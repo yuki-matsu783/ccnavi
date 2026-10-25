@@ -600,14 +600,15 @@ def _git_env():
     return {k: v for k, v in os.environ.items() if k not in drop}
 
 
-def _git(args, cwd, input=None):
+def _git(args, cwd, input=None, env=None):
+    """env は、この git にだけ足す環境（docker-gitlab のトークン）。"""
     return subprocess.run(
         ["git", *args],
         cwd=cwd,
         capture_output=True,
         text=True,
         timeout=120,
-        env=_git_env(),
+        env={**_git_env(), **(env or {})},
         input=input,
         stdin=subprocess.DEVNULL if input is None else None,
     )
@@ -702,10 +703,10 @@ def _first_line(text):
     return lines[0] if lines else ""
 
 
-def _target_git(root, top, args, level="info"):
+def _target_git(root, top, args, level="info", env=None):
     """対象で git を実行する（cwd は判定を通した toplevel）。コマンドと結果を診断ログに残す。
     level は、reset のように何度も呼ぶときだけ debug にする（ループの中で INFO を書かない）。"""
-    r = _git(args, cwd=top)
+    r = _git(args, cwd=top, env=env)
     getattr(_log(root), level)(
         "対象の git を実行した",
         cmd=shlex.join(["git", *args]),
@@ -723,12 +724,13 @@ def run_setup_git(root, target, commands, allowed=None, host=None):
     top = require_disposable_repo(root, target, allowed)
     before = repo_snapshot(root)
     via = hostenv.git_via(host) if host else []
+    env = hostenv.git_env(host) if host else None
     for argv in commands:
         try:
             check_git_argv(argv)
         except ValueError as exc:
             raise Refusal(f"setup.git を実行しない: {exc}", "シナリオの setup.git を直す") from None
-        r = _target_git(root, top, [*via, *argv[1:]])
+        r = _target_git(root, top, [*via, *argv[1:]], env=env)
         if r.returncode != 0:
             raise Refusal(
                 f"setup.git が失敗した: {shlex.join(argv)}（終了コード {r.returncode}）",
@@ -976,6 +978,16 @@ def check_before_run(scn, root, top):
             "base を、対象にあるコミットの 40 桁の SHA に直して打ち直す",
             "対象には何もしていない",
         )
+    if scenario_host(scn) == hostenv.DOCKER:
+        try:
+            hostenv.check_docker_gitlab()
+        except (RuntimeError, OSError) as exc:
+            raise Refusal(
+                f"docker-gitlab の GitLab を使えない: {exc}",
+                "`uv run python tests/manual/gitlab/docker_gitlab.py up` で立て"
+                "（動いていれば `status` で確かめる。docs/42_claude/gitlab-manual.md）、打ち直す",
+                "対象にも GitLab にも何もしていない",
+            ) from None
 
 
 def setup_clashes(scn, root):
@@ -987,16 +999,19 @@ def setup_clashes(scn, root):
 
 
 def scenario_host(scn):
-    """setup.host の値（bare / fake-gitlab / real）。欄が無ければ real。"""
+    """setup.host の値（bare / fake-gitlab / docker-gitlab / real）。欄が無ければ real。"""
     return (scn.get("setup") or {}).get("host", hostenv.DEFAULT_HOST)
 
 
 def uses_target(scn):
-    """使い捨てのリポジトリを触る setup（git・reset・追記・bare / fake-gitlab の相手）があるか。"""
+    """使い捨てのリポジトリを触る setup（git・reset・追記・代役を使う相手）があるか。"""
     setup = scn.get("setup") or {}
     appends = any(file_spec(v)[1] for v in (setup.get("files") or {}).values())
     return bool(
-        setup.get("git") or setup.get("reset") or appends or hostenv.is_fake(scenario_host(scn))
+        setup.get("git")
+        or setup.get("reset")
+        or appends
+        or hostenv.uses_stub_git(scenario_host(scn))
     )
 
 
@@ -1139,23 +1154,26 @@ def fill_issue(text, number):
 
 
 def _host_env(st):
-    """claude に渡す環境。setup.host が bare / fake-gitlab のときだけ作る（real は None）。"""
+    """claude に渡す環境。setup.host が real 以外のときだけ作る（real は None）。"""
     host = st.get("host")
     return hostenv.step_env(host) if host and not host.get("down") else None
 
 
 def _teardown_host(st, root):
-    """模擬を止め、代役の置き場を消す（何度呼んでもよい）。"""
+    """模擬を止め、代役の置き場を消す（何度呼んでもよい）。docker-gitlab のプロジェクトを
+    消せなかったとき（手作業が要る）は True。"""
     if st.get("host"):
-        hostenv.teardown(root, st["host"], _git)
+        return bool(hostenv.teardown(root, st["host"], _git))
+    return False
 
 
 def _start_host(scn, st, out, root, top):
-    """setup.host が bare / fake-gitlab なら、相手を用意して state に残す。"""
-    if not hostenv.is_fake(scenario_host(scn)):
+    """setup.host が bare / fake-gitlab / docker-gitlab なら、相手を用意して state に残す。"""
+    if not hostenv.uses_stub_git(scenario_host(scn)):
         return
     try:
-        st["host"] = hostenv.prepare(root, top, scn["setup"], _git)
+        # prepare が途中で失敗すると辞書は返らない。作ったものは prepare 自身が消す
+        st["host"] = hostenv.prepare(root, top, scn["setup"], _git, scn["id"])
     except RuntimeError as exc:
         raise Refusal(
             f"setup.host の相手を用意できなかった: {exc}",
@@ -1254,6 +1272,8 @@ HOST_NOTES = {
     "real": "real: 本物の GitHub / GitLab を相手にした",
     "bare": "bare: ローカルの bare を origin にした。ホストの API は失敗（確かめられなかった）",
     "fake-gitlab": "fake-gitlab: ローカルの bare と fake_gitlab.py を相手にした",
+    "docker-gitlab": "docker-gitlab: Docker の本物の GitLab CE を相手にした。"
+    "gh / glab は使えず curl で呼ぶ。CE にない機能（変更要求など）は確かめられない",
 }
 FAKE_NOTE = "。模擬は本物と同じ形を返す保証が無く、模擬のずれで見逃した問題がありうる"
 
@@ -1277,22 +1297,37 @@ def finish(scn, out, st, root):
         # ccnavi 本体に、ブランチ・コミット・ワークツリーが残っていないかを実際の状態で確かめる
         v, why = repo_result(st.get("pre_repo"), repo_snapshot(root))
         results.append(("repo", "ccnavi 本体の HEAD・ブランチ・ワークツリー", v, why))
-        results.append(("host", "setup.host", PASS, host_note(scenario_host(scn))))
+        note = host_note(scenario_host(scn))
+        if (st.get("host") or {}).get("version"):
+            note = note.replace(
+                "docker-gitlab:", f"docker-gitlab（GitLab {st['host']['version']}）:", 1
+            )
+        results.append(("host", "setup.host", PASS, note))
     finally:
         _cleanup(st["setup_made"], st.get("setup_dirs", []), root)
         st["setup_made"] = []  # restore が、あとから同じパスに作られたファイルを消さないように
         issue = (scn.get("setup") or {}).get("issue")
         if issue and issue.get("close") and st.get("issue_no"):
             close_issue(issue, st["issue_no"], root)
-        _teardown_host(st, root)
+        undeleted = _teardown_host(st, root)
         not_restored = release_target(st, root)
         _write_state(out, st)
     if not_restored:
         results.append(("reset", st["target"]["path"], FAIL, "base に戻せなかった。手作業が要る"))
+    if undeleted:
+        host = st["host"]
+        results.append(
+            (
+                "host-delete",
+                host["url"],
+                FAIL,
+                f"プロジェクト（ID {host['project_id']}）を消せなかった。手作業で消す",
+            )
+        )
     write_report(scn, out, st, results, rows, raw)
     final = overall(results)
     print(f"\n結果: {final}（レポート: {out}/report.md）")
-    if not_restored:
+    if not_restored or undeleted:
         return 3  # レポートは書いた。次の回を始めさせない
     return {PASS: 0, FAIL: 1, INCONCLUSIVE: 2, REVIEW: 2}[final]
 
@@ -2012,6 +2047,14 @@ def scenario_summary(scn):
             "（`claude -p` 自身の API 通信は要る）。本物のトークンは claude に渡さない。"
             "origin への通信は一時ディレクトリの bare へ向き、回したあとに消す" + FAKE_NOTE
         )
+    if host == hostenv.DOCKER:
+        lines.append(
+            "相手（setup.host）: docker-gitlab。Docker の GitLab（127.0.0.1）に"
+            "使い捨てのプロジェクトを作り（名前は sc-<シナリオ ID>-…）、"
+            "人間役をメンバーに加えて main を push する。"
+            "回したあとにプロジェクトを削除する（人間の操作で止めた回は残す）。"
+            "エージェント役のトークンは claude に渡し、人間役のトークンは渡さない"
+        )
     issue = (scn.get("setup") or {}).get("issue")
     if issue:
         close = "（回したあとに閉じる）" if issue.get("close") else "（閉じない）"
@@ -2314,6 +2357,11 @@ def _continue(scn, out, st, root):
         # 模擬は止める。置き場（bare・代役・模擬の状態）は、next が同じ環境で続けるので残す
         hostenv.hold(root, st["host"])
         _write_state(out, st)
+        if st["host"].get("project_id"):
+            print(
+                f"案内: docker-gitlab のプロジェクトを残している: {st['host']['url']}"
+                f"（ID {st['host']['project_id']}）。next が最後まで終わるか restore で消える"
+            )
     if rc == 10 and st.get("target"):
         # 人間が操作したあとの next で続くので、対象は base に戻さず残す（ロックだけ放す）
         release_target(st, root, hold=True)
@@ -2338,10 +2386,10 @@ def cmd_next(args):
     if st.get("halt"):
         # halt は finish で戻してある。届かなかった場合に備え、戻し直す（戻し済みなら何もしない）
         print(f"step {st['halt']['step']} で止めた回。続きは回せない")
-        _teardown_host(st, st["root"])
+        undeleted = _teardown_host(st, st["root"])
         failed = release_target(st, st["root"])
         _write_state(out, st)
-        return 3 if failed else 2
+        return 3 if failed or undeleted else 2
     # 人間の操作の間にモードが変わることがあるので、続けるたびに確かめる
     mode_ok, mode_text = mode_check(Path(st["root"]))
     if not mode_ok:
@@ -2379,10 +2427,10 @@ def cmd_restore(args):
     issue = (scn.get("setup") or {}).get("issue")
     if issue and issue.get("close") and st.get("issue_no"):
         close_issue(issue, st["issue_no"], st["root"])
-    _teardown_host(st, st["root"])
+    undeleted = _teardown_host(st, st["root"])
     failed = release_target(st, st["root"])
     _write_state(out, st)
-    if failed:
+    if failed or undeleted:
         return 3
     print(f"{out} の回を片付けた（setup のファイルを消し、対象を戻して放した）")
     return 0

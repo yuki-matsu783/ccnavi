@@ -3,7 +3,7 @@ title: 受入シナリオを claude -p で回す
 type: guide
 description: projects/test-repo などを使い、エージェントの振る舞いを claude -p で回してログで確かめるシナリオの書き方と回し方（run-all での 1 回の確認による続けて回す方法を含む）
 tags: [test, scenario]
-keywords: [受入シナリオ, run-all, 続けて回す, 確認の目印, 費用の累計, 評価の相手, host_state, host_stub, hostenv, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, tests/scenarios, test-repo, setup.git, setup.reset, setup.host, bare, fake-gitlab, fake_gitlab, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い]
+keywords: [受入シナリオ, run-all, 続けて回す, 確認の目印, 費用の累計, 評価の相手, host_state, host_stub, hostenv, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, tests/scenarios, test-repo, setup.git, setup.reset, setup.host, bare, fake-gitlab, docker-gitlab, fake_gitlab, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い]
 ---
 
 # 受入シナリオを claude -p で回す
@@ -51,7 +51,7 @@ setup:
     - [git, switch, -c, feature-x]
   reset:                         # 回す前と回したあとに、対象を戻す（追記を使うときは必須）
     base: "<コミットの 40 桁の SHA>"
-  host: bare                     # 評価の相手。bare / fake-gitlab / real（既定は real）
+  host: bare                     # 評価の相手。bare / fake-gitlab / docker-gitlab / real（既定は real）
 steps:
   - prompt: "ワークツリーは切らずに README.md を Edit ツールで直接編集して。拒否されたら迂回しないで"
     resume: false                # true なら直前のセッションを --resume でつなぐ
@@ -116,7 +116,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
    - `projects/test-repo` を使うシナリオは、統合先が origin と合っていて、前の回のワークツリーとブランチが残っていない
    - `setup.reset` があれば、先に対象を `base` へ戻す。`setup.files` があれば、先に作る（作る形は回したあとに消す）。追記と `setup.git` は、そのあとに行う（「使い捨てのリポジトリの事前状態と後片付け」）
    - `setup.issue` があれば、`repo` の origin に合わせて issue を作る（GitLab は glab、GitHub は gh。実行器が見分ける）
-   - `setup.host` が `bare` / `fake-gitlab` なら、対象を戻したあとに相手を用意する（「評価の相手」）
+   - `setup.host` が `bare` / `fake-gitlab` / `docker-gitlab` なら、対象を戻したあとに相手を用意する（「評価の相手」）
 3. **実行器で回す。** 人間の確認が取れたあとだけ、`--confirmed` を付ける。
 
    ```sh
@@ -191,7 +191,7 @@ ccnavi 本体に作用しうるシナリオ（`setup` が使い捨てのリポ�
 
 ### 対象の判定
 
-`setup.git`・`setup.reset`・`setup.files` の追記・`setup.host` の `bare` / `fake-gitlab` は、すべて `require_disposable_repo(root, target, allowed)` を通る。`test_repo: true` の自己申告は判定に使わない。
+`setup.git`・`setup.reset`・`setup.files` の追記・`setup.host` の `bare` / `fake-gitlab` / `docker-gitlab` は、すべて `require_disposable_repo(root, target, allowed)` を通る。`test_repo: true` の自己申告は判定に使わない。
 
 - 比べるのは、`target` の `git rev-parse --show-toplevel` の実体（realpath）と、`allowed`（既定は `projects/test-repo`）の実体。`pathcase.fold` を通して比べる。違えば断る
 - ワークスペースルート（ccnavi 本体）が対象のとき、対象が本体のリンクされたワークツリーのとき（`git rev-parse --git-common-dir` が同じ）、対象の origin が本体の origin と同じとき（`.git` の有無・末尾の `/`・大文字小文字は無視）も断る。どちらかに origin が無いときは origin を比べず、toplevel の比較だけで決める
@@ -254,25 +254,36 @@ setup:
 
 ### 評価の相手（`setup.host`）
 
-評価の目的ごとに、origin の向き先を 3 段階から選ぶ。`setup.git` とは別に、`claude` に渡す PATH と環境変数を変える。
+評価の目的ごとに、origin の向き先を 4 段階から選ぶ。`setup.git` とは別に、`claude` に渡す PATH と環境変数を変える。
 
 | 値 | 相手 | 使う場面 |
 |---|---|---|
 | `bare` | 一時ディレクトリの bare。ホストの API は失敗（「確かめられなかった」） | 直接作業・integrate・レビューなしのチケット作業（毎回） |
 | `fake-gitlab` | bare と `tests/fake_gitlab.py` | レビュー（MR・スレッド・依頼・解決）を含むチケット作業（毎回） |
+| `docker-gitlab` | Docker の本物の GitLab CE に作る使い捨てのプロジェクト | 模擬のずれを避けたい通し確認。応答が本物と同じ形になり、ホストを汚さない（下の節） |
 | `real` | 本物の GitHub / GitLab（`projects/test-repo`）。欄が無いときも同じで、挙動は変わらない | リリース前などの通し確認だけ。本物でしか出ない不具合（例: GraphQL が 403）を拾う |
 
-- `bare` / `fake-gitlab` は、`setup.git` と同じ `require_disposable_repo` を通ったときだけ動く（ccnavi 本体は断る。終了コード 3）。対象に origin が無いときも断る
+- `bare` / `fake-gitlab` / `docker-gitlab` は、`setup.git` と同じ `require_disposable_repo` を通ったときだけ動く（ccnavi 本体は断る。終了コード 3）。対象に origin が無いときも断る
 - `setup.issue` とは併用できない（読み込みの時点で ValueError）。runner の `gh` / `glab` は代役を通さずに動き、本物のホストに出るため。`fake-gitlab` で issue が要るときは、`setup.host_state`（`project: <namespace>/<project>` を含む dict。足りない欄は `seq`・`issues`・`mrs` の空の初期値）に書く
-- 用意するものは、対象の `refs/remotes/origin/*`（無ければローカルのブランチ）から作る bare、PATH の先頭の代役（`git`・`gh`・`glab`、`bare` だけ `curl`）、`fake-gitlab` では模擬。置き場は一時ディレクトリ（`ccnavi-host-*`）。`.git/config` は書き換えない
-- `git` の代役は、`remote get-url origin` に、ホストの形の URL（`bare` は `https://gitlab.com/acme/widgets.git`、`fake-gitlab` は `http://127.0.0.1:<port>/<project>.git`）で答える。答えるのは、対象のリポジトリ（そのワークツリーを含む。共通の `.git` で比べる）だけで、ccnavi 本体には本物の答えを返す。本物へ渡すときは `-c url.<bare>.insteadOf=<本物の origin>` を足すので、fetch・push・ls-remote は bare に届く。`ccnavi-git.sh` は `git` を PATH から呼ぶので、代役が効く
-- `claude` の環境は、親の環境を継承し、`GITHUB_TOKEN`・`GH_TOKEN`・`GITLAB_TOKEN`・`CCNAVI_PROBE_REVIEWER_TOKEN` など `GH_`・`GITHUB_`・`GLAB_`・`GITLAB_`・`CCNAVI_PROBE_` で始まる `*TOKEN` だけを除く。`fake-gitlab` は `GITLAB_TOKEN` に模擬のトークンを置く。許可リストにしない（HOME・認証・プロキシ・CA が落ちて `claude` が起動しなくなる）。`real` は環境を渡さない（今までどおり継承）
+- 用意するものは、対象の `refs/remotes/origin/*`（無ければローカルのブランチ）から作る bare（`docker-gitlab` は作らず、GitLab のプロジェクトを使う）、PATH の先頭の代役（`git`・`gh`・`glab`、`bare` だけ `curl`）、`fake-gitlab` では模擬。置き場は一時ディレクトリ（`ccnavi-host-*`）。`.git/config` は書き換えない
+- `git` の代役は、`remote get-url origin` に、ホストの形の URL（`bare` は `https://gitlab.com/acme/widgets.git`、`fake-gitlab` は `http://127.0.0.1:<port>/<project>.git`、`docker-gitlab` は `http://127.0.0.1:8929/root/<プロジェクト>.git`）で答える。答えるのは、対象のリポジトリ（そのワークツリーを含む。共通の `.git` で比べる）だけで、ccnavi 本体には本物の答えを返す。本物へ渡すときは `-c url.<bare>.insteadOf=<本物の origin>` を足すので、fetch・push・ls-remote は bare に届く。`ccnavi-git.sh` は `git` を PATH から呼ぶので、代役が効く
+- `claude` の環境は、親の環境を継承し、`GITHUB_TOKEN`・`GH_TOKEN`・`GITLAB_TOKEN`・`CCNAVI_PROBE_REVIEWER_TOKEN` など `GH_`・`GITHUB_`・`GLAB_`・`GITLAB_`・`CCNAVI_PROBE_` で始まる `*TOKEN` だけを除く。`fake-gitlab` は `GITLAB_TOKEN` に模擬のトークンを、`docker-gitlab` はエージェント役のトークンを置く。許可リストにしない（HOME・認証・プロキシ・CA が落ちて `claude` が起動しなくなる）。`real` は環境を渡さない（今までどおり継承）
 - ホスト（GitHub / GitLab）へは出ない。`claude -p` 自身の API 通信は要る
 - 確かめたのは、`claude -p` の Bash ツールと hook（SessionStart・PreToolUse）のシェルに、PATH の代役と `FAKE_*` が届くところまで
 
+**`docker-gitlab`。** 動いている Docker の GitLab（`tests/manual/gitlab/docker_gitlab.py`。立て方と既知の制約は [gitlab-manual.md](gitlab-manual.md)）に、回すたびに使い捨てのプロジェクトを作り、回したあとに消す。
+
+- 起動: 回す前に `docker_gitlab.py status` で動いているかを見る。止まっていれば `up`（他の回が使っているかもしれないので、`down`・`up --rotate` は打たない）。止まっているシナリオは、`run` が `次:` で `up` を案内して止まる（終了コード 3）。`run-all` は、そのシナリオだけを飛ばし、ほかの相手のシナリオは回す
+- 作るもの: プロジェクト `sc-<シナリオ ID を fold した綴り>-<時刻>-<乱数>`（root の名前空間、`main` が既定のブランチ）。人間役 `ccnavi-reviewer` を Developer のメンバーに加え、対象の `main` を push する。push するのは `main` だけで、ほかのブランチ・タグが要るシナリオは対象外
+- origin: `bare` と同じ git の代役で、`-c url.<プロジェクトの URL>.insteadOf=<本物の origin>` を足す。加えて `credential.http://127.0.0.1:<port>.helper` を、空で打ち消してから、環境変数 `GITLAB_TOKEN` を返す helper にする（利用者の credential helper に root の PAT を渡さない。URL は `127.0.0.1` にそろえる）。runner 自身の git（初回の push と `setup.git`）にも同じ `-c` を足し、`GITLAB_TOKEN` はその git にだけ渡す。`curl` は本物（代役を置かない）、`gh`・`glab` は失敗する代役
+- 後片付け: `bare` と同じ経路でプロジェクトを削除する。GitLab 19 は遅延削除で、`DELETE /projects/:id`（202）のあとも GET が 200（`marked_for_deletion_on` 付き）のまま、パスが `…-deletion_scheduled-<id>` に変わる。そこで、印が付いたら `permanently_remove=true&full_path=<改名後のパス>` で 2 回目を打ち、404 になるまで最大 60 秒待つ。消せなかったときは `案内:` にプロジェクトの URL と ID を出し、`report` に `host-delete` の行（fail）を足して終了コード 3（手作業で消す）。終了コード 10 では残し、ID と URL を出す。`next` が最後まで終わるか `restore` で消える
+- 残ったプロジェクトは、接頭辞 `sc-` で一覧して手で消す。掃除の道具は無いので、GitLab の「プロジェクト」画面で `sc-` を検索する
+- 資格情報: `claude` にはエージェント役 `GITLAB_TOKEN`（root の PAT）を渡し、人間役のトークンは渡さない。トークンは回すたびに `tokens.env` から読み、`state.json` には識別子と URL だけを残す。ccnavi が書く記録（`state.json`・`evidence.md`・`messages.md`・`report.*`・診断ログ）には出さない。`step-N.jsonl` は `claude` の出力そのもので、エージェントが `tokens.env` を読めば混ざる
+- 限界: 同じ uid のエージェントは `tokens.env` を読め、root の PAT で管理者 API から人間役のトークンを作れる。人間役の独立は保証しない（確かめたいのは ccnavi の振る舞いで、人間役の偽装ではない）。CE に無い機能（変更要求の `request_changes` は 404）は確かめられない。`human` step から人間役の API を呼ぶ仕組みは無い（人間役の操作は、操作者が `tokens.env` を読んで `gitlab_api.Client` を呼び、`next` で続ける）。`setup.issue` とは併用できない（`make_issue` は本物の `projects/test-repo` に立てるため）
+
 **`bare` で許す依頼。** `gh` / `glab` が失敗するので、エージェントが issue や MR を作る依頼は通らない。`bare` を選べるのは、依頼がホストの API を要しないシナリオだけ。`judge` に「`gh` が使えない状況で詰まったのは ccnavi の不具合ではない」を書く。MR・スレッドを読む依頼は `fake-gitlab` にする。
 
-**模擬のずれ。** `bare` / `fake-gitlab` の模擬は、本物と同じ形を返す保証が無い（契約テストは別）。`report.md` の「相手（setup.host）」と `report.json` の `host` の行に、どの相手で回したかと「模擬のずれで見逃した問題がありうる」を出す。
+**模擬のずれ。** `bare` / `fake-gitlab` の模擬は、本物と同じ形を返す保証が無い（契約テストは別）。`report.md` の「相手（setup.host）」と `report.json` の `host` の行に、どの相手で回したかと「模擬のずれで見逃した問題がありうる」を出す（`docker-gitlab` は本物の GitLab なのでこの文は付けず、版 `GitLab 19.x` を出す）。
 
 **後片付け。** 模擬の停止、一時ディレクトリの削除、回している間に動いた対象の `refs/remotes/origin/*` の巻き戻しは、`setup.reset` の戻しと同じ経路で行う（`finish` の `finally`・`_continue` の `BaseException`・`restore`・失敗の停止）。人間の操作の step（終了コード 10）では、模擬は止め、置き場（bare・代役・模擬の状態）は残す。`next` は、同じ置き場で模擬を、残した状態ファイルのまま起こし直す（初期状態で上書きしない）。ポートは同じものを取り直し、取れなければ OS に決めさせて `案内:` を出す（前の step の記録に古いポートの URL が残りうる）。
 

@@ -70,6 +70,14 @@ case " $* " in
 esac
 PATH="$real_path"
 if [ -n "${FAKE_BARE:-}" ] && [ -n "${FAKE_REAL_ORIGIN:-}" ]; then
+  if [ -n "${FAKE_CRED_URL:-}" ]; then
+    # 利用者の credential helper（GCM・osxkeychain）に PAT が渡らないよう、先に空で打ち消す。
+    # helper は環境変数 GITLAB_TOKEN を読む（値を引数に入れない）
+    helper='!f() { echo username=root; echo "password=$GITLAB_TOKEN"; }; f'
+    GIT_TERMINAL_PROMPT=0 exec git -c "url.${FAKE_BARE}.insteadOf=${FAKE_REAL_ORIGIN}" \\
+      -c "credential.${FAKE_CRED_URL}.helper=" \\
+      -c "credential.${FAKE_CRED_URL}.helper=$helper" "$@"
+  fi
   exec git -c "url.${FAKE_BARE}.insteadOf=${FAKE_REAL_ORIGIN}" "$@"
 fi
 exec git "$@"
@@ -150,11 +158,14 @@ def env(
     target_common=None,
     bare=None,
     real_origin=None,
+    cred_url=None,
 ):
     """ホストの代役を効かせる環境変数。渡された PATH の先頭に代役の置き場を足す。
 
     target_common・bare・real_origin は、git の代役を対象のリポジトリだけに効かせ、
-    本物の origin への通信を bare へ向ける（上の git の代役の説明を参照）。"""
+    本物の origin への通信を bare へ向ける（上の git の代役の説明を参照）。
+    cred_url（`http://127.0.0.1:8929`）は、その URL だけに環境変数 GITLAB_TOKEN を返す
+    credential helper を足す（Docker の GitLab 用）。"""
     out = {
         "PATH": os.pathsep.join(
             [bin_dir, path if path is not None else os.environ.get("PATH", "")]
@@ -170,4 +181,6 @@ def env(
     if bare and real_origin:
         out["FAKE_BARE"] = bare
         out["FAKE_REAL_ORIGIN"] = real_origin
+    if cred_url:
+        out["FAKE_CRED_URL"] = cred_url
     return out

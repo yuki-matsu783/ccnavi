@@ -2924,7 +2924,7 @@ class LifecycleTest(unittest.TestCase):
             self.assertIn("対象のリポジトリを使えない", body)
 
 
-# ---- setup.host（評価の相手: bare / fake-gitlab / real） ----
+# ---- setup.host（評価の相手: bare / fake-gitlab / docker-gitlab / real） ----
 
 # 別のグループ（tests/sh）の部品は import できないので、読むのに要るぶんだけここに持つ
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
@@ -3572,6 +3572,240 @@ class HostLifecycleTest(unittest.TestCase):
         self.assertIn("本物のトークンは claude に渡さない", text)
         scn["setup"] = {}
         self.assertNotIn("setup.host", runner.scenario_summary(scn))
+
+
+# ---- setup.host: docker-gitlab（Docker 不要。GitLab の API は偽の Client で受ける） ----
+
+ROOT_PAT = "glpat-root-agent-secret"
+REVIEWER_TOKEN = "glpat-human-reviewer-secret"
+BASE = "http://127.0.0.1:8929"
+
+
+class FakeClient:
+    """DELETE を遅延削除（1 回目は印を付けるだけ）で受ける。fail=True なら消えない。"""
+
+    def __init__(self, fail=False, version=200):
+        self.fail, self.version_status = fail, version
+        self.calls = []
+        self.marked = False
+        self.gone = False
+
+    def version(self, token):
+        return self.version_status, {"version": "19.4.1"}
+
+    def delete_project(self, token, pid):
+        return self.call("DELETE", f"/projects/{pid}", token)
+
+    def call(self, method, path, token, payload=None, tag=""):
+        self.calls.append((method, path))
+        assert token == ROOT_PAT
+        if method == "DELETE":
+            if "permanently_remove=true" in path and not self.fail:
+                self.gone = True
+            elif not self.marked:
+                self.marked = True
+            return 202, {"message": "202 Accepted"}
+        if self.gone:
+            return 404, {}
+        body = {"path_with_namespace": "root/sc-x-deletion_scheduled-7"}
+        if self.marked:
+            body["marked_for_deletion_on"] = "2026-10-26"
+        return 200, body
+
+    def deletes(self):
+        return [c for c in self.calls if c[0] == "DELETE"]
+
+
+def fake_project(client):
+    """_make_docker_project の代わり。識別子を記録し、通信先をローカルの bare にする。"""
+
+    def make(root, host, top, scenario_id, git):
+        host["version"] = "19.4.1"
+        host.update(project_id=7, project="root/sc-x", base=BASE, url=f"{BASE}/root/sc-x")
+        host["bare"] = os.path.join(host["dir"], "origin.git")
+        hostenv._make_bare(top, host["bare"], git)
+
+    return make
+
+
+class DockerHostBase(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.client = FakeClient()
+        values = {"GITLAB_TOKEN": ROOT_PAT, "CCNAVI_PROBE_REVIEWER_TOKEN": REVIEWER_TOKEN}
+        for patcher in (
+            mock.patch.object(hostenv, "_connect", lambda: (self.client, ROOT_PAT, BASE, values)),
+            mock.patch.object(hostenv, "_sleep", lambda s: None),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+
+class FieldAndNameTest(DockerHostBase):
+    def load(self, setup):
+        with tempfile.TemporaryDirectory() as d:
+            return runner.load_scenario(write_scenario(d, setup))
+
+    def test_host_is_valid_and_is_not_a_fake(self):
+        scn = self.load({"host": "docker-gitlab"})
+        self.assertEqual(runner.scenario_host(scn), "docker-gitlab")
+        self.assertTrue(runner.uses_target(scn))
+        self.assertFalse(hostenv.is_fake("docker-gitlab"))
+        self.assertTrue(hostenv.uses_stub_git("docker-gitlab"))
+        self.assertIn("docker-gitlab", runner.HOST_NOTES)
+        self.assertNotIn("模擬のずれ", runner.host_note("docker-gitlab"))
+
+    def test_it_is_not_combined_with_issue_or_host_state(self):
+        issue = {"repo": "projects/test-repo", "title": "t"}
+        with self.assertRaises(ValueError) as cm:
+            self.load({"host": "docker-gitlab", "issue": issue})
+        self.assertIn("setup.issue", str(cm.exception))
+        with self.assertRaises(ValueError):
+            self.load({"host": "docker-gitlab", "host_state": {}})
+
+    def test_project_names_are_prefixed_folded_and_unique(self):
+        a = hostenv.project_name("UC-08")
+        b = hostenv.project_name("uc-08")
+        self.assertTrue(a.startswith("sc-uc-08-"))
+        self.assertTrue(b.startswith("sc-uc-08-"))
+        self.assertNotEqual(a, hostenv.project_name("UC-08"))
+
+
+@unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
+class DockerLifecycleTest(DockerHostBase):
+    STEP_OUT = {"cost_usd": 0.0, "session_ids": []}
+
+    def setUp(self):
+        super().setUp()
+        self.scratch = private_tempdir(self, self._tmp.name)
+        self.ws = host_workspace(self._tmp.name)
+        patcher = mock.patch.object(hostenv, "_make_docker_project", fake_project(self.client))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def scenario(self, steps=None):
+        return self.ws.scenario_file(
+            {"host": "docker-gitlab", "reset": {"base": self.ws.base}}, steps
+        )
+
+    def run_cmd(self, path, *extra):
+        args = ["run", str(path), "--confirmed", "--root", str(self.ws.root)]
+        args += ["--out", str(self.ws.out), *extra]
+        with mock.patch.object(runner, "_ENTRY", True), mock.patch("builtins.print"):
+            return runner.main(args)
+
+    def state_text(self):
+        return (self.ws.out / "state.json").read_text(encoding="utf-8")
+
+    def test_finish_deletes_the_project_and_no_token_reaches_the_records(self):
+        seen = {}
+
+        def run_step(*a, **k):
+            seen["env"] = k["env"]
+            return self.STEP_OUT
+
+        parent = {"CCNAVI_PROBE_REVIEWER_TOKEN": REVIEWER_TOKEN, "GITLAB_TOKEN": "parent-token"}
+        with (
+            mock.patch.dict(os.environ, parent),
+            mock.patch.object(runner, "run_step", side_effect=run_step),
+        ):
+            self.run_cmd(self.scenario())
+        env = seen["env"]
+        self.assertEqual(env["GITLAB_TOKEN"], ROOT_PAT)
+        self.assertNotIn(REVIEWER_TOKEN, json.dumps(env))
+        self.assertNotIn("CCNAVI_PROBE_REVIEWER_TOKEN", env)
+        self.assertEqual(env["FAKE_CRED_URL"], BASE)
+        self.assertTrue(self.client.gone)
+        self.assertEqual(len(self.client.deletes()), 2)  # 遅延削除なので 2 回目で確定する
+        for path in self.ws.out.iterdir():
+            if path.name.startswith("step-"):
+                continue
+            text = path.read_text(encoding="utf-8")
+            self.assertNotIn(ROOT_PAT, text, path.name)
+            self.assertNotIn(REVIEWER_TOKEN, text, path.name)
+        report = (self.ws.out / "report.md").read_text(encoding="utf-8")
+        self.assertIn("docker-gitlab", report)
+        self.assertIn("GitLab 19.4.1", report)
+
+    def test_a_delete_failure_is_exit_3_and_names_the_project(self):
+        self.client.fail = True
+        with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT):
+            rc = self.run_cmd(self.scenario())
+        self.assertEqual(rc, 3)
+        rows = json.loads((self.ws.out / "report.json").read_text(encoding="utf-8"))
+        row = next(r for r in rows if r["kind"] == "host-delete")
+        self.assertIn(f"{BASE}/root/sc-x", row["expect"])
+        self.assertEqual(row["verdict"], "fail")
+
+    def test_interrupt_and_setup_failure_delete_the_project(self):
+        with (
+            mock.patch.object(runner, "run_step", side_effect=KeyboardInterrupt),
+            self.assertRaises(KeyboardInterrupt),
+        ):
+            self.run_cmd(self.scenario())
+        self.assertTrue(self.client.gone)
+        self.client.gone = self.client.marked = False
+        with (
+            mock.patch.object(runner, "_setup", side_effect=RuntimeError("壊れた")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.run_cmd(self.scenario())
+        self.assertTrue(self.client.gone)
+
+    def test_a_human_step_keeps_the_project_until_restore(self):
+        steps = [{"prompt": "a"}, {"human": True, "instruction": "i", "check": "c"}]
+        with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT):
+            rc = self.run_cmd(self.scenario(steps))
+        self.assertEqual(rc, 10)
+        self.assertEqual(self.client.deletes(), [])
+        self.assertNotIn(ROOT_PAT, self.state_text())
+        with mock.patch("builtins.print"):
+            self.assertEqual(runner.main(["restore", str(self.ws.out)]), 0)
+        self.assertTrue(self.client.gone)
+
+    def test_restore_reports_a_delete_failure(self):
+        steps = [{"prompt": "a"}, {"human": True, "instruction": "i", "check": "c"}]
+        with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT):
+            self.run_cmd(self.scenario(steps))
+        self.client.fail = True
+        with mock.patch("builtins.print"):
+            self.assertEqual(runner.main(["restore", str(self.ws.out)]), 3)
+
+    def test_a_stopped_docker_refuses_only_that_scenario(self):
+        self.client.version_status = 0
+        root, top = self.ws.root, self.ws.target
+        docker = runner.load_scenario(self.scenario())
+        bare = runner.load_scenario(
+            self.ws.scenario_file({"host": "bare", "reset": {"base": self.ws.base}}, None)
+        )
+        with self.assertRaises(runner.Refusal) as cm:
+            runner.check_before_run(docker, root, top)
+        self.assertIn("docker_gitlab.py", str(cm.exception))
+        self.assertIn("次:", str(cm.exception))
+        runner.check_before_run(bare, root, top)
+
+
+@unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
+class DockerGitTest(DockerHostBase):
+    def test_git_via_resets_the_helper_before_setting_it(self):
+        host = {
+            "kind": "docker-gitlab",
+            "bare": f"{BASE}/root/p.git",
+            "real_origin": "o",
+            "base": BASE,
+        }
+        via = hostenv.git_via(host)
+        key = f"credential.{BASE}.helper"
+        self.assertEqual(via.count(f"{key}="), 1)
+        self.assertLess(via.index(f"{key}="), via.index(f"{key}={hostenv.CRED_HELPER}"))
+        self.assertNotIn(ROOT_PAT, " ".join(via))
+        env = hostenv.git_env(host)
+        self.assertEqual(env, {"GITLAB_TOKEN": ROOT_PAT, "GIT_TERMINAL_PROMPT": "0"})
+        self.assertEqual(hostenv.git_env({"kind": "bare"}), {})
+
+    def test_the_stub_git_carries_the_scoped_helper(self):
+        self.assertIn("credential.${FAKE_CRED_URL}.helper=", Path(host_stub.__file__).read_text())
 
 
 if __name__ == "__main__":
