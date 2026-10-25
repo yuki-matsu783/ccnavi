@@ -236,6 +236,8 @@ function groupsFor(wanted, map) {
     for (const [group, files] of map) {
       if (files.has(screen.helper)) groups.add(group);
     }
+    // 開発用の画面確認ツール（devtools）はボードを実際に描くので、ボードの画面を直したら回す
+    if (screen.name === "board" && map.has("devtools")) groups.add("devtools");
     // 画面と同じ名前のグループは、テストの入口のパスが約束と違っても必ず回す。
     // ここが無いと、画面を足して `test/helpers/<名前>.ts` を作り忘れたときに、
     // その画面のテストだけが気づかないうちに回らなくなる
@@ -295,6 +297,13 @@ function callFor(rel, map) {
   }
 
   const all = [...map.keys()];
+
+  // 開発用の画面確認ツール。ツール自身は `require` で読まれ import では辿れないので、名前で決める。
+  // ツールが読む `src/` 側は、E2E（`test/devtools/render-board.e2e.ts`）の import で閉包に入る。
+  // `scripts/` の他のファイル（組み立てとテストの入口）は下の規則（全グループ）に任せる。
+  if (rel === "scripts/render-board.js" || rel.startsWith("scripts/lib/")) {
+    return { groups: map.has("devtools") ? ["devtools"] : all, compile: true, webview: false };
+  }
 
   // 組み立ての土台。どのグループの結果も変わりうる。
   if (
@@ -397,6 +406,25 @@ function testFiles(groups, domOnly) {
   return files;
 }
 
+/**
+ * `test/<グループ>/*.e2e.ts`（コンパイルすると `out/test/<グループ>/*.e2e.js`）は、`node --test` には渡さず、別に起こす。
+ * E2E は実機のブラウザを使う。環境が無いときにスキップして成功に数えないよう、終了コードをそのまま受ける
+ * （0 通った / 1 失敗 / 3 環境が揃っていない）。1 つでも 1 なら 1、そうでなく 3 があれば 3。
+ */
+function runE2e(groups) {
+  let code = 0;
+  for (const group of groups) {
+    const dir = path.join(ROOT, "out", "test", group);
+    if (!fs.existsSync(dir)) continue;
+    for (const full of filesUnder(dir, (name) => name.endsWith(".e2e.js"))) {
+      const result = run(process.execPath, [path.relative(ROOT, full)]);
+      if (result === 1 || (result !== 0 && code !== 1 && result !== NOT_READY)) code = 1;
+      else if (result === NOT_READY && code === 0) code = NOT_READY;
+    }
+  }
+  return code;
+}
+
 function main(argv) {
   const domOnly = argv.includes("--dom");
   const planOnly = argv.includes("--plan");
@@ -469,7 +497,9 @@ function main(argv) {
   // 既定で TAP を出し、そこでは `not ok` が失敗したファイルの位置に出る。ターンの終わりの
   // hook がモデルへ渡せるのは末尾 40 行だけなので、TAP だと「失敗した」とだけ伝わって
   // 何が失敗したかが入らない。
-  return run(process.execPath, ["--test", "--test-reporter=spec", ...files]);
+  const tested = run(process.execPath, ["--test", "--test-reporter=spec", ...files]);
+  if (tested !== 0 || domOnly) return tested;
+  return runE2e(plan.groups);
 }
 
 process.exit(main(process.argv.slice(2)));

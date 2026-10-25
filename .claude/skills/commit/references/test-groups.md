@@ -82,7 +82,7 @@ Python のテスト（`tests/core/test_test_json.py`・`tests/guard/test_suggest
 
 ## 拡張（`extensions/vscode/ccnavi-board`）のグループ
 
-拡張側にも同じ分け方がある（`test/<グループ>/`。board / rules / risk / phases / projects / flow / workflow / templates / handoff / shared）。
+拡張側にも同じ分け方がある（`test/<グループ>/`。board / rules / risk / phases / projects / flow / workflow / templates / handoff / shared / devtools）。
 こちらは表を引かない。変えたファイルを渡せば、関わるグループだけが回る。
 
 ```sh
