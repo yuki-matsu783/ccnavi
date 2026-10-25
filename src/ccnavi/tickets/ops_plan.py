@@ -30,7 +30,7 @@ def plan_missing(stderr: TextIO, found: ticket_model.Ticket) -> bool:
         "phases.yml はユーザが持つ設定なので、書くのはユーザ。"
         "承認済みの親に plan を追加するには、plan を追加した提案を改版として出し、"
         "ユーザに承認し直してもらう。"
-        "書き方は `ccnavi-launcher.sh --docs` の proposal-format と phases\n"
+        "書き方は `ccnavi-launcher.sh --docs --keyword 提案書式` と `--keyword phases` で引く。\n"
     )
     return True
 

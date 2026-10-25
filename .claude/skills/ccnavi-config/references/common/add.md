@@ -8,7 +8,7 @@ keywords: [rules.yml, phases.yml, risks.yml, deny, ask, allow, glob, regex, ル�
 
 # 足す・直す
 
-書式の細部で迷ったら `src/ccnavi/policy/rules.py` `src/ccnavi/tickets/phasetypes.py` `src/ccnavi/tickets/risk.py` の冒頭の docstring を読む。
+書式の細部で迷ったら、下書きを `ccnavi --lint` に掛けて指摘を読む。`ccnavi --explain` で、いま効いている設定が見える。
 
 ## 手順
 
@@ -141,7 +141,18 @@ Bash は実行される部分にヒットする。`$( )` の中や `&&` の先�
 期待とヒットしてほしくない期待を両方足す。期待は
 `tool` `subject` `why` の 3 つで、置いたタイプが期待する判定。`subject` の `/repo` は
 ワークスペースルートに読み替わる。その下書きも `wip/handoff/` に置き、`--test-expectations` で
-本物と一緒に回す。
+本物と一緒に回す。配布先にこのファイルが無いときは、次の形で新しく作る（置くのはユーザ）。
+
+```yaml
+deny:                          # タイプ（deny / ask / allow）が期待する判定
+  - tool: Bash
+    subject: "git push --force origin main"
+    why: 強制 push は止める（理由を一言）
+allow:
+  - tool: Bash
+    subject: "git status"
+    why: 読むだけの操作は通す
+```
 
 ## phases.yml
 
@@ -195,7 +206,7 @@ phases:
 - `scope` と `deliverables` はそれぞれ 20 件まで
 - `feedback` のフェーズ定義に `review: none` は書けない
 - 小さい作業を親 1 本・子 1 本で回すなら、`review: mr`・`scope: inherit` の定義（例: `quick`）を 1 つ置き、親は `plan: [quick]`・`feedback: []` にする
-  （親の `phases:` は `--fill-phases` で差し込む。手順は docs/21_design/tickets/phases.md の「小さい作業」）
+  （親の `phases:` は `ccnavi --plan-order <親> --fill-phases` で差し込む）
 - `when` と `agent` は判定に使われない案内。`when` は「次は X の計画です（定義の案内: …）」の
   形でモデルに届くので、そのフェーズ定義を飛ばしてよい条件まで書く
 

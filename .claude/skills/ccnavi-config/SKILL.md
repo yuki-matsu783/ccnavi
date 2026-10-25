@@ -1,5 +1,6 @@
 ---
 name: ccnavi-config
+distribute: true
 description: >-
   ccnavi の設定 3 本（rules.yml・phases.yml・risks.yml。.ccnavi/config/common/ と config/project/ の和）を書く・足す・直す・
   確かめる。ルールを足したい、フェーズ定義やリスクの配点を変えたい、書いた設定が
@@ -19,7 +20,14 @@ ccnavi の判定と進め方は 3 本のファイルで決まる。どれもユ�
 | `risks.yml` | 子を閉じるときに差分を数える配点。HIGH 以上はレビューが済むまで止まる | 組み込みの配点（定量 4 項目） |
 
 置けるレイヤーは 3 つ（共通 `.ccnavi/config/common/`、自身と各プロジェクトの `.ccnavi/config/project/`）で、置き場は固定。判定には、共通レイヤーにその操作に関わるレイヤーを足したものを使い、足すだけで上書きも取り消しもしない。
-どのレイヤーを足すか、同じ `id` の扱い、ミラーは[ルールの書き方](../../../docs/41_guide/rules.md)の「ルールは 3 つのレイヤーの和でヒットする」が正本。
+
+| レイヤー | 置き場 | 何を置くか |
+|---|---|---|
+| 共通 | `.ccnavi/config/common/{rules,phases,risks}.yml` | どのツリーにも適用するもの |
+| ワークスペース自身 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml` | ワークスペース自身のツリーにだけ適用するもの |
+| プロジェクト | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` | そのプロジェクトのツリーにだけ適用するもの |
+
+同じ `id` のルールは足すだけで、上書きも取り消しもしない。厳しいほうが採られる。共通レイヤーは、着手済みの親のワークツリーのプロジェクトへミラーされる（`.ccnavi/docs/projects.md`）。
 どのプロジェクトでも同じ構成（`src/*`・`tests/*` など）を前提にできる `phases.yml` の定義は共通に、`scope` がレイアウトに依存する定義は config に置く。
 `phases.yml` を読むのは提案の承認の検査と `--plan-order <親> --fill-phases`（コピーを差し込む）と `--lint` だけで、承認のあとの判定は
 親チケットにコピーした定義（`phases:`）を読む。直しても進行中の親には届かない。
@@ -36,13 +44,13 @@ ccnavi の判定と進め方は 3 本のファイルで決まる。どれもユ�
 
 | 言われたこと | 読むもの |
 |---|---|
-| 足す・直す・新しく書く（「ルールを足して」「フェーズに調査を入れたい」「配点を変えたい」） | [references/add.md](references/add.md) |
-| 確かめる・疑う（「効いているか見て」「lint して」「期待する判定を回して」） | [references/check.md](references/check.md) |
+| 足す・直す・新しく書く（「ルールを足して」「フェーズに調査を入れたい」「配点を変えたい」） | [references/common/add.md](references/common/add.md) |
+| 確かめる・疑う（「効いているか見て」「lint して」「期待する判定を回して」） | [references/common/check.md](references/common/check.md) |
 
 足したあとは必ず確かめる側も通る。どちらか決まらないときだけユーザに聞く。
 
 条件の組み合わせは 1 本の regex に詰めない。「ここは除く」だけなら `except:`、「A か B」「A かつ B」のような
-組み合わせなら `when:` で書く。書き方と使い分けは [references/add.md](references/add.md) の rules.yml の節。
+組み合わせなら `when:` で書く。書き方と使い分けは [references/common/add.md](references/common/add.md) の rules.yml の節。
 
 ## 絶対ルール
 
@@ -54,8 +62,8 @@ ccnavi の判定と進め方は 3 本のファイルで決まる。どれもユ�
 
 ## ccnavi の打ち方
 
-以下で `ccnavi` と書いたら、このリポジトリでは `uv run python -m ccnavi`。配布先の
-プロジェクトでは settings.json の `CCNAVI_ENTRY_PATH` が指す `.ccnavi/scripts/ccnavi-launcher.sh`。
+以下で `ccnavi` と書いたら、settings.json の `CCNAVI_ENTRY_PATH` が指す launcher
+（`sh "$CCNAVI_ENTRY_PATH" <引数>`。未設定なら `.ccnavi/scripts/ccnavi-launcher.sh`）。
 
 診断のときは記録と state を外す（`--log "" --state ""`）。
 
@@ -74,4 +82,4 @@ ccnavi --explain --log "" --state ""
 - `--rules` / `--phases` / `--risk` で下書きを差し替えられる
 
 `--test` に禁止語を書かない（`ccnavi --test Bash "git push"` はその Bash 自体が `builtin:guard-raw-git` にヒットする）。
-単発で試したいものも期待のファイルを `wip/handoff/` に書いて `--test-expectations` で回す。その形は `.ccnavi/config/common/rule-expectations.yml` の先頭のコメントにある。
+単発で試したいものも、期待する判定のファイルを `wip/handoff/` に書いて `--test-expectations` で回す。その形は [references/common/add.md](references/common/add.md) の rules.yml の節にある（`.ccnavi/config/common/rule-expectations.yml` が既にあればそれも見る）。

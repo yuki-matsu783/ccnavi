@@ -615,7 +615,7 @@ def main() -> int:
     said = hook("PostToolUse", "Bash", parent_tree, command="ls")
     record(
         "フェーズ 1 の終わりの告知",
-        "フェーズ 1 が終わりました" in said,
+        "フェーズ 1（作業） が終わりました" in said,
         said[:120].replace("\n", " "),
     )
     blocked, detail = agent_gate(parent_tree)
