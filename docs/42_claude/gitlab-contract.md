@@ -24,8 +24,8 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 | `requests.json` | sh が打つ GitLab API の列（23 本）。本物にも模擬にも同じ列を送る。各要求に `expect_status` と `reads` を持つ |
 | `recorded.json` | 本物から録った形。**本物だけ**。`uv run python tests/manual/gitlab/record_contract.py` で作る |
 | `recorded.sample.json` | 模擬から作ったサンプル（`"source": "sample"`）。`uv run python -m tests.contract.fakeside` で作り直す |
-| `normalize-cases.json` | 正規化の入力と期待の対の表。Python のテストが読む。#553 の TypeScript も同じ表を読む |
-| `allow.json` | `fake_gitlab.py` の許可リスト（`entries`）と、録らないものの一覧（`not_recorded`） |
+| `normalize-cases.json` | 正規化の入力と期待の対の表。Python のテストと、Chrome 拡張の TypeScript の試験（`test/helpers/shape.ts`）が同じ表を読む |
+| `allow.json` | `fake_gitlab.py` の許可リスト（`entries`）、Chrome 拡張の `MockGitLab` の許可リスト（`chrome_entries`。Python は読まない）、録らないものの一覧（`not_recorded`） |
 | `forbidden.json` | 記録に入れない文字列の正規表現 |
 
 比較器と正規化は `tests/contract/shape.py` の 1 本。模擬の側の場面と送り手は `tests/contract/fakeside.py`。本物の側の場面を組むのは `tests/manual/gitlab/record_contract.py`（contract のテストは manual に依存しない。置くか置かないかの判定と `os.replace` は `shape.py` に置き、Docker 無しで試験する）。
@@ -44,13 +44,13 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 
 - `path` は `/api/v4` より後ろ。`query`・`body` は省略できる
 - `token` は `main`（認証あり）か `none`（認証なし）
-- `used_by` はその要求を使うもの（`sh`。#553 が `chrome` を足す）
+- `used_by` は、その要求を比べる側（`sh`、`chrome`）。`sh` は sh が打つ要求。`chrome` は、Chrome 拡張の `MockGitLab` が内部の状態から 200/201 で答え、TS の契約の試験が比べる要求だけに付ける。録る側と `fakeside` は `used_by` を見ずに全要求を送る
 - `expect_status` は録るときに本物が返すべきステータス。`error_401` は 401、`error_404` は 404、ほかは 200 か 201。**1 本でも違えば `recorded.json` を置かない**
 - `reads` は、その要求の応答のうち、sh と拡張が実際に読むキー（下の「reads」）
 - `save` は、応答の本文のキーを後ろの要求の `${…}` に使う（`user` が `user.id` を置く）
 - 状態の宣言は持たない。場面は下に固定し、録る側と比べる側が作る
 - 書き込みは最後にまとめてある（読みの形が前の書き込みで変わらないように）
-- `used_by` が `sh` だけなので、`POST repository/commits` などの拡張だけが使う要求は載せていない（#553 で足す）
+- `POST repository/commits` などの拡張だけが使う要求は載せていない
 
 ### 置き換えの書き方
 
@@ -78,7 +78,7 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 
 ## reads（比べるキー）
 
-本物の応答は 30〜100 のキーを返すが、sh が読むのはその一部（拡張は project の権限の検査だけ。拡張だけが使う要求は #553 で足す）。模擬は読まれるキーだけ返せばよい。そこで要求ごとに `reads`（読むキーの一覧）を持ち、比べるキーを絞る。
+本物の応答は 30〜100 のキーを返すが、sh が読むのはその一部（拡張は project の権限の検査（`project_access` と `group_access`）と既定のブランチ（default_branch）だけ。拡張だけが使う要求は載せていない）。模擬は読まれるキーだけ返せばよい。そこで要求ごとに `reads`（読むキーの一覧）を持ち、比べるキーを絞る。
 
 - **導き方**: `.ccnavi/scripts/` の `jq` の式（`ccnavi-start.sh`・`ccnavi-branches.sh`・`ccnavi-review.sh`・`ccnavi-common-review.sh`・`ccnavi-user-lib-review.sh`・`ccnavi-common-host.sh`）と、拡張の `extensions/chrome/ccnavi-approval/src/core/gitlab.ts` の読み方から導く。sh が `// ""` で受ける省略できるキーでも、本物が返すものは載せる。本物が返さないキー（`closes_issues` の `references`、`reviewers` の `updated_at`、非差分のスレッドの `position`）は、存在の検査に通らないので載せない
 - **書き方**: 比較器の差のキーと同じ。`author.id`、`[].iid`（応答が配列のとき）、`notes[].system`（配列の中）
@@ -150,7 +150,7 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 - 許可したのに実際は差が出ていない項目は失敗する（古い許可の検出）。模擬を直したら外す
 - `not_recorded` は、録らないものの宣言（ヘッダ・2 ページ目・403）。比べる対象ではない
 
-**いまの項目は 0 件**。`reads` で絞ったうえで、録った差は全部模擬を直して消した。版差や EE の機能（直せない差）が出たら、理由つきで足す。
+**いまの項目は 0 件**（`chrome_entries` も 0 件）。`reads` で絞ったうえで、録った差は全部模擬を直して消した。版差や EE の機能（直せない差）が出たら、理由つきで足す。
 
 ### 契約テストが見つけた模擬の誤り
 
@@ -168,6 +168,17 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 
 `forbidden.json` の正規表現が、`recorded*.json` と `requests.json` に当たらないこと。`glpat-` `gldt-` `glptt-` `glrt-`、`PRIVATE-TOKEN`、`Bearer `、メールの形、`root`、`ccnavi-reviewer`（単語境界つき。`root_ref` には当たらない）、`p551-`（録るときのプロジェクト名）。GitLab の版（`GITLAB_IMAGE`）は入れてよい。サンプルに禁止語を 1 つ混ぜると落ちる試験がある。録るときも、記録の全文をこれで検査してから置く。
 
+## Chrome 拡張の模擬（MockGitLab）との比較
+
+`extensions/chrome/ccnavi-approval/test/gitlab-contract.test.ts`（`pnpm test`。`--e2e` には入れない）が、`MockGitLab` の `handle` を直接呼び、`used_by` に `chrome` を持つ要求だけを `recorded.json` と `reads` で比べる。比較器 `test/helpers/shape.ts` は `shape.py` の写しで、名前も規則も同じ。正本は Python で、規則を変えたいときは Python を直し、`normalize-cases.json` を直してから TS を合わせる。
+
+- 比べる要求（`MockGitLab` が内部の状態から 200/201 で答えるもの）: `user`・`project`・`mrs_merged`・`mr_create`・`error_401`・`error_404`。`MockGitLab` が 404 か形の違う応答を返す要求（`member` など）は `chrome` を付けず、比べない
+- `mrs_opened` は比べない。`source_branch` を付けると `MockGitLab` は `pulls` から `iid`・`source_project_id`・`web_url` だけを返し、場面を付けると見本から返すため、`reads` の範囲で答える経路がない
+- 見本（`test/fixtures/host/gitlab/*`）から返す応答は比べない。手で組んだもので、本物の形を写していない
+- 許可リストは `chrome_entries`（`entries` に混ぜない。`apply_allow` が当たらない項目を古い許可として落とす）
+- 同じ生の入力を Python と TS で正規化して一致することも確かめる。`uv` が無ければ、その試験は skip と出る
+- `shape.py`・`normalize-cases.json`・`requests.json`・`recorded.json` を直したら、`pnpm test` も回す。`python -m tests tests/contract` は TS を回さないので、食い違いは `pnpm test` を回すまで見つからない
+
 ## 限界
 
 比べられない・比べないもの。
@@ -179,12 +190,14 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 - レート制限、競合、実時間の遅延（非同期の判定は録る前に待って確定させる）
 - 値（ID・時刻・SHA）の一致。`state`・`source_branch` の絞り込みが効くか、`order_by`・`sort` の並び、日時の書式は、型が同じなら緑になる
 - `web_url` は sh が読むが、環境で変わる欄として形から落とすので、模擬が返さなくなっても検出できない
+- TS の比較器との既知の差。`1.0` のように小数点以下が 0 の値は、Python では `number`、JS の `JSON.parse` では `integer` になる。`DATETIME` の正規表現は、Python の `\d` が Unicode の数字にも、`$` が末尾の改行の前にも当たるのに対し、JS は ASCII の数字だけに当たり、`$` は末尾だけに当たる（JS の方が厳しい）
+- Chrome 拡張の比較は `reads` の範囲と、`MockGitLab` が内部の状態から答える要求だけ。見本由来の応答と、拡張だけが使う要求（branches・tree・commits・compare など）は対象外
 - 空の配列の要素の形（録るときに、`NON_EMPTY` の要求が空でないことを確かめる）
 - 録った場面の外（差分への指摘のスレッド、複数ページ、フォークからの MR、グループ配下のプロジェクトで `group_access` が整数になる形など）
 
 ## 模擬を直したとき
 
-`tests/fake_gitlab.py` の応答を変えたら、**必ず** `uv run python -m tests tests/contract` を回す（`tests/fake_gitlab.py` を変えるコミットの前）。落ちたら、本物に合わせて模擬を直す（基本）。版差・EE など直せない差だけ、意図した差として許可リストに理由つきで足す。サンプルが古くなって落ちたら `uv run python -m tests.contract.fakeside` で作り直す（本物の記録 `recorded.json` は作り直さない）。
+`tests/fake_gitlab.py` の応答を変えたら、**必ず** `uv run python -m tests tests/contract` を回す（`tests/fake_gitlab.py` を変えるコミットの前）。Chrome 拡張の `MockGitLab`（`test/helpers/mock-gitlab.ts`）を変えたら、`extensions/chrome/ccnavi-approval` で `pnpm test` を回す。落ちたら、本物に合わせて模擬を直す（基本）。版差・EE など直せない差だけ、意図した差として許可リストに理由つきで足す。サンプルが古くなって落ちたら `uv run python -m tests.contract.fakeside` で作り直す（本物の記録 `recorded.json` は作り直さない）。
 
 ## 録り直し（本物の GitLab）
 

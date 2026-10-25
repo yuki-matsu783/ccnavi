@@ -1,6 +1,6 @@
 """GitLab の応答の「形」を作り、比べる。仕様は `docs/42_claude/gitlab-contract.md`。
 
-形（node）は JSON で表せる辞書で、TypeScript 側（#553）も同じ表で読む。
+形（node）は JSON で表せる辞書で、Chrome 拡張の TS（`test/helpers/shape.ts`）も同じ表で読む。
 
     {"t": ["integer", "null"],       型の和集合（並べ替え済み）
      "keys": {名前: node},            object のとき。キーの順は持たない

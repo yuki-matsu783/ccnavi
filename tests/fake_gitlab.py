@@ -209,6 +209,7 @@ class Handler(BaseHTTPRequestHandler):
             return 200, {
                 "id": 1,
                 "path_with_namespace": state["project"],
+                "default_branch": "main",
                 "archived": False,
                 "issues_enabled": True,
                 "issues_access_level": "enabled",
