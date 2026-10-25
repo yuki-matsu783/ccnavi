@@ -197,12 +197,15 @@ setup:
 `base` は 40 桁の 16 進のコミット SHA だけ（短縮 SHA・ブランチ名・タグ名は ValueError。ブランチやタグは動くので使わない）。次の順で対象を戻す。
 
 1. `git worktree remove --force`（本体のワークツリー以外すべて）→ `git worktree prune`
-2. `git checkout -f -B main <base>`（ローカルの `main` を `base` に合わせて切り替える）
-3. `main` 以外のローカルブランチを `git branch -D`
-4. タグを `git tag -d`
-5. `git stash clear`
-6. `git reset --hard <base>`
-7. `git clean -fd`
+2. ccnavi 自身の状態を消す: git の共通ディレクトリ直下の `ccnavi-direct/`（直接作業の記録）・`ccnavi-integrate/`（取り込みの marker）・`ccnavi-integrate-done/`、と `refs/ccnavi/` の下のすべての ref（`refs/ccnavi/direct/<名前>/s` など）。前のシナリオの取り込み待ちが、次の SessionStart の文脈や `ccnavi-worktree.sh` の `adopt-recorded` に残らないようにする
+3. `git checkout -f -B main <base>`（ローカルの `main` を `base` に合わせて切り替える）
+4. `main` 以外のローカルブランチを `git branch -D`
+5. タグを `git tag -d`
+6. `git stash clear`
+7. `git reset --hard <base>`
+8. `git clean -fd`
+
+2 をワークツリーの除去と prune の後に置くのは、記録が一時ワークツリー（本体の `logs/direct-tmp/<repo>/<名前>`。対象の外）やブランチを指すため。ワークツリーが消せずに止まった回（ロックされているなど）で、記録だけ先に消えて食い違いを作らない。ディレクトリだけ先に消えた登録（prunable）は prune が外す。消すのは `require_disposable_repo` を通した対象の `.git/` の名指しの 3 つと `refs/ccnavi/` だけで、`logs/` など `.gitignore` 済みのものは残す（判定の記録はセッション ID で絞れる）。
 
 `git clean` に `-x` は付けない（`.gitignore` 済みの `logs/`・`.claude/` などを消さない）。`refs/remotes/*` は触らない。`.git/config`・`.git/hooks`・reflog・`refs/notes` も戻さない。merge・rebase などの途中で止まった対象は、`branch -D` が失敗して「戻せなかった」になる（手で中断してから `restore`）。origin への push は戻さない。push が要るシナリオは、各シナリオが自分で後始末する。
 戻す前に `base` が対象にあるコミットかを確かめ、無ければ何も変えずに止める。

@@ -39,6 +39,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -733,9 +734,39 @@ def run_setup_git(root, target, commands, allowed=None, host=None):
             )
 
 
+CCNAVI_STATE_DIRS = ("ccnavi-direct", "ccnavi-integrate", "ccnavi-integrate-done")
+CCNAVI_REF_PREFIX = "refs/ccnavi"
+
+
+def _git_common_path(top):
+    """対象の git の共通ディレクトリ（リンクされたワークツリーでも本体の .git）の実体。"""
+    r = _git(["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=top)
+    if r.returncode != 0 or not r.stdout.strip():
+        raise RuntimeError(f"git の共通ディレクトリを取れない: {top}: {r.stderr.strip()}")
+    return Path(os.path.realpath(r.stdout.strip()))
+
+
+def _clear_ccnavi_state(root, top, run):
+    """ccnavi 自身が対象の git に書く状態（直接作業の記録・取り込みの marker・専用の ref）を消す。
+    top は require_disposable_repo を通したものだけ。消すのは共通ディレクトリ直下の名指しの 3 つと
+    refs/ccnavi の下だけ（logs/ など .gitignore 済みのものは触らない）。"""
+    common = _git_common_path(top)
+    for name in CCNAVI_STATE_DIRS:
+        path = common / name
+        if path.is_symlink() or path.is_file():
+            path.unlink()
+        elif path.is_dir():
+            shutil.rmtree(path)
+    for ref in run("for-each-ref", "--format=%(refname)", CCNAVI_REF_PREFIX).split():
+        run("update-ref", "-d", ref)
+
+
 def reset_repo(root, target, base, allowed=None):
-    """対象を base へ戻す。順序: ワークツリーを消す → prune → main を base に合わせて切り替える →
-    main 以外のローカルブランチを消す → タグを消す → stash を空にする → reset --hard → clean -fd。
+    """対象を base へ戻す。順序: ワークツリーを消す → prune → ccnavi の記録・marker・ref を消す →
+    main を base に合わせて切り替える → main 以外のローカルブランチを消す → タグを消す →
+    stash を空にする → reset --hard → clean -fd。
+    ccnavi の状態は、ワークツリーを消して prune した後に消す。記録は一時ワークツリーや
+    ブランチを指すので、ワークツリーが消せずに止まった回で、記録だけ先に消さない。
     clean に -x は付けない（.gitignore 済みを消さない）。refs/remotes は触らない。"""
     top = require_disposable_repo(root, target, allowed)
 
@@ -761,6 +792,7 @@ def reset_repo(root, target, base, allowed=None):
         if pathcase.fold(os.path.realpath(p)) not in keep:
             run("worktree", "remove", "--force", p)
     run("worktree", "prune")
+    _clear_ccnavi_state(root, top, run)
     run("checkout", "-f", "-B", "main", base)
     for name in run("for-each-ref", "--format=%(refname:short)", "refs/heads").split():
         if name != "main":

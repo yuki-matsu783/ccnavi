@@ -1893,6 +1893,83 @@ class ResetTest(unittest.TestCase):
                 "refs/remotes/origin/keep",
             )
 
+    def ccnavi_state(self, ws, name="work1"):
+        """ccnavi が対象の .git に書く記録・marker・ref を作る（ブランチも切る）。"""
+        t = ws.target
+        common = t / ".git"
+        (common / "ccnavi-direct").mkdir()
+        (common / "ccnavi-direct" / name).write_text("version 4\n", encoding="utf-8")
+        (common / "ccnavi-integrate" / name).mkdir(parents=True)
+        (common / "ccnavi-integrate" / name / "marker").write_text("m\n", encoding="utf-8")
+        (common / "ccnavi-integrate-done").mkdir()
+        (common / "ccnavi-integrate-done" / name).write_text("done\n", encoding="utf-8")
+        git(t, "branch", name)
+        git(t, "update-ref", f"refs/ccnavi/direct/{name}/s", ws.base)
+        git(t, "update-ref", f"refs/ccnavi/direct/{name}/pending", ws.base)
+        return common
+
+    def test_ccnavi_own_records_markers_and_refs_are_removed(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            common = self.ccnavi_state(ws)
+            (ws.target / "logs").mkdir()
+            (ws.target / "logs" / "keep.log").write_text("判定の記録\n", encoding="utf-8")
+            (ws.target / ".gitignore").write_text("logs/\n", encoding="utf-8")
+            git(ws.target, "add", ".gitignore")
+            git(ws.target, "commit", "-q", "-m", "ignore logs")
+            base = git(ws.target, "rev-parse", "HEAD")
+            runner.reset_repo(ws.root, ws.target, base)
+            self.assertFalse((common / "ccnavi-direct").exists())
+            self.assertFalse((common / "ccnavi-integrate").exists())
+            self.assertFalse((common / "ccnavi-integrate-done").exists())
+            self.assertEqual(git(ws.target, "for-each-ref", "refs/ccnavi"), "")
+            self.assertEqual(
+                git(ws.target, "for-each-ref", "--format=%(refname:short)", "refs/heads"), "main"
+            )
+            self.assertTrue((ws.target / "logs" / "keep.log").exists(), "ignore 済みは残す")
+
+    def test_temp_worktree_with_a_record_leaves_nothing_prunable(self):
+        # 一時ワークツリーは本体の logs/direct-tmp/<repo>/<名前> にある（対象の外）。
+        # 登録が生きているものと、ディレクトリだけ先に消えたもの（prunable）の両方
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            self.ccnavi_state(ws)
+            base_dir = ws.root / "logs" / "direct-tmp" / "test-repo"
+            alive, gone = base_dir / "work1", base_dir / "work2"
+            git(ws.target, "worktree", "add", "-q", "--detach", str(alive), ws.base)
+            git(ws.target, "worktree", "add", "-q", "--detach", str(gone), ws.base)
+            shutil.rmtree(gone)
+            self.assertIn("prunable", git(ws.target, "worktree", "list", "--porcelain"))
+            runner.reset_repo(ws.root, ws.target, ws.base)
+            self.assertEqual(len(git(ws.target, "worktree", "list").splitlines()), 1)
+            self.assertNotIn("prunable", git(ws.target, "worktree", "list", "--porcelain"))
+            self.assertFalse(alive.exists())
+
+    def test_failed_worktree_removal_keeps_the_records(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            common = self.ccnavi_state(ws)
+            locked = ws.root / "logs" / "direct-tmp" / "test-repo" / "work1"
+            git(ws.target, "worktree", "add", "-q", "--detach", str(locked), ws.base)
+            git(ws.target, "worktree", "lock", str(locked))
+            with self.assertRaises(runner.Refusal):
+                runner.reset_repo(ws.root, ws.target, ws.base)
+            self.assertTrue((common / "ccnavi-direct" / "work1").exists())
+            refs = git(ws.target, "for-each-ref", "refs/ccnavi")
+            self.assertIn("refs/ccnavi/direct/work1/s", refs)
+
+    def test_ccnavi_state_of_the_body_is_not_touched(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            common = ws.root / ".git"
+            (common / "ccnavi-direct").mkdir()
+            (common / "ccnavi-direct" / "mine").write_text("x\n", encoding="utf-8")
+            git(ws.root, "update-ref", "refs/ccnavi/direct/mine/s", "HEAD")
+            with self.assertRaises(runner.Refusal):
+                runner.reset_repo(ws.root, ws.root, ws.base, allowed=ws.root)
+            self.assertTrue((common / "ccnavi-direct" / "mine").exists())
+            self.assertIn("refs/ccnavi/direct/mine/s", git(ws.root, "for-each-ref", "refs/ccnavi"))
+
     def test_main_pointing_elsewhere_is_moved_to_base(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
