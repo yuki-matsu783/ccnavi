@@ -173,22 +173,22 @@ class UndeclaredTextTest(unittest.TestCase):
                 decision, reason, record = self.reason(permission_mode, self.UNREADABLE)
                 self.assertEqual("deny", decision)
                 self.assertEqual("PARSE_UNCERTAIN", record["code"])
-                self.assertNotIn("asking rather than deciding", reason)
-                self.assertIn("will not get it through", reason)
-                self.assertIn("Rewrite it in a form that can be read", reason)
+                self.assertNotIn("確認しています", reason)
+                self.assertIn("通りません", reason)
+                self.assertIn("読める形に書き直してください", reason)
 
     def test_読み切れずに聞く回は用途を言うよう促す(self):
         decision, reason, _ = self.reason("default", self.UNREADABLE)
         self.assertEqual("ask", decision)
-        self.assertIn("asking rather than deciding", reason)
-        self.assertNotIn("will not get it through", reason)
+        self.assertIn("確認しています", reason)
+        self.assertNotIn("通りません", reason)
 
     def test_ルールにヒットしていない回に_this_rule_と言わない(self):
         for permission_mode in ("default", "bypassPermissions"):
             with self.subTest(permission_mode=permission_mode):
                 _, reason, _ = self.reason(permission_mode, self.UNREADABLE)
-                self.assertNotIn("this rule", reason)
-                self.assertIn("none of them mentions it", reason)
+                self.assertNotIn("このルールは", reason)
+                self.assertIn("どのルールもそれに言及していません", reason)
 
     def test_読み切れた回は_allow_に足す道を示す(self):
         # 知らない権限モードは ask になる（default などの判断できるモードは渡す）。

@@ -187,8 +187,9 @@ def _chdir(segment: list[str], here: str | None, out: list[str], budget: list[in
         return None
     if here is None or budget[0] <= 0 or shellread_words._classify([rest]):
         # 行き先が読めない、語数の上限を越えた、または文字列をコードとして実行する形
-        # （`sh -c` `eval` `xargs` `find -exec`）。最後のものは、どの語がパスかが表記に
-        # 無い。この読み全体が縮退するので、判定は生の文字列で下る。
+        # （`sh -c` `eval` `xargs` `find -exec`。後ろが読むだけの許可リストにある
+        # `xargs` `find -exec` を除く）。最後のものは、どの語がパスかが表記に無い。
+        # この読み全体が縮退するので、判定は生の文字列で下る。
         out.extend(rest)
         return here
     # 居場所が動いていなくても、`env -C <パス>` はその 1 本だけ動かす。

@@ -34,7 +34,7 @@ from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 EVERY = "ここまでに 5 件の編集があった。ルールと突き合わせること。"
-ONCE = "突き合わせの観点は docs/adr/ を見る。"
+ONCE = "突き合わせの観点は docs/30_adr/ を見る。"
 
 
 def rule(name: str, **extra) -> dict:

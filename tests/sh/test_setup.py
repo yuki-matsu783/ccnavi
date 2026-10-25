@@ -64,7 +64,7 @@ SHELL = shutil.which("sh") or shutil.which("bash")
 HAS_JQ = shutil.which("jq") is not None
 
 # 登録されていることを確かめる 8 つ。
-# docs/guide/settings.md「hook の 8 つのイベント」の表と対になる。
+# docs/41_guide/settings.md「hook の 8 つのイベント」の表と対になる。
 EVENTS = (
     "SessionStart",
     "UserPromptSubmit",
@@ -88,7 +88,7 @@ TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
 UNWATCHED_ENV = "CCNAVI_GUARD_UNWATCHED"
 # チケット制御を使うか（settings.py の TICKET_CONTROL_ENV）。プロジェクトが導入のときに決める。
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
-# hook に登録される 1 行。docs/guide/settings.md「settings.json の例」と対になる。表記が変わると、
+# hook に登録される 1 行。docs/41_guide/settings.md「settings.json の例」と対になる。表記が変わると、
 # ccnavi 自身が守る対象（CCNAVI_ENTRY_PATH）と実際に起動するものが食い違う。
 HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}"'
 # セッションの頭の取り込み。本体とは別の 1 行で SessionStart にだけ登録する。
@@ -284,7 +284,7 @@ REGION_BEGIN = "# ---ccnavi begin--- (scripts/ccnavi-setup.sh が管理する範
 REGION_END = "# ---ccnavi end---"
 BIN_COMMENT = "# 実行ファイル"
 # `--docs` の索引の 1 行。docsearch は git がそこの ccnavi-index.jsonl を無視しているときだけ書く
-# （docs/design/diagnostics.md の 10.1「ドキュメントの索引」）。
+# （docs/21_design/diagnostics.md の 10.1「ドキュメントの索引」）。
 INDEX_LINE = "**/ccnavi-index.jsonl"
 INDEX_COMMENT = "# --docs の索引"
 # 使い捨ての置き場（ワークスペースルート直下の scratchpad/）を追跡から外す 1 行。
@@ -2930,7 +2930,7 @@ class LeavesAPathItDidNotWrite(DeploysWhatTheProjectNeeds):
 
 
 class WritesTheVscodeSettings(SetupTest):
-    """VS Code へ渡す設定。docs/guide/install.md「VS Code からワークツリーを見る」と対になる。
+    """VS Code へ渡す設定。docs/41_guide/install.md「VS Code からワークツリーを見る」と対になる。
 
     ccnavi は作業を .claude/worktrees/ の中でさせる。この 1 行が無いと、
     エディタからはワークスペースルートのブランチしか見えないまま作業が進む。

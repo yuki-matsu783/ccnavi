@@ -99,6 +99,11 @@
             "type": "command",
             "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/lint-py.sh\"",
             "timeout": 180
+          },
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/check-adr.sh\"",
+            "timeout": 10
           }
         ]
       }

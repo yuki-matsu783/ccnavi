@@ -1,6 +1,6 @@
 /**
  * `ccnavi --lint --json`（lint の JSON）が出す形。実行ファイルと拡張の契約で、拡張はこれ以外を読まない。
- * 形の定義は ccnavi の docs/requirements/json-shapes.md「lint の JSON」。
+ * 形の定義は ccnavi の docs/11_requirements/json-shapes.md「lint の JSON」。
  *
  * 読み手はプロジェクト管理画面。プロジェクトごとの苦情（`projects/` が無視されていない、
  * プロジェクトの中にワークツリーがある）を拾って並べる。判定と同じ深刻度で届くので、

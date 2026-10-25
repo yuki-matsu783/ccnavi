@@ -227,10 +227,10 @@ issue「決済の金額が合わない」に、ブランチ fix-payment とマ�
 
 | 知りたいこと | 読む文書 |
 |---|---|
-| 外から観測できる約束 | [requirements.md](requirements.md) |
-| いまの実装の作り | [design.md](design.md) |
-| 判断の理由と経緯、採らなかった案 | [adr/README.md](adr/README.md) |
+| 外から観測できる約束 | [10_requirements.md](10_requirements.md) |
+| いまの実装の作り | [20_design.md](20_design.md) |
+| 判断の理由と経緯、採らなかった案 | [30_adr.md](30_adr.md) |
 | 用語 | [CONTEXT.md](CONTEXT.md) |
-| 使い方 | [guide/index.md](guide/index.md) |
+| 使い方 | [41_guide/index.md](41_guide/index.md) |
 
 新しい機能や決まりがここに書いた考え方と食い違うときは、機能の側を見直す。考え方の側を直すのは、ユーザが依頼したときだけである。

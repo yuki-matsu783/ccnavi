@@ -173,7 +173,7 @@ def report(
 ) -> int:
     """検証の結果を書き、error が 1 件でもあれば非ゼロを返す。
 
-    as_json なら docs/requirements/json-shapes.md「lint の JSON」の形で 1 つの JSON を書く。
+    as_json なら docs/11_requirements/json-shapes.md「lint の JSON」の形で 1 つの JSON を書く。
     VS Code 拡張が プロジェクトごとの warn を拾うための形で、ユーザ向けの文面は書き換えてよいが、
     この JSON の形は拡張との契約になる。
 
@@ -318,7 +318,7 @@ def report(
         }
         if flow_path:
             # 実行ファイルが読んだ中身。拡張のフロー編集画面は自分の読みとこれを見比べる
-            # （docs/requirements/json-shapes.md「lint の JSON」）。`rendered` は SubagentStart で
+            # （docs/11_requirements/json-shapes.md「lint の JSON」）。`rendered` は SubagentStart で
             # 渡る手順の行（読めなければ null）、
             # `candidates` はフローで選べるサブエージェントとスキルの名前
             payload["flow"] = {

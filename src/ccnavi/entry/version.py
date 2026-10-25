@@ -27,7 +27,7 @@ Chrome 拡張は組み立てのときにここの値を埋め込む。
 ソースで動かしているときはその部品が無いので `unknown` と言う。実行ファイルは git に
 聞かない（ソースで動いているときにワークツリーの HEAD を言うと、組み立てた版と取り違える）。
 
-ネットワークにも git にも出ない（docs/claude/exe-boundary.md）。
+ネットワークにも git にも出ない（docs/42_claude/exe-boundary.md）。
 """
 
 from __future__ import annotations

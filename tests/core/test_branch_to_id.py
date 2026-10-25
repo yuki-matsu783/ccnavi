@@ -90,6 +90,11 @@ class BranchToIdTest(unittest.TestCase):
                 self.assertEqual(
                     ticket_ids.issue_identifier(int(args[0]), title, project, args[1]), ident
                 )
+        # 題が長くて slug を短くしたときは、`long yes` を添える（start.sh が短い --slug を求める）
+        title = "テキスト整形CLI（main.sh）を README の仕様どおりに実装する"
+        code, lines, err = self.ask("worktree", "issue-id", "41", "feature", "--title", title)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(lines, ["id feature-41-テキスト整形cli-main-sh-を-readme", "long yes"])
         code, lines, err = self.ask("worktree", "issue-id", "7", "Bad-Prefix", "--title", "x")
         self.assertNotEqual(code, 0)
         self.assertEqual(lines, [])
