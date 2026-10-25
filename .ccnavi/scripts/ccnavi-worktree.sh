@@ -207,6 +207,28 @@ print_next() {
 	printf '次: 編集はこのワークツリーの下で行います（Write / Edit に渡すパス: %s/…）。git は `cd %s && %s <サブコマンド>` の形で実行します。終わったらコミットし、ターンの終わりの integrate の案内に従います\n' "$dest" "$pn_q" "$pn_g"
 }
 
+# 同じ識別子になる別のブランチ（feature/7-x に対する feature-7-x、英字の大文字小文字だけ違う名前）があれば止める。
+# <一覧のファイル> <どこ（手元・origin）>
+# dest-exists・既にあるワークツリーの分岐・branch-exists の検査より前に置く。大文字小文字を区別しない機械では、綴り違いの名前のパスが既にあるように見えるため。
+heads_list="$root/logs/state/worktree-heads-$$"
+cand_index="$root/logs/state/worktree-index-$$"
+mkdir -p "$root/logs/state" 2>/dev/null || :
+trap 'rm -f "$heads_list" "$heads_list.names" "$cand_index"' EXIT
+same_id_guard() {
+	sg_other=$(ccnavi_id_clash "$name" "$1") || return 0
+	log_info 同じ識別子のブランチ -- "name=$name" "where=$2"
+	printf 'ワークツリーは切っていない。%s にブランチ %s があり、%s と同じ識別子（%s。英字の大文字小文字は区別しない）になる。\n' "$2" "$sg_other" "$name" "$name"
+	printf '同じ識別子のブランチが 2 本あると、ワークツリーの置き場が重なる。既にあるブランチは ccnavi-start.sh で始める:\n'
+	printf '  sh %s --mr <MR の番号>\n  sh %s --issue <issue の番号>\n' "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")" "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")"
+	printf '別の作業として新しく切るなら、別の名前で再実行する: sh %s <別の名前>\n' "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")"
+	exit 1
+}
+{
+	git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null || :
+	git for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin 2>/dev/null | grep -v -x 'HEAD' || :
+} >"$heads_list"
+[ -n "$adopt" ] || same_id_guard "$heads_list" 手元
+
 if [ -z "$adopt" ] && { [ -e "$dest" ] || [ -L "$dest" ]; }; then
 	# 在るのは、このリポジトリのワークツリーで、同じ名前のブランチを開いているときだけ成功にする。
 	have=$(git worktree list --porcelain 2>/dev/null | awk -v want="$(ccnavi_phys "$dest")" '
@@ -232,27 +254,6 @@ fi
 if [ -z "$adopt" ] && git show-ref --verify --quiet "refs/heads/$name"; then
 	fail branch-exists "ブランチ ${name} が既にあります（ワークツリーはありません）。既にあるブランチを出すには、2 段の手順が要ります。1 段目: sh $(ccnavi_sh_quote "$scripts/ccnavi-git.sh") worktree add $(ccnavi_sh_quote ".claude/worktrees/${name}") $(ccnavi_sh_quote "$name")。2 段目: sh $(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh") $(ccnavi_sh_quote "$name") --adopt --base <統合先> で引き取ります（引き取らないと integrate できません。引き取りにはユーザの確認が要ります）。新しく切るなら別の名前にしてください。$(unattended_line)"
 fi
-
-# 同じ識別子になる別のブランチ（feature/7-x に対する feature-7-x、英字の大文字小文字だけ違う名前）があれば止める。
-# <一覧のファイル> <どこ（手元・origin）>
-heads_list="$root/logs/state/worktree-heads-$$"
-cand_index="$root/logs/state/worktree-index-$$"
-mkdir -p "$root/logs/state" 2>/dev/null || :
-trap 'rm -f "$heads_list" "$heads_list.names" "$cand_index"' EXIT
-same_id_guard() {
-	sg_other=$(ccnavi_id_clash "$name" "$1") || return 0
-	log_info 同じ識別子のブランチ -- "name=$name" "where=$2"
-	printf 'ワークツリーは切っていない。%s にブランチ %s があり、%s と同じ識別子（%s。英字の大文字小文字は区別しない）になる。\n' "$2" "$sg_other" "$name" "$name"
-	printf '同じ識別子のブランチが 2 本あると、ワークツリーの置き場が重なる。既にあるブランチは ccnavi-start.sh で始める:\n'
-	printf '  sh %s --mr <MR の番号>\n  sh %s --issue <issue の番号>\n' "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")" "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")"
-	printf '別の作業として新しく切るなら、別の名前で再実行する: sh %s <別の名前>\n' "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")"
-	exit 1
-}
-{
-	git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null || :
-	git for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin 2>/dev/null | grep -v -x 'HEAD' || :
-} >"$heads_list"
-[ -n "$adopt" ] || same_id_guard "$heads_list" 手元
 
 # ---- C1〜C3。先に断るもの。
 # 取り込み先は、ユーザのチェックアウト（git worktree listの先頭）が開いているブランチ。
