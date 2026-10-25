@@ -101,6 +101,37 @@ class PathsafeTest(unittest.TestCase):
         self.assertFalse(pathsafe.is_link(os.path.join(self.root, "a")))
         self.assertFalse(pathsafe.is_link(os.path.join(self.root, "nope")))
 
+    def test_first_link_stops_at_missing(self):
+        self.link(self.out, "m")
+        self.assertIsNone(pathsafe.first_link(self.root, ["nope", "m"]))
+
+    def test_junction_counts_as_link(self):
+        from unittest import mock
+
+        target = os.path.join(self.root, "a")
+        with mock.patch("os.path.isjunction", lambda p: p == target):
+            self.assertTrue(pathsafe.is_link(target))
+            self.assertTrue(pathsafe.has_link(self.root, os.path.join(target, "b")))
+            self.assertEqual(pathsafe.scan(self.root, ["a", "b"]), (pathsafe.LINK, target))
+
+    def test_callers_keep_their_meaning(self):
+        from ccnavi.records import prune
+        from ccnavi.tickets import archive, learning, review
+
+        link = self.link(self.out, "m")
+        self.assertEqual(learning.unsafe_path(self.root, "m/x.md"), link)
+        self.assertEqual(learning.unsafe_path(self.root, "a/b/f.txt"), "")
+        self.assertTrue(review._escapes(self.root, "m/x"))
+        self.assertFalse(review._escapes(self.root, "a/b/f.txt"))
+        # 最後の名前がリンクなのは構わない
+        self.assertFalse(review._escapes(self.root, "m"))
+        self.assertFalse(prune._linkless(self.root, link))
+        self.assertTrue(prune._linkless(self.root, os.path.join(self.root, "a", "b")))
+        self.assertFalse(prune._linkless(self.root, self.out))
+        self.assertIs(archive._linked(self.root, ("m",)), True)
+        self.assertIs(archive._linked(self.root, ("a", "b")), False)
+        self.assertIsNone(archive._linked(self.root, ("a", "nope")))
+
 
 if __name__ == "__main__":
     unittest.main()
