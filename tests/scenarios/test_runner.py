@@ -1578,6 +1578,52 @@ class ResetTest(unittest.TestCase):
             self.assertIn("keep-me", git(ws.root, "branch"))
 
 
+class PreRunCheckTest(unittest.TestCase):
+    def test_unknown_base_is_refused_before_anything_is_changed(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            ws.dirty()
+            scn = {"setup": {"reset": {"base": "0" * 40}}}
+            with self.assertRaises(runner.Refusal) as cm:
+                runner.check_before_run(scn, ws.root, str(ws.target.resolve()))
+            self.assertIn("次: ", str(cm.exception))
+            self.assertEqual(git(ws.target, "branch", "--show-current"), "main")
+            self.assertNotIn(runner.LEFT_NAME, {p.name for p in (ws.target / ".git").iterdir()})
+
+    def test_unusable_append_target_is_refused_before_the_confirmation(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            path = ws.scenario_file(
+                {
+                    "files": {"projects/test-repo/untracked.txt": {"content": "x", "append": True}},
+                    "reset": {"base": ws.base},
+                }
+            )
+            (ws.target / "untracked.txt").write_text("u", encoding="utf-8")
+            with mock.patch.object(runner, "_ENTRY", True), mock.patch("builtins.print"):
+                rc = runner.main(["run", str(path), "--root", str(ws.root)])  # --confirmed なし
+            self.assertEqual(rc, 3)
+            self.assertFalse(ws.out.exists())
+
+
+class SetupFailureTest(unittest.TestCase):
+    def test_partial_failure_removes_what_was_made(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            scn = {"setup": {"files": {"a/one.txt": "1", "a/two.txt": "2"}}}
+            real = Path.write_text
+
+            def flaky(self, *a, **k):
+                if self.name == "two.txt":
+                    raise OSError("書けない")
+                return real(self, *a, **k)
+
+            with mock.patch.object(Path, "write_text", flaky), self.assertRaises(OSError):
+                runner._setup(scn, root)
+            self.assertFalse((root / "a").exists())
+            self.assertEqual(runner.setup_clashes(scn, root), [])
+
+
 class LockTest(unittest.TestCase):
     def test_second_run_is_refused_and_release_lets_it_in(self):
         with tempfile.TemporaryDirectory() as d:

@@ -19,7 +19,8 @@ restore は、人間の操作で止まった回を続けずにやめるとき、
 ccnavi 本体にブランチ・コミット・ワークツリーが残らないことは、
 回す前後の状態を比べて確かめる（repo）。
 
-終了コード: 0 全部通った / 1 不合格がある / 2 未成立か意味の判定待ちがある /
+終了コード: 0 全部通った / 1 不合格がある・setup のパスが合わず回せない /
+2 未成立か意味の判定待ちがある /
 3 人間の確認が要る・回す前の拒否・使い捨てのリポジトリを戻せなかった（手作業が要る） /
 10 人間の操作で止まった（「次へ」のあと next で続ける。setup.reset の対象は base に戻さず残す）。
 
@@ -597,7 +598,7 @@ def require_disposable_repo(root, target, allowed=None):
     """target が使い捨てのリポジトリだと確かめ、その toplevel（実体）を返す。違えば Refusal。
 
     setup.git・setup.reset・setup.files の追記は、すべてこれを通る。比べるのは toplevel の実体で、
-    ccnavi 本体（root）と同じ・origin が本体と同じものは断る。許可されるのは allowed
+    ccnavi 本体（root）と同じもの、origin が本体と同じものは断る。許可されるのは allowed
     （既定は root/projects/test-repo）の実体だけ。どちらかに origin が無いときは origin を比べない。
     """
     allowed = Path(allowed) if allowed is not None else Path(root) / DISPOSABLE_REL
@@ -774,7 +775,7 @@ def acquire_target(top, out, resuming=False):
             raise Refusal(
                 f"前の回が対象を戻さずに残している: {who}",
                 f"続けるなら `{RUNNER} next {who}`、やめるなら `{RUNNER} restore {who}`",
-                "戻せなくて残した回も同じ（restore が戻し直す）",
+                "戻せずに残した回も同じ。restore で戻す",
             )
     lock = git_dir / LOCK_NAME
     for _ in range(2):
@@ -849,7 +850,7 @@ def resolve_append(rel, root, toplevel):
     p = Path(rel)
     if p.is_absolute() or ".." in p.parts:
         raise Refusal(
-            f"追記のパスは、ワークスペースルートからの相対で .. を含まない形にする: {rel}",
+            f"追記のパスは、ワークスペースルートからの相対パスで .. を含まない形にする: {rel}",
             "setup.files のパスを直す",
         )
     real = os.path.realpath(Path(root) / p)
@@ -872,9 +873,25 @@ def resolve_append(rel, root, toplevel):
     return real
 
 
+def check_before_run(scn, root, top):
+    """回す前（確認文より前）に確かめられる setup の誤りを、Refusal で返す。何も変えない。
+    追記の対象は reset のあとにもう一度確かめる（base の中身で変わりうるため）。"""
+    setup = scn.get("setup") or {}
+    for rel, v in (setup.get("files") or {}).items():
+        if file_spec(v)[1]:
+            resolve_append(rel, root, top)
+    base = (setup.get("reset") or {}).get("base")
+    if base and _git(["cat-file", "-e", f"{base}^{{commit}}"], cwd=top).returncode != 0:
+        raise Refusal(
+            f"setup.reset.base {base} が対象 {top} にコミットとして無い",
+            "base を、対象にあるコミットの 40 桁の SHA に直して打ち直す",
+            "対象には何もしていない",
+        )
+
+
 def setup_clashes(scn, root):
     """setup.files のパスのうち、回せない原因になるもの。
-    作る形（文字列）は、もう有るもの（後片付けで消してしまうため）。
+    作る形（文字列）は、すでにあるもの（後片付けで消してしまうため）。
     追記の形（append: true）は、まだ無いもの（追記は対象にある管理下のファイルにだけ使う）。"""
     files = (scn.get("setup") or {}).get("files") or {}
     return [rel for rel, v in files.items() if (Path(root) / rel).exists() != file_spec(v)[1]]
@@ -904,23 +921,27 @@ def _setup(scn, root, toplevel=None):
                     "追記の対象を決められない（対象の判定を通っていない）", "setup を直す"
                 )
             appends[resolve_append(rel, root, toplevel)] = body
-    for rel, (body, append) in entries.items():
-        if append:
-            continue
-        p = Path(root) / rel
-        missing = []
-        d = p.parent
-        while d != Path(root) and not d.exists():
-            missing.append(d)
-            d = d.parent
-        for d in reversed(missing):
-            d.mkdir()
-            dirs.append(str(d.relative_to(root)))
-        p.write_text(body, encoding="utf-8")
-        files.append(rel)
-    for real, body in appends.items():
-        with open(real, "a", encoding="utf-8", newline="") as f:
-            f.write(body)
+    try:
+        for rel, (body, append) in entries.items():
+            if append:
+                continue
+            p = Path(root) / rel
+            missing = []
+            d = p.parent
+            while d != Path(root) and not d.exists():
+                missing.append(d)
+                d = d.parent
+            for d in reversed(missing):
+                d.mkdir()
+                dirs.append(str(d.relative_to(root)))
+            p.write_text(body, encoding="utf-8")
+            files.append(rel)
+        for real, body in appends.items():
+            with open(real, "a", encoding="utf-8", newline="") as f:
+                f.write(body)
+    except BaseException:
+        _cleanup(files, dirs, root)  # 途中で失敗したとき、ここまでに作ったものを残さない
+        raise
     return files, dirs
 
 
@@ -1473,6 +1494,7 @@ def confirmation_text(scn, root, mode_text):
     if uses_target(scn):
         try:
             top = require_disposable_repo(root, Path(root) / DISPOSABLE_REL)
+            check_before_run(scn, root, top)
             facts += ["", f"対象のリポジトリ: {top}（使い捨てと確かめた）"]
         except Refusal as exc:
             facts += ["", f"注意: 対象のリポジトリを使えない（run は回さない）\n{exc}"]
@@ -1629,6 +1651,7 @@ def cmd_run(args):
     if uses_target(scn):
         try:
             top = require_disposable_repo(root, root / DISPOSABLE_REL)
+            check_before_run(scn, root, top)
         except Refusal as exc:
             return _refuse(exc)
     if not args.confirmed:
