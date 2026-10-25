@@ -111,7 +111,7 @@ sh .ccnavi/scripts/ccnavi-start.sh --list-open
   --repo <owner/repo>
                 依頼の URL が示すリポジトリ。cwd の origin と違えば、ホストに問い合わせる前に止めて、移動先
                 （projects/<名前>/）を案内する（終了コード 1）。大文字小文字は区別しない
-  --reopened    --issue の issue が closed でも続ける。closed の issue は、MR が無くても止めて（終了コード 3）、reopen する・
+  --reopened    --issue で指定した issue が closed でも続ける。closed の issue は、MR が無くても止めて（終了コード 3）、reopen する・
                 closed のまま続ける・別の issue にする・やめる、を「次の手:」に並べる。ユーザが closed と承知のうえで
                 続けると言ったときだけ付ける。ホストから issue の状態を読めないときは止めず、「確認:」の行で未確認と出す
   --dry-run     何も作らず、作る予定の内容だけ出す（リモートは読むだけ）
@@ -600,7 +600,7 @@ issue_state_gate() {
 		printf '案内: issue #%s は closed。--reopened が付いているので、そのまま続ける\n' "$number"
 		return 0
 	fi
-	printf 'ccnavi-start: issue #%s は closed です。完了済み・却下・重複のことが多いので、何も作成せずに処理を中断しました。ユーザに状況を伝えて、どれにするか聞いて返事を待ってください。直接実装には切り替えない。\n' "$number"
+	printf 'ccnavi-start: issue #%s は closed です。完了済み・却下・重複のことが多いので、何も作成せずに処理を中断しました。ユーザに状況を伝えて、どれにするか聞いて返事を待ってください。直接実装には切り替えないでください。\n' "$number"
 	printf '次の手:\n'
 	printf '  1. reopen する: ユーザに issue #%s を reopen してもらい、同じコマンドを打ち直す（reopen 済みなら止まらない）: sh %s/ccnavi-start.sh %s\n' "$number" "$scripts" "$real_args"
 	printf '  2. closed のまま続ける: ユーザが closed と承知のうえで続けると言ったときだけ、--reopened を付けて打ち直す: sh %s/ccnavi-start.sh %s --reopened\n' "$scripts" "$real_args"

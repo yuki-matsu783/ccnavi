@@ -733,7 +733,7 @@ class StartShTest(unittest.TestCase):
     # ---- closed の issue
 
     def closed_issue(self, state="closed"):
-        """issue #152 が state の GitHub で新規作成が通る代役（MR は無い）。"""
+        """issue #152 の状態が state になっている GitHub の代役（MR は無い）。新規作成は通る。"""
         self.github_new()
         with open(self.routes, encoding="utf-8") as f:
             routes = json.load(f)
