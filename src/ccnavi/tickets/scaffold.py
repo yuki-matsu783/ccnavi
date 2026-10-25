@@ -262,7 +262,7 @@ def run(
     if ticket_ids.child_pattern().fullmatch(ident):
         return refuse(
             f"{ident} は子の識別子の形（<親>-<NN>-<NN>）。雛形を出すのは親だけ。"
-            "子の提案は手で書く（設計 9.3）"
+            "子の提案は手で書く（書式は ccnavi --docs --keyword 提案書式）"
         )
     if not (title or "").strip():
         return refuse("--title <題> が必要です")
@@ -354,7 +354,7 @@ def run(
         return refuse(
             f"plan の型（{', '.join(inherited)}）は scope: inherit のため、範囲を親の allow から"
             "継承します。今回の範囲が未指定で、allow が集まりません（allow か ask が 1 件は"
-            "必要です。設計 9.3）。ユーザに今回編集するファイルを確認し、--scope <glob> で"
+            "必要です）。ユーザに今回編集するファイルを確認し、--scope <glob> で"
             "指定して再実行してください"
             '（例: --plan quick-work --scope "src/ui/error.ts"）。'
             "範囲を持つ型を追加する必要はありません"
