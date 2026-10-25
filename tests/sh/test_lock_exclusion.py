@@ -1,12 +1,14 @@
 """ロックの強制取得の排他を固定する試験（`ccnavi-common-lock.sh` の `ccnavi_lock_take`）。
 
-古いロックを取り合っても、2 つのプロセスが同時に臨界区間に入らないことを見る。強制取得の層
-（`.steal` ゲート・`mv` 後の再確認・元へ戻す処理）を縮めたときに破れる性質なので、縮める変更の前後で
-同じ試験が通ることを求める。
+古いロックを取り合っても、2 つのプロセスが同時に臨界区間に入らないことを見る。
 
 - 5 つのプロセスが同時に 1 つの古いロックを取りに行き、臨界区間（`mkdir` で作る印）が重ならない
 - 時系列: A が古いと判断して強制取得の入口で止まる間に、B が回収して生きたロックを持つ。
-  再開した A が B のロックを奪わない
+  再開した A が B のロックを奪わない。強制取得の入口で owner の行を読み直す比較が、これを守る
+
+守る範囲: 古いと判断してから強制取得に入るまでの間に持ち主が替わる場合。
+`mv` の直前の比較と `mv` の間に持ち主が替わる場合（`mv` 後の再確認が守る）と、`.steal` ゲート
+（外しても排他は保たれ、戻し損ねて人の対応になる確率が上がる）は、この試験では見ない。
 
 時系列の試験の遅延は、スクリプトのコピーに差し込む。本番のスクリプトには入れない。
 """
@@ -15,6 +17,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import socket
 import subprocess
 import tempfile
 import time
@@ -99,7 +102,7 @@ class LockExclusionTest(unittest.TestCase):
         self.driver = os.path.join(self._tmp.name, "driver.sh")
         with open(self.driver, "w", encoding="utf-8", newline="\n") as f:
             f.write(DRIVER)
-        self.host = subprocess.run(["hostname"], capture_output=True, text=True).stdout.strip()
+        self.host = socket.gethostname()
 
     def lock_dir(self):
         return os.path.join(self.ws, "state", "locks", "self", PARENT)
