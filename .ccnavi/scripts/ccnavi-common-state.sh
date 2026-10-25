@@ -74,6 +74,31 @@ ccnavi_ask() {
 	printf '%s\n' "$ccnavi_ak_out" | tr -d '\r'
 }
 
+# 文面ファイルの文を、実行ファイル（`ccnavi text`）に引かせて標準出力に出す。
+# <ワークスペースルート> <識別子> [<名前>=<値>]... [@<欄>=<場合>]...
+#
+# 値は引用せずそのまま渡す。コマンドの一部になる値は、文面ファイルの側が `{名前:sh}` で引用する。引数の並びなど
+# 呼ぶ側が引用を済ませた値は、名前を `_q` で終える。sh は文面ファイルを直接読まない。
+#
+# 引けないとき（実行ファイルが無い・版が合わない・識別子や値が合わない・文面ファイルが壊れている）は、
+# 識別子の種類に合わせた短い既定の文を出す。どちらでも 0 を返す（呼ぶ側の `set -e` を起こさない）。
+# 止める・止めないは呼ぶ側が決めたままで、変えない。
+ccnavi_text() {
+	ccnavi_tx_root="$1"
+	ccnavi_tx_id="$2"
+	shift 2
+	if ccnavi_tx_out=$(ccnavi_ask "$ccnavi_tx_root" text "$ccnavi_tx_id" "$@") && [ -n "$ccnavi_tx_out" ]; then
+		printf '%s\n' "$ccnavi_tx_out"
+		return 0
+	fi
+	ccnavi_tx_gone="ユーザに、ccnavi の実行ファイルと文面ファイル（.ccnavi/config/common/messages/）が使えるかを確かめてもらい、返事を待つ（文面 ${ccnavi_tx_id} を引けませんでした）"
+	case "$ccnavi_tx_id" in
+	CHOICES_*) printf '次の手:\n  1. %s\n' "$ccnavi_tx_gone" ;;
+	NOTE_*) printf '案内: 文面 %s を引けませんでした\n' "$ccnavi_tx_id" ;;
+	*) printf '次: %s\n' "$ccnavi_tx_gone" ;;
+	esac
+}
+
 # 名前のワークツリーがチケットに結び付くかを実行ファイル（`tree bound`）に聞く。<ワークスペースルート> <ワークツリーのパス> <名前>
 #
 # 答えは ccnavi_tb_state（yes・no・unavailable（実行ファイルに確かめられない）・undecided（決められない））と、

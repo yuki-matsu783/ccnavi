@@ -59,7 +59,7 @@ from dataclasses import dataclass, field
 import yaml
 
 from ..infra import fsio, gitcmd, pathcase, pathsafe, settings, yamlread
-from ..policy import ruleload
+from ..policy import ruleload, texts
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 from . import config_check, flow, handoff_names, plan_templates, ticket_places
 
@@ -75,6 +75,7 @@ ORIG_SUFFIX = ".orig"
 HANDOFF_ALIASES = handoff_names.ALIASES
 
 KIND_TEMPLATE = "template"
+KIND_MESSAGES = "messages"
 KIND_LAYER_CONFIG = "layer-config"
 KIND_DOCS = "docs"
 KIND_DEFENSE = "defense"
@@ -130,6 +131,19 @@ KINDS: tuple[Kind, ...] = (
         ),
         new=True,
         board=True,
+    ),
+    Kind(
+        KIND_MESSAGES,
+        (
+            ".ccnavi/config/common/messages/<名前>.yml",
+            ".ccnavi/config/project/messages/<名前>.yml",
+        ),
+        (
+            rf"\.ccnavi/config/common/messages/{_NAME}\.yml",
+            rf"\.ccnavi/config/project/messages/{_NAME}\.yml",
+        ),
+        new=True,
+        board=False,
     ),
     Kind(
         KIND_LAYER_CONFIG,
@@ -560,7 +574,7 @@ def _inside(root: str, path: str) -> bool:
 
 def _locate_layer(conf: settings.Settings, root: str, entry: Entry) -> None:
     """テンプレートとレイヤーの設定の、レイヤーを決める。読まれない置き場なら断る。"""
-    if entry.kind.id not in (KIND_TEMPLATE, KIND_LAYER_CONFIG):
+    if entry.kind.id not in (KIND_TEMPLATE, KIND_LAYER_CONFIG, KIND_MESSAGES):
         return
     parts = entry.key.split("/")
     if parts[0] == "projects":
@@ -647,8 +661,27 @@ def _check_contents(conf: settings.Settings, root: str, plan: Plan) -> None:
             _said(entry, config_check.file_problems(overlay, root, entry.config_kind, entry.layer))
             if entry.config_kind == settings.KIND_RULES:
                 entry.defense = _defense_change(entry.current, entry.raw)
+        elif entry.kind.id == KIND_MESSAGES:
+            _check_messages(root, entry)
         elif entry.kind.id == KIND_DEFENSE:
             _check_defense(entry)
+
+
+def _check_messages(root: str, entry: Entry) -> None:
+    """文面ファイルの下書き。取り込んだあとに検査（`--lint`）で落ちる文は取り込ませない。
+
+    欄・差し込みの名前・`次:` の数などを外した文で、拒否や促しの型を弱められないようにする。
+    自身のレイヤーの下書きは、共通レイヤーの同じ識別子に重ねて検査する。
+    """
+    try:
+        text = (entry.raw or b"").decode("utf-8")
+    except UnicodeDecodeError:
+        entry.errors.append("UTF-8 として読めない")
+        return
+    layer = entry.layer or settings.LAYER_SELF
+    common = texts.load(root).common if layer != settings.LAYER_COMMON else None
+    _, problems = texts.check_text(text, layer, entry.draft or entry.rel, common)
+    _said(entry, problems)
 
 
 # ルールの id のうち、防御の記述の印。レイヤーの rules.yml に利用者が書く防御のルールの印。

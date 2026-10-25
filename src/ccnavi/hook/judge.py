@@ -23,6 +23,7 @@ from ..policy import (
     selfguard_shell,
     selfguard_targets,
     subjects,
+    texts,
 )
 from ..records import audit, failstreak, repeat
 from ..tickets import (
@@ -1472,23 +1473,17 @@ def ticket_verdict(
                     f"[ccnavi] {reasons.CODE_TICKET_PARENT} (source: {ticket.path})",
                     f"subject: {full}",
                     f"ticket: {ticket.ticket} ({ticket.title}), worktree {t.name}",
-                    "This is the parent ticket's worktree. Work is not written here: only the "
-                    "draft and proposal places (wip/proposals/, wip/handoff/, wip/eli5/) are "
-                    "writable. Widening the parent's scope does not help. Propose a child "
-                    "ticket for the phase (ccnavi-ticket.sh propose), have the user agree to it, "
-                    "start it, and do the work in the child's worktree; the child's finish merges "
-                    "it into the parent. If the parent has no child for this phase yet, "
-                    "create one first.",
-                    # 承認の前に親へ入った変更を、承認の後に戻す手順。迂回しない旨も添える。
-                    "If this edit is meant to undo a change that is already uncommitted in the "
-                    "parent worktree (for example work done before the ticket was agreed), "
-                    "do not rewrite it here and do not work around this denial. Discard it with "
-                    f"(for example: cd {settings.shell_path(t.root)} && "
-                    f"{settings.script_command(root, 'ccnavi-git.sh')} "
-                    "restore --staged --worktree -- <path>; one file at a time), "
-                    "or move it into the child's worktree and commit it there. "
-                    "If you did not write the change yourself, ask the user "
-                    "before discarding it.",
+                    texts.say(
+                        root,
+                        "DENY_TICKET_PARENT",
+                        {
+                            "ticket": ticket.ticket,
+                            "title": ticket.title,
+                            "worktree": t.name,
+                            "path": full,
+                            "worktree_path": t.root,
+                        },
+                    ),
                 ]
             ),
             "",

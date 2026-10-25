@@ -22,7 +22,7 @@
 # 下書きが既にあれば上書きしない（編集中のものを消さないため）。
 #
 # --commands は、編集が済んだあとに打つ。元と違う下書きだけを、種類ごとに分けて出す。
-#   取り込める種類（template・layer-config・docs。表は handoff.KINDS）: ユーザが ccnavi-user-handoff.sh で
+#   取り込める種類（template・messages・layer-config・docs。表は handoff.KINDS）: ユーザが ccnavi-user-handoff.sh で
 #     下見（検査・差分・ハッシュ）をしてから --yes --expect で取り込む。mv は出さない（検査も差分も通らないため）
 #   defense（.ccnavi/scripts の sh・.claude の hook・settings・skills）: 差し替えの mv を、フルパスで 1 行ずつ出す
 # 元と同じ（まだ編集していない）もの、下書きがまだ無いもの、下書きを作ったあとに元が変わったもの
@@ -47,7 +47,7 @@ sh .ccnavi/scripts/ccnavi-stage.sh --commands <パス>...
 
   <パス>      直したい元のファイル（ワークスペースルートの下）。cwd からの相対でも絶対でもよい
   --commands  編集が済んだあとに実行します。元と違う下書きだけを、種類ごとに分けて出します
-              （template・layer-config・docs は ccnavi-user-handoff.sh の手順。defense は差し替えの mv を、フルパスで出します）
+              （template・messages・layer-config・docs は ccnavi-user-handoff.sh の手順。defense は差し替えの mv を、フルパスで出します）
 
 下書きは <cwd のワークツリー（無ければワークスペースルート）>/wip/handoff/<ワークスペースルートからの相対パス> に cp する
 （既にあれば上書きしない）。.claude の階層は handoff-.claude に読み替えて置く
@@ -210,7 +210,7 @@ relative_of() {
 	printf '%s\n' "$rl_rel"
 }
 
-# 元の相対パス <$1> が、ccnavi-user-handoff.sh で取り込める種類（template・layer-config・docs）なら 0。
+# 元の相対パス <$1> が、ccnavi-user-handoff.sh で取り込める種類（template・messages・layer-config・docs）なら 0。
 # 表は src/ccnavi/tickets/handoff.py の KINDS（defense と対象外は 1 を返し、mv の道に残す）。
 # 比べ方は ASCII の大文字小文字を区別しない（Python 側は NFC と fold）。表を変えたら、test_stage_sh の例も直す。
 is_importable() {
@@ -229,6 +229,10 @@ is_importable() {
 	*/.yml | */.md) return 1 ;;
 	.ccnavi/config/common/templates/*.yml | .ccnavi/config/project/templates/*.yml)
 		case "${im_b#*/templates/}" in */*) return 1 ;; esac
+		return 0
+		;;
+	.ccnavi/config/common/messages/*.yml | .ccnavi/config/project/messages/*.yml)
+		case "${im_b#*/messages/}" in */*) return 1 ;; esac
 		return 0
 		;;
 	.ccnavi/config/common/rules.yml | .ccnavi/config/common/phases.yml | .ccnavi/config/common/risks.yml) return 0 ;;

@@ -52,7 +52,7 @@ import tempfile
 import time
 import unittest
 
-from tests import ROOT, common_path, config_path, host_stub
+from tests import ROOT, common_path, config_path, host_stub, put_messages
 from tests.ticketsample import PHASES, RULES, child_text, parent_text
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -180,6 +180,7 @@ class WriteAndPushHarness(unittest.TestCase):
             for name in os.listdir(overlay):
                 if name.endswith(".sh"):
                     shutil.copy(os.path.join(overlay, name), self.scripts)
+        put_messages(self.ws)
         git(base, "init", "-q", "-b", "main", self.ws)
         for key, value in CONFIG:
             git(self.ws, "config", key, value)

@@ -23,6 +23,7 @@ import unittest
 from ccnavi.hook import turngate
 from ccnavi.hook.turngate import BUILTIN, Cond, Gate
 from ccnavi.records import userprompt
+from tests import put_messages
 
 # integrate と関係の無い架空の組。「copy-in <名前>」のあと、発言をはさむまで
 # 「copy-out <名前>」を打てない。
@@ -32,8 +33,7 @@ COPY = Gate(
     second=Cond(regex=r"\bcopy-out\s+(?P<key>\S+)"),
     first_name="copy-in",
     second_name="copy-out",
-    why="コピーの中身をユーザが見るためです。",
-    next_step="ユーザに見せて返事を待ち、あとで copy-out {key} を打ち直す",
+    message="DENY_NEEDS_USER_TURN__COPY",
     key_name="<名前>",
 )
 # キーを持たない架空の組（glob と but）。「deploy」のあと、発言をはさむまで「promote」を打てない。
@@ -43,8 +43,7 @@ DEPLOY = Gate(
     second=Cond(glob="*promote*"),
     first_name="deploy",
     second_name="promote",
-    why="デプロイの結果をユーザが見るためです。",
-    next_step="結果を見せて返事を待つ",
+    message="DENY_NEEDS_USER_TURN__PROMOTE",
 )
 GATES = (COPY, DEPLOY)
 
@@ -319,12 +318,35 @@ class BrokenRecordTest(TurnGateTestCase):
         self.assertIsNone(turngate.note(GATES, ["ls"], blocker, SESSION, "c1"))
 
 
+EXTRA_MESSAGES = """\
+version: 1
+messages:
+  DENY_NEEDS_USER_TURN__COPY:
+    kind: deny
+    values: [first_name, second_name, where, key]
+    what:
+      same_command: "{first_name} と {second_name} をまとめて打とうとしました{where}。"
+      no_user_turn: "{first_name} を打ったあと、発言が無いまま {second_name} を打とうとしました{where}。"
+    why: コピーの中身をユーザが見るためです。
+    next: ユーザに見せて返事を待ち、あとで {second_name} {key} を打ち直す
+    no_bypass: 分けても同じ関門に当たります。
+"""
+
+
 class MessageTest(TurnGateTestCase):
+    def setUp(self):
+        super().setUp()
+        self.root = tempfile.mkdtemp(prefix="ccnavi-turngate-root-")
+        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        directory = put_messages(self.root)
+        with open(os.path.join(directory, "test-copy.yml"), "w", encoding="utf-8") as f:
+            f.write(EXTRA_MESSAGES)
+
     def test_止めた文は_4_つの段で_値が埋まっている(self):
         self.a("copy-in foo")
         got = self.b("copy-out foo")
 
-        text = turngate.message(got, "")
+        text = turngate.message(got, self.root)
 
         lines = text.split("\n")
         self.assertEqual(len(lines), 4)
@@ -346,7 +368,7 @@ class MessageTest(TurnGateTestCase):
             turngate.Stop(COPY, turngate.UNWRITABLE, "foo", "disk full"),
         ):
             with self.subTest(reason=stop.reason):
-                text = turngate.message(stop, "")
+                text = turngate.message(stop, self.root)
                 self.assertEqual(sum(1 for line in text.split("\n") if line.startswith("次: ")), 1)
                 self.assertNotRegex(text, r"ADR|adr-?\d")
 
@@ -355,12 +377,12 @@ class MessageTest(TurnGateTestCase):
         got = self.b("copy-out $name")
 
         self.assertEqual(got.key, "")
-        self.assertIn("copy-out <名前> を打ち直す", turngate.message(got, ""))
+        self.assertIn("copy-out <名前> を打ち直す", turngate.message(got, self.root))
 
     def test_読み書きできないときは_ユーザに置き場を確かめてもらう(self):
         stop = turngate.Stop(COPY, turngate.UNREADABLE, "foo", "permission denied")
 
-        text = turngate.message(stop, "")
+        text = turngate.message(stop, self.root)
 
         self.assertIn("permission denied", text)
         self.assertIn("次: ユーザに", text)

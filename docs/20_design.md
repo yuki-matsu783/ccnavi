@@ -139,5 +139,6 @@ ccnavi は、Claude Code を使った開発を、ルール・チケット・必�
 | 10 | [21_design/diagnostics.md](21_design/diagnostics.md) | 診断のオプションと機械可読な出力 |
 | 11 | [21_design/multi-repo.md](21_design/multi-repo.md) | ワークスペースとプロジェクトのレイヤー、置き場・ツリー・ルールの合成・守るもの・共通レイヤーの配布などの各節 |
 | 12 | [21_design/limits.md](21_design/limits.md) | 保証しないこと、許容する誤検知、未実装、最終防衛線 |
+| 13 | [21_design/messages.md](21_design/messages.md) | 拒否・促し・次の一手の文を条件から分けて置く文面ファイル。形式、置き場、識別子、差し込み、読み出し口、上書き、壊れたときの扱い、点検 |
 | Stop の AI 判定 | [21_design/stop-review.md](21_design/stop-review.md) | agent 型 Stop hook が提案の取りこぼしを判定する仕組み、状態、記録、評価、実測で確かめた前提、限界 |
 | 付録 A〜C | [21_design/appendix.md](21_design/appendix.md) | 理由コード、記録の 1 行、実測で確かめた前提 |

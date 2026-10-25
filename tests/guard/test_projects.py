@@ -469,7 +469,7 @@ class ProjectsTest(unittest.TestCase):
             refused = self.hook("Write", self.ws, file_path=os.path.join(home, *rel))
             self.assertEqual(self.decision(refused), "deny", refused.stdout + refused.stderr)
             self.assertIn("DENY_TICKET_PARENT", self.reason(refused))
-            self.assertIn("child", self.reason(refused))
+            self.assertIn("子チケット", self.reason(refused))
         for rel in (("wip", "handoff", "a.md"), ("wip", "proposals", "todo", "i0099.md")):
             placed = self.hook("Write", self.ws, file_path=os.path.join(home, *rel))
             self.assertNotIn("DENY_TICKET_PARENT", self.reason(placed))
