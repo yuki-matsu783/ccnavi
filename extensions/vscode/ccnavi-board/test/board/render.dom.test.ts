@@ -263,7 +263,7 @@ test("CB-T108b 承認したら同じオーバーレイに文とコピー・新�
     // 文は文字として出す。<b> がタグにならない
     assert.equal(text(page, "pre.approval-text"), "i0001-02-03 を承認した <b>");
     assert.equal(page.all("pre.approval-text b").length, 0);
-    // 案内は畳んで初期は閉じ、コピーが上に主役で並ぶ。コピーは画面に 1 個
+    // 案内は折りたたんで最初は閉じておく。コピーは上に並べ、画面に 1 個だけ置く
     const more = page.one("details.approval-more");
     assert.equal(more.hasAttribute("open"), false);
     assert.equal(text(page, "details.approval-more > summary"), "次に打つコマンドを含む案内");
