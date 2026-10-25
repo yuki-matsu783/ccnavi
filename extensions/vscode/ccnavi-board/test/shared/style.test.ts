@@ -228,7 +228,7 @@ test("CB-T584 図の枠の z-index は枠の内側だけで有効で、ツール
   assert.match(fs.readFileSync(PAGE_CSS, "utf8"), /\.toolbar \{[^}]*z-index: var\(--z-toolbar\);/, "ツールバーが重なりの単位（z-index）を持たない");
 });
 
-test("CB-T1221 作業中の帯の情報色が page.css にある。.lock の赤は残す", () => {
+test("CB-T1221 作業中の帯の情報色が page.css にあり、.lock の赤も残る", () => {
   const page = fs.readFileSync(PAGE_CSS, "utf8");
   assert.match(page, /\.lock\.info \{[^}]*var\(--vscode-editorInfo-foreground\);[^}]*var\(--info-text\)/);
   assert.match(page, /\.lock \{[^}]*var\(--vscode-editorError-foreground\)/);

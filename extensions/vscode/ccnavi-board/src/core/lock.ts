@@ -57,8 +57,8 @@ export function lockFromBoard(board: BoardJson, project?: string): Lock {
 }
 
 /**
- * 帯のクラス。作業中のチケットがあって止めているとき（`doing` が空でない）だけ情報色にする。
- * 読めなかった・確認中（`lockFromError`）は異常なので赤のまま
+ * 帯のクラス。作業中のチケットがあって保存を止めているとき（`doing` が空でない）だけ情報色にする。
+ * 読めなかったとき・確認中（`lockFromError`）は異常なので赤のまま
  */
 export function lockClass(lock: Lock): string {
   if (!lock.locked) {
