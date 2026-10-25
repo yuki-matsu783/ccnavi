@@ -1972,6 +1972,10 @@ class TagListOnlyTest(GitWrapperTest):
                 self.assertRejected(*args)
         self.assertEqual("", git_out(self.dir, "tag", "--list"))
 
+    def test_help_says_creation_is_the_users(self):
+        result = self.run_wrapper("--help")
+        self.assertIn("作成はユーザに依頼", result.stdout + result.stderr)
+
     def test_listing_still_passes(self):
         git(self.dir, "tag", "v0")
         for args in (

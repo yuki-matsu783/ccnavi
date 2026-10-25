@@ -315,6 +315,8 @@ class PostToolUseTest(Harness, unittest.TestCase):
         text = self.context(result)
         self.assertIn("POST_PREEXISTING", text)
         self.assertIn("戻さず、これを土台にもせず", text)
+        # 捨てるよう頼まれたときだけ、パスを絞った退避にする。
+        self.assertIn("stash push -u -- <頼まれたパス>", text)
         self.assertNotIn("POST_VIOLATION", text)
         # この呼び出しは何も汚していない。判定は呼び出しについてのもの。
         self.assertEqual(self.records()[-1]["decision"], "allow")

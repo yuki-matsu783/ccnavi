@@ -66,23 +66,11 @@ class TextsTest(unittest.TestCase):
         put(self.root, "common", "a.yml", "version: [")
         self.assertIn("引けませんでした", texts.say(self.root, "NEXT_SAMPLE", {"args_q": "x"}))
 
-    def test_the_project_layer_replaces_one_message(self):
-        put(
-            self.root,
-            "project",
-            "b.yml",
-            'version: 1\nmessages:\n  NEXT_SAMPLE:\n    next: "別の文: {args_q}"\n',
-        )
-        self.assertIn("別の文: x", texts.say(self.root, "NEXT_SAMPLE", {"args_q": "x"}))
-
-    def test_an_override_that_fails_the_check_is_not_taken(self):
+    def test_the_project_layer_is_not_read(self):
         bodies = [
-            'next: "次: 二重"',  # 次: で始める
-            'next: "値が無い"',  # values を使わない
-            "next: |-\n      一行目\n      二行目",  # 1 行でない
-            'next: "ADR-0001 に従う {args_q}"',
-            'next: "sh .ccnavi/scripts/x.sh {args_q}"',
-            'kind: next\n    next: "{args_q}"',  # kind は上書けない
+            'next: "別の文: {args_q}"',
+            'next: "次: 二重"',  # 共通レイヤーなら検査で落ちる形も、読まないので何も言わない
+            'kind: next\n    next: "{args_q}"',
         ]
         for body in bodies:
             with self.subTest(body=body):
@@ -93,8 +81,10 @@ class TextsTest(unittest.TestCase):
                     f"version: 1\nmessages:\n  NEXT_SAMPLE:\n    {body}\n",
                 )
                 cat = texts.load(self.root)
-                self.assertTrue([p for p in cat.problems if p.severity == "error"])
-                self.assertIn("打ち直す:", texts.say(self.root, "NEXT_SAMPLE", {"args_q": "x"}))
+                self.assertEqual([], cat.problems)
+                out = texts.say(self.root, "NEXT_SAMPLE", {"args_q": "x"})
+                self.assertNotIn("別の文", out)
+                self.assertIn("ccnavi-start.sh", out)  # 共通レイヤーの文のまま
 
     def test_a_non_string_kind_or_a_line_separator_is_an_error_not_a_crash(self):
         bad = [

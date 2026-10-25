@@ -250,7 +250,7 @@ class StageShTest(unittest.TestCase):
         paths = [
             ".ccnavi/config/common/templates/a.yml",
             ".ccnavi/config/common/messages/deny.yml",
-            ".ccnavi/config/project/messages/a.yml",
+            ".ccnavi/config/project/messages/a.yml",  # 読まれない置き場。取り込めない（mv の道）
             ".ccnavi/config/project/messages/sub/a.yml",
             ".ccnavi/config/project/templates/a.yml",
             ".ccnavi/config/project/templates/sub/a.yml",

@@ -107,6 +107,9 @@ class SessionConventionsTest(unittest.TestCase):
         self.assertIn("サブエージェントにバックグラウンドで任せ", text)
         self.assertIn("実装する前にユーザと合意する", text)
 
+    def test_ラッパーがあればタグはユーザに頼むと届く(self):
+        self.assertIn("タグの作成・push はユーザに頼む", block(self.start("--mode", "enable")))
+
     def test_考え方と保護対象の直し方も届く(self):
         text = block(self.start("--mode", "enable"))
 
@@ -186,6 +189,7 @@ class SessionConventionsTest(unittest.TestCase):
         self.assertIn(NO_WRAPPER_GIT_LINE, text)
         self.assertNotIn(GIT_LINE, text)
         self.assertNotIn(f"sh {self.root}/.ccnavi/scripts/ccnavi-git.sh", text)
+        self.assertNotIn("タグの作成・push", text)
 
     def test_git行はチケット制御の可否に依らず載る(self):
         self.assertIn(GIT_LINE, block(self.start("--mode", "enable")))

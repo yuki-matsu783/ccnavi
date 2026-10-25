@@ -1,9 +1,9 @@
 ---
 type: guide
 title: 文面ファイルに文を足す・直す
-description: 拒否・促し・次の一手の文を文面ファイルに置く決まり。種類と欄の表、差し込みの書き方、呼ぶ側（Python と sh）の書き方、上書き、テスト、移行の進め方
+description: 拒否・促し・次の一手の文を文面ファイルに置く決まり。種類と欄の表、差し込みの書き方、呼ぶ側（Python と sh）の書き方、上書きの口を持たないこと、テスト、移行の進め方
 tags: [exe-boundary, sh-scripts]
-keywords: [文面, 文面ファイル, messages, ccnavi text, ccnavi_text, texts.say, 識別子, 差し込み, 欄, 次:, 拒否, 促し, 移行, 上書き]
+keywords: [文面, 文面ファイル, messages, ccnavi text, ccnavi_text, texts.say, 識別子, 差し込み, 欄, 次:, 拒否, 促し, 移行, 読まれない]
 ---
 
 # 文面ファイルに文を足す・直す
@@ -47,9 +47,9 @@ keywords: [文面, 文面ファイル, messages, ccnavi text, ccnavi_text, texts
 
 ## 上書きと保護
 
-配布先は、自身のレイヤーの `.ccnavi/config/project/messages/*.yml` に同じ識別子を書いて、文だけを替えられる。`kind` と `values` は書けず、検査（欄・差し込みの名前・`次:` の数・長さ・ADR 番号・相対の script）を通らない上書きは採られない。条件は替えられない。
+文だけを替える上書きの口は持たない。自身のレイヤーの `.ccnavi/config/project/messages/` に文面ファイルが置かれていても読まず、`--lint` も何も言わない。読まれるのは共通レイヤーだけ。
 
-`.ccnavi/` の下は組み込みの保護が止めるので、エージェントは書けない。直す下書きは `wip/handoff/` に置き、ユーザが `ccnavi-user-handoff.sh` で取り込む（取り込み前に同じ検査が走る）。文面ファイルは設定 3 本（コア）に加えていない。
+`.ccnavi/` の下は組み込みの保護が止めるので、エージェントは書けない。直す下書きは `wip/handoff/` に置き、ユーザが `ccnavi-user-handoff.sh` で取り込む（共通レイヤーの下書きだけが取り込める。取り込み前に検査（欄・差し込みの名前・`次:` の数・長さ・ADR 番号・相対の script）が走る）。文面ファイルは設定 3 本（コア）に加えていない。
 
 ## 配る
 
