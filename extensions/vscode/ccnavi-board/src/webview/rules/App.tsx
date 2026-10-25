@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
 
 import { lockClass, type Lock } from "../../core/lock.js";
-import { isToolName, KNOWN_TOOLS, SECTIONS, SECTION_LABELS, modeBanner, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
+import { isToolName, KNOWN_TOOLS, SECTIONS, SECTION_LABELS, modeBanner, tmpName, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
 import type { SuggestJson } from "../../core/suggestmodel.js";
 import type { ExpectationsJson } from "../../core/testmodel.js";
 import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
@@ -227,7 +227,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       showTab("judge");
     } else if (message.type === "failed") {
       setBusy(false);
-      setStatus({ text: String(message.message ?? ""), error: true });
+      setStatus({ text: tmpName(String(message.message ?? "")), error: true });
     } else if (message.type === "notice") {
       setBusy(false);
       setStatus({ text: String(message.message ?? ""), error: false });

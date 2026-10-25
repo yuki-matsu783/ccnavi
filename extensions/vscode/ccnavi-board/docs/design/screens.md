@@ -93,7 +93,7 @@ keywords: [設計, 画面, approval-machine, 状態の札, ユーザ待ち, 詳�
 
 画面ごとに要るのは、契約（`*-view.ts`）・入れ物を組む関数・画面の CSS（`webview/<名前>/style.css` と部品ごとの CSS）・`useHostMessages(handler, ready)` の引数（handler と `ready`）・テストの入口（`test/helpers/<名前>.ts`）と、`test/shared/style.test.ts` の `reactPages` への 1 行（足し忘れは CB-T127 が止める）。
 
-**実行ファイルへの往復がある画面（ルール管理）も、やり取りの形は同じ。** 画面は編集中の中身を付けて頼み（`judge` / `expectations`）、拡張ホストが実行ファイルの結果をそのまま返す（`judged` / `expectationsChecked`）。画面は判定の理屈を持たない。VS Code のダイアログが要る欄（`pickFile` → `picked`）も同じで、行を特定するキーは画面が渡し、拡張ホストは読まずにそのまま返す。
+**実行ファイルへの往復がある画面（ルール管理）も、やり取りの形は同じ。** 画面は編集中の中身を付けて頼み（`judge` / `expectations`）、拡張ホストが実行ファイルの結果をそのまま返す（`judged` / `expectationsChecked`）。画面は判定の理屈を持たない。ただし期待する判定のファイルが無いときは、拡張ホストが実行ファイルを呼ばず案内（`notice`。赤くしない）を返す。VS Code のダイアログが要る欄（`pickFile` → `picked`）も同じで、行を特定するキーは画面が渡し、拡張ホストは読まずにそのまま返す。
 
 **画面を 1 つ足すときに触る場所。**
 
