@@ -155,7 +155,7 @@ export function decidePreviewArgs(phase: number): readonly string[] {
 }
 
 /**
- * `ccnavi-user-decide.sh <N> --choices <JSON> --digest <ダイジェスト>`（先頭は `decide` でなくフェーズ番号）。ユーザがオーバーレイで選んだ行き先を置く。
+ * `ccnavi-user-decide.sh <N> --choices <JSON> --digest <ダイジェスト>`。先頭の引数は `decide` ではなくフェーズ番号。ユーザがオーバーレイで選んだ行き先を置く。
  * ダイジェストは見せたときの preview の `digest`。見せたあとに指摘が変わっていれば、実行ファイルは何も置かない。
  * エージェントがこの形を打つと、組み込みの deny（builtin:guard-ticket-approval）が止める
  */

@@ -57,7 +57,7 @@ test("CB-T641 実行ファイルを呼ぶ読み取り（runMrState・runSyncReti
   }
 });
 
-test("CB-T641b 確定の runDecideYes は、書く側の USER_DECIDE_SCRIPT に decideArgs を渡す（読む側の REVIEW_SCRIPT ではない）", () => {
+test("CB-T641b 確定の runDecideYes は、書く側の USER_DECIDE_SCRIPT に decideArgs を渡し、読む側の REVIEW_SCRIPT は使わない", () => {
   const body = bodyOf(read("ccnavi.ts"), /export async function runDecideYes\(/);
   assert.match(body, /runScript\(shell, root, USER_DECIDE_SCRIPT, tree, decideArgs\(/);
   assert.doesNotMatch(body, /REVIEW_SCRIPT/);
