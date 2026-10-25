@@ -501,7 +501,7 @@ def _frontmatter_hint(conf: settings.Settings, root: str, shown: str, has_front:
         lack = "frontmatter に type が無い"
         todo = (
             "既にあるキーの値と順序は変えず、type: skill を足してください。"
-            if shown.replace("\\", "/").rsplit("/", 1)[-1] == "SKILL.md"
+            if shown.replace("\\", "/").rsplit("/", 1)[-1].casefold() == "skill.md"
             else "既にあるキーの値と順序は変えず、type を足してください。"
         )
     else:

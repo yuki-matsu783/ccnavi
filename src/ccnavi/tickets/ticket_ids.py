@@ -133,7 +133,7 @@ def direct_name_warning(
 ) -> str:
     """直接作業のワークツリーの名前が形に合わないときの案内（1 行）。合えば空。
 
-    `--lint` の warn と、`ccnavi-worktree.sh` が切ったあとに出す案内が同じ文面を使う。
+    `--lint` の warn と、`ccnavi-worktree.sh` が切る前に出す案内が同じ文面を使う。
     `root` があれば、切り方を `sh <引用したパス>/ccnavi-worktree.sh <名前>` の完全な形で出す。
     無いときだけ、これまでのスクリプト名だけの形にする。
     """

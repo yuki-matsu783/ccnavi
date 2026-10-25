@@ -346,11 +346,11 @@ def _deny(root: str) -> list[dict]:
             "message": (
                 "再帰的な強制削除は取り消せません。削除するものを 1 つずつ名指しするか、"
                 f"ファイルが追跡されているなら {git} rm <パス> を使ってください。"
-                "scratchpad/ の一時物は、名指しの rm -f と rmdir で消せます。"
+                "scratchpad/ の一時物は、名指しの rm -f と rmdir（空のディレクトリ）で消せます。"
                 if wrapper
                 else "再帰的な強制削除は取り消せません。削除するものを 1 つずつ名指しするか、"
                 "ユーザに削除を頼んでください。"
-                "scratchpad/ の一時物は、名指しの rm -f と rmdir で消せます。"
+                "ただし scratchpad/ の一時物は、名指しの rm -f と rmdir（空のディレクトリ）で消せます。"
             ),
         },
         {

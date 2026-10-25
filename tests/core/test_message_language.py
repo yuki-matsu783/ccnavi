@@ -6,7 +6,9 @@ ASCII だけの文は、英語のまま出ている。コード・識別子・�
 
 from __future__ import annotations
 
+import os
 import re
+import tempfile
 import unittest
 
 from ccnavi.hook import post_report, reasons
@@ -49,7 +51,13 @@ class MessageLanguageTest(unittest.TestCase):
         self.assertIn("rmdir", deletes["builtin:recursive-delete"])
         self.assertIn("scratchpad/", deletes["builtin:recursive-delete"])
         self.assertEqual(english_in(deletes["builtin:recursive-delete"]), [])
-        self.assertIsNotNone(ticket_guard.raw_git_rule)
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, ".ccnavi", "scripts"))
+            with open(os.path.join(root, ".ccnavi", "scripts", "ccnavi-git.sh"), "w") as f:
+                f.write("")
+            said = ticket_guard.raw_git_rule(root).message
+        self.assertIn("status・log・diff・show・blame", said)
+        self.assertIn("log -5", said)
 
 
 if __name__ == "__main__":
