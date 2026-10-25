@@ -9,13 +9,12 @@
 # 呼ぶ側は抜けるときに ccnavi_lock_drop を打つ（trap の EXIT・INT・TERM・HUP にも置く）。
 #
 # - `mkdir` の原子性で取る。`flock` は macOS に無い
-# - owner は `<ホスト名> <pid> <開始時刻（date +%s）> <持ち主の情報> <OS>`、持ち主の情報は `<pid>-<開始時刻>`。
+# - owner は `<ホスト名> <pid> <開始時刻（date +%s）> <持ち主の情報>`、持ち主の情報は `<pid>-<開始時刻>`。
 #   書けなかった・書いた中身が読み返せないときは取れていないとして手放す
-# - 古い: ホスト名と OS（`uname -s`）が同じで、置き場が /mnt/ の下で
-#   なければ pid で見る。`kill -0` が失敗すれば古く、持ち主が生きていれば 10 分を過ぎても強制取得しない
-#   （長い操作からロックを取り上げて二重に書かせない。待ちで取れなければ「長い」と言って失敗にする）。pid を確かめ
-#   られない（別のホスト・別の OS・/mnt/ の下・pid が読めない）ときだけ、10 分を過ぎたら時刻で古い
-#   とする（WSL と Git Bash は同じホスト名で pid が通じない）。owner が読めなければ `find -mmin +10`
+# - 古い: ホスト名が同じで pid が数なら pid で見る。`kill -0` が失敗すれば古く、持ち主が生きていれば 10 分を過ぎても
+#   強制取得しない（長い操作からロックを取り上げて二重に書かせない。待ちで取れなければ「長い」と言って失敗にする）。
+#   pid を確かめられない（別のホスト・pid が読めない）ときだけ、10 分を過ぎたら時刻で古いとする。
+#   owner が読めなければ `find -mmin +10`。同じ機械は同じ環境（WSL だけ、Git Bash だけ）で使う前提で、環境の違いは見ない
 # - 強制取得の仕方: 強制取得の操作を `<ロック>.steal`（`mkdir`、10 分で古い）で 1 つにし、古いと判断したときに読んだ
 #   owner の行と今の owner の行が同じなら `mv` で退避して、退避した中の owner がまだ同じなら消して取り直す。
 #   違えば（その間に持ち主が替わった）、元の名前が空いていれば戻して待ちに戻り、空いていなければ 2
@@ -27,9 +26,6 @@ ccnavi_lock_set_held=""
 # 取る前の CCNAVI_LOCK_HELD（入れ子で別のロックを取ったとき、外すときに元へ戻す）。
 ccnavi_lock_prev_held=""
 ccnavi_lock_prev_set=""
-ccnavi_lock_os() {
-	uname -s 2>/dev/null | tr ' ' '_' || echo unknown
-}
 ccnavi_lock_take() {
 	ccnavi_lk_key="$2/$3"
 	ccnavi_lk_dir="$(ccnavi_state "$1")/locks/$2/$3"
@@ -46,7 +42,6 @@ ccnavi_lock_take() {
 	esac
 	mkdir -p "${ccnavi_lk_dir%/*}" 2>/dev/null || return 1
 	ccnavi_lk_host=$(hostname 2>/dev/null || uname -n 2>/dev/null || echo unknown)
-	ccnavi_lk_os=$(ccnavi_lock_os)
 	ccnavi_lk_start=$(date +%s)
 	while :; do
 		if mkdir "$ccnavi_lk_dir" 2>/dev/null; then
@@ -55,7 +50,7 @@ ccnavi_lock_take() {
 			ccnavi_lock_mark=""
 			ccnavi_lk_now=$(date +%s)
 			ccnavi_lk_mark="$$-$ccnavi_lk_now"
-			ccnavi_lk_want="$ccnavi_lk_host $$ $ccnavi_lk_now $ccnavi_lk_mark $ccnavi_lk_os"
+			ccnavi_lk_want="$ccnavi_lk_host $$ $ccnavi_lk_now $ccnavi_lk_mark"
 			# 書く前に持ち主の情報を覚えておく（書いた直後に切られても、drop が自分の owner と分かるように）。
 			ccnavi_lock_mark="$ccnavi_lk_mark"
 			if printf '%s\n' "$ccnavi_lk_want" >"$ccnavi_lk_dir/owner" 2>/dev/null &&
@@ -81,7 +76,7 @@ ccnavi_lock_take() {
 			log_warn 取ったロックの持ち主を保存できなかった -- "lock=$ccnavi_lk_key"
 		else
 			ccnavi_lk_seen=$(ccnavi_lock_owner "$ccnavi_lk_dir")
-			if ccnavi_lock_stale "$ccnavi_lk_dir" "$ccnavi_lk_host" "$ccnavi_lk_os" "$ccnavi_lk_seen"; then
+			if ccnavi_lock_stale "$ccnavi_lk_dir" "$ccnavi_lk_host" "$ccnavi_lk_seen"; then
 				ccnavi_lk_rc=0
 				ccnavi_lock_steal "$ccnavi_lk_dir" "$ccnavi_lk_seen" || ccnavi_lk_rc=$?
 				case "$ccnavi_lk_rc" in
@@ -110,19 +105,19 @@ ccnavi_lock_num() {
 	printf '%s\n' "${ccnavi_ln_v:-0}"
 }
 
-# そのロックが古いか。<ロック> <自分のホスト名> <自分の OS> <読んだ owner の行>
+# そのロックが古いか。<ロック> <自分のホスト名> <読んだ owner の行>
 ccnavi_lock_stale() {
-	if [ -z "$4" ]; then
+	if [ -z "$3" ]; then
 		# 取った直後で owner がまだ無いこともある。時刻で見る。
 		[ -n "$(find "$1" -maxdepth 0 -mmin +10 2>/dev/null)" ]
 		return
 	fi
 	set -f
 	# shellcheck disable=SC2086
-	set -- "$1" "$2" "$3" $4
+	set -- "$1" "$2" $3
 	set +f
-	# $4 ホスト名 $5 pid $6 開始時刻 $7 持ち主の情報 $8 OS
-	ccnavi_ls_started=$(ccnavi_lock_num "${6:-}")
+	# $3 ホスト名 $4 pid $5 開始時刻 $6 持ち主の情報
+	ccnavi_ls_started=$(ccnavi_lock_num "${5:-}")
 	if [ -z "$ccnavi_ls_started" ]; then
 		[ -n "$(find "$1" -maxdepth 0 -mmin +10 2>/dev/null)" ]
 		return
@@ -130,14 +125,9 @@ ccnavi_lock_stale() {
 	ccnavi_ls_now=$(date +%s)
 	ccnavi_ls_old=no
 	[ "$((ccnavi_ls_now - ccnavi_ls_started))" -gt 600 ] && ccnavi_ls_old=yes
-	# 同じ機械の同じ OS のときだけ pid を見る。/mnt/ の下（WSL から Windows の置き場）は時刻だけ。
-	ccnavi_ls_pid=$(ccnavi_lock_num "${5:-}")
-	ccnavi_ls_local=yes
-	case "$1" in
-	/mnt/*) ccnavi_ls_local=no ;;
-	esac
-	{ [ "${4:-}" = "$2" ] && [ "${8:-}" = "$3" ] && [ -n "$ccnavi_ls_pid" ]; } || ccnavi_ls_local=no
-	if [ "$ccnavi_ls_local" = yes ]; then
+	# 同じホストで pid が数のときだけ pid を見る。
+	ccnavi_ls_pid=$(ccnavi_lock_num "${4:-}")
+	if [ "${3:-}" = "$2" ] && [ -n "$ccnavi_ls_pid" ]; then
 		# 持ち主が生きていれば、時刻に関わらず古くない。
 		kill -0 "$ccnavi_ls_pid" 2>/dev/null && return 1
 		return 0

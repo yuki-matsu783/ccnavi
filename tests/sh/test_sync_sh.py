@@ -100,10 +100,6 @@ def fields(path):
         return dict((line.rstrip("\n").split(" ", 1) + [""])[:2] for line in f if line.strip())
 
 
-def os_name():
-    return subprocess.run(["uname", "-s"], capture_output=True, text=True).stdout.strip()
-
-
 class NoTicketYamlInShTest(unittest.TestCase):
     """sh はチケットの YAML を自分で読まない。閉じたかは `ccnavi-review.sh merged` に、
     親のワークツリーかは `ccnavi tree parent` に聞く（答えの約束は tests/core/test_sh_ask.py）。
@@ -259,13 +255,12 @@ class SyncHarness(unittest.TestCase):
     def lock_dir(self, name=PARENT):
         return os.path.join(self.state, "locks", "self", name)
 
-    def own_lock(self, pid, started, os_part=None, name=PARENT):
+    def own_lock(self, pid, started, host=None, name=PARENT):
         lock = self.lock_dir(name)
         os.makedirs(lock)
-        tail = os_name() if os_part is None else os_part
         write(
             os.path.join(lock, "owner"),
-            f"{socket.gethostname()} {pid} {started} {pid}-{started} {tail}".rstrip() + "\n",
+            f"{socket.gethostname() if host is None else host} {pid} {started} {pid}-{started}\n",
         )
         return lock
 
@@ -1108,16 +1103,16 @@ class SyncTest(SyncHarness):
         self.assertFalse(os.path.exists(lock), "取ったロックが残っている")
         self.assertFalse(os.path.exists(lock + ".steal"))
 
-    def test_a_dead_pid_on_another_os_is_judged_by_time_only(self):
-        # WSL と Git Bash は同じホスト名で pid が通じない。OS が違えば時刻だけで見る。
-        lock = self.own_lock(self.dead_pid(), int(time.time()), os_part="OtherOS")
+    def test_a_dead_pid_on_another_host_is_judged_by_time_only(self):
+        # 別のホストの pid は通じない（コンテナの入れ替わりなど）。ホスト名が違えば時刻だけで見る。
+        lock = self.own_lock(self.dead_pid(), int(time.time()), host="other-host")
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertTrue(os.path.isdir(lock))
 
     def test_an_old_lock_with_leading_zeros_is_taken_over(self):
-        # 先頭の 0 を 8 進に読んで失敗しない。pid を確かめられない（別の OS）ので時刻で古いと見る。
-        lock = self.own_lock("0123", "0000000001", os_part="OtherOS")
+        # 先頭の 0 を 8 進に読んで失敗しない。pid を確かめられない（別ホスト）ので時刻で古いと見る。
+        lock = self.own_lock("0123", "0000000001", host="other-host")
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertFalse(os.path.exists(lock))
@@ -1129,8 +1124,8 @@ class SyncTest(SyncHarness):
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertTrue(os.path.isdir(lock))
 
-    def test_an_old_lock_of_another_os_is_taken_over_by_time(self):
-        lock = self.own_lock(live_sh_pid(self), int(time.time()) - 3600, os_part="OtherOS")
+    def test_an_old_lock_of_another_host_is_taken_over_by_time(self):
+        lock = self.own_lock(live_sh_pid(self), int(time.time()) - 3600, host="other-host")
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertFalse(os.path.exists(lock))
