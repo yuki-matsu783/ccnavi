@@ -27,7 +27,7 @@
 # 確かめられない（C2。実行ファイルの `tree base-bound`）、gitが 2.40 未満（C3）。
 #
 # 手で打つgitではなくccnavi-git.shを通す。fetchはorigin <取り込み先> だけ。
-# ワークツリーが既にあれば、何も切らずにパスと取り込みの記録の有無を出す（冪等）。
+# ワークツリーが既にあれば、何も切らずに、パスと取り込みの記録の有無を出します（冪等）。
 #
 # origin か手元に同じ識別子になるブランチ（同じ名前、`/` を `-` に置き換えると同じになる名前、英字の大文字小文字だけ
 # 違う名前）があるときは、切らずに終了コード 1 で止まり、ccnavi-start.sh へ案内する。既にあるブランチ（MR の元ブランチ
@@ -86,7 +86,7 @@ sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--base <ブランチ>] [--accept
 直接作業（チケットを使わない作業）用。親子のチケットの親のワークツリーには使わない
 （親は ccnavi-start.sh --mr <番号> / --issue <番号> で、親のブランチを直接チェックアウトして作る）。
 ずれが無ければ確認なしで切る。ずれがあれば切らずに状態・勧め・リスク・確認コードを出して終了コード 3 で止まる。
-ワークツリーが既にあれば、パスと取り込みの記録の有無を出すだけ（冪等）。
+ワークツリーが既にあれば、パスと取り込みの記録の有無を出すだけです（冪等）。
 終了コード: 0 完了 / 1 前提の未充足か worktree add の拒否 / 2 引数か環境の誤り / 3 確認が要る
 USAGE
 }
@@ -194,7 +194,7 @@ cgit() {
 }
 
 # 非対話（CLAUDE_CODE_SESSION_ATTENDED が 0。実行ファイルの ccnavimd.unattended と同じ見方）のときだけ、
-# 確認に答えられないことと次の行動を足す。対話のときは何も出さない。
+# 確認に答えられないことと次の行動を足します。対話のときは何も出しません。
 unattended_line() {
 	[ "${CLAUDE_CODE_SESSION_ATTENDED:-}" = 0 ] || return 0
 	printf '%s' "このセッションでは確認に答えられません。ユーザに引き取りの了承を頼み、了承されたら打ち直してもらってください。"
@@ -215,13 +215,13 @@ if [ -z "$adopt" ] && { [ -e "$dest" ] || [ -L "$dest" ]; }; then
 	[ "$have" = "refs/heads/$name" ] ||
 		fail dest-exists "${dest} は既にありますが、ブランチ ${name} を開いているこのリポジトリのワークツリーではありません（${have:-ワークツリーの登録が無い}）。中身を確かめ、不要ならユーザに確かめてから片付け、別の名前で再実行してください。"
 	printf 'ワークツリーは既にある: %s\n' "$dest"
-	# 取り込みの記録（--adopt が読む場所）の有無。無いと integrate に進めない。
+	# 取り込みの記録（--adopt が読む場所）があるかを確かめます。無いと integrate に進めません。
 	ex_common=$(git -C "$top" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || :)
 	if [ -n "$ex_common" ] && [ -e "$(ccnavi_phys "$ex_common")/ccnavi-direct/$name" ]; then
-		printf '案内: 取り込みの記録は、ある（ccnavi-direct/%s）。integrate に進める\n' "$name"
+		printf '案内: 取り込みの記録は、ある（ccnavi-direct/%s）。integrate に進めます\n' "$name"
 		ex_record=yes
 	else
-		printf '案内: 取り込みの記録は、無い（ccnavi-direct/%s）。integrate に進むには、ユーザの確認を経て sh %s %s --adopt --base <取り込み先> で引き取る%s\n' \
+		printf '案内: 取り込みの記録は、無い（ccnavi-direct/%s）。integrate に進むには、ユーザの確認を経て sh %s %s --adopt --base <取り込み先> で引き取ります。%s\n' \
 			"$name" "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")" "$(ccnavi_sh_quote "$name")" "$(unattended_line)"
 		ex_record=no
 	fi
@@ -230,7 +230,7 @@ if [ -z "$adopt" ] && { [ -e "$dest" ] || [ -L "$dest" ]; }; then
 	exit 0
 fi
 if [ -z "$adopt" ] && git show-ref --verify --quiet "refs/heads/$name"; then
-	fail branch-exists "ブランチ ${name} が既にあります（ワークツリーはありません）。既にあるブランチを出すなら 2 段です。1 段目: sh $(ccnavi_sh_quote "$scripts/ccnavi-git.sh") worktree add $(ccnavi_sh_quote ".claude/worktrees/${name}") $(ccnavi_sh_quote "$name")。2 段目: sh $(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh") $(ccnavi_sh_quote "$name") --adopt --base <統合先> で引き取ります（引き取らないと integrate できません。引き取りにはユーザの確認が要ります）。新しく切るなら別の名前にしてください。$(unattended_line)"
+	fail branch-exists "ブランチ ${name} が既にあります（ワークツリーはありません）。既にあるブランチを出すには、2 段の手順が要ります。1 段目: sh $(ccnavi_sh_quote "$scripts/ccnavi-git.sh") worktree add $(ccnavi_sh_quote ".claude/worktrees/${name}") $(ccnavi_sh_quote "$name")。2 段目: sh $(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh") $(ccnavi_sh_quote "$name") --adopt --base <統合先> で引き取ります（引き取らないと integrate できません。引き取りにはユーザの確認が要ります）。新しく切るなら別の名前にしてください。$(unattended_line)"
 fi
 
 # 同じ識別子になる別のブランチ（feature/7-x に対する feature-7-x、英字の大文字小文字だけ違う名前）があれば止める。

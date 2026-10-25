@@ -898,19 +898,19 @@ class WorktreeShTest(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.wt("topic"), "keep.txt")))
 
     def test_existing_worktree_reports_whether_the_record_exists(self):
-        # 切ったワークツリーには記録がある。integrate に進める。
+        # 切ったワークツリーには記録があり、integrate に進めます。
         self.run_sh("topic")
         result = self.run_sh("topic")
         self.assertIn("取り込みの記録は、ある（ccnavi-direct/topic）", result.stdout)
         self.assertNotIn("--adopt", result.stdout)
-        # 手で切ったワークツリーには記録が無い。引き取る手を言う。
+        # 手で切ったワークツリーには記録が無いため、引き取る手を言います。
         git(self.ws, "worktree", "add", "-q", self.wt("manual"), "-b", "manual", "main")
         result = self.run_sh("manual")
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("取り込みの記録は、無い（ccnavi-direct/manual）", result.stdout)
         self.assertIn("manual' --adopt --base <取り込み先>", result.stdout)
         self.assertNotIn("確認に答えられません", result.stdout)
-        # 最後の行は次の一手のまま。
+        # 最後の行は、従来どおり次の一手です。
         self.assertTrue(result.stdout.rstrip("\n").split("\n")[-1].startswith("次: 編集は"))
 
     def test_existing_branch_points_to_adopt_as_the_second_step(self):

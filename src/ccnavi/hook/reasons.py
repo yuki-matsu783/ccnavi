@@ -326,22 +326,22 @@ def reason_for(
     return "\n".join(lines)
 
 
-# 非対話で確認が自動で拒否になるとき、代わりの手を reason に出すルール（bare_id → 1 行）。
-# ask のルールには message を書けず、additionalContext は自動拒否のとき届かないので、ここに置く。
+# 非対話で確認が自動で拒否になるとき、代わりの手を reason に出すルールの一覧です（bare_id → 1 行）。
+# ask のルールには message を書けず、additionalContext は自動拒否のときに届かないため、ここに置きます。
 _ASK_ALTERNATIVE = {
     "prefer-webfetch": (
-        "代わりの手: 調査で一度きりなら WebFetch ツール、"
-        "何度も叩くなら .ccnavi/scripts/ の sh に固めてから実行してください。"
+        "代わりの手: 調べものが一度きりなら WebFetch ツールを、"
+        "何度も呼び出すなら .ccnavi/scripts/ の sh にまとめてから実行してください。"
     ),
 }
 
 
 def ask_hint(bare_id: str, shown: str) -> list[str]:
-    """確認（ask）の理由に足す、非対話のときだけの説明。対話のときは空。
+    """確認（ask）の理由に足す説明です。非対話のときだけ返し、対話のときは空にします。
 
-    非対話のセッションでは確認に答える人がいないので、ask は自動で拒否になる。
-    ルール名と対象だけでは「確認待ち」なのか「止められた」のかが読めないため、
-    確認が要ることと次の行動を言う。
+    非対話のセッションでは確認に答える人がいないため、ask は自動で拒否されます。
+    ルール名と対象だけでは、「確認待ち」なのか「止められた」のかが分からないため、
+    確認が要ることと次の行動を言います。
     """
     if not ccnavimd.unattended():
         return []

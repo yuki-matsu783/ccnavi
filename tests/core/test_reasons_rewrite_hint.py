@@ -10,6 +10,7 @@ from ccnavi.hook import ccnavimd, reasons
 from ccnavi.infra import shellread_scan, shellread_words
 
 ANSWER_LINE = "確認に答えられない"
+ASK_LINE = "確認に答えられません"
 
 
 class RewriteHintTest(unittest.TestCase):
@@ -45,7 +46,7 @@ if __name__ == "__main__":
 
 
 class AskHintTest(unittest.TestCase):
-    """確認（ask）の理由に足す、非対話のときだけの説明。"""
+    """確認（ask）の理由に足す説明です。非対話のときだけ足します。"""
 
     SHOWN = "sh x/ccnavi-worktree.sh a --base main"
 
@@ -58,7 +59,7 @@ class AskHintTest(unittest.TestCase):
 
     def test_非対話のときだけ確認が要ることと次の行動を言う(self):
         said = self.hint("direct-worktree-confirm", "0")
-        self.assertIn(ANSWER_LINE, said)
+        self.assertIn(ASK_LINE, said)
         self.assertIn(self.SHOWN, said)
         self.assertIn("了承", said)
         for attended in ("1", ""):

@@ -127,7 +127,7 @@ class RepoRulesTest(unittest.TestCase):
             f"{script} x",
             f"{script} x --dry-run",
             f"{script} x --no-wip",
-            # 何も書かない確認は、指定があっても対象から外す。
+            # 何も書かない確認は、ほかの指定があっても対象から外します。
             f"{script} x --adopt --base feature/x --dry-run",
             f"{script} x --dry-run --adopt --base feature/x",
             f"{script} x --base feature/x --accept 7f3a9c21 --dry-run",
@@ -195,7 +195,7 @@ class RepoRulesTest(unittest.TestCase):
         self.assertIn("ccnavi-worktree.sh", body["response"])
         self.assertNotIn("--no-track", body["response"], "手の worktree add に誘わない")
         self.assertNotIn("ff-only", body["response"])
-        # ブランチが既にあるときの worktree add は、続けて --adopt が要る（言い切りで済ませない）。
+        # ブランチが既にあるときの worktree add は、続けて --adopt が要ります（言い切りで済ませない）。
         self.assertIn("--adopt --base", body["response"])
         self.assertIn("integrate できません", body["response"])
         # ほかのサブコマンドには添えない。
