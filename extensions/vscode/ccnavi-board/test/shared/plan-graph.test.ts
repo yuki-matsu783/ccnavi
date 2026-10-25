@@ -214,7 +214,7 @@ test("CB-T364 点は振り直す前の番号（from）を持つ。置き場所�
   assert.equal(planGraphOf(before).nodes[0].from, null);
 });
 
-test("CB-T1224 下限の倍率で止まったら、開始の点を枠の左端に、縦は開始の中心を枠の中心に置く。下限に届かなければ寄せない", () => {
+test("CB-T1224 下限の倍率で止まったか（fitStalled）を判定し、止まったら開始の点を枠の左端に、縦は開始の中心を枠の中心に置く", () => {
   assert.ok(fitStalled(PLAN_FIT_MIN_ZOOM));
   assert.ok(fitStalled(PLAN_FIT_MIN_ZOOM + 1e-9));
   assert.ok(!fitStalled(PLAN_FIT_MIN_ZOOM + 0.01));

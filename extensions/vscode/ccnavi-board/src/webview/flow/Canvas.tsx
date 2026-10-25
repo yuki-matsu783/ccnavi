@@ -418,10 +418,11 @@ function TourSettle(): null {
  * `useNodesInitialized` は使わない（点の読み込みが終わったことを返さない図では、実際の Chromium で偽のままになる）
  */
 function ReadableFit(): null {
-  const measured = useStore((s) => s.nodeLookup.size > 0 && [...s.nodeLookup.values()].every((node) => (node.measured?.width ?? 0) > 0 && (node.measured?.height ?? 0) > 0));
+  const done = useRef(false);
+  // 合わせ終えたあとは走査しない（パン・ズームのたびに全点を舐めないため）
+  const measured = useStore((s) => done.current || (s.nodeLookup.size > 0 && [...s.nodeLookup.values()].every((node) => (node.measured?.width ?? 0) > 0 && (node.measured?.height ?? 0) > 0)));
   const frameHeight = useStore((s) => s.height);
   const flow = useReactFlow<FlowNodeView, FlowEdge>();
-  const done = useRef(false);
   useEffect(() => {
     if (!measured || done.current) {
       return;
