@@ -305,20 +305,31 @@ def put_ccnavi_md(root: str) -> str:
     return target
 
 
+def _repo_messages() -> str:
+    """このリポジトリの文面ファイルの置き場。
+
+    `git mv` で `.ccnavi/messages/` へ移すまでは旧い置き場にある（#661）。
+    移したら旧い側の分岐は要らない。
+    """
+    new = os.path.join(ROOT, ".ccnavi", "messages")
+    if os.path.isdir(new):
+        return new
+    return os.path.join(ROOT, ".ccnavi", "config", "common", "messages")
+
+
 def put_messages(root: str) -> str:
-    """作業ディレクトリに、このリポジトリの共通レイヤーの文面ファイル（`messages/`）をコピーする。
+    """作業ディレクトリに、このリポジトリの文面ファイル（`.ccnavi/messages/`）をコピーする。
 
     文面は文面ファイルが持つので、文を見るテストの使い捨てのワークスペースには要る。
     無くても判定は変わらず、文が短い既定の文に落ちる。
     """
-    target = os.path.join(root, ".ccnavi", "config", "common", "messages")
-    source = os.path.join(ROOT, ".ccnavi", "config", "common", "messages")
-    _shutil.copytree(source, target, dirs_exist_ok=True)
+    target = os.path.join(root, ".ccnavi", "messages")
+    _shutil.copytree(_repo_messages(), target, dirs_exist_ok=True)
     return target
 
 
 def _use_repo_messages_when_absent() -> None:
-    """使い捨てのワークスペースに文面ファイルが無いとき、このリポジトリの共通レイヤーの文面を引く。
+    """使い捨てのワークスペースに文面ファイルが無いとき、このリポジトリの文面を引く。
 
     文を見るテストの大半は、判定の外側の文面を気にしない使い捨ての木を組む。そのたびに文面ファイルを
     コピーさせない。同じプロセスで動く Python のテストだけに効く（別プロセスで起こす sh と
@@ -329,10 +340,10 @@ def _use_repo_messages_when_absent() -> None:
     real = _texts.dirs
 
     def dirs(root: str) -> str:
-        common = real(root)
-        if not os.path.isdir(common):
-            common = os.path.join(ROOT, ".ccnavi", "config", "common", "messages")
-        return common
+        where = real(root)
+        if not os.path.isdir(where):
+            where = _repo_messages()
+        return where
 
     _texts.dirs = dirs
 

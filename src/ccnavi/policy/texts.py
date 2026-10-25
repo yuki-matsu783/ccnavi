@@ -4,8 +4,9 @@
 呼ぶ側は識別子と差し込む値を渡すだけで、組み立てた文を受け取る。
 止める・止めないの判定には関わらない。
 
-置き場は共通レイヤー（`.ccnavi/config/common/messages/*.yml`）だけ。
-自身のレイヤーに `messages/` があっても読まない（文だけを替える口は持たない）。
+置き場はワークスペースルートの `.ccnavi/messages/*.yml` だけ（文は ccnavi の仕組み側のもので、
+設定ではないので `config/` の外に置く）。レイヤーごとの `messages/` は読まない
+（文だけを替える口は持たない）。
 検査（欄・差し込みの名前・`次:` の数・長さ・ADR 番号・相対の script 呼び出し）を
 通らない 1 件は採らない。形式と欄の表は設計書の「文面ファイル」の章にある。
 
@@ -77,7 +78,7 @@ _ADR = re.compile(r"ADR[-\s]?\d", re.IGNORECASE)
 _TOKEN = re.compile(r"\{\{|\}\}|\{([^{}]*)\}|[{}]")
 # 値に入れない文字。制御文字・行と段落の区切り・全角空白は、空白にする。
 _UNSAFE = re.compile("[\x00-\x1f\x7f-\x9f  　]+")
-_FILE_HINT = f"{settings.DEFAULT_PROJECT_HOME}/{settings.COMMON_DIR}/{MESSAGES_DIR}/"
+_FILE_HINT = f"{settings.DEFAULT_PROJECT_HOME}/{MESSAGES_DIR}/"
 
 
 class TextError(Exception):
@@ -97,7 +98,7 @@ class Entry:
 
 @dataclass
 class Catalog:
-    """読み込んだ文面（共通レイヤーの全件）。"""
+    """読み込んだ文面（置き場の全件）。"""
 
     entries: dict[str, Entry] = field(default_factory=dict)
     problems: list[Problem] = field(default_factory=list)
@@ -117,9 +118,9 @@ def code_of_id(text_id: str) -> str:
 
 
 def dirs(root: str) -> str:
-    """共通レイヤーの置き場。絶対パス。"""
+    """文面ファイルの置き場（`<root>/.ccnavi/messages`）。絶対パス。"""
     home = settings.DEFAULT_PROJECT_HOME.replace("/", os.sep)
-    return os.path.join(root, home, settings.COMMON_DIR, MESSAGES_DIR)
+    return os.path.join(root, home, MESSAGES_DIR)
 
 
 # ---- 差し込み
@@ -414,7 +415,7 @@ def _read_dir(directory: str) -> tuple[dict[str, Entry], list[Problem]]:
 
 
 def load(root: str) -> Catalog:
-    """共通レイヤーの文面を読む。例外を投げない（問題は `problems`）。"""
+    """置き場の文面を読む。例外を投げない（問題は `problems`）。"""
     entries, problems = _read_dir(dirs(root))
     return Catalog(entries, problems)
 
