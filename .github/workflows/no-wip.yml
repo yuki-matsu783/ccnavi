@@ -1,0 +1,15 @@
+name: no-wip
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+jobs:
+  no-wip:
+    # Draft はチケット作業中のため、wip/proposals/ が載っているのが正常
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: sh scripts/ccnavi-check-no-wip.sh "origin/${{ github.base_ref }}" "${{ github.event.pull_request.head.sha }}"
