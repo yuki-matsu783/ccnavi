@@ -207,7 +207,8 @@ class RepoRulesTest(unittest.TestCase):
         self.assertIn("ccnavi-worktree.sh", body["response"])
         self.assertNotIn("--no-track", body["response"], "手の worktree add に誘わない")
         self.assertNotIn("ff-only", body["response"])
-        # ブランチが既にあるときの worktree add は、続けて --adopt が要ります（言い切りで済ませない）。
+        # ブランチが既にあるときの worktree add は、続けて --adopt が要ります
+        # （言い切りで済ませない）。
         self.assertIn("--adopt --base", body["response"])
         self.assertIn("integrate できません", body["response"])
         # ほかのサブコマンドには添えない。

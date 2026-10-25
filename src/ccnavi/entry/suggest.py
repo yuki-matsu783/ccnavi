@@ -466,7 +466,10 @@ def _message_candidates(
 
 
 def collect(conf: settings.Settings, root: str) -> dict:
-    """候補を集めて 1 つのマップにする。キーは docs/11_requirements/json-shapes.md「候補の JSON」。"""
+    """候補を集めて 1 つのマップにする。
+
+    キーは docs/11_requirements/json-shapes.md「候補の JSON」。
+    """
     # 試験と同じく記録を持たない。候補の検証で「1 度だけ渡す文」を消費しない。
     conf = dataclasses.replace(conf, state="")
     paths = log_files(conf.log)

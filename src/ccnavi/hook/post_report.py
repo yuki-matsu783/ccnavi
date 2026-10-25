@@ -139,7 +139,8 @@ def _preexisting(finding: post_findings.Finding) -> str:
         [
             f"[ccnavi] {CODE_PREEXISTING} ({_source(finding.source, group)})",
             f"path: {change.path} ({change.status.strip()} / {change.kind})",
-            "note: セッションの開始前から作業ツリーにあった変更です。直前の操作が起こしたものではありません。"
+            "note: セッションの開始前から作業ツリーにあった変更です。"
+            "直前の操作が起こしたものではありません。"
             "戻さず、これを土台にもせず、見つけたことをユーザに伝えて判断を任せてください。",
             _messages(group),
         ]

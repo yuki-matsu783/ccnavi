@@ -104,8 +104,7 @@ class LintOpsTest(PhaseHarness):
         lines = self.lint_lines("i0001", "plan がありません")
         self.assertTrue(
             any(
-                "親 i0001 に plan がありません" in line
-                and "--keyword 提案書式" in line
+                "親 i0001 に plan がありません" in line and "--keyword 提案書式" in line
                 for line in lines
             ),
             lines,

@@ -330,7 +330,7 @@ messages:
     why: コピーの中身をユーザが見るためです。
     next: ユーザに見せて返事を待ち、あとで {second_name} {key} を打ち直す
     no_bypass: 分けても同じ関門に当たります。
-"""
+"""  # noqa: E501
 
 
 class MessageTest(TurnGateTestCase):

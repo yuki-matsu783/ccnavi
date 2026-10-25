@@ -385,8 +385,8 @@ def integrated_paths(top: str, base: str) -> set[str]:
     * `merge-tree --write-tree <base> B` の結果が C のツリーと、`wip/handoff/` の下を
       除いて同じ
 
-    数えるコミットは `gitstate.committed` と同じ（`--first-parent --no-merges`）。`--not --remotes` は
-    付けない。上流のコミットは除かれず、外すパスが減る側に倒れる。返すのは、
+    数えるコミットは `gitstate.committed` と同じ（`--first-parent --no-merges`）。
+    `--not --remotes` は付けない。上流のコミットは除かれず、外すパスが減る側に倒れる。返すのは、
     squash と確かめたコミットが変え、それ以外のコミットが 1 度も変えていないパスだけ。
     同じパスを別のコミットも変えていれば外さない。記録が無い、git を起こせない、
     読めないものがあるときは空（外さない）。

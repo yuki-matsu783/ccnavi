@@ -777,8 +777,9 @@ def integrate_nudge(root: str, found: Direct) -> str:
     """Stopを止めて渡す文。`integrate` の打ち方と、確認してもらう手順を言う。
 
     文は文面ファイルが持つ（`NUDGE_INTEGRATE__*`。状態ごとに 1 件）。ここは、どの状態かを決めて、
-    条件つきの補足（`NOTE_INTEGRATE_*`）を足す。コマンドは文面ファイルが 1 行で完結させ、別のツリーで
-    打つものは `cd <引用したパス> && …` で始める（Bash の cwd が次の呼び出しに残るとは限らない）。
+    条件つきの補足（`NOTE_INTEGRATE_*`）を足す。コマンドは文面ファイルが 1 行で完結させ、
+    別のツリーで打つものは `cd <引用したパス> && …` で始める
+    （Bash の cwd が次の呼び出しに残るとは限らない）。
     ラッパーを通らない `git` は書かない。
     """
     n = found.name
@@ -804,9 +805,7 @@ def integrate_nudge(root: str, found: Direct) -> str:
     lines = [head]
     extra: list[str] = []
     if found.dirty:
-        extra.append(
-            texts.say(root, "NOTE_INTEGRATE_COMMIT_FIRST", {"work_tree": found.worktree})
-        )
+        extra.append(texts.say(root, "NOTE_INTEGRATE_COMMIT_FIRST", {"work_tree": found.worktree}))
     keep_going = texts.say(root, "NOTE_INTEGRATE_KEEP_GOING")
     if found.no_record:
         values["base"] = tree.branch_of(found.integ_tree) or "<取り込み先のブランチ>"

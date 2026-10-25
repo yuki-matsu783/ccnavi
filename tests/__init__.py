@@ -1,6 +1,7 @@
 """テストの共通の置き場。"""
 
 import atexit as _atexit
+import contextlib as _contextlib
 import glob as _glob
 import os
 import shutil as _shutil
@@ -48,10 +49,8 @@ def _drop_ccnavi_from_path() -> None:
         for entry in os.listdir(place):
             if entry in names:
                 continue
-            try:
+            with _contextlib.suppress(OSError):
                 os.symlink(os.path.join(place, entry), os.path.join(shim, entry))
-            except OSError:
-                pass
         kept.append(shim)
     os.environ["PATH"] = os.pathsep.join(kept)
 
@@ -322,8 +321,8 @@ def _use_repo_messages_when_absent() -> None:
     """使い捨てのワークスペースに文面ファイルが無いとき、このリポジトリの共通レイヤーの文面を引く。
 
     文を見るテストの大半は、判定の外側の文面を気にしない使い捨ての木を組む。そのたびに文面ファイルを
-    コピーさせない。同じプロセスで動く Python のテストだけに効く（別プロセスで起こす sh と実行ファイルには
-    `put_messages` でコピーする）。文面ファイルを置いた木は、その木のものを引く。
+    コピーさせない。同じプロセスで動く Python のテストだけに効く（別プロセスで起こす sh と
+    実行ファイルには `put_messages` でコピーする）。文面ファイルを置いた木は、その木のものを引く。
     """
     from ccnavi.policy import texts as _texts
 

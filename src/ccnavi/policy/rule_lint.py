@@ -100,8 +100,9 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
     1. `_inert` で、match のツールのうち対象を取り出せないものを warn にする
     2. `_stop_problems` で `match: Stop` の書き方を見る
     3. `message` を `deny` 以外に書いていれば error（届かない欄）
-    4. `message` と `additionalContext` と `additionalContextOnce` の文面を、`rules.has_relative_scripts`
-       と `rules.SCRIPT_PLACEHOLDER` で見る（相対の sh、`{script:<名前>}` の名前と有無）
+    4. `message` と `additionalContext` と `additionalContextOnce` の文面を、
+       `rules.has_relative_scripts` と `rules.SCRIPT_PLACEHOLDER` で見る
+       （相対の sh、`{script:<名前>}` の名前と有無）
     5. `additionalContextFile` と `additionalContextOnceFile` の場所を `ctxfile` で見る
        （ワークスペースの外、無い、上限超え）
     6. `_every_problems` `_except_problems` `_when_problems` `_catch_all_deny_problems` に委ねる
