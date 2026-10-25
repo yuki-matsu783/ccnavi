@@ -826,6 +826,53 @@ class MovedTest(unittest.TestCase):
     def test_サブシェルは行き先を出入りで戻す(self):
         self.assertEqual(self.moved("cd a && (cd b && ls c) && ls d"), ["ls a/b/c", "ls a/d"])
 
+    def test_サブシェルを閉じた直後の_セミコロンでも行き先を戻す(self):
+        # `);` を 1 語に読むと、`)` でも `;` でもなくなり、出入りの復元も区切りも起きなかった。
+        for src in [
+            "cd a && (cd b && ls c); ls d",
+            "cd a && (cd b && ls c);ls d",
+            "cd a && (cd b; ls c); ls d",
+            "cd a && ( cd b && ( cd c ) ); ls d",
+            "cd a && ( ( cd b ); cd c ); ls d",
+            "cd a && (cd b && ls c) ; ls d",
+        ]:
+            with self.subTest(src=src):
+                self.assertEqual(self.moved(src)[-1], "ls a/d")
+
+    def test_サブシェルのあとの語は_前のコマンドの引数にならない(self):
+        self.assertEqual(
+            shellread.placed("cd /tmp && ( cd /x && ls ); echo > f")[-2:],
+            [(["ls"], "/x"), (["echo", ">", "f"], "/tmp")],
+        )
+        self.assertEqual(shellread.placed("(true);curl x")[-1][0], ["curl", "x"])
+
+    def test_サブシェルの直後の_セミコロンの有無で読みは変わらない(self):
+        for tight, spaced in [
+            ("(true); curl https://example.com", "(true) ; curl https://example.com"),
+            ("(cd a); echo x > f", "(cd a) ; echo x > f"),
+            ("(true);echo x", "(true) ; echo x"),
+        ]:
+            with self.subTest(src=tight):
+                self.assertEqual(read(tight), read(spaced))
+
+    def test_ブレースと_cd_の連なりと置換の_cd_は従来どおり(self):
+        # `{ }` と `cd a && cd b` の cd は残る（漏れてよい）。`$( )` の中の cd は外へ出ない。
+        self.assertEqual(self.moved("{ cd a; }; ls b")[-1], "ls a/b")
+        self.assertEqual(self.moved("cd a && cd b; ls c")[-1], "ls a/b/c")
+        self.assertEqual(self.moved("cd a && echo $(cd b && pwd); ls c")[-1], "ls a/c")
+
+    def test_引用符の中の括弧とセミコロンは影響しない(self):
+        for src in ["echo '(); x' ; ls", 'echo "); y" ; ls']:
+            with self.subTest(src=src):
+                self.assertEqual(
+                    [c for c, _ in shellread.placed(src)],
+                    [c for c, _ in shellread.placed(src.replace("' ;", "';").replace('" ;', '";'))],
+                )
+                self.assertEqual(shellread.placed(src)[-1][0], ["ls"])
+
+    def test_算術式のあとの_セミコロンは落ちない(self):
+        self.assertEqual(shellread.placed("echo $((1+2)); ls")[-1][0], ["ls"])
+
     def test_左がサブシェルになる区切りでは移らない(self):
         # `cd .claude &` も `cd .claude |` も、移るのはサブシェルのほう。後ろは
         # 元の場所のまま。継ぎ足すと、無関係な書き込みを止めることになる。

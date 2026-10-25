@@ -222,6 +222,31 @@ class RootShellWriteTest(unittest.TestCase):
                 parentwrite.write_targets(self.repo, command, layers)
                 self.decide(command)
 
+    def test_サブシェルの直後の_セミコロンで_cd_の起点が漏れない(self):
+        # サブシェルの中の行き先（checkout のルート）が後ろに漏れると、ルート直下の書き込みになる。
+        outside = tempfile.mkdtemp(prefix="ccnavi-rootwrite-out-")
+        self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
+        for command in (
+            f"cd {outside} && ( cd {self.repo} && ls ); printf x > f",
+            f"cd {outside} && ( cd {self.repo}; ls );printf x > f",
+            f"cd {outside} && ( cd {self.repo} && ls ) ; printf x > f",
+            f"cd {outside} && ( ( cd {self.repo} ); cd docs ); printf x > f",
+        ):
+            with self.subTest(command=command):
+                self.assertFalse(self.stopped(command, cwd=".claude/worktrees/wt"))
+        self.assertTrue(self.stopped(f"cd {outside} && ( ls ); cd {self.repo}; printf x > f"))
+
+    def test_サブシェルの直後の語もコマンド名のルールに当たる(self):
+        tight = self.decide("(true); curl https://example.com")
+        spaced = self.decide("(true) ; curl https://example.com")
+        self.assertEqual(tight[0], spaced[0])
+        self.assertIn("prefer-webfetch", tight[1])
+        self.assertIn("prefer-webfetch", spaced[1])
+        self.assertEqual(
+            self.decide("$(cd docs && pwd); printf x > f")[0],
+            self.decide("$(cd docs && pwd) ; printf x > f")[0],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
