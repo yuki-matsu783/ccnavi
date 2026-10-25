@@ -277,3 +277,4 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0167](0167-idle-handoff-before-cache-expires.md) | 大きな会話の放置は、キャッシュが切れる前に引き継ぎ文書を書かせる |
 | [0168](0168-print-mode-background-work-waits-within-ceiling.md) | claude -p は、ターン終了後のバックグラウンド作業を待ち上限の範囲で待つように見える。待ちを消す環境変数に注意する |
 | [0172](0172-chrome-decide-writes-host-first.md) | Chrome 拡張の decide は、issue・返信・解決の順にホストへ書いてから、親のブランチへ 1 コミットする |
+| [0173](0173-setup-gitignore-region-and-worktrees-line.md) | 導入スクリプトが .gitignore に足す行を目印の領域にまとめ、.claude/worktrees/ も足す。ワークツリーを切る sh は、その置き場を書きかけに数えない |

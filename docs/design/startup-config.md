@@ -332,23 +332,25 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 `--lint` は error として報告する（10 章）。
 
 **`.gitignore`。** 配った組み立ての置き場は、配布先が git のリポジトリなら `.gitignore` にも足す（入れると履歴から消すのが難しい）。
-置き場は配った機械のぶんだけ足す。同じ回に、配った実行ファイルの `--docs` が索引を書けるよう `**/ccnavi-index.jsonl` も別の見出しで足す（10 章）。
+置き場は配った機械のぶんだけ足す。同じ回に、配った実行ファイルの `--docs` が索引を書けるよう `**/ccnavi-index.jsonl` も足す（10 章）。足す行は、目印の行（`# ---ccnavi begin---` と `# ---ccnavi end---`）で囲んだ 1 つの領域に入れる。
 `**/ccnavi-index.jsonl` か `ccnavi-index.jsonl` の行が既にあれば足さない。行は CRLF の `\r` と行末の空白を除いて比べる。
 `!**/ccnavi-index.jsonl` や `!docs/ccnavi-index.jsonl` のように `ccnavi-index.jsonl` を否定する行があれば、ユーザが除外しているとみなして足さず、`--check` でもそう言う。
-`/scratchpad`（同等以上の `/scratchpad/`・`scratchpad/`・`scratchpad` があれば足さない。`!/scratchpad` などの否定があれば足さずに伝える）と、`/logs/`（同等以上の `/logs`・`logs/`・`logs` があれば足さない。`!/logs` や `!/logs/diag` などの否定があれば足さずに伝える）も同じ回に別の見出しで足す。
+`/scratchpad`（同等以上の `/scratchpad/`・`scratchpad/`・`scratchpad` があれば足さない。`!/scratchpad` などの否定があれば足さずに伝える）と、`/logs/`（同等以上の `/logs`・`logs/`・`logs` があれば足さない。`!/logs` や `!/logs/diag` などの否定があれば足さずに伝える）も同じ回に足す。ワークツリーの置き場 `/.claude/worktrees/` も足す（同等以上の `/.claude/worktrees`・`.claude/worktrees/`・`.claude/worktrees` があれば足さない。`!/.claude/worktrees` などの否定があれば足さずに伝える。`--bin user` でも足す）。
+領域の扱い: 領域が無ければ末尾に領域ごと足す（直前に空行 1 つ。末尾に改行が無ければ先に足す。CRLF のファイルには CRLF で足す）。領域があって行が足りなければ、end の直前に、コメント 1 行と足す行のセットで足す（領域の中に同じコメントがあれば重ねない）。領域の中の既存の行は書き換えない。行が領域の外にあっても足さない。begin と end が 1 つずつで begin が先、という形でない壊れた領域には触らず、行番号と直し方を知らせる（`--check` は「揃っていない」に数える）。領域を使い始める前の古い見出しブロックは、そのまま残す。
 
 ```
-# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）
+# ---ccnavi begin--- (scripts/ccnavi-setup.sh が管理する範囲)
+# 実行ファイル
 /.ccnavi/bin/darwin-arm64/
-
-# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）
+# --docs の索引
 **/ccnavi-index.jsonl
-
-# ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）
+# 使い捨ての置き場
 /scratchpad
-
-# ccnavi の実行時の記録（scripts/ccnavi-setup.sh）
+# 実行時の記録
 /logs/
+# ワークツリーの置き場
+/.claude/worktrees/
+# ---ccnavi end---
 ```
 
 足すのはワークスペースの `.gitignore` だけ。`projects/<名前>/` の各プロジェクトには触らない（そのプロジェクトのチケットの範囲で足す）。

@@ -595,6 +595,76 @@ class WorktreeShTest(unittest.TestCase):
         self.run_sh("topic")
         self.assertEqual(before, self.snapshot_of_root())
 
+    # ---- .claude/worktrees/ は書きかけに数えない（.gitignore に行が無い配布先）
+
+    def leave_worktrees_untracked(self):
+        """.gitignore から .claude/ を外し、README.md を足す。
+
+        最初のワークツリーを切ると、置き場が未追跡で残る。
+        """
+        write(os.path.join(self.ws, ".gitignore"), "logs/\n.ccnavi/\n")
+        write(os.path.join(self.ws, "README.md"), "# readme\n")
+        git(self.ws, "add", ".gitignore", "README.md")
+        git(self.ws, "commit", "-q", "-m", "no claude ignore")
+        git(self.ws, "update-ref", "refs/remotes/origin/main", "HEAD")
+        git(self.ws, "push", "-q", self.bare, "main")
+        first = self.run_sh("first")
+        self.assertEqual(0, first.returncode, first.stdout + first.stderr)
+        self.assertIn(
+            "?? .claude/worktrees/",
+            git(self.ws, "status", "--porcelain", "--untracked-files=all"),
+            "前提: 置き場が未追跡で残っている",
+        )
+
+    def test_the_worktrees_dir_alone_is_not_wip(self):
+        self.leave_worktrees_untracked()
+        dry = self.run_sh("second", "--dry-run")
+        self.assertEqual(0, dry.returncode, dry.stdout + dry.stderr)
+        self.assertNotIn("書きかけ", dry.stdout)
+        done = self.run_sh("second")
+        self.assertEqual(0, done.returncode, "確認なしで切れる: " + done.stdout + done.stderr)
+        self.assertTrue(os.path.isdir(self.wt("second")))
+
+    def test_real_wip_still_needs_the_confirmation(self):
+        self.leave_worktrees_untracked()
+        write(os.path.join(self.ws, "README.md"), "# readme 書きかけ\n")
+        write(os.path.join(self.ws, "notes.txt"), "メモ\n")
+        result = self.run_sh("second")
+        self.assertEqual(3, result.returncode, result.stdout + result.stderr)
+        self.assertIn("書きかけ: 変更 1・新規 1（staged 0", result.stdout)
+        self.assertFalse(os.path.exists(self.wt("second")))
+
+    def test_the_count_leaves_out_the_worktrees_dir(self):
+        self.leave_worktrees_untracked()
+        write(os.path.join(self.ws, "notes.txt"), "メモ\n")
+        dry = self.run_sh("second", "--dry-run")
+        self.assertIn("書きかけ 変更 0・新規 1（staged 0）", dry.stdout)
+
+    def test_staged_files_in_the_worktrees_dir_are_not_counted(self):
+        self.leave_worktrees_untracked()
+        write(os.path.join(self.ws, ".claude", "worktrees", "stray.txt"), "s\n")
+        git(self.ws, "add", "-f", ".claude/worktrees/stray.txt")
+        dry = self.run_sh("second", "--dry-run")
+        self.assertNotIn("書きかけ", dry.stdout)
+
+    def test_other_untracked_places_still_count(self):
+        """除くのは .claude/worktrees/ だけ。wip/ の新規などは今のまま数える。"""
+        self.leave_worktrees_untracked()
+        write(os.path.join(self.ws, "wip", "handoff", "a.md"), "a\n")
+        dry = self.run_sh("second", "--dry-run")
+        self.assertIn("書きかけ 変更 0・新規 1", dry.stdout)
+
+    def test_the_snapshot_does_not_take_the_other_worktrees(self):
+        self.leave_worktrees_untracked()
+        write(os.path.join(self.ws, "notes.txt"), "メモ\n")
+        code = self.code_of(self.run_sh("second"))
+        done = self.run_sh("second", "--accept", code, "--copy-wip")
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        tree = git(self.wt("second"), "ls-tree", "-r", "HEAD")
+        self.assertIn("notes.txt", tree)
+        self.assertNotIn(".claude/worktrees", tree)
+        self.assertNotIn("160000", tree)
+
     # ---- 確認コードが縛るもの（外すと落ちる）
 
     def test_the_code_depends_on_the_head_when_origin_has_no_such_branch(self):

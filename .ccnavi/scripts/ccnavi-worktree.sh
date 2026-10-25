@@ -412,10 +412,13 @@ c4=no
 c5=no
 [ "$target" = "$integ" ] || c5=yes
 
-status_out=$(git -C "$main_tree" status --porcelain --untracked-files=all 2>/dev/null || :)
+# .claude/worktrees/ はワークツリーの置き場で、ccnavi 自身が作る。ユーザの書きかけではないので数えない。
+# .gitignore に行が無い配布先では、最初のワークツリーを切ったあと未追跡のまま残る。
+# 数えないのはこの置き場だけ（wip/・scratchpad/・logs/ などは今のまま）。パスが "…" で囲まれる場合も除く。
+status_out=$(git -C "$main_tree" status --porcelain --untracked-files=all 2>/dev/null | grep -v -E '^.. "?\.claude/worktrees/' || :)
 wip_changed=$(printf '%s\n' "$status_out" | grep -c -E '^([^?! ]| [^?! ])' || :)
 wip_new=$(printf '%s\n' "$status_out" | grep -c '^??' || :)
-wip_staged=$(git -C "$main_tree" diff --cached --name-only 2>/dev/null | grep -c . || :)
+wip_staged=$(git -C "$main_tree" diff --cached --name-only 2>/dev/null | grep -v -E '^"?\.claude/worktrees/' | grep -c . || :)
 c7=no
 [ "$wip_changed" -eq 0 ] && [ "$wip_new" -eq 0 ] || c7=yes
 
@@ -424,7 +427,8 @@ c7=no
 make_candidate() {
 	rm -f "$cand_index"
 	GIT_INDEX_FILE="$cand_index" git -C "$main_tree" read-tree "$head_sha" 2>/dev/null || return 1
-	GIT_INDEX_FILE="$cand_index" git -C "$main_tree" add -A >/dev/null 2>&1 || return 1
+	# 他のワークツリー（.claude/worktrees/ の下）は、埋め込みリポジトリとして木に入るので取り込まない。
+	GIT_INDEX_FILE="$cand_index" git -C "$main_tree" add -A -- . ':(exclude).claude/worktrees' >/dev/null 2>&1 || return 1
 	mc_tree=$(GIT_INDEX_FILE="$cand_index" git -C "$main_tree" write-tree 2>/dev/null) || return 1
 	GIT_AUTHOR_NAME=ccnavi GIT_AUTHOR_EMAIL=ccnavi@localhost GIT_AUTHOR_DATE="1970-01-01T00:00:00+0000" \
 		GIT_COMMITTER_NAME=ccnavi GIT_COMMITTER_EMAIL=ccnavi@localhost GIT_COMMITTER_DATE="1970-01-01T00:00:00+0000" \
