@@ -31,7 +31,7 @@ export function Review({ panel, writable, onReview, decide }: { panel: ReviewPan
   );
   if (panel.error) {
     return (
-      <section className="review" data-phase={String(panel.phase)}>
+      <section className="review" data-phase={String(panel.phase)} data-waiting="review">
         {head}
         <Notice kind="error" text={panel.error} />
       </section>
@@ -44,7 +44,7 @@ export function Review({ panel, writable, onReview, decide }: { panel: ReviewPan
   // 未解決の指摘が残るフェーズは、行き先を決める画面から確定する（0 件のときは「レビュー済みにする」）
   const showDecide = writable && decide !== undefined && (unresolved > 0 || (panel.decide?.threads.length ?? 0) > 0);
   return (
-    <section className="review" data-phase={String(panel.phase)}>
+    <section className="review" data-phase={String(panel.phase)} data-waiting="review">
       {head}
       <p className="threads-count">{`スレッド ${threads.length} 件（未解決 ${unresolved} 件）・レビュー ${panel.copy?.reviews.length ?? 0} 件`}</p>
       <ul className="threads">
