@@ -75,7 +75,7 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
   `projects/<名前>`の中からなら`../../.claude/worktrees/<名前>`と書く。間違えるとコマンドは拒否され、cwdに合わせた正しいパスが表示される
 - `worktree add`に渡せるオプションは決まっている（`-b` `--reason` `--track`など）。
   一覧に無いオプションは拒否される。必要なオプションが出てきたら、ユーザに一覧へ足してもらう
-- `branch` `checkout` `switch` `fetch` `pull` `merge` `commit` `rm` `restore`のオプションは、許可リストと照らし合わせて通すかどうかが決まる。
+- `branch` `checkout` `switch` `fetch` `pull` `merge` `commit` `rm` `restore`のオプションは、許可リストと照らし合わせて通すかどうかが決まる。`merge`は、統合先のユーザのチェックアウトでは`--abort` `--continue` `--quit`以外は、どの形でも止める（ワークツリーの中と、統合先でないブランチでは通る）。
   長いオプションは略さずに書く。`--force-c`のような略は拒否される
 - プロジェクトのワークツリーは`cd projects/<名前>`してから切る。`<統合先>`はそのプロジェクトのブランチで、
   ワークスペースの`main`ではない

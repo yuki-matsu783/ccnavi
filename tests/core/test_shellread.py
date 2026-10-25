@@ -2,7 +2,7 @@ import re
 import time
 import unittest
 
-from ccnavi.infra import shellread, shellread_cd, shellread_scan
+from ccnavi.infra import shellread, shellread_cd, shellread_scan, shellread_words
 from ccnavi.infra.shellread import SEP, read
 from ccnavi.infra.shellread_scan import REASON_UNTERMINATED
 from ccnavi.infra.shellread_words import REASON_TAKEN_AS_CODE
@@ -614,6 +614,43 @@ def marked(text):
 @unittest.skipUnless(
     hasattr(shellread_scan, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち"
 )
+class RenderedLayerTest(unittest.TestCase):
+    """層（unwrapped・moved）を読み直しても、引用の中の `<` `>` は演算子にならない。"""
+
+    def operators(self, src, layer):
+        reading = read(src)
+        text = getattr(reading, layer).replace(SEP, "\n")
+        return [w for words, _ in shellread.placed(text, rendered=True) for w in words if w in "<>"]
+
+    def test_山括弧は語の先頭と途中と末尾でも層に演算子として残らない(self):
+        for src in (
+            "sh x.sh log --format='%an <%ae>'",
+            'sh x.sh commit -m "<a@b>"',
+            "echo '<' '>' 'a<' '>b' 'a>b'",
+            "echo \"$(echo '<x>')\"",
+        ):
+            for layer in ("unwrapped", "moved"):
+                with self.subTest(src=src, layer=layer):
+                    self.assertEqual(self.operators(src, layer), [])
+
+    def test_cd_の後ろでも同じ(self):
+        reading = read('cd /w && sh x.sh commit -m "a <b@c.d>"')
+        for text in (reading.unwrapped, reading.moved):
+            for words, _ in shellread.placed(text.replace(SEP, "\n"), rendered=True):
+                self.assertNotIn(">", words)
+
+    def test_打たれたコマンドの目印の文字では演算子を隠せない(self):
+        # 入力の WORD_SEP は取り除く決まり。rendered でない読みでは戻さない。
+        words = [w for ws, _ in shellread.placed("echo x \x01>\x01 f") for w in ws]
+        self.assertIn(">", words)
+
+    def test_演算子が末尾の語ならリダイレクトに数えない(self):
+        for src in ("echo x >", "echo x 2>", "echo x >>"):
+            with self.subTest(src=src):
+                words = shellread.placed(src)[0][0]
+                self.assertEqual(shellread_words._redirect_width(words, len(words) - 1), 0)
+
+
 class MovedTest(unittest.TestCase):
     """`cd` で移った先から見たパス（issue #61）。
 
@@ -788,6 +825,53 @@ class MovedTest(unittest.TestCase):
 
     def test_サブシェルは行き先を出入りで戻す(self):
         self.assertEqual(self.moved("cd a && (cd b && ls c) && ls d"), ["ls a/b/c", "ls a/d"])
+
+    def test_サブシェルを閉じた直後の_セミコロンでも行き先を戻す(self):
+        # `);` を 1 語に読むと、`)` でも `;` でもなくなり、出入りの復元も区切りも起きなかった。
+        for src in [
+            "cd a && (cd b && ls c); ls d",
+            "cd a && (cd b && ls c);ls d",
+            "cd a && (cd b; ls c); ls d",
+            "cd a && ( cd b && ( cd c ) ); ls d",
+            "cd a && ( ( cd b ); cd c ); ls d",
+            "cd a && (cd b && ls c) ; ls d",
+        ]:
+            with self.subTest(src=src):
+                self.assertEqual(self.moved(src)[-1], "ls a/d")
+
+    def test_サブシェルのあとの語は_前のコマンドの引数にならない(self):
+        self.assertEqual(
+            shellread.placed("cd /tmp && ( cd /x && ls ); echo > f")[-2:],
+            [(["ls"], "/x"), (["echo", ">", "f"], "/tmp")],
+        )
+        self.assertEqual(shellread.placed("(true);curl x")[-1][0], ["curl", "x"])
+
+    def test_サブシェルの直後の_セミコロンの有無で読みは変わらない(self):
+        for tight, spaced in [
+            ("(true); curl https://example.com", "(true) ; curl https://example.com"),
+            ("(cd a); echo x > f", "(cd a) ; echo x > f"),
+            ("(true);echo x", "(true) ; echo x"),
+        ]:
+            with self.subTest(src=tight):
+                self.assertEqual(read(tight), read(spaced))
+
+    def test_ブレースと_cd_の連なりと置換の_cd_は従来どおり(self):
+        # `{ }` と `cd a && cd b` の cd は残る（漏れてよい）。`$( )` の中の cd は外へ出ない。
+        self.assertEqual(self.moved("{ cd a; }; ls b")[-1], "ls a/b")
+        self.assertEqual(self.moved("cd a && cd b; ls c")[-1], "ls a/b/c")
+        self.assertEqual(self.moved("cd a && echo $(cd b && pwd); ls c")[-1], "ls a/c")
+
+    def test_引用符の中の括弧とセミコロンは影響しない(self):
+        for src in ["echo '(); x' ; ls", 'echo "); y" ; ls']:
+            with self.subTest(src=src):
+                self.assertEqual(
+                    [c for c, _ in shellread.placed(src)],
+                    [c for c, _ in shellread.placed(src.replace("' ;", "';").replace('" ;', '";'))],
+                )
+                self.assertEqual(shellread.placed(src)[-1][0], ["ls"])
+
+    def test_算術式のあとの_セミコロンは落ちない(self):
+        self.assertEqual(shellread.placed("echo $((1+2)); ls")[-1][0], ["ls"])
 
     def test_左がサブシェルになる区切りでは移らない(self):
         # `cd .claude &` も `cd .claude |` も、移るのはサブシェルのほう。後ろは

@@ -1927,8 +1927,17 @@ class SafeAdditionsTest(GitWrapperTest):
             ("pull", "--depth=1", "origin", b),
             ("pull", "--autostash", "origin", b),
             ("pull", "--no-autostash", "origin", b),
-            ("merge", "--autostash", "origin/" + b),
-            ("merge", "--no-autostash", "origin/" + b),
+        ):
+            with self.subTest(args=args):
+                result = self.run_wrapper(*args)
+                self.assertNotEqual(2, result.returncode, result.stdout + result.stderr)
+
+    def test_merge_autostash_forms_are_not_rejected(self):
+        # 統合先をチェックアウトしている間は merge 全体を止めるので、別のブランチで確かめる。
+        git(self.dir, "checkout", "-q", "-b", "topic")
+        for args in (
+            ("merge", "--autostash", "origin/" + self.branch),
+            ("merge", "--no-autostash", "origin/" + self.branch),
         ):
             with self.subTest(args=args):
                 result = self.run_wrapper(*args)

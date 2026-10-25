@@ -602,7 +602,34 @@ def _tokenize(src: str) -> list[str]:
     # コメントは走査が除いてある。shlex に `#` を扱わせると、語の途中の `#` からも
     # コメントにして後ろのコマンドを破棄する。
     lexer.commenters = ""
-    return _drop_arithmetic(list(lexer))
+    return _drop_arithmetic(_split_glued(list(lexer)))
+
+
+# 区切りの演算子。長いものを先に置く（`;;&` を `;;` と `&` に割らない）。
+_SEPARATORS = re.compile(r";;&|;&|;;|&&|\|\||\|&|;|&|\||\(|\)")
+
+
+def _split_glued(tokens: list[str]) -> list[str]:
+    """shlex が 1 語につなげた区切りの演算子の塊を、演算子ごとに割る。
+
+    punctuation_chars は、続いた記号を 1 語で返す。`);` は `)` でも `;` でもない 1 語になり、
+    サブシェルの出入りの復元もコマンドの区切りも起きなかった（`( cd x && ls ); echo > f` の
+    `echo > f` が `ls` の引数に混ざる）。`)` や `;` を含み、演算子として知られていない塊だけを割る。
+    `((`・`))`（算術式）は割らない。リダイレクト（`<` `>` を含む塊）も割らない。
+    """
+    out: list[str] = []
+    for token in tokens:
+        if (
+            len(token) > 1
+            and token not in shellread_words._OPERATORS
+            and token not in ("((", "))")
+            and all(c in ";&|()" for c in token)
+            and (";" in token or "&" in token or "|" in token)
+        ):
+            out.extend(_SEPARATORS.findall(token))
+        else:
+            out.append(token)
+    return out
 
 
 def _drop_arithmetic(tokens: list[str]) -> list[str]:

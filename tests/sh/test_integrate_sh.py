@@ -1404,5 +1404,114 @@ class IntegrateGapsTest(Fixture):
         self.assertEqual(before_q, q_state())
 
 
+@unittest.skipUnless(SHELL and GIT and git_supports_v4(), "sh と git 2.40 以上が要る")
+class MergeOnTargetTest(Fixture):
+    """ユーザが統合先をチェックアウトしているとき、merge を事前に止める。"""
+
+    def make_branch(self, name="fa"):
+        git(self.ws, "branch", name)
+        wt = os.path.join(self._tmp.name, f"side-{name}")
+        git(self.ws, "worktree", "add", "-q", wt, name)
+        write(os.path.join(wt, f"{name}.txt"), f"{name}\n")
+        git(wt, "add", ".")
+        git(wt, "commit", "-q", "-m", name)
+        git(self.ws, "worktree", "remove", "--force", wt)
+
+    def assertMergeRefused(self, *args):
+        before = git(self.ws, "rev-parse", "HEAD").strip()
+        r = self.run_git_sh("merge", *args)
+        self.assertEqual(2, r.returncode, r.stdout + r.stderr)
+        self.assertIn("統合先 main のユーザのチェックアウトでは merge できません", r.stderr)
+        self.assertIn("次: ", r.stderr)
+        self.assertIn("ccnavi-worktree.sh", r.stderr)
+        self.assertIn("integrate <名前>", r.stderr)
+        self.assertEqual(before, git(self.ws, "rev-parse", "HEAD").strip())
+        self.assertFalse(os.path.exists(os.path.join(self.ws, "fa.txt")))
+        return r
+
+    def test_every_form_of_merge_on_the_target_is_refused(self):
+        self.make_branch("fa")
+        for args in (
+            ("fa",),
+            ("fa", "-m", "Merge branch 'fa' into main"),
+            ("--ff-only", "fa"),
+            ("--squash", "fa"),
+            ("--no-commit", "fa"),
+            ("--no-ff", "fa"),
+        ):
+            with self.subTest(args=args):
+                self.assertMergeRefused(*args)
+
+    def test_a_subdirectory_and_an_option_after_the_separator_are_still_refused(self):
+        self.make_branch("fa")
+        os.makedirs(os.path.join(self.ws, "sub"))
+        r = self.run_git_sh("merge", "fa", cwd=os.path.join(self.ws, "sub"))
+        self.assertEqual(2, r.returncode, r.stdout + r.stderr)
+        # `--` の後ろの --abort は枝の名前で、途中の merge を終わらせる操作ではない。
+        r = self.run_git_sh("merge", "--no-ff", "fa", "--", "--abort")
+        self.assertEqual(2, r.returncode, r.stdout + r.stderr)
+        self.assertIn("merge できません", r.stderr)
+
+    def test_merge_main_inside_a_worktree_passes(self):
+        self.advance_main()
+        r = self.run_git_sh("merge", "main", "--no-edit", cwd=self.wt)
+        self.assertOk(r)
+        self.assertEqual("y\n", read(os.path.join(self.wt, "other.txt")))
+
+    def test_abort_continue_and_quit_pass_on_the_target(self):
+        # 途中の merge を終わらせる操作は、止める判定の対象外で、git の結果がそのまま返る。
+        for flag in ("--abort", "--quit", "--continue"):
+            with self.subTest(flag=flag):
+                r = self.run_git_sh("merge", flag)
+                self.assertNotIn("merge できません", r.stderr)
+                self.assertNotEqual(2, r.returncode, r.stdout + r.stderr)
+
+    def test_abort_ends_a_conflicted_merge_on_the_target(self):
+        write(os.path.join(self.ws, "keep.txt"), "main\n")
+        git(self.ws, "commit", "-q", "-am", "main side")
+        git(self.ws, "branch", "fb", "HEAD~1")
+        side = os.path.join(self._tmp.name, "side-fb")
+        git(self.ws, "worktree", "add", "-q", side, "fb")
+        write(os.path.join(side, "keep.txt"), "fb\n")
+        git(side, "commit", "-q", "-am", "fb side")
+        subprocess.run(
+            ["git", "merge", "fb"], cwd=self.ws, capture_output=True
+        )  # ユーザが直接打つ git
+        self.assertTrue(os.path.exists(os.path.join(self.ws, ".git", "MERGE_HEAD")))
+        self.assertOk(self.run_git_sh("merge", "--abort"))
+        self.assertFalse(os.path.exists(os.path.join(self.ws, ".git", "MERGE_HEAD")))
+
+    def test_a_branch_other_than_the_target_passes(self):
+        self.make_branch("fa")
+        git(self.ws, "checkout", "-q", "-b", "scratch")
+        self.assertOk(self.run_git_sh("merge", "fa", "--no-edit"))
+        self.assertTrue(os.path.exists(os.path.join(self.ws, "fa.txt")))
+
+    def test_detached_head_passes(self):
+        # 統合先のブランチを動かさないので止めない。
+        self.make_branch("fa")
+        git(self.ws, "checkout", "-q", "--detach")
+        self.assertOk(self.run_git_sh("merge", "fa", "--no-edit"))
+        self.assertEqual("", git(self.ws, "branch", "--show-current").strip())
+
+    def test_undecidable_target_passes(self):
+        # origin/HEAD も origin/main も無いと、どれが統合先か言えない。
+        self.make_branch("fa")
+        git(self.ws, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
+        git(self.ws, "update-ref", "-d", "refs/remotes/origin/main")
+        self.assertOk(self.run_git_sh("merge", "fa", "--no-edit"))
+
+    def test_integrate_and_done_still_land_on_the_target(self):
+        # integrate-done の中の git merge --ff-only は直接 git を呼ぶので、merge) を通らない。
+        self.work_in_branch()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        self.assertOk(self.run_git_sh("integrate-done", "wt", "-m", "feat: x"))
+        self.assertEqual("1\n2\nthree\n", read(os.path.join(self.ws, "keep.txt")))
+
+    def test_the_merge_ff_only_hint_is_gone_from_the_diverged_message(self):
+        text = read(os.path.join(SH_DIR, "ccnavi-git.sh"))
+        self.assertNotIn("$SELF merge --ff-only では", text)
+
+
 if __name__ == "__main__":
     unittest.main()
