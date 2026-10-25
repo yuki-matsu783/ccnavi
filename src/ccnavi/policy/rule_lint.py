@@ -362,17 +362,43 @@ def _except_problems(rule: rules.Rule, name: str) -> list[Problem]:
             )
     tools = [want.strip() for want in rule.match.split("|")]
     shells = [t for t in _COMMAND_TOOLS if t in tools]
-    if shells and rule.decision in (rules.DENY, rules.ASK):
+    loose = [e for e in rule.excepts if e.compiled and not _bound_to_command(e.compiled.pattern)]
+    if shells and rule.decision in (rules.DENY, rules.ASK) and loose:
         problems.append(
             Problem(
                 SEVERITY_WARN,
                 name,
                 f"{'|'.join(shells)} の except はコマンド列の全体にヒットする。コマンドのどこかに"
                 "除く語を追加するだけでこのルールが外れるので、except は語の位置まで狭く書くか、"
-                "ルールを分けてください",
+                "ルールを分けてください。語の位置まで狭くとは、コマンド名から始めて"
+                "`[^\\x00]*` でつなぎ、コマンドの切れ目を越えない形にすることです",
             )
         )
     return problems
+
+
+# コマンド名（頭の語）。先頭の `^` か `(^|\x00)` は付けてもよい。
+_COMMAND_HEAD = re.compile(r"(?:\(\^\|\\x00\)|\^)?(?:[A-Za-z0-9_\-/]|\\[.\-/b]|\\s[+*]?)+")
+_COMMAND_SPAN = r"[^\x00]"
+# 頭のあとに置くと、コマンドの切れ目（\x00）まで届いてしまう書き方。
+# 任意の 1 字（`.`）、否定の文字クラス（`[^…]`）、空白・語・数字でないもの（`\S` `\W` `\D`）。
+_REACHES_BOUNDARY = re.compile(r"\\[SWD]|\.|\[\^")
+# `\.` `\s` `\b` のような逃がし。字そのものか空白を指すので、上の検査の前に除く。
+_ESCAPED_CHAR = re.compile(r"\\[^SWD]")
+
+
+def _bound_to_command(pattern: str) -> bool:
+    """except の式が、頭のコマンド名から同じコマンドの中だけを読む形か。
+
+    `ccnavi-worktree\\.sh\\b[^\\x00]*\\s--dry-run` のように、コマンド名のあとを `[^\\x00]` の
+    繰り返しでつなぐ式は、除く語がそのコマンドの中にあるときだけヒットする。`--dry-run` だけの式や、
+    `.*` でつなぐ式は、切れ目を越えて別のコマンドの語にもヒットするので含まない。
+    """
+    head, sep, rest = pattern.partition(_COMMAND_SPAN)
+    if not sep or not _COMMAND_HEAD.fullmatch(head):
+        return False
+    rest = _ESCAPED_CHAR.sub("", rest.replace(_COMMAND_SPAN, ""))
+    return _REACHES_BOUNDARY.search(rest) is None
 
 
 # 組み合わせ条件のノードを書き方だけから見積もった値。

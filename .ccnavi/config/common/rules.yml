@@ -94,8 +94,9 @@ ask:
     match: Bash
     regex: 'ccnavi-worktree\.sh\b[^\x00]*\s--(base|accept|side-by-side|adopt)(\s|=|$)'
     # --dry-run は何も書かずに予定だけ出します（--adopt を含む）。そのため、確認の対象から外します。
-    # 先読みは使えないので except で除きます。[^\x00] はコマンドの境界を越えないため、複合コマンドの
-    # 別のコマンドの --dry-run では除かれません。
+    # 先読みは使えないので except で除きます。except はコマンド名から [^\x00] でつなぎ、コマンドの
+    # 境界を越えません（--lint はこの形を言いません）。複合コマンドの別の呼び出しの --dry-run では
+    # 除かれないことは、rule-expectations.yml の期待で確かめます。
     except:
       - regex: 'ccnavi-worktree\.sh\b[^\x00]*\s--dry-run(\s|$)'
     additionalContext: >-
