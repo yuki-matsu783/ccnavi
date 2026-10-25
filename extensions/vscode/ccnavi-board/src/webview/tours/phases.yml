@@ -341,8 +341,8 @@ courses:
         diagram: phase-save
         focus: save, lock
       - target: save
-        title: 書き込まれて、承認・着手・閉じるときに読まれる
-        body: 検証を通ると、phases.yml に書き込みます。この定義を読むのは、承認・着手・閉じるとき、--fill-phases、--lint です。
+        title: 書き込まれて、承認のときに読まれる
+        body: 検証を通ると、phases.yml に書き込みます。この定義を読むのは、親の提案の承認、--fill-phases、--lint のときだけです。承認のあとは、親が持つコピーを読むので、あとで直しても進行中の親には反映されません。
         scene: { open: research, dirty: true }
         diagram: phase-save
         focus: write, use
