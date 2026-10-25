@@ -1406,7 +1406,7 @@ class IntegrateGapsTest(Fixture):
 
 @unittest.skipUnless(SHELL and GIT and git_supports_v4(), "sh と git 2.40 以上が要る")
 class MergeOnTargetTest(Fixture):
-    """統合先をチェックアウトしたユーザのチェックアウトでは、merge を事前に止める。"""
+    """ユーザが統合先をチェックアウトしているとき、merge を事前に止める。"""
 
     def make_branch(self, name="fa"):
         git(self.ws, "branch", name)
@@ -1449,7 +1449,7 @@ class MergeOnTargetTest(Fixture):
         self.assertEqual("y\n", read(os.path.join(self.wt, "other.txt")))
 
     def test_abort_continue_and_quit_pass_on_the_target(self):
-        # 途中の merge を終わらせる操作は、止める側の判定に入らない（git の答えがそのまま返る）。
+        # 途中の merge を終わらせる操作は、止める判定の対象外で、git の結果がそのまま返る。
         for flag in ("--abort", "--quit", "--continue"):
             with self.subTest(flag=flag):
                 r = self.run_git_sh("merge", flag)
@@ -1466,7 +1466,7 @@ class MergeOnTargetTest(Fixture):
         git(side, "commit", "-q", "-am", "fb side")
         subprocess.run(
             ["git", "merge", "fb"], cwd=self.ws, capture_output=True
-        )  # ユーザが打つ生の git
+        )  # ユーザが直接打つ git
         self.assertTrue(os.path.exists(os.path.join(self.ws, ".git", "MERGE_HEAD")))
         self.assertOk(self.run_git_sh("merge", "--abort"))
         self.assertFalse(os.path.exists(os.path.join(self.ws, ".git", "MERGE_HEAD")))

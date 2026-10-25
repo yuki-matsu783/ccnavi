@@ -112,7 +112,7 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
                   ccnavi-git.sh) には rm と restore --source と checkout <ref> <パス> を利用できない
                   (衝突の解決の restore --ours / --theirs は利用できる。変更が必要ならユーザに依頼する)
             stash (list show push pop apply)
-            merge (-X ours / -s ours / --no-verify は不可。統合先のユーザのチェックアウトでは --abort / --continue / --quit 以外すべて不可)
+            merge (-X ours / -s ours / --no-verify は不可。統合先のユーザのチェックアウトでは --abort / --continue / --quit 以外は不可)
             merge-file -p (標準出力に出す形だけ。ファイルへは書かない)
                   両方取り込むときは merge-file -p --union --object-id :2:<パス> :1:<パス> :3:<パス>
                   (現在・祖先・相手の順) で出力し、それを読んで Edit で書く
@@ -787,7 +787,7 @@ d4_unknown_marker() {
 	reject integrate-marker "取り込みの記録（${d4_g0}/${1}/marker）の版（${d4_pv}）を知りません。版 4 でない記録は ccnavi が読めません。ユーザが git status で統合先の staged を確かめ、不要なら git reset --merge で戻してから、${d4_g0}/${1} を手で消してください。エージェントは操作しません。"
 }
 
-# そのトップが、ユーザのチェックアウト（git worktree list の先頭）か。<git のトップ>
+# 引数のパス（git のトップ）が、ユーザのチェックアウト（git worktree list の先頭）か調べる。
 #
 # 先頭の場所は d4_main に残す（見つからなければ空）。d4_begin（integrate 系）と merge) が同じ判定を使う。
 user_checkout_is() {
@@ -1965,8 +1965,8 @@ merge)
 		esac
 	}
 	opt_walk merge_cb ${1+"$@"}
-	# 統合先をチェックアウトしているユーザのチェックアウトでは、merge の全形（--ff-only・--squash・
-	# --no-commit を含む）を止める。統合先は integrate が載せるもので、直接 merge すると事後の通知でしか止まらない。
+	# ユーザの手元で統合先をチェックアウトしている場合は、merge のすべての形（--ff-only・--squash・
+	# --no-commit を含む）を止める。統合先への取り込みは integrate が行う決まりなので、直接 merge すると事後の通知でしか気づけない。
 	# 通すのは次の 3 つ。
 	#  - --abort / --continue / --quit: 途中の merge を終わらせる操作で、新しく取り込まない。--continue は、
 	#    ユーザが衝突を解いたあとに統合先で打つ形があり得るので、エージェントの入口としても止めない。
@@ -1979,7 +1979,7 @@ merge)
 			mg_integ=$(ccnavi_integration "$mg_top" || :)
 			mg_cur=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || :)
 			if [ -n "$mg_integ" ] && [ "$mg_cur" = "$mg_integ" ]; then
-				reject merge-on-target "統合先 $mg_integ のユーザのチェックアウトでは merge できません。統合先へ直接 merge しない決まりで、取り込みは integrate が行います。
+				reject merge-on-target "統合先 $mg_integ のユーザのチェックアウトでは merge できません。統合先へは直接 merge しない決まりなので、取り込みは integrate が行います。
 次: $WT_SH_Q <名前> でワークツリーを切り、その中で $SELF_Q merge $(ccnavi_sh_quote "$mg_integ") を打って衝突を解いてコミットし、$SELF_Q integrate <名前> で取り込む
 案内: 途中の merge を終わらせる --abort / --continue / --quit と、統合先でないブランチでの merge は、ここでも打てます。"
 			fi
