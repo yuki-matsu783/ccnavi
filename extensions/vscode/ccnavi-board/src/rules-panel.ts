@@ -592,6 +592,13 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       if (loaded === undefined) {
         return;
       }
+      if (!fs.existsSync(loaded.expectationsPath)) {
+        current.host.post({
+          type: "notice",
+          message: `期待する判定のファイルがまだありません: ${loaded.expectationsRel}。作ると、ここで一括で確かめられます。書き方は /ccnavi-config（.claude/skills/ccnavi-config/references/common/check.md）`,
+        } satisfies ToRules);
+        return;
+      }
       let rules: RulesOverride;
       try {
         rules = stage(current, message.sections);

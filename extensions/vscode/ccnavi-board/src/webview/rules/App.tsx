@@ -228,6 +228,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     } else if (message.type === "failed") {
       setBusy(false);
       setStatus({ text: String(message.message ?? ""), error: true });
+    } else if (message.type === "notice") {
+      setBusy(false);
+      setStatus({ text: String(message.message ?? ""), error: false });
     } else if (message.type === "lock" && message.lock !== undefined) {
       setLock(message.lock as Lock);
     } else if (message.type === "changed") {

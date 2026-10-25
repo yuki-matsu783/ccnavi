@@ -520,7 +520,7 @@ export async function runExpectations(
     return { ok: false, error: cutOff("ccnavi --test-expectations --json", DIAGNOSE_TIMEOUT_MS) };
   }
   if (ran.code !== 0) {
-    return { ok: false, error: `ccnavi --test-expectations --json が失敗しました: ${ran.stderr}` };
+    return { ok: false, error: `ccnavi --test-expectations --json が失敗しました: ${firstLine(ran.stderr)}` };
   }
   const parsed = parseExpectationsJson(ran.stdout);
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
@@ -573,7 +573,7 @@ export async function runLint(
  * error があると終了コードが 1 になるが、それは JSON の中身で分かるので失敗にしない。
  */
 /** 出力の最初の空でない行。画面の 1 行に収める用途で、全量は要らない */
-function firstLine(text: string): string {
+export function firstLine(text: string): string {
   return text.split(/\r?\n/).map((l) => l.trim()).find((l) => l !== "") ?? "";
 }
 

@@ -443,6 +443,17 @@ test("CB-D71 ファイルが外で変わったら帯を出す。錠と操作の�
   }
 });
 
+test("CB-D1223 notice は赤にせずに一言を出す（期待する判定のファイルが無いときの案内）", async () => {
+  const dom = await openRules();
+  try {
+    await dom.send({ type: "notice", message: "期待する判定のファイルがまだありません: x.yml。" });
+    assert.equal(dom.one("#status").textContent, "期待する判定のファイルがまだありません: x.yml。");
+    assert.ok(!dom.one("#status").closest(".foot")?.classList.contains("error"));
+  } finally {
+    await dom.close();
+  }
+});
+
 test("CB-D72 再読み込みできなかった画面から中身が届いたあとも、id の確定で開いた行を state に残す", async () => {
   const dom = await openPage({ kind: "error", error: "ルールファイルを読み込めない" });
   try {

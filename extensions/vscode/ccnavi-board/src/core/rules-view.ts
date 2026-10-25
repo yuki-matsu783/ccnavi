@@ -201,6 +201,8 @@ export type ToRules =
   | { readonly type: "expectationsChecked"; readonly result: ExpectationsJson }
   | { readonly type: "suggested"; readonly result: SuggestJson }
   | { readonly type: "failed"; readonly message: string }
+  /** 失敗ではない案内（赤にしない）。期待する判定のファイルがまだ無い、など */
+  | { readonly type: "notice"; readonly message: string }
   | { readonly type: "lock"; readonly lock: Lock }
   | { readonly type: "changed" }
   /** 頼んだ往復が起きなかった（ユーザが「破棄して読み直す？」をやめた）。画面は欄を戻す */
