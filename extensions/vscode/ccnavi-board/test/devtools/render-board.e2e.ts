@@ -2,8 +2,8 @@
  * 開発用の画面確認ツール（`scripts/render-board.js`）を `--fixture test/fixtures/board.json` で実際に回し、
  * Chromium が PNG を出すことを確かめる。
  *
- * `node --test` では回さない（ファイル名が `.test.js` ではない）。ブラウザが無い環境でスキップして成功に
- * 数えないよう、`scripts/test-groups.js` がこのファイルを別に起こして、終了コードをそのまま返す
+ * `node --test` では回さない（ファイル名が `.test.js` ではない）。`scripts/test-groups.js` がこのファイルを別に起こし、
+ * ブラウザが無いときはスキップして成功に数えず、終了コードをそのまま返す
  * （0 通った / 1 失敗 / 3 環境が揃っていない。`NOT_READY` と同じ意味）。
  */
 import { spawnSync } from "node:child_process";
@@ -12,6 +12,11 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { buildBoard } from "../../src/core/board.js";
 import { parseBoardJson } from "../../src/core/model.js";
+// ツールが out/ から読むもの。`test-groups.js` は import を辿って回すグループを決めるので、ここに並べて
+// 「これを直したら devtools も回す」を表す（実行時には何もしない）
+import "../../src/ccnavi.js";
+import "../../src/core/render.js";
+import "../../src/webview-asset.js";
 
 const ROOT = path.join(__dirname, "..", "..", "..");
 const FIXTURE = path.join(ROOT, "test", "fixtures", "board.json");

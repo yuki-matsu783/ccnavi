@@ -1,12 +1,12 @@
-// ボードの画面を VS Code なしで Chromium に描かせ、PNG とテキストに残す開発用のツール。
+// VS Code なしで Chromium にボードの画面を描き、PNG とテキストに残す開発用ツール。
 // ccnavi の配布物には含めない（package.sh の対象外）。
 //
 //   node scripts/render-board.js (--repo <ccnavi 配布済みのリポジトリ> | --fixture <BoardJson ファイル>) --out <出力ディレクトリ>
 //        [--appearance vscode|claude-light|claude-dark] [--width 1400]
 //
 // 前提: `pnpm install && pnpm run compile`（このスクリプトからはビルドしない）。
-// ブラウザは playwright-core と PLAYWRIGHT_BROWSERS_PATH の Chromium（Chrome 拡張の試験と同じやり方で、
-// `playwright install` はしない。版が違うときは CCNAVI_CHROMIUM に実行ファイルを指す）。
+// ブラウザは playwright-core と PLAYWRIGHT_BROWSERS_PATH の Chromium（Chrome 拡張の試験と同じやり方。
+// `playwright install` はしない。版が違うときは CCNAVI_CHROMIUM に実行ファイルのパスを指定する）。
 //
 // 出力（<out>/）: board.png（fullPage）・board.txt（body の見えているテキスト）・board.html（入れ物の HTML）・
 // board.log（ページのコンソール・ページエラー・CSP 違反・画面が拡張ホストへ送ったメッセージ。アプリのログではない）。
@@ -41,7 +41,7 @@ const USAGE = [
   "  --repo        ccnavi を配布済みのリポジトリ。ccnavi --explain --json で中身を得る（読むだけ）",
   "  --fixture     BoardJson のファイル（test/fixtures/board.json など）。--repo とどちらか一方",
   "  --out         出力ディレクトリ（無ければ作る。リポジトリの下は不可）",
-  `  --appearance  見た目。既定は ${DEFAULT_APPEARANCE}（vscode は VS Code のテーマ変数に頼るので、Chromium 単体では色が欠ける）`,
+  `  --appearance  見た目。既定は ${DEFAULT_APPEARANCE}（vscode は VS Code のテーマ変数を使うので、Chromium だけでは色が欠ける）`,
   `  --width       ページの幅（${MIN_WIDTH}〜${MAX_WIDTH} の整数。既定 ${DEFAULT_WIDTH}。高さは全体が入るまで伸ばす）`,
 ].join("\n");
 
@@ -105,7 +105,7 @@ function validateAppearance(value, appearances) {
   return { ok: false, error: `--appearance は ${appearances.join("|")} のどれか: ${value}` };
 }
 
-/** 存在する一番深い祖先を実体にし、残りをそのまま付ける（出力先はまだ無いことがある） */
+/** 存在する一番深い祖先を実際のパスにそろえ、残りはそのまま付ける（出力先はまだ無いことがある） */
 function realPathOf(target) {
   const absolute = path.resolve(target);
   const rest = [];
@@ -125,7 +125,7 @@ function realPathOf(target) {
 }
 
 /**
- * `child` が `parent` と同じか、その下か。両方を実体にしてから、`fold`（`foldPath`。大文字小文字と NFC/NFD を
+ * `child` が `parent` と同じか、その下か。両方を実際のパスに直してから、`fold`（`foldPath`。大文字小文字と NFC/NFD を
  * 区別しない）で比べる。区切りは `\` と `/` の両方を `/` に揃える。
  */
 function isInside(child, parent, fold) {
@@ -193,7 +193,7 @@ function loadOut() {
 
 /**
  * playwright-core の Chromium。無ければ 3。
- * 固定した playwright-core の版と、入っているブラウザの版が違うときは、`CCNAVI_CHROMIUM` に実行ファイルを指す。
+ * playwright-core の版と入っているブラウザの版が違うときは、`CCNAVI_CHROMIUM` に実行ファイルのパスを指定する。
  */
 function loadChromium() {
   let chromium;
@@ -204,7 +204,7 @@ function loadChromium() {
   }
   const executable = process.env.CCNAVI_CHROMIUM || chromium.executablePath();
   if (!fs.existsSync(executable)) {
-    throw new ToolError(EXIT.NOT_READY, `Chromium がありません: ${executable}（PLAYWRIGHT_BROWSERS_PATH を見る。playwright install はしない。版が違うなら CCNAVI_CHROMIUM に実行ファイルを指す）`);
+    throw new ToolError(EXIT.NOT_READY, `Chromium がありません: ${executable}（PLAYWRIGHT_BROWSERS_PATH を見る。playwright install はしない。版が違うなら CCNAVI_CHROMIUM に実行ファイルのパスを指定する）`);
   }
   return { chromium, executable };
 }
@@ -307,7 +307,7 @@ async function main(argv) {
         throw new ToolError(EXIT.USAGE, `--repo がありません: ${options.repo}`);
       }
       if (isInside(options.out, options.repo, out.foldPath)) {
-        throw new ToolError(EXIT.USAGE, `--out が --repo の下です（リポジトリを汚さないため、外を指す）: ${options.out}`);
+        throw new ToolError(EXIT.USAGE, `--out が --repo の下です（リポジトリを汚さないため、外のパスを指定する）: ${options.out}`);
       }
     }
     const browserType = loadChromium();

@@ -1,5 +1,5 @@
 // VS Code の窓口（`acquireVsCodeApi`）のスタブ。開発用の画面確認ツール（scripts/render-board.js）が、
-// Chromium に画面を描かせるときにページへ差し込む。
+// Chromium で画面を描くときに、ページへ差し込む。
 //
 // `page.addInitScript` は関数を文字列にしてページへ送るので、`installVsCodeStub` は外の変数を
 // 読まない 1 つの関数に閉じる。単体テストは、同じ関数に偽の window を渡して振る舞いを確かめる。
@@ -9,8 +9,8 @@
 //   - getState / setState: 覚えておくだけ
 // `ready` への応答は要らない。最初の中身は HTML に埋め込んである。
 //
-// 本物と同じく、`acquireVsCodeApi` は 1 度しか呼べない（2 度目は投げる）。画面が 2 度呼ぶ作りになっても
-// 気づけるようにするため。
+// 本物と同じく、`acquireVsCodeApi` は 1 度しか呼べない（2 度目は投げる）。画面が 2 度呼ぶ作りになったときに
+// 気づけるようにする。
 // CSP 違反（`securitypolicyviolation`）は `window.__csp` に積む。
 "use strict";
 

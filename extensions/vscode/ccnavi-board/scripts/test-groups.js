@@ -236,6 +236,8 @@ function groupsFor(wanted, map) {
     for (const [group, files] of map) {
       if (files.has(screen.helper)) groups.add(group);
     }
+    // 開発用の画面確認ツール（devtools）はボードを実際に描くので、ボードの画面を直したら回す
+    if (screen.name === "board" && map.has("devtools")) groups.add("devtools");
     // 画面と同じ名前のグループは、テストの入口のパスが約束と違っても必ず回す。
     // ここが無いと、画面を足して `test/helpers/<名前>.ts` を作り忘れたときに、
     // その画面のテストだけが気づかないうちに回らなくなる
@@ -296,8 +298,9 @@ function callFor(rel, map) {
 
   const all = [...map.keys()];
 
-  // 開発用の画面確認ツール。読むのは `test/devtools/` のテストだけで、import では辿れない（`require` で読む）ので名前で決める。
-  // `scripts/` の他のファイル（組み立てとテストの入口）は下の道（全グループ）に任せる
+  // 開発用の画面確認ツール。ツール自身は `require` で読まれ import では辿れないので、名前で決める。
+  // ツールが読む `src/` 側は、E2E（`test/devtools/render-board.e2e.ts`）の import で閉包に入る。
+  // `scripts/` の他のファイル（組み立てとテストの入口）は下の規則（全グループ）に任せる。
   if (rel === "scripts/render-board.js" || rel.startsWith("scripts/lib/")) {
     return { groups: map.has("devtools") ? ["devtools"] : all, compile: true, webview: false };
   }
@@ -404,8 +407,8 @@ function testFiles(groups, domOnly) {
 }
 
 /**
- * `test/<グループ>/*.e2e.ts`（コンパイルすると `out/test/<グループ>/*.e2e.js`）は、`node --test` に渡さず別に起こす。
- * 実機のブラウザが要るもので、環境が無いときにスキップして成功に数えないよう、終了コードをそのまま受ける
+ * `test/<グループ>/*.e2e.ts`（コンパイルすると `out/test/<グループ>/*.e2e.js`）は、`node --test` には渡さず、別に起こす。
+ * E2E は実機のブラウザを使う。環境が無いときにスキップして成功に数えないよう、終了コードをそのまま受ける
  * （0 通った / 1 失敗 / 3 環境が揃っていない）。1 つでも 1 なら 1、そうでなく 3 があれば 3。
  */
 function runE2e(groups) {

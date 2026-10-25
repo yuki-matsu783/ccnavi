@@ -266,6 +266,7 @@ test/
   projects/           プロジェクト管理（projects と、画面を動かす projects.dom）
   flow/               フロー編集（flow-doc, flow-view, flow-lint, flow-match, flow-write と、書き出しを PyYAML で読み戻す flow-pyyaml（リポジトリのルートで uv run python か python3 を起動する。起動できなければ飛ばす）、画面を動かす flow.dom、線を引ける先・コピー・貼り付け・履歴・差分の flow-edit-ops、元に戻す・コピー・ミニマップ・保存前の確かめを画面で動かす flow-edit.dom、ボードのカードのボタンを動かす flow-card.dom、エージェントの下書きの取り込みと依頼のボタンを動かす flow-proposal.dom）
   workflow/           計画編集（planordermodel, workflow-view, ボードと結ぶ帳面の workflow-tabs と、画面を動かす workflow.dom）
+  devtools/           開発用の画面確認ツール（scripts/render-board.js）。引数・--out の拒否・失敗の条件・スタブの単体テストと、Chromium で PNG が出ることを確かめる render-board.e2e.ts（node --test には渡さず test-groups.js が別に起こす）
   shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens, style, appearance, screen-host, approval-machine, plan-graph, decidemodel, mrstate, merge, read-only（読み取りから書き込みを呼ばない）)
   */*.test.ts         組み立てと HTML の文字列を見る単体テスト CB-T01〜
   */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。画面はどれも React なので、描くものも動かして見る（render.dom, projects.dom, risk.dom, phases.dom, rules.dom, flow.dom, templates.dom, templates-edit.dom, handoff.dom）
@@ -274,6 +275,7 @@ scripts/
   bundle.js           esbuild で本体を out/extension.js にバンドルする
   bundle-webview.js   esbuild で画面（React）を画面ごとに out/webview/<名前>.js へバンドルする。画面は src/webview/<名前>/main.tsx があるものを見つける（表で持たない）。`.png` は data: の URL にして JS へ入れる（案内の画像。tours/images.ts）
   package.sh          vsix の組み立て
+  render-board.js     VS Code なしで Chromium にボードの画面を描く開発用ツール（lib/vscode-stub.js は acquireVsCodeApi のスタブ。使い方は development.md）
 ```
 
 **テストの ID。** 名前の頭に付ける `CB-T…` / `CB-D…` は「失敗したテストを名指しする」ためのもので、手動確認の表（[manual-checks.md](manual-checks.md)）やチケットの記録から参照する。

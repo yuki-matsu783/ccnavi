@@ -1,7 +1,7 @@
 ---
 title: ccnavi ボードの動作確認
 type: design
-description: VS Code 拡張 ccnavi ボードを拡張開発ホストで動かす手順と、単体テストの対象外の部分を手で確かめる項目の表。各項目を画面確認ツール（render-board.js）で代わりに確かめられるかを示す列つき
+description: VS Code 拡張 ccnavi ボードを拡張開発ホストで動かす手順と、単体テストの対象外の部分を手で確かめる項目の表。各項目を画面確認ツール（render-board.js）で代えて確かめられるかを示す列つき
 tags: [design-doc, extension, testing]
 keywords: [手動確認, 拡張開発ホスト, F5, Developer: Reload Window, 動作確認, パネル, board-panel, 確認項目, 画面確認ツール, render-board, ツールで代替]
 ---
@@ -18,10 +18,10 @@ keywords: [手動確認, 拡張開発ホスト, F5, Developer: Reload Window, �
 
 ## 手動確認の手順
 
-画面の見た目だけなら、VS Code を起動せず Chromium に描かせて確かめられる。使い方と、確かめられること・られないことは
+画面の見た目だけなら、VS Code を起動せず Chromium で描いて確かめられる。使い方と、確かめられること・られないことは
 [画面を VS Code なしで描く](development.md#画面を-vs-code-なしで描くrender-boardjs)にある。
-表の「ツールで代替できるか」の列は、その確認をツールで代わりに確かめられるかを示す。`不可` は VS Code・拡張ホスト・画面の操作が要るもの、
-`一部` は括弧の範囲だけ描いて確かめられるもの。ボード以外の画面はツールの対象外なので、すべて `不可`。
+表の「ツールで代替できるか」の列は、その確認をツールで代えられるかを示す。`不可` は VS Code・拡張ホスト・画面の操作が要るもの、
+`一部` は括弧内の範囲だけをツールで確かめられるもの。ボード以外の画面はツールの対象外なので、すべて `不可`。
 
 `extension.ts` / `board-panel.ts` / `rules-panel.ts` / `risk-panel.ts` / `phases-panel.ts` / `templates-panel.ts` / `flow-panel.ts` / `workflow-panel.ts` / `prompt-handover.ts` / `projects-panel.ts` / `sidebar.ts` / `handoff-panel.ts` / `handoff-entry.ts` / `terminal.ts` / `ccnavi.ts` / `git.ts` / `tour.ts` は、VS Code の API か子プロセスに触れるので単体テストの対象外。次の項目を拡張開発ホストで確かめる。チケットのある状態を作るには、`tests/ticket/test_board.py` の `scene()` と同じ手順（親を承認、子を着手・閉じる、次の子を提案）を実際のリポジトリでたどる。
 
