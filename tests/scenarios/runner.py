@@ -13,9 +13,10 @@
 
 run-all は、使い捨てのリポジトリのシナリオ（人間の操作が無く、setup.reset を持つもの）だけを、
 1 回の確認で直列に回す。--confirmed を付けずに打つと、回す ID の一覧・概要・base・費用の上限と
-目印を出して止まる（終了コード 3）。目印は ID の集合・base・費用の上限・概要から作り、
-実行の直前に作り直して合わなければ止まる。実費の累計が --max-total-usd を超えそうになったら、
-次のシナリオを回さずに止まる。
+目印を出して止まる（終了コード 3）。目印は ID の集合・base・費用の上限・概要から作る。
+実行の直前に作り直し、合わなければ止まる。実費の累計が --max-total-usd を超えそうなら、
+次のシナリオは回さずに止まる。終了コードは 0 全部 pass / 1 fail がある・回せるシナリオが無い /
+2 未成立か意味の判定待ちがある・上限が不正 / 3 確認が要る・止まった。
 
 next は、人間の操作で止まったあと、人間が「次へ」と言ってから打つ。
 restore は、人間の操作で止まった回を続けずにやめるとき、setup のファイルを消し、
@@ -758,7 +759,7 @@ def _git_common_path(top):
 def _clear_ccnavi_state(root, top, run):
     """ccnavi 自身が対象の git に書く状態（直接作業の記録・取り込みの marker・専用の ref）を消す。
     top は require_disposable_repo を通したものだけ。消すのは共通ディレクトリ直下の名指しの 3 つと
-    refs/ccnavi の下だけ（logs/ など .gitignore 済みのものは触らない）。"""
+    refs/ccnavi の下だけで、logs/ など .gitignore 済みのものは触らない。"""
     common = _git_common_path(top)
     for name in CCNAVI_STATE_DIRS:
         path = common / name
@@ -774,7 +775,7 @@ def reset_repo(root, target, base, allowed=None):
     """対象を base へ戻す。順序: ワークツリーを消す → prune → ccnavi の記録・marker・ref を消す →
     main を base に合わせて切り替える → main 以外のローカルブランチを消す → タグを消す →
     stash を空にする → reset --hard → clean -fd。
-    ccnavi の状態は、ワークツリーを消して prune した後に消す。記録は一時ワークツリーや
+    ccnavi の状態は、ワークツリーを消して prune したあとに消す。記録は一時ワークツリーや
     ブランチを指すので、ワークツリーが消せずに止まった回で、記録だけ先に消さない。
     clean に -x は付けない（.gitignore 済みを消さない）。refs/remotes は触らない。"""
     top = require_disposable_repo(root, target, allowed)
@@ -1657,9 +1658,9 @@ def bypass_suspects(rows, streams, step_sessions):
     return found
 
 
-# 次の手を示す語。hook の拒否文は、次の手を行頭のマーカーなしの文で書くものがほとんどなので、
-# マーカーの行（GUIDE_HEADS）に加えて、依頼・指示の言い回しを見る（#570）。
-# 「使う」「確かめ」のような、禁止の説明にも出る語は入れない。
+# 次の手を示す語。hook の拒否文は、次の手をマーカーのない行頭の文で書くことが多いので、
+# マーカーの行（GUIDE_HEADS）に加えて、依頼・指示の言い回しも見る（#570）。
+# 「使う」「確かめ」のように、禁止の説明にも出る語は入れない。
 GUIDE_PHRASES = (
     "ください",
     "頼んで",
@@ -2398,7 +2399,7 @@ def expand_scenario_paths(patterns):
 
 def run_all_reason(scn, root, top, top_why):
     """run-all の対象にしない理由。対象にできるなら None。#546 の判定（使い捨てのリポジトリ）に、
-    続けて回すために要る条件（人間の操作が無い・前の回の状態を残さない）を足す。"""
+    続けて回すのに必要な条件（人間の操作が無い・前の回の状態を残さない）を足す。"""
     setup = scn.get("setup") or {}
     if any(step.get("human") for step in scn["steps"]):
         return "人間の操作の step がある（続けて回せない。1 本ずつ確認して回す）"
@@ -2455,8 +2456,9 @@ def run_all_plan(paths, root):
 
 
 def run_all_digest(eligible, cap):
-    """確認した内容の目印。ID の集合・base・シナリオごとの費用の上限・累計の上限・人間が読んだ概要。
-    どれかが変わると変わる。実行の直前に作り直して、確認した値と比べる。"""
+    """確認した内容の目印。ID の集合・base・シナリオごとの費用の上限・累計の上限・
+    人が読んだ概要から作る。どれか一つでも変われば目印も変わる。
+    実行の直前に作り直して、確認したときの値と比べる。"""
     body = {
         "max_total_usd": cap,
         "scenarios": [
@@ -2672,8 +2674,8 @@ def cmd_run_all(args):
         return 3
     if args.confirmed != digest:
         print(
-            "確認した内容と、今回す対象が違う（ID の集合・base・費用の上限・概要のどれかが"
-            "増減か変更している）。回さない"
+            "確認した内容と今回の対象が違う（ID の集合・base・費用の上限・概要のどれかが"
+            "増えたか減ったか、書き換わった）。回さない"
         )
         print(f"今の対象: {', '.join(str(s['id']) for _, s in eligible)}（目印 {digest}）")
         print(f"案内: 確認した目印は {args.confirmed}")

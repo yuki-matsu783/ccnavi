@@ -86,7 +86,7 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
 - 出力ディレクトリ（`logs/scenarios/<ID>-<日時>/`）のファイル: `step-N.jsonl`（stream-json）・`report.md`（判定と、拒否の傾向の目印）・`report.json`・`evidence.md`（`judge` 用の証拠。渡った文脈の先頭を含む）・`context-N.md`（step N に渡った文脈の全文）・`messages.md`（hook の応答の文面の一覧）。
   読み方は [証拠の読み方](../../docs/42_claude/acceptance-scenarios.md)
 - 回すのは [runner.py](runner.py)（`uv run python -m tests.scenarios.runner run <シナリオ>`。ほかに `preflight`・`run-all`・`next`・`restore`・`judge`。使い方と終了コード（10 を含む）は [回し方](../../docs/42_claude/acceptance-scenarios.md)）。判定は pass / fail / inconclusive（未成立）/ needs-review。
-  `run-all <ディレクトリ or glob> --max-total-usd <USD>` は、使い捨てのリポジトリのシナリオ（人間の操作が無く、`setup.reset` を持つもの）を、1 回の確認で直列に回し、最後に全体の表（ID・判定・実費・ツール呼び出し数・拒否数・ask 数）を出す。確認は ID の集合・`base`・費用の上限・概要に限って有効（[続けて回す](../../docs/42_claude/acceptance-scenarios.md)）。
+  `run-all <ディレクトリ or glob> --max-total-usd <USD>` は、使い捨てのリポジトリのシナリオ（人間の操作が無く、`setup.reset` を持つもの）を、1 回の確認で直列に回す。最後に全体の表（ID・判定・実費・ツール呼び出し数・拒否数・ask 数・出力の置き場）を出し、`summary.md` / `summary.json` に書く。確認が有効なのは ID の集合・`base`・費用の上限・概要に限る（[続けて回す](../../docs/42_claude/acceptance-scenarios.md)）。
   全量テスト（`python -m tests`）には入らない。拾われるのは [test_runner.py](test_runner.py)（実行器の単体テスト）だけ
 
 ## 期待の確かめ方の約束

@@ -2500,7 +2500,7 @@ class RunAllTest(unittest.TestCase):
                 rc = self.main(ws, str(scn_dir), "--max-total-usd", "5", "--confirmed", confirmed)
             self.assertEqual(rc, 3)
             self.assertEqual(calls, [])
-            self.assertIn("確認した内容と、今回す対象が違う", buf.getvalue())
+            self.assertIn("確認した内容と今回の対象が違う", buf.getvalue())
             self.assertIn("UC-91, UC-92", buf.getvalue())
 
     def test_a_removed_scenario_a_new_cap_and_a_new_base_each_invalidate_the_confirmation(self):
