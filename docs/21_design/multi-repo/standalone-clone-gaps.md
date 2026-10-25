@@ -106,8 +106,8 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 
 #### C3 setup が `/.claude/worktrees/` を `.gitignore` に足さない（minor から中）
 
-- 処理と場所: `scripts/ccnavi-setup.sh:960-1060,1627-1652` が `.gitignore` に足すのは `.ccnavi/bin/<os-arch>/`、`**/ccnavi-index.jsonl`、`/scratchpad`、`/logs/`。`/.claude/worktrees/` は足さない。ccnavi 自身のリポジトリは `.gitignore` に `/.claude/worktrees/` と `/projects/` を手で書いている
-- ワークスペース内 clone: ワークスペース側にも `/.claude/worktrees/` を足さない。ワークスペースの `.gitignore` に `/projects/` も足されず、警告だけが出る（setup の 1274 行以降）。重さは minor
+- 処理と場所: `scripts/ccnavi-setup.sh` が配布先のワークスペースの `.gitignore` に足すのは、目印の領域の中の `.ccnavi/bin/<os-arch>/`、`**/ccnavi-index.jsonl`、`/scratchpad`、`/logs/`、`/.claude/worktrees/`。足すのはワークスペースだけで、`projects/<名前>/` の各プロジェクトには足さない。ccnavi 自身のリポジトリは `.gitignore` に `/projects/` を手で書いている
+- ワークスペース内 clone: ワークスペースの `.gitignore` に `/projects/` も足されず、警告だけが出る（setup の 1274 行以降）。重さは minor
 - 単体 clone: ワークツリーがプロジェクト自身の `.claude/worktrees/` に切られ、`git status` に `?? .claude/worktrees/` が出る。`ccnavi-git.sh add .` が `adding embedded git repository` の警告を出し、gitlink を staged する。重さは中
 - 確認: 実行で確認。単体 clone 固有ではない
 - 直し方の案: setup が `/.claude/worktrees/` を足す（ワークスペース側には `/projects/` も）。未決
