@@ -74,6 +74,64 @@ def _connect():
     return gitlab_api.Client(docker_gitlab.BASE), token, docker_gitlab.BASE, values
 
 
+HUMAN_TOKEN_KEY = "CCNAVI_PROBE_REVIEWER_TOKEN"
+HUMAN_OPS = ("thread", "resolve", "approve")
+
+
+def human_op(root, host, op, threads):
+    """人間役（ccnavi-reviewer）の操作を 1 件実行する。結果の辞書を返す。
+    status が 2xx で error が無ければ成功。再試行しない（thread は冪等でない）。
+    対象の MR は、使い捨てのプロジェクトにちょうど 1 件あるものだけ。
+    トークンは結果にも例外の文字列にも入れない。
+    thread の名前と discussion の対応は threads に足す。"""
+    result = {"op": op["op"]}
+    if op.get("as"):
+        result["as"] = op["as"]
+    if op.get("thread"):
+        result["thread"] = op["thread"]
+
+    def fail(status, error):
+        return {**result, "status": status, "error": error}
+
+    try:
+        client, _, _, values = _connect()
+        token = values.get(HUMAN_TOKEN_KEY)
+        if not token:
+            return fail(0, "人間役のトークンをトークンのファイルから読めない")
+        pid = host["project_id"]
+        status, mrs = client.list_mrs(token, pid)
+        if not 200 <= status < 300 or not isinstance(mrs, list):
+            return fail(status, f"MR の一覧を取れない（HTTP {status}）")
+        if len(mrs) != 1:
+            return fail(status, f"プロジェクトの MR が {len(mrs)} 件ある（ちょうど 1 件が要る）")
+        iid = mrs[0]["iid"]
+        if op["op"] == "thread":
+            status, body = client.create_discussion(token, pid, iid, op["body"], tag="human-thread")
+            if 200 <= status < 300 and isinstance(body, dict) and body.get("id"):
+                result["discussion_id"] = body["id"]
+                if op.get("as"):
+                    threads[op["as"]] = {"id": body["id"], "iid": iid}
+        elif op["op"] == "approve":
+            status, _ = client.approve(token, pid, iid)
+            result["iid"] = iid
+        else:
+            ref = threads.get(op["thread"])
+            if ref is None:
+                return fail(0, f"名前 {op['thread']} のスレッドを、この回では立てていない")
+            result["discussion_id"] = ref["id"]
+            status, _ = client.resolve_discussion(token, pid, ref["iid"], ref["id"])
+        result.update(status=status, iid=iid)
+        if not 200 <= status < 300:
+            result["error"] = f"HTTP {status}"
+        return result
+    except Exception as exc:  # 後片付けまで通すため、例外にしない。文字列は型の名前だけ
+        return fail(0, f"例外 {type(exc).__name__}")
+    finally:
+        _log(root).info(
+            "人間役の操作", op=op["op"], as_=op.get("as"), project_id=host.get("project_id")
+        )
+
+
 def agent_token():
     return _connect()[1]
 

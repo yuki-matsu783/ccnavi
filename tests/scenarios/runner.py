@@ -111,6 +111,7 @@ def load_scenario(path):
     data.setdefault("permission_mode", "auto")
     data.setdefault("expect", {})
     _check_setup(path, data.get("setup"))
+    _check_human_api(path, data)
     for n, step in enumerate(data["steps"], 1):
         after = step.get("expect_after")
         if after is None:
@@ -130,6 +131,44 @@ def load_scenario(path):
                 + ", ".join(sorted(extra))
             )
     return data
+
+
+def _check_human_api(path, data):
+    """human step の human_api（人間役の API 操作）の形を確かめる。docker-gitlab 専用。"""
+    named = set()
+    host = (data.get("setup") or {}).get("host", hostenv.DEFAULT_HOST)
+    for n, step in enumerate(data["steps"], 1):
+        ops = step.get("human_api")
+        if ops is None:
+            continue
+        where = f"{path}: step {n} human_api"
+        if not step.get("human"):
+            raise ValueError(f"{where} は human: true の step にだけ書けます")
+        if host != hostenv.DOCKER:
+            raise ValueError(
+                f"{where} は setup.host: docker-gitlab のときだけ使えます（今は {host}）。"
+                "setup.host を docker-gitlab にするか、"
+                "human_api を消して instruction で手で操作する"
+            )
+        if not isinstance(ops, list) or not ops:
+            raise ValueError(f"{where} は 1 件以上の操作の list です")
+        for i, op in enumerate(ops, 1):
+            if not isinstance(op, dict) or op.get("op") not in hostenv.HUMAN_OPS:
+                raise ValueError(
+                    f"{where} の {i} 件目: op は {' / '.join(hostenv.HUMAN_OPS)} のどれかです"
+                )
+            if op["op"] == "thread":
+                if not isinstance(op.get("body"), str) or not op["body"].strip():
+                    raise ValueError(f"{where} の {i} 件目: thread には body（本文）が要ります")
+                if op.get("as") is not None:
+                    if not isinstance(op["as"], str) or not op["as"].strip():
+                        raise ValueError(f"{where} の {i} 件目: as は空でない文字列です")
+                    named.add(op["as"])
+            elif op["op"] == "resolve" and op.get("thread") not in named:
+                raise ValueError(
+                    f"{where} の {i} 件目: resolve の thread {op.get('thread')!r} は、"
+                    "前の thread の as で名前を付けたものだけ指せます"
+                )
 
 
 def file_spec(value):
@@ -1195,6 +1234,40 @@ def _failed_step_cost(scn, out, num, exc):
     return 0.0
 
 
+def _run_human_api(out, st, idx, step, root):
+    """human_api の操作を書いた順に実行して、止まらずに次の step へ進む。失敗したら 11。
+    操作の結果は 1 件ごとに state に書く（再開しても同じ操作を二度実行しない）。"""
+    print(f"\n== 人間役の操作（step {idx + 1}、API）==")
+    st.setdefault("human_ops", [])
+    st.setdefault("threads", {})
+    for op in step["human_api"]:
+        res = hostenv.human_op(root, st["host"], op, st["threads"])
+        st["human_ops"].append({"step": idx + 1, **res})
+        _write_state(out, st)
+        ok = 200 <= res["status"] < 300 and not res.get("error")
+        detail = f"HTTP {res['status']}" if ok else res.get("error", "失敗")
+        print(f"  {_human_op_text(op)}: {'成功' if ok else '失敗'}（{detail}）")
+        if not ok:
+            st["next_step"] = idx + 1
+            st["halt"] = {
+                "step": idx + 1,
+                "kind": "human_api",
+                "reasons": [f"{_human_op_text(op)}: {res.get('error', '失敗')}"],
+            }
+            _write_state(out, st)
+            print(f"step {idx + 1}: 人間役の操作が失敗した。後続の step には進まず止める")
+            return 11
+    st["next_step"] = idx + 1
+    _write_state(out, st)
+    return None
+
+
+def _human_op_text(op):
+    """操作の表示（種類と名前。本文は出さない）。"""
+    name = op.get("as") or op.get("thread")
+    return f"{op['op']}（{name}）" if name else op["op"]
+
+
 def drive(scn, out, st, root):
     """st['next_step'] から、人間の操作の step か末尾まで進める。
     人間の操作で止まったら 10、末尾まで進んだら None を返す。
@@ -1203,6 +1276,11 @@ def drive(scn, out, st, root):
     while st["next_step"] < len(steps):
         idx = st["next_step"]
         step = steps[idx]
+        if step.get("human") and step.get("human_api"):
+            rc = _run_human_api(out, st, idx, step, root)
+            if rc:
+                return rc
+            continue
         if step.get("human"):
             print(f"\n== 人間の操作（step {idx + 1}）==")
             print(step.get("instruction", "").strip())
@@ -1314,6 +1392,18 @@ def finish(scn, out, st, root):
         _write_state(out, st)
     if not_restored:
         results.append(("reset", st["target"]["path"], FAIL, "base に戻せなかった。手作業が要る"))
+    if st.get("human_ops"):
+        bad = [o for o in st["human_ops"] if not 200 <= o["status"] < 300 or o.get("error")]
+        total = len(st["human_ops"])
+        results.append(
+            (
+                "human-api",
+                "人間役の API 操作",
+                FAIL if bad else PASS,
+                f"{total} 件中 {total - len(bad)} 件が成功"
+                + (f"、{len(bad)} 件が失敗" if bad else ""),
+            )
+        )
     if undeleted:
         host = st["host"]
         results.append(
@@ -1502,6 +1592,10 @@ def step_answer_lines(scn, out):
         if step.get("human"):
             lines.append(f"### step {num}（人間の操作）")
             lines.append(_one_line(step.get("instruction", ""), 200))
+            if step.get("human_api"):
+                lines.append(
+                    "人間役の API: " + "、".join(_human_op_text(o) for o in step["human_api"])
+                )
             continue
         lines.append(f"### step {num}")
         lines.append("【入力プロンプト】")
@@ -1945,6 +2039,15 @@ def write_report(scn, out, st, results, rows, raw):
         "judge の基準:",
         *[f"- {c}" for c in scn["expect"].get("judge", [])],
     ]
+    if st.get("human_ops"):
+        ev += ["", "## 人間役の操作"]
+        for o in st["human_ops"]:
+            extra = f" discussion {o['discussion_id']}" if o.get("discussion_id") else ""
+            name = f"（{o.get('as') or o.get('thread')}）" if o.get("as") or o.get("thread") else ""
+            ev.append(
+                f"- step {o['step']}: {o['op']}{name} → HTTP {o['status']}{extra}"
+                + (f" 失敗: {o['error']}" if o.get("error") else "")
+            )
     steps = scn.get("steps") or []
     step_sessions = {}
     for p in sorted(out.glob("step-*.jsonl")):
@@ -2065,7 +2168,11 @@ def scenario_summary(scn):
     lines.append("手順:")
     for i, step in enumerate(scn["steps"], 1):
         if step.get("human"):
-            lines.append(f"  {i}. 人間の操作: {_one_line(step.get('instruction', ''))}")
+            text = _one_line(step.get("instruction", ""))
+            if step.get("human_api"):
+                api = "、".join(_human_op_text(o) for o in step["human_api"])
+                text = f"{text}（人間役の API: {api}。止まらずに進む）".lstrip()
+            lines.append(f"  {i}. 人間の操作: {text}")
         else:
             lines.append(f"  {i}. {_one_line(step.get('prompt', ''))}")
     expect = scn.get("expect") or {}
