@@ -172,7 +172,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `wip/` | 作業中の下書き（`design/`・`handoff/`・`proposals/`） |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る（例外は `tests/scenarios/test_runner.py`。受入シナリオの実行器の内部を呼ぶ単体テストで、`claude` は呼ばない） |
 | `tests/__main__.py` | `python -m tests`。テストをモジュールごとに別プロセスで同時に回す。回す中身は discover と同じ |
-| `tests/manual/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを適用して 1 周する、ユーザが手で回す道具。自動テストは呼ばない |
+| `tests/manual/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを適用して 1 周する、ユーザが手で回す道具。自動テストは呼ばない。Docker で立てる手順は [docs/42_claude/gitlab-manual.md](42_claude/gitlab-manual.md) |
 | `tests/fixtures/` | テスト用のルール（`rules.yml`、言及の無い呼び出しを見る `rules-undeclared.yml`） |
 | `.ccnavi/config/common/rules.yml` / `phases.yml` / `risks.yml` | このリポジトリ自身の共通レイヤーの設定（`phases.yml` はどのプロジェクトでも使える定義） |
 | `.ccnavi/config/project/phases.yml` | このリポジトリ自身のレイヤーのフェーズ定義（このリポジトリのレイアウトに依存する定義） |
