@@ -178,11 +178,7 @@ class SceneListTest(unittest.TestCase):
     def test_scenes_are_decided_one_by_one(self):
         host = load_host()
         self.assertEqual(set(host.scene_names()), set(COMPARED_SCENES) | set(EXCLUDED_SCENES))
-
-    def test_excluded_scenes_exist_and_compared_scenes_are_not_empty(self):
-        host = load_host()
         self.assertTrue(COMPARED_SCENES)
-        self.assertLessEqual(set(EXCLUDED_SCENES), set(host.scene_names()))
         self.assertFalse(set(COMPARED_SCENES) & set(EXCLUDED_SCENES))
 
     def test_requests_are_in_requests_json(self):
@@ -206,7 +202,7 @@ class HostSampleTest(unittest.TestCase):
     def test_the_sample_agrees_with_the_recording_except_for_the_allow_list(self):
         self.assertEqual([], problems(self.recorded, run(self.host), self.entries))
 
-    def test_every_request_in_every_scene_compared_some_keys(self):
+    def test_every_request_compared_some_keys(self):
         n = counts(self.recorded, run(self.host))
         self.assertTrue(n)
         self.assertEqual({}, {k: v for k, v in n.items() if v == 0})

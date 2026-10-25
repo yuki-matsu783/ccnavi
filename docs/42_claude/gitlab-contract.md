@@ -187,7 +187,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 | `user` `mrs_opened` `discussions` `reviewers` | `user.json`・`mrs.json`・`discussions.1.json`・`reviewers.1.json` | 場面ごとに比べる |
 | `notes_post` `notes_get` | 状態ファイル（`FAKE_GITLAB_STATE`） | 場面によらないので 1 場面で 1 回。先に `notes_post` を打ち、`notes_get` が空にならないようにする |
 | `mrs_merged` | 全場面で `[]` | 除く。`state=merged` の枝が無く、比べても配列が空で何も比べない |
-| `project` | 固定値 `{"id":42,"default_branch":"main"}` | 除く。読むキー（`archived` `permissions` など）がほとんど無い |
+| `project` | 固定値 `{"id":42,"default_branch":"main"}` | 除く。`reads` は 5 キーで、見本が持つのは `id` と `default_branch` だけ（比べられるのは `id` のみ） |
 | 上以外 | 404 | 見本が答えない（見本は読み取りだけの代役） |
 
 ### 比べ方と許可
@@ -210,7 +210,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 
 ## 限界
 
-比べられない・比べないもの。見本の比べない範囲は「見本」の節の表。
+比べられない・比べないもの。見本は、2 ページ目・`reads` 外のキー・値の並び順を比べない（`paged` は 1 ページ目のみ）。除く場面と要求は「見本」の節の表。
 
 - `reads` に無いキー。本物だけのキーは比べないので、sh や拡張が新しいキーを読むようになったら、`requests.json` の `reads` に足す（足し忘れは検出できない）
 - ヘッダ（`Link`・`X-Next-Page`・`X-Total`）と 2 ページ目。`Client` がヘッダを捨てる。模擬も出さない
