@@ -208,8 +208,8 @@ def issue_identifier_parts(
 ) -> tuple[str, bool]:
     """`issue_identifier` の答えと、題が長くて slug を短くしたか。
 
-    短くしたかは、`issue_slug` が `room` に収めるために落とした（題から作った slug より短くなった）
-    ことを指す。末尾の `-<2 桁>` を除いただけなら偽。
+    短くしたかどうかは、`issue_slug` が `room` に収めるために字を落としたかで決まる。
+    末尾の `-<2 桁>` を除いただけなら偽。
     `ccnavi-start.sh` はこれが真のとき、題から作った名前で進めず、短い `--slug` を付けさせる。
     題から何も残らず `EMPTY_SLUG` にしたときは偽。
     """
@@ -222,7 +222,8 @@ def issue_identifier_parts(
     head = f"{prefix}-{number}-" + (f"{project}-" if project else "")
     title = title if isinstance(title, str) else ""
     slug = issue_slug(title, SUGGESTED_ID_LENGTH - len(head))
-    full = issue_slug(title, len(title) * 2 + 1)
+    # NFKC で字数が増える題でも切られないよう、十分大きい上限で全体の slug を作る。
+    full = issue_slug(title, 10**6)
     shortened = len(slug) < len(full)
     ident = head + slug
     while slug and _CHILD_TAIL.search(ident):

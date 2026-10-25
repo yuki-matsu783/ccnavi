@@ -1577,9 +1577,12 @@ if [ "$total" -eq 0 ]; then
 		esac
 		if [ "$issue_branch_long" = yes ]; then
 			# 題が長く、機械で切ると語の途中や意味の欠けた名前になる。何も作らずに、短い語を付けて打ち直させる
-			printf 'ccnavi-start: issue #%s の題が長く、題から作る名前 %s は途中で切れます。何も作らずに止めました。\n' "$number" "$issue_branch" >&2
+			printf 'ccnavi-start: issue #%s の題が長く、題から作る名前 %s は途中で切れます。ブランチは作らずに止めました（--new-issue から来たときの issue は作成済み）。\n' "$number" "$issue_branch" >&2
 			printf '案内: 名前はワークツリーのパス・子の識別子・ログのパスに何度も出るので、短く保つ。--slug は小文字・数字・ハイフンだけ（日本語は使えない）\n' >&2
-			printf '次: 題の要点を表す短い英語の語を決め（30 文字ほどまで。例: text-formatter-cli）、<語> に入れて打ち直す: sh .ccnavi/scripts/ccnavi-start.sh %s --slug <語>\n' "$real_args" >&2
+			if [ -n "$ib_project" ]; then
+				printf '案内: プロジェクト %s の issue なので、--slug の語は %s- から始める（issue の番号はリポジトリごとなので、名前を分ける）。長さは 48 文字に収める\n' "$ib_project" "$ib_project" >&2
+			fi
+			printf '次: 題の要点を表す短い英語の語を決め（30 文字ほどまで。例: text-formatter-cli）、<語> に入れて打ち直す: sh %s/ccnavi-start.sh %s --slug <語>\n' "$scripts" "$real_args" >&2
 			log_info 止めた -- "exit=2" "reason=long-title"
 			exit 2
 		fi

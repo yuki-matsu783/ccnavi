@@ -206,6 +206,12 @@ class BranchNameRulesTest(unittest.TestCase):
             with self.subTest(title=text):
                 self.assertFalse(ticket_ids.issue_identifier_parts(3, text)[1])
 
+    def test_the_cut_is_noticed_when_nfkc_makes_the_title_longer(self):
+        # NFKC で 1 字が 2 字に増える題（㍿ → 株式）でも、切ったことを返す
+        ident, shortened = ticket_ids.issue_identifier_parts(7, "㍿" * 10)
+        self.assertTrue(shortened, ident)
+        self.assertTrue(ticket_ids.is_valid_id(ident))
+
     def test_issue_identifier(self):
         self.assertEqual("feature-12-issue", ticket_ids.issue_identifier(12))
         self.assertEqual(

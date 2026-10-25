@@ -535,7 +535,8 @@ _SCRIPTS = """\
          子の識別子の形なら "child yes" を出力します）
     ccnavi worktree issue-id <number> <prefix> [<project>] --title <title>
         （ccnavi-start.sh 用。issue から新しい親のブランチ名（= 識別子）を作り、"id <名前>" を
-         出力します。Chrome 拡張の「始める」と同じ作り方です）
+         出力します。Chrome 拡張の「始める」と同じ作り方です。題が長くて slug を
+         語の区切りで切ったときは、続けて "long yes" を出力します）
     ccnavi write-and-push family <id>
         （write-and-push 用。"write-and-push 1" の行に続いて、
         親子のチケット・リポジトリ・write-and-push の対象か

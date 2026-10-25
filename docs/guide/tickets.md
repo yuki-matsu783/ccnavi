@@ -65,7 +65,7 @@ keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケッ�
 
 - 親の識別子は `<先頭の語>-<番号>-<slug>`（`feature-63-integration-branch`、`hotfix-64-統合先の解決`）。先頭の語は既定で `feature` `hotfix` `fix` `bugfix` `chore` `refactor` `docs` のどれか。チャットで「hotfix で」と言えばエージェントがその語で書く
 - リストを変えるときだけ `.claude/settings.json` の `env` に `CCNAVI_BRANCH_PREFIXES=feature,hotfix,fix` のように書く
-- 番号は issue の番号（通し番号は直接作業のワークツリー名だけに使う）。slug には日本語も指定できる。issue の題が長いと、`ccnavi-start.sh --issue` は名前を作らずに止まり、エージェントが短い英語の `--slug` を考えて打ち直す（`--slug` は小文字・数字・ハイフンだけ）。Chrome 拡張の「始める」は、題から作った名前を語の区切りで切って進む
+- 番号は issue の番号（通し番号は直接作業のワークツリー名だけに使う）。slug には日本語も指定できる。issue の題が長いと、`ccnavi-start.sh --issue` は名前を作らずに止まり、エージェントが短い英語の `--slug` を考えて打ち直す。`--slug` で渡す語は小文字・数字・ハイフンだけ。Chrome 拡張の「始める」は、題から作った名前を語の区切りで切って進む
 - 子の識別子は `<親>-<2 桁のフェーズ番号>-<2 桁のフェーズ内の連番>`。ワークツリーの名前は識別子と同じ
 
 提案の書式、親のワークツリーの扱い、深さと件数の上限は [設計 9.3](../design/tickets/proposal-format.md)。ワークツリーの名前の決まりは [.ccnavi/docs/worktree.md](../../.ccnavi/docs/worktree.md)。

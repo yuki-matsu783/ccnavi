@@ -768,6 +768,12 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(self.local_branches(), ["main"])
         self.assertEqual(self.remote_branches(), ["main"])
         self.assertEqual(self.posts(), [])
+        # 引数は同じ形で打ち直せる（--title に ' を含んでも）
+        quoted = title + " it's"
+        self.github_new(title=quoted, branch="feature-152-text-formatter-cli")
+        done = self.run_sh("--issue", "152", "--title", quoted)
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertIn("'--title' '" + title + " it'\\''s'", done.stderr)
         # <語> のまま打っても断られる（誤った成果物を作らない）
         placeholder = self.run_sh("--issue", "152", "--slug", "<語>")
         self.assertEqual(placeholder.returncode, 2, placeholder.stdout + placeholder.stderr)
