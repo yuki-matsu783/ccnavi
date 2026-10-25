@@ -14,7 +14,7 @@
  */
 import { Fragment, useEffect, useRef, type JSX } from "react";
 
-import { unsavedParents, unsavedText, type ApprovePlan, type ApprovePreview } from "../../core/approvemodel.js";
+import { summarize, unsavedParents, unsavedText, type ApprovePlan, type ApprovePreview } from "../../core/approvemodel.js";
 import type { ApprovalOverlay } from "../../core/board-view.js";
 import { Dialog, DialogActions } from "../shared/Dialog.js";
 import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
@@ -119,12 +119,23 @@ function Body({
 }): JSX.Element {
   const count = preview.batch.length;
   const tickets = preview.batch.map((b) => b.ticket);
+  const summary = summarize(preview);
   const blocked = unsavedParents(preview, unsaved);
   const blockedText = blocked.length === 0 ? "" : unsavedText(blocked);
   return (
     <>
       <h2 id="approval-title">{count === 0 ? "承認待ちのチケットなし" : `承認待ちのチケット ${count} 件`}</h2>
       {notice ? <p className="approval-note warn">{notice}</p> : null}
+      {summary.tickets === "" ? null : (
+        <div className="approval-summary" data-approval-summary>
+          <p>{summary.tickets}</p>
+          {summary.plans.map((line) => (
+            <p key={line} data-approval-summary-plan>
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
       {count === 0 ? null : (
         <table className="approval-batch" data-tour="approval-batch">
           <thead>
@@ -179,6 +190,7 @@ function Body({
           ))}
         </div>
       ) : null}
+      {count === 0 ? null : <Legend />}
       <BodyText text={preview.text} />
       {preview.rejected.length > 0 ? (
         <>
@@ -228,6 +240,32 @@ function Body({
         <Cancel label="キャンセル" disabled={approving} />
       </DialogActions>
     </>
+  );
+}
+
+/**
+ * 本文に出る開発者向けの語の凡例。本文は実行ファイルの出力のまま触らないので、本文の外に語の出る順で置く。
+ * 実行ファイルの意味と合わせる（`agree_screen.py`、`docs/21_design/tickets/proposal-format.md`）
+ */
+const LEGEND: readonly (readonly [string, string])[] = [
+  ["allow", "確認なしで編集できる場所"],
+  ["ask", "実行時に確認が要る場所"],
+  ["deny", "このチケットでも編集できない場所"],
+  ["after", "そのステップより前に終わっているべきステップ（先行）"],
+  ["scope", "そのフェーズで編集できる範囲（inherit は親の範囲を引き継ぐ）"],
+  ["review", "フェーズが終わったあとの人間のレビュー（none は不要、mr はマージリクエスト）"],
+];
+
+function Legend(): JSX.Element {
+  return (
+    <dl className="approval-legend" data-approval-legend>
+      {LEGEND.map(([term, meaning]) => (
+        <Fragment key={term}>
+          <dt>{term}</dt>
+          <dd>{meaning}</dd>
+        </Fragment>
+      ))}
+    </dl>
   );
 }
 

@@ -9,6 +9,7 @@ import {
   parseApprovePreview,
   parseApproveResult,
   partialMessage,
+  summarize,
   type ApproveWorktree,
 } from "../../src/core/approvemodel.js";
 
@@ -280,4 +281,24 @@ test("CB-T400 失敗の理由は fatal / error の行を優先し、標準出力
   assert.equal(failureReason("error: x\n", "fail git worktree"), "error: x");
   assert.equal(failureReason("", "fail git worktree exit=255  log=logs/git-1.log\n"), "fail git worktree exit=255  log=logs/git-1.log");
   assert.equal(failureReason("", ""), "");
+});
+
+test("CB-T1220 承認の要約は batch と plans から作る（件数・part ごとのステップ数・改版・計画なし）", () => {
+  const preview = parseApprovePreview(fixtureText("approve-preview.json"));
+  assert.ok(preview.ok);
+  if (!preview.ok) {
+    return;
+  }
+  const base = preview.value;
+  const plan = base.plans[0];
+  const two = { ...base, plans: [plan, { ...plan, part: "feedback", items: [plan.items[0]] }] };
+  assert.deepEqual(summarize(two), {
+    tickets: "承認するチケット 3 件（親 1 件・子 2 件）",
+    plans: ["i0001 の全体計画 2 ステップ（調査・設計）", "i0001 のフィードバック計画 1 ステップ（調査）"],
+  });
+  const revised = { ...base, batch: base.batch.map((b) => (b.parent === null ? { ...b, revision: true } : b)) };
+  assert.match(summarize(revised).tickets, /改版 1 件/);
+  assert.match(summarize(revised).plans[0], /^i0001（改版） の全体計画/);
+  assert.deepEqual(summarize({ ...base, plans: [] }).plans, []);
+  assert.equal(summarize({ ...base, batch: [], plans: [] }).tickets, "");
 });

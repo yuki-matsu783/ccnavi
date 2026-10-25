@@ -423,6 +423,7 @@ export function PlanGraph({ plan, detail = false, editable = false, onConnect, o
           edges={edges}
           nodeTypes={NODE_TYPES}
           edgeTypes={EDGE_TYPES}
+          proOptions={{ hideAttribution: true }}
           nodesDraggable={false}
           nodesConnectable={editable}
           nodesFocusable={false}
