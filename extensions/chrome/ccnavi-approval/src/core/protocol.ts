@@ -235,6 +235,13 @@ export async function dispatch(message: unknown, sender: Sender, deps: Deps): Pr
     }
   } catch (err) {
     const e = err as { message?: string; status?: number };
+    // 画面へ返すだけでなく、想定していない失敗（`HostError` ではないもの）は service worker のコンソールにも残す
+    // （開発用ツールと実機の試験が拾える）。`HostError` は画面に出る想定の失敗なので残さない。PAT の値は文面に入れない
+    if (!(err instanceof github.HostError)) {
+      const sent = (message as { token?: unknown } | null)?.token;
+      const said = e.message ?? String(err);
+      console.error(`ccnavi: 要求に失敗: ${typeof sent === "string" && sent !== "" ? said.replaceAll(sent, "[PAT]") : said}`);
+    }
     return { ok: false, error: e.message ?? String(err), status: e.status };
   }
 }

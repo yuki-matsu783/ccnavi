@@ -68,8 +68,17 @@ const deps: Deps = {
   },
 };
 
+/** 失敗の文面。PAT の値は出さない（ログを共有しても漏れないように） */
+function describe(err: unknown): string {
+  return err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  dispatch(message, sender, deps).then(sendResponse);
+  dispatch(message, sender, deps).then(sendResponse, (err: unknown) => {
+    // dispatch は投げない作りだが、投げたときに画面が応答を待ち続けないよう、失敗として返す
+    console.error(`ccnavi: 要求を処理できなかった: ${describe(err)}`);
+    sendResponse({ ok: false, error: "service worker で予期しない失敗が起きた" });
+  });
   return true;
 });
 
@@ -78,8 +87,8 @@ chrome.action.onClicked.addListener(() => {
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === ALARM) void refreshBadge();
+  if (alarm.name === ALARM) refreshBadge().catch((err: unknown) => console.error(`ccnavi: バッジを更新できなかった: ${describe(err)}`));
 });
 // 起動し直すたびに作り直さない（周期が数え直しになる）。無いときだけ作る
-void ensureDailyAlarm(chrome.alarms);
-void refreshBadge();
+ensureDailyAlarm(chrome.alarms).catch((err: unknown) => console.error(`ccnavi: 毎日のアラームを作れなかった: ${describe(err)}`));
+refreshBadge().catch((err: unknown) => console.error(`ccnavi: バッジを更新できなかった: ${describe(err)}`));
