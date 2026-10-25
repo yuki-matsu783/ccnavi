@@ -394,6 +394,7 @@ def _bound_to_command(pattern: str) -> bool:
     `ccnavi-worktree\\.sh\\b[^\\x00]*\\s--dry-run` のように、コマンド名のあとを `[^\\x00]` の
     繰り返しでつなぐ式は、除く語がそのコマンドの中にあるときだけヒットする。`--dry-run` だけの式や、
     `.*` でつなぐ式は、切れ目を越えて別のコマンドの語にもヒットするので含まない。
+    簡易な判定で、`|` で分けた別の枝までは見ない。本物の穴は rule-expectations.yml の期待で確かめる。
     """
     head, sep, rest = pattern.partition(_COMMAND_SPAN)
     if not sep or not _COMMAND_HEAD.fullmatch(head):
