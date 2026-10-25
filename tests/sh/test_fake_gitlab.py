@@ -1,4 +1,4 @@
-"""GitLab の代役（`tests/sh/fake_gitlab.py`）を関数で起こして止める。
+"""GitLab の代役（`tests/fake_gitlab.py`）を関数で起こして止める。
 
 見るのは次の観点。
 
@@ -29,8 +29,7 @@ import unittest
 from datetime import UTC, datetime, timedelta
 
 from ccnavi.entry import version
-from tests import common_sh
-from tests.sh import fake_gitlab
+from tests import common_sh, fake_gitlab
 from tests.sh.test_review_host_fixture import REVIEW_SH, SH_DIR, STUB, write
 
 SHELL = shutil.which("sh") or shutil.which("bash")
