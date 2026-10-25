@@ -33,10 +33,13 @@ import gitlab_api  # noqa: E402
 
 
 class FakeClient:
-    def __init__(self, valid: bool = True) -> None:
+    def __init__(self, valid: bool = True, status: int | None = None) -> None:
         self.valid = valid
+        self.status = status
 
     def user(self, token: str):
+        if self.status is not None:
+            return self.status, {}
         return (200 if self.valid else 401), {}
 
     def version(self, token: str):
@@ -178,6 +181,17 @@ class DockerGitlabTest(unittest.TestCase):
             tokens = docker_gitlab.ensure_tokens(FakeClient(valid=True), rotate=False)
         run.assert_not_called()
         self.assertEqual("glpat-old", tokens["GITLAB_TOKEN"])
+
+    def test_transient_api_failure_does_not_revoke_tokens(self):
+        docker_gitlab.write_env_file(
+            docker_gitlab.tokens_path(),
+            {"GITLAB_TOKEN": "glpat-old", "CCNAVI_PROBE_REVIEWER_TOKEN": "glpat-rev-old"},
+        )
+        for status in (0, 502, 503):
+            with self.subTest(status=status), mock.patch.object(docker_gitlab, "run") as run:
+                tokens = docker_gitlab.ensure_tokens(FakeClient(status=status), rotate=False)
+            run.assert_not_called()
+            self.assertEqual("glpat-old", tokens["GITLAB_TOKEN"])
 
     def test_invalid_tokens_are_recreated_without_rotate_flag(self):
         docker_gitlab.write_env_file(

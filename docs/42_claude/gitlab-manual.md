@@ -47,7 +47,7 @@ uv run python tests/manual/gitlab/docker_gitlab.py down --purge  # ボリュー�
 - `up --rotate` のときだけ作り直す。既存は失効する。
 - トークンは `~/.cache/ccnavi/gitlab/tokens.env`（`XDG_CACHE_HOME` があればその下）に 0600 で書く。リポジトリの外。端末には出さない。
 - 使うときは、`set -a; . <status が出すパス>; set +a` で環境変数に載せる。
-- トークンの有効期限は 7 日。期限が切れたら `up --rotate`。
+- トークンの有効期限は 7 日。期限が切れたら、`up` が失効（401）を見て自動で作り直す。`--rotate` は有効なものも作り直したいときだけ。
 
 ## probe_gitlab.py で 1 周する
 
