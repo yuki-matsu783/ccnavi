@@ -8,7 +8,7 @@
 - `real`: 何もしない
 
 実行器（runner.py）から呼ぶ。状態は JSON にできる辞書（`prepare` の戻り値）で、state.json に残す。
-起こした模擬のスレッドだけは、この辞書の `dir` をキーにしたプロセス内の表に持つ。
+起こした模擬のスレッドは、この辞書の `dir` をキーにしたプロセス内の表で持つ。
 """
 
 import os
@@ -110,7 +110,7 @@ def _remote_refs(top, git):
 
 
 def _restore_remote_refs(top, before, git):
-    """fetch・push で動いた refs/remotes/origin/* を、回す前に戻す。"""
+    """fetch・push で動いた refs/remotes/origin/* を、回す前の値に戻す。"""
     now = _remote_refs(top, git)
     cmds = [f"delete {ref}" for ref in now if ref not in before]
     cmds += [f"update {ref} {sha}" for ref, sha in before.items() if now.get(ref) != sha]
@@ -122,9 +122,9 @@ def _restore_remote_refs(top, before, git):
 
 
 def prepare(root, top, setup, git):
-    """代役の置き場を作り、(fake-gitlab なら) 模擬を起こす。state.json に残せる辞書を返す。
+    """代役の置き場を作り、fake-gitlab のときは模擬を起こす。state.json に残せる辞書を返す。
     失敗したら、作ったものを消してから例外を投げる。
-    `git(args, cwd=, input=)` は、本物の git を打つ関数。"""
+    `git(args, cwd=, input=)` は、本物の git を実行する関数。"""
     kind = setup.get("host", DEFAULT_HOST)
     place = tempfile.mkdtemp(prefix="ccnavi-host-")
     host = {"kind": kind, "dir": place, "top": str(top)}
@@ -164,7 +164,7 @@ def origin_url(host):
 
 
 def git_via(host):
-    """setup.git（runner が対象で打つ git）にも、本物の origin への通信を bare へ向けさせる -c。"""
+    """setup.git（runner が実行する git）にも、origin への通信を bare へ向ける -c を付ける。"""
     return ["-c", f"url.{host['bare']}.insteadOf={host['real_origin']}"]
 
 
@@ -225,7 +225,7 @@ def teardown(root, host, git):
     if host.get("remote_refs") is not None and os.path.isdir(host.get("top", "")):
         try:
             _restore_remote_refs(host["top"], host["remote_refs"], git)
-        except Exception as exc:  # 後片付けを止めない
+        except Exception as exc:  # 後片付けを途中で止めない
             _log(root).error("refs/remotes/origin を戻せなかった", target=host["top"], err=str(exc))
             print(f"案内: {host['top']} の refs/remotes/origin/* を戻せなかった: {exc}")
     shutil.rmtree(host["dir"], ignore_errors=True)

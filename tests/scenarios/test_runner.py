@@ -2694,7 +2694,7 @@ class FakeGitlabHostTest(unittest.TestCase):
         self.assertTrue(os.path.isfile(host["state_path"]))
         with self.assertRaises(OSError):
             socket_connect(port)
-        # 模擬の状態を、止めている間に直接変える（作った MR が残る場合の代わり）
+        # 止めている間に模擬の状態を直接変える。作った MR が残ったときの代わり
         state = fake_gitlab.load(host["state_path"])
         state["seq"] = 777
         fake_gitlab.save(host["state_path"], state)
@@ -2877,7 +2877,7 @@ class HostLifecycleTest(unittest.TestCase):
             state_path = self.host_in_state()["state_path"]
             made["state_path"] = state_path
             state = fake_gitlab.load(state_path)
-            state["seq"] = 555  # この step で模擬の状態が動いた、という代わり
+            state["seq"] = 555  # この step で模擬の状態が動いたものとして扱う
             fake_gitlab.save(state_path, state)
             return self.STEP_OUT
 

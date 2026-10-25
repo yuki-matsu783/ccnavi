@@ -151,10 +151,10 @@ def env(
     bare=None,
     real_origin=None,
 ):
-    """ホストの代役を効かせる環境変数。PATH は渡されたものの先頭に代役の置き場を足す。
+    """ホストの代役を効かせる環境変数。渡された PATH の先頭に代役の置き場を足す。
 
     target_common・bare・real_origin は、git の代役を対象のリポジトリだけに効かせ、
-    本物の origin への通信を bare へ向ける（GIT の説明）。"""
+    本物の origin への通信を bare へ向ける（上の git の代役の説明を参照）。"""
     out = {
         "PATH": os.pathsep.join(
             [bin_dir, path if path is not None else os.environ.get("PATH", "")]

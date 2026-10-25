@@ -209,7 +209,7 @@ setup:
 
 ### 評価の相手（`setup.host`）
 
-評価の目的ごとに、origin の向き先を 3 段階から選ぶ。`setup.git` とは別の処理で、`claude` に渡す PATH と環境変数を変える。
+評価の目的ごとに、origin の向き先を 3 段階から選ぶ。`setup.git` とは別に、`claude` に渡す PATH と環境変数を変える。
 
 | 値 | 相手 | 使う場面 |
 |---|---|---|
@@ -218,12 +218,12 @@ setup:
 | `real` | 本物の GitHub / GitLab（`projects/test-repo`）。欄が無いときも同じで、挙動は変わらない | リリース前などの通し確認だけ。本物でしか出ない不具合（例: GraphQL が 403）を拾う |
 
 - `bare` / `fake-gitlab` は、`setup.git` と同じ `require_disposable_repo` を通ったときだけ動く（ccnavi 本体は断る。終了コード 3）。対象に origin が無いときも断る
-- `setup.issue` とは併用できない（読み込みの時点で ValueError）。runner の `gh` / `glab` は代役の外で動き、本物のホストに出るため。`fake-gitlab` で issue が要るときは、`setup.host_state`（`project: <namespace>/<project>` を含む dict。足りない欄は `seq`・`issues`・`mrs` の空の初期値）に書く
-- 用意するもの: 対象の `refs/remotes/origin/*`（無ければローカルのブランチ）から作る bare、PATH の先頭の代役（`git`・`gh`・`glab`、`bare` だけ `curl`）、`fake-gitlab` では模擬。置き場は一時ディレクトリ（`ccnavi-host-*`）。`.git/config` は書き換えない
+- `setup.issue` とは併用できない（読み込みの時点で ValueError）。runner の `gh` / `glab` は代役を通さずに動き、本物のホストに出るため。`fake-gitlab` で issue が要るときは、`setup.host_state`（`project: <namespace>/<project>` を含む dict。足りない欄は `seq`・`issues`・`mrs` の空の初期値）に書く
+- 用意するものは、対象の `refs/remotes/origin/*`（無ければローカルのブランチ）から作る bare、PATH の先頭の代役（`git`・`gh`・`glab`、`bare` だけ `curl`）、`fake-gitlab` では模擬。置き場は一時ディレクトリ（`ccnavi-host-*`）。`.git/config` は書き換えない
 - `git` の代役は、`remote get-url origin` に、ホストの形の URL（`bare` は `https://gitlab.com/acme/widgets.git`、`fake-gitlab` は `http://127.0.0.1:<port>/<project>.git`）で答える。答えるのは、対象のリポジトリ（そのワークツリーを含む。共通の `.git` で比べる）だけで、ccnavi 本体には本物の答えを返す。本物へ渡すときは `-c url.<bare>.insteadOf=<本物の origin>` を足すので、fetch・push・ls-remote は bare に届く。`ccnavi-git.sh` は `git` を PATH から呼ぶので、代役が効く
 - `claude` の環境は、親の環境を継承し、`GITHUB_TOKEN`・`GH_TOKEN`・`GITLAB_TOKEN`・`CCNAVI_PROBE_REVIEWER_TOKEN` など `GH_`・`GITHUB_`・`GLAB_`・`GITLAB_`・`CCNAVI_PROBE_` で始まる `*TOKEN` だけを除く。`fake-gitlab` は `GITLAB_TOKEN` に模擬のトークンを置く。許可リストにしない（HOME・認証・プロキシ・CA が落ちて `claude` が起動しなくなる）。`real` は環境を渡さない（今までどおり継承）
 - ホスト（GitHub / GitLab）へは出ない。`claude -p` 自身の API 通信は要る
-- 確かめた範囲: `claude -p` の Bash ツールと hook（SessionStart・PreToolUse）のシェルに、PATH の代役と `FAKE_*` が届く
+- 確かめたのは、`claude -p` の Bash ツールと hook（SessionStart・PreToolUse）のシェルに、PATH の代役と `FAKE_*` が届くところまで
 
 **`bare` で許す依頼。** `gh` / `glab` が失敗するので、エージェントが issue や MR を作る依頼は通らない。`bare` を選べるのは、依頼がホストの API を要しないシナリオだけ。`judge` に「`gh` が使えない状況で詰まったのは ccnavi の不具合ではない」を書く。MR・スレッドを読む依頼は `fake-gitlab` にする。
 
