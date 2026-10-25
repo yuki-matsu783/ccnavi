@@ -63,7 +63,7 @@ keywords: [サブエージェント, SubagentStart, SubagentStop, 差し戻し, 
 - 親への知らせは、確定した結果を 1 度だけ。出力に書き終えてから `notified` の印を付ける
 - `Stop` が促すのは `outside` と `unchecked` だけ（理由コード `NUDGE_SUBAGENT_OUTCOME`）。同じ結果では 1 回で（`nudged` の印）、別の経路で同じ内容を親に言った結果は促し済みにする。`stop_hook_active` が真のとき、サブエージェントの中、実行中のサブエージェントが居る間、state の置き場が無いときは促さない。順序は `finish` → 依頼までの道 → サブエージェント結果 → `integrate` → ルール（6.6）
 - `.outcome` は prune が 14 日で掃除する
-- 実測（`wip/research/agent-cwd-probe.md`、claude 2.1.309、`claude -p`）。サブエージェントの hook の cwd は、起動したときのメインの cwd に固定される。体が `cd` しても、あとでメインが `cd` しても変わらない。`isolation: worktree` で起動した体だけは、`cwd` が隔離したワークツリーのパスになる（起動の時点で止める。付録 C）。このため `SubagentStop` の担当は、メインがワークスペースルートから起動した体では決まらず、`unattributed` になる。起動の PreToolUse の `updatedInput.cwd` は、`permissionDecision: allow` を付けても Agent の引数として使われず（体の `pwd` と相対パスの解決先は変わらない）、cwd の注入では解けなかった。孫の hook の cwd がどうなるか（入れ子）は、cwd の注入が効かなかったので未実施
+- 実測（`wip/research/agent-cwd-probe.md`、claude 2.1.309、`claude -p`）。サブエージェントの hook の cwd は、起動したときのメインの cwd に固定される。体が `cd` しても、あとでメインが `cd` しても変わらない。このため `SubagentStop` の担当は、メインがワークスペースルートから起動した体では決まらず、`unattributed` になる。`isolation: worktree` で起動した体だけは、`cwd` が隔離したワークツリーのパスになる（起動の時点で止める。付録 C）。起動の PreToolUse の `updatedInput.cwd` は、`permissionDecision: allow` を付けても Agent の引数として使われず（体の `pwd` と相対パスの解決先は変わらない）、cwd の注入では解けなかった。孫の hook の cwd がどうなるか（入れ子）は、cwd の注入が効かなかったので未実施
 - バックグラウンド（`Agent` の既定。`-p` でも同じ）で起動したサブエージェントでは、メインのターンの開始（`UserPromptSubmit`）と `Agent` の `PostToolUse` が `SubagentStop` より先に来る。`SubagentStop` はメインのターン開始より後になりうるので、終了結果の記録（`.outcome`）を読む側は、記録が無いときも扱えるようにする
 - 非対話（`claude -p`）では、メインが終わったあとのバックグラウンドのサブエージェントは待ち上限まで待たれるが、環境の設定によってはターン終了で消える。そのため作業の決まりはフォアグラウンドで起動して完了を待つよう言う（[12.5](../limits.md)）
 
