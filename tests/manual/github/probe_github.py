@@ -56,6 +56,7 @@ ROOT_OF_CCNAVI = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 REVIEW_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-review.sh")
+DECIDE_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-user-decide.sh")
 CLOSE_EARLY_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-user-close-early.sh")
 GIT_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-git.sh")
 TICKET_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-ticket.sh")
@@ -923,7 +924,27 @@ def main() -> int:
     )
     record("レビュアーが 3 本目のスレッドを立てる", status == 200)
     third_ids = [t["id"] for t in threads_of(num, "threads-3") if not t["isResolved"]]
-    accepted = sh(REVIEW_SH, parent_tree, "decide", "1", stdin="k\n")
+    # 読む側（ccnavi-review.sh decide <N> --preview）で threads と digest を取り、
+    # 書く側（ユーザ専用の ccnavi-user-decide.sh）は人間役としてこの probe が打つ
+    preview = sh(REVIEW_SH, parent_tree, "decide", "1", "--preview")
+    write(os.path.join(OUT, "decide-preview.json"), preview.stdout)
+    try:
+        shown = json.loads(preview.stdout)
+    except ValueError:
+        shown = {}
+    threads = shown.get("threads") if isinstance(shown, dict) else None
+    record(
+        "decide --preview が threads と digest を JSON で返す",
+        preview.returncode == 0 and bool(threads) and bool(shown.get("digest")),
+        redact(preview.stderr)[-160:],
+    )
+    choices = json.dumps(
+        {t["key"]: "keep" for t in threads or [] if isinstance(t, dict) and "key" in t},
+        ensure_ascii=False,
+    )
+    accepted = sh(
+        DECIDE_SH, parent_tree, "1", "--choices", choices, "--digest", str(shown.get("digest", ""))
+    )
     say("decide:\n" + redact(accepted.stdout + accepted.stderr))
     record(
         "decide で未解決を受け入れる",
