@@ -90,3 +90,7 @@ node scripts/render-board.js --repo <ccnavi を配布済みのリポジトリ> -
 
 テストは `test/devtools/`（`pnpm run test:devtools`）。引数・`--out` の拒否・失敗の条件・スタブの単体テストと、
 `--fixture test/fixtures/board.json` で PNG が出ることを確かめる E2E（`render-board.e2e.ts`）がある。ブラウザが無いときは、E2E は終了コード 3 で終わる。
+
+## 実画面で日本語ユーザ目線を確かめる
+
+VS Code に拡張を入れた実画面（code-server）を Chromium で撮り、日本語を読む利用者にとって分かりづらい点を洗い出す手順は、[実画面（code-server の VS Code）で日本語ユーザ目線を確かめる](real-screen-check.md)にある。
