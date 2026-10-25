@@ -1,6 +1,7 @@
 {
-  "note": "意図して許す違い（要求名＋キー＋違いの種類）。比べるのは requests.json の reads のキーだけ。reason が空なら失敗し、差が出ていない項目も失敗する。host_entries は見本（gitlab_host.py）の比較の許可で、fake 側の entries とは別",
+  "note": "意図して許す違い（要求名＋キー＋違いの種類）。比べるのは requests.json の reads のキーだけ。reason が空なら失敗し、差が出ていない項目も失敗する。entries は Python の模擬（fake_gitlab.py）用、chrome_entries は Chrome 拡張の模擬（MockGitLab）用で、Python は chrome_entries を読まない。host_entries は見本（gitlab_host.py）の比較用で、fake 側の entries とは別",
   "entries": [],
+  "chrome_entries": [],
   "not_recorded": [
     {
       "what": "headers",

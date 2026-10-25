@@ -47,6 +47,11 @@
        "boolean"
       ]
      },
+     "default_branch": {
+      "t": [
+       "string"
+      ]
+     },
      "id": {
       "t": [
        "integer"

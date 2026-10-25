@@ -108,7 +108,7 @@ export class MockGitLab extends MockGitHub {
     if (method === "GET" && p === "/user") return { status: 200, json: { id: 7, username: GL_LOGIN } };
     if (method === "GET" && p === "/personal_access_tokens/self") return { status: 200, json: { id: 1, expires_at: this.glExpiry || null } };
     const base = this.project;
-    if (method === "GET" && p === base) return { status: 200, json: { id: 42, default_branch: this.defaultBranch } };
+    if (method === "GET" && p === base) return { status: 200, json: { id: 42, default_branch: this.defaultBranch, archived: false, issues_enabled: true, issues_access_level: "enabled", permissions: { project_access: { access_level: 40 } } } };
     if (!p.startsWith(`${base}/`)) return { status: 404, json: { message: "404 Project Not Found" } };
     const rest = p.slice(base.length);
     if (method === "GET" && rest.startsWith("/repository/branches/")) {
@@ -198,6 +198,8 @@ export class MockGitLab extends MockGitHub {
             source_branch: m.branch,
             target_branch: m.base,
             source_project_id: m.fork ? 99 : 42,
+            state: merged ? "merged" : "opened",
+            sha: this.heads.get(m.branch) ?? "",
             web_url: `https://gitlab.com/${this.owner}/${this.repo}/-/merge_requests/${m.number}`,
           })),
       );
