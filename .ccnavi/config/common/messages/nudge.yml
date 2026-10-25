@@ -1,0 +1,62 @@
+# Stop の促しの文。条件（いつ促すか）はコード側にある。
+version: 1
+messages:
+  NUDGE_INTEGRATE__UNKNOWN_MARKER:
+    kind: nudge
+    values: [name, integ_tree]
+    what: |-
+      ワークツリー .claude/worktrees/{name} の取り込みの記録（{integ_tree} の ccnavi-integrate/{name}/marker）の版を知りません。版 4 でない記録は ccnavi が読めません。
+    next: |-
+      操作せず、ユーザに、統合先の staged を git status で確かめ、不要なら git reset --merge で戻してから記録のディレクトリを手で消すよう頼み、返事を待つ
+
+  NUDGE_INTEGRATE__CONFIRM:
+    kind: nudge
+    values: [name, integ_tree]
+    what: |-
+      ワークツリー .claude/worktrees/{name} の取り込み（integrate {name}）が、確定を待っています。
+    why: |-
+      差分と変わるファイルの一覧をユーザに見せ、返事を待ってこのターンを終えます。確定はユーザの次の発言のあとで、この同じターンでは integrate-done を打てません（この案内で続けたターンは、ユーザの発言に数えません）。
+    next: |-
+      ユーザの発言のあと、了承を得ていれば `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate-done {name} -m '<メッセージ>'` で取り込んで片付ける。やめるなら `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate --abort {name}`
+    note: |-
+      ファイルをエディタで開いて保存していない編集がないか、ユーザに確かめてから確定します。
+
+  NUDGE_INTEGRATE__ADOPT:
+    kind: nudge
+    values: [name, left, integ_tree, base]
+    what: |-
+      ワークツリー .claude/worktrees/{name} はチケットに結び付かない直接作業で、{left}があり、取り込みの記録（ccnavi-direct）がありません。
+    why: |-
+      記録の無いワークツリー（更新前に切った・手で切った）は、integrate が断ります。
+    next: |-
+      ユーザに取り込み先を確かめてから、`cd {integ_tree:path} && {script:ccnavi-worktree.sh} {name} --adopt --base {base:sh}` で引き取る。出力の範囲と差分をユーザに見せ、了承を得て確認コードを付けて打ち直す
+
+  NUDGE_INTEGRATE__RUN:
+    kind: nudge
+    values: [name, left, integ_tree]
+    what: |-
+      ワークツリー .claude/worktrees/{name} はチケットに結び付かない直接作業で、{left}があり、integrate {name} をまだ打っていません。
+    next: |-
+      作業が終わったなら `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate {name}` を実行して止める。取り込み結果は一時ワークツリーに用意され、ユーザのチェックアウトは変わらない
+    note: |-
+      hook は integrate を実行しません。
+      続き: 出力の差分と変わるファイルの一覧をユーザに見せ、返事を待ってターンを終えます。確定はユーザの次の発言のあとで、同じターンでは integrate-done を打てません。
+      ユーザの発言のあと、了承を得ていれば `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate-done {name} -m '<メッセージ>'` で取り込んで片付けます。やめるなら `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate --abort {name}`。
+
+  NOTE_INTEGRATE_COMMIT_FIRST:
+    kind: note
+    values: [work_tree]
+    note: |-
+      integrate が取り込むのはコミットした分だけです。先にコミットしてください: `cd {work_tree:path} && {script:ccnavi-git.sh} add -- <パス>` と `cd {work_tree:path} && {script:ccnavi-git.sh} commit -m '<メッセージ>'`。
+
+  NOTE_INTEGRATE_ORIGIN_AHEAD:
+    kind: note
+    values: [base, count]
+    note: |-
+      origin/{base} が手元の {base} より {count} 件先に進んでいます。取り込んだあとの push の前に、ユーザに手元を合わせてもらってください。
+
+  NOTE_INTEGRATE_KEEP_GOING:
+    kind: note
+    values: []
+    note: |-
+      まだ続けるなら、続ける理由（何が残っているか）をユーザに向けて書いてから終えてください。この案内は同じ状態では 1 回だけです。

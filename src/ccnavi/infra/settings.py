@@ -211,6 +211,14 @@ def shell_path(path: str) -> str:
     return _quoted(path)
 
 
+def shell_word(text: str) -> str:
+    """文面で案内するコマンドの 1 語。区切りは変えず、要るときだけ引用する（`shell_path` の語版）。
+
+    パスでない値（題・名前）に使う。パスは `shell_path` で、区切りを `/` に揃える。
+    """
+    return _quoted(text)
+
+
 def has_git_wrapper(root: str) -> bool:
     """ワークスペースルートに git のラッパー（`ccnavi-git.sh`）がある。"""
     wrapper = os.path.join(root, DEFAULT_PROJECT_HOME, "scripts", "ccnavi-git.sh")

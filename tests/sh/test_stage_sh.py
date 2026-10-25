@@ -249,6 +249,9 @@ class StageShTest(unittest.TestCase):
 
         paths = [
             ".ccnavi/config/common/templates/a.yml",
+            ".ccnavi/config/common/messages/deny.yml",
+            ".ccnavi/config/project/messages/a.yml",
+            ".ccnavi/config/project/messages/sub/a.yml",
             ".ccnavi/config/project/templates/a.yml",
             ".ccnavi/config/project/templates/sub/a.yml",
             ".ccnavi/config/common/templates/x/templates/a.yml",

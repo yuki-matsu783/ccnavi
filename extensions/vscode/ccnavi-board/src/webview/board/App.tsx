@@ -60,7 +60,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   // 次の中身を渡したとき。読み直しが失敗しても中身は届く（エラーの画面になる）ので、ここで戻す経路は要らない。
   // 実行ファイルが返らない場合は期限（ccnavi.ts）で打ち切る。
   const [refreshing, setRefreshing] = useState(false);
-  // 「マージ状況を確認」を押した直後から、拡張ホストの答え（確認中）が届くまで押せなくする
+  // 「MR の状況を確認」を押した直後から、拡張ホストの答え（確認中）が届くまで押せなくする
   const [mergePending, setMergePending] = useState(false);
 
   const board = data.kind === "board" ? data.board : undefined;
@@ -311,7 +311,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 }}
               >
                 <span className="spin" aria-hidden="true" />
-                <span className="label">{mergeShown?.checking === true || mergePending ? "確認中…" : "マージ状況を確認"}</span>
+                <span className="label">{mergeShown?.checking === true || mergePending ? "確認中…" : "MR の状況を確認"}</span>
               </button>
               <button
                 type="button"

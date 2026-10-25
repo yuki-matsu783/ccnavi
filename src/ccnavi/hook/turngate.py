@@ -63,7 +63,7 @@ import time
 from dataclasses import dataclass
 
 from ..infra import fsio, shellread
-from ..policy import rules
+from ..policy import rules, texts
 from ..records import userprompt
 
 # 拒否コード。宣言ごとには分けない。どの宣言で止めたかは、記録の `rules`（RULE_PREFIX + id）と
@@ -107,9 +107,9 @@ class Cond:
 class Gate:
     """宣言 1 件。「`first` を打ったら、ユーザの発言が 1 回はさまるまで `second` を打てない」。
 
-    文面の素材は、止めたときに 4 つの段（何が起きたか・なぜ・次の一手・迂回しない）に組む。
-    `first_name` と `second_name` は段 1 で呼ぶ名前。`why` と `next_step` は段 2 と 3 で、
-    `{key}`（キー）と `{script:<sh の名前>}`（`rules.fill_text`）を埋める。
+    文面は文面ファイルの `message`（識別子）が持つ。4 つの段（何が起きたか・なぜ・次の一手・迂回しない）の
+    うち、段 1 は `what` の場合分け（`same_command`・`no_user_turn`）で、`first_name` と `second_name`、
+    宣言の id とキー（`where`）、`key` を埋める。別の組を足すときは、文面ファイルにも 1 件足す。
     """
 
     id: str
@@ -117,8 +117,7 @@ class Gate:
     second: Cond
     first_name: str
     second_name: str
-    why: str
-    next_step: str
+    message: str
     # 次の一手の `{key}` に、キーが解けなかったとき入れる仮の値。
     key_name: str = "<キー>"
 
@@ -163,17 +162,7 @@ INTEGRATE_GATE = Gate(
     ),
     first_name="ccnavi-git.sh integrate",
     second_name="ccnavi-git.sh integrate-done",
-    why=(
-        "取り込む差分と変わるファイルをユーザに見せ、返事を待つためです。"
-        "ターンが終わってユーザが 1 回発言するまで、確定しません。"
-        "バックグラウンド作業の完了通知と、Stop の促しで同じターンを続けた分は、"
-        "ユーザの発言に数えません。"
-    ),
-    next_step=(
-        "integrate の出力の差分と変わるファイルをユーザに見せ、返事を待ってターンを終える。"
-        "ユーザの返事のあとで "
-        "{script:ccnavi-git.sh} integrate-done {key} -m '<メッセージ>' を打ち直す"
-    ),
+    message="DENY_NEEDS_USER_TURN__INTEGRATE",
     key_name="<名前>",
 )
 
@@ -417,42 +406,22 @@ def clear(state: str, session: str) -> None:
 def message(stop: Stop, root: str) -> str:
     """止めた文。何が起きたか・なぜ・次の一手・迂回しない、の順に 1 行ずつ。
 
-    次の一手は `次:` で始めて 1 行にする。値（キー・sh の呼び出し）は埋める。
+    文は文面ファイルが持つ。宣言の文面（`Gate.message`）は止めた理由が「同じコマンド」か「発言が無い」
+    のとき、記録を読み書きできないときは `DENY_NEEDS_USER_TURN__STATE`。
     """
     gate = stop.gate
     key = stop.key
     where = f"（宣言 {gate.id}" + (f"、キー {key}" if key else "") + "）"
-    if stop.reason == SAME_COMMAND:
-        what = (
-            f"{gate.first_name} と {gate.second_name} を 1 つのコマンドにまとめて"
-            f"打とうとしました{where}。"
-        )
-    elif stop.reason == NO_USER_TURN:
-        what = (
-            f"{gate.first_name} を打ったあと、ユーザの発言が 1 回も無いまま "
-            f"{gate.second_name} を打とうとしました{where}。"
-        )
-    elif stop.reason == UNREADABLE:
-        what = (
-            f"{gate.second_name} の前に、{gate.first_name} を打ったかを調べる記録を"
-            f"読めません{where}。"
-            f"（{stop.detail}）"
-        )
-    else:
-        what = f"{gate.first_name} を打った記録を残せないので、通しません{where}。（{stop.detail}）"
+    values = {
+        "first_name": gate.first_name,
+        "second_name": gate.second_name,
+        "where": where,
+    }
     if stop.reason in (UNREADABLE, UNWRITABLE):
-        why = "関門の記録を読み書きできないと、ユーザの発言をはさんだかを確かめられないためです。"
-        step = (
-            "次: ユーザに、ccnavi の state の置き場（logs/state）が読み書きできるかを"
-            "確かめてもらい、返事を待つ"
+        values["detail"] = stop.detail
+        return texts.say(
+            root, "DENY_NEEDS_USER_TURN__STATE", values, {"what": stop.reason}
         )
-    else:
-        why = gate.why
-        step = "次: " + gate.next_step.replace("{key}", key or gate.key_name)
-        step = rules.fill_text(step, root)
-    avoid = (
-        "迂回しない: コマンドを分けても、別のセッションやサブエージェントから打っても、"
-        "同じ関門に当たります。"
-        "ユーザの発言を待ちます。"
-    )
-    return "\n".join([what, f"なぜ: {why}", step, avoid])
+    values["key"] = key or gate.key_name
+    case = "same_command" if stop.reason == SAME_COMMAND else "no_user_turn"
+    return texts.say(root, gate.message, values, {"what": case})

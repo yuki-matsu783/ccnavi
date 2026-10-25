@@ -394,6 +394,39 @@ hook の応答の文面（拒否・確認・案内）を、重複を除いて 1 
 
 人間が画面を見て直す必要があると言えば、その step を回し直す（直したあとに同じ `check` をもう一度見てもらう）。
 
+### 人間役の API 操作（`human_api`）
+
+`setup.host: docker-gitlab` のとき、`human: true` の step に `human_api` を書くと、人間役 `ccnavi-reviewer` の API 操作を runner が実行する。止まらずに次の step へ進む（終了コード 10 を返さない）。`instruction` は併記してもよく、止まらず報告にだけ残る。`human_api` の無い human step は、従来どおり `instruction` と `check` を出して 10 で止まる。`docker-gitlab` 以外の相手では `load_scenario` が `ValueError` にする。
+
+```yaml
+steps:
+  - prompt: 実装して、MR を出して
+  - human: true
+    human_api:
+      - op: thread          # スレッドを立てる。as で名前を付けると resolve が指せる
+        body: エラー処理を足してください
+        as: t1
+  - prompt: 指摘に対応して
+  - human: true
+    human_api:
+      - op: resolve         # 直前までに runner が立てたスレッドを名前で解決する
+        thread: t1
+      - op: approve         # MR を承認する
+```
+
+| op | 欄 | 呼ぶ API |
+|---|---|---|
+| `thread` | `body`（必須）、`as`（任意の名前） | MR にスレッドを立てる(discussion の作成) |
+| `resolve` | `thread`（前の `as` の名前。無ければ読み込みで拒否） | スレッドを解決する |
+| `approve` | なし | MR を承認する。CE では承認の状態（`approved_by`）が変わることを実機で確かめた。承認ルールは無料版に無く、承認を必須にする設定は確かめていない |
+
+- 対象の MR は、使い捨てのプロジェクトにちょうど 1 件あるものだけ。0 件や 2 件以上なら、その step を失敗にする。エージェントが立てたスレッドを解決する宣言は無い（対象外）
+- 1 step に複数の操作を書ける。書いた順に実行する。人間役のトークンで呼ぶ（`tokens.env` を呼ぶたびに読む）
+- 失敗（HTTP が 2xx でない、接続失敗、MR が 1 件でない）は、再試行せず、`halt`（`kind: human_api`）を立てて止める。後片付け（プロジェクトの削除まで）は `finish` が通す。プロセスの終了コードは `finish` の判定に従い、失敗の行（`human-api`）が fail になる
+- 記録: 操作の結果は 1 件ごとに `state.json`（`human_ops`、名前と discussion の対応 `threads`）に書き、`next` で再開しても同じ操作は二度実行しない。`evidence.md` に「人間役の操作」の節、`report.*` に `human-api` の 1 行（件数と成功・失敗）を出す。トークンは、値も変数名も、記録・診断ログ・例外の文字列に出さない
+- `run-all` の対象外のまま（human step があるシナリオは除く規則は変えない。`claude` を呼ぶシナリオは 1 本ずつ確認して回す）
+- 限界: エージェント役の root PAT は管理者 API で人間役のトークンを作れる。人間役の独立は保証しない。CE に無い機能（`request_changes` は 404）は使えない
+
 ## 見つけたものの扱い
 
 受入シナリオを回して見つけた不具合・期待のずれ・道具の不足は、**その回の中では直さない。** 次の手順で issue にする。

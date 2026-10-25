@@ -3587,6 +3587,9 @@ class FakeClient:
     def __init__(self, fail=False, version=200):
         self.fail, self.version_status = fail, version
         self.calls = []
+        self.human = []  # (呼び出し, token, 引数)。人間役の操作
+        self.mrs = [{"iid": 3}]
+        self.discussion_status = 201
         self.marked = False
         self.gone = False
 
@@ -3614,6 +3617,22 @@ class FakeClient:
 
     def deletes(self):
         return [c for c in self.calls if c[0] == "DELETE"]
+
+    def list_mrs(self, token, pid, *, state="all"):
+        self.human.append(("list_mrs", token, (pid,)))
+        return 200, list(self.mrs)
+
+    def approve(self, token, pid, iid):
+        self.human.append(("approve", token, (pid, iid)))
+        return 201, {}
+
+    def create_discussion(self, token, pid, iid, body, tag=""):
+        self.human.append(("create_discussion", token, (pid, iid, body)))
+        return self.discussion_status, {"id": f"d{len(self.human)}"}
+
+    def resolve_discussion(self, token, pid, iid, discussion_id, resolved=True):
+        self.human.append(("resolve_discussion", token, (pid, iid, discussion_id)))
+        return 200, {}
 
 
 def fake_project(client):
@@ -3806,6 +3825,139 @@ class DockerGitTest(DockerHostBase):
 
     def test_the_stub_git_carries_the_scoped_helper(self):
         self.assertIn("credential.${FAKE_CRED_URL}.helper=", Path(host_stub.__file__).read_text())
+
+
+class HumanApiTest(DockerLifecycleTest):
+    """human step の human_api（人間役の API 操作）。DockerLifecycleTest の道具を使う。"""
+
+    API = [
+        {"op": "thread", "body": "直してください", "as": "t1"},
+        {"op": "resolve", "thread": "t1"},
+    ]
+
+    def steps(self, api=None, extra=()):
+        return [
+            {"prompt": "a"},
+            {"human": True, "human_api": self.API if api is None else api},
+            *extra,
+            {"prompt": "b"},
+        ]
+
+    def run_steps(self, steps):
+        with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT):
+            return self.run_cmd(self.scenario(steps))
+
+    def halt_kind(self):
+        return json.loads(self.state_text()).get("halt", {}).get("kind")
+
+    def out_text(self):
+        texts = []
+        for p in self.ws.out.iterdir():
+            if not p.name.startswith("step-") and p.is_file():
+                texts.append(p.read_text(encoding="utf-8"))
+        for p in (self.ws.root / "logs" / "diag").glob("*"):
+            texts.append(p.read_text(encoding="utf-8"))
+        return "\n".join(texts)
+
+    def test_field_is_checked(self):
+        def load(setup, steps):
+            with tempfile.TemporaryDirectory() as d:
+                return runner.load_scenario(write_scenario(d, setup, steps))
+
+        docker = {"host": "docker-gitlab"}
+        load(docker, self.steps())
+        bad = {
+            "kind": [{"op": "comment", "body": "x"}],
+            "empty": [],
+            "no body": [{"op": "thread"}],
+            "unresolved": [{"op": "resolve", "thread": "t9"}],
+            "resolve before thread": [
+                {"op": "resolve", "thread": "t1"},
+                {"op": "thread", "body": "x", "as": "t1"},
+            ],
+        }
+        for name, api in bad.items():
+            with self.subTest(name), self.assertRaises(ValueError):
+                load(docker, self.steps(api))
+        with self.assertRaises(ValueError) as cm:
+            load({"host": "fake-gitlab"}, self.steps())
+        self.assertIn("docker-gitlab", str(cm.exception))
+        with self.assertRaises(ValueError):
+            load(docker, [{"prompt": "a", "human_api": self.API}])
+
+    def test_ops_run_in_order_with_the_human_token_and_do_not_stop(self):
+        rc = self.run_steps(self.steps())
+        self.assertIn(rc, (0, 2))
+        names = [c[0] for c in self.client.human]
+        self.assertEqual(names, ["list_mrs", "create_discussion", "list_mrs", "resolve_discussion"])
+        self.assertEqual({c[1] for c in self.client.human}, {REVIEWER_TOKEN})
+        self.assertEqual(self.client.human[1][2], (7, 3, "直してください"))
+        self.assertEqual(self.client.human[3][2], (7, 3, "d2"))
+        state = json.loads(self.state_text())
+        self.assertEqual([o["op"] for o in state["human_ops"]], ["thread", "resolve"])
+        self.assertEqual(state["threads"]["t1"]["iid"], 3)
+        evidence = (self.ws.out / "evidence.md").read_text(encoding="utf-8")
+        self.assertIn("## 人間役の操作", evidence)
+        self.assertIn("thread（t1） → HTTP 201", evidence)
+        rows = json.loads((self.ws.out / "report.json").read_text(encoding="utf-8"))
+        row = next(r for r in rows if r["kind"] == "human-api")
+        self.assertEqual(row["verdict"], "pass")
+        self.assertTrue(self.client.gone)
+
+    def test_approve_uses_the_human_token_on_the_only_mr(self):
+        self.run_steps(self.steps([{"op": "approve"}]))
+        self.assertEqual(
+            self.client.human,
+            [("list_mrs", REVIEWER_TOKEN, (7,)), ("approve", REVIEWER_TOKEN, (7, 3))],
+        )
+
+    def test_the_human_token_is_not_in_the_records(self):
+        with mock.patch.dict(os.environ, {"CCNAVI_PROBE_REVIEWER_TOKEN": REVIEWER_TOKEN}):
+            self.run_steps(self.steps())
+        text = self.out_text()
+        self.assertNotIn(REVIEWER_TOKEN, text)
+        self.assertNotIn(ROOT_PAT, text)
+        self.assertNotIn("CCNAVI_PROBE_REVIEWER_TOKEN", text)
+
+    def test_zero_or_two_mrs_halt_the_run(self):
+        for mrs in ([], [{"iid": 1}, {"iid": 2}]):
+            with self.subTest(count=len(mrs)):
+                self.client.mrs = mrs
+                self.client.gone = self.client.marked = False
+                self.client.human.clear()
+                self.run_steps(self.steps())
+                self.assertEqual(self.halt_kind(), "human_api")
+                self.assertEqual([c[0] for c in self.client.human], ["list_mrs"])
+                self.assertTrue(self.client.gone)  # 後片付けは通る
+
+    def test_an_http_failure_halts_the_run_and_is_not_retried(self):
+        self.client.discussion_status = 500
+        self.run_steps(self.steps())
+        self.assertEqual(self.halt_kind(), "human_api")
+        self.assertEqual([c[0] for c in self.client.human], ["list_mrs", "create_discussion"])
+        rows = json.loads((self.ws.out / "report.json").read_text(encoding="utf-8"))
+        self.assertEqual(next(r for r in rows if r["kind"] == "human-api")["verdict"], "fail")
+
+    def test_resume_does_not_run_the_ops_twice(self):
+        human = {"human": True, "instruction": "手で操作する"}
+        with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT):
+            rc = self.run_cmd(self.scenario(self.steps(extra=[human])))
+        self.assertEqual(rc, 10)
+        before = list(self.client.human)
+        self.assertEqual(len(before), 4)
+        with (
+            mock.patch.object(runner, "run_step", return_value=self.STEP_OUT),
+            mock.patch.object(runner, "_ENTRY", True),
+            mock.patch("builtins.print"),
+        ):
+            runner.main(["next", str(self.ws.out)])
+        self.assertEqual(self.client.human, before)
+        self.assertTrue(self.client.gone)
+
+
+# 親の試験は繰り返さない（道具だけ使う）
+for _name in [n for n in dir(DockerLifecycleTest) if n.startswith("test_")]:
+    setattr(HumanApiTest, _name, None)
 
 
 if __name__ == "__main__":

@@ -8,8 +8,8 @@ import type { Moved } from "../../core/board-moved.js";
 
 /** ツールバーの絞り込みのチェックボックスの言葉 */
 export const FILTER_LABELS = {
-  attention: "要対応のみ",
-  attentionTitle: "ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーが見つからない・HIGH 以上のリスク・不備）",
+  attention: "ユーザ待ちのみ",
+  attentionTitle: "承認・レビューなど、ユーザの操作で進むものだけを出します",
   archived: "アーカイブ済みチケットを表示",
   archivedTitle: "Draft を解除したとき（ccnavi-review.sh ready）にローカルの logs/archive/ に移動した、完了・取り消しのチケットを「アーカイブ」の列に表示します。初期状態では表示しません。",
 } as const;
