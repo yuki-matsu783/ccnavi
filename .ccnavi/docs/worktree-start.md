@@ -70,6 +70,7 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
   親チケットも提案も無いワークツリーでは、出力に「次:」の行が出る。識別子・題・`--issue`・`--mr`を埋めた`ccnavi ticket new`なので、
   `--scope`の`<触るファイルの glob>`だけを実際のパスに直して、ワークツリーの中で打つ。設計判断が要らない作業は、範囲が複数のディレクトリや文書・設定にまたがっても`--plan quick-work`で足りる。
   大きい作業は`--plan`を`design,implement`のように変える（型と範囲は`.ccnavi/config/common/phases.yml`）。
+  使えるテンプレートがあるプロジェクトでは、その後に「案内:」が 1 行出る。合うものがあれば`--plan`の代わりに`--template <名前>`を使う（一覧は`ccnavi --templates`。[templates.md](templates.md)）。
   提案は手で書かない。承認が通らないなど詰まったら、直接実装に切り替えず、ユーザに報告して止まる。
   チケットが既にあるワークツリーでは、「次:」の行が`ccnavi-ticket.sh status <識別子>`を勧める。行頭の語は[terms.md](terms.md)
 - ホストに届かないか、断られたとき（Claude remoteのコンテナでは、GitHubのAPIに届かないことがある）、`ccnavi-start.sh`は終了コード4で止まり、
