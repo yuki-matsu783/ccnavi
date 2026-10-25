@@ -1,6 +1,6 @@
 """GitLab の代役（`tests/sh/fake_gitlab.py`）を関数で起こして止める。
 
-見るのは次の 8 つ。
+見るのは次の観点。
 
 1. 起動して要求が通り、止めたあとはつながらない
 2. keep-alive の接続を開いたままでも `stop()` が返る
@@ -9,7 +9,7 @@
 5. 実物の `ccnavi-review.sh fetch` が、`GITLAB_TOKEN` と代役の origin から、
    curl 経路で模擬の MR とスレッドを読める（`glab` は失敗する代役を前に置く）
 6. 401・404 を返したあとも、同じ keep-alive 接続の次の要求が通る（本文を読み捨てている）
-7. 存在しない MR への要求は、どれも 404 になる（接続が切れない）
+7. 存在しない MR への要求は、MR を引く全ルートで 404 になり、接続が切れない
 8. 手で使う入口 `python tests/manual/gitlab/fake_gitlab.py <state.json> <port>` が、
    別プロセスで起動して 1 往復できる
 """
