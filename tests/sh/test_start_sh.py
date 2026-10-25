@@ -1189,6 +1189,38 @@ class StartShTest(unittest.TestCase):
         self.assertIn("末尾", done.stderr)
         self.assertFalse(os.path.isdir(self.wt("fix-152-other-05")))
 
+    def templates_note(self, templates_out):
+        """`--templates --json` に決めた答えを返す実行ファイルで、新規作成の出力から案内の行を取る。"""
+        self.github_new()
+        fake = write(
+            os.path.join(self._tmp.name, "tpl", "ccnavi"),
+            '#!/bin/sh\ncase " $* " in *" --templates "*)\n'
+            f"{templates_out}\nesac\n"
+            f"exec '{self.exe}' \"$@\"\n",
+        )
+        os.chmod(fake, 0o755)
+        done = self.run_sh("--issue", "152", CCNAVI_ENTRY_PATH=fake)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        lines = [x for x in done.stdout.splitlines() if "--template <名前>" in x]
+        self.assertEqual(len([x for x in done.stdout.splitlines() if x.startswith("次: ")]), 1)
+        return lines
+
+    def test_start_hints_templates_only_when_some_are_usable(self):
+        """使えるテンプレートがあれば 1 行足す。error のみ・0 本・実行ファイルが読めないときは出さない。"""
+        for out, count in (
+            ("""printf '{"templates":[{"usable":true},{"usable":false},{"usable":true}]}'; exit 0 ;;""", 2),
+            ("""printf '{"templates":[{"usable":false}]}'; exit 0 ;;""", 0),
+            ("""printf '{"templates":[]}'; exit 0 ;;""", 0),
+            ("""echo 'unknown option' >&2; exit 2 ;;""", 0),
+        ):
+            with self.subTest(out=out):
+                lines = self.templates_note(out)
+                if count:
+                    self.assertEqual(len(lines), 1, lines)
+                    self.assertTrue(lines[0].startswith("案内: 使えるテンプレートがある（2 本）"))
+                else:
+                    self.assertEqual(lines, [])
+
     def test_without_the_executable_the_identifier_is_not_guessed(self):
         """実行ファイルが答えなければ、sh で代わりに数えず「確かめられない」と止める。"""
         git(self.ws, "push", "-q", self.bare, "main:refs/heads/topic/x")
