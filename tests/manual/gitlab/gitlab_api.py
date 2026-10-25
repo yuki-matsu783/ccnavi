@@ -25,6 +25,7 @@ sh と同じ道具（curl・glab）を使わないのは、片方の不具合が
     Client.list_issues(token, project_id, *, state="opened")
     Client.create_mr(token, project_id, source_branch, target_branch, title)
     Client.find_mr(token, project_id, branch) -> dict | None
+    Client.list_mrs(token, project_id, *, state="all") -> (status, body)
     Client.set_reviewers(token, project_id, iid, reviewer_ids)
     Client.notes(token, project_id, iid) -> list[dict]
     Client.create_discussion(token, project_id, iid, body)
@@ -189,6 +190,14 @@ class Client:
             tag=f"mr-list-{branch}",
         )
         return found[0] if isinstance(found, list) and found else None
+
+    def list_mrs(self, token: str, project_id: int, *, state: str = "all"):
+        return self.call(
+            "GET",
+            f"/projects/{project_id}/merge_requests?state={state}&per_page=100",
+            token,
+            tag="mrs-list",
+        )
 
     def set_reviewers(self, token: str, project_id: int, iid: int, reviewer_ids: list[int]):
         return self.call(
