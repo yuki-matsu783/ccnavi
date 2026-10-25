@@ -194,8 +194,26 @@ class AllowListTest(HandoffCase):
         self.stage(DOCS, b"# \xe6\x89\x8b\xe5\xbc\x95\xe3\x81\x8d\n\n\xe6\x96\xb0\n")
         answer = self.view()
         self.assertEqual(answer["ignored"], 2)
+        self.assertEqual(
+            answer["ignored_paths"],
+            [
+                {"path": "repro.sh", "why": "not-allowed"},
+                {"path": "learnings/i0001.md", "why": "not-allowed"},
+            ],
+        )
+        self.assertEqual(answer["ignored"], len(answer["ignored_paths"]))
         self.assertEqual([e["path"] for e in answer["entries"]], [DOCS])
         self.assertTrue(answer["ok"])
+
+    @requires_symlink
+    def test_a_linked_directory_is_ignored_with_its_reason(self):
+        outside = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
+        os.makedirs(os.path.dirname(self.draft_path("x")), exist_ok=True)
+        os.symlink(outside, self.draft_path("linked"))
+        answer = self.view()
+        self.assertEqual(answer["ignored"], 1)
+        self.assertEqual(answer["ignored_paths"], [{"path": "linked", "why": "linked-dir"}])
 
     def test_the_orig_file_is_not_a_draft(self):
         self.stage(SCRIPT, b"#!/bin/sh\necho new\n")
@@ -680,7 +698,7 @@ class RouteTest(HandoffCase):
     def test_the_view_json_has_the_agreed_shape(self):
         self.stage(DOCS, b"new\n")
         answer = self.view()
-        self.assertEqual(sorted(answer), ["entries", "expect", "ignored", "ok", "tree", "version"])
+        self.assertEqual(sorted(answer), ["entries", "expect", "ignored", "ignored_paths", "ok", "tree", "version"])
         self.assertEqual(answer["version"], 1)
         self.assertEqual(answer["tree"], self.root)
         self.assertEqual(

@@ -21,6 +21,7 @@ import {
   renumber,
   serializeTemplate,
   sameData,
+  untouched,
   setFlow,
   setItem,
   setMeta,
@@ -218,4 +219,10 @@ test("CB-T1149 新しい名前は、共通の層とこの層の既存の名前�
   assert.deepEqual(templateNameTaken(layers, "self", "IMPL"), { layer: "self", name: "impl" });
   assert.equal(templateNameTaken(layers, "self", "libonly"), undefined);
   assert.equal(templateNameTaken(layers, "self", "fresh"), undefined);
+});
+
+test("CB-T1225 untouched は開いた直後の雛形と同じ内容のときだけ真になる", () => {
+  const blank = blankTemplate("a", "implement");
+  assert.equal(untouched(blankTemplate("a", "implement"), blank), true);
+  assert.equal(untouched(setMeta(blank, { description: "x" }), blank), false);
 });
