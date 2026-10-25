@@ -284,7 +284,7 @@ ask:
   - tool: Bash
     subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --base feature/x && sh /repo/.ccnavi/scripts/ccnavi-worktree.sh y --dry-run"
     why: >-
-      同じスクリプトの別の呼び出しの --dry-run でも除外されません。--dry-run のある呼び出しは確認の対象外ですが、
+      同じスクリプトの別の呼び出しに --dry-run があっても除外されません。--dry-run のある呼び出しは確認の対象外ですが、
       --base のある呼び出しは対象のままです（direct-worktree-confirm）
   - tool: Bash
     subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh y --dry-run && sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --base feature/x"

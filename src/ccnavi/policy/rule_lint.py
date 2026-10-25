@@ -345,7 +345,8 @@ def _except_problems(rule: rules.Rule, name: str) -> list[Problem]:
 
     1. 何にでもヒットする except。ルールが何にもヒットしなくなり、書いてあるのに何も止めない
     2. Bash / PowerShell を見る deny / ask の except。適用するのはコマンド列の全体なので、
-       `git push; echo wip/handoff/` のように除く語を足すだけで外れる
+       `git push; echo wip/handoff/` のように除く語を足すだけで外れる。ただし、コマンド名から
+       `[^\x00]*` でつなぐ形は、コマンドの切れ目を越えないので言わない（判定は _bound_to_command）
     """
     if not rule.excepts:
         return []
@@ -381,9 +382,9 @@ def _except_problems(rule: rules.Rule, name: str) -> list[Problem]:
 _COMMAND_HEAD = re.compile(r"(?:\(\^\|\\x00\)|\^)?(?:[A-Za-z0-9_\-/]|\\[.\-/b]|\\s[+*]?)+")
 _COMMAND_SPAN = r"[^\x00]"
 # 頭のあとに置くと、コマンドの切れ目（\x00）まで届いてしまう書き方。
-# 任意の 1 字（`.`）、否定の文字クラス（`[^…]`）、空白・語・数字でないもの（`\S` `\W` `\D`）。
+# 任意の 1 字（`.`）、否定の文字クラス（`[^…]`）、空白以外・語の字以外・数字以外（`\S` `\W` `\D`）。
 _REACHES_BOUNDARY = re.compile(r"\\[SWD]|\.|\[\^")
-# `\.` `\s` `\b` のような逃がし。字そのものか空白を指すので、上の検査の前に除く。
+# `\.` `\s` `\b` のようなエスケープは、字そのもの・空白・語の境目を指すので、上の検査の前に除く。
 _ESCAPED_CHAR = re.compile(r"\\[^SWD]")
 
 
