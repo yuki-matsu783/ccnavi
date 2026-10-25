@@ -247,14 +247,14 @@ def pending_notice(root: str, conf: settings.Settings, deadline: float) -> str:
 
 
 def _notice(root: str, conf: settings.Settings, deadline: float) -> str:
-    """取り込みの途中の跡を、見出しの後ろに 1 件 1 行で並べる。無ければ空。例外は呼び元が受ける。
+    """取り込みの途中の跡を、見出しの後ろに並べる。多いときは名前の一覧 1 行にする。無ければ空。例外は呼び元が受ける。
 
     処理フロー:
     1. 本体と各プロジェクトのツリーを順に見る。期限が過ぎたら打ち切り、`CUT_LINE` を足す。
     2. 記録の置き場の名前ごとに、版 4 の記録なら `_v4_line`、それ以外は `_unknown_line` で言う。
     3. 記録の無い跡は `_leftovers` で言う。
     4. 行が無ければ空を返す。記録が `SHORT_FROM` 件未満なら、`HEAD_LINE` の後ろに1件1行で返す。
-       `SHORT_FROM` 件以上なら、1 件ずつの行を出さず、名前を全件 1 行に並べて詳しい見方を添える。
+       `SHORT_FROM` 件以上なら、1 件ずつの行を出さず、名前を全件 1 行に並べ、確かめ方を添える。
     """
     tops = [root] + [t.root for t in tree.projects(conf.projects)]
     lines: list[tuple[str, str]] = []
