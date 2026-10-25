@@ -11,7 +11,8 @@
 
 next は、人間の操作で止まったあと、人間が「次へ」と言ってから打つ。
 restore は、人間の操作で止まった回を続けずにやめるとき、setup のファイルを消し、
-使い捨てのリポジトリを setup.reset の base へ戻して、残し印を外す。
+setup.host の代役の置き場を消し、使い捨てのリポジトリを setup.reset の base へ戻して、
+残し印を外す。next は、setup.host が fake-gitlab なら模擬を残した状態ファイルのまま起こし直す。
 
 --confirmed を付けるのは、人間が「状態がきれいで最新か」（と、test_repo のシナリオでは
 「test-repo にブランチや MR ができてよいか」）に答えたあとだけ。
@@ -22,7 +23,8 @@ ccnavi 本体にブランチ・コミット・ワークツリーが残らない�
 終了コード: 0 全部通った / 1 不合格がある・setup のパスが合わず回せない /
 2 未成立か意味の判定待ちがある /
 3 人間の確認が要る・回す前の拒否・使い捨てのリポジトリを戻せなかった（手作業が要る） /
-10 人間の操作で止まった（「次へ」のあと next で続ける。setup.reset の対象は base に戻さず残す）。
+10 人間の操作で止まった（「次へ」のあと next で続ける。setup.reset の対象と setup.host の
+置き場は残し、模擬だけ止める）。
 
 判定は 3 つ。機械で比べられるもの（ccnavi の判定の記録、ファイルの最終状態、
 コマンドの出力）は pass / fail。期待した呼び出しをエージェントが打たなかったものは
@@ -49,6 +51,7 @@ import yaml
 from ccnavi.infra import pathcase
 from ccnavi.records import diaglog
 from ccnavi.tickets import review_host
+from tests.scenarios import hostenv
 
 ROOT = Path(__file__).resolve().parents[2]
 GIT_SH = "{root}/.ccnavi/scripts/ccnavi-git.sh"
@@ -59,7 +62,7 @@ LOG_NAME = "scenario-runner"
 RUNNER = "uv run python -m tests.scenarios.runner"
 LOCK_NAME = "ccnavi-scenario.lock"  # 対象の .git/ の中。git clean で消えず、status も汚さない
 LEFT_NAME = "ccnavi-scenario.left"  # 戻さずに残した回の印（中身は出力の置き場）
-SETUP_KEYS = {"files", "issue", "git", "reset"}
+SETUP_KEYS = {"files", "issue", "git", "reset", "host", "host_state"}
 SHA40 = re.compile(r"[0-9a-fA-F]{40}")
 # setup.git で、対象の外へ出られる git の指定
 GIT_ESCAPES = ("-C", "--git-dir", "--work-tree")
@@ -195,6 +198,7 @@ def _check_setup(path, setup):
         raise ValueError(
             f"{path}: setup.git と setup.files の追記は、戻す setup.reset が無いと使えない"
         )
+    hostenv.validate(path, setup)
 
 
 # ---- claude -p の出力（stream-json）を読む ----
@@ -505,7 +509,8 @@ def mode_check(root):
 # ---- 実行 ----
 
 
-def run_step(scn, step, out, idx, session_id, resume_id, persist, root, issue_no=None):
+def run_step(scn, step, out, idx, session_id, resume_id, persist, root, issue_no=None, env=None):
+    """env が None なら親の環境を継承する（setup.host が real のとき）。"""
     _require_entry()
     cmd = [
         "claude",
@@ -528,7 +533,9 @@ def run_step(scn, step, out, idx, session_id, resume_id, persist, root, issue_no
         cmd += ["--session-id", session_id]
     if not persist:
         cmd += ["--no-session-persistence"]
-    r = subprocess.run(cmd, cwd=root, capture_output=True, text=True, timeout=STEP_TIMEOUT_SEC)
+    r = subprocess.run(
+        cmd, cwd=root, capture_output=True, text=True, timeout=STEP_TIMEOUT_SEC, env=env
+    )
     (out / f"step-{idx}.jsonl").write_text(r.stdout, encoding="utf-8")
     if r.stderr.strip():
         (out / f"step-{idx}.stderr").write_text(r.stderr, encoding="utf-8")
@@ -581,7 +588,7 @@ def _git_env():
     return {k: v for k, v in os.environ.items() if k not in drop}
 
 
-def _git(args, cwd):
+def _git(args, cwd, input=None):
     return subprocess.run(
         ["git", *args],
         cwd=cwd,
@@ -589,7 +596,8 @@ def _git(args, cwd):
         text=True,
         timeout=120,
         env=_git_env(),
-        stdin=subprocess.DEVNULL,
+        input=input,
+        stdin=subprocess.DEVNULL if input is None else None,
     )
 
 
@@ -696,17 +704,19 @@ def _target_git(root, top, args, level="info"):
     return r
 
 
-def run_setup_git(root, target, commands, allowed=None):
+def run_setup_git(root, target, commands, allowed=None, host=None):
     """setup.git のコマンドを、対象の toplevel を cwd にして順に実行する（shell=False）。
-    各コマンドのあと ccnavi 本体の repo_snapshot が変わっていたら止める。"""
+    各コマンドのあと ccnavi 本体の repo_snapshot が変わっていたら止める。
+    host（setup.host の辞書）があれば、本物の origin への通信を bare へ向ける -c を足す。"""
     top = require_disposable_repo(root, target, allowed)
     before = repo_snapshot(root)
+    via = hostenv.git_via(host) if host else []
     for argv in commands:
         try:
             check_git_argv(argv)
         except ValueError as exc:
             raise Refusal(f"setup.git を実行しない: {exc}", "シナリオの setup.git を直す") from None
-        r = _target_git(root, top, argv[1:])
+        r = _target_git(root, top, [*via, *argv[1:]])
         if r.returncode != 0:
             raise Refusal(
                 f"setup.git が失敗した: {shlex.join(argv)}（終了コード {r.returncode}）",
@@ -933,11 +943,18 @@ def setup_clashes(scn, root):
     return [rel for rel, v in files.items() if (Path(root) / rel).exists() != file_spec(v)[1]]
 
 
+def scenario_host(scn):
+    """setup.host の値（bare / fake-gitlab / real）。欄が無ければ real。"""
+    return (scn.get("setup") or {}).get("host", hostenv.DEFAULT_HOST)
+
+
 def uses_target(scn):
-    """使い捨てのリポジトリを触る setup（git・reset・追記）があるか。"""
+    """使い捨てのリポジトリを触る setup（git・reset・追記・bare / fake-gitlab の相手）があるか。"""
     setup = scn.get("setup") or {}
     appends = any(file_spec(v)[1] for v in (setup.get("files") or {}).values())
-    return bool(setup.get("git") or setup.get("reset") or appends)
+    return bool(
+        setup.get("git") or setup.get("reset") or appends or hostenv.is_fake(scenario_host(scn))
+    )
 
 
 def _setup(scn, root, toplevel=None):
@@ -1078,6 +1095,33 @@ def fill_issue(text, number):
     return text if number is None else text.replace(ISSUE_PLACEHOLDER, str(number))
 
 
+def _host_env(st):
+    """claude に渡す環境。setup.host が bare / fake-gitlab のときだけ作る（real は None）。"""
+    host = st.get("host")
+    return hostenv.step_env(host) if host and not host.get("down") else None
+
+
+def _teardown_host(st, root):
+    """模擬を止め、代役の置き場を消す（何度呼んでもよい）。"""
+    if st.get("host"):
+        hostenv.teardown(root, st["host"], _git)
+
+
+def _start_host(scn, st, out, root, top):
+    """setup.host が bare / fake-gitlab なら、相手を用意して state に残す。"""
+    if not hostenv.is_fake(scenario_host(scn)):
+        return
+    try:
+        st["host"] = hostenv.prepare(root, top, scn["setup"], _git)
+    except RuntimeError as exc:
+        raise Refusal(
+            f"setup.host の相手を用意できなかった: {exc}",
+            f"対象 {top} の origin を確かめて打ち直す",
+            "対象は後始末で戻す",
+        ) from None
+    _write_state(out, st)
+
+
 def drive(scn, out, st, root):
     """st['next_step'] から、人間の操作の step か末尾まで進める。
     人間の操作で止まったら 10、末尾まで進んだら None を返す。
@@ -1103,7 +1147,16 @@ def drive(scn, out, st, root):
         persist = _persist_needed(steps, idx)
         try:
             ev = run_step(
-                scn, step, out, idx + 1, sid, resume_id, persist, root, st.get("issue_no")
+                scn,
+                step,
+                out,
+                idx + 1,
+                sid,
+                resume_id,
+                persist,
+                root,
+                st.get("issue_no"),
+                env=_host_env(st),
             )
         except Exception as e:  # 起動できない・時間切れ・終了コードが 0 でない
             # 後続は回さず止める。finish に回して、後片付けを通す
@@ -1141,6 +1194,18 @@ def drive(scn, out, st, root):
     return None
 
 
+HOST_NOTES = {
+    "real": "real: 本物の GitHub / GitLab を相手にした",
+    "bare": "bare: ローカルの bare を origin にした。ホストの API は失敗（確かめられなかった）",
+    "fake-gitlab": "fake-gitlab: ローカルの bare と fake_gitlab.py を相手にした",
+}
+FAKE_NOTE = "。模擬は本物と同じ形を返す保証が無く、模擬のずれで見逃した問題がありうる"
+
+
+def host_note(host):
+    return HOST_NOTES[host] + (FAKE_NOTE if hostenv.is_fake(host) else "")
+
+
 def finish(scn, out, st, root):
     try:
         # state の run は setup のファイルが残っているうちに回す。消すのは判定のあと
@@ -1156,12 +1221,14 @@ def finish(scn, out, st, root):
         # ccnavi 本体に、ブランチ・コミット・ワークツリーが残っていないかを実際の状態で確かめる
         v, why = repo_result(st.get("pre_repo"), repo_snapshot(root))
         results.append(("repo", "ccnavi 本体の HEAD・ブランチ・ワークツリー", v, why))
+        results.append(("host", "setup.host", PASS, host_note(scenario_host(scn))))
     finally:
         _cleanup(st["setup_made"], st.get("setup_dirs", []), root)
         st["setup_made"] = []  # restore が、あとから同じパスに作られたファイルを消さないように
         issue = (scn.get("setup") or {}).get("issue")
         if issue and issue.get("close") and st.get("issue_no"):
             close_issue(issue, st["issue_no"], root)
+        _teardown_host(st, root)
         not_restored = release_target(st, root)
         _write_state(out, st)
     if not_restored:
@@ -1705,6 +1772,8 @@ def write_report(scn, out, st, results, rows, raw):
         "",
         f"全体: {overall(results)}  費用: {st['cost_usd']:.3f} USD",
         "",
+        f"相手（setup.host）: {host_note(scenario_host(scn))}",
+        "",
     ]
     lines += _results_table(results, 100)
     lines += ["", "## ステップごとの入力プロンプトと最終出力", *step_answer_lines(scn, out)]
@@ -1826,6 +1895,13 @@ def scenario_summary(scn):
             f"回す前と回したあとに、{DISPOSABLE_REL} を {reset['base']} へ戻す"
             "（未コミットの変更・main 以外のブランチ・ワークツリー・タグ・stash が消える）。"
             "人間の操作で止めた回は、戻さずに残す（続きは next、やめるのは restore）"
+        )
+    host = scenario_host(scn)
+    if hostenv.is_fake(host):
+        lines.append(
+            f"相手（setup.host）: {host}。ホスト（GitHub / GitLab）へは出ない"
+            "（`claude -p` 自身の API 通信は要る）。本物のトークンは claude に渡さない。"
+            "origin への通信は一時ディレクトリの bare へ向き、回したあとに消す" + FAKE_NOTE
         )
     issue = (scn.get("setup") or {}).get("issue")
     if issue:
@@ -2072,12 +2148,13 @@ def cmd_run(args):
             _write_state(out, st)
             if base:
                 reset_repo(root, top, base)
+            _start_host(scn, st, out, root, top)
         # issue は回すたびに新しく作る。番号は state に残し、続きの step の prompt にも入れる
         if setup.get("issue"):
             st["issue_no"] = make_issue(setup["issue"], root)
         st["setup_made"], st["setup_dirs"] = _setup(scn, root, top)
         if setup.get("git"):
-            run_setup_git(root, top, setup["git"])
+            run_setup_git(root, top, setup["git"], host=st.get("host"))
     except Refusal as exc:
         _abort(scn, out, st, root)
         return _refuse(exc)
@@ -2101,6 +2178,7 @@ def _abort(scn, out, st, root):
     issue = (scn.get("setup") or {}).get("issue")
     if issue and issue.get("close") and st.get("issue_no"):
         close_issue(issue, st["issue_no"], root)
+    _teardown_host(st, root)
     release_target(st, root)
     _write_state(out, st)
 
@@ -2113,9 +2191,14 @@ def _continue(scn, out, st, root):
         # 対象を base へ戻す（戻せなければ文面を出す。元の例外はそのまま投げ直す）
         _cleanup(st["setup_made"], st.get("setup_dirs", []), root)
         st["setup_made"] = []
+        _teardown_host(st, root)
         release_target(st, root)
         _write_state(out, st)
         raise
+    if rc == 10 and st.get("host"):
+        # 模擬は止める。置き場（bare・代役・模擬の状態）は、next が同じ環境で続けるので残す
+        hostenv.hold(root, st["host"])
+        _write_state(out, st)
     if rc == 10 and st.get("target"):
         # 人間が操作したあとの next で続くので、対象は base に戻さず残す（ロックだけ放す）
         release_target(st, root, hold=True)
@@ -2133,13 +2216,17 @@ def _continue(scn, out, st, root):
 def cmd_next(args):
     out = Path(args.out)
     st = json.loads((out / "state.json").read_text(encoding="utf-8"))
+    if st.get("released"):
+        print("対象を戻して放した回（restore 済みか終了済み）。続きは回せない")
+        print(f"次: やり直すなら `{RUNNER} run <シナリオ> --confirmed`")
+        return 2
     if st.get("halt"):
         # halt は finish で戻してある。届かなかった場合に備え、戻し直す（戻し済みなら何もしない）
         print(f"step {st['halt']['step']} で止めた回。続きは回せない")
-        if release_target(st, st["root"]):
-            return 3
+        _teardown_host(st, st["root"])
+        failed = release_target(st, st["root"])
         _write_state(out, st)
-        return 2
+        return 3 if failed else 2
     # 人間の操作の間にモードが変わることがあるので、続けるたびに確かめる
     mode_ok, mode_text = mode_check(Path(st["root"]))
     if not mode_ok:
@@ -2151,6 +2238,10 @@ def cmd_next(args):
         except Refusal as exc:
             return _refuse(exc)
         st["held"] = False
+    if st.get("host") and not st["host"].get("down"):
+        for note in hostenv.resume(st["root"], st["host"]):
+            print(f"案内: {note}")
+        _write_state(out, st)
     scn = load_scenario(st["scenario"])
     scn["_prompt_steps"] = sum(1 for s in scn["steps"] if not s.get("human"))
     return _continue(scn, out, st, st["root"])
@@ -2173,6 +2264,7 @@ def cmd_restore(args):
     issue = (scn.get("setup") or {}).get("issue")
     if issue and issue.get("close") and st.get("issue_no"):
         close_issue(issue, st["issue_no"], st["root"])
+    _teardown_host(st, st["root"])
     failed = release_target(st, st["root"])
     _write_state(out, st)
     if failed:

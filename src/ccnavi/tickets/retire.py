@@ -125,12 +125,6 @@ def _closed_children(root: str, conf: settings.Settings, parent: str) -> list[Ch
     return out
 
 
-def read_record(conf: settings.Settings, parent: str) -> dict:
-    path = record_path(conf, parent)
-    data, failed = fsio.read_json(path) if path else (None, None)
-    return data if failed is None and isinstance(data, dict) else {}
-
-
 def _held_record(path: str) -> tuple[dict, str]:
     """前の回の記録と、読めなかった理由。無いのは普通なので `({}, "")`。
 

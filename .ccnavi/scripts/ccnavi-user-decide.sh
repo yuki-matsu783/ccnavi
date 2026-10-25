@@ -196,7 +196,8 @@ accept_before_place() {
 
 post_decision() {
 	if [ -n "$op_id" ]; then
-		post_decision_staged
+		# 取れなければ post_warning に言う（置いたあとなので決めたことは戻さない）
+		post_decision_staged || :
 		return 0
 	fi
 	issue_url=""
@@ -238,7 +239,7 @@ resume_report() {
 review_begin "$args_n"
 # 抜けるときに exe に渡した JSON を消し、終わりの 1 行を診断ログに残す。終了コードは変えない。
 # rm が失敗しても、`set -e` がその失敗の値で抜けて元の終了コードを上書きしないよう、失敗を無視してから元の値で抜け直す。
-trap 'review_exit=$?; ccnavi_wap_end; accept_cleanup "$review_exit"; rm -f "$result" "$result.re" ${accept_plan:+"$accept_plan"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
+trap 'review_exit=$?; ccnavi_wap_end; op_lock_release; accept_cleanup "$review_exit"; rm -f "$result" "$result.re" ${accept_plan:+"$accept_plan"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
 trap 'ccnavi_wap_end; exit 130' INT TERM HUP
 
 review_wap
@@ -261,6 +262,14 @@ unapply_local() {
 	[ -n "$ua_op" ] || ua_op="${resume_op:-}"
 	[ -z "$ua_op" ] || ccnavi ops applied "$ua_op" local false 2>/dev/null || :
 }
+# --resume は、返信・解決の前から操作 ID のロックを持つ（同じ判断を同時に続けて、二重に送らない）。
+if [ -n "$resume_op" ]; then
+	post_warning=""
+	op_lock_take "$resume_op" || {
+		printf '%s: %s\n' "$review_label" "$post_warning" >&2
+		exit 1
+	}
+fi
 [ -z "$choices" ] || wap_start "$family"
 fetch_all >"$result"
 if [ -n "$choices" ]; then
@@ -269,7 +278,10 @@ if [ -n "$choices" ]; then
 	# 適用まで済んでいる判断の続きは、投稿の段階だけを進める。
 	if [ -n "$resume_op" ] && [ "$(ccnavi ops show "$resume_op" | "$JQ" -r '.applied.local // empty')" = true ]; then
 		op_id="$resume_op"
-		post_decision_staged
+		if ! post_decision_staged; then
+			printf '%s: %s\n' "$review_label" "$post_warning" >&2
+			exit 1
+		fi
 		resume_report
 		exit 0
 	fi

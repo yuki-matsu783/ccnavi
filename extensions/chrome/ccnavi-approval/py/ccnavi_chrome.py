@@ -841,7 +841,7 @@ def _one_branch(changes: dict, family: str) -> None:
     if others:
         raise Refused(
             f"反映する内容が親ブランチ {family} の外"
-            f"（{', '.join(others or ['?'])}）に及んでいます。"
+            f"（{', '.join(others)}）に及んでいます。"
             f"提案を {family} の上に置いてから、承認を依頼してください。"
         )
 

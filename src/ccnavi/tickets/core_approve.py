@@ -13,15 +13,19 @@ import json
 import os
 from typing import TextIO
 
-from ..infra import fsio, modes, settings
+from ..infra import fsio, gitcmd, modes, pathcase, settings, tree
 from . import (
     agree,
     agree_candidates,
     agree_screen,
     approval,
     core_base,
+    ticket_places,
     worktrees,
 )
+
+_GIT_TIMEOUT = 20.0
+_SHOWN_PATHS = 8
 
 # ボードの承認（`--agree --yes`）が通らなかった根拠の種別。付録 A の `CORE_APPROVE_*`。
 # 確認（`CORE_CONFIRM_*`）と同じく、文面の頭に
@@ -141,8 +145,15 @@ def approve(
     applied, written = write_recorded(
         stdout, stderr, root, core_base.plan(snapshot, verdict).planned
     )
+    # 承認は止めない。承認の後に戻せなくなる変更があれば、止まる前に知らせる。
+    dirty = dirty_parents(
+        conf, root, [c.ticket for c in gathered.batch if c.ticket.ticket in applied.placed]
+    )
+    say_dirty_parents(stderr, root, dirty)
     if placed_out:
-        _write_report(placed_out, placed_report(conf, root, gathered, applied, written), stderr)
+        _write_report(
+            placed_out, placed_report(conf, root, gathered, applied, written, dirty), stderr
+        )
     if applied.code == 0 and gathered.rejected:
         # 承認の対象の一部が失敗したときは、通ったぶんを置いてから失敗で終わる。置いたので
         # 繰り返してよく、失敗したものは上で名指ししてある。成功で終わると、
@@ -185,6 +196,76 @@ def write_recorded(
     return applied, written_paths(root, written)
 
 
+def dirty_parents(conf: settings.Settings, root: str, tickets: list) -> list[dict]:
+    """承認した親のワークツリーにある、提案とチケットの置き場以外の未コミットの変更。
+
+    承認の前は、親のワークツリーへの書き込みは判定の対象外で通る（承認済みの索引に無いため）。
+    承認の後に同じ変更を戻そうとしても、親のワークツリーへの書き込みとして断られ、子の
+    `finish` も止まる（`write_and_push_merge._tree_problem`）。止まる前に知らせるため、承認の
+    時点で同じ条件（追跡中のファイルの変更のうち、置き場の外のもの）を数える。
+
+    承認は止めない。親のワークツリーが無い・git のワークツリーでない・状態を読めないときは、
+    黙って空にする。プロジェクトの子は置き場が別なので数えない。
+
+    返すのは `{"ticket": 親の識別子, "worktree": ワークツリーのパス, "paths": 変更のパス}` の列。
+    """
+    seen: set[str] = set()
+    out: list[dict] = []
+    for t in tickets:
+        if t.project:
+            continue
+        ident = t.parent if t.is_child else t.ticket
+        key = pathcase.fold(ident or "")
+        if not ident or key in seen:
+            continue
+        seen.add(key)
+        path = tree.worktree_path(root, ident)
+        if not os.path.isdir(path) or not tree.is_worktree_of(root, path):
+            continue
+        done = gitcmd.run(
+            path,
+            ["status", "--porcelain", "-z", "--untracked-files=no", "--no-renames"],
+            _GIT_TIMEOUT,
+            raw_paths=True,
+        )
+        if not done.ok:
+            continue
+        paths = [
+            entry[3:]
+            for entry in done.out.split("\0")
+            if len(entry) > 3
+            and not ticket_places.is_ticket_place(entry[3:], conf.tickets, conf.approved)
+        ]
+        if paths:
+            out.append({"ticket": ident, "worktree": path, "paths": paths})
+    return out
+
+
+def dirty_parent_text(root: str, found: dict) -> str:
+    """`dirty_parents` の 1 件を知らせる文（行頭の語は呼び手が付ける）。戻し方まで書く。"""
+    shown = ", ".join(found["paths"][:_SHOWN_PATHS])
+    if len(found["paths"]) > _SHOWN_PATHS:
+        shown += f" ほか {len(found['paths']) - _SHOWN_PATHS} 件"
+    git_sh = settings.script_command(root, "ccnavi-git.sh")
+    restore = (
+        f"cd {settings.shell_path(found['worktree'])} && "
+        f"{git_sh} restore --staged --worktree -- {settings.shell_path(found['paths'][0])}"
+    )
+    return (
+        f"親 {found['ticket']} のワークツリーに、提案以外の未コミットの変更がある（{shown}）。"
+        "承認の後は、親のワークツリーへの書き込みが断られ、この変更があると子の finish も止まる。"
+        "自分が書いた変更でなければ、戻す前にユーザへ確かめる（戻すと取り消せない）。"
+        "残す変更は、子のワークツリーへ移してコミットする。"
+        f"要らない変更は、パスを 1 つずつ名指しして戻す。例: {restore}"
+    )
+
+
+def say_dirty_parents(stderr: TextIO, root: str, found: list[dict]) -> None:
+    """承認の結果に、親のワークツリーの未コミットの変更を出す（承認は止めない）。"""
+    for item in found:
+        stderr.write(f"ccnavi: {dirty_parent_text(root, item)}\n")
+
+
 def written_paths(root: str, written: list[str]) -> list[str]:
     """書いたパス（絶対パス）を、ワークスペースルートからの相対（"/" 区切り）にする。外は除く。"""
     base = os.path.realpath(root)
@@ -207,6 +288,7 @@ def placed_report(
     gathered: agree.Gathered,
     applied: agree.Applied,
     written: list[str] | None = None,
+    dirty: list[dict] | None = None,
 ) -> dict:
     """承認の書き込みの結果。実際に書けたパス（`placed`）と、書けなかったもの・書かなかったもの。
 
@@ -215,6 +297,8 @@ def placed_report(
     - `failed`: 書き込みで止まった提案（識別子と理由）。止まらなければ空
     - `unwritten`: 止まったために書かなかった提案の識別子
     - `rejected`: 検査で承認の対象にしなかった提案（識別子と理由）
+    - `dirty_parent`: 承認した親のワークツリーに残る、提案以外の未コミットの変更
+      （親の識別子とパス。`dirty_parents`）。無いときは空
     """
     ids = [c.ticket.ticket for c in gathered.batch]
     failed = (
@@ -238,6 +322,7 @@ def placed_report(
             {"ticket": t.ticket, "problems": [str(p) for p in complaints]}
             for t, complaints in gathered.rejected
         ],
+        "dirty_parent": [{"ticket": d["ticket"], "paths": list(d["paths"])} for d in (dirty or [])],
     }
 
 
@@ -477,8 +562,13 @@ def approve_yes(
     revisions = {c.ticket.ticket for c in gathered.batch if c.is_revision}
     # 子のワークツリーの計画。拡張が `create` の子を承認の後に作る（作れなければ案内に名指しで出る）
     plan = worktrees.child_worktrees(root, tickets)
-    prompt = agree_screen.approved_text(tickets, revisions, root, plan)
+    # 承認は止めない。親のワークツリーに残る提案以外の変更は、エージェントに渡す文に載せる。
+    dirty = dirty_parents(conf, root, tickets)
+    prompt = agree_screen.approved_text(
+        tickets, revisions, root, plan, [dirty_parent_text(root, d) for d in dirty]
+    )
     if not as_json:
+        say_dirty_parents(stderr, root, dirty)
         stdout.write(lines.getvalue())
         return 0
     body = {
@@ -495,6 +585,7 @@ def approve_yes(
         # この承認で書いた・消したパス（ワークスペースルートからの相対。`write_recorded`）
         "written": written,
         "worktrees": plan,
+        "dirty_parent": [{"ticket": d["ticket"], "paths": list(d["paths"])} for d in dirty],
         "prompt": prompt,
     }
     stdout.write(json.dumps(body, ensure_ascii=False) + "\n")

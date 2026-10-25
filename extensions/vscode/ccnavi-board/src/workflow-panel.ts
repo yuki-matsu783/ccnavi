@@ -44,7 +44,7 @@ import { checkPlanOrder, loadBoard, runPlanOrder, runPlanOrderWrite } from "./cc
 import { loadingText } from "./core/loading-render.js";
 import type { PlanOrder, PlanOrderAnswer } from "./core/planordermodel.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
-import { OWN_WRITE_GRACE_MS, WATCH_PATTERNS } from "./core/watch.js";
+import { OWN_WRITE_GRACE_MS } from "./core/watch.js";
 import { markUnsaved, rememberSaved } from "./core/workflow-tabs.js";
 import { renderWorkflowPage } from "./core/workflow-render.js";
 import {
@@ -60,6 +60,7 @@ import {
 } from "./core/workflow-view.js";
 import { showLoading } from "./loading.js";
 import * as diaglog from "./log.js";
+import { assertNever, assertRetained, debounce, watchTickets } from "./panel-common.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -211,14 +212,7 @@ function registerPanelHandlers(current: PanelState): void {
     }
   });
   // 提案（親と子）が動いたら、外で変わったかを実行ファイルに聞き直す。承認されて置き場が変わったときもここで気づく
-  for (const pattern of WATCH_PATTERNS) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
-    const moved = () => scheduleCheck(current);
-    watcher.onDidCreate(moved);
-    watcher.onDidChange(moved);
-    watcher.onDidDelete(moved);
-    current.watchers.push(watcher);
-  }
+  current.watchers.push(...watchTickets(folder, () => scheduleCheck(current)));
 }
 
 /** 外で変わった・無くなったの知らせを画面に送る（作り直した画面と、再表示された画面へ） */
@@ -267,11 +261,7 @@ async function openDraftAsJson(draft: PlanOrder): Promise<void> {
 }
 
 function scheduleCheck(current: PanelState): void {
-  if (current.timer !== undefined) {
-    clearTimeout(current.timer);
-  }
-  current.timer = setTimeout(() => {
-    current.timer = undefined;
+  debounce(current, "timer", () => {
     if (alive(current)) {
       void checkOutside(current);
     }
@@ -357,10 +347,7 @@ function redraw(current: PanelState): void {
 }
 
 function workflowHost(panel: vscode.WebviewPanel, rootPath: string): ScreenHost<WorkflowData> {
-  if (panel.options.retainContextWhenHidden !== true) {
-    // retainedHost は retainContextWhenHidden が真であることを前提にしている。診断ログにだけ残す
-    diaglog.get("ccnavi-board", rootPath).error("画面の前提が崩れている", { screen: SCREEN, retainContextWhenHidden: false });
-  }
+  assertRetained(panel, rootPath, SCREEN);
   return retainedHost<WorkflowData>(
     {
       html(text: string): void {
@@ -478,11 +465,9 @@ async function handleMessage(current: PanelState, message: WorkflowMessage | und
     case "save":
       await save(current, message.order, message.expect);
       return;
-    default: {
-      const unhandled: never = message;
-      void unhandled;
+    default:
+      assertNever(message);
       return;
-    }
   }
 }
 
@@ -564,10 +549,8 @@ async function save(current: PanelState, order: PlanOrder, expect: string): Prom
       log.error("計画編集の保存に失敗", { screen: SCREEN });
       fail(current, result.error);
       return;
-    default: {
-      const unhandled: never = result;
-      void unhandled;
+    default:
+      assertNever(result);
       return;
-    }
   }
 }

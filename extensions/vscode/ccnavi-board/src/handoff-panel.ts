@@ -27,9 +27,9 @@ import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { loadingText } from "./core/loading-render.js";
 import type { TreeJson } from "./core/model.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
-import { OWN_WRITE_GRACE_MS, WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
+import { OWN_WRITE_GRACE_MS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
-import * as diaglog from "./log.js";
+import { assertRetained, debounce, watchGlobs, watchTickets } from "./panel-common.js";
 import { confirmIfTurn } from "./turn-confirm.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
@@ -213,14 +213,7 @@ function registerPanelHandlers(current: PanelState): void {
 
   watchFiles(current);
   // チケットが動いたら、取り込みを止めるかを取り直す。
-  for (const pattern of WATCH_PATTERNS) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
-    const moved = () => scheduleLock(current);
-    watcher.onDidCreate(moved);
-    watcher.onDidChange(moved);
-    watcher.onDidDelete(moved);
-    current.watchers.push(watcher);
-  }
+  current.watchers.push(...watchTickets(folder, () => scheduleLock(current)));
 }
 
 /** 下書きの置き場と、取り込み先になる場所（許可リストの種類）の監視。ワークスペース・プロジェクト・ワークツリーの下を見る */
@@ -242,14 +235,7 @@ function watchFiles(current: PanelState): void {
     watcher.dispose();
   }
   current.fileWatchers = [];
-  for (const glob of WATCH_GLOBS) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(current.folder, glob));
-    const changed = () => scheduleChanged(current);
-    watcher.onDidCreate(changed);
-    watcher.onDidChange(changed);
-    watcher.onDidDelete(changed);
-    current.fileWatchers.push(watcher);
-  }
+  current.fileWatchers.push(...watchGlobs(current.folder, WATCH_GLOBS, () => scheduleChanged(current)));
 }
 
 function alive(current: PanelState): boolean {
@@ -261,27 +247,19 @@ function scheduleChanged(current: PanelState): void {
   if (current.writing || Date.now() - current.wroteAt < OWN_WRITE_GRACE_MS) {
     return;
   }
-  if (current.timer !== undefined) {
-    clearTimeout(current.timer);
-  }
-  current.timer = setTimeout(() => {
-    current.timer = undefined;
+  debounce(current, "timer", () => {
     if (alive(current)) {
       void reload(current);
     }
-  }, WATCH_DEBOUNCE_MS);
+  });
 }
 
 function scheduleLock(current: PanelState): void {
-  if (current.lockTimer !== undefined) {
-    clearTimeout(current.lockTimer);
-  }
-  current.lockTimer = setTimeout(() => {
-    current.lockTimer = undefined;
+  debounce(current, "lockTimer", () => {
     if (alive(current)) {
       void refreshLock(current);
     }
-  }, WATCH_DEBOUNCE_MS);
+  });
 }
 
 /**
@@ -355,9 +333,7 @@ function redraw(current: PanelState): void {
 
 /** 取り込み待ちの画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。パネルの前提が崩れていれば診断ログに残す */
 function handoffHost(panel: vscode.WebviewPanel, root: string): ScreenHost<HandoffData> {
-  if (panel.options.retainContextWhenHidden !== true) {
-    diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "handoff", retainContextWhenHidden: false });
-  }
+  assertRetained(panel, root, "handoff");
   return retainedHost<HandoffData>(
     {
       html(text: string): void {

@@ -303,6 +303,11 @@ class TicketNewScopeTest(TicketNewTestBase):
         self.assertIn("--agree --preview --verify", nexts[0])
         self.assertIn("承認が済むまで実装はしない", nexts[0])
         self.assertIn("直接実装に切り替えず", result.stdout)
+        # 子の提案も同じ承認で通すため先に書く。propose は親の識別子で打つ
+        self.assertIn("子の提案", nexts[0])
+        self.assertIn("-01-01", nexts[0])
+        self.assertIn("同じ承認で通す", nexts[0])
+        self.assertIn("親の識別子で打つ。子の識別子では打たない", nexts[0])
 
     def test_scope_is_added_after_the_collected_scope_without_duplicates(self):
         result = self.new("--scope", "docs/a.md,SRC/*", "--scope", "docs/a.md", plan="implement")

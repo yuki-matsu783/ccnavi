@@ -37,5 +37,6 @@ keywords: [工程スキル, reference, 育つ, 全体像, 振り返り, wiki, sk
 | 読むとき | 開くファイル |
 |---|---|
 | 置き場と書き方 | `.ccnavi/docs/skill-processes.md` |
-| 振り返りの拾い方・候補の渡し方 | `.ccnavi/docs/skill-review.md` |
+| 振り返りの拾い方・候補の渡し先 | `.ccnavi/docs/skill-review.md` |
+| 候補・提案チケットの出し方・書き方 | `.ccnavi/docs/skill-review-propose.md` |
 | wiki の中身 | `.ccnavi/docs/skill-wiki.md` |

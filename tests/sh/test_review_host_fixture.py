@@ -241,6 +241,47 @@ class HostFixtureTest(unittest.TestCase):
         self.assertIn("confirm", passed)
         self.assertIn("--actor=octo-reviewer", passed)
 
+    def on_integration_branch(self):
+        """ワークスペースルートを統合先のブランチ（main）の上に置く。"""
+        git = ["git", "-C", self.ws]
+        subprocess.run([*git, "checkout", "-q", "-b", "main"], check=True)
+        subprocess.run([*git, "update-ref", "refs/remotes/origin/main", "HEAD"], check=True)
+        subprocess.run(
+            [*git, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"],
+            check=True,
+        )
+
+    def test_confirm_on_the_integration_branch_says_to_type_it_in_the_parent_worktree(self):
+        self.on_integration_branch()
+        for sub, rest in (("confirm", ("--phase", "1")), ("ready", ())):
+            with self.subTest(sub=sub):
+                done = self.review("resolved", sub, *rest)
+                self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+                self.assertIn("の中で打ってください", done.stderr)
+                self.assertIn(".claude/worktrees/", done.stderr)
+                # main を親と読んで、親のワークツリーを切り直せとは案内しない
+                self.assertNotIn("切り直し", done.stderr)
+                self.assertFalse(os.path.exists(self.args))
+
+    def test_parent_option_is_refused_except_for_ready(self):
+        for sub, rest in (
+            ("confirm", ("--phase", "1")),
+            ("request", ("--phase", "1")),
+            ("comment", ()),
+        ):
+            for parent in (("--parent", "feature-1"), ("--parent=feature-1",)):
+                with self.subTest(sub=sub, parent=parent):
+                    done = self.review("resolved", sub, *rest, *parent)
+                    self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+                    self.assertIn("--parent は ready だけです", done.stderr)
+                    self.assertFalse(os.path.exists(self.args))
+
+    def test_usage_lists_parent_only_on_ready(self):
+        done = self.review("resolved", "--help")
+        lines = [ln for ln in done.stdout.splitlines() if "--parent" in ln]
+        self.assertEqual(len(lines), 1, lines)
+        self.assertIn("ready", lines[0])
+
     def test_without_an_owner_confirm_passes_no_actor(self):
         done = self.review("resolved", "confirm", "--phase", "1", FAKE_GITHUB_NO_USER="1")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)

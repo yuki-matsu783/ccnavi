@@ -73,9 +73,9 @@ import {
 } from "./core/flow-view.js";
 import { loadingText } from "./core/loading-render.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
-import { OWN_WRITE_GRACE_MS, WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
+import { OWN_WRITE_GRACE_MS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
-import * as diaglog from "./log.js";
+import { assertNever, assertRetained, debounce, watchPattern, watchTickets } from "./panel-common.js";
 import { copyPrompt, openPromptInSession } from "./prompt-handover.js";
 import { runInTerminal } from "./terminal.js";
 import { requireTickets } from "./ticket-control.js";
@@ -416,14 +416,7 @@ function registerPanelHandlers(current: PanelState): void {
     }
   });
   // チケットが動いたら（着手・終わり・取り消し）、錠を取り直す
-  for (const pattern of WATCH_PATTERNS) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
-    const moved = () => scheduleLock(current);
-    watcher.onDidCreate(moved);
-    watcher.onDidChange(moved);
-    watcher.onDidDelete(moved);
-    current.watchers.push(watcher);
-  }
+  current.watchers.push(...watchTickets(folder, () => scheduleLock(current)));
 }
 
 /**
@@ -467,30 +460,19 @@ function watchFile(current: PanelState): void {
     return;
   }
   const filePath = loaded.target.flow.path;
-  const watcher = vscode.workspace.createFileSystemWatcher(
-    new vscode.RelativePattern(vscode.Uri.file(path.dirname(filePath)), path.basename(filePath)),
+  current.fileWatchers.push(
+    watchPattern(new vscode.RelativePattern(vscode.Uri.file(path.dirname(filePath)), path.basename(filePath)), () => scheduleChanged(current)),
   );
-  const changed = () => scheduleChanged(current);
-  watcher.onDidCreate(changed);
-  watcher.onDidChange(changed);
-  watcher.onDidDelete(changed);
-  current.fileWatchers.push(watcher);
   // 下書きはエージェントが書く。動いたら「提案あり」を出し直す。置き場のディレクトリ（`flows/`）は
   // 開いた時点で無いことが多いので、在るツリーのルートからの相対パスで見張る（後から作られても届く）
   const draft = loaded.target.flow.draft;
   if (draft !== null) {
     const relative = path.relative(loaded.target.flow.tree, draft.path);
     const inside = loaded.target.flow.tree !== "" && relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
-    const drafts = vscode.workspace.createFileSystemWatcher(
-      inside
-        ? new vscode.RelativePattern(vscode.Uri.file(loaded.target.flow.tree), relative.split(path.sep).join("/"))
-        : new vscode.RelativePattern(vscode.Uri.file(path.dirname(draft.path)), path.basename(draft.path)),
-    );
-    const moved = () => scheduleOffer(current);
-    drafts.onDidCreate(moved);
-    drafts.onDidChange(moved);
-    drafts.onDidDelete(moved);
-    current.fileWatchers.push(drafts);
+    const pattern = inside
+      ? new vscode.RelativePattern(vscode.Uri.file(loaded.target.flow.tree), relative.split(path.sep).join("/"))
+      : new vscode.RelativePattern(vscode.Uri.file(path.dirname(draft.path)), path.basename(draft.path));
+    current.fileWatchers.push(watchPattern(pattern, () => scheduleOffer(current)));
   }
 }
 
@@ -498,28 +480,20 @@ function scheduleChanged(current: PanelState): void {
   if (Date.now() - current.wroteAt < OWN_WRITE_GRACE_MS) {
     return;
   }
-  if (current.timer !== undefined) {
-    clearTimeout(current.timer);
-  }
-  current.timer = setTimeout(() => {
-    current.timer = undefined;
+  debounce(current, "timer", () => {
     if (alive(current)) {
       current.changedPending = true;
       current.host.post({ type: "changed" } satisfies ToFlow);
     }
-  }, WATCH_DEBOUNCE_MS);
+  });
 }
 
 function scheduleLock(current: PanelState): void {
-  if (current.lockTimer !== undefined) {
-    clearTimeout(current.lockTimer);
-  }
-  current.lockTimer = setTimeout(() => {
-    current.lockTimer = undefined;
+  debounce(current, "lockTimer", () => {
     if (alive(current)) {
       void refreshLock(current);
     }
-  }, WATCH_DEBOUNCE_MS);
+  });
 }
 
 /**
@@ -593,13 +567,9 @@ function postOffer(current: PanelState): void {
 }
 
 function scheduleOffer(current: PanelState): void {
-  if (current.offerTimer !== undefined) {
-    clearTimeout(current.offerTimer);
-  }
-  current.offerTimer = setTimeout(() => {
-    current.offerTimer = undefined;
+  debounce(current, "offerTimer", () => {
     postOffer(current);
-  }, WATCH_DEBOUNCE_MS);
+  });
 }
 
 function showError(current: PanelState, error: string): void {
@@ -621,11 +591,7 @@ function redraw(current: PanelState): void {
 }
 
 function flowHost(panel: vscode.WebviewPanel, root: string): ScreenHost<FlowData> {
-  if (panel.options.retainContextWhenHidden !== true) {
-    // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、非表示になった画面へ
-    // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/42_claude/logging.md）
-    diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "flow", retainContextWhenHidden: false });
-  }
+  assertRetained(panel, root, "flow");
   return retainedHost<FlowData>(
     {
       html(text: string): void {
@@ -772,11 +738,9 @@ async function handleMessage(current: PanelState, message: FlowMessage | undefin
     case "check":
       await check(current, message.seq, message.doc);
       return;
-    default: {
-      const unhandled: never = message;
-      void unhandled;
+    default:
+      assertNever(message);
       return;
-    }
   }
 }
 

@@ -28,7 +28,7 @@
 #                           タイムアウト監視つきの git（ccnavi_git_timed・ccnavi_git_refusal）
 #   ccnavi-common-lock.sh   親子のチケットのロック（ccnavi_lock_take・ccnavi_lock_drop など）
 #   ccnavi-common-write-and-push.sh     write-and-push。チケットの状態を書く一連の操作を 1 つにまとめる（ccnavi_wap_*）
-#   ccnavi-common-host.sh   ホスト（GitHub / GitLab）への接続（ccnavi_host_*）
+#   ccnavi-common-host.sh   ホスト（GitHub / GitLab）への接続（ccnavi_host_*）と、時間を区切って実行する ccnavi_run_timed
 #   ccnavi-common-log.sh    診断ログの 4 つ（log_debug / log_info / log_warn / log_error）。標準出力にも
 #                           標準エラーにも何も出さず、`logs/diag/<出どころ>.log` に 1 行足すだけ。
 #                           決まりは ccnavi のリポジトリの docs/42_claude/logging.md

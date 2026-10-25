@@ -142,6 +142,7 @@ review_host() {
 	# の / を - に置き換えたもの（ブランチ名とは違うことがある）。マージリクエストは居るブランチ（branch）で探して作り、
 	# write-and-push の親子のチケット・下書きの名前（実行ファイルと揃える）は識別子で引く。ワークツリーの外なら前どおりブランチ名。
 	family="$branch"
+	review_in_tree=no
 	review_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	if [ -n "$review_top" ]; then
 		review_top_p=$(ccnavi_phys "$review_top")
@@ -150,6 +151,7 @@ review_host() {
 		"$review_root_p"/.claude/worktrees/*)
 			family="${review_top_p#"$review_root_p"/.claude/worktrees/}"
 			family="${family%%/*}"
+			review_in_tree=yes
 			;;
 		esac
 	fi
@@ -585,42 +587,11 @@ refetch() {
 
 account_max_time="${CCNAVI_REVIEW_ACCOUNT_TIMEOUT:-15}"
 
-# timed <秒> <書き先> <コマンド>... 標準出力を書き先へ、標準エラーは破棄する。時間を過ぎたら止めて 1。
-timed() {
-	timed_limit="$1"
-	timed_out="$2"
-	shift 2
-	"$@" </dev/null >"$timed_out" 2>/dev/null &
-	timed_pid=$!
-	# sleep はバックグラウンドで起こして wait で待つ。TERM を受けたら sleep も止めて抜ける（sleep を ppid 1 で残さない）。
-	(
-		exec </dev/null >/dev/null 2>&1
-		timed_sleep=""
-		timed_stop=""
-		# trap は印を立てて、分かっていれば sleep を止めるだけ。抜けるのは本流で、sleep の pid を控えた後に印を見る
-		# （sleep を起こした直後に TERM が来ても、sleep を残さない）。
-		trap 'timed_stop=1; test -z "$timed_sleep" || kill "$timed_sleep"' TERM
-		sleep "$timed_limit" &
-		timed_sleep=$!
-		test -z "$timed_stop" || { kill "$timed_sleep"; exit 0; }
-		wait "$timed_sleep"
-		test -z "$timed_stop" || exit 0
-		kill "$timed_pid"
-	) &
-	timed_dog=$!
-	timed_rc=0
-	wait "$timed_pid" 2>/dev/null || timed_rc=$?
-	kill "$timed_dog" 2>/dev/null || :
-	# 見張りの終了を回収して、シェルに「Terminated」の報告を出させない。
-	wait "$timed_dog" 2>/dev/null || :
-	return "$timed_rc"
-}
-
 account() {
 	if [ "$kind" = github ]; then field=login; else field=username; fi
 	account_out="$state/review-account-$$.json"
 	case "$transport" in
-	gh | glab) timed "$account_max_time" "$account_out" "$CLI" api --hostname "$host" user || : >"$account_out" ;;
+	gh | glab) ccnavi_run_timed "$account_max_time" /dev/null "$account_out" /dev/null "$CLI" api --hostname "$host" user || : >"$account_out" ;;
 	curl)
 		ccnavi_h_max_time="$account_max_time"
 		api GET user >"$account_out" 2>/dev/null || : >"$account_out"

@@ -38,7 +38,6 @@ import { showLoading } from "./loading.js";
 import { copyCommand, copyPrompt, openPromptInSession, runPromptInTerminal } from "./prompt-handover.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { ticketControlOf } from "./core/ticket-control.js";
-import { WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
 import { isTicketId } from "./core/ticket-id.js";
 import { forgetSaved, onWorkflowTabs, staleSaved, workflowTabs } from "./core/workflow-tabs.js";
 import { childWorktreeFailureText, unsavedText, type ApproveWorktree, type ChildWorktreeFailure } from "./core/approvemodel.js";
@@ -47,6 +46,7 @@ import { markTourSeen, tourDue, tourPanelClosed } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 import { noteTicketControl, requireTickets } from "./ticket-control.js";
 import * as diaglog from "./log.js";
+import { assertNever, assertRetained, debounce, watchTickets } from "./panel-common.js";
 
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "board";
@@ -158,10 +158,7 @@ export async function openBoard(project?: string): Promise<void> {
     localResourceRoots: [],
     retainContextWhenHidden: false,
   });
-  if (panel.options.retainContextWhenHidden !== false) {
-    // screenHost は retainContextWhenHidden が偽であることを前提にしている。真だと、非表示になっても画面が破棄されず、表示の有無の読み直しが働かない。診断ログにだけ残す（docs/42_claude/logging.md）
-    diaglog.get("ccnavi-board", folder.uri.fsPath).error("画面の前提が崩れている", { screen: SCREEN, retainContextWhenHidden: true });
-  }
+  assertRetained(panel, folder.uri.fsPath, SCREEN, false);
   showLoading(panel, TITLE, SCREEN, "チケット");
   const current: PanelState = {
     panel,
@@ -234,13 +231,7 @@ function registerPanelHandlers(current: PanelState): void {
     }
   });
 
-  for (const pattern of WATCH_PATTERNS) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
-    watcher.onDidCreate(scheduleUpdate);
-    watcher.onDidChange(scheduleUpdate);
-    watcher.onDidDelete(scheduleUpdate);
-    current.watchers.push(watcher);
-  }
+  current.watchers.push(...watchTickets(folder, scheduleUpdate));
 }
 
 function scheduleUpdate(): void {
@@ -248,15 +239,11 @@ function scheduleUpdate(): void {
   if (current === undefined) {
     return;
   }
-  if (current.timer !== undefined) {
-    clearTimeout(current.timer);
-  }
-  current.timer = setTimeout(() => {
-    current.timer = undefined;
+  debounce(current, "timer", () => {
     if (state === current) {
       void update();
     }
-  }, WATCH_DEBOUNCE_MS);
+  });
 }
 
 /** 実行ファイルを走らせ直して Webview の内容を差し替える */
@@ -494,13 +481,11 @@ function handleMessage(message: BoardMessage | undefined): void {
         void makeTemplateDraft(current, message.ticket);
       }
       return;
-    default: {
+    default:
       // `BoardMessage` に操作を足したのに、ここに処理を書いていなければ型が合わなくなる。
       // 画面のボタンだけ足して受け側を書き忘れるのを防ぐ
-      const unhandled: never = message;
-      void unhandled;
+      assertNever(message);
       return;
-    }
   }
 }
 
@@ -633,11 +618,9 @@ async function runMergeEffect(current: PanelState, effect: MergeEffect): Promise
     case "warn":
       vscode.window.showWarningMessage(effect.text);
       return;
-    default: {
-      const unhandled: never = effect;
-      void unhandled;
+    default:
+      assertNever(effect);
       return;
-    }
   }
 }
 
@@ -763,12 +746,10 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
     case "refresh":
       void update();
       return;
-    default: {
+    default:
       // `ApprovalEffect` に足したのに、ここに書いていなければ型が合わなくなる
-      const unhandled: never = effect;
-      void unhandled;
+      assertNever(effect);
       return;
-    }
   }
 }
 

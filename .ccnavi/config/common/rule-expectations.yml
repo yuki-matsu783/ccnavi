@@ -269,6 +269,27 @@ ask:
     subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --adopt --base feature/x"
     why: 記録の無い既存のワークツリーの引き取りも、ユーザの確認を経る（direct-worktree-confirm）
   - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --adopt --base feature/x --dry-run"
+    why: >-
+      --dry-run は何も書かない確認なので、--adopt があってもダイアログに出しません（direct-worktree-confirm の except）。
+      どのルールも言及せず、権限モードへ渡ります。
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --base feature/x --accept 7f3a9c21 --dry-run"
+    why: --dry-run が最後にあっても同じです。何も書かない確認は、ダイアログに出しません
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --adopt --base feature/x && sh /repo/other.sh y --dry-run"
+    why: >-
+      別のコマンドの --dry-run では除外されません。除外はコマンドの境界を越えず、ccnavi-worktree.sh の
+      呼び出しの中の --dry-run だけを見ます（direct-worktree-confirm）
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --base feature/x && sh /repo/.ccnavi/scripts/ccnavi-worktree.sh y --dry-run"
+    why: >-
+      同じスクリプトの別の呼び出しに --dry-run があっても除外されません。--dry-run のある呼び出しは確認の対象外ですが、
+      --base のある呼び出しは対象のままです（direct-worktree-confirm）
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh y --dry-run && sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --base feature/x"
+    why: 順を入れ替えても同じです（direct-worktree-confirm）
+  - tool: Bash
     subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x"
     why: >-
       指定の無い呼び出しは direct-worktree-confirm にヒットしない。どのルールも言及せず権限モードへ渡る。

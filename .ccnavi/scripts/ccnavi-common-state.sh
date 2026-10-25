@@ -324,8 +324,8 @@ ccnavi_push_gate() {
 #
 # 認証を尋ねさせず（GIT_TERMINAL_PROMPT=0・GCM_INTERACTIVE=never、ssh は BatchMode）、<秒> で切る。
 # ssh の BatchMode は、ユーザが GIT_SSH_COMMAND・GIT_SSH・core.sshCommand を持っていればそちらを尊重する。
-# タイムアウト監視の出力は破棄する（つないだままだと、監視の sleep が終わるまで呼ぶ側の `$( )` が閉じない）。
-# 戻り値は git のもの（切ったときは 0 でない）。標準出力は、呼ぶ側がリダイレクトする。
+# git 用の環境を前置きする薄い層。時間の監視は ccnavi_run_timed（ccnavi-common-host.sh）に任せる。
+# 戻り値は git のもの。時間切れで切ったときは 124（ccnavi_run_timed と同じ）。標準出力は呼ぶ側がリダイレクトする。
 ccnavi_git_timed() {
 	ccnavi_gt_limit="$1"
 	ccnavi_gt_err="$2"
@@ -338,39 +338,14 @@ ccnavi_git_timed() {
 		ccnavi_gt_ssh="ssh -o BatchMode=yes"
 	fi
 	if [ -n "$ccnavi_gt_ssh" ]; then
-		GIT_SSH_COMMAND="$ccnavi_gt_ssh" GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never LC_ALL=C \
-			git -C "$ccnavi_gt_repo" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 "$@" \
-			</dev/null 2>"$ccnavi_gt_err" &
+		ccnavi_run_timed "$ccnavi_gt_limit" /dev/null - "$ccnavi_gt_err" \
+			env GIT_SSH_COMMAND="$ccnavi_gt_ssh" GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never LC_ALL=C \
+			git -C "$ccnavi_gt_repo" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 "$@"
 	else
-		GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never LC_ALL=C \
-			git -C "$ccnavi_gt_repo" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 "$@" \
-			</dev/null 2>"$ccnavi_gt_err" &
+		ccnavi_run_timed "$ccnavi_gt_limit" /dev/null - "$ccnavi_gt_err" \
+			env GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never LC_ALL=C \
+			git -C "$ccnavi_gt_repo" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 "$@"
 	fi
-	ccnavi_gt_pid=$!
-	# タイムアウト監視の中で標準入出力を先に閉じる（呼ぶ側のパイプを開いたまま残らないように）。
-	# sleep はバックグラウンドで起こして wait で待つ。TERM を受けたら sleep も止めて抜ける（sleep を ppid 1 で残さない）。
-	(
-		exec </dev/null >/dev/null 2>&1
-		ccnavi_gt_sleep=""
-		ccnavi_gt_stop=""
-		# trap は印を立てて、分かっていれば sleep を止めるだけ。抜けるのは本流で、sleep の pid を控えた後に印を見る
-		# （sleep を起こした直後に TERM が来ても、sleep を残さない）。
-		trap 'ccnavi_gt_stop=1; test -z "$ccnavi_gt_sleep" || kill "$ccnavi_gt_sleep"' TERM
-		sleep "$ccnavi_gt_limit" &
-		ccnavi_gt_sleep=$!
-		test -z "$ccnavi_gt_stop" || { kill "$ccnavi_gt_sleep"; exit 0; }
-		wait "$ccnavi_gt_sleep"
-		test -z "$ccnavi_gt_stop" || exit 0
-		kill "$ccnavi_gt_pid"
-	) &
-	ccnavi_gt_dog=$!
-	ccnavi_gt_rc=0
-	wait "$ccnavi_gt_pid" 2>/dev/null || ccnavi_gt_rc=$?
-	kill "$ccnavi_gt_dog" 2>/dev/null || :
-	# 見張りの終了を回収して、シェルに「Terminated」の報告を出させない。
-	wait "$ccnavi_gt_dog" 2>/dev/null || :
-	ccnavi_gt_dog=""
-	return "$ccnavi_gt_rc"
 }
 
 # git が拒んだ理由を 1 行にする（ccnavi-fetch.sh と ccnavi-sync.sh の文面）。<標準エラーを書いたファイル>

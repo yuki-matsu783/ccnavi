@@ -35,8 +35,7 @@ import sys
 import tempfile
 import unittest
 
-from tests import ROOT, SRC, common_path, config_path
-from tests.sh import host_stub
+from tests import ROOT, SRC, common_path, config_path, host_stub
 from tests.ticketsample import PHASES, RULES, child_text, parent_text
 
 SHELL = shutil.which("sh") or shutil.which("bash")

@@ -439,9 +439,12 @@ def run(
         f"次: {path} の rationale と、見出しの下の目印（「（ここに〜を書く）」）を実際の内容に"
         "書き換える。目印が残っていると承認で止まる。"
         f"allow を実際の作業に合わせて絞る・足す。{tail}"
+        f"子の提案（'{ident}-<フェーズ番号 2 桁>-<連番 2 桁>'。例: '{ident}-01-01'）も"
+        "同じ承認で通すため、先に手で書く。"
         f"書けたら '{launcher} --lint' で確かめ、"
         f"'{launcher} --agree --preview --verify {ident}' が通ったら、"
-        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} propose {ident}' で"
+        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} propose {ident}'"
+        "（親の識別子で打つ。子の識別子では打たない）で"
         "提案を親のブランチへ送り、"
         "承認をユーザに頼んで返事を待つ。承認が済むまで実装はしない\n"
     )

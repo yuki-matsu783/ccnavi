@@ -206,7 +206,7 @@ def _regular_md(directory: str) -> list[str]:
 
 
 def _fields(data: bytes | None) -> donecopy.DoneCopy | None:
-    """チケットの識別子・親・着手と取り消しの欄（チケットとしての検査は掛けない）。"""
+    """チケットの識別子と親を返す。チケットとしての検査はしない。"""
     if data is None:
         return None
     try:
@@ -230,7 +230,7 @@ def archived_name(root: str, project: str, ident: str) -> str | None:
 
 
 def archived_fields(root: str, project: str, ident: str) -> donecopy.DoneCopy | None:
-    """退避の `done/<識別子>.md` の識別子・親・着手と取り消しの欄。無い・読めない・リンクなら None。
+    """退避の `done/<識別子>.md` の識別子と親を返す。無い・読めない・リンクのときは None。
 
     大文字小文字だけが違う識別子も同じものとして引く（区別しないファイルシステムでは、ブランチと
     ワークツリーの名前がぶつかるため。使い回しの検査を緩めない向き）。

@@ -8,7 +8,7 @@ sh と同じ道具を使わないほうが、片方の不具合がもう片方�
 
 ## 用意するもの
 
-- 動いている GitLab（既定 `http://localhost:8929`。`CCNAVI_PROBE_GITLAB` で変える）。
+- 動いている GitLab（既定 `http://127.0.0.1:8929`。`CCNAVI_PROBE_GITLAB` で変える）。
   `tests/manual/gitlab/docker_gitlab.py up` で立てる（手順は docs/42_claude/gitlab-manual.md）
 - トークン 2 本（`GITLAB_TOKEN`（root、エージェント役）と
   `CCNAVI_PROBE_REVIEWER_TOKEN`（人間役））。

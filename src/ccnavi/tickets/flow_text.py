@@ -11,42 +11,14 @@ import unicodedata
 # 1 行に載せる文の長さの上限。
 TEXT_LIMIT = 120
 
-# フローの文の中で ccnavi の接頭辞を真似させない。`[` / `［` の直後が（互換文字・書式の制御・
-# 結合文字・似た形の字をそろえて）`ccnavi` で始まる括弧は、亀甲括弧 `〔…〕` に置き換える。
+# フローの文に ccnavi の接頭辞を真似させない。大文字小文字・空白・結合文字・書式の制御を無視して、
+# `[` の直後が `ccnavi` で始まる括弧は、亀甲括弧 `〔…〕` に置き換える。
+# キリル文字・全角の括弧など、見た目だけが似た別の字には対応しない。ASCII の素の混入だけを中和する。
 _BADGE_WORD = "ccnavi"
 _BADGE_OPEN = "〔"
 _BADGE_CLOSE = "〕"
 # 括弧の閉じを探す範囲（元の文字数）。
 _BADGE_REACH = 64
-# ラテン文字に似た形の字（キリル・ギリシャ・アルメニアなど）。`ccnavi` の表記に要る字だけ。
-_CONFUSABLE = {
-    "\u0441": "c",  # с キリル
-    "\u0421": "c",  # С
-    "\u03f2": "c",  # ϲ ギリシャ
-    "\u03f9": "c",  # Ϲ
-    "\u217d": "c",  # ⅽ
-    "\u0430": "a",  # а キリル
-    "\u0410": "a",  # А
-    "\u03b1": "a",  # α
-    "\u0391": "a",  # Α
-    "\u043f": "n",  # п キリル（小文字の n に似る）
-    "\u0578": "n",  # ո アルメニア
-    "\u03b7": "n",  # η
-    "\u0274": "n",  # ɴ
-    "\u03bd": "v",  # ν ギリシャ
-    "\u0475": "v",  # ѵ キリル
-    "\u0474": "v",  # Ѵ
-    "\u2174": "v",  # ⅴ
-    "\u0456": "i",  # і キリル
-    "\u0406": "i",  # І
-    "\u03b9": "i",  # ι
-    "\u0399": "i",  # Ι
-    "\u0131": "i",  # ı
-    "\u04cf": "i",  # ӏ
-    "\u2170": "i",  # ⅰ
-    "\u217c": "i",  # ⅼ
-    "\u01c0": "i",  # ǀ
-}
 # 案内の区切りの行に似せた文。フローの文の中に出たら置き換える。
 # プロジェクトのスキルの目録（projskills.FENCE_OPEN / FENCE_CLOSE）の区切りも同じく置き換える。
 _FENCE_PHRASES = (
@@ -97,23 +69,24 @@ def _line(value) -> str:
     return shown
 
 
-_IGNORED = ("Mn", "Mc", "Me", "Cf", "Cc", "Zs")
+_MARKS = ("Mn", "Mc", "Me")
+_IGNORED = (*_MARKS, "Cf", "Cc", "Zs")
 
 
 def _skeleton(text: str) -> tuple[str, list[int]]:
-    """見た目で比べるための表記と、その 1 字ずつの元の位置。
+    """比べるための表記と、表記の 1 字ごとの元の位置を返す。
 
-    互換分解（NFKD。全角の `［` は `[`、`ⅽ` は `c`）し、結合文字・書式の制御・制御文字・
-    空白を除き、似た形の字（`_CONFUSABLE`）をラテン文字に置き換え、大文字小文字をそろえる。
+    1 字ずつ正準分解（NFD）して、正準等価（NFC と NFD）の違いをそろえる。結合文字・書式の制御・
+    制御文字・空白を除き、大文字小文字をそろえる。
     """
     chars: list[str] = []
     origin: list[int] = []
     for i, ch in enumerate(text):
-        for part in unicodedata.normalize("NFKD", ch):
+        for part in unicodedata.normalize("NFD", ch):
             if part.isspace() or unicodedata.category(part) in _IGNORED:
                 continue
-            for folded in _CONFUSABLE.get(part, part).casefold():
-                chars.append(_CONFUSABLE.get(folded, folded))
+            for folded in part.casefold():
+                chars.append(folded)
                 origin.append(i)
     return "".join(chars), origin
 
@@ -121,9 +94,8 @@ def _skeleton(text: str) -> tuple[str, list[int]]:
 def _neutral(text: str) -> str:
     """フローの文が ccnavi の知らせや案内の区切りに見えないようにする。
 
-    - `[` / `［`（互換文字も）の直後が `ccnavi` で始まる括弧は、開きと、その先の最初の閉じ
-      （`]` / `］`）を `〔` `〕` に置き換える。`[ccnavi dry-run]`・`[CCNAVI]`・幅の無い字や
-      結合文字を挟んだもの・キリル文字の `с` で書いたものも同じ
+    - `[` の直後が `ccnavi` で始まる括弧は、開きと、その先の最初の閉じ `]` を `〔` `〕` にする。
+      `[ccnavi dry-run]`・`[CCNAVI]`・空白や結合文字を挟んだものも同様に扱う
     - 案内の区切りの行の文（`_FENCE_PHRASES`）は `_FENCE_SHOWN` に置き換える
     """
     skeleton, origin = _skeleton(text)
@@ -143,6 +115,8 @@ def _neutral(text: str) -> str:
         at = skeleton.find(needle)
         while at >= 0:
             first, last = origin[at], origin[at + len(needle) - 1]
+            while last + 1 < len(text) and unicodedata.category(text[last + 1]) in _MARKS:
+                last += 1  # 末尾の文字に付いた結合文字（分解した濁点など）も置き換えに含める
             replace[first] = _FENCE_SHOWN
             for i in range(first + 1, last + 1):
                 replace[i] = ""
@@ -150,14 +124,6 @@ def _neutral(text: str) -> str:
     if not replace:
         return text
     return "".join(replace.get(i, ch) for i, ch in enumerate(text))
-
-
-def impersonates(text: str) -> bool:
-    """文に ccnavi の接頭辞か案内の区切りに見える箇所が残っているか。テストと確かめ用。"""
-    skeleton, _ = _skeleton(text)
-    if any(_skeleton(p)[0] in skeleton for p in _FENCE_PHRASES):
-        return True
-    return f"[{_BADGE_WORD}" in skeleton
 
 
 def _dict(value) -> dict:
