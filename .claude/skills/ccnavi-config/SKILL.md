@@ -44,13 +44,13 @@ ccnavi の判定と進め方は 3 本のファイルで決まる。どれもユ�
 
 | 言われたこと | 読むもの |
 |---|---|
-| 足す・直す・新しく書く（「ルールを足して」「フェーズに調査を入れたい」「配点を変えたい」） | [references/add.md](references/common/add.md) |
-| 確かめる・疑う（「効いているか見て」「lint して」「期待する判定を回して」） | [references/check.md](references/common/check.md) |
+| 足す・直す・新しく書く（「ルールを足して」「フェーズに調査を入れたい」「配点を変えたい」） | [references/common/add.md](references/common/add.md) |
+| 確かめる・疑う（「効いているか見て」「lint して」「期待する判定を回して」） | [references/common/check.md](references/common/check.md) |
 
 足したあとは必ず確かめる側も通る。どちらか決まらないときだけユーザに聞く。
 
 条件の組み合わせは 1 本の regex に詰めない。「ここは除く」だけなら `except:`、「A か B」「A かつ B」のような
-組み合わせなら `when:` で書く。書き方と使い分けは [references/add.md](references/common/add.md) の rules.yml の節。
+組み合わせなら `when:` で書く。書き方と使い分けは [references/common/add.md](references/common/add.md) の rules.yml の節。
 
 ## 絶対ルール
 

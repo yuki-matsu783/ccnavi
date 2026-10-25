@@ -154,12 +154,12 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `main.py` | 配布物の入口。PyInstaller が渡すスクリプト |
 | `src/ccnavi/__main__.py` | `python -m ccnavi` の入口。サブパッケージは役割ごとに 6 つで、読む向きは infra < records < policy < tickets < hook < entry（`tests/core/test_module_layers.py` が見る） |
 | `build.py` | 配布物の組み立て。`dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へコピーする |
-| `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトと使い方の文書（`.ccnavi/docs/*.md`）と共通のテンプレート（`.ccnavi/config/common/templates/*.yml`）と共通の工程スキル（`.claude/skills/` のうち `process: true` を持つもの。`SKILL.md` と `references/common/` の下の `.md` だけ）を配る |
+| `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトと使い方の文書（`.ccnavi/docs/*.md`）と共通のテンプレート（`.ccnavi/config/common/templates/*.yml`）と共通の工程スキル（`.claude/skills/` のうち `process: true` か `distribute: true` を持つもの。`SKILL.md` と `references/common/` の下の `.md` だけ）を配る |
 | `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。整形と検査、ターンの終わりのテスト |
 | `.claude/hooks/check-adr.sh` | 同じく ADR の番号の重なりと置き場の間違いを、書いた直後に止める |
 | `.claude/hooks/mark-ext.sh` / `test-ext.sh` | 同じく拡張のぶん。触ったことの書き残しと、ターンの終わりに関わるグループだけ回すテスト |
 | `extensions/vscode/ccnavi-board/scripts/test-groups.js` | 拡張のテストの入口。触ったファイルから回すグループを決め、コンパイルは 1 回で済ませる |
-| `.claude/skills/` | このリポジトリのスキル。設定 3 本を足す・確かめる `ccnavi-config`、ccnavi を入れる・更新する `ccnavi-install`、コミットの手順 `commit`、気づきを記録に足す `learn`、図解の説明 `eli5` / `eli10`、文章の推敲 `yomiyasu`、工程の考え方の入口 `process-*`（`process: true` のものは `scripts/ccnavi-setup.sh` が配る） |
+| `.claude/skills/` | このリポジトリのスキル。設定 3 本を足す・確かめる `ccnavi-config`、ccnavi を入れる・更新する `ccnavi-install`、コミットの手順 `commit`、気づきを記録に足す `learn`、図解の説明 `eli5` / `eli10`、文章の推敲 `yomiyasu`、工程の考え方の入口 `process-*`（`process: true` と `distribute: true` のものは `scripts/ccnavi-setup.sh` が配る） |
 | `.ccnavi/scripts/` | 配布する sh。一覧と役割は[配布するスクリプト](41_guide/scripts.md) |
 | `scripts/ccnavi-install.sh` | ccnavi を入れる入口。状況を調べ（`ccnavi-doctor.sh`）、入れる先に配り（`ccnavi-setup.sh`）、最後に lint で確かめる |
 | `scripts/ccnavi-doctor.sh` | 入れる前に、この機械の状況を調べて 1 項目 1 行で報告する。何も書き換えない |
