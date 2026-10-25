@@ -112,6 +112,35 @@ class FakeGitlabTest(unittest.TestCase):
             conn.request("GET", "/api/v4/version")
             conn.getresponse().read()
 
+    def test_a_rejected_request_with_a_body_does_not_break_the_next_one_on_the_connection(self):
+        server = self.start()
+        conn = http.client.HTTPConnection("127.0.0.1", server.port, timeout=5)
+        self.addCleanup(conn.close)
+        path = f"/api/v4/projects/{ENC}/merge_requests"
+        conn.request("POST", path, body='{"title": "x"}', headers={"PRIVATE-TOKEN": "wrong"})
+        res = conn.getresponse()
+        res.read()
+        self.assertEqual(res.status, 401)
+        conn.request("GET", "/api/v4/version")
+        res = conn.getresponse()
+        res.read()
+        self.assertEqual(res.status, 200)
+
+    def test_a_missing_mr_is_a_404_not_a_dropped_connection(self):
+        server = self.start()
+        base = f"/api/v4/projects/{ENC}/merge_requests/9"
+        for method, path in (
+            ("GET", base),
+            ("PUT", base),
+            ("GET", base + "/discussions"),
+            ("POST", base + "/discussions"),
+            ("GET", base + "/reviewers"),
+            ("GET", base + "/notes"),
+            ("PUT", base + "/merge"),
+        ):
+            with self.subTest(method=method, path=path):
+                self.assertEqual(call(server, method, path)[0], 404)
+
     def test_the_server_does_not_wait_for_handler_threads(self):
         # stop が返る理由を固定する。block_on_close が True だと、接続のスレッドの終わりを待つ
         server = self.start()
