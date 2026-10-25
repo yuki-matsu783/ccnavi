@@ -26,6 +26,7 @@ keywords: [工程スキル, reference, references, skill-reference, 入口, proc
 - スキル名は `process-` に続けて、対応するフェーズ定義の id と同じ語を置く（対応するフェーズ定義が無いものは `process-debug` のように工程の語を置く）。`process-` は、組み込みや各自が作ったスキルと名前が重ならないようにするための印で、SKILL.md の frontmatter の `process: true` とは別。フェーズ定義の id を足したり改めたりするときは、この表も見る
 - 本文は「基本の考え方」の短い列と、引き方の一文だけにする。細かい手順は書かない
 - 既存のスキル（`commit` `ccnavi-config` `eli5` `eli10` `yomiyasu`）はこの決まりの対象外。直し方は `skill-review.md` のとおり
+- 配布先にも配るだけのスキル（`ccnavi-config`）は、SKILL.md の frontmatter に `distribute: true` を持つ。配るのは `SKILL.md` と `references/common/` の下の `.md` だけで、工程スキルと同じ範囲。工程スキルではないので、プロジェクトの `skills/` へはコピーされない。配布先で辿れないパス（配布元の `docs/` や `src/`、`uv run`）は書かない
 - 工程スキルを増やすのは、既存のどの工程にも該当しない作業が繰り返し出たときだけ。ユーザの承認を取る
 
 ## reference の置き場

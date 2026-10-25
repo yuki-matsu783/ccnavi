@@ -137,11 +137,12 @@ DEPLOY_DOCS_DIR=".ccnavi/docs"
 # 一部なので、設定 3 本と同じく .ccnavi/config/common/ の下へ配る。配布元に置き場が無い、または
 # *.yml が 1 本も無いのは正常（共通のテンプレートはまだ無いことがある）で、何も言わずに飛ばす。
 DEPLOY_TEMPLATES_DIR=".ccnavi/config/common/templates"
-# 共通の工程スキル。配布元の .claude/skills/ の中で、SKILL.md の frontmatter に `process: true` を持つ
-# スキルだけを配る（.ccnavi/docs/skill-processes.md）。配るのは SKILL.md と references/common/ の下の .md。
+# 配布先へ配るスキル。配布元の .claude/skills/ の中で、SKILL.md の frontmatter に `process: true`（共通の工程スキル）
+# か `distribute: true`（配るだけのスキル。ccnavi-config）を持つものだけを配る（.ccnavi/docs/skill-processes.md）。
+# 配るのは SKILL.md と references/common/ の下の .md。`distribute: true` のスキルは、ユーザの発言のときの同期の対象ではない。
 # references/project/ は配布元固有の事情なので配らない。ユーザの発言のときの同期は、ワークスペースのこの置き場から
 # プロジェクトの skills/<工程>/ へコピーするので、配布先のワークスペースに無いとコピーする元が無い。
-# commit や yomiyasu のような `process: true` を持たないスキルは、配布元固有の手順や外部の取り込みなので配らない。
+# commit や yomiyasu のような どちらの印も持たないスキルは、配布元固有の手順や外部の取り込みなので配らない。
 # 配布元に置き場が無い、または該当するスキルが 1 つも無いのは正常で、何も言わずに飛ばす。
 DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-common.sh は、3 本の sh が `.` で読み込む共通部分の入口。入口は同じディレクトリの部品
@@ -240,8 +241,8 @@ CCNAVI_ENTRY_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）
 .ccnavi/config/common/risks.yml、.ccnavi/config/common/phases.yml。自身のレイヤーの .ccnavi/config/project/phases.yml は
 配らず、既にあれば触らない。フェーズ定義は 2 本の和で判定する）・代わりに通る sh と振り分けの sh
 （.ccnavi/scripts/）・使い方の文書（.ccnavi/docs/*.md）・共通の作業・レビュー計画のテンプレート
-（.ccnavi/config/common/templates/*.yml。配布元に無ければ配らない）・共通の工程スキル
-（.claude/skills/ のうち SKILL.md に process: true を持つもの。SKILL.md と references/common/ の下の .md だけで、
+（.ccnavi/config/common/templates/*.yml。配布元に無ければ配らない）・共通の工程スキルと配るだけのスキル
+（.claude/skills/ のうち SKILL.md に process: true か distribute: true を持つもの。SKILL.md と references/common/ の下の .md だけで、
 references/project/ は配らない）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
 --docs の索引（**/ccnavi-index.jsonl）は、配布先の .gitignore に足す（ccnavi-index.jsonl を否定する
 行があれば足さない）。
@@ -532,20 +533,20 @@ skills_todo=""
 skills_skipped=""
 skills_blocked=""
 
-# 配布元のスキルが、frontmatter に `process: true` を持つか。先頭の `---` から閉じの `---` までの
+# 配布元のスキルが、frontmatter に `process: true` か `distribute: true` を持つか。先頭の `---` から閉じの `---` までの
 # 間に、その 1 行（行末の `# コメント`は可）があるものだけを適用する。ユーザの発言のときの同期がコピーする判定
-# （src/ccnavi/tickets/skillsync.py の _process_flag）に寄せてある。CRLF の改行と、`---` の前後の空白は
+# （src/ccnavi/tickets/skillsync.py の _process_flag。`process` の側）に寄せてある。CRLF の改行と、`---` の前後の空白は
 # 許し、閉じの `---` が無いもの、BOM 付き、文字列の "true"、本文だけにあるものは適用しない。
 # SKILL.md 自体がリンクのものは、skillsync と同じく適用しない。
-# 書き方は文書どおりの `process: true` だけを見る。`process: yes` のような別の綴りは、skillsync は
-# 真と読むが、ここでは適用しない（配り漏れは、まだ無いものにも出ない。文書は `process: true` と書く）。
-is_process_skill() {
+# 書き方は文書どおりの `process: true` と `distribute: true` だけを見る。`process: yes` のような別の綴りは、
+# skillsync は真と読むが、ここでは適用しない（配り漏れは、まだ無いものにも出ない。文書は `true` と書く）。
+is_deployed_skill() {
 	{ [ -f "$1" ] && [ ! -L "$1" ]; } || return 1
 	awk '
 		{ sub(/\r$/, "") }
 		NR == 1 { if ($0 !~ /^[ \t]*---[ \t]*$/) { exit } open = 1; next }
 		$0 ~ /^[ \t]*---[ \t]*$/ { closed = 1; exit }
-		$0 ~ /^process:[ \t]*true([ \t]+#.*)?[ \t]*$/ { found = 1 }
+		$0 ~ /^(process|distribute):[ \t]*true([ \t]+#.*)?[ \t]*$/ { found = 1 }
 		END { exit (open && closed && found) ? 0 : 1 }
 	' "$1"
 }
@@ -815,13 +816,13 @@ if [ -n "$deploy" ]; then
 		done
 	fi
 
-	# 共通の工程スキル。置き場が無いか、該当するスキルが無ければ、何も配らず何も言わない。
+	# 配布先へ配るスキル。置き場が無いか、該当するスキルが無ければ、何も配らず何も言わない。
 	if [ -d "$source_root/$DEPLOY_SKILLS_DIR" ]; then
 		for skill_path in "$source_root/$DEPLOY_SKILLS_DIR"/*; do
 			skill_name=$(basename "$skill_path")
 			# スキルのディレクトリ自体がリンクのものは配らない（配布元の外を読んでしまうため）。
 			{ [ -d "$skill_path" ] && [ ! -L "$skill_path" ]; } || continue
-			is_process_skill "$skill_path/SKILL.md" || continue
+			is_deployed_skill "$skill_path/SKILL.md" || continue
 			case "$skill_name" in
 			*[!A-Za-z0-9._-]*)
 				skills_skipped="$skills_skipped$skill_name
@@ -1443,11 +1444,11 @@ report_deploy() {
 		printf '%s' "$templates_skipped" | sed 's/^/  /'
 	fi
 	if [ -n "$skills_blocked" ]; then
-		printf '配布先の道にディレクトリでないものがある、または配り先がディレクトリなので配っていない共通の工程スキル:\n'
+		printf '配布先の道にディレクトリでないものがある、または配り先がディレクトリなので配っていないスキル:\n'
 		printf '%s' "$skills_blocked" | sed 's/^/  /'
 	fi
 	if [ -n "$skills_skipped" ]; then
-		printf '名前に使えない文字があるので配っていない共通の工程スキル（英数字と . _ - だけ。ファイルは / も可）:\n'
+		printf '名前に使えない文字があるので配っていないスキル（英数字と . _ - だけ。ファイルは / も可）:\n'
 		printf '%s' "$skills_skipped" | sed 's/^/  /'
 	fi
 	if [ -n "$ignore_todo" ]; then
@@ -2166,7 +2167,7 @@ IFS='
 set -f
 for skill_rel in $skills_all; do
 	if [ ! -f "$root/$DEPLOY_SKILLS_DIR/$skill_rel" ]; then
-		note_missing "${DEPLOY_SKILLS_DIR}/${skill_rel}（共通の工程スキル。ユーザの発言のときの同期がプロジェクトへコピーする元）"
+		note_missing "${DEPLOY_SKILLS_DIR}/${skill_rel}（配布するスキル。工程スキルは、ユーザの発言のときの同期がプロジェクトへコピーする元）"
 	fi
 done
 set +f
