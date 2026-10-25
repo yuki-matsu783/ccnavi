@@ -8,6 +8,8 @@ keywords: [手動確認, 拡張開発ホスト, F5, Developer: Reload Window, �
 
 [設計の入口に戻る](../design.md)
 
+本物の VS Code の画面を撮って日本語ユーザ目線で確かめる手順は、[実画面で日本語ユーザ目線を確かめる](real-screen-check.md)にある。
+
 ## 拡張開発ホストで動かす
 
 1. `pnpm install && pnpm run compile`
