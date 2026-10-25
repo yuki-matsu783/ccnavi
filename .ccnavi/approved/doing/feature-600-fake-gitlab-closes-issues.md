@@ -22,6 +22,8 @@ allow:
     glob: "tests/sh/test_fake_gitlab.py"
   - match: Write|Edit
     glob: "tests/sh/gitlab_host.py"
+started_at: "2026-10-25T19:42:49+0900"
+base_sha: "8d9494afd295a1be0dee15f532e971ab7150233c"
 ---
 ## 目的
 
