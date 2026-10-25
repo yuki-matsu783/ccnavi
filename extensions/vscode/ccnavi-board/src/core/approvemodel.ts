@@ -113,10 +113,10 @@ export function summarize(preview: ApprovePreview): ApproveSummary {
   const kinds = [`親 ${parents} 件`, `子 ${batch.length - parents} 件`, ...(revisions > 0 ? [`改版 ${revisions} 件`] : [])];
   const revised = new Set(batch.filter((b) => b.revision).map((b) => b.ticket));
   const plans = preview.plans.map((plan) => {
-    // 番号順に並べるだけ。計画は先行関係なので、並列のステップがあり、矢印では書かない
+    // 番号順に並べるだけにする。計画は先行関係で並列のステップもあるため、矢印では書かない
     const names = [...plan.items].sort((a, b) => a.number - b.number).map((item) => item.title || item.type);
     const label = PART_LABELS[plan.part] ?? plan.part;
-    return `${plan.ticket}${revised.has(plan.ticket) ? "（改版）" : ""} の${label} ${names.length} ステップ（${names.join("・")}）`;
+    return `${plan.ticket}${revised.has(plan.ticket) ? "（改版）" : ""}の${label} ${names.length} ステップ（${names.join("・")}）`;
   });
   return { tickets: `承認するチケット ${batch.length} 件（${kinds.join("・")}）`, plans };
 }

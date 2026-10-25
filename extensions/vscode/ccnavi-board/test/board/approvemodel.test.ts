@@ -298,7 +298,7 @@ test("CB-T1220 承認の要約は batch と plans から作る（件数・part �
   });
   const revised = { ...base, batch: base.batch.map((b) => (b.parent === null ? { ...b, revision: true } : b)) };
   assert.match(summarize(revised).tickets, /改版 1 件/);
-  assert.match(summarize(revised).plans[0], /^i0001（改版） の全体計画/);
+  assert.match(summarize(revised).plans[0], /^i0001（改版）の全体計画/);
   assert.deepEqual(summarize({ ...base, plans: [] }).plans, []);
   assert.equal(summarize({ ...base, batch: [], plans: [] }).tickets, "");
 });
