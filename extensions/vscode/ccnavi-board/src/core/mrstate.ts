@@ -46,10 +46,6 @@ const OPEN_WORDS = 4;
 const SETTLED_WORDS = 3;
 const UNKNOWN_MIN_WORDS = 3;
 
-function firstLine(text: string): string {
-  return text.split("\n")[0]?.replace(/\r$/, "") ?? "";
-}
-
 function unknown(reason: UnknownKind, detail: string): MrStateResult {
   return { kind: "unknown", reason, detail };
 }
