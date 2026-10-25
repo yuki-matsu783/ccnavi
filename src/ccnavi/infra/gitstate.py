@@ -250,6 +250,12 @@ def committed(top: str, base: str, timeout: float = TIMEOUT_SECONDS) -> tuple[li
     作業し、`merge <統合先>` を打ってから統合先へ取り込むのがこのリポジトリの手順なので、
     それを打つたびに、ユーザが統合先で直した保護領域が毎回報告に並ぶ。
 
+    `--no-merges` はマージが持ち込むコミットしか外せない。`pull --ff-only`・`checkout <上流>`・
+    `reset --hard <上流>` は fast-forward で、上流の通常コミットがそのまま first-parent の列に入る。
+    そこで `--not --remotes` を足し、リモート追跡ブランチに入っているコミット（上流から取り込んだもの）
+    を外す。未 push のコミット（このツリーで作ったもの）だけが残る。リモートが無ければ何も外れない。
+    reflog は読まない（git の呼び出しが増え、分類も増える）。残る穴は docs/21_design/post-check.md。
+
     `--no-renames` と `--ignore-submodules=none` は phase_scope.scope_findings と同じ理由。
     改名を 1 行にまとめられると移動元が消え、submodule の進みは `.gitmodules` の
     `ignore = all` で丸ごと消える。どちらも差分から行が消える経路になる。
@@ -268,6 +274,8 @@ def committed(top: str, base: str, timeout: float = TIMEOUT_SECONDS) -> tuple[li
             "--ignore-submodules=none",
             "-z",
             f"{base}..HEAD",
+            "--not",
+            "--remotes",
         ],
         timeout,
     )
