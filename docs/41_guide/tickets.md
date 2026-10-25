@@ -68,7 +68,7 @@ keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケッ�
 - 番号は issue の番号（通し番号は直接作業のワークツリー名だけに使う）。slug には日本語も指定できる。issue の題が長いと、`ccnavi-start.sh --issue` は名前を作らずに止まり、エージェントが短い英語の `--slug` を考えて打ち直す。`--slug` で渡す語は小文字・数字・ハイフンだけ。Chrome 拡張の「始める」は、題から作った名前を語の区切りで切って進む
 - 子の識別子は `<親>-<2 桁のフェーズ番号>-<2 桁のフェーズ内の連番>`。ワークツリーの名前は識別子と同じ
 
-提案の書式は [.ccnavi/docs/proposal-format.md](../../.ccnavi/docs/proposal-format.md)（配布先にも配る）、親のワークツリーの扱い、深さと件数の上限は [設計 9.3](../21_design/tickets/proposal-format.md)。ワークツリーの名前の決まりは [.ccnavi/docs/worktree.md](../../.ccnavi/docs/worktree.md)。
+提案の書式は [.ccnavi/docs/proposal-format.md](../../.ccnavi/docs/proposal-format.md)（配布先にも配る）。親のワークツリーの扱いと、深さと件数の上限は [設計 9.3](../21_design/tickets/proposal-format.md) にある。ワークツリーの名前の決まりは [.ccnavi/docs/worktree.md](../../.ccnavi/docs/worktree.md)。
 提案はエージェントが書くので、ユーザが frontmatter を直接書くことはほとんどない。ユーザが見るのは承認の画面である。
 
 ## 効くのは承認したものだけ
