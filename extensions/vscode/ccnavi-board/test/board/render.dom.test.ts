@@ -473,7 +473,7 @@ test("CB-T132r 「要対応のみ」の絞り込みを出し、カードに要�
     const label = page.one("label.filter.attention");
     assert.equal(
       label.getAttribute("title"),
-      "ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）",
+      "ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーが見つからない・HIGH 以上のリスク・不備）",
     );
     assert.equal(label.textContent.trim(), "要対応のみ");
     assert.equal(page.one('.card[data-id="i0001-02-03"]').getAttribute("data-attention"), "1");

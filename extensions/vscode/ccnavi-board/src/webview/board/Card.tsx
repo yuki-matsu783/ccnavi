@@ -1,5 +1,5 @@
 /**
- * 1 枚のカード。上から 見出し（ID・題・状態の札）・位置・ユーザ待ち・注意・フェーズ行（親だけ）・補助の操作・詳細（畳む）。
+ * 1 枚のカード。上から 見出し（題・ID・状態の札。DOM は ID・題・札の順で、題を先頭に出すのは CSS の order）・位置・ユーザ待ち・注意・フェーズ行（親だけ）・補助の操作・詳細（畳む）。
  * 何を出すかは組み立て（core/board.ts）と状態の札（core/status.ts）が決めた値のとおりで、ここで判定し直さない。
  *
  * 札は「状況」、「ユーザ待ち」は「ユーザができること」。別の規則で決めるので、同時に出てよい
@@ -74,7 +74,12 @@ export function CardItem({
       data-status={card.status.label}
       data-moved={moved === undefined ? undefined : `${moved.from ?? "none"}-${moved.to}`}
       tabIndex={0}
-      onClick={(event) => open(event.target)}
+      onClick={(event) => {
+        // ID をドラッグして文字を選んだあとの click は、共通の親（カード）まで届く。文字を選択中は開かない（Enter では見ない）
+        if ((window.getSelection?.()?.toString() ?? "") === "") {
+          open(event.target);
+        }
+      }}
       onKeyDown={(event) => {
         if (event.key === "Enter" && !(event.target instanceof Element && event.target.closest(NOT_OPENING) !== null)) {
           event.preventDefault();
@@ -83,7 +88,7 @@ export function CardItem({
       }}
     >
       <div className="card-head">
-        <span className="num">{card.id}</span>
+        <span className="num" title={card.id}>{card.id}</span>
         <span className="title">{card.title}</span>
         <StatusMark status={card.status} />
       </div>

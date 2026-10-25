@@ -65,3 +65,5 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 
 拡張開発ホストで動かす手順と、単体テストの対象外の部分を手で確かめる項目は [docs/design/manual-checks.md](docs/design/manual-checks.md) に書いてある。
 画面だけなら VS Code を使わず Chromium で描いて確かめられる。使い方は [画面を VS Code なしで描く](docs/design/development.md#画面を-vs-code-なしで描くrender-boardjs) にある。
+
+本物の VS Code（code-server）の画面を撮って日本語ユーザ目線で確かめる手順は [docs/design/real-screen-check.md](docs/design/real-screen-check.md) にある。
