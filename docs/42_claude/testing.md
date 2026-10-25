@@ -31,6 +31,8 @@ uv run python -m tests --plan          # 何をどの順で回すかだけ出す
 
 `tests/fake_gitlab.py`（GitLab の模擬）の応答を変えたら、`contract`（`uv run python -m tests tests/contract`。約 15 秒）を必ず回す。本物から録った応答の形と比べる試験で、模擬が本物とずれると落ちる。落ちたら本物に合わせて模擬を直す。仕様と録り直しは [gitlab-contract.md](gitlab-contract.md)。
 
+`tests/contract/shape.py`・`normalize-cases.json`・`requests.json`・`recorded.json` を直したら、`extensions/chrome/ccnavi-approval` の `pnpm test` も回す（TS の比較器が同じ表を読む）。Chrome 拡張の `MockGitLab` を直したときも `pnpm test` を回す。`python -m tests tests/contract` は TS を回さないので、食い違いは `pnpm test` を回すまで見つからない。CI で `pnpm` が回るかは未確認（`.github/workflows/` に記述がない）。
+
 ## 待つとき
 
 長く走るテストは、バックグラウンドで走らせて終了を待つ。フォアグラウンドで`sleep`を繰り返さない。
