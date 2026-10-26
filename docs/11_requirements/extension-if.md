@@ -124,7 +124,6 @@ REQ-EXT-27 の規則は、Chrome 拡張の入口（`py/ccnavi_chrome.py`）が�
 拡張は `src/ccnavi/entry/ext.py` の再公開だけを呼ぶので、本体のモジュールを動かすときは `ext.py` の行を直す。
 拡張は同じ版の本体と一緒に同梱されるので、名前を変えても、旧い本体と新しい拡張が組み合わさることはない。
 互換の版（REQ-EXT-05）は、拡張が統合先のデータや出力の形を読み違えるような変更のときに上げる。呼び出しの名前だけを変えるときは上げない。
-たとえば `lint._SH_COMPAT` を `SH_COMPAT` に、`review._is_sha` を `is_sha` に改めても、互換の版は上げない。
 `tests/ticket/test_swap_points.py` は、手元の承認・レビュー済みが書いたバイト列と、同じ入力で Chrome の入口が返す書くものとを突き合わせる。
 
 REQ-EXT-29 のダイジェストが覆うものは json-shapes.md「[承認の JSON](json-shapes.md#承認の-json)」と同じ（提案の識別子の一覧と各提案ファイルのバイト列全体だけ）。
@@ -132,5 +131,5 @@ REQ-EXT-29 のダイジェストが覆うものは json-shapes.md「[承認の J
 そのときだけ `plan` を呼ぶ。書く先のブランチと互換の版で断るのは拡張の側（REQ-CHR-03・REQ-CHR-04）。
 
 REQ-EXT-30 の `confirm` は、依頼の後にユーザが見るものが動いたかの説明（`changed_since_request`）を受ける。Chrome 拡張は
-`moved_on_host` に compare API の変更の一覧を渡してこれを作り、一覧が打ち切られた・依頼時の先頭が祖先でないときは
+`moved_detail_on_host` に compare API の変更の一覧を渡してこれを作り、一覧が打ち切られた・依頼時の先頭が祖先でないときは
 `changed` を `None` にして「動いた」と数えさせる（`review.moved_since`）。
