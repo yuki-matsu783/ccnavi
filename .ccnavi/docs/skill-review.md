@@ -75,6 +75,7 @@ keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, refere
    - 親の範囲に、対象のスキルの置き場が入っている
 
    `feedback:` は最後のステップの `after` にほかの全部を並べる形にする（終端は1つ）。後ろに足すだけだと承認で落ちるので、
+   `after` の書き方は3つ。(1) フィードバック計画の番号は全体計画の続き（計画が1本なら最初のステップは2）。(2) `after` に全体計画の番号は書けない（全体計画は全部済んでいる前提）。書くと `propose` で断られる。(3) 最初のステップには `after` を書かない。`skill-improve` を1つだけ足すときは `{type: skill-improve}` で足りる
    最後のステップの `after` に `skill-improve` の番号も足すか、`skill-improve` を最後に置いてほかの全部を先行させる。
    定義は `ccnavi --plan-order <親> --fill-phases` で親の `phases:` にコピーする
 3. フィードバック計画が承認されたら、`skill-improve` のフェーズに子チケットを提案して承認を受け、その子でスキルを直してMRで見てもらう
