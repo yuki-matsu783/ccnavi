@@ -105,7 +105,7 @@ class DeadlineTest(unittest.TestCase):
     def test_stderr_names_the_deadline(self):
         result = self.run_with("echo hi", Clock(0))
         self.assertIn("[ccnavi] deadline-exceeded", result.stderr)
-        self.assertIn(f"({judge.DEADLINE_SECONDS:g} s)", result.stderr)
+        self.assertIn(f"期限（{judge.DEADLINE_SECONDS:g} 秒）", result.stderr)
 
     def test_record_says_deadline_exceeded(self):
         self.run_with("echo hi", Clock(0))

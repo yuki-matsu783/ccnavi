@@ -202,9 +202,7 @@ unattended_line() {
 
 # 最後の行（名前の警告よりも後）に出す次の一手。コマンドは 1 行で完結する形にする。
 print_next() {
-	pn_q=$(ccnavi_sh_quote "$dest")
-	pn_g="sh $(ccnavi_sh_quote "$scripts/ccnavi-git.sh")"
-	printf '次: 編集はこのワークツリーの下で行います（Write / Edit に渡すパス: %s/…）。git は `cd %s && %s <サブコマンド>` の形で実行します。終わったらコミットし、ターンの終わりの integrate の案内に従います\n' "$dest" "$pn_q" "$pn_g"
+	ccnavi_text "$root" NEXT_WORKTREE_EDIT "dest=$dest"
 }
 
 # 同じ識別子になる別のブランチ（feature/7-x に対する feature-7-x、英字の大文字小文字だけ違う名前）があれば止める。
@@ -364,8 +362,7 @@ if [ -n "$adopt" ]; then
 		printf '取り込みの差分:\n'
 		git diff --stat "$ad_s" "$ad_tip" 2>/dev/null | head -n 50 | sed 's/^/  /'
 		printf '了承の文面: この範囲全体をエージェントの成果として扱う。範囲に他人のコミットや、取り込み先に入れたくない変更が混ざっていないかを、ユーザに確かめる\n'
-		ad_cmd="sh $(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh") $(ccnavi_sh_quote "$name") --adopt --base $(ccnavi_sh_quote "$target") --accept $ad_code"
-		printf '次: 上をユーザに伝えて了承を得てから、%s\n' "$ad_cmd"
+		ccnavi_text "$root" NEXT_WORKTREE_ADOPT "name=$name" "target=$target" "code=$ad_code"
 		printf '案内: 横で作業する（ルートの変更を自動で戻さない）なら、了承を得たうえで --side-by-side を付ける\n'
 	}
 	log_info 引き取りを調べた -- "name=$name" "target=$target" "s=$ad_s" "tip=$ad_tip"
@@ -629,11 +626,12 @@ report_and_stop() {
 	printf '  横で作業するか (--side-by-side)\n'
 	printf '    このワークツリーが残っている間は、%s で見つかった変更（エージェントが Bash で書き換えた分も含む）を\n' "$main_tree"
 	printf '    自動で戻さず、報告にする。ccnavi の設定ファイルは戻す\n'
-	rs_cmd="sh $(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh") $(ccnavi_sh_quote "$name")"
-	[ "$c4" = no ] || rs_cmd="$rs_cmd --base $rs_target_q"
-	[ "$need_accept" = no ] || rs_cmd="$rs_cmd --accept $code"
-	[ "$c7" = no ] || rs_cmd="$rs_cmd --no-wip"
-	printf '次: 上をユーザに伝えて決めてもらう。合わせたら同じコマンドを打ち直す。このまま進めるなら例えば %s\n' "$rs_cmd"
+	rs_args=""
+	[ "$c4" = no ] || rs_args="$rs_args --base $rs_target_q"
+	[ "$need_accept" = no ] || rs_args="$rs_args --accept $code"
+	[ "$c7" = no ] || rs_args="$rs_args --no-wip"
+	# 先頭の空白は文面の側が持つ（値の前後の空白は落ちる）。
+	ccnavi_text "$root" NEXT_WORKTREE_CONFIRM "name=$name" "args_q=${rs_args# }"
 	printf '案内: ユーザの了承を得るまで --base・--accept・--side-by-side を付けない。確認コードは今の状態から決まるので、状態が動いたら報告からやり直す\n'
 	exit "$EXIT_CONFIRM"
 }

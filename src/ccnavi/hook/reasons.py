@@ -12,7 +12,7 @@ import re
 
 from ..infra import hookio, settings, shellread, shellread_scan, shellread_words
 from ..infra.modes import DRY_RUN
-from ..policy import rules
+from ..policy import rules, texts
 from ..tickets import phase, phase_forms
 from . import ccnavimd
 
@@ -148,6 +148,7 @@ def undeclared(
     *,
     verdict: str,
     fell_back: bool = False,
+    root: str,
 ) -> str:
     """どのタイプも言及しなかった呼び出しに返す文。
 
@@ -179,7 +180,7 @@ def undeclared(
         f"subject: {_shorten(subject)}",
     ]
     if degraded:
-        lines.append(unreadable(degraded, matched=False))
+        lines.append(unreadable(root, degraded, matched=False))
     if fell_back:
         where = "the built-in defaults ccnavi fell back to"
         then = _UNDECLARED_FALLEN_BACK[verdict]
@@ -190,7 +191,7 @@ def undeclared(
         template.format(what="command" if tool == "Bash" else "path", where=where, then=then)
     )
     if degraded:
-        lines.extend(rewrite_hint(degraded))
+        lines.extend(rewrite_hint(root, degraded))
     return "\n".join(lines)
 
 
@@ -257,6 +258,7 @@ def reason_for(
     inner: str,
     quoted: bool,
     *,
+    root: str,
     git: str = "git",
 ) -> str:
     """ヒットしたルール 1 件を、それだけで読んで成立する理由に組む。
@@ -316,42 +318,31 @@ def reason_for(
 
     lines = [f"[ccnavi] {code} ({source})", f"subject: {shown}"]
     if inner:
-        lines.append(ran_by(runner, inner))
+        lines.append(ran_by(root, runner, inner))
     if degraded:
-        lines.append(unreadable(degraded))
-        lines.extend(rewrite_hint(degraded))
+        lines.append(unreadable(root, degraded))
+        lines.extend(rewrite_hint(root, degraded))
     lines.append(rule.spoken_message())
     if quoted:
-        lines.append(inside_quotes(git))
+        lines.append(inside_quotes(root, git))
     return "\n".join(lines)
 
 
-# 非対話で確認が自動で拒否になるとき、代わりの手を reason に出すルールの一覧です（bare_id → (対象に
-# 含まれる語の式, 1 行)）。式が空なら、そのルールにヒットした回に必ず出します。
-# ask のルールには message を書けず、additionalContext は自動拒否のときに届かないため、
-# ここに置きます。
+# 非対話で確認が自動で拒否になるとき、ルールごとに文を分ける表です（bare_id → (対象に含まれる語の式,
+# 文面の識別子)）。式が空なら、そのルールにヒットした回に必ずその文を出します。表に無いルールは
+# RULE_ASK です。ask のルールには message を書けず、additionalContext は自動拒否のときに届かない
+# ため、ここに置きます。
 #
-# direct-worktree-confirm の 1 行は、あとのスクリプト側の拒否を確認が隠さないための説明です。
+# direct-worktree-confirm の文は、あとのスクリプト側の拒否を確認が隠さないための説明です。
 # `--adopt` は、確認が通ってもスクリプトが「チケットに結び付くワークツリーです」と断るので、
 # 「了承されたら打ち直す」だけを言うと、打ち直しても通らない案内になります。
 _ASK_ALTERNATIVE = {
-    "prefer-webfetch": (
-        "",
-        "代わりの手: 調べものが一度きりなら WebFetch ツールを、"
-        "何度も呼び出すなら .ccnavi/scripts/ の sh にまとめてから実行してください。",
-    ),
-    "direct-worktree-confirm": (
-        r"\s--adopt(?:\s|=|$)",
-        "ただし --adopt は、チケットに結び付く名前（承認済みチケット・提案・親のブランチの識別子。"
-        "ccnavi-ticket.sh status に出る）のワークツリーには、了承されても通りません。"
-        "ccnavi-worktree.sh が断ります。その場合は了承を頼まず、"
-        "チケットの作業はマージリクエストで出します（ccnavi-ticket.sh status の次の操作に従う）。"
-        "了承を頼むのは、チケットに結び付かない直接作業のワークツリーだけです。",
-    ),
+    "prefer-webfetch": ("", "RULE_ASK__PREFER_WEBFETCH"),
+    "direct-worktree-confirm": (r"\s--adopt(?:\s|=|$)", "RULE_ASK__ADOPT"),
 }
 
 
-def ask_hint(bare_id: str, subject: str) -> list[str]:
+def ask_hint(root: str, bare_id: str, subject: str) -> list[str]:
     """確認（ask）の理由に足す説明です。非対話のときだけ返し、対話のときは空にします。
 
     非対話のセッションでは確認に答える人がいないため、ask は自動で拒否されます。
@@ -361,18 +352,13 @@ def ask_hint(bare_id: str, subject: str) -> list[str]:
     """
     if not ccnavimd.unattended():
         return []
-    shown = _shorten(subject)
-    lines = [
-        "この操作はユーザの確認が要りますが、このセッションでは確認に答えられません。"
-        f"ユーザに「{shown}」の了承を頼み、了承されたら打ち直してもらってください。"
-    ]
-    needle, alternative = _ASK_ALTERNATIVE.get(bare_id, ("", ""))
-    if alternative and (not needle or re.search(needle, subject, re.IGNORECASE)):
-        lines.append(alternative)
-    return lines
+    needle, text_id = _ASK_ALTERNATIVE.get(bare_id, ("", "RULE_ASK"))
+    if needle and not re.search(needle, subject, re.IGNORECASE):
+        text_id = "RULE_ASK"
+    return texts.say(root, text_id, {"subject": _shorten(subject)}).splitlines()
 
 
-def ran_by(runner: str, inner: str) -> str:
+def ran_by(root: str, runner: str, inner: str) -> str:
     """実行役のコマンドが中で実行するコマンドにヒットしたことを言う 1 行。
 
     元の形（`env rm -f …`）だけを見た読み手には、ルールのどこがヒットしたのかが分からない。
@@ -381,12 +367,9 @@ def ran_by(runner: str, inner: str) -> str:
     `cd` で移った先から見たパスにヒットしたときも同じで、書いた表記（`rm settings.json`）には
     ヒットしたルールの名前が出てこない。どこへ書こうとしているかをパスで示す。
     """
-    if runner == shellread.MOVED:
-        return (
-            f"`cd` で移った先から見ると `{_one_line(inner)}` になり、"
-            "ルールはこの形にヒットしました。"
-        )
-    return f"ルールは `{_one_line(runner)}` が実行する `{_one_line(inner)}` にヒットしました。"
+    case = "moved" if runner == shellread.MOVED else "runner"
+    values = {"runner": _one_line(runner), "inner": _one_line(inner)}
+    return texts.say(root, "NOTE_RAN_BY", values, {"note": case})
 
 
 def _one_line(text: str) -> str:
@@ -406,7 +389,7 @@ def _shorten(text: str) -> str:
     return shown
 
 
-def inside_quotes(git: str | None = None) -> str:
+def inside_quotes(root: str, git: str | None = None) -> str:
     """引用の中から切り出したコマンドにルールがヒットしたときにつける断り。
 
     書いた側は、二重引用や引用しないヒアドキュメントの中の `$( )` とバッククォートを、
@@ -415,18 +398,21 @@ def inside_quotes(git: str | None = None) -> str:
     git の値を変数に取る形は、ラッパースクリプトで出して読み、値を次に書く 2 つの手順になる。
     git は案内するラッパーの打ち方（settings.git_wrapper_command）。ラッパーが無いときは None。
     """
-    return (
-        "注: このルールは二重引用符の中、または引用しないヒアドキュメントの中のコマンドに"
-        "ヒットしました。そこではシェルが $( ) とバッククォートを実行します。文字として書くだけでは"
-        "ありません。文字のまま渡すには、シングルクォートで囲むか、\\$( と \\` と書くか、"
-        f"文面をファイルから渡してください（{_commit_file(git)}"
-        "glab --description-file <file>、gh なら --body-file <file>）。"
-        "git のリビジョンのような値を使うには、先に 1 つのコマンドで値を出力し、"
-        "次のコマンドに値を書いてください。"
+    return texts.say(
+        root, "NOTE_INSIDE_QUOTES", {"git": git or ""}, {"note": "git" if git else "plain"}
     )
 
 
-def unreadable(reason: str, *, matched: bool = True) -> str:
+# 読めなかった理由ごとの断りの文面。表に無い理由は OTHER。
+_UNREADABLE_ID = {
+    shellread_scan.REASON_UNTERMINATED: "NOTE_UNREADABLE__UNTERMINATED",
+    shellread_words.REASON_TAKEN_AS_CODE: "NOTE_UNREADABLE__TAKEN_AS_CODE",
+    shellread_scan.REASON_UNTERMINATED_SUBST: "NOTE_UNREADABLE__UNTERMINATED_SUBST",
+    shellread_scan.REASON_ANSI_C: "NOTE_UNREADABLE__ANSI_C",
+}
+
+
+def unreadable(root: str, reason: str, *, matched: bool = True) -> str:
     """コマンドを読めないまま出した 1 件につける断り。
 
     2 つの違う失敗に同じ文を使わせないために要る。「禁止されたコマンドを実行した」と
@@ -437,66 +423,42 @@ def unreadable(reason: str, *, matched: bool = True) -> str:
     ヒットしていないので、「this rule」と言うと指す先が無い。そのときは読めなかったことだけを言い、
     次の一手は呼び手が続けて書く。
     """
-    what = {
-        shellread_scan.REASON_UNTERMINATED: "引用符かヒアドキュメントが閉じていない",
-        shellread_words.REASON_TAKEN_AS_CODE: "文字列をコードとして実行するものに渡している",
-        shellread_scan.REASON_UNTERMINATED_SUBST: "$( ) が閉じていない",
-        shellread_scan.REASON_ANSI_C: "ANSI-C 引用（$'…'）の中身が何の文字になるか読めない",
-    }.get(reason, "読めない形をしている")
-    if not matched:
-        return (
-            f"注: このコマンドは、{what}ため、ccnavi は書かれた生の文字列にしかルールを当てられず、"
-            "どのルールもそれに言及していません。"
-        )
-    return (
-        f"注: このコマンドは、{what}ため、このルールは実行される中身ではなく、書かれた生の文字列に"
-        "当てました。語を書いただけで実行しないなら、禁止したわけではありません。"
-        "語をファイルに移すか、コマンドを分けて打ち直してください。"
-    )
+    text_id = _UNREADABLE_ID.get(reason, "NOTE_UNREADABLE__OTHER")
+    return texts.say(root, text_id, {}, {"note": "matched" if matched else "raw"})
 
 
-# 読めなかった理由ごとの書き換え例。書き換え先は読める形で、ルールには触れない。
-_REWRITE = {
-    shellread_words.REASON_TAKEN_AS_CODE: (
-        "書き換え: Grep ツールを使うか、`grep -rn <語> <パス>` と書く。"
-        "ファイルの行数などが要るなら、`wc -l <パス>` のようにファイル名を直接並べて 1 回で呼ぶ。",
-        "`xargs` と `find -exec` は、後ろのコマンドが次のどれかのときだけ読める形として扱う: "
-        + " ".join(sorted(shellread_words._READONLY_RUNNEE)),
-    ),
-    shellread_scan.REASON_ANSI_C: (
-        "書き換え: タブは `grep -P '\\t'` のように書く。"
-        "または `printf '\\t'` の出力をファイルに書いて、そのファイルを渡す。",
-    ),
-    shellread_scan.REASON_UNTERMINATED: (
-        "書き換え: 複数行の文字列やヒアドキュメントは、Write ツールでファイルに書き、"
-        "そのファイルを渡す。引用符は閉じて書く。",
-    ),
+# 読めなかった理由ごとの書き換え例の文面。例の無い理由は引かない。
+_REWRITE_HINT_ID = {
+    shellread_words.REASON_TAKEN_AS_CODE: "NOTE_REWRITE_HINT__TAKEN_AS_CODE",
+    shellread_scan.REASON_ANSI_C: "NOTE_REWRITE_HINT__ANSI_C",
+    shellread_scan.REASON_UNTERMINATED: "NOTE_REWRITE_HINT__UNTERMINATED",
 }
 
 
-def rewrite_hint(reason: str) -> list[str]:
+def rewrite_hint(root: str, reason: str) -> list[str]:
     """読めなかった理由ごとの書き換え例の行。例の無い理由は空。
 
     非対話のセッションでは確認に答える人がいないので、書き直すほかないことを 1 行足す。
     """
-    lines = list(_REWRITE.get(reason, ()))
-    if lines and ccnavimd.unattended():
-        lines.append("このセッションでは確認に答えられないので、上の形に書き直してください。")
+    text_id = _REWRITE_HINT_ID.get(reason)
+    if text_id is None:
+        return []
+    runnee = " ".join(sorted(shellread_words._READONLY_RUNNEE))
+    lines = texts.say(root, text_id, {"runnee": runnee}).splitlines()
+    if ccnavimd.unattended():
+        lines.extend(texts.say(root, "NOTE_REWRITE_HINT__UNATTENDED").splitlines())
     return lines
 
 
-def subagent_forbidden(subject: str, runner: str, inner: str) -> str:
+def subagent_forbidden(root: str, subject: str, runner: str, inner: str) -> str:
     """サブエージェントに許さない操作を止めた文。inner は reason_for と同じ。"""
     shown = _shorten(subject)
     return "\n".join(
         [
             f"[ccnavi] {phase.CODE_SUBAGENT}",
             f"subject: {shown}",
-            *([ran_by(runner, inner)] if inner else []),
-            "チケットの状態を動かす操作、レビューの依頼・確認、リモートへの push は、"
-            "親（メインエージェント）だけが行います。サブエージェントは自分のチケットの"
-            "範囲で作業を終えたら、コミットまで済ませ、結果を報告して終えてください。"
-            "合流、push、チケットを閉じることは親の仕事です。",
+            *([ran_by(root, runner, inner)] if inner else []),
+            texts.say(root, "DENY_SUBAGENT_TICKET_OP", {}),
         ]
     )
 
@@ -513,7 +475,9 @@ def builtin_refusal(code: str, rule_id: str, subject: str, text: str) -> str:
     return "\n".join([f"[ccnavi] {code} (組み込みのルール: {rule_id})", f"subject: {shown}", text])
 
 
-def internal_error(code: str, event: str, kind: str, log_path: str, *, passed: bool = False) -> str:
+def internal_error(
+    root: str, code: str, event: str, kind: str, log_path: str, *, passed: bool = False
+) -> str:
     """ccnavi 自身の例外で判定や検査を終えられなかったときに、モデルへ返す文。
 
     呼び出しの中身が原因ではないので、書き直し方は言えない。言えるのは、同じ呼び出しを
@@ -521,25 +485,14 @@ def internal_error(code: str, event: str, kind: str, log_path: str, *, passed: b
     名指しするのは、ユーザが例外の型と場所をそこで読めるようにするため。
     """
     if event == hookio.POST_TOOL_USE:
-        what = (
-            "ccnavi の内部の不具合で、この呼び出しが何を変えたかを確かめられませんでした。"
-            "実行後の保護対象の検査は行われていません。"
-        )
+        case = "post_tool_use"
     elif passed:
-        what = (
-            "ccnavi の内部の不具合で、この呼び出しを判定できませんでした。"
-            "この呼び出しは、ルールなしで確かめられる読み取りだけなので、通しました。"
-        )
+        case = "passed"
     else:
-        what = "ccnavi の内部の不具合で判定できなかったため、この呼び出しを止めました。"
+        case = "stopped"
+    values = {"kind": kind, "log_path": log_path}
     return "\n".join(
-        [
-            f"[ccnavi] {code}",
-            f"{what}原因は呼び出しではなく ccnavi にあります（{kind}）。詳細は診断ログ "
-            f"{log_path} にあります。同じ呼び出しを打ち直して回避しないでください。"
-            "ユーザに、ここで ccnavi が失敗したことと診断ログの場所を伝え、"
-            "続け方を任せてください。",
-        ]
+        [f"[ccnavi] {code}", texts.say(root, "DENY_INTERNAL_ERROR", values, {"what": case})]
     )
 
 
@@ -553,44 +506,21 @@ def internal_error_notice(code: str, event: str, kind: str, log_path: str) -> st
     )
 
 
-# 判定に達しなかった回（payload 不正・期限切れ）に、直す側として名指しする先。
-_CHECK_SETUP = (
-    "the ccnavi hook registration in .claude/settings.json and whether this ccnavi build "
-    "matches the Claude Code version"
-)
-
 # payload を読めずに止めた（enable の exit 2）とき、イベントごとに何が起きたかと次の一手。
 # exit 2 の意味と標準エラーの宛先はイベントで違う。PreToolUse は呼び出しを止めてモデルへ、
 # PostToolUse は走った後でモデルへ、UserPromptSubmit はユーザの発言を止めてユーザへ、Stop と
 # SubagentStop は終わりを止めてモデルへ届く。ほかのイベントは止まらず、ユーザにだけ見える。
+# 値は（what の場合, next の場合）。
 _PAYLOAD_STOPPED = {
-    hookio.PRE_TOOL_USE: (
-        "so it could not judge this call and stopped it. Rewriting the call will not help. "
-        f"Tell the user, so they can check {_CHECK_SETUP}."
-    ),
-    hookio.POST_TOOL_USE: (
-        "so it could not check what this call changed. The call has already run, and this is "
-        "not about what you wrote. Do not retry it. "
-        f"Tell the user, so they can check {_CHECK_SETUP}."
-    ),
-    hookio.USER_PROMPT_SUBMIT: (
-        "so it held this message back before Claude saw it. Sending it again will not help "
-        f"until someone checks {_CHECK_SETUP}."
-    ),
-    hookio.STOP: (
-        "so it could not check the end of this turn and kept it from ending. This is not "
-        "about your work. Do not go on with the task: tell the user, so they can check "
-        f"{_CHECK_SETUP}, and end the turn."
-    ),
-    hookio.SUBAGENT_STOP: (
-        "so it could not check this subagent's work and kept it from ending. This is not "
-        "about your work. Do not go on with the task: put this in your final report, so the "
-        f"user can check {_CHECK_SETUP}, and end."
-    ),
+    hookio.PRE_TOOL_USE: ("pre_tool_use", "check"),
+    hookio.POST_TOOL_USE: ("post_tool_use", "check"),
+    hookio.USER_PROMPT_SUBMIT: ("user_prompt_submit", "prompt"),
+    hookio.STOP: ("stop", "stop"),
+    hookio.SUBAGENT_STOP: ("subagent_stop", "subagent"),
 }
 
 
-def payload_unusable(code: str, problem: str, *, event: str = "", mode: str = "") -> str:
+def payload_unusable(root: str, code: str, problem: str, *, event: str = "", mode: str = "") -> str:
     """hook の入力（payload）を読めなかったときの文。
 
     ccnavi は何の呼び出しかも分からないので、enable では止める（`modes.fail_closed`）。呼び出しを
@@ -603,30 +533,20 @@ def payload_unusable(code: str, problem: str, *, event: str = "", mode: str = ""
     言わない（PreToolUse とイベントすら読めなかった回は dry-run でも止める）。event は
     イベント名すら読めなかった回は空で、そのときは何を止めたかを言わない。
     """
-    head = f"[ccnavi] {code}"
-    said = f"ccnavi could not read the hook input from Claude Code ({problem}), "
     # ツールの呼び出しを判定するイベント（と、イベントすら読めなかった回）は dry-run でも止める
     # （`modes.fail_closed`）。ほかのイベントは、dry-run なら通す。
     if mode == DRY_RUN and event not in ("", hookio.PRE_TOOL_USE):
-        return "\n".join(
-            [
-                head,
-                said + "so it could not check this "
-                f"{event or 'hook'} event. CCNAVI_MODE is dry-run, so nothing was stopped; under "
-                f"enable it would have been. The user needs to check {_CHECK_SETUP}.",
-            ]
-        )
-    stopped = _PAYLOAD_STOPPED.get(event)
-    if stopped is None:
-        stopped = (
-            f"so it could not check this {event or 'hook'} event and stopped with exit code 2. "
-            "This is not about anything that was written, and repeating it will not help. "
-            f"The user needs to check {_CHECK_SETUP}."
-        )
-    return "\n".join([head, said + stopped])
+        variants = {"what": "dry_run", "next": "check"}
+    else:
+        what, step = _PAYLOAD_STOPPED.get(event, ("other", "check"))
+        variants = {"what": what, "next": step}
+    values = {"problem": problem, "event": event or "hook"}
+    return "\n".join(
+        [f"[ccnavi] {code}", texts.say(root, "DENY_PAYLOAD_UNUSABLE", values, variants)]
+    )
 
 
-def deadline_exceeded(code: str, seconds: float, *, passed: bool = False) -> str:
+def deadline_exceeded(root: str, code: str, seconds: float, *, passed: bool = False) -> str:
     """判定が期限に届かなかったときの文。
 
     照合が長引くのは、コマンドの文字列が長いか、`>` のような照合を伸ばす形が多いとき。
@@ -635,30 +555,15 @@ def deadline_exceeded(code: str, seconds: float, *, passed: bool = False) -> str
 
     期限を見るのは実行前チェック（PreToolUse）だけなので、宛先はツール呼び出しを書いたモデル。
     dry-run は、設定を読まずに安全と分かる読み取りだけ exit 0 で通すので、その回は「止めた」と
-    言わず、enable なら止めていたと言う。それ以外の呼び出しは dry-run でも止める。
+    言わず、通したと言う。それ以外の呼び出しは dry-run でも止める。
     """
-    if passed:
-        what = (
-            "This call is a plain read that ccnavi can check without its rules, so it went through."
-        )
-    else:
-        what = "so it stopped it."
+    case = "passed" if passed else "stopped"
     return "\n".join(
         [
             f"[ccnavi] {code}",
-            f"ccnavi ran out of time ({seconds:g} s) before it finished judging this call"
-            + (". " if passed else ", ")
-            + what
-            + " Long commands and long inline text make matching slow: split the command "
-            "into smaller ones, or write long text to a file with the Write tool and pass the "
-            "file. If a short command keeps hitting this, tell the user.",
+            texts.say(root, "DENY_DEADLINE_EXCEEDED", {"seconds": f"{seconds:g}"}, {"what": case}),
         ]
     )
-
-
-def _commit_file(git: str | None) -> str:
-    """ファイルから本文を渡す入口の案内。ラッパーがあるときだけ `git commit -F` を名指しする。"""
-    return f"{git} commit -F <file>, " if git else ""
 
 
 def rewrite_rule(form: str) -> str:
@@ -666,71 +571,25 @@ def rewrite_rule(form: str) -> str:
     return f"builtin:{form}"
 
 
-def rewrite(subject: str, form: str, found: list[str], git: str | None = None) -> str:
+def rewrite(root: str, subject: str, form: str, found: list[str], git: str | None = None) -> str:
     """書き直しを求める形を止めた文。形ごとに 1 件。
 
     ルールにヒットしたのではないので、禁止された操作をしたとは言わない。止めたのは読みの
     決めごとで、書き直す方法は必ずある。方法を名指ししないと、同じ形を書き直しては止まる。
+    文は形ごとの識別子（`CODE_REWRITE`）で引く。
     git は案内するラッパーの打ち方（settings.git_wrapper_command）。無いときは None で、
-    文面の `{commit}` は書かない。
+    ラッパーの案内を書かない。
     """
     shown = _shorten(subject)
     listed = ", ".join(f"`{_one_line(text)}`" for text in found[:_REWRITES_SHOWN])
     if len(found) > _REWRITES_SHOWN:
         listed += f" (+{len(found) - _REWRITES_SHOWN})"
-    what, how = _REWRITE_TEXT[form]
-    how = how.replace("{commit}", f", {git} commit -F <ファイル>" if git else "")
-    return "\n".join(
-        [f"[ccnavi] {CODE_REWRITE[form]}", f"subject: {shown}", f"{what}: {listed}", how]
-    )
+    values = {"found": listed}
+    if form == shellread.FORM_BACKQUOTE:
+        values["git"] = git or ""
+    text = texts.say(root, CODE_REWRITE[form], values, {"next": "git" if git else "plain"})
+    return "\n".join([f"[ccnavi] {CODE_REWRITE[form]}", f"subject: {shown}", text])
 
 
 # 止めた文に並べる表記の数。1 つ直せば残りも同じ直し方になる。
 _REWRITES_SHOWN = 5
-
-# 形ごとの（見つけたものの呼び名, 書き直し方）。
-_REWRITE_TEXT = {
-    shellread.FORM_BRACE: (
-        "引用の外の波括弧展開",
-        "引用の外では、シェルがコマンドを実行する前に波括弧を複数の語に展開します。"
-        "そのため、ccnavi が読んだ語と実際に実行される語が一致しません。"
-        "bash と zsh で展開の結果が異なるので、ccnavi は結果を推測せず、呼び出しを止めます。"
-        "代入や case のパターン、[[ ]] のように展開されない箇所でも止まります。"
-        "語を書き出してください。"
-        "`--exclude-dir={a,b}` は `--exclude-dir=a --exclude-dir=b`、"
-        "`cp f{,.bak}` は `cp f f.bak`、`{1..3}` は `1 2 3` と書きます。"
-        "波括弧を文字として使うなら、シングルクォートで囲んでください（'{a,b}'）。",
-    ),
-    shellread.FORM_COMMAND_NAME: (
-        "実行時に決まるコマンド名",
-        "シェルは、このコマンド名を実行するときに変数・コマンド置換・グロブから決めます。"
-        "どのプログラムが走るかが表記から分からないので、どのルールも適用されません。"
-        "そのため、呼び出しを止めます。"
-        "コマンド名を直接書いてください。"
-        "`c=ls; $c -la` は `ls -la`、"
-        '`"$(command -v python3)" x.py` は `python3 x.py`、'
-        "`/usr/bin/l? -la` は `/usr/bin/ls -la` と書きます。"
-        "sh や source に渡すスクリプトも、`sh $SCRIPT` ではなくパスを直接書いてください。",
-    ),
-    shellread.FORM_BACKQUOTE: (
-        "バッククォート",
-        "バッククォートの中身は、二重引用符の中や引用なしの here-doc でもシェルが実行します。"
-        "ccnavi はバッククォートを読まないので、呼び出しを止めます。"
-        "コマンド置換には `$( )` を使ってください。"
-        "バッククォートを文字として残すなら（Issue や PR 本文の Markdown など）、"
-        "シングルクォートで囲むか、1 つずつ \\` とエスケープするか、ファイルから渡してください"
-        "（`glab --description-file <ファイル>`、gh なら `--body-file`{commit}）。",
-    ),
-    shellread.FORM_AMBIGUOUS: (
-        "読みが分かれる形",
-        "bash と zsh で読みが分かれる形か、入れ子が深すぎる形なので、"
-        "実行される内容を確定できません。"
-        "そのため、呼び出しを止めます。"
-        "素直な形に書き直してください。"
-        "`$( )` の中の case は if と elif にしてください。"
-        "`$((cmd) | x)` は算術式と読まれるので、`$( (cmd) | x )` と空白を入れてください。"
-        "内側のコマンドを先に実行し、その値を次のコマンドに書いてください。"
-        "入れ子の `$( )` を深くしないでください。"
-        "coproc の代わりに `&` を、select の代わりに for を使ってください。",
-    ),
-}

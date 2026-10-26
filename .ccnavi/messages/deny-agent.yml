@@ -1,0 +1,98 @@
+# サブエージェントの起動（Agent・Task）を止める拒否の文。条件（いつ止めるか）は hook/agentlaunch.py にある。
+# 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
+version: 1
+messages:
+  DENY_AGENT_ISOLATION:
+    kind: deny
+    what: |-
+      サブエージェントの起動に isolation が指定されたため、止めました。
+    why: |-
+      作業場所は ccnavi が決めます。isolation のワークツリーでは、チケットの範囲は適用されないので、値によらず使えません。
+    next: |-
+      チケットの子の作業なら、その子の識別子だけをプロンプトに書いて起動し直す（ccnavi がその子の範囲とフローの案内を書き足す）。直接作業なら、`{script:ccnavi-worktree.sh}` で切ったワークツリーのパス（.claude/worktrees/<名前>）だけをプロンプトに書いて起動し直す
+    no_bypass: |-
+      担当以外の子の識別子やワークツリーのパスをプロンプトに書いても、値を変えて isolation を付けても、同じ関門に当たります。
+
+  DENY_AGENT_TARGET_INVALID:
+    kind: deny
+    values: [listed, rest]
+    what:
+      few: |-
+        プロンプトに書かれたワークツリーのパスが利用できないため、止めました。{listed}
+      many: |-
+        プロンプトに書かれたワークツリーのパスが利用できないため、止めました。{listed} / ほか {rest} 件
+    why: |-
+      担当のワークツリーは、プロンプトのパスから決めます。パスの前後を空白で区切って書かないと（日本語や記号に続けると）、正しく読めません。
+    next: |-
+      チケットの子の作業なら、パスではなく子の識別子を 1 つ書いて起動し直す。直接作業なら、`{script:ccnavi-worktree.sh}` で切ったワークツリーのパスを、前後を空白で区切って 1 つ書いて起動し直す
+    no_bypass: |-
+      パスの書き方を変えても、登録のないワークツリーや範囲外のパスは同じ関門に当たります。
+
+  DENY_AGENT_MULTI_TARGET:
+    kind: deny
+    values: [count, names]
+    what: |-
+      プロンプトが違うワークツリーを {count} つ指している（{names}）ため、止めました。
+    why: |-
+      サブエージェント 1 体の担当は 1 つのワークツリーだけです。「触れない」と書いた子の識別子やパスも、言及として数えます。
+    next: |-
+      1 体に 1 つを割り当て、担当以外の子の識別子やパスを書かずに、別々に起動し直す
+    no_bypass: |-
+      言い換えや、担当以外を否定する書き方をしても、言及として数えるので同じ関門に当たります。
+
+  DENY_AGENT_PARENT_TREE:
+    kind: deny
+    values: [name, listed]
+    what: |-
+      {name} は親のワークツリーです。親のワークツリーを担当にする起動を止めました。
+    why: |-
+      親のワークツリーでは作業しません。作業は子のワークツリーで行います。
+    next:
+      working: |-
+        子の識別子をプロンプトに 1 つ書いて起動し直す（作業中の子: {listed}）
+      none: |-
+        子の識別子をプロンプトに 1 つ書いて起動し直す
+    no_bypass: |-
+      親のパスを言い換えても、別の経路で起動しても、同じ関門に当たります。
+
+  DENY_AGENT_NO_CHILD:
+    kind: deny
+    values: [parent, listed, rest]
+    what:
+      few: |-
+        親 {parent} のワークツリーから、担当の子を指さずに編集するサブエージェントを起動しようとしたため、止めました。作業中の子: {listed}
+      many: |-
+        親 {parent} のワークツリーから、担当の子を指さずに編集するサブエージェントを起動しようとしたため、止めました。作業中の子: {listed}（ほか {rest} 件）
+    why: |-
+      編集するサブエージェントは、担当の子のワークツリーで動かないと、子の範囲とフローの案内を受け取れません。
+    next: |-
+      担当の子の識別子を 1 つ、プロンプトに書いて起動し直す（ccnavi がその子のワークツリーで案内する）。調べるだけなら、読み取り専用の種類（Explore など）で起動する
+    no_bypass: |-
+      子を指さない言い換えや、別の経路での起動でも、編集する種類は同じ関門に当たります。
+
+  DENY_AGENT_CHILD_UNAVAILABLE:
+    kind: deny
+    values: [name, reason]
+    what: |-
+      子 {name} は担当にできないため、止めました（{reason}）。
+    why: |-
+      担当にできる子は、着手済みで、作業中で、ワークツリーのあるものだけです。
+    next:
+      start: |-
+        `{script:ccnavi-ticket.sh} start {name:sh}` で着手してから起動し直す
+      wait: |-
+        子の状態を動かすのはユーザの判断なので、ユーザに状態を伝えて指示を待つ
+    no_bypass: |-
+      ワークツリーのパスで指しても、言い換えても、同じ関門に当たります。
+
+  DENY_AGENT_CWD_CONFLICT:
+    kind: deny
+    values: [given, name, path]
+    what: |-
+      tool_input の cwd（{given}）が、プロンプトで決まった担当先（{name}: {path}）と違うため、止めました。
+    why: |-
+      担当先はプロンプトの言及で決まります。cwd が食い違うと、サブエージェントが担当以外のワークツリーで動きます。
+    next: |-
+      cwd は付けずに、担当の子の識別子かワークツリーのパスをプロンプトに 1 つ書いて起動し直す
+    no_bypass: |-
+      別の cwd を付け直しても、同じ関門に当たります。

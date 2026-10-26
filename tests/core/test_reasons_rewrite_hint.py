@@ -8,6 +8,7 @@ from unittest import mock
 
 from ccnavi.hook import ccnavimd, reasons
 from ccnavi.infra import shellread_scan, shellread_words
+from tests import ROOT
 
 ANSWER_LINE = "確認に答えられない"
 ASK_LINE = "確認に答えられません"
@@ -19,7 +20,7 @@ class RewriteHintTest(unittest.TestCase):
         with mock.patch.dict(os.environ, env, clear=False):
             if not attended:
                 os.environ.pop(ccnavimd.ATTENDED_ENV, None)
-            return "\n".join(reasons.rewrite_hint(reason))
+            return "\n".join(reasons.rewrite_hint(ROOT, reason))
 
     def test_理由ごとに書き換え例が出る(self):
         cases = {
@@ -51,7 +52,7 @@ class AskHintTest(unittest.TestCase):
         with mock.patch.dict(os.environ, env, clear=False):
             if not attended:
                 os.environ.pop(ccnavimd.ATTENDED_ENV, None)
-            return "\n".join(reasons.ask_hint(bare_id, self.SHOWN))
+            return "\n".join(reasons.ask_hint(ROOT, bare_id, self.SHOWN))
 
     def test_非対話のときだけ確認が要ることと次の行動を言う(self):
         said = self.hint("direct-worktree-confirm", "0")
@@ -71,7 +72,7 @@ class AskHintTest(unittest.TestCase):
         self.assertIn("了承", said)
         self.assertIn("通りません", said)
         self.assertIn("チケットに結び付く", said)
-        self.assertIn("マージリクエストで出します", said)
+        self.assertIn("マージリクエストで出す", said)
         self.assertIn("ccnavi-ticket.sh status", said)
 
     def test_adopt_の無い指定には_チケットの断りを足さない(self):
@@ -105,7 +106,7 @@ class AskHintTest(unittest.TestCase):
         with mock.patch.dict(os.environ, env, clear=False):
             if not attended:
                 os.environ.pop(ccnavimd.ATTENDED_ENV, None)
-            return "\n".join(reasons.ask_hint(bare_id, shown))
+            return "\n".join(reasons.ask_hint(ROOT, bare_id, shown))
 
     def test_prefer_webfetch_は代わりの手も言う(self):
         self.assertIn("WebFetch", self.hint("prefer-webfetch", "0"))

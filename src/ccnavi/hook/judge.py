@@ -288,7 +288,7 @@ def decide_before(
                         wrapguard.CODE_ENV,
                         wrapguard.ENV_RULE_ID,
                         display_subject,
-                        wrapguard.env_message(script, names),
+                        wrapguard.env_message(root, script, names),
                     )
                 ],
                 conf=conf,
@@ -347,7 +347,7 @@ def decide_before(
                         phase_forms.CODE_RECORDS_PRUNE,
                         phase_forms.RECORDS_PRUNE_RULE_ID,
                         display_subject,
-                        phase_forms.prune_message(),
+                        phase_forms.prune_message(root),
                     )
                 ],
                 conf=conf,
@@ -379,13 +379,13 @@ def decide_before(
                         phase_forms.CODE_TICKET_APPROVAL,
                         phase_forms.TICKET_APPROVAL_RULE_ID,
                         display_subject,
-                        phase_forms.guard_off_message(found)
+                        phase_forms.guard_off_message(root, found)
                         if kind == "guard-off"
-                        else phase_forms.user_script_message(found)
+                        else phase_forms.user_script_message(root, found)
                         if kind == "user-script"
-                        else phase_forms.expanded_option_message(found)
+                        else phase_forms.expanded_option_message(root, found)
                         if kind == "expanded"
-                        else phase_forms.board_form_message(found),
+                        else phase_forms.board_form_message(root, found),
                     )
                 ],
                 conf=conf,
@@ -412,7 +412,7 @@ def decide_before(
                         phase_forms.CODE_TICKET_APPROVAL,
                         phase_forms.TICKET_APPROVAL_RULE_ID,
                         display_subject,
-                        phase_forms.hidden_entry_message(entry, found),
+                        phase_forms.hidden_entry_message(root, entry, found),
                     )
                 ],
                 conf=conf,
@@ -439,7 +439,7 @@ def decide_before(
                         wrapguard.CODE_CHILD_PUSH,
                         wrapguard.CHILD_PUSH_RULE_ID,
                         display_subject,
-                        wrapguard.child_push_message(name, parent),
+                        wrapguard.child_push_message(root, name, parent),
                     )
                 ],
                 conf=conf,
@@ -500,7 +500,7 @@ def decide_before(
             mode,
             record,
             rules.DENY,
-            notices + [reasons.subagent_forbidden(display_subject, runner, layer)],
+            notices + [reasons.subagent_forbidden(root, display_subject, runner, layer)],
             conf=conf,
             root=root,
             kind=GATE,
@@ -517,7 +517,7 @@ def decide_before(
                 conf, root, payload.cwd, record.subject, record.degraded
             )
             if where:
-                message = wrapguard.parent_tree_message(sub, where)
+                message = wrapguard.parent_tree_message(root, sub, where)
             else:
                 # シェルからの書き込み（リダイレクト・tee・sed -i・cp / mv の行き先、
                 # インタプリタに渡したコード）。読み方と限界は parentwrite に書いてある。
@@ -530,7 +530,7 @@ def decide_before(
                     [layer.replace(shellread.SEP, "\n") for _, layer, _ in inner],
                 )
                 if where:
-                    message = wrapguard.parent_write_message(what, where, kind)
+                    message = wrapguard.parent_write_message(root, what, where, kind)
         elif payload.tool_name in SCOPE_TOOLS:
             # 書き込み先のパスが `.claude/worktrees/<名前>` の中で、その名前が親のチケットか
             # （ワークツリーが git に登録されているかは問わない。sh の検査と同じ広さ）。
@@ -543,7 +543,7 @@ def decide_before(
                 rel = os.path.relpath(os.path.abspath(record.subject), base).replace(os.sep, "/")
                 if not ticket_places.is_unscoped(rel, conf.tickets, conf.approved):
                     where = name
-                    message = wrapguard.parent_write_message(payload.tool_name, name)
+                    message = wrapguard.parent_write_message(root, payload.tool_name, name)
         if where:
             record.code = wrapguard.CODE_PARENT_TREE
             record.rules = [wrapguard.PARENT_TREE_RULE_ID]
@@ -692,6 +692,7 @@ def decide_before(
         record.rules = [reasons.rewrite_rule(form) for form in forms]
         parts = [
             reasons.rewrite(
+                root,
                 record.subject,
                 form,
                 [text for f, text in rewrites if f == form],
@@ -764,6 +765,7 @@ def decide_before(
                 )
                 stderr.write(
                     reasons.deadline_exceeded(
+                        root,
                         audit.REASON_DEADLINE_EXCEEDED,
                         DEADLINE_SECONDS,
                         passed=code == EXIT_OK,
@@ -931,12 +933,19 @@ def decide_before(
     # チケットが強かった回はチケットの文面になる（ticket_reason があるのはその回だけ）。
     if verdict == rules.DENY and capped:
         # `>` の上限で止めた。ヒットした ask のルールがあれば、その文も後ろに並べる。
-        texts = [
+        parts = [
             reasons.builtin_refusal(
                 reasons.CODE_REDIRECT_LIMIT_DENY,
                 reasons.REDIRECT_LIMIT_RULE,
                 display_subject,
-                selfguard_shell.REDIRECT_LIMIT_MESSAGE,
+                texts.say(
+                    root,
+                    "DENY_REDIRECT_LIMIT",
+                    {
+                        "limit": str(selfguard_shell.REDIRECT_LIMIT),
+                        "length": str(selfguard_shell.RAW_LENGTH_LIMIT),
+                    },
+                ),
             ),
             *(
                 reasons.reason_for(
@@ -948,6 +957,7 @@ def decide_before(
                     runner,
                     layer,
                     quoted,
+                    root=root,
                     git=settings.git_wrapper_command(root),
                 )
                 for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
@@ -961,7 +971,7 @@ def decide_before(
     elif verdict == rules.DENY and not ticket_reason:
         # ルールの deny。ヒットした理由はまとめて 1 回で返す。1 つずつ返すと、エージェントも
         # 1 つずつ直すことになり、そのたびに往復が 1 回増える。
-        texts = [
+        parts = [
             reasons.reason_for(
                 rule,
                 payload.tool_name,
@@ -971,6 +981,7 @@ def decide_before(
                 runner,
                 layer,
                 quoted,
+                root=root,
                 git=settings.git_wrapper_command(root),
             )
             for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
@@ -984,10 +995,10 @@ def decide_before(
     elif verdict == rules.DENY:
         # チケットが止めた。範囲の外かチケットの deny で、ルールは何も言わないか、
         # allow / ask にヒットしている（そのときは文面がルールの id を名指しする）。
-        texts = [ticket_reason]
+        parts = [ticket_reason]
         record.code = ticket_code or reasons.CODE_TICKET_SCOPE
     elif verdict == rules.ASK and not ticket_reason:
-        texts = [
+        parts = [
             "\n".join(
                 [
                     reasons.reason_for(
@@ -999,10 +1010,11 @@ def decide_before(
                         runner,
                         layer,
                         quoted,
+                        root=root,
                         git=settings.git_wrapper_command(root),
                     ),
                     *(
-                        reasons.ask_hint(rule.bare_id, display_subject)
+                        reasons.ask_hint(root, rule.bare_id, display_subject)
                         if rule.decision == rules.ASK
                         else ()
                     ),
@@ -1014,7 +1026,7 @@ def decide_before(
     elif verdict == rules.ASK:
         # チケットが ask と書いた場所。ユーザが 1 度見る場所として宣言されている。
         # ルールは何も言わないか、allow にヒットしている。
-        texts = [ticket_reason]
+        parts = [ticket_reason]
         record.code = reasons.CODE_TICKET_ASK
     else:
         # どのタイプも言及しなかった。ccnavi はこの呼び出しの判定を持たない。
@@ -1023,7 +1035,7 @@ def decide_before(
         verdict = undeclared_verdict(payload.permission_mode, record.degraded, conf.guard_unwatched)
         # 渡した回（HANDOVER）は文を返さないので組まない。出所は判定の出所（退避した回は
         # 組み込みの既定）で、読めなかったルールファイルを名指ししない。
-        texts = (
+        parts = (
             []
             if verdict == HANDOVER
             else [
@@ -1034,6 +1046,7 @@ def decide_before(
                     record.degraded,
                     verdict=verdict,
                     fell_back=record.fallback == builtin.FALLBACK,
+                    root=root,
                 )
             ]
         )
@@ -1059,7 +1072,7 @@ def decide_before(
         mode,
         record,
         verdict,
-        notices + texts,
+        notices + parts,
         context,
         conf=conf,
         root=root,
@@ -1375,7 +1388,7 @@ def flow_lock(
             copies, _ = approval.scan(conf, root)
         child = flow.lock_hit(copies, found[1], found[0])
         if child is not None:
-            return flow.locked_message(conf, child, path), copies
+            return flow.locked_message(root, conf, child, path), copies
     # ハードリンクはパスに置き場が出ないので `locate` ではヒットしない。書き込み先が在って
     # 名前が 2 つ以上あるときだけ、着手中の子のフローと同じ中身（inode）かを見る。
     target = full or spelled
@@ -1384,7 +1397,7 @@ def flow_lock(
             copies, _ = approval.scan(conf, root)
         child = flow.inode_hit(conf, root, copies, target)
         if child is not None:
-            return flow.locked_message(conf, child, target), copies
+            return flow.locked_message(root, conf, child, target), copies
     return "", copies
 
 

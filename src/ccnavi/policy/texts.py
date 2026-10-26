@@ -414,10 +414,39 @@ def _read_dir(directory: str) -> tuple[dict[str, Entry], list[Problem]]:
     return entries, problems
 
 
+# 置き場ごとの読み込み結果。1 回の判定で `say` を何度も呼ぶので、読み直しを避ける
+# （hook の期限があり、文面ファイルは十数本ある）。ファイルの名前・更新時刻・大きさが
+# 変わったら読み直す。変わらなければ同じ結果を返す（呼ぶ側は書き換えない）。
+_CACHE: dict[str, tuple[tuple, Catalog]] = {}
+
+
+def _signature(directory: str) -> tuple:
+    try:
+        names = sorted(n for n in os.listdir(directory) if n.endswith(SUFFIX))
+    except OSError:
+        return ()
+    found: list[tuple] = []
+    for name in names:
+        try:
+            stat = os.stat(os.path.join(directory, name))
+        except OSError:
+            found.append((name, None, None))
+            continue
+        found.append((name, stat.st_mtime_ns, stat.st_size))
+    return tuple(found)
+
+
 def load(root: str) -> Catalog:
     """置き場の文面を読む。例外を投げない（問題は `problems`）。"""
-    entries, problems = _read_dir(dirs(root))
-    return Catalog(entries, problems)
+    directory = dirs(root)
+    signature = _signature(directory)
+    hit = _CACHE.get(directory)
+    if hit is not None and hit[0] == signature:
+        return hit[1]
+    entries, problems = _read_dir(directory)
+    catalog = Catalog(entries, problems)
+    _CACHE[directory] = (signature, catalog)
+    return catalog
 
 
 # ---- 組み立て

@@ -812,7 +812,7 @@ merge_target_is_here() {
 
 # merge-on-target の「次:」の行。merge) と pull が同じ案内を出す。
 merge_on_target_next() {
-	printf '%s' "次: $WT_SH_Q <名前> でワークツリーを切り、その中で $SELF_Q merge $(ccnavi_sh_quote "$mg_integ") を打って衝突を解いてコミットし、$SELF_Q integrate <名前> で取り込む"
+	ccnavi_text "$WS" NEXT_GIT_MERGE_ON_TARGET "integ=$mg_integ"
 }
 
 # 共通部。名前・場所・記録の置き場を決める（ロックは取らない）。<名前>
@@ -1238,7 +1238,7 @@ ig_integrate() {
 			created "$(date +%s)" ||
 			reject integrate-marker "取り込みの記録（${ig_mark}）を書けません。ユーザに伝えてください。"
 		printf 'ok  git integrate  %s に取り込む差分は無かった（作業ブランチの中身は %s に入っている）\n' "$ig_n" "$d4_base"
-		printf '次: ユーザに伝えて返事を待ってターンを終える。片付けはユーザの発言のあとで %s integrate-done %s を打つ\n' "$SELF_Q" "$ig_n"
+		ccnavi_text "$WS" NEXT_GIT_INTEGRATE_EMPTY "name=$ig_n"
 		log_info 取り込む差分が無かった -- "name=$ig_n"
 		exit 0
 	fi
@@ -1288,8 +1288,7 @@ EOF
 		printf '案内: origin/%s が手元より進んでいる。先に合わせると、古い上に載せずに済む（cd %s && git pull --ff-only origin %s）\n' \
 			"$d4_base" "$(ccnavi_sh_quote "$ig_top")" "$d4_base"
 	fi
-	printf '次: 差分（%s diff %s %s）をユーザに見せ、返事を待ってターンを終える。確定はユーザの発言のあとで、了承を得ていれば %s integrate-done %s -m '"'"'<メッセージ>'"'"'。やめるなら %s integrate --abort %s\n' \
-		"$SELF_Q" "$d4_head" "$d4_c" "$SELF_Q" "$ig_n" "$SELF_Q" "$ig_n"
+	ccnavi_text "$WS" NEXT_GIT_INTEGRATE_REVIEW "head=$d4_head" "result=$d4_c" "name=$ig_n"
 	log_info 取り込み結果を用意した -- "name=$ig_n" "files=$d4_count"
 	exit 0
 }
@@ -1420,8 +1419,7 @@ d4_finish() {
 	log_info 取り込みを片付けた -- "name=$ig_n"
 	# 8: pushはユーザが打つ。
 	if [ -n "$d4_m_k" ] && d4_origin_ahead "$d4_base"; then
-		printf '次: ユーザにターミナルで %s をリモートへ送るよう頼む（cd %s && git push origin %s）。ccnavi-git.sh push は取り込み先へ送らない\n' \
-			"$d4_base" "$(ccnavi_sh_quote "$ig_top")" "$d4_base"
+		ccnavi_text "$WS" NEXT_GIT_PUSH_USER "base=$d4_base" "top=$ig_top"
 	fi
 	exit 0
 }

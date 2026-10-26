@@ -155,7 +155,7 @@ class RepoRulesTest(unittest.TestCase):
                     said = json.dumps(body["response"], ensure_ascii=False)
                     self.assertEqual(shown, "確認に答えられません" in said, said)
                     if rule_id == "prefer-webfetch":
-                        self.assertEqual(shown, "代わりの手:" in said, said)
+                        self.assertEqual(shown, "まとめてから実行する" in said, said)
 
     def test_リダイレクトの上限で止めた拒否には確認の固定文を足さない(self):
         from unittest import mock

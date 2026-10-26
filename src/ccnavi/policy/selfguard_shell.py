@@ -1078,13 +1078,6 @@ REDIRECT_LIMIT = 50
 # 超えたら同じ拒否にする（#241）。`>` の無い生の文字列には掛けない。
 RAW_LENGTH_LIMIT = 100_000
 
-REDIRECT_LIMIT_MESSAGE = (
-    f"コマンドに '>' が {REDIRECT_LIMIT} 個を超えて含まれているか、'>' を含む長さが "
-    f"{RAW_LENGTH_LIMIT} 字を超えていて、"
-    "保護の照合を安全に終えられないため、止めました。"
-    "長い内容は Write / Edit ツールでファイルに書くか、コマンドを分けて実行してください。"
-)
-
 
 def too_many_redirects(subject: str) -> bool:
     """生の文字列の `>` が REDIRECT_LIMIT を超えるか、`>` を含んで RAW_LENGTH_LIMIT を超えるか。"""

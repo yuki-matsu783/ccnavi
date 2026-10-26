@@ -10,7 +10,7 @@ import os
 import re
 
 from ..infra import modes, settings, shellread, shellread_words
-from ..policy import rules, selfguard_shell
+from ..policy import rules, selfguard_shell, texts
 from . import user_only
 
 # 何がユーザ専用かは `user_only` の表が正本。この module はその表から正規表現とオプションの一覧を
@@ -261,66 +261,35 @@ def human_path_form(subject: str) -> tuple[str, str]:
     return "", ""
 
 
-def expanded_option_message(found: str) -> str:
+def expanded_option_message(root: str, found: str) -> str:
     """`user` の語と、展開を含む `--` の語が並ぶ形で止めた文。"""
-    return (
-        f"コマンド行に `user` の語と、変数やコマンド置換を含むオプションの語（{found}）が"
-        "並んでいます。ユーザ専用の入口（ccnavi user <操作>）の `--yes` などを、"
-        "実行の時点で組み立てられる形なので、"
-        "何を実行するかを確かめられず止めました。オプションは変数や置換で組み立てず、"
-        "そのまま書いてください（値が必要なら先に読み、次の手に書きます）。"
-        "ユーザ専用の操作は、ユーザがターミナルかボードで実行します。"
-    )
+    return texts.say(root, "DENY_TICKET_APPROVAL_CLI__EXPANDED", {"found": found})
 
 
-def board_form_message(found: str) -> str:
+def board_form_message(root: str, found: str) -> str:
     """ボードの経路の形で止めた文。"""
     # 取り込みの形は、承認と残った指摘の対応方針の文にヒットしない。
     lowered = found.casefold()
     decided = (
-        "共通レイヤーのミラーの同期（`ccnavi-user-mirror.sh`）は、ユーザがボードかターミナルで"
-        "ミラーの差分を読んでから決めます。"
+        "mirror"
         if "mirror" in lowered
-        else "保護対象の下書きの取り込み（`ccnavi-user-handoff.sh`）は、"
-        "ユーザがボードかターミナルで"
-        "下書きの差分を読んでから決めます。"
+        else "handoff"
         if "handoff" in lowered
-        else "`--via board` は、ボードの画面から押した操作を拡張が実行するときだけ付ける印です。"
+        else "via"
         if lowered.startswith("--via")
-        else "承認はユーザがターミナル・ボード・置き場のファイルの移動で行い、"
-        "残った指摘の対応方針はユーザが VS Code のボードかターミナルで決めます。"
+        else "approval"
     )
-    return (
-        f"コマンド行に、ボード経由の操作用の形（{found}）が含まれています。この形はユーザがボードの"
-        "オーバーレイで押したものを拡張が実行するためのもので、ターミナルでの確かめが無いので、エージェントが"
-        f"実行した場合はここで止めます。{decided}"
-        "この文字列を探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
-    )
+    return texts.say(root, "DENY_TICKET_APPROVAL_CLI__BOARD", {"found": found}, {"why": decided})
 
 
-def user_script_message(found: str) -> str:
+def user_script_message(root: str, found: str) -> str:
     """ユーザ専用の sh の名前（`ccnavi-user-*.sh`）で止めた文。"""
-    return (
-        f"コマンド行に、ユーザ専用の sh の名前（{found}）が含まれています。"
-        "ccnavi-user- で始まる sh は、承認・レビュー済み・早めに閉じる・"
-        "残った子のブランチの削除など、ユーザがターミナルで決める操作です。"
-        "エージェントは実行しません。必要なら、理由を添えてユーザに依頼してください。"
-        "この文字列を探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
-    )
+    return texts.say(root, "DENY_TICKET_APPROVAL_CLI__USER_SCRIPT", {"found": found})
 
 
-def guard_off_message(found: str) -> str:
+def guard_off_message(root: str, found: str) -> str:
     """ターミナル要求を切る形で止めた文。"""
-    return (
-        f"ユーザの判断の経路（承認・レビュー済み・早めに閉じる操作）で、"
-        f"ターミナルからの入力を求めないようにする形（{found}）を、"
-        "コマンド行に書いています。"
-        "この変数とフラグは、テストや CI がターミナルを使わずに実行ファイルを"
-        "実行するためのもので、エージェントが置くものではありません。"
-        "承認はユーザがターミナル・ボード・置き場のファイルの移動で、レビュー済みはユーザがターミナルかボードで、"
-        "早めに閉じる操作はユーザがターミナルで行います。"
-        "この文字列を探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
-    )
+    return texts.say(root, "DENY_TICKET_APPROVAL_CLI__GUARD_OFF", {"found": found})
 
 
 # ユーザがターミナルで打つ入口のうち、引数を読み切れない形。human_path_form と組み込みの script 節は
@@ -813,45 +782,19 @@ def _executed_entry(words: list[str], bin_base: str) -> str:
     return ""
 
 
-# 止めた語が、実行の時点で何になりうるか（入口ごと）と、通る形の案内。
-_ENTRY_REASONS = {
-    _ENTRY_REVIEW: (
-        "decide の --choices（ボードで押した選択を置く操作）になりうる",
-        "一覧を見るだけなら decide <N> --preview は通ります。",
-    ),
-    "ccnavi": (
-        "ユーザ専用の入口 user、承認のオプション（--agree / --reviewed）と --yes、"
-        "放棄した親の記録を消す worktree retire --abandon、"
-        "またはターミナル要求を切る --guard-ticket-approval になりうる",
-        "診断（--docs・--test・--lint・--explain など）は、そのオプションを"
-        "展開を含む語より前に書けば"
-        "通ります。承認待ちを見るだけなら --agree --preview も通ります。",
-    ),
-}
-
-
-def hidden_entry_message(entry: str, found: str) -> str:
+def hidden_entry_message(root: str, entry: str, found: str) -> str:
     """ユーザがターミナルで打つ入口を、エージェントが打った形で止めた文。"""
-    tail = (
-        "承認・残った指摘の対応方針・放棄した親の記録を消す操作は、ユーザがターミナルで実行します。"
-    )
+    values = {"entry": entry, "found": found}
     if found == STDIN_SHELL:
-        return (
-            f"標準入力から読むシェルに流し込む文字列に、ユーザがターミナルで実行する入口（{entry}）の名前が"
-            "あります。流し込んだ文字列の中は語として読めないので、何を実行するかを確かめられません。"
-            "入口はコマンド行にそのまま書いてください。" + tail
-        )
+        return texts.say(root, "DENY_TICKET_APPROVAL_CLI__HIDDEN_STDIN", {"entry": entry})
     if found in _FEEDERS or found.startswith("< "):
-        return (
-            f"ユーザがターミナルで実行する入口（{entry}）に、引数か中身を外から流し込む形（{found}）が"
-            "あります。何が渡るかを確かめられないので止めました。"
-            "引数はコマンド行にそのまま書いてください。" + tail
-        )
-    reason, way = _ENTRY_REASONS.get(entry, ("止める操作になりうる", ""))
-    return (
-        f"ユーザがターミナルで実行する入口（{entry}）に渡る語（{found}）が、実行の時点で、{reason}ので止めました。"
-        "値は変数や glob で組み立てず、そのまま書いてください"
-        "（値が必要なら先に読み、次の手に書きます）。" + way + tail
+        return texts.say(root, "DENY_TICKET_APPROVAL_CLI__HIDDEN_FEED", values)
+    kind = "review" if entry == _ENTRY_REVIEW else "exe" if entry == "ccnavi" else "other"
+    return texts.say(
+        root,
+        "DENY_TICKET_APPROVAL_CLI__HIDDEN_ENTRY",
+        {"entry": entry, "found": found},
+        {"what": kind, "next": kind},
     )
 
 
@@ -952,16 +895,9 @@ def _previewed(text: str, cuts: set[int], start: int, end: int) -> bool:
     return not any(gap <= i <= start for i in cuts)
 
 
-def prune_message() -> str:
+def prune_message(root: str) -> str:
     """`--prune` で止めた文。"""
-    return (
-        "記録と state を削除する 'ccnavi-user-prune.sh' は、"
-        "ユーザがターミナルから実行するものです。記録は"
-        "「ccnavi が何を判定したか」を後から確かめるための材料なので、"
-        "エージェントからは消しません。"
-        "何が消える対象かを見るだけなら 'ccnavi --prune --preview' は通ります。"
-        "削除する必要があれば、理由を添えてユーザに依頼してください。"
-    )
+    return texts.say(root, "DENY_RECORDS_PRUNE", {})
 
 
 # Python から実行ファイルの中身を走らせる表記（ticket_approval_rule の launcher）。

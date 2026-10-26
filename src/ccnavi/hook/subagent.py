@@ -577,9 +577,9 @@ def confirm_outcomes(state_dir: str, done: list) -> None:
         subagent_outcome.confirm(state_dir, done)
 
 
-def stop_nudge(state_dir: str, session: str) -> str:
-    """Stop で促す文（`subagent_outcome.stop_nudge`）。"""
-    return subagent_outcome.stop_nudge(state_dir, session)
+def stop_lines(state_dir: str, session: str) -> list[str]:
+    """Stop で促す結果の 1 行ずつ（`subagent_outcome.stop_lines`）。"""
+    return subagent_outcome.stop_lines(state_dir, session)
 
 
 def ignored_bounce(state_dir: str, payload: hookio.Input) -> str:

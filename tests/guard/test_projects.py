@@ -383,8 +383,8 @@ class ProjectsTest(unittest.TestCase):
         denied = self.hook("Write", self.ws, file_path=os.path.join(wrong, "src", "a", "a.py"))
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
         self.assertIn("DENY_TICKET_PROJECT_MISMATCH", self.reason(denied))
-        self.assertIn("'lib'", self.reason(denied))
-        self.assertIn("'app'", self.reason(denied))
+        self.assertIn("lib のリポジトリ向け", self.reason(denied))
+        self.assertIn("app から切られている", self.reason(denied))
         self.assertEqual(self.last_record()["code"], "DENY_TICKET_PROJECT_MISMATCH")
         # 範囲の判定ではないので、記録の名前は builtin:ticket-scope を使い回さない。
         self.assertEqual(self.last_record()["rules"], ["builtin:ticket-project"])

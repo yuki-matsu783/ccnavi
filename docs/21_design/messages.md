@@ -22,7 +22,7 @@ keywords: [文面, 文面ファイル, messages, 識別子, 差し込み, ccnavi
 | `policy/texts.py` | 読み込み、検査、差し込み、組み立て、壊れたときの既定の文 | 判定 |
 | `ccnavi text` | sh から `texts` を引く入口 | 文面ファイルの直接の読み書き |
 
-組み込みの拒否・促し（Python）は `texts.say` を呼ぶ。sh は文面ファイルを読まず、`ccnavi text` を `ccnavi_text`（`ccnavi-common-state.sh`）で呼ぶ。
+組み込みの拒否・促し（Python）は `texts.say` を呼ぶ。まだ移していない文（ルールの `message`、種類を決められない通知など）は呼ばず、[文面の移行の一覧](../42_claude/message-migration.md)にある。sh は文面ファイルを読まず、`ccnavi text` を `ccnavi_text`（`ccnavi-common-state.sh`）で呼ぶ。
 
 ### 13.2 置き場とレイヤー
 
@@ -166,8 +166,8 @@ ccnavi のリポジトリのテストは、次も見る（呼ぶ側が手元の�
 
 この設計に沿って、次を文面ファイルに移した。残りは `docs/42_claude/message-migration.md` の一覧表が持つ。
 
-- 拒否: `DENY_TICKET_PARENT`・`DENY_PHASE_REVIEW`・`DENY_NEEDS_USER_TURN`
-- 促し: `NUDGE_INTEGRATE`
-- `ccnavi-start.sh` の `次:` と `次の手:` の全部と、`ccnavi_pf_next`（事前確認の `次:`。`ccnavi-ticket.sh` も使う）の文
+- 拒否: 組み込みの拒否の大半（`DENY_TICKET_*`・`DENY_PHASE_REVIEW`・`DENY_NEEDS_USER_TURN`・`DENY_AGENT_*`・ラッパーと関門の `DENY_*`・書き直しを求める拒否・`DENY_REDIRECT_LIMIT`）と、確認の理由（`RULE_ASK`）
+- 促し: `NUDGE_INTEGRATE`・`NUDGE_TICKET_*`・`NUDGE_SUBAGENT_OUTCOME`・`NUDGE_STOP_RULE`、`standing` の案内
+- sh の `次:`: `ccnavi-start.sh` の `次:` と `次の手:` の全部、`ccnavi_pf_next`（事前確認）、`ccnavi-git.sh`・`ccnavi-worktree.sh`・`ccnavi-stage.sh`・`ccnavi-ticket.sh`・`ccnavi-user-close-early.sh` の `次:`
 
 `rules.yml` のインラインの `message` は、そのまま残す。識別子で引く形（`message_id:`）は持たない。ルールの書式の版（`rules.VERSION`）、レイヤーの合成、`--lint`、`--explain` に手を入れることになり、ルールの `message` は移す対象に含めていないため。移す日が来たら、`message_id` の識別子は 13.4 の `deny` の識別子（`RULE_*`）とする。

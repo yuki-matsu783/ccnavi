@@ -831,7 +831,7 @@ class SelfGuardTest(unittest.TestCase):
             ),
             reason,
         )
-        self.assertIn(selfguard_shell.REDIRECT_LIMIT_MESSAGE, reason)
+        self.assertIn(f"'>' が {selfguard_shell.REDIRECT_LIMIT} 個を超えて", reason)
         self.assertIn("止めました", reason)
         self.assertIn("Write / Edit", reason)
         self.assertNotIn("確認に答える人", reason)

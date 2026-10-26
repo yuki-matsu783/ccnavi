@@ -34,7 +34,7 @@ import os
 import re
 
 from ..infra import pathcase, settings, shellread, shellread_words, tree
-from ..policy import selfguard_shell
+from ..policy import selfguard_shell, texts
 from ..tickets import ticket_model
 
 CODE_ENV = "DENY_SCRIPT_ENV_OVERRIDE"
@@ -221,53 +221,25 @@ def check_parent_tree_git(
     return "", ""
 
 
-_PARENT_TREE_TAIL = (
-    "子のワークツリー（.claude/worktrees/<子>）で実装してコミットし、結果を報告して"
-    "終わってください。親のブランチへの合流・状態の記録・push は、メインが finish で行います。"
-    "衝突を解くときは、子のワークツリーで親のブランチを merge してコミットします。"
-)
-
-
-def parent_tree_message(sub: str, name: str) -> str:
+def parent_tree_message(root: str, sub: str, name: str) -> str:
     """サブエージェントが `ccnavi-git.sh` で親のワークツリーを書き換えるのを止めた文。"""
     if name == "?":
-        return (
-            f"ccnavi-git.sh {sub} をどのツリーで実行するのかが読めません"
-            "（`cd` や `env -C` の行き先に変数・置換がある、読み切れないコマンド行、など）。"
-            "サブエージェントは親のワークツリーを書き換えないので、"
-            "実行するツリーが決まらない形は使用できません。子のワークツリーに入って、"
-            "`cd` の行き先をそのまま書いて再実行してください。"
-        )
-    return (
-        f"{name} は親のワークツリーです。サブエージェントは親のワークツリーを書き換えません"
-        f"（ccnavi-git.sh {sub} も、ファイルの書き込みも）。" + _PARENT_TREE_TAIL
-    )
+        return texts.say(root, "DENY_SUBAGENT_PARENT_TREE__GIT_UNREAD", {"sub": sub})
+    return texts.say(root, "DENY_SUBAGENT_PARENT_TREE__GIT", {"sub": sub, "name": name})
 
 
-def parent_write_message(what: str, name: str, kind: str = "write") -> str:
+def parent_write_message(root: str, what: str, name: str, kind: str = "write") -> str:
     """サブエージェントが親のワークツリーへファイルを書き込むのを止めた文。
 
     what は書き込みの形（ツールの名前か、シェルの書き込み先・コードの文字列）。
     """
     if name == "?":
-        return (
-            f"書き込み先（{what}）がどのツリーにあるかを読めません（`cd` の行き先に変数・置換が"
-            "ある、など）。サブエージェントは親のワークツリーへ書き込まないので、書き込み先が"
-            "決まらない形は使用できません。`cd` の行き先をそのまま書くか、子のワークツリーの中の"
-            "絶対パスで書いて再実行してください。"
-        )
+        return texts.say(root, "DENY_SUBAGENT_PARENT_TREE__WRITE_UNREAD", {"what": what})
     if kind == "code":
-        return (
-            f"{name} は親のワークツリーです。インタプリタに渡したコード（{what}）が親の"
-            "ワークツリーを指し、書き込みを疑う語を含むので止めました。コードの中は読み切れない"
-            "ため、親のワークツリーを指す形は止める側に倒します。読むだけなら Read・Grep を"
-            "使ってください。" + _PARENT_TREE_TAIL
+        return texts.say(
+            root, "DENY_SUBAGENT_PARENT_TREE__WRITE_CODE", {"name": name, "what": what}
         )
-    return (
-        f"{name} は親のワークツリーです。サブエージェントは親のワークツリーへ書き込みません"
-        f"（{what}）。下書き・提案・ELI5 の置き場（wip/proposals/・wip/handoff/・wip/eli5/）は"
-        "書けます。" + _PARENT_TREE_TAIL
-    )
+    return texts.say(root, "DENY_SUBAGENT_PARENT_TREE__WRITE", {"name": name, "what": what})
 
 
 # ラッパーのサブコマンドのうち、行き先のファイルを消す・別のコミットの中身に戻すもの。
@@ -637,55 +609,16 @@ def core_path_message(root: str, sub: str, word: str, kind: str = CORE_HIT) -> s
        （`CORE_REVIEW`）・索引（`CORE_INDEX`）・読み切れない形（`CORE_UNREAD`）。
     3. どれにもヒットしなければ、ccnavi 自身を守る場所（既定の `CORE_HIT`）の文を返す。
     """
-    git_sh = settings.script_command(root, _GIT_SCRIPT)
     if kind == CORE_STORE:
-        return (
-            f"{_GIT_SCRIPT} {sub} が、承認済みチケットの置き場（{word}）を削除するか、"
-            "別のコミットの中身に戻す形になっています。ここには承認済みチケットとレビュー済みのマーカーがあり、"
-            "動かすのはユーザと ccnavi のスクリプトです（レビューをやり直すためにマーカーを削除する"
-            " "
-            f"'{git_sh} rm <マーカー>' も、ユーザがターミナルで実行する手順です）。"
-            "必要なら、何をなぜ削除したいのかを伝えてユーザに依頼してください。"
-        )
+        return texts.say(root, "DENY_WRAPPER_CORE_PATH__STORE", {"sub": sub, "word": word})
     if kind == CORE_REVIEW:
-        return (
-            f"{_GIT_SCRIPT} {sub} が、レビュー待ちの提案の置き場（{word}）を削除するか、"
-            "別のコミットの中身に戻す形になっています。ここにはユーザのレビューを待つチケットがあり、"
-            "動かすのはユーザと ccnavi のスクリプトです（レビューで done/ へ動かすのも、"
-            "置き場から外すのもユーザです）。"
-            "レビュー待ちの提案を外したいなら、どれをなぜ外したいのかを伝えてユーザに依頼してください。"
-        )
+        return texts.say(root, "DENY_WRAPPER_CORE_PATH__REVIEW", {"sub": sub, "word": word})
     if kind == CORE_INDEX:
-        return (
-            f"{_GIT_SCRIPT} {sub} にパスを渡す形（{word}）は、そのファイルの書きかけを削除します。"
-            f"戻したいファイルがあるなら '{git_sh} restore <パス>' を名指しで使ってください。"
-            "ccnavi 自身を守る場所（hook の登録・設定・保護済みのスクリプト・記録）を戻すなら、"
-            "何をなぜ戻したいのかを伝えてユーザに依頼してください。"
-        )
+        return texts.say(root, "DENY_WRAPPER_CORE_PATH__INDEX", {"sub": sub, "word": word})
     if kind == CORE_UNREAD:
         call = f"{_GIT_SCRIPT} の呼び出し" if sub == "?" else f"{_GIT_SCRIPT} {sub}"
-        return (
-            f"{call}（{word}）を読み切れません。サブコマンドや対象を変数・置換・glob で書いた形、"
-            "標準入力から読むシェルや xargs に渡した文字列の中の呼び出し、"
-            '居場所を読めない cd（cd "$D"・pushd）の後の相対パスは、'
-            "ccnavi 自身を守る場所（hook の登録・ルールとフェーズの設定・"
-            "保護済みのスクリプト・実行ファイル・判定の記録）と承認済みチケットの置き場に"
-            "ヒットするかを確かめられないので止めました。ラッパーはサブコマンドと対象をそのまま書いて、"
-            f"直接呼んでください（'{git_sh} <サブコマンド> <パス>'。値は先に読んでから書きます）。"
-        )
-    return (
-        f"{_GIT_SCRIPT} {sub} が、ccnavi 自身を守る場所（{word}）を削除するか、別のコミットの中身に"
-        "戻す形になっています。ここには hook の登録・ルールとフェーズの設定・保護済みのスクリプト・"
-        "実行ファイル・判定の記録があり、削除したり古い中身に戻したりすると ccnavi"
-        " の止めが外れます。"
-        "シェルの rm や Write / Edit でも拒否される場所です。変更が必要なら、何をなぜ変えたいのかを"
-        "伝えてユーザに依頼してください。"
-        f"衝突を解くときの '{git_sh} restore --ours -- <パス>'（--theirs も）と、索引だけを戻す "
-        f"'{git_sh} restore --staged <パス>' は通ります。"
-        "グロブ（* ? [）・: で始まる指定・--pathspec-from-file は、守る場所にヒットするかを"
-        "決められないので、"
-        "削除する・戻すファイルを 1 つずつ名指ししてください。"
-    )
+        return texts.say(root, "DENY_WRAPPER_CORE_PATH__UNREAD", {"call": call, "word": word})
+    return texts.say(root, "DENY_WRAPPER_CORE_PATH__HIT", {"sub": sub, "word": word})
 
 
 def worktree_name(root: str, place: str) -> str:
@@ -992,35 +925,21 @@ def _strip_heads(words: list[str]) -> list[str]:
     return words[i:]
 
 
-def env_message(script: str, names: list[str]) -> str:
+def env_message(root: str, script: str, names: list[str]) -> str:
     """環境変数の代入で止めた文。"""
-    shown = ", ".join(names)
-    return (
-        f"保護済みの sh（{script}）を、sh の検査の材料を変える環境変数（{shown}）と"
-        "同じコマンド行で呼んでいます。この変数は sh がワークスペースルート・承認済みチケットの"
-        "置き場・実行ファイルを決めるのに使うか（CCNAVI_*）、git が操作するリポジトリと"
-        "ワークツリーを決めるのに使う（GIT_*）ので、書き換えると sh の検査が外れます。"
-        "コマンド行のどこに書いても数えます（ループや関数の中では、後ろに書いた代入も次の呼び出しに"
-        "届くため）。変数を置かずに、sh の呼び出しを別のコマンドに分けて実行してください。"
-        "置き場が本当に違うなら、ユーザに "
-        "settings.json の env を直してもらってください。出力の量と待ち時間の変数（"
-        + ", ".join(sorted(PASS_THROUGH))
-        + "）は置けます。"
+    return texts.say(
+        root,
+        "DENY_SCRIPT_ENV_OVERRIDE",
+        {
+            "script": script,
+            "names": ", ".join(names),
+            "pass_through": ", ".join(sorted(PASS_THROUGH)),
+        },
     )
 
 
-def child_push_message(name: str, parent: str) -> str:
+def child_push_message(root: str, name: str, parent: str) -> str:
     """子のワークツリーからの push を止めた文。sh の文面と揃える。"""
     if name == "?":
-        return (
-            "ccnavi-git.sh push をどのツリーから実行するのかが読めません（`cd` の行き先に変数・"
-            "置換・グロブがある、など）。子チケットのワークツリーからは送らないので、"
-            "送るツリーが決まらない形は使用できません。`cd` の行き先をそのまま書くか、"
-            "送るツリーに入ってから再実行してください。"
-        )
-    return (
-        f"{name} は子チケットのワークツリーです。子のブランチはリモートへ送りません。"
-        f"親（{parent}）が子の成果を取り込んでから、親のワークツリー "
-        f"(.claude/worktrees/{parent}) で送ります。子は作業を終えたら結果を報告して"
-        "終わってください。"
-    )
+        return texts.say(root, "DENY_CHILD_PUSH__UNREAD", {})
+    return texts.say(root, "DENY_CHILD_PUSH__CHILD", {"name": name, "parent": parent})

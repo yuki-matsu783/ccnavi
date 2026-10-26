@@ -1251,7 +1251,7 @@ def _hook_steps(
     except hookio.Unusable as exc:
         stderr.write(
             reasons.payload_unusable(
-                audit.REASON_PAYLOAD_UNUSABLE, str(exc), event=exc.event, mode=mode
+                root, audit.REASON_PAYLOAD_UNUSABLE, str(exc), event=exc.event, mode=mode
             )
             + "\n"
         )
@@ -1395,7 +1395,7 @@ def _internal_error(
         passed = code == 0 and payload.event != hookio.POST_TOOL_USE
         stderr.write(
             reasons.internal_error(
-                audit.REASON_INTERNAL_ERROR, payload.event, kind, log_path, passed=passed
+                root, audit.REASON_INTERNAL_ERROR, payload.event, kind, log_path, passed=passed
             )
             + "\n"
         )

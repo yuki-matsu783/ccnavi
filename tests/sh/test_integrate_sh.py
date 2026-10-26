@@ -22,7 +22,7 @@ import tempfile
 import time
 import unittest
 
-from tests import ROOT, common_sh
+from tests import ROOT, common_sh, put_messages
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
@@ -73,6 +73,7 @@ class Fixture(unittest.TestCase):
         os.makedirs(scripts)
         for name in SCRIPTS:
             shutil.copy(os.path.join(SH_DIR, name), scripts)
+        put_messages(self.ws)
         self.bin = os.path.join(self._tmp.name, "bin", "ccnavi")
         write(
             self.bin,

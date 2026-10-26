@@ -1,0 +1,263 @@
+# 組み込みの拒否と確認の理由の文（hook/reasons.py が組む）。条件（いつ止めるか）はコード側にある。
+# ここは何を言うかだけを持つ。先頭の `[ccnavi] CODE (…)` と `subject:` の行はコード側が付ける。
+# 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
+version: 1
+messages:
+  # ---- 書き直しを求める形（shellread の FORM_*）。識別子は reasons.CODE_REWRITE の値と同じ。
+  DENY_BRACE_EXPANSION:
+    kind: deny
+    values: [found]
+    what: |-
+      引用の外の波括弧展開を見つけたため、呼び出しを止めました: {found}
+    why: |-
+      引用の外では、シェルがコマンドを実行する前に波括弧を複数の語に展開します。ccnavi が読んだ語と実際に実行される語が一致せず、bash と zsh で展開の結果も異なるので、結果を推測せずに止めます。代入や case のパターン、[[ ]] のように展開されない箇所でも止まります。
+    next: |-
+      語を書き出して打ち直す（`--exclude-dir={{a,b}}` は `--exclude-dir=a --exclude-dir=b`、`cp f{{,.bak}}` は `cp f f.bak`、`{{1..3}}` は `1 2 3`）。波括弧を文字として使うなら、シングルクォートで囲む（'{{a,b}}'）
+    no_bypass: |-
+      波括弧の書き方を変えても、展開される形は同じ関門に当たります。
+
+  DENY_COMMAND_NAME_EXPANSION:
+    kind: deny
+    values: [found]
+    what: |-
+      実行時に決まるコマンド名を見つけたため、呼び出しを止めました: {found}
+    why: |-
+      シェルは、このコマンド名を実行するときに変数・コマンド置換・グロブから決めます。どのプログラムが走るかが表記から分からないので、どのルールも適用できません。
+    next: |-
+      コマンド名を直接書いて打ち直す（`c=ls; $c -la` は `ls -la`、`"$(command -v python3)" x.py` は `python3 x.py`、`/usr/bin/l? -la` は `/usr/bin/ls -la`）。sh や source に渡すスクリプトも、`sh $SCRIPT` ではなくパスを直接書く
+    no_bypass: |-
+      変数やグロブの組み方を変えても、実行時に決まる名前は同じ関門に当たります。
+
+  DENY_BACKQUOTE:
+    kind: deny
+    values: [found, git]
+    what: |-
+      バッククォートを見つけたため、呼び出しを止めました: {found}
+    why: |-
+      バッククォートの中身は、二重引用符の中や引用なしの here-doc でもシェルが実行します。ccnavi はバッククォートを読まないので、止めます。
+    next:
+      git: |-
+        コマンド置換には `$( )` を使って打ち直す。バッククォートを文字として残すなら（Issue や PR 本文の Markdown など）、シングルクォートで囲むか、1 つずつ \` とエスケープするか、ファイルから渡す（`glab --description-file <ファイル>`、gh なら `--body-file`、{git} commit -F <ファイル>）
+      plain: |-
+        コマンド置換には `$( )` を使って打ち直す。バッククォートを文字として残すなら（Issue や PR 本文の Markdown など）、シングルクォートで囲むか、1 つずつ \` とエスケープするか、ファイルから渡す（`glab --description-file <ファイル>`、gh なら `--body-file`）
+    no_bypass: |-
+      バッククォートを別の位置に書いても、シェルが実行する形は同じ関門に当たります。
+
+  DENY_AMBIGUOUS_FORM:
+    kind: deny
+    values: [found]
+    what: |-
+      読みが分かれる形を見つけたため、呼び出しを止めました: {found}
+    why: |-
+      bash と zsh で読みが分かれる形か、入れ子が深すぎる形なので、実行される内容を確定できません。
+    next: |-
+      素直な形に書き直して打ち直す（`$( )` の中の case は if と elif に、算術式と読まれる `$((cmd) | x)` は `$( (cmd) | x )` と空白を入れる、内側のコマンドを先に実行してその値を次のコマンドに書く、coproc の代わりに `&`・select の代わりに for を使う、入れ子の `$( )` を深くしない）
+    no_bypass: |-
+      言い換えても、読みが分かれる形は同じ関門に当たります。
+
+  # ---- サブエージェントに許さない操作
+  DENY_SUBAGENT_TICKET_OP:
+    kind: deny
+    values: []
+    what: |-
+      サブエージェントから、チケットの状態を動かす操作・レビューの依頼や確認・リモートへの push を打とうとしたため、止めました。
+    why: |-
+      これらは親（メインエージェント）だけが行います。合流、push、チケットを閉じることは親の仕事です。
+    next: |-
+      自分のチケットの範囲で作業を終えたらコミットまで済ませ、結果を報告して終える
+    no_bypass: |-
+      言い換えや別の経路でも、サブエージェントからは同じ関門に当たります。親に任せます。
+
+  # ---- ccnavi 自身の失敗（識別子は記録の reason とは別。記録の reason は internal-error など）
+  DENY_INTERNAL_ERROR:
+    kind: deny
+    values: [kind, log_path]
+    what:
+      post_tool_use: |-
+        ccnavi の内部の不具合で、この呼び出しが何を変えたかを確かめられませんでした。実行後の保護対象の検査は行われていません。
+      passed: |-
+        ccnavi の内部の不具合で、この呼び出しを判定できませんでした。この呼び出しは、ルールなしで確かめられる読み取りだけなので、通しました。
+      stopped: |-
+        ccnavi の内部の不具合で判定できなかったため、この呼び出しを止めました。
+    why: |-
+      原因は呼び出しではなく ccnavi にあります（{kind}）。詳細は診断ログ {log_path} にあります。
+    next: |-
+      ユーザに、ここで ccnavi が失敗したことと診断ログの場所を伝え、続け方を任せる
+    no_bypass: |-
+      同じ呼び出しを打ち直して回避しないでください。
+
+  DENY_PAYLOAD_UNUSABLE:
+    kind: deny
+    values: [problem, event]
+    what:
+      pre_tool_use: |-
+        ccnavi は Claude Code からの hook の入力を読めず（{problem}）、この呼び出しを判定できないので止めました。
+      post_tool_use: |-
+        ccnavi は Claude Code からの hook の入力を読めず（{problem}）、この呼び出しが何を変えたかを確かめられませんでした。呼び出しはすでに実行済みで、あなたの書いたものが原因ではないので、再実行しません。
+      user_prompt_submit: |-
+        ccnavi は Claude Code からの hook の入力を読めず（{problem}）、この発言を Claude に渡す前に止めました。
+      stop: |-
+        ccnavi は Claude Code からの hook の入力を読めず（{problem}）、このターンの終わりを確かめられないので、終わらせませんでした。あなたの作業が原因ではありません。
+      subagent_stop: |-
+        ccnavi は Claude Code からの hook の入力を読めず（{problem}）、このサブエージェントの作業を確かめられないので、終わらせませんでした。あなたの作業が原因ではありません。
+      dry_run: |-
+        ccnavi は Claude Code からの hook の入力を読めず（{problem}）、この {event} イベントを確かめられませんでした。CCNAVI_MODE が dry-run なので何も止めていません。enable なら止めていました。
+      other: |-
+        ccnavi は Claude Code からの hook の入力を読めず（{problem}）、この {event} イベントを確かめられないまま exit code 2 で止まりました。書いたものが原因ではありません。
+    why: |-
+      入力を読めないと、ccnavi は何の呼び出しかを判定できないためです。呼び出しや発言を書き直しても、入力は変わりません。
+    next:
+      check: |-
+        ユーザに、`.claude/settings.json` の ccnavi の hook の登録と、この ccnavi の版が Claude Code の版に合っているかを確かめてもらい、返事を待つ
+      prompt: |-
+        ユーザに、`.claude/settings.json` の ccnavi の hook の登録と、この ccnavi の版が Claude Code の版に合っているかを確かめてもらう。確かめるまで、同じ発言を送り直しても通らない
+      stop: |-
+        作業を続けず、ユーザに、`.claude/settings.json` の ccnavi の hook の登録と、この ccnavi の版が Claude Code の版に合っているかを確かめてもらうよう伝えて、ターンを終える
+      subagent: |-
+        作業を続けず、最終報告に、ユーザが `.claude/settings.json` の ccnavi の hook の登録と、この ccnavi の版が Claude Code の版に合っているかを確かめるべきことを書いて、終える
+    no_bypass: |-
+      打ち直しや別の経路を試しても、入力が読めないかぎり結果は変わりません。
+
+  DENY_DEADLINE_EXCEEDED:
+    kind: deny
+    values: [seconds]
+    what:
+      stopped: |-
+        ccnavi は、この呼び出しの判定を終える前に期限（{seconds} 秒）を超えたので、止めました。
+      passed: |-
+        ccnavi は、この呼び出しの判定を終える前に期限（{seconds} 秒）を超えましたが、この呼び出しはルールなしで確かめられる読み取りだけなので、通しました。
+    why: |-
+      長いコマンドや長い文字列、`>` のように照合を伸ばす形が多いと、照合に時間がかかるためです。
+    next: |-
+      コマンドを短く分けて打ち直すか、長い文面は Write ツールでファイルに書いてそのファイルを渡す。短いコマンドで繰り返し止まるなら、ユーザに伝える
+    no_bypass: |-
+      同じ長さのまま打ち直しても、同じ関門に当たります。
+
+  # ---- 非対話のセッションで、確認が自動で拒否になるときの理由。識別子は記録の code（RULE_ASK）と同じ。
+  # ルールごとに代わりの手が違うので、同じコードで文を分ける。
+  RULE_ASK:
+    kind: deny
+    values: [subject]
+    what: |-
+      この操作はユーザの確認が要りますが、このセッションでは確認に答えられません。
+    why: |-
+      確認に答える人がいないと、確認は自動で拒否になるためです。
+    next: |-
+      ユーザに「{subject}」の了承を頼んで返事を待ち、了承されたら打ち直す
+    no_bypass: |-
+      言い換えや別の経路でも、同じ確認に当たります。ユーザの返事を待ちます。
+
+  RULE_ASK__PREFER_WEBFETCH:
+    kind: deny
+    values: [subject]
+    what: |-
+      この操作はユーザの確認が要りますが、このセッションでは確認に答えられません。
+    why: |-
+      確認に答える人がいないと、確認は自動で拒否になるためです。調べものは、ツールか sh にまとめれば確認なしで済みます。
+    next: |-
+      調べものが一度きりなら WebFetch ツールを使う。何度も呼び出すなら sh にまとめてから実行する。どちらも使えないなら、ユーザに「{subject}」の了承を頼んで返事を待ち、了承されたら打ち直す
+    no_bypass: |-
+      言い換えや別の経路でも、同じ確認に当たります。
+
+  RULE_ASK__ADOPT:
+    kind: deny
+    values: [subject]
+    what: |-
+      この操作はユーザの確認が要りますが、このセッションでは確認に答えられません。
+    why: |-
+      確認に答える人がいないと、確認は自動で拒否になるためです。さらに --adopt は、チケットに結び付く名前（承認済みチケット・提案・親のブランチの識別子。`ccnavi-ticket.sh status` に出る）のワークツリーには、了承されても通りません。ccnavi-worktree.sh が断ります。
+    next: |-
+      チケットに結び付く名前なら了承を頼まず、チケットの作業をマージリクエストで出す（`{script:ccnavi-ticket.sh} status` の次の操作に従う）。チケットに結び付かない直接作業のワークツリーだけ、ユーザに「{subject}」の了承を頼んで返事を待ち、了承されたら打ち直す
+    no_bypass: |-
+      言い換えや別の経路でも、同じ確認と断りに当たります。
+
+  # ---- ルールにヒットした理由に足す案内（reason_for が足す）
+  NOTE_RAN_BY:
+    kind: note
+    values: [runner, inner]
+    note:
+      moved: |-
+        `cd` で移った先から見ると `{inner}` になり、ルールはこの形にヒットしました。
+      runner: |-
+        ルールは `{runner}` が実行する `{inner}` にヒットしました。
+
+  NOTE_INSIDE_QUOTES:
+    kind: note
+    values: [git]
+    note:
+      git: |-
+        このルールは二重引用符の中、または引用しないヒアドキュメントの中のコマンドにヒットしました。そこではシェルが $( ) とバッククォートを実行します。文字として書くだけではありません。文字のまま渡すには、シングルクォートで囲むか、\$( と \` と書くか、文面をファイルから渡してください（{git} commit -F <file>, glab --description-file <file>、gh なら --body-file <file>）。git のリビジョンのような値を使うには、先に 1 つのコマンドで値を出力し、次のコマンドに値を書いてください。
+      plain: |-
+        このルールは二重引用符の中、または引用しないヒアドキュメントの中のコマンドにヒットしました。そこではシェルが $( ) とバッククォートを実行します。文字として書くだけではありません。文字のまま渡すには、シングルクォートで囲むか、\$( と \` と書くか、文面をファイルから渡してください（glab --description-file <file>、gh なら --body-file <file>）。git のリビジョンのような値を使うには、先に 1 つのコマンドで値を出力し、次のコマンドに値を書いてください。
+
+  # 読めないまま出した 1 件につける断り。matched はルールにヒットした 1 件、raw は言及の無い回。
+  NOTE_UNREADABLE__UNTERMINATED:
+    kind: note
+    values: []
+    note:
+      matched: |-
+        このコマンドは、引用符かヒアドキュメントが閉じていないため、このルールは実行される中身ではなく、書かれた生の文字列に当てました。語を書いただけで実行しないなら、禁止したわけではありません。語をファイルに移すか、コマンドを分けて打ち直してください。
+      raw: |-
+        このコマンドは、引用符かヒアドキュメントが閉じていないため、ccnavi は書かれた生の文字列にしかルールを当てられず、どのルールもそれに言及していません。
+
+  NOTE_UNREADABLE__TAKEN_AS_CODE:
+    kind: note
+    values: []
+    note:
+      matched: |-
+        このコマンドは、文字列をコードとして実行するものに渡しているため、このルールは実行される中身ではなく、書かれた生の文字列に当てました。語を書いただけで実行しないなら、禁止したわけではありません。語をファイルに移すか、コマンドを分けて打ち直してください。
+      raw: |-
+        このコマンドは、文字列をコードとして実行するものに渡しているため、ccnavi は書かれた生の文字列にしかルールを当てられず、どのルールもそれに言及していません。
+
+  NOTE_UNREADABLE__UNTERMINATED_SUBST:
+    kind: note
+    values: []
+    note:
+      matched: |-
+        このコマンドは、$( ) が閉じていないため、このルールは実行される中身ではなく、書かれた生の文字列に当てました。語を書いただけで実行しないなら、禁止したわけではありません。語をファイルに移すか、コマンドを分けて打ち直してください。
+      raw: |-
+        このコマンドは、$( ) が閉じていないため、ccnavi は書かれた生の文字列にしかルールを当てられず、どのルールもそれに言及していません。
+
+  NOTE_UNREADABLE__ANSI_C:
+    kind: note
+    values: []
+    note:
+      matched: |-
+        このコマンドは、ANSI-C 引用（$'…'）の中身が何の文字になるか読めないため、このルールは実行される中身ではなく、書かれた生の文字列に当てました。語を書いただけで実行しないなら、禁止したわけではありません。語をファイルに移すか、コマンドを分けて打ち直してください。
+      raw: |-
+        このコマンドは、ANSI-C 引用（$'…'）の中身が何の文字になるか読めないため、ccnavi は書かれた生の文字列にしかルールを当てられず、どのルールもそれに言及していません。
+
+  NOTE_UNREADABLE__OTHER:
+    kind: note
+    values: []
+    note:
+      matched: |-
+        このコマンドは、読めない形をしているため、このルールは実行される中身ではなく、書かれた生の文字列に当てました。語を書いただけで実行しないなら、禁止したわけではありません。語をファイルに移すか、コマンドを分けて打ち直してください。
+      raw: |-
+        このコマンドは、読めない形をしているため、ccnavi は書かれた生の文字列にしかルールを当てられず、どのルールもそれに言及していません。
+
+  # 読めなかった理由ごとの書き換え例。書き換え先は読める形で、ルールには触れない。
+  NOTE_REWRITE_HINT__TAKEN_AS_CODE:
+    kind: note
+    values: [runnee]
+    note: |-
+      書き換え: Grep ツールを使うか、`grep -rn <語> <パス>` と書く。ファイルの行数などが要るなら、`wc -l <パス>` のようにファイル名を直接並べて 1 回で呼ぶ。
+      `xargs` と `find -exec` は、後ろのコマンドが次のどれかのときだけ読める形として扱う: {runnee}
+
+  NOTE_REWRITE_HINT__ANSI_C:
+    kind: note
+    values: []
+    note: |-
+      書き換え: タブは `grep -P '\t'` のように書く。または `printf '\t'` の出力をファイルに書いて、そのファイルを渡す。
+
+  NOTE_REWRITE_HINT__UNTERMINATED:
+    kind: note
+    values: []
+    note: |-
+      書き換え: 複数行の文字列やヒアドキュメントは、Write ツールでファイルに書き、そのファイルを渡す。引用符は閉じて書く。
+
+  NOTE_REWRITE_HINT__UNATTENDED:
+    kind: note
+    values: []
+    note: |-
+      このセッションでは確認に答えられないので、上の形に書き直してください。

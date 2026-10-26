@@ -413,7 +413,7 @@ start | finish | cancel | propose | consolidate)
 		if [ "$wap_rc" -eq 0 ] && [ "$1" = propose ]; then
 			# 送り終えたあとの案内。出力先が閉じていても、送った結果を失敗にしない（この 1 行の間だけ PIPE を無視する）。
 			trap '' PIPE
-			printf '次: ユーザに承認を頼んで返事を待つ。承認が済むまで実装はしない\n' 2>/dev/null || :
+			ccnavi_text "$root" NEXT_TICKET_PROPOSED 2>/dev/null || :
 			trap - PIPE
 		fi
 		[ "$wap_rc" -ne 0 ] || tidy_after "$@"

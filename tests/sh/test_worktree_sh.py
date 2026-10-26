@@ -130,6 +130,7 @@ class WorktreeShTest(unittest.TestCase):
         os.makedirs(scripts)
         for name in ("ccnavi-worktree.sh", "ccnavi-git.sh", *common_sh(SH_DIR)):
             shutil.copy(final(f".ccnavi/scripts/{name}"), scripts)
+        put_messages(self.ws)
         self.exe = write(
             os.path.join(base, "exe", "ccnavi"), EXE.format(src=SRC, python=sys.executable)
         )
@@ -208,6 +209,8 @@ class WorktreeShTest(unittest.TestCase):
     def code_of(self, result):
         found = re.search(r"--accept ([0-9a-f]{8})", result.stdout)
         self.assertIsNotNone(found, result.stdout)
+        # 名前とオプションの間に空白がある（つながると別の名前になる）。
+        self.assertRegex(result.stdout, r"ccnavi-worktree\.sh'? '?\w+'? --")
         return found.group(1)
 
     def make_feature_with_origin(self, branch="feature/x"):

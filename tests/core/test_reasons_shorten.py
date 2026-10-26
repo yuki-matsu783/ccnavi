@@ -10,6 +10,7 @@ import unittest
 
 from ccnavi.hook import reasons
 from ccnavi.policy import rules
+from tests import ROOT
 
 LIMIT = reasons.SUBJECT_LIMIT
 
@@ -30,7 +31,7 @@ class ShortenTest(unittest.TestCase):
         self.assertEqual(shown, folded[:LIMIT] + f"…(+{len(folded) - LIMIT})")
 
     def test_サブエージェントの文面も切った目印を付ける(self):
-        text = reasons.subagent_forbidden("x" * (LIMIT + 5), "", "")
+        text = reasons.subagent_forbidden(ROOT, "x" * (LIMIT + 5), "", "")
         self.assertEqual(subject_line(text), "subject: " + "x" * LIMIT + "…(+5)")
 
     def test_組み込みの判定の文面も切った目印を付ける(self):
@@ -39,7 +40,7 @@ class ShortenTest(unittest.TestCase):
 
     def test_宣言の無い呼び出しの文面も畳んだ後の長さで数える(self):
         subject = "z\n" * (LIMIT + 3)
-        text = reasons.undeclared("Bash", subject, "rules.yml", "", verdict=rules.ASK)
+        text = reasons.undeclared("Bash", subject, "rules.yml", "", verdict=rules.ASK, root=ROOT)
         folded = " ".join(subject.split())
         self.assertEqual(
             subject_line(text), "subject: " + folded[:LIMIT] + f"…(+{len(folded) - LIMIT})"
