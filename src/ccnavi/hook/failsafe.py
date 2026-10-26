@@ -4,8 +4,9 @@
 落ちる。見るのは payload のツール名と対象の文字列だけ。
 
 - Read・Grep・Glob は、組み込みの最低限の deny（認証情報の形、`.git` の中、操作記録の置き場）に
-  ヒットしなければ通す。通常の判定と同じく、cwd から解いた場所と渡された表記の両方を見る。探す場所を
-  省いた Grep・Glob は cwd を見る。この評価もできなければ通さない
+  ヒットしなければ通す。通常の判定と同じく、cwd から解いた場所と渡された表記の両方を見る
+  （ワークスペースのルートより上の祖先の名前は見ない）。Glob は pattern も探す先として見る。
+  探す場所を省いた Grep・Glob は cwd を見る。この評価もできなければ通さない
 - Bash・PowerShell は、読み切れて、連結・置換・リダイレクト・glob を含まない単独のコマンドで、
   下の許可リストにヒットし、引数のパス（引数の無い `ls` は cwd）が最低限の deny にヒットしない
   ときだけ通す
@@ -48,7 +49,8 @@ _MINIMAL_DENY = re.compile(
 )
 
 # 読み取りのツールが対象にする欄。Grep は探す文字列（pattern）にも認証情報の名前が書けるが、
-# 探す先のパスと glob を見れば足りる。
+# 探す先のパスと glob を見れば足りる。Glob の pattern は探す先そのもの（`/home/u/.ssh/*`）なので、
+# Glob だけ見る（`_paths`）。
 _READ_FIELDS = ("file_path", "path", "glob", "notebook_path")
 
 # 判定できないときに通すコマンド。単独で、オプションは取らず、引数は 1 つのパスだけ
@@ -82,10 +84,26 @@ def _is_workspace_status(command: str, cwd: str, root: str) -> bool:
 
 
 def _paths(payload: hookio.Input) -> list[str]:
-    return [v for name in _READ_FIELDS if (v := payload.field_value(name))]
+    names = _READ_FIELDS + (("pattern",) if payload.tool_name == "Glob" else ())
+    return [v for name in names if (v := payload.field_value(name))]
 
 
-def _denied(path: str, cwd: str) -> bool:
+def _below_root(form: str, root: str) -> str:
+    """比べる形にして、ワークスペースのルートより上の祖先を除く。
+
+    ルートの置き場が `secrets/` や `.aws/` の下にあっても、中の読み取りまで止めないため。
+    ルートの中の名前（`.git` など）は残る。ルートの外のパスは、そのまま比べる。
+    """
+    folded = pathcase.fold(form).replace("\\", "/")
+    if root:
+        for spelled in {root, fsio.full_path(root, root)}:
+            head = pathcase.fold(spelled).replace("\\", "/").rstrip("/")
+            if head and (folded == head or folded.startswith(head + "/")):
+                return folded[len(head) :]
+    return folded
+
+
+def _denied(path: str, cwd: str, root: str = "") -> bool:
     """このパスが最低限の deny にヒットするか。渡された表記と、解いた先の両方を見る。
 
     通常の判定は `fsio.full_path` で場所を解いてからルールに当てる。相対パス・`..`・symlink を
@@ -94,12 +112,11 @@ def _denied(path: str, cwd: str) -> bool:
     解けなければ例外になり、呼び側が通さない。
     """
     return any(
-        _MINIMAL_DENY.search(pathcase.fold(form).replace("\\", "/"))
-        for form in (path, fsio.full_path(path, cwd))
+        _MINIMAL_DENY.search(_below_root(form, root)) for form in (path, fsio.full_path(path, cwd))
     )
 
 
-def read_is_safe(payload: hookio.Input) -> bool:
+def read_is_safe(payload: hookio.Input, root: str = "") -> bool:
     """Read・Grep・Glob を、最低限の deny に適用して通してよいか。評価できなければ偽。"""
     try:
         found = _paths(payload)
@@ -111,7 +128,7 @@ def read_is_safe(payload: hookio.Input) -> bool:
             omitted = not found
         if omitted:
             found.append(payload.cwd or os.getcwd())
-        return not any(_denied(p, payload.cwd) for p in found)
+        return not any(_denied(p, payload.cwd, root) for p in found)
     except Exception:  # noqa: BLE001 評価できなければ通さない
         return False
 
@@ -141,7 +158,7 @@ def shell_is_safe(payload: hookio.Input, root: str = "") -> bool:
         # 引数のパスは cwd から解いて見る。引数の無い `ls` は cwd を一覧する。
         words = command.split()
         target = words[1] if len(words) > 1 else "." if words[0] == "ls" else ""
-        return not (target and _denied(target, payload.cwd))
+        return not (target and _denied(target, payload.cwd, root))
     except Exception:  # noqa: BLE001 読めなければ通さない
         return False
 
@@ -151,7 +168,7 @@ def is_safe(payload: hookio.Input, root: str = "") -> bool:
     if payload.tool_name in modes.REPORT_TOOLS:
         return True
     if payload.tool_name in READ_TOOLS:
-        return read_is_safe(payload)
+        return read_is_safe(payload, root)
     if payload.tool_name in SHELL_TOOLS:
         return shell_is_safe(payload, root)
     return False

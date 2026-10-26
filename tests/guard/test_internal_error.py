@@ -332,7 +332,7 @@ class FailClosedByToolTest(unittest.TestCase):
                 )
                 self.assertEqual(self.crash("Grep", {"path": "/home/u/.ssh/id_rsa"}, mode), 2)
 
-    def crash_in(self, cwd, tool, tool_input, mode="enable"):
+    def crash_in(self, cwd, tool, tool_input, mode="enable", root=None):
         payload = {
             "hook_event_name": "PreToolUse",
             "tool_name": tool,
@@ -340,7 +340,7 @@ class FailClosedByToolTest(unittest.TestCase):
             "cwd": cwd,
         }
         with mock.patch.object(judge, "decide_before", side_effect=boom):
-            result, _ = run(self.root, payload, mode)
+            result, _ = run(root or self.root, payload, mode)
         return result.returncode
 
     def test_reads_are_resolved_from_the_cwd_like_the_normal_judgement(self):
@@ -394,12 +394,33 @@ class FailClosedByToolTest(unittest.TestCase):
     def test_a_path_that_cannot_be_resolved_is_stopped(self):
         self.assertEqual(self.crash("Read", {"file_path": "/tmp/a\x00b"}), 2)
 
-    def test_a_root_under_a_denied_looking_name_does_not_stop_reads(self):
-        """cwd は相対パスを解く基準にだけ使う。置き場の名前だけでは止めない。"""
-        base = os.path.join(self.root, "secrets-archive", "proj")
-        os.makedirs(base)
-        self.assertEqual(self.crash_in(base, "Read", {"file_path": "a.md"}), 0)
-        self.assertEqual(self.crash_in(base, "Bash", {"command": "cat a.md"}), 0)
+    def test_a_root_below_a_denied_looking_directory_does_not_stop_reads(self):
+        """ルートより上の祖先の名前（`secrets/`・`.aws/`）では止めない。ルートの中の名前では止める。"""
+        for parent in ("secrets", ".aws"):
+            base = os.path.join(self.root, parent, "proj")
+            os.makedirs(os.path.join(base, ".git"))
+            for tool, tool_input, expected in (
+                ("Read", {"file_path": "a.md"}, 0),
+                ("Read", {"file_path": os.path.join(base, "a.md")}, 0),
+                ("Grep", {"pattern": "x"}, 0),
+                ("Bash", {"command": "cat a.md"}, 0),
+                ("Bash", {"command": "ls"}, 0),
+                ("Read", {"file_path": ".git/config"}, 2),
+                ("Read", {"file_path": os.path.join(base, ".git", "config")}, 2),
+                ("Bash", {"command": "cat .git/config"}, 2),
+            ):
+                with self.subTest(parent=parent, tool=tool, tool_input=tool_input):
+                    self.assertEqual(self.crash_in(base, tool, tool_input, root=base), expected)
+
+    def test_glob_pattern_is_the_place_it_searches(self):
+        for pattern, expected in (
+            ("/home/u/.ssh/*", 2),
+            ("../.ssh/*", 2),
+            ("**/id_rsa", 2),
+            ("docs/*.md", 0),
+        ):
+            with self.subTest(pattern=pattern):
+                self.assertEqual(self.crash("Glob", {"pattern": pattern}), expected)
 
     def test_shell_passes_only_the_narrow_allowlist(self):
         for command, expected in (
