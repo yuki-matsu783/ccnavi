@@ -332,6 +332,96 @@ class FailClosedByToolTest(unittest.TestCase):
                 )
                 self.assertEqual(self.crash("Grep", {"path": "/home/u/.ssh/id_rsa"}, mode), 2)
 
+    def crash_in(self, cwd, tool, tool_input, mode="enable", root=None):
+        payload = {
+            "hook_event_name": "PreToolUse",
+            "tool_name": tool,
+            "tool_input": tool_input,
+            "cwd": cwd,
+        }
+        with mock.patch.object(judge, "decide_before", side_effect=boom):
+            result, _ = run(root or self.root, payload, mode)
+        return result.returncode
+
+    def test_reads_are_resolved_from_the_cwd_like_the_normal_judgement(self):
+        git = os.path.join(self.root, ".git")
+        ops = os.path.join(self.root, "logs", "state", "ops")
+        os.makedirs(git)
+        os.makedirs(ops)
+        for cwd, tool, tool_input, expected in (
+            (git, "Read", {"file_path": "config"}, 2),
+            (git, "Read", {"file_path": "../README.md"}, 0),
+            (self.root, "Read", {"file_path": "docs/../.git/config"}, 2),
+            (ops, "Grep", {"pattern": "x", "glob": "*.json"}, 2),
+            (ops, "Glob", {"pattern": "*.json"}, 2),
+            (self.root, "Grep", {"pattern": "x", "glob": "*.md"}, 0),
+            (git, "Bash", {"command": "cat config"}, 2),
+            (git, "Bash", {"command": "ls"}, 2),
+            (self.root, "Bash", {"command": "ls"}, 0),
+            (self.root, "Bash", {"command": "cat docs/../.git/config"}, 2),
+        ):
+            for mode in ("enable", "dry-run"):
+                with self.subTest(cwd=cwd, tool=tool, tool_input=tool_input, mode=mode):
+                    self.assertEqual(self.crash_in(cwd, tool, tool_input, mode), expected)
+
+    def test_a_symlink_to_a_denied_place_is_stopped(self):
+        secret = os.path.join(self.root, "keep", ".ssh")
+        os.makedirs(secret)
+        link = os.path.join(self.root, "notes")
+        try:
+            os.symlink(secret, link)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlink を作れない環境")
+        self.assertEqual(self.crash("Read", {"file_path": os.path.join(link, "id")}), 2)
+        self.assertEqual(self.crash("Bash", {"command": "cat notes/id"}), 2)
+
+    def test_an_omitted_search_place_falls_back_to_the_process_cwd(self):
+        from ccnavi.hook import failsafe
+
+        git = os.path.join(self.root, ".git")
+        os.makedirs(git)
+        before = os.getcwd()
+        self.addCleanup(os.chdir, before)
+        for here, expected in ((git, False), (self.root, True)):
+            os.chdir(here)
+            for tool in ("Grep", "Glob"):
+                with self.subTest(cwd=here, tool=tool):
+                    payload = hookio.Input(
+                        event="PreToolUse", tool_name=tool, tool_input={"pattern": "x"}, cwd=""
+                    )
+                    self.assertEqual(failsafe.is_safe(payload, self.root), expected)
+
+    def test_a_path_that_cannot_be_resolved_is_stopped(self):
+        self.assertEqual(self.crash("Read", {"file_path": "/tmp/a\x00b"}), 2)
+
+    def test_a_root_below_a_denied_looking_directory_does_not_stop_reads(self):
+        """ルートより上の祖先の名前（`secrets/`・`.aws/`）では止めない。ルートの中の名前では止める。"""
+        for parent in ("secrets", ".aws"):
+            base = os.path.join(self.root, parent, "proj")
+            os.makedirs(os.path.join(base, ".git"))
+            for tool, tool_input, expected in (
+                ("Read", {"file_path": "a.md"}, 0),
+                ("Read", {"file_path": os.path.join(base, "a.md")}, 0),
+                ("Grep", {"pattern": "x"}, 0),
+                ("Bash", {"command": "cat a.md"}, 0),
+                ("Bash", {"command": "ls"}, 0),
+                ("Read", {"file_path": ".git/config"}, 2),
+                ("Read", {"file_path": os.path.join(base, ".git", "config")}, 2),
+                ("Bash", {"command": "cat .git/config"}, 2),
+            ):
+                with self.subTest(parent=parent, tool=tool, tool_input=tool_input):
+                    self.assertEqual(self.crash_in(base, tool, tool_input, root=base), expected)
+
+    def test_glob_pattern_is_the_place_it_searches(self):
+        for pattern, expected in (
+            ("/home/u/.ssh/*", 2),
+            ("../.ssh/*", 2),
+            ("**/id_rsa", 2),
+            ("docs/*.md", 0),
+        ):
+            with self.subTest(pattern=pattern):
+                self.assertEqual(self.crash("Glob", {"pattern": pattern}), expected)
+
     def test_shell_passes_only_the_narrow_allowlist(self):
         for command, expected in (
             ("pwd", 0),
