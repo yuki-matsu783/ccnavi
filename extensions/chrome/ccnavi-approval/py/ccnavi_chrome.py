@@ -80,17 +80,20 @@ import re
 import shutil
 import sys
 
-from ccnavi.entry import cli, lint, version
-from ccnavi.infra import fsio, settings
-from ccnavi.tickets import (
+from ccnavi.entry.ext import (
+    cli,
     core,
+    fsio,
+    lint,
     review,
     review_host,
+    settings,
     ticket_ids,
     ticket_model,
+    version,
     via,
 )
-from ccnavi.tickets import ticket as ticket_mod
+from ccnavi.entry.ext import ticket as ticket_mod
 
 # 要求と答えの形の版。拡張の `PY_SCHEMA` と揃える。
 SCHEMA = 1
@@ -969,7 +972,7 @@ def _op_confirm(req: dict, root: str) -> dict:
     with _environ():
         snapshot = _core_snapshot(req, root)
         recorded = core.requested_head(snapshot, ident, phase_no)
-        if compare is None and recorded and recorded != head and review._is_sha(recorded):
+        if compare is None and recorded and recorded != head and review.is_sha(recorded):
             return {
                 "family": family,
                 "need_compare": {"base": recorded, "head": head},
@@ -1129,7 +1132,7 @@ def _op_decide(req: dict, root: str) -> dict:
     with _environ():
         snapshot = _core_snapshot(req, root)
         recorded = core.requested_head(snapshot, ident, phase_no)
-        if compare is None and recorded and recorded != head and review._is_sha(recorded):
+        if compare is None and recorded and recorded != head and review.is_sha(recorded):
             return {
                 "family": family,
                 "need_compare": {"base": recorded, "head": head},
@@ -1233,7 +1236,7 @@ def _compat(snap: dict) -> dict:
     # （プロジェクトのリポジトリはワークスペースのものを読む）
     text = _workspace_files(snap).get(COMPAT_FILE)
     ours = version.COMPAT
-    found = lint._SH_COMPAT.search(text) if text else None
+    found = lint.SH_COMPAT.search(text) if text else None
     theirs = int(found.group(1)) if found else None
     if theirs == ours:
         message = ""

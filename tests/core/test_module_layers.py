@@ -315,6 +315,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "entry.status",
                 "entry.suggest",
                 "entry.version",
+                "entry.ext",
                 "hook.events",
                 "hook.stopjudge",
                 "hook.subagent",

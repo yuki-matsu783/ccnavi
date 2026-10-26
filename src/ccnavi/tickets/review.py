@@ -535,7 +535,7 @@ def _unseen_by_review(conf: settings.Settings, path: str) -> bool:
 _SHA = re.compile(r"^[0-9a-f]{7,64}$")
 
 
-def _is_sha(value: str) -> bool:
+def is_sha(value: str) -> bool:
     """マーカーの `head` が sha の形をしているか。
 
     マーカーは親のブランチに乗って他の機械から届くファイルなので、中身を
@@ -1051,7 +1051,7 @@ def _moved_detail(tree_root: str, conf: settings.Settings, requested_mark: dict)
     recorded = str(requested_mark.get("head") or "")
     paths: list[str] | None = None
     ancestor = True
-    if recorded and head != recorded and _is_sha(recorded):
+    if recorded and head != recorded and is_sha(recorded):
         found, failed = _diff_paths(tree_root, recorded)
         paths = None if failed else found
         ancestor = _git(tree_root, ["merge-base", "--is-ancestor", recorded, head])[0] == 0
@@ -1122,7 +1122,7 @@ def moved_detail(
         return Moved()
     moved = f"依頼の後に親の HEAD が動いている（依頼時 {recorded[:12]}、いま {head[:12]}）"
     # sha でない値は差分の相手にしない。読めない（依頼時のコミットが消えているなど）も同じ。
-    if not _is_sha(recorded) or changed is None:
+    if not is_sha(recorded) or changed is None:
         return Moved(moved, KIND_UNVERIFIED)
     # ccnavi 自身の置き場と ELI5 の置き場だけの変更は、ユーザが見るものを動かさない。
     if any(not _unseen_by_review(conf, path) for path in changed):
@@ -1159,7 +1159,7 @@ def _unseen_commits(tree_root: str, conf: settings.Settings, recorded: str) -> l
     `MAX_COMMITS` 件（短い sha・作者・件名）。超えた分は「ほか N 件」の 1 行。git で取れなければ
     None（一覧を省く）。件名と作者は外から来た文字列なので `_quoted` で表示の形にする。
     """
-    if not _is_sha(recorded):
+    if not is_sha(recorded):
         return None
     rc, out = _git(
         tree_root,
@@ -1259,7 +1259,7 @@ def _already_requested(
     if not recorded:
         return ""
     if rc == 0 and head.strip() != recorded:
-        if not _is_sha(recorded):
+        if not is_sha(recorded):
             return ""
         changed, failed = _outside_approved(tree_root, conf, recorded, eli5=True)
         if failed or changed:
