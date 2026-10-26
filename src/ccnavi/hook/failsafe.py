@@ -20,7 +20,7 @@ from __future__ import annotations
 import os
 import re
 
-from ..infra import hookio, modes, pathcase, shellread
+from ..infra import fsio, hookio, modes, pathcase, shellread
 
 READ_TOOLS = ("Read", "Grep", "Glob")
 SHELL_TOOLS = ("Bash", "PowerShell")
@@ -83,15 +83,32 @@ def _paths(payload: hookio.Input) -> list[str]:
     return [v for name in _READ_FIELDS if (v := payload.field_value(name))]
 
 
+def _denied(path: str, cwd: str) -> bool:
+    """このパスが最低限の deny にヒットするか。来た表記と、行き着く先の両方を見る。
+
+    通常の判定は `fsio.full_path` で場所を解いてからルールに当てる。相対パス・`..`・symlink を
+    挟んだ読み取りが、ここだけ素通りしないようにする。解いた先で名前が変わる symlink
+    （`.ssh` を指す別名）もあるので、来た表記も見る。解けなければ例外のまま呼び側が通さない。
+    """
+    return any(
+        _MINIMAL_DENY.search(pathcase.fold(form).replace("\\", "/"))
+        for form in (path, fsio.full_path(path, cwd))
+    )
+
+
 def read_is_safe(payload: hookio.Input) -> bool:
     """Read・Grep・Glob を、最低限の deny に適用して通してよいか。評価できなければ偽。"""
     try:
         found = _paths(payload)
-        # 探す場所を省いた Grep・Glob は cwd を探す。cwd が操作記録の置き場の中でない限り、
-        # 省略は通す（置き場の中に居る場合は cwd の文字列でヒットする）。
-        if not found and payload.cwd:
+        # 探す場所を省いた Grep・Glob は cwd を探す。`glob` だけ書いても探す場所は省かれたまま。
+        # cwd が操作記録の置き場や `.git` の中でない限り、省略は通す。
+        if payload.tool_name in ("Grep", "Glob"):
+            omitted = not payload.field_value("path")
+        else:
+            omitted = not found
+        if omitted and payload.cwd:
             found.append(payload.cwd)
-        return not any(_MINIMAL_DENY.search(pathcase.fold(p).replace("\\", "/")) for p in found)
+        return not any(_denied(p, payload.cwd) for p in found)
     except Exception:  # noqa: BLE001 評価できなければ通さない
         return False
 
@@ -116,7 +133,12 @@ def shell_is_safe(payload: hookio.Input, root: str = "") -> bool:
             return not _MINIMAL_DENY.search(command)
         if not _SINGLE.match(command):
             return False
-        return not _MINIMAL_DENY.search(command)
+        if _MINIMAL_DENY.search(command):
+            return False
+        # 引数のパスは cwd から解いて見る。引数の無い `ls` は cwd を一覧する。
+        words = command.split()
+        target = words[1] if len(words) > 1 else "." if words[0] == "ls" else ""
+        return not (target and _denied(target, payload.cwd))
     except Exception:  # noqa: BLE001 読めなければ通さない
         return False
 

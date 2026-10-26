@@ -332,6 +332,59 @@ class FailClosedByToolTest(unittest.TestCase):
                 )
                 self.assertEqual(self.crash("Grep", {"path": "/home/u/.ssh/id_rsa"}, mode), 2)
 
+    def crash_in(self, cwd, tool, tool_input, mode="enable"):
+        payload = {
+            "hook_event_name": "PreToolUse",
+            "tool_name": tool,
+            "tool_input": tool_input,
+            "cwd": cwd,
+        }
+        with mock.patch.object(judge, "decide_before", side_effect=boom):
+            result, _ = run(self.root, payload, mode)
+        return result.returncode
+
+    def test_reads_are_resolved_from_the_cwd_like_the_normal_judgement(self):
+        git = os.path.join(self.root, ".git")
+        ops = os.path.join(self.root, "logs", "state", "ops")
+        os.makedirs(git)
+        os.makedirs(ops)
+        for cwd, tool, tool_input, expected in (
+            (git, "Read", {"file_path": "config"}, 2),
+            (git, "Read", {"file_path": "../README.md"}, 0),
+            (self.root, "Read", {"file_path": "docs/../.git/config"}, 2),
+            (ops, "Grep", {"pattern": "x", "glob": "*.json"}, 2),
+            (ops, "Glob", {"pattern": "*.json"}, 2),
+            (self.root, "Grep", {"pattern": "x", "glob": "*.md"}, 0),
+            (git, "Bash", {"command": "cat config"}, 2),
+            (git, "Bash", {"command": "ls"}, 2),
+            (self.root, "Bash", {"command": "ls"}, 0),
+            (self.root, "Bash", {"command": "cat docs/../.git/config"}, 2),
+        ):
+            for mode in ("enable", "dry-run"):
+                with self.subTest(cwd=cwd, tool=tool, tool_input=tool_input, mode=mode):
+                    self.assertEqual(self.crash_in(cwd, tool, tool_input, mode), expected)
+
+    def test_a_symlink_to_a_denied_place_is_stopped(self):
+        secret = os.path.join(self.root, "keep", ".ssh")
+        os.makedirs(secret)
+        link = os.path.join(self.root, "notes")
+        try:
+            os.symlink(secret, link)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlink を作れない環境")
+        self.assertEqual(self.crash("Read", {"file_path": os.path.join(link, "id")}), 2)
+        self.assertEqual(self.crash("Bash", {"command": "cat notes/id"}), 2)
+
+    def test_a_path_that_cannot_be_resolved_is_stopped(self):
+        self.assertEqual(self.crash("Read", {"file_path": "/tmp/a\x00b"}), 2)
+
+    def test_a_root_under_a_denied_looking_name_does_not_stop_reads(self):
+        """cwd は相対パスを解く基準にだけ使う。置き場の名前だけでは止めない。"""
+        base = os.path.join(self.root, "secrets-archive", "proj")
+        os.makedirs(base)
+        self.assertEqual(self.crash_in(base, "Read", {"file_path": "a.md"}), 0)
+        self.assertEqual(self.crash_in(base, "Bash", {"command": "cat a.md"}), 0)
+
     def test_shell_passes_only_the_narrow_allowlist(self):
         for command, expected in (
             ("pwd", 0),
