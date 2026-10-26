@@ -22,7 +22,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.infra import pathcase, platformtag, settings, shellread
-from ccnavi.policy import rules, selfguard_shell, selfguard_targets
+from ccnavi.policy import rules, selfguard_shell, selfguard_targets, texts
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
@@ -1927,7 +1927,7 @@ class InsertTest(unittest.TestCase):
         "id": selfguard_shell.RECORDS_RULE_ID,
         "match": "Write|Edit|NotebookEdit",
         "regex": "(",
-        "message": selfguard_shell.RECORDS_MESSAGE,
+        **texts.spec("RULE_GUARD_RECORDS"),
     }
 
     def test_組み立てられない保護は判定を止めずに外し診断ログに残す(self):

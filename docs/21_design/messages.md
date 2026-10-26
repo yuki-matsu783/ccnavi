@@ -22,7 +22,7 @@ keywords: [文面, 文面ファイル, messages, 識別子, 差し込み, ccnavi
 | `policy/texts.py` | 読み込み、検査、差し込み、組み立て、壊れたときの既定の文 | 判定 |
 | `ccnavi text` | sh から `texts` を引く入口 | 文面ファイルの直接の読み書き |
 
-組み込みの拒否・促し（Python）は `texts.say` を呼ぶ。まだ移していない文（組み込みルールの文、ルールの `message`、種類を決められない通知など）は呼ばず、[文面の移行の一覧](../42_claude/message-migration.md)にある。sh は文面ファイルを読まず、`ccnavi text` を `ccnavi_text`（`ccnavi-common-state.sh`）で呼ぶ。
+組み込みの拒否・促し（Python）は `texts.say` を呼ぶ。組み込みルールの文は、ルールが識別子と値を持ち、拒否に当たった回に `texts.spoken` が引く（13.4）。まだ移していない文（ルールの `message`、種類を決められない通知など）は呼ばず、[文面の移行の一覧](../42_claude/message-migration.md)にある。sh は文面ファイルを読まず、`ccnavi text` を `ccnavi_text`（`ccnavi-common-state.sh`）で呼ぶ。
 
 ### 13.2 置き場とレイヤー
 
@@ -55,7 +55,7 @@ messages:
 
 | 種類 | 使う場面 | 必須の欄 | 任意の欄 | 組み立てる出力 |
 |---|---|---|---|---|
-| `deny` | 拒否・確認 | `what` `why` `next` `no_bypass` | `note` | `what` / `なぜ: why` / `次: next` / `迂回しない: no_bypass` / `案内: note` |
+| `deny` | 拒否・確認 | `what` `why` `next` `no_bypass`（`RULE_*` は `what` だけ） | `note`（`RULE_*` は `why` `next` `no_bypass` も） | `what` / `なぜ: why` / `次: next` / `迂回しない: no_bypass` / `案内: note` |
 | `nudge` | Stop の促し | `what` `next` | `why` `no_bypass` `note` | `what` / `なぜ: why` / `次: next` / `迂回しない: no_bypass` / `案内: note` |
 | `next` | 出力の次の一手 | `next` | `note` | `次: next` / `案内: note` |
 | `choices` | 次の一手が 1 つに決まらないとき | `items`（2 件以上） | | `次の手:` と `  1. …` の番号つき |
@@ -65,6 +65,7 @@ messages:
 - `what` `why` `next` `no_bypass` は 1 行。`note` は複数行でよく、1 行ごとに `案内: ` を付けて出す。`items` の 1 件は 1 行
 - `next` の値は `次:` で始めない。出力に `次: ` を付けるのは組み立てる側で、出力の `次:` の行はちょうど 1 行になる
 - 欄の値は、文字列か、`{名前: 文字列}` の表（場合分け。13.4）
+- `RULE_*`（組み込みルールの文。`RULE_ASK` と `RULE_ASK__*` を除く）は `what` だけが必須。ほかの欄は省くか、空にしてよい（空の欄は省いたものとして読み、見出しの行は出さない）。ルールごとに止める対象が違い、言うことが無い段を作り足すと偽の文になるため。`RULE_ASK` の系統と `DENY_*` は、行き止まりを作らないよう 4 欄を必ず持つ
 
 ### 13.4 識別子・差し込み・場合分け
 
@@ -73,6 +74,7 @@ messages:
 | 種類 | コード | 例 |
 |---|---|---|
 | `deny` | 記録の `code` と同じ（`DENY_*`・`RULE_ASK` など） | `DENY_TICKET_PARENT`、`DENY_PHASE_REVIEW__WAITING` |
+| `deny`（組み込みルール） | `RULE_<ルールの id>`。記録の `code` とは別（記録の `code` は `DENY_COMMAND` など、根拠の種類）。ルールが識別子と値と場合を持ち、拒否に当たった回に `texts.spoken` が引く | `RULE_GIT_PUSH`、`RULE_GUARD_HOOKS` |
 | `nudge` | 記録の `code` と同じ（`NUDGE_*`） | `NUDGE_INTEGRATE__CONFIRM` |
 | `next`・`choices`・`note` | `NEXT_*`・`CHOICES_*`・`NOTE_*`。出力元の名前を 2 語目に置く | `NEXT_START_DRY_RUN` |
 
@@ -136,7 +138,7 @@ ccnavi_text <ワークスペースルート> <識別子> [名前=値]... [@欄=�
 | ファイルが読めない、形が違う、`version` が違う | error |
 | 同じ識別子が 2 回ある | error |
 | 識別子の形、種類と識別子の頭の対応 | error |
-| 種類ごとの必須の欄が欠けている、知らない欄がある | error |
+| 種類ごとの必須の欄が欠けている、知らない欄がある（`RULE_*` は `what` だけが必須） | error |
 | `values` と文面の差し込みの名前が一致しない、`_q` と `:sh` の使い分けが合わない | error |
 | `次:` の行が 1 行でない | error |
 | 長さの上限（1 欄 600 字、1 件の出力 2000 字）を超える | error |
@@ -147,6 +149,7 @@ ccnavi のリポジトリのテストは、次も見る（呼ぶ側が手元の�
 
 - コードと sh が引く識別子で、文面ファイルに無いものが無い
 - 文面ファイルの識別子で、コードと sh のどこからも引かれないものが無い
+- 組み込みのルールが持つ識別子が文面ファイルにあり、渡す値の名前が `values` と一致する
 - 呼ぶ側が渡す値の名前が、`values` と一致する
 
 ### 13.8 壊れたときの扱い
@@ -166,8 +169,8 @@ ccnavi のリポジトリのテストは、次も見る（呼ぶ側が手元の�
 
 この設計に沿って、次を文面ファイルに移した。残りと進め方は `docs/42_claude/message-migration.md` の一覧表と「残りの進め方」が持つ。
 
-- 拒否: 組み込みの拒否の大半（`DENY_TICKET_*`・`DENY_PHASE_REVIEW`・`DENY_NEEDS_USER_TURN`・`DENY_AGENT_*`・ラッパーと関門の `DENY_*`・書き直しを求める拒否・`DENY_REDIRECT_LIMIT`）と、確認の理由（`RULE_ASK`）
+- 拒否: 組み込みルールの文（`RULE_*`。`builtin:` で始まる id のルール。判定のたびに組み立てるので、識別子と値だけを持たせ、拒否に当たった回に引く）、組み込みの拒否の大半（`DENY_TICKET_*`・`DENY_PHASE_REVIEW`・`DENY_NEEDS_USER_TURN`・`DENY_AGENT_*`・ラッパーと関門の `DENY_*`・書き直しを求める拒否・`DENY_REDIRECT_LIMIT`）と、確認の理由（`RULE_ASK`）
 - 促し: `NUDGE_INTEGRATE`・`NUDGE_TICKET_*`・`NUDGE_SUBAGENT_OUTCOME`・`NUDGE_STOP_RULE`、`standing` の案内
 - sh の `次:`: `ccnavi-start.sh` の `次:` と `次の手:` の全部、`ccnavi_pf_next`（事前確認）、`ccnavi-git.sh`・`ccnavi-worktree.sh`・`ccnavi-stage.sh`・`ccnavi-ticket.sh`・`ccnavi-user-close-early.sh` の `次:`
 
-`rules.yml` のインラインの `message` は、そのまま残す。識別子で引く形（`message_id:`）は持たない。ルールの書式の版（`rules.VERSION`）、レイヤーの合成、`--lint`、`--explain` に手を入れることになり、ルールの `message` は移す対象に含めていないため。移す日が来たら、`message_id` の識別子は 13.4 の `deny` の識別子（`RULE_*`）とする。
+`rules.yml` のインラインの `message` は、そのまま残す。識別子で引く形（`message_id:`）はルールファイルからは書けず、持つのは組み込みのルール（`from_file` が偽のもの）だけ。ルールの書式の版（`rules.VERSION`）、レイヤーの合成、`--lint`、`--explain` に手を入れることになり、配布先が書く文は、その場で読める自由文のほうが書きやすいため。

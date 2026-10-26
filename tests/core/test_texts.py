@@ -29,6 +29,24 @@ messages:
 """
 
 
+RULE_BODY = """\
+version: 1
+messages:
+  RULE_SAMPLE:
+    kind: deny
+    what: 止めました。
+    why: ""
+    next: 打ち直す
+"""
+
+ASK_BODY = """\
+  RULE_ASK__SAMPLE:
+    kind: deny
+    what: 確認です。
+    next: 返事を待つ
+"""
+
+
 def put(root: str, layer: str, name: str, body: str) -> None:
     # common は読まれる置き場（`.ccnavi/messages/`）。project は読まれない旧来のレイヤーの置き場。
     where = ("messages",) if layer == "common" else ("config", "project", "messages")
@@ -66,6 +84,38 @@ class TextsTest(unittest.TestCase):
     def test_values_cannot_add_lines(self):
         out = texts.say(self.root, "NEXT_SAMPLE", {"args_q": "a\n次: 偽"})
         self.assertEqual(len(out.splitlines()), 1)
+
+    def test_a_rule_text_needs_only_what_and_drops_blank_fields(self):
+        """`RULE_*` は `what` だけ必須。空の欄は省いたものとして読み、見出しの行を出さない。"""
+        put(self.root, "common", "r.yml", RULE_BODY)
+        self.assertEqual(texts.load(self.root).problems, [])
+        self.assertEqual(texts.say(self.root, "RULE_SAMPLE"), "止めました。\n次: 打ち直す")
+        only = RULE_BODY.replace("    why: \"\"\n    next: 打ち直す\n", "")
+        put(self.root, "common", "r.yml", only)
+        self.assertEqual(texts.say(self.root, "RULE_SAMPLE"), "止めました。")
+
+    def test_a_rule_text_still_needs_what(self):
+        put(self.root, "common", "r.yml", RULE_BODY.replace("    what: 止めました。\n", "    what: \"\"\n"))
+        problems = [str(p) for p in texts.load(self.root).problems]
+        self.assertTrue(any("RULE_SAMPLE" in p and "what" in p for p in problems), problems)
+        self.assertNotIn("RULE_SAMPLE", texts.load(self.root).entries)
+
+    def test_the_ask_reasons_and_other_denials_keep_the_four_fields(self):
+        """緩めるのは `RULE_*` だけ。`RULE_ASK` の系統と `DENY_*` は 4 欄が必須のまま。"""
+        put(self.root, "common", "r.yml", RULE_BODY + ASK_BODY)
+        problems = "\n".join(str(p) for p in texts.load(self.root).problems)
+        self.assertIn("RULE_ASK__SAMPLE", problems)
+        self.assertIn("欄 `why` が無い", problems)
+        put(
+            self.root,
+            "common",
+            "r.yml",
+            "version: 1\nmessages:\n  DENY_LOOSE:\n    kind: deny\n    what: 止めました。\n",
+        )
+        problems = "\n".join(str(p) for p in texts.load(self.root).problems)
+        self.assertIn("DENY_LOOSE", problems)
+        self.assertEqual(texts.fields_for("RULE_ASK", texts.DENY), texts.FIELDS[texts.DENY])
+        self.assertEqual(texts.fields_for("RULE_GIT_PUSH", texts.DENY), texts.RULE_LOOSE_FIELDS)
 
     def test_a_missing_value_gives_the_fallback(self):
         out = texts.say(self.root, "DENY_SAMPLE", {"name": "x"})

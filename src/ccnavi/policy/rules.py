@@ -532,6 +532,14 @@ class Rule:
     regex: str = ""
     # message は、なぜ止めたかと、代わりに何をすればよいかを言う。
     message: str = ""
+    # message_id は、文面ファイルの識別子（`texts.spoken` が判定の時点で引く）。組み込みのルール
+    # （`from_file` が偽）だけが持ち、ルールファイルからは書けない。組み立てで引かないのは、
+    # ルールを hook の呼び出しごとに組み立てるので、通る呼び出しに文面ファイルの冷たい読みを
+    # 乗せないため。持つときは `message` を空にする。値（message_values）と場合（message_variants）は
+    # `texts.say` に渡す。
+    message_id: str = ""
+    message_values: dict[str, str] = field(default_factory=dict)
+    message_variants: dict[str, str] = field(default_factory=dict)
     # additionalContext は、ヒットしたときにモデルへ渡す文。message と違って
     # 止められた側ではなく進む側に向けた言葉で、allow でも ask でも deny でも
     # 応答の `additionalContext` に載る。通すが踏まえてほしいことを書く。
@@ -643,6 +651,9 @@ class Rule:
             # 重複として破棄し、前のレイヤーの except で通るはずのないものが通ってしまう。
             tuple(e.compiled.pattern if e.compiled else "" for e in self.excepts),
             self.message,
+            self.message_id,
+            tuple(sorted(self.message_values.items())),
+            tuple(sorted(self.message_variants.items())),
             self.additional_context,
             self.additional_context_once,
             self.additional_context_file,
@@ -816,6 +827,13 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
     return rule_set, problems
 
 
+def _text_map(raw: object) -> dict[str, str]:
+    """組み込みのルールが文面に渡す値・場合の表（名前 → 文字列）。表でなければ空。"""
+    if not isinstance(raw, dict):
+        return {}
+    return {str(k): str(v) for k, v in raw.items()}
+
+
 def _build(
     raw: object, section: str, index: int, root: str = "", builtin: bool = False
 ) -> tuple[Rule | None, list[Problem]]:
@@ -865,6 +883,9 @@ def _build(
         glob=str(raw.get("glob") or ""),
         regex=str(raw.get("regex") or ""),
         message=str(raw.get("message") or ""),
+        message_id=str(raw.get("message_id") or "") if builtin else "",
+        message_values=_text_map(raw.get("message_values")) if builtin else {},
+        message_variants=_text_map(raw.get("message_variants")) if builtin else {},
         additional_context=str(raw.get("additionalContext") or ""),
         additional_context_once=str(raw.get("additionalContextOnce") or ""),
         additional_context_file=str(raw.get("additionalContextFile") or ""),
@@ -899,7 +920,7 @@ def _build(
                 "見分けが付かず、記録を読んだユーザがどのファイルを直すのか決められない",
             )
         ]
-    if not rule.message and section in _NEEDS_MESSAGE:
+    if not rule.message and not rule.message_id and section in _NEEDS_MESSAGE:
         return None, [
             Problem(
                 SEVERITY_ERROR,

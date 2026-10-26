@@ -971,42 +971,8 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
         id=TICKET_APPROVAL_RULE_ID,
         match="|".join(SHELL_TOOLS),
         regex=expression,
-        message=(
-            "ccnavi の承認・レビュー済みの受け入れ・チケットの状態の操作は、エージェントが"
-            "直接実行するものではありません。状態の移動とレビューは "
-            f"'{settings.script_command(root, 'ccnavi-ticket.sh')}' と "
-            f"'{settings.script_command(root, 'ccnavi-review.sh')}' を"
-            "使い、承認はユーザが VS Code のボード・Chrome のボード・"
-            f"'{settings.script_command(root, 'ccnavi-user-agree.sh')}'・"
-            "置き場のファイルの移動のどれかで、"
-            "残った指摘の対応方針はユーザが VS Code のボードかターミナルで決めます。"
-            "承認済みチケットのコミットと push"
-            f"（'{settings.script_command(root, 'ccnavi-user-push-approved.sh')}'）"
-            "もユーザが実行します。"
-            "放棄した親の片付けの記録を消す 'ccnavi worktree retire --abandon <親>' と、"
-            "ユーザの判断の入口"
-            f"（'{settings.script_command(root, 'ccnavi-user-close-early.sh')}'）"
-            "もユーザが実行します。"
-            "保護対象の下書き（wip/handoff/）の取り込み（'ccnavi-user-handoff.sh'。"
-            "見るだけの形も含む）と、共通レイヤーのミラーの同期（'ccnavi-user-mirror.sh'。"
-            "見るだけの形も含む）も、ユーザが実行します。"
-            "親を閉じたときの片付け（'ccnavi sync tidy'・'ccnavi worktree retire'・"
-            "'ccnavi worktree branch'・"
-            f"'{settings.script_command(root, 'ccnavi-user-clean-branch.sh')}'）は、"
-            "ccnavi-review.sh ready と ccnavi-sync.sh が中で呼びます。"
-            "残ったブランチを消すのは、ユーザが先頭に ! を付けて打つコマンドです"
-            "（案内されたコマンドをユーザに見せて、打ってもらってください）。"
-            "ボードで承認すると、承認済みチケットのコミットと push がターミナルで実行されます。"
-            "エージェントは実行しません。"
-            "承認が済んだかどうかは "
-            f"'{settings.script_command(root, 'ccnavi-ticket.sh')} status' で確かめます。"
-            "置き場のファイルを自分で探さず、承認を頼み直す前に status を実行してください。"
-            "ユーザ専用の操作は 'ccnavi user <操作>'（agree・reviewed・close-early・prune・"
-            "handoff・mirror）にまとめてあり、エージェントは実行しません。"
-            "下書きの状態を見るだけなら "
-            f"'{settings.script_command(root, 'ccnavi-stage.sh')} --commands <パス>' を使います。"
-            "承認先行の一覧を見るだけなら 'ccnavi --agree --preview' は通ります。"
-        ),
+        root=root,
+        **texts.spec("RULE_GUARD_TICKET_APPROVAL"),
         decision=rules.DENY,
     )
     rule.compiled = re.compile(expression)

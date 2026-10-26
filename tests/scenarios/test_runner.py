@@ -1355,12 +1355,13 @@ class DenialTrendTest(unittest.TestCase):
     def test_real_denials_with_a_next_step_are_not_flagged(self):
         # issue #570 の実データ 4 件。文面は実コードから取る（文面が変わっても追従する）
         from ccnavi.policy import builtin
+        from ccnavi.policy import texts as ptexts
         from ccnavi.tickets import ops_stop_integrate as stop
         from ccnavi.tickets import ticket_guard
 
         root = str(ROOT)
-        raw_git = ticket_guard.raw_git_rule(root).message
-        by_id = {r["id"]: r["message"] for r in builtin._deny(root)}
+        raw_git = ptexts.spoken(ticket_guard.raw_git_rule(root))
+        by_id = {r.id: ptexts.spoken(r) for r in builtin.load_base(root)[0].deny}
         heredoc = next(
             r["message"]
             for r in yaml.safe_load(
@@ -1389,12 +1390,14 @@ class DenialTrendTest(unittest.TestCase):
 
     def test_every_shipped_deny_message_has_a_next_step(self):
         from ccnavi.policy import builtin
+        from ccnavi.policy import texts as ptexts
 
         rules = yaml.safe_load((Path(ROOT) / ".ccnavi/config/common/rules.yml").read_text("utf-8"))
         texts = [r["message"] for r in rules["deny"]]
-        texts += [r["message"] for r in builtin._deny(str(ROOT))]
+        texts += [ptexts.spoken(r) for r in builtin.load_base(str(ROOT))[0].deny]
         with tempfile.TemporaryDirectory() as d:  # git の入口が無いワークスペースの文面
-            texts += [r["message"] for r in builtin._deny(d)]
+            shutil.copytree(Path(ROOT) / ".ccnavi/messages", Path(d) / ".ccnavi/messages")
+            texts += [ptexts.spoken(r) for r in builtin.load_base(d)[0].deny]
         self.assertGreater(len(texts), 10)
         self.assertEqual([t for t in texts if not runner.has_guide(t)], [])
 

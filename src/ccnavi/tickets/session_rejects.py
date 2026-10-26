@@ -27,7 +27,7 @@ import time
 from dataclasses import dataclass, field
 
 from ..infra import settings, tree
-from ..policy import builtin, ruleload, rules, selfguard, selfguard_shell
+from ..policy import builtin, ruleload, rules, selfguard, selfguard_shell, texts
 from ..records import audit
 from . import approval, approval_checks, phase_scope, phasetypes, ticket_guard, ticket_model
 
@@ -171,7 +171,7 @@ def _reject_of(
     rule = _denied_by(rule_set, os.path.join(target.root, *probe.split("/")))
     if rule is not None:
         origin = f"{ORIGIN_RULE} {rules.record_name(rule)}（レイヤー {rule.source or '?'}）"
-        return Reject(t.ticket, entry.decision, entry.glob, rule.spoken_message(), origin)
+        return Reject(t.ticket, entry.decision, entry.glob, texts.spoken(rule), origin)
     # 統合の子には親の範囲の上限を適用しない（phase_scope.scope_verdict と同じ）。
     if (
         parent is not None

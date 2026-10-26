@@ -6,7 +6,7 @@ post から分けた。post を読まない。
 from __future__ import annotations
 
 from ..infra import gitstate, hookio, settings
-from ..policy import rules, selfguard
+from ..policy import rules, selfguard, texts
 from . import post_findings
 
 # 前から在った変更には別のコードを使う。同じコードで送ると、受け取った側に
@@ -166,7 +166,7 @@ def _messages(group: list[rules.Rule]) -> str:
     """
     seen, out = set(), []
     for rule in group:
-        said = rule.spoken_message()
+        said = texts.spoken(rule)
         if said not in seen:
             seen.add(said)
             out.append(said)

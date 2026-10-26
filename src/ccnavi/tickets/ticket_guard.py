@@ -10,7 +10,7 @@ import re
 from typing import TextIO
 
 from ..infra import hookio, settings
-from ..policy import ctxfile, rules, selfguard_shell
+from ..policy import ctxfile, rules, selfguard_shell, texts
 from . import ticket_model
 
 STATE_RULE_ID = "builtin:ticket-state"
@@ -68,17 +68,14 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     置き場のパスが現れないので、ここにヒットしない。root は文面の sh のパスに使う。
     """
     place = state_dir_regex(tickets_rel)
-    message = (
-        "チケットの状態は置き場で表します。review/（レビュー待ち）へ動かすのは "
-        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} finish <識別子>' だけです。"
-        "直接ファイルを作ったり動かしたりしないでください。todo/ への作成と編集は自由です。"
-    )
+    spec = texts.spec("RULE_TICKET_STATE")
     write_rule = rules.Rule(
         id=STATE_RULE_ID,
         match="|".join(ticket_model.WRITE_TOOLS),
         regex=place,
-        message=message,
+        root=root,
         decision=rules.DENY,
+        **spec,
     )
     # `DONE/` も同じ場所として適用する（どの機械でも区別しない）。状態の名前を大文字で書く
     # 正当な用事は無い。
@@ -106,15 +103,16 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
         id=STATE_SHELL_RULE_ID,
         match="Bash|PowerShell",
         regex=shell,
-        message=message,
+        root=root,
         decision=rules.DENY,
+        **spec,
     )
     shell_rule.compiled = re.compile(shell, re.IGNORECASE)
     return [write_rule, shell_rule]
 
 
 def _dir_rules(
-    rule_id: str, shell_id: str, place_rel: str, message: str
+    rule_id: str, shell_id: str, place_rel: str, spec: dict, root: str
 ) -> tuple[rules.Rule, rules.Rule]:
     """置き場のディレクトリ全体への書き込みを止める 2 本（ツールの書き込みとシェルの書き込み）。
 
@@ -126,8 +124,9 @@ def _dir_rules(
         id=rule_id,
         match="|".join(ticket_model.WRITE_TOOLS),
         regex=path,
-        message=message,
+        root=root,
         decision=rules.DENY,
+        **spec,
     )
     write_rule.compiled = re.compile(path, re.IGNORECASE)
     loose = place + r"([\\/]|\s|$)"
@@ -151,8 +150,9 @@ def _dir_rules(
         id=shell_id,
         match="Bash|PowerShell",
         regex=shell,
-        message=message,
+        root=root,
         decision=rules.DENY,
+        **spec,
     )
     shell_rule.compiled = re.compile(shell, re.IGNORECASE)
     return write_rule, shell_rule
@@ -167,26 +167,6 @@ OPS_SHELL_RULE_ID = OPS_RULE_ID + "-shell"
 OPS_REL = "logs/state/ops"
 
 
-def approved_message_for(root: str) -> str:
-    """承認済みの置き場の文面。承認の経路・状態の確かめ方・終え方・範囲の変え方を 1 か所で言う。
-
-    実行前の関門（`gate_rules`）と、実行後の保護範囲（`approved_write_rule`）が同じ文を使う。
-    """
-    ticket = settings.script_command(root, "ccnavi-ticket.sh")
-    return (
-        "承認済みチケットの置き場です。承認・状態・レビューの記録は、ユーザの操作と"
-        " ccnavi のスクリプトだけが動かします。直接書き込まないでください。"
-        "承認はユーザが、VS Code のボード・Chrome のボード・ターミナルの 'ccnavi-user-agree.sh'・"
-        "置き場のファイルの移動のどれかで行います。"
-        f"承認が済んだかどうかは '{ticket} status' で確かめてください。"
-        "置き場のファイルを自分で探さず、承認を頼み直す前に status を打ってください。"
-        f"作業を終えたら '{ticket} finish <識別子>' で、レビュー待ち（wip/proposals/review/）へ"
-        "動かしてください。"
-        "範囲を変えたいなら、wip/proposals/todo/ に新しい提案を書き、"
-        f"'{ticket} propose <識別子>' で送ってから承認を依頼してください。"
-    )
-
-
 def approved_write_rule(approved_rel: str, root: str) -> rules.Rule:
     """承認済みの置き場を名前で書くツールから守る 1 本（`builtin:ticket-approved`）。
 
@@ -194,7 +174,7 @@ def approved_write_rule(approved_rel: str, root: str) -> rules.Rule:
     変更を見るため。実行前の関門（`gate_rules`）と同じ式・同じ文面。
     """
     return _dir_rules(
-        APPROVED_RULE_ID, APPROVED_SHELL_RULE_ID, approved_rel, approved_message_for(root)
+        APPROVED_RULE_ID, APPROVED_SHELL_RULE_ID, approved_rel, texts.spec("RULE_TICKET_APPROVED"), root
     )[0]
 
 
@@ -207,14 +187,17 @@ def gate_rules(approved_rel: str, root: str) -> list[rules.Rule]:
     （チケット制御が有効な間）。
     操作記録（判断の保存と送信の段階）も同じ。書き直すと、送り直しの根拠を偽れる。
     """
-    approved_message = approved_message_for(root)
-    ops_message = (
-        "操作記録の置き場です。ユーザの判断と外部への送信の段階を保存する記録で、書き直すと送り直しの"
-        "根拠が変わります。ccnavi のスクリプトだけが書きます。直接書き込まないでください。"
-    )
     return [
-        *_dir_rules(APPROVED_RULE_ID, APPROVED_SHELL_RULE_ID, approved_rel, approved_message),
-        *_dir_rules(OPS_RULE_ID, OPS_SHELL_RULE_ID, OPS_REL, ops_message),
+        *_dir_rules(
+            APPROVED_RULE_ID,
+            APPROVED_SHELL_RULE_ID,
+            approved_rel,
+            texts.spec("RULE_TICKET_APPROVED"),
+            root,
+        ),
+        *_dir_rules(
+            OPS_RULE_ID, OPS_SHELL_RULE_ID, OPS_REL, texts.spec("RULE_TICKET_OPS"), root
+        ),
     ]
 
 
@@ -234,27 +217,14 @@ def raw_git_rule(root: str) -> rules.Rule:
     土台（`base`）として扱う。ほかのレイヤーの deny にもヒットした回は、
     そちらだけを言う（拒否は変わらない）。
     """
-    if settings.has_git_wrapper(root):
-        message = (
-            "生の git は実行しません。"
-            f"'{settings.script_command(root, 'ccnavi-git.sh')} <サブコマンド> ...'"
-            " を使ってください。読む系は status・log・diff・show・blame で、"
-            f"例は '{settings.script_command(root, 'ccnavi-git.sh')} log -5' です。"
-            "書く系の通る形は同じスクリプトの --help にあります。"
-            "チケット制御の可否（承認済みチケットの置き場を戻さない・取り込み・push の条件）は"
-            "このスクリプトが確かめるので、生の git では外れます。"
-        )
-    else:
-        message = (
-            "生の git は実行しません。このワークスペースには git の入口のスクリプトが無いので、"
-            "git の操作が必要なときはユーザに頼んでください。"
-        )
+    wrapper = settings.has_git_wrapper(root)
     rule = rules.Rule(
         id=RAW_GIT_RULE_ID,
         match="Bash",
         regex=RAW_GIT_REGEX,
-        message=message,
+        root=root,
         decision=rules.DENY,
+        **texts.spec("RULE_RAW_GIT", wrapper=wrapper, cased=("why", "next")),
     )
     rule.compiled = re.compile(RAW_GIT_REGEX, re.IGNORECASE)
     rule.base = True

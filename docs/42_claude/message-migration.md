@@ -29,6 +29,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | `DENY_REDIRECT_LIMIT` | `policy/selfguard_shell.py` の旧 `REDIRECT_LIMIT_MESSAGE`（`deny-policy.yml`。判定のときに `hook/judge.py` が引く） | 移した |
 | `NUDGE_TICKET_FINISH`・`NUDGE_TICKET_REQUEST`・`NUDGE_TICKET_FEEDBACK`・`NUDGE_SUBAGENT_OUTCOME`・`NUDGE_STOP_RULE`・`NEXT_STANDING` | `tickets/ops_stop.py`・`ops_stop_request.py`・`ops_stop_feedback.py`・`hook/events.py`・`tickets/standing.py` の `guidance()`（`nudge-stop.yml`） | 移した（共有の `USER_STOP_NOTE` と `subagent_outcome.line()` は値としてコードに残る。`subagent_outcome` は下位の層で文面を引けないので、行だけを返す） |
 | `NEXT_GIT_*`・`NEXT_WORKTREE_*`・`NEXT_STAGE_*`・`NEXT_TICKET_PROPOSED`・`NEXT_CLOSE_EARLY` | `ccnavi-git.sh`・`ccnavi-worktree.sh`・`ccnavi-stage.sh`・`ccnavi-ticket.sh`・`ccnavi-user-close-early.sh` の `次:`（`next-sh.yml`） | 移した（`ccnavi-common-state.sh` の `ccnavi_text` の既定の文は残る） |
+| `RULE_*`（`RULE_RECURSIVE_DELETE`・`RULE_GIT_PUSH`・`RULE_GUARD_*`・`RULE_TICKET_*`・`RULE_RAW_GIT`・`RULE_CREDENTIALS`・`RULE_CONFIG_VIA_BASH`） | `policy/builtin.py`・`policy/selfguard_shell.py`・`tickets/ticket_guard.py`・`tickets/phase_forms.py` の組み込みルールの文（`deny-builtin-rules.yml`） | 移した（ルールが識別子と値と場合を持ち、拒否に当たった回に `texts.spoken` が引く。`hook/post_findings.py` の英語の文は残る） |
 
 ## 残り
 
@@ -39,7 +40,6 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | 日本語の直書き（Python の拒否・次の一手） | `hook/rootwrite.py` の `message()`（`DENY_SHELL_WORKSPACE_ROOT`）、`hook/post.py`・`hook/post_report.py`（実行後の次の一手）、`hook/docsearch.py`、`tickets/propose.py`（計画の誤りで断るときの `次:`）、`tickets/ticket_guard.py`（状態の置き場・承認済みの置き場・生の git の拒否）、`tickets/approval_checks.py`・`agree_screen.py`・`ops.py`（`次:`）・`review.py`・`phase.py`（CLI の stderr の次の手）、`tickets/flow.py`（サブエージェント向けの手順）、`policy/selfguard.py` | 多数 | 未移行（2026-10 の調査で見つかった分。網羅ではない。数え直して、1 まとまりずつ移す） |
 | sh の残りの `次の手:`・`次:`・`案内:` | `ccnavi-ticket.sh`（`次の手:` の選択肢と `案内:`）、`ccnavi-worktree.sh`（取り込みの記録が無い案内・横で作業する案内・了承を得るまでの案内）、`ccnavi-git.sh`（integrate の次の一手の残り）、`ccnavi-start.sh`（リモート未確認・テンプレート）、`ccnavi-stage.sh`・`ccnavi-sync.sh` の `案内:` | 約 20 | 未移行（状態の報告に近いものは残す。境目は[残りの進め方](#残りの進め方)の項目 3） |
 | ルールの文 | `rules.yml` の `message`・`additionalContext`・`additionalContextOnce`（インライン） | | 未移行（識別子で引く `message_id` は持たない。`additionalContextFile` で md の本文を出せる） |
-| 組み込みのルールの文 | `policy/builtin.py`・`policy/selfguard_shell.py` の `message`（`SHELL_MESSAGE`・`BINARY_MESSAGE`・`COMMON_LAYER_MESSAGE`・`RECORDS_MESSAGE`・`PROJECT_HOME_MESSAGE`・`HANDOFF_*_MESSAGE`・`add_named_rules` の 4 本・`builtin.py` の各ルール）、`tickets/ticket_guard.py`・`tickets/phase_forms.py` が `Rule` に直接入れる文 | 判定 1 回で 24 本 | 未移行。文は `rules.parse` に渡す dict の `message` か `Rule(message=…)` に文字列で入る。`texts.load` は署名（`os.listdir` と各ファイルの `os.stat`）でキャッシュするので、温まったあとの `texts.say` は 1 回約 40 µs で済む。ただしキャッシュはプロセスの中だけで、hook は 1 呼び出し 1 プロセスなので、組み立ての時点で引くと拒否に当たらない呼び出しにも冷たい読み（約 45 ms）が乗る。進め方は[残りの進め方](#残りの進め方)の項目 1 |
 | 配布側の sh の `次:` | `scripts/ccnavi-doctor.sh` 2、`scripts/ccnavi-package.sh` 1、`scripts/ccnavi-install.sh`（`次:` を組み立てる関数）。配布の道具で、ワークスペースの実行ファイルが無いときにも動くため、`ccnavi text` に頼らない | | 対象外 |
 | sh の拒否・失敗の文 | `fail "…"` の文（各 sh） | 約 210 | 移さない（[残りの進め方](#残りの進め方)の項目 3） |
 
@@ -64,7 +64,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 - `texts.say` 1 回の時間は、温まっていれば約 40 µs、冷たければ約 45 ms。以前の見積もりの約 2 ms は、どちらにも当たらない
 - プロセス全体の壁時間は import が大半を占め（約 430 ms、ばらつき ±50 ms）、上の差は測定のばらつきに隠れる。差を見るには判定の中身だけを測る
 
-### 数えたこと（項目 1 の材料）
+### 数えたこと（項目 1 の材料。移す前の数）
 
 - `policy/builtin.py` の `"message"` は 7 件（`_config_via_bash` 1、`_deny` 6）。`_config_via_bash` は組み込みの既定に戻ったときだけ足す。`.git` 向けの 2 本は同じ文（`_git_dir_message`）
 - `policy/selfguard_shell.py` の `"message"` は 11 件（`*_MESSAGE` の定数 7、`add_named_rules` の 4 本）。実行ファイルの 1 本（`BINARY_MESSAGE`）は実行ファイルのパスがあるときだけ足す
@@ -145,7 +145,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 
 | 順 | PR | 中身 |
 |---|---|---|
-| 1 | 組み込みルールの文 | 仕組み（`Rule` の欄、`_build` の検査、`key()`、引く 3 か所、点検の拡張、空の欄を許す検査）、`builtin.py`・`selfguard_shell.py`・`ticket_guard.py`・`phase_forms.py` の文。手引きの 1 行（項目 2）を含む |
+| 1 | 組み込みルールの文（移した） | 仕組み（`Rule` の欄、`_build` の検査、`key()`、引く 3 か所、点検の拡張、空の欄を許す検査）、`builtin.py`・`selfguard_shell.py`・`ticket_guard.py`・`phase_forms.py` の文。手引きの 1 行（項目 2）を含む |
 | 2 | hook の通知と実行後の報告 | `notice` の種類と `undeclared`・`fallen_back`、`post.py`・`post_report.py`・`post_findings.py`、`rootwrite.py`・`docsearch.py`・`selfguard.py` の文 |
 | 3 | Python の CLI の次の手 | `ops.py`・`agree_screen.py`・`approval_checks.py`・`review.py`・`phase.py` |
 | 4 | sh の `案内:` | `ccnavi-git.sh`・`ccnavi-worktree.sh`・`ccnavi-start.sh` とほか |

@@ -15,6 +15,8 @@ import ast
 import glob
 import os
 import re
+import shutil
+import tempfile
 import unittest
 
 from ccnavi.policy import rules, texts
@@ -124,6 +126,93 @@ class CatalogTest(unittest.TestCase):
             with self.subTest(ident=ident):
                 used = ident in body or any(ident.startswith(h) for h in heads)
                 self.assertTrue(used, f"{ident} をどこも引かない")
+
+
+def builtin_rules(root: str, wrapper: bool) -> list[rules.Rule]:
+    """判定で組み立てる組み込みのルール（文を持つもの）を、全部集める。
+
+    ラッパーの有無（git の入口の sh）と、ワークスペースルートの有無で、文の場合が変わる。
+    """
+    from ccnavi.infra import settings
+    from ccnavi.policy import builtin, selfguard_shell
+    from ccnavi.tickets import phase_forms, ticket_guard
+
+    if wrapper:
+        script = os.path.join(root, ".ccnavi", "scripts", "ccnavi-git.sh")
+        os.makedirs(os.path.dirname(script), exist_ok=True)
+        with open(script, "w", encoding="utf-8"):
+            pass
+    conf = settings.Settings(project_home=settings.DEFAULT_PROJECT_HOME)
+    found = [*builtin.load(root, conf)[0].deny, *builtin.load_base(root)[0].deny]
+    rule_set = rules.RuleSet(version=rules.VERSION)
+    # 実行ファイルの 1 本と共通レイヤーの 1 本は、パスが決まっているときだけ足す。
+    common = tuple(p for p in selfguard_shell.common_layer_files(conf) if p) or (
+        os.path.join(root, ".ccnavi", "config", "common", "rules.yml"),
+    )
+    selfguard_shell.add_rules(
+        rule_set,
+        os.path.join(root, "bin", "ccnavi"),
+        conf.project_home,
+        root,
+        common,
+        (conf.log, conf.state),
+    )
+    selfguard_shell.add_named_rules(rule_set, conf.project_home, root)
+    selfguard_shell.add_named_rules(rule_set, conf.project_home, "")
+    found += rule_set.deny
+    found += ticket_guard.guard_rules(conf.tickets, root)
+    found += ticket_guard.gate_rules(conf.approved, root)
+    found.append(ticket_guard.raw_git_rule(root))
+    found.append(phase_forms.ticket_approval_rule(conf.bin, root))
+    return found
+
+
+class BuiltinRuleTextsTest(unittest.TestCase):
+    """組み込みのルールが持つ文の識別子・値・場合が、文面ファイルと合っている。
+
+    組み込みのルールは文を組み立てで引かず、識別子を持つ。呼び出しが定数の `texts.say` では
+    ないので、上の点検には映らない。ここで同じことを見る。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.catalog = texts.load(ROOT)
+
+    def test_every_builtin_rule_has_a_text_that_exists_with_the_same_values(self):
+        seen = set()
+        for wrapper in (False, True):
+            with tempfile.TemporaryDirectory() as root:
+                shutil.copytree(
+                    os.path.join(ROOT, ".ccnavi", "messages"),
+                    os.path.join(root, ".ccnavi", "messages"),
+                )
+                for rule in builtin_rules(root, wrapper):
+                    with self.subTest(rule=rule.id, wrapper=wrapper):
+                        self.assertTrue(rule.message_id, f"{rule.id}: 文の識別子が無い")
+                        self.assertFalse(rule.message, f"{rule.id}: 文を直接持っている")
+                        entry = self.catalog.entries.get(rule.message_id)
+                        self.assertIsNotNone(entry, f"{rule.id}: {rule.message_id} が無い")
+                        self.assertEqual(set(entry.values), set(rule.message_values))
+                        for name, case in rule.message_variants.items():
+                            self.assertIn(name, entry.fields)
+                            self.assertIn(case, entry.fields[name], f"{rule.id}: 場合 {case}")
+                        said = texts.spoken(rule)
+                        self.assertNotIn("引けませんでした", said, f"{rule.id}: 文が引けない")
+                        self.assertNotIn("{", said, f"{rule.id}: 差し込みが残っている")
+                        self.assertEqual(len(texts.lines_of(said)) <= 1, True)
+                        seen.add(rule.message_id)
+        self.assertGreaterEqual(len(seen), 20)
+
+    def test_every_rule_text_in_the_files_is_used_by_a_builtin_rule(self):
+        """`RULE_` の文（`RULE_ASK` の系統を除く）は、組み込みのルールのどれかが持つ。"""
+        used = set()
+        for wrapper in (False, True):
+            with tempfile.TemporaryDirectory() as root:
+                used.update(r.message_id for r in builtin_rules(root, wrapper))
+        for ident, entry in self.catalog.entries.items():
+            if ident.startswith("RULE_") and not ident.startswith("RULE_ASK"):
+                with self.subTest(ident=ident):
+                    self.assertIn(ident, used, f"{ident} をどの組み込みのルールも持たない")
 
 
 class SharedRulesWordingTest(unittest.TestCase):

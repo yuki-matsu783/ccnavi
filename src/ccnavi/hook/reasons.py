@@ -322,7 +322,7 @@ def reason_for(
     if degraded:
         lines.append(unreadable(root, degraded))
         lines.extend(rewrite_hint(root, degraded))
-    lines.append(rule.spoken_message())
+    lines.append(texts.spoken(rule))
     if quoted:
         lines.append(inside_quotes(root, git))
     return "\n".join(lines)
