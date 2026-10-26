@@ -173,7 +173,7 @@ Python は終了コード 1 で終わり、Claude Code は 0 と 2 以外を止�
 
 | イベント | 終え方 |
 |---|---|
-| `PreToolUse`、payload を読む前（イベントが分からない）、または判定中の内部例外 | 標準エラーに文、終了コード 2 で止める。ツールの種類で決め、Write・Edit・NotebookEdit・Agent・Task とツールが分からない回は `dry-run` でも止める。サブエージェントの報告用のツール（`SubagentHandback`・`StructuredOutput`。`modes.REPORT_TOOLS`）はモードによらず通す（体が報告を返せなくなるのを避ける）。Read・Grep・Glob は組み込みの最低限の deny（認証情報の形・`.git` の中・`logs/state/ops/`）にヒットしなければ通し、Bash は狭い許可リスト（`pwd`・`ls`・`cat` / `head` / `tail` / `wc` の単独の 1 パス・`ccnavi-ticket.sh status` / `--help`）だけ通す。deny は通常の判定と同じく cwd から解いた場所と渡された表記の両方に当て、探す場所を省いた Grep・Glob と引数の無い `ls` は cwd に当てる。PowerShell は止める。未知のツールは `enable` だけ止める |
+| `PreToolUse`、payload を読む前（イベントが分からない）、または判定中の内部例外 | 標準エラーに文、終了コード 2 で止める。ツールの種類で決め、Write・Edit・NotebookEdit・Agent・Task とツールが分からない回は `dry-run` でも止める。サブエージェントの報告用のツール（`SubagentHandback`・`StructuredOutput`。`modes.REPORT_TOOLS`）はモードによらず通す（体が報告を返せなくなるのを避ける）。Read・Grep・Glob は組み込みの最低限の deny（認証情報の形・`.git` の中・`logs/state/ops/`）にヒットしなければ通し、Bash は狭い許可リスト（`pwd`・`ls`・`cat` / `head` / `tail` / `wc` の単独の 1 パス・`ccnavi-ticket.sh status` / `--help`）だけ通す。deny は通常の判定と同じく cwd から解いた場所と渡された表記の両方（ワークスペースのルートより上の祖先の名前は除く）に当て、Glob は pattern も探す先として当てる。探す場所を省いた Grep・Glob と引数の無い `ls` は cwd に当てる。PowerShell は止める。未知のツールは `enable` だけ止める |
 | `PostToolUse` | ツールはもう走っていて止めるものは無い。`enable` は終了コード 2 と標準エラーで、実行後の検査をしていないことをモデルに言う。`dry-run` は 0 |
 | それ以外（`SessionStart`・`UserPromptSubmit`・`Stop`・`SubagentStart`・`SubagentStop`・未知のイベント） | 終了コード 0 で、ユーザに `systemMessage` で知らせる。終了コード 2 で終えると、`Stop` と `SubagentStop` は終われずに続けさせられ、`UserPromptSubmit` は依頼文を消す。ccnavi の不具合が作業そのものを止めないようにする。`SubagentStop` は、子の範囲を確かめられなかった回と同じ印を置き、親に届ける（9.12） |
 
