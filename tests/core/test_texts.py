@@ -54,6 +54,15 @@ class TextsTest(unittest.TestCase):
         self.assertTrue(lines[3].startswith("迂回しない: "))
         self.assertIn('status "a b"', out)
 
+    def test_the_files_are_read_again_only_when_they_change(self):
+        first = texts.load(self.root)
+        self.assertIs(first, texts.load(self.root))
+        put(self.root, "common", "b.yml", COMMON.replace("DENY_SAMPLE", "DENY_OTHER"))
+        second = texts.load(self.root)
+        self.assertIsNot(first, second)
+        self.assertIn("DENY_OTHER", second.entries)
+        self.assertNotIn("DENY_OTHER", first.entries)
+
     def test_values_cannot_add_lines(self):
         out = texts.say(self.root, "NEXT_SAMPLE", {"args_q": "a\n次: 偽"})
         self.assertEqual(len(out.splitlines()), 1)

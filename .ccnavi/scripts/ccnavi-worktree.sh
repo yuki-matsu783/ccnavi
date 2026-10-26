@@ -630,7 +630,8 @@ report_and_stop() {
 	[ "$c4" = no ] || rs_args="$rs_args --base $rs_target_q"
 	[ "$need_accept" = no ] || rs_args="$rs_args --accept $code"
 	[ "$c7" = no ] || rs_args="$rs_args --no-wip"
-	ccnavi_text "$root" NEXT_WORKTREE_CONFIRM "name=$name" "args_q=$rs_args"
+	# 先頭の空白は文面の側が持つ（値の前後の空白は落ちる）。
+	ccnavi_text "$root" NEXT_WORKTREE_CONFIRM "name=$name" "args_q=${rs_args# }"
 	printf '案内: ユーザの了承を得るまで --base・--accept・--side-by-side を付けない。確認コードは今の状態から決まるので、状態が動いたら報告からやり直す\n'
 	exit "$EXIT_CONFIRM"
 }

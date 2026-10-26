@@ -506,7 +506,7 @@ def internal_error_notice(code: str, event: str, kind: str, log_path: str) -> st
     )
 
 
-# payload を読めずに止めた（enable の exit 2）とき、イベントごとに何が起きたかと次の一手の場合。
+# payload を読めずに止めた（enable の exit 2）とき、イベントごとに何が起きたかと次の一手。
 # exit 2 の意味と標準エラーの宛先はイベントで違う。PreToolUse は呼び出しを止めてモデルへ、
 # PostToolUse は走った後でモデルへ、UserPromptSubmit はユーザの発言を止めてユーザへ、Stop と
 # SubagentStop は終わりを止めてモデルへ届く。ほかのイベントは止まらず、ユーザにだけ見える。

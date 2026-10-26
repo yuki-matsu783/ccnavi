@@ -42,7 +42,7 @@ messages:
     kind: next
     values: [name, args_q]
     next: |-
-      上をユーザに伝えて決めてもらう。合わせたら同じコマンドを打ち直す。このまま進めるなら例えば {script:ccnavi-worktree.sh} {name:sh}{args_q}
+      上をユーザに伝えて決めてもらう。合わせたら同じコマンドを打ち直す。このまま進めるなら例えば {script:ccnavi-worktree.sh} {name:sh} {args_q}
 
   NEXT_STAGE_EDIT:
     kind: next

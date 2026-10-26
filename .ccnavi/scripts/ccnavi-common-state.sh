@@ -91,7 +91,7 @@ ccnavi_text() {
 		printf '%s\n' "$ccnavi_tx_out"
 		return 0
 	fi
-	ccnavi_tx_gone="ユーザに、ccnavi の実行ファイルと文面ファイル（.ccnavi/config/common/messages/）が使えるかを確かめてもらい、返事を待つ（文面 ${ccnavi_tx_id} を引けませんでした）"
+	ccnavi_tx_gone="ユーザに、ccnavi の実行ファイルと文面ファイル（.ccnavi/messages/）が使えるかを確かめてもらい、返事を待つ（文面 ${ccnavi_tx_id} を引けませんでした）"
 	case "$ccnavi_tx_id" in
 	CHOICES_*) printf '次の手:\n  1. %s\n' "$ccnavi_tx_gone" ;;
 	NOTE_*) printf '案内: 文面 %s を引けませんでした\n' "$ccnavi_tx_id" ;;
