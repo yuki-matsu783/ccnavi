@@ -57,19 +57,19 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | 温まった `texts.load` と `texts.say` | それぞれ約 30〜50 µs |
 | `say` を 16 回続けた時間 | 約 0.6〜0.9 ms |
 | 実行前の判定 1 回の中身（`--test`、import 後） | `Bash ls` で中央値約 90 ms、`Read` で約 66〜84 ms |
-| 同じ判定の前に冷たい `texts.load` を 1 回足した場合 | `Bash ls` で約 136〜145 ms、`Read` で約 103〜109 ms（約 +35〜50 ms） |
+| 同じ判定の前に冷たい `texts.load` を 1 回足した場合 | `Bash ls` で約 136〜145 ms、`Read` で約 103〜109 ms（約 +20〜55 ms） |
 
 - 判定 1 回で組むルール 1 本ごとに `texts.say` を呼んでも、署名の検査にかかる時間は約 0.7 ms（27 µs × 24 本）にとどまる。ルールを組み立てる回数は、毎回の `stat`（署名の検査）の時間に影響しない
 - 時間がかかるのは冷たい読みだけ。キャッシュは `texts` のモジュールの中にあり、hook は 1 呼び出しで 1 プロセス（`cli.run` が 1 回の起動で 1 判定）なので、呼び出しをまたいで温まらない。組み立てで引くと、拒否に当たらない大半の呼び出しにも約 45 ms が乗る。いまは拒否に当たった呼び出しだけがその時間を負担している
-- `texts.say` が約 2 ms という値は、この測り方には当てはまらない。温まっていれば約 40 µs、冷たければ約 45 ms
+- `texts.say` 1 回の時間は、温まっていれば約 40 µs、冷たければ約 45 ms。以前の見積もりの約 2 ms は、どちらにも当たらない
 - プロセス全体の壁時間は import が大半を占め（約 430 ms、ばらつき ±50 ms）、上の差は測定のばらつきに隠れる。差を見るには判定の中身だけを測る
 
 ### 数えたこと（項目 1 の材料）
 
 - `policy/builtin.py` の `"message"` は 7 件（`_config_via_bash` 1、`_deny` 6）。`_config_via_bash` は組み込みの既定に戻ったときだけ足す。`.git` 向けの 2 本は同じ文（`_git_dir_message`）
 - `policy/selfguard_shell.py` の `"message"` は 11 件（`*_MESSAGE` の定数 7、`add_named_rules` の 4 本）。実行ファイルの 1 本（`BINARY_MESSAGE`）は実行ファイルのパスがあるときだけ足す
-- `Rule` を直接作って文を入れるものが、`tickets/ticket_guard.py` に 5 か所（状態の置き場、承認済みの置き場、操作記録の置き場、生の git。置き場の 3 つは名前で書くツールとシェルの 2 本が同じ文）、`tickets/phase_forms.py` に 1 か所（承認の操作）。`hook/post_findings.py` は英語の文で `Rule` を 1 本作る
-- ラッパーの有無で文が分かれるのは、`builtin.py` の 5 本（再帰削除、push、reset、`.git` の 2 本の断片、設定のシェル書き込み）と `ticket_guard.py` の生の git
+- `Rule` を直接作って文を入れるものが、`tickets/ticket_guard.py` に 5 か所（判定では 7 本になる。状態の置き場、承認済みの置き場、操作記録の置き場、生の git。置き場の 3 つは名前で書くツールとシェルの 2 本が同じ文）、`tickets/phase_forms.py` に 1 か所（承認の操作）。`hook/post_findings.py` は英語の文で `Rule` を 1 本作る
+- ラッパーの有無で文が分かれるのは、`builtin.py` の 5 系統（再帰削除、push、reset、`.git` の 2 本（同じ文）、設定のシェル書き込み）と `ticket_guard.py` の生の git
 - 実行前の判定 1 回（`--test Bash ls`）で作られる `Rule` は 39 本。`message` つきは 29 本で、うち `builtin:` は 24 本（`builtin.py` 6、`selfguard_shell.py` 10、`ticket_guard.py` 7、`phase_forms.py` 1）。`Write`・`Read` では 23 本
 - 組み立ての呼び出しは、判定 1 回で `builtin.load_base` 1、`selfguard_shell.add_rules` 1、`add_named_rules` 1、`rules.parse` 11〜12、`selfguard_shell._insert` 9〜10（`Bash` は 1 つ多い）。実行後の保護範囲（`events.watched_for`）は、触ったツリーごとに `load_rules` と `add_named_rules` を呼ぶ（測っていない。コードから）
 - `Rule.spoken_message()` を呼ぶのは 3 か所: `hook/reasons.py` の `reason_for`、`hook/post_report.py` の `_messages`、`tickets/session_rejects.py`
@@ -79,14 +79,16 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | 案 | 中身 | 利点 | 欠点 | コード量 | 性能 |
 |---|---|---|---|---|---|
 | (a) 識別子を持たせ、判定の時点で引く | 組み込みの `Rule` に `message_id` と値（と場合）を持たせ、`spoken_message` の呼び手が `texts.say` で引く | 組み立てで `texts` を触らないので、通る呼び出しに読みが乗らない。当たったときだけ引く（拒否の文はいまもそうしている）。識別子で `test_texts_catalog` の対象にできる | `Rule` に欄が 3 つ増える。`Rule.key()`（レイヤーをまたいだ同一判定）に入れる。`rules` が `texts` を import できない（`texts` が `rules` を import する）ので、引く関数を呼び手から渡す。呼び手 3 か所を直す | `Rule` と `_build` で約 +40 行、呼び手 3 か所で約 +20 行。組み立ての側は、文字列 24 本を `(識別子, 値)` に替えて約 −150 行。文面ファイルに 24 件ほど足す | 通る呼び出しは今と同じ。当たった呼び出しは冷たい読み約 45 ms（拒否に当たる他の文と同じで、増えない） |
-| (b) 組み立ての時点で引く | `_deny`・`add_rules` などが `texts.say` を呼び、できた文字列を `message` に入れる | `Rule` を変えない。差分が最小 | 判定のたびに冷たい読みが加わる（+35〜50 ms、中身の約 1.5 倍）。24 本の `say` で約 1 ms。文面ファイルが壊れていると、24 本すべてが既定の短い文になる | 組み立ての側の置き換えだけ（約 −150 行） | 全呼び出しに約 +45 ms |
+| (b) 組み立ての時点で引く | `_deny`・`add_rules` などが `texts.say` を呼び、できた文字列を `message` に入れる | `Rule` を変えない。差分が最小 | 判定のたびに冷たい読みが加わる（+20〜55 ms、中身の約 1.3〜1.5 倍）。24 本の `say` で約 1 ms。文面ファイルが壊れていると、24 本すべてが既定の短い文になる | 組み立ての側の置き換えだけ（約 −150 行） | 全呼び出しに約 +20〜55 ms |
 | (c) 遅れて評価する文字列 | `message` に、引くまで評価しない値を入れる | `Rule` の欄は 1 つ | `message` を文字列とみなす箇所（`rule_lint`、`entry/suggest.py`、`entry/diagnose_board.py`、`Rule.key()`）が型に合わなくなる。識別子が欄に見えず、点検が拾いにくい | 約 +60 行と、各所の分岐 | (a) と同じ |
 
 推奨は (a)。決め手は性能で、(b) は全呼び出しに冷たい読みを足す。(c) は (a) の欄を隠すだけで、型が合わなくなる箇所が増える。
 
 - 識別子は `RULE_` で始める（種類は `deny`）。名前は組み込みのルールの id から決める（`builtin:git-push` なら `RULE_GIT_PUSH`）。場合の分け（ラッパーの有無）は `what` の場合分けにする。`DENY_TICKET_SCOPE` の前例がある
 - `message_id` と値は組み込みの `Rule`（`from_file` が偽のもの）にだけ持たせる。ルールファイルからは書けない。`rules.yml` に `message_id` を開かない（項目 2）
-- いまの文は 1 段落の自由文なので、`what` `why` `next` `no_bypass` の 4 欄に分け直す。欄は 1 つ 600 字まで、1 件で 2000 字までなので、長い文（承認済みの置き場の約 480 字）は欄に分けて収める。分け直しは文の見直しにもなるので、レビューの負担はここがいちばん大きい
+- `message` が空だと `rules.parse` が「message がない」と断る（`_NEEDS_MESSAGE` の検査）。`message_id` があれば通す変更を、`Rule` と `_build` の行数に含める。`message` を直接読む `rule_lint`・`entry/suggest.py`・`entry/diagnose_board.py`・`Rule.key()` には、空のまま渡さない。`key()` は識別子と値を含め、表示と検査は識別子を引いた文を使う
+- 既存の文の `{root}` は値として渡す。`{script:<名前>}` は文面ファイルの書式にそのまま使える。`{名前}` などの差し込みと `{{` `}}` の扱いは文面ファイルの決まりに合わせる
+- いまの文は 1 段落の自由文なので、`what` `why` `next` `no_bypass` の 4 欄に分け直す。欄は 1 つ 600 字まで、1 件で 2000 字までなので、長い文（承認済みの置き場の約 530 字。置き場のパスで変わる）は欄に分けて収める。分け直しは文の見直しにもなるので、レビューの負担はここがいちばん大きい
 - 引く側は、`reasons.reason_for`・`post_report._messages`・`session_rejects` の 3 か所。`texts.say` が引けなかったときは既定の文が出て、判定は変わらない（`texts` の約束）
 - 設計書 `docs/21_design/messages.md` の「`message_id` は持たない」の段と、それを決めた記録は、実装の PR で扱う。設計書は組み込みだけが持つと直し、決定の記録は既存のものを書き換えず、新しく1枚書く
 
@@ -103,7 +105,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 
 | 順 | 出力元 | 仕分け | 根拠 |
 |---|---|---|---|
-| 1 | 組み込みのルールの文（`builtin.py`・`selfguard_shell.py`・`ticket_guard.py`・`phase_forms.py`） | 移す（項目 1） | 判定のたびに 24 本が組まれ、生の git・push・設定の書き込みなど、エージェントが最もよく当たる拒否の文 |
+| 1 | 組み込みのルールの文（`builtin.py`・`selfguard_shell.py`・`ticket_guard.py`・`phase_forms.py`） | 移す（項目 1） | 判定のたびに 24 本が組まれ、生の git・push・設定の書き込みなど、エージェントが最もよく当たると見込む拒否の文（当たった回数ではなく、組まれる回数からの推定） |
 | 2 | `reasons.py` の `undeclared`・`fallen_back` | 移す（項目 4） | ルールが言及しない呼び出しのたびに返る。配布先では allow が増えるまで最も多い。`fallen_back` は設定を読めない間の全呼び出しに付く |
 | 3 | `hook/post.py`・`post_report.py`・`post_findings.py` の次の一手 | 移す。`stderr.write` の状態の報告は残す | 実行後のチェックで、書き込みのたびに戻し方や取り込み前の確かめ方を言う。`post_findings.py` は英語の文。`post_report._messages` の組み込みルールの文は項目 1 で一緒に移る |
 | 4 | `tickets/ops.py`・`agree_screen.py`（`次:`） | 移す | チケットの操作ごとに出る `次:`。`ops.py` に 4 件 |
@@ -115,15 +117,15 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | 10 | `hook/docsearch.py` の使い方の案内（3 か所） | 移す。`stderr.write` の「引かない」理由は残す | `--docs` を使う場面でだけ出る |
 | 11 | `policy/selfguard.py` の知らせ（約 6 件） | 移す | 設定ファイルを戻したときだけ出る。まれ |
 | 12 | 英語の文面の `reasons.py` の残り | 項目 4 に含める | |
-| — | sh の `fail "…"`（約 210 件。`fail <理由> "…"` の形を数えた: `ccnavi-start.sh` 88、`ccnavi-worktree.sh` 48、`ccnavi-review.sh` 36、`ccnavi-common-review.sh` 16、`ccnavi-user-decide.sh` 14、`ccnavi-branches.sh` 11） | 移さない | 失敗の理由の報告が大半で、次の一手は文ごとに違う。1 件ごとに実行ファイルを起こす（Python の起動で約 0.4 秒）と失敗の経路が遅くなり、実行ファイルに不具合があるときに理由を言えなくなる。`ccnavi-user-*.sh` はユーザが打つのでエージェントに届かない。次の一手を含む `fail` が見つかったら、その `次:` の行だけを `ccnavi_text` に分けて移す |
+| — | sh の `fail "…"`（約 210 件。`fail <理由> "…"` の形を数えた: `ccnavi-start.sh` 88、`ccnavi-worktree.sh` 48、`ccnavi-review.sh` 36、`ccnavi-common-review.sh` 16、`ccnavi-user-decide.sh` 14、`ccnavi-branches.sh` 11） | 移さない | 失敗の理由の報告が大半で、次の一手は文ごとに違う。1 件ごとに実行ファイルを起こす（import を含めて約 0.4 秒）と失敗の経路が遅くなり、実行ファイルに不具合があるときに理由を言えなくなる。`ccnavi-user-*.sh` はユーザが打つのでエージェントに届かない。次の一手を含む `fail` が見つかったら、その `次:` の行だけを `ccnavi_text` に分けて移す |
 | — | `stderr.write("ccnavi: …")` の診断（`post.py`・`docsearch.py`・`review.py` など） | 移さない | 内部の不具合や状態の報告で、次の一手ではない |
 | — | `tickets/flow.py` のサブエージェント向けの手順 | 移さない | 値の断片で、`DENY_*` が引く共有の定数（移行の一覧の「移した」の注） |
 
 ### 項目 4: 種類を決められない通知
 
-- `undeclared`・`fallen_back` は、新しい種類 `notice`（識別子の頭は `NOTICE_`）を足して移す。必須は `what`、任意は `why` `next` `note`。出力は `deny` と同じ見出し（`次: `）を使う。`nudge` に入れないのは、`nudge` の識別子は記録の `code` と同じという決まりがあり、`UNDECLARED` の見出し（`[ccnavi] UNDECLARED (source: …)`）と `subject:` の行はコードに残るため。`undeclared` は、読み切れたかどうかと ask／deny の組（4 通り）と、`{then}` の 2 通りを場合分けにする
+- `undeclared`・`fallen_back` は、新しい種類 `notice`（識別子の頭は `NOTICE_`）を足して移す。必須は `what`、任意は `why` `next` `note`。出力は `deny` と同じ見出し（`次: `）を使う。`nudge` に入れないのは、`nudge` の識別子は記録の `code` と同じという決まりがあり、`UNDECLARED` の見出し（`[ccnavi] UNDECLARED (source: …)`。読み切れなかった回は `PARSE_UNCERTAIN`）と `subject:` の行はコードに残るため。`undeclared` は、読み切れたかどうかと ask／deny の組（4 通り）と、`{then}` の 2 通りを場合分けにする
 - 実装に入る前に、2 つを確かめる
-  - `undeclared` は通る呼び出しの近くで頻繁に出るので、冷たい読み約 45 ms が加わる。冷たい読みは YAML の読みが大半（約 33 ms）なので、同じ PR の前に、文面ファイルを必要な 1 本だけ読む形にするかを測って決める。そのままにするなら、この数字を PR に書く
+  - `undeclared` は、ルールが言及せず ask か deny になった呼び出しのたびに文を組む（通した回と、判定を渡した回は組まない）。頻度は測っていない。移すと、その呼び出しに冷たい読み約 45 ms が加わる。冷たい読みは YAML の読みが大半（約 33 ms）なので、同じ PR の前に、文面ファイルを必要な 1 本だけ読む形にするかを測って決める。重複した識別子の検査は全ファイルを読む前提なので、その形にするなら検査を別（`--lint`）に回す。そのままにするなら、この数字を PR に書く
   - 英語の文面は整理が別に進んでいる。移すときは文をそのまま写す。言い換えは整理の側で、文面ファイルの上で直す
 - `internal_error_notice` は移さない。ツールの呼び出しを持たないイベントで、ccnavi 自身に不具合があるときに出る文なので、不具合があるかもしれない文面ファイルに頼らない。まれで、止めない通知でもある
 - 共有する定数の文（`PARALLEL_REQUEST_NOTE`・`EXEMPT_NOTE`・`USER_STOP_NOTE`・`TURN_DEFINED` など）は移さない。複数の文と、下位の層が使う値だからで、移行の一覧の「移した」の注と同じ扱い
@@ -134,7 +136,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 
 | 項目 | PR | 中身 |
 |---|---|---|
-| 1 | 3 | ① 仕組み（`Rule` の欄、`_build`、`key()`、引く 3 か所）と `builtin.py`。② `selfguard_shell.py`。③ `ticket_guard.py` と `phase_forms.py` |
+| 1 | 3 | ① 仕組み（`Rule` の欄、`_build` の検査、`key()`、引く 3 か所、点検の拡張）と `builtin.py`。② `selfguard_shell.py`。③ `ticket_guard.py` と `phase_forms.py` |
 | 2 | 0 | 方針は変えない。手引きの 1 行は項目 1 に含める |
 | 3 | 8〜9 | 実行後の報告（`post*.py`）1〜2、`ops.py`・`agree_screen.py` 1、`approval_checks.py` 1、sh の `案内:`（`ccnavi-git.sh`、`ccnavi-worktree.sh`、`ccnavi-start.sh` とほか）3、`review.py`・`phase.py` 1、`rootwrite.py` と `docsearch.py` と `selfguard.py` 1 |
 | 4 | 1〜2 | `notice` の種類と `undeclared`・`fallen_back`。冷たい読みを短くするなら、その PR を前に 1 つ |
@@ -146,3 +148,4 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 
 - `tests/core/test_texts_catalog.py` は、移した文の識別子と値の名前が、引くコード・sh と一致することを見る
 - 移した出力のテストは、文面ファイルを引いた結果に対して書く（`次:` の行が 1 行、値が埋まっている）
+- `test_texts_catalog.py` は、`say` の第 1 引数が定数の呼び出しだけを拾う。組み込みルールの `message_id` は `Rule` の欄に入るので、項目 1 の最初の PR で、組み込みの `Rule` の識別子と値の名前を点検の対象に足す
