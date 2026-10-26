@@ -29,7 +29,7 @@ keywords: [文面, 文面ファイル, messages, ccnavi text, ccnavi_text, texts
 4. 呼ぶ側に識別子と値を渡す。Python は `texts.say(root, "ID", {"名前": 値})`（値の辞書は直接書く。テストが名前を数えるため）。sh は `ccnavi_text "$root" ID "名前=値"`。出力の `次:` と `案内:` の見出しは文面ファイルの側が付けるので、コードや sh に書かない
 5. `tests/core/test_texts_catalog.py` が、引く識別子が文面ファイルにあること、値の名前が一致すること、どこからも引かれない識別子が無いことを見る。通るまで直す
 6. 移した出力は、文面ファイルを引いた結果に対して、`次:` の行が 1 行で値が埋まっていることを確かめる
-7. [文面の移行の一覧](message-migration.md)の行を「移した」にする
+7. [文面の移行の一覧](message-migration.md)の行を「移した」にする。残りを移すときは、同じ文書の[残りの進め方](message-migration.md#残りの進め方)の仕分けと順に従う
 
 ## 書き方の決まり
 
