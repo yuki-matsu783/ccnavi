@@ -1,7 +1,7 @@
 """判定のコアを通すレビュー済み（`review confirm`）の判定と手元の入口。
 
 `confirm` が検査と書くものの並べ方、`confirm_local` が手元の入力を読んで書く入口。
-`reviewable` / `requested_head` / `moved_on_host` は Chrome のボードが引く。
+`reviewable` / `requested_head` / `moved_detail_on_host` は Chrome のボードが引く。
 `decide_preview` と `decide` は、残った指摘の行き先を決める操作（`--reviewed` の決め方）のうち、
 書くもの（Changes）とホストへの書き込みの計画（host_plan）を並べる部分で、Chrome が引く。
 決め方の部品（見せる材料・ダイジェスト・転記）は review_decide のものをそのまま使う。

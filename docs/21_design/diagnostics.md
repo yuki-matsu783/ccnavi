@@ -113,7 +113,7 @@ error がある間は配点もフェーズ定義も保存できない。
   フローを保存した後に承認の push を送るかを、これで決める
 - 診断ログ（`logs/diag/`）の行の形・置き場・レベルは、sh・Python・拡張の 3 つの logger で揃える（`docs/42_claude/logging.md`）。
   `tests/core/test_diaglog.py` が 3 つの行を突き合わせる
-- Chrome 拡張は `src/ccnavi/` を Pyodide で import して、判定のコア（`tickets/core.py`（実体は `core_base`・`core_approve`・`core_review`）の
+- Chrome 拡張は `src/ccnavi/` を Pyodide に同梱し、公開の入口 `entry/ext.py` の再公開を通して、判定のコア（`tickets/core.py`（実体は `core_base`・`core_approve`・`core_review`）の
   Snapshot → 判定 → Changes）と `cli.run` を直に呼ぶ。呼ぶ名前の一覧は REQ-EXT-27 の表にある
 
 ### 10.1 `--docs` の索引
