@@ -1,15 +1,15 @@
 """Chrome 拡張の公開の入口（`ccnavi.entry.ext`）を守る受入テスト。
 
-拡張（`extensions/chrome/ccnavi-approval/py/ccnavi_chrome.py`）は本体の内部の名前を直に引いていたので、
-本体で改名・移動すると拡張だけが壊れた。拡張は `ccnavi.entry.ext` の再公開モジュールだけを呼ぶ。
+拡張（`extensions/chrome/ccnavi-approval/py/ccnavi_chrome.py`）は本体の内部の名前を直接参照していたため、
+本体で改名・移動すると拡張だけが壊れた。拡張は今、`ccnavi.entry.ext` の再公開モジュールだけを呼ぶ。
 
-見るのは 3 つ。
+確かめるのは次の 3 点。
 
-1. `ccnavi_chrome.py` は `ccnavi.` の下で `ccnavi.entry.ext` 以外を import しない
-2. `ext` 経由で引いている `<モジュール>.<属性>` を AST で全部集め、`ext` の同名のモジュールに
-   その属性が在る。名前を消すと、拡張が壊れる前にここが落ちる
+1. `ccnavi_chrome.py` は、`ccnavi.entry.ext` 以外の `ccnavi.` 下のモジュールを import しない
+2. `ext` 経由で引いている `<モジュール>.<属性>` を AST で全部集め、`ext` の同名のモジュールにその属性があることを確かめる。
+   名前を消すと、拡張が壊れる前にここが落ちる
 3. `ext` はモジュールをそのまま再公開する（別のオブジェクトを作らない）。
-   `settings` の属性の差し替え（`test_swap_points.py` の `ENV_CONSTANTS`）が `ext` 経由でも効く
+   `settings` の属性を差し替えたとき（`test_swap_points.py` の `ENV_CONSTANTS`）、その差し替えは `ext` 経由でも効く
 """
 
 from __future__ import annotations

@@ -95,7 +95,7 @@ Pyodide のメモリ上のファイルシステムに組んだ仮のツリーを
 | ID | 型 | 要求 |
 |---|---|---|
 | REQ-EXT-26 | 常時 | ccnavi は、実行時の依存を Python の標準ライブラリと PyYAML に限り、PyYAML の C 拡張が無いときは純 Python の読み手で同じ値を読むこと。ネットワークに出ないこと。ホストから取るもの（マージリクエストのスレッドとレビュー、変更の一覧、承認コミットの親の提案）は、呼び手から値で受け取ること |
-| REQ-EXT-27 | 常時 | ccnavi は、Chrome 拡張が呼ぶ名前を、`ccnavi.entry.ext` が再公開するモジュールに限り、下の表の名前を、表の引数と戻り値のまま置くこと。拡張は `ccnavi.entry.ext` 以外の `ccnavi` のモジュールを import しないこと。拡張が使う属性は `py/ccnavi_chrome.py` の実使用で決まり、本体にそれが無くなったらテストが落ちること。使う名前の消去・引数と既存の戻り値の変更は、拡張の組み立てが同じ版の本体を同梱するので、互換の版（REQ-EXT-05）を上げる対象にしないこと |
+| REQ-EXT-27 | 常時 | ccnavi は、下の表の名前（Chrome 拡張が呼ぶもの）を、`ccnavi.entry.ext` が再公開するモジュールに置き、表の引数と戻り値のまま保つこと。拡張は `ccnavi.entry.ext` 以外の `ccnavi` のモジュールを import しないこと。拡張が使う属性は `py/ccnavi_chrome.py` で実際に使っているものに限り、本体からそれが無くなったらテストが落ちること。拡張は同じ版の本体と一緒に組み立てて同梱するため、使う名前の消去や引数・既存の戻り値の変更では、互換の版（REQ-EXT-05）を上げないこと |
 | REQ-EXT-28 | 事象 | `cli.run(stdin, stdout, stderr, argv)` を呼ばれたとき、ccnavi は、渡された標準入力・標準出力・標準エラーに書き、終了コードを返すこと（引数の読み違いの苦情だけは argparse がプロセスの標準エラーに書く）。判定の設定として読む環境変数は、名前が `CCNAVI_` で始まるものと `CLAUDE_PROJECT_DIR` に限ること |
 | REQ-EXT-29 | 事象 | `core.judge_approval(snapshot, only, shown_ids, shown_digest)` を呼ばれたとき、ccnavi は、`--agree --preview --json` と同じ関数で承認の対象・画面の本文・ダイジェストを出すこと。見せた識別子（`shown_ids`）とダイジェスト（`shown_digest`、提案の識別子の一覧と各提案ファイルのバイト列全体から作る。大文字小文字は問わない）が渡されたときは今のものと比べ、どちらかが違えば `mismatch`（`{expected, current, digest: {expected, current}}`）を返すこと。絞り（`only`）が通らないときは、絞らない一覧を今の一覧として比べること |
 | REQ-EXT-30 | 常時 | ccnavi は、`core.plan`・`core.confirm` で、書くものを値（`Changes`）で返すだけにし、ディスクにもホストにも書かないこと。`confirm` は、通らなければ `changes` を `None` にして理由を `problems` で返すこと。`Changes.per_branch()` はブランチごとに `{op: create\|update\|delete, path, content}`（`path` はツリーからの相対、`content` はバイト列）を返すこと |
@@ -103,7 +103,7 @@ Pyodide のメモリ上のファイルシステムに組んだ仮のツリーを
 | REQ-EXT-32 | 常時 | ccnavi は、手元と同じ形に組んだ仮のツリー（ワークスペースルートに統合先、`.claude/worktrees/<識別子>` に親子のチケット、`projects/<名前>` にプロジェクトの統合先）を、手元と同じ関数で読むこと。ワークツリーの見分けとブランチ名は `.git` のファイル（`HEAD`・`gitdir:`）から読むこと。git を起こせない場（`sys.platform` が `emscripten`）では、承認の時刻のように git に頼る表示の値を分からないとして空にすること |
 | REQ-EXT-35 | 事象 | `user mirror [<プロジェクト名>…] --json` を求められたとき、ccnavi は、何も書かずに、プロジェクトごとのミラーの状態と照合の値を JSON で返し、全体の誤りは `ok` を偽にして 1、それ以外は 0 で終わること。`user mirror [<プロジェクト名>…] --yes --expect <値> --via board --json` を求められたときは、標準入力がターミナルでなくても、値が今の差分と一致するときだけワークツリーのミラーを揃えて、書けたものを返し、不一致・対象なし・書けなかったときは `ok` を偽にして 1 で終わること。形は json-shapes.md のミラーの JSON |
 
-Chrome 拡張が呼ぶ名前。拡張は `ccnavi.entry.ext` が再公開する下のモジュールだけを呼ぶ。名前は `py/ccnavi_chrome.py` の実使用を集めたもの。引数と戻り値は今の実装のとおり。
+Chrome 拡張が呼ぶ名前の一覧。拡張は、`ccnavi.entry.ext` が再公開する次のモジュールだけを呼ぶ。名前は `py/ccnavi_chrome.py` で実際に使っているものを集めた。引数と戻り値は今の実装のとおり。
 
 | `ext` のモジュール | 名前 |
 |---|---|
@@ -120,11 +120,11 @@ Chrome 拡張が呼ぶ名前。拡張は `ccnavi.entry.ext` が再公開する�
 | `ticket_ids`（`ccnavi.tickets.ticket_ids`） | `ID_CHARS`・`RESERVED_BRANCH_IDS`・`DEFAULT_ISSUE_PREFIX`・`is_valid_id(text)`・`is_valid_name(text)`・`child_pattern()`・`branch_to_id(name)`・`branch_name_problems(t, integration="", serial=0, prefixes=…)`・`branch_problem(name)`・`adoption_id_problem(branch)`・`issue_identifier(number, title="", project="", prefix="feature")` |
 | `ticket_model`（`ccnavi.tickets.ticket_model`） | `DOING`・`DONE`・`STATES`・`Ticket`（`ticket`・`title`・`body`・`is_child`・`predecessors`） |
 
-REQ-EXT-27 の規則は、Chrome 拡張の入口（`py/ccnavi_chrome.py`）が本体の内部の名前を直に引いていたので、改名や移動で拡張だけが壊れるのを防ぐため。
+REQ-EXT-27 の規則は、Chrome 拡張の入口（`py/ccnavi_chrome.py`）が本体の内部の名前を直接参照していたため、改名や移動で拡張だけが壊れないようにするためのもの。
 拡張は `src/ccnavi/entry/ext.py` の再公開だけを呼ぶので、本体のモジュールを動かすときは `ext.py` の行を直す。
-拡張の Python は拡張の組み立てが同じ版の本体と一緒に同梱するので、名前の変更は、同梱の旧い本体と拡張の組では起きない。
-互換の版（REQ-EXT-05）は、拡張が統合先のデータや出力の形を読み違える変更で上げる。呼び出しの名前の変更では上げない。
-たとえば `lint._SH_COMPAT` を `SH_COMPAT` に、`review._is_sha` を `is_sha` に改めたときは、互換の版を上げていない。
+拡張は同じ版の本体と一緒に同梱されるので、名前を変えても、旧い本体と新しい拡張が組み合わさることはない。
+互換の版（REQ-EXT-05）は、拡張が統合先のデータや出力の形を読み違えるような変更のときに上げる。呼び出しの名前だけを変えるときは上げない。
+たとえば `lint._SH_COMPAT` を `SH_COMPAT` に、`review._is_sha` を `is_sha` に改めても、互換の版は上げない。
 `tests/ticket/test_swap_points.py` は、手元の承認・レビュー済みが書いたバイト列と、同じ入力で Chrome の入口が返す書くものとを突き合わせる。
 
 REQ-EXT-29 のダイジェストが覆うものは json-shapes.md「[承認の JSON](json-shapes.md#承認の-json)」と同じ（提案の識別子の一覧と各提案ファイルのバイト列全体だけ）。
