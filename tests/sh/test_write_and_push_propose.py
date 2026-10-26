@@ -117,6 +117,74 @@ class ProposeTest(WriteAndPushHarness):
         for rel in (other, sibling, draft):
             self.assertIn(f"?? {rel}", status)
 
+    def feedback_parent(self, feedback):
+        """計画が 2 ステップの親の提案を書く。フィードバック計画の番号は 3 から始まる。"""
+        text = parent_text(PARENT, ["design", "implement"], feedback, allow=("src/*", "wip/*"))
+        return self.put(f"{self.TODO}/{PARENT}.md", text)
+
+    def test_a_feedback_step_pointing_into_the_plan_is_refused_and_nothing_is_sent(self):
+        """承認で「フィードバック計画の番号だけを指せる」と落ちる提案は、送る時点で断る。"""
+        self.feedback_parent([{"type": "implement-feedback", "after": [1]}])
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("`feedback[0]` の `after` の 1 は読めない", result.stderr)
+        self.assertIn("フィードバック計画の番号だけを指せる", result.stderr)
+        self.assertEqual(
+            [x for x in result.stderr.splitlines() if x.startswith("次: ")],
+            [f"次: 直して `ccnavi-ticket.sh propose {PARENT}` を打ち直す"],
+        )
+        self.assertNotIn("提案:", result.stdout)
+        self.assertEqual(self.sha(self.tree, "HEAD"), before)
+        self.assertEqual(self.remote_sha(), before)
+
+    def test_a_feedback_plan_with_two_ends_is_refused(self):
+        self.feedback_parent(
+            [
+                {"type": "implement-feedback", "after": []},
+                {"type": "implement-feedback", "after": []},
+            ]
+        )
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("終端は 1 つにしてください", result.stderr)
+        self.assertNotIn("提案:", result.stdout)
+
+    def test_a_correct_feedback_plan_is_sent(self):
+        rel = self.feedback_parent([{"type": "implement-feedback", "after": []}])
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.committed(), [rel])
+
+    def test_a_plan_with_a_misplaced_after_is_refused_even_without_feedback(self):
+        text = parent_text(
+            PARENT, ["design", {"type": "implement", "after": [5]}], allow=("src/*", "wip/*")
+        )
+        self.put(f"{self.TODO}/{PARENT}.md", text)
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("`plan[1]` の `after` の 5 は読めない", result.stderr)
+
+    def test_children_and_unplanned_proposals_are_not_checked(self):
+        """子の提案・計画の無い提案・読めない提案は検査せず、今までどおり送る。"""
+        bad = parent_text(
+            PARENT, ["design", "implement"], [{"type": "x", "after": [1]}], allow=("src/*",)
+        )
+        child = self.put(f"{self.TODO}/{CHILD}.md", bad)
+        flow = self.put(f"{self.FLOWS}/{CHILD}.yml", "after: [1]\n")
+        free = self.put(f"{self.TODO}/{PARENT}.md", "plan も feedback も無い\n")
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.committed(), sorted([child, flow, free]))
+
+    def test_a_proposal_that_is_not_utf8_is_sent_unchecked(self):
+        path = os.path.join(self.tree, *self.TODO.split("/"), f"{PARENT}.md")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(b"---\nx: \xe9\n---\n")
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_a_child_id_sends_the_whole_family(self):
         todo = self.put(f"{self.TODO}/{PARENT}.md")
         result = self.ticket("propose", CHILD)
