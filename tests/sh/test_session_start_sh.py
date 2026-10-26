@@ -4,7 +4,7 @@
 見るのは次の 4 つ。
 
 1. 入口は、取り込み（fetch）が失敗しても、clone 済みリポジトリの一覧（dirs）を出して 0 で終わる
-2. 一覧は 10 件までで、超えると残りの件数と ls を案内する
+2. 一覧は 10 件までで、超えると残りの件数を添える
 3. projects/ が無いとき、または .git を持つものが無いときは何も出さない
 4. 10 件ちょうどなら案内を出さない
 """
@@ -80,7 +80,6 @@ class SessionStartSh(unittest.TestCase):
             [x.strip() for x in lines[1:11]], [f"- d{i:02d}" for i in range(11, 1, -1)]
         )
         self.assertIn("ほかに 2 件", lines[11])
-        self.assertIn("ls -d projects/", lines[11])
 
     def test_no_more_note_when_within_ten(self):
         self.make_dirs(10)
