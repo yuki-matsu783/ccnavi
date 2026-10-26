@@ -91,7 +91,7 @@ keywords: [設定, settings.json, env, 環境変数, hook, CCNAVI_HANDOFF_SUGGES
 
 同じ実行ファイルを上の 8 つのイベントに登録する。payload にイベント名が入っているので、どれを走らせるかは ccnavi が選ぶ。
 `matcher` は絞らない。絞ると、書かなかったツールで hook 自体が起動しなくなる。
-`SessionStart` の 2 本目は入口の sh（`ccnavi-session-start.sh`。中で `ccnavi-fetch.sh` と、直下のディレクトリ一覧の `ccnavi-dirs.sh` を順に呼ぶ）で、承認済みチケットと
+`SessionStart` の 2 本目は入口の sh（`ccnavi-session-start.sh`。中で `ccnavi-fetch.sh` と、`projects/` の clone 済みリポジトリ一覧の `ccnavi-dirs.sh` を順に呼ぶ）で、承認済みチケットと
 マーカー（親ブランチに乗って届く）と、ワークツリーの起点になる統合先ブランチを fast-forward で
 取ってくる。登録しないと、別の機械で承認したものが反映されず、古い `main` からブランチを切ることになる。
 

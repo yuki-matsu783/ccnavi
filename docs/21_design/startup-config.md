@@ -289,8 +289,8 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 - 同じ 1 回で `.vscode/settings.json` も見る。触ってほしくないときは `--no-vscode`。
   `.vscode/settings.json` にコメントや末尾のカンマがあると（`jq` が読めない）、何を足せばよいかだけを出し、`.claude/settings.json` は書く。
   VS Code の他の設定は残し、`false` と書いてあれば変えずに並べて見せる。
-- セッション開始時の入口（`ccnavi-session-start.sh`。取り込みの `ccnavi-fetch.sh` と、直下のディレクトリ一覧の `ccnavi-dirs.sh` を順に呼ぶ）も
-  `SessionStart` に別の 1 行で登録する。1 台だけで使いリモートに合わせる必要が無ければ `--no-fetch` で外す（ディレクトリ一覧も出なくなる）。
+- セッション開始時の入口（`ccnavi-session-start.sh`。取り込みの `ccnavi-fetch.sh` と、`projects/` の clone 済みリポジトリ一覧の `ccnavi-dirs.sh` を順に呼ぶ）も
+  `SessionStart` に別の 1 行で登録する。1 台だけで使いリモートに合わせる必要が無ければ `--no-fetch` で外す（clone 済みリポジトリの一覧も出なくなる）。
 - 既にある値は置き換えず、違えば並べて見せる。置き換えるのは `--mode` か `--ticket-control` を名指しして `--force` を付けたときだけで、
   名指ししていない値はそのままにする。
 - 戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES`）は `CCNAVI_MODE` と同じ値で書く。`CCNAVI_MODE` が `dry-run` のうちは、
