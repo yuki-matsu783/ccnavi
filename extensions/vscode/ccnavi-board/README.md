@@ -15,7 +15,7 @@ ccnavi のチケットが、どのワークツリーでどこまで進んでい�
 | 実行ファイルの版 | 起動のときに 1 度 `--version --json` を聞き、互換の版（`compat`）が拡張の `EXTENSION_COMPAT` と違うときに通知を出す。版を聞けなかったとき（実行ファイルが `--version --json` に失敗する・答えが読めない）は、起動では何も言わない。画面ごとに、使うフラグを確かめられない理由を出して先へ進まない。通知では、どちらが古いかと直し方（ccnavi のリポジトリなら `build.py` で組み立て直し、配布先なら `scripts/ccnavi-setup.sh --force` で配り直し、拡張が古ければ入れ直し）を示す。画面は止めない（[版の JSON](../../../docs/11_requirements/json-shapes.md#版の-json)） |
 | bash | clone / fetch / pull を送るターミナル。承認と未解決の指摘の対応方針はこのターミナルを通らない（子プロセスで打つ。sh はこのシェルで走らせる）。Windows は Git Bash（`C:\Program Files\Git\bin\bash.exe`、無ければ PATH の `bash`） |
 | git | PATH にあること。プロジェクト管理画面が origin を読み、ターミナルで clone を打つ |
-| Node.js / pnpm | 22 以上 / 10。組み立てとテストにだけ要る |
+| Node.js / pnpm | 22.13.1 以上 / 10。組み立てとテストにだけ要る |
 
 設定（`settings.json`）。
 

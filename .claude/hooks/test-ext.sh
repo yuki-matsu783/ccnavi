@@ -53,7 +53,7 @@ esac
 
 # node がない環境では実行できない。モデルが直せることではないため、差し戻さずにユーザへ伝える
 if ! command -v node >/dev/null 2>&1; then
-	printf 'ccnavi: node がないため拡張のテストを実行していません（Node 22 が必要）。\n' >&2
+	printf 'ccnavi: node がないため拡張のテストを実行していません（Node 22.13.1 以上が必要）。\n' >&2
 	rm -f "$files"
 	exit 0
 fi

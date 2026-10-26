@@ -13,7 +13,7 @@
 // 読めない形なら組み立てを止める。
 //
 // 取ってくるのは PyYAML の sdist だけ。置き場は .cache/（追跡しない）。プロキシの内側では
-// NODE_USE_ENV_PROXY=1 を付けて回すと HTTPS_PROXY を通る（Node 22.21 から）。
+// NODE_USE_ENV_PROXY=1 を付けて回すと HTTPS_PROXY を通る（Node 22.21 以上。それより古い版では効かない）。
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
