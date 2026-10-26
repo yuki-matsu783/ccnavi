@@ -400,7 +400,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 
 `match` に `Stop` を書いた `allow` のルールは、メインエージェントのターンの終わり（`Stop`）にヒットする（REQ-PRE-17）。
 適用する先の文字列は無いので固定の `(stop)` に適用し、ルールは `glob: "*"` と書く。渡す回にだけ `decision: block` で止め、`reason` を
-`NUDGE_STOP_RULE: ` と決まった前置き（`events.STOP_PREFACE`）とルールの文にする。`every: 10` なら「ターンの終わり 10 回に 1 度」になる。
+`NUDGE_STOP_RULE: ` と決まった前置き（文面ファイルの `NUDGE_STOP_RULE`）とルールの文にする。`every: 10` なら「ターンの終わり 10 回に 1 度」になる。
 ルールの文を振り返りの手順にする前提の仕組みで、前置きもそう書いてある。
 
 | 何を | どうするか |
@@ -437,7 +437,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 
 #### レビュー依頼までの道の途中で終えたとき
 
-チケット作業の道（子の `finish`（親ブランチへの合流を含む） → ELI5 → `ccnavi-review.sh request`）の途中で、確認を取ってターンを終えるのを `Stop` で 1 回だけ止める（REQ-PRE-18。理由コード `NUDGE_TICKET_REQUEST`。チケット側の条件と除く形は 9.6）。ルールではなく状態で決める。文は `STOP_PREFACE` と同じ考え方で、決まった道の途中でユーザの許可は要らないこと、状態に応じた次のコマンド、ユーザの判断が本当に要る問いなら最後に書き直すことを言う。`finish` の促しと同じく `dry-run` でも止め、同じ状態では 1 回だけ（`nudged-<セッション>.json` の `request:` で始まるキー）。順序は `finish` の促し → この促し → 直接作業の `integrate` の促し → `match: Stop` のルール。
+チケット作業の道（子の `finish`（親ブランチへの合流を含む） → ELI5 → `ccnavi-review.sh request`）の途中で、確認を取ってターンを終えるのを `Stop` で 1 回だけ止める（REQ-PRE-18。理由コード `NUDGE_TICKET_REQUEST`。チケット側の条件と除く形は 9.6）。ルールではなく状態で決める。文は `NUDGE_STOP_RULE` の前置きと同じ考え方で、決まった道の途中でユーザの許可は要らないこと、状態に応じた次のコマンド、ユーザの判断が本当に要る問いなら最後に書き直すことを言う。`finish` の促しと同じく `dry-run` でも止め、同じ状態では 1 回だけ（`nudged-<セッション>.json` の `request:` で始まるキー）。順序は `finish` の促し → この促し → 直接作業の `integrate` の促し → `match: Stop` のルール。
 
 `finish` の促しと依頼までの道の促しは、このセッションに実行中のサブエージェントが居る間（`subagent.running`。記録を読めないときも）は見送り、「1 回だけ」の記録も進めない。委任して待つ回の誤った促しを防ぐだけで、メインが自分から早く `finish` を打つことは防がない。
 

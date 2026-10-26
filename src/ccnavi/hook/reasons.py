@@ -148,7 +148,7 @@ def undeclared(
     *,
     verdict: str,
     fell_back: bool = False,
-    root: str = "",
+    root: str,
 ) -> str:
     """どのタイプも言及しなかった呼び出しに返す文。
 
