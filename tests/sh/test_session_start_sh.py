@@ -84,6 +84,16 @@ class SessionStartSh(unittest.TestCase):
         self.assertIn("- d00", r.stdout)
         self.assertNotIn("plain", r.stdout)
 
+    def test_counts_git_file_and_odd_names(self):
+        base = os.path.join(self.project, "projects")
+        os.makedirs(os.path.join(base, "sub mod"))
+        with open(os.path.join(base, "sub mod", ".git"), "w", encoding="utf-8") as f:
+            f.write("gitdir: ../x\n")
+        os.makedirs(os.path.join(base, "-dash", ".git"))
+        r = run("ccnavi-dirs.sh", self.project, self.scripts)
+        self.assertIn("- sub mod", r.stdout)
+        self.assertIn("- -dash", r.stdout)
+
     def test_ignores_top_level_directories(self):
         os.makedirs(os.path.join(self.project, "src", ".git"))
         r = run("ccnavi-dirs.sh", self.project, self.scripts)

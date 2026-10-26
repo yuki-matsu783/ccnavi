@@ -4,8 +4,9 @@
 #   sh .ccnavi/scripts/ccnavi-dirs.sh
 #
 # 数えるのは projects/ 直下で `.git`（ディレクトリでもファイルでも）を持つもの。.git の無いディレクトリは
-# 数えない。並びは更新が新しい順（ls -t）。sh だけで Windows (Git Bash / WSL)・Linux・macOS のどれでも
-# 同じに動く。作成日時は sh だけでは取れないため、更新日時で代える。
+# 数えない。ワークスペースルートで起動する前提（CLAUDE_PROJECT_DIR の projects/ を見る）。
+# 並びは各ディレクトリの更新が新しい順（ls -t。直下の増減で変わり、中身の編集では変わらない）。
+# sh だけで Windows (Git Bash / WSL)・Linux・macOS のどれでも同じに動く。作成日時は sh だけでは取れないため、更新日時で代える。
 # 11 件以上あるときは、残りを見る ls を案内する。出力はモデルに届く。該当が無ければ何も出さない。
 
 set -eu
@@ -24,8 +25,8 @@ done)
 
 total=$(printf '%s\n' "$list" | wc -l | tr -d ' ')
 
-printf '案内: projects/ に clone 済みのリポジトリ（更新が新しい順、最大 %s 件）\n' "$limit"
+printf '案内: projects/ に clone 済みのリポジトリ（直下の更新が新しい順、最大 %s 件）\n' "$limit"
 printf '%s\n' "$list" | head -n "$limit" | sed 's|/$||; s|^|  - |'
 if [ "$total" -gt "$limit" ]; then
-  printf '案内: ほかに %s 件あります。全部は `ls -dt projects/*/` で見られます。\n' "$((total - limit))"
+  printf '案内: ほかに %s 件あります。`ls -dt projects/*/` で全部見られます（.git の無いものも並びます）。\n' "$((total - limit))"
 fi
