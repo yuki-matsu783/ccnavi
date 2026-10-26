@@ -491,7 +491,7 @@ def check(
 # sh が互換の版を宣言する場所。`.ccnavi/scripts/` の sh はどれもこれを `.` で読むので、
 # 1 か所で足りる。
 SH_COMPAT_FILE = os.path.join(".ccnavi", "scripts", "ccnavi-common.sh")
-_SH_COMPAT = re.compile(r"^CCNAVI_COMPAT=([0-9]+)[ \t]*$", re.MULTILINE)
+SH_COMPAT = re.compile(r"^CCNAVI_COMPAT=([0-9]+)[ \t]*$", re.MULTILINE)
 
 
 def compat_fix(root: str) -> str:
@@ -524,7 +524,7 @@ def _sh_compat(root: str) -> list[Problem]:
         return []
     except (OSError, UnicodeDecodeError) as exc:
         return [Problem(SEVERITY_WARN, "(version)", f"{path} を読めない ({exc})")]
-    found = _SH_COMPAT.search(text)
+    found = SH_COMPAT.search(text)
     if found is None:
         return [
             Problem(

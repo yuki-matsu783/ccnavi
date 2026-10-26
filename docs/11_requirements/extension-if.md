@@ -95,7 +95,7 @@ Pyodide のメモリ上のファイルシステムに組んだ仮のツリーを
 | ID | 型 | 要求 |
 |---|---|---|
 | REQ-EXT-26 | 常時 | ccnavi は、実行時の依存を Python の標準ライブラリと PyYAML に限り、PyYAML の C 拡張が無いときは純 Python の読み手で同じ値を読むこと。ネットワークに出ないこと。ホストから取るもの（マージリクエストのスレッドとレビュー、変更の一覧、承認コミットの親の提案）は、呼び手から値で受け取ること |
-| REQ-EXT-27 | 常時 | ccnavi は、下の表の名前（モジュール・関数・クラス・定数。下線で始まる `lint._SH_COMPAT` と `review._is_sha` を含む）を、表の引数と戻り値のまま置くこと。名前・引数・既存の戻り値を変える・消すときは、互換の版を上げること（REQ-EXT-05）。名前や戻り値のキーを足すだけの変更（古い拡張が読み飛ばせるもの）では、互換の版を上げないこと |
+| REQ-EXT-27 | 常時 | ccnavi は、Chrome 拡張が呼ぶ名前を、`ccnavi.entry.ext` が再公開するモジュールに限り、下の表の名前を、表の引数と戻り値のまま置くこと。拡張は `ccnavi.entry.ext` 以外の `ccnavi` のモジュールを import しないこと。拡張が使う属性は `py/ccnavi_chrome.py` の実使用で決まり、本体にそれが無くなったらテストが落ちること。使う名前の消去・引数と既存の戻り値の変更は、拡張の組み立てが同じ版の本体を同梱するので、互換の版（REQ-EXT-05）を上げる対象にしないこと |
 | REQ-EXT-28 | 事象 | `cli.run(stdin, stdout, stderr, argv)` を呼ばれたとき、ccnavi は、渡された標準入力・標準出力・標準エラーに書き、終了コードを返すこと（引数の読み違いの苦情だけは argparse がプロセスの標準エラーに書く）。判定の設定として読む環境変数は、名前が `CCNAVI_` で始まるものと `CLAUDE_PROJECT_DIR` に限ること |
 | REQ-EXT-29 | 事象 | `core.judge_approval(snapshot, only, shown_ids, shown_digest)` を呼ばれたとき、ccnavi は、`--agree --preview --json` と同じ関数で承認の対象・画面の本文・ダイジェストを出すこと。見せた識別子（`shown_ids`）とダイジェスト（`shown_digest`、提案の識別子の一覧と各提案ファイルのバイト列全体から作る。大文字小文字は問わない）が渡されたときは今のものと比べ、どちらかが違えば `mismatch`（`{expected, current, digest: {expected, current}}`）を返すこと。絞り（`only`）が通らないときは、絞らない一覧を今の一覧として比べること |
 | REQ-EXT-30 | 常時 | ccnavi は、`core.plan`・`core.confirm` で、書くものを値（`Changes`）で返すだけにし、ディスクにもホストにも書かないこと。`confirm` は、通らなければ `changes` を `None` にして理由を `problems` で返すこと。`Changes.per_branch()` はブランチごとに `{op: create\|update\|delete, path, content}`（`path` はツリーからの相対、`content` はバイト列）を返すこと |
@@ -103,24 +103,28 @@ Pyodide のメモリ上のファイルシステムに組んだ仮のツリーを
 | REQ-EXT-32 | 常時 | ccnavi は、手元と同じ形に組んだ仮のツリー（ワークスペースルートに統合先、`.claude/worktrees/<識別子>` に親子のチケット、`projects/<名前>` にプロジェクトの統合先）を、手元と同じ関数で読むこと。ワークツリーの見分けとブランチ名は `.git` のファイル（`HEAD`・`gitdir:`）から読むこと。git を起こせない場（`sys.platform` が `emscripten`）では、承認の時刻のように git に頼る表示の値を分からないとして空にすること |
 | REQ-EXT-35 | 事象 | `user mirror [<プロジェクト名>…] --json` を求められたとき、ccnavi は、何も書かずに、プロジェクトごとのミラーの状態と照合の値を JSON で返し、全体の誤りは `ok` を偽にして 1、それ以外は 0 で終わること。`user mirror [<プロジェクト名>…] --yes --expect <値> --via board --json` を求められたときは、標準入力がターミナルでなくても、値が今の差分と一致するときだけワークツリーのミラーを揃えて、書けたものを返し、不一致・対象なし・書けなかったときは `ok` を偽にして 1 で終わること。形は json-shapes.md のミラーの JSON |
 
-Chrome 拡張が呼ぶ名前。引数と戻り値は今の実装のとおり。
+Chrome 拡張が呼ぶ名前。拡張は `ccnavi.entry.ext` が再公開する下のモジュールだけを呼ぶ。名前は `py/ccnavi_chrome.py` の実使用を集めたもの。引数と戻り値は今の実装のとおり。
 
-| モジュール | 名前 |
+| `ext` のモジュール | 名前 |
 |---|---|
-| `ccnavi.tickets.core` | `Snapshot`・`Actor`・`Changes`（`per_branch()`・`lines`・`planned.stopped`）・`read_fs(conf, root, stamp="", actor=None)`・`judge_approval(snapshot, only=None, shown_ids=None, shown_digest=None)`（戻り値の `gathered.refused`・`batch`・`mismatch`・`identifiers`・`screen_text`・`digest`・`rejected`）・`approval_refusal_code(verdict)`・`plan(snapshot, verdict)`・`confirm(snapshot, parent_id, phase_no, result, changed_since_request)`（`confirm` の戻り値の `problems`・`changes`・`code`）・`decide_preview(snapshot, parent_id, phase_no, result, changed_since_request, moved=None, carry=frozenset())`・`decide(snapshot, parent_id, phase_no, result, changed_since_request, moved=None, choices=None, shown_digest=None, carry=frozenset())`・`reviewable(snapshot, parent_id)`・`requested_head(snapshot, parent_id, phase_no)`・`moved_on_host(snapshot, parent_id, phase_no, head, changed)` |
-| `ccnavi.entry.cli` | `run(stdin, stdout, stderr, argv)` |
-| `ccnavi.entry.lint` | `SH_COMPAT_FILE`・`_SH_COMPAT`（`CCNAVI_COMPAT` の行を読む正規表現） |
-| `ccnavi.entry.version` | `VERSION`・`COMPAT` |
-| `ccnavi.infra.fsio` | `clock(fixed)`・`stamp()` |
-| `ccnavi.infra.settings` | `DEFAULT_TICKETS`・`DEFAULT_APPROVED`・`DEFAULT_STATE`・`DEFAULT_PROJECTS`・`DEFAULT_PROJECT_HOME`・`DEFAULT_BRANCH_PREFIXES`・`LAYER_CONFIG_DIR`・`LAYER_FILE_NAMES`・`load(root)`・`is_branch_prefix(word)`・`is_reserved_layer_name(name)` |
-| `ccnavi.tickets.via` | `session(via, actor="")`・`VIA_CHROME` |
-| `ccnavi.tickets.review_host` | `Result.from_data(data)`（戻り値の `error`） |
-| `ccnavi.tickets.review` | `_is_sha(value)` |
-| `ccnavi.tickets.ticket` | `TODO`・`DOING`・`DONE`・`STATES`・`ID_CHARS`・`RESERVED_BRANCH_IDS`・`DEFAULT_ISSUE_PREFIX`・`Ticket`（`ticket`・`title`・`body`・`is_child`・`predecessors`）・`parse(text)`・`load(path)`・`is_valid_id(text)`・`is_valid_name(text)`・`child_pattern()`・`branch_name(t)`・`branch_name_problems(t, integration="", serial=0, prefixes=…)`・`branch_problem(name)`・`issue_identifier(number, title="", project="", prefix="feature")` |
+| `core`（`ccnavi.tickets.core`） | `Snapshot`・`Actor`・`Changes`（`per_branch()`・`lines`・`planned.stopped`）・`read_fs(conf, root, stamp="", actor=None)`・`judge_approval(snapshot, only=None, shown_ids=None, shown_digest=None)`（戻り値の `gathered.refused`・`batch`・`mismatch`・`identifiers`・`screen_text`・`digest`・`rejected`）・`approval_refusal_code(verdict)`・`plan(snapshot, verdict)`・`confirm(snapshot, parent_id, phase_no, result, changed_since_request)`（`confirm` の戻り値の `problems`・`changes`・`code`）・`decide_preview(snapshot, parent_id, phase_no, result, changed_since_request, moved=None, carry=frozenset())`・`decide(snapshot, parent_id, phase_no, result, changed_since_request, moved=None, choices=None, shown_digest=None, carry=frozenset())`・`reviewable(snapshot, parent_id)`・`requested_head(snapshot, parent_id, phase_no)`・`moved_detail_on_host(snapshot, parent_id, phase_no, head, changed)`・`manual_for(snapshot, parent_id, phase_no, moved_at=None)` |
+| `cli`（`ccnavi.entry.cli`） | `run(stdin, stdout, stderr, argv)` |
+| `lint`（`ccnavi.entry.lint`） | `SH_COMPAT_FILE`・`SH_COMPAT`（`CCNAVI_COMPAT` の行を読む正規表現） |
+| `version`（`ccnavi.entry.version`） | `VERSION`・`COMPAT` |
+| `fsio`（`ccnavi.infra.fsio`） | `clock(fixed)` |
+| `settings`（`ccnavi.infra.settings`） | `DEFAULT_TICKETS`・`DEFAULT_APPROVED`・`DEFAULT_PROJECTS`・`DEFAULT_PROJECT_HOME`・`DEFAULT_BRANCH_PREFIXES`・`LAYER_CONFIG_DIR`・`load(root)`・`is_branch_prefix(word)`・`is_reserved_layer_name(name)` |
+| `via`（`ccnavi.tickets.via`） | `session(via, actor="")`・`VIA_CHROME` |
+| `review_host`（`ccnavi.tickets.review_host`） | `Result.from_data(data)`（戻り値の `error`） |
+| `review`（`ccnavi.tickets.review`） | `is_sha(value)` |
+| `ticket`（`ccnavi.tickets.ticket`） | `parse(text)`・`load(path)` |
+| `ticket_ids`（`ccnavi.tickets.ticket_ids`） | `ID_CHARS`・`RESERVED_BRANCH_IDS`・`DEFAULT_ISSUE_PREFIX`・`is_valid_id(text)`・`is_valid_name(text)`・`child_pattern()`・`branch_to_id(name)`・`branch_name_problems(t, integration="", serial=0, prefixes=…)`・`branch_problem(name)`・`adoption_id_problem(branch)`・`issue_identifier(number, title="", project="", prefix="feature")` |
+| `ticket_model`（`ccnavi.tickets.ticket_model`） | `DOING`・`DONE`・`STATES`・`Ticket`（`ticket`・`title`・`body`・`is_child`・`predecessors`） |
 
-REQ-EXT-27 の規則は、Chrome 拡張の入口（`py/ccnavi_chrome.py`）が名前を直に引くため。改名すると、同梱の版を組み立て直すまで
-Chrome 拡張だけが動かなくなる。上げた互換の版は統合先の `CCNAVI_COMPAT` に載り、古い Chrome 拡張は書く操作を出さなくなる（REQ-CHR-03）。
-たとえば `approval_refusal_code` と、`confirm` の戻り値の `code` を足したときは、古い拡張はそれを引かず読み飛ばすだけなので、互換の版を上げていない。
+REQ-EXT-27 の規則は、Chrome 拡張の入口（`py/ccnavi_chrome.py`）が本体の内部の名前を直に引いていたので、改名や移動で拡張だけが壊れるのを防ぐため。
+拡張は `src/ccnavi/entry/ext.py` の再公開だけを呼ぶので、本体のモジュールを動かすときは `ext.py` の行を直す。
+拡張の Python は拡張の組み立てが同じ版の本体と一緒に同梱するので、名前の変更は、同梱の旧い本体と拡張の組では起きない。
+互換の版（REQ-EXT-05）は、拡張が統合先のデータや出力の形を読み違える変更で上げる。呼び出しの名前の変更では上げない。
+たとえば `lint._SH_COMPAT` を `SH_COMPAT` に、`review._is_sha` を `is_sha` に改めたときは、互換の版を上げていない。
 `tests/ticket/test_swap_points.py` は、手元の承認・レビュー済みが書いたバイト列と、同じ入力で Chrome の入口が返す書くものとを突き合わせる。
 
 REQ-EXT-29 のダイジェストが覆うものは json-shapes.md「[承認の JSON](json-shapes.md#承認の-json)」と同じ（提案の識別子の一覧と各提案ファイルのバイト列全体だけ）。
