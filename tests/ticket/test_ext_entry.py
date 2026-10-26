@@ -55,9 +55,9 @@ class ExtEntryTest(unittest.TestCase):
         found = []
         for node in ast.walk(_parse()):
             if isinstance(node, ast.ImportFrom):
-                if node.level or (node.module or "").split(".")[0] == "ccnavi":
-                    if node.level or node.module != EXT_MODULE:
-                        found.append(f"{node.lineno}: from {'.' * node.level}{node.module}")
+                from_ccnavi = node.level or (node.module or "").split(".")[0] == "ccnavi"
+                if from_ccnavi and (node.level or node.module != EXT_MODULE):
+                    found.append(f"{node.lineno}: from {'.' * node.level}{node.module}")
             elif isinstance(node, ast.Import):
                 found += [
                     f"{node.lineno}: import {a.name}"
