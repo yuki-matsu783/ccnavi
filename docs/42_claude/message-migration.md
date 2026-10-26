@@ -18,7 +18,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | `DENY_PHASE_REVIEW__WAITING`・`DENY_PHASE_REVIEW__REQUEST` | `tickets/phase.py` の `hold_reason` | 移した（並行の依頼の断り `PARALLEL_REQUEST_NOTE` と止めている間も通せる操作の案内 `EXEMPT_NOTE` は、`review.py` や `phase.py` の別の文と共有する定数なので、コードに残る） |
 | `DENY_NEEDS_USER_TURN__INTEGRATE`・`DENY_NEEDS_USER_TURN__STATE` | `hook/turngate.py` の `message` | 移した（宣言の `Gate.message` が識別子を指す） |
 | `NUDGE_INTEGRATE__UNKNOWN_MARKER`・`__CONFIRM`・`__ADOPT`・`__RUN`、`NOTE_INTEGRATE_*` | `tickets/ops_stop_integrate.py` の `integrate_nudge` | 移した（`blocked_notice` の `systemMessage` は残る） |
-| `NEXT_START_*`・`NOTE_START_*`・`CHOICES_START_ISSUE_CLOSED` | `ccnavi-start.sh` の `次:`・`次の手:` と、それに続く `案内:` | 移した（全部。状態を報告する行・`必須:`・`確認:`・`MCP で行う手順:` は次の一手ではないので残る） |
+| `NEXT_START_*`・`NOTE_START_*`・`CHOICES_START_ISSUE_CLOSED` | `ccnavi-start.sh` の `次:`・`次の手:` と、それに続く `案内:` | 移した（`次:`・`次の手:` に続く `案内:` まで。続かない `案内:` は下の「残り」。状態を報告する行・`必須:`・`確認:`・`MCP で行う手順:` は次の一手ではないので残る） |
 | `DENY_TICKET_PROJECT_MISMATCH`・`DENY_TICKET_BLOCKED`・`DENY_TICKET_SCOPE` | `hook/judge.py`（取り違え・チケットが成り立たない・範囲の外） | 移した（状態を報告する先頭の行 `subject:`・`ticket:`・`scope:`・`limit:`・`problem:` は残る。`DENY_TICKET_SCOPE` は上限ごとに `what` `why` `next` を `area`・`type`・`parent` で分ける） |
 | `NOTE_WORKTREE_LEFTOVER*` | `ccnavi-worktree.sh`（親のワークツリーから直接作業へ切り替えたあとの取り下げの案内。残っているかは実行ファイルの `tree leftover` に聞く） | 移した（新規） |
 | `NEXT_PF_*` | `ccnavi-common-host.sh` の `ccnavi_pf_next`（`--check`・失敗時の `次:`・`ccnavi-ticket.sh` の事前確認） | 移した（`integration` の文は共有の `ccnavi_integration_hint` を使うので残る） |
@@ -36,12 +36,12 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 |---|---|---|---|
 | 組み込みの拒否（Python） | `hook/reasons.py` の `fallen_back`・`undeclared`（`_UNDECLARED_*`）・`internal_error_notice`（種類を決められない英語の通知）、`hook/wrapguard.py` などが組んで渡す他の文 | 少数 | 未移行（英語の文面の整理と一緒に進める） |
 | 英語の文面 | `hook/post_findings.py`・`reasons.py` の一部（日本語と英語の混在の整理は別に進めている） | | 未移行 |
-| 日本語の直書き（Python の拒否・次の一手） | `hook/rootwrite.py` の `message()`（`DENY_SHELL_WORKSPACE_ROOT`）、`hook/post.py`・`hook/post_report.py`（実行後の次の一手）、`hook/docsearch.py`、`tickets/ticket_guard.py`（状態の置き場・承認済みの置き場・生の git の拒否）、`tickets/approval_checks.py`・`agree_screen.py`・`ops.py`（`次:`）・`review.py`・`phase.py`（CLI の stderr の次の手）、`tickets/flow.py`（サブエージェント向けの手順）、`policy/selfguard.py` | 多数 | 未移行（2026-10 の調査で見つかった分。網羅ではない。数え直して、1 まとまりずつ移す） |
-| sh の残りの `次の手:`・`次:`・`案内:` | `ccnavi-ticket.sh`（`次の手:` の選択肢と `案内:`）、`ccnavi-worktree.sh`（取り込みの記録が無い案内・横で作業する案内・了承を得るまでの案内）、`ccnavi-git.sh`（integrate の次の一手の残り）、`ccnavi-start.sh`（リモート未確認・テンプレート）、`ccnavi-stage.sh`・`ccnavi-sync.sh` の `案内:` | 約 20 | 未移行（状態の報告に近いものは残してよい。境目を見て移す） |
+| 日本語の直書き（Python の拒否・次の一手） | `hook/rootwrite.py` の `message()`（`DENY_SHELL_WORKSPACE_ROOT`）、`hook/post.py`・`hook/post_report.py`（実行後の次の一手）、`hook/docsearch.py`、`tickets/approval_checks.py`・`agree_screen.py`・`ops.py`（`次:`）・`review.py`・`phase.py`（CLI の stderr の次の手）、`tickets/flow.py`（サブエージェント向けの手順）、`policy/selfguard.py` | 多数 | 未移行（2026-10 の調査で見つかった分。網羅ではない。数え直して、1 まとまりずつ移す） |
+| sh の残りの `次の手:`・`次:`・`案内:` | `ccnavi-ticket.sh`（`次の手:` の選択肢と `案内:`）、`ccnavi-worktree.sh`（取り込みの記録が無い案内・横で作業する案内・了承を得るまでの案内）、`ccnavi-git.sh`（integrate の次の一手の残り）、`ccnavi-start.sh`（リモート未確認・テンプレート）、`ccnavi-stage.sh`・`ccnavi-sync.sh` の `案内:` | 約 40 | 未移行（状態の報告に近いものは残す。境目は[残りの進め方](#残りの進め方)の項目 3） |
 | ルールの文 | `rules.yml` の `message`・`additionalContext`・`additionalContextOnce`（インライン） | | 未移行（識別子で引く `message_id` は持たない。`additionalContextFile` で md の本文を出せる） |
 | 組み込みのルールの文 | `policy/builtin.py`・`policy/selfguard_shell.py` の `message`（`SHELL_MESSAGE`・`BINARY_MESSAGE`・`COMMON_LAYER_MESSAGE`・`RECORDS_MESSAGE`・`PROJECT_HOME_MESSAGE`・`HANDOFF_*_MESSAGE`・`add_named_rules` の 4 本・`builtin.py` の各ルール）、`tickets/ticket_guard.py`・`tickets/phase_forms.py` が `Rule` に直接入れる文 | 判定 1 回で 24 本 | 未移行。文は `rules.parse` に渡す dict の `message` か `Rule(message=…)` に文字列で入る。`texts.load` は署名（`os.listdir` と各ファイルの `os.stat`）でキャッシュするので、温まったあとの `texts.say` は 1 回約 40 µs で済む。ただしキャッシュはプロセスの中だけで、hook は 1 呼び出し 1 プロセスなので、組み立ての時点で引くと拒否に当たらない呼び出しにも冷たい読み（約 45 ms）が乗る。進め方は[残りの進め方](#残りの進め方)の項目 1 |
 | 配布側の sh の `次:` | `scripts/ccnavi-doctor.sh` 2、`scripts/ccnavi-package.sh` 1、`scripts/ccnavi-install.sh`（`次:` を組み立てる関数）。配布の道具で、ワークスペースの実行ファイルが無いときにも動くため、`ccnavi text` に頼らない | | 対象外 |
-| sh の拒否・失敗の文 | `fail "…"` の文（各 sh） | 約 160 | 移さない（[残りの進め方](#残りの進め方)の項目 3） |
+| sh の拒否・失敗の文 | `fail "…"` の文（各 sh） | 約 210 | 移さない（[残りの進め方](#残りの進め方)の項目 3） |
 
 ## 残りの進め方
 
@@ -80,15 +80,15 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 |---|---|---|---|---|---|
 | (a) 識別子を持たせ、判定の時点で引く | 組み込みの `Rule` に `message_id` と値（と場合）を持たせ、`spoken_message` の呼び手が `texts.say` で引く | 組み立てで `texts` を触らないので、通る呼び出しに読みが乗らない。当たったときだけ引く（拒否の文はいまもそうしている）。識別子で `test_texts_catalog` の対象にできる | `Rule` に欄が 3 つ増える。`Rule.key()`（レイヤーをまたいだ同一判定）に入れる。`rules` が `texts` を import できない（`texts` が `rules` を import する）ので、引く関数を呼び手から渡す。呼び手 3 か所を直す | `Rule` と `_build` で約 +40 行、呼び手 3 か所で約 +20 行。組み立ての側は、文字列 24 本を `(識別子, 値)` に替えて約 −150 行。文面ファイルに 24 件ほど足す | 通る呼び出しは今と同じ。当たった呼び出しは冷たい読み約 45 ms（拒否に当たる他の文と同じで、増えない） |
 | (b) 組み立ての時点で引く | `_deny`・`add_rules` などが `texts.say` を呼び、できた文字列を `message` に入れる | `Rule` を変えない。差分が最小 | 判定のたびに冷たい読みが加わる（+35〜50 ms、中身の約 1.5 倍）。24 本の `say` で約 1 ms。文面ファイルが壊れていると、24 本すべてが既定の短い文になる | 組み立ての側の置き換えだけ（約 −150 行） | 全呼び出しに約 +45 ms |
-| (c) 遅れて評価する文字列 | `message` に、引くまで評価しない値を入れる | `Rule` の欄は 1 つ | `message` を文字列とみなす箇所（`rule_lint`、`suggest.py`、`diagnose_board.py`、`Rule.key()`）が型に合わなくなる。識別子が欄に見えず、点検が拾いにくい | 約 +60 行と、各所の分岐 | (a) と同じ |
+| (c) 遅れて評価する文字列 | `message` に、引くまで評価しない値を入れる | `Rule` の欄は 1 つ | `message` を文字列とみなす箇所（`rule_lint`、`entry/suggest.py`、`entry/diagnose_board.py`、`Rule.key()`）が型に合わなくなる。識別子が欄に見えず、点検が拾いにくい | 約 +60 行と、各所の分岐 | (a) と同じ |
 
 推奨は (a)。決め手は性能で、(b) は全呼び出しに冷たい読みを足す。(c) は (a) の欄を隠すだけで、型が合わなくなる箇所が増える。
 
 - 識別子は `RULE_` で始める（種類は `deny`）。名前は組み込みのルールの id から決める（`builtin:git-push` なら `RULE_GIT_PUSH`）。場合の分け（ラッパーの有無）は `what` の場合分けにする。`DENY_TICKET_SCOPE` の前例がある
-- `message_id` と値は組み込み（`builtin=True`）の `Rule` にだけ持たせる。ルールファイルからは書けない。`rules.yml` に `message_id` を開かない（項目 2）
+- `message_id` と値は組み込みの `Rule`（`from_file` が偽のもの）にだけ持たせる。ルールファイルからは書けない。`rules.yml` に `message_id` を開かない（項目 2）
 - いまの文は 1 段落の自由文なので、`what` `why` `next` `no_bypass` の 4 欄に分け直す。欄は 1 つ 600 字まで、1 件で 2000 字までなので、長い文（承認済みの置き場の約 480 字）は欄に分けて収める。分け直しは文の見直しにもなるので、レビューの負担はここがいちばん大きい
 - 引く側は、`reasons.reason_for`・`post_report._messages`・`session_rejects` の 3 か所。`texts.say` が引けなかったときは既定の文が出て、判定は変わらない（`texts` の約束）
-- 設計書 `docs/21_design/messages.md` の「`message_id` は持たない」の段は、実装の PR で、組み込みだけが持つと直す
+- 設計書 `docs/21_design/messages.md` の「`message_id` は持たない」の段と、それを決めた記録は、実装の PR で扱う。設計書は組み込みだけが持つと直し、決定の記録は既存のものを書き換えず、新しく1枚書く
 
 ### 項目 2: `rules.yml` の `message`
 
@@ -108,14 +108,14 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | 3 | `hook/post.py`・`post_report.py`・`post_findings.py` の次の一手 | 移す。`stderr.write` の状態の報告は残す | 実行後のチェックで、書き込みのたびに戻し方や取り込み前の確かめ方を言う。`post_findings.py` は英語の文。`post_report._messages` の組み込みルールの文は項目 1 で一緒に移る |
 | 4 | `tickets/ops.py`・`agree_screen.py`（`次:`） | 移す | チケットの操作ごとに出る `次:`。`ops.py` に 4 件 |
 | 5 | `tickets/approval_checks.py` | 移す | 承認の依頼の前提が満たされないときに返る。直し方を言う文が約 18 件 |
-| 6 | sh の `案内:` のうち `ccnavi-git.sh`（15 本） | 移す | 取り込み（integrate）の経路で、チケットごとに出る。状態の報告（1 本）は残す |
+| 6 | sh の `案内:` のうち `ccnavi-git.sh`（`printf '案内:` が 15 本） | 移す | 取り込み（integrate）の経路で、チケットごとに出る。状態の報告（1 本）は残す |
 | 7 | sh の `案内:` のうち `ccnavi-worktree.sh`（11 本）、`ccnavi-start.sh`（9 本）、`ccnavi-stage.sh`・`ccnavi-sync.sh`・`ccnavi-ticket.sh` | 移す。`ccnavi-dirs.sh` の見出し 2 本、`issue は closed`（状態）、依頼文を消した報告は残す | ワークツリーの作成・着手でチケットごとに 1 回 |
 | 8 | `tickets/review.py`・`phase.py` の CLI の stderr の次の手 | 移す。`ccnavi: …を読めない` などの状態の報告は残す | レビューとフェーズの操作でだけ出る |
 | 9 | `hook/rootwrite.py` の `message()`（`DENY_SHELL_WORKSPACE_ROOT`） | 移す | 1 件。`turngate` と同じく判定の時点で引けるので、仕組みの変更は要らない |
 | 10 | `hook/docsearch.py` の使い方の案内（3 か所） | 移す。`stderr.write` の「引かない」理由は残す | `--docs` を使う場面でだけ出る |
 | 11 | `policy/selfguard.py` の知らせ（約 6 件） | 移す | 設定ファイルを戻したときだけ出る。まれ |
 | 12 | 英語の文面の `reasons.py` の残り | 項目 4 に含める | |
-| — | sh の `fail "…"`（約 160 件: `ccnavi-start.sh` 65、`ccnavi-worktree.sh` 42、`ccnavi-review.sh` 29、`ccnavi-user-decide.sh` 9、`ccnavi-branches.sh` 8、`ccnavi-common-review.sh` 8） | 移さない | 失敗の理由の報告が大半で、次の一手は文ごとに違う。1 件ごとに実行ファイルを起こす（Python の起動で約 0.4 秒）と失敗の経路が遅くなり、実行ファイルに不具合があるときに理由を言えなくなる。`ccnavi-user-*.sh` はユーザが打つのでエージェントに届かない。次の一手を含む `fail` が見つかったら、その `次:` の行だけを `ccnavi_text` に分けて移す |
+| — | sh の `fail "…"`（約 210 件。`fail <理由> "…"` の形を数えた: `ccnavi-start.sh` 88、`ccnavi-worktree.sh` 48、`ccnavi-review.sh` 36、`ccnavi-common-review.sh` 16、`ccnavi-user-decide.sh` 14、`ccnavi-branches.sh` 11） | 移さない | 失敗の理由の報告が大半で、次の一手は文ごとに違う。1 件ごとに実行ファイルを起こす（Python の起動で約 0.4 秒）と失敗の経路が遅くなり、実行ファイルに不具合があるときに理由を言えなくなる。`ccnavi-user-*.sh` はユーザが打つのでエージェントに届かない。次の一手を含む `fail` が見つかったら、その `次:` の行だけを `ccnavi_text` に分けて移す |
 | — | `stderr.write("ccnavi: …")` の診断（`post.py`・`docsearch.py`・`review.py` など） | 移さない | 内部の不具合や状態の報告で、次の一手ではない |
 | — | `tickets/flow.py` のサブエージェント向けの手順 | 移さない | 値の断片で、`DENY_*` が引く共有の定数（移行の一覧の「移した」の注） |
 
