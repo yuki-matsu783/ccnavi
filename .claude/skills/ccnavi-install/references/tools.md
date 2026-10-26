@@ -35,7 +35,7 @@ glab は [glab.md](glab.md)。
 
 - パッケージマネージャーが無い macOS の git は `xcode-select --install`（コマンドラインツール）でも入る。
 - uv（Linux・WSL）: uv の公式の導入手順（https://docs.astral.sh/uv/getting-started/installation/ ）に従う。`pipx install uv` でも入る。
-- Node.js（Linux・WSL）: ディストリビューションの版は古いことが多い。Node.js 22 以上を、公式の配布か nvm で入れる。
+- Node.js（Linux・WSL）: ディストリビューションの版は古いことが多い。Node.js 22.13.1 以上を、公式の配布か nvm で入れる。
 - pnpm: Node.js を入れたあと、`corepack enable`（Node.js 22 に同梱）か `npm install -g pnpm`。
 - パッケージマネージャーも利用できない、管理者権限も無い、外のサイトから取れないときは、社内の配布手順か管理者に頼んでもらう。
 

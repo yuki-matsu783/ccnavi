@@ -24,7 +24,7 @@ VS Code 本体の配布元、GitHub のリリース、Open VSX は 403 で、`co
 
 | もの | 用途 | 確かめ方 |
 |---|---|---|
-| Node.js 22 以上と npm | 拡張の組み立て、code-server | `node -v` |
+| Node.js 22.13.1 以上と npm | 拡張の組み立て、code-server | `node -v` |
 | pnpm 10 | 拡張の組み立て | `pnpm -v`（壊れていたら詰まりどころの表） |
 | uv と Python 3.12 以上 | ccnavi の組み立て、チケットの見本を作る | `uv --version` |
 | Playwright の Chromium | 撮影 | `ls -d /opt/pw-browsers/chromium-*/chrome-linux*/chrome` |
