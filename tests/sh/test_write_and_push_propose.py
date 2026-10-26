@@ -177,6 +177,14 @@ class ProposeTest(WriteAndPushHarness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.committed(), sorted([child, flow, free]))
 
+    def test_a_proposal_that_is_not_utf8_is_sent_unchecked(self):
+        path = os.path.join(self.tree, *self.TODO.split("/"), f"{PARENT}.md")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(b"---\nx: \xe9\n---\n")
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_a_child_id_sends_the_whole_family(self):
         todo = self.put(f"{self.TODO}/{PARENT}.md")
         result = self.ticket("propose", CHILD)

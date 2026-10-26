@@ -68,14 +68,18 @@ def _plan_problems(paths: list[str], parent: str) -> list[str]:
     found: list[str] = []
     for path in paths:
         stem, ext = os.path.splitext(os.path.basename(path))
-        in_todo = os.path.basename(os.path.dirname(path)) == ticket_model.TODO
+        folder = os.path.basename(os.path.dirname(path))
+        in_todo = pathcase.fold(folder) == pathcase.fold(ticket_model.TODO)
         if (
             not in_todo
             or pathcase.fold(stem) != pathcase.fold(parent)
             or pathcase.fold(ext) != ".md"
         ):
             continue
-        loaded, _ = ticket.load(path)
+        try:
+            loaded, _ = ticket.load(path)
+        except ValueError:  # UTF-8 で読めない提案は検査せず、今までどおり送る
+            continue
         if loaded is None or not (loaded.plan or loaded.feedback):
             continue
         found += [
