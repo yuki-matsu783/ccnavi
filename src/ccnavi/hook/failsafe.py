@@ -4,9 +4,11 @@
 落ちる。見るのは payload のツール名と対象の文字列だけ。
 
 - Read・Grep・Glob は、組み込みの最低限の deny（認証情報の形、`.git` の中、操作記録の置き場）に
-  ヒットしなければ通す。この評価もできなければ通さない
+  ヒットしなければ通す。通常の判定と同じく、cwd から解いた場所と来た表記の両方を見る。探す場所を
+  省いた Grep・Glob は cwd を見る。この評価もできなければ通さない
 - Bash・PowerShell は、読み切れて、連結・置換・リダイレクト・glob を含まない単独のコマンドで、
-  下の許可リストにヒットするときだけ通す
+  下の許可リストにヒットし、引数のパス（引数の無い `ls` は cwd）が最低限の deny にヒットしない
+  ときだけ通す
 - 報告用のツール（`modes.REPORT_TOOLS`）は通す（体が報告を返せなくなるのを避ける）
 - それ以外のツールは通さない（呼び出し側が `modes.fail_closed` で扱いを決める）
 
@@ -106,8 +108,8 @@ def read_is_safe(payload: hookio.Input) -> bool:
             omitted = not payload.field_value("path")
         else:
             omitted = not found
-        if omitted and payload.cwd:
-            found.append(payload.cwd)
+        if omitted:
+            found.append(payload.cwd or os.getcwd())
         return not any(_denied(p, payload.cwd) for p in found)
     except Exception:  # noqa: BLE001 評価できなければ通さない
         return False

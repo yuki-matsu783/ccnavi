@@ -375,6 +375,22 @@ class FailClosedByToolTest(unittest.TestCase):
         self.assertEqual(self.crash("Read", {"file_path": os.path.join(link, "id")}), 2)
         self.assertEqual(self.crash("Bash", {"command": "cat notes/id"}), 2)
 
+    def test_an_omitted_search_place_falls_back_to_the_process_cwd(self):
+        from ccnavi.hook import failsafe
+
+        git = os.path.join(self.root, ".git")
+        os.makedirs(git)
+        before = os.getcwd()
+        self.addCleanup(os.chdir, before)
+        for here, expected in ((git, False), (self.root, True)):
+            os.chdir(here)
+            for tool in ("Grep", "Glob"):
+                with self.subTest(cwd=here, tool=tool):
+                    payload = hookio.Input(
+                        event="PreToolUse", tool_name=tool, tool_input={"pattern": "x"}, cwd=""
+                    )
+                    self.assertEqual(failsafe.is_safe(payload, self.root), expected)
+
     def test_a_path_that_cannot_be_resolved_is_stopped(self):
         self.assertEqual(self.crash("Read", {"file_path": "/tmp/a\x00b"}), 2)
 
