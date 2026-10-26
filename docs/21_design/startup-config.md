@@ -173,7 +173,7 @@ Python は終了コード 1 で終わり、Claude Code は 0 と 2 以外を止�
 
 | イベント | 終え方 |
 |---|---|
-| `PreToolUse`、payload を読む前（イベントが分からない）、または判定中の内部例外 | 標準エラーに文、終了コード 2 で止める。ツールの種類で決め、Write・Edit・NotebookEdit・Agent・Task とツールが分からない回は `dry-run` でも止める。サブエージェントの報告用のツール（`SubagentHandback`・`StructuredOutput`。`modes.REPORT_TOOLS`）はモードによらず通す（体が報告を返せなくなるのを避ける）。Read・Grep・Glob は組み込みの最低限の deny（認証情報の形・`.git` の中・`logs/state/ops/`）にヒットしなければ通し、Bash は狭い許可リスト（`pwd`・`ls`・`cat` / `head` / `tail` / `wc` の単独の 1 パス・`ccnavi-ticket.sh status` / `--help`）だけ通す。PowerShell は止める。未知のツールは `enable` だけ止める |
+| `PreToolUse`、payload を読む前（イベントが分からない）、または判定中の内部例外 | 標準エラーに文、終了コード 2 で止める。ツールの種類で決め、Write・Edit・NotebookEdit・Agent・Task とツールが分からない回は `dry-run` でも止める。サブエージェントの報告用のツール（`SubagentHandback`・`StructuredOutput`。`modes.REPORT_TOOLS`）はモードによらず通す（体が報告を返せなくなるのを避ける）。Read・Grep・Glob は組み込みの最低限の deny（認証情報の形・`.git` の中・`logs/state/ops/`）にヒットしなければ通し、Bash は狭い許可リスト（`pwd`・`ls`・`cat` / `head` / `tail` / `wc` の単独の 1 パス・`ccnavi-ticket.sh status` / `--help`）だけ通す。deny は通常の判定と同じく cwd から解いた場所と渡された表記の両方（ワークスペースのルートより上の祖先の名前は除く）に当て、Glob は pattern も探す先として当てる。探す場所を省いた Grep・Glob と引数の無い `ls` は cwd に当てる。PowerShell は止める。未知のツールは `enable` だけ止める |
 | `PostToolUse` | ツールはもう走っていて止めるものは無い。`enable` は終了コード 2 と標準エラーで、実行後の検査をしていないことをモデルに言う。`dry-run` は 0 |
 | それ以外（`SessionStart`・`UserPromptSubmit`・`Stop`・`SubagentStart`・`SubagentStop`・未知のイベント） | 終了コード 0 で、ユーザに `systemMessage` で知らせる。終了コード 2 で終えると、`Stop` と `SubagentStop` は終われずに続けさせられ、`UserPromptSubmit` は依頼文を消す。ccnavi の不具合が作業そのものを止めないようにする。`SubagentStop` は、子の範囲を確かめられなかった回と同じ印を置き、親に届ける（9.12） |
 
@@ -262,7 +262,7 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 | `.ccnavi/scripts/ccnavi-fetch.sh` | セッション開始時に親ブランチと、ワークツリーの起点になる統合先ブランチを取ってくる。進めるのは fast-forward だけ |
 | `.ccnavi/scripts/ccnavi-session-start.sh` | セッション開始時の入口。`ccnavi-fetch.sh` と `ccnavi-dirs.sh` を順に呼ぶ。SessionStart にはこれを登録する |
 | `.ccnavi/scripts/ccnavi-idle.sh` | 放置したセッションの引き継ぎ促し（`start`・`notice`・`reset`）。`Stop` に 2 行、`UserPromptSubmit` に 1 行で登録する（4.2.1） |
-| `.ccnavi/scripts/ccnavi-dirs.sh` | セッション開始時に、プロジェクト直下のディレクトリを更新が新しい順に最大 10 件出す。超えるときは `ls` を案内する |
+| `.ccnavi/scripts/ccnavi-dirs.sh` | セッション開始時に、`projects/` 直下で `.git` を持つ clone 済みの外リポジトリを最新コミットが新しい順に最大 10 件出す。超えるときは残りの件数だけ添える |
 | `.ccnavi/scripts/ccnavi-sync.sh` | 親のブランチを取り込む（早送りか merge。衝突したら取りやめてユーザの対応に切り替える）。リモートから消えた親のブランチを診断する（閉じたかはホストの MR で決める） |
 | `.ccnavi/scripts/ccnavi-branches.sh` | issue・MR に紐づくブランチを探す。読むだけ。ホストは sh が読み、手元の候補は `ccnavi branches` が集める |
 | `.ccnavi/scripts/ccnavi-start.sh` | issue・MR を指定された依頼の着手の入口。`ccnavi-branches.sh` で候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る |
@@ -289,8 +289,8 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 - 同じ 1 回で `.vscode/settings.json` も見る。触ってほしくないときは `--no-vscode`。
   `.vscode/settings.json` にコメントや末尾のカンマがあると（`jq` が読めない）、何を足せばよいかだけを出し、`.claude/settings.json` は書く。
   VS Code の他の設定は残し、`false` と書いてあれば変えずに並べて見せる。
-- セッション開始時の入口（`ccnavi-session-start.sh`。取り込みの `ccnavi-fetch.sh` と、直下のディレクトリ一覧の `ccnavi-dirs.sh` を順に呼ぶ）も
-  `SessionStart` に別の 1 行で登録する。1 台だけで使いリモートに合わせる必要が無ければ `--no-fetch` で外す（ディレクトリ一覧も出なくなる）。
+- セッション開始時の入口（`ccnavi-session-start.sh`。取り込みの `ccnavi-fetch.sh` と、`projects/` の clone 済みリポジトリ一覧の `ccnavi-dirs.sh` を順に呼ぶ）も
+  `SessionStart` に別の 1 行で登録する。1 台だけで使いリモートに合わせる必要が無ければ `--no-fetch` で外す（clone 済みリポジトリの一覧も出なくなる）。
 - 既にある値は置き換えず、違えば並べて見せる。置き換えるのは `--mode` か `--ticket-control` を名指しして `--force` を付けたときだけで、
   名指ししていない値はそのままにする。
 - 戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES`）は `CCNAVI_MODE` と同じ値で書く。`CCNAVI_MODE` が `dry-run` のうちは、

@@ -167,7 +167,7 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-user-handoff.sh・ccnavi-user-mirror.sh・ccnavi-user-prune.sh は、実行ファイルの `user handoff` / `user mirror` /
 # `user prune` を入口の印つきで起こす薄い sh。印が無い `user` の入口は実行ファイルが断るので、配らないと打つ手が無くなる。
 # ccnavi-session-start.sh はセッション開始時の入口（FETCH_COMMAND）。中で、取り込みの ccnavi-fetch.sh と
-# 直下のディレクトリ一覧の ccnavi-dirs.sh を順に呼ぶ。ccnavi-sync.sh はユーザが実行する
+# projects/ の clone 済みリポジトリ一覧の ccnavi-dirs.sh を順に呼ぶ。ccnavi-sync.sh はユーザが実行する
 # 取り込み（分かれた親ブランチの merge、消えた親ブランチの確認、片付けの記録の読み出し）。
 # ccnavi-git.sh の拒否の文面が ccnavi-sync.sh を案内するので、配らないと案内どおりに実行しても動かない。
 # ccnavi-clean.sh と ccnavi-clean.js は、ワークツリーを片付ける前に生成物を消すもの。Windows では
@@ -236,7 +236,7 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
   --check                   書かずに、揃っていないところだけを並べる
   --no-vscode               .vscode/settings.json には触らない
   --no-fetch                セッション開始時の入口（ccnavi-session-start.sh）を hook に登録しない。
-                            取り込みは通信する。1 台だけで使い、リモートに合わせる必要が無いときに指定する（ディレクトリ一覧も出なくなる）
+                            取り込みは通信する。1 台だけで使い、リモートに合わせる必要が無いときに指定する（clone 済みリポジトリの一覧も出なくなる）
   --no-idle                 放置したセッションの引き継ぎ促し（ccnavi-idle.sh）を hook に登録しない。
                             会話が大きく育ったまま放置されると、キャッシュが切れて続きの料金が増える。そのため、切れる前に
                             次のセッションへの引き継ぎ文書を書かせる。要らないときに指定する
@@ -2140,7 +2140,7 @@ for name in $DEPLOY_SCRIPTS; do
 			why="セッション開始時の取り込み"
 			;;
 		ccnavi-dirs.sh)
-			why="セッション開始時のディレクトリ一覧"
+			why="セッション開始時の clone 済みリポジトリ一覧"
 			;;
 		ccnavi-sync.sh)
 			why="ユーザが実行する取り込みと、親のブランチが消えたかの確認"

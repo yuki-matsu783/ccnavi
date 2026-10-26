@@ -211,7 +211,11 @@ def _explain_modes(stdout: TextIO, conf: settings.Settings) -> None:
         enable = "止める" if modes.fail_closed(modes.ENABLE, tool) else "通す"
         dry = "止める" if modes.fail_closed(modes.DRY_RUN, tool) else "通す"
         safe = "止める" if modes.fail_closed(modes.ENABLE, tool, safe=True) else "通す"
-        if tool in modes.READ_TOOLS or tool in modes.SHELL_TOOLS:
+        if tool in modes.READ_TOOLS:
+            stdout.write(
+                f"  {label}: 最低限の deny にヒットしなければ{safe}、ヒットすれば{enable}\n"
+            )
+        elif tool in modes.SHELL_TOOLS:
             stdout.write(
                 f"  {label}: 最低限の許可リストにヒットすれば{safe}、ヒットしなければ{enable}\n"
             )
