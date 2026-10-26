@@ -12,9 +12,9 @@ write-and-push の手順で行う。コミットされるのは、未追跡の�
 ## 決まり
 
 - 対象は、識別子の親子の提案だけ。`todo/<親>.md`、`todo/<子>.md`、`flows/<子>.yml`。
-- 親の提案（`todo/<親>.md` で `plan:` か `feedback:` を持つもの）だけは、送る前に計画の `after` の
+- 計画を持つ親の提案（`todo/<親>.md` で `plan:` か `feedback:` を持つもの）だけ、送る前に計画の `after` の
   形と終端を検査する（`workflow.after_problems`・`workflow.terminal_problems`）。承認で落ちる誤りを
-  承認の前に返すため。誤りがあれば何も送らない。子の提案・子のフロー・計画の無い提案・
+  承認の前に返すためである。誤りがあれば何も送らない。子の提案・子のフロー・計画の無い提案・
   読めない提案は検査しない
 - 親のワークツリー（`.claude/worktrees/<親>`）の中のものだけを見る
 - 送る提案が 1 本も無ければ、何も載せずに止める
@@ -63,7 +63,7 @@ def _candidates(base: str, tickets: str, parent: str) -> list[str]:
 
 
 def _plan_problems(paths: list[str], parent: str) -> list[str]:
-    """送る親の提案（計画を持つもの）の、`after` と終端の誤り。文面は `workflow` が返すもの。"""
+    """計画を持つ、送る親の提案の `after` と終端の誤りを返す。文面は `workflow` が返すものを使う。"""
     found: list[str] = []
     for path in paths:
         stem, ext = os.path.splitext(os.path.basename(path))

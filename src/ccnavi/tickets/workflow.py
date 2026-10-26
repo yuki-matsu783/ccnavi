@@ -122,9 +122,9 @@ def ready(parent: ticket_model.Ticket, wf: ticket_model.Workflow | None = None) 
 def terminal_problems(
     parent: ticket_model.Ticket, wf: ticket_model.Workflow | None = None, part: str = ""
 ) -> list[rules.Problem]:
-    """終端の崩れ。最後のステップに全部が先行しているか、最後のステップが延期していないか。
+    """終端の崩れを返す。最後のステップに全部が先行しているか、最後のステップが延期されていないか。
 
-    提案を送る時点の検査（`propose`）が、`after` の形（`after_problems`）と合わせて呼ぶ。
+    送る時点の検査（`propose`）が、`after` の形を調べる `after_problems` と合わせて呼ぶ。
     """
     wf = wf or compute(parent)
     gaps = loose(parent, wf)

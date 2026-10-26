@@ -118,7 +118,7 @@ class ProposeTest(WriteAndPushHarness):
             self.assertIn(f"?? {rel}", status)
 
     def feedback_parent(self, feedback):
-        """計画が 2 本の親の提案を書く。フィードバック計画の番号は 3 から始まる。"""
+        """計画が 2 ステップの親の提案を書く。フィードバック計画の番号は 3 から始まる。"""
         text = parent_text(PARENT, ["design", "implement"], feedback, allow=("src/*", "wip/*"))
         return self.put(f"{self.TODO}/{PARENT}.md", text)
 
