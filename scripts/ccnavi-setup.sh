@@ -167,7 +167,7 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-user-handoff.sh・ccnavi-user-mirror.sh・ccnavi-user-prune.sh は、実行ファイルの `user handoff` / `user mirror` /
 # `user prune` を入口の印つきで起こす薄い sh。印が無い `user` の入口は実行ファイルが断るので、配らないと打つ手が無くなる。
 # ccnavi-session-start.sh はセッション開始時の入口（FETCH_COMMAND）。中で、取り込みの ccnavi-fetch.sh と
-# 直下のディレクトリ一覧の ccnavi-dirs.sh を順に呼ぶ。ccnavi-sync.sh はユーザが実行する
+# projects/ の clone 済みリポジトリ一覧の ccnavi-dirs.sh を順に呼ぶ。ccnavi-sync.sh はユーザが実行する
 # 取り込み（分かれた親ブランチの merge、消えた親ブランチの確認、片付けの記録の読み出し）。
 # ccnavi-git.sh の拒否の文面が ccnavi-sync.sh を案内するので、配らないと案内どおりに実行しても動かない。
 # ccnavi-clean.sh と ccnavi-clean.js は、ワークツリーを片付ける前に生成物を消すもの。Windows では
@@ -2140,7 +2140,7 @@ for name in $DEPLOY_SCRIPTS; do
 			why="セッション開始時の取り込み"
 			;;
 		ccnavi-dirs.sh)
-			why="セッション開始時のディレクトリ一覧"
+			why="セッション開始時の clone 済みリポジトリ一覧"
 			;;
 		ccnavi-sync.sh)
 			why="ユーザが実行する取り込みと、親のブランチが消えたかの確認"

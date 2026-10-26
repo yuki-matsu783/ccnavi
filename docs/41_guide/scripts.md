@@ -22,7 +22,7 @@ keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.s
 | `ccnavi-launcher.sh` | hook が起動する振り分け。`.ccnavi/bin/<os>-<arch>/` から、この機械の実行ファイルを選んで起動する。無ければ PATH の `ccnavi` | hook |
 | `ccnavi-session-start.sh` | セッション開始の入口。下の `ccnavi-fetch.sh` と `ccnavi-dirs.sh` を順に呼ぶ | hook |
 | `ccnavi-fetch.sh` | リモートの最新を取る。親ブランチと、ワークツリーの起点になる統合先ブランチ。進めるのは fast-forward だけ | hook |
-| `ccnavi-dirs.sh` | プロジェクト直下のディレクトリを、更新が新しい順に出す | hook |
+| `ccnavi-dirs.sh` | `projects/` に clone 済みの外リポジトリを、更新が新しい順に出す | hook |
 | `ccnavi-idle.sh` | 大きな会話が放置されたとき、記憶（プロンプトキャッシュ）が切れる前に、次のセッションへの引き継ぎ文書を書かせる。`start`（待機）・`notice`（ユーザへの知らせ）・`reset`（入力で待機をやめる）。[設定](settings.md)の「大きな会話を放置したとき」 | hook |
 
 ## git・ワークツリー

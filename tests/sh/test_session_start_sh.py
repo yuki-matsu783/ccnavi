@@ -3,9 +3,9 @@
 
 見るのは次の 4 つ。
 
-1. 入口は、取り込み（fetch）が失敗しても、ディレクトリ一覧（dirs）を出して 0 で終わる
+1. 入口は、取り込み（fetch）が失敗しても、clone 済みリポジトリの一覧（dirs）を出して 0 で終わる
 2. 一覧は 10 件までで、超えると残りの件数と ls を案内する
-3. ディレクトリが無ければ何も出さない
+3. projects/ が無い・.git を持つものが無ければ何も出さない
 4. 10 件ちょうどなら案内を出さない
 """
 
@@ -49,8 +49,8 @@ class SessionStartSh(unittest.TestCase):
 
     def make_dirs(self, count: int):
         for i in range(count):
-            path = os.path.join(self.project, f"d{i:02d}")
-            os.makedirs(path)
+            path = os.path.join(self.project, "projects", f"d{i:02d}")
+            os.makedirs(os.path.join(path, ".git"))
             os.utime(path, (1_000_000 + i, 1_000_000 + i))
 
     def stub_fetch(self, body: str):
@@ -66,7 +66,7 @@ class SessionStartSh(unittest.TestCase):
             [x.strip() for x in lines[1:11]], [f"- d{i:02d}" for i in range(11, 1, -1)]
         )
         self.assertIn("ほかに 2 件", lines[11])
-        self.assertIn("ls -dt", lines[11])
+        self.assertIn("ls -dt projects/", lines[11])
 
     def test_no_more_note_when_within_ten(self):
         self.make_dirs(10)
@@ -74,6 +74,18 @@ class SessionStartSh(unittest.TestCase):
         self.assertNotIn("ほかに", r.stdout)
 
     def test_prints_nothing_without_directories(self):
+        r = run("ccnavi-dirs.sh", self.project, self.scripts)
+        self.assertEqual((r.returncode, r.stdout), (0, ""))
+
+    def test_skips_directories_without_git(self):
+        self.make_dirs(1)
+        os.makedirs(os.path.join(self.project, "projects", "plain"))
+        r = run("ccnavi-dirs.sh", self.project, self.scripts)
+        self.assertIn("- d00", r.stdout)
+        self.assertNotIn("plain", r.stdout)
+
+    def test_ignores_top_level_directories(self):
+        os.makedirs(os.path.join(self.project, "src", ".git"))
         r = run("ccnavi-dirs.sh", self.project, self.scripts)
         self.assertEqual((r.returncode, r.stdout), (0, ""))
 
