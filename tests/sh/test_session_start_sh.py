@@ -47,11 +47,25 @@ class SessionStartSh(unittest.TestCase):
         for name in ("ccnavi-session-start.sh", "ccnavi-dirs.sh"):
             shutil.copy(os.path.join(SH_DIR, name), self.scripts)
 
+    def commit_at(self, path: str, ts: int):
+        date = f"{ts} +0000"
+        env = {
+            **os.environ,
+            "GIT_AUTHOR_DATE": date,
+            "GIT_COMMITTER_DATE": date,
+            "GIT_AUTHOR_NAME": "t",
+            "GIT_AUTHOR_EMAIL": "t@example.com",
+            "GIT_COMMITTER_NAME": "t",
+            "GIT_COMMITTER_EMAIL": "t@example.com",
+        }
+        for args in (["init", "-q"], ["commit", "-q", "--allow-empty", "-m", "x"]):
+            subprocess.run(["git", "-C", path, *args], env=env, check=True, capture_output=True)
+
     def make_dirs(self, count: int):
         for i in range(count):
             path = os.path.join(self.project, "projects", f"d{i:02d}")
-            os.makedirs(os.path.join(path, ".git"))
-            os.utime(path, (1_000_000 + i, 1_000_000 + i))
+            os.makedirs(path)
+            self.commit_at(path, 1_000_000_000 + i)
 
     def stub_fetch(self, body: str):
         with open(os.path.join(self.scripts, "ccnavi-fetch.sh"), "w", encoding="utf-8") as f:
@@ -66,7 +80,7 @@ class SessionStartSh(unittest.TestCase):
             [x.strip() for x in lines[1:11]], [f"- d{i:02d}" for i in range(11, 1, -1)]
         )
         self.assertIn("ほかに 2 件", lines[11])
-        self.assertIn("ls -dt projects/", lines[11])
+        self.assertIn("ls -d projects/", lines[11])
 
     def test_no_more_note_when_within_ten(self):
         self.make_dirs(10)
@@ -76,6 +90,15 @@ class SessionStartSh(unittest.TestCase):
     def test_prints_nothing_without_directories(self):
         r = run("ccnavi-dirs.sh", self.project, self.scripts)
         self.assertEqual((r.returncode, r.stdout), (0, ""))
+
+    def test_orders_by_latest_commit_not_dir_mtime(self):
+        self.make_dirs(3)
+        old = os.path.join(self.project, "projects", "d02")
+        os.utime(old, (2_000_000_000, 2_000_000_000))
+        os.makedirs(os.path.join(self.project, "projects", "nocommit", ".git"))
+        r = run("ccnavi-dirs.sh", self.project, self.scripts)
+        names = [x.strip() for x in r.stdout.splitlines()[1:]]
+        self.assertEqual(names, ["- d02", "- d01", "- d00", "- nocommit"])
 
     def test_skips_directories_without_git(self):
         self.make_dirs(1)

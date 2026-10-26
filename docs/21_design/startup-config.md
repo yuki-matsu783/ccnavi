@@ -262,7 +262,7 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 | `.ccnavi/scripts/ccnavi-fetch.sh` | セッション開始時に親ブランチと、ワークツリーの起点になる統合先ブランチを取ってくる。進めるのは fast-forward だけ |
 | `.ccnavi/scripts/ccnavi-session-start.sh` | セッション開始時の入口。`ccnavi-fetch.sh` と `ccnavi-dirs.sh` を順に呼ぶ。SessionStart にはこれを登録する |
 | `.ccnavi/scripts/ccnavi-idle.sh` | 放置したセッションの引き継ぎ促し（`start`・`notice`・`reset`）。`Stop` に 2 行、`UserPromptSubmit` に 1 行で登録する（4.2.1） |
-| `.ccnavi/scripts/ccnavi-dirs.sh` | セッション開始時に、`projects/` 直下で `.git` を持つ clone 済みの外リポジトリを更新が新しい順に最大 10 件出す。超えるときは `ls` を案内する |
+| `.ccnavi/scripts/ccnavi-dirs.sh` | セッション開始時に、`projects/` 直下で `.git` を持つ clone 済みの外リポジトリを最新コミットが新しい順に最大 10 件出す。超えるときは `ls` を案内する |
 | `.ccnavi/scripts/ccnavi-sync.sh` | 親のブランチを取り込む（早送りか merge。衝突したら取りやめてユーザの対応に切り替える）。リモートから消えた親のブランチを診断する（閉じたかはホストの MR で決める） |
 | `.ccnavi/scripts/ccnavi-branches.sh` | issue・MR に紐づくブランチを探す。読むだけ。ホストは sh が読み、手元の候補は `ccnavi branches` が集める |
 | `.ccnavi/scripts/ccnavi-start.sh` | issue・MR を指定された依頼の着手の入口。`ccnavi-branches.sh` で候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る |
