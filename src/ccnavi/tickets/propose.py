@@ -12,6 +12,11 @@ write-and-push の手順で行う。コミットされるのは、未追跡の�
 ## 決まり
 
 - 対象は、識別子の親子の提案だけ。`todo/<親>.md`、`todo/<子>.md`、`flows/<子>.yml`。
+- 計画を持つ親の提案（`todo/<親>.md` で `plan:` か `feedback:` を持つもの）だけ、
+  送る前に計画の `after` の形と終端を検査する
+  （`workflow.after_problems`・`workflow.terminal_problems`）。
+  承認で落ちる誤りを承認の前に返すためである。誤りがあれば何も送らない。
+  子の提案・子のフロー・計画の無い提案・読めない提案は検査しない
 - 親のワークツリー（`.claude/worktrees/<親>`）の中のものだけを見る
 - 送る提案が 1 本も無ければ、何も載せずに止める
 - origin の無い親子には送る先がないので、何も載せずに案内して終える
@@ -26,7 +31,7 @@ import os
 from typing import TextIO
 
 from ..infra import fsio, pathcase, settings
-from . import ticket_ids, ticket_model, write_and_push
+from . import ticket, ticket_ids, ticket_model, workflow, write_and_push
 
 FLOWS = "flows"
 
@@ -58,6 +63,31 @@ def _candidates(base: str, tickets: str, parent: str) -> list[str]:
     return found
 
 
+def _plan_problems(paths: list[str], parent: str) -> list[str]:
+    """計画を持つ親の提案の `after` と終端の誤りを返す。文面は `workflow` が返すものを使う。"""
+    found: list[str] = []
+    for path in paths:
+        stem, ext = os.path.splitext(os.path.basename(path))
+        folder = os.path.basename(os.path.dirname(path))
+        in_todo = pathcase.fold(folder) == pathcase.fold(ticket_model.TODO)
+        if (
+            not in_todo
+            or pathcase.fold(stem) != pathcase.fold(parent)
+            or pathcase.fold(ext) != ".md"
+        ):
+            continue
+        try:
+            loaded, _ = ticket.load(path)
+        except ValueError:  # UTF-8 で読めない提案は検査せず、今までどおり送る
+            continue
+        if loaded is None or not (loaded.plan or loaded.feedback):
+            continue
+        found += [
+            p.detail for p in workflow.after_problems(loaded) + workflow.terminal_problems(loaded)
+        ]
+    return found
+
+
 def run(
     stdout: TextIO,
     stderr: TextIO,
@@ -85,6 +115,15 @@ def run(
             f"{tickets.strip('/')}/{ticket_model.TODO}/{parent}.md など）。"
             "提案は識別子と同名のワークツリーの中に書いてください。\n"
         )
+        return 1
+    wrong = _plan_problems(paths, parent)
+    if wrong:
+        stderr.write(
+            f"ccnavi: {parent} の提案の計画に誤りがあるので送りません（何も送っていません）。\n"
+        )
+        for detail in wrong:
+            stderr.write(f"  {detail}\n")
+        stderr.write(f"次: 直して `ccnavi-ticket.sh propose {parent}` を打ち直す\n")
         return 1
     for path in paths:
         fsio.note_input(path)

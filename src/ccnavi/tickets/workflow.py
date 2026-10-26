@@ -119,6 +119,35 @@ def ready(parent: ticket_model.Ticket, wf: ticket_model.Workflow | None = None) 
     return out
 
 
+def terminal_problems(
+    parent: ticket_model.Ticket, wf: ticket_model.Workflow | None = None, part: str = ""
+) -> list[rules.Problem]:
+    """終端の崩れを返す。最後のステップに全部が先行しているか、最後のステップが延期されていないか。
+
+    送る時点の検査（`propose`）が、`after` の形を調べる `after_problems` と合わせて呼ぶ。
+    """
+    wf = wf or compute(parent)
+    gaps = loose(parent, wf)
+    found: list[rules.Problem] = []
+
+    def error(text: str) -> None:
+        found.append(rules.Problem(rules.SEVERITY_ERROR, parent.ticket, text))
+
+    for key, first, items in [p for p in _parts(parent) if not part or p[0] == part]:
+        last = first + len(items) - 1
+        cut = [m for m in gaps if first <= m < last]
+        if cut:
+            error(
+                f"`{key}` の最後のステップ（{last}: {items[-1].type}）に "
+                f"{', '.join(map(str, cut))} が先行していない。終端は 1 つにしてください"
+                "（最後のステップにほかの全部が推移的に先行するように `after` を書く。"
+                "独立した作業は最後に 1 ステップで受けるか、一直線に並べる）"
+            )
+        if items and items[-1].deferred:
+            error(f"`{key}` の最後のステップは延期できない。誰も見ないまま終わる")
+    return found
+
+
 def problems(
     parent: ticket_model.Ticket, types: dict | None = None, part: str = ""
 ) -> list[rules.Problem]:
@@ -154,20 +183,7 @@ def problems(
                 )
     # 先行の計算。
     wf = compute(parent)
-    gaps = loose(parent, wf)
-    # 終端: 最後のステップに全部が先行しているか、最後のステップが延期していないか。
-    for key, first, items in parts:
-        last = first + len(items) - 1
-        cut = [m for m in gaps if first <= m < last]
-        if cut:
-            error(
-                f"`{key}` の最後のステップ（{last}: {items[-1].type}）に "
-                f"{', '.join(map(str, cut))} が先行していない。終端は 1 つにしてください"
-                "（最後のステップにほかの全部が推移的に先行するように `after` を書く。"
-                "独立した作業は最後に 1 ステップで受けるか、一直線に並べる）"
-            )
-        if items and items[-1].deferred:
-            error(f"`{key}` の最後のステップは延期できない。誰も見ないまま終わる")
+    found.extend(terminal_problems(parent, wf, part))
     # 延期: 延期を引き受けるステップが在るか、そのステップにレビューが在るか。
     numbered = dict(parent.numbered())
     for key, first, items in parts:

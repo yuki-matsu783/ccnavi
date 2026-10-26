@@ -17,7 +17,7 @@ keywords: [設計, 構成, service worker, Pyodide, Web Worker, hosts.json, ccna
 | `src/options/` | 設定画面。通信先（追加すると許可を求め、削除すると PAT と許可（画面と API の origin すべて。GHE.com は 2 つ）を削除する。`Hosts.tsx`）、リポジトリ（統合先の名前・直近の日数・指定のブランチ）と PAT。React で組み、見た目は VS Code 拡張と共通の部品（`extensions/shared` の `@ccnavi/shared`。ボタン・骨組み・一覧の CSS と、Claude の配色で `--vscode-*` を定義する `browser-theme.css`）を使う。CSS の入口は `style.css`（ビルドが `options.css` に組む） |
 | `src/worker/` | Pyodide を動かす Web Worker |
 | `src/core/` | 画面に依らない部品（描いたボードの DOM の要約 `dom-summary.ts`（開発用ツール `scripts/render-scene.js` が使う。拡張のバンドルには入らない）、通信先と manifest、設定画面で足すホスト（`custom-hosts.ts`）、GitHub の読み書き（`github.ts`）、GitLab の読み書き（`gitlab.ts`）、「始める」（`start.ts`）、画面と service worker の約束、読み取りの流れ、レビュー済みの材料の読み（`reviewed.ts`）、承認・レビュー済みの流れ（`write.ts`）、decide のホスト書き込み（`decide-host.ts`）、PAT の期限、Markdown の消毒） |
-| `py/ccnavi_chrome.py` | Pyodide の上の入口。MEMFS に仮のツリーを組んで今の ccnavi を呼ぶ。判定のコア（`ccnavi.tickets.core`）の `plan`・`confirm` の答え（書くもの）を拡張が 1 コミットにする |
+| `py/ccnavi_chrome.py` | Pyodide の上の入口。MEMFS に仮のツリーを組んで`ccnavi.entry.ext` の再公開を通して今の ccnavi を呼ぶ。判定のコア（`core`）の `plan`・`confirm` の答え（書くもの）を拡張が 1 コミットにする |
 | `hosts.json` | 焼き込む通信先（組み込み）。組織ごとのビルドはこれを替える。設定画面で足したホストは `chrome.storage.local` の `customHosts` に持つ（`custom-hosts.ts`） |
 
 ## decide のホスト書き込み

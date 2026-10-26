@@ -360,7 +360,8 @@ _TICKET = """\
          .ccnavi/approved/done/ に移動します。cancel は .ccnavi/approved/done/ に移動します）
     ccnavi ticket propose <id>
         （親子の承認待ちの提案 wip/proposals/todo/ と子のフローの下書き wip/proposals/flows/ を、
-         書いたパスの一覧に載せます。載せるだけで、コミットと push は
+         書いたパスの一覧に載せます。親の提案の計画に誤り（after・終端）があれば、何も載せずに断ります。
+         コミットと push は
          ccnavi-ticket.sh propose が write-and-push の手順で行います）
     ccnavi ticket record-risk <child> <factor> yes|no --reason <why>   （定性的なリスク）
     ccnavi ticket learn [<id>] [--note <text> [--target <kind>] [--signal <kind>]]
