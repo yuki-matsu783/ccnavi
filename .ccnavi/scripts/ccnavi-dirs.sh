@@ -31,7 +31,7 @@ done | sort -t "$tab" -k1,1nr -k2,2 | cut -f2-)
 
 total=$(printf '%s\n' "$list" | wc -l | tr -d ' ')
 
-printf '案内: projects/ のプロジェクト（最新コミットが新しい順、最大 %s 件）\n' "$limit"
+printf '案内: projects/ のプロジェクト\n'
 printf '%s\n' "$list" | head -n "$limit" | sed 's|/$||; s|^|  - |'
 if [ "$total" -gt "$limit" ]; then
   printf '案内: ほかに %s 件あります。\n' "$((total - limit))"
