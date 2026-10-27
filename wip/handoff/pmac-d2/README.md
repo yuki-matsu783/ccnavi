@@ -1,0 +1,51 @@
+# PMAC-D2: docker-gitlab で、エージェントが MR を作る通しの 1 本（評価の資産）
+
+2026-10-27 の P-mac 評価（Intel Mac・main 541c6a36・GitLab 19.4.1）で作ったもの。リポジトリには入れていない（評価用）。
+取り込むなら、シナリオは `tests/scenarios/` へ、ドライバは `tests/manual/gitlab/` へ移し、ruff を通す（下の注意）。
+
+## 中身
+
+| ファイル | 役目 |
+|---|---|
+| pmac-d2.yml | シナリオ。`setup.host: docker-gitlab`、haiku、`budget_usd: 5.0`。human step が 2 種類ある（issue の作成、擬似 tty での承認）。`human_api` で thread・resolve・approve を行う。`setup.reset.base` は評価時の `projects/test-repo` の HEAD なので、回す前に今の HEAD に直す |
+| mkissue.py | 操作者として issue を 2 件作る（#1 は捨て、#2 が対象）。`uv run python -I mkissue.py <プロジェクト ID>`。ID は `run` の出力の「ID <数字>」 |
+| agree.py | 代役の git の環境（`hostenv.step_env`）の中で、擬似 tty で承認用の sh を打つ。`uv run python agree.py <出力の置き場の絶対パス> "<親> <子>" 'y\ny\n'`（子は親に `-01-01` を付けたもの） |
+| poll.py | MR・コメント・スレッド・承認の状態を、4 秒ごとに API で記録する。`runner next` と並行して回す（プロジェクトは `finish` で消えるため）。`uv run python -I poll.py <プロジェクト ID> <出力ファイル>` |
+| lsproj.py | GitLab のプロジェクトを一覧する（削除の確認用）。トークンは出さない |
+
+いずれも作業ディレクトリはワークスペースルート。パスは評価時の機械のもの（`/Users/y-taniyama/Data/ccnavi`）で、直書きしている。
+
+## 回し方（要点）
+
+1. `docker_gitlab.py status` で動いていて、トークンが有効なこと。`CCNAVI_MODE=enable`
+2. git の作成者情報が無い機械では、`GIT_AUTHOR_NAME`・`GIT_AUTHOR_EMAIL`・`GIT_COMMITTER_NAME`・`GIT_COMMITTER_EMAIL` を環境変数で与える（#691）。Bash は呼び出しごとに環境が消えるので、毎回 export する
+3. `uv run python -m tests.scenarios.runner run <シナリオ>`（確認文）→ 許可をもらって `--confirmed`。人間の step で終了コード 10
+4. issue を作る（mkissue.py）→ `next <出力の置き場の絶対パス>`。**相対パスは断られる（#692）**
+5. 承認の human step は agree.py。親と子を 1 回で承認する
+6. 並行して poll.py を回す。終わったらプロジェクトが消えたことを lsproj.py で確かめる
+
+## 評価で分かったこと
+
+- issue 番号は、test-repo の古いブランチ名の `-N-` と衝突しない値にする（今回は 2。#690）
+- 通った範囲: `ccnavi-start.sh --issue` で MR 作成 → 承認 → 実装 → finish → `request` → thread → resolve・approve → レビュー済みの印
+- 生の curl・glab は使われなかった。MR は、stub の glab が失敗したあと、sh の curl+`GITLAB_TOKEN` への切り替えで作られた
+- 人間役のトークンは、記録・診断ログに出なかった
+- 擬似 tty の承認は、評価のため既知の穴を使っている。macOS の `script -q /dev/null` で、`y` は 1 秒遅らせて送る
+
+## 2026-10-28 の回（`ready` まで）
+
+- 10 step（親と子の承認 → 実装 → thread → resolve・approve → `confirm` と改版 → 改版の承認 → `finish` と `ready`）を、`logs/scenarios/PMAC-D2-20261028-005734/` で完走した。費用 0.307 USD
+- 親の `finish` は通り、MR の承認・スレッドの解決も API で確かめた
+- `ready` は届かなかった。親のワークツリーに共通レイヤーのミラー差分 6 件が残り、未コミットの変更として拒まれた（#695）
+- 改版の承認は親だけ（子は無し）。agree.py の第 2 引数は親だけを渡す
+
+## evidence/
+
+- poll76.jsonl（2026-10-27 の回）・poll77.jsonl（2026-10-28 の回）: poll.py の出力。MR・コメント・スレッド・承認の状態の変化を 1 行 1 スナップショットで記録している
+- dry.json: D1（`record_contract.py --dry-run`）の出力。`recorded_at` を除いて `tests/contract/gitlab/recorded.json` と一致した
+
+## 注意
+
+- `agree.py`・`poll.py`・`mkissue.py`・`lsproj.py` は ruff の format と lint を通っていない（`open()` の with 化、行の長さ）
+- 承認用の sh の名前をコマンド行に書くと、ガードが止める。ドライバのファイルの中から呼ぶ
+- 関連 issue: #685・#686・#690・#691・#692

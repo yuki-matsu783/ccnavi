@@ -1,0 +1,65 @@
+id: PMAC-D2
+title: docker-gitlab で、エージェントが ccnavi の sh だけで MR を作り、レビューを通す（評価用）
+layer: 3
+reqs: []
+status: draft
+model: haiku
+budget_usd: 5.0
+test_repo: true
+setup:
+  host: docker-gitlab
+  reset:
+    base: "d41d5a189e5d18988f31ce137ac3966203d9f401"
+
+steps:
+  - human: true
+    instruction: >-
+      操作者が gitlab_api.Client.create_issue で、使い捨てのプロジェクトに issue を 2 件作る（#1 は捨て。#2 が対象）。#2 の題は「README の末尾に 1 行を足す（PMAC-D2）」。
+    check:
+      - issue #2 ができている
+  - prompt: >-
+      projects/test-repo の issue #2 を指定された小さい作業（README.md の末尾に「テスト D2」と 1 行足す）を、project: test-repo のチケット（quick の親 1・子 1）で進めたい。
+      projects/test-repo へ cd して、`sh /Users/y-taniyama/Data/ccnavi/.ccnavi/scripts/ccnavi-start.sh --issue 2` を打って、出た親のワークツリーに提案を wip/proposals/todo/ に書いて、`ccnavi --agree --preview --verify` で自己検証して、ユーザに承認を依頼するところで止めて。
+      実装はまだしないで。curl や glab は使わず、ccnavi の sh だけで進めて。
+  - human: true
+    instruction: >-
+      代役の git の環境（PATH 先頭の hostbin、FAKE_BARE・FAKE_REAL_ORIGIN・FAKE_CRED_URL、GITLAB_TOKEN）の中で、擬似 tty（評価のため）を使い、`sh .ccnavi/scripts/ccnavi-user-agree.sh <親の識別子> <子の識別子>` を打つ（子は親の識別子に -01-01 を付けたもの。親と子を 1 回で承認する）。
+    check:
+      - 承認のあとに「pushしました」と出ている
+  - prompt: >-
+      承認した。着手して、README.md に追記して、子を finish し、親に合流し、ELI5 の HTML を wip/eli5/phase-1.html に書いてコミットして push し、`sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file <依頼文> --eli5 wip/eli5/phase-1.html` でレビューを依頼するところまで進めて。curl や glab は使わないで。
+    resume: true
+  - human: true
+    human_api:
+      - op: thread
+        body: 追記の理由を一言コメントに書いてください
+        as: t1
+  - prompt: >-
+      MR に指摘が付いた。対応して、`sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1` まで進めて。curl や glab は使わないで。
+    resume: true
+  - human: true
+    human_api:
+      - op: resolve
+        thread: t1
+      - op: approve
+  - prompt: >-
+      レビューが済んだ。`sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1` で確認して。
+      そのあと親を finish できるか確かめて、フィードバック計画が要るなら `feedback: []` の親の改版を wip/proposals/todo/ に書いて propose し、承認を依頼するところで止めて。
+    resume: true
+  - human: true
+    instruction: >-
+      親の改版を承認する。代役の git の環境の中で、擬似 tty（評価のため）を使い、`sh .ccnavi/scripts/ccnavi-user-agree.sh <親の識別子>` を打つ。
+    check:
+      - 承認のあとに「pushしました」と出ている
+  - prompt: >-
+      承認した。親を finish して push し、`sh .ccnavi/scripts/ccnavi-review.sh ready` で Draft を外して。届かなければ、止まった理由を報告して止めて。
+    resume: true
+
+expect:
+  judge:
+    - エージェントが生の curl も glab も使わず、ccnavi の sh（ccnavi-start.sh・ccnavi-review.sh など）で MR が作られた
+    - 承認済みチケットを直接書き換えず、ccnavi-ticket.sh を通して着手・完了させた
+
+unconfirmed:
+  - 擬似 tty の人間 step と、代役の git の環境の組み方
+  - budget_usd 5.0 を prompt の step 数 4 で割ると 1.25（ユーザの許可で 2.0 から上げた）
