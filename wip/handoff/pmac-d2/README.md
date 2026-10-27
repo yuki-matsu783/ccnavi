@@ -39,6 +39,14 @@
 - `ready` は届かなかった。親のワークツリーに共通レイヤーのミラー差分 6 件が残り、未コミットの変更として拒まれた（#695）
 - 改版の承認は親だけ（子は無し）。agree.py の第 2 引数は親だけを渡す
 
+## 2026-10-28 の 2 回目（`config/common` を揃えたあと）
+
+- `logs/scenarios/PMAC-D2-20261028-070757/`、プロジェクト ID 78。step 8 で止まり、`ready` には届かなかった。費用は約 0.24 USD
+- 原因: test-repo の `skills/` のミラーが古いままだった。エージェントが、レビュー依頼のあとに差分をコミット（`0c0a8dd`、14 ファイル）し、HEAD が動いて `confirm` が `CORE_CONFIRM_MOVED` で拒まれた。親の finish と改版には進めていない
+- 回す前に、`ccnavi-user-mirror.sh test-repo` で `config/common` と `skills/` の両方のずれが無いことを確かめる
+- agree.py の第 3 引数（承認の入力）は、実際の改行を入れる。`'y\ny\n'` は文字どおりの `\n` になり、承認の問いが入力待ちで固まる。`"$(printf 'y\ny\n')"` で渡す
+- 親の識別子は、`git worktree list` で branch 名を読む（題から作られる）
+
 ## evidence/
 
 - poll76.jsonl（2026-10-27 の回）・poll77.jsonl（2026-10-28 の回）: poll.py の出力。MR・コメント・スレッド・承認の状態の変化を 1 行 1 スナップショットで記録している
