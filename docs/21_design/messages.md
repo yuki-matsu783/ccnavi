@@ -22,7 +22,7 @@ keywords: [文面, 文面ファイル, messages, 識別子, 差し込み, ccnavi
 | `policy/texts.py` | 読み込み、検査、差し込み、組み立て、壊れたときの既定の文 | 判定 |
 | `ccnavi text` | sh から `texts` を引く入口 | 文面ファイルの直接の読み書き |
 
-組み込みの拒否・促し（Python）は `texts.say` を呼ぶ。通知（`NOTICE_*`）は、見出し（`[ccnavi] <コード> (…)`）と `subject:` などの状態の行をコードに残し、本文を `texts.say` で引く。組み込みルールの文は、ルールが識別子と値を持ち、拒否に当たった回に `texts.spoken` が引く（13.4）。まだ移していない文（ルールの `message`、種類を決められない通知など）は呼ばず、[文面の移行の一覧](../42_claude/message-migration.md)にある。sh は文面ファイルを読まず、`ccnavi text` を `ccnavi_text`（`ccnavi-common-state.sh`）で呼ぶ。
+組み込みの拒否・促し（Python）は `texts.say` を呼ぶ。通知（`NOTICE_*`）は、見出し（`[ccnavi] <コード> (…)`）と `subject:` などの状態の行をコードに残し、本文だけを `texts.say` で引く。組み込みルールの文は、ルールが識別子と値を持ち、拒否に当たった回に `texts.spoken` が引く（13.4）。まだ移していない文（ルールの `message`、種類を決められない通知など）は呼ばず、[文面の移行の一覧](../42_claude/message-migration.md)にある。sh は文面ファイルを読まず、`ccnavi text` を `ccnavi_text`（`ccnavi-common-state.sh`）で呼ぶ。
 
 ### 13.2 置き場とレイヤー
 

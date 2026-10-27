@@ -5,7 +5,7 @@
 version: 1
 messages:
   # ---- hook/reasons.py
-  # ルールファイルを読めずに組み込みの既定に戻ったことを、通した回にも返す。
+  # ルールファイルを読めず組み込みの既定に戻ったことは、呼び出しを通した回にも知らせる。
   NOTICE_FALLEN_BACK:
     kind: notice
     values: [path]
@@ -13,7 +13,7 @@ messages:
       [ccnavi] the rule file at {path} could not be read, so ccnavi is judging with its built-in defaults. The project's own rules are not in force right now. Neither the shell nor the Write or Edit tool can write to that file while the defaults are in force. Put a draft at wip/handoff/.ccnavi/config/common/rules.yml and ask the user to import it with 'ccnavi-user-handoff.sh' (or to fix the file by hand).
 
   # どのルールも言及しなかった呼び出し。結末（ask／deny）と、読み切れたか、組み込みの既定に退避したかで分ける。
-  # 危険だとは言わない。言えないから権限モードに委ねている。
+  # 危険だと判定したわけではない。判定できないので権限モードに委ねている。
   NOTICE_UNDECLARED__ASK:
     kind: notice
     values: [target, where]

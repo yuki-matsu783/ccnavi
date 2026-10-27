@@ -1,7 +1,7 @@
 # 実行前後のフックが組み立てる拒否・報告の文（シェルからルート直下へ書く形、承認された作業範囲の外、
 # 実行後の報告の案内）。条件（いつ出すか）と状態の行はコード側（hook/rootwrite.py・hook/post_findings.py・
 # hook/post_report.py）にあり、ここは何を言うかだけを持つ。
-# `RULE_` の文は `what` だけが必須で、言うことが無い欄は省く。英語の文は、そのまま写してある。
+# `RULE_` の文は `what` だけが必須で、書くことがない欄は省く。英語の文は、そのまま写してある。
 # 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
 version: 1
 messages:
@@ -53,7 +53,7 @@ messages:
     note: |-
       ここは承認済みの置き場です。このセッションで先に ccnavi-ticket.sh か ccnavi-review.sh を打っていた（start・finish・confirm など）なら、書いたのはおそらく ccnavi 自身で、after: の呼び出しではありません。undo: は打たないでください。何が書いたか分からないときだけ、ユーザに伝えてください。
 
-  # セッションが始まる前から在った変更。戻すなと書く。
+  # セッションの開始前からあった変更。戻さないよう書く。
   NOTE_POST_PREEXISTING:
     kind: note
     note: |-
