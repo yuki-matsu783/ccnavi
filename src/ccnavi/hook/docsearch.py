@@ -72,6 +72,7 @@ from dataclasses import dataclass, field
 from typing import TextIO
 
 from ..infra import fsio, hookio, settings, tree
+from ..policy import texts
 from ..tickets import ticket_places
 from . import docsearch_index, docsearch_query
 
@@ -384,16 +385,10 @@ def guide_lines(conf: settings.Settings, root: str, lead: str) -> list[str]:
     作った時点で案内し（`missing_frontmatter`）、詳しいことは決まりの文書を --docs で引かせる。
     """
     command = _command(conf, root)
-    line = (
-        f"{lead} '{command} --docs --keyword <語>' で"
-        " frontmatter の索引を引いてください"
-        "（--keyword のほかに --type・--tag・--path・--text でも絞れる。"
-        f"絞り方の一覧は '{command} --docs --help' で見られる。"
-        "ワークスペースとプロジェクトを横断し、パスはワークスペースルートから）。"
-        "grep は本文中の文字列を探すときか、0 件だったときに使ってください。"
+    case = "convention" if _has_convention(root) else "plain"
+    line = texts.say(
+        root, "NOTICE_DOCS_GUIDE", {"lead": lead, "command": command}, {"what": case}
     )
-    if _has_convention(root):
-        line += f"書き方の決まりは '{command} --docs --keyword frontmatter' で引けます。"
     return [line]
 
 
@@ -403,12 +398,7 @@ def fail_streak_note(conf: settings.Settings, root: str, n: int) -> str:
     止められた呼び出しを迂回する案内にはしない。止まった理由と決まった手順を確かめるために
     引かせ、見つからなければユーザに相談させる。
     """
-    lead = (
-        f"[ccnavi] ツール呼び出しの失敗か拒否が {n} 回続いています。"
-        "同じ操作を言い換えて再実行したり、止められた操作の迂回を探したりせず、"
-        "止まった理由と決まった手順を資料で確かめてください。確かめても分からなければ、"
-        "ユーザに相談してください。資料は"
-    )
+    lead = texts.say(root, "NOTICE_DOCS_FAIL_STREAK_LEAD", {"n": str(n)})
     return "\n".join(guide_lines(conf, root, lead))
 
 
@@ -499,26 +489,16 @@ def missing_frontmatter(conf: settings.Settings, root: str, payload: hookio.Inpu
 
 def _frontmatter_hint(conf: settings.Settings, root: str, shown: str, has_front: bool) -> str:
     command = _command(conf, root)
-    if has_front:
-        lack = "frontmatter に type が無い"
-        todo = (
-            "既にあるキーの値と順序は変えず、type: skill を足してください。"
-            if shown.replace("\\", "/").rsplit("/", 1)[-1].casefold() == "skill.md"
-            else "既にあるキーの値と順序は変えず、type を足してください。"
-        )
+    if not has_front:
+        text_id = "NOTICE_DOCS_FRONTMATTER__NONE"
+    elif shown.replace("\\", "/").rsplit("/", 1)[-1].casefold() == "skill.md":
+        text_id = "NOTICE_DOCS_FRONTMATTER__SKILL"
     else:
-        lack = "frontmatter が無いか読めない"
-        todo = (
-            "頭を --- で囲んだ frontmatter にし、type（必須）・title・description・tags・"
-            "keywords を書いてください。"
-        )
-    line = (
-        f"[ccnavi] {CODE_MISSING_FRONTMATTER} ({shown}) "
-        f"{lack}と、'{command} --docs' の --type・--tag・--keyword で見つかりません。{todo}"
+        text_id = "NOTICE_DOCS_FRONTMATTER__TYPE"
+    case = "convention" if _has_convention(root) else "plain"
+    return texts.say(
+        root,
+        text_id,
+        {"code": CODE_MISSING_FRONTMATTER, "shown": shown, "command": command, "doc": CONVENTION_DOC},
+        {"what": case},
     )
-    if _has_convention(root):
-        line += (
-            f"type の値と決まりは {CONVENTION_DOC}"
-            f"（'{command} --docs --keyword frontmatter' でも引けます）。"
-        )
-    return line

@@ -29,15 +29,19 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | `DENY_REDIRECT_LIMIT` | `policy/selfguard_shell.py` の旧 `REDIRECT_LIMIT_MESSAGE`（`deny-policy.yml`。判定のときに `hook/judge.py` が引く） | 移した |
 | `NUDGE_TICKET_FINISH`・`NUDGE_TICKET_REQUEST`・`NUDGE_TICKET_FEEDBACK`・`NUDGE_SUBAGENT_OUTCOME`・`NUDGE_STOP_RULE`・`NEXT_STANDING` | `tickets/ops_stop.py`・`ops_stop_request.py`・`ops_stop_feedback.py`・`hook/events.py`・`tickets/standing.py` の `guidance()`（`nudge-stop.yml`） | 移した（共有の `USER_STOP_NOTE` と `subagent_outcome.line()` は値としてコードに残る。`subagent_outcome` は下位の層で文面を引けないので、行だけを返す） |
 | `NEXT_GIT_*`・`NEXT_WORKTREE_*`・`NEXT_STAGE_*`・`NEXT_TICKET_PROPOSED`・`NEXT_CLOSE_EARLY` | `ccnavi-git.sh`・`ccnavi-worktree.sh`・`ccnavi-stage.sh`・`ccnavi-ticket.sh`・`ccnavi-user-close-early.sh` の `次:`（`next-sh.yml`） | 移した（`ccnavi-common-state.sh` の `ccnavi_text` の既定の文は残る） |
-| `RULE_*`（`RULE_RECURSIVE_DELETE`・`RULE_GIT_PUSH`・`RULE_GUARD_*`・`RULE_TICKET_*`・`RULE_RAW_GIT`・`RULE_CREDENTIALS`・`RULE_CONFIG_VIA_BASH`） | `policy/builtin.py`・`policy/selfguard_shell.py`・`tickets/ticket_guard.py`・`tickets/phase_forms.py` の組み込みルールの文（`deny-builtin-rules.yml`） | 移した（ルールが識別子と値と場合を持ち、拒否に当たった回に `texts.spoken` が引く。`hook/post_findings.py` の英語の文は残る） |
+| `RULE_*`（`RULE_RECURSIVE_DELETE`・`RULE_GIT_PUSH`・`RULE_GUARD_*`・`RULE_TICKET_*`・`RULE_RAW_GIT`・`RULE_CREDENTIALS`・`RULE_CONFIG_VIA_BASH`） | `policy/builtin.py`・`policy/selfguard_shell.py`・`tickets/ticket_guard.py`・`tickets/phase_forms.py` の組み込みルールの文（`deny-builtin-rules.yml`） | 移した（ルールが識別子と値と場合を持ち、拒否に当たった回に `texts.spoken` が引く。`hook/post_findings.py` の英語の文は `RULE_TICKET_SCOPE__*` として `deny-post.yml` に英語のまま写した） |
+| `NOTICE_FALLEN_BACK`・`NOTICE_UNDECLARED__*`（`ASK`・`DENY`・`UNREADABLE_ASK`・`UNREADABLE_DENY`） | `hook/reasons.py` の `fallen_back`・`undeclared`（`notice.yml`） | 移した（新しい種類 `notice`。見出し `[ccnavi] UNDECLARED (source: …)` と `subject:` の行はコードに残る。`undeclared` は結末（ask／deny）と、読み切れたかどうかで識別子を分け、退避した回は `what` の `fell_back` を選ぶ。`undeclared` が組まれるのは、どのルールも言及せず ask か deny になった呼び出しのときで、そこに文面ファイルの冷たい読みが加わる） |
+| `NOTICE_POST_*`・`NOTE_POST_APPROVED_AREA`・`NOTE_POST_PREEXISTING`・`RULE_TICKET_SCOPE__*` | `hook/post.py`・`post_report.py`・`post_findings.py` の実行後の報告（`notice.yml`・`deny-post.yml`） | 移した（`path:`・`tree:`・`after:` などの状態の行と、ターンの終わりの報告の「どのパスを戻すか」の断片はコードに残る。`note:` の行は `案内:` で出る。`RULE_TICKET_SCOPE__*` は英語の文のまま） |
+| `DENY_SHELL_WORKSPACE_ROOT` | `hook/rootwrite.py`（`deny-post.yml`） | 移した（4 欄に分けたので、`なぜ:`・`次:`・`迂回しない:` の行で出る。`迂回しない` は元の文に無く、足した） |
+| `NOTICE_DOCS_GUIDE`・`NOTICE_DOCS_FAIL_STREAK_LEAD`・`NOTICE_DOCS_FRONTMATTER__*` | `hook/docsearch.py` の索引の案内と、frontmatter が無い md を書いたときの案内（`notice.yml`） | 移した（`stderr` の診断は残る） |
 
 ## 残り
 
 | 種類 | 出力元 | 数の目安 | 状態 |
 |---|---|---|---|
-| 組み込みの拒否（Python） | `hook/reasons.py` の `fallen_back`・`undeclared`（`_UNDECLARED_*`）・`internal_error_notice`（種類を決められない英語の通知）、`hook/wrapguard.py` などが組んで渡す他の文 | 少数 | 未移行（英語の文面の整理と一緒に進める） |
-| 英語の文面 | `hook/post_findings.py`・`reasons.py` の一部（日本語と英語の混在の整理は別に進めている） | | 未移行 |
-| 日本語の直書き（Python の拒否・次の一手） | `hook/rootwrite.py` の `message()`（`DENY_SHELL_WORKSPACE_ROOT`）、`hook/post.py`・`hook/post_report.py`（実行後の次の一手）、`hook/docsearch.py`、`tickets/propose.py`（計画の誤りで断るときの `次:`）、`tickets/ticket_guard.py`（状態の置き場・承認済みの置き場・生の git の拒否）、`tickets/approval_checks.py`・`agree_screen.py`・`ops.py`（`次:`）・`review.py`・`phase.py`（CLI の stderr の次の手）、`tickets/flow.py`（サブエージェント向けの手順）、`policy/selfguard.py` | 多数 | 未移行（2026-10 の調査で見つかった分。網羅ではない。数え直して、1 まとまりずつ移す） |
+| 組み込みの拒否（Python） | `hook/reasons.py` の `internal_error_notice`（ツールの呼び出しを持たないイベントで、ccnavi 自身に不具合があるときの文。文面ファイルに頼らない）、`hook/wrapguard.py` などが組んで渡す他の文 | 少数 | 移さない（`internal_error_notice`）。ほかは未移行 |
+| 英語の文面 | `hook/reasons.py` の一部（日本語と英語の混在の整理は別に進めている） | | 未移行 |
+| 日本語の直書き（Python の拒否・次の一手） | `tickets/propose.py`（計画の誤りで断るときの `次:`）、`tickets/approval_checks.py`・`agree_screen.py`・`ops.py`（`次:`）・`review.py`・`phase.py`（CLI の stderr の次の手）、`tickets/flow.py`（サブエージェント向けの手順）、`policy/selfguard.py`（設定ファイルを戻したときの知らせ） | 多数 | 未移行（数え直して、1 まとまりずつ移す。`hook/post.py` の状態を報告する行と、`hook/docsearch.py` の `stderr` の診断は移さない） |
 | sh の残りの `次の手:`・`次:`・`案内:` | `ccnavi-ticket.sh`（`次の手:` の選択肢と `案内:`）、`ccnavi-worktree.sh`（取り込みの記録が無い案内・横で作業する案内・了承を得るまでの案内）、`ccnavi-git.sh`（integrate の次の一手の残り）、`ccnavi-start.sh`（リモート未確認・テンプレート）、`ccnavi-stage.sh`・`ccnavi-sync.sh` の `案内:` | 約 20 | 未移行（状態の報告に近いものは残す。境目は[残りの進め方](#残りの進め方)の項目 3） |
 | ルールの文 | `rules.yml` の `message`・`additionalContext`・`additionalContextOnce`（インライン） | | 未移行（識別子で引く `message_id` は持たない。`additionalContextFile` で md の本文を出せる） |
 | 配布側の sh の `次:` | `scripts/ccnavi-doctor.sh` 2、`scripts/ccnavi-package.sh` 1、`scripts/ccnavi-install.sh`（`次:` を組み立てる関数）。配布の道具で、ワークスペースの実行ファイルが無いときにも動くため、`ccnavi text` に頼らない | | 対象外 |
@@ -72,7 +76,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 - ラッパーの有無で文が分かれるのは、`builtin.py` の 5 系統（再帰削除、push、reset、`.git` の 2 本（同じ文）、設定のシェル書き込み）と `ticket_guard.py` の生の git
 - 実行前の判定 1 回（`--test Bash ls`）で作られる `Rule` は 39 本。`message` つきは 29 本で、うち `builtin:` は 24 本（`builtin.py` 6、`selfguard_shell.py` 10、`ticket_guard.py` 7、`phase_forms.py` 1）。`Write`・`Read` では 23 本
 - 組み立ての呼び出しは、判定 1 回で `builtin.load_base` 1、`selfguard_shell.add_rules` 1、`add_named_rules` 1、`rules.parse` 11〜12、`selfguard_shell._insert` 9〜10（`Bash` は 1 つ多い）。実行後の保護範囲（`events.watched_for`）は、触ったツリーごとに `load_rules` と `add_named_rules` を呼ぶ（測っていない。コードから）
-- `Rule.spoken_message()` を呼ぶのは 3 か所: `hook/reasons.py` の `reason_for`、`hook/post_report.py` の `_messages`、`tickets/session_rejects.py`
+- ルールの文を引く `texts.spoken(rule)` を呼ぶのは 3 か所: `hook/reasons.py` の `reason_for`、`hook/post_report.py` の `_messages`、`tickets/session_rejects.py`
 
 ### 項目 1: 組み込みルールの文
 
@@ -123,7 +127,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 
 ### 項目 4: 種類を決められない通知
 
-- `undeclared`・`fallen_back` は、新しい種類 `notice`（識別子の頭は `NOTICE_`）を足して移す。必須は `what`、任意は `why` `next` `note`。出力は `deny` と同じ見出し（`次: `）を使う。`nudge` に入れないのは、`nudge` の識別子は記録の `code` と同じという決まりがあり、`UNDECLARED` の見出し（`[ccnavi] UNDECLARED (source: …)`。読み切れなかった回は `PARSE_UNCERTAIN`）と `subject:` の行はコードに残るため。`undeclared` は、読み切れたかどうかと ask／deny の組（4 通り）と、`{then}` の 2 通りを場合分けにする
+- `undeclared`・`fallen_back` は、新しい種類 `notice`（識別子の頭は `NOTICE_`）を足して移す。必須は `what`、任意は `why` `next` `note`。`why` `next` を書けば `deny` と同じ見出し（`なぜ: `・`次: `）で出る。`nudge` に入れないのは、`nudge` の識別子は記録の `code` と同じという決まりがあり、`UNDECLARED` の見出し（`[ccnavi] UNDECLARED (source: …)`。読み切れなかった回は `PARSE_UNCERTAIN`）と `subject:` の行はコードに残るため。`undeclared` は、読み切れたかどうかと ask／deny の組（4 通り）を識別子で分け、退避した回かどうかを `what` の場合（`rules`・`fell_back`）で分ける
 - 実装に入る前に、2 つを確かめる
   - `undeclared` は、ルールが言及せず ask か deny になった呼び出しのたびに文を組む（通した回と、判定を渡した回は組まない）。頻度は測っていない。移すと、その呼び出しに冷たい読み約 45 ms が加わる。まず受け入れて出し（決めたこと）、PR にこの数字を書く。遅さが問題になったら、文面ファイルを必要な 1 本だけ読む形に直す。冷たい読みは YAML の読みが大半（約 33 ms）で、重複した識別子の検査は全ファイルを読む前提なので、その形にするなら検査を別（`--lint`）に回す
   - 英語の文面は整理が別に進んでいる。移すときは文をそのまま写す。言い換えは整理の側で、文面ファイルの上で直す
@@ -146,7 +150,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | 順 | PR | 中身 |
 |---|---|---|
 | 1 | 組み込みルールの文（移した） | 仕組み（`Rule` の欄、`_build` の検査、`key()`、引く 3 か所、点検の拡張、空の欄を許す検査）、`builtin.py`・`selfguard_shell.py`・`ticket_guard.py`・`phase_forms.py` の文。手引きの 1 行（項目 2）を含む |
-| 2 | hook の通知と実行後の報告 | `notice` の種類と `undeclared`・`fallen_back`、`post.py`・`post_report.py`・`post_findings.py`、`rootwrite.py`・`docsearch.py`・`selfguard.py` の文 |
+| 2 | hook の通知と実行後の報告（移した） | `notice` の種類と `undeclared`・`fallen_back`、`post.py`・`post_report.py`・`post_findings.py`、`rootwrite.py`・`docsearch.py` の文。`policy/selfguard.py` の知らせは含めず、残りに置く |
 | 3 | Python の CLI の次の手 | `ops.py`・`agree_screen.py`・`approval_checks.py`・`review.py`・`phase.py` |
 | 4 | sh の `案内:` | `ccnavi-git.sh`・`ccnavi-worktree.sh`・`ccnavi-start.sh` とほか |
 

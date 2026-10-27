@@ -209,10 +209,97 @@ class BuiltinRuleTextsTest(unittest.TestCase):
         for wrapper in (False, True):
             with tempfile.TemporaryDirectory() as root:
                 used.update(r.message_id for r in builtin_rules(root, wrapper))
+        # 実行後の報告（hook/post_findings.py）が作るルールの文は、組み立てる場面が違うので、
+        # ソースに識別子が書かれていることで見る。
+        body = source_text()
         for ident, entry in self.catalog.entries.items():
             if ident.startswith("RULE_") and not ident.startswith("RULE_ASK"):
                 with self.subTest(ident=ident):
-                    self.assertIn(ident, used, f"{ident} をどの組み込みのルールも持たない")
+                    self.assertTrue(
+                        ident in used or ident in body,
+                        f"{ident} をどの組み込みのルールも持たない",
+                    )
+
+
+class HookTextsTest(unittest.TestCase):
+    """識別子や場合を実行のときに選ぶ通知・報告の文が、どの組み合わせでも引ける。
+
+    呼び出しの識別子が定数でない（結末や場合で選ぶ）ので、上の点検には映らない。
+    """
+
+    GONE = "引けませんでした"
+
+    def test_undeclared_texts_exist_for_every_verdict_and_case(self):
+        from ccnavi.hook import reasons
+
+        for degraded in ("", "x"):
+            for verdict in (rules.ASK, rules.DENY):
+                for fell_back in (False, True):
+                    with self.subTest(degraded=degraded, verdict=verdict, fell_back=fell_back):
+                        said = reasons.undeclared(
+                            "Bash",
+                            "ls",
+                            "/s/rules.yml",
+                            degraded,
+                            verdict=verdict,
+                            fell_back=fell_back,
+                            root=ROOT,
+                        )
+                        self.assertTrue(said)
+                        self.assertNotIn(self.GONE, said)
+                        self.assertNotIn("{", said)
+        self.assertEqual(
+            "", reasons.undeclared("Bash", "ls", "s", "", verdict="handover", root=ROOT)
+        )
+
+    def test_the_fallen_back_notice_names_the_file(self):
+        from ccnavi.hook import reasons
+
+        said = reasons.fallen_back("/p/rules.yml", ROOT)
+        self.assertIn("/p/rules.yml", said)
+        self.assertNotIn(self.GONE, said)
+
+    def test_ticket_scope_texts_take_the_values_the_code_gives(self):
+        expected = {
+            "RULE_TICKET_SCOPE__BLOCKED": {"ticket", "worktree", "blocked"},
+            "RULE_TICKET_SCOPE__TYPE": {
+                "ticket",
+                "worktree",
+                "area",
+                "type_title",
+                "type_id",
+                "scope",
+            },
+            "RULE_TICKET_SCOPE__PARENT": {"ticket", "worktree", "area", "parent", "parent_area"},
+            "RULE_TICKET_SCOPE__PLAIN": {"ticket", "worktree", "area"},
+        }
+        catalog = texts.load(ROOT)
+        for ident, names in expected.items():
+            with self.subTest(ident=ident):
+                self.assertEqual(set(catalog.entries[ident].values), names)
+
+    def test_docs_and_report_texts_render_with_each_case(self):
+        catalog = texts.load(ROOT)
+        cases = {
+            "NOTICE_DOCS_GUIDE": ("what", ("plain", "convention")),
+            "NOTICE_DOCS_FRONTMATTER__NONE": ("what", ("plain", "convention")),
+            "NOTICE_DOCS_FRONTMATTER__TYPE": ("what", ("plain", "convention")),
+            "NOTICE_DOCS_FRONTMATTER__SKILL": ("what", ("plain", "convention")),
+            "NOTICE_POST_NOT_RESTORED": ("what", ("shadowed", "scope", "ask")),
+            "NOTICE_POST_DROPPED": ("what", ("git", "plain")),
+            "NOTICE_POST_ALL_AT": ("what", ("git", "plain")),
+            "NOTICE_POST_UNCOUNTED": ("what", ("git", "plain")),
+            "DENY_SHELL_WORKSPACE_ROOT": ("what", ("origin", "plain")),
+        }
+        for ident, (field_name, wanted) in cases.items():
+            entry = catalog.entries[ident]
+            self.assertEqual(set(entry.fields[field_name]), set(wanted), ident)
+            values = {name: "v" for name in entry.values}
+            for case in wanted:
+                with self.subTest(ident=ident, case=case):
+                    said = texts.say(ROOT, ident, values, {field_name: case})
+                    self.assertNotIn(self.GONE, said)
+                    self.assertNotIn("{", said)
 
 
 class SharedRulesWordingTest(unittest.TestCase):

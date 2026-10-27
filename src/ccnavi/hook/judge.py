@@ -260,7 +260,7 @@ def decide_before(
     # 退避ではないので、同じ文面を出すと「既定で判定している」と読み違えられる。
     # そちらは記録の `fallback` にレイヤーの名前が残り、`--lint` が error で言う。
     fallback = (
-        reasons.fallen_back(record.detail or conf.rules)
+        reasons.fallen_back(record.detail or conf.rules, root)
         if record.fallback == builtin.FALLBACK
         else ""
     )

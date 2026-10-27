@@ -31,7 +31,7 @@ def english_in(text: str) -> list[str]:
 class MessageLanguageTest(unittest.TestCase):
     def test_the_detector_finds_an_english_sentence(self):
         self.assertTrue(english_in("note: this is the approved area."))
-        self.assertFalse(english_in("note: 承認済みの置き場です。"))
+        self.assertFalse(english_in("案内: 承認済みの置き場です。"))
 
     def test_internal_error_is_in_japanese(self):
         from ccnavi.infra import hookio
@@ -43,8 +43,9 @@ class MessageLanguageTest(unittest.TestCase):
         self.assertEqual(english_in(reasons.internal_error_notice("X", "Stop", "E", "/log")), [])
 
     def test_approved_hint_is_in_japanese(self):
-        self.assertEqual(english_in(post_report.APPROVED_HINT), [])
-        self.assertIn("承認済み", post_report.APPROVED_HINT)
+        hint = texts.say(ROOT, "NOTE_POST_APPROVED_AREA")
+        self.assertEqual(english_in(hint), [])
+        self.assertIn("承認済み", hint)
 
     def test_refusal_texts_keep_their_hints(self):
         from ccnavi.policy import builtin

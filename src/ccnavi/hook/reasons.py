@@ -118,7 +118,7 @@ def code_for(tool: str, degraded: str) -> str:
     return CODE_COMMAND if tool == "Bash" else CODE_PATH
 
 
-def fallen_back(rules_path: str) -> str:
+def fallen_back(rules_path: str, root: str) -> str:
     """ルールファイルを読めずに組み込みの既定に戻ったことを伝える文。
 
     通した回にも返す。ここで何も言わないと、ガードが働いているように見えて実際には
@@ -127,17 +127,9 @@ def fallen_back(rules_path: str) -> str:
 
     直し方として下書きとユーザの取り込みを挙げるのは、既定の側がシェルからも、Write / Edit からも
     この場所への書き込みを止めているため（builtin:guard-ccnavi-config は読めない間も外れない）。
-    止めた先に代わりの方法が無いと、拒否されたあと先へ進めなくなる。
+    止めた先に代わりの方法が無いと、拒否されたあと先へ進めなくなる。文は文面ファイルが持つ。
     """
-    return (
-        "[ccnavi] the rule file at "
-        + rules_path
-        + " could not be read, so ccnavi is judging with its built-in defaults. "
-        "The project's own rules are not in force right now. Neither the shell nor "
-        "the Write or Edit tool can write to that file while the defaults are in "
-        "force. Put a draft at wip/handoff/.ccnavi/config/common/rules.yml and ask "
-        "the user to import it with 'ccnavi-user-handoff.sh' (or to fix the file by hand)."
-    )
+    return texts.say(root, "NOTICE_FALLEN_BACK", {"path": rules_path})
 
 
 def undeclared(
@@ -161,7 +153,7 @@ def undeclared(
     「この場所を allow に書くかどうか」になる。
 
     verdict は `judge.undeclared_verdict` の戻り（ask か deny）。次の一手は、その結末と
-    読み切れたかどうか（degraded）の組で決まるので、組ごとの表（`_UNDECLARED_NEXT`）から引く。
+    読み切れたかどうか（degraded）の組で決まるので、組ごとの識別子の表（`_UNDECLARED_TEXT`）から引く。
     `refused: bool` のように片方だけを渡すと、読めなかった回の分岐が先にヒットし、止めた回にも
     「聞いている、用途を言えば通る」と返していた。聞ける者が居ないモードで用途を言っても通らない。
     表に無い結末（渡した回 `(handover)` など）には文を組まず空を返す。渡した回は文面を返さない
@@ -172,8 +164,8 @@ def undeclared(
     そこへ allow を足せと案内すると、同じ応答の退避の文（`fallen_back`）と食い違う。直し方は
     退避の文が言うので、ここではそれを指すだけにする。
     """
-    template = _UNDECLARED_NEXT.get((bool(degraded), verdict))
-    if template is None:
+    text_id = _UNDECLARED_TEXT.get((bool(degraded), verdict))
+    if text_id is None:
         return ""
     lines = [
         f"[ccnavi] {CODE_UNCERTAIN if degraded else CODE_UNDECLARED} (source: {source})",
@@ -181,70 +173,29 @@ def undeclared(
     ]
     if degraded:
         lines.append(unreadable(root, degraded, matched=False))
-    if fell_back:
-        where = "the built-in defaults ccnavi fell back to"
-        then = _UNDECLARED_FALLEN_BACK[verdict]
-    else:
-        where = source
-        then = _UNDECLARED_THEN[verdict].format(where=source)
+    # 退避した回は、読めなかったルールファイルへ allow を足せとは言わない（直し方は `fallen_back` が言う）。
     lines.append(
-        template.format(what="command" if tool == "Bash" else "path", where=where, then=then)
+        texts.say(
+            root,
+            text_id,
+            {} if degraded else {"target": "command" if tool == "Bash" else "path", "where": source},
+            {"what": "fell_back" if fell_back else "rules"},
+        )
     )
     if degraded:
         lines.extend(rewrite_hint(root, degraded))
     return "\n".join(lines)
 
 
-# 言及の無い呼び出しの文。キーは（読み切れなかったか, 結末）。結末は
+# 言及の無い呼び出しの文の識別子。キーは（読み切れなかったか, 結末）。結末は
 # `judge.undeclared_verdict` が返す ask か deny で、渡した回（handover）は文を返さない。
 # 読み切れなかった回は、ルールファイルに何を足しても読めるようにはならないので、
-# 次の一手は書き直しになる（{then} を使わない）。
-_UNDECLARED_NEXT = {
-    (False, rules.ASK): (
-        "No rule in {where} mentions this {what}, so ccnavi has no verdict of its own and "
-        "leaves the call to Claude Code's permission mode, which in this session asks the user. "
-        "This is not a warning about the call itself. {then}"
-    ),
-    (False, rules.DENY): (
-        "No rule in {where} mentions this {what}, and this session has no one to ask: its "
-        "permission mode answers on its own or not at all. An undeclared call is not allowed "
-        "here. {then}"
-    ),
-    (True, rules.ASK): (
-        "ccnavi は、このコマンドが実際に何を実行するか読めなかったので、判定せずに確認しています。"
-        "何のためのコマンドかを伝えるか、読める形に書き直してください。"
-    ),
-    (True, rules.DENY): (
-        "ccnavi は、このコマンドが実際に何を実行するか読めませんでした。このセッションには"
-        "確認に答える人がおらず、権限モードが自分で答えるか、そもそも答えないので、実行しません。"
-        "何のためのコマンドかを伝えても通りません。読める形に書き直してください。"
-        "書き直せないときは、何のために要るかをユーザに伝えてください。"
-    ),
-}
-
-# 読み切れた回の締め。ルールファイルを読めている回は、穴を塞ぐ先（allow）を名指しする。
-_UNDECLARED_THEN = {
-    rules.ASK: (
-        "If this is ordinary work for this project, say so and ask the user to add it to the "
-        "allow section of {where}; that is what stops the same question from coming back."
-    ),
-    rules.DENY: (
-        "Either do the work with something the allow section of {where} already covers, "
-        "or tell the user what needs to be added there and let them decide."
-    ),
-}
-
-# 組み込みの既定に退避した回の締め。読めなかったファイルへ allow を足せとは言わない。
-# 直し方は同じ応答の退避の文（`fallen_back`）が言うので、それを指すだけにする。
-_UNDECLARED_FALLEN_BACK = {
-    rules.ASK: (
-        "The project's rule file could not be read (see the note above), so its allow section "
-        "is not in force; ask the user to repair that file rather than to add anything to it."
-    ),
-    rules.DENY: (
-        "The project's rule file could not be read (see the note above), so its allow section "
-        "is not in force; tell the user that file has to be repaired first."
-    ),
+# 次の一手は書き直しになる。
+_UNDECLARED_TEXT = {
+    (False, rules.ASK): "NOTICE_UNDECLARED__ASK",
+    (False, rules.DENY): "NOTICE_UNDECLARED__DENY",
+    (True, rules.ASK): "NOTICE_UNDECLARED__UNREADABLE_ASK",
+    (True, rules.DENY): "NOTICE_UNDECLARED__UNREADABLE_DENY",
 }
 
 

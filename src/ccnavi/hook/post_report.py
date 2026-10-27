@@ -26,6 +26,8 @@ def _violation(
     git: str | None = None,
     shadowed: bool = False,
     side_by_side: bool = False,
+    *,
+    root: str,
 ) -> str:
     """1 件を、それだけで読んで成立する差し戻しの文に組む。
 
@@ -46,6 +48,8 @@ def _violation(
     コミット済みの内容は、ユーザの編集より古いので、戻すとその編集まで消える。だから戻さない。
     `not_restored` の理由の文を、これ用に差し替える。
 
+    root は文面ファイルを引くワークスペースルート。文は `texts.say` が引く。
+
     処理フロー:
     1. 1 行目（理由コードと出所）と、対象・ワークツリー・呼び出しの行を置く。
     2. 横で作業する変更は、動かさなかったことを言う（`SIDE_BY_SIDE_LABEL`）。
@@ -62,33 +66,22 @@ def _violation(
         f"after: {_call(payload)}",
     ]
     if side_by_side and moved is None:
-        lines.append(
-            f"side-by-side: {SIDE_BY_SIDE_LABEL}。ユーザは、このワークツリーがある間、"
-            "このチェックアウトでも作業すると宣言しているので、ccnavi は変更をそのままにしました。"
-            "自分で戻さず、何を実行したかを伝えて、誰の変更かをユーザに決めてもらってください。"
-        )
+        said = texts.say(root, "NOTICE_POST_SIDE_BY_SIDE", {"label": SIDE_BY_SIDE_LABEL})
+        lines.append(f"side-by-side: {said}")
     if moved is None:
         if not side_by_side:
             # 横で作業する変更は、誰の変更かをユーザが決める。戻す手順を並べると、上の文と矛盾する。
             undo = gitstate.undo(change, git)
-            no_wrapper = "ユーザに頼んでください（git の操作はエージェントには止まります）"
+            no_wrapper = texts.say(root, "NOTICE_POST_UNDO_ASK_USER")
             lines.append(f"undo: {undo or (no_wrapper if git is None else '')}")
         if not_restored:
-            lines.append(
-                "not-restored: "
-                + (
-                    "このパスには既にユーザの変更があり、上の呼び出しがさらに変えました。"
-                    "コミット済みの内容はユーザの編集より古いので、戻すとその編集まで消えます"
-                    if shadowed
-                    else (
-                        "チケットの作業範囲は、ルールファイルの `deny` ではありません"
-                        if finding.code == post_findings.CODE_TICKET_SCOPE
-                        else "この場所は `deny` ではなく `ask` と宣言されています"
-                    )
-                )
-                + "。そのため ccnavi は変更をそのままにしました。残すかどうかは人が決めます。"
-                "自分で戻さず、何が書いたかを伝えてください。"
+            why = (
+                "shadowed"
+                if shadowed
+                else ("scope" if finding.code == post_findings.CODE_TICKET_SCOPE else "ask")
             )
+            said = texts.say(root, "NOTICE_POST_NOT_RESTORED", variants={"what": why})
+            lines.append(f"not-restored: {said}")
         if would_restore:
             lines.append(
                 f"{selfguard.ACTION_WOULD}: ccnavi did not touch this path. With "
@@ -104,7 +97,7 @@ def _violation(
     else:
         lines.append("restored: ccnavi put this path back to its committed content.")
     if _in_approved_area(change.path):
-        lines.append(APPROVED_HINT)
+        lines.append(texts.say(root, "NOTE_POST_APPROVED_AREA"))
     lines.append(_messages(group))
     return "\n".join(line for line in lines if line)
 
@@ -112,23 +105,12 @@ def _violation(
 # 横で作業する指定が有効なチェックアウトで見つかった変更につける呼び名（`directrec`）。
 SIDE_BY_SIDE_LABEL = "出所不明の変更（ユーザか別のセッションの可能性）"
 
-# 承認済みの置き場の報告につける 1 行。判定は変えない。ccnavi-ticket.sh / ccnavi-review.sh が
-# 前に書いた未コミットの変更は、後のどのコマンドの後でも同じ形で報告され、
-# 受け取った側が自分の違反と読んで undo を打つ（打つと手順が進まなくなる）。
-APPROVED_HINT = (
-    "note: ここは承認済みの置き場です。このセッションで先に ccnavi-ticket.sh か ccnavi-review.sh を"
-    "打っていた（start・finish・confirm など）なら、書いたのはおそらく ccnavi 自身で、"
-    "after: の呼び出しではありません。undo: は打たないでください。"
-    "何が書いたか分からないときだけ、ユーザに伝えてください。"
-)
-
-
 def _in_approved_area(path: str) -> bool:
     """報告のパスが承認済みの置き場（`.ccnavi/approved/`）の下か。"""
     return f"/{path.replace(chr(92), '/').lower()}".find("/.ccnavi/approved/") >= 0
 
 
-def _preexisting(finding: post_findings.Finding) -> str:
+def _preexisting(finding: post_findings.Finding, root: str) -> str:
     """セッションが始まる前から在った変更につける文。
 
     戻すなと書く。ここを書き落とすと、受け取った側は違反と同じ形の通知を読んで
@@ -139,11 +121,7 @@ def _preexisting(finding: post_findings.Finding) -> str:
         [
             f"[ccnavi] {CODE_PREEXISTING} ({_source(finding.source, group)})",
             f"path: {change.path} ({change.status.strip()} / {change.kind})",
-            "note: セッションの開始前から作業ツリーにあった変更です。"
-            "直前の操作が起こしたものではありません。"
-            "戻さず、これを土台にもせず、見つけたことをユーザに伝えて判断を任せてください。"
-            "ユーザがこの変更を捨てるよう明示して頼んだときだけ、捨てずに"
-            "ccnavi-git.sh stash push -u -- <頼まれたパス> で退避してください。",
+            texts.say(root, "NOTE_POST_PREEXISTING"),
             _messages(group),
         ]
     )

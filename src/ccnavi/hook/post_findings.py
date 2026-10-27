@@ -112,54 +112,35 @@ class ScopeGuard:
         if not found.outside:
             return None
         area = ", ".join(ticket.paths(rules.ALLOW) + ticket.paths(rules.ASK)) or "(empty)"
-        inside = (
-            f"This path is inside the work area that ticket {ticket.ticket} declares ({area}) "
-            f"for worktree {t.name}, but "
-        )
-        overflow = (
-            "The ticket was approved with that overflow shown as a warning; writes there stay "
-            "blocked. "
-        )
+        # 文は報告のときに文面ファイルから引く。範囲の外に出た理由ごとに識別子を分ける。
+        values = {"ticket": ticket.ticket, "worktree": t.name}
         if found.limit == phase_scope.LIMIT_BLOCKED:
             # 範囲の外に出たのではなく、チケット自体が信頼できない。範囲を
             # 見せても直しようが無いので、引っかかった検査を名指しする。
-            message = (
-                f"The approved ticket {ticket.ticket} for worktree {t.name} does not hold "
-                f"together ({ticket.blocked}), so its work area is not in effect and every "
-                "change here is reported. Nothing you write can fix this: the user has to "
-                "repair the approved ticket or where it sits. Tell them the problem above and "
-                "ask them to run 'ccnavi --lint', which names every ticket in this state."
-            )
+            text_id = "RULE_TICKET_SCOPE__BLOCKED"
+            values["blocked"] = str(ticket.blocked)
         elif found.limit == phase_scope.LIMIT_TYPE and found.type is not None:
-            message = (
-                inside + f"outside what phase type {found.type.title} ({found.type.id}) allows "
-                f"({', '.join(found.type.scope_globs)}). "
-                + overflow
-                + "Send the output to a path that type covers, do the work in a later phase "
-                "whose type covers this path, or ask the user to change the definition fixed in "
-                "the parent's approved ticket (its `phases:`); editing phases.yml does not reach "
-                "a parent that is already approved."
+            text_id = "RULE_TICKET_SCOPE__TYPE"
+            values.update(
+                area=area,
+                type_title=found.type.title,
+                type_id=found.type.id,
+                scope=", ".join(found.type.scope_globs),
             )
         elif found.limit == phase_scope.LIMIT_PARENT and parent is not None:
-            parent_area = (
-                ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK)) or "(empty)"
-            )
-            message = (
-                inside
-                + f"outside its parent {parent.ticket} ({parent_area}). "
-                + overflow
-                + "Send the output inside the parent's area, or, if the task genuinely needs "
-                "this path, tell the parent so it can propose a ticket whose parent covers it "
-                "and ask the user to run 'ccnavi-user-agree.sh'."
+            text_id = "RULE_TICKET_SCOPE__PARENT"
+            values.update(
+                area=area,
+                parent=parent.ticket,
+                parent_area=", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK))
+                or "(empty)",
             )
         else:
-            message = (
-                f"This path is outside the work area that ticket {ticket.ticket} declares "
-                f"({area}) for worktree {t.name}. Send the output inside that area, or, if the "
-                "task genuinely needs this path, tell the parent so it can propose a ticket that "
-                "covers it and ask the user to run 'ccnavi-user-agree.sh'."
-            )
-        rule = rules.Rule(id=TICKET_SCOPE_RULE, message=message)
+            text_id = "RULE_TICKET_SCOPE__PLAIN"
+            values["area"] = area
+        rule = rules.Rule(
+            id=TICKET_SCOPE_RULE, root=self.root, message_id=text_id, message_values=values
+        )
         # 出所はその承認済みチケット自身の場所。承認済みチケットはツリーごとに在るので、
         # 1 か所にはまとめられない。
         return rule, ticket.path

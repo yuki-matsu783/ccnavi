@@ -1,0 +1,60 @@
+# 実行前後のフックが組み立てる拒否・報告の文（シェルからルート直下へ書く形、承認された作業範囲の外、
+# 実行後の報告の案内）。条件（いつ出すか）と状態の行はコード側（hook/rootwrite.py・hook/post_findings.py・
+# hook/post_report.py）にあり、ここは何を言うかだけを持つ。
+# `RULE_` の文は `what` だけが必須で、書くことがない欄は省く。英語の文は、そのまま写してある。
+# 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
+version: 1
+messages:
+  # ---- hook/rootwrite.py（記録の `code` と同じ識別子）
+  DENY_SHELL_WORKSPACE_ROOT:
+    kind: deny
+    values: [target, path, origin]
+    what:
+      origin: |-
+        シェルでチェックアウトしたブランチ直下（{path}）へ書き込む形です（書き込み先: {target}。読んだ箇所: {origin}）。
+      plain: |-
+        シェルでチェックアウトしたブランチ直下（{path}）へ書き込む形です（書き込み先: {target}）。
+    why: |-
+      Write / Edit と同じく、ここには書きません。
+    next: |-
+      ユーザに渡すものはワークスペースルート直下の wip/handoff/、一時的なもの・コミットしたくないものは同じく直下の scratchpad/ に書く（.ccnavi/docs/scratchpad.md）。リポジトリのファイルを直すときは、{script:ccnavi-worktree.sh} <名前> でワークツリーを切り、その中で編集する
+    no_bypass: |-
+      書き込み先の書き方を変えても、同じ場所なら同じ関門に当たります。
+
+  # ---- hook/post_findings.py（承認されたチケットの作業範囲の外。ルール `builtin:ticket-scope` の文）
+  RULE_TICKET_SCOPE__BLOCKED:
+    kind: deny
+    values: [ticket, worktree, blocked]
+    what: |-
+      The approved ticket {ticket} for worktree {worktree} does not hold together ({blocked}), so its work area is not in effect and every change here is reported. Nothing you write can fix this: the user has to repair the approved ticket or where it sits. Tell them the problem above and ask them to run 'ccnavi --lint', which names every ticket in this state.
+
+  RULE_TICKET_SCOPE__TYPE:
+    kind: deny
+    values: [ticket, area, worktree, type_title, type_id, scope]
+    what: |-
+      This path is inside the work area that ticket {ticket} declares ({area}) for worktree {worktree}, but outside what phase type {type_title} ({type_id}) allows ({scope}). The ticket was approved with that overflow shown as a warning; writes there stay blocked. Send the output to a path that type covers, do the work in a later phase whose type covers this path, or ask the user to change the definition fixed in the parent's approved ticket (its `phases:`); editing phases.yml does not reach a parent that is already approved.
+
+  RULE_TICKET_SCOPE__PARENT:
+    kind: deny
+    values: [ticket, area, worktree, parent, parent_area]
+    what: |-
+      This path is inside the work area that ticket {ticket} declares ({area}) for worktree {worktree}, but outside its parent {parent} ({parent_area}). The ticket was approved with that overflow shown as a warning; writes there stay blocked. Send the output inside the parent's area, or, if the task genuinely needs this path, tell the parent so it can propose a ticket whose parent covers it and ask the user to run 'ccnavi-user-agree.sh'.
+
+  RULE_TICKET_SCOPE__PLAIN:
+    kind: deny
+    values: [ticket, area, worktree]
+    what: |-
+      This path is outside the work area that ticket {ticket} declares ({area}) for worktree {worktree}. Send the output inside that area, or, if the task genuinely needs this path, tell the parent so it can propose a ticket that covers it and ask the user to run 'ccnavi-user-agree.sh'.
+
+  # ---- hook/post_report.py（`note:` の行を `案内:` で出す）
+  # 承認済みの置き場の報告につける 1 行。判定は変えない。
+  NOTE_POST_APPROVED_AREA:
+    kind: note
+    note: |-
+      ここは承認済みの置き場です。このセッションで先に ccnavi-ticket.sh か ccnavi-review.sh を打っていた（start・finish・confirm など）なら、書いたのはおそらく ccnavi 自身で、after: の呼び出しではありません。undo: は打たないでください。何が書いたか分からないときだけ、ユーザに伝えてください。
+
+  # セッションの開始前からあった変更。戻さないよう書く。
+  NOTE_POST_PREEXISTING:
+    kind: note
+    note: |-
+      セッションの開始前から作業ツリーにあった変更です。直前の操作が起こしたものではありません。戻さず、これを土台にもせず、見つけたことをユーザに伝えて判断を任せてください。ユーザがこの変更を捨てるよう明示して頼んだときだけ、捨てずに ccnavi-git.sh stash push -u -- <頼まれたパス> で退避してください。

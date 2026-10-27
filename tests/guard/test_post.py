@@ -927,7 +927,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         result = self.run_hook(event="Stop")
 
         message = json.loads(result.stdout)["systemMessage"]
-        self.assertIn("ワークツリー wt1 では、今回のターンでこの確認ができませんでした", message)
+        self.assertIn("ワークツリー wt1では、今回のターンでこの確認ができませんでした", message)
         self.assertIn("uncounted", self.records()[-1].get("detail", ""))
 
     def test_ターンの終わりの記録は数えていないツリーと違反の両方を残す(self):
