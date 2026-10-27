@@ -241,7 +241,9 @@ if [ -z "$adopt" ] && { [ -e "$dest" ] || [ -L "$dest" ]; }; then
 		printf '案内: 取り込みの記録は、ある（ccnavi-direct/%s）。integrate に進めます\n' "$name"
 		ex_record=yes
 	else
-		ccnavi_text "$root" NOTE_WORKTREE_RECORD_MISSING "name=$name" "unattended=$(unattended_line)"
+		ex_name_q=$(ccnavi_sh_quote "$name")
+		ex_unattended=$(unattended_line)
+		ccnavi_text "$root" NOTE_WORKTREE_RECORD_MISSING "name=$name" "name_q=$ex_name_q" "unattended=$ex_unattended"
 		ex_record=no
 	fi
 	log_info 既にある -- "name=$name" "record=$ex_record"

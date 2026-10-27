@@ -110,9 +110,9 @@ messages:
   # 既にあるワークツリーに、取り込みの記録が無いとき。`unattended` は非対話のときの追記（無ければ空）。
   NOTE_WORKTREE_RECORD_MISSING:
     kind: note
-    values: [name, unattended]
+    values: [name, name_q, unattended]
     note: |-
-      取り込みの記録は、無い（ccnavi-direct/{name}）。integrate に進むには、ユーザの確認を経て {script:ccnavi-worktree.sh} {name:sh} --adopt --base <取り込み先> で引き取ります（チケットに結び付く名前は引き取れません）。{unattended}
+      取り込みの記録は、無い（ccnavi-direct/{name}）。integrate に進むには、ユーザの確認を経て {script:ccnavi-worktree.sh} {name_q} --adopt --base <取り込み先> で引き取ります（チケットに結び付く名前は引き取れません）。{unattended}
 
   # 引き取り・切る前の確認で、渡された確認コードが今の状態と合わないとき。
   NOTE_WORKTREE_ADOPT_CODE_STALE:
