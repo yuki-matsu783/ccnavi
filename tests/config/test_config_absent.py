@@ -18,7 +18,7 @@ import time
 import unittest
 
 from ccnavi.infra import settings, shellread, yamlread
-from ccnavi.policy import builtin
+from ccnavi.policy import builtin, texts
 from ccnavi.tickets import risk, ticket_guard
 from tests import ROOT
 from tests.config.test_config_union import (
@@ -609,10 +609,15 @@ class BuiltinGitWordingTest(unittest.TestCase):
     )
 
     def messages(self, root):
-        found = {r["id"]: r["message"] for r in builtin.base_data(root)["deny"]}
+        # 文は拒否に当たった回に文面ファイルから引く。同梱の文面ファイルを写して引く。
+        shutil.copytree(
+            os.path.join(ROOT, ".ccnavi", "messages"),
+            os.path.join(root, ".ccnavi", "messages"),
+        )
+        found = {r.id: texts.spoken(r) for r in builtin.load_base(root)[0].deny}
         conf = settings.Settings(project_home=settings.DEFAULT_PROJECT_HOME)
-        for rule in builtin.rule_data(root, conf)["deny"]:
-            found.setdefault(rule["id"], rule["message"])
+        for rule in builtin.load(root, conf)[0].deny:
+            found.setdefault(rule.id, texts.spoken(rule))
         return {i: found[i] for i in self.IDS}
 
     def test_with_the_wrapper(self):
@@ -638,16 +643,16 @@ class BuiltinGitWordingTest(unittest.TestCase):
         text = self.messages(root)["builtin:git-push"]
         self.assertIn("親のワークツリーのブランチ", text)
         self.assertIn("子のワークツリーのブランチは送らず", text)
-        self.assertNotIn("push はユーザに頼んでください", text)
+        self.assertNotIn("push をユーザに頼む", text)
 
     def test_without_the_wrapper(self):
         root = tempfile.mkdtemp(prefix="ccnavi-builtin:words-")
         self.addCleanup(shutil.rmtree, root, ignore_errors=True)
-        texts = self.messages(root)
-        self.assertIn("ユーザに削除を頼んでください", texts["builtin:recursive-delete"])
-        self.assertIn("ユーザに確認してください", texts["builtin:git-reset-hard"])
-        self.assertIn("push はユーザに頼んでください", texts["builtin:git-push"])
-        self.assertIn("ユーザに頼んでください", texts[builtin.CONFIG_VIA_BASH_RULE_ID])
+        said = self.messages(root)
+        self.assertIn("ユーザに削除を頼む", said["builtin:recursive-delete"])
+        self.assertIn("ユーザに確認する", said["builtin:git-reset-hard"])
+        self.assertIn("push をユーザに頼む", said["builtin:git-push"])
+        self.assertIn("ユーザに頼んでください", said[builtin.CONFIG_VIA_BASH_RULE_ID])
         # 生の git は止まるので、`git` の形は案内しない。ユーザに頼む文になる。
 
 

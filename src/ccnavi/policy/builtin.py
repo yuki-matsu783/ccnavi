@@ -72,7 +72,7 @@ YAML として読めないので既定に戻る。そこで解決の手が止ま
 from __future__ import annotations
 
 from ..infra import settings
-from . import rules, selfguard_shell
+from . import rules, selfguard_shell, texts
 
 
 def rule_data(root: str, conf: settings.Settings) -> dict:
@@ -112,7 +112,7 @@ def base_data(root: str = "") -> dict:
 
 def load_base(root: str = "") -> tuple[rules.RuleSet, list[rules.Problem]]:
     """常に有効な組み込みの deny を組み立てる。`load` と同じく、問題はこのビルドの不備。"""
-    built, problems = rules.parse(base_data(root), builtin=True)
+    built, problems = rules.parse(base_data(root), root=root, builtin=True)
     for rule in built.all():
         rule.base = True
     return built, problems
@@ -128,16 +128,6 @@ CONFIG_VIA_BASH_RULE_ID = "builtin:guard-config-via-bash"
 
 
 def _config_via_bash(regex: str, git: str = "git", wrapper: bool = False) -> dict:
-    # 競合の解き方の一文は、ラッパーがあるときだけ書く。無いときは生の git が止まるので、
-    # 打てる形を案内せず、ユーザに頼む。
-    resolve = (
-        "マージの衝突を解くことは止めていません。"
-        f"{git} add <パス>、{git} restore --ours -- <パス>（または --theirs）は、"
-        "コミット済みの版を戻すだけなので実行できます。"
-        if wrapper
-        else "マージの衝突を解くことは、ここではエージェントが git を実行しないため、"
-        "ユーザに頼んでください。"
-    )
     return {
         "id": CONFIG_VIA_BASH_RULE_ID,
         "match": "Bash",
@@ -145,14 +135,9 @@ def _config_via_bash(regex: str, git: str = "git", wrapper: bool = False) -> dic
         # コピーすると既定のほうだけが弱くなり、ルールファイルを破損させることが
         # そのまま保護を弱めることになる。
         "regex": regex,
-        "message": (
-            "ルールファイルを読めなかったため、ccnavi は組み込みの既定で動いています。"
-            "シェルで書き込むのは適切ではありません。"
-            "共通のルールファイルは Write / Edit でも直せません。"
-            "wip/handoff/.ccnavi/config/common/rules.yml に下書きを置き、"
-            "ユーザにターミナルの 'ccnavi-user-handoff.sh' での取り込みを頼んでください。"
-            "ユーザが差分を見て取り込めば直せます。" + resolve
-        ),
+        # 競合の解き方の一文は、ラッパーがあるときだけ書く。無いときは生の git が止まるので、
+        # 打てる形を案内せず、ユーザに頼む。
+        **texts.spec("RULE_CONFIG_VIA_BASH", git=git, wrapper=wrapper, cased=("note",)),
     }
 
 
@@ -332,7 +317,7 @@ def _deny(root: str) -> list[dict]:
          （`selfguard_shell.GIT_DIR_PATH_REGEX`）
        - `builtin:guard-git-dir-via-bash`: `.git` の中を書く Bash
          （`selfguard_shell.git_dir_shell_regex`）
-    3. `.git` 向けの 2 本の文面は `_git_dir_message` で組む
+    3. 文は組み立てない。識別子と値を持たせ、拒否に当たった回に `texts.spoken` が引く（`_message`）
 
     ラッパーが無いときは、打てる git の形を案内せず、ユーザに頼む文にする。
     """
@@ -343,40 +328,19 @@ def _deny(root: str) -> list[dict]:
             "id": "builtin:recursive-delete",
             "match": "Bash",
             "regex": RECURSIVE_DELETE_REGEX,
-            "message": (
-                "再帰的な強制削除は取り消せません。削除するものを 1 つずつ名指しするか、"
-                f"ファイルが追跡されているなら {git} rm <パス> を使ってください。"
-                "scratchpad/ の一時物は、名指しの rm -f と rmdir（空のディレクトリ）で消せます。"
-                if wrapper
-                else "再帰的な強制削除は取り消せません。削除するものを 1 つずつ名指しするか、"
-                "ユーザに削除を頼んでください。"
-                "ただし scratchpad/ の一時物は、名指しの rm -f と rmdir"
-                "（空のディレクトリ）で消せます。"
-            ),
+            **texts.spec("RULE_RECURSIVE_DELETE", git=git, wrapper=wrapper, cased=("next",)),
         },
         {
             "id": "builtin:git-push",
             "match": "Bash",
             "regex": GIT_PUSH_REGEX,
-            "message": (
-                f"git push は直接実行しません。親のワークツリーのブランチは {git} push で送ります。"
-                "子のワークツリーのブランチは送らず、親が取り込んでから親のワークツリーで送ります。"
-                f"統合先への送りはユーザが打ちます。通る形は {git} の --help を見てください。"
-                if wrapper
-                else "エージェントは git push を実行しません。"
-                "ブランチはそのままにして、push はユーザに頼んでください。"
-            ),
+            **texts.spec("RULE_GIT_PUSH", git=git, wrapper=wrapper, cased=("why", "next")),
         },
         {
             "id": "builtin:git-reset-hard",
             "match": "Bash",
             "regex": GIT_RESET_HARD_REGEX,
-            "message": (
-                f"作業中の変更が失われます。{git} stash push -u で退避するか、"
-                f"ファイルを名指しして {git} restore <パス> を使ってください。"
-                if wrapper
-                else "作業中の変更が失われます。変更を破棄する前に、ユーザに確認してください。"
-            ),
+            **texts.spec("RULE_GIT_RESET_HARD", git=git, wrapper=wrapper, cased=("next",)),
         },
         {
             "id": "builtin:credentials",
@@ -397,19 +361,19 @@ def _deny(root: str) -> list[dict]:
                 r"|[\\/]credentials([\\/]|\.json\b)"
                 r"|\b(id_rsa|id_ed25519)\b"
             ),
-            "message": "認証情報を含む場所です。中身を読まず、必要な値をユーザに尋ねてください。",
+            **texts.spec("RULE_CREDENTIALS"),
         },
         {
             "id": GIT_DIR_RULE_ID,
             "match": "Write|Edit|NotebookEdit",
             "regex": selfguard_shell.GIT_DIR_PATH_REGEX,
-            "message": _git_dir_message(git, wrapper),
+            **texts.spec("RULE_GUARD_GIT_DIR", git=git, wrapper=wrapper, cased=("next",)),
         },
         {
             "id": GIT_DIR_SHELL_RULE_ID,
             "match": "Bash",
             "regex": selfguard_shell.git_dir_shell_regex(),
-            "message": _git_dir_message(git, wrapper),
+            **texts.spec("RULE_GUARD_GIT_DIR", git=git, wrapper=wrapper, cased=("next",)),
         },
     ]
 
@@ -420,27 +384,6 @@ def _deny(root: str) -> list[dict]:
 # 読むだけ（`cat .git/config`、名指しの Read）は止めない。
 GIT_DIR_RULE_ID = "builtin:guard-git-dir"
 GIT_DIR_SHELL_RULE_ID = "builtin:guard-git-dir-via-bash"
-
-
-def _git_dir_message(git: str, wrapper: bool) -> str:
-    how = (
-        f"git のサブコマンドでできる作業なら、{git} <サブコマンド> で実行してください。"
-        if wrapper
-        else ""
-    )
-    return (
-        ".git ディレクトリの中に直接書き込もうとしています。"
-        "git を通さない変更は、履歴を失わせたり、"
-        "フックを通してコマンドを走らせたりするおそれがあります。"
-        f"{how}"
-        "フック、.git/info/exclude、MERGE_MSG、index.lock、ワークツリーの .git ファイルは、"
-        "どのサブコマンドでも編集されません。"
-        "変更が必要なら、ファイル名と理由を添えてユーザに頼んでください。"
-        "index.lock が古く残っているときは、git のプロセスが動いていないことを確かめてから、"
-        "ユーザに削除を頼んでください。"
-        "ファイルを無視したいときは、.gitignore を編集してください。"
-        ".git の下のファイルを読むことは止めていません。"
-    )
 
 
 _ALLOW: list[dict] = [
@@ -474,4 +417,4 @@ def load(root: str, conf: settings.Settings) -> tuple[rules.RuleSet, list[rules.
     ここが問題を返したら、それはルールファイルではなくこのビルドの不備なので、
     呼び手はそのまま報告してよい。
     """
-    return rules.parse(rule_data(root, conf), builtin=True)
+    return rules.parse(rule_data(root, conf), root=root, builtin=True)

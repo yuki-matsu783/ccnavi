@@ -48,6 +48,16 @@ FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     NOTE: (("note",), ()),
 }
 
+# `RULE_` の文（組み込みルールの文）は、`what` だけが必須で、ほかの欄は省くか空にしてよい。
+# 言うことが無い欄を作り足さないため。`RULE_ASK` と `RULE_ASK__*`（確認が自動で拒否になるときの理由）は
+# 記録の `code` と同じ識別子で、ほかの拒否と同じ 4 欄を必ず持つ。
+RULE_LOOSE_FIELDS: tuple[tuple[str, ...], tuple[str, ...]] = (
+    ("what",),
+    ("why", "next", "no_bypass", "note"),
+)
+RULE_PREFIX = "RULE_"
+RULE_ASK = "RULE_ASK"
+
 # 識別子の頭と種類。拒否のコード（`DENY_*`・`RULE_ASK`）と促しのコード（`NUDGE_*`）は、
 # 記録の `code` と同じ。
 PREFIXES: dict[str, str] = {
@@ -110,6 +120,17 @@ def kind_of_id(text_id: str) -> str:
         if text_id.startswith(prefix):
             return kind
     return ""
+
+
+def fields_for(text_id: str, kind: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """識別子と種類から決まる（必須の欄, 任意の欄）。
+
+    `RULE_` の文（`RULE_ASK` の系統を除く）だけが、`what` 以外の欄を任意にする。
+    """
+    if kind == DENY and text_id.startswith(RULE_PREFIX):
+        if text_id != RULE_ASK and not text_id.startswith(RULE_ASK + "__"):
+            return RULE_LOOSE_FIELDS
+    return FIELDS[kind]
 
 
 def code_of_id(text_id: str) -> str:
@@ -198,6 +219,11 @@ def fill(text: str, values: dict[str, str], root: str) -> str:
 
 
 # ---- 検査
+
+
+def _blank(raw: object) -> bool:
+    """欄が空（書かれていない・空文字・空白だけ）か。"""
+    return raw is None or (isinstance(raw, str) and not raw.strip())
 
 
 def _text_of(raw: object) -> str:
@@ -316,7 +342,8 @@ def check_entry(text_id: str, raw: object, path: str) -> tuple[Entry | None, lis
         err("`values` は重ならない名前（小文字・数字・`_`）の並び")
         return None, problems
     values = tuple(declared)
-    required, optional = FIELDS[kind]
+    required, optional = fields_for(text_id, kind)
+    loose = (required, optional) == RULE_LOOSE_FIELDS
     unknown = sorted(str(k) for k in set(raw) - set(required) - set(optional) - {"kind", "values"})
     if unknown:
         err(f"{kind} の欄に無い: {', '.join(unknown)}")
@@ -329,6 +356,8 @@ def check_entry(text_id: str, raw: object, path: str) -> tuple[Entry | None, lis
     for name in (*required, *optional):
         if name not in raw:
             continue
+        if loose and name not in required and _blank(raw[name]):
+            continue  # 言うことが無い欄は省くのと同じ（`RULE_` の文だけ）
         before = len(problems)
         got = _check_field(name, raw[name], err, used, sizes)
         if got is None and len(problems) == before:
@@ -532,6 +561,39 @@ def say(
         return render(entry, values or {}, variants or {}, root)
     except (TextError, OSError, ValueError, RecursionError, yaml.YAMLError):
         return fallback(text_id)
+
+
+def spec(
+    message_id: str,
+    *,
+    git: str | None = None,
+    wrapper: bool = False,
+    cased: tuple[str, ...] = (),
+    variants: dict[str, str] | None = None,
+) -> dict:
+    """組み込みのルールの文の指定（識別子・値・場合）。ルールの dict に展開して渡す。
+
+    `git` は文面に出す git の打ち方（文面が `{git}` を使うときだけ渡す）。`cased` は、
+    ラッパーの有無で文が分かれる欄の名前で、ラッパーがあれば `wrapper`、なければ `plain` を選ぶ。
+    `variants` はそれ以外の場合の選び方（欄の名前 → 場合）。
+    """
+    chosen = {name: "wrapper" if wrapper else "plain" for name in cased}
+    return {
+        "message_id": message_id,
+        "message_values": {} if git is None else {"git": git},
+        "message_variants": {**chosen, **(variants or {})},
+    }
+
+
+def spoken(rule: rules.Rule) -> str:
+    """ルールがモデルに渡す文。識別子を持つ組み込みのルールは、いま引く。
+
+    組み立てでは引かない（hook の呼び出しごとに組み立てるので、通る呼び出しに文面ファイルの
+    冷たい読みを乗せないため）。拒否に当たった回に、ここで引く。
+    """
+    if rule.message_id and not rule.degraded_message:
+        return say(rule.root, rule.message_id, rule.message_values, rule.message_variants)
+    return rule.spoken_message()
 
 
 def lines_of(text: str) -> list[str]:

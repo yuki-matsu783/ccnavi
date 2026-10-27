@@ -11,7 +11,7 @@ from collections.abc import Callable
 
 from ..infra import pathcase, platformtag, settings, shellread, tree
 from ..records import diaglog
-from . import rules, selfguard_targets
+from . import rules, selfguard_targets, texts
 
 # 設定ファイルへシェルから書き込む形。戻す側と対になる、止める側。
 #
@@ -1043,14 +1043,6 @@ SHELL_RULE_ID = "builtin:guard-setting-files"
 # シェルから書き込む形の 1 本を適用するツール（`add_rules`）。
 SHELL_MATCH = "Bash"
 
-SHELL_MESSAGE = (
-    "ガード自身の設定と hook を、シェルから書き換えようとしています。"
-    "Write / Edit でも拒否される場所です。表記を変えても同じ場所なので、変更が必要な"
-    "理由を伝えてユーザに依頼してください。読むだけなら cat や grep はそのまま通ります。"
-    "テスト用のフィクスチャは wip/handoff/ の下に作ってください。"
-    "保護された場所そのものは、Python など別の手段でも書き換えないでください。"
-)
-
 # 生の文字列（読み切れなかった Bash と、読まない PowerShell）に、シェルから書き込む形の保護を
 # 適用してよい `>` の個数の上限。
 #
@@ -1090,56 +1082,15 @@ def too_many_redirects(subject: str) -> bool:
 # どちらの読みでヒットしたのかが報告から消える。
 BINARY_RULE_ID = "builtin:guard-binary"
 
-BINARY_MESSAGE = (
-    "ccnavi 自身の実行ファイルです。ここが差し替わると、ルールを 1 行も変えずに"
-    "判定そのものを入れ替えられます。作り直しが必要なら、何をなぜ変えたいのかを"
-    "伝えてユーザに依頼してください。"
-)
-
 COMMON_LAYER_RULE_ID = "builtin:guard-common-layer"
 
-COMMON_LAYER_MESSAGE = (
-    "ccnavi の共通レイヤーの設定（ルール・フェーズ定義・リスクの配点）です。どのツリーの判定にも"
-    "使われるので、エージェントが書き換えると自分の判定を緩められます。変更が必要なら、下書きを"
-    "検証したうえで何をなぜ変えたいのかを伝えてユーザに依頼してください（/ccnavi-config）。"
-    "読むだけなら止まりません。"
-)
-
 RECORDS_RULE_ID = "builtin:guard-records"
-
-RECORDS_MESSAGE = (
-    "ccnavi の記録と state の置き場（logs/decisions*.jsonl と logs/state/）か、"
-    "クローズ済みのチケットの"
-    "退避（logs/archive/）です。判定が読み、「ccnavi が何を判定したか」・「何が閉じたか」を"
-    "後から確かめるための材料なので、エージェントは書き換えません。"
-    "シェルからの書き込みでも拒否される場所です。読むだけなら止まりません。"
-)
 
 PROJECT_HOME_RULE_ID = "builtin:guard-project-home"
 
 HANDOFF_LINK_RULE_ID = "builtin:guard-handoff-links"
 
-HANDOFF_LINK_MESSAGE = (
-    "下書きの置き場（wip/handoff/）の中の、リンクかハードリンクでほかの場所とつながったファイルです。"
-    "書くとつながった先（守る場所のことがあります）も書き換わるので、止めました。"
-    "コピーは ccnavi-stage.sh <パス> で作り直してください（中身をコピーするので、つながりません）。"
-)
-
 HANDOFF_LN_RULE_ID = "builtin:guard-handoff-ln"
-
-HANDOFF_LN_MESSAGE = (
-    "下書きの置き場（wip/handoff/）にリンクを作る形です。置き場の中のリンクは、守る場所への"
-    "書き込みの入口になるので、エージェントは作りません。守る場所を直すときは"
-    " ccnavi-stage.sh <パス> で中身をコピーし、コピーを Write / Edit で直してください。"
-)
-
-PROJECT_HOME_MESSAGE = (
-    "レイヤーの設定の置き場です。ここに入っているルール・フェーズ定義・リスクの配点が"
-    "このツリーへの判定を決めるので、エージェントが書き換えると自分の判定を緩め"
-    "られます。承認済みチケット・フェーズのマーカー・子のフロー（approved/ の下）も"
-    "ここにあり、書くのはユーザです。変更が必要なら、何をなぜ変えたいのかを伝えてユーザに"
-    "依頼してください。読むだけなら止まりません。"
-)
 
 
 def add_rules(
@@ -1201,7 +1152,7 @@ def add_rules(
                 "id": SHELL_RULE_ID,
                 "match": SHELL_MATCH,
                 "regex": guard_shell_regex(root, bin_path, project_home, common_files),
-                "message": SHELL_MESSAGE,
+                **texts.spec("RULE_GUARD_SETTING_FILES"),
             },
             root,
             exempt=handoff_copy_exempt(root, cwd),
@@ -1215,7 +1166,7 @@ def add_rules(
                 "match": "Write|Edit|NotebookEdit",
                 # 適用する先は解決済みの絶対パスなので、末尾で閉じる。
                 "regex": clause + "$",
-                "message": BINARY_MESSAGE,
+                **texts.spec("RULE_GUARD_BINARY"),
             },
             root,
         )
@@ -1231,7 +1182,7 @@ def add_rules(
                 # どの ccnavi ディレクトリ（ワークスペース、プロジェクト、ワークツリー）にも
                 # 同じ 1 本がヒットする。
                 "glob": home_glob,
-                "message": PROJECT_HOME_MESSAGE,
+                **texts.spec("RULE_GUARD_PROJECT_HOME"),
             },
             root,
             exempt=handoff_write_exempt(root),
@@ -1244,7 +1195,7 @@ def add_rules(
                 "match": "Write|Edit|NotebookEdit",
                 # 適用する対象は関数が決める（置き場の中のつながった対象だけが残る）。
                 "regex": ".",
-                "message": HANDOFF_LINK_MESSAGE,
+                **texts.spec("RULE_GUARD_HANDOFF_LINKS"),
             },
             root,
             exempt=handoff_link_target(root),
@@ -1256,7 +1207,7 @@ def add_rules(
                 "id": HANDOFF_LN_RULE_ID,
                 "match": "Bash",
                 "regex": ".",
-                "message": HANDOFF_LN_MESSAGE,
+                **texts.spec("RULE_GUARD_HANDOFF_LN"),
             },
             root,
             exempt=handoff_link_command(root, cwd),
@@ -1267,7 +1218,7 @@ def add_rules(
             "id": RECORDS_RULE_ID,
             "match": "Write|Edit|NotebookEdit",
             "regex": records_regex(*records),
-            "message": RECORDS_MESSAGE,
+            **texts.spec("RULE_GUARD_RECORDS"),
         },
         root,
     )
@@ -1280,7 +1231,7 @@ def add_rules(
                 "id": COMMON_LAYER_RULE_ID,
                 "match": "Write|Edit|NotebookEdit",
                 "regex": common,
-                "message": COMMON_LAYER_MESSAGE,
+                **texts.spec("RULE_GUARD_COMMON_LAYER"),
             },
             root,
         )
@@ -1294,29 +1245,6 @@ NAMED_RULE_IDS = (HOOKS_RULE_ID, SETTINGS_RULE_ID, SCRIPTS_RULE_ID, CCNAVI_CONFI
 
 _NAMED_MATCH = "Write|Edit|NotebookEdit"
 _SETTINGS_REGEX = r"[\\/]\.claude[\\/]settings(\.local)?\.json$"
-
-
-def _stage_hint(root: str) -> str:
-    """守る場所を直すときの案内の一文。ワークスペースの `ccnavi-stage.sh` を指す。"""
-    if not root:
-        return (
-            "wip/handoff/ にコピーを置き、"
-            "ユーザに ccnavi-user-handoff.sh での取り込みを頼んでください。"
-        )
-    stage = settings.script_command(root, "ccnavi-stage.sh")
-    return (
-        f"直すときは '{stage} <パス>' で wip/handoff/ にコピーし、コピーを直して、"
-        "ユーザに ccnavi-user-handoff.sh での取り込みを頼んでください。"
-    )
-
-
-# .claude 配下の保護対象の案内に添える一文。Claude Code 本体は .claude の階層を機密パスとして扱い、
-# 非対話では編集を許可できないので、下書きの置き場では handoff-.claude に読み替える。
-_CLAUDE_COPY_HINT = (
-    "下書きの置き場では .claude の階層を handoff-.claude に読み替えます"
-    "（.claude/settings.json は wip/handoff/handoff-.claude/settings.json）。"
-    "wip/handoff/.claude/ に自分で作らないでください。"
-)
 
 
 def _home_regex(project_home: str) -> str:
@@ -1347,30 +1275,24 @@ def add_named_rules(rule_set: rules.RuleSet, project_home: str = "", root: str =
     ccnavi ディレクトリの名前が空なら、それを使う 2 本（scripts と共通の設定）は足さない。
 
     処理フロー:
-    1. 案内の一文（`_stage_hint`）と、下書きの置き場の例外（`handoff_write_exempt`）を用意する
+    1. 下書きの置き場の例外（`handoff_write_exempt`）と、直す手順の場合（ルートの有無）を用意する
     2. hook 本体と hook の登録（settings）の 2 本は、必ず名前で足す
     3. ccnavi ディレクトリの名前（`_home_regex`）があれば、scripts と共通の設定の 2 本を足す
     4. 4 本とも、`match` を `Write|Edit|NotebookEdit` にして `_insert` で足す
     """
-    stage = _stage_hint(root)
     exempt = handoff_write_exempt(root)
+    # 守る場所を直す手順の文は、ワークスペースルートがあるか（`root`）で分かれる。
+    hint = "root" if root else "noroot"
     named: list[dict] = [
         {
             "id": HOOKS_RULE_ID,
             "glob": "*/.claude/hooks/*",
-            "message": (
-                "hook 本体です。エージェントの判断で書き換えず、理由を伝えてユーザに変更を"
-                f"依頼してください。{stage}{_CLAUDE_COPY_HINT}"
-            ),
+            **texts.spec("RULE_GUARD_HOOKS", variants={"next": hint}),
         },
         {
             "id": SETTINGS_RULE_ID,
             "regex": _SETTINGS_REGEX,
-            "message": (
-                "hook の登録そのものです。ワークツリー側の設定も統合すると統合先の設定になります。"
-                "エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。"
-                f"{stage}{_CLAUDE_COPY_HINT}"
-            ),
+            **texts.spec("RULE_GUARD_SETTINGS", variants={"next": hint}),
         },
     ]
     home = _home_regex(project_home)
@@ -1379,23 +1301,12 @@ def add_named_rules(rule_set: rules.RuleSet, project_home: str = "", root: str =
             {
                 "id": SCRIPTS_RULE_ID,
                 "glob": f"*/{_home_name(project_home)}/scripts/*",
-                "message": (
-                    "安全を確かめたコマンドだけを実行するラッパースクリプトです。"
-                    "エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。"
-                    f"{stage}"
-                ),
+                **texts.spec("RULE_GUARD_SCRIPTS", variants={"next": hint}),
             },
             {
                 "id": CCNAVI_CONFIG_RULE_ID,
                 "regex": rf"[\\/]{home}[\\/]config[\\/]common[\\/](rules|phases|risks)\.yml$",
-                "message": (
-                    "ccnavi の設定（ルール・フェーズ定義・リスクの配点）です。エージェントの判断で"
-                    "書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えてユーザに依頼してください"
-                    "（/ccnavi-config）。ルールファイルが読めないときも同じです。書き換えず、"
-                    "wip/handoff/.ccnavi/config/common/rules.yml に下書きを置いて"
-                    "ユーザに取り込みを頼んでください。"
-                    f"{stage}"
-                ),
+                **texts.spec("RULE_GUARD_CCNAVI_CONFIG", variants={"next": hint}),
             },
         ]
     for raw in named:
@@ -1405,7 +1316,7 @@ def add_named_rules(rule_set: rules.RuleSet, project_home: str = "", root: str =
 def _insert(
     rule_set: rules.RuleSet, raw: dict, root: str, exempt: Callable[[str], str] | None = None
 ) -> None:
-    built, problems = rules.parse({"version": rules.VERSION, "deny": [raw]}, builtin=True)
+    built, problems = rules.parse({"version": rules.VERSION, "deny": [raw]}, root=root, builtin=True)
     if problems or not built.deny:
         # 組み立てられないのは、このファイルの書き損じ。判定を止める理由には
         # しない。止まると、直すための呼び出しごと止まる。ただ何も知らせずに外すと、保護が

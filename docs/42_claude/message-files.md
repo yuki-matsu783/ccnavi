@@ -14,12 +14,13 @@ keywords: [文面, 文面ファイル, messages, ccnavi text, ccnavi_text, texts
 
 ## 文を足す手順
 
-1. 文面ファイルに 1 件足す。種類は識別子の頭で決まる（`DENY_*`・`RULE_*` は `deny`、`NUDGE_*` は `nudge`、`NEXT_*` は `next`、`CHOICES_*` は `choices`、`NOTE_*` は `note`）。拒否と促しの識別子は、記録の `code` と同じ。同じコードで文が分かれるときだけ `__<区別>` を足す
+1. 文面ファイルに 1 件足す。種類は識別子の頭で決まる（`DENY_*`・`RULE_*` は `deny`、`NUDGE_*` は `nudge`、`NEXT_*` は `next`、`CHOICES_*` は `choices`、`NOTE_*` は `note`）。拒否と促しの識別子は、記録の `code` と同じ（組み込みルールの文 `RULE_<ルールの id>` は別。記録の `code` ではなく、ルールの id から決める）。同じコードで文が分かれるときだけ `__<区別>` を足す
 2. 種類ごとの欄を書く。文は `|-` のブロックで書くと、`{` や backtick を含んでも引用符で囲まずに済む
 
    | 種類 | 必須 | 任意 |
    |---|---|---|
    | `deny` | `what` `why` `next` `no_bypass` | `note` |
+   | `deny`（`RULE_*`） | `what` | `why` `next` `no_bypass` `note`（省くか空にしてよい） |
    | `nudge` | `what` `next` | `why` `no_bypass` `note` |
    | `next` | `next` | `note` |
    | `choices` | `items`（2 件以上） | |
@@ -30,6 +31,17 @@ keywords: [文面, 文面ファイル, messages, ccnavi text, ccnavi_text, texts
 5. `tests/core/test_texts_catalog.py` が、引く識別子が文面ファイルにあること、値の名前が一致すること、どこからも引かれない識別子が無いことを見る。通るまで直す
 6. 移した出力は、文面ファイルを引いた結果に対して、`次:` の行が 1 行で値が埋まっていることを確かめる
 7. [文面の移行の一覧](message-migration.md)の行を「移した」にする。残りを移すときは、同じ文書の[残りの進め方](message-migration.md#残りの進め方)の仕分けと順に従う
+
+## 組み込みルールの文を足す
+
+`builtin:` で始まる id の組み込みルール（`policy/builtin.py`・`policy/selfguard_shell.py`・`tickets/ticket_guard.py`・`tickets/phase_forms.py`）の文は、ルールの組み立てでは引かない。ルールは hook の呼び出しごとに組み立てるので、組み立てで引くと、拒否に当たらない呼び出しにも文面ファイルの冷たい読み（約 45 ms）が乗る。
+
+1. 文面ファイルに `RULE_<ルールの id>` を足す。`what` だけが必須で、言うことが無い欄は省く
+2. ルールの dict（または `Rule`）に `**texts.spec("RULE_…", git=…, wrapper=…, cased=(…))` を渡す。ラッパーの有無で分かれる欄は `cased` に、それ以外の場合の選びは `variants` に書く。`message` は書かない
+3. 拒否に当たった回に、`texts.spoken(rule)` が識別子と値と場合から文を組む。文を使う側は `rule.spoken_message()` ではなく `texts.spoken(rule)` を呼ぶ
+4. `tests/core/test_texts_catalog.py` が、組み込みのルールが持つ識別子が文面ファイルにあり、渡す値の名前が `values` と一致することを見る
+
+`message_id` はルールファイルからは書けない（`from_file` が偽のルールだけが持つ）。
 
 ## 書き方の決まり
 

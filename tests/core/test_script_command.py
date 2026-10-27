@@ -7,11 +7,14 @@
 from __future__ import annotations
 
 import os
+import shutil
 import tempfile
 import unittest
 
 from ccnavi.infra import settings, shellread
+from ccnavi.policy import texts
 from ccnavi.tickets import phase_forms
+from tests import ROOT
 
 
 class ScriptCommandTest(unittest.TestCase):
@@ -80,11 +83,16 @@ class ScriptCommandTest(unittest.TestCase):
             self.assertTrue(phase_forms.exempt(f"{review} confirm --phase 1", ""))
             self.assertTrue(phase_forms.forbidden(f"{review} ready"))
             self.assertTrue(phase_forms.forbidden(f"{ticket} finish i0001-01-01"))
+            shutil.copytree(
+                os.path.join(ROOT, ".ccnavi", "messages"),
+                os.path.join(root, ".ccnavi", "messages"),
+            )
             rule = phase_forms.ticket_approval_rule("", root)
             approve = settings.script_command(root, "ccnavi-user-agree.sh")
             self.assertIsNotNone(rule.compiled.search(approve))
-            self.assertIn(approve, rule.message)
-            self.assertNotIn("sh .ccnavi/scripts/", rule.message)
+            said = texts.spoken(rule)
+            self.assertIn(approve, said)
+            self.assertNotIn("sh .ccnavi/scripts/", said)
 
 
 if __name__ == "__main__":

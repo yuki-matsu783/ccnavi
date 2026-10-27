@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import tempfile
 import unittest
 
 from ccnavi.hook import post_report, reasons
+from ccnavi.policy import texts
 from tests import ROOT
 
 ENGLISH_SENTENCE = re.compile(r"\b[A-Za-z]{2,}(?:\s+[A-Za-z']{2,}){3,}")
@@ -48,15 +50,24 @@ class MessageLanguageTest(unittest.TestCase):
         from ccnavi.policy import builtin
         from ccnavi.tickets import ticket_guard
 
-        deletes = {r["id"]: r["message"] for r in builtin._deny("/nonexistent")}
+        with tempfile.TemporaryDirectory() as plain:
+            shutil.copytree(
+                os.path.join(ROOT, ".ccnavi", "messages"),
+                os.path.join(plain, ".ccnavi", "messages"),
+            )
+            deletes = {r.id: texts.spoken(r) for r in builtin.load_base(plain)[0].deny}
         self.assertIn("rmdir", deletes["builtin:recursive-delete"])
         self.assertIn("scratchpad/", deletes["builtin:recursive-delete"])
         self.assertEqual(english_in(deletes["builtin:recursive-delete"]), [])
         with tempfile.TemporaryDirectory() as root:
+            shutil.copytree(
+                os.path.join(ROOT, ".ccnavi", "messages"),
+                os.path.join(root, ".ccnavi", "messages"),
+            )
             os.makedirs(os.path.join(root, ".ccnavi", "scripts"))
             with open(os.path.join(root, ".ccnavi", "scripts", "ccnavi-git.sh"), "w") as f:
                 f.write("")
-            said = ticket_guard.raw_git_rule(root).message
+            said = texts.spoken(ticket_guard.raw_git_rule(root))
         self.assertIn("status・log・diff・show・blame", said)
         self.assertIn("log -5", said)
 
