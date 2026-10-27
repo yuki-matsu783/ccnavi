@@ -31,7 +31,7 @@ def english_in(text: str) -> list[str]:
 class MessageLanguageTest(unittest.TestCase):
     def test_the_detector_finds_an_english_sentence(self):
         self.assertTrue(english_in("note: this is the approved area."))
-        self.assertFalse(english_in("note: 承認済みの置き場です。"))
+        self.assertFalse(english_in("案内: 承認済みの置き場です。"))
 
     def test_internal_error_is_in_japanese(self):
         from ccnavi.infra import hookio

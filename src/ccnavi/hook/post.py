@@ -561,7 +561,7 @@ def _uncounted_line(
     """
     names = sorted(set(uncounted))
     shown = ", ".join(names[:REPORT_LIMIT])
-    trees = f"ワークツリー {shown} "
+    trees = f"ワークツリー {shown}"
     if len(names) > 1:
         trees = f"ワークツリー {len(names)} 本（{shown}）"
     turn = phase_forms.TURN_DEFINED if define else "ターン"

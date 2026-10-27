@@ -29,10 +29,10 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | `DENY_REDIRECT_LIMIT` | `policy/selfguard_shell.py` の旧 `REDIRECT_LIMIT_MESSAGE`（`deny-policy.yml`。判定のときに `hook/judge.py` が引く） | 移した |
 | `NUDGE_TICKET_FINISH`・`NUDGE_TICKET_REQUEST`・`NUDGE_TICKET_FEEDBACK`・`NUDGE_SUBAGENT_OUTCOME`・`NUDGE_STOP_RULE`・`NEXT_STANDING` | `tickets/ops_stop.py`・`ops_stop_request.py`・`ops_stop_feedback.py`・`hook/events.py`・`tickets/standing.py` の `guidance()`（`nudge-stop.yml`） | 移した（共有の `USER_STOP_NOTE` と `subagent_outcome.line()` は値としてコードに残る。`subagent_outcome` は下位の層で文面を引けないので、行だけを返す） |
 | `NEXT_GIT_*`・`NEXT_WORKTREE_*`・`NEXT_STAGE_*`・`NEXT_TICKET_PROPOSED`・`NEXT_CLOSE_EARLY` | `ccnavi-git.sh`・`ccnavi-worktree.sh`・`ccnavi-stage.sh`・`ccnavi-ticket.sh`・`ccnavi-user-close-early.sh` の `次:`（`next-sh.yml`） | 移した（`ccnavi-common-state.sh` の `ccnavi_text` の既定の文は残る） |
-| `RULE_*`（`RULE_RECURSIVE_DELETE`・`RULE_GIT_PUSH`・`RULE_GUARD_*`・`RULE_TICKET_*`・`RULE_RAW_GIT`・`RULE_CREDENTIALS`・`RULE_CONFIG_VIA_BASH`） | `policy/builtin.py`・`policy/selfguard_shell.py`・`tickets/ticket_guard.py`・`tickets/phase_forms.py` の組み込みルールの文（`deny-builtin-rules.yml`） | 移した（ルールが識別子と値と場合を持ち、拒否に当たった回に `texts.spoken` が引く。`hook/post_findings.py` の英語の文は残る） |
+| `RULE_*`（`RULE_RECURSIVE_DELETE`・`RULE_GIT_PUSH`・`RULE_GUARD_*`・`RULE_TICKET_*`・`RULE_RAW_GIT`・`RULE_CREDENTIALS`・`RULE_CONFIG_VIA_BASH`） | `policy/builtin.py`・`policy/selfguard_shell.py`・`tickets/ticket_guard.py`・`tickets/phase_forms.py` の組み込みルールの文（`deny-builtin-rules.yml`） | 移した（ルールが識別子と値と場合を持ち、拒否に当たった回に `texts.spoken` が引く。`hook/post_findings.py` の英語の文は `RULE_TICKET_SCOPE__*` として `deny-post.yml` に英語のまま写した） |
 | `NOTICE_FALLEN_BACK`・`NOTICE_UNDECLARED__*`（`ASK`・`DENY`・`UNREADABLE_ASK`・`UNREADABLE_DENY`） | `hook/reasons.py` の `fallen_back`・`undeclared`（`notice.yml`） | 移した（新しい種類 `notice`。見出し `[ccnavi] UNDECLARED (source: …)` と `subject:` の行はコードに残る。`undeclared` は結末（ask／deny）と、読み切れたかどうかで識別子を分け、退避した回は `what` の `fell_back` を選ぶ。`undeclared` が組まれるのは、どのルールも言及せず ask か deny になった呼び出しのときで、そこに文面ファイルの冷たい読みが加わる） |
 | `NOTICE_POST_*`・`NOTE_POST_APPROVED_AREA`・`NOTE_POST_PREEXISTING`・`RULE_TICKET_SCOPE__*` | `hook/post.py`・`post_report.py`・`post_findings.py` の実行後の報告（`notice.yml`・`deny-post.yml`） | 移した（`path:`・`tree:`・`after:` などの状態の行と、ターンの終わりの報告の「どのパスを戻すか」の断片はコードに残る。`note:` の行は `案内:` で出る。`RULE_TICKET_SCOPE__*` は英語の文のまま） |
-| `DENY_SHELL_WORKSPACE_ROOT` | `hook/rootwrite.py`（`deny-post.yml`） | 移した |
+| `DENY_SHELL_WORKSPACE_ROOT` | `hook/rootwrite.py`（`deny-post.yml`） | 移した（4 欄に分けたので、`なぜ:`・`次:`・`迂回しない:` の行で出る。`迂回しない` は元の文に無く、足した） |
 | `NOTICE_DOCS_GUIDE`・`NOTICE_DOCS_FAIL_STREAK_LEAD`・`NOTICE_DOCS_FRONTMATTER__*` | `hook/docsearch.py` の索引の案内と、frontmatter が無い md を書いたときの案内（`notice.yml`） | 移した（`stderr` の診断は残る） |
 
 ## 残り
@@ -76,7 +76,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 - ラッパーの有無で文が分かれるのは、`builtin.py` の 5 系統（再帰削除、push、reset、`.git` の 2 本（同じ文）、設定のシェル書き込み）と `ticket_guard.py` の生の git
 - 実行前の判定 1 回（`--test Bash ls`）で作られる `Rule` は 39 本。`message` つきは 29 本で、うち `builtin:` は 24 本（`builtin.py` 6、`selfguard_shell.py` 10、`ticket_guard.py` 7、`phase_forms.py` 1）。`Write`・`Read` では 23 本
 - 組み立ての呼び出しは、判定 1 回で `builtin.load_base` 1、`selfguard_shell.add_rules` 1、`add_named_rules` 1、`rules.parse` 11〜12、`selfguard_shell._insert` 9〜10（`Bash` は 1 つ多い）。実行後の保護範囲（`events.watched_for`）は、触ったツリーごとに `load_rules` と `add_named_rules` を呼ぶ（測っていない。コードから）
-- `Rule.spoken_message()` を呼ぶのは 3 か所: `hook/reasons.py` の `reason_for`、`hook/post_report.py` の `_messages`、`tickets/session_rejects.py`
+- ルールの文を引く `texts.spoken(rule)` を呼ぶのは 3 か所: `hook/reasons.py` の `reason_for`、`hook/post_report.py` の `_messages`、`tickets/session_rejects.py`
 
 ### 項目 1: 組み込みルールの文
 
@@ -127,7 +127,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 
 ### 項目 4: 種類を決められない通知
 
-- `undeclared`・`fallen_back` は、新しい種類 `notice`（識別子の頭は `NOTICE_`）を足して移す。必須は `what`、任意は `why` `next` `note`。出力は `deny` と同じ見出し（`次: `）を使う。`nudge` に入れないのは、`nudge` の識別子は記録の `code` と同じという決まりがあり、`UNDECLARED` の見出し（`[ccnavi] UNDECLARED (source: …)`。読み切れなかった回は `PARSE_UNCERTAIN`）と `subject:` の行はコードに残るため。`undeclared` は、読み切れたかどうかと ask／deny の組（4 通り）と、`{then}` の 2 通りを場合分けにする
+- `undeclared`・`fallen_back` は、新しい種類 `notice`（識別子の頭は `NOTICE_`）を足して移す。必須は `what`、任意は `why` `next` `note`。`why` `next` を書けば `deny` と同じ見出し（`なぜ: `・`次: `）で出る。`nudge` に入れないのは、`nudge` の識別子は記録の `code` と同じという決まりがあり、`UNDECLARED` の見出し（`[ccnavi] UNDECLARED (source: …)`。読み切れなかった回は `PARSE_UNCERTAIN`）と `subject:` の行はコードに残るため。`undeclared` は、読み切れたかどうかと ask／deny の組（4 通り）を識別子で分け、退避した回かどうかを `what` の場合（`rules`・`fell_back`）で分ける
 - 実装に入る前に、2 つを確かめる
   - `undeclared` は、ルールが言及せず ask か deny になった呼び出しのたびに文を組む（通した回と、判定を渡した回は組まない）。頻度は測っていない。移すと、その呼び出しに冷たい読み約 45 ms が加わる。まず受け入れて出し（決めたこと）、PR にこの数字を書く。遅さが問題になったら、文面ファイルを必要な 1 本だけ読む形に直す。冷たい読みは YAML の読みが大半（約 33 ms）で、重複した識別子の検査は全ファイルを読む前提なので、その形にするなら検査を別（`--lint`）に回す
   - 英語の文面は整理が別に進んでいる。移すときは文をそのまま写す。言い換えは整理の側で、文面ファイルの上で直す

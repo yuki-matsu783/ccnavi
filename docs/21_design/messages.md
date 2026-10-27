@@ -78,7 +78,7 @@ messages:
 | `deny`（組み込みルール） | `RULE_<ルールの id>`。記録の `code` とは別（記録の `code` は `DENY_COMMAND` など、根拠の種類）。ルールが識別子と値と場合を持ち、拒否に当たった回に `texts.spoken` が引く | `RULE_GIT_PUSH`、`RULE_GUARD_HOOKS` |
 | `nudge` | 記録の `code` と同じ（`NUDGE_*`） | `NUDGE_INTEGRATE__CONFIRM` |
 | `next`・`choices`・`note` | `NEXT_*`・`CHOICES_*`・`NOTE_*`。出力元の名前を 2 語目に置く | `NEXT_START_DRY_RUN` |
-| `notice` | `NOTICE_*`。記録の `code` とは別。出力元の名前を 2 語目に置く。場合を結末や状態で分けるときは `__` | `NOTICE_UNDECLARED__ASK` |
+| `notice` | `NOTICE_*`。記録の `code` とは別（記録の `code` や見出しの理由コードに `NOTICE_` で始まるものがあっても、文面の識別子ではない）。sh からは引かない。出力元の名前を 2 語目に置く。場合を結末や状態で分けるときは `__` | `NOTICE_UNDECLARED__ASK` |
 
 同じコードで文が分かれる場合（ホストの種類、段、操作）だけ `__` で分ける。コードを分けない（判定の根拠の種類は 1 つ）。
 
