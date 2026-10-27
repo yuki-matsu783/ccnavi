@@ -43,8 +43,9 @@ class MessageLanguageTest(unittest.TestCase):
         self.assertEqual(english_in(reasons.internal_error_notice("X", "Stop", "E", "/log")), [])
 
     def test_approved_hint_is_in_japanese(self):
-        self.assertEqual(english_in(post_report.APPROVED_HINT), [])
-        self.assertIn("承認済み", post_report.APPROVED_HINT)
+        hint = texts.say(ROOT, "NOTE_POST_APPROVED_AREA")
+        self.assertEqual(english_in(hint), [])
+        self.assertIn("承認済み", hint)
 
     def test_refusal_texts_keep_their_hints(self):
         from ccnavi.policy import builtin

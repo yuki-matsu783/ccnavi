@@ -18,8 +18,7 @@ from __future__ import annotations
 
 import os
 
-from ..infra import settings
-from ..policy import rules
+from ..policy import rules, texts
 from . import parentwrite
 
 CODE = "DENY_SHELL_WORKSPACE_ROOT"
@@ -57,14 +56,10 @@ def check(
 
 
 def message(root: str, target: str, path: str, origin: str = "") -> str:
-    worktree_sh = settings.script_command(root, "ccnavi-worktree.sh")
-    return (
-        f"シェルでチェックアウトしたブランチ直下（{path}）へ書き込む形です"
-        f"（書き込み先: {target}" + (f"。読んだ箇所: {origin}" if origin else "") + "）。"
-        "Write / Edit と同じく、ここには書きません。"
-        "ユーザに渡すものはワークスペースルート直下の wip/handoff/、"
-        "一時的なもの・コミットしたくないものは同じく直下の scratchpad/ に書いてください"
-        "（.ccnavi/docs/scratchpad.md）。"
-        f"リポジトリのファイルを直すときは、{worktree_sh} <名前> でワークツリーを切り、"
-        "その中で編集します。"
+    """止めた理由。文は文面ファイルが持つ（`DENY_SHELL_WORKSPACE_ROOT`）。"""
+    return texts.say(
+        root,
+        CODE,
+        {"target": target, "path": path, "origin": origin},
+        {"what": "origin" if origin else "plain"},
     )

@@ -38,6 +38,7 @@ NUDGE = "nudge"
 NEXT = "next"
 CHOICES = "choices"
 NOTE = "note"
+NOTICE = "notice"
 
 # 種類ごとの（必須の欄, 任意の欄）。順は出力の行の順。
 FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
@@ -46,6 +47,8 @@ FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     NEXT: (("next",), ("note",)),
     CHOICES: (("items",), ()),
     NOTE: (("note",), ()),
+    # 止めない通知。判定の見出し（コードと出所）と対象の行はコードに残し、本文だけを持つ。
+    NOTICE: (("what",), ("why", "next", "note")),
 }
 
 # `RULE_` の文（組み込みルールの文）は、`what` だけが必須で、ほかの欄は省くか空にしてよい。
@@ -59,7 +62,7 @@ RULE_PREFIX = "RULE_"
 RULE_ASK = "RULE_ASK"
 
 # 識別子の頭と種類。拒否のコード（`DENY_*`・`RULE_ASK`）と促しのコード（`NUDGE_*`）は、
-# 記録の `code` と同じ。
+# 記録の `code` と同じ。通知（`NOTICE_*`）は止めない文で、記録の `code` とは別。
 PREFIXES: dict[str, str] = {
     "DENY_": DENY,
     "RULE_": DENY,
@@ -67,6 +70,7 @@ PREFIXES: dict[str, str] = {
     "NEXT_": NEXT,
     "CHOICES_": CHOICES,
     "NOTE_": NOTE,
+    "NOTICE_": NOTICE,
 }
 
 # 出力で欄の前に付ける語。`what` と `items` は付けない（`items` は番号を付ける）。
@@ -536,6 +540,8 @@ def fallback(text_id: str) -> str:
     )
     if kind == NOTE:
         return NOTE_LABEL + gone
+    if kind == NOTICE:
+        return f"{gone}\n{LABELS['next']}{ask}"
     if kind == CHOICES:
         return f"{CHOICES_HEAD}\n  1. {ask}（{gone}）"
     if kind == NEXT:

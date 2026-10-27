@@ -22,7 +22,7 @@ keywords: [文面, 文面ファイル, messages, 識別子, 差し込み, ccnavi
 | `policy/texts.py` | 読み込み、検査、差し込み、組み立て、壊れたときの既定の文 | 判定 |
 | `ccnavi text` | sh から `texts` を引く入口 | 文面ファイルの直接の読み書き |
 
-組み込みの拒否・促し（Python）は `texts.say` を呼ぶ。組み込みルールの文は、ルールが識別子と値を持ち、拒否に当たった回に `texts.spoken` が引く（13.4）。まだ移していない文（ルールの `message`、種類を決められない通知など）は呼ばず、[文面の移行の一覧](../42_claude/message-migration.md)にある。sh は文面ファイルを読まず、`ccnavi text` を `ccnavi_text`（`ccnavi-common-state.sh`）で呼ぶ。
+組み込みの拒否・促し（Python）は `texts.say` を呼ぶ。通知（`NOTICE_*`）は、見出し（`[ccnavi] <コード> (…)`）と `subject:` などの状態の行をコードに残し、本文を `texts.say` で引く。組み込みルールの文は、ルールが識別子と値を持ち、拒否に当たった回に `texts.spoken` が引く（13.4）。まだ移していない文（ルールの `message`、種類を決められない通知など）は呼ばず、[文面の移行の一覧](../42_claude/message-migration.md)にある。sh は文面ファイルを読まず、`ccnavi text` を `ccnavi_text`（`ccnavi-common-state.sh`）で呼ぶ。
 
 ### 13.2 置き場とレイヤー
 
@@ -60,6 +60,7 @@ messages:
 | `next` | 出力の次の一手 | `next` | `note` | `次: next` / `案内: note` |
 | `choices` | 次の一手が 1 つに決まらないとき | `items`（2 件以上） | | `次の手:` と `  1. …` の番号つき |
 | `note` | 条件つきで足す 1 件の補足 | `note` | | `案内: note` |
+| `notice` | 止めない通知（見出しと状態の行はコードに残し、本文だけ） | `what` | `why` `next` `note` | `what` / `なぜ: why` / `次: next` / `案内: note`（`what` だけなら本文がそのまま 1 行で出る） |
 
 - どの種類も `values` を持つ（空でもよい）。文面に書いた差し込みの名前の全部と一致する
 - `what` `why` `next` `no_bypass` は 1 行。`note` は複数行でよく、1 行ごとに `案内: ` を付けて出す。`items` の 1 件は 1 行
@@ -77,6 +78,7 @@ messages:
 | `deny`（組み込みルール） | `RULE_<ルールの id>`。記録の `code` とは別（記録の `code` は `DENY_COMMAND` など、根拠の種類）。ルールが識別子と値と場合を持ち、拒否に当たった回に `texts.spoken` が引く | `RULE_GIT_PUSH`、`RULE_GUARD_HOOKS` |
 | `nudge` | 記録の `code` と同じ（`NUDGE_*`） | `NUDGE_INTEGRATE__CONFIRM` |
 | `next`・`choices`・`note` | `NEXT_*`・`CHOICES_*`・`NOTE_*`。出力元の名前を 2 語目に置く | `NEXT_START_DRY_RUN` |
+| `notice` | `NOTICE_*`。記録の `code` とは別。出力元の名前を 2 語目に置く。場合を結末や状態で分けるときは `__` | `NOTICE_UNDECLARED__ASK` |
 
 同じコードで文が分かれる場合（ホストの種類、段、操作）だけ `__` で分ける。コードを分けない（判定の根拠の種類は 1 つ）。
 
@@ -169,7 +171,8 @@ ccnavi のリポジトリのテストは、次も見る（呼ぶ側が手元の�
 
 この設計に沿って、次を文面ファイルに移した。残りと進め方は `docs/42_claude/message-migration.md` の一覧表と「残りの進め方」が持つ。
 
-- 拒否: 組み込みルールの文（`RULE_*`。`builtin:` で始まる id のルール。判定のたびに組み立てるので、識別子と値だけを持たせ、拒否に当たった回に引く）、組み込みの拒否の大半（`DENY_TICKET_*`・`DENY_PHASE_REVIEW`・`DENY_NEEDS_USER_TURN`・`DENY_AGENT_*`・ラッパーと関門の `DENY_*`・書き直しを求める拒否・`DENY_REDIRECT_LIMIT`）と、確認の理由（`RULE_ASK`）
+- 拒否: シェルからルート直下へ書く形（`DENY_SHELL_WORKSPACE_ROOT`）、承認された作業範囲の外の報告（`RULE_TICKET_SCOPE__*`）、組み込みルールの文（`RULE_*`。`builtin:` で始まる id のルール。判定のたびに組み立てるので、識別子と値だけを持たせ、拒否に当たった回に引く）、組み込みの拒否の大半（`DENY_TICKET_*`・`DENY_PHASE_REVIEW`・`DENY_NEEDS_USER_TURN`・`DENY_AGENT_*`・ラッパーと関門の `DENY_*`・書き直しを求める拒否・`DENY_REDIRECT_LIMIT`）と、確認の理由（`RULE_ASK`）
+- 通知: `fallen_back`・`undeclared`（`NOTICE_FALLEN_BACK`・`NOTICE_UNDECLARED__*`）、実行後の報告の案内（`NOTICE_POST_*`・`NOTE_POST_*`）、md の索引の案内（`NOTICE_DOCS_*`）。`internal_error_notice` は、ccnavi 自身に不具合があるときに出る文で、文面ファイルに頼らないので移さない
 - 促し: `NUDGE_INTEGRATE`・`NUDGE_TICKET_*`・`NUDGE_SUBAGENT_OUTCOME`・`NUDGE_STOP_RULE`、`standing` の案内
 - sh の `次:`: `ccnavi-start.sh` の `次:` と `次の手:` の全部、`ccnavi_pf_next`（事前確認）、`ccnavi-git.sh`・`ccnavi-worktree.sh`・`ccnavi-stage.sh`・`ccnavi-ticket.sh`・`ccnavi-user-close-early.sh` の `次:`
 

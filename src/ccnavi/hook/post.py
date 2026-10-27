@@ -50,7 +50,7 @@ from dataclasses import dataclass
 from typing import TextIO
 
 from ..infra import fsio, gitstate, hookio, pathcase, settings, tree
-from ..policy import rules, selfguard
+from ..policy import rules, selfguard, texts
 from ..records import audit
 from ..tickets import (
     phase_forms,
@@ -313,22 +313,23 @@ def check(
             git=git,
             shadowed=f.key() in shadowed,
             side_by_side=_in_side(f, side_roots) and _restorable(f),
+            root=root,
         )
         for f in fresh
     ]
     # 件数の上限は下の `shown` で切る。ここで切ると、落とした件数が「ほか N 件」に入らない。
-    blocks += [post_report._preexisting(f) for f in carried]
+    blocks += [post_report._preexisting(f, root) for f in carried]
     if not blocks:
         return "", tried
 
     shown, dropped = blocks[:REPORT_LIMIT], len(blocks) - REPORT_LIMIT
     if dropped > 0:
         shown.append(
-            f"[ccnavi] 保護対象の変更のうち、あと {dropped} 件のパスはここに載せていません。"
-            + (
-                f"戻す前に '{git} status' で残りを確かめてください。"
-                if git
-                else "戻す前に、git status で残りを確かめるようユーザに頼んでください。"
+            texts.say(
+                root,
+                "NOTICE_POST_DROPPED",
+                {"dropped": str(dropped), "git": git or ""},
+                {"what": "git" if git else "plain"},
             )
         )
     return "\n\n".join(shown), tried
@@ -488,7 +489,7 @@ def at_stop(
         # 違反は無いが、数えていないツリーがある。そのことだけを言う。
         record.decision, record.enforced = audit.ALLOW, True
         _add_detail(record, f"uncounted {len(uncounted)}")
-        return _uncounted_line(uncounted, git=git)
+        return _uncounted_line(uncounted, git=git, root=root)
 
     record.decision, record.enforced = audit.DENY, True
     record.code = post_findings.record_code(found)
@@ -531,14 +532,12 @@ def at_stop(
             f" 対象のルール: {rules.record_name(rule)} /{origin} {how}"
         )
     if len(found) > REPORT_LIMIT:
-        all_at = (
-            f"全部は {git} status に出ます。"
-            if git
-            else "全部はユーザに git status で確かめてもらってください。"
+        all_at = texts.say(
+            root, "NOTICE_POST_ALL_AT", {"git": git or ""}, {"what": "git" if git else "plain"}
         )
         lines.append(f"  ほか {len(found) - REPORT_LIMIT} 件。{all_at}")
     if uncounted:
-        lines.append(_uncounted_line(uncounted, define=False, git=git))
+        lines.append(_uncounted_line(uncounted, define=False, git=git, root=root))
         _add_detail(record, f"uncounted {len(uncounted)}")
     return "\n".join(lines)
 
@@ -552,7 +551,9 @@ def _add_detail(record: audit.Record, note: str) -> None:
         record.detail = f"{record.detail}; {note}" if record.detail else note
 
 
-def _uncounted_line(uncounted: list[str], *, define: bool = True, git: str | None = None) -> str:
+def _uncounted_line(
+    uncounted: list[str], *, define: bool = True, git: str | None = None, root: str = ""
+) -> str:
     """コミット済みを数えなかったツリーを言う 1 行。
 
     数えていないことを言わないと、そのツリーで何も起きなかったのと見分けが付かない。
@@ -564,20 +565,11 @@ def _uncounted_line(uncounted: list[str], *, define: bool = True, git: str | Non
     if len(names) > 1:
         trees = f"ワークツリー {len(names)} 本（{shown}）"
     turn = phase_forms.TURN_DEFINED if define else "ターン"
-    return (
-        f"[ccnavi] ccnavi は{turn}ごとに、その間に作られたコミットが保護領域のファイルを"
-        "変更していないかを確認します。"
-        f"{trees}では、今回のターンでこの確認ができませんでした。"
-        "ターン開始時の HEAD が記録されていないか、差分を読み取れなかったためです。"
-        "ターンの途中で作り、一度も触らなかったワークツリーでよく起きます。"
-        "このツリーでコミットしていなければ対応は不要です。"
-        + (
-            "コミットした場合は、保護領域のファイルを変更していないか"
-            f"`{git} log` で確認してください。"
-            if git
-            else "コミットした場合は、保護領域のファイルを変更していないか"
-            "ユーザに確かめてもらってください。"
-        )
+    return texts.say(
+        root,
+        "NOTICE_POST_UNCOUNTED",
+        {"turn": turn, "trees": trees, "git": git or ""},
+        {"what": "git" if git else "plain"},
     )
 
 

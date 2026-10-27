@@ -117,6 +117,24 @@ class TextsTest(unittest.TestCase):
         self.assertEqual(texts.fields_for("RULE_ASK", texts.DENY), texts.FIELDS[texts.DENY])
         self.assertEqual(texts.fields_for("RULE_GIT_PUSH", texts.DENY), texts.RULE_LOOSE_FIELDS)
 
+    def test_a_notice_is_the_body_only_and_a_missing_one_gives_a_short_fallback(self):
+        put(
+            self.root,
+            "common",
+            "n.yml",
+            "version: 1\nmessages:\n  NOTICE_SAMPLE:\n    kind: notice\n    values: [name]\n"
+            "    what: \"[ccnavi] {name} を読めませんでした。\"\n    next: 打ち直す\n",
+        )
+        self.assertEqual(texts.load(self.root).problems, [])
+        self.assertEqual(
+            texts.say(self.root, "NOTICE_SAMPLE", {"name": "x"}),
+            "[ccnavi] x を読めませんでした。\n次: 打ち直す",
+        )
+        gone = texts.say(self.root, "NOTICE_NOTHING")
+        self.assertIn("NOTICE_NOTHING", gone)
+        self.assertEqual(len(texts.lines_of(gone)), 1)
+        self.assertNotIn("止めた", gone)
+
     def test_a_missing_value_gives_the_fallback(self):
         out = texts.say(self.root, "DENY_SAMPLE", {"name": "x"})
         self.assertIn("引けませんでした", out)
