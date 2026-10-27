@@ -302,6 +302,44 @@ class HookTextsTest(unittest.TestCase):
                     self.assertNotIn("{", said)
 
 
+class ShNotesTest(unittest.TestCase):
+    """sh の `案内:`（note-sh.yml）は、値を埋めると `案内: ` の行だけになり、`次:` の行を足さない。
+
+    `次:` の行は、出力の終わりの 1 行に決まっている（script-output.md）。案内が `次:` を足すと、
+    その数が崩れる。
+    """
+
+    def test_every_note_renders_as_note_lines_only(self):
+        catalog = texts.load(ROOT)
+        path = os.path.join(ROOT, ".ccnavi", "messages", "note-sh.yml")
+        with open(path, encoding="utf-8") as f:
+            ids = re.findall(r"^  (NOTE_[A-Z0-9_]+):$", f.read(), re.M)
+        self.assertGreaterEqual(len(ids), 25)
+        for ident in ids:
+            with self.subTest(ident=ident):
+                entry = catalog.entries[ident]
+                said = texts.say(ROOT, ident, {name: "v" for name in entry.values})
+                self.assertNotIn("引けませんでした", said)
+                self.assertNotIn("{", said)
+                self.assertEqual(texts.lines_of(said), [])
+                for line in said.splitlines():
+                    self.assertTrue(line.startswith(texts.NOTE_LABEL), line)
+
+    def test_sh_calls_the_notes_it_moved(self):
+        """移した `案内:` を sh が引く。引く識別子は文面ファイルにあり、値の名前が合う（上の点検）。"""
+        called = {ident for ident, _, _ in sh_calls() if ident.startswith("NOTE_")}
+        for ident in (
+            "NOTE_GIT_INTEGRATE_CONFLICT",
+            "NOTE_GIT_MERGE_ON_TARGET_ALLOWED",
+            "NOTE_WORKTREE_RECORD_MISSING",
+            "NOTE_START_TEMPLATES",
+            "NOTE_STAGE_NONINTERACTIVE",
+            "NOTE_SYNC_RETIRED_UNANSWERED",
+            "NOTE_TICKET_NEW_ISSUE",
+        ):
+            self.assertIn(ident, called)
+
+
 class SharedRulesWordingTest(unittest.TestCase):
     """同梱の rules.yml の文面。ユーザとエージェントに見える文に ADR 番号を書かない。
 
