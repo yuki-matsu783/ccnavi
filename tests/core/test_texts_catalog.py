@@ -305,8 +305,7 @@ class HookTextsTest(unittest.TestCase):
 class ShNotesTest(unittest.TestCase):
     """sh の `案内:`（note-sh.yml）は、値を埋めると `案内: ` の行だけになり、`次:` の行を足さない。
 
-    `次:` の行は、出力の終わりの 1 行に決まっている（script-output.md）。案内が `次:` を足すと、
-    その数が崩れる。
+    `次:` の行は 1 行と数える（script-output.md）。案内が `次:` を足すと、その数が崩れる。
     """
 
     def test_every_note_renders_as_note_lines_only(self):

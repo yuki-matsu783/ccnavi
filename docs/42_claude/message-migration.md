@@ -116,8 +116,8 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | 3 | `hook/post.py`・`post_report.py`・`post_findings.py` の次の一手 | 移す。`stderr.write` の状態の報告は残す | 実行後のチェックで、書き込みのたびに戻し方や取り込み前の確かめ方を言う。`post_findings.py` は英語の文。`post_report._messages` の組み込みルールの文は項目 1 で一緒に移る |
 | 4 | `tickets/ops.py`・`agree_screen.py`（`次:`） | 移す | チケットの操作ごとに出る `次:`。`ops.py` に 4 件 |
 | 5 | `tickets/approval_checks.py` | 移す | 承認の依頼の前提が満たされないときに返る。直し方を言う文が約 18 件 |
-| 6 | sh の `案内:` のうち `ccnavi-git.sh`（`printf '案内:` が 15 本） | 移す | 取り込み（integrate）の経路で、チケットごとに出る。状態の報告（1 本）は残す |
-| 7 | sh の `案内:` のうち `ccnavi-worktree.sh`（11 本）、`ccnavi-start.sh`（9 本）、`ccnavi-stage.sh`・`ccnavi-sync.sh`・`ccnavi-ticket.sh` | 移す。`ccnavi-dirs.sh` の見出し 2 本、`issue は closed`（状態）、依頼文を消した報告は残す | ワークツリーの作成・着手でチケットごとに 1 回 |
+| 6 | sh の `案内:` のうち `ccnavi-git.sh`（`printf '案内:` が 15 本） | 移した | 取り込み（integrate）の経路で、チケットごとに出る。状態の報告（1 本）は残す |
+| 7 | sh の `案内:` のうち `ccnavi-worktree.sh`（11 本）、`ccnavi-start.sh`（9 本）、`ccnavi-stage.sh`・`ccnavi-sync.sh`・`ccnavi-ticket.sh` | 移した。`ccnavi-dirs.sh` の見出し 2 本、`issue は closed`（状態）、依頼文を消した報告は残す | ワークツリーの作成・着手でチケットごとに 1 回 |
 | 8 | `tickets/review.py`・`phase.py` の CLI の stderr の次の手 | 移す。`ccnavi: …を読めない` などの状態の報告は残す | レビューとフェーズの操作でだけ出る |
 | 9 | `hook/rootwrite.py` の `message()`（`DENY_SHELL_WORKSPACE_ROOT`） | 移す | 1 件。`turngate` と同じく判定の時点で引けるので、仕組みの変更は要らない |
 | 10 | `hook/docsearch.py` の使い方の案内（3 か所） | 移す。`stderr.write` の「引かない」理由は残す | `--docs` を使う場面でだけ出る |

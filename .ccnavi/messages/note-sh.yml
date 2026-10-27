@@ -17,7 +17,7 @@ messages:
     kind: note
     values: [wt, base, name, self_q]
     note: |-
-      ワークツリー（{wt}）の中で {self_q} merge {base} を実行して衝突を解いてコミットしてから、{self_q} integrate {name} を再実行します。
+      ワークツリー（{wt}）の中で {self_q} merge {base:sh} を実行して衝突を解いてコミットしてから、{self_q} integrate {name:sh} を再実行します。
 
   # 取り込み結果を一時ワークツリーに用意した後（常に出る 2 本と、条件つきの 4 本）。
   NOTE_GIT_INTEGRATE_SAVE_EDITS:
@@ -60,32 +60,32 @@ messages:
     kind: note
     values: [self_q, name]
     note: |-
-      直接作業の記録は残した。作業を続けて、もう一度 {self_q} integrate {name} を打てる
+      直接作業の記録は残した。作業を続けて、もう一度 {self_q} integrate {name:sh} を打てる
 
   # integrate-done（片付け）
   NOTE_GIT_DONE_STOPPED:
     kind: note
     values: [self_q, name]
     note: |-
-      取り込み自体は成功している。原因を片付けてから、ユーザのチェックアウトで {self_q} integrate-done {name} を再実行すると、済んだところを飛ばして続きから進む
+      取り込み自体は成功している。原因を片付けてから、ユーザのチェックアウトで {self_q} integrate-done {name:sh} を再実行すると、済んだところを飛ばして続きから進む
 
   NOTE_GIT_DONE_COMMIT_FAILED:
     kind: note
     values: [self_q, name]
     note: |-
-      原因を直してから {self_q} integrate-done {name} -m '<メッセージ>' を再実行します。
+      原因を直してから {self_q} integrate-done {name:sh} -m '<メッセージ>' を再実行します。
 
   NOTE_GIT_DONE_HOOK_CHANGED:
     kind: note
     values: [self_q, name]
     note: |-
-      フックが何を変えたかをユーザに確かめてもらう。{self_q} integrate --abort {name} で戻せる。
+      フックが何を変えたかをユーザに確かめてもらう。{self_q} integrate --abort {name:sh} で戻せる。
 
   NOTE_GIT_DONE_FF_FAILED:
     kind: note
     values: [self_q, name, short]
     note: |-
-      原因を直してから、同じコマンド（{self_q} integrate-done {name}）を再実行すると、K（{short}）から再開する。
+      原因を直してから、同じコマンド（{self_q} integrate-done {name:sh}）を再実行すると、K（{short}）から再開する。
 
   # 統合先のユーザのチェックアウトでの merge・pull を断った理由に続ける案内（`次:` の行のあと）。
   NOTE_GIT_MERGE_ON_TARGET_ALLOWED:
@@ -97,7 +97,7 @@ messages:
     kind: note
     values: [integ]
     note: |-
-      統合先の更新（引数なしの pull と pull [--ff-only] <リモート> {integ}）と、統合先でないブランチ・ワークツリーでの pull は、ここでも実行できます。
+      統合先の更新（引数なしの pull と pull [--ff-only] <リモート> {integ:sh}）と、統合先でないブランチ・ワークツリーでの pull は、ここでも実行できます。
 
   # ワークツリーを消せなかったとき（Windows で、cwd がワークツリーの中にあるとき）。
   NOTE_GIT_WORKTREE_REMOVE_CWD:
@@ -146,7 +146,7 @@ messages:
     kind: note
     values: [target]
     note: |-
-      リモート未確認で切った。つながったら ccnavi-git.sh fetch origin {target} で確かめ、遅れていれば取り込む前に合わせる。ユーザにも伝える
+      リモート未確認で切った。つながったら {script:ccnavi-git.sh} fetch origin {target:sh} で確かめ、遅れていれば取り込む前に合わせる。ユーザにも伝える
 
   # ワークスペースのルートで切ったときに、projects/ の下にリポジトリがある場合。
   NOTE_WORKTREE_PROJECTS_HINT:
