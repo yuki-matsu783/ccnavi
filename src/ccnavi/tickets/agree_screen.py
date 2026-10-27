@@ -6,7 +6,7 @@ agree から分けた。agree を読まない。
 from __future__ import annotations
 
 from ..infra import settings
-from ..policy import rules
+from ..policy import rules, texts
 from . import (
     agree_candidates,
     agree_digest,
@@ -57,18 +57,15 @@ def approved_text(
     # 最初の子の着手で止まってから読むことになる。ただし勧めるのは、この回に承認された
     # 親が居るときだけ。改版と子だけの回で `start <親>` を勧めると、親は着手済みなので
     # 案内どおりに打つと「着手済み」で終わる。
-    guide = "次: 後工程を進める。"
-    if any(not t.is_child and t.ticket not in revisions for t in tickets):
-        guide += f"親は自分のワークツリーで '{ticket_sh} start <親>' を先に実行してください。"
-    if any(t.is_child for t in tickets) and worktrees is None:
-        guide += (
-            "子はワークツリー .claude/worktrees/<識別子> を親のブランチから切り、"
-            f"'{ticket_sh} start <識別子>' で開始してください（親が未着手だと止まります）。"
-        )
-    elif any(t.is_child for t in tickets):
-        guide += (
-            f"子は'{ticket_sh} start <識別子>' で開始してください（親が未着手だと止まります）。"
-        )
+    has_parent = any(not t.is_child and t.ticket not in revisions for t in tickets)
+    has_child = any(t.is_child for t in tickets)
+    if not has_child:
+        case = "parent" if has_parent else "plain"
+    elif worktrees is None:
+        case = "parent_child" if has_parent else "child"
+    else:
+        case = "parent_child_wt" if has_parent else "child_wt"
+    guide = texts.say(root, "NEXT_AGREE_FOLLOWUP", variants={"next": case})
     lines.append(guide)
     if worktrees is not None:
         git_sh = settings.script_command(root, "ccnavi-git.sh")
