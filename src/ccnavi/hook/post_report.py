@@ -27,7 +27,7 @@ def _violation(
     shadowed: bool = False,
     side_by_side: bool = False,
     *,
-    root: str = "",
+    root: str,
 ) -> str:
     """1 件を、それだけで読んで成立する差し戻しの文に組む。
 
@@ -110,7 +110,7 @@ def _in_approved_area(path: str) -> bool:
     return f"/{path.replace(chr(92), '/').lower()}".find("/.ccnavi/approved/") >= 0
 
 
-def _preexisting(finding: post_findings.Finding, root: str = "") -> str:
+def _preexisting(finding: post_findings.Finding, root: str) -> str:
     """セッションが始まる前から在った変更につける文。
 
     戻すなと書く。ここを書き落とすと、受け取った側は違反と同じ形の通知を読んで
