@@ -1,6 +1,6 @@
 # sh（ccnavi-git.sh・ccnavi-worktree.sh・ccnavi-start.sh・ccnavi-stage.sh・ccnavi-sync.sh・ccnavi-ticket.sh）が
-# 標準出力・標準エラーに出す `案内:`。条件（いつ出すか）と状態の報告は sh 側にある。
-# `案内: ` の見出しは組み立てる側が付ける。値のうち、sh が引用を済ませたもの（`$SELF_Q`）は名前を `_q` で終える。
+# 標準出力・標準エラーに出す `案内:`。いつ出すかの条件と状態の報告は sh 側にある。
+# `案内: ` の見出しは、文を組み立てる側が付ける。sh が引用を済ませた値（`$SELF_Q` など）は、名前の末尾を `_q` にする。
 # 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
 version: 1
 messages:
@@ -19,7 +19,7 @@ messages:
     note: |-
       ワークツリー（{wt}）の中で {self_q} merge {base} を実行して衝突を解いてコミットしてから、{self_q} integrate {name} を再実行します。
 
-  # 取り込み結果を一時ワークツリーに用意したあと（常に出る 2 本と、条件つきの 4 本）。
+  # 取り込み結果を一時ワークツリーに用意した後（常に出る 2 本と、条件つきの 4 本）。
   NOTE_GIT_INTEGRATE_SAVE_EDITS:
     kind: note
     note: |-
@@ -99,7 +99,7 @@ messages:
     note: |-
       統合先の更新（引数なしの pull と pull [--ff-only] <リモート> {integ}）と、統合先でないブランチ・ワークツリーでの pull は、ここでも実行できます。
 
-  # ワークツリーを消せなかったとき（Windows で cwd がワークツリーの中にある）。
+  # ワークツリーを消せなかったとき（Windows で、cwd がワークツリーの中にあるとき）。
   NOTE_GIT_WORKTREE_REMOVE_CWD:
     kind: note
     values: [ws, self_q, path_q]
@@ -107,14 +107,14 @@ messages:
       ワークツリーのディレクトリを削除できませんでした。Windows では、シェルの cwd がその中にあると削除できません（Bash ツールの cwd は呼び出しをまたいで残り、サブシェルの中の cd では動きません）。cwd をワークスペースルートに戻す cd を単独で打ち（cd {ws:path}）、{self_q} worktree list で登録が外れたかを確かめてください。外れていて空のディレクトリだけが残っていれば rmdir {path_q} で消し、登録が残っていれば同じ remove を再実行してください。中にファイルが残っているなら削除せずにユーザに報告してください。
 
   # ---- ccnavi-worktree.sh
-  # 既にあるワークツリーに、取り込みの記録が無いとき。`unattended` は非対話のときの追記（無ければ空）。
+  # 既にあるワークツリーに、取り込みの記録が無いとき。`unattended` は非対話のときだけ付く追記で、それ以外は空。
   NOTE_WORKTREE_RECORD_MISSING:
     kind: note
     values: [name, name_q, unattended]
     note: |-
       取り込みの記録は、無い（ccnavi-direct/{name}）。integrate に進むには、ユーザの確認を経て {script:ccnavi-worktree.sh} {name_q} --adopt --base <取り込み先> で引き取ります（チケットに結び付く名前は引き取れません）。{unattended}
 
-  # 引き取り・切る前の確認で、渡された確認コードが今の状態と合わないとき。
+  # 引き取り・切る前の確認で渡された確認コードが、今の状態と合わないとき。
   NOTE_WORKTREE_ADOPT_CODE_STALE:
     kind: note
     note: |-
@@ -135,7 +135,7 @@ messages:
     note: |-
       ユーザの了承を得るまで --base・--accept・--side-by-side を付けない。確認コードは今の状態から決まるので、状態が動いたら報告からやり直す
 
-  # 切ったあとの、取り込み先のリモートとの差。
+  # 切った後の、取り込み先とリモートとのずれ。
   NOTE_WORKTREE_REMOTE_BEHIND:
     kind: note
     values: [target, behind, main_tree, branch]
@@ -148,7 +148,7 @@ messages:
     note: |-
       リモート未確認で切った。つながったら ccnavi-git.sh fetch origin {target} で確かめ、遅れていれば取り込む前に合わせる。ユーザにも伝える
 
-  # ワークスペースのルートで切ったとき、projects/ の下のリポジトリがある。
+  # ワークスペースのルートで切ったときに、projects/ の下にリポジトリがある場合。
   NOTE_WORKTREE_PROJECTS_HINT:
     kind: note
     note: |-
