@@ -1261,7 +1261,7 @@ report() {
 	[ -z "$ff_note" ] || printf '最新化: %s\n' "$ff_note"
 	[ -z "$host_unseen" ] || printf '案内: ホストは見ていない（MCP などで確認済みとして扱った）。既存の MR と閉じる issue は、渡された --issue・--mr・--branch のとおりに扱った\n'
 	case "$remote_state" in
-	unchecked) printf '案内: リモート未確認。origin から取れなかったので、手元のブランチのまま続けた。つながったら sh %s/ccnavi-sync.sh を打つ\n' "$scripts" ;;
+	unchecked) ccnavi_text "$root" NOTE_START_REMOTE_UNCHECKED ;;
 	gone) printf '案内: origin にブランチ %s が無い（手元だけのブランチ）\n' "$1" ;;
 	esac
 	[ -z "$sync_note" ] || printf '案内: %s\n' "$sync_note"
@@ -1323,7 +1323,7 @@ template_note() {
 		;;
 	0) return 0 ;;
 	esac
-	printf '案内: 使えるテンプレートがある（%s 本）。合うものがあれば --plan の代わりに --template <名前> を使う。一覧は sh %s/ccnavi-launcher.sh --templates（名前・説明・使う場面が出る）\n' "$tn_n" "$scripts"
+	ccnavi_text "$root" NOTE_START_TEMPLATES "count=$tn_n"
 }
 
 # 既存の MR を採用してよいか確かめる。引っかかったら止める。<ブランチ> <MR の JSON>
