@@ -51,6 +51,7 @@ from dataclasses import dataclass
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, pathcase, pathsafe, settings, tree
+from ..policy import texts
 from . import (
     approval,
     approval_checks,
@@ -262,7 +263,7 @@ def _note_mr(
     elif result == ticket_fields.MR_DIFFERS:
         stderr.write(
             f"ccnavi: 警告: {parent.ticket} の `mr:` に別の値が既にある。上書きしない。"
-            f"今回のレビューの MR は !{number}。値が合っているか、ユーザが確かめてください\n"
+            f"今回のレビューの MR は !{number}。\n{texts.say(root, 'NEXT_REVIEW_MR_DIFFERS')}\n"
         )
     elif result == ticket_fields.MR_UNREADABLE:
         stderr.write(

@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from ..infra import settings, tree
-from ..policy import rules
+from ..policy import rules, texts
 from . import standing, ticket_model, workflow
 
 
@@ -93,11 +93,9 @@ def family_problems(
                 rules.SEVERITY_ERROR,
                 t.ticket,
                 f"提案が親のブランチ {st.branch_name} のワークツリーの外"
-                f"（{t.tree or 'ワークスペースルート'}）にある。"
-                "親子のチケットの提案は"
-                f"親のワークツリー（.claude/worktrees/{st.family}）で書き、"
-                f"'{settings.script_command(root, 'ccnavi-ticket.sh')} propose {st.family}' で"
-                "親のブランチへ送ってから承認を頼んでください",
+                f"（{t.tree or 'ワークスペースルート'}）にある。親子のチケットの提案は親のブランチの"
+                "ワークツリーで書く決まり。\n"
+                + texts.say(root, "NEXT_APPROVAL_PROPOSAL_OUTSIDE", {"family": st.family}),
             )
         ]
     return []
@@ -234,7 +232,6 @@ def place_problems(
     family = t.parent or t.ticket
     if home.name == family:
         return []
-    worktree_sh = settings.script_command(root, "ccnavi-worktree.sh")
     what = f"子の提案 {t.ticket}" if t.is_child else f"提案 {t.ticket}"
     return [
         rules.Problem(
@@ -243,8 +240,8 @@ def place_problems(
             f"{what} を識別子と違う名前のワークツリー {home.name} に書いている。"
             f"親のワークツリーは識別子と同じ名前（{family}）にする。承認済みチケットは提案を書いた"
             "ツリーに置かれるので、別名のままだと親が取り込み済みにならず、承認済みチケットの自動"
-            "コミットが動かず、`ready` で止まる。承認のあとには取り返せないので、承認の前に直す: "
-            f"'{worktree_sh} {family}' で切り、提案を移して元を削除してから承認を頼んでください",
+            "コミットが動かず、`ready` で止まる。承認のあとには取り返せないので、承認の前に直す。\n"
+            + texts.say(root, "NEXT_APPROVAL_PLACE", {"family": family}),
         )
     ]
 

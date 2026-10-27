@@ -24,6 +24,7 @@ from dataclasses import replace
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, gitstate, settings, tree
+from ..policy import texts
 from . import (
     approval,
     approval_checks,
@@ -151,12 +152,7 @@ def start(
     for line in ops_plan.childless_notice(root, conf, found):
         stdout.write(line + "\n")
     if found.is_child:
-        ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
-        stdout.write(
-            "次: サブエージェントに、子のワークツリー"
-            f"（.claude/worktrees/{found.ticket}）での実装を任せる。"
-            f"終わってコミットされたら '{ticket_sh} finish {found.ticket}' を打つ\n"
-        )
+        stdout.write(texts.say(root, "NEXT_OPS_START_CHILD", {"ticket": found.ticket}) + "\n")
     if learning.applies(root, conf, found):
         stdout.write(
             "学びの蓄積: 閉じる前に "
@@ -325,12 +321,15 @@ def _close_parent(
     wip = ticket_places.WIP_ROOT
     if phase.without_mr(root, conf, found.ticket, venues):
         stdout.write(
-            f"次: この移動をコミットし、`{wip}/` を削除して"
-            f"（'{git_sh} rm -r {wip}'）コミットし、統合先のブランチに取り込んでください。"
-            "このチケットにはマージリクエストで見るフェーズが無いので、"
-            "Draft を解除する手順はありません。途中の作業は既定のブランチに残さない。"
-            f"`{wip}/` で消えるのは追跡済みのファイルだけで、削除する前のコミットから戻せる。"
-            f"{worktrees.classifier_note(root, f'{git_sh} rm -r {wip}')}\n"
+            texts.say(
+                root,
+                "NEXT_OPS_CLOSE_NO_MR",
+                {
+                    "wip": wip,
+                    "classifier_note": worktrees.classifier_note(root, f"{git_sh} rm -r {wip}"),
+                },
+            )
+            + "\n"
         )
         # 材料（`done/`）は取り込みまで残るので、`wip/` を消す前の今なら下書きが作れる。
         stdout.write(template_drafts.close_notice(conf, root, found.ticket, mr=False))
@@ -343,20 +342,17 @@ def _close_parent(
         stdout.write("Draft は外してある。マージはユーザが行う\n")
         return
     stdout.write(
-        "次: この移動をコミットして push し"
-        "（取り込み済みの親子では、この finish が済ませている）、"
-        f"'{ready_command(root, found.ticket)}' で Draft を解除してください"
-        "（「マージに進んでよい」の合図）。"
-        "ready は Draft を解除する前に、クローズ済みのチケットとその記録"
-        f"（`{conf.approved}/` の done/・phases/・flows/）を手元の logs/archive/ へ移し、"
-        f"`{wip}/` の追跡済みのファイルを削除して、その削除をコミットして push する"
-        f"（`{wip}/` に未追跡のファイルがあれば削除せずに止まる。削除したものは履歴から戻せる）。"
-        "Draft を解除したあと、ready は親のワークツリーを削除します（親のワークツリーの外から"
-        " --parent で"
-        "実行すれば消える。中から --parent なしで実行すると消さず、"
-        "外に出てから実行するコマンドを表示する）。"
-        "途中の作業もチケットも既定のブランチに残さない。マージはユーザが squash で行う。"
-        f"{READY_FLOW_AGREED}\n"
+        texts.say(
+            root,
+            "NEXT_OPS_CLOSE_MR",
+            {
+                "ready_command": ready_command(root, found.ticket),
+                "approved": conf.approved,
+                "wip": wip,
+                "flow_agreed": READY_FLOW_AGREED,
+            },
+        )
+        + "\n"
     )
     # 材料は ready で退避されるので、ready の前の今しか拾えない。出力に足すだけで、判定は変えない。
     stdout.write(template_drafts.close_notice(conf, root, found.ticket))
@@ -641,10 +637,7 @@ def _move(
         )
     elif state == ticket_model.DONE and found.is_child and not fields.get("cancelled_at"):
         # 次の一手は status が計算する
-        stdout.write(
-            f"次: '{settings.script_command(root, 'ccnavi-ticket.sh')} status {found.parent}' で、"
-            "親の次の一手を確かめる\n"
-        )
+        stdout.write(texts.say(root, "NEXT_OPS_CHILD_DONE", {"parent": found.parent}) + "\n")
     return 0
 
 
