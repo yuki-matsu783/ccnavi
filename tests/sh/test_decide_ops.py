@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -213,28 +214,7 @@ class DecideOpsShTest(unittest.TestCase):
         shell = base.SHELL
         tools = os.path.join(self.work, "bin")
         os.makedirs(tools, exist_ok=True)
-        import shutil
-
-        for name in (
-            "jq",
-            "curl",
-            "git",
-            "sed",
-            "cat",
-            "rm",
-            "dirname",
-            "printf",
-            "mkdir",
-            "tr",
-            "mktemp",
-            "head",
-            "date",
-            "grep",
-            "wc",
-            "uname",
-            "cp",
-            "mv",
-        ):
+        for name in base.STANDARD_TOOLS:
             found = shutil.which(name)
             if found and not os.path.exists(os.path.join(tools, name)):
                 base.put_tool(found, os.path.join(tools, name))
@@ -282,6 +262,15 @@ class DecideOpsShTest(unittest.TestCase):
             json.dump(record, f)
 
     # ---- 1. 目印と記録
+
+    def test_every_standard_tool_resolves_in_the_child_path(self):
+        # 子プロセスの PATH は tools（と /bin）だけ。macOS では awk が /bin にないため、tools になければ rc=127 で終わる
+        self.run_decide("--help")
+        tools = os.path.join(self.work, "bin")
+        for name in base.STANDARD_TOOLS:
+            if shutil.which(name):
+                self.assertTrue(os.path.lexists(os.path.join(tools, name)), name)
+        self.assertIn("awk", base.STANDARD_TOOLS)
 
     def test_every_post_carries_the_marker_and_the_record_is_removed(self):
         done = self.choose()
