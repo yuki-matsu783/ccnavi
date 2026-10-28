@@ -40,7 +40,7 @@ usage() {
 sh .ccnavi/scripts/ccnavi-branches.sh (--issue <番号> | --mr <番号>) [--json]
 
   issue・MR に紐づくブランチを探して、1 候補 1 行で出す（--json なら JSON）。読むだけ。
-  --issue <番号>  名前に番号を含むブランチ（手元と origin）、その issue を参照している開いた MR の元ブランチ、
+  --issue <番号>  名前に番号を含むブランチ（手元と origin。名前が `<先頭の語>-<番号>-<slug>` の形なら、番号の位置だけで見る）、その issue を参照している開いた MR の元ブランチ、
                   issue: <番号> を持つチケットと、その親のブランチ
   --mr <番号>     その MR の元ブランチ
   各候補には、チェックアウトしているワークツリーと結び付くチケットを添える。
@@ -154,15 +154,25 @@ github_mr() {
 		  fork: (((.head.repo.full_name // "") | ascii_downcase) != ($p | ascii_downcase))}]'
 }
 
-# GitHub: その issue を参照している開いた PR。タイトル・本文の `#<番号>` か `issues/<番号>`、元ブランチ名の番号（前後が `-` `/` `_` `.` か端のもの）で見る。
+# GitHub: その issue を参照している開いた PR。タイトル・本文の `#<番号>` か `issues/<番号>`、元ブランチ名に含む番号を下の jq の規則で見る。
 github_issue() {
 	got=$(ccnavi_host_pages "repos/$ccnavi_h_path/pulls?state=open") || return "$?"
-	printf '%s' "$got" | "$ccnavi_h_jq" --arg p "$ccnavi_h_path" --arg n "$number" '
+	# 元ブランチ名の規則は実行ファイルの names_number と同じ。`<先頭の語>-<番号>-<slug>` の形なら 2 つ目の番号だけ、
+	# 形に合わなければ、番号の前後が区切りか端であること。先頭の語は CCNAVI_BRANCH_PREFIXES（無ければ既定のリスト）。
+	printf '%s' "$got" | "$ccnavi_h_jq" --arg p "$ccnavi_h_path" --arg n "$number" \
+		--arg pre "${CCNAVI_BRANCH_PREFIXES:-feature hotfix fix bugfix chore refactor docs}" '
+		# 既定のリストは settings.DEFAULT_BRANCH_PREFIXES、文字クラスは ticket_ids の JA_CHARS・ID_CHARS と同じ。変えるなら両方直す。
+		def names_number($n; $pre):
+			([ascii_downcase
+			 | capture("^(?<w>[a-z][a-z0-9]*)-(?<num>[1-9][0-9]*)-[A-Za-z0-9々ぁ-ゖァ-ヺー一-鿿][A-Za-z0-9._\\-々ぁ-ゖァ-ヺー一-鿿]*$")?] | .[0]) as $f
+			| if $f != null and ($pre | split("[ ,\t\n]+"; "g") | index($f.w)) != null
+			  then $f.num == $n
+			  else test("(^|[-/_.])" + $n + "([-/_.]|$)") end;
 		[.[] | select(
 			(((.title // "") + " " + (.body // "")) as $t
 			 | ($t | test("(^|[^0-9A-Za-z_&/])#" + $n + "([^0-9]|$)"))
 			   or ($t | test("issues/" + $n + "([^0-9]|$)")))
-			or ((.head.ref // "") | test("(^|[-/_.])" + $n + "([-/_.]|$)")))
+			or ((.head.ref // "") | names_number($n; $pre)))
 		 | {number: .number, branch: .head.ref, state: .state, url: .html_url, title: .title, base: (.base.ref // ""),
 		    fork: (((.head.repo.full_name // "") | ascii_downcase) != ($p | ascii_downcase))}]'
 }

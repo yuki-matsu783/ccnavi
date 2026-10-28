@@ -247,6 +247,24 @@ class BranchesShTest(unittest.TestCase):
         self.assertIn("MR=!14(open,フォーク)", found["topic/c"])
         self.assertIn("在りか=手元  由来=名前に番号", found["feature-152-login"])
 
+    def test_pull_request_branch_names_follow_the_python_table(self):
+        # tests/core/test_branchfind_refs.py の NAME_CASES と同じ規則。規則を変えたら両方を直す。
+        self.origin("https://github.com/acme/widgets.git")
+        slug = "feature-102-main-sh-の使い方の表示を-1-行足す-c3-検証用"
+        for number, names in (
+            (1, [slug, "feature-1-login", "fix-1-typo", "other-102-a-1-b"]),
+            (152, ["fix/152-y", "issue-152", "x-152", "feature-1-152-x"]),
+        ):
+            pulls = [pr(30 + i, name) for i, name in enumerate(names)]
+            self.route({f"GET {GITHUB}/pulls?state=open&per_page=100&page=1": [200, pulls]})
+            found = sorted(self.candidates(self.ok("--issue", str(number), GITHUB_TOKEN="t0k")))
+            want = {
+                1: ["feature-1-login", "fix-1-typo", "other-102-a-1-b"],
+                152: ["feature-152-login", "fix/152-y", "issue-152", "x-152"],
+            }[number]
+            with self.subTest(number=number):
+                self.assertEqual(found, sorted(want))
+
     def test_gitlab_issue_reads_related_merge_requests(self):
         self.origin("https://gitlab.com/acme/widgets.git")
         related = [mr(3, "feat-a"), mr(4, "feat-b", state="merged")]
