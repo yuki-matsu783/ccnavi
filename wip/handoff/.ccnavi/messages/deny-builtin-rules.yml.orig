@@ -1,0 +1,275 @@
+# 組み込みルールの拒否の文。条件（何を止めるか）はコード側（policy/builtin.py・policy/selfguard_shell.py・
+# tickets/ticket_guard.py・tickets/phase_forms.py）にあり、ここは何を言うかだけを持つ。
+# 識別子 `RULE_<名前>` は組み込みのルールの id から決める（`builtin:git-push` なら `RULE_GIT_PUSH`）。
+# ルールは識別子と値だけを持ち、拒否に当たった回に `texts.spoken` が引く。記録の `code` とは別。
+# `RULE_` の文は `what` だけが必須で、言うことが無い欄は省く。場合分けは `message_variants` で選ぶ。
+# 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
+version: 1
+messages:
+  # ---- policy/builtin.py
+  RULE_RECURSIVE_DELETE:
+    kind: deny
+    values: [git]
+    what: |-
+      再帰的な強制削除は取り消せません。
+    next:
+      wrapper: |-
+        削除するものを 1 つずつ名指しするか、ファイルが追跡されているなら {git} rm <パス> を使う
+      plain: |-
+        削除するものを 1 つずつ名指しするか、ユーザに削除を頼む
+    note: |-
+      scratchpad/ の一時物は、名指しの rm -f と rmdir（空のディレクトリ）で消せます。
+
+  RULE_GIT_PUSH:
+    kind: deny
+    values: [git]
+    what: |-
+      git push は直接実行しません。
+    why:
+      wrapper: |-
+        子のワークツリーのブランチは送らず、親が取り込んでから親のワークツリーで送る決まりです。統合先への送りはユーザが打ちます。
+      plain: |-
+        push はユーザが打つ決まりです。
+    next:
+      wrapper: |-
+        親のワークツリーのブランチは {git} push で送る。通る形は {git} の --help を見る
+      plain: |-
+        ブランチはそのままにして、push をユーザに頼む
+
+  RULE_GIT_RESET_HARD:
+    kind: deny
+    values: [git]
+    what: |-
+      作業中の変更が失われます。
+    next:
+      wrapper: |-
+        {git} stash push -u で退避するか、ファイルを名指しして {git} restore <パス> を使う
+      plain: |-
+        変更を破棄する前に、ユーザに確認する
+
+  RULE_CREDENTIALS:
+    kind: deny
+    what: |-
+      認証情報を含む場所です。
+    next: |-
+      中身を読まず、必要な値をユーザに尋ねる
+
+  # `.git` の中を書く 2 本（名前で書くツールとシェル）が同じ文を使う。
+  RULE_GUARD_GIT_DIR:
+    kind: deny
+    values: [git]
+    what: |-
+      .git ディレクトリの中に直接書き込もうとしています。
+    why: |-
+      git を通さない変更は、履歴を失わせたり、フックを通してコマンドを走らせたりするおそれがあります。
+    next:
+      wrapper: |-
+        git のサブコマンドでできる作業なら、{git} <サブコマンド> で実行する。できない変更は、ファイル名と理由を添えてユーザに頼む
+      plain: |-
+        変更が必要なら、ファイル名と理由を添えてユーザに頼む
+    note: |-
+      フック、.git/info/exclude、MERGE_MSG、index.lock、ワークツリーの .git ファイルは、どのサブコマンドでも編集されません。
+      index.lock が古く残っているときは、git のプロセスが動いていないことを確かめてから、ユーザに削除を頼んでください。
+      ファイルを無視したいときは、.gitignore を編集してください。
+      .git の下のファイルを読むことは止めていません。
+
+  # 組み込みの既定に戻ったときだけ足す（ルールファイルが読めない間の、シェルからの書き込み）。
+  RULE_CONFIG_VIA_BASH:
+    kind: deny
+    values: [git]
+    what: |-
+      ルールファイルを読めなかったため、ccnavi は組み込みの既定で動いています。シェルで書き込むのは適切ではありません。
+    why: |-
+      共通のルールファイルは Write / Edit でも直せません。
+    next: |-
+      wip/handoff/.ccnavi/config/common/rules.yml に下書きを置き、ユーザにターミナルの 'ccnavi-user-handoff.sh' での取り込みを頼む。ユーザが差分を見て取り込めば直せます
+    note:
+      wrapper: |-
+        マージの衝突を解くことは止めていません。{git} add <パス>、{git} restore --ours -- <パス>（または --theirs）は、コミット済みの版を戻すだけなので実行できます。
+      plain: |-
+        マージの衝突を解くことは、ここではエージェントが git を実行しないため、ユーザに頼んでください。
+
+  # ---- policy/selfguard_shell.py
+  RULE_GUARD_SETTING_FILES:
+    kind: deny
+    what: |-
+      ガード自身の設定と hook を、シェルから書き換えようとしています。
+    why: |-
+      Write / Edit でも拒否される場所です。表記を変えても同じ場所です。
+    next: |-
+      変更が必要な理由を伝えてユーザに依頼する。テスト用のフィクスチャは wip/handoff/ の下に作る
+    no_bypass: |-
+      保護された場所そのものは、Python など別の手段でも書き換えないでください。
+    note: |-
+      読むだけなら cat や grep はそのまま通ります。
+
+  RULE_GUARD_BINARY:
+    kind: deny
+    what: |-
+      ccnavi 自身の実行ファイルです。
+    why: |-
+      ここが差し替わると、ルールを 1 行も変えずに判定そのものを入れ替えられます。
+    next: |-
+      作り直しが必要なら、何をなぜ変えたいのかを伝えてユーザに依頼する
+
+  RULE_GUARD_COMMON_LAYER:
+    kind: deny
+    what: |-
+      ccnavi の共通レイヤーの設定（ルール・フェーズ定義・リスクの配点）です。
+    why: |-
+      どのツリーの判定にも使われるので、エージェントが書き換えると自分の判定を緩められます。
+    next: |-
+      下書きを検証したうえで、何をなぜ変えたいのかを伝えてユーザに依頼する（/ccnavi-config）
+    note: |-
+      読むだけなら止まりません。
+
+  RULE_GUARD_RECORDS:
+    kind: deny
+    what: |-
+      ccnavi の記録と state の置き場（logs/decisions*.jsonl と logs/state/）か、クローズ済みのチケットの退避（logs/archive/）です。
+    why: |-
+      判定が読み、「ccnavi が何を判定したか」・「何が閉じたか」を後から確かめるための材料なので、エージェントは書き換えません。
+    next: |-
+      記録を直す必要があるときは、理由を伝えてユーザに依頼する
+    note: |-
+      シェルからの書き込みでも拒否される場所です。
+      読むだけなら止まりません。
+
+  RULE_GUARD_HANDOFF_LINKS:
+    kind: deny
+    what: |-
+      下書きの置き場（wip/handoff/）の中の、リンクかハードリンクでほかの場所とつながったファイルです。
+    why: |-
+      書くとつながった先（守る場所のことがあります）も書き換わるので、止めました。
+    next: |-
+      コピーは ccnavi-stage.sh <パス> で作り直す（中身をコピーするので、つながりません）
+
+  RULE_GUARD_HANDOFF_LN:
+    kind: deny
+    what: |-
+      下書きの置き場（wip/handoff/）にリンクを作る形です。
+    why: |-
+      置き場の中のリンクは、守る場所への書き込みの入口になるので、エージェントは作りません。
+    next: |-
+      守る場所を直すときは ccnavi-stage.sh <パス> で中身をコピーし、コピーを Write / Edit で直す
+
+  RULE_GUARD_PROJECT_HOME:
+    kind: deny
+    what: |-
+      レイヤーの設定の置き場です。
+    why: |-
+      ここに入っているルール・フェーズ定義・リスクの配点がこのツリーへの判定を決めるので、エージェントが書き換えると自分の判定を緩められます。承認済みチケット・フェーズのマーカー・子のフロー（approved/ の下）もここにあり、書くのはユーザです。
+    next: |-
+      変更が必要なら、何をなぜ変えたいのかを伝えてユーザに依頼する
+    note: |-
+      読むだけなら止まりません。
+
+  # 名前で書くツールの 4 本。`next` は守る場所を直す手順で、ワークスペースルートがあるか（root）で分ける。
+  RULE_GUARD_HOOKS:
+    kind: deny
+    what: |-
+      hook 本体です。
+    next:
+      root: |-
+        エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼する。直すときは '{script:ccnavi-stage.sh} <パス>' で wip/handoff/ にコピーし、コピーを直して、ユーザに ccnavi-user-handoff.sh での取り込みを頼む
+      noroot: |-
+        エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼する。wip/handoff/ にコピーを置き、ユーザに ccnavi-user-handoff.sh での取り込みを頼む
+    note: |-
+      下書きの置き場では .claude の階層を handoff-.claude に読み替えます（.claude/settings.json は wip/handoff/handoff-.claude/settings.json）。
+      wip/handoff/.claude/ に自分で作らないでください。
+
+  RULE_GUARD_SETTINGS:
+    kind: deny
+    what: |-
+      hook の登録そのものです。
+    why: |-
+      ワークツリー側の設定も統合すると統合先の設定になります。
+    next:
+      root: |-
+        エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼する。直すときは '{script:ccnavi-stage.sh} <パス>' で wip/handoff/ にコピーし、コピーを直して、ユーザに ccnavi-user-handoff.sh での取り込みを頼む
+      noroot: |-
+        エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼する。wip/handoff/ にコピーを置き、ユーザに ccnavi-user-handoff.sh での取り込みを頼む
+    note: |-
+      下書きの置き場では .claude の階層を handoff-.claude に読み替えます（.claude/settings.json は wip/handoff/handoff-.claude/settings.json）。
+      wip/handoff/.claude/ に自分で作らないでください。
+
+  RULE_GUARD_SCRIPTS:
+    kind: deny
+    what: |-
+      安全を確かめたコマンドだけを実行するラッパースクリプトです。
+    next:
+      root: |-
+        エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼する。直すときは '{script:ccnavi-stage.sh} <パス>' で wip/handoff/ にコピーし、コピーを直して、ユーザに ccnavi-user-handoff.sh での取り込みを頼む
+      noroot: |-
+        エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼する。wip/handoff/ にコピーを置き、ユーザに ccnavi-user-handoff.sh での取り込みを頼む
+
+  RULE_GUARD_CCNAVI_CONFIG:
+    kind: deny
+    what: |-
+      ccnavi の設定（ルール・フェーズ定義・リスクの配点）です。
+    next:
+      root: |-
+        エージェントの判断で書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えてユーザに依頼する（/ccnavi-config）。ルールファイルが読めないときも同じで、wip/handoff/.ccnavi/config/common/rules.yml に下書きを置いてユーザに取り込みを頼む。直すときは '{script:ccnavi-stage.sh} <パス>' で wip/handoff/ にコピーし、コピーを直して、ユーザに ccnavi-user-handoff.sh での取り込みを頼む
+      noroot: |-
+        エージェントの判断で書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えてユーザに依頼する（/ccnavi-config）。ルールファイルが読めないときも同じで、wip/handoff/.ccnavi/config/common/rules.yml に下書きを置いてユーザに取り込みを頼む。wip/handoff/ にコピーを置き、ユーザに ccnavi-user-handoff.sh での取り込みを頼む
+
+  # ---- tickets/ticket_guard.py（名前で書くツールとシェルの 2 本が同じ文を使う）
+  RULE_TICKET_STATE:
+    kind: deny
+    what: |-
+      チケットの状態は置き場で表します。直接ファイルを作ったり動かしたりしないでください。
+    next: |-
+      review/（レビュー待ち）へは '{script:ccnavi-ticket.sh} finish <識別子>' で動かす。todo/ への作成と編集は自由です
+
+  RULE_TICKET_APPROVED:
+    kind: deny
+    what: |-
+      承認済みチケットの置き場です。承認・状態・レビューの記録は、ユーザの操作と ccnavi のスクリプトだけが動かします。直接書き込まないでください。
+    why: |-
+      承認はユーザが、VS Code のボード・Chrome のボード・ターミナルの 'ccnavi-user-agree.sh'・置き場のファイルの移動のどれかで行います。
+    next: |-
+      承認が済んだかどうかは '{script:ccnavi-ticket.sh} status' で確かめる。置き場のファイルを自分で探さず、承認を頼み直す前に status を打つ
+    note: |-
+      作業を終えたら '{script:ccnavi-ticket.sh} finish <識別子>' で、レビュー待ち（wip/proposals/review/）へ動かしてください。
+      範囲を変えたいなら、wip/proposals/todo/ に新しい提案を書き、'{script:ccnavi-ticket.sh} propose <識別子>' で送ってから承認を依頼してください。
+
+  RULE_TICKET_OPS:
+    kind: deny
+    what: |-
+      操作記録の置き場です。直接書き込まないでください。
+    why: |-
+      ユーザの判断と外部への送信の段階を保存する記録で、書き直すと送り直しの根拠が変わります。ccnavi のスクリプトだけが書きます。
+    next: |-
+      記録を直す必要があるときは、理由を伝えてユーザに依頼する
+
+  RULE_RAW_GIT:
+    kind: deny
+    what: |-
+      生の git は実行しません。
+    why:
+      wrapper: |-
+        チケット制御の可否（承認済みチケットの置き場を戻さない・取り込み・push の条件）は git の入口のスクリプトが確かめるので、生の git では外れます。
+      plain: |-
+        このワークスペースには git の入口のスクリプトがありません。
+    next:
+      wrapper: |-
+        '{script:ccnavi-git.sh} <サブコマンド> ...' を使う。読む系は status・log・diff・show・blame で、例は '{script:ccnavi-git.sh} log -5'。書く系の通る形は同じスクリプトの --help にある
+      plain: |-
+        git の操作が必要なときは、ユーザに頼む
+
+  # ---- tickets/phase_forms.py（承認・レビュー済みの受け入れ・チケットの状態の操作）
+  RULE_GUARD_TICKET_APPROVAL:
+    kind: deny
+    what: |-
+      ccnavi の承認・レビュー済みの受け入れ・チケットの状態の操作は、エージェントが直接実行するものではありません。
+    why: |-
+      承認はユーザが VS Code のボード・Chrome のボード・'{script:ccnavi-user-agree.sh}'・置き場のファイルの移動のどれかで行います。残った指摘の対応方針はユーザが VS Code のボードかターミナルで決めます。承認済みチケットのコミットと push（'{script:ccnavi-user-push-approved.sh}'）は、ボードで承認するとターミナルで実行され、エージェントは実行しません。
+    next: |-
+      状態の移動とレビューは '{script:ccnavi-ticket.sh}' と '{script:ccnavi-review.sh}' を使う。承認が済んだかどうかは '{script:ccnavi-ticket.sh} status' で確かめ、置き場のファイルを自分で探さず、承認を頼み直す前に status を実行する
+    no_bypass: |-
+      ユーザ専用の操作は 'ccnavi user <操作>'（agree・reviewed・close-early・prune・handoff・mirror）にまとめてあり、エージェントは実行しません。
+    note: |-
+      放棄した親の片付けの記録を消す 'ccnavi worktree retire --abandon <親>' と、ユーザの判断の入口（'{script:ccnavi-user-close-early.sh}'）もユーザが実行します。
+      保護対象の下書き（wip/handoff/）の取り込み（'ccnavi-user-handoff.sh'。見るだけの形も含む）と、共通レイヤーのミラーと工程スキルの同期（'ccnavi-user-mirror.sh'。見るだけの形も含む）も、ユーザが実行します。
+      親を閉じたときの片付け（'ccnavi sync tidy'・'ccnavi worktree retire'・'ccnavi worktree branch'・'{script:ccnavi-user-clean-branch.sh}'）は、ccnavi-review.sh ready と ccnavi-sync.sh が中で呼びます。残ったブランチを消すのは、ユーザが先頭に ! を付けて打つコマンドです（案内されたコマンドをユーザに見せて、打ってもらってください）。
+      下書きの状態を見るだけなら '{script:ccnavi-stage.sh} --commands <パス>' を使います。承認先行の一覧を見るだけなら 'ccnavi --agree --preview' は通ります。
