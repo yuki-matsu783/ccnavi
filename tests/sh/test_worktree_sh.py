@@ -342,7 +342,8 @@ class WorktreeShTest(unittest.TestCase):
         stub = write(
             os.path.join(self._tmp.name, "exe2", "ccnavi"),
             "#!/bin/sh\n"
-            'for a in "$@"; do [ "$a" = leftover ] && { printf "tree 1\\nleftover yes\\ndoing 0\\n"; exit 0; }; done\n'
+            'for a in "$@"; do [ "$a" = leftover ] &&'
+            ' { printf "tree 1\\nleftover yes\\ndoing 0\\n"; exit 0; }; done\n'
             f'PYTHONPATH={SRC} exec {sys.executable} -m ccnavi "$@"\n',
         )
         os.chmod(stub, 0o755)

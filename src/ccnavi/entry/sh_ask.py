@@ -26,9 +26,9 @@ sh はチケットの YAML も JSON も自分で読まない。読むのは実�
   子・MR が残っているか（`ccnavi-worktree.sh` が、直接作業へ切り替えたあとに取り下げの手順を
   案内するか決めるために聞く）。`leftover yes|no`、`proposal yes|no`（`todo/`・`review/` の提案）、
   `doing <件数>`（`doing/` の子）、`mr <番号>|-`（親の `mr:`）、`stage doing|review|todo|-`
-  （親の段階。`doing/` に親が在れば `doing`、なければ `review/` に在れば `review`、なければ `todo/` に
-  在れば `todo`。優先順位は doing > review > todo。親でない・読めないときは `-`。`ccnavi-worktree.sh` は
-  `doing`・`review`、または `doing` の件数が 1 以上のとき、切る前に断る）。親でなければ `leftover no`。
+  （親の段階。優先順位は doing > review > todo。親でない・読めないときは `-`。
+  `ccnavi-worktree.sh` は `doing`・`review`、または `doing` の件数が 1 以上のとき、切る前に断る）。
+  親でなければ `leftover no`。
 
 - `ccnavi tree base-bound <ユーザのチェックアウト> <ブランチ>`: 直接作業の取り込み先のブランチが、
   チケットに結び付くか（`ccnavi-worktree.sh` が切る前に断る条件）。`bound yes|no|unknown` に続けて、
@@ -188,10 +188,11 @@ def leftover_tree(
     頭に `tree 1`、続けて `leftover yes|no`、`proposal yes|no`、`doing <件数>`、`mr <番号>|-`、
     `stage doing|review|todo|-`。
 
-    `stage` は親の段階。`doing/` に親が在れば `doing`（承認済み。改版の提案が `todo/` に在っても `doing`）、
-    なければ `review/` に在れば `review`（finish 済みでレビュー待ち）、なければ `todo/` に在れば `todo`
-    （承認前の提案だけ）、いずれも無ければ `-`。
-    `ccnavi-worktree.sh` が、切り替える前に断るか、切り替えたあとに取り下げの手順を案内するかを決めるために聞く。
+    `stage` は親の段階。`doing/` に親が在れば `doing`（承認済み。改版の提案が `todo/` にあっても
+    `doing`）、なければ `review/` に在れば `review`（finish 済みでレビュー待ち）、
+    なければ `todo/` に在れば `todo`（承認前の提案だけ）、いずれも無ければ `-`。
+    `ccnavi-worktree.sh` が、切り替える前に断るか、切り替えたあとに取り下げの手順を案内するか
+    決めるために聞く。
     親のワークツリーでなければ（親が読めないときも）`no`。案内を出さない向きに倒す。
     """
     if not _ident_ok(stderr, "tree leftover", "名前", name):
