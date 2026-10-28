@@ -900,7 +900,9 @@ def acquire_target(top, out, resuming=False):
     left = git_dir / LEFT_NAME
     if left.exists():
         who = left.read_text(encoding="utf-8").strip()
-        same = pathcase.fold(os.path.realpath(who)) == pathcase.fold(os.path.realpath(out))
+        same = bool(who) and (
+            pathcase.fold(os.path.realpath(who)) == pathcase.fold(os.path.realpath(out))
+        )
         if not (resuming and same):
             raise Refusal(
                 f"前の回が対象を戻さずに残している: {who}",

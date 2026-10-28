@@ -2261,7 +2261,10 @@ class LockTest(unittest.TestCase):
             top = str(ws.target.resolve())
             ws.out.mkdir()
             link = Path(d) / "link"
-            link.symlink_to(ws.out.resolve(), target_is_directory=True)
+            try:
+                link.symlink_to(ws.out.resolve(), target_is_directory=True)
+            except OSError:
+                self.skipTest("symlink を作れない環境")
             before = os.getcwd()
             os.chdir(ws.out.parent)
             self.addCleanup(os.chdir, before)
