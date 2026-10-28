@@ -67,6 +67,6 @@ dry-run のときは末尾に 1 行足し、通ったことを許可と読まな
 | 9.15 | [tickets/templates.md](tickets/templates.md) | 作業・レビュー計画のテンプレート。置き場・2 層の統合結果・検査・`--templates` |
 | 9.16 | [tickets/learning-wiki.md](tickets/learning-wiki.md) | 学びの蓄積。子の気づきを learning-wiki に溜め、反映先への提案として育てる流れ（一部実装済み） |
 | 9.17 | [tickets/sharing.md](tickets/sharing.md) | 複数人・別 PC・別セッションでの作業。共有するもの・同期の手順・承認者の操作の入口・保証しないこと |
-| 9.18 | [tickets/user-entry.md](tickets/user-entry.md) | ユーザ専用の入口。`ccnavi user`・`ccnavi-user-*.sh`・hook の止め・実行ファイルの読み替えと断り・ターミナル要求を、表 1 つ（`user_only.py`）から作る仕組み |
+| 9.18 | [tickets/user-entry.md](tickets/user-entry.md) | ユーザ専用の入口。`ccnavi user`・`ccnavi-user-*.sh`・hook の止め・実行ファイルの読み替えと断り・ターミナル要求を、表 1 つ（`tickets/model/user_only.py`）から作る仕組み |
 | 9.19 | [tickets/handoff.md](tickets/handoff.md) | 保護対象の変更の取り込み。`wip/handoff/` の下書きを `ccnavi user handoff` で取り込む手順・種類の表・取り込みの安全・ターミナル要求とボードの経路 |
 | 9.20 | [tickets/chrome-approval.md](tickets/chrome-approval.md) | Chrome 拡張による承認。形と CSP・ブランチの読み方・承認の流れと競合・1 コミットの作り方・PAT の権限・「始める」・レビュー済みのマーカー |

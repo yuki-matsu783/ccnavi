@@ -89,7 +89,7 @@ PACKAGES: tuple[Node, ...] = (
     (
         "tickets",
         3,
-        "チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、"
+        "チケット。承認済みチケットの置き場（approval）と提案・合意の手続き（proposal）、"
         "承認・レビュー済みの判定のコア（core）、write-and-push の見分け、フェーズ、操作",
         (
             (
