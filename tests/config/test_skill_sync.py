@@ -156,7 +156,7 @@ class SkillSyncTest(ConfigUnionHarness):
 
     def test_symlinked_process_dir_is_not_a_process(self):
         """2: 工程スキルのディレクトリ自体がシンボリックリンクなら、工程スキルに数えない"""
-        from ccnavi.tickets import skillsync
+        from ccnavi.tickets.sync import skillsync
 
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
         os.symlink(self.source("process-test"), self.source("evil"))
@@ -164,7 +164,7 @@ class SkillSyncTest(ConfigUnionHarness):
 
     def test_symlink_under_a_process_stops_the_copy(self):
         """2: 工程スキルの下にシンボリックリンクがあれば、何もコピーせず理由を返す"""
-        from ccnavi.tickets import skillsync
+        from ccnavi.tickets.sync import skillsync
 
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
         outside = os.path.join(self.ws, "outside.md")
@@ -216,7 +216,7 @@ class SkillSyncTest(ConfigUnionHarness):
 
     def test_symlinked_common_dir_stops_the_copy(self):
         """2: common/ そのものがシンボリックリンクなら、何もコピーせず理由を返す"""
-        from ccnavi.tickets import skillsync
+        from ccnavi.tickets.sync import skillsync
 
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
         outside = os.path.join(self.ws, "outside")

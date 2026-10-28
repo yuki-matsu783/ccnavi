@@ -255,7 +255,7 @@ class StageShTest(unittest.TestCase):
 
     def test_importable_classification_matches_the_python_kinds(self):
         """sh の is_importable が、実行ファイルの KINDS と同じ答えを返す（表のずれを見つける）。"""
-        from ccnavi.tickets import handoff
+        from ccnavi.tickets.sync import handoff
 
         paths = [
             ".ccnavi/config/common/templates/a.yml",

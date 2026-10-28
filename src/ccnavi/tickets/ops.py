@@ -25,7 +25,7 @@ from typing import TextIO
 
 from ..infra import fsio, gitcmd, gitstate, settings, tree
 from ..policy import texts
-from . import ops_close, ops_plan, ops_stop, template_drafts, worktrees
+from . import ops_close, ops_plan, ops_stop, worktrees
 from .approval import checks as approval_checks
 from .approval import marks as approval_marks
 from .approval import ops as approval_ops
@@ -35,6 +35,7 @@ from .flow import graph as flow
 from .learning import notes as learning
 from .model import ticket_model, ticket_places
 from .phase import gates as phase
+from .sync import template_drafts
 
 # 最後のレビューのあと、Draft を外すまでの手順がユーザの合意の範囲に入ることの言い切り。
 # `confirm` の知らせ（core_review.after_last_review）と親の `finish` の出力が同じ文を使う。

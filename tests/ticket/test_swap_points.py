@@ -1327,7 +1327,7 @@ class RecordWritesTest(CoreHarness):
             "tickets.approval.store",
             "tickets.proposal.agree",
             "tickets.model.via",
-            "tickets.configsync",
+            "tickets.sync.configsync",
         )
         names += (
             "tickets.ops",

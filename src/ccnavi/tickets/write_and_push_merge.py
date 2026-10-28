@@ -33,12 +33,13 @@ from typing import TextIO
 
 from ..infra import gitcmd, gitstate, pathcase, settings, tree
 from ..policy import rules
-from . import mirror_gap, ops_close
+from . import ops_close
 from .approval import checks as approval_checks
 from .approval import store as approval
 from .approval import write_and_push
 from .model import ticket_model, ticket_places
 from .phase import scope as phase_scope
+from .sync import mirror_gap
 
 _TIMEOUT = 20.0
 _SHOWN = 8

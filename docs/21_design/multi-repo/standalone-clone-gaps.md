@@ -124,7 +124,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 
 #### D1 ワークスペースの発言のときの同期が、プロジェクトのミラーとコピーを上書きする（minor から中。設計上の緊張）
 
-- 処理と場所: `src/ccnavi/tickets/promptsync.py` の `sync`、および `configsync.py`、`skillsync.py`。プロジェクトの `.ccnavi/config/common/` と `skills/<工程>/` を、共通レイヤーと工程スキルのコピーで上書きする
+- 処理と場所: `src/ccnavi/tickets/sync/promptsync.py` の `sync`、および `configsync.py`、`skillsync.py`。プロジェクトの `.ccnavi/config/common/` と `skills/<工程>/` を、共通レイヤーと工程スキルのコピーで上書きする
 - ワークスペース内 clone: プロジェクトの `config/common/rules.yml` に 1 行足してコミットしておくと、「共通レイヤーの中身に揃えた: rules.yml（上書き）」と書き換える。書き換えるのは親のワークツリーで、差分はマージリクエストに出る。静かにデータが消えるわけではない
 - 単体 clone: `found.project` が空でコピーは動かず、このミラーが共通レイヤーそのものになる。`user handoff` の取り込み先（`handoff.py` の `KINDS`）に `.ccnavi/config/common/…` が入っているので、単体の利用者は編集できる。ミラーは誰も編集しないという前提が単体 clone では成り立たず、更新の手段もワークスペースの発言のときの同期か setup だけ
 - 確認: 実行で確認

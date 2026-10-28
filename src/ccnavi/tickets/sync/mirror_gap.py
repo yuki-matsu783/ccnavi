@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 
-from ..infra import pathcase, settings
+from ...infra import pathcase, settings
 from . import configsync, skillsync
 
 _SHOWN = 10

@@ -11,7 +11,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, user handoff, 許可�
 ### 9.19 保護対象の変更の取り込み（handoff）
 
 エージェントが書けない保護対象（`rules.yml`・hook・ラッパースクリプト・テンプレート・文書など）の変更が、どの手順で元の場所に届くかを書く。
-取り込む処理は `tickets/handoff.py`、入口は `ccnavi user handoff`（9.18 の表の操作の 1 つ）。テンプレートの下書きの作り方は [9.15](templates.md)、
+取り込む処理は `tickets/sync/handoff.py`、入口は `ccnavi user handoff`（9.18 の表の操作の 1 つ）。テンプレートの下書きの作り方は [9.15](templates.md)、
 ユーザ専用の入口の仕組みは [9.18](user-entry.md)。
 
 #### 手順

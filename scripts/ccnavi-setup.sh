@@ -543,7 +543,7 @@ skills_blocked=""
 
 # 配布元のスキルが、frontmatter に `process: true` か `distribute: true` を持つか。先頭の `---` から閉じの `---` までの
 # 間に、その 1 行（行末の `# コメント`は可）があるものだけを適用する。ユーザの発言のときの同期がコピーする判定
-# （src/ccnavi/tickets/skillsync.py の _process_flag。`process` の側）に寄せてある。CRLF の改行と、`---` の前後の空白は
+# （src/ccnavi/tickets/sync/skillsync.py の _process_flag。`process` の側）に寄せてある。CRLF の改行と、`---` の前後の空白は
 # 許し、閉じの `---` が無いもの、BOM 付き、文字列の "true"、本文だけにあるものは適用しない。
 # SKILL.md 自体がリンクのものは、skillsync と同じく適用しない。
 # 書き方は文書どおりの `process: true` と `distribute: true` だけを見る。`process: yes` のような別の綴りは、

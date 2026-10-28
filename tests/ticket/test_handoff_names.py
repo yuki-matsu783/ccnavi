@@ -20,8 +20,8 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi.tickets import handoff
 from ccnavi.tickets.model import handoff_names
+from ccnavi.tickets.sync import handoff
 from tests import ROOT
 from tests.handoff_names_samples import RESERVED, REVERSE_SAMPLES, SAMPLES
 from tests.ticket.test_handoff import DOCS, SETTINGS, HandoffCase, put, slurp

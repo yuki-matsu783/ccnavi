@@ -29,7 +29,7 @@ import hashlib
 import os
 from dataclasses import dataclass, field
 
-from ..infra import settings, tree
+from ...infra import settings, tree
 from . import configsync, skillsync
 
 JSON_VERSION = 1

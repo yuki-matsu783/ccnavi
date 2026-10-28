@@ -24,8 +24,8 @@ from ..infra import settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN
-from ..tickets import handoff, template_drafts
 from ..tickets.proposal import plan_templates
+from ..tickets.sync import handoff, template_drafts
 from . import cli_args
 
 

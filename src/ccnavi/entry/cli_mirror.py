@@ -6,7 +6,7 @@
 見るだけの形を含めて、ユーザ専用（`user` の入口。hook が止める）。`--yes` で書くときは、標準入力が
 ターミナルであることを求める。`--via board` は拡張の子プロセスの経路で、ターミナルを求めない代わりに
 `--expect` と `--json` を付けて呼ぶことを求める。書くのはワークツリーだけで、コミットはしない。
-中身は `tickets.mirrorsync`。cli を読まない。
+中身は `tickets.sync.mirrorsync`。cli を読まない。
 """
 
 from __future__ import annotations
@@ -19,8 +19,8 @@ from typing import TextIO
 
 from ..infra import settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
-from ..tickets import mirrorsync
 from ..tickets.model import user_only, via
+from ..tickets.sync import mirrorsync
 from . import cli_args
 
 # `--mirror` と一緒に読むオプション（argparse の dest）。ほかのオプションが既定の値でなければ断る。

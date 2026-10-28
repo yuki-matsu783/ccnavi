@@ -8,7 +8,7 @@
 ターミナルを求めない代わりに
 `--expect` と `--json` が揃うことと、選んだ種類がボードから取り込めること（`defense` は断る）を
 求める。
-取り込みの中身は `tickets.handoff`。cli を読まない。
+取り込みの中身は `tickets.sync.handoff`。cli を読まない。
 """
 
 from __future__ import annotations
@@ -19,8 +19,8 @@ from typing import TextIO
 
 from ..infra import settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
-from ..tickets import handoff
 from ..tickets.model import user_only, via
+from ..tickets.sync import handoff
 from . import cli_args
 
 # `--handoff` と一緒に読むオプション（argparse の dest）。ほかのオプションが既定の値でなければ断る。
