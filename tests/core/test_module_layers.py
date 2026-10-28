@@ -139,7 +139,7 @@ PACKAGES: tuple[Node, ...] = (
 # 深さの上限。`ccnavi/<サブパッケージ>/<サブパッケージ>/` まで。
 MAX_DEPTH = 2
 # 直下にモジュールを置かず、サブパッケージだけにしたパッケージ（`__init__.py` は除く）。
-SPLIT: frozenset[str] = frozenset()
+SPLIT: frozenset[str] = frozenset({"tickets"})
 
 # 段は下から上へ。下の段は上の段を知らない。
 #
