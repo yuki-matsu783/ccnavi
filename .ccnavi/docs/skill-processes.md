@@ -66,6 +66,15 @@ ccnavi --docs --type skill-reference --tag process-test --keyword <語> # 語で
 
 ワークスペースとプロジェクトは同じ索引で引けるので、cwd にかかわらず両方が出る。ヒットしなかったときは、キーワードの付け方を疑い、reference の `keywords` を足す。
 
+## 入口を呼ばせる
+
+reference は入口のスキルが呼ばれて初めて届く。エージェントが `Skill` を呼ばないと届かないので、ルール `process-skill-first-edit`（共通の `rules.yml`）が、ワークツリーの中でコードや文書を最初に書き換える `Write|Edit` のときに（その書き込みは止めずに）1 度だけ、「作業に合う工程スキルがあれば `Skill` で呼ぶ」と促す。
+
+- 文脈ごと（セッション、サブエージェントの 1 回の起動）に 1 度。提案・`wip/`・`scratchpad/`・`.ccnavi/`・`.claude/` の編集は除くので、先に消費される事態は避けられる（パスの途中の同名の階層も除くので、その下では出ない）。調べものや質問は `Write|Edit` に当たらず、出ない。`sed -i` など `Bash` での書き換えと `NotebookEdit` にも出さない
+- ルール `process-skill-call` が 名前が `process-` で始まる（プラグイン名前置きを含む）`Skill` を通す。無いと `dontAsk`・`bypassPermissions` で宣言の無い呼び出しとして拒否される
+- 目録（`projskills`）は本文を `Read` で開くよう案内する。`Skill` で呼ぶと `allowed-tools` などが効くが、`Read` では効かない。目録の文面はこの仕組みでは変えない
+- 工程スキルが無い配布先では、文が「あれば」なので呼ばずに進む
+
 ## 振り返りとの関係
 
 スキル改善（`skill-improve`）と wiki（`skill-wiki.md`）の結果は、原則 reference の追加か追記として入れる。
