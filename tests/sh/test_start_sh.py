@@ -1411,12 +1411,38 @@ class StartShTest(unittest.TestCase):
         self.assertTrue(done.stdout.startswith("対象リポジトリ: acme/widgets"), done.stdout)
         self.assertEqual(
             self.labels(done.stdout),
-            {k: "OK" for k in ("tools", "origin", "integration", "api", "access", "git")},
+            {k: "OK" for k in ("tools", "origin", "integration", "api", "access", "git", "ident")},
         )
         self.assertEqual(self.local_branches(), ["main"])
         self.assertEqual(self.remote_branches(), ["main"])
         self.assertFalse(os.path.isdir(os.path.join(self.ws, ".claude", "worktrees")))
         self.assertNotIn("t0k", done.stdout + done.stderr)
+
+    def test_check_without_a_git_author_is_ng_and_asks_for_the_config(self):
+        done = self.check(**self.no_identity())
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(self.labels(done.stdout)["ident"], "NG")
+        self.assertEqual(self.labels(done.stdout)["git"], "OK")
+        self.assertIn("git config user.name", done.stdout)
+        self.assertIn("不備があり", done.stdout)
+
+    def test_check_with_only_the_author_given_is_ng_on_the_committer(self):
+        done = self.check(
+            **self.no_identity(GIT_AUTHOR_NAME="a", GIT_AUTHOR_EMAIL="a@example.invalid")
+        )
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(self.labels(done.stdout)["ident"], "NG")
+
+    def test_check_with_author_and_committer_from_the_environment_is_ok(self):
+        env = self.no_identity(
+            GIT_AUTHOR_NAME="a",
+            GIT_AUTHOR_EMAIL="a@example.invalid",
+            GIT_COMMITTER_NAME="c",
+            GIT_COMMITTER_EMAIL="c@example.invalid",
+        )
+        done = self.check(**env)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(self.labels(done.stdout)["ident"], "OK")
 
     def test_check_probe_401_and_404_are_ng(self):
         for status, fix in ((401, "auth login"), (404, "origin のパス")):
