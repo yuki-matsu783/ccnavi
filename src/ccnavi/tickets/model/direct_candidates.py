@@ -7,7 +7,7 @@ cwd がワークスペースルートのままでも、サブエージェント�
 
 候補は、促す対象を絞るための材料であり、担当の証明ではない。
 登録では git を呼ばず、ファイルシステムだけを使う。
-候補を確かめるのは Stop（`ops_stop_integrate.direct_at_stop`）である。
+候補を確かめるのは Stop（`lifecycle.stop_integrate.direct_at_stop`）である。
 
 置き場は `logs/state/direct-<セッション>.json`。形は
 `{"session": "<ID>", "entries": [{"name", "path", "seen", "checked"}]}`。

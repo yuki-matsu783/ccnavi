@@ -45,8 +45,9 @@
 どちらも `src/ccnavi/` では 1 度も使っていないので、書き方ごと止めるほうが安い。
 同じ理由で、パッケージの中の書き方を相対に限り、点の数を共通の親まで上がる最短の数にする。
 同じサブパッケージは `from . import x`、同じ親の兄弟は `from ..model import ticket`、
-別の大きなサブパッケージは `from ...infra import fsio`（`from ..infra.modes import EXIT_OK`
-も可）。余分に重ねた点、`from .. import model`（行き先がサブパッケージそのもので、
+別の大きなサブパッケージは `from ...infra import fsio`（深さ 1 のモジュールなら
+`from ..infra.modes import EXIT_OK` も可）。
+余分に重ねた点、`from .. import model`（行き先がサブパッケージそのもので、
 モジュールが import 文に出ない）、パッケージの中の `ccnavi.` で始まる絶対の import は止める。
 回避できないわけではない。`getattr` や `exec` で組み立てれば、いまでも
 隠せる。そこまで防ぐには import を実行時に捕まえるしかなく、この速さを手放す。
@@ -960,7 +961,7 @@ class OrderTableTest(unittest.TestCase):
             order_violations({"big.top.x": {"big.root_mod"}}, FAKE),
         )
 
-    def test_a_sibling_missing_from_the_table_is_not_silently_passed_for_edges_inside_it(self):
+    def test_imports_inside_one_subpackage_are_not_checked_for_order(self):
         # 同じサブパッケージの中の import は、順の検査の対象外（段が見る）
         self.assertEqual([], order_violations({"big.low.x": {"big.low.x"}}, FAKE))
 

@@ -137,7 +137,8 @@ def script_fields_set(text: str) -> tuple[str, ...]:
     1 度しか書かない（`ops.start` は着手済みを拒む）ので、既に値がある欄が変わったのなら、
     それはサブコマンドが書いたものではない。
 
-    とくに `base_sha` は着手の基準点で、親の自分のコミットの数え（`ops_stop._own_commits`）が使う。
+    とくに `base_sha` は着手の基準点で、
+    親の自分のコミットの数え（`lifecycle.stop._own_commits`）が使う。
     子の範囲検査（`phase_scope.scope_findings`）と実績リスク（`risk.measure`）は、親のワークツリーの
     HEAD との共通の祖先（`gitstate.child_base`）から数える。
     ただし `base_sha` はスクリプトだけが書く欄で、
