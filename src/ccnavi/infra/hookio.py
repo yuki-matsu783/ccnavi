@@ -124,7 +124,7 @@ class Input:
     # compact が N 回より先に来る長いセッションで一度も届かない。
     source: str = ""
     # prompt は UserPromptSubmit にだけ来る。ユーザの依頼文で、issue・MR の指定を探すのに読む
-    # （tickets.branchfind）。記録にも診断ログにも書かない。
+    # （tickets.lifecycle.branchfind）。記録にも診断ログにも書かない。
     prompt: str = ""
     # transcript_path は会話の記録（JSONL）の場所。Stop の AI 判定が共有キー（末尾のアシスタント行の
     # uuid）を導くためだけに読む。記録にも診断ログにも書かない。

@@ -254,7 +254,8 @@ def _script_writes(
     * `finish` と `cancel` の移動。正規化した内容が同じチケットが `doing/` から消えて、
       レビュー待ちか閉じた置き場に現れた組。片側だけなら外さない
 
-    * `ready` の退避（`tickets/model/archive.py`）が消したもの。閉じた親の `done/` の親子のチケット・
+    * `ready` の退避（`tickets/model/archive.py`）が消したもの。
+    閉じた親の `done/` の親子のチケット・
       `phases/<親>/`・`flows/` の削除で、ready のマーカーに載り、消えた中身が
       ワークスペースの `logs/archive/` のコピーと同じもの（見分けは write-and-push と同じ
       `write_and_push.archived_removal`）。`root`（ワークスペースルート）が空なら外さない

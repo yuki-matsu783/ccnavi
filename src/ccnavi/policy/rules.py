@@ -52,7 +52,8 @@ ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` 
 `glob` も `regex` も、どの機械でも大文字小文字を区別せずに適用する。`*/.ccnavi/*` は
 `.Ccnavi/config/project/rules.yml` にもヒットする。ヒットの仕方が機械で変わると、
 同じルールファイルが
-ある機械では止め、別の機械では通す（tickets/config/risk.py と tickets/config/phasetypes.py の範囲も同じ）。
+ある機械では止め、
+別の機械では通す（tickets/config/risk.py と tickets/config/phasetypes.py の範囲も同じ）。
 区別が要る `regex` は `(?-i:...)` で囲む。囲むのは区別したい部分だけでよく、
 否定の文字クラス（`[^c]` のような除外）を持つルールは、区別せずに適用すると除外の側が
 広がるのでそこを囲む。

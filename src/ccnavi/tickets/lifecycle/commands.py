@@ -8,12 +8,14 @@
 `doing/` の欄を書く。`finish` は `doing/` から `wip/proposals/review/`（レビュー要）か
 `.ccnavi/approved/done/`（不要）へ、`cancel` は `doing/` から `done/` へ動かす。
 子のワークツリーは、`confirm` が子を `done/` へ動かしたあとと、
-親の `finish` のあとに sh が `worktree tidy` で消す（tickets/lifecycle/worktrees.py）。finish の前にワークツリーを
+親の `finish` のあとに sh が `worktree tidy` で消す（tickets/lifecycle/worktrees.py）。
+finish の前にワークツリーを
 消すと base_sha の検査ができなくなり、レビュー待ちの間に見返す場所も無くなる（そこで積んだ
 コミットは親へ合流しないので、差し戻しは同じフェーズに子を足して直す）。
 
 ここに置くのは操作の本体（`start` / `finish` / `cancel` / `record_risk`）と、`finish` が閉じるときに
-実績のリスクを数える手順。チケットを引いて閉じてよいかを検査する部分は `tickets/lifecycle/close.py`、Stop で
+実績のリスクを数える手順。
+チケットを引いて閉じてよいかを検査する部分は `tickets/lifecycle/close.py`、Stop で
 `finish` の打ち忘れを促す部分と git の読み取りは `tickets/lifecycle/stop.py` に分けてある。
 """
 
@@ -198,7 +200,8 @@ def finish(
     # 親は、学び以外の検査をすべて通したあとに、親の今の HEAD で気づきの処理の証跡を照合する。
     if learning.parent_blocked(stderr, root, conf, found):
         return 1
-    # 子は、閉じる前に実績のリスクを数える（tickets/config/risk.py）。定性項目の判定が揃わなければ閉じない。
+    # 子は、閉じる前に実績のリスクを数える（tickets/config/risk.py）。
+    # 定性項目の判定が揃わなければ閉じない。
     scored = _score_child(stdout, stderr, root, conf, found)
     if scored is None:
         return 1

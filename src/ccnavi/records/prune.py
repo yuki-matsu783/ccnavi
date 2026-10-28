@@ -287,7 +287,7 @@ def _prune_directory(
             report.state.append(_shown(root, path))
 
 
-# 操作記録の置き場の名前（`tickets/oplog.OPS_DIR`）。
+# 操作記録の置き場の名前（`tickets/model/oplog.OPS_DIR`）。
 # records は tickets を読めないのでコピーして持つ。
 OPS_DIR = "ops"
 

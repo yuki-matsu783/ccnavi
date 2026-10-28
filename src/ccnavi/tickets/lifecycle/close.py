@@ -1,4 +1,5 @@
-"""チケットを引いて、動かしてよいかを検査する。`tickets/lifecycle/commands.py` の `start` / `finish` / `cancel` が使う。
+"""チケットを引いて、動かしてよいかを検査する。
+`tickets/lifecycle/commands.py` の `start` / `finish` / `cancel` が使う。
 
 置き場を全部引いて 1 つに決める（`find`）、取り込み済みの親子のチケットが決まらない・閉じて
 いるときに止める（`family_stopped`）、子の着手の前（親の着手・先行）と終了の前（親を閉じられる・

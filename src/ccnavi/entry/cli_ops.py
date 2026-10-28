@@ -292,7 +292,8 @@ def _worktree(
     words: list[str],
     cwd: str,
 ) -> int:
-    """`worktree drop <名前>` と `worktree tidy <親> [--phase <N>]`（tickets/lifecycle/worktrees.py）。
+    """`worktree drop <名前>` と `worktree tidy <親> [--phase <N>]`
+    （tickets/lifecycle/worktrees.py）。
 
     sh が状態を書く操作の後に呼ぶ。名前は識別子の形だけを受ける（パスを渡して任意の場所を
     消させない）。

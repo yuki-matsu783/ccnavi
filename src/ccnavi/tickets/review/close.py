@@ -162,7 +162,8 @@ def _archive_closed(
         set(archive.closed_parents(where)) | set(archive.archived_parents(root, parent.project))
     )
     # 閉じた子のチケットは退避へ移って見えなくなるので、親を閉じた後の片付けの記録（子の一覧と
-    # MR の番号。`tickets/lifecycle/retire.py`）を先に書く。親のワークツリーを片付けた後の列挙元になるので、
+    # MR の番号。`tickets/lifecycle/retire.py`）を先に書く。
+    # 親のワークツリーを片付けた後の列挙元になるので、
     # 書けなければ退避へ進まずに止める（記録が無いと片付け待ちの親を見失う）。打ち直せる。
     noted = retire.note(root, conf, parent.ticket, parent.project, tree_root, mr)
     if noted:

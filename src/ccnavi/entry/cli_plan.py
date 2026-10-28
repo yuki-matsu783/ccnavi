@@ -1,6 +1,7 @@
 """親の提案の計画を書き換える補助のフラグ `ccnavi --plan-order <親> ...` の入口。
 
-形は 2 つ。ここは引数を受けて答えを出すだけで、振り直しと書き戻しは `tickets/proposal/plan_order.py`、
+形は 2 つ。ここは引数を受けて答えを出すだけで、
+振り直しと書き戻しは `tickets/proposal/plan_order.py`、
 定義のコピーは `tickets/proposal/plan_phases.py` が持つ。
 
 - `--json [--order <JSON>]` と `--order <JSON> --expect <ハッシュ> --write`: 計画の番号を振り直して

@@ -213,7 +213,8 @@ def confirm_local(
     検査と書くものの並べ方はコア（`confirm`）。ここは手元の入力
     （cwd の親、git の差分、`--result` で取得した結果）を読んで渡し、
     並べたものを書く（Writer(FS)）。Chrome の「レビュー済み」も同じコアを通る。
-    前は tickets/review/request.py にあった（コアより下の段に置くと review → core → review の循環になる）。
+    前は tickets/review/request.py にあった
+    （コアより下の段に置くと review → core → review の循環になる）。
 
     `actor` は `ccnavi-review.sh` がトークンの持ち主を引いて `--actor` で渡すアカウント。
     あればマーカーに `actor` と `via: cli` を書く。空（引けなかった）
