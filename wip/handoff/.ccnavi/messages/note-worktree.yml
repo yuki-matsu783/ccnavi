@@ -1,0 +1,33 @@
+# ccnavi-worktree.sh が、親のワークツリーから直接作業へ切り替えたときに出す案内と、切り替えを断るときの案内。
+# 何が残っているか（条件）は sh が実行ファイル（tree leftover）に聞く。取り下げの手順は
+# .ccnavi/docs/ticket-work.md の「拒否される条件と、切り替える前の取り下げ」と同じ。
+version: 1
+messages:
+  NOTE_WORKTREE_LEFTOVER:
+    kind: note
+    values: [parent]
+    note: |-
+      親 {parent} の承認待ちの提案・MR は、直接作業へ切り替えても取り下げられずに残る。残っているものと取り下げ方をユーザに伝える
+
+  NOTE_WORKTREE_LEFTOVER_PROPOSAL:
+    kind: note
+    values: [parent]
+    note: |-
+      承認待ちの提案 {parent} が wip/proposals/ に残っている。要らなければ、ユーザに確かめて提案のファイルを削除する（cancel は doing/ の子の用で、提案には使えない）。削除できない、または propose で送った分が親のブランチに残るときは、状態を報告してユーザの判断を仰ぐ
+
+  NOTE_WORKTREE_PARENT_CLOSE:
+    kind: note
+    note: |-
+      親を早めに閉じたいなら、ユーザが親のワークツリーで {script:ccnavi-user-close-early.sh} --reason <理由> を打つ（エージェントは打たず、代わりに判断もしない）
+
+  NOTE_WORKTREE_PARENT_CHILDREN:
+    kind: note
+    values: [count]
+    note: |-
+      着手済みの子が {count} 件ある。取り下げるなら、メインが {script:ccnavi-ticket.sh} cancel <子の識別子> --reason <理由> を打つ（サブエージェントは打てない）
+
+  NOTE_WORKTREE_LEFTOVER_MR:
+    kind: note
+    values: [mr]
+    note: |-
+      MR {mr} が残っている。ccnavi には MR を閉じる操作が無く、Draft のまま残すか閉じるかはユーザがホストで決める（エージェントは閉じない）。MR のブランチは変わらず、直接作業の変更はこのワークツリーのブランチに入る
