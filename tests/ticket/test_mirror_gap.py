@@ -92,8 +92,8 @@ class MovedTest(unittest.TestCase):
     def setUp(self):
         self.conf = settings.Settings()
 
-    def explain(self, changed):
-        moved = review.moved_detail(self.conf, {"head": RECORDED}, HEAD, changed)
+    def explain(self, changed, project=True):
+        moved = review.moved_detail(self.conf, {"head": RECORDED}, HEAD, changed, True, project)
         self.assertTrue(moved.text)
         return "\n".join(review.moved_explanation(moved))
 
@@ -110,6 +110,9 @@ class MovedTest(unittest.TestCase):
 
     def test_normal_paths_get_no_mirror_sentence(self):
         self.assertNotIn("ミラー", self.explain(["src/keep.py"]))
+
+    def test_the_workspace_own_parent_gets_no_mirror_sentence(self):
+        self.assertNotIn("ミラー", self.explain([MIRROR_FILE], project=False))
 
     def test_unverified_gets_no_mirror_sentence(self):
         moved = review.moved_detail(self.conf, {"head": RECORDED}, HEAD, None)

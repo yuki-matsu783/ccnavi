@@ -1043,7 +1043,9 @@ def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark
     return _moved_detail(tree_root, conf, requested_mark).text
 
 
-def _moved_detail(tree_root: str, conf: settings.Settings, requested_mark: dict) -> Moved:
+def _moved_detail(
+    tree_root: str, conf: settings.Settings, requested_mark: dict, project: bool = False
+) -> Moved:
     """依頼の後に、ユーザが見るものが動いたか。動いていれば、その説明と動いた理由の種類。
 
     ユーザが見たのは依頼時の HEAD。その後に積んだコミットは誰も見ていないので、
@@ -1075,7 +1077,7 @@ def _moved_detail(tree_root: str, conf: settings.Settings, requested_mark: dict)
         found, failed = _diff_paths(tree_root, recorded)
         paths = None if failed else found
         ancestor = _git(tree_root, ["merge-base", "--is-ancestor", recorded, head])[0] == 0
-    moved = moved_detail(conf, requested_mark, head, paths, ancestor)
+    moved = moved_detail(conf, requested_mark, head, paths, ancestor, project)
     if moved.text:
         if moved.kind == KIND_SEEN:
             moved.commits = _unseen_commits(tree_root, conf, recorded)
@@ -1136,8 +1138,13 @@ def moved_detail(
     head: str,
     changed: list[str] | None,
     ancestor: bool = True,
+    project: bool = False,
 ) -> Moved:
-    """`moved_since` と同じ判定で、動いた理由の種類も返す。判定は `text` が空かどうか。"""
+    """`moved_since` と同じ判定で、動いた理由の種類も返す。判定は `text` が空かどうか。
+
+    `project` はプロジェクトの親のとき。ミラー側の数（`Moved.mirrored`）はこのときだけ数える。
+    ワークスペース自身の親では `.ccnavi/config/common/` は共通レイヤー本体なので、ずれと説明しない。
+    """
     recorded = str(requested_mark.get("head") or "")
     if not recorded:
         # 記録が無ければ照合できない。確かめずに通すと、依頼の後のコミットが全部
@@ -1154,6 +1161,8 @@ def moved_detail(
     if seen:
         if not ancestor:
             return Moved(moved, KIND_UNVERIFIED)
+        if not project:
+            return Moved(moved, KIND_SEEN)
         mirrored, _ = mirror_gap.split(conf, seen)
         return Moved(moved, KIND_SEEN, mirrored=len(mirrored), total=len(seen))
     return Moved()
