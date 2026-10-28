@@ -33,8 +33,8 @@ import unittest
 from unittest import mock
 
 from ccnavi.infra import fsio, settings
-from ccnavi.tickets import review
 from ccnavi.tickets.model import handoff_names
+from ccnavi.tickets.review import request as review
 from ccnavi.tickets.sync import handoff
 from tests import ROOT, can_case_sensitive, common_path, config_path, requires_symlink
 from tests.inproc import run_ccnavi

@@ -11,8 +11,8 @@ from __future__ import annotations
 from ..infra import fsio as fsio
 from ..infra import settings as settings
 from ..tickets import core as core
-from ..tickets import review as review
 from ..tickets.model import review_host, ticket, ticket_ids, ticket_model, via
+from ..tickets.review import request as review
 from . import cli as cli
 from . import lint as lint
 from . import version as version

@@ -1334,11 +1334,11 @@ class RecordWritesTest(CoreHarness):
             "tickets.flow.graph",
             "tickets.config.risk",
             "tickets.core",
-            "tickets.review",
+            "tickets.review.request",
         )
         names += ("tickets.phase.gates", "tickets.model.ticket", "infra.gitstate")
         names += ("tickets.approval.marks", "tickets.approval.checks", "tickets.approval.times")
-        names += ("tickets.model.review_host", "tickets.review_decide", "tickets.review_close")
+        names += ("tickets.model.review_host", "tickets.review.decide", "tickets.review.close")
         names += (
             "tickets.model.ticket_model",
             "tickets.model.ticket_ids",

@@ -15,8 +15,8 @@ keywords: [レビュー, 依頼, 確認, mr, ccnavi-review.sh, GraphQL, 403, RES
 リモート（GitHub / GitLab）を読み書きするのは `.ccnavi/scripts/ccnavi-review.sh` で、実行ファイルは
 ネットワークに出ない（P11）。実行ファイルが持つのはワークツリーの中で分かる前提検査と、
 sh が取得して JSON ファイルに書き、そのパスを `--result` で渡す。実行ファイルはその JSON の判定とマーカーの操作だけを持つ。sh と実行ファイルの間の契約は、この JSON の形で決まる。
-実行ファイルの側では、JSON を読む形と投稿の目印は `tickets/model/review_host.py`、`request` と `confirm` の段は `tickets/review.py`、
-`decide` の段は `tickets/review_decide.py`、`ready` と `close-early` の段は `tickets/review_close.py` が持つ。
+実行ファイルの側では、JSON を読む形と投稿の目印は `tickets/model/review_host.py`、`request` と `confirm` の段は `tickets/review/request.py`、
+`decide` の段は `tickets/review/decide.py`、`ready` と `close-early` の段は `tickets/review/close.py` が持つ。
 
 | `--result` の JSON | 形 |
 |---|---|

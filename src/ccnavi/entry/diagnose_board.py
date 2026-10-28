@@ -13,7 +13,6 @@ from typing import TextIO
 from ..infra import modes, pathcase, settings, tree
 from ..policy import ruleload, rules, selfguard
 from ..records import turn
-from ..tickets import overview
 from ..tickets.approval import checks as approval_checks
 from ..tickets.approval import marks as approval_marks
 from ..tickets.approval import store as approval
@@ -22,6 +21,7 @@ from ..tickets.config import risk
 from ..tickets.flow import graph as flow
 from ..tickets.model import archive, oplog, standing, ticket_fold, ticket_model
 from ..tickets.model import ticket as ticket_mod
+from ..tickets.notice import overview
 from ..tickets.phase import gates as phase
 from ..tickets.phase import manual_settle
 from ..tickets.proposal import agree

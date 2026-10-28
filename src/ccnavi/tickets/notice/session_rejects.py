@@ -26,14 +26,14 @@ import os
 import time
 from dataclasses import dataclass, field
 
-from ..infra import settings, tree
-from ..policy import builtin, ruleload, rules, selfguard, selfguard_shell, texts
-from ..records import audit
-from .approval import checks as approval_checks
-from .approval import store as approval
-from .config import phasetypes
-from .model import ticket_guard, ticket_model
-from .phase import scope as phase_scope
+from ...infra import settings, tree
+from ...policy import builtin, ruleload, rules, selfguard, selfguard_shell, texts
+from ...records import audit
+from ..approval import checks as approval_checks
+from ..approval import store as approval
+from ..config import phasetypes
+from ..model import ticket_guard, ticket_model
+from ..phase import scope as phase_scope
 
 # 適用するツール。チケットの範囲が効くのは書き込み系で、項はツールを持たない。
 _TOOLS = ("Write", "Edit", "NotebookEdit")

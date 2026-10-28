@@ -12,10 +12,10 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from ..infra import gitcmd, settings, tree
-from .approval import checks as approval_checks
-from .approval import store as approval
-from .model import ticket_model
+from ...infra import gitcmd, settings, tree
+from ..approval import checks as approval_checks
+from ..approval import store as approval
+from ..model import ticket_model
 
 TIMEOUT_SECONDS = 5.0
 

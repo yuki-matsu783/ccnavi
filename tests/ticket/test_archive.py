@@ -19,12 +19,12 @@ import tempfile
 import unittest
 
 from ccnavi.infra import pathcase, settings
-from ccnavi.tickets import review
 from ccnavi.tickets.approval import checks as approval_checks
 from ccnavi.tickets.approval import ops as approval_ops
 from ccnavi.tickets.approval import write_and_push
 from ccnavi.tickets.model import archive
 from ccnavi.tickets.model import ticket as ticket_mod
+from ccnavi.tickets.review import request as review
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text, parent_text
@@ -629,7 +629,7 @@ class SecondReviewChecksTest(ChecksHarness):
     """2 回目のレビューの指摘の再現（判定）。"""
 
     def test_5_ready_does_not_archive_from_the_workspace_root(self):
-        from ccnavi.tickets import review_close
+        from ccnavi.tickets.review import close as review_close
 
         approved = os.path.join(self.root, ".ccnavi", "approved")
         write(os.path.join(approved, "done", "i0001.md"), closed_text("i0001"))

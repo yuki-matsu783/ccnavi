@@ -16,16 +16,16 @@ import os
 from dataclasses import dataclass
 from typing import TextIO
 
-from ..infra import fsio, settings, tree
-from . import review
-from .approval import checks as approval_checks
-from .approval import marks as approval_marks
-from .approval import store as approval
-from .lifecycle import close as ops_close
-from .lifecycle import commands as ops
-from .lifecycle import retire
-from .model import archive, review_host, standing, ticket_model, ticket_places
-from .phase import gates as phase
+from ...infra import fsio, settings, tree
+from ..approval import checks as approval_checks
+from ..approval import marks as approval_marks
+from ..approval import store as approval
+from ..lifecycle import close as ops_close
+from ..lifecycle import commands as ops
+from ..lifecycle import retire
+from ..model import archive, review_host, standing, ticket_model, ticket_places
+from ..phase import gates as phase
+from . import request as review
 
 # Draft を外すときにマージリクエストへ残すコメント。sh が Draft を外してから投稿する。
 READY_FILE = "review-ready-{parent}.md"

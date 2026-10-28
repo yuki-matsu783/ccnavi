@@ -219,7 +219,7 @@ class ConsolidateFlowTest(FlowHarness):
 
 class SessionRejectsTest(FlowHarness):
     def test_the_fixed_scope_is_not_reported_as_outside_the_parent(self):
-        from ccnavi.tickets import session_rejects
+        from ccnavi.tickets.notice import session_rejects
 
         self.setup_family()
         self.assertEqual(self.consolidate().returncode, 0)

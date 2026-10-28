@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from typing import TextIO
 
 from ..infra import fsio, settings, tree
-from . import core_base, review, review_decide
+from . import core_base
 from .approval import checks as approval_checks
 from .approval import marks as approval_marks
 from .approval import ops as approval_ops
@@ -27,6 +27,8 @@ from .model import oplog, review_host, ticket_model, ticket_places, via
 from .phase import gates as phase
 from .phase import manual_settle
 from .proposal import agree
+from .review import decide as review_decide
+from .review import request as review
 
 # レビュー済み（`confirm`）が通らなかった根拠の種別。付録 A の `CORE_CONFIRM_*`。
 # 親の承認済みチケットが作業中に無い。

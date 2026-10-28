@@ -41,7 +41,6 @@ from ..records import (
     turn,
     userprompt,
 )
-from ..tickets import learning_notice, overview, pending_integrate, session_rejects
 from ..tickets.approval import checks as approval_checks
 from ..tickets.approval import store as approval
 from ..tickets.lifecycle import branchfind
@@ -50,6 +49,7 @@ from ..tickets.lifecycle import stop_feedback as ops_stop_feedback
 from ..tickets.lifecycle import stop_integrate as ops_stop_integrate
 from ..tickets.lifecycle import stop_request as ops_stop_request
 from ..tickets.model import direct_candidates, ticket_guard
+from ..tickets.notice import learning_notice, overview, pending_integrate, session_rejects
 from ..tickets.phase import gates as phase
 from ..tickets.sync import promptsync
 from . import (

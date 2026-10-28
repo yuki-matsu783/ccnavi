@@ -18,9 +18,9 @@ import os
 
 from ..infra import directrec, gitcmd, pathcase, settings, tree
 from ..policy.rules import SEVERITY_INFO, SEVERITY_WARN, Problem
-from ..tickets import pending_integrate
 from ..tickets.lifecycle import stop_integrate as osi
 from ..tickets.model import direct_candidates
+from ..tickets.notice import pending_integrate
 
 _NEED = ("base_branch", "snap_sha", "common_dir", "main_tree")
 

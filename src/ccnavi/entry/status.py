@@ -24,13 +24,13 @@ from dataclasses import dataclass, field
 from typing import TextIO
 
 from ..infra import gitcmd, settings, tree
-from ..tickets import overview
 from ..tickets.approval import checks as approval_checks
 from ..tickets.approval import store as approval
 from ..tickets.approval import times as approval_times
 from ..tickets.approval import write_and_push
 from ..tickets.lifecycle import stop as ops_stop
 from ..tickets.model import oplog, standing, ticket_model
+from ..tickets.notice import overview
 from ..tickets.phase import gates as phase
 from ..tickets.phase import manual_settle
 
