@@ -1156,12 +1156,17 @@ fast_forward() {
 cleanup_created_worktree() {
 	[ -n "$ew_created" ] || return 0
 	cc_branch="$1"
-	if cgit_quiet worktree remove "$wt" && cgit_quiet branch -d "$cc_branch"; then
-		log_info 作ったワークツリーを片付けた -- "branch=$cc_branch"
+	if ! cgit_quiet worktree remove "$wt"; then
+		log_info ワークツリーを片付けられず -- "branch=$cc_branch"
+		ccnavi_text "$root" NOTE_START_WORKTREE_KEPT "wt=$wt" "branch=$cc_branch"
 		return 0
 	fi
-	log_info ワークツリーを片付けられず -- "branch=$cc_branch"
-	ccnavi_text "$root" NOTE_START_WORKTREE_KEPT "wt=$wt" "branch=$cc_branch"
+	if ! cgit_quiet branch -d "$cc_branch"; then
+		log_info ブランチだけ残った -- "branch=$cc_branch"
+		ccnavi_text "$root" NOTE_START_BRANCH_KEPT "branch=$cc_branch"
+		return 0
+	fi
+	log_info 作ったワークツリーを片付けた -- "branch=$cc_branch"
 }
 
 # ensure_initial_commit <ブランチ>。統合先より進んでいなければ、空の初期コミットを積む（wt で）。
