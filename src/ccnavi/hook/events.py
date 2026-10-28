@@ -50,13 +50,13 @@ from ..tickets import (
     ops_stop_request,
     overview,
     pending_integrate,
-    phase,
     promptsync,
     session_rejects,
 )
 from ..tickets.approval import checks as approval_checks
 from ..tickets.approval import store as approval
 from ..tickets.model import direct_candidates, ticket_guard
+from ..tickets.phase import gates as phase
 from . import (
     ccnavimd,
     judge,

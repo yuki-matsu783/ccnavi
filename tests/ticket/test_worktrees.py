@@ -97,7 +97,7 @@ class ReviewTurnTest(PhaseHarness):
         「ユーザのレビューを待つ」と言わない。"""
         from unittest import mock
 
-        from ccnavi.tickets import phase
+        from ccnavi.tickets.phase import gates as phase
 
         self.child("i0001-01-01")
         with mock.patch.object(phase, "review_next", return_value=""):

@@ -24,12 +24,14 @@ from dataclasses import dataclass, field
 from typing import TextIO
 
 from ..infra import gitcmd, settings, tree
-from ..tickets import manual_settle, ops_stop, overview, phase
+from ..tickets import ops_stop, overview
 from ..tickets.approval import checks as approval_checks
 from ..tickets.approval import store as approval
 from ..tickets.approval import times as approval_times
 from ..tickets.approval import write_and_push
 from ..tickets.model import oplog, standing, ticket_model
+from ..tickets.phase import gates as phase
+from ..tickets.phase import manual_settle
 
 TIMEOUT_SECONDS = 10.0
 

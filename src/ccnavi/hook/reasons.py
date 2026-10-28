@@ -13,8 +13,8 @@ import re
 from ..infra import hookio, settings, shellread, shellread_scan, shellread_words
 from ..infra.modes import DRY_RUN
 from ..policy import rules, texts
-from ..tickets import phase
 from ..tickets.model import phase_forms
+from ..tickets.phase import gates as phase
 from . import ccnavimd
 
 # 返す理由に載せる理由コード。設計の理由コードの体系から、今のビルドが実際に

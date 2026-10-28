@@ -22,7 +22,6 @@ from ..tickets import (
     learning,
     next_id,
     ops,
-    phase,
     propose,
     retire,
     review,
@@ -33,6 +32,7 @@ from ..tickets import (
 )
 from ..tickets.approval import write_and_push
 from ..tickets.model import oplog, ticket_ids, user_only, via
+from ..tickets.phase import gates as phase
 from . import cli_args, cli_usage, lint, status
 
 

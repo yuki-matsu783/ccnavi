@@ -41,11 +41,13 @@ from dataclasses import dataclass, field
 
 from ..infra import fsio, gitcmd, settings, tree
 from ..policy import texts
-from . import manual_settle, ops_close, ops_stop, phase
+from . import ops_close, ops_stop
 from .approval import checks as approval_checks
 from .approval import marks as approval_marks
 from .approval import store as approval
 from .model import ticket_model
+from .phase import gates as phase
+from .phase import manual_settle
 
 # Stop でレビューの依頼までの道を促すときの理由コード。止めるのは 1 回だけの促しで、
 # 判定の deny ではない。

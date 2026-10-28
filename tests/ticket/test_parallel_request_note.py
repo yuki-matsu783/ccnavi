@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import unittest
 
-from ccnavi.tickets import phase
+from ccnavi.tickets.phase import gates as phase
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticketsample import child_text
 

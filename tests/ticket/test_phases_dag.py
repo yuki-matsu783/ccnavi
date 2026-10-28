@@ -373,7 +373,7 @@ class PlanProblemsTest(unittest.TestCase):
 class NextHintTest(unittest.TestCase):
     def test_an_earlier_branch_without_children_is_offered(self):
         """3 が先に閉じても、まだ子の無い 2 を次に始められるものとして挙げる。"""
-        from ccnavi.tickets import phase as phase_mod
+        from ccnavi.tickets.phase import gates as phase_mod
 
         owner = parent_of(
             [

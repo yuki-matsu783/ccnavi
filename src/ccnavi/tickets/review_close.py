@@ -17,11 +17,12 @@ from dataclasses import dataclass
 from typing import TextIO
 
 from ..infra import fsio, settings, tree
-from . import ops, ops_close, phase, retire, review
+from . import ops, ops_close, retire, review
 from .approval import checks as approval_checks
 from .approval import marks as approval_marks
 from .approval import store as approval
 from .model import archive, review_host, standing, ticket_model, ticket_places
+from .phase import gates as phase
 
 # Draft を外すときにマージリクエストへ残すコメント。sh が Draft を外してから投稿する。
 READY_FILE = "review-ready-{parent}.md"

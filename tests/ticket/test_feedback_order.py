@@ -18,9 +18,9 @@ from __future__ import annotations
 import os
 import unittest
 
-from ccnavi.tickets import phase
 from ccnavi.tickets.config import workflow
 from ccnavi.tickets.model import ticket_model
+from ccnavi.tickets.phase import gates as phase
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_phases_dag import item, parent_of
 from tests.ticketsample import child_text, parent_text

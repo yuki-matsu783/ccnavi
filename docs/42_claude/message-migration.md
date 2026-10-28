@@ -15,7 +15,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | 識別子 | 出力元 | 状態 |
 |---|---|---|
 | `DENY_TICKET_PARENT` | `hook/judge.py`（親のワークツリーへの書き込み） | 移した |
-| `DENY_PHASE_REVIEW__WAITING`・`DENY_PHASE_REVIEW__REQUEST` | `tickets/phase.py` の `hold_reason` | 移した（並行の依頼の断り `PARALLEL_REQUEST_NOTE` と止めている間も通せる操作の案内 `EXEMPT_NOTE` は、`review.py` や `phase.py` の別の文と共有する定数なので、コードに残る） |
+| `DENY_PHASE_REVIEW__WAITING`・`DENY_PHASE_REVIEW__REQUEST` | `tickets/phase/gates.py` の `hold_reason` | 移した（並行の依頼の断り `PARALLEL_REQUEST_NOTE` と止めている間も通せる操作の案内 `EXEMPT_NOTE` は、`review.py` や `phase.py` の別の文と共有する定数なので、コードに残る） |
 | `DENY_NEEDS_USER_TURN__INTEGRATE`・`DENY_NEEDS_USER_TURN__STATE` | `hook/turngate.py` の `message` | 移した（宣言の `Gate.message` が識別子を指す） |
 | `NUDGE_INTEGRATE__UNKNOWN_MARKER`・`__CONFIRM`・`__ADOPT`・`__RUN`、`NOTE_INTEGRATE_*` | `tickets/ops_stop_integrate.py` の `integrate_nudge` | 移した（`blocked_notice` の `systemMessage` は残る） |
 | `NEXT_START_*`・`NOTE_START_*`・`CHOICES_START_ISSUE_CLOSED` | `ccnavi-start.sh` の `次:`・`次の手:` と、それに続く `案内:` | 移した（`次:`・`次の手:` に続く `案内:` まで。続かない `案内:` は下の「残り」。状態を報告する行・`必須:`・`確認:`・`MCP で行う手順:` は次の一手ではないので残る） |
@@ -43,7 +43,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 |---|---|---|---|
 | 組み込みの拒否（Python） | `hook/reasons.py` の `internal_error_notice`（ツールの呼び出しを持たないイベントで、ccnavi 自身に不具合があるときの文。文面ファイルに頼らない）、`hook/wrapguard.py` などが組んで渡す他の文 | 少数 | 移さない（`internal_error_notice`）。ほかは未移行 |
 | 英語の文面 | `hook/reasons.py` の一部（日本語と英語の混在の整理は別に進めている） | | 未移行 |
-| 日本語の直書き（Python の拒否・次の一手） | `tickets/propose.py`（計画の誤りで断るときの `次:`）、`tickets/approval/checks.py` の残り（`root` を持たず `Problem.detail` に入る文）、`tickets/review.py` の残り（問題の一覧の要素・`root` を持たない関数の文）、`tickets/phase.py`（`review_next`・`_next_hint` の状態を伝える文）、`tickets/flow/graph.py`（サブエージェント向けの手順）、`policy/selfguard.py`（設定ファイルを戻したときの知らせ） | 多数 | 未移行（数え直して、1 まとまりずつ移す。`hook/post.py` の状態を報告する行と、`catalog/docsearch.py` の `stderr` の診断は移さない） |
+| 日本語の直書き（Python の拒否・次の一手） | `tickets/propose.py`（計画の誤りで断るときの `次:`）、`tickets/approval/checks.py` の残り（`root` を持たず `Problem.detail` に入る文）、`tickets/review.py` の残り（問題の一覧の要素・`root` を持たない関数の文）、`tickets/phase/gates.py`（`review_next`・`_next_hint` の状態を伝える文）、`tickets/flow/graph.py`（サブエージェント向けの手順）、`policy/selfguard.py`（設定ファイルを戻したときの知らせ） | 多数 | 未移行（数え直して、1 まとまりずつ移す。`hook/post.py` の状態を報告する行と、`catalog/docsearch.py` の `stderr` の診断は移さない） |
 | sh の残りの `次の手:`・`次:`・`案内:` | `ccnavi-ticket.sh` の `次の手:` の選択肢、`ccnavi-git.sh`（`ig_note`）・`ccnavi-worktree.sh`・`ccnavi-start.sh` の状態を報告する `案内:`（取り込みの記録がある・手元が進んでいる・origin に無い・issue が closed・ホストを見ていない・origin にブランチが無い・`sync_note`・`clash_note`・ホストに届かない）、`ccnavi-dirs.sh`・`ccnavi-review.sh` の `案内:` | 約 15 | 移さない（状態の報告に近い。次の一手を含む `案内:` が見つかったら、その行だけを `ccnavi_text` に分けて移す） |
 | ルールの文 | `rules.yml` の `message`・`additionalContext`・`additionalContextOnce`（インライン） | | 未移行（識別子で引く `message_id` は持たない。`additionalContextFile` で md の本文を出せる） |
 | 配布側の sh の `次:` | `scripts/ccnavi-doctor.sh` 2、`scripts/ccnavi-package.sh` 1、`scripts/ccnavi-install.sh`（`次:` を組み立てる関数）。配布の道具で、ワークスペースの実行ファイルが無いときにも動くため、`ccnavi text` に頼らない | | 対象外 |

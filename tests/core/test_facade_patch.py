@@ -2,7 +2,7 @@
 
 `src/ccnavi/` には、別のモジュールの名前を同じ名前で束ね直す書き方（`X = mod.X`）がある。
 名前を再輸出するだけの薄いファサード（`tickets/core.py`・`entry/diagnose.py`）と、
-モジュールの一部だけを束ね直すもの（`tickets/phase.py` の `load_types`、`hook/judge.py` の
+モジュールの一部だけを束ね直すもの（`tickets/phase/gates.py` の `load_types`、`hook/judge.py` の
 `PATH_TOOLS` など）。`mock.patch.object(core, "x")` は `core` の属性を差し替えるだけで、
 実体のモジュールの中の呼び出し（`core_base.x(...)`）には効かない。効いたつもりで通るテストは、
 差し替えたはずの処理を実物のまま走らせる。
@@ -173,7 +173,9 @@ class FacadePatchTest(unittest.TestCase):
         facades = _facades()
         self.assertLessEqual({"approve", "judge_approval", "confirm"}, facades["tickets.core"])
         self.assertLessEqual({"explain", "test", "board"}, facades["entry.diagnose"])
-        self.assertLessEqual({"types_path", "layer_types", "load_types"}, facades["tickets.phase"])
+        self.assertLessEqual(
+            {"types_path", "layer_types", "load_types"}, facades["tickets.phase.gates"]
+        )
         self.assertIn("PATH_TOOLS", facades["hook.judge"])
         self.assertNotIn("DOING_DIR", facades.get("tickets.approval.store", set()))
 
@@ -181,16 +183,16 @@ class FacadePatchTest(unittest.TestCase):
         facades = {
             "tickets.core": {"a", "c"},
             "entry.diagnose": {"b", "d"},
-            "tickets.phase": {"g", "h"},
+            "tickets.phase.gates": {"g", "h"},
         }
         modules = {
             "core": ["tickets.core"],
             "core_base": ["tickets.core_base"],
             "diagnose": ["entry.diagnose"],
-            "phase": ["tickets.phase"],
+            "phase": ["tickets.phase.gates"],
         }
         tree = ast.parse(
-            "from ccnavi.tickets import phase as phase_mod\n"
+            "from ccnavi.tickets.phase import gates as phase_mod\n"
             "mock.patch.object(core, 'a')\n"
             "mock.patch.object(cli.diagnose, 'b')\n"
             "mock.patch('ccnavi.tickets.core.c')\n"
@@ -198,9 +200,9 @@ class FacadePatchTest(unittest.TestCase):
             "mock.patch('ccnavi.tickets.core_base.e')\n"
             "mock.patch.object(core_base, 'f')\n"
             "mock.patch.object(phase_mod, 'g')\n"
-            "mock.patch('ccnavi.tickets.phase.h')\n"
+            "mock.patch('ccnavi.tickets.phase.gates.h')\n"
             "mock.patch.object(phase, 'own')\n"
-            "mock.patch('ccnavi.tickets.phase.own')\n"
+            "mock.patch('ccnavi.tickets.phase.gates.own')\n"
         )
         self.assertEqual(
             [
@@ -209,7 +211,7 @@ class FacadePatchTest(unittest.TestCase):
                 ("ccnavi.tickets.core", "c"),
                 ("ccnavi.entry.diagnose", "d"),
                 ("phase_mod", "g"),
-                ("ccnavi.tickets.phase", "h"),
+                ("ccnavi.tickets.phase.gates", "h"),
             ],
             sorted(_facade_patches(tree, facades, modules), key=lambda p: p[1]),
         )

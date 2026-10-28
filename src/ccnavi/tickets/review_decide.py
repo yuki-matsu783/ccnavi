@@ -20,11 +20,12 @@ from types import SimpleNamespace
 from typing import TextIO
 
 from ..infra import fsio, settings, tree
-from . import phase, review
+from . import review
 from .approval import marks as approval_marks
 from .approval import ops as approval_ops
 from .approval import store as approval
 from .model import oplog, review_host, standing, ticket_model, via
+from .phase import gates as phase
 
 DECIDE_FILE = "review-decide-{parent}-{phase}.md"
 # 残った指摘のうち、ユーザが issue に回すと選んだ分の下書き。sh がこれで issue を作る。

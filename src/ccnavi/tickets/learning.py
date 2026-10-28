@@ -17,12 +17,13 @@ from typing import TextIO
 
 from ..infra import fsio, gitcmd, pathsafe, settings, tree
 from ..records import audit, redact
-from . import learning_records, phase
+from . import learning_records
 from .approval import checks as approval_checks
 from .approval import marks as approval_marks
 from .approval import store as approval
 from .config import phasetypes
 from .model import ticket_model
+from .phase import gates as phase
 
 LEARNING_DIR = "wip/handoff/learnings"
 INBOX_DIR = "docs/wiki/inbox"

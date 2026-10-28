@@ -10,9 +10,9 @@ from dataclasses import dataclass, field
 
 from ..infra import fsio, gitcmd, gitstate, pathcase, tree
 from ..policy import rules
-from ..tickets import phase_scope
 from ..tickets.approval import write_and_push
 from ..tickets.model import archive, ticket_fields, ticket_model, ticket_places
+from ..tickets.phase import scope as phase_scope
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
 # そのルールは「この場所に書かせない」を言っている。

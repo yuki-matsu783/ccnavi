@@ -10,10 +10,10 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from ccnavi.tickets import phase
 from ccnavi.tickets.approval import marks as approval_marks
 from ccnavi.tickets.config import workflow
 from ccnavi.tickets.model import ticket_model
+from ccnavi.tickets.phase import gates as phase
 
 
 def phase_of(number, states, marks=()):

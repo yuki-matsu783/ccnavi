@@ -8,12 +8,12 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from ..infra import gitcmd, gitstate, settings, tree
-from ..policy import rules
-from . import phase
-from .config import phasetypes
-from .model import ticket as ticket_mod
-from .model import ticket_model, ticket_places
+from ...infra import gitcmd, gitstate, settings, tree
+from ...policy import rules
+from ..config import phasetypes
+from ..model import ticket as ticket_mod
+from ..model import ticket_model, ticket_places
+from . import gates as phase
 
 # 範囲の外へ出した上限の名前（ScopeVerdict.limit）。
 LIMIT_TICKET = "ticket"

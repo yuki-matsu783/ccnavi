@@ -17,11 +17,11 @@ from ..infra import fsio, hookio, modes, pathcase, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import ctxfile, rules
 from ..records import audit
-from ..tickets import phase_scope
 from ..tickets.approval import checks as approval_checks
 from ..tickets.approval import store as approval
 from ..tickets.flow import graph as flow
 from ..tickets.model import ticket_model
+from ..tickets.phase import scope as phase_scope
 from . import (
     agentkind,
     childnote,

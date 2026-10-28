@@ -18,8 +18,8 @@ import os
 from dataclasses import replace
 
 from ccnavi.infra import settings
-from ccnavi.tickets import phase
 from ccnavi.tickets.approval import store as approval
+from ccnavi.tickets.phase import gates as phase
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import write
 from tests.ticketsample import child_text
