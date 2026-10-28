@@ -3,7 +3,7 @@ type: design
 title: モジュール構成
 description: src/ccnavi/ のサブパッケージと、その中のモジュールを役割ごとにまとめた表。ファイル単位の役割は各ファイル先頭の説明が持つ
 tags: [design-doc, modules]
-keywords: [モジュール, 構成, infra, records, policy, tickets, hook, entry, サブパッケージ]
+keywords: [モジュール, 構成, infra, records, policy, tickets, catalog, hook, entry, サブパッケージ, 目録]
 ---
 
 [設計書の入口に戻る](../20_design.md)
@@ -24,7 +24,8 @@ keywords: [モジュール, 構成, infra, records, policy, tickets, hook, entry
 | `src/ccnavi/records/` | 記録。伏せ字・判定の記録・診断ログ・後始末・拒否や失敗の数え・ターン中の印・学びの蓄積・放置セッションの引き継ぎ促し | `infra` |
 | `src/ccnavi/policy/` | ルール。読み込み・照合・組み込み・レイヤーの合成・自己防衛・文脈ファイル | `infra`、`records` |
 | `src/ccnavi/tickets/` | チケット。置き場、合意の手続き、承認・レビュー済みの判定、フェーズ、リスク、操作、ユーザの発言のときの共通レイヤー・工程スキルのミラー | `infra`、`records`、`policy` |
-| `src/ccnavi/hook/` | hook の判定。実行前チェック・文面・実行後チェック・イベント・サブエージェント・文書の検索 | `infra`、`records`、`policy`、`tickets` |
+| `src/ccnavi/catalog/` | 目録。文書の索引と `--docs` の引き方、プロジェクトのスキルの目録 | `infra`、`policy`、`tickets` |
+| `src/ccnavi/hook/` | hook の判定。実行前チェック・文面・実行後チェック・イベント・サブエージェント | `infra`、`records`、`policy`、`tickets`、`catalog` |
 | `src/ccnavi/entry/` | 入口。CLI・診断・lint・提案・版 | 下の全部。どこからも読まれない |
 
 同じサブパッケージの中の読む順（段）は、サブパッケージだけでは言えないので、テストの段の表が持つ。モジュールを足したら、その表に段を足す。
@@ -79,6 +80,13 @@ keywords: [モジュール, 構成, infra, records, policy, tickets, hook, entry
 | 学び（`learning*`・`consolidate`） | 気づきの記録・受信箱・判定記録の要約、処理すべきものの判定、SessionStart の通知、統合の子を作る |
 | そのほか | ユーザだけが打つ操作の表（`user_only`。hook の止めとターミナル要求が引く正本）、誰がどの経路で動かしたか（`via`）、保護対象の下書きの取り込み、ブランチの探索、セッション開始で示す一覧と却下された要求 |
 
+## catalog
+
+| まとまり | 役割 |
+|---|---|
+| 文書の索引（`docsearch*`） | 索引を組む（`docsearch_index`）、問いに答える（`docsearch_query`）、SessionStart の案内と失敗が続いたときの案内、frontmatter が無い md の案内（`docsearch`） |
+| スキルの目録（`projskills`） | プロジェクトのスキルの目録を作って案内する |
+
 ## hook
 
 | まとまり | 役割 |
@@ -87,7 +95,7 @@ keywords: [モジュール, 構成, infra, records, policy, tickets, hook, entry
 | 実行後チェック（`post*`） | ワークツリーの読み取り、前からあった変更の記録、復元、変わったファイルを守る場所とチケットの範囲に適用する、差し戻しの文 |
 | 実行前に止める形 | サブエージェントが Bash から親のワークツリーへ書き込む形、Bash からワークスペースルート直下へ書く形（Write / Edit と同じ決まりに適用する。`rootwrite`）、保護済みの sh を呼ぶ形のうち止めるもの |
 | サブエージェント | SubagentStart / SubagentStop、終了結果の記録、編集するものか読み取り専用かの見分け、起動ツールの PreToolUse での担当の決定、子 1 本の担当の案内 |
-| セッション開始 | 作業の決まり（`.ccnavi/CCNAVI.md`）の条件と差し込み、プロジェクトのスキルの目録、文書の索引（`docsearch*`。索引を組む、問いに答える） |
+| セッション開始 | 作業の決まり（`.ccnavi/CCNAVI.md`）の条件と差し込み。目録（`catalog`）の案内を並べる |
 | そのほか | 親の提案を手書きしたときの書式の案内、Stop の AI 判定の判定役の呼び出しの見分け |
 
 ## entry
