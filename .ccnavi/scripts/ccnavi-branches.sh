@@ -154,7 +154,7 @@ github_mr() {
 		  fork: (((.head.repo.full_name // "") | ascii_downcase) != ($p | ascii_downcase))}]'
 }
 
-# GitHub: その issue を参照している開いた PR。タイトル・本文の `#<番号>` か `issues/<番号>`、元ブランチ名の番号（前後が `-` `/` `_` `.` か端のもの）で見る。
+# GitHub: その issue を参照している開いた PR。タイトル・本文の `#<番号>` か `issues/<番号>`、元ブランチ名の番号（下の jq の規則）で見る。
 github_issue() {
 	got=$(ccnavi_host_pages "repos/$ccnavi_h_path/pulls?state=open") || return "$?"
 	# 元ブランチ名の規則は実行ファイルの names_number と同じ。`<先頭の語>-<番号>-<slug>` の形なら 2 つ目の番号だけ、
