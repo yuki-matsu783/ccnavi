@@ -76,8 +76,8 @@ esac
 WINDOWS = os.name == "nt"
 
 
-# 子プロセスの PATH に並べる標準コマンド。PATH は偽の道具の bin とシェル本体の置き場だけで組むので、
-# sh が使うものはここに足す（macOS は awk などが /bin に無く、/usr/bin を足すと gh / glab も引ける）
+# 子プロセスの PATH に並べる標準コマンド。PATH は偽の道具の bin とシェル本体の置き場だけで組む。
+# sh が使うコマンドはここに足す。macOS は awk などが /bin にないが、/usr/bin を足すと gh と glab も見つかってしまう。
 STANDARD_TOOLS = (
     "jq",
     "curl",

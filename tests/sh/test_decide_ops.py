@@ -264,7 +264,7 @@ class DecideOpsShTest(unittest.TestCase):
     # ---- 1. 目印と記録
 
     def test_every_standard_tool_resolves_in_the_child_path(self):
-        # 子プロセスの PATH は tools（と /bin）だけ。macOS は awk が /bin に無いので、tools に無いと rc=127 になる
+        # 子プロセスの PATH は tools（と /bin）だけ。macOS では awk が /bin にないため、tools になければ rc=127 で終わる
         self.run_decide("--help")
         tools = os.path.join(self.work, "bin")
         for name in base.STANDARD_TOOLS:
