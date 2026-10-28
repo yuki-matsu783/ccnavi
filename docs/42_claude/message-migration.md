@@ -29,6 +29,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | `DENY_REDIRECT_LIMIT` | `policy/selfguard_shell.py` の旧 `REDIRECT_LIMIT_MESSAGE`（`deny-policy.yml`。判定のときに `hook/judge.py` が引く） | 移した |
 | `NUDGE_TICKET_FINISH`・`NUDGE_TICKET_REQUEST`・`NUDGE_TICKET_FEEDBACK`・`NUDGE_SUBAGENT_OUTCOME`・`NUDGE_STOP_RULE`・`NEXT_STANDING` | `tickets/ops_stop.py`・`ops_stop_request.py`・`ops_stop_feedback.py`・`hook/events.py`・`tickets/standing.py` の `guidance()`（`nudge-stop.yml`） | 移した（共有の `USER_STOP_NOTE` と `subagent_outcome.line()` は値としてコードに残る。`subagent_outcome` は下位の層で文面を引けないので、行だけを返す） |
 | `NEXT_GIT_*`・`NEXT_WORKTREE_*`・`NEXT_STAGE_*`・`NEXT_TICKET_PROPOSED`・`NEXT_CLOSE_EARLY` | `ccnavi-git.sh`・`ccnavi-worktree.sh`・`ccnavi-stage.sh`・`ccnavi-ticket.sh`・`ccnavi-user-close-early.sh` の `次:`（`next-sh.yml`） | 移した（`ccnavi-common-state.sh` の `ccnavi_text` の既定の文は残る） |
+| `NOTE_GIT_*`・`NOTE_WORKTREE_*`（`RECORD_MISSING`・`ADOPT_CODE_STALE`・`CODE_STALE`・`SIDE_BY_SIDE`・`WAIT_FOR_OK`・`REMOTE_BEHIND`・`REMOTE_UNVERIFIED`・`PROJECTS_HINT`）・`NOTE_START_REMOTE_UNCHECKED`・`NOTE_START_TEMPLATES`・`NOTE_STAGE_NONINTERACTIVE`・`NOTE_SYNC_RETIRED_UNANSWERED`・`NOTE_TICKET_NEW_ISSUE` | `ccnavi-git.sh`（integrate・integrate-done・merge・pull・worktree remove の `案内:`）、`ccnavi-worktree.sh`・`ccnavi-start.sh`・`ccnavi-stage.sh`・`ccnavi-sync.sh`・`ccnavi-ticket.sh` の次の一手を含む `案内:`（`note-sh.yml`） | 移した。`printf` ではなく文字列の中にあった `案内:` も `$(ccnavi_text …)` に替えた。実行ファイルが古いなどで引けないときは、`ccnavi_text` の一般文（`案内: 文面 <識別子> を引けませんでした`）に落ちる |
 | `RULE_*`（`RULE_RECURSIVE_DELETE`・`RULE_GIT_PUSH`・`RULE_GUARD_*`・`RULE_TICKET_*`・`RULE_RAW_GIT`・`RULE_CREDENTIALS`・`RULE_CONFIG_VIA_BASH`） | `policy/builtin.py`・`policy/selfguard_shell.py`・`tickets/ticket_guard.py`・`tickets/phase_forms.py` の組み込みルールの文（`deny-builtin-rules.yml`） | 移した（ルールが識別子と値と場合を持ち、拒否に当たった回に `texts.spoken` が引く。`hook/post_findings.py` の英語の文は `RULE_TICKET_SCOPE__*` として `deny-post.yml` に英語のまま写した） |
 | `NOTICE_FALLEN_BACK`・`NOTICE_UNDECLARED__*`（`ASK`・`DENY`・`UNREADABLE_ASK`・`UNREADABLE_DENY`） | `hook/reasons.py` の `fallen_back`・`undeclared`（`notice.yml`） | 移した（新しい種類 `notice`。見出し `[ccnavi] UNDECLARED (source: …)` と `subject:` の行はコードに残る。`undeclared` は結末（ask／deny）と、読み切れたかどうかで識別子を分け、退避した回は `what` の `fell_back` を選ぶ。`undeclared` が組まれるのは、どのルールも言及せず ask か deny になった呼び出しのときで、そこに文面ファイルの冷たい読みが加わる） |
 | `NOTICE_POST_*`・`NOTE_POST_APPROVED_AREA`・`NOTE_POST_PREEXISTING`・`RULE_TICKET_SCOPE__*` | `hook/post.py`・`post_report.py`・`post_findings.py` の実行後の報告（`notice.yml`・`deny-post.yml`） | 移した（`path:`・`tree:`・`after:` などの状態の行と、ターンの終わりの報告の「どのパスを戻すか」の断片はコードに残る。`note:` の行は `案内:` で出る。`RULE_TICKET_SCOPE__*` は英語の文のまま） |
@@ -43,7 +44,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | 組み込みの拒否（Python） | `hook/reasons.py` の `internal_error_notice`（ツールの呼び出しを持たないイベントで、ccnavi 自身に不具合があるときの文。文面ファイルに頼らない）、`hook/wrapguard.py` などが組んで渡す他の文 | 少数 | 移さない（`internal_error_notice`）。ほかは未移行 |
 | 英語の文面 | `hook/reasons.py` の一部（日本語と英語の混在の整理は別に進めている） | | 未移行 |
 | 日本語の直書き（Python の拒否・次の一手） | `tickets/propose.py`（計画の誤りで断るときの `次:`）、`tickets/approval_checks.py` の残り（`root` を持たず `Problem.detail` に入る文）、`tickets/review.py` の残り（問題の一覧の要素・`root` を持たない関数の文）、`tickets/phase.py`（`review_next`・`_next_hint` の状態を伝える文）、`tickets/flow.py`（サブエージェント向けの手順）、`policy/selfguard.py`（設定ファイルを戻したときの知らせ） | 多数 | 未移行（数え直して、1 まとまりずつ移す。`hook/post.py` の状態を報告する行と、`hook/docsearch.py` の `stderr` の診断は移さない） |
-| sh の残りの `次の手:`・`次:`・`案内:` | `ccnavi-ticket.sh`（`次の手:` の選択肢と `案内:`）、`ccnavi-worktree.sh`（取り込みの記録が無い案内・横で作業する案内・了承を得るまでの案内）、`ccnavi-git.sh`（integrate の次の一手の残り）、`ccnavi-start.sh`（リモート未確認・テンプレート）、`ccnavi-stage.sh`・`ccnavi-sync.sh` の `案内:` | 約 20 | 未移行（状態の報告に近いものは残す。境目は[残りの進め方](#残りの進め方)の項目 3） |
+| sh の残りの `次の手:`・`次:`・`案内:` | `ccnavi-ticket.sh` の `次の手:` の選択肢、`ccnavi-git.sh`（`ig_note`）・`ccnavi-worktree.sh`・`ccnavi-start.sh` の状態を報告する `案内:`（取り込みの記録がある・手元が進んでいる・origin に無い・issue が closed・ホストを見ていない・origin にブランチが無い・`sync_note`・`clash_note`・ホストに届かない）、`ccnavi-dirs.sh`・`ccnavi-review.sh` の `案内:` | 約 15 | 移さない（状態の報告に近い。次の一手を含む `案内:` が見つかったら、その行だけを `ccnavi_text` に分けて移す） |
 | ルールの文 | `rules.yml` の `message`・`additionalContext`・`additionalContextOnce`（インライン） | | 未移行（識別子で引く `message_id` は持たない。`additionalContextFile` で md の本文を出せる） |
 | 配布側の sh の `次:` | `scripts/ccnavi-doctor.sh` 2、`scripts/ccnavi-package.sh` 1、`scripts/ccnavi-install.sh`（`次:` を組み立てる関数）。配布の道具で、ワークスペースの実行ファイルが無いときにも動くため、`ccnavi text` に頼らない | | 対象外 |
 | sh の拒否・失敗の文 | `fail "…"` の文（各 sh） | 約 210 | 移さない（[残りの進め方](#残りの進め方)の項目 3） |
@@ -115,8 +116,8 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | 3 | `hook/post.py`・`post_report.py`・`post_findings.py` の次の一手 | 移す。`stderr.write` の状態の報告は残す | 実行後のチェックで、書き込みのたびに戻し方や取り込み前の確かめ方を言う。`post_findings.py` は英語の文。`post_report._messages` の組み込みルールの文は項目 1 で一緒に移る |
 | 4 | `tickets/ops.py`・`agree_screen.py`（`次:`） | 移す | チケットの操作ごとに出る `次:`。`ops.py` に 4 件 |
 | 5 | `tickets/approval_checks.py` | 移す | 承認の依頼の前提が満たされないときに返る。直し方を言う文が約 18 件 |
-| 6 | sh の `案内:` のうち `ccnavi-git.sh`（`printf '案内:` が 15 本） | 移す | 取り込み（integrate）の経路で、チケットごとに出る。状態の報告（1 本）は残す |
-| 7 | sh の `案内:` のうち `ccnavi-worktree.sh`（11 本）、`ccnavi-start.sh`（9 本）、`ccnavi-stage.sh`・`ccnavi-sync.sh`・`ccnavi-ticket.sh` | 移す。`ccnavi-dirs.sh` の見出し 2 本、`issue は closed`（状態）、依頼文を消した報告は残す | ワークツリーの作成・着手でチケットごとに 1 回 |
+| 6 | sh の `案内:` のうち `ccnavi-git.sh`（`printf '案内:` が 15 本） | 移した | 取り込み（integrate）の経路で、チケットごとに出る。状態の報告（1 本）は残す |
+| 7 | sh の `案内:` のうち `ccnavi-worktree.sh`（11 本）、`ccnavi-start.sh`（9 本）、`ccnavi-stage.sh`・`ccnavi-sync.sh`・`ccnavi-ticket.sh` | 移した。`ccnavi-dirs.sh` の見出し 2 本、`issue は closed`（状態）、依頼文を消した報告は残す | ワークツリーの作成・着手でチケットごとに 1 回 |
 | 8 | `tickets/review.py`・`phase.py` の CLI の stderr の次の手 | 移す。`ccnavi: …を読めない` などの状態の報告は残す | レビューとフェーズの操作でだけ出る |
 | 9 | `hook/rootwrite.py` の `message()`（`DENY_SHELL_WORKSPACE_ROOT`） | 移す | 1 件。`turngate` と同じく判定の時点で引けるので、仕組みの変更は要らない |
 | 10 | `hook/docsearch.py` の使い方の案内（3 か所） | 移す。`stderr.write` の「引かない」理由は残す | `--docs` を使う場面でだけ出る |
@@ -153,7 +154,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | 1 | 組み込みルールの文（移した） | 仕組み（`Rule` の欄、`_build` の検査、`key()`、引く 3 か所、点検の拡張、空の欄を許す検査）、`builtin.py`・`selfguard_shell.py`・`ticket_guard.py`・`phase_forms.py` の文。手引きの 1 行（項目 2）を含む |
 | 2 | hook の通知と実行後の報告（移した） | `notice` の種類と `undeclared`・`fallen_back`、`post.py`・`post_report.py`・`post_findings.py`、`rootwrite.py`・`docsearch.py` の文。`policy/selfguard.py` の知らせは含めず、残りに置く |
 | 3 | Python の CLI の次の手（移した） | `ops.py`・`agree_screen.py`・`approval_checks.py` の一部・`review.py` の一部。`phase.py` の stderr に次の手は無く、残りは `root` を持たない・問題の一覧の要素・状態を伝える文のため移していない |
-| 4 | sh の `案内:` | `ccnavi-git.sh`・`ccnavi-worktree.sh`・`ccnavi-start.sh` とほか |
+| 4 | sh の `案内:`（移した） | `ccnavi-git.sh`・`ccnavi-worktree.sh`・`ccnavi-start.sh` など。状態を報告する `案内:` は移していない |
 
 - 項目 2 は方針を変えないので、PR は増えない
 - 順は、項目 3 の頻度の順に合わせた。1 本目で仕組みの形が固まり、あとの PR はその形に合わせる

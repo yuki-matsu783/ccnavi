@@ -1,0 +1,185 @@
+# sh（ccnavi-git.sh・ccnavi-worktree.sh・ccnavi-start.sh・ccnavi-stage.sh・ccnavi-sync.sh・ccnavi-ticket.sh）が
+# 標準出力・標準エラーに出す `案内:`。いつ出すかの条件と状態の報告は sh 側にある。
+# `案内: ` の見出しは、文を組み立てる側が付ける。sh が引用を済ませた値（`$SELF_Q` など）は、名前の末尾を `_q` にする。
+# 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
+version: 1
+messages:
+  # ---- ccnavi-git.sh（integrate）
+  # 一時ワークツリーを消せなかったとき。
+  NOTE_GIT_TMP_LEFT:
+    kind: note
+    values: [tmp, why]
+    note: |-
+      一時ワークツリー {tmp} を残した（{why}）。中身はユーザのものかもしれないので、黙って消さない。ユーザに確かめてください。
+
+  # 取り込みが衝突したとき。
+  NOTE_GIT_INTEGRATE_CONFLICT:
+    kind: note
+    values: [wt, base, name, self_q]
+    note: |-
+      ワークツリー（{wt}）の中で {self_q} merge {base:sh} を実行して衝突を解いてコミットしてから、{self_q} integrate {name:sh} を再実行します。
+
+  # 取り込み結果を一時ワークツリーに用意した後（常に出る 2 本と、条件つきの 4 本）。
+  NOTE_GIT_INTEGRATE_SAVE_EDITS:
+    kind: note
+    note: |-
+      このファイルをエディタで開いて保存していない編集があれば、integrate-done の前に保存してもらう
+
+  NOTE_GIT_INTEGRATE_VERIFY:
+    kind: note
+    values: [tmp]
+    note: |-
+      取り込み結果は一時ワークツリーで検証できる: cd {tmp:path} && <テストやビルド>。ここは編集しない。プロジェクトのレイヤーのルールが通常どおりヒットする場所ではない
+
+  NOTE_GIT_INTEGRATE_IGNORED_OVERLAP:
+    kind: note
+    values: [paths]
+    note: |-
+      取り込みで増えるパスが、ユーザのチェックアウトの ignored のファイルと重なっている（{paths}）。integrate-done の fast-forward は上書きせずに止まる。ユーザに退避を頼む
+
+  NOTE_GIT_INTEGRATE_DRAFTS:
+    kind: note
+    values: [notes]
+    note: |-
+      取り込まない下書き: {notes}（取り込み結果には含まれず、作業ブランチにだけ残る。作業ブランチを片付けると消える。内容をユーザに伝え、必要なら先に別の場所へ写してもらう）
+
+  NOTE_GIT_INTEGRATE_GUARDED:
+    kind: note
+    values: [paths]
+    note: |-
+      自己防衛の対象（{paths}）を含む。integrate-done はユーザがターミナルで、エージェントのターンが終わってから打つ
+
+  NOTE_GIT_INTEGRATE_ORIGIN_BEHIND:
+    kind: note
+    values: [base, top]
+    note: |-
+      origin/{base} が手元より進んでいる。先に合わせると、古い上に載せずに済む（cd {top:path} && git pull --ff-only origin {base:sh}）
+
+  # 取り込みをやめたあと（integrate --abort）。
+  NOTE_GIT_INTEGRATE_ABORTED:
+    kind: note
+    values: [self_q, name]
+    note: |-
+      直接作業の記録は残した。作業を続けて、もう一度 {self_q} integrate {name:sh} を打てる
+
+  # integrate-done（片付け）
+  NOTE_GIT_DONE_STOPPED:
+    kind: note
+    values: [self_q, name]
+    note: |-
+      取り込み自体は成功している。原因を片付けてから、ユーザのチェックアウトで {self_q} integrate-done {name:sh} を再実行すると、済んだところを飛ばして続きから進む
+
+  NOTE_GIT_DONE_COMMIT_FAILED:
+    kind: note
+    values: [self_q, name]
+    note: |-
+      原因を直してから {self_q} integrate-done {name:sh} -m '<メッセージ>' を再実行します。
+
+  NOTE_GIT_DONE_HOOK_CHANGED:
+    kind: note
+    values: [self_q, name]
+    note: |-
+      フックが何を変えたかをユーザに確かめてもらう。{self_q} integrate --abort {name:sh} で戻せる。
+
+  NOTE_GIT_DONE_FF_FAILED:
+    kind: note
+    values: [self_q, name, short]
+    note: |-
+      原因を直してから、同じコマンド（{self_q} integrate-done {name:sh}）を再実行すると、K（{short}）から再開する。
+
+  # 統合先のユーザのチェックアウトでの merge・pull を断った理由に続ける案内（`次:` の行のあと）。
+  NOTE_GIT_MERGE_ON_TARGET_ALLOWED:
+    kind: note
+    note: |-
+      途中の merge を終わらせる --abort / --continue / --quit と、統合先でないブランチでの merge は、ここでも打てます。
+
+  NOTE_GIT_PULL_ON_TARGET_ALLOWED:
+    kind: note
+    values: [integ]
+    note: |-
+      統合先の更新（引数なしの pull と pull [--ff-only] <リモート> {integ:sh}）と、統合先でないブランチ・ワークツリーでの pull は、ここでも実行できます。
+
+  # ワークツリーを消せなかったとき（Windows で、cwd がワークツリーの中にあるとき）。
+  NOTE_GIT_WORKTREE_REMOVE_CWD:
+    kind: note
+    values: [ws, self_q, path_q]
+    note: |-
+      ワークツリーのディレクトリを削除できませんでした。Windows では、シェルの cwd がその中にあると削除できません（Bash ツールの cwd は呼び出しをまたいで残り、サブシェルの中の cd では動きません）。cwd をワークスペースルートに戻す cd を単独で打ち（cd {ws:path}）、{self_q} worktree list で登録が外れたかを確かめてください。外れていて空のディレクトリだけが残っていれば rmdir {path_q} で消し、登録が残っていれば同じ remove を再実行してください。中にファイルが残っているなら削除せずにユーザに報告してください。
+
+  # ---- ccnavi-worktree.sh
+  # 既にあるワークツリーに、取り込みの記録が無いとき。`unattended` は非対話のときだけ付く追記で、それ以外は空。
+  NOTE_WORKTREE_RECORD_MISSING:
+    kind: note
+    values: [name, name_q, unattended]
+    note: |-
+      取り込みの記録は、無い（ccnavi-direct/{name}）。integrate に進むには、ユーザの確認を経て {script:ccnavi-worktree.sh} {name_q} --adopt --base <取り込み先> で引き取ります（チケットに結び付く名前は引き取れません）。{unattended}
+
+  # 引き取り・切る前の確認で渡された確認コードが、今の状態と合わないとき。
+  NOTE_WORKTREE_ADOPT_CODE_STALE:
+    kind: note
+    note: |-
+      渡された確認コードが今の状態と合わない（報告のあとでブランチか取り込み先が動いた）。報告からやり直す。
+
+  NOTE_WORKTREE_CODE_STALE:
+    kind: note
+    note: |-
+      渡された確認コードが今の状態と合わない（報告のあとで状態が動いた）。報告からやり直す。
+
+  NOTE_WORKTREE_SIDE_BY_SIDE:
+    kind: note
+    note: |-
+      横で作業する（ルートの変更を自動で戻さない）なら、了承を得たうえで --side-by-side を付ける
+
+  NOTE_WORKTREE_WAIT_FOR_OK:
+    kind: note
+    note: |-
+      ユーザの了承を得るまで --base・--accept・--side-by-side を付けない。確認コードは今の状態から決まるので、状態が動いたら報告からやり直す
+
+  # 切った後の、取り込み先とリモートとのずれ。
+  NOTE_WORKTREE_REMOTE_BEHIND:
+    kind: note
+    values: [target, behind, main_tree, branch]
+    note: |-
+      手元の {target} は origin/{target} より古い（遅れ {behind} 件）。push の前に合わせ直しが要る: cd {main_tree:path} && git pull --ff-only origin {branch:sh}
+
+  NOTE_WORKTREE_REMOTE_UNVERIFIED:
+    kind: note
+    values: [target]
+    note: |-
+      リモート未確認で切った。つながったら {script:ccnavi-git.sh} fetch origin {target:sh} で確かめ、遅れていれば取り込む前に合わせる。ユーザにも伝える
+
+  # ワークスペースのルートで切ったときに、projects/ の下にリポジトリがある場合。
+  NOTE_WORKTREE_PROJECTS_HINT:
+    kind: note
+    note: |-
+      projects/ の下のプロジェクトの変更を頼まれたなら、このワークツリーはワークスペース自身のリポジトリから作られている。このワークツリーを片付け、projects/<名前> へ cd してから実行し直す
+
+  # ---- ccnavi-start.sh
+  NOTE_START_REMOTE_UNCHECKED:
+    kind: note
+    note: |-
+      リモート未確認。origin から取れなかったので、手元のブランチのまま続けた。つながったら {script:ccnavi-sync.sh} を打つ
+
+  NOTE_START_TEMPLATES:
+    kind: note
+    values: [count]
+    note: |-
+      使えるテンプレートがある（{count} 本）。合うものがあれば --plan の代わりに --template <名前> を使う。一覧は {script:ccnavi-launcher.sh} --templates（名前・説明・使う場面が出る）
+
+  # ---- ccnavi-stage.sh
+  NOTE_STAGE_NONINTERACTIVE:
+    kind: note
+    note: |-
+      非対話セッションでは、編集済みの下書きを push し、確認と取り込み（差し替え）をユーザに頼んでターンを終える
+
+  # ---- ccnavi-sync.sh
+  NOTE_SYNC_RETIRED_UNANSWERED:
+    kind: note
+    note: |-
+      実行ファイルが片付けの記録の一覧（sync retired）に答えなかった。ready の後の親の片付けは列挙できない。再実行してください
+
+  # ---- ccnavi-ticket.sh
+  NOTE_TICKET_NEW_ISSUE:
+    kind: note
+    note: |-
+      issue が無いときは、{script:ccnavi-start.sh} --new-issue <タイトル> で作ってから 2 へ進む

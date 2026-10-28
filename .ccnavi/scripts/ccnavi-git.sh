@@ -950,7 +950,7 @@ d4_tmp_remove() {
 
 # 一時ワークツリーを消せなかったときの案内。
 d4_tmp_note() {
-	printf '案内: 一時ワークツリー %s を残した（%s）。中身はユーザのものかもしれないので、黙って消さない。ユーザに確かめてください。\n' "$d4_tmp" "$d4_tmp_why"
+	ccnavi_text "$WS" NOTE_GIT_TMP_LEFT "tmp=$d4_tmp" "why=$d4_tmp_why"
 }
 
 # 専用のrefを消す。<種類>...
@@ -1219,8 +1219,7 @@ ig_integrate() {
 		printf 'fail  git integrate  %s の取り込みが衝突した（ユーザのチェックアウトは変えていない）\n' "$ig_n"
 		printf '衝突したパス:\n'
 		printf '%s\n' "$d4_mt" | sed -n '2,/^$/p' | grep -v '^$' | head -n "$MAX_LINES" | sed 's/^/  /'
-		printf '案内: ワークツリー（%s）の中で %s merge %s を実行して衝突を解いてコミットしてから、%s integrate %s を再実行します。\n' \
-			"$ig_wt" "$SELF_Q" "$d4_base" "$SELF_Q" "$ig_n"
+		ccnavi_text "$WS" NOTE_GIT_INTEGRATE_CONFLICT "wt=$ig_wt" "base=$d4_base" "name=$ig_n" "self_q=$SELF_Q"
 		log_error 取り込みが衝突した -- "name=$ig_n"
 		exit 1
 	fi
@@ -1275,18 +1274,17 @@ EOF
 	git diff --stat "$d4_head_tree" "$d4_c" 2>/dev/null | head -n "$MAX_LINES"
 	printf '変わるファイル:\n'
 	printf '%s\n' "$d4_changed" | head -n "$MAX_LINES" | sed 's/^/  /'
-	printf '案内: このファイルをエディタで開いて保存していない編集があれば、integrate-done の前に保存してもらう\n'
-	printf '案内: 取り込み結果は一時ワークツリーで検証できる: cd %s && <テストやビルド>。ここは編集しない。プロジェクトのレイヤーのルールが通常どおりヒットする場所ではない\n' "$(ccnavi_sh_quote "$d4_tmp")"
+	ccnavi_text "$WS" NOTE_GIT_INTEGRATE_SAVE_EDITS
+	ccnavi_text "$WS" NOTE_GIT_INTEGRATE_VERIFY "tmp=$d4_tmp"
 	[ -z "$d4_overlap" ] ||
-		printf '案内: 取り込みで増えるパスが、ユーザのチェックアウトの ignored のファイルと重なっている（%s）。integrate-done の fast-forward は上書きせずに止まる。ユーザに退避を頼む\n' "${d4_overlap# }"
+		ccnavi_text "$WS" NOTE_GIT_INTEGRATE_IGNORED_OVERLAP "paths=${d4_overlap# }"
 	[ -z "$d4_draft_notes" ] ||
-		printf '案内: 取り込まない下書き: %s（取り込み結果には含まれず、作業ブランチにだけ残る。作業ブランチを片付けると消える。内容をユーザに伝え、必要なら先に別の場所へ写してもらう）\n' "$d4_draft_notes"
+		ccnavi_text "$WS" NOTE_GIT_INTEGRATE_DRAFTS "notes=$d4_draft_notes"
 	if [ "$d4_guard" != no ]; then
-		printf '案内: 自己防衛の対象（%s）を含む。integrate-done はユーザがターミナルで、エージェントのターンが終わってから打つ\n' "${d4_guard_paths:-対象を確かめられなかった}"
+		ccnavi_text "$WS" NOTE_GIT_INTEGRATE_GUARDED "paths=${d4_guard_paths:-対象を確かめられなかった}"
 	fi
 	if d4_origin_behind "$d4_base"; then
-		printf '案内: origin/%s が手元より進んでいる。先に合わせると、古い上に載せずに済む（cd %s && git pull --ff-only origin %s）\n' \
-			"$d4_base" "$(ccnavi_sh_quote "$ig_top")" "$d4_base"
+		ccnavi_text "$WS" NOTE_GIT_INTEGRATE_ORIGIN_BEHIND "base=$d4_base" "top=$ig_top"
 	fi
 	ccnavi_text "$WS" NEXT_GIT_INTEGRATE_REVIEW "head=$d4_head" "result=$d4_c" "name=$ig_n"
 	log_info 取り込み結果を用意した -- "name=$ig_n" "files=$d4_count"
@@ -1328,7 +1326,7 @@ ig_abort() {
 		reject integrate-abort-marker "取り込みの記録（${ig_mark}）を削除できませんでした。ユーザに伝えてください。"
 	printf 'ok  git integrate  %s の取り込みをやめた（作業ワークツリーとユーザのチェックアウトは変えていない）\n' "$ig_n"
 	[ "$d4_a_left" = no ] || d4_tmp_note
-	printf '案内: 直接作業の記録は残した。作業を続けて、もう一度 %s integrate %s を打てる\n' "$SELF_Q" "$ig_n"
+	ccnavi_text "$WS" NOTE_GIT_INTEGRATE_ABORTED "self_q=$SELF_Q" "name=$ig_n"
 	log_info 取り込みをやめた -- "name=$ig_n"
 	exit 0
 }
@@ -1344,7 +1342,7 @@ d4_stop() {
 	git show-ref --verify --quiet "refs/heads/$ig_n" && d4_kept="${d4_kept:+${d4_kept}、}ブランチ $ig_n"
 	[ -f "$ig_mark" ] && d4_kept="${d4_kept:+${d4_kept}、}取り込みの記録"
 	[ -z "$d4_kept" ] || printf '残したもの: %s\n' "$d4_kept"
-	printf '案内: 取り込み自体は成功している。原因を片付けてから、ユーザのチェックアウトで %s integrate-done %s を再実行すると、済んだところを飛ばして続きから進む\n' "$SELF_Q" "$ig_n"
+	ccnavi_text "$WS" NOTE_GIT_DONE_STOPPED "self_q=$SELF_Q" "name=$ig_n"
 	log_info 片付けを止めた -- "name=$ig_n" "reason=${2:-}"
 	exit 1
 }
@@ -1526,7 +1524,7 @@ ig_done() {
 				d4_why=$(ccnavi_git_refusal "$d4_out")
 				rm -f "$d4_out"
 				printf 'fail  git integrate-done  %s をコミットできなかった（%s）。ユーザのチェックアウトは変えていない\n' "$ig_n" "$d4_why"
-				printf '案内: 原因を直してから %s integrate-done %s -m '"'"'<メッセージ>'"'"' を再実行します。\n' "$SELF_Q" "$ig_n"
+				ccnavi_text "$WS" NOTE_GIT_DONE_COMMIT_FAILED "self_q=$SELF_Q" "name=$ig_n"
 				log_error コミットできなかった -- "name=$ig_n" "exit=$d4_crc"
 				exit 1
 			fi
@@ -1538,7 +1536,7 @@ ig_done() {
 				git -C "$d4_tmp" reset -q --hard "$d4_m_head" >/dev/null 2>&1 || :
 				git -C "$d4_tmp" read-tree --reset -u "$d4_m_ctree" >/dev/null 2>&1 || :
 				printf 'fail  git integrate-done  %s のコミットのフックが、確認した取り込み結果と違う中身にした。記録せずに止めた（ユーザのチェックアウトは変えていない）\n' "$ig_n"
-				printf '案内: フックが何を変えたかをユーザに確かめてもらう。%s integrate --abort %s で戻せる。\n' "$SELF_Q" "$ig_n"
+				ccnavi_text "$WS" NOTE_GIT_DONE_HOOK_CHANGED "self_q=$SELF_Q" "name=$ig_n"
 				log_error フックが中身を変えた -- "name=$ig_n"
 				exit 1
 			fi
@@ -1558,7 +1556,7 @@ ig_done() {
 		d4_why=$(ccnavi_git_refusal "$d4_ffout")
 		rm -f "$d4_ffout"
 		printf 'fail  git integrate-done  %s を取り込めなかった（%s）。ユーザのチェックアウトは変えていない\n' "$ig_n" "$d4_why"
-		printf '案内: 原因を直してから、同じコマンド（%s integrate-done %s）を再実行すると、K（%s）から再開する。\n' "$SELF_Q" "$ig_n" "$(ig_short "$d4_m_k")"
+		ccnavi_text "$WS" NOTE_GIT_DONE_FF_FAILED "self_q=$SELF_Q" "name=$ig_n" "short=$(ig_short "$d4_m_k")"
 		log_error 取り込めなかった -- "name=$ig_n" "exit=$d4_ffrc"
 		exit 1
 	fi
@@ -1999,7 +1997,7 @@ merge)
 	if [ "$mg_finish" = no ] && merge_target_is_here; then
 		reject merge-on-target "統合先 $mg_integ のユーザのチェックアウトでは merge できません。統合先へは直接 merge しない決まりなので、取り込みは integrate が行います。
 $(merge_on_target_next)
-案内: 途中の merge を終わらせる --abort / --continue / --quit と、統合先でないブランチでの merge は、ここでも打てます。"
+$(ccnavi_text "$WS" NOTE_GIT_MERGE_ON_TARGET_ALLOWED)"
 	fi
 	;;
 
@@ -2250,7 +2248,7 @@ fetch | pull)
 	if [ "$sub" = pull ] && [ "$fp_other" = yes ] && merge_target_is_here; then
 		reject merge-on-target "統合先 $mg_integ のユーザのチェックアウトでは、pull <リモート> <ブランチ>（${fp_refs# }）で別のブランチ・リモートを取り込めません（merge できないのと同じです）。統合先へは直接 merge しない決まりなので、取り込みは integrate が行います。
 $(merge_on_target_next)
-案内: 統合先の更新（引数なしの pull と pull [--ff-only] <リモート> ${mg_integ}）と、統合先でないブランチ・ワークツリーでの pull は、ここでも実行できます。"
+$(ccnavi_text "$WS" NOTE_GIT_PULL_ON_TARGET_ALLOWED "integ=$mg_integ")"
 	fi
 	;;
 
@@ -2541,7 +2539,9 @@ else
 	# サブシェルの中で cd してから打っても防げず、ここで pwd を見ても親の cwd は分からないので、
 	# 起きたときに直し方を言う。
 	if [ "$sub" = worktree ] && [ "${action:-}" = remove ] && body | grep -q 'Permission denied'; then
-		printf '案内: ワークツリーのディレクトリを削除できませんでした。Windows では、シェルの cwd がその中にあると削除できません（Bash ツールの cwd は呼び出しをまたいで残り、サブシェルの中の cd では動きません）。cwd をワークスペースルートに戻す cd を単独で打ち（cd %s）、%s worktree list で登録が外れたかを確かめてください。外れていて空のディレクトリだけが残っていれば rmdir %s で消し、登録が残っていれば同じ remove を再実行してください。中にファイルが残っているなら削除せずにユーザに報告してください。\n' "$WS" "$SELF" "${2:-<パス>}"
+		rm_path_q='<パス>'
+		[ -z "${2:-}" ] || rm_path_q=$(ccnavi_sh_quote "$2")
+		ccnavi_text "$WS" NOTE_GIT_WORKTREE_REMOVE_CWD "ws=$WS" "self_q=$SELF_Q" "path_q=$rm_path_q"
 	fi
 fi
 

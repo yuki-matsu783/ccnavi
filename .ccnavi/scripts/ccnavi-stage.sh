@@ -327,4 +327,4 @@ if [ -n "$mvs" ]; then
 fi
 [ -z "$missing$same$changed" ] || exit 1
 ccnavi_text "$root" NEXT_STAGE_GUIDE "guide=$guide"
-printf '案内: 非対話セッションでは、編集済みの下書きを push し、確認と取り込み（差し替え）をユーザに頼んでターンを終える\n'
+ccnavi_text "$root" NOTE_STAGE_NONINTERACTIVE

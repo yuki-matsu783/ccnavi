@@ -340,7 +340,7 @@ load_retired() {
 	run_ccnavi sync retired >"$scratch/retired-raw" 2>/dev/null || :
 	tr -d '\r' <"$scratch/retired-raw" >"$scratch/retired-out"
 	if [ "$(head -n 1 "$scratch/retired-out")" != "retired 1" ]; then
-		printf '案内: 実行ファイルが片付けの記録の一覧（sync retired）に答えなかった。ready の後の親の片付けは列挙できない。再実行してください\n'
+		ccnavi_text "$root" NOTE_SYNC_RETIRED_UNANSWERED
 		return 0
 	fi
 	awk 'BEGIN { OFS = "\t" } $1 == "retired" && NF >= 5 { print $2, $3, $4, $5 }' "$scratch/retired-out" >"$scratch/retired-all"
