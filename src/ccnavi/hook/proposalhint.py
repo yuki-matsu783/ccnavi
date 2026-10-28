@@ -21,7 +21,7 @@ import os
 import re
 
 from ..infra import fsio, hookio, settings, tree
-from ..tickets import ticket, ticket_ids
+from ..tickets.model import ticket, ticket_ids
 
 # 理由コード（設計 付録 A）。記録（`decisions.jsonl`）の `code` には残らない。
 CODE_PARENT_KEY = "NOTICE_PROPOSAL_PARENT_KEY"

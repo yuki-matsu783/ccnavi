@@ -29,16 +29,9 @@ from dataclasses import dataclass
 
 from ..infra import fsio, settings, tree
 from ..policy import texts
-from . import (
-    approval,
-    approval_checks,
-    approval_marks,
-    ops_stop,
-    phase,
-    standing,
-    ticket_model,
-)
-from . import ticket as ticket_mod
+from . import approval, approval_checks, approval_marks, ops_stop, phase
+from .model import standing, ticket_model
+from .model import ticket as ticket_mod
 
 # Stop でフィードバック計画を促すときの理由コード。止めるのは 1 回だけの促しで、
 # 判定の deny ではない。

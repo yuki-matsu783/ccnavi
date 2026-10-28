@@ -9,8 +9,8 @@ from __future__ import annotations
 import re
 from typing import TextIO
 
-from ..infra import hookio, settings
-from ..policy import ctxfile, rules, selfguard_shell, texts
+from ...infra import hookio, settings
+from ...policy import ctxfile, rules, selfguard_shell, texts
 from . import ticket_model
 
 STATE_RULE_ID = "builtin:ticket-state"
@@ -174,7 +174,11 @@ def approved_write_rule(approved_rel: str, root: str) -> rules.Rule:
     変更を見るため。実行前の関門（`gate_rules`）と同じ式・同じ文面。
     """
     return _dir_rules(
-        APPROVED_RULE_ID, APPROVED_SHELL_RULE_ID, approved_rel, texts.spec("RULE_TICKET_APPROVED"), root
+        APPROVED_RULE_ID,
+        APPROVED_SHELL_RULE_ID,
+        approved_rel,
+        texts.spec("RULE_TICKET_APPROVED"),
+        root,
     )[0]
 
 
@@ -195,9 +199,7 @@ def gate_rules(approved_rel: str, root: str) -> list[rules.Rule]:
             texts.spec("RULE_TICKET_APPROVED"),
             root,
         ),
-        *_dir_rules(
-            OPS_RULE_ID, OPS_SHELL_RULE_ID, OPS_REL, texts.spec("RULE_TICKET_OPS"), root
-        ),
+        *_dir_rules(OPS_RULE_ID, OPS_SHELL_RULE_ID, OPS_REL, texts.spec("RULE_TICKET_OPS"), root),
     ]
 
 

@@ -27,8 +27,9 @@ from typing import TextIO
 
 from ..infra import fsio, gitcmd, pathcase, settings, tree
 from ..policy import ctxfile
-from . import approval, ticket_ids, ticket_model
-from . import ticket as ticket_mod
+from . import approval
+from .model import ticket as ticket_mod
+from .model import ticket_ids, ticket_model
 
 ISSUE = "issue"
 MR = "mr"
@@ -434,9 +435,7 @@ def read_host(path: str) -> Host:
     )
 
 
-def names_number(
-    name: str, number: int, prefixes=settings.DEFAULT_BRANCH_PREFIXES
-) -> bool:
+def names_number(name: str, number: int, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> bool:
     """ブランチ名が番号を含むか。
 
     ccnavi の命名 `<先頭の語>-<番号>-<slug>`（先頭の語は `prefixes`）に合う名前は、2 つ目の番号だけで比べる
@@ -663,7 +662,9 @@ def render(data: dict) -> str:
         lines.append("  ".join(parts))
     for t in data["issue_tickets"]:
         state = "承認済み" if t["approved"] else "提案（承認前）"
-        lines.append(f"チケット {t['ticket']}  {state}  状態={t['state']}  タイトル={t['title'] or '-'}")
+        lines.append(
+            f"チケット {t['ticket']}  {state}  状態={t['state']}  タイトル={t['title'] or '-'}"
+        )
     count = len(data["candidates"])
     weak = [
         c["branch"] for c in data["candidates"] if c["sources"] == ["name"] and not c["tickets"]

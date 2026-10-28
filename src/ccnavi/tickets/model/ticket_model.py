@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from ..policy import rules
+from ...policy import rules
 
 # frontmatter の囲い。
 FENCE = "---"

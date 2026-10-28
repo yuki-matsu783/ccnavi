@@ -19,8 +19,8 @@ from __future__ import annotations
 import os
 
 from ..infra import fsio, pathcase, settings, tree
-from . import archive, ticket_ids, ticket_model
-from . import ticket as ticket_mod
+from .model import archive, ticket_ids, ticket_model
+from .model import ticket as ticket_mod
 from .ops_stop_integrate import _named_file, _tree_roots
 
 YES = "yes"

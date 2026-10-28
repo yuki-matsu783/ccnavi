@@ -10,13 +10,9 @@ from dataclasses import dataclass
 
 from ..infra import gitcmd, gitstate, settings, tree
 from ..policy import rules
-from . import (
-    phase,
-    phasetypes,
-    ticket_model,
-    ticket_places,
-)
-from . import ticket as ticket_mod
+from . import phase, phasetypes
+from .model import ticket as ticket_mod
+from .model import ticket_model, ticket_places
 
 # 範囲の外へ出した上限の名前（ScopeVerdict.limit）。
 LIMIT_TICKET = "ticket"

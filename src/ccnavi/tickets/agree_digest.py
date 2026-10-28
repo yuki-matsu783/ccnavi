@@ -10,13 +10,9 @@ import hashlib
 
 from ..infra import fsio
 from ..policy import rules
-from . import (
-    agree_candidates,
-    approval,
-    approval_marks,
-    ticket_model,
-)
-from . import ticket as ticket_mod
+from . import agree_candidates, approval, approval_marks
+from .model import ticket as ticket_mod
+from .model import ticket_model
 
 
 def proposals_digest(batch: list[agree_candidates.Candidate]) -> str:

@@ -1,4 +1,4 @@
-"""下書きの置き場での階層名の読み替え（src/ccnavi/tickets/handoff_names.py）。
+"""下書きの置き場での階層名の読み替え（src/ccnavi/tickets/model/handoff_names.py）。
 
 見るのは次のとおり。名前を増やすときは、見本（tests/handoff_names_samples.py）に
 1 行足すだけでよい。
@@ -9,15 +9,19 @@
 3. 往復: stage → 編集 → `user handoff` で、`.claude/settings.json` が元の場所に戻る
 4. 拡張: 表に仮の 1 行を足しても、同じ往復が通る
 5. 表のファイル: sh と実行ファイルが読む `.ccnavi/scripts/ccnavi-handoff-names.txt` の形
+6. 表の探し方: 実行ファイルの展開先・パッケージの直下・リポジトリの 3 つの置き場のどれでも見つかる
 """
 
 from __future__ import annotations
 
 import os
+import sys
+import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi.tickets import handoff, handoff_names
+from ccnavi.tickets import handoff
+from ccnavi.tickets.model import handoff_names
 from tests import ROOT
 from tests.handoff_names_samples import RESERVED, REVERSE_SAMPLES, SAMPLES
 from tests.ticket.test_handoff import DOCS, SETTINGS, HandoffCase, put, slurp
@@ -75,6 +79,50 @@ class ParseTest(unittest.TestCase):
     def test_the_names_file_is_the_one_sh_reads(self):
         path = os.path.join(ROOT, ".ccnavi", "scripts", handoff_names.NAMES_FILE)
         self.assertEqual(os.path.abspath(path), os.path.abspath(handoff_names._names_path()))
+
+
+class NamesPathTest(unittest.TestCase):
+    """表のファイルの探し方。モジュールの深さを変えても、3 つの置き場のどれでも見つかる。"""
+
+    def locate(self, root: str, *, meipass: str = "") -> str:
+        """`src/ccnavi/tickets/model/` の位置にあるつもりで探した結果。"""
+        module = os.path.join(root, "src", "ccnavi", "tickets", "model", "handoff_names.py")
+        patches = [mock.patch.object(handoff_names, "__file__", module)]
+        if meipass:
+            patches.append(mock.patch.object(sys, "_MEIPASS", meipass, create=True))
+        with patches[0]:
+            if meipass:
+                with patches[1]:
+                    return handoff_names._names_path()
+            return handoff_names._names_path()
+
+    def put_names(self, *parts: str) -> str:
+        path = os.path.join(*parts, handoff_names.NAMES_FILE)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("a b\n")
+        return path
+
+    def test_the_repo_copy_is_found_from_the_source_tree(self):
+        with tempfile.TemporaryDirectory() as root:
+            want = self.put_names(root, ".ccnavi", "scripts")
+            self.assertEqual(want, self.locate(root))
+
+    def test_the_copy_next_to_the_package_is_found(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.put_names(root, ".ccnavi", "scripts")
+            want = self.put_names(root, "src", "ccnavi")
+            self.assertEqual(want, self.locate(root))
+
+    def test_the_bundled_copy_comes_first(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as bundle:
+            self.put_names(root, "src", "ccnavi")
+            self.put_names(root, ".ccnavi", "scripts")
+            want = self.put_names(bundle)
+            self.assertEqual(want, self.locate(root, meipass=bundle))
+
+    def test_the_real_table_loads_from_the_real_location(self):
+        self.assertTrue(os.path.isfile(handoff_names._names_path()))
 
 
 class RoundTripTest(HandoffCase):

@@ -7,15 +7,9 @@ from __future__ import annotations
 
 from ..infra import settings
 from ..policy import rules, texts
-from . import (
-    agree_candidates,
-    agree_digest,
-    approval,
-    phasetypes,
-    ticket_model,
-    workflow,
-)
-from . import ticket as ticket_mod
+from . import agree_candidates, agree_digest, approval, phasetypes, workflow
+from .model import ticket as ticket_mod
+from .model import ticket_model
 
 
 def approved_text(

@@ -34,7 +34,7 @@ import os
 import re
 
 from ..infra import pathcase, settings, shellread, shellread_words, tree
-from ..tickets import ticket_places
+from ..tickets.model import ticket_places
 from . import wrapguard
 
 KIND_WRITE = "write"

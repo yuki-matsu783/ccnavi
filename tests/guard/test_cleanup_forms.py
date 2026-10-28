@@ -1,5 +1,5 @@
 """ユーザだけが打つ実行ファイルの形を、hook の入口から確かめる
-（src/ccnavi/tickets/phase_forms.py）。
+（src/ccnavi/tickets/model/phase_forms.py）。
 
 1. 状態の操作（`ticket finish` など）は、副命令の前に `--` を挟んでも止まる。挟んだ形に
    `--record-tree` を足すと、実行ファイルの「write-and-push を通っていない」検査も外れる
@@ -16,7 +16,7 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi.tickets import phase_forms
+from ccnavi.tickets.model import phase_forms
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 

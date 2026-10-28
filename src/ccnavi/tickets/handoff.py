@@ -61,7 +61,8 @@ import yaml
 from ..infra import fsio, gitcmd, pathcase, pathsafe, settings, yamlread
 from ..policy import ruleload, texts
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
-from . import config_check, flow, handoff_names, plan_templates, ticket_places
+from . import config_check, flow, plan_templates
+from .model import handoff_names, ticket_places
 
 JSON_VERSION = 1
 

@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 from ccnavi.records import prune
-from ccnavi.tickets import oplog
+from ccnavi.tickets.model import oplog
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 

@@ -19,10 +19,10 @@ from ..tickets import (
     phasetypes,
     risk,
     session_rejects,
-    ticket_model,
     workflow,
 )
-from ..tickets import ticket as ticket_mod
+from ..tickets.model import ticket as ticket_mod
+from ..tickets.model import ticket_model
 from . import diagnose_board, diagnose_shared
 
 # レイヤーの見出し。共通レイヤーと自身のレイヤーだけ日本語の名前で出す。

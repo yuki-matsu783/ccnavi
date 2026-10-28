@@ -19,18 +19,14 @@ from ..tickets import (
     approval_checks,
     approval_marks,
     approval_times,
-    archive,
     flow,
     manual_settle,
-    oplog,
     overview,
     phase,
     risk,
-    standing,
-    ticket_fold,
-    ticket_model,
 )
-from ..tickets import ticket as ticket_mod
+from ..tickets.model import archive, oplog, standing, ticket_fold, ticket_model
+from ..tickets.model import ticket as ticket_mod
 from . import diagnose_shared
 
 # `--explain --json` の形の版。読み手（VS Code 拡張）が形の違いに気づけるように。

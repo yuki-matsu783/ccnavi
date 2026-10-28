@@ -19,14 +19,9 @@ import tempfile
 import unittest
 
 from ccnavi.infra import pathcase, settings
-from ccnavi.tickets import (
-    approval_checks,
-    approval_ops,
-    archive,
-    review,
-    write_and_push,
-)
-from ccnavi.tickets import ticket as ticket_mod
+from ccnavi.tickets import approval_checks, approval_ops, review, write_and_push
+from ccnavi.tickets.model import archive
+from ccnavi.tickets.model import ticket as ticket_mod
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text, parent_text
@@ -530,7 +525,7 @@ class ArchivedStandingTest(ChecksHarness):
     """親子のチケットの立ち位置: 手元の退避からは閉じたと推定しない。"""
 
     def test_an_archived_family_without_its_tree_is_undecided(self):
-        from ccnavi.tickets import standing
+        from ccnavi.tickets.model import standing
 
         st = standing.standing(self.conf, self.root, "i0001")
         self.assertIn("ワークツリー", st.stop)

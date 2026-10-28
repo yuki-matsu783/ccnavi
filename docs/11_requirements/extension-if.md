@@ -113,12 +113,12 @@ Chrome 拡張が呼ぶ名前の一覧。拡張は、`ccnavi.entry.ext` が再公
 | `version`（`ccnavi.entry.version`） | `VERSION`・`COMPAT` |
 | `fsio`（`ccnavi.infra.fsio`） | `clock(fixed)` |
 | `settings`（`ccnavi.infra.settings`） | `DEFAULT_TICKETS`・`DEFAULT_APPROVED`・`DEFAULT_PROJECTS`・`DEFAULT_PROJECT_HOME`・`DEFAULT_BRANCH_PREFIXES`・`LAYER_CONFIG_DIR`・`load(root)`・`is_branch_prefix(word)`・`is_reserved_layer_name(name)` |
-| `via`（`ccnavi.tickets.via`） | `session(via, actor="")`・`VIA_CHROME` |
-| `review_host`（`ccnavi.tickets.review_host`） | `Result.from_data(data)`（戻り値の `error`） |
+| `via`（`ccnavi.tickets.model.via`） | `session(via, actor="")`・`VIA_CHROME` |
+| `review_host`（`ccnavi.tickets.model.review_host`） | `Result.from_data(data)`（戻り値の `error`） |
 | `review`（`ccnavi.tickets.review`） | `is_sha(value)` |
-| `ticket`（`ccnavi.tickets.ticket`） | `parse(text)`・`load(path)` |
-| `ticket_ids`（`ccnavi.tickets.ticket_ids`） | `ID_CHARS`・`RESERVED_BRANCH_IDS`・`DEFAULT_ISSUE_PREFIX`・`is_valid_id(text)`・`is_valid_name(text)`・`child_pattern()`・`branch_to_id(name)`・`branch_name_problems(t, integration="", serial=0, prefixes=…)`・`branch_problem(name)`・`adoption_id_problem(branch)`・`issue_identifier(number, title="", project="", prefix="feature")` |
-| `ticket_model`（`ccnavi.tickets.ticket_model`） | `DOING`・`DONE`・`STATES`・`Ticket`（`ticket`・`title`・`body`・`is_child`・`predecessors`） |
+| `ticket`（`ccnavi.tickets.model.ticket`） | `parse(text)`・`load(path)` |
+| `ticket_ids`（`ccnavi.tickets.model.ticket_ids`） | `ID_CHARS`・`RESERVED_BRANCH_IDS`・`DEFAULT_ISSUE_PREFIX`・`is_valid_id(text)`・`is_valid_name(text)`・`child_pattern()`・`branch_to_id(name)`・`branch_name_problems(t, integration="", serial=0, prefixes=…)`・`branch_problem(name)`・`adoption_id_problem(branch)`・`issue_identifier(number, title="", project="", prefix="feature")` |
+| `ticket_model`（`ccnavi.tickets.model.ticket_model`） | `DOING`・`DONE`・`STATES`・`Ticket`（`ticket`・`title`・`body`・`is_child`・`predecessors`） |
 
 REQ-EXT-27 の規則は、Chrome 拡張の入口（`py/ccnavi_chrome.py`）が本体の内部の名前を直接参照していたため、改名や移動で拡張だけが壊れないようにするためのもの。
 拡張は `src/ccnavi/entry/ext.py` の再公開だけを呼ぶので、本体のモジュールを動かすときは `ext.py` の行を直す。

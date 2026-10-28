@@ -102,7 +102,8 @@ import yaml
 from ..infra import fsio, pathsafe, settings, tree, yamlread
 from ..policy import texts
 from ..records import diaglog
-from . import flow_render, flow_shape, flow_text, ticket_model
+from . import flow_render, flow_shape, flow_text
+from .model import ticket_model
 
 # ロックで止めたときの理由コードと、記録のルール名。
 CODE_LOCKED = "DENY_TICKET_FLOW_LOCKED"

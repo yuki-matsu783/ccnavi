@@ -24,8 +24,9 @@ import unittest
 
 import yaml
 
-from ccnavi.tickets import agree_candidates, agree_screen, phase_forms, plan_order, ticket_model
-from ccnavi.tickets import ticket as ticket_mod
+from ccnavi.tickets import agree_candidates, agree_screen, plan_order
+from ccnavi.tickets.model import phase_forms, ticket_model
+from ccnavi.tickets.model import ticket as ticket_mod
 from tests.ticket.test_board import _portable
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, write
@@ -385,7 +386,9 @@ class PlanOrderWriteTest(PlanOrderHarness):
     """4・6. 書き戻し。"""
 
     def test_write_changes_only_the_plan_value(self):
-        text = parent_text("i0001", PLAN3).replace("title: 親\n", "# タイトルの前のコメント\ntitle: 親\n")
+        text = parent_text("i0001", PLAN3).replace(
+            "title: 親\n", "# タイトルの前のコメント\ntitle: 親\n"
+        )
         self.propose("i0001", text)
         result = self.write_order(REVERSE)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

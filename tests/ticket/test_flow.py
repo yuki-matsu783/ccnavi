@@ -30,7 +30,8 @@ from unittest import mock
 import yaml
 
 from ccnavi.infra import pathcase, settings, yamlread
-from ccnavi.tickets import flow, flow_render, flow_shape, flow_text, ticket, ticket_model
+from ccnavi.tickets import flow, flow_render, flow_shape, flow_text
+from ccnavi.tickets.model import ticket, ticket_model
 from tests import requires_symlink
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write

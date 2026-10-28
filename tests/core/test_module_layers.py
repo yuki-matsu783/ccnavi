@@ -91,7 +91,14 @@ PACKAGES: tuple[Node, ...] = (
         3,
         "チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、"
         "承認・レビュー済みの判定のコア（core）、write-and-push の見分け、フェーズ、操作",
-        (),
+        (
+            (
+                "model",
+                0,
+                "型と名前。チケット・フェーズ・提案の形、記録の置き場の名前、承認の記録の見分け。ほかのサブパッケージすべてから読まれる。新しい機能は上のサブパッケージに足す",
+                (),
+            ),
+        ),
     ),
     ("catalog", 4, "目録。文書の索引と --docs の引き方・プロジェクトのスキルの目録", ()),
     ("hook", 5, "hook の判定と、その文面・実行後の監視・イベント", ()),
@@ -134,11 +141,11 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "records.redact",
                 "records.wiki",
                 "records.wiki_load",
-                "tickets.user_only",
-                "tickets.oplog",
+                "tickets.model.user_only",
+                "tickets.model.oplog",
                 "hook.subagent_outcome",
-                "tickets.direct_candidates",
-                "tickets.handoff_names",
+                "tickets.model.direct_candidates",
+                "tickets.model.handoff_names",
             }
         ),
     ),
@@ -185,24 +192,24 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "policy.selfguard",
                 "policy.selfguard_targets",
                 "policy.selfguard_shell",
-                "tickets.archive",
-                "tickets.donecopy",
+                "tickets.model.archive",
+                "tickets.model.donecopy",
                 "tickets.flow",
                 "tickets.flow_text",
                 "tickets.flow_shape",
                 "tickets.flow_render",
-                "tickets.via",
-                "tickets.review_host",
+                "tickets.model.via",
+                "tickets.model.review_host",
                 "tickets.risk",
-                "tickets.standing",
-                "tickets.ticket",
-                "tickets.ticket_fields",
-                "tickets.ticket_fold",
-                "tickets.ticket_guard",
-                "tickets.ticket_ids",
-                "tickets.ticket_model",
-                "tickets.proposal_form",
-                "tickets.ticket_places",
+                "tickets.model.standing",
+                "tickets.model.ticket",
+                "tickets.model.ticket_fields",
+                "tickets.model.ticket_fold",
+                "tickets.model.ticket_guard",
+                "tickets.model.ticket_ids",
+                "tickets.model.ticket_model",
+                "tickets.model.proposal_form",
+                "tickets.model.ticket_places",
             }
         ),
     ),
@@ -247,7 +254,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.skillsync",
                 "tickets.phase",
                 "tickets.manual_settle",
-                "tickets.phase_forms",
+                "tickets.model.phase_forms",
                 "tickets.phase_scope",
                 "tickets.plan_order",
                 "tickets.plan_phases",
@@ -937,14 +944,14 @@ class ShapeTest(unittest.TestCase):
 
     def test_depth_beyond_the_limit_is_caught(self):
         self.assertEqual(["big.top.deep"], too_deep(list(package_paths(FAKE)), 2))
-        self.assertEqual([], too_deep(["infra", "tickets.review"], 2))
+        self.assertEqual([], too_deep(["infra", "alpha.beta"], 2))
 
     def test_the_real_table_stays_within_the_limit(self):
         self.assertEqual([], too_deep(list(package_paths(PACKAGES))))
 
     def test_a_loose_module_in_a_split_package_is_caught(self):
-        mods = ["tickets.ticket", "tickets.model.ticket", "hook.judge"]
-        self.assertEqual(["tickets.ticket"], loose_modules(mods, frozenset({"tickets"})))
+        mods = ["alpha.loose", "alpha.beta.thing", "gamma.thing"]
+        self.assertEqual(["alpha.loose"], loose_modules(mods, frozenset({"alpha"})))
         self.assertEqual([], loose_modules(mods, frozenset()))
 
 

@@ -61,13 +61,8 @@ from . import (
     mirror_gap,
     ops_close,
     phase,
-    phase_forms,
-    review_host,
-    ticket_fields,
-    ticket_model,
-    ticket_places,
-    via,
 )
+from .model import phase_forms, review_host, ticket_fields, ticket_model, ticket_places, via
 
 TIMEOUT_SECONDS = 15.0
 

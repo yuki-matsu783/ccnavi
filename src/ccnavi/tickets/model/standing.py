@@ -18,8 +18,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from ..infra import pathcase, settings, tree
-from ..policy import texts
+from ...infra import pathcase, settings, tree
+from ...policy import texts
 from . import ticket_ids
 
 # `Standing.kind`: 止める理由の種別。案内（`guidance`）は文面ではなくこれで分ける。

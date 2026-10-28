@@ -12,17 +12,9 @@ import os
 from typing import TextIO
 
 from ..infra import gitcmd, settings, tree
-from . import (
-    approval,
-    approval_checks,
-    approval_marks,
-    approval_ops,
-    phase,
-    phasetypes,
-    standing,
-    ticket_model,
-)
-from . import ticket as ticket_mod
+from . import approval, approval_checks, approval_marks, approval_ops, phase, phasetypes
+from .model import standing, ticket_model
+from .model import ticket as ticket_mod
 
 # git を読むときの待ち時間（秒）。`ops_stop.py` の git の読み取りも使う。
 TIMEOUT_SECONDS = 5.0

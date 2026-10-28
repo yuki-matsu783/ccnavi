@@ -36,7 +36,7 @@ from __future__ import annotations
 import os
 import sys
 
-from ..infra import pathcase
+from ...infra import pathcase
 
 # 表のファイル名。`.ccnavi/scripts/` に置き、sh と実行ファイルが同じものを読む。
 NAMES_FILE = "ccnavi-handoff-names.txt"
@@ -49,7 +49,7 @@ def _names_path() -> str:
     パッケージの直下の写し（`python.js` が入れる）、ソースではリポジトリの `.ccnavi/scripts/`。
     """
     here = os.path.dirname(os.path.abspath(__file__))
-    package = os.path.dirname(here)
+    package = os.path.dirname(os.path.dirname(here))
     repo = os.path.dirname(os.path.dirname(package))
     candidates = [
         os.path.join(getattr(sys, "_MEIPASS", ""), NAMES_FILE),

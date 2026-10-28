@@ -21,7 +21,8 @@ import sys
 
 from ccnavi.entry import lint, version
 from ccnavi.infra import fsio
-from ccnavi.tickets import core_review, review_decide, review_host
+from ccnavi.tickets import core_review, review_decide
+from ccnavi.tickets.model import review_host
 from tests.ticket.test_swap_points import CoreHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text, load_chrome

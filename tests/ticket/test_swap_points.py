@@ -37,7 +37,8 @@ from unittest import mock
 from ccnavi.entry import lint, version
 from ccnavi.infra import fsio, pathcase, settings
 from ccnavi.infra import tree as tree_mod
-from ccnavi.tickets import approval, approval_ops, core, core_base, ticket_model, via
+from ccnavi.tickets import approval, approval_ops, core, core_base
+from ccnavi.tickets.model import ticket_model, via
 from tests import requires_symlink
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, git, read_json, write
@@ -597,7 +598,7 @@ class WriterFailureTest(CoreHarness):
         self.merge("i0001-01-01")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
-        from ccnavi.tickets import review_host
+        from ccnavi.tickets.model import review_host
 
         result = review_host.Result.from_data({"host": "fixture", "mr": {"number": 7, "url": "u"}})
         checked = core.confirm(self.snapshot(), "i0001", 1, result, "")
@@ -1320,15 +1321,23 @@ class RecordWritesTest(CoreHarness):
             # なく、write-and-push の書いたパスの一覧に載せるものでもない。
             ("gitstate", "shutil.move(source, target)"),
         }
-        names = ("tickets.approval", "tickets.agree", "tickets.via", "tickets.configsync")
+        names = ("tickets.approval", "tickets.agree", "tickets.model.via", "tickets.configsync")
         names += ("tickets.ops", "tickets.flow", "tickets.risk", "tickets.core", "tickets.review")
-        names += ("tickets.phase", "tickets.ticket", "infra.gitstate")
+        names += ("tickets.phase", "tickets.model.ticket", "infra.gitstate")
         names += ("tickets.approval_marks", "tickets.approval_checks", "tickets.approval_times")
-        names += ("tickets.review_host", "tickets.review_decide", "tickets.review_close")
-        names += ("tickets.ticket_model", "tickets.ticket_ids", "tickets.ticket_places")
-        names += ("tickets.ticket_fold", "tickets.ticket_guard", "tickets.ticket_fields")
+        names += ("tickets.model.review_host", "tickets.review_decide", "tickets.review_close")
+        names += (
+            "tickets.model.ticket_model",
+            "tickets.model.ticket_ids",
+            "tickets.model.ticket_places",
+        )
+        names += (
+            "tickets.model.ticket_fold",
+            "tickets.model.ticket_guard",
+            "tickets.model.ticket_fields",
+        )
         names += ("tickets.agree_candidates", "tickets.agree_digest", "tickets.agree_screen")
-        names += ("tickets.phase_forms", "tickets.phase_scope")
+        names += ("tickets.model.phase_forms", "tickets.phase_scope")
         names += ("tickets.flow_text", "tickets.flow_shape", "tickets.flow_render")
         names += ("tickets.approval_ops", "tickets.ops_close", "tickets.ops_stop")
         names += (
@@ -1337,8 +1346,8 @@ class RecordWritesTest(CoreHarness):
             "tickets.core_review",
         )
         for dotted in names:
-            package, name = dotted.split(".")
-            path = os.path.join(ROOT, "src", "ccnavi", package, name + ".py")
+            name = dotted.rpartition(".")[2]
+            path = os.path.join(ROOT, "src", "ccnavi", *dotted.split(".")) + ".py"
             with open(path, encoding="utf-8") as f:
                 lines = f.read().splitlines()
             hits = [

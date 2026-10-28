@@ -38,10 +38,9 @@ from . import (
     phase,
     risk,
     template_drafts,
-    ticket_model,
-    ticket_places,
     worktrees,
 )
+from .model import ticket_model, ticket_places
 
 # 最後のレビューのあと、Draft を外すまでの手順がユーザの合意の範囲に入ることの言い切り。
 # `confirm` の知らせ（core_review.after_last_review）と親の `finish` の出力が同じ文を使う。

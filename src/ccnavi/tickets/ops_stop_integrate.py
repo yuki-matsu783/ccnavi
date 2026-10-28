@@ -67,7 +67,8 @@ from dataclasses import dataclass
 
 from ..infra import directrec, fsio, gitcmd, pathcase, settings, tree
 from ..policy import texts
-from . import archive, direct_candidates, ops_close, ops_stop, ticket_ids, ticket_model
+from . import ops_close, ops_stop
+from .model import archive, direct_candidates, ticket_ids, ticket_model
 
 # Stop で直接作業の `integrate` を促すときの理由コード。止めるのは 1 回だけの促しで、
 # 判定の deny ではない。

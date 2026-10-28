@@ -45,7 +45,6 @@ from ..tickets import (
     approval,
     approval_checks,
     branchfind,
-    direct_candidates,
     learning_notice,
     ops_stop,
     ops_stop_feedback,
@@ -56,8 +55,8 @@ from ..tickets import (
     phase,
     promptsync,
     session_rejects,
-    ticket_guard,
 )
+from ..tickets.model import direct_candidates, ticket_guard
 from . import (
     ccnavimd,
     judge,

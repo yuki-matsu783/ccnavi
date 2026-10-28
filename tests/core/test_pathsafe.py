@@ -116,7 +116,8 @@ class PathsafeTest(unittest.TestCase):
 
     def test_callers_keep_their_meaning(self):
         from ccnavi.records import prune
-        from ccnavi.tickets import archive, learning, review
+        from ccnavi.tickets import learning, review
+        from ccnavi.tickets.model import archive
 
         link = self.link(self.out, "m")
         self.assertEqual(learning.unsafe_path(self.root, "m/x.md"), link)

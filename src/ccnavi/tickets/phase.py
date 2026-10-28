@@ -37,16 +37,8 @@ from typing import TextIO
 
 from ..infra import modes, settings, tree
 from ..policy import rules, texts
-from . import (
-    approval,
-    approval_checks,
-    approval_marks,
-    phase_forms,
-    phasetypes,
-    risk,
-    ticket_model,
-    workflow,
-)
+from . import approval, approval_checks, approval_marks, phasetypes, risk, workflow
+from .model import phase_forms, ticket_model
 
 # 止めている間の呼び名。依頼のマーカーが境目で、未依頼はエージェントの番、
 # 依頼済みはユーザ待ち。

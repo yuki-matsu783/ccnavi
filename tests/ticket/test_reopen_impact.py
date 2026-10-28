@@ -10,7 +10,8 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from ccnavi.tickets import approval_marks, phase, ticket_model, workflow
+from ccnavi.tickets import approval_marks, phase, workflow
+from ccnavi.tickets.model import ticket_model
 
 
 def phase_of(number, states, marks=()):

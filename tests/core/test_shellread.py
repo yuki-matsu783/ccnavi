@@ -6,7 +6,7 @@ from ccnavi.infra import shellread, shellread_cd, shellread_scan, shellread_word
 from ccnavi.infra.shellread import SEP, read
 from ccnavi.infra.shellread_scan import REASON_UNTERMINATED
 from ccnavi.infra.shellread_words import REASON_TAKEN_AS_CODE
-from ccnavi.tickets import phase_forms
+from ccnavi.tickets.model import phase_forms
 
 # 語の中の切れ目の目印。コマンドの区切り（SEP）と別の文字になる予定で、
 # 実装が入るまでは無い。無い間は、それを前提にしたテストを skip する。

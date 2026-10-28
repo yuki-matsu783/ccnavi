@@ -16,15 +16,11 @@ from ..tickets import (
     approval,
     approval_checks,
     approval_marks,
-    oplog,
     ops_stop,
     ops_stop_integrate,
     phase,
-    review_host,
-    standing,
-    ticket_fold,
-    ticket_model,
 )
+from ..tickets.model import oplog, review_host, standing, ticket_fold, ticket_model
 from . import lint_branch, lint_project
 
 

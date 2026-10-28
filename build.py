@@ -149,7 +149,7 @@ def build() -> int:
         "--hidden-import",
         "yaml._yaml",
         # 下書きの置き場で読み替える階層名の表。sh（ccnavi-stage.sh）と同じファイルを同梱する
-        # （src/ccnavi/tickets/handoff_names.py が読む）。
+        # （src/ccnavi/tickets/model/handoff_names.py が読む）。
         "--add-data",
         f"{HANDOFF_NAMES}{os.pathsep}.",
         os.path.join(ROOT, "main.py"),

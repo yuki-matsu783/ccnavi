@@ -19,7 +19,7 @@ scaffold が agree_candidates を import しているので、どちらかに置
 
 from __future__ import annotations
 
-from ..policy import rules
+from ...policy import rules
 from . import ticket_model
 
 # 親の必須の見出し（雛形の本文の並び）。「背景」は「目的」にまとめ、

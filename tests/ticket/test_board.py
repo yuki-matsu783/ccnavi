@@ -390,7 +390,7 @@ class BoardTest(PhaseHarness):
 
     def test_the_merged_head_of_a_child_is_shown(self):
         """finish が書いた `merged_sha`（合流した子の先頭）をボードの JSON に載せる（表示だけ）。"""
-        from ccnavi.tickets import ticket_fields
+        from ccnavi.tickets.model import ticket_fields
 
         self.scene()
         self.assertEqual(self.close_child("i0001-02-02").returncode, 0)

@@ -13,15 +13,9 @@ import os
 from ..infra import fsio, gitcmd, pathcase, settings, tree
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_INFO, SEVERITY_WARN, Problem
-from ..tickets import (
-    approval,
-    archive,
-    config_check,
-    ops_stop_integrate,
-    standing,
-    ticket_model,
-)
-from ..tickets import ticket as ticket_mod
+from ..tickets import approval, config_check, ops_stop_integrate
+from ..tickets.model import archive, standing, ticket_model
+from ..tickets.model import ticket as ticket_mod
 
 # 苦情の出どころの表記。VS Code 拡張がこの前置きでプロジェクトを引く。
 layer_where = config_check.layer_where

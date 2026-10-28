@@ -17,7 +17,7 @@ import tempfile
 import unicodedata
 import unittest
 
-from ccnavi.tickets import standing
+from ccnavi.tickets.model import standing
 from tests import ROOT
 
 COMMON = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-common.sh")

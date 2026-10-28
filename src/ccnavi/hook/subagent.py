@@ -17,7 +17,8 @@ from ..infra import fsio, hookio, modes, pathcase, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import ctxfile, rules
 from ..records import audit
-from ..tickets import approval, approval_checks, flow, phase_scope, ticket_model
+from ..tickets import approval, approval_checks, flow, phase_scope
+from ..tickets.model import ticket_model
 from . import (
     agentkind,
     childnote,

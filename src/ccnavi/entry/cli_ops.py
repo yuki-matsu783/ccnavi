@@ -21,7 +21,6 @@ from ..tickets import (
     core,
     learning,
     next_id,
-    oplog,
     ops,
     phase,
     propose,
@@ -30,12 +29,10 @@ from ..tickets import (
     review_close,
     review_decide,
     scaffold,
-    ticket_ids,
-    user_only,
-    via,
     worktrees,
     write_and_push,
 )
+from ..tickets.model import oplog, ticket_ids, user_only, via
 from . import cli_args, cli_usage, lint, status
 
 

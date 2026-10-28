@@ -77,9 +77,9 @@ import re
 
 import yaml
 
-from ..infra import fsio, globmatch, tree, yamlread
-from ..policy import rules
-from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
+from ...infra import fsio, globmatch, tree, yamlread
+from ...policy import rules
+from ...policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 from . import ticket_fold, ticket_ids, ticket_model
 
 # 範囲の件数の上限。大量に並べてユーザがレビューしきれない

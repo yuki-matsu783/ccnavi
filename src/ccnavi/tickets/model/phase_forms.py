@@ -9,8 +9,8 @@ from __future__ import annotations
 import os
 import re
 
-from ..infra import modes, settings, shellread, shellread_words
-from ..policy import rules, selfguard_shell, texts
+from ...infra import modes, settings, shellread, shellread_words
+from ...policy import rules, selfguard_shell, texts
 from . import user_only
 
 # 何がユーザ専用かは `user_only` の表が正本。この module はその表から正規表現とオプションの一覧を

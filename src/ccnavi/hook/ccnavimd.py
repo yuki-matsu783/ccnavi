@@ -34,7 +34,7 @@ from collections.abc import Callable, Collection
 from typing import NamedTuple
 
 from ..infra import modes, settings, tree
-from ..tickets import ticket_places
+from ..tickets.model import ticket_places
 
 FILE = "CCNAVI.md"
 

@@ -24,7 +24,7 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi.tickets import user_only
+from ccnavi.tickets.model import user_only
 from tests import ROOT, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")

@@ -27,7 +27,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN
-from . import plan_templates, ticket_ids
+from . import plan_templates
+from .model import ticket_ids
 
 # 子の連番は、フェーズの最初の子として決める。
 FIRST_SEQ = 1

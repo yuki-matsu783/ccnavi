@@ -43,7 +43,7 @@ import re
 import stat
 from dataclasses import dataclass, field
 
-from ..infra import fsio, gitcmd, pathcase, pathsafe, tree
+from ...infra import fsio, gitcmd, pathcase, pathsafe, tree
 from . import donecopy, ticket_ids, ticket_model
 from . import ticket as ticket_mod
 

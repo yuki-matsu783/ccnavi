@@ -12,11 +12,7 @@ from ..infra import fsio as fsio
 from ..infra import settings as settings
 from ..tickets import core as core
 from ..tickets import review as review
-from ..tickets import review_host as review_host
-from ..tickets import ticket as ticket
-from ..tickets import ticket_ids as ticket_ids
-from ..tickets import ticket_model as ticket_model
-from ..tickets import via as via
+from ..tickets.model import review_host, ticket, ticket_ids, ticket_model, via
 from . import cli as cli
 from . import lint as lint
 from . import version as version

@@ -1,7 +1,7 @@
 """テストが実行ファイルへ渡す引数に、`user` の入口の形を置く。
 
 実行ファイルの `user` は、`--root`・`--cwd`・`--record-writes`・`--record-tree` を読み飛ばした
-後の最初の語でなければならない（`ccnavi.tickets.user_only.rewrite`）。テストのヘルパーは、
+後の最初の語でなければならない（`ccnavi.tickets.model.user_only.rewrite`）。テストのヘルパーは、
 `--guard-ticket-approval` など読み飛ばされないオプションを先頭に付けて呼ぶので、そのまま
 `user …` を後ろに渡すと入口として読まれない。`place` は、`user <操作> [値]` を先頭の
 ラッパーのオプションのすぐ後ろへ寄せ、ヘルパーのオプションをその後ろに置く。
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from ccnavi.tickets import user_only
+from ccnavi.tickets.model import user_only
 
 
 def place(prefix: Sequence[str], args: Sequence[str]) -> list[str]:

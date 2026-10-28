@@ -28,7 +28,7 @@ import tempfile
 import unittest
 
 from ccnavi.entry import version
-from ccnavi.tickets import review_host
+from ccnavi.tickets.model import review_host
 from tests import ROOT, can_pass_argument, can_symlink, common_sh
 from tests.sh import github_host, gitlab_host
 

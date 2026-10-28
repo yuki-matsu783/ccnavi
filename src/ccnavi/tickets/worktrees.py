@@ -50,8 +50,9 @@ from dataclasses import dataclass
 from typing import TextIO
 
 from ..infra import gitcmd, pathcase, settings, tree
-from . import approval, approval_checks, phase, ticket_ids, ticket_model
-from . import ticket as ticket_mod
+from . import approval, approval_checks, phase
+from .model import ticket as ticket_mod
+from .model import ticket_ids, ticket_model
 
 TIMEOUT_SECONDS = 30.0
 

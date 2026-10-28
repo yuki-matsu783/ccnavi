@@ -17,7 +17,8 @@ from unittest import mock
 from ccnavi.hook import subagent
 from ccnavi.infra import gitcmd, hookio, settings
 from ccnavi.records import prune
-from ccnavi.tickets import direct_candidates, ops_stop_integrate
+from ccnavi.tickets import ops_stop_integrate
+from ccnavi.tickets.model import direct_candidates
 from tests.ticket import test_stop_integrate_nudge as base
 from tests.ticket.test_ticket import git, write
 

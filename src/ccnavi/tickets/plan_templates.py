@@ -79,16 +79,8 @@ import yaml
 from ..infra import pathsafe, settings, tree
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
-from . import (
-    agree_candidates,
-    flow,
-    flow_shape,
-    phasetypes,
-    ticket,
-    ticket_ids,
-    ticket_model,
-    workflow,
-)
+from . import agree_candidates, flow, flow_shape, phasetypes, workflow
+from .model import ticket, ticket_ids, ticket_model
 
 SUFFIX = flow.SUFFIX
 FIELDS = ("name", "description", "when", "plan", "feedback", "flows")

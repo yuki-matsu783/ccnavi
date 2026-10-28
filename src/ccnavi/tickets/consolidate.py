@@ -28,16 +28,9 @@ from typing import TextIO
 
 from ..infra import fsio, settings, tree
 from ..policy import rules
-from . import (
-    approval,
-    approval_marks,
-    approval_ops,
-    learning,
-    learning_records,
-    ops_close,
-    ticket_model,
-)
-from . import ticket as ticket_mod
+from . import approval, approval_marks, approval_ops, learning, learning_records, ops_close
+from .model import ticket as ticket_mod
+from .model import ticket_model
 
 
 def _open_consolidate(

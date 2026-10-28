@@ -14,7 +14,7 @@ import unicodedata
 import unittest
 
 from ccnavi.entry import cli
-from ccnavi.tickets import ticket_ids
+from ccnavi.tickets.model import ticket_ids
 from tests import ROOT
 
 TABLE = os.path.join(ROOT, "tests", "fixtures", "branch-to-id.json")

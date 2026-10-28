@@ -38,16 +38,8 @@ from dataclasses import dataclass, field
 from ..infra import fsio, pathsafe, settings, tree
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
-from . import (
-    approval,
-    archive,
-    flow,
-    handoff,
-    plan_templates,
-    ticket_ids,
-    ticket_model,
-    ticket_places,
-)
+from . import approval, flow, handoff, plan_templates
+from .model import archive, ticket_ids, ticket_model, ticket_places
 
 TO_COMMON = "common"
 TO_PROJECT = "project"

@@ -23,7 +23,8 @@
 from __future__ import annotations
 
 from ..policy import rules
-from . import phasetypes, ticket_model
+from . import phasetypes
+from .model import ticket_model
 
 
 def _parts(parent: ticket_model.Ticket) -> list[tuple[str, int, list[ticket_model.PlanItem]]]:

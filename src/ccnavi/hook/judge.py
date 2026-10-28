@@ -27,17 +27,8 @@ from ..policy import (
     texts,
 )
 from ..records import audit, failstreak, repeat
-from ..tickets import (
-    approval,
-    approval_checks,
-    flow,
-    phase,
-    phase_forms,
-    phase_scope,
-    ticket_guard,
-    ticket_model,
-    ticket_places,
-)
+from ..tickets import approval, approval_checks, flow, phase, phase_scope
+from ..tickets.model import phase_forms, ticket_guard, ticket_model, ticket_places
 from . import (
     agentlaunch,
     failsafe,

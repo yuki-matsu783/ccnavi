@@ -20,18 +20,8 @@ from types import SimpleNamespace
 from typing import TextIO
 
 from ..infra import fsio, settings, tree
-from . import (
-    approval,
-    approval_marks,
-    approval_ops,
-    oplog,
-    phase,
-    review,
-    review_host,
-    standing,
-    ticket_model,
-    via,
-)
+from . import approval, approval_marks, approval_ops, phase, review
+from .model import oplog, review_host, standing, ticket_model, via
 
 DECIDE_FILE = "review-decide-{parent}-{phase}.md"
 # 残った指摘のうち、ユーザが issue に回すと選んだ分の下書き。sh がこれで issue を作る。

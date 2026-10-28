@@ -9,7 +9,8 @@ from collections.abc import Callable
 
 from ..infra import gitcmd, settings, tree
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
-from ..tickets import agree_candidates, next_id, ticket_ids, ticket_model
+from ..tickets import agree_candidates, next_id
+from ..tickets.model import ticket_ids, ticket_model
 
 
 def _branch_name_problems(

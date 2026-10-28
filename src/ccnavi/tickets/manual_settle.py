@@ -25,7 +25,8 @@ import time
 from dataclasses import dataclass, field
 
 from ..infra import gitcmd, settings, tree
-from . import approval_marks, phase, ticket_model
+from . import approval_marks, phase
+from .model import ticket_model
 
 # 手動の移動の判定の結果。
 NONE = "none"  # 該当しない（レビューが要らない・済み・手で動かした子が無い）

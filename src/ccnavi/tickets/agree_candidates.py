@@ -9,19 +9,9 @@ from dataclasses import dataclass, field
 
 from ..infra import gitstate, settings, tree
 from ..policy import rules
-from . import (
-    approval,
-    approval_checks,
-    approval_ops,
-    phase,
-    phasetypes,
-    proposal_form,
-    standing,
-    ticket_ids,
-    ticket_model,
-    workflow,
-)
-from . import ticket as ticket_mod
+from . import approval, approval_checks, approval_ops, phase, phasetypes, workflow
+from .model import proposal_form, standing, ticket_ids, ticket_model
+from .model import ticket as ticket_mod
 
 
 @dataclass

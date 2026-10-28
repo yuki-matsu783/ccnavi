@@ -28,8 +28,9 @@ import yaml
 
 from ..infra import fsio, settings
 from ..policy import rules
-from . import agree_candidates, phasetypes, plan_order, ticket_model
-from . import ticket as ticket_mod
+from . import agree_candidates, phasetypes, plan_order
+from .model import ticket as ticket_mod
+from .model import ticket_model
 
 _KEY_LINE = re.compile(rf"^{re.escape(phasetypes.COPY_KEY)}\s*:")
 _PLAN_LINE = re.compile(r"^plan\s*:")

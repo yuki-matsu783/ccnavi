@@ -25,7 +25,7 @@ import time
 import uuid
 from typing import Any
 
-from ..infra import fsio
+from ...infra import fsio
 
 VERSION = 1
 OPS_DIR = "ops"

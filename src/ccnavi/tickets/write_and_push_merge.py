@@ -33,16 +33,8 @@ from typing import TextIO
 
 from ..infra import gitcmd, gitstate, pathcase, settings, tree
 from ..policy import rules
-from . import (
-    approval,
-    approval_checks,
-    mirror_gap,
-    ops_close,
-    phase_scope,
-    ticket_model,
-    ticket_places,
-    write_and_push,
-)
+from . import approval, approval_checks, mirror_gap, ops_close, phase_scope, write_and_push
+from .model import ticket_model, ticket_places
 
 _TIMEOUT = 20.0
 _SHOWN = 8

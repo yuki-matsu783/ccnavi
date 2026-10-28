@@ -18,7 +18,7 @@ import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from ..infra import fsio
+from ...infra import fsio
 
 # 投稿に付けるマーカー。機構自身の投稿を、確認のときに除くため。
 MARKER_REQUEST = "<!-- ccnavi:request "

@@ -11,15 +11,9 @@ from dataclasses import dataclass, field
 
 from ..infra import settings, tree
 from ..policy import rules
-from ..tickets import (
-    approval,
-    approval_checks,
-    flow,
-    phase,
-    phasetypes,
-    ticket_model,
-)
-from ..tickets import ticket as ticket_mod
+from ..tickets import approval, approval_checks, flow, phase, phasetypes
+from ..tickets.model import ticket as ticket_mod
+from ..tickets.model import ticket_model
 
 # 担当の案内に必ず足す 3 行。サブエージェントの Bash は cd がコマンドをまたいで続かず、
 # 担当外のワークツリーと、push・チケットの状態の操作は触らせない（メインが行う）。

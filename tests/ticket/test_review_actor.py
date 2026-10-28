@@ -19,7 +19,8 @@ import os
 
 from ccnavi.entry import lint, version
 from ccnavi.infra import settings
-from ccnavi.tickets import review, review_host
+from ccnavi.tickets import review
+from ccnavi.tickets.model import review_host
 from tests.ticket.test_swap_points import STAMP, CoreHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text

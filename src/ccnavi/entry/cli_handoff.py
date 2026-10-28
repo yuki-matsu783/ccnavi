@@ -19,7 +19,8 @@ from typing import TextIO
 
 from ..infra import settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
-from ..tickets import handoff, user_only, via
+from ..tickets import handoff
+from ..tickets.model import user_only, via
 from . import cli_args
 
 # `--handoff` と一緒に読むオプション（argparse の dest）。ほかのオプションが既定の値でなければ断る。

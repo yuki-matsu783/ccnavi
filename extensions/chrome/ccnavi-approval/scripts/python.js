@@ -23,7 +23,7 @@ import zlib from "node:zlib";
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const REPO = path.resolve(HERE, "..", "..", "..");
 const CACHE = path.join(HERE, ".cache");
-// 下書きの階層名の読み替え表。sh と実行ファイルと同じファイル（src/ccnavi/tickets/handoff_names.py が読む）
+// 下書きの階層名の読み替え表。sh と実行ファイルと同じファイル（src/ccnavi/tickets/model/handoff_names.py が読む）
 const HANDOFF_NAMES = path.join(REPO, ".ccnavi", "scripts", "ccnavi-handoff-names.txt");
 
 /** uv.lock の `[[package]] name = "pyyaml"` の sdist の url と sha256 */

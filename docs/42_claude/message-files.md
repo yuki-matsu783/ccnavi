@@ -35,7 +35,7 @@ keywords: [文面, 文面ファイル, messages, ccnavi text, ccnavi_text, texts
 
 ## 組み込みルールの文を足す
 
-`builtin:` で始まる id の組み込みルール（`policy/builtin.py`・`policy/selfguard_shell.py`・`tickets/ticket_guard.py`・`tickets/phase_forms.py`）の文は、ルールの組み立てでは引かない。ルールは hook の呼び出しごとに組み立てるので、組み立てで引くと、拒否に当たらない呼び出しにも文面ファイルの冷たい読み（約 45 ms）が乗る。
+`builtin:` で始まる id の組み込みルール（`policy/builtin.py`・`policy/selfguard_shell.py`・`tickets/model/ticket_guard.py`・`tickets/model/phase_forms.py`）の文は、ルールの組み立てでは引かない。ルールは hook の呼び出しごとに組み立てるので、組み立てで引くと、拒否に当たらない呼び出しにも文面ファイルの冷たい読み（約 45 ms）が乗る。
 
 1. 文面ファイルに `RULE_<ルールの id>` を足す。`what` だけが必須で、言うことが無い欄は省く
 2. ルールの dict（または `Rule`）に `**texts.spec("RULE_…", git=…, wrapper=…, cased=(…))` を渡す。ラッパーの有無で分かれる欄は `cased` に、それ以外の場合の選びは `variants` に書く。`message` は書かない

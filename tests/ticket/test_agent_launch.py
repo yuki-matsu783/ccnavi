@@ -32,7 +32,7 @@ import unittest
 
 from ccnavi.hook import agentlaunch
 from ccnavi.infra import hookio, settings
-from ccnavi.tickets import ticket_model
+from ccnavi.tickets.model import ticket_model
 from tests import common_path
 from tests.ticket.test_flow import WORKFLOW_YAML
 from tests.ticket.test_phases import PhaseHarness

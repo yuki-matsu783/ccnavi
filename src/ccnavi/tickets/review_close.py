@@ -17,21 +17,8 @@ from dataclasses import dataclass
 from typing import TextIO
 
 from ..infra import fsio, settings, tree
-from . import (
-    approval,
-    approval_checks,
-    approval_marks,
-    archive,
-    ops,
-    ops_close,
-    phase,
-    retire,
-    review,
-    review_host,
-    standing,
-    ticket_model,
-    ticket_places,
-)
+from . import approval, approval_checks, approval_marks, ops, ops_close, phase, retire, review
+from .model import archive, review_host, standing, ticket_model, ticket_places
 
 # Draft を外すときにマージリクエストへ残すコメント。sh が Draft を外してから投稿する。
 READY_FILE = "review-ready-{parent}.md"

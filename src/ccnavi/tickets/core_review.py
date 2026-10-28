@@ -24,17 +24,13 @@ from . import (
     approval_ops,
     core_base,
     manual_settle,
-    oplog,
     ops,
     ops_close,
     phase,
     review,
     review_decide,
-    review_host,
-    ticket_model,
-    ticket_places,
-    via,
 )
+from .model import oplog, review_host, ticket_model, ticket_places, via
 
 # レビュー済み（`confirm`）が通らなかった根拠の種別。付録 A の `CORE_CONFIRM_*`。
 # 親の承認済みチケットが作業中に無い。

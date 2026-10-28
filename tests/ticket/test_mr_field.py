@@ -15,8 +15,9 @@ import unittest
 from unittest import mock
 
 from ccnavi.infra import settings
-from ccnavi.tickets import agree_candidates, ticket_fields, ticket_model
-from ccnavi.tickets import ticket as ticket_mod
+from ccnavi.tickets import agree_candidates
+from ccnavi.tickets.model import ticket as ticket_mod
+from ccnavi.tickets.model import ticket_fields, ticket_model
 
 
 def parent_text(mr=None, child=False):

@@ -38,9 +38,8 @@ from ..tickets import (
     flow_render,
     flow_shape,
     flow_text,
-    standing,
-    ticket_model,
 )
+from ..tickets.model import standing, ticket_model
 from . import (
     lint_direct,
     lint_layers,

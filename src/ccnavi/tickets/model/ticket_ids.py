@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 import unicodedata
 
-from ..infra import settings
+from ...infra import settings
 from . import ticket_model
 
 # 識別子。親は 1 語、子は `<親>-<2 桁のフェーズ番号>-<2 桁のフェーズ内の連番>`。新しい親は

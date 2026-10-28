@@ -29,10 +29,10 @@ from ccnavi.tickets import (
     approval_checks,
     approval_marks,
     phasetypes,
-    ticket_model,
     workflow,
 )
-from ccnavi.tickets import ticket as ticket_mod
+from ccnavi.tickets.model import ticket as ticket_mod
+from ccnavi.tickets.model import ticket_model
 from tests import config_path
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, write

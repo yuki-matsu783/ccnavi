@@ -29,14 +29,12 @@ from ..tickets import (
     approval_checks,
     approval_times,
     manual_settle,
-    oplog,
     ops_stop,
     overview,
     phase,
-    standing,
-    ticket_model,
     write_and_push,
 )
+from ..tickets.model import oplog, standing, ticket_model
 
 TIMEOUT_SECONDS = 10.0
 

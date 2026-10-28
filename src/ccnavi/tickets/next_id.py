@@ -26,8 +26,9 @@ import os
 from typing import TextIO
 
 from ..infra import gitcmd, settings, tree
-from . import approval, ticket_ids
-from . import ticket as ticket_mod
+from . import approval
+from .model import ticket as ticket_mod
+from .model import ticket_ids
 
 # 数えきれなかったときに添える一言。
 ASK_USER = "番号を決められないので、ユーザに確かめてください"

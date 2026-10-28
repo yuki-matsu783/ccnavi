@@ -53,11 +53,10 @@ from . import (
     approval_marks,
     flow,
     phasetypes,
-    ticket_ids,
-    ticket_model,
     workflow,
 )
-from . import ticket as ticket_mod
+from .model import ticket as ticket_mod
+from .model import ticket_ids, ticket_model
 
 # `--plan-order <親> --json` の答えの版。欄を足すだけなら上げない。
 VERSION = 1

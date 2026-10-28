@@ -11,7 +11,8 @@ from dataclasses import dataclass, replace
 
 from ..infra import settings, tree
 from ..policy import rules, texts
-from . import standing, ticket_model, workflow
+from . import workflow
+from .model import standing, ticket_model
 
 
 def mark_imported(

@@ -49,7 +49,7 @@ class MessageLanguageTest(unittest.TestCase):
 
     def test_refusal_texts_keep_their_hints(self):
         from ccnavi.policy import builtin
-        from ccnavi.tickets import ticket_guard
+        from ccnavi.tickets.model import ticket_guard
 
         with tempfile.TemporaryDirectory() as plain:
             shutil.copytree(

@@ -15,16 +15,9 @@ from typing import TextIO
 
 from ..infra import fsio, settings
 from ..policy import rules
-from . import (
-    approval,
-    approval_checks,
-    approval_marks,
-    archive,
-    ticket_fields,
-    ticket_ids,
-    ticket_model,
-)
-from . import ticket as ticket_mod
+from . import approval, approval_checks, approval_marks
+from .model import archive, ticket_fields, ticket_ids, ticket_model
+from .model import ticket as ticket_mod
 
 
 def admit(approved_dir: str, ticket: ticket_model.Ticket) -> str:

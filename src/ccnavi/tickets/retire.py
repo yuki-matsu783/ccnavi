@@ -48,7 +48,8 @@ from dataclasses import dataclass
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, pathcase, settings, tree
-from . import approval, archive, ticket_ids, worktrees
+from . import approval, worktrees
+from .model import archive, ticket_ids
 
 STATE_DIR = "retire"
 KIND_MERGED = "merged"

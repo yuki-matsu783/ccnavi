@@ -17,7 +17,7 @@ import yaml
 from ccnavi.hook import ccnavimd
 from ccnavi.infra import settings
 from ccnavi.policy import rule_lint, rules
-from ccnavi.tickets import ticket_ids
+from ccnavi.tickets.model import ticket_ids
 from tests import ROOT
 from tests.draft import final
 from tests.inproc import run_ccnavi

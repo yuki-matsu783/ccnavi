@@ -25,7 +25,7 @@ from __future__ import annotations
 import os
 import time
 
-from ..infra import fsio, hookio, pathcase, settings, tree
+from ...infra import fsio, hookio, pathcase, settings, tree
 
 # 候補にする書き込みのツール。
 TOOLS = ("Write", "Edit", "NotebookEdit")

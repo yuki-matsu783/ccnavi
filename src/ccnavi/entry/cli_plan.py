@@ -24,7 +24,8 @@ from typing import TextIO
 
 from ..infra import settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
-from ..tickets import approval, plan_order, plan_phases, ticket_model
+from ..tickets import approval, plan_order, plan_phases
+from ..tickets.model import ticket_model
 
 
 def _not_found(stderr: TextIO, conf: settings.Settings, name: str) -> int:

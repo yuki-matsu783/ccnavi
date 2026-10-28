@@ -44,8 +44,8 @@ from . import (
     approval_ops,
     phase,
     plan_order,
-    ticket_model,
 )
+from .model import ticket_model
 
 # 承認の JSON の版。`--agree --preview --json` と `--agree --yes … --json` が出す。
 # VS Code のボード拡張が読み、知らない番号なら読まずに版の違いを言う。

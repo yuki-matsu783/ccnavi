@@ -14,7 +14,8 @@ from dataclasses import dataclass
 
 from ..infra import fsio, gitcmd, settings, tree
 from ..policy import texts
-from . import approval, approval_checks, ops_close, standing, ticket_model
+from . import approval, approval_checks, ops_close
+from .model import standing, ticket_model
 
 # Stop で `finish` の打ち忘れを促すときの理由コード。止めるのは 1 回だけの促しで、
 # 判定の deny ではない。

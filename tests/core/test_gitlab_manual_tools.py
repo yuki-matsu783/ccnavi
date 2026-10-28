@@ -123,7 +123,7 @@ class ProbePureHelpersTest(unittest.TestCase):
         return parent_text("i0001", ["work"])
 
     def parse(self, text: str):
-        from ccnavi.tickets import ticket as ticket_mod  # noqa: PLC0415
+        from ccnavi.tickets.model import ticket as ticket_mod
 
         found, problems = ticket_mod.parse(text)
         self.assertIsNotNone(found, problems)
@@ -161,7 +161,7 @@ class ProbePureHelpersTest(unittest.TestCase):
             self.probe.feedback_revision(once)
 
     def test_cancelled_children_live_in_done_not_in_a_cancelled_directory(self):
-        from ccnavi.tickets import ticket_model  # noqa: PLC0415
+        from ccnavi.tickets.model import ticket_model
 
         path = self.probe.approved_copy_path("/t", "done", "i0002-01-01")
         self.assertEqual(os.path.join("/t", ".ccnavi", "approved", "done", "i0002-01-01.md"), path)
