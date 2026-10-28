@@ -30,7 +30,7 @@ import unicodedata
 import unittest
 from unittest import mock
 
-from ccnavi.hook import docsearch, docsearch_index, docsearch_query
+from ccnavi.catalog import docsearch, docsearch_index, docsearch_query
 from ccnavi.infra import hookio, pathcase, settings
 from tests import ROOT
 from tests.inproc import run_ccnavi

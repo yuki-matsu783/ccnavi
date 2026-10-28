@@ -1,6 +1,6 @@
 """`src/ccnavi/` の import の向きを、テストで守る。
 
-`src/ccnavi/` は役割ごとのサブパッケージ 6 つ（`PACKAGES`）に分かれ、その中にモジュールが並ぶ。
+`src/ccnavi/` は役割ごとのサブパッケージ 7 つ（`PACKAGES`）に分かれ、その中にモジュールが並ぶ。
 読む順は 2 つの表で書く。サブパッケージの順（`PACKAGES`）と、モジュールの段（`TIERS`）。
 ディレクトリが言えるのは「どの役割か」までで、同じサブパッケージの中の読む順は言えない。
 段がそれを補う。2 つの表と食い違う import を名指しする。
@@ -75,6 +75,7 @@ PACKAGES: tuple[tuple[str, str], ...] = (
         "チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、"
         "承認・レビュー済みの判定のコア（core）、write-and-push の見分け、フェーズ、操作",
     ),
+    ("catalog", "目録。文書の索引と --docs の引き方・プロジェクトのスキルの目録"),
     ("hook", "hook の判定と、その文面・実行後の監視・イベント"),
     ("entry", "入口。CLI・診断・lint・提案・版"),
 )
@@ -188,10 +189,10 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         frozenset(
             {
                 "hook.ccnavimd",
-                "hook.docsearch",
-                "hook.docsearch_index",
-                "hook.docsearch_query",
-                "hook.projskills",
+                "catalog.docsearch",
+                "catalog.docsearch_index",
+                "catalog.docsearch_query",
+                "catalog.projskills",
                 "hook.proposalhint",
                 "policy.ruleload",
                 "policy.rule_lint",
