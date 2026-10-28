@@ -150,7 +150,8 @@ def _plan_text(stdout: TextIO, plan: mirrorsync.Plan, wanted: list[str] | None, 
         return
     if plan.common_empty:
         stdout.write(
-            "  共通レイヤーにコピーするものがありません。ミラーは消さず、何も揃えません。\n"
+            "  共通レイヤーにも工程スキルにもコピーするものがありません。"
+            "ミラーは消さず、何も揃えません。\n"
         )
     for project in plan.projects:
         if not project.selected:
