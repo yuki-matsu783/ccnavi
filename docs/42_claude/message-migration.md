@@ -152,7 +152,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | 順 | PR | 中身 |
 |---|---|---|
 | 1 | 組み込みルールの文（移した） | 仕組み（`Rule` の欄、`_build` の検査、`key()`、引く 3 か所、点検の拡張、空の欄を許す検査）、`builtin.py`・`selfguard_shell.py`・`ticket_guard.py`・`phase_forms.py` の文。手引きの 1 行（項目 2）を含む |
-| 2 | hook の通知と実行後の報告（移した） | `notice` の種類と `undeclared`・`fallen_back`、`post.py`・`post_report.py`・`post_findings.py`、`rootwrite.py`・`docsearch.py` の文。`policy/selfguard.py` の知らせは含めず、残りに置く |
+| 2 | hook の通知と実行後の報告（移した） | `notice` の種類と `undeclared`・`fallen_back`、`post.py`・`post_report.py`・`post_findings.py`、`hook/rootwrite.py`・`catalog/docsearch.py` の文。`policy/selfguard.py` の知らせは含めず、残りに置く |
 | 3 | Python の CLI の次の手（移した） | `ops.py`・`agree_screen.py`・`approval_checks.py` の一部・`review.py` の一部。`phase.py` の stderr に次の手は無く、残りは `root` を持たない・問題の一覧の要素・状態を伝える文のため移していない |
 | 4 | sh の `案内:`（移した） | `ccnavi-git.sh`・`ccnavi-worktree.sh`・`ccnavi-start.sh` など。状態を報告する `案内:` は移していない |
 
