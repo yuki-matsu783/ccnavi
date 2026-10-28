@@ -12,6 +12,7 @@ import os
 import time
 from typing import TextIO
 
+from ..catalog import projskills
 from ..infra import fsio, hookio, modes, pathcase, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import ctxfile, rules
@@ -22,7 +23,6 @@ from . import (
     childnote,
     post,
     post_findings,
-    projskills,
     reasons,
     subagent_outcome,
 )

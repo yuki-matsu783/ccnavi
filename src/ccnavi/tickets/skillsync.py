@@ -32,7 +32,7 @@ PROCESS_KEY = "process"
 SKILL_FILE = "SKILL.md"
 # `references/` の最上段で、共通としてコピーするディレクトリ。それ以外はコピーせず、触れない。
 COMMON_REFS = ("references", "common")
-# コピー先の、プロジェクトのルートからの相対。目録（`hook.projskills`）の読み先と同じ。
+# コピー先の、プロジェクトのルートからの相対。目録（`catalog.projskills`）の読み先と同じ。
 SKILLS_DIR = "skills"
 # 共通の置き場の、ワークスペースルートからの相対。
 SOURCE_DIR = ".claude/skills"

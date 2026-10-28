@@ -17,6 +17,7 @@ import sys
 import time
 from typing import TextIO
 
+from ..catalog import docsearch, projskills
 from ..infra import directrec, fsio, hookio, modes, pathcase, settings, shellread, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import (
@@ -59,11 +60,9 @@ from ..tickets import (
 )
 from . import (
     ccnavimd,
-    docsearch,
     judge,
     post,
     post_findings,
-    projskills,
     proposalhint,
     stopjudge,
     subagent,
