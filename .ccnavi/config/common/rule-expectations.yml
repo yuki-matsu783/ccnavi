@@ -255,6 +255,12 @@ deny:
     why: 同上。コマンド列の途中でも止まる
 
 ask:
+  - tool: Skill
+    subject: "data-process-wipe"
+    why: 名前の途中の process- には process-skill-call が当たらない（名前が process- で始まるものだけ）
+  - tool: Skill
+    subject: "commit"
+    why: 工程スキルでない Skill には process-skill-call が当たらない。どのルールにも当たらず、権限モードへ渡る
   - tool: Bash
     subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --base feature/x --accept 7f3a9c21 --no-wip"
     why: >-
@@ -406,6 +412,21 @@ ask:
     why: 変数が引数にあるだけで、コマンド名の位置ではない。どのルールにもヒットせず権限モードへ渡る
 
 allow:
+  - tool: Skill
+    subject: "process-implement"
+    why: 工程スキルの入口の呼び出し。ルールが無いと dontAsk / bypassPermissions で拒否され、促しに従って呼んだ Skill が止まる（process-skill-call）
+  - tool: Skill
+    subject: "test-repo:process-implement"
+    why: プラグイン名前置きの形も同じ（先頭に * を付けた glob）
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/src/a.py"
+    why: ワークツリーの中のコード。worktrees と process-skill-first-edit がヒットし、工程スキルを Skill で呼ぶ一言が最初の 1 度だけ添えられる
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/wip/proposals/todo/p.md"
+    why: 提案は process-skill-first-edit の except。Once を先に消費しない
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/scratchpad/a.md"
+    why: scratchpad/ も process-skill-first-edit の except（wip/・.ccnavi/・.claude/ も同じ）
   - tool: Bash
     subject: "sh .ccnavi/scripts/ccnavi-git.sh status --porcelain"
     why: git の入口。サブコマンドの選別はラッパースクリプトの中で行う
