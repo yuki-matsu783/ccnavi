@@ -227,11 +227,11 @@ ccnavi_host_cli_ping() {
 	return "$ccnavi_cp_rc"
 }
 
-# PATH の絶対パスのエントリだけから実行可能な道具を探し、見つかれば絶対パスを標準出力に出す（無ければ 1）。
-# `command -v` は使わない。macOS の sh は PATH の相対エントリ（例 bin）を絶対パスにして返すので、
-# リポジトリの中の gh などが選ばれる。空のエントリ（cwd を指す）と相対のエントリは飛ばす。
-# IFS を変えず ${p%%:*} で割る（`*` を含むエントリで glob が走らないように）。
-# 結果に " $ ` \ を含むものは、式に埋めると危ないので断る。
+# PATH の絶対パスのエントリだけから実行可能な道具を探し、見つかれば絶対パスを標準出力に出す（無ければ終了コード 1）。
+# `command -v` は使わない。macOS の sh は PATH の相対エントリ（例 bin）を絶対パスに直して返すため、
+# リポジトリの中の gh などが選ばれてしまう。空のエントリ（cwd を指す）と相対のエントリは飛ばす。
+# IFS を変えず ${PATH%%:*} の形 で割る（`*` を含むエントリで glob が展開されないように）。
+# 結果に " $ ` \ を含むものは、式に埋め込むと危険なので返さない。
 ccnavi_find_tool() {
 	ccnavi_ft_rest="${PATH-}:"
 	while [ -n "$ccnavi_ft_rest" ]; do
@@ -492,7 +492,7 @@ ccnavi_git_auth() {
 		ccnavi_ga_name=glab
 	fi
 	ccnavi_ga_cli=$(ccnavi_find_tool "$ccnavi_ga_name" || :)
-	# ccnavi_find_tool は絶対パスで、式に効く文字を含まないものだけ返す。相対パスだと、リポジトリの中の gh が helper として動く。
+	# ccnavi_find_tool は、式の中で特別な意味を持つ文字（" $ ` \）を含まない絶対パスだけを返す。相対パスだと、リポジトリの中の gh が helper として動いてしまう。
 	[ -n "$ccnavi_ga_cli" ] || { ccnavi_git_auth_reset; return 0; }
 	# 値は変数のまま eval に渡す（ホスト名や道具のパスを式に埋めない。origin の文字列がコマンドとして走らないように）。
 	ccnavi_ga_key="credential.$ccnavi_ga_scheme://$ccnavi_ga_host.helper"
