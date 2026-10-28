@@ -637,11 +637,16 @@ def _dirty_problem(conf: settings.Settings, paths: list[str]) -> str:
     shown = "、".join(mirrored[:10]) + (
         f" ほか {len(mirrored) - 10} 件" if len(mirrored) > 10 else ""
     )
+    others = len(paths) - len(mirrored)
+    lead = (
+        f"{base}（共通レイヤーのコピーとのずれ: {shown}）。ずれの分は作業による変更ではないため、"
+        "コミットも取り消しもしない。"
+    )
+    if others:
+        lead += f"ずれ以外の変更が {others} 件ある。そちらは作業の変更として扱う。"
     return (
-        f"{base}（共通レイヤーのコピーとのずれ: {shown}）。作業による変更ではないため、"
-        "コミットも取り消しもしない。ユーザには、"
-        "`ccnavi-user-mirror.sh <プロジェクト名>` で共通レイヤーのミラーを揃え、"
-        "統合先にコミットしてもらうよう頼む。"
+        lead + "ユーザには、`ccnavi-user-mirror.sh <プロジェクト名>` で差分と値を確かめ、"
+        "`--yes --expect <値>` で共通レイヤーのミラーを揃えて、統合先にコミットしてもらうよう頼む。"
         "`skills/` のずれはその操作では揃わないため、統合先で揃えてコミットしてもらう"
     )
 

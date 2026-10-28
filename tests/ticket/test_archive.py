@@ -23,6 +23,7 @@ from ccnavi.tickets import (
     approval_checks,
     approval_ops,
     archive,
+    review,
     write_and_push,
 )
 from ccnavi.tickets import ticket as ticket_mod
@@ -335,6 +336,15 @@ class ReadyArchivesTest(ReadyHarness):
         self.assertIn("skills/process-test/SKILL.md", refused.stderr)
         self.assertIn("ccnavi-user-mirror.sh", refused.stderr)
         self.assertIn("コミットも取り消しもしない", refused.stderr)
+
+    def test_mirror_drift_text_counts_other_changes_and_folds_case_and_long_lists(self):
+        conf = settings.Settings()
+        drift = [f"skills/process-test/references/common/r{n}.md" for n in range(11)]
+        text = review._dirty_problem(conf, ["SKILLS/process-test/SKILL.md", "src/keep.py"] + drift)
+        self.assertIn("ずれ以外の変更が 1 件ある", text)
+        self.assertIn("ほか 2 件", text)
+        self.assertIn("--yes --expect <値>", text)
+        self.assertNotIn("ずれ以外", review._dirty_problem(conf, drift))
 
     def test_ready_does_not_blame_the_mirror_for_other_uncommitted_changes(self):
         fixture = self.closable()
