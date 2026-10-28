@@ -30,16 +30,16 @@ from . import (
     approval_checks,
     approval_marks,
     approval_ops,
-    flow,
     learning,
     ops_close,
     ops_plan,
     ops_stop,
     phase,
-    risk,
     template_drafts,
     worktrees,
 )
+from .config import risk
+from .flow import graph as flow
 from .model import ticket_model, ticket_places
 
 # 最後のレビューのあと、Draft を外すまでの手順がユーザの合意の範囲に入ることの言い切り。

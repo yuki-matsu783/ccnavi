@@ -20,7 +20,8 @@ import unittest
 
 import yaml
 
-from ccnavi.tickets import agree_digest, phasetypes
+from ccnavi.tickets import agree_digest
+from ccnavi.tickets.config import phasetypes
 from ccnavi.tickets.model import phase_forms
 from ccnavi.tickets.model import ticket as ticket_mod
 from tests import phasecopy

@@ -11,7 +11,7 @@ from dataclasses import dataclass, replace
 
 from ..infra import settings, tree
 from ..policy import rules, texts
-from . import workflow
+from .config import workflow
 from .model import standing, ticket_model
 
 

@@ -19,7 +19,7 @@ import unittest
 
 from ccnavi.infra import settings, shellread, yamlread
 from ccnavi.policy import builtin, texts
-from ccnavi.tickets import risk
+from ccnavi.tickets.config import risk
 from ccnavi.tickets.model import ticket_guard
 from tests import ROOT
 from tests.config.test_config_union import (

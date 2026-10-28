@@ -14,9 +14,9 @@ import io
 import os
 from typing import TextIO
 
-from ..infra import pathcase, settings, tree
-from ..policy import rule_lint, ruleload
-from ..policy.rules import SEVERITY_ERROR, Problem
+from ...infra import pathcase, settings, tree
+from ...policy import rule_lint, ruleload
+from ...policy.rules import SEVERITY_ERROR, Problem
 from . import phasetypes, risk
 
 

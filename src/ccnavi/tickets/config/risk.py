@@ -63,8 +63,8 @@ from dataclasses import dataclass, field, replace
 
 import yaml
 
-from ..infra import gitcmd, globmatch, settings, tree, yamlread
-from ..policy.rules import ID_SEPARATOR, SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
+from ...infra import gitcmd, globmatch, settings, tree, yamlread
+from ...policy.rules import ID_SEPARATOR, SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 
 VERSION = 1
 

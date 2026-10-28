@@ -37,7 +37,9 @@ import yaml
 
 from ..infra import fsio, pathcase, pathsafe, settings, yamlread
 from ..policy import rules
-from . import flow, phasetypes, plan_templates, risk
+from . import plan_templates
+from .config import phasetypes, risk
+from .flow import graph as flow
 
 COMMON_DIR = settings.COMMON_DIR
 # 共通レイヤーの期待する判定のファイル名。

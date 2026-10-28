@@ -28,7 +28,8 @@ import yaml
 
 from ..infra import fsio, settings
 from ..policy import rules
-from . import agree_candidates, phasetypes, plan_order
+from . import agree_candidates, plan_order
+from .config import phasetypes
 from .model import ticket as ticket_mod
 from .model import ticket_model
 

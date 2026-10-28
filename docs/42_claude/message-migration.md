@@ -23,7 +23,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | `NOTE_WORKTREE_LEFTOVER*` | `ccnavi-worktree.sh`（親のワークツリーから直接作業へ切り替えたあとの取り下げの案内。残っているかは実行ファイルの `tree leftover` に聞く） | 移した（新規） |
 | `NEXT_PF_*` | `ccnavi-common-host.sh` の `ccnavi_pf_next`（`--check`・失敗時の `次:`・`ccnavi-ticket.sh` の事前確認） | 移した（`integration` の文は共有の `ccnavi_integration_hint` を使うので残る） |
 | `DENY_AGENT_*`（`ISOLATION`・`TARGET_INVALID`・`MULTI_TARGET`・`PARENT_TREE`・`NO_CHILD`・`CHILD_UNAVAILABLE`・`CWD_CONFLICT`） | `hook/agentlaunch.py`（`deny-agent.yml`） | 移した（`Mention.invalid` と `unavailable()` の理由の断片は、条件の判断と公開関数の戻り値に使うので、値としてコードに残る） |
-| `DENY_SCRIPT_ENV_OVERRIDE`・`DENY_CHILD_PUSH__*`・`DENY_WRAPPER_CORE_PATH__*`・`DENY_SUBAGENT_PARENT_TREE__*`・`DENY_TICKET_FLOW_LOCKED`・`DENY_TICKET_APPROVAL_CLI__*`・`DENY_RECORDS_PRUNE` | `hook/wrapguard.py`・`tickets/flow.py`・`tickets/model/phase_forms.py`（`deny-guards.yml`） | 移した（1 件の長さの上限のため、`__<区別>` で識別子を分けたものがある。`phase_forms.py` の `EXEMPT_NOTE`・`TURN_DEFINED` は `phase.py` などと共有するのでコードに残る） |
+| `DENY_SCRIPT_ENV_OVERRIDE`・`DENY_CHILD_PUSH__*`・`DENY_WRAPPER_CORE_PATH__*`・`DENY_SUBAGENT_PARENT_TREE__*`・`DENY_TICKET_FLOW_LOCKED`・`DENY_TICKET_APPROVAL_CLI__*`・`DENY_RECORDS_PRUNE` | `hook/wrapguard.py`・`tickets/flow/graph.py`・`tickets/model/phase_forms.py`（`deny-guards.yml`） | 移した（1 件の長さの上限のため、`__<区別>` で識別子を分けたものがある。`phase_forms.py` の `EXEMPT_NOTE`・`TURN_DEFINED` は `phase.py` などと共有するのでコードに残る） |
 | `DENY_BRACE_EXPANSION`・`DENY_COMMAND_NAME_EXPANSION`・`DENY_BACKQUOTE`・`DENY_AMBIGUOUS_FORM`・`DENY_SUBAGENT_TICKET_OP`・`DENY_INTERNAL_ERROR`・`DENY_PAYLOAD_UNUSABLE`・`DENY_DEADLINE_EXCEEDED`、`NOTE_RAN_BY`・`NOTE_INSIDE_QUOTES`・`NOTE_UNREADABLE__*`・`NOTE_REWRITE_HINT__*` | `hook/reasons.py`（`deny-reasons.yml`） | 移した（`fallen_back`・`undeclared` の本体・`internal_error_notice` は、種類を決められない英語の通知か止めない通知なので残る） |
 | `RULE_ASK`・`RULE_ASK__PREFER_WEBFETCH`・`RULE_ASK__ADOPT` | `hook/reasons.py` の `ask_hint`・`_ASK_ALTERNATIVE`（`deny-reasons.yml`） | 移した（`--adopt` の「チケットに結び付く名前には通らない」と、対話のときは出さないことは保つ） |
 | `DENY_REDIRECT_LIMIT` | `policy/selfguard_shell.py` の旧 `REDIRECT_LIMIT_MESSAGE`（`deny-policy.yml`。判定のときに `hook/judge.py` が引く） | 移した |
@@ -43,7 +43,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 |---|---|---|---|
 | 組み込みの拒否（Python） | `hook/reasons.py` の `internal_error_notice`（ツールの呼び出しを持たないイベントで、ccnavi 自身に不具合があるときの文。文面ファイルに頼らない）、`hook/wrapguard.py` などが組んで渡す他の文 | 少数 | 移さない（`internal_error_notice`）。ほかは未移行 |
 | 英語の文面 | `hook/reasons.py` の一部（日本語と英語の混在の整理は別に進めている） | | 未移行 |
-| 日本語の直書き（Python の拒否・次の一手） | `tickets/propose.py`（計画の誤りで断るときの `次:`）、`tickets/approval_checks.py` の残り（`root` を持たず `Problem.detail` に入る文）、`tickets/review.py` の残り（問題の一覧の要素・`root` を持たない関数の文）、`tickets/phase.py`（`review_next`・`_next_hint` の状態を伝える文）、`tickets/flow.py`（サブエージェント向けの手順）、`policy/selfguard.py`（設定ファイルを戻したときの知らせ） | 多数 | 未移行（数え直して、1 まとまりずつ移す。`hook/post.py` の状態を報告する行と、`catalog/docsearch.py` の `stderr` の診断は移さない） |
+| 日本語の直書き（Python の拒否・次の一手） | `tickets/propose.py`（計画の誤りで断るときの `次:`）、`tickets/approval_checks.py` の残り（`root` を持たず `Problem.detail` に入る文）、`tickets/review.py` の残り（問題の一覧の要素・`root` を持たない関数の文）、`tickets/phase.py`（`review_next`・`_next_hint` の状態を伝える文）、`tickets/flow/graph.py`（サブエージェント向けの手順）、`policy/selfguard.py`（設定ファイルを戻したときの知らせ） | 多数 | 未移行（数え直して、1 まとまりずつ移す。`hook/post.py` の状態を報告する行と、`catalog/docsearch.py` の `stderr` の診断は移さない） |
 | sh の残りの `次の手:`・`次:`・`案内:` | `ccnavi-ticket.sh` の `次の手:` の選択肢、`ccnavi-git.sh`（`ig_note`）・`ccnavi-worktree.sh`・`ccnavi-start.sh` の状態を報告する `案内:`（取り込みの記録がある・手元が進んでいる・origin に無い・issue が closed・ホストを見ていない・origin にブランチが無い・`sync_note`・`clash_note`・ホストに届かない）、`ccnavi-dirs.sh`・`ccnavi-review.sh` の `案内:` | 約 15 | 移さない（状態の報告に近い。次の一手を含む `案内:` が見つかったら、その行だけを `ccnavi_text` に分けて移す） |
 | ルールの文 | `rules.yml` の `message`・`additionalContext`・`additionalContextOnce`（インライン） | | 未移行（識別子で引く `message_id` は持たない。`additionalContextFile` で md の本文を出せる） |
 | 配布側の sh の `次:` | `scripts/ccnavi-doctor.sh` 2、`scripts/ccnavi-package.sh` 1、`scripts/ccnavi-install.sh`（`次:` を組み立てる関数）。配布の道具で、ワークスペースの実行ファイルが無いときにも動くため、`ccnavi text` に頼らない | | 対象外 |
@@ -125,7 +125,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | 12 | 英語の文面の `reasons.py` の残り | 項目 4 に含める | |
 | — | sh の `fail "…"`（約 210 件。`fail <理由> "…"` の形を数えた: `ccnavi-start.sh` 88、`ccnavi-worktree.sh` 48、`ccnavi-review.sh` 36、`ccnavi-common-review.sh` 16、`ccnavi-user-decide.sh` 14、`ccnavi-branches.sh` 11） | 移さない | 失敗の理由の報告が大半で、次の一手は文ごとに違う。1 件ごとに実行ファイルを起こす（import を含めて約 0.4 秒）と失敗の経路が遅くなり、実行ファイルに不具合があるときに理由を言えなくなる。`ccnavi-user-*.sh` はユーザが打つのでエージェントに届かない。次の一手を含む `fail` が見つかったら、その `次:` の行だけを `ccnavi_text` に分けて移す |
 | — | `stderr.write("ccnavi: …")` の診断（`post.py`・`docsearch.py`・`review.py` など） | 移さない | 内部の不具合や状態の報告で、次の一手ではない |
-| — | `tickets/flow.py` のサブエージェント向けの手順 | 移さない | 値の断片で、`DENY_*` が引く共有の定数（移行の一覧の「移した」の注） |
+| — | `tickets/flow/graph.py` のサブエージェント向けの手順 | 移さない | 値の断片で、`DENY_*` が引く共有の定数（移行の一覧の「移した」の注） |
 
 ### 項目 4: 種類を決められない通知
 

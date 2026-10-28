@@ -23,7 +23,9 @@ import os
 import textwrap
 
 from ccnavi.infra import settings
-from ccnavi.tickets import agree_candidates, flow, phasetypes, plan_templates, workflow
+from ccnavi.tickets import agree_candidates, plan_templates
+from ccnavi.tickets.config import phasetypes, workflow
+from ccnavi.tickets.flow import graph as flow
 from ccnavi.tickets.model import proposal_form
 from ccnavi.tickets.model import ticket as ticket_mod
 from tests.ticket.test_parent_phases import front_of

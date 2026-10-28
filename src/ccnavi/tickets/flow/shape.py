@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections import deque
 
-from . import flow_text
+from . import text as flow_text
 
 # 1 ノードに並べる選択肢・分岐・次の上限。
 ITEM_LIMIT = 10

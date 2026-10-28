@@ -1,7 +1,7 @@
 /**
  * 子チケットのフローの読み書き。フロー編集画面と拡張ホストが分け合う。
  *
- * ファイルは YAML の 1 文書（既定 `.ccnavi/approved/flows/<子>.yml`）。形は実行ファイル（`src/ccnavi/tickets/flow.py`）が読むもの。
+ * ファイルは YAML の 1 文書（既定 `.ccnavi/approved/flows/<子>.yml`）。形は実行ファイル（`src/ccnavi/tickets/flow/graph.py`）が読むもの。
  *
  *     id, name, description?, version
  *     nodes:          [node, ...]

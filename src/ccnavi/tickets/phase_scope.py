@@ -10,7 +10,8 @@ from dataclasses import dataclass
 
 from ..infra import gitcmd, gitstate, settings, tree
 from ..policy import rules
-from . import phase, phasetypes
+from . import phase
+from .config import phasetypes
 from .model import ticket as ticket_mod
 from .model import ticket_model, ticket_places
 

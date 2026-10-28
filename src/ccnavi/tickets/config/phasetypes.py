@@ -58,11 +58,11 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from ..infra import globmatch, settings, tree, yamlread
-from ..policy import rules
-from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
-from .model import ticket as ticket_mod
-from .model import ticket_model
+from ...infra import globmatch, settings, tree, yamlread
+from ...policy import rules
+from ...policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
+from ..model import ticket as ticket_mod
+from ..model import ticket_model
 
 VERSION = 1
 

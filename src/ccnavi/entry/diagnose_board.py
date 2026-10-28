@@ -19,12 +19,12 @@ from ..tickets import (
     approval_checks,
     approval_marks,
     approval_times,
-    flow,
     manual_settle,
     overview,
     phase,
-    risk,
 )
+from ..tickets.config import risk
+from ..tickets.flow import graph as flow
 from ..tickets.model import archive, oplog, standing, ticket_fold, ticket_model
 from ..tickets.model import ticket as ticket_mod
 from . import diagnose_shared

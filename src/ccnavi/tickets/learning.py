@@ -17,7 +17,8 @@ from typing import TextIO
 
 from ..infra import fsio, gitcmd, pathsafe, settings, tree
 from ..records import audit, redact
-from . import approval, approval_checks, approval_marks, learning_records, phase, phasetypes
+from . import approval, approval_checks, approval_marks, learning_records, phase
+from .config import phasetypes
 from .model import ticket_model
 
 LEARNING_DIR = "wip/handoff/learnings"

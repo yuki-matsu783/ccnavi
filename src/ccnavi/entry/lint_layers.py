@@ -3,7 +3,7 @@
 ワークツリーの ccnavi ディレクトリに元リポジトリに無いファイルが
 無いか、取得済みの `origin/<統合先>` のレイヤーが手元のレイヤーと食い違っていないかを見る。
 1 つのレイヤーの 1 本ずつの検査（ルールの読み・phases / risk の合成）は
-`tickets.config_check` にあり、保護対象の下書きの取り込み（`user handoff`）も同じものを呼ぶ。
+`tickets.config.check` にあり、保護対象の下書きの取り込み（`user handoff`）も同じものを呼ぶ。
 """
 
 from __future__ import annotations
@@ -13,7 +13,8 @@ import os
 from ..infra import fsio, gitcmd, pathcase, settings, tree
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_INFO, SEVERITY_WARN, Problem
-from ..tickets import approval, config_check, ops_stop_integrate
+from ..tickets import approval, ops_stop_integrate
+from ..tickets.config import check as config_check
 from ..tickets.model import archive, standing, ticket_model
 from ..tickets.model import ticket as ticket_mod
 

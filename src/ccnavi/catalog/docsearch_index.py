@@ -24,7 +24,7 @@ from typing import Any
 import yaml
 
 from ..infra import gitcmd, pathcase
-from ..tickets import flow
+from ..tickets.flow import graph as flow
 
 INDEX_NAME = "ccnavi-index.jsonl"
 # 無視の設定が無いツリーのルートの .gitignore に足す 1 行。

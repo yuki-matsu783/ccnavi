@@ -6,7 +6,7 @@ import unittest
 
 import yaml
 
-from ccnavi.tickets import phasetypes
+from ccnavi.tickets.config import phasetypes
 
 
 def text(extra: str) -> str:

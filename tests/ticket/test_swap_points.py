@@ -1322,7 +1322,13 @@ class RecordWritesTest(CoreHarness):
             ("gitstate", "shutil.move(source, target)"),
         }
         names = ("tickets.approval", "tickets.agree", "tickets.model.via", "tickets.configsync")
-        names += ("tickets.ops", "tickets.flow", "tickets.risk", "tickets.core", "tickets.review")
+        names += (
+            "tickets.ops",
+            "tickets.flow.graph",
+            "tickets.config.risk",
+            "tickets.core",
+            "tickets.review",
+        )
         names += ("tickets.phase", "tickets.model.ticket", "infra.gitstate")
         names += ("tickets.approval_marks", "tickets.approval_checks", "tickets.approval_times")
         names += ("tickets.model.review_host", "tickets.review_decide", "tickets.review_close")
@@ -1338,7 +1344,7 @@ class RecordWritesTest(CoreHarness):
         )
         names += ("tickets.agree_candidates", "tickets.agree_digest", "tickets.agree_screen")
         names += ("tickets.model.phase_forms", "tickets.phase_scope")
-        names += ("tickets.flow_text", "tickets.flow_shape", "tickets.flow_render")
+        names += ("tickets.flow.text", "tickets.flow.shape", "tickets.flow.render")
         names += ("tickets.approval_ops", "tickets.ops_close", "tickets.ops_stop")
         names += (
             "tickets.core_base",
@@ -1355,9 +1361,9 @@ class RecordWritesTest(CoreHarness):
                 for n, line in enumerate(lines, 1)
                 if pattern.search(line)
             ]
-            # flow.read_bytes は読むだけ（`os.open` の flags は O_RDONLY）。
-            reads = ["flow.py:" + str(n) for n, line in enumerate(lines, 1) if "O_RDONLY" in line]
-            if name == "flow":
+            # flow/graph.py の read_bytes は読むだけ（`os.open` の flags は O_RDONLY）。
+            reads = ["graph.py:" + str(n) for n, line in enumerate(lines, 1) if "O_RDONLY" in line]
+            if name == "graph":
                 self.assertEqual(len(reads), 1)
                 hits = [h for h in hits if "os.open(path, flags)" not in h]
             hits = [h for h in hits if not any(n == name and w in h for n, w in allowed)]

@@ -32,7 +32,8 @@ import os
 from unittest import mock
 
 from ccnavi.infra import settings
-from ccnavi.tickets import configsync, promptsync, risk, skillsync
+from ccnavi.tickets import configsync, promptsync, skillsync
+from ccnavi.tickets.config import risk
 from tests import ROOT, phasecopy
 from tests.config.test_config_union import (
     COMMON_PHASES,

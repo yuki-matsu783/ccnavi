@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from collections import deque
 
-from . import flow_shape, flow_text
+from . import shape as flow_shape
+from . import text as flow_text
 
 # サブエージェントに並べる手順の上限。多ければファイルを読ませる。
 RENDER_LIMIT = 40

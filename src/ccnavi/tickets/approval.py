@@ -66,7 +66,8 @@ from dataclasses import dataclass
 
 from ..infra import fsio, settings, tree
 from ..policy import rules
-from . import approval_checks, phasetypes, workflow
+from . import approval_checks
+from .config import phasetypes, workflow
 from .model import standing, ticket_fold, ticket_model
 from .model import ticket as ticket_mod
 

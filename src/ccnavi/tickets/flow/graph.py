@@ -99,11 +99,13 @@ import stat
 
 import yaml
 
-from ..infra import fsio, pathsafe, settings, tree, yamlread
-from ..policy import texts
-from ..records import diaglog
-from . import flow_render, flow_shape, flow_text
-from .model import ticket_model
+from ...infra import fsio, pathsafe, settings, tree, yamlread
+from ...policy import texts
+from ...records import diaglog
+from ..model import ticket_model
+from . import render as flow_render
+from . import shape as flow_shape
+from . import text as flow_text
 
 # ロックで止めたときの理由コードと、記録のルール名。
 CODE_LOCKED = "DENY_TICKET_FLOW_LOCKED"

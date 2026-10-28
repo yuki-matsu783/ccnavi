@@ -9,10 +9,7 @@ import os
 
 from ..infra import settings, tree
 from ..policy import ruleload, rules
-from ..tickets import (
-    phasetypes,
-    risk,
-)
+from ..tickets.config import phasetypes, risk
 
 
 def layer_home(conf: settings.Settings, root: str, name: str) -> str:

@@ -46,15 +46,9 @@ import yaml
 
 from ..infra import fsio, settings, tree
 from ..policy import rules
-from . import (
-    agree_candidates,
-    approval,
-    approval_checks,
-    approval_marks,
-    flow,
-    phasetypes,
-    workflow,
-)
+from . import agree_candidates, approval, approval_checks, approval_marks
+from .config import phasetypes, workflow
+from .flow import graph as flow
 from .model import ticket as ticket_mod
 from .model import ticket_ids, ticket_model
 

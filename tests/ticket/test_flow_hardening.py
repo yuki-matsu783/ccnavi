@@ -27,7 +27,10 @@ from unittest import mock
 import yaml
 
 from ccnavi.infra import pathcase, settings
-from ccnavi.tickets import approval_marks, flow, flow_render, flow_text
+from ccnavi.tickets import approval_marks
+from ccnavi.tickets.flow import graph as flow
+from ccnavi.tickets.flow import render as flow_render
+from ccnavi.tickets.flow import text as flow_text
 from tests.ticket.test_flow import (
     CHILD,
     WORKFLOW,

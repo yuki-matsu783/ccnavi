@@ -16,11 +16,9 @@ from ..tickets import (
     approval_marks,
     approval_times,
     phase,
-    phasetypes,
-    risk,
     session_rejects,
-    workflow,
 )
+from ..tickets.config import phasetypes, risk, workflow
 from ..tickets.model import ticket as ticket_mod
 from ..tickets.model import ticket_model
 from . import diagnose_board, diagnose_shared

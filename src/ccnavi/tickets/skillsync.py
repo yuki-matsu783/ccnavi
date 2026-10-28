@@ -26,7 +26,8 @@ import os
 import yaml
 
 from ..infra import pathsafe, yamlread
-from . import configsync, flow
+from . import configsync
+from .flow import graph as flow
 
 PROCESS_KEY = "process"
 SKILL_FILE = "SKILL.md"
