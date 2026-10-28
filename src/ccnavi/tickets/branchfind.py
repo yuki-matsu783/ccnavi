@@ -434,16 +434,25 @@ def read_host(path: str) -> Host:
     )
 
 
-def names_number(name: str, number: int) -> bool:
-    """ブランチ名が番号を含むか。番号の前後が区切り（`-` `/` `_` `.`）か文字列の端であること。
+def names_number(
+    name: str, number: int, prefixes=settings.DEFAULT_BRANCH_PREFIXES
+) -> bool:
+    """ブランチ名が番号を含むか。
 
+    ccnavi の命名 `<先頭の語>-<番号>-<slug>`（先頭の語は `prefixes`）に合う名前は、2 つ目の番号だけで比べる
+    （`feature-102-…-1-…` は 102 で、1 ではない）。
+    形に合わない名前は、番号の前後が区切り（`-` `/` `_` `.`）か文字列の端であること。
     通る: `feature-152-x`・`152-x`・`fix/152`・`x-152`・`issue-152`・`feature_152_x`。
     区切り以外の文字（英字・数字など）が隣にあるものは通さない（`feature-1520-x`・`v15-2`・`i152`・`152a`）。
     Claude の web セッションが作る `claude/<形容詞>-<名前>-<6 文字の乱数>` の乱数
     （`claude/tender-volta-qmy99q`）に番号と同じ数字が入っても、無関係なブランチを候補にしない。
     `i152` のように英字が直に付くものは、番号を含む別の語の一部かもしれず、
     番号を指すとは言えないので通さない。
+    `ccnavi-branches.sh` の jq が同じ規則で GitHub の PR の元ブランチを選ぶ。片方だけ直さない。
     """
+    ident = ticket_ids.identifier_number(name.casefold(), prefixes)
+    if ident is not None:
+        return ident == number
     return re.search(rf"(?<![^-/_.]){number}(?![^-/_.])", name) is not None
 
 
@@ -566,7 +575,7 @@ def collect(
             candidate(_branch_of_ticket(t, local | origin)).add_source("ticket")
         # 3. 名前に番号を含むブランチ（手元と origin）。
         for name in sorted(local | origin):
-            if names_number(name, number):
+            if names_number(name, number, conf.branch_prefixes):
                 candidate(name).add_source("name")
     elif kind == MR:
         # 2'. MR 指定なら `mr: <番号>` を持つ親（提案も承認済みも。`mr:` は同じリポジトリだけ）。

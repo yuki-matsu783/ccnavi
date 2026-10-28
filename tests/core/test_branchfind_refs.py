@@ -116,6 +116,21 @@ class PromptRefsTest(unittest.TestCase):
         self.assertEqual(Ref(MR, 5, "acme/w").label(), "MR !5（acme/w）")
 
 
+# sh 側（tests/sh/test_branches_sh.py）にも同じ表がある。規則を変えたら両方を直す。
+# （名前, issue の番号, 名前に番号を含むか）
+NAME_CASES = (
+    ("feature-102-main-sh-の使い方の表示を-1-行足す-c3-検証用", 1, False),
+    ("feature-102-main-sh-の使い方の表示を-1-行足す-c3-検証用", 102, True),
+    ("feature-1-login", 1, True),
+    ("fix-1-typo", 1, True),
+    ("fix-1-typo", 2, False),
+    ("fix/152-y", 152, True),
+    ("issue-152", 152, True),
+    ("x-152", 152, True),
+    ("other-102-a-1-b", 1, True),
+)
+
+
 class NamesNumberTest(unittest.TestCase):
     def test_the_number_is_set_off_by_separators_or_the_ends(self):
         for name in (
@@ -138,6 +153,17 @@ class NamesNumberTest(unittest.TestCase):
     def test_random_suffixes_of_web_session_branches_do_not_match(self):
         self.assertFalse(branchfind.names_number("claude/tender-volta-qmy99q", 99))
         self.assertFalse(branchfind.names_number("claude/zesty-a5b-x5y7z9", 5))
+
+    def test_a_name_in_the_ccnavi_form_is_read_by_its_number_only(self):
+        slug = "feature-102-main-sh-の使い方の表示を-1-行足す-c3-検証用"
+        for name, number, expected in NAME_CASES:
+            with self.subTest(name=name, number=number):
+                self.assertEqual(branchfind.names_number(name, number), expected)
+        self.assertFalse(branchfind.names_number(slug, 1))
+
+    def test_the_first_word_comes_from_the_given_prefixes(self):
+        self.assertFalse(branchfind.names_number("story-102-a-1-b", 1, ("story",)))
+        self.assertTrue(branchfind.names_number("story-102-a-1-b", 1))
 
 
 if __name__ == "__main__":
