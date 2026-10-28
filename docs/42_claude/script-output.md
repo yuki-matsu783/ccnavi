@@ -70,6 +70,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チ
 | `ccnavi-start.sh` の成功、チケットが既にある | `ccnavi-ticket.sh status <識別子>` | `ccnavi-start.sh` の `report` |
 | `ccnavi-start.sh` の成功、取り込みが他の理由で止まった | 理由を直して `ccnavi-sync.sh` を打ち直す | `ccnavi-start.sh` の `run_sync` |
 | `ccnavi-start.sh --issue` で issue が closed（MR なし） | 次の一手は決まらないので `次:` は出さず、`次の手:` に reopen して打ち直す・`--reopened` で続ける・別の issue・やめる、を番号つきで並べる（終了コード 3）。状態を読めないときは止めず `確認: issue #<番号> の状態: 未確認` | `ccnavi-start.sh` の `issue_state_gate` |
+| `ccnavi-start.sh` の初期コミットで git の作成者情報が無い | ユーザに `git config user.name` と `user.email` の設定を頼んで返事を待ち、設定できたら打ち直す（`NEXT_START_IDENT`）。作ったワークツリーを消せなかったときは `案内:` で残りを言う（`NOTE_START_WORKTREE_KEPT`） | `ccnavi-start.sh` の `ensure_initial_commit` |
 | `ccnavi-start.sh --check` | 結果に応じた一手（ユーザに認証や権限を頼む、MCPで代行する、など。ok なら出さない） | `ccnavi-common-host.sh` の `ccnavi_pf_next` |
 | `ccnavi-ticket.sh` の start・finish・propose・consolidate の事前確認 | 同上（標準エラーに `確認:` と `次:` を出す。標準出力には何も足さない） | `ccnavi-ticket.sh` の `ticket_preflight` |
 | `ccnavi-start.sh --dry-run` | `--dry-run` を外した同じコマンド | `ccnavi-start.sh` の `real_args` |
