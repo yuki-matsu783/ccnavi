@@ -1,9 +1,9 @@
-"""ワークスペースルート（origin は GitHub）から review の confirm・decide・request を打ったときの止まり方。
+"""ワークスペースルート（origin は GitHub）から review の confirm・decide・request・ready を打ったときの止まり方。
 
 親は cwd のワークツリーから引く。ルートから打つと親が決まらないので、ホストへ繋ぐ前に
-「親のワークツリーの中で打つ」と止める。先にホストへ繋ぐと、親のプロジェクトが GitLab でも
-ルート自身の origin（GitHub）で見て、「gh が github.com で利用できず」と別の理由で止まっていた。
-sh を起動するので sh のグループに置く。
+「親のワークツリーの中で打つ」と止める。先にホストへ繋ぐと、親のプロジェクトが GitLab でも、
+ルート自身の origin（GitHub）で見て「gh が github.com で利用できず」と別の理由で止まっていた。
+sh を起動するので、sh のグループに置く。
 """
 
 from __future__ import annotations

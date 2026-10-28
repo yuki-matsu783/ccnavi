@@ -95,12 +95,12 @@ review_no_bin() {
 	fail no-bin "ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
 }
 
-# 居るブランチと、親の識別子と、親のワークツリーの中か（branch・family・review_in_tree）。
+# 居るブランチ・親の識別子・親のワークツリーの中か（branch・family・review_in_tree）を決める。
 # ホストに触れない。親を cwd から引くサブコマンドが、ホストへ繋ぐ前に使う。
 review_tree() {
 	branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
-	# 親の識別子。親のワークツリー（.claude/worktrees/<識別子>）の名前で、親のブランチ名
-	# の / を - に置き換えたもの（ブランチ名とは違うことがある）。マージリクエストは居るブランチ（branch）で探して作り、
+	# 親の識別子。親のワークツリー（.claude/worktrees/<識別子>）の名前で、親のブランチ名の / を - に
+	# 置き換えたもの。ブランチ名とは違うことがある。マージリクエストは居るブランチ（branch）で探して作り、
 	# write-and-push の親子のチケット・下書きの名前（実行ファイルと揃える）は識別子で引く。ワークツリーの外なら前どおりブランチ名。
 	family="$branch"
 	review_in_tree=no
