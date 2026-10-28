@@ -68,7 +68,7 @@ ccnavi --docs --type skill-reference --tag process-test --keyword <語> # 語で
 
 ## 入口を呼ばせる
 
-reference は入口のスキルが呼ばれて初めて届く。エージェントが `Skill` を呼ばないと届かないので、ルール `process-skill-first-edit`（共通の `rules.yml`）が、ワークツリーの中でコードや文書を最初に書き換える `Write|Edit` のときに 1 度だけ「作業に合う工程スキルがあれば `Skill` で呼ぶ」を渡す。
+reference は入口のスキルが呼ばれて初めて届く。エージェントが `Skill` を呼ばないと届かないので、ルール `process-skill-first-edit`（共通の `rules.yml`）が、ワークツリーの中でコードや文書を最初に書き換える `Write|Edit` のときに 1 度だけ、「作業に合う工程スキルがあれば `Skill` で呼ぶ」と促す。
 
 - 文脈ごと（セッション、サブエージェントの 1 回の起動）に 1 度。提案・`wip/`・`scratchpad/`・`.ccnavi/`・`.claude/` の編集は除くので、先に消費されない。調べものや質問は `Write|Edit` に当たらず、出ない
 - ルール `process-skill-call` が `Skill` の `*process-*` を通す。無いと `dontAsk`・`bypassPermissions` で宣言の無い呼び出しとして拒否される

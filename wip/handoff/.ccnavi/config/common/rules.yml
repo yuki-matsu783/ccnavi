@@ -179,7 +179,7 @@ allow:
     additionalContextOnce: >-
       書き換えに入る前に、作業に合う工程スキルがあれば Skill ツールで呼んでください
       （process-design・research・implement・test・debug・review・release）。
-      そこに、このリポジトリで育てた決まりが入っています。
+      その中に、このリポジトリで育てた決まりが入っています。
       合うものが無ければ呼ばずに進めます。
 
   # git の入口。サブコマンドの選別はラッパースクリプトの中で行うので、ここでは区別しない。
