@@ -255,6 +255,9 @@ deny:
     why: 同上。コマンド列の途中でも止まる
 
 ask:
+  - tool: Skill
+    subject: "commit"
+    why: 工程スキルでない Skill には process-skill-call が当たらない。どのルールも言及せず、権限モードへ渡る
   - tool: Bash
     subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --base feature/x --accept 7f3a9c21 --no-wip"
     why: >-
@@ -418,6 +421,9 @@ allow:
   - tool: Write
     subject: "/repo/.claude/worktrees/x/wip/proposals/todo/p.md"
     why: 提案は process-skill-first-edit の except。先に Once を消費しない
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/scratchpad/a.md"
+    why: scratchpad/ も process-skill-first-edit の except（wip/・.ccnavi/・.claude/ も同じ）
   - tool: Bash
     subject: "sh .ccnavi/scripts/ccnavi-git.sh status --porcelain"
     why: git の入口。サブコマンドの選別はラッパースクリプトの中で行う
