@@ -57,13 +57,12 @@ from . import (
     approval_checks,
     approval_marks,
     approval_ops,
-    configsync,
     handoff,
+    mirror_gap,
     ops_close,
     phase,
     phase_forms,
     review_host,
-    skillsync,
     ticket_fields,
     ticket_model,
     ticket_places,
@@ -615,13 +614,6 @@ def _dirty_paths(tree_root: str, conf: settings.Settings, wip_removals: bool = F
     return paths
 
 
-def _mirror_prefixes(conf: settings.Settings) -> tuple[str, ...]:
-    """プロジェクトのツリーで ccnavi がコピーを置く場所。ルートからの相対パスで、末尾に `/` を付け、
-    大文字小文字は畳んである。共通レイヤーのミラーと工程スキルの 2 つ。"""
-    mirror = configsync.mirror_dir(conf, "").replace(os.sep, "/").strip("/")
-    return (pathcase.fold(mirror + "/"), pathcase.fold(skillsync.SKILLS_DIR + "/"))
-
-
 def _dirty_problem(conf: settings.Settings, paths: list[str]) -> str:
     """未コミットの変更があるために止めるときの文面。
 
@@ -630,25 +622,11 @@ def _dirty_problem(conf: settings.Settings, paths: list[str]) -> str:
     揃える手順（ユーザの操作）を案内する。
     """
     base = "親のワークツリーに未コミットの変更がある"
-    prefixes = _mirror_prefixes(conf)
-    mirrored = [p for p in paths if pathcase.fold(p).startswith(prefixes)]
+    mirrored, others = mirror_gap.split(conf, paths)
     if not mirrored:
         return base
-    shown = "、".join(mirrored[:10]) + (
-        f" ほか {len(mirrored) - 10} 件" if len(mirrored) > 10 else ""
-    )
-    others = len(paths) - len(mirrored)
-    lead = (
-        f"{base}（共通レイヤーのコピーとのずれ: {shown}）。ずれの分は作業による変更ではないため、"
-        "コミットも取り消しもしない。"
-    )
-    if others:
-        lead += f"ずれ以外の変更が {others} 件ある。そちらは作業の変更として扱う。"
-    return (
-        lead + "ユーザには、`ccnavi-user-mirror.sh <プロジェクト名>` で差分と値を確かめ、"
-        "`--yes --expect <値>` で共通レイヤーのミラーを揃えて、統合先にコミットしてもらうよう頼む。"
-        "`skills/` のずれはその操作では揃わないため、統合先で揃えてコミットしてもらう"
-    )
+    lead = f"{base}（{mirror_gap.label(mirrored)}）。{mirror_gap.NOT_WORK}"
+    return lead + mirror_gap.others_note(len(others)) + mirror_gap.ASK
 
 
 def in_wip(path: str) -> bool:
@@ -1065,7 +1043,9 @@ def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark
     return _moved_detail(tree_root, conf, requested_mark).text
 
 
-def _moved_detail(tree_root: str, conf: settings.Settings, requested_mark: dict) -> Moved:
+def _moved_detail(
+    tree_root: str, conf: settings.Settings, requested_mark: dict, project: bool = False
+) -> Moved:
     """依頼の後に、ユーザが見るものが動いたか。動いていれば、その説明と動いた理由の種類。
 
     ユーザが見たのは依頼時の HEAD。その後に積んだコミットは誰も見ていないので、
@@ -1097,7 +1077,7 @@ def _moved_detail(tree_root: str, conf: settings.Settings, requested_mark: dict)
         found, failed = _diff_paths(tree_root, recorded)
         paths = None if failed else found
         ancestor = _git(tree_root, ["merge-base", "--is-ancestor", recorded, head])[0] == 0
-    moved = moved_detail(conf, requested_mark, head, paths, ancestor)
+    moved = moved_detail(conf, requested_mark, head, paths, ancestor, project)
     if moved.text:
         if moved.kind == KIND_SEEN:
             moved.commits = _unseen_commits(tree_root, conf, recorded)
@@ -1126,6 +1106,11 @@ class Moved:
     text: str = ""
     kind: str = ""
     commits: list[str] | None = None
+    # `KIND_SEEN` のとき、レビューの対象を動かしたパス（置き場などで絞ったあと）のうち、
+    # ミラー側（共通レイヤーのコピー・`skills/`）の数と全体の数。説明の出し分けだけに使う。
+    # 数えていなければ None。
+    mirrored: int | None = None
+    total: int | None = None
 
 
 def moved_since(
@@ -1153,8 +1138,13 @@ def moved_detail(
     head: str,
     changed: list[str] | None,
     ancestor: bool = True,
+    project: bool = False,
 ) -> Moved:
-    """`moved_since` と同じ判定で、動いた理由の種類も返す。判定は `text` が空かどうか。"""
+    """`moved_since` と同じ判定で、動いた理由の種類も返す。判定は `text` が空かどうか。
+
+    `project` はプロジェクトの親のとき。ミラー側の数（`Moved.mirrored`）はこのときだけ数える。
+    ワークスペース自身の親では `.ccnavi/config/common/` は共通レイヤー本体なので、ずれと説明しない。
+    """
     recorded = str(requested_mark.get("head") or "")
     if not recorded:
         # 記録が無ければ照合できない。確かめずに通すと、依頼の後のコミットが全部
@@ -1167,8 +1157,14 @@ def moved_detail(
     if not is_sha(recorded) or changed is None:
         return Moved(moved, KIND_UNVERIFIED)
     # ccnavi 自身の置き場と ELI5 の置き場だけの変更は、ユーザが見るものを動かさない。
-    if any(not _unseen_by_review(conf, path) for path in changed):
-        return Moved(moved, KIND_SEEN if ancestor else KIND_UNVERIFIED)
+    seen = [path for path in changed if not _unseen_by_review(conf, path)]
+    if seen:
+        if not ancestor:
+            return Moved(moved, KIND_UNVERIFIED)
+        if not project:
+            return Moved(moved, KIND_SEEN)
+        mirrored, _ = mirror_gap.split(conf, seen)
+        return Moved(moved, KIND_SEEN, mirrored=len(mirrored), total=len(seen))
     return Moved()
 
 
@@ -1261,6 +1257,17 @@ def moved_explanation(moved: Moved) -> list[str]:
         ]
     else:
         lines = ["依頼時と同じレビュー対象だと確認できない。"]
+    if moved.kind == KIND_SEEN and moved.total and moved.mirrored:
+        if moved.mirrored == moved.total:
+            lines.append(
+                "動かしたのはミラーのずれ（共通レイヤーのコピーか `skills/`）のコミット。"
+                "ユーザが見たものと HEAD が違うので、再 `request` が要る。"
+            )
+        else:
+            lines.append(
+                f"レビュー対象を動かした変更のうち、ミラー側（共通レイヤーのコピーか `skills/`）が"
+                f" {moved.mirrored} 件（全体 {moved.total} 件）。"
+            )
     if moved.commits:
         lines.append(
             "依頼のあとのコミット（置き場と ELI5 だけを変えたものとマージは除く。新しい順。"

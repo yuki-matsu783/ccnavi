@@ -248,6 +248,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
             {
                 "tickets.write_and_push",
                 "tickets.write_and_push_merge",
+                "tickets.mirror_gap",
                 "tickets.core",
                 "tickets.core_approve",
                 "tickets.core_base",

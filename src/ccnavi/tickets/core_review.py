@@ -236,7 +236,9 @@ def confirm_local(
     # 動いていれば取得した結果を読まない。レビュー済みなら差分も取得した結果も読まない
     # （コアが「レビュー済み」で止める。Chrome と同じ文面）
     if requested_mark is not None and approval_marks.MARK_REVIEWED not in ph.marks:
-        moved = review._moved_detail(tree.worktree_path(root, parent.ticket), conf, requested_mark)
+        moved = review._moved_detail(
+            tree.worktree_path(root, parent.ticket), conf, requested_mark, bool(parent.project)
+        )
         if not moved.text:
             result = review._result(stderr, result_path)
             if result is None:

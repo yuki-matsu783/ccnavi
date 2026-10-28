@@ -54,7 +54,7 @@ keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.s
 | `ccnavi-user-close-early.sh` | 残りがあるまま親を早めに閉じる判断を置く。残りを issue に書き出す | ユーザ |
 | `ccnavi-user-clean-branch.sh` | 親を閉じたときに残した、子の手元のブランチを消す。条件は消す前に確かめ直す | ユーザ |
 | `ccnavi-user-handoff.sh` | 保護対象の下書き（`wip/handoff/`）を、本来の場所へ取り込む。引数なしは取り込み待ちを見せるだけ | ユーザ |
-| `ccnavi-user-mirror.sh` | 共通レイヤーのミラーのずれを見て、プロジェクトへ揃える。引数なしは見せるだけ | ユーザ |
+| `ccnavi-user-mirror.sh` | 共通レイヤーのミラーと工程スキル（`skills/`）のずれを見て、プロジェクトへ揃える。引数なしは見せるだけ | ユーザ |
 | `ccnavi-user-prune.sh` | 判定ログと state を整理する。`--preview` は動かすものを並べるだけ | ユーザ |
 
 ## 共有の部品

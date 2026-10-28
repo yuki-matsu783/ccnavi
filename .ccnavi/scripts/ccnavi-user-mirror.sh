@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-user-mirror 共通レイヤーのミラーがずれていないかを見て、プロジェクトへ揃える。ユーザが端末で打つ。
+# ccnavi-user-mirror 共通レイヤーのミラーと工程スキル（skills/）がずれていないかを見て、プロジェクトへ揃える。ユーザが端末で打つ。
 #
 #   sh .ccnavi/scripts/ccnavi-user-mirror.sh [<プロジェクト名>…] [--yes --expect <値>]
 #
@@ -20,7 +20,7 @@ usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-user-mirror.sh [<プロジェクト名>…] [--yes --expect <値>]
 
-  共通レイヤーのミラーがずれていないかを見て、プロジェクトへ揃える。
+  共通レイヤーのミラーと工程スキル（skills/）がずれていないかを見て、プロジェクトへ揃える。
   実行ファイルの `user mirror` を、入口の印を付けて起こす。ユーザが端末で実行します。
 USAGE
 }
