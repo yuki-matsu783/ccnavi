@@ -86,7 +86,7 @@ class NamesPathTest(unittest.TestCase):
 
     def locate(self, root: str, *, meipass: str = "") -> str:
         """`src/ccnavi/tickets/model/` の位置にあるつもりで探した結果。"""
-        module = os.path.join(root, "src", "ccnavi", "tickets", "model", "tickets/model/handoff_names.py")
+        module = os.path.join(root, "src", "ccnavi", "tickets", "model", "handoff_names.py")
         patches = [mock.patch.object(handoff_names, "__file__", module)]
         if meipass:
             patches.append(mock.patch.object(sys, "_MEIPASS", meipass, create=True))

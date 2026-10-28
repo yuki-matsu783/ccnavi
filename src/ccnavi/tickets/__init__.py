@@ -18,5 +18,5 @@
 - 7 review: レビュー
 - 8 core: 承認・レビュー済みの判定のコア
 
-読むのは infra・records・policy。
+このパッケージは infra・records・policy を読む。
 """

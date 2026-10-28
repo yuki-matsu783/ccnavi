@@ -2,8 +2,8 @@
 
 `src/ccnavi/` は役割ごとのサブパッケージに分かれ、大きいものはさらに分かれる。
 読む順は 2 つの表で書く。サブパッケージの順（`PACKAGES`。入れ子を持てる木）と、
-モジュールの段（`TIERS`）。ディレクトリが言えるのは「どの役割か」までで、同じ
-サブパッケージの中の読む順は言えない。段がそれを補う。2 つの表と食い違う import を名指しする。
+モジュールの段（`TIERS`）。ディレクトリから言えるのは「どの役割か」までで、同じ
+サブパッケージの中の読む順は言えない。その差は段で補う。2 つの表と食い違う import を名指しする。
 
 「レイヤー」ではなく「段」と呼ぶのは、このリポジトリではレイヤーが設定の 3 つのレイヤー
 （共通レイヤー・自身のレイヤー・プロジェクトのレイヤー）を指すため。ここで言う段は
@@ -28,7 +28,7 @@
 3. import の行き先は、同じ段か下の段。上を向いた import を名指しする
 4. 循環を 1 つも許さない。既知として通す一覧も持たない
 5. import の行き先が、import 文に残らない書き方をしていない
-6. 同じ親の下の兄弟は、`PACKAGES` で段が下のものだけを読む。どの深さにも同じ関数でかける
+6. 同じ親の下の兄弟は、`PACKAGES` で段が下のものだけを読む。どの深さでも同じ検査で見る
 
 同じ段どうしのモジュールの import は止めない。段は「どちらを先に読めるか」の順序であって、
 同じ段の中の結び付きは 4 が見る。同じ段どうしの問題（たとえば判定がチケットを
@@ -48,7 +48,7 @@
 別の大きなサブパッケージは `from ...infra import fsio`（`from ..infra.modes import EXIT_OK`
 も可）。余分に重ねた点、`from .. import model`（行き先がサブパッケージそのもので、
 モジュールが import 文に出ない）、パッケージの中の `ccnavi.` で始まる絶対の import は止める。
-回避できないわけではない。 `getattr` や `exec` で組み立てれば、いまでも
+回避できないわけではない。`getattr` や `exec` で組み立てれば、いまでも
 隠せる。そこまで防ぐには import を実行時に捕まえるしかなく、この速さを手放す。
 
 `main.py`（PyInstaller の入口）は `src/ccnavi/` の外なので、ここには入らない。
@@ -95,7 +95,8 @@ PACKAGES: tuple[Node, ...] = (
             (
                 "model",
                 0,
-                "型と名前。チケット・フェーズ・提案の形、記録の置き場の名前、承認の記録の見分け。ほかのサブパッケージすべてから読まれる。新しい機能は上のサブパッケージに足す",
+                "型と名前。チケット・フェーズ・提案の形、記録の置き場の名前、承認の記録の見分け。"
+                "ほかのサブパッケージすべてから読まれる。新しい機能は上のサブパッケージに足す",
                 (),
             ),
             (
@@ -532,7 +533,7 @@ def imports_of(
         from .entry import cli              （直下の __main__）-> entry.cli
         from ccnavi.infra import settings   -> infra.settings（5 で止める形）
 
-    パッケージの中で `ccnavi.` の絶対の形を書かれても見落とさないように、相対と同じに数える。
+    パッケージの中で `ccnavi.` の絶対の形を使っても見落とさないよう、相対と同じに数える。
     """
     packages = packages if packages is not None else set(directories())
     found: set[str] = set()
@@ -564,12 +565,13 @@ def hiding_in_tree(module: str, tree: ast.Module, known: set[str], packages: set
     - `import ccnavi`（ドット無し）。`import ccnavi.hook.judge` と違い、行き先が
       import 文に出ない。使うときは `ccnavi.hook.judge.…` という属性の参照になる
     - `importlib` / `__import__` / `sys.modules`。行き先が文字列になる
-    - 相対の点の数が、共通の親まで上がる最短の数でない形。余分に重ねた形は行き先を
-      読み違える。同じサブパッケージを `..` で指す形も、同じ行き先に書き方が 2 つできる
+    - 相対の点の数が、共通の親まで上がる最短の数でない形。余分に重ねた点は行き先を
+      読み違えやすく、同じ行き先に書き方が 2 つできる。同じサブパッケージを `..` で指す形も
+      この理由で止める
     - `from .. import model`（`from . import approval` を直下から書くのも同じ）。行き先が
       サブパッケージそのもので、使うモジュールが import 文に出ない
-    - パッケージの中の `ccnavi.` で始まる絶対の import。相対に揃えておかないと、
-      同じ行き先に書き方が 2 つでき、読み比べにくい
+    - パッケージの中の `ccnavi.` で始まる絶対の import。相対に揃えないと、同じ行き先を
+      2 通りに書けて読み比べにくい
     """
     found: list[str] = []
     rel = module.replace(".", "/") + ".py"
@@ -613,7 +615,8 @@ def _relative_problems(
     full = ".".join(parts)
     problems: list[str] = []
     if full in packages:
-        # `from .. import model`：名前がサブパッケージそのものなら、モジュールが import 文に出ない
+        # `from .. import model` の形。名前がサブパッケージそのものなら、
+        # モジュールが import 文に出ない
         for alias in node.names:
             if f"{full}.{alias.name}" in packages:
                 problems.append(
@@ -626,7 +629,7 @@ def _relative_problems(
         target = parts
     else:
         return [f"{rel}:{node.lineno} {spelled} （行き先が見つからない）"]
-    # 点の数は、1 つの文の中で行き先が揃っているので、先頭の行き先で測る
+    # 1 つの文の行き先は点の数が揃うので、先頭の行き先で測る
     want = shortest_level(module, target, packages)
     if node.level != want:
         problems.append(
@@ -678,7 +681,7 @@ def knots(edges: dict[str, set[str]]) -> set[tuple[str, ...]]:
 
 
 def order_violations(edges: dict[str, set[str]], tree: tuple[Node, ...]) -> list[str]:
-    """同じ親の下の兄弟が、段の同じか上の兄弟を読んでいる import。どの深さにもかける。
+    """同じ親の下の兄弟のうち、段が同じか上のものを読んでいる import。どの深さでも見る。
 
     2 つのモジュールの共通の親の直下で、それぞれが入っている枝を比べる。枝がどちらも木に
     書いたサブパッケージなら、読まれる側の段が読む側より小さいことを求める。読む側が親の
@@ -774,13 +777,13 @@ class ModuleTiersTest(unittest.TestCase):
         )
 
     def test_the_package_has_the_listed_subpackages_only(self):
-        """ディレクトリは PACKAGES と同じで、深さは上限まで。"""
+        """ディレクトリは PACKAGES と一致し、深さは上限以内に収まる。"""
         found = directories()
         extra, absent = unlisted_directories(found, PACKAGES)
         self.assertEqual(
             ([], []),
             (extra, absent),
-            "ディレクトリが PACKAGES と違う（左: 表に無いディレクトリ、右: 表にあって無い"
+            "ディレクトリが PACKAGES と違う（左: 表に無いディレクトリ、右: 表にあるのに無い"
             "ディレクトリ）。サブパッケージを足すなら PACKAGES に役割と順を書いてから作る。"
             f"いまの役割は {PACKAGE_MEANING}",
         )
@@ -788,7 +791,7 @@ class ModuleTiersTest(unittest.TestCase):
             [],
             too_deep(found),
             f"ディレクトリが深すぎる。深さは `ccnavi/<サブパッケージ>/<サブパッケージ>/` "
-            f"まで（{MAX_DEPTH}）。サブパッケージの下に更に作らず、サブパッケージの直下に戻す",
+            f"まで（{MAX_DEPTH}）。サブパッケージの下にさらに作らず、そのサブパッケージの直下に置く",
         )
         self.assertEqual([], too_deep(list(package_paths(PACKAGES))), "PACKAGES が深すぎる")
         stray = sorted(mod for mod in self.modules if not package_of(mod) and mod not in TOP_LEVEL)
@@ -884,7 +887,7 @@ class ModuleTiersTest(unittest.TestCase):
 # --- 検査そのものを確かめる。わざと違反する入力で、止まることを見る。 ---
 #
 # 本物の木（PACKAGES）はいまの形しか持たないので、入れ子・最短の点の数・深さの上限は、
-# 小さな作り物の表で確かめる。ここが落ちたら、検査が働かなくなっている。
+# 小さな作り物の表で確かめる。ここで落ちるなら、検査そのものが働いていない。
 
 FAKE: tuple[Node, ...] = (
     ("base", 0, "土台", ()),
@@ -943,7 +946,8 @@ class OrderTableTest(unittest.TestCase):
         )
 
     def test_a_deep_module_reading_across_the_top_is_judged_at_the_common_parent(self):
-        # base と big は兄弟（段 0 と 1）。深い所から base へ下りるのは良く、逆は悪い
+        # base と big は兄弟（段 0 と 1）。big の深い所から base を読むのは良く、
+        # base から big の深い所を読むのは悪い
         self.assertEqual([], order_violations({"big.top.deep.x": {"base.x"}}, FAKE))
         self.assertEqual(
             ["base.x -> big.top.deep.x"], order_violations({"base.x": {"big.top.deep.x"}}, FAKE)
