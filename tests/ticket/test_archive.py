@@ -23,6 +23,7 @@ from ccnavi.tickets import (
     approval_checks,
     approval_ops,
     archive,
+    review,
     write_and_push,
 )
 from ccnavi.tickets import ticket as ticket_mod
@@ -315,6 +316,43 @@ class ReadyArchivesTest(ReadyHarness):
         self.assertEqual(set(archived), {"i0001", "i0001-01-01", "old", "old-01-01"})
         self.assertTrue(archived["i0001"]["path"].startswith(base))
         self.assertNotIn("i0001", {t["ticket"] for t in board["tickets"]})
+
+    def drift_after_push(self, *rels):
+        """追跡済みの `rels` を push 済みの状態にしてから書き換え、未コミットの変更にする。"""
+        for rel in rels:
+            write(os.path.join(self.parent_tree, *rel.split("/")), "old\n")
+        self.commit_parent("古いコピー")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        for rel in rels:
+            write(os.path.join(self.parent_tree, *rel.split("/")), "new\n")
+
+    def test_ready_names_the_mirror_drift_and_who_aligns_it(self):
+        fixture = self.closable()
+        self.drift_after_push(".ccnavi/config/common/rules.yml", "skills/process-test/SKILL.md")
+        refused = self.ready(fixture)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("親のワークツリーに未コミットの変更がある", refused.stderr)
+        self.assertIn(".ccnavi/config/common/rules.yml", refused.stderr)
+        self.assertIn("skills/process-test/SKILL.md", refused.stderr)
+        self.assertIn("ccnavi-user-mirror.sh", refused.stderr)
+        self.assertIn("コミットも取り消しもしない", refused.stderr)
+
+    def test_mirror_drift_text_counts_other_changes_and_folds_case_and_long_lists(self):
+        conf = settings.Settings()
+        drift = [f"skills/process-test/references/common/r{n}.md" for n in range(11)]
+        text = review._dirty_problem(conf, ["SKILLS/process-test/SKILL.md", "src/keep.py"] + drift)
+        self.assertIn("ずれ以外の変更が 1 件ある", text)
+        self.assertIn("ほか 2 件", text)
+        self.assertIn("--yes --expect <値>", text)
+        self.assertNotIn("ずれ以外", review._dirty_problem(conf, drift))
+
+    def test_ready_does_not_blame_the_mirror_for_other_uncommitted_changes(self):
+        fixture = self.closable()
+        self.drift_after_push("src/keep.py")
+        refused = self.ready(fixture)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("親のワークツリーに未コミットの変更がある", refused.stderr)
+        self.assertNotIn("ccnavi-user-mirror.sh", refused.stderr)
 
     def test_ready_does_not_move_anything_while_the_parent_is_not_closable(self):
         self.family(plan=["design"])
