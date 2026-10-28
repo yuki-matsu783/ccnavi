@@ -26,9 +26,10 @@ from ..infra import fsio, hookio, modes, pathcase, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..records import audit, diaglog
-from ..tickets import branchfind, core, review, write_and_push_merge
+from ..tickets import core, review
 from ..tickets.approval import store as approval
 from ..tickets.approval import write_and_push
+from ..tickets.lifecycle import branchfind, write_and_push_merge
 from ..tickets.model import user_only, via
 from . import (
     cli_args,

@@ -25,10 +25,10 @@ from __future__ import annotations
 import os
 from typing import TextIO
 
-from ..infra import gitcmd, settings, tree
-from .approval import store as approval
-from .model import ticket as ticket_mod
-from .model import ticket_ids
+from ...infra import gitcmd, settings, tree
+from ..approval import store as approval
+from ..model import ticket as ticket_mod
+from ..model import ticket_ids
 
 # 数えきれなかったときに添える一言。
 ASK_USER = "番号を決められないので、ユーザに確かめてください"

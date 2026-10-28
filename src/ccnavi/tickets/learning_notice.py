@@ -28,7 +28,7 @@ import time
 
 from ..infra import fsio, pathcase, settings, tree
 from ..records import wiki, wiki_load
-from . import ops_stop_integrate
+from .lifecycle import stop_integrate as ops_stop_integrate
 
 NOTICE_DIR = "learning-notice"
 SELF_NAME = "_self"

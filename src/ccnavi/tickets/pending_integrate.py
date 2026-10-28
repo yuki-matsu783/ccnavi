@@ -28,7 +28,7 @@ from __future__ import annotations
 import os
 
 from ..infra import directrec, gitcmd, pathcase, settings, tree
-from . import ops_stop_integrate as osi
+from .lifecycle import stop_integrate as osi
 
 HEAD_LINE = (
     "[ccnavi] 終わっていない integrate の記録があります。別のセッションの取り込みの場合もあるため、"

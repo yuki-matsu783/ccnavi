@@ -2576,7 +2576,7 @@ class TicketTest(unittest.TestCase):
             f"sh {review} decide 1",
             f"sh {review} decide 1 --preview --json",
             f'sh {review} request 1 --eli5 "$F"',
-            "grep -n -- '--abandon' src/ccnavi/tickets/retire.py",
+            "grep -n -- '--abandon' src/ccnavi/tickets/lifecycle/retire.py",
             "echo ccnavi worktree $V --abandon",
             "ccnavi worktree drop P1",
             "ccnavi worktree tidy P1 --phase 2",

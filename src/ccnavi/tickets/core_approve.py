@@ -14,8 +14,9 @@ import os
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, modes, pathcase, settings, tree
-from . import core_base, worktrees
+from . import core_base
 from .approval import store as approval
+from .lifecycle import worktrees
 from .model import ticket_places
 from .proposal import agree, agree_candidates, agree_screen
 

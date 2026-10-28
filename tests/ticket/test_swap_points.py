@@ -1330,7 +1330,7 @@ class RecordWritesTest(CoreHarness):
             "tickets.sync.configsync",
         )
         names += (
-            "tickets.ops",
+            "tickets.lifecycle.commands",
             "tickets.flow.graph",
             "tickets.config.risk",
             "tickets.core",
@@ -1356,7 +1356,7 @@ class RecordWritesTest(CoreHarness):
         )
         names += ("tickets.model.phase_forms", "tickets.phase.scope")
         names += ("tickets.flow.text", "tickets.flow.shape", "tickets.flow.render")
-        names += ("tickets.approval.ops", "tickets.ops_close", "tickets.ops_stop")
+        names += ("tickets.approval.ops", "tickets.lifecycle.close", "tickets.lifecycle.stop")
         names += (
             "tickets.core_base",
             "tickets.core_approve",

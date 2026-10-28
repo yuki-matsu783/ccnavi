@@ -11,10 +11,10 @@ from __future__ import annotations
 
 from typing import TextIO
 
-from ..infra import settings
-from .approval import store as approval
-from .model import ticket_model
-from .phase import gates as phase
+from ...infra import settings
+from ..approval import store as approval
+from ..model import ticket_model
+from ..phase import gates as phase
 
 
 def plan_missing(stderr: TextIO, found: ticket_model.Ticket) -> bool:

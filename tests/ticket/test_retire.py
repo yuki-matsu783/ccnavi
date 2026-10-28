@@ -16,7 +16,7 @@ import json
 import os
 
 from ccnavi.infra import settings
-from ccnavi.tickets import retire
+from ccnavi.tickets.lifecycle import retire
 from tests.ticket.test_archive import ReadyHarness
 from tests.ticket.test_ticket import git, write
 

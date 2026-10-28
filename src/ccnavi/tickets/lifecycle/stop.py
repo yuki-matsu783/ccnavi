@@ -12,12 +12,12 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from ..infra import fsio, gitcmd, settings, tree
-from ..policy import texts
-from . import ops_close
-from .approval import checks as approval_checks
-from .approval import store as approval
-from .model import standing, ticket_model
+from ...infra import fsio, gitcmd, settings, tree
+from ...policy import texts
+from ..approval import checks as approval_checks
+from ..approval import store as approval
+from ..model import standing, ticket_model
+from . import close as ops_close
 
 # Stop で `finish` の打ち忘れを促すときの理由コード。止めるのは 1 回だけの促しで、
 # 判定の deny ではない。

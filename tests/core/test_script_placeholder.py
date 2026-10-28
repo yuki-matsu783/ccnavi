@@ -201,7 +201,7 @@ class FinalFilesTest(unittest.TestCase):
 
 class NoRawGitInNudgeTest(unittest.TestCase):
     def test_the_nudge_has_no_git_outside_the_wrapper(self):
-        from ccnavi.tickets import ops_stop_integrate as osi
+        from ccnavi.tickets.lifecycle import stop_integrate as osi
 
         with tempfile.TemporaryDirectory() as tmp:
             root = os.path.realpath(tmp)

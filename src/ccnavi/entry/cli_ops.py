@@ -16,19 +16,11 @@ from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
-from ..tickets import (
-    consolidate,
-    core,
-    next_id,
-    ops,
-    retire,
-    review,
-    review_close,
-    review_decide,
-    worktrees,
-)
+from ..tickets import core, review, review_close, review_decide
 from ..tickets.approval import write_and_push
 from ..tickets.learning import notes as learning
+from ..tickets.lifecycle import commands as ops
+from ..tickets.lifecycle import consolidate, next_id, retire, worktrees
 from ..tickets.model import oplog, ticket_ids, user_only, via
 from ..tickets.phase import gates as phase
 from ..tickets.proposal import propose, scaffold

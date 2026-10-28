@@ -25,11 +25,11 @@ import sys
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from ..infra import fsio, gitcmd, pathcase, settings, tree
-from ..policy import ctxfile
-from .approval import store as approval
-from .model import ticket as ticket_mod
-from .model import ticket_ids, ticket_model
+from ...infra import fsio, gitcmd, pathcase, settings, tree
+from ...policy import ctxfile
+from ..approval import store as approval
+from ..model import ticket as ticket_mod
+from ..model import ticket_ids, ticket_model
 
 ISSUE = "issue"
 MR = "mr"

@@ -13,9 +13,9 @@ import os
 from ..infra import fsio, gitcmd, pathcase, settings, tree
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_INFO, SEVERITY_WARN, Problem
-from ..tickets import ops_stop_integrate
 from ..tickets.approval import store as approval
 from ..tickets.config import check as config_check
+from ..tickets.lifecycle import stop_integrate as ops_stop_integrate
 from ..tickets.model import archive, standing, ticket_model
 from ..tickets.model import ticket as ticket_mod
 

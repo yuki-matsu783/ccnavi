@@ -14,7 +14,8 @@ import tempfile
 import unittest
 
 from ccnavi.infra import settings
-from ccnavi.tickets import review, write_and_push_merge
+from ccnavi.tickets import review
+from ccnavi.tickets.lifecycle import write_and_push_merge
 
 RECORDED = "a" * 40
 HEAD = "b" * 40

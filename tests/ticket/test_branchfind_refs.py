@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import unittest
 
-from ccnavi.tickets import branchfind
-from ccnavi.tickets.branchfind import ISSUE, MR, Ref
+from ccnavi.tickets.lifecycle import branchfind
+from ccnavi.tickets.lifecycle.branchfind import ISSUE, MR, Ref
 
 
 def refs(text):

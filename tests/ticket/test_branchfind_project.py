@@ -7,8 +7,8 @@ import tempfile
 import unittest
 
 from ccnavi.infra import settings, tree
-from ccnavi.tickets import branchfind
-from ccnavi.tickets.branchfind import ISSUE, Ref
+from ccnavi.tickets.lifecycle import branchfind
+from ccnavi.tickets.lifecycle.branchfind import ISSUE, Ref
 
 
 def make_repo(path: str, url: str) -> None:

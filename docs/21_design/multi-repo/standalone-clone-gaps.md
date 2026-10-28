@@ -114,7 +114,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 
 #### C4 `.git` がファイルの clone で、ワークツリーが認識されない（中）
 
-- 処理と場所: `src/ccnavi/infra/tree.py:222-250` の `is_worktree_of` は `<root>/.git/worktrees/` の下しか受け付けない。`src/ccnavi/tickets/worktrees.py:437-460` の `_owner` は、common dir の名前が `.git` であることを要求する。`tree.projects()` は、サブモジュールとして置かれた形も許すとコメントしている。sh の `ccnavi_project` も `*/.git/worktrees/*` だけを見る
+- 処理と場所: `src/ccnavi/infra/tree.py:222-250` の `is_worktree_of` は `<root>/.git/worktrees/` の下しか受け付けない。`src/ccnavi/tickets/lifecycle/worktrees.py:437-460` の `_owner` は、common dir の名前が `.git` であることを要求する。`tree.projects()` は、サブモジュールとして置かれた形も許すとコメントしている。sh の `ccnavi_project` も `*/.git/worktrees/*` だけを見る
 - ワークスペース内 clone・単体 clone: リンクされたワークツリー、`--separate-git-dir`、サブモジュールの形は、どちらでも同じ経路で落ちる（後ろの 2 つは読みのみ）
 - 起きること: リンク済みのワークツリー `linked-main` の中で `.claude/worktrees/feature-9-x` を作ると、`--explain` の trees は MAIN のみ、`--lint` は「元のプロジェクトがありません」、`ccnavi worktree remove` も断られる。ccnavi のワークツリーが 1 本も認識されない
 - 確認: リンク済みのワークツリーは実行で確認

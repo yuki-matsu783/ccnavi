@@ -9,7 +9,8 @@ from __future__ import annotations
 import types
 import unittest
 
-from ccnavi.tickets import ops_stop, ops_stop_request
+from ccnavi.tickets.lifecycle import stop as ops_stop
+from ccnavi.tickets.lifecycle import stop_request as ops_stop_request
 
 ROOT = "/tmp/ccnavi-stop-note"
 NOTE_PARTS = (

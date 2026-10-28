@@ -16,11 +16,13 @@ from dataclasses import dataclass, field
 from typing import TextIO
 
 from ..infra import fsio, settings, tree
-from . import core_base, ops, ops_close, review, review_decide
+from . import core_base, review, review_decide
 from .approval import checks as approval_checks
 from .approval import marks as approval_marks
 from .approval import ops as approval_ops
 from .approval import store as approval
+from .lifecycle import close as ops_close
+from .lifecycle import commands as ops
 from .model import oplog, review_host, ticket_model, ticket_places, via
 from .phase import gates as phase
 from .phase import manual_settle

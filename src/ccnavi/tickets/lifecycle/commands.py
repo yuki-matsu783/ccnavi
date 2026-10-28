@@ -23,19 +23,22 @@ import os
 from dataclasses import replace
 from typing import TextIO
 
-from ..infra import fsio, gitcmd, gitstate, settings, tree
-from ..policy import texts
-from . import ops_close, ops_plan, ops_stop, worktrees
-from .approval import checks as approval_checks
-from .approval import marks as approval_marks
-from .approval import ops as approval_ops
-from .approval import store as approval
-from .config import risk
-from .flow import graph as flow
-from .learning import notes as learning
-from .model import ticket_model, ticket_places
-from .phase import gates as phase
-from .sync import template_drafts
+from ...infra import fsio, gitcmd, gitstate, settings, tree
+from ...policy import texts
+from ..approval import checks as approval_checks
+from ..approval import marks as approval_marks
+from ..approval import ops as approval_ops
+from ..approval import store as approval
+from ..config import risk
+from ..flow import graph as flow
+from ..learning import notes as learning
+from ..model import ticket_model, ticket_places
+from ..phase import gates as phase
+from ..sync import template_drafts
+from . import close as ops_close
+from . import plan as ops_plan
+from . import stop as ops_stop
+from . import worktrees
 
 # 最後のレビューのあと、Draft を外すまでの手順がユーザの合意の範囲に入ることの言い切り。
 # `confirm` の知らせ（core_review.after_last_review）と親の `finish` の出力が同じ文を使う。

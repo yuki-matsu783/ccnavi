@@ -10,7 +10,7 @@ import os
 import tempfile
 import unittest
 
-from ccnavi.tickets import worktrees
+from ccnavi.tickets.lifecycle import worktrees
 from ccnavi.tickets.model import ticket_model
 
 
