@@ -160,6 +160,18 @@ messages:
     note: |-
       リモート未確認。origin から取れなかったので、手元のブランチのまま続けた。つながったら {script:ccnavi-sync.sh} を打つ
 
+  NOTE_START_WORKTREE_KEPT:
+    kind: note
+    values: [wt, branch]
+    note: |-
+      この回で作ったワークツリー {wt:path} が、片付けられずに残っている。作業の跡ではない。{script:ccnavi-git.sh} worktree remove {wt:path} と {script:ccnavi-git.sh} branch -d {branch:sh} で消してから打ち直す（消せなければユーザに伝える）
+
+  NOTE_START_BRANCH_KEPT:
+    kind: note
+    values: [branch]
+    note: |-
+      ワークツリーは消したが、この回で作ったブランチ {branch:sh} が残っている（手元の統合先が origin より遅れていると、branch -d が通らない）。残したまま打ち直すと「古いブランチらしい」で止まる。ユーザに伝え、手元の統合先を origin に揃えてもらってから {script:ccnavi-git.sh} branch -d {branch:sh} で消し、打ち直す
+
   NOTE_START_TEMPLATES:
     kind: note
     values: [count]

@@ -1070,10 +1070,13 @@ init_subject="chore: #${number} の作業を開始する"
 #
 # 行き先は .claude/worktrees/<識別子>（識別子はブランチ名の / を - に置き換えたもの）。既にあるブランチは
 # `worktree add <行き先> <ブランチ>` で直接チェックアウトする。
+# ew_created は、この回で新規に作ったときだけ 1 になる。既にあった場合や既存ブランチを使った回は空のまま。
 wt=""
+ew_created=""
 ensure_worktree() {
 	ew_branch="$1"
 	ew_start="${2:-}"
+	ew_created=""
 	wt=$(worktree_of "$ew_branch")
 	if [ -n "$wt" ]; then
 		log_info ワークツリーがある -- "branch=$ew_branch"
@@ -1089,6 +1092,7 @@ ensure_worktree() {
 		cgit worktree add "$ew_dest" -b "$ew_branch" --no-track "$ew_start" ||
 			fail worktree-failed "ワークツリーを作成できませんでした（上の出力を確認してください）。"
 		wt="$ew_dest"
+		ew_created=1
 		log_info ワークツリーを切った -- "branch=$ew_branch"
 		return 0
 	fi
@@ -1147,15 +1151,41 @@ fast_forward() {
 	fi
 }
 
-# ensure_initial_commit <ブランチ>。統合先より進んでいなければ、空の初期コミットを積む（wt で）
+# この回で新規に作ったワークツリーとブランチを片付ける（ensure_worktree の ew_created があるときだけ）。
+# 強制はしない（worktree remove に --force を付けず、branch は -d で消す）。消せなければ、残ったことと続け方を伝える。
+cleanup_created_worktree() {
+	[ -n "$ew_created" ] || return 0
+	cc_branch="$1"
+	if ! cgit_quiet worktree remove "$wt"; then
+		log_info ワークツリーを片付けられず -- "branch=$cc_branch"
+		ccnavi_text "$root" NOTE_START_WORKTREE_KEPT "wt=$wt" "branch=$cc_branch"
+		return 0
+	fi
+	if ! cgit_quiet branch -d "$cc_branch"; then
+		log_info ブランチだけ残った -- "branch=$cc_branch"
+		ccnavi_text "$root" NOTE_START_BRANCH_KEPT "branch=$cc_branch"
+		return 0
+	fi
+	log_info 作ったワークツリーを片付けた -- "branch=$cc_branch"
+}
+
+# ensure_initial_commit <ブランチ>。統合先より進んでいなければ、空の初期コミットを積む（wt で）。
+# 積む前に作成者（author と committer の両方）を確かめる。無ければ、この回で作った分を片付けたうえで、設定を頼んで止める。
 ensure_initial_commit() {
 	ahead=$(git -C "$wt" rev-list --count "origin/$integration..HEAD" 2>/dev/null || echo 0)
 	if [ "$ahead" -ge 1 ]; then
 		log_info 初期コミットは飛ばす -- "ahead=$ahead"
 		return 0
 	fi
-	(cd "$wt" && cgit commit --allow-empty -m "$init_subject") ||
+	if ! git -C "$wt" var GIT_AUTHOR_IDENT >/dev/null 2>&1 || ! git -C "$wt" var GIT_COMMITTER_IDENT >/dev/null 2>&1; then
+		cleanup_created_worktree "$1"
+		ccnavi_text "$root" NEXT_START_IDENT "real_args_q=$real_args"
+		fail ident-missing "git の作成者情報（user.name と user.email）が無いため、初期コミットを積めません。"
+	fi
+	(cd "$wt" && cgit commit --allow-empty -m "$init_subject") || {
+		cleanup_created_worktree "$1"
 		fail commit-failed "初期コミットを積めなかった（上の出力を見てください。commit --allow-empty が許可リストで通らないときは、ユーザに許可リストへの追加を頼んでください）。"
+	}
 	log_info 初期コミットを積んだ
 }
 
@@ -1698,7 +1728,7 @@ if [ "$total" -eq 0 ]; then
 	cgit fetch origin "$integration" || fail fetch-failed "統合先 ${integration} を origin から取れなかった（上の出力を見てください）。"
 	ref_exists "refs/remotes/origin/$integration" || fail no-origin-integration "origin/${integration} がありません。統合先の名前を確かめてください。"
 	ensure_worktree "$new_branch" "origin/$integration"
-	ensure_initial_commit
+	ensure_initial_commit "$new_branch"
 	ensure_push "$new_branch"
 	ensure_mr "$new_branch" "$new_title"
 	final_mr="$mr_num"
@@ -1830,7 +1860,7 @@ if [ -n "$resume" ]; then
 	fetch_branch "$cb"
 	ensure_worktree "$cb"
 	fast_forward "$cb"
-	ensure_initial_commit
+	ensure_initial_commit "$cb"
 	ensure_push "$cb"
 	next_title=$(make_title "$cb")
 	ensure_mr "$cb" "$next_title"

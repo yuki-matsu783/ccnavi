@@ -26,6 +26,12 @@ messages:
     next: |-
       ユーザに、ブラウザで MR の元ブランチと、その MR が閉じる issue を伝えてもらい、返事を待つ。3 つそろえて打ち直す: {cmd_q}。聞けなければ、直接実装にも切り替えず、ユーザに報告して止まる
 
+  NEXT_START_IDENT:
+    kind: next
+    values: [real_args_q]
+    next: |-
+      ユーザに `git config user.name` と `user.email` の設定を頼み、返事を待つ。エージェントは自分では設定しない。設定できたと返事が来たら、次を打ち直す: {script:ccnavi-start.sh} {real_args_q}
+
   NEXT_START_SYNC_RETRY:
     kind: next
     values: [id]
