@@ -27,7 +27,8 @@ import hashlib
 import os
 
 from ..infra import fsio, settings, tree
-from . import approval, configsync, skillsync
+from . import configsync, skillsync
+from .approval import store as approval
 
 SIGNATURE_PREFIX = "mirror-"
 

@@ -30,8 +30,8 @@ from ..tickets import (
     review_decide,
     scaffold,
     worktrees,
-    write_and_push,
 )
+from ..tickets.approval import write_and_push
 from ..tickets.model import oplog, ticket_ids, user_only, via
 from . import cli_args, cli_usage, lint, status
 

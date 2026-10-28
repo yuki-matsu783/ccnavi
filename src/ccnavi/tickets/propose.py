@@ -31,7 +31,7 @@ import os
 from typing import TextIO
 
 from ..infra import fsio, pathcase, settings
-from . import write_and_push
+from .approval import write_and_push
 from .config import workflow
 from .model import ticket, ticket_ids, ticket_model
 

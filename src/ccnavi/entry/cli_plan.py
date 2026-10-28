@@ -24,7 +24,8 @@ from typing import TextIO
 
 from ..infra import settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
-from ..tickets import approval, plan_order, plan_phases
+from ..tickets import plan_order, plan_phases
+from ..tickets.approval import store as approval
 from ..tickets.model import ticket_model
 
 

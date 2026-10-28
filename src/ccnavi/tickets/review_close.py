@@ -17,7 +17,10 @@ from dataclasses import dataclass
 from typing import TextIO
 
 from ..infra import fsio, settings, tree
-from . import approval, approval_checks, approval_marks, ops, ops_close, phase, retire, review
+from . import ops, ops_close, phase, retire, review
+from .approval import checks as approval_checks
+from .approval import marks as approval_marks
+from .approval import store as approval
 from .model import archive, review_host, standing, ticket_model, ticket_places
 
 # Draft を外すときにマージリクエストへ残すコメント。sh が Draft を外してから投稿する。

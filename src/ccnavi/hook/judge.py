@@ -27,7 +27,9 @@ from ..policy import (
     texts,
 )
 from ..records import audit, failstreak, repeat
-from ..tickets import approval, approval_checks, phase, phase_scope
+from ..tickets import phase, phase_scope
+from ..tickets.approval import checks as approval_checks
+from ..tickets.approval import store as approval
 from ..tickets.flow import graph as flow
 from ..tickets.model import phase_forms, ticket_guard, ticket_model, ticket_places
 from . import (

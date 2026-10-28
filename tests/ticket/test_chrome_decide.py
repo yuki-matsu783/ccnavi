@@ -620,7 +620,7 @@ class BoundaryTest(ChromeDecideHarness):
     def test_the_parent_worktree_that_can_not_be_decided_stops_without_writing(self):
         from unittest import mock
 
-        from ccnavi.tickets import approval
+        from ccnavi.tickets.approval import store as approval
 
         calls = []
         real = core_review.approval.home_dir

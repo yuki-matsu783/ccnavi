@@ -37,7 +37,9 @@ from typing import TextIO
 
 from ..infra import modes, settings, tree
 from ..policy import rules, texts
-from . import approval, approval_checks, approval_marks
+from .approval import checks as approval_checks
+from .approval import marks as approval_marks
+from .approval import store as approval
 from .config import phasetypes, risk, workflow
 from .model import phase_forms, ticket_model
 

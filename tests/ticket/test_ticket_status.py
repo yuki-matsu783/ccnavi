@@ -21,7 +21,7 @@ import os
 import unittest
 from unittest import mock
 
-from ccnavi.tickets import write_and_push
+from ccnavi.tickets.approval import write_and_push
 from ccnavi.tickets.model import ticket_fields
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write

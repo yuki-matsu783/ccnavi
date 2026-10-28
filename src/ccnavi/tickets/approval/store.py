@@ -64,12 +64,12 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from ..infra import fsio, settings, tree
-from ..policy import rules
-from . import approval_checks
-from .config import phasetypes, workflow
-from .model import standing, ticket_fold, ticket_model
-from .model import ticket as ticket_mod
+from ...infra import fsio, settings, tree
+from ...policy import rules
+from ..config import phasetypes, workflow
+from ..model import standing, ticket_fold, ticket_model
+from ..model import ticket as ticket_mod
+from . import checks as approval_checks
 
 # 承認済みチケットの下の置き場。作業中（判定が読む）、閉じた、マーカーと記録。
 DOING_DIR = ticket_model.DOING

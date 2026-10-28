@@ -12,7 +12,8 @@ from __future__ import annotations
 from typing import TextIO
 
 from ..infra import settings
-from . import approval, phase
+from . import phase
+from .approval import store as approval
 from .model import ticket_model
 
 

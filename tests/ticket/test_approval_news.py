@@ -216,7 +216,7 @@ class ApprovalToldTest(PhaseHarness):
         """
         from unittest import mock
 
-        from ccnavi.tickets import approval
+        from ccnavi.tickets.approval import store as approval
 
         self.parent_only()
         self.next_child()

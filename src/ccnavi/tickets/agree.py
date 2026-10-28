@@ -34,17 +34,11 @@ from typing import TextIO
 
 from ..infra import fsio, settings
 from ..policy import rules
-from . import (
-    agree_candidates,
-    agree_digest,
-    agree_screen,
-    approval,
-    approval_checks,
-    approval_marks,
-    approval_ops,
-    phase,
-    plan_order,
-)
+from . import agree_candidates, agree_digest, agree_screen, phase, plan_order
+from .approval import checks as approval_checks
+from .approval import marks as approval_marks
+from .approval import ops as approval_ops
+from .approval import store as approval
 from .model import ticket_model
 
 # 承認の JSON の版。`--agree --preview --json` と `--agree --yes … --json` が出す。

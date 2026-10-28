@@ -42,8 +42,6 @@ from ..records import (
     userprompt,
 )
 from ..tickets import (
-    approval,
-    approval_checks,
     branchfind,
     learning_notice,
     ops_stop,
@@ -56,6 +54,8 @@ from ..tickets import (
     promptsync,
     session_rejects,
 )
+from ..tickets.approval import checks as approval_checks
+from ..tickets.approval import store as approval
 from ..tickets.model import direct_candidates, ticket_guard
 from . import (
     ccnavimd,

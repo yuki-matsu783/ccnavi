@@ -50,7 +50,9 @@ from dataclasses import dataclass
 from typing import TextIO
 
 from ..infra import gitcmd, pathcase, settings, tree
-from . import approval, approval_checks, phase
+from . import phase
+from .approval import checks as approval_checks
+from .approval import store as approval
 from .model import ticket as ticket_mod
 from .model import ticket_ids, ticket_model
 

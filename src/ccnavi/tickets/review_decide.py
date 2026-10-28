@@ -20,7 +20,10 @@ from types import SimpleNamespace
 from typing import TextIO
 
 from ..infra import fsio, settings, tree
-from . import approval, approval_marks, approval_ops, phase, review
+from . import phase, review
+from .approval import marks as approval_marks
+from .approval import ops as approval_ops
+from .approval import store as approval
 from .model import oplog, review_host, standing, ticket_model, via
 
 DECIDE_FILE = "review-decide-{parent}-{phase}.md"

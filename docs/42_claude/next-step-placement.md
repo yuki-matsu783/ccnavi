@@ -41,8 +41,8 @@ keywords: [次の一手, 置き場, 分担, SessionStart, UserPromptSubmit, PreT
 | 呼び手 | 出し先 |
 |---|---|
 | `entry/status.py` | 標準出力の「止まっている理由」の下の行 |
-| `tickets/write_and_push.py` | 実行ファイルと sh の間の約束の `hint` 行（sh がそのまま出す） |
-| `tickets/approval_checks.py` の `family_stop_text` | `--lint` の問題の文と、承認の断り |
+| `tickets/approval/write_and_push.py` | 実行ファイルと sh の間の約束の `hint` 行（sh がそのまま出す） |
+| `tickets/approval/checks.py` の `family_stop_text` | `--lint` の問題の文と、承認の断り |
 | `tickets/ops_close.py` | 標準エラー |
 
 ## sh の側と実行ファイルの側

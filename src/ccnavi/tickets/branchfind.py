@@ -27,7 +27,7 @@ from typing import TextIO
 
 from ..infra import fsio, gitcmd, pathcase, settings, tree
 from ..policy import ctxfile
-from . import approval
+from .approval import store as approval
 from .model import ticket as ticket_mod
 from .model import ticket_ids, ticket_model
 

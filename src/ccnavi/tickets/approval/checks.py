@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from ..infra import settings, tree
-from ..policy import rules, texts
-from .config import workflow
-from .model import standing, ticket_model
+from ...infra import settings, tree
+from ...policy import rules, texts
+from ..config import workflow
+from ..model import standing, ticket_model
 
 
 def mark_imported(

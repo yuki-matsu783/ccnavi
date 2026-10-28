@@ -30,7 +30,8 @@ from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 from ..records import stopreview
-from ..tickets import approval, approval_checks
+from ..tickets.approval import checks as approval_checks
+from ..tickets.approval import store as approval
 from ..tickets.config import check as config_check
 from ..tickets.flow import graph as flow
 from ..tickets.flow import render as flow_render

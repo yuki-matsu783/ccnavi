@@ -10,7 +10,9 @@ import hashlib
 
 from ..infra import fsio
 from ..policy import rules
-from . import agree_candidates, approval, approval_marks
+from . import agree_candidates
+from .approval import marks as approval_marks
+from .approval import store as approval
 from .model import ticket as ticket_mod
 from .model import ticket_model
 

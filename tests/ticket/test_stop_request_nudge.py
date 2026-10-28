@@ -18,7 +18,8 @@ from unittest import mock
 
 from ccnavi.hook import subagent
 from ccnavi.infra import settings
-from ccnavi.tickets import approval, ops_stop, ops_stop_request
+from ccnavi.tickets import ops_stop, ops_stop_request
+from ccnavi.tickets.approval import store as approval
 from tests.ticket import test_stop_nudge as base
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write

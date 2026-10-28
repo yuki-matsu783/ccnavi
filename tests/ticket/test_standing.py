@@ -16,7 +16,9 @@ import os
 import unittest
 
 from ccnavi.infra import pathcase, settings
-from ccnavi.tickets import approval, approval_checks, approval_ops
+from ccnavi.tickets.approval import checks as approval_checks
+from ccnavi.tickets.approval import ops as approval_ops
+from ccnavi.tickets.approval import store as approval
 from ccnavi.tickets.model import standing, ticket_model
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write

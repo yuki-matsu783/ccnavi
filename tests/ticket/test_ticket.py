@@ -33,7 +33,8 @@ from unittest import mock
 from ccnavi.entry import cli
 from ccnavi.hook.subagent import CANDIDATE_NOTE
 from ccnavi.infra import settings, shellread
-from ccnavi.tickets import approval, phase_scope, review
+from ccnavi.tickets import phase_scope, review
+from ccnavi.tickets.approval import store as approval
 from ccnavi.tickets.model import phase_forms, ticket_fields
 from ccnavi.tickets.model import ticket as ticket_mod
 from tests import ROOT, common_path, userform, write_and_push_flag

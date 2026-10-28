@@ -15,7 +15,8 @@ import unittest
 
 from ccnavi.infra import settings
 from ccnavi.policy import rules
-from ccnavi.tickets import agree_candidates, approval_checks, phase_scope
+from ccnavi.tickets import agree_candidates, phase_scope
+from ccnavi.tickets.approval import checks as approval_checks
 from ccnavi.tickets.config import phasetypes
 from ccnavi.tickets.model import ticket
 from tests.ticket.test_phases import PhaseHarness

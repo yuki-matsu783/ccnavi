@@ -19,7 +19,10 @@ import tempfile
 import unittest
 
 from ccnavi.infra import pathcase, settings
-from ccnavi.tickets import approval_checks, approval_ops, review, write_and_push
+from ccnavi.tickets import review
+from ccnavi.tickets.approval import checks as approval_checks
+from ccnavi.tickets.approval import ops as approval_ops
+from ccnavi.tickets.approval import write_and_push
 from ccnavi.tickets.model import archive
 from ccnavi.tickets.model import ticket as ticket_mod
 from tests.ticket.test_phases import PhaseHarness

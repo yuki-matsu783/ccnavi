@@ -25,7 +25,8 @@ import time
 from dataclasses import dataclass, field
 
 from ..infra import gitcmd, settings, tree
-from . import approval_marks, phase
+from . import phase
+from .approval import marks as approval_marks
 from .model import ticket_model
 
 # 手動の移動の判定の結果。

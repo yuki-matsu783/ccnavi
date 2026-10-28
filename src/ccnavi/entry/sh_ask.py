@@ -53,7 +53,9 @@ from typing import TextIO
 
 from ..infra import fsio, pathcase, settings, tree
 from ..policy import ruleload, selfguard_targets
-from ..tickets import approval, approval_marks, base_bound, handoff, ops_stop_integrate
+from ..tickets import base_bound, handoff, ops_stop_integrate
+from ..tickets.approval import marks as approval_marks
+from ..tickets.approval import store as approval
 from ..tickets.model import archive, donecopy, ticket_ids, ticket_model
 from ..tickets.model import ticket as ticket_mod
 

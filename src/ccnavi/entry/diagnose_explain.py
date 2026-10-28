@@ -10,14 +10,11 @@ from typing import TextIO
 from ..hook import judge
 from ..infra import modes, settings, tree
 from ..policy import builtin, ruleload, rules, selfguard
-from ..tickets import (
-    approval,
-    approval_checks,
-    approval_marks,
-    approval_times,
-    phase,
-    session_rejects,
-)
+from ..tickets import phase, session_rejects
+from ..tickets.approval import checks as approval_checks
+from ..tickets.approval import marks as approval_marks
+from ..tickets.approval import store as approval
+from ..tickets.approval import times as approval_times
 from ..tickets.config import phasetypes, risk, workflow
 from ..tickets.model import ticket as ticket_mod
 from ..tickets.model import ticket_model

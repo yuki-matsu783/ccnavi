@@ -16,20 +16,11 @@ from dataclasses import dataclass, field
 from typing import TextIO
 
 from ..infra import fsio, settings, tree
-from . import (
-    agree,
-    approval,
-    approval_checks,
-    approval_marks,
-    approval_ops,
-    core_base,
-    manual_settle,
-    ops,
-    ops_close,
-    phase,
-    review,
-    review_decide,
-)
+from . import agree, core_base, manual_settle, ops, ops_close, phase, review, review_decide
+from .approval import checks as approval_checks
+from .approval import marks as approval_marks
+from .approval import ops as approval_ops
+from .approval import store as approval
 from .model import oplog, review_host, ticket_model, ticket_places, via
 
 # レビュー済み（`confirm`）が通らなかった根拠の種別。付録 A の `CORE_CONFIRM_*`。

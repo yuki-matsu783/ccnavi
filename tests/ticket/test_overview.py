@@ -14,7 +14,8 @@ from __future__ import annotations
 import os
 
 from ccnavi.infra import settings
-from ccnavi.tickets import approval, overview
+from ccnavi.tickets import overview
+from ccnavi.tickets.approval import store as approval
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
 from tests.ticketsample import child_text

@@ -11,7 +11,9 @@ from dataclasses import dataclass, field
 
 from ..infra import settings, tree
 from ..policy import rules
-from ..tickets import approval, approval_checks, phase
+from ..tickets import phase
+from ..tickets.approval import checks as approval_checks
+from ..tickets.approval import store as approval
 from ..tickets.config import phasetypes
 from ..tickets.flow import graph as flow
 from ..tickets.model import ticket as ticket_mod

@@ -29,7 +29,9 @@ from dataclasses import dataclass, field
 from ..infra import settings, tree
 from ..policy import builtin, ruleload, rules, selfguard, selfguard_shell, texts
 from ..records import audit
-from . import approval, approval_checks, phase_scope
+from . import phase_scope
+from .approval import checks as approval_checks
+from .approval import store as approval
 from .config import phasetypes
 from .model import ticket_guard, ticket_model
 

@@ -13,7 +13,8 @@ import os
 from dataclasses import dataclass
 
 from ..infra import gitcmd, settings, tree
-from . import approval, approval_checks
+from .approval import checks as approval_checks
+from .approval import store as approval
 from .model import ticket_model
 
 TIMEOUT_SECONDS = 5.0

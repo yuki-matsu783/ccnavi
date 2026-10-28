@@ -46,9 +46,9 @@ import os
 import re
 from typing import TextIO
 
-from ..infra import fsio, gitcmd, settings, tree
-from . import approval_marks
-from .model import archive, standing, ticket_ids, ticket_model
+from ...infra import fsio, gitcmd, settings, tree
+from ..model import archive, standing, ticket_ids, ticket_model
+from . import marks as approval_marks
 
 # 答えの頭の行。sh はこれが無ければ「実行ファイルが write-and-push に答えなかった」と読んで止める。
 HEAD = "write-and-push 1"

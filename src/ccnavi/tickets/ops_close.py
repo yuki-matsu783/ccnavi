@@ -12,7 +12,11 @@ import os
 from typing import TextIO
 
 from ..infra import gitcmd, settings, tree
-from . import approval, approval_checks, approval_marks, approval_ops, phase
+from . import phase
+from .approval import checks as approval_checks
+from .approval import marks as approval_marks
+from .approval import ops as approval_ops
+from .approval import store as approval
 from .config import phasetypes
 from .model import standing, ticket_model
 from .model import ticket as ticket_mod

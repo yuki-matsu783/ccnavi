@@ -52,16 +52,11 @@ from typing import TextIO
 
 from ..infra import fsio, gitcmd, pathcase, pathsafe, settings, tree
 from ..policy import texts
-from . import (
-    approval,
-    approval_checks,
-    approval_marks,
-    approval_ops,
-    handoff,
-    mirror_gap,
-    ops_close,
-    phase,
-)
+from . import handoff, mirror_gap, ops_close, phase
+from .approval import checks as approval_checks
+from .approval import marks as approval_marks
+from .approval import ops as approval_ops
+from .approval import store as approval
 from .model import phase_forms, review_host, ticket_fields, ticket_model, ticket_places, via
 
 TIMEOUT_SECONDS = 15.0

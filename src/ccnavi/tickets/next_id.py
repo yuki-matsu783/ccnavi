@@ -26,7 +26,7 @@ import os
 from typing import TextIO
 
 from ..infra import gitcmd, settings, tree
-from . import approval
+from .approval import store as approval
 from .model import ticket as ticket_mod
 from .model import ticket_ids
 

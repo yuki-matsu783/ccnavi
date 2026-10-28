@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from ..infra import settings
 from ..policy import rules, texts
-from . import agree_candidates, agree_digest, approval
+from . import agree_candidates, agree_digest
+from .approval import store as approval
 from .config import phasetypes, workflow
 from .model import ticket as ticket_mod
 from .model import ticket_model

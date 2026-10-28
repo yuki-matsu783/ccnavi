@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 import shutil
 
-from ccnavi.tickets import approval_checks
+from ccnavi.tickets.approval import checks as approval_checks
 from ccnavi.tickets.model import ticket_model
 from tests.ticket.test_phases import PhaseHarness, child_text, git
 from tests.ticketsample import parent_text

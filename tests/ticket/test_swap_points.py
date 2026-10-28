@@ -37,7 +37,9 @@ from unittest import mock
 from ccnavi.entry import lint, version
 from ccnavi.infra import fsio, pathcase, settings
 from ccnavi.infra import tree as tree_mod
-from ccnavi.tickets import approval, approval_ops, core, core_base
+from ccnavi.tickets import core, core_base
+from ccnavi.tickets.approval import ops as approval_ops
+from ccnavi.tickets.approval import store as approval
 from ccnavi.tickets.model import ticket_model, via
 from tests import requires_symlink
 from tests.ticket.test_phases import PhaseHarness
@@ -1321,7 +1323,12 @@ class RecordWritesTest(CoreHarness):
             # なく、write-and-push の書いたパスの一覧に載せるものでもない。
             ("gitstate", "shutil.move(source, target)"),
         }
-        names = ("tickets.approval", "tickets.agree", "tickets.model.via", "tickets.configsync")
+        names = (
+            "tickets.approval.store",
+            "tickets.agree",
+            "tickets.model.via",
+            "tickets.configsync",
+        )
         names += (
             "tickets.ops",
             "tickets.flow.graph",
@@ -1330,7 +1337,7 @@ class RecordWritesTest(CoreHarness):
             "tickets.review",
         )
         names += ("tickets.phase", "tickets.model.ticket", "infra.gitstate")
-        names += ("tickets.approval_marks", "tickets.approval_checks", "tickets.approval_times")
+        names += ("tickets.approval.marks", "tickets.approval.checks", "tickets.approval.times")
         names += ("tickets.model.review_host", "tickets.review_decide", "tickets.review_close")
         names += (
             "tickets.model.ticket_model",
@@ -1345,7 +1352,7 @@ class RecordWritesTest(CoreHarness):
         names += ("tickets.agree_candidates", "tickets.agree_digest", "tickets.agree_screen")
         names += ("tickets.model.phase_forms", "tickets.phase_scope")
         names += ("tickets.flow.text", "tickets.flow.shape", "tickets.flow.render")
-        names += ("tickets.approval_ops", "tickets.ops_close", "tickets.ops_stop")
+        names += ("tickets.approval.ops", "tickets.ops_close", "tickets.ops_stop")
         names += (
             "tickets.core_base",
             "tickets.core_approve",

@@ -10,8 +10,8 @@ import os
 import sys
 from dataclasses import dataclass
 
-from ..infra import gitcmd, settings
-from .model import ticket_model
+from ...infra import gitcmd, settings
+from ..model import ticket_model
 
 # どこから引いた時刻か。
 APPROVED_FROM_COMMIT = "commit"  # doing/ に足したコミットの時刻
