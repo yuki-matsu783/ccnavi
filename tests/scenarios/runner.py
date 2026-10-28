@@ -900,7 +900,10 @@ def acquire_target(top, out, resuming=False):
     left = git_dir / LEFT_NAME
     if left.exists():
         who = left.read_text(encoding="utf-8").strip()
-        if not (resuming and pathcase.fold(who) == pathcase.fold(str(out))):
+        same = bool(who) and (
+            pathcase.fold(os.path.realpath(who)) == pathcase.fold(os.path.realpath(out))
+        )
+        if not (resuming and same):
             raise Refusal(
                 f"前の回が対象を戻さずに残している: {who}",
                 f"続けるなら `{RUNNER} next {who}`、やめるなら `{RUNNER} restore {who}`",
@@ -947,7 +950,7 @@ def release_target(st, root, hold=False):
             except Exception as exc:  # 戻せない原因は何でも、手作業の案内にする
                 err = str(exc) or repr(exc)
         if hold or err:
-            left.write_text(out, encoding="utf-8")
+            left.write_text(os.path.realpath(out) if out else out, encoding="utf-8")
         else:
             with contextlib.suppress(FileNotFoundError):
                 left.unlink()

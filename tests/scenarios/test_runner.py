@@ -2255,6 +2255,42 @@ class LockTest(unittest.TestCase):
             runner.release_target(st, ws.root)
             runner.acquire_target(top, ws.out)
 
+    def test_resuming_matches_the_same_out_in_any_spelling(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            top = str(ws.target.resolve())
+            ws.out.mkdir()
+            link = Path(d) / "link"
+            try:
+                link.symlink_to(ws.out.resolve(), target_is_directory=True)
+            except OSError:
+                self.skipTest("symlink を作れない環境")
+            before = os.getcwd()
+            os.chdir(ws.out.parent)
+            self.addCleanup(os.chdir, before)
+            spellings = [
+                os.path.relpath(ws.out),
+                str(ws.out.resolve()),
+                str(ws.out.resolve()) + "/",
+                str(link),
+            ]
+            for held in (os.path.relpath(ws.out), str(ws.out.resolve())):
+                (ws.target / ".git" / runner.LEFT_NAME).write_text(held, encoding="utf-8")
+                for spelling in spellings:
+                    runner.acquire_target(top, spelling, resuming=True)
+                    (ws.target / ".git" / runner.LOCK_NAME).unlink()
+
+    def test_left_marker_holds_realpath_not_folded(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            top = str(ws.target.resolve())
+            ws.out.mkdir()
+            runner.acquire_target(top, ws.out)
+            st = {"target": {"path": top, "base": None}, "out": str(ws.out)}
+            runner.release_target(st, ws.root, hold=True)
+            marker = ws.target / ".git" / runner.LEFT_NAME
+            self.assertEqual(marker.read_text(encoding="utf-8"), os.path.realpath(ws.out))
+
     def test_lock_lives_in_dot_git_and_survives_clean(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
