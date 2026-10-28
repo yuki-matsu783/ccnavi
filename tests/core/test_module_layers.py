@@ -1,47 +1,54 @@
 """`src/ccnavi/` の import の向きを、テストで守る。
 
-`src/ccnavi/` は役割ごとのサブパッケージ 7 つ（`PACKAGES`）に分かれ、その中にモジュールが並ぶ。
-読む順は 2 つの表で書く。サブパッケージの順（`PACKAGES`）と、モジュールの段（`TIERS`）。
-ディレクトリが言えるのは「どの役割か」までで、同じサブパッケージの中の読む順は言えない。
-段がそれを補う。2 つの表と食い違う import を名指しする。
+`src/ccnavi/` は役割ごとのサブパッケージに分かれ、大きいものはさらに分かれる。
+読む順は 2 つの表で書く。サブパッケージの順（`PACKAGES`。入れ子を持てる木）と、
+モジュールの段（`TIERS`）。ディレクトリが言えるのは「どの役割か」までで、同じ
+サブパッケージの中の読む順は言えない。段がそれを補う。2 つの表と食い違う import を名指しする。
 
 「レイヤー」ではなく「段」と呼ぶのは、このリポジトリではレイヤーが設定の 3 つのレイヤー
 （共通レイヤー・自身のレイヤー・プロジェクトのレイヤー）を指すため。ここで言う段は
 モジュールを読む順で、別のもの。
 
 読むのは `src/ccnavi/` の下の `.py` の import 文だけ。実行ファイルは起動しないので速い。
-モジュールはドットでつないだ名前で呼ぶ（`infra.fsio`）。直下の `__init__` と
-`__main__` はそのままの名前。
+モジュールはドットでつないだ名前で呼ぶ（`infra.fsio`、`tickets.review.close`）。
+直下の `__init__` と `__main__` はそのままの名前。
 
 関数の中の import も数える。 循環は、先頭の import を関数の中へ移すと
 消えたように見える。`ast.walk` ですべて拾うので、移しても隠れない。
 
 見るのは 6 つ。
 
-1. どのモジュールも段をちょうど 1 つ持つ。モジュールを足したら、どの段かを決めさせる
-2. 置き場の形。`src/ccnavi/` の直下のディレクトリは `PACKAGES` と同じで、それより深い階層を
-   作らない。どのサブパッケージにも `__init__.py` があり、中身は役割を書いた docstring だけ
-   （再輸出しない。`from .infra import fsio` の行き先が `infra/__init__.py` にならないように）
+1. どのモジュールも段をちょうど 1 つ持つ。モジュールを足したら、どの段かを決めさせる。
+   `TIERS` の名前は、ドットでつないだ全体の名前で引く
+2. 置き場の形。ディレクトリは `PACKAGES` に書いたものだけで、深さは
+   `ccnavi/<サブパッケージ>/<サブパッケージ>/` まで。どのサブパッケージにも `__init__.py` があり、
+   中身は役割を書いた docstring だけ（再輸出しない。`from ..infra import fsio` の行き先が
+   `infra/__init__.py` にならないように）。`SPLIT` に挙げたパッケージの直下には
+   `__init__.py` 以外を置かない
 3. import の行き先は、同じ段か下の段。上を向いた import を名指しする
 4. 循環を 1 つも許さない。既知として通す一覧も持たない
 5. import の行き先が、import 文に残らない書き方をしていない
-6. サブパッケージをまたぐ import は、`PACKAGES` で下のサブパッケージへだけ
+6. 同じ親の下の兄弟は、`PACKAGES` で段が下のものだけを読む。どの深さにも同じ関数でかける
 
-同じ段どうしの import は止めない。段は「どちらを先に読めるか」の順序であって、
+同じ段どうしのモジュールの import は止めない。段は「どちらを先に読めるか」の順序であって、
 同じ段の中の結び付きは 4 が見る。同じ段どうしの問題（たとえば判定がチケットを
 動かし始める形）は、段では止まらない。 サブパッケージをまたぐなら 6 が見る。
+
+6 の読み方。2 つのモジュールの共通の親を見つけ、その直下でそれぞれが入っている枝を比べる。
+枝が兄弟のサブパッケージどうしなら、読む側の段より読まれる側の段が小さいことを求める
+（同じ段の兄弟も互いに読めない）。親の直下にあるモジュールは、その親の子のサブパッケージを
+読める。子のサブパッケージは、親の直下のモジュールを読めない。
 
 5 が要るのは、1 から 4 と 6 が import 文しか読まないから。
 `importlib.import_module("ccnavi.hook.judge")` と、ドットの無い `import ccnavi` に
 続く `ccnavi.hook.judge.…` は、行き先が import 文に残らないので 1 つも見つからない。
 どちらも `src/ccnavi/` では 1 度も使っていないので、書き方ごと止めるほうが安い。
-同じ理由で、パッケージの中の書き方を相対の 2 形に限る。同じサブパッケージは
-`from . import x`、別のサブパッケージは `from ..infra import fsio`（`from ..infra.modes import
-EXIT_OK` も可）。3 段以上の相対（`from ...`）、自分のサブパッケージを `..` で指す形
-（`infra` の中の `from ..infra import fsio`。同じサブパッケージは `from . import fsio`）、
-`from .. import infra`（行き先がサブパッケージ
-そのもので、モジュールが import 文に出ない）、パッケージの中の `ccnavi.` で始まる絶対の import
-は止める。回避できないわけではない。 `getattr` や `exec` で組み立てれば、いまでも
+同じ理由で、パッケージの中の書き方を相対に限り、点の数を共通の親まで上がる最短の数にする。
+同じサブパッケージは `from . import x`、同じ親の兄弟は `from ..model import ticket`、
+別の大きなサブパッケージは `from ...infra import fsio`（`from ..infra.modes import EXIT_OK`
+も可）。余分に重ねた点、`from .. import model`（行き先がサブパッケージそのもので、
+モジュールが import 文に出ない）、パッケージの中の `ccnavi.` で始まる絶対の import は止める。
+回避できないわけではない。 `getattr` や `exec` で組み立てれば、いまでも
 隠せる。そこまで防ぐには import を実行時に捕まえるしかなく、この速さを手放す。
 
 `main.py`（PyInstaller の入口）は `src/ccnavi/` の外なので、ここには入らない。
@@ -61,24 +68,40 @@ from tests import SRC
 
 PACKAGE = os.path.join(SRC, "ccnavi")
 
-# サブパッケージは下から上へ。下のサブパッケージは上のサブパッケージを知らない。
+# サブパッケージの順を書く木。1 行は (名前, 段, 役割, 子)。
 #
+# 同じ親の下の兄弟は、段が小さいサブパッケージだけを読める。段が同じ兄弟は互いに読めない。
 # 段（TIERS）と違い、こちらは役割で引いた線。依存の向きがこの順に収まることを
 # 6 の検査で確かめる。モジュールがどのサブパッケージに居るかはディレクトリで決まり、
 # ここには書かない。サブパッケージを足す・並べ替えるときは、この表を先に直す。
-PACKAGES: tuple[tuple[str, str], ...] = (
-    ("infra", "土台。ファイル・git・パス照合・hook の入出力・設定・シェルの読み・ワークツリー"),
-    ("records", "記録。伏せ字・判定の記録・診断ログ・後始末・拒否の数え"),
-    ("policy", "ルール。読み込み・照合・組み込み・レイヤーの合成・自己防衛・文脈ファイル"),
+# 深さの上限は MAX_DEPTH。
+Node = tuple[str, int, str, tuple]
+
+PACKAGES: tuple[Node, ...] = (
+    (
+        "infra",
+        0,
+        "土台。ファイル・git・パス照合・hook の入出力・設定・シェルの読み・ワークツリー",
+        (),
+    ),
+    ("records", 1, "記録。伏せ字・判定の記録・診断ログ・後始末・拒否の数え", ()),
+    ("policy", 2, "ルール。読み込み・照合・組み込み・レイヤーの合成・自己防衛・文脈ファイル", ()),
     (
         "tickets",
+        3,
         "チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、"
         "承認・レビュー済みの判定のコア（core）、write-and-push の見分け、フェーズ、操作",
+        (),
     ),
-    ("catalog", "目録。文書の索引と --docs の引き方・プロジェクトのスキルの目録"),
-    ("hook", "hook の判定と、その文面・実行後の監視・イベント"),
-    ("entry", "入口。CLI・診断・lint・提案・版"),
+    ("catalog", 4, "目録。文書の索引と --docs の引き方・プロジェクトのスキルの目録", ()),
+    ("hook", 5, "hook の判定と、その文面・実行後の監視・イベント", ()),
+    ("entry", 6, "入口。CLI・診断・lint・提案・版", ()),
 )
+
+# 深さの上限。`ccnavi/<サブパッケージ>/<サブパッケージ>/` まで。
+MAX_DEPTH = 2
+# 直下にモジュールを置かず、サブパッケージだけにしたパッケージ（`__init__.py` は除く）。
+SPLIT: frozenset[str] = frozenset()
 
 # 段は下から上へ。下の段は上の段を知らない。
 #
@@ -329,43 +352,71 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
 TIER_ORDER = {name: i for i, (name, _, _) in enumerate(TIERS)}
 TIER_OF = {mod: name for name, _, mods in TIERS for mod in mods}
 TIER_MEANING = " / ".join(f"{name}: {note}" for name, note, _ in TIERS)
-PACKAGE_ORDER = {name: i for i, (name, _) in enumerate(PACKAGES)}
-PACKAGE_MEANING = " / ".join(f"{name}: {note}" for name, note in PACKAGES)
 # 直下に置いてよいモジュール。パッケージの目印と `python -m ccnavi` の入口だけ。
 TOP_LEVEL = frozenset({"__init__", "__main__"})
 
 
+def package_paths(tree: tuple[Node, ...], prefix: str = "") -> dict[str, int]:
+    """木に書いたサブパッケージの、ドットでつないだ名前 → 同じ親の下での段。"""
+    found: dict[str, int] = {}
+    for name, rank, _, children in tree:
+        path = f"{prefix}{name}"
+        found[path] = rank
+        found.update(package_paths(children, f"{path}."))
+    return found
+
+
+def meaning_of(tree: tuple[Node, ...], prefix: str = "") -> str:
+    """木の読み方の説明。エラーの文面に添える。"""
+    parts = []
+    for name, _, note, children in tree:
+        parts.append(f"{prefix}{name}: {note}")
+        if children:
+            parts.append(meaning_of(children, f"{prefix}{name}."))
+    return " / ".join(parts)
+
+
+PACKAGE_RANK = package_paths(PACKAGES)
+PACKAGE_MEANING = meaning_of(PACKAGES)
+
+
 def package_of(module: str) -> str:
-    """モジュールの居るサブパッケージ。直下のモジュールなら空。"""
-    return module.split(".")[0] if "." in module else ""
+    """モジュールの居るサブパッケージ（ドットでつないだ名前）。直下のモジュールなら空。"""
+    return module.rpartition(".")[0]
 
 
 def path_of(module: str) -> str:
     return os.path.join(PACKAGE, *module.split(".")) + ".py"
 
 
-def directories() -> list[str]:
-    """`src/ccnavi/` の直下のディレクトリ（`__pycache__` を除く）。"""
-    return sorted(
-        name
-        for name in os.listdir(PACKAGE)
-        if name != "__pycache__" and os.path.isdir(os.path.join(PACKAGE, name))
-    )
+def directories(root: str = PACKAGE) -> list[str]:
+    """`src/ccnavi/` の下のディレクトリを、ドットでつないだ名前で（`__pycache__` を除く）。"""
+    found: list[str] = []
+    for current, names, _ in os.walk(root):
+        names[:] = sorted(n for n in names if n != "__pycache__")
+        for name in names:
+            rel = os.path.relpath(os.path.join(current, name), root)
+            found.append(rel.replace(os.sep, "."))
+    return sorted(found)
 
 
-def modules() -> list[str]:
+def modules(root: str = PACKAGE) -> list[str]:
     """`src/ccnavi/` に置いてあるモジュールの、ドットでつないだ名前。
 
-    直下の `.py` と、直下のディレクトリの `.py`。サブパッケージの `__init__.py` は数えない
-    （中身が docstring だけであることを 2 で見る）。
+    どの深さの `.py` も数える。サブパッケージの `__init__.py` は数えない
+    （中身が docstring だけであることを 2 で見る）。直下の `__init__` は数える。
     """
-    found = [f[:-3] for f in os.listdir(PACKAGE) if f.endswith(".py")]
-    for package in directories():
-        found += [
-            f"{package}.{f[:-3]}"
-            for f in os.listdir(os.path.join(PACKAGE, package))
-            if f.endswith(".py") and f != "__init__.py"
-        ]
+    found: list[str] = []
+    for current, names, files in os.walk(root):
+        names[:] = [n for n in names if n != "__pycache__"]
+        rel = os.path.relpath(current, root)
+        prefix = "" if rel == "." else rel.replace(os.sep, ".") + "."
+        for f in files:
+            if not f.endswith(".py"):
+                continue
+            if f == "__init__.py" and prefix:
+                continue
+            found.append(prefix + f[:-3])
     return sorted(found)
 
 
@@ -374,87 +425,117 @@ def parse(module: str) -> ast.Module:
         return ast.parse(f.read())
 
 
-def _targets(module: str, node: ast.AST) -> set[str]:
-    """1 つの import 文の行き先（ドットでつないだモジュール名）。行き先が言えない形は空。"""
-    here = package_of(module)
+def _resolve(parts: list[str], names: list[str], known: set[str], packages: set[str]) -> set[str]:
+    """`from <parts> import <names>` の行き先のモジュール（ドットでつないだ名前）。
+
+    `parts` がモジュールならそれ、サブパッケージなら `parts.<name>` のうちモジュールのもの。
+    サブパッケージそのものや、見つからない名前は含めない（サブパッケージそのものは 5 が止める）。
+    """
+    full = ".".join(parts)
+    if full in known:
+        return {full}
     found: set[str] = set()
-    if isinstance(node, ast.ImportFrom):
-        parts = node.module.split(".") if node.module else []
-        if node.level == 1 and here:
-            # 同じサブパッケージ。`from . import x` / `from .x import y`
-            found |= (
-                {f"{here}.{a.name}" for a in node.names} if not parts else {f"{here}.{parts[0]}"}
-            )
-        elif node.level == 1:
-            # 直下のモジュールから。`from .entry import cli` / `from .entry.cli import main`
-            if len(parts) >= 2:
-                found.add(".".join(parts[:2]))
-            elif parts:
-                found |= {f"{parts[0]}.{a.name}" for a in node.names}
-            else:
-                found |= {a.name for a in node.names}
-        elif node.level == 2 and here and parts:
-            # 別のサブパッケージ。`from ..infra import fsio` / `from ..infra.modes import X`
-            if len(parts) >= 2:
-                found.add(".".join(parts[:2]))
-            else:
-                found |= {f"{parts[0]}.{a.name}" for a in node.names}
-        elif not node.level and parts and parts[0] == "ccnavi":
-            # 止める形（5）だが、行き先は数える。数えないと 3・4・6 から抜ける
-            if len(parts) >= 3:
-                found.add(".".join(parts[1:3]))
-            elif len(parts) == 2:
-                found |= {f"{parts[1]}.{a.name}" for a in node.names}
-            else:
-                found |= {a.name for a in node.names}
-    elif isinstance(node, ast.Import):
-        for alias in node.names:
-            parts = alias.name.split(".")
-            if parts[0] == "ccnavi" and len(parts) >= 3:
-                found.add(".".join(parts[1:3]))
-            elif parts[0] == "ccnavi" and len(parts) == 2:
-                found.add(parts[1])
+    if full in packages or not parts:
+        for name in names:
+            candidate = f"{full}.{name}" if full else name
+            if candidate in known:
+                found.add(candidate)
     return found
 
 
-def imports_of(module: str, known: set[str]) -> set[str]:
+def _base(module: str, level: int) -> list[str] | None:
+    """相対 import の起点（点の数 `level` だけ上がったパッケージ）。root を越えたら None。"""
+    here = package_of(module).split(".") if package_of(module) else []
+    up = level - 1
+    if up > len(here):
+        return None
+    return here[: len(here) - up]
+
+
+def _targets(
+    module: str, node: ast.AST, known: set[str] | None = None, packages: set[str] | None = None
+) -> set[str]:
+    """1 つの import 文の行き先（ドットでつないだモジュール名）。行き先が言えない形は空。"""
+    known = known if known is not None else set(modules())
+    packages = packages if packages is not None else set(directories())
+    found: set[str] = set()
+    if isinstance(node, ast.ImportFrom):
+        parts = node.module.split(".") if node.module else []
+        names = [a.name for a in node.names]
+        if node.level:
+            base = _base(module, node.level)
+            if base is None:
+                return found
+            found |= _resolve(base + parts, names, known, packages)
+        elif parts and parts[0] == "ccnavi":
+            # 止める形（5）だが、行き先は数える。数えないと 3・4・6 から抜ける
+            found |= _resolve(parts[1:], names, known, packages)
+    elif isinstance(node, ast.Import):
+        for alias in node.names:
+            parts = alias.name.split(".")
+            if parts[0] == "ccnavi" and len(parts) >= 2:
+                found |= _resolve(parts[1:], [], known, packages)
+    return found
+
+
+def imports_of(
+    module: str,
+    known: set[str],
+    packages: set[str] | None = None,
+    tree: ast.Module | None = None,
+) -> set[str]:
     """そのモジュールが import している、同じパッケージのモジュール。
 
-    頭のものも関数の中のものも同じに数える。行き先は 2 階層で解く。
+    頭のものも関数の中のものも同じに数える。行き先はどの深さでも解く。
 
-        from . import ticket, flow          （tickets の中）-> tickets.ticket, tickets.flow
-        from ..infra import fsio            -> infra.fsio
-        from ..infra.modes import EXIT_OK   -> infra.modes
+        from . import ticket, flow          （tickets.review の中）-> tickets.review.ticket, ...
+        from ..model import ticket          （tickets.review の中）-> tickets.model.ticket
+        from ...infra.modes import EXIT_OK  （tickets.review の中）-> infra.modes
         from .entry import cli              （直下の __main__）-> entry.cli
         from ccnavi.infra import settings   -> infra.settings（5 で止める形）
 
     パッケージの中で `ccnavi.` の絶対の形を書かれても見落とさないように、相対と同じに数える。
     """
+    packages = packages if packages is not None else set(directories())
     found: set[str] = set()
-    for node in ast.walk(parse(module)):
-        found |= _targets(module, node)
-    return found & known
+    for node in ast.walk(tree if tree is not None else parse(module)):
+        found |= _targets(module, node, known, packages)
+    return found
 
 
-def hiding_in(module: str) -> list[str]:
+def shortest_level(module: str, target_parts: list[str], packages: set[str]) -> int:
+    """`module` から `target_parts`（モジュールかサブパッケージ）への、最短の相対の点の数。
+
+    共通の親まで上がる数。同じサブパッケージの中なら 1。
+    """
+    here = package_of(module).split(".") if package_of(module) else []
+    full = ".".join(target_parts)
+    # 行き先のモジュールが居るサブパッケージ。行き先がサブパッケージそのものならそれ自身
+    there = target_parts if full in packages else target_parts[:-1]
+    common = 0
+    for a, b in zip(here, there, strict=False):
+        if a != b:
+            break
+        common += 1
+    return len(here) - common + 1
+
+
+def hiding_in_tree(module: str, tree: ast.Module, known: set[str], packages: set[str]) -> list[str]:
     """そのモジュールで使われている、行き先を import 文から隠す書き方。
 
     - `import ccnavi`（ドット無し）。`import ccnavi.hook.judge` と違い、行き先が
       import 文に出ない。使うときは `ccnavi.hook.judge.…` という属性の参照になる
     - `importlib` / `__import__` / `sys.modules`。行き先が文字列になる
-    - 3 段以上の相対（`from ...`）。`src/ccnavi/` は 2 階層までなので、外へ出るか、行き先を
-      読み違える
-    - 自分の居るサブパッケージを `..` で指す形（`infra` の中の `from ..infra import fsio`）。
-      同じサブパッケージは `from . import fsio` と書く。2 つの書き方が同じ行き先に並ぶのを避ける
-    - `from .. import infra`（`from . import infra` を直下から書くのも同じ）。行き先が
+    - 相対の点の数が、共通の親まで上がる最短の数でない形。余分に重ねた形は行き先を
+      読み違える。同じサブパッケージを `..` で指す形も、同じ行き先に書き方が 2 つできる
+    - `from .. import model`（`from . import approval` を直下から書くのも同じ）。行き先が
       サブパッケージそのもので、使うモジュールが import 文に出ない
-    - パッケージの中の `ccnavi.` で始まる絶対の import。相対の 2 形に揃えておかないと、
+    - パッケージの中の `ccnavi.` で始まる絶対の import。相対に揃えておかないと、
       同じ行き先に書き方が 2 つでき、読み比べにくい
     """
     found: list[str] = []
-    rel = os.path.relpath(path_of(module), PACKAGE).replace(os.sep, "/")
-    packages = {name for name, _ in PACKAGES}
-    for node in ast.walk(parse(module)):
+    rel = module.replace(".", "/") + ".py"
+    for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
                 if alias.name == "ccnavi":
@@ -469,24 +550,8 @@ def hiding_in(module: str) -> list[str]:
                 found.append(f"{rel}:{node.lineno} from importlib import ...")
             elif not node.level and head == "ccnavi":
                 found.append(f"{rel}:{node.lineno} from {node.module} import ...")
-            elif node.level >= 3:
-                found.append(f"{rel}:{node.lineno} from {'.' * node.level}{node.module or ''}")
-            elif node.level == 2 and not node.module:
-                found.append(f"{rel}:{node.lineno} from .. import ...")
-            elif (
-                node.level == 2 and node.module and node.module.split(".")[0] == package_of(module)
-            ):
-                found.append(
-                    f"{rel}:{node.lineno} from ..{node.module} import ... "
-                    f"（同じサブパッケージは `from . import x` と書く）"
-                )
-            elif (
-                node.level == 1
-                and not node.module
-                and not package_of(module)
-                and any(alias.name in packages for alias in node.names)
-            ):
-                found.append(f"{rel}:{node.lineno} from . import <サブパッケージ>")
+            elif node.level:
+                found += _relative_problems(module, node, rel, known, packages)
         elif isinstance(node, ast.Name) and node.id == "__import__":
             found.append(f"{rel}:{node.lineno} __import__")
         elif (
@@ -499,9 +564,47 @@ def hiding_in(module: str) -> list[str]:
     return found
 
 
+def _relative_problems(
+    module: str, node: ast.ImportFrom, rel: str, known: set[str], packages: set[str]
+) -> list[str]:
+    spelled = f"from {'.' * node.level}{node.module or ''} import ..."
+    base = _base(module, node.level)
+    if base is None:
+        return [f"{rel}:{node.lineno} {spelled} （ccnavi の外へ出る）"]
+    parts = base + (node.module.split(".") if node.module else [])
+    full = ".".join(parts)
+    problems: list[str] = []
+    if full in packages:
+        # `from .. import model`：名前がサブパッケージそのものなら、モジュールが import 文に出ない
+        for alias in node.names:
+            if f"{full}.{alias.name}" in packages:
+                problems.append(
+                    f"{rel}:{node.lineno} {spelled} （行き先がサブパッケージ `{alias.name}` "
+                    f"そのもの。中のモジュールを import する）"
+                )
+        reached = [a.name for a in node.names if f"{full}.{a.name}" in known]
+        target = parts + reached[:1] if reached else parts
+    elif full in known:
+        target = parts
+    else:
+        return [f"{rel}:{node.lineno} {spelled} （行き先が見つからない）"]
+    # 点の数は、1 つの文の中で行き先が揃っているので、先頭の行き先で測る
+    want = shortest_level(module, target, packages)
+    if node.level != want:
+        problems.append(
+            f"{rel}:{node.lineno} {spelled} （点は {want} つ。共通の親まで上がる最短の数にする）"
+        )
+    return problems
+
+
+def hiding_in(module: str) -> list[str]:
+    return hiding_in_tree(module, parse(module), set(modules()), set(directories()))
+
+
 def graph() -> dict[str, set[str]]:
     known = set(modules())
-    return {mod: imports_of(mod, known) for mod in sorted(known)}
+    packages = set(directories())
+    return {mod: imports_of(mod, known, packages) for mod in sorted(known)}
 
 
 def knots(edges: dict[str, set[str]]) -> set[tuple[str, ...]]:
@@ -536,6 +639,60 @@ def knots(edges: dict[str, set[str]]) -> set[tuple[str, ...]]:
     return groups
 
 
+def order_violations(edges: dict[str, set[str]], tree: tuple[Node, ...]) -> list[str]:
+    """同じ親の下の兄弟が、段の同じか上の兄弟を読んでいる import。どの深さにもかける。
+
+    2 つのモジュールの共通の親の直下で、それぞれが入っている枝を比べる。枝がどちらも木に
+    書いたサブパッケージなら、読まれる側の段が読む側より小さいことを求める。読む側が親の
+    直下のモジュールなら、子のサブパッケージを読める。読まれる側が親の直下のモジュールなら、
+    子のサブパッケージからは読めない。
+    """
+    rank = package_paths(tree)
+    found: list[str] = []
+    for mod in sorted(edges):
+        for target in sorted(edges[mod]):
+            a, b = mod.split("."), target.split(".")
+            depth = 0
+            while depth < min(len(a), len(b)) - 1 and a[depth] == b[depth]:
+                depth += 1
+            parent = ".".join(a[:depth])
+            mine = ".".join(a[: depth + 1])
+            theirs = ".".join(b[: depth + 1])
+            if mine == theirs:
+                continue
+            mine_is_package = depth + 1 < len(a)
+            theirs_is_package = depth + 1 < len(b)
+            if mine_is_package and not theirs_is_package:
+                found.append(
+                    f"{mod} -> {target}（{parent or 'ccnavi'} の直下のモジュールを読んでいる）"
+                )
+            elif (
+                mine_is_package
+                and theirs_is_package
+                and mine in rank
+                and theirs in rank
+                and rank[theirs] >= rank[mine]
+            ):
+                found.append(f"{mod} -> {target}")
+    return found
+
+
+def unlisted_directories(found: list[str], tree: tuple[Node, ...]) -> tuple[list[str], list[str]]:
+    """(木に無いディレクトリ, 木にあるのに無いディレクトリ)。"""
+    listed = set(package_paths(tree))
+    return sorted(set(found) - listed), sorted(listed - set(found))
+
+
+def too_deep(found: list[str], limit: int = MAX_DEPTH) -> list[str]:
+    """深さが上限を超えているディレクトリ。`infra` が深さ 1、`tickets.review` が 2。"""
+    return sorted(d for d in found if len(d.split(".")) > limit)
+
+
+def loose_modules(mods: list[str], split: frozenset[str]) -> list[str]:
+    """`split` のパッケージの直下にあるモジュール。"""
+    return sorted(m for m in mods if package_of(m) in split)
+
+
 def _only_a_docstring(path: str) -> bool:
     with open(path, encoding="utf-8") as f:
         body = ast.parse(f.read()).body
@@ -564,8 +721,9 @@ class ModuleTiersTest(unittest.TestCase):
         self.assertEqual(
             [],
             missing,
-            "段の決まっていないモジュールがある。TIERS にドットでつないだ名前（`infra.fsio`）で"
-            "足す。置き場は「import している先のうち一番高い段」と同じか、その 1 つ上。"
+            "段の決まっていないモジュールがある。TIERS にドットでつないだ全体の名前"
+            "（`infra.fsio`、`tickets.review.close`）で足す。置き場は「import している先の"
+            "うち一番高い段」と同じか、その 1 つ上。"
             f"段の意味は {TIER_MEANING}。どのサブパッケージに置くかは {PACKAGE_MEANING}",
         )
 
@@ -573,18 +731,28 @@ class ModuleTiersTest(unittest.TestCase):
         self.assertEqual(
             [],
             phantom,
-            "TIERS が、置かれていないモジュールを挙げている。サブパッケージを移したなら、"
-            "TIERS の名前（`<サブパッケージ>.<モジュール>`）も直す",
+            "TIERS が、置かれていないモジュールを挙げている。モジュールを移したなら、"
+            "TIERS の名前（ドットでつないだ全体の名前）も直す",
         )
 
     def test_the_package_has_the_listed_subpackages_only(self):
-        """直下のディレクトリは PACKAGES と同じで、それより深い階層を作らない。"""
+        """ディレクトリは PACKAGES と同じで、深さは上限まで。"""
+        found = directories()
+        extra, absent = unlisted_directories(found, PACKAGES)
         self.assertEqual(
-            sorted(name for name, _ in PACKAGES),
-            directories(),
-            "`src/ccnavi/` の直下のディレクトリが PACKAGES と違う。サブパッケージを足すなら "
-            f"PACKAGES に役割と順を書いてから作る。いまの役割は {PACKAGE_MEANING}",
+            ([], []),
+            (extra, absent),
+            "ディレクトリが PACKAGES と違う（左: 表に無いディレクトリ、右: 表にあって無い"
+            "ディレクトリ）。サブパッケージを足すなら PACKAGES に役割と順を書いてから作る。"
+            f"いまの役割は {PACKAGE_MEANING}",
         )
+        self.assertEqual(
+            [],
+            too_deep(found),
+            f"ディレクトリが深すぎる。深さは `ccnavi/<サブパッケージ>/<サブパッケージ>/` "
+            f"まで（{MAX_DEPTH}）。サブパッケージの下に更に作らず、サブパッケージの直下に戻す",
+        )
+        self.assertEqual([], too_deep(list(package_paths(PACKAGES))), "PACKAGES が深すぎる")
         stray = sorted(mod for mod in self.modules if not package_of(mod) and mod not in TOP_LEVEL)
         self.assertEqual(
             [],
@@ -592,32 +760,28 @@ class ModuleTiersTest(unittest.TestCase):
             "`src/ccnavi/` の直下にモジュールがある。直下に置くのは `__init__` と `__main__` だけ。"
             f"役割に合うサブパッケージへ置く（{PACKAGE_MEANING}）",
         )
-        deeper = sorted(
-            f"{package}/{name}"
-            for package in directories()
-            for name in os.listdir(os.path.join(PACKAGE, package))
-            if name != "__pycache__" and os.path.isdir(os.path.join(PACKAGE, package, name))
-        )
         self.assertEqual(
             [],
-            deeper,
-            "サブパッケージの下にディレクトリがある。このテストは 2 階層までしか読まないので、"
-            "中のモジュールは段を持たないまま素通りする。サブパッケージの直下に戻す",
+            loose_modules(self.modules, SPLIT),
+            "サブパッケージに分けたパッケージの直下にモジュールがある（SPLIT）。"
+            "新しいファイルは必ずどれかのサブパッケージに入れる。合うものが無ければ、"
+            "新しいサブパッケージを作って PACKAGES に 1 行足す",
         )
 
     def test_every_subpackage_has_an_init_with_only_a_docstring(self):
         """どのサブパッケージにも `__init__.py` があり、中身は役割を書いた docstring だけ。"""
+        dirs = directories()
         missing = [
             package
-            for package in directories()
-            if not os.path.isfile(os.path.join(PACKAGE, package, "__init__.py"))
+            for package in dirs
+            if not os.path.isfile(os.path.join(PACKAGE, *package.split("."), "__init__.py"))
         ]
         self.assertEqual([], missing, "`__init__.py` の無いサブパッケージがある")
         busy = [
             package
-            for package in directories()
+            for package in dirs
             if package not in missing
-            and not _only_a_docstring(os.path.join(PACKAGE, package, "__init__.py"))
+            and not _only_a_docstring(os.path.join(PACKAGE, *package.split("."), "__init__.py"))
         ]
         self.assertEqual(
             [],
@@ -643,23 +807,14 @@ class ModuleTiersTest(unittest.TestCase):
             "下の段へ出す。段そのものを組み替えるなら TIERS を先に直す",
         )
 
-    def test_imports_across_subpackages_go_downward(self):
-        """サブパッケージをまたぐ import は、PACKAGES で下のサブパッケージへだけ。"""
-        upward = [
-            f"{mod} -> {target}"
-            for mod in sorted(self.edges)
-            if package_of(mod) in PACKAGE_ORDER
-            for target in sorted(self.edges[mod])
-            if package_of(target) in PACKAGE_ORDER
-            and PACKAGE_ORDER[package_of(target)] > PACKAGE_ORDER[package_of(mod)]
-        ]
+    def test_imports_between_siblings_go_downward(self):
+        """同じ親の下の兄弟は、PACKAGES で段が下のサブパッケージだけを読む。"""
         self.assertEqual(
             [],
-            upward,
-            "下のサブパッケージが上のサブパッケージを import している。順は "
-            f"{' < '.join(name for name, _ in PACKAGES)}。呼ぶ側から材料を渡すか、"
-            "共通の部分を下のサブパッケージへ出す。モジュールの役割が違っていたなら、"
-            f"合うサブパッケージへ移す（{PACKAGE_MEANING}）",
+            order_violations(self.edges, PACKAGES),
+            "サブパッケージが、段の同じか上のサブパッケージを import している。順は "
+            f"{PACKAGE_MEANING}。呼ぶ側から材料を渡すか、共通の部分を下のサブパッケージへ"
+            "出す。モジュールの役割が違っていたなら、合うサブパッケージへ移す",
         )
 
     def test_no_module_sits_in_a_cycle(self):
@@ -681,11 +836,169 @@ class ModuleTiersTest(unittest.TestCase):
             hidden,
             "import の行き先が import 文に残らない書き方をしている。1 から 4 と 6 は"
             "この形を見つけられないか読み違えるので、書き方のほうを止める。パッケージの中は"
-            "`from . import x`（同じサブパッケージ）と `from ..infra import fsio`（別の"
-            "サブパッケージ）の 2 形で書く。自分のサブパッケージを `..` で指さず、同じ"
-            "サブパッケージの中は `from . import x`。どうしても要るなら、なぜ要るかを添えてここに"
-            "例外を書く",
+            "相対で、点の数は共通の親まで上がる最短の数にする（同じサブパッケージは"
+            "`from . import x`、兄弟は `from ..model import ticket`、別の大きなサブパッケージは"
+            "`from ...infra import fsio`）。サブパッケージそのものは import せず、中の"
+            "モジュールを import する。どうしても要るなら、なぜ要るかを添えてここに例外を書く",
         )
+
+
+# --- 検査そのものを確かめる。わざと違反する入力で、止まることを見る。 ---
+#
+# 本物の木（PACKAGES）はいまの形しか持たないので、入れ子・最短の点の数・深さの上限は、
+# 小さな作り物の表で確かめる。ここが落ちたら、検査が働かなくなっている。
+
+FAKE: tuple[Node, ...] = (
+    ("base", 0, "土台", ()),
+    (
+        "big",
+        1,
+        "大きい",
+        (
+            ("low", 0, "下", ()),
+            ("mid_a", 1, "中", ()),
+            ("mid_b", 1, "中（mid_a と同じ段）", ()),
+            ("top", 2, "上", (("deep", 0, "さらに下", ()),)),
+        ),
+    ),
+)
+FAKE_MODULES = {
+    "__main__",
+    "base.x",
+    "big.root_mod",
+    "big.low.x",
+    "big.mid_a.x",
+    "big.mid_b.x",
+    "big.top.x",
+    "big.top.deep.x",
+}
+
+
+class OrderTableTest(unittest.TestCase):
+    """入れ子の表と、深さに依らない順の検査。"""
+
+    def test_nested_table_is_read_at_every_depth(self):
+        self.assertEqual(
+            {"base", "big", "big.low", "big.mid_a", "big.mid_b", "big.top", "big.top.deep"},
+            set(package_paths(FAKE)),
+        )
+
+    def test_a_sibling_may_read_a_lower_sibling(self):
+        edges = {"big.top.x": {"big.low.x", "big.mid_a.x"}, "big.mid_a.x": {"big.low.x"}}
+        self.assertEqual([], order_violations(edges, FAKE))
+
+    def test_a_sibling_reading_a_higher_sibling_is_caught(self):
+        edges = {"big.low.x": {"big.top.x"}}
+        self.assertEqual(["big.low.x -> big.top.x"], order_violations(edges, FAKE))
+
+    def test_siblings_on_the_same_tier_do_not_read_each_other(self):
+        edges = {"big.mid_a.x": {"big.mid_b.x"}}
+        self.assertEqual(["big.mid_a.x -> big.mid_b.x"], order_violations(edges, FAKE))
+
+    def test_the_order_is_checked_one_level_down_too(self):
+        edges = {"big.top.deep.x": {"big.top.x"}}
+        # 子から親の直下の兄弟モジュールではなく、同じ親の中の順（deep は top の子）
+        self.assertEqual([], order_violations({"big.top.x": {"big.top.deep.x"}}, FAKE))
+        self.assertEqual(
+            ["big.top.deep.x -> big.top.x（big.top の直下のモジュールを読んでいる）"],
+            order_violations(edges, FAKE),
+        )
+
+    def test_a_deep_module_reading_across_the_top_is_judged_at_the_common_parent(self):
+        # base と big は兄弟（段 0 と 1）。深い所から base へ下りるのは良く、逆は悪い
+        self.assertEqual([], order_violations({"big.top.deep.x": {"base.x"}}, FAKE))
+        self.assertEqual(
+            ["base.x -> big.top.deep.x"], order_violations({"base.x": {"big.top.deep.x"}}, FAKE)
+        )
+
+    def test_a_module_directly_under_a_parent_may_read_its_children_only_that_way(self):
+        self.assertEqual([], order_violations({"big.root_mod": {"big.top.x"}}, FAKE))
+        self.assertEqual(
+            ["big.top.x -> big.root_mod（big の直下のモジュールを読んでいる）"],
+            order_violations({"big.top.x": {"big.root_mod"}}, FAKE),
+        )
+
+    def test_a_sibling_missing_from_the_table_is_not_silently_passed_for_edges_inside_it(self):
+        # 同じサブパッケージの中の import は、順の検査の対象外（段が見る）
+        self.assertEqual([], order_violations({"big.low.x": {"big.low.x"}}, FAKE))
+
+
+class ShapeTest(unittest.TestCase):
+    """置き場の形：表に無いディレクトリ・深さの上限・直下のモジュール。"""
+
+    def test_a_directory_missing_from_the_table_is_named(self):
+        extra, absent = unlisted_directories(["base", "big", "big.low", "stray"], FAKE)
+        self.assertEqual(["stray"], extra)
+        self.assertIn("big.top", absent)
+
+    def test_a_directory_listed_in_the_table_but_absent_is_named(self):
+        _, absent = unlisted_directories(["base"], FAKE)
+        self.assertIn("big", absent)
+
+    def test_depth_beyond_the_limit_is_caught(self):
+        self.assertEqual(["big.top.deep"], too_deep(list(package_paths(FAKE)), 2))
+        self.assertEqual([], too_deep(["infra", "tickets.review"], 2))
+
+    def test_the_real_table_stays_within_the_limit(self):
+        self.assertEqual([], too_deep(list(package_paths(PACKAGES))))
+
+    def test_a_loose_module_in_a_split_package_is_caught(self):
+        mods = ["tickets.ticket", "tickets.model.ticket", "hook.judge"]
+        self.assertEqual(["tickets.ticket"], loose_modules(mods, frozenset({"tickets"})))
+        self.assertEqual([], loose_modules(mods, frozenset()))
+
+
+class RelativeImportTest(unittest.TestCase):
+    """相対 import の点の数と、行き先がサブパッケージそのものの形。"""
+
+    PACKAGES = set(package_paths(FAKE))
+
+    def problems(self, module: str, source: str) -> list[str]:
+        return hiding_in_tree(module, ast.parse(source), set(FAKE_MODULES), self.PACKAGES)
+
+    def targets(self, module: str, source: str) -> set[str]:
+        return imports_of(module, set(FAKE_MODULES), self.PACKAGES, ast.parse(source))
+
+    def test_the_shortest_spelling_passes_at_every_depth(self):
+        self.assertEqual([], self.problems("big.top.x", "from . import x\n"))
+        self.assertEqual([], self.problems("big.top.x", "from .deep import x\n"))
+        self.assertEqual([], self.problems("big.top.x", "from ..low import x\n"))
+        self.assertEqual([], self.problems("big.top.deep.x", "from ...low import x\n"))
+        self.assertEqual([], self.problems("big.top.deep.x", "from ....base import x\n"))
+        self.assertEqual([], self.problems("big.top.x", "from ...base import x\n"))
+        self.assertEqual([], self.problems("big.low.x", "from . import x\n"))
+
+    def test_one_dot_too_many_is_caught(self):
+        self.assertTrue(self.problems("big.top.x", "from ...low import x\n"))
+        self.assertTrue(self.problems("big.top.deep.x", "from ....low import x\n"))
+        self.assertTrue(self.problems("base.x", "from ..base import x\n"))
+
+    def test_naming_your_own_subpackage_with_dots_is_caught(self):
+        self.assertTrue(self.problems("big.low.x", "from ..low import x\n"))
+
+    def test_too_few_dots_for_a_sibling_is_caught(self):
+        self.assertTrue(self.problems("big.top.x", "from .low import x\n"))
+
+    def test_going_above_the_root_is_caught(self):
+        self.assertTrue(self.problems("base.x", "from ... import x\n"))
+
+    def test_a_subpackage_itself_as_the_target_is_caught(self):
+        self.assertTrue(self.problems("big.top.x", "from .. import low\n"))
+        self.assertTrue(self.problems("big.top.x", "from . import deep, low\n"))
+        self.assertTrue(self.problems("__main__", "from . import base\n"))
+        self.assertEqual([], self.problems("__main__", "from .base import x\n"))
+
+    def test_targets_are_resolved_at_every_depth(self):
+        self.assertEqual({"big.low.x"}, self.targets("big.top.deep.x", "from ...low import x\n"))
+        # サブパッケージそのものは行き先に数えない（5 が止める）
+        self.assertEqual(set(), self.targets("big.top.x", "from . import deep\n"))
+        self.assertEqual({"big.top.deep.x"}, self.targets("big.top.x", "from .deep import x\n"))
+        self.assertEqual(
+            {"base.x"}, self.targets("big.top.deep.x", "def f():\n    from ....base import x\n")
+        )
+
+    def test_the_tickets_style_absolute_form_is_still_caught(self):
+        self.assertTrue(self.problems("big.top.x", "from ccnavi.big.low import x\n"))
 
 
 if __name__ == "__main__":
