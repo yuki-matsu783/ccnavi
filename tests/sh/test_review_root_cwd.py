@@ -57,7 +57,7 @@ class RootCwdTest(unittest.TestCase):
             f.write("#!/bin/sh\nexit 1\n")
         os.chmod(gh, 0o755)
 
-    def run_review(self, *args: str) -> subprocess.CompletedProcess:
+    def run_review(self, *args: str, cwd: str | None = None) -> subprocess.CompletedProcess:
         env = {
             k: v
             for k, v in os.environ.items()
@@ -68,7 +68,7 @@ class RootCwdTest(unittest.TestCase):
         env["PATH"] = self.shim + os.pathsep + env.get("PATH", "")
         return subprocess.run(
             [SHELL, SCRIPT, *args],
-            cwd=self.dir,
+            cwd=cwd or self.dir,
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -96,6 +96,25 @@ class RootCwdTest(unittest.TestCase):
                 self.assertEqual(len(nexts), 1, done.stderr)
                 self.assertIn("cd ", nexts[0])
                 self.assertIn(f"ccnavi-review.sh' {args[0]}", nexts[0])
+
+    def test_inside_a_parent_worktree_is_not_stopped(self):
+        subprocess.run(
+            ["git", "worktree", "add", "-q", "-b", "p-1", ".claude/worktrees/p-1"],
+            cwd=self.dir,
+            check=True,
+        )
+        tree = os.path.join(self.dir, ".claude", "worktrees", "p-1")
+        for args in (["confirm", "--phase", "1"], ["decide", "1", "--preview"]):
+            with self.subTest(sub=args[0]):
+                done = self.run_review(*args, cwd=tree)
+                self.assertNotIn("の中で打ってください", done.stderr)
+                # 中なら先へ進み、ホストへ繋ぐところで止まる
+                self.assertIn("利用できず", done.stderr)
+
+    def test_ready_with_parent_is_not_stopped_by_the_check(self):
+        done = self.run_review("ready", "--parent", "p-1")
+        self.assertNotIn("の中で打ってください", done.stderr)
+        self.assertIn("ワークツリー", done.stderr)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@
 #
 #   review_place            ワークスペースルート・いまのワークツリー・state の置き場（root・here・state・script_dir・exe_cwd）
 #   review_exe              実行ファイル（関数 ccnavi）。見つからなければ 1
+#   review_tree             居るブランチ・親の識別子・親のワークツリーの中か（branch・family・review_in_tree）。ホストに触れない。review_host も中で呼ぶ
 #   review_host             origin からホストと道具を決める（kind・host・path・JQ・transport など）。branch・family も
 #   review_begin            受け付けたことを診断ログに残し、取ってきた結果の置き場（result）を決める
 #   review_wap              write-and-push の支度（ccnavi_wap_*・wap_on）

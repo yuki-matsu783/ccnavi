@@ -422,8 +422,8 @@ need_parent_tree() {
 		np_args="$np_args $(ccnavi_sh_quote "$np_a")"
 	done
 	fail not-in-parent-tree "$sub は親のワークツリー（$root/.claude/worktrees/<親の識別子>）の中で打ってください。いまの cwd（${here}）は統合先のブランチ（${branch}）の上で、親を決められません。${np_hint}
-次: cd '$root/.claude/worktrees/<親の識別子>' && sh $(ccnavi_sh_quote "$script_dir/ccnavi-review.sh") ${sub}${np_args}
-案内: 親の識別子は 'sh $script_dir/ccnavi-ticket.sh status' か 'sh $script_dir/ccnavi-git.sh worktree list' で確かめる。" 2
+次: cd $(ccnavi_sh_quote "$root/.claude/worktrees/<親の識別子>") && sh $(ccnavi_sh_quote "$script_dir/ccnavi-review.sh") ${sub}${np_args}
+案内: 親の識別子は 'sh $script_dir/ccnavi-ticket.sh status' か 'sh $script_dir/ccnavi-git.sh worktree list' で確かめる。--body-file・--eli5 などの相対パスは cd で指す先が変わるので、絶対パスで打ち直す。" 2
 }
 
 # ---- 親を cwd から引くサブコマンドは、ホストへ繋ぐ前に cwd を確かめる。
