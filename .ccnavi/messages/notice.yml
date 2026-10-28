@@ -98,7 +98,7 @@ messages:
       plain: |-
         [ccnavi] ccnavi は{turn}ごとに、その間に作られたコミットが保護領域のファイルを変更していないかを確認します。{trees}では、今回のターンでこの確認ができませんでした。ターン開始時の HEAD が記録されていないか、差分を読み取れなかったためです。ターンの途中で作り、一度も触らなかったワークツリーでよく起きます。このツリーでコミットしていなければ対応は不要です。コミットした場合は、保護領域のファイルを変更していないかユーザに確かめてもらってください。
 
-  # ---- hook/docsearch.py（md の索引の案内。`lead` は案内の頭）
+  # ---- catalog/docsearch.py（md の索引の案内。`lead` は案内の頭）
   NOTICE_DOCS_GUIDE:
     kind: notice
     values: [lead, command]

@@ -153,7 +153,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | 場所 | 中身 |
 |---|---|
 | `main.py` | 配布物の入口。PyInstaller が渡すスクリプト |
-| `src/ccnavi/__main__.py` | `python -m ccnavi` の入口。サブパッケージは役割ごとに 6 つで、読む向きは infra < records < policy < tickets < hook < entry（`tests/core/test_module_layers.py` が見る） |
+| `src/ccnavi/__main__.py` | `python -m ccnavi` の入口。サブパッケージは役割ごとに 7 つで、読む向きは infra < records < policy < tickets < catalog < hook < entry（`tests/core/test_module_layers.py` が見る） |
 | `build.py` | 配布物の組み立て。`dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へコピーする |
 | `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトと使い方の文書（`.ccnavi/docs/*.md`）と共通のテンプレート（`.ccnavi/config/common/templates/*.yml`）と共通の工程スキル（`.claude/skills/` のうち `process: true` か `distribute: true` を持つもの。`SKILL.md` と `references/common/` の下の `.md` だけ）を配る |
 | `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。編集したファイルの整形と検査、ターンの終わりのテスト |

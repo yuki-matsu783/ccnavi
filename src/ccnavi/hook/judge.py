@@ -12,6 +12,7 @@ import time
 from collections.abc import Callable
 from typing import TextIO
 
+from ..catalog import docsearch, projskills
 from ..infra import fsio, hookio, modes, settings, shellread, tree
 from ..infra.modes import AUX, EXIT_OK, GATE, GENERAL
 from ..policy import (
@@ -39,10 +40,8 @@ from ..tickets import (
 )
 from . import (
     agentlaunch,
-    docsearch,
     failsafe,
     parentwrite,
-    projskills,
     reasons,
     rootwrite,
     turngate,
