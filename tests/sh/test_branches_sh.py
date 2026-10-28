@@ -248,7 +248,7 @@ class BranchesShTest(unittest.TestCase):
         self.assertIn("在りか=手元  由来=名前に番号", found["feature-152-login"])
 
     def test_pull_request_branch_names_follow_the_python_table(self):
-        # tests/core/test_branchfind_refs.py の NAME_CASES と同じ規則。規則を変えたら両方を直す。
+        # tests/ticket/test_branchfind_refs.py の NAME_CASES と同じ規則。規則を変えたら両方を直す。
         self.origin("https://github.com/acme/widgets.git")
         slug = "feature-102-main-sh-の使い方の表示を-1-行足す-c3-検証用"
         for number, names in (
