@@ -227,8 +227,35 @@ ccnavi_host_cli_ping() {
 	return "$ccnavi_cp_rc"
 }
 
+# PATH の絶対パスのエントリだけから実行可能な道具を探し、見つかれば絶対パスを標準出力に出す（無ければ終了コード 1）。
+# `command -v` は使わない。macOS の sh は PATH の相対エントリ（例 bin）を絶対パスに直して返すため、
+# リポジトリの中の gh などが選ばれてしまう。空のエントリ（cwd を指す）と相対のエントリは飛ばす。
+# IFS は変えず、パラメータ展開（${変数%%:*}）で : 区切りに割る。
+# " $ ` \ を含む候補は、式に埋め込むと危険なので飛ばして次を探す。
+ccnavi_find_tool() {
+	ccnavi_ft_rest="${PATH-}:"
+	while [ -n "$ccnavi_ft_rest" ]; do
+		ccnavi_ft_dir="${ccnavi_ft_rest%%:*}"
+		ccnavi_ft_rest="${ccnavi_ft_rest#*:}"
+		case "$ccnavi_ft_dir" in
+		/*) ;;
+		*) continue ;;
+		esac
+		for ccnavi_ft_cand in "$ccnavi_ft_dir/$1" "$ccnavi_ft_dir/$1.exe"; do
+			if [ -f "$ccnavi_ft_cand" ] && [ -x "$ccnavi_ft_cand" ]; then
+				case "$ccnavi_ft_cand" in
+				*[\"\$\`\\]*) continue ;;
+				esac
+				printf '%s\n' "$ccnavi_ft_cand"
+				return 0
+			fi
+		done
+	done
+	return 1
+}
+
 ccnavi_host_connect() {
-	ccnavi_h_jq=$(command -v jq 2>/dev/null || :)
+	ccnavi_h_jq=$(ccnavi_find_tool jq || :)
 	[ -n "$ccnavi_h_jq" ] || return 3
 	# gh / glab は「入っている」だけでは足りない。そのホストで認証されていなければ
 	# 通らない（手元に立てた GitLab に glab を繋いでいない、が普通にある）。
@@ -238,19 +265,19 @@ ccnavi_host_connect() {
 	ccnavi_h_token=""
 	if [ "$ccnavi_h_kind" = github ]; then
 		ccnavi_h_cli_name=gh
-		ccnavi_h_cli=$(command -v gh 2>/dev/null || :)
+		ccnavi_h_cli=$(ccnavi_find_tool gh || :)
 		if [ -n "$ccnavi_h_cli" ] && ccnavi_host_cli_ping "repos/$ccnavi_h_path"; then
 			ccnavi_h_transport=gh
 		fi
 	else
 		ccnavi_h_cli_name=glab
-		ccnavi_h_cli=$(command -v glab 2>/dev/null || :)
+		ccnavi_h_cli=$(ccnavi_find_tool glab || :)
 		if [ -n "$ccnavi_h_cli" ] && ccnavi_host_cli_ping "projects/$(ccnavi_host_encoded_path)"; then
 			ccnavi_h_transport=glab
 		fi
 	fi
 	[ -n "$ccnavi_h_transport" ] && return 0
-	ccnavi_h_curl=$(command -v curl 2>/dev/null || :)
+	ccnavi_h_curl=$(ccnavi_find_tool curl || :)
 	eval "ccnavi_h_token=\${$ccnavi_h_token_name:-}"
 	if [ -n "$ccnavi_h_curl" ] && [ -n "$ccnavi_h_token" ]; then
 		ccnavi_h_transport=curl
@@ -464,13 +491,9 @@ ccnavi_git_auth() {
 	else
 		ccnavi_ga_name=glab
 	fi
-	ccnavi_ga_cli=$(command -v "$ccnavi_ga_name" 2>/dev/null || :)
-	# 絶対パスで、式に効く文字（" $ ` \）を含まないものだけ使う。相対パスだと、リポジトリの中の gh が helper として動く。
-	case "$ccnavi_ga_cli" in
-	*[\"\$\`\\]*) ccnavi_git_auth_reset; return 0 ;;
-	[A-Za-z]:[/\\]* | /*) ;;
-	*) ccnavi_git_auth_reset; return 0 ;;
-	esac
+	ccnavi_ga_cli=$(ccnavi_find_tool "$ccnavi_ga_name" || :)
+	# ccnavi_find_tool は、式の中で特別な意味を持つ文字（" $ ` \）を含まない絶対パスだけを返す。相対パスだと、リポジトリの中の gh が helper として動いてしまう。
+	[ -n "$ccnavi_ga_cli" ] || { ccnavi_git_auth_reset; return 0; }
 	# 値は変数のまま eval に渡す（ホスト名や道具のパスを式に埋めない。origin の文字列がコマンドとして走らないように）。
 	ccnavi_ga_key="credential.$ccnavi_ga_scheme://$ccnavi_ga_host.helper"
 	ccnavi_ga_val="!\"$ccnavi_ga_cli\" auth git-credential"
