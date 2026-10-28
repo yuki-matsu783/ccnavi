@@ -1711,6 +1711,67 @@ class StartShTest(unittest.TestCase):
         self.assertFalse(os.path.isdir(self.wt(BRANCH)))
         self.assertEqual(self.posts(), [])
 
+    # ---- 作成者情報が無い機械
+
+    def no_identity(self, **extra):
+        """作成者を推定させない構成（useConfigOnly が無いと、FQDN のある機械で推定されて通る）。"""
+        git(self.ws, "config", "--unset", "user.name")
+        git(self.ws, "config", "--unset", "user.email")
+        empty = os.path.join(self._tmp.name, "home")
+        os.makedirs(empty, exist_ok=True)
+        env = {
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_SYSTEM": os.devnull,
+            "HOME": empty,
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "user.useConfigOnly",
+            "GIT_CONFIG_VALUE_0": "true",
+        }
+        return {**env, **extra}
+
+    def test_a_missing_author_stops_with_guidance_and_removes_the_new_worktree(self):
+        self.github_new()
+        done = self.run_sh("--issue", "152", **self.no_identity())
+        self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("作成者情報", done.stderr)
+        self.assertNotIn("許可リスト", done.stdout + done.stderr)
+        self.assertIn("git config user.name", done.stdout)
+        self.assertFalse(os.path.isdir(self.wt(BRANCH)))
+        self.assertNotIn(BRANCH, self.local_branches())
+        self.assertEqual(self.posts(), [])
+
+    def test_a_missing_committer_alone_also_stops(self):
+        self.github_new()
+        env = self.no_identity(GIT_AUTHOR_NAME="a", GIT_AUTHOR_EMAIL="a@example.invalid")
+        done = self.run_sh("--issue", "152", **env)
+        self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("作成者情報", done.stderr)
+        self.assertFalse(os.path.isdir(self.wt(BRANCH)))
+
+    def test_author_and_committer_from_the_environment_go_through(self):
+        self.github_new()
+        env = self.no_identity(
+            GIT_AUTHOR_NAME="a",
+            GIT_AUTHOR_EMAIL="a@example.invalid",
+            GIT_COMMITTER_NAME="c",
+            GIT_COMMITTER_EMAIL="c@example.invalid",
+        )
+        done = self.run_sh("--issue", "152", **env)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertTrue(os.path.isdir(self.wt(BRANCH)))
+
+    def test_a_resumed_start_keeps_its_worktree_without_an_author(self):
+        # 続き（既に初期コミットがある）はコミットしないので、作成者が無くても通り、ワークツリーも残る
+        tip = git(
+            self.ws, "commit-tree", "-p", "main", "-m", "chore: #152 の作業を開始する", "main^{tree}"
+        )
+        git(self.ws, "branch", BRANCH, tip)
+        git(self.ws, "push", "-q", self.bare, f"{BRANCH}:refs/heads/{BRANCH}")
+        self.github_new()
+        done = self.run_sh("--issue", "152", **self.no_identity())
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertTrue(os.path.isdir(self.wt(BRANCH)))
+
     def test_a_candidate_without_an_mr_is_not_a_success(self):
         tip = git(self.ws, "commit-tree", "-p", "main", "-m", "work", "main^{tree}")
         git(self.ws, "branch", "fix-152-other", tip)
