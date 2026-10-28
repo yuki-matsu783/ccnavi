@@ -316,6 +316,34 @@ class ReadyArchivesTest(ReadyHarness):
         self.assertTrue(archived["i0001"]["path"].startswith(base))
         self.assertNotIn("i0001", {t["ticket"] for t in board["tickets"]})
 
+    def drift_after_push(self, *rels):
+        """追跡済みの `rels` を push 済みの状態にしてから書き換え、未コミットの変更にする。"""
+        for rel in rels:
+            write(os.path.join(self.parent_tree, *rel.split("/")), "old\n")
+        self.commit_parent("古いコピー")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        for rel in rels:
+            write(os.path.join(self.parent_tree, *rel.split("/")), "new\n")
+
+    def test_ready_names_the_mirror_drift_and_who_aligns_it(self):
+        fixture = self.closable()
+        self.drift_after_push(".ccnavi/config/common/rules.yml", "skills/process-test/SKILL.md")
+        refused = self.ready(fixture)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("親のワークツリーに未コミットの変更がある", refused.stderr)
+        self.assertIn(".ccnavi/config/common/rules.yml", refused.stderr)
+        self.assertIn("skills/process-test/SKILL.md", refused.stderr)
+        self.assertIn("ccnavi-user-mirror.sh", refused.stderr)
+        self.assertIn("コミットも取り消しもしない", refused.stderr)
+
+    def test_ready_does_not_blame_the_mirror_for_other_uncommitted_changes(self):
+        fixture = self.closable()
+        self.drift_after_push("src/keep.py")
+        refused = self.ready(fixture)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("親のワークツリーに未コミットの変更がある", refused.stderr)
+        self.assertNotIn("ccnavi-user-mirror.sh", refused.stderr)
+
     def test_ready_does_not_move_anything_while_the_parent_is_not_closable(self):
         self.family(plan=["design"])
         fixture = self.remote()
