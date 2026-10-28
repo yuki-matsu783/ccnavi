@@ -256,6 +256,9 @@ deny:
 
 ask:
   - tool: Skill
+    subject: "data-process-wipe"
+    why: 名前の途中の process- には process-skill-call が当たらない（名前が process- で始まるものだけ）
+  - tool: Skill
     subject: "commit"
     why: 工程スキルでない Skill には process-skill-call が当たらない。どのルールにも当たらず、権限モードへ渡る
   - tool: Bash

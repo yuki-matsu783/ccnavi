@@ -156,18 +156,20 @@ allow:
       手順は .ccnavi/docs/skill-review-propose.md。
 
   # 工程スキル（process-*）の入口を Skill で呼ばせる（.ccnavi/docs/skill-processes.md）。
-  # 参照（references/）は入口のスキルが呼ばれて初めて届くので、書き換えの頭で 1 度だけ促す。
+  # 参照（references/）は入口のスキルが呼ばれて初めて届くので、最初の書き換えで 1 度だけ促す。
   # 工程スキルが無い配布先でも困らないよう、促しは「あれば」の文にしてある。
   # 1 つ目は Skill の呼び出し自体を通す。ルールが無いと dontAsk / bypassPermissions で
-  # 「宣言の無い呼び出し」として拒否され、促しに従った Skill が止まる。範囲は process-* に限る
-  # （プラグイン名前置きの test-repo:process-implement にも当たるよう、先頭に * を付ける）。
+  # 「宣言の無い呼び出し」として拒否され、促しに従った Skill が止まる。範囲は名前が process- で
+  # 始まるものに限る（プラグイン名前置きの test-repo:process-implement も含める）。
   - id: process-skill-call
     match: Skill
-    glob: "*process-*"
+    regex: '^(.*:)?process-'
 
   # ワークツリーの中でコード・文書の本体を最初に書き換えるとき。提案・wip/・scratchpad/・.ccnavi/・
   # .claude/（スキルや設定）は除き、先にそちらで消費されないようにする。Once は文脈ごと
   # （サブエージェントの起動ごと）に 1 度。作業を伴わない問いは Write|Edit に当たらないので出ない。
+  # except の * は / を跨ぐので、src/wip/ のようにパスの途中にある同名の階層も除く（促しが出ないだけ）。
+  # sed -i など Bash での書き換えと NotebookEdit には出さない（単純さを優先）。
   - id: process-skill-first-edit
     match: Write|Edit
     glob: "*/.claude/worktrees/*"
@@ -177,9 +179,10 @@ allow:
       - glob: "*/.claude/worktrees/*/.ccnavi/*"
       - glob: "*/.claude/worktrees/*/.claude/*"
     additionalContextOnce: >-
-      書き換えに入る前に、作業に合う工程スキルがあれば Skill ツールで呼んでください
-      （process-design・research・implement・test・debug・review・release）。
-      その中に、このリポジトリで育てた決まりが入っています。
+      書き換えに入る前に、作業に合う工程スキルがあれば Skill ツールで呼んでください。
+      工程スキルは次の 7 つです。
+      process-design・process-research・process-implement・process-test・process-debug・process-review・process-release
+      工程スキルの中に、このリポジトリで育てた決まりが入っています。
       合うものが無ければ呼ばずに進めます。
 
   # git の入口。サブコマンドの選別はラッパースクリプトの中で行うので、ここでは区別しない。
