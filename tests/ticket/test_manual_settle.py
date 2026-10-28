@@ -20,8 +20,8 @@ import unittest
 from datetime import UTC, datetime
 
 from ccnavi.infra import settings
-from ccnavi.tickets import core_review
 from ccnavi.tickets.approval import marks as approval_marks
+from ccnavi.tickets.core import review as core_review
 from ccnavi.tickets.model import review_host, ticket_fields
 from ccnavi.tickets.phase import gates as phase
 from ccnavi.tickets.phase import manual_settle

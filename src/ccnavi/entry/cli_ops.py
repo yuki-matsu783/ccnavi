@@ -16,8 +16,8 @@ from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
-from ..tickets import core
 from ..tickets.approval import write_and_push
+from ..tickets.core import api as core
 from ..tickets.learning import notes as learning
 from ..tickets.lifecycle import commands as ops
 from ..tickets.lifecycle import consolidate, next_id, retire, worktrees

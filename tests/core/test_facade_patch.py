@@ -1,7 +1,7 @@
 """ファサードが束ね直した名前への patch を、テストで止める。
 
 `src/ccnavi/` には、別のモジュールの名前を同じ名前で束ね直す書き方（`X = mod.X`）がある。
-名前を再輸出するだけの薄いファサード（`tickets/core.py`・`entry/diagnose.py`）と、
+名前を再輸出するだけの薄いファサード（`tickets/core/api.py`・`entry/diagnose.py`）と、
 モジュールの一部だけを束ね直すもの（`tickets/phase/gates.py` の `load_types`、`hook/judge.py` の
 `PATH_TOOLS` など）。`mock.patch.object(core, "x")` は `core` の属性を差し替えるだけで、
 実体のモジュールの中の呼び出し（`core_base.x(...)`）には効かない。効いたつもりで通るテストは、
@@ -38,7 +38,7 @@ ALLOWED: set[tuple[str, str, str]] = set()
 
 
 def _dotted(path: Path) -> str:
-    """`src/ccnavi/` の下のモジュールの、ドットでつないだ名前（`tickets.core`）。"""
+    """`src/ccnavi/` の下のモジュールの、ドットでつないだ名前（`tickets.core.api`）。"""
     return ".".join(path.relative_to(PACKAGE).with_suffix("").parts)
 
 
@@ -171,7 +171,7 @@ class FacadePatchTest(unittest.TestCase):
     def test_the_collection_finds_the_known_facades(self):
         """集め方が壊れて何も見つけなくなったら、上の検査は黙って通る。知っている形で確かめる。"""
         facades = _facades()
-        self.assertLessEqual({"approve", "judge_approval", "confirm"}, facades["tickets.core"])
+        self.assertLessEqual({"approve", "judge_approval", "confirm"}, facades["tickets.core.api"])
         self.assertLessEqual({"explain", "test", "board"}, facades["entry.diagnose"])
         self.assertLessEqual(
             {"types_path", "layer_types", "load_types"}, facades["tickets.phase.gates"]
@@ -181,13 +181,13 @@ class FacadePatchTest(unittest.TestCase):
 
     def test_the_scan_finds_each_form(self):
         facades = {
-            "tickets.core": {"a", "c"},
+            "tickets.core.api": {"a", "c"},
             "entry.diagnose": {"b", "d"},
             "tickets.phase.gates": {"g", "h"},
         }
         modules = {
-            "core": ["tickets.core"],
-            "core_base": ["tickets.core_base"],
+            "core": ["tickets.core.api"],
+            "core_base": ["tickets.core.base"],
             "diagnose": ["entry.diagnose"],
             "phase": ["tickets.phase.gates"],
         }
@@ -195,9 +195,9 @@ class FacadePatchTest(unittest.TestCase):
             "from ccnavi.tickets.phase import gates as phase_mod\n"
             "mock.patch.object(core, 'a')\n"
             "mock.patch.object(cli.diagnose, 'b')\n"
-            "mock.patch('ccnavi.tickets.core.c')\n"
+            "mock.patch('ccnavi.tickets.core.api.c')\n"
             "mock.patch('ccnavi.entry.diagnose.d')\n"
-            "mock.patch('ccnavi.tickets.core_base.e')\n"
+            "mock.patch('ccnavi.tickets.core.base.e')\n"
             "mock.patch.object(core_base, 'f')\n"
             "mock.patch.object(phase_mod, 'g')\n"
             "mock.patch('ccnavi.tickets.phase.gates.h')\n"
@@ -208,7 +208,7 @@ class FacadePatchTest(unittest.TestCase):
             [
                 ("core", "a"),
                 ("cli.diagnose", "b"),
-                ("ccnavi.tickets.core", "c"),
+                ("ccnavi.tickets.core.api", "c"),
                 ("ccnavi.entry.diagnose", "d"),
                 ("phase_mod", "g"),
                 ("ccnavi.tickets.phase.gates", "h"),

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from ..infra import fsio as fsio
 from ..infra import settings as settings
-from ..tickets import core as core
+from ..tickets.core import api as core
 from ..tickets.model import review_host, ticket, ticket_ids, ticket_model, via
 from ..tickets.review import request as review
 from . import cli as cli

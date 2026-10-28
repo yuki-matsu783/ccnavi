@@ -600,7 +600,7 @@ class ApproveJsonTest(PhaseHarness):
 
     def test_a_proposal_swapped_after_the_check_is_not_approved(self):
         """照合のあと書く前に提案を差し替えると、差し替えた中身を承認せずに止める。"""
-        from ccnavi.tickets import core_base
+        from ccnavi.tickets.core import base as core_base
 
         self.pending_parent_and_child()
         shown = self.preview()

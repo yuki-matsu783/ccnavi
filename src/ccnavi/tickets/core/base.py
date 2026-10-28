@@ -36,9 +36,9 @@ import os
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from ..infra import fsio, pathcase, settings, tree
-from .proposal import agree, agree_candidates, agree_digest
-from .review import request as review
+from ...infra import fsio, pathcase, settings, tree
+from ..proposal import agree, agree_candidates, agree_digest
+from ..review import request as review
 
 # ---- 入力 -----------------------------------------------------------------------------------
 

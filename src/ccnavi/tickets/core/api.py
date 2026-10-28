@@ -20,7 +20,9 @@
 
 from __future__ import annotations
 
-from . import core_approve, core_base, core_review
+from . import approve as core_approve
+from . import base as core_base
+from . import review as core_review
 
 Actor = core_base.Actor
 Snapshot = core_base.Snapshot

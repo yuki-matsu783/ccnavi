@@ -13,12 +13,12 @@ import json
 import os
 from typing import TextIO
 
-from ..infra import fsio, gitcmd, modes, pathcase, settings, tree
-from . import core_base
-from .approval import store as approval
-from .lifecycle import worktrees
-from .model import ticket_places
-from .proposal import agree, agree_candidates, agree_screen
+from ...infra import fsio, gitcmd, modes, pathcase, settings, tree
+from ..approval import store as approval
+from ..lifecycle import worktrees
+from ..model import ticket_places
+from ..proposal import agree, agree_candidates, agree_screen
+from . import base as core_base
 
 _GIT_TIMEOUT = 20.0
 _SHOWN_PATHS = 8

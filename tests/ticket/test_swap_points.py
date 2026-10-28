@@ -37,9 +37,10 @@ from unittest import mock
 from ccnavi.entry import lint, version
 from ccnavi.infra import fsio, pathcase, settings
 from ccnavi.infra import tree as tree_mod
-from ccnavi.tickets import core, core_base
 from ccnavi.tickets.approval import ops as approval_ops
 from ccnavi.tickets.approval import store as approval
+from ccnavi.tickets.core import api as core
+from ccnavi.tickets.core import base as core_base
 from ccnavi.tickets.model import ticket_model, via
 from tests import requires_symlink
 from tests.ticket.test_phases import PhaseHarness
@@ -1333,7 +1334,7 @@ class RecordWritesTest(CoreHarness):
             "tickets.lifecycle.commands",
             "tickets.flow.graph",
             "tickets.config.risk",
-            "tickets.core",
+            "tickets.core.api",
             "tickets.review.request",
         )
         names += ("tickets.phase.gates", "tickets.model.ticket", "infra.gitstate")
@@ -1358,9 +1359,9 @@ class RecordWritesTest(CoreHarness):
         names += ("tickets.flow.text", "tickets.flow.shape", "tickets.flow.render")
         names += ("tickets.approval.ops", "tickets.lifecycle.close", "tickets.lifecycle.stop")
         names += (
-            "tickets.core_base",
-            "tickets.core_approve",
-            "tickets.core_review",
+            "tickets.core.base",
+            "tickets.core.approve",
+            "tickets.core.review",
         )
         for dotted in names:
             name = dotted.rpartition(".")[2]
