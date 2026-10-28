@@ -15,7 +15,7 @@
 `tests/` を `ast` で走査し、次の形を見つける。許可リスト（`ALLOWED`）にない patch は失敗にする。
 
 - `mock.patch.object(<モジュール>, "名前")`（`cli.core` のような属性参照も含む）。
-  モジュールは、そのテストの import（`from ccnavi.tickets import ticket as ticket_mod`）か、
+  モジュールは、そのテストの import（`from ccnavi.tickets.model import ticket as ticket_mod`）か、
   `src/ccnavi/` の中で 1 つに決まるモジュール名で引く
 - `mock.patch("ccnavi.<サブパッケージ>.<モジュール>.名前")`
 

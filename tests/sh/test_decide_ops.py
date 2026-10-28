@@ -60,7 +60,7 @@ esac
 BEGIN = """import json
 import sys
 
-from ccnavi.tickets import oplog
+from ccnavi.tickets.model import oplog
 
 state, plan, mr_url = sys.argv[1:4]
 op = oplog.begin(
