@@ -189,6 +189,16 @@ ccnavi 本体に作用しうるシナリオ（`setup` が使い捨てのリポ�
 「ユーザのチェックアウトに未コミットの変更がある」「同名のブランチがある」といった git の状態は、`setup` の `git`・`files` の追記・`reset` で作り、回したあとに戻す。
 この 3 つと `setup.host`（次々節）が触れるのは、使い捨てのリポジトリ（`projects/test-repo`）だけ。
 
+### プロジェクトを使うシナリオの前提
+
+プロジェクトを使うシナリオ（PMAC 系）は、プロジェクトのチェックアウト（`projects/test-repo`）のミラー（`.ccnavi/config/common/`）と `skills/` を、ワークスペースの共通に揃えてコミットしてある前提で回す。ずれていると、親のワークツリーへのコピーが未コミットの差分になり、`ready`・`request`・`finish` が止まって、評価したい振る舞いに届かない。
+
+揃え方（ユーザの手元作業。エージェントには頼まない）:
+
+1. `sh .ccnavi/scripts/ccnavi-user-mirror.sh test-repo` で差分と `--expect` の値を見る
+2. `sh .ccnavi/scripts/ccnavi-user-mirror.sh test-repo --yes --expect <値>` で揃える（ワークツリーに書くだけ）
+3. `projects/test-repo` の統合先に、揃えた分をコミットする
+
 ### 対象の判定
 
 `setup.git`・`setup.reset`・`setup.files` の追記・`setup.host` の `bare` / `fake-gitlab` / `docker-gitlab` は、すべて `require_disposable_repo(root, target, allowed)` を通る。`test_repo: true` の自己申告は判定に使わない。

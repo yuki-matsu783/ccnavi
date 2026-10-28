@@ -1,19 +1,26 @@
-"""共通レイヤーのミラーが、ワークスペースの共通レイヤーとずれていないかを調べ、ずれを同期する。
+"""共通レイヤーのミラーと工程スキルの `skills/` が、ワークスペースの共通とずれていないかを
+調べ、ずれを同期する。
 
 `ccnavi user mirror` の中身。着手済みの親のワークツリーのミラーは、ユーザの発言のたびに揃う
 （`promptsync`）。ユーザのチェックアウトは対象外で、間が空くと、
 プロジェクトを単体で clone した人が共通レイヤーとして読むミラーが古いまま残る。
 ここでは、プロジェクトのユーザのチェックアウト（`projects/<名前>/`）の
-ミラーを、ユーザが見たいときに調べ、押したときに揃える。
+ミラーと、工程スキルのコピー（`skills/`）を、ユーザが見たいときに調べ、押したときに揃える。
 
 - 調べる（`prepare`）: 何も書かない。プロジェクトごとに、ワークスペースの共通レイヤーとの差分を
-  `configsync.plan` で求める。差分が無ければ `synced`、あれば `differs`、調べられなければ `error`
+  `configsync.plan` で、工程スキルとの差分を `skillsync.plan` で求め、1 つの `changes` に
+  合わせて持つ
+  （`rel` の頭が `.ccnavi/…` と `skills/…` で分かれる）。
+  差分が無ければ `synced`、あれば `differs`、調べられなければ `error`
 - 揃える（`apply`）: 見せた差分と同じ内容のときだけ書く。`expect`（差分の内容から決めた値）が
   今の差分と一致しなければ、何も書かない。書くのはワークツリーだけで、コミットはしない
-- ワークスペースの共通レイヤーが無い、または空なら、コピーするものが無い（`common_empty`）。
-  ミラーは消さない（共通を消し忘れたときに、ミラーを全部失わないため）
+- ワークスペースの共通レイヤーも工程スキルも無い、または空なら、コピーするものが無い
+  （`common_empty`）。ミラーは消さない（共通を消し忘れたときに、ミラーを全部失わないため）
+- 書く順は `skills/` が先、ミラーが後。`skills/` が失敗したらそのプロジェクトのミラーは書かない。
+  どちらかが失敗したプロジェクトは `synced` に入れず、失敗に載せる。書けた分は残り、
+  次の `prepare` が残りの差分だけを出すので、整合は壊れない
 
-書き込みの中身は `configsync`。cli を読まない。
+書き込みの中身は `configsync` と `skillsync`。cli を読まない。
 """
 
 from __future__ import annotations
@@ -23,7 +30,7 @@ import os
 from dataclasses import dataclass, field
 
 from ..infra import settings, tree
-from . import configsync
+from . import configsync, skillsync
 
 JSON_VERSION = 1
 
@@ -37,6 +44,11 @@ ACTION_DELETE = "delete"
 
 # 見せた内容と、書く直前の内容がずれたときの文面。拡張は、この語で読み直しを判断する。
 STALE = "内容が更新されました。最新の差分を読み直してから、もう一度実行してください"
+
+
+def is_skill(change: configsync.Change) -> bool:
+    """工程スキルのコピー（`skills/…`）の変更か。それ以外はミラー（`.ccnavi/…`）。"""
+    return change.rel.startswith(skillsync.SKILLS_DIR + "/")
 
 
 def action_of(change: configsync.Change) -> str:
@@ -113,10 +125,12 @@ def prepare(conf: settings.Settings, root: str, wanted: list[str] | None = None)
     """ミラーの状態を調べる。何も書かない。
 
     処理フロー:
-    1. 共通レイヤーが読めるかを `configsync.sources` で確かめる。読めなければ全体の誤り
-    2. コピーするものが無ければ `common_empty` として、全プロジェクトを `synced` にする
-    3. プロジェクトごとに `configsync.plan` で差分を求める。求められなければ、そのプロジェクトだけ
-       `error` にする
+    1. 共通レイヤーを `configsync.sources` で、工程スキルを `skillsync.sources` で読めるかを
+       確かめる。どちらかが読めなければ全体の誤り（どのプロジェクトでも同じ理由のため）
+    2. 両方ともコピーするものが無ければ `common_empty`。差分は求めても空になり、全プロジェクトが
+       `synced` になる
+    3. プロジェクトごとに `configsync.plan` と `skillsync.plan` で差分を求める。求められなければ、
+       そのプロジェクトだけ `error` にする
     4. 名前を渡されたときは、渡されたプロジェクトだけを選ぶ。無い名前があれば全体の誤り
     """
     plan = Plan(common_path=configsync.common_dir(conf, root))
@@ -133,7 +147,11 @@ def prepare(conf: settings.Settings, root: str, wanted: list[str] | None = None)
     if why:
         plan.error = why
         return plan
-    plan.common_empty = not wanted_files
+    skill_files, why = skillsync.sources(root)
+    if why:
+        plan.error = why
+        return plan
+    plan.common_empty = not wanted_files and not skill_files
     for entry in found:
         project = Project(
             entry.name,
@@ -142,9 +160,10 @@ def prepare(conf: settings.Settings, root: str, wanted: list[str] | None = None)
             mirror_path=configsync.mirror_dir(conf, entry.root),
         )
         plan.projects.append(project)
-        if plan.common_empty:
-            continue
         changes, problem = configsync.plan(conf, root, entry.root)
+        if not problem:
+            skill_changes, problem = skillsync.plan(root, entry.root)
+            changes = changes + skill_changes
         if problem:
             project.state = STATE_ERROR
             project.error = problem
@@ -168,8 +187,9 @@ def apply(conf: settings.Settings, plan: Plan, expect: str) -> Applied:
     1. 全体の誤りがあれば、何も書かずに返す
     2. 対象が無ければ、何も書かずに返す（空の `expect` を通すと、見せていない内容を書くため）
     3. `expect` が今の差分の値と違えば、`STALE` で何も書かずに返す
-    4. プロジェクトごとに `configsync.apply` で書く。1 つが失敗しても、ほかのプロジェクトは書く。
-       書けなかった理由は、プロジェクトの名前を添えてまとめて返す
+    4. プロジェクトごとに、`skills/` の分を `skillsync.apply`、ミラーの分を `configsync.apply` で
+       書く（この順。`skills/` が失敗したらミラーは書かない）。1 つが失敗しても、ほかの
+       プロジェクトは書く。書けなかった理由は、プロジェクトの名前を添えてまとめて返す
     """
     if plan.error:
         return Applied(False, plan.error)
@@ -181,7 +201,11 @@ def apply(conf: settings.Settings, plan: Plan, expect: str) -> Applied:
     done = Applied()
     failures: list[str] = []
     for project in chosen:
-        failed = configsync.apply(project.changes, configsync.mirror_dir(conf, project.root))
+        skills = [c for c in project.changes if is_skill(c)]
+        mirror = [c for c in project.changes if not is_skill(c)]
+        failed = skillsync.apply(skills) if skills else ""
+        if not failed and mirror:
+            failed = configsync.apply(mirror, configsync.mirror_dir(conf, project.root))
         if failed:
             failures.append(f"{project.name}: {failed}")
             continue
