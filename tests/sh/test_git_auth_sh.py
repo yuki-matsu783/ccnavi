@@ -104,6 +104,43 @@ class GitAuthShTest(unittest.TestCase):
         got = self.run_auth("https://github.com/o/r.git", path="bin:/usr/bin:/bin")
         self.assertEqual(got["keys"], [])
 
+    def repo_tool(self, name: str, reldir: str = "bin") -> None:
+        d = os.path.join(self.repo, reldir) if reldir else self.repo
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, name), "w", encoding="utf-8", newline="\n") as f:
+            f.write("#!/bin/sh\nexit 0\n")
+        os.chmod(os.path.join(d, name), 0o755)
+
+    def test_relative_entry_is_skipped_and_absolute_one_is_used(self):
+        self.repo_tool("gh")
+        gh = self.tool("gh")
+        got = self.run_auth("https://github.com/o/r.git", path=f"bin:{self.bin}:/usr/bin:/bin")
+        self.assertEqual(got["values"], [f'!"{gh}" auth git-credential'])
+
+    def test_empty_path_entry_does_not_pick_cwd(self):
+        self.repo_tool("gh", "")
+        got = self.run_auth("https://github.com/o/r.git", path="::/usr/bin:/bin:")
+        self.assertEqual(got["keys"], [])
+
+    def test_host_connect_runs_absolute_glab_not_relative(self):
+        self.repo_tool("glab")
+        marker = os.path.join(self.tmp.name, "rel-ran")
+        with open(os.path.join(self.repo, "bin", "glab"), "w", encoding="utf-8") as f:
+            f.write(f"#!/bin/sh\n: > '{marker}'\nexit 0\n")
+        self.tool("glab")
+        probe = (
+            '. "$1"\ncd "$2"\n'
+            "ccnavi_h_kind=gitlab ccnavi_h_host=h ccnavi_h_path=g/p ccnavi_h_max_time=5\n"
+            "ccnavi_host_connect\nprintf 'rc=%s cli=%s\\n' \"$?\" \"$ccnavi_h_cli\"\n"
+        )
+        env = dict(os.environ, PATH=f"bin:{self.bin}:/usr/bin:/bin")
+        done = subprocess.run(
+            [SHELL, "-c", probe, "probe", HOST_SH, self.repo],
+            capture_output=True, text=True, encoding="utf-8", env=env, check=False,
+        )
+        self.assertIn(f"cli={self.bin}/glab", done.stdout, done.stdout + done.stderr)
+        self.assertFalse(os.path.exists(marker))
+
     def test_tool_path_with_dollar_is_refused(self):
         bad = os.path.join(self.tmp.name, "d$(touch pwned)")
         os.makedirs(bad)
