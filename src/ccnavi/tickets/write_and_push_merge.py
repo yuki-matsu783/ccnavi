@@ -36,6 +36,7 @@ from ..policy import rules
 from . import (
     approval,
     approval_checks,
+    mirror_gap,
     ops_close,
     phase_scope,
     ticket_model,
@@ -101,7 +102,7 @@ def plan(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> int:
         return 0
     parent_tree = tree.worktree_path(root, parent_id)
     child_tree = tree.worktree_path(root, ident)
-    problem = _tree_problem(conf, parent_tree, child_tree, ident)
+    problem = _tree_problem(conf, parent_tree, child_tree, ident, bool(found.project))
     if problem:
         _stop(stdout, *problem)
         return 0
@@ -206,9 +207,15 @@ def _stop(stdout: TextIO, why: str, hints: list[str]) -> None:
 
 
 def _tree_problem(
-    conf: settings.Settings, parent_tree: str, child_tree: str, ident: str
+    conf: settings.Settings, parent_tree: str, child_tree: str, ident: str, project: bool = False
 ) -> tuple[str, list[str]] | None:
-    """親と子のワークツリーが合流できる形か。できなければ（止める理由, 案内）。"""
+    """親と子のワークツリーが合流できる形か。できなければ（止める理由, 案内）。
+
+    `project` はプロジェクトの子のとき。親のワークツリーがプロジェクトのツリーなので、
+    共通のコピー（`.ccnavi/config/common/`・`skills/`）のずれは作業の変更ではなく、ユーザに
+    揃えてもらう（`ready` と同じ案内）。ワークスペース自身の親では、`.ccnavi/config/common/` は
+    共通レイヤー本体なので、従来の案内のまま。
+    """
     ok, out = _git(
         parent_tree, ["status", "--porcelain", "-z", "--untracked-files=no", "--no-renames"]
     )
@@ -221,15 +228,29 @@ def _tree_problem(
         and not ticket_places.is_ticket_place(entry[3:], conf.tickets, conf.approved)
     ]
     if dirty:
+        mirrored, others = mirror_gap.split(conf, dirty) if project else ([], dirty)
+        restore = (
+            "親のワークツリー（メインの作業場）には、状態の置き場以外の変更を残さない。"
+            "子のワークツリーへ移してコミットするか、親のワークツリーで "
+            "ccnavi-git.sh restore --staged --worktree -- <パス>（1 つずつ名指し）を打って"
+            "変更を取り除いてから、finish をやり直す"
+        )
+        if not mirrored:
+            return (
+                f"親のワークツリーに未コミットの変更がある（{_shown(dirty)}）。"
+                "サブエージェントの作業がコミットされていません。何も変えずに止めた",
+                [restore],
+            )
+        gap = f"{mirror_gap.label(mirrored)}。{mirror_gap.NOT_WORK}"
+        if not others:
+            return f"親のワークツリーに未コミットの変更がある（{gap}）。何も変えずに止めた", [
+                mirror_gap.ASK
+            ]
         return (
-            f"親のワークツリーに未コミットの変更がある（{_shown(dirty)}）。"
+            f"親のワークツリーに未コミットの変更がある（{gap}）。"
+            f"ずれ以外の変更が {len(others)} 件ある（{_shown(others)}）。"
             "サブエージェントの作業がコミットされていません。何も変えずに止めた",
-            [
-                "親のワークツリー（メインの作業場）には、状態の置き場以外の変更を残さない。"
-                "子のワークツリーへ移してコミットするか、親のワークツリーで "
-                "ccnavi-git.sh restore --staged --worktree -- <パス>（1 つずつ名指し）を打って"
-                "変更を取り除いてから、finish をやり直す"
-            ],
+            [restore + "（ミラーのずれは対象外）", mirror_gap.ASK],
         )
     if not os.path.isdir(child_tree):
         return (

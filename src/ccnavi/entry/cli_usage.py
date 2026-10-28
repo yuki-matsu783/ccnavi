@@ -164,7 +164,7 @@ ccnavi-user-handoff.sh で行います（見るだけの形も含めてユーザ
         （取り込みます。ボードは実行ファイルを --entry board --via board で呼びます）
 
 共通レイヤー（ワークスペースの .ccnavi/config/common/）のミラー（各プロジェクトの
-.ccnavi/config/common/）がずれていないかの確認と、ずれの同期は、ユーザが
+.ccnavi/config/common/）と工程スキル（各プロジェクトの skills/）がずれていないかの確認と、ずれの同期は、ユーザが
 ccnavi-user-mirror.sh で行います（見るだけの形も含めてユーザ専用です。実行ファイルは内部で
 --mirror に読み替えます。sh が付ける入口の印（--entry sh）がない user mirror は断ります）。同期は各プロジェクトのワークツリーに書くだけで、コミットはしません。
 

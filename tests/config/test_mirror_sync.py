@@ -14,7 +14,8 @@ fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ�
 3. 揃える: 見せた差分の照合の値（expect）が今の差分と一致するときだけ書く。書くのはミラーだけで、
    プロジェクトの config には触れない。一致しなければ何も書かない
 4. 調べられないプロジェクト（ミラーがリンク）は error にして、まとめて揃える対象から外す
-5. 入口: JSON の形、組み合わせの誤り、ターミナルなしの `--yes` の拒否
+5. 工程スキルのコピー（`skills/`）も同じ入口で調べて揃える。書く順と、片方の失敗
+6. 入口: JSON の形、組み合わせの誤り、ターミナルなしの `--yes` の拒否
 """
 
 from __future__ import annotations
@@ -220,7 +221,120 @@ class MirrorSyncTest(ConfigUnionHarness):
         self.assertTrue(done.ok, done.error)
         self.assertEqual(os.listdir(outside), [])
 
-    # ---- 5. 入口
+    # ---- 工程スキル（skills/）
+
+    def skill(self, name="process-test", body="# 本文\n", refs=None):
+        """ワークスペースの共通の工程スキル `.claude/skills/<名前>/` を作る。"""
+        top = os.path.join(self.ws, ".claude", "skills", name)
+        write(os.path.join(top, "SKILL.md"), f"---\nname: {name}\nprocess: true\n---\n{body}")
+        for rel, text in (refs or {}).items():
+            write(os.path.join(top, "references", "common", rel), text)
+
+    def skill_changes(self, name):
+        return sorted(
+            (c.rel, mirrorsync.action_of(c))
+            for c in self.by_name(self.plan())[name].changes
+            if mirrorsync.is_skill(c)
+        )
+
+    def test_a_missing_skills_copy_is_a_create_and_the_expect_covers_its_content(self):
+        self.skill(refs={"a.md": "A\n"})
+        self.sync_all()
+        self.skill(body="# 変えた\n", refs={"a.md": "A\n"})
+        before = self.by_name(self.plan())["lib"].expect
+        self.skill(body="# さらに変えた\n", refs={"a.md": "A\n"})
+        self.assertEqual(
+            self.skill_changes("lib"), [("skills/process-test/SKILL.md", mirrorsync.ACTION_UPDATE)]
+        )
+        self.assertNotEqual(self.by_name(self.plan())["lib"].expect, before)
+
+    def test_without_process_skills_the_expect_is_the_mirror_only_value(self):
+        plan = self.plan()
+        for project in plan.projects:
+            self.assertFalse([c for c in project.changes if mirrorsync.is_skill(c)])
+        self.skill()
+        self.assertNotEqual(self.plan().expect, plan.expect)
+
+    def test_apply_writes_the_skills_and_the_mirror_and_then_nothing_differs(self):
+        self.skill(refs={"a.md": "A\n"})
+        self.assertEqual(
+            self.skill_changes("lib"),
+            [
+                ("skills/process-test/SKILL.md", mirrorsync.ACTION_CREATE),
+                ("skills/process-test/references/common/a.md", mirrorsync.ACTION_CREATE),
+            ],
+        )
+        self.sync_all()
+        self.assertEqual(
+            read(os.path.join(self.lib, "skills", "process-test", "references", "common", "a.md")),
+            "A\n",
+        )
+        self.assertTrue(os.path.exists(mirror_of(self.lib, "rules.yml")))
+        for project in self.plan().projects:
+            self.assertEqual(project.state, mirrorsync.STATE_SYNCED, project.name)
+
+    def test_a_file_removed_from_the_common_side_is_deleted_and_the_empty_dir_is_pruned(self):
+        self.skill(refs={"sub/a.md": "A\n"})
+        self.sync_all()
+        os.remove(
+            os.path.join(
+                self.ws, ".claude", "skills", "process-test", "references", "common", "sub", "a.md"
+            )
+        )
+        self.assertEqual(
+            self.skill_changes("lib"),
+            [("skills/process-test/references/common/sub/a.md", mirrorsync.ACTION_DELETE)],
+        )
+        self.sync_all()
+        common = os.path.join(self.lib, "skills", "process-test", "references", "common")
+        self.assertFalse(os.path.exists(os.path.join(common, "sub")))
+        self.assertTrue(
+            os.path.exists(os.path.join(self.lib, "skills", "process-test", "SKILL.md"))
+        )
+
+    def test_skills_only_differences_are_not_common_empty(self):
+        self.sync_all()
+        for path in (self.rules, self.phases, self.risk):
+            if os.path.exists(path):
+                os.remove(path)
+        self.skill()
+        plan = self.plan()
+        self.assertFalse(plan.common_empty)
+        self.assertEqual(self.by_name(plan)["lib"].state, mirrorsync.STATE_DIFFERS)
+        done = mirrorsync.apply(self.conf(), plan, plan.expect)
+        self.assertTrue(done.ok, done.error)
+        self.assertTrue(
+            os.path.exists(os.path.join(self.lib, "skills", "process-test", "SKILL.md"))
+        )
+        self.assertTrue(os.path.exists(mirror_of(self.lib, "rules.yml")))
+
+    def test_a_linked_skills_dir_is_an_error_for_that_project(self):
+        self.skill()
+        outside = os.path.join(os.path.dirname(self.ws), "elsewhere-skills")
+        os.makedirs(outside)
+        os.symlink(outside, os.path.join(self.app, "skills"))
+        found = self.by_name(self.plan())
+        self.assertEqual(found["app"].state, mirrorsync.STATE_ERROR)
+        self.assertEqual(found["lib"].state, mirrorsync.STATE_DIFFERS)
+        self.assertEqual(os.listdir(outside), [])
+
+    def test_a_skills_failure_leaves_the_mirror_unwritten_and_is_reported(self):
+        self.skill()
+        plan = self.plan()
+        original = mirrorsync.skillsync.apply
+        mirrorsync.skillsync.apply = lambda changes: "書けない"
+        try:
+            done = mirrorsync.apply(self.conf(), plan, plan.expect)
+        finally:
+            mirrorsync.skillsync.apply = original
+        self.assertFalse(done.ok)
+        self.assertIn("書けない", done.error)
+        self.assertEqual(done.synced, [])
+        self.assertFalse(os.path.exists(mirror_of(self.lib, "rules.yml")))
+        # 次に調べると、残りの差分がそのまま出る
+        self.assertEqual(self.by_name(self.plan())["lib"].state, mirrorsync.STATE_DIFFERS)
+
+    # ---- 6. 入口
 
     def user_mirror(self, *args):
         return self.ccnavi("user", "mirror", *args)

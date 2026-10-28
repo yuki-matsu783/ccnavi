@@ -326,7 +326,7 @@ ccnavi --entry board user mirror [<プロジェクト名>…] --yes --expect <�
 ```
 
 ワークスペースの共通レイヤーと、各プロジェクトのユーザのチェックアウトにあるミラー
-（`.ccnavi/config/common/`）のずれを調べる（見るだけ）形と、ずれを揃える形。揃える形はワークツリーに書き、
+（`.ccnavi/config/common/`）と、共通の工程スキルとプロジェクトの `skills/` のずれを調べる（見るだけ）形と、ずれを揃える形。揃える形はワークツリーに書き、
 コミットはしない。読み手は VS Code 拡張のプロジェクト管理画面。
 
 ```json
@@ -344,13 +344,13 @@ ccnavi --entry board user mirror [<プロジェクト名>…] --yes --expect <�
 | キー | 何 |
 |---|---|
 | `ok` / `error` | 全体の成否と理由。偽のとき（共通レイヤーが読めない、渡した名前がプロジェクトに無い）は `projects` が空 |
-| `common_empty` | 共通レイヤーにコピーするものが無い。揃えても何も起きず、ミラーは消さない |
+| `common_empty` | 共通レイヤーにも工程スキルにもコピーするものが無い。揃えても何も起きず、ミラーは消さない |
 | `projects[].state` | `synced`（ずれなし）、`differs`（ずれあり）、`error`（調べられない。理由は `error`） |
 | `projects[].changes` | ずれの中身。`rel` はプロジェクトのルートからの相対、`action` は `create`・`update`・`delete` |
 | `projects[].expect` | そのプロジェクトだけを揃えるときの `--expect` の値。ずれが無ければ空 |
 | `expect` | 差分のある全プロジェクトを揃えるときの `--expect` の値。差分が無ければ空 |
 
-全体の `expect` に入るのは、`differs` のプロジェクトだけ（`error` と `synced` は入らない）。`common_empty` が真のときは、`projects` は全部 `synced` で、`expect` は空。`changes[].action` は `create`・`update`・`delete` の 3 つだけ。
+全体の `expect` に入るのは、`differs` のプロジェクトだけ（`error` と `synced` は入らない）。`common_empty` が真のときは、`projects` は全部 `synced` で、`expect` は空。`changes[].rel` は `.ccnavi/config/common/…` か `skills/…`。`changes[].action` は `create`・`update`・`delete` の 3 つだけ。
 名前は大文字小文字を区別せずに引き、結果には実際のディレクトリの綴りで返す。
 終了コードは、見るだけは 0（`projects` に `error` があっても 0）、全体の誤り（`ok` が偽）は 1。揃える形は、全部書けたとき 0、書けなかったもの・照合の不一致・対象が無いとき 1。どちらも、終了コードより先に標準出力の JSON を読む。
 

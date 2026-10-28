@@ -270,6 +270,6 @@ messages:
       ユーザ専用の操作は 'ccnavi user <操作>'（agree・reviewed・close-early・prune・handoff・mirror）にまとめてあり、エージェントは実行しません。
     note: |-
       放棄した親の片付けの記録を消す 'ccnavi worktree retire --abandon <親>' と、ユーザの判断の入口（'{script:ccnavi-user-close-early.sh}'）もユーザが実行します。
-      保護対象の下書き（wip/handoff/）の取り込み（'ccnavi-user-handoff.sh'。見るだけの形も含む）と、共通レイヤーのミラーの同期（'ccnavi-user-mirror.sh'。見るだけの形も含む）も、ユーザが実行します。
+      保護対象の下書き（wip/handoff/）の取り込み（'ccnavi-user-handoff.sh'。見るだけの形も含む）と、共通レイヤーのミラーと工程スキルの同期（'ccnavi-user-mirror.sh'。見るだけの形も含む）も、ユーザが実行します。
       親を閉じたときの片付け（'ccnavi sync tidy'・'ccnavi worktree retire'・'ccnavi worktree branch'・'{script:ccnavi-user-clean-branch.sh}'）は、ccnavi-review.sh ready と ccnavi-sync.sh が中で呼びます。残ったブランチを消すのは、ユーザが先頭に ! を付けて打つコマンドです（案内されたコマンドをユーザに見せて、打ってもらってください）。
       下書きの状態を見るだけなら '{script:ccnavi-stage.sh} --commands <パス>' を使います。承認先行の一覧を見るだけなら 'ccnavi --agree --preview' は通ります。

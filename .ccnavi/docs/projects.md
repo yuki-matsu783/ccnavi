@@ -34,7 +34,7 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 | ユーザに渡す物（保護対象を直したコピーなど） | ワークスペースのワークツリーの`wip/handoff/`（追跡する。直接作業では`integrate`が取り込み結果から外す） |
 | 使い捨てのファイル・コミットしたくないもの | ワークスペースルート直下の`scratchpad/`（`.gitignore`で追跡から外す。`.ccnavi/docs/scratchpad.md`）。セッションのスクラッチパッドには置かない。プロジェクトの`projects/<名前>/`には`wip/`の規約が無いので、プロジェクトの作業中の置き物もワークスペース側に置く |
 | ワークスペースのルール | 共通レイヤーの`.ccnavi/config/common/rules.yml`。リスクの配点とフェーズ定義（`phases.yml`）も同じ場所。レイアウトに依存するフェーズ定義は自身のレイヤーの`.ccnavi/config/project/phases.yml` |
-| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/project/`（`rules.yml`・`phases.yml`・`risks.yml`）。ここはプロジェクト専用で、着手では上書きされない。親チケットに着手したあと、ユーザの発言のたびに、共通レイヤーは親のワークツリーのプロジェクトの`.ccnavi/config/common/`にミラーされる（設計11.12。ずれは`ccnavi-user-mirror.sh`で見て、揃えるのはユーザ）。フェーズ定義は共通レイヤーと`config/project/`の和 |
+| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/project/`（`rules.yml`・`phases.yml`・`risks.yml`）。ここはプロジェクト専用で、着手では上書きされない。親チケットに着手したあと、ユーザの発言のたびに、共通レイヤーは親のワークツリーのプロジェクトの`.ccnavi/config/common/`にミラーされる（設計11.12。ずれは`ccnavi-user-mirror.sh`で見て、揃えるのはユーザ。`skills/`の工程スキルも同じ入口で揃う）。フェーズ定義は共通レイヤーと`config/project/`の和 |
 
 プロジェクトのgitリポジトリに入るのは、提案、承認済みチケットとマーカー、プロジェクトの設定の3つ。
 承認とフェーズの進み具合は親チケットのブランチに含まれて他の機械へ届くので、cloneすれば続きから作業できる（設計9.2、REQ-MLT-14）。

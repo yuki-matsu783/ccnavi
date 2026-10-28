@@ -221,7 +221,7 @@ def _decision(
         stderr.write("ccnavi: 依頼の記録がありません。先に request してください\n")
         return None
     tree_root = tree.worktree_path(root, parent.ticket)
-    moved = review._moved_detail(tree_root, conf, requested_mark)
+    moved = review._moved_detail(tree_root, conf, requested_mark, bool(parent.project))
     if moved.text:
         stderr.write(f"ccnavi: {moved.text}。{review._redo_request(root, phase_no)}\n")
         for line in review.moved_explanation(moved):
