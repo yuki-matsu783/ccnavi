@@ -1,0 +1,530 @@
+# ルールが何を止めて何を通すかの期待する判定。`/ccnavi-config` スキルがこれを回す。
+#
+# ルールを 1 件足したり直したりしたら、ここにも 1 行足す。足さないと、
+# あとから読んだユーザに「そのルールが何のために在るのか」を伝える手立てが
+# ルールの文面しか無くなる。文面は止められた側に向けた言葉で、
+# 何にヒットするかは書いていない。
+#
+# タイプの名前が期待する判定になる。deny なら止まるはず、allow なら通るはず、
+# ask ならユーザに確認が出るはず。実際の判定と食い違ったものをスキルが報告する。
+# どのルールも言及しない呼び出し（UNDECLARED）は権限モードへ渡り、ターミナルからの
+# 試験では ask として出る。deny にヒットしてほしくないが allow にも無いものは、
+# ask に置いて「ヒットしないこと」を期待にする。
+#
+# subject は Bash / PowerShell ならコマンド、Read / Grep / Glob / Edit / Write /
+# NotebookEdit ならパス、Skill ならスキル名、Agent なら見出し、WebFetch なら URL。
+# パスは絶対で書く。
+# 判定は行き着く先まで解いてから適用するので、相対で書くと走らせた場所で
+# 答えが変わる。
+
+deny:
+  - tool: Write
+    subject: "/tmp/claude-0/-repo/0a1b2c/scratchpad/a.md"
+    why: セッションのスクラッチパッドは置き場にしない。使い捨ては scratchpad/、ユーザに渡す物は wip/handoff/ に置く（session-scratchpad）
+  - tool: Edit
+    subject: "/tmp/claude-0/-repo/0a1b2c/scratchpad/sub/b.md"
+    why: 下の階層も同じ。スクラッチパッドの中ならどこでも止める（session-scratchpad）
+  - tool: NotebookEdit
+    subject: "/tmp/claude-0/-repo/0a1b2c/scratchpad/c.ipynb"
+    why: ノートブックの編集も同じ（session-scratchpad）
+  - tool: Write
+    subject: "/repo/README.md"
+    why: ユーザのチェックアウトでは編集しない。作業はワークツリーの中で
+  - tool: Edit
+    subject: "/repo/src/ccnavi/cli.py"
+    why: 同上。ソースもユーザのチェックアウトでは触らない
+  - tool: Write
+    subject: "/repo/.gitignore"
+    why: 隠しファイルも同じ
+  - tool: Write
+    subject: "/repo/.claude/skills/commit/SKILL.md"
+    why: .claude/ の下も worktrees/ 以外はユーザのチェックアウトでは触らない
+  - tool: Write
+    subject: "/repo/projects/lib/skills/deploy/SKILL.md"
+    why: プロジェクトのスキル（skills/ に置く）も元ツリーでは触らない。プロジェクトから切ったワークツリーで直す
+  - tool: Write
+    subject: "/repo/wip/handoffx/a.md"
+    why: workspace-root の except が除くのは wip/handoff/ だけ。名前の続く別のディレクトリは除かない
+  - tool: Write
+    subject: "/repo/docs/wip/handoff/.ccnavi/scripts/x.sh"
+    why: >-
+      コピーの例外が効くのは、ツリーの直下の wip/handoff/ だけ。docs/ の下の同名の綴りは、
+      守る場所そのものの綴りではないので除かない（builtin:guard-scripts と builtin:guard-project-home）
+  - tool: Edit
+    subject: "/repo/wip/handoffx/.claude/hooks/x.sh"
+    why: コピーの例外は wip/handoff/ だけ。名前の続く別のディレクトリは除かない（builtin:guard-hooks）
+  - tool: Write
+    subject: "/repo/wip/../.ccnavi/scripts/x.sh"
+    why: >-
+      wip/handoff/ から .. で抜けた先は、守る場所そのもの。解いたあとのパスで適用するので除かない
+      （builtin:guard-scripts）
+  - tool: Write
+    subject: "/repo/wip/a.md"
+    why: wip/ の直下は除かない。ユーザに渡す物は wip/handoff/ に置く
+  - tool: Write
+    subject: "/repo/scratchpadx/a.md"
+    why: workspace-root の except が除くのは scratchpad/ だけ。名前の続く別のディレクトリは除かない
+  - tool: Write
+    subject: "/repo/wip/scratchpad/a.md"
+    why: 使い捨ての置き場はワークスペースルート直下の scratchpad/ だけ。wip/ の下の同名は除かない
+  - tool: Write
+    subject: "/repo/.claude/worktreesx/a.md"
+    why: .claude/worktrees/ と名前の続く別のディレクトリも除かない
+  - tool: Write
+    subject: "/repo/.clang-format"
+    why: .c で始まる隠しファイルも、.claude/worktrees/ の外なので止まる
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/.claude/settings.json"
+    why: ワークツリーの中でも hook の登録は触らない（builtin:guard-settings）。統合すると取り込み先の登録になる
+  - tool: Edit
+    subject: "/repo/.claude/worktrees/x/.claude/settings.local.json"
+    why: 個人の上書きも同じ。permissions を足せる
+  - tool: Bash
+    subject: "git push origin main"
+    why: エージェントからは push しない
+  - tool: Bash
+    subject: "cd /repo && git push"
+    why: コマンド列の途中でもヒットする
+  - tool: Bash
+    subject: "/usr/bin/git push"
+    why: パス付きでもヒットする
+  - tool: Bash
+    subject: "echo $(git push origin main)"
+    why: コマンド置換の中も実行される
+  - tool: Bash
+    subject: "git reset --hard HEAD~1"
+    why: 作業中の変更が消える
+  - tool: Bash
+    subject: "git branch -D feature"
+    why: 未マージのブランチが消える
+  - tool: Bash
+    subject: "git status"
+    why: 生の git はサブコマンドによらず止め、ラッパースクリプトへ寄せる
+  - tool: Bash
+    subject: "/usr/bin/git.exe diff"
+    why: パス付きでも拡張子付きでも、コマンドの位置に立つ git はヒットする
+  - tool: Bash
+    subject: "git -c diff.external=touch diff"
+    why: 読むだけに見えて任意コマンドを実行する形
+  - tool: Bash
+    subject: "rm -rf /tmp/x"
+    why: 再帰的な強制削除は取り消せない
+  - tool: Bash
+    subject: "find /repo -name *.log -delete"
+    why: >-
+      探すついでに消す形。allow の prefer-glob が単純な find を通すので、
+      通してはいけない形を deny で先に外す。タイプの順で deny が先にヒットする
+  - tool: Bash
+    subject: "cat <<'EOF' > notes.md"
+    why: ヒアドキュメントは検査を通らない経路になる
+  - tool: Bash
+    subject: "cat /repo/.env"
+    why: 認証情報。settings.json はシェル経由を止められない
+  - tool: Bash
+    subject: "cat /repo/.env.production"
+    why: 環境名が付いた形も同じ場所
+  - tool: Read
+    subject: "/repo/.env"
+    why: 認証情報。Read でも同じ
+  - tool: Read
+    subject: "C:\\repo\\.env.local"
+    why: Windows の区切りでも同じ。環境名付きも .env のうち
+  - tool: Bash
+    subject: "cat /repo/.env.example.bak"
+    why: 見本の名前で終わらない形も対象に入れる（見本をコピーした中身かもしれない）
+  - tool: Read
+    subject: "/repo/.env.example"
+    why: >-
+      値を持たない見本の .env も止める。認証情報は組み込みの builtin:credentials（常に効く土台。
+      設定で切れないので、見本の誤検知が出ても外せない）が、.env の後ろに続く名前ごと止める。
+      match は Bash|Read|Write|Edit|NotebookEdit
+  - tool: NotebookEdit
+    subject: "/repo/.claude/worktrees/x/.env.example"
+    why: >-
+      NotebookEdit でも見本の .env は止める。builtin:credentials の match に NotebookEdit が入っている
+  - tool: NotebookEdit
+    subject: "/repo/.claude/worktrees/x/secrets/.env.example"
+    why: 見本の名前で終わっても、secrets/ の下は止める（builtin:credentials）
+  - tool: NotebookEdit
+    subject: "/repo/.claude/worktrees/x/.env.local"
+    why: NotebookEdit でも .env は止める（builtin:credentials）
+  - tool: Bash
+    subject: "cat /repo/.env; cat /repo/.env.example"
+    why: >-
+      Bash の builtin:credentials には例外を付けていないので、見本の名前を足しても外れない
+  - tool: Bash
+    subject: "cat /repo/secrets/token; cat /repo/.env.example"
+    why: 同上。.aws・secrets・*.pem も builtin:credentials が止める
+  - tool: Bash
+    subject: "cat /repo/certs/server.pem"
+    why: 同上
+  - tool: Bash
+    subject: "cat /home/u/.aws/credentials"
+    why: 同上
+  - tool: Bash
+    subject: "cat /repo/secrets/token.txt"
+    why: 同上
+  - tool: Write
+    subject: "/repo/.ccnavi/config/common/rules.yml"
+    why: ガード自身の設定
+  - tool: Edit
+    subject: "/repo/.claude/worktrees/x/.ccnavi/config/common/rules.yml"
+    why: >-
+      ワークツリー側の設定も止める（builtin:guard-ccnavi-config）。統合すればそのまま取り込み先の
+      ルールになる。直したい形は下書きを検証してユーザに渡す
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/.ccnavi/config/common/phases.yml"
+    why: フェーズ定義はユーザが持つ。エージェントが書けるとレビュー不要のフェーズ定義を作ってから使える
+  - tool: Edit
+    subject: "/repo/.claude/worktrees/x/.ccnavi/config/common/rule-expectations.yml"
+    why: >-
+      共通レイヤーの期待する判定も ccnavi ディレクトリ（.ccnavi/）の下なので、組み込みの builtin:guard-project-home が止める。
+      期待する判定の下書きは wip/handoff/ に置き、ルールの下書きと一緒にユーザに渡す
+  - tool: Edit
+    subject: "/repo/.ccnavi/config/common/risks.yml"
+    why: リスクの配点も同じ。自分の作業の重さを自分で決められる
+  - tool: Write
+    subject: "/repo/.claude/hooks/lint-py.sh"
+    why: ガードを起動する hook 本体
+  - tool: Edit
+    subject: "/repo/docs/../.ccnavi/config/common/rules.yml"
+    why: 迂回したパスでも行き着く先でヒットする
+  - tool: Bash
+    subject: "echo x > /repo/.ccnavi/config/common/rules.yml"
+    why: Write で拒否した場所。リダイレクトで同じところに届く
+  - tool: Bash
+    subject: "cd /repo && printf x >> .claude/hooks/lint-py.sh"
+    why: 相対パスでも、追記でも同じ場所
+  - tool: Bash
+    subject: "sed -i s/deny/allow/ /repo/.ccnavi/config/common/rules.yml"
+    why: その場で書き換える形
+  - tool: Bash
+    subject: "cp /tmp/x /repo/.claude/hooks/lint-py.sh"
+    why: 別の場所から上書きする形。行き先に名前が来ている
+  - tool: Bash
+    subject: "mv /repo/.ccnavi/config/common/rules.yml /tmp/old.yml"
+    why: 移した元が消える。ルールが読めなくなる
+  - tool: Bash
+    subject: "rm /repo/logs/decisions.jsonl"
+    why: 記録を消すのも書き換えのうち
+  - tool: Bash
+    subject: "echo x | tee /repo/.ccnavi/config/common/rules.yml"
+    why: リダイレクトを使わない書き込み
+  - tool: Write
+    subject: "/repo/.claude/settings.json"
+    why: hook の登録そのもの。ルールを触らずにガードを外せる
+  - tool: Edit
+    subject: "/repo/.claude/settings.local.json"
+    why: permissions を足せるので同じ強さを持つ
+  - tool: Bash
+    subject: "echo {} > /repo/.claude/settings.json"
+    why: 設定もシェルから届く
+  - tool: Bash
+    subject: "cp /tmp/x /repo/.claude/settings.local.json"
+    why: 行き先に来た設定ファイル
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/.Claude/Settings.json"
+    why: >-
+      表記を変えても hook の登録。区別しない機械では同じファイルで、シェルから書く形は
+      組み込みの保護が表記の違いを無視して止めている。`regex` のルールだけ区別すると、この 1 経路が抜ける
+  - tool: Bash
+    subject: "GIT push origin main"
+    why: >-
+      Windows では大文字でも同じコマンドが走る。表記で判定が割れると、同じルールが
+      機械によって止めたり通したりする
+  - tool: Read
+    subject: "/repo/.claude/worktrees/x/.ENV"
+    why: 認証情報の場所も表記を問わない
+  - tool: Write
+    subject: "/repo/.ccnavi/scripts/ccnavi-git.sh"
+    why: git の入口。書き換えれば git のルールがまとめて外れる
+  - tool: Bash
+    subject: "sed -i s/push/x/ /repo/.ccnavi/scripts/ccnavi-git.sh"
+    why: 通さないはずのサブコマンドを通す形に変えられる
+  - tool: Bash
+    subject: "cd /repo/.claude/worktrees/x && echo x > ../../scripts/ccnavi-git.sh"
+    why: .claude を通らないパス。Bash の対象は解かれないので名前で捕まえる
+
+  - tool: Bash
+    subject: "sh $L status"
+    why: >-
+      コマンド名の位置の変数は、ルールではなく組み込みの検査（shellread の command-name-expansion、
+      DENY_COMMAND_NAME_EXPANSION）が止める。何が走るか表記に無く、builtin:guard-raw-git などのルールがヒットしないため
+  - tool: Bash
+    subject: "cd /repo && $CMD push origin main"
+    why: 同上。コマンド列の途中でも止まる
+
+ask:
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --base feature/x --accept 7f3a9c21 --no-wip"
+    why: >-
+      直接作業の取り込み先と状態の了承は、ユーザの確認ダイアログに出す（direct-worktree-confirm）。
+      ダイアログのコマンドに、取り込み先のブランチ名と選んだ指定が見える
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --side-by-side"
+    why: >-
+      横で作業する指定は自動復元を緩めるので、ほかにずれが無くても必ずダイアログに出す
+      （direct-worktree-confirm）
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --adopt --base feature/x"
+    why: 記録の無い既存のワークツリーの引き取りも、ユーザの確認を経る（direct-worktree-confirm）
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --adopt --base feature/x --dry-run"
+    why: >-
+      --dry-run は何も書かない確認なので、--adopt があってもダイアログに出しません（direct-worktree-confirm の except）。
+      どのルールも言及せず、権限モードへ渡ります。
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --base feature/x --accept 7f3a9c21 --dry-run"
+    why: --dry-run が最後にあっても同じです。何も書かない確認は、ダイアログに出しません
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --adopt --base feature/x && sh /repo/other.sh y --dry-run"
+    why: >-
+      別のコマンドの --dry-run では除外されません。除外はコマンドの境界を越えず、ccnavi-worktree.sh の
+      呼び出しの中の --dry-run だけを見ます（direct-worktree-confirm）
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --base feature/x && sh /repo/.ccnavi/scripts/ccnavi-worktree.sh y --dry-run"
+    why: >-
+      同じスクリプトの別の呼び出しに --dry-run があっても除外されません。--dry-run のある呼び出しは確認の対象外ですが、
+      --base のある呼び出しは対象のままです（direct-worktree-confirm）
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh y --dry-run && sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --base feature/x"
+    why: 順を入れ替えても同じです（direct-worktree-confirm）
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x"
+    why: >-
+      指定の無い呼び出しは direct-worktree-confirm にヒットしない。どのルールも言及せず権限モードへ渡る。
+      ずれがあれば sh が確認を求めて止まる（終了コード 3）ので、ダイアログは要らない
+  - tool: Write
+    subject: "/tmp/claude-0/-repo/0a1b2c/scratchpadx/a.md"
+    why: 名前の続く別のディレクトリは session-scratchpad にヒットしない。止めないが allow にも無いので権限モードに渡る
+  - tool: Write
+    subject: "/repo/wip/handoff/a.md"
+    why: >-
+      workspace-root の except で除く、ユーザに渡す物の置き場。止めないが allow にも無いので、
+      権限モードに渡る（ターミナルからの試験では ask）
+  - tool: Write
+    subject: "/repo/wip/handoff/.ccnavi/scripts/ccnavi-x.sh"
+    why: >-
+      守る場所のコピー。ccnavi-stage.sh が元と同じ相対パスでコピーするので、パスに .ccnavi/ が入る。
+      コピーにはルールとしての効力が無く、ユーザが ccnavi-user-handoff.sh で取り込むまで何も変わらない。
+      builtin:guard-scripts と builtin:guard-project-home が除く。止めないが allow にも無いので、
+      権限モードに渡る
+  - tool: Edit
+    subject: "/repo/wip/handoff/handoff-.claude/settings.json"
+    why: >-
+      hook の登録のコピー。ccnavi-stage.sh は .claude の階層を handoff-.claude に読み替えて置く
+      （Claude Code 本体が .claude の階層の編集を非対話で許可しないため）。
+      builtin:guard-settings が除く。ユーザが ccnavi-user-handoff.sh で取り込むまで
+      何も変わらない。権限モードに渡る
+  - tool: Write
+    subject: "/repo/wip/handoff/.ccnavi/config/common/rules.yml"
+    why: >-
+      ルールの下書き。builtin:guard-ccnavi-config と builtin:guard-project-home が除く。
+      検査は取り込むときに ccnavi-user-handoff.sh が行う。権限モードに渡る
+  - tool: Write
+    subject: "/repo/scratchpad/a.md"
+    why: >-
+      workspace-root の except で除く、使い捨ての置き場。止めないが allow にも無いので、
+      権限モードに渡る（ターミナルからの試験では ask）
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/pyproject.toml"
+    why: 実行時の依存が変わる。ユーザのチェックアウトの側は deny なのでワークツリーで見る
+  - tool: Bash
+    subject: "jq -r '.hooks.PostToolUse[0].hooks[0].command, .env.CCNAVI_ENTRY_PATH' .claude/settings.json"
+    why: >-
+      jq のフィールド参照 `.env` は認証情報のファイル名ではない。credentials に
+      適用すると、設定を読むだけの操作が「中身を読むな」と止まる。どのルールにも
+      ヒットせず、権限モードへ渡って確認になる。allow に
+      jq を足せば通るが、それは網を広げる別の判断なので、ここではヒットの仕方を
+      そのまま記録する
+  - tool: Bash
+    subject: "curl https://example.com"
+    why: >-
+      外から取ってくるコマンド。止めはしないが、調査で一度きりなら WebFetch、
+      何度も叩くなら sh に固める。ユーザが通せば取ってきた文字列はそのまま
+      コンテキストに載るので、そのことも文面で断る
+  - tool: Bash
+    subject: "cat /repo/urls.txt | wget -i -"
+    why: パイプの後ろに立つ取得も拾う。コマンドの先頭ならヒットする
+  - tool: Bash
+    subject: "CURL https://example.com"
+    why: 勧めるほうの文面も表記を問わない。止める側だけ区別しないと、案内が表記の違いで消える
+  - tool: Bash
+    subject: "echo curl is a tool"
+    why: >-
+      引数に出ただけの名前にはヒットしない。どのルールも言及せず権限モードへ渡る。
+      ヒットすると、取得について書く作業がそのまま止まる
+  - tool: Bash
+    subject: "docker run --rm alpine"
+    why: 同上
+  - tool: Bash
+    subject: "bash -c 'ls'"
+    why: 読み切れないコマンド。allow は適用しない
+  - tool: Bash
+    subject: "cat /repo/README.md | head -20"
+    why: >-
+      後ろに別のコマンドが続く行に prefer-read-grep は適用しない。allow はヒットした
+      時点で呼び出し全体を通すので、そこまで適用すると cat と書いただけで隣の
+      コマンドまで無条件になる。Read ツールの勧めもここでは出ない
+  - tool: Bash
+    subject: "cd /repo/.claude/worktrees/git-wrapper && ls"
+    why: >-
+      パスの中の git は builtin:guard-raw-git にヒットしない。ヒットするとワークツリーの出入りが丸ごと止まる。
+      cd と ls を allow に書いてはいないので、権限モードへ渡る
+  - tool: Bash
+    subject: "sed -n 1,20p /repo/logs/git-20260907-000000-1.log"
+    why: ラッパースクリプトが残した記録を読む手。-i の無い sed はどの deny にもヒットせず、allow にも無い
+  - tool: Bash
+    subject: "sed -n 1,20p /repo/.ccnavi/config/common/rules.yml"
+    why: ガードの設定でも、-i が無ければ書き換えない。deny にはヒットしない
+  - tool: Bash
+    subject: "sed -n 1,20p /repo/.claude/worktrees/feature-id/.ccnavi/config/common/rules.yml"
+    why: パスの途中に -i があるだけの読み。独立したオプションの -i ではないので deny にヒットしない
+  - tool: Bash
+    subject: "uv run python -m unittest discover -s tests -t ."
+    why: 検査コマンド。どのルールも言及しない
+  - tool: Bash
+    subject: "uv run python -m ccnavi --rules /repo/.ccnavi/config/common/rules.yml --test Bash ls"
+    why: ルールを確かめる手そのもの。ルールファイルの名前が引数に出ても deny にはヒットしない
+  - tool: Bash
+    subject: "cp /repo/.ccnavi/config/common/rules.yml /tmp/backup.yml"
+    why: コピーを取っているだけ。cp は行き先の側だけを見るので deny にはヒットしない
+  - tool: Bash
+    subject: "diff /repo/.claude/settings.json /repo/.claude/settings.local.json"
+    why: 2 つ並べて見比べるだけ。deny にはヒットしない
+  - tool: Read
+    subject: "/repo/README.md"
+    why: Read はどの deny にもヒットしない。allow にも書いていないので権限モードへ渡る
+  - tool: Read
+    subject: "/repo/.claude/settings.json"
+    why: 設定の Read も止めない。止めると何が効いているか分からなくなる
+  - tool: Read
+    subject: "/repo/.ccnavi/config/common/phases.yml"
+    why: builtin:guard-ccnavi-config は Write / Edit / NotebookEdit だけ。読むのは止めない
+  - tool: Bash
+    subject: 'echo "$HOME" "$L"'
+    why: 変数が引数にあるだけで、コマンド名の位置ではない。どのルールにもヒットせず権限モードへ渡る
+
+allow:
+  - tool: Skill
+    subject: "process-implement"
+    why: 工程スキルの入口の呼び出し。ルールが無いと dontAsk / bypassPermissions で拒否され、促しに従った Skill が止まる（process-skill-call）
+  - tool: Skill
+    subject: "test-repo:process-implement"
+    why: プラグイン名前置きの形も同じ（先頭に * を付けた glob）
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/src/a.py"
+    why: ワークツリーの中のコード。worktrees と process-skill-first-edit がヒットし、工程スキルを Skill で呼ぶ一言が最初の 1 度だけ添えられる
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/wip/proposals/todo/p.md"
+    why: 提案は process-skill-first-edit の except。先に Once を消費しない
+  - tool: Bash
+    subject: "sh .ccnavi/scripts/ccnavi-git.sh status --porcelain"
+    why: git の入口。サブコマンドの選別はラッパースクリプトの中で行う
+  - tool: Bash
+    subject: "sh .ccnavi/scripts/ccnavi-git.sh push -u origin i0001"
+    why: push もラッパースクリプトの入口。送ってよい形か（force でない、main へ直接でない）はラッパースクリプトが選別する
+  - tool: Bash
+    subject: "cd /repo && sh .ccnavi/scripts/ccnavi-git.sh worktree add .claude/worktrees/x -b x"
+    why: このプロジェクトの作業手順。コマンド列の途中でも通る
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-git.sh worktree add .claude/worktrees/y -b y main"
+    why: >-
+      通す。ccnavi-git-worktree-add が、先に fetch して遅れを確かめる案内をセッションに一度だけ添える
+      （遅れの判定で止めるのは ccnavi-git.sh の中）
+  - tool: Bash
+    subject: "grep -n TODO src/ccnavi/cli.py"
+    why: 読むだけ。prefer-read-grep が適用して通す
+  - tool: Bash
+    subject: "CAT /etc/hosts"
+    why: >-
+      コマンドの名前も区別しない（大文字小文字だけが違う名前には同じ判定）。区別しない機械では `cat` そのものなので、
+      小文字なら通る呼び出しを大文字か小文字かだけで別扱いにしない。代償として、区別する機械で `CAT` という
+      別の実行ファイルが在れば、この allow がそれにも掛かる
+  - tool: Bash
+    subject: "FIND /etc -name x"
+    why: 同上。prefer-glob も表記を問わず適用する
+  - tool: Bash
+    subject: 'grep -n "git push" README.md'
+    why: >-
+      引用された語は実行位置ではないので builtin:guard-raw-git にはヒットしない。引用の中の空白は
+      語の中の目印（\x01）になり、コマンドの区切り（\x00）とは別なので、「後ろにコマンドが続かない」を
+      求める prefer-read-grep が適用して通す。ccnavi のリポジトリの docs/41_guide/bash-reading.md「Bash のコマンドは実行される部分だけを見る」
+  - tool: Bash
+    subject: 'grep -n "rm -rf" /repo/.ccnavi/config/common/rules.yml'
+    why: 引用の中の rm -rf は recursive-delete にヒットしない。上と同じ理由で prefer-read-grep が通す
+  - tool: Bash
+    subject: "grep -n \"regex: '(>\" /repo/.ccnavi/config/common/rules.yml"
+    why: >-
+      引用の中の > は文字であって書き込み先を連れてこない。両側に置かれるのは語の中の目印なので、
+      deny にはヒットせず、prefer-read-grep が通す
+  - tool: Bash
+    subject: 'grep -n "<<EOF" /repo/README.md'
+    why: >-
+      引用の中で他の字と並んだ << は語の中の目印で 1 字ずつ区切られ、heredoc にはヒットしない。
+      prefer-read-grep が通す。引用が << だけの 1 語（grep -n "<<" f）は区別が付かず止まる。
+      ccnavi のリポジトリの docs/41_guide/bash-reading.md「読み切れないとき」
+  - tool: Bash
+    subject: "# git push origin main"
+    why: コメントだけの行は何も走らない
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/src/ccnavi/cli.py"
+    why: ワークツリーの中のソース。ユーザのチェックアウトの側は deny
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/tests/test_glob.py"
+    why: 同上
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/README.md"
+    why: 同上。文書もワークツリーで直して取り込み先に戻す
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/.vscode/settings.json"
+    why: builtin:guard-settings が止めるのは .claude/ の下の settings だけ。エディタの設定はワークツリーで直せる
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/wip/proposals/todo/i0001.md"
+    why: 提案はワークツリーで書く。効くのは承認済みチケットの側
+  - tool: Bash
+    subject: "cat /repo/.ccnavi/config/common/rules.yml"
+    why: ガードの設定は読むほうが普通。名前が出ただけでは止めない
+  - tool: Bash
+    subject: "grep -n cp /repo/.claude/hooks/lint-py.sh"
+    why: 書き込むコマンドの名前を探しているだけ。コマンドの先頭に無い
+  - tool: Bash
+    subject: "cat /repo/.ccnavi/config/common/rules.yml > /tmp/x"
+    why: リダイレクトはあるが行き先が別の場所
+  - tool: Bash
+    subject: "cat /repo/.claude/settings.json"
+    why: 設定も読むのは普通
+  - tool: Bash
+    subject: "cat /repo/.ccnavi/scripts/ccnavi-git.sh"
+    why: ラッパースクリプトの中身を読むのは普通
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-git.sh diff --stat"
+    why: これが git の打ち方そのもの。ここを止めたら何もできない
+  - tool: Bash
+    subject: "cp /repo/.ccnavi/scripts/ccnavi-git.sh /tmp/backup.sh"
+    why: バックアップを取っているだけ。ccnavi-git.sh の名前が出るので allow にヒットする
+  - tool: Bash
+    subject: "find /repo/ccnavi -name *.py"
+    why: >-
+      探すだけの find。prefer-glob が適用して通し、Glob ツールのほうを一度だけ勧める。
+      -exec が付いた形は shellread が読み切れないと言うので、ここには来ない
+  - tool: Bash
+    subject: "grep -rn TODO /repo/ccnavi"
+    why: >-
+      1 本だけの検索。prefer-read-grep が適用して通し、Grep ツールのほうを
+      セッションに一度だけ勧める。読む手を取り上げるのが目的ではない
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/wip/proposals/todo/skill-commit-retry.md"
+    why: >-
+      ワークツリーの中で提案を書く。worktrees と skill-review-at-proposal の両方がヒットし、
+      振り返りの候補を思い出させる一言が添えられる
+  - tool: Stop
+    subject: "(stop)"
+    why: >-
+      ターンの終わり。skill-review-every-10 が使われ、10 回に 1 度止めて振り返りの手順を渡す
+      every が無い・プロジェクトのレイヤーにしか無いルールでは判定に入らない
+  - tool: Write
+    subject: "/repo/.claude/worktrees/lib1/skills/deploy/SKILL.md"
+    why: >-
+      プロジェクトから切ったワークツリーの skills/（プロジェクトのスキルの置き場）。組み込みの保護の外のふつうの場所で、
+      worktrees の allow にヒットする。チケットがあればその範囲でさらに絞られる
