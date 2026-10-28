@@ -1,0 +1,84 @@
+# チケットの CLI（ccnavi-ticket.sh・--agree・ccnavi-review.sh など）が標準出力・標準エラーに出す次の一手。
+# 状態の報告（何をしたか・何が起きたか）はコード側にあり、ここは次の一手だけを持つ。
+# `次:` の行は組み立てる側が付ける。`note` は 1 行ごとに `案内: ` を付けて出す。
+# 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
+version: 1
+messages:
+  # ---- tickets/lifecycle/commands.py
+  # 子の着手のあと。
+  NEXT_OPS_START_CHILD:
+    kind: next
+    values: [ticket]
+    next: |-
+      サブエージェントに、子のワークツリー（.claude/worktrees/{ticket}）での実装を任せる。終わってコミットされたら '{script:ccnavi-ticket.sh} finish {ticket}' を打つ
+
+  # 親を閉じたあと。マージリクエストで見るフェーズが無いとき。
+  NEXT_OPS_CLOSE_NO_MR:
+    kind: next
+    values: [wip, classifier_note]
+    next: |-
+      この移動をコミットし、`{wip}/` を削除して（'{script:ccnavi-git.sh} rm -r {wip}'）コミットし、統合先のブランチに取り込んでください。
+    note: |-
+      このチケットにはマージリクエストで見るフェーズが無いので、Draft を解除する手順はありません。途中の作業は既定のブランチに残さない。
+      `{wip}/` で消えるのは追跡済みのファイルだけで、削除する前のコミットから戻せる。
+      {classifier_note}
+
+  # 親を閉じたあと。マージリクエストがあるとき。
+  NEXT_OPS_CLOSE_MR:
+    kind: next
+    values: [ready_command, approved, wip, flow_agreed]
+    next: |-
+      この移動をコミットして push し（取り込み済みの親子では、この finish が済ませている）、'{ready_command}' で Draft を解除してください（「マージに進んでよい」の合図）
+    note: |-
+      ready は Draft を解除する前に、クローズ済みのチケットとその記録（`{approved}/` の done/・phases/・flows/）を手元の logs/archive/ へ移し、`{wip}/` の追跡済みのファイルを削除して、その削除をコミットして push する（`{wip}/` に未追跡のファイルがあれば削除せずに止まる。削除したものは履歴から戻せる）。
+      Draft を解除したあと、ready は親のワークツリーを削除します（親のワークツリーの外から --parent で実行すれば消える。中から --parent なしで実行すると消さず、外に出てから実行するコマンドを表示する）。
+      途中の作業もチケットも既定のブランチに残さない。マージはユーザが squash で行う。{flow_agreed}
+
+  # 子を done/ へ動かしたあと。
+  NEXT_OPS_CHILD_DONE:
+    kind: next
+    values: [parent]
+    next: |-
+      '{script:ccnavi-ticket.sh} status {parent}' で、親の次の一手を確かめる
+
+  # ---- tickets/proposal/agree_screen.py（承認されたあとの案内）
+  # 場合は、この回に承認された親が居るか（parent）と、子の開始の仕方（child: 子のワークツリーを切る手順も言う、
+  # child_wt: 切ったワークツリーが計画に出ている）で選ぶ。改版と子だけの回で親の着手を勧めると、
+  # 案内どおりに打っても「着手済み」で終わるので、親が居ない回は親の着手を言わない。
+  NEXT_AGREE_FOLLOWUP:
+    kind: next
+    next:
+      plain: |-
+        後工程を進める。
+      parent: |-
+        後工程を進める。親は自分のワークツリーで '{script:ccnavi-ticket.sh} start <親>' を先に実行してください。
+      child: |-
+        後工程を進める。子はワークツリー .claude/worktrees/<識別子> を親のブランチから切り、'{script:ccnavi-ticket.sh} start <識別子>' で開始してください（親が未着手だと止まります）。
+      parent_child: |-
+        後工程を進める。親は自分のワークツリーで '{script:ccnavi-ticket.sh} start <親>' を先に実行してください。子はワークツリー .claude/worktrees/<識別子> を親のブランチから切り、'{script:ccnavi-ticket.sh} start <識別子>' で開始してください（親が未着手だと止まります）。
+      child_wt: |-
+        後工程を進める。子は'{script:ccnavi-ticket.sh} start <識別子>' で開始してください（親が未着手だと止まります）。
+      parent_child_wt: |-
+        後工程を進める。親は自分のワークツリーで '{script:ccnavi-ticket.sh} start <親>' を先に実行してください。子は'{script:ccnavi-ticket.sh} start <識別子>' で開始してください（親が未着手だと止まります）。
+
+  # ---- tickets/review/request.py
+  # 依頼のとき、親の `mr:` に別の値が既にあった。状態（上書きしないこと・今回の MR の番号）はコードが言う。
+  NEXT_REVIEW_MR_DIFFERS:
+    kind: next
+    next: |-
+      `mr:` の値が今回のレビューの MR と合っているか、ユーザに確かめてもらう
+
+  # ---- tickets/approval/checks.py（承認しない理由に添える次の一手。理由はコードが言う）
+  # 提案が親のワークツリーの外にある。
+  NEXT_APPROVAL_PROPOSAL_OUTSIDE:
+    kind: next
+    values: [family]
+    next: |-
+      親のワークツリー（.claude/worktrees/{family}）で書き、'{script:ccnavi-ticket.sh} propose {family}' で親のブランチへ送ってから承認を頼む
+
+  # 提案を識別子と違う名前のワークツリーに書いている。
+  NEXT_APPROVAL_PLACE:
+    kind: next
+    values: [family]
+    next: |-
+      '{script:ccnavi-worktree.sh} {family}' で切り、提案を移して元を削除してから承認を頼む
