@@ -76,6 +76,39 @@ esac
 WINDOWS = os.name == "nt"
 
 
+# 子プロセスの PATH に並べる標準コマンド。PATH は偽の道具の bin とシェル本体の置き場だけで組むので、
+# sh が使うものはここに足す（macOS は awk などが /bin に無く、/usr/bin を足すと gh / glab も引ける）
+STANDARD_TOOLS = (
+    "jq",
+    "curl",
+    "git",
+    "sed",
+    "cat",
+    "rm",
+    "dirname",
+    "printf",
+    "mkdir",
+    "tr",
+    "mktemp",
+    "head",
+    "date",
+    "grep",
+    "wc",
+    "uname",
+    "cp",
+    "mv",
+    "awk",
+    "tail",
+    "sleep",
+    "find",
+    "rmdir",
+    "basename",
+    "env",
+    "cut",
+    "hostname",
+)
+
+
 def put_tool(found: str, link: str) -> None:
     """`found` の道具を `link` の名前で PATH に置く。
 
@@ -285,24 +318,7 @@ class ReviewDecideShTest(unittest.TestCase):
         # gh / glab を PATH から外し、curl とトークンの経路を通す
         tools = os.path.join(self.work, "bin")
         os.makedirs(tools, exist_ok=True)
-        for name in (
-            "jq",
-            "curl",
-            "git",
-            "sed",
-            "cat",
-            "rm",
-            "dirname",
-            "printf",
-            "mkdir",
-            "tr",
-            "mktemp",
-            "head",
-            "date",
-            "grep",
-            "wc",
-            "uname",
-        ):
+        for name in STANDARD_TOOLS:
             found = shutil.which(name)
             if found and not os.path.exists(os.path.join(tools, name)):
                 put_tool(found, os.path.join(tools, name))
