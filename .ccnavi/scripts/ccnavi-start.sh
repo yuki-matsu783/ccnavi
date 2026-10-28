@@ -1070,7 +1070,7 @@ init_subject="chore: #${number} の作業を開始する"
 #
 # 行き先は .claude/worktrees/<識別子>（識別子はブランチ名の / を - に置き換えたもの）。既にあるブランチは
 # `worktree add <行き先> <ブランチ>` で直接チェックアウトする。
-# ew_created は、この回で新規に作ったときだけ 1（既にあった・既存ブランチを使った回は空）。
+# ew_created は、この回で新規に作ったときだけ 1 になる。既にあった場合や既存ブランチを使った回は空のまま。
 wt=""
 ew_created=""
 ensure_worktree() {
@@ -1152,7 +1152,7 @@ fast_forward() {
 }
 
 # この回で新規に作ったワークツリーとブランチを片付ける（ensure_worktree の ew_created があるときだけ）。
-# 強制はしない（worktree remove に --force を付けず、branch は -d）。消せなければ、残ったことと続け方を言う。
+# 強制はしない（worktree remove に --force を付けず、branch は -d で消す）。消せなければ、残ったことと続け方を伝える。
 cleanup_created_worktree() {
 	[ -n "$ew_created" ] || return 0
 	cc_branch="$1"
@@ -1165,7 +1165,7 @@ cleanup_created_worktree() {
 }
 
 # ensure_initial_commit <ブランチ>。統合先より進んでいなければ、空の初期コミットを積む（wt で）。
-# 積む前に作成者（author と committer の両方）を確かめる。無ければ、作った分を片付けて、設定を頼んで止める。
+# 積む前に作成者（author と committer の両方）を確かめる。無ければ、この回で作った分を片付けたうえで、設定を頼んで止める。
 ensure_initial_commit() {
 	ahead=$(git -C "$wt" rev-list --count "origin/$integration..HEAD" 2>/dev/null || echo 0)
 	if [ "$ahead" -ge 1 ]; then
@@ -1175,7 +1175,7 @@ ensure_initial_commit() {
 	if ! git -C "$wt" var GIT_AUTHOR_IDENT >/dev/null 2>&1 || ! git -C "$wt" var GIT_COMMITTER_IDENT >/dev/null 2>&1; then
 		cleanup_created_worktree "$1"
 		ccnavi_text "$root" NEXT_START_IDENT "real_args_q=$real_args"
-		fail ident-missing "git の作成者情報（user.name と user.email）が無く、初期コミットを積めません。"
+		fail ident-missing "git の作成者情報（user.name と user.email）が無いため、初期コミットを積めません。"
 	fi
 	(cd "$wt" && cgit commit --allow-empty -m "$init_subject") || {
 		cleanup_created_worktree "$1"

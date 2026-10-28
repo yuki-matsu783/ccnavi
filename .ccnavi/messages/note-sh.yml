@@ -164,7 +164,7 @@ messages:
     kind: note
     values: [wt, branch]
     note: |-
-      この回で作ったワークツリー {wt:path} とブランチ {branch:sh} を片付けられず、残っている。作業の跡ではない。{script:ccnavi-git.sh} worktree remove {wt:path} と branch -d {branch:sh} で消してから打ち直す（消せなければユーザに伝える）
+      この回で作ったワークツリー {wt:path} とブランチ {branch:sh} が、片付けられずに残っている。作業の跡ではない。{script:ccnavi-git.sh} worktree remove {wt:path} と branch -d {branch:sh} で消してから打ち直す（消せなければユーザに伝える）
 
   NOTE_START_TEMPLATES:
     kind: note
