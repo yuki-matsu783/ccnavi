@@ -390,7 +390,7 @@ if [ -n "$check" ]; then
 	log_info 事前確認 -- "result=$ccnavi_pf_result" "fix=${ccnavi_pf_fix:-none}" "auth=${ccnavi_pf_auth_source:-none}"
 	pc_name=$(ccnavi_project "$top" "$root")
 	printf '対象リポジトリ: %s（%s）\n' "${ccnavi_h_path:-$top}" "${pc_name:-ワークスペース自身}"
-	for pc_item in tools origin integration api access git; do
+	for pc_item in tools origin integration api access git ident; do
 		ccnavi_pf_line "$pc_item"
 		printf '確認: %s\n' "$ccnavi_pf_line_text"
 	done

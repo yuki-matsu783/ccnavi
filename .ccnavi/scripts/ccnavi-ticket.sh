@@ -337,7 +337,7 @@ ticket_unsent_parent_next() {
 ticket_preflight() {
 	ccnavi_preflight "${ccnavi_wap_tree:-$here}"
 	[ "$ccnavi_pf_result" != ok ] || return 0
-	for tp_item in tools origin integration api access git; do
+	for tp_item in tools origin integration api access git ident; do
 		eval "tp_kind=\$ccnavi_pf_$tp_item"
 		[ "$tp_kind" != ok ] || { [ "$tp_item" = access ] && [ -n "$ccnavi_pf_access_unknown" ]; } || continue
 		ccnavi_pf_line "$tp_item"

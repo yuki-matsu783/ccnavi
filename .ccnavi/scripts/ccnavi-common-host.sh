@@ -617,9 +617,9 @@ ccnavi_host_access() {
 #
 #   ccnavi_preflight <リポジトリの top>
 #     ccnavi_pf_result       ok / ng / unverified（ng が 1 つでもあれば ng。ng が無く unverified か skipped があれば unverified）
-#     ccnavi_pf_<項目>       項目は tools origin integration api access git
+#     ccnavi_pf_<項目>       項目は tools origin integration api access git ident
 #     ccnavi_pf_<項目>_why   理由
-#     ccnavi_pf_fix          勧める対処の種類（tool origin integration auth notfound access git-auth network。無ければ空）
+#     ccnavi_pf_fix          勧める対処の種類（tool origin integration auth notfound access git-auth ident network。無ければ空）
 #     ccnavi_pf_auth_source  認証の出どころの種類（cli / token / none。値は入れない）
 # 1 回の問い合わせは 15 秒、git の確認は 30 秒（どちらも CCNAVI_PREFLIGHT_TIMEOUT で変える。テスト用）、全体は 60 秒まで。全体を過ぎたら残りは skipped。
 # キャッシュはしない。毎回確かめる。
@@ -639,6 +639,7 @@ ccnavi_preflight() {
 	ccnavi_pf_api=skipped ccnavi_pf_api_why=""
 	ccnavi_pf_access=skipped ccnavi_pf_access_why=""
 	ccnavi_pf_git=skipped ccnavi_pf_git_why=""
+	ccnavi_pf_ident=skipped ccnavi_pf_ident_why=""
 	ccnavi_pf_result=""
 	ccnavi_pf_fix=""
 	ccnavi_pf_auth_source=""
@@ -785,9 +786,20 @@ ccnavi_preflight() {
 	fi
 	[ "$ccnavi_pf_dir" = "${TMPDIR:-/tmp}" ] || rm -rf "$ccnavi_pf_dir" || :
 
+	# 7. ident（git の作成者。author と committer の両方。手元の設定だけを見る。ネットワークには出ない）
+	if [ -n "$ccnavi_pf_have_git" ]; then
+		if git -C "$ccnavi_pf_top" var GIT_AUTHOR_IDENT >/dev/null 2>&1 &&
+			git -C "$ccnavi_pf_top" var GIT_COMMITTER_IDENT >/dev/null 2>&1; then
+			ccnavi_pf_ident=ok
+		else
+			ccnavi_pf_ident=ng
+			ccnavi_pf_ident_why="git の作成者情報（user.name と user.email）が無く、コミットできない"
+		fi
+	fi
+
 	# まとめ
 	ccnavi_pf_result=ok
-	for ccnavi_pf_k in tools origin integration api access git; do
+	for ccnavi_pf_k in tools origin integration api access git ident; do
 		eval "ccnavi_pf_v=\$ccnavi_pf_$ccnavi_pf_k"
 		case "$ccnavi_pf_v" in
 		ng) ccnavi_pf_result=ng ;;
@@ -812,6 +824,8 @@ ccnavi_preflight() {
 		ccnavi_pf_fix=access
 	elif [ "$ccnavi_pf_git" = ng ]; then
 		ccnavi_pf_fix=git-auth
+	elif [ "$ccnavi_pf_ident" = ng ]; then
+		ccnavi_pf_fix=ident
 	elif [ "$ccnavi_pf_result" != ok ]; then
 		ccnavi_pf_fix=network
 	fi
@@ -858,6 +872,7 @@ ccnavi_pf_next() {
 	notfound) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" NEXT_PF_NOTFOUND "path=$ccnavi_pn_path") ;;
 	access) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" NEXT_PF_ACCESS "path=$ccnavi_pn_path") ;;
 	git-auth) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" "NEXT_PF_GIT_AUTH__$ccnavi_pn_kind" "host=$ccnavi_pn_host") ;;
+	ident) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" NEXT_PF_IDENT) ;;
 	network) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" "NEXT_PF_NETWORK__$ccnavi_pn_kind") ;;
 	esac
 }

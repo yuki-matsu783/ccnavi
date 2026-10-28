@@ -147,6 +147,12 @@ messages:
     next: |-
       ユーザに、足りない道具（git・jq。API には gh か glab か curl のどれか）を入れてもらう
 
+  NEXT_PF_IDENT:
+    kind: next
+    values: []
+    next: |-
+      ユーザに `git config user.name` と `user.email` の設定を頼んで返事を待つ。エージェントは設定しない。チケット作業は初期コミットやマージコミットを積む
+
   NEXT_PF_ORIGIN:
     kind: next
     values: []

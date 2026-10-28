@@ -240,8 +240,11 @@ class StartShTest(unittest.TestCase):
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
             "CCNAVI_LEARNING": "disable",
         }
-        for name in ("GITHUB_TOKEN", "GITLAB_TOKEN", "CLAUDE_PROJECT_DIR"):
-            env.pop(name, None)
+        for name in list(env):
+            if name in ("GITHUB_TOKEN", "GITLAB_TOKEN", "CLAUDE_PROJECT_DIR") or name.startswith(
+                ("GIT_AUTHOR_", "GIT_COMMITTER_")
+            ):
+                env.pop(name)
         if token:
             env["GITLAB_TOKEN" if self.origin_url == GL_URL else "GITHUB_TOKEN"] = "t0k"
         env.update(
@@ -1408,12 +1411,53 @@ class StartShTest(unittest.TestCase):
         self.assertTrue(done.stdout.startswith("対象リポジトリ: acme/widgets"), done.stdout)
         self.assertEqual(
             self.labels(done.stdout),
-            {k: "OK" for k in ("tools", "origin", "integration", "api", "access", "git")},
+            {k: "OK" for k in ("tools", "origin", "integration", "api", "access", "git", "ident")},
         )
         self.assertEqual(self.local_branches(), ["main"])
         self.assertEqual(self.remote_branches(), ["main"])
         self.assertFalse(os.path.isdir(os.path.join(self.ws, ".claude", "worktrees")))
         self.assertNotIn("t0k", done.stdout + done.stderr)
+
+    def no_identity_env(self):
+        """作成者を推定させない構成（useConfigOnly が無いと、FQDN のある機械で推定されて通る）。"""
+        git(self.ws, "config", "--unset", "user.name")
+        git(self.ws, "config", "--unset", "user.email")
+        empty = os.path.join(self._tmp.name, "home")
+        os.makedirs(empty, exist_ok=True)
+        return {
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_SYSTEM": os.devnull,
+            "HOME": empty,
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "user.useConfigOnly",
+            "GIT_CONFIG_VALUE_0": "true",
+        }
+
+    def test_check_without_a_git_author_is_ng_and_asks_for_the_config(self):
+        done = self.check(**self.no_identity_env())
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(self.labels(done.stdout)["ident"], "NG")
+        self.assertEqual(self.labels(done.stdout)["git"], "OK")
+        self.assertIn("git config user.name", done.stdout)
+        self.assertIn("不備があり", done.stdout)
+
+    def test_check_with_only_the_author_given_is_ng_on_the_committer(self):
+        env = self.no_identity_env()
+        done = self.check(GIT_AUTHOR_NAME="a", GIT_AUTHOR_EMAIL="a@example.invalid", **env)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(self.labels(done.stdout)["ident"], "NG")
+
+    def test_check_with_author_and_committer_from_the_environment_is_ok(self):
+        env = self.no_identity_env()
+        done = self.check(
+            GIT_AUTHOR_NAME="a",
+            GIT_AUTHOR_EMAIL="a@example.invalid",
+            GIT_COMMITTER_NAME="c",
+            GIT_COMMITTER_EMAIL="c@example.invalid",
+            **env,
+        )
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(self.labels(done.stdout)["ident"], "OK")
 
     def test_check_probe_401_and_404_are_ng(self):
         for status, fix in ((401, "auth login"), (404, "origin のパス")):
