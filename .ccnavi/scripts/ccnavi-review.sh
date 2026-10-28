@@ -55,8 +55,8 @@
 #
 # 親のワークツリーの中で実行すること。どの親かは cwd から引く。ready だけは `--parent <親>` で
 # 外（ワークスペースルートなど）からも打てる（ほかのサブコマンドに --parent を渡すと拒否する）。
-# request・confirm を統合先のブランチの上（ワークスペースルートなど）で打つと、親を決められないので
-# 「親のワークツリーの中で打ってください」と止める。外から打てば、Draft を外したあとに親のワークツリーも消える。
+# request・confirm・decide・ready（--parent なし）を統合先のブランチの上（ワークスペースルートなど）で打つと、
+# 親が決まらないので、ホストへ繋ぐ前に「親のワークツリーの中で打ってください」と止める（理由に cwd を示し、`次:` に cd 付きの打ち直しを出す）。ready は --parent を付ければ外から打てる。外から打つと、Draft を外したあとに親のワークツリーも消える。
 # 終了コード: 0 成功 / 1 前提の未充足 / 2 引数か環境の誤り /
 #             3 merged だけ: MR がマージ済みかを確かめられなかった（"unknown" を出す。推定せずに止める）
 #
@@ -401,6 +401,37 @@ fi
 # ---- 実行ファイル。merged は実行ファイルを起こさない（ホストに聞くだけ）ので、無くても進める。
 review_exe || [ "$sub" = merged ] || review_no_bin
 
+# 親のワークツリーの外で、親を cwd から引くサブコマンド（request・confirm・decide・ready）を打ったとき、
+# ホストへ繋ぐ前に止めて案内する。
+#
+# 親のワークツリーの外で居るブランチを親の識別子と読むと、統合先（main など）を親と読んでしまい、
+# 「親のワークツリーを切り直せ」という見当違いの案内になる。ホストは cwd の origin で決まるので、先に繋ぐと
+# 親のプロジェクトとは別のホスト（ワークスペース自身の origin）に繋ぎ、別の理由で止まる。原因は、親のワークツリーの中で
+# 打っていないことにある。居るブランチが統合先のときだけ止める。統合先が決まらないときは、前どおり進める。
+# ready は --parent で外から打てる（上で親のワークツリーへ移ってあるので、ここでは中として通る）。
+need_parent_tree() {
+	review_tree
+	[ "$review_in_tree" = yes ] && return 0
+	np_tree=$(git rev-parse --show-toplevel 2>/dev/null || :)
+	np_name=$(ccnavi_integration "${np_tree:-.}" 2>/dev/null) || np_name=""
+	[ -n "$np_name" ] && [ "$np_name" = "$branch" ] || return 0
+	np_hint=""
+	[ "$sub" != ready ] || np_hint="外から打つなら --parent <親の識別子> を付けます。"
+	np_args=""
+	for np_a in "$@"; do
+		np_args="$np_args $(ccnavi_sh_quote "$np_a")"
+	done
+	fail not-in-parent-tree "$sub は親のワークツリー（$root/.claude/worktrees/<親の識別子>）の中で打ってください。いまの cwd（${here}）は統合先のブランチ（${branch}）の上で、親を決められません。${np_hint}
+次: cd $(ccnavi_sh_quote "$root/.claude/worktrees/<親の識別子>") && sh $(ccnavi_sh_quote "$script_dir/ccnavi-review.sh") ${sub}${np_args}
+案内: 親の識別子は 'sh $script_dir/ccnavi-ticket.sh status' か 'sh $script_dir/ccnavi-git.sh worktree list' で確かめる。--body-file・--eli5 などの相対パスは cd で指す先が変わるので、絶対パスで打ち直す。" 2
+}
+
+# ---- 親を cwd から引くサブコマンドは、ホストへ繋ぐ前に cwd を確かめる。
+case "$sub" in
+request | confirm | decide) need_parent_tree "$@" ;;
+ready) [ -n "$ready_parent" ] || need_parent_tree "$@" ;;
+esac
+
 # ---- リモート。
 review_host
 
@@ -414,21 +445,6 @@ default_branch() {
 	db_name=$(ccnavi_integration "${db_tree:-.}") || db_name=""
 	[ -n "$db_name" ] || fail no-integration "$(ccnavi_integration_hint "${db_tree:-.}")"
 	printf '%s' "$db_name"
-}
-
-# 親のワークツリーの外で、親を cwd から引くサブコマンド（request・confirm）を打ったとき、止めて案内する。
-#
-# 親のワークツリーの外で居るブランチを親の識別子と読むと、統合先（main など）を親と読んでしまい、
-# 「親のワークツリーを切り直せ」という見当違いの案内になる。原因は、親のワークツリーの中で打っていないこと。
-# 居るブランチが統合先のときだけ止める。統合先が決まらないときは、前どおり進める。
-need_parent_tree() {
-	[ "$review_in_tree" = yes ] && return 0
-	np_tree=$(git rev-parse --show-toplevel 2>/dev/null || :)
-	np_name=$(ccnavi_integration "${np_tree:-.}" 2>/dev/null) || np_name=""
-	[ -n "$np_name" ] && [ "$np_name" = "$branch" ] || return 0
-	np_hint=""
-	[ "$sub" != ready ] || np_hint="外から打つなら --parent <親の識別子> を付けます。"
-	fail not-in-parent-tree "$sub は親のワークツリー（$root/.claude/worktrees/<親の識別子>）の中で打ってください。いまは統合先のブランチ（${branch}）の上で、親を決められません。親のワークツリーは 'sh $script_dir/ccnavi-git.sh worktree list' で探せます。${np_hint}" 2
 }
 
 # ---- 目印で始まる投稿を探す。{url, created_at} を返す（無ければ空）。<番号> <URL> <目印>
@@ -622,7 +638,6 @@ confirm)
 		esac
 		confirm_prev="$a"
 	done
-	need_parent_tree
 	wap_start "$family"
 	fetch_all >"$result"
 	wap_ccnavi "$branch のレビュー済みを置いた" -- review confirm "$@" --result "$result"
@@ -736,7 +751,6 @@ request)
 ${eli5_how}"
 	log_debug ELI5 を確かめた -- "eli5=set"
 	# 段 0: 取り込み済みの親子のチケットなら write-and-push の前半（ロック・取り込み）を先に済ませる。
-	need_parent_tree
 	wap_start "$family"
 	# 段 1: 前提。exe が依頼の本文を書き出す。
 	tell_skew
@@ -878,7 +892,6 @@ ready)
 	# 閉じた親子のチケット（done/ の親子・phases/<親>/・flows/）を手元の logs/archive/ へ
 	# 退避する（git の上では削除）。write-and-push の中なら、その削除をコミットして push してから、ここが外して
 	# コメントを投稿する。マージはユーザ（squash。既定のブランチにチケットを残さない）。
-	[ -n "$ready_parent" ] || need_parent_tree
 	wap_start "$family"
 	fetch_all >"$result"
 	# 打ち直しの判断（Draft を外し損ねたか）に、MR がまだ Draft かを結果に足す。

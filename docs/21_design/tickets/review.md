@@ -143,6 +143,7 @@ write-and-push の書いたパスの一覧の検査は、`review ready` が消�
 続いて write-and-push が退避と `wip/` の削除をコミットして push し、sh が Draft を外し、コメントを投稿し、最後に `worktree drop <親>` で
 親のワークツリーを消す（cwd が中にあれば消さず、外から打つ `ccnavi-clean.sh --worktree <親>` を出す。Draft を外す前と、
 外せなかったときは消さない）。互換の版が食い違っていても止めず、組み立て直しはユーザに頼むと言う。
+親は cwd から引くので、`request`・`confirm`・`decide`・`ready`（`--parent` なし）を統合先のブランチの上（ワークスペースルートなど）で打つと、sh はホストへ繋ぐ前に止まる。cwd を示して「親のワークツリーの中で打ってください」と言い、`次:` に `cd` 付きの打ち直しを出す。ホストは cwd の origin で決まるので、先に繋ぐと親のプロジェクトとは別のホストで止まってしまう。
 `ready --parent <親>` は親のワークツリーの外から打つ形。sh は `.claude/worktrees/<親>` へ移ってから origin・ブランチ・親の識別子を
 読み、実行ファイルにもそこを cwd として渡すので、条件の確かめ・退避・write-and-push・Draft 外しは中から打ったときと同じに進む。
 最後の `worktree drop` だけは打った場所へ戻ってから、打った場所を cwd として渡すので、親のワークツリーが消える。GitLab では、Draft を外すときに `squash` も
