@@ -3,7 +3,7 @@
     "PYTHONUTF8": "1",
     "ARCHIFY_UPDATE_CHECK_DISABLED": "1",
     "CCNAVI_GUARD_CORE_FILES": "dry-run",
-    "CCNAVI_MODE": "enable",
+    "CCNAVI_MODE": "dry-run",
     "CCNAVI_RESTORE_IF_DENY": "dry-run",
     "CCNAVI_ENTRY_PATH": ".ccnavi/scripts/ccnavi-launcher.sh",
     "CCNAVI_TICKET_CONTROL": "enable",
