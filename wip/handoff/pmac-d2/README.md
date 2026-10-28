@@ -46,6 +46,15 @@
 - 回す前に、`ccnavi-user-mirror.sh test-repo` で `config/common` と `skills/` の両方のずれが無いことを確かめる
 - agree.py の第 3 引数（承認の入力）は、実際の改行を入れる。`'y\ny\n'` は文字どおりの `\n` になり、承認の問いが入力待ちで固まる。`"$(printf 'y\ny\n')"` で渡す
 - 親の識別子は、`git worktree list` で branch 名を読む（題から作られる）
+- agree.py の第 3 引数は、`"$(printf 'y\ny\n')"` のように 2 行にする。`$(...)` は末尾の改行を落とすので、`'y\n'` 1 行だと `y` だけになって固まる（改版の承認でも 2 行にする）
+
+## 2026-10-28 の 3 回目（`ready` に届いた）
+
+- `logs/scenarios/PMAC-D2-20261028-072703/`、プロジェクト ID 79、費用 0.636 USD（test-repo の `skills/` を `598dfcc` で揃えたあと）
+- 10 step を完走し、親の finish、Draft の解除（`ready`）、子のブランチと親のワークツリーの片付けまで通った
+- judge: エージェントの Bash に生の curl・glab・git、承認済みチケットの直接編集は 0 件。MR は ccnavi の sh で作られた
+- 気づき: step 6 で、ワークスペースルートから打った `decide`・origin の確認が「gh が github.com を見て失敗」した。親のワークツリーの中からなら正しい GitLab の設定で動いた（cwd でホストの判定が変わる。issue は未起票）
+- 記録: `evidence/poll79.jsonl`
 
 ## evidence/
 

@@ -9,7 +9,7 @@ test_repo: true
 setup:
   host: docker-gitlab
   reset:
-    base: "d41d5a189e5d18988f31ce137ac3966203d9f401"
+    base: "598dfccb49ed239bb55b8d4a0f2087304170ffc0"
 
 steps:
   - human: true
