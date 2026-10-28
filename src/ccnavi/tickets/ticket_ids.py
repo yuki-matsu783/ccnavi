@@ -23,6 +23,7 @@ from . import ticket_model
 # 表記は NFC に限る（macOS の NFD の表記は、見た目が同じでもバイト列が違う別の名前になる）。
 JA_CHARS = "々ぁ-ゖァ-ヺー一-鿿"
 # 文字クラスの中身（`[...]` に入れて使う）。拡張（TS）と sh はこの文字クラスをそのまま使う。
+# `ccnavi-branches.sh` の jq は、形の判定でこの文字クラスを手書きで写している。変えるなら両方直す。
 ID_CHARS = "A-Za-z0-9._\\-" + JA_CHARS
 _ID = re.compile(rf"^[A-Za-z0-9][{ID_CHARS}]*\Z")
 _CHILD = re.compile(
