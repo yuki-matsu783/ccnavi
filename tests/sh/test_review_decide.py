@@ -100,12 +100,12 @@ STANDARD_TOOLS = (
     "awk",
     "tail",
     "sleep",
-    "find",
     "rmdir",
     "basename",
     "env",
-    "cut",
-    "hostname",
+    "xargs",
+    # Windows の PATH では System32 の find.exe（文字列検索）に解けてしまうので載せない
+    *(() if WINDOWS else ("find",)),
 )
 
 
