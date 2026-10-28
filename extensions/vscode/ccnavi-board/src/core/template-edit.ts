@@ -1,7 +1,7 @@
 /**
  * テンプレートの編集の手元のコピー。テンプレート管理画面の編集欄と拡張ホストが分け合う。
  *
- * ファイルは YAML の 1 文書（`.ccnavi/config/<層>/templates/<名前>.yml`）。形は実行ファイル（`plan_templates.py`）が読むもの。
+ * ファイルは YAML の 1 文書（`.ccnavi/config/<層>/templates/<名前>.yml`）。形は実行ファイル（`tickets/proposal/plan_templates.py`）が読むもの。
  *
  *     name, description, when?
  *     plan:     [型の名前 | {type, review?, after?}, ...]     全体計画。`after` は計画の中の添字（1 始まり）

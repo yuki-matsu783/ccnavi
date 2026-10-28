@@ -559,7 +559,7 @@ def run_probe() -> None:
             os.path.join(tree, "src", {"i0001-01-01": "a", "i0001-01-02": "b"}[child], "work.py"),
             f"# {child}\n",
         )
-        # finish では学びの記録が必須（learning.py の record_missing）。learn で雛形を書いてから
+        # finish では学びの記録が必須（tickets/learning/notes.py の record_missing）。learn で雛形を書いてから
         # 同じコミットに入れる（learnings: none のまま）
         learned = sh(TICKET_SH, tree, "learn")
         record(

@@ -1,6 +1,6 @@
 """閉じた親子のチケットの退避（`ready` が `logs/archive/` へ移す）。
 
-- 退避の構成と移し方（archive.py）
+- 退避の構成と移し方（tickets/model/archive.py）
 - `ready` が条件を確かめてから退避し、打ち直しても通ること
 - write-and-push の見分け（`write_and_push.classify_all`）
 と実行後チェック（`post_findings._script_writes`）が、
@@ -61,7 +61,7 @@ def closed_text(name, parent="", phase=None, predecessors=()):
 
 
 class ArchiveTreeHarness(unittest.TestCase):
-    """archive.py の構成と移し方。git は使わない。"""
+    """tickets/model/archive.py の構成と移し方。git は使わない。"""
 
     def setUp(self):
         self.root = tempfile.mkdtemp(prefix="ccnavi-archive-")
@@ -84,7 +84,7 @@ class ArchiveTreeHarness(unittest.TestCase):
 
 
 class ArchiveModuleTest(ArchiveTreeHarness):
-    """archive.py の構成と移し方。git は使わない。"""
+    """tickets/model/archive.py の構成と移し方。git は使わない。"""
 
     def test_plan_takes_only_closed_families(self):
         self.assertEqual(archive.closed_parents(self.approved), ["i0001", "old"])
@@ -490,7 +490,7 @@ class ReviewFindingsTest(ReadyHarness):
 
 
 class ArchiveModuleReviewTest(ArchiveTreeHarness):
-    """archive.py の指摘の再現。"""
+    """tickets/model/archive.py の指摘の再現。"""
 
     def test_7_a_parent_named_like_a_child_is_not_taken(self):
         write(os.path.join(self.approved, "done", "rel.md"), closed_text("rel"))
@@ -615,7 +615,7 @@ class SecondReviewTest(ReadyHarness):
 
 
 class SecondReviewModuleTest(ArchiveTreeHarness):
-    """2 回目のレビューの指摘の再現（archive.py）。"""
+    """2 回目のレビューの指摘の再現（tickets/model/archive.py）。"""
 
     def test_10_a_ticketless_child_flow_goes_with_its_family(self):
         write(os.path.join(self.approved, "flows", "i0001-01-09.yml"), "steps: []\n")

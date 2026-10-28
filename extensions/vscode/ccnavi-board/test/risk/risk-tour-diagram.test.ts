@@ -1,7 +1,7 @@
 /**
  * リスク管理の案内の時系列の図（`tours/risk.yml` の `diagrams:`）の検査。図の中の値（差分・点・合計・レベル・境目の点）が、
  * 見本の配点（`sample:`）をそのとおりに適用した結果と一致していること、新しい 2 本の案内の形を見る。
- * 点を数えるのは実行ファイルで、ここでは `risk.py` の `evaluate` と同じ数え方を小さく書き直して、図の数字と突き合わせる。
+ * 点を数えるのは実行ファイルで、ここでは `tickets/config/risk.py` の `evaluate` と同じ数え方を小さく書き直して、図の数字と突き合わせる。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";

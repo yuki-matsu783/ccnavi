@@ -2,7 +2,7 @@
 
 置き場は approval、合意の手続きは agree。ここは承認済みチケット・フェーズのマーカー・子の記録が
 どこにどう置かれているかを読み書きする。提案を集めてユーザに見せ、合意を受けて置き場へ動かす
-手続き（`ccnavi --agree`）は `agree.py` にある。approval は agree を知らない。
+手続き（`ccnavi --agree`）は `tickets/proposal/agree.py` にある。approval は agree を知らない。
 
 マーカーと記録の読み書きは `approval_marks`、構造の検査（親子・統合先・先行・プロジェクト）は
 `approval_checks`、承認の時刻（表示だけ）は `approval_times` に分けてある。
@@ -48,7 +48,7 @@
 ## フェーズのマーカー
 
 `phases/<親>/<N>.<種類>` に、依頼・レビュー済み・省略・通知済みのマーカーを置く。
-レビューが済むまで止める判定（phase.py）はこれを見る。中身は JSON 1 つで、いつ誰が置いたかが入る。
+レビューが済むまで止める判定（tickets/phase/gates.py）はこれを見る。中身は JSON 1 つで、いつ誰が置いたかが入る。
 
 ## 先行関係は計画から都度計算する
 

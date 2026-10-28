@@ -159,7 +159,7 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-user-*.sh は、ユーザだけがターミナルで打つ sh（エージェントからは hook が名前で止める）。
 # ccnavi-user-push-approved.sh は、ボードが承認のあとにターミナルへ送る 1 行の中身。
 # 配らないと、配布先のボードは承認済みチケットをコミットして push できない。
-# ccnavi-user-agree.sh はターミナルから承認するための sh。承認の案内（phase.py）がこのパスを表示するので、
+# ccnavi-user-agree.sh はターミナルから承認するための sh。承認の案内（tickets/phase/gates.py）がこのパスを表示するので、
 # 配らないと、案内どおりに実行しても動かない。ccnavi-user-decide.sh・
 # ccnavi-user-close-early.sh・ccnavi-user-clean-branch.sh は、残った指摘の対応方針・
 # 早めに閉じる判断・残った子のブランチの削除。ccnavi-user-lib-review.sh は、decide と close-early が読む、

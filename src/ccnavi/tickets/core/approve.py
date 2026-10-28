@@ -63,7 +63,7 @@ def refusal_code(verdict: core_base.Verdict) -> str:
 # ---- 手元の入口（`--agree`。
 # ターミナル・ボードの `--yes`・`--preview`・`--verify`） ------------------
 #
-# 前は approval.py にあった。コアを通す入口なので、コアより下の段（agree）には置かない
+# 前は tickets/approval/store.py にあった。コアを通す入口なので、コアより下の段（agree）には置かない
 # （agree → core → agree の循環になる。tests/core/test_module_layers.py）。
 
 

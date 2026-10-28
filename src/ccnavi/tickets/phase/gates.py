@@ -194,7 +194,7 @@ class Phase:
             for t in self.tickets
             if self.states.get(t.ticket) in (ticket_model.REVIEW, ticket_model.DONE)
         )
-        # 実績のリスクは、宣言を厳しい側にだけ上書きする（risk.py）。
+        # 実績のリスクは、宣言を厳しい側にだけ上書きする（tickets/config/risk.py）。
         needed = from_children or self.risk_escalates
         declared = [d for d in [self.declared_review, *self.covered_reviews] if d is not None]
         if not declared:

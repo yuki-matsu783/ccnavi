@@ -75,7 +75,7 @@ def _hint(conf: settings.Settings, root: str, payload: hookio.Input) -> str:
     if parent:
         matched = ticket_ids.child_pattern().match(name)
         if matched is not None:
-            # 子の形。親の欄は求めない。別の親を指す誤りは読み込み（ticket.py）のエラー文が言う
+            # 子の形。親の欄は求めない。別の親を指す誤りは読み込み（tickets/model/ticket.py）のエラー文が言う
             return ""
         return (
             f"[ccnavi] {CODE_PARENT_KEY} ({rel}) 識別子 {name} は子の形ではないのに `parent:` が"

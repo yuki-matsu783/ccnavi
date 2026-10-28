@@ -31,7 +31,7 @@ DOING = "doing"
 DONE = "done"
 # 取り消しは置き場ではなく欄。`done/` に在って `cancelled_at` を持つものをこう呼ぶ。
 CANCELLED = "cancelled"
-# 提案の置き場を走査する状態。承認済みチケットの置き場は approval.py が読む。
+# 提案の置き場を走査する状態。承認済みチケットの置き場は tickets/approval/store.py が読む。
 STATES = (TODO, REVIEW)
 # 終わった状態。フェーズの終わりはこれで数える（レビュー待ちも作業としては終わっている）。
 FINISHED = (REVIEW, DONE, CANCELLED)

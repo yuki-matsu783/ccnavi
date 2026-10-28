@@ -4,7 +4,7 @@
 （`unfinished_at_stop`）、促しを 1 回だけ出す
 （`nudged_before` / `remember_nudge` / `finish_nudge`）。
 `base_off_head` は基準点がワークツリーの HEAD の祖先かを見る。
-`worktree_head_sha` は `ops.py` も使う。
+`worktree_head_sha` は `tickets/lifecycle/commands.py` も使う。
 """
 
 from __future__ import annotations

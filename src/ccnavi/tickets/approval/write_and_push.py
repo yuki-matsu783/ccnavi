@@ -21,7 +21,7 @@
     コミットに入った変更（取り込みの後に未送信を確かめる分）
   - (b) ccnavi が書いたと内容で分かるもの。hook のフェーズの終わりの告知が置く、その親子のチケットの
     `phases/<親>/<N>.pending`・`.skipped` だけ。`reviewed` は入れない。
-    もう 1 つは `ready` の退避（archive.py）が消したもの。ready のマーカー
+    もう 1 つは `ready` の退避（tickets/model/archive.py）が消したもの。ready のマーカー
     （`logs/archive/<リポジトリ>/ready/<親>.json`。このツリーから移したファイルの一覧）に載っている削除で、消えた中身が
     退避したコピーと同じものだけ
   - (c) ユーザがコミットするもの（ユーザの判断）。write-and-push はコミットせずに止める。
@@ -335,7 +335,7 @@ def archived_removal(
     root: str,
     project: str,
 ) -> bool:
-    """`ready` の退避が消したものか（archive.py）。`rel` は承認済みの領域からの相対。
+    """`ready` の退避が消したものか（tickets/model/archive.py）。`rel` は承認済みの領域からの相対。
 
     ready のマーカー（`archive.ready_files`。そのツリーから ready が移したファイルの一覧）に
     載っていて、

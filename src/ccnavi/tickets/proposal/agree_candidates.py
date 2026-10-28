@@ -23,7 +23,7 @@ class Candidate:
     """承認の対象の 1 件。新規の提案か、親の改版か。
 
     リスクの点はここに無い。点は子を閉じるときに実績（差分）で数え、宣言の広さでは
-    数えない（risk.py）。宣言の広さは、親が `human_review.reason` で言う。
+    数えない（tickets/config/risk.py）。宣言の広さは、親が `human_review.reason` で言う。
     """
 
     ticket: ticket_model.Ticket
