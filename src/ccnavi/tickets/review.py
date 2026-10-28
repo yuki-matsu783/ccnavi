@@ -57,11 +57,13 @@ from . import (
     approval_checks,
     approval_marks,
     approval_ops,
+    configsync,
     handoff,
     ops_close,
     phase,
     phase_forms,
     review_host,
+    skillsync,
     ticket_fields,
     ticket_model,
     ticket_places,
@@ -524,8 +526,8 @@ def _unseen_by_review(conf: settings.Settings, path: str) -> bool:
     説明を直すたびに依頼のコメントが増え、レビュー済みにしにくくなる。代わりに、
     直した ELI5 をユーザが見直す保証は無くなる。
 
-    未コミットの検査（`_dirty`）と push の検査（`_unpushed`）はこれを使わない。ELI5 の未コミットは
-    sh が依頼のときに止め、push していない ELI5 はマージリクエストの差分に無い
+    未コミットの検査（`_dirty_paths`）と push の検査（`_unpushed`）はこれを使わない。
+    ELI5 の未コミットは sh が依頼のときに止め、push していない ELI5 はマージリクエストの差分に無い
     （crit push が届かない）。
     """
     # git の `-z` の表記をそのまま見る（`\` を `/` に直さない。`_outside_approved` と同じ理由）。
@@ -583,8 +585,8 @@ def _diff_paths(tree_root: str, ref: str) -> tuple[list[str], str]:
     return [path for path in out.split("\0") if path], ""
 
 
-def _dirty(tree_root: str, conf: settings.Settings, wip_removals: bool = False) -> bool:
-    """ワークツリーに、ccnavi 自身の置き場を除いた未コミットの変更があるか。
+def _dirty_paths(tree_root: str, conf: settings.Settings, wip_removals: bool = False) -> list[str]:
+    """ワークツリーの、ccnavi 自身の置き場を除いた未コミットの変更のパス。読めなければ `[""]`。
 
     承認済みチケットとマーカーはこのワークツリーの `.ccnavi/` に置かれ、git が追跡する。
     マーカーはフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
@@ -596,11 +598,12 @@ def _dirty(tree_root: str, conf: settings.Settings, wip_removals: bool = False) 
         tree_root, ["status", "--porcelain", "-z", "--untracked-files=no", "--no-renames"]
     )
     if rc != 0:
-        return True
+        return [""]
     # `-z` で読む。既定の出力は非 ASCII を引用符で囲んで 8 進でエスケープするので、置き場の中の
     # 日本語のファイルが置き場の外と判定され、「未コミットがある」で依頼が止まる。
     # `--no-renames` は、改名のときに出る 2 つめのパス（移動元）が XY を持たない形で
     # 入り込むのを避けるため。phase_scope.scope_findings と同じ読み方。
+    paths: list[str] = []
     for entry in status.split("\0"):
         if len(entry) > 3 and entry[2] == " " and not _is_own_place(conf, entry[3:]):
             if wip_removals and "D" in entry[:2] and in_wip(entry[3:]):
@@ -608,8 +611,44 @@ def _dirty(tree_root: str, conf: settings.Settings, wip_removals: bool = False) 
                 # write-and-push の外では sh がコミットと push を求めて止める。打ち直しの ready
                 # は止めない。
                 continue
-            return True
-    return False
+            paths.append(entry[3:])
+    return paths
+
+
+def _mirror_prefixes(conf: settings.Settings) -> tuple[str, ...]:
+    """プロジェクトのツリーで ccnavi がコピーを置く場所。ルートからの相対パスで、末尾に `/` を付け、
+    大文字小文字は畳んである。共通レイヤーのミラーと工程スキルの 2 つ。"""
+    mirror = configsync.mirror_dir(conf, "").replace(os.sep, "/").strip("/")
+    return (pathcase.fold(mirror + "/"), pathcase.fold(skillsync.SKILLS_DIR + "/"))
+
+
+def _dirty_problem(conf: settings.Settings, paths: list[str]) -> str:
+    """未コミットの変更があるために止めるときの文面。
+
+    変更がミラーのコピー先（共通レイヤー・工程スキル）にあるなら、作業の変更ではなく、
+    共通レイヤーとのずれである。承認の範囲を超えるコミットは促さず、
+    揃える手順（ユーザの操作）を案内する。
+    """
+    base = "親のワークツリーに未コミットの変更がある"
+    prefixes = _mirror_prefixes(conf)
+    mirrored = [p for p in paths if pathcase.fold(p).startswith(prefixes)]
+    if not mirrored:
+        return base
+    shown = "、".join(mirrored[:10]) + (
+        f" ほか {len(mirrored) - 10} 件" if len(mirrored) > 10 else ""
+    )
+    others = len(paths) - len(mirrored)
+    lead = (
+        f"{base}（共通レイヤーのコピーとのずれ: {shown}）。ずれの分は作業による変更ではないため、"
+        "コミットも取り消しもしない。"
+    )
+    if others:
+        lead += f"ずれ以外の変更が {others} 件ある。そちらは作業の変更として扱う。"
+    return (
+        lead + "ユーザには、`ccnavi-user-mirror.sh <プロジェクト名>` で差分と値を確かめ、"
+        "`--yes --expect <値>` で共通レイヤーのミラーを揃えて、統合先にコミットしてもらうよう頼む。"
+        "`skills/` のずれはその操作では揃わないため、統合先で揃えてコミットしてもらう"
+    )
 
 
 def in_wip(path: str) -> bool:
@@ -700,8 +739,9 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
             "`ccnavi-user-handoff.sh` で取り込んでもらうか、要らない下書きを削除してから"
             "再実行してください"
         )
-    if _dirty(tree_root, conf, wip_removals=True):
-        problems.append("親のワークツリーに未コミットの変更がある")
+    dirty = _dirty_paths(tree_root, conf, wip_removals=True)
+    if dirty:
+        problems.append(_dirty_problem(conf, dirty))
     branch = _branch(tree_root)
     if not branch:
         problems.append("親ブランチの名前を読めない")
@@ -943,8 +983,9 @@ def _unmet(root: str, tree_root: str, conf: settings.Settings, ph: phase.Phase) 
             )
     # 未追跡は数えない。依頼文そのものをワークツリーに置く使い方が普通にあり、未追跡で
     # 前提を満たさないと判定すると依頼文を書く場所が無くなる。未追跡はマージリクエストに載らない。
-    if _dirty(tree_root, conf):
-        unmet.append("親のワークツリーに未コミットの変更がある")
+    dirty = _dirty_paths(tree_root, conf)
+    if dirty:
+        unmet.append(_dirty_problem(conf, dirty))
     branch = _branch(tree_root)
     if not branch:
         unmet.append("親ブランチの名前を読めない")
@@ -1036,7 +1077,7 @@ def _moved_detail(tree_root: str, conf: settings.Settings, requested_mark: dict)
     数えると「依頼 → マーカー → コミット」の順のせいで、依頼の直後に必ず自分のマーカーの
     コミットで「動いた」と判定され、
     承認の push（`ccnavi-user-push-approved.sh`）が置き場をまとめてコミットするので、レビューを
-    待っている間の承認でも依頼が無効になる。未コミットの側は `_dirty` が同じ理由で外しており、
+    待っている間の承認でも依頼が無効になる。未コミットの側は `_dirty_paths` が同じ理由で外しており、
     基準をそこに揃える。ユーザがレビューで見るものは 1 バイトも変わらない。
 
     push の判定も同じ基準で見る。置き場だけが手元に残っていても、リモートにあるものと
