@@ -12,7 +12,8 @@ from __future__ import annotations
 
 from ..infra import settings
 from ..policy.rules import Problem
-from ..tickets import plan_templates, template_drafts
+from ..tickets import template_drafts
+from ..tickets.proposal import plan_templates
 
 
 def where(layer: str) -> str:

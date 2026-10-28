@@ -7,15 +7,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ..infra import gitstate, settings, tree
-from ..policy import rules
-from .approval import checks as approval_checks
-from .approval import ops as approval_ops
-from .approval import store as approval
-from .config import phasetypes, workflow
-from .model import proposal_form, standing, ticket_ids, ticket_model
-from .model import ticket as ticket_mod
-from .phase import gates as phase
+from ...infra import gitstate, settings, tree
+from ...policy import rules
+from ..approval import checks as approval_checks
+from ..approval import ops as approval_ops
+from ..approval import store as approval
+from ..config import phasetypes, workflow
+from ..model import proposal_form, standing, ticket_ids, ticket_model
+from ..model import ticket as ticket_mod
+from ..phase import gates as phase
 
 
 @dataclass

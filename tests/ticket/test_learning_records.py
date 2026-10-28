@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi.tickets import learning_records as lr
+from ccnavi.tickets.learning import records as lr
 
 HEAD = "---\nticket: c-01-01\nparent: c\nlearnings: {n}\n---\n\n"
 SEC = "## {t}\n\n- 種類: 未定\n- 内容: x\n{p}\n"

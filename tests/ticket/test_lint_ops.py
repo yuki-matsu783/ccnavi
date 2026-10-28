@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import os
 
-from ccnavi.tickets import agree_candidates
 from ccnavi.tickets.model import ticket_model
+from ccnavi.tickets.proposal import agree_candidates
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, write
 

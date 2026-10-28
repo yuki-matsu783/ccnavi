@@ -76,14 +76,14 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from ..infra import pathsafe, settings, tree
-from ..policy import ruleload
-from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
+from ...infra import pathsafe, settings, tree
+from ...policy import ruleload
+from ...policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
+from ..config import phasetypes, workflow
+from ..flow import graph as flow
+from ..flow import shape as flow_shape
+from ..model import ticket, ticket_ids, ticket_model
 from . import agree_candidates
-from .config import phasetypes, workflow
-from .flow import graph as flow
-from .flow import shape as flow_shape
-from .model import ticket, ticket_ids, ticket_model
 
 SUFFIX = flow.SUFFIX
 FIELDS = ("name", "description", "when", "plan", "feedback", "flows")

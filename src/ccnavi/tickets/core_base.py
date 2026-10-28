@@ -37,12 +37,8 @@ from dataclasses import dataclass, field
 from typing import TextIO
 
 from ..infra import fsio, pathcase, settings, tree
-from . import (
-    agree,
-    agree_candidates,
-    agree_digest,
-    review,
-)
+from . import review
+from .proposal import agree, agree_candidates, agree_digest
 
 # ---- 入力 -----------------------------------------------------------------------------------
 

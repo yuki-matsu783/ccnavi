@@ -627,7 +627,7 @@ class ApproveJsonTest(PhaseHarness):
 
     def test_the_digest_is_taken_from_the_bytes_that_were_parsed(self):
         """解析したあと照合の前に元に戻されても、解析した中身（見せていない）を照合で通さない。"""
-        from ccnavi.tickets import agree_digest
+        from ccnavi.tickets.proposal import agree_digest
 
         self.pending_parent_and_child()
         shown = self.preview()

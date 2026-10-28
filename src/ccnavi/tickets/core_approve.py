@@ -14,9 +14,10 @@ import os
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, modes, pathcase, settings, tree
-from . import agree, agree_candidates, agree_screen, core_base, worktrees
+from . import core_base, worktrees
 from .approval import store as approval
 from .model import ticket_places
+from .proposal import agree, agree_candidates, agree_screen
 
 _GIT_TIMEOUT = 20.0
 _SHOWN_PATHS = 8

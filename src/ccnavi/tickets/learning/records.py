@@ -20,8 +20,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from ..infra import gitcmd, pathcase, yamlread
-from ..records import wiki
+from ...infra import gitcmd, pathcase, yamlread
+from ...records import wiki
 
 LEARNING_DIR = "wip/handoff/learnings"
 INBOX_DIR = "docs/wiki/inbox"

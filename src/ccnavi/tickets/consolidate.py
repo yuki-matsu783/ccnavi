@@ -28,10 +28,12 @@ from typing import TextIO
 
 from ..infra import fsio, settings, tree
 from ..policy import rules
-from . import learning, learning_records, ops_close
+from . import ops_close
 from .approval import marks as approval_marks
 from .approval import ops as approval_ops
 from .approval import store as approval
+from .learning import notes as learning
+from .learning import records as learning_records
 from .model import ticket as ticket_mod
 from .model import ticket_model
 

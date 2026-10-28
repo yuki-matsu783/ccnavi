@@ -14,7 +14,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.infra import pathsafe
-from ccnavi.tickets import learning
+from ccnavi.tickets.learning import notes as learning
 from ccnavi.tickets.model import archive
 
 

@@ -23,11 +23,11 @@ import os
 import textwrap
 
 from ccnavi.infra import settings
-from ccnavi.tickets import agree_candidates, plan_templates
 from ccnavi.tickets.config import phasetypes, workflow
 from ccnavi.tickets.flow import graph as flow
 from ccnavi.tickets.model import proposal_form
 from ccnavi.tickets.model import ticket as ticket_mod
+from ccnavi.tickets.proposal import agree_candidates, plan_templates
 from tests.ticket.test_parent_phases import front_of
 from tests.ticket.test_template_drafts import FLOW_IMPL, Drafts, target_rel
 from tests.ticket.test_ticket import git, write
@@ -526,7 +526,7 @@ class RoundTripTest(Use):
         self.assertIn("フィードバック計画（2 ステップ）がある", result.stdout)
 
     def test_absolute_is_the_inverse_of_the_draft_normalization(self):
-        from ccnavi.tickets import template_use
+        from ccnavi.tickets.proposal import template_use
 
         template = plan_templates.Template(
             name="t",

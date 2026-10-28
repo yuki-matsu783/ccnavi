@@ -13,7 +13,7 @@ from typing import TextIO
 from ..infra import modes, pathcase, settings, tree
 from ..policy import ruleload, rules, selfguard
 from ..records import turn
-from ..tickets import agree, overview
+from ..tickets import overview
 from ..tickets.approval import checks as approval_checks
 from ..tickets.approval import marks as approval_marks
 from ..tickets.approval import store as approval
@@ -24,6 +24,7 @@ from ..tickets.model import archive, oplog, standing, ticket_fold, ticket_model
 from ..tickets.model import ticket as ticket_mod
 from ..tickets.phase import gates as phase
 from ..tickets.phase import manual_settle
+from ..tickets.proposal import agree
 from . import diagnose_shared
 
 # `--explain --json` の形の版。読み手（VS Code 拡張）が形の違いに気づけるように。

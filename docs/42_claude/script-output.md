@@ -76,11 +76,11 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チ
 | `ccnavi-start.sh --dry-run` | `--dry-run` を外した同じコマンド | `ccnavi-start.sh` の `real_args` |
 | `ccnavi-stage.sh` | 下書きを編集し、ユーザに `ccnavi-user-handoff.sh` での取り込みを案内する | `ccnavi-stage.sh` |
 | `ccnavi-review.sh` の早めに閉じた | 親に閉じて片付け、`ready` を打たせる | `ccnavi-review.sh` |
-| `ccnavi ticket new` の成功 | 提案を書き、`--lint` と `--agree --preview --verify` を通し、`ccnavi-ticket.sh propose` で親のブランチへ送り、ユーザに承認を頼む | `tickets/scaffold.py` |
+| `ccnavi ticket new` の成功 | 提案を書き、`--lint` と `--agree --preview --verify` を通し、`ccnavi-ticket.sh propose` で親のブランチへ送り、ユーザに承認を頼む | `tickets/proposal/scaffold.py` |
 | `ccnavi-ticket.sh propose` の成功 | ユーザに承認を頼んで返事を待つ | `ccnavi-ticket.sh` |
-| `ccnavi-ticket.sh propose` が親の計画の誤りで断る | 直して `propose` を打ち直す（指摘の行は `workflow` の返す文面をそのまま出す） | `tickets/propose.py` |
-| `ccnavi --agree --preview --verify` | 通れば承認を頼む。通らなければ提案を直して打ち直す | `tickets/agree.py` |
-| 承認後の通知 | 親の `start`、子の `start` | `tickets/agree_screen.py` |
+| `ccnavi-ticket.sh propose` が親の計画の誤りで断る | 直して `propose` を打ち直す（指摘の行は `workflow` の返す文面をそのまま出す） | `tickets/proposal/propose.py` |
+| `ccnavi --agree --preview --verify` | 通れば承認を頼む。通らなければ提案を直して打ち直す | `tickets/proposal/agree.py` |
+| 承認後の通知 | 親の `start`、子の `start` | `tickets/proposal/agree_screen.py` |
 | `ccnavi-ticket.sh start`（子） | サブエージェントに実装を任せ、終わったら `finish` | `tickets/ops.py` |
 | `ccnavi-ticket.sh start`（親で子の無いフェーズが残る） | フェーズごとに子チケットを作る | `tickets/ops_plan.py` |
 | `ccnavi-ticket.sh finish`（子で、レビュー不要） | 親の `status` | `tickets/ops.py` |

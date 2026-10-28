@@ -16,7 +16,7 @@ from unittest import mock
 from ccnavi.infra import settings
 from ccnavi.infra import tree as tree_mod
 from ccnavi.records import redact
-from ccnavi.tickets import learning
+from ccnavi.tickets.learning import notes as learning
 from tests import requires_symlink
 from tests.inproc import run_ccnavi
 

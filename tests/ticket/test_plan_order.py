@@ -24,9 +24,9 @@ import unittest
 
 import yaml
 
-from ccnavi.tickets import agree_candidates, agree_screen, plan_order
 from ccnavi.tickets.model import phase_forms, ticket_model
 from ccnavi.tickets.model import ticket as ticket_mod
+from ccnavi.tickets.proposal import agree_candidates, agree_screen, plan_order
 from tests.ticket.test_board import _portable
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, write

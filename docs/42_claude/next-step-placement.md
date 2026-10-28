@@ -20,7 +20,7 @@ keywords: [次の一手, 置き場, 分担, SessionStart, UserPromptSubmit, PreT
 | SessionStart（`hook/events.py` の `decide_at_start`。サブエージェントには出さない） | 作業の決まり（`hook/ccnavimd.py` が `.ccnavi/CCNAVI.md` の条件と差し込みを解く） | 状態は読まない。ルールの有無・付き添いの有無・入口の有無で行を選ぶ | セッションの文脈 |
 | 同上 | 今の現況（`tickets/overview.py` の作業中の親の一覧）、却下された要求（`tickets/session_rejects.py`）、終わっていない integrate の続きの一手（`tickets/pending_integrate.py`） | 手元のファイルと git の ref。ネットワークには出ない。期限を超えたら打ち切る | セッションの文脈。却下された要求と integrate は、ユーザにも出す |
 | 同上 | 道具の案内（`selfguard.report`、`docsearch.at_start`、`projskills.notice`） | 設定ファイル・索引・cwd | セッションの文脈 |
-| UserPromptSubmit（`decide_at_prompt`） | 依頼文の issue・MR への指示（`tickets/branchfind.py` の `prompt_context`）、終わったサブエージェントの印（`hook/subagent.py` の `unchecked_scope`・`outcome_notices`）、手で `done/` に動かされた子の確定待ち（`_manual_confirm_note`） | 依頼文、`state` の印、承認済みチケットの置き場 | 文脈に足すだけで、止めない。承認後の知らせは hook でなく拡張が渡す（`tickets/agree_screen.py` の `approved_text`） |
+| UserPromptSubmit（`decide_at_prompt`） | 依頼文の issue・MR への指示（`tickets/branchfind.py` の `prompt_context`）、終わったサブエージェントの印（`hook/subagent.py` の `unchecked_scope`・`outcome_notices`）、手で `done/` に動かされた子の確定待ち（`_manual_confirm_note`） | 依頼文、`state` の印、承認済みチケットの置き場 | 文脈に足すだけで、止めない。承認後の知らせは hook でなく拡張が渡す（`tickets/proposal/agree_screen.py` の `approved_text`） |
 | PreToolUse | 拒否・確認（組み込みの関門とルールの `deny`・`ask`。拒否の文は `.ccnavi/messages/deny-*.yml`、確認の理由は `hook/reasons.py` の `ask_hint`） | ツール呼び出しの対象（コマンド・パス・名前）と、ファイルだけで引ける状態。hook は git もネットワークも起こさない | 拒否の文・確認の理由 |
 | 同上 | 止めない案内（ルールの `additionalContext`・`additionalContextOnce` と `…File`。`policy/ctxfile.py`）、サブエージェントの起動前のプロンプトへの書き足し（`hook/agentlaunch.py`） | 同上 | 文脈 |
 | PostToolUse | 書いた結果への案内と報告（`hook/proposalhint.py`、`hook/post.py`・`post_report.py`） | 書いたファイルと実行後のツリー | 文脈、実行後チェックの差し戻しの文 |

@@ -51,14 +51,14 @@ import unicodedata
 from dataclasses import dataclass
 from typing import TextIO
 
-from ..infra import fsio, pathsafe, settings, tree
-from ..infra.modes import EXIT_ERROR, EXIT_OK
-from ..policy.rules import SEVERITY_ERROR
+from ...infra import fsio, pathsafe, settings, tree
+from ...infra.modes import EXIT_ERROR, EXIT_OK
+from ...policy.rules import SEVERITY_ERROR
+from ..config import phasetypes
+from ..flow import graph as flow
+from ..model import proposal_form, standing, ticket_ids, ticket_model
+from ..model import ticket as ticket_mod
 from . import agree_candidates, plan_phases, plan_templates, template_use
-from .config import phasetypes
-from .flow import graph as flow
-from .model import proposal_form, standing, ticket_ids, ticket_model
-from .model import ticket as ticket_mod
 
 # `allow` に書く項の `match`。判定に使われるのは Write / Edit / NotebookEdit を含む項だけ。
 ALLOW_MATCH = "Write|Edit"

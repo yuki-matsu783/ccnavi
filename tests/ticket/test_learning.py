@@ -7,7 +7,7 @@ import os
 import tempfile
 import unittest
 
-from ccnavi.tickets import learning
+from ccnavi.tickets.learning import notes as learning
 
 
 class LearningTest(unittest.TestCase):

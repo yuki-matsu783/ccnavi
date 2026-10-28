@@ -32,15 +32,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from ..infra import fsio, settings
-from ..policy import rules
+from ...infra import fsio, settings
+from ...policy import rules
+from ..approval import checks as approval_checks
+from ..approval import marks as approval_marks
+from ..approval import ops as approval_ops
+from ..approval import store as approval
+from ..model import ticket_model
+from ..phase import gates as phase
 from . import agree_candidates, agree_digest, agree_screen, plan_order
-from .approval import checks as approval_checks
-from .approval import marks as approval_marks
-from .approval import ops as approval_ops
-from .approval import store as approval
-from .model import ticket_model
-from .phase import gates as phase
 
 # 承認の JSON の版。`--agree --preview --json` と `--agree --yes … --json` が出す。
 # VS Code のボード拡張が読み、知らない番号なら読まずに版の違いを言う。

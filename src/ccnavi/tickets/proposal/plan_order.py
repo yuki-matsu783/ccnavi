@@ -44,16 +44,16 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from ..infra import fsio, settings, tree
-from ..policy import rules
+from ...infra import fsio, settings, tree
+from ...policy import rules
+from ..approval import checks as approval_checks
+from ..approval import marks as approval_marks
+from ..approval import store as approval
+from ..config import phasetypes, workflow
+from ..flow import graph as flow
+from ..model import ticket as ticket_mod
+from ..model import ticket_ids, ticket_model
 from . import agree_candidates
-from .approval import checks as approval_checks
-from .approval import marks as approval_marks
-from .approval import store as approval
-from .config import phasetypes, workflow
-from .flow import graph as flow
-from .model import ticket as ticket_mod
-from .model import ticket_ids, ticket_model
 
 # `--plan-order <親> --json` の答えの版。欄を足すだけなら上げない。
 VERSION = 1

@@ -25,13 +25,14 @@ from typing import TextIO
 
 from ..infra import fsio, gitcmd, gitstate, settings, tree
 from ..policy import texts
-from . import learning, ops_close, ops_plan, ops_stop, template_drafts, worktrees
+from . import ops_close, ops_plan, ops_stop, template_drafts, worktrees
 from .approval import checks as approval_checks
 from .approval import marks as approval_marks
 from .approval import ops as approval_ops
 from .approval import store as approval
 from .config import risk
 from .flow import graph as flow
+from .learning import notes as learning
 from .model import ticket_model, ticket_places
 from .phase import gates as phase
 

@@ -26,12 +26,12 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from ..infra import fsio, settings
-from ..policy import rules
+from ...infra import fsio, settings
+from ...policy import rules
+from ..config import phasetypes
+from ..model import ticket as ticket_mod
+from ..model import ticket_model
 from . import agree_candidates, plan_order
-from .config import phasetypes
-from .model import ticket as ticket_mod
-from .model import ticket_model
 
 _KEY_LINE = re.compile(rf"^{re.escape(phasetypes.COPY_KEY)}\s*:")
 _PLAN_LINE = re.compile(r"^plan\s*:")

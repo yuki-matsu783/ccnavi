@@ -14,9 +14,9 @@ import unittest
 from unittest import mock
 
 from ccnavi.infra import settings
-from ccnavi.tickets import agree_candidates
 from ccnavi.tickets.model import ticket as ticket_mod
 from ccnavi.tickets.model import ticket_model
+from ccnavi.tickets.proposal import agree_candidates
 
 
 def parent_text(issue):

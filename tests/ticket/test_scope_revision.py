@@ -15,9 +15,9 @@ import unittest
 from unittest import mock
 
 from ccnavi.infra import settings
-from ccnavi.tickets import agree_candidates, agree_digest, agree_screen
 from ccnavi.tickets.approval import store as approval
 from ccnavi.tickets.model import ticket as ticket_mod
+from ccnavi.tickets.proposal import agree_candidates, agree_digest, agree_screen
 from tests.ticket.test_phases import PhaseHarness, child_text
 from tests.ticket.test_phases import parent_text as plan_parent_text
 

@@ -1325,7 +1325,7 @@ class RecordWritesTest(CoreHarness):
         }
         names = (
             "tickets.approval.store",
-            "tickets.agree",
+            "tickets.proposal.agree",
             "tickets.model.via",
             "tickets.configsync",
         )
@@ -1349,7 +1349,11 @@ class RecordWritesTest(CoreHarness):
             "tickets.model.ticket_guard",
             "tickets.model.ticket_fields",
         )
-        names += ("tickets.agree_candidates", "tickets.agree_digest", "tickets.agree_screen")
+        names += (
+            "tickets.proposal.agree_candidates",
+            "tickets.proposal.agree_digest",
+            "tickets.proposal.agree_screen",
+        )
         names += ("tickets.model.phase_forms", "tickets.phase.scope")
         names += ("tickets.flow.text", "tickets.flow.shape", "tickets.flow.render")
         names += ("tickets.approval.ops", "tickets.ops_close", "tickets.ops_stop")

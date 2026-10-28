@@ -23,13 +23,13 @@ import os
 import unittest
 
 from ccnavi.infra import settings
-from ccnavi.tickets import agree_candidates
 from ccnavi.tickets.approval import checks as approval_checks
 from ccnavi.tickets.approval import marks as approval_marks
 from ccnavi.tickets.approval import store as approval
 from ccnavi.tickets.config import phasetypes, workflow
 from ccnavi.tickets.model import ticket as ticket_mod
 from ccnavi.tickets.model import ticket_model
+from ccnavi.tickets.proposal import agree_candidates
 from tests import config_path
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, write

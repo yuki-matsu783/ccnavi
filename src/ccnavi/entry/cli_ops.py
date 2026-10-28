@@ -19,20 +19,19 @@ from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..tickets import (
     consolidate,
     core,
-    learning,
     next_id,
     ops,
-    propose,
     retire,
     review,
     review_close,
     review_decide,
-    scaffold,
     worktrees,
 )
 from ..tickets.approval import write_and_push
+from ..tickets.learning import notes as learning
 from ..tickets.model import oplog, ticket_ids, user_only, via
 from ..tickets.phase import gates as phase
+from ..tickets.proposal import propose, scaffold
 from . import cli_args, cli_usage, lint, status
 
 

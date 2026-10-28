@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import hashlib
 
-from ..infra import fsio
-from ..policy import rules
+from ...infra import fsio
+from ...policy import rules
+from ..approval import marks as approval_marks
+from ..approval import store as approval
+from ..model import ticket as ticket_mod
+from ..model import ticket_model
 from . import agree_candidates
-from .approval import marks as approval_marks
-from .approval import store as approval
-from .model import ticket as ticket_mod
-from .model import ticket_model
 
 
 def proposals_digest(batch: list[agree_candidates.Candidate]) -> str:
