@@ -27,7 +27,8 @@ sh はチケットの YAML も JSON も自分で読まない。読むのは実�
   案内するか決めるために聞く）。`leftover yes|no`、`proposal yes|no`（`todo/`・`review/` の提案）、
   `doing <件数>`（`doing/` の子）、`mr <番号>|-`（親の `mr:`）、`stage doing|review|todo|-`
   （親の段階。優先順位は doing > review > todo。親でない・読めないときは `-`。
-  `ccnavi-worktree.sh` は `doing`・`review`、または `doing` の件数が 1 以上のとき、切る前に断る）。
+  `stage` が `doing`・`review` のとき、または `doing` の件数が 1 以上のときは、
+  `ccnavi-worktree.sh` が切る前に断る）。
   親でなければ `leftover no`。
 
 - `ccnavi tree base-bound <ユーザのチェックアウト> <ブランチ>`: 直接作業の取り込み先のブランチが、
@@ -212,7 +213,11 @@ def leftover_tree(
         ("review", True, os.path.join(proposals, ticket_model.REVIEW, f"{name}.md")),
     ):
         front = _front(fsio.read_text(path_of_parent))
-        if front is None or str(front.get("ticket") or "").strip() != name or front.get("parent"):
+        if (
+            front is None
+            or pathcase.fold(str(front.get("ticket") or "").strip()) != pathcase.fold(name)
+            or front.get("parent")
+        ):
             continue
         found.add(stage_name)
         proposal = YES if held or proposal == YES else NO

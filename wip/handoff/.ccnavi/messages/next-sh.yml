@@ -41,7 +41,7 @@ messages:
   NEXT_WORKTREE_PARENT_ACTIVE:
     kind: next
     next: |-
-      状況をユーザに報告し、親を早めに閉じるか子を取り下げるかの判断を頼んで、返事を待つ。直接実装に切り替えず、ユーザに報告して止まる
+      状況をユーザに報告し、親を早めに閉じるか子を取り下げるかを決めてもらう。返事が来るまで止まり、直接実装には切り替えない
 
   NEXT_WORKTREE_CONFIRM:
     kind: next

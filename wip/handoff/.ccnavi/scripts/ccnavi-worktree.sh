@@ -293,7 +293,7 @@ esac
 
 # 親のワークツリーから直接作業へ切り替えられるのは、承認依頼の時点（親の提案が todo/ にあり、承認前）だけ。
 # 承認済み・レビュー待ち・着手済みの子があると、切り替えても取り下げられないものが残るので、切る前に断る。
-# 断るのは cwd が親のワークツリーのときだけ（ワークスペースのルートや子のワークツリーから打てば掛からない。意図した抜け道）。
+# 断るのは cwd が親のワークツリーのときだけ（ワークスペースのルートや子のワークツリーから打てば掛からない。意図して残した抜け道）。
 # 実行ファイルに聞けない・古くて stage が無いときは通す。--adopt は対象外（親のワークツリーの引き取りは adopt-ticket が断る）。
 if [ -z "$adopt" ]; then
 	pb_name=$(basename "$top")
@@ -314,7 +314,7 @@ if [ -z "$adopt" ]; then
 			log_info 親のワークツリーから切り替えない -- "parent=$pb_name" "stage=$pb_stage" "doing=$pb_doing"
 			printf 'ccnavi-worktree: ワークツリーは切っていない。親のワークツリー（%s）から直接作業へは切り替えられない。%s。\n' "$pb_name" "$pb_why" >&2
 			printf '親のワークツリーから切り替えられるのは、承認依頼の時点（親の提案が todo/ にあり、承認前）だけ。\n' >&2
-			if [ "$pb_stage" != review ]; then
+			if [ "$pb_stage" = doing ]; then
 				ccnavi_text "$root" NOTE_WORKTREE_PARENT_CLOSE >&2
 			fi
 			[ "$pb_doing" -eq 0 ] || ccnavi_text "$root" NOTE_WORKTREE_PARENT_CHILDREN "count=$pb_doing" >&2

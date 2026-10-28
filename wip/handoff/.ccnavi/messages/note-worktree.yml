@@ -18,7 +18,7 @@ messages:
   NOTE_WORKTREE_PARENT_CLOSE:
     kind: note
     note: |-
-      親を早めに閉じたいなら、ユーザが親のワークツリーで {script:ccnavi-user-close-early.sh} --reason <理由> を打つ（エージェントは打たず、代わりに判断もしない）
+      親を早めに閉じたいなら、ユーザが親のワークツリーで {script:ccnavi-user-close-early.sh} --reason <理由> を打つ（エージェントは打てず、判断もしない）
 
   NOTE_WORKTREE_PARENT_CHILDREN:
     kind: note

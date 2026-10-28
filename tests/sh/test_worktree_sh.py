@@ -332,6 +332,24 @@ class WorktreeShTest(unittest.TestCase):
         self.assertIn("案内: 着手済みの子が 1 件ある", result.stderr)
         self.assertIn("cancel", result.stderr)
 
+    def test_a_started_child_under_a_todo_parent_is_not_told_to_close_the_parent_early(self):
+        path = self.parent_tree(
+            **{
+                "wip/proposals/todo/p0001.md": {},
+                ".ccnavi/approved/doing/p0001-01.md": {"ticket": "p0001-01", "parent": "p0001"},
+            }
+        )
+        result = self.run_sh("topic", cwd=path)
+        self.assertRefused(result)
+        self.assertNotIn("ccnavi-user-close-early.sh", result.stderr)
+
+    def test_the_refusal_says_to_report_and_wait(self):
+        path = self.parent_tree(**{".ccnavi/approved/doing/p0001.md": {}})
+        result = self.run_sh("topic", cwd=path)
+        self.assertRefused(result)
+        self.assertIn("親のワークツリー（p0001）から", result.stderr)
+        self.assertIn("次: 状況をユーザに報告し", result.stderr)
+
     def test_the_workspace_root_is_not_refused(self):
         self.parent_tree(**{".ccnavi/approved/doing/p0001.md": {}})
         result = self.run_sh("topic")

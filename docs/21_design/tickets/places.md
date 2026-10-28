@@ -86,7 +86,7 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 `update-ref -d`）も sh が持つ。例外に入るのは、生の操作が組み込みで止まり、ラッパーが許可リストで読み、判定の材料のうち
 チケットの中身を実行ファイルに聞くものだけ。sh はチケットの YAML を読まず、親のワークツリーか・承認済みの親チケットと着手済みか・`.requested`・退避の有無・
 親チケットの `mr:` は `ccnavi tree parent`、`integrate` が断る「チケットに結び付く名前」かどうかは `ccnavi tree bound`（Stop の促しと同じ判定）、直接作業の取り込み先のブランチがチケットに結び付くかは `ccnavi tree base-bound`、親のワークツリーからの切り替えを断るか（親の段階 `stage` と `doing/` の子の件数）と、切り替えたあとに残る承認待ちの提案・MR があるかは `ccnavi tree leftover`、親のブランチ名は `ccnavi write-and-push family` の 1 行の答えで決める。答えが得られないときは、
-止める側の検査は止める向きに（`integrate` は断り、checkout は親のワークツリーとして狭める。ただし親のワークツリーからの切り替えの拒否は、聞けないときも `stage` が無いときも通す）、ツリーを動かす側
+止める側の検査は止める向きに（`integrate` は断り、checkout は親のワークツリーとして狭める。ただし親のワークツリーからの切り替えの拒否は、聞けないときや `stage` が無いときも通す）、ツリーを動かす側
 （`ccnavi-fetch.sh` の早送り、`ccnavi-sync.sh` の取り込み）は動かさない向きに倒す。
 
 push の関門（`ccnavi_push_gate`、`ccnavi-common-state.sh`）も同じ例外に入る。範囲は `ccnavi-git.sh` の中に限らず、
