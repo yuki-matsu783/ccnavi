@@ -95,6 +95,29 @@ review_no_bin() {
 	fail no-bin "ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
 }
 
+# 居るブランチと、親の識別子と、親のワークツリーの中か（branch・family・review_in_tree）。
+# ホストに触れない。親を cwd から引くサブコマンドが、ホストへ繋ぐ前に使う。
+review_tree() {
+	branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
+	# 親の識別子。親のワークツリー（.claude/worktrees/<識別子>）の名前で、親のブランチ名
+	# の / を - に置き換えたもの（ブランチ名とは違うことがある）。マージリクエストは居るブランチ（branch）で探して作り、
+	# write-and-push の親子のチケット・下書きの名前（実行ファイルと揃える）は識別子で引く。ワークツリーの外なら前どおりブランチ名。
+	family="$branch"
+	review_in_tree=no
+	review_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
+	if [ -n "$review_top" ]; then
+		review_top_p=$(ccnavi_phys "$review_top")
+		review_root_p=$(ccnavi_phys "$root")
+		case "$review_top_p" in
+		"$review_root_p"/.claude/worktrees/*)
+			family="${review_top_p#"$review_root_p"/.claude/worktrees/}"
+			family="${family%%/*}"
+			review_in_tree=yes
+			;;
+		esac
+	fi
+}
+
 # ---- リモート。origin の URL でホストを見分ける。
 review_host() {
 	origin=$(git remote get-url origin 2>/dev/null || :)
@@ -137,24 +160,7 @@ review_host() {
 	transport="$ccnavi_h_transport"
 	ccnavi_h_tmp="$state"
 	ccnavi_h_on_fail=api_failed
-	branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
-	# 親の識別子。親のワークツリー（.claude/worktrees/<識別子>）の名前で、親のブランチ名
-	# の / を - に置き換えたもの（ブランチ名とは違うことがある）。マージリクエストは居るブランチ（branch）で探して作り、
-	# write-and-push の親子のチケット・下書きの名前（実行ファイルと揃える）は識別子で引く。ワークツリーの外なら前どおりブランチ名。
-	family="$branch"
-	review_in_tree=no
-	review_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
-	if [ -n "$review_top" ]; then
-		review_top_p=$(ccnavi_phys "$review_top")
-		review_root_p=$(ccnavi_phys "$root")
-		case "$review_top_p" in
-		"$review_root_p"/.claude/worktrees/*)
-			family="${review_top_p#"$review_root_p"/.claude/worktrees/}"
-			family="${family%%/*}"
-			review_in_tree=yes
-			;;
-		esac
-	fi
+	review_tree
 }
 
 # api <METHOD> <path> [<JSON body>] レスポンスの JSON を標準出力へ。path は api_base からの相対。
