@@ -448,7 +448,7 @@ def names_number(
     （`claude/tender-volta-qmy99q`）に番号と同じ数字が入っても、無関係なブランチを候補にしない。
     `i152` のように英字が直に付くものは、番号を含む別の語の一部かもしれず、
     番号を指すとは言えないので通さない。
-    `ccnavi-branches.sh` の jq が同じ規則で GitHub の PR の元ブランチを選ぶ。片方だけ直さない。
+    `ccnavi-branches.sh` の jq も同じ規則で GitHub の PR の元ブランチを選ぶので、片方だけを直さないこと。
     """
     ident = ticket_ids.identifier_number(name.casefold(), prefixes)
     if ident is not None:
