@@ -120,7 +120,7 @@ class GitAuthShTest(unittest.TestCase):
     def test_empty_path_entry_does_not_pick_cwd(self):
         self.repo_tool("gh", "")
         got = self.run_auth("https://github.com/o/r.git", path="::/usr/bin:/bin:")
-        self.assertEqual(got["keys"], [])
+        self.assertFalse([v for v in got["values"] if self.repo in v])
 
     def test_host_connect_runs_absolute_glab_not_relative(self):
         self.repo_tool("glab")

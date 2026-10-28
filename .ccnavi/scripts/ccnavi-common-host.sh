@@ -230,8 +230,8 @@ ccnavi_host_cli_ping() {
 # PATH の絶対パスのエントリだけから実行可能な道具を探し、見つかれば絶対パスを標準出力に出す（無ければ終了コード 1）。
 # `command -v` は使わない。macOS の sh は PATH の相対エントリ（例 bin）を絶対パスに直して返すため、
 # リポジトリの中の gh などが選ばれてしまう。空のエントリ（cwd を指す）と相対のエントリは飛ばす。
-# IFS を変えず ${PATH%%:*} の形 で割る（`*` を含むエントリで glob が展開されないように）。
-# 結果に " $ ` \ を含むものは、式に埋め込むと危険なので返さない。
+# IFS は変えず、パラメータ展開（${変数%%:*}）で : 区切りに割る。
+# " $ ` \ を含む候補は、式に埋め込むと危険なので飛ばして次を探す。
 ccnavi_find_tool() {
 	ccnavi_ft_rest="${PATH-}:"
 	while [ -n "$ccnavi_ft_rest" ]; do
@@ -244,7 +244,7 @@ ccnavi_find_tool() {
 		for ccnavi_ft_cand in "$ccnavi_ft_dir/$1" "$ccnavi_ft_dir/$1.exe"; do
 			if [ -f "$ccnavi_ft_cand" ] && [ -x "$ccnavi_ft_cand" ]; then
 				case "$ccnavi_ft_cand" in
-				*[\"\$\`\\]*) return 1 ;;
+				*[\"\$\`\\]*) continue ;;
 				esac
 				printf '%s\n' "$ccnavi_ft_cand"
 				return 0
