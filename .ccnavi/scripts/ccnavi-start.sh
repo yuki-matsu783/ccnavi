@@ -881,7 +881,8 @@ resolve_issue() {
 # ---- ホストに届かないときの案内。標準出力に出して終了コード 4 で止まる。
 #
 # 段は search（既存の MR を確かめる）・title（issue のタイトルを読む）・create（MR を作る）。
-# GitHub は MCP（mcp__github__のツール）で代行する手順を出す。GitLab には MCP の案内が無いので、理由と手で打つ手順を出す。
+# GitHub は MCP（mcp__github__のツール）で代行する手順を出す。GitLab には MCP の案内が無いので、理由の 1 語と、
+# ユーザに認証を頼んで打ち直す次の一手だけを出す。
 # 使う変数: stop_branch・stop_target・stop_title・stop_wt（段より前に出来たこと）
 stop_branch=""
 stop_target=""
@@ -891,7 +892,7 @@ stop_mr=""
 stop_host() {
 	sh_stage="$1"
 	sh_why="$2"
-	log_info ホストに届かず止めた -- "stage=$sh_stage" "kind=${ccnavi_h_kind:-}"
+	log_info ホストに届かず止めた -- "stage=$sh_stage" "kind=${ccnavi_h_kind:-}" "why=$sh_why"
 	if [ -z "${ccnavi_h_kind:-}" ]; then
 		fail host-unknown "ホストを読めない（${sh_why}）。origin を確かめてください。"
 	fi
@@ -985,53 +986,23 @@ stop_host() {
 			;;
 		esac
 	else
-		case "$sh_stage" in
-		search) printf 'ccnavi-start: GitLab APIが応答しないか要求を拒み、%s #%sに紐づく既存のMRを確かめられなかった（%s）。既存のMRを見落として重複を作らないため、何も作成せずに処理を中断しました。\n' "$what" "$number" "$sh_why" ;;
-		title) printf 'ccnavi-start: GitLab APIが応答しないか要求を拒み、issue #%sを読めなかった（%s）。実在を確かめられないので、何も作成せずに処理を中断しました。\n' "$number" "$sh_why" ;;
-		merged) printf 'ccnavi-start: GitLab APIが応答しないか要求を拒み、ブランチ %s と同じ名前のマージ済みの MR があるかを確かめられなかった（%s）。マージ済みのブランチを再利用しないため、何も作成せずに処理を中断しました。\n' "$stop_branch" "$sh_why" ;;
-		issue-link) printf 'ccnavi-start: MR !%s が閉じる issue を確かめられなかった（%s）。issue と MR のセットが確定しないため、続けずに処理を中断しました。\n' "$stop_mr" "$sh_why" ;;
-		*) printf 'ccnavi-start: GitLab APIが応答しないか要求を拒み、マージリクエストを作れなかった（%s）。\n' "$sh_why" ;;
+		# GitLab には MCP の代行が無い。段ごとの手順は出さず、認証を頼んで同じ引数で打ち直す（出来た段は飛ばして続きから進む）
+		case "$sh_why" in
+		*"HTTP "[0-9][0-9][0-9]*)
+			sh_word="${sh_why#*HTTP }"
+			sh_word="HTTP ${sh_word%%:*}"
+			;;
+		*利用できず*) sh_word="認証なし" ;;
+		*) sh_word="応答なし" ;;
 		esac
+		printf 'ccnavi-start: GitLab の API に届かない（%s）。処理を中断しました。\n' "$sh_word"
 		printf '完了済みの処理:\n'
 		if [ "$sh_stage" = create ]; then
 			printf '  ブランチ: %s（push 済み）\n  ワークツリー: %s\n' "$stop_branch" "$stop_wt"
 		else
 			printf '  なし（ブランチもワークツリーも作っていない）\n'
 		fi
-		printf '手で行う手順（GitLab には MCP の案内がありません）:\n'
-		case "$sh_why" in
-		*"。HTTP "[0-9][0-9][0-9]:*)
-			printf '  1. 理由に出たホストの返事（HTTPの番号と本文）を読む。401・403は認証、404は番号かアクセス権（非公開は404で返ることがある）、それ以外は要求の中身かccnaviの不具合を疑う。原因を直すか、ユーザに伝える。直ったら同じコマンドを再実行する: %s\n' "$sh_cmd"
-			;;
-		*)
-			printf '  1. glab を %s に認証するか、GITLAB_TOKEN を置く（ユーザに頼む）。届くようになったら同じコマンドを再実行する: %s\n' "${ccnavi_h_host:-?}" "$sh_cmd"
-			;;
-		esac
-		case "$sh_stage" in
-		create)
-			printf '  2. 再実行できないなら、ユーザに、ブラウザで %s の MR を手で作ってもらう。ソース: %s、ターゲット: %s、タイトル: Draft: %s、説明: Closes #%s。作れたら、ユーザから聞いたその番号を <作った番号> に入れて打ち直す: %s。番号が聞けなければ、作り話の番号で打たず、直接実装にも切り替えず、ユーザに報告して止まる\n' "$ccnavi_h_path" "$stop_branch" "$stop_target" "$stop_title" "$number" "$sh_cmd"
-			;;
-		issue-link)
-			printf '  2. 再実行できないなら、ユーザに、ブラウザで MR !%s の説明欄と元ブランチを読み、閉じる issue（Closes #<番号>）を伝えてもらい、返事を待つ。聞いた値で打ち直す: %s。値が聞けなければ、作り話の値で打たず、直接実装にも切り替えず、ユーザに報告して止まる\n' "$stop_mr" "$sh_cmd"
-			;;
-		search)
-			if [ -n "$sh_adopt" ]; then
-				printf '  2. 再実行できないなら、ユーザに、ブラウザで %s の MR の一覧から、%s #%s に紐づく MR の番号と元ブランチ、閉じる issue を伝えてもらい、返事を待つ。3 つそろえて打ち直す: %s。確かめられなければ、直接実装にも切り替えず、ユーザに報告して止まる\n' "$ccnavi_h_path" "$what" "$number" "$sh_adopt_cmd"
-			else
-				printf '  2. 再実行できないなら、ユーザに、ブラウザで %s の MR の一覧から、%s #%s に紐づく MR が無いと確かめてもらい、返事を待つ。無いと分かったときだけ %s --mcp-checked を打つ。確かめられなければ、付けず、直接実装にも切り替えず、ユーザに報告して止まる\n' "$ccnavi_h_path" "$what" "$number" "$sh_cmd"
-			fi
-			;;
-		merged)
-			if [ -n "$sh_adopt" ]; then
-				printf '  2. 再実行できないなら、ユーザに、ブラウザで %s の MR の一覧から、ブランチ %s のマージ済みの MR が無いと確かめてもらい、返事を待つ。無いと分かったときだけ、issue・MR・元ブランチの 3 つをそろえて打ち直す: %s。確かめられなければ、直接実装にも切り替えず、ユーザに報告して止まる\n' "$ccnavi_h_path" "$stop_branch" "$sh_adopt_cmd"
-			else
-				printf '  2. 再実行できないなら、ユーザに、ブラウザで %s の MR の一覧から、ブランチ %s のマージ済みの MR が無いと確かめてもらい、返事を待つ。無いと分かったときだけ %s --mcp-checked を打つ。確かめられなければ、付けず、直接実装にも切り替えず、ユーザに報告して止まる\n' "$ccnavi_h_path" "$stop_branch" "$sh_cmd"
-			fi
-			;;
-		title)
-			printf '  2. 再実行できないなら、ユーザに、ブラウザで issue #%s のタイトルを伝えてもらい、返事を待つ。実在とタイトルが分かったときだけ %s --slug <語> --title '"'"'<タイトル>'"'"' --mcp-checked を打つ。確かめられなければ、付けず、直接実装にも切り替えず、ユーザに報告して止まる\n' "$number" "$sh_cmd"
-			;;
-		esac
+		ccnavi_text "$root" NEXT_START_HOST__GITLAB "host=${ccnavi_h_host:-?}" "args_q=$orig_args"
 	fi
 	exit "$EXIT_HOST"
 }
