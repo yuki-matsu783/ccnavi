@@ -1038,31 +1038,22 @@ def _parsed(
             return EXIT_ERROR
         code = write_and_push.sort(stdout, stderr, conf, root, args.command[2], since)
         return EXIT_OK if code == 0 else EXIT_ERROR
-    if len(args.command) >= 3 and list(args.command[:2]) in (
-        ["write-and-push", "merge"],
-        ["write-and-push", "merge-blame"],
-    ):
-        verb = args.command[1]
+    if len(args.command) >= 3 and list(args.command[:2]) == ["write-and-push", "merge"]:
         if (
             not cli_ops._FAMILY.fullmatch(args.command[2])
             or ".." in args.command[2]
-            or (verb == "merge" and len(args.command) != 3)
+            or len(args.command) != 3
         ):
             stderr.write(
-                f"ccnavi: write-and-push {verb} の {args.command[2]!r} "
+                f"ccnavi: write-and-push merge の {args.command[2]!r} "
                 "は有効な識別子の形式ではありません。\n"
             )
             return EXIT_ERROR
-        if verb == "merge":
-            return (
-                EXIT_OK
-                if write_and_push_merge.plan(stdout, conf, root, args.command[2]) == 0
-                else EXIT_ERROR
-            )
-        code = write_and_push_merge.blame(
-            stdout, conf, root, args.command[2], list(args.command[3:])
+        return (
+            EXIT_OK
+            if write_and_push_merge.plan(stdout, conf, root, args.command[2]) == 0
+            else EXIT_ERROR
         )
-        return EXIT_OK if code == 0 else EXIT_ERROR
 
     # issue・MR に紐づくブランチを探す。`ccnavi-branches.sh` が呼ぶ。
     # ホストの結果は sh が取ってきて `--result` で渡す。

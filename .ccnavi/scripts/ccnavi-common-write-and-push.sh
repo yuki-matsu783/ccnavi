@@ -484,32 +484,13 @@ ccnavi_wap_merge_begin() {
 		return 1
 	fi
 	if [ -n "$ccnavi_mb_conflicts" ]; then
-		ccnavi_wap_say "子 ${ccnavi_wap_merge_child} を親のブランチ ${ccnavi_wap_branch} へ合流すると衝突する（${ccnavi_mb_conflicts}）。合流を取りやめて、何も変えずに止めた"
-		ccnavi_wap_blame "$ccnavi_wap_tmp/conflicts"
+		ccnavi_wap_say "子 ${ccnavi_wap_merge_child} を親のブランチ ${ccnavi_wap_branch} へ合流すると衝突する（${ccnavi_mb_conflicts}）。合流を取りやめて、何も変えずに止めた。並行していた子とぶつかったときも、解くのは後から finish した側（この子）です"
 		ccnavi_wap_say "  子のワークツリー（.claude/worktrees/${ccnavi_wap_merge_child}）で親のブランチ ${ccnavi_wap_branch} を merge して衝突を解き、コミットしてから finish をやり直してください"
 	else
 		ccnavi_wap_say "子 ${ccnavi_wap_merge_child} を合流できなかった（$(ccnavi_git_refusal "$ccnavi_wap_tmp/merge-git-err")）。何も変えずに止めた"
 	fi
 	log_info write-and-push で止めた -- "family=$ccnavi_wap_family_id" "reason=write-and-push-merge-conflict"
 	return 1
-}
-
-# 衝突したパスを持ち込んだ、先に合流した別の子を名指しする。<1 行 1 パスの一覧>
-ccnavi_wap_blame() {
-	# 一覧の 1 行を 1 つの引数にして渡す（語に割らない）。
-	ccnavi_bl_list="$1"
-	set --
-	while IFS= read -r ccnavi_bl_path; do
-		if [ -n "$ccnavi_bl_path" ]; then
-			set -- "$@" "$ccnavi_bl_path"
-		fi
-	done <"$ccnavi_bl_list"
-	[ "$#" -gt 0 ] || return 0
-	ccnavi_wap_exe write-and-push merge-blame "$ccnavi_wap_merge_child" "$@" 2>/dev/null </dev/null | tr -d '\r' >"$ccnavi_wap_tmp/blame" || :
-	[ "$(head -n 1 "$ccnavi_wap_tmp/blame" 2>/dev/null)" = "write-and-push 1" ] || return 0
-	sed -n 's/^other //p' "$ccnavi_wap_tmp/blame" | while IFS= read -r ccnavi_bl_line; do
-		ccnavi_wap_say "  先に合流した子 ${ccnavi_bl_line%% *} の変更と重なる（${ccnavi_bl_line#* }）。後から finish した ${ccnavi_wap_merge_child} 側のワークツリーで解く"
-	done
 }
 
 # 合流の途中なら取りやめ、書いたものを元に戻す。<元の先頭> <書いたパスの一覧>。0 で元に戻った（か、合流の途中でない）。
