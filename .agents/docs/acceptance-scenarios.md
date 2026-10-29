@@ -457,7 +457,7 @@ steps:
 - 対象: 回し始め（setup のあと）と、human_run を打ち終えるたびに、承認待ちの提案の識別子を集めて基準にする。基準に無い識別子だけを引数に並べて打つ。0 件か、test-repo 以外（ワークスペースルートや他のプロジェクト）の提案が混ざっていれば、打たずに止める。同じ識別子のまま書き換えた提案（親の改版）は対象にならない
 - 引数は runner が組む。yml には argv も識別子も書かない（本物のチケットの識別子や `--root` を書けないように）
 - 打ち方: 擬似端末を付け、claude の外で打つ。環境から `CCNAVI_GUARD_TICKET_APPROVAL` を外し、`CCNAVI_WORKSPACE` をワークスペースルートに固定する。模擬の相手では claude と同じ環境（push 先が模擬）を使う。300 秒で終わらなければ、プロセスグループごと止める（孫の ccnavi や git も残さない）
-- 成否: 終了コードでなく、対象の識別子が承認済みにあるかで見る（`ccnavi-user-agree.sh` は push の失敗や保護ブランチでも 0 で終わる）。push まで確かめるなら、後の step の `expect_after.state` か `expect.state` に書く
+- 成否: 終了コードでなく、対象の識別子が新しく承認済みになったか（打つ前からある承認済みは数えない）で見る（`ccnavi-user-agree.sh` は push の失敗や保護ブランチでも 0 で終わる）。起動できないときや、state に基準が無いときも止める。push まで確かめるなら、後の step の `expect_after.state` か `expect.state` に書く
 - 失敗は `halt`（`kind: human_run`）を立てて止め、`inconclusive` にする
 - 記録: 打つ前に `state.json` の `human_runs` に `started` を書き、終われば `done` か `halted` にする。`started` のまま残った回を `next` で続けると、打ち直さずに止める。出力は `human-run-<step>.log`
 - `check` は、打った step の項目ごとに `human-run-check` の行（needs-review）になる。人間が見ていた項目を誰も見ていないので、全体は pass にならない。ログを見て判断する
