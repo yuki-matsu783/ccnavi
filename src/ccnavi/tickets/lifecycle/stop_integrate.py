@@ -7,8 +7,8 @@
 
 直接作業では、コミットは作業を終えて `integrate` を打つ直前にまとめて打つ決まりにしている。
 コミットがあるのに `integrate` が無い形は打ち忘れで、未コミットの変更だけの形は作業中か
-ユーザの返事を待っている途中なので促さない。取り込みの途中（markerがある）も、ユーザの返事を
-待っている途中なので促さない。
+ユーザの返事を待っている途中なので促さない。版 4 のmarkerがある取り込みの途中も、ユーザの
+返事を待っている途中なので促さない。版を知らないmarkerは、ユーザに片付けを頼むよう促す。
 
 ## 促す条件
 
@@ -301,7 +301,7 @@ def probe(
     found.integ_tree = integ_tree
     if not found.integ_tree:
         found.blocked = (
-            f"統合先（{integration}）をチェックアウトしているツリーが見ヒットしません。"
+            f"統合先（{integration}）をチェックアウトしているツリーが見つかりません。"
             "どのツリーで取り込むかをユーザに確かめてください"
         )
         return Probe(HIT, found)
@@ -779,8 +779,15 @@ def integrate_nudge(root: str, found: Direct) -> str:
 
 
 def blocked_notice(found: Direct) -> str:
-    """促せないときにユーザへ言う文（`systemMessage`）。"""
-    return (
-        f"[ccnavi] 直接作業 {found.name} は {_left(found) or '取り込みの途中'}がありますが、"
-        f"今は取り込みを促せません。{found.blocked}"
-    )
+    """促せないときにユーザへ言う文（`systemMessage`）。
+
+    残りを言うのは、促す条件のコミットがあるときだけ。未コミットの変更だけでは促さないので、
+    そのときは取り込めない理由だけを言う。
+    """
+    if found.ahead:
+        where = f"{_left(found)}がありますが"
+    elif found.marker:
+        where = "取り込みの途中ですが"
+    else:
+        return f"[ccnavi] 直接作業 {found.name} は、今は取り込めません。{found.blocked}"
+    return f"[ccnavi] 直接作業 {found.name} は {where}、今は取り込みを促せません。{found.blocked}"
