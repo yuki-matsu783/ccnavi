@@ -76,7 +76,7 @@ messages:
 |---|---|---|
 | `deny` | 記録の `code` と同じ（`DENY_*`・`RULE_ASK` など） | `DENY_TICKET_PARENT`、`DENY_PHASE_REVIEW__WAITING` |
 | `deny`（組み込みルール） | `RULE_<ルールの id>`。記録の `code` とは別（記録の `code` は `DENY_COMMAND` など、根拠の種類）。ルールが識別子と値と場合を持ち、拒否に当たった回に `texts.spoken` が引く | `RULE_GIT_PUSH`、`RULE_GUARD_HOOKS` |
-| `nudge` | 記録の `code` と同じ（`NUDGE_*`） | `NUDGE_INTEGRATE__CONFIRM` |
+| `nudge` | 記録の `code` と同じ（`NUDGE_*`） | `NUDGE_INTEGRATE__RUN` |
 | `next`・`choices`・`note` | `NEXT_*`・`CHOICES_*`・`NOTE_*`。出力元の名前を 2 語目に置く | `NEXT_START_DRY_RUN` |
 | `notice` | `NOTICE_*`。記録の `code` とは別（記録の `code` や見出しの理由コードに `NOTICE_` で始まるものがあっても、文面の識別子ではない）。sh からは引かない。出力元の名前を 2 語目に置く。場合を結末や状態で分けるときは `__` | `NOTICE_UNDECLARED__ASK` |
 
