@@ -129,7 +129,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
    `--output-format stream-json` を付ける）。`resume: true` の step は、直前の step のセッション ID を `--resume` で渡す。
    続きの step が `resume` でなければ `--no-session-persistence` を付ける。出力は `logs/scenarios/<ID>-<日時>/` に置く
    （`step-N.jsonl`、`report.md`、`report.json`、`evidence.md`、`context-N.md`、`messages.md`。後ろの 2 つは下の「証拠の読み方」）。`run-all` の出力は「続けて回す（run-all）」
-4. **人間の操作の step で止める。** 実行器は `instruction` と `check` を出して終了コード 10 で止まる。
+4. **人間の操作の step で止める。** 実行器は `instruction` と `check` を出して終了コード 10 で止まる。`human_api` か `human_run` のある step は止まらずに進む（擬似端末を作れない環境の `human_run` は 10 で止まる）。
    人間が「次へ」と言ったら `uv run python -m tests.scenarios.runner next <出力の置き場>` で続ける。直す必要があると言われたら、直してから `next` を打つ。
    続けずにやめるときは `uv run python -m tests.scenarios.runner restore <出力の置き場>`（`setup.reset` の対象は、止めている間 `base` に戻さず残す。「中断・失敗・停止のあと」）
 5. **`expect_after` を満たさず止まった回を扱う。** `expect_after` を満たさず止まった回は `next` で続けられない（終了コード 2）。prompt か期待を直して、`run` からやり直す。止まった回の `report.md` には `expect_after` の行が `inconclusive` で出て、止まった step より後に頼る `decisions`・`state` の判定は載せない
@@ -302,7 +302,7 @@ setup:
 | 終わり方 | 対象 | ロック |
 |---|---|---|
 | 最後まで回った（`finish`） | `base` に戻す | 放す |
-| claude の失敗・`expect_after` を満たさない停止（内部の値 11。`finish` を通る） | `base` に戻す | 放す |
+| claude の失敗・`expect_after` を満たさない停止・`human_api` と `human_run` の失敗（内部の値 11。`finish` を通る） | `base` に戻す | 放す |
 | `KeyboardInterrupt` など（`_continue` の `BaseException`） | `base` に戻し、元の例外を投げ直す | 放す |
 | 人間の操作の step で止まった（10） | **戻さず残す**（人間が操作したあとの `next` で続くため。`setup.host` は模擬を止め、置き場は残す） | 放す |
 | 対象を取る前の拒否（判定・ロック・残し印・`base` が無い・追記の対象が使えない） | 何もしない（出力の置き場だけ作る） | 取っていない |
