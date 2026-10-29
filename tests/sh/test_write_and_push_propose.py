@@ -74,6 +74,13 @@ class ProposeTest(WriteAndPushHarness):
         self.assertNotIn("子の提案がありません", result.stdout)
         self.assertEqual(self.remote_sha("i0002"), self.sha(tree, "HEAD"))
 
+    def test_a_revision_of_an_approved_parent_gets_no_child_warning(self):
+        """承認済みの親の改版には、子の警告を出さない（子は承認の側にある）。"""
+        self.put(f"{self.TODO}/{PARENT}.md", parent_text(PARENT, ["design"]))
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("子の提案がありません", result.stderr)
+
     def test_a_parent_with_its_child_gets_no_warning(self):
         tree = self.second_parent()
         write(os.path.join(tree, *f"{self.TODO}/i0002-01-01.md".split("/")), "x\n")

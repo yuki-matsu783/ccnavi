@@ -113,6 +113,7 @@ class ApproveVerifyTest(PhaseHarness):
         nexts = [x for x in result.stdout.splitlines() if x.startswith("次: ")]
         self.assertEqual(len(nexts), 1, result.stdout)
         self.assertIn("子の提案を", nexts[0])
+        self.assertIn("承認が済むまで実装はしない", nexts[0])
         self.assertNotIn("承認を依頼してよい", result.stdout)
 
     def test_only_the_steps_that_start_at_once_need_a_child(self):

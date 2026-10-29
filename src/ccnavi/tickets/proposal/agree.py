@@ -295,7 +295,7 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
             "次: 子の提案が無い親がある（上の warn）。子の提案を wip/proposals/todo/ に書いてから、"
             "同じ --agree --preview --verify を打ち直す。親だけを先に承認する進め方なら、"
             "ccnavi-ticket.sh propose <識別子> で送り、子の承認がもう 1 回要ることを"
-            "ユーザに伝える\n"
+            "ユーザに伝える。承認が済むまで実装はしない\n"
             if childless
             else "次: ccnavi-ticket.sh propose <識別子> で提案を親のブランチへ送ってから、"
             "ユーザに承認を依頼してよい。承認が済むまで実装はしない\n"

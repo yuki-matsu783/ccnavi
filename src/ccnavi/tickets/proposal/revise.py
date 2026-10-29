@@ -46,12 +46,12 @@ def _stripped(text: str) -> str:
     return (text if kept is None else kept).rstrip("\n") + "\n"
 
 
-def _with_feedback_none(text: str) -> str:
-    """frontmatter の閉じの前に `feedback: []` を足す。"""
+def _with_feedback_none(text: str) -> str | None:
+    """frontmatter の閉じの前に `feedback: []` を足す。閉じが見つからなければ None。"""
     lines = text.splitlines()
     end = next((i for i in range(1, len(lines)) if lines[i].strip() == ticket_model.FENCE), None)
     if not lines or end is None:
-        return text
+        return None
     lines.insert(end, FEEDBACK_NONE)
     return "\n".join(lines) + "\n"
 
@@ -114,7 +114,12 @@ def run(
 
     body = _stripped(text)
     if feedback:
-        body = _with_feedback_none(body)
+        added = _with_feedback_none(body)
+        if added is None:
+            return refuse(
+                f"{source} の frontmatter の閉じ（---）が見つからない。承認済みの親を確かめる"
+            )
+        body = added
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
     except OSError as exc:
@@ -142,9 +147,7 @@ def run(
         stdout.write(f"次: {verify}{send}\n")
     else:
         cancel = f"{ticket_sh} cancel <子> --reason <理由>"
-        stdout.write(
-            f"次: {path} の plan・phases・allow などを直す。"
-            f"範囲を変えるときは、作業中の子を先に '{cancel}' で取り消す。"
-            f"直したら、{verify}{send}\n"
-        )
+        stdout.write(f"次: {path} の plan・phases・allow などを直す\n")
+        stdout.write(f"案内: 範囲を変えるときは、作業中の子を先に '{cancel}' で取り消す\n")
+        stdout.write(f"案内: 直したら、{verify}{send}\n")
     return EXIT_OK

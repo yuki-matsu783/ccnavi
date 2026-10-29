@@ -114,6 +114,25 @@ class ReviseTest(PhaseHarness):
         self.assertIn("の中ではない", self.revise(cwd=self.root).stderr)
         self.assertFalse(os.path.exists(self.todo_path()))
 
+    def test_a_missing_closing_fence_is_not_reported_as_done(self):
+        """閉じの `---` が無い写しに、黙って `feedback: []` を足さずに成功と言わない。"""
+        from ccnavi.tickets.proposal import revise
+
+        self.assertIsNone(revise._with_feedback_none("---\nticket: i0001\n"))
+        self.assertEqual(
+            revise._with_feedback_none("---\nticket: i0001\n---\n"),
+            "---\nticket: i0001\nfeedback: []\n---\n",
+        )
+
+    def test_a_copy_only_run_splits_the_next_step_from_the_notes(self):
+        self.reviewed()
+        made = self.revise()
+        lines = made.stdout.splitlines()
+        self.assertEqual(len([x for x in lines if x.startswith("次: ")]), 1, made.stdout)
+        notes = "\n".join(x for x in lines if x.startswith("案内: "))
+        self.assertIn("ccnavi-ticket.sh cancel <子>", notes)
+        self.assertIn("--agree --preview --verify i0001", notes)
+
     # ---- 5. finish の案内
 
     def test_finish_says_how_to_make_the_feedback_scaffold(self):
