@@ -60,3 +60,13 @@ keywords: [サブパッケージ, 段, 循環, import, approval, agree, --agree,
   7.3 の設計どおり）。拡張の配り直しが要る
 - 失ったもの（実行ファイル）: マージ後は `build.py` で実行ファイルを組み直すまで、ターミナルの承認が通らない。
   古い実行ファイルは `--agree` を知らないので、新しい sh（`ccnavi-agree.sh`）から呼ぶと落ちる
+
+## 後の変更: 7 つ目のサブパッケージ `catalog`
+
+2026-10-28。`hook/` に、hook の判定ではないモジュール（`docsearch.py`・`docsearch_index.py`・`docsearch_query.py`・`projskills.py`。約 1,700 行）が残っていた。文書の索引と `--docs` の引き方、プロジェクトのスキルの目録で、hook の他のモジュール（judge・post・events など）に依存しない。
+
+| 決めたこと | なぜ | 採らなかった側 |
+|---|---|---|
+| 新しいサブパッケージ `catalog` を `tickets` と `hook` の間に置き、4 本を移す。`catalog` が読むのは `infra`・`policy`・`tickets` だけ。`hook`（judge・events・subagent）と `entry/cli_args.py` が `catalog` を読む | `hook/` を開いたときに、hook の判定の流れだけを追える。読む向きは `infra < records < policy < tickets < catalog < hook < entry` で、上向きの import は 0 本のまま | `hook/` に残して docstring で役割を書き分ける（判定とそうでないものが同じ階層に並ぶ）、`entry` 寄りに置く（`hook` が `entry` を読めない） |
+
+サブパッケージは 7 つになった。上の決定の表の「6 つ」と段の並びは、決めた時点の記録として残す。`tests/core/test_module_layers.py` の `PACKAGES`・`TIERS` は `catalog` を持つ。
