@@ -2,8 +2,8 @@
 道具を外から呼んで応答だけを見る。
 
 促すのは、チケットに結び付かない `.claude/worktrees/<名前>` で、
-統合先に入っていないコミットがあり、`integrate <名前>` の記録が無いとき
-（未コミットの変更だけでは促さない。版 4 のmarkerがある取り込みの途中も促さない）。同じ状態では 1 回だけ。
+統合先に入っていないコミットがあり、`integrate <名前>` の記録が無いとき。同じ状態では 1 回だけ。
+未コミットの変更だけでは促さない。版 4 のmarkerがある取り込みの途中も促さない。
 統合の前提を満たせないときは止めずに理由だけを言う。何を除くかをここで固定する。
 
 道具は `finish` の促しの受入テスト（test_stop_nudge.StopNudgeTest）のものを借りる。
@@ -196,7 +196,7 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         self.assertIn("origin/main が手元の main より 1 件先に進んでいます", reason)
 
     def test_uncommitted_changes_alone_are_not_asked(self):
-        """コミットは integrate の直前にまとめて打つ。未コミットだけなら作業中か返事待ち。"""
+        """コミットは integrate の直前にまとめて打つ。未コミットだけなら作業中か返事待ちである。"""
         self.assert_not_asked(self.stop(self.direct(dirty=True)))
 
     def test_uncommitted_changes_on_top_of_commits_are_told_to_commit_first(self):
@@ -222,7 +222,7 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         self.assert_not_asked(self.stop(self.direct()))
 
     def test_a_marker_means_waiting_for_the_user_and_is_not_asked(self):
-        """integrate のあとは、差分を見せて返事を待つ途中。確定を促さない。"""
+        """integrate のあとは、差分を見せて返事を待っている途中である。確定は促さない。"""
         path = self.direct(commit=True)
         self.record()
         gitdir = os.path.join(
