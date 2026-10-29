@@ -100,7 +100,8 @@
       },
       {
         "command": "ccnaviBoard.bugReportScreenshot",
-        "title": "ccnavi ボード: バグ報告のスクリーンショットを撮る"
+        "title": "ccnavi ボード: バグ報告のスクリーンショットを撮る",
+        "icon": "$(device-camera)"
       },
       {
         "command": "ccnaviBoard.bugReportFinish",
@@ -123,6 +124,11 @@
           "command": "ccnaviBoard.bugReport",
           "when": "view == ccnaviBoard.entries",
           "group": "navigation@3"
+        },
+        {
+          "command": "ccnaviBoard.bugReportScreenshot",
+          "when": "view == ccnaviBoard.entries && ccnaviBoard.bugReporting && !ccnaviBoard.bugReportNoCapture",
+          "group": "navigation@4"
         }
       ],
       "commandPalette": [
