@@ -15,7 +15,7 @@ export interface ProjectProps {
   readonly ticketsEnabled: boolean;
   /** 案内が指す先にする（一覧の最初のカードだけ） */
   readonly tour?: boolean;
-  /** ミラーの状態。無ければ（まだ調べていない）「ミラー」の欄を出さない */
+  /** ミラーの状態。無ければ（まだ確認していない）「ミラー」の欄を出さない */
   readonly mirror?: MirrorData;
   /** 拡張ホストへの送信（案内の間は送らないもの） */
   readonly act?: (message: ProjectsMessage) => void;

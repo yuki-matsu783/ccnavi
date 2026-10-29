@@ -1,6 +1,6 @@
 /**
  * 共通レイヤーのミラーの表示。カードの「ミラー」の欄（状態・ずれの中身・「ミラーを同期」）、上部の「すべて同期」と最終確認の時刻、
- * 調べられないときの帯。
+ * 確認できないときの帯。
  *
  * 見せる中身は拡張ホストが渡す（`ProjectsData` の `mirror`）。ボタンを押せるかと文言は `core/mirrormodel.ts` が決め、
  * ここは並べるだけ。同期するのは拡張ホスト（実行ファイル）で、画面は押されたことを送るだけ。
@@ -40,17 +40,17 @@ export function MirrorField({ mirror, name, act }: { readonly mirror: MirrorData
   );
 }
 
-/** 状態の一言。一覧全体を調べられないときの理由は帯（`MirrorBanners`）に出すので、ここでは繰り返さない */
+/** 状態の一言。一覧全体を確認できないときの理由は帯（`MirrorBanners`）に出すので、ここでは繰り返さない */
 function MirrorState({ mirror, project }: { readonly mirror: MirrorData; readonly project: MirrorProject | undefined }): JSX.Element {
   const status = mirror.status;
   if (status.kind === "waiting") {
-    return <span className="mirror-state dim">調べています…</span>;
+    return <span className="mirror-state dim">確認しています…</span>;
   }
   if (status.kind !== "ok" || !status.list.ok) {
     return <span className="mirror-state dim">確認できません</span>;
   }
   if (project === undefined) {
-    return <span className="mirror-state dim">結果がありません</span>;
+    return <span className="mirror-state dim">確認結果がありません</span>;
   }
   const className = project.state === "synced" ? "ok" : "warn-text";
   return (
@@ -96,7 +96,7 @@ export function SyncAllButton({ mirror, act }: { readonly mirror: MirrorData; re
   );
 }
 
-/** ミラーの最終確認の時刻。まだ調べていなければ出さない */
+/** ミラーの最終確認の時刻。まだ確認していなければ出さない */
 export function CheckedAt({ mirror }: { readonly mirror: MirrorData }): JSX.Element | null {
   if (mirror.checkedAt === "") {
     return null;
@@ -104,17 +104,17 @@ export function CheckedAt({ mirror }: { readonly mirror: MirrorData }): JSX.Elem
   return <span className="mirror-checked dim">ミラーの最終確認 {mirror.checkedAt}</span>;
 }
 
-/** ミラーを調べられないとき・コピーするものが無いときの帯 */
+/** ミラーを確認できないとき・コピーするものが無いときの帯 */
 export function MirrorBanners({ mirror }: { readonly mirror: MirrorData }): JSX.Element | null {
   const status = mirror.status;
   if (status.kind === "unsupported") {
-    return <div className="banner warn mirror-banner">ミラーのずれを調べられません。{status.reason}</div>;
+    return <div className="banner warn mirror-banner">ミラーのずれを確認できません。{status.reason}</div>;
   }
   if (status.kind === "failed") {
-    return <div className="banner warn mirror-banner">ミラーのずれを調べられませんでした。{status.error}</div>;
+    return <div className="banner warn mirror-banner">ミラーのずれを確認できませんでした。{status.error}</div>;
   }
   if (status.kind === "ok" && !status.list.ok) {
-    return <div className="banner warn mirror-banner">ミラーのずれを調べられませんでした。{status.list.error}</div>;
+    return <div className="banner warn mirror-banner">ミラーのずれを確認できませんでした。{status.list.error}</div>;
   }
   if (status.kind === "ok" && status.list.commonEmpty) {
     return (

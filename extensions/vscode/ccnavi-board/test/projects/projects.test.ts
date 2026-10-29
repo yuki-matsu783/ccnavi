@@ -52,6 +52,7 @@ test("CB-T62 名前は ASCII に絞り、既存のツリー名と大文字小文
   const clash = checkName("Lib", ["", "lib", "i0001"]);
   assert.ok(!clash.ok);
   assert.match(clash.error, /lib/);
+  assert.match(clash.error, /プロジェクトかワークツリーが既にあります/);
   const worktree = checkName("i0001", ["", "i0001"]);
   assert.ok(!worktree.ok);
 });

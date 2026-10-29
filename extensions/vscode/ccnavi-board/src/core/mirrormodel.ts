@@ -4,7 +4,7 @@
  * ミラーは、ワークスペースの `.ccnavi/config/common/`（共通レイヤー）を各プロジェクトの `.ccnavi/config/common/` にコピーしたもの。
  * ずれの有無・中身・ハッシュ（`expect`）は実行ファイルが決めて返し、同期で書くのも実行ファイル。ここで決めるのは次の 3 つだけ。
  *
- * - 行と帯に出す文言（同期済み / ずれ N 件 / 調べられない、変更の種類の言い方、同期の結果の通知）
+ * - 行と帯に出す文言（同期済み / ずれ N 件 / 確認できない、変更の種類の言い方、同期の結果の通知）
  * - ボタンを押せるか（実行ファイルが古い・読めない・同期中・コピーするものが無い・ずれが無い、のどれかなら押せない）
  * - 「すべて同期」の対象（`state` が `differs` のプロジェクト）と、そのとき渡す `expect`（結果全体の `expect`）
  *
@@ -32,7 +32,7 @@ export interface MirrorProject {
   readonly name: string;
   readonly state: MirrorState;
   readonly changes: readonly MirrorChange[];
-  /** 調べられない・書けない理由（`state` が `error` のとき） */
+  /** 確認できない・書けない理由（`state` が `error` のとき） */
   readonly error: string;
   /** そのプロジェクトだけを同期するときに渡す `--expect` の値。ずれが無ければ空 */
   readonly expect: string;
@@ -87,7 +87,7 @@ export function parseMirrorList(text: string): MirrorListParse {
   if (!raw.ok) {
     return {
       ok: true,
-      value: { version: MIRROR_VERSION, ok: false, error: str(raw.error) || "ミラーを調べられませんでした（理由は返りませんでした）", commonEmpty: raw.common_empty === true, projects: [], expect: "" },
+      value: { version: MIRROR_VERSION, ok: false, error: str(raw.error) || "ミラーを確認できませんでした（理由は返りませんでした）", commonEmpty: raw.common_empty === true, projects: [], expect: "" },
     };
   }
   if (!Array.isArray(raw.projects)) {
@@ -178,7 +178,7 @@ export function stateText(project: MirrorProject): string {
     case "differs":
       return `ずれ ${project.changes.length} 件`;
     case "error":
-      return "調べられません";
+      return "確認できません";
     default:
       return `未知の状態です（${project.state}）`;
   }
@@ -210,8 +210,8 @@ export interface SyncButton {
 }
 
 /**
- * ミラーを調べた結果（`projects-view.ts` の `MirrorData` が持つ）。`waiting` はまだ調べていない、`unsupported` は実行ファイルが
- * `user mirror` を持たない、`failed` は調べられなかった（実行ファイルが無い・期限切れ・結果が読めない）
+ * ミラーを確認した結果（`projects-view.ts` の `MirrorData` が持つ）。`waiting` はまだ確認していない、`unsupported` は実行ファイルが
+ * `user mirror` を持たない、`failed` は確認できなかった（実行ファイルが無い・期限切れ・結果が読めない）
  */
 export type MirrorStatus =
   | { readonly kind: "waiting" }
@@ -226,14 +226,14 @@ function commonBlock(status: MirrorStatus, busy: boolean): string {
   }
   switch (status.kind) {
     case "waiting":
-      return "ミラーを調べています";
+      return "ミラーを確認しています";
     case "unsupported":
       return status.reason;
     case "failed":
-      return "ミラーを調べられませんでした。「更新」で調べ直してください";
+      return "ミラーを確認できませんでした。「更新」で確認し直してください";
     case "ok":
       if (!status.list.ok) {
-        return "ミラーを調べられませんでした。「更新」で調べ直してください";
+        return "ミラーを確認できませんでした。「更新」で確認し直してください";
       }
       return status.list.commonEmpty ? "共通レイヤーにも工程スキルにもコピーするものがありません" : "";
   }
@@ -256,7 +256,7 @@ export function projectSyncButton(status: MirrorStatus, busy: boolean, name: str
     return { enabled: false, reason: project.error || stateText(project) };
   }
   if (project.expect === "") {
-    return { enabled: false, reason: "同期に要る値が返りませんでした。「更新」で調べ直してください" };
+    return { enabled: false, reason: "同期に要る値が返りませんでした。「更新」で確認し直してください" };
   }
   return { enabled: true, reason: "" };
 }
@@ -272,7 +272,7 @@ export function syncAllButton(status: MirrorStatus, busy: boolean): SyncButton &
     return { enabled: false, reason: "ずれのあるプロジェクトはありません", count };
   }
   if (status.kind === "ok" && status.list.expect === "") {
-    return { enabled: false, reason: "同期に要る値が返りませんでした。「更新」で調べ直してください", count };
+    return { enabled: false, reason: "同期に要る値が返りませんでした。「更新」で確認し直してください", count };
   }
   return { enabled: true, reason: "", count };
 }

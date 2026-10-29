@@ -98,7 +98,7 @@ diagrams:
       - id: name-stop
         from: プロジェクト管理画面
         text: 大文字小文字だけ違う名前も同じ名前として止める（Windows では同じフォルダになるため）
-        value: web-app という名前のツリーが既にあります
+        value: web-app という名前のプロジェクトかワークツリーが既にあります
 
   # カードの値がどこから来るか
   project-card:
