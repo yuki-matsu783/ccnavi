@@ -36,3 +36,5 @@ ccnavi の使い方（`.ccnavi/docs/`）は `.ccnavi/CCNAVI.md` の表に記載�
 | Python のテストを回す（特に全件）、回すグループを決める | `.agents/docs/testing.md` |
 | GitLab の模擬（`tests/fake_gitlab.py`）の応答を変える、契約テスト（`tests/contract/`）・録画した応答の形（`recorded*.json`）を足す・直す | `.agents/docs/gitlab-contract.md` |
 | 受入シナリオ（`tests/scenarios/`）を書く、`claude -p` で振る舞いを回す（明確な指示があったときだけ） | `.agents/docs/acceptance-scenarios.md` |
+| 手動で本物の GitLab（Docker）を立てて 1 周する | `.agents/docs/gitlab-manual.md` |
+| 拒否・促し・次の一手の文を文面ファイルに足す・直す | `.agents/docs/message-files.md`（移行の進み具合は `.agents/docs/message-migration.md`） |

@@ -38,7 +38,7 @@ keywords: [つまずき, トラブル, hook が動かない, env, 再読み込�
 
 ## ワークツリー
 
-- Windows でワークツリーが消せない。誰かのテストが同じ実体のファイルを読み込んでいる間は消せない。テストが走っていないときにやり直す。失敗したら、残ったディレクトリを `mv` で `.claude/worktrees/` の外へ出して `git worktree prune`。先に `sh .ccnavi/scripts/ccnavi-clean.sh <名前>` で生成物を消すと、`node_modules` で止まる分は避けられる。理由と詳細は[実行環境の決まり](../.agents/docs/environment.md)にある
+- Windows でワークツリーが消せない。誰かのテストが同じ実体のファイルを読み込んでいる間は消せない。テストが走っていないときにやり直す。失敗したら、残ったディレクトリを `mv` で `.claude/worktrees/` の外へ出して `git worktree prune`。先に `sh .ccnavi/scripts/ccnavi-clean.sh <名前>` で生成物を消すと、`node_modules` で止まる分は避けられる。理由と詳細は[実行環境の決まり](../../.agents/docs/environment.md)にある
 - VS Code からワークツリーが見えない。`.vscode/settings.json` に `git.detectWorktrees` と `git.repositoryScanMaxDepth` が無い。導入スクリプトが書くが、`false` と書いてあれば変えない。`.vscode/settings.json` にコメントや末尾のカンマがあると何を足せばよいかだけを出す（[導入と配布](install.md)の「VS Code からワークツリーを見る」）
 
 ## ルール

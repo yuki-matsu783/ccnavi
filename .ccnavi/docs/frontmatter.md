@@ -86,4 +86,4 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 
 既にあるmdにfrontmatterを足すときは、既存のキーの値と順序を変えず、足りないキーだけを後ろに足す。
 
-Writeで新しく作ったmdにfrontmatterか`type`が無いと、ccnaviが`NOTICE_DOC_FRONTMATTER`で1度だけ案内する。`README.md`・`CLAUDE.md`・`CHANGELOG.md`と、上の対象外の表で「付けない」「付けなくてよい」とした置き場には出さない。
+Writeで新しく作ったmdにfrontmatterか`type`が無いと、ccnaviが`NOTICE_DOC_FRONTMATTER`で1度だけ案内する。`README.md`・`CLAUDE.md`・`AGENTS.md`・`CHANGELOG.md`と、上の対象外の表で「付けない」「付けなくてよい」とした置き場には出さない。

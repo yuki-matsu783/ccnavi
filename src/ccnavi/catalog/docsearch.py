@@ -438,7 +438,7 @@ def missing_frontmatter(conf: settings.Settings, root: str, payload: hookio.Inpu
 
     - Write で新しく作った（`tool_response.type` が `create`）。
       既にある md の Edit・上書きでは出さない。意図して frontmatter を持たない md
-      （README.md・CLAUDE.md・CHANGELOG.md、取り込んだ資料）を直すたびに促すと、
+      （README.md・CLAUDE.md・AGENTS.md・CHANGELOG.md、取り込んだ資料）を直すたびに促すと、
       付けに行かせることになる。作るのは 1 本につき 1 度なので、
       セッションをまたいで覚える必要も無い
     - 索引の対象に入る md。書いた先のツリー（ワークスペース・プロジェクト・ワークツリー）の
@@ -446,7 +446,7 @@ def missing_frontmatter(conf: settings.Settings, root: str, payload: hookio.Inpu
       統合先の索引に入るので、そのワークツリー自身の git に聞く。ccnavi ディレクトリの下と、
       git が無視するものは索引に載らないので出さない
     - 決まりの文書で「付けない・付けなくてよい」とされている md ではない。
-      README.md・CLAUDE.md・CHANGELOG.md と、
+      README.md・CLAUDE.md・AGENTS.md・CHANGELOG.md と、
       対象外の表の置き場（NO_FRONTMATTER_PLACES。チケットとチケットの下書き・下書きの置き場・
       外から取り込んだスキル）。下書きは索引には載るが、frontmatter を求めない
     """

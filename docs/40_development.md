@@ -171,6 +171,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `scripts/check_rules.py` | このリポジトリの共通レイヤーの `rules.yml` と `rule-expectations.yml` で `ccnavi --test-expectations` を呼ぶだけの薄いラッパースクリプト。引数でルールファイル（下書き）を差し替えられる。`CCNAVI_*` を外した環境で、承認済みチケット・state・記録を使わずに回し、終了コードは実行ファイルのまま返す（食い違いがあれば 1）。判定は実行ファイル側で行い、ここでは作らない。全件テスト（`tests/core/test_check_rules.py`）も同じ引数を使う。配布先には無く、そこでは `ccnavi --test-expectations` を直接打つ（`/ccnavi-config` スキルもそう打つ） |
 | `extensions/` | VS Code 拡張（`vscode/ccnavi-board`）と Chrome 拡張（`chrome/ccnavi-approval`）、共有の設定（`shared/`） |
 | `docs/` | 設計・要件・ADR・手引き。置き場は番号順に `10_requirements.md`・`11_requirements/`（要件）、`20_design.md`・`21_design/`（設計）、`30_adr.md`・`30_adr/`（ADR）、`40_development.md`・`41_guide/`（手引き）。ccnavi の開発の決まりは `docs/` でなく `.agents/docs/` に置く。`wiki/` と `CONTEXT.md` は実行時に読むため、番号を付けない |
+| `.agents/docs/` | ccnavi の開発で常に守る決まり（テストの回し方、ログ、sh、出力の案内など）。入口は [AGENTS.md](../AGENTS.md) の「詳細」の表。配布しない |
 | `wip/` | 作業中の下書き（`design/`・`handoff/`・`proposals/`） |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る。例外は 2 つ。`tests/scenarios/test_runner.py` は、受入シナリオの実行器の内部を呼ぶ単体テストで、`claude` は呼ばない。`tests/scenarios/hostenv.py` は、シナリオの `setup.host` が使う代役と模擬を起こして片付ける補助 |
 | `tests/__main__.py` | `python -m tests`。テストをモジュールごとに別プロセスで同時に回す。回す中身は discover と同じ |
