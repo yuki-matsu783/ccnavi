@@ -86,6 +86,13 @@ class RequestNudgeTest(base.StopNudgeTest):
         # 別のセッションは自分の記録を持つ。
         self.asked(self.stop(self.parent_tree, session="s2"))
 
+    def test_the_awaiting_user_mark_holds_the_nudge_without_using_it_up(self):
+        """最後の行がユーザの返事を待つ目印なら止めず、「1 回だけ」も進めない。"""
+        self.family()
+        message = "決めてほしいことがあります。\n<!-- awaiting-user -->"
+        self.assert_not_asked(self.stop(self.parent_tree, message=message))
+        self.asked(self.stop(self.parent_tree, message="進めました。"))
+
     def test_a_child_worktree_is_asked_about_its_own_child_only(self):
         """並行して動く別の子は別のセッションの作業。子のツリーでは自分の子だけを言う。"""
         self.family()

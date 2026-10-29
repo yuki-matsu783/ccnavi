@@ -41,7 +41,15 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         write(os.path.join(self.root, exclude), "/logs/\n/.ccnavi/config/\n")
 
     def stop(
-        self, cwd, *, active=False, event="Stop", agent_id="", integration="main", session="s1"
+        self,
+        cwd,
+        *,
+        active=False,
+        event="Stop",
+        agent_id="",
+        integration="main",
+        session="s1",
+        message=None,
     ):
         payload = {
             "hook_event_name": event,
@@ -51,6 +59,8 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         }
         if agent_id:
             payload["agent_id"] = agent_id
+        if message is not None:
+            payload["last_assistant_message"] = message
         self.point_origin_head(integration)
         return self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
 
@@ -135,6 +145,15 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         # 進めば（コミットを足せば）また 1 回。
         self.commit_work(path, rel="src/more.py")
         self.assertIn("コミット 2 件", self.asked(self.stop(path)))
+
+    def test_the_awaiting_user_mark_holds_the_nudge_without_using_it_up(self):
+        """ユーザに問いを出して返事を待つ回は止めない。目印を忘れた回は今までどおり促す。"""
+        path = self.direct(commit=True)
+        self.record()
+        self.assert_not_asked(
+            self.stop(path, message="どちらで進めますか。\n\n<!-- awaiting-user -->")
+        )
+        self.asked(self.stop(path, message="どちらで進めますか。"))
 
     def test_commits_are_counted_from_the_recorded_start_point(self):
         """入っていないコミットは S..先頭で数える。S より前のコミットは数えない。"""

@@ -27,6 +27,7 @@ def load_tests(loader, tests, pattern):
 
 
 CODE = "NUDGE_TICKET_FINISH"
+MARK = "<!-- awaiting-user -->"
 
 
 def result_text(body):
@@ -35,7 +36,16 @@ def result_text(body):
 
 class StopNudgeTest(TicketTest):
     def stop(
-        self, cwd, *, active=False, mode="enable", event="Stop", agent_id="", extra=(), session="s1"
+        self,
+        cwd,
+        *,
+        active=False,
+        mode="enable",
+        event="Stop",
+        agent_id="",
+        extra=(),
+        session="s1",
+        message=None,
     ):
         payload = {
             "hook_event_name": event,
@@ -45,6 +55,8 @@ class StopNudgeTest(TicketTest):
         }
         if agent_id:
             payload["agent_id"] = agent_id
+        if message is not None:
+            payload["last_assistant_message"] = message
         if mode == "disable":
             # disable を言えるのは起動した環境だけ（フラグの disable は enable になる）。
             return self.ccnavi(
@@ -296,6 +308,40 @@ class StopNudgeTest(TicketTest):
         self.assertTrue(third["reason"].startswith("NUDGE_STOP_RULE: "), third["reason"])
         self.assertIn("振り返る", third["reason"])
         self.assertNotIn(CODE, third["reason"])
+
+    # ---- ユーザの返事を待つ目印
+
+    def test_the_awaiting_user_mark_holds_the_nudge_without_using_it_up(self):
+        """最後の行が目印だけなら止めず、「1 回だけ」も進めない。目印の無い次の終わりで促す。"""
+        self.family()
+        tree = self.child_tree()
+        self.commit_work(tree)
+        self.assert_quiet(self.stop(tree, message="どちらで進めますか。\n\n" + MARK + "\n"))
+        body = self.body(self.stop(tree, message="終わりました。"))
+        self.assertEqual(body.get("decision"), "block")
+
+    def test_the_mark_counts_only_on_the_last_line(self):
+        """本文の途中の目印（説明で引いただけ）は数えない。"""
+        self.family()
+        tree = self.child_tree()
+        self.commit_work(tree)
+        message = f"最後の行に {MARK} を書く決まりです。\n{MARK}\n終わりました。"
+        self.assertEqual(self.body(self.stop(tree, message=message)).get("decision"), "block")
+
+    def test_the_mark_does_not_hold_the_stop_rule(self):
+        """目印で控えるのは作業の流れの促しだけ。`match: Stop` のルールはいつもどおり数える。"""
+        with open(self.rules, encoding="utf-8") as f:
+            body = json.load(f)
+        rule = {"id": "review", "match": "Stop", "glob": "*", "every": 2}
+        body["allow"] = [*body.get("allow", []), {**rule, "additionalContext": "振り返る"}]
+        write(self.rules, json.dumps(body))
+        self.family()
+        tree = self.child_tree()
+        self.commit_work(tree)
+        self.assert_quiet(self.stop(tree, message=MARK))
+        second = self.body(self.stop(tree, message=MARK))
+        self.assertEqual(second.get("decision"), "block")
+        self.assertTrue(second["reason"].startswith("NUDGE_STOP_RULE: "), second["reason"])
 
 
 if __name__ == "__main__":
