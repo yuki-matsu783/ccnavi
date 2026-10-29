@@ -57,7 +57,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
 | `tests/ticketsample.py` | `ticket` `sh` |
 | `tests/host_stub.py`・`tests/fake_gitlab.py`・`tests/scenarios/hostenv.py`・`tests/scenarios/runner.py` | `scenarios` `sh` `contract`（どちらのグループも、この 2 つの代役と模擬を import して使う） |
-| `tests/manual/gitlab/gitlab_api.py` | `scenarios` `core`（受入シナリオの相手の準備と状態の読み取り、`core` の `test_gitlab_manual_tools` が使う） |
+| `tests/manual/gitlab/gitlab_api.py` | `scenarios` `core`（受入シナリオの相手の準備と状態の読み取りに使う。`core` の `test_gitlab_manual_tools` も使う） |
 | `tests/fixtures/` | `guard` `ticket` |
 | `extensions/vscode/` | `ticket`（`core` の `test_test_json` と `guard` の `test_suggest` も `test/fixtures/` を読む） |
 | `tests/contract/`（`shape.py`・`*.json`） | `contract`。あわせて `extensions/chrome/ccnavi-approval` の `pnpm test`（TS の比較器が同じ表を読む） |

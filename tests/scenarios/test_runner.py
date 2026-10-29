@@ -3410,7 +3410,7 @@ def snap_state():
 
 @unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
 class HostSnapshotTest(unittest.TestCase):
-    """hostsnap を fake-gitlab（模擬）を相手に確かめる。Docker・ネットワーク・claude は使わない。"""
+    """fake-gitlab（模擬）を相手に hostsnap を確かめる。Docker・ネットワーク・claude は使わない。"""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -3525,7 +3525,7 @@ class HostSnapshotTest(unittest.TestCase):
             result, snap, _ = self.take()
         self.assertFalse(result["ok"])
         self.assertEqual(result["errors"], 2)
-        self.assertEqual(snap["mrs"][0]["title"], "t", "1 件が取れなくても一覧の分は残す")
+        self.assertEqual(snap["mrs"][0]["title"], "t", "1 件が取れなくても、一覧の分は残る")
         self.assertTrue(snap["mrs"][0]["threads_unavailable"])
         self.assertEqual({e["api"] for e in snap["errors"]}, {"get_mr 1", "list_discussions 1"})
 
@@ -3613,7 +3613,7 @@ class HostLifecycleTest(unittest.TestCase):
 
         def run_step(*a, **k):
             calls.append(len(calls) + 1)
-            if len(calls) == 1:  # 1 つ目の step の間に、相手側で MR ができたものとして扱う
+            if len(calls) == 1:  # 1 つ目の step の間に、相手側で MR が作られた状況にする
                 path = self.host_in_state()["state_path"]
                 state = fake_gitlab.load(path)
                 state["mrs"] = seeded()["mrs"]

@@ -302,10 +302,10 @@ setup:
   - `mrs`: `iid`・`title`・`state`（opened / merged / closed）・`draft`・ブランチ・`merged_at`・`merge_status` など、あるものだけ。`threads` に、スレッドの `id`・`resolved`（解決できるメモがすべて解決済みなら true、未解決があれば false、解決できないスレッドは null）・`notes`（作者・本文・解決の状態）
   - `issues`: `iid`・`title`・`state`・`closed_at` など
   - 本文（MR の説明・メモ・issue の説明）は 1000 文字で切る。切ったときは末尾に `…(+N)`
-- 承認は取らない。模擬に `approvals` の API が無く、模擬と本物で記録の形を揃えるため、`docker-gitlab` でも取らない。`approvals` は `{"taken": false, "reason": ...}` の固定の形で、承認が無いことと取っていないことを区別できるようにする。`mrs` に承認の欄は無い
-- 取れなかったときは止めない。取れなかった API を `errors`（`api`・`status`・`error` の配列）に残し、取れた分は残す。接続や例外で何も取れなかった step も `host-N.json` を書き、`errors` に例外の型の名前だけを入れる。一覧が取れなければ `mrs` は空、1 件が取れなければ一覧の分だけ残し、スレッドが取れなければ `threads_unavailable` を付ける
-- 一覧（MR・スレッド・issue）は 1 ページ（100 件）だけ読む。100 件に届いたら、切れたかもしれないことを `errors` に残す
-- トークンは記録に出さない。取る項目は選んである（認証の情報を含む応答の全文は残さない）うえで、`tokens.env` の値と模擬のトークンが文字列に混ざっていたら `***` に置き換える
+- 承認は取らない。模擬に `approvals` の API が無く、模擬と本物で記録の形を揃えるため、`docker-gitlab` でも取らない。`approvals` は `{"taken": false, "reason": ...}` の固定の形にし、承認が無いのか、そもそも取っていないのかを読めるようにする。`mrs` に承認の欄は無い
+- 取れなかったときは止めない。取れなかった API は `errors`（`api`・`status`・`error` の配列）に残し、取れた分は残す。接続や例外で何も取れなかった step でも `host-N.json` は書き、`errors` には例外の型の名前だけを入れる。一覧が取れなければ `mrs` は空にし、1 件の詳細が取れなければ一覧の分は残す。スレッドが取れなければ `threads_unavailable` を付ける
+- 一覧（MR・スレッド・issue）は 1 ページ（100 件）だけ読む。100 件に達したら、取り切れていないかもしれないことを `errors` に残す
+- トークンは記録に出さない。認証の情報を含む応答は全文を残さず、取る項目を選ぶ。そのうえで、`tokens.env` の値と模擬のトークンが文字列に混ざっていたら `***` に置き換える
 - `state.json` の `host_snapshots` に step ごとの結果（`step`・`file`・`ok`・`errors`。ここの `errors` は件数）を残し、`report.md` の「相手（setup.host）」の行のあとに件数と、取れなかった step を出す。判定（`pass` / `fail`）には使わない
 
 **後片付け。** 模擬の停止、一時ディレクトリの削除、回している間に動いた対象の `refs/remotes/origin/*` の巻き戻しは、`setup.reset` の戻しと同じ経路で行う（`finish` の `finally`・`_continue` の `BaseException`・`restore`・失敗の停止）。人間の操作の step（終了コード 10）では、模擬は止め、置き場（bare・代役・模擬の状態）は残す。`next` は、同じ置き場で模擬を、残した状態ファイルのまま起こし直す（初期状態で上書きしない）。ポートは同じものを取り直し、取れなければ OS に決めさせて `案内:` を出す（前の step の記録に古いポートの URL が残りうる）。

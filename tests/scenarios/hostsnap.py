@@ -6,7 +6,7 @@
 - 読むだけ。呼ぶのは GET の API（list_mrs・get_mr・list_discussions・list_issues）だけ
 - 承認（approvals）は取らない。模擬に API が無いため。記録の `approvals` に「取っていない」と残す
 - 取れなかったものは、その場所の `errors` に残す。例外は呼び出し側へ出さない（シナリオを止めない）
-- トークンは記録に出さない。取るのは選んだ項目だけで、そのうえで知っているトークンの値を伏せる
+- トークンは記録に出さない。取る項目は選んだものだけにし、知っているトークンの値は伏せる
 
 実行器（runner.py）が `take` を呼び、出力の置き場に `host-<step>.json` を書く。
 """
@@ -19,7 +19,7 @@ from tests.scenarios import hostenv
 
 LOG_NAME = hostenv.LOG_NAME
 TEXT_LIMIT = 1000
-# 一覧は 1 ページ（100 件）だけ読む。届いたら、切れたかもしれないことを errors に残す。
+# 一覧は 1 ページ（100 件）だけ読む。100 件に達したら、切れた可能性を errors に残す。
 PAGE_LIMIT = 100
 MASK = "***"
 APPROVALS_NOT_TAKEN = {
@@ -156,7 +156,7 @@ def collect(client, token, project):
         iid = item.get("iid")
         detail = read(f"get_mr {iid}", client.get_mr(token, project, iid))
         if not isinstance(detail, dict):
-            detail = item  # 1 件が取れなければ一覧の分だけ残す（errors には残っている）
+            detail = item  # 1 件の詳細が取れなければ、一覧の分は残す（errors にも残る）
         view = _mr(detail)
         found = read(f"list_discussions {iid}", client.list_discussions(token, project, iid))
         if isinstance(found, list):
@@ -192,7 +192,7 @@ def _mask(text, secrets):
 def take(root, host, step, out, now=None):
     """相手側の状態を読んで `out/host-<step>.json` に書く。結果の要約の辞書を返す。
     要約: {"step", "file", "ok", "errors"}。読めなかった・書けなかったときも例外にせず、
-    読めなかった理由を記録の errors に残す（書けなければ要約の errors だけ）。"""
+    読めなかった理由を記録の errors に残す（書けなかったときは、要約の errors だけに残す）。"""
     log = diaglog.get(LOG_NAME, str(root))
     name = file_name(step)
     record = {
@@ -205,7 +205,7 @@ def take(root, host, step, out, now=None):
     try:
         client, token, project, secrets = hostenv.api_access(host)
         record.update(collect(client, token, project))
-    except Exception as exc:  # 取れなくてもシナリオは止めない。文字列は型の名前だけ
+    except Exception as exc:  # 取れなくてもシナリオは止めない。errors には例外の型名だけを入れる
         record.update(
             approvals=APPROVALS_NOT_TAKEN,
             mrs=[],

@@ -10,7 +10,7 @@
   origin への通信はそのプロジェクトへ向く。回したあとに消す
 - `real`: 何もしない
 
-`api_access` は、`fake-gitlab` / `docker-gitlab` の相手を読む入口
+`api_access` は、`fake-gitlab` / `docker-gitlab` の相手を読むために必要なもの
 （クライアント・トークン・プロジェクト）を返す。
 step の終わりの相手側の状態の記録（hostsnap.py）が使う。
 
@@ -146,15 +146,15 @@ def agent_token():
 
 
 def snapshot_hosts():
-    """step の終わりに相手側の状態を取る相手。"""
+    """step の終わりに相手側の状態を読む対象。"""
     return ("fake-gitlab", DOCKER)
 
 
 def api_access(host):
     """相手側の状態を読む API の入口。(Client, トークン, プロジェクト, 伏せる値の一覧) を返す。
     fake-gitlab は模擬のポートとトークン、docker-gitlab はエージェント役のトークン。
-    伏せる値は、記録に混ざったら消すトークンの値（人間役のものを含む）。
-    Client は書き込みの method も持つ。読むだけであることは、呼び出し側（hostsnap）が守る。"""
+    伏せる値は、記録に混ざったら `***` に置き換えるトークンの値（人間役のものを含む）。
+    Client は書き込み用のメソッドも持つ。読むだけにすることは、呼び出し側（hostsnap）が守る。"""
     if host["kind"] == DOCKER:
         client, token, _, values = _connect()
         secrets = [v for k, v in values.items() if k.upper().endswith("TOKEN") and v]

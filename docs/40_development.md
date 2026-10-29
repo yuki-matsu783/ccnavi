@@ -175,7 +175,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `wip/` | 作業中の下書き（`design/`・`handoff/`・`proposals/`） |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る。例外は 2 つ。`tests/scenarios/test_runner.py` は、受入シナリオの実行器の内部を呼ぶ単体テストで、`claude` は呼ばない。`tests/scenarios/hostenv.py` は、シナリオの `setup.host` が使う代役と模擬を起こして片付ける補助 |
 | `tests/__main__.py` | `python -m tests`。テストをモジュールごとに別プロセスで同時に回す。回す中身は discover と同じ |
-| `tests/manual/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを適用して 1 周する、ユーザが手で回す道具。代役 `fake_gitlab.py` は起動するだけの入口。本体は `tests/fake_gitlab.py` にあり、自動テストが `start` で起こす（受入シナリオからも同じ関数を呼べる）。`gitlab_api.py` は、受入シナリオの実行器も相手の準備と状態の読み取りに使う。ほかのファイルは自動テストが呼ばない。Docker で実物を立てる手順は [.agents/docs/gitlab-manual.md](../.agents/docs/gitlab-manual.md) |
+| `tests/manual/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを適用して 1 周する、ユーザが手で回す道具。代役 `fake_gitlab.py` は起動するだけの入口。本体は `tests/fake_gitlab.py` にあり、自動テストが `start` で起こす（受入シナリオからも同じ関数を呼べる）。`gitlab_api.py` は、受入シナリオの実行器も、相手の準備と状態の読み取りに使う。ほかのファイルは自動テストが呼ばない。Docker で実物を立てる手順は [.agents/docs/gitlab-manual.md](../.agents/docs/gitlab-manual.md) |
 | `tests/contract/` | 録画した GitLab の応答の形（JSON）と Python の模擬の応答の形の比較（グループ `contract`）。sh を起動しない。仕様と録り直しは [.agents/docs/gitlab-contract.md](../.agents/docs/gitlab-contract.md) |
 | `tests/fixtures/` | テスト用のルール（`rules.yml`、言及の無い呼び出しを見る `rules-undeclared.yml`） |
 | `.ccnavi/config/common/rules.yml` / `phases.yml` / `risks.yml` | このリポジトリ自身の共通レイヤーの設定（`phases.yml` はどのプロジェクトでも使える定義） |
