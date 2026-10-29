@@ -3,7 +3,11 @@
 
 UserPromptSubmit・PreToolUse・PostToolUseFailure・Stop・SessionStart を続けて呼ぶ。
 
-見るのは次の 7 つ。
+見るのは次の 8 つ。付き添いのないセッション（`CLAUDE_CODE_SESSION_ATTENDED=0`）を既定にして、
+発言を待つ関門を確かめる。付き添いのあるセッションは `AttendedTest` で確かめる。
+
+- 付き添いのあるセッションでは、`integrate-done` は発言を待たず確認（ask）に出る。
+  同じコマンドに並べた呼び出しだけは、確認でなく止まる
 
 - 同じ発言の中で `integrate` → `integrate-done` は止まる。発言を 1 回はさむと通る
 - バックグラウンド作業の完了通知は、何回挟んでも開かない。完了通知のあとにユーザの発言が来れば開く
@@ -40,6 +44,8 @@ class TurnGateHookTest(unittest.TestCase):
         os.makedirs(os.path.join(self.repo, ".ccnavi", "config", "common"))
         self.calls = 0
 
+    attended = "0"
+
     def hook(self, event, session="s1", mode="enable", **body):
         payload = {"hook_event_name": event, "session_id": session, "tool_name": "Bash"}
         payload["tool_input"] = {"command": "ls"}
@@ -47,6 +53,9 @@ class TurnGateHookTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment["CCNAVI_LEARNING"] = "disable"
         environment["CCNAVI_MODE"] = mode
+        environment.pop("CLAUDE_CODE_SESSION_ATTENDED", None)
+        if self.attended is not None:
+            environment["CLAUDE_CODE_SESSION_ATTENDED"] = self.attended
         return run_ccnavi(
             ["--root", self.repo], input=json.dumps(payload), cwd=ROOT, env=environment
         )
@@ -116,6 +125,78 @@ class FlowTest(TurnGateHookTest):
         self.assertEqual(len(denied), 1)
         self.assertEqual(denied[0]["code"], "DENY_NEEDS_USER_TURN")
         self.assertEqual(denied[0]["rules"], ["builtin:turn-gate:integrate-user-turn"])
+
+
+class AttendedTest(TurnGateHookTest):
+    """付き添いのあるセッションでは、発言を待たず `integrate-done` を確認に出す。"""
+
+    attended = "1"
+
+    def asked(self, done):
+        return '"permissionDecision": "ask"' in done.stdout
+
+    def test_同じ発言の中でも_integrate_done_は確認に出る(self):
+        self.say()
+        self.assertFalse(self.stopped(self.run_command(INTEGRATE)))
+
+        done = self.run_command(DONE)
+
+        self.assertTrue(self.asked(done))
+        self.assertFalse(self.stopped(done))
+        self.assertIn("builtin:turn-gate:integrate-user-turn", done.stdout)
+        self.assertIn("ユーザの確認が要ります", done.stdout)
+
+    def test_integrate_は記録を残さない(self):
+        self.say()
+        self.run_command(INTEGRATE)
+
+        self.assertEqual(self.entries(), [])
+
+    def test_integrate_を打たなくても確認に出る(self):
+        self.say()
+
+        self.assertTrue(self.asked(self.run_command(DONE)))
+
+    def test_同じコマンドに並べた呼び出しは確認でなく止まる(self):
+        self.say()
+
+        done = self.run_command(f"{INTEGRATE} && {DONE}")
+
+        self.assertTrue(self.stopped(done))
+        self.assertFalse(self.asked(done))
+
+    def test_キーが違う名前も確認に出る(self):
+        self.say()
+
+        self.assertTrue(self.asked(self.run_command(f"{GIT} integrate-done bar -m 'msg x'")))
+
+    def test_確認の記録は_ask_で残り_拒否コードでは残らない(self):
+        self.say()
+        self.run_command(DONE)
+
+        asked = [d for d in self.decisions() if d.get("decision") == "ask"]
+
+        self.assertEqual(len(asked), 1)
+        self.assertEqual(asked[0]["code"], "RULE_ASK")
+        self.assertEqual(asked[0]["rules"], ["builtin:turn-gate:integrate-user-turn"])
+
+    def test_dry_run_でも確認に出る(self):
+        self.say(mode="dry-run")
+
+        self.assertTrue(self.asked(self.run_command(DONE, mode="dry-run")))
+
+    def test_付き添いの有無が未設定なら対話として扱う(self):
+        self.attended = None
+        self.say()
+
+        self.assertTrue(self.asked(self.run_command(DONE)))
+
+    def test_非対話に戻れば発言を待つ関門が働く(self):
+        self.attended = "0"
+        self.say()
+        self.run_command(INTEGRATE)
+
+        self.assertTrue(self.stopped(self.run_command(DONE)))
 
 
 class NotUserTurnTest(TurnGateHookTest):

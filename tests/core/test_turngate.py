@@ -3,7 +3,9 @@
 宣言の表を直接渡して確かめる。組み込みの 1 件（`integrate` → `integrate-done`）のほかに、
 `integrate` と関係の無い架空の組を使い、部品が特定の組に依存していないことを見る。
 
-見るのは次の 5 つ。
+見るのは次の 6 つ。
+
+- 付き添いのあるセッションでは、`ask_if_attended` の宣言だけが確認（ask）に出る側へ分かれる
 
 - 同じ発言の中で A→B は止まり、発言を 1 回はさむと通る。通ると記録が消える
 - キーが違う組、A の記録が無い B は対象外
@@ -498,6 +500,74 @@ class BuiltinFormsTest(TurnGateTestCase):
 
         self.assertEqual(got.gate.id, "integrate-user-turn")
         self.assertEqual(got.key, "foo")
+
+
+class AskIfAttendedTest(TurnGateTestCase):
+    GIT = "sh .ccnavi/scripts/ccnavi-git.sh"
+
+    def setUp(self):
+        super().setUp()
+        self.root = tempfile.mkdtemp(prefix="ccnavi-turngate-root-")
+        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        put_messages(self.root)
+
+    def test_付き添いがあれば_integrate_は確認の側に分かれる(self):
+        waited, asked = turngate.split_by_attendance(BUILTIN, True)
+
+        self.assertEqual(waited, ())
+        self.assertEqual(asked, BUILTIN)
+
+    def test_付き添いがなければ発言を待つ側に残る(self):
+        waited, asked = turngate.split_by_attendance(BUILTIN, False)
+
+        self.assertEqual(waited, BUILTIN)
+        self.assertEqual(asked, ())
+
+    def test_立てていない宣言は付き添いがあっても発言を待つ側に残る(self):
+        waited, asked = turngate.split_by_attendance(GATES, True)
+
+        self.assertEqual(waited, GATES)
+        self.assertEqual(asked, ())
+
+    def test_asks_は_B_にヒットした宣言とキーを返す(self):
+        got = turngate.asks(BUILTIN, [f"{self.GIT} integrate-done foo -m x"])
+
+        self.assertEqual(got.gate.id, "integrate-user-turn")
+        self.assertEqual(got.key, "foo")
+        self.assertEqual(got.reason, turngate.ASK)
+
+    def test_asks_は_A_や関係の無いコマンドにヒットしない(self):
+        self.assertIsNone(turngate.asks(BUILTIN, [f"{self.GIT} integrate foo"]))
+        self.assertIsNone(turngate.asks(BUILTIN, ["ls"]))
+
+    def test_same_command_only_は同じコマンドの_A_と_B_だけ止める(self):
+        both = [f"{self.GIT} integrate foo && {self.GIT} integrate-done foo -m x"]
+
+        got = turngate.check(BUILTIN, both, self.state, SESSION, same_command_only=True)
+
+        self.assertEqual(got.reason, turngate.SAME_COMMAND)
+
+    def test_same_command_only_は_B_だけなら記録を見ずに通す(self):
+        turngate.note(BUILTIN, [f"{self.GIT} integrate foo"], self.state, SESSION, "c1", now=1.0)
+
+        got = turngate.check(
+            BUILTIN,
+            [f"{self.GIT} integrate-done foo -m x"],
+            self.state,
+            SESSION,
+            same_command_only=True,
+        )
+
+        self.assertIsNone(got)
+
+    def test_確認の文は宣言の識別子から引く(self):
+        stop = turngate.asks(BUILTIN, [f"{self.GIT} integrate-done foo -m x"])
+
+        text = turngate.ask_message(stop, self.root)
+
+        self.assertIn("ユーザの確認が要ります", text)
+        self.assertIn("integrate-user-turn", text)
+        self.assertIn("foo", text)
 
 
 if __name__ == "__main__":
