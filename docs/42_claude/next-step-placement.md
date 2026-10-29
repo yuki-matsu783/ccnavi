@@ -72,7 +72,7 @@ keywords: [次の一手, 置き場, 分担, SessionStart, UserPromptSubmit, PreT
 |---|---|
 | チケットに結び付かない直接作業の、取り込みが済んでいない作業 | Stop の `integrate` の促し（cwd のツリーと、このセッションが書いたツリー）。`--lint`（`entry/lint_direct.py`）が記録の無いワークツリーと壊れた記録を言う |
 | 直接作業の、取り込みの途中の跡（marker・一時ワークツリー・専用の ref・片付けの途中の done の記録） | SessionStart の `pending_integrate`。`--lint` の `_markers`・`_leftovers` |
-| 直接作業へ切り替えたあとに残る承認待ちの提案・着手中の子・MR | `ccnavi-worktree.sh` の切り替え 1 回の出力（`NOTE_WORKTREE_LEFTOVER*`。残っているかは `ccnavi tree leftover` に聞く）。取り下げの手順を言うのはこの 1 回だけで、あとのセッションでは SessionStart の一覧（`MR !<番号>`）と `status` が状態を事実として言う |
+| 直接作業へ切り替えたあとに残る承認待ちの提案・MR | `ccnavi-worktree.sh` の切り替え 1 回の出力（`NOTE_WORKTREE_LEFTOVER*`。残っているかは `ccnavi tree leftover` に聞く）。親のワークツリーからの切り替えは承認前（`stage` が `todo`）のときだけで、承認済み・レビュー待ち・着手済みの子があるときは切る前に断る（`NOTE_WORKTREE_PARENT_*`・`NEXT_WORKTREE_PARENT_ACTIVE`）。取り下げの手順を言うのはこの 1 回だけで、あとのセッションでは SessionStart の一覧（`MR !<番号>`）と `status` が状態を事実として言う |
 | 親子の立ち位置が決まらない（親のワークツリーが無い・HEAD が合わない・途中の操作） | `status` の「止まっている理由」と `guidance()` |
 | 同じ識別子のチケットが複数の置き場にある | `status` の「次の操作」（ユーザに重複の解消を頼む） |
 | 閉じた子の、消せずに残ったワークツリー | `ccnavi worktree remaining <親>`（`ccnavi-review.sh ready` が呼ぶ。`tickets/lifecycle/worktrees.py`） |
