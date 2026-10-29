@@ -1306,7 +1306,7 @@ def _human_op_text(op):
 
 # human_run で実行器が人間役として打てる sh（ワークスペースルートからの相対）と、確認文に出す説明。
 # argv は実行器が組み、yml には書かせない（本物のチケットの識別子や --root を書けないように）。
-# 行を足すのは、要るシナリオができたとき。
+# 行を足すのは、必要なシナリオができたときだけ。
 HUMAN_RUN_SCRIPTS = {
     "agree": (
         ".ccnavi/scripts/ccnavi-user-agree.sh",
@@ -1326,7 +1326,7 @@ def _human_run_text(step):
 
 
 def _pending_proposals(root):
-    """承認待ちの提案の [識別子, プロジェクト] の並び。同じ識別子が複数のツリーに出るので畳む。"""
+    """承認待ちの提案の [識別子, プロジェクト] の並び。複数のツリーに同じ識別子が出るので畳む。"""
     conf, _ = settings.load(str(root))
     found, _ = ticket.scan_all(str(root), conf.tickets, conf.projects)
     return [
@@ -1343,7 +1343,7 @@ def _approved_ids(root):
 
 
 def _human_run_env(st, root):
-    """人間役の環境。ターミナル要求を本物の端末で通すため、切る変数を外す。
+    """人間役の環境。ターミナル要求を本物の端末で通すため、その要求を切る変数を外す。
     別のワークスペースへ向かないよう、CCNAVI_WORKSPACE を root に固定する。
     模擬のホストでは、push 先を模擬に向けるため claude と同じ環境を使う。"""
     env = dict(_host_env(st) or os.environ)
@@ -1353,7 +1353,7 @@ def _human_run_env(st, root):
 
 
 def _run_on_terminal(argv, cwd, env, answers, timeout=HUMAN_RUN_TIMEOUT_SEC):
-    """argv を擬似端末に付けて起こし、（終了コード, 出力）を返す。
+    """argv を擬似端末に付けて起動し、（終了コード, 出力）を返す。
     時間切れは subprocess.TimeoutExpired。孫（ccnavi・git）も残さないよう、
     プロセスグループごと止める。"""
     if not hasattr(os, "openpty"):
@@ -1415,7 +1415,7 @@ def _run_on_terminal(argv, cwd, env, answers, timeout=HUMAN_RUN_TIMEOUT_SEC):
 def _halt_human_run(out, st, num, reason):
     st["halt"] = {"step": num, "kind": "human_run", "reasons": [reason]}
     _write_state(out, st)
-    print(f"step {num}: 人間役の操作を止めた（{reason}）。後続の step には進まず止める")
+    print(f"step {num}: 人間役の操作を止めた（{reason}）。後続の step には進まない")
     return 11
 
 
@@ -1430,7 +1430,7 @@ def _run_human_run(out, st, idx, step, root):
        0 件か、test-repo 以外の提案が混ざっていれば止める
        （黙って外すと親だけ落ちて承認が失敗する）。
     3. 打ち始めたことを state に書いてから、端末で打つ。
-    4. 終了コードでなく、対象が承認済みに在るかで成否を見る
+    4. 終了コードでなく、対象が承認済みにあるかで成否を見る
        （push の失敗や保護ブランチでも 0 で終わるため）。
     """
     num = idx + 1
