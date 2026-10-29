@@ -96,8 +96,11 @@ messages:
       ガード自身の設定と hook を、シェルから書き換えようとしています。
     why: |-
       Write / Edit でも拒否される場所です。表記を変えても同じ場所です。
-    next: |-
-      変更が必要な理由を伝えてユーザに依頼する。テスト用のフィクスチャは wip/handoff/ の下に作る
+    next:
+      root: |-
+        変更が必要な理由を伝えてユーザに依頼する。直すときは '{script:ccnavi-stage.sh} <元のパス>' で wip/handoff/ に写し（cp で写すと止まる）、写しを直して、ユーザに ccnavi-user-handoff.sh での取り込みを頼む。テスト用のフィクスチャは wip/handoff/ の下に作る
+      noroot: |-
+        変更が必要な理由を伝えてユーザに依頼する。直すときは ccnavi-stage.sh で wip/handoff/ に写し（cp で写すと止まる）、写しを直して、ユーザに ccnavi-user-handoff.sh での取り込みを頼む。テスト用のフィクスチャは wip/handoff/ の下に作る
     no_bypass: |-
       保護された場所そのものは、Python など別の手段でも書き換えないでください。
     note: |-

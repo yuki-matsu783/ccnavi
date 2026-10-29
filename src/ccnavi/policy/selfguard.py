@@ -130,7 +130,7 @@ from typing import TextIO
 
 from ..infra import fsio, gitstate
 from ..infra.modes import DISABLE, DRY_RUN, ENABLE
-from . import rules, selfguard_targets
+from . import selfguard_targets
 
 # 設定の値。mode と同じ 3 語。定義は modes にあり、ここは借りているだけ。
 SETTINGS = (ENABLE, DRY_RUN, DISABLE)
@@ -177,15 +177,15 @@ ACTION_RESTORED_GIT = "restored-from-git"  # バックアップが無く、git �
 ACTION_MISSING = "missing"  # 対象が無く、戻す先も無い
 ACTION_FAILED = "failed"  # 戻そうとして駄目だった
 ACTION_WOULD = "would-restore"  # dry-run。戻す代わりに言うだけ
-ACTION_LEFT = "left-as-repair"  # 読めないルールファイルへの修復なので戻さなかった
 ACTION_REBASED = "rebased"  # 大きい対象が変わったので、新しい版を基準に取り直した
 ACTION_ACCEPTED = "accepted"  # ユーザの発言で、消えたことを受け入れた
 
 # 共通レイヤーのルールファイルに付けるバックアップの key（_places）。
 COMMON_RULES_KEY = "rules"
 
-# 名指しのツールで書くもの。修復として戻さない判断は、この経路で書いた先にだけ掛ける。
-REPAIR_TOOLS = ("Write", "Edit", "NotebookEdit")
+# 共通レイヤーのルールファイルの下書きの置き場（ワークスペースルートからの相対）。
+# 取り込みは ccnavi-user-handoff.sh がする。
+COMMON_RULES_DRAFT = "wip/handoff/.ccnavi/config/common/rules.yml"
 
 
 @dataclass
@@ -315,7 +315,6 @@ def after(
     session: str,
     root: str,
     found: list[selfguard_targets.Target],
-    written: str,
 ) -> list[Outcome]:
     """実行後。バックアップと比べて、変わっていれば戻す。
 
@@ -323,20 +322,19 @@ def after(
     報告に書く。戻した先が直前の断面なのかコミット済みの内容なのかで、
     ユーザの書きかけが残っているかどうかが変わるので。
 
-    written は、この呼び出しが名指しのツール（REPAIR_TOOLS）で書いた先の解決済みの
-    パス。組み込みの既定を使っている間の修復だけは戻さない（_left_as_repair）。
+    共通レイヤーのルールファイルが読めない間に直した書き込みも、例外にせず戻す。直し方は下書きと
+    ユーザの取り込みで、その案内は `report` が添える。
 
     処理フロー:
     1. 無効（DISABLE）か状態の置き場が無ければ何もしない
     2. 大きい対象は `_check_heavy` に任せる
     3. バックアップと今の中身が同じなら何もしない
-    4. 読めないルールファイルの間の修復（`_left_as_repair`）は戻さず、報告だけにする
-    5. バックアップが無いとき: 中身も無ければ何もしない。無かったものが現れていれば、
+    4. バックアップが無いとき: 中身も無ければ何もしない。無かったものが現れていれば、
        報告だけにする（`_absent_noted`）。それ以外は `_fall_back_to_git` で
        コミット済みの内容を基準にする
-    6. dry-run のときは書かず、戻す予定だけを報告する
-    7. enable のときは、バックアップの内容を書き戻す
-    8. 何も起きていない回（`ACTION_KEPT`）は報告から除く
+    5. dry-run のときは書かず、戻す予定だけを報告する
+    6. enable のときは、バックアップの内容を書き戻す
+    7. 何も起きていない回（`ACTION_KEPT`）は報告から除く
     """
     if setting == DISABLE or not state_dir:
         return []
@@ -354,16 +352,6 @@ def after(
         now = _read(target.path)
 
         if saved is not None and now == saved:
-            continue
-
-        if _left_as_repair(target, written, saved, now):
-            outcomes.append(
-                Outcome(
-                    target,
-                    ACTION_LEFT,
-                    "ルールファイルが読めない間に Write / Edit で直したので、戻さなかった",
-                )
-            )
             continue
 
         if saved is None:
@@ -463,35 +451,6 @@ def accept(
                 Outcome(target, ACTION_FAILED, f"バックアップを保存できませんでした: {failed}")
             )
     return outcomes
-
-
-def _left_as_repair(
-    target: selfguard_targets.Target, written: str, saved: bytes | None, now: bytes | None
-) -> bool:
-    """組み込みの既定を使っている間の修復か。そうなら戻さない。
-
-    共通レイヤーのルールファイルが読めない間の直し方は、下書きとユーザの取り込みで、名前で書くツール
-    （`builtin:guard-ccnavi-config`）は止める。ただし全体モードが dry-run のときは deny が止めず、
-    名前で書くツールが通る。実行前に取るバックアップは破損した中身なので、そのまま戻すと、直した結果が
-    同じ呼び出しの中で消える。その場合に限る既存の例外で、実行後のチェック（`post.check`）には引き継がない。
-
-    戻さないのは次の 4 つが揃ったときだけ。
-      1. 対象が共通レイヤーのルールファイルそのもの。組み込みの既定に戻る原因になるのはこの
-         1 本だけで、ワークツリー側の設定や他のレイヤーの設定は読めなくても既定に戻らない
-      2. この呼び出しが名指しのツールでそこを書いた。シェルからの書き込みは既定でも止める
-         経路なので、ここでも戻す
-      3. バックアップ（この呼び出しの直前の中身）がルールファイルとして読めない。実行後の中身で
-         決めると、読める版を破損させた書き込み（dry-run の deny は止めない）がそのまま残り、
-         破損させることが戻されない経路になる
-      4. 今もファイルが在る。消した呼び出しは修復ではない
-    """
-    if not written or target.copy or target.key != COMMON_RULES_KEY:
-        return False
-    if saved is None or now is None:
-        return False
-    if os.path.realpath(written) != target.path:
-        return False
-    return not rules.readable(saved)
 
 
 def at_start(
@@ -915,8 +874,8 @@ def report(outcomes: list[Outcome]) -> str:
     処理フロー:
     1. 結果が無ければ空文字を返す
     2. 見出しを書き、結果を 1 件ずつ並べる
-    3. 状況ごとに注意を足す（ワークツリー側・戻さなかった修復・取り直し）
-    4. 取り直し・戻さなかった以外の結果があれば、ユーザに依頼するよう添える
+    3. 状況ごとに注意を足す（ワークツリー側・共通レイヤーのルールファイル・取り直し）
+    4. 取り直し以外の結果があれば、ユーザに依頼するよう添える
     """
     if not outcomes:
         return ""
@@ -935,12 +894,13 @@ def report(outcomes: list[Outcome]) -> str:
             "ワークツリー側の設定は、その場では誰も読みませんが、統合すれば統合先の "
             "hook の登録とルールになります。"
         )
-    if any(outcome.action == ACTION_LEFT for outcome in outcomes):
-        # 戻さなかった回。「次も戻る」と言うと嘘になる。代わりに、ユーザが中身を見る
-        # 用件を渡す。ルールが読めない間の書き込みは、どれだけ緩めたかを誰も判定していない。
+    if any(_common_rules(outcome) for outcome in outcomes):
+        # 壊れたルールファイルを直した書き込みも戻る。直す道を言わないと、黙って戻されたように
+        # 見え、同じ書き込みが繰り返される。
         lines.append(
-            "読めなかった共通レイヤーのルールファイルに加えられた修復は、元に戻していません。"
-            "直した中身が意図どおりかを、ユーザが確かめてください。"
+            f"共通レイヤーのルールファイルを直すときは、下書きを {COMMON_RULES_DRAFT} に置き、"
+            "ユーザにターミナルの ccnavi-user-handoff.sh での取り込みを頼んでください。"
+            "読めない間も同じです。"
         )
     if any(outcome.action == ACTION_REBASED for outcome in outcomes):
         # 取り直した版は、ccnavi の外で作り直されたものも含めて、この時点から基準になる。
@@ -948,12 +908,18 @@ def report(outcomes: list[Outcome]) -> str:
             "実行ファイルは新しい版を基準に取り直しました。ccnavi の外で作り直された版も、"
             "この時点から基準になります。"
         )
-    if any(outcome.action not in (ACTION_LEFT, ACTION_REBASED) for outcome in outcomes):
+    if any(outcome.action != ACTION_REBASED for outcome in outcomes):
         lines.append(
             "変更が必要なら、何をなぜ変えたいのかをユーザに伝えて依頼してください。"
             "自分で書き換えると、次の呼び出しで同じように戻ります。"
         )
     return "\n".join(lines)
+
+
+def _common_rules(outcome: Outcome) -> bool:
+    """戻した（戻す予定の）対象が、共通レイヤーのルールファイルそのものか。"""
+    target = outcome.target
+    return target.key == COMMON_RULES_KEY and not target.copy and outcome.action != ACTION_REBASED
 
 
 def _recover_missing(

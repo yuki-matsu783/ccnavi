@@ -565,8 +565,6 @@ _SCRIPTS = """\
         置き場の変更をコミットしてよいものと止めるものに分けて1行ずつ出力します）
     ccnavi write-and-push merge <child>
         （write-and-push 用。finish が子を親のブランチへ合流する前の検査）
-    ccnavi write-and-push merge-blame <child> <path>...
-        （write-and-push 用。合流で衝突したパスを持ち込んだ、先に合流した別の子を出力します）
     ccnavi branches issue|mr <number> [--result <json>] [--json]
         （ccnavi-branches.sh 用。issue・MR に紐づくブランチの候補を出力します。読み取り専用）
 

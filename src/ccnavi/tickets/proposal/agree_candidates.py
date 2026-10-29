@@ -116,6 +116,7 @@ def candidates(
         t.workflow = workflow.compute(t)
         types = phasetypes.types_of(t)
         complaints = _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
+        complaints += shorthand_problems(t)
         complaints += proposal_form.form_problems(t, revision=True)
         complaints += revision_problems(root, conf, t, current, config)
         complaints += approval_checks.family_problems(conf, root, t, fams)
@@ -152,6 +153,7 @@ def candidates(
             missing = parent_elsewhere_text(root, conf, t)
         complaints, overflow = validate(t, pool, config, missing=missing)
         complaints += _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
+        complaints += shorthand_problems(t)
         complaints += proposal_form.form_problems(t)
         complaints += approval_checks.project_problems(t, pool, conf)
         complaints += approval_checks.place_problems(root, conf, t)
@@ -251,6 +253,34 @@ def _workflow_field(t: ticket_model.Ticket) -> list[rules.Problem]:
             "先行関係は計画のステップの `after` から決まる",
         )
     ]
+
+
+def shorthand_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
+    """提案に欄の短縮形（`issue: "#12"`・`human_review: true/false`）があれば拒む。
+
+    読み取り（`ticket.parse`）は承認済みチケットのために寛容なまま。書き直せる提案だけを正す。
+    """
+    out: list[rules.Problem] = []
+    issue = t.raw.get("issue")
+    if isinstance(issue, str) and issue.strip().startswith("#"):
+        out.append(
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"`issue: {issue.strip()}` は短縮形。番号だけを書く"
+                f"（`issue: {issue.strip().lstrip('#').strip()}`）",
+            )
+        )
+    if isinstance(t.raw.get("human_review"), bool):
+        out.append(
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                "`human_review` は {required: true か false, reason: 理由} で書く"
+                "（true/false だけは書かない）",
+            )
+        )
+    return out
 
 
 def script_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:

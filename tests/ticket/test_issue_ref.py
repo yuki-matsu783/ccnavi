@@ -6,6 +6,8 @@
    `..` を含む表記や 0 は読まない
 2. MR の下書きの `Closes` は、同じリポジトリなら `#12`、別のリポジトリなら `owner/repo#12`
 3. 改版で課題のリポジトリを変えることはできない（タイトル・課題番号と同じ）
+4. 読み取りは承認済みチケットのために `"#12"` と `human_review: true/false` を受けるが、
+   提案の検査（`agree_candidates.shorthand_problems`。`--agree` と `--lint` が通る）は error にする
 """
 
 from __future__ import annotations
@@ -75,6 +77,29 @@ class IssueRefTest(unittest.TestCase):
                 "/nonexistent-ccnavi-root", conf, revised, current, None
             )
         self.assertTrue(any("課題番号" in p.detail for p in found), found)
+
+
+class ShorthandTest(unittest.TestCase):
+    def problems(self, text):
+        t, errors = ticket_mod.parse(text)
+        self.assertEqual([], [p for p in errors if p.severity == ticket_mod.SEVERITY_ERROR])
+        return agree_candidates.shorthand_problems(t)
+
+    def test_a_hash_issue_is_an_error_in_a_proposal(self):
+        found = self.problems(parent_text('"#12"'))
+        self.assertEqual(1, len(found))
+        self.assertEqual(ticket_mod.SEVERITY_ERROR, found[0].severity)
+        self.assertIn("`issue: 12`", found[0].detail)
+
+    def test_a_bare_bool_human_review_is_an_error_in_a_proposal(self):
+        text = parent_text("12").replace("allow:", "human_review: true\nallow:")
+        found = self.problems(text)
+        self.assertEqual(1, len(found))
+        self.assertIn("{required: true か false, reason: 理由}", found[0].detail)
+
+    def test_the_long_forms_pass(self):
+        self.assertEqual([], self.problems(parent_text("12")))
+        self.assertEqual([], self.problems(parent_text("acme/other#12")))
 
 
 if __name__ == "__main__":

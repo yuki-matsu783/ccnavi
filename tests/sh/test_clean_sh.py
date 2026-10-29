@@ -3,8 +3,8 @@
 確かめるのは 3 つ。決まった名前の生成物だけが消えること。`.claude/worktrees/` の直下の
 名前以外は受け付けないこと。未コミットの変更があるワークツリーでは何も消さないこと。
 
-同じ検査を 2 回回す。node で消す側と、node が無いときに sh で消す側。node が無い状態は、
-sh に渡す PATH から node のあるディレクトリを外して作る。
+消すのは node（ccnavi-clean.js）。node が無いときは何も消さず、ユーザが打つ削除の 1 本を出して
+止めることを確かめる。node が無い状態は、sh に渡す PATH から node のあるディレクトリを外して作る。
 
 読み返すのは終了コード・出力と、ファイルシステムに残ったものだけ。
 
@@ -36,7 +36,7 @@ SCRIPTS = (
 )
 # ccnavi-clean.sh と共通部（ccnavi-common*.sh）が呼ぶ外部コマンド。
 # node を外した PATH でも見えるように残す。
-TOOLS = ("basename", "cat", "dirname", "find", "git", "head", "rm", "sed", "sleep", "sort", "tr")
+TOOLS = ("basename", "cat", "dirname", "find", "git", "head", "sed", "tr")
 # Windows は chmod で消せなくならず、root は権限を無視して消す。
 CANNOT_LOCK = os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0)
 
@@ -104,8 +104,8 @@ def path_without_node(shim):
     return os.pathsep.join(dirs)
 
 
-class CleanCases:
-    """node で消す側と sh で消す側に共通の検査。strip_node が真なら PATH から node を外す。"""
+class CleanBase:
+    """使い捨てのワークスペース。strip_node が真なら PATH から node を外す。"""
 
     strip_node = False
 
@@ -162,6 +162,10 @@ class CleanCases:
         write(os.path.join(top, ".pytest_cache", "v", "cache"))
         write(os.path.join(top, ".ruff_cache", "0.16.6", "123", "abc"))
         return top
+
+
+class CleanCases(CleanBase):
+    """node で消す側の検査。"""
 
     def test_removes_only_generated_directories(self):
         top = self.make_shell("shell")
@@ -401,27 +405,44 @@ class CleanWithNodeTest(CleanCases, unittest.TestCase):
 
 
 @unittest.skipUnless(SHELL, "sh が要る")
-class CleanWithoutNodeTest(CleanCases, unittest.TestCase):
+class CleanWithoutNodeTest(CleanBase, unittest.TestCase):
+    """node が無ければ何も消さず、ユーザが打つ削除の 1 本を出して 1 で止まる。"""
+
     strip_node = True
 
-    def test_says_it_cleans_with_sh(self):
-        self.make_shell("shell")
-        result = self.run_clean("shell")
+    def test_prints_the_command_for_the_user_and_removes_nothing(self):
+        top = self.make_shell("shell")
+        before = files_under(top)
+        for args in (("shell",), ("shell", "--dry-run")):
+            with self.subTest(args=args):
+                result = self.run_clean(*args)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn("ユーザに頼んで", result.stderr)
+                command = result.stderr.strip().splitlines()[-1]
+                if os.name == "nt":
+                    self.assertTrue(command.startswith("cmd //c 'rd /s /q "), command)
+                else:
+                    self.assertTrue(command.startswith("rm -rf "), command)
+                    listed = ("node_modules", "ext/node_modules", "ext/out-x/node_modules", ".venv")
+                    for rel in listed:
+                        self.assertIn(f"'{top}/{rel}'", command)
+                self.assertEqual(files_under(top), before)
+
+    def test_nothing_to_remove(self):
+        write(os.path.join(self.worktrees, "empty", "a.txt"))
+        result = self.run_clean("empty")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("sh で消します", result.stderr)
+        self.assertIn("削除するものはありません", result.stdout)
 
     @unittest.skipIf(os.name == "nt", "Windows は名前に改行を入れられない")
-    def test_stops_on_a_name_with_a_newline(self):
-        # 行で読むと `../other/node_modules` が現れる名前。隣のワークツリーを消させない。
-        other = os.path.join(self.worktrees, "other", "node_modules", "keep.js")
-        write(other)
+    def test_skips_lines_outside_the_worktree(self):
+        # 行で読むと `../other/node_modules` が現れる名前。隣のワークツリーを名指ししない。
+        write(os.path.join(self.worktrees, "other", "node_modules", "keep.js"))
         top = self.make_shell("shell")
         write(os.path.join(top, "a\n..", "other", "node_modules", "x.js"))
         result = self.run_clean("shell")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("改行", result.stderr)
-        self.assertTrue(os.path.exists(other))
-        self.assertTrue(os.path.exists(os.path.join(top, "node_modules")))
+        self.assertNotIn("other", result.stderr.strip().splitlines()[-1])
 
 
 if __name__ == "__main__":

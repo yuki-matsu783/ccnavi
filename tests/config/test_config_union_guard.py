@@ -188,11 +188,13 @@ class RestoreTest(GuardHarness):
             line["guarded"],
         )
 
-    # 組み込みの既定を使っている間の修復（selfguard._left_as_repair）
+    # 共通レイヤーのルールファイルが読めない間の書き込み
 
-    def test_a_repair_of_an_unreadable_common_rules_file_is_left(self):
-        """読めない共通レイヤーのルールを名指しのツールで直した結果は、
-        実行後に戻さない。"""
+    def test_a_repair_of_an_unreadable_common_rules_file_is_restored_with_the_way(self):
+        """読めない共通レイヤーのルールを名指しのツールで直した結果も、実行後に戻す。
+
+        黙って戻されたように見せず、下書きとユーザの取り込みという直し方を添える。
+        """
         fixed = json.dumps(OPEN_RULES)
         for tool in ("Write", "Edit"):
             with self.subTest(tool=tool):
@@ -200,8 +202,12 @@ class RestoreTest(GuardHarness):
                 self.guarded_hook(tool, self.ws, file_path=self.rules)
                 write(self.rules, fixed)
                 result = self.guarded_hook(tool, self.ws, event="PostToolUse", file_path=self.rules)
-                self.assertEqual(read(self.rules), fixed, self.said(result))
-                self.assertIn("left-as-repair", result.stdout, self.said(result))
+                self.assertEqual(read(self.rules), BROKEN_RULES, self.said(result))
+                self.assertIn("restored", result.stdout, self.said(result))
+                self.assertIn(
+                    "wip/handoff/.ccnavi/config/common/rules.yml", result.stdout, self.said(result)
+                )
+                self.assertIn("ccnavi-user-handoff.sh", result.stdout, self.said(result))
 
     def test_breaking_a_readable_common_rules_file_is_still_restored(self):
         """実行前に読めていたなら、名指しのツールで壊した結果は戻す。
@@ -215,20 +221,8 @@ class RestoreTest(GuardHarness):
         self.assertEqual(read(self.rules), before, self.said(result))
         self.assertIn("restored", result.stdout, self.said(result))
 
-    def test_only_the_common_rules_file_the_call_wrote_is_left(self):
-        """戻さないのは、その呼び出しが書いた共通レイヤーのルールだけ。一緒に変わった設定は戻す。"""
-        write(self.rules, BROKEN_RULES)
-        phases = read(self.phases)
-        self.guarded_hook("Edit", self.ws, file_path=self.rules)
-        fixed = json.dumps(OPEN_RULES)
-        write(self.rules, fixed)
-        write(self.phases, "version: 1\n")
-        result = self.guarded_hook("Edit", self.ws, event="PostToolUse", file_path=self.rules)
-        self.assertEqual(read(self.rules), fixed, self.said(result))
-        self.assertEqual(read(self.phases), phases, self.said(result))
-
     def test_a_shell_write_to_an_unreadable_common_rules_file_is_restored(self):
-        """シェルからの書き込みは、読めない間でも戻す。既定でも止める経路なので。"""
+        """シェルからの書き込みも、読めない間でも戻す。"""
         write(self.rules, BROKEN_RULES)
         self.run_hook("PreToolUse")
         write(self.rules, json.dumps(OPEN_RULES))

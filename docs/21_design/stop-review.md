@@ -20,7 +20,7 @@ Stop ─┬─ command hook（ccnavi）: 既存の促しを実行 → 共有キ�
 - **共有キー**: セッション ID と、transcript 末尾のサイドチェーンでないアシスタント行の `uuid`（`records/stopreview.py` の `shared_key`）。末尾が書きかけなら短く読み直し、それでも読めなければ導けない（未検査）。
 - **判定計画**（`stopreview-plan-*.json`）: 候補か否かと理由、AI による継続か・再判定か、対象（Stop の機会と提案の版）、材料の版、実効モード、issue／MR の指定、提出済みの提案と承認状態、汚染の印。同じキーへ何度書いても結果は変わらない。
 - **候補条件**（`stopreview.candidate`）: メインエージェントの Stop、`stop_hook_active` が偽（または AI による継続で未再判定）、`CCNAVI_STOP_REVIEW` が disable でない、チケット制御が有効、agent hook が登録済み、既存の促しが止めていない、対象を解決できる、かつ（着手済みでない親に属する提案の操作実績か未送信の提案がある、または cwd に着手済みの承認済みチケットが無い）。候補でない Stop は ccnavi が最終分類（対象外・検査省略・未検査）まで確定する。
-- **試行の状態**: `plan_wait` → `pending` → `running`（material）→ `done`（record が受理）／ `sent_back`（差し戻し送出）→ `consumed`（次の Stop で消費）。期限切れ（`expired`）は次の hook 起動時と集計時に確定する。
+- **試行の状態**: `plan_wait` → `pending` → `running`（material）→ `done`（record が受理）／ `sent_back`（差し戻し送出）→ `consumed`（次の Stop で消費）。期限切れ（`expired`）は次の hook 起動時と集計時に確定する。計画を書くときに試行のファイルが在るのに読めなければ、判定せず未検査（`attempt_unreadable`）で確定する。次の Stop は別の共有キーなので、新しい試行になる。
 
 ## stop-review
 
