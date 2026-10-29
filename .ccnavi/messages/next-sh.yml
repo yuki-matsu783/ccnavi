@@ -12,13 +12,13 @@ messages:
     kind: next
     values: [name]
     next: |-
-      ユーザに伝えて返事を待ってターンを終える。片付けは、ユーザの了承（対話では integrate-done を打つと出る確認の許可、非対話では次の発言）のあとで {script:ccnavi-git.sh} integrate-done {name:sh} を打つ
+      ユーザに伝える。対話では、そのまま {script:ccnavi-git.sh} integrate-done {name:sh} を打つとユーザの確認が出る。非対話では、返事を待ってターンを終え、次の発言のあとに打つ
 
   NEXT_GIT_INTEGRATE_REVIEW:
     kind: next
     values: [head, result, name]
     next: |-
-      差分（{script:ccnavi-git.sh} diff {head:sh} {result:sh}）をユーザに見せ、返事を待ってターンを終える。確定はユーザの了承（対話では integrate-done を打つと出る確認の許可、非対話では次の発言）を得たあとで、{script:ccnavi-git.sh} integrate-done {name:sh} -m '<メッセージ>'。やめるなら {script:ccnavi-git.sh} integrate --abort {name:sh}
+      差分（{script:ccnavi-git.sh} diff {head:sh} {result:sh}）をユーザに見せる。対話では、そのまま {script:ccnavi-git.sh} integrate-done {name:sh} -m '<メッセージ>' を打つとユーザの確認が出て、許可されたら確定する。非対話では、返事を待ってターンを終え、了承の返事のあとに同じコマンドを打つ。やめるなら {script:ccnavi-git.sh} integrate --abort {name:sh}
 
   NEXT_GIT_PUSH_USER:
     kind: next

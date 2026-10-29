@@ -145,10 +145,10 @@ messages:
   # ---- hook/turngate.py（付き添いのあるセッションで、B をユーザの確認に出す宣言）
   NOTICE_ASK_USER_CONFIRM__INTEGRATE:
     kind: notice
-    values: [first_name, second_name, where, key]
+    values: [second_name, where, key]
     what: |-
-      {first_name} のあと、{second_name} を打つには、ユーザの確認が要ります{where}。
+      {second_name} を打つには、ユーザの確認が要ります{where}。
     why: |-
-      取り込み先はユーザが使っている場所で、取り込むと、ユーザがエディタで開いている内容と食い違うことがあるためです。この確認は、差分を見て了承したというユーザの操作になります。
+      取り込み先はユーザが使っている場所で、取り込むと、ユーザがエディタで開いている内容と食い違うことがあるためです。この確認は、ユーザが了承したという操作です。差分を読んだかどうかは、ccnavi には確かめられません。
     next: |-
       確認の前に、integrate の出力にある差分と変わるファイルを、文章でユーザに見せておく。許可されたら確定し、断られたら取り込まず、やめるなら {script:ccnavi-git.sh} integrate --abort {key} を打つ

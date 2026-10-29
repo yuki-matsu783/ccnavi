@@ -447,10 +447,13 @@ def decide_before(
     # 待つ手順は外さない。B は止め、通した A は記録する（記録は拒否・失敗で消す。`events.decide`、
     # `decide_after_failure`）。サブエージェントの呼び出しも、同じセッションの記録で見る。
     # 付き添いのあるセッションでは、`ask_if_attended` の宣言は発言を待たず、B を確認に出す
-    # （同じコマンドに A と B を並べた呼び出しだけは止める）。
+    # （同じコマンドに A と B を並べた呼び出しだけは止める）。サブエージェントの呼び出しは対話でも
+    # 発言を待つ関門のままにする。確認で先に返すと、後段のサブエージェントの禁止に届かないため。
     if payload.tool_name in phase_forms.SHELL_TOOLS:
         gate_texts = [subject, *(layer for runner, layer, _ in inner if runner != shellread.MOVED)]
-        waited, asked = turngate.split_by_attendance(turngate.BUILTIN, not ccnavimd.unattended())
+        waited, asked = turngate.split_by_attendance(
+            turngate.BUILTIN, not ccnavimd.unattended() and not payload.agent_id
+        )
         stop = (
             turngate.check(waited, gate_texts, conf.state, payload.session_id)
             or turngate.check(

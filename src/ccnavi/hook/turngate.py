@@ -27,12 +27,15 @@
   働かせず、B を確認ダイアログ（ask）に出す。ユーザの許可はダイアログという別の操作で得られるので、
   同じターンで確定できる。同じコマンドに A と B を並べた呼び出しだけは、対話でも止める（差分を
   見せる前に確定させない）。付き添いのないセッションは確認に答える人がいないので、これまでの関門が働く。
-  付き添いの有無は `ccnavimd.unattended` が決める
+  付き添いの有無は `ccnavimd.unattended` が決める。サブエージェントの呼び出しは対話でも発言を待つ
+  関門のまま（確認で先に返すと、後段のサブエージェントの禁止に届かない）。確認に出す宣言は A を
+  記録しない
 
 ## 状態
 
-- A を許したとき（`note`）、`state/turngate-<セッション>-…json` に「宣言 id・キー・時刻・呼び出しの
-  識別子」を 1 件 1 ファイルで残す。1 件 1 ファイルなので、並行する呼び出しが書き換え合わない。
+- 発言を待つ関門で見る宣言では、A を許したとき（`note`）、`state/turngate-<セッション>-…json` に
+  「宣言 id・キー・時刻・呼び出しの識別子」を 1 件 1 ファイルで残す。
+  1 件 1 ファイルなので、並行する呼び出しが書き換え合わない。
   残すのは実行前（PreToolUse）。実行後（PostToolUse の成功）に残すと、同じメッセージで並べた呼び出し
   （A と B を並行して打つ）が、A の記録の前に B を通る。代わりに、A が最終的に拒否されたとき
   （`forget_call`）と、A が失敗したとき（PostToolUseFailure）に、その呼び出しの記録を消す。失敗した
@@ -118,7 +121,7 @@ class Gate:
 
     文面は文面ファイルの `message`（識別子）が持つ。
     4 つの段（何が起きたか・なぜ・次の一手・迂回しない）のうち、
-    段 1 は `what` の場合分け（`same_command`・`no_user_turn`）で、
+    段 1 は `what` の、次の一手は `next` の場合分け（どちらも `same_command`・`no_user_turn`）で、
     `first_name` と `second_name`、宣言の id とキー（`where`）、`key` を埋める。
     別の組を足すときは、文面ファイルにも 1 件足す。
     """
@@ -455,7 +458,6 @@ def ask_message(stop: Stop, root: str) -> str:
     gate = stop.gate
     where = f"（宣言 {gate.id}" + (f"、キー {stop.key}" if stop.key else "") + "）"
     values = {
-        "first_name": gate.first_name,
         "second_name": gate.second_name,
         "where": where,
         "key": stop.key or gate.key_name,

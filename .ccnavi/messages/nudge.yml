@@ -15,7 +15,7 @@ messages:
     what: |-
       ワークツリー .claude/worktrees/{name} の取り込み（integrate {name}）が、確定を待っています。
     why: |-
-      差分と変わるファイルの一覧をユーザに見せ、返事を待ってこのターンを終えます。確定は、対話セッションでは integrate-done を打つと出るユーザの確認で許可を得てから行います。非対話セッションでは、ユーザの次の発言のあとに始まるターンで integrate-done を打ちます。この同じターンでは打てません（この案内で続けたターンは、ユーザの発言に数えません）。
+      差分と変わるファイルの一覧をユーザに見せます。対話セッションでは、そのまま integrate-done を打つと出るユーザの確認で許可を得て確定します。非対話セッションでは、返事を待ってこのターンを終え、ユーザの次の発言のあとに始まるターンで integrate-done を打ちます。この同じターンでは打てません（この案内で続けたターンは、ユーザの発言に数えません）。
     next: |-
       ユーザの了承（対話では確認の許可、非対話では次の発言）を得ていれば `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate-done {name} -m '<メッセージ>'` で取り込んで片付ける。やめるなら `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate --abort {name}`
     note: |-
@@ -40,7 +40,7 @@ messages:
       作業が終わったなら `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate {name}` を実行して止める。取り込み結果は一時ワークツリーに用意され、ユーザのチェックアウトは変わらない
     note: |-
       hook は integrate を実行しません。
-      続き: 出力の差分と変わるファイルの一覧をユーザに見せ、返事を待ってターンを終えます。確定は、対話セッションでは integrate-done を打つと出るユーザの確認で許可を得てから行います。非対話セッションでは、ユーザの次の発言のあとに始まるターンで integrate-done を打ちます。この同じターンでは打てません。
+      続き: 出力の差分と変わるファイルの一覧をユーザに見せます。対話セッションでは、そのまま integrate-done を打つと出るユーザの確認で許可を得て確定します。非対話セッションでは、返事を待ってターンを終え、ユーザの次の発言のあとに始まるターンで integrate-done を打ちます。この同じターンでは打てません。
       ユーザの了承（対話では確認の許可、非対話では次の発言）を得ていれば `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate-done {name} -m '<メッセージ>'` で取り込んで片付けます。やめるなら `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate --abort {name}`。
 
   NOTE_INTEGRATE_COMMIT_FIRST:
