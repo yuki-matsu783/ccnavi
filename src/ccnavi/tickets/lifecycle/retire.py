@@ -20,7 +20,7 @@
   - 取り消した子: ユーザに一覧を見せ、ユーザが `!` を付けて `ccnavi-user-clean-branch.sh <名前>
     --confirmed` を打ったときだけ（エージェントからは hook が止める）。確認なしでは消さない。
     消す前に、記録の子が実際にその親の子か（チケットの `parent:`）を確かめ直す。
-    親に無いコミットの数を添える
+    親に入っていないコミットがあれば、そう添える
 - 親のワークツリーを消す
 
 ## MR がマージされたと分かった後（片付け 2）
@@ -400,10 +400,8 @@ def judge_child(
     base = _commit(repo, reference) if reference else ""
     if child.kind == KIND_CANCELLED:
         extra = ""
-        if base:
-            counted = gitcmd.run(repo, ["rev-list", "--count", f"{base}..{tip}"])
-            if counted.ok:
-                extra = f"（親に無いコミット {counted.out.strip()} 件）"
+        if base and not _is_ancestor(repo, tip, base):
+            extra = "（親に入っていないコミットがある）"
         if not confirmed:
             return Outcome(
                 ASK,
@@ -622,18 +620,12 @@ def _parent_head_blocker(parent_path: str, branch: str, has_ref: bool) -> str:
     ブランチの確認（`_merged_blocker`）が実際の HEAD を見たことになる。
     """
     head = tree.branch_of(parent_path)
-    if head is None:
+    if head is None or head != branch or not has_ref:
         return (
-            "親のワークツリーの HEAD がブランチを指していない（切り離し、または読めない）ので、"
-            "成果が失われないか確かめられない"
+            f"親のワークツリーの HEAD が記録のブランチ {branch} を指していない、"
+            "またはその ref が手元に無いので、成果が失われないか確かめられない"
+            f"（git -C {parent_path} status で HEAD とブランチを確かめてください）"
         )
-    if head != branch:
-        return (
-            f"親のワークツリーの HEAD は {head} で、記録のブランチ {branch} と違う。"
-            f"{head} のコミットが push 済みか確かめられない"
-        )
-    if not has_ref:
-        return f"ブランチ {branch} の ref が手元に無いのに親のワークツリーが在り、確かめられない"
     return ""
 
 

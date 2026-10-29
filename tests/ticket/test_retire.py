@@ -478,7 +478,7 @@ class UnverifiableParentTest(RetireHarness):
         git(self.root, "update-ref", "-d", "refs/heads/i0001")
         done = self.tidy(head)
         self.assert_nothing_removed(done)
-        self.assertIn("ref が手元に無いのに親のワークツリーが在り", done.stdout)
+        self.assertIn("HEAD が記録のブランチ i0001 を指していない", done.stdout)
 
     def test_a_head_on_another_branch_than_the_recorded_one_is_not_removed(self):
         self.closed_and_pushed()
@@ -487,7 +487,7 @@ class UnverifiableParentTest(RetireHarness):
         git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "別のブランチの成果")
         done = self.tidy(head)
         self.assert_nothing_removed(done)
-        self.assertIn("HEAD は elsewhere で、記録のブランチ i0001 と違う", done.stdout)
+        self.assertIn("HEAD が記録のブランチ i0001 を指していない", done.stdout)
         self.assertIn("elsewhere", git(self.root, "branch", "--format=%(refname:short)").split())
 
     def test_a_detached_head_is_not_removed(self):
@@ -496,7 +496,7 @@ class UnverifiableParentTest(RetireHarness):
         git(self.parent_tree, "checkout", "--quiet", "--detach")
         done = self.tidy(head)
         self.assert_nothing_removed(done)
-        self.assertIn("HEAD がブランチを指していない", done.stdout)
+        self.assertIn("HEAD が記録のブランチ i0001 を指していない", done.stdout)
 
 
 class BrokenChildrenTest(RetireHarness):
