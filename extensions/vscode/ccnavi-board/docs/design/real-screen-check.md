@@ -216,6 +216,8 @@ curl -s http://127.0.0.1:8080/healthz      # {"status":...} が返る
 
 ### 1.6 撮影の道具
 
+操作して撮る道具は、リポジトリの [`scripts/real-screen/`](../../scripts/real-screen/README.md)（ページオブジェクトの形）にある。以下の `shoot.js` は最小の例で、新しい操作は `scripts/real-screen/` に足す。
+
 次を `$W/shoot.js` に保存する。左の「画面」一覧から画面を開き、案内ツアーを閉じて、撮る。
 
 ```js

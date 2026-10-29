@@ -357,6 +357,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--template", default="")
     # `ticket new --template` が、テンプレートのフィードバック計画も書く（既定は書かない）。
     parser.add_argument("--with-feedback", action="store_true")
+    # `ticket revise <識別子> --feedback`。`feedback: []`（対応なし）の改版の雛形を作る。
+    parser.add_argument("--feedback", action="store_true")
     # `ticket learn [<識別子>] [--note <本文>] [--target <種類>] [--signal <信号>]`。
     parser.add_argument("--note", default="")
     parser.add_argument("--target", default="")

@@ -110,6 +110,7 @@ base_sha: ""
     既定で許すことはしない。承認していない範囲が黙って広がるため）。項が 20 件を超えれば止める
   - `plan` は各ステップが前のステップを `after` に書いた一直線（終端が 1 つになり、承認の検査を通る）。並行させたいステップはユーザが `after` を直す
   - `phases:` は書いた直後に `plan_phases.fill`（`--fill-phases` と同じ関数）で差し込む。失敗したら雛形も消す
+- 承認済みの親の改版の雛形は `ccnavi ticket revise <識別子> [--feedback]` で作る（`tickets/proposal/revise.py`。REQ-TKT-62）。承認済みの置き場の `doing/<識別子>.md` を写し、スクリプトだけが書く欄と `followup_of` を外して `<提案の置き場>/todo/<識別子>.md` に書く。`--feedback` は `feedback: []` を足し、局面が「フィードバック計画待ち」（`phase.STAGE_FEEDBACK_WAITING`）のときだけ。親のワークツリーの中かどうかの検査は `ticket new` と共通（`scaffold.parent_worktree`）
   - 書いたあと、`allow` の項が計画のどのフェーズ定義の `scope` とも重ならないとき（例: `--plan implement --scope "docs/**"`）は、「承認しても書けない」と名指しする（警告で、書いた提案は残る。承認の確認 `--agree --preview --verify` も同じ文を出す）。子はその項に書けないので、`--plan quick-work` に切り替える。計画に `scope: inherit` の型が 1 つでもあれば、上限が無いので何も言わない
   - `quick-work` のような `scope: inherit` の型は範囲を持たないので、今回触るファイルを `--scope <glob>`（繰り返せる。ワークツリーのルートからの相対）で渡す（例: `--plan quick-work --scope src/ui/error.ts`）。渡さずに止まったときの案内は、範囲を持つ型を足すのではなく `--scope` を示す
   - 止める場合は何も書かない。共通レイヤーとレイヤーの `phases.yml` がどちらも無いか読めない（承認の検査を通る plan とコピーを作れない。9.7）、plan の型が無い・

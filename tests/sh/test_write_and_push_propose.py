@@ -53,6 +53,41 @@ class ProposeTest(WriteAndPushHarness):
         )
         self.assertFalse(os.path.exists(self.lock_dir()))
 
+    def second_parent(self):
+        """承認前の別の親 i0002（リモートに押してある）。ワークツリーを返す。"""
+        tree = os.path.join(self.ws, ".claude", "worktrees", "i0002")
+        git(self.ws, "worktree", "add", "-q", tree, "-b", "i0002", "main")
+        git(tree, "push", "-q", "-u", "origin", "i0002")
+        write(
+            os.path.join(tree, *f"{self.TODO}/i0002.md".split("/")),
+            parent_text("i0002", ["design"], allow=("src/*", "wip/*")),
+        )
+        return tree
+
+    def test_a_parent_without_a_child_is_sent_with_a_warning_on_stderr(self):
+        """すぐ始まるステップに子の提案が無い親。親を先に承認する進め方も正規なので送るが、言う。"""
+        tree = self.second_parent()
+        result = self.sh("ccnavi-ticket.sh", "propose", "i0002", cwd=tree, **self.host_env({}))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("子の提案がありません", result.stderr)
+        self.assertIn("i0002-01-01", result.stderr)
+        self.assertNotIn("子の提案がありません", result.stdout)
+        self.assertEqual(self.remote_sha("i0002"), self.sha(tree, "HEAD"))
+
+    def test_a_revision_of_an_approved_parent_gets_no_child_warning(self):
+        """承認済みの親の改版には、子の警告を出さない（子は承認の側にある）。"""
+        self.put(f"{self.TODO}/{PARENT}.md", parent_text(PARENT, ["design"]))
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("子の提案がありません", result.stderr)
+
+    def test_a_parent_with_its_child_gets_no_warning(self):
+        tree = self.second_parent()
+        write(os.path.join(tree, *f"{self.TODO}/i0002-01-01.md".split("/")), "x\n")
+        result = self.sh("ccnavi-ticket.sh", "propose", "i0002", cwd=tree, **self.host_env({}))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("子の提案がありません", result.stderr)
+
     def test_a_parent_never_pushed_stops_with_the_options_and_writes_nothing(self):
         """ccnavi-start.sh を通さずに手で切った親。内部のエラーでなく、事実と次の手で止まる。"""
         tree = os.path.join(self.ws, ".claude", "worktrees", "i0002")

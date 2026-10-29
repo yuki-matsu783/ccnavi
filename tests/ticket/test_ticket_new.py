@@ -86,7 +86,13 @@ class TicketNewTest(TicketNewTestBase):
         self.assertIn("error 0 件", lint.stdout)
         # 提案について言う warn は「承認待ち」と「ワークツリーにチケットが無い」だけ。
         about = [x for x in lint.stdout.splitlines() if x.startswith("warn") and IDENT in x]
-        self.assertTrue(all("承認待ち" in x or "チケットがありません" in x for x in about), about)
+        self.assertTrue(
+            all(
+                "承認待ち" in x or "チケットがありません" in x or "子の提案がありません" in x
+                for x in about
+            ),
+            about,
+        )
         verify = self.ccnavi("--agree", "--preview", "--verify")
         self.assertEqual(verify.returncode, 0, verify.stdout + verify.stderr)
 
@@ -298,17 +304,23 @@ class TicketNewScopeTest(TicketNewTestBase):
         self.assertEqual([e["glob"] for e in front["allow"]], ["src/ui/error.ts"])
         self.assertEqual(front["plan"], ["quick-work"])
         self.assertIn("quick-work", front["phases"])
-        # 次の一手は「次:」で始まる 1 行。承認までは実装しない
-        nexts = [line for line in result.stdout.splitlines() if line.startswith("次: ")]
+        lines = result.stdout.splitlines()
+        # 次の一手は「次:」で始まる 1 行（提案の空欄を埋める）。承認までは実装しない
+        nexts = [line for line in lines if line.startswith("次: ")]
         self.assertEqual(len(nexts), 1, result.stdout)
-        self.assertIn("--agree --preview --verify", nexts[0])
-        self.assertIn("承認が済むまで実装はしない", nexts[0])
+        self.assertIn("rationale", nexts[0])
+        # 子の提案は無いと承認の確認が警告するので、「次:」の途中に埋めず「必須:」の行にする
+        musts = [line for line in lines if line.startswith("必須: ")]
+        self.assertEqual(len(musts), 1, result.stdout)
+        self.assertIn("子の提案", musts[0])
+        self.assertIn("-01-01", musts[0])
+        self.assertIn("同じ承認で通す", musts[0])
+        # 確かめと送り方は「案内:」。propose は親の識別子で打つ
+        guide = "\n".join(line for line in lines if line.startswith("案内: 書けたら"))
+        self.assertIn("--agree --preview --verify", guide)
+        self.assertIn("承認が済むまで実装はしない", guide)
         self.assertIn("直接実装に切り替えず", result.stdout)
-        # 子の提案も同じ承認で通すため先に書く。propose は親の識別子で打つ
-        self.assertIn("子の提案", nexts[0])
-        self.assertIn("-01-01", nexts[0])
-        self.assertIn("同じ承認で通す", nexts[0])
-        self.assertIn("親の識別子で打つ。子の識別子では打たない", nexts[0])
+        self.assertIn("親の識別子で打つ。子の識別子では打たない", guide)
 
     def test_scope_is_added_after_the_collected_scope_without_duplicates(self):
         result = self.new("--scope", "docs/a.md,SRC/*", "--scope", "docs/a.md", plan="implement")
