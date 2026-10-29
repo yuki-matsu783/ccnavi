@@ -3,7 +3,7 @@ title: 受入シナリオを claude -p で回す
 type: guide
 description: projects/test-repo などを使い、エージェントの振る舞いを claude -p で回してログで確かめるシナリオの書き方と回し方（run-all での 1 回の確認による続けて回す方法を含む）
 tags: [test, scenario]
-keywords: [受入シナリオ, run-all, 続けて回す, 確認の目印, 費用の累計, 評価の相手, host_state, host_stub, hostenv, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, tests/scenarios, test-repo, setup.git, setup.reset, setup.host, bare, fake-gitlab, docker-gitlab, fake_gitlab, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い]
+keywords: [受入シナリオ, run-all, 続けて回す, 確認の目印, 費用の累計, 評価の相手, host_state, host_stub, hostenv, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, tests/scenarios, test-repo, setup.git, setup.reset, setup.host, bare, fake-gitlab, docker-gitlab, fake_gitlab, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, host-N.json, 相手側の状態, hostsnap, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い]
 ---
 
 # 受入シナリオを claude -p で回す
@@ -294,6 +294,18 @@ setup:
 **`bare` で許す依頼。** `gh` / `glab` が失敗するので、エージェントが issue や MR を作る依頼は通らない。`bare` を選べるのは、依頼がホストの API を要しないシナリオだけ。`judge` に「`gh` が使えない状況で詰まったのは ccnavi の不具合ではない」を書く。MR・スレッドを読む依頼は `fake-gitlab` にする。
 
 **模擬のずれ。** `bare` / `fake-gitlab` の模擬は、本物と同じ形を返す保証が無い（契約テストは別）。`report.md` の「相手（setup.host）」と `report.json` の `host` の行に、どの相手で回したかと「模擬のずれで見逃した問題がありうる」を出す（`docker-gitlab` は本物の GitLab なのでこの文は付けず、版 `GitLab 19.x` を出す）。
+
+**相手側の状態の記録（`host-N.json`）。** `setup.host` が `fake-gitlab` / `docker-gitlab` のとき、runner が prompt の step の終わりごと（失敗して止めた step も）と、`human_api` の step の終わりに、相手のプロジェクトの状態を API で読み、出力の置き場（`logs/scenarios/<id>-<時刻>/`）の `host-<step の番号>.json` に残す。`bare` / `real` では残さない。止まって人間が操作する step（終了コード 10）では読まない（人間の操作は次の step の記録に出る）。部品は `tests/scenarios/hostsnap.py`（`hostenv.api_access` が相手ごとの接続を返す）。
+
+- 読むだけ。呼ぶのは GET の API（MR の一覧と 1 件、スレッド、issue）だけで、書き込みはしない
+- 中身: `step`・`taken_at`（秒までの ISO 8601）・`host`・`project`・`summary`（件数）・`mrs`・`issues`・`calls`（呼んだ API と status）・`errors`・`approvals`
+  - `mrs`: `iid`・`title`・`state`（opened / merged / closed）・`draft`・ブランチ・`merged_at`・`merge_status` など、あるものだけ。`threads` に、スレッドの `id`・`resolved`（解決できるメモがすべて解決済みなら true、未解決があれば false、解決できないスレッドは null）・`notes`（作者・本文・解決の状態）
+  - `issues`: `iid`・`title`・`state`・`closed_at` など
+  - 本文（MR の説明・メモ・issue の説明）は 1000 文字で切る。切ったときは末尾に `…(+N)`
+- 承認は取らない（模擬に `approvals` の API が無い）。`approvals` は `{"taken": false, "reason": ...}` の固定の形で、承認が無いことと取っていないことを区別できるようにする。`mrs` に承認の欄は無い
+- 取れなかったときは止めない。取れなかった API を `errors`（`api`・`status`・`error`）に残し、取れた分は残す。接続や例外で何も取れなかった step も `host-N.json` を書き、`errors` に例外の型の名前だけを入れる。一覧が取れなければ `mrs` は空、1 件が取れなければ一覧の分だけ残し、スレッドが取れなければ `threads_unavailable` を付ける
+- トークンは記録に出さない。取る項目は選んである（認証の情報を含む応答の全文は残さない）うえで、`tokens.env` の値と模擬のトークンが文字列に混ざっていたら `***` に置き換える
+- `state.json` の `host_snapshots` に step ごとの結果（`step`・`file`・`ok`・`errors`）を残し、`report.md` の「相手（setup.host）」の次の行に件数と、取れなかった step を出す。判定（`pass` / `fail`）には使わない
 
 **後片付け。** 模擬の停止、一時ディレクトリの削除、回している間に動いた対象の `refs/remotes/origin/*` の巻き戻しは、`setup.reset` の戻しと同じ経路で行う（`finish` の `finally`・`_continue` の `BaseException`・`restore`・失敗の停止）。人間の操作の step（終了コード 10）では、模擬は止め、置き場（bare・代役・模擬の状態）は残す。`next` は、同じ置き場で模擬を、残した状態ファイルのまま起こし直す（初期状態で上書きしない）。ポートは同じものを取り直し、取れなければ OS に決めさせて `案内:` を出す（前の step の記録に古いポートの URL が残りうる）。
 
