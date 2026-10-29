@@ -606,14 +606,15 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
     fail(current, remote.error);
     return;
   }
-  const name = checkName(rawName === "" ? remote.remote.name : rawName, page.existingNames);
-  if (!name.ok) {
-    fail(current, name.error);
-    return;
-  }
+  // 同じリポジトリの再 clone は、名前の衝突より先に言う（名前を空にして同じ URL を送ると、自動で付く名前が既存と重なる）
   const twin = duplicateOf(page.rows, remote.remote.key);
   if (twin !== undefined) {
     fail(current, `同じリポジトリを ${twin.name} として既に clone しています（origin ${twin.origin}）`);
+    return;
+  }
+  const name = checkName(rawName === "" ? remote.remote.name : rawName, page.existingNames);
+  if (!name.ok) {
+    fail(current, name.error);
     return;
   }
   const target = path.join(page.projectsDir, name.name);

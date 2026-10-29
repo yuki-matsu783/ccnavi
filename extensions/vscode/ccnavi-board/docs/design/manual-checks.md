@@ -24,7 +24,7 @@ code-server と Playwright で回した結果は [real-screen-check.md](real-scr
 
 1. 準備。`<ccnavi>` は ccnavi のリポジトリ、`test-repo` の置き場は [real-screen-check.md](real-screen-check.md) の 1.2 の `$CCNAVI`・`$TESTREPO` と同じ。`<ccnavi>` で `uv run --with pyinstaller python build.py`（`dist/ccnavi` を作る。ccnavi-setup.sh が配る元）、`extensions/vscode/ccnavi-board/` で `pnpm install && pnpm run compile` のあと、`test-repo` を別の場所へコピーして `git remote remove origin`（承認の操作が push するため）。`sh <ccnavi>/scripts/ccnavi-setup.sh <コピー> --mode enable --force` で反映する。拡張開発ホスト（上の手順）でそのコピーを開く。
 2. 25b・26（一覧の自動更新）。clone の欄から clone する。画面を開いたまま、別のターミナルで `projects/` の下へ `git clone` する。どちらも、20 秒待っても「更新」を押さずに一覧が増えるか見る。増えなければ、実機でも起きる不具合として issue に書く（code-server では増えなかったが、そちらのファイル監視のせいかもしれない）。
-3. 27（同じ origin）。実在する remote を 1 つ clone してから、同じ URL をもう一度送り、「既に clone しています」が出るか見る。
+3. 27（同じ origin）。実在する remote を 1 つ clone してから、同じ URL を、名前を空にしてもう一度送り、「同じリポジトリを <名前> として既に clone しています」が出るか見る（0.12.0 までは「<名前> という名前のツリーが既にあります」が先に出ていた。直したあとの拡張で確かめる）。
 4. 29（プロジェクトのルール管理）。`プロジェクト <名前>` でルールを 1 件足し、保存せずに「判定を試す」で `Write` とそのルールに当たるパスを判定する（ヒットした id は `rules.yml:<id>` と出るのが正しい）。そのあと保存し、ターミナルの `ccnavi --explain` の `■ rules <名前>` に保存したルールが `<名前>:<id>` で出るか見る。
 5. 30（子が作業中のプロジェクト）。プロジェクトの git で `<親>` と `<親>-01-01` のブランチを `git branch` で作り、それぞれ `git worktree add <ワークスペース>/.claude/worktrees/<ブランチ名> <ブランチ名>` で切り、親のワークツリーの `.ccnavi/approved/doing/` に親と子を置いてコミットする（書式は `tests/ticketsample.py` の `parent_text`・`child_text`）。`ccnavi --explain --json` の `tickets` に `project: <名前>`・`in_progress: true` が出て、`--lint` が error 0 件になってから、保存が止まる／別のプロジェクトは保存できる、を見る。
 6. 34・38・44。34 は、ccnavi 自身のリポジトリを開けば path が `.ccnavi/config/common/risks.yml` になる（`config/project/risks.yml` を足したコピーなら、そちらになる）。38・44 は、本物の `ccnavi-ticket.sh finish` で子を閉じてから、保存が押せるようになるか見る。

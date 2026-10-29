@@ -280,7 +280,7 @@ node "$W/shoot.js" "$UC" board 1280 760 チケット管理      # 最初の 1 �
 | Playwright が `strict mode violation`（同じ placeholder の入力欄が 16 個）や `element is not visible` で落ちる | ルールなどの一覧は、行ごとに隠れた入力欄を持つ。新しく足した行は値が空 | `input[placeholder="git-push"][value=""]` や `textarea.f-message:visible` のように、空の値・見えているものに絞る |
 | `setsid nohup … & disown` で code-server を起動しようとすると、自動モードの判定器に「危険」と拒否される | 認証なし（`--auth none`）の待ち受けを切り離して動かす操作が危険と見なされた（理由は出ない） | `PASSWORD=<任意> … --auth password` にして、`setsid` を付けずバックグラウンド実行（Bash の `run_in_background`）で起動する。`shoot.js` は先に `/login` でパスワードを入れてから `?folder=` を開く。止めるのは `pgrep -f "[c]ode-server/out/node/entry"` の PID を `kill` |
 | プロジェクト管理で clone の URL にローカルのパスを入れると、「指定できる形式は https://host/path、ssh://host/path、git@host:path の 3 つです」で止まる | 画面が `file://` とローカルのパスを拒否する（仕様）。外へ出られない環境では、本物の remote が無い | 見本の bare リポジトリを作り、code-server の起動時に環境変数 `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=url.<bare の置き場>/.insteadOf GIT_CONFIG_VALUE_0=https://example.test/g/` を付ける。ワークスペースの `.git/config` に書いても、clone には効かなかった（ターミナルは `CONNECT tunnel failed, response 403`）。clone の URL は `https://example.test/g/repo.git` を入れる |
-| 上の書き換えをすると、一覧の origin が書き換え後のローカルのパスになり、同じ origin の URL を送っても「既に clone しています」が出ない（行 27 の 2 つ目） | 画面は、一覧にある origin と、入れた URL を文字で比べる。書き換え前の URL とは一致しない | この確認は、書き換えた後の origin（ローカルのパス）が URL として通らないので、この環境では確かめられない。実機で行う |
+| 行 27 の 2 つ目（同じ URL を送る）で、「既に clone しています」ではなく「repo という名前のツリーが既にあります」が出る | 名前を空にして送ると、URL から付く名前が既存のプロジェクトと重なる。拡張は名前の衝突を先に調べていたので、同じリポジトリだと言わなかった（実機でも同じ。0.12.0 までの挙動。`src/projects-panel.ts` の `clone` で、同じリポジトリの確認を先にして直した）。前の回の説明（origin が書き換え後のパスになって比べられない）は誤り | 直したあとは、同じ URL を送れば「同じリポジトリを <名前> として既に clone しています」が出る。0.12.0 以前の vsix では、別の名前を入れて送ると同じ文が出る |
 | clone が終わっても、プロジェクト管理の一覧が 20 秒待っても増えない（「プロジェクト 0 件」のまま）。「更新」を押すと出る | code-server では、ターミナルの終了で一覧が読み直されなかった。実機の VS Code でも起きるかは未確認 | 撮る前に「更新」を押す。実機で行 25・26 を通すとき、「終わると一覧が更新されます」の文のとおり自動で増えるか見る（増えなければ拡張の不具合） |
 | ワークスペース直下の `.git` 付きディレクトリは、見本の `参考/` のように作れば認識外の枠に出る。`projects/` を消して作り直すとき、書き込んだ `.gitignore` も `git checkout -- .gitignore` で戻す | 前の回の操作（行 28）が残る | 検証用コピーを `rm -rf` と `cp -a` で作り直すか、上の 2 つを戻してから回す |
 | 行 34・35・36 を test-repo のコピーで回すと、画面の「ワークスペース」が `.ccnavi/config/common/risks.yml` を指す（行 34 の期待する `config/project/risks.yml` にならない） | test-repo には `config/project/risks.yml` が無く、共通の設定がワークスペースの設定を兼ねる（行 37 の「無ければ作る」と同じ状況） | 行 34 の path は、ccnavi 自身のリポジトリか、`project/risks.yml` を置いたコピーで見る。行 35・36 の動きは、共通の設定を開いたこの状態でも確かめられた |
@@ -386,7 +386,7 @@ ccnavi 本体が返す文言（エラーの文、判定の結果）は `$CCNAVI/
 ## 5b. 手動確認の表 25〜44 を code-server で回した結果
 
 通った行: 25・25b の入力の保持・30（子が作業中のプロジェクトは情報色の帯で止まり、別のプロジェクトは保存できた）・25c・25d（失敗する実行ファイルで）・25e・26（clone の送信と成功）・27（資格情報と名前の重複）・28・29（保存と `--explain`）・33・35・36・37・38・39・40・41・42・43・44（`finish` は doing を done へ移して近似）。
-通らなかった・確かめられなかった行: 25b の「表示中に一覧だけが増える」（増えなかった）・27 の同じ origin（書き換えた origin と文字が合わない）・34 の `project/risks.yml` の path（test-repo のコピーに無い。表 34 の期待は `common/risks.yml`）。上に書いていない行（25f〜25j・29c・29d・37b・37c・38b・38c・44b〜44d）は回していない。
+通らなかった・確かめられなかった行: 25b の「表示中に一覧だけが増える」（増えなかった）・27 の同じ origin（名前の衝突の文が先に出ていた。拡張を直した）・34 の `project/risks.yml` の path（test-repo のコピーに無い。表 34 の期待は `common/risks.yml`）。上に書いていない行（25f〜25j・29c・29d・37b・37c・38b・38c・44b〜44d）は回していない。
 気づいた点（実機で要確認）: clone の終了や外からの clone で、表示中の一覧が自動で増えない。行 29 の判定の id が `rules.yml:docs-guard` と出るのは不具合ではない（判定は編集中の内容の一時ファイルで行い、画面がそのパスを `rules.yml` に縮める設計。`src/core/rules-view.ts` の `tmpName`。`--explain` では `repo:docs-guard` と出る）。
 
 ## 6. 画像の置き場
