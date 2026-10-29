@@ -203,7 +203,7 @@ test("CB-T133 チケット制御が disable なら、チケットの件数の欄
   }
 });
 
-test("CB-D1230 フッターの最終更新は ISO 形式の秒とタイムゾーンを落とし、ワークスペースのパスを重ねない", async () => {
+test("CB-D1230 フッターの最終更新は ISO 形式の秒とタイムゾーンを落とし、ワークスペースのパスは付けない", async () => {
   const dom = await openProjects([row()], { generatedAt: "2026-10-29T09:00:00+0900" });
   try {
     assert.equal(text(dom.one("footer.foot")), "最終更新 2026-10-29 09:00");
