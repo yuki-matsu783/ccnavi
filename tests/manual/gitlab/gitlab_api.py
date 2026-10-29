@@ -36,6 +36,8 @@ sh と同じ道具（curl・glab）を使わないのは、片方の不具合が
     Client.list_discussions(token, project_id, iid) -> (status, body)
         `discussions` と同じ取得だが、status も返す（読めなかったことと空を区別したいとき）
     Client.tree(token, project_id, ref, path="", recursive=False) -> list[str]   ブランチの一覧
+    Client.list_approvals(token, project_id, iid) -> (status, body)
+        承認の状態（`approved`・`approved_by`）。GET .../approvals。CE でも 200 で返る
     Client.request_changes(token, project_id, iid)   変更要求。GitLab EE の機能で、CE では 404
     Client.approve(token, project_id, iid)
     Client.reviewers(token, project_id, iid)
@@ -263,6 +265,14 @@ class Client:
             f"/projects/{project_id}/merge_requests/{iid}/discussions?per_page=100",
             token,
             tag=f"discussions-{iid}",
+        )
+
+    def list_approvals(self, token: str, project_id: int, iid: int):
+        return self.call(
+            "GET",
+            f"/projects/{project_id}/merge_requests/{iid}/approvals",
+            token,
+            tag=f"approvals-{iid}",
         )
 
     def discussions(self, token: str, project_id: int, iid: int) -> list[dict]:

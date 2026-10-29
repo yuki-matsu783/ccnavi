@@ -449,6 +449,36 @@
     }
    }
   },
+  "approvals_get": {
+   "status": 200,
+   "shape": {
+    "t": [
+     "object"
+    ],
+    "keys": {
+     "approved": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "approved_by": {
+      "t": [
+       "array"
+      ]
+     },
+     "user_can_approve": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "user_has_approved": {
+      "t": [
+       "boolean"
+      ]
+     }
+    }
+   }
+  },
   "notes_get": {
    "status": 200,
    "shape": {

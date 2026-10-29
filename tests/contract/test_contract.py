@@ -53,14 +53,14 @@ class RequestsTest(unittest.TestCase):
         requests = fakeside.load_requests()
         names = [r["name"] for r in requests]
         self.assertEqual(len(names), len(set(names)), "名前が重複している")
-        self.assertGreaterEqual(len(requests), 23)
+        self.assertGreaterEqual(len(requests), 24)
         context = set(fakeside.scene_context()) | SAVED
         for r in requests:
             with self.subTest(r["name"]):
                 self.assertIn(r["method"], ("GET", "POST", "PUT"))
                 self.assertIn(r["token"], ("main", "none"))
                 self.assertTrue(r["used_by"])
-                self.assertLessEqual(set(r["used_by"]), {"sh", "chrome"})
+                self.assertLessEqual(set(r["used_by"]), {"sh", "chrome", "scenarios"})
                 text = json.dumps(r)
                 self.assertFalse(
                     set(shape.PLACEHOLDER.findall(text)) - context, "場面に無い置き換えの名前"

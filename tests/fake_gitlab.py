@@ -76,6 +76,8 @@ ROUTES: list[tuple[str, re.Pattern]] = [
     ("mr", re.compile(_MR + r"$")),
     ("discussions", re.compile(_MR + r"/discussions$")),
     ("discussion", re.compile(_MR + r"/discussions/(?P<did>[^/]+)$")),
+    ("approvals", re.compile(_MR + r"/approvals$")),
+    ("approve", re.compile(_MR + r"/approve$")),
     ("reviewers", re.compile(_MR + r"/reviewers$")),
     ("reviewer", re.compile(_MR + r"/reviewers/(?P<uid>\d+)$")),
     ("notes", re.compile(_MR + r"/notes$")),
@@ -292,6 +294,17 @@ class Handler(BaseHTTPRequestHandler):
                     return 200, d
             raise KeyError(args["did"])
 
+        if name == "approvals" and method == "GET":
+            return 200, self.approvals_view(mr_of(state, iid))
+
+        if name == "approve" and method == "POST":
+            # 同じ人の 2 回目は、承認を増やさない。実物は 201 を返す（応答の本文は承認の状態）
+            mr = mr_of(state, iid)
+            who = {"id": 2, "username": "reviewer"}
+            if not any(a["user"]["id"] == who["id"] for a in mr.setdefault("approved_by", [])):
+                mr["approved_by"].append({"approved_at": self.now(), "user": who})
+            return 201, self.approvals_view(mr)
+
         if name == "reviewers" and method == "GET":
             return 200, page(mr_of(state, iid)["reviewers"], query)
 
@@ -415,6 +428,21 @@ class Handler(BaseHTTPRequestHandler):
             raise KeyError(iid)
 
         return 405, {"message": f"405 {method} {name}"}
+
+    def approvals_view(self, mr: dict) -> dict:
+        """承認の状態。実物の CE は、承認の前後ともに 200 でこの形を返す。
+        `user_can_approve`・`user_has_approved` は、読んだトークンから見た値。
+        模擬は誰でも承認できる扱い"""
+        approved_by = [
+            {"approved_at": a["approved_at"], "user": dict(a["user"])}
+            for a in mr.get("approved_by", [])
+        ]
+        return {
+            "approved": bool(approved_by),
+            "approved_by": approved_by,
+            "user_can_approve": True,
+            "user_has_approved": False,
+        }
 
     def wanted(self, mr: dict, key: str, query: dict) -> bool:
         if key not in query:
