@@ -320,8 +320,6 @@ def probe(
     if recorded:
         return Probe(CLEAR)
     busy = _integration_busy(found.integ_tree, deadline)
-    if busy is None:
-        return Probe(UNKNOWN)
     found.blocked = busy
     return Probe(HIT, found)
 
@@ -414,8 +412,6 @@ def _probe_recorded(
         )
         return Probe(HIT, found)
     busy = _integration_busy(owner, deadline)
-    if busy is None:
-        return Probe(UNKNOWN)
     if busy:
         found.blocked = busy
         return Probe(HIT, found)
@@ -713,10 +709,10 @@ def _recorded(
     return not dirty
 
 
-def _integration_busy(integ_tree: str, deadline: float | None = None) -> str | None:
+def _integration_busy(integ_tree: str, deadline: float | None = None) -> str:
     """取り込み先のツリーが `integrate` の前提（途中の操作が無い）を満たさない理由。
 
-    満たすなら空。期限不足で確かめられなければ None（判定全体を「不明」にする）。
+    満たすなら空。
     未コミットの変更は見ない（ユーザの書きかけはfast-forwardで持ち越すので、促しを止める理由にしない）。
     """
     mark = tree.busy_of(integ_tree)
