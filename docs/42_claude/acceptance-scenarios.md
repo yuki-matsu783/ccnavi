@@ -3,7 +3,7 @@ title: 受入シナリオを claude -p で回す
 type: guide
 description: projects/test-repo などを使い、エージェントの振る舞いを claude -p で回してログで確かめるシナリオの書き方と回し方（run-all での 1 回の確認による続けて回す方法を含む）
 tags: [test, scenario]
-keywords: [受入シナリオ, run-all, 続けて回す, 確認の目印, 費用の累計, 評価の相手, host_state, host_stub, hostenv, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, tests/scenarios, test-repo, setup.git, setup.reset, setup.host, bare, fake-gitlab, docker-gitlab, fake_gitlab, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い]
+keywords: [受入シナリオ, run-all, 続けて回す, 確認の目印, 費用の累計, 評価の相手, host_state, host_stub, hostenv, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, human_run, 人間役, 擬似端末, tests/scenarios, test-repo, setup.git, setup.reset, setup.host, bare, fake-gitlab, docker-gitlab, fake_gitlab, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い]
 ---
 
 # 受入シナリオを claude -p で回す
@@ -21,7 +21,7 @@ ccnavi の振る舞い（ガードの拒否、チケットの流れ、サブエ�
 - **回し始める前に、人間に状態を確認する。** 今の状態がきれいで最新か、`projects/test-repo` にブランチや MR ができてよいかを、人間に問う（「回し方」の 1）
 - **基本は Haiku で回す。** `--model haiku`。判定の確かめ方を変える理由がある場合だけ、シナリオに別のモデルを書く
 - **毎回クリアなセッションで始める。** 続きが要るシナリオだけ `--resume` でつなぐ
-- **人間しかできない操作は一時停止して人間に打ってもらう。** 下の「人間の操作」を見る
+- **人間しかできない操作は一時停止して人間に打ってもらう。** 決まった手順で打てる承認は、`human_run` を書けば実行器が人間役として打つ。下の「人間の操作」を見る
 - **費用の上限を置く。** 1 本ごとに `--max-budget-usd` を付ける
 
 ## 置き場
@@ -95,7 +95,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 - `expect` の機械で比べる欄（`decisions`・`decisions_none`・`files_unchanged`・`state`・`transcript_forbidden`）は、
   比べられる形で書く。「それらしく見えた」は期待にしない。意味で読むものは `judge` に自然文の基準で書く（下の「判定の 3 つ」）
 - `decisions` の欄の意味と取りうる値は `tests/scenarios/README.md` の「前提」にある。`decision_not` は「その値でない」を比べる
-- 人間の操作が要る step には `human: true` を付け、`prompt` の代わりに `instruction`（人間に打ってもらうコマンド）と、必要なら `check`（画面で見てもらう項目）を書く
+- 人間の操作が要る step には `human: true` を付け、`prompt` の代わりに `instruction`（人間に打ってもらうコマンド）と、必要なら `check`（画面で見てもらう項目）を書く。実行器に打たせるなら `human_run` も書く（「人間役が端末で打つ sh（`human_run`）」）
 - 実ログと突き合わせていない期待は `unconfirmed` に書き、`status` は `draft` のままにする。1 本通して期待が確かめられたら `verified` にする
 
 ## 回し方
@@ -157,7 +157,7 @@ uv run python -m tests.scenarios.runner run-all tests/scenarios --max-total-usd 
 
 「対象の判定」（`require_disposable_repo`・`check_before_run`・`setup_clashes`）を通る、使い捨てのリポジトリを触る setup を持つシナリオだけ。加えて、続けて回すために次の 2 つを満たすこと。
 
-- 人間の操作の step が無い（10 で止まると、残し印が次の回を断る）
+- 人間の操作の step が無い（10 で止まると、残し印が次の回を断る）。`human_run` の step も人間の操作の step として数える（`check` が needs-review になり、pass で閉じないため）
 - `setup.reset` を持つ（前の回の状態を次の回に残さない。`reset` が無い `setup.host` だけの回は対象にしない）
 
 ccnavi 本体に作用しうるシナリオ（`setup` が使い捨てのリポジトリを触らないもの）は対象にせず、従来どおり 1 本ずつ確認して回す。対象にしなかったものは、理由つきで確認文と要約の「対象にしなかったもの」に出す。
@@ -391,7 +391,7 @@ hook の応答の文面（拒否・確認・案内）を、重複を除いて 1 
 
 ## 人間の操作
 
-次は人間しかできないので、シナリオの step にして一時停止する。
+次は人間しかできないので、シナリオの step にして一時停止する。承認（`ccnavi-user-agree.sh`）だけは、`human_run` を書けば runner が人間役として打てる（下の「人間役が端末で打つ sh（`human_run`）」）。
 
 - `sh .ccnavi/scripts/ccnavi-user-agree.sh`（承認は人間の判断。承認のあとコミットと push まで行う。実行ファイルの `ccnavi user agree` は承認だけで push しないので、シナリオには書かない）
 - `ccnavi-user-decide.sh` / `ccnavi-review.sh confirm`
@@ -436,6 +436,33 @@ steps:
 - 記録: 操作の結果は 1 件ごとに `state.json`（`human_ops`、名前と discussion の対応 `threads`）に書き、`next` で再開しても同じ操作は二度実行しない。`evidence.md` に「人間役の操作」の節、`report.*` に `human-api` の 1 行（件数と成功・失敗）を出す。トークンは、値も変数名も、記録・診断ログ・例外の文字列に出さない
 - `run-all` の対象外のまま（human step があるシナリオは除く規則は変えない。`claude` を呼ぶシナリオは 1 本ずつ確認して回す）
 - 限界: エージェント役の root PAT は管理者 API で人間役のトークンを作れる。人間役の独立は保証しない。CE に無い機能（`request_changes` は 404）は使えない
+
+### 人間役が端末で打つ sh（`human_run`）
+
+`test_repo: true` のシナリオでは、`human: true` の step に `human_run` を書くと、ユーザ専用の sh を runner が人間役として打つ。止まらずに次の step へ進む。打てる sh は runner の表（`HUMAN_RUN_SCRIPTS`）にあるものだけで、今は承認（`agree` → `ccnavi-user-agree.sh`）だけ。
+
+```yaml
+test_repo: true
+steps:
+  - prompt: 提案を作って、承認を頼むところで止めて
+  - human: true
+    instruction: ワークスペースルートで `sh .ccnavi/scripts/ccnavi-user-agree.sh <親> <子>` を打つ   # 必須。端末を作れないときに手で打つ
+    check:
+      - 承認画面に、親の範囲（README.md）が出ている    # 評価しない。needs-review の行になる
+    human_run:
+      script: agree
+      answers: ["y"]       # 端末へ送る行（起動直後に書く）
+```
+
+- 対象: 回し始め（setup のあと）と、human_run を打ち終えるたびに、承認待ちの提案の識別子を集めて基準にする。基準に無い識別子だけを引数に並べて打つ。0 件か、test-repo 以外（ワークスペースルートや他のプロジェクト）の提案が混ざっていれば、打たずに止める。同じ識別子のまま書き換えた提案（親の改版）は対象にならない
+- 引数は runner が組む。yml には argv も識別子も書かない（本物のチケットの識別子や `--root` を書けないように）
+- 打ち方: 擬似端末を付け、claude の外で打つ。環境から `CCNAVI_GUARD_TICKET_APPROVAL` を外し、`CCNAVI_WORKSPACE` をワークスペースルートに固定する。模擬の相手では claude と同じ環境（push 先が模擬）を使う。300 秒で終わらなければ、プロセスグループごと止める（孫の ccnavi や git も残さない）
+- 成否: 終了コードでなく、対象の識別子が承認済みにあるかで見る（`ccnavi-user-agree.sh` は push の失敗や保護ブランチでも 0 で終わる）。push まで確かめるなら、後の step の `expect_after.state` か `expect.state` に書く
+- 失敗は `halt`（`kind: human_run`）を立てて止め、`inconclusive` にする
+- 記録: 打つ前に `state.json` の `human_runs` に `started` を書き、終われば `done` か `halted` にする。`started` のまま残った回を `next` で続けると、打ち直さずに止める。出力は `human-run-<step>.log`
+- `check` は、打った step の項目ごとに `human-run-check` の行（needs-review）になる。人間が見ていた項目を誰も見ていないので、全体は pass にならない。ログを見て判断する
+- 擬似端末を作れない環境（Windows の Python）では、従来の human step と同じく `instruction` を出して 10 で止まる
+- 受け入れた穴: runner はエージェントも Bash から起動できる。開発ワークスペースでは、エージェントが yml を書いて runner を通せば、ユーザの承認を出せる。runner は配布物に入らない（配布先に穴は増えない）ので、これを受け入れた。`human_run` を書くことが、その回で runner が test-repo の提案を承認し push することへの同意になる（回す前の確認文の手順に「実行器が打つ」と出る）
 
 ## 見つけたものの扱い
 
