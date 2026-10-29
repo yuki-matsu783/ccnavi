@@ -2,7 +2,9 @@
  * バグ報告。サイドパネルの「バグ報告」で始め、ステータスバーの「終了」で zip にまとめる。
  *
  * 始めると「バグ発生時の挙動を再現してください」を出し、ffmpeg が見つかれば画面全体の録画を始める。
- * 途中はステータスバーのカメラのボタン（通知の「スクリーンショット」も同じ）で何枚でも撮れる（ffmpeg は使わない）。
+ * 途中はステータスバーの「スクリーンショット」のボタンか、ボードのビューのタイトルのカメラのボタン（通知の
+ * 「スクリーンショット」も同じ）で何枚でも撮れる（ffmpeg は使わない）。通知は時間が経つと隠れるが、この 2 つは
+ * 報告の間ずっと出ている。
  * 終了すると、録画を gif にし、始めてから `logs/diag/*.log` に足された行、スクリーンショット、
  * 説明（report.txt）を `logs/bug-report/bug-report-<時刻>.zip` にまとめる。
  * ffmpeg が無い・録画を始められないときは、録画だけをやめて残りはそのまま作る。
@@ -204,8 +206,10 @@ function statusItem(text: string, command: string, tooltip: string, priority: nu
   return item;
 }
 
-async function setReporting(on: boolean): Promise<void> {
+/** 報告中か（ビューのタイトルのボタンの出し分け）。撮れない環境ではカメラのボタンを出さない */
+async function setReporting(on: boolean, canShoot = false): Promise<void> {
   await vscode.commands.executeCommand("setContext", "ccnaviBoard.bugReporting", on);
+  await vscode.commands.executeCommand("setContext", "ccnaviBoard.bugReportNoCapture", on && !canShoot);
 }
 
 /**
@@ -258,7 +262,7 @@ export async function startReport(): Promise<void> {
     errors: [],
     items: [
       statusItem("$(record) 再現中: 終了", "ccnaviBoard.bugReportFinish", "バグ報告を終えて zip にまとめる", 1001),
-      statusItem("$(device-camera)", "ccnaviBoard.bugReportScreenshot", "バグ報告: スクリーンショットを撮る", 1000),
+      statusItem("$(device-camera) スクリーンショット", "ccnaviBoard.bugReportScreenshot", "バグ報告: スクリーンショットを撮る", 1000),
     ],
   };
   current.items[0].backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
@@ -266,7 +270,7 @@ export async function startReport(): Promise<void> {
     current.items[1].hide();
   }
   session = current;
-  await setReporting(true);
+  await setReporting(true, capture !== "none");
   diaglog.get("ccnavi-board", root).info("バグ報告を始めた", { capture });
   current.starting = startRecording(current).catch((error: unknown) => {
     current.noRecording = "録画を始められなかった";
