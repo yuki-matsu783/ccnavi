@@ -6,7 +6,7 @@ tags: [rules, hooks, worktree]
 keywords: [Stop, 促し, nudge, awaiting-user, 目印, last_assistant_message, integrate, finish, request, feedback, 言い直し]
 ---
 
-# ADR-0186: 最後の行の目印でユーザの返事を待つと宣言した回は、作業の流れの Stop の促しを控える
+# ADR-0191: 最後の行の目印でユーザの返事を待つと宣言した回は、作業の流れの Stop の促しを控える
 
 状態: 採用
 
