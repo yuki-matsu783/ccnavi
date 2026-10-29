@@ -82,8 +82,6 @@ _RECORD_DIR = "ccnavi-integrate"
 _DONE_DIR = "ccnavi-integrate-done"
 # 統合先のツリーで、あれば `integrate` が断る途中の操作の目印のうち、`tree.BUSY_MARKS` に無いもの。
 _SQUASH_MSG = "SQUASH_MSG"
-# 理由に並べる未コミットのパスの数。
-_LISTED = 5
 
 
 @dataclass
@@ -321,7 +319,7 @@ def probe(
         return Probe(UNKNOWN)
     if recorded:
         return Probe(CLEAR)
-    busy = _integration_busy(found.integ_tree, deadline, dirty_too=False)
+    busy = _integration_busy(found.integ_tree, deadline)
     if busy is None:
         return Probe(UNKNOWN)
     found.blocked = busy
@@ -415,7 +413,7 @@ def _probe_recorded(
             "ユーザに戻してもらってください（エージェントは checkout しません）"
         )
         return Probe(HIT, found)
-    busy = _integration_busy(owner, deadline, dirty_too=False)
+    busy = _integration_busy(owner, deadline)
     if busy is None:
         return Probe(UNKNOWN)
     if busy:
@@ -715,14 +713,11 @@ def _recorded(
     return not dirty
 
 
-def _integration_busy(
-    integ_tree: str, deadline: float | None = None, dirty_too: bool = True
-) -> str | None:
+def _integration_busy(integ_tree: str, deadline: float | None = None) -> str | None:
     """取り込み先のツリーが `integrate` の前提（途中の操作が無い）を満たさない理由。
 
     満たすなら空。期限不足で確かめられなければ None（判定全体を「不明」にする）。
-    `dirty_too` を偽にすると未コミットの変更は見ない（ユーザの書きかけはfast-forwardで持ち越す
-    ので、促しを止める理由にしない）。
+    未コミットの変更は見ない（ユーザの書きかけはfast-forwardで持ち越すので、促しを止める理由にしない）。
     """
     mark = tree.busy_of(integ_tree)
     squash = _git_path(integ_tree, _SQUASH_MSG, deadline)
@@ -732,21 +727,6 @@ def _integration_busy(
         return (
             f"統合先のツリー（{integ_tree}）に途中の操作（{mark}）があります。"
             "持ち主に確かめて済ませてもらってください"
-        )
-    if not dirty_too:
-        return ""
-    done = _run(integ_tree, ["status", "--porcelain", "--untracked-files=all"], deadline)
-    if done.timed_out:
-        return None
-    if not done.ok:
-        return f"統合先のツリー（{integ_tree}）の状態を読めません"
-    lines = [ln for ln in done.out.splitlines() if ln.strip()]
-    if lines:
-        listed = " ".join(ln.strip() for ln in lines[:_LISTED])
-        more = f" ほか {len(lines) - _LISTED} 件" if len(lines) > _LISTED else ""
-        return (
-            f"統合先のツリー（{integ_tree}）に未コミットの変更があります（{listed}{more}）。"
-            "取り込みと混ざるので、持ち主に確かめ、コミットか退避を済ませてもらってください"
         )
     return ""
 
