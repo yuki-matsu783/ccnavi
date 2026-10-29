@@ -67,6 +67,8 @@ test("CB-T1231 録画は画面全体を mkv に録り（Windows と WSL は gdig
   assert.deepEqual(windows.slice(windows.indexOf("-f"), windows.indexOf("-f") + 2), ["-f", "gdigrab"]);
   assert.equal(windows[windows.indexOf("-i") + 1], "desktop");
   assert.equal(windows.at(-1), "C:\\t\\screen.mkv");
+  // 終了を忘れても録り続けない
+  assert.deepEqual(windows.slice(-3, -1), ["-t", "600"]);
   assert.deepEqual(recordArgs("wsl", "x").slice(0, 10), recordArgs("windows", "x").slice(0, 10));
   const mac = recordArgs("mac", "/t/screen.mkv");
   assert.equal(mac[mac.indexOf("-f") + 1], "avfoundation");

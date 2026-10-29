@@ -184,7 +184,7 @@
         "ccnaviBoard.ffmpegPath": {
           "type": "string",
           "default": "",
-          "description": "バグ報告の録画に使う ffmpeg の場所です。空なら、Windows は PATH の ffmpeg、WSL は Windows 側の ffmpeg.exe、macOS は PATH の ffmpeg と /opt/homebrew/bin・/usr/local/bin を探します。見つからなければ録画せず、スクリーンショットとログだけを zip にまとめます。"
+          "description": "バグ報告の録画に使う ffmpeg の絶対パスです。WSL では Windows 側の ffmpeg.exe を指します（例 /mnt/c/ffmpeg/bin/ffmpeg.exe）。空なら、Windows は PATH の ffmpeg、WSL は Windows 側の ffmpeg.exe、macOS は PATH の ffmpeg と /opt/homebrew/bin・/usr/local/bin を探します。見つからなければ録画せず、スクリーンショットとログだけを zip にまとめます。"
         },
         "ccnaviBoard.appearance": {
           "type": "string",

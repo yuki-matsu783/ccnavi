@@ -36,6 +36,8 @@ export function captureKind(platform: string, env: NodeJS.ProcessEnv, procVersio
 
 /** 録画の fps。gif は大きくなりやすいので低めに置く */
 export const RECORD_FPS = 10;
+/** 録画の長さの上限（秒）。終了を忘れたときや拡張ホストが落ちたときに、録り続けないため */
+export const RECORD_MAX_SECONDS = 600;
 /** 録画の幅の上限（px）。これより広い画面は縮めて録る */
 export const RECORD_MAX_WIDTH = 1920;
 /** gif の fps と幅の上限 */
@@ -94,6 +96,8 @@ export function recordArgs(kind: Capture, output: string): string[] {
     "ultrafast",
     "-crf",
     "28",
+    "-t",
+    String(RECORD_MAX_SECONDS),
     output,
   ];
 }

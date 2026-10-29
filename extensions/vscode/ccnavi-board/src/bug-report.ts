@@ -26,6 +26,7 @@ import {
   logsSince,
   type LogMarks,
   markLogs,
+  RECORD_MAX_SECONDS,
   recordArgs,
   reportStamp,
   reportText,
@@ -57,9 +58,15 @@ interface Session {
   readonly started: Date;
   readonly marks: LogMarks;
   recording: Recording | undefined;
+  /** 録画を始める処理。終えるときはこれを待ってから録画を止める（始める途中の ffmpeg を取り残さない） */
+  starting: Promise<void>;
+  /** 拡張が止まった。始める途中で立っていれば、起こした ffmpeg をその場で止める */
+  disposed: boolean;
   /** 録画しなかった・できなかった理由 */
   noRecording: string;
+  /** 撮れた枚数と、撮り始めた回数（ファイル名の番号。連打しても名前がぶつからないよう撮る前に取る） */
   shots: number;
+  seq: number;
   readonly errors: string[];
   readonly items: vscode.StatusBarItem[];
 }
@@ -130,10 +137,16 @@ async function startRecording(current: Session): Promise<void> {
     return;
   }
   const file = path.join(current.work, "screen.mkv");
-  const child = spawn(ffmpeg, recordArgs(current.capture, await toolPath(current.capture, file)), {
+  const output = await toolPath(current.capture, file);
+  if (current.disposed) {
+    return;
+  }
+  const child = spawn(ffmpeg, recordArgs(current.capture, output), {
     stdio: ["pipe", "ignore", "pipe"],
     windowsHide: true,
   });
+  // 止める直前に ffmpeg が落ちていると `q` の書き込みが EPIPE になる。拾わないと拡張ホストの例外になる
+  child.stdin?.on("error", () => undefined);
   const recording: Recording = { ffmpeg, child, file, exit: undefined, stderr: "" };
   child.stderr?.on("data", (chunk: Buffer) => {
     recording.stderr = tail(recording.stderr + chunk.toString("utf8"));
@@ -146,6 +159,10 @@ async function startRecording(current: Session): Promise<void> {
     recording.exit = code;
   });
   await new Promise((resolve) => setTimeout(resolve, START_GRACE_MS));
+  if (current.disposed) {
+    halt(recording);
+    return;
+  }
   if (recording.exit !== undefined) {
     current.noRecording = "録画を始められなかった";
     current.errors.push(`ffmpeg（録画）: ${recording.stderr.trim()}`);
@@ -154,6 +171,13 @@ async function startRecording(current: Session): Promise<void> {
     return;
   }
   current.recording = recording;
+}
+
+/** 待たずに止める（拡張を止めるとき）。WSL では kill が Windows 側に届かないことがあるので、先に `q` も送る */
+function halt(recording: Recording): void {
+  recording.child.stdin?.write("q");
+  recording.child.stdin?.end();
+  recording.child.kill();
 }
 
 /** 録画を止めて、書き終わるのを待つ */
@@ -184,15 +208,27 @@ async function setReporting(on: boolean): Promise<void> {
   await vscode.commands.executeCommand("setContext", "ccnaviBoard.bugReporting", on);
 }
 
-/** 再現を促す。押されたボタンに応じて、スクリーンショットを撮るか報告を終える */
-async function prompt(): Promise<void> {
+/**
+ * 再現を促す。押されたボタンに応じて、スクリーンショットを撮るか報告を終える。
+ * 通知は閉じずに残ることがあるので、押されたときに別の報告へ替わっていれば何もしない。
+ */
+async function prompt(current: Session): Promise<void> {
   const shot = "スクリーンショット";
   const finish = "終了";
-  const picked = await vscode.window.showInformationMessage(
-    "バグ発生時の挙動を再現してください。途中の画面は「スクリーンショット」で撮れます。終わったら「終了」を押します（ステータスバーにも同じボタンがあります）。",
-    shot,
-    finish,
-  );
+  const canShoot = current.capture !== "none";
+  const picked = canShoot
+    ? await vscode.window.showInformationMessage(
+        "バグ発生時の挙動を再現してください。途中の画面は「スクリーンショット」で撮れます。終わったら「終了」を押します（ステータスバーにも同じボタンがあります）。",
+        shot,
+        finish,
+      )
+    : await vscode.window.showInformationMessage(
+        "バグ発生時の挙動を再現してください。終わったら「終了」を押します（ステータスバーにも同じボタンがあります）。",
+        finish,
+      );
+  if (session !== current) {
+    return;
+  }
   if (picked === shot) {
     await takeScreenshot();
   } else if (picked === finish) {
@@ -202,7 +238,7 @@ async function prompt(): Promise<void> {
 
 export async function startReport(): Promise<void> {
   if (session !== undefined) {
-    await prompt();
+    await prompt(session);
     return;
   }
   const root = workspaceRoot();
@@ -214,8 +250,11 @@ export async function startReport(): Promise<void> {
     started: new Date(),
     marks: root === "" ? new Map() : markLogs(diagDir(root)),
     recording: undefined,
+    starting: Promise.resolve(),
+    disposed: false,
     noRecording: "",
     shots: 0,
+    seq: 0,
     errors: [],
     items: [
       statusItem("$(record) 再現中: 終了", "ccnaviBoard.bugReportFinish", "バグ報告を終えて zip にまとめる", 1001),
@@ -229,8 +268,15 @@ export async function startReport(): Promise<void> {
   session = current;
   await setReporting(true);
   diaglog.get("ccnavi-board", root).info("バグ報告を始めた", { capture });
-  await startRecording(current);
-  void prompt();
+  current.starting = startRecording(current).catch((error: unknown) => {
+    current.noRecording = "録画を始められなかった";
+    current.errors.push(`録画: ${error instanceof Error ? error.message : String(error)}`);
+  });
+  await current.starting;
+  // 始める間に「終了」が押されていれば、促さない
+  if (session === current) {
+    void prompt(current);
+  }
 }
 
 export async function takeScreenshot(): Promise<void> {
@@ -238,7 +284,8 @@ export async function takeScreenshot(): Promise<void> {
   if (current === undefined) {
     return;
   }
-  const file = path.join(current.work, `screenshot-${String(current.shots + 1).padStart(2, "0")}.png`);
+  current.seq += 1;
+  const file = path.join(current.work, `screenshot-${String(current.seq).padStart(2, "0")}.png`);
   try {
     const command = screenshotCommand(current.capture, await toolPath(current.capture, file));
     if (command === undefined) {
@@ -286,59 +333,73 @@ export async function finishReport(): Promise<void> {
   current.items.forEach((item) => item.dispose());
   await setReporting(false);
   const finished = new Date();
-  diaglog.get("ccnavi-board", current.root).info("バグ報告を終えた", { shots: current.shots, recorded: current.recording !== undefined });
 
-  const zipFile = await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: "バグ報告をまとめています…" },
-    async (progress) => {
-      const entries: ZipEntry[] = [];
-      let recordingNote = current.noRecording;
-      if (current.recording !== undefined) {
-        progress.report({ message: "録画を止めています" });
-        await stopRecording(current.recording);
-        progress.report({ message: "録画を gif にしています" });
-        const gif = await toGif(current, current.recording);
-        if (typeof gif === "string") {
-          recordingNote = gif;
-        } else {
-          entries.push({ name: "screen.gif", data: gif });
-          recordingNote = "screen.gif";
+  let zipFile: string;
+  try {
+    zipFile = await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: "バグ報告をまとめています…" },
+      async (progress) => {
+        // 録画を始める途中で押されたときは、始め終わるのを待ってから止める
+        await current.starting;
+        diaglog.get("ccnavi-board", current.root).info("バグ報告を終えた", { shots: current.shots, recorded: current.recording !== undefined });
+        const entries: ZipEntry[] = [];
+        let recordingNote = current.noRecording;
+        if (current.recording !== undefined) {
+          if (current.recording.exit !== undefined) {
+            const why = current.recording.exit === 0 ? `上限の ${RECORD_MAX_SECONDS} 秒で止まった` : `終える前に止まった（終了コード ${String(current.recording.exit)}）`;
+            current.errors.push(`ffmpeg（録画）: ${why} ${current.recording.stderr.trim()}`.trim());
+          }
+          progress.report({ message: "録画を止めています" });
+          await stopRecording(current.recording);
+          progress.report({ message: "録画を gif にしています" });
+          const gif = await toGif(current, current.recording);
+          if (typeof gif === "string") {
+            recordingNote = gif;
+          } else {
+            entries.push({ name: "screen.gif", data: gif });
+            recordingNote = "screen.gif";
+          }
         }
-      }
-      for (const name of fs.readdirSync(current.work).filter((name) => name.endsWith(".png")).sort()) {
-        entries.push({ name: `screenshots/${name}`, data: fs.readFileSync(path.join(current.work, name)) });
-      }
-      const logs = current.root === "" ? new Map<string, Buffer>() : logsSince(diagDir(current.root), current.marks);
-      for (const [name, data] of logs) {
-        entries.push({ name: `logs/${name}`, data });
-      }
-      const extension = vscode.extensions.getExtension("local.ccnavi-board");
-      const report = reportText({
-        started: current.started,
-        finished,
-        vscodeVersion: vscode.version,
-        extensionVersion: String((extension?.packageJSON as { version?: unknown } | undefined)?.version ?? ""),
-        platform: `${process.platform} ${os.release()}`,
-        capture: current.capture,
-        recording: recordingNote,
-        screenshots: current.shots,
-        logs: [...logs.keys()],
-        errors: current.errors,
-      });
-      entries.unshift({ name: "report.txt", data: Buffer.from(report, "utf8") });
+        for (const name of fs.readdirSync(current.work).filter((name) => name.endsWith(".png")).sort()) {
+          entries.push({ name: `screenshots/${name}`, data: fs.readFileSync(path.join(current.work, name)) });
+        }
+        const logs = current.root === "" ? new Map<string, Buffer>() : logsSince(diagDir(current.root), current.marks);
+        for (const [name, data] of logs) {
+          entries.push({ name: `logs/${name}`, data });
+        }
+        const extension = vscode.extensions.getExtension("local.ccnavi-board");
+        const report = reportText({
+          started: current.started,
+          finished,
+          vscodeVersion: vscode.version,
+          extensionVersion: String((extension?.packageJSON as { version?: unknown } | undefined)?.version ?? ""),
+          platform: `${process.platform} ${os.release()}`,
+          capture: current.capture,
+          recording: recordingNote,
+          screenshots: current.shots,
+          logs: [...logs.keys()],
+          errors: current.errors,
+        });
+        entries.unshift({ name: "report.txt", data: Buffer.from(report, "utf8") });
 
-      const outDir = current.root === "" ? os.tmpdir() : path.join(current.root, "logs", "bug-report");
-      fs.mkdirSync(outDir, { recursive: true });
-      const out = path.join(outDir, `bug-report-${reportStamp(current.started)}.zip`);
-      fs.writeFileSync(out, buildZip(entries, finished));
-      fs.rmSync(current.work, { recursive: true, force: true });
-      return out;
-    },
-  );
+        const outDir = current.root === "" ? os.tmpdir() : path.join(current.root, "logs", "bug-report");
+        fs.mkdirSync(outDir, { recursive: true });
+        const out = path.join(outDir, `bug-report-${reportStamp(current.started)}.zip`);
+        fs.writeFileSync(out, buildZip(entries, finished), { mode: 0o600 });
+        return out;
+      },
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    void vscode.window.showErrorMessage(`バグ報告の zip を書けませんでした: ${message}`);
+    return;
+  } finally {
+    removeWork(current.work);
+  }
 
   const reveal = "フォルダで表示";
   const picked = await vscode.window.showInformationMessage(
-    `バグ報告を ${zipFile} に保存しました。録画とスクリーンショットには画面に映っていたもの（秘密の値も）がそのまま入るので、渡す前に中身を確かめてください。`,
+    `バグ報告を ${zipFile} に保存しました。録画とスクリーンショットには画面に映っていたもの（秘密の値も）が、ログにはその間の操作の記録が入るので、渡す前に中身を確かめてください。`,
     reveal,
   );
   if (picked === reveal) {
@@ -353,7 +414,19 @@ export function disposeReport(): void {
   if (current === undefined) {
     return;
   }
-  current.recording?.child.kill();
+  current.disposed = true;
+  if (current.recording !== undefined) {
+    halt(current.recording);
+  }
   current.items.forEach((item) => item.dispose());
-  fs.rmSync(current.work, { recursive: true, force: true });
+  removeWork(current.work);
+}
+
+/** 作業フォルダを消す。Windows で ffmpeg がまだ開いているなどで消せなければ残す（例外にしない） */
+function removeWork(work: string): void {
+  try {
+    fs.rmSync(work, { recursive: true, force: true });
+  } catch {
+    // 一時フォルダなので OS に任せる
+  }
 }
