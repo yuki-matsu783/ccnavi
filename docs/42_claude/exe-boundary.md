@@ -38,7 +38,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   （ネットワークはshの仕事）。この2経路にほかの判定は足さない
 - shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルのサブコマンド（`tree parent`・`tree bound`・`tree base-bound`・`tree guarded`・`tree leftover`・`tree handoff-pending`・`write-and-push family`・`sync retired`・
   `sync paths`など）に聞き、1行1項目の答えを見る。答えが得られないときにどちらへ倒すかは呼ぶ側が決める
-  （止める側の検査は止める向き、ツリーを動かす側は動かさない向き）。
+  （止める側の検査は止める向き、ツリーを動かす側は動かさない向き。ただし、親のワークツリーからの切り替えの拒否は、聞けないときも通す）。
 - 実行ファイルには、ディレクトリの外へ情報を取りに行くコードを足さない。取得する処理はshに任せ、
   実行ファイルには取得した結果を読む処理だけを足す。shと実行ファイルの間の契約は、このJSONの形で決まる。
   形は設計 9.10に書いてある
@@ -64,7 +64,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   コミットして送ってからDraftを外す（設計 9.10）。ファイルを`logs/archive/`へ動かすのと`wip/`の追跡済みのファイルを消すのは実行ファイルで、
   ネットワーク（push・Draftを外す・コメント）はshが受け持つ
 - 親を閉じたときのブランチの片付けも実行ファイルが行う（`worktree retire <親>`・`worktree branch <名前> [confirmed]`・
-  `sync tidy <親> <リポジトリ> <ブランチ> <sha>`。`tickets/retire.py`）。MR がマージ済みかと、その先頭の sha は sh が
+  `sync tidy <親> <リポジトリ> <ブランチ> <sha>`。`tickets/lifecycle/retire.py`）。MR がマージ済みかと、その先頭の sha は sh が
   `ccnavi-review.sh merged [<番号>]` で取って渡し、実行ファイルはその sha を基準に、手元の先頭が含まれるかなどをローカルの git で
   確かめて消す。エージェントに `git branch -D` を開けないので、消す入口はこれらだけ（`ccnavi-user-clean-branch.sh`）。最後の行が
   `record yes|no`（片付けが済んだか）で、`yes`のときは実行ファイルが`retire/<親>.json`も消す（shは消さない）。

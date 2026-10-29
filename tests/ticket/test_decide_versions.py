@@ -12,7 +12,9 @@ import unicodedata
 import unittest
 from types import SimpleNamespace
 
-from ccnavi.tickets import review, review_decide, review_host
+from ccnavi.tickets.model import review_host
+from ccnavi.tickets.review import decide as review_decide
+from ccnavi.tickets.review import request as review
 
 
 def thread(key="u1", body="x", **kw):

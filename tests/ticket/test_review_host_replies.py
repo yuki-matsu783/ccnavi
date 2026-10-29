@@ -27,7 +27,7 @@ import json
 import os
 import unittest
 
-from ccnavi.tickets import review_host
+from ccnavi.tickets.model import review_host
 from tests import ROOT
 
 SCENES = os.path.join(

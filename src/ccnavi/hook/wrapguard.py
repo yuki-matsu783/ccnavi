@@ -35,7 +35,7 @@ import re
 
 from ..infra import pathcase, settings, shellread, shellread_words, tree
 from ..policy import selfguard_shell, texts
-from ..tickets import ticket_model
+from ..tickets.model import ticket_model
 
 CODE_ENV = "DENY_SCRIPT_ENV_OVERRIDE"
 CODE_CHILD_PUSH = "DENY_CHILD_PUSH"

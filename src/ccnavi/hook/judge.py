@@ -12,6 +12,7 @@ import time
 from collections.abc import Callable
 from typing import TextIO
 
+from ..catalog import docsearch, projskills
 from ..infra import fsio, hookio, modes, settings, shellread, tree
 from ..infra.modes import AUX, EXIT_OK, GATE, GENERAL
 from ..policy import (
@@ -26,23 +27,16 @@ from ..policy import (
     texts,
 )
 from ..records import audit, failstreak, repeat
-from ..tickets import (
-    approval,
-    approval_checks,
-    flow,
-    phase,
-    phase_forms,
-    phase_scope,
-    ticket_guard,
-    ticket_model,
-    ticket_places,
-)
+from ..tickets.approval import checks as approval_checks
+from ..tickets.approval import store as approval
+from ..tickets.flow import graph as flow
+from ..tickets.model import phase_forms, ticket_guard, ticket_model, ticket_places
+from ..tickets.phase import gates as phase
+from ..tickets.phase import scope as phase_scope
 from . import (
     agentlaunch,
-    docsearch,
     failsafe,
     parentwrite,
-    projskills,
     reasons,
     rootwrite,
     turngate,

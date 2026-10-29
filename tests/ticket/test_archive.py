@@ -1,6 +1,6 @@
 """閉じた親子のチケットの退避（`ready` が `logs/archive/` へ移す）。
 
-- 退避の構成と移し方（archive.py）
+- 退避の構成と移し方（tickets/model/archive.py）
 - `ready` が条件を確かめてから退避し、打ち直しても通ること
 - write-and-push の見分け（`write_and_push.classify_all`）
 と実行後チェック（`post_findings._script_writes`）が、
@@ -19,14 +19,12 @@ import tempfile
 import unittest
 
 from ccnavi.infra import pathcase, settings
-from ccnavi.tickets import (
-    approval_checks,
-    approval_ops,
-    archive,
-    review,
-    write_and_push,
-)
-from ccnavi.tickets import ticket as ticket_mod
+from ccnavi.tickets.approval import checks as approval_checks
+from ccnavi.tickets.approval import ops as approval_ops
+from ccnavi.tickets.approval import write_and_push
+from ccnavi.tickets.model import archive
+from ccnavi.tickets.model import ticket as ticket_mod
+from ccnavi.tickets.review import request as review
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text, parent_text
@@ -63,7 +61,7 @@ def closed_text(name, parent="", phase=None, predecessors=()):
 
 
 class ArchiveTreeHarness(unittest.TestCase):
-    """archive.py の構成と移し方。git は使わない。"""
+    """tickets/model/archive.py の構成と移し方。git は使わない。"""
 
     def setUp(self):
         self.root = tempfile.mkdtemp(prefix="ccnavi-archive-")
@@ -86,7 +84,7 @@ class ArchiveTreeHarness(unittest.TestCase):
 
 
 class ArchiveModuleTest(ArchiveTreeHarness):
-    """archive.py の構成と移し方。git は使わない。"""
+    """tickets/model/archive.py の構成と移し方。git は使わない。"""
 
     def test_plan_takes_only_closed_families(self):
         self.assertEqual(archive.closed_parents(self.approved), ["i0001", "old"])
@@ -492,7 +490,7 @@ class ReviewFindingsTest(ReadyHarness):
 
 
 class ArchiveModuleReviewTest(ArchiveTreeHarness):
-    """archive.py の指摘の再現。"""
+    """tickets/model/archive.py の指摘の再現。"""
 
     def test_7_a_parent_named_like_a_child_is_not_taken(self):
         write(os.path.join(self.approved, "done", "rel.md"), closed_text("rel"))
@@ -530,7 +528,7 @@ class ArchivedStandingTest(ChecksHarness):
     """親子のチケットの立ち位置: 手元の退避からは閉じたと推定しない。"""
 
     def test_an_archived_family_without_its_tree_is_undecided(self):
-        from ccnavi.tickets import standing
+        from ccnavi.tickets.model import standing
 
         st = standing.standing(self.conf, self.root, "i0001")
         self.assertIn("ワークツリー", st.stop)
@@ -617,7 +615,7 @@ class SecondReviewTest(ReadyHarness):
 
 
 class SecondReviewModuleTest(ArchiveTreeHarness):
-    """2 回目のレビューの指摘の再現（archive.py）。"""
+    """2 回目のレビューの指摘の再現（tickets/model/archive.py）。"""
 
     def test_10_a_ticketless_child_flow_goes_with_its_family(self):
         write(os.path.join(self.approved, "flows", "i0001-01-09.yml"), "steps: []\n")
@@ -631,7 +629,7 @@ class SecondReviewChecksTest(ChecksHarness):
     """2 回目のレビューの指摘の再現（判定）。"""
 
     def test_5_ready_does_not_archive_from_the_workspace_root(self):
-        from ccnavi.tickets import review_close
+        from ccnavi.tickets.review import close as review_close
 
         approved = os.path.join(self.root, ".ccnavi", "approved")
         write(os.path.join(approved, "done", "i0001.md"), closed_text("i0001"))

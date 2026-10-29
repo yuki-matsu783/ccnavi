@@ -15,7 +15,8 @@ import json
 import os
 import unittest
 
-from ccnavi.tickets import approval, ticket_fold, ticket_model
+from ccnavi.tickets.approval import store as approval
+from ccnavi.tickets.model import ticket_fold, ticket_model
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_standing import AuthorityHarness
 from tests.ticket.test_ticket import git, write

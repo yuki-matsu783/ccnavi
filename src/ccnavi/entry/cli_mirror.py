@@ -6,19 +6,21 @@
 見るだけの形を含めて、ユーザ専用（`user` の入口。hook が止める）。`--yes` で書くときは、標準入力が
 ターミナルであることを求める。`--via board` は拡張の子プロセスの経路で、ターミナルを求めない代わりに
 `--expect` と `--json` を付けて呼ぶことを求める。書くのはワークツリーだけで、コミットはしない。
-中身は `tickets.mirrorsync`。cli を読まない。
+中身は `tickets.sync.mirrorsync`。cli を読まない。
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import shlex
 from typing import TextIO
 
 from ..infra import settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
-from ..tickets import mirrorsync, user_only, via
+from ..tickets.model import user_only, via
+from ..tickets.sync import mirrorsync
 from . import cli_args
 
 # `--mirror` と一緒に読むオプション（argparse の dest）。ほかのオプションが既定の値でなければ断る。
@@ -140,13 +142,17 @@ def run(
 
 def _plan_text(stdout: TextIO, plan: mirrorsync.Plan, wanted: list[str] | None, root: str) -> None:
     """ミラーの状態を人が読む形で書く。何も反映せず、揃えるときに実行するコマンドを添える。"""
-    stdout.write("ccnavi: 共通レイヤーのミラー（各プロジェクトの .ccnavi/config/common/）\n")
+    stdout.write(
+        "ccnavi: 共通レイヤーのミラー（各プロジェクトの .ccnavi/config/common/）と"
+        "工程スキル（skills/）\n"
+    )
     if not plan.projects:
         stdout.write("  プロジェクトはありません。\n")
         return
     if plan.common_empty:
         stdout.write(
-            "  共通レイヤーにコピーするものがありません。ミラーは消さず、何も揃えません。\n"
+            "  共通レイヤーにも工程スキルにもコピーするものがありません。"
+            "ミラーは消さず、何も揃えません。\n"
         )
     for project in plan.projects:
         if not project.selected:
@@ -160,10 +166,17 @@ def _plan_text(stdout: TextIO, plan: mirrorsync.Plan, wanted: list[str] | None, 
             for change in project.changes:
                 stdout.write(f"      {_ACTION_TEXT[mirrorsync.action_of(change)]} {change.rel}\n")
             if project.mirror_path and plan.common_path:
-                stdout.write(
-                    "      中身の差を見るには: diff -ru "
-                    f"{shlex.quote(project.mirror_path)} {shlex.quote(plan.common_path)}\n"
-                )
+                if any(not mirrorsync.is_skill(c) for c in project.changes):
+                    stdout.write(
+                        "      .ccnavi/ の中身の差を見るには: diff -ru "
+                        f"{shlex.quote(project.mirror_path)} {shlex.quote(plan.common_path)}\n"
+                    )
+                if any(mirrorsync.is_skill(c) for c in project.changes):
+                    stdout.write(
+                        "      skills/ の元は、ワークスペースの .claude/skills/<工程>/ の"
+                        " SKILL.md と references/common/。"
+                        f"{shlex.quote(os.path.join(project.root, 'skills'))} と見比べる\n"
+                    )
     chosen = plan.chosen
     if not chosen:
         stdout.write("揃えるミラーはありません。\n")
@@ -179,7 +192,7 @@ def _plan_text(stdout: TextIO, plan: mirrorsync.Plan, wanted: list[str] | None, 
     if any(mirrorsync.action_of(c) != mirrorsync.ACTION_CREATE for p in chosen for c in p.changes):
         stdout.write(
             "更新と削除は、ミラーの今の中身を共通レイヤーの中身で上書き・削除します。"
-            "ミラーに手を入れていたなら、上の diff で確かめてから実行します。\n"
+            "ミラーや skills/ に手を入れていたなら、上の案内で確かめてから実行します。\n"
         )
 
 

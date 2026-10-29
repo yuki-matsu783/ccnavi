@@ -20,7 +20,7 @@ import subprocess
 import time
 import unittest
 
-from ccnavi.tickets import oplog
+from ccnavi.tickets.model import oplog
 from tests.sh import test_decide_ops as ops
 from tests.sh import test_review_decide as base
 

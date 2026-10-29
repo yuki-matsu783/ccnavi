@@ -30,6 +30,7 @@ ccnavi の使い方（`.ccnavi/docs/`）は `.ccnavi/CCNAVI.md` の表に記載�
 | sh やスクリプトを書く、パス・名前を比べる、文書・コメント・ユーザに見える文言で ADR に触れたくなった | `docs/42_claude/environment.md` |
 | ccnavi の実行ファイル（`src/ccnavi/`）か `.ccnavi/scripts/` の sh を直す | `docs/42_claude/exe-boundary.md` |
 | エージェントを止める・返事を求める仕組みを足す・直す、拒否の文を書く | `docs/42_claude/stop-patterns.md` |
+| エージェントに渡す次の一手を、どの契機・担当に置くか選ぶ（`status`・`guidance()`・Stop の促し・ルールの文脈など） | `docs/42_claude/next-step-placement.md` |
 | sh・Python・TS でログを書く、logger を直す | `docs/42_claude/logging.md` |
 | sh や実行ファイルの出力に案内（`次:`・`案内:`・`必須:`）を足す・直す、チケット作業を進める出力を新しく書く | `docs/42_claude/script-output.md` |
 | Python のテストを回す（特に全件）、回すグループを決める | `docs/42_claude/testing.md` |

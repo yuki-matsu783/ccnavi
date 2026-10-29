@@ -17,7 +17,8 @@ import types
 import unittest
 
 from ccnavi.infra import settings, tree
-from ccnavi.tickets import approval, manual_settle
+from ccnavi.tickets.approval import store as approval
+from ccnavi.tickets.phase import manual_settle
 from tests.ticket.test_ticket import git, write
 
 PARENT = "feature-1-web-x"

@@ -26,8 +26,8 @@ import tempfile
 import unittest
 
 from ccnavi.entry import version
-from ccnavi.tickets import ticket as ticket_mod
-from ccnavi.tickets import ticket_ids
+from ccnavi.tickets.model import ticket as ticket_mod
+from ccnavi.tickets.model import ticket_ids
 from tests import ROOT, common_path, config_path, userform
 from tests.inproc import run_ccnavi
 from tests.ticket.test_swap_points import STAMP

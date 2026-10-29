@@ -1627,7 +1627,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
     def test_a_distribute_skill_is_not_copied_into_the_projects_by_the_prompt_sync(self):
         """配るだけのスキルは工程スキルではない。ユーザの発言のときの同期の対象に入らない。"""
-        from ccnavi.tickets import skillsync
+        from ccnavi.tickets.sync import skillsync
 
         root = tempfile.mkdtemp(prefix="ccnavi-skills-")
         self.addCleanup(shutil.rmtree, root, ignore_errors=True)
@@ -1657,7 +1657,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         食い違うと、着手がコピーする元の SKILL.md が配布先に届かないまま、何の知らせも出ない。
         特に Windows の Git Bash は、SKILL.md を CRLF で取り出すことがある。
         """
-        from ccnavi.tickets import skillsync
+        from ccnavi.tickets.sync import skillsync
 
         cases = {
             "lf": ("---\nname: x\nprocess: true\n---\n", True),

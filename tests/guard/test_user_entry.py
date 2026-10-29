@@ -1,4 +1,4 @@
-"""ユーザ専用の入口（`ccnavi user <操作>`）を確かめる（src/ccnavi/tickets/user_only.py）。
+"""ユーザ専用の入口（`ccnavi user <操作>`）を確かめる（src/ccnavi/tickets/model/user_only.py）。
 
 1. 表: `user` の操作と、`user` の外で断るオプションが、食い違わない
 2. 実行ファイル: `user <操作>` を内部の形に読み替える。`user` の外のユーザ専用のオプションは
@@ -14,7 +14,7 @@ import os
 import unittest
 
 from ccnavi.infra.modes import EXIT_BLOCK, EXIT_ERROR
-from ccnavi.tickets import phase_forms, user_only
+from ccnavi.tickets.model import phase_forms, user_only
 from tests import ROOT
 from tests.guard.test_cleanup_forms import HookCase
 from tests.inproc import run_ccnavi

@@ -86,7 +86,7 @@ def _block_host_git_config() -> dict[str, str]:
 
     どちらも「テストが緩む」ではなく「テストの答えが機械で変わる」問題で、
     同じチケットがどの環境でも同じ場所で止まるという設計（regex も大文字小文字を
-    区別せずに適用し、機械で答えを割らない。ticket.py）と
+    区別せずに適用し、機械で答えを割らない。tickets/model/ticket.py）と
     合わない。
 
     空の設定ではなく `init.defaultBranch` を書いた設定を指すのは、git 自身の

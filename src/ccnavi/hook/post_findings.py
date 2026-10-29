@@ -10,14 +10,9 @@ from dataclasses import dataclass, field
 
 from ..infra import fsio, gitcmd, gitstate, pathcase, tree
 from ..policy import rules
-from ..tickets import (
-    archive,
-    phase_scope,
-    ticket_fields,
-    ticket_model,
-    ticket_places,
-    write_and_push,
-)
+from ..tickets.approval import write_and_push
+from ..tickets.model import archive, ticket_fields, ticket_model, ticket_places
+from ..tickets.phase import scope as phase_scope
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
 # そのルールは「この場所に書かせない」を言っている。
@@ -259,7 +254,8 @@ def _script_writes(
     * `finish` と `cancel` の移動。正規化した内容が同じチケットが `doing/` から消えて、
       レビュー待ちか閉じた置き場に現れた組。片側だけなら外さない
 
-    * `ready` の退避（`tickets/archive.py`）が消したもの。閉じた親の `done/` の親子のチケット・
+    * `ready` の退避（`tickets/model/archive.py`）が消したもの。
+    閉じた親の `done/` の親子のチケット・
       `phases/<親>/`・`flows/` の削除で、ready のマーカーに載り、消えた中身が
       ワークスペースの `logs/archive/` のコピーと同じもの（見分けは write-and-push と同じ
       `write_and_push.archived_removal`）。`root`（ワークスペースルート）が空なら外さない

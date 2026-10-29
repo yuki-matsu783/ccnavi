@@ -1356,8 +1356,8 @@ class DenialTrendTest(unittest.TestCase):
         # issue #570 の実データ 4 件。文面は実コードから取る（文面が変わっても追従する）
         from ccnavi.policy import builtin
         from ccnavi.policy import texts as ptexts
-        from ccnavi.tickets import ops_stop_integrate as stop
-        from ccnavi.tickets import ticket_guard
+        from ccnavi.tickets.lifecycle import stop_integrate as stop
+        from ccnavi.tickets.model import ticket_guard
 
         root = str(ROOT)
         raw_git = ptexts.spoken(ticket_guard.raw_git_rule(root))

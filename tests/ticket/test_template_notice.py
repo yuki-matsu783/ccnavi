@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 
 from ccnavi.infra import settings
-from ccnavi.tickets import template_drafts
+from ccnavi.tickets.sync import template_drafts
 from tests import ROOT
 from tests.inproc import run_ccnavi
 from tests.ticket.test_archive import ReadyHarness

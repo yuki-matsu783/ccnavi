@@ -17,7 +17,7 @@ import json
 import os
 import unittest
 
-from ccnavi.tickets import oplog
+from ccnavi.tickets.model import oplog
 from tests.ticket import test_phases, test_ticket
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import parent_text

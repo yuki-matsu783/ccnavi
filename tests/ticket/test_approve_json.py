@@ -600,7 +600,7 @@ class ApproveJsonTest(PhaseHarness):
 
     def test_a_proposal_swapped_after_the_check_is_not_approved(self):
         """照合のあと書く前に提案を差し替えると、差し替えた中身を承認せずに止める。"""
-        from ccnavi.tickets import core_base
+        from ccnavi.tickets.core import base as core_base
 
         self.pending_parent_and_child()
         shown = self.preview()
@@ -627,7 +627,7 @@ class ApproveJsonTest(PhaseHarness):
 
     def test_the_digest_is_taken_from_the_bytes_that_were_parsed(self):
         """解析したあと照合の前に元に戻されても、解析した中身（見せていない）を照合で通さない。"""
-        from ccnavi.tickets import agree_digest
+        from ccnavi.tickets.proposal import agree_digest
 
         self.pending_parent_and_child()
         shown = self.preview()

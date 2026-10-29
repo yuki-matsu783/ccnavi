@@ -164,7 +164,7 @@ ccnavi-user-handoff.sh で行います（見るだけの形も含めてユーザ
         （取り込みます。ボードは実行ファイルを --entry board --via board で呼びます）
 
 共通レイヤー（ワークスペースの .ccnavi/config/common/）のミラー（各プロジェクトの
-.ccnavi/config/common/）がずれていないかの確認と、ずれの同期は、ユーザが
+.ccnavi/config/common/）と工程スキル（各プロジェクトの skills/）がずれていないかの確認と、ずれの同期は、ユーザが
 ccnavi-user-mirror.sh で行います（見るだけの形も含めてユーザ専用です。実行ファイルは内部で
 --mirror に読み替えます。sh が付ける入口の印（--entry sh）がない user mirror は断ります）。同期は各プロジェクトのワークツリーに書くだけで、コミットはしません。
 
@@ -521,7 +521,9 @@ _SCRIPTS = """\
         （ccnavi-worktree.sh 用。"tree 1" の行に続いて、"leftover yes|no"（そのツリーが親の
          ワークツリーで、承認待ちの提案・着手中の子・MR が残っているか）、"proposal yes|no"
          （todo/ か review/ の提案があるか）、"doing <件数>"（doing/ の子の数）、
-         "mr <番号>|-"（親の mr:）を出力します。親でなければ "leftover no" です）
+         "mr <番号>|-"（親の mr:）、"stage doing|review|todo|-"（親の段階。doing が最優先で、
+         承認済みなら doing、finish 済みでレビュー待ちなら review、承認前の提案だけなら todo）
+         を出力します。親でなければ "leftover no"、"stage -" です）
     ccnavi tree base-bound <main-checkout> <branch>
         （ccnavi-worktree.sh 用。"tree 1" の行に続いて、"bound yes|no|unknown"（取り込み先の
          ブランチがチケットに結び付くか。yes と unknown は切るのを断ります）、yes なら

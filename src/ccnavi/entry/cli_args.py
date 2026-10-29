@@ -13,15 +13,12 @@ import os
 import re
 from typing import TextIO
 
-from ..hook import docsearch, docsearch_query
+from ..catalog import docsearch, docsearch_query
 from ..infra import fsio, pathcase, settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..records import audit, prune
-from ..tickets import (
-    ticket_ids,
-    user_only,
-)
+from ..tickets.model import ticket_ids, user_only
 from . import cli_usage
 
 # フラグで上書きする設定の欄と、空文字を「指定した」と読むかどうか。

@@ -21,7 +21,8 @@ import json
 import unittest
 from unittest import mock
 
-from ccnavi.tickets import approval_marks, phase
+from ccnavi.tickets.approval import marks as approval_marks
+from ccnavi.tickets.phase import gates as phase
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticketsample import child_text, parent_text
 

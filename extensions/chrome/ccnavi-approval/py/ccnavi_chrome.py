@@ -6,7 +6,7 @@
 互換の比べも Python が出し、拡張（TS）は並べるだけ。TS で判定し直すと、hook・lint と答えが
 2 か所に分かれるため。
 
-判定のコア（`ccnavi.tickets.core`）の `plan`・`confirm` も呼べる。どれも書くもの
+判定のコア（`ccnavi.tickets.core.api`）の `plan`・`confirm` も呼べる。どれも書くもの
 （Changes）を値で返すだけで、ホストにもディスクにも書かない（fsio で書き込み待ちの内容を溜める段）。
 拡張は `plan`（承認）・`confirm`（レビュー済み）の答えを、親のブランチへの
 1 コミットにして書く。
@@ -863,7 +863,7 @@ def _stamp(req: dict) -> str:
 
 
 def _core_snapshot(req: dict, root: str) -> core.Snapshot:
-    """`ccnavi.tickets.core` の入力。時刻（`stamp`）と誰が（`actor`）は要求から取る。"""
+    """`ccnavi.tickets.core.api` の入力。時刻（`stamp`）と誰が（`actor`）は要求から取る。"""
     actor = req.get("actor") if isinstance(req.get("actor"), dict) else {}
     conf, _ = settings.load(root)
     return core.read_fs(

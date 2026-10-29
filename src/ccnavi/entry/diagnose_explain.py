@@ -10,19 +10,15 @@ from typing import TextIO
 from ..hook import judge
 from ..infra import modes, settings, tree
 from ..policy import builtin, ruleload, rules, selfguard
-from ..tickets import (
-    approval,
-    approval_checks,
-    approval_marks,
-    approval_times,
-    phase,
-    phasetypes,
-    risk,
-    session_rejects,
-    ticket_model,
-    workflow,
-)
-from ..tickets import ticket as ticket_mod
+from ..tickets.approval import checks as approval_checks
+from ..tickets.approval import marks as approval_marks
+from ..tickets.approval import store as approval
+from ..tickets.approval import times as approval_times
+from ..tickets.config import phasetypes, risk, workflow
+from ..tickets.model import ticket as ticket_mod
+from ..tickets.model import ticket_model
+from ..tickets.notice import session_rejects
+from ..tickets.phase import gates as phase
 from . import diagnose_board, diagnose_shared
 
 # レイヤーの見出し。共通レイヤーと自身のレイヤーだけ日本語の名前で出す。

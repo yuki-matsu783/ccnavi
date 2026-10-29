@@ -10,21 +10,14 @@ import os
 from ..infra import gitcmd, hookio, settings, tree
 from ..policy import rules, selfguard
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
-from ..tickets import (
-    agree,
-    agree_candidates,
-    approval,
-    approval_checks,
-    approval_marks,
-    oplog,
-    ops_stop,
-    ops_stop_integrate,
-    phase,
-    review_host,
-    standing,
-    ticket_fold,
-    ticket_model,
-)
+from ..tickets.approval import checks as approval_checks
+from ..tickets.approval import marks as approval_marks
+from ..tickets.approval import store as approval
+from ..tickets.lifecycle import stop as ops_stop
+from ..tickets.lifecycle import stop_integrate as ops_stop_integrate
+from ..tickets.model import oplog, review_host, standing, ticket_fold, ticket_model
+from ..tickets.phase import gates as phase
+from ..tickets.proposal import agree, agree_candidates
 from . import lint_branch, lint_project
 
 

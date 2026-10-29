@@ -14,7 +14,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi.tickets import manual_settle
+from ccnavi.tickets.phase import manual_settle
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 

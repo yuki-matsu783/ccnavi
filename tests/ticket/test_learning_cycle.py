@@ -14,7 +14,7 @@ import subprocess
 import unittest
 
 from ccnavi.infra import settings
-from ccnavi.tickets import learning_notice
+from ccnavi.tickets.notice import learning_notice
 from tests.learningsample import impact, pattern
 from tests.ticket.test_learning_consolidate import (
     CHILD,

@@ -20,7 +20,7 @@ import os
 import tempfile
 import unittest
 
-from ccnavi.hook import projskills
+from ccnavi.catalog import projskills
 from ccnavi.hook.subagent import CANDIDATE_NOTE
 from tests import ROOT
 from tests.inproc import run_ccnavi

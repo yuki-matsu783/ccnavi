@@ -24,7 +24,8 @@ from ..infra import settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN
-from ..tickets import handoff, plan_templates, template_drafts
+from ..tickets.proposal import plan_templates
+from ..tickets.sync import handoff, template_drafts
 from . import cli_args
 
 
@@ -94,7 +95,9 @@ def usage_problem(args: argparse.Namespace) -> str:
     if args.template and (args.templates or not _ticket_new(args)):
         return "--template は ticket new <識別子> --title <タイトル> --template <名前> でだけ使う"
     if args.with_feedback and (args.templates or not _ticket_new(args) or not args.template):
-        return "--with-feedback は ticket new <識別子> --title <タイトル> --template <名前> でだけ使う"
+        return (
+            "--with-feedback は ticket new <識別子> --title <タイトル> --template <名前> でだけ使う"
+        )
     if not args.templates:
         for flag, given in (
             ("--check-file", args.check_file is not None),

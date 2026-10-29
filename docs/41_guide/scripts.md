@@ -30,7 +30,7 @@ keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.s
 | sh | 役割 | 打つ人 |
 |---|---|---|
 | `ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返す。生の git の代わり（[生の git を止めてラッパースクリプトを使う](git.md)） | エージェント |
-| `ccnavi-worktree.sh` | 直接作業のワークツリーを、取り込み先から切る。状況にずれや書きかけがあれば、切らずに状態と確認コードを出し、ユーザの了承を得て打ち直す | エージェント |
+| `ccnavi-worktree.sh` | 直接作業のワークツリーを、取り込み先から切る。状況にずれや書きかけがあれば、切らずに状態と確認コードを出し、ユーザの了承を得て打ち直す。親のワークツリーの中からは、親の提案が承認前のときだけ切り替えられる（それ以外は断る） | エージェント |
 | `ccnavi-sync.sh` | 親のブランチをリモートから取り込む。リモートから消えた親のブランチを診断する | エージェント |
 | `ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`--worktree` で、掃除とワークツリーの削除を 1 本で行う | エージェント |
 | `ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/` へコピーして、下書きで直せるようにする（`.claude` の階層は `handoff-.claude` に読み替えて置く）。元の場所へ取り込むのはユーザ（`sh .ccnavi/scripts/ccnavi-user-handoff.sh`） | エージェント |
@@ -54,7 +54,7 @@ keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.s
 | `ccnavi-user-close-early.sh` | 残りがあるまま親を早めに閉じる判断を置く。残りを issue に書き出す | ユーザ |
 | `ccnavi-user-clean-branch.sh` | 親を閉じたときに残した、子の手元のブランチを消す。条件は消す前に確かめ直す | ユーザ |
 | `ccnavi-user-handoff.sh` | 保護対象の下書き（`wip/handoff/`）を、本来の場所へ取り込む。引数なしは取り込み待ちを見せるだけ | ユーザ |
-| `ccnavi-user-mirror.sh` | 共通レイヤーのミラーのずれを見て、プロジェクトへ揃える。引数なしは見せるだけ | ユーザ |
+| `ccnavi-user-mirror.sh` | 共通レイヤーのミラーと工程スキル（`skills/`）のずれを見て、プロジェクトへ揃える。引数なしは見せるだけ | ユーザ |
 | `ccnavi-user-prune.sh` | 判定ログと state を整理する。`--preview` は動かすものを並べるだけ | ユーザ |
 
 ## 共有の部品

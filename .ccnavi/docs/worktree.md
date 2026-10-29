@@ -52,6 +52,7 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
   記録（version 4）は共通のgitディレクトリの`ccnavi-direct/<名前>`、Sは`refs/ccnavi/direct/<名前>/s`に置く。
   `worktree add`が拒否されたときは、`ccnavi-git.sh`の出力の案内に従う。以下の手動の手順は、このスクリプトを使えないときに使います。名前と同じブランチが既にあってワークツリーが無いときは2段に分かれます。まず`ccnavi-git.sh worktree add .claude/worktrees/<名前> <名前>`でワークツリーを出し、次に`ccnavi-worktree.sh <名前> --adopt --base <統合先>`で引き取ります（ユーザの確認が要ります。引き取らないと、`integrate`は記録が無いため止まります。`--adopt`は既存のワークツリーが前提です）
 - `ccnavi-worktree.sh`は直接作業のワークツリー用で、名前と同じブランチを新しく切る。親子のチケットの親のワークツリーには使わない。
+  親のワークツリーの中から切り替えられるのは、親の提案が承認前（`todo/` にあるだけ）のときだけ。承認済み・レビュー待ち・着手済みの子があるときは、切る前に終了コード 1 で断る（[ticket-work.md](ticket-work.md)の「拒否される条件と、切り替える前の取り下げ」）。
   親は識別子の名前のブランチを作らず、親のブランチ（MRの元ブランチ）を直接チェックアウトする。作るのは`ccnavi-start.sh --mr <番号>`か
   `--issue <番号>`。子のワークツリーは`ccnavi-ticket.sh start <子>`が親のブランチから作る
 

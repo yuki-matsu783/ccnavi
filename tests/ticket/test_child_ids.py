@@ -19,8 +19,10 @@ import tempfile
 import unittest
 
 from ccnavi.infra import settings
-from ccnavi.tickets import approval_ops, ticket_ids, ticket_model, write_and_push
-from ccnavi.tickets import ticket as ticket_mod
+from ccnavi.tickets.approval import ops as approval_ops
+from ccnavi.tickets.approval import write_and_push
+from ccnavi.tickets.model import ticket as ticket_mod
+from ccnavi.tickets.model import ticket_ids, ticket_model
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

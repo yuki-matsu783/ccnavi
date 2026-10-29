@@ -162,14 +162,14 @@ class MovedListTest(ActorHarness):
 
     def test_a_push_pending_stop_adds_no_moved_explanation(self):
         """動いたのではなく push されていないだけのとき（kind が空）は、説明を足さない。"""
-        from ccnavi.tickets import review
+        from ccnavi.tickets.review import request as review
 
         self.assertEqual(
             review.moved_explanation(review.Moved("親ブランチの HEAD が push されていない")), []
         )
 
     def test_direction_and_zero_width_characters_are_replaced(self):
-        from ccnavi.tickets import review
+        from ccnavi.tickets.review import request as review
 
         shown = review._quoted("a\u202eb\u200bc\ufeffd", 60)
         self.assertEqual(shown, "「a b c d」")

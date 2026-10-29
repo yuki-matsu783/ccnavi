@@ -1,0 +1,1034 @@
+"""実績で測るリスク。`.ccnavi/config/common/risks.yml` を読み、子を閉じるときに差分を数える。
+
+## 宣言ではなく実績を測る
+
+計画のときに「軽い」と思った作業が、やってみたら大きな変更になることがある。
+宣言（チケットの範囲や `human_review.required: false`）だけを信頼すると、それが
+レビューを通らずに進む。だから点は、子を閉じるときにその子のワークツリーで
+子の仕事の始まり（取り込み直後の親の先頭と子の共通の祖先。`gitstate.child_base`）から
+子の先頭までの差分を数えて付ける。宣言の広さで数える点は持たない。
+宣言の広さは、親がチケットを書くときに `human_review.reason` で言えばよい。
+
+## 点が何をするか
+
+リスクレベルの名前は 4 つで固定（LOW / MEDIUM / HIGH / CRITICAL）。境目の点は `levels` で動かす。
+`HIGH` 以上なら、定義が `review: none` でも子が `required: false` でも、そのフェーズは
+人間レビューが要る扱いになり、レビューが済むまで止まる。実績で宣言を厳しい側にだけ上書きする。
+
+## 項目は 3 系統
+
+- 定量（組み込み）: `lines_over` / `files_over` / `deleted_over` / `glob`。差分から数える
+- 定量（スクリプト）: `script:` に書いた sh を exe が走らせ、点を受け取る。置ける場所は
+  guard の内側だけ。エージェントが書ける場所のスクリプトを許すと、自分のリスクを自分で決められる
+- 定性（サブエージェント）: `judge:` に書いた問いを、親がサブエージェントに判断させ、
+  `ccnavi-ticket.sh record-risk` で yes / no を記録する。判定が揃うまで子は閉じられない
+
+測れなかった項目（スクリプトの失敗、読めない出力）は重いほうとして扱い、その項目の点を加える。
+「測れないから 0」にすると、スクリプトが動かなくなっただけでその項目の点が消える。
+
+## 書式
+
+    version: 1
+    levels: {medium: 20, high: 40, critical: 70}
+    factors:
+      - {id: big-diff,   points: 25, lines_over: 300,   message: 行数が多い}
+      - {id: many-files, points: 15, files_over: 10,    message: ファイルが多い}
+      - {id: src-diff,   points: 25, lines_over: 300, include: ["src/**"], exclude: ["*.lock"]}
+      - {id: ci,         points: 35, glob: ".github/", max: 35, message: CI に触った}
+      - {id: deletes,    points: 20, deleted_over: 3,   message: 消したファイルが多い}
+      - {id: complexity, points: 30, script: .ccnavi/config/common/scripts/complexity.sh,
+      message: 複雑度}
+      - {id: untested,   points: 30, judge: テストの無い振る舞いの変更を含むか, message: テスト無し}
+
+`lines_over` / `files_over` / `deleted_over` には、数えるパスを
+`include` / `exclude`（glob のリスト）で絞れる。どちらも既定は無指定で、無指定なら差分全体を数える。
+`include` があればヒットしたパスだけ、`exclude` にヒットしたパスは `include` にヒットしていても
+数えない。`exclude` だけなら、それ以外は全部数える。末尾が `/` の glob はディレクトリ
+（`src/` は `src/`）。rename / copy は元のパスも見て、`include` は旧新どちらかがヒットすれば数え、
+`exclude` は旧新の両方がヒットしたときだけ外す。
+バイナリの変更は行数 0 として数える（ファイル数と削除数には入る）。
+
+ファイルが無ければ組み込みの既定（上の定量 4 項目と同じ値）。破損していれば組み込みに戻り、
+そのことは --lint と子を閉じるときの出力が言う。
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import subprocess
+from dataclasses import dataclass, field, replace
+
+import yaml
+
+from ...infra import gitcmd, globmatch, settings, tree, yamlread
+from ...policy.rules import ID_SEPARATOR, SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
+
+VERSION = 1
+
+LEVEL_LOW = "LOW"
+LEVEL_MEDIUM = "MEDIUM"
+LEVEL_HIGH = "HIGH"
+LEVEL_CRITICAL = "CRITICAL"
+LEVELS = (LEVEL_LOW, LEVEL_MEDIUM, LEVEL_HIGH, LEVEL_CRITICAL)
+# レビューが要る扱いに上書きするリスクレベル。
+ESCALATE_FROM = (LEVEL_HIGH, LEVEL_CRITICAL)
+
+DEFAULT_LEVELS = {"medium": 20, "high": 40, "critical": 70}
+
+KIND_LINES = "lines_over"
+KIND_FILES = "files_over"
+KIND_DELETED = "deleted_over"
+KIND_GLOB = "glob"
+KIND_SCRIPT = "script"
+KIND_JUDGE = "judge"
+KINDS = (KIND_LINES, KIND_FILES, KIND_DELETED, KIND_GLOB, KIND_SCRIPT, KIND_JUDGE)
+
+# スクリプトを置いてよい場所（ワークスペースルートからの相対の先頭）。guard の内側。
+SCRIPT_HOMES = (".ccnavi/config/common/scripts/",)
+SCRIPT_TIMEOUT_SECONDS = 30.0
+# 差分を数える git に与える時間。閉じるときにしか走らないので、判定より長くてよい。
+GIT_TIMEOUT_SECONDS = 10.0
+
+BUILTIN = "(builtin)"
+
+_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+@dataclass
+class Factor:
+    id: str
+    points: int
+    message: str
+    kind: str
+    # lines_over / files_over / deleted_over は int、glob / script / judge は str。
+    value: object
+    # glob の上限。ヒットするごとに加点するので、無ければ青天井。
+    max: int | None = None
+    compiled: re.Pattern | None = None
+    # lines_over / files_over / deleted_over だけが持つ、数える対象のパス（glob）。
+    # include が空なら全パスが対象、あればヒットしたパスだけ。exclude にヒットしたパスは常に外す。
+    include: tuple[str, ...] = ()
+    exclude: tuple[str, ...] = ()
+    include_compiled: tuple[re.Pattern, ...] = ()
+    exclude_compiled: tuple[re.Pattern, ...] = ()
+    # source はこの項目が書いてあるレイヤーの名前（`common` / `self` / プロジェクト名）。
+    # 記録の hit と judge の項目に残す。
+    source: str = ""
+    # home は `script:` を解く基準ディレクトリ。共通レイヤーと自身のレイヤーはワークスペース
+    # ルート、プロジェクトのレイヤーはそのプロジェクトの git プロジェクトルート。
+    # 定義を読んだ側が埋める。
+    home: str = ""
+
+    def matches(self, rel: str) -> bool:
+        return self.compiled is not None and self.compiled.match(rel) is not None
+
+    def in_scope(self, change: Change) -> bool:
+        """定量項目（行数・ファイル数・削除数）がこの変更を数えるか。
+
+        rename / copy は元のパスも見る。新しいパスだけで見ると、対象の外へ動かしたファイルの
+        書き換えが数えから消え、リスクが軽い側へ倒れる。include はどちらかがヒットすれば数え、
+        exclude は両方がヒットしたときだけ外す。
+        """
+        paths = [change.path] + ([change.old] if change.old else [])
+        if self.include_compiled and not any(
+            p.match(x) for p in self.include_compiled for x in paths
+        ):
+            return False
+        return not all(any(p.match(x) for p in self.exclude_compiled) for x in paths)
+
+    def key(self) -> tuple:
+        """レイヤーをまたいで「同じ項目か」を比べるための全欄。`source` と `home` は含めない。
+
+        `script:` は書かれたパスではなく、そのレイヤーのスクリプトの置き場からの相対と、
+        指す先の中身で比べる。共通レイヤーは `.ccnavi/config/common/scripts/`、
+        各レイヤーは `<ccnavi ディレクトリ>/scripts/` を指すので、
+        同期で共通レイヤーをコピーした配点はパスが違う。パスで比べると同じ項目を
+        `<レイヤー>:<id>` として 2 重に数える。中身まで見るのは、
+        名前だけ同じ別のスクリプトを同じ項目として破棄しないため。
+        """
+        value = self.value
+        if self.kind == KIND_SCRIPT:
+            rel = str(self.value)
+            value = (rel.split("/scripts/", 1)[-1], _file_digest(self.home, rel))
+        return (
+            self.id,
+            self.points,
+            self.message,
+            self.kind,
+            value,
+            self.max,
+            tuple(sorted(set(self.include))),
+            tuple(sorted(set(self.exclude))),
+        )
+
+
+@dataclass
+class Definition:
+    # levels は書かれたキーだけ。書かれていないキーは DEFAULT_LEVELS で読む
+    # （`level_of`）。既定で埋めて持つと、合成のときに「書いていないレイヤー」が
+    # 共通レイヤーの緩めた境目の点を気づかないうちに戻すことになる。
+    levels: dict[str, int] = field(default_factory=dict)
+    factors: list[Factor] = field(default_factory=list)
+    # どこから読んだか。組み込みなら BUILTIN。
+    source: str = BUILTIN
+    # 読めなかった理由（組み込みに戻ったとき、か、レイヤーを空として扱ったとき）。
+    fallback: str = ""
+    # 空として扱ったレイヤーの名前。記録の `fallback` にそのまま入る。
+    dropped: list[str] = field(default_factory=list)
+
+    @property
+    def judges(self) -> list[Factor]:
+        return [f for f in self.factors if f.kind == KIND_JUDGE]
+
+    def level_of(self, points: int) -> str:
+        if points >= self.levels.get("critical", DEFAULT_LEVELS["critical"]):
+            return LEVEL_CRITICAL
+        if points >= self.levels.get("high", DEFAULT_LEVELS["high"]):
+            return LEVEL_HIGH
+        if points >= self.levels.get("medium", DEFAULT_LEVELS["medium"]):
+            return LEVEL_MEDIUM
+        return LEVEL_LOW
+
+    def factor(self, ident: str) -> Factor | None:
+        for f in self.factors:
+            if f.id == ident:
+                return f
+        return None
+
+
+def _file_digest(home: str, rel: str) -> str:
+    """スクリプトの中身のハッシュ。置き場が決まっていないか読めなければ空文字。"""
+    if not home:
+        return ""
+    try:
+        with open(os.path.join(home, rel.replace("/", os.sep)), "rb") as f:
+            return hashlib.sha256(f.read().replace(b"\r\n", b"\n")).hexdigest()
+    except OSError:
+        return ""
+
+
+def builtin() -> Definition:
+    factors, _ = _factors(
+        [
+            {"id": "big-diff", "points": 25, "lines_over": 300, "message": "行数が多い"},
+            {"id": "many-files", "points": 15, "files_over": 10, "message": "ファイルが多い"},
+            {
+                "id": "ci",
+                "points": 35,
+                "glob": ".github/**",
+                "max": 35,
+                "message": "CI やエージェント定義に触った",
+            },
+            {"id": "deletes", "points": 20, "deleted_over": 3, "message": "削除したファイルが多い"},
+        ],
+        BUILTIN,
+    )
+    return Definition(factors=factors)
+
+
+def load(path: str) -> tuple[Definition, list[Problem]]:
+    """共通レイヤーの定義を読む。無ければ組み込み。破損していれば組み込みに戻り、苦情を返す。"""
+    if not path:
+        return builtin(), []
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    except FileNotFoundError:
+        return builtin(), []
+    except (OSError, ValueError) as exc:
+        # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、破損した
+        # ファイルとして苦情付きで返す。phasetypes.load と同じ扱い。
+        fallen = builtin()
+        fallen.fallback = f"{path} を読めない ({exc})"
+        return fallen, [Problem(SEVERITY_ERROR, "(risk)", fallen.fallback)]
+    definition, problems = parse(text, path)
+    if definition is None:
+        fallen = builtin()
+        fallen.fallback = f"{path} が不正。組み込みの配点で数える"
+        return fallen, problems
+    return definition, problems
+
+
+def load_layer(path: str, script_homes: tuple[str, ...]) -> tuple[Definition | None, list[Problem]]:
+    """レイヤーの定義を読む。無ければ None（無いレイヤー = 空）。
+    破損していても組み込みには戻さない。
+
+    共通レイヤーが在るのに組み込みに戻すと、共通レイヤーの配点が消える側になる。
+    破損したレイヤーは空として扱い、苦情だけを返す。
+    """
+    if not path:
+        return None, []
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    except FileNotFoundError:
+        return None, []
+    except (OSError, ValueError) as exc:
+        return None, [Problem(SEVERITY_ERROR, "(risk)", f"{path} を読めない ({exc})")]
+    return parse(text, path, script_homes)
+
+
+def parse(
+    text: str, where: str = "(risk)", script_homes: tuple[str, ...] = SCRIPT_HOMES
+) -> tuple[Definition | None, list[Problem]]:
+    """定義 1 本を読む。`script_homes` はこのレイヤーで `script:` に書けるパスの先頭。
+
+    共通レイヤーは `.ccnavi/config/common/scripts/`、
+    各レイヤーはその `<ccnavi ディレクトリ>/scripts/` だけ。
+    たがいの側を指す定義はここで error にする。プロジェクトの
+    リポジトリに入る定義が、ワークスペースの道具に依存する形を作らないため。
+
+    処理フロー:
+    1. `yamlread.safe_load` で読む。
+    読めない・最上位がマップでない・版（`VERSION`）が違うなら止める。
+    2. `levels` を読む。書かれたキーだけを `levels` に入れ、既定は足さない。`ordered` で medium
+       <= high <= critical を見る。
+    3. `factors` を `_factors` で読む。`script_homes` の外を指す `script:` はそこで error になる。
+    4. error が 1 つでもあれば None を返す。warn だけなら定義と問題の列を返す。
+    """
+    # 読み込み。YAML・最上位・版の順に見て、読めなければ止める。
+    problems: list[Problem] = []
+    try:
+        data = yamlread.safe_load(text)
+    except yaml.YAMLError as exc:
+        return None, [Problem(SEVERITY_ERROR, where, f"YAML として読めない: {exc}")]
+    if not isinstance(data, dict):
+        return None, [Problem(SEVERITY_ERROR, where, "最上位がマップではない")]
+    if data.get("version") != VERSION:
+        return None, [
+            Problem(
+                SEVERITY_ERROR,
+                where,
+                f"版 {data.get('version')!r} は扱えない（このビルドが読むのは {VERSION}）",
+            )
+        ]
+    # 書かれたキーだけを持つ。既定で埋めると、合成のときに「書いていないレイヤー」が
+    # 共通レイヤーの緩めた境目の点を気づかないうちに戻す。
+    # 順を見るときだけ既定で補う。
+    levels: dict[str, int] = {}
+    # 境目の点。書かれたキーだけを読む。
+    raw_levels = data.get("levels")
+    if raw_levels is not None:
+        if not isinstance(raw_levels, dict):
+            return None, [Problem(SEVERITY_ERROR, where, "`levels` がマップではない")]
+        for name in ("medium", "high", "critical"):
+            if name in raw_levels:
+                value = raw_levels[name]
+                if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                    problems.append(
+                        Problem(SEVERITY_ERROR, where, f"`levels.{name}` が 0 以上の整数ではない")
+                    )
+                    continue
+                levels[name] = value
+        unknown = sorted(set(raw_levels) - {"medium", "high", "critical", "low"})
+        for name in unknown:
+            problems.append(
+                Problem(SEVERITY_WARN, where, f"`levels.{name}` は未対応のリスクレベル。名前は固定")
+            )
+    if not ordered(levels):
+        problems.append(
+            Problem(SEVERITY_ERROR, where, "`levels` は medium <= high <= critical の順で書く")
+        )
+    # 加点の項目。
+    raw_factors = data.get("factors")
+    if raw_factors is None:
+        raw_factors = []
+    if not isinstance(raw_factors, list):
+        return None, [Problem(SEVERITY_ERROR, where, "`factors` がリストではない")]
+    factors, more = _factors(raw_factors, where, script_homes)
+    problems += more
+    if any(p.severity == SEVERITY_ERROR for p in problems):
+        return None, problems
+    return Definition(levels=levels, factors=factors, source=where), problems
+
+
+def effective_levels(levels: dict[str, int]) -> dict[str, int]:
+    """書かれたキーに既定を足した、実際に使われる境目の点。"""
+    return {**DEFAULT_LEVELS, **levels}
+
+
+def ordered(levels: dict[str, int]) -> bool:
+    """`medium <= high <= critical` になっているか。書かれていないキーは既定で読む。"""
+    effective = effective_levels(levels)
+    return effective["medium"] <= effective["high"] <= effective["critical"]
+
+
+def _factors(
+    raw: list, where: str, script_homes: tuple[str, ...] = SCRIPT_HOMES
+) -> tuple[list[Factor], list[Problem]]:
+    """`factors:` の 1 項目ずつを Factor の列にする。外れた項目は Problem に積んで次へ進む。
+
+    処理フロー:
+    1. 項目がマップか、id の形と重複を見る（`_ID`・`seen`）。
+    2. `points` が 0 以上の整数かを見る。
+    3. 加点条件（`KINDS` のどれか 1 つだけ）を見る。
+    4. 条件の種類ごとに値を検証する。`glob` は `globmatch.translate` で式にし、`script` は
+       `script_homes` の下に限る。
+    5. 通った項目を Factor にして並べる。
+
+    戻り値は (factors, problems)。error の項目は factors に入らない。warn の項目は入る。
+    `where` は問題の出所の名前で、文を組むのに使うだけ。
+    """
+    problems: list[Problem] = []
+    factors: list[Factor] = []
+    seen: set[str] = set()
+    for i, item in enumerate(raw):
+        # 項目の形（マップ・id・重複・点数）を見る。
+        if not isinstance(item, dict):
+            problems.append(Problem(SEVERITY_ERROR, where, f"`factors[{i}]` がマップではない"))
+            continue
+        ident = str(item.get("id") or "").strip()
+        if ID_SEPARATOR in ident:
+            # レイヤーの名前をつけた形（`lib:schema`）と見分けが付かない。共通レイヤーに書けば
+            # lib の配点に見え、記録を読んだユーザがどのファイルを直すのか決められない。
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    where,
+                    f"`factors[{i}].id` に `{ID_SEPARATOR}` は書けない。"
+                    f"レイヤーの名前を添えた形（`self{ID_SEPARATOR}id` / "
+                    f"`<プロジェクト名>{ID_SEPARATOR}id`）と見分けが付かない",
+                )
+            )
+            continue
+        if not _ID.match(ident):
+            problems.append(Problem(SEVERITY_ERROR, where, f"`factors[{i}].id` が無いか形が違う"))
+            continue
+        if ident in seen:
+            problems.append(Problem(SEVERITY_ERROR, where, f"`{ident}` が重複している"))
+            continue
+        seen.add(ident)
+        points = item.get("points")
+        if not isinstance(points, int) or isinstance(points, bool) or points < 0:
+            problems.append(Problem(SEVERITY_ERROR, ident, "`points` が 0 以上の整数ではない"))
+            continue
+        # 加点条件の種類と、その種類ごとの値・範囲を見る。
+        kinds = [k for k in KINDS if k in item]
+        if len(kinds) != 1:
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    ident,
+                    "加点条件は（" + " / ".join(KINDS) + "）のうち 1 つだけ書く",
+                )
+            )
+            continue
+        kind = kinds[0]
+        value = item[kind]
+        message = str(item.get("message") or "").strip() or ident
+        maximum = item.get("max")
+        if maximum is not None and (
+            not isinstance(maximum, int) or isinstance(maximum, bool) or maximum < 0
+        ):
+            problems.append(Problem(SEVERITY_ERROR, ident, "`max` が 0 以上の整数ではない"))
+            continue
+        compiled = None
+        scope: dict[str, tuple[tuple[str, ...], tuple[re.Pattern, ...]]] = {}
+        if kind not in (KIND_LINES, KIND_FILES, KIND_DELETED):
+            stray = [k for k in ("include", "exclude") if k in item]
+            if stray:
+                problems.append(
+                    Problem(
+                        SEVERITY_ERROR,
+                        ident,
+                        f"`{stray[0]}` は {KIND_LINES} / {KIND_FILES} / {KIND_DELETED} "
+                        "の項目にだけ書ける",
+                    )
+                )
+                continue
+        if kind in (KIND_LINES, KIND_FILES, KIND_DELETED):
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                problems.append(Problem(SEVERITY_ERROR, ident, f"`{kind}` が 0 以上の整数ではない"))
+                continue
+            bad = False
+            for name in ("include", "exclude"):
+                parsed, error = _globs(item.get(name))
+                if error:
+                    problems.append(Problem(SEVERITY_ERROR, ident, f"`{name}` {error}"))
+                    bad = True
+                    break
+                scope[name] = parsed
+            if bad:
+                continue
+            # ワイルドカードの無い include はそのファイル名にしかヒットしない。ディレクトリの
+            # つもりで `src` と書くと、何も数えず点が 0 になる（気づかないうちに軽い側へ偏る）。
+            for glob in scope["include"][0]:
+                if not any(ch in glob for ch in "*?["):
+                    problems.append(
+                        Problem(
+                            SEVERITY_WARN,
+                            ident,
+                            f"`include` の `{glob}` はワイルドカードが無いので、その名前の"
+                            f"ファイルにしか一致しない。ディレクトリなら `{glob}/**` か `{glob}/`",
+                        )
+                    )
+        elif kind == KIND_GLOB:
+            if not isinstance(value, str) or not value.strip():
+                problems.append(Problem(SEVERITY_ERROR, ident, "`glob` が文字列ではない"))
+                continue
+            glob = value.strip().replace("\\", "/").strip("/")
+            # ルールの glob と同じく、どの機械でも大文字小文字を区別しない。
+            flags = re.IGNORECASE
+            try:
+                compiled = re.compile("^" + globmatch.translate(glob), flags)
+            except re.error as exc:
+                problems.append(Problem(SEVERITY_ERROR, ident, f"`glob` を式にできない: {exc}"))
+                continue
+            value = glob
+        elif kind == KIND_SCRIPT:
+            if not isinstance(value, str) or not value.strip():
+                problems.append(Problem(SEVERITY_ERROR, ident, "`script` が文字列ではない"))
+                continue
+            rel = value.strip().replace("\\", "/")
+            if os.path.isabs(rel) or ".." in rel or not rel.startswith(tuple(script_homes)):
+                problems.append(
+                    Problem(
+                        SEVERITY_ERROR,
+                        ident,
+                        f"`script` の `{rel}` はこのレイヤーから指せない。"
+                        + " か ".join(f"`{h}`" for h in script_homes)
+                        + " の下に、そのレイヤーの git プロジェクトルートからの相対で置く"
+                        "（守られた場所。レイヤーと共通レイヤーはたがいの側を指せない）",
+                    )
+                )
+                continue
+            value = rel
+        elif kind == KIND_JUDGE:
+            if not isinstance(value, str) or not value.strip():
+                problems.append(Problem(SEVERITY_ERROR, ident, "`judge` は問いの文を書く"))
+                continue
+            value = value.strip()
+        # 通った項目を Factor にする。
+        factors.append(
+            Factor(
+                id=ident,
+                points=points,
+                message=message,
+                kind=kind,
+                value=value,
+                max=maximum,
+                compiled=compiled,
+                include=scope.get("include", ((), ()))[0],
+                exclude=scope.get("exclude", ((), ()))[0],
+                include_compiled=scope.get("include", ((), ()))[1],
+                exclude_compiled=scope.get("exclude", ((), ()))[1],
+            )
+        )
+    return factors, problems
+
+
+def _globs(raw: object) -> tuple[tuple[tuple[str, ...], tuple[re.Pattern, ...]], str]:
+    """`include` / `exclude` の glob のリストを式にする。書かれていなければ空。
+    戻りの 2 つ目は error の理由で、空文字なら正常。"""
+    empty: tuple[tuple[str, ...], tuple[re.Pattern, ...]] = ((), ())
+    if raw is None:
+        return empty, ""
+    if not isinstance(raw, list) or not all(isinstance(g, str) and g.strip() for g in raw):
+        return empty, "は glob（文字列）のリストで書く"
+    globs: list[str] = []
+    compiled: list[re.Pattern] = []
+    for g in raw:
+        glob = g.strip().replace("\\", "/")
+        # 末尾の `/` はディレクトリ。
+        # `src/` を `src/**` として読む（`src` だけでは何もヒットしない）。
+        glob = (
+            glob.strip("/") + "/**" if glob.endswith("/") and glob.strip("/") else glob.strip("/")
+        )
+        try:
+            compiled.append(re.compile("^" + globmatch.translate(glob), re.IGNORECASE))
+        except re.error as exc:
+            return empty, f"の `{g}` を式にできない: {exc}"
+        globs.append(glob)
+    return (tuple(globs), tuple(compiled)), ""
+
+
+def mark_layer(definition: Definition, layer: str, home: str) -> None:
+    """この定義の項目に、レイヤーの名前と `script:` を解く基準ディレクトリを持たせる。"""
+    for f in definition.factors:
+        f.source = layer
+        f.home = home
+
+
+def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition, list[Problem]]:
+    """共通レイヤーの配点に、行き先のレイヤーの配点を足す。
+
+    `factors` は連結。同 `id` で全欄が一致すれば重複として後ろを破棄し（info）、
+    中身が違えば両方を数え、後ろのレイヤーの項目を `<レイヤー>:<id>` という名前にする（warn）。
+    `levels` は書かれたキーだけを合わせ、キーごとに小さいほうを採る。どのレイヤーも書いて
+    いないキーは既定（`DEFAULT_LEVELS`）。
+
+    同 `id` の衝突でレイヤーを空にしないのは、空にすると点が小さくなる側になるから。
+    両方を数えれば、衝突は点を増やす向きにしか影響しない（ルールの同 `id` と同じ扱い）。
+    裸の `id` にコロンは書けないので、レイヤーの名前を前に付けた `id` が他の項目と重なることは無い。
+
+    合成後の `levels` の順が崩れる error のときは、そのレイヤーを空として扱い、
+    共通レイヤーだけを返す。
+    """
+    problems: list[Problem] = []
+    ids = {f.id for f in common.factors}
+    keys = {f.key() for f in common.factors}
+    added: list[Factor] = []
+    for f in extra.factors:
+        if f.key() in keys:
+            problems.append(
+                Problem(
+                    SEVERITY_INFO,
+                    f.id,
+                    f"`{f.id}` は前のレイヤーと全欄が同じなので、{layer} の側を破棄した。"
+                    "点は前のレイヤーの 1 本で数える",
+                )
+            )
+            continue
+        if f.id in ids:
+            qualified = f"{layer}{ID_SEPARATOR}{f.id}"
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    f.id,
+                    f"`{f.id}` が前のレイヤーと同じ id で中身が違う。両方を数え、{layer} の側は"
+                    f" `{qualified}` という名前にする（記録と record-risk もこの名前）。"
+                    "同じ項目のつもりなら全欄を揃え、別の項目なら id を変えてください",
+                )
+            )
+            f = replace(f, id=qualified)
+        ids.add(f.id)
+        keys.add(f.key())
+        added.append(f)
+    levels = dict(common.levels)
+    for name, value in extra.levels.items():
+        levels[name] = min(levels[name], value) if name in levels else value
+    if not ordered(levels):
+        shown = effective_levels(levels)
+        problems.append(
+            Problem(
+                SEVERITY_ERROR,
+                "(levels)",
+                f"合成後の `levels` が medium {shown['medium']} <= high {shown['high']} <= "
+                f"critical {shown['critical']} になっていない。{layer} のレイヤーは空として扱う",
+            )
+        )
+    if any(p.severity == SEVERITY_ERROR for p in problems):
+        dropped = Definition(
+            levels=dict(common.levels),
+            factors=list(common.factors),
+            source=common.source,
+            fallback=common.fallback,
+            dropped=[*common.dropped, layer],
+        )
+        return dropped, problems
+    merged = Definition(
+        levels=levels,
+        factors=[*common.factors, *added],
+        source=common.source,
+        fallback=common.fallback,
+        dropped=list(common.dropped),
+    )
+    return merged, problems
+
+
+def script_problems(definition: Definition, layer: str = "") -> list[Problem]:
+    """`script:` が指す先が、そのレイヤーの git プロジェクトルートに在るか。
+
+    `layer` を渡すと、そのレイヤーから来た項目だけを見る。走らせるときは今までどおり
+    「測れなかった」でその項目の点を加えるが、`--lint` は在ることを先に言う。
+    """
+    problems: list[Problem] = []
+    for f in definition.factors:
+        if f.kind != KIND_SCRIPT:
+            continue
+        if layer and f.source != layer:
+            continue
+        path = os.path.join(f.home, str(f.value).replace("/", os.sep))
+        if not os.path.isfile(path):
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    f.id,
+                    f"`script` の `{f.value}` が {f.home or '(基準なし)'} にありません。"
+                    "ワークツリーの中のものは読まないので、元リポジトリに置いてください",
+                )
+            )
+    return problems
+
+
+def definition_path(conf: settings.Settings, root: str, project: str) -> str:
+    """そのプロジェクトのレイヤーの risks.yml。空の `project` はワークスペース自身のレイヤー。
+
+    予約名（`common` / `self`）のプロジェクトはレイヤーとして数えないので、パスを持たない。
+    名前で引くと `project or LAYER_SELF` がワークスペース自身のレイヤーの
+    名前と一致し、そのプロジェクトの配点がワークスペースのレイヤーとして合成される。
+    配点を書ける側がレイヤーを選べると、自分のリスクを自分で下げる方法になる。
+    """
+    if settings.is_reserved_layer_name(project):
+        return ""
+    home = tree.project_root(conf.projects, project) if project else root
+    if not home:
+        return ""
+    return settings.layer_path(conf, home, settings.KIND_RISK, project or settings.LAYER_SELF)
+
+
+def layer_definition(
+    conf: settings.Settings, root: str = "", project: str = ""
+) -> tuple[Definition, list[Problem]]:
+    """共通レイヤー + そのレイヤーの配点と、そのレイヤーの苦情。
+
+    共通レイヤー自身の苦情は返さない。言う場所は `--lint` の共通レイヤーの項で、そこと二重に
+    言うと同じ文を 2 度読むことになる。共通レイヤーが破損していれば組み込みに戻り、
+    そのときはレイヤーを足さない。
+
+    ファイルが無いのは正常（無い = 空）。共通レイヤーにも config にも `risks.yml` が無ければ
+    組み込みの 4 項目を使う。共通レイヤーだけが無く config が在れば、共通レイヤーは空として
+    config の項目だけを数える。
+    """
+    home = tree.project_root(conf.projects, project) if project else root
+    layer = project or settings.LAYER_SELF
+    path = definition_path(conf, root, project)
+    layer_present = bool(path) and os.path.exists(path)
+    if layer_present and not (conf.risk and os.path.exists(conf.risk)):
+        definition = Definition(source=conf.risk or BUILTIN)
+    else:
+        definition, _ = load(conf.risk)
+    mark_layer(definition, settings.LAYER_COMMON, root)
+    if definition.fallback or not layer_present:
+        return definition, []
+    extra, notes = load_layer(path, (settings.layer_script_home(conf),))
+    if extra is None:
+        definition.dropped.append(layer)
+        definition.fallback = f"{layer} の配点が不正。このレイヤーは空として数える"
+        return definition, list(notes)
+    mark_layer(extra, layer, home)
+    merged, problems = merge(definition, extra, layer)
+    if merged.dropped:
+        dropped = ", ".join(merged.dropped)
+        merged.fallback = (
+            f"{dropped} の配点の境目の点が合成で逆転している。このレイヤーは空として数える"
+        )
+    return merged, list(notes) + problems
+
+
+def load_definition(conf: settings.Settings, root: str = "", project: str = "") -> Definition:
+    """判定が使う配点。
+    共通レイヤーに、親の承認済みチケットの `project:` が指すレイヤーを足したもの。"""
+    definition, _ = layer_definition(conf, root, project)
+    return definition
+
+
+# ---- 差分
+
+
+@dataclass
+class Change:
+    path: str
+    added: int = 0
+    deleted: int = 0
+    # A / M / D / R など。git の name-status の 1 文字目。
+    status: str = "M"
+    # rename / copy の元のパス。無ければ空。
+    old: str = ""
+
+
+@dataclass
+class Diff:
+    changes: list[Change] = field(default_factory=list)
+    base: str = ""
+    head: str = ""
+
+    @property
+    def lines(self) -> int:
+        return sum(c.added + c.deleted for c in self.changes)
+
+    @property
+    def files(self) -> int:
+        return len(self.changes)
+
+    @property
+    def deleted_files(self) -> int:
+        return sum(1 for c in self.changes if c.status.startswith("D"))
+
+    def summary(self) -> str:
+        return (
+            f"{self.files} ファイル、+{sum(c.added for c in self.changes)} "
+            f"-{sum(c.deleted for c in self.changes)} 行、削除したファイル {self.deleted_files}"
+        )
+
+
+def measure(worktree: str, base: str, head: str = "HEAD") -> tuple[Diff | None, str]:
+    """`base..head` の差分を数える。読めなければ None と理由。
+
+    処理フロー:
+    1. base が空なら、子の仕事の始まりが無いとして止める。
+    2. `git diff --numstat -z` で行数と path を読む。rename は旧と新の 2 つが続く形を読み、path
+       は新しい側にする。
+    3. `git diff --name-status -z` で変更の種類（先頭の 1 文字）を読む。numstat に無い path
+       は行数 0 で足す。読めなければ止める（0 件と数えない）。
+    4. `rev-parse` で head を sha にする。読めなければ止める。
+    5. Diff にして返す。Diff.head は引数の head ではなく、その sha になる。
+    """
+    if not base:
+        return None, "子の仕事の始まり（親との共通の祖先）がありません。"
+    rc, out = _git(worktree, ["diff", "--numstat", "-z", f"{base}..{head}"])
+    if rc != 0:
+        return None, "子の仕事の始まりからの差分を読めない"
+    # 行数と path を読む。
+    changes: dict[str, Change] = {}
+    # -z の numstat は `added\tdeleted\tpath\0`。rename は `added\tdeleted\t\0old\0new\0`。
+    parts = out.split("\0")
+    i = 0
+    while i < len(parts):
+        entry = parts[i]
+        i += 1
+        if not entry:
+            continue
+        cols = entry.split("\t")
+        if len(cols) < 3:
+            continue
+        added = _int(cols[0])
+        deleted = _int(cols[1])
+        path = cols[2]
+        old = ""
+        if path == "" and i + 1 < len(parts):
+            # rename: 次の 2 つが旧と新。
+            old = parts[i].replace("\\", "/")
+            path = parts[i + 1]
+            i += 2
+        path = path.replace("\\", "/")
+        changes[path] = Change(path=path, added=added, deleted=deleted, old=old)
+    # 消したファイルの数は name-status から数える。読めなければ測れなかったとして止める
+    # （0 件と数えると軽い側へ倒れる）。
+    rc, out = _git(worktree, ["diff", "--name-status", "-z", f"{base}..{head}"])
+    if rc != 0:
+        return None, "子の仕事の始まりからの変更の種類を読めない"
+    parts = out.split("\0")
+    i = 0
+    while i < len(parts):
+        status = parts[i]
+        i += 1
+        if not status:
+            continue
+        if status.startswith(("R", "C")) and i + 1 < len(parts):
+            path = parts[i + 1].replace("\\", "/")
+            i += 2
+        elif i < len(parts):
+            path = parts[i].replace("\\", "/")
+            i += 1
+        else:
+            break
+        if path in changes:
+            changes[path].status = status[:1]
+        else:
+            changes[path] = Change(path=path, status=status[:1])
+    # 測った先の commit を sha にして、戻り値に入れる。
+    rc, sha = _git(worktree, ["rev-parse", head])
+    if rc != 0 or not sha.strip():
+        return None, "測った先のコミットを読めない"
+    return Diff(changes=list(changes.values()), base=base, head=sha.strip()), ""
+
+
+# ---- 判定
+
+
+@dataclass
+class Hit:
+    id: str
+    points: int
+    detail: str
+    # この項目が書いてあるレイヤー。記録に残す。
+    source: str = ""
+
+
+@dataclass
+class Score:
+    points: int = 0
+    level: str = LEVEL_LOW
+    hits: list[Hit] = field(default_factory=list)
+    # 測れなかった項目（重いほうとして扱い、加点済み）。
+    unmeasured: list[str] = field(default_factory=list)
+    # 判定の無い定性項目。揃うまで子は閉じられない。
+    pending: list[Factor] = field(default_factory=list)
+
+    def lines(self) -> list[str]:
+        out = [f"リスク: {self.points} ({self.level})"]
+        out += [f"  +{h.points} {h.detail}" for h in self.hits]
+        out += [f"  ! {u}" for u in self.unmeasured]
+        return out
+
+    def as_dict(self) -> dict:
+        return {
+            "points": self.points,
+            "level": self.level,
+            "hits": [
+                {"id": h.id, "points": h.points, "detail": h.detail, "source": h.source}
+                for h in self.hits
+            ],
+            "unmeasured": list(self.unmeasured),
+        }
+
+
+def scoped(diff: Diff, factor: Factor) -> Diff:
+    """項目の include / exclude で絞った差分。どちらも無ければ差分そのもの。"""
+    if not factor.include_compiled and not factor.exclude_compiled:
+        return diff
+    kept = [c for c in diff.changes if factor.in_scope(c)]
+    return Diff(changes=kept, base=diff.base, head=diff.head)
+
+
+def evaluate(
+    definition: Definition,
+    diff: Diff,
+    root: str,
+    worktree: str,
+    env: dict[str, str],
+    judgements: dict[str, dict],
+) -> Score:
+    """差分と判定から点を出す。定性項目に判定が無ければ pending に積む。
+
+    処理フロー:
+    1. 定義の項目を順に読み、種類ごとに適用する。行数・ファイル数・削除数は `scoped` で include /
+       exclude に絞った差分を数える。
+    2. `glob` はヒットしたファイルの数だけ加点する。その項目に `max` があれば、その値で上限を切る。
+    3. `script` は `run_script` で測る。点が 0 なら何も積まない。
+       測れなければ配点の全部を加点し、理由を `unmeasured` に積む（0
+       件と数えて軽い側へ倒さない）。
+    4. `judge` は `judgements` に、いまの差分の head と同じ判定が無ければ `pending` に積む。
+       判定が hit なら加点する。
+    5. 加点の合計を `points` にし、`definition.level_of` で `level` を決める。
+
+    `pending` は判定がまだ無い定性項目で、点にはまだ含まれない。
+    """
+    score = Score()
+    for f in definition.factors:
+        # 加点した項目には、その定義が書いてあるレイヤーを残す。
+        where = f.source
+        if f.kind in (KIND_LINES, KIND_FILES, KIND_DELETED):
+            # include / exclude があれば、数える差分をその項目の対象パスに絞る。
+            counted = scoped(diff, f)
+        if f.kind == KIND_LINES:
+            if counted.lines > int(f.value):
+                detail = f"{f.message}（{counted.lines} 行 > {f.value}）"
+                score.hits.append(Hit(f.id, f.points, detail, where))
+        elif f.kind == KIND_FILES:
+            if counted.files > int(f.value):
+                detail = f"{f.message}（{counted.files} ファイル > {f.value}）"
+                score.hits.append(Hit(f.id, f.points, detail, where))
+        elif f.kind == KIND_DELETED:
+            if counted.deleted_files > int(f.value):
+                score.hits.append(
+                    Hit(
+                        f.id,
+                        f.points,
+                        f"{f.message}（削除した {counted.deleted_files} > {f.value}）",
+                        where,
+                    )
+                )
+        elif f.kind == KIND_GLOB:
+            hit = [c.path for c in diff.changes if f.matches(c.path)]
+            if hit:
+                points = f.points * len(hit)
+                if f.max is not None:
+                    points = min(points, f.max)
+                shown = ", ".join(hit[:3]) + ("…" if len(hit) > 3 else "")
+                score.hits.append(Hit(f.id, points, f"{f.message}（{shown}）", where))
+        elif f.kind == KIND_SCRIPT:
+            # 解く基準はそのレイヤーの git プロジェクトルート。共通レイヤーと自身のレイヤーは
+            # ワークスペースルート、プロジェクトのレイヤーはそのプロジェクト。
+            points, note = run_script(f.home or root, str(f.value), worktree, env)
+            if points is None:
+                score.hits.append(
+                    Hit(f.id, f.points, f"{f.message}（測れなかった: {note}）", where)
+                )
+                score.unmeasured.append(f"{f.id}: {note}")
+            elif points > 0:
+                score.hits.append(
+                    Hit(f.id, points, f"{f.message}（{note or 'スクリプト'}）", where)
+                )
+        elif f.kind == KIND_JUDGE:
+            verdict = judgements.get(f.id)
+            if not isinstance(verdict, dict) or verdict.get("head") != diff.head:
+                score.pending.append(f)
+            elif verdict.get("hit"):
+                reason = str(verdict.get("reason") or "").strip()
+                score.hits.append(Hit(f.id, f.points, f"{f.message}（判定: {reason}）", where))
+    score.points = sum(h.points for h in score.hits)
+    score.level = definition.level_of(score.points)
+    return score
+
+
+def run_script(root: str, rel: str, worktree: str, env: dict[str, str]) -> tuple[int | None, str]:
+    """スクリプトを走らせて点を受け取る。測れなければ None と理由。"""
+    path = os.path.join(root, rel.replace("/", os.sep))
+    if not os.path.isfile(path):
+        return None, f"{rel} がありません。"
+    environment = dict(os.environ)
+    environment.update(env)
+    try:
+        done = subprocess.run(
+            ["sh", path],
+            cwd=worktree,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=environment,
+            timeout=SCRIPT_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return None, f"{rel} を走らせられない ({exc.__class__.__name__})"
+    if done.returncode != 0:
+        tail = (done.stderr or done.stdout).strip().splitlines()
+        return None, f"{rel} が {done.returncode} で終わった" + (f": {tail[-1]}" if tail else "")
+    text = done.stdout.strip()
+    if not text:
+        return None, f"{rel} が何も出さなかった"
+    try:
+        data = json.loads(text)
+    except ValueError:
+        data = None
+    if isinstance(data, dict):
+        points = data.get("points")
+        if isinstance(points, int) and not isinstance(points, bool) and points >= 0:
+            return points, str(data.get("message") or "")
+        return None, f"{rel} の JSON に `points`（0 以上の整数）がありません。"
+    if isinstance(data, int) and not isinstance(data, bool) and data >= 0:
+        return data, ""
+    return None, f"{rel} の出力を点として読めない: {text[:60]}"
+
+
+def judge_prompt(
+    child: str, parent: str, diff: Diff, pending: list[Factor], worktree: str, root: str
+) -> str:
+    """親がサブエージェントに渡す、定性項目の問いと差分の要約。root は sh のパスに使う。"""
+    lines = [
+        f"# {child} のリスク判定（定性）",
+        "",
+        f"親: {parent}。ワークツリー: {worktree}。差分: `{diff.base[:12]}..{diff.head[:12]}`"
+        f"（{diff.summary()}）。",
+        "",
+        "次の問いに、差分を読んで yes / no で答え、根拠を 1〜3 行で書いてください。",
+        "判断するのはこの文書を渡されたサブエージェント。記録するのは親で、",
+        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} record-risk {child} <項目> yes|no "
+        "--reason <根拠>' "
+        "で 1 項目ずつ。",
+        "",
+    ]
+    for f in pending:
+        lines += [f"## {f.id}（yes なら +{f.points}）", "", str(f.value), ""]
+    lines += ["## 変更したファイル", ""]
+    for c in sorted(diff.changes, key=lambda x: x.path):
+        lines.append(f"- {c.status} {c.path} (+{c.added} -{c.deleted})")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _int(text: str) -> int:
+    try:
+        return int(text)
+    except ValueError:
+        # バイナリは `-`。
+        return 0
+
+
+def _git(cwd: str, args: list[str]) -> tuple[int, str]:
+    return gitcmd.output(cwd, args, GIT_TIMEOUT_SECONDS, raw_paths=True)

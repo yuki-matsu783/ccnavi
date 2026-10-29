@@ -2,7 +2,7 @@
 
 エージェントは、コマンドが失敗したり ccnavi に止められたりしても、資料を引かずに試行錯誤を
 重ねることがある。失敗が N 回続いたら、資料の索引を引くよう案内する。ここは数えるだけで、
-案内の文面は hook 側（docsearch）が持つ。
+案内の文面は catalog 側（docsearch）が持つ。
 
 数える対象は 2 つ。ツール自体の失敗（PostToolUseFailure）と、ccnavi の拒否（PreToolUse の deny。
 dry-run でも数える。dry-run は判定を変えないので、案内を出してよい）。成功（PostToolUse）が

@@ -60,7 +60,7 @@ GUARD_CORE_FILES_ENV = "CCNAVI_GUARD_CORE_FILES"
 # GUARD_TICKET_APPROVAL_ENV は、チケットの承認の経路を守るか。enable（既定）なら、
 # シェルから、ユーザ専用の入口（`ccnavi user <操作>` と `ccnavi-user-*.sh`）と、実行ファイルへの
 # `ticket` `review` の呼び出しを止め、`user` の入口は標準入力がターミナルでなければ拒む。
-# ユーザ専用の操作の表は tickets/user_only.py にある（ADR-0143）。
+# ユーザ専用の操作の表は tickets/model/user_only.py にある（ADR-0143）。
 # テストは disable にする。
 #
 # 守る対象で名前を付ける。

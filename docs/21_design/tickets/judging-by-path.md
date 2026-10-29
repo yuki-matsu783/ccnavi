@@ -88,14 +88,14 @@ limit: parent i0001: src/*, tests/*
 （`ticket_places.is_handoff_place`）。ワークツリーで作業するエージェントが、範囲を宣言したワークツリーでも手元に下書きを
 置けるようにするため。追跡して push する置き場で、`ccnavi-git.sh integrate` が取り込むときに外し、`ready` が `wip/` ごと
 消すので、統合先の成果物には残らない。追跡されるので、実行前チェック（`ticket_places.is_unscoped`）に加えて、
-実行後チェック（`post_findings.ScopeGuard.finding`）とサブエージェント終了時チェック（`phase_scope.scope_findings`）でも外す。
+実行後チェック（`post_findings.ScopeGuard.finding`）とサブエージェント終了時チェック（`phase.scope.scope_findings`）でも外す。
 外さないと、実行前に通った書き込みがコミットのあとで範囲外として報告される。
 外すのは `wip/handoff/` の下だけで、`wip/` のほかの場所・`wip/handoffX/`・`docs/wip/handoff/`・
 同じ名前のファイルは外さない。大文字小文字は区別する。置き場の名前は固定。
 
 ELI5 の HTML の置き場（ワークツリーのルートからの相対で `wip/eli5/` の下）も、範囲の外として扱わない（`ticket_places.is_eli5_place`）。レビューの依頼に必ず添える材料で（9.10）、親の範囲に毎回書かせると書き忘れた親が依頼の手前で止まるため。
 下書きの置き場と同じく追跡される置き場なので、実行前チェック（`ticket_places.is_unscoped`）に加えて、実行後チェック
-（`post_findings.ScopeGuard.finding`）とサブエージェント終了時チェック（`phase_scope.scope_findings`）でも外す。親のツリーでも子のツリーでも同じ。
+（`post_findings.ScopeGuard.finding`）とサブエージェント終了時チェック（`phase.scope.scope_findings`）でも外す。親のツリーでも子のツリーでも同じ。
 外すのは `wip/eli5/` の下だけで、`wip/` のほかの場所・`wip/eli5x/`・`docs/wip/eli5/`・同じ名前のファイルは外さない。
 大文字小文字は区別せず、`\` は `/` に直さずに見る（`wip\eli5\x.py` という名前の 1 ファイルは置き場ではない）。
 `tree.relative` が `os.sep` を `/` に直すので、Windows の区切りはこれで足りる。チケットの置き場（`ticket_places._under`）と
@@ -117,7 +117,7 @@ ELI5 の HTML の置き場（ワークツリーのルートからの相対で `w
 `user` の入口（`ccnavi user …`）付き、または状態とレビューを動かすサブコマンド（`ticket start|finish|cancel|propose|consolidate|record-risk`、
 `review prepare|requested|confirm|ready`）付きで直接打つ形は、素性によらず
 `DENY_TICKET_APPROVAL_CLI` で止める。`ccnavi-user-*.sh` は引数に依らず、名前がコマンド行のどこにあっても同じ理由コードで止める。
-大文字小文字によらない。止めは `user_only.py` の表から作る（9.18）。
+大文字小文字によらない。止めは `tickets/model/user_only.py` の表から作る（9.18）。
 `comment` / `fetch` / `origin` は sh だけの仕事なので適用していない。
 **hook のほかに保護が無い形**は、実行ファイルの表記によらず、同じ理由コードで止める（`phase_forms.human_path_form`）。
 

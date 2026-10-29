@@ -16,7 +16,7 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 
 #### 表が正本
 
-何がユーザ専用かは `src/ccnavi/tickets/user_only.py` の表だけが持つ。ほかの場所に手書きの一覧や正規表現を持たない。
+何がユーザ専用かは `src/ccnavi/tickets/model/user_only.py` の表だけが持つ。ほかの場所に手書きの一覧や正規表現を持たない。
 
 | 表 | 持つもの |
 |---|---|

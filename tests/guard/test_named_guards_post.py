@@ -413,7 +413,7 @@ class SessionRejectsTest(Fixture):
     """ticket の範囲の退けは、組み込みの保護（ルールファイルに無い）も数える。"""
 
     def denied(self, rel):
-        from ccnavi.tickets import session_rejects
+        from ccnavi.tickets.notice import session_rejects
 
         conf, _ = settings.load(self.root)
         target = session_rejects.tree.Tree("w", self.trees["worktree"], "", "worktree")

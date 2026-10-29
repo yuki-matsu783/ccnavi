@@ -1,7 +1,8 @@
 """親の提案の計画を書き換える補助のフラグ `ccnavi --plan-order <親> ...` の入口。
 
-形は 2 つ。ここは引数を受けて答えを出すだけで、振り直しと書き戻しは `tickets/plan_order.py`、
-定義のコピーは `tickets/plan_phases.py` が持つ。
+形は 2 つ。ここは引数を受けて答えを出すだけで、
+振り直しと書き戻しは `tickets/proposal/plan_order.py`、
+定義のコピーは `tickets/proposal/plan_phases.py` が持つ。
 
 - `--json [--order <JSON>]` と `--order <JSON> --expect <ハッシュ> --write`: 計画の番号を振り直して
   答え、保存では提案の `plan:` / `feedback:` の値を書き換える。VS Code の計画編集タブが
@@ -24,7 +25,9 @@ from typing import TextIO
 
 from ..infra import settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
-from ..tickets import approval, plan_order, plan_phases, ticket_model
+from ..tickets.approval import store as approval
+from ..tickets.model import ticket_model
+from ..tickets.proposal import plan_order, plan_phases
 
 
 def _not_found(stderr: TextIO, conf: settings.Settings, name: str) -> int:

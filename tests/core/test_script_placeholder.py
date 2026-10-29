@@ -17,7 +17,7 @@ import yaml
 from ccnavi.hook import ccnavimd
 from ccnavi.infra import settings
 from ccnavi.policy import rule_lint, rules
-from ccnavi.tickets import ticket_ids
+from ccnavi.tickets.model import ticket_ids
 from tests import ROOT
 from tests.draft import final
 from tests.inproc import run_ccnavi
@@ -201,7 +201,7 @@ class FinalFilesTest(unittest.TestCase):
 
 class NoRawGitInNudgeTest(unittest.TestCase):
     def test_the_nudge_has_no_git_outside_the_wrapper(self):
-        from ccnavi.tickets import ops_stop_integrate as osi
+        from ccnavi.tickets.lifecycle import stop_integrate as osi
 
         with tempfile.TemporaryDirectory() as tmp:
             root = os.path.realpath(tmp)

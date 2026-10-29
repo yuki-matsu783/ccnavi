@@ -44,7 +44,7 @@ export interface MirrorList {
   /** 偽なら `error` に理由（共通レイヤーが読めないなど）。そのとき `projects` は空 */
   readonly ok: boolean;
   readonly error: string;
-  /** 共通レイヤーにコピーするものが無い。同期しても何も起きない（ミラーは消さない） */
+  /** 共通レイヤーにも工程スキルにもコピーするものが無い。同期しても何も起きない（ミラーは消さない） */
   readonly commonEmpty: boolean;
   readonly projects: readonly MirrorProject[];
   /** 差分のある全プロジェクトをまとめて同期するときに渡す `--expect` の値。差分が無ければ空 */
@@ -235,7 +235,7 @@ function commonBlock(status: MirrorStatus, busy: boolean): string {
       if (!status.list.ok) {
         return "ミラーを調べられませんでした。「更新」で調べ直してください";
       }
-      return status.list.commonEmpty ? "共通レイヤーにコピーするものがありません" : "";
+      return status.list.commonEmpty ? "共通レイヤーにも工程スキルにもコピーするものがありません" : "";
   }
 }
 

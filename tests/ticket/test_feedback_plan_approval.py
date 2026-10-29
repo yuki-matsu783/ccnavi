@@ -16,7 +16,7 @@ import json
 import os
 import shutil
 
-from ccnavi.tickets import approval_marks
+from ccnavi.tickets.approval import marks as approval_marks
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text, parent_text

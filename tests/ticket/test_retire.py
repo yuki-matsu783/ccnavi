@@ -1,4 +1,4 @@
-"""親を閉じたときのワークツリーとブランチの片付け（`retire.py`）。
+"""親を閉じたときのワークツリーとブランチの片付け（`tickets/lifecycle/retire.py`）。
 
 見るのは 3 つ。
 
@@ -16,7 +16,7 @@ import json
 import os
 
 from ccnavi.infra import settings
-from ccnavi.tickets import retire
+from ccnavi.tickets.lifecycle import retire
 from tests.ticket.test_archive import ReadyHarness
 from tests.ticket.test_ticket import git, write
 

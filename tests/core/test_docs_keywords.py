@@ -12,7 +12,7 @@ import re
 import unicodedata
 import unittest
 
-from ccnavi.hook import docsearch_index
+from ccnavi.catalog import docsearch_index
 from tests import ROOT
 
 DOCS = os.path.join(ROOT, ".ccnavi", "docs")

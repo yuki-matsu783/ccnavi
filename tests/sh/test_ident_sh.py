@@ -14,7 +14,7 @@ import subprocess
 import unicodedata
 import unittest
 
-from ccnavi.tickets import ticket_ids
+from ccnavi.tickets.model import ticket_ids
 from tests import ROOT
 
 COMMON = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-common.sh")

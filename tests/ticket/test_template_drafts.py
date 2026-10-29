@@ -21,7 +21,7 @@ import unittest
 
 from ccnavi.infra import settings
 from ccnavi.policy.rules import SEVERITY_ERROR, SEVERITY_WARN
-from ccnavi.tickets import plan_templates
+from ccnavi.tickets.proposal import plan_templates
 from tests import ROOT, common_path, requires_symlink
 from tests.inproc import run_ccnavi
 from tests.ticket.test_phases import PhaseHarness

@@ -20,7 +20,8 @@ from typing import TextIO
 
 from ..infra import pathcase, settings, tree
 from ..records import stopeval, stopreview
-from ..tickets import approval, approval_checks
+from ..tickets.approval import checks as approval_checks
+from ..tickets.approval import store as approval
 
 EXIT_OK = 0
 # 計画が届くのを待つ時間と間隔（秒）。値は成立性の検証の後に決める（暫定）。

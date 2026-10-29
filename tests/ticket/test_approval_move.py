@@ -19,7 +19,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi.tickets import approval_ops
+from ccnavi.tickets.approval import ops as approval_ops
 
 TEXT = "---\nticket: i0001\n---\nbody\n"
 

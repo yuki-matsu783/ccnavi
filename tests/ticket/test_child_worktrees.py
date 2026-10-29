@@ -10,7 +10,8 @@ import os
 import tempfile
 import unittest
 
-from ccnavi.tickets import ticket_model, worktrees
+from ccnavi.tickets.lifecycle import worktrees
+from ccnavi.tickets.model import ticket_model
 
 
 def child(name: str, parent: str, project: str = "") -> ticket_model.Ticket:

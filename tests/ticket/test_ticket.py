@@ -33,8 +33,11 @@ from unittest import mock
 from ccnavi.entry import cli
 from ccnavi.hook.subagent import CANDIDATE_NOTE
 from ccnavi.infra import settings, shellread
-from ccnavi.tickets import approval, phase_forms, phase_scope, review, ticket_fields
-from ccnavi.tickets import ticket as ticket_mod
+from ccnavi.tickets.approval import store as approval
+from ccnavi.tickets.model import phase_forms, ticket_fields
+from ccnavi.tickets.model import ticket as ticket_mod
+from ccnavi.tickets.phase import scope as phase_scope
+from ccnavi.tickets.review import request as review
 from tests import ROOT, common_path, userform, write_and_push_flag
 from tests.inproc import run_ccnavi
 from tests.ticketsample import RULES, plain_parent, record_merge, write_plain_phases
@@ -2573,7 +2576,7 @@ class TicketTest(unittest.TestCase):
             f"sh {review} decide 1",
             f"sh {review} decide 1 --preview --json",
             f'sh {review} request 1 --eli5 "$F"',
-            "grep -n -- '--abandon' src/ccnavi/tickets/retire.py",
+            "grep -n -- '--abandon' src/ccnavi/tickets/lifecycle/retire.py",
             "echo ccnavi worktree $V --abandon",
             "ccnavi worktree drop P1",
             "ccnavi worktree tidy P1 --phase 2",

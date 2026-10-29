@@ -292,7 +292,7 @@ class PhaseTest(PhaseHarness):
     # ---- 1. フェーズ定義
 
     def test_phase_types_must_be_unique_and_well_formed(self):
-        from ccnavi.tickets import phasetypes
+        from ccnavi.tickets.config import phasetypes
 
         _, problems = phasetypes.parse(
             "version: 1\nphases:\n  a: {title: 同じ, kind: work}\n  b: {title: 同じ, kind: work}\n"

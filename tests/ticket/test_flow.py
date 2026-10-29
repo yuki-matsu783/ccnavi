@@ -30,7 +30,11 @@ from unittest import mock
 import yaml
 
 from ccnavi.infra import pathcase, settings, yamlread
-from ccnavi.tickets import flow, flow_render, flow_shape, flow_text, ticket, ticket_model
+from ccnavi.tickets.flow import graph as flow
+from ccnavi.tickets.flow import render as flow_render
+from ccnavi.tickets.flow import shape as flow_shape
+from ccnavi.tickets.flow import text as flow_text
+from ccnavi.tickets.model import ticket, ticket_model
 from tests import requires_symlink
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
@@ -957,7 +961,7 @@ class FlowLockTest(FlowHarness):
     def test_a_crash_in_the_briefing_is_one_line(self):
         """フローの案内が万一例外を出しても、1 行の知らせにして残りを渡す（H3）。"""
         child_tree = self.run_child(CHILD)
-        with mock.patch("ccnavi.tickets.flow.briefing", side_effect=RecursionError("deep")):
+        with mock.patch("ccnavi.tickets.flow.graph.briefing", side_effect=RecursionError("deep")):
             result = self.hook("SubagentStart", "", child_tree, agent_id="sub-1")
         self.assertEqual(result.returncode, 0, result.stderr)
         text = self.reason(result)

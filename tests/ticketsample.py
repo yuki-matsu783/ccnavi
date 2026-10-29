@@ -238,7 +238,7 @@ def record_merge(parent_tree: str, child: str) -> None:
     """
     import subprocess
 
-    from ccnavi.tickets import ticket_fields
+    from ccnavi.tickets.model import ticket_fields
 
     def git(*args: str) -> str:
         done = subprocess.run(

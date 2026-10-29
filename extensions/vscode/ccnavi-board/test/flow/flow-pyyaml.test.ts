@@ -1,5 +1,5 @@
 /**
- * 画面が書き出す本文（`serializeFlow`）を、実行ファイルの読み手（PyYAML。`src/ccnavi/tickets/flow.py` の `parse`）で実際に読み戻す。
+ * 画面が書き出す本文（`serializeFlow`）を、実行ファイルの読み手（PyYAML。`src/ccnavi/tickets/flow/graph.py` の `parse`）で実際に読み戻す。
  * 読み戻した中身（`flow.as_json`。`--lint --json --flow` の `flow.data` と同じ形）が画面の中身と同じかを
  * `flow-match.ts` の見比べで確かめる。乱数の入力（固定の種）でも確かめる。
  *
@@ -21,7 +21,7 @@ const PACKAGE_ROOT = path.join(REPO_ROOT, "src");
 
 const SCRIPT = `
 import base64, json, sys
-from ccnavi.tickets import flow
+from ccnavi.tickets.flow import graph as flow
 out = []
 for item in json.load(sys.stdin):
     data, why = flow.parse(base64.b64decode(item))

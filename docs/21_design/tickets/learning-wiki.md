@@ -114,7 +114,7 @@ learnings: 2
 - 要約は機械が書き機械が読む。ユーザとエージェントは直さない（直せば次の `learn` で書き直される）
 
 子の `ticket finish` は、学びの蓄積が有効な親の子について、`wip/handoff/learnings/<子>.md` が子のブランチの HEAD にコミットされた通常のファイル（モードが `100644` か `100755` の blob。ディレクトリとシンボリックリンクは不可）で、空でないことを確かめる
-（子の閉じる操作の検査のうち、成果物を見る `ops_close.deliverables_missing` の隣に置く。フェーズ定義の `deliverables` とは別に持つ）。満たさなければ閉じるのを拒み、置き場と `ticket learn` を示す。
+（子の閉じる操作の検査のうち、成果物を見る `lifecycle.close.deliverables_missing` の隣に置く。フェーズ定義の `deliverables` とは別に持つ）。満たさなければ閉じるのを拒み、置き場と `ticket learn` を示す。
 `deliverables` に載せない理由は、置き場が固定で定義ごとに変える意味が無いことと、全定義に書き足すと書き漏れた定義の子だけ検査から抜けること。
 `deliverables` と同じく、見るのは「在って追跡されている」ことと、空でないこと。
 
@@ -135,7 +135,7 @@ learnings: 2
 
 統合の子だけに適用する例外は、すべて `Ticket.is_consolidate` の 1 か所で決める（子・`phase: 0`・印の 3 つがそろうとき）。識別子の形や名前から推定しない。
 
-- 構造エラー（例外を適用せず、子を止める）: 親に印がある、印があるのに `phase` が 0 でない、`maintenance` の値が `learning-consolidate` 以外。承認の側（`agree_candidates.validate`）でも判定の側（`approval_checks.blocking_problems`）でも適用する。印の無い `phase: 0` の子は、今までどおり計画に無い番号として止まる
+- 構造エラー（例外を適用せず、子を止める）: 親に印がある、印があるのに `phase` が 0 でない、`maintenance` の値が `learning-consolidate` 以外。承認の側（`agree_candidates.validate`）でも判定の側（`approval.checks.blocking_problems`）でも適用する。印の無い `phase: 0` の子は、今までどおり計画に無い番号として止まる
 - 計画への所属: `phase: 0` を計画のステップと照合しない。フェーズの進行・レビュー待ちの集計・レビュー依頼の対象に含めない（`phase.phases_of` が除く）。開いている子の検査・親への合流・連番の管理は通常の子と同じ
 - 範囲: ccnavi の中に固定した定義（`phasetypes.consolidate_type`）を上限に使い、`scope_verdict` で親の範囲の上限だけを適用しない。子の `allow` も適用する。実行前・実行後・サブエージェント終了時・合流前の 4 か所は `scope_verdict` を共有するので、判定が揃う
 - 学び・リスク・レビュー: 気づきの記録を求めず、実績リスクを測らず、必ずレビュー不要で `finish` が `done/` へ移す
@@ -149,7 +149,7 @@ learnings: 2
 
 #### 気づきの記録の読み取りと処理すべきものの判定
 
-収集・親の検査・`consolidate`・`--learnings` が同じ読み方を使う（`learning_records`）。書式は、frontmatter の後の `## ` で始まる行を 1 件の気づきの見出しとし、処理の行はその節の中の `- 処理: ...` の 1 行（字下げした継続行は処理の行ではない）。
+収集・親の検査・`consolidate`・`--learnings` が同じ読み方を使う（`learning.records`）。書式は、frontmatter の後の `## ` で始まる行を 1 件の気づきの見出しとし、処理の行はその節の中の `- 処理: ...` の 1 行（字下げした継続行は処理の行ではない）。
 
 | 検査 | ヒットする条件 | 扱い |
 |---|---|---|
@@ -158,7 +158,7 @@ learnings: 2
 
 どちらも統合では直せないので、親の `finish` も `consolidate` も止め、ファイルとヒットした条件を名指しして記録を直すよう案内する。訂正や追加は新しい節を足す形に限り、処理済みの節の本文は書き換えない。
 
-処理すべきものは、親の HEAD で次を列挙する（`learning_records.pending`）。親の `finish` と `consolidate` が同じ結果を使う。
+処理すべきものは、親の HEAD で次を列挙する（`learning.records.pending`）。親の `finish` と `consolidate` が同じ結果を使う。
 
 - 処理の行が無い節（`learnings: none` でない記録）
 - `処理: 反映` の指すパターンが無い節、または、そのパターンの `sources` に記録の観測元の ID が無い節
