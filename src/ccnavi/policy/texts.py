@@ -447,9 +447,9 @@ def _read_dir(directory: str) -> tuple[dict[str, Entry], list[Problem]]:
     return entries, problems
 
 
-# 置き場ごとの読み込み結果。1 回の判定で `say` を何度も呼ぶので、読み直しを避ける
-# （hook の期限があり、文面ファイルは十数本ある）。ファイルの名前・更新時刻・大きさが
-# 変わったら読み直す。変わらなければ同じ結果を返す（呼ぶ側は書き換えない）。
+# 置き場ごとの全件の読み込み結果（`--lint` と点検が使う。1 件を引く `say` は `find` を使う）。
+# ファイルの名前・更新時刻・大きさが変わったら読み直す。変わらなければ同じ結果を返す
+# （呼ぶ側は書き換えない）。
 _CACHE: dict[str, tuple[tuple, Catalog]] = {}
 
 
@@ -470,7 +470,7 @@ def _signature(directory: str) -> tuple:
 
 
 def load(root: str) -> Catalog:
-    """置き場の文面を読む。例外を投げない（問題は `problems`）。"""
+    """置き場の文面を全件読む。例外を投げない（問題は `problems`）。"""
     directory = dirs(root)
     signature = _signature(directory)
     hit = _CACHE.get(directory)
@@ -480,6 +480,51 @@ def load(root: str) -> Catalog:
     catalog = Catalog(entries, problems)
     _CACHE[directory] = (signature, catalog)
     return catalog
+
+
+# 1 件を引くときは、識別子の字を含むファイルだけを YAML として読む（hook は 1 回ごとに別の
+# プロセスで、全件を読むと文 1 件のために十数本を毎回読むため）。名前順に見て、その識別子を
+# 検査を通る形で持つ最初のファイルの 1 件を採る。全件を読む `load` と同じ結果になる
+# （別のファイルの重複は後ろを捨てる）。ファイルごとの結果は、更新時刻と大きさが変わるまで使い回す。
+_FILES: dict[str, tuple[tuple, str, dict[str, Entry] | None]] = {}
+
+
+def _file(path: str) -> tuple[str, dict[str, Entry] | None] | None:
+    """ファイル 1 本の（中身, 検査済みの件 または未読の None）。読めなければ None。"""
+    try:
+        stat = os.stat(path)
+    except OSError:
+        return None
+    signature = (stat.st_mtime_ns, stat.st_size)
+    hit = _FILES.get(path)
+    if hit is not None and hit[0] == signature:
+        return hit[1], hit[2]
+    text = fsio.read_text(path)
+    if text is None:
+        return None
+    _FILES[path] = (signature, text, None)
+    return text, None
+
+
+def find(root: str, text_id: str) -> Entry | None:
+    """識別子の 1 件。無い・検査を通らないなら None。例外を投げない。"""
+    directory = dirs(root)
+    try:
+        names = sorted(n for n in os.listdir(directory) if n.endswith(SUFFIX))
+    except OSError:
+        return None
+    for name in names:
+        path = os.path.join(directory, name)
+        got = _file(path)
+        if got is None or text_id not in got[0]:
+            continue
+        text, entries = got
+        if entries is None:
+            entries = check_text(text, path)[0]
+            _FILES[path] = (_FILES[path][0], text, entries)
+        if text_id in entries:
+            return entries[text_id]
+    return None
 
 
 # ---- 組み立て
@@ -561,7 +606,7 @@ def say(
 ) -> str:
     """識別子の文を組み立てて返す。引けなければ既定の文（`fallback`）。例外を投げない。"""
     try:
-        entry = load(root).entries.get(text_id)
+        entry = find(root, text_id)
         if entry is None:
             raise TextError(f"{text_id}: 文面が無い")
         return render(entry, values or {}, variants or {}, root)
