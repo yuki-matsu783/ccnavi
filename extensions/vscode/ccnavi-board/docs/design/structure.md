@@ -11,7 +11,8 @@ keywords: [設計, 構成, ファイル, src, core, webview, test, fixtures, テ
 ```
 src/
   extension.ts        画面の入口の登録（core/screens.ts の帳面）、コマンド登録とサイドパネルの登録（vscode に依存する）
-  sidebar.ts          左端のアイコンから開くサイドパネルの 6 つの入口（取り込み待ちは並べない）。チケット制御が disable なら 2 つ（プロジェクト管理・ルール管理）。タイトルバーの「?」で左パネルの案内を開く。見た目は配色のアイコンで切り替え、今の値を見出しの横に出す（vscode に依存する）
+  sidebar.ts          左端のアイコンから開くサイドパネルの 6 つの画面の入口（取り込み待ちは並べない）と「バグ報告」。チケット制御が disable なら画面の入口は 2 つ（プロジェクト管理・ルール管理）。タイトルバーの「?」で左パネルの案内を開く。見た目は配色のアイコンで切り替え、今の値を見出しの横に出す（vscode に依存する）
+  bug-report.ts       バグ報告。ステータスバーの撮る・終えるのボタン、ffmpeg の録画の起動と停止（標準入力に q）、スクリーンショットのコマンドの起動、終えたときの gif への変換と zip の書き出し（vscode に依存する。組むものは core/bug-report.ts）
   ticket-control.ts   CCNAVI_TICKET_CONTROL を設定ファイルから読み、context key に反映する。変化を監視する（vscode に依存する）
   board-panel.ts      ボードの Webview パネルの生成・更新・破棄、監視、操作の受け付け。承認のオーバーレイと動いた表示もここが持つ（画面は作り直されるので持たせない）。計画編集タブの帳面（core/workflow-tabs.ts）を見て、未保存の親を画面に渡し、承認を打つ直前にも確かめる。オーバーレイの「計画を編集」でタブを開く（画面の帳面 screens().workflow を通す）。1 枚目は HTML ごと、以後は postMessage で中身だけ渡す（vscode に依存する）。マージ状況の確認の結果（core/merge.ts）もここが持つ（ボードが開いている間だけ）。実行ファイルと sh を子プロセスで呼ぶ読み取りと、片付けの送信（ダイアログのあとだけ）を分けて行う
   rules-panel.ts      ルール管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。判定・検証・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
@@ -78,6 +79,7 @@ src/
     flow-match.ts     画面の中身と実行ファイルが読んだ中身（flow.data）の見比べ（整数と浮動小数の揃え方、食い違った場所と両者の値の言い方）
     flow-history.ts   フロー編集（とテンプレートの編集）の元に戻す・やり直すの履歴（直す前の中身の複製を積む。同じ欄への打ち込みをまとめる。上限 100）
     flow-diff.ts      読み込んだフローと編集中のフローの見比べ（未保存の判定と、保存前に見せる足した・消した・変えたノードと線）。下書きの取り込みの前に見せる、値の前後まで並べた差分（textDiff）
+    bug-report.ts     バグ報告の組み立て。OS ごとの画面の取り方、ffmpeg の録画と gif の引数、スクリーンショットのコマンド、診断ログの始めてから足されたぶんの切り出し、zip（依存を足さずに書く）、report.txt。vscode に触れないので単体で試せる
     tour-sidebar.ts   左パネルの案内（ウォークスルー）の ID と、続けて動かす基本の案内の画面。DOM にも vscode にも触れないので、単体で試せる
     tour-place.ts     吹き出しの案内の置き場所（画面の外に出さない）。DOM に触れないので単体で試せる
     tour-def.ts       案内の定義（YAML）の形 TourDef と検査 parseTour（画面ごとの screen / sample / courses。手順は target・タイトル・本文・scene・image と alt）。見本の目印の文 SAMPLE_NOTE もここ。DOM に触れないので単体で試せる
@@ -269,6 +271,7 @@ test/
   flow/               フロー編集（flow-doc, flow-view, flow-lint, flow-match, flow-write と、書き出しを PyYAML で読み戻す flow-pyyaml（リポジトリのルートで uv run python か python3 を起動する。起動できなければ飛ばす）、画面を動かす flow.dom、線を引ける先・コピー・貼り付け・履歴・差分の flow-edit-ops、元に戻す・コピー・ミニマップ・保存前の確かめを画面で動かす flow-edit.dom、ボードのカードのボタンを動かす flow-card.dom、エージェントの下書きの取り込みと依頼のボタンを動かす flow-proposal.dom）
   workflow/           計画編集（planordermodel, workflow-view, ボードと結ぶ帳面の workflow-tabs と、画面を動かす workflow.dom）
   devtools/           開発用の画面確認ツール（scripts/render-board.js）。引数・--out の拒否・失敗の条件・スタブの単体テストと、Chromium で PNG が出ることを確かめる render-board.e2e.ts（node --test には渡さず test-groups.js が別に起こす）
+  bugreport/          バグ報告（bug-report。ffmpeg と OS の道具は起動せず、組んだ引数・ログの切り出し・zip の読み戻しを見る）
   shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens, style, appearance, screen-host, approval-machine, plan-graph, decidemodel, mrstate, merge, read-only（読み取りから書き込みを呼ばない）)
   */*.test.ts         組み立てと HTML の文字列を見る単体テスト CB-T01〜
   */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。画面はどれも React なので、描くものも動かして見る（render.dom, projects.dom, risk.dom, phases.dom, rules.dom, flow.dom, templates.dom, templates-edit.dom, handoff.dom）

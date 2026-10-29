@@ -92,6 +92,18 @@
       {
         "command": "ccnaviBoard.tourBoard",
         "title": "ccnavi ボード: チケット管理の基本の案内を見る"
+      },
+      {
+        "command": "ccnaviBoard.bugReport",
+        "title": "ccnavi ボード: バグ報告を始める"
+      },
+      {
+        "command": "ccnaviBoard.bugReportScreenshot",
+        "title": "ccnavi ボード: バグ報告のスクリーンショットを撮る"
+      },
+      {
+        "command": "ccnaviBoard.bugReportFinish",
+        "title": "ccnavi ボード: バグ報告を終えて zip にまとめる"
       }
     ],
     "menus": {
@@ -135,6 +147,14 @@
         {
           "command": "ccnaviBoard.tourBoard",
           "when": "ccnaviBoard.ticketControl == 'enable'"
+        },
+        {
+          "command": "ccnaviBoard.bugReportScreenshot",
+          "when": "ccnaviBoard.bugReporting"
+        },
+        {
+          "command": "ccnaviBoard.bugReportFinish",
+          "when": "ccnaviBoard.bugReporting"
         }
       ]
     },
@@ -160,6 +180,11 @@
           "type": "boolean",
           "default": true,
           "description": "フロー編集画面で「保存」を押したとき、読み込んだ時点からの変更（追加した・削除した・変更したノードと線）を一覧で表示し、確認してから保存します。チェックを外すと、確認を省略して保存します。一覧の「次回から保存前の確認を省略」にチェックを付けて保存すると、この設定のチェックが外れます。"
+        },
+        "ccnaviBoard.ffmpegPath": {
+          "type": "string",
+          "default": "",
+          "description": "バグ報告の録画に使う ffmpeg の場所です。空なら、Windows は PATH の ffmpeg、WSL は Windows 側の ffmpeg.exe、macOS は PATH の ffmpeg と /opt/homebrew/bin・/usr/local/bin を探します。見つからなければ録画せず、スクリーンショットとログだけを zip にまとめます。"
         },
         "ccnaviBoard.appearance": {
           "type": "string",
@@ -243,6 +268,7 @@
     "test:workflow": "node scripts/test-groups.js workflow",
     "test:shared": "node scripts/test-groups.js shared",
     "test:devtools": "node scripts/test-groups.js devtools",
+    "test:bugreport": "node scripts/test-groups.js bugreport",
     "test:dom": "node scripts/test-groups.js --dom --all",
     "test:for": "node scripts/test-groups.js --for",
     "test:plan": "node scripts/test-groups.js --plan --for",

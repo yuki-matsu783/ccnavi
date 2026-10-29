@@ -1,5 +1,6 @@
 /**
  * アクティビティバーの ccnavi から開くサイドパネル。並ぶのは画面の入口 6 つで（取り込み待ちは並べない。ルール管理・リスク管理・フェーズ管理・テンプレート管理の各画面から開く）、どれも Webview パネルを開く。
+ * 最後の「バグ報告」だけは画面を開かず、再現の録画・スクリーンショット・ログを zip にまとめる報告を始める（bug-report.ts）。
  * 「チケット管理」「リスク管理」「フェーズ管理」「テンプレート管理」は、チケット制御（CCNAVI_TICKET_CONTROL）が
  * disable のワークスペースでは出さない。配点は子チケットを閉じるときに、フェーズ定義は親の
  * 計画と子の範囲にしか読まれないので、disable の間はどちらも何も動かさない。使われない設定の
@@ -67,6 +68,13 @@ const ENTRIES: readonly Entry[] = [
     command: "ccnaviBoard.open",
     icon: "checklist",
     needsTickets: true,
+  },
+  {
+    label: "バグ報告",
+    description: "不具合を再現する間の画面の録画（ffmpeg があるとき）・スクリーンショット・ログを zip にまとめる",
+    command: "ccnaviBoard.bugReport",
+    icon: "bug",
+    needsTickets: false,
   },
 ];
 
