@@ -466,7 +466,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 
 「A を打ったら、ユーザの発言が 1 回はさまるまで B を打てない」を止める。汎用の部品（`hook/turngate.py`）で、宣言（`Gate`）の表を渡して判定する。組み込みの表は 1 件で、A が `ccnavi-git.sh integrate <名前>`（`--abort` は除く）、B が `ccnavi-git.sh integrate-done <名前> …`、キーが `<名前>`。`PreToolUse` の組み込みの止めの 1 つで、子の push の止めのあと、サブエージェントの禁止の前にある。ルールが `allow` と書いていても外れない。
 
-付き添いのあるセッション（`ccnavimd.unattended` が偽）では、宣言の `ask_if_attended` が立っている組は、発言を待つ関門を働かせず、B を確認（ask）に返す（`turngate.split_by_attendance`・`turngate.asks`）。組み込みの 1 件は立っている。同じコマンドに A と B が並ぶ形だけは、どちらのセッションでも止める（`turngate.check` の `same_command_only`）。確認を返すときは、A の記録を残さず、B の側で記録を読まない。確認の判定はルールより先で、`dry-run` でも出す（関門の分類）。付き添いのないセッションは、確認に答える人が居ないので、以降に書く発言を待つ関門が働く。
+付き添いのあるセッション（`ccnavimd.unattended` が偽）では、宣言の `ask_if_attended` が立っている組は、発言を待つ関門を働かせず、B を確認（ask）に返す（`turngate.split_by_attendance`・`turngate.asks`）。組み込みの 1 件は立っている。同じコマンドに A と B が並ぶ形だけは、どちらのセッションでも止める（`turngate.check` の `same_command_only`）。確認を返すときは、A の記録を残さず、B の側で記録を読まない。確認の判定はルールより先で、`dry-run` でも出す（関門の分類）。付き添いのないセッションは、確認に答える人が居ないので、以下で述べる発言を待つ関門が働く。
 
 宣言は組み込みの表（`BUILTIN`）だけにある。ユーザの了承の関門を、配布先のルールファイルで外させないため。止めるのは B の側だけで、A と B が同じターンに起きたことを、あとから点検する処理は無い。
 
