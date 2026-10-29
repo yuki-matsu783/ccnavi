@@ -145,7 +145,7 @@ class WriteAndPushMergeTest(WriteAndPushMergeHarness):
         # 取り込みは済んでいるが、合流は何も残していない
         self.assert_untouched(remote)
 
-    def test_a_conflict_names_the_child_that_merged_first(self):
+    def test_a_conflict_with_a_child_that_merged_first_is_solved_in_the_later_child(self):
         self.start_parent()
         self.approve_second_child()
         first = self.start_child()
@@ -156,11 +156,11 @@ class WriteAndPushMergeTest(WriteAndPushMergeHarness):
         before = self.sha(self.tree, "HEAD")
         result = self.ticket("finish", CHILD_B)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn(f"先に合流した子 {CHILD}", result.stderr)
-        self.assertIn(f"後から finish した {CHILD_B}", result.stderr)
+        self.assertIn("解くのは後から finish した側（この子）", result.stderr)
+        self.assertIn(f"子のワークツリー（.claude/worktrees/{CHILD_B}）", result.stderr)
         self.assert_untouched(before, CHILD_B)
 
-    def test_a_conflict_on_paths_with_spaces_and_japanese_names_the_child_that_merged_first(self):
+    def test_a_conflict_on_paths_with_spaces_and_japanese_names_the_paths(self):
         self.start_parent()
         self.approve_second_child()
         first = self.start_child()
@@ -176,8 +176,6 @@ class WriteAndPushMergeTest(WriteAndPushMergeHarness):
         result = self.ticket("finish", CHILD_B)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("wip/design/a b.md, wip/design/日本.md", result.stderr)
-        for rel in rels:
-            self.assertIn(f"先に合流した子 {CHILD} の変更と重なる（{rel}）", result.stderr)
         self.assert_untouched(before, CHILD_B)
 
     def test_a_path_ignored_in_the_parent_stops_without_overwriting_it(self):

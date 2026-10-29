@@ -81,6 +81,7 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
 - `setup` の `host` は評価の相手を選ぶ（`bare` / `fake-gitlab` / `docker-gitlab` / `real`。既定は `real`）。`bare` は origin への通信をローカルの bare に向け、ホストの API は失敗させる（origin の URL は git の代役がホストの形で答える）。`fake-gitlab` は bare に加えて `fake_gitlab.py` を使い、`docker-gitlab` は Docker の本物の GitLab CE（[立て方](../../.agents/docs/gitlab-manual.md)）に使い捨てのプロジェクトを作って回し、回したあとに消す。`real` は本物を相手にする。
   `bare` / `fake-gitlab` / `docker-gitlab` は対象の判定を通ったときだけ動き、`setup.issue` とは併用できない。`fake-gitlab` の模擬の初期状態は、`setup` の `host_state`（`project: <namespace>/<project>` を含む dict）に書く。使い分けと `bare` で許す依頼は、.agents/docs/acceptance-scenarios.md を見る。
 - `human: true` の step に `human_api`（`op: thread` / `resolve` / `approve` の list）を書くと、`setup.host: docker-gitlab` のとき人間役の API 操作を runner が実行し、止まらずに次の step へ進む（書き方と限界は同じ文書の「人間役の API 操作」）。
+- `test_repo: true` のシナリオで `human: true` の step に `human_run`（`script: agree` と、端末へ送る `answers`）を書くと、その回で増えた test-repo の提案を runner が人間役として端末で承認し、止まらずに次の step へ進む。`check` は needs-review の行になる（書き方と受け入れた穴は同じ文書の「人間役が端末で打つ sh（`human_run`）」）。
 - `setup.host` が `fake-gitlab` / `docker-gitlab` のとき、runner は step の終わりごとに相手側の状態（MR・スレッド・issue）を読んで `host-N.json` に残す（読むだけ。承認は取らない）。
 - `state` は、全 step が終わったあとに打つコマンドと、出力に含まれるべき文字列
 - step の欄 `expect_after`（`decisions`・`state` を `expect` と同じ書き方で書く。満たさなければ後続の step に進まず止める）

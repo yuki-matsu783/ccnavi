@@ -3,7 +3,7 @@
 子の `finish` は、取り込み済みの親では、親のワークツリーで子のブランチを合流し（`merge --no-ff
 --no-commit`）、完了の記録と一緒に 1 つのマージコミットにして push する。git を動かすのは sh
 （`ccnavi-common-write-and-push.sh`）で、実行ファイルはネットワークに出ず、コミットもしない。ここが答えるのは
-合流してよいかの判定と、衝突したときに誰のワークツリーで解くかの案内だけ。どちらも 1 行 1 項目
+合流してよいかの判定だけ。答えは 1 行 1 項目
 （`<キー> <値>`。sh は jq を使わない）。
 
 - `ccnavi write-and-push merge <子>`: 合流の前の検査
@@ -17,10 +17,6 @@
     ある、範囲（子・親・フェーズ定義）の外のパスがある、子が変えたパスが親のワークツリーに
     無視されたファイルとしてある（merge が黙って上書きし、戻すと消える）、合流を戻せない形の
     変更（改行を含むパス・大文字小文字だけが違うパス・submodule の追加と削除）がある、のどれか
-- `ccnavi write-and-push merge-blame <子> <パス>...`: 衝突したパスを、
-先に親へ合流した別の子の変更から探す。
-  `other <子> <パス>` を 1 パス 1 行で（パスの空白はそのまま、改行は `\\n`）。
-  見つからなければ何も出さない
 
 git は読み取りだけ。
 """
@@ -360,41 +356,3 @@ def _unrestorable(child_tree: str, base: str, head: str) -> tuple[list[str], str
 
 def _same(a: str, b: str) -> bool:
     return pathcase.fold(os.path.realpath(a)) == pathcase.fold(os.path.realpath(b))
-
-
-def blame(stdout: TextIO, conf: settings.Settings, root: str, ident: str, paths: list[str]) -> int:
-    """`ccnavi write-and-push merge-blame <子> <パス>...`。衝突したパスを持ち込んだ、
-    先に合流した別の子。"""
-    stdout.write(write_and_push.HEAD + "\n")
-    parent_id = write_and_push.family_of(ident)
-    parent_tree = tree.worktree_path(root, parent_id)
-    child_tree = tree.worktree_path(root, ident)
-    parent_head = gitstate.head(parent_tree)
-    child_head = gitstate.head(child_tree)
-    if not parent_head or not child_head or not paths:
-        return 0
-    copies, _ = approval.scan(conf, root)
-    closed, _ = approval.scan(conf, root, closed=True)
-    review, _ = approval.scan_review(conf, root)
-    wanted = set(paths)
-    ok, listing = _git(
-        parent_tree, ["rev-list", "--parents", "--merges", parent_head, f"^{child_head}"]
-    )
-    merges = [line.split() for line in listing.splitlines()] if ok else []
-    for other in copies + review + closed:
-        if other.parent != parent_id or other.ticket == ident or not other.merged_sha:
-            continue
-        # その子の finish が作ったマージコミット（2 つ目の親が合流した子の先頭）の変更。
-        for commit in merges:
-            if len(commit) != 3 or commit[2] != other.merged_sha:
-                continue
-            ok, out = _git(
-                parent_tree,
-                ["diff", "--name-only", "--no-renames", "-z", commit[1], commit[0]],
-            )
-            # 1 行に 1 パス。パスに空白があっても、sh は子の識別子（空白を含まない）の
-            # 後ろを丸ごと読む。
-            for rel in sorted(wanted & set(_names(out))) if ok else []:
-                stdout.write(f"other {other.ticket} {_one_line(rel)}\n")
-            break
-    return 0

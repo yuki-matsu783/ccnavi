@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
-import functools
 import io
 import os
 import sys
@@ -18,7 +17,7 @@ import time
 from typing import TextIO
 
 from ..catalog import docsearch, projskills
-from ..infra import directrec, fsio, hookio, modes, pathcase, settings, shellread, tree
+from ..infra import directrec, hookio, modes, pathcase, settings, shellread, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import (
     builtin,
@@ -303,6 +302,7 @@ def decide_at_prompt(
     # ユーザの発言と言い切れるものだけを、ターン分離の関門が読む記録に書く。ターンの印とは別。
     if hookio.is_user_prompt(payload):
         userprompt.note(conf.state, payload.session_id)
+        turngate.drop_broken(conf.state, payload.session_id)
     by_user = not payload.from_background_task() and not busy.is_busy(
         conf.state, payload.session_id
     )
@@ -1188,13 +1188,6 @@ def _prune_at_start(stderr: TextIO, conf: settings.Settings, root: str, session:
     return prune.summary(report)
 
 
-def _written(payload: hookio.Input, record: audit.Record) -> str:
-    """この呼び出しが名指しのツールで書いた先の、解決済みのパス。書かないツールなら空。"""
-    if payload.tool_name not in selfguard.REPAIR_TOOLS:
-        return ""
-    return fsio.full_path(record.subject, payload.cwd)
-
-
 def decide_after_failure(
     stdout: TextIO,
     stderr: TextIO,
@@ -1223,8 +1216,7 @@ def decide_after_failure(
         # ユーザの中断。Stop は来ないことがあるので、ここでターンの終わりにする。
         # 下の照合は中断までに書かれたぶんを戻すので、印を先に消してよい（消す前でも結果は同じ）。
         turn.end(conf.state, payload.session_id)
-    after = functools.partial(selfguard.after, written=_written(payload, record))
-    texts = [judge.guard_setting_files(mode, conf, root, payload, record, after)]
+    texts = [judge.guard_setting_files(mode, conf, root, payload, record, selfguard.after)]
     raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
     text, _ = post.check(
         stderr,
@@ -1314,10 +1306,7 @@ def _decide_after(
     # 戻すと、この呼び出しが書き換えたルールファイルをそのまま読んで保護領域を
     # 決めることになり、`deny` を空にされた版で「守るものは無い」と判断する。
     # 保護の根拠を、この呼び出しが触れる前の状態に返してから読む。
-    # 書いた先を渡すのは、組み込みの既定を使っている間の修復を戻さないため
-    # （selfguard._left_as_repair）。
-    restore = functools.partial(selfguard.after, written=_written(payload, record))
-    guard = judge.guard_setting_files(mode, conf, root, payload, record, restore)
+    guard = judge.guard_setting_files(mode, conf, root, payload, record, selfguard.after)
 
     watched = watched_for(stderr, conf, root, record, payload)
     if len(watched) > 1:

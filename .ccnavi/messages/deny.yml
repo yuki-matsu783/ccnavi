@@ -73,10 +73,15 @@ messages:
         {second_name} の前に、{first_name} を打ったかを調べる記録を読めません{where}。（{detail}）
       unwritable: |-
         {first_name} を打った記録を残せないので、通しません{where}。（{detail}）
+      broken: |-
+        {second_name} の前に、{first_name} を打ったかを調べる記録が壊れていて読めません{where}。（{detail}）
     why: |-
       関門の記録を読み書きできないと、ユーザの発言をはさんだかを確かめられないためです。
-    next: |-
-      ユーザに、ccnavi の state の置き場（logs/state）が読み書きできるかを確かめてもらい、返事を待つ
+    next:
+      place: |-
+        ユーザに、ccnavi の state の置き場（logs/state）が読み書きできるかを確かめてもらい、返事を待つ
+      broken: |-
+        ここでターンを終え、ユーザの返事を待つ。次のユーザの発言で壊れた記録は消えるので、そのあとで {second_name} を打ち直す
     no_bypass: |-
       コマンドを分けても、別のセッションやサブエージェントから打っても、同じ関門に当たります。ユーザの発言を待ちます。
 

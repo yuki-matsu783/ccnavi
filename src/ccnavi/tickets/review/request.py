@@ -1055,24 +1055,20 @@ def _moved_detail(
     push の判定も同じ基準で見る。置き場だけが手元に残っていても、リモートにあるものと
     ユーザが見るものは同じ。
 
-    判定（`text` が空かどうか）は理由の種類（`kind`）や一覧（`commits`）に左右されない。
-    それらは止めたあとに足す説明だけ。
+    判定（`text` が空かどうか）は理由の種類（`kind`）に左右されない。`kind` は止めたあとに足す
+    説明だけに使う。
     """
     rc, head = _git(tree_root, ["rev-parse", "HEAD"])
     head = head.strip()
     if rc != 0:
-        return Moved("親の HEAD を読めない", KIND_UNVERIFIED)
+        return Moved("親の HEAD を読めない")
     recorded = str(requested_mark.get("head") or "")
     paths: list[str] | None = None
-    ancestor = True
     if recorded and head != recorded and is_sha(recorded):
         found, failed = _diff_paths(tree_root, recorded)
         paths = None if failed else found
-        ancestor = _git(tree_root, ["merge-base", "--is-ancestor", recorded, head])[0] == 0
-    moved = moved_detail(conf, requested_mark, head, paths, ancestor, project)
+    moved = moved_detail(conf, requested_mark, head, paths, project)
     if moved.text:
-        if moved.kind == KIND_SEEN:
-            moved.commits = _unseen_commits(tree_root, conf, recorded)
         return moved
     branch = _branch(tree_root)
     if not branch or _unpushed(tree_root, conf, branch):
@@ -1081,28 +1077,21 @@ def _moved_detail(
 
 
 # 動いたと数えた理由の種類。説明（`moved_explanation`）の出し分けにだけ使い、判定には使わない。
-KIND_SEEN = "seen"  # 依頼時の HEAD からの差分を確かめられ、レビューの対象に入るパスが変わっている
-KIND_UNVERIFIED = "unverified"  # 差分を確かめられない（読めない・祖先でない・一覧が打ち切られた）
+KIND_MOVED = "moved"  # 依頼時の HEAD と今の HEAD が違う
+KIND_MIRROR = "mirror"  # プロジェクトの親で、レビューの対象を動かしたのがミラー側だけ
 
 
 @dataclass
 class Moved:
     """依頼の後に動いたかの答え。`text` が空なら動いていない（判定）。
 
-    `kind` は動いた理由の種類（`KIND_*`。止めたあとの説明の出し分けだけに使う）、`commits` は
-    手元の git で取れたときの、依頼時の HEAD から今の HEAD までのコミットの表示行
-    （置き場と `wip/eli5/` だけを変えたものとマージコミットは除く。新しい順で最大
-    `MAX_COMMITS` 件。取れなければ None）。
+    `kind` は動いた理由の種類（`KIND_*`。止めたあとの説明の出し分けだけに使う）。
+    空なら説明を足さない（依頼時の HEAD の記録が無い・HEAD を読めない・push されていないだけの
+    ときは、判定の文で足りる）。
     """
 
     text: str = ""
     kind: str = ""
-    commits: list[str] | None = None
-    # `KIND_SEEN` のとき、レビューの対象を動かしたパス（置き場などで絞ったあと）のうち、
-    # ミラー側（共通レイヤーのコピー・`skills/`）の数と全体の数。説明の出し分けだけに使う。
-    # 数えていなければ None。
-    mirrored: int | None = None
-    total: int | None = None
 
 
 def moved_since(
@@ -1110,7 +1099,6 @@ def moved_since(
     requested_mark: dict,
     head: str,
     changed: list[str] | None,
-    ancestor: bool = True,
 ) -> str:
     """依頼の後に、ユーザが見るものが動いたか（`_moved_since_request` の読みを除いた判定）。
 
@@ -1119,9 +1107,8 @@ def moved_since(
     変わったパスで、置き場で絞る前のもの。読めなかった（差分を取れない、ホストの一覧が
     打ち切られた、依頼時のコミットが祖先でない）なら None で、動いたと数える。
     手元は git の差分、Chrome は compare API の変更の一覧から作る。
-    `ancestor` は説明の出し分けだけに使う（判定は変えない）。
     """
-    return moved_detail(conf, requested_mark, head, changed, ancestor).text
+    return moved_detail(conf, requested_mark, head, changed).text
 
 
 def moved_detail(
@@ -1129,147 +1116,50 @@ def moved_detail(
     requested_mark: dict,
     head: str,
     changed: list[str] | None,
-    ancestor: bool = True,
     project: bool = False,
 ) -> Moved:
     """`moved_since` と同じ判定で、動いた理由の種類も返す。判定は `text` が空かどうか。
 
-    `project` はプロジェクトの親のとき。ミラー側の数（`Moved.mirrored`）はこのときだけ数える。
+    `project` はプロジェクトの親のとき。ミラー側だけが動いた（`KIND_MIRROR`）はこのときだけ見る。
     ワークスペース自身の親では `.ccnavi/config/common/` は共通レイヤー本体なので、ずれと説明しない。
     """
     recorded = str(requested_mark.get("head") or "")
     if not recorded:
         # 記録が無ければ照合できない。確かめずに通すと、依頼の後のコミットが全部
         # 「ユーザが見たもの」になる。出し直しで書き直させる。
-        return Moved("依頼時の親の HEAD が記録されていない", KIND_UNVERIFIED)
+        return Moved("依頼時の親の HEAD が記録されていない")
     if head == recorded:
         return Moved()
     moved = f"依頼の後に親の HEAD が動いている（依頼時 {recorded[:12]}、いま {head[:12]}）"
     # sha でない値は差分の相手にしない。読めない（依頼時のコミットが消えているなど）も同じ。
     if not is_sha(recorded) or changed is None:
-        return Moved(moved, KIND_UNVERIFIED)
+        return Moved(moved, KIND_MOVED)
     # ccnavi 自身の置き場と ELI5 の置き場だけの変更は、ユーザが見るものを動かさない。
     seen = [path for path in changed if not _unseen_by_review(conf, path)]
-    if seen:
-        if not ancestor:
-            return Moved(moved, KIND_UNVERIFIED)
-        if not project:
-            return Moved(moved, KIND_SEEN)
-        mirrored, _ = mirror_gap.split(conf, seen)
-        return Moved(moved, KIND_SEEN, mirrored=len(mirrored), total=len(seen))
-    return Moved()
-
-
-# 説明に並べるコミットの最大数。これを超えた分は「ほか N 件」。
-MAX_COMMITS = 5
-_SCAN_COMMITS = 100
-# 制御文字・行区切り・幅ゼロと向きを変える文字（U+200B〜200F、202A〜202E、2066〜2069、FEFF）
-_CONTROL = re.compile(
-    "[\x00-\x1f\x7f-\x9f\u2028\u2029\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]+"
-)
-
-
-def _quoted(text: str, limit: int) -> str:
-    """外から来た文字列（コミットの作者と件名）を表示する形にする。
-
-    制御文字と改行は空白に置き換え、長さを切り詰め、引用の形（「…」）で囲む。中の括弧は
-    別の括弧に置き換える。引用の中の文は指示ではなく、ただの文字列として読ませる。
-    """
-    flat = _CONTROL.sub(" ", text).strip()
-    flat = flat.replace("「", "『").replace("」", "』")
-    if len(flat) > limit:
-        flat = flat[: limit - 1] + "…"
-    return f"「{flat}」"
-
-
-def _unseen_commits(tree_root: str, conf: settings.Settings, recorded: str) -> list[str] | None:
-    """依頼時の HEAD から今の HEAD までのコミットのうち、レビューの対象を変えたものの表示行。
-
-    ccnavi 自身の置き場と `wip/eli5/` だけを変えたコミットとマージコミットは除く。新しい順で最大
-    `MAX_COMMITS` 件（短い sha・作者・件名）。超えた分は「ほか N 件」の 1 行。git で取れなければ
-    None（一覧を省く）。件名と作者は外から来た文字列なので `_quoted` で表示の形にする。
-    """
-    if not is_sha(recorded):
-        return None
-    rc, out = _git(
-        tree_root,
-        [
-            "log",
-            "--no-merges",
-            f"--max-count={_SCAN_COMMITS + 1}",
-            "--format=%H%x1f%h%x1f%an%x1f%s%x1e",
-            f"{recorded}..HEAD",
-        ],
-    )
-    if rc != 0:
-        return None
-    rows = [row.strip("\n") for row in out.split("\x1e") if row.strip()]
-    if len(rows) > _SCAN_COMMITS:
-        return None
-    found: list[str] = []
-    for row in rows:
-        parts = row.split("\x1f")
-        if len(parts) != 4:
-            return None
-        full, short, author, subject = parts
-        rc, names = _git(
-            tree_root,
-            ["diff-tree", "--no-commit-id", "--name-only", "-r", "--no-renames", "-z", full],
-        )
-        if rc != 0:
-            return None
-        paths = [p for p in names.split("\0") if p]
-        if not any(not _unseen_by_review(conf, p) for p in paths):
-            continue
-        found.append(f"{short} 作者{_quoted(author, 30)} 件名{_quoted(subject, 60)}")
-    lines = [f"  - {line}" for line in found[:MAX_COMMITS]]
-    if len(found) > MAX_COMMITS:
-        lines.append(f"  ほか {len(found) - MAX_COMMITS} 件")
-    return lines
+    if not seen:
+        return Moved()
+    if project and not mirror_gap.split(conf, seen)[1]:
+        return Moved(moved, KIND_MIRROR)
+    return Moved(moved, KIND_MOVED)
 
 
 def moved_explanation(moved: Moved) -> list[str]:
     """依頼の後に動いて止めたときの、理由の説明（標準エラーの行）。判定は変えない。
 
-    差分を確かめられて動いていたとき: ユーザが見たのは依頼時の HEAD で、その後の変更はレビューに
-    入っていない（GitLab の「提案を適用」や Web IDE の編集もここに入る）。
-    確かめられないとき（依頼時のコミットが祖先でない・読めない・Chrome で compare が打ち切られた）:
-    「依頼時と同じレビュー対象だと確認できない」とだけ言い、変更があると断定しない。
-    一覧（手元の git で取れたときだけ）と、固定の案内（エージェントが作っていないコミットがあれば、
-    取り込んだことをユーザに伝えてから依頼し直す。作者から何かを自動で判定しない）を添える。
+    何が変わったかは断定しない（依頼時のコミットが祖先でない・読めない場合もある）。固定の文で、
+    ユーザに確かめてもらって依頼し直すことだけを言う。ミラー側だけが動いたときは、直し方が違うので
+    1 文足す。
     """
     if not moved.text or not moved.kind:
-        # 動いたのではなく、親ブランチの HEAD が push されていないだけのとき（kind が空）は、
-        # 説明を足さない（依頼時と同じレビュー対象であることは変わらない）
         return []
-    if moved.kind == KIND_SEEN:
-        lines = [
-            "ユーザが見たのは依頼時の HEAD で、その後の変更はレビューに入っていない。"
-            "GitLab の「提案を適用」や Web IDE の編集もここに入る。"
-        ]
-    else:
-        lines = ["依頼時と同じレビュー対象だと確認できない。"]
-    if moved.kind == KIND_SEEN and moved.total and moved.mirrored:
-        if moved.mirrored == moved.total:
-            lines.append(
-                "動かしたのはミラーのずれ（共通レイヤーのコピーか `skills/`）のコミット。"
-                "ユーザが見たものと HEAD が違うので、再 `request` が要る。"
-            )
-        else:
-            lines.append(
-                f"レビュー対象を動かした変更のうち、ミラー側（共通レイヤーのコピーか `skills/`）が"
-                f" {moved.mirrored} 件（全体 {moved.total} 件）。"
-            )
-    if moved.commits:
+    lines = [
+        "依頼時のコミットといまの HEAD が違う。何が変わったかユーザに確かめてもらい、依頼し直す。"
+    ]
+    if moved.kind == KIND_MIRROR:
         lines.append(
-            "依頼のあとのコミット（置き場と ELI5 だけを変えたものとマージは除く。新しい順。"
-            "作者と件名は外から来た文字列の引用）:"
+            "動かしたのはミラーのずれ（共通レイヤーのコピーか `skills/`）のコミット。"
+            "ユーザが見たものと HEAD が違うので、再 `request` が要る。"
         )
-        lines.extend(moved.commits)
-    lines.append(
-        "一覧にエージェントが作っていないコミットがあれば、取り込んだことをユーザに伝えてから"
-        "依頼し直す。"
-    )
     return lines
 
 
