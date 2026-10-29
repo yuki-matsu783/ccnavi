@@ -18,6 +18,7 @@ keywords: [GitLab, Docker, docker_gitlab, probe_gitlab, make_gitlab_tokens, comp
 | `make_gitlab_tokens.rb` | root（エージェント役）と `ccnavi-reviewer`（人間役）の personal access token を作る。`docker_gitlab.py up` が呼ぶ |
 | `gitlab_api.py` | 人間役の API 呼び出し。import しても副作用は無い |
 | `probe_gitlab.py` | 動いている GitLab に使い捨てのプロジェクトを作り、親の Draft MR を API で先に作ってから、sh と実行ファイルを 1 周させる |
+| `scenario_tools.py` | シナリオ（`setup.host: docker-gitlab`）の人間の操作の step で止めたときの操作者の道具。`issue`（人間役で issue を作る）・`agree`（代役の git の環境の中で、擬似 tty から承認を代行する）・`leak`（トークンの値が記録に出ていないかを、ファイル名だけで報告する）。ワークツリーから使うときは `--root` にワークスペースルートを渡す |
 | `fake_gitlab.py` | Docker が無い環境で使う代役の GitLab |
 
 ## 起動・確認・停止
