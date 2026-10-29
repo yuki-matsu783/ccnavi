@@ -4,8 +4,8 @@
 
 承認済みの親（`doing/`）の計画・範囲・`phases:` を変えるには、承認済みチケットをコピーした提案を
 同じ識別子で `todo/` に置き、改版として承認を受ける。手で写すと、スクリプトだけが書く欄
-（`started_at`・`base_sha` など）を残したり消し損ねたりして、承認が断る。この雛形の生成は、
-そのコピーと欄の始末を済ませる。
+（`started_at`・`base_sha` など）を残したり消し損ねたりして、承認の検査が断る。
+この雛形は、そのコピーと欄の始末まで済ませて作る。
 
 ## 決まり
 
@@ -17,7 +17,7 @@
   計画・`phases:`・範囲・本文はそのまま残る
 - `--feedback` は `feedback: []`（対応なし）の改版を作る。全体計画のフェーズが全部閉じて
   レビューが済んだ（局面が「フィードバック計画待ち」）ときだけ。フィードバック計画が既にあれば止まる。
-  対応のフェーズを並べる改版は、雛形のあとに `feedback:` を手で足す
+  対応のフェーズを並べる改版は、雛形の `feedback: []` を `feedback:` に手で直す
 
 ネットワークにも git にも触らない。書いたあとの検査（`--agree --preview --verify`）と、
 送る手順は出力が言う。
@@ -88,7 +88,7 @@ def run(
             text = f.read()
     except OSError:
         return refuse(
-            f"承認済みの親が {source} に無い。承認前の提案は、改版でなく提案そのものを直す"
+            f"承認済みの親が {source} に無い。承認前の提案は、改版ではなく提案そのものを直す"
         )
     path = os.path.join(
         where.root,
@@ -129,21 +129,22 @@ def run(
         f"{ident} の改版の雛形を {path} に書いた"
         "（承認済みチケットのコピー。スクリプトだけが書く欄は外した）\n"
     )
+    verify = f"'{launcher} --agree --preview --verify {ident}' が通ったら、"
+    send = f"'{ticket_sh} propose {ident}' で親のブランチへ送り、承認をユーザに頼んで返事を待つ"
     if feedback:
         stdout.write("フィードバック計画は `feedback: []`（対応なし）にした\n")
-        edit = ""
-    else:
-        edit = (
-            f"{path} の plan・phases・allow などを直してから、"
-            "（範囲を変えるときは、作業中の子を `ccnavi-ticket.sh cancel` で取り消してから）"
-        )
-    stdout.write(
-        f"次: {edit}'{launcher} --agree --preview --verify {ident}' が通ったら、"
-        f"'{ticket_sh} propose {ident}' で親のブランチへ送り、承認をユーザに頼んで返事を待つ\n"
-    )
-    if feedback:
+        # 対応のフェーズを並べる場合は、確かめる前に直す。先に言ってから次の一手を言う
         stdout.write(
             "案内: 全体計画のレビューで残った指摘を対応のフェーズにするときは、"
-            f"{path} の `feedback: []` を、対応のフェーズを並べた `feedback:` に直す\n"
+            f"{path} の `feedback: []` を、対応のフェーズを並べた `feedback:` に直してから"
+            "確かめる\n"
+        )
+        stdout.write(f"次: {verify}{send}\n")
+    else:
+        cancel = f"{ticket_sh} cancel <子> --reason <理由>"
+        stdout.write(
+            f"次: {path} の plan・phases・allow などを直す。"
+            f"範囲を変えるときは、作業中の子を先に '{cancel}' で取り消す。"
+            f"直したら、{verify}{send}\n"
         )
     return EXIT_OK

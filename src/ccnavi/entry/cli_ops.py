@@ -42,6 +42,7 @@ def operate(
 
     `ticket start|finish|cancel|propose|consolidate <識別子>`、
     `ticket new <識別子> ...`（親の提案の雛形）、
+    `ticket revise <識別子> [--feedback]`（承認済みの親の改版の雛形）、
     `review prepare|requested|confirm`、それに
     ユーザが打つ `--reviewed` と `--close-early`。
     リモートから取得した結果は `--result <json>` で受け取る。

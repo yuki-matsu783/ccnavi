@@ -91,7 +91,7 @@ class ReviseTest(PhaseHarness):
         with open(self.todo_path(), encoding="utf-8") as f:
             text = f.read()
         self.assertNotIn("feedback:", text)
-        self.assertIn("直してから", made.stdout)
+        self.assertIn("plan・phases・allow などを直す", made.stdout)
 
     # ---- 4. 止まる場合
 

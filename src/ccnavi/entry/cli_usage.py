@@ -396,7 +396,7 @@ _TICKET = """\
          フィードバック計画は --with-feedback を指定した場合のみ書き込まれます。
          上記の --templates の節を参照してください）
     ccnavi ticket revise <id> [--feedback]
-        （承認済みの親（doing/）の改版の雛形を、ワークツリー ID の
+        （承認済みの親（doing/）の改版の雛形を、ID と同名のワークツリーの
          wip/proposals/todo/ID.md に書きます。承認済みチケットのコピーから、
          スクリプトだけが書く欄（started_at・base_sha など）を外します。
          --feedback は、全体計画のフェーズが全部閉じてレビューが済んだあとに、フィードバック計画なし
