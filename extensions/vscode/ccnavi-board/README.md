@@ -15,6 +15,7 @@ ccnavi のチケットが、どのワークツリーでどこまで進んでい�
 | 実行ファイルの版 | 起動のときに 1 度 `--version --json` を聞き、互換の版（`compat`）が拡張の `EXTENSION_COMPAT` と違うときに通知を出す。版を聞けなかったとき（実行ファイルが `--version --json` に失敗する・答えが読めない）は、起動では何も言わない。画面ごとに、使うフラグを確かめられない理由を出して先へ進まない。通知では、どちらが古いかと直し方（ccnavi のリポジトリなら `build.py` で組み立て直し、配布先なら `scripts/ccnavi-setup.sh --force` で配り直し、拡張が古ければ入れ直し）を示す。画面は止めない（[版の JSON](../../../docs/11_requirements/json-shapes.md#版の-json)） |
 | bash | clone / fetch / pull を送るターミナル。承認と未解決の指摘の対応方針はこのターミナルを通らない（子プロセスで打つ。sh はこのシェルで走らせる）。Windows は Git Bash（`C:\Program Files\Git\bin\bash.exe`、無ければ PATH の `bash`） |
 | git | PATH にあること。プロジェクト管理画面が origin を読み、ターミナルで clone を打つ |
+| ffmpeg | 任意。バグ報告の録画にだけ使う（無ければ録画せず、スクリーンショットとログだけを zip にする）。Windows は PATH から呼べること、WSL は Windows 側の PATH に `ffmpeg.exe` があること、macOS は PATH か Homebrew の置き場にあること。入れ方は `winget install ffmpeg`・`brew install ffmpeg` など。入れたあとは VS Code を再起動する（起動中の VS Code は新しい PATH を読まない） |
 | Node.js / pnpm | 22.13.1 以上 / 10。組み立てとテストにだけ要る |
 
 設定（`settings.json`）。
@@ -24,6 +25,7 @@ ccnavi のチケットが、どのワークツリーでどこまで進んでい�
 | `ccnaviBoard.binPath` | 実行ファイルの場所。空なら上の順で探す。相対ならワークスペースルートから |
 | `ccnaviBoard.bashPath` | Windows で使うシェル。空なら Git Bash |
 | `ccnaviBoard.expectationsPath` | ルール管理画面が一括で確かめる期待する判定のファイル。既定は `.ccnavi/config/common/rule-expectations.yml`。相対ならワークスペースルートから。ファイルが無いときは、実行ファイルを呼ばずに作り方を案内する |
+| `ccnaviBoard.ffmpegPath` | バグ報告の録画に使う ffmpeg の絶対パス。WSL では Windows 側の `ffmpeg.exe` を指す（例 `/mnt/c/ffmpeg/bin/ffmpeg.exe`）。空なら OS ごとの候補を探す |
 | `ccnaviBoard.flowSaveReview` | フロー編集画面で保存の前に変更の一覧を出すか。既定は出す |
 
 ルールファイルの場所は `.ccnavi/config/common/rules.yml` 固定。
@@ -39,7 +41,7 @@ ccnavi のチケットが、どのワークツリーでどこまで進んでい�
 pnpm install --frozen-lockfile
 pnpm run compile   # tsc -p .（拡張ホスト）と tsc -p tsconfig.webview.json（画面）で型を見て、esbuild で out/webview/<名前>.js と out/extension.js にバンドルする
 pnpm test          # 全部
-pnpm test:rules    # 領域だけ。board / rules / risk / phases / projects / templates / handoff / flow / workflow / shared / devtools
+pnpm test:rules    # 領域だけ。board / rules / risk / phases / projects / templates / handoff / flow / workflow / shared / devtools / bugreport
 pnpm test:devtools  # 画面確認ツール（render-board.js）だけ。Chromium が無いと終了コード 3
 pnpm test:templates # テンプレート管理だけ（templates）
 pnpm test:handoff   # 取り込み待ちだけ（handoff）
