@@ -10,6 +10,10 @@
   origin への通信はそのプロジェクトへ向く。回したあとに消す
 - `real`: 何もしない
 
+`api_access` は、`fake-gitlab` / `docker-gitlab` の相手を読む入口
+（クライアント・トークン・プロジェクト）を返す。
+step の終わりの相手側の状態の記録（hostsnap.py）が使う。
+
 実行器（runner.py）から呼ぶ。状態は JSON にできる辞書（`prepare` の戻り値）で、state.json に残す。
 起こした模擬のスレッドは、この辞書の `dir` をキーにしたプロセス内の表で持つ。
 """

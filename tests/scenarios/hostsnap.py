@@ -19,10 +19,15 @@ from tests.scenarios import hostenv
 
 LOG_NAME = hostenv.LOG_NAME
 TEXT_LIMIT = 1000
+# 一覧は 1 ページ（100 件）だけ読む。届いたら、切れたかもしれないことを errors に残す。
+PAGE_LIMIT = 100
 MASK = "***"
 APPROVALS_NOT_TAKEN = {
     "taken": False,
-    "reason": "承認は取っていない（模擬に approvals の API が無い。docker-gitlab でも取らない）",
+    "reason": (
+        "承認は取っていない（模擬に approvals の API が無く、"
+        "模擬と本物で同じ形に揃えるため docker-gitlab でも取らない）"
+    ),
 }
 MR_KEYS = (
     "iid",
@@ -137,11 +142,16 @@ def collect(client, token, project):
             return None
         return body
 
+    def capped(label, items):
+        if len(items) >= PAGE_LIMIT:
+            errors.append({"api": label, "error": f"{PAGE_LIMIT} 件で切った（ページを送らない）"})
+
     mrs = []
     listed = read("list_mrs", client.list_mrs(token, project, state="all"))
     if listed is not None and not isinstance(listed, list):
         errors.append({"api": "list_mrs", "error": "応答が配列ではない"})
         listed = None
+    capped("list_mrs", listed or [])
     for item in listed or []:
         iid = item.get("iid")
         detail = read(f"get_mr {iid}", client.get_mr(token, project, iid))
@@ -150,14 +160,16 @@ def collect(client, token, project):
         view = _mr(detail)
         found = read(f"list_discussions {iid}", client.list_discussions(token, project, iid))
         if isinstance(found, list):
+            capped(f"list_discussions {iid}", found)
             view["threads"] = [_thread(d) for d in found if isinstance(d, dict)]
         else:
             view["threads"] = []
             view["threads_unavailable"] = True
         mrs.append(view)
     issues = []
-    body = read("list_issues", client.list_issues(token, project, state="all", per_page=100))
+    body = read("list_issues", client.list_issues(token, project, state="all", per_page=PAGE_LIMIT))
     if isinstance(body, list):
+        capped("list_issues", body)
         issues = [_issue(i) for i in body if isinstance(i, dict)]
     return {
         "approvals": APPROVALS_NOT_TAKEN,

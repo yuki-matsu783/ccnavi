@@ -3939,6 +3939,22 @@ class FakeReader:
         return self._get("list_issues", [])
 
 
+class FullPageReader(FakeReader):
+    """issue の一覧が 1 ページ（100 件）ちょうど返る相手。"""
+
+    def list_issues(self, token, pid, *, state="opened", per_page=None):
+        return self._get(
+            "list_issues", [{"iid": n, "title": "x", "state": "opened"} for n in range(100)]
+        )
+
+
+class HostSnapshotPageTest(unittest.TestCase):
+    def test_a_full_page_is_marked_as_possibly_cut(self):
+        record = hostsnap.collect(FullPageReader(), "t", 1)
+        self.assertEqual(100, len(record["issues"]))
+        self.assertIn("list_issues", [e["api"] for e in record["errors"]])
+
+
 class DockerHostBase(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
