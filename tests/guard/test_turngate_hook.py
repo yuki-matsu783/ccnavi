@@ -171,7 +171,7 @@ class AttendedTest(TurnGateHookTest):
 
         self.assertTrue(self.asked(self.run_command(f"{GIT} integrate-done bar -m 'msg x'")))
 
-    def test_確認の記録は_ask_で残り_拒否コードでは残らない(self):
+    def test_確認の記録は_ask_と_RULE_ASK_と宣言の名前を残す(self):
         self.say()
         self.run_command(DONE)
 
@@ -180,6 +180,13 @@ class AttendedTest(TurnGateHookTest):
         self.assertEqual(len(asked), 1)
         self.assertEqual(asked[0]["code"], "RULE_ASK")
         self.assertEqual(asked[0]["rules"], ["builtin:turn-gate:integrate-user-turn"])
+
+    def test_サブエージェントは対話でも確認に出さず発言を待つ(self):
+        self.say()
+
+        done = self.run_command(DONE, agent_id="sub1", agent_type="x")
+
+        self.assertFalse(self.asked(done))
 
     def test_dry_run_でも確認に出る(self):
         self.say(mode="dry-run")
