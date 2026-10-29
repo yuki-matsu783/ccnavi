@@ -122,8 +122,14 @@ def scene_context() -> dict[str, str]:
     }
 
 
-def load_requests() -> list[dict]:
+def load_all_requests() -> list[dict]:
+    """全要求。書式の検査と、本物の側の記録（`record_contract.py`）が使う。"""
     return shape.load_data("requests.json")["requests"]
+
+
+def load_requests() -> list[dict]:
+    """fake に送る要求。`used_by` に `sh` を持つものだけ（fake は拡張の要求に答えない）。"""
+    return [r for r in load_all_requests() if "sh" in r["used_by"]]
 
 
 def run(requests: list[dict], tamper: Callable[[str, object], object] | None = None) -> dict:

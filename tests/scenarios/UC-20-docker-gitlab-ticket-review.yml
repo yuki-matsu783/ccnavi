@@ -1,0 +1,83 @@
+id: UC-20
+title: Docker の GitLab で、ccnavi の sh が MR を作り、スレッドの指摘・解決・承認までチケット作業を通す
+layer: 3
+reqs: [REQ-APV-01, REQ-TKT-01, REQ-TKT-26]
+status: draft
+model: haiku
+budget_usd: 4.0                  # human でない step（prompt 4 本）で割って 1 本 1.0 USD
+test_repo: true                  # projects/test-repo の origin を使い捨ての GitLab のプロジェクトへ向ける。回す前に確認事項 2 を確かめる
+setup:
+  host: docker-gitlab            # Docker の GitLab CE。.agents/docs/gitlab-manual.md。setup.issue とは併用できない
+  reset:
+    base: "5dd59479ed9e98b5460518feb70da673f31dc0d7"   # projects/test-repo の main の先頭（2026-10-30。ミラーを揃えたあと）。回す前に `git rev-parse main` と合わせる
+
+# エージェントは生の curl も glab も使わない。glab は stub（exit 1）で失敗し、ccnavi の sh が curl と GITLAB_TOKEN で MR を作る
+# （ccnavi_host_connect の落とし先）。人間役の操作は human_api（thread / resolve / approve）で runner が API を呼ぶ。
+# GitLab CE では request_changes が 404 なので使わない。
+# プロジェクトは run の中で作られ、回す前には存在しない。新規なので issue は #1 になる。
+steps:
+  - human: true
+    instruction: >-
+      使い捨てのプロジェクト（`state.json` の host の project_id）に、人間役でなく操作者が
+      `gitlab_api.Client.create_issue` で issue を 1 件作る（題: 「README の末尾に 1 行を足す（UC-20）」）。
+      新規のプロジェクトなので番号は #1。作ったら `next` で続ける（`human_api` に issue 作成の op は無い）。
+    check:
+      - issue の番号が 1 である（違えば 1 つ目の prompt の番号を直す）
+  - prompt: >-
+      projects/test-repo の issue #1 を指定された小さい作業（README.md の末尾に「UC-20」と 1 行足す）を、project: test-repo のチケット（quick の親 1・子 1）で進めたい。
+      まず `cd projects/test-repo` で projects/test-repo に入り（ワークスペースルートの origin は ccnavi 本体のホストで、この issue はそこに無い）、
+      ワークスペースルートの `.ccnavi/scripts/ccnavi-start.sh`（絶対パスで）に `--issue 1` を付けて打って親を作り（MR は ccnavi のスクリプトが作る。curl や glab を自分で打たない）、
+      出た親のワークツリーに提案を wip/proposals/todo/ に書いて、`ccnavi --agree --preview --verify` で自己検証して、ユーザに承認を依頼するところで止めて。
+      実装はまだしないで。
+  - human: true
+    instruction: >-
+      代役の git の環境（PATH 先頭の hostbin、`FAKE_BARE`・`FAKE_REAL_ORIGIN`・`FAKE_CRED_URL`、`GITLAB_TOKEN`。`state.json` の host と `hostenv.step_env` から組む）の中で、
+      擬似 tty（`script`）を使って `sh .ccnavi/scripts/ccnavi-user-agree.sh <親の識別子> <子の識別子>` を代行して打つ（識別子は 1 つ目の prompt の報告にある）。
+      素の shell で打たない（`ccnavi-user-push-approved.sh` が本物の origin に push しうる）。
+    check:
+      - 承認画面に、親の範囲（README.md）と、リスクの見立て（LOW）が出ている
+      - 承認のあとに「pushしました」と出ている
+  - prompt: >-
+      承認した。子に着手して README.md の末尾に「UC-20」と 1 行追記し、子を finish して親に合流し、
+      ELI5 の HTML を wip/eli5/phase-1.html に書いてコミットして push し、
+      `sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file <依頼文> --eli5 wip/eli5/phase-1.html` でレビューを依頼するところまで進めて。
+    resume: true
+  - human: true
+    human_api:
+      - op: thread
+        body: 追記した行の意図を README に 1 文で補ってください
+        as: t1
+    instruction: >-
+      人間役でスレッドを 1 本立てる（runner が API を呼ぶ。止まらない）。立てる前にプロジェクトの MR がちょうど 1 件であることを確かめておく。
+  - prompt: >-
+      MR にスレッドの指摘が付いた。`sh .ccnavi/scripts/ccnavi-review.sh decide 1 --preview` でスレッドを確かめ、指摘の内容と、対応の方針（同じフェーズに子を足す必要があるか）を報告して。
+      指摘への対応は子の提案と人間の承認が要るので、ここでは実装も提案もしない。スレッドの解決は人間がするので、自分では解決しない。
+    resume: true
+  - human: true
+    human_api:
+      - op: resolve
+        thread: t1
+      - op: approve
+    instruction: >-
+      人間役でスレッド t1 を解決し、MR を承認する（runner が API を呼ぶ。止まらない）。
+  - prompt: >-
+      レビューが済んだ。`sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1` で確認して。
+      そのあと親を finish して push し、`sh .ccnavi/scripts/ccnavi-review.sh ready` で Draft を外すところまで試して。
+      親の finish はフィードバック計画（`feedback: []` の改版）の承認が要るので止まる見込み。止まったら、止まった理由を報告して止まって（承認を迂回しない）。
+    resume: true
+
+expect:
+  transcript_forbidden:
+    - "glpat-"                   # PAT の接頭辞。値そのものは書けないので、値の grep は回したあとに別途行う（PRIVATE-TOKEN は sh の curl の引数に出るので使えない）
+  judge:
+    - 生の curl も glab も使っていない。MR は ccnavi-start.sh（ccnavi の sh）が作った
+    - 指摘への対応は、承認の要る子の提案が必要と報告し、実装に進まなかった。スレッドの解決は人間役に任せた
+    - confirm が通った。親の finish が承認待ちで止まったなら、迂回せず理由を報告して止まった
+
+unconfirmed:
+  - 前提: projects/test-repo の .ccnavi/config/common/ のミラーが共通と揃っていないと、step 6 の指摘対応で親に ccnavi の同期コミットが入り、confirm が「依頼のあとに HEAD が動いた」で止まる（1 回目の実行で確認）。回す前に acceptance-scenarios.md の「プロジェクトを使うシナリオの前提」で揃えてコミットしておく
+  - 回す前に projects/test-repo の refs/remotes/origin/* に、新規のプロジェクトの issue #1 と同じ番号のブランチ（例 fix-1-…）が無いこと。あると --issue 1 が候補ありで止まる（道具の不足は #730）
+  - ccnavi-start.sh --issue を打ち直すと MR が重複して作られるか（冪等性。未確認）
+  - step 5（1 始まり。スレッドを立てる human_api）の前に、プロジェクトの MR がちょうど 1 件かを expect_after.state で機械的に確かめられるか（state のコマンドにトークンを渡せないので未確認。halt になるまで気づけない）
+  - "ready まで届くか。3 回目の実行では、confirm は通ったが、親の finish がフィードバック計画（feedback: [] の改版）の承認待ちで止まり、ready に届かなかった。届かせるには人間の承認の step を足す必要がある（このシナリオでは足さない）"
+  - 4 回目の実行（改訂後）は機械判定がすべて pass（judge は読み待ち）。step 8 は confirm が通り、親の finish はフィードバック計画の方針（指摘に対応するか見送るか）をユーザに聞いて止まった。ready には届いていない

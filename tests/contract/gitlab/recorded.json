@@ -6,8 +6,485 @@
   "page2",
   "error_403"
  ],
- "recorded_at": "2026-10-25",
+ "recorded_at": "2026-10-29",
  "requests": {
+  "approvals": {
+   "shape": {
+    "keys": {
+     "approved": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "approved_by": {
+      "t": [
+       "array"
+      ]
+     },
+     "user_can_approve": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "user_has_approved": {
+      "t": [
+       "boolean"
+      ]
+     }
+    },
+    "t": [
+     "object"
+    ]
+   },
+   "status": 200
+  },
+  "blob": {
+   "shape": {
+    "keys": {
+     "content": {
+      "t": [
+       "string"
+      ]
+     },
+     "encoding": {
+      "t": [
+       "string"
+      ]
+     },
+     "sha": {
+      "t": [
+       "string"
+      ]
+     },
+     "size": {
+      "t": [
+       "integer"
+      ]
+     }
+    },
+    "t": [
+     "object"
+    ]
+   },
+   "status": 200
+  },
+  "branch_404": {
+   "shape": {
+    "keys": {
+     "message": {
+      "t": [
+       "string"
+      ]
+     }
+    },
+    "t": [
+     "object"
+    ]
+   },
+   "status": 404
+  },
+  "branch_create": {
+   "shape": {
+    "keys": {
+     "can_push": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "commit": {
+      "keys": {
+       "author_email": {
+        "t": [
+         "string"
+        ]
+       },
+       "author_name": {
+        "t": [
+         "string"
+        ]
+       },
+       "authored_date": {
+        "t": [
+         "datetime"
+        ]
+       },
+       "committed_date": {
+        "t": [
+         "datetime"
+        ]
+       },
+       "committer_email": {
+        "t": [
+         "string"
+        ]
+       },
+       "committer_name": {
+        "t": [
+         "string"
+        ]
+       },
+       "created_at": {
+        "t": [
+         "datetime"
+        ]
+       },
+       "extended_trailers": {
+        "keys": {},
+        "t": [
+         "object"
+        ]
+       },
+       "id": {
+        "t": [
+         "string"
+        ]
+       },
+       "message": {
+        "t": [
+         "string"
+        ]
+       },
+       "parent_ids": {
+        "t": [
+         "array"
+        ]
+       },
+       "short_id": {
+        "t": [
+         "string"
+        ]
+       },
+       "title": {
+        "t": [
+         "string"
+        ]
+       },
+       "trailers": {
+        "keys": {},
+        "t": [
+         "object"
+        ]
+       }
+      },
+      "t": [
+       "object"
+      ]
+     },
+     "default": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "developers_can_merge": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "developers_can_push": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "merged": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "name": {
+      "t": [
+       "string"
+      ]
+     },
+     "protected": {
+      "t": [
+       "boolean"
+      ]
+     }
+    },
+    "t": [
+     "object"
+    ]
+   },
+   "status": 201
+  },
+  "branch_exists": {
+   "shape": {
+    "keys": {
+     "message": {
+      "t": [
+       "string"
+      ]
+     }
+    },
+    "t": [
+     "object"
+    ]
+   },
+   "status": 400
+  },
+  "branch_get": {
+   "shape": {
+    "keys": {
+     "can_push": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "commit": {
+      "keys": {
+       "author_email": {
+        "t": [
+         "string"
+        ]
+       },
+       "author_name": {
+        "t": [
+         "string"
+        ]
+       },
+       "authored_date": {
+        "t": [
+         "datetime"
+        ]
+       },
+       "committed_date": {
+        "t": [
+         "datetime"
+        ]
+       },
+       "committer_email": {
+        "t": [
+         "string"
+        ]
+       },
+       "committer_name": {
+        "t": [
+         "string"
+        ]
+       },
+       "created_at": {
+        "t": [
+         "datetime"
+        ]
+       },
+       "extended_trailers": {
+        "keys": {},
+        "t": [
+         "object"
+        ]
+       },
+       "id": {
+        "t": [
+         "string"
+        ]
+       },
+       "message": {
+        "t": [
+         "string"
+        ]
+       },
+       "parent_ids": {
+        "items": {
+         "t": [
+          "string"
+         ]
+        },
+        "t": [
+         "array"
+        ]
+       },
+       "short_id": {
+        "t": [
+         "string"
+        ]
+       },
+       "title": {
+        "t": [
+         "string"
+        ]
+       },
+       "trailers": {
+        "keys": {},
+        "t": [
+         "object"
+        ]
+       }
+      },
+      "t": [
+       "object"
+      ]
+     },
+     "default": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "developers_can_merge": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "developers_can_push": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "merged": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "name": {
+      "t": [
+       "string"
+      ]
+     },
+     "protected": {
+      "t": [
+       "boolean"
+      ]
+     }
+    },
+    "t": [
+     "object"
+    ]
+   },
+   "status": 200
+  },
+  "branches_list": {
+   "shape": {
+    "items": {
+     "keys": {
+      "can_push": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "commit": {
+       "keys": {
+        "author_email": {
+         "t": [
+          "string"
+         ]
+        },
+        "author_name": {
+         "t": [
+          "string"
+         ]
+        },
+        "authored_date": {
+         "t": [
+          "datetime"
+         ]
+        },
+        "committed_date": {
+         "t": [
+          "datetime"
+         ]
+        },
+        "committer_email": {
+         "t": [
+          "string"
+         ]
+        },
+        "committer_name": {
+         "t": [
+          "string"
+         ]
+        },
+        "created_at": {
+         "t": [
+          "datetime"
+         ]
+        },
+        "extended_trailers": {
+         "keys": {},
+         "t": [
+          "object"
+         ]
+        },
+        "id": {
+         "t": [
+          "string"
+         ]
+        },
+        "message": {
+         "t": [
+          "string"
+         ]
+        },
+        "parent_ids": {
+         "items": {
+          "t": [
+           "string"
+          ]
+         },
+         "t": [
+          "array"
+         ]
+        },
+        "short_id": {
+         "t": [
+          "string"
+         ]
+        },
+        "title": {
+         "t": [
+          "string"
+         ]
+        },
+        "trailers": {
+         "keys": {},
+         "t": [
+          "object"
+         ]
+        }
+       },
+       "t": [
+        "object"
+       ]
+      },
+      "default": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "developers_can_merge": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "developers_can_push": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "merged": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "name": {
+       "t": [
+        "string"
+       ]
+      },
+      "protected": {
+       "t": [
+        "boolean"
+       ]
+      }
+     },
+     "t": [
+      "object"
+     ]
+    },
+    "t": [
+     "array"
+    ]
+   },
+   "status": 200
+  },
   "closes_issues": {
    "shape": {
     "items": {
@@ -210,6 +687,606 @@
     },
     "t": [
      "array"
+    ]
+   },
+   "status": 200
+  },
+  "commit_create": {
+   "shape": {
+    "keys": {
+     "author_email": {
+      "t": [
+       "string"
+      ]
+     },
+     "author_name": {
+      "t": [
+       "string"
+      ]
+     },
+     "authored_date": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "committed_date": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "committer_email": {
+      "t": [
+       "string"
+      ]
+     },
+     "committer_name": {
+      "t": [
+       "string"
+      ]
+     },
+     "created_at": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "extended_trailers": {
+      "keys": {},
+      "t": [
+       "object"
+      ]
+     },
+     "id": {
+      "t": [
+       "string"
+      ]
+     },
+     "last_pipeline": {
+      "t": [
+       "null"
+      ]
+     },
+     "message": {
+      "t": [
+       "string"
+      ]
+     },
+     "parent_ids": {
+      "items": {
+       "t": [
+        "string"
+       ]
+      },
+      "t": [
+       "array"
+      ]
+     },
+     "project_id": {
+      "t": [
+       "integer"
+      ]
+     },
+     "short_id": {
+      "t": [
+       "string"
+      ]
+     },
+     "stats": {
+      "keys": {
+       "additions": {
+        "t": [
+         "integer"
+        ]
+       },
+       "deletions": {
+        "t": [
+         "integer"
+        ]
+       },
+       "total": {
+        "t": [
+         "integer"
+        ]
+       }
+      },
+      "t": [
+       "object"
+      ]
+     },
+     "status": {
+      "t": [
+       "null"
+      ]
+     },
+     "title": {
+      "t": [
+       "string"
+      ]
+     },
+     "trailers": {
+      "keys": {},
+      "t": [
+       "object"
+      ]
+     }
+    },
+    "t": [
+     "object"
+    ]
+   },
+   "status": 201
+  },
+  "commit_get": {
+   "shape": {
+    "keys": {
+     "author_email": {
+      "t": [
+       "string"
+      ]
+     },
+     "author_name": {
+      "t": [
+       "string"
+      ]
+     },
+     "authored_date": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "committed_date": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "committer_email": {
+      "t": [
+       "string"
+      ]
+     },
+     "committer_name": {
+      "t": [
+       "string"
+      ]
+     },
+     "created_at": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "extended_trailers": {
+      "keys": {},
+      "t": [
+       "object"
+      ]
+     },
+     "id": {
+      "t": [
+       "string"
+      ]
+     },
+     "last_pipeline": {
+      "t": [
+       "null"
+      ]
+     },
+     "message": {
+      "t": [
+       "string"
+      ]
+     },
+     "parent_ids": {
+      "items": {
+       "t": [
+        "string"
+       ]
+      },
+      "t": [
+       "array"
+      ]
+     },
+     "project_id": {
+      "t": [
+       "integer"
+      ]
+     },
+     "short_id": {
+      "t": [
+       "string"
+      ]
+     },
+     "stats": {
+      "keys": {
+       "additions": {
+        "t": [
+         "integer"
+        ]
+       },
+       "deletions": {
+        "t": [
+         "integer"
+        ]
+       },
+       "total": {
+        "t": [
+         "integer"
+        ]
+       }
+      },
+      "t": [
+       "object"
+      ]
+     },
+     "status": {
+      "t": [
+       "null"
+      ]
+     },
+     "title": {
+      "t": [
+       "string"
+      ]
+     },
+     "trailers": {
+      "keys": {},
+      "t": [
+       "object"
+      ]
+     }
+    },
+    "t": [
+     "object"
+    ]
+   },
+   "status": 200
+  },
+  "commits_path": {
+   "shape": {
+    "items": {
+     "keys": {
+      "author_email": {
+       "t": [
+        "string"
+       ]
+      },
+      "author_name": {
+       "t": [
+        "string"
+       ]
+      },
+      "authored_date": {
+       "t": [
+        "datetime"
+       ]
+      },
+      "committed_date": {
+       "t": [
+        "datetime"
+       ]
+      },
+      "committer_email": {
+       "t": [
+        "string"
+       ]
+      },
+      "committer_name": {
+       "t": [
+        "string"
+       ]
+      },
+      "created_at": {
+       "t": [
+        "datetime"
+       ]
+      },
+      "extended_trailers": {
+       "keys": {},
+       "t": [
+        "object"
+       ]
+      },
+      "id": {
+       "t": [
+        "string"
+       ]
+      },
+      "message": {
+       "t": [
+        "string"
+       ]
+      },
+      "parent_ids": {
+       "items": {
+        "t": [
+         "string"
+        ]
+       },
+       "t": [
+        "array"
+       ]
+      },
+      "short_id": {
+       "t": [
+        "string"
+       ]
+      },
+      "title": {
+       "t": [
+        "string"
+       ]
+      },
+      "trailers": {
+       "keys": {},
+       "t": [
+        "object"
+       ]
+      }
+     },
+     "t": [
+      "object"
+     ]
+    },
+    "t": [
+     "array"
+    ]
+   },
+   "status": 200
+  },
+  "compare": {
+   "shape": {
+    "keys": {
+     "commit": {
+      "keys": {
+       "author_email": {
+        "t": [
+         "string"
+        ]
+       },
+       "author_name": {
+        "t": [
+         "string"
+        ]
+       },
+       "authored_date": {
+        "t": [
+         "datetime"
+        ]
+       },
+       "committed_date": {
+        "t": [
+         "datetime"
+        ]
+       },
+       "committer_email": {
+        "t": [
+         "string"
+        ]
+       },
+       "committer_name": {
+        "t": [
+         "string"
+        ]
+       },
+       "created_at": {
+        "t": [
+         "datetime"
+        ]
+       },
+       "extended_trailers": {
+        "keys": {},
+        "t": [
+         "object"
+        ]
+       },
+       "id": {
+        "t": [
+         "string"
+        ]
+       },
+       "message": {
+        "t": [
+         "string"
+        ]
+       },
+       "parent_ids": {
+        "items": {
+         "t": [
+          "string"
+         ]
+        },
+        "t": [
+         "array"
+        ]
+       },
+       "short_id": {
+        "t": [
+         "string"
+        ]
+       },
+       "title": {
+        "t": [
+         "string"
+        ]
+       },
+       "trailers": {
+        "keys": {},
+        "t": [
+         "object"
+        ]
+       }
+      },
+      "t": [
+       "object"
+      ]
+     },
+     "commits": {
+      "items": {
+       "keys": {
+        "author_email": {
+         "t": [
+          "string"
+         ]
+        },
+        "author_name": {
+         "t": [
+          "string"
+         ]
+        },
+        "authored_date": {
+         "t": [
+          "datetime"
+         ]
+        },
+        "committed_date": {
+         "t": [
+          "datetime"
+         ]
+        },
+        "committer_email": {
+         "t": [
+          "string"
+         ]
+        },
+        "committer_name": {
+         "t": [
+          "string"
+         ]
+        },
+        "created_at": {
+         "t": [
+          "datetime"
+         ]
+        },
+        "extended_trailers": {
+         "keys": {},
+         "t": [
+          "object"
+         ]
+        },
+        "id": {
+         "t": [
+          "string"
+         ]
+        },
+        "message": {
+         "t": [
+          "string"
+         ]
+        },
+        "parent_ids": {
+         "items": {
+          "t": [
+           "string"
+          ]
+         },
+         "t": [
+          "array"
+         ]
+        },
+        "short_id": {
+         "t": [
+          "string"
+         ]
+        },
+        "title": {
+         "t": [
+          "string"
+         ]
+        },
+        "trailers": {
+         "keys": {},
+         "t": [
+          "object"
+         ]
+        }
+       },
+       "t": [
+        "object"
+       ]
+      },
+      "t": [
+       "array"
+      ]
+     },
+     "compare_same_ref": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "compare_timeout": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "diffs": {
+      "items": {
+       "keys": {
+        "a_mode": {
+         "t": [
+          "string"
+         ]
+        },
+        "b_mode": {
+         "t": [
+          "string"
+         ]
+        },
+        "collapsed": {
+         "t": [
+          "boolean"
+         ]
+        },
+        "deleted_file": {
+         "t": [
+          "boolean"
+         ]
+        },
+        "diff": {
+         "t": [
+          "string"
+         ]
+        },
+        "generated_file": {
+         "t": [
+          "null"
+         ]
+        },
+        "new_file": {
+         "t": [
+          "boolean"
+         ]
+        },
+        "new_path": {
+         "t": [
+          "string"
+         ]
+        },
+        "old_path": {
+         "t": [
+          "string"
+         ]
+        },
+        "renamed_file": {
+         "t": [
+          "boolean"
+         ]
+        },
+        "too_large": {
+         "t": [
+          "boolean"
+         ]
+        }
+       },
+       "t": [
+        "object"
+       ]
+      },
+      "t": [
+       "array"
+      ]
+     }
+    },
+    "t": [
+     "object"
     ]
    },
    "status": 200
@@ -742,6 +1819,71 @@
     ]
    },
    "status": 404
+  },
+  "file_get": {
+   "shape": {
+    "keys": {
+     "blob_id": {
+      "t": [
+       "string"
+      ]
+     },
+     "commit_id": {
+      "t": [
+       "string"
+      ]
+     },
+     "content": {
+      "t": [
+       "string"
+      ]
+     },
+     "content_sha256": {
+      "t": [
+       "string"
+      ]
+     },
+     "encoding": {
+      "t": [
+       "string"
+      ]
+     },
+     "execute_filemode": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "file_name": {
+      "t": [
+       "string"
+      ]
+     },
+     "file_path": {
+      "t": [
+       "string"
+      ]
+     },
+     "last_commit_id": {
+      "t": [
+       "string"
+      ]
+     },
+     "ref": {
+      "t": [
+       "string"
+      ]
+     },
+     "size": {
+      "t": [
+       "integer"
+      ]
+     }
+    },
+    "t": [
+     "object"
+    ]
+   },
+   "status": 200
   },
   "issue_create": {
    "shape": {
@@ -2361,6 +3503,88 @@
      "state": {
       "t": [
        "string"
+      ]
+     }
+    },
+    "t": [
+     "object"
+    ]
+   },
+   "status": 200
+  },
+  "merge_base": {
+   "shape": {
+    "keys": {
+     "author_email": {
+      "t": [
+       "string"
+      ]
+     },
+     "author_name": {
+      "t": [
+       "string"
+      ]
+     },
+     "authored_date": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "committed_date": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "committer_email": {
+      "t": [
+       "string"
+      ]
+     },
+     "committer_name": {
+      "t": [
+       "string"
+      ]
+     },
+     "created_at": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "extended_trailers": {
+      "keys": {},
+      "t": [
+       "object"
+      ]
+     },
+     "id": {
+      "t": [
+       "string"
+      ]
+     },
+     "message": {
+      "t": [
+       "string"
+      ]
+     },
+     "parent_ids": {
+      "t": [
+       "array"
+      ]
+     },
+     "short_id": {
+      "t": [
+       "string"
+      ]
+     },
+     "title": {
+      "t": [
+       "string"
+      ]
+     },
+     "trailers": {
+      "keys": {},
+      "t": [
+       "object"
       ]
      }
     },
@@ -5413,6 +6637,166 @@
        },
        "t": [
         "object"
+       ]
+      }
+     },
+     "t": [
+      "object"
+     ]
+    },
+    "t": [
+     "array"
+    ]
+   },
+   "status": 200
+  },
+  "token_self": {
+   "shape": {
+    "keys": {
+     "active": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "created_at": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "description": {
+      "t": [
+       "null"
+      ]
+     },
+     "expires_at": {
+      "t": [
+       "string"
+      ]
+     },
+     "granular": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "id": {
+      "t": [
+       "integer"
+      ]
+     },
+     "last_used_at": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "last_used_ips": {
+      "items": {
+       "t": [
+        "string"
+       ]
+      },
+      "t": [
+       "array"
+      ]
+     },
+     "name": {
+      "t": [
+       "string"
+      ]
+     },
+     "revoked": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "scopes": {
+      "items": {
+       "t": [
+        "string"
+       ]
+      },
+      "t": [
+       "array"
+      ]
+     },
+     "user_id": {
+      "t": [
+       "integer"
+      ]
+     }
+    },
+    "t": [
+     "object"
+    ]
+   },
+   "status": 200
+  },
+  "tree_recursive": {
+   "shape": {
+    "items": {
+     "keys": {
+      "id": {
+       "t": [
+        "string"
+       ]
+      },
+      "mode": {
+       "t": [
+        "string"
+       ]
+      },
+      "name": {
+       "t": [
+        "string"
+       ]
+      },
+      "path": {
+       "t": [
+        "string"
+       ]
+      },
+      "type": {
+       "t": [
+        "string"
+       ]
+      }
+     },
+     "t": [
+      "object"
+     ]
+    },
+    "t": [
+     "array"
+    ]
+   },
+   "status": 200
+  },
+  "tree_root": {
+   "shape": {
+    "items": {
+     "keys": {
+      "id": {
+       "t": [
+        "string"
+       ]
+      },
+      "mode": {
+       "t": [
+        "string"
+       ]
+      },
+      "name": {
+       "t": [
+        "string"
+       ]
+      },
+      "path": {
+       "t": [
+        "string"
+       ]
+      },
+      "type": {
+       "t": [
+        "string"
        ]
       }
      },
