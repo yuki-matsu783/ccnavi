@@ -3,13 +3,13 @@ title: 提案の書式
 type: guide
 description: 親の提案・子の提案の frontmatter と本文、plan / after / phases のコピー、子のフロー、雛形を作る ccnavi ticket new と、書いたあとに打つ検査。フェーズの型の選び方の引き先
 tags: [ticket, phase]
-keywords: [proposal-format, 提案書式, 提案, 子の提案, 親の提案, 書式, phases, フェーズ, plan, after, 計画, frontmatter, ticket new, 雛形, lint, flows, フロー]
+keywords: [proposal-format, 提案書式, 提案, 子の提案, 親の提案, 書式, phases, フェーズ, plan, after, 計画, frontmatter, ticket new, ticket revise, 改版, 雛形, lint, flows, フロー]
 ---
 
 # 提案の書式
 
 提案は、チケット作業の親と子を `wip/proposals/todo/<識別子>.md` に書いたもの。承認すると、中身がそのまま承認済みチケットになる。
-親の提案は手で書かず、雛形を `ccnavi ticket new` で作ってから空欄を埋める。子の提案は雛形が無いので、下の形で手で書く。
+新しい親の提案は手で書かず、雛形を `ccnavi ticket new` で作ってから空欄を埋める。承認済みの親の改版は、`ccnavi ticket revise` で雛形を作る（[下](#承認済みの親の改版の雛形を作る)）。子の提案は雛形が無いので、下の形で手で書く。
 `ccnavi` は `.ccnavi/scripts/ccnavi-launcher.sh` 経由でも打てる（出力が示す形に従う）。提案を送る・承認を頼む流れは[ticket-flow.md](ticket-flow.md)、提案を書く前に合意が要る範囲は[decisions.md](decisions.md)。
 
 ## 書く前に決めること
@@ -35,7 +35,7 @@ ccnavi ticket new <識別子> --title <タイトル> --plan <型,型,...> --issu
 - 作るのは親だけ。`todo/<識別子>.md` に、frontmatter（`version` `ticket` `issue` `mr` `title` `phases` `plan` `rationale` `allow`）と、本文の見出し `## 目的` `## 範囲` `## 対象外` `## 完了の確かめ方` `## 計画の理由` が入る
 - `rationale` と各見出しの下の `（ここに〜を書く）` は空欄の目印で、これが残ったままの新しい提案は、承認と `--lint` が止めるので、すべて書き換える
 - 止まったときは、何も書かれない（子の識別子を渡した、識別子と同名のワークツリーの外で打った、同じ識別子の提案が既にある、など）。出力の案内に従う
-- 子の提案は雛形が作らない。すぐ始まるステップ（`after` の無いステップ）ごとに、子を 1 つ以上同じ承認で通す。無いと `--agree --preview --verify` と `propose` が止まる（`ccnavi ticket new` の出力の「必須:」の行も言う）。先行のあるステップの子は、先行のレビューを見てから足してよい
+- 子の提案は雛形が作らない。すぐ始まるステップ（`after` の無いステップ）ごとに、子を 1 つ以上同じ承認で通す。無いと `--agree --preview --verify` と `propose` が警告する（止めないが、子の承認がもう 1 回要る）。`ccnavi ticket new` の出力も、「必須:」の行で同じことを言う。先行のあるステップの子は、先行のレビューを見てから足してよい
 - `allow` は、雛形が計画の型の `scope` を集めて入れたもの。この作業で触るファイルに合わせて、手で絞るか足す。承認しても書けない項があれば、警告で名指しされる
 
 ## 承認済みの親の改版の雛形を作る

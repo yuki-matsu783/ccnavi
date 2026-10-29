@@ -50,7 +50,7 @@
 | 下書き・使い捨てのファイルを置く | `scratchpad.md` |
 | `projects/` 配下を直す、チケット・マーカー・記録の置き場を確かめる、`rules.yml` の `message` を書く | `projects.md` |
 | 提案を書く、承認・レビュー済みをユーザに頼む、相談が要るか迷う、ccnavi に止められた、サブエージェントに任せる | `decisions.md` |
-| 親の提案・子の提案の書式（frontmatter・`plan`・`after`・`ticket new`）を確かめる、提案を書いたあとに検査を打つ | `proposal-format.md` |
+| 親の提案・子の提案の書式（frontmatter・`plan`・`after`・`ticket new`・承認済みの親の改版の雛形 `ticket revise`）を確かめる、提案を書いたあとに検査を打つ | `proposal-format.md` |
 | 親の提案を始める、完了した親の計画とフローを使い回す、閉じるときにテンプレートの案内が出た | `templates.md` |
 | 用語（ワークスペースルート・統合先ブランチなど）を引く、`.ccnavi/CCNAVI.md` の条件・差し込みを書く、md に frontmatter を付ける・直す、索引で引く | `terms.md`、`ccnavi-md.md`、`frontmatter.md` |
 | フィードバックが届いた、`.claude/skills/` を直す、スキルを新しく作る、スキルの振り返りで知識を溜める・読む、工程スキル（process-*）の reference を引く・足す | `skill-review.md`、`skill-review-propose.md`、`skill-wiki.md`、`skill-processes.md` |
