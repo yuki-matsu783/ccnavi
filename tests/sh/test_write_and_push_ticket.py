@@ -185,8 +185,8 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         merge_head = git(self.tree, "rev-parse", "--git-path", "MERGE_HEAD").stdout.strip()
         self.assertFalse(os.path.exists(os.path.join(self.tree, merge_head)))
 
-    def test_a_hook_writing_between_sorting_and_taking_in_is_retried_once(self):
-        """3 と 4 の間に hook が書いて取り込みが重なったら、見分けからもう 1 回だけやり直す。"""
+    def test_a_hook_writing_between_sorting_and_taking_in_stops_and_a_rerun_passes(self):
+        """3 と 4 の間に hook が書いて取り込みが重なったら、やり直さずに止める。再実行は通る。"""
         rel = f"{APPROVED}/phases/{PARENT}/2.pending"
         body = json.dumps({"review": "mr", "at": "t"})
         self.remote_commit(rel, body)
@@ -203,9 +203,16 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
             "esac\n"
             f"exec '{GIT}' \"$@\"\n",
         )
-        result = self.ticket("start", PARENT, PATH=shim + os.pathsep + os.environ["PATH"])
+        path = shim + os.pathsep + os.environ["PATH"]
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("start", PARENT, PATH=path)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("書きかけ", result.stderr)
+        self.assertIn("再実行してください", result.stderr)
+        self.assertEqual(self.sha(self.tree, "HEAD"), before)
+        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
+        result = self.ticket("start", PARENT, PATH=path)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("もう 1 回だけやり直す", result.stderr)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         self.assertEqual(self.dirty(), "")
 

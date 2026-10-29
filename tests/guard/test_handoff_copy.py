@@ -1,13 +1,9 @@
-"""守る場所のファイルを、下書きの置き場（`wip/handoff/`）へコピーする cp を通すことの受入テスト。
+"""守る場所のファイルを、下書きの置き場（`wip/handoff/`）へ cp で写す形も止めることの受入テスト。
 
-守る場所を直したいときは、置き場へコピーしてコピーを直す（.ccnavi/docs/scratchpad.md）。シェルから
-書き込む形の保護は、cp の行き先の最後の語に守る名前があれば止めるので、`cp
-.ccnavi/scripts/ccnavi-git.sh wip/handoff/ccnavi-git.sh` のように同じ名前でコピーする形まで止まる。
-その形だけを通し、置き場を足場にして守る場所へ書く形は通さないことを確かめる。
-
-保護の式に否定先読みを足して通すと、ルールの読み込みが先読みを受け付けず、
-保護の 1 本がまるごと外れて `echo x > .ccnavi/config/common/rules.yml` まで通る。
-`test_the_guard_itself_still_stops_writes` はそれを見る。
+守る場所を直したいときは、`ccnavi-stage.sh <元のパス>` で置き場へ写し、写しを直す
+（.ccnavi/docs/scratchpad.md）。シェルから書き込む形の保護は、cp の行き先の最後の語に
+守る名前があれば止めるので、`cp .ccnavi/scripts/ccnavi-git.sh wip/handoff/ccnavi-git.sh`
+も止まる。止めた文が `ccnavi-stage.sh` を案内することを確かめる。
 """
 
 from __future__ import annotations
@@ -74,91 +70,20 @@ class HandoffCopyTest(unittest.TestCase):
             cwd=ROOT,
             env=environment,
         )
+        self.said = result.stdout
         return RULE_ID if RULE_ID in result.stdout else ""
 
-    def test_copying_into_the_scratchpad_under_the_same_name_passes(self):
+    def test_copying_into_the_scratchpad_is_stopped_and_points_to_the_stage_script(self):
         for command in (
             "cp .ccnavi/scripts/ccnavi-git.sh wip/handoff/ccnavi-git.sh",
             f"cp {self.repo}/.ccnavi/scripts/ccnavi-git.sh {self.pad}/ccnavi-git.sh",
-            "cp .ccnavi/scripts/ccnavi-git.sh wip/handoff/",
             "cp -f -- .ccnavi/scripts/ccnavi-git.sh wip/handoff/ccnavi-git.sh",
             "install .ccnavi/scripts/ccnavi-git.sh wip/handoff/ccnavi-git.sh",
         ):
             with self.subTest(command=command):
-                self.assertEqual("", self.decide(command))
-
-    def test_a_relative_destination_is_read_from_the_cwd(self):
-        sub = os.path.join(self.repo, "docs")
-        os.makedirs(sub)
-        # docs/ から見た wip/handoff/ は置き場ではない。
-        self.assertEqual(RULE_ID, self.decide("cp /tmp/x wip/handoff/ccnavi-git.sh", cwd=sub))
-        self.assertEqual("", self.decide(f"cp /tmp/x {self.pad}/ccnavi-git.sh", cwd=sub))
-
-    def test_the_scratchpad_is_not_a_stepping_stone(self):
-        try:
-            os.symlink(
-                os.path.join(self.repo, ".ccnavi"),
-                os.path.join(self.pad, "link"),
-                target_is_directory=True,
-            )
-        except OSError:
-            # Windows で開発者モードでないと作れない。
-            self.skipTest("シンボリックリンクを作れない機械")
-        for command in (
-            # `..` で置き場の外へ出る
-            "cp /tmp/x wip/handoff/../../.ccnavi/config/common/rules.yml",
-            # 置き場の中のリンクを通って守る場所へ書く
-            "cp /tmp/x wip/handoff/link/scripts/ccnavi-git.sh",
-            # リンクを作る・リンクのままコピーする・行き先を -t で動かす
-            "cp -l .ccnavi/scripts/ccnavi-git.sh wip/handoff/ccnavi-git.sh",
-            "cp -s .ccnavi wip/handoff/.ccnavi",
-            "cp -a .ccnavi wip/handoff/.ccnavi",
-            "ln -s .ccnavi/scripts/ccnavi-git.sh wip/handoff/ccnavi-git.sh",
-            "cp -t .ccnavi/scripts /tmp/x wip/handoff/ccnavi-git.sh",
-            # 長い選択肢の省略（GNU は曖昧でない範囲で受ける）と、知らない選択肢
-            "cp --target .ccnavi/scripts /tmp/x wip/handoff/ccnavi-git.sh",
-            "cp --target-d .ccnavi/scripts /tmp/x wip/handoff/ccnavi-git.sh",
-            "cp --target=.ccnavi/scripts wip/handoff/ccnavi-git.sh",
-            "cp --l .ccnavi/scripts/ccnavi-git.sh wip/handoff/ccnavi-git.sh",
-            "cp --sym .ccnavi wip/handoff/ccnavi-git.sh",
-            "cp --rec .ccnavi wip/handoff/ccnavi-git.sh",
-            "install --dir .ccnavi wip/handoff/ccnavi-git.sh",
-            "cp -x .ccnavi/scripts/ccnavi-git.sh wip/handoff/ccnavi-git.sh",
-            # 1 本目で置き場へコピーし、続くコマンドで守る場所へ書く
-            "cp a wip/handoff/ccnavi-git.sh && cp /tmp/x .ccnavi/config/common/rules.yml",
-            "cp a wip/handoff/ccnavi-git.sh; echo x > .ccnavi/config/common/rules.yml",
-            "cp a wip/handoff/ccnavi-git.sh > .ccnavi/config/common/rules.yml",
-            # 表記どおりに読めない行き先
-            "cp $X wip/handoff/ccnavi-git.sh",
-            # 名前が似ているだけの別の場所
-            "cp /tmp/x wip/handoffx/ccnavi-git.sh",
-        ):
-            with self.subTest(command=command):
                 self.assertEqual(RULE_ID, self.decide(command))
-
-    def test_a_home_destination_is_not_read_from_the_cwd(self):
-        # シェルは `~` をホームに展開する。cwd が置き場の中でも、置き場の中とは読まない。
-        self.assertEqual(RULE_ID, self.decide("cp /tmp/x ~/.claude/settings.json", cwd=self.pad))
-
-    def test_a_hard_linked_destination_is_not_exempt(self):
-        # 置き場のコピーが守る場所のファイルとつながっていれば、上書きは守る場所も書き換える。
-        original = os.path.join(self.repo, ".ccnavi", "scripts", "ccnavi-git.sh")
-        try:
-            os.link(original, os.path.join(self.pad, "ccnavi-git.sh"))
-        except OSError:
-            self.skipTest("ハードリンクを作れない機械")
-        self.assertEqual(RULE_ID, self.decide("cp /tmp/x wip/handoff/ccnavi-git.sh"))
-
-    def test_a_linked_scratchpad_is_not_exempt(self):
-        # 置き場そのものが守る場所へのリンクなら、置き場へコピーすることが守る場所へ書くことになる。
-        shutil.rmtree(self.pad)
-        try:
-            os.symlink(
-                os.path.join(self.repo, ".ccnavi", "scripts"), self.pad, target_is_directory=True
-            )
-        except OSError:
-            self.skipTest("シンボリックリンクを作れない機械")
-        self.assertEqual(RULE_ID, self.decide("cp /tmp/x wip/handoff/ccnavi-git.sh"))
+                self.assertIn("ccnavi-stage.sh", self.said)
+                self.assertIn("<元のパス>", self.said)
 
     def test_the_guard_itself_still_stops_writes(self):
         for command in (

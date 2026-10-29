@@ -171,7 +171,7 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # 取り込み（分かれた親ブランチの merge、消えた親ブランチの確認、片付けの記録の読み出し）。
 # ccnavi-git.sh の拒否の文面が ccnavi-sync.sh を案内するので、配らないと案内どおりに実行しても動かない。
 # ccnavi-clean.sh と ccnavi-clean.js は、ワークツリーを片付ける前に生成物を消すもの。Windows では
-# node_modules などが残ると worktree remove が途中で止まる。js が本体で、sh は node を探して js を渡す。
+# node_modules などが残ると worktree remove が途中で止まる。js が本体で、sh は node を探して js を渡す（node が無ければ消さず、ユーザが打つ削除の 1 本を出す）。
 # ccnavi-branches.sh は issue・MR に紐づくブランチを探す sh。UserPromptSubmit の hook が依頼文の
 # issue・MR の指定を見つけるとこの表記を案内するので、配らないと案内どおりに実行しても動かない。
 # ccnavi-start.sh は issue・MR の指定を受けた着手の入口で、hook がこの表記を案内する。中で ccnavi-branches.sh を呼ぶ。

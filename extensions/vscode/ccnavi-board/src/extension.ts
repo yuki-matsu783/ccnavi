@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 
 import { pickAppearance } from "./appearance.js";
+import { disposeReport, finishReport, startReport, takeScreenshot } from "./bug-report.js";
 import { openBoard, refreshBoard } from "./board-panel.js";
 import { registerScreens, screens } from "./core/screens.js";
 import { openFlow } from "./flow-panel.js";
@@ -55,6 +56,11 @@ export function activate(context: vscode.ExtensionContext): void {
     // 親の識別子を引数で受けて開く（キーバインドの args や、ほかの拡張の executeCommand から）。開く親を選ぶ段が
     // 無いので、コマンドパレットには出さない（package.json の menus.commandPalette で when: false）
     vscode.commands.registerCommand("ccnaviBoard.openWorkflow", (ticket: unknown) => void screens().workflow(String(ticket ?? ""))),
+    // バグ報告。撮る・終えるは報告の間だけコマンドパレットに出す（package.json の when）
+    vscode.commands.registerCommand("ccnaviBoard.bugReport", () => void startReport()),
+    vscode.commands.registerCommand("ccnaviBoard.bugReportScreenshot", () => void takeScreenshot()),
+    vscode.commands.registerCommand("ccnaviBoard.bugReportFinish", () => void finishReport()),
+    { dispose: disposeReport },
   );
   // 版が変わった最初の起動で、左パネルの案内を開く
   openSidebarTourOnNewVersion(context);

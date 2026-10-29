@@ -50,8 +50,9 @@
 閉じる側（B を止める）に倒す。壊れた記録が防御を消さないため。ただし文面が次の一手を言う。
 
 - ユーザの発言の記録が無い・読めない: 「まだ発言が無い」。次のユーザの発言が書き直すので、詰まらない
-- 関門の記録のファイルが読めない: 時刻はファイルの更新時刻で代える。名前から宣言が決まれば、キーは
-  どれとも一致する扱いにする
+- 関門の記録のファイルが読めない（壊れた・形が違う）: このセッションのどの B も止め、文に記録の
+  パスを出す。時刻・宣言・キーは推さない。次のユーザの発言（`drop_broken`）が消すので、詰まらない。
+  記録の A はその発言より前にあるので、消しても発言をはさんだ事実は変わらない
 - 関門の置き場を読めない: B を止め、ユーザに置き場を確かめてもらう
 - A の記録を書けない: A を止め、ユーザに置き場を確かめてもらう
 
@@ -90,6 +91,7 @@ _SAFE_KEY = re.compile(r"[A-Za-z0-9._-]+")
 SAME_COMMAND = "same-command"
 NO_USER_TURN = "no-user-turn"
 UNREADABLE = "unreadable"
+BROKEN = "broken"
 UNWRITABLE = "unwritable"
 ASK = "ask"
 
@@ -274,10 +276,11 @@ def _session_names(state: str, session: str) -> tuple[list[str], str]:
     return sorted(n for n in names if n.startswith(head) and n.endswith(SUFFIX)), ""
 
 
-def _entries(state: str, session: str, gates: tuple[Gate, ...]) -> tuple[list[_Entry], str]:
-    """このセッションの記録。読めない記録は、更新時刻で時刻を代え、名前から宣言が決まれば残す。"""
+def _entries(state: str, session: str) -> tuple[list[_Entry], list[str], str]:
+    """このセッションの記録、読めない記録のパス、置き場を読めなかった理由。"""
     names, failed = _session_names(state, session)
     found: list[_Entry] = []
+    broken: list[str] = []
     for name in names:
         path = os.path.join(state, name)
         data, bad = fsio.read_json(path)
@@ -293,17 +296,16 @@ def _entries(state: str, session: str, gates: tuple[Gate, ...]) -> tuple[list[_E
             ):
                 found.append(_Entry(gate, key, float(at), path))
                 continue
-        # 読めない記録。防御を消さないよう、宣言が名前から決まるものは、
-        # どのキーとも一致する扱いで残す。
-        try:
-            at = os.stat(path).st_mtime
-        except OSError:
-            continue
-        for gate in gates:
-            if f"-{_safe(gate.id, 40)}-" in name:
-                found.append(_Entry(gate.id, WILDCARD, at, path))
-                break
-    return found, failed
+        if os.path.lexists(path):  # 読む間に消えた（B が通って消した）ものは数えない
+            broken.append(path)
+    return found, broken, failed
+
+
+def drop_broken(state: str, session: str) -> None:
+    """読めない記録を消す。ユーザの発言で呼ぶ（記録の A は、この発言より前にある）。"""
+    if state and session:
+        for path in _entries(state, session)[1]:
+            fsio.remove(path)
 
 
 def check(
@@ -322,7 +324,8 @@ def check(
     処理フロー:
     1. 宣言ごとに B にヒットする箇所を探す。無ければ次の宣言へ。
     2. 同じコマンドに、同じキーの A もあれば止める（まだ記録が無い）。
-    3. このセッションの記録を読み、同じ宣言・同じキーの記録を集める。置き場を読めなければ止める。
+    3. このセッションの記録を読み、同じ宣言・同じキーの記録を集める。置き場を読めない、または
+       読めない記録があれば止める。
     4. 記録が無ければ通す。あれば、ユーザの発言の記録（`userprompt.last`）を読み、記録の時刻より
        後の発言が無い記録が 1 つでもあれば止める。無い・読めなければ「まだ発言が無い」と読む。
     5. 全部の記録より後に発言があれば、一致した記録を消して通す。
@@ -343,9 +346,11 @@ def check(
                 return Stop(gate, SAME_COMMAND, _shown(b_raw))
         if same_command_only:
             continue
-        entries, failed = _entries(state, session, gates)
+        entries, broken, failed = _entries(state, session)
         if failed:
             return Stop(gate, UNREADABLE, _shown(b_hits[0][1]), failed)
+        if broken:
+            return Stop(gate, BROKEN, _shown(b_hits[0][1]), broken[0])
         matched: list[tuple[_Entry, str]] = [
             (e, b_raw)
             for e in entries
@@ -471,9 +476,10 @@ def message(stop: Stop, root: str) -> str:
         "second_name": gate.second_name,
         "where": where,
     }
-    if stop.reason in (UNREADABLE, UNWRITABLE):
+    if stop.reason in (UNREADABLE, UNWRITABLE, BROKEN):
         values["detail"] = stop.detail
-        return texts.say(root, "DENY_NEEDS_USER_TURN__STATE", values, {"what": stop.reason})
+        cases = {"what": stop.reason, "next": "broken" if stop.reason == BROKEN else "place"}
+        return texts.say(root, "DENY_NEEDS_USER_TURN__STATE", values, cases)
     values["key"] = key or gate.key_name
     case = "same_command" if stop.reason == SAME_COMMAND else "no_user_turn"
     return texts.say(root, gate.message, values, {"what": case})

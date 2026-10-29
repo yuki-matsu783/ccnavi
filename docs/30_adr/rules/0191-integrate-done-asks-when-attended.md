@@ -5,7 +5,7 @@ description: ターン分離の関門の宣言に、付き添いのあるセッ�
 tags: [hook, direct-flow, ask]
 keywords: [ターン分離, 関門, integrate, integrate-done, ask, 確認ダイアログ, 付き添い, 非対話, CLAUDE_CODE_SESSION_ATTENDED, ask_if_attended, bypassPermissions]
 ---
-# ADR-0186: 付き添いのあるセッションでは、確定の前に発言を待たず、組み込みの確認（ask）でユーザの了承を取る
+# ADR-0191: 付き添いのあるセッションでは、確定の前に発言を待たず、組み込みの確認（ask）でユーザの了承を取る
 
 状態: 採用
 

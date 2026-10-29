@@ -597,7 +597,7 @@ class Rule:
     compiled: re.Pattern | None = None
     # exempt は、式を適用する前に対象から外すものを決める関数。組み込みの保護だけが持ち、
     # ルールファイルからは書けない。式は先読みを使えないので、「この形の中でも、これだけは
-    # 通す」は式の外で決める（selfguard_shell.handoff_copy_exempt）。返すのは式を適用する
+    # 通す」は式の外で決める（selfguard_shell.handoff_link_command など）。返すのは式を適用する
     # 対象で、外すものが無ければ受け取ったまま返す。
     exempt: Callable[[str], str] | None = field(default=None, repr=False, compare=False)
 
@@ -755,20 +755,6 @@ def load(path: str, root: str = "") -> tuple[RuleSet, list[Problem]]:
     with open(path, encoding="utf-8") as f:
         text = f.read()
     return parse(_decode(text, path), root)
-
-
-def readable(content: bytes) -> bool:
-    """その中身を、load がルールファイルとして読めるか。
-
-    読めなければ呼び手（ruleload.load_rules）は組み込みの既定を使う。バックアップの中身を見て
-    「この呼び出しの直前に既定を使っていたか」を決めるのに使う（selfguard）。線を load と
-    別に引くと、既定を使っていたのに使っていないと読む、あるいはその逆が起きる。
-    """
-    try:
-        _decode(content.decode("utf-8"), "(content)")
-    except ValueError:
-        return False
-    return True
 
 
 def _decode(text: str, path: str) -> dict:

@@ -3,7 +3,7 @@
 
 UserPromptSubmit・PreToolUse・PostToolUseFailure・Stop・SessionStart を続けて呼ぶ。
 
-見るのは次の 8 つ。付き添いのないセッション（`CLAUDE_CODE_SESSION_ATTENDED=0`）を既定にして、
+見るのは次の 9 つ。付き添いのないセッション（`CLAUDE_CODE_SESSION_ATTENDED=0`）を既定にして、
 発言を待つ関門を確かめる。付き添いのあるセッションは `AttendedTest` で確かめる。
 
 - 付き添いのあるセッションでは、`integrate-done` は発言を待たず確認（ask）に出る。
@@ -16,6 +16,7 @@ UserPromptSubmit・PreToolUse・PostToolUseFailure・Stop・SessionStart を続�
 - サブエージェント、別のセッション、並行した呼び出し、同じコマンドの連結
 - 起動と再開は記録を消す。compact は消さない。dry-run でも止まる
 - 止めた記録（`decisions.jsonl`）の拒否コードと `rules`
+- 壊れた関門の記録は止め、次のユーザの発言で消える（完了通知では消えない）
 """
 
 from __future__ import annotations
@@ -197,6 +198,26 @@ class AttendedTest(TurnGateHookTest):
         self.run_command(INTEGRATE)
 
         self.assertTrue(self.stopped(self.run_command(DONE)))
+
+
+class BrokenEntryTest(TurnGateHookTest):
+    def test_壊れた記録は止め_次のユーザの発言で解ける(self):
+        self.say()
+        self.run_command(INTEGRATE)
+        path = os.path.join(self.state, self.entries()[0])
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("{not json")
+
+        done = self.run_command(DONE)
+        self.assertTrue(self.stopped(done))
+        self.assertIn(self.entries()[0], done.stdout)
+
+        self.say(NOTICE)
+        self.assertTrue(self.stopped(self.run_command(DONE)))
+
+        self.say("どうぞ")
+        self.assertEqual(self.entries(), [])
+        self.assertFalse(self.stopped(self.run_command(DONE)))
 
 
 class NotUserTurnTest(TurnGateHookTest):
