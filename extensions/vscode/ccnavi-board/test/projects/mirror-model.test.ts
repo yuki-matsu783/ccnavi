@@ -138,7 +138,7 @@ test("CB-T1159 実行ファイルの出力の読み方: 読める答えは終了
 
 test("CB-T1160 行の一言と変更の種類の言い方。名前は大文字小文字を区別せずに引く", () => {
   const list = listOf();
-  assert.deepEqual(list.projects.map(stateText), ["同期済み", "ずれ 3 件", "調べられません"]);
+  assert.deepEqual(list.projects.map(stateText), ["同期済み", "ずれ 3 件", "確認できません"]);
   assert.deepEqual(["update", "create", "delete", "rename"].map(actionText), ["更新", "追加", "削除", "rename"]);
   assert.equal(mirrorOf(list, "WEB")?.name, "web");
   assert.equal(mirrorOf(list, "nothing"), undefined);
@@ -156,20 +156,20 @@ test("CB-T1161 「すべて同期」の対象は differs のプロジェクト�
   assert.equal(syncAllButton(ok(noExpect), false).enabled, false);
 });
 
-test("CB-T1162 ボタンを押せないとき: 同期中、調べる前、古い実行ファイル、調べられない、コピーするものが無い。理由を返す", () => {
+test("CB-T1162 ボタンを押せないとき: 同期中、確認する前、古い実行ファイル、確認できない、コピーするものが無い。理由を返す", () => {
   const list = listOf();
   assert.deepEqual(projectSyncButton(ok(list), false, "web"), { enabled: true, reason: "" });
   assert.match(projectSyncButton(ok(list), true, "web").reason, /同期しています/);
   assert.equal(syncAllButton(ok(list), true).enabled, false);
-  assert.match(projectSyncButton({ kind: "waiting" }, false, "web").reason, /調べています/);
+  assert.match(projectSyncButton({ kind: "waiting" }, false, "web").reason, /確認しています/);
   const old: MirrorStatus = { kind: "unsupported", reason: "実行ファイル（ccnavi 0.1.0）が mirror の機能に対応していません（古い版です）" };
   assert.deepEqual(projectSyncButton(old, false, "web"), { enabled: false, reason: old.reason });
   assert.deepEqual(syncAllButton(old, false), { enabled: false, reason: old.reason, count: 0 });
-  assert.match(projectSyncButton({ kind: "failed", error: "期限切れ" }, false, "web").reason, /調べられませんでした/);
+  assert.match(projectSyncButton({ kind: "failed", error: "期限切れ" }, false, "web").reason, /確認できませんでした/);
   const empty = listOf(LIST_TEXT.replace('"common_empty":false', '"common_empty":true'));
   assert.match(projectSyncButton(ok(empty), false, "web").reason, /コピーするものがありません/);
   assert.equal(syncAllButton(ok(empty), false).enabled, false);
-  // 行ごと: ずれが無い・調べられない・結果に無い
+  // 行ごと: ずれが無い・確認できない・結果に無い
   assert.deepEqual(projectSyncButton(ok(list), false, "app"), { enabled: false, reason: "ずれはありません" });
   assert.deepEqual(projectSyncButton(ok(list), false, "x"), { enabled: false, reason: "理由" });
   assert.match(projectSyncButton(ok(list), false, "lib").reason, /このプロジェクトがありません/);

@@ -16,7 +16,7 @@ import { CheckedAt, MirrorBanners, SyncAllButton } from "./Mirror.js";
 import { Project } from "./Project.js";
 import { post } from "./post.js";
 import { EMPTY, guessName, loadClone, saveClone, type CloneState } from "./state.js";
-import { isTrackedProjectsDir } from "./text.js";
+import { formatGeneratedAt, isTrackedProjectsDir } from "./text.js";
 
 /** 案内（`tours/projects.yml`）。見本は使わず、画面は今の中身のまま指す */
 const TOUR = tourOf(projectsTour);
@@ -175,7 +175,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
       </section>
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
       <footer className="foot">
-        最終更新 {page.generatedAt}（{page.root}）
+        最終更新 {formatGeneratedAt(page.generatedAt)}
       </footer>
     </>
   );
@@ -242,7 +242,7 @@ function Strays({ strays }: { readonly strays: readonly Stray[] }): JSX.Element 
         プロジェクトとして認識されない git リポジトリ <span className="count">{strays.length}</span>
       </h2>
       <p className="hint">
-        ワークスペース直下から 2 階層まで（`projects/` の中だけ 3 階層まで）を探して見つかったものです。プロジェクトとして扱うには <code>projects/</code>{" "}
+        ワークスペース直下から 2 階層まで（<code>projects/</code> の中だけ 3 階層まで）を探して見つかったものです。プロジェクトとして扱うには <code>projects/</code>{" "}
         の直下へ移してください。
       </p>
       <ul className="stray-list">

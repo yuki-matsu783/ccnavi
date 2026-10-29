@@ -141,7 +141,7 @@ src/
     projects/App.tsx  ツールバー（更新）・帯・clone の欄・一覧・認識されない git・ワークスペース（プロジェクト外）と、拡張ホストからのメッセージの受け
     projects/Project.tsx カード 1 枚（名前・バッジ・項目・検証）
     projects/state.ts 画面が覚えるもの（clone の欄）の読み書き
-    projects/text.ts  カードに出す言葉（プロジェクトの設定の場所、重ねない苦情）
+    projects/text.ts  カードに出す言葉（プロジェクトの設定の場所、重ねない苦情）と、フッタの最終更新の時刻の形（`formatGeneratedAt`）
     risk/style.css    リスク管理画面の CSS の入口
     risk/App.css      App.tsx の CSS（境目の点の枠）
     risk/Factor.css   Factor.tsx の CSS（配点 1 件の行）
