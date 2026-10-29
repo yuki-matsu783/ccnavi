@@ -192,7 +192,7 @@ class TidyTest(PhaseHarness):
         self.assertTrue(os.path.isdir(doing))
         self.assertFalse(os.path.exists(gone))
 
-    def test_a_closed_child_with_uncommitted_changes_is_named_and_kept(self):
+    def test_a_closed_child_with_uncommitted_changes_is_kept_with_a_status_hint(self):
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["src/*"], review=False))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)

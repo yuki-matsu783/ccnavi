@@ -81,7 +81,7 @@ _SHOWN = 10
 
 @dataclass
 class Dropped:
-    """1 本のワークツリーを消した結果。`detail` は名指しする変更や、消せなかった理由。"""
+    """1 本のワークツリーを消した結果。`detail` は消せなかった理由や、名指しする無視されたファイル。"""
 
     name: str
     status: str
