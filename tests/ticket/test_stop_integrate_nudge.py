@@ -161,6 +161,23 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         self.assertIn("取り込み先が切り替わっています", body["systemMessage"])
         self.assertIn("other", body["systemMessage"])
 
+    def test_a_switched_base_branch_with_uncommitted_changes_only_tells_the_reason(self):
+        """未コミットだけなら促す前提で言わず、取り込めない理由だけを言う。"""
+        path = self.direct(dirty=True)
+        self.record()
+        git(self.root, "switch", "--quiet", "-c", "other")
+        message = self.assert_not_asked(self.stop(path))["systemMessage"]
+        self.assertIn("今は取り込めません", message)
+        self.assertNotIn("未コミット", message)
+
+    def test_a_switched_base_branch_during_integrate_says_it_is_in_progress(self):
+        path = self.direct(commit=True)
+        common = self.record()
+        write(os.path.join(common, "ccnavi-integrate", "scratch", "marker"), "version 4\n")
+        git(self.root, "switch", "--quiet", "-c", "other")
+        message = self.assert_not_asked(self.stop(path))["systemMessage"]
+        self.assertIn("取り込みの途中ですが", message)
+
     def test_a_mid_operation_in_the_main_checkout_is_reported_without_stopping(self):
         path = self.direct(commit=True)
         self.record()
