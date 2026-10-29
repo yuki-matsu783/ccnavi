@@ -35,6 +35,7 @@ from ..tickets.phase import gates as phase
 from ..tickets.phase import scope as phase_scope
 from . import (
     agentlaunch,
+    ccnavimd,
     failsafe,
     parentwrite,
     reasons,
@@ -445,13 +446,41 @@ def decide_before(
     # （`turngate.BUILTIN`）。ルールより先に見る。ルールが allow と書いていても、ユーザの返事を
     # 待つ手順は外さない。B は止め、通した A は記録する（記録は拒否・失敗で消す。`events.decide`、
     # `decide_after_failure`）。サブエージェントの呼び出しも、同じセッションの記録で見る。
+    # 付き添いのあるセッションでは、`ask_if_attended` の宣言は発言を待たず、B を確認に出す
+    # （同じコマンドに A と B を並べた呼び出しだけは止める）。
     if payload.tool_name in phase_forms.SHELL_TOOLS:
         gate_texts = [subject, *(layer for runner, layer, _ in inner if runner != shellread.MOVED)]
-        stop = turngate.check(
-            turngate.BUILTIN, gate_texts, conf.state, payload.session_id
-        ) or turngate.note(
-            turngate.BUILTIN, gate_texts, conf.state, payload.session_id, payload.tool_use_id
+        waited, asked = turngate.split_by_attendance(turngate.BUILTIN, not ccnavimd.unattended())
+        stop = (
+            turngate.check(waited, gate_texts, conf.state, payload.session_id)
+            or turngate.check(
+                asked, gate_texts, conf.state, payload.session_id, same_command_only=True
+            )
+            or turngate.note(
+                waited, gate_texts, conf.state, payload.session_id, payload.tool_use_id
+            )
         )
+        confirm = None if stop is not None else turngate.asks(asked, gate_texts)
+        if confirm is not None:
+            record.code, record.rules = reasons.CODE_RULE_ASK, [turngate.rule_id(confirm.gate)]
+            return refuse(
+                stdout,
+                mode,
+                record,
+                rules.ASK,
+                notices
+                + [
+                    reasons.builtin_refusal(
+                        reasons.CODE_RULE_ASK,
+                        turngate.rule_id(confirm.gate),
+                        display_subject,
+                        turngate.ask_message(confirm, root),
+                    )
+                ],
+                conf=conf,
+                root=root,
+                kind=GATE,
+            )
         if stop is not None:
             record.code, record.rules = turngate.CODE, [turngate.rule_id(stop.gate)]
             return refuse(

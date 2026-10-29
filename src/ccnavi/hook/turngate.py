@@ -22,6 +22,11 @@
   キーとも一致する扱い（A の側なら、どの B も止める）。読めない書き方で関門を外せないようにするため
 - 宣言の置き場は組み込みの表（`BUILTIN`）だけ。ユーザの了承の関門を、配布先のルールファイルで
   外されないようにするため。ルールファイルから足す道は、いまは持たない
+- `ask_if_attended` を立てた宣言は、付き添いのある（対話の）セッションでは、発言を待つ関門を
+  働かせず、B を確認ダイアログ（ask）に出す。ユーザの許可がダイアログという別の操作で取れるので、
+  同じターンで確定できる。同じコマンドに A と B を並べた呼び出しだけは、対話でも止める（差分を
+  見せる前に確定させない）。付き添いのないセッションは確認に答える人がいないので、これまでの関門が働く。
+  付き添いの有無は `ccnavimd.unattended` が決める
 
 ## 状態
 
@@ -86,6 +91,7 @@ SAME_COMMAND = "same-command"
 NO_USER_TURN = "no-user-turn"
 UNREADABLE = "unreadable"
 UNWRITABLE = "unwritable"
+ASK = "ask"
 
 # 文面に載せるキーの長さの上限（識別子の長さの上限と同じ）。
 _SHOWN = 64
@@ -122,6 +128,10 @@ class Gate:
     message: str
     # 次の一手の `{key}` に、キーが解けなかったとき入れる仮の値。
     key_name: str = "<キー>"
+    # 付き添いのあるセッションでは、発言を待つ代わりに B を確認（ask）に出す。
+    ask_if_attended: bool = False
+    # ask の文を引く識別子。`ask_if_attended` のときだけ使う。
+    ask_message: str = ""
 
 
 @dataclass(frozen=True)
@@ -166,6 +176,8 @@ INTEGRATE_GATE = Gate(
     second_name="ccnavi-git.sh integrate-done",
     message="DENY_NEEDS_USER_TURN__INTEGRATE",
     key_name="<名前>",
+    ask_if_attended=True,
+    ask_message="NOTICE_ASK_USER_CONFIRM__INTEGRATE",
 )
 
 BUILTIN: tuple[Gate, ...] = (INTEGRATE_GATE,)
@@ -299,6 +311,8 @@ def check(
     texts: list[str],
     state: str,
     session: str,
+    *,
+    same_command_only: bool = False,
 ) -> Stop | None:
     """B を打とうとしているコマンドを止めるか。止めるなら理由を返す。通すなら None。
 
@@ -312,6 +326,9 @@ def check(
     4. 記録が無ければ通す。あれば、ユーザの発言の記録（`userprompt.last`）を読み、記録の時刻より
        後の発言が無い記録が 1 つでもあれば止める。無い・読めなければ「まだ発言が無い」と読む。
     5. 全部の記録より後に発言があれば、一致した記録を消して通す。
+
+    same_command_only が真なら、手順 2（同じコマンドに A と B が並ぶ）だけを見る。付き添いのある
+    セッションで B を確認に出す宣言（`ask_if_attended`）に使う。記録は読まない・消さない。
     """
     if not state or not session:
         return None
@@ -324,6 +341,8 @@ def check(
         for b_key, b_raw in b_hits:
             if any(_same(b_key, a_key) for a_key, _ in a_hits):
                 return Stop(gate, SAME_COMMAND, _shown(b_raw))
+        if same_command_only:
+            continue
         entries, failed = _entries(state, session, gates)
         if failed:
             return Stop(gate, UNREADABLE, _shown(b_hits[0][1]), failed)
@@ -342,6 +361,26 @@ def check(
                 return Stop(gate, NO_USER_TURN, _shown(b_raw))
         for entry, _ in matched:
             fsio.remove(entry.path)
+    return None
+
+
+def split_by_attendance(
+    gates: tuple[Gate, ...], attended: bool
+) -> tuple[tuple[Gate, ...], tuple[Gate, ...]]:
+    """宣言を (発言を待つ関門で見るもの, 確認（ask）に出すもの) に分ける。
+
+    確認に出すのは、付き添いのあるセッションで `ask_if_attended` を立てた宣言だけ。
+    """
+    asked = tuple(g for g in gates if attended and g.ask_if_attended)
+    return tuple(g for g in gates if g not in asked), asked
+
+
+def asks(gates: tuple[Gate, ...], texts: list[str]) -> Stop | None:
+    """B を打とうとしているコマンドが、確認に出す宣言にヒットするか。ヒットした宣言とキーを返す。"""
+    for gate in gates:
+        found = hits(gate.second, f"{gate.id} の second", texts)
+        if found:
+            return Stop(gate, ASK, _shown(found[0][1]))
     return None
 
 
@@ -403,6 +442,19 @@ def clear(state: str, session: str) -> None:
     names, _ = _session_names(state, session)
     for name in names:
         fsio.remove(os.path.join(state, name))
+
+
+def ask_message(stop: Stop, root: str) -> str:
+    """確認ダイアログに添える文。文は `Gate.ask_message` の識別子が持つ。"""
+    gate = stop.gate
+    where = f"（宣言 {gate.id}" + (f"、キー {stop.key}" if stop.key else "") + "）"
+    values = {
+        "first_name": gate.first_name,
+        "second_name": gate.second_name,
+        "where": where,
+        "key": stop.key or gate.key_name,
+    }
+    return texts.say(root, gate.ask_message, values)
 
 
 def message(stop: Stop, root: str) -> str:
