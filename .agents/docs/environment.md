@@ -27,7 +27,7 @@ keywords: [落とし穴, uv, jq, CP932, Docker, PyInstaller, gitdir, 大文字�
 
 ## 実測で分かった環境固有の落とし穴
 
-Claude Codeの振る舞いについて測った前提は設計書の付録C（[appendix.md](../21_design/appendix.md)）にある。ここには環境ごとの落とし穴を置く。
+Claude Codeの振る舞いについて測った前提は設計書の付録C（[appendix.md](../../docs/21_design/appendix.md)）にある。ここには環境ごとの落とし穴を置く。
 
 - **ワークツリーが消せない（Windows）。** uvのハードリンクで`.venv`の`_yaml.*.pyd`が全ツリーで同じ実体になり、
   誰かのテストが読み込んでいる間は消せない。`pyproject.toml`の`link-mode = "copy"`で分けてあるが、

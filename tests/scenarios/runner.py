@@ -1,4 +1,4 @@
-"""受入シナリオを claude -p で回す実行器。手順と決まりは docs/42_claude/acceptance-scenarios.md。
+"""受入シナリオを claude -p で回す実行器。手順と決まりは .agents/docs/acceptance-scenarios.md。
 
 普段のテストには含めない。人間に確認を取ってから、明確な指示があったときだけ回す。
 
@@ -642,7 +642,7 @@ def _write_state(out, st):
 
 class Refusal(Exception):
     """回す前の拒否・停止。str() は、理由の行・`案内:` の行・最後に `次:` の 1 行。
-    行頭の語は docs/42_claude/script-output.md。"""
+    行頭の語は .agents/docs/script-output.md。"""
 
     def __init__(self, what, next_line, *notes):
         super().__init__(what)
@@ -1058,7 +1058,7 @@ def check_before_run(scn, root, top):
             raise Refusal(
                 f"docker-gitlab の GitLab を使えない: {exc}",
                 "`uv run python tests/manual/gitlab/docker_gitlab.py up` で立て"
-                "（動いていれば `status` で確かめる。docs/42_claude/gitlab-manual.md）、打ち直す",
+                "（動いていれば `status` で確かめる。.agents/docs/gitlab-manual.md）、打ち直す",
                 "対象にも GitLab にも何もしていない",
             ) from None
 

@@ -1,7 +1,7 @@
 /**
  * GitLab の応答の「形」を作り、比べる。`tests/contract/shape.py` を同じ名前・同じ規則で写したもの。
  * 正本は Python。規則を変えたいときは Python 側を直し、`normalize-cases.json` を直してからここを合わせる。
- * 仕様は `docs/42_claude/gitlab-contract.md`。
+ * 仕様は `.agents/docs/gitlab-contract.md`。
  */
 import fs from "node:fs";
 import path from "node:path";

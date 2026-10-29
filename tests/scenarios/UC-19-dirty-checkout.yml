@@ -7,7 +7,7 @@ model: haiku
 budget_usd: 2.0
 test_repo: true                  # projects/test-repo にブランチ・コミットを作る。回す前に確認事項 2・3 を確かめる
 
-# 事前状態は実行器が作り、回す前と回したあとに base へ戻す（docs/42_claude/acceptance-scenarios.md）。
+# 事前状態は実行器が作り、回す前と回したあとに base へ戻す（.agents/docs/acceptance-scenarios.md）。
 # 追記は projects/test-repo にすでにある管理下のファイルへの追記で、消さない（戻すのは reset）。
 # 判定の対象は projects/test-repo だけ。ccnavi 本体に追記や git を向けると、回す前に拒否される。
 setup:

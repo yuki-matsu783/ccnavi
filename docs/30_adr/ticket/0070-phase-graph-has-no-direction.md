@@ -134,7 +134,7 @@ Chromium で実測したところ、無効になるのは属性のほうだけ�
 MIT の条件ではないので消すこともできるが、こちらから決めることではない。
 
 ただしこれは**押すと外へ出るリンク**（`https://reactflow.dev?utm_source=attribution`）で、
-VS Code は Webview のリンクを外部ブラウザで開く。画面は自分から外を見に行かない（`docs/42_claude/exe-boundary.md` の
+VS Code は Webview のリンクを外部ブラウザで開く。画面は自分から外を見に行かない（`.agents/docs/exe-boundary.md` の
 実行ファイルの境界）が、**ユーザが押せば外へ出る経路が 1 つできる**。CB-T167 は CSS しか見ないので、
 これは検出されない。色は変数ではなく直書き（`#999`）なので、`Graph.css` で
 `--vscode-textLink-foreground` に合わせた（高コントラストの明るいテーマで #999 は 3:1 に届かない）。

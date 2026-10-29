@@ -1,5 +1,5 @@
 """受入シナリオの `setup.host`（評価の相手）を用意して片付ける。
-決まりは docs/42_claude/acceptance-scenarios.md。
+決まりは .agents/docs/acceptance-scenarios.md。
 
 - `bare`: 対象の origin への通信を、一時ディレクトリの bare に向ける。
   git の代役が URL をホストの形で答える。

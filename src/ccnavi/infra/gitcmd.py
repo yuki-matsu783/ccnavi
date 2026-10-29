@@ -37,7 +37,7 @@ def _env() -> dict[str, str]:
 
     `GIT_NO_LAZY_FETCH=1` は partial clone の遅延取得を止める。無い blob を読むとき git は
     promisor のリモートへ取りに行くので、実行ファイルがネットワークに出ることになる
-    （docs/42_claude/exe-boundary.md）。取れない blob は
+    （.agents/docs/exe-boundary.md）。取れない blob は
     「読めない」になる。
     """
     return {**os.environ, "GIT_OPTIONAL_LOCKS": "0", "GIT_NO_LAZY_FETCH": "1"}

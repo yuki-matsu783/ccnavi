@@ -1,6 +1,6 @@
 """見本（`tests/sh/gitlab_host.py` とフィクスチャ）の応答の形を、本物の記録と比べる。
 
-仕様は `docs/42_claude/gitlab-contract.md` の「見本」の節。`tests/sh` は import しない
+仕様は `.agents/docs/gitlab-contract.md` の「見本」の節。`tests/sh` は import しない
 （`test_layout` が禁じる）ので、`gitlab_host.py` はパスを指して読み込む。
 
 見る観点:
