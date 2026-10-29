@@ -49,8 +49,10 @@ import json
 import math
 import os
 import re
+import select
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -60,9 +62,10 @@ from pathlib import Path
 
 import yaml
 
-from ccnavi.infra import pathcase
+from ccnavi.infra import pathcase, settings
 from ccnavi.records import diaglog
-from ccnavi.tickets.model import review_host
+from ccnavi.tickets.approval import store as approval_store
+from ccnavi.tickets.model import review_host, ticket, ticket_model
 from tests.scenarios import hostenv
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -112,6 +115,7 @@ def load_scenario(path):
     data.setdefault("expect", {})
     _check_setup(path, data.get("setup"))
     _check_human_api(path, data)
+    _check_human_run(path, data)
     for n, step in enumerate(data["steps"], 1):
         after = step.get("expect_after")
         if after is None:
@@ -169,6 +173,33 @@ def _check_human_api(path, data):
                     f"{where} の {i} 件目: resolve の thread {op.get('thread')!r} は、"
                     "前の thread の as で名前を付けたものだけ指せます"
                 )
+
+
+def _check_human_run(path, data):
+    """human step の human_run（人間役が端末で打つ sh）の形を確かめる。test_repo のシナリオ専用。"""
+    for n, step in enumerate(data["steps"], 1):
+        spec = step.get("human_run")
+        if spec is None:
+            continue
+        where = f"{path}: step {n} human_run"
+        if not step.get("human"):
+            raise ValueError(f"{where} は human: true の step にだけ書けます")
+        if step.get("human_api") is not None:
+            raise ValueError(f"{where} は human_api と同じ step には書けません")
+        if not data.get("test_repo"):
+            raise ValueError(f"{where} は test_repo: true のシナリオにだけ書けます")
+        if not isinstance(spec, dict) or spec.get("script") not in HUMAN_RUN_SCRIPTS:
+            raise ValueError(f"{where}: script は {' / '.join(HUMAN_RUN_SCRIPTS)} のどれかです")
+        extra = set(spec) - {"script", "answers"}
+        if extra:
+            raise ValueError(
+                f"{where} に書けるのは script と answers だけです: " + ", ".join(sorted(extra))
+            )
+        answers = spec.get("answers", [])
+        if not isinstance(answers, list) or not all(isinstance(a, str) for a in answers):
+            raise ValueError(f"{where}: answers は文字列の list です")
+        if not str(step.get("instruction") or "").strip():
+            raise ValueError(f"{where} には、端末を作れないときに手で打つ instruction が要ります")
 
 
 def file_spec(value):
@@ -1271,6 +1302,201 @@ def _human_op_text(op):
     return f"{op['op']}（{name}）" if name else op["op"]
 
 
+# ---- 人間役の操作（端末。human_run） ----
+
+# human_run で実行器が人間役として打てる sh（ワークスペースルートからの相対）と、確認文に出す説明。
+# argv は実行器が組み、yml には書かせない（本物のチケットの識別子や --root を書けないように）。
+# 行を足すのは、要るシナリオができたとき。
+HUMAN_RUN_SCRIPTS = {
+    "agree": (
+        ".ccnavi/scripts/ccnavi-user-agree.sh",
+        "この回で増えた test-repo の提案を承認し、push する",
+    ),
+}
+HUMAN_RUN_TIMEOUT_SEC = 300
+
+
+class NoTerminal(Exception):
+    """擬似端末を作れない（Windows の Python には pty が無い）。"""
+
+
+def _human_run_text(step):
+    script, what = HUMAN_RUN_SCRIPTS[step["human_run"]["script"]]
+    return f"`{Path(script).name}`（{what}）"
+
+
+def _pending_proposals(root):
+    """承認待ちの提案の [識別子, プロジェクト] の並び。同じ識別子が複数のツリーに出るので畳む。"""
+    conf, _ = settings.load(str(root))
+    found, _ = ticket.scan_all(str(root), conf.tickets, conf.projects)
+    return [
+        list(p)
+        for p in sorted({(t.ticket, t.project) for t in found if t.state == ticket_model.TODO})
+    ]
+
+
+def _approved_ids(root):
+    """承認済みチケットの識別子（全ツリー）。"""
+    conf, _ = settings.load(str(root))
+    found, _ = approval_store.scan_all(conf, str(root))
+    return {t.ticket for t in found}
+
+
+def _human_run_env(st, root):
+    """人間役の環境。ターミナル要求を本物の端末で通すため、切る変数を外す。
+    別のワークスペースへ向かないよう、CCNAVI_WORKSPACE を root に固定する。
+    模擬のホストでは、push 先を模擬に向けるため claude と同じ環境を使う。"""
+    env = dict(_host_env(st) or os.environ)
+    env.pop("CCNAVI_GUARD_TICKET_APPROVAL", None)
+    env["CCNAVI_WORKSPACE"] = str(root)
+    return env
+
+
+def _run_on_terminal(argv, cwd, env, answers, timeout=HUMAN_RUN_TIMEOUT_SEC):
+    """argv を擬似端末に付けて起こし、（終了コード, 出力）を返す。
+    時間切れは subprocess.TimeoutExpired。孫（ccnavi・git）も残さないよう、
+    プロセスグループごと止める。"""
+    if not hasattr(os, "openpty"):
+        raise NoTerminal
+    try:
+        master, slave = os.openpty()
+    except OSError as e:
+        raise NoTerminal from e
+    try:
+        proc = subprocess.Popen(
+            argv,
+            stdin=slave,
+            stdout=slave,
+            stderr=slave,
+            cwd=cwd,
+            env=env,
+            start_new_session=True,
+        )
+    except BaseException:
+        os.close(master)
+        raise
+    finally:
+        # 親が slave を持ったままだと、子が全部終わっても master の読みが終わらない
+        os.close(slave)
+    chunks = []
+    try:
+        # 端末は行単位の入力なので、sh が読むまで溜まる。子が先に終わって書けなければ捨てる
+        for answer in answers:
+            try:
+                os.write(master, (answer + "\n").encode("utf-8"))
+            except OSError:
+                break
+        deadline = time.monotonic() + timeout
+        while True:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                raise subprocess.TimeoutExpired(argv, timeout)
+            ready, _, _ = select.select([master], [], [], min(left, 1.0))
+            if not ready:
+                continue
+            try:
+                data = os.read(master, 4096)
+            except OSError:  # Linux は slave が全部閉じると EIO を返す。EOF として扱う
+                break
+            if not data:
+                break
+            chunks.append(data)
+        rc = proc.wait(timeout=max(1.0, deadline - time.monotonic()))
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait()
+        raise
+    finally:
+        os.close(master)
+    return rc, b"".join(chunks).decode("utf-8", errors="replace").replace("\r", "")
+
+
+def _halt_human_run(out, st, num, reason):
+    st["halt"] = {"step": num, "kind": "human_run", "reasons": [reason]}
+    _write_state(out, st)
+    print(f"step {num}: 人間役の操作を止めた（{reason}）。後続の step には進まず止める")
+    return 11
+
+
+def _run_human_run(out, st, idx, step, root):
+    """human_run の sh を人間役として端末で打ち、止まらずに次の step へ進む。
+    止めたら 11、進んだら None。端末を作れないときは "pause"
+    （今の human step と同じく一時停止させる）。
+
+    処理フロー:
+    1. 前の回で打ち始めたまま止まった記録があれば、打ち直さずに止める。
+    2. 承認待ちの提案を集め、基準（回し始めか、前の human_run のあと）に無い識別子を対象にする。
+       0 件か、test-repo 以外の提案が混ざっていれば止める
+       （黙って外すと親だけ落ちて承認が失敗する）。
+    3. 打ち始めたことを state に書いてから、端末で打つ。
+    4. 終了コードでなく、対象が承認済みに在るかで成否を見る
+       （push の失敗や保護ブランチでも 0 で終わるため）。
+    """
+    num = idx + 1
+    runs = st.setdefault("human_runs", [])
+    if any(r["step"] == num and r["status"] == "started" for r in runs):
+        return _halt_human_run(
+            out,
+            st,
+            num,
+            "前の回で打ち始めたまま止まった。承認と push の状態を確かめてから回し直す",
+        )
+    if not hasattr(os, "openpty"):
+        return "pause"
+    before = {p[0] for p in st.get("proposals_before") or []}
+    added = [p for p in _pending_proposals(root) if p[0] not in before]
+    if not added:
+        return _halt_human_run(out, st, num, "承認する提案が増えていない")
+    project = Path(DISPOSABLE_REL).name
+    other = [p for p in added if p[1] != project]
+    if other:
+        return _halt_human_run(
+            out,
+            st,
+            num,
+            f"{project} 以外の提案が増えている: "
+            + ", ".join(f"{i}（{proj or 'ワークスペースルート'}）" for i, proj in other),
+        )
+    ids = sorted({p[0] for p in added})
+    spec = step["human_run"]
+    script = HUMAN_RUN_SCRIPTS[spec["script"]][0]
+    record = {"step": num, "script": script, "tickets": ids, "status": "started"}
+    runs.append(record)
+    _write_state(out, st)
+    print(f"\n== 人間役の操作（step {num}、端末）==\n  sh {script} {' '.join(ids)}")
+    log = out / f"human-run-{num}.log"
+    try:
+        rc, text = _run_on_terminal(
+            ["sh", script, *ids], root, _human_run_env(st, root), spec.get("answers", [])
+        )
+    except NoTerminal:
+        runs.remove(record)
+        _write_state(out, st)
+        return "pause"
+    except subprocess.TimeoutExpired:
+        record["status"] = "halted"
+        return _halt_human_run(out, st, num, f"{HUMAN_RUN_TIMEOUT_SEC} 秒で終わらなかった")
+    log.write_text(text, encoding="utf-8")
+    for line in text.strip().splitlines()[-5:]:
+        print(f"  | {line}")
+    record.update(exit=rc, log=str(log))
+    missing = [i for i in ids if i not in _approved_ids(root)]
+    if missing:
+        record["status"] = "halted"
+        return _halt_human_run(
+            out,
+            st,
+            num,
+            f"承認済みに無い: {', '.join(missing)}（終了コード {rc}、ログ: {log}）",
+        )
+    record["status"] = "done"
+    st["proposals_before"] = _pending_proposals(root)
+    st["next_step"] = num
+    _write_state(out, st)
+    return None
+
+
 def drive(scn, out, st, root):
     """st['next_step'] から、人間の操作の step か末尾まで進める。
     人間の操作で止まったら 10、末尾まで進んだら None を返す。
@@ -1284,6 +1510,15 @@ def drive(scn, out, st, root):
             if rc:
                 return rc
             continue
+        if step.get("human") and step.get("human_run"):
+            rc = _run_human_run(out, st, idx, step, root)
+            if rc != "pause":
+                if rc:
+                    return rc
+                continue
+            print(
+                f"\nstep {idx + 1}: この環境では擬似端末を作れないので、人間役を打てない。手で打つ"
+            )
         if step.get("human"):
             print(f"\n== 人間の操作（step {idx + 1}）==")
             print(step.get("instruction", "").strip())
@@ -1407,6 +1642,19 @@ def finish(scn, out, st, root):
                 + (f"、{len(bad)} 件が失敗" if bad else ""),
             )
         )
+    for run in st.get("human_runs") or []:
+        if run.get("status") != "done":
+            continue
+        # 人間が見ていた項目を、実行器が打った回は誰も見ていない。pass にせず目視を求める
+        for item in scn["steps"][run["step"] - 1].get("check") or []:
+            results.append(
+                (
+                    "human-run-check",
+                    {"step": run["step"]},
+                    REVIEW,
+                    f"{item}（実行器が打ったので未確認。ログ: {run['log']}）",
+                )
+            )
     if undeleted:
         host = st["host"]
         results.append(
@@ -1595,6 +1843,8 @@ def step_answer_lines(scn, out):
         if step.get("human"):
             lines.append(f"### step {num}（人間の操作）")
             lines.append(_one_line(step.get("instruction", ""), 200))
+            if step.get("human_run"):
+                lines.append("実行器が打つ: " + _human_run_text(step))
             if step.get("human_api"):
                 lines.append(
                     "人間役の API: " + "、".join(_human_op_text(o) for o in step["human_api"])
@@ -2175,6 +2425,11 @@ def scenario_summary(scn):
             if step.get("human_api"):
                 api = "、".join(_human_op_text(o) for o in step["human_api"])
                 text = f"{text}（人間役の API: {api}。止まらずに進む）".lstrip()
+            if step.get("human_run"):
+                text = (
+                    f"実行器が打つ: {_human_run_text(step)}。止まらずに進む"
+                    f"（手で打つのは端末を作れないときだけ: {text}）"
+                )
             lines.append(f"  {i}. 人間の操作: {text}")
         else:
             lines.append(f"  {i}. {_one_line(step.get('prompt', ''))}")
@@ -2423,6 +2678,9 @@ def start_scenario(scn, scenario_path, root, top, out):
         st["setup_made"], st["setup_dirs"] = _setup(scn, root, top)
         if setup.get("git"):
             run_setup_git(root, top, setup["git"], host=st.get("host"))
+        if any(s.get("human_run") for s in scn["steps"]):
+            # human_run の対象を決める基準。setup で置いた提案は対象にしない
+            st["proposals_before"] = _pending_proposals(root)
     except Refusal as exc:
         _abort(scn, out, st, root)
         return _refuse(exc)

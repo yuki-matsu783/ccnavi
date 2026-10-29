@@ -397,6 +397,65 @@ class ExpectAfterTest(unittest.TestCase):
             self.load_yml(text)
 
 
+@unittest.skipUnless(hasattr(os, "openpty"), "擬似端末を作れない環境")
+class HumanRunTest(unittest.TestCase):
+    """human_run（実行器が人間役として端末で打つ sh）。claude も本物の sh も呼ばない。"""
+
+    STEP = {"human": True, "instruction": "x", "human_run": {"script": "agree", "answers": ["y"]}}
+
+    def drive(self, pending, approved, rc=0):
+        with tempfile.TemporaryDirectory() as d:
+            out, root = Path(d) / "out", Path(d) / "root"
+            out.mkdir()
+            root.mkdir()
+            scn = {"steps": [dict(self.STEP)], "_prompt_steps": 0}
+            st = {"next_step": 0, "session_ids": [], "cost_usd": 0.0, "proposals_before": []}
+            with (
+                mock.patch.object(runner, "_pending_proposals", return_value=pending),
+                mock.patch.object(runner, "_approved_ids", return_value=approved),
+                mock.patch.object(runner, "_run_on_terminal", return_value=(rc, "")) as term,
+            ):
+                got = runner.drive(scn, out, st, root)
+        return got, st, term
+
+    def test_load_scenario_needs_test_repo(self):
+        text = yaml.safe_dump({"id": "T", "steps": [self.STEP]})
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "scn.yml"
+            path.write_text(text, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "test_repo: true"):
+                runner.load_scenario(path)
+
+    def test_terminal_is_attached_and_answers_arrive(self):
+        script = 'if [ -t 0 ]; then echo tty; fi; read a; echo "got=$a"; exit 3'
+        rc, text = runner._run_on_terminal(["sh", "-c", script], None, None, ["y"], timeout=10)
+        self.assertEqual(rc, 3)
+        self.assertIn("tty", text)
+        self.assertIn("got=y", text)
+
+    def test_timeout_stops_the_whole_group(self):
+        with self.assertRaises(subprocess.TimeoutExpired):
+            runner._run_on_terminal(["sh", "-c", "sleep 30 & wait"], None, None, [], timeout=1)
+
+    def test_success_is_judged_by_approved_tickets_not_exit_code(self):
+        got, st, term = self.drive([["i1", "test-repo"]], approved=set(), rc=0)
+        self.assertEqual(got, 11)
+        self.assertIn("承認済みに無い: i1", st["halt"]["reasons"][0])
+        self.assertEqual(term.call_args.args[0][2:], ["i1"])
+
+    def test_proposal_outside_test_repo_stops_before_running(self):
+        got, st, term = self.drive([["i1", "test-repo"], ["w1", ""]], approved={"i1"})
+        self.assertEqual(got, 11)
+        self.assertIn("w1（ワークスペースルート）", st["halt"]["reasons"][0])
+        term.assert_not_called()
+
+    def test_approved_run_continues_and_is_recorded(self):
+        got, st, _ = self.drive([["i1", "test-repo"]], approved={"i1"})
+        self.assertIsNone(got)
+        self.assertEqual(st["human_runs"][0]["status"], "done")
+        self.assertEqual(st["next_step"], 1)
+
+
 class PreflightTest(unittest.TestCase):
     def test_missing_project_dir_is_reported_not_raised(self):
         with tempfile.TemporaryDirectory() as d:
