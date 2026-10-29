@@ -63,7 +63,7 @@ import yaml
 from ccnavi.infra import pathcase
 from ccnavi.records import diaglog
 from ccnavi.tickets.model import review_host
-from tests.scenarios import hostenv
+from tests.scenarios import hostenv, hostsnap
 
 ROOT = Path(__file__).resolve().parents[2]
 GIT_SH = "{root}/.ccnavi/scripts/ccnavi-git.sh"
@@ -1237,6 +1237,21 @@ def _failed_step_cost(scn, out, num, exc):
     return 0.0
 
 
+def _snapshot_host(out, st, idx, root):
+    """setup.host が fake-gitlab / docker-gitlab のとき、step の終わりの相手側の状態を
+    `host-<step>.json` に残す。取れなくても例外にせず、シナリオを止めない（失敗は記録に残る）。"""
+    host = st.get("host")
+    if not host or host.get("down") or host.get("kind") not in hostenv.snapshot_hosts():
+        return
+    try:
+        result = hostsnap.take(root, host, idx + 1, out)
+    except Exception as exc:  # 記録の失敗でシナリオを止めない
+        result = {"step": idx + 1, "file": None, "ok": False, "errors": 1}
+        _log(root).error("相手側の状態の記録で例外", step=idx + 1, err=type(exc).__name__)
+    st.setdefault("host_snapshots", []).append(result)
+    _write_state(out, st)
+
+
 def _run_human_api(out, st, idx, step, root):
     """human_api の操作を書いた順に実行して、止まらずに次の step へ進む。失敗したら 11。
     操作の結果は 1 件ごとに state に書く（再開しても同じ操作を二度実行しない）。"""
@@ -1281,6 +1296,7 @@ def drive(scn, out, st, root):
         step = steps[idx]
         if step.get("human") and step.get("human_api"):
             rc = _run_human_api(out, st, idx, step, root)
+            _snapshot_host(out, st, idx, root)
             if rc:
                 return rc
             continue
@@ -1314,6 +1330,7 @@ def drive(scn, out, st, root):
             )
         except Exception as e:  # 起動できない・時間切れ・終了コードが 0 でない
             st["cost_usd"] += _failed_step_cost(scn, out, idx + 1, e)
+            _snapshot_host(out, st, idx, root)
             # 後続は回さず止める。finish に回して、後片付けを通す
             st["halt"] = {
                 "step": idx + 1,
@@ -1330,6 +1347,7 @@ def drive(scn, out, st, root):
         st["cost_usd"] += ev["cost_usd"]
         st["next_step"] = idx + 1
         _write_state(out, st)
+        _snapshot_host(out, st, idx, root)
         after = step.get("expect_after")
         if after:
             try:
@@ -1361,6 +1379,24 @@ FAKE_NOTE = "。模擬は本物と同じ形を返す保証が無く、模擬の�
 
 def host_note(host):
     return HOST_NOTES[host] + (FAKE_NOTE if hostenv.is_fake(host) else "")
+
+
+SNAPSHOT_PLAN = (
+    "相手側の状態: step の終わりごとに MR・スレッド・issue を API で読み、"
+    "出力の置き場の host-N.json に残す（読むだけ。承認は取らない。トークンは伏せる）"
+)
+
+
+def snapshot_note(st):
+    """report の host の行に足す、相手側の状態の記録の要約。記録が無い相手には空。"""
+    snaps = st.get("host_snapshots")
+    if not snaps:
+        return ""
+    bad = [s for s in snaps if not s["ok"]]
+    text = f"相手側の状態: step ごとに host-N.json へ残した（{len(snaps)} 件。承認は取っていない）"
+    if bad:
+        text += "。取れなかった所がある step: " + "、".join(str(s["step"]) for s in bad)
+    return text
 
 
 def finish(scn, out, st, root):
@@ -2007,6 +2043,8 @@ def write_report(scn, out, st, results, rows, raw):
         f"相手（setup.host）: {host_note(scenario_host(scn))}",
         "",
     ]
+    if snapshot_note(st):
+        lines += [snapshot_note(st), ""]
     lines += _results_table(results, 100)
     lines += ["", "## ステップごとの入力プロンプトと最終出力", *step_answer_lines(scn, out)]
     if scn.get("unconfirmed"):
@@ -2153,6 +2191,8 @@ def scenario_summary(scn):
             "（`claude -p` 自身の API 通信は要る）。本物のトークンは claude に渡さない。"
             "origin への通信は一時ディレクトリの bare へ向き、回したあとに消す" + FAKE_NOTE
         )
+        if host == "fake-gitlab":
+            lines.append(SNAPSHOT_PLAN)
     if host == hostenv.DOCKER:
         lines.append(
             "相手（setup.host）: docker-gitlab。Docker の GitLab（127.0.0.1）に"
@@ -2161,6 +2201,7 @@ def scenario_summary(scn):
             "回したあとにプロジェクトを削除する（人間の操作で止めた回は残す）。"
             "エージェント役のトークンは claude に渡し、人間役のトークンは渡さない"
         )
+        lines.append(SNAPSHOT_PLAN)
     issue = (scn.get("setup") or {}).get("issue")
     if issue:
         close = "（回したあとに閉じる）" if issue.get("close") else "（閉じない）"

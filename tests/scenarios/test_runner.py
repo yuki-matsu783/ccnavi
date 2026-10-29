@@ -22,7 +22,7 @@ import yaml
 from ccnavi.entry import version
 from tests import ROOT, common_sh, fake_gitlab, host_stub
 from tests import __main__ as full_run
-from tests.scenarios import hostenv, runner
+from tests.scenarios import hostenv, hostsnap, runner
 
 SCENARIOS = sorted(Path(__file__).parent.glob("UC-*.yml"))
 EXPECT_KEYS = {
@@ -3390,6 +3390,151 @@ def socket_listen(port):
     return sock
 
 
+# ---- 相手側の状態の記録（hostsnap。step の終わりに fake-gitlab / docker-gitlab を読む） ----
+
+
+def snap_state():
+    """MR が 3 件（下書き・開いた・マージ済み）と issue が 2 件ある、模擬の初期状態。"""
+    state = seeded()
+    first = state["mrs"][0]
+    first["title"] = "Draft: i0001"
+    second = {**first, "iid": 2, "title": "i0002", "source_branch": "i0002", "discussions": []}
+    third = {**second, "iid": 3, "title": "i0003", "state": "merged", "merged_at": "2026-10-26"}
+    state["mrs"] += [second, third]
+    state["issues"] = [
+        {"iid": 1, "title": "開いた issue", "state": "opened", "description": "本文"},
+        {"iid": 2, "title": "閉じた issue", "state": "closed", "description": ""},
+    ]
+    return state
+
+
+@unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
+class HostSnapshotTest(unittest.TestCase):
+    """hostsnap を fake-gitlab（模擬）を相手に確かめる。Docker・ネットワーク・claude は使わない。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.scratch = private_tempdir(self, self._tmp.name)
+        self.ws = host_workspace(self._tmp.name)
+        self.top = str(self.ws.target.resolve())
+        self.out = Path(self._tmp.name) / "out"
+        self.out.mkdir()
+        self.host = hostenv.prepare(
+            self.ws.root,
+            self.top,
+            {"host": "fake-gitlab", "host_state": snap_state()},
+            runner._git,
+        )
+        self.addCleanup(hostenv.teardown, self.ws.root, self.host, runner._git)
+
+    def take(self, step=1):
+        result = hostsnap.take(self.ws.root, self.host, step, self.out)
+        text = (self.out / hostsnap.file_name(step)).read_text(encoding="utf-8")
+        return result, json.loads(text), text
+
+    def test_it_records_mrs_threads_and_issues(self):
+        result, snap, _ = self.take()
+        self.assertEqual(result, {"step": 1, "file": "host-1.json", "ok": True, "errors": 0})
+        self.assertEqual(snap["host"], "fake-gitlab")
+        self.assertEqual(snap["project"], FAKE_PROJECT)
+        self.assertEqual(snap["errors"], [])
+        mrs = {m["iid"]: m for m in snap["mrs"]}
+        self.assertEqual(sorted(mrs), [1, 2, 3])
+        self.assertTrue(mrs[1]["draft"])
+        self.assertFalse(mrs[2]["draft"])
+        self.assertEqual(mrs[3]["state"], "merged")
+        self.assertEqual(mrs[3]["merged_at"], "2026-10-26")
+        thread = mrs[1]["threads"][0]
+        self.assertEqual(thread["id"], "d101")
+        self.assertIs(thread["resolved"], False)
+        self.assertEqual(thread["notes"][0]["author"], "reviewer")
+        self.assertEqual(thread["notes"][0]["body"], "ここを直してください")
+        self.assertEqual(thread["notes"][0]["path"], "a.txt")
+        self.assertEqual(mrs[2]["threads"], [])
+        self.assertEqual({i["iid"]: i["state"] for i in snap["issues"]}, {1: "opened", 2: "closed"})
+        self.assertEqual(
+            snap["summary"],
+            {
+                "mrs": 3,
+                "mrs_opened": 2,
+                "mrs_merged": 1,
+                "mrs_draft": 1,
+                "threads": 1,
+                "threads_unresolved": 1,
+                "issues": 2,
+                "issues_opened": 1,
+            },
+        )
+
+    def test_approvals_are_recorded_as_not_taken(self):
+        _, snap, _ = self.take()
+        self.assertIs(snap["approvals"]["taken"], False)
+        self.assertIn("取っていない", snap["approvals"]["reason"])
+
+    def test_it_follows_the_state_of_the_other_side(self):
+        _, before, _ = self.take(1)
+        client, token, project, _ = hostenv.api_access(self.host)
+        self.assertEqual(client.resolve_discussion(token, project, 1, "d101")[0], 200)
+        self.assertEqual(client.merge_mr(token, project, 1, attempts=1)[0], 200)
+        _, after, _ = self.take(2)
+        self.assertIs(before["mrs"][0]["threads"][0]["resolved"], False)
+        self.assertIs(after["mrs"][0]["threads"][0]["resolved"], True)
+        self.assertEqual(before["mrs"][0]["state"], "opened")
+        self.assertEqual(after["mrs"][0]["state"], "merged")
+        self.assertEqual(after["summary"]["threads_unresolved"], 0)
+
+    def test_it_only_reads(self):
+        client, token, project, secrets = hostenv.api_access(self.host)
+        events = []
+        client._recorder = events.append
+        access = (client, token, project, secrets)
+        with mock.patch.object(hostenv, "api_access", return_value=access):
+            self.take()
+        self.assertTrue(events)
+        self.assertEqual({e["method"] for e in events}, {"GET"})
+        self.assertFalse([e for e in events if "approv" in e["path"]])
+        self.assertEqual(fake_gitlab.load(self.host["state_path"]), snap_state())
+
+    def test_the_token_is_masked_even_when_the_other_side_returns_it(self):
+        state = fake_gitlab.load(self.host["state_path"])
+        state["mrs"][0]["discussions"][0]["notes"][0]["body"] = f"鍵は {self.host['token']}"
+        state["mrs"][0]["description"] = f"Bearer {self.host['token']}"
+        fake_gitlab.save(self.host["state_path"], state)
+        _, snap, text = self.take()
+        self.assertNotIn(self.host["token"], text)
+        self.assertEqual(snap["mrs"][0]["threads"][0]["notes"][0]["body"], "鍵は ***")
+        self.assertEqual(snap["mrs"][0]["description"], "Bearer ***")
+
+    def test_a_failure_is_recorded_and_does_not_raise(self):
+        hostenv.hold(self.ws.root, self.host)  # 模擬を止める。接続できない
+        result, snap, _ = self.take()
+        self.assertFalse(result["ok"])
+        self.assertGreater(result["errors"], 0)
+        self.assertEqual(snap["mrs"], [])
+        self.assertTrue(snap["errors"])
+        self.assertFalse(snap["approvals"]["taken"])
+
+    def test_an_error_from_the_other_side_is_recorded_per_call(self):
+        reader = mock.Mock()
+        reader.list_mrs.return_value = (200, [{"iid": 1, "title": "t", "state": "opened"}])
+        reader.get_mr.return_value = (404, {"message": "404"})
+        reader.list_discussions.return_value = (500, {"message": "x"})
+        reader.list_issues.return_value = (200, [])
+        with mock.patch.object(hostenv, "api_access", return_value=(reader, "t", "p", [])):
+            result, snap, _ = self.take()
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["errors"], 2)
+        self.assertEqual(snap["mrs"][0]["title"], "t", "1 件が取れなくても一覧の分は残す")
+        self.assertTrue(snap["mrs"][0]["threads_unavailable"])
+        self.assertEqual({e["api"] for e in snap["errors"]}, {"get_mr 1", "list_discussions 1"})
+
+    def test_it_is_only_for_fake_and_docker_gitlab(self):
+        self.assertEqual(hostenv.snapshot_hosts(), ("fake-gitlab", "docker-gitlab"))
+        with self.assertRaises(ValueError):
+            hostenv.api_access({"kind": "bare"})
+
+
 @unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
 class HostLifecycleTest(unittest.TestCase):
     """cmd_run から finish / 中断 / 人間の操作の step までを、claude を呼ばずに回す。"""
@@ -3458,6 +3603,81 @@ class HostLifecycleTest(unittest.TestCase):
         report = (self.ws.out / "report.md").read_text(encoding="utf-8")
         self.assertIn("相手（setup.host）: real: 本物", report)
         self.assertNotIn("模擬のずれ", report)
+
+    def snap(self, n):
+        return json.loads((self.ws.out / f"host-{n}.json").read_text(encoding="utf-8"))
+
+    def test_fake_gitlab_leaves_the_other_side_state_at_the_end_of_each_step(self):
+        steps = [{"prompt": "a"}, {"prompt": "b"}]
+        calls = []
+
+        def run_step(*a, **k):
+            calls.append(len(calls) + 1)
+            if len(calls) == 1:  # 1 つ目の step の間に、相手側で MR ができたものとして扱う
+                path = self.host_in_state()["state_path"]
+                state = fake_gitlab.load(path)
+                state["mrs"] = seeded()["mrs"]
+                fake_gitlab.save(path, state)
+            return self.STEP_OUT
+
+        with mock.patch.object(runner, "run_step", side_effect=run_step):
+            rc = self.run_cmd(self.scenario("fake-gitlab", steps))
+        self.assertIn(rc, (0, 2))
+        self.assertEqual([self.snap(n)["step"] for n in (1, 2)], [1, 2])
+        self.assertEqual(self.snap(1)["summary"]["mrs"], 1)
+        self.assertEqual(self.snap(1)["summary"]["threads_unresolved"], 1)
+        self.assertFalse(self.snap(1)["approvals"]["taken"])
+        state = json.loads((self.ws.out / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            [s["file"] for s in state["host_snapshots"]], ["host-1.json", "host-2.json"]
+        )
+        self.assertTrue(all(s["ok"] for s in state["host_snapshots"]))
+        report = (self.ws.out / "report.md").read_text(encoding="utf-8")
+        self.assertIn("host-N.json", report)
+        self.assertIn("承認は取っていない", report)
+
+    def test_a_snapshot_failure_does_not_stop_the_scenario(self):
+        steps = [{"prompt": "a"}, {"prompt": "b"}]
+        with (
+            mock.patch.object(runner, "run_step", return_value=self.STEP_OUT) as step,
+            mock.patch.object(hostsnap.hostenv, "api_access", side_effect=OSError("接続できない")),
+        ):
+            rc = self.run_cmd(self.scenario("fake-gitlab", steps))
+        self.assertIn(rc, (0, 2))
+        self.assertEqual(step.call_count, 2)
+        for n in (1, 2):
+            snap = self.snap(n)
+            self.assertEqual(snap["mrs"], [])
+            self.assertEqual(snap["errors"][0]["error"], "例外 OSError")
+        state = json.loads((self.ws.out / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual([s["ok"] for s in state["host_snapshots"]], [False, False])
+        report = (self.ws.out / "report.md").read_text(encoding="utf-8")
+        self.assertIn("取れなかった所がある step: 1、2", report)
+
+    def test_a_crash_in_the_recorder_does_not_stop_the_scenario(self):
+        steps = [{"prompt": "a"}, {"prompt": "b"}]
+        with (
+            mock.patch.object(runner, "run_step", return_value=self.STEP_OUT) as step,
+            mock.patch.object(hostsnap, "take", side_effect=RuntimeError("壊れた")),
+        ):
+            rc = self.run_cmd(self.scenario("fake-gitlab", steps))
+        self.assertIn(rc, (0, 2))
+        self.assertEqual(step.call_count, 2)
+        state = json.loads((self.ws.out / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual([s["ok"] for s in state["host_snapshots"]], [False, False])
+
+    def test_bare_and_real_leave_no_host_state(self):
+        for host in ("bare", "real"):
+            with (
+                self.subTest(host=host),
+                mock.patch.object(runner, "run_step", return_value=self.STEP_OUT),
+            ):
+                self.run_cmd(self.scenario(host))
+                self.assertEqual(list(self.ws.out.glob("host-*.json")), [])
+                state = json.loads((self.ws.out / "state.json").read_text(encoding="utf-8"))
+                self.assertNotIn("host_snapshots", state)
+                report = (self.ws.out / "report.md").read_text(encoding="utf-8")
+                self.assertNotIn("host-N.json", report)
 
     def test_keyboard_interrupt_stops_the_server_and_leaves_no_place(self):
         before = self.places()
@@ -3694,13 +3914,44 @@ def fake_project(client):
     return make
 
 
+class FakeReader:
+    """step の終わりの相手側の状態を読む入口（hostenv.api_access）の代わり。読む API だけを持つ。
+    メモの本文にトークンを混ぜておき、記録で伏せられることを確かめる。"""
+
+    def __init__(self):
+        self.calls = []
+
+    def _get(self, name, body):
+        self.calls.append(name)
+        return 200, body
+
+    def list_mrs(self, token, pid, *, state="all"):
+        return self._get("list_mrs", [{"iid": 3, "title": "i0001", "state": "opened"}])
+
+    def get_mr(self, token, pid, iid):
+        return self._get("get_mr", {"iid": iid, "title": "i0001", "state": "opened", "draft": True})
+
+    def list_discussions(self, token, pid, iid):
+        note = {"id": 1, "body": f"鍵 {ROOT_PAT}", "resolvable": True, "resolved": False}
+        return self._get("list_discussions", [{"id": "d1", "notes": [note]}])
+
+    def list_issues(self, token, pid, *, state="opened", per_page=None):
+        return self._get("list_issues", [])
+
+
 class DockerHostBase(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         self.client = FakeClient()
+        self.reader = FakeReader()
         values = {"GITLAB_TOKEN": ROOT_PAT, "CCNAVI_PROBE_REVIEWER_TOKEN": REVIEWER_TOKEN}
+
+        def access(host):
+            return self.reader, ROOT_PAT, host["project_id"], [ROOT_PAT, REVIEWER_TOKEN]
+
         for patcher in (
+            mock.patch.object(hostenv, "api_access", access),
             mock.patch.object(hostenv, "_connect", lambda: (self.client, ROOT_PAT, BASE, values)),
             mock.patch.object(hostenv, "_sleep", lambda s: None),
         ):
@@ -3793,6 +4044,20 @@ class DockerLifecycleTest(DockerHostBase):
         report = (self.ws.out / "report.md").read_text(encoding="utf-8")
         self.assertIn("docker-gitlab", report)
         self.assertIn("GitLab 19.4.1", report)
+
+    def test_each_step_leaves_the_host_state_and_the_token_is_masked(self):
+        steps = [{"prompt": "a"}, {"prompt": "b"}]
+        with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT):
+            self.run_cmd(self.scenario(steps))
+        for n in (1, 2):
+            snap = json.loads((self.ws.out / f"host-{n}.json").read_text(encoding="utf-8"))
+            self.assertEqual(snap["step"], n)
+            self.assertEqual(snap["host"], "docker-gitlab")
+            self.assertTrue(snap["mrs"][0]["draft"])
+            self.assertFalse(snap["approvals"]["taken"])
+            self.assertIn("***", snap["mrs"][0]["threads"][0]["notes"][0]["body"])
+            self.assertNotIn(ROOT_PAT, json.dumps(snap))
+        self.assertEqual(self.reader.calls.count("list_mrs"), 2)
 
     def test_a_delete_failure_is_exit_3_and_names_the_project(self):
         self.client.fail = True
