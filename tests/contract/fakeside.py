@@ -128,8 +128,11 @@ def load_all_requests() -> list[dict]:
 
 
 def load_requests() -> list[dict]:
-    """fake に送る要求。`used_by` に `sh` を持つものだけ（fake は拡張の要求に答えない）。"""
-    return [r for r in load_all_requests() if "sh" in r["used_by"]]
+    """fake に送る要求。`used_by` に `sh` か `scenarios` を持つもの。
+
+    fake は拡張だけの要求に答えない。
+    """
+    return [r for r in load_all_requests() if {"sh", "scenarios"} & set(r["used_by"])]
 
 
 def run(requests: list[dict], tamper: Callable[[str, object], object] | None = None) -> dict:

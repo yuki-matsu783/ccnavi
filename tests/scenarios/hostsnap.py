@@ -3,8 +3,11 @@
 
 - 対象は `setup.host` が `fake-gitlab` / `docker-gitlab` のとき。
   MR（一覧と 1 件）・スレッドと解決・issue
-- 読むだけ。呼ぶのは GET の API（list_mrs・get_mr・list_discussions・list_issues）だけ
-- 承認（approvals）は取らない。模擬に API が無いため。記録の `approvals` に「取っていない」と残す
+- 読むだけ。呼ぶのは GET の API
+  （list_mrs・get_mr・list_discussions・list_approvals・list_issues）だけ
+- 承認は MR ごとに読み、MR の `approvals` に残す。取れたら
+  `{"taken": true, "approved", "approved_by"}`、取れなかったら `{"taken": false}`
+  （承認が無い＝`taken` が true で `approved` が false、と区別できる）
 - 取れなかったものは、その場所の `errors` に残す。例外は呼び出し側へ出さない（シナリオを止めない）
 - トークンは記録に出さない。取る項目は選んだものだけにし、知っているトークンの値は伏せる
 
@@ -22,13 +25,6 @@ TEXT_LIMIT = 1000
 # 一覧は 1 ページ（100 件）だけ読む。100 件に達したら、切れた可能性を errors に残す。
 PAGE_LIMIT = 100
 MASK = "***"
-APPROVALS_NOT_TAKEN = {
-    "taken": False,
-    "reason": (
-        "承認は取っていない（模擬に approvals の API が無く、"
-        "模擬と本物で同じ形に揃えるため docker-gitlab でも取らない）"
-    ),
-}
 MR_KEYS = (
     "iid",
     "title",
@@ -97,6 +93,23 @@ def _thread(discussion):
     }
 
 
+def _approvals(body):
+    """承認の応答から、残す 3 つ（approved・approved_by[].user.username・
+    approved_by[].approved_at）だけを取る。
+    user_can_approve・user_has_approved は、読んだトークンから見た値で意味が曖昧なので残さない。"""
+    given = body.get("approved_by")
+    given = given if isinstance(given, list) else []
+    return {
+        "taken": True,
+        "approved": body.get("approved") is True,
+        "approved_by": [
+            {"username": _user(a.get("user")), "approved_at": a.get("approved_at")}
+            for a in given
+            if isinstance(a, dict)
+        ],
+    }
+
+
 def _mr(mr):
     out = _pick(mr, MR_KEYS)
     # 古い GitLab は draft の代わりに work_in_progress を返す
@@ -124,6 +137,7 @@ def _summary(mrs, issues):
         "mrs_opened": sum(1 for m in mrs if m.get("state") == "opened"),
         "mrs_merged": sum(1 for m in mrs if m.get("state") == "merged"),
         "mrs_draft": sum(1 for m in mrs if m.get("draft")),
+        "mrs_approved": sum(1 for m in mrs if m.get("approvals", {}).get("approved")),
         "threads": len(threads),
         "threads_unresolved": sum(1 for t in threads if t["resolved"] is False),
         "threads_system": len(every) - len(threads),
@@ -156,7 +170,6 @@ def collect(client, token, project):
         # 相手に接続できない。残りを読んでも同じ待ちを重ねるだけなので、ここでやめる
         errors.append({"api": "snapshot", "error": "相手に接続できないので、残りは読まない"})
         return {
-            "approvals": APPROVALS_NOT_TAKEN,
             "summary": _summary([], []),
             "mrs": [],
             "issues": [],
@@ -180,6 +193,8 @@ def collect(client, token, project):
         else:
             view["threads"] = []
             view["threads_unavailable"] = True
+        got = read(f"list_approvals {iid}", client.list_approvals(token, project, iid))
+        view["approvals"] = _approvals(got) if isinstance(got, dict) else {"taken": False}
         mrs.append(view)
     issues = []
     body = read("list_issues", client.list_issues(token, project, state="all", per_page=PAGE_LIMIT))
@@ -187,7 +202,6 @@ def collect(client, token, project):
         capped("list_issues", body)
         issues = [_issue(i) for i in body if isinstance(i, dict)]
     return {
-        "approvals": APPROVALS_NOT_TAKEN,
         "summary": _summary(mrs, issues),
         "mrs": mrs,
         "issues": issues,
@@ -222,7 +236,6 @@ def take(root, host, step, out, now=None):
         record.update(collect(client, token, project))
     except Exception as exc:  # 取れなくてもシナリオは止めない。errors には例外の型名だけを入れる
         record.update(
-            approvals=APPROVALS_NOT_TAKEN,
             summary=_summary([], []),
             mrs=[],
             issues=[],

@@ -60,16 +60,16 @@ class RequestsTest(unittest.TestCase):
         self.assertGreaterEqual(len(requests), 23)
         context = set(fakeside.scene_context()) | SAVED | CHROME_SCENE
         for r in requests:
-            if "sh" in r["used_by"]:
+            if {"sh", "scenarios"} & set(r["used_by"]):
                 self.assertFalse(
                     set(shape.PLACEHOLDER.findall(json.dumps(r))) & CHROME_SCENE,
-                    f"{r['name']}: fake に無い名前を sh の要求で使えない",
+                    f"{r['name']}: fake に無い名前を sh・scenarios の要求で使えない",
                 )
             with self.subTest(r["name"]):
                 self.assertIn(r["method"], ("GET", "POST", "PUT"))
                 self.assertIn(r["token"], ("main", "none"))
                 self.assertTrue(r["used_by"])
-                self.assertLessEqual(set(r["used_by"]), {"sh", "chrome"})
+                self.assertLessEqual(set(r["used_by"]), {"sh", "chrome", "scenarios"})
                 text = json.dumps(r)
                 self.assertFalse(
                     set(shape.PLACEHOLDER.findall(text)) - context, "場面に無い置き換えの名前"
@@ -98,13 +98,13 @@ class RequestsTest(unittest.TestCase):
         names = {r["name"] for r in fakeside.load_all_requests()}
         self.assertLessEqual(set(shape.NON_EMPTY), names)
 
-    def test_fake_requests_are_the_ones_used_by_sh(self):
+    def test_fake_requests_are_the_ones_used_by_sh_or_scenarios(self):
         all_requests = fakeside.load_all_requests()
         self.assertEqual(
-            [r["name"] for r in all_requests if "sh" in r["used_by"]],
+            [r["name"] for r in all_requests if {"sh", "scenarios"} & set(r["used_by"])],
             [r["name"] for r in fakeside.load_requests()],
         )
-        self.assertTrue(any("sh" not in r["used_by"] for r in all_requests))
+        self.assertTrue(any(not {"sh", "scenarios"} & set(r["used_by"]) for r in all_requests))
 
     def test_writes_come_after_reads(self):
         methods = [r["method"] for r in fakeside.load_all_requests()]

@@ -21,7 +21,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 
 | ファイル | 中身 |
 |---|---|
-| `requests.json` | GitLab API の列（39 本。sh が打つ 23 本と、Chrome 拡張だけが打つ 16 本）。本物には全部、`fake_gitlab.py` には `sh` の要求だけ、`MockGitLab` には `chrome` の要求だけを送る。各要求に `expect_status` と `reads` を持つ |
+| `requests.json` | GitLab API の列（40 本。sh が打つ 23 本、Chrome 拡張だけが打つ 16 本、受入シナリオの相手側の記録だけが読む 1 本）。本物には全部、`fake_gitlab.py` には `sh` と `scenarios` の要求、`MockGitLab` には `chrome` の要求だけを送る。各要求に `expect_status` と `reads` を持つ |
 | `recorded.json` | 本物から録った形。**本物だけ**。`uv run python tests/manual/gitlab/record_contract.py` で作る |
 | `recorded.sample.json` | 模擬から作ったサンプル（`"source": "sample"`）。`uv run python -m tests.contract.fakeside` で作り直す |
 | `normalize-cases.json` | 正規化の入力と期待の対の表。Python のテストと、Chrome 拡張の TypeScript の試験（`test/helpers/shape.ts`）が同じ表を読む |
@@ -45,9 +45,9 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 
 - `path` は `/api/v4` より後ろ。`query`・`body` は省略できる
 - `token` は `main`（認証あり）か `none`（認証なし）
-- `used_by` は、その要求を比べる側（`sh`、`chrome`）。`sh` は sh が打つ要求。`chrome` は、Chrome 拡張が打つ要求（`src/core/gitlab.ts` が組む URL）で、TS の契約の試験が `MockGitLab` と比べる。拡張だけが打つ要求は `used_by` が `["chrome"]`。
+- `used_by` は、その要求を比べる側（`sh`、`chrome`、`scenarios`）。`sh` は sh が打つ要求。`chrome` は、Chrome 拡張が打つ要求（`src/core/gitlab.ts` が組む URL）で、TS の契約の試験が `MockGitLab` と比べる。拡張だけが打つ要求は `used_by` が `["chrome"]`。`scenarios` は、受入シナリオの相手側の記録（`tests/scenarios/hostsnap.py`）だけが読む要求（`approvals_get`）。同じ API を拡張も読む（`approvals`）が、読むキーが違う（`approved` は拡張の `MockGitLab` が返さない）ので、要求を分けてある
   - 録る側（`record_contract.py`）は全要求を送る（`fakeside.load_all_requests()`）。書式・`reads`・状態の検査も全要求を見る
-  - `fakeside.load_requests()` は `sh` を持つ要求だけ返す。`fake_gitlab.py` は拡張だけの要求（`repository/branches` など）に答えないので送らない。`RecordedTest` は `recorded.json` も `sh` の名前に絞って比べる（`compare_all` は `recorded` のキーを回し、`actual` に無ければ `missing` を出すため）
+  - `fakeside.load_requests()` は `sh` か `scenarios` を持つ要求だけ返す。`fake_gitlab.py` は拡張だけの要求（`repository/branches` など）に答えないので送らない。`RecordedTest` は `recorded.json` も、この名前に絞って比べる（`compare_all` は `recorded` のキーを回し、`actual` に無ければ `missing` を出すため）
   - TS は `chrome` を持つ要求だけを `MockGitLab` に送る
 - `expect_status` は録るときに本物が返すべきステータス。`error_401` は 401、`error_404`・`branch_404` は 404、`branch_exists`（既にあるブランチを作る）は 400、ほかは 200 か 201（`test_contract.py` の `ERROR_STATUS` が一覧）。**1 本でも違えば `recorded.json` を置かない**
 - `reads` は、その要求の応答のうち、sh と拡張が実際に読むキー（下の「reads」）

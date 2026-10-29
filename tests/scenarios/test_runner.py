@@ -3532,6 +3532,7 @@ class HostSnapshotTest(unittest.TestCase):
                 "mrs_opened": 2,
                 "mrs_merged": 1,
                 "mrs_draft": 1,
+                "mrs_approved": 0,
                 "threads": 1,
                 "threads_unresolved": 1,
                 "threads_system": 0,
@@ -3540,10 +3541,37 @@ class HostSnapshotTest(unittest.TestCase):
             },
         )
 
-    def test_approvals_are_recorded_as_not_taken(self):
-        _, snap, _ = self.take()
-        self.assertIs(snap["approvals"]["taken"], False)
-        self.assertIn("取っていない", snap["approvals"]["reason"])
+    def test_approvals_are_recorded_per_mr_and_follow_the_other_side(self):
+        _, before, _ = self.take(1)
+        for mr in before["mrs"]:
+            self.assertEqual(mr["approvals"], {"taken": True, "approved": False, "approved_by": []})
+        self.assertNotIn("approvals", before, "最上位には置かない")
+        self.assertEqual(before["summary"]["mrs_approved"], 0)
+        client, token, project, _ = hostenv.api_access(self.host)
+        self.assertEqual(client.approve(token, project, 2)[0], 201)
+        _, after, _ = self.take(2)
+        mrs = {m["iid"]: m for m in after["mrs"]}
+        self.assertIs(mrs[2]["approvals"]["approved"], True)
+        self.assertEqual([a["username"] for a in mrs[2]["approvals"]["approved_by"]], ["reviewer"])
+        self.assertRegex(mrs[2]["approvals"]["approved_by"][0]["approved_at"], r"^\d{4}-\d\d-\d\d")
+        self.assertEqual(set(mrs[2]["approvals"]["approved_by"][0]), {"username", "approved_at"})
+        self.assertEqual(set(mrs[2]["approvals"]), {"taken", "approved", "approved_by"})
+        self.assertIs(mrs[1]["approvals"]["approved"], False)
+        self.assertEqual(after["summary"]["mrs_approved"], 1)
+
+    def test_an_approval_that_could_not_be_read_is_not_taken_and_is_in_errors(self):
+        reader = mock.Mock()
+        reader.list_mrs.return_value = (200, [{"iid": 1, "title": "t", "state": "opened"}])
+        reader.get_mr.return_value = (200, {"iid": 1, "title": "t", "state": "opened"})
+        reader.list_discussions.return_value = (200, [])
+        reader.list_approvals.return_value = (500, {"message": "x"})
+        reader.list_issues.return_value = (200, [])
+        with mock.patch.object(hostenv, "api_access", return_value=(reader, "t", "p", [])):
+            result, snap, _ = self.take()
+        self.assertEqual(snap["mrs"][0]["approvals"], {"taken": False})
+        self.assertEqual([e["api"] for e in snap["errors"]], ["list_approvals 1"])
+        self.assertEqual(snap["summary"]["mrs_approved"], 0)
+        self.assertFalse(result["ok"])
 
     def test_it_follows_the_state_of_the_other_side(self):
         _, before, _ = self.take(1)
@@ -3566,7 +3594,8 @@ class HostSnapshotTest(unittest.TestCase):
             self.take()
         self.assertTrue(events)
         self.assertEqual({e["method"] for e in events}, {"GET"})
-        self.assertFalse([e for e in events if "approv" in e["path"]])
+        self.assertTrue([e for e in events if e["path"].endswith("/approvals")])
+        self.assertFalse([e for e in events if e["path"].endswith("/approve")])
         self.assertEqual(fake_gitlab.load(self.host["state_path"]), snap_state())
 
     def test_the_token_is_masked_even_when_the_other_side_returns_it(self):
@@ -3588,7 +3617,6 @@ class HostSnapshotTest(unittest.TestCase):
         self.assertEqual([c["api"] for c in snap["calls"]], ["list_mrs"], "残りは読まない")
         self.assertEqual(snap["summary"]["mrs"], 0)
         self.assertTrue(snap["errors"])
-        self.assertFalse(snap["approvals"]["taken"])
 
     def test_system_notes_are_kept_but_counted_apart(self):
         """本物の GitLab が返すシステムのメモ（承認など）は残し、スレッドの件数とは分けて数える。"""
@@ -3604,6 +3632,7 @@ class HostSnapshotTest(unittest.TestCase):
                 {"id": "s1", "individual_note": True, "notes": [system]},
             ],
         )
+        reader.list_approvals.return_value = (200, {"approved": False, "approved_by": []})
         reader.list_issues.return_value = (200, [])
         with mock.patch.object(hostenv, "api_access", return_value=(reader, "t", "p", [])):
             _, snap, _ = self.take()
@@ -3618,6 +3647,7 @@ class HostSnapshotTest(unittest.TestCase):
         reader.list_mrs.return_value = (200, [{"iid": 1, "title": "t", "state": "opened"}])
         reader.get_mr.return_value = (404, {"message": "404"})
         reader.list_discussions.return_value = (500, {"message": "x"})
+        reader.list_approvals.return_value = (200, {"approved": False, "approved_by": []})
         reader.list_issues.return_value = (200, [])
         with mock.patch.object(hostenv, "api_access", return_value=(reader, "t", "p", [])):
             result, snap, _ = self.take()
@@ -3724,7 +3754,10 @@ class HostLifecycleTest(unittest.TestCase):
         self.assertEqual([self.snap(n)["step"] for n in (1, 2)], [1, 2])
         self.assertEqual(self.snap(1)["summary"]["mrs"], 1)
         self.assertEqual(self.snap(1)["summary"]["threads_unresolved"], 1)
-        self.assertFalse(self.snap(1)["approvals"]["taken"])
+        self.assertEqual(
+            self.snap(1)["mrs"][0]["approvals"],
+            {"taken": True, "approved": False, "approved_by": []},
+        )
         state = json.loads((self.ws.out / "state.json").read_text(encoding="utf-8"))
         self.assertEqual(
             [s["file"] for s in state["host_snapshots"]], ["host-1.json", "host-2.json"]
@@ -3732,7 +3765,7 @@ class HostLifecycleTest(unittest.TestCase):
         self.assertTrue(all(s["ok"] for s in state["host_snapshots"]))
         report = (self.ws.out / "report.md").read_text(encoding="utf-8")
         self.assertIn("host-N.json", report)
-        self.assertIn("承認は取っていない", report)
+        self.assertIn("承認は MR ごとに読んだ", report)
 
     def test_a_snapshot_failure_does_not_stop_the_scenario(self):
         steps = [{"prompt": "a"}, {"prompt": "b"}]
@@ -4036,6 +4069,11 @@ class FakeReader:
         note = {"id": 1, "body": f"鍵 {ROOT_PAT}", "resolvable": True, "resolved": False}
         return self._get("list_discussions", [{"id": "d1", "notes": [note]}])
 
+    def list_approvals(self, token, pid, iid):
+        who = {"username": "root", "name": "x", "id": 1}
+        body = {"approved": True, "approved_by": [{"approved_at": "t", "user": who}]}
+        return self._get("list_approvals", body)
+
     def list_issues(self, token, pid, *, state="opened", per_page=None):
         return self._get("list_issues", [])
 
@@ -4182,7 +4220,8 @@ class DockerLifecycleTest(DockerHostBase):
             self.assertEqual(snap["step"], n)
             self.assertEqual(snap["host"], "docker-gitlab")
             self.assertTrue(snap["mrs"][0]["draft"])
-            self.assertFalse(snap["approvals"]["taken"])
+            self.assertEqual(snap["mrs"][0]["approvals"]["approved_by"][0]["username"], "root")
+            self.assertEqual(snap["summary"]["mrs_approved"], 1)
             self.assertIn("***", snap["mrs"][0]["threads"][0]["notes"][0]["body"])
             self.assertNotIn(ROOT_PAT, json.dumps(snap))
         self.assertEqual(self.reader.calls.count("list_mrs"), 2)
