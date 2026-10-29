@@ -59,7 +59,7 @@ EOF
 	git -C "$repo" remote add origin "$work/remote.git"
 	git -C "$repo" push -q -u origin main
 	git -C "$repo" remote set-head origin -a >/dev/null
-	echo "起動した: http://127.0.0.1:$port（状態 $work/state.json）"
+	echo "起動した: http://127.0.0.1:${port}（状態 ${work}/state.json）"
 	echo "次を設定する: export PATH=$work/bin:\$PATH GITLAB_TOKEN=fake-gitlab-token-0001"
 	;;
 down)
