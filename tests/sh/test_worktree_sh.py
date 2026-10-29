@@ -263,12 +263,110 @@ class WorktreeShTest(unittest.TestCase):
         git(self.ws, "update-ref", "refs/remotes/origin/main", "HEAD")
         result = self.run_sh("topic")
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
-        self.assertIn("案内: 親 ws の承認待ちの提案・着手中の子・MR は", result.stdout)
+        self.assertIn("案内: 親 ws の承認待ちの提案・MR は", result.stdout)
         self.assertIn(f"案内: 承認待ちの提案 {self.WS_DIR} が", result.stdout)
         self.assertIn("案内: MR #12 が残っている", result.stdout)
         self.assertNotIn("着手済みの子が", result.stdout)
         self.assertEqual(1, result.stdout.count("\n次: "), result.stdout)
         self.assertTrue(result.stdout.rstrip().splitlines()[-1].startswith("次: "))
+
+    PARENT = "p0001"
+
+    def parent_tree(self, **places):
+        """実際の親のワークツリー（別ブランチ）を切り、置き場にチケットを置いて、そのパスを返す。
+
+        places は 置き場の相対パス → 本文の frontmatter（ticket 以外の欄）。
+        """
+        path = os.path.join(self.ws, ".claude", "worktrees", self.PARENT)
+        git(self.ws, "worktree", "add", "-q", "-b", self.PARENT, path)
+        for rel, extra in places.items():
+            write(
+                os.path.join(path, *rel.split("/")),
+                f"---\nticket: {extra.get('ticket', self.PARENT)}\n"
+                + "".join(f"{k}: {v}\n" for k, v in extra.items() if k != "ticket")
+                + "---\n本文\n",
+            )
+        return path
+
+    def assertRefused(self, result, *args):
+        self.assertEqual(1, result.returncode, result.stderr + result.stdout)
+        self.assertIn("直接作業へは切り替えられない", result.stderr)
+        self.assertEqual(1, result.stdout.count("\n次: ") + result.stderr.count("\n次: "))
+        self.assertTrue(result.stderr.rstrip().splitlines()[-1].startswith("次: "))
+        self.assertFalse(os.path.exists(self.wt("topic")))
+        self.assertEqual("", git(self.ws, "for-each-ref", "refs/ccnavi"))
+        self.assertEqual("", git(self.ws, "branch", "--list", "topic"))
+
+    def test_a_parent_tree_with_only_a_todo_proposal_may_switch(self):
+        path = self.parent_tree(**{"wip/proposals/todo/p0001.md": {"mr": 12}})
+        result = self.run_sh("topic", "--base", "main", cwd=path)
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertIn("案内: 親 p0001 の承認待ちの提案・MR は", result.stdout)
+        self.assertTrue(os.path.isdir(self.wt("topic")))
+
+    def test_an_approved_parent_tree_may_not_switch(self):
+        path = self.parent_tree(**{".ccnavi/approved/doing/p0001.md": {"mr": 12}})
+        for args in (("topic",), ("topic", "--dry-run")):
+            self.assertRefused(self.run_sh(*args, cwd=path))
+        result = self.run_sh("topic", cwd=path)
+        self.assertIn("案内: 親を早めに閉じたいなら", result.stderr)
+        self.assertIn("ccnavi-user-close-early.sh", result.stderr)
+
+    def test_a_finished_parent_tree_may_not_switch_and_is_not_told_to_close_early(self):
+        path = self.parent_tree(**{"wip/proposals/review/p0001.md": {"mr": 12}})
+        result = self.run_sh("topic", cwd=path)
+        self.assertRefused(result)
+        self.assertIn("完了済み（レビュー待ち）", result.stderr)
+        self.assertNotIn("案内: 親を早めに閉じたいなら", result.stderr)
+        self.assertNotIn("ccnavi-user-close-early.sh", result.stderr)
+
+    def test_a_parent_tree_with_a_started_child_may_not_switch_even_if_only_a_proposal(self):
+        path = self.parent_tree(
+            **{
+                "wip/proposals/todo/p0001.md": {},
+                ".ccnavi/approved/doing/p0001-01.md": {"ticket": "p0001-01", "parent": "p0001"},
+            }
+        )
+        result = self.run_sh("topic", cwd=path)
+        self.assertRefused(result)
+        self.assertIn("案内: 着手済みの子が 1 件ある", result.stderr)
+        self.assertIn("cancel", result.stderr)
+
+    def test_a_started_child_under_a_todo_parent_is_not_told_to_close_the_parent_early(self):
+        path = self.parent_tree(
+            **{
+                "wip/proposals/todo/p0001.md": {},
+                ".ccnavi/approved/doing/p0001-01.md": {"ticket": "p0001-01", "parent": "p0001"},
+            }
+        )
+        result = self.run_sh("topic", cwd=path)
+        self.assertRefused(result)
+        self.assertNotIn("ccnavi-user-close-early.sh", result.stderr)
+
+    def test_the_refusal_says_to_report_and_wait(self):
+        path = self.parent_tree(**{".ccnavi/approved/doing/p0001.md": {}})
+        result = self.run_sh("topic", cwd=path)
+        self.assertRefused(result)
+        self.assertIn("親のワークツリー（p0001）から", result.stderr)
+        self.assertIn("次: 状況をユーザに報告し", result.stderr)
+
+    def test_the_workspace_root_is_not_refused(self):
+        self.parent_tree(**{".ccnavi/approved/doing/p0001.md": {}})
+        result = self.run_sh("topic")
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+
+    def test_an_old_executable_without_stage_does_not_refuse(self):
+        path = self.parent_tree(**{"wip/proposals/todo/p0001.md": {}})
+        stub = write(
+            os.path.join(self._tmp.name, "exe2", "ccnavi"),
+            "#!/bin/sh\n"
+            'for a in "$@"; do [ "$a" = leftover ] &&'
+            ' { printf "tree 1\\nleftover yes\\ndoing 0\\n"; exit 0; }; done\n'
+            f'PYTHONPATH={SRC} exec {sys.executable} -m ccnavi "$@"\n',
+        )
+        os.chmod(stub, 0o755)
+        result = self.run_sh("topic", "--base", "main", cwd=path, CCNAVI_ENTRY_PATH=stub)
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
 
     def test_nothing_is_said_about_leftovers_without_a_parent(self):
         put_messages(self.ws)

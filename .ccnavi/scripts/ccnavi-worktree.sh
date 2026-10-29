@@ -24,7 +24,8 @@
 # ヒットしないときは確認なしでS = 取り込み先のHEADから切る。--side-by-sideだけはaskルールがユーザの確認を取る。
 #
 # 先に断るもの: ユーザのチェックアウトがdetached HEAD（C1）、取り込み先がチケットに結び付く・結び付くかを
-# 確かめられない（C2。実行ファイルの `tree base-bound`）、gitが 2.40 未満（C3）。
+# 確かめられない（C2。実行ファイルの `tree base-bound`）、gitが 2.40 未満（C3）、
+# cwdが親のワークツリーで、親が承認済み・レビュー待ち・着手済みの子がある（終了コード 1。実行ファイルの `tree leftover` の `stage`）。
 #
 # 手で打つgitではなくccnavi-git.shを通す。fetchはorigin <取り込み先> だけ。
 # ワークツリーが既にあれば、何も切らずに、パスと取り込みの記録の有無を出します（冪等）。
@@ -83,7 +84,9 @@ sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--base <ブランチ>] [--accept
                   ユーザの了承を得て --accept <確認コード> を付けて打ち直すと記録を書く
   --dry-run       何も作らず、調べた結果と予定だけ出す
 
-直接作業（チケットを使わない作業）用。親子のチケットの親のワークツリーには使わない
+直接作業（チケットを使わない作業）用。親子のチケットの親のワークツリーには使わない。
+親のワークツリーの中から打てるのは、親の提案が承認前（todo/ にあるだけ）のときだけ。
+承認済み・レビュー待ち・着手済みの子があるときは、切る前に終了コード 1 で断る
 （親は ccnavi-start.sh --mr <番号> / --issue <番号> で、親のブランチを直接チェックアウトして作る）。
 ずれが無ければ確認なしで切る。ずれがあれば切らずに状態・勧め・リスク・確認コードを出して終了コード 3 で止まる。
 ワークツリーが既にあれば、パスと取り込みの記録の有無を出すだけです（冪等）。
@@ -287,6 +290,39 @@ yes)
 	fail base-bound-unknown "取り込み先 ${target} がチケットに結び付くかを決められません（置き場の読み取りに失敗）。ユーザに確かめてください。"
 	;;
 esac
+
+# 親のワークツリーから直接作業へ切り替えられるのは、承認依頼の時点（親の提案が todo/ にあり、承認前）だけ。
+# 承認済み・レビュー待ち・着手済みの子があると、切り替えても取り下げられないものが残るので、切る前に断る。
+# 断るのは cwd が親のワークツリーのときだけ（ワークスペースのルートや子のワークツリーから打てば掛からない。意図して残した抜け道）。
+# 実行ファイルに聞けない・古くて stage が無いときは通す。--adopt は対象外（親のワークツリーの引き取りは adopt-ticket が断る）。
+if [ -z "$adopt" ]; then
+	pb_name=$(basename "$top")
+	pb_out=$(ccnavi_ask "$root" tree leftover "$top" "$pb_name") || pb_out=""
+	if [ "$(printf '%s\n' "$pb_out" | head -n 1)" = "tree 1" ]; then
+		pb_stage=$(printf '%s\n' "$pb_out" | sed -n 's/^stage //p' | head -n 1)
+		pb_doing=$(printf '%s\n' "$pb_out" | sed -n 's/^doing //p' | head -n 1)
+		case "$pb_doing" in
+		'' | *[!0-9]*) pb_doing=0 ;;
+		esac
+		pb_why=""
+		case "$pb_stage" in
+		doing) pb_why="親 ${pb_name} は承認済みで、着手済みの子・MR が取り下げられずに残る" ;;
+		review) pb_why="親 ${pb_name} は完了済み（レビュー待ち）で、MR が取り下げられずに残る" ;;
+		*) [ "$pb_doing" -eq 0 ] || pb_why="親 ${pb_name} に着手済みの子が ${pb_doing} 件あり、取り下げられずに残る" ;;
+		esac
+		if [ -n "$pb_why" ]; then
+			log_info 親のワークツリーから切り替えない -- "parent=$pb_name" "stage=$pb_stage" "doing=$pb_doing"
+			printf 'ccnavi-worktree: ワークツリーは切っていない。親のワークツリー（%s）から直接作業へは切り替えられない。%s。\n' "$pb_name" "$pb_why" >&2
+			printf '親のワークツリーから切り替えられるのは、承認依頼の時点（親の提案が todo/ にあり、承認前）だけ。\n' >&2
+			if [ "$pb_stage" = doing ]; then
+				ccnavi_text "$root" NOTE_WORKTREE_PARENT_CLOSE >&2
+			fi
+			[ "$pb_doing" -eq 0 ] || ccnavi_text "$root" NOTE_WORKTREE_PARENT_CHILDREN "count=$pb_doing" >&2
+			ccnavi_text "$root" NEXT_WORKTREE_PARENT_ACTIVE >&2
+			exit 1
+		fi
+	fi
+fi
 
 # 同じ名前の終わっていない取り込み（marker）が残っていれば切らない。前の作業の K や一時ワークツリーを
 # 新しい作業と取り違え、新しい記録と ref を片付けてしまうため。
@@ -735,7 +771,7 @@ if [ "$top_cmp" = "$root_cmp" ]; then
 		fi
 	done
 fi
-# 親のワークツリーから切り替えたとき、承認待ちの提案・着手中の子・MR は取り下げられずに残る。
+# 親のワークツリーから切り替えたとき（承認前の提案だけ。それ以外は切る前に断った）、承認待ちの提案・MR は取り下げられずに残る。
 # 何が残っているかは実行ファイルに聞く（sh はチケットの置き場を読まない）。聞けないときは何も出さない。
 lo_name=$(basename "$top")
 lo_out=$(ccnavi_ask "$root" tree leftover "$top" "$lo_name") || lo_out=""
@@ -743,7 +779,6 @@ lo_get() { printf '%s\n' "$lo_out" | sed -n "s/^$1 //p" | head -n 1; }
 if [ "$(printf '%s\n' "$lo_out" | head -n 1)" = "tree 1" ] && [ "$(lo_get leftover)" = yes ]; then
 	ccnavi_text "$root" NOTE_WORKTREE_LEFTOVER "parent=$lo_name"
 	[ "$(lo_get proposal)" != yes ] || ccnavi_text "$root" NOTE_WORKTREE_LEFTOVER_PROPOSAL "parent=$lo_name"
-	[ "$(lo_get doing)" = 0 ] || ccnavi_text "$root" NOTE_WORKTREE_LEFTOVER_DOING "count=$(lo_get doing)"
 	[ "$(lo_get mr)" = - ] || ccnavi_text "$root" NOTE_WORKTREE_LEFTOVER_MR "mr=#$(lo_get mr)"
 fi
 print_next

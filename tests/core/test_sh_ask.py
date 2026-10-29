@@ -132,14 +132,17 @@ class TreeLeftoverTest(Harness):
         write(os.path.join(self.tree, *rel.split("/")), front(**fields))
 
     def test_a_tree_without_a_parent_has_nothing_left(self):
-        self.assertEqual({"leftover": "no", "proposal": "no", "doing": "0", "mr": "-"}, self.left())
+        self.assertEqual(
+            {"leftover": "no", "proposal": "no", "doing": "0", "mr": "-", "stage": "-"}, self.left()
+        )
 
     def test_a_proposal_waiting_for_approval_is_left(self):
         for place in ("todo", "review"):
             path = os.path.join(self.tree, *f"{PROPOSALS}/{place}/p0001.md".split("/"))
             write(path, front(ticket="p0001", issue=5, mr=12))
             self.assertEqual(
-                {"leftover": "yes", "proposal": "yes", "doing": "0", "mr": "12"}, self.left()
+                {"leftover": "yes", "proposal": "yes", "doing": "0", "mr": "12", "stage": place},
+                self.left(),
             )
             os.remove(path)
 
@@ -148,12 +151,23 @@ class TreeLeftoverTest(Harness):
         self.put(f"{APPROVED}/doing/p0001-01.md", ticket="p0001-01", parent="p0001")
         self.put(f"{APPROVED}/doing/p0002-01.md", ticket="p0002-01", parent="p0002")
         self.assertEqual(
-            {"leftover": "yes", "proposal": "no", "doing": "1", "mr": "12"}, self.left()
+            {"leftover": "yes", "proposal": "no", "doing": "1", "mr": "12", "stage": "doing"},
+            self.left(),
         )
+
+    def test_the_stage_prefers_doing_over_review_over_todo(self):
+        self.put(f"{PROPOSALS}/todo/p0001.md", ticket="p0001")
+        self.assertEqual("todo", self.left()["stage"])
+        self.put(f"{PROPOSALS}/review/p0001.md", ticket="p0001")
+        self.assertEqual("review", self.left()["stage"])
+        self.put(f"{APPROVED}/doing/p0001.md", ticket="p0001")
+        self.assertEqual("doing", self.left()["stage"])
 
     def test_a_closed_parent_leaves_nothing(self):
         self.put(f"{APPROVED}/done/p0001.md", ticket="p0001", mr=12)
-        self.assertEqual("no", self.left()["leftover"])
+        left = self.left()
+        self.assertEqual("no", left["leftover"])
+        self.assertEqual("-", left["stage"])
 
     def test_a_bad_name_is_refused(self):
         self.assertEqual(1, self.ask("tree", "leftover", self.tree, "../x").returncode)

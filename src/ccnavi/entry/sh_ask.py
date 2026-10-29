@@ -25,7 +25,11 @@ sh はチケットの YAML も JSON も自分で読まない。読むのは実�
 - `ccnavi tree leftover <ツリー> <名前>`: そのツリーが親のワークツリーで、承認待ちの提案・着手中の
   子・MR が残っているか（`ccnavi-worktree.sh` が、直接作業へ切り替えたあとに取り下げの手順を
   案内するか決めるために聞く）。`leftover yes|no`、`proposal yes|no`（`todo/`・`review/` の提案）、
-  `doing <件数>`（`doing/` の子）、`mr <番号>|-`（親の `mr:`）。親でなければ `leftover no`。
+  `doing <件数>`（`doing/` の子）、`mr <番号>|-`（親の `mr:`）、`stage doing|review|todo|-`
+  （親の段階。優先順位は doing > review > todo。親でない・読めないときは `-`。
+  `stage` が `doing`・`review` のとき、または `doing` の件数が 1 以上のときは、
+  `ccnavi-worktree.sh` が切る前に断る）。
+  親でなければ `leftover no`。
 
 - `ccnavi tree base-bound <ユーザのチェックアウト> <ブランチ>`: 直接作業の取り込み先のブランチが、
   チケットに結び付くか（`ccnavi-worktree.sh` が切る前に断る条件）。`bound yes|no|unknown` に続けて、
@@ -182,10 +186,14 @@ def leftover_tree(
 ) -> int:
     """`ccnavi tree leftover <ツリー> <名前>`。
 
-    頭に `tree 1`、続けて `leftover yes|no`、`proposal yes|no`、`doing <件数>`、`mr <番号>|-`。
+    頭に `tree 1`、続けて `leftover yes|no`、`proposal yes|no`、`doing <件数>`、`mr <番号>|-`、
+    `stage doing|review|todo|-`。
 
-    直接作業へ切り替えても、承認待ちの提案・着手中の子・MR は取り下げられずに残る。
-    `ccnavi-worktree.sh` が、その取り下げの手順を案内するかどうかを決めるために聞く。
+    `stage` は親の段階。`doing/` に親が在れば `doing`（承認済み。改版の提案が `todo/` にあっても
+    `doing`）、なければ `review/` に在れば `review`（finish 済みでレビュー待ち）、
+    なければ `todo/` に在れば `todo`（承認前の提案だけ）、いずれも無ければ `-`。
+    `ccnavi-worktree.sh` が、切り替える前に断るか、切り替えたあとに取り下げの手順を案内するか
+    決めるために聞く。
     親のワークツリーでなければ（親が読めないときも）`no`。案内を出さない向きに倒す。
     """
     if not _ident_ok(stderr, "tree leftover", "名前", name):
@@ -198,16 +206,23 @@ def leftover_tree(
     proposals = os.path.join(work.root, conf.tickets.replace("/", os.sep))
     proposal = NO
     mr = ""
-    for held, directory in (
-        (False, os.path.join(approved, ticket_model.DOING)),
-        (True, os.path.join(proposals, ticket_model.TODO)),
-        (True, os.path.join(proposals, ticket_model.REVIEW)),
+    found = set()
+    for stage_name, held, path_of_parent in (
+        ("doing", False, approval.copy_path(approved, name)),
+        ("todo", True, os.path.join(proposals, ticket_model.TODO, f"{name}.md")),
+        ("review", True, os.path.join(proposals, ticket_model.REVIEW, f"{name}.md")),
     ):
-        front = _front(fsio.read_text(os.path.join(directory, f"{name}.md")))
-        if front is None or str(front.get("ticket") or "").strip() != name or front.get("parent"):
+        front = _front(fsio.read_text(path_of_parent))
+        if (
+            front is None
+            or pathcase.fold(str(front.get("ticket") or "").strip()) != pathcase.fold(name)
+            or front.get("parent")
+        ):
             continue
+        found.add(stage_name)
         proposal = YES if held or proposal == YES else NO
         mr = mr or _mr_of(front)
+    stage = next((s for s in ("doing", "review", "todo") if s in found), "-")
     doing = 0
     if proposal == YES or mr or _holds_parent(conf, work) == YES:
         doing = _children_in_doing(approved, name)
@@ -217,6 +232,7 @@ def leftover_tree(
     stdout.write(f"proposal {proposal}\n")
     stdout.write(f"doing {doing}\n")
     stdout.write(f"mr {mr or '-'}\n")
+    stdout.write(f"stage {stage}\n")
     return 0
 
 
