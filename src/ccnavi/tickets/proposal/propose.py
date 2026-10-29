@@ -17,6 +17,9 @@ write-and-push の手順で行う。コミットされるのは、未追跡の�
   （`workflow.after_problems`・`workflow.terminal_problems`）。
   承認で落ちる誤りを承認の前に返すためである。誤りがあれば何も送らない。
   子の提案・子のフロー・計画の無い提案・読めない提案は検査しない
+- 承認済みの無い（最初の）親の提案は、すぐ始まるステップに子の提案が 1 つも無ければ、送りはするが
+  標準エラーに警告する（`workflow.childless_ready`。承認の確認と同じ判定）。親を先に承認して子を
+  後から出す進め方も正規なので止めない。改版には効かせない
 - 親のワークツリー（`.claude/worktrees/<親>`）の中のものだけを見る
 - 送る提案が 1 本も無ければ、何も載せずに止める
 - origin の無い親子には送る先がないので、何も載せずに案内して終える
@@ -31,6 +34,8 @@ import os
 from typing import TextIO
 
 from ...infra import fsio, pathcase, settings
+from ..approval import checks as approval_checks
+from ..approval import store as approval
 from ..approval import write_and_push
 from ..config import workflow
 from ..model import ticket, ticket_ids, ticket_model
@@ -90,6 +95,40 @@ def _plan_problems(paths: list[str], parent: str) -> list[str]:
     return found
 
 
+def _childless_problems(
+    conf: settings.Settings, root: str, paths: list[str], parent: str
+) -> list[str]:
+    """最初の親の提案で、すぐ始まるステップに子の提案が無い警告。承認の確認と同じ文面を返す。"""
+    own = next(
+        (
+            p
+            for p in paths
+            if pathcase.fold(os.path.basename(p)) == pathcase.fold(parent + ".md")
+            and pathcase.fold(os.path.basename(os.path.dirname(p)))
+            == pathcase.fold(ticket_model.TODO)
+        ),
+        "",
+    )
+    if not own:
+        return []
+    try:
+        loaded, _ = ticket.load(own)
+    except ValueError:
+        return []
+    if loaded is None or not loaded.plan:
+        return []
+    open_, _ = approval.scan(conf, root)
+    closed, _ = approval.scan(conf, root, closed=True)
+    if parent in approval_checks.by_id(open_ + closed):
+        return []  # 承認済みの親の改版。子はもう承認の側にある
+    phases = set()
+    for path in paths:
+        matched = ticket_ids.child_pattern().fullmatch(os.path.splitext(os.path.basename(path))[0])
+        if matched is not None and path.endswith(".md"):
+            phases.add(int(matched.group("phase")))
+    return [p.detail for p in workflow.childless_ready(loaded, phases)]
+
+
 def run(
     stdout: TextIO,
     stderr: TextIO,
@@ -127,6 +166,8 @@ def run(
             stderr.write(f"  {detail}\n")
         stderr.write(f"次: 直して `ccnavi-ticket.sh propose {parent}` を打ち直す\n")
         return 1
+    for detail in _childless_problems(conf, root, paths, parent):
+        stderr.write(f"ccnavi: 注意: {detail}\n")
     for path in paths:
         fsio.note_input(path)
         rel = os.path.relpath(path, base).replace(os.sep, "/")

@@ -38,6 +38,7 @@ from ..approval import checks as approval_checks
 from ..approval import marks as approval_marks
 from ..approval import ops as approval_ops
 from ..approval import store as approval
+from ..config import workflow
 from ..model import ticket_model
 from ..phase import gates as phase
 from . import agree_candidates, agree_digest, agree_screen, plan_order
@@ -286,12 +287,20 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
         )
     else:
         reason = VERIFY_OK
-        tail = (
-            f"\n{len(gathered.batch)} 件が承認の対象に入る。\n"
-            "次: ccnavi-ticket.sh propose <識別子> で提案を親のブランチへ送ってから、"
-            "ユーザに承認を依頼してよい。"
-            "承認が済むまで実装はしない\n"
+        childless = any(
+            workflow.CHILDLESS_MARK in p.detail for c in gathered.batch for p in c.complaints
         )
+        # 子の無い親は通るが、書き忘れに気づけるよう、次の一手を子の提案に向ける
+        step = (
+            "次: 子の提案が無い親がある（上の warn）。子の提案を wip/proposals/todo/ に書いてから、"
+            "同じ --agree --preview --verify を打ち直す。親だけを先に承認する進め方なら、"
+            "ccnavi-ticket.sh propose <識別子> で送り、子の承認がもう 1 回要ることを"
+            "ユーザに伝える\n"
+            if childless
+            else "次: ccnavi-ticket.sh propose <識別子> で提案を親のブランチへ送ってから、"
+            "ユーザに承認を依頼してよい。承認が済むまで実装はしない\n"
+        )
+        tail = f"\n{len(gathered.batch)} 件が承認の対象に入る。\n{step}"
     lines.append(tail)
     return Verdict(reason == VERIFY_OK, reason, "".join(lines))
 

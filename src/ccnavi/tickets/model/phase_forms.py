@@ -366,7 +366,7 @@ EXE_OPTIONS = frozenset(
         "--body-file", "--check-file",
         "--choose-out", "--close-early", "--cwd", "--digest", "--docs", "--draft",
         "--expect",
-        "--explain", "--fill-phases", "--flow", "--format", "--guard-core-files",
+        "--explain", "--feedback", "--fill-phases", "--flow", "--format", "--guard-core-files",
         "--guard-ticket-approval", "--handoff", "--help", "--issue",
         "--json",
         "--keyword", "--layer", "--learnings", "--limit", "--lint", "--log", "--mirror",

@@ -99,6 +99,47 @@ class ApproveVerifyTest(PhaseHarness):
         # 通るほうも同じ画面に出る。直す相手が分かるように。
         self.assertIn("通る", result.stdout)
 
+    # ---- 2b. すぐ始まるステップに子の提案が無い親
+
+    def test_a_parent_without_a_child_passes_but_says_so_and_points_at_the_child(self):
+        """親を先に承認して子を後から出す進め方も正規なので、止めない。ただ黙って通さない。"""
+        self.propose("i0001", parent_text("i0001", ["research", "design"]))
+        self.commit_parent()
+
+        result = self.verify()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("子の提案がありません", result.stdout)
+        self.assertIn("i0001-01-01", result.stdout)
+        nexts = [x for x in result.stdout.splitlines() if x.startswith("次: ")]
+        self.assertEqual(len(nexts), 1, result.stdout)
+        self.assertIn("子の提案を", nexts[0])
+        self.assertNotIn("承認を依頼してよい", result.stdout)
+
+    def test_only_the_steps_that_start_at_once_need_a_child(self):
+        """先行のあるステップ（design）の子は、先行のレビューを見てから書いてよい。"""
+        self.propose("i0001", parent_text("i0001", ["research", "design"]))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
+        self.commit_parent()
+
+        result = self.verify()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("子の提案がありません", result.stdout)
+        self.assertIn("承認を依頼してよい", result.stdout)
+
+    def test_a_child_outside_the_narrowed_batch_still_counts(self):
+        """ボードで親だけを選んでも、todo/ に子を書いてあれば、子無しと言わない。"""
+        self.propose("i0001", parent_text("i0001", ["research"]))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
+        self.commit_parent()
+
+        result = self.verify("i0001")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("子の提案がありません", result.stdout)
+
     # ---- 3. 承認待ちが無い
 
     def test_nothing_pending_is_a_failed_check(self):
@@ -163,6 +204,9 @@ class ApproveVerifyTest(PhaseHarness):
         （自分が書いた 1 本かもしれない）。
         """
         self.propose("i0001", parent_text("i0001", ["research"]))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
         write(os.path.join(self.parent_tree, "wip", "proposals", "todo", "broken.md"), "---\n: :\n")
         self.commit_parent()
 

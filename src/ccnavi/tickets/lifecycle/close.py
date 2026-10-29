@@ -317,9 +317,11 @@ def close_problems(
     copy = approval_checks.by_id(copies + closed_copies).get(parent_id)
     if copy is not None and copy.has_plan:
         if copy.feedback is None:
+            launcher = settings.script_command(root, "ccnavi-launcher.sh")
+            revise_cmd = f"{launcher} ticket revise {parent_id} --feedback"
             problems.append(
-                f"{parent_id} はフィードバック計画がまだ。対応が無くても "
-                "`feedback: []` を改版で出して承認を受けてから"
+                f"{parent_id} はフィードバック計画がまだ。対応が無くても `feedback: []` の改版を"
+                f"出して承認を受けてから（雛形は '{revise_cmd}' が作る）"
             )
         unfinished = [
             p.label for p in phase.phases_of(root, conf, parent_id, raw=raw) if not p.ended

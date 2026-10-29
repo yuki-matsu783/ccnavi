@@ -22,8 +22,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from ...policy import rules
-from ..model import ticket_model
+from ..model import ticket_ids, ticket_model
 from . import phasetypes
 
 
@@ -118,6 +120,40 @@ def ready(parent: ticket_model.Ticket, wf: ticket_model.Workflow | None = None) 
             if not [m for m in wf.waits.get(n, []) if m >= first]
         ]
     return out
+
+
+# `childless_ready` の警告の見分け方。承認の確認の「次:」が、子を書くよう言い換えるのに使う。
+CHILDLESS_MARK = "子の提案がありません"
+
+
+def childless_ready(
+    parent: ticket_model.Ticket, child_phases: Iterable[int]
+) -> list[rules.Problem]:
+    """全体計画ですぐ始まるのに、子の提案が 1 つも無いステップの警告。
+
+    すぐ始まるステップは、子が無いと着手できない。子の提案を後から出すと、親と別にもう 1 回
+    承認が要る。止めないのは、親を先に承認して子を後から出す進め方も正規だから。ただ、書き忘れて
+    承認の確認と `propose` が黙って通ると気づけないので、警告で名指しする。先行のあるステップの子は、
+    先行のレビューを見てから書くことがあるので見ない。フィードバック計画のステップも、
+    全体計画のレビューのあとに子を足すので見ない。
+    `child_phases` は同じ承認で通す子（と書いた子）のフェーズ番号。
+    """
+    have = set(child_phases)
+    found: list[rules.Problem] = []
+    for n in ready(parent):
+        item = parent.item_at(n)
+        if not parent.in_plan(n) or item is None or n in have:
+            continue
+        found.append(
+            rules.Problem(
+                rules.SEVERITY_WARN,
+                parent.ticket,
+                f"計画の {n} 番目（{item.type}）はすぐ始まるのに、{CHILDLESS_MARK}。"
+                f"`{ticket_ids.child_id(parent.ticket, n, 1)}` のような子を同じ承認で通さないと、"
+                "子の承認がもう 1 回要る",
+            )
+        )
+    return found
 
 
 def terminal_problems(

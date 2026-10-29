@@ -42,7 +42,7 @@ from . import stop as ops_stop
 CODE_FEEDBACK_NUDGE = "NUDGE_TICKET_FEEDBACK"
 
 # 親の局面（`phase.stage`）のうち、促す局面。
-STAGE_WAITING = "フィードバック計画待ち"
+STAGE_WAITING = phase.STAGE_FEEDBACK_WAITING
 
 _KEY_HEAD = "feedback:"
 

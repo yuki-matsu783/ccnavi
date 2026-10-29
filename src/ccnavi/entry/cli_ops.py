@@ -23,7 +23,7 @@ from ..tickets.lifecycle import commands as ops
 from ..tickets.lifecycle import consolidate, next_id, retire, worktrees
 from ..tickets.model import oplog, ticket_ids, user_only, via
 from ..tickets.phase import gates as phase
-from ..tickets.proposal import propose, scaffold
+from ..tickets.proposal import propose, revise, scaffold
 from ..tickets.review import close as review_close
 from ..tickets.review import decide as review_decide
 from ..tickets.review import request as review
@@ -215,6 +215,13 @@ def operate(
         code = learning.run(
             stdout, stderr, root, conf, where, target, args.note, args.target, args.signal
         )
+    elif kind == "ticket" and verb == "revise":
+        # ticket revise <識別子> [--feedback]。承認済みの親の改版の雛形を作る。
+        if len(words) != 3:
+            stderr.write("ccnavi: ticket revise <識別子> [--feedback]\n")
+        else:
+            where = cwd[-1] if isinstance(cwd, list) and cwd else cwd
+            code = revise.run(stdout, stderr, conf, root, where, target, args.feedback)
     elif kind == "ticket" and verb == "new":
         # ticket new <識別子> --title <タイトル> (--plan <型,型,...> |
         # --template <名前> [--layer <名前>] [--with-feedback]) [--issue N]。親の提案の雛形を作る。
