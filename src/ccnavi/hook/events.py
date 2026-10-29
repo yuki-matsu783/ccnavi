@@ -302,6 +302,7 @@ def decide_at_prompt(
     # ユーザの発言と言い切れるものだけを、ターン分離の関門が読む記録に書く。ターンの印とは別。
     if hookio.is_user_prompt(payload):
         userprompt.note(conf.state, payload.session_id)
+        turngate.drop_broken(conf.state, payload.session_id)
     by_user = not payload.from_background_task() and not busy.is_busy(
         conf.state, payload.session_id
     )
