@@ -32,7 +32,7 @@ def run(stdout: TextIO, stderr: TextIO, root: str, words: list[str]) -> int:
         else:
             values[key] = value
     try:
-        entry = texts.load(root).entries.get(words[0])
+        entry = texts.find(root, words[0])
         if entry is None:
             raise texts.TextError(f"{words[0]}: 文面が無い")
         text = texts.render(entry, values, variants, root)

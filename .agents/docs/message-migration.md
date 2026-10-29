@@ -17,7 +17,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | `DENY_TICKET_PARENT` | `hook/judge.py`（親のワークツリーへの書き込み） | 移した |
 | `DENY_PHASE_REVIEW__WAITING`・`DENY_PHASE_REVIEW__REQUEST` | `tickets/phase/gates.py` の `hold_reason` | 移した（並行の依頼の断り `PARALLEL_REQUEST_NOTE` と止めている間も通せる操作の案内 `EXEMPT_NOTE` は、`tickets/review/request.py` や `tickets/phase/gates.py` の別の文と共有する定数なので、コードに残る） |
 | `DENY_NEEDS_USER_TURN__INTEGRATE`・`DENY_NEEDS_USER_TURN__STATE`・`NOTICE_ASK_USER_CONFIRM__INTEGRATE` | `hook/turngate.py` の `message`・`ask_message` | 移した（宣言の `Gate.message`・`Gate.ask_message` が識別子を指す） |
-| `NUDGE_INTEGRATE__UNKNOWN_MARKER`・`__CONFIRM`・`__ADOPT`・`__RUN`、`NOTE_INTEGRATE_*` | `tickets/lifecycle/stop_integrate.py` の `integrate_nudge` | 移した（`blocked_notice` の `systemMessage` は残る） |
+| `NUDGE_INTEGRATE__UNKNOWN_MARKER`・`__ADOPT`・`__RUN`、`NOTE_INTEGRATE_*` | `tickets/lifecycle/stop_integrate.py` の `integrate_nudge` | 移した（`blocked_notice` の `systemMessage` は残る） |
 | `NEXT_START_*`・`NOTE_START_*`・`CHOICES_START_ISSUE_CLOSED` | `ccnavi-start.sh` の `次:`・`次の手:` と、それに続く `案内:` | 移した（`次:`・`次の手:` に続く `案内:` まで。続かない `案内:` は下の「残り」。状態を報告する行・`必須:`・`確認:`・`MCP で行う手順:` は次の一手ではないので残る） |
 | `DENY_TICKET_PROJECT_MISMATCH`・`DENY_TICKET_BLOCKED`・`DENY_TICKET_SCOPE` | `hook/judge.py`（取り違え・チケットが成り立たない・範囲の外） | 移した（状態を報告する先頭の行 `subject:`・`ticket:`・`scope:`・`limit:`・`problem:` は残る。`DENY_TICKET_SCOPE` は上限ごとに `what` `why` `next` を `area`・`type`・`parent` で分ける） |
 | `NOTE_WORKTREE_LEFTOVER*` | `ccnavi-worktree.sh`（親のワークツリーから直接作業へ切り替えたあとの取り下げの案内。残っているかは実行ファイルの `tree leftover` に聞く）。切り替えを断る `NOTE_WORKTREE_PARENT_*` も同じ | 移した（新規） |
@@ -68,6 +68,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 - 判定 1 回で組むルール 1 本ごとに `texts.say` を呼んでも、署名の検査にかかる時間は約 0.7 ms（27 µs × 24 本）にとどまる。ルールを組み立てる回数は、毎回の `stat`（署名の検査）の時間に影響しない
 - 時間がかかるのは冷たい読みだけ。キャッシュは `texts` のモジュールの中にあり、hook は 1 呼び出しで 1 プロセス（`cli.run` が 1 回の起動で 1 判定）なので、呼び出しをまたいで温まらない。組み立てで引くと、拒否に当たらない大半の呼び出しにも約 45 ms が乗る。いまは拒否に当たった呼び出しだけがその時間を負担している
 - `texts.say` 1 回の時間は、温まっていれば約 40 µs、冷たければ約 45 ms。以前の見積もりの約 2 ms は、どちらにも当たらない
+- この表は `say` が全件の `texts.load` を通っていたときの値。いまの `say` は `texts.find` で識別子を含むファイルだけを読むので、冷たい 1 回でも数 ms で済む（`ls` の実行前の判定で、YAML の読みが 16 回・約 89 KB から 2 回・約 18 KB に減った）
 - プロセス全体の壁時間は import が大半を占め（約 430 ms、ばらつき ±50 ms）、上の差は測定のばらつきに隠れる。差を見るには判定の中身だけを測る
 
 ### 数えたこと（項目 1 の材料。移す前の数）

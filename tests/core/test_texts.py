@@ -81,6 +81,22 @@ class TextsTest(unittest.TestCase):
         self.assertIn("DENY_OTHER", second.entries)
         self.assertNotIn("DENY_OTHER", first.entries)
 
+    def test_one_lookup_gives_the_same_entry_as_reading_all(self):
+        """`find` は識別子を含むファイルだけを読み、全件の `load` と同じ 1 件を採る。"""
+        later = COMMON.replace("{name} を止めました。", "後ろの {name} です。")
+        put(self.root, "common", "b.yml", later)
+        put(self.root, "common", "c.yml", "version: 1\nmessages: [\n")
+        whole = texts.load(self.root).entries
+        for text_id in ("DENY_SAMPLE", "NEXT_SAMPLE"):
+            self.assertEqual(texts.find(self.root, text_id), whole[text_id])
+        self.assertIsNone(texts.find(self.root, "DENY_NOTHING"))
+        # 前のファイルの 1 件が検査を通らなければ、全件の読みと同じく後ろのファイルの 1 件を採る。
+        put(self.root, "common", "a.yml", COMMON.replace("    why: 理由です。\n", ""))
+        self.assertIn("後ろの", texts.find(self.root, "DENY_SAMPLE").fields["what"])
+        self.assertEqual(
+            texts.find(self.root, "DENY_SAMPLE"), texts.load(self.root).entries["DENY_SAMPLE"]
+        )
+
     def test_values_cannot_add_lines(self):
         out = texts.say(self.root, "NEXT_SAMPLE", {"args_q": "a\n次: 偽"})
         self.assertEqual(len(out.splitlines()), 1)
@@ -90,12 +106,17 @@ class TextsTest(unittest.TestCase):
         put(self.root, "common", "r.yml", RULE_BODY)
         self.assertEqual(texts.load(self.root).problems, [])
         self.assertEqual(texts.say(self.root, "RULE_SAMPLE"), "止めました。\n次: 打ち直す")
-        only = RULE_BODY.replace("    why: \"\"\n    next: 打ち直す\n", "")
+        only = RULE_BODY.replace('    why: ""\n    next: 打ち直す\n', "")
         put(self.root, "common", "r.yml", only)
         self.assertEqual(texts.say(self.root, "RULE_SAMPLE"), "止めました。")
 
     def test_a_rule_text_still_needs_what(self):
-        put(self.root, "common", "r.yml", RULE_BODY.replace("    what: 止めました。\n", "    what: \"\"\n"))
+        put(
+            self.root,
+            "common",
+            "r.yml",
+            RULE_BODY.replace("    what: 止めました。\n", '    what: ""\n'),
+        )
         problems = [str(p) for p in texts.load(self.root).problems]
         self.assertTrue(any("RULE_SAMPLE" in p and "what" in p for p in problems), problems)
         self.assertNotIn("RULE_SAMPLE", texts.load(self.root).entries)
@@ -123,7 +144,7 @@ class TextsTest(unittest.TestCase):
             "common",
             "n.yml",
             "version: 1\nmessages:\n  NOTICE_SAMPLE:\n    kind: notice\n    values: [name]\n"
-            "    what: \"[ccnavi] {name} を読めませんでした。\"\n    next: 打ち直す\n",
+            '    what: "[ccnavi] {name} を読めませんでした。"\n    next: 打ち直す\n',
         )
         self.assertEqual(texts.load(self.root).problems, [])
         self.assertEqual(

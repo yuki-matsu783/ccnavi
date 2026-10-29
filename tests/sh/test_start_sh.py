@@ -1894,9 +1894,8 @@ class StartShGitLabTest(StartShTest):
         self.gitlab_routes(created=False)
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
-        self.assertIn("GitLab APIが応答しないか要求を拒み", done.stdout)
-        self.assertIn("手で行う手順", done.stdout)
-        self.assertIn("Closes #152", done.stdout)
+        self.assertIn("GitLab の API に届かない（HTTP ", done.stdout)
+        self.assertIn(f"ブランチ: {BRANCH}（push 済み）", done.stdout)
         self.assertNotIn("mcp__github__", done.stdout)
         self.gitlab_routes()
         again = self.run_sh("--issue", "152")
@@ -1967,33 +1966,30 @@ exec '{self.bin}/curl' -X "$method" "https://gitlab.com/api/v4/$path"
         self.route(routes)
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
-        self.assertIn("HTTP 415", done.stdout)
-        self.assertNotIn("glab を", done.stdout)
+        self.assertIn("GitLab の API に届かない（HTTP 415）", done.stdout)
 
     def test_gitlab_unreachable_at_search_has_no_mcp(self):
         done = self.run_sh("--issue", "152", token=False)
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
-        self.assertIn("GitLab APIが応答しないか要求を拒み", done.stdout)
+        self.assertIn("GitLab の API に届かない（glab が", done.stdout)
+        self.assertIn("利用できず", done.stdout)
         self.assertNotIn("mcp__github__", done.stdout)
 
-    def test_gitlab_unreachable_asks_the_user_instead_of_inviting_mcp_checked(self):
-        """GitLab は確かめる手段がない。確かめるのはユーザで、返事が無ければ止まる。"""
+    def test_gitlab_unreachable_asks_the_user_for_auth_and_reruns(self):
+        """GitLab は代行の手段がない。ユーザに認証を頼み、同じ引数で打ち直す。
+
+        --mcp-checked は勧めない。
+        """
         done = self.run_sh("--issue", "152", token=False)
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
-        self.assertIn("ユーザに、ブラウザで", done.stdout)
-        self.assertIn("返事を待つ", done.stdout)
-        self.assertIn("'--issue' '152' --mcp-checked を打つ", done.stdout)
-        self.assertIn("付けず、直接実装にも切り替えず、ユーザに報告して止まる", done.stdout)
-        self.assertNotIn("確かめ、無ければ --mcp-checked を付けて再実行します", done.stdout)
-
-    def test_gitlab_manual_mr_creation_is_done_by_the_user(self):
-        self.gitlab_routes(created=False)
-        done = self.run_sh("--issue", "152")
-        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
-        self.assertIn("ユーザに、ブラウザで", done.stdout)
-        self.assertIn(
-            "作り話の番号で打たず、直接実装にも切り替えず、ユーザに報告して止まる", done.stdout
-        )
+        nexts = [line for line in done.stdout.splitlines() if line.startswith("次: ")]
+        self.assertEqual(len(nexts), 1, done.stdout)
+        self.assertIn("ユーザに glab の gitlab.com への認証か GITLAB_TOKEN の用意を頼み", nexts[0])
+        self.assertIn("ccnavi-start.sh '--issue' '152'。", nexts[0])
+        self.assertIn("直接実装に切り替えず、ユーザに報告して止まる", nexts[0])
+        self.assertIn("なし（ブランチもワークツリーも作っていない）", done.stdout)
+        self.assertNotIn("--mcp-checked", done.stdout)
+        self.assertNotIn("ブラウザ", done.stdout)
 
     def test_gitlab_mcp_checked_without_all_three_asks_the_user(self):
         done = self.run_sh("--mr", "5", "--mcp-checked", token=False)

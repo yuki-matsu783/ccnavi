@@ -26,6 +26,12 @@ messages:
     next: |-
       ユーザに、ブラウザで MR の元ブランチと、その MR が閉じる issue を伝えてもらい、返事を待つ。3 つそろえて打ち直す: {cmd_q}。聞けなければ、直接実装にも切り替えず、ユーザに報告して止まる
 
+  NEXT_START_HOST__GITLAB:
+    kind: next
+    values: [host, args_q]
+    next: |-
+      ユーザに glab の {host} への認証か GITLAB_TOKEN の用意を頼み、返事を待つ。用意できたら打ち直す: {script:ccnavi-start.sh} {args_q}。認証済みで一時的な失敗（応答なし）なら、そのまま打ち直す。用意できなければ、直接実装に切り替えず、ユーザに報告して止まる
+
   NEXT_START_IDENT:
     kind: next
     values: [real_args_q]

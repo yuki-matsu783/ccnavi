@@ -192,7 +192,7 @@ class TidyTest(PhaseHarness):
         self.assertTrue(os.path.isdir(doing))
         self.assertFalse(os.path.exists(gone))
 
-    def test_a_closed_child_with_uncommitted_changes_is_named_and_kept(self):
+    def test_a_closed_child_with_uncommitted_changes_is_kept_with_a_status_hint(self):
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["src/*"], review=False))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
@@ -202,7 +202,7 @@ class TidyTest(PhaseHarness):
         tidy = self.tidy()
         self.assertEqual(tidy.returncode, 1, tidy.stdout + tidy.stderr)
         self.assertIn("未コミットの変更があるので、何も削除しませんでした。", tidy.stdout)
-        self.assertIn("src/left.py", tidy.stdout)
+        self.assertIn("status で確かめてもらう", tidy.stdout)
         self.assertTrue(os.path.exists(os.path.join(tree, "src", "left.py")))
         # cwd が中にあれば、未コミットを見る前に止める
         os.remove(os.path.join(tree, "src", "left.py"))
@@ -319,8 +319,9 @@ class DropTest(PhaseHarness):
         self.assertFalse(os.path.exists(tree))
         self.assertNotIn("i0002", git(self.root, "worktree", "list"))
 
-    def test_a_locked_worktree_is_left_whole(self):
-        """worktree remove が通らない（ロックされた）ワークツリーは、生成物も消さずに残す。"""
+    def test_a_locked_worktree_is_kept_with_the_refusal_of_git(self):
+        """git worktree remove が断る（ロックされた）ワークツリーは残り、git の拒否文を伝える。
+        生成物は先に消えるが、作り直せるので失うものは無い。"""
         tree = self.worktree("i0002", "main")
         write(os.path.join(tree, ".gitignore"), "node_modules/\n")
         git(tree, "add", "-A")
@@ -329,8 +330,10 @@ class DropTest(PhaseHarness):
         git(self.root, "worktree", "lock", tree)
         dropped = self.drop("i0002")
         self.assertEqual(dropped.returncode, 1, dropped.stdout + dropped.stderr)
-        self.assertIn("ロック", dropped.stdout)
-        self.assertTrue(os.path.exists(os.path.join(tree, "node_modules", "x.js")))
+        self.assertIn("git worktree remove が失敗した", dropped.stdout)
+        self.assertIn("locked", dropped.stdout)
+        self.assertTrue(os.path.exists(os.path.join(tree, ".gitignore")))
+        self.assertIn("i0002", git(self.root, "worktree", "list"))
 
     def test_many_ignored_files_are_cut_short(self):
         tree = self.worktree("i0002", "main")
@@ -359,7 +362,7 @@ class DropTest(PhaseHarness):
         write(os.path.join(tree, "draft.txt"), "書きかけ\n")
         dropped = self.drop("i0002")
         self.assertEqual(dropped.returncode, 1)
-        self.assertIn("draft.txt", dropped.stdout)
+        self.assertIn(f"git -C {tree} status", dropped.stdout)
         self.assertTrue(os.path.exists(os.path.join(tree, "draft.txt")))
 
     def test_refuses_what_is_not_a_worktree_and_names_that_are_paths(self):
