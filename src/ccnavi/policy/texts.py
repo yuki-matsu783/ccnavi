@@ -490,7 +490,7 @@ _FILES: dict[str, tuple[tuple, str, dict[str, Entry] | None]] = {}
 
 
 def _file(path: str) -> tuple[str, dict[str, Entry] | None] | None:
-    """ファイル 1 本の（中身, 検査済みの件 または未読の None）。読めなければ None。"""
+    """ファイル 1 本の中身と、検査済みの件（未検査なら None）。読めなければ None。"""
     try:
         stat = os.stat(path)
     except OSError:
