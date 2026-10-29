@@ -1,4 +1,4 @@
-"""GitLab の応答の「形」を作り、比べる。仕様は `docs/42_claude/gitlab-contract.md`。
+"""GitLab の応答の「形」を作り、比べる。仕様は `.agents/docs/gitlab-contract.md`。
 
 形（node）は JSON で表せる辞書で、Chrome 拡張の TS（`test/helpers/shape.ts`）も同じ表で読む。
 

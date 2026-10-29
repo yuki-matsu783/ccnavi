@@ -1,6 +1,6 @@
 """動いている本物の GitLab に `requests.json` の列を送り、応答の形を `recorded.json` に録る。
 
-契約テストの録る側（仕様は `docs/42_claude/gitlab-contract.md`）。手動で回す。自動テストは呼ばない。
+契約テストの録る側（仕様は `.agents/docs/gitlab-contract.md`）。手動で回す。自動テストは呼ばない。
 
     uv run python tests/manual/gitlab/record_contract.py            録って recorded.json に置く
     uv run python tests/manual/gitlab/record_contract.py --dry-run  置かずに標準出力へ（理由も出す）
@@ -8,7 +8,7 @@
 ## 前提
 
 - `docker_gitlab.py status` で GitLab が動いていて、トークンが有効なこと。動いていなければ
-  `docs/42_claude/gitlab-manual.md` のとおりに起こす（この道具は起動も停止もしない）
+  `.agents/docs/gitlab-manual.md` のとおりに起こす（この道具は起動も停止もしない）
 - トークンは `docker_gitlab.py` が書く `tokens.env` から読む。同名の環境変数があればそちらを使う
 
 ## やること

@@ -1742,7 +1742,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         forbidden = {
             "uv run": r"\buv run\b",
             "scripts/check_rules.py": r"scripts/check_rules\.py",
-            "配布元の docs/": r"(?<![\w.])docs/(?:\d\d_|41_guide|42_claude)",
+            "配布元の docs/": r"(?<![\w])(?:docs/(?:\d\d_|41_guide)|\.agents/docs)",
             "配布元の src/ccnavi": r"src/ccnavi/",
             "親ディレクトリをさかのぼる": r"\]\((?:\.\./)+",
         }

@@ -11,7 +11,7 @@ keywords: [SessionStart, additionalContext, CLAUDE.md, 段階的詳細化, 作�
 
 ## 状況
 
-2026-10-05。このワークスペースの `CLAUDE.md` の「常に守ること」には、ccnavi の動作に依存する決まりが並んでいた。
+2026-10-05。このワークスペースの `AGENTS.md` の「常に守ること」には、ccnavi の動作に依存する決まりが並んでいた。
 ワークツリー（`.claude/worktrees/<名前>`）を切ってから編集する、git は `ccnavi-git.sh` を通す、下書きは `scratchpad/` に置く、
 `projects/<名前>/` へ `cd` してから作業する、実装・調査・テストはサブエージェントに任せる、合意の要る変更の範囲、
 承認済みチケットの状態は `ccnavi-ticket.sh status` で確かめる。

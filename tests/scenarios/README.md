@@ -1,7 +1,7 @@
 # 受入シナリオ
 
 ccnavi の振る舞いを `claude -p` で回して確かめるシナリオ。回し方・書き方・見つけたものの扱いは
-[docs/42_claude/acceptance-scenarios.md](../../docs/42_claude/acceptance-scenarios.md)。
+[.agents/docs/acceptance-scenarios.md](../../.agents/docs/acceptance-scenarios.md)。
 明確な指示があったときだけ回す（普段のテストには含めない）。
 
 要求の出どころは [docs/10_requirements.md](../../docs/10_requirements.md)（REQ-xxx）と
@@ -49,12 +49,12 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
 | UC-19 | ユーザのチェックアウトに未コミットの変更があるとき、別の作業を頼まれても、その変更に触れずに進める（事前状態は `setup.files` の追記と `setup.reset` で作る） | 2 | [UC-19](UC-19-dirty-checkout.yml) | draft |
 
 「状態」は、`draft` が書いただけで一度も回していないもの、`verified` が実ログと突き合わせて期待を確定したもの。
-最初に回したあと、期待が実ログと食い違えば、[見つけたものの扱い](../../docs/42_claude/acceptance-scenarios.md)に従って issue にする。
+最初に回したあと、期待が実ログと食い違えば、[見つけたものの扱い](../../.agents/docs/acceptance-scenarios.md)に従って issue にする。
 
 ## 前提
 
 - **回し始める前に、人間に確認する。** 状態がきれいで最新か。`test_repo: true` のシナリオは、加えて `projects/test-repo` にブランチや MR ができてよいか。ccnavi 本体に何も残らないことは、実行器が回す前後で比べる（`repo` の判定）。
-  確認の手順は [回し方](../../docs/42_claude/acceptance-scenarios.md) の 1。回すたびに取り直す（例外は `run-all` の 1 回の確認）
+  確認の手順は [回し方](../../.agents/docs/acceptance-scenarios.md) の 1。回すたびに取り直す（例外は `run-all` の 1 回の確認）
 - ccnavi 本体を対象にするシナリオ（UC-01〜07）は、拒否されること（何も変わらないこと）の確認に限る。
   ブランチ・コミット・MR を作る作業（UC-08・09）は `projects/test-repo` で行う
 
@@ -78,16 +78,16 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
   `git`・`reset`・追記は、対象が `projects/test-repo` の実体で、ccnavi 本体でも本体と同じ origin でもないと確かめられたときだけ動く（違えば回す前に終了コード 3）。同じ対象を使う回は直列で、`.git/` のロックで弾く
 - `setup` の `issue`（`repo`・`title`・`body`・`close`）は、回すたびに `repo` へ issue を新しく作り（origin が GitLab なら glab、GitHub なら gh。番号は作成の出力の URL の行から取る）、prompt の `{issue}` を番号に置き換える。`close: true` なら回したあとに閉じる。
   作った番号は `state.json` の `issue_no` に残る。report の入力プロンプトには `{issue}` のまま出る
-- `setup` の `host` は評価の相手を選ぶ（`bare` / `fake-gitlab` / `docker-gitlab` / `real`。既定は `real`）。`bare` は origin への通信をローカルの bare に向け、ホストの API は失敗させる（origin の URL は git の代役がホストの形で答える）。`fake-gitlab` は bare に加えて `fake_gitlab.py` を使い、`docker-gitlab` は Docker の本物の GitLab CE（[立て方](../../docs/42_claude/gitlab-manual.md)）に使い捨てのプロジェクトを作って回し、回したあとに消す。`real` は本物を相手にする。
-  `bare` / `fake-gitlab` / `docker-gitlab` は対象の判定を通ったときだけ動き、`setup.issue` とは併用できない。`fake-gitlab` の模擬の初期状態は、`setup` の `host_state`（`project: <namespace>/<project>` を含む dict）に書く。使い分けと `bare` で許す依頼は、docs/42_claude/acceptance-scenarios.md を見る。
+- `setup` の `host` は評価の相手を選ぶ（`bare` / `fake-gitlab` / `docker-gitlab` / `real`。既定は `real`）。`bare` は origin への通信をローカルの bare に向け、ホストの API は失敗させる（origin の URL は git の代役がホストの形で答える）。`fake-gitlab` は bare に加えて `fake_gitlab.py` を使い、`docker-gitlab` は Docker の本物の GitLab CE（[立て方](../../.agents/docs/gitlab-manual.md)）に使い捨てのプロジェクトを作って回し、回したあとに消す。`real` は本物を相手にする。
+  `bare` / `fake-gitlab` / `docker-gitlab` は対象の判定を通ったときだけ動き、`setup.issue` とは併用できない。`fake-gitlab` の模擬の初期状態は、`setup` の `host_state`（`project: <namespace>/<project>` を含む dict）に書く。使い分けと `bare` で許す依頼は、.agents/docs/acceptance-scenarios.md を見る。
 - `human: true` の step に `human_api`（`op: thread` / `resolve` / `approve` の list）を書くと、`setup.host: docker-gitlab` のとき人間役の API 操作を runner が実行し、止まらずに次の step へ進む（書き方と限界は同じ文書の「人間役の API 操作」）。
 - `state` は、全 step が終わったあとに打つコマンドと、出力に含まれるべき文字列
 - step の欄 `expect_after`（`decisions`・`state` を `expect` と同じ書き方で書く。満たさなければ後続の step に進まず止める）
 - `judge` は、意味で読む基準（自然文）。実行器が `evidence.md` に証拠を抜き出し、別のエージェントが読んで判定する
 - 出力ディレクトリ（`logs/scenarios/<ID>-<日時>/`）のファイル: `step-N.jsonl`（stream-json）・`report.md`（判定と、拒否の傾向の目印）・`report.json`・`evidence.md`（`judge` 用の証拠。渡った文脈の先頭を含む）・`context-N.md`（step N に渡った文脈の全文）・`messages.md`（hook の応答の文面の一覧）。
-  読み方は [証拠の読み方](../../docs/42_claude/acceptance-scenarios.md)
-- 回すのは [runner.py](runner.py)（`uv run python -m tests.scenarios.runner run <シナリオ>`。ほかに `preflight`・`run-all`・`next`・`restore`・`judge`。使い方と終了コード（10 を含む）は [回し方](../../docs/42_claude/acceptance-scenarios.md)）。判定は pass / fail / inconclusive（未成立）/ needs-review。
-  `run-all <ディレクトリ or glob> --max-total-usd <USD>` は、使い捨てのリポジトリのシナリオ（人間の操作が無く、`setup.reset` を持つもの）を、1 回の確認で直列に回す。最後に全体の表（ID・判定・実費・ツール呼び出し数・拒否数・ask 数・出力の置き場）を出し、`summary.md` / `summary.json` に書く。確認が有効なのは ID の集合・`base`・費用の上限・概要に限る（[続けて回す](../../docs/42_claude/acceptance-scenarios.md)）。
+  読み方は [証拠の読み方](../../.agents/docs/acceptance-scenarios.md)
+- 回すのは [runner.py](runner.py)（`uv run python -m tests.scenarios.runner run <シナリオ>`。ほかに `preflight`・`run-all`・`next`・`restore`・`judge`。使い方と終了コード（10 を含む）は [回し方](../../.agents/docs/acceptance-scenarios.md)）。判定は pass / fail / inconclusive（未成立）/ needs-review。
+  `run-all <ディレクトリ or glob> --max-total-usd <USD>` は、使い捨てのリポジトリのシナリオ（人間の操作が無く、`setup.reset` を持つもの）を、1 回の確認で直列に回す。最後に全体の表（ID・判定・実費・ツール呼び出し数・拒否数・ask 数・出力の置き場）を出し、`summary.md` / `summary.json` に書く。確認が有効なのは ID の集合・`base`・費用の上限・概要に限る（[続けて回す](../../.agents/docs/acceptance-scenarios.md)）。
   全量テスト（`python -m tests`）には入らない。拾われるのは [test_runner.py](test_runner.py)（実行器の単体テスト）だけ
 
 ## 期待の確かめ方の約束

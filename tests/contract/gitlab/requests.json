@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "書き方は docs/42_claude/gitlab-contract.md。パスは /api/v4 より後ろ。${名前} は録る側・比べる側が実体に置き換える。書き込みは最後にまとめてある（読みの形が前の書き込みで変わらないように）。expect_status は録るときに本物が返すべきステータス。reads はその応答のうち sh と拡張が読むキー（環境で変わる欄 web_url・username などは形から落とすので載せない）",
+  "note": "書き方は .agents/docs/gitlab-contract.md。パスは /api/v4 より後ろ。${名前} は録る側・比べる側が実体に置き換える。書き込みは最後にまとめてある（読みの形が前の書き込みで変わらないように）。expect_status は録るときに本物が返すべきステータス。reads はその応答のうち sh と拡張が読むキー（環境で変わる欄 web_url・username などは形から落とすので載せない）",
   "requests": [
     {"name": "user", "method": "GET", "path": "/user", "token": "main", "used_by": ["sh", "chrome"], "expect_status": 200, "reads": ["id"], "save": {"user.id": "id"}},
     {"name": "project", "method": "GET", "path": "/projects/${project}", "token": "main", "used_by": ["sh", "chrome"], "expect_status": 200, "reads": ["id", "default_branch", "archived", "issues_enabled", "issues_access_level", "permissions.project_access.access_level"]},

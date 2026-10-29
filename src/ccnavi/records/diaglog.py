@@ -1,4 +1,4 @@
-"""診断ログ。`logs/diag/<出どころ>.log` に 1 行ずつ足す（docs/42_claude/logging.md）。
+"""診断ログ。`logs/diag/<出どころ>.log` に 1 行ずつ足す（.agents/docs/logging.md）。
 
 sh（`.ccnavi/scripts/ccnavi-common-log.sh` の log_*）と拡張（`src/log.ts`）と同じ形の行を出す。
 
