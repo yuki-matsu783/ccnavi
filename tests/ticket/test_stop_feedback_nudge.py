@@ -71,8 +71,10 @@ class FeedbackNudgeTest(FeedbackPlanApprovalTest):
         todo_dir = os.path.dirname(self.todo())
         self.assertIn(todo_dir, reason)
         self.assertIn("feedback: []", reason)
-        self.assertIn("started_at・completed_at・base_sha", reason)
-        self.assertIn(".ccnavi/docs/decisions.md", reason)
+        # 改版の雛形は手で写さず、コマンドが作る（スクリプトだけが書く欄の始末も済ませる）
+        launcher = settings.script_command(self.root, "ccnavi-launcher.sh")
+        self.assertIn(f"{launcher} ticket revise i0001 --feedback", reason)
+        self.assertIn("--agree --preview --verify i0001", reason)
         ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
         self.assertIn(f"`{ticket_sh} propose i0001`", reason)
         # ユーザが止めたときの扱いと、同じ状態では 1 回だけであること

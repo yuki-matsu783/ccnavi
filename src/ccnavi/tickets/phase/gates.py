@@ -978,6 +978,11 @@ def without_mr(
     return bool(venues) and phasetypes.REVIEW_MR not in venues.values()
 
 
+# 全体計画が全部閉じてレビューも済み、フィードバック計画（`feedback:`）がまだ無い局面の呼び名。
+# 親を閉じる前に改版で出す（`ticket revise --feedback`）。Stop の促しとボードがこの名前で見分ける。
+STAGE_FEEDBACK_WAITING = "フィードバック計画待ち"
+
+
 def stage(
     root: str,
     conf: settings.Settings,
@@ -1027,5 +1032,5 @@ def stage(
         where = "フィードバック対応中" if phase.number > len(parent.plan) else "作業中"
         return f"{where}（{phase.label}）"
     if parent.feedback is None:
-        return "フィードバック計画待ち"
+        return STAGE_FEEDBACK_WAITING
     return "クローズ可" if not in_feedback else "クローズ可（フィードバック対応済み）"

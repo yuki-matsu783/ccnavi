@@ -297,13 +297,17 @@ setup:
 
 **相手側の状態の記録（`host-N.json`）。** `setup.host` が `fake-gitlab` / `docker-gitlab` のとき、runner が prompt の step の終わりごと（失敗して止めた step も）と、`human_api`・`human_run` の step の終わりに、相手のプロジェクトの状態を API で読み、出力の置き場（`logs/scenarios/<ID>-<日時>/`）の `host-<step の番号>.json` に残す。`bare` / `real` では残さない。止まって人間が操作する step（終了コード 10）では読まない（人間の操作は次の step の記録に出る）。部品は `tests/scenarios/hostsnap.py`（`hostenv.api_access` が相手ごとの接続を返す）。
 
-- 読むだけ。呼ぶのは GET の API（MR の一覧と 1 件、スレッド、issue）だけで、書き込みはしない
-- 中身: `step`・`taken_at`（秒までの ISO 8601）・`host`・`project`・`summary`（件数）・`mrs`・`issues`・`calls`（呼んだ API と status）・`errors`・`approvals`
+- 読むだけ。呼ぶのは GET の API（MR の一覧と 1 件、スレッド、承認、issue）だけで、書き込みはしない
+- 中身: `step`・`taken_at`（秒までの ISO 8601）・`host`・`project`・`summary`（件数）・`mrs`・`issues`・`calls`（呼んだ API と status）・`errors`
   - `mrs`: `iid`・`title`・`state`（opened / merged / closed）・`draft`・ブランチ・`merged_at`・`merge_status` など、あるものだけ。`threads` に、スレッドの `id`・`resolved`（解決できるメモがすべて解決済みなら true、未解決があれば false、解決できないスレッドは null）・`system`・`notes`（作者・本文・解決の状態）。本物の GitLab は、承認や解決などのシステムのメモもスレッドとして返す。これは `system` を true にして残し、`summary` では `threads` に数えず `threads_system` に数える（模擬はシステムのメモを返さない）
   - `issues`: `iid`・`title`・`state`・`closed_at` など
   - 本文（MR の説明・メモ・issue の説明）は 1000 文字で切る。切ったときは末尾に `…(+N)`
-- 承認は取らない。模擬に `approvals` の API が無く、模擬と本物で記録の形を揃えるため、`docker-gitlab` でも取らない。`approvals` は `{"taken": false, "reason": ...}` の固定の形にし、承認が無いのか、そもそも取っていないのかを読めるようにする。`mrs` に承認の欄は無い
-- 取れなかったときは止めない。取れなかった API は `errors`（`api`・`status`・`error` の配列）に残し、取れた分は残す。接続や例外で何も取れなかった step でも `host-N.json` は書き、`errors` には例外の型の名前だけを入れる。一覧が取れなければ `mrs` は空にし、1 件の詳細が取れなければ一覧の分は残す。スレッドが取れなければ `threads_unavailable` を付ける。最初の MR の一覧で相手に接続できなければ、残りの API は呼ばない（待ちを重ねないため）
+- 承認は MR ごとに `GET .../merge_requests/:iid/approvals` で読み、その MR の `approvals` に残す（最上位には置かない）。`docker-gitlab` も `fake-gitlab` も同じ形
+  - 取れたとき: `{"taken": true, "approved": <bool>, "approved_by": [{"username", "approved_at"}]}`。承認が無いのは `taken` が true で `approved` が false、`approved_by` が空
+  - 取れなかったとき: `{"taken": false}`。理由は `errors` に残す。「承認が無い」と「取れなかった」は `taken` で分かれる
+  - 残すのはこの 3 つ（`approved`・`approved_by[].user.username`・`approved_by[].approved_at`）だけ。`user_can_approve`・`user_has_approved` は、読んだトークンから見た値で意味が曖昧なので残さない
+  - `summary.mrs_approved` は、`approved` が true の MR の件数
+- 取れなかったときは止めない。取れなかった API は `errors`（`api`・`status`・`error` の配列）に残し、取れた分は残す。接続や例外で何も取れなかった step でも `host-N.json` は書き、`errors` には例外の型の名前だけを入れる。一覧が取れなければ `mrs` は空にし、1 件の詳細が取れなければ一覧の分は残す。スレッドが取れなければ `threads_unavailable` を付ける。承認が取れなければ `approvals` は `{"taken": false}` にする。最初の MR の一覧で相手に接続できなければ、残りの API は呼ばない（待ちを重ねないため）
 - 一覧（MR・スレッド・issue）は 1 ページ（100 件）だけ読む。100 件に達したら、取り切れていないかもしれないことを `errors` に残す
 - トークンは記録に出さない。認証の情報を含む応答は全文を残さず、取る項目を選ぶ。そのうえで、`tokens.env` の値と模擬のトークンが文字列に混ざっていたら `***` に置き換える
 - `state.json` の `host_snapshots` に step ごとの結果（`step`・`file`・`ok`・`errors`。ここの `errors` は件数）を残し、`report.md` の「相手（setup.host）」の行のあとに件数と、取れなかった step を出す。判定（`pass` / `fail`）には使わない

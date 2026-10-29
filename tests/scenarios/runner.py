@@ -1626,8 +1626,8 @@ def host_note(host):
 
 
 SNAPSHOT_PLAN = (
-    "相手側の状態: step の終わりごとに MR・スレッド・issue を API で読み、"
-    "出力の置き場の host-N.json に残す（読むだけ。承認は取らない。トークンは伏せる）"
+    "相手側の状態: step の終わりごとに MR・スレッド・承認・issue を API で読み、"
+    "出力の置き場の host-N.json に残す（読むだけ。トークンは伏せる）"
 )
 
 
@@ -1637,7 +1637,9 @@ def snapshot_note(st):
     if not snaps:
         return ""
     bad = [s for s in snaps if not s["ok"]]
-    text = f"相手側の状態: step ごとに host-N.json へ残した（{len(snaps)} 件。承認は取っていない）"
+    text = (
+        f"相手側の状態: step ごとに host-N.json へ残した（{len(snaps)} 件。承認は MR ごとに読んだ）"
+    )
     if bad:
         text += "。取れなかった所がある step: " + "、".join(str(s["step"]) for s in bad)
     return text

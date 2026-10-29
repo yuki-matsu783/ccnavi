@@ -13,7 +13,7 @@ from typing import TextIO
 
 from ...infra import settings
 from ..approval import store as approval
-from ..model import ticket_model
+from ..model import ticket_ids, ticket_model
 from ..phase import gates as phase
 
 
@@ -37,8 +37,10 @@ def plan_missing(stderr: TextIO, found: ticket_model.Ticket) -> bool:
     return True
 
 
-def childless_phases(root: str, conf: settings.Settings, found: ticket_model.Ticket) -> list[str]:
-    """子（承認済みと `todo/` の提案の両方）のないフェーズの見出し。計画の無い親は空。"""
+def childless_phases(
+    root: str, conf: settings.Settings, found: ticket_model.Ticket
+) -> list[tuple[int, str]]:
+    """子（承認済みと `todo/` の提案の両方）のないフェーズの（番号, 見出し）。計画の無い親は空。"""
     if found.is_child or not found.has_plan:
         return []
     proposed, _ = approval.scan_proposals(conf, root)
@@ -48,7 +50,7 @@ def childless_phases(root: str, conf: settings.Settings, found: ticket_model.Tic
         if t.parent == found.ticket and t.state == ticket_model.TODO and t.phase is not None
     }
     return [
-        p.label
+        (p.number, p.label)
         for p in phase.phases_of(root, conf, found.ticket)
         if not p.tickets and p.number not in drafted
     ]
@@ -56,11 +58,16 @@ def childless_phases(root: str, conf: settings.Settings, found: ticket_model.Tic
 
 def childless_notice(root: str, conf: settings.Settings, found: ticket_model.Ticket) -> list[str]:
     """`start` の成功時に足す案内の行。子のないフェーズが無ければ空。"""
-    labels = childless_phases(root, conf, found)
-    if not labels:
+    missing = childless_phases(root, conf, found)
+    if not missing:
         return []
+    labels = ", ".join(label for _, label in missing)
+    example = ticket_ids.child_id(found.ticket, missing[0][0], 1)
+    propose = settings.script_command(root, "ccnavi-ticket.sh")
     return [
-        f"子のない（子の提案もありません）フェーズがある: {', '.join(labels)}",
-        "次: フェーズごとに子チケットを作ってください（子の着手は親が着手済みであることが条件）",
+        f"子のない（子の提案もありません）フェーズがある: {labels}",
+        f"次: 子の提案（例: '{example}'）を wip/proposals/todo/ に書き、"
+        f"'{propose} propose {found.ticket}' で送って、承認をユーザに頼む"
+        "（子の着手は親が着手済みであることが条件。親と別の承認になる）",
         "子のないまま親で進めても、`finish` で「終わっていないフェーズがある」と止まります",
     ]

@@ -141,6 +141,7 @@ def candidates(
     # 子はフェーズの番号の順に並べる。識別子の順だと、後のフェーズの子（-02）が前のフェーズに
     # 足す子（-03）より先に検査され、開き直す前のマーカーで通ってしまう。
     added: dict[str, list[ticket_model.Ticket]] = {}
+    proposed_phases = _proposed_phases(conf, root, pending)
     for t in sorted(
         pending, key=lambda x: (x.parent or x.ticket, x.is_child, x.phase or 0, x.ticket)
     ):
@@ -152,6 +153,8 @@ def candidates(
         if t.is_child and pool.get(t.parent) is None:
             missing = parent_elsewhere_text(root, conf, t)
         complaints, overflow = validate(t, pool, config, missing=missing)
+        if not t.is_child and t.has_plan:
+            complaints += workflow.childless_ready(t, proposed_phases.get(t.ticket, ()))
         complaints += _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
         complaints += shorthand_problems(t)
         complaints += proposal_form.form_problems(t)
@@ -192,6 +195,24 @@ def candidates(
         if t.is_child:
             added.setdefault(t.parent, []).append(t)
     return batch, rejected, pool
+
+
+def _proposed_phases(
+    conf: settings.Settings, root: str, pending: list[ticket_model.Ticket]
+) -> dict[str, set[int]]:
+    """子の提案があるフェーズの番号（親ごと）。すぐ始まるステップに子が無い親を断るのに使う。
+
+    承認の対象を絞っても（ボードで親だけを選ぶなど）、`todo/` に子の提案があれば子が居るとみなす。
+    絞った分だけで数えると、子を書いた親が子無しとして断られる。
+    """
+    if not any(not t.is_child and t.has_plan for t in pending):
+        return {}
+    drafted, _ = approval.scan_proposals(conf, root)
+    found: dict[str, set[int]] = {}
+    for t in list(pending) + list(drafted):
+        if t.is_child and t.phase is not None:
+            found.setdefault(t.parent, set()).add(t.phase)
+    return found
 
 
 def _feedback_with_plan_children(
@@ -307,7 +328,8 @@ def script_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
             "入る started_at・completed_at・base_sha・merged_sha・cancelled_at・cancel_reason・"
             "finished_to・settled_by を"
             "空にする"
-            "（改版は承認済みチケットの側の値を残し、計画・`phases:`・範囲だけを差し替える）",
+            "（改版は承認済みチケットの側の値を残し、計画・`phases:`・範囲だけを差し替える）。"
+            "`ccnavi ticket revise <親>` が作る雛形は、これらの欄を外してある",
         )
     ]
 
@@ -366,7 +388,8 @@ def feedback_notes(parent: ticket_model.Ticket) -> list[str]:
     """
     notes: list[str] = []
     if not parent.feedback:
-        notes.append("対応なし。見たうえで対応しない、という記録になる")
+        # 「対応なし」の言い換えは、画面の計画の差分（`agree_screen._plan_diff_lines`）が言う。
+        # ここで重ねると同じ文が 2 回出る
         notes.append("別に追うものは issue に回したか（ccnavi-user-decide.sh）")
     return notes
 
