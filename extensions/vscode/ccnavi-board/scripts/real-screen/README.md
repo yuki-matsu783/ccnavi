@@ -17,7 +17,7 @@
 | `approve.js` | 先頭の承認待ちを承認する（承認の前後を撮り、画面の文を出す。`--no-confirm` で開くだけ） |
 | `snapshot.js` | 左の一覧の画面を順に開き、PNG とテキストを残す |
 | `fake-host.sh` | 偽の GitLab と bare を立て、検証用コピーの origin を向ける（チケット作業はホストが要る） |
-| `haiku-step.sh` | haiku に 1 手ずつ進めさせる（`--continue` で続き）。`summarize-run.py` が呼んだ操作と結果の頭に要約する |
+| `haiku-step.sh` | haiku に 1 手ずつ進めさせる（`--continue` で続き）。`summarize-run.py` が、呼んだ操作と結果の頭だけに要約する |
 
 新しい画面（ルール管理など）を足すときは、`pages/<画面>Page.js` を作り、`WorkbenchPage` を受け取る形にそろえる。
 

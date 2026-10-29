@@ -76,7 +76,7 @@ rename するか、バイト単位でコピーして元を消す。欄を書き�
 
 承認が中身を変えないので、提案に書いた値はそのまま承認済みチケットの値になる。提案（`todo/`）にスクリプトだけが書く欄の空でない値が
 あれば、`user agree` と `--lint` が error にする（判定では提案に適用しない）。改版の提案も同じで、承認済みチケットをコピーして書くときは
-`started_at`・`completed_at`・`base_sha`・`merged_sha`・`cancelled_at`・`cancel_reason`・`finished_to`・`settled_by` を空にする（改版は承認済みチケットの側の値を残し、計画・
+`started_at`・`completed_at`・`base_sha`・`merged_sha`・`cancelled_at`・`cancel_reason`・`finished_to`・`settled_by` を空にする（`ccnavi ticket revise` の雛形は、これらの欄を外して書く。改版は承認済みチケットの側の値を残し、計画・
 `phases:`・範囲だけを差し替える）。続きの子の目印 `followup_of` も、ユーザの判断だけが残す欄なので、提案にあれば
 `user agree` と `--lint` が error にする（改版の提案でコピーしたときも消す）。`wip/proposals/review/` で読むのは `completed_at` に値があるもの（`finish` が書く）だけ。判定が読むのは `doing/` だけで、
 承認後に同じ識別子の提案を `todo/` に書いても、適用される範囲は変わらない（親の改版〔計画・`phases:`・範囲〕だけが承認の対象に入る）。
