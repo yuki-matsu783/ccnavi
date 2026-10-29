@@ -150,8 +150,8 @@ def _v4_line(root: str, top: str, name: str, fields: dict[str, str], deadline: f
         return (
             f"{head}取り込み結果を一時ワークツリー（{settings.shell_path(fields.get('tmp', ''))}）"
             "に用意して、確認を待っています。差分と変わるファイルの一覧をユーザに見せ、"
-            "返事を待ちます。確定はユーザの了承（対話では確認の許可、非対話では次の発言）を得たあとで、"
-            f"`{cd} integrate-done {name} -m '<メッセージ>'`。"
+            "返事を待ちます。確定はユーザの了承（対話では確認の許可、非対話では次の発言）を得ていれば、"
+            f"`{cd} integrate-done {name} -m '<メッセージ>'` を打ちます。"
             f"やめるなら `{cd} integrate --abort {name}`"
         )
     except Exception:  # noqa: BLE001  壊れた記録でセッションの開始を止めない
