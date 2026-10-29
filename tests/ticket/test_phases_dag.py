@@ -23,16 +23,13 @@ import os
 import unittest
 
 from ccnavi.infra import settings
-from ccnavi.tickets import (
-    agree_candidates,
-    approval,
-    approval_checks,
-    approval_marks,
-    phasetypes,
-    ticket_model,
-    workflow,
-)
-from ccnavi.tickets import ticket as ticket_mod
+from ccnavi.tickets.approval import checks as approval_checks
+from ccnavi.tickets.approval import marks as approval_marks
+from ccnavi.tickets.approval import store as approval
+from ccnavi.tickets.config import phasetypes, workflow
+from ccnavi.tickets.model import ticket as ticket_mod
+from ccnavi.tickets.model import ticket_model
+from ccnavi.tickets.proposal import agree_candidates
 from tests import config_path
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, write
@@ -376,7 +373,7 @@ class PlanProblemsTest(unittest.TestCase):
 class NextHintTest(unittest.TestCase):
     def test_an_earlier_branch_without_children_is_offered(self):
         """3 が先に閉じても、まだ子の無い 2 を次に始められるものとして挙げる。"""
-        from ccnavi.tickets import phase as phase_mod
+        from ccnavi.tickets.phase import gates as phase_mod
 
         owner = parent_of(
             [

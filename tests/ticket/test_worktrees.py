@@ -97,7 +97,7 @@ class ReviewTurnTest(PhaseHarness):
         「ユーザのレビューを待つ」と言わない。"""
         from unittest import mock
 
-        from ccnavi.tickets import phase
+        from ccnavi.tickets.phase import gates as phase
 
         self.child("i0001-01-01")
         with mock.patch.object(phase, "review_next", return_value=""):
@@ -171,7 +171,7 @@ class TidyTest(PhaseHarness):
         """片付けの候補は閉じた（done/ の）子だけ。作業中の子と取り消した子が並んでいるとき、
         候補に入るのは取り消した子だけで、作業中の子のワークツリーは残る。"""
         from ccnavi.infra import settings
-        from ccnavi.tickets import worktrees
+        from ccnavi.tickets.lifecycle import worktrees
 
         for name in ("i0001-01-01", "i0001-01-02"):
             self.propose(name, child_text(name, "i0001", 1, ["src/*"]))

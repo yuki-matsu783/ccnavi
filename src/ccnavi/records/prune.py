@@ -79,7 +79,9 @@ SELFGUARD_STORE = "store"
 
 # 名前からセッションがそのまま読める記録。
 _SESSION_ONLY = (
-    re.compile(r"^nudged-(?P<s>.+)\.json$"),  # ops_stop.nudge_path（ops_stop_request も使う）
+    re.compile(
+        r"^nudged-(?P<s>.+)\.json$"
+    ),  # lifecycle.stop.nudge_path（lifecycle.stop_request も使う）
     re.compile(r"^denied-(?P<s>.+)\.json$"),  # repeat._path
     re.compile(r"^stop-(?P<s>.+)\.json$"),  # ctxfile.stop_path
     re.compile(r"^(?P<s>.+)\.turn\.json$"),  # post._turn_path
@@ -287,7 +289,7 @@ def _prune_directory(
             report.state.append(_shown(root, path))
 
 
-# 操作記録の置き場の名前（`tickets/oplog.OPS_DIR`）。
+# 操作記録の置き場の名前（`tickets/model/oplog.OPS_DIR`）。
 # records は tickets を読めないのでコピーして持つ。
 OPS_DIR = "ops"
 

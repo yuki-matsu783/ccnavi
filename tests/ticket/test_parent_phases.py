@@ -20,8 +20,10 @@ import unittest
 
 import yaml
 
-from ccnavi.tickets import agree_digest, phase_forms, phasetypes
-from ccnavi.tickets import ticket as ticket_mod
+from ccnavi.tickets.config import phasetypes
+from ccnavi.tickets.model import phase_forms
+from ccnavi.tickets.model import ticket as ticket_mod
+from ccnavi.tickets.proposal import agree_digest
 from tests import phasecopy
 from tests.ticket.test_phases import (
     PHASES,
@@ -129,7 +131,7 @@ class CopyAgreeTest(PhaseHarness):
         self.assertIn("--fill-phases", result.stderr)
 
     def test_a_parent_without_a_plan_gets_a_warning_before_the_request(self):
-        from ccnavi.tickets import agree_candidates
+        from ccnavi.tickets.proposal import agree_candidates
 
         text = "\n".join(
             ["---", "version: 1", "ticket: i0001", "title: t", "mr: 1", "issue: 1", "allow:"]
@@ -603,7 +605,7 @@ class CopyRuleTableTest(unittest.TestCase):
 
     def test_the_rules_match_the_table(self):
         from ccnavi.policy import rules
-        from ccnavi.tickets import agree_candidates
+        from ccnavi.tickets.proposal import agree_candidates
 
         with open(FIXTURE, encoding="utf-8") as f:
             table = json.load(f)

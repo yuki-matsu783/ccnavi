@@ -16,26 +16,17 @@ from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
-from ..tickets import (
-    consolidate,
-    core,
-    learning,
-    next_id,
-    oplog,
-    ops,
-    phase,
-    propose,
-    retire,
-    review,
-    review_close,
-    review_decide,
-    scaffold,
-    ticket_ids,
-    user_only,
-    via,
-    worktrees,
-    write_and_push,
-)
+from ..tickets.approval import write_and_push
+from ..tickets.core import api as core
+from ..tickets.learning import notes as learning
+from ..tickets.lifecycle import commands as ops
+from ..tickets.lifecycle import consolidate, next_id, retire, worktrees
+from ..tickets.model import oplog, ticket_ids, user_only, via
+from ..tickets.phase import gates as phase
+from ..tickets.proposal import propose, scaffold
+from ..tickets.review import close as review_close
+from ..tickets.review import decide as review_decide
+from ..tickets.review import request as review
 from . import cli_args, cli_usage, lint, status
 
 
@@ -301,7 +292,8 @@ def _worktree(
     words: list[str],
     cwd: str,
 ) -> int:
-    """`worktree drop <名前>` と `worktree tidy <親> [--phase <N>]`（worktrees.py）。
+    """`worktree drop <名前>` と `worktree tidy <親> [--phase <N>]`
+    （tickets/lifecycle/worktrees.py）。
 
     sh が状態を書く操作の後に呼ぶ。名前は識別子の形だけを受ける（パスを渡して任意の場所を
     消させない）。

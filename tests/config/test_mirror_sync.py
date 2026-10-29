@@ -24,7 +24,7 @@ import json
 import os
 
 from ccnavi.infra import settings
-from ccnavi.tickets import mirrorsync
+from ccnavi.tickets.sync import mirrorsync
 from tests.config.test_config_union import (
     COMMON_RISK,
     COMMON_RULES,

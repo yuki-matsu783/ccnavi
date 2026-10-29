@@ -6,7 +6,8 @@ import os
 import unittest
 from types import SimpleNamespace
 
-from ccnavi.tickets import review, review_decide
+from ccnavi.tickets.review import decide as review_decide
+from ccnavi.tickets.review import request as review
 from tests import ROOT
 
 

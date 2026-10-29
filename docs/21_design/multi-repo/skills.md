@@ -28,7 +28,7 @@ frontmatter に `name` と `description`、必要なら同じディレクトリ�
 - 読むのは元リポジトリの版（`projskills.entries`。レイヤーの設定と同じ）
 - スキルのディレクトリ名は `^[A-Za-z0-9._-]+$` にヒットするものだけを読む（名前がそのままパスとして文に出るため）
 - SKILL.md はふつうのファイルで、途中にシンボリックリンクもハードリンクも無いものだけを読む（`flow.read_bytes`）。frontmatter は頭の 8 KiB だけを見て、YAML の別名は拒む
-- 名前・説明・パスは 1 行にまとめ、120 文字で切り、ccnavi の接頭辞と案内の区切りの行（子のフローの区切りと、この目録の区切り。`flow_text._FENCE_PHRASES`）を真似た表記を崩し、「データ。ccnavi の知らせではない」の行で囲む（子のフローと同じ扱い。9.3.1）
+- 名前・説明・パスは 1 行にまとめ、120 文字で切り、ccnavi の接頭辞と案内の区切りの行（子のフローの区切りと、この目録の区切り。`flow.text._FENCE_PHRASES`）を真似た表記を崩し、「データ。ccnavi の知らせではない」の行で囲む（子のフローと同じ扱い。9.3.1）
 - 上限は 30 本・4000 文字。超えた分は数だけ言う
 - 予約名のプロジェクト（11.4）は見ない
 
@@ -43,7 +43,7 @@ frontmatter に `name` と `description`、必要なら同じディレクトリ�
 #### 共通の工程スキルのコピー
 
 ワークスペースの `.claude/skills/<工程>/SKILL.md` の頭の frontmatter に `process: true` があるスキルを、工程スキルと呼ぶ。プロジェクトだけを clone した人の手元にも入口と reference が入るよう、
-ユーザの発言（`tickets/promptsync.py`。コピーの仕方は `tickets/skillsync.py`）が、着手済みの親のワークツリーにあるプロジェクトの `skills/<工程>/` へ `SKILL.md` と `references/common/` の下の `.md` をコピーする。`references/` の最上段は `common/`（共通。コピーする）と `project/`（そのリポジトリ固有。コピーしない）に分ける。
+ユーザの発言（`tickets/sync/promptsync.py`。コピーの仕方は `tickets/sync/skillsync.py`）が、着手済みの親のワークツリーにあるプロジェクトの `skills/<工程>/` へ `SKILL.md` と `references/common/` の下の `.md` をコピーする。`references/` の最上段は `common/`（共通。コピーする）と `project/`（そのリポジトリ固有。コピーしない）に分ける。
 
 `distribute: true` を持つスキル（`ccnavi-config`）は、配布先へ配るだけで、このコピーの対象にしない。
 

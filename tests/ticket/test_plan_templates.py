@@ -24,7 +24,7 @@ import unittest
 
 import yaml
 
-from ccnavi.tickets import plan_templates
+from ccnavi.tickets.proposal import plan_templates
 from tests import ROOT, common_path, config_path, requires_symlink
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import write

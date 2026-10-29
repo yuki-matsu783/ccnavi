@@ -15,7 +15,7 @@ import tempfile
 import unittest
 
 from ccnavi.infra import settings
-from ccnavi.tickets import learning_notice
+from ccnavi.tickets.notice import learning_notice
 from tests import ROOT
 from tests.inproc import run_ccnavi
 from tests.learningsample import pattern

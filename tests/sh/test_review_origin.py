@@ -20,7 +20,7 @@ import sys
 import tempfile
 import unittest
 
-from ccnavi.tickets import review_host
+from ccnavi.tickets.model import review_host
 from tests import ROOT
 
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")

@@ -1,4 +1,4 @@
-"""保護対象の下書きの取り込み（`ccnavi user handoff`。src/ccnavi/tickets/handoff.py）。
+"""保護対象の下書きの取り込み（`ccnavi user handoff`。src/ccnavi/tickets/sync/handoff.py）。
 
 見るのは次のとおり。
 
@@ -33,7 +33,9 @@ import unittest
 from unittest import mock
 
 from ccnavi.infra import fsio, settings
-from ccnavi.tickets import handoff, handoff_names, review
+from ccnavi.tickets.model import handoff_names
+from ccnavi.tickets.review import request as review
+from ccnavi.tickets.sync import handoff
 from tests import ROOT, can_case_sensitive, common_path, config_path, requires_symlink
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import git, write

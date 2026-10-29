@@ -16,7 +16,7 @@ import os
 import shutil
 import unittest
 
-from ccnavi.tickets import review_host
+from ccnavi.tickets.model import review_host
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text

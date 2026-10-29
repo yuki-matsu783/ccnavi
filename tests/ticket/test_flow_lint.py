@@ -22,7 +22,9 @@ import tempfile
 import time
 import unittest
 
-from ccnavi.tickets import flow, flow_render, flow_shape
+from ccnavi.tickets.flow import graph as flow
+from ccnavi.tickets.flow import render as flow_render
+from ccnavi.tickets.flow import shape as flow_shape
 from tests import requires_symlink
 from tests.inproc import run_ccnavi
 from tests.ticket.test_flow import WORKFLOW_YAML

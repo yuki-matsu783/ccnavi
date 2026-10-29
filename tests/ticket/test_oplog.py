@@ -1,4 +1,4 @@
-"""操作記録（`tickets/oplog.py`）。保存・段階の更新・未完了の判定・消さない条件を確かめる。"""
+"""操作記録（`tickets/model/oplog.py`）。保存・段階の更新・未完了の判定・消さない条件を確かめる。"""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import time
 import unittest
 
 from ccnavi.records import prune
-from ccnavi.tickets import oplog
+from ccnavi.tickets.model import oplog
 
 REPO = {"host": "github.com", "kind": "github", "path": "o/r"}
 STAGES = [("reply", oplog.STAGE_REPLY), ("issue", oplog.STAGE_ISSUE), ("note", oplog.STAGE_COMMENT)]

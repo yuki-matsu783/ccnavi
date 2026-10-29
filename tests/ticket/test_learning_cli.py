@@ -12,7 +12,7 @@ import types
 import unittest
 
 from ccnavi.infra import settings
-from ccnavi.tickets import learning
+from ccnavi.tickets.learning import notes as learning
 from tests.inproc import run_ccnavi
 
 

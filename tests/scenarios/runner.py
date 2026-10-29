@@ -62,7 +62,7 @@ import yaml
 
 from ccnavi.infra import pathcase
 from ccnavi.records import diaglog
-from ccnavi.tickets import review_host
+from ccnavi.tickets.model import review_host
 from tests.scenarios import hostenv
 
 ROOT = Path(__file__).resolve().parents[2]

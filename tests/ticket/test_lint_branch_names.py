@@ -25,7 +25,7 @@ import unicodedata
 import unittest
 
 from ccnavi.infra import settings
-from ccnavi.tickets import ticket_ids, ticket_model
+from ccnavi.tickets.model import ticket_ids, ticket_model
 from tests.inproc import run_ccnavi
 
 ADR = "（親のブランチ名の規則）"

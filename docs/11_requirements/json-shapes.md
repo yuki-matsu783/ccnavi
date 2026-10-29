@@ -87,7 +87,7 @@ ccnavi --lint --json
 `problems[].where` は、ユーザ向けの文面で `error:` の後ろに出る場所。`(projects/lib) rule-id` や `(self) (phases) design` のような形で、
 `--flow` で渡したフローへの指摘なら `(flow)` になる。ファイル全体への指摘なら空。
 
-`flow.rendered` は文字列の配列で、`flow_render.render` が返したままのもの。子のパスやロックの案内は入らない。
+`flow.rendered` は文字列の配列で、`flow.render.render` が返したままのもの。子のパスやロックの案内は入らない。
 
 `flow.candidates` の `source` は `builtin` か `project`。`builtin` は `general-purpose`・`Explore`・`Plan` の 3 つで、`project` は
 ワークスペースの `.claude/agents/*.md` と `.claude/skills/*/SKILL.md` から読む。`project` の名前は frontmatter の `name` で、

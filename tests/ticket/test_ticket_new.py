@@ -19,7 +19,8 @@ import os
 
 import yaml
 
-from ccnavi.tickets import ops, proposal_form, ticket_model
+from ccnavi.tickets.lifecycle import commands as ops
+from ccnavi.tickets.model import proposal_form, ticket_model
 from tests import config_path
 from tests.ticket.test_parent_phases import front_of
 from tests.ticket.test_phases import PhaseHarness

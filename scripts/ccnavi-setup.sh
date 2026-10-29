@@ -159,7 +159,7 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-user-*.sh は、ユーザだけがターミナルで打つ sh（エージェントからは hook が名前で止める）。
 # ccnavi-user-push-approved.sh は、ボードが承認のあとにターミナルへ送る 1 行の中身。
 # 配らないと、配布先のボードは承認済みチケットをコミットして push できない。
-# ccnavi-user-agree.sh はターミナルから承認するための sh。承認の案内（phase.py）がこのパスを表示するので、
+# ccnavi-user-agree.sh はターミナルから承認するための sh。承認の案内（tickets/phase/gates.py）がこのパスを表示するので、
 # 配らないと、案内どおりに実行しても動かない。ccnavi-user-decide.sh・
 # ccnavi-user-close-early.sh・ccnavi-user-clean-branch.sh は、残った指摘の対応方針・
 # 早めに閉じる判断・残った子のブランチの削除。ccnavi-user-lib-review.sh は、decide と close-early が読む、
@@ -543,7 +543,7 @@ skills_blocked=""
 
 # 配布元のスキルが、frontmatter に `process: true` か `distribute: true` を持つか。先頭の `---` から閉じの `---` までの
 # 間に、その 1 行（行末の `# コメント`は可）があるものだけを適用する。ユーザの発言のときの同期がコピーする判定
-# （src/ccnavi/tickets/skillsync.py の _process_flag。`process` の側）に寄せてある。CRLF の改行と、`---` の前後の空白は
+# （src/ccnavi/tickets/sync/skillsync.py の _process_flag。`process` の側）に寄せてある。CRLF の改行と、`---` の前後の空白は
 # 許し、閉じの `---` が無いもの、BOM 付き、文字列の "true"、本文だけにあるものは適用しない。
 # SKILL.md 自体がリンクのものは、skillsync と同じく適用しない。
 # 書き方は文書どおりの `process: true` と `distribute: true` だけを見る。`process: yes` のような別の綴りは、

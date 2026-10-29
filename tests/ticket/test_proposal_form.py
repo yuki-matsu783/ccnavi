@@ -17,7 +17,7 @@ from __future__ import annotations
 import unittest
 
 from ccnavi.policy import rules
-from ccnavi.tickets import proposal_form, ticket_model
+from ccnavi.tickets.model import proposal_form, ticket_model
 
 FILLED = "".join(f"## {name}\n\n書いた内容\n\n" for name in proposal_form.PARENT_HEADINGS)
 

@@ -211,7 +211,7 @@ relative_of() {
 }
 
 # 元の相対パス <$1> が、ccnavi-user-handoff.sh で取り込める種類（template・messages・layer-config・docs）なら 0。
-# 表は src/ccnavi/tickets/handoff.py の KINDS（defense と対象外は 1 を返し、mv の道に残す）。
+# 表は src/ccnavi/tickets/sync/handoff.py の KINDS（defense と対象外は 1 を返し、mv の道に残す）。
 # 比べ方は ASCII の大文字小文字を区別しない（Python 側は NFC と fold）。表を変えたら、test_stage_sh の例も直す。
 is_importable() {
 	im_k=$(printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')

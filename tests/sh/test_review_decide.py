@@ -37,7 +37,7 @@ import threading
 import unittest
 
 from ccnavi.entry import version
-from ccnavi.tickets import review_host
+from ccnavi.tickets.model import review_host
 from tests import ROOT, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")

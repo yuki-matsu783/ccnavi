@@ -31,7 +31,8 @@ import yaml
 
 from ..infra import hookio, settings, tree, yamlread
 from ..policy import ctxfile, rules
-from ..tickets import flow, flow_text
+from ..tickets.flow import graph as flow
+from ..tickets.flow import text as flow_text
 
 # プロジェクトのルートからの相対。ccnavi ディレクトリの外に置く（中は組み込みの保護が丸ごと
 # 止めるので、承認したチケットの中でもエージェントが書けない）。

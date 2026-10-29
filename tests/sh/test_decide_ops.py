@@ -10,7 +10,7 @@
    0 件でも、反映待ち（送ってすぐ）やアカウント違いのときは自動で送り直さない
 
 実行ファイルは代役の sh。`ops …` だけは本物の `ccnavi ops` に渡し、受け入れの計画は本物の
-操作記録（`tickets/oplog.py`）で書く。GitLab は同じプロセスの小さな HTTP サーバ。
+操作記録（`tickets/model/oplog.py`）で書く。GitLab は同じプロセスの小さな HTTP サーバ。
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.entry import version
-from ccnavi.tickets import oplog
+from ccnavi.tickets.model import oplog
 from tests import ROOT
 from tests.sh import test_review_decide as base
 
@@ -60,7 +60,7 @@ esac
 BEGIN = """import json
 import sys
 
-from ccnavi.tickets import oplog
+from ccnavi.tickets.model import oplog
 
 state, plan, mr_url = sys.argv[1:4]
 op = oplog.begin(

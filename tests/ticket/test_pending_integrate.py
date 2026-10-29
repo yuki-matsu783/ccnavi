@@ -16,7 +16,7 @@ import time
 import unittest
 
 from ccnavi.infra import gitcmd, settings
-from ccnavi.tickets import pending_integrate
+from ccnavi.tickets.notice import pending_integrate
 from tests.ticket.test_ticket import TicketTest, git, write
 
 

@@ -1,10 +1,10 @@
-"""閉じた親チケットのコピー（`tickets/donecopy.py`）から欄を読む処理を確かめる。"""
+"""閉じた親チケットのコピー（`tickets/model/donecopy.py`）から欄を読む処理を確かめる。"""
 
 from __future__ import annotations
 
 import unittest
 
-from ccnavi.tickets import donecopy
+from ccnavi.tickets.model import donecopy
 
 
 class CopyFieldsTest(unittest.TestCase):

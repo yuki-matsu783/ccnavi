@@ -73,7 +73,7 @@ from typing import TextIO
 
 from ..infra import fsio, hookio, settings, tree
 from ..policy import texts
-from ..tickets import ticket_places
+from ..tickets.model import ticket_places
 from . import docsearch_index, docsearch_query
 
 # 規約の詳しい文書。ワークスペースに在るときだけ案内に名前を出す。
@@ -386,9 +386,7 @@ def guide_lines(conf: settings.Settings, root: str, lead: str) -> list[str]:
     """
     command = _command(conf, root)
     case = "convention" if _has_convention(root) else "plain"
-    line = texts.say(
-        root, "NOTICE_DOCS_GUIDE", {"lead": lead, "command": command}, {"what": case}
-    )
+    line = texts.say(root, "NOTICE_DOCS_GUIDE", {"lead": lead, "command": command}, {"what": case})
     return [line]
 
 
@@ -499,6 +497,11 @@ def _frontmatter_hint(conf: settings.Settings, root: str, shown: str, has_front:
     return texts.say(
         root,
         text_id,
-        {"code": CODE_MISSING_FRONTMATTER, "shown": shown, "command": command, "doc": CONVENTION_DOC},
+        {
+            "code": CODE_MISSING_FRONTMATTER,
+            "shown": shown,
+            "command": command,
+            "doc": CONVENTION_DOC,
+        },
         {"what": case},
     )

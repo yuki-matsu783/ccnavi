@@ -20,14 +20,11 @@ import unittest
 from datetime import UTC, datetime
 
 from ccnavi.infra import settings
-from ccnavi.tickets import (
-    approval_marks,
-    core_review,
-    manual_settle,
-    phase,
-    review_host,
-    ticket_fields,
-)
+from ccnavi.tickets.approval import marks as approval_marks
+from ccnavi.tickets.core import review as core_review
+from ccnavi.tickets.model import review_host, ticket_fields
+from ccnavi.tickets.phase import gates as phase
+from ccnavi.tickets.phase import manual_settle
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text

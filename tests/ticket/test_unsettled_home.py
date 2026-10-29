@@ -15,7 +15,10 @@ import os
 import unittest
 
 from ccnavi.infra import settings
-from ccnavi.tickets import approval, approval_checks, ops_close, phase
+from ccnavi.tickets.approval import checks as approval_checks
+from ccnavi.tickets.approval import store as approval
+from ccnavi.tickets.lifecycle import close as ops_close
+from ccnavi.tickets.phase import gates as phase
 from tests.ticket.test_stop_request_nudge import RequestNudgeTest
 from tests.ticket.test_ticket import git, write
 

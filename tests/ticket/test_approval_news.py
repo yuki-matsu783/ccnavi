@@ -166,7 +166,7 @@ class ApprovalToldTest(PhaseHarness):
         from types import SimpleNamespace
 
         from ccnavi.infra import settings
-        from ccnavi.tickets import core_approve
+        from ccnavi.tickets.core import approve as core_approve
 
         self.parent_only()
         conf, _ = settings.load(self.root)
@@ -216,7 +216,7 @@ class ApprovalToldTest(PhaseHarness):
         """
         from unittest import mock
 
-        from ccnavi.tickets import approval
+        from ccnavi.tickets.approval import store as approval
 
         self.parent_only()
         self.next_child()

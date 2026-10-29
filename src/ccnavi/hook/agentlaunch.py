@@ -23,7 +23,10 @@ from dataclasses import dataclass, field
 
 from ..infra import modes, pathcase, pathsafe, settings, tree
 from ..policy import texts
-from ..tickets import approval, approval_checks, flow, ticket_model
+from ..tickets.approval import checks as approval_checks
+from ..tickets.approval import store as approval
+from ..tickets.flow import graph as flow
+from ..tickets.model import ticket_model
 from . import agentkind, childnote
 
 CODE_ISOLATION = "DENY_AGENT_ISOLATION"

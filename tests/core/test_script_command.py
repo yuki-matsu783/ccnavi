@@ -13,7 +13,7 @@ import unittest
 
 from ccnavi.infra import settings, shellread
 from ccnavi.policy import texts
-from ccnavi.tickets import phase_forms
+from ccnavi.tickets.model import phase_forms
 from tests import ROOT
 
 

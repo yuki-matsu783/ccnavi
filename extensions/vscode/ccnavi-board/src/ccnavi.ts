@@ -313,7 +313,7 @@ export async function runApproveYes(
     return { ok: false, error: refused };
   }
   const ran = await run(launcher, root, approveArgs(tickets, digest, only), APPROVE_TIMEOUT_MS);
-  // 打ち切りは読む前に見る。承認済みチケットは 1 件ずつ置かれる（agree.py の for cand in batch）ので、
+  // 打ち切りは読む前に見る。承認済みチケットは 1 件ずつ置かれる（tickets/proposal/agree.py の for cand in batch）ので、
   // 途中で強制終了されると一部だけ置かれた状態が残る。stdout も途中で切れていて「読み取れない」になるため、
   // ここで拾わないと何が起きたのか伝わらない。
   if (ran.killed) {

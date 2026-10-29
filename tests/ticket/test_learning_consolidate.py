@@ -15,13 +15,11 @@ import unittest
 
 from ccnavi.infra import settings
 from ccnavi.policy import rules
-from ccnavi.tickets import (
-    agree_candidates,
-    approval_checks,
-    phase_scope,
-    phasetypes,
-    ticket,
-)
+from ccnavi.tickets.approval import checks as approval_checks
+from ccnavi.tickets.config import phasetypes
+from ccnavi.tickets.model import ticket
+from ccnavi.tickets.phase import scope as phase_scope
+from ccnavi.tickets.proposal import agree_candidates
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
 from tests.ticketsample import child_text, parent_text
@@ -221,7 +219,7 @@ class ConsolidateFlowTest(FlowHarness):
 
 class SessionRejectsTest(FlowHarness):
     def test_the_fixed_scope_is_not_reported_as_outside_the_parent(self):
-        from ccnavi.tickets import session_rejects
+        from ccnavi.tickets.notice import session_rejects
 
         self.setup_family()
         self.assertEqual(self.consolidate().returncode, 0)

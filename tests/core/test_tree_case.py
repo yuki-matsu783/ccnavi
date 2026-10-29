@@ -59,7 +59,7 @@ class TreeCaseTest(unittest.TestCase):
         self.assertEqual(tree.parts_under(os.sep, path), [name, "x"])
 
     def test_owner_は大文字を含むルートでも所有ツリーを返す(self) -> None:
-        from ccnavi.tickets import core_base
+        from ccnavi.tickets.core import base as core_base
 
         upper = os.path.join(self.root, "Work")
         os.makedirs(upper)

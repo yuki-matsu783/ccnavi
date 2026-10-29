@@ -21,7 +21,7 @@ import os
 import re
 
 from ..infra import fsio, hookio, settings, tree
-from ..tickets import ticket, ticket_ids
+from ..tickets.model import ticket, ticket_ids
 
 # 理由コード（設計 付録 A）。記録（`decisions.jsonl`）の `code` には残らない。
 CODE_PARENT_KEY = "NOTICE_PROPOSAL_PARENT_KEY"
@@ -75,7 +75,8 @@ def _hint(conf: settings.Settings, root: str, payload: hookio.Input) -> str:
     if parent:
         matched = ticket_ids.child_pattern().match(name)
         if matched is not None:
-            # 子の形。親の欄は求めない。別の親を指す誤りは読み込み（ticket.py）のエラー文が言う
+            # 子の形。親の欄は求めない。別の親を指す誤りは読み込み（tickets/model/ticket.py）
+            # のエラー文が言う
             return ""
         return (
             f"[ccnavi] {CODE_PARENT_KEY} ({rel}) 識別子 {name} は子の形ではないのに `parent:` が"

@@ -52,10 +52,7 @@ from typing import TextIO
 from ..infra import fsio, gitstate, hookio, pathcase, settings, tree
 from ..policy import rules, selfguard, texts
 from ..records import audit
-from ..tickets import (
-    phase_forms,
-    ticket_places,
-)
+from ..tickets.model import phase_forms, ticket_places
 from . import post_findings, post_report
 
 # ワークツリーを変えようがないツール。ここを飛ばすぶん git を起こす回数が減る。

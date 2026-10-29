@@ -1,5 +1,5 @@
 # 組み込みルールの拒否の文。条件（何を止めるか）はコード側（policy/builtin.py・policy/selfguard_shell.py・
-# tickets/ticket_guard.py・tickets/phase_forms.py）にあり、ここは何を言うかだけを持つ。
+# tickets/model/ticket_guard.py・tickets/model/phase_forms.py）にあり、ここは何を言うかだけを持つ。
 # 識別子 `RULE_<名前>` は組み込みのルールの id から決める（`builtin:git-push` なら `RULE_GIT_PUSH`）。
 # ルールは識別子と値だけを持ち、拒否に当たった回に `texts.spoken` が引く。記録の `code` とは別。
 # `RULE_` の文は `what` だけが必須で、言うことが無い欄は省く。場合分けは `message_variants` で選ぶ。
@@ -213,7 +213,7 @@ messages:
       noroot: |-
         エージェントの判断で書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えてユーザに依頼する（/ccnavi-config）。ルールファイルが読めないときも同じで、wip/handoff/.ccnavi/config/common/rules.yml に下書きを置いてユーザに取り込みを頼む。wip/handoff/ にコピーを置き、ユーザに ccnavi-user-handoff.sh での取り込みを頼む
 
-  # ---- tickets/ticket_guard.py（名前で書くツールとシェルの 2 本が同じ文を使う）
+  # ---- tickets/model/ticket_guard.py（名前で書くツールとシェルの 2 本が同じ文を使う）
   RULE_TICKET_STATE:
     kind: deny
     what: |-
@@ -257,7 +257,7 @@ messages:
       plain: |-
         git の操作が必要なときは、ユーザに頼む
 
-  # ---- tickets/phase_forms.py（承認・レビュー済みの受け入れ・チケットの状態の操作）
+  # ---- tickets/model/phase_forms.py（承認・レビュー済みの受け入れ・チケットの状態の操作）
   RULE_GUARD_TICKET_APPROVAL:
     kind: deny
     what: |-

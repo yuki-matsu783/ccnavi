@@ -98,12 +98,12 @@ base_sha: ""
   承認のあとの判定はコピーを読み、`phases.yml` を読まない。`phases.yml` を直したら、承認待ちの提案は `--fill-phases` を
   打ち直す。改版の提案では、子が承認された番号が使う定義は承認済みチケットの値のまま（`--fill-phases` がそう差し込む）。
   子に `phases:` は書けない（error。子は `phase:` で番号を指す）（9.7）
-- 親の提案の雛形は `ccnavi ticket new <識別子> --title <タイトル> (--plan <型,型,...> | --template <名前> [--layer <名>] [--with-feedback]) --issue <N|owner/repo#N> --mr <N>` で作る（`tickets/scaffold.py`。
+- 親の提案の雛形は `ccnavi ticket new <識別子> --title <タイトル> (--plan <型,型,...> | --template <名前> [--layer <名>] [--with-feedback]) --issue <N|owner/repo#N> --mr <N>` で作る（`tickets/proposal/scaffold.py`。
   REQ-TKT-56）。識別子と同名のワークツリーの中から打つと、`<提案の置き場>/todo/<識別子>.md` に書く。生成物は
   `version` `ticket` `issue`（`--issue` があれば）`title` `phases` `plan` `rationale` `allow` と、本文の見出し
   `## 目的` `## 範囲` `## 対象外` `## 完了の確かめ方` `## 計画の理由`（この順。Stop の判定が親の提案に求める内容に
   そろえた。「背景」は「目的」にまとめ、「計画の理由」は計画の説明として残す）。rationale と各見出しの下には空欄の目印
-  （`（ここに〜を書く）`）を 1 行ずつ置く。目印は `tickets/proposal_form.py` が持つ
+  （`（ここに〜を書く）`）を 1 行ずつ置く。目印は `tickets/model/proposal_form.py` が持つ
   - `allow` は plan の順に各型の `scope` を集め、重複を除いた `match: Write|Edit` の項にする（案 A。判定側で `wip/` を
     既定で許すことはしない。承認していない範囲が黙って広がるため）。項が 20 件を超えれば止める
   - `plan` は各ステップが前のステップを `after` に書いた一直線（終端が 1 つになり、承認の検査を通る）。並行させたいステップはユーザが `after` を直す
@@ -155,7 +155,7 @@ base_sha: ""
 
 **承認で一緒に動く。** 承認の前、ボードは提案が在るツリーの置き場を示し、ユーザはそこへ保存する。承認で子が別の
 ツリー（親のワークツリーなど。`approval.home_dir`）へ動くときは、そのフローも承認済みチケットのツリーの
-`flows/` へ動かす（`approval_ops.carry_flow`）。行き先に違う中身のフローが既に在れば上書きせず、承認の出力でそう言い、
+`flows/` へ動かす（`approval.ops.carry_flow`）。行き先に違う中身のフローが既に在れば上書きせず、承認の出力でそう言い、
 元も残す。同じ中身なら元を消す。リンク・ふつうのファイルでないもの・ハードリンクは移さない。
 
 **効かせるのはユーザ。判定がそれを守る。** 効力のあるフロー（承認済みの領域）は、ユーザがボードのエディタ（VS Code 拡張のフロー編集画面）で
@@ -237,7 +237,7 @@ subAgentFlows:             # 無くてよい
 
 **不正なフローで止まらない。** 読むときも並べるときも、例外を外へ出さない。UTF-8 として読めない・YAML として
 読めない・別名がある・入れ子が深すぎる・形の誤り（最上位がマッピングでない、`nodes` が無い、ノードに文字列の
-`id` が無い・`id` が重なる、`connections` が配列でない。`flow_shape.shape_problem`）は、読めないと 1 行で言う。
+`id` が無い・`id` が重なる、`connections` が配列でない。`flow.shape.shape_problem`）は、読めないと 1 行で言う。
 ノードの中の欄の型が違う（`data` が配列、など）ときは、並べられるところまで並べる。`SubagentStart` は
 フローの案内が例外を出しても 1 行の知らせにして、子の一覧と範囲は渡す。上限は、ファイル 256KB（超えたら
 読まずにそう言う。ボードの読み書きも同じ）、1 ノードの選択肢・分岐・次は 10 件（残りは「…ほか N 件」）、
@@ -254,12 +254,12 @@ subAgentFlows:             # 無くてよい
 開くときは読んだバイトを、保存の前は書き出す本文を、呼ぶたびに別の名前の一時ファイルに書いてこれで確かめ、
 error があれば理由を出して開かない・保存しない。
 
-**手順として怪しいところは warn。** 読めたフローには、線の構造（`flow_shape.structure_problems`。無いノードを指す線、
+**手順として怪しいところは warn。** 読めたフローには、線の構造（`flow.shape.structure_problems`。無いノードを指す線、
 `start` から届かないノード、`start` に入る線・`end` から出る線、分岐・問いの出口に線が無い、`start` / `end` が無い、`loop` の条件（`condition` が空）・上限（`maxIterations`）・出口（`branches` の 2 項目）、`loop` の「繰り返す」側（`body`）を通らない巡回。
 出口は画面の `portsOf` と同じに読み、複数選択の問いは `output` の 1 本、グループへ出る線も出口を使ったと数える。
 無いノードを指す線は `ITEM_LIMIT` 件まで言い、残りは数だけ）と、
-`subAgent` の種類・`skill` の名前の表記（`flow_shape.name_problems`。候補は `flow.catalog`）を `(flow)` の warn で足す。
-巡回は `loop` の「繰り返す」側の線を通るものだけを正しい巡回として扱い、通らない巡回（「抜ける」側が巡回に戻る形を含む）は warn で言う（回数の上限が効かず終わらなくなりうる）。`--json` には、渡る手順の行（`flow.rendered`。`flow_render.render` のまま）と選べる名前（`flow.candidates`。
+`subAgent` の種類・`skill` の名前の表記（`flow.shape.name_problems`。候補は `flow.catalog`）を `(flow)` の warn で足す。
+巡回は `loop` の「繰り返す」側の線を通るものだけを正しい巡回として扱い、通らない巡回（「抜ける」側が巡回に戻る形を含む）は warn で言う（回数の上限が効かず終わらなくなりうる）。`--json` には、渡る手順の行（`flow.rendered`。`flow.render.render` のまま）と選べる名前（`flow.candidates`。
 組み込みと、ワークスペースの `.claude/agents` `.claude/skills`。ディレクトリの中だけを見る）も載せる。
 
 **値の意味も実行ファイルが言う。** 画面の読み手（`yaml`、YAML 1.2）と PyYAML（YAML 1.1）は同じ表記を別の値に

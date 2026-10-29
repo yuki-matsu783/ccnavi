@@ -1,10 +1,10 @@
-"""`tickets.via`。起動の間だけ経路とアカウントを覚え、抜けると前の値へ戻す。"""
+"""`tickets.model.via`。起動の間だけ経路とアカウントを覚え、抜けると前の値へ戻す。"""
 
 from __future__ import annotations
 
 import unittest
 
-from ccnavi.tickets import via
+from ccnavi.tickets.model import via
 
 
 class ViaTest(unittest.TestCase):

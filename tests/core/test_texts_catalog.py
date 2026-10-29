@@ -135,7 +135,7 @@ def builtin_rules(root: str, wrapper: bool) -> list[rules.Rule]:
     """
     from ccnavi.infra import settings
     from ccnavi.policy import builtin, selfguard_shell
-    from ccnavi.tickets import phase_forms, ticket_guard
+    from ccnavi.tickets.model import phase_forms, ticket_guard
 
     if wrapper:
         script = os.path.join(root, ".ccnavi", "scripts", "ccnavi-git.sh")

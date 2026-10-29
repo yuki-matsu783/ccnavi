@@ -1,4 +1,4 @@
-# 組み込みの関門（hook/wrapguard.py・tickets/flow.py・tickets/phase_forms.py）の拒否の文。
+# 組み込みの関門（hook/wrapguard.py・tickets/flow/graph.py・tickets/model/phase_forms.py）の拒否の文。
 # 条件（いつ止めるか）はコード側にある。ここは何を言うかだけを持つ。
 # 先頭の `[ccnavi] CODE (…)` と `subject:` などの状態の行は、コード側が付ける。
 # 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
@@ -164,7 +164,7 @@ messages:
     no_bypass: |-
       書き方を変えても、読めない形は同じ関門に当たります。
 
-  # ---- 着手中の子のフローのロック（tickets/flow.py）
+  # ---- 着手中の子のフローのロック（tickets/flow/graph.py）
 
   DENY_TICKET_FLOW_LOCKED:
     kind: deny
@@ -178,7 +178,7 @@ messages:
     no_bypass: |-
       別のパスや言い換えで書いても、同じ関門に当たります。
 
-  # ---- ユーザの判断の経路と記録の削除（tickets/phase_forms.py）
+  # ---- ユーザの判断の経路と記録の削除（tickets/model/phase_forms.py）
 
   DENY_TICKET_APPROVAL_CLI__GUARD_OFF:
     kind: deny

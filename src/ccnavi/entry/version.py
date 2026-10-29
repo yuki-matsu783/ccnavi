@@ -39,7 +39,8 @@ from typing import TextIO
 
 from ..infra.modes import EXIT_OK
 from ..policy import rules
-from ..tickets import phasetypes, risk, ticket_model
+from ..tickets.config import phasetypes, risk
+from ..tickets.model import ticket_model
 
 # ccnavi の版。pyproject.toml の `version` と揃える（tests/core/test_version.py が見る）。
 VERSION = "0.1.0"

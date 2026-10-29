@@ -57,18 +57,13 @@ from typing import TextIO
 
 from ..infra import fsio, pathcase, settings, tree
 from ..policy import ruleload, selfguard_targets
-from ..tickets import (
-    approval,
-    approval_marks,
-    archive,
-    base_bound,
-    donecopy,
-    handoff,
-    ops_stop_integrate,
-    ticket_ids,
-    ticket_model,
-)
-from ..tickets import ticket as ticket_mod
+from ..tickets.approval import marks as approval_marks
+from ..tickets.approval import store as approval
+from ..tickets.lifecycle import base_bound
+from ..tickets.lifecycle import stop_integrate as ops_stop_integrate
+from ..tickets.model import archive, donecopy, ticket_ids, ticket_model
+from ..tickets.model import ticket as ticket_mod
+from ..tickets.sync import handoff
 
 # 答えの頭の行。
 TREE_HEAD = "tree 1"

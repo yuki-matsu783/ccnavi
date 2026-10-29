@@ -21,7 +21,9 @@ import sys
 
 from ccnavi.entry import lint, version
 from ccnavi.infra import fsio
-from ccnavi.tickets import core_review, review_decide, review_host
+from ccnavi.tickets.core import review as core_review
+from ccnavi.tickets.model import review_host
+from ccnavi.tickets.review import decide as review_decide
 from tests.ticket.test_swap_points import CoreHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text, load_chrome
@@ -619,7 +621,7 @@ class BoundaryTest(ChromeDecideHarness):
     def test_the_parent_worktree_that_can_not_be_decided_stops_without_writing(self):
         from unittest import mock
 
-        from ccnavi.tickets import approval
+        from ccnavi.tickets.approval import store as approval
 
         calls = []
         real = core_review.approval.home_dir

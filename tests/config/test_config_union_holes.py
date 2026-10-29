@@ -180,7 +180,9 @@ COUNT_RISK = (
 class GlobCaseTest(ConfigUnionHarness):
     """大文字小文字: ルールに書いたパスの扱い。
 
-    `glob` も `regex` も、`risk.py` / `phasetypes.py` / `ticket.py` の範囲と同じく、
+    `glob` も `regex` も、
+    `tickets/config/risk.py` / `tickets/config/phasetypes.py` /
+    `tickets/model/ticket.py` の範囲と同じく、
     どの機械でも大文字小文字を区別せずにヒットする。区別すると、`.ccnavi/` を `.Ccnavi/` の
     パスで作って deny に止められずに通れる。区別が要るときは `(?-i:...)` で囲む。
     """

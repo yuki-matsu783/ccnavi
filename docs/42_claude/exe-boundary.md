@@ -64,7 +64,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   コミットして送ってからDraftを外す（設計 9.10）。ファイルを`logs/archive/`へ動かすのと`wip/`の追跡済みのファイルを消すのは実行ファイルで、
   ネットワーク（push・Draftを外す・コメント）はshが受け持つ
 - 親を閉じたときのブランチの片付けも実行ファイルが行う（`worktree retire <親>`・`worktree branch <名前> [confirmed]`・
-  `sync tidy <親> <リポジトリ> <ブランチ> <sha>`。`tickets/retire.py`）。MR がマージ済みかと、その先頭の sha は sh が
+  `sync tidy <親> <リポジトリ> <ブランチ> <sha>`。`tickets/lifecycle/retire.py`）。MR がマージ済みかと、その先頭の sha は sh が
   `ccnavi-review.sh merged [<番号>]` で取って渡し、実行ファイルはその sha を基準に、手元の先頭が含まれるかなどをローカルの git で
   確かめて消す。エージェントに `git branch -D` を開けないので、消す入口はこれらだけ（`ccnavi-user-clean-branch.sh`）。最後の行が
   `record yes|no`（片付けが済んだか）で、`yes`のときは実行ファイルが`retire/<親>.json`も消す（shは消さない）。

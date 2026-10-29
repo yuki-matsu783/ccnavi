@@ -1039,7 +1039,7 @@ class SelfGuardTest(unittest.TestCase):
         # 名前が変わると上限が効かなくなり、2 乗の照合に戻る。
         from ccnavi.hook import judge
         from ccnavi.policy import builtin
-        from ccnavi.tickets import ticket_guard
+        from ccnavi.tickets.model import ticket_guard
 
         rule_set = rules.RuleSet(version=rules.VERSION)
         selfguard_shell.add_rules(rule_set, root=self.repo, tool="Bash")
