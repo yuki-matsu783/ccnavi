@@ -30,7 +30,7 @@ diagrams:
           URL の形（https / ssh / git@host:path） ✓
           資格情報（user:token@）なし ✓
           名前 web-app は英数字と . _ - だけ ✓
-          既存のツリー名・origin と重ならない ✓
+          既存のプロジェクトかワークツリーの名前・origin と重ならない ✓
           projects/web-app が無いか、空 ✓
       - id: send
         from: プロジェクト管理画面
