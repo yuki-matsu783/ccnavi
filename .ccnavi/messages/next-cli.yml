@@ -4,7 +4,7 @@
 # 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
 version: 1
 messages:
-  # ---- tickets/ops.py
+  # ---- tickets/lifecycle/commands.py
   # 子の着手のあと。
   NEXT_OPS_START_CHILD:
     kind: next
@@ -41,7 +41,7 @@ messages:
     next: |-
       '{script:ccnavi-ticket.sh} status {parent}' で、親の次の一手を確かめる
 
-  # ---- tickets/agree_screen.py（承認されたあとの案内）
+  # ---- tickets/proposal/agree_screen.py（承認されたあとの案内）
   # 場合は、この回に承認された親が居るか（parent）と、子の開始の仕方（child: 子のワークツリーを切る手順も言う、
   # child_wt: 切ったワークツリーが計画に出ている）で選ぶ。改版と子だけの回で親の着手を勧めると、
   # 案内どおりに打っても「着手済み」で終わるので、親が居ない回は親の着手を言わない。
@@ -61,14 +61,14 @@ messages:
       parent_child_wt: |-
         後工程を進める。親は自分のワークツリーで '{script:ccnavi-ticket.sh} start <親>' を先に実行してください。子は'{script:ccnavi-ticket.sh} start <識別子>' で開始してください（親が未着手だと止まります）。
 
-  # ---- tickets/review.py
+  # ---- tickets/review/request.py
   # 依頼のとき、親の `mr:` に別の値が既にあった。状態（上書きしないこと・今回の MR の番号）はコードが言う。
   NEXT_REVIEW_MR_DIFFERS:
     kind: next
     next: |-
       `mr:` の値が今回のレビューの MR と合っているか、ユーザに確かめてもらう
 
-  # ---- tickets/approval_checks.py（承認しない理由に添える次の一手。理由はコードが言う）
+  # ---- tickets/approval/checks.py（承認しない理由に添える次の一手。理由はコードが言う）
   # 提案が親のワークツリーの外にある。
   NEXT_APPROVAL_PROPOSAL_OUTSIDE:
     kind: next

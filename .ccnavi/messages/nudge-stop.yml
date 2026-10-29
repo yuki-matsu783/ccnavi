@@ -1,6 +1,6 @@
 # Stop の促しと、親のワークツリーの立ち位置の解き方の文。条件（いつ促すか）はコード側にある。
 # 先頭の `[ccnavi] CODE (…)` の状態の行と、サブエージェントの結果の 1 行ずつはコード側が出す。
-# `user_stop_note` は ops_stop.USER_STOP_NOTE（finish・依頼・フィードバックの促しで共有する 1 文）。
+# `user_stop_note` は lifecycle/stop.py の USER_STOP_NOTE（finish・依頼・フィードバックの促しで共有する 1 文）。
 version: 1
 messages:
   NUDGE_TICKET_FINISH:
