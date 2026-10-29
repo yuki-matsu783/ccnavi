@@ -9,18 +9,6 @@ messages:
     next: |-
       操作せず、ユーザに、統合先の staged を git status で確かめ、不要なら git reset --merge で戻してから記録のディレクトリを手で消すよう頼み、返事を待つ
 
-  NUDGE_INTEGRATE__CONFIRM:
-    kind: nudge
-    values: [name, integ_tree]
-    what: |-
-      ワークツリー .claude/worktrees/{name} の取り込み（integrate {name}）が、確定を待っています。
-    why: |-
-      差分と変わるファイルの一覧をユーザに見せ、返事を待ってこのターンを終えます。確定はユーザの次の発言のあとで、この同じターンでは integrate-done を打てません（この案内で続けたターンは、ユーザの発言に数えません）。
-    next: |-
-      ユーザの発言のあと、了承を得ていれば `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate-done {name} -m '<メッセージ>'` で取り込んで片付ける。やめるなら `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate --abort {name}`
-    note: |-
-      ファイルをエディタで開いて保存していない編集がないか、ユーザに確かめてから確定します。
-
   NUDGE_INTEGRATE__ADOPT:
     kind: nudge
     values: [name, left, integ_tree, base]

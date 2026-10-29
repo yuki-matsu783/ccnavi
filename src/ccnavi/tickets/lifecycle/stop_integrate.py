@@ -1,9 +1,14 @@
 """Stop で、直接作業が `integrate` まで進んでいないときの促し。
 
 チケットに結び付かない直接作業のワークツリー（`.claude/worktrees/<名前>`。ブランチも同じ名前）で
-終えようとしたとき、作業が残っていて `integrate <名前>` の記録も無ければ、1 回だけ止めて
-`integrate` の打ち方と、一時ワークツリーに展開した取り込み結果をユーザに確かめてもらう手順を返す。
-hook自身は `integrate` を打たない。促すだけ。
+終えようとしたとき、取り込み先に入っていないコミットがあって `integrate <名前>` の記録も無ければ、
+1 回だけ止めて `integrate` の打ち方と、一時ワークツリーに展開した取り込み結果をユーザに確かめて
+もらう手順を返す。hook自身は `integrate` を打たない。促すだけ。
+
+直接作業では、コミットは作業を終えて `integrate` を打つ直前にまとめて打つ決まりにしている。
+コミットがあるのに `integrate` が無い状態は打ち忘れで、未コミットの変更だけの状態は作業中か
+ユーザの返事を待っている途中なので促さない。版 4 のmarkerがある取り込みの途中も同じく促さない。
+版を知らないmarkerは、ユーザに片付けを頼むよう促す。
 
 ## 促す条件
 
@@ -15,15 +20,15 @@ hook自身は `integrate` を打たない。促すだけ。
   承認済みチケット・提案の `<名前>.md`、手元の退避、origin に在る親のブランチのワークツリー。
   最後の1つは、直接作業の記録（`ccnavi-direct/<名前>`）があるワークツリーを外す）を
   使うので、促したのに `integrate` が断る食い違いは起きない
-- 作業が残っている。ワークツリーに未コミットの変更がある（追跡していないファイルも数える）か、
-  取り込み先に入っていないコミットがある。入っていないコミットは、直接作業の記録
+- 取り込み先に入っていないコミットがある。未コミットの変更だけでは促さない（あれば、促しの文に
+  「先にコミットする」を足す）。入っていないコミットは、直接作業の記録
   （`ccnavi-direct/<名前>`。取り込み先 `base_branch` と起点 `snap_sha`）があれば
   `S..先頭` で数える。
   記録が無いときは統合先（`origin/HEAD`）で数え、`integrate` が断るので `--adopt` を案内する
-- 取り込みの途中のmarker（`ccnavi-integrate/<名前>/`）が無い。あれば「`integrate-done` か
-  `integrate --abort`」を促す。片付けた記録のコピー（`ccnavi-integrate-done/<名前>`）は、コピーの
-  `branch_sha` が今のHEADと同じで未コミットの変更が無い、という形では無い
-  （名前を使い直した作業を、前のコピーで黙らせない）
+- 取り込みの途中のmarker（`ccnavi-integrate/<名前>/`）が無い。版 4 のmarkerがあれば促さない。
+  版を知らないmarkerは、ユーザに片付けを頼むよう促す。片付けた記録のコピー
+  （`ccnavi-integrate-done/<名前>`）は、コピーの `branch_sha` が今のHEADと同じで、未コミットの
+  変更も無いときだけ記録とみなす（名前を使い直した作業を、前のコピーで黙らせない）
 
 ## 3 つの結果
 
@@ -237,11 +242,12 @@ def probe(
     2. HEAD と未コミットの変更（`_dirty`）を求める。取れなければ不明にする。
     3. 直接作業の記録（`direct_record`）があれば `_probe_recorded` で判定する。
     4. 統合先（`_integration`）と、統合先に入っていない分（`_ahead` か `_unique`）を求める。
-    5. 統合先が決まらない・取り込み先のツリーが無いときは、未取り込みの変更があるときだけ、
-       ユーザに確かめる理由（`blocked`）を付けて HIT にする。統合先の ref が無いときは、
-       未コミットの変更があるときだけ同じく HIT にする。統合先が読めなければ UNKNOWN。
-    6. 取り込みのマーカー（`marker_kind`）があれば HIT。統合先に同じ HEAD の記録（`_recorded`）が
-       あれば CLEAR。無ければ、統合先の作業の空き（`_integration_busy`）を理由に HIT にする。
+    5. 入っていないコミットが無ければ CLEAR（未コミットの変更だけでは促さない）。数えられなければ
+       UNKNOWN。統合先が決まらない・取り込み先のツリーが無いときは、ユーザに確かめる理由
+       （`blocked`）を付けて HIT にする。
+    6. 取り込みのマーカー（`marker_kind`）が版 4 なら CLEAR、版を知らなければ HIT。統合先に
+       同じ HEAD の記録（`_recorded`）があれば CLEAR。無ければ、統合先の作業の空き
+       （`_integration_busy`）を理由に HIT にする。
     """
     branch = tree.branch_of(here.root)
     if branch is None:
@@ -274,16 +280,8 @@ def probe(
         else _unique(here.root, here.name, deadline)
     )
     if ahead is None:
-        if not (dirty and integration) or not _ref_missing(here.root, integration, deadline):
-            return Probe(UNKNOWN)
-        # 未コミットの変更があるのに統合先の ref を引けない。
-        found = Direct(here.name, here.root, head, dirty, 0, integration, no_record=True)
-        found.blocked = (
-            f"統合先（{integration}）の ref が無く、引けません。統合先の名前が合っているか、"
-            "ブランチが手元か origin にあるかをユーザに確かめてください"
-        )
-        return Probe(HIT, found)
-    if not (dirty or ahead):
+        return Probe(UNKNOWN)
+    if not ahead:
         return Probe(CLEAR)
     found = Direct(here.name, here.root, head, dirty, ahead, integration, no_record=True)
     if not integration:
@@ -303,7 +301,7 @@ def probe(
     found.integ_tree = integ_tree
     if not found.integ_tree:
         found.blocked = (
-            f"統合先（{integration}）をチェックアウトしているツリーが見ヒットしません。"
+            f"統合先（{integration}）をチェックアウトしているツリーが見つかりません。"
             "どのツリーで取り込むかをユーザに確かめてください"
         )
         return Probe(HIT, found)
@@ -311,6 +309,8 @@ def probe(
     if marks is None:
         return Probe(UNKNOWN)
     found.marker = marker_kind(marks, here.name)
+    if found.marker == "v4":
+        return Probe(CLEAR)
     if found.marker:
         found.no_record = False
         return Probe(HIT, found)
@@ -432,7 +432,9 @@ def _probe_recorded(
         return Probe(UNKNOWN)
     found.ahead = int(out)
     found.origin_ahead = _origin_ahead(owner, base, deadline)
-    if not (dirty or found.ahead or found.marker):
+    if found.marker == "unknown":
+        return Probe(HIT, found)
+    if found.marker or not found.ahead:
         return Probe(CLEAR)
     return Probe(HIT, found)
 
@@ -609,18 +611,6 @@ def _ahead(worktree: str, integration: str, deadline: float | None = None) -> in
     return None
 
 
-def _ref_missing(worktree: str, integration: str, deadline: float | None = None) -> bool:
-    """統合先の ref が、手元にも origin にも「無い」と確かめられたか。
-
-    期限不足・git の失敗は「確かめられていない」ので偽（呼び手は不明として扱う）。
-    """
-    for ref in (f"refs/heads/{integration}", f"refs/remotes/origin/{integration}"):
-        done = _run(worktree, ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"], deadline)
-        if done.failure or done.ok:
-            return False
-    return True
-
-
 def _unique(worktree: str, name: str, deadline: float | None = None) -> int | None:
     """統合先が決まらないときの目安。ほかのどのブランチにも入っていないコミットの数。"""
     done = _run(
@@ -773,11 +763,6 @@ def integrate_nudge(root: str, found: Direct) -> str:
     # 版を知らない記録は、操作させず、ユーザに片付けを頼んで終える
     if found.marker == "unknown":
         return "\n".join([head, texts.say(root, "NUDGE_INTEGRATE__UNKNOWN_MARKER", values)])
-    # 取り込みが確定を待っている
-    if found.marker:
-        return "\n".join(
-            [head, texts.say(root, "NUDGE_INTEGRATE__CONFIRM", values), *origin_ahead()]
-        )
     # 直接作業（チケットに結び付かない）。記録の有無で案内を分ける
     values["left"] = _left(found)
     lines = [head]
@@ -794,8 +779,15 @@ def integrate_nudge(root: str, found: Direct) -> str:
 
 
 def blocked_notice(found: Direct) -> str:
-    """促せないときにユーザへ言う文（`systemMessage`）。"""
-    return (
-        f"[ccnavi] 直接作業 {found.name} は {_left(found) or '取り込みの途中'}がありますが、"
-        f"今は取り込みを促せません。{found.blocked}"
-    )
+    """促せないときにユーザへ言う文（`systemMessage`）。
+
+    残りを言うのは、取り込み先に入っていないコミットがあるときだけ。未コミットの変更だけでは
+    促さないので、そのときは取り込めない理由だけを言う。
+    """
+    if found.ahead:
+        where = f"{_left(found)}がありますが"
+    elif found.marker:
+        where = "取り込みの途中ですが"
+    else:
+        return f"[ccnavi] 直接作業 {found.name} は、今は取り込めません。{found.blocked}"
+    return f"[ccnavi] 直接作業 {found.name} は {where}、今は取り込みを促せません。{found.blocked}"
