@@ -14,7 +14,8 @@
 ## やること
 
 1. 使い捨てのプロジェクト `p551-<乱数>` を作り、`tests/contract/fakeside.py` の `scene_state()` と
-   同じ場面を組む。`merge_status` が確定し `diff_refs` が入るまで待つ
+   同じ場面を組み、拡張だけの要求のために `feature` にもう 1 コミットを足す
+   （`sha.*`・`blob.sha` を積む）。`merge_status` が確定し `diff_refs` が入るまで待つ
 2. `requests.json` の列を順に送る（読み取り → 書き込み）。応答の形を正規化する
 3. 2 回やる（2 回目は別のプロジェクト）。`reads` の各キーの形が 2 回で一致しなければ、置かない
 4. 置く前の検査（期待のステータス・配列が非空・`reads` のキーが記録にある・機密・イメージの一致）
@@ -81,12 +82,22 @@ class Scene:
         self.project_id = pid = project["id"]
         self.context["project"] = urllib.parse.quote(project["path_with_namespace"], safe="")
         self.need("レビュアーを member に", c.add_member(t, pid, self.reviewer_id))
-        self.need("最初のコミット", c.first_commit(t, pid, "main"))
+        sha = {"main": self.need("最初のコミット", c.first_commit(t, pid, "main"))["id"]}
         for branch in ("feature", "done", "fresh"):
-            self.need(
+            sha[branch] = self.need(
                 f"ブランチ {branch}",
                 c.commit_file(t, pid, branch, f"{branch}.txt", branch, start_branch="main"),
-            )
+            )["id"]
+        # 拡張だけの要求（tree・compare・commits）のための 2 つ目のコミット（ディレクトリと履歴）
+        sha["feature"] = self.need(
+            "feature の 2 つ目のコミット",
+            c.commit_file(t, pid, "feature", "docs/note.txt", "note\n"),
+        )["id"]
+        tree = self.need(
+            "feature の tree",
+            c.call("GET", f"/projects/{pid}/repository/tree?ref={sha['feature']}", t),
+        )
+        blob = next(e["id"] for e in tree if e["name"] == "feature.txt")
         issue = self.need("issue", c.create_issue(t, pid, "scene issue", "scene"))
         self.need("issue のメモ", c.create_issue_note(t, pid, issue["iid"], "scene note"))
         mr = self.need(
@@ -127,6 +138,9 @@ class Scene:
                 "mr.new_branch": "fresh",
                 "issue.iid": str(issue["iid"]),
                 "discussion.id": thread["id"],
+                "sha.main": sha["main"],
+                "sha.feature": sha["feature"],
+                "blob.sha": blob,
             }
         )
 
@@ -213,7 +227,7 @@ def record(argv: list[str]) -> int:
     if status != 200 or not isinstance(version, dict):
         sys.stderr.write(f"GitLab に認証できない（HTTP {status}）。何も作らず終える\n")
         return 2
-    requests = shape.load_data("requests.json")["requests"]
+    requests = shape.load_data("requests.json")["requests"]  # 全要求（sh と拡張）
     reviewer_id = int(values["CCNAVI_PROBE_REVIEWER_ID"])
     first_answers, first_shapes = record_once(client, token, reviewer_id, requests)
     _, second_shapes = record_once(client, token, reviewer_id, requests)

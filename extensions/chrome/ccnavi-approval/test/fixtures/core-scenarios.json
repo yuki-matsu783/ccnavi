@@ -266,7 +266,7 @@
    "rejected": [],
    "schema": 1,
    "stopped": null,
-   "text": "チケットの承認リクエスト: 1 件\n\n== i0001: 親  親の改版\n■ フィードバック計画\n    対応なし。見たうえで対応しない、という記録になる\n    対応なし。見たうえで対応しない、という記録になる\n    別に追うものは issue に回したか（ccnavi-user-decide.sh）\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md"
+   "text": "チケットの承認リクエスト: 1 件\n\n== i0001: 親  親の改版\n■ フィードバック計画\n    対応なし。見たうえで対応しない、という記録になる\n    別に追うものは issue に回したか（ccnavi-user-decide.sh）\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md"
   },
   "request": {
    "family": "i0001",

@@ -3,7 +3,7 @@ title: チケットによる作業範囲の使い方
 type: guide
 description: チケット制御を使うかの決め方、置き場と状態、承認の打ち方、承認したものだけが効く理由、止まったときの見方、フェーズとレビュー、親の閉じ方と片付け、テンプレートの取り込み
 tags: [user-guide, ticket, worktree, approval]
-keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケット作業, CCNAVI_TICKET_CONTROL, CCNAVI_BRANCH_PREFIXES, フェーズ, HITL, リスク, ready, Draft, 片付け, close-early, テンプレート, user handoff, user mirror, ticket new, ccnavi-user-push-approved.sh, ccnavi-sync.sh]
+keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケット作業, CCNAVI_TICKET_CONTROL, CCNAVI_BRANCH_PREFIXES, フェーズ, HITL, リスク, ready, Draft, 片付け, close-early, テンプレート, user handoff, user mirror, ticket new, ticket revise, 改版, ccnavi-user-push-approved.sh, ccnavi-sync.sh]
 ---
 
 # チケットによる作業範囲の使い方
@@ -224,6 +224,8 @@ Write / Edit の対象が `.claude/worktrees/<名前>/` の中なら、その名
 - 順序は承認で止まる。N 番目の子は、N 番目に先行する番号が全部閉じてレビューが済むまで承認されない
 - 改版で変えられるのは `plan`・`feedback`・`phases:`・範囲だけである。範囲を変える改版は、作業中（`doing/`）の子が居ないときだけ通る
 - 改版は、承認済みチケットが在るツリー（親のワークツリーがあればそこ）の `todo/` に書く。ほかのツリーに書いた改版は承認待ちに入らず、`ccnavi-user-agree.sh` と `--lint` が置き場を名指しする
+
+すぐ始まるステップに子の提案が無い親の提案は、承認の確認と `propose` が警告する（止めないが、親だけを承認すると子の承認がもう 1 回要る）。承認済みの親の改版の雛形は、エージェントが `ccnavi ticket revise` で作る。親を閉じる前の、フィードバック計画なし（`feedback: []`）の改版は `--feedback` を付ける。
 
 提案の雛形は、エージェントが `ccnavi ticket new` で作る（書式は [.ccnavi/docs/proposal-format.md](../../.ccnavi/docs/proposal-format.md)、設計は [設計 9.3](../21_design/tickets/proposal-format.md)）。
 

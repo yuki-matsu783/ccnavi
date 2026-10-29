@@ -21,7 +21,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 
 | ファイル | 中身 |
 |---|---|
-| `requests.json` | sh が打つ GitLab API の列（24 本）。本物にも模擬にも同じ列を送る。各要求に `expect_status` と `reads` を持つ |
+| `requests.json` | GitLab API の列（40 本。sh が打つ 23 本、Chrome 拡張だけが打つ 16 本、受入シナリオの相手側の記録だけが読む 1 本）。本物には全部、`fake_gitlab.py` には `sh` と `scenarios` の要求、`MockGitLab` には `chrome` の要求だけを送る。各要求に `expect_status` と `reads` を持つ |
 | `recorded.json` | 本物から録った形。**本物だけ**。`uv run python tests/manual/gitlab/record_contract.py` で作る |
 | `recorded.sample.json` | 模擬から作ったサンプル（`"source": "sample"`）。`uv run python -m tests.contract.fakeside` で作り直す |
 | `normalize-cases.json` | 正規化の入力と期待の対の表。Python のテストと、Chrome 拡張の TypeScript の試験（`test/helpers/shape.ts`）が同じ表を読む |
@@ -45,13 +45,17 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 
 - `path` は `/api/v4` より後ろ。`query`・`body` は省略できる
 - `token` は `main`（認証あり）か `none`（認証なし）
-- `used_by` は、その要求を比べる側（`sh`、`chrome`、`scenarios`）。`sh` は sh が打つ要求。`scenarios` は受入シナリオの相手側の記録（`tests/scenarios/hostsnap.py`）だけが読む要求（`approvals_get`）。`chrome` は、Chrome 拡張の `MockGitLab` が内部の状態から 200/201 で答え、TS の契約の試験が比べる要求だけに付ける。録る側と `fakeside` は `used_by` を見ずに全要求を送る
-- `expect_status` は録るときに本物が返すべきステータス。`error_401` は 401、`error_404` は 404、ほかは 200 か 201。**1 本でも違えば `recorded.json` を置かない**
+- `used_by` は、その要求を比べる側（`sh`、`chrome`、`scenarios`）。`sh` は sh が打つ要求。`chrome` は、Chrome 拡張が打つ要求（`src/core/gitlab.ts` が組む URL）で、TS の契約の試験が `MockGitLab` と比べる。拡張だけが打つ要求は `used_by` が `["chrome"]`。`scenarios` は、受入シナリオの相手側の記録（`tests/scenarios/hostsnap.py`）だけが読む要求（`approvals_get`）。同じ API を拡張も読む（`approvals`）が、読むキーが違う（`approved` は拡張の `MockGitLab` が返さない）ので、要求を分けてある
+  - 録る側（`record_contract.py`）は全要求を送る（`fakeside.load_all_requests()`）。書式・`reads`・状態の検査も全要求を見る
+  - `fakeside.load_requests()` は `sh` か `scenarios` を持つ要求だけ返す。`fake_gitlab.py` は拡張だけの要求（`repository/branches` など）に答えないので送らない。`RecordedTest` は `recorded.json` も、この名前に絞って比べる（`compare_all` は `recorded` のキーを回し、`actual` に無ければ `missing` を出すため）
+  - TS は `chrome` を持つ要求だけを `MockGitLab` に送る
+- `expect_status` は録るときに本物が返すべきステータス。`error_401` は 401、`error_404`・`branch_404` は 404、`branch_exists`（既にあるブランチを作る）は 400、ほかは 200 か 201（`test_contract.py` の `ERROR_STATUS` が一覧）。**1 本でも違えば `recorded.json` を置かない**
 - `reads` は、その要求の応答のうち、sh と拡張が実際に読むキー（下の「reads」）
 - `save` は、応答の本文のキーを後ろの要求の `${…}` に使う（`user` が `user.id` を置く）
 - 状態の宣言は持たない。場面は下に固定し、録る側と比べる側が作る
 - 書き込みは最後にまとめてある（読みの形が前の書き込みで変わらないように）
-- `POST repository/commits` などの拡張だけが使う要求は載せていない
+- 拡張だけが使う要求（`branches_list`・`branch_get`・`branch_404`・`tree_root`・`tree_recursive`・`blob`・`commits_path`・`commit_get`・`merge_base`・`compare`・`file_get`・`approvals`・`token_self`、書き込みの `branch_create`・`branch_exists`・`commit_create`）は `used_by` が `["chrome"]`。載せていないのは、ページを繰る 2 ページ目以降、`update`・`delete` の action（`last_commit_id` が要る）、GraphQL。`mrs_opened` は `reads` の範囲で答える経路が `MockGitLab` に無いので、`chrome` を付けない
+- 場面から積む置き換えの名前: `sha.main`・`sha.feature`・`blob.sha`（拡張だけの要求が使う。本物は `Scene.build`、TS は `mock()` が積む。`fakeside.scene_context()` には持たず、`test_contract.py` の `CHROME_SCENE` が名前の一覧。`sh` の要求がこれを使うと落ちる）
 
 ### 置き換えの書き方
 
@@ -75,11 +79,14 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 - open の MR が 1 本（`feature` から `main` へ。本文は `Closes #<issue>`）。スレッド 1 つ（未解決、メモ 1 件）、レビュアー 1 人（`CCNAVI_PROBE_REVIEWER_ID` を member にして入れる）、MR のメモ 2 件。実物のスレッド一覧にはレビュアー割り当ての system メモも混じる（模擬の場面にも 1 件入れてある）
 - merged の MR が 1 本（`done`）
 - `fresh` は存在するブランチで、MR は無い
+- 拡張だけの要求のために、`feature` にもう 1 コミット（`docs/note.txt`。ディレクトリと、2 つの履歴を作る）。`sha.main`（`main` の先頭）・`sha.feature`（`feature` の先頭）・`blob.sha`（`feature.txt` の blob の sha）を `context` に積む
+
+**場面の分担**: 上の最後の項目（拡張だけの要求の場面）は、本物の `record_contract.py` の `Scene.build` と、TS の `mock()`（`gitlab-contract.test.ts`）にだけある。`fakeside.scene_state()` には足さない（`fake_gitlab.py` はこれらの要求に答えない）。それ以外は、本物と fake が同じ前提で書かれている。
 - 録る前に、open の MR の `merge_status` が `checking` でなくなり `diff_refs` が入るまで待つ。`related_merge_requests` に MR が出るまでも待つ（参照は非同期に作られる）
 
 ## reads（比べるキー）
 
-本物の応答は 30〜100 のキーを返すが、sh が読むのはその一部（拡張は project の権限の検査（`project_access` と `group_access`）と既定のブランチ（default_branch）だけ。拡張だけが使う要求は載せていない）。模擬は読まれるキーだけ返せばよい。そこで要求ごとに `reads`（読むキーの一覧）を持ち、比べるキーを絞る。
+本物の応答は 30〜100 のキーを返すが、sh が読むのはその一部（拡張は `gitlab.ts` が読むキーだけ。project の権限の検査（`project_access` と `group_access`）と既定のブランチ、ブランチ・tree・blob・コミット・compare・approvals・トークンの期限とスコープの各要求の、読む欄）。模擬は読まれるキーだけ返せばよい。そこで要求ごとに `reads`（読むキーの一覧）を持ち、比べるキーを絞る。
 
 - **導き方**: `.ccnavi/scripts/` の `jq` の式（`ccnavi-start.sh`・`ccnavi-branches.sh`・`ccnavi-review.sh`・`ccnavi-common-review.sh`・`ccnavi-user-lib-review.sh`・`ccnavi-common-host.sh`）と、拡張の `extensions/chrome/ccnavi-approval/src/core/gitlab.ts` の読み方から導く。sh が `// ""` で受ける省略できるキーでも、本物が返すものは載せる。本物が返さないキー（`closes_issues` の `references`、`reviewers` の `updated_at`、非差分のスレッドの `position`）は、存在の検査に通らないので載せない
 - **書き方**: 比較器の差のキーと同じ。`author.id`、`[].iid`（応答が配列のとき）、`notes[].system`（配列の中）
@@ -212,7 +219,9 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 
 `extensions/chrome/ccnavi-approval/test/gitlab-contract.test.ts`（`pnpm test`。`--e2e` には入れない）が、`MockGitLab` の `handle` を直接呼び、`used_by` に `chrome` を持つ要求だけを `recorded.json` と `reads` で比べる。比較器 `test/helpers/shape.ts` は `shape.py` の写しで、名前も規則も同じ。正本は Python で、規則を変えたいときは Python を直し、`normalize-cases.json` を直してから TS を合わせる。
 
-- 比べる要求（`MockGitLab` が内部の状態から 200/201 で答えるもの）: `user`・`project`・`mrs_merged`・`mr_create`・`error_401`・`error_404`。`MockGitLab` が 404 か形の違う応答を返す要求（`member` など）は `chrome` を付けず、比べない
+- 比べる要求（`used_by` に `chrome` を持つ 22 本）: `user`・`project`・`mrs_merged`・`mr_create`・`error_401`・`error_404` と、拡張だけの 16 本（上の「要求の列」）。`MockGitLab` が 404 か形の違う応答を返す要求（`member` など）は `chrome` を付けず、比べない
+- 拡張だけの要求は、`MockGitLab` の `GET repository/commits` が `ref_name` にブランチ名を取り `committed_date` を返すこと、`GET personal_access_tokens/self` が `scopes` を返せること（`glScopes`）を、本物に合わせて直した。`chrome_entries` は 0 件のまま
+- 場面は `gitlab-contract.test.ts` の `mock()` が組む（上の「場面の分担」）
 - `mrs_opened` は比べない。`source_branch` を付けると `MockGitLab` は `pulls` から `iid`・`source_project_id`・`web_url` だけを返し、場面を付けると見本から返すため、`reads` の範囲で答える経路がない
 - 見本（`test/fixtures/host/gitlab/*`）から返す応答は比べない。手で組んだもので、本物の形を写していない
 - 許可リストは `chrome_entries`（`entries` に混ぜない。`apply_allow` が当たらない項目を古い許可として落とす）
@@ -231,7 +240,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 - 値（ID・時刻・SHA）の一致。`state`・`source_branch` の絞り込みが効くか、`order_by`・`sort` の並び、日時の書式は、型が同じなら緑になる
 - `web_url` は sh が読むが、環境で変わる欄として形から落とすので、模擬が返さなくなっても検出できない
 - TS の比較器との既知の差。`1.0` のように小数点以下が 0 の値は、Python では `number`、JS の `JSON.parse` では `integer` になる。`DATETIME` の正規表現は、Python の `\d` が Unicode の数字にも、`$` が末尾の改行の前にも当たるのに対し、JS は ASCII の数字だけに当たり、`$` は末尾だけに当たる（JS の方が厳しい）
-- Chrome 拡張の比較は `reads` の範囲と、`MockGitLab` が内部の状態から答える要求だけ。見本由来の応答と、拡張だけが使う要求（branches・tree・commits・compare など）は対象外
+- Chrome 拡張の比較は `reads` の範囲と、`used_by` に `chrome` を持つ要求だけ。見本由来の応答と、`mrs_opened`、ページを繰る 2 ページ目以降、Commits API の `update`・`delete`、`compare` の `collapsed`・`too_large`（本物は立つときだけ返し、場面で立てていない）、`approvals` で承認が付いた形（`approved_by` が空）は対象外
 - 空の配列の要素の形（録るときに、`NON_EMPTY` の要求が空でないことを確かめる）
 - 録った場面の外（差分への指摘のスレッド、複数ページ、フォークからの MR、グループ配下のプロジェクトで `group_access` が整数になる形など）
 

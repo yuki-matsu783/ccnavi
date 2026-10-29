@@ -44,7 +44,11 @@ class StartPlanTest(PhaseHarness):
         started = self.ccnavi("ticket", "start", "i0001")
         self.assertEqual(started.returncode, 0, started.stderr)
         self.assertIn(f"{HEAD}: 1（調査）, 2（設計）", started.stdout)
-        self.assertIn("フェーズごとに子チケットを作ってください", started.stdout)
+        # 次の一手は、子の提案を書いて propose で送ること（識別子の例を埋めて言う）
+        nexts = [x for x in started.stdout.splitlines() if x.startswith("次: ")]
+        self.assertEqual(len(nexts), 1, started.stdout)
+        self.assertIn("子の提案（例: 'i0001-01-01'）", nexts[0])
+        self.assertIn("propose i0001", nexts[0])
         self.assertIn("`finish` で", started.stdout)
         self.assertEqual(started.stderr, "")
 

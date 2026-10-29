@@ -28,6 +28,10 @@ from tests.contract import fakeside, shape
 
 NAMES = {"project", "mr.iid", "mr.branch", "mr.merged_branch", "mr.new_branch", "issue.iid"}
 SAVED = {"user.id", "discussion.id"}
+# 拡張だけの要求が使う名前。本物の側の Scene.build と TS の mock() が積む（fake は持たない）
+CHROME_SCENE = {"sha.main", "sha.feature", "blob.sha"}
+# 2xx 以外を期待する要求（拒否の形を録る）
+ERROR_STATUS = {"error_401": 401, "error_404": 404, "branch_404": 404, "branch_exists": 400}
 
 
 def load_sample() -> dict:
@@ -50,12 +54,17 @@ def set_shape(doc: dict, request: str, mutate) -> dict:
 
 class RequestsTest(unittest.TestCase):
     def test_format(self):
-        requests = fakeside.load_requests()
+        requests = fakeside.load_all_requests()
         names = [r["name"] for r in requests]
         self.assertEqual(len(names), len(set(names)), "名前が重複している")
-        self.assertGreaterEqual(len(requests), 24)
-        context = set(fakeside.scene_context()) | SAVED
+        self.assertGreaterEqual(len(requests), 23)
+        context = set(fakeside.scene_context()) | SAVED | CHROME_SCENE
         for r in requests:
+            if {"sh", "scenarios"} & set(r["used_by"]):
+                self.assertFalse(
+                    set(shape.PLACEHOLDER.findall(json.dumps(r))) & CHROME_SCENE,
+                    f"{r['name']}: fake に無い名前を sh・scenarios の要求で使えない",
+                )
             with self.subTest(r["name"]):
                 self.assertIn(r["method"], ("GET", "POST", "PUT"))
                 self.assertIn(r["token"], ("main", "none"))
@@ -68,15 +77,15 @@ class RequestsTest(unittest.TestCase):
                 self.assertNotIn("/projects/ns", text, "実体の名前を入れない（${project} を使う）")
 
     def test_expected_status(self):
-        for r in fakeside.load_requests():
+        for r in fakeside.load_all_requests():
             with self.subTest(r["name"]):
-                want = {"error_401": 401, "error_404": 404}.get(r["name"])
+                want = ERROR_STATUS.get(r["name"])
                 if want is None:
                     want = 201 if r["method"] == "POST" else 200
                 self.assertEqual(want, r["expect_status"])
 
     def test_reads_are_listed_and_not_in_dropped_keys(self):
-        for r in fakeside.load_requests():
+        for r in fakeside.load_all_requests():
             with self.subTest(r["name"]):
                 self.assertIsInstance(r["reads"], list)
                 self.assertTrue(r["reads"], "読むキーが無い要求は reads を空にせず、理由を書く")
@@ -86,10 +95,19 @@ class RequestsTest(unittest.TestCase):
                     self.assertNotIn(last, shape.DROPPED_KEYS, "形から落とす欄は読むキーにできない")
 
     def test_non_empty_requests_are_requests(self):
-        self.assertLessEqual(set(shape.NON_EMPTY), {r["name"] for r in fakeside.load_requests()})
+        names = {r["name"] for r in fakeside.load_all_requests()}
+        self.assertLessEqual(set(shape.NON_EMPTY), names)
+
+    def test_fake_requests_are_the_ones_used_by_sh_or_scenarios(self):
+        all_requests = fakeside.load_all_requests()
+        self.assertEqual(
+            [r["name"] for r in all_requests if {"sh", "scenarios"} & set(r["used_by"])],
+            [r["name"] for r in fakeside.load_requests()],
+        )
+        self.assertTrue(any(not {"sh", "scenarios"} & set(r["used_by"]) for r in all_requests))
 
     def test_writes_come_after_reads(self):
-        methods = [r["method"] for r in fakeside.load_requests()]
+        methods = [r["method"] for r in fakeside.load_all_requests()]
         first_write = next(i for i, m in enumerate(methods) if m != "GET")
         self.assertEqual({"GET"}, set(methods[:first_write]))
         self.assertNotIn("GET", methods[first_write:])
@@ -401,20 +419,20 @@ class RecordedTest(unittest.TestCase):
 
     def test_every_request_is_recorded_with_only_status_and_shape(self):
         doc = self.load()
-        self.assertEqual({r["name"] for r in fakeside.load_requests()}, set(doc["requests"]))
+        self.assertEqual({r["name"] for r in fakeside.load_all_requests()}, set(doc["requests"]))
         for name, entry in doc["requests"].items():
             with self.subTest(name):
                 self.assertEqual({"status", "shape"}, set(entry))
 
     def test_the_recorded_status_is_the_expected_one(self):
         doc = self.load()
-        for r in fakeside.load_requests():
+        for r in fakeside.load_all_requests():
             with self.subTest(r["name"]):
                 self.assertEqual(r["expect_status"], doc["requests"][r["name"]]["status"])
 
     def test_every_read_key_is_in_the_recording(self):
         doc = self.load()
-        self.assertEqual([], shape.reads_problems(fakeside.load_requests(), doc["requests"]))
+        self.assertEqual([], shape.reads_problems(fakeside.load_all_requests(), doc["requests"]))
 
     def test_the_arrays_that_must_not_be_empty_have_elements(self):
         doc = self.load()
@@ -424,8 +442,12 @@ class RecordedTest(unittest.TestCase):
 
     def test_recorded_json_agrees_except_for_the_allow_list(self):
         recorded = self.load()
+        # 本物の記録のうち、fake が答える（sh の）要求だけを比べる。拡張だけの要求は TS 側で比べる
+        sh_names = {r["name"] for r in fakeside.load_requests()}
         found = shape.compare_all(
-            recorded["requests"], fakeside.run(fakeside.load_requests()), reads()
+            {n: v for n, v in recorded["requests"].items() if n in sh_names},
+            fakeside.run(fakeside.load_requests()),
+            reads(),
         )
         left, problems = shape.apply_allow(found, shape.load_data("allow.json")["entries"])
         self.assertEqual([], problems)

@@ -395,6 +395,16 @@ _TICKET = """\
         （上と同じですが、計画と子フローの下書きは --plan の代わりにテンプレートから取得します。
          フィードバック計画は --with-feedback を指定した場合のみ書き込まれます。
          上記の --templates の節を参照してください）
+    ccnavi ticket revise <id> [--feedback]
+        （承認済みの親（doing/）の改版の雛形を、ID と同名のワークツリーの
+         wip/proposals/todo/ID.md に書きます。承認済みチケットのコピーから、
+         スクリプトだけが書く欄（started_at・base_sha など）を外します。
+         --feedback は、全体計画のフェーズが全部閉じてレビューが済んだあとに、フィードバック計画なし
+         （feedback: []）の改版を作ります。範囲や計画を直す改版は、雛形を編集します。
+         どちらも、書いたあとに --agree --preview --verify が通れば、
+         ccnavi-ticket.sh propose で送ります。
+         承認済みの親が無い・todo/ に同じ識別子が既にある・フィードバック計画が既にある・
+         局面が違う（--feedback）ときは何も書きません）
     ccnavi ticket status [<parent>]
         （読み取り専用。置き場、承認時刻、着手済みかどうか、未コミット・未pushの有無
          （ローカルのリモート追跡参照に基づく）、停止している理由、次の手順を表示します。

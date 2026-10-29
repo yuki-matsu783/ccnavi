@@ -22,7 +22,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チ
 | 行頭の語 | 意味 | 1回の出力での数 |
 |---|---|---|
 | `次:` | 次の一手 | 1行 |
-| `必須:` | 書き漏らすと止まる項目 | 必要なだけ |
+| `必須:` | 書き漏らすと止まる・警告される項目 | 必要なだけ |
 | `案内:` | 補足と注意。`次:` の一手とは別で、補足として手順を含むことがある | 必要なだけ |
 | `次の手:` | 次の一手が1つに決まらないときの、番号つきの選択肢の見出し | 1つ |
 | `MCP で行う手順:` | ホストに届かないときの、MCPでの代行手順（`ccnavi-start.sh`など） | 1つ |
@@ -37,6 +37,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チ
 - 識別子・タイトル・番号・パスは、分かる値を埋めて、そのまま打てる形にする。分からない値だけ `'<触るファイルの glob>'` のように `<…>` で残し、`sh_quote` などで1語に包む
 - `<…>` の仮の値を残した次の一手を、そのまま打たれても、誤った成果物ができないようにする。受け側（`ccnavi ticket new` の `--scope` と `--title`）が `<…>` を含む値を断る。新しく仮の値を出すときは、受け側にも同じ断りを足す
 - 詰まったときの行き先も言う。承認が通らない、ホストに届かないなど、エージェントが自力で進められない場面では、「直接実装に切り替えず、ユーザに報告して止まる」と添える。決まりを外れた道を、出力が先回りして塞ぐ
+- 書き漏らすと止まる・警告される項目（検査が断る・警告するもの）は、長い `次:` の途中に置かず、`必須:` の行に独立させる。`次:` に並べた手順は、途中の 1 つが読み飛ばされやすい
 - 次の一手の中身をshが計算しない。チケットの状態から決まる次は、`ccnavi-ticket.sh status` を打つよう促す（`exe-boundary.md`）
 - 文言にADR番号を書かない（`environment.md`）
 
@@ -76,13 +77,14 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チ
 | `ccnavi-start.sh --dry-run` | `--dry-run` を外した同じコマンド | `ccnavi-start.sh` の `real_args` |
 | `ccnavi-stage.sh` | 下書きを編集し、ユーザに `ccnavi-user-handoff.sh` での取り込みを案内する | `ccnavi-stage.sh` |
 | `ccnavi-review.sh` の早めに閉じた | 親に閉じて片付け、`ready` を打たせる | `ccnavi-review.sh` |
-| `ccnavi ticket new` の成功 | 提案を書き、`--lint` と `--agree --preview --verify` を通し、`ccnavi-ticket.sh propose` で親のブランチへ送り、ユーザに承認を頼む | `tickets/proposal/scaffold.py` |
+| `ccnavi ticket new` の成功 | `次:` は提案の空欄を埋めること。子の提案は、無いと承認の確認と `propose` が警告するので、`必須:` の行に独立させる。`--lint`・`--agree --preview --verify`・`propose`・承認の依頼は `案内:` の行 | `tickets/proposal/scaffold.py` |
+| `ccnavi ticket revise` の成功 | `--feedback` なら `--agree --preview --verify` を通して `propose` で送り、ユーザに承認を頼む。写しだけのときは、まず雛形を直す | `tickets/proposal/revise.py` |
 | `ccnavi-ticket.sh propose` の成功 | ユーザに承認を頼んで返事を待つ | `ccnavi-ticket.sh` |
 | `ccnavi-ticket.sh propose` が親の計画の誤りで断る | 直して `propose` を打ち直す（指摘の行は `workflow` の返す文面をそのまま出す） | `tickets/proposal/propose.py` |
 | `ccnavi --agree --preview --verify` | 通れば承認を頼む。通らなければ提案を直して打ち直す | `tickets/proposal/agree.py` |
 | 承認後の通知 | 親の `start`、子の `start` | `tickets/proposal/agree_screen.py` |
 | `ccnavi-ticket.sh start`（子） | サブエージェントに実装を任せ、終わったら `finish` | `tickets/lifecycle/commands.py` |
-| `ccnavi-ticket.sh start`（親で子の無いフェーズが残る） | フェーズごとに子チケットを作る | `tickets/lifecycle/plan.py` |
+| `ccnavi-ticket.sh start`（親で子の無いフェーズが残る） | 子の提案を書いて `propose` で送り、承認をユーザに頼む（子の識別子の例を埋める） | `tickets/lifecycle/plan.py` |
 | `ccnavi-ticket.sh finish`（子で、レビュー不要） | 親の `status` | `tickets/lifecycle/commands.py` |
 | `ccnavi-ticket.sh finish`（親） | 移動をコミットして push し、Draft を解除する | `tickets/lifecycle/commands.py` |
 | `ccnavi-git.sh integrate` | 差分と変わるファイルをユーザに見せる。対話では、続けて `integrate-done` を打つと確認が出て、許可されたら確定する。非対話では、返事を待ってターンを終え、了承を得ていれば `integrate-done` で確定する（やめるなら `integrate --abort`）。取り込む差分が無いときも、ユーザに伝えて返事を待ち、片付けは了承のあと | `ccnavi-git.sh` |

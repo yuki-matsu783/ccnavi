@@ -289,7 +289,7 @@ setup:
 - 後片付け: `bare` と同じ経路でプロジェクトを削除する。GitLab 19 は遅延削除で、`DELETE /projects/:id`（202）のあとも GET が 200（`marked_for_deletion_on` 付き）のまま、パスが `…-deletion_scheduled-<id>` に変わる。そこで、印が付いたら `permanently_remove=true&full_path=<改名後のパス>` で 2 回目を打ち、404 になるまで最大 60 秒待つ。消せなかったときは `案内:` にプロジェクトの URL と ID を出し、`report` に `host-delete` の行（fail）を足して終了コード 3（手作業で消す）。終了コード 10 では残し、ID と URL を出す。`next` が最後まで終わるか `restore` で消える
 - 残ったプロジェクトは、接頭辞 `sc-` で一覧して手で消す。掃除の道具は無いので、GitLab の「プロジェクト」画面で `sc-` を検索する
 - 資格情報: `claude` にはエージェント役 `GITLAB_TOKEN`（root の PAT）を渡し、人間役のトークンは渡さない。トークンは回すたびに `tokens.env` から読み、`state.json` には識別子と URL だけを残す。ccnavi が書く記録（`state.json`・`evidence.md`・`messages.md`・`report.*`・`host-N.json`・診断ログ）には出さない。`step-N.jsonl` は `claude` の出力そのもので、エージェントが `tokens.env` を読めば混ざる
-- 限界: 同じ uid のエージェントは `tokens.env` を読め、root の PAT で管理者 API から人間役のトークンを作れる。人間役の独立は保証しない（確かめたいのは ccnavi の振る舞いで、人間役の偽装ではない）。CE に無い機能（変更要求の `request_changes` は 404）は確かめられない。`human` step から人間役の API を呼ぶ仕組みは無い（人間役の操作は、操作者が `tokens.env` を読んで `gitlab_api.Client` を呼び、`next` で続ける）。`setup.issue` とは併用できない（`make_issue` は本物の `projects/test-repo` に立てるため）
+- 限界: 同じ uid のエージェントは `tokens.env` を読め、root の PAT で管理者 API から人間役のトークンを作れる。人間役の独立は保証しない（確かめたいのは ccnavi の振る舞いで、人間役の偽装ではない）。CE に無い機能（変更要求の `request_changes` は 404）は確かめられない。人間役の API 操作は `human_api`（下の「人間役の API 操作」）で呼べる。`human_api` に無い操作（issue の作成など）は、操作者が `tokens.env` を読んで `gitlab_api.Client` を呼び、`next` で続ける。`setup.issue` とは併用できない（`make_issue` は本物の `projects/test-repo` に立てるため）
 
 **`bare` で許す依頼。** `gh` / `glab` が失敗するので、エージェントが issue や MR を作る依頼は通らない。`bare` を選べるのは、依頼がホストの API を要しないシナリオだけ。`judge` に「`gh` が使えない状況で詰まったのは ccnavi の不具合ではない」を書く。MR・スレッドを読む依頼は `fake-gitlab` にする。
 

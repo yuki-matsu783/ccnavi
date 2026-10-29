@@ -61,7 +61,7 @@ messages:
       proposed: |-
         フィードバック計画の改版は {proposal} にあります。送っていなければ `{script:ccnavi-ticket.sh} propose {parent}` で送り、ユーザに承認を頼んで返事を待つ。送り済みかは `{script:ccnavi-ticket.sh} status {parent}` で確かめる
       drafting: |-
-        全体計画のレビューが済み、親を閉じる前にフィードバック計画が要る。指摘が無ければ feedback: [] を、あれば対応のフェーズを feedback: に並べた親の改版を {todo} に書く（承認済みチケットをコピーし、スクリプトだけが書く欄 started_at・completed_at・base_sha・merged_sha・cancelled_at・cancel_reason・finished_to・settled_by は空にする。手順は .ccnavi/docs/decisions.md）。書いたら `{script:ccnavi-ticket.sh} propose {parent}` で送り、ユーザに承認を頼む
+        全体計画のレビューが済み、親を閉じる前にフィードバック計画が要る。指摘が無ければ `{script:ccnavi-launcher.sh} ticket revise {parent} --feedback` で `feedback: []` の改版の雛形を {todo} に作る（承認済みチケットのコピーで、スクリプトだけが書く欄は外してある。親のワークツリーで打つ）。対応のフェーズを並べる改版も、この雛形の `feedback:` を直して作る。そのあと `{script:ccnavi-launcher.sh} --agree --preview --verify {parent}` が通ったら `{script:ccnavi-ticket.sh} propose {parent}` で送り、ユーザに承認を頼んで返事を待つ
     note: |-
       {user_stop_note}
       この案内は同じ状態では 1 回だけで、作業が進むまで次に終えるときは止めません。

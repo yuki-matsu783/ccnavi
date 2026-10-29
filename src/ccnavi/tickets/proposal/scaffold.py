@@ -200,6 +200,36 @@ def _quote(text: str) -> str:
     return json.dumps(text, ensure_ascii=False)
 
 
+def parent_worktree(
+    conf: settings.Settings, root: str, cwd: str, ident: str
+) -> tuple[tree.Tree | None, str]:
+    """cwd が親 `ident` のワークツリー（識別子と同名で、HEAD が親のブランチ）の中か。
+
+    中なら（ツリー, 空）、外なら（None, 理由）。提案を書く入口（`ticket new`・`ticket revise`）が
+    同じ見方をする。
+    """
+    where = tree.tree_of(root, cwd, conf.projects)
+    if (
+        where is None
+        or where.kind != tree.KIND_WORKTREE
+        or unicodedata.normalize("NFC", where.name) != ident
+    ):
+        start_sh = settings.script_command(root, "ccnavi-start.sh")
+        return None, (
+            f"cwd が .claude/worktrees/{ident} の中ではない。"
+            "提案は親のワークツリー（識別子と同名）に書く。"
+            f"先に '{start_sh} --mr <MR の番号>'（MR が無ければ '--issue <issue の番号>'）で、"
+            "親のブランチを直接チェックアウトした親のワークツリーを作り、その中から実行します"
+        )
+    if not standing.head_branch(where.root, ident):
+        return None, (
+            f"親のワークツリー（.claude/worktrees/{ident}）の HEAD のブランチ名の `/` を `-` に"
+            f"置き換えたものが {ident} になっていない。親のブランチ名は MR のブランチ"
+            "（`ccnavi-start.sh` が出す）で、ワークツリーはそのブランチを直接チェックアウトする"
+        )
+    return where, ""
+
+
 def run(
     stdout: TextIO,
     stderr: TextIO,
@@ -289,25 +319,9 @@ def run(
     elif not plan:
         return refuse('--plan "design,acceptance,implement" のように型をカンマで区切って渡す')
 
-    where = tree.tree_of(root, cwd, conf.projects)
-    if (
-        where is None
-        or where.kind != tree.KIND_WORKTREE
-        or unicodedata.normalize("NFC", where.name) != ident
-    ):
-        start_sh = settings.script_command(root, "ccnavi-start.sh")
-        return refuse(
-            f"cwd が .claude/worktrees/{ident} の中ではない。"
-            "提案は親のワークツリー（識別子と同名）に書く。"
-            f"先に '{start_sh} --mr <MR の番号>'（MR が無ければ '--issue <issue の番号>'）で、"
-            "親のブランチを直接チェックアウトした親のワークツリーを作り、その中から実行します"
-        )
-    if not standing.head_branch(where.root, ident):
-        return refuse(
-            f"親のワークツリー（.claude/worktrees/{ident}）の HEAD のブランチ名の `/` を `-` に"
-            f"置き換えたものが {ident} になっていない。親のブランチ名は MR のブランチ"
-            "（`ccnavi-start.sh` が出す）で、ワークツリーはそのブランチを直接チェックアウトする"
-        )
+    where, why = parent_worktree(conf, root, cwd, ident)
+    if where is None:
+        return refuse(why)
     types = phasetypes.load_types(conf, root, where.project)
     if types is None:
         return refuse(
@@ -430,14 +444,20 @@ def run(
     stdout.write(
         f"次: {path} の rationale と、見出しの下の目印（「（ここに〜を書く）」）を実際の内容に"
         "書き換える。目印が残っていると承認で止まる。"
-        f"allow を実際の作業に合わせて絞る・足す。{tail}"
-        f"子の提案（'{ident}-<フェーズ番号 2 桁>-<連番 2 桁>'。例: '{ident}-01-01'）も"
-        "同じ承認で通すため、先に手で書く。"
-        f"書けたら '{launcher} --lint' で確かめ、"
+        f"allow を実際の作業に合わせて絞る・足す。{tail}\n"
+    )
+    # 子が無いと承認の確認と propose が警告する（`workflow.childless_ready`）。必須の行で独立させる
+    stdout.write(
+        f"必須: 子の提案（'{ident}-<フェーズ番号 2 桁>-<連番 2 桁>'。例: '{ident}-01-01'）を、"
+        "すぐ始まるステップごとに 1 つ以上 wip/proposals/todo/ に手で書く。"
+        "親と同じ承認で通すので、先に書く（書式は ccnavi --docs --keyword 提案書式）。"
+        "無いと --agree --preview --verify と propose が警告し、子の承認がもう 1 回要る\n"
+    )
+    stdout.write(
+        f"案内: 書けたら '{launcher} --lint' で確かめ、"
         f"'{launcher} --agree --preview --verify {ident}' が通ったら、"
         f"'{settings.script_command(root, 'ccnavi-ticket.sh')} propose {ident}'"
-        "（親の識別子で打つ。子の識別子では打たない）で"
-        "提案を親のブランチへ送り、"
+        "（親の識別子で打つ。子の識別子では打たない）で提案を親のブランチへ送り、"
         "承認をユーザに頼んで返事を待つ。承認が済むまで実装はしない\n"
     )
     stdout.write(

@@ -28,6 +28,8 @@ export class MockGitLab extends MockGitHub {
   readonly glCommits: GitLabCommitCall[] = [];
   /** `GET /personal_access_tokens/self` の `expires_at`（空なら null） */
   glExpiry = "";
+  /** 同じ答えの `scopes`（null なら欄ごと出さない。プロジェクトのトークンなどで読めない形） */
+  glScopes: string[] | null = null;
   /** 付けた見本（GitLab の MR・スレッド・レビュアー） */
   readonly glScenes = new Map<string, GitLabScene>();
   /** compare の変更の一覧を切る件数（拡張は 450 件以上で打ち切られたとみなす） */
@@ -106,7 +108,9 @@ export class MockGitLab extends MockGitHub {
       if (answered) return answered;
     }
     if (method === "GET" && p === "/user") return { status: 200, json: { id: 7, username: GL_LOGIN } };
-    if (method === "GET" && p === "/personal_access_tokens/self") return { status: 200, json: { id: 1, expires_at: this.glExpiry || null } };
+    if (method === "GET" && p === "/personal_access_tokens/self") {
+      return { status: 200, json: { id: 1, expires_at: this.glExpiry || null, ...(this.glScopes ? { scopes: this.glScopes } : {}) } };
+    }
     const base = this.project;
     if (method === "GET" && p === base) return { status: 200, json: { id: 42, default_branch: this.defaultBranch, archived: false, issues_enabled: true, issues_access_level: "enabled", permissions: { project_access: { access_level: 40 } } } };
     if (!p.startsWith(`${base}/`)) return { status: 404, json: { message: "404 Project Not Found" } };
@@ -139,7 +143,9 @@ export class MockGitLab extends MockGitHub {
       return { status: 200, json: { size: bytes.length, encoding: "base64", content: bytes.toString("base64"), sha: oid } };
     }
     if (method === "GET" && rest === "/repository/commits") {
-      const start = u.searchParams.get("ref_name") ?? "";
+      // 実物の `ref_name` はブランチ名でもコミットの sha でもよい
+      const refName = u.searchParams.get("ref_name") ?? "";
+      const start = this.heads.get(refName) ?? refName;
       if (!this.commits.has(start)) return { status: 404, json: { message: "404 Commit Not Found" } };
       let list: Commit[];
       if (u.searchParams.get("first_parent") === "true") {
@@ -148,7 +154,7 @@ export class MockGitLab extends MockGitHub {
       } else {
         list = this.history(start, u.searchParams.get("path") ?? "");
       }
-      return this.list(u, list.map((c) => ({ id: c.sha, parent_ids: [...c.parents] })));
+      return this.list(u, list.map((c) => ({ id: c.sha, parent_ids: [...c.parents], committed_date: c.date })));
     }
     if (method === "GET" && rest.startsWith("/repository/commits/")) {
       const c = this.commits.get(rest.slice("/repository/commits/".length));
