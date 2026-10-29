@@ -81,10 +81,11 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
 - `setup` の `host` は評価の相手を選ぶ（`bare` / `fake-gitlab` / `docker-gitlab` / `real`。既定は `real`）。`bare` は origin への通信をローカルの bare に向け、ホストの API は失敗させる（origin の URL は git の代役がホストの形で答える）。`fake-gitlab` は bare に加えて `fake_gitlab.py` を使い、`docker-gitlab` は Docker の本物の GitLab CE（[立て方](../../.agents/docs/gitlab-manual.md)）に使い捨てのプロジェクトを作って回し、回したあとに消す。`real` は本物を相手にする。
   `bare` / `fake-gitlab` / `docker-gitlab` は対象の判定を通ったときだけ動き、`setup.issue` とは併用できない。`fake-gitlab` の模擬の初期状態は、`setup` の `host_state`（`project: <namespace>/<project>` を含む dict）に書く。使い分けと `bare` で許す依頼は、.agents/docs/acceptance-scenarios.md を見る。
 - `human: true` の step に `human_api`（`op: thread` / `resolve` / `approve` の list）を書くと、`setup.host: docker-gitlab` のとき人間役の API 操作を runner が実行し、止まらずに次の step へ進む（書き方と限界は同じ文書の「人間役の API 操作」）。
+- `setup.host` が `fake-gitlab` / `docker-gitlab` のとき、runner は step の終わりごとに相手側の状態（MR・スレッド・issue）を読んで `host-N.json` に残す（読むだけ。承認は取らない）。
 - `state` は、全 step が終わったあとに打つコマンドと、出力に含まれるべき文字列
 - step の欄 `expect_after`（`decisions`・`state` を `expect` と同じ書き方で書く。満たさなければ後続の step に進まず止める）
 - `judge` は、意味で読む基準（自然文）。実行器が `evidence.md` に証拠を抜き出し、別のエージェントが読んで判定する
-- 出力ディレクトリ（`logs/scenarios/<ID>-<日時>/`）のファイル: `step-N.jsonl`（stream-json）・`report.md`（判定と、拒否の傾向の目印）・`report.json`・`evidence.md`（`judge` 用の証拠。渡った文脈の先頭を含む）・`context-N.md`（step N に渡った文脈の全文）・`messages.md`（hook の応答の文面の一覧）。
+- 出力ディレクトリ（`logs/scenarios/<ID>-<日時>/`）のファイル: `step-N.jsonl`（stream-json）・`report.md`（判定と、拒否の傾向の目印）・`report.json`・`evidence.md`（`judge` 用の証拠。渡った文脈の先頭を含む）・`context-N.md`（step N に渡った文脈の全文）・`messages.md`（hook の応答の文面の一覧）・`state.json`（回した状態）。`setup.host` が `fake-gitlab` / `docker-gitlab` なら、step ごとの相手側の状態 `host-N.json` も置く（[相手側の状態の記録](../../.agents/docs/acceptance-scenarios.md)）。
   読み方は [証拠の読み方](../../.agents/docs/acceptance-scenarios.md)
 - 回すのは [runner.py](runner.py)（`uv run python -m tests.scenarios.runner run <シナリオ>`。ほかに `preflight`・`run-all`・`next`・`restore`・`judge`。使い方と終了コード（10 を含む）は [回し方](../../.agents/docs/acceptance-scenarios.md)）。判定は pass / fail / inconclusive（未成立）/ needs-review。
   `run-all <ディレクトリ or glob> --max-total-usd <USD>` は、使い捨てのリポジトリのシナリオ（人間の操作が無く、`setup.reset` を持つもの）を、1 回の確認で直列に回す。最後に全体の表（ID・判定・実費・ツール呼び出し数・拒否数・ask 数・出力の置き場）を出し、`summary.md` / `summary.json` に書く。確認が有効なのは ID の集合・`base`・費用の上限・概要に限る（[続けて回す](../../.agents/docs/acceptance-scenarios.md)）。
