@@ -103,7 +103,7 @@ class RetireAfterReadyTest(RetireHarness):
         done = self.retire()
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertIn("未コミットの変更があるので、何も削除しませんでした", done.stdout)
-        self.assertIn("memo.txt", done.stdout)
+        self.assertIn(f"git -C {self.child_tree} status", done.stdout)
         self.assertTrue(os.path.isdir(self.child_tree))
         self.assertIn("チェックアウトしている", done.stdout)
         self.assertIn(CHILD, self.branches())
