@@ -21,7 +21,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 
 | ファイル | 中身 |
 |---|---|
-| `requests.json` | sh が打つ GitLab API の列（23 本）。本物にも模擬にも同じ列を送る。各要求に `expect_status` と `reads` を持つ |
+| `requests.json` | sh が打つ GitLab API の列（24 本）。本物にも模擬にも同じ列を送る。各要求に `expect_status` と `reads` を持つ |
 | `recorded.json` | 本物から録った形。**本物だけ**。`uv run python tests/manual/gitlab/record_contract.py` で作る |
 | `recorded.sample.json` | 模擬から作ったサンプル（`"source": "sample"`）。`uv run python -m tests.contract.fakeside` で作り直す |
 | `normalize-cases.json` | 正規化の入力と期待の対の表。Python のテストと、Chrome 拡張の TypeScript の試験（`test/helpers/shape.ts`）が同じ表を読む |
@@ -45,7 +45,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 
 - `path` は `/api/v4` より後ろ。`query`・`body` は省略できる
 - `token` は `main`（認証あり）か `none`（認証なし）
-- `used_by` は、その要求を比べる側（`sh`、`chrome`）。`sh` は sh が打つ要求。`chrome` は、Chrome 拡張の `MockGitLab` が内部の状態から 200/201 で答え、TS の契約の試験が比べる要求だけに付ける。録る側と `fakeside` は `used_by` を見ずに全要求を送る
+- `used_by` は、その要求を比べる側（`sh`、`chrome`、`scenarios`）。`sh` は sh が打つ要求。`scenarios` は受入シナリオの相手側の記録（`tests/scenarios/hostsnap.py`）だけが読む要求（`approvals_get`）。`chrome` は、Chrome 拡張の `MockGitLab` が内部の状態から 200/201 で答え、TS の契約の試験が比べる要求だけに付ける。録る側と `fakeside` は `used_by` を見ずに全要求を送る
 - `expect_status` は録るときに本物が返すべきステータス。`error_401` は 401、`error_404` は 404、ほかは 200 か 201。**1 本でも違えば `recorded.json` を置かない**
 - `reads` は、その要求の応答のうち、sh と拡張が実際に読むキー（下の「reads」）
 - `save` は、応答の本文のキーを後ろの要求の `${…}` に使う（`user` が `user.id` を置く）
