@@ -3,7 +3,7 @@ title: 拡張の使い方
 type: guide
 description: VS Code の拡張 ccnavi ボードと Chrome の拡張 ccnavi 承認ボードで、何を見て何を操作できるか。組み立てと入れ方は各拡張の README
 tags: [user-guide, extension, vscode, chrome]
-keywords: [拡張, VS Code, Chrome, ccnavi ボード, 承認ボード, ボード, 承認, レビュー済み, ルール管理画面, リスク管理画面, フェーズ管理画面, 残った指摘, close-early, PAT]
+keywords: [拡張, VS Code, Chrome, ccnavi ボード, 承認ボード, ボード, 承認, レビュー済み, ルール管理画面, リスク管理画面, フェーズ管理画面, 残った指摘, close-early, PAT, バグ報告, ffmpeg]
 ---
 
 # 拡張の使い方
@@ -13,7 +13,7 @@ ccnavi には、チケットの状態を見て人の操作を受ける拡張が 
 
 | 拡張 | 使う場面 | README |
 |---|---|---|
-| VS Code の「ccnavi ボード」 | 手元の VS Code で、チケットの進み具合を見る。承認、レビューで残った指摘への対応、ルール・リスク・フェーズ定義を画面で直す | [extensions/vscode/ccnavi-board/README.md](../../extensions/vscode/ccnavi-board/README.md) |
+| VS Code の「ccnavi ボード」 | 手元の VS Code で、チケットの進み具合を見る。承認、レビューで残った指摘への対応、ルール・リスク・フェーズ定義を画面で直す。不具合の再現を録画・スクリーンショット・ログで zip にまとめる | [extensions/vscode/ccnavi-board/README.md](../../extensions/vscode/ccnavi-board/README.md) |
 | Chrome の「ccnavi 承認ボード」 | 作業者の環境の外で、ブラウザと PAT だけで、承認とレビュー済みをリモートの親のブランチへ書く。issue から親のブランチを始める | [extensions/chrome/ccnavi-approval/README.md](../../extensions/chrome/ccnavi-approval/README.md) |
 
 組み立て方・入れ方・試験の手順は、各拡張の README にある。このページは、入れたあとに何ができるかを書く。
@@ -42,6 +42,12 @@ VS Code からワークツリーを見えるようにする設定は[導入と�
 形は[JSON の形](../11_requirements/json-shapes.md)の「残った指摘の JSON」にある。レビューの流れは[レビュー](review.md)にある。
 
 `close-early` はボードに置かない。ターミナルで `ccnavi-user-close-early.sh` を打つ。
+
+### バグ報告
+
+拡張の不具合を報告するときは、サイドパネルの「バグ報告」を押し、不具合を再現してからステータスバーの「再現中: 終了」を押す。
+途中の画面は、ステータスバーのカメラのボタンで何枚でも撮れる。終えると `logs/bug-report/bug-report-<時刻>.zip` に、録画の gif・スクリーンショット・その間の診断ログ（`logs/diag/`）がまとまる。
+録画には ffmpeg が要る（Windows・macOS・WSL）。無ければ録画だけを省く。画面に映ったものはそのまま入るので、渡す前に中身を確かめる。詳しくは[入口とコマンド](../../extensions/vscode/ccnavi-board/docs/requirements/commands.md#バグ報告)にある。
 
 ### ルール管理画面
 
