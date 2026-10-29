@@ -197,9 +197,9 @@ class ExtTestPlanTest(unittest.TestCase):
 
     def test_the_shared_helper_calls_every_group(self):
         # 画面を描くグループはどれも読む部品。触ったら全部回る。
-        # devtools は happy-dom を使わず（E2E が Chromium で描く）、dom.ts を import しないため、
-        # ここでは回らない。
-        expected = [name for name in groups_on_disk() if name != "devtools"]
+        # devtools は happy-dom を使わず（E2E が Chromium で描く）、bugreport も dom.ts を
+        # import しないため、ここでは回らない。
+        expected = [name for name in groups_on_disk() if name not in ("devtools", "bugreport")]
         self.assertEqual(expected, plan("test/helpers/dom.ts")["groups"])
 
     def test_the_build_ground_calls_every_group(self):
