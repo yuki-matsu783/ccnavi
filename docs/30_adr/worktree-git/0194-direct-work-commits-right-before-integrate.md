@@ -6,7 +6,7 @@ tags: [worktree, git, hooks]
 keywords: [直接作業, integrate, Stop, 促し, NUDGE_INTEGRATE, コミット, 未コミット, marker, 確定待ち, 言い直し, awaiting-user]
 ---
 
-# ADR-0191: 直接作業のコミットは integrate の直前にまとめ、Stop の促しはコミットがあるのに integrate が無いときだけ出す
+# ADR-0194: 直接作業のコミットは integrate の直前にまとめ、Stop の促しはコミットがあるのに integrate が無いときだけ出す
 
 状態: 採用
 
