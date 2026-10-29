@@ -246,6 +246,7 @@ def write_plan(state: str, key: str, plan: dict[str, Any], now: float | None = N
     """計画を 1 件書いて試行を作り、試行 ID を返す。同じキーで呼び直しても結果は変わらない（冪等）。
 
     候補でない計画は、作成と同時に ccnavi が最終分類（対象外・検査省略）まで確定する。
+    試行が在るのに読めなければ、判定せず未検査で確定する。
     計画より先に material が来ていた（plan_wait）なら、その試行を開始待ちへ進める。
     """
     when = time.time() if now is None else now
@@ -267,10 +268,12 @@ def write_plan(state: str, key: str, plan: dict[str, Any], now: float | None = N
             return aid
         attempt = read_attempt(state, aid)
         if attempt is None:
-            # 在るのに読めない（書きかけ・壊れた）試行は、新しい試行で置き直す。
+            # 在るのに読めない（書きかけ・壊れた）試行は、判定せず未検査で確定する。
+            # 次の Stop は別のキーなので、新しい試行になる。
+            if fresh["state"] != DONE:
+                _finalize_ccnavi(fresh, {"final": FINAL_UNCHECKED, "reason": "attempt_unreadable"})
             _store(state, fresh)
-            if fresh["state"] == DONE:
-                log_event(state, "final", fresh)
+            log_event(state, "final", fresh)
             return aid
     if attempt is not None and attempt["state"] == PLAN_WAIT:
         # 計画より先に material が来ていた。候補なら開始待ちへ、候補でなければ ccnavi が確定する。

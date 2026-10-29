@@ -727,12 +727,21 @@ class SecondReviewFixesTest(Base):
         ):
             sr.write_plan(self.state, self.key, {"is_candidate": True, "targets": ["stop"]})
 
-    def test_an_unreadable_existing_attempt_is_replaced(self):
+    def test_an_unreadable_existing_attempt_is_closed_as_unchecked(self):
         aid = sr.attempt_id(self.key)
         with open(os.path.join(self.state, f"stopreview-attempt-{aid}.json"), "w") as handle:
             handle.write("{broken")
         sr.write_plan(self.state, self.key, {"is_candidate": True, "targets": ["stop"]})
-        self.assertEqual(sr.read_attempt(self.state, aid)["state"], sr.PENDING)
+        attempt = sr.read_attempt(self.state, aid)
+        self.assertEqual(attempt["state"], sr.DONE)
+        self.assertEqual(attempt["final"], sr.FINAL_UNCHECKED)
+        self.assertEqual(attempt["reason"], "attempt_unreadable")
+        # 判定役は材料を受け取っても判定せず、record は何もせず ok を返す。
+        self.assertEqual(sr.accept(self.state, self.key, {}, material_version="x"), sr.OK_RETURN)
+        # 次の Stop は別のキーなので、新しい試行として始まる。
+        other = self.key + "-next"
+        sr.write_plan(self.state, other, {"is_candidate": True, "targets": ["stop"]})
+        self.assertEqual(sr.read_attempt(self.state, sr.attempt_id(other))["state"], sr.PENDING)
 
 
 class ExtractionTest(Base):
