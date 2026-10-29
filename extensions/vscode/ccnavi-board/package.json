@@ -95,7 +95,8 @@
       },
       {
         "command": "ccnaviBoard.bugReport",
-        "title": "ccnavi ボード: バグ報告を始める"
+        "title": "ccnavi ボード: バグ報告を始める",
+        "icon": "$(bug)"
       },
       {
         "command": "ccnaviBoard.bugReportScreenshot",
@@ -117,6 +118,11 @@
           "command": "ccnaviBoard.appearance",
           "when": "view == ccnaviBoard.entries",
           "group": "navigation@2"
+        },
+        {
+          "command": "ccnaviBoard.bugReport",
+          "when": "view == ccnaviBoard.entries",
+          "group": "navigation@3"
         }
       ],
       "commandPalette": [
