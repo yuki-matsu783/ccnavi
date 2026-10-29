@@ -13,6 +13,7 @@
 
 - sh は Windows (Git Bash / WSL)・Linux・macOS のどれでも動くように書く
 - パスと名前は、どの機械でも大文字小文字を区別せず比べる（同じ綴り違いは同じものとして、両立させない）。`os.path.normcase`を単独で使わず、`pathcase.fold`を通す。決まりは `.agents/docs/environment.md`
+- まれな異常状態のために推測・修復・やり直し・詳しい説明を作り込まず、状態と直し方を言って止める（ユーザに頼む）。データ損失を防ぐ処理、保護の強さ、普段の経路で使う処理は残す。決まりは `.agents/docs/irregular-states.md`
 - AGENTS.md には、常に守る決まりだけを短く書く。理由・手順・例は「詳細」の表が指す文書に書く。新しい決まりは、まずその文書に書き、表に 1 行足す（段階的詳細化）
 - ccnavi の使い方に関わる考え方と決まり（ワークツリー・git の入口・下書きの置き場・サブエージェントへの委任・合意が要る変更の範囲・保護対象の直し方）は `.ccnavi/CCNAVI.md` に書く。セッション開始時に ccnavi がそれを渡すので、ここには書かない。ccnavi の振る舞いが変わったら CCNAVI.md を直す
 
@@ -30,6 +31,7 @@ ccnavi の使い方（`.ccnavi/docs/`）は `.ccnavi/CCNAVI.md` の表に記載�
 | sh やスクリプトを書く、パス・名前を比べる、文書・コメント・ユーザに見える文言で ADR に触れたくなった | `.agents/docs/environment.md` |
 | ccnavi の実行ファイル（`src/ccnavi/`）か `.ccnavi/scripts/` の sh を直す | `.agents/docs/exe-boundary.md` |
 | エージェントを止める・返事を求める仕組みを足す・直す、拒否の文を書く | `.agents/docs/stop-patterns.md` |
+| 異常状態（壊れた記録・書きかけ・手で動かされた状態・一時的な失敗）を扱う処理を足す・直す・削る | `.agents/docs/irregular-states.md` |
 | エージェントに渡す次の一手を、どの契機・担当に置くか選ぶ（`status`・`guidance()`・Stop の促し・ルールの文脈など） | `.agents/docs/next-step-placement.md` |
 | sh・Python・TS でログを書く、logger を直す | `.agents/docs/logging.md` |
 | sh や実行ファイルの出力に案内（`次:`・`案内:`・`必須:`）を足す・直す、チケット作業を進める出力を新しく書く | `.agents/docs/script-output.md` |

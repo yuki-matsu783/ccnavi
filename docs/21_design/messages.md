@@ -30,6 +30,7 @@ keywords: [文面, 文面ファイル, messages, 識別子, 差し込み, ccnavi
 - 各レイヤー: 持たない。`.ccnavi/config/project/messages/` や旧い置き場 `.ccnavi/config/common/messages/` に置いても読まない（13.5）。共通レイヤーのミラー（`config/common/` を各プロジェクトへコピーするもの）の対象でもなく、文面はワークスペースルートでだけ読まれる
 - プロジェクトのレイヤー（`projects/<名前>/`）は読まない。文面はワークスペースの文であり、呼び出しを受けるツリーのものではないから
 - 置き場の中のファイルは名前順に読み、別のファイルに同じ識別子が現れたら、後ろを捨てて `--lint` が error を出す（1 つのファイルの中の重複は YAML の読みが後ろを採るので見分けられない）。ファイルの分け方（`deny.yml`・`nudge.yml`・`next-start.yml`）に意味は無い
+- 1 件を引くとき（`texts.say`・`ccnavi text`）は、識別子の字を含むファイルだけを名前順に YAML として読み、その識別子を検査を通る形で持つ最初のファイルの 1 件を採る。全件を読んだときと同じ 1 件になる。hook は呼び出しごとに別のプロセスで、文 1 件のために全部のファイルを読むと時間がかかるため。全件を読むのは `--lint` と点検（`texts.load`）だけ
 
 保護: `.ccnavi/` の下は、名前で書くツールは組み込みの `builtin:guard-project-home`、シェルからの書き込みは `builtin:guard-setting-files` が止める。文面ファイルはその内側にあり、設定 3 本（コア）には加えない。コアに加えると、バックアップと復元の対象とミラーの種類（`settings.LAYER_KINDS`）が増える。直すときは下書きの置き場（`wip/handoff/`）から `ccnavi-user-handoff.sh` で取り込む。取り込めるのは `.ccnavi/messages/<名前>.yml` だけ（`projects/<名前>/.ccnavi/messages/` は取り込めない）で、13.7 の検査を通らない下書きは断る。
 

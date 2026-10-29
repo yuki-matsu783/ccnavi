@@ -295,7 +295,7 @@ issue が closed で MR が無いときも、`ccnavi-start.sh` は終了コー�
 `--issue` だけで来て、紐づく open の MR がすでにあり、この PC にそのブランチのワークツリーが無いときも、他の PC や他のセッションの作業かもしれないので、エージェントが聞く。続けるなら `--issue <番号> --mr <MR の番号>` で打ち直す（自分の作業の再開は聞かない）。
 
 issue がまだ無いときは、エージェントが `ccnavi-start.sh --new-issue <タイトル>` で issue を作ってから進む。作る前に、タイトルの似た open の issue・MR（タイトルの 2 文字組の一致率 0.5 以上）を確かめ、あれば作らずに一覧を見せて、同じ作業かを聞く。似たものが無くても、haiku のサブエージェントが open の issue・MR の一覧（`--list-open`）を読んで意味の近いものを探し、該当が無いと分かってから作る。別の作業だと答えたときは、エージェントが `--similar-checked` を付けて打ち直す。ホストに届かず作れないときは、GitHub は MCP で、GitLab はユーザが issue を作って番号を伝える。
-終了コード、ホストに届かないときの代行（GitHub は MCP、GitLab はユーザが確かめる）、`projects/<名前>` の依頼（`--repo`）、候補の探し方は [.ccnavi/docs/worktree-start.md](../../.ccnavi/docs/worktree-start.md) と [設計 9.13](../21_design/tickets/branch-lookup.md)。
+終了コード、ホストに届かないときの代行（GitHub は MCP、GitLab はユーザに認証を頼む）、`projects/<名前>` の依頼（`--repo`）、候補の探し方は [.ccnavi/docs/worktree-start.md](../../.ccnavi/docs/worktree-start.md) と [設計 9.13](../21_design/tickets/branch-lookup.md)。
 
 ## プロジェクトのスキル
 

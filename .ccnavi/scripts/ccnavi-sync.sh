@@ -740,10 +740,10 @@ sync_absent() {
 		return 0
 		;;
 	esac
-	printf '%s: 親のブランチ %s がリモートにありません。マージリクエストもマージされていないので、改名・消し間違いか破棄した親子のチケットかを決められない。このブランチへの push は止まる（push の関門）\n' "$P" "$B"
-	printf '  戻し方 1（改名・消し間違い）: 元の名前 %s でブランチを作り直す。ユーザがターミナルで、手元の親のワークツリーから git push origin %s を一度打つ。GitHub ならマージリクエストの画面の「Restore branch」、GitLab ならマージリクエストの refs/merge-requests/<番号>/head から %s を作ってもよい。戻したら sh %s/ccnavi-sync.sh %s を再実行します。\n' \
-		"$B" "$B" "$B" "$here_sh" "$P"
-	printf '  戻し方 2（親子のチケットを破棄した）: 親のワークツリーを片付ける（sh %s/ccnavi-git.sh worktree remove .claude/worktrees/%s）。片付ければこの sh の対象から外れ、push の関門も掛からない。ready の後にマージせず閉じた親の記録は、ユーザが sh %s/ccnavi-launcher.sh worktree retire --abandon %s で消す（エージェントは実行しません）\n' \
+	printf '%s: 親のブランチ %s がリモートに無く、マージリクエストもマージされていないので、消し間違いか破棄かを決められない。このブランチへの push は止まる（push の関門）。どちらかをユーザに確かめてもらう\n' "$P" "$B"
+	printf '  戻し方 1（改名・消し間違い）: ユーザが手元の親のワークツリーで git push origin %s を一度打つ（ホストの MR の画面から戻してもよい）。戻したら sh %s/ccnavi-sync.sh %s を打ち直す\n' \
+		"$B" "$here_sh" "$P"
+	printf '  戻し方 2（破棄した）: sh %s/ccnavi-git.sh worktree remove .claude/worktrees/%s で親のワークツリーを片付ける。ready の後に閉じた親の記録は、ユーザが sh %s/ccnavi-launcher.sh worktree retire --abandon %s で消す（エージェントは打たない）\n' \
 		"$here_sh" "$P" "$here_sh" "$P"
 	fail_note
 	return 0

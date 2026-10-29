@@ -33,10 +33,12 @@ write-and-push の中では書いたものが push の失敗で戻ることが�
 - cwd が消す対象の中にある。消すと呼び手の居場所が無くなり、Windows ではロックにもなる。
   外へ出てから打つ 1 本（`ccnavi-clean.sh --worktree <名前>`）を出す
 - 未コミットの変更（未追跡を含む）がある。別のセッションが作業している見込みがあるので、
-  変更を名指しする
+  `git status` で確かめてもらう
 - git が無視しているファイル（生成物を除く。.env など）がある。
   `worktree remove` はそれごと消して戻せないので、名指しする
 - git のワークツリーとして登録されていない、リンクである、など。任意の場所を消す手段にしない
+- `git worktree remove` が断る（ロック・submodule など）。git の拒否文をそのまま伝える。
+  生成物はその前に消えているが、作り直せるので失うものは無い
 
 ネットワークには出ない。git はローカルの操作（`status`・`rev-parse`・`worktree remove`）だけ。
 """
@@ -44,6 +46,7 @@ write-and-push の中では書いたものが push の失敗で戻ることが�
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 import stat
 from dataclasses import dataclass
@@ -73,13 +76,13 @@ REFUSED = "refused"
 # 消すので、.env などを知らないうちに消さないよう止める。
 IGNORED = "ignored"
 
-# 未コミットの変更を名指しする行の上限。
+# 無視されたファイルを名指しする行の上限。
 _SHOWN = 10
 
 
 @dataclass
 class Dropped:
-    """1 本のワークツリーを消した結果。`detail` は名指しする変更や、消せなかった理由。"""
+    """1 本のワークツリーを消した結果。`detail` は消せなかった理由や、無視されたファイル。"""
 
     name: str
     status: str
@@ -118,10 +121,11 @@ def drop(root: str, name: str, cwd: str) -> Dropped:
     3. cwd がその中なら CWD_INSIDE。
     4. `_owner` で持ち主のリポジトリを求める。
     5. `git status --porcelain` で未コミットの変更を見る。あれば DIRTY。`_ignored`
-       で無視されたファイルを見る。あれば IGNORED。
-    6. `_remove_blocked` で `git worktree remove` が通らない形を、生成物を消す前に見る。
-       通るなら `_clean_generated` で生成物を消す。
-    7. `git worktree remove` で消す。失敗したら REFUSED。
+       で無視されたファイルを見る。あれば IGNORED（`git worktree remove` は無視された
+       ファイルを断らずに消すので、ここで止める）。
+    6. `_clean_generated` で生成物を消す。
+    7. `git worktree remove` で消す。git が断ったら（ロック・submodule など）、その拒否文で
+       REFUSED。
     """
     path = tree.worktree_path(root, name)
     if not name or name in (".", "..") or any(c in name for c in ("/", "\\", ":")):
@@ -149,12 +153,8 @@ def drop(root: str, name: str, cwd: str) -> Dropped:
         return Dropped(
             name, REFUSED, path, "git の状態を読めない。未コミットの変更を確かめられない"
         )
-    changes = [line for line in done.out.splitlines() if line.strip()]
-    if changes:
-        shown = changes[:_SHOWN] + (
-            [f"…ほか {len(changes) - _SHOWN} 件"] if len(changes) > _SHOWN else []
-        )
-        return Dropped(name, DIRTY, path, "\n".join(shown))
+    if done.out.strip():
+        return Dropped(name, DIRTY, path)
     ignored, why = _ignored(path)
     if why:
         return Dropped(name, REFUSED, path, why)
@@ -163,11 +163,6 @@ def drop(root: str, name: str, cwd: str) -> Dropped:
             [f"…ほか {len(ignored) - _SHOWN} 件"] if len(ignored) > _SHOWN else []
         )
         return Dropped(name, IGNORED, path, "\n".join(shown))
-    # `git worktree remove` が通らない形は、生成物を消す前に止める（消したあとで通らないと、
-    # 生成物だけが消えた半端なツリーが残る）。
-    blocked = _remove_blocked(owner, path)
-    if blocked:
-        return Dropped(name, REFUSED, path, blocked)
     failed = _clean_generated(path)
     if failed:
         return Dropped(name, REFUSED, path, failed)
@@ -203,10 +198,9 @@ def report(stdout: TextIO, root: str, d: Dropped, after: str = "。ブランチ�
     elif d.status == DIRTY:
         stdout.write(
             f"ワークツリー {d.name} に未コミットの変更があるので、何も削除しませんでした。"
-            "（別のセッションが作業している見込みがある）。ユーザに確かめてもらう:\n"
+            "別のセッションが作業している見込みがあるので、"
+            f"ユーザに git -C {shlex.quote(d.path)} status で確かめてもらう\n"
         )
-        for line in d.detail.splitlines():
-            stdout.write(f"  {line}\n")
     elif d.status == IGNORED:
         stdout.write(
             f"ワークツリー {d.name} に git が無視しているファイルがあるので、"
@@ -322,7 +316,9 @@ def _leftover_facts(path: str) -> tuple[list[str], list[str]]:
     if changes:
         scratch = [c for c in changes if "wip/handoff/" in c.replace("\\", "/")]
         why.append("未保存の下書きがある（wip/handoff/）" if scratch else "未コミットの変更がある")
-        check.append(f"`git -C {path} status` で中身を見て、必要なものはコミットするか退避する")
+        check.append(
+            f"`git -C {shlex.quote(path)} status` で中身を見て、必要なものはコミットするか退避する"
+        )
     ignored, _ = _ignored(path)
     if ignored:
         why.append("git が無視しているファイル（.env など）がある")
@@ -421,33 +417,6 @@ def _is_generated(top: str, rel: str) -> bool:
         ):
             return True
     return False
-
-
-def _remove_blocked(owner: str, path: str) -> str:
-    """`git worktree remove`（--force なし）が通らないと分かっている理由。無ければ空。
-
-    ロックされたワークツリーと、submodule を持つワークツリー（git が消さない）。
-    """
-    done = gitcmd.run(owner, ["worktree", "list", "--porcelain"], TIMEOUT_SECONDS, raw_paths=True)
-    if not done.ok:
-        return "git のワークツリーの一覧を読めない。削除できるかを確かめられない"
-    want = _canonical(path)
-    for block in done.out.split("\n\n"):
-        lines = block.splitlines()
-        if not lines or not lines[0].startswith("worktree "):
-            continue
-        if _canonical(lines[0][len("worktree ") :]) != want:
-            continue
-        if any(line == "locked" or line.startswith("locked ") for line in lines[1:]):
-            return (
-                "ロックされている（git worktree lock）。"
-                "ロックした人に確かめ、外してから再実行します。"
-            )
-    if os.path.lexists(os.path.join(path, ".gitmodules")):
-        return (
-            "submodule を持つワークツリーは git worktree remove（--force なし）で削除できません。"
-        )
-    return ""
 
 
 def _owner(path: str) -> tuple[str, str]:
