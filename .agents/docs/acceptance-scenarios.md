@@ -462,7 +462,7 @@ steps:
 - 記録: 打つ前に `state.json` の `human_runs` に `started` を書き、終われば `done` か `halted` にする。`started` のまま残った回を `next` で続けると、打ち直さずに止める。出力は `human-run-<step>.log`
 - `check` は、打った step の項目ごとに `human-run-check` の行（needs-review）になる。人間が見ていた項目を誰も見ていないので、全体は pass にならない。ログを見て判断する
 - 擬似端末を作れない環境（Windows の Python）では、従来の human step と同じく `instruction` を出して 10 で止まる
-- 受け入れた穴: runner はエージェントも Bash から起動できる。開発ワークスペースでは、エージェントが yml を書いて runner を通せば、ユーザの承認を出せる。runner は配布物に入らない（配布先に穴は増えない）ので、これを受け入れた。`human_run` を書くことが、その回で runner が test-repo の提案を承認し push することへの同意になる（回す前の確認文の手順に「実行器が打つ」と出る）
+- 受け入れた穴: runner はエージェントも Bash から起動できる。開発ワークスペースでは、エージェントが yml を書いて runner を通せば、ユーザの承認を出せる。runner は配布物に入らない（配布先に穴は増えない）ため、この穴を受け入れた。`human_run` を書くことが、その回で runner が test-repo の提案を承認し push することへの同意になる（回す前の確認文の手順に「実行器が打つ」と出る）
 
 ## 見つけたものの扱い
 
