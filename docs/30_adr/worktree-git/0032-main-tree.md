@@ -12,7 +12,7 @@ keywords: [ワークスペース, main, ルール, 保護, 編集, 直下]
 
 ## 状況
 
-「編集は worktree で」は CLAUDE.md の指示だけで、hook はワークスペースルート直下の Write / Edit を
+「編集は worktree で」は AGENTS.md の指示だけで、hook はワークスペースルート直下の Write / Edit を
 通していた（allow の `source` と `project-files`）。2026-09-11。
 
 ## 決定
@@ -33,13 +33,13 @@ hook・スクリプト・承認済みチケットは既存の deny が場所を�
 
 ## 採らなかった案
 
-- CLAUDE.md の指示だけで運用する。プロンプトに書いた禁止は確率を下げるだけで 0 にはならない
+- AGENTS.md の指示だけで運用する。プロンプトに書いた禁止は確率を下げるだけで 0 にはならない
 - ワークスペースルート直下を丸ごと `deny` にする。`.claude/worktrees/` もその下なので、
   ルールの契約が先読みを禁じている以上、1 段目で場合分けするしかない
 
 ## 得たもの・失ったもの
 
-- 得たもの: CLAUDE.md の運用が hook で担保される
+- 得たもの: AGENTS.md の運用が hook で担保される
 - 失ったもの: このセッション自身がワークスペースルートで編集していたのは hook が dry-run
   だったから。enable に戻せば止まる
 - `tests/test_root_placeholder.py` と `.claude/ccnavi/rule-samples.yml` に固定してある
