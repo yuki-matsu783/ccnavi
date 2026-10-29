@@ -133,6 +133,10 @@ class Input:
     # （`background_tasks`）か、予約した繰り返し（`session_crons`）が残っているとき真。
     # そのターンの終わりのあとにも、エージェントの手がワークツリーに届きうる。
     busy: bool = False
+    # last_assistant_message は Stop / SubagentStop にだけ来る。ターンを終えるアシスタントの
+    # 最後の発言の本文（実機で確かめた）。Stop の促しを、ユーザの返事を待つ目印（`awaiting_user`）で
+    # 控えるために読む。記録にも診断ログにも書かない。
+    last_assistant_message: str = ""
 
     def from_background_task(self) -> bool:
         """この UserPromptSubmit が、ユーザの発言ではなくバックグラウンド作業の完了通知か。
@@ -148,6 +152,23 @@ class Input:
         """tool_input から文字列を 1 つ取り出す。"command" や "file_path" など。"""
         value = self.tool_input.get(name)
         return value if isinstance(value, str) else ""
+
+
+# ユーザの返事を待ってターンを終える目印。最後の発言の最後の行に、これだけを書く。
+# 画面に出ても目立たず、トークンも少ない形にした。
+AWAITING_USER_MARK = "<!-- awaiting-user -->"
+
+
+def awaiting_user(payload: Input) -> bool:
+    """この Stop は、エージェントがユーザの返事を待つと宣言して終えた回か。
+
+    最後の発言（`last_assistant_message`）の、空でない最後の行が目印だけのとき真。本文の途中の
+    目印は数えない（目印の説明を引いただけの回を外す）。欄が来ない版の Claude Code では常に偽で、
+    促しは今までどおり出る。目印は促しを控えるだけで、保護は緩めない（取り込みの確定は
+    発言をまたぐ関門が守る）。
+    """
+    lines = [line.strip() for line in payload.last_assistant_message.splitlines() if line.strip()]
+    return bool(lines) and lines[-1] == AWAITING_USER_MARK
 
 
 def is_user_prompt(payload: Input) -> bool:
@@ -246,6 +267,11 @@ def decode(stream: TextIO) -> Input:
             data.get("transcript_path") if isinstance(data.get("transcript_path"), str) else ""
         ),
         busy=_has_items(data.get("background_tasks")) or _has_items(data.get("session_crons")),
+        last_assistant_message=(
+            data.get("last_assistant_message")
+            if isinstance(data.get("last_assistant_message"), str)
+            else ""
+        ),
     )
 
 

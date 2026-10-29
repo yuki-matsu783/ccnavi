@@ -446,6 +446,12 @@ def decide_at_stop(
     どれも促さなかった回に限り、`match: Stop` のルールが渡す回ならそこで止める
     （`stop_rules_nudge`）。止め方とモードの扱いは `finish` の促しと同じ。
 
+    最後の発言の最後の行がユーザの返事を待つ目印（`hookio.awaiting_user`）なら、`finish`・
+    依頼までの道・フィードバック・`integrate` の 4 つは促しも数えもしない。エージェントは待つ理由を
+    もう書いており、促すと同じ内容を言い直させるだけになる。目印を忘れた回は今までどおり促す。
+    サブエージェントの範囲外の変更と `match: Stop` のルールは、目印があっても促す（作業の流れの
+    次の一手ではなく、ユーザに知らせたいことや、ユーザが書いた決まりのため）。
+
     承認済みチケットの置き場は、ここで 1 度だけ読んで範囲（`scope_guard`）と `finish` の促し
     （`ops_stop.unfinished_at_stop`）の両方に渡す。
     間の `post.at_stop` は報告するだけでワークツリーを
@@ -475,15 +481,18 @@ def decide_at_stop(
     # 同じに 1 回だけ動かす。差し戻しのせいで既存の促しが黙るのを防ぐため。
     continuation = _ai_continuation(conf, payload)
     asked = dataclasses.replace(payload, stop_hook_active=False) if continuation else payload
-    nudge = _finish_nudge(stderr, conf, root, asked, record, raw)
-    if not nudge:
+    # ユーザの返事を待つ目印で終えた回は、作業の流れの促し（finish・依頼・フィードバック・
+    # integrate）を出しも数えもしない。待つ理由はもう書いてあり、促すと言い直させるだけになる。
+    awaiting = hookio.awaiting_user(payload)
+    nudge = "" if awaiting else _finish_nudge(stderr, conf, root, asked, record, raw)
+    if not nudge and not awaiting:
         # finish の促しで止める回は、依頼までの道の促しを出しも数えもしない。
         nudge = _request_nudge(stderr, conf, root, asked, record, raw)
-    if not nudge:
+    if not nudge and not awaiting:
         nudge = _feedback_nudge(stderr, conf, root, asked, record, raw)
     if not nudge:
         nudge = _subagent_nudge(conf, root, payload, record)
-    if not nudge:
+    if not nudge and not awaiting:
         # 上の促しで止める回は、直接作業の促しを出しも数えもしない。前提を満たせず促せない回は
         # 止めずに理由だけを報告へ足す。
         nudge, notice = _integrate_nudge(stderr, conf, root, asked, record, deadline)
