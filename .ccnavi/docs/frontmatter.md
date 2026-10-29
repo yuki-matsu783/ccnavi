@@ -50,7 +50,7 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 `guide`（使い方と作業の手引き）、`design`（現在の実装の説明）、`requirements`（外から観測できる約束）、`adr`（設計判断の記録）、
 `report`（調査結果や作業報告）のように、文書の役割で分けると探しやすい。
 
-- `CLAUDE.md`・`README.md`・`CHANGELOG.md`には付けない。中身がそのまま使われるためで、`CLAUDE.md`は毎回モデルの文脈に入り、`README.md`はホストやエディタが
+- `CLAUDE.md`・`AGENTS.md`・`README.md`・`CHANGELOG.md`には付けない。中身がそのまま使われるためで、`CLAUDE.md`は毎回モデルの文脈に入り、`README.md`はホストやエディタが
   先頭から表示する。先頭にYAMLを足すと、そのYAMLがユーザにも見え、モデルの文脈にも毎回入る。
   これらは`--path`（`--path README`、`--path CLAUDE`）か、`--text`でパスを指定して探す
 - `SKILL.md`には、Claude Codeがスキルを選ぶときに読む`name`と`description`がある。`type: skill`を足す決まりはあるが、

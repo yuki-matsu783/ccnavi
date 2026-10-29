@@ -9,7 +9,7 @@ keywords: [文面, 文面ファイル, messages, ccnavi text, ccnavi_text, texts
 # 文面ファイルに文を足す・直す
 
 エージェントとユーザが読む文は、コードや sh に書かず、文面ファイル（`.ccnavi/messages/*.yml`）に置く。
-条件（いつ出すか）はコード・ルール・sh に残る。設計は[文面ファイルの設計](../21_design/messages.md)、一覧と移行の進み具合は[文面の移行の一覧](message-migration.md)にある。
+条件（いつ出すか）はコード・ルール・sh に残る。設計は[文面ファイルの設計](../../docs/21_design/messages.md)、一覧と移行の進み具合は[文面の移行の一覧](message-migration.md)にある。
 止め方の選び方と拒否の文の型は[止め方の型と選び方](stop-patterns.md)、出力の `次:` の決まりは[スクリプトの出力に次の一手を書く](script-output.md)。
 
 ## 文を足す手順

@@ -7,7 +7,7 @@ keywords: [文面, 文面ファイル, messages, ccnavi text, 識別子, 差し�
 ---
 # ADR-0184: 拒否・促し・次の一手の文を、条件から分けた文面ファイルに置く
 
-状態: 採用（移行は段階的。移した範囲は `docs/42_claude/message-migration.md` の一覧表が持つ）
+状態: 採用（移行は段階的。移した範囲は `.agents/docs/message-migration.md` の一覧表が持つ）
 
 ## 状況
 

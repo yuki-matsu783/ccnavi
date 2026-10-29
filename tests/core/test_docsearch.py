@@ -899,6 +899,7 @@ class FrontmatterHintTest(Repo):
             "README.md",
             "extensions/x/README.md",
             "CLAUDE.md",
+            "AGENTS.md",
             "CHANGELOG.md",
             "wip/handoff/draft.md",
             "wip/proposals/todo/i0001.md",

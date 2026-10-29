@@ -411,7 +411,7 @@ CODE_MISSING_FRONTMATTER = "NOTICE_DOC_FRONTMATTER"
 # frontmatter を付けない決まりの md の名前。中身がそのまま使われる（README はホストや
 # エディタが頭から表示し、CLAUDE.md は毎回モデルの文脈に入る）ので、頭の YAML がそのまま
 # 人にもモデルにも見える。決まりの文書（CONVENTION_DOC）の「付けていない」と揃える。
-NO_FRONTMATTER_NAMES = ("README.md", "CLAUDE.md", "CHANGELOG.md")
+NO_FRONTMATTER_NAMES = ("README.md", "CLAUDE.md", "AGENTS.md", "CHANGELOG.md")
 # 決まりの文書（CONVENTION_DOC）の「対象外」の表で、付けない・付けなくてよいとする置き場
 # （ツリーのルートからの glob）。表を直したらここも直す
 # （tests/core/test_docsearch.py が表と比べる）。

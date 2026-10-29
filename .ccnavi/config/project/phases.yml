@@ -35,7 +35,7 @@ phases:
     kind: work
     title: 文書
     review: mr
-    scope: ["README.md", "docs/*", "extensions/vscode/ccnavi-board/docs/*", "extensions/chrome/ccnavi-approval/docs/*", "CLAUDE.md", ".claude/skills/*"]
+    scope: ["README.md", "docs/*", "extensions/vscode/ccnavi-board/docs/*", "extensions/chrome/ccnavi-approval/docs/*", "CLAUDE.md", "AGENTS.md", ".claude/skills/*"]
 
   # 作業の振り返りで出たスキルの候補を、ワークスペースの .claude/skills/ に配置する。
   # 候補の根拠を溜める docs/wiki/ も同じ子で直す（wiki 層。.ccnavi/docs/skill-wiki.md）。

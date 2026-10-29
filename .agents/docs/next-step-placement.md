@@ -13,7 +13,7 @@ keywords: [次の一手, 置き場, 分担, SessionStart, UserPromptSubmit, PreT
 
 ## 契機ごとの担当
 
-担当（仕組み）の単位で並べる。識別子と出力元の細かい対応は[文面の移行の一覧](message-migration.md)と各文面ファイルにある。Stop の促しの条件は設計書の[状態遷移](../21_design/tickets/state-transitions.md)、理由コードは設計書の付録にある。
+担当（仕組み）の単位で並べる。識別子と出力元の細かい対応は[文面の移行の一覧](message-migration.md)と各文面ファイルにある。Stop の促しの条件は設計書の[状態遷移](../../docs/21_design/tickets/state-transitions.md)、理由コードは設計書の付録にある。
 
 | 契機 | 担当 | 状態の読み方 | 出す先 |
 |---|---|---|---|
@@ -26,7 +26,7 @@ keywords: [次の一手, 置き場, 分担, SessionStart, UserPromptSubmit, PreT
 | PostToolUse | 書いた結果への案内と報告（`hook/proposalhint.py`、`hook/post.py`・`post_report.py`） | 書いたファイルと実行後のツリー | 文脈、実行後チェックの差し戻しの文 |
 | SubagentStart | 子の担当の案内（`hook/subagent.py` の `at_start`、`hook/childnote.py`） | cwd のツリーに対応する親か子 | サブエージェントの文脈 |
 | Stop | 促し（`finish`・依頼までの道・フィードバック計画・サブエージェントの結果・`integrate`・`match: Stop` のルール。`tickets/lifecycle/stop*.py` と `hook/events.py`） | チケットの置き場・git・サブエージェントの印・数えの記録 | `Stop` を止めて渡す文。1 回の `Stop` で止める理由は 1 つ（順序は `decide_at_stop`）。同じ状態では 1 回だけ |
-| 同上 | AI による判定（`hook/stopjudge.py`。構成は設計書の[Stop の AI 判定](../21_design/stop-review.md)） | 判定役が材料を取る | 差し戻しの文 |
+| 同上 | AI による判定（`hook/stopjudge.py`。構成は設計書の[Stop の AI 判定](../../docs/21_design/stop-review.md)） | 判定役が材料を取る | 差し戻しの文 |
 | 同上 | ターンの終わりの報告（`post.at_stop`）と、同じ理由での繰り返しの知らせ（`repeat.at_stop`） | 実行後チェックの報告、拒否の記録 | ユーザへの `systemMessage`。エージェントに次の一手を渡す担当ではない |
 | スクリプト・実行ファイルの出力 | `次:`・`案内:`・`次の手:`（場面は[実装済みの場面](script-output.md#実装済みの場面)の表）。状態を動かす操作の結果は、その操作が出す（`tickets/lifecycle/commands.py` の `finish`・`start`、`tickets/lifecycle/plan.py`） | 操作が動かした状態 | 標準出力。止まるときは標準エラー |
 | `ccnavi-ticket.sh status`（`entry/status.py`） | 「次の操作」の行。レビュー待ちの子は `tickets/phase/gates.py` の `review_next`（`finish` の出力も使う）。立ち位置が決まらないときの解き方は `tickets/model/standing.py` の `guidance()` | 承認済みチケットと提案の置き場、git、親子の立ち位置。読むだけで書かない | 標準出力 |
