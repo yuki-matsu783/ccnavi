@@ -148,7 +148,7 @@ python3 "$W/seed.py" "$UC" "$CCNAVI"
 sh "$UC/.ccnavi/scripts/ccnavi-launcher.sh" --lint | tail -3    # error 0 件になること（warn は出てよい）
 ```
 
-コピー元（`$TESTREPO`）にコミット済みの内容から親のワークツリーを切るので、コピー元の未コミットの変更は反映されない。やり直すときは 1.2 から（同じ名前のブランチが残ると止まる）。
+コピー元（`$TESTREPO`）にコミット済みの内容から親のワークツリーを切るので、コピー元の未コミットの変更は反映されない。コピーに `ccnavi-setup.sh` を回したあとは、その変更を `git add -A` と `git commit` してから `seed.py` を回す（しないと、親のワークツリーに setup の結果が入らない）。やり直すときは 1.2 から（同じ名前のブランチが残ると止まる）。
 
 `--lint` が error になるときは、親のワークツリー（`.claude/worktrees/<親>`）が無いか、子の `allow` が親の範囲を超えている。
 
@@ -286,7 +286,7 @@ node "$W/shoot.js" "$UC" board 1280 760 チケット管理      # 最初の 1 �
 | 行 34・35・36 を test-repo のコピーで回すと、画面の「ワークスペース」が `.ccnavi/config/common/risks.yml` を指す（行 34 の期待する `config/project/risks.yml` にならない） | test-repo には `config/project/risks.yml` が無く、共通の設定がワークスペースの設定を兼ねる（行 37 の「無ければ作る」と同じ状況） | 行 34 の path は、ccnavi 自身のリポジトリか、`project/risks.yml` を置いたコピーで見る。行 35・36 の動きは、共通の設定を開いたこの状態でも確かめられた |
 | フェーズ・リスク管理で「設定」の欄を切り替えようとして、Playwright の click が `monaco-dialog-modal-block` に遮られて 30 秒で落ちる | 保存していない編集があると、切り替えの前に VS Code の確認ダイアログが出る（`.monaco-dialog-box`） | 編集を戻して保存するか、スクリプトを分けて、操作ごとに画面を開き直す。操作の途中で「設定」の欄を切り替えない |
 | フェーズ管理の「上へ」「下へ」を `getByRole("button", {name: "上へ"})` や `:has-text("上へ")` で押そうとして見つからない | ボタンの文字は「上へ」ではなく `title`（`aria-label`）に持つ。畳んだ行にも隠れた同名のボタンがあり、`.first()` は隠れた方に当たる | `locator('button[title="上へ"]').locator("visible=true").first()` のように、見えているものに絞る。行は先に `button.twist` で開く |
-| 行 29 の「判定を試す」で、ヒットしたルールの id が `rules.yml:docs-guard` と出る（期待は `<名前>:...`）。同じルールが `ccnavi --explain` では `repo:docs-guard` | 画面の判定とターミナルの `--explain` で、プロジェクトのルールの id の付き方が違う。拡張の不具合の疑い（実機では未確認） | 実機でも同じなら、判定の結果の id にプロジェクト名が付かない理由を調べる（`src/ccnavi/` の判定と、拡張の判定の呼び出しを比べる） |
+| 行 29 の「判定を試す」で、ヒットしたルールの id が `rules.yml:docs-guard` と出る（表の旧い期待は `<名前>:...`）。同じルールが `ccnavi --explain` では `repo:docs-guard` | 不具合ではない。判定は編集中の内容を一時ファイルに書いて実行ファイルへ渡し、画面がそのパスを `rules.yml` に縮める（`src/core/rules-view.ts` の `tmpName`）。画面の判定では、どのレイヤーのルールかは id から分からない | 判定の確認は、ヒットしたルールの id の文字ではなく、deny の有無とメッセージで見る。プロジェクトのルールが効いているかは、保存してから `ccnavi --explain` の `■ rules <名前>` で見る |
 | 作業中のチケットが要る行（30・38・44）で、test-repo のコピーに親子のチケットを手で作ろうとして詰まる | チケットは親のワークツリーに置き、`--lint` が通る形でないと読まれない | 1.3 の `seed.py`（この文書のコード）を、そのまま写して使う。`git -c user.name=t -c user.email=t@t` を付ける。コピーは `setup` のあとにコミットしてから `seed.py` を回す（ワークツリーがコミット済みの内容から切られる） |
 | 行 25d で `ccnaviBoard.binPath` を存在しないパスにしても、一覧が普通に出る（失敗の文が出ない） | 設定のパスにファイルが無いと、探す順の次の候補（`.ccnavi/scripts/ccnavi-launcher.sh` など）へ進む | 失敗させるには、実行ビットのある sh（`#!/bin/sh` と `echo boom >&2; exit 1`）を指す。そうすると「ccnavi --explain --json が失敗しました: boom」が出て、古い一覧は残らない。設定はワークスペースの `.vscode/settings.json` に書くと、サーバーを再起動せずに効く |
 | 行 30 で、プロジェクトの子チケットが作業中でも「保存」が止まらない。または別のプロジェクトの保存が `--lint` の error で通らない | 行 30 の子チケットは、ワークスペース側の `.claude/worktrees/<親>` に置いた、プロジェクトのリポジトリのワークツリーの中にある。`seed.py` をプロジェクトのルートへ回して作った worktree は、ボードの対象（`trees`）に入らない。プロジェクトのルートの `.ccnavi/approved/doing/` に直接置いた場合は数えられるが、親のワークツリーが無いので `--lint` が error になり、どのプロジェクトの保存も止まる | プロジェクトの git（`projects/repo`）で `git worktree add <ワークスペース>/.claude/worktrees/<親> <親>` と、子の分を切り、親のワークツリーの `.ccnavi/approved/doing/` に親と子を置いてコミットする（`tests/ticketsample.py` の `parent_text`・`child_text`）。`--explain --json` で `tickets` に `project: repo`・`in_progress: true` が出て、`--lint` が error 0 件になるまで確かめてから回す |
@@ -386,8 +386,8 @@ ccnavi 本体が返す文言（エラーの文、判定の結果）は `$CCNAVI/
 ## 5b. 手動確認の表 25〜44 を code-server で回した結果
 
 通った行: 25・25b の入力の保持・30（子が作業中のプロジェクトは情報色の帯で止まり、別のプロジェクトは保存できた）・25c・25d（失敗する実行ファイルで）・25e・26（clone の送信と成功）・27（資格情報と名前の重複）・28・29（保存と `--explain`）・33・35・36・37・38・39・40・41・42・43・44（`finish` は doing を done へ移して近似）。
-通らなかった・確かめられなかった行: 25b の「表示中に一覧だけが増える」（増えなかった）・27 の同じ origin（書き換えた origin と文字が合わない）・34 の `project/risks.yml` の path（test-repo のコピーに無い）。
-気づいた点（実機で要確認）: clone の終了や外からの clone で、表示中の一覧が自動で増えない。行 29 の判定の id にプロジェクト名が付かない（`rules.yml:docs-guard`。`--explain` では `repo:docs-guard`）。
+通らなかった・確かめられなかった行: 25b の「表示中に一覧だけが増える」（増えなかった）・27 の同じ origin（書き換えた origin と文字が合わない）・34 の `project/risks.yml` の path（test-repo のコピーに無い。表 34 の期待は `common/risks.yml`）。上に書いていない行（25f〜25j・29c・29d・37b・37c・38b・38c・44b〜44d）は回していない。
+気づいた点（実機で要確認）: clone の終了や外からの clone で、表示中の一覧が自動で増えない。行 29 の判定の id が `rules.yml:docs-guard` と出るのは不具合ではない（判定は編集中の内容の一時ファイルで行い、画面がそのパスを `rules.yml` に縮める設計。`src/core/rules-view.ts` の `tmpName`。`--explain` では `repo:docs-guard` と出る）。
 
 ## 6. 画像の置き場
 
