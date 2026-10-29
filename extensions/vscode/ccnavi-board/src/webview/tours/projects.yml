@@ -138,8 +138,8 @@ diagrams:
       - id: verdict
         from: ccnavi
         to: プロジェクト管理画面
-        text: 場所が (projects/web-app) の苦情だけを、このカードの検証の欄に並べる
-        value: 苦情なし → 問題なし。error / warn があれば、見出しにそのバッジが付く
+        text: 場所が (projects/web-app) の指摘だけを、このカードの検証の欄に並べる
+        value: 指摘なし → 問題なし。error / warn があれば、見出しにそのバッジが付く
 
   # 検証の結果の例（値で結果が分かれる）
   project-lint:
@@ -175,7 +175,7 @@ diagrams:
       - id: ok
         from: ccnavi
         to: プロジェクト管理画面
-        text: 名前も置き場所も問題のない web-app には、苦情が無い
+        text: 名前も置き場所も問題のない web-app には、指摘が無い
         value: 問題なし
 
   # プロジェクトの設定とワークスペースの設定: どのツールの呼び出しに、どの層が効くか
@@ -356,8 +356,8 @@ courses:
         diagram: project-card
         focus: rules, counts
       - target: project-check
-        title: 検証は ccnavi の苦情
-        body: 検証の欄には、ccnavi の検証の結果のうち、このプロジェクトのものだけが並びます。苦情が無ければ「問題なし」です。
+        title: 検証は ccnavi の指摘
+        body: 検証の欄には、ccnavi の検証の結果のうち、このプロジェクトのものだけが並びます。指摘が無ければ「問題なし」です。
         diagram: project-card
         focus: lint, verdict
       - target: project-check
@@ -367,7 +367,7 @@ courses:
         focus: err-place, err-say, err-card
       - target: project-check
         title: warn の例 と、問題なし
-        body: プロジェクトの中に作ったワークツリーは warn です。ワークスペースの .claude/worktrees/ に作り直します。名前も置き場所も問題がなければ、苦情は付きません。
+        body: プロジェクトの中に作ったワークツリーは warn です。ワークスペースの .claude/worktrees/ に作り直します。名前も置き場所も問題がなければ、指摘は付きません。
         diagram: project-lint
         focus: warn-place, warn-say, ok
       - target: workspace
