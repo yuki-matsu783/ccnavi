@@ -231,7 +231,7 @@ is_importable() {
 		case "${im_b#*/templates/}" in */*) return 1 ;; esac
 		return 0
 		;;
-	.ccnavi/config/common/messages/*.yml)
+	.ccnavi/messages/*.yml)
 		case "${im_b#*/messages/}" in */*) return 1 ;; esac
 		return 0
 		;;
