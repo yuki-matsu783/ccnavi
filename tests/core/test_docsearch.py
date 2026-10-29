@@ -859,7 +859,7 @@ class FrontmatterHintTest(Repo):
     """Write で新しく作った md に frontmatter か type が無ければ、PostToolUse で 1 度だけ案内する。
 
     既にある md の Edit・上書きでは出さない。対象は索引に入る md（書いた先のツリーの git で決める）
-    から、決まりの文書で「付けない・付けなくてよい」とされているもの（README.md・CLAUDE.md・下書きの
+    から、決まりの文書で「付けない・付けなくてよい」とされているもの（README.md・CLAUDE.md・AGENTS.md・下書きの
     置き場・チケットの置き場）を除いたもの。
     """
 
@@ -899,6 +899,7 @@ class FrontmatterHintTest(Repo):
             "README.md",
             "extensions/x/README.md",
             "CLAUDE.md",
+            "AGENTS.md",
             "CHANGELOG.md",
             "wip/handoff/draft.md",
             "wip/proposals/todo/i0001.md",

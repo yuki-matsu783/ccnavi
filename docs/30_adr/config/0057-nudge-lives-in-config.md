@@ -14,7 +14,7 @@ keywords: [勧告, しきい値, 設定, ルール, every, additionalContext, �
 
 編集が積み重なっても、レビューを入れるきっかけが無かった。`PostToolUse` の hook は `lint-py.sh` だけで、
 これは編集したファイル 1 本の整形と検査しかしない。複数ファイルにまたがった変更が、
-このリポジトリに溜めてきた決まり（`CLAUDE.md`・`.ccnavi/config/common/rules.yml`・`docs/30_adr/` 53 枚・
+このリポジトリに溜めてきた決まり（`AGENTS.md`・`.ccnavi/config/common/rules.yml`・`docs/30_adr/` 53 枚・
 `CONTEXT.md`）に沿っているかの確認は、ユーザが「そろそろ見て」と言うまで入らなかった。
 
 溜めた決まりは、書いた本人が次に読むとは限らない場所にある。ADR は 53 枚あり、全部を毎回の編集で

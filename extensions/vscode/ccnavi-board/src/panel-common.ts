@@ -15,7 +15,7 @@ import * as diaglog from "./log.js";
  *
  * 保持する画面（`retainedHost`）は `retained` が真。偽のままだと、非表示になった画面へ送り続けて中身が古いまま止まる。
  * 保持しない画面（`screenHost`）は偽。真だと、非表示になっても画面が破棄されず、表示の有無の読み直しが働かない。
- * 診断ログにだけ残す（console には出さない。docs/42_claude/logging.md）。
+ * 診断ログにだけ残す（console には出さない。.agents/docs/logging.md）。
  */
 export function assertRetained(panel: vscode.WebviewPanel, root: string, screen: string, retained = true): void {
   if (panel.options.retainContextWhenHidden !== retained) {

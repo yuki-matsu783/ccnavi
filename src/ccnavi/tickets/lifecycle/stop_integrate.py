@@ -56,7 +56,7 @@ fast-forwardでgitが持ち越す。
 コミットの数・HEAD）。同じ要約では 1 回だけで、進めばまた言う。記録は `finish` の促しと同じ
 `nudged-<セッション>.json`。
 
-git とファイルだけを読む。ネットワークには出ない（`docs/42_claude/exe-boundary.md`）。
+git とファイルだけを読む。ネットワークには出ない（`.agents/docs/exe-boundary.md`）。
 """
 
 from __future__ import annotations

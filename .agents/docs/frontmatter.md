@@ -28,8 +28,8 @@ frontmatterのキーと書き方、索引、対象外の置き場は[.ccnavi/doc
 
 | type | 対象 | 現状 |
 |---|---|---|
-| `guide` | 使い方と作業の手引き。`.ccnavi/docs/*.md`、`docs/42_claude/*.md`、`docs/30_adr.md`、`docs/41_guide/*.md`（利用者向け）、`docs/40_development.md`（開発者向けの入口） | 付いている。ルートの`README.md`と拡張の`README.md`（`extensions/**`）には付けていない（理由は表の下） |
-| `rule` | 常に守る決まり。`CLAUDE.md` | 付けていない（理由は表の下）。`--type rule`では何も出ない |
+| `guide` | 使い方と作業の手引き。`.ccnavi/docs/*.md`、`.agents/docs/*.md`、`docs/30_adr.md`、`docs/41_guide/*.md`（利用者向け）、`docs/40_development.md`（開発者向けの入口） | 付いている。ルートの`README.md`と拡張の`README.md`（`extensions/**`）には付けていない（理由は表の下） |
+| `rule` | 常に守る決まり。`AGENTS.md`（`CLAUDE.md` は読み込ませるだけ） | 付けていない（理由は表の下）。`--type rule`では何も出ない |
 | `design` | 現在の実装の説明。`docs/20_design.md`・`docs/21_design/**`、`wip/design/**`の設計メモ | `docs/20_design.md`・`docs/21_design/**`に付いている |
 | `idea` | 製品の根底にある考え方（Why・What・How）。`docs/00_idea.md`。ユーザが依頼しない限り直さない | `docs/00_idea.md`に付いている |
 | `requirements` | 外から観測できる約束。`docs/10_requirements.md`・`docs/11_requirements/**` | 付いている |
@@ -42,7 +42,7 @@ frontmatterのキーと書き方、索引、対象外の置き場は[.ccnavi/doc
 
 表に無い種類の文書を足すときは、この表に行を足してから使う。
 
-表で「付けていない」とした文書（`CLAUDE.md`・`README.md`・`CHANGELOG.md`・`SKILL.md`）の理由と探し方は、[.ccnavi/docs/frontmatter.md](../../.ccnavi/docs/frontmatter.md)の「typeの値」と「対象外」にある。
+表で「付けていない」とした文書（`CLAUDE.md`・`AGENTS.md`・`README.md`・`CHANGELOG.md`・`SKILL.md`）の理由と探し方は、[.ccnavi/docs/frontmatter.md](../../.ccnavi/docs/frontmatter.md)の「typeの値」と「対象外」にある。
 
 ## 対象外の表と実行ファイル
 

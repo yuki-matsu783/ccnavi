@@ -36,7 +36,7 @@ keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedba
 
 エージェントが溜める手順は、ほかの保護対象と同じ handoff に一本化している（[scratchpad.md](scratchpad.md)）。ユーザが取り込み済みのテンプレートを直すときは、下の「画面で直す」でもできる。
 
-1. 計画を持つ親が閉じるときに、ccnavi が案内を 1 行出す。`ready` の前に `ccnavi --templates --draft <親>` で下書きを作る。`ready` を打つと下書きの材料が退避されて拾えなくなる
+1. 計画を持つ親が閉じるときに、ccnavi が案内を 1 行出す。`ready` の前に `ccnavi --templates --draft <親>` で下書きを作る。`ready` を打つと下書きの材料が退避されて拾えなくなる。MR なしの親（全フェーズが MR で見ない）には `ready` が無いので、`wip/` を削除して取り込む前に打つ（取り込んだあとは拾えない）
 2. 下書きは `wip/handoff/` の下の、取り込み先と同じ相対パス（既定は `wip/handoff/.ccnavi/config/project/templates/<名前>.yml`）に書かれる。`description` と `when` に `TODO` の印が付くので、固有名を一般化し、効かなかった手順を削り、印を消す。直すのはエージェントでよい（Write で直接編集する）
 3. ユーザが `ccnavi-user-handoff.sh [<相対パス>…]` で見る。何も書かず、検査と差分（既存があれば文の前後まで）と `--expect` のハッシュを見せる。読んだうえで、`--yes --expect <ハッシュ>` を付けて取り込む
 4. 取り込んだ下書きは消える

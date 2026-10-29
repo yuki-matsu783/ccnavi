@@ -22,7 +22,7 @@ keywords: [文面, 文面ファイル, messages, 識別子, 差し込み, ccnavi
 | `policy/texts.py` | 読み込み、検査、差し込み、組み立て、壊れたときの既定の文 | 判定 |
 | `ccnavi text` | sh から `texts` を引く入口 | 文面ファイルの直接の読み書き |
 
-組み込みの拒否・促し（Python）は `texts.say` を呼ぶ。通知（`NOTICE_*`）は、見出し（`[ccnavi] <コード> (…)`）と `subject:` などの状態の行をコードに残し、本文だけを `texts.say` で引く。組み込みルールの文は、ルールが識別子と値を持ち、拒否に当たった回に `texts.spoken` が引く（13.4）。まだ移していない文（ルールの `message`、種類を決められない通知など）は呼ばず、[文面の移行の一覧](../42_claude/message-migration.md)にある。sh は文面ファイルを読まず、`ccnavi text` を `ccnavi_text`（`ccnavi-common-state.sh`）で呼ぶ。
+組み込みの拒否・促し（Python）は `texts.say` を呼ぶ。通知（`NOTICE_*`）は、見出し（`[ccnavi] <コード> (…)`）と `subject:` などの状態の行をコードに残し、本文だけを `texts.say` で引く。組み込みルールの文は、ルールが識別子と値を持ち、拒否に当たった回に `texts.spoken` が引く（13.4）。まだ移していない文（ルールの `message`、種類を決められない通知など）は呼ばず、[文面の移行の一覧](../../.agents/docs/message-migration.md)にある。sh は文面ファイルを読まず、`ccnavi text` を `ccnavi_text`（`ccnavi-common-state.sh`）で呼ぶ。
 
 ### 13.2 置き場とレイヤー
 
@@ -169,7 +169,7 @@ ccnavi のリポジトリのテストは、次も見る（呼ぶ側が手元の�
 
 ### 13.9 移行の範囲
 
-この設計に沿って、次を文面ファイルに移した。残りと進め方は `docs/42_claude/message-migration.md` の一覧表と「残りの進め方」が持つ。
+この設計に沿って、次を文面ファイルに移した。残りと進め方は `.agents/docs/message-migration.md` の一覧表と「残りの進め方」が持つ。
 
 - 拒否: シェルからルート直下へ書く形（`DENY_SHELL_WORKSPACE_ROOT`）、承認された作業範囲の外の報告（`RULE_TICKET_SCOPE__*`）、組み込みルールの文（`RULE_*`。`builtin:` で始まる id のルール。判定のたびに組み立てるので、識別子と値だけを持たせ、拒否に当たった回に引く）、組み込みの拒否の大半（`DENY_TICKET_*`・`DENY_PHASE_REVIEW`・`DENY_NEEDS_USER_TURN`・`DENY_AGENT_*`・ラッパーと関門の `DENY_*`・書き直しを求める拒否・`DENY_REDIRECT_LIMIT`）と、確認の理由（`RULE_ASK`）
 - 通知: `fallen_back`・`undeclared`（`NOTICE_FALLEN_BACK`・`NOTICE_UNDECLARED__*`）、実行後の報告の案内（`NOTICE_POST_*`・`NOTE_POST_*`）、md の索引の案内（`NOTICE_DOCS_*`）。`internal_error_notice` は、ccnavi 自身に不具合があるときに出る文で、文面ファイルに頼らないので移さない

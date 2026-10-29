@@ -1,6 +1,6 @@
 """`requests.json` の列を `tests/fake_gitlab.py` に送り、正規化した形を返す。
 
-模擬の側の状態（場面）をここで組む。場面の中身は `docs/42_claude/gitlab-contract.md`。
+模擬の側の状態（場面）をここで組む。場面の中身は `.agents/docs/gitlab-contract.md`。
 本物の側は、録る側が同じ場面を `Client` で作る。
 
     uv run python -m tests.contract.fakeside        recorded.sample.json を作り直す
