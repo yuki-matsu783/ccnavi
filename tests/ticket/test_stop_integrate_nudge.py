@@ -195,8 +195,12 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         reason = self.asked(self.stop(path))
         self.assertIn("origin/main が手元の main より 1 件先に進んでいます", reason)
 
-    def test_uncommitted_changes_are_asked_and_told_to_commit_first(self):
-        path = self.direct(dirty=True)
+    def test_uncommitted_changes_alone_are_not_asked(self):
+        """コミットは integrate の直前にまとめて打つ。未コミットだけなら作業中か返事待ち。"""
+        self.assert_not_asked(self.stop(self.direct(dirty=True)))
+
+    def test_uncommitted_changes_on_top_of_commits_are_told_to_commit_first(self):
+        path = self.direct(commit=True, dirty=True)
         reason = self.asked(self.stop(path))
         self.assertIn("未コミットの変更", reason)
         self.assertIn("先にコミットしてください", reason)
@@ -217,17 +221,14 @@ class IntegrateNudgeTest(base.StopNudgeTest):
     def test_a_clean_worktree_with_nothing_new_is_not_asked(self):
         self.assert_not_asked(self.stop(self.direct()))
 
-    def test_a_marker_asks_for_integrate_done_or_abort(self):
+    def test_a_marker_means_waiting_for_the_user_and_is_not_asked(self):
+        """integrate のあとは、差分を見せて返事を待つ途中。確定を促さない。"""
         path = self.direct(commit=True)
         self.record()
         gitdir = os.path.join(
             self.root, git(self.root, "rev-parse", "--git-path", "ccnavi-integrate").strip()
         )
         write(os.path.join(gitdir, "scratch", "marker"), "version 4\nhead x\ntip y\nc_tree z\n")
-        reason = self.asked(self.stop(path))
-        self.assertIn("integrate-done scratch", reason)
-        self.assertIn("integrate --abort scratch", reason)
-        self.assertIn("保存していない編集", reason)
         self.assert_not_asked(self.stop(path))
 
     def test_a_marker_of_unknown_version_asks_the_user_without_commands(self):
@@ -374,15 +375,6 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         write(os.path.join(self.root, gitdir), "squash\n")
         body = self.assert_not_asked(self.stop(path))
         self.assertIn("SQUASH_MSG", body["systemMessage"])
-
-    def test_a_missing_integration_ref_with_uncommitted_changes_is_reported_once(self):
-        path = self.direct(dirty=True)
-        body = self.assert_not_asked(self.stop(path, integration="nonexistent"))
-        self.assertIn("nonexistent", body["systemMessage"])
-        self.assertIn("ref", body["systemMessage"])
-        self.assertNotIn(
-            "systemMessage", self.assert_not_asked(self.stop(path, integration="nonexistent"))
-        )
 
     def test_a_missing_integration_ref_with_only_commits_stays_quiet(self):
         """コミットだけでは、統合先に入っているかを数えられない。誤って促さず黙る。"""
