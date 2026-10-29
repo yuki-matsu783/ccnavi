@@ -19,7 +19,10 @@ def main() -> None:
     path = sys.argv[1]
     width = int(sys.argv[2]) if len(sys.argv) > 2 else 350
     for line in open(path, encoding="utf-8"):
-        event = json.loads(line)
+        try:
+            event = json.loads(line)
+        except ValueError:  # timeout で殺されて最後の行が欠けたときも、読めたところまで要約する
+            continue
         kind = event.get("type")
         if kind == "assistant":
             for part in event["message"]["content"]:

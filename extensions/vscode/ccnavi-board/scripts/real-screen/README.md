@@ -1,5 +1,7 @@
 # 実画面確認の道具（real-screen）
 
+Linux 限定の開発用です（`setsid`・`timeout`・`pgrep` と、`/opt/pw-browsers` の Chromium を前提にします）。
+
 本物の VS Code（code-server）に入れた拡張を Chromium で操作し、チケット管理の手順を haiku（`claude -p`）に進めさせて、
 文書と画面が初見の相手に通じるかを確かめる開発用の道具。配布物には含めない。準備と評価の観点は
 [実画面（code-server の VS Code）で日本語ユーザ目線を確かめる](../../docs/design/real-screen-check.md)。

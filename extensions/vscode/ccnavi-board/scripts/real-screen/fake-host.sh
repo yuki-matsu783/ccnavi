@@ -19,6 +19,14 @@ work=${2:?作業ディレクトリ}
 case "$cmd" in
 up)
 	repo=${3:?検証用コピー}
+	# .git を作り直すので、ccnavi 本体（とその祖先）を渡されたら止める
+	repo_abs=$(cd "$repo" && pwd)
+	case "$ccnavi/" in
+	"$repo_abs"/*)
+		echo "検証用コピーに ccnavi 本体（またはその祖先）は渡せない: $repo_abs" >&2
+		exit 2
+		;;
+	esac
 	port=${4:-8929}
 	title=${5:-"README に使い方の実行例を足す"}
 	body=${6:-"README.md の「使い方」に、実際に動かした例（入力と出力）を 1 つ足してください。"}
