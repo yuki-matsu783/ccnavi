@@ -10,6 +10,10 @@
   origin への通信はそのプロジェクトへ向く。回したあとに消す
 - `real`: 何もしない
 
+`api_access` は、`fake-gitlab` / `docker-gitlab` の相手を読むために必要なもの
+（クライアント・トークン・プロジェクト）を返す。
+step の終わりの相手側の状態の記録（hostsnap.py）が使う。
+
 実行器（runner.py）から呼ぶ。状態は JSON にできる辞書（`prepare` の戻り値）で、state.json に残す。
 起こした模擬のスレッドは、この辞書の `dir` をキーにしたプロセス内の表で持つ。
 """
@@ -54,14 +58,19 @@ def uses_stub_git(host):
     return is_fake(host) or host == DOCKER
 
 
+def _connect_tools():
+    """tests/manual/gitlab を import できるようにする（sys.path の末尾に足す）。"""
+    tools = os.path.normpath(GITLAB_TOOLS)
+    if tools not in sys.path:
+        sys.path.append(tools)
+
+
 def _connect():
     """(Client, エージェント役のトークン, GitLab の根の URL, トークンのファイルの値)。
     トークンは呼ぶたびにファイルから読む。
     tests/manual/gitlab は package ではなく、docker_gitlab.py は同じ場所の gitlab_api を import
     するので、sys.path の末尾に足して読む（同名の tests.fake_gitlab を隠さないため末尾）。"""
-    tools = os.path.normpath(GITLAB_TOOLS)
-    if tools not in sys.path:
-        sys.path.append(tools)
+    _connect_tools()
     import docker_gitlab
     import gitlab_api
 
@@ -134,6 +143,31 @@ def human_op(root, host, op, threads):
 
 def agent_token():
     return _connect()[1]
+
+
+def snapshot_hosts():
+    """step の終わりに相手側の状態を読む対象。"""
+    return ("fake-gitlab", DOCKER)
+
+
+def api_access(host):
+    """相手側の状態を読む API の入口。(Client, トークン, プロジェクト, 伏せる値の一覧) を返す。
+    fake-gitlab は模擬のポートとトークン、docker-gitlab はエージェント役のトークン。
+    伏せる値は、記録に混ざったら `***` に置き換えるトークンの値（人間役のものを含む）。
+    Client は書き込み用のメソッドも持つ。読むだけにすることは、呼び出し側（hostsnap）が守る。"""
+    if host["kind"] == DOCKER:
+        client, token, _, values = _connect()
+        secrets = [v for k, v in values.items() if k.upper().endswith("TOKEN") and v]
+        return client, token, host["project_id"], secrets
+    if host["kind"] != "fake-gitlab":
+        raise ValueError(f"{host['kind']} は相手側の API を読めない")
+    _connect_tools()
+    import gitlab_api
+
+    # 模擬は手元で答えるので、失敗を待って試し直さない
+    client = gitlab_api.Client(f"http://127.0.0.1:{host['port']}", sleep=lambda s: None)
+    project = urllib.parse.quote(host["project"], safe="")
+    return client, host["token"], project, [host["token"]]
 
 
 def check_docker_gitlab():

@@ -2,7 +2,8 @@
 
 環境変数を読まない・ファイルや一時ディレクトリを作らない・`sys.exit` しない。接続先は
 `Client(base)` の引数、トークンは各メソッドの引数で受ける。`probe_gitlab.py` と、本物の GitLab の
-応答を記録する道具、受入シナリオの相手の準備が使う。
+応答を記録する道具。受入シナリオの相手の準備と、step の終わりの相手側の状態の読み取り
+（`tests/scenarios/hostsnap.py`）が使う。
 
 sh と同じ道具（curl・glab）を使わないのは、片方の不具合がもう片方に隠れないようにするため。
 
@@ -22,7 +23,8 @@ sh と同じ道具（curl・glab）を使わないのは、片方の不具合が
     Client.delete_project(token, project_id)
     Client.add_member(token, project_id, user_id, access_level=40)
     Client.create_issue(token, project_id, title, description="")
-    Client.list_issues(token, project_id, *, state="opened")
+    Client.list_issues(token, project_id, *, state="opened", per_page=None) -> (status, body)
+        per_page を渡さないと GitLab の既定の 20 件になる。
     Client.create_mr(token, project_id, source_branch, target_branch, title)
     Client.find_mr(token, project_id, branch) -> dict | None
     Client.list_mrs(token, project_id, *, state="all") -> (status, body)
@@ -31,6 +33,8 @@ sh と同じ道具（curl・glab）を使わないのは、片方の不具合が
     Client.create_discussion(token, project_id, iid, body)
     Client.resolve_discussion(token, project_id, iid, discussion_id, resolved=True)
     Client.discussions(token, project_id, iid) -> list[dict]   スレッドの一覧（notes を持つ）
+    Client.list_discussions(token, project_id, iid) -> (status, body)
+        `discussions` と同じ取得だが、status も返す（読めなかったことと空を区別したいとき）
     Client.tree(token, project_id, ref, path="", recursive=False) -> list[str]   ブランチの一覧
     Client.request_changes(token, project_id, iid)   変更要求。GitLab EE の機能で、CE では 404
     Client.approve(token, project_id, iid)
@@ -165,13 +169,13 @@ class Client:
             tag="issue-create",
         )
 
-    def list_issues(self, token: str, project_id: int, *, state: str = "opened"):
-        return self.call(
-            "GET",
-            f"/projects/{project_id}/issues?state={state}&order_by=created_at&sort=desc",
-            token,
-            tag="issues-list",
-        )
+    def list_issues(
+        self, token: str, project_id: int, *, state: str = "opened", per_page: int | None = None
+    ):
+        query = f"state={state}&order_by=created_at&sort=desc"
+        if per_page is not None:
+            query += f"&per_page={per_page}"
+        return self.call("GET", f"/projects/{project_id}/issues?{query}", token, tag="issues-list")
 
     def create_mr(
         self, token: str, project_id: int, source_branch: str, target_branch: str, title: str
@@ -253,13 +257,16 @@ class Client:
             tag="discussion-resolve",
         )
 
-    def discussions(self, token: str, project_id: int, iid: int) -> list[dict]:
-        _, found = self.call(
+    def list_discussions(self, token: str, project_id: int, iid: int):
+        return self.call(
             "GET",
             f"/projects/{project_id}/merge_requests/{iid}/discussions?per_page=100",
             token,
             tag=f"discussions-{iid}",
         )
+
+    def discussions(self, token: str, project_id: int, iid: int) -> list[dict]:
+        _, found = self.list_discussions(token, project_id, iid)
         return found if isinstance(found, list) else []
 
     def tree(
