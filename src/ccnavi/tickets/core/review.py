@@ -390,8 +390,7 @@ def moved_detail_on_host(
     `confirm` が「依頼の記録が無い」で止める。
     """
     mark = _requested_mark(snapshot, parent_id, phase_no)
-    # Chrome は祖先かどうかを compare API の一覧に任せる（読めなければ changed が None）。
-    # コミットの一覧は手元の git が無いので出さない
+    # Chrome は祖先かどうかを compare API の一覧に任せる（読めなければ changed が None）
     return (
         review.Moved() if mark is None else review.moved_detail(snapshot.conf, mark, head, changed)
     )
