@@ -263,69 +263,65 @@ ccnavi_wap_stops() {
 
 # 3〜5。0 なら続けてよい。
 ccnavi_wap_prepare() {
-	ccnavi_cp_try=0
-	while :; do
-		ccnavi_cp_try=$((ccnavi_cp_try + 1))
-		# 3. write-and-push の外の変更を見分け、(b) を取り込みの前にコミットする。
-		ccnavi_wap_sort "$ccnavi_wap_tmp/sort" || return 1
-		ccnavi_wap_stops "$ccnavi_wap_tmp/sort" "ユーザの判断が未送信" \
-			"。承認の push（sh $ccnavi_wap_sh/ccnavi-user-push-approved.sh ${ccnavi_wap_family_id}）をユーザが実行します。何も反映していません" \
-			"置き場に ccnavi が把握していない変更があります" "。ユーザが確かめてください。何も反映していません" || return 1
-		sed -n 's/^keep //p' "$ccnavi_wap_tmp/sort" >"$ccnavi_wap_tmp/keep"
-		sed -n 's/^b //p' "$ccnavi_wap_tmp/sort" >"$ccnavi_wap_tmp/b"
-		if [ -s "$ccnavi_wap_tmp/b" ]; then
-			ccnavi_wap_commit "$ccnavi_wap_tmp/b" "ccnavi: $ccnavi_wap_family_id の hook のマーカーをコミットする" || return 1
-		fi
-		# 4. 取り込み（ccnavi-sync.sh。ロックは入れ子で渡る）。
-		ccnavi_cp_rc=0
-		sh "$ccnavi_wap_sh/ccnavi-sync.sh" "$ccnavi_wap_family_id" </dev/null >"$ccnavi_wap_tmp/sync" 2>&1 || ccnavi_cp_rc=$?
-		sed "s/^/  /" "$ccnavi_wap_tmp/sync" >&2
-		if [ "$ccnavi_cp_rc" -ne 0 ]; then
-			# 3 と 4 の間に hook が書いた（merge が書きかけと重なった）なら、3 から 1 回だけやり直す。
-			if [ "$ccnavi_cp_try" -eq 1 ] && grep -q '書きかけの' "$ccnavi_wap_tmp/sync" 2>/dev/null; then
-				ccnavi_wap_say "取り込みが書きかけと重なった。変更の見分けからもう 1 回だけやり直す"
-				continue
-			fi
-			ccnavi_wap_say "取り込めなかった（上の ccnavi-sync.sh の文面）。何も反映していません。接続と、上に出た原因を直してから再実行してください"
+	# 3. write-and-push の外の変更を見分け、(b) を取り込みの前にコミットする。
+	ccnavi_wap_sort "$ccnavi_wap_tmp/sort" || return 1
+	ccnavi_wap_stops "$ccnavi_wap_tmp/sort" "ユーザの判断が未送信" \
+		"。承認の push（sh $ccnavi_wap_sh/ccnavi-user-push-approved.sh ${ccnavi_wap_family_id}）をユーザが実行します。何も反映していません" \
+		"置き場に ccnavi が把握していない変更があります" "。ユーザが確かめてください。何も反映していません" || return 1
+	sed -n 's/^keep //p' "$ccnavi_wap_tmp/sort" >"$ccnavi_wap_tmp/keep"
+	sed -n 's/^b //p' "$ccnavi_wap_tmp/sort" >"$ccnavi_wap_tmp/b"
+	if [ -s "$ccnavi_wap_tmp/b" ]; then
+		ccnavi_wap_commit "$ccnavi_wap_tmp/b" "ccnavi: $ccnavi_wap_family_id の hook のマーカーをコミットする" || return 1
+	fi
+	# 4. 取り込み（ccnavi-sync.sh。ロックは入れ子で渡る）。
+	ccnavi_cp_rc=0
+	sh "$ccnavi_wap_sh/ccnavi-sync.sh" "$ccnavi_wap_family_id" </dev/null >"$ccnavi_wap_tmp/sync" 2>&1 || ccnavi_cp_rc=$?
+	sed "s/^/  /" "$ccnavi_wap_tmp/sync" >&2
+	if [ "$ccnavi_cp_rc" -ne 0 ]; then
+		# 3 と 4 の間に hook が書いた（merge が書きかけと重なった）。やり直さずに止める。再実行すれば 3 でコミットされる。
+		if grep -q '書きかけの' "$ccnavi_wap_tmp/sync" 2>/dev/null; then
+			ccnavi_wap_say "取り込みが書きかけ（変更の見分けの後に hook が書いたもの）と重なった。何も反映していません。再実行してください（書きかけを先にコミットしてから取り込みます）"
 			return 1
 		fi
-		# 取り込みが、マージ済みの親のワークツリーを片付けて 0 で終わることがある。無いツリーには書かずに止める。
-		if [ ! -d "$ccnavi_wap_tree" ]; then
-			ccnavi_wap_say "親のワークツリーが取り込みの後に無い。親子のチケット ${ccnavi_wap_family_id} は閉じた（マージ済み）か、ワークツリーが無い。何も反映していません"
-			log_info write-and-push で止めた -- "family=$ccnavi_wap_family_id" "reason=parent-tree-gone"
-			return 1
-		fi
-		# 親のブランチがリモートから消えていれば、push で作り直さずに止める（push の関門。3 経路で同じ）。
-		ccnavi_cp_gate=0
-		ccnavi_push_gate "$ccnavi_wap_tree" "$ccnavi_wap_branch" "$ccnavi_wap_family_id" "$ccnavi_wap_root" \
-			"$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)" || ccnavi_cp_gate=$?
-		if [ "$ccnavi_cp_gate" -ne 0 ]; then
-			ccnavi_wap_say "${ccnavi_pg_why}。何も反映していません"
-			log_info write-and-push で止めた -- "family=$ccnavi_wap_family_id" "reason=push-gate" "gate=$ccnavi_cp_gate"
-			return 1
-		fi
-		# 親のブランチが一度も送られていない（ccnavi-start.sh を通さずに手で切った親）。5 の見分けは
-		# origin の参照を基点にするので、参照が無いと差分を読めずに内部のエラーで終わる。先に事実を言って止める。
-		# 送った形跡があるのに参照が無い親は、上の push の関門と ccnavi-sync.sh の判定に任せる。
-		ccnavi_parent_info "$ccnavi_wap_tree" "$ccnavi_wap_family_id" || :
-		# 実行ファイルが答えない・古くて値が unknown のときは、断定せず従来の関門に任せる
-		if [ "$ccnavi_pi_parent" = yes ] && [ "$ccnavi_pi_approved" != unreadable ] &&
-			[ "$ccnavi_pi_approved" != unknown ] && [ "$ccnavi_pi_requested" != unknown ] &&
-			[ "$ccnavi_pi_archived" != unknown ] && [ "$ccnavi_pi_started" != unknown ] &&
-			! ccnavi_parent_trace "$ccnavi_wap_tree" "$ccnavi_wap_branch"; then
-			ccnavi_wap_unsent_parent=1
-			ccnavi_wap_say "親のブランチ ${ccnavi_wap_branch} はリモートにありません。ccnavi-start.sh を通さずに切った親です。何も反映していません"
-			log_info write-and-push で止めた -- "family=$ccnavi_wap_family_id" "reason=parent-never-pushed"
-			return 1
-		fi
-		# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める。
-		ccnavi_wap_sort "$ccnavi_wap_tmp/unsent" "refs/remotes/origin/$ccnavi_wap_branch" || return 1
-		ccnavi_wap_stops "$ccnavi_wap_tmp/unsent" "置き場に未送信のユーザの判断のコミットがある" \
-			"。承認の push（sh $ccnavi_wap_sh/ccnavi-user-push-approved.sh ${ccnavi_wap_family_id}）をユーザが実行します。何も反映していません" \
-			"置き場に ccnavi が把握していない未送信のコミットがあります" \
-			"。ユーザが確かめてください。前の状態の操作が送る前に強制終了されて残ったものなら、中身を確かめてから承認の push（sh $ccnavi_wap_sh/ccnavi-user-push-approved.sh ${ccnavi_wap_family_id}）で送るか、ユーザがそのコミットを取り除く。何も反映していません" || return 1
-		return 0
-	done
+		ccnavi_wap_say "取り込めなかった（上の ccnavi-sync.sh の文面）。何も反映していません。接続と、上に出た原因を直してから再実行してください"
+		return 1
+	fi
+	# 取り込みが、マージ済みの親のワークツリーを片付けて 0 で終わることがある。無いツリーには書かずに止める。
+	if [ ! -d "$ccnavi_wap_tree" ]; then
+		ccnavi_wap_say "親のワークツリーが取り込みの後に無い。親子のチケット ${ccnavi_wap_family_id} は閉じた（マージ済み）か、ワークツリーが無い。何も反映していません"
+		log_info write-and-push で止めた -- "family=$ccnavi_wap_family_id" "reason=parent-tree-gone"
+		return 1
+	fi
+	# 親のブランチがリモートから消えていれば、push で作り直さずに止める（push の関門。3 経路で同じ）。
+	ccnavi_cp_gate=0
+	ccnavi_push_gate "$ccnavi_wap_tree" "$ccnavi_wap_branch" "$ccnavi_wap_family_id" "$ccnavi_wap_root" \
+		"$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)" || ccnavi_cp_gate=$?
+	if [ "$ccnavi_cp_gate" -ne 0 ]; then
+		ccnavi_wap_say "${ccnavi_pg_why}。何も反映していません"
+		log_info write-and-push で止めた -- "family=$ccnavi_wap_family_id" "reason=push-gate" "gate=$ccnavi_cp_gate"
+		return 1
+	fi
+	# 親のブランチが一度も送られていない（ccnavi-start.sh を通さずに手で切った親）。5 の見分けは
+	# origin の参照を基点にするので、参照が無いと差分を読めずに内部のエラーで終わる。先に事実を言って止める。
+	# 送った形跡があるのに参照が無い親は、上の push の関門と ccnavi-sync.sh の判定に任せる。
+	ccnavi_parent_info "$ccnavi_wap_tree" "$ccnavi_wap_family_id" || :
+	# 実行ファイルが答えない・古くて値が unknown のときは、断定せず従来の関門に任せる
+	if [ "$ccnavi_pi_parent" = yes ] && [ "$ccnavi_pi_approved" != unreadable ] &&
+		[ "$ccnavi_pi_approved" != unknown ] && [ "$ccnavi_pi_requested" != unknown ] &&
+		[ "$ccnavi_pi_archived" != unknown ] && [ "$ccnavi_pi_started" != unknown ] &&
+		! ccnavi_parent_trace "$ccnavi_wap_tree" "$ccnavi_wap_branch"; then
+		ccnavi_wap_unsent_parent=1
+		ccnavi_wap_say "親のブランチ ${ccnavi_wap_branch} はリモートにありません。ccnavi-start.sh を通さずに切った親です。何も反映していません"
+		log_info write-and-push で止めた -- "family=$ccnavi_wap_family_id" "reason=parent-never-pushed"
+		return 1
+	fi
+	# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める。
+	ccnavi_wap_sort "$ccnavi_wap_tmp/unsent" "refs/remotes/origin/$ccnavi_wap_branch" || return 1
+	ccnavi_wap_stops "$ccnavi_wap_tmp/unsent" "置き場に未送信のユーザの判断のコミットがある" \
+		"。承認の push（sh $ccnavi_wap_sh/ccnavi-user-push-approved.sh ${ccnavi_wap_family_id}）をユーザが実行します。何も反映していません" \
+		"置き場に ccnavi が把握していない未送信のコミットがあります" \
+		"。ユーザが確かめてください。前の状態の操作が送る前に強制終了されて残ったものなら、中身を確かめてから承認の push（sh $ccnavi_wap_sh/ccnavi-user-push-approved.sh ${ccnavi_wap_family_id}）で送るか、ユーザがそのコミットを取り除く。何も反映していません" || return 1
+	return 0
 }
 
 # 一覧のパスだけをコミットする。<一覧> <文>。新しいファイルは先に add する。
