@@ -303,7 +303,7 @@ setup:
   - `issues`: `iid`・`title`・`state`・`closed_at` など
   - 本文（MR の説明・メモ・issue の説明）は 1000 文字で切る。切ったときは末尾に `…(+N)`
 - 承認は取らない。模擬に `approvals` の API が無く、模擬と本物で記録の形を揃えるため、`docker-gitlab` でも取らない。`approvals` は `{"taken": false, "reason": ...}` の固定の形にし、承認が無いのか、そもそも取っていないのかを読めるようにする。`mrs` に承認の欄は無い
-- 取れなかったときは止めない。取れなかった API は `errors`（`api`・`status`・`error` の配列）に残し、取れた分は残す。接続や例外で何も取れなかった step でも `host-N.json` は書き、`errors` には例外の型の名前だけを入れる。一覧が取れなければ `mrs` は空にし、1 件の詳細が取れなければ一覧の分は残す。スレッドが取れなければ `threads_unavailable` を付ける
+- 取れなかったときは止めない。取れなかった API は `errors`（`api`・`status`・`error` の配列）に残し、取れた分は残す。接続や例外で何も取れなかった step でも `host-N.json` は書き、`errors` には例外の型の名前だけを入れる。一覧が取れなければ `mrs` は空にし、1 件の詳細が取れなければ一覧の分は残す。スレッドが取れなければ `threads_unavailable` を付ける。最初の MR の一覧で相手に接続できなければ、残りの API は呼ばない（待ちを重ねないため）
 - 一覧（MR・スレッド・issue）は 1 ページ（100 件）だけ読む。100 件に達したら、取り切れていないかもしれないことを `errors` に残す
 - トークンは記録に出さない。認証の情報を含む応答は全文を残さず、取る項目を選ぶ。そのうえで、`tokens.env` の値と模擬のトークンが文字列に混ざっていたら `***` に置き換える
 - `state.json` の `host_snapshots` に step ごとの結果（`step`・`file`・`ok`・`errors`。ここの `errors` は件数）を残し、`report.md` の「相手（setup.host）」の行のあとに件数と、取れなかった step を出す。判定（`pass` / `fail`）には使わない
