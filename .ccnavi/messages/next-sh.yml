@@ -30,7 +30,7 @@ messages:
     kind: next
     values: [dest]
     next: |-
-      編集はこのワークツリーの下で行います（Write / Edit に渡すパス: {dest}/…）。git は `cd {dest:path} && {script:ccnavi-git.sh} <サブコマンド>` の形で実行します。コミットは作業を終えてからまとめて打ち、続けて integrate を打ちます（ユーザの確認を待つ間はコミットしません）。ターンの終わりの integrate の案内に従います
+      編集はこのワークツリーの下で行います（Write / Edit に渡すパス: {dest}/…）。git は `cd {dest:path} && {script:ccnavi-git.sh} <サブコマンド>` の形で実行します。コミットは作業を終えてからまとめて打ち、続けて integrate を打ちます（ユーザの確認を待つ間はコミットしません）
 
   NEXT_WORKTREE_ADOPT:
     kind: next
