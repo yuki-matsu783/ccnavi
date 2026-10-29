@@ -35,7 +35,22 @@ ccnavi ticket new <識別子> --title <タイトル> --plan <型,型,...> --issu
 - 作るのは親だけ。`todo/<識別子>.md` に、frontmatter（`version` `ticket` `issue` `mr` `title` `phases` `plan` `rationale` `allow`）と、本文の見出し `## 目的` `## 範囲` `## 対象外` `## 完了の確かめ方` `## 計画の理由` が入る
 - `rationale` と各見出しの下の `（ここに〜を書く）` は空欄の目印で、これが残ったままの新しい提案は、承認と `--lint` が止めるので、すべて書き換える
 - 止まったときは、何も書かれない（子の識別子を渡した、識別子と同名のワークツリーの外で打った、同じ識別子の提案が既にある、など）。出力の案内に従う
+- 子の提案は雛形が作らない。すぐ始まるステップ（`after` の無いステップ）ごとに、子を 1 つ以上同じ承認で通す。無いと `--agree --preview --verify` と `propose` が止まる（`ccnavi ticket new` の出力の「必須:」の行も言う）。先行のあるステップの子は、先行のレビューを見てから足してよい
 - `allow` は、雛形が計画の型の `scope` を集めて入れたもの。この作業で触るファイルに合わせて、手で絞るか足す。承認しても書けない項があれば、警告で名指しされる
+
+## 承認済みの親の改版の雛形を作る
+
+承認済みの親の計画・範囲・`phases:` を変える改版と、親を閉じる前のフィードバック計画（`feedback: []`）は、承認済みチケットをコピーした提案を、親と同じ識別子で `todo/` に置いて出す。手で写さず、親のワークツリーの中で雛形を作る。
+
+```
+ccnavi ticket revise <識別子> [--feedback]
+```
+
+- 承認済みの置き場の `doing/<識別子>.md` をコピーし、スクリプトだけが書く欄（`started_at`・`completed_at`・`base_sha`・`merged_sha`・`cancelled_at`・`cancel_reason`・`finished_to`・`settled_by`）と続きの子の目印を外して、`todo/<識別子>.md` に書く
+- `--feedback` は `feedback: []`（対応なし）を足す。全体計画のフェーズが全部閉じてレビューが済んだあと（局面が「フィードバック計画待ち」）だけ。フィードバック計画が既にあれば止まる。対応のフェーズを並べるときは、雛形の `feedback:` を直す
+- `--feedback` を付けないときは、写しだけを作る。`plan`・`phases`・`allow`・`ask`・`deny` を直す（範囲を変えるときは、作業中の子を先に取り消す。[decisions.md](decisions.md)）
+- `todo/` に同じ識別子の提案が既にあるときは、上書きせず止まる
+- 書けたら `--agree --preview --verify <識別子>` を通し、`ccnavi-ticket.sh propose <識別子>` で送る
 
 ## 親の提案の frontmatter
 
