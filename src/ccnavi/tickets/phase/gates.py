@@ -754,14 +754,10 @@ def resumed_review(
     もう一度 `finish` しても止まらず、レビューの告知も出ない。マーカーを消すかは
     レビューをやり直すかどうかで、ユーザが決める。`--lint` と `status` がこの文を warn で言う。
 
-    延期したフェーズの子は、引き受けた側（`review_at`）の `reviewed` が残っているときに言う
-    （消すのはその引き受けた側のマーカー）。引き受けた側がまだ
-    レビュー前なら、これからのレビューが再開後の作業も覆うので言わない。
+    延期したフェーズの子は、そのフェーズが一度終わった印（`skipped`）が残っているときに言う。
+    消すのは引き受けた側のマーカーだが、引き受け手は辿らず、置き場のどれかを確かめてもらう。
     閉じ直したときにレビューが要らないフェーズ（定義が `review: none` で、この子も
-    `human_review` を求めていない）と、レビューが要らない引き受け手は、マーカーが残っていても
-    止める条件に入らないので言わない。
-    引き受け手 M は、ゲートと同じく計画から計算した先行関係で引く `review_at`（`N.skipped` の
-    `deferred_to` ではない。書いたあとに改版で引き受け手が動けば、skipped は古くなる）。
+    `human_review` を求めていない）は、マーカーが残っていても止める条件に入らないので言わない。
     文には子の識別子を入れない（呼び手が前に付ける）。
     """
     if child.state != ticket_model.DOING or not child.is_child or child.phase is None:
@@ -771,19 +767,15 @@ def resumed_review(
         if ph.number != child.phase:
             continue
         if ph.deferred:
-            # 延期したフェーズは、引き受けた側 M のレビューが覆う。M が済んでいれば、再開後の作業は
-            # そのレビューに含まれない。M がまだなら、これからのレビューが再開後の作業も見る。
-            owner = next((p for p in phases if p.number == ph.review_at), None)
-            if owner is None or owner is ph or not owner.review_required:
-                return ""
-            if approval_marks.MARK_REVIEWED not in owner.marks:
+            if approval_marks.MARK_SKIPPED not in ph.marks:
                 return ""
             lead = (
-                f"作業中（doing/）ですが、このフェーズ {ph.label} は {ph.number} から "
-                f"{owner.number} へ延期されていて、フェーズ {owner.label} の reviewed マーカーが"
-                "残っています。再開後の作業は、そのレビューに含まれていません。"
+                f"作業中（doing/）ですが、延期したフェーズ {ph.label} は一度終わっています。"
+                "延期フェーズの子なので、マーカーは引き受けたフェーズの番号のものです。"
+                f"{_marks_dir(conf, child)}/ に *.{approval_marks.MARK_REVIEWED} が残っていれば、"
+                "再開後の作業はそのレビューに含まれていません。"
             )
-            return lead + _erase_steps(root, conf, child, owner.number)
+            return lead + _erase_steps(root, conf, child, None)
         # `review_kind` は子の要求（`human_review`）を `review/` と `done/` の子からしか数えない。
         # 再開された子は `doing/` なので、閉じ直したときに要る分（この子の要求）も足して見る。
         # ここだけで足し、`review_kind` は変えない（ゲートと告知とボードの判定を動かさないため）。
@@ -796,18 +788,22 @@ def resumed_review(
     return ""
 
 
-def _erase_steps(
-    root: str, conf: settings.Settings, child: ticket_model.Ticket, number: int
-) -> str:
-    """`number` 番の reviewed マーカーを消す手順と、残してよい場合の言い添え。"""
-    mark = "/".join(
-        (
-            conf.approved or settings.DEFAULT_APPROVED,
-            approval_marks.PHASES_DIR,
-            child.parent,
-            f"{number}.{approval_marks.MARK_REVIEWED}",
-        )
+def _marks_dir(conf: settings.Settings, child: ticket_model.Ticket) -> str:
+    """子の親のマーカーの置き場（ツリーのルートからの相対）。"""
+    return "/".join(
+        (conf.approved or settings.DEFAULT_APPROVED, approval_marks.PHASES_DIR, child.parent)
     )
+
+
+def _erase_steps(
+    root: str, conf: settings.Settings, child: ticket_model.Ticket, number: int | None
+) -> str:
+    """`number` 番の reviewed マーカーを消す手順と、残してよい場合の言い添え。
+
+    `number` が None（延期フェーズの子で番号を決めない）なら、マーカーの名前を `<番号>` と書く。
+    """
+    shown = "<番号>" if number is None else str(number)
+    mark = f"{_marks_dir(conf, child)}/{shown}.{approval_marks.MARK_REVIEWED}"
     git = settings.script_command(root, "ccnavi-git.sh")
     push = settings.script_command(root, "ccnavi-user-push-approved.sh")
     return (

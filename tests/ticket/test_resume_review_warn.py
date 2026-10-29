@@ -8,8 +8,8 @@
 2. 言わないもの: `reviewed` が無い、子が閉じている（`done/`）、レビューが要らないフェーズ
 3. 警告は判定と `start` を止めない
 4. 定義が `review: none` でも、再開された子が `human_review` を求めれば言う（閉じ直すと要る）
-5. 延期したフェーズの子が作業中で、引き受けた側に `reviewed` が残っていれば言う。
-   消すのは引き受けた側。引き受けた側がレビュー前なら言わない
+5. 延期したフェーズの子が作業中で、そのフェーズが一度終わった印（`skipped`）が残っていれば言う。
+   引き受け手は辿らず、マーカーの置き場と消し方（番号は `<番号>`）を言う
 """
 
 from __future__ import annotations
@@ -46,8 +46,8 @@ class ResumedReviewWarnTest(PhaseHarness):
             )
         self.commit_parent()
 
-    def setup_deferred(self, owner_mark):
-        """フェーズ 1（設計、延期）の子が作業中。2 は引き受け手で、owner_mark なら reviewed。"""
+    def setup_deferred(self, skipped):
+        """フェーズ 1（設計、延期）の子が作業中。skipped なら 1 が一度終わった印を置く。"""
         self.family(plan=[("design", "defer"), "acceptance", "implement"])
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/*",), True))
         self.commit_parent()
@@ -57,11 +57,11 @@ class ResumedReviewWarnTest(PhaseHarness):
         started = self.ccnavi("ticket", "start", "i0001-01-01")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
         phases = os.path.join(self.approved, "phases", "i0001")
-        write(
-            os.path.join(phases, "1.skipped"),
-            '{"at": "2026-01-01T00:00:00+0000", "deferred_to": 2}\n',
-        )
-        if owner_mark:
+        if skipped:
+            write(
+                os.path.join(phases, "1.skipped"),
+                '{"at": "2026-01-01T00:00:00+0000", "deferred_to": 2}\n',
+            )
             write(os.path.join(phases, "2.reviewed"), '{"at": "2026-01-01T00:00:00+0000"}\n')
         self.commit_parent()
 
@@ -141,39 +141,38 @@ class ResumedReviewWarnTest(PhaseHarness):
 
     # ---- 4. 延期したフェーズの子
 
-    def test_a_resumed_child_of_a_deferred_phase_is_warned_when_the_owner_is_reviewed(self):
-        self.setup_deferred(owner_mark=True)
+    def test_a_resumed_child_of_a_deferred_phase_is_warned_with_the_marker_place(self):
+        self.setup_deferred(skipped=True)
         for text in (self.lint(), self.status_of_child()):
-            self.assertIn("フェーズ 1（設計） は 1 から 2 へ延期されていて", text)
-            self.assertIn("再開後の作業は、そのレビューに含まれていません", text)
-            # 消すのは引き受けた側（2）のマーカー。延期の skipped ではない
-            self.assertIn("ccnavi-git.sh rm .ccnavi/approved/phases/i0001/2.reviewed", text)
-            self.assertNotIn("1.skipped", text)
+            self.assertIn("延期したフェーズ 1（設計） は一度終わっています", text)
+            self.assertIn(".ccnavi/approved/phases/i0001/ に *.reviewed が残っていれば", text)
+            self.assertIn("ccnavi-git.sh rm .ccnavi/approved/phases/i0001/<番号>.reviewed", text)
             self.assertIn("ツリー .claude/worktrees/i0001で", text)
+            self.assertIn("続きの作業だけなら、そのままで構いません", text)
         self.assertTrue(
             os.path.exists(os.path.join(self.approved, "phases", "i0001", "2.reviewed"))
         )
         self.assertTrue(os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.skipped")))
 
-    def test_no_warning_for_a_deferred_child_while_the_owner_is_not_reviewed(self):
-        self.setup_deferred(owner_mark=False)
+    def test_no_warning_for_a_deferred_child_whose_phase_has_not_ended(self):
+        self.setup_deferred(skipped=False)
         self.assertNotIn(MARKER_WORDS, self.lint())
-        self.assertNotIn("延期されていて", self.lint())
-        self.assertNotIn("延期されていて", self.status_of_child())
+        self.assertNotIn("一度終わっています", self.lint())
+        self.assertNotIn("一度終わっています", self.status_of_child())
 
     def test_no_warning_for_a_closed_child_of_a_deferred_phase(self):
-        self.setup_deferred(owner_mark=True)
+        self.setup_deferred(skipped=True)
         os.makedirs(os.path.join(self.approved, "done"), exist_ok=True)
         os.rename(
             os.path.join(self.approved, "doing", "i0001-01-01.md"),
             os.path.join(self.approved, "done", "i0001-01-01.md"),
         )
         self.commit_parent()
-        self.assertNotIn("延期されていて", self.lint())
-        self.assertNotIn("延期されていて", self.status_of_child())
+        self.assertNotIn("一度終わっています", self.lint())
+        self.assertNotIn("一度終わっています", self.status_of_child())
 
     def test_the_deferred_warning_does_not_stop_the_verdict_or_lint(self):
-        self.setup_deferred(owner_mark=True)
+        self.setup_deferred(skipped=True)
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         result = self.hook(
             "PreToolUse",
@@ -183,7 +182,7 @@ class ResumedReviewWarnTest(PhaseHarness):
         )
         self.assertNotIn("DENY", self.reason(result))
         warned = self.ccnavi("--lint")
-        self.assertIn("延期されていて", warned.stdout)
+        self.assertIn("一度終わっています", warned.stdout)
         self.assertEqual(warned.returncode, 0, warned.stdout)
         self.assertIn("error 0 件", warned.stdout)
 
