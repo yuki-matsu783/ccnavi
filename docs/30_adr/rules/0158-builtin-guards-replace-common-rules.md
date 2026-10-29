@@ -8,7 +8,7 @@ keywords: [組み込み, 共通ルール, 認証情報, guard-hooks, guard-setti
 
 # ADR-0158: ccnavi 自身の保護と認証情報の保護を組み込みに寄せ、共通の rules.yml から外す
 
-状態: 採用
+状態: 採用（D の、dry-run で名前で書くツールが直した書き込みを戻さない例外は ADR-0187 がやめた）
 
 ## 状況
 

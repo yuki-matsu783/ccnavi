@@ -265,16 +265,22 @@ class BrokenRecordTest(TurnGateTestCase):
         self.speak()
         self.assertIsNone(self.b("copy-out foo"))
 
-    def test_壊れた記録は更新時刻で数え_どのキーとも一致する(self):
+    def test_壊れた記録はどの_B_も止め_次の発言で消える(self):
         self.a("copy-in foo")
-        name = self.files()[0]
-        path = os.path.join(self.state, name)
+        path = os.path.join(self.state, self.files()[0])
         with open(path, "w", encoding="utf-8") as f:
             f.write("{not json")
-        os.utime(path, (self.clock, self.clock))
+        self.speak()  # 記録の時刻は読めないので、この発言の前後を決めない
 
-        self.assertIsNotNone(self.b("copy-out bar"))
+        got = self.b("copy-out bar")
+        self.assertEqual(got.reason, turngate.BROKEN)
+        self.assertEqual(got.detail, path)
+        self.assertEqual(self.b("promote").reason, turngate.BROKEN)
+
+        # 次のユーザの発言（UserPromptSubmit）が壊れた記録を消す。
         self.speak()
+        turngate.drop_broken(self.state, SESSION)
+        self.assertEqual(self.files(), [])
         self.assertIsNone(self.b("copy-out bar"))
 
     def test_形の違う記録も壊れた記録として数える(self):
@@ -282,9 +288,16 @@ class BrokenRecordTest(TurnGateTestCase):
         path = os.path.join(self.state, self.files()[0])
         with open(path, "w", encoding="utf-8") as f:
             json.dump({"session": SESSION, "gate": "copy-out", "key": "foo", "at": "x"}, f)
-        os.utime(path, (self.clock, self.clock))
+        self.speak()
 
-        self.assertIsNotNone(self.b("copy-out foo"))
+        self.assertEqual(self.b("copy-out foo").reason, turngate.BROKEN)
+
+    def test_発言で消すのは壊れた記録だけ(self):
+        self.a("copy-in foo")
+        turngate.drop_broken(self.state, SESSION)
+
+        self.assertEqual(len(self.files()), 1)
+        self.assertEqual(self.b("copy-out foo").reason, turngate.NO_USER_TURN)
 
     def test_置き場を読めなければ_B_を止める(self):
         # 置き場の名前にファイルを置くと、listdir が NotADirectoryError になる。
@@ -366,6 +379,7 @@ class MessageTest(TurnGateTestCase):
             self.b("copy-in foo && copy-out foo"),
             turngate.Stop(COPY, turngate.UNREADABLE, "foo", "permission denied"),
             turngate.Stop(COPY, turngate.UNWRITABLE, "foo", "disk full"),
+            turngate.Stop(COPY, turngate.BROKEN, "foo", "/state/turngate-s1-x.json"),
         ):
             with self.subTest(reason=stop.reason):
                 text = turngate.message(stop, self.root)
@@ -386,6 +400,15 @@ class MessageTest(TurnGateTestCase):
 
         self.assertIn("permission denied", text)
         self.assertIn("次: ユーザに", text)
+
+    def test_壊れた記録は_パスを出し_次の発言を待たせる(self):
+        stop = turngate.Stop(COPY, turngate.BROKEN, "foo", "/state/turngate-s1-x.json")
+
+        text = turngate.message(stop, self.root)
+
+        self.assertIn("/state/turngate-s1-x.json", text)
+        self.assertIn("次: ここでターンを終え", text)
+        self.assertIn("copy-out を打ち直す", text)
 
 
 class ConditionTest(unittest.TestCase):

@@ -449,7 +449,7 @@ def _read_relations(ticket: ticket_model.Ticket, front: dict, problems: list[Pro
                 Problem(
                     SEVERITY_ERROR,
                     name,
-                    "`issue` は課題の番号（正の整数）で書く。`#12` も可。"
+                    "`issue` は課題の番号（正の整数）で書く。"
                     "別のリポジトリの課題は `owner/repo#12`",
                 )
             )

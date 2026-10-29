@@ -3,7 +3,7 @@
 
 1. `finish`（`write_and_push_merge._tree_problem`）: プロジェクトの親だけミラーの案内。
    ワークスペース自身の親は従来のまま。混在のときはずれ以外の件数も出す
-2. `confirm`（`review.moved_detail` と `moved_explanation`）: 動かしたのがミラー側だけか、一部か
+2. `confirm`（`review.moved_detail` と `moved_explanation`）: 動かしたのがミラー側だけなら 1 文足す
 """
 
 from __future__ import annotations
@@ -94,7 +94,7 @@ class MovedTest(unittest.TestCase):
         self.conf = settings.Settings()
 
     def explain(self, changed, project=True):
-        moved = review.moved_detail(self.conf, {"head": RECORDED}, HEAD, changed, True, project)
+        moved = review.moved_detail(self.conf, {"head": RECORDED}, HEAD, changed, project)
         self.assertTrue(moved.text)
         return "\n".join(review.moved_explanation(moved))
 
@@ -103,11 +103,8 @@ class MovedTest(unittest.TestCase):
         self.assertIn("ミラーのずれ", text)
         self.assertIn("再 `request`", text)
 
-    def test_a_mix_counts_the_mirror_side(self):
-        text = self.explain([MIRROR_FILE, "src/keep.py"])
-        self.assertIn("ミラー側", text)
-        self.assertIn("1 件（全体 2 件）", text)
-        self.assertNotIn("再 `request`", text)
+    def test_a_mix_gets_no_mirror_sentence(self):
+        self.assertNotIn("ミラー", self.explain([MIRROR_FILE, "src/keep.py"]))
 
     def test_normal_paths_get_no_mirror_sentence(self):
         self.assertNotIn("ミラー", self.explain(["src/keep.py"]))

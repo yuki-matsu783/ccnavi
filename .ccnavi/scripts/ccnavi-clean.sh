@@ -21,9 +21,8 @@
 # 趣旨（消す対象を名指しする）に合わせてある。
 #
 # 消すのは、作り直せば戻る決まった名前のディレクトリだけ。何を消すかと消し方は
-# ccnavi-clean.js にある。node が無ければ、同じものを sh で消す（clean_with_sh）。
-# sh の rm は Windows の深い node_modules を消しきれないことがあり、そのときは
-# 消し残しとして 1 で返る。
+# ccnavi-clean.js にある。node が無ければ何も消さず、node_modules と .venv を消すための
+# 1 本（ユーザが打つ）を出して 1 で返る。
 #
 # ワークツリーに未コミットの変更があれば、何も消さずに止める。別のセッションが
 # そこで作業している見込みが高い。git に登録の残っていない、消しきれなかったディレクトリ（.git が無い、
@@ -143,132 +142,45 @@ if [ -e "$target/.git" ]; then
 	fi
 fi
 
-# node が無いときの消し方。ccnavi-clean.js と同じものを探し、同じ文面で報告する。
-#
-# 探すのは find、消すのは rm -rf。find は既定でリンクをたどらない。rm -rf はリンクを
-# 末尾の / 無しで渡せば、リンクそのものだけを消して先は残す。
-#
-#   clean_with_sh <ワークツリーの絶対パス>
-#
-# 終了コード: 0 成功 / 1 消し残しか、名前が読めずに止めた
-clean_with_sh() {
-	cw_top="$1"
-	cw_nl='
-'
-	# find の出力は行で読む。名前に改行があると行の切れ目を取り違え、名前の途中から
-	# 始まる行がワークツリーの外（`../` で始まるパス）を指しかねない。1 つでもあれば
-	# 何も消さない。調べるのは消す対象の外だけ（中の node_modules などは中身ごと消す）。
-	cw_odd=$(cd "$cw_top" && {
-		find . -name .git -prune \
-			-o \( -name node_modules -o -name .venv -o -name __pycache__ -o -name .pytest_cache -o -name .ruff_cache \) -prune \
-			-o -name "*${cw_nl}*" -print 2>/dev/null || :
-	}) || {
-		printf 'ccnavi-clean: %s に移動できません。\n' "$cw_top" >&2
-		return 1
-	}
-	if [ -n "$cw_odd" ]; then
-		printf 'ccnavi-clean: 名前に改行を含むものがあるので、sh では何も消しません。node を入れて再実行してください。\n' >&2
-		return 1
-	fi
-
-	# 決まった名前はそこで降りるのをやめる（-prune）。out は package.json の隣かどうかを
-	# 後で見るので、ここでは降りる。読めないディレクトリは探さない（find のエラー出力は破棄する）。
-	cw_found=$(cd "$cw_top" && {
-		find . -name .git -prune \
-			-o \( -name node_modules -o -name .venv -o -name __pycache__ -o -name .pytest_cache -o -name .ruff_cache \) \
-			\( -type d -o -type l \) -print -prune \
-			-o -name out \( -type d -o -type l \) -print 2>/dev/null || :
-	} | LC_ALL=C sort)
-
-	# 並べ替え済みなので、消す out は必ずその中身より先に来る。消す out の下にあるものは
-	# out ごと消えるので、並べない。
-	cw_targets=""
-	cw_outs=""
-	while IFS= read -r cw_rel; do
-		[ -n "$cw_rel" ] || continue
-		case "$cw_rel" in
-		./*) cw_rel="${cw_rel#./}" ;;
-		*)
-			printf 'ccnavi-clean: find の出力が読めません（%s）。何も消しません。\n' "$cw_rel" >&2
-			return 1
-			;;
-		esac
-		cw_up="$cw_rel"
-		cw_inside=""
-		while :; do
-			case "$cw_up" in
-			*/*) cw_up="${cw_up%/*}" ;;
-			*) break ;;
-			esac
-			case "$cw_nl$cw_outs" in
-			*"$cw_nl$cw_up$cw_nl"*)
-				cw_inside=1
-				break
-				;;
-			esac
-		done
-		[ -z "$cw_inside" ] || continue
-		case "$cw_rel" in
-		out | */out)
-			case "$cw_rel" in
-			*/out) cw_dir="${cw_rel%/out}" ;;
-			*) cw_dir=. ;;
-			esac
-			# JS と同じく、リンクの package.json は数えない。
-			if [ ! -f "$cw_top/$cw_dir/package.json" ] || [ -L "$cw_top/$cw_dir/package.json" ]; then
-				continue
-			fi
-			cw_outs="$cw_outs$cw_rel$cw_nl"
-			;;
-		esac
-		cw_targets="$cw_targets$cw_rel$cw_nl"
-	done <<EOF
-$cw_found
-EOF
-
-	if [ -z "$cw_targets" ]; then
-		printf '削除するものはありません（%s）\n' "$cw_top"
-		return 0
-	fi
-
-	cw_failed=""
-	while IFS= read -r cw_rel; do
-		[ -n "$cw_rel" ] || continue
-		if [ -n "$dry" ]; then
-			printf 'would remove %s\n' "$cw_rel"
-			continue
-		fi
-		# 使用中の状態がすぐ解けることがあるので、3 回まで試す（JS の maxRetries に合わせる）。
-		cw_tries=0
-		cw_err=""
-		while :; do
-			cw_err=$(rm -rf "$cw_top/$cw_rel" 2>&1 >/dev/null) || :
-			[ -e "$cw_top/$cw_rel" ] || [ -L "$cw_top/$cw_rel" ] || break
-			cw_tries=$((cw_tries + 1))
-			[ "$cw_tries" -lt 3 ] || break
-			sleep 1
-		done
-		if [ -e "$cw_top/$cw_rel" ] || [ -L "$cw_top/$cw_rel" ]; then
-			cw_failed=1
-			cw_err=$(printf '%s\n' "$cw_err" | head -n 1)
-			printf '削除できなかった: %s (%s)\n' "$cw_rel" "${cw_err:-残った}" >&2
-		else
-			printf 'removed %s\n' "$cw_rel"
-		fi
-	done <<EOF
-$cw_targets
-EOF
-
-	if [ -n "$cw_failed" ]; then
-		printf 'ccnavi-clean: 消し残しがあります。Windows では、読み込まれている DLL（uv の .venv の .pyd）はどのワークツリーからも削除できません。テストが終わるのを待って再実行するか、ディレクトリごと mv で .claude/worktrees/ の外へ出し、`git worktree prune` を打ってください。\n' >&2
-		return 1
-	fi
-	return 0
-}
-
 if command -v node >/dev/null 2>&1; then
 	exec node "$(dirname "$0")/ccnavi-clean.js" "$target" ${dry:+--dry-run}
 fi
 
-printf 'ccnavi-clean: node が見つからないので、sh で消します。\n' >&2
-clean_with_sh "$target"
+# node が無ければ消さない。消えにくい生成物（node_modules・.venv）を探し、ユーザが打つ削除の 1 本を出して止める。
+# エージェントは再帰の削除を打てない（builtin:recursive-delete）。Windows（Git Bash）では、260 文字を超える
+# パスと junction を扱える `rd /s /q "\\?\<パス>"`（junction はたどらずにリンクだけを消す）、ほかは `rm -rf`。
+found=$(find "$target" -name .git -prune -o \( -name node_modules -o -name .venv \) -type d -print -prune 2>/dev/null || :)
+paths=""
+on_windows=""
+old_ifs=$IFS
+IFS='
+'
+set -f
+for path in $found; do
+	# 名前に改行があると行の切れ目を取り違える。ワークツリーの中の決まった名前で終わる行だけを使う。
+	case "$path" in
+	"$target"/node_modules | "$target"/*/node_modules | "$target"/.venv | "$target"/*/.venv) ;;
+	*) continue ;;
+	esac
+	if win=$(cd "$path" && pwd -W 2>/dev/null); then
+		on_windows=1
+		win=$(printf '%s\n' "$win" | sed 's#/#\\#g')
+		paths="$paths \"\\\\?\\$win\""
+	else
+		paths="$paths $(ccnavi_sh_quote "$path")"
+	fi
+done
+set +f
+IFS=$old_ifs
+if [ -z "$paths" ]; then
+	printf '削除するものはありません（%s）\n' "$target"
+	exit 0
+fi
+if [ -n "$on_windows" ]; then
+	cmd="cmd //c 'rd /s /q$paths'"
+else
+	cmd="rm -rf$paths"
+fi
+printf 'ccnavi-clean: node が見つからないので消しません。node を入れて再実行するか、次の 1 本を打つようユーザに頼んで返事を待ってください（エージェントは再帰の削除を打てません）。\n' >&2
+printf '%s\n' "$cmd" >&2
+exit 1

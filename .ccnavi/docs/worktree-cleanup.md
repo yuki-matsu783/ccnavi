@@ -66,7 +66,7 @@ keywords: [片付け, ワークツリー, worktree remove, ccnavi-clean.sh, 分�
 
 - 自分で`worktree remove`を打つとき（`<統合先>`に直接取り込んだワークツリーなど）は、その前に`ccnavi-clean.sh <名前>`で
   node_modules・.venvなどの生成物を消す。Windowsで削除が途中で止まるのを防ぐためである。未コミットの変更があるワークツリーでは、
-  `ccnavi-clean.sh`は何も消さずに止まる。`ccnavi-clean.sh --worktree <名前>`は掃除と`worktree remove`を1本で行う
+  `ccnavi-clean.sh`は何も消さずに止まる。node が無いときも何も消さず、ユーザが打つ削除の1本を出して止まる（エージェントは打たず、ユーザに頼む）。`ccnavi-clean.sh --worktree <名前>`は掃除と`worktree remove`を1本で行う
 - 片付けの1本（`ccnavi-clean.sh --worktree`）や`ccnavi-git.sh rm -r wip`がClaude Codeの自動モードの分類器に止められたら、迂回しない。
   ユーザに許可を頼む。続けて許すなら、ユーザがホームの`~/.claude/settings.json`の`permissions.allow`に、操作ごとに絞った許可
   （例 `Bash(sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-clean.sh --worktree *)`）を足す。分類器はプロジェクトの
