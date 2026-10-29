@@ -46,6 +46,7 @@ write-and-push の中では書いたものが push の失敗で戻ることが�
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 import stat
 from dataclasses import dataclass
@@ -198,7 +199,7 @@ def report(stdout: TextIO, root: str, d: Dropped, after: str = "。ブランチ�
         stdout.write(
             f"ワークツリー {d.name} に未コミットの変更があるので、何も削除しませんでした。"
             "別のセッションが作業している見込みがあるので、"
-            f"ユーザに git -C {d.path} status で確かめてもらう\n"
+            f"ユーザに git -C {shlex.quote(d.path)} status で確かめてもらう\n"
         )
     elif d.status == IGNORED:
         stdout.write(
@@ -315,7 +316,9 @@ def _leftover_facts(path: str) -> tuple[list[str], list[str]]:
     if changes:
         scratch = [c for c in changes if "wip/handoff/" in c.replace("\\", "/")]
         why.append("未保存の下書きがある（wip/handoff/）" if scratch else "未コミットの変更がある")
-        check.append(f"`git -C {path} status` で中身を見て、必要なものはコミットするか退避する")
+        check.append(
+            f"`git -C {shlex.quote(path)} status` で中身を見て、必要なものはコミットするか退避する"
+        )
     ignored, _ = _ignored(path)
     if ignored:
         why.append("git が無視しているファイル（.env など）がある")

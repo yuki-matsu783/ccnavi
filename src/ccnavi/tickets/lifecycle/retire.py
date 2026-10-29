@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 from dataclasses import dataclass
 from typing import TextIO
 
@@ -624,7 +625,7 @@ def _parent_head_blocker(parent_path: str, branch: str, has_ref: bool) -> str:
         return (
             f"親のワークツリーの HEAD が記録のブランチ {branch} を指していない、"
             "またはその ref が手元に無いので、成果が失われないか確かめられない"
-            f"（git -C {parent_path} status で HEAD とブランチを確かめてください）"
+            f"（git -C {shlex.quote(parent_path)} status で HEAD とブランチを確かめてください）"
         )
     return ""
 

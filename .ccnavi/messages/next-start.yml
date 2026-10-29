@@ -30,7 +30,7 @@ messages:
     kind: next
     values: [host, args_q]
     next: |-
-      ユーザに glab の {host} への認証か GITLAB_TOKEN の用意を頼み、返事を待つ。用意できたら打ち直す: {script:ccnavi-start.sh} {args_q}。用意できなければ、直接実装に切り替えず、ユーザに報告して止まる
+      ユーザに glab の {host} への認証か GITLAB_TOKEN の用意を頼み、返事を待つ。用意できたら打ち直す: {script:ccnavi-start.sh} {args_q}。認証済みで一時的な失敗（応答なし）なら、そのまま打ち直す。用意できなければ、直接実装に切り替えず、ユーザに報告して止まる
 
   NEXT_START_IDENT:
     kind: next

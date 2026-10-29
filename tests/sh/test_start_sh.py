@@ -1971,7 +1971,8 @@ exec '{self.bin}/curl' -X "$method" "https://gitlab.com/api/v4/$path"
     def test_gitlab_unreachable_at_search_has_no_mcp(self):
         done = self.run_sh("--issue", "152", token=False)
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
-        self.assertIn("GitLab の API に届かない（認証なし）", done.stdout)
+        self.assertIn("GitLab の API に届かない（glab が", done.stdout)
+        self.assertIn("利用できず", done.stdout)
         self.assertNotIn("mcp__github__", done.stdout)
 
     def test_gitlab_unreachable_asks_the_user_for_auth_and_reruns(self):
