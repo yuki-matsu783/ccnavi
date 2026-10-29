@@ -141,3 +141,14 @@ messages:
         [ccnavi] {code} ({shown}) frontmatter に type が無いと、'{command} --docs' の --type・--tag・--keyword で見つかりません。既にあるキーの値と順序は変えず、type: skill を足してください。
       convention: |-
         [ccnavi] {code} ({shown}) frontmatter に type が無いと、'{command} --docs' の --type・--tag・--keyword で見つかりません。既にあるキーの値と順序は変えず、type: skill を足してください。type の値と決まりは {doc}（'{command} --docs --keyword frontmatter' でも引けます）。
+
+  # ---- hook/turngate.py（付き添いのあるセッションで、B をユーザの確認に出す宣言）
+  NOTICE_ASK_USER_CONFIRM__INTEGRATE:
+    kind: notice
+    values: [second_name, where, key]
+    what: |-
+      {second_name} を打つには、ユーザの確認が要ります{where}。
+    why: |-
+      取り込み先はユーザが使っている場所で、取り込むと、ユーザがエディタで開いている内容と食い違うことがあるためです。この確認は、ユーザが了承したという操作です。差分を読んだかどうかは、ccnavi には確かめられません。
+    next: |-
+      確認の前に、integrate の出力にある差分と変わるファイルを、文章でユーザに見せておく。許可されたら確定し、断られたら取り込まず、やめるなら {script:ccnavi-git.sh} integrate --abort {key} を打つ

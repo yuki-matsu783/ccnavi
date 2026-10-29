@@ -14,7 +14,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 |---|---|
 | `DENY_COMMAND_PATTERN` | Bash の実行される部分がルールにヒットした。読み切れない形でも、ヒットしたルールが全部、中で実行されるコマンドでヒットしたときはこれ（6.3.1） |
 | `DENY_PATH` | ファイルのパスがヒットした |
-| `RULE_ASK` | ルールの `ask` にヒットした |
+| `RULE_ASK` | ルールの `ask` にヒットした。付き添いのあるセッションで、ターン分離の関門の B を確認に出した回も同じコードになる。`rules` は `builtin:turn-gate:<宣言 id>` |
 | `UNDECLARED` | どのルールも言及しない。権限モードに委ねた、または確認できる者が居ないので断った |
 | `PARSE_UNCERTAIN` | コマンドを読み切れず生の文字列に適用し、どこにもヒットしなかった |
 | `DENY_SHELL_WORKSPACE_ROOT` | Bash の書き込み先（`>`・`tee`・`sed -i`・`rm`・`mv`・`cp` など）を、`cd` で移った先をたどって絶対パスに解くと、ルールファイルの `workspace-root` にヒットした。ワークスペースルート直下には書かず、`wip/handoff/`・`scratchpad/`・ワークツリーの中に書くよう案内して止める。ガード自身の保護など、ほかの `deny` にヒットした呼び出しはその文面で止まる。変数・置換・`~`・`{}` で組んだ書き込み先と、インタプリタに渡したコードの中は見ず、実行後チェックが戻す |
@@ -46,7 +46,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `NUDGE_STOP_RULE` | メインエージェントの `Stop` で、`match: Stop` の `allow` のルールが渡す回になった（`every` の刻み）。止めて、ルールの文を渡す。`finish` の促しと重なった回は出ない（6.6）。記録の `decision` は `nudge` |
 | `DENY_SUBAGENT_TICKET_OP` | サブエージェントが、役割の表（`user_only.SUBAGENT_ROLES`）で許されていない操作（チケットの状態・レビュー・push・開始や片付けの sh）を打とうとした |
 | `DENY_SUBAGENT_PARENT_TREE` | サブエージェントが、親のワークツリーへの merge・commit・書き込みをしようとした。子のワークツリーでのコミットと、衝突を解くための親のブランチの merge は通す。親のワークツリーかは、そのワークツリー自身のチケットで決める（9.12） |
-| `DENY_NEEDS_USER_TURN` | ターン分離の関門。A（`ccnavi-git.sh integrate <名前>`）を打ったあと、ユーザの発言をはさまずに B（`ccnavi-git.sh integrate-done <名前>`）を打った。同じコマンドに A と B を連結した形、記録を読み書きできない場合も。ルールより先に止め、`dry-run` でも止める。どの宣言かは記録の `rules` と文面が言う（6.7） |
+| `DENY_NEEDS_USER_TURN` | ターン分離の関門。A（`ccnavi-git.sh integrate <名前>`）を打ったあと、ユーザの発言をはさまずに B（`ccnavi-git.sh integrate-done <名前>`）を打った。同じコマンドに A と B を連結した形、記録を読み書きできない場合も。ルールより先に止め、`dry-run` でも止める。付き添いのあるセッションでは、連結した形以外の B は止めずに確認（`RULE_ASK`）に出す。どの宣言かは記録の `rules` と文面が言う（6.7） |
 | `DENY_CHILD_PUSH` | 子チケットのワークツリーから `ccnavi-git.sh push` を打った。`cd` の行き先が読めない push を含む（9.10） |
 | `DENY_SCRIPT_ENV_OVERRIDE` | 保護済みの sh を、sh の検査の材料を変える環境変数と同じコマンド行で呼んだ。補助の保護で、`CCNAVI_GUARD_CORE_FILES` では切れず、`dry-run` でも止める（8.2） |
 | `DENY_WRAPPER_CORE_PATH` | `ccnavi-git.sh` の `rm`・`restore --source`・`checkout <ref> <パス>` で、自己防衛の対象か承認済みチケットの置き場かレビュー待ちの置き場（`wip/proposals/review/`。置き場に何かがある間はその親も）を消す・別のコミットの中身に戻そうとした。対象を読み切れない形（変数・置換・居場所の読めない `cd` / `pushd` の後の相対パス）、サブコマンドが文字どおりの語でない形、標準入力から読むシェルに流す文字列の中の呼び出し、走査が読み切れず名前の直後に文字どおりのサブコマンドが無い形と、索引の中身に戻す `checkout -- <パス>` も（8.2） |

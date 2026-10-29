@@ -85,7 +85,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チ
 | `ccnavi-ticket.sh start`（親で子の無いフェーズが残る） | フェーズごとに子チケットを作る | `tickets/lifecycle/plan.py` |
 | `ccnavi-ticket.sh finish`（子で、レビュー不要） | 親の `status` | `tickets/lifecycle/commands.py` |
 | `ccnavi-ticket.sh finish`（親） | 移動をコミットして push し、Draft を解除する | `tickets/lifecycle/commands.py` |
-| `ccnavi-git.sh integrate` | 差分と変わるファイルをユーザに見せ、返事を待ってターンを終える。確定はユーザの発言のあとで、了承を得ていれば `integrate-done`（やめるなら `integrate --abort`）。取り込む差分が無いときも、ユーザに伝えて返事を待ち、片付けは発言のあと | `ccnavi-git.sh` |
+| `ccnavi-git.sh integrate` | 差分と変わるファイルをユーザに見せる。対話では、続けて `integrate-done` を打つと確認が出て、許可されたら確定する。非対話では、返事を待ってターンを終え、了承を得ていれば `integrate-done` で確定する（やめるなら `integrate --abort`）。取り込む差分が無いときも、ユーザに伝えて返事を待ち、片付けは了承のあと | `ccnavi-git.sh` |
 | `ccnavi-worktree.sh` の成功（切ったとき・既にあるとき） | 編集は、ワークツリーの中で行う。git は `cd <引用したパス> && <ラッパー> <サブコマンド>`。作業を終えてからまとめてコミットし、続けて integrate を打つ（確認を待つ間はコミットしない）。名前の警告の後に出る最後の行 | `ccnavi-worktree.sh` の `print_next` |
 
 issue・MRを指定された依頼文には、ccnaviのUserPromptSubmitが「出力に『次:』があればそれに従う」と足す（`tickets/lifecycle/branchfind.py` の `_start_lines`）。

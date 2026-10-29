@@ -173,7 +173,7 @@ ccnavi のリポジトリのテストは、次も見る（呼ぶ側が手元の�
 この設計に沿って、次を文面ファイルに移した。残りと進め方は `.agents/docs/message-migration.md` の一覧表と「残りの進め方」が持つ。
 
 - 拒否: シェルからルート直下へ書く形（`DENY_SHELL_WORKSPACE_ROOT`）、承認された作業範囲の外の報告（`RULE_TICKET_SCOPE__*`）、組み込みルールの文（`RULE_*`。`builtin:` で始まる id のルール。判定のたびに組み立てるので、識別子と値だけを持たせ、拒否に当たった回に引く）、組み込みの拒否の大半（`DENY_TICKET_*`・`DENY_PHASE_REVIEW`・`DENY_NEEDS_USER_TURN`・`DENY_AGENT_*`・ラッパーと関門の `DENY_*`・書き直しを求める拒否・`DENY_REDIRECT_LIMIT`）と、確認の理由（`RULE_ASK`）
-- 通知: `fallen_back`・`undeclared`（`NOTICE_FALLEN_BACK`・`NOTICE_UNDECLARED__*`）、実行後の報告の案内（`NOTICE_POST_*`・`NOTE_POST_*`）、md の索引の案内（`NOTICE_DOCS_*`）。`internal_error_notice` は、ccnavi 自身に不具合があるときに出る文で、文面ファイルに頼らないので移さない
+- 通知: `fallen_back`・`undeclared`（`NOTICE_FALLEN_BACK`・`NOTICE_UNDECLARED__*`）、実行後の報告の案内（`NOTICE_POST_*`・`NOTE_POST_*`）、md の索引の案内（`NOTICE_DOCS_*`）、ターン分離の関門が確認に出すときの文（`NOTICE_ASK_USER_CONFIRM__*`）。`internal_error_notice` は、ccnavi 自身に不具合があるときに出る文で、文面ファイルに頼らないので移さない
 - 促し: `NUDGE_INTEGRATE`・`NUDGE_TICKET_*`・`NUDGE_SUBAGENT_OUTCOME`・`NUDGE_STOP_RULE`、`standing` の案内
 - sh の `次:`: `ccnavi-start.sh` の `次:` と `次の手:` の全部、`ccnavi_pf_next`（事前確認）、`ccnavi-git.sh`・`ccnavi-worktree.sh`・`ccnavi-stage.sh`・`ccnavi-ticket.sh`・`ccnavi-user-close-early.sh` の `次:`
 
