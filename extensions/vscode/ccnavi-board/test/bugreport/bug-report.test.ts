@@ -18,7 +18,7 @@ import {
   screenshotCommand,
 } from "../../src/core/bug-report.js";
 
-/** zip を中央ディレクトリから読み戻す（名前 → 中身）。書いた形を外の道具に頼らず確かめる */
+/** zip を中央ディレクトリから読み戻して（名前 → 中身）、書いた形を外の道具に頼らず確かめる */
 function readZip(zip: Buffer): Map<string, { data: Buffer; method: number }> {
   const end = zip.length - 22;
   assert.equal(zip.readUInt32LE(end), 0x06054b50, "終わりの印が無い");
@@ -79,7 +79,7 @@ test("CB-T1231 録画は画面全体を mkv に録り（Windows と WSL は gdig
   assert.match(gif[gif.indexOf("-vf") + 1], /palettegen.*paletteuse/);
 });
 
-test("CB-T1232 スクリーンショットは ffmpeg を使わず、macOS は screencapture、Windows と WSL は PowerShell で撮る。パスの引用符はスクリプトの中で崩れない", () => {
+test("CB-T1232 スクリーンショットは ffmpeg を使わず、macOS は screencapture、Windows と WSL は PowerShell で撮る。パスの引用符がスクリプトの中で崩れない", () => {
   assert.deepEqual(screenshotCommand("mac", "/t/s 1.png"), { file: "screencapture", args: ["-x", "-t", "png", "/t/s 1.png"] });
   const windows = screenshotCommand("windows", "C:\\Users\\o'neil\\s.png");
   assert.ok(windows !== undefined);
@@ -90,7 +90,7 @@ test("CB-T1232 スクリーンショットは ffmpeg を使わず、macOS は sc
   assert.match(script, /\$bmp\.Save\('C:\\Users\\o''neil\\s\.png', /);
 });
 
-test("CB-T1233 ログは始めたときの大きさを控え、終わりにはそのあと足された行だけを取る（作り直されたファイルと新しいファイルは全体）", () => {
+test("CB-T1233 ログは始めたときの大きさを控え、終わりには、そのあとに足された行だけを取る（作り直されたファイルと新しく現れたファイルは全体）", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bug-report-test-"));
   try {
     fs.writeFileSync(path.join(dir, "ccnavi-board.log"), "古い行\n");

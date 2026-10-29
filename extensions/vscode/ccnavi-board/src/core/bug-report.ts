@@ -7,7 +7,7 @@
  * - zip の組み立て（依存を増やさないため、ここで書く）
  *
  * ffmpeg は利用者に入れてもらう。見つからなければ録画だけをやめ、スクリーンショットとログの zip は作る。
- * 子プロセスを起こすのは src/bug-report.ts で、ここはコマンドと引数を組むだけ。
+ * 子プロセスを起動するのは src/bug-report.ts で、ここはコマンドと引数を組むだけ。
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -44,7 +44,7 @@ export const GIF_MAX_WIDTH = 1280;
 
 /**
  * ffmpeg を探す候補。設定 `ccnaviBoard.ffmpegPath` があればそれだけを使う。
- * macOS は Dock から起動した VS Code の PATH に Homebrew が入らないことがあるので、置き場を足す。
+ * macOS では、Dock から起動した VS Code の PATH に Homebrew が入っていないことがあるので、置き場を候補に足す。
  */
 export function ffmpegCandidates(kind: Capture, configured: string): string[] {
   if (configured.trim() !== "") {
@@ -77,7 +77,7 @@ function inputArgs(kind: Capture): string[] {
 
 /**
  * 録画の引数。止めるときは標準入力に `q` を送る。
- * 途中で切れても読める mkv に、縦横を偶数にそろえて（yuv420p の条件）書く。`output` は ffmpeg から見たパス。
+ * 途中で切れても読めるよう mkv に書き、縦横は偶数にそろえる（yuv420p の条件）。`output` は ffmpeg から見たパス。
  */
 export function recordArgs(kind: Capture, output: string): string[] {
   return [
@@ -98,7 +98,7 @@ export function recordArgs(kind: Capture, output: string): string[] {
   ];
 }
 
-/** 録画を gif にする引数。色は 1 回目に作ったパレットで塗る（既定の 256 色より文字が読める） */
+/** 録画を gif にする引数。色は先に作ったパレットで塗る（既定の 256 色より文字が読める） */
 export function gifArgs(input: string, output: string): string[] {
   return [
     "-hide_banner",
@@ -121,7 +121,7 @@ export interface Command {
 
 /**
  * Windows の画面全体（複数の画面をまたぐ仮想画面）を png に撮る PowerShell。
- * 拡大率を 100% 以外にしている機械で一部しか撮れないのを避けるため、先に DPI を認識させる。
+ * 拡大率が 100% 以外の機械で一部だけが撮れないよう、先に DPI を認識させる。
  */
 function powershellScript(output: string): string {
   const quoted = `'${output.replace(/'/g, "''")}'`;
@@ -142,7 +142,7 @@ function powershellScript(output: string): string {
 /**
  * スクリーンショットを撮るコマンド。ffmpeg は使わず、OS に元からある道具で撮る。
  * `output` はそのコマンドから見たパス（WSL なら Windows の形に直してから渡す）。
- * スクリプトは -EncodedCommand（UTF-16LE の base64）で渡し、パスの引用符の解釈に左右されないようにする。
+ * スクリプトは -EncodedCommand（UTF-16LE の base64）で渡し、パスの引用符の扱いに左右されないようにする。
  */
 export function screenshotCommand(kind: Capture, output: string): Command | undefined {
   switch (kind) {
@@ -256,7 +256,7 @@ function dosTime(when: Date): { time: number; date: number } {
   };
 }
 
-/** 縮めても得をしない形式（gif・png は既に縮めてある）。そのまま入れる */
+/** 縮めても効果が無い形式（gif・png は既に圧縮されている）。そのまま入れる */
 const STORED = /\.(gif|png|jpe?g|zip|mkv|mp4)$/i;
 
 /**

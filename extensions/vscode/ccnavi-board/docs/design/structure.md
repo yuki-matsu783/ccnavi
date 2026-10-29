@@ -79,7 +79,7 @@ src/
     flow-match.ts     画面の中身と実行ファイルが読んだ中身（flow.data）の見比べ（整数と浮動小数の揃え方、食い違った場所と両者の値の言い方）
     flow-history.ts   フロー編集（とテンプレートの編集）の元に戻す・やり直すの履歴（直す前の中身の複製を積む。同じ欄への打ち込みをまとめる。上限 100）
     flow-diff.ts      読み込んだフローと編集中のフローの見比べ（未保存の判定と、保存前に見せる足した・消した・変えたノードと線）。下書きの取り込みの前に見せる、値の前後まで並べた差分（textDiff）
-    bug-report.ts     バグ報告の組み立て。OS ごとの画面の取り方、ffmpeg の録画と gif の引数、スクリーンショットのコマンド、診断ログの始めてから足されたぶんの切り出し、zip（依存を足さずに書く）、report.txt。vscode に触れないので単体で試せる
+    bug-report.ts     バグ報告の組み立て。OS ごとの画面の取り方、ffmpeg の録画と gif の引数、スクリーンショットのコマンド、診断ログのうち報告を始めてから足された分の切り出し、zip（依存を足さずに書く）、report.txt。vscode に触れないので単体で試せる
     tour-sidebar.ts   左パネルの案内（ウォークスルー）の ID と、続けて動かす基本の案内の画面。DOM にも vscode にも触れないので、単体で試せる
     tour-place.ts     吹き出しの案内の置き場所（画面の外に出さない）。DOM に触れないので単体で試せる
     tour-def.ts       案内の定義（YAML）の形 TourDef と検査 parseTour（画面ごとの screen / sample / courses。手順は target・タイトル・本文・scene・image と alt）。見本の目印の文 SAMPLE_NOTE もここ。DOM に触れないので単体で試せる

@@ -47,7 +47,7 @@ VS Code からワークツリーを見えるようにする設定は[導入と�
 
 拡張の不具合を報告するときは、サイドパネルの「バグ報告」を押し、不具合を再現してからステータスバーの「再現中: 終了」を押す。
 途中の画面は、ステータスバーのカメラのボタンで何枚でも撮れる。終えると `logs/bug-report/bug-report-<時刻>.zip` に、録画の gif・スクリーンショット・その間の診断ログ（`logs/diag/`）がまとまる。
-録画には ffmpeg が要る（Windows・macOS・WSL）。無ければ録画だけを省く。画面に映ったものはそのまま入るので、渡す前に中身を確かめる。詳しくは[入口とコマンド](../../extensions/vscode/ccnavi-board/docs/requirements/commands.md#バグ報告)にある。
+録画には ffmpeg が要る（Windows・macOS・WSL）。ffmpeg が無ければ録画だけを省く。画面に映ったものはそのまま入るので、渡す前に中身を確かめる。詳しくは[入口とコマンド](../../extensions/vscode/ccnavi-board/docs/requirements/commands.md#バグ報告)にある。
 
 ### ルール管理画面
 

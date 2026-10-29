@@ -2,8 +2,8 @@
  * バグ報告。サイドパネルの「バグ報告」で始め、ステータスバーの「終了」で zip にまとめる。
  *
  * 始めると「バグ発生時の挙動を再現してください」を出し、ffmpeg が見つかれば画面全体の録画を始める。
- * 途中はステータスバーの「スクリーンショット」で何枚でも撮れる（ffmpeg は使わない）。
- * 終了すると、録画を gif にし、始めてから `logs/diag/*.log` に足された行と、スクリーンショットと、
+ * 途中はステータスバーのカメラのボタン（通知の「スクリーンショット」も同じ）で何枚でも撮れる（ffmpeg は使わない）。
+ * 終了すると、録画を gif にし、始めてから `logs/diag/*.log` に足された行、スクリーンショット、
  * 説明（report.txt）を `logs/bug-report/bug-report-<時刻>.zip` にまとめる。
  * ffmpeg が無い・録画を始められないときは、録画だけをやめて残りはそのまま作る。
  *
@@ -82,7 +82,7 @@ function tail(text: string): string {
   return text.length > ERROR_TAIL ? text.slice(-ERROR_TAIL) : text;
 }
 
-/** 子プロセスを走らせて終わるまで待つ。失敗すれば標準エラーの末尾を載せて投げる */
+/** 子プロセスを走らせ、終わるまで待つ。失敗したら標準エラーの末尾を載せて例外を投げる */
 function run(file: string, args: readonly string[], timeout: number): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(file, [...args], { timeout, windowsHide: true, maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) => {
@@ -95,7 +95,7 @@ function run(file: string, args: readonly string[], timeout: number): Promise<st
   });
 }
 
-/** 子プロセスに渡すパス。WSL の Windows の道具には Windows の形（`\\wsl.localhost\…`）で渡す */
+/** 子プロセスに渡すパス。WSL から Windows の道具を呼ぶときは、Windows の形（`\\wsl.localhost\…`）に直す */
 async function toolPath(capture: Capture, file: string): Promise<string> {
   if (capture !== "wsl") {
     return file;
@@ -184,7 +184,7 @@ async function setReporting(on: boolean): Promise<void> {
   await vscode.commands.executeCommand("setContext", "ccnaviBoard.bugReporting", on);
 }
 
-/** 再現の手順を促す。押されたボタンに応じて撮る・終える */
+/** 再現を促す。押されたボタンに応じて、スクリーンショットを撮るか報告を終える */
 async function prompt(): Promise<void> {
   const shot = "スクリーンショット";
   const finish = "終了";
@@ -256,7 +256,7 @@ export async function takeScreenshot(): Promise<void> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     current.errors.push(`スクリーンショット: ${message}`);
-    const hint = current.capture === "mac" ? "（macOS では「画面収録」で VS Code の許可が要ります）" : "";
+    const hint = current.capture === "mac" ? "（macOS では、「画面収録」で VS Code の許可が必要です）" : "";
     void vscode.window.showWarningMessage(`スクリーンショットを撮れませんでした${hint}: ${message}`);
   }
 }
