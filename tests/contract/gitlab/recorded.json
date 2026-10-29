@@ -6,8 +6,38 @@
   "page2",
   "error_403"
  ],
- "recorded_at": "2026-10-25",
+ "recorded_at": "2026-10-29",
  "requests": {
+  "approvals_get": {
+   "shape": {
+    "keys": {
+     "approved": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "approved_by": {
+      "t": [
+       "array"
+      ]
+     },
+     "user_can_approve": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "user_has_approved": {
+      "t": [
+       "boolean"
+      ]
+     }
+    },
+    "t": [
+     "object"
+    ]
+   },
+   "status": 200
+  },
   "closes_issues": {
    "shape": {
     "items": {
