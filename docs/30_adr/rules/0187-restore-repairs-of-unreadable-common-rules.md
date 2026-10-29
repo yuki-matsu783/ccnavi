@@ -5,7 +5,7 @@ description: 全体が dry-run で名前で書くツールが通ったときに�
 tags: [rules, selfguard]
 keywords: [自己防衛, 実行後, 戻す, 読めない間, 修復, left-as-repair, dry-run, handoff, ccnavi-user-handoff.sh, ADR-0158]
 ---
-# ADR-0190: 共通のルールファイルが読めない間に直した書き込みも、実行後に戻す
+# ADR-0187: 共通のルールファイルが読めない間に直した書き込みも、実行後に戻す
 
 状態: 採用
 

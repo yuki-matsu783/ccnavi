@@ -5,7 +5,7 @@ description: シェルから書き込む形の保護から、ワークスペー�
 tags: [rules, selfguard, handoff]
 keywords: [自己防衛, guard-setting-files, cp, install, wip/handoff, ccnavi-stage.sh, 例外, handoff_copy_exempt]
 ---
-# ADR-0191: 守る場所のファイルを wip/handoff/ へ cp で写す形も止め、ccnavi-stage.sh を案内する
+# ADR-0188: 守る場所のファイルを wip/handoff/ へ cp で写す形も止め、ccnavi-stage.sh を案内する
 
 状態: 採用
 
