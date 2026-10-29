@@ -2301,6 +2301,13 @@ def write_report(scn, out, st, results, rows, raw):
                 f"- step {o['step']}: {o['op']}{name} → HTTP {o['status']}{extra}"
                 + (f" 失敗: {o['error']}" if o.get("error") else "")
             )
+    if st.get("human_runs"):
+        ev += ["", "## 人間役の操作（端末）"]
+        for r in st["human_runs"]:
+            ev.append(
+                f"- step {r['step']}: sh {r['script']} {' '.join(r['tickets'])} → {r['status']}"
+                + (f"（終了コード {r['exit']}、ログ: {r['log']}）" if "exit" in r else "")
+            )
     steps = scn.get("steps") or []
     step_sessions = {}
     for p in sorted(out.glob("step-*.jsonl")):
