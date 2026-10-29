@@ -757,20 +757,6 @@ def load(path: str, root: str = "") -> tuple[RuleSet, list[Problem]]:
     return parse(_decode(text, path), root)
 
 
-def readable(content: bytes) -> bool:
-    """その中身を、load がルールファイルとして読めるか。
-
-    読めなければ呼び手（ruleload.load_rules）は組み込みの既定を使う。バックアップの中身を見て
-    「この呼び出しの直前に既定を使っていたか」を決めるのに使う（selfguard）。線を load と
-    別に引くと、既定を使っていたのに使っていないと読む、あるいはその逆が起きる。
-    """
-    try:
-        _decode(content.decode("utf-8"), "(content)")
-    except ValueError:
-        return False
-    return True
-
-
 def _decode(text: str, path: str) -> dict:
     try:
         data = yamlread.safe_load(text)
