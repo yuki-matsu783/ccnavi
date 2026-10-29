@@ -299,7 +299,7 @@ setup:
 
 - 読むだけ。呼ぶのは GET の API（MR の一覧と 1 件、スレッド、issue）だけで、書き込みはしない
 - 中身: `step`・`taken_at`（秒までの ISO 8601）・`host`・`project`・`summary`（件数）・`mrs`・`issues`・`calls`（呼んだ API と status）・`errors`・`approvals`
-  - `mrs`: `iid`・`title`・`state`（opened / merged / closed）・`draft`・ブランチ・`merged_at`・`merge_status` など、あるものだけ。`threads` に、スレッドの `id`・`resolved`（解決できるメモがすべて解決済みなら true、未解決があれば false、解決できないスレッドは null）・`notes`（作者・本文・解決の状態）
+  - `mrs`: `iid`・`title`・`state`（opened / merged / closed）・`draft`・ブランチ・`merged_at`・`merge_status` など、あるものだけ。`threads` に、スレッドの `id`・`resolved`（解決できるメモがすべて解決済みなら true、未解決があれば false、解決できないスレッドは null）・`system`・`notes`（作者・本文・解決の状態）。本物の GitLab は、承認や解決などのシステムのメモもスレッドとして返す。これは `system` を true にして残し、`summary` では `threads` に数えず `threads_system` に数える（模擬はシステムのメモを返さない）
   - `issues`: `iid`・`title`・`state`・`closed_at` など
   - 本文（MR の説明・メモ・issue の説明）は 1000 文字で切る。切ったときは末尾に `…(+N)`
 - 承認は取らない。模擬に `approvals` の API が無く、模擬と本物で記録の形を揃えるため、`docker-gitlab` でも取らない。`approvals` は `{"taken": false, "reason": ...}` の固定の形にし、承認が無いのか、そもそも取っていないのかを読めるようにする。`mrs` に承認の欄は無い

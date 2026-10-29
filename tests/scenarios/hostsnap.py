@@ -89,6 +89,8 @@ def _thread(discussion):
     return {
         "id": discussion.get("id"),
         "individual_note": bool(discussion.get("individual_note")),
+        # 本物の GitLab は、承認・解決などのシステムのメモもスレッドとして返す（模擬は返さない）
+        "system": bool(notes) and all(n.get("system") for n in notes),
         # 解決できるメモがあり、すべて解決済みなら true。解決できないスレッドは null
         "resolved": all(n.get("resolved") for n in resolvable) if resolvable else None,
         "notes": [_note(n) for n in notes],
@@ -115,7 +117,8 @@ def _issue(issue):
 
 
 def _summary(mrs, issues):
-    threads = [t for mr in mrs for t in mr.get("threads", [])]
+    every = [t for mr in mrs for t in mr.get("threads", [])]
+    threads = [t for t in every if not t["system"]]
     return {
         "mrs": len(mrs),
         "mrs_opened": sum(1 for m in mrs if m.get("state") == "opened"),
@@ -123,6 +126,7 @@ def _summary(mrs, issues):
         "mrs_draft": sum(1 for m in mrs if m.get("draft")),
         "threads": len(threads),
         "threads_unresolved": sum(1 for t in threads if t["resolved"] is False),
+        "threads_system": len(every) - len(threads),
         "issues": len(issues),
         "issues_opened": sum(1 for i in issues if i.get("state") == "opened"),
     }
