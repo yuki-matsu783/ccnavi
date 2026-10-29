@@ -1,7 +1,8 @@
 """ターン分離の関門。「A を打ったら、ユーザの発言が 1 回はさまるまで B を打てない」を止める。
 
 エージェントが自分の判断で止まる以外に守られない手順（差分をユーザに見せて返事を待つ、など）を、
-「A のあとにユーザの発言が 1 回あった」という機械で確かめられる事実に置き換える。止めるのは B の側
+「A のあとにユーザの発言が 1 回あった」という機械で確かめられる事実に置き換える（付き添いのある
+セッションでは、ユーザの確認で置き換える。下の宣言の節）。止めるのは B の側
 だけ。A と B が同じターンに両方起きたことを、あとから点検する処理は作らない。
 
 ## 宣言
@@ -482,4 +483,4 @@ def message(stop: Stop, root: str) -> str:
         return texts.say(root, "DENY_NEEDS_USER_TURN__STATE", values, cases)
     values["key"] = key or gate.key_name
     case = "same_command" if stop.reason == SAME_COMMAND else "no_user_turn"
-    return texts.say(root, gate.message, values, {"what": case})
+    return texts.say(root, gate.message, values, {"what": case, "next": case})
