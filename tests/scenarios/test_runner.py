@@ -3534,6 +3534,7 @@ class HostSnapshotTest(unittest.TestCase):
                 "mrs_draft": 1,
                 "threads": 1,
                 "threads_unresolved": 1,
+                "threads_system": 0,
                 "issues": 2,
                 "issues_opened": 1,
             },
@@ -3588,6 +3589,29 @@ class HostSnapshotTest(unittest.TestCase):
         self.assertEqual(snap["summary"]["mrs"], 0)
         self.assertTrue(snap["errors"])
         self.assertFalse(snap["approvals"]["taken"])
+
+    def test_system_notes_are_kept_but_counted_apart(self):
+        """本物の GitLab が返すシステムのメモ（承認など）は残し、スレッドの件数とは分けて数える。"""
+        system = {"id": 9, "system": True, "body": "approved this merge request"}
+        person = {"id": 1, "body": "直して", "resolvable": True, "resolved": False}
+        reader = mock.Mock()
+        reader.list_mrs.return_value = (200, [{"iid": 1, "title": "t", "state": "opened"}])
+        reader.get_mr.return_value = (200, {"iid": 1, "title": "t", "state": "opened"})
+        reader.list_discussions.return_value = (
+            200,
+            [
+                {"id": "d1", "individual_note": False, "notes": [person]},
+                {"id": "s1", "individual_note": True, "notes": [system]},
+            ],
+        )
+        reader.list_issues.return_value = (200, [])
+        with mock.patch.object(hostenv, "api_access", return_value=(reader, "t", "p", [])):
+            _, snap, _ = self.take()
+        threads = snap["mrs"][0]["threads"]
+        self.assertEqual([t["system"] for t in threads], [False, True])
+        self.assertEqual(snap["summary"]["threads"], 1)
+        self.assertEqual(snap["summary"]["threads_unresolved"], 1)
+        self.assertEqual(snap["summary"]["threads_system"], 1)
 
     def test_an_error_from_the_other_side_is_recorded_per_call(self):
         reader = mock.Mock()
