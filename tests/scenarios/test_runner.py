@@ -3512,6 +3512,8 @@ class HostSnapshotTest(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertGreater(result["errors"], 0)
         self.assertEqual(snap["mrs"], [])
+        self.assertEqual([c["api"] for c in snap["calls"]], ["list_mrs"], "残りは読まない")
+        self.assertEqual(snap["summary"]["mrs"], 0)
         self.assertTrue(snap["errors"])
         self.assertFalse(snap["approvals"]["taken"])
 
@@ -3649,6 +3651,7 @@ class HostLifecycleTest(unittest.TestCase):
             snap = self.snap(n)
             self.assertEqual(snap["mrs"], [])
             self.assertEqual(snap["errors"][0]["error"], "例外 OSError")
+            self.assertEqual(snap["summary"]["mrs"], 0, "例外のときも summary の形は同じ")
         state = json.loads((self.ws.out / "state.json").read_text(encoding="utf-8"))
         self.assertEqual([s["ok"] for s in state["host_snapshots"]], [False, False])
         report = (self.ws.out / "report.md").read_text(encoding="utf-8")
@@ -3845,6 +3848,8 @@ class HostLifecycleTest(unittest.TestCase):
 
 ROOT_PAT = "glpat-root-agent-secret"
 REVIEWER_TOKEN = "glpat-human-reviewer-secret"
+# DockerHostBase が差し替える前の入口（docker-gitlab の分岐そのものを確かめる）
+REAL_API_ACCESS = hostenv.api_access
 BASE = "http://127.0.0.1:8929"
 
 
@@ -3973,6 +3978,17 @@ class DockerHostBase(unittest.TestCase):
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
+
+
+class DockerApiAccessTest(DockerHostBase):
+    def test_both_tokens_in_the_file_are_masked(self):
+        """docker-gitlab の入口が、トークンのファイルの値を両方とも伏せる値に入れる。"""
+        client, token, project, secrets = REAL_API_ACCESS(
+            {"kind": "docker-gitlab", "project_id": 1}
+        )
+        self.assertIs(client, self.client)
+        self.assertEqual((token, project), (ROOT_PAT, 1))
+        self.assertEqual(set(secrets), {ROOT_PAT, REVIEWER_TOKEN})
 
 
 class FieldAndNameTest(DockerHostBase):
@@ -4107,6 +4123,8 @@ class DockerLifecycleTest(DockerHostBase):
         self.assertEqual(rc, 10)
         self.assertEqual(self.client.deletes(), [])
         self.assertNotIn(ROOT_PAT, self.state_text())
+        self.assertTrue((self.ws.out / "host-1.json").exists())
+        self.assertFalse((self.ws.out / "host-2.json").exists(), "止まった人間の step では読まない")
         with mock.patch("builtins.print"):
             self.assertEqual(runner.main(["restore", str(self.ws.out)]), 0)
         self.assertTrue(self.client.gone)
@@ -4231,6 +4249,8 @@ class HumanApiTest(DockerLifecycleTest):
         row = next(r for r in rows if r["kind"] == "human-api")
         self.assertEqual(row["verdict"], "pass")
         self.assertTrue(self.client.gone)
+        for n in (1, 2, 3):  # human_api の step（2）の終わりにも残す
+            self.assertTrue((self.ws.out / f"host-{n}.json").exists(), n)
 
     def test_approve_uses_the_human_token_on_the_only_mr(self):
         self.run_steps(self.steps([{"op": "approve"}]))

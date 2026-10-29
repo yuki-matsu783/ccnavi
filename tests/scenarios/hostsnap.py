@@ -148,6 +148,17 @@ def collect(client, token, project):
 
     mrs = []
     listed = read("list_mrs", client.list_mrs(token, project, state="all"))
+    if calls[-1]["status"] == 0:
+        # 相手に接続できない。残りを読んでも同じ待ちを重ねるだけなので、ここでやめる
+        errors.append({"api": "snapshot", "error": "相手に接続できないので、残りは読まない"})
+        return {
+            "approvals": APPROVALS_NOT_TAKEN,
+            "summary": _summary([], []),
+            "mrs": [],
+            "issues": [],
+            "calls": calls,
+            "errors": errors,
+        }
     if listed is not None and not isinstance(listed, list):
         errors.append({"api": "list_mrs", "error": "応答が配列ではない"})
         listed = None
@@ -208,6 +219,7 @@ def take(root, host, step, out, now=None):
     except Exception as exc:  # 取れなくてもシナリオは止めない。errors には例外の型名だけを入れる
         record.update(
             approvals=APPROVALS_NOT_TAKEN,
+            summary=_summary([], []),
             mrs=[],
             issues=[],
             calls=[],
