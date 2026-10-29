@@ -38,6 +38,11 @@ messages:
     next: |-
       上をユーザに伝えて了承を得てから、{script:ccnavi-worktree.sh} {name:sh} --adopt --base {target:sh} --accept {code}
 
+  NEXT_WORKTREE_PARENT_ACTIVE:
+    kind: next
+    next: |-
+      状況をユーザに報告し、親を早めに閉じるか子を取り下げるかを決めてもらう。返事が来るまで止まり、直接実装には切り替えない
+
   NEXT_WORKTREE_CONFIRM:
     kind: next
     values: [name, args_q]

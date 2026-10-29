@@ -325,12 +325,6 @@ def put_messages(root: str) -> str:
     """
     target = os.path.join(root, ".ccnavi", "messages")
     _shutil.copytree(_repo_messages(), target, dirs_exist_ok=True)
-    # 取り込み前の下書き（wip/handoff/.ccnavi/messages/）があれば、できあがりの姿として重ねる。
-    drafts = os.path.join(ROOT, "wip", "handoff", ".ccnavi", "messages")
-    if os.path.isdir(drafts):
-        for name in os.listdir(drafts):
-            if name.endswith(".yml"):
-                _shutil.copy(os.path.join(drafts, name), target)
     return target
 
 
