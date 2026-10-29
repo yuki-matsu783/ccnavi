@@ -47,7 +47,9 @@ human step に `expect_after` を付けられない今の決まりも変えな�
 ## 打てる sh の表
 
 ```python
-HUMAN_RUN_SCRIPTS = {"agree": "ccnavi-user-agree.sh"}
+HUMAN_RUN_SCRIPTS = {
+    "agree": (".ccnavi/scripts/ccnavi-user-agree.sh", "この回で増えた test-repo の提案を承認し、push する"),
+}
 ```
 
 最初は `agree` だけにする。今ある human step で決まった手順になっているのは承認だけだから
@@ -96,8 +98,10 @@ sh .ccnavi/scripts/ccnavi-user-agree.sh <対象の識別子>...
 終了コードだけでは足りない。`ccnavi-user-agree.sh` は push に失敗しても、保護ブランチで push しなくても、
 承認待ちが空でも 0 で終わる。
 
-- 打ったあと、`approval.store.scan_all(conf, root)` で承認済みチケットを集め、対象の識別子が全部あるかを見る。
+- 打つ前と打ったあとに、`approval.store.scan_all(conf, root)` で承認済みチケットの識別子を集める。
+  対象の識別子が全部「新しく」承認済みになったか（後 − 前）を見る。前の回の承認済みのコピーが残っていても成功に数えない。
   欠けていれば止める（理由に欠けた識別子、終了コード、ログのパス）
+- 起動できない（sh や cwd が無い。`OSError`）ときも止める
 - push まで済んだかは、ここでは見ない。push の結果を要るシナリオは、続く prompt の step の `expect_after.state`
   か、末尾の `expect.state` で確かめる
 - 止めたときの結果は `inconclusive`（`halt`、`kind: human_run`）。後続の step には進まない
@@ -112,7 +116,10 @@ Windows の Python には `pty` が無い。`os.openpty` が無いか失敗し�
 - 打つ前に `st["human_runs"]` へ `{step, script, tickets, status: "started"}` を足して書く。
   終わったら `status` を `done`（か `halted`）にして、`next_step` を進める
 - 再開（`next`）で、その step の記録が `started` のまま残っていたら打ち直さずに止める
-  （理由「前の回で打ち始めたまま止まった。承認と push の状態を確かめてから回し直す」）。自動では打ち直さない
+  （理由「前の回で打ち始めたまま止まった。承認と push の状態を確かめてから run でやり直す」）。自動では打ち直さない。
+  実際には、打っている途中の例外は `_continue` が対象を戻して放す（`released`）ので、`next` はその手前で断る。
+  この検査は、そこを通らずに落ちた（プロセスごと殺された）ときの保険
+- 基準（`proposals_before`）が state に無ければ、打たずに止める（承認待ちが全部「増えた」ことになるため）
 - state は `st.get(...)`・`setdefault` で読む（この欄の無い古い `state.json` を `next` で続けても落ちない）
 
 ## 結果と表示
@@ -127,9 +134,9 @@ Windows の Python には `pty` が無い。`os.openpty` が無いか失敗し�
 
 ## 文書の変更
 
-- `docs/42_claude/acceptance-scenarios.md`
+- `.agents/docs/acceptance-scenarios.md`（当初は `docs/42_claude/` にあった）と `tests/scenarios/README.md`
   - 基本の決まりの「人間しかできない操作は一時停止して人間に打ってもらう」に、「`human_run` があれば実行器が人間役として打つ」を足す
-  - シナリオの形に `human_run` の欄と決まり（`test_repo: true`、表、増えた test-repo の提案だけ、成否は承認済みに在るか、
+  - シナリオの形に `human_run` の欄と決まり（`test_repo: true`、表、増えた test-repo の提案だけ、成否は新しく承認済みになったか、
     `check` は needs-review）を書く
   - 受け入れた穴（開発ワークスペースでは、エージェントが実行器を通して承認を出せる）と、配布物に入らないこと、
     `human_run` を書くことが承認と push への同意になることを書く
@@ -137,12 +144,10 @@ Windows の Python には `pty` が無い。`os.openpty` が無いか失敗し�
 
 ## テスト（`tests/scenarios/test_runner.py`）
 
-偽の sh（`[ -t 0 ]` を確かめ、1 行読み、引数を書き出して終了コードを返す）を `HUMAN_RUN_SCRIPTS` に差し替えて回す。
+ユーザの指示で最低限にした。`_pending_proposals`・`_approved_ids`・`_run_on_terminal` を差し替えて `drive` を回す。
 
-- 読み込みの検査: 各 ValueError の条件
-- 対象: 基準との差、test-repo 以外が混ざると止まる、0 件で止まる、2 回目の human_run で基準が更新されている
-- 打ち方: 端末が付く、`answers` が届く、孫プロセスが slave を握ったままの時間切れで止まり孫も残らない
-- 成否: 終了コード 0 でも承認済みに無ければ止まる
-- 再開: `started` のまま残った記録で止まる、古い `state.json` で落ちない
-- 結果: `check` が needs-review の行になる
-- 端末が無いとき: `os.openpty` を無くすと一時停止（10）になる
+- 読み込みの検査: `test_repo: true` が無いと断る
+- 打ち方（本物の擬似端末）: 端末が付き `answers` が届く、時間切れで止まる
+- 対象: test-repo 以外が混ざると打たずに止まる、増えていなければ打たずに止まる
+- 成否: 終了コード 0 でも新しく承認済みにならなければ止まる、なれば `done` で進む
+- 集める関数: チケットの無いワークスペースで、実物の `_pending_proposals`・`_approved_ids` が空を返す
