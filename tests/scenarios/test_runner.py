@@ -403,16 +403,18 @@ class HumanRunTest(unittest.TestCase):
 
     STEP = {"human": True, "instruction": "x", "human_run": {"script": "agree", "answers": ["y"]}}
 
-    def drive(self, pending, approved, rc=0):
+    def drive(self, pending, approved, rc=0, before=None):
         with tempfile.TemporaryDirectory() as d:
             out, root = Path(d) / "out", Path(d) / "root"
             out.mkdir()
             root.mkdir()
             scn = {"steps": [dict(self.STEP)], "_prompt_steps": 0}
-            st = {"next_step": 0, "session_ids": [], "cost_usd": 0.0, "proposals_before": []}
+            st = {"next_step": 0, "session_ids": [], "cost_usd": 0.0}
+            st["proposals_before"] = before or []
             with (
                 mock.patch.object(runner, "_pending_proposals", return_value=pending),
-                mock.patch.object(runner, "_approved_ids", return_value=approved),
+                # 打つ前は何も承認済みでなく、打ったあとは approved
+                mock.patch.object(runner, "_approved_ids", side_effect=[set(), approved]),
                 mock.patch.object(runner, "_run_on_terminal", return_value=(rc, "")) as term,
             ):
                 got = runner.drive(scn, out, st, root)
@@ -440,7 +442,7 @@ class HumanRunTest(unittest.TestCase):
     def test_success_is_judged_by_approved_tickets_not_exit_code(self):
         got, st, term = self.drive([["i1", "test-repo"]], approved=set(), rc=0)
         self.assertEqual(got, 11)
-        self.assertIn("承認済みに無い: i1", st["halt"]["reasons"][0])
+        self.assertIn("新しく承認済みにならなかった: i1", st["halt"]["reasons"][0])
         self.assertEqual(term.call_args.args[0][2:], ["i1"])
 
     def test_proposal_outside_test_repo_stops_before_running(self):
@@ -448,6 +450,17 @@ class HumanRunTest(unittest.TestCase):
         self.assertEqual(got, 11)
         self.assertIn("w1（ワークスペースルート）", st["halt"]["reasons"][0])
         term.assert_not_called()
+
+    def test_nothing_added_stops_before_running(self):
+        got, st, term = self.drive([["i1", "test-repo"]], approved={"i1"}, before=[["i1", ""]])
+        self.assertEqual(got, 11)
+        self.assertIn("増えていない", st["halt"]["reasons"][0])
+        term.assert_not_called()
+
+    def test_scans_run_on_a_workspace_without_tickets(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(runner._pending_proposals(d), [])
+            self.assertEqual(runner._approved_ids(d), set())
 
     def test_approved_run_continues_and_is_recorded(self):
         got, st, _ = self.drive([["i1", "test-repo"]], approved={"i1"})

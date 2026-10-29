@@ -1430,8 +1430,8 @@ def _run_human_run(out, st, idx, step, root):
        0 件か、test-repo 以外の提案が混ざっていれば止める
        （黙って外すと親だけ落ちて承認が失敗する）。
     3. 打ち始めたことを state に書いてから、端末で打つ。
-    4. 終了コードでなく、対象が承認済みにあるかで成否を見る
-       （push の失敗や保護ブランチでも 0 で終わるため）。
+    4. 終了コードでなく、対象が新しく承認済みになったかで成否を見る
+       （push の失敗や保護ブランチでも 0 で終わるため。前からある承認済みは数えない）。
     """
     num = idx + 1
     runs = st.setdefault("human_runs", [])
@@ -1440,16 +1440,19 @@ def _run_human_run(out, st, idx, step, root):
             out,
             st,
             num,
-            "前の回で打ち始めたまま止まった。承認と push の状態を確かめてから回し直す",
+            "前の回で打ち始めたまま止まった。承認と push の状態を確かめてから run でやり直す",
         )
     if not hasattr(os, "openpty"):
         return "pause"
-    before = {p[0] for p in st.get("proposals_before") or []}
+    if "proposals_before" not in st:
+        # 基準が無いと、承認待ちが全部「増えた」ことになる。打たずに止める
+        return _halt_human_run(out, st, num, "承認待ちの基準が state に無い。run でやり直す")
+    before = {p[0] for p in st["proposals_before"]}
     added = [p for p in _pending_proposals(root) if p[0] not in before]
     if not added:
         return _halt_human_run(out, st, num, "承認する提案が増えていない")
     project = Path(DISPOSABLE_REL).name
-    other = [p for p in added if p[1] != project]
+    other = [p for p in added if pathcase.fold(p[1]) != pathcase.fold(project)]
     if other:
         return _halt_human_run(
             out,
@@ -1466,6 +1469,7 @@ def _run_human_run(out, st, idx, step, root):
     _write_state(out, st)
     print(f"\n== 人間役の操作（step {num}、端末）==\n  sh {script} {' '.join(ids)}")
     log = out / f"human-run-{num}.log"
+    approved_before = _approved_ids(root)
     try:
         rc, text = _run_on_terminal(
             ["sh", script, *ids], root, _human_run_env(st, root), spec.get("answers", [])
@@ -1477,18 +1481,22 @@ def _run_human_run(out, st, idx, step, root):
     except subprocess.TimeoutExpired:
         record["status"] = "halted"
         return _halt_human_run(out, st, num, f"{HUMAN_RUN_TIMEOUT_SEC} 秒で終わらなかった")
+    except OSError as e:  # sh や cwd が無いなど、起動できない
+        record["status"] = "halted"
+        return _halt_human_run(out, st, num, f"起動できない: {e}")
     log.write_text(text, encoding="utf-8")
     for line in text.strip().splitlines()[-5:]:
         print(f"  | {line}")
     record.update(exit=rc, log=str(log))
-    missing = [i for i in ids if i not in _approved_ids(root)]
+    approved = _approved_ids(root) - approved_before
+    missing = [i for i in ids if i not in approved]
     if missing:
         record["status"] = "halted"
         return _halt_human_run(
             out,
             st,
             num,
-            f"承認済みに無い: {', '.join(missing)}（終了コード {rc}、ログ: {log}）",
+            f"新しく承認済みにならなかった: {', '.join(missing)}（終了コード {rc}、ログ: {log}）",
         )
     record["status"] = "done"
     st["proposals_before"] = _pending_proposals(root)
