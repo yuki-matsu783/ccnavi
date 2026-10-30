@@ -403,7 +403,7 @@ class HumanRunTest(unittest.TestCase):
 
     STEP = {"human": True, "instruction": "x", "human_run": {"script": "agree", "answers": ["y"]}}
 
-    def drive(self, pending, approved, rc=0, before=None):
+    def drive(self, pending, approved, rc=0, before=None, approved_before=None, pending_after=None):
         with tempfile.TemporaryDirectory() as d:
             out, root = Path(d) / "out", Path(d) / "root"
             out.mkdir()
@@ -412,9 +412,16 @@ class HumanRunTest(unittest.TestCase):
             st = {"next_step": 0, "session_ids": [], "cost_usd": 0.0}
             st["proposals_before"] = before or []
             with (
-                mock.patch.object(runner, "_pending_proposals", return_value=pending),
-                # 打つ前は何も承認済みでなく、打ったあとは approved
-                mock.patch.object(runner, "_approved_ids", side_effect=[set(), approved]),
+                # 1 回目は打つ前、2 回目は打ったあと
+                mock.patch.object(
+                    runner,
+                    "_pending_proposals",
+                    side_effect=[pending, pending if pending_after is None else pending_after],
+                ),
+                # 打つ前は approved_before（既定は空）、打ったあとは approved
+                mock.patch.object(
+                    runner, "_approved_ids", side_effect=[approved_before or set(), approved]
+                ),
                 mock.patch.object(runner, "_run_on_terminal", return_value=(rc, "")) as term,
             ):
                 got = runner.drive(scn, out, st, root)
@@ -444,6 +451,18 @@ class HumanRunTest(unittest.TestCase):
         self.assertEqual(got, 11)
         self.assertIn("新しく承認済みにならなかった: i1", st["halt"]["reasons"][0])
         self.assertEqual(term.call_args.args[0][2:], ["i1"])
+
+    def test_revision_of_approved_parent_counts_when_it_leaves_pending(self):
+        got, st, _ = self.drive(
+            [["p1", "test-repo"]], approved={"p1"}, approved_before={"p1"}, pending_after=[]
+        )
+        self.assertIsNone(got)
+        self.assertEqual(st["human_runs"][0]["status"], "done")
+
+    def test_revision_still_pending_is_not_approved(self):
+        got, st, _ = self.drive([["p1", "test-repo"]], approved={"p1"}, approved_before={"p1"})
+        self.assertEqual(got, 11)
+        self.assertIn("新しく承認済みにならなかった: p1", st["halt"]["reasons"][0])
 
     def test_proposal_outside_test_repo_stops_before_running(self):
         got, st, term = self.drive([["i1", "test-repo"], ["w1", ""]], approved={"i1"})

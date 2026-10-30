@@ -1458,8 +1458,9 @@ def _run_human_run(out, st, idx, step, root):
        0 件か、test-repo 以外の提案が混ざっていれば止める
        （黙って外すと親だけ落ちて承認が失敗する）。
     3. 打ち始めたことを state に書いてから、端末で打つ。
-    4. 終了コードでなく、対象が新しく承認済みになったかで成否を見る
-       （push の失敗や保護ブランチでも 0 で終わるため。前からある承認済みは数えない）。
+    4. 終了コードでなく、対象が新しく承認済みになったか、打つ前から承認済みで
+       承認待ちから消えたか（親の改版）で成否を見る
+       （push の失敗や保護ブランチでも 0 で終わるため。承認待ちのまま残った改版は数えない）。
     """
     num = idx + 1
     runs = st.setdefault("human_runs", [])
@@ -1516,7 +1517,10 @@ def _run_human_run(out, st, idx, step, root):
     for line in text.strip().splitlines()[-5:]:
         print(f"  | {line}")
     record.update(exit=rc, log=str(log))
-    approved = _approved_ids(root) - approved_before
+    pending_now = _pending_proposals(root)
+    pending_ids = {p[0] for p in pending_now}
+    # 新しく承認済みになったか、打つ前から承認済みで承認待ちから消えた（親の改版）なら成功
+    approved = (_approved_ids(root) - approved_before) | (approved_before - pending_ids)
     missing = [i for i in ids if i not in approved]
     if missing:
         record["status"] = "halted"
@@ -1527,7 +1531,7 @@ def _run_human_run(out, st, idx, step, root):
             f"新しく承認済みにならなかった: {', '.join(missing)}（終了コード {rc}、ログ: {log}）",
         )
     record["status"] = "done"
-    st["proposals_before"] = _pending_proposals(root)
+    st["proposals_before"] = pending_now
     st["next_step"] = num
     _write_state(out, st)
     return None
