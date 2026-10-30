@@ -487,3 +487,21 @@ test("CB-T316 統合結果は読み取り専用で、境目の点・項目・由
 test("CB-T1150 見出しに「取り込み待ちを開く」があり、押すと openHandoff を送る。実行ファイルが handoff を持たなければ無効で、理由を出す", async () => {
   await checkHandoffLink((handoff) => openRisk({ handoff }));
 });
+
+test("CB-D1231 先頭の行の「↑」と末尾の行の「↓」は押せない。絞り込みで 0 件のときは案内を出す", async () => {
+  const dom = await openRisk();
+  try {
+    const count = dom.all("li.factor").length;
+    assert.ok(count >= 2);
+    const button = (nth: number, title: string): HTMLButtonElement => dom.all<HTMLButtonElement>(`li.factor button[title="${title}"]`)[nth];
+    assert.equal(button(0, "上へ").disabled, true);
+    assert.equal(button(0, "下へ").disabled, false);
+    assert.equal(button(count - 1, "下へ").disabled, true);
+    assert.equal(button(count - 1, "上へ").disabled, false);
+    dom.type(dom.one("#find"), "存在しない文字列-zzz");
+    await dom.settle();
+    assert.match(dom.one(".empty").textContent, /絞り込みに一致する項目がありません/);
+  } finally {
+    await dom.close();
+  }
+});
