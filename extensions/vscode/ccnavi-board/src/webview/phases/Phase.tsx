@@ -31,6 +31,9 @@ export interface PhaseProps {
   readonly onToggle: () => void;
   readonly onToggleMore: (open: boolean) => void;
   readonly onChange: (next: PhaseForm) => void;
+  /** 並びの先頭・末尾の行は、動かせない向きのボタンを無効にする */
+  readonly first: boolean;
+  readonly last: boolean;
   readonly onMove: (delta: number) => void;
   readonly onRemove: () => void;
   /** 案内が指す行か。真のとき、行と欄に `data-tour` の印を付ける（印は画面に 1 つだけ。見本の最初の行にだけ付ける） */
@@ -184,10 +187,10 @@ export function Phase(props: PhaseProps): JSX.Element {
           </div>
         </details>
         <span className="buttons">
-          <button type="button" className="action small" title="上へ" disabled={disabled} onClick={() => props.onMove(-1)}>
+          <button type="button" className="action small" title="上へ" disabled={disabled || props.first} onClick={() => props.onMove(-1)}>
             ↑
           </button>
-          <button type="button" className="action small" title="下へ" disabled={disabled} onClick={() => props.onMove(1)}>
+          <button type="button" className="action small" title="下へ" disabled={disabled || props.last} onClick={() => props.onMove(1)}>
             ↓
           </button>
           <button type="button" className="action small" disabled={disabled} onClick={() => props.onRemove()}>

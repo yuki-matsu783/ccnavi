@@ -9,6 +9,7 @@ import { useState, type JSX } from "react";
 
 import { sumLabel } from "../../core/sums.js";
 import type { Sum as SumData } from "../../core/templates-view.js";
+import { Code } from "../shared/Code.js";
 import { droppedLabel, layerLabel } from "./text.js";
 
 export interface SumProps {
@@ -70,7 +71,7 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
                   </td>
                   <td>{layerLabel(row.layer)}</td>
                   <td>{row.effective ? <span className="tag ok">使われる</span> : <span className="tag">使われない</span>}</td>
-                  <td className="why">{row.dropped === null ? "" : `${droppedLabel(row.dropped.reason)}: ${row.dropped.detail}`}</td>
+                  <td className="why">{row.dropped === null ? "" : <Code text={`${droppedLabel(row.dropped.reason)}: ${row.dropped.detail}`} />}</td>
                 </tr>
               ))}
             </tbody>

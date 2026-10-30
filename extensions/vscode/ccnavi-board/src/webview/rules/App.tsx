@@ -29,6 +29,7 @@ import { HandoffLink } from "../shared/HandoffLink.js";
 import { defaultSum } from "../../core/sums.js";
 import { Sum } from "./Sum.js";
 import { mutePosts, post } from "./post.js";
+import { Code } from "../shared/Code.js";
 import { Rule } from "./Rule.js";
 import {
   draftOf,
@@ -713,7 +714,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       </section>
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
       <footer className={shownStatus?.error === true ? "foot error" : "foot"} data-tour="status">
-        <span id="status">{shownStatus?.text ?? ""}</span>
+        <span id="status">
+          <Code text={shownStatus?.text ?? ""} />
+        </span>
       </footer>
     </>
   );

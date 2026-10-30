@@ -29,6 +29,9 @@ export interface FactorProps {
   readonly tour?: boolean;
   readonly onToggle: () => void;
   readonly onChange: (next: FactorForm) => void;
+  /** 並びの先頭・末尾の行は、動かせない向きのボタンを無効にする */
+  readonly first: boolean;
+  readonly last: boolean;
   readonly onMove: (delta: number) => void;
   readonly onRemove: () => void;
 }
@@ -153,10 +156,10 @@ export function Factor(props: FactorProps): JSX.Element {
           {text("message", "f-message", "加点の理由として依頼文とクローズしたときの出力に出る短い文です。空なら id をそのまま使います")}
         </Captioned>
         <span className="buttons" {...mark("factor-buttons")}>
-          <button type="button" className="action small" title="上へ" disabled={disabled} onClick={() => props.onMove(-1)}>
+          <button type="button" className="action small" title="上へ" disabled={disabled || props.first} onClick={() => props.onMove(-1)}>
             ↑
           </button>
-          <button type="button" className="action small" title="下へ" disabled={disabled} onClick={() => props.onMove(1)}>
+          <button type="button" className="action small" title="下へ" disabled={disabled || props.last} onClick={() => props.onMove(1)}>
             ↓
           </button>
           <button type="button" className="action small" disabled={disabled} onClick={() => props.onRemove()}>
