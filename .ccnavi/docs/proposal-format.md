@@ -3,7 +3,7 @@ title: 提案の書式
 type: guide
 description: 親の提案・子の提案の frontmatter と本文、plan / after / phases のコピー、子のフロー、雛形を作る ccnavi ticket new と、書いたあとに打つ検査。フェーズの型の選び方の引き先
 tags: [ticket, phase]
-keywords: [proposal-format, 提案書式, 提案, 子の提案, 親の提案, 書式, phases, フェーズ, plan, after, 計画, frontmatter, ticket new, ticket revise, 改版, 雛形, lint, flows, フロー]
+keywords: [proposal-format, 提案書式, 提案, 子の提案, 親の提案, 書式, phases, フェーズ, plan, after, 計画, frontmatter, ticket new, ticket revise, 改版, 雛形, lint, flows, フロー, feedback, フィードバック計画]
 ---
 
 # 提案の書式
@@ -98,6 +98,8 @@ ask:                       # 無くてよい。allow か ask のどちらかが 
 - 親の `phases:` は、計画が使う型の定義**だけ**のコピー。手で写さず `ccnavi --plan-order <識別子> --fill-phases` で差し込む（`ticket new` は書いた直後に同じことをする）。
   承認のあとは、このコピーを読んで判定し、`phases.yml` は読まない。`phases.yml` を直したら、承認待ちの提案は `--fill-phases` を打ち直す
 - `feedback:` は、レビューを受けたあとの改版で足すフィードバック計画（番号は全体計画の続き）。最初の提案には書かない
+  - フィードバック計画に置けるのは feedback 型（`implement-feedback`・`design-feedback`・`skill-improve` など）だけ。work 型は断られ、`after` が指せるのもフィードバック計画の番号だけ
+  - 対応のための実装の子は、フィードバック計画の feedback 型のフェーズに足す。同じフェーズに子を足す提案で出してもよい
 
 ## 子の提案
 
