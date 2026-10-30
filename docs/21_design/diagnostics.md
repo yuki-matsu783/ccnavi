@@ -114,7 +114,11 @@ error がある間は配点もフェーズ定義も保存できない。
 - 診断ログ（`logs/diag/`）の行の形・置き場・レベルは、sh・Python・拡張の 3 つの logger で揃える。
   `tests/core/test_diaglog.py` が 3 つの行を突き合わせる
 - Chrome 拡張は `src/ccnavi/` を Pyodide に同梱し、公開の入口 `entry/ext.py` が再公開するモジュールを通して、判定のコア（`tickets/core/api.py`（実体は `core.base`・`core.approve`・`core.review`）の
-  Snapshot → 判定 → Changes）と `cli.run` を直接呼ぶ。呼ぶ名前の一覧は REQ-EXT-27 の表にある
+  Snapshot → 判定 → Changes）と `cli.run` を直接呼ぶ。拡張が呼ぶ名前は `entry/ext.py` の再公開に限り、一覧はその再公開（コード）が正で、ここには写さない。
+  本体のモジュールを動かすときは `ext.py` の行だけを直す。拡張は同じ版の本体と一緒に同梱するので、旧い本体と新しい拡張は組み合わさらない。
+  互換の版は、拡張が統合先のデータや出力の形を読み違えるような変更のときに上げ、呼び出しの名前だけを変えるときは上げない
+- 互換の版の書き方: 実行ファイル側は `entry/version.py` の行頭から始まる 1 行 `COMPAT = <整数>` で、Chrome 拡張の組み立てが正規表現で読む。
+  VS Code 拡張側は `EXTENSION_COMPAT`。3 か所（実行ファイル・sh の `CCNAVI_COMPAT`・拡張）の突き合わせは `tests/sh/test_compat_skew.py` が見る
 
 ### 10.1 `--docs` の索引
 
