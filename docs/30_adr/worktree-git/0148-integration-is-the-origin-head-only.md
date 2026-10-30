@@ -8,7 +8,7 @@ keywords: [統合先, origin/HEAD, CCNAVI_INTEGRATION_BRANCH, --integration-bran
 
 # ADR-0148: 統合先は各リポジトリの origin/HEAD だけで決め、環境変数と --integration-branch を廃止する
 
-状態: 採用（2026-10-19）
+状態: 採用
 
 ## 状況
 
@@ -39,7 +39,7 @@ keywords: [統合先, origin/HEAD, CCNAVI_INTEGRATION_BRANCH, --integration-bran
 - `settings.local.json` はエージェントが書き換えられるファイルで、sh はその内容をその場で読むため、エージェントが統合先を変えられた
 - Chrome 拡張はもともとホスト API の `default_branch` を見ており、sh・Python とずれていた。廃止すると sh・Python と揃う。ただし拡張のリポジトリごとの「統合先の名前」設定欄はこの変更の対象外で残っており、sh・Python との統一は欄の扱いの判断待ちである
 
-## 代償と逃げ道
+## 得たもの・失ったもの
 
 - 既定が `main` のまま `develop`・`release/*` へマージリクエストを出す運用（hotfix など）では、宛先がずれる。宛先はホストの画面で直す
 - origin の無いリポジトリでは統合先が決まらず、`integrate` が断る。origin があることを前提にした
