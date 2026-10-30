@@ -243,7 +243,7 @@ diagrams:
       - id: load
         from: ccnavi（hook）
         to: rules.yml
-        text: ルールを読む（共通・ワークスペース・プロジェクトの設定の和）
+        text: ルールを読む（共通・ワークスペース・プロジェクトの設定を重ねたもの）
       - id: match
         from: ccnavi（hook）
         text: deny → ask → allow の順に適用する
@@ -708,11 +708,11 @@ courses:
 
   - id: read-sum
     title: 共通の設定との統合結果を確認したいとき
-    summary: 実際に効くルールは、共通の設定と 1 つの設定の和。統合結果の枠で、由来と件数を読む
+    summary: 実際に効くルールは、共通の設定に選んだ設定を重ねたもの。統合結果の枠で、由来と件数を読む
     steps:
       - target: sum
         title: 統合結果とは
-        body: 判定に効くルールは、共通の設定と、ひとつの設定（ワークスペースかプロジェクト）のルールの和です。「統合結果」の枠は、その和を実行ファイルが出した結果のまま表示します。読み取り専用で、保存済みの内容の和なので、編集中の内容は含みません。
+        body: 判定に効くルールは、共通の設定に、ひとつの設定（ワークスペースかプロジェクト）のルールを重ねたものです。「統合結果」の枠は、その結果を実行ファイルの答えのまま並べます。読み取り専用で、保存済みの内容が対象なので、編集中の内容は含みません。
         scene: { tab: rules, sum: web }
       - target: sum-pick
         title: 統合結果を選ぶ
@@ -720,7 +720,7 @@ courses:
         scene: { tab: rules, sum: web }
       - target: sum-count
         title: 件数と追加されたレイヤー
-        body: 件数の横に、追加されたレイヤーが出ます。見本の web は「共通の設定 + web」の和で、共通の設定のルールに、web のルールが追加されています。
+        body: 件数の横に、追加されたレイヤーが出ます。見本の web は「共通の設定 + web」を重ねたもので、共通の設定のルールに、web のルールが追加されています。
         scene: { tab: rules, sum: web }
       - target: sum-deny
         title: 由来で確認する
@@ -728,7 +728,7 @@ courses:
         scene: { tab: rules, sum: web }
       - target: sum-deny
         title: 統合結果を替えて見比べる
-        body: 同じ共通のルール（git-push・no-rm-rf）が、どの統合結果にも入ります。統合結果を替えると、レイヤーごとに追加されるルールだけが入れ替わります。見本の self では secrets の置き場を止めるルールが追加されます。
+        body: 同じ共通のルール（git-push・no-rm-rf）が、どの統合結果にも入ります。統合結果を切り替えると、レイヤーごとに追加されるルールだけが入れ替わります。見本のワークスペースでは secrets の置き場を止めるルールが追加されます。
         scene: { tab: rules, sum: self }
       - target: target
         title: 編集する設定ファイルを選ぶ

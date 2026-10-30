@@ -168,7 +168,7 @@ courses:
 
   - id: how-save-effect
     title: 保存してから効くまでを知りたいとき
-    summary: 配点の保存で何が検証され、どこへ書かれ、いつから使われるか。共通の設定との和と、HIGH 以上のときに変わること
+    summary: 配点の保存で何が検証され、どこへ書かれ、いつから使われるか。共通の設定との重ね合わせと、HIGH 以上のときに変わること
     steps:
       - target: levels
         title: 値を直す
@@ -200,13 +200,13 @@ courses:
         body: HIGH が 40 のときは、40 点の子は HIGH です。50 に直したあとに閉じる 40 点の子は MEDIUM で、実績ではユーザのレビューが要る扱いになりません。宣言の mr は下がりません。
         diagram: risk-level-edit
       - target: sum
-        title: 実際に使うのは、共通の設定との和
-        body: 子を閉じるときの配点は、共通の設定と、親の project が指す設定の和です。ここでは lib の設定を共通の設定に足します。境目の点は小さいほう、項目は連結です。
+        title: 実際に使うのは、共通の設定との重ね合わせ
+        body: 子を閉じるときの配点は、共通の設定と、親の project が指す設定を重ねたものです。ここでは lib の設定を共通の設定に足します。境目の点は小さいほう、項目は連結です。
         scene: { sum: lib }
         diagram: risk-sum-lib
         focus: common, layer, merge
       - target: sum-table
-        title: 同じ差分を、和の配点で数える
+        title: 同じ差分を、重ねた配点で数える
         body: src/api/v1.py を 120 行変えた子で見ます。共通の big-diff は 300 行以下で 0 点です。lib の lib:big-diff は 100 行を超えるので 15 点、public-api は 1 ファイルで 20 点になり、合計 35 点です。lib の HIGH は 30 なので HIGH になります。
         scene: { sum: lib }
         diagram: risk-sum-lib
@@ -359,7 +359,7 @@ courses:
           sum: lib
       - target: factors
         title: 編集する設定ファイルを選ぶ
-        body: 統合結果は読み取り専用です。直すときは、画面上部の「設定」の欄で、編集する設定を切り替えます。統合結果は保存済みの配点の和で、編集中の内容は含みません。
+        body: 統合結果は読み取り専用です。直すときは、画面上部の「設定」の欄で、編集する設定を切り替えます。統合結果は保存済みの配点が対象で、編集中の内容は含みません。
 
   - id: create-file
     title: 組み込みの配点からファイルを作りたいとき
@@ -399,7 +399,7 @@ diagrams:
       - id: load
         from: ccnavi
         to: risks.yml
-        text: 配点を読む（共通の設定と、親の project が指す設定の和）
+        text: 配点を読む（共通の設定に、親の project が指す設定を重ねたもの）
         value: 'levels: {medium: 20, high: 40, critical: 70}'
       - id: diff
         from: ccnavi
@@ -626,7 +626,7 @@ diagrams:
       - id: ask
         from: ccnavi
         to: エージェント
-        text: すべての子が合流済みと確かめ、レビューを頼み、ターンを終えてユーザを待つよう返す
+        text: すべての子が合流済みと確かめ、レビューを頼み、応答を終えてユーザを待つよう返す
       - id: block
         from: ccnavi
         text: レビューが済むまで、親のワークツリーでのサブエージェントの起動と Bash を止める。通すのは ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh だけ

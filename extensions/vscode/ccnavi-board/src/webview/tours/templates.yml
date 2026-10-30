@@ -189,9 +189,9 @@ diagrams:
       - id: found
         from: ccnavi
         to: エージェント
-        text: 共通の設定と自分の層の和から、名前・説明・使う場面を返す
+        text: 共通の設定に自分の層を重ねたものから、名前・説明・使う場面を返す
         value: |-
-          ccnavi: テンプレート（共通 + self）
+          ccnavi: テンプレート（共通 + ワークスペース）
             feature  [self]  機能を追加する親の計画
                 いつ: 新しい機能を追加するとき
       - id: new
@@ -266,7 +266,7 @@ courses:
           body: true
       - target: sum
         title: 統合結果
-        body: 実際に使われるのは、共通の設定と選んだ層の和です。枠を開くと、どの名前がどの層から使われ、どれが破棄されたかの一覧が出ます。読み取り専用で、中身は上の一覧で読みます。
+        body: 実際に使われるのは、共通の設定に選んだ層を重ねたものです。枠を開くと、どの名前がどの層から使われ、どれが破棄されたかの一覧が出ます。読み取り専用で、中身は上の一覧で読みます。
         scene:
           sum: self
       - target: drafts
@@ -275,7 +275,7 @@ courses:
         scene: {}
       - target: refresh
         title: 更新
-        body: 一覧を再読み込みします。ファイルを外で変更したあとに押します。
+        body: 一覧を読み直します。ファイルを外で変更したあとに押します。
         scene: {}
       - target: tour
         title: 案内
@@ -335,7 +335,7 @@ courses:
     steps:
       - target: list
         title: 利用できるテンプレートを探す
-        body: エージェントは ccnavi --templates で、共通の設定と自分の層の和を引きます。この画面の一覧と統合結果と同じ答えです。名前・説明・使う場面で絞れます。
+        body: エージェントは ccnavi --templates で、共通の設定に自分の層を重ねたものを引きます。この画面の一覧と統合結果と同じ答えです。名前・説明・使う場面で絞れます。
         scene: {}
         diagram: template-propose
         focus: list,found
@@ -419,6 +419,6 @@ courses:
         body: 下書きの取り込みは「取り込み待ち」の画面で行います。差分を読んで、取り込む対象を選びます。
         scene: {}
       - target: refresh
-        title: 再読み込みする
-        body: 下書きを直したあとは、更新を押して再読み込みします。
+        title: 読み直す
+        body: 下書きを直したあとは、更新を押して読み直します。
         scene: {}

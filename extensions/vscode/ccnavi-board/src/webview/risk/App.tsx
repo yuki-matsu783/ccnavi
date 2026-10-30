@@ -186,7 +186,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
     return (
       <>
         <p className="empty">
-          リスク管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に替わります。
+          リスク管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に変わります。
         </p>
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>

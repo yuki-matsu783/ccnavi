@@ -48,7 +48,7 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
       {sum.unreadable !== "" && (
         <div className="banner warn">実行ファイルは {sum.path} を読み込めず、その設定を空として扱っています（共通の設定のルールだけが効いています）: {sum.unreadable}</div>
       )}
-      {sum.missing && sum.unreadable === "" && <p className="hint">{sum.path} はないので、共通の設定のルールだけの和です（ファイルがないのは、その設定がまだ作られていない正常な状態です）。</p>}
+      {sum.missing && sum.unreadable === "" && <p className="hint">{sum.path} はないので、共通の設定のルールだけです（ファイルがないのは、その設定がまだ作られていない正常な状態です）。</p>}
       <p className="count" data-count="sum" data-tour="sum-count">
         {total} 件（{layersText(sum.layers)}）
       </p>

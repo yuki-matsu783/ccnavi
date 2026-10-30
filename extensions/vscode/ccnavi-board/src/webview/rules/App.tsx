@@ -337,7 +337,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         </p>
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" title="ファイルを再読み込みします" disabled={busy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
           更新
         </button>
       </>
@@ -482,7 +482,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       ))}
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。更新してください。
-        <button type="button" className="action" data-action="reload" title="ファイルを再読み込みします" disabled={busy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
           更新
         </button>
       </div>
@@ -507,7 +507,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           <button type="button" className="action" data-action="open-rules" disabled={page?.exists === false} onClick={() => post({ type: "openFile", which: "rules" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" title="ファイルを再読み込みします" disabled={busy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
             更新
           </button>
           <button

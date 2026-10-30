@@ -128,7 +128,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
   if (data.kind === "error") {
     return (
       <>
-        <p className="empty">テンプレート管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に替わります。</p>
+        <p className="empty">テンプレート管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に変わります。</p>
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>
         <button type="button" className="action" data-action="reload" onClick={() => post({ type: "refresh" })}>
