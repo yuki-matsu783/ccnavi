@@ -20,6 +20,8 @@ allow:
     glob: "tests/scenarios/**"
   - match: Write|Edit
     glob: ".agents/docs/acceptance-scenarios.md"
+started_at: "2026-10-31T04:35:05+0900"
+base_sha: "b8b9c8a92acc4427928e822194712e8c22b51be0"
 ---
 ## 目的
 
