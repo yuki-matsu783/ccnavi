@@ -844,10 +844,22 @@ def _clear_ccnavi_state(root, top, run):
         run("update-ref", "-d", ref)
 
 
+def _clear_archive(root, top):
+    """前の回の ready が logs/archive/<プロジェクト>/ へ退避した親子を消す。
+    残すと、同じ識別子の親が「一度は送った形跡」になり、新しい origin への push の関門が止まる。
+    置き場はワークスペースルートの logs/ の下（git の外）で、そのプロジェクトの分だけを消す。
+    リンクは辿らず、リンク自体を外す。"""
+    path = Path(root) / "logs" / "archive" / Path(top).name
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+
+
 def reset_repo(root, target, base, allowed=None):
     """対象を base へ戻す。順序: ワークツリーを消す → prune → ccnavi の記録・marker・ref を消す →
-    main を base に合わせて切り替える → main 以外のローカルブランチを消す → タグを消す →
-    stash を空にする → reset --hard → clean -fd。
+    logs/archive/<プロジェクト>/ を消す → main を base に合わせて切り替える →
+    main 以外のローカルブランチを消す → タグを消す → stash を空にする → reset --hard → clean -fd。
     ccnavi の状態は、ワークツリーを消して prune したあとに消す。記録は一時ワークツリーや
     ブランチを指すので、ワークツリーが消せずに止まった回で、記録だけ先に消さない。
     clean に -x は付けない（.gitignore 済みを消さない）。refs/remotes は触らない。"""
@@ -876,6 +888,7 @@ def reset_repo(root, target, base, allowed=None):
             run("worktree", "remove", "--force", p)
     run("worktree", "prune")
     _clear_ccnavi_state(root, top, run)
+    _clear_archive(root, top)
     run("checkout", "-f", "-B", "main", base)
     for name in run("for-each-ref", "--format=%(refname:short)", "refs/heads").split():
         if name != "main":

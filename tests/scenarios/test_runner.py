@@ -2070,6 +2070,19 @@ class ResetTest(unittest.TestCase):
         git(t, "update-ref", f"refs/ccnavi/direct/{name}/pending", ws.base)
         return common
 
+    def test_archive_of_the_target_is_removed_and_others_are_kept(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            mine = ws.root / "logs" / "archive" / ws.target.name / "done"
+            other = ws.root / "logs" / "archive" / "self" / "done"
+            for p in (mine, other):
+                p.mkdir(parents=True)
+                (p / "feature-1-x.md").write_text("done\n", encoding="utf-8")
+            base = git(ws.target, "rev-parse", "HEAD")
+            runner.reset_repo(ws.root, ws.target, base)
+            self.assertFalse((ws.root / "logs" / "archive" / ws.target.name).exists())
+            self.assertTrue((other / "feature-1-x.md").exists())
+
     def test_ccnavi_own_records_markers_and_refs_are_removed(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
