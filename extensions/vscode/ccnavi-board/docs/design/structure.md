@@ -27,7 +27,7 @@ src/
   workflow-panel.ts   計画編集タブの Webview パネル（親の提案ごとに 1 枚。識別子を渡すコマンドと、ボードの親の提案のカードの「計画編集」、承認のオーバーレイの「計画を編集」から開く）。線を変えるたびの --plan-order --json --order と、保存の --plan-order --write --expect を実行ファイルに打たせる（拡張はファイルを書かない）。提案の監視（外で変わった・承認待ちから無くなった）、未保存の「●」と閉じた後の聞き方、初回の案内もここ。未保存と、保存したあとのハッシュ（source_sha）を帳面（core/workflow-tabs.ts）に書く（vscode に依存する）
   prompt-handover.ts  Claude Code に文を渡す経路（コピー / 新しいセッションで開く / 専用ターミナルで claude -p を実行）。ボードとフロー編集画面が使う（vscode に依存する）
   projects-panel.ts   プロジェクト管理画面の Webview パネル。clone の送信、.gitignore への追記（vscode に依存する）
-  terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
+  terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信。作った直後はシェル統合が立ち上がるのを待って送る（vscode に依存する）
   tour.ts             画面ごとの初回の案内を見たかどうか（拡張の globalState に画面の名前ごとに持つ）（vscode に依存する）。左パネルの案内（package.json の walkthroughs。本文は media/tour/）を、拡張の版が変わった最初の起動と、パネルのタイトルバーの ? で開き、プロジェクト管理 → チケット管理の基本の案内を続けて動かす（vscode に依存する）
   ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-expectations --json / --lint（--rules / --project-rules-file / --risk / --project-risk-file / --project-phases-file の差し替え）/ --lint --json（--flow でフロー 1 本を確かめる）/ --agree --preview --json / user agree --yes … --json / --templates --json / --templates --show <名前> --json / user handoff [<パス>…] --json（取り込み先行の一覧。見るだけ）と user handoff <パス…> --yes --expect --via board --json（取り込み）/ --templates --draft <親> --json（ボードの親のカードの「テンプレートの下書きを作る」）/ --suggest --json / --plan-order <親> --json（--order）と --plan-order --write の実行（Node の子プロセス）
   git.ts              ローカルの git を読み取り専用で起動する（origin を読む。Node の子プロセス）

@@ -51,16 +51,19 @@ export function runInNewTerminal(root: string, name: string, command: string): v
   sendWhenReady(terminal, command);
 }
 
-/** 作った直後のシェルはまだ起動中で、すぐ送った行が行入力の途中で中断されることがある。立ち上がりを待つ時間の上限 */
+/**
+ * 作った直後のシェルはまだ起動中で、すぐ送った行が行入力の途中で中断されることがある。立ち上がりを待つ時間の上限。
+ * シェルの起動がこれより遅いと、待ちきれずに送るので防げない
+ */
 const READY_TIMEOUT_MS = 3000;
 
 /** シェルの準備を待っていて、まだ送っていない行（ターミナルごと。送ったら消える） */
 const pending = new WeakMap<vscode.Terminal, string[]>();
 
 /**
- * 作ったばかりのターミナルへ、シェルの準備ができてから 1 行を送る。シェル統合が使えれば、その
- * 立ち上がりを待つ。使えない場合や、上限の時間までに立ち上がらない場合は、そのまま送る
- * （シェル統合の API は VS Code 1.93 から使える。それより前の版では待たずに送る）
+ * 作ったばかりのターミナルで、シェル統合が立ち上がってから行を送る。待っている間に runInTerminal が
+ * 積んだ行も、送った順に送る。シェル統合の API が無い版では待たずに送る。API があっても統合が働かない
+ * 環境（設定で無効・対応しないシェルなど）では、上限の時間まで待ってから送る
  */
 function sendWhenReady(terminal: vscode.Terminal, command: string): void {
   const window = vscode.window as unknown as {
