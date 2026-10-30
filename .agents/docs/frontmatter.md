@@ -26,7 +26,7 @@ frontmatterのキーと書き方、索引、対象外の置き場は[.ccnavi/doc
 
 ## ccnaviのリポジトリ固有のtypeの値
 
-`type`の値の選び方と、どのリポジトリでも使う値（`guide`・`skill`・`skill-reference`・`learning-wiki`・`report`など）は[.ccnavi/docs/frontmatter.md](../../.ccnavi/docs/frontmatter.md)の「typeの値」にある。
+`type`の値の選び方と、どのリポジトリでも使う値（`guide`・`report`など）は[.ccnavi/docs/frontmatter.md](../../.ccnavi/docs/frontmatter.md)の「typeの値」にある。`skill-reference`は[.ccnavi/docs/skill-processes.md](../../.ccnavi/docs/skill-processes.md)、`learning-wiki`は[.ccnavi/docs/skill-wiki.md](../../.ccnavi/docs/skill-wiki.md)にある。
 ここには、ccnaviのリポジトリの`docs/`で使う、固有の値だけを置く。
 
 | type | 対象 |

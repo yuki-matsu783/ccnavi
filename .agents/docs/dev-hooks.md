@@ -32,7 +32,7 @@ ccnavi のリポジトリ自身の開発に使う hook は `.claude/hooks/` に�
 
 ## 拡張のテスト
 
-拡張（`extensions/vscode/ccnavi-board`）のテストも同じ形で回す。`mark-ext.sh` が、拡張のファイルを触ったら `logs/session/<セッション>.ext-files` に書き残し、`test-ext.sh` がターンの終わりに 1 回回す。
+拡張（VS Code の `extensions/vscode/ccnavi-board`、Chrome の `extensions/chrome/ccnavi-approval`、共通の `extensions/shared`）のテストも同じ形で回す。`mark-ext.sh` が、拡張のファイルを触ったら `logs/session/<セッション>.ext-files` に書き残し、`test-ext.sh` がターンの終わりに 1 回回す。
 回すのは触ったファイルが関わるグループだけで、決めるのは `extensions/vscode/ccnavi-board/scripts/test-groups.js`。テストの `import` を辿り、辿れないものだけをパスの規則で補う。拡張を触っていないターンは何もしない。
 差し戻しは 3 回までで、回数は `test-py.sh` と別に数える。
 
