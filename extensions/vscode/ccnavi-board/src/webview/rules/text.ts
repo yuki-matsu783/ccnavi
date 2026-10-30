@@ -84,6 +84,6 @@ export const JUDGE_LABELS = {
   subject: "対象（subject）",
   resolved: "実際に見た対象（resolved）",
   reason: "理由（reason）",
-  degraded: "縮退（degraded）",
+  degraded: "縮退（生の文字列で判定。degraded）",
   fallback: "組み込みの既定（fallback）",
 } as const;
