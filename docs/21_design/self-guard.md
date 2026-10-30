@@ -53,18 +53,17 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 | `builtin:guard-scripts` | glob `*/<ccnavi ディレクトリ>/scripts/*` | 同上 |
 | `builtin:guard-ccnavi-config` | regex `[\\/]<ccnavi ディレクトリ>[\\/]config[\\/]common[\\/](rules\|phases\|risks)\.yml$` | 同上 |
 
-- 共通のルールファイルには書かない。ルールファイルの `deny` に置くと、書き換えられた時点で保護も一緒に消える
+- 共通のルールファイルには書かない
 - ccnavi ディレクトリの名前が空なら、それを使う 2 本（scripts と共通の設定）は足さない
 - `builtin:guard-ccnavi-config` はルートを固定せず、パスの末尾で適用する。`builtin:guard-common-layer` と同じ範囲だとは仮定しない
 - 足す場所は 3 つで、同じ関数から足す。実行前の通常時は `add_rules` の後に呼ぶ（`deny` の先頭に挿すので、専用の文面が `builtin:guard-project-home` / `builtin:guard-common-layer` より先に並ぶ。`add_rules` の中身は変えず、二重に足さない）。実行前で、共通のルールファイルが読めず組み込みの既定で動いている間は、`add_rules` は呼ばずこの関数だけ呼ぶ。実行後は `events.watched_for` が、各ツリーのルールの組にこの関数だけを足す（読めない間も同じ。`builtin:guard-project-home` 全体は足さない）
 - 一般の保護と同じ扱いで、`dry-run` では報告だけにする。実行後は、`CCNAVI_RESTORE_IF_DENY` を全体モードと掛け合わせた実効値（`modes.effective_setting`）が `enable` なら未コミットの変更を復元し、全体モードが `dry-run` なら報告だけにする。`Stop` は報告だけで復元しない。`UserPromptSubmit` と `SessionStart` は同じ保護範囲で基準を取り、前からある変更とユーザが受け入れた変更を戻さない
 - `disable` のときは、実行前にも実行後にも足さない。ワークスペースルートの `.claude/hooks/` と `.claude/settings*.json` は、ルールの `workspace-root` が実行前に止める
 
-共通のルールファイルが読めない間の修復は、エージェントが `Write` / `Edit` で直接直す形では通さない（読めない間だけ例外にすると、その例外が攻める入口になるため）。読めない間も `builtin:guard-ccnavi-config` は外れない。直し方は 1 つで、エージェントが `wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（置き場は例外で書ける）、ユーザがターミナルから `ccnavi user handoff` で取り込むか、手で直す。今の中身が読めない `rules.yml` の取り込みは、`handoff._defense_change` が「確かめられないのでターミナルに限る」と扱う。そのため、ボードからの取り込みは断られる。`builtin:guard-config-via-bash` と `builtin:guard-ccnavi-config` の文面が、この手順を案内する。
+共通のルールファイルが読めない間の修復は、エージェントが `Write` / `Edit` で直接直す形では通さない。読めない間も `builtin:guard-ccnavi-config` は外れない。直し方は 1 つで、エージェントが `wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（置き場は例外で書ける）、ユーザがターミナルから `ccnavi user handoff` で取り込むか、手で直す。今の中身が読めない `rules.yml` の取り込みは、`handoff._defense_change` が「確かめられないのでターミナルに限る」と扱う。そのため、ボードからの取り込みは断られる。`builtin:guard-config-via-bash` と `builtin:guard-ccnavi-config` の文面が、この手順を案内する。
 
 同じ設定が有効な間、`ccnavi user prune` をシェルから打つ形も、チケット制御に依らず
-`DENY_RECORDS_PRUNE`（`builtin:guard-records-prune`）で止める（`phase_forms.prune_form`）。実行ファイルのターミナル要求は
-擬似ターミナル（`script -qc`）を使えば満たせてしまい、チケット制御を切ったワークスペースではターミナル要求を切る変数も止まらないため。
+`DENY_RECORDS_PRUNE`（`builtin:guard-records-prune`）で止める（`phase_forms.prune_form`）。
 見るのは引用符を外したコマンド行で、コマンドの切れ目の中に ccnavi の名前と `user prune`（`user` の次の語が `prune`）が並べば止める。免除は無い。
 
 `logs/` の下の git のラッパースクリプトの記録は守らない。
@@ -110,13 +109,12 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 `builtin:guard-project-home` が止める。
 
 生の git（`builtin:guard-raw-git`）: いつも、生の git を組み込みで止める（9.1）。ラッパーがあればその打ち方を文面で名指しする。
-ラッパーの中のチケット制御の可否を、ラッパーの外から打つ git で外させないためで、ガード自身を守る組み込みに数える（P4）。
+ガード自身を守る組み込みに数える（P4）。
 `CCNAVI_GUARD_CORE_FILES` では切れず、チケット制御（`CCNAVI_TICKET_CONTROL`）を切ると外れる。
 
 git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PATH`、`builtin:guard-wrapper-paths`）: `ccnavi-git.sh` の
 `rm`（`--cached` も）・`restore --source <ref>`・`checkout <ref> <パス>` で、`builtin:guard-setting-files` と同じ場所を
-消す・別のコミットの中身に戻す形を、ルールより先に止める（`wrapguard.check_core_paths`）。シェルの `rm` は止まるのに、ラッパーの
-`git rm` は同じファイルを消せた。`ccnavi-git.sh` 自身が消えても、生の git の組み込みは足したままなので外れない。
+消す・別のコミットの中身に戻す形を、ルールより先に止める（`wrapguard.check_core_paths`）。`ccnavi-git.sh` 自身が消えても、生の git の組み込みは足したままなので外れない。
 `CCNAVI_GUARD_CORE_FILES` が有効な間、チケット制御と組み込みの既定への退避に依らず足す。
 
 | ヒットするもの | 理由 |
@@ -149,13 +147,6 @@ git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PAT
 この止めは補助の保護で、`CCNAVI_GUARD_CORE_FILES` では切れず、`dry-run` でも止める。
 hook 自身は settings.json の env で起動するので、ここで見る代入の影響を受けない。
 
-### 8.2.1 設計方針: イレギュラーな場面は止めて人間に直してもらう
-
-例外的な場面（共通のルールファイルが読めない、など）のために判定の経路が複雑になるときは、仕組みで解かない。
-判定の例外を足すと、その例外が攻める入口になり、読み手も経路を追い切れなくなる。止めて、人間に直してもらう案内にする
-（読めない間の修復は、下書きとユーザの取り込み）。保護の実装中に、想定していない複雑さが見つかったときも、
-実装で抱え込まず、報告して判断を仰ぐ。
-
 ### 8.3 戻す側
 
 実行前に対象の中身を `state/selfguard/<セッション>/<キー>` へバックアップし、実行後に比べて、変わって
@@ -166,11 +157,11 @@ hook 自身は settings.json の env で起動するので、ここで見る代�
 ついては何も言わず、無かったところに現れた場合は言う。
 
 ユーザの発言（`UserPromptSubmit`）では、その時点の状態を基準に取り直す。前のターンの終わりから発言までに起きた変更は、
-エージェントが何も実行していない間のことで、ユーザの手による編集か削除だから、次のツール呼び出しで戻さない。
+エージェントが何も実行していない間のことで、ユーザの手による編集か削除として扱い、次のツール呼び出しで戻さない。
 設定ファイルは今の中身でバックアップを取り直し、消えていたらバックアップを破棄して `.absent` のマーカーを置く。実行ファイルは
 大きさか更新時刻が変わっていれば新しい版を基準に取り込み、消えていれば参照を破棄して `.absent` を置く（再び置かれたら、
 次の実行前で新しい版を基準にする）。`dry-run` でも取り直す。バックアップを取り直すだけで、戻さない。
-`SessionStart` では小さい対象のバックアップを取らない。最初の発言までの変更を戻す根拠が無いため、最初の発言で取る。
+`SessionStart` では小さい対象のバックアップを取らない。最初の発言で取る。
 この受け入れは `UserPromptSubmit` の登録が前提で、登録が無いと、ターンの間に消えた設定ファイルは次の実行前に
 前回のバックアップから戻る（`PreToolUse` の登録が無いのと同じく、`--lint` がまだ言わない）。
 
@@ -189,8 +180,7 @@ hook 自身は settings.json の env で起動するので、ここで見る代�
 残る穴は、`Stop` の payload に現れない手段（外部の予約など）で、ユーザの発言に見える `UserPromptSubmit` を作る場合。
 受け入れた消えたことと取り直しは、記録の `guarded`（`accepted`・`rebased`）に残す。
 
-失敗した呼び出し（`PostToolUseFailure`）も、成功した呼び出しと同じ照合を行う。失敗する前に消した・書き換えたものを
-通すと、次の発言で「ユーザが消した」ものとして受け入れられるため。
+失敗した呼び出し（`PostToolUseFailure`）も、成功した呼び出しと同じ照合を行う。
 
 組み込みの既定を使っている間（共通レイヤーのルールファイルが読めない間）に、そのファイルを直した書き込みも、例外にせず戻す。全体が dry-run で名前で書くツールが通った場合も同じ。
 共通レイヤーのルールファイルを戻した報告には、直し方（下書きを `wip/handoff/.ccnavi/config/common/rules.yml` に置き、ユーザがターミナルの `ccnavi-user-handoff.sh` で取り込む）を添える。
@@ -199,10 +189,9 @@ hook 自身は settings.json の env で起動するので、ここで見る代�
 sh がこの機械で起動する実体（`bin-launched`）の 2 つ。実体は `platformtag.launched_executable` が sh と同じ順で探し、
 名前が `ccnavi-launcher.sh` なら `../bin/`、それ以外は隣を見る（8.2 と同じ条件）。見つからなければ足さない。
 実体は中身のハッシュで名前を付けて `state/selfguard/store/` へ 1 本だけ置き、セッションの側は参照（ハッシュ・大きさ・更新時刻）だけ
-持つ。比べるのは大きさと更新時刻。`CCNAVI_ENTRY_PATH` が振り分けの sh のときは、PATH にある `ccnavi`（`platformtag.path_executable`。絶対パスの項目だけを、sh と同じ順で見る）の実体も、`bin/` の有無に関わらず守る。自分と同じファイル（`ccnavi` という名前で張った launcher へのリンク）は sh と同じく飛ばす。PATH の実体はセッション開始のあとに現れることもあるので、参照が無いまま現れたら、実行前に最初に見た版を基準に取る（`_rebase_if_changed`）。キーは `bin-path-<実パスの印>` で、PATH が変わって指す先が替わっても、古い実体の参照を新しい実体に適用しない。止める正規表現は実体のパスの末尾 3 要素で適用し（要素が 3 以下の浅い実体は、区切りで始まる形だけに適用する）、置き場のディレクトリ全体は守らない（`~/.local/bin` への無関係な導入まで止まるため）。3 日より長く触られていないセッションのバックアップは、次のセッション開始で消す。
+持つ。比べるのは大きさと更新時刻。`CCNAVI_ENTRY_PATH` が振り分けの sh のときは、PATH にある `ccnavi`（`platformtag.path_executable`。絶対パスの項目だけを、sh と同じ順で見る）の実体も、`bin/` の有無に関わらず守る。自分と同じファイル（`ccnavi` という名前で張った launcher へのリンク）は sh と同じく飛ばす。PATH の実体はセッション開始のあとに現れることもあるので、参照が無いまま現れたら、実行前に最初に見た版を基準に取る（`_rebase_if_changed`）。キーは `bin-path-<実パスの印>` で、PATH が変わって指す先が替わっても、古い実体の参照を新しい実体に適用しない。止める正規表現は実体のパスの末尾 3 要素で適用し（要素が 3 以下の浅い実体は、区切りで始まる形だけに適用する）、置き場のディレクトリ全体は守らない。3 日より長く触られていないセッションのバックアップは、次のセッション開始で消す。
 
-実行前にも見るのは、`PostToolUse` の登録を消されるとその次の呼び出しから実行後チェックが動かないため。`PreToolUse` の
-登録ごと消された場合は ccnavi が一切動かない（12.3）。
+実行前にも照合する。`PreToolUse` の登録ごと消された場合は ccnavi が一切動かない（12.1）。
 
 ### 8.4 ターン中の印
 

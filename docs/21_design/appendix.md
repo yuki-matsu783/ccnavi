@@ -18,7 +18,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `UNDECLARED` | どのルールも言及しない。権限モードに委ねた、または確認できる者が居ないので断った |
 | `PARSE_UNCERTAIN` | コマンドを読み切れず生の文字列に適用し、どこにもヒットしなかった |
 | `DENY_SHELL_WORKSPACE_ROOT` | Bash の書き込み先（`>`・`tee`・`sed -i`・`rm`・`mv`・`cp` など）を、`cd` で移った先をたどって絶対パスに解くと、ルールファイルの `workspace-root` にヒットした。ワークスペースルート直下には書かず、`wip/handoff/`・`scratchpad/`・ワークツリーの中に書くよう案内して止める。ガード自身の保護など、ほかの `deny` にヒットした呼び出しはその文面で止まる。変数・置換・`~`・`{}` で組んだ書き込み先と、インタプリタに渡したコードの中は見ず、実行後チェックが戻す |
-| `DENY_REDIRECT_LIMIT` | 生の文字列（読み切れなかった Bash と PowerShell）に `>` が 50 個を超えて含まれ、シェルから書き込む形の保護を適用せずに止めた。権限モードに依らず止め、確認には回さない。生の文字列への照合は `>` の個数 × その後ろの空白の無い語の長さで伸びる。上限が無いと `>` が増えるほど長さの 2 乗に近づく。上限の下でも `>` 50 個 × 尾の長さで伸び（照合だけで 100KB で約 0.5 秒、400KB で約 1.8 秒）、上限はこれを長さの 50 倍の線形に抑える。期限（3 秒）を超えると `deadline-exceeded` の block（終了コード 2）になって理由を返せない。上限は止める側のまま、Write / Edit で書くかコマンドを分ける案内を付けて返すためのもの。ほかのルールの `deny` と `ask` には今までどおり適用し、`deny` にヒットすればそのルールの `deny` のまま。`allow` には適用しない。上限を掛けるのは、外す保護（ガード自身の設定とチケットの置き場を守る組み込み）がそのツールにヒットするときだけ |
+| `DENY_REDIRECT_LIMIT` | 生の文字列（読み切れなかった Bash と PowerShell）に `>` が 50 個を超えて含まれ、シェルから書き込む形の保護を適用せずに止めた。権限モードに依らず止め、確認には回さない。Write / Edit で書くかコマンドを分ける案内を付けて返す。ほかのルールの `deny` と `ask` には適用し、`deny` にヒットすればそのルールの `deny` のまま。`allow` には適用しない。上限を掛けるのは、外す保護（ガード自身の設定とチケットの置き場を守る組み込み）がそのツールにヒットするときだけ |
 | `DENY_BRACE_EXPANSION` | 引用の外にブレース展開を書いた。ルールより先に止める（6.3） |
 | `DENY_COMMAND_NAME_EXPANSION` | コマンド名の位置に変数・置換・グロブを書いた。ルールより先に止める（6.3） |
 | `DENY_BACKQUOTE` | 実行されるバッククォートを書いた。ルールより先に止める（6.3） |
@@ -83,7 +83,7 @@ JSON も、同じコードをキー `code` に持つ（通れば `null`。`stopp
 | `builtin:ticket-state` / `builtin:ticket-state-shell` | 状態の置き場への直接の作成・移動（`wip/proposals/review/` など） |
 | `builtin:ticket-approved` / `builtin:ticket-approved-shell` | 承認済みの置き場（`.ccnavi/approved/` の下すべて）への書き込み。関門で、`dry-run` でも `CCNAVI_GUARD_CORE_FILES` の値でも効く。文面は承認の経路・`status`・`finish`・`propose` を案内する。名前で書くツール用の 1 本は、実行後の保護範囲にも足す（チケット制御が有効な間。`ticket_guard.approved_write_rule`） |
 | `builtin:ticket-ops` / `builtin:ticket-ops-shell` | 操作記録の置き場（`logs/state/ops/`）への書き込み。関門で、`dry-run` でも `CCNAVI_GUARD_CORE_FILES` の値でも効く |
-| `builtin:guard-hooks` / `builtin:guard-settings` / `builtin:guard-scripts` / `builtin:guard-ccnavi-config` | `.claude/hooks/`、`.claude/settings*.json`、`<ccnavi ディレクトリ>/scripts/`、共通の設定 3 本（`<ccnavi ディレクトリ>/config/common/{rules,phases,risks}.yml`）への `Write` `Edit` `NotebookEdit`。`CCNAVI_GUARD_CORE_FILES` が `disable` でなければ、実行前にも、実行後の保護範囲にも足す。直下の `wip/handoff/` の普通のコピーは通す。共通のルールファイルが読めなくても、外れない（8.2） |
+| `builtin:guard-hooks` / `builtin:guard-settings` / `builtin:guard-scripts` / `builtin:guard-ccnavi-config` | 名前で書くツール（`Write` `Edit` `NotebookEdit`）から自己防衛の対象への書き込み。対象と例外は自己防衛の「止める側」の表にある |
 | `builtin:credentials` | 認証情報の場所（`.env*`、`.dev.vars`、`.netrc`、`.npmrc`、`.pypirc`、`.aws/`、`.ssh/`、`*.pem` / `*.key`（後ろに別の拡張子が続く形も）、`secrets/`、`credentials/`、`credentials.json`、`id_rsa`、`id_ed25519`）への `Bash` `Read` `Write` `Edit` `NotebookEdit`。常に効く土台で、設定で切れない。見本の `.env.example` も止める。`Grep` `Glob` `PowerShell` は対象外 |
 | `builtin:guard-raw-git` | 生の `git`。補助（チケット制御が有効なら `dry-run` でも止める） |
 | `builtin:ticket-scope` | `DENY_TICKET_SCOPE` / `TICKET_ASK`、実行後チェックと `SubagentStop` の `POST_TICKET_SCOPE` |
@@ -209,7 +209,7 @@ shlex に任せる。走査か shlex のどちらかに手を入れたら `tests
 | 自動 compact で `SubagentStart` の文は残るか | 文書: 起動時に入れた文は compact で消えうる。同じサブエージェントの次の起動（再開）で `SubagentStart` がまた走り、文脈にその文が無ければ入れ直す |
 | `PreCompact` / `PostCompact` | 文書: サブエージェントの compact でも来て、`agent_id` / `agent_type` を持つ。どちらも `systemMessage` を破棄し、`additionalContext` を受けるとは書かれていない（`PostCompact` は decision control も無い）。メインの compact は別の文脈のサブエージェントに影響しない |
 
-合成した payload で確かめた判定（同じ日）。書き込みは書き先のワークツリーで判定し、`agent_id` を見ない。そのため、
+合成した payload で確かめた判定。書き込みは書き先のワークツリーで判定し、`agent_id` を見ない。そのため、
 孫も子と同じように判定される。残る弱点は 4 つ。
 
 | | 弱点 | 今の扱い |
