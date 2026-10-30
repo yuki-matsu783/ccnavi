@@ -268,7 +268,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
       ) : (
         <>
         <p className="count" id="counts" data-tour="summary">
-          <span>テンプレート {shownTemplates.length} 件</span>・<span>下書き {page.data.drafts.length} 件</span>・<span>error {page.data.errors}</span>・<span>warn {page.data.warns}</span>・<span>info {page.data.infos}</span>
+          <span>エラー {page.data.errors} 件</span>・<span>警告 {page.data.warns} 件</span>・<span>情報 {page.data.infos} 件</span>
         </p>
         <section className="templates" data-tour="list">
           <h2>

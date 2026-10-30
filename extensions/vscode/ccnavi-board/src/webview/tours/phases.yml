@@ -187,7 +187,7 @@ diagrams:
       - id: finish
         from: 親（メインエージェント）
         to: ccnavi
-        text: 1 番目のフェーズ（research）の子を閉じる
+        text: 一つ目のフェーズ（research）の子を閉じる
         value: sh .ccnavi/scripts/ccnavi-ticket.sh finish <子>
       - id: deliverables
         from: ccnavi
@@ -217,7 +217,7 @@ diagrams:
       - id: finish
         from: 親（メインエージェント）
         to: ccnavi
-        text: 2 番目のフェーズ（design）の最後の子を閉じる
+        text: 二つ目のフェーズ（design）の最後の子を閉じる
         value: sh .ccnavi/scripts/ccnavi-ticket.sh finish <子>
       - id: ended
         from: ccnavi
@@ -294,8 +294,8 @@ diagrams:
       - id: gate
         from: ユーザ
         to: ccnavi
-        text: 4 番目の子を承認しようとする
-        value: 3 番目が閉じてレビューが済むまで、承認されない
+        text: 四つ目の子を承認しようとする
+        value: 三つ目が閉じてレビューが済むまで、承認されない
       - id: fixed
         from: ccnavi
         text: 先行は親の計画から計算する。承認のあとに phases.yml を直しても変わらない
@@ -363,12 +363,12 @@ courses:
         focus: agree
       - target: phases
         title: 順序は計画の after が決める
-        body: 定義には順序の欄がありません。どのフェーズにどのフェーズが先行するかは、計画のステップの after が決めます。4 番目の implement には、3 → 2 → 1 を辿って 1, 2, 3 が先行します。
+        body: 定義には順序の欄がありません。どのフェーズにどのフェーズが先行するかは、計画のステップの after が決めます。四つ目の implement には、3 → 2 → 1 を辿って 1, 2, 3 が先行します。
         diagram: phase-order
         focus: after, waits
       - target: phases
         title: 先行は承認で効く
-        body: 4 番目の子は、3 番目が閉じてレビューが済むまで承認されません。先行は計画から計算するので、承認のあとに phases.yml を直しても変わりません。after の書き漏れは並行として通るので、承認の画面の「すぐ始まる」の一覧で確かめます。
+        body: 四つ目の子は、三つ目が閉じてレビューが済むまで承認されません。先行は計画から計算するので、承認のあとに phases.yml を直しても変わりません。after の書き漏れは並行として通るので、承認の画面の「すぐ始まる」の一覧で確かめます。
         diagram: phase-order
         focus: gate, fixed
 

@@ -99,9 +99,9 @@ test("CB-D327 苦情の件数と深刻度の文字（[error] [warn] [info]）が
   const dom = await openTemplates();
   try {
     const summary = text(dom.one('[data-tour="summary"]'));
-    assert.match(summary, /error 3/);
-    assert.match(summary, /warn 2/);
-    assert.match(summary, /info 1/);
+    assert.match(summary, /エラー 3/);
+    assert.match(summary, /警告 2/);
+    assert.match(summary, /情報 1/);
     await openRow(dom, 'li.template[data-name="ends"][data-layer="self"]');
     assert.match(text(dom.one('li.template[data-name="ends"][data-layer="self"] .sev-label')), /\[error\]/);
     await openRow(dom, 'li.template[data-name="feature"][data-layer="self"]');
