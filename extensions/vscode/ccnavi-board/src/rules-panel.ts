@@ -667,7 +667,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     return;
   }
   if (!lint.value.ok) {
-    // 苦情は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
+    // 指摘は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
     fail(current, `設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください:\n${lint.value.report.split(tmp).join(loaded.rulesRel)}`);
     return;
   }
@@ -682,7 +682,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     return;
   }
   if (!(await confirmDuringTurn(lock))) {
-    fail(current, "ターン中のため保存を取りやめました。ターンが終わってから保存してください。");
+    fail(current, "エージェントの応答中のため保存を取りやめました。応答が終わってから保存してください。");
     return;
   }
   if (!alive(current)) {

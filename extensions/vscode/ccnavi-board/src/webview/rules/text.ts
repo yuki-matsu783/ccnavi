@@ -24,7 +24,7 @@ export function summaryMatch(rule: RuleForm): string {
 }
 
 /**
- * 要約につける文。deny は拒否の文面、ask と allow は渡す文（message はどこにも届かないため）。
+ * 要約につける文。deny は拒否の文面、ask と allow はプロンプト（message はどこにも届かないため）。
  */
 export function summaryNote(section: Section, rule: RuleForm): string {
   const shown = section === "deny" ? rule.message : rule.additionalContext || rule.additionalContextOnce;
@@ -49,7 +49,7 @@ export function hasContext(rule: RuleForm): boolean {
 export function contextSummary(rule: RuleForm): string {
   return hasContext(rule)
     ? "（設定あり）"
-    : "（未設定）ルールに一致したときにモデルへ渡すプロンプト・ファイルと、その頻度（every）を設定します。";
+    : "（未設定）ルールにヒットしたときにモデルへ渡すプロンプト・ファイルと、その頻度（every）を設定します。";
 }
 
 /** ask と allow に message が残っているときに出す断り。lint が error にする */
@@ -60,7 +60,7 @@ export function staleMessage(section: Section): string {
 
 /**
  * 絞り込みが適用する文字列。適用するのは書いてある値そのもの（id・ツール・パターン・文面・
- * 渡す文）で、要約に出ない全文にもヒットする。組み合わせ条件のルールは、個別条件の文字すべてにヒットする。
+ * プロンプト）で、要約に出ない全文にもヒットする。組み合わせ条件のルールは、個別条件の文字すべてにヒットする。
  */
 export function findText(rule: RuleForm): string {
   const patterns = rule.when === undefined ? rule.pattern : condPatterns(rule.when).join(" ");

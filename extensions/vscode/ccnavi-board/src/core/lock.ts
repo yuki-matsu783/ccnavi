@@ -22,13 +22,13 @@ export interface Lock {
   readonly turns?: readonly string[];
 }
 
-/** ターン中の保存の前に見せる文。ターン中のセッションが無ければ空 */
+/** 応答中の保存の前に見せる文。応答中のセッションが無ければ空 */
 export function turnWarning(lock: Lock): string {
   const turns = lock.turns ?? [];
   if (turns.length === 0) {
     return "";
   }
-  return `エージェントがターンの途中です（セッション ${turns.join(", ")}）。いま保存すると、次のツール呼び出しで元に戻されることがあります。ターンが終わってから保存すると確実です。`;
+  return `エージェントが応答の途中です（セッション ${turns.join(", ")}）。いま保存すると、次のツール呼び出しで元に戻されることがあります。応答が終わってから保存すると確実です。`;
 }
 
 /**
@@ -40,7 +40,7 @@ export function turnWarning(lock: Lock): string {
 export function lockFromBoard(board: BoardJson, project?: string): Lock {
   const mine = board.tickets.filter((t) => project === undefined || t.project === project);
   if (mine.some((t) => t.in_progress === null)) {
-    return lockFromError("実行ファイルが作業中かを示しません。実行ファイルを組み立て直すか配り直してください");
+    return lockFromError("実行ファイルが作業中かを返しません。実行ファイルを更新してください");
   }
   const doing = mine.filter((t) => t.in_progress === true).map((t) => t.ticket);
   const turns = (board.turns ?? []).map((t) => t.session);
@@ -71,7 +71,7 @@ export function lockClass(lock: Lock): string {
 export function lockFromError(error: string): Lock {
   return {
     locked: true,
-    reason: `作業中のチケット: ${error}`,
+    reason: `保存できるか確認できません: ${error}`,
     doing: [],
   };
 }

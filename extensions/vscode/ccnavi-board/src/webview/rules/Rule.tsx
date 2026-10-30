@@ -132,7 +132,7 @@ export function Rule(props: RuleProps): JSX.Element {
               </span>
             )}
           </span>
-          {/* 刻みは折りたたんだままでも見える。見えないと「毎回渡る」と思ったまま渡す文を直すことになる */}
+          {/* 刻みは折りたたんだままでも見える。見えないと「毎回渡る」と思ったままプロンプトを直すことになる */}
           {rule.every === "" ? (
             <span className="sum-every" />
           ) : (
@@ -198,7 +198,7 @@ export function Rule(props: RuleProps): JSX.Element {
                 </div>
               ))}
               <span className="dim">
-                {rule.when !== undefined ? "組み合わせ条件にヒットしても" : "パターンにヒットしても"}、これにヒットすればヒットしない扱いになります。画面では編集できません。ルールファイルで直すか、
+                {rule.when !== undefined ? "組み合わせ条件" : "パターン"}にヒットした操作でも、除外にヒットしたものは対象から外れます。画面では編集できません。ルールファイルで直すか、
                 {rule.when !== undefined ? "組み合わせ条件の not に移してください" : "「組み合わせ条件に変換」で組み合わせ条件の中へ移してください"}
               </span>
             </div>
@@ -226,7 +226,7 @@ export function Rule(props: RuleProps): JSX.Element {
             {contextSummary(rule)}
           </summary>
           <div className="sub">
-            {/* 刻みは渡す文の前。ここから下の 4 欄が「何回に 1 度届くか」を決める欄なので、先に置く。
+            {/* 刻みはプロンプトの前。ここから下の 4 欄が「何回に 1 度届くか」を決める欄なので、先に置く。
                 type は text（number ではない）。数でない値を空にしてしまうと、読み込めない値を
                 見せて直させるという欄の目的が消える */}
             <Captioned name="every" yamlKey="every" tour={tour("every")}>

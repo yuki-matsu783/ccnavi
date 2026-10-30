@@ -21,7 +21,7 @@ export function rulesHtml(data: RulesData, options: Partial<RenderOptions> = {})
   return renderRulesPage(data, { nonce: NONCE, script: screenScript("rules"), style: screenStyle("rules"), ...options });
 }
 
-/** 見本のルール。deny 2 件（1 件は刻みと渡す文を持つ）と、初回だけ渡す文を持つ ask 1 件 */
+/** 見本のルール。deny 2 件（1 件は刻みとプロンプトを持つ）と、初回だけ渡すプロンプトを持つ ask 1 件 */
 export const RULES = `version: 1
 deny:
   - id: git-push

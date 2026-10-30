@@ -333,7 +333,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     return (
       <>
         <p className="empty">
-          ルール管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に替わります。
+          ルール管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に変わります。
         </p>
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>
@@ -472,7 +472,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       {!touring && page !== undefined && modeBanner(page.mode) !== "" && (
         // モードは実行ファイルの答え。enable と、答えが取れないときは帯を出さない
         <div className="banner warn">
-          現在の <code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>（{modeBanner(page.mode)}）
+          現在の <code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>。{modeBanner(page.mode)}
         </div>
       )}
       {(touring ? [] : page?.notices ?? []).map((notice, index) => (
@@ -550,7 +550,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       </nav>
       <section id="tab-rules" data-tour="rules" className={`pane${shownTab === "rules" ? " active" : ""}${query === "" ? "" : " finding"}`} ref={list}>
         <div className="find">
-          <input id="find" data-tour="find" type="search" placeholder="id・ツール・パターン・メッセージで絞り込む" spellCheck={false} value={shownFind} onChange={(event) => (tour.touring ? undefined : setFind(event.target.value))} />
+          <input id="find" data-tour="find" type="search" placeholder="id・ツール・パターン・メッセージ・プロンプトで絞り込む" spellCheck={false} value={shownFind} onChange={(event) => (tour.touring ? undefined : setFind(event.target.value))} />
           <span className="hint" data-tour="order-hint">判定は強い順に deny &gt; ask &gt; allow</span>
         </div>
         {SECTIONS.map((section) => {

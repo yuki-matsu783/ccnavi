@@ -588,7 +588,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     return;
   }
   if (!(await confirmDuringTurn(lock))) {
-    fail(current, "ターン中のため保存を取りやめました。ターンが終わってから保存してください。");
+    fail(current, "エージェントの応答中のため保存を取りやめました。応答が終わってから保存してください。");
     return;
   }
   if (!alive(current)) {
