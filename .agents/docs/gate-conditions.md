@@ -38,7 +38,7 @@ ccnavi の開発で、操作を止める条件を足す・直すとき、実装�
 実装は、読み手にとって一番シンプルになる方法を選ぶ。既存の作りに合わせて継ぎ足すより、共通の関数・型・置き場にまとめて単純にできるなら、そちらを選ぶ。
 
 - 修正範囲が広がることは理由にしない。同じ処理が複数の場所にあるなら、1 か所に寄せる変更は、触るファイルが増えても進める
-- 複製を残したまま、コメントで「あちらと同じ条件」と書いて済ませない（`dirty_parent_of` のコメントがその例）。関数を共有する
+- 複製を残したまま、コメントで「あちらと同じ条件」と書いて済ませない。関数を共有する
 - ただし、判定が緩む・やり取りの形が変わる・元に戻せない・影響範囲を読み切れない変更は、`.ccnavi/docs/decisions.md` のとおり、実装の前にユーザと合意する。シンプルにする理由で、合意を省かない
 
 ## 責務と依存関係を考える
@@ -64,7 +64,6 @@ ccnavi の開発で、操作を止める条件を足す・直すとき、実装�
 
 次は、同じ条件が別々に書かれている箇所。上の決まりに沿って 1 つに寄せる。
 
-- 親のワークツリーの未コミットの変更: `core/approve.py:dirty_parent_of`、`lifecycle/write_and_push_merge.py:_tree_problem`、`review/request.py:_dirty_paths`
-- 親ブランチの未 push: `ccnavi-ticket.sh:propose_guard`、`review/request.py:_unpushed`、`review/close.py` の `ready` が使う `_merge_problems`
 - 子が親に合流済みか: `write_and_push_merge.py:plan` と `review/request.py:_unmet`
-- 置き場の判定: `model/ticket_places.py:is_ticket_place` と `review/request.py:_is_own_place`（大文字小文字の扱いが違う）
+
+親のワークツリーの未コミットの変更と親ブランチの未 push は、`lifecycle/treegate.py`（`check`）に寄せた。操作が見る条件は `WATCHES` に宣言する。git の呼び出しが重複していないことは `tests/core/test_gate_single_source.py`、操作ごとの拒否は `tests/core/test_treegate.py` が守る。置き場の判定は `ticket_places.is_ticket_place` に一本化した。

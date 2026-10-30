@@ -13,8 +13,8 @@
 
 判定の対象は提案ごとの最終の有効版（`final_versions`）。途中の版は記録に残る。
 
-経路（`route`）は 7 つ: 送った・変更なし・書くだけ（origin なし）・止めた・コードが未 push・
-送る前に失敗・push 後の後処理で失敗。
+経路（`route`）は 6 つ: 送った・変更なし・書くだけ（origin なし）・止めた・
+送る前に失敗（親の状態で拒否した回を含む）・push 後の後処理で失敗。
 
 保存先は state と同じ場所。ターンの開始時刻（`start_turn`）もここに置く（通知でない発言の時刻）。
 """
@@ -32,12 +32,9 @@ SENT = "sent"
 UNCHANGED = "unchanged"
 WRITE_ONLY = "write_only"
 STOPPED = "stopped"
-UNPUSHED_CODE = "unpushed_code"
 FAILED_BEFORE = "failed_before"
 FAILED_AFTER = "failed_after"
-ROUTES = frozenset(
-    {SENT, UNCHANGED, WRITE_ONLY, STOPPED, UNPUSHED_CODE, FAILED_BEFORE, FAILED_AFTER}
-)
+ROUTES = frozenset({SENT, UNCHANGED, WRITE_ONLY, STOPPED, FAILED_BEFORE, FAILED_AFTER})
 # 提案の最終の有効版になる経路。変更なしは、前に送った版がそのまま有効のままになる。
 EFFECTIVE = frozenset({SENT, UNCHANGED})
 

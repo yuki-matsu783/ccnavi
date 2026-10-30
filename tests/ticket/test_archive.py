@@ -22,9 +22,9 @@ from ccnavi.infra import pathcase, settings
 from ccnavi.tickets.approval import checks as approval_checks
 from ccnavi.tickets.approval import ops as approval_ops
 from ccnavi.tickets.approval import write_and_push
+from ccnavi.tickets.lifecycle import treegate
 from ccnavi.tickets.model import archive
 from ccnavi.tickets.model import ticket as ticket_mod
-from ccnavi.tickets.review import request as review
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text, parent_text
@@ -338,11 +338,12 @@ class ReadyArchivesTest(ReadyHarness):
     def test_mirror_drift_text_counts_other_changes_and_folds_case_and_long_lists(self):
         conf = settings.Settings()
         drift = [f"skills/process-test/references/common/r{n}.md" for n in range(11)]
-        text = review._dirty_problem(conf, ["SKILLS/process-test/SKILL.md", "src/keep.py"] + drift)
+        paths = ["SKILLS/process-test/SKILL.md", "src/keep.py"] + drift
+        text = treegate.dirty_refusal(treegate.READY, "", conf, paths).line
         self.assertIn("ずれ以外の変更が 1 件ある", text)
         self.assertIn("ほか 2 件", text)
         self.assertIn("--yes --expect <値>", text)
-        self.assertNotIn("ずれ以外", review._dirty_problem(conf, drift))
+        self.assertNotIn("ずれ以外", treegate.dirty_refusal(treegate.READY, "", conf, drift).line)
 
     def test_ready_does_not_blame_the_mirror_for_other_uncommitted_changes(self):
         fixture = self.closable()

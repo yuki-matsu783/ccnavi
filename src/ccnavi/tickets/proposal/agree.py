@@ -235,8 +235,14 @@ class Verdict:
     text: str
 
 
-def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
-    """`--verify` の答えを組む。判定は `gather` が済ませてあり、ここは言い換えるだけ。"""
+def verify_verdict(
+    gathered: Gathered, tickets_rel: str, held: tuple[str, str] | None = None
+) -> Verdict:
+    """`--verify` の答えを組む。判定は `gather` が済ませてあり、ここは言い換えるだけ。
+
+    `held` は、提案は通るが承認を頼めない状態のときの（理由の名前, 本文）。親のワークツリーの
+    状態を呼び手（`core.approve.readiness`）が調べて渡す。本文は、承認の対象になる分の代わりに出す。
+    """
     head = "承認の可否（確かめるだけ）\n"
     # 読めなかったものは、承認されない枝でも必ず出す。むしろこの 2 つ（絞りが通らない・承認待ちが
     # 1 件も無い）が「読めないのは自分が書いた 1 本」である見込みのいちばん高い枝で、
@@ -278,7 +284,10 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
     lines.append(elsewhere)
     lines.append(unreadable)
 
-    if gathered.rejected:
+    if held is not None:
+        reason = held[0]
+        tail = "\n" + held[1]
+    elif gathered.rejected:
         reason = VERIFY_REJECTED
         tail = (
             f"\n{len(gathered.rejected)} 件が承認の対象にならない。\n"

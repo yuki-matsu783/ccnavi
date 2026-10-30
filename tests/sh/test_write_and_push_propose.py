@@ -280,6 +280,17 @@ class ProposeTest(WriteAndPushHarness):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("提案以外の未コミットの変更がある", result.stderr)
 
+    def test_check_stops_on_unpushed_code_like_the_real_run(self):
+        """未 push のコードは、--check でも本番でも実行ファイルの関門が同じ文で止める。"""
+        self.put("src/secret.py", "x = 1\n")
+        git(self.tree, "add", "--", "src/secret.py")
+        git(self.tree, "commit", "-q", "-m", "wip code")
+        self.put(f"{self.TODO}/{PARENT}.md")
+        result = self.ticket("approval-request", PARENT, "--check")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("未 push のコード", result.stderr)
+        self.assertIn("src/secret.py", result.stderr)
+
     def test_a_child_id_sends_the_whole_family(self):
         todo = self.put(f"{self.TODO}/{PARENT}.md")
         result = self.ticket("approval-request", CHILD)
@@ -328,7 +339,7 @@ class ProposeTest(WriteAndPushHarness):
         self.assertEqual(result["commit"], head)
         self.assertIn(f"file={self.sha(self.tree, f'HEAD:{rel}')} {rel}", result["text"])
 
-    def test_the_result_file_records_unchanged_unpushed_code_and_failure(self):
+    def test_the_result_file_records_unchanged_and_a_refusal_before_sending(self):
         rel = self.put(f"{self.TODO}/{PARENT}.md")
         git(self.tree, "add", "--", rel)
         git(self.tree, "commit", "-q", "-m", "approval-request by hand")
@@ -339,7 +350,8 @@ class ProposeTest(WriteAndPushHarness):
         self.put(f"{self.TODO}/{PARENT}.md", "v2\n")
         self.assertEqual(self.ticket("approval-request", PARENT).returncode, 1)
         routes = [r["route"] for r in self.results()]
-        self.assertEqual(routes[-1], "unpushed_code")
+        # 親のブランチの状態で止めた回は、実行ファイルの関門（treegate）が拒否した送る前の失敗。
+        self.assertEqual(routes[-1], "failed_before")
         self.assertIn(routes[0], ("sent", "unchanged"))
 
     def test_a_rejected_push_leaves_a_failed_before_result(self):

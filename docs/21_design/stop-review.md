@@ -35,7 +35,7 @@ Stop ─┬─ command hook（ccnavi）: 既存の促しを実行 → 共有キ�
 ## approval-request の操作実績（`records/stopops.py`）
 
 - PreToolUse が `ccnavi-ticket.sh approval-request <識別子>` を読んで `tool_use_id` と識別子を登録する（1 つの Bash に複数あれば識別子ごと）。
-- `ccnavi-ticket.sh approval-request` は、自分をもう一度起動する外側の層で、どの道を通っても `logs/state/stopops-result/*.kv` を 1 つ書く。経路は 7 つ（送った・変更なし・書くだけ・止めた・コードが未 push・送る前に失敗・push 後の後処理で失敗）。送ったコミットとパスごとのブロブも書く。
+- `ccnavi-ticket.sh approval-request` は、自分をもう一度起動する外側の層で、どの道を通っても `logs/state/stopops-result/*.kv` を 1 つ書く。経路は 6 つ（送った・変更なし・書くだけ・止めた・送る前に失敗（コードが未 push で拒否した回を含む）・push 後の後処理で失敗）。送ったコミットとパスごとのブロブも書く。
 - PostToolUse・PostToolUseFailure が識別子と時刻の範囲で結び付ける。結べないものは Stop と集計で結び直し、30 秒過ぎても見つからなければ未連携。
 - 提案ごとの最終の有効版が判定の対象。`todo/<識別子>.md` への Write・Edit を記録し、書いた後に送った操作が無いものを未送信とする（Bash で書いた提案は検出できない）。
 

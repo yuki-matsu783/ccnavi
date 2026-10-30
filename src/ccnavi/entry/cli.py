@@ -30,8 +30,7 @@ from ..tickets.approval import store as approval
 from ..tickets.approval import write_and_push
 from ..tickets.core import api as core
 from ..tickets.lifecycle import branchfind, write_and_push_merge
-from ..tickets.model import user_only, via
-from ..tickets.review import request as review
+from ..tickets.model import ticket_places, user_only, via
 from . import (
     cli_args,
     cli_handoff,
@@ -617,7 +616,7 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
 def _ready_removed_wip(real: str, base: str) -> bool:
     """`review ready` が消した途中の作業の置き場（`wip/`）の下のファイルか。
 
-    `ready` が消すものを選ぶのと同じ判定（`review.in_wip`。大文字小文字と `\\` の区切りを
+    `ready` が消すものを選ぶのと同じ判定（`ticket_places.in_wip`。大文字小文字と `\\` の区切りを
     問わない）を、write-and-push のツリー（`base`）からの相対に適用する。通すのは、
     そのツリーの中で、
     今は無い
@@ -632,7 +631,7 @@ def _ready_removed_wip(real: str, base: str) -> bool:
     parts = rel.split(os.sep)
     if any(p in ("", ".", "..") for p in parts):
         return False
-    return review.in_wip("/".join(parts))
+    return ticket_places.in_wip("/".join(parts))
 
 
 def _record_place_problem(place: str, target: str, given: str) -> str:

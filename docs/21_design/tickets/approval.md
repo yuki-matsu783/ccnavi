@@ -253,7 +253,7 @@ write-and-push の対象の親子のチケットでは、親のワークツリ�
 （改版は warn で外さない。親の必須の見出しの欠けも warn。提案の書式 9.3）。ただし「まだ承認できない」もの（前のフェーズが閉じていない子。
 `rules.KIND_NOT_YET`）は `--lint` では warn。
 
-エージェントは、同じ検査を `ccnavi-ticket.sh approval-request <親> --check` で通す。`--check` は承認の画面と同じ `gather` に加えて、親のワークツリーの未コミットの変更（承認の後に子の `finish` を止める）とホスト・git のリモートの事前確認を見て、何も送らない。本番の `approval-request` も同じ検査を送る前に通す（`core.approve.approval_request_gate`）。
+エージェントは、同じ検査を `ccnavi-ticket.sh approval-request <親> --check` で通す。`--check` は承認の画面と同じ `gather` に加えて、親の状態（`lifecycle.treegate` の `APPROVAL_REQUEST`）を見る。置き場の外の未コミットの変更は、承認の後に子の `finish` を止める。未 push のコードは、送る提案と一緒に公開される。ホスト・git のリモートの事前確認もして、何も送らない。判定は `core.approve.readiness` の 1 か所にあり、本番の `approval-request` の gate（`approval_request_gate`）と `--agree --preview --verify` が同じ関数を通す。sh は親の状態を判定しない。`--verify` の `verify.reason` には、この理由が `dirty_parent`・`unpushed_code` として出る。承認そのもの（`--yes`）は、親の未コミットの変更を警告にとどめ、拒否しない。
 
 提案を `todo/` に書いた回に、この確認（`approval-request --check`）を勧める文を 1 度だけ渡す（REQ-APV-14、`ticket_guard.propose_notice`）。
 判定には足さず、ルールの文と同じ `PreToolUse` の `additionalContext` の経路で渡す。

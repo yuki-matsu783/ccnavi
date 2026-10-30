@@ -249,35 +249,6 @@ tidy_after() {
 	ccnavi_wap_exe --cwd "$here" worktree tidy "$ta_id" || :
 }
 
-# approval-request の前に、親のブランチに未 push のコード（承認済みの置き場と提案の置き場の外）の変更が無いかを見る。
-# approval-request は親のブランチを push するので、提案を送るつもりで、設計途中のコードまで公開しないため。
-# git の状態だけを見た判定。
-# 親のブランチのリモート追跡が無ければ（まだ一度も送っていない）見ない。
-propose_guard() {
-	pg_ref="refs/remotes/origin/$ccnavi_wap_branch"
-	git -C "$ccnavi_wap_tree" rev-parse --verify -q "$pg_ref" >/dev/null 2>&1 || return 0
-	pg_known="${ccnavi_wap_review%/*}"
-	git -C "$ccnavi_wap_tree" diff --name-only --no-renames -z "$pg_ref" HEAD 2>/dev/null |
-		tr '\000' '\n' >"$ccnavi_wap_tmp/pg-paths" || :
-	pg_other=""
-	pg_count=0
-	while IFS= read -r pg_path; do
-		[ -n "$pg_path" ] || continue
-		case "$pg_path" in
-		"$ccnavi_wap_approved"/* | "$pg_known"/*) ;;
-		*)
-			pg_count=$((pg_count + 1))
-			[ "$pg_count" -gt 3 ] || pg_other="$pg_other $pg_path"
-			;;
-		esac
-	done <"$ccnavi_wap_tmp/pg-paths"
-	[ "$pg_count" -gt 0 ] || return 0
-	ccnavi_wap_say "親のブランチに未 push のコードの変更が${pg_count}件ある（${pg_other# }${pg_other:+ }など）。approval-request は提案だけを送るので、止めた。コードは先に送るか、手元の変更を整理してから再実行してください（何も反映していません）"
-	log_info 提案を送らずに止めた -- "family=$ccnavi_wap_family_id" "reason=unpushed-code"
-	ccnavi_wap_note "route=unpushed_code"
-	return 1
-}
-
 # 子の start で、このPCに子のワークツリーが無ければ、取り込み直後の親ブランチ（write-and-push の親のワークツリーの HEAD）から作る。
 # 別のPCで承認された子でも、どのPCでも同じ場所に作る。ネットワークには出ない（git の局所の操作だけ）。
 # 子のブランチ（子の識別子の名前）が手元に残っていれば、親の先頭が含むものだけ親の先頭に揃えて使う
@@ -398,10 +369,6 @@ start | finish | cancel | approval-request | consolidate)
 		[ "$1" = cancel ] || ticket_preflight || exit 1
 		# approval-request --check は、ロックも取り込みもせず、送る前の検査だけを実行ファイルで行う。
 		if [ -n "$po_check" ]; then
-			propose_guard || {
-				ccnavi_wap_end
-				exit 1
-			}
 			ccnavi_wap_end
 			trap - EXIT INT TERM HUP
 			ccnavi_wap_exe ticket "$@" || exit $?
@@ -421,10 +388,6 @@ start | finish | cancel | approval-request | consolidate)
 		if [ "$1" = approval-request ]; then
 			# 失敗しても、利用者が書いた提案はワークツリーに残す（戻すのは自分のコミットだけ）。
 			ccnavi_wap_keep_worktree=yes
-			propose_guard || {
-				ccnavi_wap_end
-				exit 1
-			}
 		fi
 		wap_rc=0
 		ccnavi_wap_write "ccnavi: ${wap_words}" -- ticket "$@" || wap_rc=$?
