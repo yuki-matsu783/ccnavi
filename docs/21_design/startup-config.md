@@ -146,7 +146,7 @@ Stop の AI 判定の効き方 `CCNAVI_STOP_REVIEW` も同じ 3 値で、`CCNAVI
 | `Stop` | `{"systemMessage": "…"}`。`finish`・レビュー依頼までの道・サブエージェント結果・直接作業の `integrate`・`match: Stop` のルールを促すときは、モードによらず（`dry-run` でも）`{"decision": "block", "reason": "…", "systemMessage": "…"}`。Stop でモデルに文を届ける経路は止めることしか無いため |
 | `PostToolUse` / `SubagentStop` の差し戻し | 標準エラーに文、終了コード 2。`dry-run` なら `additionalContext` で 0 |
 
-期限は `PreToolUse` で 3 秒。ルール照合の途中で超えたら `deadline-exceeded` として、`enable` は
+期限は `PreToolUse` で 3 秒（既定。`CCNAVI_HOOK_DEADLINE_SECONDS` で変える）。ルール照合の途中で超えたら `deadline-exceeded` として、`enable` は
 終了コード 2。`dry-run` は、設定を読まずに安全と分かる読み取り（`hook.failsafe`）だけ 0 で、そのほかのツールの呼び出しは `dry-run` でも止める（REQ-CMN-08）。この block は理由を返せないので、生の文字列に `>` が 50 個を超えて並ぶ入力は、シェルから書き込む形の組み込みの保護だけを適用せずに、ほかのルールの `deny` と `ask` を適用したあとで、`deny` にヒットしていなければ `DENY_REDIRECT_LIMIT` に上げて理由と書き直し方を返す（付録 A）。この保護の照合は `>` の個数 × その後ろの空白の無い語の長さで伸びるので、上限で `>` の個数を抑える。上限の下でも尾が長い入力（400KB 程度）は期限に届きうる。実ルールでの実測では、`*x*` 形の glob の照合が長いと、期限の確認が間に合わずに 3 秒を超える（[12.1](limits.md)）。外側で打ち切られた場合には手が出ない。`PostToolUse` に期限は無く、
 git の読み取りが 2 秒で打ち切られる。
 

@@ -27,7 +27,7 @@ READ_ONLY_BUILTIN = ("explore", "plan", "claude-code-guide")
 # 読み取り専用と確かめられているツール。一覧のツールがこれだけで構成されるときだけ `READ` にする。
 # `Bash`（コードから書く経路は読み切れない）、`*`、`Edit(src/**)` のような括弧付き、MCP のツール
 # （`mcp__` で始まる。書き込むものがありうる）、空の一覧は、読み取りと確かめられないので入れない。
-READ_TOOLS = (
+READ_ONLY_AGENT_TOOLS = (
     "read",
     "grep",
     "glob",
@@ -68,7 +68,7 @@ def kind_of(roots: list[str], agent_type: str, tools: object = None) -> str:
 
 def _only_reads(names: list[str]) -> bool:
     """一覧が空でなく、全部が読み取りと確かめられたツールか。"""
-    return bool(names) and all(n.strip().casefold() in READ_TOOLS for n in names)
+    return bool(names) and all(n.strip().casefold() in READ_ONLY_AGENT_TOOLS for n in names)
 
 
 def _names(value: object) -> list[str] | None:
