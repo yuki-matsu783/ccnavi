@@ -56,7 +56,7 @@ test("CB-D700 カードは 見出し（ID・タイトル・状態のバッジ）
     // 親（承認待ち・計画あり）: 見出し・ユーザ待ち・補助（計画編集）・詳細（人間レビューの要否はいつも詳細にある）。注意は出すものが無い
     assert.deepEqual(kindsOf("fresh"), ["card-head", "turn", "card-actions", "card-details"]);
     const parent = page.one(card(page, "busy"));
-    assert.deepEqual(kindsOf("busy"), ["card-head", "stage", "badges", "phases", "card-details"]);
+    assert.deepEqual(kindsOf("busy"), ["card-head", "stage", "card-mr", "badges", "phases", "card-details"]);
     // 見出し: ID・タイトル・バッジ（バッジは右端の 1 つ）
     const head = parent.querySelector(".card-head")!;
     assert.deepEqual(Array.from(head.children).map((el) => el.className.split(" ")[0]), ["num", "title", "status"]);
@@ -65,7 +65,7 @@ test("CB-D700 カードは 見出し（ID・タイトル・状態のバッジ）
     const child = page.one(card(page, "busy-02-01"));
     assert.equal(child.querySelector(".where")?.textContent, "親 busy / 2（設計）");
     assert.equal(head.querySelector(".where"), null);
-    assert.deepEqual(kindsOf("busy-02-01"), ["card-head", "where", "turn", "badges", "card-details"]);
+    assert.deepEqual(kindsOf("busy-02-01"), ["card-head", "where", "card-mr", "turn", "badges", "card-details"]);
     // 子のフェーズが引けなければ、番号で言う
     const orphan = await openBoard(boardOf([reviewJson("lost", { parent: "ghost", phase: 3 })]));
     try {
@@ -351,7 +351,7 @@ test("CB-D708 消すもの: base / 合流の sha・マーカー名・「承認�
   }
 });
 
-test("CB-D709 詳細は畳んである。MR・issue・ブランチ・ワークツリー名・リスク・人間レビューの要否と理由・フェーズごとのレビューの要否とリスク（JSON の文言のまま）を開くと見られる", async () => {
+test("CB-D709 詳細は畳んである。MR は詳細に無く位置の下にある。issue・ブランチ・ワークツリー名・リスク・人間レビューの要否と理由・フェーズごとのレビューの要否とリスク（JSON の文言のまま）は、詳細を開くと見られる", async () => {
   const page = await openBoard(scene());
   try {
     const parent = card(page, "busy");
@@ -369,10 +369,12 @@ test("CB-D709 詳細は畳んである。MR・issue・ブランチ・ワーク�
     assert.equal(row("worktree"), "busy");
     assert.equal(row("phase-1"), "レビュー不要 · リスク: 0 (LOW)");
     assert.equal(row("phase-2"), "レビュー必須 · リスク: 60 (HIGH)");
-    // 詳細の MR は普通のリンク（ボタンの寸法にしない）
-    const link = page.one(`${parent} .detail-row[data-row="mr"] a`);
+    // MR は詳細ではなくカード本体に出る。普通のリンク（ボタンの寸法にしない）
+    assert.equal(page.all(`${parent} .detail-row[data-row="mr"]`).length, 0);
+    const link = page.one(`${parent} .card-mr a`);
     assert.equal(link.getAttribute("href"), "https://example.com/o/r/pull/18");
     assert.ok(link.classList.contains("detail-link") && !link.classList.contains("card-button"));
+    assert.match(link.textContent, /^MR #\d+$/);
     // 子のリスクは詳細に（JSON の水準と点）
     page.click(page.one(`${card(page, "busy-02-01")} details > summary`));
     await page.settle();
