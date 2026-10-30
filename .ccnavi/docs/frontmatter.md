@@ -86,7 +86,7 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 
 | 対象 | 扱い | 理由 |
 |---|---|---|
-| チケット（`wip/proposals/**`、`.ccnavi/approved/**`などの下書き） | 付けない | チケットは独自のfrontmatter（`version:` `ticket:` …）を持ち、ccnaviが読む。`.ccnavi/`の下は（`.ccnavi/docs/`を除いて）索引にも載らない |
+| チケット（`wip/proposals/**`、`.ccnavi/approved/**`、`wip/design/scripts/i*.md`などの下書き） | 付けない | チケットは独自のfrontmatter（`version:` `ticket:` …）を持ち、ccnaviが読む。`.ccnavi/`の下は（`.ccnavi/docs/`を除いて）索引にも載らない |
 | `SKILL.md`の`name`と`description` | 変えない | Claude Codeがスキルを選ぶときに実際に使うキー。`description`は流用し、`type`などを下に足す。工程スキルの`process: true`・`distribute: true`も変えない |
 | ユーザに渡す物（`wip/handoff/`）、使い捨て（`scratchpad/`） | 付けなくてよい | 使い捨て。`wip/handoff/`は統合のときに`integrate`が外し、`scratchpad/`は追跡されない |
 | `.claude/skills/yomiyasu/**` | 付けない | 外部から取り込んだもの（`UPSTREAM.md`を参照）。中身を書き換えないのでfrontmatterも足さない |
