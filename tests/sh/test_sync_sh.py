@@ -1013,7 +1013,7 @@ class SyncTest(SyncHarness):
         rel = "wip/proposals/todo/i0002.md"
         write(os.path.join(other, rel), "---\nversion: 1\nticket: i0002\n---\n")
         git(other, "add", "--", rel)
-        git(other, "commit", "-q", "-m", "propose")
+        git(other, "commit", "-q", "-m", "approval-request")
         git(other, "push", "-q", "-u", "origin", "i0002")
         body = (
             '#!/bin/sh\nif [ "$3" = sync ] && [ "$4" = paths ]; then exit 0; fi\n'

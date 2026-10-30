@@ -974,7 +974,7 @@ def render_material(
         shown = defang(str(row["ident"]))
         out.append(f"{shown}: {state}{'（着手済み）' if row['in_progress'] else ''}")
     if not plan.get("submitted"):
-        out.append("（このセッションで propose した提案なし）")
+        out.append("（このセッションで approval-request した提案なし）")
     out.append("</data>")
     for proposal in plan.get("proposals") or []:
         body = (bodies or {}).get(proposal["key"])

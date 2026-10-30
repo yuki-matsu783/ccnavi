@@ -10,7 +10,7 @@ keywords: [probe, manual, tests/manual, 手動, 偽陽性, PASS, 前提]
 
 ## 説明
 
-`tests/manual/` の probe が、仕様の変更（親を先に start、`review request` の `--eli5`、`decide` の入力など）に追いつかず古くなっていた。
+`tests/manual/` の probe が、仕様の変更（親を先に start、`review-request` の `--eli5`、`decide` の入力など）に追いつかず古くなっていた。
 「止まる」ことを確かめる段で、止まったことだけを見て PASS とし、止まった理由が別だった。
 
 ## 原因

@@ -1,7 +1,7 @@
 #!/bin/sh
 # ccnavi-review レビューの依頼と確認。親（メインエージェント）だけが呼ぶ。
 #
-#   sh .ccnavi/scripts/ccnavi-review.sh request --phase <N> --body-file <依頼文> --eli5 <HTML>
+#   sh .ccnavi/scripts/ccnavi-review.sh review-request --phase <N> --body-file <依頼文> --eli5 <HTML>
 #   sh .ccnavi/scripts/ccnavi-review.sh confirm --phase <N>
 #   sh .ccnavi/scripts/ccnavi-review.sh comment --body-file <本文>
 #   sh .ccnavi/scripts/ccnavi-review.sh decide  <N> --preview （残った指摘の一覧を JSON で見るだけ。ボードも読む）
@@ -21,7 +21,7 @@
 # だけで、マージリクエストの中身はここが取ってきて JSON で渡す（--result）。ホストを読む関数と write-and-push の支度は
 # ccnavi-common-review.sh にあり、ユーザ専用のレビューの sh と共有する。
 #
-#   request: `ccnavi review prepare` が前提を確かめ、依頼の本文とマージリクエストの
+#   review-request: `ccnavi review prepare` が前提を確かめ、依頼の本文とマージリクエストの
 #            下書きを書き出す → ここが（無ければ）マージリクエストを下書きで作り、依頼を投稿する
 #            → `ccnavi review requested` がマーカーを置く
 #            ユーザはレビューをマージリクエストで行うので、マージリクエストが無いことで止めない。タイトルから Draft を
@@ -47,7 +47,7 @@
 #            何も置かない（見るだけ）。選んだものを置くのは ccnavi-user-decide.sh
 #
 # 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）では、状態を書く
-# request（マーカー）・confirm・ready を write-and-push で回す
+# review-request（マーカー）・confirm・ready を write-and-push で回す
 # （Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため）。
 # ロック → 途中の操作の確認 → hook のマーカーを先にコミット → 取り込み → 未送信の確かめを済ませてから
 # ホストに触り、実行ファイルが書いたパスだけを commit --only して push する。送れなければ戻す。
@@ -55,7 +55,7 @@
 #
 # 親のワークツリーの中で実行すること。どの親かは cwd から引く。ready だけは `--parent <親>` で
 # 外（ワークスペースルートなど）からも打てる（ほかのサブコマンドに --parent を渡すと拒否する）。
-# request・confirm・decide・ready（--parent なし）を統合先のブランチの上（ワークスペースルートなど）で打つと、
+# review-request・confirm・decide・ready（--parent なし）を統合先のブランチの上（ワークスペースルートなど）で打つと、
 # 親が決まらないので、ホストへ繋ぐ前に「親のワークツリーの中で打ってください」と止める（理由に cwd を示し、`次:` に cd 付きの打ち直しを出す）。ready は --parent を付ければ外から打てる。外から打つと、Draft を外したあとに親のワークツリーも消える。
 # 終了コード: 0 成功 / 1 前提の未充足 / 2 引数か環境の誤り /
 #             3 merged だけ: MR がマージ済みかを確かめられなかった（"unknown" を出す。推定せずに止める）
@@ -76,9 +76,9 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|fetch|origin|merged|mr-state> [--phase <N>] [--body-file <path>] [--eli5 <html>]
+sh .ccnavi/scripts/ccnavi-review.sh <review-request|confirm|comment|decide|ready|fetch|origin|merged|mr-state> [--phase <N>] [--body-file <path>] [--eli5 <html>]
 
-  request      --phase <N> --body-file <依頼文> --eli5 <HTML>
+  review-request --phase <N> --body-file <依頼文> --eli5 <HTML>
                                                   前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く。
                                                   --eli5 は必須。変更の目的・何が変わるか・リスクを専門用語なしで書いた
                                                   1 枚の HTML（.html / .htm）。このワークツリーの wip/eli5/ の下（既定の名前は
@@ -86,8 +86,10 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|fetch|
                                                   差分に載せる）。相対パスは実行した場所から。投稿が済むと、ユーザが実行する
                                                   crit review <パス> と crit push <番号> を出す。--body-file が
                                                   ワークスペースルート直下の scratchpad/ の中のファイルなら、成功のあとに
-                                                  request 自身が消す（待ち中は rm を打てないため。それ以外の場所のファイルは
+                                                  review-request 自身が消す（待ち中は rm を打てないため。それ以外の場所のファイルは
                                                   消さない。消せなければ警告だけで、終了コードは変えない）
+                                                  --check を付けると、同じ前提（ELI5・フェーズの終了・合流・push・MR）を
+                                                  確かめるだけで、投稿もマーカーも置かない。0 なら前提は通っている（取り込みとロックは確かめない）
   confirm      --phase <N>                        未解決（Unresolved）のスレッドが 1 つも無ければマーカーを置く（未解決のスレッドは依頼の時刻に関わらずすべて数える。手で done/ に動かして共有した子は、移動の前の指摘を台帳 accepted.json に版つきで受け入れて確定する）
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに書き出す
   decide       <N> --preview                      未解決（Unresolved）の指摘と、選べる対応方針の一覧を JSON で見るだけ。何も置かない
@@ -121,13 +123,13 @@ shift
 # 診断ログに残す引数の数（サブコマンドを除いた、読む前の数）。
 args_n=$#
 case "$sub" in
-request | confirm | comment | decide | ready | fetch | origin | merged | mr-state) ;;
+review-request | confirm | comment | decide | ready | fetch | origin | merged | mr-state) ;;
 -h | --help | help)
 	usage
 	exit 0
 	;;
 *)
-	fail unknown-sub "$sub は指定できません。指定できるのは request / confirm / comment / decide / ready / fetch / origin / merged / mr-state です。" 2
+	fail unknown-sub "$sub は指定できません。指定できるのは review-request / confirm / comment / decide / ready / fetch / origin / merged / mr-state です。" 2
 	;;
 esac
 
@@ -401,7 +403,7 @@ fi
 # ---- 実行ファイル。merged は実行ファイルを起こさない（ホストに聞くだけ）ので、無くても進める。
 review_exe || [ "$sub" = merged ] || review_no_bin
 
-# 親のワークツリーの外で、親を cwd から引くサブコマンド（request・confirm・decide・ready）を打ったとき、
+# 親のワークツリーの外で、親を cwd から引くサブコマンド（review-request・confirm・decide・ready）を打ったとき、
 # ホストへ繋ぐ前に止めて案内する。
 #
 # 親のワークツリーの外で居るブランチを親の識別子と読むと、統合先（main など）を親と読んでしまい、
@@ -428,7 +430,7 @@ need_parent_tree() {
 
 # ---- 親を cwd から引くサブコマンドは、ホストへ繋ぐ前に cwd を確かめる。
 case "$sub" in
-request | confirm | decide) need_parent_tree "$@" ;;
+review-request | confirm | decide) need_parent_tree "$@" ;;
 ready) [ -n "$ready_parent" ] || need_parent_tree "$@" ;;
 esac
 
@@ -648,10 +650,11 @@ confirm)
 	*) ccnavi worktree tidy "$family" --phase "$confirm_phase" || : ;;
 	esac
 	;;
-request)
+review-request)
 	# 段 -1: ELI5 の HTML。--eli5 を抜き出し、残りを実行ファイルへ渡す（実行ファイルは
 	# --eli5 を知らない）。ロックを取る前に確かめ、欠けていれば何も書かずに止める。
 	eli5=""
+	rr_check=""
 	eli5_n=$#
 	eli5_i=0
 	while [ "$eli5_i" -lt "$eli5_n" ]; do
@@ -659,6 +662,7 @@ request)
 		shift
 		eli5_i=$((eli5_i + 1))
 		case "$eli5_a" in
+		--check) rr_check=yes ;;
 		--eli5)
 			eli5=""
 			if [ "$eli5_i" -lt "$eli5_n" ]; then
@@ -676,7 +680,7 @@ request)
 	# 置き場は wip/eli5/ の下で、wip/ のほかの場所は ELI5 にさせない。マージリクエストの差分に載せ、
 	# ユーザが crit push で行に指摘を送れるようにする。wip/ は ready の前に丸ごと消すので、squash した成果物には残らない。
 	eli5_how="依頼の前に、変更の目的・何が変わるか・リスクを専門用語なしで書いた 1 枚の HTML（外部の読み込み無し）を、このワークツリーの wip/eli5/ の下（既定の名前は wip/eli5/phase-<N>.html。名前は英数字と . _ / - だけ）に普通のファイルとして書いてコミットし、push してから --eli5 <パス> で渡してください。"
-	[ -n "$eli5" ] || fail explainer-missing "request には --eli5 <HTML> が必要です。${eli5_how}" 2
+	[ -n "$eli5" ] || fail explainer-missing "review-request には --eli5 <HTML> が必要です。${eli5_how}" 2
 	case "$eli5" in
 	*.[Hh][Tt][Mm][Ll] | *.[Hh][Tt][Mm]) ;;
 	*) fail explainer-not-html "--eli5 には拡張子が .html か .htm のファイルを渡してください ($eli5)。${eli5_how}" 2 ;;
@@ -751,7 +755,8 @@ request)
 ${eli5_how}"
 	log_debug ELI5 を確かめた -- "eli5=set"
 	# 段 0: 取り込み済みの親子のチケットなら write-and-push の前半（ロック・取り込み）を先に済ませる。
-	wap_start "$family"
+	# --check は読むだけなので、ロックも取り込みもしない。
+	[ -n "$rr_check" ] || wap_start "$family"
 	# 段 1: 前提。exe が依頼の本文を書き出す。
 	tell_skew
 	prepared=$(ccnavi review prepare "$@") || exit $?
@@ -771,6 +776,12 @@ ${eli5_how}"
 	number=$(printf '%s' "$mr" | "$JQ" '.number')
 	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
 	mr=$(printf '%s' "$mr" | "$JQ" -c '{number: .number, url: .url}')
+	# --check はここまでの前提を全部通ったところで終える。投稿もマーカーも置かない（本文の書き出しは state の一時ファイルだけ）。
+	if [ -n "$rr_check" ]; then
+		rm -f "$file" 2>/dev/null || :
+		printf '確認: ok（前提は通った。取り込みとロックは確かめていない。MR #%s）\n' "$number"
+		exit 0
+	fi
 	# 段 2: 投稿。同じ目印（親・フェーズ・キー）の依頼が既にあれば投稿し直さない（打ち直しや write-and-push の
 	# やり直しで依頼を二重にしない）。
 	request_marker=$(head -n 1 "$file" | tr -d '\r')
@@ -802,8 +813,8 @@ ${eli5_how}"
 		'{host: $host, mr: $mr} + $posted' >"$result"
 	# 段 3: マーカー。
 	wap_ccnavi "$branch のレビューを依頼した" -- review requested "$@" --result "$result"
-	# 段 3.5: 依頼文の後始末。依頼文は request の入力で、依頼した後は要らない。ここからはレビュー待ちで、
-	# ccnavi-*.sh を単独で打つ以外のシェルは止まり、エージェントは rm で消せない。だから request 自身が消す。
+	# 段 3.5: 依頼文の後始末。依頼文は review-request の入力で、依頼した後は要らない。ここからはレビュー待ちで、
+	# ccnavi-*.sh を単独で打つ以外のシェルは止まり、エージェントは rm で消せない。だから review-request 自身が消す。
 	# 消すのは、--body-file がワークスペースルート直下の scratchpad/ の中のファイルのときだけ（利用者のファイルは消さない）。
 	# 消せなくても依頼は済んでいるので、警告だけで終了コードは変えない。
 	request_body=""

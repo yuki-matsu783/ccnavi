@@ -1,11 +1,12 @@
-"""提案を親のブランチへ送る（`ccnavi ticket propose <識別子>`）。
+"""提案を親のブランチへ送る（`ccnavi ticket approval-request <識別子>`）。
 
 エージェントが書いた承認待ちの提案（`wip/proposals/todo/`）と、子のフローの下書き
 （`wip/proposals/flows/`）は、書いただけでは手元にしかない。別のPCで承認して作業に入るには、
 親のブランチに載って届かなければならない。送る入口がここ。
 
 実行ファイルは書き換えずに、送る提案のパスを「この実行で書いたもの」の一覧に載せるだけ
-（`fsio.note_input`）。ロック・取り込み・`commit --only`・push は sh（`ccnavi-ticket.sh propose`）が
+（`fsio.note_input`）。ロック・取り込み・`commit --only`・push は sh（`ccnavi-ticket.sh
+approval-request`）が
 write-and-push の手順で行う。コミットされるのは、未追跡のものと書き換えたものだけ。
 変わっていなければコミットせず、未 push のコミットがあればそれを送る。
 
@@ -31,6 +32,7 @@ write-and-push の手順で行う。コミットされるのは、未追跡の�
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from typing import TextIO
 
 from ...infra import fsio, pathcase, settings
@@ -135,8 +137,16 @@ def run(
     root: str,
     conf: settings.Settings,
     ident: str,
+    check: bool = False,
+    gate: Callable[[list[str]], int] | None = None,
 ) -> int:
-    """`ticket propose <識別子>`。送る提案を一覧に載せ、載せたものを標準出力に 1 行ずつ出す。"""
+    """`ticket approval-request <識別子>`。送る提案を一覧に載せ、載せたものを標準出力に 1
+    行ずつ出す。
+
+    `gate` は、送る提案の識別子（`todo/` の `.md`）を受け取り、承認の画面と同じ検査を通す
+    （`core.approve.approval_request_gate`。通らなければ 0 以外）。ここは提案の層なので、
+    検査そのものは呼び手から受け取る。`check` は検査だけをして、何も一覧に載せない。
+    """
     parent = write_and_push.family_of(ident)
     verdict, why, st = write_and_push.target(conf, root, parent)
     if verdict == write_and_push.TARGET_STOP or st.home is None:
@@ -164,10 +174,21 @@ def run(
         )
         for detail in wrong:
             stderr.write(f"  {detail}\n")
-        stderr.write(f"次: 直して `ccnavi-ticket.sh propose {parent}` を打ち直す\n")
+        stderr.write(f"次: 直して `ccnavi-ticket.sh approval-request {parent}` を打ち直す\n")
         return 1
     for detail in _childless_problems(conf, root, paths, parent):
         stderr.write(f"ccnavi: 注意: {detail}\n")
+    if gate is not None:
+        sending = [
+            os.path.splitext(os.path.basename(p))[0]
+            for p in paths
+            if p.endswith(".md") and os.path.basename(os.path.dirname(p)) == ticket_model.TODO
+        ]
+        if gate(sending) != 0:
+            return 1
+    if check:
+        stdout.write("確認: ok（approval-request を打てる状態。提案は送っていません）\n")
+        return 0
     for path in paths:
         fsio.note_input(path)
         rel = os.path.relpath(path, base).replace(os.sep, "/")

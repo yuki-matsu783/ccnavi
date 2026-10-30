@@ -943,8 +943,8 @@ class TicketTest(unittest.TestCase):
             "env sh .ccnavi/scripts/ccnavi-ticket.sh start x",
             "command sh .ccnavi/scripts/ccnavi-ticket.sh start x",
             "/bin/sh .ccnavi/scripts/ccnavi-ticket.sh finish x",
-            "sh .ccnavi/scripts/ccnavi-ticket.sh propose x",
-            "sh -c 'sh .ccnavi/scripts/ccnavi-review.sh request --phase 1'",
+            "sh .ccnavi/scripts/ccnavi-ticket.sh approval-request x",
+            "sh -c 'sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 1'",
         ):
             with self.subTest(command=command):
                 result = self.hook(
@@ -1137,12 +1137,12 @@ class TicketTest(unittest.TestCase):
         self.close_phase()
         review_sh = settings.script_command(self.root, "ccnavi-review.sh")
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn(f"{review_sh} request --phase 1", self.reason(said))
+        self.assertIn(f"{review_sh} review-request --phase 1", self.reason(said))
         self.assertNotIn("sh .ccnavi/scripts/", self.reason(said))
 
         shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(shell))
-        self.assertIn(f"{review_sh} request --phase 1", self.reason(shell))
+        self.assertIn(f"{review_sh} review-request --phase 1", self.reason(shell))
         self.assertIn(f"{review_sh} confirm --phase 1", self.reason(shell))
         self.assertNotIn("sh .ccnavi/scripts/", self.reason(shell))
 
@@ -1151,7 +1151,7 @@ class TicketTest(unittest.TestCase):
             "PreToolUse",
             "Bash",
             self.parent_tree,
-            command=f"{review_sh} request --phase 1 --body-file b.md",
+            command=f"{review_sh} review-request --phase 1 --body-file b.md",
         )
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(guided), self.reason(guided))
 
@@ -1167,7 +1167,7 @@ class TicketTest(unittest.TestCase):
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertIn(phase_forms.EXEMPT_NOTE, self.reason(said))
 
-        guided = f"{review_sh} request --phase 1 --body-file b.md"
+        guided = f"{review_sh} review-request --phase 1 --body-file b.md"
         decorated = self.hook(
             "PreToolUse",
             "Bash",
@@ -3241,7 +3241,7 @@ class TicketTest(unittest.TestCase):
         moved = self.confirm(fixture)
         self.assertNotEqual(moved.returncode, 0)
         self.assertIn("HEAD が動いている", moved.stderr)
-        self.assertIn("request --phase 1", moved.stderr)
+        self.assertIn("review-request --phase 1", moved.stderr)
 
         redo = self.request(fixture)
         self.assertEqual(redo.returncode, 0, redo.stderr)

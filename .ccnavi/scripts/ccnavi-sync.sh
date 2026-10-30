@@ -705,7 +705,7 @@ sync_absent() {
 			fail_note
 			return 0
 		fi
-		printf '%s: リモートにありません（まだ送っていない親子のチケット）。今の手元の動きのまま（ccnavi-start.sh を通さずに切った親は、propose・start がリモートへ送る前に止まる）\n' "$P"
+		printf '%s: リモートにありません（まだ送っていない親子のチケット）。今の手元の動きのまま（ccnavi-start.sh を通さずに切った親は、approval-request・start がリモートへ送る前に止まる）\n' "$P"
 		return 0
 	fi
 	# ccnavi-review.sh の道具（gh / glab / curl とトークン）で、MR がマージ済みかを先に聞く。答えは

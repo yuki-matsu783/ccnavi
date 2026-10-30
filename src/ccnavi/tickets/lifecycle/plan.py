@@ -67,7 +67,7 @@ def childless_notice(root: str, conf: settings.Settings, found: ticket_model.Tic
     return [
         f"子のない（子の提案もありません）フェーズがある: {labels}",
         f"次: 子の提案（例: '{example}'）を wip/proposals/todo/ に書き、"
-        f"'{propose} propose {found.ticket}' で送って、承認をユーザに頼む"
+        f"'{propose} approval-request {found.ticket}' で送って、承認をユーザに頼む"
         "（子の着手は親が着手済みであることが条件。親と別の承認になる）",
         "子のないまま親で進めても、`finish` で「終わっていないフェーズがある」と止まります",
     ]

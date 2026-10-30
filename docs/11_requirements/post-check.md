@@ -21,7 +21,7 @@ keywords: [要件, REQ-PST, ツール実行後, 事後検知, PostToolUse, 復�
 
 実行後チェックは実行後に走り、操作そのものを取り消せないので、REQ-PST-02 は差し戻しの文を返す。
 
-ccnavi 自身のサブコマンド（`ticket start` / `finish` / `cancel` と `review request` / `confirm` / `ready`）が
+ccnavi 自身のサブコマンド（`ticket start` / `finish` / `cancel` と `review-request` / `confirm` / `ready`）が
 承認済みチケットとフェーズのマーカーの置き場に書いたぶんは、内容で判断して REQ-PST-01 の検証から外す。
 外すのは、サブコマンドがまだ書いていない欄が足されただけのもの、範囲を宣言しないファイル、1 対 1 で対になった
 閉じる向きの移動の 3 つに限る。承認された作業範囲（チケットが宣言する allow / ask / deny、親、フェーズ）が

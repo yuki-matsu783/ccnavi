@@ -170,7 +170,7 @@ class ApproveAndPushTest(unittest.TestCase):
         self.ok(self.run_sh("ccnavi-git.sh", "worktree", "add", where, "-b", TICKET))
         write(os.path.join(self.tree, *PROPOSAL.split("/"), TICKET + ".md"), PROPOSAL_TEXT)
         self.ok(self.run_sh("ccnavi-git.sh", "add", f"{PROPOSAL}/{TICKET}.md", cwd=self.tree))
-        self.ok(self.run_sh("ccnavi-git.sh", "commit", "-m", "propose", cwd=self.tree))
+        self.ok(self.run_sh("ccnavi-git.sh", "commit", "-m", "approval-request", cwd=self.tree))
         proposed = out(self.tree, "rev-parse", "HEAD")
         # 親のブランチは承認の前にリモートへ送ってある（MR の元ブランチ）。承認済みチケットは、
         # リモートにある親のブランチに取り込んでから送る

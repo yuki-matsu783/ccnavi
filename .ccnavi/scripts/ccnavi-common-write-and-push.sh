@@ -390,7 +390,7 @@ ccnavi_wap_unstage() {
 # 書いた一覧のうち、この実行で書いたパスのワークツリーの中身を <版> に戻す（無ければ消す）。<一覧> <版>
 # record-risk の記録など、この実行の前から未コミットだったもの（keep）は触らない。
 # ccnavi_wap_keep_worktree が空でなければ何も戻さない。呼ぶ側が書いたものではなく、利用者の書いた入力
-# （propose の提案）を一覧に載せている操作で使う。戻すと、送れなかったときに提案そのものが消える。
+# （approval-request の提案）を一覧に載せている操作で使う。戻すと、送れなかったときに提案そのものが消える。
 ccnavi_wap_keep_worktree=""
 ccnavi_wap_restore_written() {
 	[ -z "$ccnavi_wap_keep_worktree" ] || return 0
@@ -683,8 +683,8 @@ ccnavi_wap_undo() {
 	return 0
 }
 
-# propose の結果ファイル（ccnavi-ticket.sh が書く）への申し送り。CCNAVI_PROPOSE_NOTE が無ければ何もしない。
-# 書けなくても propose は止めない。
+# approval-request の結果ファイル（ccnavi-ticket.sh が書く）への申し送り。CCNAVI_PROPOSE_NOTE が無ければ何もしない。
+# 書けなくても approval-request は止めない。
 ccnavi_wap_note() {
 	[ -z "${CCNAVI_PROPOSE_NOTE:-}" ] || printf '%s\n' "$1" >>"$CCNAVI_PROPOSE_NOTE" 2>/dev/null || :
 }

@@ -40,7 +40,9 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
     def test_request_confirm_and_ready_are_carried(self):
         body = write(os.path.join(self._base, "body.md"), "見てほしい\n")
         self.eli5()
-        requested = self.review("request", "--phase", "1", "--body-file", body, "--eli5", ELI5)
+        requested = self.review(
+            "review-request", "--phase", "1", "--body-file", body, "--eli5", ELI5
+        )
         self.assertEqual(requested.returncode, 0, requested.stdout + requested.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/1.requested")
         self.assertEqual(len(Host.notes), 1)
@@ -305,12 +307,12 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         once = os.path.join(self._base, "failed-once")
         html = self.eli5()
         first = self.review(
-            "request", "--phase", "1", "--body-file", body, "--eli5", html, HALF_FAIL=once
+            "review-request", "--phase", "1", "--body-file", body, "--eli5", html, HALF_FAIL=once
         )
         self.assertNotEqual(first.returncode, 0, first.stdout + first.stderr)
         self.assertEqual(len(Host.notes), 1)
         again = self.review(
-            "request", "--phase", "1", "--body-file", body, "--eli5", html, HALF_FAIL=once
+            "review-request", "--phase", "1", "--body-file", body, "--eli5", html, HALF_FAIL=once
         )
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertIn("投稿済み", again.stdout)

@@ -715,7 +715,7 @@ class PushApprovedTest(Workspace):
         self.place(tree, "i0009")
         gone = write(os.path.join(tree, "wip", "proposals", "todo", "i0001.md"), "proposal\n")
         git(tree, "add", "--", gone)
-        git(tree, "commit", "-q", "-m", "propose")
+        git(tree, "commit", "-q", "-m", "approval-request")
         os.remove(gone)
         review = write(os.path.join(tree, "wip", "proposals", "review", "i0008.md"), "review\n")
         other = self.worktree("i0002")

@@ -10,7 +10,7 @@ messages:
     why: |-
       親のワークツリーは作業の場ではありません。書けるのは下書きと提案の置き場（wip/proposals/・wip/handoff/・wip/eli5/）だけで、親の範囲を広げても通りません。
     next: |-
-      フェーズごとの子チケットを `{script:ccnavi-ticket.sh} propose` で提案し、ユーザに承認を頼んで返事を待つ。承認されたら start して、子のワークツリーで作業する（子の finish が親へ合流させる。そのフェーズの子がまだ無ければ先に作る）
+      フェーズごとの子チケットを `{script:ccnavi-ticket.sh} approval-request` で提案し、ユーザに承認を頼んで返事を待つ。承認されたら start して、子のワークツリーで作業する（子の finish が親へ合流させる。そのフェーズの子がまだ無ければ先に作る）
     no_bypass: |-
       親の範囲を広げる、別の経路で書く、言い換えるなどをしても、同じ関門に当たります。
     note: |-
@@ -46,7 +46,7 @@ messages:
       risk: |-
         フェーズは終わっていて、実績のリスクが高い（{risk_line}）ので、宣言に関わらずレビューが要ります。
     next: |-
-      子が合流済み（finish 済み）であることを確かめ、ELI5 の HTML を wip/eli5/phase-{phase}.html に書いてコミットして push し、`{script:ccnavi-review.sh} request --phase {phase} --body-file <依頼文> --eli5 wip/eli5/phase-{phase}.html` でレビューを頼み、{turn_defined}を終えてユーザを待つ。ユーザがレビューを終えたら `{script:ccnavi-review.sh} confirm --phase {phase}` で確かめる。次のフェーズの計画（wip/proposals/todo/ への提案）はレビュー前に進めてよい
+      子が合流済み（finish 済み）であることを確かめ、ELI5 の HTML を wip/eli5/phase-{phase}.html に書いてコミットして push し、`{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文> --eli5 wip/eli5/phase-{phase}.html` でレビューを頼み、{turn_defined}を終えてユーザを待つ。ユーザがレビューを終えたら `{script:ccnavi-review.sh} confirm --phase {phase}` で確かめる。次のフェーズの計画（wip/proposals/todo/ への提案）はレビュー前に進めてよい
     no_bypass: |-
       子の作業や別の経路で先へ進めても、レビュー済みのマーカーが置かれるまで同じ関門に当たります。依頼を出して待ちます。
 

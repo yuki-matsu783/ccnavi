@@ -32,10 +32,10 @@ Stop ─┬─ command hook（ccnavi）: 既存の促しを実行 → 共有キ�
 
 最終分類は、AI が「チケット作業の依頼ではない」→ 対象外（判定者 AI）、材料不足 → 未検査、R1・R2・R4 に受理された不備 → 不備検出、必要な基準に判定不能 → 未検査、それ以外 → 終了可。出力の検証は構造だけを確かめる。指摘が正しいことは保証しない。
 
-## propose の操作実績（`records/stopops.py`）
+## approval-request の操作実績（`records/stopops.py`）
 
-- PreToolUse が `ccnavi-ticket.sh propose <識別子>` を読んで `tool_use_id` と識別子を登録する（1 つの Bash に複数あれば識別子ごと）。
-- `ccnavi-ticket.sh propose` は、自分をもう一度起動する外側の層で、どの道を通っても `logs/state/stopops-result/*.kv` を 1 つ書く。経路は 7 つ（送った・変更なし・書くだけ・止めた・コードが未 push・送る前に失敗・push 後の後処理で失敗）。送ったコミットとパスごとのブロブも書く。
+- PreToolUse が `ccnavi-ticket.sh approval-request <識別子>` を読んで `tool_use_id` と識別子を登録する（1 つの Bash に複数あれば識別子ごと）。
+- `ccnavi-ticket.sh approval-request` は、自分をもう一度起動する外側の層で、どの道を通っても `logs/state/stopops-result/*.kv` を 1 つ書く。経路は 6 つ（送った・変更なし・書くだけ・止めた・送る前に失敗（コードが未 push で拒否した回を含む）・push 後の後処理で失敗）。送ったコミットとパスごとのブロブも書く。
 - PostToolUse・PostToolUseFailure が識別子と時刻の範囲で結び付ける。結べないものは Stop と集計で結び直し、30 秒過ぎても見つからなければ未連携。
 - 提案ごとの最終の有効版が判定の対象。`todo/<識別子>.md` への Write・Edit を記録し、書いた後に送った操作が無いものを未送信とする（Bash で書いた提案は検出できない）。
 
@@ -76,7 +76,7 @@ Stop ─┬─ command hook（ccnavi）: 既存の促しを実行 → 共有キ�
 - 作業者の呼び出しは、サブエージェントの分も含めて止めて印を付ける。`sh -c`・`eval`・変数展開のように読み取れない形は、`stop-review` と動詞が並んでいれば印だけ付ける（止められない）。
 - ユーザ自身の agent 型 hook も `hook-agent-` で始まる `agent_id` になるので、登録したワークスペースでは判定役として扱われる（Bash は止まる）。
 - `material` と `record` に認証は無い。セッション ID と transcript のパスが分かれば誰でも打てる。防ぐのは上の PreToolUse の制限だけで、見分ける値が無ければ防げない。
-- 外側の層を飛ばす `CCNAVI_PROPOSE_INNER=1 sh ccnavi-ticket.sh propose …` と、外側に TERM だけが届いた場合は、操作実績が残らない（未連携として数える）。
+- 外側の層を飛ばす `CCNAVI_PROPOSE_INNER=1 sh ccnavi-ticket.sh approval-request …` と、外側に TERM だけが届いた場合は、操作実績が残らない（未連携として数える）。
 - 差し戻しの消費には窓がある（既定 600 秒）。窓を過ぎた差し戻しは、次の Stop で消費されず、期限で閉じる（最終分類は不備検出のまま、修正率の「再判定なし」に数える）。
 
 - 成立性の検証は小さい標本で測っただけで、しきい値も暫定。採用の前に、実際のワークスペースの運用データで測り直す。

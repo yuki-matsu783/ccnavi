@@ -266,7 +266,7 @@ class HostFixtureTest(unittest.TestCase):
     def test_parent_option_is_refused_except_for_ready(self):
         for sub, rest in (
             ("confirm", ("--phase", "1")),
-            ("request", ("--phase", "1")),
+            ("review-request", ("--phase", "1")),
             ("comment", ()),
         ):
             for parent in (("--parent", "feature-1"), ("--parent=feature-1",)):
@@ -677,7 +677,15 @@ class GitLabHostFixtureTest(unittest.TestCase):
         extra = {"CCNAVI_ENTRY_PATH": stub, "FAKE_GITLAB_STATE": state}
         for _ in range(2):
             done = self.review(
-                "resolved", "request", "--phase", "1", "--body-file", "x", "--eli5", html, **extra
+                "resolved",
+                "review-request",
+                "--phase",
+                "1",
+                "--body-file",
+                "x",
+                "--eli5",
+                html,
+                **extra,
             )
             self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
             with open(os.path.join(out, "result.json"), encoding="utf-8") as f:
@@ -715,7 +723,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         path = os.pathsep.join([catcher, self.bin, os.environ.get("PATH", "")])
         done = self.review(
             "resolved",
-            *("request", "--phase", "1", "--body-file", "x", "--eli5", html),
+            *("review-request", "--phase", "1", "--body-file", "x", "--eli5", html),
             CCNAVI_ENTRY_PATH=stub,
             PATH=path,
             FAKE_GITLAB_STATE=os.path.join(self._tmp.name, "notes.json"),
@@ -875,7 +883,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         for name, (flag, code, said) in cases.items():
             with self.subTest(name):
                 done = self.review(
-                    "resolved", "request", "--phase", "1", "--body-file", "x", *flag, **extra
+                    "resolved", "review-request", "--phase", "1", "--body-file", "x", *flag, **extra
                 )
                 self.assertEqual(done.returncode, code, done.stdout + done.stderr)
                 self.assertIn("--eli5", done.stderr)
@@ -900,7 +908,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         state = os.path.join(self._tmp.name, "notes.json")
         done = self.review(
             "resolved",
-            "request",
+            "review-request",
             "--phase",
             "1",
             "--body-file",
@@ -943,7 +951,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
             self.eli5()
         return self.review(
             "resolved",
-            *("request", "--phase", "1", "--body-file", body, f"--eli5={ELI5}"),
+            *("review-request", "--phase", "1", "--body-file", body, f"--eli5={ELI5}"),
             CCNAVI_ENTRY_PATH=stub,
             FAKE_GITLAB_STATE=os.path.join(self._tmp.name, "notes.json"),
             **extra,
@@ -1008,7 +1016,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         state = os.path.join(self._tmp.name, "notes.json")
         done = self.review(
             "resolved",
-            "request",
+            "review-request",
             "--phase",
             "1",
             "--body-file",

@@ -1061,7 +1061,7 @@ class StopNudgeRecordTest(unittest.TestCase):
 class TicketPlaceTest(Harness, unittest.TestCase):
     """チケットの置き場の変更を、誰が書いたかではなく何が変わったかで見分ける。
 
-    ここは ccnavi のサブコマンド（`ticket start` / `finish`、`review request` / `confirm` /
+    ここは ccnavi のサブコマンド（`ticket start` / `finish`、`review-request` / `confirm` /
     `ready`）が書く場所で、同時にプロジェクトが `deny` と宣言した場所でもある。外さないと、自分の
     手順を自分で違反として報告し、戻す設定では自分で戻して手順が進まなくなる。外しすぎると、
     承認済みチケットが宣言する範囲を、引数に現れない書き込みで広げる経路ができる。
@@ -1248,7 +1248,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
 
     def test_mrが空から整数になっただけなら言わない(self):
-        # `review request` が MR を作った後に、承認済みチケットの空の `mr:` へ番号を書き足す。
+        # `review-request` が MR を作った後に、承認済みチケットの空の `mr:` へ番号を書き足す。
         # 欄が無い版・値なしの版のどちらからでも、ほかが 1 文字も変わらなければ ccnavi の書き込み。
         for before in (TICKET, TICKET.replace("---\nbody", 'mr: ""\n---\nbody')):
             with self.subTest(before=before):
@@ -1330,7 +1330,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         # 作業中かレビュー待ちに限る。
         write(self.path("wip/proposals/todo/i0009.md"), TICKET.replace("i0001", "i0009"))
         git(self.repo, "add", "--", "wip/proposals/todo/i0009.md")
-        git(self.repo, "commit", "--quiet", "-m", "propose")
+        git(self.repo, "commit", "--quiet", "-m", "approval-request")
         self.run_hook(command="ls")
         os.remove(self.path("wip/proposals/todo/i0009.md"))
         write(self.path("wip/proposals/review/i0009.md"), TICKET.replace("i0001", "i0009"))

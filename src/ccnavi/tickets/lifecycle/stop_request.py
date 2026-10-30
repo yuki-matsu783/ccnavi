@@ -1,7 +1,7 @@
 """Stop で、レビューの依頼まで進めずに終えようとしたときの促し。
 
 チケット作業の決まった道（子の `finish`（親ブランチへ合流して push）→ すべての子が合流済みかの確認
-→ ELI5 → `ccnavi-review.sh request`）の
+→ ELI5 → `ccnavi-review.sh review-request`）の
 途中で、エージェントが「進めてよいですか」と確認して終えてしまうのを、1 回だけ止めて次の一手を返す。
 `ops_stop.unfinished_at_stop` は `finish` の打ち忘れ専用なので、ここは別の判定にしてある。
 

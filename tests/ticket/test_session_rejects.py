@@ -201,7 +201,7 @@ class SessionRejectsTest(PhaseHarness):
             parent_text("i0002", ["research", "design"], allow=("src/*", SECRET)),
         )
         git(other, "add", "-A")
-        git(other, "commit", "--quiet", "-m", "propose")
+        git(other, "commit", "--quiet", "-m", "approval-request")
         self.approve_all("i0002")
 
         system, context = self.shown()  # i0001 のツリー

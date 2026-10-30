@@ -33,7 +33,7 @@ class PromptHintTest(PhaseHarness):
         tree = self.worktree(name, "main")
         self.propose(name, text, tree=tree)
         git(tree, "add", "-A")
-        git(tree, "commit", "--quiet", "-m", "propose " + name)
+        git(tree, "commit", "--quiet", "-m", "approval-request " + name)
 
     def prompt(self, text, *extra, session="s1"):
         payload = {

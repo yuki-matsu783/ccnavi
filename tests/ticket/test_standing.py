@@ -32,7 +32,7 @@ class AuthorityHarness(PhaseHarness):
         super().setUp()
         self.family(plan=["research", "design"])
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/research/*"]))
-        self.commit_parent("propose child")
+        self.commit_parent("approval-request child")
         self.assertEqual(self.approve().returncode, 0)
         self.child_tree = self.run_child("i0001-01-01")
 
@@ -352,7 +352,7 @@ class UnreadableChildTest(AuthorityHarness):
 
     def start_second_child(self):
         self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
-        self.commit_parent("propose second")
+        self.commit_parent("approval-request second")
         self.assertEqual(self.approve().returncode, 0)
         tree = self.worktree("i0001-01-02", "i0001")
         started = self.ccnavi("ticket", "start", "i0001-01-02")

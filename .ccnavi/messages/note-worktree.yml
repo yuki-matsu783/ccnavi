@@ -13,7 +13,7 @@ messages:
     kind: note
     values: [parent]
     note: |-
-      承認待ちの提案 {parent} が wip/proposals/ に残っている。要らなければ、ユーザに確かめて提案のファイルを削除する（cancel は doing/ の子の用で、提案には使えない）。削除できない、または propose で送った分が親のブランチに残るときは、状態を報告してユーザの判断を仰ぐ
+      承認待ちの提案 {parent} が wip/proposals/ に残っている。要らなければ、ユーザに確かめて提案のファイルを削除する（cancel は doing/ の子の用で、提案には使えない）。削除できない、または approval-request で送った分が親のブランチに残るときは、状態を報告してユーザの判断を仰ぐ
 
   NOTE_WORKTREE_PARENT_CLOSE:
     kind: note

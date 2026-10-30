@@ -35,7 +35,7 @@ class MisplacedHomeTest(PhaseHarness):
     def test_a_parent_proposal_in_a_differently_named_worktree_is_not_approved(self):
         stray = self.stray_tree()
         self.propose("i0003", parent_text("i0003", ["research"]), tree=stray)
-        self.commit_in(stray, "propose i0003")
+        self.commit_in(stray, "approval-request i0003")
         result = self.ccnavi("user", "agree", stdin="y\n")
         said = result.stdout + result.stderr
         self.assertEqual(result.returncode, 1, said)
@@ -49,7 +49,7 @@ class MisplacedHomeTest(PhaseHarness):
     def test_a_parent_proposal_in_its_own_worktree_is_approved(self):
         own = self.worktree("i0003", "main")
         self.propose("i0003", parent_text("i0003", ["research"]), tree=own)
-        self.commit_in(own, "propose i0003")
+        self.commit_in(own, "approval-request i0003")
         result = self.ccnavi("user", "agree", stdin="y\n")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(
@@ -62,7 +62,7 @@ class MisplacedHomeTest(PhaseHarness):
         self.propose(
             "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/design/*",)), tree=stray
         )
-        self.commit_in(stray, "propose child")
+        self.commit_in(stray, "approval-request child")
         result = self.ccnavi("user", "agree", stdin="y\n")
         said = result.stdout + result.stderr
         self.assertEqual(result.returncode, 1, said)

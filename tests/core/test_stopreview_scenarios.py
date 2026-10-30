@@ -16,7 +16,7 @@ recordに渡す入力であり、ここで確かめるのはccnavi側の確定�
 
 - `transcript.jsonl`: そのStopの時点の会話
 - `proposals/<識別子>.txt`: Writeで書いた提案（`wip/proposals/todo/<識別子>.md` に置く）
-- `propose.kv`: proposeの結果ファイル。`{now}`・`{commit}`・`{blob:<パス>}` を置き換える。
+- `propose.kv`: approval-requestの結果ファイル。`{now}`・`{commit}`・`{blob:<パス>}` を置き換える。
   あれば `proposals/` の提案をコミットして、送った版にする
 - `judge_result*.json`: 判定役の結果を模したもの。`$ATTEMPT`・`$PROPOSAL:<識別子>` を置き換える
 - `settings.json`（場面の直下）: `stop_review` の値。無ければenable
@@ -134,7 +134,7 @@ class Play:
             self._git("init", "-q")
             self.repo = True
         self._git("add", "-A", "wip")
-        self._git("commit", "-q", "--allow-empty", "-m", "propose")
+        self._git("commit", "-q", "--allow-empty", "-m", "approval-request")
         return self._git("rev-parse", "HEAD")
 
     def _expand(self, text, commit):
@@ -144,7 +144,7 @@ class Play:
         )
 
     def stage(self, folder):
-        """このStopまでに起きたこと（ユーザの発言・提案の書き込み・proposeの実行）を再現する。"""
+        """このStopまでに起きたこと（ユーザの発言・提案の書き込み・approval-requestの実行）を再現する。"""
         shutil.copyfile(os.path.join(folder, "transcript.jsonl"), self.transcript)
         prompts = _prompts(self.transcript)
         for text in prompts[self.prompted :]:
@@ -167,7 +167,7 @@ class Play:
             tool_use_id = f"tu{self.calls}"
             body = self._expand(_read(kv), commit)
             ident = re.search(r"^id=(.+)$", body, re.MULTILINE).group(1)
-            command = f"sh .ccnavi/scripts/ccnavi-ticket.sh propose {ident}"
+            command = f"sh .ccnavi/scripts/ccnavi-ticket.sh approval-request {ident}"
             call = dict(tool_name="Bash", tool_input={"command": command}, tool_use_id=tool_use_id)
             self._hook(hookio.PRE_TOOL_USE, **call)
             directory = os.path.join(self.state, stopops.RESULT_DIR)

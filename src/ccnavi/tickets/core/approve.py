@@ -11,17 +11,15 @@ from __future__ import annotations
 import io
 import json
 import os
+from dataclasses import dataclass, field
 from typing import TextIO
 
-from ...infra import fsio, gitcmd, modes, pathcase, settings, tree
+from ...infra import fsio, modes, pathcase, settings, tree
 from ..approval import store as approval
-from ..lifecycle import worktrees
-from ..model import ticket_places
+from ..approval import write_and_push
+from ..lifecycle import treegate, worktrees
 from ..proposal import agree, agree_candidates, agree_screen
 from . import base as core_base
-
-_GIT_TIMEOUT = 20.0
-_SHOWN_PATHS = 8
 
 # ボードの承認（`--agree --yes`）が通らなかった根拠の種別。付録 A の `CORE_APPROVE_*`。
 # 確認（`CORE_CONFIRM_*`）と同じく、文面の頭に
@@ -145,7 +143,7 @@ def approve(
     dirty = dirty_parents(
         conf, root, [c.ticket for c in gathered.batch if c.ticket.ticket in applied.placed]
     )
-    say_dirty_parents(stderr, root, dirty)
+    say_dirty_parents(stderr, dirty)
     if placed_out:
         _write_report(
             placed_out, placed_report(conf, root, gathered, applied, written, dirty), stderr
@@ -192,18 +190,26 @@ def write_recorded(
     return applied, written_paths(root, written)
 
 
+def _parent_tree(root: str, ident: str) -> str | None:
+    """親のワークツリーのパス。無い・git のワークツリーでないときは None。"""
+    path = tree.worktree_path(root, ident)
+    if not os.path.isdir(path) or not tree.is_worktree_of(root, path):
+        return None
+    return path
+
+
 def dirty_parents(conf: settings.Settings, root: str, tickets: list) -> list[dict]:
     """承認した親のワークツリーにある、提案とチケットの置き場以外の未コミットの変更。
 
     承認の前は、親のワークツリーへの書き込みは判定の対象外で通る（承認済みの索引に無いため）。
     承認の後に同じ変更を戻そうとしても、親のワークツリーへの書き込みとして断られ、子の
-    `finish` も止まる（`write_and_push_merge._tree_problem`）。止まる前に知らせるため、承認の
-    時点で同じ条件（追跡中のファイルの変更のうち、置き場の外のもの）を数える。
+    `finish` も止まる。止まる前に知らせるため、承認の時点で同じ条件（`treegate`）を数えて伝える。
 
     承認は止めない。親のワークツリーが無い・git のワークツリーでない・状態を読めないときは、
     黙って空にする。プロジェクトの子は置き場が別なので数えない。
 
-    返すのは `{"ticket": 親の識別子, "worktree": ワークツリーのパス, "paths": 変更のパス}` の列。
+    返すのは `{"ticket": 親の識別子, "worktree": ワークツリーのパス, "paths": 変更のパス,
+    "text": 知らせる文}` の列。
     """
     seen: set[str] = set()
     out: list[dict] = []
@@ -215,51 +221,116 @@ def dirty_parents(conf: settings.Settings, root: str, tickets: list) -> list[dic
         if not ident or key in seen:
             continue
         seen.add(key)
-        path = tree.worktree_path(root, ident)
-        if not os.path.isdir(path) or not tree.is_worktree_of(root, path):
-            continue
-        done = gitcmd.run(
-            path,
-            ["status", "--porcelain", "-z", "--untracked-files=no", "--no-renames"],
-            _GIT_TIMEOUT,
-            raw_paths=True,
-        )
-        if not done.ok:
-            continue
-        paths = [
-            entry[3:]
-            for entry in done.out.split("\0")
-            if len(entry) > 3
-            and not ticket_places.is_ticket_place(entry[3:], conf.tickets, conf.approved)
-        ]
+        path = _parent_tree(root, ident)
+        paths = treegate.tree_dirty(path, conf) if path else None
         if paths:
-            out.append({"ticket": ident, "worktree": path, "paths": paths})
+            refusal = treegate.dirty_refusal(
+                treegate.APPROVAL_REQUEST, path, conf, paths, root=root
+            )
+            out.append({"ticket": ident, "worktree": path, "paths": paths, "text": refusal.reason})
     return out
 
 
-def dirty_parent_text(root: str, found: dict) -> str:
-    """`dirty_parents` の 1 件を知らせる文（行頭の語は呼び手が付ける）。戻し方まで書く。"""
-    shown = ", ".join(found["paths"][:_SHOWN_PATHS])
-    if len(found["paths"]) > _SHOWN_PATHS:
-        shown += f" ほか {len(found['paths']) - _SHOWN_PATHS} 件"
-    git_sh = settings.script_command(root, "ccnavi-git.sh")
-    restore = (
-        f"cd {settings.shell_path(found['worktree'])} && "
-        f"{git_sh} restore --staged --worktree -- {settings.shell_path(found['paths'][0])}"
-    )
-    return (
-        f"親 {found['ticket']} のワークツリーに、提案以外の未コミットの変更がある（{shown}）。"
-        "承認の後は、親のワークツリーへの書き込みが断られ、この変更があると子の finish も止まる。"
-        "自分が書いた変更でなければ、戻す前にユーザへ確かめる（戻すと取り消せない）。"
-        "残す変更は、子のワークツリーへ移してコミットする。"
-        f"要らない変更は、パスを 1 つずつ名指しして戻す。例: {restore}"
-    )
+@dataclass
+class Readiness:
+    """承認を頼める状態か。`reason` が空なら頼める。
+
+    `reason` は承認の画面が外す理由（`READY_PROPOSAL`）か、親のワークツリーの状態
+    （`treegate.DIRTY_PARENT`・`treegate.UNPUSHED_CODE`）。`lines` は理由、`steps` は次の一手。
+    """
+
+    reason: str = ""
+    lines: list[str] = field(default_factory=list)
+    steps: list[str] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return not self.reason
+
+    def say(self, stderr: TextIO) -> None:
+        for line in self.lines:
+            stderr.write(line + "\n")
+        for step in self.steps:
+            stderr.write(f"次: {step}\n")
+
+    def text(self) -> str:
+        return "".join(f"{line}\n" for line in self.lines) + "".join(
+            f"次: {step}\n" for step in self.steps
+        )
 
 
-def say_dirty_parents(stderr: TextIO, root: str, found: list[dict]) -> None:
+# 承認の画面が外す理由（提案を読めない・承認の対象にならない）。
+READY_PROPOSAL = "proposal"
+
+
+def readiness(
+    conf: settings.Settings,
+    root: str,
+    idents: list[str],
+    gathered: agree.Gathered | None = None,
+) -> Readiness:
+    """送る提案（`idents`）で、承認を頼める状態か。承認の可否の判定は、ここだけ。
+
+    `approval-request`（と `--check`）の gate と、`--agree --preview --verify` が使う。
+    承認を押したあとで拒否や止まりに気づく往復を避けるため、承認の画面（`--agree`）が
+    外す理由と、承認のあとに子の `finish` を止める親の状態（`treegate.check` の
+    `APPROVAL_REQUEST`）を、ユーザに渡す前に言う。
+
+    見るのは送る提案だけ。ほかの親子の提案の不備は言わない。承認待ちに無い識別子（すでに承認済み
+    など）は、承認の画面が外す理由にならないので止めない。`gathered` を渡すと、承認の画面の
+    集計を取り直さない。
+    """
+    mine = set(idents)
+    if gathered is None:
+        try:
+            gathered = agree.gather(io.StringIO(), conf, root)
+        except ValueError as exc:  # UTF-8 で読めない提案がある。承認の画面も同じ所で読めない
+            return Readiness(
+                READY_PROPOSAL,
+                [f"ccnavi: 提案を読めない（UTF-8 でないファイルがある）: {exc}"],
+                ["提案を UTF-8 で保存し直して、approval-request を打ち直す（何も送っていません）"],
+            )
+    lines = [
+        f"ccnavi: {text}"
+        for text in gathered.problems
+        if any(f"/{ident}.md" in text for ident in mine)
+    ]
+    for t, found in gathered.rejected:
+        if t.ticket in mine:
+            lines.append(f"ccnavi: {t.ticket} は承認の対象にならない")
+            lines += [f"  {problem}" for problem in found]
+    if lines:
+        step = "上の理由を直して、approval-request を打ち直す（何も送っていません）"
+        return Readiness(READY_PROPOSAL, lines, [step])
+    # 承認の画面の対象に入らない提案（承認済みと同じ中身の改版など）も、親のワークツリーは同じ。
+    # 対象の組み（batch）には頼らず、送る提案の識別子から親を引く。
+    projects = {t.ticket for t in gathered.proposals if t.project}
+    parents = dict.fromkeys(write_and_push.family_of(i) for i in sorted(mine))
+    refusals = []
+    for parent in parents:
+        path = None if not parent or parent in projects else _parent_tree(root, parent)
+        if path:
+            refusals += treegate.check(treegate.APPROVAL_REQUEST, path, conf, root=root)
+    if not refusals:
+        return Readiness()
+    steps = list(dict.fromkeys(h for r in refusals for h in r.hints))
+    return Readiness(refusals[0].kind, [f"ccnavi: {r.reason}" for r in refusals], steps)
+
+
+def approval_request_gate(
+    stderr: TextIO, root: str, conf: settings.Settings, idents: list[str]
+) -> int:
+    """`approval-request` が提案を送る前に、承認の画面と同じ検査（`readiness`）を通す。
+    通らなければ 1。理由は標準エラーに出し、何も送らない。"""
+    ready = readiness(conf, root, idents)
+    ready.say(stderr)
+    return 0 if ready.ok else 1
+
+
+def say_dirty_parents(stderr: TextIO, found: list[dict]) -> None:
     """承認の結果に、親のワークツリーの未コミットの変更を出す（承認は止めない）。"""
     for item in found:
-        stderr.write(f"ccnavi: {dirty_parent_text(root, item)}\n")
+        stderr.write(f"ccnavi: {item['text']}\n")
 
 
 def written_paths(root: str, written: list[str]) -> list[str]:
@@ -380,22 +451,26 @@ def verify(
     失敗として扱うので、承認の対象にしない提案が 1 件あるだけで一覧を出せなくなる。
     見せる枝と確かめる枝を分け、判定そのものは `gather` の 1 か所に置く。
 
-    通る = 指定したもの（指定が無ければ承認待ち全部）が、そのまま承認の対象に入る。
-    次のどれかがあれば通らない。
+    通る = 指定したもの（指定が無ければ承認待ち全部）が、そのまま承認の対象に入り、
+    承認を頼める状態（`readiness`）にある。次のどれかがあれば通らない。
 
     - 絞りが通らない（承認待ちに無い識別子、親の改版を外した子）
     - 承認待ちが 1 件も無い。承認を頼む前の確認としては失敗で、
       提案の置き場を間違えた回がここに出る
     - 承認の対象にしない提案がある（`rejected`）
+    - 親のワークツリーに置き場の外の未コミットの変更がある（`dirty_parent`）、親のブランチに
+      未 push のコードがある（`unpushed_code`）。`approval-request` が止まる条件と同じ
 
-    失敗扱いにしないものが 2 つある。どちらも `--agree` が失敗させないもので、ここで失敗扱いにすると
+    失敗扱いにしないものが 1 つある。`--agree` が失敗させないもので、ここで失敗扱いにすると
     「確かめは『いいえ』なのに承認は通る」という食い違いになる。
 
     - 範囲の超過（`overflow`）。承認は止まらず、判定が切り詰めるだけ。承認しても
       書けない場所が残るのは伝える値打ちがあるから、その行につけて見せる
-    - 読めない提案（`problems`）。走査は絞る前の全ツリーを見るので、他のセッションの
-      書きかけ 1 本で、自分の提案が通るのに「直せ」と言われることになる。
-      出さずに済ませることはせず、件数と文面を本文に出す（自分が書いた 1 本かもしれないので）
+
+    送る提案を名指しする `problems`（警告を含む。`proposal`）は失敗にする。`approval-request`
+    が止まる条件と同じにするため。他の提案の `problems` は見ない。走査は絞る前の全ツリーを
+    見るので、他のセッションの書きかけ 1 本で、自分の提案が通るのに「直せ」と言われることになる。
+    本文には、他の提案のものも件数と文面を出す（自分が書いた 1 本かもしれないので）。
 
     返すのは「はい」（0）か「いいえ」（`modes.EXIT_ANSWER_NO`）。使い方と設定の誤りで返す
     1 とは分ける。同じ値にすると、打ち方を間違えた回と提案が失敗する回が読む側から
@@ -408,7 +483,13 @@ def verify(
         # 標準エラーへ出す。
         core_base.say_elsewhere(stderr, judged.gathered)
     gathered = judged.gathered
-    verdict = agree.verify_verdict(gathered, conf.tickets)
+    held = None
+    if gathered.batch and not gathered.rejected and not gathered.refused:
+        ready = readiness(conf, root, [c.ticket.ticket for c in gathered.batch], gathered)
+        held = None if ready.ok else (ready.reason, ready.text())
+        if held and as_json:  # JSON の本体には理由が無いので標準エラーへ出す
+            stderr.write(held[1])
+    verdict = agree.verify_verdict(gathered, conf.tickets, held)
     # 新規の親のブランチ名が既にあるブランチと同じか。warn なので答えは変えない。
     fresh = [c.ticket for c in gathered.batch if not c.is_revision and not c.ticket.is_child]
     branches = agree_candidates.existing_branch_warnings(root, conf, fresh, [], [], [])
@@ -560,11 +641,9 @@ def approve_yes(
     plan = worktrees.child_worktrees(root, tickets)
     # 承認は止めない。親のワークツリーに残る提案以外の変更は、エージェントに渡す文に載せる。
     dirty = dirty_parents(conf, root, tickets)
-    prompt = agree_screen.approved_text(
-        tickets, revisions, root, plan, [dirty_parent_text(root, d) for d in dirty]
-    )
+    prompt = agree_screen.approved_text(tickets, revisions, root, plan, [d["text"] for d in dirty])
     if not as_json:
-        say_dirty_parents(stderr, root, dirty)
+        say_dirty_parents(stderr, dirty)
         stdout.write(lines.getvalue())
         return 0
     body = {

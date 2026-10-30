@@ -1,8 +1,9 @@
-"""propose の操作実績。どの提案を送ったか、送らなかったかを、どの経路を通っても確定する。
+"""approval-request の操作実績。どの提案を送ったか、送らなかったかを、どの経路を通っても確定する。
 
 3 つの記録をつなぐ。
 
-- 実行前（PreToolUse）: `ccnavi-ticket.sh propose <識別子>` を読んだら、`tool_use_id`・セッション・
+- 実行前（PreToolUse）: `ccnavi-ticket.sh approval-request <識別子>` を読んだら、
+  `tool_use_id`・セッション・
   識別子・時刻を登録する（`register`）
 - 結果ファイル: `ccnavi-ticket.sh` が出口で、どの経路を通っても 1 つ書く
   （`stopops-result/<開始秒>-<pid>.kv`）。標準出力の識別行は、出力が切られると消えるので頼らない
@@ -12,8 +13,8 @@
 
 判定の対象は提案ごとの最終の有効版（`final_versions`）。途中の版は記録に残る。
 
-経路（`route`）は 7 つ: 送った・変更なし・書くだけ（origin なし）・止めた・コードが未 push・
-送る前に失敗・push 後の後処理で失敗。
+経路（`route`）は 6 つ: 送った・変更なし・書くだけ（origin なし）・止めた・
+送る前に失敗（親の状態で拒否した回を含む）・push 後の後処理で失敗。
 
 保存先は state と同じ場所。ターンの開始時刻（`start_turn`）もここに置く（通知でない発言の時刻）。
 """
@@ -31,12 +32,9 @@ SENT = "sent"
 UNCHANGED = "unchanged"
 WRITE_ONLY = "write_only"
 STOPPED = "stopped"
-UNPUSHED_CODE = "unpushed_code"
 FAILED_BEFORE = "failed_before"
 FAILED_AFTER = "failed_after"
-ROUTES = frozenset(
-    {SENT, UNCHANGED, WRITE_ONLY, STOPPED, UNPUSHED_CODE, FAILED_BEFORE, FAILED_AFTER}
-)
+ROUTES = frozenset({SENT, UNCHANGED, WRITE_ONLY, STOPPED, FAILED_BEFORE, FAILED_AFTER})
 # 提案の最終の有効版になる経路。変更なしは、前に送った版がそのまま有効のままになる。
 EFFECTIVE = frozenset({SENT, UNCHANGED})
 
@@ -74,7 +72,8 @@ def _runs(before: list[str]) -> bool:
 
 
 def propose_ident(words: list[str]) -> str:
-    """コマンドの語から、`ccnavi-ticket.sh propose <識別子>` の識別子を取る。無ければ空文字。
+    """コマンドの語から、`ccnavi-ticket.sh approval-request <識別子>` の識別子を取る。
+    無ければ空文字。
 
     識別子は `--` と `--reason <値>` を読み飛ばした最初の語（sh の `ticket_id` と同じ読み方）。
     """
@@ -85,8 +84,10 @@ def propose_ident(words: list[str]) -> str:
         if not _runs(words[:at]):
             continue
         rest = words[at + 1 :]
-        if not rest or rest[0] != "propose":
+        if not rest or rest[0] != "approval-request":
             continue
+        if "--check" in rest[1:]:  # 確かめるだけ。提案は送らないので、操作実績に載せない
+            return ""
         skip = False
         for arg in rest[1:]:
             if skip:
@@ -102,7 +103,8 @@ def propose_ident(words: list[str]) -> str:
 
 
 def _names(directory: str) -> list[str]:
-    """ディレクトリの中の名前。無ければ空（結果ファイルの置き場は、最初の propose まで無い）。"""
+    """ディレクトリの中の名前。無ければ空（結果ファイルの置き場は、最初の approval-request
+    まで無い）。"""
     try:
         return sorted(fsio.listdir(directory)) if directory else []
     except OSError:
@@ -110,7 +112,7 @@ def _names(directory: str) -> list[str]:
 
 
 def _call(tool_use_id: str, ident: str) -> str:
-    """1 つの Bash に propose が複数あっても、それぞれ別の呼び出しとして扱うためのキー。"""
+    """1 つの Bash に approval-request が複数あっても、それぞれ別の呼び出しとして扱うためのキー。"""
     return f"{tool_use_id}~{ident.casefold()}"
 
 
@@ -144,7 +146,7 @@ def turn_start(state: str, session: str) -> float:
 
 
 def register(state: str, session: str, tool_use_id: str, ident: str, now: float) -> None:
-    """実行前に、propose の呼び出しを登録する。"""
+    """実行前に、approval-request の呼び出しを登録する。"""
     if not (state and session and tool_use_id and ident):
         return
     fsio.write_json_atomic(
@@ -204,7 +206,7 @@ def _bound_files(state: str) -> set[str]:
 def bind(state: str, tool_use_id: str, now: float) -> dict[str, Any] | None:
     """実行後に、結果ファイルを `tool_use_id` の呼び出しへ結び付ける。最後に結べた操作を返す。
 
-    1 つの Bash に propose が複数あれば、登録は識別子ごとにある。それぞれ結ぶ。
+    1 つの Bash に approval-request が複数あれば、登録は識別子ごとにある。それぞれ結ぶ。
     """
     bound = None
     if state and tool_use_id:
@@ -357,7 +359,8 @@ def unsent_writes(writes: list[dict[str, Any]], ops: list[dict[str, Any]]) -> li
     """書いたのに、書いた後に送った操作が無い提案。
 
     送ったかは、送った操作の `files` に `todo/<識別子>.md` があり、その終了が書いた時刻より
-    後（粗さの分を許す）かで決める。親の propose は子の提案も一緒に送るので、識別子では決めない。
+    後（粗さの分を許す）かで決める。親の approval-request は子の提案も一緒に送るので、
+    識別子では決めない。
     """
     sent: dict[str, float] = {}
     for op in ops:

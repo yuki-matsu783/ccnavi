@@ -595,7 +595,7 @@ def revision_problems(
                 "タイトルか課題番号が承認済みチケットと違う",
             )
         )
-    # `mr:` は承認のあとに ccnavi が書き足すことがある（`review request`）。改版の提案は
+    # `mr:` は承認のあとに ccnavi が書き足すことがある（`review-request`）。改版の提案は
     # 書き足す前のコピーかもしれないので、片方が空なら比べない。両方に値があって違えば error。
     if revised.mr is not None and current.mr is not None and revised.mr != current.mr:
         problems.append(

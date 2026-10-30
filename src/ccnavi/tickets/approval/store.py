@@ -490,7 +490,7 @@ def revision_elsewhere_text(
     同じ文面を出す。取り込み済みの親子のチケットでは、親子のチケットが決まらないなら止まった理由と
     手順（`family_stop_text`。`family_problems` と同じ文面）を足す。決まっていれば、正とする
     ツリーが親のワークツリー（`family_problems` が言う書く場所と同じ）なので、場所は繰り返さず
-    承認を頼む前に `propose` で親のブランチへ送る手順だけを足す。
+    承認を頼む前に `approval-request` で親のブランチへ送る手順だけを足す。
     """
     rel = os.path.relpath(t.path, root).replace(os.sep, "/")
     place = tree_path(conf, root, where, t.project)
@@ -505,7 +505,7 @@ def revision_elsewhere_text(
     if st.stop:
         text += "。親子のチケットが止まっている: " + approval_checks.family_stop_text(root, st)
     elif st.home is not None:
-        propose = f"{settings.script_command(root, 'ccnavi-ticket.sh')} propose {t.ticket}"
+        propose = f"{settings.script_command(root, 'ccnavi-ticket.sh')} approval-request {t.ticket}"
         text += f"。書いたら '{propose}' で親のブランチへ送ってから承認を頼んでください"
     return text
 

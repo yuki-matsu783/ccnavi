@@ -20,7 +20,7 @@ setup:
 steps:
   - prompt: >-
       projects/test-repo の issue #{issue} を指定された小さい作業（README.md の末尾に「テスト 2」と 1 行足す）を、project: test-repo のチケット（quick の親 1・子 1）で進めたい。
-      issue #{issue} で `sh .ccnavi/scripts/ccnavi-start.sh --issue {issue}` を打って、出た親のワークツリーに提案を wip/proposals/todo/ に書いて、`ccnavi --agree --preview --verify` で自己検証して、ユーザに承認を依頼するところで止めて。
+      issue #{issue} で `sh .ccnavi/scripts/ccnavi-start.sh --issue {issue}` を打って、出た親のワークツリーに提案を wip/proposals/todo/ に書いて、`sh .ccnavi/scripts/ccnavi-ticket.sh approval-request <親の識別子> --check` で自己検証して、ユーザに承認を依頼するところで止めて。
       実装はまだしないで。
   - human: true
     instruction: >-
@@ -30,7 +30,7 @@ steps:
       - 承認のあとに「pushしました」と出ている（承認済みチケットが親のブランチに送られている）
       - 「新たに書ける領域」に README.md 以外が無い
   - prompt: >-
-      承認した。着手して、README.md に追記して、子を finish し、親に合流し、ELI5 の HTML を wip/eli5/phase-1.html に書いてコミットして push し、`sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file <依頼文> --eli5 wip/eli5/phase-1.html` でレビューを依頼するところまで進めて。
+      承認した。着手して、README.md に追記して、子を finish し、親に合流し、ELI5 の HTML を wip/eli5/phase-1.html に書いてコミットして push し、`sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 1 --body-file <依頼文> --eli5 wip/eli5/phase-1.html` でレビューを依頼するところまで進めて。
     resume: true
   - human: true
     instruction: >-
