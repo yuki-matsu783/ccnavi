@@ -28,7 +28,7 @@ keywords: [phases, 定義の固定, fill-phases, フェーズ定義, plan, after
 
 ## 状況
 
-2026-10-06 の時点で、フェーズの順序は `phases.yml` が持っている。定義の `after`（先に済んでいるべき定義）とファイルの頭の `order`（`sequential` / `dag`）が先行関係を決め、`overlap`（並行してよい）と `requires`（一緒に置くべき）が承認の検査に効く。
+フェーズの順序は `phases.yml` が持っている。定義の `after`（先に済んでいるべき定義）とファイルの頭の `order`（`sequential` / `dag`）が先行関係を決め、`overlap`（並行してよい）と `requires`（一緒に置くべき）が承認の検査に効く。
 このワークスペースの `phases.yml` には `order` も `after` も無く、全体計画は一直線で進む。
 
 困りごとは 3 つあった。

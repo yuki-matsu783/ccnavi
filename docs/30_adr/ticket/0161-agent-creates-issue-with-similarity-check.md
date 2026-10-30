@@ -7,7 +7,7 @@ keywords: [issue, MR, ccnavi-start.sh, new-issue, list-open, similar-checked, mc
 ---
 # ADR-0161: issue が無いとき、エージェントが似た issue・MR を確かめてから issue を作って進める
 
-状態: 採用（2026-10-24 に実装。ADR-0160 の「issue が無ければユーザに作ってもらう」を改める）
+状態: 採用（実装済み。ADR-0160 の「issue が無ければユーザに作ってもらう」を改める）
 
 ## 状況
 
