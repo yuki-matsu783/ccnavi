@@ -15,10 +15,12 @@ export interface TargetSelectProps {
   readonly target: { readonly kind: string; readonly name: string } | undefined;
   readonly targets: readonly TargetOption[] | undefined;
   readonly disabled?: boolean;
+  /** 切り替えで未保存の変更の確認が出ないか（出さない画面は false。既定は出す） */
+  readonly confirms?: boolean;
   readonly onSwitch: (kind: string, name: string) => void;
 }
 
-export function TargetSelect({ target, targets, disabled, onSwitch }: TargetSelectProps): JSX.Element | null {
+export function TargetSelect({ target, targets, disabled, confirms, onSwitch }: TargetSelectProps): JSX.Element | null {
   if (target === undefined || targets === undefined) {
     return null;
   }
@@ -30,7 +32,7 @@ export function TargetSelect({ target, targets, disabled, onSwitch }: TargetSele
         data-action="switch-target"
         value={targetValue(target)}
         disabled={disabled === true}
-        title="編集する設定を切り替えます。未保存の変更があれば、破棄してよいかを聞きます"
+        title={confirms === false ? "見る設定を切り替えます" : "編集する設定を切り替えます。未保存の変更があれば、破棄してよいかを聞きます"}
         onChange={(event) => {
           const picked = targets.find((t) => targetValue(t) === event.target.value);
           if (picked !== undefined) {

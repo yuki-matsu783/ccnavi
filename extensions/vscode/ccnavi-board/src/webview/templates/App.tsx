@@ -246,13 +246,13 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <ScreenHeader courses={courses} onPick={tour.start}>
         <div className="summary" data-tour="target">
-          <TargetSelect target={touring ? undefined : page.target} targets={touring ? undefined : page.targets} disabled={shownBusy || editing !== undefined} onSwitch={(kind, name) => act({ type: "switchTarget", kind, name })} />
+          <TargetSelect target={touring ? undefined : page.target} targets={touring ? undefined : page.targets} disabled={shownBusy || editing !== undefined} confirms={false} onSwitch={(kind, name) => act({ type: "switchTarget", kind, name })} />
           <span className="path" title={touring ? "" : page.root}>
             {touring ? `（見本）${layer?.path ?? ""}` : (layer?.path ?? "")}
           </span>
         </div>
         <div className="controls">
-          <button type="button" className="action" data-action="reload" data-tour="refresh" title="ファイルを再読み込みします" disabled={shownBusy || editing !== undefined} onClick={refresh}>
+          <button type="button" className="action" data-action="reload" data-tour="refresh" title="ファイルを読み直します" disabled={shownBusy || editing !== undefined} onClick={refresh}>
             更新
           </button>
         </div>

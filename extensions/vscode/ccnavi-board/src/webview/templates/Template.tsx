@@ -121,9 +121,14 @@ function detailMatches(detail: TemplateDetail, entry: TemplateEntry): boolean {
 function StateTags({ entry }: { readonly entry: TemplateEntry }): JSX.Element {
   return (
     <>
-      {entry.usable ? <span className="tag ok">有効</span> : <span className="tag bad">無効</span>}
-      {!entry.effective && <span className="tag">使われない</span>}
-      {entry.dropped !== null && <span className="tag warn">{`破棄した: ${droppedLabel(entry.dropped.reason)}`}</span>}
+      {entry.dropped !== null ? (
+        <span className="tag warn">{`破棄: ${droppedLabel(entry.dropped.reason)}`}</span>
+      ) : (
+        <>
+          {entry.usable ? <span className="tag ok">有効</span> : <span className="tag bad">無効</span>}
+          {!entry.effective && <span className="tag">使われない</span>}
+        </>
+      )}
       {!entry.writable && <span className="tag">読み取り専用</span>}
       {!entry.valid && <span className="tag bad">読み込めません</span>}
     </>
