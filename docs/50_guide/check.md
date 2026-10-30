@@ -97,9 +97,9 @@ ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml
 `tool: Stop`（`subject: "(stop)"`）は、ターンの終わりに使われるルールがあるかを見る（あれば`allow`）。
 ルールを 1 件足したら期待も 1 行足し、**止めたくないものも必ず一緒に置く**。
 
+期待する判定のファイルは配られない。自分で作る（`ccnavi --suggest`の出力や`/ccnavi-config`の下書きから起こす）。
 期待のファイルはエージェントが直接書けない（[hooks.md](hooks.md)の「コアファイルを守る」）。下書きはワークツリーの`wip/handoff/`に置き、ルールの下書きと一緒にユーザに渡す。
 `/ccnavi-config`スキルがこの流れを回し、フェーズ定義とリスクの配点も見る。エージェント向けの手順は [ルールを育てる](../../.ccnavi/docs/grow-rules.md)。
-開発者が同じ検査を回す方法は [開発](../40_development.md)。
 
 ## 記録から候補を起こす
 
@@ -154,8 +154,6 @@ error 3 件、warn 0 件、info 0 件
 合わせて 3 件。`allow`が空なら、その`warn`がさらに 1 件付く。いずれも終了コードは変わらない。
 `enable`に切り替えると消える。
 
-何を拾うかの一覧（深刻度ごと）は、要件書の[診断](../11_requirements/diagnostics.md)にある。
-
 ## ルールファイルが読めないとき
 
 組み込みの既定を使って判定を続ける。止まらない（止めると不正な設定を直す操作まで止まる）。
@@ -172,4 +170,5 @@ error 3 件、warn 0 件、info 0 件
 - 診断の仕組み: 設計書の[診断と機械可読な出力](../21_design/diagnostics.md)
 - ルールが読めないときの既定: 設計書の[ルール](../21_design/rules.md)
 - 出力の機械可読な形: 要件書の[JSONの形](../11_requirements/json-shapes.md)
-- 設定の検証で拾うもの: 要件書の[診断](../11_requirements/diagnostics.md)
+- 設定の検証で拾うもの（深刻度ごとの一覧）: 要件書の[診断コマンド](../11_requirements/diagnostics.md)
+- 開発者が同じ検査を回す方法: [開発の入口](../40_development.md)

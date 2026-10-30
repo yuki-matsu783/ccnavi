@@ -14,7 +14,6 @@ keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケッ�
 チケットは複数を同時に有効にできる。親（メインエージェント）が作業を子チケットに分け、子は別々のワークツリーでサブエージェントが実行する。
 
 別の PC・セッション・人で進める場合は [複数人・別 PC・別セッションで進める](multi-pc.md)、レビューの受け方は [レビューの依頼と確認](review.md) を読む。
-外から観測できる約束は [要件 REQ-TKT](../11_requirements/tickets.md) にある。
 
 ## 使うかどうかはワークスペースが決める
 
@@ -190,7 +189,7 @@ Write / Edit の対象が `.claude/worktrees/<名前>/` の中なら、その名
 | 先へ進める者 | `ccnavi-review.sh confirm` / `ccnavi-user-decide.sh`、Chrome 拡張のレビュー済み | — |
 | `review/` の子 | レビュー済みで `.ccnavi/approved/done/` へ動く | `finish` の時点で `done/` へ |
 
-止めている間は、その親でのサブエージェントの起動と Bash が止まる（`DENY_PHASE_REVIEW`）。ファイルの書き込みは通すので、次のフェーズの計画はレビュー前に進められる。
+止めている間は、その親でのサブエージェントの起動と Bash が止まる（`DENY_PHASE_REVIEW`）。ただし`ccnavi-ticket.sh` `ccnavi-review.sh` `ccnavi-git.sh`は通す。ファイルの書き込みは通すので、次のフェーズの計画はレビュー前に進められる。
 止めている間は、依頼を出すまでが「レビュー準備中」（次に動くのはエージェント）、出してからが「レビュー待ち」（次に動くのはユーザ）。
 レビュー待ちで止めるのは親ごとなので、どれかの枝がレビューを待つ間は別の枝にも子を起こせない。
 
@@ -296,3 +295,7 @@ Claude Code はそこをスキルとして読まないので、ccnavi が目録�
 
 完了した作業の計画とフローを、次の作業で使い回すひな形である。下書きはエージェントが作り、ユーザが `sh .ccnavi/scripts/ccnavi-user-handoff.sh` か VS Code 拡張の「取り込み待ち」「テンプレート管理」で読んで取り込む。
 一覧・下書き・取り込み・提案の作り方・画面・古くなったときの扱いは [.ccnavi/docs/templates.md](../../.ccnavi/docs/templates.md) にある。
+
+## さらに詳しく
+
+- チケットの外から観測できる約束: 要件書の[並行するチケット](../11_requirements/tickets.md)

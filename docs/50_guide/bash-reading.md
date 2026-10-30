@@ -22,7 +22,7 @@ echo "git push origin main"       # 通る
 grep -n '$(git push)' f           # 通る。単一引用の中は文字
 grep -n "\$(git push)" f          # 通る。\$( は置換にならない
 # git push origin main            # 通る。コメント
-cat <<'EOF' > notes.md            # 通る。区切りを引用したヒアドキュメントの本文は文字
+cat <<'EOF' > notes.md            # git push には当たらない（ただし << は別のルールで止まる。後述）
 git push origin main
 EOF
 
@@ -294,5 +294,6 @@ ignoreされたファイルを名指しした`Grep`は通る。
 
 ## さらに詳しく
 
-読み方の仕組みは、設計書の[実行前チェック](../21_design/pre-check.md)にある。許容した誤検知は、設計書の[限界と保証しないこと](../21_design/limits.md)にまとめてある。
-探すツールと`.gitignore`の実測は、設計書の[付録](../21_design/appendix.md)にある。
+- 読み方の仕組み: 設計書の[実行前チェック](../21_design/pre-check.md)
+- 許容した誤検知: 設計書の[限界と保証しないこと](../21_design/limits.md)
+- 探すツールと`.gitignore`の実測: 設計書の[付録](../21_design/appendix.md)

@@ -43,7 +43,7 @@ keywords: [導入, dry-run, enable, ccnavi-setup.sh, 配布, 実行ファイル,
 
 ルールファイルには、取り返しの付かない操作とガード自身の設定だけを `deny` に書いて始める
 （`rm -rf`、`git push`、`git reset --hard`、認証情報の置き場、`.claude/` の下）。組み込みの既定
-（[ルールファイルが読めないとき](records.md)）がちょうどその範囲なので、コピーして直すのが早い。
+（[ルールファイルが読めないとき](check.md)）がちょうどその範囲なので、コピーして直すのが早い。
 
 `allow` は空のままでよい。`dry-run` は一般の保護には手を出さないので作業は止まらず、ルールの抜けている箇所だけが記録に溜まる（チケット制御が有効なら、チケットの関門と補助の保護は `dry-run` でも止める）。
 モードごとの違いは[設定](settings.md)の「動作モード」にある。
@@ -109,7 +109,7 @@ ccnavi --test Bash "cd /repo && git push"  # 1 件が何にヒットするか
 ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml  # 期待する判定をまとめて回す
 ```
 
-期待する判定の書き方は[設定の確かめ方](check.md)にある。
+期待する判定のファイルは配られない。自分で作る（`ccnavi --suggest`の出力や`/ccnavi-config`の下書きから）。書き方は[設定の確かめ方](check.md)にある。
 
 ルールを 1 件足したら期待する判定も 1 行足す（[設定の確かめ方](check.md)）。止めたくないものも必ず一緒に置く。
 `/ccnavi-config` スキルがこの流れをまとめて回す。記録を数えて `deny` / `ask` の下書きを起こすのは `ccnavi --suggest`

@@ -51,7 +51,7 @@ URLに埋めた資格情報、コマンドのパスワード引数など）を�
 独立したコンテキストのagent型Stop hookが判定する。既定では登録されておらず、登録しても`CCNAVI_STOP_REVIEW`の
 既定は`dry-run`（記録だけ残して止めない）。
 
-- 登録・解除・点検: ccnavi の配布物の`scripts/`にある`ccnavi-stop-review.sh`を、`sh <配布物>/scripts/ccnavi-stop-review.sh register|unregister|check [--root <ワークスペース>]`の形で打つ。
+- 登録・解除・点検: ccnavi の根（clone したリポジトリ）の`scripts/ccnavi-stop-review.sh`を、`sh scripts/ccnavi-stop-review.sh register|unregister|check [--root <ワークスペース>]`の形で打つ。
   判定役のモデルの既定は`haiku`、タイムアウトは 60 秒（`register --model <名前>`で変えられる）
 - 効き方: `CCNAVI_STOP_REVIEW`（`dry-run` / `enable` / `disable`）。`enable`のときは、検証に通った不備検出だけを
   1 回差し戻す。差し戻しの次のStopでは、既存の促しを 1 回通常どおり動かし、修正後の材料で 1 回だけ再判定する
@@ -91,5 +91,8 @@ AIモデル自体の学習ではなく、人間の承認なしに設定やルー
 - `ccnavi --learnings [--json]`がパターンごとの状態（提案中・候補・決着）と観測元の数を出す。SessionStartで、提案の候補が溜まるか閾値に届くと、ユーザにだけ知らせる。提案はエージェントに頼む。採否はMRのマージで決まる。ルール・配点・フェーズ定義は下書きまでで、ユーザが置く
 - `type: learning-wiki`の文書は、`ccnavi --docs --type learning-wiki`と明示したときだけ引ける（作業のセッションに渡さない）
 
-外から観測できる約束は [要件](../11_requirements/learning-wiki.md)。
 エージェント向けの手順は [提案の手順](../../.ccnavi/docs/learning-propose.md)。
+
+## さらに詳しく
+
+- 学びの蓄積の外から観測できる約束: 要件書の[学びの蓄積](../11_requirements/learning-wiki.md)
