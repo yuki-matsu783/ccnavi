@@ -10,7 +10,7 @@ keywords: [launcher, sh, .ccnavi/scripts, 振り分け, 配置]
 
 状態: 採用
 
-追記: 「見つからなければ 127」は、`bin/` に合う実行ファイルが無いときに PATH の `ccnavi` を探し、それも無いときに変わった。`bin/` が先で、PATH は絶対パスの項目だけを見る。自己防衛は PATH の実体も守る。仕様は 設計書の起動と設定の章にある「起動の形」の節にある。拡張（`locate.ts`）も、探す順の最後に PATH の `ccnavi` を見る。環境変数は `CCNAVI_BIN_PATH` から `CCNAVI_ENTRY_PATH` に改めた（本文の旧い名前は当時のまま）。
+追記: 「見つからなければ 127」は、`bin/` に合う実行ファイルが無いときに PATH の `ccnavi` を探し、それも無いときに変わった。`bin/` が先で、PATH は絶対パスの項目だけを見る。自己防衛は PATH の実体も守る。仕様は、設計書の「起動と設定」の章の「起動の形」の節にある。拡張（`locate.ts`）も、探す順の最後に PATH の `ccnavi` を見る。環境変数は `CCNAVI_BIN_PATH` から `CCNAVI_ENTRY_PATH` に改めた（本文の旧い名前は当時のまま）。
 
 ## 状況
 
