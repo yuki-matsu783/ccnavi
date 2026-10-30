@@ -10,7 +10,7 @@
 #   sum      「統合結果」の枠を開き、選ぶ統合結果の名前（sample.sums の name）
 # `diagrams:` は手順が引く時系列の図（形と `diagram:` / `focus:` の使い方は core/tour-def.ts の冒頭）。値は見本（sample）の名前・説明・パスと揃える。
 # `target:` の印（画面の data-tour）:
-#   summary         件数の行（テンプレート・下書き・error / warn / info）
+#   summary         件数の行（エラー・警告・情報）
 #   target          対象の切り替えとパス
 #   refresh         「更新」
 #   list            テンプレートの一覧

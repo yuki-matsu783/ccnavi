@@ -127,7 +127,10 @@ function StateTags({ entry }: { readonly entry: TemplateEntry }): JSX.Element {
   return (
     <>
       {entry.dropped !== null ? (
-        <span className="tag warn">{`破棄: ${droppedLabel(entry.dropped.reason)}`}</span>
+        <>
+          {!entry.usable && <span className="tag bad">無効</span>}
+          <span className="tag warn">{`破棄: ${droppedLabel(entry.dropped.reason)}`}</span>
+        </>
       ) : (
         <>
           {entry.usable ? <span className="tag ok">有効</span> : <span className="tag bad">無効</span>}

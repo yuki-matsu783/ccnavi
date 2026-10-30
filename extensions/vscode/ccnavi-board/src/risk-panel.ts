@@ -48,6 +48,7 @@ import { openHandoffFrom, readHandoffEntry } from "./handoff-entry.js";
 import type { RiskTarget } from "./core/screens.js";
 import { riskSums, type RiskSum } from "./core/sums.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
+import { lintSummary } from "./core/lint-summary.js";
 import { showLoading } from "./loading.js";
 import { assertRetained, watchPattern } from "./panel-common.js";
 import { settingsPanel, type SettingsState } from "./settings-panel.js";
@@ -649,10 +650,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
     return;
   }
   await reload(current);
-  const tail = lint.value.report.split("\n").filter((l) => l.trim() !== "").pop() ?? "";
-  // 実行ファイルの要約行（error N 件、warn N 件、info N 件）は日本語に言い換えて出す
-  const counts = tail.replace(/\berror\b/g, "エラー").replace(/\bwarn\b/g, "警告").replace(/\binfo\b/g, "情報");
-  vscode.window.showInformationMessage(`${loaded.riskRel} に保存しました（${counts}）`);
+  vscode.window.showInformationMessage(`${loaded.riskRel} に保存しました（${lintSummary(lint.value.report)}）`);
 }
 
 function asMessage(message: unknown): RiskMessage | undefined {
