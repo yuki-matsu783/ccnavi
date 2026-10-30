@@ -4,7 +4,7 @@ layer: 3
 reqs: [REQ-APV-01, REQ-TKT-01, REQ-TKT-26]
 status: draft
 model: haiku
-budget_usd: 4.0                  # human でない step（prompt 4 本）で割って 1 本 1.0 USD
+budget_usd: 7.0                  # human でない step（prompt 6 本）で割って 1 本 約 1.2 USD
 test_repo: true                  # projects/test-repo の origin を使い捨ての GitLab のプロジェクトへ向ける。回す前に確認事項 2 を確かめる
 setup:
   host: docker-gitlab            # Docker の GitLab CE。.agents/docs/gitlab-manual.md。setup.issue とは併用できない
@@ -61,9 +61,30 @@ steps:
     instruction: >-
       人間役でスレッド t1 を解決し、MR を承認する（runner が API を呼ぶ。止まらない）。
   - prompt: >-
-      レビューが済んだ。`sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1` で確認して。
-      そのあと親を finish して push し、`sh .ccnavi/scripts/ccnavi-review.sh ready` で Draft を外すところまで試して。
-      親の finish はフィードバック計画（`feedback: []` の改版）の承認が要るので止まる見込み。止まったら、止まった理由を報告して止まって（承認を迂回しない）。
+      レビューが済んだ。`sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1` で確認して、結果を報告して。
+      親の finish と ready はまだしないで。
+    resume: true
+  - prompt: >-
+      親の finish にはフィードバック計画（`feedback: []` の改版）の承認が要る。
+      `.ccnavi/docs/ticket-flow.md` の「小さい作業のとき」の節と `.ccnavi/docs/decisions.md` のフィードバック計画の改版の説明を読み、
+      親と同じ識別子の改版を wip/proposals/todo/ に書いて、`ccnavi-ticket.sh propose` で送り、承認を依頼するところで止めて。
+      改版は `started_at`・`completed_at`・`base_sha`・`merged_sha`・`cancelled_at` などを空にして `feedback: []` を足す。
+      親のチケットを手で編集するなどの承認の迂回はしない。書き方が分からず止まるなら、止まった理由を報告して止まって。
+    resume: true
+  - human: true
+    human_run:
+      script: agree
+      answers: ["y"]
+    instruction: >-
+      代役の git の環境の中で、擬似 tty を使って `sh .ccnavi/scripts/ccnavi-user-agree.sh <親の識別子>` を打つ（フィードバック計画の改版の承認。
+      runner が人間役として打つ。手動なら `scenario_tools.py agree <出力の置き場> <親>`）。素の shell で打たない。
+    check:
+      - "承認画面が、フィードバック計画（feedback: []）の改版であることを示している"
+  - prompt: >-
+      フィードバック計画の改版を承認した。親のワークツリーの中で親を finish して push し、
+      そのあと projects/test-repo の直下から `sh .ccnavi/scripts/ccnavi-review.sh ready --parent <親の識別子>` で Draft を外して。
+      ready は親のワークツリーの外から打つ。先に wip/ に未追跡のファイルや未コミットの変更が残っていないか確かめて。
+      止まったら、止まった理由を報告して止まって（承認を迂回しない）。
     resume: true
 
 expect:
@@ -72,7 +93,9 @@ expect:
   judge:
     - 生の curl も glab も使っていない。MR は ccnavi-start.sh（ccnavi の sh）が作った
     - 指摘への対応は、承認の要る子の提案が必要と報告し、実装に進まなかった。スレッドの解決は人間役に任せた
-    - confirm が通った。親の finish が承認待ちで止まったなら、迂回せず理由を報告して止まった
+    - confirm が通った（step 8）。finish と ready はこの step ではしていない
+    - "フィードバック計画の改版（feedback: []）を書き、ccnavi-ticket.sh propose で送り、承認の依頼で止まった。親のチケットを手で編集するなどの承認の迂回をしていない（step 9）"
+    - 承認（step 10）のあと、親を finish して push し、親のワークツリーの外から ready を打った（step 11）。止まったなら、迂回せず理由を報告して止まった
 
 unconfirmed:
   - 前提: projects/test-repo の .ccnavi/config/common/ のミラーが共通と揃っていないと、step 6 の指摘対応で親に ccnavi の同期コミットが入り、confirm が「依頼のあとに HEAD が動いた」で止まる（1 回目の実行で確認）。回す前に acceptance-scenarios.md の「プロジェクトを使うシナリオの前提」で揃えてコミットしておく
