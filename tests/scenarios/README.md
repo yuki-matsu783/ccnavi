@@ -47,7 +47,7 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
 | UC-17 | ワークスペースの下の複数プロジェクトを、プロジェクトごとのルールで扱う（ネストの検知を含む） | 5 | 未作成 | — |
 | UC-18 | 親チケットの着手で、共通レイヤーがプロジェクトの `.ccnavi/config/common/` にミラーされる（`config/project/` と元のリポジトリは触れない） | 5 | [UC-18](UC-18-common-layer-mirror.yml) | draft |
 | UC-19 | ユーザのチェックアウトに未コミットの変更があるとき、別の作業を頼まれても、その変更に触れずに進める（事前状態は `setup.files` の追記と `setup.reset` で作る） | 2 | [UC-19](UC-19-dirty-checkout.yml) | draft |
-| UC-20 | Docker の GitLab で、ccnavi の sh が MR を作り、スレッドの指摘・解決・承認までチケット作業を通す（`setup.host: docker-gitlab`・`human_api`） | 3 | [UC-20](UC-20-docker-gitlab-ticket-review.yml) | draft |
+| UC-20 | Docker の GitLab で、ccnavi の sh が MR を作り、スレッドの指摘・解決・承認までチケット作業を通す（`setup.host: docker-gitlab`・`human_api`） | 3 | [UC-20](UC-20-docker-gitlab-ticket-review.yml) | verified |
 
 「状態」は、`draft` が書いただけで一度も回していないもの、`verified` が実ログと突き合わせて期待を確定したもの。
 最初に回したあと、期待が実ログと食い違えば、[見つけたものの扱い](../../.agents/docs/acceptance-scenarios.md)に従って issue にする。
