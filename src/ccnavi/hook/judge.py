@@ -79,11 +79,6 @@ DRY_RUN_HOLDS_NOTE = (
     "protections that keep them from being bypassed are enforced in every mode except disable."
 )
 
-# 範囲の中かどうかを問うツールは `toolnames.WRITE_TOOLS`（ワークツリーを書き換えるものだけ）。
-# Bash は入れていない。コマンド文字列に現れるパスは追えないので、ここで
-# 適用するとヒットしたりヒットしなかったりする判定になる。シェル経由の書き込みは
-# 実行後チェックがワークツリーの実物を見て拾う。
-
 # ルールを適用する欄の表と選び方は `policy.subjects` にある（ルールファイルの検査も同じ表を読む）。
 SUBJECT_FIELDS = subjects.SUBJECT_FIELDS
 

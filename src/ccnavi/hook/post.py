@@ -55,13 +55,6 @@ from ..records import audit
 from ..tickets.model import phase_forms, ticket_places
 from . import post_findings, post_report
 
-# ワークツリーを変えようがないツール。ここを飛ばすぶん git を起こす回数が減る。
-# 飛ばしてよいのは「このツールが走った直後に確かめなくても、次に走る
-# 書き込みうるツールの直後に同じ変更が見える」から。見落としではなく遅れ。
-#
-# 名前を並べる側は狭く保つ。MCP のツールは名前を自由に付けられるので、
-# 知らない名前は「書けるかもしれない」側に置く。
-
 # 判定に至らなかった理由のうち、このチェックだけが出すもの。
 REASON_TOOL_CANNOT_WRITE = "tool-cannot-write"
 REASON_WORKTREE_UNREADABLE = "worktree-unreadable"

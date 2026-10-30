@@ -14,9 +14,6 @@ from ..tickets.approval import write_and_push
 from ..tickets.model import archive, ticket_fields, ticket_model, ticket_places
 from ..tickets.phase import scope as phase_scope
 
-# 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
-# そのルールは「この場所に書かせない」を言っている。
-
 # 返す文に載せる理由コード。cli.py の表と同じ体系から借りている。
 # 監査に残す事象名がそのまま POST_VIOLATION。
 CODE_VIOLATION = "POST_VIOLATION"

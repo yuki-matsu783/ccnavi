@@ -39,12 +39,34 @@ class TunableValueTest(unittest.TestCase):
 
 
 class DefaultsTest(unittest.TestCase):
+    def test_env_names_are_distinct(self):
+        envs = [t.env for t in vars(tunables).values() if isinstance(t, tunables.Tunable)]
+        self.assertEqual(5, len(envs))
+        self.assertEqual(len(envs), len(set(envs)))
+
     def test_users_keep_the_original_defaults(self):
-        self.assertEqual(3.0, judge.DEADLINE_SECONDS)
-        self.assertEqual(2.0, events.PENDING_SECONDS)
-        self.assertEqual(4 * 3600, subagent.RUNNING_MAX_SECONDS)
-        self.assertEqual(30 * 60, turn.STALE_SECONDS)
-        self.assertEqual(600.0, stopreview.DEFAULT_TTL_SECONDS)
+        # 開発者のシェルに CCNAVI_*_SECONDS があるものは、使う側の値の比較から外す。
+        pairs = [
+            (tunables.HOOK_DEADLINE, 3.0),
+            (tunables.INTEGRATE_PENDING, 2.0),
+            (tunables.SUBAGENT_RUNNING_MAX, 4 * 3600.0),
+            (tunables.TURN_STALE, 30 * 60.0),
+            (tunables.STOP_REVIEW_TTL, 600.0),
+        ]
+        for tunable, default in pairs:
+            with self.subTest(env=tunable.env):
+                self.assertEqual(default, tunable.default)
+        used = {
+            tunables.HOOK_DEADLINE: judge.DEADLINE_SECONDS,
+            tunables.INTEGRATE_PENDING: events.PENDING_SECONDS,
+            tunables.SUBAGENT_RUNNING_MAX: subagent.RUNNING_MAX_SECONDS,
+            tunables.TURN_STALE: turn.STALE_SECONDS,
+            tunables.STOP_REVIEW_TTL: stopreview.DEFAULT_TTL_SECONDS,
+        }
+        for tunable, value in used.items():
+            if tunable.env not in os.environ:
+                with self.subTest(env=tunable.env):
+                    self.assertEqual(tunable.default, value)
 
 
 if __name__ == "__main__":
