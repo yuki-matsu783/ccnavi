@@ -45,13 +45,13 @@ export function runInNewTerminal(root: string, name: string, command: string): v
   sendWhenReady(terminal, command);
 }
 
-/** 作った直後のシェルはまだ起動中で、すぐ送った行が行入力の途中で中断されることがある。待つ上限 */
+/** 作った直後のシェルはまだ起動中で、すぐ送った行が行入力の途中で中断されることがある。立ち上がりを待つ時間の上限 */
 const READY_TIMEOUT_MS = 3000;
 
 /**
  * 作ったばかりのターミナルへ、シェルの準備ができてから 1 行を送る。シェル統合が使えれば、その
- * 立ち上がりを待つ。使えない・上限までに立ち上がらないときは、そのまま送る
- * （シェル統合の API は VS Code 1.93 から。それ未満では待たずに送る）
+ * 立ち上がりを待つ。使えない場合や、上限の時間までに立ち上がらない場合は、そのまま送る
+ * （シェル統合の API は VS Code 1.93 から使える。それより前の版では待たずに送る）
  */
 function sendWhenReady(terminal: vscode.Terminal, command: string): void {
   const window = vscode.window as unknown as {
