@@ -41,7 +41,7 @@ class ReviewTurnTest(PhaseHarness):
 
     def child(self, name):
         self.propose(name, child_text(name, "i0001", 1, ["src/*"]))
-        self.commit_parent(f"propose {name}")
+        self.commit_parent(f"approval-request {name}")
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         tree = self.run_child(name, [(f"src/{name}.py", "x = 1\n")])
@@ -67,7 +67,7 @@ class ReviewTurnTest(PhaseHarness):
         tree, closed = self.child("i0001-01-01")
         # 依頼の前。ユーザには回っていない
         self.assertIn("レビュー準備中", closed.stdout)
-        self.assertIn("request --phase 1", closed.stdout)
+        self.assertIn("review-request --phase 1", closed.stdout)
         self.assertNotIn("ユーザのレビューを待つ", closed.stdout)
         # 誰が done/ へ動かすかは 1 度だけ言う（重ねない）
         self.assertEqual(closed.stdout.count("done/ へ動"), 1, closed.stdout)

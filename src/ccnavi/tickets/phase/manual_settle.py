@@ -13,7 +13,7 @@ ccnavi が子を動かす経路（confirm・decide・close-early・chrome）は�
 
 - 子が 1 つだけ動いたとき: 子 X はレビュー完了、フェーズは未完了（PARTIAL）
 - 移動が未コミット・未 push: 確定しない（UNSHARED）。エージェントは代わりに push しない
-- 依頼のマーカーが無い: 確認待ち（NO_REQUEST）。request を案内する
+- 依頼のマーカーが無い: 確認待ち（NO_REQUEST）。review-request を案内する
 - `finished_to` を持たない子（この変更より前に閉じた子）: 手動とはみなさない（ROUTE_UNKNOWN）
 """
 
@@ -79,7 +79,7 @@ class Manual:
                 "ユーザの commit・push が必要（確定しない）"
             )
         if self.state == NO_REQUEST:
-            return "確認待ち（依頼の記録が無い）: 先に request を打つ"
+            return "確認待ち（依頼の記録が無い）: 先に review-request を打つ"
         if self.state == ROUTE_UNKNOWN:
             return (
                 "レビュー完了確認待ち（経路が分からない）: 子が done/ に動いているが、"

@@ -18,6 +18,7 @@ from ..infra import fsio, gitcmd, settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..tickets.approval import write_and_push
 from ..tickets.core import api as core
+from ..tickets.core import approve
 from ..tickets.learning import notes as learning
 from ..tickets.lifecycle import commands as ops
 from ..tickets.lifecycle import consolidate, next_id, retire, worktrees
@@ -40,7 +41,7 @@ def operate(
 ) -> int:
     """チケットの状態とレビューの操作を振り分ける。
 
-    `ticket start|finish|cancel|propose|consolidate <識別子>`、
+    `ticket start|finish|cancel|approval-request|consolidate <識別子>`、
     `ticket new <識別子> ...`（親の提案の雛形）、
     `ticket revise <識別子> [--feedback]`（承認済みの親の改版の雛形）、
     `review prepare|requested|confirm`、それに
@@ -194,10 +195,19 @@ def operate(
             code = status.run(
                 stdout, stderr, root, conf, write_and_push.family_of(target) if target else ""
             )
-    elif kind == "ticket" and verb == "propose" and target:
-        # ticket propose <識別子>。親子の提案（todo/ と flows/）を、書いたパスの一覧に載せるだけ。
-        # コミットと push は sh（ccnavi-ticket.sh propose）が write-and-push の手順で行う。
-        code = propose.run(stdout, stderr, root, conf, target)
+    elif kind == "ticket" and verb == "approval-request" and target:
+        # ticket approval-request <識別子>。親子の提案（todo/ と flows/）を、
+        # 書いたパスの一覧に載せるだけ。
+        # コミットと push は sh（ccnavi-ticket.sh approval-request）が write-and-push の手順で行う。
+        code = propose.run(
+            stdout,
+            stderr,
+            root,
+            conf,
+            target,
+            check=args.check,
+            gate=lambda idents: approve.approval_request_gate(stderr, root, conf, idents),
+        )
     elif kind == "ticket" and verb in ("start", "finish", "cancel") and target:
         if verb == "start":
             code = ops.start(stdout, stderr, root, conf, target)
@@ -404,17 +414,18 @@ def _write_and_push_bypass(
     """write-and-push を通らずに、取り込み済みの親子のチケットの状態を書こうとしているなら、
     その親の識別子。無ければ空。
 
-    状態の操作（`ticket start|finish|cancel|propose|consolidate`、
+    状態の操作（`ticket start|finish|cancel|approval-request|consolidate`、
     `review requested|confirm|ready`、残った指摘の
     行き先の `--reviewed N --accept-unresolved`）は、write-and-push の対象の親子のチケットでは sh が
     `--record-tree` を付けて起こす。付いていなければ、sh の引数の読み違いや直打ちで
     write-and-push を通っていない。
     ユーザの判断の操作（`--close-early`）と、
-    書かない形（`--preview`・`--choose-out`・`--accept-plan`・`review prepare`）は見ない。
+    書かない形（`--preview`・`--choose-out`・`--accept-plan`・`review prepare`・
+    `ticket approval-request --check`）は見ない。`--check` を読むのは `approval-request` だけ。
     """
-    if args.record_tree:
-        return ""
     words = list(args.command)
+    if args.record_tree or (args.check and words[:2] == ["ticket", "approval-request"]):
+        return ""
     family_id = ""
     if (
         len(words) >= 3
@@ -424,7 +435,7 @@ def _write_and_push_bypass(
             "start",
             "finish",
             "cancel",
-            "propose",
+            "approval-request",
             "consolidate",
         )
     ):
@@ -479,7 +490,8 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
     - `reconcile <操作ID> <段階ID> <URL,…> <yes|no|error> [アカウント]`: 送信の照合。結論を
       `sent|send|unknown|stop` で出す（`yes` は一覧を最後まで読めた、`no` は打ち切った）
     - `begin <種類> <親> <フェーズ> <MR> <キー> <段階ID:種類>…`: キーから決めた操作ID で記録を作る
-      （エージェントの request・comment・ready が、打ち直しで同じ記録にヒットするため）。ID を出す
+      （エージェントの review-request・comment・ready が、打ち直しで同じ記録にヒットするため）。
+      ID を出す
     - `post-text <操作ID> <段階ID> <ファイル>`: 段階で投稿する本文を、保存した判断から作り直して書く
     - `resume-plan <操作ID> <ファイル>`: 保存した判断から受け入れの計画を書き直す（`--resume`）
     - `done <操作ID>`: すべての段階が sent なら記録を消す。消したら `done`、残るなら `open` を出す

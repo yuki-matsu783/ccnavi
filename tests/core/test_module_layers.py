@@ -282,6 +282,8 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.approval.ops",
                 "tickets.approval.times",
                 "tickets.lifecycle.branchfind",
+                "tickets.lifecycle.treegate",
+                "tickets.sync.mirror_gap",
                 "tickets.sync.configsync",
                 "tickets.notice.overview",
                 "tickets.sync.skillsync",
@@ -312,7 +314,6 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
             {
                 "tickets.approval.write_and_push",
                 "tickets.lifecycle.write_and_push_merge",
-                "tickets.sync.mirror_gap",
                 "tickets.core.api",
                 "tickets.core.approve",
                 "tickets.core.base",

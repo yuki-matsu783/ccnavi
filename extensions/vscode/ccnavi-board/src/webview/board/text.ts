@@ -74,8 +74,9 @@ export interface DetailRow {
 }
 
 /**
- * 詳細に畳む項目。MR・issue・ブランチ・ワークツリー名・プロジェクト・取り消しの理由と、
+ * 詳細に畳む項目。issue・ブランチ・ワークツリー名・プロジェクト・取り消しの理由と、
  * 注意の行に出した例外の理由の全文、リスク（JSON の文言のまま）、人間レビューの要否と理由、フェーズごとのレビューの要否とリスク。
+ * MR は詳細に入れず、カード本体の位置の下に出す（`Card.tsx` の `MrLink`）。
  * base / 合流の sha とマーカー名は画面に出さない（チケットのファイルにだけ残る）。
  * 出すものが無い行は作らない。
  */
@@ -109,7 +110,6 @@ export function detailRows(card: Card): DetailRow[] {
   for (const p of card.phases) {
     add({ key: `phase-${p.number}`, label: `フェーズ ${p.label}`, values: [phaseDetail(p)] });
   }
-  add({ key: "mr", label: "マージリクエスト", values: card.mrUrl === "" && card.mrNumber === null ? [] : [mrText(card.mrNumber)], href: isHttpUrl(card.mrUrl) ? card.mrUrl : undefined, title: card.mrUrl });
   add({ key: "parent-mr", label: "親の MR", values: card.parentMr === null ? [] : [`!${card.parentMr}`] });
   add({ key: "issue", label: "issue", values: card.issueNumber === null ? [] : [`#${card.issueNumber}`] });
   add({ key: "branch", label: "ブランチ", values: [card.branch] });
@@ -161,9 +161,9 @@ export function worktreeName(path: string): string {
   return name === "" ? "あり" : name;
 }
 
-/** マージリクエストのバッジの文字。番号が読めなければ「マージリクエスト」だけ */
+/** マージリクエストのリンクの文字。番号が読めなければ「MR」だけ */
 export function mrText(number: number | null): string {
-  return number === null ? "マージリクエスト" : `マージリクエスト #${number}`;
+  return number === null ? "MR" : `MR #${number}`;
 }
 
 /** 依頼のマーカーが持つ URL は中身を確かめずにそのまま取り込んであるので、http(s) のときだけリンクにする */

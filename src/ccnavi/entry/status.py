@@ -292,10 +292,10 @@ class _Family:
         )
         lines.append(f"    置き場のファイル: {file_state.label()}")
         if t.state == ticket_model.REVIEW:
-            # 依頼の前は「レビュー準備中」で、動くのは親（合流・ELI5・request）。
+            # 依頼の前は「レビュー準備中」で、動くのは親（合流・ELI5・review-request）。
             # 依頼の後に初めてユーザを待つ。
             nxt = phase.review_next(self.root, self.conf, t, raw=self.raw)
-            if nxt and "request --phase" in nxt:
+            if nxt and "review-request --phase" in nxt:
                 nxt += PARENT_ONLY
             # 子のフェーズが読めないと、依頼済みかが分からない。分からないまま「待つ」と言うと、
             # 依頼の前でもユーザに回ったと読める（依頼の打ち忘れ）。
@@ -304,7 +304,7 @@ class _Family:
                 + (
                     nxt
                     or "フェーズを読めないので、レビューを依頼済みかを言えない。ユーザに回るのは、"
-                    "親が合流・ELI5 を済ませて ccnavi-review.sh request で依頼した後"
+                    "親が合流・ELI5 を済ませて ccnavi-review.sh review-request で依頼した後"
                     "（依頼済みなら、ユーザが confirm / decide か Chrome 拡張のレビュー済みで "
                     "done/ へ動かすのを待つ）"
                     + PARENT_ONLY

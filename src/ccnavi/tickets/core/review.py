@@ -100,7 +100,7 @@ def confirm(
     if requested_mark is None:
         return core_base.refused(
             CODE_CONFIRM_NOT_REQUESTED,
-            ["ccnavi: 依頼の記録がありません。先に request してください"],
+            ["ccnavi: 依頼の記録がありません。先に review-request してください"],
         )
     if changed_since_request:
         return core_base.refused(
@@ -505,7 +505,7 @@ def _decision(
     if requested_mark is None:
         return core_base.refused(
             CODE_CONFIRM_NOT_REQUESTED,
-            ["ccnavi: 依頼の記録がありません。先に request してください"],
+            ["ccnavi: 依頼の記録がありません。先に review-request してください"],
         )
     if changed_since_request:
         return core_base.refused(

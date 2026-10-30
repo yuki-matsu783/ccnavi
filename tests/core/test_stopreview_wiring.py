@@ -207,9 +207,9 @@ class PlanAtStopTest(unittest.TestCase):
 
 
 class ProposalPlanTest(PlanAtStopTest):
-    """propose の操作実績が、計画の対象になる。"""
+    """approval-request の操作実績が、計画の対象になる。"""
 
-    CMD = "sh .ccnavi/scripts/ccnavi-ticket.sh propose p1"
+    CMD = "sh .ccnavi/scripts/ccnavi-ticket.sh approval-request p1"
 
     def _hook(self, event, tool_use_id="tu1", command=None):
         return hookio.Input(

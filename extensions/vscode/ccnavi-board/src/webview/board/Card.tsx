@@ -1,5 +1,5 @@
 /**
- * 1 枚のカード。上から 見出し（タイトル・ID・状態のバッジ。DOM は ID・タイトル・バッジの順で、タイトルを先頭に出すのは CSS の order）・位置・ユーザ待ち・注意・フェーズ行（親だけ）・補助の操作・詳細（畳む）。
+ * 1 枚のカード。上から 見出し（タイトル・ID・状態のバッジ。DOM は ID・タイトル・バッジの順で、タイトルを先頭に出すのは CSS の order）・位置・MR（あれば）・ユーザ待ち・注意・フェーズ行（親だけ）・補助の操作・詳細（畳む）。
  * 何を出すかは組み立て（core/board.ts）と状態のバッジ（core/status.ts）が決めた値のとおりで、ここで判定し直さない。
  *
  * バッジは「状況」、「ユーザ待ち」は「ユーザができること」。別の規則で決めるので、同時に出てよい
@@ -13,7 +13,7 @@ import { flowButtonLabel } from "../../core/flow-view.js";
 import type { FlowJson } from "../../core/model.js";
 import type { Status } from "../../core/status.js";
 import { post } from "./post.js";
-import { detailRows, isHttpUrl, movedLabel, notesOf, predecessorsBadge, type DetailRow, type Note } from "./text.js";
+import { detailRows, isHttpUrl, movedLabel, mrText, notesOf, predecessorsBadge, type DetailRow, type Note } from "./text.js";
 
 type ReviewAction = Extract<Action, { readonly kind: "review" }>;
 
@@ -93,6 +93,7 @@ export function CardItem({
         <StatusMark status={card.status} />
       </div>
       {where !== "" ? <div className={card.isParent ? "stage" : "where"}>{where}</div> : null}
+      <MrLink card={card} />
       {moved !== undefined ? (
         <div className="moved-mark" data-tour="moved" title="前回の更新から列が変わりました。この表示は、次にどれかのカードの列が変わるまで残ります">
           {movedLabel(moved)}
@@ -115,6 +116,25 @@ export function CardItem({
 
 /** カードの上で押しても提案を開かない場所。ボタン・リンク・詳細（開閉と開いた本文） */
 const NOT_OPENING = "button, a, details";
+
+/** マージリクエスト（`MR #番号`）。詳細を開かなくても見えるよう、位置の下に出す。URL が http(s) のときだけリンクにする */
+function MrLink({ card }: { readonly card: Card }): JSX.Element | null {
+  if (card.mrUrl === "" && card.mrNumber === null) {
+    return null;
+  }
+  const text = mrText(card.mrNumber);
+  return (
+    <div className="card-mr" data-row="mr" title={card.mrUrl === "" ? undefined : card.mrUrl}>
+      {isHttpUrl(card.mrUrl) ? (
+        <a className="detail-link" href={card.mrUrl}>
+          {text}
+        </a>
+      ) : (
+        text
+      )}
+    </div>
+  );
+}
 
 /** 状態のバッジ。見出しの右端に 1 つ。言葉は必ず出す（色だけに頼らない）。理由があればツールチップ */
 function StatusMark({ status }: { readonly status: Status }): JSX.Element {

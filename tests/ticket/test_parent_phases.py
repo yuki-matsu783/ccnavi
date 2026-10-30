@@ -193,7 +193,7 @@ class CopyJudgeTest(PhaseHarness):
             "i0001-01-01",
             child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"], review=review),
         )
-        self.commit_parent("propose child")
+        self.commit_parent("approval-request child")
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         return self.run_child("i0001-01-01")

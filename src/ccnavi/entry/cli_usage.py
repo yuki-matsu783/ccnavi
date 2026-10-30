@@ -256,8 +256,8 @@ _AGREE = """\
 は一括処理の対象を絞り込むだけです。承認待ちでない id や、
 承認待ちの親（またはその親の承認待ちの改訂）がない状態で指定された子は、何も承認されません。
 
-エージェントは、ユーザに承認を求める前に、
-書いたばかりの提案が承認可能な状態であることを検証します。
+ユーザとボードは、承認を押す前に、提案が承認可能な状態であることを検証します
+（エージェントは `ccnavi-ticket.sh approval-request <親> --check` で、同じ検査を送らずに通します）。
 
     ccnavi --agree --preview --verify [--json] [<id>...]
 
@@ -358,11 +358,12 @@ _TICKET = """\
         （start は、基点を .ccnavi/approved/doing/<id>.md に書き込みます。finish は、
          フェーズがレビュー対象の場合は wip/proposals/review/ に、それ以外は
          .ccnavi/approved/done/ に移動します。cancel は .ccnavi/approved/done/ に移動します）
-    ccnavi ticket propose <id>
+    ccnavi ticket approval-request <id>
         （親子の承認待ちの提案 wip/proposals/todo/ と子のフローの下書き wip/proposals/flows/ を、
          書いたパスの一覧に載せます。親の提案の計画に誤り（after・終端）があれば、何も載せずに断ります。
          コミットと push は
-         ccnavi-ticket.sh propose が write-and-push の手順で行います）
+         ccnavi-ticket.sh approval-request が write-and-push の手順で行います。
+         --check は承認の画面と同じ検査と未コミットの変更の確認だけを行い、何も載せません）
     ccnavi ticket record-risk <child> <factor> yes|no --reason <why>   （定性的なリスク）
     ccnavi ticket learn [<id>] [--note <text> [--target <kind>] [--signal <kind>]]
         （学習記録の雛形と判定ログのダイジェストを wip/handoff/learnings/<id>.* に書き込みます。
@@ -388,7 +389,7 @@ _TICKET = """\
          「承認しても書けない」と警告します
          （scope: inherit のタイプが計画にあれば警告しません）。
          子の提案は雛形にならないので手で書きます（<id>-<フェーズ番号 2 桁>-<連番 2 桁>）。
-         ccnavi-ticket.sh propose は親の識別子で打ち、子も同じ承認で通します。
+         ccnavi-ticket.sh approval-request は親の識別子で打ち、子も同じ承認で通します。
          ccnavi を直接実行します（sh のラッパーは使いません））
     ccnavi ticket new <id> --title <title> --template <name> [--layer <name>]
                            [--with-feedback] --issue <N|owner/repo#N> --mr <N>
@@ -401,8 +402,8 @@ _TICKET = """\
          スクリプトだけが書く欄（started_at・base_sha など）を外します。
          --feedback は、全体計画のフェーズが全部閉じてレビューが済んだあとに、フィードバック計画なし
          （feedback: []）の改版を作ります。範囲や計画を直す改版は、雛形を編集します。
-         どちらも、書いたあとに --agree --preview --verify が通れば、
-         ccnavi-ticket.sh propose で送ります。
+         どちらも、書いたあとに ccnavi-ticket.sh approval-request <ID> --check が通れば、
+         ccnavi-ticket.sh approval-request で送ります。
          承認済みの親が無い・todo/ に同じ識別子が既にある・フィードバック計画が既にある・
          局面が違う（--feedback）ときは何も書きません）
     ccnavi ticket status [<parent>]

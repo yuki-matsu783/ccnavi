@@ -438,13 +438,13 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 
 #### レビュー依頼までの道の途中で終えたとき
 
-チケット作業の道（子の `finish`（親ブランチへの合流を含む） → ELI5 → `ccnavi-review.sh request`）の途中で、確認を取ってターンを終えるのを `Stop` で 1 回だけ止める（REQ-PRE-18。理由コード `NUDGE_TICKET_REQUEST`。チケット側の条件と除く形は 9.6）。ルールではなく状態で決める。文は `NUDGE_STOP_RULE` の前置きと同じ考え方で、決まった道の途中でユーザの許可は要らないこと、状態に応じた次のコマンド、ユーザの判断が本当に要る問いなら最後に書き直すことを言う。`finish` の促しと同じく `dry-run` でも止め、同じ状態では 1 回だけ（`nudged-<セッション>.json` の `request:` で始まるキー）。順序は `finish` の促し → この促し → 直接作業の `integrate` の促し → `match: Stop` のルール。
+チケット作業の道（子の `finish`（親ブランチへの合流を含む） → ELI5 → `ccnavi-review.sh review-request`）の途中で、確認を取ってターンを終えるのを `Stop` で 1 回だけ止める（REQ-PRE-18。理由コード `NUDGE_TICKET_REQUEST`。チケット側の条件と除く形は 9.6）。ルールではなく状態で決める。文は `NUDGE_STOP_RULE` の前置きと同じ考え方で、決まった道の途中でユーザの許可は要らないこと、状態に応じた次のコマンド、ユーザの判断が本当に要る問いなら最後に書き直すことを言う。`finish` の促しと同じく `dry-run` でも止め、同じ状態では 1 回だけ（`nudged-<セッション>.json` の `request:` で始まるキー）。順序は `finish` の促し → この促し → 直接作業の `integrate` の促し → `match: Stop` のルール。
 
 `finish` の促しと依頼までの道の促しは、このセッションに実行中のサブエージェントが居る間（`subagent.running`。記録を読めないときも）は見送り、「1 回だけ」の記録も進めない。委任して待つ回の誤った促しを防ぐだけで、メインが自分から早く `finish` を打つことは防がない。
 
 #### フィードバック計画待ちを促す
 
-親の局面（`phase.stage`）が「フィードバック計画待ち」のまま、メインエージェントがターンを終えようとしたとき、`Stop` で 1 回だけ止める（理由コード `NUDGE_TICKET_FEEDBACK`。`tickets/lifecycle/stop_feedback.py`）。順序は `finish` → 依頼までの道 → フィードバック計画 → サブエージェントの結果。改版の雛形は `ccnavi ticket revise <親> --feedback`（スクリプトだけが書く欄は雛形が外す）で作り、`ccnavi-ticket.sh propose` で送り、ユーザに承認を頼む。親のワークツリーの提案の置き場（`todo/`）に、親と同じ識別子で `feedback:` を持つ提案があれば「提案済み」の文面（送っていなければ送る・`status` で確かめる）、無ければ置き場の絶対パスと書き方（スクリプトだけが書く欄は空にする）を言う。同じ状態（親・HEAD・改版を提案済みか）では 1 回だけ。止め方とモードの扱いは依頼までの道の促しと同じ。
+親の局面（`phase.stage`）が「フィードバック計画待ち」のまま、メインエージェントがターンを終えようとしたとき、`Stop` で 1 回だけ止める（理由コード `NUDGE_TICKET_FEEDBACK`。`tickets/lifecycle/stop_feedback.py`）。順序は `finish` → 依頼までの道 → フィードバック計画 → サブエージェントの結果。改版の雛形は `ccnavi ticket revise <親> --feedback`（スクリプトだけが書く欄は雛形が外す）で作り、`ccnavi-ticket.sh approval-request` で送り、ユーザに承認を頼む。親のワークツリーの提案の置き場（`todo/`）に、親と同じ識別子で `feedback:` を持つ提案があれば「提案済み」の文面（送っていなければ送る・`status` で確かめる）、無ければ置き場の絶対パスと書き方（スクリプトだけが書く欄は空にする）を言う。同じ状態（親・HEAD・改版を提案済みか）では 1 回だけ。止め方とモードの扱いは依頼までの道の促しと同じ。
 
 #### 直接作業の取り込みを促す
 

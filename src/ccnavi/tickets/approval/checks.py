@@ -81,7 +81,7 @@ def family_problems(
     """親子のチケットの提案を承認しない理由。
 
     親子のチケットが決まらない（親のワークツリーが無いなど）・閉じているなら承認しない。提案は親のブランチの上で書き、
-    `ccnavi-ticket.sh propose` で送ってから承認を頼む決まりなので、
+    `ccnavi-ticket.sh approval-request` で送ってから承認を頼む決まりなので、
     親のワークツリーの外にある提案も承認しない。
     """
     fams = fams or standing.Families(conf, root)

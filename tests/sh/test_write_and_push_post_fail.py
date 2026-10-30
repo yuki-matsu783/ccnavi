@@ -73,7 +73,7 @@ class PostFailureTest(WriteAndPushHostHarness):
 
     def request_args(self):
         body = write(os.path.join(self._base, "body.md"), "見てほしい\n")
-        return ("request", "--phase", "1", "--body-file", body, "--eli5", self.eli5())
+        return ("review-request", "--phase", "1", "--body-file", body, "--eli5", self.eli5())
 
     def ready_exe(self):
         """ready の補助コメントの下書きを返す実行ファイルの代役（実際の ready は下書きを置く）。"""

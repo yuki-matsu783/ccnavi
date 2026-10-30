@@ -71,7 +71,7 @@ keywords: [提案, 採否, 却下, 差分, commit, test-groups, testing, designi
 差分（新規ファイルの本文）:
 
 ```diff
-+- 回す前に、probe の手順が今の ccnavi の前提に合っているかを読む（一時リポジトリへの `.ccnavi/scripts/` の配置、親を先に start、`review request` の `--eli5`、`decide` の入力など）。`tests/manual/` は自動テストが呼ばないので、仕様が変わっても落ちずに古くなるため
++- 回す前に、probe の手順が今の ccnavi の前提に合っているかを読む（一時リポジトリへの `.ccnavi/scripts/` の配置、親を先に start、`review-request` の `--eli5`、`decide` の入力など）。`tests/manual/` は自動テストが呼ばないので、仕様が変わっても落ちずに古くなるため
 +- 「止まる」ことを確かめる段は、止まったことだけでなく、止まった理由（拒否の文面やコード）が期待どおりかまで見る。前提の崩れで別の理由で止まっても PASS に見えるため
 +- 前提を直したら、probe の docstring の「用意するもの」も同じ変更で直す
 ```

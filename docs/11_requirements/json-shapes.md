@@ -246,9 +246,9 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 |---|---|
 | `verify.ok` | 真偽。`user agree` を打てば、指定したもの（指定が無ければ承認待ち全部）がそのまま承認の対象に入るか |
 | `branch_warnings[]` | 新規の親の識別子と同じ名前のブランチが手元か origin に既にあるときの説明（文字列の配列、無ければ `[]`）。承認は止めず、答えも変えない |
-| `verify.reason` | 答えの理由の名前。全部入るなら `ok`、入らないなら `refused`（絞りが通らない）/ `nothing-pending`（承認待ちが 1 件も無い）/ `rejected`（承認の対象にしない提案がある）。読めない提案（`problems[]`）はここに出ない |
+| `verify.reason` | 答えの理由の名前。全部入るなら `ok`、入らないなら `refused`（絞りが通らない）/ `nothing-pending`（承認待ちが 1 件も無い）/ `rejected`（承認の対象にしない提案がある）/ `proposal`（送る提案を名指しする problems がある）/ `dirty_parent`（親のワークツリーに置き場の外の未コミットの変更がある）/ `unpushed_code`（親のブランチに未 push のコードがある。後ろの 2 つは `approval-request` が止まる条件と同じ）。読めない提案（`problems[]`）はここに出ない |
 
-`--verify` は、`user agree` が承認を止めない範囲の超過（`batch[].overflow`）と読めない提案（`problems[]`）では「いいえ」にしない。どちらも本文には出す。
+`--verify` は、`user agree` が承認を止めない範囲の超過（`batch[].overflow`）では「いいえ」にしない。本文には出す。送る提案を名指しする `problems[]`（警告を含む）は `proposal` で「いいえ」にする（`approval-request` が止まる条件と同じ。他の提案の `problems[]` は見ない）。
 承認されないものは `ccnavi --lint` も同じ関数で名指しする。ただし「まだ承認できない」子は `--lint` では warn で、先行が閉じれば通る子もここに入る。取り消し済み・どこにも無い・複数の場所にある・自分自身・自分の親・輪になった先行は error。
 
 `--yes` の答え。値は `--preview` の `batch[].ticket` をカンマで並べたもの。

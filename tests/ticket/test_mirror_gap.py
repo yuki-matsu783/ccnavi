@@ -101,7 +101,7 @@ class MovedTest(unittest.TestCase):
     def test_only_mirror_paths_say_it_is_the_mirror_commit_and_a_new_request(self):
         text = self.explain([MIRROR_FILE, SKILL_FILE])
         self.assertIn("ミラーのずれ", text)
-        self.assertIn("再 `request`", text)
+        self.assertIn("再 `review-request`", text)
 
     def test_a_mix_gets_no_mirror_sentence(self):
         self.assertNotIn("ミラー", self.explain([MIRROR_FILE, "src/keep.py"]))

@@ -40,7 +40,7 @@ class PredecessorTest(TicketTest):
     def propose_after(self, name, *predecessors, phase=1, allow=("src/c/*",)):
         self.propose(name, parent="i0001", phase=phase, allow=allow, predecessors=predecessors)
         git(self.parent_tree, "add", "-A")
-        git(self.parent_tree, "commit", "--quiet", "-m", "propose " + name)
+        git(self.parent_tree, "commit", "--quiet", "-m", "approval-request " + name)
 
     def placed(self, name):
         return os.path.exists(os.path.join(self.approved, "doing", name + ".md"))

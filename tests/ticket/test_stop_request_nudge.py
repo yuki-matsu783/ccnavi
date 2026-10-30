@@ -117,7 +117,7 @@ class RequestNudgeTest(base.StopNudgeTest):
         ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
         # 子 1 は親に合流した記録が無い（合流は finish が済ませる。ここは確かめを促すだけ）。
         reason = self.asked(self.stop(self.parent_tree))
-        self.assertIn("レビューの依頼（request）がまだです", reason)
+        self.assertIn("レビューの依頼（review-request）がまだです", reason)
         self.assertIn("子 i0001-01-01 が親のブランチに合流済みと確かめられません", reason)
         self.assertIn(f"`{ticket_sh} status i0001`", reason)
         self.assertNotIn(f"`{git_sh} merge", reason)
@@ -136,7 +136,8 @@ class RequestNudgeTest(base.StopNudgeTest):
         git(self.parent_tree, "commit", "--quiet", "-m", "eli5")
         reason = self.asked(self.stop(self.parent_tree))
         self.assertIn(
-            f"`{review_sh} request --phase 1 --body-file <依頼文> --eli5 wip/eli5/phase-1.html`",
+            f"`{review_sh} review-request --phase 1 --body-file <依頼文> "
+            "--eli5 wip/eli5/phase-1.html`",
             reason,
         )
         self.assertNotIn("ELI5 の HTML を", reason)
@@ -162,7 +163,7 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.close_children(work=False)
         write(os.path.join(self.parent_tree, "wip", "eli5", "phase-1.html"), "<p>x</p>\n")
         reason = self.asked(self.stop(self.parent_tree))
-        self.assertIn("request --phase 1", reason)
+        self.assertIn("review-request --phase 1", reason)
         self.assertIn("未コミットの変更があれば先にコミットして push", reason)
 
     def test_a_blocked_parent_is_not_asked(self):

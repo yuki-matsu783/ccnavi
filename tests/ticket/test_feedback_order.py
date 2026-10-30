@@ -120,7 +120,7 @@ class FeedbackFlowTest(PhaseHarness):
         for n in (2, 3, 4):
             name = f"i0001-0{n}-0{n}"
             self.propose(name, child_text(name, "i0001", n, ["src/*"]))
-        self.commit_parent("propose feedback children")
+        self.commit_parent("approval-request feedback children")
         result = self.approve()
         self.assertTrue(self.is_approved("i0001-02-02"), result.stdout + result.stderr)
         self.assertTrue(self.is_approved("i0001-03-03"), result.stdout + result.stderr)
