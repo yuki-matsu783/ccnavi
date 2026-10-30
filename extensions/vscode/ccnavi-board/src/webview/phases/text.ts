@@ -12,7 +12,7 @@ export function hasMore(phase: PhaseForm): boolean {
 
 /** 「補足」の見出しにつける一言 */
 export function moreNote(phase: PhaseForm): string {
-  return hasMore(phase) ? "（設定あり）" : "（未設定）案内するエージェントと、使う場面";
+  return hasMore(phase) ? "（設定あり）" : "（未設定）案内するエージェントと、使う場面を設定します";
 }
 
 /** 要約に出す範囲。inherit ならその表記、glob が無ければ未設定と言う */
@@ -71,7 +71,7 @@ export function commonTitleNote(ids: ReadonlySet<string>): string {
 
 /** 共通の設定にも同じ id がある定義に添える文 */
 export function commonIdNote(ids: ReadonlySet<string>): string {
-  return `共通の設定にも同じ id があります（${Array.from(ids).join(", ")}）。すべての項目が同じ場合は共通の設定の定義が使われます。内容が異なる場合は、保存時の検証（--lint）でエラーになります。変えたいときは別の id にしてください`;
+  return `共通の設定にも同じ id があります（${Array.from(ids).join(", ")}）。中身がすべて同じなら共通の設定の定義が使われ、中身が違えば保存時の検証（--lint）でエラーになります。変えたいときは別の id にしてください`;
 }
 
 /** 共通の設定の定義の欄の見出しにつける説明 */

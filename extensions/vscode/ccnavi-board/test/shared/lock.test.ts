@@ -36,7 +36,7 @@ test("CB-T391 作業中かを答えない古い実行ファイルの答えでは
   const tickets = board.tickets.map((t) => ({ ...t, in_progress: null }));
   const lock = lockFromBoard({ ...board, tickets });
   assert.equal(lock.locked, true);
-  assert.match(lock.reason, /作業中かを返しません/);
+  assert.match(lock.reason, /作業中かどうかを答えません/);
 });
 
 test("CB-T392 プロジェクトを渡したときは、そのプロジェクトのチケットの答えだけを見る", () => {

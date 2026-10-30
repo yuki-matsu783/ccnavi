@@ -204,7 +204,7 @@ function Inspector({
   const isRoot = path.length === 0;
   const adders = (into: CondPath, index: number): JSX.Element => (
     <span className="cond-add">
-      <span className="dim">子を足す:</span>
+      <span className="dim">子を足す</span>
       {ADDABLE.map(({ name, make }) => (
         <button key={name} type="button" className="action small" data-add={name} onClick={() => edit(addChild(tree, into, make()), [...into, index])}>
           ＋ {name}

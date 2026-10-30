@@ -132,7 +132,7 @@ export type Sections = Readonly<Record<Section, readonly RuleForm[]>>;
 export interface RulesModel {
   readonly version: number | null;
   readonly sections: Sections;
-  /** 読み込み時の指摘。ルールの形が読めなかった場所。あっても他は出す */
+  /** 読み込み時の指摘。ルールの形が読めなかった場所。ほかの指摘は、これがあっても出す */
   readonly problems: readonly string[];
 }
 
