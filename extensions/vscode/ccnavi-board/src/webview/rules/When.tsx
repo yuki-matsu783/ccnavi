@@ -50,7 +50,7 @@ const OP_TITLES: Readonly<Record<string, string>> = {
   not: "not: 中にヒットしなければヒットします",
   glob: "glob: 対象をこの glob で照合します",
   regex: "regex: 対象をこの正規表現で照合します",
-  invalid: "読み込めないノード",
+  invalid: "読み込めない条件",
   empty: "空。押して中に入れるものを選びます",
 };
 
@@ -268,10 +268,10 @@ function Inspector({
         </span>
       )}
       <span className="buttons">
-        <button type="button" className="action small" data-op-action="wrap-all" title="このノードを all で包みます。隣に子を追加して組み合わせにできます" onClick={() => edit(wrapGroup(tree, path, "all"), path)}>
+        <button type="button" className="action small" data-op-action="wrap-all" title="この条件を all で包みます。隣に子を足して組み合わせにできます" onClick={() => edit(wrapGroup(tree, path, "all"), path)}>
           all で包む
         </button>
-        <button type="button" className="action small" data-op-action="wrap-any" title="このノードを any で包みます。隣に子を追加して組み合わせにできます" onClick={() => edit(wrapGroup(tree, path, "any"), path)}>
+        <button type="button" className="action small" data-op-action="wrap-any" title="この条件を any で包みます。隣に子を足して組み合わせにできます" onClick={() => edit(wrapGroup(tree, path, "any"), path)}>
           any で包む
         </button>
         <button type="button" className="action small" data-op-action="wrap" onClick={() => edit(wrapNot(tree, path), path)}>

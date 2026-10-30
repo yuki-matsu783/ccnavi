@@ -429,7 +429,7 @@ courses:
           add: blank
       - target: phase-title
         title: タイトルを付ける
-        body: 表示名です。空なら id をそのまま使います。id と同じく、ほかの定義と重複させられません。
+        body: タイトルです。空なら id をそのまま使います。id と同じく、ほかの定義と重なるものは使えません。
         scene:
           add: blank
       - target: phase-kind

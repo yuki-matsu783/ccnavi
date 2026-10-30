@@ -522,11 +522,11 @@ courses:
         scene: { tab: rules, open: protect-env, when: r }
       - target: when-graph
         title: 点を選んで直す
-        body: ノードをクリックすると選択され、下の編集欄でそのノードの条件を変更できます。ここでは .env 系に一致させる regex の点を選んでいます。文字を直すと、その場で図と要約に反映されます。
+        body: 条件をクリックすると選ばれ、下の編集欄でその条件を変更できます。ここでは .env 系に一致させる regex の点を選んでいます。文字を直すと、その場で図と要約に反映されます。
         scene: { tab: rules, open: protect-env, when: r.0 }
       - target: when-inspector
-        title: 子を追加する・削除
-        body: all / any の点を選ぶと「＋ glob」「＋ regex」「＋ all」「＋ any」「＋ not」で子を追加できます。例えば any に「＋ glob」を追加すれば、通す例外が 1 つ増えます。「ノードを削除」で削除できます。
+        title: 子を足す・削除
+        body: all / any の点を選ぶと「＋ glob」「＋ regex」「＋ all」「＋ any」「＋ not」で子を足せます。例えば any に「＋ glob」を足せば、通す例外が 1 つ増えます。「この条件を削除」で削除できます。
         scene: { tab: rules, open: protect-env, when: r.1.0 }
       - target: when-inspector
         title: 包む・種類を替える
@@ -716,11 +716,11 @@ courses:
         scene: { tab: rules, sum: web }
       - target: sum-pick
         title: 統合結果を選ぶ
-        body: 選ぶ欄で、統合結果（共通 + ワークスペース）と、プロジェクトの統合結果（共通の設定 + そのプロジェクトの設定）を切り替えます。パスを持たないツール（Bash など）に適用されるのは、全プロジェクトの設定を合算した和ではありません。
+        body: 選ぶ欄で、統合結果（共通 + ワークスペース）と、プロジェクトの統合結果（共通 + プロジェクト（名前））を切り替えます。パスを持たないツール（Bash など）に適用されるのは、全プロジェクトの設定を合算した和ではありません。
         scene: { tab: rules, sum: web }
       - target: sum-count
         title: 件数と追加されたレイヤー
-        body: 件数の横に、追加されたレイヤーが出ます。見本の web は「共通の設定 + web」を重ねたもので、共通の設定のルールに、web のルールが追加されています。
+        body: 件数の横に、追加されたレイヤーが出ます。見本の web は「共通 + プロジェクト（web）」を重ねたもので、共通の設定のルールに、web のルールが追加されています。
         scene: { tab: rules, sum: web }
       - target: sum-deny
         title: 由来で確認する
