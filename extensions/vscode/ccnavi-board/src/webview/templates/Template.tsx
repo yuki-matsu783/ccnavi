@@ -59,9 +59,11 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
         <StateTags entry={entry} />
         {entry.description !== "" && <span className="tpl-desc">{entry.description}</span>}
       </div>
-      {dropped !== null && <p className="hint tpl-dropped">
+      {dropped !== null && (
+        <p className="hint tpl-dropped">
           <Code text={dropped.detail} />
-        </p>}
+        </p>
+      )}
       {open && (
         <div className="row-body tpl-body">
           {entry.when !== "" && (
