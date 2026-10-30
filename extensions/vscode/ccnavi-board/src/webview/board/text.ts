@@ -109,7 +109,6 @@ export function detailRows(card: Card): DetailRow[] {
   for (const p of card.phases) {
     add({ key: `phase-${p.number}`, label: `フェーズ ${p.label}`, values: [phaseDetail(p)] });
   }
-  add({ key: "mr", label: "マージリクエスト", values: card.mrUrl === "" && card.mrNumber === null ? [] : [mrText(card.mrNumber)], href: isHttpUrl(card.mrUrl) ? card.mrUrl : undefined, title: card.mrUrl });
   add({ key: "parent-mr", label: "親の MR", values: card.parentMr === null ? [] : [`!${card.parentMr}`] });
   add({ key: "issue", label: "issue", values: card.issueNumber === null ? [] : [`#${card.issueNumber}`] });
   add({ key: "branch", label: "ブランチ", values: [card.branch] });
@@ -161,9 +160,9 @@ export function worktreeName(path: string): string {
   return name === "" ? "あり" : name;
 }
 
-/** マージリクエストのバッジの文字。番号が読めなければ「マージリクエスト」だけ */
+/** マージリクエストのリンクの文字。番号が読めなければ「MR」だけ */
 export function mrText(number: number | null): string {
-  return number === null ? "マージリクエスト" : `マージリクエスト #${number}`;
+  return number === null ? "MR" : `MR #${number}`;
 }
 
 /** 依頼のマーカーが持つ URL は中身を確かめずにそのまま取り込んであるので、http(s) のときだけリンクにする */

@@ -143,6 +143,7 @@ a.card-button, a.card-button:hover, a.card-button:focus, a.card-button:active { 
 .card-actions { display: flex; flex-wrap: wrap; gap: var(--gap-2) var(--gap-3); margin-top: 8px; min-width: 0; }
 
 /* 詳細。畳んでおき、開きたいときだけ見る。ここのリンクは普通のリンク */
+.card-mr { margin-top: 2px; font-size: var(--font-sm); color: var(--vscode-descriptionForeground); }
 .card-details { margin-top: 8px; font-size: var(--font-sm); color: var(--vscode-descriptionForeground); }
 .card-details > summary { cursor: pointer; width: fit-content; }
 .card-details > summary:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
