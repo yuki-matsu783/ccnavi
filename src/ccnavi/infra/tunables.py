@@ -31,7 +31,7 @@ HOOK_DEADLINE = Tunable("CCNAVI_HOOK_DEADLINE_SECONDS", 3.0)
 INTEGRATE_PENDING = Tunable("CCNAVI_INTEGRATE_PENDING_SECONDS", 2.0)
 # 実行中のサブエージェントの印を「実行中」と数える長さの上限（hook.subagent）。
 SUBAGENT_RUNNING_MAX = Tunable("CCNAVI_SUBAGENT_RUNNING_MAX_SECONDS", 4 * 3600.0)
-# 更新が無いまま、ターンの印を古いと数えるまでの長さ（records.turn）。
+# ターンの印を、更新が無いまま古いと数えるまでの長さ（records.turn）。
 TURN_STALE = Tunable("CCNAVI_TURN_STALE_SECONDS", 30 * 60.0)
 # 停止レビューの判定計画を待つ時間と、試行の期限（records.stopreview）。
 STOP_REVIEW_TTL = Tunable("CCNAVI_STOP_REVIEW_TTL_SECONDS", 600.0)

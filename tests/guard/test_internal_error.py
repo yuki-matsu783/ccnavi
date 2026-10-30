@@ -478,7 +478,7 @@ REPORT_TOOLS = ("SubagentHandback", "StructuredOutput")
 class ReportToolTest(unittest.TestCase):
     """サブエージェントの報告用のツールは、ccnavi の内部エラーで止めない。
 
-    体が報告を返せないと、終われずに続けることになる。知らないツール全般を通す変更ではなく、
+    体が報告を返せないと、終われずに続けることになる。知らないツール全般を通す変更ではなく、通すのは
     `toolnames.REPORT_TOOLS` の名前だけ。入力を読めない障害までは通すと約束しない。
     """
 
