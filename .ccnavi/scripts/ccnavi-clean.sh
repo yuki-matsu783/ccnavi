@@ -47,7 +47,7 @@ sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>
               cwd がその中なら削除しません。ブランチは残す。このときの <名前> はチケットの識別子
               （.claude/worktrees/<識別子>）だけを受ける。識別子の形でない名前は断る
 
-削除するもの: node_modules / .venv / __pycache__ / .pytest_cache / .ruff_cache と、package.json の隣の out
+削除するもの: node_modules / .venv / __pycache__ / .pytest_cache / .ruff_cache と、package.json の隣の out / dist / .cache
 未コミットの変更があるワークツリーでは、何も削除せずに止まる
 USAGE
 }

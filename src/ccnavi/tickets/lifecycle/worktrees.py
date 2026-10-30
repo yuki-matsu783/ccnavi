@@ -64,7 +64,7 @@ TIMEOUT_SECONDS = 30.0
 # どこにあっても生成物と言える名前と、隣に package.json があるときだけ生成物と見る名前。
 # `ccnavi-clean.js` の ALWAYS・BESIDE_PACKAGE_JSON と揃える。
 ALWAYS = frozenset({"node_modules", ".venv", "__pycache__", ".pytest_cache", ".ruff_cache"})
-BESIDE_PACKAGE_JSON = frozenset({"out"})
+BESIDE_PACKAGE_JSON = frozenset({"out", "dist", ".cache"})
 
 # drop の結果。
 REMOVED = "removed"
@@ -391,7 +391,8 @@ def _ignored(top: str) -> tuple[list[str], str]:
     """git が無視しているもの（生成物を除く）。2 つめは読めなかった理由。
 
     `--directory` で、全体が無視されたディレクトリは 1 行（末尾の `/`）にまとめる。生成物
-    （`ccnavi-clean.js` と同じ名前。`out` は package.json の隣だけ）は消してよいので数えない。
+    （`ccnavi-clean.js` と同じ名前。`out`・`dist`・`.cache` は package.json の隣だけ）は
+    消してよいので数えない。
     下書きの置き場（`wip/handoff/`）は追跡されるファイルで、gitが無視するものではないので、
     ここには現れない。
     """
