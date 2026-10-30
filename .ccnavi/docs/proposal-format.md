@@ -65,7 +65,7 @@ mr: 12                     # 必須。仕事を載せる MR の番号（同じ�
 title: 設定画面の分割
 phases:                    # 計画が使う型の定義のコピー。--fill-phases が作る（下の節）
   research: {kind: work, title: 調査, review: none, scope: ["wip/research/*"]}
-  implement: {kind: work, title: 実装, review: mr, scope: ["src/*", "tests/*"]}
+  implement: {kind: work, title: 実装, review: mr, scope: ["app/*", "test/*"]}
 plan:
   - research               # 1。先行なし
   - {type: implement, after: [1]}  # 2。1 が済んでから
@@ -75,16 +75,16 @@ allow:
   - match: Write|Edit
     glob: "wip/research/*"
   - match: Write|Edit
-    glob: "src/components/Settings/*"
+    glob: "app/components/Settings/*"
 ask:                       # 無くてよい。allow か ask のどちらかが 1 件は要る
   - match: Write|Edit
-    glob: "src/components/*"
+    glob: "app/components/*"
 ---
 ## 目的
 …
 ```
 
-- `allow` / `ask` の `glob` は、ワイルドカードが無ければ前置として扱う（`src` は `src/` 以下全部）。`..` `~` `$` と絶対パスは書けない。項は 20 件まで。書いていない場所は範囲外
+- `allow` / `ask` の `glob` は、ワイルドカードが無ければ前置として扱う（`app` は `app/` 以下全部）。`..` `~` `$` と絶対パスは書けない。項は 20 件まで。書いていない場所は範囲外
 - `human_review: {required: true, reason: …}` は子ごとの欄。省くと既定（`required: true`）。`required: false` にするときは `reason` に理由を書く
 - `started_at` `completed_at` `base_sha` などの欄はスクリプトが書く。提案には書かない
 - `branch:` は書けない（使えない欄としてエラーになる）。本文は自由で、MR の下書きの本文に使われる
@@ -117,7 +117,7 @@ human_review:
   reason: 設定の読み込み経路を変えるため
 allow:
   - match: Write|Edit
-    glob: "src/components/Settings/*"
+    glob: "app/components/Settings/*"
 ---
 この子で何をするか。
 ```
