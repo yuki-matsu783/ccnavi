@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { ExpectationJson, ExpectationsJson, RuleHitJson } from "../../src/core/testmodel.js";
 import { openRules } from "../helpers/rules.js";
-import type { HTMLButtonElement } from "happy-dom" with { "resolution-mode": "import" };
+import type { HTMLButtonElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
 
 function hit(section: string, id: string, source: "file" | "outside"): RuleHitJson {
   return { section, id, kind: "glob", written: "*", pattern: ".*", source };
@@ -38,10 +38,14 @@ test("CB-D1237 絞り込み中は上下ボタンを止め、title に理由を�
     await dom.settle();
     assert.equal(down().disabled, true);
     assert.match(down().title, /絞り込み中は並べ替えできません/);
+    const typeSelect = (): HTMLSelectElement => dom.one<HTMLSelectElement>('.rule[data-id="git-push"] select.f-section');
+    assert.equal(typeSelect().disabled, true);
+    assert.match(typeSelect().title, /絞り込み中は並べ替えできません/);
     dom.type(dom.one("#find"), "");
     await dom.settle();
     assert.equal(down().disabled, false);
     assert.equal(down().title, "下へ");
+    assert.equal(typeSelect().disabled, false);
   } finally {
     await dom.close();
   }

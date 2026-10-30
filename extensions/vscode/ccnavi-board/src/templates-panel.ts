@@ -784,7 +784,7 @@ async function editNew(current: PanelState, session: number, name: string): Prom
   }
   const file = validNewTemplateName(name) ? templateFile(current.folder.uri.fsPath, where.layer, name) : undefined;
   if (file === undefined) {
-    postOpened(current, session, null, `テンプレートの名前 ${name} は指定できません（${NEW_TEMPLATE_NAME_RULE}）`);
+    postOpened(current, session, null, `テンプレートの名前 ${name} は指定できません。${NEW_TEMPLATE_NAME_RULE}`);
     return;
   }
   // 大文字小文字だけが違う名前は同じものとして扱う（別の機械で 2 本が 1 本に重なるため）。共通の層にある名前も、

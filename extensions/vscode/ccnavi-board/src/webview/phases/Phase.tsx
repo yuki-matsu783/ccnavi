@@ -154,11 +154,11 @@ export function Phase(props: PhaseProps): JSX.Element {
               <option value="inherit">inherit（親チケットの編集可能範囲を引き継ぐ）</option>
               <option value="globs">上限を指定する（glob のリスト）</option>
             </select>
-            {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*（ワークツリーのルートからの相対。子チケットの編集可能な範囲はこの中に収めます。区切りは半角 ,）")}
+            {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*。ワークツリーのルートからの相対で、子チケットの編集可能な範囲はこの中に収めます。区切りは半角 ,")}
           </div>
         </Captioned>
         <Captioned name="必須成果物" yamlKey="deliverables" tour={mark("phase-deliverables")}>
-          {list("deliverables", "f-deliverables", "wip/design/*.md（閉じる前に存在し、git に追跡されているべきもの。区切りは半角 ,）")}
+          {list("deliverables", "f-deliverables", "wip/design/*.md。閉じる前に存在し、git に追跡されている必要があります。区切りは半角 ,")}
         </Captioned>
         <details
           className="more"

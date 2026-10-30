@@ -26,7 +26,7 @@ import type { TargetOption } from "./targets.js";
 export const PHASE_KINDS = ["work", "feedback"] as const;
 export type PhaseKind = (typeof PHASE_KINDS)[number];
 
-/** レビューの既定。phasetypes.REVIEWS と同じ順 */
+/** レビューの並び。phasetypes.REVIEWS と同じ順 */
 export const REVIEWS = ["none", "mr"] as const;
 export type Review = (typeof REVIEWS)[number];
 
@@ -79,7 +79,7 @@ export const KIND_LABELS: Readonly<Record<PhaseKind, string>> = {
   feedback: "feedback（フィードバック計画 feedback: に並べる定義。レビューは mr 固定）",
 };
 
-/** レビューの説明。select のラベル（追加した定義の既定は mr で、none は既定ではない） */
+/** レビューの説明。select のラベル。追加した定義の既定は mr で、none は既定ではない */
 export const REVIEW_LABELS: Readonly<Record<Review, string>> = {
   none: "none（レビューを求めない。ただし実績のリスクが HIGH 以上ならレビューが必要です）",
   mr: "mr（マージリクエストのレビューを受ける）",
