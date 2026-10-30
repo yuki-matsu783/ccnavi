@@ -63,6 +63,7 @@
 .status-cancel { color: var(--vscode-descriptionForeground); text-decoration: line-through; }
 /* 「親 <長い名前> / フェーズ名」はカードより長くなる。折り返して、はみ出さないようにする */
 .where, .stage { margin-top: 2px; min-width: 0; max-width: 100%; font-size: var(--font-sm); color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
+.card-mr { margin-top: 2px; font-size: var(--font-sm); color: var(--vscode-descriptionForeground); }
 /* バッジはユーザが動く必要がある状態だけ。属性は枠無しの薄い文字で 1 行に並べる。
    角の丸みは 1 行のときに丸く見える分だけにする（999px だと 2 行に折れたときに縁が楕円に崩れる）。
    文字と枠の色はどちらも文字用の色（`App.css` の `--board-*-text`）で、地に対して 4.5:1 以上 */
@@ -143,7 +144,6 @@ a.card-button, a.card-button:hover, a.card-button:focus, a.card-button:active { 
 .card-actions { display: flex; flex-wrap: wrap; gap: var(--gap-2) var(--gap-3); margin-top: 8px; min-width: 0; }
 
 /* 詳細。畳んでおき、開きたいときだけ見る。ここのリンクは普通のリンク */
-.card-mr { margin-top: 2px; font-size: var(--font-sm); color: var(--vscode-descriptionForeground); }
 .card-details { margin-top: 8px; font-size: var(--font-sm); color: var(--vscode-descriptionForeground); }
 .card-details > summary { cursor: pointer; width: fit-content; }
 .card-details > summary:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
