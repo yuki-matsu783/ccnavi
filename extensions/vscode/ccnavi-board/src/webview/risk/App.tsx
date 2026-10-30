@@ -347,7 +347,9 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       {!touring && page !== undefined && page.model.problems.length > 0 && (
         <ul className="problems">
           {page.model.problems.map((problem, index) => (
-            <li key={index}>{problem}</li>
+            <li key={index}>
+              <Code text={problem} />
+            </li>
           ))}
         </ul>
       )}
@@ -458,7 +460,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
               onRemove={() => remove(row.key)}
             />
           ))}
-          {rows.length > 0 && shown === 0 && <li className="empty">絞り込みに一致する項目がありません。検索の文字を変えるか、空にしてください</li>}
+          {rows.length > 0 && shown === 0 && <li className="empty">絞り込みに一致する項目がありません。検索語を変えるか、検索欄を空にしてください</li>}
           {shownDraft.rows.length === 0 && <li className="empty">項目がありません。加点する項目がなければ、どの子も LOW のままクローズされます</li>}
         </ul>
       </section>

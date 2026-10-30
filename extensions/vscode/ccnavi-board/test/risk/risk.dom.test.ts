@@ -488,7 +488,7 @@ test("CB-T1150 見出しに「取り込み待ちを開く」があり、押す�
   await checkHandoffLink((handoff) => openRisk({ handoff }));
 });
 
-test("CB-D1231 先頭の行は「↑」、末尾の行は「↓」が押せない。絞り込みで 0 件のときは案内を出す", async () => {
+test("CB-D1231 先頭の行の「↑」と末尾の行の「↓」は押せない。絞り込みで 0 件のときは案内を出す", async () => {
   const dom = await openRisk();
   try {
     const count = dom.all("li.factor").length;

@@ -276,7 +276,7 @@ test("CB-D05 ツールの選択肢で選ぶと、欄と行の要約が同じ操�
   }
 });
 
-test("CB-D1232 実行ファイルが返す一時ファイル名つきの id でも、ヒットした行を開いて強調する", async () => {
+test("CB-D1232 実行ファイルが返す id に一時ファイル名が付いていても、ヒットした行を開いて強調する", async () => {
   const dom = await openRules();
   try {
     await dom.send(judged([hit("deny", "../../tmp/ccnavi-rules-AbC123/rules.yml:git-push")]));

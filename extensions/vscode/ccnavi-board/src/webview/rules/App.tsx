@@ -534,7 +534,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       {!touring && page !== undefined && page.model.problems.length > 0 && (
         <ul className="problems">
           {page.model.problems.map((problem, index) => (
-            <li key={index}>{problem}</li>
+            <li key={index}>
+              <Code text={problem} />
+            </li>
           ))}
         </ul>
       )}
@@ -587,7 +589,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
                 </button>
               </h2>
               <ul className="list" data-list={section}>
-                {rows.map((row) => (
+                {rows.map((row, index) => (
                   <Rule
                     key={row.key}
                     ruleKey={row.key}
@@ -602,6 +604,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
                     onToggle={() => toggle(row.key)}
                     onChange={(rule) => editRule(section, row.key, rule)}
                     onMoveSection={(to) => moveSection(section, row.key, to)}
+                    first={index === 0}
+                    last={index === rows.length - 1}
                     onMove={(delta) => move(section, row.key, delta)}
                     onRemove={() => remove(section, row.key)}
                     onOpenPicker={() => (tour.touring ? undefined : setPickerKey(row.key))}

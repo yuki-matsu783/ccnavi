@@ -55,5 +55,5 @@
 .cond-invalid { color: var(--error-text); overflow-wrap: anywhere; }
 .cond-problems { margin: 0; padding-left: 18px; color: var(--error-text); }
 .cond-problems button.action { margin-left: 0; color: inherit; text-align: left; }
-/* 狭い幅では ボタンを折り返し、はみ出さない */
+/* 狭い幅ではボタンを折り返し、枠からはみ出さないようにする */
 .cond-inspector .buttons { flex-wrap: wrap; max-width: 100%; }

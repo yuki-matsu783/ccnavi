@@ -29,7 +29,7 @@ export interface FactorProps {
   readonly tour?: boolean;
   readonly onToggle: () => void;
   readonly onChange: (next: FactorForm) => void;
-  /** 並びの先頭・末尾の行は、動かせない向きのボタンを無効にする */
+  /** 先頭の行は「上へ」、末尾の行は「下へ」を押せないようにする */
   readonly first: boolean;
   readonly last: boolean;
   readonly onMove: (delta: number) => void;

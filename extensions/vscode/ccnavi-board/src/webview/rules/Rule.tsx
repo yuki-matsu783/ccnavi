@@ -37,6 +37,9 @@ export interface RuleProps {
   readonly onToggle: () => void;
   readonly onChange: (next: RuleForm) => void;
   readonly onMoveSection: (to: Section) => void;
+  /** 並びの先頭・末尾の行は、動かせない向きのボタンを無効にする */
+  readonly first: boolean;
+  readonly last: boolean;
   readonly onMove: (delta: number) => void;
   readonly onRemove: () => void;
   readonly onOpenPicker: () => void;
@@ -243,10 +246,10 @@ export function Rule(props: RuleProps): JSX.Element {
           </div>
         </details>
         <span className="buttons" data-tour={tour("buttons")}>
-          <button type="button" className="action small" title="上へ" onClick={() => props.onMove(-1)}>
+          <button type="button" className="action small" title="上へ" disabled={props.first} onClick={() => props.onMove(-1)}>
             ↑
           </button>
-          <button type="button" className="action small" title="下へ" onClick={() => props.onMove(1)}>
+          <button type="button" className="action small" title="下へ" disabled={props.last} onClick={() => props.onMove(1)}>
             ↓
           </button>
           <button type="button" className="action small" onClick={() => props.onRemove()}>
