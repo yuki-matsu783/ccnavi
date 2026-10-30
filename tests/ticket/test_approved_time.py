@@ -55,7 +55,7 @@ class ApprovedTimeTest(PhaseHarness):
         self.family(plan=["research"])
         child = child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
         self.propose("i0001-01-01", child)
-        self.commit_parent("propose")
+        self.commit_parent("approval-request")
         todo = os.path.join("wip", "proposals", "todo", "i0001-01-01.md")
         doing = os.path.join(".ccnavi", "approved", "doing", "i0001-01-01.md")
         git(self.parent_tree, "mv", todo, doing)

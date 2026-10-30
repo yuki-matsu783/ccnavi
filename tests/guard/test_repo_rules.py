@@ -419,7 +419,7 @@ class TicketApprovalPathTest(LauncherJudgeTest):
             "grep -n 'ccnavi --agree --yes' README.md",
             "sed -n 1,20p " + LAUNCHER,
             "sh .ccnavi/scripts/ccnavi-ticket.sh start x",
-            "sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file x.md",
+            "sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 1 --body-file x.md",
             "echo " + LAUNCHER,
             # 引用しない形。`echo` や `grep` は実行役のコマンドではないので、中を見ない。
             "echo ccnavi --agree --yes x",
@@ -541,7 +541,7 @@ class RunnerTest(LauncherJudgeTest):
             "bash -lc 'uv run ruff check .'": set(),
             # 代わりに通る sh 3 形。承認のスクリプトは元の形から止まっている。
             "sh .ccnavi/scripts/ccnavi-ticket.sh start x": set(),
-            "sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file x.md": set(),
+            "sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 1 --body-file x.md": set(),
             "sh .ccnavi/scripts/ccnavi-user-agree.sh": {APPROVAL},
             "exec zsh": set(),
             "time git log --oneline": {"builtin:guard-raw-git"},

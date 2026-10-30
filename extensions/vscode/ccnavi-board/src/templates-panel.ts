@@ -43,7 +43,7 @@ import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import type { TemplatesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
-import { shownLayerOf, templateNameTaken, templatesLayerOf, validTemplateName } from "./core/templatesmodel.js";
+import { NEW_TEMPLATE_NAME_RULE, shownLayerOf, templateNameTaken, templatesLayerOf, validNewTemplateName, validTemplateName } from "./core/templatesmodel.js";
 import { renderTemplatesPage } from "./core/templates-render.js";
 import type { TemplateCheck, TemplateLayer, TemplatesData, TemplatesJson, TemplatesMessage, ToTemplates } from "./core/templates-view.js";
 import { showLoading } from "./loading.js";
@@ -136,6 +136,11 @@ export async function openTemplates(target: TemplatesTarget = { kind: "self" }):
   if (state !== undefined) {
     state.panel.reveal(state.panel.viewColumn);
     if (!sameTarget(state.target, target)) {
+      // 編集欄を開いている間は、外から対象を替えない（古い対象の編集欄が残るため）。画面は前面に出すだけ
+      if (state.editing !== undefined) {
+        vscode.window.showInformationMessage("編集中のため切り替えません。保存か破棄してから切り替えてください");
+        return;
+      }
       await switchTarget(state, target);
     }
     return;
@@ -777,9 +782,9 @@ async function editNew(current: PanelState, session: number, name: string): Prom
     postOpened(current, session, null, where.error);
     return;
   }
-  const file = templateFile(current.folder.uri.fsPath, where.layer, name);
+  const file = validNewTemplateName(name) ? templateFile(current.folder.uri.fsPath, where.layer, name) : undefined;
   if (file === undefined) {
-    postOpened(current, session, null, `テンプレートの名前 ${name} は指定できません（英数字で始め、英数字と . _ - のみ、64 字まで）`);
+    postOpened(current, session, null, `テンプレートの名前 ${name} は指定できません。${NEW_TEMPLATE_NAME_RULE}`);
     return;
   }
   // 大文字小文字だけが違う名前は同じものとして扱う（別の機械で 2 本が 1 本に重なるため）。共通の層にある名前も、

@@ -15,6 +15,7 @@ from typing import TextIO
 
 from ...infra import fsio, gitcmd, modes, pathcase, settings, tree
 from ..approval import store as approval
+from ..approval import write_and_push
 from ..lifecycle import worktrees
 from ..model import ticket_places
 from ..proposal import agree, agree_candidates, agree_screen
@@ -215,26 +216,32 @@ def dirty_parents(conf: settings.Settings, root: str, tickets: list) -> list[dic
         if not ident or key in seen:
             continue
         seen.add(key)
-        path = tree.worktree_path(root, ident)
-        if not os.path.isdir(path) or not tree.is_worktree_of(root, path):
-            continue
-        done = gitcmd.run(
-            path,
-            ["status", "--porcelain", "-z", "--untracked-files=no", "--no-renames"],
-            _GIT_TIMEOUT,
-            raw_paths=True,
-        )
-        if not done.ok:
-            continue
-        paths = [
-            entry[3:]
-            for entry in done.out.split("\0")
-            if len(entry) > 3
-            and not ticket_places.is_ticket_place(entry[3:], conf.tickets, conf.approved)
-        ]
-        if paths:
-            out.append({"ticket": ident, "worktree": path, "paths": paths})
+        found = dirty_parent_of(conf, root, ident)
+        if found:
+            out.append(found)
     return out
+
+
+def dirty_parent_of(conf: settings.Settings, root: str, ident: str) -> dict | None:
+    """1 つの親のワークツリーの提案以外の未コミットの変更。無ければ None。形は `dirty_parents`。"""
+    path = tree.worktree_path(root, ident)
+    if not os.path.isdir(path) or not tree.is_worktree_of(root, path):
+        return None
+    done = gitcmd.run(
+        path,
+        ["status", "--porcelain", "-z", "--untracked-files=no", "--no-renames"],
+        _GIT_TIMEOUT,
+        raw_paths=True,
+    )
+    if not done.ok:
+        return None
+    paths = [
+        entry[3:]
+        for entry in done.out.split("\0")
+        if len(entry) > 3
+        and not ticket_places.is_ticket_place(entry[3:], conf.tickets, conf.approved)
+    ]
+    return {"ticket": ident, "worktree": path, "paths": paths} if paths else None
 
 
 def dirty_parent_text(root: str, found: dict) -> str:
@@ -254,6 +261,56 @@ def dirty_parent_text(root: str, found: dict) -> str:
         "残す変更は、子のワークツリーへ移してコミットする。"
         f"要らない変更は、パスを 1 つずつ名指しして戻す。例: {restore}"
     )
+
+
+def approval_request_gate(
+    stderr: TextIO, root: str, conf: settings.Settings, idents: list[str]
+) -> int:
+    """`approval-request` が提案を送る前に、承認の画面と同じ検査を通す。通らなければ 1。
+
+    ユーザが承認を押したあとで拒否や止まりに気づく往復をなくすため、承認の画面（`--agree`）が
+    外す理由と、承認の後に子の `finish` を止める親のワークツリーの未コミットの変更を、
+    ユーザに渡す前に言う。理由は標準エラーに出し、何も送らない。
+
+    見るのは送る提案（`idents`）だけ。ほかの親子の提案の不備は言わない。承認待ちに無い識別子
+    （すでに承認済みなど）は、承認の画面が外す理由にならないので止めない。
+    """
+    mine = set(idents)
+    try:
+        gathered = agree.gather(io.StringIO(), conf, root)
+    except ValueError as exc:  # UTF-8 で読めない提案がある。承認の画面も同じ所で読めない
+        stderr.write(f"ccnavi: 提案を読めない（UTF-8 でないファイルがある）: {exc}\n")
+        stderr.write(
+            "次: 提案を UTF-8 で保存し直して、approval-request を打ち直す（何も送っていません）\n"
+        )
+        return 1
+    unreadable = [
+        text for text in gathered.problems if any(f"/{ident}.md" in text for ident in mine)
+    ]
+    blocked = [(t, found) for t, found in gathered.rejected if t.ticket in mine]
+    for text in unreadable:
+        stderr.write(f"ccnavi: {text}\n")
+    for t, found in blocked:
+        stderr.write(f"ccnavi: {t.ticket} は承認の対象にならない\n")
+        for problem in found:
+            stderr.write(f"  {problem}\n")
+    if unreadable or blocked:
+        stderr.write("次: 上の理由を直して、approval-request を打ち直す（何も送っていません）\n")
+        return 1
+    # 承認の画面の対象に入らない提案（承認済みと同じ中身の改版など）も、親のワークツリーは同じ。
+    # 対象の組み（batch）には頼らず、送る提案の識別子から親を引く。
+    parent = write_and_push.family_of(next(iter(sorted(mine)), ""))
+    projects = {t.ticket for t in gathered.proposals if t.project}
+    found = dirty_parent_of(conf, root, parent) if parent and parent not in projects else None
+    dirty = [found] if found else []
+    if dirty:
+        say_dirty_parents(stderr, root, dirty)
+        stderr.write(
+            "次: 親のワークツリーの変更を片付けて、approval-request を打ち直す"
+            "（何も送っていません）\n"
+        )
+        return 1
+    return 0
 
 
 def say_dirty_parents(stderr: TextIO, root: str, found: list[dict]) -> None:

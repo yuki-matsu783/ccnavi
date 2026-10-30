@@ -325,7 +325,7 @@ courses:
         scene: { parent: sample-a }
       - target: board
         title: エージェントが準備して、提案を送る
-        body: 頼まれると、エージェントは、まず事前確認（ccnavi-start.sh --check）で、GitLab と git が利用できる状態かを確かめます。そのうえで、親のワークツリーと、Draft の MR を用意します。issue だけを渡したときも、MR はエージェントが作ります。MR の用意まで終わると、エージェントが親と子の提案（チケット）を書いて、親のブランチに送ります（propose）。
+        body: 頼まれると、エージェントは、まず事前確認（ccnavi-start.sh --check）で、GitLab と git が利用できる状態かを確かめます。そのうえで、親のワークツリーと、Draft の MR を用意します。issue だけを渡したときも、MR はエージェントが作ります。MR の用意まで終わると、エージェントが親と子の提案（チケット）を書いて、親のブランチに送ります（approval-request）。
         scene: { parent: sample-a }
       - target: card-sample-a
         title: 承認待ちの提案が届く

@@ -1,4 +1,4 @@
-"""propose の操作実績（records.stopops）の単体テスト。"""
+"""approval-request の操作実績（records.stopops）の単体テスト。"""
 
 from __future__ import annotations
 
@@ -30,32 +30,33 @@ def _result(ident="p1", route="sent", started=100, ended=101, **extra):
 class IdentTest(unittest.TestCase):
     def test_reads_the_identifier(self):
         cases = {
-            ("sh", ".ccnavi/scripts/ccnavi-ticket.sh", "propose", "p1"): "p1",
-            ("sh", "C:\\w\\ccnavi-TICKET.sh", "propose", "--", "p1"): "p1",
-            ("sh", "ccnavi-ticket.sh", "propose", "--reason", "x", "p2"): "p2",
+            ("sh", ".ccnavi/scripts/ccnavi-ticket.sh", "approval-request", "p1"): "p1",
+            ("sh", "C:\\w\\ccnavi-TICKET.sh", "approval-request", "--", "p1"): "p1",
+            ("sh", "ccnavi-ticket.sh", "approval-request", "--reason", "x", "p2"): "p2",
             ("sh", "ccnavi-ticket.sh", "start", "p1"): "",
-            ("sh", "ccnavi-ticket.sh", "propose"): "",
-            ("echo", "propose", "p1"): "",
-            ("FOO=1", "sh", "ccnavi-ticket.sh", "propose", "p1"): "p1",
-            ("env", "FOO=1", "sh", "ccnavi-ticket.sh", "propose", "p1"): "p1",
-            ("timeout", "60", "sh", "ccnavi-ticket.sh", "propose", "p1"): "p1",
-            ("nohup", "sh", "-x", "ccnavi-ticket.sh", "propose", "p1"): "p1",
-            ("uv", "run", "sh", "ccnavi-ticket.sh", "propose", "p1"): "p1",
-            ("echo", "-n", "ccnavi-ticket.sh", "propose", "p1"): "",
-            ("grep", "ccnavi-ticket.sh", "propose", "p1"): "",
+            ("sh", "ccnavi-ticket.sh", "approval-request"): "",
+            ("echo", "approval-request", "p1"): "",
+            ("FOO=1", "sh", "ccnavi-ticket.sh", "approval-request", "p1"): "p1",
+            ("env", "FOO=1", "sh", "ccnavi-ticket.sh", "approval-request", "p1"): "p1",
+            ("timeout", "60", "sh", "ccnavi-ticket.sh", "approval-request", "p1"): "p1",
+            ("nohup", "sh", "-x", "ccnavi-ticket.sh", "approval-request", "p1"): "p1",
+            ("uv", "run", "sh", "ccnavi-ticket.sh", "approval-request", "p1"): "p1",
+            ("echo", "-n", "ccnavi-ticket.sh", "approval-request", "p1"): "",
+            ("grep", "ccnavi-ticket.sh", "approval-request", "p1"): "",
         }
         for words, want in cases.items():
             with self.subTest(words=words):
                 self.assertEqual(stopops.propose_ident(list(words)), want)
 
     def test_a_pipe_around_propose_still_registers_the_call(self):
-        # `| head` のように出力を切るパイプの左右にあるproposeも、コマンドの語として読んで登録する。
+        # `| head` のように出力を切るパイプの左右にあるapproval-requestも、
+        # コマンドの語として読んで登録する。
         # `sh -c '…'` は引数1本の文字列で、実装は中を読まないので登録しない。
         cases = {
-            "sh ccnavi-ticket.sh propose p1 | head -1": True,
-            "sh .ccnavi/scripts/ccnavi-ticket.sh propose p1 2>&1 | tail -n 3": True,
-            "head -1 | sh ccnavi-ticket.sh propose p1": True,
-            "sh -c 'sh ccnavi-ticket.sh propose p1 | head -n 1'": False,
+            "sh ccnavi-ticket.sh approval-request p1 | head -1": True,
+            "sh .ccnavi/scripts/ccnavi-ticket.sh approval-request p1 2>&1 | tail -n 3": True,
+            "head -1 | sh ccnavi-ticket.sh approval-request p1": True,
+            "sh -c 'sh ccnavi-ticket.sh approval-request p1 | head -n 1'": False,
         }
         with tempfile.TemporaryDirectory() as state:
             conf = settings.Settings(state=state, stop_review_agent=True)

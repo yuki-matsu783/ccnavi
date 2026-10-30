@@ -855,5 +855,40 @@ class ShapeTest(unittest.TestCase):
         return value
 
 
+class NewNameTest(unittest.TestCase):
+    """新しく作る名前の検査。読み込みの側（`NAME_RE`）は変えない。"""
+
+    def test_usable_names_pass(self):
+        for name in ("feature", "a", "full-phases", "v1.2_x", "console", "com10", "A" * 64):
+            self.assertEqual(plan_templates.new_name_problem(name), "", name)
+
+    def test_windows_reserved_names_and_trailing_period_are_refused(self):
+        bad = (
+            "con",
+            "CON",
+            "prn",
+            "aux",
+            "nul",
+            "com1",
+            "COM9",
+            "lpt1",
+            "lpt9",
+            "con.x",
+            "nul.tar.gz",
+            "a.",
+            "a..",
+        )
+        for name in bad:
+            self.assertNotEqual(plan_templates.new_name_problem(name), "", name)
+
+    def test_the_old_shape_is_still_refused(self):
+        for name in ("", "-x", "a b", "a/b", "A" * 65):
+            self.assertNotEqual(plan_templates.new_name_problem(name), "", name)
+
+    def test_reading_still_accepts_what_it_accepted(self):
+        for name in ("con", "a."):
+            self.assertTrue(plan_templates.NAME_RE.match(name), name)
+
+
 if __name__ == "__main__":
     unittest.main()

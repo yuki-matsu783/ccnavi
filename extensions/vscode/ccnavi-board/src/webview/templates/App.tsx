@@ -9,7 +9,7 @@
 import { useRef, useState, type JSX } from "react";
 
 import { defaultSum } from "../../core/sums.js";
-import { templateNameTaken, validTemplateName } from "../../core/templatesmodel.js";
+import { NEW_TEMPLATE_NAME_RULE, templateNameTaken, validNewTemplateName } from "../../core/templatesmodel.js";
 import type { EditOpened, TemplateCheck, TemplateDetail, TemplateEntry, TemplatesData, TemplatesMessage, TemplatesPage, ToTemplates } from "../../core/templates-view.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
 import { parseTemplatesSample } from "../../core/tour-templates.js";
@@ -297,13 +297,13 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                     type="button"
                     className="action small"
                     data-action="new-template"
-                    disabled={!validTemplateName(newName) || templateNameTaken(page.data.layers, layer.name, newName) !== undefined}
-                    title={newName === "" || validTemplateName(newName) ? "この層に新しいテンプレートを作ります。保存するまでファイルは作りません" : "英数字で始め、英数字と . _ - のみ、64 字まで"}
+                    disabled={!validNewTemplateName(newName) || templateNameTaken(page.data.layers, layer.name, newName) !== undefined}
+                    title={newName === "" || validNewTemplateName(newName) ? "この層に新しいテンプレートを作ります。保存するまでファイルは作りません" : NEW_TEMPLATE_NAME_RULE}
                     onClick={() => startEdit({ type: "editNew", name: newName })}
                   >
                     作る
                   </button>
-                  {validTemplateName(newName) && templateNameTaken(page.data.layers, layer.name, newName) !== undefined && (
+                  {validNewTemplateName(newName) && templateNameTaken(page.data.layers, layer.name, newName) !== undefined && (
                     <span className="hint" role="status" data-role="name-taken">
                       {" "}
                       同じ名前のテンプレートが既にあります（大文字小文字は区別しません）

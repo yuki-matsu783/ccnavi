@@ -283,7 +283,8 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
         tail = (
             f"\n{len(gathered.rejected)} 件が承認の対象にならない。\n"
             "次: 提案を直してから、同じ --agree --preview --verify を打ち直す。"
-            "通ったら、ccnavi-ticket.sh propose で親のブランチへ送り、ユーザに承認を依頼する\n"
+            "通ったら、ccnavi-ticket.sh approval-request で親のブランチへ送り、"
+            "ユーザに承認を依頼する\n"
         )
     else:
         reason = VERIFY_OK
@@ -294,10 +295,10 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
         step = (
             "次: 子の提案が無い親がある（上の warn）。子の提案を wip/proposals/todo/ に書いてから、"
             "同じ --agree --preview --verify を打ち直す。親だけを先に承認する進め方なら、"
-            "ccnavi-ticket.sh propose <識別子> で送り、子の承認がもう 1 回要ることを"
+            "ccnavi-ticket.sh approval-request <識別子> で送り、子の承認がもう 1 回要ることを"
             "ユーザに伝える。承認が済むまで実装はしない\n"
             if childless
-            else "次: ccnavi-ticket.sh propose <識別子> で提案を親のブランチへ送ってから、"
+            else "次: ccnavi-ticket.sh approval-request <識別子> で提案を親のブランチへ送ってから、"
             "ユーザに承認を依頼してよい。承認が済むまで実装はしない\n"
         )
         tail = f"\n{len(gathered.batch)} 件が承認の対象に入る。\n{step}"

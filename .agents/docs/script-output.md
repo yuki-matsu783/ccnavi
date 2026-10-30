@@ -73,18 +73,18 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チ
 | `ccnavi-start.sh --issue` で issue が closed（MR なし） | 次の一手は決まらないので `次:` は出さず、`次の手:` に reopen して打ち直す・`--reopened` で続ける・別の issue・やめる、を番号つきで並べる（終了コード 3）。状態を読めないときは止めず `確認: issue #<番号> の状態: 未確認` | `ccnavi-start.sh` の `issue_state_gate` |
 | `ccnavi-start.sh` の初期コミットで git の作成者情報が無い | ユーザに `git config user.name` と `user.email` の設定を頼んで返事を待ち、設定できたら打ち直す（`NEXT_START_IDENT`）。作ったワークツリーを消せなかったときは `案内:` で残りを言う（`NOTE_START_WORKTREE_KEPT`） | `ccnavi-start.sh` の `ensure_initial_commit` |
 | `ccnavi-start.sh --check` | 結果に応じた一手（ユーザに認証や権限を頼む、MCPで代行する、作成者情報の設定を頼む、など。ok なら出さない） | `ccnavi-common-host.sh` の `ccnavi_pf_next` |
-| `ccnavi-ticket.sh` の start・finish・propose・consolidate の事前確認 | 同上（標準エラーに `確認:` と `次:` を出す。標準出力には何も足さない） | `ccnavi-ticket.sh` の `ticket_preflight` |
+| `ccnavi-ticket.sh` の start・finish・approval-request・consolidate の事前確認 | 同上（標準エラーに `確認:` と `次:` を出す。標準出力には何も足さない） | `ccnavi-ticket.sh` の `ticket_preflight` |
 | `ccnavi-start.sh --dry-run` | `--dry-run` を外した同じコマンド | `ccnavi-start.sh` の `real_args` |
 | `ccnavi-stage.sh` | 下書きを編集し、ユーザに `ccnavi-user-handoff.sh` での取り込みを案内する | `ccnavi-stage.sh` |
 | `ccnavi-review.sh` の早めに閉じた | 親に閉じて片付け、`ready` を打たせる | `ccnavi-review.sh` |
-| `ccnavi ticket new` の成功 | `次:` は提案の空欄を埋めること。子の提案は、無いと承認の確認と `propose` が警告するので、`必須:` の行に独立させる。`--lint`・`--agree --preview --verify`・`propose`・承認の依頼は `案内:` の行 | `tickets/proposal/scaffold.py` |
-| `ccnavi ticket revise` の成功 | `--feedback` なら `--agree --preview --verify` を通して `propose` で送り、ユーザに承認を頼む。写しだけのときは、まず雛形を直す | `tickets/proposal/revise.py` |
-| `ccnavi-ticket.sh propose` の成功 | ユーザに承認を頼んで返事を待つ | `ccnavi-ticket.sh` |
-| `ccnavi-ticket.sh propose` が親の計画の誤りで断る | 直して `propose` を打ち直す（指摘の行は `workflow` の返す文面をそのまま出す） | `tickets/proposal/propose.py` |
+| `ccnavi ticket new` の成功 | `次:` は提案の空欄を埋めること。子の提案は、無いと承認の確認と `approval-request` が警告するので、`必須:` の行に独立させる。`--lint`・`--agree --preview --verify`・`approval-request`・承認の依頼は `案内:` の行 | `tickets/proposal/scaffold.py` |
+| `ccnavi ticket revise` の成功 | `--feedback` なら `--agree --preview --verify` を通して `approval-request` で送り、ユーザに承認を頼む。写しだけのときは、まず雛形を直す | `tickets/proposal/revise.py` |
+| `ccnavi-ticket.sh approval-request` の成功 | ユーザに承認を頼んで返事を待つ | `ccnavi-ticket.sh` |
+| `ccnavi-ticket.sh approval-request` が親の計画の誤りで断る | 直して `approval-request` を打ち直す（指摘の行は `workflow` の返す文面をそのまま出す） | `tickets/proposal/propose.py` |
 | `ccnavi --agree --preview --verify` | 通れば承認を頼む。通らなければ提案を直して打ち直す | `tickets/proposal/agree.py` |
 | 承認後の通知 | 親の `start`、子の `start` | `tickets/proposal/agree_screen.py` |
 | `ccnavi-ticket.sh start`（子） | サブエージェントに実装を任せ、終わったら `finish` | `tickets/lifecycle/commands.py` |
-| `ccnavi-ticket.sh start`（親で子の無いフェーズが残る） | 子の提案を書いて `propose` で送り、承認をユーザに頼む（子の識別子の例を埋める） | `tickets/lifecycle/plan.py` |
+| `ccnavi-ticket.sh start`（親で子の無いフェーズが残る） | 子の提案を書いて `approval-request` で送り、承認をユーザに頼む（子の識別子の例を埋める） | `tickets/lifecycle/plan.py` |
 | `ccnavi-ticket.sh finish`（子で、レビュー不要） | 親の `status` | `tickets/lifecycle/commands.py` |
 | `ccnavi-ticket.sh finish`（親） | 移動をコミットして push し、Draft を解除する | `tickets/lifecycle/commands.py` |
 | `ccnavi-git.sh integrate` | 差分と変わるファイルをユーザに見せる。対話では、続けて `integrate-done` を打つと確認が出て、許可されたら確定する。非対話では、返事を待ってターンを終え、了承を得ていれば `integrate-done` で確定する（やめるなら `integrate --abort`）。取り込む差分が無いときも、ユーザに伝えて返事を待ち、片付けは了承のあと | `ccnavi-git.sh` |

@@ -185,8 +185,7 @@ export function ExpectationsResult({ result }: { readonly result: ExpectationsJs
                 </td>
                 <td>
                   {expectation.rules
-                    .filter((rule) => rule.source === "file")
-                    .map((rule) => `${rule.section}:${tmpName(rule.id)}`)
+                    .map((rule) => `${rule.section}:${tmpName(rule.id)}${rule.source === "outside" ? "（ルールファイル外の根拠）" : ""}`)
                     .join(", ")}
                 </td>
                 <td className="why">{tmpName(expectation.why)}</td>

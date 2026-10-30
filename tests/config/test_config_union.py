@@ -422,7 +422,7 @@ class ConfigUnionHarness(unittest.TestCase):
     def worktree(self, owner, name):
         """`.claude/worktrees/<名前>` に、owner（ワークスペースかプロジェクト）から切る。
 
-        あれば（`propose` が親の提案を書くために切ったもの）そのまま返す。
+        あれば（`approval-request` が親の提案を書くために切ったもの）そのまま返す。
         """
         path = os.path.join(self.ws, ".claude", "worktrees", name)
         if not os.path.isdir(path):

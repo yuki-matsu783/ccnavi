@@ -38,13 +38,13 @@ messages:
     kind: deny
     values: [ticket, area, worktree, parent, parent_area]
     what: |-
-      This path is inside the work area that ticket {ticket} declares ({area}) for worktree {worktree}, but outside its parent {parent} ({parent_area}). The ticket was approved with that overflow shown as a warning; writes there stay blocked. Send the output inside the parent's area, or, if the task genuinely needs this path, tell the parent so it can propose a ticket whose parent covers it and ask the user to run 'ccnavi-user-agree.sh'.
+      This path is inside the work area that ticket {ticket} declares ({area}) for worktree {worktree}, but outside its parent {parent} ({parent_area}). The ticket was approved with that overflow shown as a warning; writes there stay blocked. Send the output inside the parent's area, or, if the task genuinely needs this path, tell the parent so it can approval-request a ticket whose parent covers it and ask the user to run 'ccnavi-user-agree.sh'.
 
   RULE_TICKET_SCOPE__PLAIN:
     kind: deny
     values: [ticket, area, worktree]
     what: |-
-      This path is outside the work area that ticket {ticket} declares ({area}) for worktree {worktree}. Send the output inside that area, or, if the task genuinely needs this path, tell the parent so it can propose a ticket that covers it and ask the user to run 'ccnavi-user-agree.sh'.
+      This path is outside the work area that ticket {ticket} declares ({area}) for worktree {worktree}. Send the output inside that area, or, if the task genuinely needs this path, tell the parent so it can approval-request a ticket that covers it and ask the user to run 'ccnavi-user-agree.sh'.
 
   # ---- hook/post_report.py（`note:` の行を `案内:` で出す）
   # 承認済みの置き場の報告につける 1 行。判定は変えない。

@@ -4,14 +4,14 @@
 #   sh .ccnavi/scripts/ccnavi-ticket.sh status      [<親>]
 #   sh .ccnavi/scripts/ccnavi-ticket.sh next-id     [<先頭の語> <slug>]
 #   sh .ccnavi/scripts/ccnavi-ticket.sh learn      [--note <本文>] [--target <種類>] [--signal <信号>]
-#   sh .ccnavi/scripts/ccnavi-ticket.sh propose     <識別子>
+#   sh .ccnavi/scripts/ccnavi-ticket.sh approval-request     <識別子>
 #   sh .ccnavi/scripts/ccnavi-ticket.sh consolidate <親>
 #   sh .ccnavi/scripts/ccnavi-ticket.sh start       <識別子>
 #   sh .ccnavi/scripts/ccnavi-ticket.sh finish      <識別子>
 #   sh .ccnavi/scripts/ccnavi-ticket.sh cancel      <識別子> --reason <理由>
 #   sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>
 #
-# propose は、書いた承認待ちの提案（wip/proposals/todo/）と子のフローの下書き（wip/proposals/flows/）を
+# approval-request は、書いた承認待ちの提案（wip/proposals/todo/）と子のフローの下書き（wip/proposals/flows/）を
 # 親のブランチへコミットして push する。別のPCで承認して作業に入るために、承認を頼む前に打つ。
 # 提案を書く親のワークツリーで足りる（親子の識別子を渡す）。送るのは親子の提案だけ。サブエージェントからは打てない。
 # 親の提案は、送る前に計画の after の形と終端だけを検査し、誤りなら何も送らずに止まる（実行ファイル側の検査）。
@@ -40,18 +40,18 @@
 # .ccnavi/approved/done/。ユーザが動かす向きは .ccnavi/approved/ へ、エージェントが動かす向きは
 # wip/proposals/ へ。エージェントの側を動かすのはこのスクリプトだけで、直接ファイルを
 # 作ったり動かしたりするのは ccnavi が止める。
-# サブエージェントからの start・finish・cancel・propose・consolidate・record-risk は ccnavi の hook が止める（判定がサブエージェントの
+# サブエージェントからの start・finish・cancel・approval-request・consolidate・record-risk は ccnavi の hook が止める（判定がサブエージェントの
 # 呼び出しを見分ける。実行ファイルとこのスクリプトは呼び手を知らない）。
 #
 # 本体は ccnavi の `ticket` サブコマンド。ここは実行ファイルを探して渡すだけ。
 # 探す順は、環境変数 CCNAVI_ENTRY_PATH が指すもの → ワークスペースルートの dist/ccnavi/ccnavi →
 # ソースツリーの `python -m ccnavi`。
 #
-# start・finish・propose・consolidate は、ロックの前に事前確認（ホストの API と git のリモートが使える状態か）を打つ。
+# start・finish・approval-request・consolidate は、ロックの前に事前確認（ホストの API と git のリモートが使える状態か）を打つ。
 #   直接作業では確かめない。標準出力には何も足さず、ok でない項目だけを標準エラーに出す（ticket_preflight）。
 #
 # 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）の
-# start・finish・cancel・propose・consolidate は write-and-push で回す。Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため、次を 1 操作にする。
+# start・finish・cancel・approval-request・consolidate は write-and-push で回す。Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため、次を 1 操作にする。
 # ロック → 途中の操作の確認 → hook のマーカーを先にコミット →
 # 取り込み（ccnavi-sync.sh）→ 未送信の確かめ → 書く → 書いたパスだけ commit --only → push。push が
 # 通るまで完了にしない。送れなければ書いたものを戻す。record-risk のコミットと送信は、その子の finish が行う。
@@ -77,7 +77,8 @@ usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-ticket.sh status [<親>]
 sh .ccnavi/scripts/ccnavi-ticket.sh next-id [<先頭の語> <slug>]
-sh .ccnavi/scripts/ccnavi-ticket.sh <start|finish|cancel|propose> <識別子> [--reason <理由>]
+sh .ccnavi/scripts/ccnavi-ticket.sh <start|finish|cancel|approval-request> <識別子> [--reason <理由>]
+  （approval-request は --check を付けると、送る前の検査だけをして何も送らない）
 sh .ccnavi/scripts/ccnavi-ticket.sh consolidate <親>
 sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>
 sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] [--signal <信号>]
@@ -93,7 +94,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] 
                `ccnavi ticket new <識別子> --title <タイトル> --plan <型,…> --issue <値> --mr <番号>` が識別子のワークツリーの中で作る
                （このスクリプトに new は無い。手で書かない）
 
-  propose      承認待ちの提案（wip/proposals/todo/）と子のフローの下書き（wip/proposals/flows/）を親のブランチへ
+  approval-request      承認待ちの提案（wip/proposals/todo/）と子のフローの下書き（wip/proposals/flows/）を親のブランチへ
                コミットして push する。別のPCで承認できるように、承認を頼む前に打つ（親のワークツリーが必要です）。
                変わっていない提案は、未 push のコミットがあればそれだけを送る。未 push のコードの変更があれば止まる
   consolidate  親の finish が止めた気づきを処理する統合の子を doing/ に作り、親のブランチへ push する。
@@ -142,9 +143,9 @@ status | next-id | learn) ;;
 	;;
 esac
 case "$1" in
-status | next-id | start | finish | cancel | propose | consolidate | record-risk | learn) ;;
+status | next-id | start | finish | cancel | approval-request | consolidate | record-risk | learn) ;;
 *)
-	printf 'ccnavi-ticket: 未対応のサブコマンドです：%s。使用できるサブコマンドは status / next-id / start / finish / cancel / propose / consolidate / record-risk / learn です。\n' "$1" >&2
+	printf 'ccnavi-ticket: 未対応のサブコマンドです：%s。使用できるサブコマンドは status / next-id / start / finish / cancel / approval-request / consolidate / record-risk / learn です。\n' "$1" >&2
 	[ "$1" != new ] || printf '親の提案の雛形は、このスクリプトではなく実行ファイルが作ります: ccnavi ticket new <識別子> --title <タイトル> --plan <型,…> --issue <番号> --mr <番号> [--scope <glob>]（識別子のワークツリーの中で打つ。チケット作業は issue と MR のセット。issue の番号をユーザに聞き（無ければユーザに作ってもらい）、ccnavi-start.sh --issue <番号> でワークツリーと MR を作ると、識別子と --issue・--mr の値が出る）。\n' >&2
 	exit 2
 	;;
@@ -184,11 +185,18 @@ ticket_id() {
 	printf '%s' "$ti_id"
 }
 
-# propose は、どの道を通っても結果ファイルを 1 つ書く（Stop の AI 判定が、提案を送ったか送らなかったかを
+# approval-request は、どの道を通っても結果ファイルを 1 つ書く（Stop の AI 判定が、提案を送ったか送らなかったかを
 # 確定する）。自分をもう 1 度起こし（CCNAVI_PROPOSE_INNER）、終わった後に外側が書く。中がどこで終わっても
 # （止めた・送る前の失敗・出力を切られた）外側は残る。結果は ccnavi 自身の記録で、判定には使わない。
 # 道は、中が申し送り（CCNAVI_PROPOSE_NOTE の route=）に書く。書かれていなければ、終了コードで決める。
-if [ "$1" = propose ] && [ -z "${CCNAVI_PROPOSE_INNER:-}" ]; then
+# --check は確かめるだけで何も送らない。結果ファイルも書かない（送ったかどうかの記録に混ぜない）。
+po_check=""
+if [ "$1" = approval-request ]; then
+	for po_arg in "$@"; do
+		[ "$po_arg" != --check ] || po_check=yes
+	done
+fi
+if [ "$1" = approval-request ] && [ -z "${CCNAVI_PROPOSE_INNER:-}" ] && [ -z "$po_check" ]; then
 	po_id=$(ticket_id "$@")
 	po_dir="$root/logs/state/stopops-result"
 	po_start=$(date +%s 2>/dev/null || printf 0)
@@ -241,8 +249,8 @@ tidy_after() {
 	ccnavi_wap_exe --cwd "$here" worktree tidy "$ta_id" || :
 }
 
-# propose の前に、親のブランチに未 push のコード（承認済みの置き場と提案の置き場の外）の変更が無いかを見る。
-# propose は親のブランチを push するので、提案を送るつもりで、設計途中のコードまで公開しないため。
+# approval-request の前に、親のブランチに未 push のコード（承認済みの置き場と提案の置き場の外）の変更が無いかを見る。
+# approval-request は親のブランチを push するので、提案を送るつもりで、設計途中のコードまで公開しないため。
 # git の状態だけを見た判定。
 # 親のブランチのリモート追跡が無ければ（まだ一度も送っていない）見ない。
 propose_guard() {
@@ -264,7 +272,7 @@ propose_guard() {
 		esac
 	done <"$ccnavi_wap_tmp/pg-paths"
 	[ "$pg_count" -gt 0 ] || return 0
-	ccnavi_wap_say "親のブランチに未 push のコードの変更が${pg_count}件ある（${pg_other# }${pg_other:+ }など）。propose は提案だけを送るので、止めた。コードは先に送るか、手元の変更を整理してから再実行してください（何も反映していません）"
+	ccnavi_wap_say "親のブランチに未 push のコードの変更が${pg_count}件ある（${pg_other# }${pg_other:+ }など）。approval-request は提案だけを送るので、止めた。コードは先に送るか、手元の変更を整理してから再実行してください（何も反映していません）"
 	log_info 提案を送らずに止めた -- "family=$ccnavi_wap_family_id" "reason=unpushed-code"
 	ccnavi_wap_note "route=unpushed_code"
 	return 1
@@ -311,14 +319,14 @@ ensure_child_worktree() {
 # 1 項目 1 行と `次:` 1 本で標準エラーに出す。ok なら何も出さない。
 # 続けるのは、全体が ok か、ng が無く「api が確かめられず、権限は省略、git が ok」のときだけ（後者は注意を添える）。
 # それ以外は何も書かずに止める。事前確認は保証ではない（通ったあとの取り込みや push の関門で止まることはある）。
-# propose は外側と内側の 2 回起動するので、呼ぶのは内側（ここ）だけ。
+# approval-request は外側と内側の 2 回起動するので、呼ぶのは内側（ここ）だけ。
 # 親のブランチが一度も送られていないために止まったときの次の手（共通関数は事実だけを言う）。
 # MR の有無はホストの事柄でエージェントは調べられないので、決めるのはユーザ。
 ticket_unsent_parent_next() {
 	[ -n "${ccnavi_wap_unsent_parent:-}" ] || return 0
-	# 次の手は、手で切った親が最初に打つ propose・start のためのもの。ほかの操作は事実の文だけにする
+	# 次の手は、手で切った親が最初に打つ approval-request・start のためのもの。ほかの操作は事実の文だけにする
 	case "${1:-}" in
-	start | propose) ;;
+	start | approval-request) ;;
 	*) return 0 ;;
 	esac
 	tup_mr="<MR の番号>"
@@ -348,7 +356,7 @@ ticket_preflight() {
 	[ -z "$ccnavi_pf_next_text" ] || ccnavi_wap_say "$ccnavi_pf_next_text"
 	if [ "$ccnavi_pf_result" = unverified ] && [ "$ccnavi_pf_api" = unverified ] &&
 		[ "$ccnavi_pf_access" = skipped ] && [ "$ccnavi_pf_git" = ok ]; then
-		ccnavi_wap_say "注意: ホストの API を確かめられなかったが、続ける。このあとの request・confirm・ready はホストの API が要る"
+		ccnavi_wap_say "注意: ホストの API を確かめられなかったが、続ける。このあとの review-request・confirm・ready はホストの API が要る"
 		log_info 事前確認で注意して続ける -- "fix=${ccnavi_pf_fix:-none}" "auth=${ccnavi_pf_auth_source:-none}"
 		return 0
 	fi
@@ -358,7 +366,7 @@ ticket_preflight() {
 
 # write-and-push（親子のチケットの start・finish・cancel）。
 case "$1" in
-start | finish | cancel | propose | consolidate)
+start | finish | cancel | approval-request | consolidate)
 	ccnavi_log_root="$root"
 	ccnavi_wap_root="$root"
 	ccnavi_wap_label=ccnavi-ticket
@@ -382,12 +390,23 @@ start | finish | cancel | propose | consolidate)
 		case "$1" in
 		start) wap_words="$wap_id に着手" ;;
 		finish) wap_words="$wap_id の作業を終えた" ;;
-		propose) wap_words="$wap_id の提案を送る" ;;
+		approval-request) wap_words="$wap_id の提案を送る" ;;
 		consolidate) wap_words="$wap_id の学びの統合の子を作る" ;;
 		*) wap_words="$wap_id を取り消した" ;;
 		esac
 		# 取り消しは事前確認しない（ホストに届かない・権限が足りないときでも、取り消せるようにする）
 		[ "$1" = cancel ] || ticket_preflight || exit 1
+		# approval-request --check は、ロックも取り込みもせず、送る前の検査だけを実行ファイルで行う。
+		if [ -n "$po_check" ]; then
+			propose_guard || {
+				ccnavi_wap_end
+				exit 1
+			}
+			ccnavi_wap_end
+			trap - EXIT INT TERM HUP
+			ccnavi_wap_exe ticket "$@" || exit $?
+			exit 0
+		fi
 		ccnavi_wap_begin || {
 			ticket_unsent_parent_next "$1"
 			exit 1
@@ -399,7 +418,7 @@ start | finish | cancel | propose | consolidate)
 		if [ "$1" = start ] && [ "$wap_id" != "$ccnavi_wap_family_id" ]; then
 			ensure_child_worktree || exit 1
 		fi
-		if [ "$1" = propose ]; then
+		if [ "$1" = approval-request ]; then
 			# 失敗しても、利用者が書いた提案はワークツリーに残す（戻すのは自分のコミットだけ）。
 			ccnavi_wap_keep_worktree=yes
 			propose_guard || {
@@ -411,7 +430,7 @@ start | finish | cancel | propose | consolidate)
 		ccnavi_wap_write "ccnavi: ${wap_words}" -- ticket "$@" || wap_rc=$?
 		ccnavi_wap_end
 		trap - EXIT INT TERM HUP
-		if [ "$wap_rc" -eq 0 ] && [ "$1" = propose ]; then
+		if [ "$wap_rc" -eq 0 ] && [ "$1" = approval-request ]; then
 			# 送り終えたあとの案内。出力先が閉じていても、送った結果を失敗にしない（この 1 行の間だけ PIPE を無視する）。
 			trap '' PIPE
 			ccnavi_text "$root" NEXT_TICKET_PROPOSED 2>/dev/null || :
@@ -423,7 +442,7 @@ start | finish | cancel | propose | consolidate)
 	esac
 	ccnavi_wap_end
 	trap - EXIT INT TERM HUP
-	[ "$1" != propose ] || ccnavi_wap_note "route=write_only"
+	[ "$1" != approval-request ] || ccnavi_wap_note "route=write_only"
 	;;
 esac
 

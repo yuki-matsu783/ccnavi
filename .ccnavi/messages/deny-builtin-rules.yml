@@ -234,7 +234,7 @@ messages:
       承認が済んだかどうかは '{script:ccnavi-ticket.sh} status' で確かめる。置き場のファイルを自分で探さず、承認を頼み直す前に status を打つ
     note: |-
       作業を終えたら '{script:ccnavi-ticket.sh} finish <識別子>' で、レビュー待ち（wip/proposals/review/）へ動かしてください。
-      範囲を変えたいなら、wip/proposals/todo/ に新しい提案を書き、'{script:ccnavi-ticket.sh} propose <識別子>' で送ってから承認を依頼してください。
+      範囲を変えたいなら、wip/proposals/todo/ に新しい提案を書き、'{script:ccnavi-ticket.sh} approval-request <識別子>' で送ってから承認を依頼してください。
 
   RULE_TICKET_OPS:
     kind: deny

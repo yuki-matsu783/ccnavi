@@ -295,15 +295,15 @@ class ApproveVerifyTest(PhaseHarness):
     def test_writing_a_proposal_tells_the_agent_to_check_first(self):
         target = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0002.md")
         first = self.hook("PreToolUse", "Write", self.parent_tree, file_path=target)
-        self.assertIn("--agree --preview --verify", context(first))
+        self.assertIn("approval-request <親の識別子> --check", context(first))
         self.assertIn("承認を依頼する前に", context(first))
 
     def test_the_notice_comes_once_per_context(self):
         todo = os.path.join(self.parent_tree, "wip", "proposals", "todo")
         first = self.hook("PreToolUse", "Write", self.parent_tree, file_path=todo + "/i0002.md")
-        self.assertIn("--agree --preview --verify", context(first))
+        self.assertIn("approval-request <親の識別子> --check", context(first))
         again = self.hook("PreToolUse", "Write", self.parent_tree, file_path=todo + "/i0003.md")
-        self.assertNotIn("--agree --preview --verify", context(again))
+        self.assertNotIn("approval-request <親の識別子> --check", context(again))
 
     def test_the_notice_changes_no_verdict(self):
         """案内は判定の表に足さない。だから `todo/` の扱いは、案内を入れる前と同じ。
@@ -333,7 +333,7 @@ class ApproveVerifyTest(PhaseHarness):
                 # 止めた回にも文は届く（判定とは別の欄）。1 つの文脈で 1 度だけなので、
                 # 最初の 1 回だけを見る。
                 if mode == "bypassPermissions":
-                    self.assertIn("--agree --preview --verify", context(inside))
+                    self.assertIn("approval-request <親の識別子> --check", context(inside))
 
     def test_the_notice_stays_inside_the_workspace(self):
         """ワークスペースの外に同じディレクトリ構成を掘っても、提案を書いたことにはしない。

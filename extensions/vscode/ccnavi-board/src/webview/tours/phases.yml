@@ -238,7 +238,7 @@ diagrams:
         from: 親（メインエージェント）
         to: マージリクエスト
         text: レビューを依頼する（依頼を出すまでが「レビュー準備中」、出してからが「レビュー待ち」）
-        value: sh .ccnavi/scripts/ccnavi-review.sh request --phase 2 --body-file … --eli5 …
+        value: sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 2 --body-file … --eli5 …
       - id: confirm
         from: ユーザ
         to: ccnavi

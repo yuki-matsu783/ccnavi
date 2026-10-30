@@ -130,6 +130,10 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
    続きの step が `resume` でなければ `--no-session-persistence` を付ける。出力は `logs/scenarios/<ID>-<日時>/` に置く
    （`step-N.jsonl`、`report.md`、`report.json`、`evidence.md`、`context-N.md`、`messages.md`、`state.json`。`context-N.md` と `messages.md` は下の「証拠の読み方」。`setup.host` が `fake-gitlab` / `docker-gitlab` なら `host-N.json` も置く。下の「相手側の状態の記録」）。`run-all` の出力は「続けて回す（run-all）」
 4. **人間の操作の step で止める。** 実行器は `instruction` と `check` を出して終了コード 10 で止まる。`human_api` か `human_run` のある step は止まらずに進む（擬似端末を作れない環境の `human_run` は 10 で止まる）。
+   `docker-gitlab` のシナリオで 10 で止まる step は、操作者が `tests/manual/gitlab/scenario_tools.py` で代行する（`<出力の置き場>` は止まった回の `logs/scenarios/<ID>-<日時>/`）。素の shell で承認の sh を打たない。
+   - issue を作る（人間役のトークンで 1 件）: `uv run python tests/manual/gitlab/scenario_tools.py issue <出力の置き場> [--title 題]`
+   - 承認を代行する（代役の git の環境で擬似端末から y を送る）: `uv run python tests/manual/gitlab/scenario_tools.py agree <出力の置き場> <識別子>...`（識別子は承認する親・子。何を承認するかは `instruction` に従う）
+   - 記録にトークンの値が出ていないかを確かめる: `uv run python tests/manual/gitlab/scenario_tools.py leak <出力の置き場>`
    人間が「次へ」と言ったら `uv run python -m tests.scenarios.runner next <出力の置き場>` で続ける。直す必要があると言われたら、直してから `next` を打つ。
    続けずにやめるときは `uv run python -m tests.scenarios.runner restore <出力の置き場>`（`setup.reset` の対象は、止めている間 `base` に戻さず残す。「中断・失敗・停止のあと」）
 5. **`expect_after` を満たさず止まった回を扱う。** `expect_after` を満たさず止まった回は `next` で続けられない（終了コード 2）。prompt か期待を直して、`run` からやり直す。止まった回の `report.md` には `expect_after` の行が `inconclusive` で出て、止まった step より後に頼る `decisions`・`state` の判定は載せない
@@ -191,13 +195,19 @@ ccnavi 本体に作用しうるシナリオ（`setup` が使い捨てのリポ�
 
 ### プロジェクトを使うシナリオの前提
 
-プロジェクトを使うシナリオ（PMAC 系）は、プロジェクトのチェックアウト（`projects/test-repo`）のミラー（`.ccnavi/config/common/`）と `skills/` を、ワークスペースの共通に揃えてコミットしてある前提で回す。ずれていると、親のワークツリーへのコピーが未コミットの差分になり、`ready`・`request`・`finish` が止まって、評価したい振る舞いまで進まない。
+プロジェクトを使うシナリオ（PMAC 系）は、プロジェクトのチェックアウト（`projects/test-repo`）のミラー（`.ccnavi/config/common/`）と `skills/` を、ワークスペースの共通に揃えてコミットしてある前提で回す。ずれていると、親のワークツリーへのコピーが未コミットの差分になり、`ready`・`review-request`・`finish` が止まって、評価したい振る舞いまで進まない。
 
 揃え方（ユーザの手元作業。エージェントには頼まない）:
 
 1. `sh .ccnavi/scripts/ccnavi-user-mirror.sh test-repo` で差分と `--expect` の値を見る
 2. `sh .ccnavi/scripts/ccnavi-user-mirror.sh test-repo --yes --expect <値>` で揃える（ワークツリーに書くだけ）
 3. `projects/test-repo` の統合先に、揃えた分をコミットする
+
+エージェントが回す前に揃っているかだけを確かめるときは、`ccnavi-user-mirror.sh`（ユーザ専用。hook が止める）ではなく、読み取りの比較を使う。差分が出なければ揃っている。`skills/` はワークスペース側に比べる元が無いことがあり、その場合は比べられない。
+
+```sh
+diff -rq .ccnavi/config/common projects/test-repo/.ccnavi/config/common
+```
 
 ### 対象の判定
 
@@ -250,14 +260,15 @@ setup:
 
 1. `git worktree remove --force`（本体のワークツリー以外すべて）→ `git worktree prune`
 2. ccnavi 自身の状態を消す。git の共通ディレクトリ直下の `ccnavi-direct/`（直接作業の記録）・`ccnavi-integrate/`（取り込みの marker）・`ccnavi-integrate-done/`、と `refs/ccnavi/` の下のすべての ref（`refs/ccnavi/direct/<名前>/s` など）。前のシナリオの取り込み待ちを、次の SessionStart の文脈や `ccnavi-worktree.sh` の `adopt-recorded` に持ち越さないようにする
-3. `git checkout -f -B main <base>`（ローカルの `main` を `base` に合わせて切り替える）
-4. `main` 以外のローカルブランチを `git branch -D`
-5. タグを `git tag -d`
-6. `git stash clear`
-7. `git reset --hard <base>`
-8. `git clean -fd`
+3. ワークスペースルートの `logs/archive/<対象の名前>/` を消す（前の回の ready が退避した親子。残すと同じ識別子の親が「一度は送った形跡」になり、新しい origin への push の関門が止まる。ほかのプロジェクトの退避は消さない）
+4. `git checkout -f -B main <base>`（ローカルの `main` を `base` に合わせて切り替える）
+5. `main` 以外のローカルブランチを `git branch -D`
+6. タグを `git tag -d`
+7. `git stash clear`
+8. `git reset --hard <base>`
+9. `git clean -fd`
 
-2 をワークツリーの除去と prune の後に置くのは、記録が一時ワークツリー（本体の `logs/direct-tmp/<repo>/<名前>`。対象の外）やブランチを指しているからである。ワークツリーが消せずに止まった回（ロックされているなど）で、記録だけ先に消えて食い違いが生じるのを防ぐ。ディレクトリだけ先に消えた登録（prunable）は prune が外す。消すのは `require_disposable_repo` を通した対象の `.git/` の名指しの 3 つと `refs/ccnavi/` だけで、`logs/` など `.gitignore` 済みのものは残す（判定の記録はセッション ID で絞れる）。
+2 をワークツリーの除去と prune の後に置くのは、記録が一時ワークツリー（本体の `logs/direct-tmp/<repo>/<名前>`。対象の外）やブランチを指しているからである。ワークツリーが消せずに止まった回（ロックされているなど）で、記録だけ先に消えて食い違いが生じるのを防ぐ。ディレクトリだけ先に消えた登録（prunable）は prune が外す。消すのは `require_disposable_repo` を通した対象の `.git/` の名指しの 3 つと `refs/ccnavi/`、ワークスペースルートの `logs/archive/<対象の名前>/` だけで、そのほかの `logs/` など `.gitignore` 済みのものは残す（判定の記録はセッション ID で絞れる）。
 
 `git clean` に `-x` は付けない（`.gitignore` 済みの `logs/`・`.claude/` などを消さない）。`refs/remotes/*` は触らない。`.git/config`・`.git/hooks`・reflog・`refs/notes` も戻さない。merge・rebase などの途中で止まった対象は、`branch -D` が失敗して「戻せなかった」になる（手で中断してから `restore`）。origin への push は戻さない。push が要るシナリオは、各シナリオが自分で後始末する。
 戻す前に `base` が対象にあるコミットかを確かめ、無ければ何も変えずに止める。
@@ -471,10 +482,10 @@ steps:
       answers: ["y"]       # 端末へ送る行（起動直後に書く）
 ```
 
-- 対象: 回し始め（setup のあと）と、human_run を打ち終えるたびに、承認待ちの提案の識別子を集めて基準にする。基準に無い識別子だけを引数に並べて打つ。0 件か、test-repo 以外（ワークスペースルートや他のプロジェクト）の提案が混ざっていれば、打たずに止める。同じ識別子のまま書き換えた提案（親の改版）は対象にならない
+- 対象: 回し始め（setup のあと）と、human_run を打ち終えるたびに、承認待ちの提案の識別子を集めて基準にする。基準に無い識別子だけを引数に並べて打つ。0 件か、test-repo 以外（ワークスペースルートや他のプロジェクト）の提案が混ざっていれば、打たずに止める。親の改版（承認済みと同じ識別子の提案）は、回し始めに承認待ちでなければ増えた提案として対象になる
 - 引数は runner が組む。yml には argv も識別子も書かない（本物のチケットの識別子や `--root` を書けないように）
 - 打ち方: 擬似端末を付け、claude の外で打つ。環境から `CCNAVI_GUARD_TICKET_APPROVAL` を外し、`CCNAVI_WORKSPACE` をワークスペースルートに固定する。模擬の相手では claude と同じ環境（push 先が模擬）を使う。300 秒で終わらなければ、プロセスグループごと止める（孫の ccnavi や git も残さない）
-- 成否: 終了コードでなく、対象の識別子が新しく承認済みになったか（打つ前からある承認済みは数えない）で見る（`ccnavi-user-agree.sh` は push の失敗や保護ブランチでも 0 で終わる）。起動できないときや、state に基準が無いときも止める。push まで確かめるなら、後の step の `expect_after.state` か `expect.state` に書く
+- 成否: 終了コードでなく、対象の識別子が新しく承認済みになったか、打つ前から承認済みで打ったあとに承認待ちから消えたか（親の改版）で見る。承認待ちのまま残った改版は数えない（`ccnavi-user-agree.sh` は push の失敗や保護ブランチでも 0 で終わる）。起動できないときや、state に基準が無いときも止める。push まで確かめるなら、後の step の `expect_after.state` か `expect.state` に書く
 - 失敗は `halt`（`kind: human_run`）を立てて止め、`inconclusive` にする
 - 記録: 打つ前に `state.json` の `human_runs` に `started` を書き、終われば `done` か `halted` にする。`started` のまま残った回を `next` で続けると、打ち直さずに止める。出力は `human-run-<step>.log`
 - `check` は、打った step の項目ごとに `human-run-check` の行（needs-review）になる。人間が見ていた項目を誰も見ていないので、全体は pass にならない。ログを見て判断する

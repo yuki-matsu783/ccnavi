@@ -17,20 +17,21 @@ keywords: [レビュー, request, confirm, decide, comment, ELI5, crit, crit rev
 エージェントが打つ 3 本は次のとおり。
 
 ```sh
-sh .ccnavi/scripts/ccnavi-review.sh request --phase 2 --body-file scratchpad/request.md --eli5 wip/eli5/phase-2.html
+sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 2 --body-file scratchpad/request.md --eli5 wip/eli5/phase-2.html
 sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 2
 sh .ccnavi/scripts/ccnavi-review.sh comment --body-file scratchpad/decision.md
 ```
 
-- `request` が成功すると、`--body-file` が `scratchpad/` の中の依頼文は `request` が消す（レビュー待ちの間はシェルが止まって `rm` を打てないため）。残したいファイルは `scratchpad/` の外に置く。
-- `request` は、前提（フェーズが終わっている・レビューが延期されていない・すべての子が親に合流済み・未コミット無し・push 済み・未依頼）を確かめ、1 つでも欠けたら全件を列挙して何もしない。通れば依頼コメントを投稿する。マージリクエストは作らない（親のブランチの open の MR が無ければ止まる。作るのは `ccnavi-start.sh`）
-- 依頼後に親の HEAD が動いたら、レビュー済みになる前なら `request` を打ち直せる
+- `review-request` が成功すると、`--body-file` が `scratchpad/` の中の依頼文は `review-request` が消す（レビュー待ちの間はシェルが止まって `rm` を打てないため）。残したいファイルは `scratchpad/` の外に置く。
+- `review-request` は、前提（フェーズが終わっている・レビューが延期されていない・すべての子が親に合流済み・未コミット無し・push 済み・未依頼）を確かめ、1 つでも欠けたら全件を列挙して何もしない。通れば依頼コメントを投稿する。マージリクエストは作らない（親のブランチの open の MR が無ければ止まる。作るのは `ccnavi-start.sh`）
+- `review-request` に `--check` を付けると、同じ前提（ELI5・フェーズの終了・合流・未コミット・push・MR）を確かめるだけで、投稿もマーカーも置かない。0 なら前提は通っている（取り込みとロックは確かめない）
+- 依頼後に親の HEAD が動いたら、レビュー済みになる前なら `review-request` を打ち直せる
 - `confirm` は、依頼時の HEAD と今の HEAD が同じで push 済みであることを求め、今残っている未解決スレッドを数える。未解決も変更要求も無ければレビュー済みになり、そのフェーズの `review/` の子が `done/` へ動く。残るなら一覧を返す
 - `comment` は、このセッションで受けた承認や判断をマージリクエストのコメントにコピーする
 
 ## ELI5 を見て、crit で指摘を付ける
 
-`request` には ELI5 の HTML が付く。変更の目的・何が変わるか・リスクを専門用語なしで書いた 1 枚の HTML で、マージリクエストの差分に載る。
+`review-request` には ELI5 の HTML が付く。変更の目的・何が変わるか・リスクを専門用語なしで書いた 1 枚の HTML で、マージリクエストの差分に載る。
 依頼の投稿が済むと、エージェントは次の形の案内を出す。
 
 ```

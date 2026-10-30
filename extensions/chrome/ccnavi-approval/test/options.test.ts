@@ -31,7 +31,7 @@ const storage: Record<string, unknown> = {};
 const tokens = new Map<string, string>();
 const metas = new Map<string, TokenMeta>();
 const sent: Record<string, unknown>[] = [];
-/** 通信先の許可の呼び出し（request・remove）と、request に答える値 */
+/** 通信先の許可の呼び出し（review-request・remove）と、request に答える値 */
 const permissionCalls: { op: string; origins: string[] }[] = [];
 const grant = { ok: true };
 const NOW = new Date("2026-10-01T00:00:00Z");

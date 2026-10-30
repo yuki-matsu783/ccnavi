@@ -3,7 +3,7 @@ type: guide
 title: 子チケット作業のユーザとエージェントの手順
 description: チケット作業（親と子）を、準備・承認・着手・実装・finish・レビュー依頼・ready・片付けまでステップごとに並べた一覧と図。各操作が何を作り、何を拒むか。詰まったときの止まり方
 tags: [ticket, worktree]
-keywords: [チケット, 親, 子, 手順, 流れ, propose, start, finish, request, confirm, decide, ready, 差し戻し, レビュー, 承認, 着手, サブエージェント, Stop, 促し, 成果物]
+keywords: [チケット, 親, 子, 手順, 流れ, approval-request, review-request, --check, start, finish, confirm, decide, ready, 差し戻し, レビュー, 承認, 着手, サブエージェント, Stop, 促し, 成果物]
 ---
 
 # 子チケット作業のユーザとエージェントの手順
@@ -11,14 +11,28 @@ keywords: [チケット, 親, 子, 手順, 流れ, propose, start, finish, reque
 チケット作業は、親（計画とレビュー依頼を受け持つ）と子（実装を受け持つ）に分かれる。親は計画と依頼だけをし、作業は子が行う。
 各コマンドは `ccnavi-ticket.sh`・`ccnavi-review.sh`・`ccnavi-sync.sh`・`ccnavi-start.sh` を通す（使い方は `--help`）。
 直接作業の手順は[direct-flow.md](direct-flow.md)。合流と片付けの細部は[worktree-merge.md](worktree-merge.md)と[worktree-cleanup.md](worktree-cleanup.md)、ワークツリーの切り方は[worktree.md](worktree.md)。
-`start`・`finish`・`cancel`・`propose`・`consolidate`・`request`・`confirm`・`decide`・`ready` など状態を動かす操作は、サブエージェントからは hook が止める。打つのはメインのエージェント（`decide` はユーザ）。
+`start`・`finish`・`cancel`・`approval-request`・`consolidate`・`review-request`・`confirm`・`decide`・`ready` など状態を動かす操作は、サブエージェントからは hook が止める。打つのはメインのエージェント（`decide` はユーザ）。
 
 ## ユーザ確認までの進め方
 
 - 判断に必要な質問・問題がない限り、ユーザ確認地点まで作業を続ける。「次へ進めてよいか」だけの確認では止まらない。ユーザが停止・待機・相談を求めた場合や、操作が拒否された場合は止まり、理由を報告する
-- まず提案を書き、`ccnavi-ticket.sh propose <識別子>` で送る。内容と承認方法をユーザに案内して、承認を待つ
-- 承認後は、承認範囲内の作業・検証・子の `finish`・合流確認・ELI5 作成・レビュー依頼（`ccnavi-review.sh request`）まで進める。レビュー先と ELI5 をユーザに案内して、レビュー完了を待つ
+- まず提案を書き、`ccnavi-ticket.sh approval-request <識別子>` で送る。内容と承認方法をユーザに案内して、承認を待つ
+- 承認後は、承認範囲内の作業・検証・子の `finish`・合流確認・ELI5 作成・レビュー依頼（`ccnavi-review.sh review-request`）まで進める。レビュー先と ELI5 をユーザに案内して、レビュー完了を待つ
 - 承認待ち・レビュー待ちの関門を越えて作業を進めない
+
+## ユーザに渡す操作の標準の流れ
+
+ユーザの関門は 2 つで、承認（`approval-request`）とレビュー（`review-request`）。どちらも次の 1 つの規則に従う。
+
+> ユーザに渡す操作は、ユーザがその場で次の一手を打てる状態でなければ、何も書かずに拒否する。
+
+1. **渡す前に確かめる（任意）。** 渡さずに状態だけ見たいときは `--check` を付ける（`ccnavi-ticket.sh approval-request <親> --check`、`ccnavi-review.sh review-request --phase N --eli5 <html> --check`）。拒否条件は本番と同じ。何も書かず、送らず、投稿もせず、結果は終了コードと出力で返す（終了コード 0 なら本番も通る）
+2. **渡す。** `--check` を外して打つ。拒否されたら、理由を直して打ち直す。ユーザに頼むのは成功したあとにする
+3. **ユーザに案内する。** 成功した出力の案内（承認方法、レビュー先）をそのまま伝えて、ターンを終える
+4. **ユーザの一言のあとに確かめる。** ユーザの発言を承認やレビュー完了の根拠にせず、`ccnavi-ticket.sh status [<親>]` で承認済み・レビュー済みになったかを見てから続ける。ターミナル・Chrome 拡張・ファイル移動の経路は、セッションに通知が届かない
+
+`approval-request` の拒否条件は、計画の誤り・未 push のコード・親のワークツリーの未コミットの変更・承認の画面（`ccnavi --agree`）で外される理由（`issue:` `mr:` の欠け、置き場、先行、フェーズ定義、子の整合など）・事前確認（ホストの API と git のリモート）。承認のあとで初めて分かる止まりも、渡す前に拒否される。
+`review-request` の拒否条件は、フェーズ未完了・子が未合流・未合流の修正・未コミット・未 push・ELI5 の不備・依頼済み・MR の不一致。
 
 ## 全体の流れ
 
@@ -29,7 +43,7 @@ sequenceDiagram
   participant S as サブエージェント（子）
 
   P->>P: 0. 親のワークツリーと Draft MR を用意（ccnavi-start.sh）
-  P->>P: 1. 親と子の提案を propose
+  P->>P: 1. 親と子の提案を approval-request
   U->>P: 2. 計画・範囲を見て承認（doing/ へ）
   P->>P: 3. 親を start
   P->>P: 4. 子を start（子のワークツリーを切る）
@@ -38,7 +52,7 @@ sequenceDiagram
   S-->>P: 完了を返す
   P->>P: 6. 子を finish（親へ合流・push・review/ へ）
   P->>P: 7. ELI5 を書いて push
-  P->>U: 8. request（MR にレビュー依頼のコメント）
+  P->>U: 8. review-request（MR にレビュー依頼のコメント）
   U->>P: 9. crit review で指摘
   alt 未解決の指摘なし
     P->>P: 10. confirm（reviewed マーカー・子は done/ へ）
@@ -65,8 +79,8 @@ sequenceDiagram
 | 0 | エージェント | 手順 | 親のワークツリーと MR を用意する。issue・MR を指定された作業では、ワークツリーを切る前に打つ（[worktree-start.md](worktree-start.md)） |
 | 0 | | コマンド | `ccnavi-start.sh --issue <番号>`（MR なら `--mr <番号>`。`--issue` と `--mr` は一緒に渡せる） |
 | 0 | | 成果物 | 親のワークツリー `.claude/worktrees/<親>`、親のブランチ、Draft MR ができ、MR が閉じる issue が確定する。出力の「必須」の行（`issue:` と `mr:`）を提案に書く。`ticket start` はこれらを作らず、無ければ `ccnavi-start.sh` を案内して止まる |
-| 1 | エージェント | 手順 | `wip/proposals/todo/` に親・子の提案（と `flows/<子>.yml`）を書き、親のブランチへ送る。提案ファイルを置くのはエージェントで、`propose` はコミットして push する。すぐ始まるステップに子の提案が無いと、`--agree --preview --verify` と `propose` が警告する（止めないが、親だけを承認すると、子の承認がもう 1 回要る） |
-| 1 | | コマンド | `ccnavi-ticket.sh propose <識別子>` |
+| 1 | エージェント | 手順 | `wip/proposals/todo/` に親・子の提案（と `flows/<子>.yml`）を書き、親のブランチへ送る。提案ファイルを置くのはエージェントで、`approval-request` はコミットして push する。すぐ始まるステップに子の提案が無いと、`--agree --preview --verify` と `approval-request` が警告する（止めないが、親だけを承認すると、子の承認がもう 1 回要る） |
+| 1 | | コマンド | `ccnavi-ticket.sh approval-request <識別子>`（送らずに確かめるだけなら `--check`） |
 | 1 | | 成果物 | ロックの前に事前確認（ホストの API と git のリモート。外側の起動では確かめず、内側の 1 回だけ）を行う。全体が ok のとき、または ng が無く「api が確かめられず、権限は省略、git が ok」のときだけ続ける（後者は標準エラーに注意が出る）。それ以外は、何も書かずに終了コード 1 で止まる。標準出力には何も足さない。書いた提案だけがコミット（`ccnavi: <id> の提案を送る`）され、親のブランチへ push される。判定は承認済みのチケットだけを読むので、提案を送っても判定は変わらない。origin が無いと何も送らず案内だけ出して終わる。親のワークツリーが決まらない、提案が 0 本、親の提案の計画の `after`・終端の誤り、置き場の外のパスが差分にある、のいずれかにヒットすると止まる |
 | 2 | ユーザ | 手順 | 計画（`plan:`・先行関係）と範囲を見て承認する。ターミナルで y/N に答える。親の提案には `issue:` と `mr:` が要る |
 | 2 | | コマンド | `ccnavi-user-agree.sh <親> <子>`、または承認画面 |
@@ -83,12 +97,12 @@ sequenceDiagram
 | 6 | エージェント（メイン） | 手順 | 子を閉じる。衝突したら子のワークツリーで親のブランチを merge して解き、コミットしてからやり直す |
 | 6 | | コマンド | `ccnavi-ticket.sh finish <子>` |
 | 6 | | 成果物 | 先に事前確認（手順 1 と同じ）を行う。親のワークツリーに子の先頭が `merge --no-ff` で入り、`completed_at` と `merged_sha`（合流した子の先頭）が `doing/<子>.md` に書かれ、フェーズがレビューを要するか延期なら `wip/proposals/review/<子>.md`、そうでなければ `approved/done/<子>.md` へ移る。ここまでが 1 つのマージコミット（`ccnavi: <子> の作業を終えた`）になり、親のブランチへ push される。実績リスクが `phases/<親>/<子>.risk.json` に書かれる。`done/` に移った子のワークツリーは消え、`review/` の子のワークツリーは残る。止まる条件: 親のワークツリーに状態の置き場以外の未コミットの変更がある、子のワークツリーに未コミットの変更がある、子のコミットが置き場や範囲の外を触っている、衝突、フェーズ最後の子で成果物が追跡されていない、学びの記録（`wip/handoff/learnings/<子>.md`）が子の HEAD に無い（学びの蓄積が有効なとき）、実績リスクの判定が未記録。origin が無いと合流も push もしない |
-| 7 | エージェント（親） | 手順 | ELI5 の HTML を書き、コミットして push する。依頼文は任意のパスに置いてよく、コミット不要。ワークスペースルート直下の `scratchpad/` に置けば、`request` が成功したあとに消す |
+| 7 | エージェント（親） | 手順 | ELI5 の HTML を書き、コミットして push する。依頼文は任意のパスに置いてよく、コミット不要。ワークスペースルート直下の `scratchpad/` に置けば、`review-request` が成功したあとに消す |
 | 7 | | コマンド | ファイルを書いて `ccnavi-git.sh add`・`commit`・`push` |
 | 7 | | 成果物 | `wip/eli5/phase-N.html` が親のブランチに載る。依頼の前に、HEAD にコミット済みで、ワークツリーと中身が同じかを検査される |
-| 8 | エージェント（親） | 手順 | すべての子が合流済みと確かめ、レビューを依頼する。MR が open の状態で既にあること（`request` は MR を作らない） |
-| 8 | | コマンド | `ccnavi-review.sh request --phase N --body-file <依頼文> --eli5 <html>` |
-| 8 | | 依頼文の後始末 | 依頼文は `request` の入力で、依頼したあとは要らない。レビュー待ちの間は `ccnavi-*.sh` を単独で打つ以外のシェルが止まり `rm` を打てないので、`--body-file` がワークスペースルート直下の `scratchpad/` の中のファイルなら、`request` が成功したあとに `request` 自身が消す（出力に `案内: 依頼文 … を消した`）。ワークスペースの外や `scratchpad/` 以外のファイルは消さない。消せなければ標準エラーに警告だけ出し、終了コードは変えない |
+| 8 | エージェント（親） | 手順 | すべての子が合流済みと確かめ、レビューを依頼する。MR が open の状態で既にあること（`review-request` は MR を作らない） |
+| 8 | | コマンド | `ccnavi-review.sh review-request --phase N --body-file <依頼文> --eli5 <html>`（投稿せずに確かめるだけなら `--check`） |
+| 8 | | 依頼文の後始末 | 依頼文は `review-request` の入力で、依頼したあとは要らない。レビュー待ちの間は `ccnavi-*.sh` を単独で打つ以外のシェルが止まり `rm` を打てないので、`--body-file` がワークスペースルート直下の `scratchpad/` の中のファイルなら、`review-request` が成功したあとに `review-request` 自身が消す（出力に `案内: 依頼文 … を消した`）。ワークスペースの外や `scratchpad/` 以外のファイルは消さない。消せなければ標準エラーに警告だけ出し、終了コードは変えない |
 | 8 | | 成果物 | MR に依頼のコメントが 1 件投稿される（MR の説明欄は変えない。同じ目印のコメントがあれば投稿し直さない）。`.ccnavi/approved/phases/<親>/<N>.requested`（`head`・`mr`・`url`・`host`・`since`・`poster`・`at`）が置かれ、コミット・push される。ここからがユーザのレビュー待ち。止まる条件: ELI5 が未コミット・空・`wip/eli5/` の外、子が `merged_sha` を持たないか親の先頭の祖先でない、子のブランチに未合流の修正がある、親に未コミットの tracked 変更がある、親のブランチが未 push、既に依頼済み、open の MR が無い |
 | 9 | ユーザ | 手順 | ELI5 と MR の差分を見て、指摘を付ける |
 | 9 | | コマンド | `crit review <パス>`、`crit push <MR 番号>` |
@@ -123,15 +137,15 @@ sequenceDiagram
 
 ## 詰まったとき
 
-- 自分が準備・依頼したレビューの待ち中は、別の親・別の目的の新しい依頼をこのセッションで受けない。受けるときは、ワークスペースルートで起動した別のセッションで受けるようユーザに伝える。他の会話が待っている親は対象外。同じ親のレビュー対応・相談・止める指示・取り消し・次のフェーズの計画・動いている子の完了処理は、このセッションで続けてよい。これは案内だけで、セッション単位で機械的に止める仕組みではない（止めるのは、その親の cwd からのサブエージェントの起動とシェル実行だけ）。同じ文を、止めたときの案内（`hold_reason`）と `request` が成功したときの出力にも添える
+- 自分が準備・依頼したレビューの待ち中は、別の親・別の目的の新しい依頼をこのセッションで受けない。受けるときは、ワークスペースルートで起動した別のセッションで受けるようユーザに伝える。他の会話が待っている親は対象外。同じ親のレビュー対応・相談・止める指示・取り消し・次のフェーズの計画・動いている子の完了処理は、このセッションで続けてよい。これは案内だけで、セッション単位で機械的に止める仕組みではない（止めるのは、その親の cwd からのサブエージェントの起動とシェル実行だけ）。同じ文を、止めたときの案内（`hold_reason`）と `review-request` が成功したときの出力にも添える
 - 3 の `start` が通らないときは、実装に進まず、直接実装にも切り替えず、出力をユーザに報告して止まる
-- 非対話セッションで子が詰まったり、ユーザの確認が要ったりしたときは、止まる前に、メインが子を `cancel` するか、`finish` して続きの子を `propose` で送るかを決めてリモートへ反映する（手順は [ticket-work.md](ticket-work.md)）
-- ターンの終わりの促し（子の `finish`・合流・ELI5・`request` の抜けと、サブエージェントが範囲外の変更を残したまま、または範囲を確かめられないまま終わったこと、手で動かして共有した子の `confirm` を止める。全体計画のレビューが済んでフィードバック計画が決まらないときも、改版を書いて `propose` で送るよう促す）は、親が着手済み（`started_at` あり）でないと効かない。未着手の親で作業すると、`finish` も `request` も打たないままターンを終えられる。同じ HEAD では 1 回だけ止め、サブエージェントが実行中の間は止めない
+- 非対話セッションで子が詰まったり、ユーザの確認が要ったりしたときは、止まる前に、メインが子を `cancel` するか、`finish` して続きの子を `approval-request` で送るかを決めてリモートへ反映する（手順は [ticket-work.md](ticket-work.md)）
+- ターンの終わりの促し（子の `finish`・合流・ELI5・`review-request` の抜けと、サブエージェントが範囲外の変更を残したまま、または範囲を確かめられないまま終わったこと、手で動かして共有した子の `confirm` を止める。全体計画のレビューが済んでフィードバック計画が決まらないときも、改版を書いて `approval-request` で送るよう促す）は、親が着手済み（`started_at` あり）でないと効かない。未着手の親で作業すると、`finish` も `review-request` も打たないままターンを終えられる。同じ HEAD では 1 回だけ止め、サブエージェントが実行中の間は止めない
 - 親に `project:` があると、ユーザの発言のときの同期は、共通レイヤーの `rules.yml` をコピーする前に読み直す。この読み直しは、ワークスペースルートを渡さずに `{root}` を含むルールを読むため、`` `{root}` を使うにはワークスペースルートが必要です `` で失敗する（`src/ccnavi/tickets/sync/configsync.py` の `_unreadable_as_common`。ソースの読解で、実機では再現していない）
 - 承認済みかどうかや置き場は、ファイルを読んで推測せず `ccnavi-ticket.sh status` で確かめる
-- 子の `finish` から `request` までは、決まった手順の続きなので、ユーザの許可を待たずに進める。本当にユーザの判断が要る問いだけを、最後に書いて終える
-- `request` を打つまでは、レビューを依頼したと報告しない。ユーザのレビュー待ちになるのは、`requested` のマーカーが置かれてから
-- ホストへの送信（decide の返信・issue・コメント、close-early、request、comment、ready の補助コメント）は、`logs/state/ops/` の操作記録に段階ごとに載る。途中で失敗したら、`ccnavi-ticket.sh status` が「引き継ぎ未完了」として出す。decide は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送る。送ったか確定できない段階は自動では送り直さず、ホストで目印 `ccnavi:op=<操作ID>` を探して確かめる
+- 子の `finish` から `review-request` までは、決まった手順の続きなので、ユーザの許可を待たずに進める。本当にユーザの判断が要る問いだけを、最後に書いて終える
+- `review-request` を打つまでは、レビューを依頼したと報告しない。ユーザのレビュー待ちになるのは、`requested` のマーカーが置かれてから
+- ホストへの送信（decide の返信・issue・コメント、close-early、review-request、comment、ready の補助コメント）は、`logs/state/ops/` の操作記録に段階ごとに載る。途中で失敗したら、`ccnavi-ticket.sh status` が「引き継ぎ未完了」として出す。decide は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送る。送ったか確定できない段階は自動では送り直さず、ホストで目印 `ccnavi:op=<操作ID>` を探して確かめる
 - ユーザが子を `review/` から `done/` へ手で動かして commit・push すると、`ccnavi-ticket.sh status` が「レビュー完了確認待ち」と言い、Stop が `ccnavi-review.sh confirm --phase N` を 1 回だけ促す（`STEP_CONFIRM`）。confirm は移動の前に付いた未解決の指摘だけを、版つきで `phases/<親>/accepted.json` に受け入れる（ホストのスレッドは解決しない）。移動の後に付いた指摘や変更要求があれば確定しない。未コミット・未 push の移動は「移動が未共有」と言って確定しない
 
 ## 操作記録と dry-run

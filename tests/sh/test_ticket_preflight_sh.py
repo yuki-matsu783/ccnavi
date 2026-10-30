@@ -1,4 +1,4 @@
-"""`ccnavi-ticket.sh` の start・finish・propose・consolidate が打つ事前確認の受入テスト。
+"""`ccnavi-ticket.sh` の start・finish・approval-request・consolidate が打つ事前確認の受入テスト。
 
 ホストの API と git のリモートが使える状態かを、ロックを取る前に確かめる（直接作業では確かめない）。
 共通の道具と全体の説明は `tests/sh/write_and_push_harness.py` と `tests/host_stub.py` にある。
@@ -122,7 +122,7 @@ class TicketPreflightTest(WriteAndPushHarness):
 
     def test_propose_keeps_its_first_line_and_asks_the_host_once(self):
         self.set_routes(GOOD)
-        result = self.ticket("propose", PARENT, token="t0k")
+        result = self.ticket("approval-request", PARENT, token="t0k")
         # 事前確認だけが `GET user` を読む（外側と内側の 2 回起動しても、確かめるのは内側の 1 回）
         asked = [line for line in self.requests() if line == f"GET {host_stub.API}/user"]
         self.assertEqual(len(asked), 1, self.requests())

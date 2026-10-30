@@ -30,6 +30,7 @@ import { defaultSum } from "../../core/sums.js";
 import { Sum } from "./Sum.js";
 import { mutePosts, post } from "./post.js";
 import { Code } from "../shared/Code.js";
+import { foldFind } from "../shared/find.js";
 import { Rule } from "./Rule.js";
 import {
   draftOf,
@@ -113,6 +114,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const [lock, setLock] = useState<Lock>(() => pageOf(initial)?.lock ?? NO_LOCK);
   /** ファイルが外で変わった。破棄して読み直すかはユーザが決める */
   const [changed, setChanged] = useState(false);
+  /** 保存が通ったときの検証の warn の本文。帯に出し、次の編集か更新（中身の入れ替え）で消す */
+  const [saveWarns, setSaveWarns] = useState<readonly string[]>([]);
   const [find, setFind] = useState("");
   const [tab, setTab] = useState<TabName>(() => loadTab());
   const [judged, setJudged] = useState<Judged | undefined>(undefined);
@@ -202,6 +205,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       setBusy(false);
       setStatus(undefined);
       setChanged(false);
+      setSaveWarns([]);
       setLock(pageOf(next)?.lock ?? NO_LOCK);
       if (next.kind === "loading") {
         // 別の対象へ切り替わった。前の対象のルールで出た判定を、いまのルールの結果として残さない
@@ -234,6 +238,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       setStatus({ text: String(message.message ?? ""), error: false });
     } else if (message.type === "lock" && message.lock !== undefined) {
       setLock(message.lock as Lock);
+    } else if (message.type === "saved") {
+      setSaveWarns(message.warns ?? []);
     } else if (message.type === "changed") {
       setChanged(true);
     } else if (message.type === "cancelled") {
@@ -306,6 +312,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     }
     setEditing((now) => ({ ...now, draft: replace(now.draft, found.section, key, { ...found.row.rule, [field]: path }) }));
     setDirty(true);
+    setSaveWarns([]);
   };
 
   /**
@@ -353,6 +360,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     }
     setEditing((now) => ({ draft: next, open: opened ?? now.open }));
     setDirty(true);
+    setSaveWarns([]);
   };
 
   const editRule = (section: Section, key: string, rule: RuleForm): void => {
@@ -466,7 +474,10 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const shownSubject = touring ? (typeof scene.subject === "string" ? scene.subject : "") : subject;
   const isShownOpen = (row: { readonly key: string; readonly rule: RuleForm }): boolean => (touring ? sceneOpen.has(row.rule.id) : isOpen(row.key));
 
-  const query = shownFind.trim().toLowerCase();
+  const query = foldFind(shownFind.trim());
+  // 3 タイプとも、絞り込みに一致する行も、開いたまま見えている行も無いときだけ案内を出す
+  const allRows = SECTIONS.flatMap((section) => shownDraft[section]);
+  const nothingFound = query !== "" && allRows.length > 0 && allRows.every((row) => !findText(row.rule).includes(query) && !isShownOpen(row));
 
   return (
     <>
@@ -479,6 +490,11 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       {(touring ? [] : page?.notices ?? []).map((notice, index) => (
         <div className="banner warn" key={index}>
           {notice}
+        </div>
+      ))}
+      {(touring ? [] : saveWarns).map((warn, index) => (
+        <div className="banner warn" data-banner="save-warn" key={`save-warn-${index}`}>
+          <Code text={warn} />
         </div>
       ))}
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
@@ -556,6 +572,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           <input id="find" data-tour="find" type="search" placeholder="id・ツール・パターン・メッセージ・プロンプトで絞り込む" spellCheck={false} value={shownFind} onChange={(event) => (tour.touring ? undefined : setFind(event.target.value))} />
           <span className="hint" data-tour="order-hint">判定は強い順に deny &gt; ask &gt; allow</span>
         </div>
+        {nothingFound && <p className="empty">絞り込みに一致するルールがありません。検索語を変えるか、検索欄を空にしてください</p>}
         {SECTIONS.map((section) => {
           const rows = shownDraft[section].map((row) => {
             const text = findText(row.rule);
@@ -604,6 +621,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
                     onToggle={() => toggle(row.key)}
                     onChange={(rule) => editRule(section, row.key, rule)}
                     onMoveSection={(to) => moveSection(section, row.key, to)}
+                    finding={query !== ""}
                     first={index === 0}
                     last={index === rows.length - 1}
                     onMove={(delta) => move(section, row.key, delta)}

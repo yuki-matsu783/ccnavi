@@ -315,9 +315,9 @@ class TicketNewScopeTest(TicketNewTestBase):
         self.assertIn("子の提案", musts[0])
         self.assertIn("-01-01", musts[0])
         self.assertIn("同じ承認で通す", musts[0])
-        # 確かめと送り方は「案内:」。propose は親の識別子で打つ
+        # 確かめと送り方は「案内:」。approval-request は親の識別子で打つ
         guide = "\n".join(line for line in lines if line.startswith("案内: 書けたら"))
-        self.assertIn("--agree --preview --verify", guide)
+        self.assertIn("approval-request", guide)
         self.assertIn("承認が済むまで実装はしない", guide)
         self.assertIn("直接実装に切り替えず", result.stdout)
         self.assertIn("親の識別子で打つ。子の識別子では打たない", guide)
@@ -369,7 +369,7 @@ class TicketNewScopeTest(TicketNewTestBase):
         result = self.new("--scope", "src/ui/error.ts", plan="quick-work")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         # ccnavi を PATH に持たなくても打てる形で書く
-        self.assertRegex(result.stdout, r"ccnavi-launcher\.sh --agree --preview --verify ")
+        self.assertRegex(result.stdout, r"ccnavi-ticket\.sh approval-request \S+ --check")
         self.assertRegex(result.stdout, r"ccnavi-launcher\.sh --lint")
 
     def test_scope_must_be_relative_and_stay_inside_the_tree(self):

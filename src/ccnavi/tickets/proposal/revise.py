@@ -128,14 +128,16 @@ def run(
     if failed:
         return refuse(f"{path} に保存できませんでした（{failed}）")
 
-    launcher = settings.script_command(root, "ccnavi-launcher.sh")
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
     stdout.write(
         f"{ident} の改版の雛形を {path} に書いた"
         "（承認済みチケットのコピー。スクリプトだけが書く欄は外した）\n"
     )
-    verify = f"'{launcher} --agree --preview --verify {ident}' が通ったら、"
-    send = f"'{ticket_sh} propose {ident}' で親のブランチへ送り、承認をユーザに頼んで返事を待つ"
+    verify = f"'{ticket_sh} approval-request {ident} --check' が通ったら、"
+    send = (
+        f"'{ticket_sh} approval-request {ident}' で親のブランチへ送り、"
+        "承認をユーザに頼んで返事を待つ"
+    )
     if feedback:
         stdout.write("フィードバック計画は `feedback: []`（対応なし）にした\n")
         # 対応のフェーズを並べる場合は、確かめる前に直す。先に言ってから次の一手を言う

@@ -483,7 +483,7 @@ class PhaseTest(PhaseHarness):
         self.propose(
             "i0001-01-03", child_text("i0001-01-03", "i0001", 1, ["wip/research/*"], review=False)
         )
-        self.commit_parent("propose 02 03")
+        self.commit_parent("approval-request 02 03")
         result = self.approve()
         self.assertTrue(
             os.path.exists(os.path.join(self.approved, "doing", "i0001-01-03.md")), result.stderr
@@ -587,7 +587,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("一緒に見る", refused.stderr)
         # 2 番目を閉じて依頼すると、1 番目も含まれる。
         self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["src/a/*"]))
-        self.commit_parent("propose 02")
+        self.commit_parent("approval-request 02")
         self.assertEqual(self.approve().returncode, 0)
         self.run_child("i0001-02-02", [("src/a/x.py", "x\n")])
         self.assertEqual(self.close_child("i0001-02-02").returncode, 0)
@@ -655,7 +655,7 @@ class PhaseTest(PhaseHarness):
         self.assertEqual(self.board_phase(1), (False, False, ["requested", "reviewed"]))
         # 同じフェーズに子をもう 1 枚足すが、置き場に同じ名前のディレクトリを作って書けなくする。
         self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/design/*"]))
-        self.commit_parent("propose 02")
+        self.commit_parent("approval-request 02")
         os.makedirs(os.path.join(self.approved, "doing", "i0001-01-02.md"))
         refused = self.approve()
         self.assertNotEqual(refused.returncode, 0)
@@ -788,7 +788,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("局面: フィードバック対応中", result.stdout)
         # 2 番目の子（範囲は親の範囲そのまま）。
         self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["src/*"]))
-        self.commit_parent("propose 02")
+        self.commit_parent("approval-request 02")
         self.assertEqual(self.approve().returncode, 0)
         self.run_child("i0001-02-02", [("src/fix.py", "x\n")])
         self.assertEqual(self.close_child("i0001-02-02").returncode, 0)
@@ -1078,7 +1078,7 @@ class PhaseTest(PhaseHarness):
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         # 2 番目の子を提案して承認するが、着手はしない（todo/ に残る）。
         self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["wip/design/*"]))
-        self.commit_parent("propose 02")
+        self.commit_parent("approval-request 02")
         self.assertEqual(self.approve().returncode, 0)
         self.start_parent()
         data = read_json(fixture)
@@ -1249,7 +1249,7 @@ class PhaseTest(PhaseHarness):
         self.merge("i0001-01-01")
         # フェーズ 1 に 2 つ目の子を足して承認するが、着手はしない。
         self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/design/*"]))
-        self.commit_parent("propose 02")
+        self.commit_parent("approval-request 02")
         self.assertEqual(self.approve().returncode, 0)
         self.start_parent()
         fixture = self.remote()
@@ -1442,7 +1442,7 @@ class ScopeLimitTest(PhaseHarness):
         """親を承認し、子を提案して承認し、子のワークツリーを作って着手する。ワークツリーを返す。"""
         self.family(plan=plan)
         self.propose(name, text)
-        self.commit_parent("propose child")
+        self.commit_parent("approval-request child")
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", name + ".md")))
@@ -1474,7 +1474,7 @@ class ScopeLimitTest(PhaseHarness):
             "i0001-01-01",
             scoped_child_text("i0001-01-01", "i0001", 1, regex=("^(wip/research|src/a|docs)/",)),
         )
-        self.commit_parent("propose child")
+        self.commit_parent("approval-request child")
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))

@@ -81,7 +81,15 @@ class RootCwdTest(unittest.TestCase):
         cases = {
             "confirm": ["confirm", "--phase", "1"],
             "decide": ["decide", "1", "--preview"],
-            "request": ["request", "--phase", "1", "--body-file", "b.md", "--eli5", "e.html"],
+            "request": [
+                "review-request",
+                "--phase",
+                "1",
+                "--body-file",
+                "b.md",
+                "--eli5",
+                "e.html",
+            ],
             "ready": ["ready"],
         }
         for name, args in cases.items():

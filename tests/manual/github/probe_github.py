@@ -636,7 +636,15 @@ def main() -> int:
 
     body = write(os.path.join(OUT, "request-1.md"), "見てほしい点\n\n- src/a と src/b を足した\n")
     early = sh(
-        REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body, "--eli5", ELI5
+        REVIEW_SH,
+        parent_tree,
+        "review-request",
+        "--phase",
+        "1",
+        "--body-file",
+        body,
+        "--eli5",
+        ELI5,
     )
     record(
         "push 前の request は前提で止まる",
@@ -667,7 +675,15 @@ def main() -> int:
     record("送り先は gh", "transport=gh" in origin_seen.stdout, origin_seen.stdout[-60:])
 
     requested = sh(
-        REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body, "--eli5", ELI5
+        REVIEW_SH,
+        parent_tree,
+        "review-request",
+        "--phase",
+        "1",
+        "--body-file",
+        body,
+        "--eli5",
+        ELI5,
     )
     say("request:\n" + redact(requested.stdout + requested.stderr))
     record("request が通る（PR を作って投稿してマーカー）", requested.returncode == 0)
@@ -695,7 +711,15 @@ def main() -> int:
         has_marker(comments_of(num), "<!-- ccnavi:request i0001:1 "),
     )
     again = sh(
-        REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body, "--eli5", ELI5
+        REVIEW_SH,
+        parent_tree,
+        "review-request",
+        "--phase",
+        "1",
+        "--body-file",
+        body,
+        "--eli5",
+        ELI5,
     )
     record(
         "2 度目の request は依頼済みで止まる", again.returncode != 0 and "依頼済み" in again.stderr

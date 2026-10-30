@@ -4,6 +4,7 @@
  * ここが作るのは並べて読めるようにした文だけ。
  */
 import type { PhaseForm } from "../../core/phases-view.js";
+import { foldFind } from "../shared/find.js";
 
 /** 補足（agent / when）に何か入っているか */
 export function hasMore(phase: PhaseForm): boolean {
@@ -38,7 +39,7 @@ export function splitList(text: string): readonly string[] {
 
 /** 絞り込みが適用する文字列。id・タイトル・範囲・成果物・使う場面にヒットする */
 export function findText(phase: PhaseForm): string {
-  return `${phase.id} ${phase.title} ${phase.scope.join(" ")} ${phase.deliverables.join(" ")} ${phase.when}`.toLowerCase();
+  return foldFind(`${phase.id} ${phase.title} ${phase.scope.join(" ")} ${phase.deliverables.join(" ")} ${phase.when}`);
 }
 
 /** 定義の数。絞り込んでいるときは「一致 / 全体（開いたまま N）」 */

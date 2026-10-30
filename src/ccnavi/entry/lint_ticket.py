@@ -267,7 +267,7 @@ def _operation_problems(
                         "記録が壊れている。ユーザが logs/state/ops/ の該当ファイルを確かめて消す"
                         if record.get("broken")
                         else "decide は 'ccnavi-user-decide.sh --resume <操作ID>' で続きを送る。"
-                        "request・comment・ready・close-early は同じコマンドを打ち直す"
+                        "review-request・comment・ready・close-early は同じコマンドを打ち直す"
                     ),
                 )
             )

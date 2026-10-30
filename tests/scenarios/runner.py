@@ -844,10 +844,22 @@ def _clear_ccnavi_state(root, top, run):
         run("update-ref", "-d", ref)
 
 
+def _clear_archive(root, top):
+    """前の回の ready が logs/archive/<プロジェクト>/ へ退避した親子を消す。
+    残すと、同じ識別子の親が「一度は送った形跡」になり、新しい origin への push の関門が止まる。
+    置き場はワークスペースルートの logs/ の下（git の外）で、そのプロジェクトの分だけを消す。
+    リンクは辿らず、リンク自体を外す。"""
+    path = Path(root) / "logs" / "archive" / Path(top).name
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+
+
 def reset_repo(root, target, base, allowed=None):
     """対象を base へ戻す。順序: ワークツリーを消す → prune → ccnavi の記録・marker・ref を消す →
-    main を base に合わせて切り替える → main 以外のローカルブランチを消す → タグを消す →
-    stash を空にする → reset --hard → clean -fd。
+    logs/archive/<プロジェクト>/ を消す → main を base に合わせて切り替える →
+    main 以外のローカルブランチを消す → タグを消す → stash を空にする → reset --hard → clean -fd。
     ccnavi の状態は、ワークツリーを消して prune したあとに消す。記録は一時ワークツリーや
     ブランチを指すので、ワークツリーが消せずに止まった回で、記録だけ先に消さない。
     clean に -x は付けない（.gitignore 済みを消さない）。refs/remotes は触らない。"""
@@ -876,6 +888,7 @@ def reset_repo(root, target, base, allowed=None):
             run("worktree", "remove", "--force", p)
     run("worktree", "prune")
     _clear_ccnavi_state(root, top, run)
+    _clear_archive(root, top)
     run("checkout", "-f", "-B", "main", base)
     for name in run("for-each-ref", "--format=%(refname:short)", "refs/heads").split():
         if name != "main":
@@ -1445,8 +1458,9 @@ def _run_human_run(out, st, idx, step, root):
        0 件か、test-repo 以外の提案が混ざっていれば止める
        （黙って外すと親だけ落ちて承認が失敗する）。
     3. 打ち始めたことを state に書いてから、端末で打つ。
-    4. 終了コードでなく、対象が新しく承認済みになったかで成否を見る
-       （push の失敗や保護ブランチでも 0 で終わるため。前からある承認済みは数えない）。
+    4. 終了コードでなく、対象が新しく承認済みになったか、打つ前から承認済みで
+       承認待ちから消えたか（親の改版）で成否を見る
+       （push の失敗や保護ブランチでも 0 で終わるため。承認待ちのまま残った改版は数えない）。
     """
     num = idx + 1
     runs = st.setdefault("human_runs", [])
@@ -1503,7 +1517,10 @@ def _run_human_run(out, st, idx, step, root):
     for line in text.strip().splitlines()[-5:]:
         print(f"  | {line}")
     record.update(exit=rc, log=str(log))
-    approved = _approved_ids(root) - approved_before
+    pending_now = _pending_proposals(root)
+    pending_ids = {p[0] for p in pending_now}
+    # 新しく承認済みになったか、打つ前から承認済みで承認待ちから消えた（親の改版）なら成功
+    approved = (_approved_ids(root) - approved_before) | (approved_before - pending_ids)
     missing = [i for i in ids if i not in approved]
     if missing:
         record["status"] = "halted"
@@ -1514,7 +1531,7 @@ def _run_human_run(out, st, idx, step, root):
             f"新しく承認済みにならなかった: {', '.join(missing)}（終了コード {rc}、ログ: {log}）",
         )
     record["status"] = "done"
-    st["proposals_before"] = _pending_proposals(root)
+    st["proposals_before"] = pending_now
     st["next_step"] = num
     _write_state(out, st)
     return None

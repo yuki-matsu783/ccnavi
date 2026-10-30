@@ -20,16 +20,30 @@ from tests.sh.write_and_push_harness import (
     git,
     write,
 )
-from tests.ticketsample import parent_text
+from tests.ticketsample import child_text, parent_text
 
 
 class ProposeTest(WriteAndPushHarness):
-    """`ccnavi-ticket.sh propose`: 承認待ちの提案と子のフローの下書きを親のブランチへ送る。"""
+    """`ccnavi-ticket.sh approval-request`:
+    承認待ちの提案と子のフローの下書きを親のブランチへ送る。"""
 
     TODO = "wip/proposals/todo"
     FLOWS = "wip/proposals/flows"
 
     def put(self, rel, text="x\n"):
+        """提案を置く。todo/ の親・子の `.md` は、承認の画面の検査を通る形にして、`text` を足す。
+
+        通る形は、承認済みの親と同じ範囲の改版。`text` は本文の末尾に足す。
+
+        `text` が `---` で始まるときは、そのまま書く（形を自分で決める試験）。中身が変わったかを
+        見る試験（v1・v2）のために、`text` は本文の末尾に残す。
+        """
+        stem, ext = os.path.splitext(rel.rsplit("/", 1)[-1])
+        if rel.startswith(f"{self.TODO}/") and ext == ".md" and not text.startswith("---"):
+            if stem == PARENT:
+                text = parent_text(PARENT, ["design"], allow=("src/*", "wip/*")) + "\n" + text
+            elif stem == CHILD:
+                text = child_text(CHILD, PARENT, 1, ("wip/design/*",), False) + text
         write(os.path.join(self.tree, *rel.split("/")), text)
         return rel
 
@@ -38,7 +52,7 @@ class ProposeTest(WriteAndPushHarness):
         child = self.put(f"{self.TODO}/{CHILD}.md")
         flow = self.put(f"{self.FLOWS}/{CHILD}.yml")
         before = self.sha(self.tree, "HEAD")
-        result = self.ticket("propose", PARENT)
+        result = self.ticket("approval-request", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         head = self.sha(self.tree, "HEAD")
         self.assertNotEqual(head, before)
@@ -67,7 +81,9 @@ class ProposeTest(WriteAndPushHarness):
     def test_a_parent_without_a_child_is_sent_with_a_warning_on_stderr(self):
         """すぐ始まるステップに子の提案が無い親。親を先に承認する進め方も正規なので送るが、言う。"""
         tree = self.second_parent()
-        result = self.sh("ccnavi-ticket.sh", "propose", "i0002", cwd=tree, **self.host_env({}))
+        result = self.sh(
+            "ccnavi-ticket.sh", "approval-request", "i0002", cwd=tree, **self.host_env({})
+        )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("子の提案がありません", result.stderr)
         self.assertIn("i0002-01-01", result.stderr)
@@ -76,15 +92,22 @@ class ProposeTest(WriteAndPushHarness):
 
     def test_a_revision_of_an_approved_parent_gets_no_child_warning(self):
         """承認済みの親の改版には、子の警告を出さない（子は承認の側にある）。"""
-        self.put(f"{self.TODO}/{PARENT}.md", parent_text(PARENT, ["design"]))
-        result = self.ticket("propose", PARENT)
+        self.put(
+            f"{self.TODO}/{PARENT}.md", parent_text(PARENT, ["design"], allow=("src/*", "wip/*"))
+        )
+        result = self.ticket("approval-request", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("子の提案がありません", result.stderr)
 
     def test_a_parent_with_its_child_gets_no_warning(self):
         tree = self.second_parent()
-        write(os.path.join(tree, *f"{self.TODO}/i0002-01-01.md".split("/")), "x\n")
-        result = self.sh("ccnavi-ticket.sh", "propose", "i0002", cwd=tree, **self.host_env({}))
+        write(
+            os.path.join(tree, *f"{self.TODO}/i0002-01-01.md".split("/")),
+            child_text("i0002-01-01", "i0002", 1, ("wip/design/*",), False),
+        )
+        result = self.sh(
+            "ccnavi-ticket.sh", "approval-request", "i0002", cwd=tree, **self.host_env({})
+        )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("子の提案がありません", result.stderr)
 
@@ -97,7 +120,9 @@ class ProposeTest(WriteAndPushHarness):
             parent_text("i0002", ["design"], allow=("src/*", "wip/*")),
         )
         before = self.sha(tree, "HEAD")
-        result = self.sh("ccnavi-ticket.sh", "propose", "i0002", cwd=tree, **self.host_env({}))
+        result = self.sh(
+            "ccnavi-ticket.sh", "approval-request", "i0002", cwd=tree, **self.host_env({})
+        )
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         err = result.stderr
         self.assertIn("親のブランチ i0002 はリモートにありません", err)
@@ -145,7 +170,7 @@ class ProposeTest(WriteAndPushHarness):
         other = self.put(f"{self.TODO}/i0002.md")
         sibling = self.put(f"{self.TODO}/{PARENT}x.md")
         draft = self.put("wip/handoff/.ccnavi/config/common/templates/login.yml")
-        result = self.ticket("propose", PARENT)
+        result = self.ticket("approval-request", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.committed(), [mine])
         status = self.dirty()
@@ -161,13 +186,13 @@ class ProposeTest(WriteAndPushHarness):
         """承認で「フィードバック計画の番号だけを指せる」と落ちる提案は、送る時点で断る。"""
         self.feedback_parent([{"type": "implement-feedback", "after": [1]}])
         before = self.sha(self.tree, "HEAD")
-        result = self.ticket("propose", PARENT)
+        result = self.ticket("approval-request", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("`feedback[0]` の `after` の 1 は読めない", result.stderr)
         self.assertIn("フィードバック計画の番号だけを指せる", result.stderr)
         self.assertEqual(
             [x for x in result.stderr.splitlines() if x.startswith("次: ")],
-            [f"次: 直して `ccnavi-ticket.sh propose {PARENT}` を打ち直す"],
+            [f"次: 直して `ccnavi-ticket.sh approval-request {PARENT}` を打ち直す"],
         )
         self.assertNotIn("提案:", result.stdout)
         self.assertEqual(self.sha(self.tree, "HEAD"), before)
@@ -180,23 +205,26 @@ class ProposeTest(WriteAndPushHarness):
                 {"type": "implement-feedback", "after": []},
             ]
         )
-        result = self.ticket("propose", PARENT)
+        result = self.ticket("approval-request", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("終端は 1 つにしてください", result.stderr)
         self.assertNotIn("提案:", result.stdout)
 
-    def test_a_correct_feedback_plan_is_sent(self):
-        rel = self.feedback_parent([{"type": "implement-feedback", "after": []}])
-        result = self.ticket("propose", PARENT)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.committed(), [rel])
+    def test_a_feedback_plan_before_the_review_is_refused_before_it_is_sent(self):
+        """形が正しくても、全体計画のレビューが済む前の改版は承認の画面で外れる。送る前に止める。"""
+        self.feedback_parent([{"type": "implement-feedback", "after": []}])
+        before = self.remote_sha()
+        result = self.ticket("approval-request", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("全体計画のフェーズが全部閉じてレビューが済んでから", result.stderr)
+        self.assertEqual(self.remote_sha(), before)
 
     def test_a_plan_with_a_misplaced_after_is_refused_even_without_feedback(self):
         text = parent_text(
             PARENT, ["design", {"type": "implement", "after": [5]}], allow=("src/*", "wip/*")
         )
         self.put(f"{self.TODO}/{PARENT}.md", text)
-        result = self.ticket("propose", PARENT)
+        result = self.ticket("approval-request", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("`plan[1]` の `after` の 5 は読めない", result.stderr)
 
@@ -208,29 +236,61 @@ class ProposeTest(WriteAndPushHarness):
         child = self.put(f"{self.TODO}/{CHILD}.md", bad)
         flow = self.put(f"{self.FLOWS}/{CHILD}.yml", "after: [1]\n")
         free = self.put(f"{self.TODO}/{PARENT}.md", "plan も feedback も無い\n")
-        result = self.ticket("propose", PARENT)
+        result = self.ticket("approval-request", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.committed(), sorted([child, flow, free]))
 
-    def test_a_proposal_that_is_not_utf8_is_sent_unchecked(self):
+    def test_a_proposal_that_is_not_utf8_is_refused_before_it_is_sent(self):
+        """読めない提案は承認の画面でも外れる。ユーザに渡す前に止め、何も送らない。"""
         path = os.path.join(self.tree, *self.TODO.split("/"), f"{PARENT}.md")
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "wb") as f:
             f.write(b"---\nx: \xe9\n---\n")
-        result = self.ticket("propose", PARENT)
+        before = self.remote_sha()
+        result = self.ticket("approval-request", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("何も送っていません", result.stderr)
+        self.assertEqual(self.remote_sha(), before)
+
+    def test_check_reports_ok_and_sends_nothing(self):
+        """--check は送る前の検査だけ。通っても、コミットも push も結果ファイルもない。"""
+        self.put(f"{self.TODO}/{PARENT}.md")
+        before = (self.sha(self.tree, "HEAD"), self.remote_sha())
+        result = self.ticket("approval-request", PARENT, "--check")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("確認: ok", result.stdout)
+        self.assertNotIn("提案:", result.stdout)
+        self.assertEqual((self.sha(self.tree, "HEAD"), self.remote_sha()), before)
+        self.assertIn(f"?? {self.TODO}/{PARENT}.md", self.dirty())
+        self.assertFalse(os.path.exists(os.path.join(self.state, "stopops-result")))
+
+    def test_check_names_what_the_approval_screen_would_refuse(self):
+        """承認の画面が外す提案は、--check でも本番でも同じ理由で止まる。"""
+        self.feedback_parent([{"type": "implement-feedback", "after": []}])
+        result = self.ticket("approval-request", PARENT, "--check")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("全体計画のフェーズが全部閉じてレビューが済んでから", result.stderr)
+        self.assertIn("何も送っていません", result.stderr)
+
+    def test_an_uncommitted_change_in_the_parent_stops_it_before_the_approval(self):
+        """承認の後に子の finish を止める、親のワークツリーの未コミットの変更は、渡す前に止める。"""
+        self.put(f"{self.TODO}/{PARENT}.md")
+        self.put("src/keep.py", "print(2)\n")
+        result = self.ticket("approval-request", PARENT, "--check")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("提案以外の未コミットの変更がある", result.stderr)
 
     def test_a_child_id_sends_the_whole_family(self):
         todo = self.put(f"{self.TODO}/{PARENT}.md")
-        result = self.ticket("propose", CHILD)
+        result = self.ticket("approval-request", CHILD)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.committed(), [todo])
 
     def test_an_edited_tracked_proposal_is_sent(self):
         rel = self.put(f"{self.TODO}/{PARENT}.md", "v1\n")
-        self.assertEqual(self.ticket("propose", PARENT).returncode, 0)
+        self.assertEqual(self.ticket("approval-request", PARENT).returncode, 0)
         self.put(rel, "v2\n")
-        result = self.ticket("propose", PARENT)
+        result = self.ticket("approval-request", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.committed(), [rel])
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
@@ -238,16 +298,16 @@ class ProposeTest(WriteAndPushHarness):
     def test_an_unchanged_proposal_sends_only_the_unpushed_commit(self):
         rel = self.put(f"{self.TODO}/{PARENT}.md")
         git(self.tree, "add", "--", rel)
-        git(self.tree, "commit", "-q", "-m", "propose by hand")
+        git(self.tree, "commit", "-q", "-m", "approval-request by hand")
         before = self.sha(self.tree, "HEAD")
         self.assertNotEqual(self.remote_sha(), before)
-        result = self.ticket("propose", PARENT)
+        result = self.ticket("approval-request", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.sha(self.tree, "HEAD"), before)
         self.assertEqual(self.remote_sha(), before)
 
     def results(self):
-        """propose の結果ファイル（Stop の AI 判定の操作実績）を、書かれた順に読む。"""
+        """approval-request の結果ファイル（Stop の AI 判定の操作実績）を、書かれた順に読む。"""
         directory = os.path.join(self.ws, "logs", "state", "stopops-result")
         found = []
         for name in sorted(os.listdir(directory)) if os.path.isdir(directory) else []:
@@ -261,7 +321,7 @@ class ProposeTest(WriteAndPushHarness):
 
     def test_the_result_file_records_the_route_sent(self):
         rel = self.put(f"{self.TODO}/{PARENT}.md")
-        self.assertEqual(self.ticket("propose", PARENT).returncode, 0)
+        self.assertEqual(self.ticket("approval-request", PARENT).returncode, 0)
         (result,) = self.results()
         self.assertEqual((result["id"], result["route"], result["rc"]), (PARENT, "sent", "0"))
         head = self.sha(self.tree, "HEAD")
@@ -271,13 +331,13 @@ class ProposeTest(WriteAndPushHarness):
     def test_the_result_file_records_unchanged_unpushed_code_and_failure(self):
         rel = self.put(f"{self.TODO}/{PARENT}.md")
         git(self.tree, "add", "--", rel)
-        git(self.tree, "commit", "-q", "-m", "propose by hand")
-        self.assertEqual(self.ticket("propose", PARENT).returncode, 0)
+        git(self.tree, "commit", "-q", "-m", "approval-request by hand")
+        self.assertEqual(self.ticket("approval-request", PARENT).returncode, 0)
         self.put("src/secret.py", "x = 1\n")
         git(self.tree, "add", "--", "src/secret.py")
         git(self.tree, "commit", "-q", "-m", "wip code")
         self.put(f"{self.TODO}/{PARENT}.md", "v2\n")
-        self.assertEqual(self.ticket("propose", PARENT).returncode, 1)
+        self.assertEqual(self.ticket("approval-request", PARENT).returncode, 1)
         routes = [r["route"] for r in self.results()]
         self.assertEqual(routes[-1], "unpushed_code")
         self.assertIn(routes[0], ("sent", "unchanged"))
@@ -285,16 +345,18 @@ class ProposeTest(WriteAndPushHarness):
     def test_a_rejected_push_leaves_a_failed_before_result(self):
         self.put(f"{self.TODO}/{PARENT}.md", "v1\n")
         self.reject_pushes()
-        self.assertNotEqual(self.ticket("propose", PARENT).returncode, 0)
+        self.assertNotEqual(self.ticket("approval-request", PARENT).returncode, 0)
         (result,) = self.results()
         self.assertEqual(result["route"], "failed_before")
         self.assertNotEqual(result["rc"], "0")
 
     def test_the_result_file_records_unchanged_exactly(self):
         self.put(f"{self.TODO}/{PARENT}.md")
-        self.assertEqual(self.ticket("propose", PARENT).returncode, 0)
+        self.assertEqual(self.ticket("approval-request", PARENT).returncode, 0)
         sent = self.sha(self.tree, "HEAD")
-        again = self.ticket("propose", PARENT)  # 変更も未pushのコミットも無い状態での打ち直し
+        again = self.ticket(
+            "approval-request", PARENT
+        )  # 変更も未pushのコミットも無い状態での打ち直し
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertEqual(self.sha(self.tree, "HEAD"), sent)
         # 結果ファイルの名前は開始秒とpidで決まるため、同じ秒の2つは順番が決まらない。
@@ -312,7 +374,7 @@ class ProposeTest(WriteAndPushHarness):
         rel = self.put(f"{self.TODO}/{PARENT}.md")
         head = self.sha(self.tree, "HEAD")
         remote = git(self.remote, "rev-parse", f"refs/heads/{PARENT}").stdout  # originを外した後
-        result = self.ticket("propose", PARENT)
+        result = self.ticket("approval-request", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.sha(self.tree, "HEAD"), head)  # 送らず、コミットもしない
         self.assertEqual(git(self.remote, "rev-parse", f"refs/heads/{PARENT}").stdout, remote)
@@ -324,7 +386,7 @@ class ProposeTest(WriteAndPushHarness):
 
     def test_the_result_file_records_stopped_without_a_parent_worktree(self):
         # 親のワークツリーが無い親子のチケットは、shが何も書かずにtarget stopで止める。
-        result = self.ticket("propose", "i0099")
+        result = self.ticket("approval-request", "i0099")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("書かずに止めた", result.stderr)
         (row,) = self.results()
@@ -334,19 +396,20 @@ class ProposeTest(WriteAndPushHarness):
     def test_no_proposal_and_a_user_decision_are_failed_before_not_stopped(self):
         # 送る提案が無い場合や、未送信のユーザの判断がある場合は、
         # stoppedではなく送る前の失敗になる。
-        self.assertEqual(self.ticket("propose", PARENT).returncode, 1)
+        self.assertEqual(self.ticket("approval-request", PARENT).returncode, 1)
         self.put(f"{self.TODO}/{PARENT}.md")
         write(os.path.join(self.tree, *APPROVED.split("/"), "done", "zzz.md"), "x\n")
-        self.assertEqual(self.ticket("propose", PARENT).returncode, 1)
+        self.assertEqual(self.ticket("approval-request", PARENT).returncode, 1)
         rows = self.results()
         self.assertEqual([r["route"] for r in rows], ["failed_before"] * 2)
         self.assertEqual([r["rc"] for r in rows], ["1", "1"])
 
     def piped_propose(self):
-        """`sh -c '<ccnavi-ticket.sh> propose <親> | head -n 1'`。出力を先頭の1行で切る。"""
+        """`sh -c '<ccnavi-ticket.sh> approval-request <親> | head -n 1'`。
+        出力を先頭の1行で切る。"""
         script = shlex.quote(os.path.join(self.scripts, "ccnavi-ticket.sh"))
         return subprocess.run(
-            [SHELL, "-c", f"{shlex.quote(SHELL)} {script} propose {PARENT} | head -n 1"],
+            [SHELL, "-c", f"{shlex.quote(SHELL)} {script} approval-request {PARENT} | head -n 1"],
             cwd=self.ws,
             env=self.ticket_env(),
             capture_output=True,
@@ -388,25 +451,27 @@ class ProposeTest(WriteAndPushHarness):
         """送れなかったときに戻すのは自分のコミットだけ。書いた提案はワークツリーに残る。"""
         new = self.put(f"{self.TODO}/{PARENT}.md", "v1\n")
         flow = self.put(f"{self.FLOWS}/{CHILD}.yml", "flow\n")
+        written = self.read(os.path.join(self.tree, new))
         self.reject_pushes()
         before = self.sha(self.tree, "HEAD")
         remote_before = self.remote_sha()
-        result = self.ticket("propose", PARENT)
+        result = self.ticket("approval-request", PARENT)
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.sha(self.tree, "HEAD"), before)
         self.assertEqual(self.remote_sha(), remote_before)
-        for rel, text in ((new, "v1\n"), (flow, "flow\n")):
+        for rel, text in ((new, written), (flow, "flow\n")):
             self.assertEqual(self.read(os.path.join(self.tree, rel)), text)
         self.assertNotIn("次: ", result.stdout)
 
     def test_a_rejected_push_keeps_an_edit_of_a_sent_proposal(self):
         rel = self.put(f"{self.TODO}/{PARENT}.md", "v1\n")
-        self.assertEqual(self.ticket("propose", PARENT).returncode, 0)
+        self.assertEqual(self.ticket("approval-request", PARENT).returncode, 0)
         self.put(rel, "v2 precious edit\n")
+        edited = self.read(os.path.join(self.tree, rel))
         self.reject_pushes()
-        result = self.ticket("propose", PARENT)
+        result = self.ticket("approval-request", PARENT)
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.read(os.path.join(self.tree, rel)), "v2 precious edit\n")
+        self.assertEqual(self.read(os.path.join(self.tree, rel)), edited)
         self.assertNotIn("次: ", result.stdout)
 
     def test_unpushed_code_is_not_sent_along_with_the_proposal(self):
@@ -415,7 +480,7 @@ class ProposeTest(WriteAndPushHarness):
         git(self.tree, "commit", "-q", "-m", "wip code")
         self.put(f"{self.TODO}/{PARENT}.md")
         before = self.remote_sha()
-        result = self.ticket("propose", PARENT)
+        result = self.ticket("approval-request", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("src/secret.py", result.stderr)
         self.assertEqual(self.remote_sha(), before)
@@ -424,13 +489,13 @@ class ProposeTest(WriteAndPushHarness):
 
     def test_the_extension_is_compared_without_case(self):
         rel = self.put(f"{self.TODO}/{PARENT}.MD")
-        result = self.ticket("propose", PARENT)
+        result = self.ticket("approval-request", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.committed(), [rel])
 
     def test_no_proposal_stops_without_changing_anything(self):
         before = self.remote_sha()
-        result = self.ticket("propose", PARENT)
+        result = self.ticket("approval-request", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("送る提案がありません", result.stderr)
         self.assertEqual(self.remote_sha(), before)
@@ -439,13 +504,13 @@ class ProposeTest(WriteAndPushHarness):
     def test_it_reads_only_the_parent_worktree(self):
         # ワークスペースルートにコピーがあっても、親のワークツリーに無ければ送らない。
         write(os.path.join(self.ws, "wip", "proposals", "todo", PARENT + ".md"), "x\n")
-        result = self.ticket("propose", PARENT)
+        result = self.ticket("approval-request", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("送る提案がありません", result.stderr)
 
     def test_the_executable_alone_is_refused_for_a_pushed_family(self):
         self.put(f"{self.TODO}/{PARENT}.md")
-        result = self.exe("ticket", "propose", PARENT)
+        result = self.exe("ticket", "approval-request", PARENT)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ccnavi-ticket.sh", result.stderr)
 
@@ -454,7 +519,7 @@ class ProposeTest(WriteAndPushHarness):
         self.put(f"{self.TODO}/{PARENT}.md")
         write(os.path.join(self.tree, *APPROVED.split("/"), "done", "zzz.md"), "x\n")
         before = self.remote_sha()
-        result = self.ticket("propose", PARENT)
+        result = self.ticket("approval-request", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertEqual(self.remote_sha(), before)
 

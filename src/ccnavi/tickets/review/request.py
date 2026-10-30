@@ -1158,7 +1158,7 @@ def moved_explanation(moved: Moved) -> list[str]:
     if moved.kind == KIND_MIRROR:
         lines.append(
             "動かしたのはミラーのずれ（共通レイヤーのコピーか `skills/`）のコミット。"
-            "ユーザが見たものと HEAD が違うので、再 `request` が要る。"
+            "ユーザが見たものと HEAD が違うので、再 `review-request` が要る。"
         )
     return lines
 
@@ -1202,7 +1202,7 @@ def _redo_request(root: str, phase_no: int) -> str:
     """HEAD が動いたときの案内。push 済みの今の HEAD で依頼を出し直す。"""
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     return (
-        f"push してから '{review_sh} request --phase {phase_no} --body-file <依頼文> "
+        f"push してから '{review_sh} review-request --phase {phase_no} --body-file <依頼文> "
         f"--eli5 wip/eli5/phase-{phase_no}.html' で"
         "依頼を出し直してください"
     )

@@ -65,7 +65,7 @@ keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedba
 
 ## 使う
 
-`ccnavi ticket new <識別子> --title <タイトル> --template <名前> [--layer <名前>] [--with-feedback] --issue <値> --mr <番号>` で、親の提案（`wip/proposals/todo/`）と、子のフローの下書き（`wip/proposals/flows/`）を作る。親のブランチへ送るのは `ccnavi-ticket.sh propose <識別子>`（承認を頼む前に打つ）。
+`ccnavi ticket new <識別子> --title <タイトル> --template <名前> [--layer <名前>] [--with-feedback] --issue <値> --mr <番号>` で、親の提案（`wip/proposals/todo/`）と、子のフローの下書き（`wip/proposals/flows/`）を作る。親のブランチへ送るのは `ccnavi-ticket.sh approval-request <識別子>`（承認を頼む前に打つ）。
 
 - 提案に書くのは全体計画 `plan:` だけ。テンプレートにフィードバック計画があっても、`--with-feedback` を付けないかぎり `feedback:` は書かない。フィードバック計画は全体計画の最後のレビューを見てから、改版で 1 回だけ足す決まりで、最初の提案に入れると、承認後に全体計画を改版できなくなる。書かなかったときは、出力がフィードバック計画のステップ数を言う。全体計画のレビューを見てから足すなら、`--with-feedback` を付けて作り直すか、提案を改版で足す。`--with-feedback` は `ticket new --template` でだけ使える
 - 提案の `plan:` / `feedback:` の `after` は、提案の番号に付け直される（フィードバック計画は全体計画の続きの番号）

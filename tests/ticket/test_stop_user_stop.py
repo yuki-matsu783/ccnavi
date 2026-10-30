@@ -23,15 +23,15 @@ NOTE_PARTS = (
 GUIDE = {
     ops_stop_request.STEP_FINISH: (
         "finish i0001-01-01",
-        "ELI5、レビューの依頼（request）へ進む",
+        "ELI5、レビューの依頼（review-request）へ進む",
     ),
     ops_stop_request.STEP_CONFIRM: ("confirm --phase 1", "decide をユーザに頼む"),
     ops_stop_request.STEP_MERGE: ("status i0001", "合流済みと確かめられたら"),
     ops_stop_request.STEP_LATE_FIX: ("同じフェーズに子を足して", "判断を仰ぐ"),
-    ops_stop_request.STEP_ELI5: ("wip/eli5/phase-1.html", "request --phase 1"),
+    ops_stop_request.STEP_ELI5: ("wip/eli5/phase-1.html", "review-request --phase 1"),
     ops_stop_request.STEP_REQUEST: (
         "未コミットの変更があれば先にコミットして push",
-        "request --phase 1",
+        "review-request --phase 1",
     ),
 }
 

@@ -570,7 +570,10 @@ class ReviewFixesTest(Base):
             self.assertEqual(sr.read_attempt(self.state, first)["rejudge"], want)
 
     def test_one_bash_with_two_proposes_registers_both(self):
-        command = "sh .ccnavi/scripts/ccnavi-ticket.sh propose a1 && sh ccnavi-ticket.sh propose b2"
+        command = (
+            "sh .ccnavi/scripts/ccnavi-ticket.sh approval-request a1 "
+            "&& sh ccnavi-ticket.sh approval-request b2"
+        )
         events._track_proposals(
             self.conf,
             hookio.Input(event=hookio.PRE_TOOL_USE, session_id="s1", tool_name="Bash",
@@ -581,8 +584,8 @@ class ReviewFixesTest(Base):
 
     def test_arguments_that_only_mention_the_script_are_not_proposals(self):
         for command in (
-            "echo ccnavi-ticket.sh propose zzz",
-            "grep -r 'ccnavi-ticket.sh propose' .",
+            "echo ccnavi-ticket.sh approval-request zzz",
+            "grep -r 'ccnavi-ticket.sh approval-request' .",
         ):
             events._track_proposals(
                 self.conf,
