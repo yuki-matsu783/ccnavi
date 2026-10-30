@@ -118,6 +118,17 @@ function problem(raw: Record<string, unknown>): LintProblem {
   };
 }
 
+/**
+ * `--lint` の報告（文面）から warn の行だけを取り出す。行は `warn: <場所>: <中身>`。
+ * 保存が通ったあとに画面の帯へ出す。一時ファイルのパスは対象のファイルのパスに直す。
+ */
+export function warnLinesOf(report: string, tmp: string, shown: string): string[] {
+  return report
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("warn: "))
+    .map((line) => line.split(tmp).join(shown));
+}
+
 /** そのプロジェクトについての苦情。`where` が `(projects/<名前>)` で始まるもの */
 export function problemsOfProject(lint: LintJson, name: string): LintProblem[] {
   const prefix = `(projects/${name})`;

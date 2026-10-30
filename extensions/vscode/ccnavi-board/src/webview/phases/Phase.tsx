@@ -11,6 +11,7 @@ import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 
 import { KIND_LABELS, PHASE_KINDS, REVIEWS, REVIEW_LABELS, type PhaseForm, type PhaseKind, type Review } from "../../core/phases-view.js";
 import { moreNote, scopeText, scopeTitle, splitList } from "./text.js";
+import { moveTitle } from "../shared/find.js";
 
 export interface PhaseProps {
   /** 画面の中だけのキー（`state.ts`）。行を名指しするために `data-key` へ出す */
@@ -34,6 +35,8 @@ export interface PhaseProps {
   /** 先頭の行は「上へ」、末尾の行は「下へ」を押せないようにする */
   readonly first: boolean;
   readonly last: boolean;
+  /** 絞り込み中（検索語が空でない）。並べ替えを止める */
+  readonly finding: boolean;
   readonly onMove: (delta: number) => void;
   readonly onRemove: () => void;
   /** 案内が指す行か。真のとき、行と欄に `data-tour` の印を付ける（印は画面に 1 つだけ。見本の最初の行にだけ付ける） */
@@ -151,11 +154,11 @@ export function Phase(props: PhaseProps): JSX.Element {
               <option value="inherit">inherit（親チケットの編集可能範囲を引き継ぐ）</option>
               <option value="globs">上限を指定する（glob のリスト）</option>
             </select>
-            {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*（ワークツリーのルートからの相対。子チケットの編集可能な範囲はこの中に収めます）")}
+            {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*。ワークツリーのルートからの相対で、子チケットの編集可能な範囲はこの中に収めます。区切りは半角 ,")}
           </div>
         </Captioned>
         <Captioned name="必須成果物" yamlKey="deliverables" tour={mark("phase-deliverables")}>
-          {list("deliverables", "f-deliverables", "wip/design/*.md（閉じる前に存在し、git に追跡されているべきもの）")}
+          {list("deliverables", "f-deliverables", "wip/design/*.md。閉じる前に存在し、git に追跡されている必要があります。区切りは半角 ,")}
         </Captioned>
         <details
           className="more"
@@ -187,10 +190,10 @@ export function Phase(props: PhaseProps): JSX.Element {
           </div>
         </details>
         <span className="buttons">
-          <button type="button" className="action small" title="上へ" disabled={disabled || props.first} onClick={() => props.onMove(-1)}>
+          <button type="button" className="action small" title={moveTitle("上へ", props.finding)} disabled={disabled || props.first || props.finding} onClick={() => props.onMove(-1)}>
             ↑
           </button>
-          <button type="button" className="action small" title="下へ" disabled={disabled || props.last} onClick={() => props.onMove(1)}>
+          <button type="button" className="action small" title={moveTitle("下へ", props.finding)} disabled={disabled || props.last || props.finding} onClick={() => props.onMove(1)}>
             ↓
           </button>
           <button type="button" className="action small" disabled={disabled} onClick={() => props.onRemove()}>

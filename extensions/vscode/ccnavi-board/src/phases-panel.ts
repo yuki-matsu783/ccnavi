@@ -39,6 +39,7 @@ import { followAppearance, postAppearance, readAppearance } from "./appearance.j
 import { loadBoard, runLint, type LintOverride } from "./ccnavi.js";
 import { commonLayer, LAYER_SELF, projectLayer, selfLayer } from "./core/layers.js";
 import { loadingText } from "./core/loading-render.js";
+import { warnLinesOf } from "./core/lintmodel.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asPhasesForm, readPhases, type PhasesDocument } from "./core/phases-doc.js";
 import { renderPhasesPage } from "./core/phases-render.js";
@@ -628,6 +629,11 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     return;
   }
   await reload(current);
+  // warn の本文は画面上部の帯に出す（通知は件数だけ）。中身（data）を渡したあとに送る
+  const warns = warnLinesOf(lint.value.report, tmp, loaded.phasesRel);
+  if (warns.length > 0 && alive(current)) {
+    current.host.post({ type: "saved", warns } satisfies ToPhases);
+  }
   vscode.window.showInformationMessage(`${loaded.phasesRel} に保存しました（${lintSummary(lint.value.report)}）`);
 }
 

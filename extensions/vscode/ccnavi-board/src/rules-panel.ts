@@ -33,6 +33,7 @@ import { loadBoard, runExpectations, runLint, runSuggest, runTest, type RulesOve
 import { hooksFor, parseHooks, type HookEntry } from "./core/hooks.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
 import { loadingText } from "./core/loading-render.js";
+import { warnLinesOf } from "./core/lintmodel.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asSections, readRules, type RulesDocument } from "./core/rules-doc.js";
 import { renderRulesPage } from "./core/rules-render.js";
@@ -723,6 +724,11 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     return;
   }
   await reload(current);
+  // warn の本文は画面上部の帯に出す（通知は件数だけ）。中身（data）を渡したあとに送る
+  const warns = warnLinesOf(lint.value.report, tmp, loaded.rulesRel);
+  if (warns.length > 0 && alive(current)) {
+    current.host.post({ type: "saved", warns } satisfies ToRules);
+  }
   vscode.window.showInformationMessage(`${loaded.rulesRel} に保存しました（${lintSummary(lint.value.report)}）`);
 }
 
