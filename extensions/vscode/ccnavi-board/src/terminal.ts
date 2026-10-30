@@ -22,6 +22,9 @@ export function runInTerminal(root: string, command: string): void {
       options.shellPath = shell;
     }
     terminal = vscode.window.createTerminal(options);
+    terminal.show(true);
+    sendWhenReady(terminal, command);
+    return;
   }
   terminal.show(true);
   terminal.sendText(command, true);
@@ -39,7 +42,43 @@ export function runInNewTerminal(root: string, name: string, command: string): v
   }
   const terminal = vscode.window.createTerminal(options);
   terminal.show(true);
-  terminal.sendText(command, true);
+  sendWhenReady(terminal, command);
+}
+
+/** 作った直後のシェルはまだ起動中で、すぐ送った行が行入力の途中で中断されることがある。待つ上限 */
+const READY_TIMEOUT_MS = 3000;
+
+/**
+ * 作ったばかりのターミナルへ、シェルの準備ができてから 1 行を送る。シェル統合が使えれば、その
+ * 立ち上がりを待つ。使えない・上限までに立ち上がらないときは、そのまま送る
+ * （シェル統合の API は VS Code 1.93 から。それ未満では待たずに送る）
+ */
+function sendWhenReady(terminal: vscode.Terminal, command: string): void {
+  const window = vscode.window as unknown as {
+    onDidChangeTerminalShellIntegration?: (
+      listener: (e: { terminal: vscode.Terminal }) => void,
+    ) => vscode.Disposable;
+  };
+  if (window.onDidChangeTerminalShellIntegration === undefined) {
+    terminal.sendText(command, true);
+    return;
+  }
+  let sent = false;
+  const send = (): void => {
+    if (sent) {
+      return;
+    }
+    sent = true;
+    subscription.dispose();
+    clearTimeout(timer);
+    terminal.sendText(command, true);
+  };
+  const subscription = window.onDidChangeTerminalShellIntegration((e) => {
+    if (e.terminal === terminal) {
+      send();
+    }
+  });
+  const timer = setTimeout(send, READY_TIMEOUT_MS);
 }
 
 /**
