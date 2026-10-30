@@ -59,6 +59,7 @@ import {
 } from "../../core/plan-graph.js";
 import { mergeState, readState } from "../vscode.js";
 import { maximizeClass, MaximizeButton, RefitOnChange, useMaximize } from "./Maximize.js";
+import { FLOW_ARIA_LABELS } from "./flow-aria.js";
 
 interface ItemData extends Record<string, unknown> {
   readonly node: PlanGraphNode;
@@ -443,7 +444,7 @@ export function PlanGraph({ plan, detail = false, editable = false, onConnect, o
           onPaneClick={detail ? () => setPicked(undefined) : undefined}
           isValidConnection={isValidConnection}
           onConnect={handleConnect}
-          ariaLabelConfig={{ "controls.zoomIn.ariaLabel": "拡大", "controls.zoomOut.ariaLabel": "縮小", "controls.fitView.ariaLabel": "全体を表示" }}
+          ariaLabelConfig={FLOW_ARIA_LABELS}
           minZoom={0.2}
           maxZoom={1.6}
           // 線と点を消すキーは受けない（読むだけのときに消えたように見えないように）

@@ -306,6 +306,15 @@ def _make_docker_project(root, host, top, scenario_id, git):
     )
     if r.returncode:
         raise RuntimeError(f"main を push できない: {r.stderr.strip()}")
+    # 対象に残る本物の origin の remote-tracking ref が、新規プロジェクトの issue #1 などの
+    # 番号を含むブランチ候補と衝突しないよう、消す。戻しは teardown の _restore_remote_refs。
+    r = git(
+        [*git_via(host), "fetch", "-q", "--prune", "--no-tags", "origin"],
+        cwd=top,
+        env=git_env(host),
+    )
+    if r.returncode:
+        raise RuntimeError(f"古い refs/remotes/origin/* を消せない: {r.stderr.strip()}")
 
 
 def git_env(host):

@@ -898,7 +898,7 @@ async function save(current: PanelState, doc: FlowDoc, imported?: string): Promi
   }
   // ターン中に書くと、次のツール呼び出しの実行後チェックが戻しうる。押した時点で知らせる。
   if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting()))) {
-    fail(current, "ターン中のため保存を取りやめました。ターンが終わってから保存してください");
+    fail(current, "エージェントの応答中のため保存を取りやめました。応答が終わってから保存してください");
     return;
   }
   if (!alive(current) || stale(current, loaded)) {

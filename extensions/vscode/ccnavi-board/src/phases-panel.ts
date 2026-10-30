@@ -51,6 +51,7 @@ import type { HandoffEntry } from "./core/handoff-entry.js";
 import { openHandoffFrom, readHandoffEntry } from "./handoff-entry.js";
 import type { PhasesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
+import { lintSummary } from "./core/lint-summary.js";
 import { assertRetained, watchPattern } from "./panel-common.js";
 import { settingsPanel, type SettingsState } from "./settings-panel.js";
 import { requireTickets } from "./ticket-control.js";
@@ -589,7 +590,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     return;
   }
   if (!(await confirmDuringTurn(lock))) {
-    fail(current, "ターン中のため保存を取りやめました。ターンが終わってから保存してください。");
+    fail(current, "エージェントの応答中のため保存を取りやめました。応答が終わってから保存してください。");
     return;
   }
   if (!alive(current)) {
@@ -633,8 +634,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
   if (warns.length > 0 && alive(current)) {
     current.host.post({ type: "saved", warns } satisfies ToPhases);
   }
-  const tail = lint.value.report.split("\n").filter((l) => l.trim() !== "").pop() ?? "";
-  vscode.window.showInformationMessage(`${loaded.phasesRel} に保存しました（${tail}）`);
+  vscode.window.showInformationMessage(`${loaded.phasesRel} に保存しました（${lintSummary(lint.value.report)}）`);
 }
 
 function asMessage(message: unknown): PhasesMessage | undefined {

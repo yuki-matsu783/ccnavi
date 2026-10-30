@@ -23,8 +23,8 @@ test("CB-T307 統合結果は実行ファイルの sums[] をそのまま渡す�
 });
 
 test("CB-T308 統合結果の欄の表記と、最初に見せる統合結果。共通の設定を開いているときはワークスペースの統合結果", () => {
-  assert.equal(sumLabel("self"), "統合結果（共通 + ワークスペース）");
-  assert.equal(sumLabel("lib"), "統合結果（共通 + プロジェクト lib）");
+  assert.equal(sumLabel("self"), "共通 + ワークスペース");
+  assert.equal(sumLabel("lib"), "共通 + プロジェクト（lib）");
   const sums = [{ name: "self" }, { name: "lib" }];
   assert.equal(defaultSum(sums, { kind: "project", name: "lib" }), "lib");
   assert.equal(defaultSum(sums, { kind: "self", name: "" }), "self");

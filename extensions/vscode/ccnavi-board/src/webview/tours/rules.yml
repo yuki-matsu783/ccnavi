@@ -219,7 +219,7 @@ diagrams:
         value: error が 1 件でもあれば保存しない（warn だけなら保存する）
       - id: lock
         from: ルール管理画面
-        text: 作業中のチケット（doing）があると、進行中の作業の判定が途中で変わるため保存できない。エージェントがターン中なら、確認が出る
+        text: 作業中のチケット（doing）があると、進行中の作業の判定が途中で変わるため保存できない。エージェントが応答中なら、確認が出る
       - id: write
         from: ルール管理画面
         to: rules.yml
@@ -243,7 +243,7 @@ diagrams:
       - id: load
         from: ccnavi（hook）
         to: rules.yml
-        text: ルールを読む（共通・ワークスペース・プロジェクトの設定の和）
+        text: ルールを読む（共通・ワークスペース・プロジェクトの設定を重ねたもの）
       - id: match
         from: ccnavi（hook）
         text: deny → ask → allow の順に適用する
@@ -376,7 +376,7 @@ diagrams:
       - id: count-1
         from: ccnavi（hook）
         to: state ファイル
-        text: ヒットした回数を 1 にする。3 の倍数ではないので、文は渡さない
+        text: ヒットした回数を 1 にする。3 の倍数ではないので、プロンプトは渡さない
         value: 'every: 3'
       - id: call-3
         from: Claude Code
@@ -408,7 +408,7 @@ courses:
         scene: { tab: rules, open: git-push }
       - target: find
         title: 絞り込み
-        body: id・ツール・パターン・メッセージで絞り込みます。畳んだタイプの中も探します。
+        body: id・ツール・パターン・メッセージ・プロンプトで絞り込みます。畳んだタイプの中も探します。
         scene: { tab: rules, find: env }
       - target: judge-form
         title: 判定を試す
@@ -475,7 +475,7 @@ courses:
 
   - id: how-save-try
     title: 保存してから効くまでと、試すときの違いを知りたいとき
-    summary: 保存で何が検証され、いつから効くか。「判定を試す」と本番の違いと、文を 3 回に 1 度だけ渡す設定
+    summary: 保存で何が検証され、いつから効くか。「判定を試す」と本番の違いと、プロンプトを 3 回に 1 度だけ渡す設定
     steps:
       - target: rules
         title: ルールを書く
@@ -485,7 +485,7 @@ courses:
         focus: edit
       - target: save
         title: 保存すると、まず検証される
-        body: ［保存］を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します。error が 1 件でもあれば、何も保存しません。作業中のチケットがあるときは保存できません。エージェントがターン中なら、確認が出ます。
+        body: ［保存］を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します。error が 1 件でもあれば、何も保存しません。作業中のチケットがあるときは保存できません。エージェントが応答中なら、確認が出ます。
         scene: { tab: rules, open: git-push }
         diagram: rule-save
         focus: save, lock
@@ -502,7 +502,7 @@ courses:
         diagram: rule-try
         focus: input, ask, answer, note
       - target: rule-db-migrate
-        title: 文を 3 回に 1 度だけ渡す
+        title: プロンプトを 3 回に 1 度だけ渡す
         body: "every: 3 を付けたルールは、ヒットした回数が 3 の倍数になった回にだけ、additionalContext をモデルに渡します。「判定を試す」は回数を数えないので、毎回文が出ます。本番との違いに注意してください。"
         scene: { tab: rules, open: db-migrate, more: true }
         diagram: rule-context
@@ -522,11 +522,11 @@ courses:
         scene: { tab: rules, open: protect-env, when: r }
       - target: when-graph
         title: 点を選んで直す
-        body: ノードをクリックすると選択され、下の編集欄でそのノードの条件を変更できます。ここでは .env 系に一致させる regex の点を選んでいます。文字を直すと、その場で図と要約に反映されます。
+        body: 条件をクリックすると選ばれ、下の編集欄でその条件を変更できます。ここでは .env 系に一致させる regex の点を選んでいます。文字を直すと、その場で図と要約に反映されます。
         scene: { tab: rules, open: protect-env, when: r.0 }
       - target: when-inspector
-        title: 子を追加する・削除
-        body: all / any の点を選ぶと「＋ glob」「＋ regex」「＋ all」「＋ any」「＋ not」で子を追加できます。例えば any に「＋ glob」を追加すれば、通す例外が 1 つ増えます。「ノードを削除」で削除できます。
+        title: 子を足す・削除
+        body: all / any の点を選ぶと「＋ glob」「＋ regex」「＋ all」「＋ any」「＋ not」で子を足せます。例えば any に「＋ glob」を足せば、通す例外が 1 つ増えます。「この条件を削除」で削除できます。
         scene: { tab: rules, open: protect-env, when: r.1.0 }
       - target: when-inspector
         title: 包む・種類を替える
@@ -567,7 +567,7 @@ courses:
         scene: { tab: rules, open: no-rm-rf }
       - target: rule-git-push-message
         title: 止めるときの言葉を入力する
-        body: deny には message を入力します。止められたモデルに届く文なので、なぜ止めたかと、代わりに何をすればよいかを入力します。ask と allow に message を入力すると、どこにも届かない（ask はユーザの確認ダイアログにしか出ない）ので lint が error にします。渡したい文は「コンテキストの追加」に入力します。
+        body: deny には message を入力します。止められたモデルに届く文なので、なぜ止めたかと、代わりに何をすればよいかを入力します。ask と allow に message を入力すると、どこにも届かない（ask はユーザの確認ダイアログにしか出ない）ので lint が error にします。渡したいプロンプトは「コンテキストの追加」に入力します。
         scene: { tab: rules, open: git-push }
       - target: judge-form
         title: 判定で確認する
@@ -579,36 +579,36 @@ courses:
         scene: { tab: rules, open: git-push }
 
   - id: context-every
-    title: 何回に 1 度、どんな文をモデルに渡すかを決めたいとき
-    summary: every と additionalContext / additionalContextOnce で、渡す回と文を決める
+    title: 何回に 1 度、どんなプロンプトをモデルに渡すかを決めたいとき
+    summary: every と additionalContext / additionalContextOnce で、渡す回とプロンプトを決める
     steps:
       - target: rule-db-migrate
         title: 畳んだ行で見分ける
-        body: 畳んだ行の右に「3 回ごと」のようなバッジと、コンテキストの追加がある印が出ます。見本では db-migrate が 3 回に 1 度、deps-change が 1 回ごと（ヒットするたび）に文を渡します。
+        body: 畳んだ行の右に「3 回ごと」のようなバッジと、コンテキストの追加がある印が出ます。見本では db-migrate が 3 回に 1 度、deps-change が 1 回ごと（ヒットするたび）にプロンプトを渡します。
         scene: { tab: rules }
       - target: rule-db-migrate-context
         title: コンテキストの追加
-        body: 文を渡したいルールは、行の中の「コンテキストの追加」を開きます。message が止められた側への言葉なのに対し、ここはツールの実行を許可する際に、エージェントへ伝える注意事項や補足を入力する欄で、どのタイプにも入力できます。渡す間隔（every）と、補足文を記載したファイルのパスを指定する欄もあります。
+        body: プロンプトを渡したいルールは、行の中の「コンテキストの追加」を開きます。message が止められた側への言葉なのに対し、ここはツールの実行を許可する際に、エージェントへ伝える注意事項や補足を入力する欄で、どのタイプにも入力できます。渡す間隔（every）と、補足文を記載したファイルのパスを指定する欄もあります。
         scene: { tab: rules, open: db-migrate, more: true }
       - target: rule-db-migrate-every
         title: every で何回に 1 度かを決める
         body: 'every: 3 は、そのルールがヒットした回数が 3 の倍数になった回だけを「渡す回」にします（3・6・9 回目）。空なら毎回です。数えるのはヒットした回数で、セッションの開始（起動・再開・compact の後）で 0 に戻ります。0 や整数でない値は lint の error です。'
         scene: { tab: rules, open: db-migrate, more: true }
       - target: rule-db-migrate-text
-        title: 渡す回のたびに届く文
-        body: additionalContext は、渡す回のたびに届く文です。短く、次の行動に直結する一言にします。ask のルールでは、ユーザが確認で Yes を押したときだけ届き、No なら届きません。
+        title: 渡す回のたびに届くプロンプト
+        body: additionalContext は、渡す回のたびに届くプロンプトです。短く、次の行動に直結する一言にします。ask のルールでは、ユーザが確認で Yes を押したときだけ届き、No なら届きません。
         scene: { tab: rules, open: db-migrate, more: true }
       - target: rule-deps-change-once
-        title: 最初の 1 回だけ届く文
-        body: additionalContextOnce は、セッションで最初に渡す回にだけ届く文で、長い背景の説明に向きます。additionalContext と両方入力すると、初回は 2 つを空行で並べて届き、2 回目からは additionalContext だけが届きます。every を指定すると、1 回目ではなく N 回目に届きます。
+        title: 最初の 1 回だけ届くプロンプト
+        body: additionalContextOnce は、セッションで最初に渡す回にだけ届くプロンプトで、長い背景の説明に向きます。additionalContext と両方入力すると、初回は 2 つを空行で並べて届き、2 回目からは additionalContext だけが届きます。every を指定すると、1 回目ではなく N 回目に届きます。
         scene: { tab: rules, open: deps-change, more: true }
       - target: rule-deps-change-file
-        title: 長い文はファイルで渡す
-        body: 文が長いときは、additionalContextFile（毎回）と additionalContextOnceFile（最初の 1 回）に、補足文を記載したファイルのパスを指定できます。先頭 4000 文字までが届きます。「選択…」でダイアログからも選べます。
+        title: 長いプロンプトはファイルで渡す
+        body: プロンプトが長いときは、additionalContextFile（毎回）と additionalContextOnceFile（最初の 1 回）に、補足文を記載したファイルのパスを指定できます。先頭 4000 文字までが届きます。「選択…」でダイアログからも選べます。
         scene: { tab: rules, open: deps-change, more: true }
       - target: judge-result
-        title: 届く文を判定で確認する
-        body: 「判定を試す」の結果の「返すメッセージ」に、入力した文が何と一緒に届くかが出ます。every で間引くかどうかは、実際にヒットした回数で決まるので、ここで確認できるのは文の中身と、ヒットするルールです。
+        title: 届くプロンプトを判定で確認する
+        body: 「判定を試す」の結果の「返すメッセージ」に、入力したプロンプトが何と一緒に届くかが出ます。every で間引くかどうかは、実際にヒットした回数で決まるので、ここで確認できるのは文の中身と、ヒットするルールです。
         scene: { tab: judge, tool: Bash, subject: python manage.py migrate, judge: db-migrate }
 
   - id: check-expectations
@@ -708,19 +708,19 @@ courses:
 
   - id: read-sum
     title: 共通の設定との統合結果を確認したいとき
-    summary: 実際に効くルールは、共通の設定と 1 つの設定の和。統合結果の枠で、由来と件数を読む
+    summary: 実際に効くルールは、共通の設定に選んだ設定を重ねたもの。統合結果の枠で、由来と件数を読む
     steps:
       - target: sum
         title: 統合結果とは
-        body: 判定に効くルールは、共通の設定と、ひとつの設定（ワークスペースかプロジェクト）のルールの和です。「統合結果」の枠は、その和を実行ファイルが出した結果のまま表示します。読み取り専用で、保存済みの内容の和なので、編集中の内容は含みません。
+        body: 判定に効くルールは、共通の設定に、ひとつの設定（ワークスペースかプロジェクト）のルールを重ねたものです。「統合結果」の枠は、その結果を実行ファイルの答えのまま並べます。読み取り専用で、保存済みの内容が対象なので、編集中の内容は含みません。
         scene: { tab: rules, sum: web }
       - target: sum-pick
         title: 統合結果を選ぶ
-        body: 選ぶ欄で、統合結果（共通 + ワークスペース）と、プロジェクトの統合結果（共通の設定 + そのプロジェクトの設定）を切り替えます。パスを持たないツール（Bash など）に適用されるのは、全プロジェクトの設定を合算した和ではありません。
+        body: 選ぶ欄で、統合結果（共通 + ワークスペース）と、プロジェクトの統合結果（共通 + プロジェクト（名前））を切り替えます。パスを持たないツール（Bash など）に適用されるのは、全プロジェクトの設定を合算した和ではありません。
         scene: { tab: rules, sum: web }
       - target: sum-count
         title: 件数と追加されたレイヤー
-        body: 件数の横に、追加されたレイヤーが出ます。見本の web は「共通の設定 + web」の和で、共通の設定のルールに、web のルールが追加されています。
+        body: 件数の横に、追加されたレイヤーが出ます。見本の web は「共通 + プロジェクト（web）」を重ねたもので、共通の設定のルールに、web のルールが追加されています。
         scene: { tab: rules, sum: web }
       - target: sum-deny
         title: 由来で確認する
@@ -728,7 +728,7 @@ courses:
         scene: { tab: rules, sum: web }
       - target: sum-deny
         title: 統合結果を替えて見比べる
-        body: 同じ共通のルール（git-push・no-rm-rf）が、どの統合結果にも入ります。統合結果を替えると、レイヤーごとに追加されるルールだけが入れ替わります。見本の self では secrets の置き場を止めるルールが追加されます。
+        body: 同じ共通のルール（git-push・no-rm-rf）が、どの統合結果にも入ります。統合結果を切り替えると、レイヤーごとに追加されるルールだけが入れ替わります。見本のワークスペースでは secrets の置き場を止めるルールが追加されます。
         scene: { tab: rules, sum: self }
       - target: target
         title: 編集する設定ファイルを選ぶ
@@ -741,7 +741,7 @@ courses:
     steps:
       - target: find
         title: 文字で絞り込む
-        body: 欄に文字を入れると、id・ツール・パターン・メッセージ・渡す文にヒットする行だけが残ります。組み合わせ条件のルールは、中の個別条件の文字にもヒットします。
+        body: 欄に文字を入れると、id・ツール・パターン・メッセージ・プロンプトにヒットする行だけが残ります。組み合わせ条件のルールは、中の個別条件の文字にもヒットします。
         scene: { tab: rules, find: git }
       - target: count-deny
         title: 件数は「一致 / 全体」
@@ -786,7 +786,7 @@ courses:
         scene: { tab: rules, open: db-migrate, error: true }
       - target: rule-db-migrate-context
         title: 内容を直す
-        body: この例の直し方は、ask の message を削除して、モデルに渡したい文を additionalContext に移すことです。ask の message は、ユーザの確認ダイアログにしか出ないためです。message が残った行を開くと、「message を削除」のボタンも出ます。
+        body: この例の直し方は、ask の message を削除して、モデルに渡したいプロンプトを additionalContext に移すことです。ask の message は、ユーザの確認ダイアログにしか出ないためです。message が残った行を開くと、「message を削除」のボタンも出ます。
         scene: { tab: rules, open: db-migrate, more: true, error: true }
       - target: rule-protect-env-pattern
         title: 組み合わせ条件の誤り

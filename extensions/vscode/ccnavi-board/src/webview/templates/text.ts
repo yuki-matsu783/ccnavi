@@ -3,6 +3,7 @@
  */
 import { shownLayerOf } from "../../core/templatesmodel.js";
 import type { PlanItem, ProblemSeverity, FlowSummary, TemplateLayer, TemplateProblem } from "../../core/templates-view.js";
+import { layerLabel as coreLayerLabel } from "../../core/sums.js";
 
 /** 深刻度の言葉。表示は `[error]` の形にする（`Problems.tsx`） */
 export function severityLabel(severity: ProblemSeverity): string {
@@ -28,16 +29,8 @@ export function treeLabel(tree: string): string {
   return tree === "" ? "ワークスペース" : tree;
 }
 
-/** 層の言葉。共通・ワークスペース（self）・プロジェクトの名前 */
-export function layerLabel(layer: string): string {
-  if (layer === "common") {
-    return "共通";
-  }
-  if (layer === "self") {
-    return "ワークスペース";
-  }
-  return `プロジェクト ${layer}`;
-}
+/** 層の言葉。共通・ワークスペース（self）・プロジェクト（名前）。言い方は `core/sums.ts` と同じ */
+export const layerLabel = coreLayerLabel;
 
 /** 対象が見せる層。実行ファイルが返していなければ undefined */
 export function layerFor(target: { readonly kind: string; readonly name: string }, layers: readonly TemplateLayer[]): TemplateLayer | undefined {

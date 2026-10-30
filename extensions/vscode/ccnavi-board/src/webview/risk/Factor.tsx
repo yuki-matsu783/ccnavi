@@ -156,7 +156,7 @@ export function Factor(props: FactorProps): JSX.Element {
           </>
         )}
         <Captioned name="理由" yamlKey="message" {...mark("factor-message")}>
-          {text("message", "f-message", "加点の理由として依頼文とクローズしたときの出力に出る短い文です。空なら id をそのまま使います")}
+          {text("message", "f-message", "レビュー依頼文と、子を閉じたときの出力に出る加点の理由。空なら id を使います")}
         </Captioned>
         <span className="buttons" {...mark("factor-buttons")}>
           <button type="button" className="action small" title={moveTitle("上へ", props.finding)} disabled={disabled || props.first || props.finding} onClick={() => props.onMove(-1)}>

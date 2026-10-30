@@ -7,7 +7,7 @@
  */
 import { useState, type JSX } from "react";
 
-import { sumLabel } from "../../core/sums.js";
+import { layersText, sumLabel } from "../../core/sums.js";
 import type { Sum as SumData } from "../../core/templates-view.js";
 import { Code } from "../shared/Code.js";
 import { droppedLabel, layerLabel } from "./text.js";
@@ -32,10 +32,10 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
   const used = sum.templates.filter((row) => row.effective).length;
   return (
     <details className="sum" id="sum" data-tour="sum" open={tour === undefined ? undefined : tour.open}>
-      <summary>統合結果（読み取り専用。共通の設定 + 1 つの設定の和）</summary>
+      <summary>統合結果（読み取り専用）</summary>
       <p className="hint">
-        実際に使われるテンプレートは、共通の設定と、その設定のテンプレートの和です。ここは実行ファイルが出力した結果をそのまま表示するだけで、中身を確認するときは画面上部の「設定」の欄で見たい層に切り替えます。
-        同じ名前が重なったときに破棄された側は「使われない」と理由を出します。
+        共通の設定に選んだ設定を重ねた、実行ファイルの答えをそのまま並べた結果です。中身を確認するときは、画面上部の「設定」の欄で見たい設定に切り替えます。
+        同じ名前が重なって破棄された側には、その理由を出します。
       </p>
       <label className="sum-pick" data-tour="sum-pick">
         統合結果{" "}
@@ -48,7 +48,7 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
         </select>
       </label>
       <p className="count" data-count="sum" data-tour="sum-count">
-        使われるのは {used} 件（{sum.layers.join(" + ")}）
+        使われるのは {used} 件（{layersText(sum.layers)}）
       </p>
       {sum.templates.length === 0 ? (
         <p className="empty">テンプレートがありません</p>

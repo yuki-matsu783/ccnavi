@@ -32,9 +32,9 @@ test("CB-D324 一覧は開いている対象の層のテンプレートだけを
       dom.all("li.template").map((li) => `${li.getAttribute("data-layer")}/${li.getAttribute("data-name")}`),
       ["self/ends", "self/feature", "self/local", "self/research"],
     );
-    assert.match(text(dom.one('li.template[data-name="feature"][data-layer="self"]')), /破棄した: 共通と同じ中身/);
+    assert.match(text(dom.one('li.template[data-name="feature"][data-layer="self"]')), /破棄: 共通と同じ中身/);
     assert.match(text(dom.one('li.template[data-name="ends"][data-layer="self"]')), /無効/);
-    assert.match(text(dom.one('li.template[data-name="research"][data-layer="self"]')), /破棄した: 共通と食い違います/);
+    assert.match(text(dom.one('li.template[data-name="research"][data-layer="self"]')), /破棄: 共通と食い違います/);
     assert.equal(dom.all('button[data-action="view-sum"], button[data-action="view-raw"]').length, 0);
     assert.equal(dom.all("details#sum").length, 1);
   } finally {
@@ -53,7 +53,7 @@ test("CB-D325 統合結果の枠は閉じた枠で出て、選んだ統合結果
     assert.match(text(dom.one('details#sum tr[data-layer="common"][data-name="broken"]')), /読み込めません/);
     assert.match(text(dom.one('details#sum tr[data-layer="self"][data-name="feature"]')), /使われない/);
     assert.match(text(dom.one('details#sum tr[data-layer="self"][data-name="research"]')), /共通と食い違います/);
-    assert.match(text(dom.one('[data-count="sum"]')), /使われるのは 4 件（common \+ self）/);
+    assert.match(text(dom.one('[data-count="sum"]')), /使われるのは 4 件（共通 \+ ワークスペース）/);
     dom.change(dom.one<HTMLSelectElement>("select#sum-select"), "lib");
     await dom.settle();
     assert.deepEqual(
@@ -99,9 +99,9 @@ test("CB-D327 苦情の件数と深刻度の文字（[error] [warn] [info]）が
   const dom = await openTemplates();
   try {
     const summary = text(dom.one('[data-tour="summary"]'));
-    assert.match(summary, /error 3/);
-    assert.match(summary, /warn 2/);
-    assert.match(summary, /info 1/);
+    assert.match(summary, /エラー 3/);
+    assert.match(summary, /警告 2/);
+    assert.match(summary, /情報 1/);
     await openRow(dom, 'li.template[data-name="ends"][data-layer="self"]');
     assert.match(text(dom.one('li.template[data-name="ends"][data-layer="self"] .sev-label')), /\[error\]/);
     await openRow(dom, 'li.template[data-name="feature"][data-layer="self"]');

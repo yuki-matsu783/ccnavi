@@ -284,7 +284,7 @@ setup:
 **`docker-gitlab`。** 動いている Docker の GitLab（`tests/manual/gitlab/docker_gitlab.py`。立て方と既知の制約は [gitlab-manual.md](gitlab-manual.md)）に、回すたびに使い捨てのプロジェクトを作り、回したあとに消す。
 
 - 起動: 回す前に `docker_gitlab.py status` で動いているかを見る。止まっていれば `up`（他の回が使っているかもしれないので、`down`・`up --rotate` は打たない）。止まっているシナリオは、`run` が `次:` で `up` を案内して止まる（終了コード 3）。`run-all` は、そのシナリオだけを飛ばし、ほかの相手のシナリオは回す
-- 作るもの: プロジェクト `sc-<シナリオ ID を fold した綴り>-<時刻>-<乱数>`（root の名前空間、`main` が既定のブランチ）。人間役 `ccnavi-reviewer` を Developer のメンバーに加え、対象の `main` を push する。push するのは `main` だけで、ほかのブランチ・タグが要るシナリオは対象外
+- 作るもの: プロジェクト `sc-<シナリオ ID を fold した綴り>-<時刻>-<乱数>`（root の名前空間、`main` が既定のブランチ）。人間役 `ccnavi-reviewer` を Developer のメンバーに加え、対象の `main` を push し、続けて `git fetch --prune --no-tags origin` を 1 回打つ（対象に残る本物の origin の古い `refs/remotes/origin/*` が、新規プロジェクトの issue #1 などに番号で当たってブランチ候補になるのを防ぐ。戻すのは後片付けの `refs/remotes/origin/*` の巻き戻し）。push するのは `main` だけで、ほかのブランチ・タグが要るシナリオは対象外
 - origin: `bare` と同じ git の代役で、`-c url.<プロジェクトの URL>.insteadOf=<本物の origin>` を足す。加えて `credential.http://127.0.0.1:<port>.helper` を、空で打ち消してから、環境変数 `GITLAB_TOKEN` を返す helper にする（利用者の credential helper に root の PAT を渡さない。URL は `127.0.0.1` にそろえる）。runner 自身の git（初回の push と `setup.git`）にも同じ `-c` を足し、`GITLAB_TOKEN` はその git にだけ渡す。`curl` は本物（代役を置かない）、`gh`・`glab` は失敗する代役
 - 後片付け: `bare` と同じ経路でプロジェクトを削除する。GitLab 19 は遅延削除で、`DELETE /projects/:id`（202）のあとも GET が 200（`marked_for_deletion_on` 付き）のまま、パスが `…-deletion_scheduled-<id>` に変わる。そこで、印が付いたら `permanently_remove=true&full_path=<改名後のパス>` で 2 回目を打ち、404 になるまで最大 60 秒待つ。消せなかったときは `案内:` にプロジェクトの URL と ID を出し、`report` に `host-delete` の行（fail）を足して終了コード 3（手作業で消す）。終了コード 10 では残し、ID と URL を出す。`next` が最後まで終わるか `restore` で消える
 - 残ったプロジェクトは、接頭辞 `sc-` で一覧して手で消す。掃除の道具は無いので、GitLab の「プロジェクト」画面で `sc-` を検索する
