@@ -526,7 +526,7 @@ async function create(current: PanelState): Promise<void> {
     return;
   }
   if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting()))) {
-    fail(current, "ターン中のため作成を取りやめました。ターンが終わってから作成してください。");
+    fail(current, "エージェントの応答中のため作成を取りやめました。応答が終わってから作成してください。");
     return;
   }
   if (!alive(current)) {
@@ -610,7 +610,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
     return;
   }
   if (!(await confirmDuringTurn(lock))) {
-    fail(current, "ターン中のため保存を取りやめました。ターンが終わってから保存してください。");
+    fail(current, "エージェントの応答中のため保存を取りやめました。応答が終わってから保存してください。");
     return;
   }
   if (!alive(current)) {
@@ -650,7 +650,9 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
   }
   await reload(current);
   const tail = lint.value.report.split("\n").filter((l) => l.trim() !== "").pop() ?? "";
-  vscode.window.showInformationMessage(`${loaded.riskRel} に保存しました（${tail}）`);
+  // 実行ファイルの要約行（error N 件、warn N 件、info N 件）は日本語に言い換えて出す
+  const counts = tail.replace(/\berror\b/g, "エラー").replace(/\bwarn\b/g, "警告").replace(/\binfo\b/g, "情報");
+  vscode.window.showInformationMessage(`${loaded.riskRel} に保存しました（${counts}）`);
 }
 
 function asMessage(message: unknown): RiskMessage | undefined {

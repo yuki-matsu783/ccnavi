@@ -66,7 +66,7 @@ test("CB-D22 絞り込みは title と scope にもヒットし、開いてい�
     dom.type(dom.one("#find"), "設計");
     await dom.settle();
     // design はタイトルで、acceptance は when（「設計と並行してよく」）でヒットする
-    assert.equal(dom.one("#phase-count").textContent, "2 / 5（検索条件外の展開中項目: 1 件）", "開いている research は一致しないので数えず、開いたままの数として添える");
+    assert.equal(dom.one("#phase-count").textContent, "2 / 5（絞り込み外で開いている項目: 1 件）", "開いている research は一致しないので数えず、開いたままの数として添える");
     assert.ok(dom.one(rowSelector("p1")).classList.contains("hidden-by-find"));
     assert.ok(dom.one(rowSelector("p1")).classList.contains("open"));
     assert.ok(!dom.one(rowSelector("p2")).classList.contains("hidden-by-find"));

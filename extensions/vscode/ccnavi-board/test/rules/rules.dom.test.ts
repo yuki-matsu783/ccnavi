@@ -212,7 +212,7 @@ test("CB-D04 絞り込みは一致しない行を隠し、開いている行は�
     // 開いている deps は hidden-by-find でも表示は消えない（CSS の :not(.open)）
     assert.ok(dom.one("#tab-rules").classList.contains("finding"));
     assert.equal(dom.one('[data-count="deny"]').textContent, "1 / 2");
-    assert.equal(dom.one('[data-count="ask"]').textContent, "0 / 1（検索条件外の展開中項目: 1 件）");
+    assert.equal(dom.one('[data-count="ask"]').textContent, "0 / 1（絞り込み外で開いている項目: 1 件）");
     assert.equal(dom.one('.rule-section[data-section="deny"] h2 > .twist').textContent, "▾");
     // 空に戻すと元どおり
     dom.type(dom.one("#find"), "");
@@ -294,7 +294,7 @@ test("CB-D06 判定でヒットした行はその場で開くが state には入
     await dom.send(judged([hit("deny", "git-push"), hit("deny", "no-rm")]));
     assert.ok(dom.one(rowSelector("git-push")).classList.contains("open"));
     assert.ok(dom.one(rowSelector("no-rm")).classList.contains("open"));
-    assert.equal(dom.one('[data-count="deny"]').textContent, "0 / 2（検索条件外の展開中項目: 2 件）");
+    assert.equal(dom.one('[data-count="deny"]').textContent, "0 / 2（絞り込み外で開いている項目: 2 件）");
     assert.equal(dom.one('[data-count="ask"]').textContent, "1 / 1");
     // 折りたたんだタイプの中のルールがヒットすれば、タイプが開いて矢印もそれに合う
     dom.type(dom.one("#find"), "");
@@ -888,13 +888,13 @@ test("CB-T310 統合結果は読み取り専用の表で出し、編集する 1 
     // 開いている対象（lib）の統合結果が最初に出る。折りたたみは閉じてあるので、押して開く
     const select = dom.one<HTMLSelectElement>("select#sum-select");
     assert.equal(select.value, "lib");
-    assert.deepEqual([...select.options].map((o) => o.textContent), ["統合結果（共通 + ワークスペース）", "統合結果（共通 + プロジェクト lib）"]);
-    assert.match(dom.one("#sum .hint").textContent, /パスを持たないツール（Bash など）が適用するのは、全プロジェクトの設定を合算した和ではありません/);
+    assert.deepEqual([...select.options].map((o) => o.textContent), ["共通 + ワークスペース", "共通 + プロジェクト lib"]);
+    assert.match(dom.one("#sum .hint").textContent, /パスを持たないツール（Bash など）に効くのは、全プロジェクトの設定を合わせたものではありません/);
     const rows = (section: string) => dom.all(`#sum .sum-section[data-section="${section}"] tbody tr`).map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
-    assert.deepEqual(rows("deny").map((r) => [r[0], r[1], r[3]]), [["guard-approved", "Write|Edit", "共通の設定"], ["lib:no-tmp", "Write", "lib"]]);
+    assert.deepEqual(rows("deny").map((r) => [r[0], r[1], r[3]]), [["guard-approved", "Write|Edit", "共通"], ["lib:no-tmp", "Write", "プロジェクト lib"]]);
     assert.deepEqual(rows("ask").map((r) => r[0]), ["lib:deps"]);
     assert.equal(dom.all('#sum .sum-section[data-section="allow"] tbody tr').length, 0);
-    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "3 件（common + lib）");
+    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "3 件（共通 + プロジェクト lib）");
     // 統合結果を切り替えても、拡張ホストへは何も送らない（見せるだけ。判定も合成もしない）
     dom.change(select, "self");
     await dom.settle();
@@ -1309,7 +1309,7 @@ test("CB-D301 案内の間の統合結果は見本を出し、手順の scene �
       dom.all('#sum .sum-section[data-section="deny"] tbody tr').map((tr) => tr.querySelector("td")?.textContent),
       ["git-push", "no-rm-rf", "web:no-prod-deploy"],
     );
-    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "5 件（common + web）");
+    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "5 件（共通 + プロジェクト web）");
     await toStep(dom, "read-sum", 4);
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "self");
     assert.ok(dom.all('#sum .sum-section[data-section="deny"] tbody tr').some((tr) => tr.querySelector("td")?.textContent === "self:protect-secrets"));
@@ -1317,7 +1317,7 @@ test("CB-D301 案内の間の統合結果は見本を出し、手順の scene �
     await dom.settle();
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "lib", "閉じたあと案内で選んだ統合結果が残る");
     assert.equal(dom.one<HTMLDetailsElement>("#sum").open, false);
-    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "3 件（common + lib）");
+    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "3 件（共通 + プロジェクト lib）");
     assert.deepEqual(dom.posted.filter((message) => message.type !== "ready" && message.type !== "tourDone"), []);
   } finally {
     await dom.close();

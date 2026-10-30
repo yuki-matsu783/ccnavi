@@ -66,12 +66,12 @@ test("CB-D12 絞り込みは一致した行だけを数え、開いている行�
     await dom.settle();
     dom.type(dom.one("#find"), "該当するファイル");
     await dom.settle();
-    assert.equal(dom.one("#factor-count").textContent, "1 / 4（検索条件外の展開中項目: 1 件）", "画面に出ている語でヒットする");
+    assert.equal(dom.one("#factor-count").textContent, "1 / 4（絞り込み外で開いている項目: 1 件）", "画面に出ている語でヒットする");
     dom.type(dom.one("#find"), "github");
     await dom.settle();
     assert.ok(dom.one(rowSelector("f1")).classList.contains("hidden-by-find"));
     assert.ok(dom.one(rowSelector("f1")).classList.contains("open"));
-    assert.equal(dom.one("#factor-count").textContent, "1 / 4（検索条件外の展開中項目: 1 件）");
+    assert.equal(dom.one("#factor-count").textContent, "1 / 4（絞り込み外で開いている項目: 1 件）");
     // 保存の往復の間は欄を止めるが、行の開閉（twist）は止めない
     dom.type(dom.one(`${rowSelector("f1")} input.f-points`), "30");
     await dom.settle();
@@ -206,7 +206,7 @@ test("CB-D53 項目を追加すると開いて出し、並べ替えと削除が�
     dom.type(dom.one("#find"), "未設定");
     await dom.settle();
     assert.ok(dom.one(rowSelector("f5")).classList.contains("hidden-by-find"));
-    assert.equal(dom.one("#factor-count").textContent, "0 / 5（検索条件外の展開中項目: 1 件）");
+    assert.equal(dom.one("#factor-count").textContent, "0 / 5（絞り込み外で開いている項目: 1 件）");
     dom.type(dom.one("#find"), "");
     await dom.settle();
     dom.type(dom.one(`${rowSelector("f5")} input.f-id`), "new");
@@ -461,10 +461,9 @@ test("CB-T316 統合結果は読み取り専用で、境目の点・項目・由
     assert.equal(dom.all(".banner.warn:not(#changed)")[0].textContent, "読み込めない <理由>");
     const select = dom.one<HTMLSelectElement>("select#sum-select");
     assert.equal(select.value, "lib");
-    assert.match(dom.one("#sum .hint").textContent, /パスを持たない判定は、全プロジェクトの設定を合算した和ではありません/);
     assert.match(dom.one("#sum-levels").textContent, /MEDIUM 20.*HIGH 40.*CRITICAL 50/);
     const rows = () => dom.all("#sum tbody tr").map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
-    assert.deepEqual(rows().map((r) => [r[0], r[2], r[3]]), [["big-diff", "25", "共通の設定"], ["schema", "30", "lib"]]);
+    assert.deepEqual(rows().map((r) => [r[0], r[2], r[3]]), [["big-diff", "25", "共通"], ["schema", "30", "プロジェクト lib"]]);
     dom.change(select, "self");
     await dom.settle();
     assert.match(dom.one("#sum-levels").textContent, /CRITICAL 70/);

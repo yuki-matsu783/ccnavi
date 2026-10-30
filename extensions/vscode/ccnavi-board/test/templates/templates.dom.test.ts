@@ -53,7 +53,7 @@ test("CB-D325 統合結果の枠は閉じた枠で出て、選んだ統合結果
     assert.match(text(dom.one('details#sum tr[data-layer="common"][data-name="broken"]')), /読み込めません/);
     assert.match(text(dom.one('details#sum tr[data-layer="self"][data-name="feature"]')), /使われない/);
     assert.match(text(dom.one('details#sum tr[data-layer="self"][data-name="research"]')), /共通と食い違います/);
-    assert.match(text(dom.one('[data-count="sum"]')), /使われるのは 4 件（common \+ self）/);
+    assert.match(text(dom.one('[data-count="sum"]')), /使われるのは 4 件（共通 \+ ワークスペース）/);
     dom.change(dom.one<HTMLSelectElement>("select#sum-select"), "lib");
     await dom.settle();
     assert.deepEqual(

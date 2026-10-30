@@ -75,7 +75,7 @@ export function countText(query: string, shown: number, total: number, kept: num
   if (query === "") {
     return String(total);
   }
-  return `${shown} / ${total}${kept > 0 ? `（検索条件外の展開中項目: ${kept} 件）` : ""}`;
+  return `${shown} / ${total}${kept > 0 ? `（絞り込み外で開いている項目: ${kept} 件）` : ""}`;
 }
 
 /** 判定結果の項目名。日本語を主に、英語（実行ファイルの JSON の名前）を括弧に添える */
