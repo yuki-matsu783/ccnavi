@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState, type JSX } from "react";
 import { Background, Controls, Handle, Position, ReactFlow, type Edge, type Node, type NodeProps, type NodeTypes } from "@xyflow/react";
 
 import { maximizeClass, MaximizeButton, RefitOnChange, useMaximize } from "../shared/Maximize.js";
+import { FLOW_ARIA_LABELS } from "../shared/flow-aria.js";
 import {
   addChild,
   changeOp,
@@ -49,7 +50,7 @@ const OP_TITLES: Readonly<Record<string, string>> = {
   not: "not: 中にヒットしなければヒットします",
   glob: "glob: 対象をこの glob で照合します",
   regex: "regex: 対象をこの正規表現で照合します",
-  invalid: "読み込めないノード",
+  invalid: "読み込めない条件",
   empty: "空。押して中に入れるものを選びます",
 };
 
@@ -126,7 +127,7 @@ export function When({ tree, onChange, pick }: WhenProps): JSX.Element {
       })),
     [layout, selectedKey, brokenKeys],
   );
-  const edges = useMemo<Edge[]>(() => layout.edges.map((edge) => ({ id: edge.id, source: edge.from, target: edge.to })), [layout]);
+  const edges = useMemo<Edge[]>(() => layout.edges.map((edge) => ({ id: edge.id, source: edge.from, target: edge.to, ariaLabel: "条件の線" })), [layout]);
 
   const edit = (next: CondNode, select?: CondPath): void => {
     onChange(next);
@@ -152,7 +153,7 @@ export function When({ tree, onChange, pick }: WhenProps): JSX.Element {
           onNodeClick={(_event, node) => setPicked(node.id)}
           fitView
           fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
-          ariaLabelConfig={{ "controls.zoomIn.ariaLabel": "拡大", "controls.zoomOut.ariaLabel": "縮小", "controls.fitView.ariaLabel": "全体を表示" }}
+          ariaLabelConfig={FLOW_ARIA_LABELS}
           minZoom={0.2}
           maxZoom={1.5}
           deleteKeyCode={null}
@@ -203,7 +204,7 @@ function Inspector({
   const isRoot = path.length === 0;
   const adders = (into: CondPath, index: number): JSX.Element => (
     <span className="cond-add">
-      <span className="dim">子を追加する:</span>
+      <span className="dim">子を足す</span>
       {ADDABLE.map(({ name, make }) => (
         <button key={name} type="button" className="action small" data-add={name} onClick={() => edit(addChild(tree, into, make()), [...into, index])}>
           ＋ {name}
@@ -267,10 +268,10 @@ function Inspector({
         </span>
       )}
       <span className="buttons">
-        <button type="button" className="action small" data-op-action="wrap-all" title="このノードを all で包みます。隣に子を追加して組み合わせにできます" onClick={() => edit(wrapGroup(tree, path, "all"), path)}>
+        <button type="button" className="action small" data-op-action="wrap-all" title="この条件を all で包みます。隣に子を足して組み合わせにできます" onClick={() => edit(wrapGroup(tree, path, "all"), path)}>
           all で包む
         </button>
-        <button type="button" className="action small" data-op-action="wrap-any" title="このノードを any で包みます。隣に子を追加して組み合わせにできます" onClick={() => edit(wrapGroup(tree, path, "any"), path)}>
+        <button type="button" className="action small" data-op-action="wrap-any" title="この条件を any で包みます。隣に子を足して組み合わせにできます" onClick={() => edit(wrapGroup(tree, path, "any"), path)}>
           any で包む
         </button>
         <button type="button" className="action small" data-op-action="wrap" onClick={() => edit(wrapNot(tree, path), path)}>
@@ -281,10 +282,10 @@ function Inspector({
           className="action small"
           data-op-action="remove"
           disabled={isRoot}
-          title={isRoot ? "最上位のノードは削除できません（all / any / not で包んでから中を直すか、個別条件なら文字を直してください）" : "このノードを削除"}
+          title={isRoot ? "最上位の条件は削除できません（all / any / not で包んでから中を直すか、個別条件なら文字を直してください）" : "この条件を削除"}
           onClick={() => edit(removeAt(tree, path), path.slice(0, -1))}
         >
-          ノードを削除
+          この条件を削除
         </button>
       </span>
     </div>

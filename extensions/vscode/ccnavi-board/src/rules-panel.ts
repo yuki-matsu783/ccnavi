@@ -44,6 +44,7 @@ import type { HandoffEntry } from "./core/handoff-entry.js";
 import { openHandoffFrom, readHandoffEntry } from "./handoff-entry.js";
 import type { RulesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
+import { lintSummary } from "./core/lint-summary.js";
 import { assertRetained, watchGlobs } from "./panel-common.js";
 import { settingsPanel, type SettingsState } from "./settings-panel.js";
 import { markTourSeen, tourSeen } from "./tour.js";
@@ -667,7 +668,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     return;
   }
   if (!lint.value.ok) {
-    // 苦情は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
+    // 指摘は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
     fail(current, `設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください:\n${lint.value.report.split(tmp).join(loaded.rulesRel)}`);
     return;
   }
@@ -682,7 +683,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     return;
   }
   if (!(await confirmDuringTurn(lock))) {
-    fail(current, "ターン中のため保存を取りやめました。ターンが終わってから保存してください。");
+    fail(current, "エージェントの応答中のため保存を取りやめました。応答が終わってから保存してください。");
     return;
   }
   if (!alive(current)) {
@@ -722,8 +723,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     return;
   }
   await reload(current);
-  const tail = lint.value.report.split("\n").filter((l) => l.trim() !== "").pop() ?? "";
-  vscode.window.showInformationMessage(`${loaded.rulesRel} に保存しました（${tail}）`);
+  vscode.window.showInformationMessage(`${loaded.rulesRel} に保存しました（${lintSummary(lint.value.report)}）`);
 }
 
 function asMessage(message: unknown): RulesMessage | undefined {

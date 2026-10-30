@@ -76,9 +76,9 @@ export interface RuleForm {
   readonly kind: PatternKind;
   readonly pattern: string;
   readonly message: string;
-  /** ヒットしたときにモデルへ渡す文（`additionalContext`）。無ければ空 */
+  /** ヒットしたときにモデルへ渡すプロンプト（`additionalContext`）。無ければ空 */
   readonly additionalContext: string;
-  /** 1 つの文脈で最初にヒットしたときだけ渡す文（`additionalContextOnce`）。無ければ空 */
+  /** 1 つの文脈で最初にヒットしたときだけ渡すプロンプト（`additionalContextOnce`）。無ければ空 */
   readonly additionalContextOnce: string;
   /** 文に続けて本文を渡すファイル（`additionalContextFile`）。ルートからの相対パス。無ければ空 */
   readonly additionalContextFile: string;
@@ -92,7 +92,7 @@ export interface RuleForm {
    * 「刻み無し」なのか「刻みとして読めない値（`0`・`-1`・`x`）だった」のかを区別できず、
    * 刻みを外す操作も、読めない値を画面から直す方法も書けない。読めない値は書いたまま
    * 書き戻し、報告するのは保存前の `ccnavi --lint`。気づかないうちに画面で直されると、lint が名指し
-   * している対象が消えて苦情の出どころが分からなくなる
+   * している対象が消えて指摘の出どころが分からなくなる
    */
   readonly every: string;
   /**
@@ -132,7 +132,7 @@ export type Sections = Readonly<Record<Section, readonly RuleForm[]>>;
 export interface RulesModel {
   readonly version: number | null;
   readonly sections: Sections;
-  /** 読み込み時の苦情。ルールの形が読めなかった場所。あっても他は出す */
+  /** 読み込み時の指摘。ルールの形が読めなかった場所。ほかの指摘は、これがあっても出す */
   readonly problems: readonly string[];
 }
 
@@ -252,7 +252,7 @@ export function embedData(data: RulesData): string {
  */
 export function modeBanner(mode: string): string {
   if (mode === "dry-run") {
-    return "判定と記録をします。deny や ask にヒットしても、一般の保護はツールの実行を止めません（チケットの関門と補助の保護は止まります）";
+    return "判定と記録をします。deny や ask にヒットしても、一般の保護はツールの実行を止めません。止まるのは、チケットの関門と補助の保護です";
   }
   if (mode === "disable") {
     return "判定しません。ルールは使われず、deny や ask にヒットする操作も止まりません";

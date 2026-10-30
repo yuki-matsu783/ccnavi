@@ -120,7 +120,7 @@ export function missingFlags(probe: VersionProbe, flags: readonly string[], what
   if (missing.length === 0) {
     return undefined;
   }
-  return `実行ファイル（${named(probe.info)}）が ${missing.join(" ")} に対応していません（古い版です）。${what} で確認できないので進めません。${rebuildHint(fromSource)}`;
+  return `実行ファイル（${named(probe.info)}）が ${missing.join(" ")} に対応していません（古い版です）。「${what}」は使えないので進めません。${rebuildHint(fromSource)}`;
 }
 
 /**
@@ -135,5 +135,5 @@ export function missingFeatures(probe: VersionProbe, features: readonly string[]
   if (missing.length === 0) {
     return undefined;
   }
-  return `実行ファイル（${named(probe.info)}）が ${missing.join(" ")} の機能に対応していません（古い版です）。${what} で確認できないので進めません。${rebuildHint(fromSource)}`;
+  return `実行ファイル（${named(probe.info)}）が ${missing.join(" ")} の機能に対応していません（古い版です）。「${what}」は使えないので進めません。${rebuildHint(fromSource)}`;
 }

@@ -24,7 +24,7 @@ export function summaryMatch(rule: RuleForm): string {
 }
 
 /**
- * 要約につける文。deny は拒否の文面、ask と allow は渡す文（message はどこにも届かないため）。
+ * 要約につける文。deny は拒否の文面、ask と allow はプロンプト（message はどこにも届かないため）。
  */
 export function summaryNote(section: Section, rule: RuleForm): string {
   const shown = section === "deny" ? rule.message : rule.additionalContext || rule.additionalContextOnce;
@@ -49,7 +49,7 @@ export function hasContext(rule: RuleForm): boolean {
 export function contextSummary(rule: RuleForm): string {
   return hasContext(rule)
     ? "（設定あり）"
-    : "（未設定）ルールに一致したときにモデルへ渡すプロンプト・ファイルと、その頻度（every）を設定します。";
+    : "（未設定）ルールにヒットしたときにモデルへ渡すプロンプト・ファイルと、その頻度（every）を設定します。";
 }
 
 /** ask と allow に message が残っているときに出す断り。lint が error にする */
@@ -60,7 +60,7 @@ export function staleMessage(section: Section): string {
 
 /**
  * 絞り込みが適用する文字列。適用するのは書いてある値そのもの（id・ツール・パターン・文面・
- * 渡す文）で、要約に出ない全文にもヒットする。組み合わせ条件のルールは、個別条件の文字すべてにヒットする。
+ * プロンプト）で、要約に出ない全文にもヒットする。組み合わせ条件のルールは、個別条件の文字すべてにヒットする。
  */
 export function findText(rule: RuleForm): string {
   const patterns = rule.when === undefined ? rule.pattern : condPatterns(rule.when).join(" ");
@@ -75,7 +75,7 @@ export function countText(query: string, shown: number, total: number, kept: num
   if (query === "") {
     return String(total);
   }
-  return `${shown} / ${total}${kept > 0 ? `（検索条件外の展開中項目: ${kept} 件）` : ""}`;
+  return `${shown} / ${total}${kept > 0 ? `（絞り込み外で開いている項目: ${kept} 件）` : ""}`;
 }
 
 /** 判定結果の項目名。日本語を主に、英語（実行ファイルの JSON の名前）を括弧に添える */
@@ -84,6 +84,6 @@ export const JUDGE_LABELS = {
   subject: "対象（subject）",
   resolved: "実際に見た対象（resolved）",
   reason: "理由（reason）",
-  degraded: "縮退（degraded）",
+  degraded: "縮退（生の文字列で判定。degraded）",
   fallback: "組み込みの既定（fallback）",
 } as const;

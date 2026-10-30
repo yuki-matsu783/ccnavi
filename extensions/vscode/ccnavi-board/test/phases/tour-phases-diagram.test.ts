@@ -112,11 +112,11 @@ test("CB-T1191 計画の番号と先行は、図どうしで揃う。ステッ�
     assert.equal(plan[number - 1].type, match[2]);
     assert.deepEqual(match[3].split(", ").map(Number), waits(plan, number), `${number} 番目の先行`);
   }
-  // 終わりの図が「N 番目のフェーズ（定義）」と呼ぶ番号と、レビューの依頼の --phase は、計画と同じ
+  // 終わりの図が「N つ目のフェーズ（定義）」と呼ぶ番号と、レビューの依頼の --phase は、計画と同じ
   const numbered = (name: string, id: string): [number, string] => {
-    const match = /(\d+) 番目のフェーズ（(\S+?)）/.exec(def.diagrams[name].steps.find((step) => step.id === id)!.text);
-    assert.ok(match !== null, `${name}/${id} の本文に「N 番目のフェーズ（定義）」がない`);
-    return [Number(match[1]), match[2]];
+    const match = /(一|二|三|四|五|六|七|八|九)つ目のフェーズ（(\S+?)）/.exec(def.diagrams[name].steps.find((step) => step.id === id)!.text);
+    assert.ok(match !== null, `${name}/${id} の本文に「N つ目のフェーズ（定義）」がない`);
+    return ["一二三四五六七八九".indexOf(match[1]) + 1, match[2]];
   };
   const [noneNumber, noneType] = numbered("phase-end-none", "finish");
   const [mrNumber, mrType] = numbered("phase-end-mr", "finish");
@@ -126,7 +126,7 @@ test("CB-T1191 計画の番号と先行は、図どうしで揃う。ステッ�
   assert.match(value("phase-end-mr", "ended"), new RegExp(`phase: ${mrNumber} `));
   assert.match(value("phase-end-mr", "request"), new RegExp(`--phase ${mrNumber}\\b`));
   assert.match(value("phase-end-mr", "confirm"), new RegExp(`--phase ${mrNumber}\\b`));
-  assert.match(value("phase-order", "gate"), new RegExp(String(plan.length - 1)));
+  assert.match(value("phase-order", "gate"), new RegExp(`${"一二三四五六七八九"[plan.length - 2]}つ目`));
 });
 
 test("CB-T1192 図は登場者 2〜6 人で、値つきの矢印を持つ。足した案内 2 本は「〜たいとき」の 4〜9 手順で、全手順が図を引き、既存の案内の ID とタイトルを変えない", () => {

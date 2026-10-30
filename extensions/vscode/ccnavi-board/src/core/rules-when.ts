@@ -274,7 +274,7 @@ export function condProblems(root: CondNode): CondProblem[] {
     problems.push({ path: [], message: `深さが ${depth} あります（上限 ${COND_MAX_DEPTH}）` });
   }
   if (nodes > COND_MAX_NODES) {
-    problems.push({ path: [], message: `ノードが ${nodes} 個あります（上限 ${COND_MAX_NODES}）` });
+    problems.push({ path: [], message: `条件が ${nodes} 個あります（上限 ${COND_MAX_NODES}）` });
   }
   return problems;
 }

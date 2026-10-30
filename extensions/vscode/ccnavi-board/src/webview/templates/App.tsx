@@ -129,7 +129,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
   if (data.kind === "error") {
     return (
       <>
-        <p className="empty">テンプレート管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に替わります。</p>
+        <p className="empty">テンプレート管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に変わります。</p>
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>
         <button type="button" className="action" data-action="reload" onClick={() => post({ type: "refresh" })}>
@@ -247,13 +247,13 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <ScreenHeader courses={courses} onPick={tour.start}>
         <div className="summary" data-tour="target">
-          <TargetSelect target={touring ? undefined : page.target} targets={touring ? undefined : page.targets} disabled={shownBusy || editing !== undefined} onSwitch={(kind, name) => act({ type: "switchTarget", kind, name })} />
+          <TargetSelect target={touring ? undefined : page.target} targets={touring ? undefined : page.targets} disabled={shownBusy || editing !== undefined} confirms={false} onSwitch={(kind, name) => act({ type: "switchTarget", kind, name })} />
           <span className="path" title={touring ? "" : page.root}>
             {touring ? `（見本）${layer?.path ?? ""}` : (layer?.path ?? "")}
           </span>
         </div>
         <div className="controls">
-          <button type="button" className="action" data-action="reload" data-tour="refresh" title="ファイルを再読み込みします" disabled={shownBusy || editing !== undefined} onClick={refresh}>
+          <button type="button" className="action" data-action="reload" data-tour="refresh" title="ファイルを読み直します" disabled={shownBusy || editing !== undefined} onClick={refresh}>
             更新
           </button>
         </div>
@@ -269,7 +269,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
       ) : (
         <>
         <p className="count" id="counts" data-tour="summary">
-          <span>テンプレート {shownTemplates.length} 件</span>・<span>下書き {page.data.drafts.length} 件</span>・<span>error {page.data.errors}</span>・<span>warn {page.data.warns}</span>・<span>info {page.data.infos}</span>
+          <span>エラー {page.data.errors} 件</span>・<span>警告 {page.data.warns} 件</span>・<span>情報 {page.data.infos} 件</span>
         </p>
         <section className="templates" data-tour="list">
           <h2>
