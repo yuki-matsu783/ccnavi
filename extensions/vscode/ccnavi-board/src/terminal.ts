@@ -27,6 +27,12 @@ export function runInTerminal(root: string, command: string): void {
     return;
   }
   terminal.show(true);
+  const waiting = pending.get(terminal);
+  if (waiting !== undefined) {
+    // 作った直後でまだ送っていない行がある。追い越さないよう後ろに並べる
+    waiting.push(command);
+    return;
+  }
   terminal.sendText(command, true);
 }
 
@@ -48,6 +54,9 @@ export function runInNewTerminal(root: string, name: string, command: string): v
 /** 作った直後のシェルはまだ起動中で、すぐ送った行が行入力の途中で中断されることがある。立ち上がりを待つ時間の上限 */
 const READY_TIMEOUT_MS = 3000;
 
+/** シェルの準備を待っていて、まだ送っていない行（ターミナルごと。送ったら消える） */
+const pending = new WeakMap<vscode.Terminal, string[]>();
+
 /**
  * 作ったばかりのターミナルへ、シェルの準備ができてから 1 行を送る。シェル統合が使えれば、その
  * 立ち上がりを待つ。使えない場合や、上限の時間までに立ち上がらない場合は、そのまま送る
@@ -63,6 +72,8 @@ function sendWhenReady(terminal: vscode.Terminal, command: string): void {
     terminal.sendText(command, true);
     return;
   }
+  const queue = [command];
+  pending.set(terminal, queue);
   let sent = false;
   const send = (): void => {
     if (sent) {
@@ -71,7 +82,10 @@ function sendWhenReady(terminal: vscode.Terminal, command: string): void {
     sent = true;
     subscription.dispose();
     clearTimeout(timer);
-    terminal.sendText(command, true);
+    pending.delete(terminal);
+    for (const line of queue) {
+      terminal.sendText(line, true);
+    }
   };
   const subscription = window.onDidChangeTerminalShellIntegration((e) => {
     if (e.terminal === terminal) {
