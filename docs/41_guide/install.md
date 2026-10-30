@@ -138,7 +138,7 @@ sh scripts/ccnavi-setup.sh <ワークスペースルート>
 ところだけを見たいときは `--check` を付ける。同じ 1 回で `.vscode/settings.json` にも書く（[VS Code からワークツリーを見る](#vs-code-からワークツリーを見る)）。触ってほしくないときは `--no-vscode`。
 セッション開始時の入口（`ccnavi-session-start.sh`。取り込みの `ccnavi-fetch.sh` と、`projects/` の clone 済みリポジトリ一覧の `ccnavi-dirs.sh` を順に呼ぶ）も `SessionStart` に別の 1 行で登録する。
 1 台だけで使いリモートに合わせる必要が無ければ `--no-fetch` で外す（clone 済みリポジトリの一覧も出なくなる）。
-放置したセッションの引き継ぎ促し（`ccnavi-idle.sh`）も、`Stop` に 2 行と `UserPromptSubmit` に 1 行で別に登録する。会話が大きく育ったまま放置されたとき、記憶（プロンプトキャッシュ）が切れる前に、次のセッションへの引き継ぎ文書を書かせる仕組みである。要らなければ `--no-idle` を付けて、登録しないようにする。環境変数 `CCNAVI_HANDOFF_SUGGEST_TOKENS` を `0` にしても止まる（[設定](settings.md)の「大きな会話を放置したとき」）。
+放置したセッションの引き継ぎ促し（`ccnavi-idle.sh`）も、`Stop` に 2 行と `UserPromptSubmit` に 1 行で別に登録する。会話が大きく育ったまま放置されたとき、記憶（プロンプトキャッシュ）が切れる前に、次のセッションへの引き継ぎプロンプトを書かせる仕組みである。要らなければ `--no-idle` を付けて、登録しないようにする。環境変数 `CCNAVI_HANDOFF_SUGGEST_TOKENS` を `0` にしても止まる（[設定](settings.md)の「大きな会話を放置したとき」）。
 
 既にある値は置き換えず、違えば並べて見せる。置き換えるのは `--mode` か `--ticket-control` を
 名指しして `--force` を付けたときだけで、名指ししていない値はそのままにする。

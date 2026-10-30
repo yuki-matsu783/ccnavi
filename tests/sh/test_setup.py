@@ -234,7 +234,7 @@ ccnavi を登録した hook:
   SessionStart（.ccnavi/scripts/ccnavi-session-start.sh。セッション開始時の取り込みと一覧）
 登録した hook（放置したセッションの引き継ぎ促し。不要なら --no-idle）:
   Stop（.ccnavi/scripts/ccnavi-idle.sh notice。会話が大きいときのユーザへの知らせ）
-  Stop（.ccnavi/scripts/ccnavi-idle.sh start。放置されたら引き継ぎ文書を書かせる待機）
+  Stop（.ccnavi/scripts/ccnavi-idle.sh start。放置されたら引き継ぎプロンプトを書かせる待機）
   UserPromptSubmit（.ccnavi/scripts/ccnavi-idle.sh reset。入力したら待機をやめる）
 足した .vscode/settings.json:
   git.detectWorktrees

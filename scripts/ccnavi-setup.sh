@@ -94,7 +94,7 @@ FETCH_COMMAND='sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-session-start.sh
 FETCH_TIMEOUT=60
 # 放置したセッションの引き継ぎ促し（ccnavi-idle.sh）。会話が大きく育ったまま放置されると、モデルが覚えている
 # 会話のコピー（プロンプトキャッシュ）が時間切れで消え、続きを送り直す料金が大きく増える。消える前に、次のセッションへの
-# 引き継ぎ文書を書かせる。Stop に 2 本（ユーザへの知らせ `notice`、放置を待つ `start`）、UserPromptSubmit に 1 本
+# 引き継ぎプロンプトを書かせる。Stop に 2 本（ユーザへの知らせ `notice`、放置を待つ `start`）、UserPromptSubmit に 1 本
 # （入力したら待機をやめる `reset`）を、本体とは別の行として登録する。`start` は放置の間 sh が待つので、
 # バックグラウンドで走らせ（asyncRewake）、上限を長くする。起こす判断は ccnavi 自身が決める
 # （CCNAVI_HANDOFF_SUGGEST_TOKENS が 0 なら何もしない）。
@@ -239,7 +239,7 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
                             取り込みは通信する。1 台だけで使い、リモートに合わせる必要が無いときに指定する（clone 済みリポジトリの一覧も出なくなる）
   --no-idle                 放置したセッションの引き継ぎ促し（ccnavi-idle.sh）を hook に登録しない。
                             会話が大きく育ったまま放置されると、キャッシュが切れて続きの料金が増える。そのため、切れる前に
-                            次のセッションへの引き継ぎ文書を書かせる。要らないときに指定する
+                            次のセッションへの引き継ぎプロンプトを書かせる。要らないときに指定する
                             （環境変数 CCNAVI_HANDOFF_SUGGEST_TOKENS を 0 にしても止められる）
 
 CCNAVI_ENTRY_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）に固定で、実行ファイルは
@@ -1159,7 +1159,7 @@ if [ "$idle" = yes ]; then
 	missing_idle=$(printf '%s' "$current" | jq -r "
 		$REGISTERED
 		( if idling(\"Stop\"; \"notice\") then empty else \"Stop（.ccnavi/scripts/ccnavi-idle.sh notice。会話が大きいときのユーザへの知らせ）\" end ),
-		( if idling(\"Stop\"; \"start\") then empty else \"Stop（.ccnavi/scripts/ccnavi-idle.sh start。放置されたら引き継ぎ文書を書かせる待機）\" end ),
+		( if idling(\"Stop\"; \"start\") then empty else \"Stop（.ccnavi/scripts/ccnavi-idle.sh start。放置されたら引き継ぎプロンプトを書かせる待機）\" end ),
 		( if idling(\"UserPromptSubmit\"; \"reset\") then empty else \"UserPromptSubmit（.ccnavi/scripts/ccnavi-idle.sh reset。入力したら待機をやめる）\" end )
 	")
 fi
@@ -2155,7 +2155,7 @@ for name in $DEPLOY_SCRIPTS; do
 			why="作業用のワークツリーを統合先から切る"
 			;;
 		ccnavi-idle.sh)
-			why="放置したセッションに引き継ぎ文書を書かせる待機"
+			why="放置したセッションに引き継ぎプロンプトを書かせる待機"
 			;;
 		ccnavi-common-*.sh)
 			why="代わりに通る sh が起動して最初に読む共通部の部品"
