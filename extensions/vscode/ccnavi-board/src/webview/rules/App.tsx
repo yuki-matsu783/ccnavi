@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
 
 import { lockClass, type Lock } from "../../core/lock.js";
-import { isToolName, KNOWN_TOOLS, SECTIONS, SECTION_LABELS, modeBanner, tmpName, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
+import { isToolName, KNOWN_TOOLS, SECTIONS, SECTION_LABELS, bareRuleId, modeBanner, tmpName, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
 import type { SuggestJson } from "../../core/suggestmodel.js";
 import type { ExpectationsJson } from "../../core/testmodel.js";
 import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
@@ -213,7 +213,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       setBusy(false);
       setStatus(undefined);
       setJudged({ result, hooks: (message.hooks ?? []) as Judged["hooks"] });
-      unfoldHits(result.rules.map((rule) => rule.id));
+      unfoldHits(result.rules.map((rule) => bareRuleId(rule.id)));
       showTab("judge");
     } else if (message.type === "expectationsChecked") {
       setBusy(false);
@@ -456,7 +456,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     : judged;
   const shownChecked = touring ? (scene.checked === true ? SAMPLE.checked : undefined) : checked;
   const shownSuggested = touring ? (scene.suggested === true ? SAMPLE.suggested : undefined) : suggested;
-  const shownHits: ReadonlySet<string> = touring ? new Set(sceneJudge?.rules.map((rule) => rule.id) ?? []) : hits;
+  const shownHits: ReadonlySet<string> = touring ? new Set(sceneJudge?.rules.map((rule) => bareRuleId(rule.id)) ?? []) : hits;
   const shownDirty = touring ? false : dirty;
   // 保存前の検証エラーの見本（`sample.save_error`）。実際の直前の操作の一言は、案内の間は出さない
   const shownStatus: Status | undefined = touring ? (scene.error === true && SAMPLE.saveError !== "" ? { text: SAMPLE.saveError, error: true } : undefined) : status;

@@ -276,6 +276,17 @@ test("CB-D05 ツールの選択肢で選ぶと、欄と行の要約が同じ操�
   }
 });
 
+test("CB-D06a 実行ファイルが返す一時ファイル名つきの id でも、ヒットした行を開いて強調する", async () => {
+  const dom = await openRules();
+  try {
+    await dom.send(judged([hit("deny", "../../tmp/ccnavi-rules-AbC123/rules.yml:git-push")]));
+    assert.ok(dom.one(rowSelector("git-push")).classList.contains("open"));
+    assert.ok(dom.one(rowSelector("git-push")).classList.contains("hit"));
+  } finally {
+    await dom.close();
+  }
+});
+
 test("CB-D06 判定でヒットした行はその場で開くが state には入らず、次の判定で畳まれる", async () => {
   const dom = await openRules();
   try {

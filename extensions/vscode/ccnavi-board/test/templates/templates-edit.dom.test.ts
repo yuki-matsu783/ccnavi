@@ -242,6 +242,10 @@ test("CB-D387 編集を始められなかったときは、理由を一覧の上
     assert.match(text(dom.one('[data-role="edit-error"]')), /実行ファイルが古い版です/);
     assert.equal(dom.all('[data-role="edit"]').length, 0);
     assert.equal(dom.all("li.template").length, 4);
+    // 読み直すと、前の失敗の理由は消える
+    await dom.send({ type: "data", data: { kind: "page", page: page() } });
+    await dom.settle();
+    assert.equal(dom.all('[data-role="edit-error"]').length, 0);
   } finally {
     await dom.close();
   }
@@ -271,6 +275,7 @@ test("CB-D388 新しいテンプレートは名前を入れて作る。使えな
     dom.type(dom.one(".f-new-name"), "feature");
     await dom.settle();
     assert.equal(dom.one<HTMLButtonElement>('button[data-action="new-template"]').disabled, true, "同じ名前が一覧にある");
+    assert.match(text(dom.one('[data-role="name-taken"]')), /既にあります/);
     dom.type(dom.one(".f-new-name"), "my-flow");
     await dom.settle();
     dom.click(dom.one('button[data-action="new-template"]'));
