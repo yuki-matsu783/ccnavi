@@ -3,7 +3,7 @@ type: guide
 title: 子チケット作業のユーザとエージェントの手順
 description: チケット作業（親と子）を、準備・承認・着手・実装・finish・レビュー依頼・ready・片付けまでステップごとに並べた一覧と図。各操作が何を作り、何を拒むか。詰まったときの止まり方
 tags: [ticket, worktree]
-keywords: [チケット, 親, 子, 手順, 流れ, approval-request, review-request, --check, start, finish, confirm, decide, ready, 差し戻し, レビュー, 承認, 着手, サブエージェント, Stop, 促し, 成果物]
+keywords: [チケット, 親, 子, 手順, 流れ, approval-request, review-request, --check, start, finish, confirm, decide, ready, 差し戻し, レビュー, 承認, 着手, サブエージェント, Stop, 促し, 成果物, 学びの記録, learnings]
 ---
 
 # 子チケット作業のユーザとエージェントの手順
@@ -96,7 +96,7 @@ sequenceDiagram
 | 5 | | 成果物 | 子のブランチに実装のコミットが積まれる。親のブランチにはまだ入らない |
 | 6 | エージェント（メイン） | 手順 | 子を閉じる。衝突したら子のワークツリーで親のブランチを merge して解き、コミットしてからやり直す |
 | 6 | | コマンド | `ccnavi-ticket.sh finish <子>` |
-| 6 | | 成果物 | 先に事前確認（手順 1 と同じ）を行う。親のワークツリーに子の先頭が `merge --no-ff` で入り、`completed_at` と `merged_sha`（合流した子の先頭）が `doing/<子>.md` に書かれ、フェーズがレビューを要するか延期なら `wip/proposals/review/<子>.md`、そうでなければ `approved/done/<子>.md` へ移る。ここまでが 1 つのマージコミット（`ccnavi: <子> の作業を終えた`）になり、親のブランチへ push される。実績リスクが `phases/<親>/<子>.risk.json` に書かれる。`done/` に移った子のワークツリーは消え、`review/` の子のワークツリーは残る。止まる条件: 親のワークツリーに状態の置き場以外の未コミットの変更がある、子のワークツリーに未コミットの変更がある、子のコミットが置き場や範囲の外を触っている、衝突、フェーズ最後の子で成果物が追跡されていない、学びの記録（`wip/handoff/learnings/<子>.md`）が子の HEAD に無い（学びの蓄積が有効なとき）、実績リスクの判定が未記録。origin が無いと合流も push もしない |
+| 6 | | 成果物 | 先に事前確認（手順 1 と同じ）を行う。親のワークツリーに子の先頭が `merge --no-ff` で入り、`completed_at` と `merged_sha`（合流した子の先頭）が `doing/<子>.md` に書かれ、フェーズがレビューを要するか延期なら `wip/proposals/review/<子>.md`、そうでなければ `approved/done/<子>.md` へ移る。ここまでが 1 つのマージコミット（`ccnavi: <子> の作業を終えた`）になり、親のブランチへ push される。実績リスクが `phases/<親>/<子>.risk.json` に書かれる。`done/` に移った子のワークツリーは消え、`review/` の子のワークツリーは残る。止まる条件: 親のワークツリーに状態の置き場以外の未コミットの変更がある、子のワークツリーに未コミットの変更がある、子のコミットが置き場や範囲の外を触っている、衝突、フェーズ最後の子で成果物が追跡されていない、学びの記録（`wip/handoff/learnings/<子>.md`）が子の HEAD に無い（学びの蓄積が有効なとき。frontmatter の `learnings` は数か `none` で、気づきは `## ` 見出しの節に書く。箇条書きを frontmatter に書くと親の `finish` が止まる。統合の子の流れは learning-wiki の設計書）、実績リスクの判定が未記録。origin が無いと合流も push もしない |
 | 7 | エージェント（親） | 手順 | ELI5 の HTML を書き、コミットして push する。依頼文は任意のパスに置いてよく、コミット不要。ワークスペースルート直下の `scratchpad/` に置けば、`review-request` が成功したあとに消す |
 | 7 | | コマンド | ファイルを書いて `ccnavi-git.sh add`・`commit`・`push` |
 | 7 | | 成果物 | `wip/eli5/phase-N.html` が親のブランチに載る。依頼の前に、HEAD にコミット済みで、ワークツリーと中身が同じかを検査される |
