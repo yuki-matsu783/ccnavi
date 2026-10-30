@@ -1,0 +1,10 @@
+{
+ "recorded": true,
+ "counts": {
+  "deny": 0,
+  "ask": 0,
+  "nudge": 0,
+  "handover": 0
+ },
+ "repeated": []
+}

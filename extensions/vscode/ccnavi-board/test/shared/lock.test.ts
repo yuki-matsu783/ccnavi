@@ -28,7 +28,7 @@ test("CB-T36 ボードが読めなければ閉じる側にする", () => {
   const lock = lockFromError("実行ファイルがありません");
   assert.equal(lock.locked, true);
   // 読めなかった理由をそのまま載せる。何が読めなかったかをユーザが読める
-  assert.equal(lock.reason, "作業中のチケット: 実行ファイルがありません");
+  assert.equal(lock.reason, "保存できるか確認できません: 実行ファイルがありません");
 });
 
 test("CB-T391 作業中かを答えない古い実行ファイルの答えでは、確認できないので保存できない", () => {
@@ -36,7 +36,7 @@ test("CB-T391 作業中かを答えない古い実行ファイルの答えでは
   const tickets = board.tickets.map((t) => ({ ...t, in_progress: null }));
   const lock = lockFromBoard({ ...board, tickets });
   assert.equal(lock.locked, true);
-  assert.match(lock.reason, /作業中かを示しません/);
+  assert.match(lock.reason, /作業中かどうかを答えません/);
 });
 
 test("CB-T392 プロジェクトを渡したときは、そのプロジェクトのチケットの答えだけを見る", () => {
@@ -57,7 +57,7 @@ test("CB-T586 ターン中のセッションがあれば、保存は止めずに
   const lock = lockFromBoard({ ...board, tickets, turns });
   assert.equal(lock.locked, false);
   assert.deepEqual(lock.turns, ["a", "b"]);
-  assert.match(turnWarning(lock), /ターンの途中.*a, b/);
+  assert.match(turnWarning(lock), /応答の途中.*a, b/);
 });
 
 test("CB-T587 ターン中のセッションが無ければ警告は出ない。欄を出さない古い実行ファイルでも同じ", () => {

@@ -152,7 +152,7 @@ deny:
   assert.deepEqual(condProblems(deep).map((p) => p.message), ["深さが 9 あります（上限 8）"]);
   assert.deepEqual(condProblems((deep as { child: CondNode }).child), []);
   const wide = group("any", Array.from({ length: 64 }, (_, i) => leaf("glob", String(i))));
-  assert.deepEqual(condProblems(wide).map((p) => p.message), ["ノードが 65 個あります（上限 64）"]);
+  assert.deepEqual(condProblems(wide).map((p) => p.message), ["条件が 65 個あります（上限 64）"]);
   assert.deepEqual(condProblems(group("any", Array.from({ length: 63 }, () => leaf("glob", "x")))), []);
 });
 

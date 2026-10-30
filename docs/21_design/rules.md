@@ -24,7 +24,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 | `when` | 組み合わせ条件。`glob` / `regex` の個別条件を `all` / `any` / `not` で組む（5.3） |
 | `except` | 省略できる。`glob` か `regex` の片方だけを持つマッピングのリスト。本体にヒットしても、どれかにヒットすればヒットしない扱い（5.3） |
 | `message` | `deny` だけ。必須。止められたモデルに届く「なぜ止めたか、代わりに何をするか」 |
-| `additionalContext` / `additionalContextOnce` | ヒットするたび / 文脈で最初にヒットしたときだけ、モデルへ渡す文（6.6） |
+| `additionalContext` / `additionalContextOnce` | ヒットするたび / 文脈で最初にヒットしたときだけ、モデルへ渡すプロンプト（6.6） |
 | `additionalContextFile` / `additionalContextOnceFile` | 文に続けて本文を渡すファイル。探す起点からの相対（順は 6.6） |
 | `every` | 「渡す回」の刻み。ヒットした回数がこの倍数になった回だけが渡す回になる。既定は 1（6.6） |
 

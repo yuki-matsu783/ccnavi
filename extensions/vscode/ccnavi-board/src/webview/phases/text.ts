@@ -13,7 +13,7 @@ export function hasMore(phase: PhaseForm): boolean {
 
 /** 「補足」の見出しにつける一言 */
 export function moreNote(phase: PhaseForm): string {
-  return hasMore(phase) ? "（設定あり）" : "（未設定）推奨するエージェントと、このフェーズを使用する場面";
+  return hasMore(phase) ? "（設定あり）" : "（未設定）案内するエージェントと、使う場面を設定します";
 }
 
 /** 要約に出す範囲。inherit ならその表記、glob が無ければ未設定と言う */
@@ -47,13 +47,13 @@ export function countText(total: number, query: string, shown: number, kept: num
   if (query === "") {
     return String(total);
   }
-  return `${shown} / ${total}${kept > 0 ? `（検索条件外の展開中項目: ${kept} 件）` : ""}`;
+  return `${shown} / ${total}${kept > 0 ? `（絞り込み外で開いている項目: ${kept} 件）` : ""}`;
 }
 
 /** id が重なっているときに下部へ出す文 */
 export function duplicateNote(ids: ReadonlySet<string>): string {
-  const names = Array.from(ids).map((id) => (id === "" ? "空" : id));
-  return `ID が重複しています（${names.join(", ")}）。重複を解消するまで保存できません。`;
+  const names = Array.from(ids).map((id) => (id === "" ? "空の id" : id));
+  return `id が重なっています（${names.join(", ")}）。重なりを直すまで保存できません。`;
 }
 
 /** 定義が 1 つも無いときに一覧へ出す文。ファイルの有無で変わる */
@@ -67,12 +67,12 @@ export function emptyNote(exists: boolean): string {
 /** 共通の設定の定義と表示名が重なっているときに下部へ出す文 */
 export function commonTitleNote(ids: ReadonlySet<string>): string {
   const names = Array.from(ids).map((id) => (id === "" ? "空" : id));
-  return `共通設定のフェーズ定義と表示名（title）が重複しています（${names.join(", ")}）。重複している定義は使用されません。表示名を変更してから保存してください。`;
+  return `共通の設定のフェーズ定義とタイトル（title）が重なっています（${names.join(", ")}）。重なっている定義は使われません。タイトルを変えてから保存してください。`;
 }
 
 /** 共通の設定にも同じ id がある定義に添える文 */
 export function commonIdNote(ids: ReadonlySet<string>): string {
-  return `共通の設定にも同じ id があります（${Array.from(ids).join(", ")}）。すべての項目が同じ場合は共通設定の定義が使用されます。内容が異なる場合は、保存時の検証（--lint）でエラーになります。変えたいときは別の id にしてください`;
+  return `共通の設定にも同じ id があります（${Array.from(ids).join(", ")}）。中身がすべて同じなら共通の設定の定義が使われ、中身が違えば保存時の検証（--lint）でエラーになります。変えたいときは別の id にしてください`;
 }
 
 /** 共通の設定の定義の欄の見出しにつける説明 */

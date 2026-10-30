@@ -4304,6 +4304,38 @@ class DockerGitTest(DockerHostBase):
         self.assertEqual(env, {"GITLAB_TOKEN": ROOT_PAT, "GIT_TERMINAL_PROMPT": "0"})
         self.assertEqual(hostenv.git_env({"kind": "bare"}), {})
 
+    def test_make_project_pushes_main_then_prunes_stale_remote_refs(self):
+        calls = []
+
+        def git(args, cwd=None, input=None, env=None):
+            calls.append(args)
+            return subprocess.CompletedProcess(args, 0, "", "")
+
+        host = {"kind": "docker-gitlab", "real_origin": "o", "dir": self._tmp.name}
+        values = {"CCNAVI_PROBE_REVIEWER_ID": "5"}
+
+        class Client:
+            def version(self, token):
+                return 200, {"version": "19.4.1"}
+
+            def create_project(self, token, name):
+                return 201, {"id": 7, "path_with_namespace": f"root/{name}"}
+
+            def add_member(self, token, pid, user, level):
+                return 201, {}
+
+        def connect():
+            return Client(), ROOT_PAT, BASE, values
+
+        with mock.patch.object(hostenv, "_connect", connect):
+            hostenv._make_docker_project(self._tmp.name, host, "top", "UC-20", git)
+        verbs = [[a for a in c if a in ("push", "fetch")][0] for c in calls]
+        self.assertEqual(verbs, ["push", "fetch"])
+        fetch = calls[-1]
+        self.assertIn("--prune", fetch)
+        self.assertIn("--no-tags", fetch)
+        self.assertEqual(fetch[-1], "origin")
+
     def test_the_stub_git_carries_the_scoped_helper(self):
         self.assertIn("credential.${FAKE_CRED_URL}.helper=", Path(host_stub.__file__).read_text())
 

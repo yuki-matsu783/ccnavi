@@ -49,6 +49,7 @@ import { openHandoffFrom, readHandoffEntry } from "./handoff-entry.js";
 import type { RiskTarget } from "./core/screens.js";
 import { riskSums, type RiskSum } from "./core/sums.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
+import { lintSummary } from "./core/lint-summary.js";
 import { showLoading } from "./loading.js";
 import { assertRetained, watchPattern } from "./panel-common.js";
 import { settingsPanel, type SettingsState } from "./settings-panel.js";
@@ -527,7 +528,7 @@ async function create(current: PanelState): Promise<void> {
     return;
   }
   if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting()))) {
-    fail(current, "ターン中のため作成を取りやめました。ターンが終わってから作成してください。");
+    fail(current, "エージェントの応答中のため作成を取りやめました。応答が終わってから作成してください。");
     return;
   }
   if (!alive(current)) {
@@ -611,7 +612,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
     return;
   }
   if (!(await confirmDuringTurn(lock))) {
-    fail(current, "ターン中のため保存を取りやめました。ターンが終わってから保存してください。");
+    fail(current, "エージェントの応答中のため保存を取りやめました。応答が終わってから保存してください。");
     return;
   }
   if (!alive(current)) {
@@ -655,8 +656,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
   if (warns.length > 0 && alive(current)) {
     current.host.post({ type: "saved", warns } satisfies ToRisk);
   }
-  const tail = lint.value.report.split("\n").filter((l) => l.trim() !== "").pop() ?? "";
-  vscode.window.showInformationMessage(`${loaded.riskRel} に保存しました（${tail}）`);
+  vscode.window.showInformationMessage(`${loaded.riskRel} に保存しました（${lintSummary(lint.value.report)}）`);
 }
 
 function asMessage(message: unknown): RiskMessage | undefined {
