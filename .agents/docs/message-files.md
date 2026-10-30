@@ -65,13 +65,13 @@ sh の次の一手は、実行ファイルの `text` に引かせる。実行フ
 
 ## 上書きと保護
 
-文だけを替える上書きの口は持たない。`.ccnavi/messages/` の外（`.ccnavi/config/project/messages/` や旧い置き場）に文面ファイルが置かれていても読まず、`--lint` も何も言わない。読まれるのは `.ccnavi/messages/` だけで、共通レイヤーのミラーにも入らない。
+文だけを替える上書きの口は持たない。`.ccnavi/messages/` の外（`.ccnavi/config/project/messages/` や以前の置き場）に文面ファイルが置かれていても読まず、`--lint` も何も言わない。読まれるのは `.ccnavi/messages/` だけで、共通レイヤーのミラーにも入らない。
 
 `.ccnavi/` の下は組み込みの保護が止めるので、エージェントは書けない。直す下書きは `wip/handoff/` に置き、ユーザが `ccnavi-user-handoff.sh` で取り込む（`.ccnavi/messages/<名前>.yml` の下書きだけが取り込める。取り込み前に検査（欄・差し込みの名前・`次:` の数・長さ・ADR 番号・相対の script）が走る）。文面ファイルは設定 3 本（コア）に加えていない。
 
 ## 配る
 
-`scripts/ccnavi-setup.sh` が、配布元の `.ccnavi/messages/*.yml` を配布先の同じ場所へ配る。配布先に無いと、文は短い既定の文に落ちる。配布先に旧い置き場 `.ccnavi/config/common/messages/` が残っていても自動では消さず、不要と案内するだけ（古い実行ファイルが走っている間に消すと、文が既定の文に落ちる）。
+`scripts/ccnavi-setup.sh` が、配布元の `.ccnavi/messages/*.yml` を配布先の同じ場所へ配る。配布先に無いと、文は短い既定の文に落ちる。配布先に以前の置き場 `.ccnavi/config/common/messages/` が残っていても自動では消さず、不要と案内するだけ（古い実行ファイルが走っている間に消すと、文が既定の文に落ちる）。
 
 ## 使う側のテスト
 
