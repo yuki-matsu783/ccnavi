@@ -5,6 +5,7 @@
  * 何点になるかは実行ファイルが子を閉じるときに出す。
  */
 import { KIND_LABELS, type FactorForm, type FactorKind } from "../../core/risk-view.js";
+import { foldFind } from "../shared/find.js";
 
 /** 要約の文の 1 片。`code` は等幅で出す（値そのもの）、`dim` は薄い地の文 */
 export interface Part {
@@ -98,7 +99,7 @@ export function findText(factor: FactorForm): string {
   const points = factor.points === "" ? "" : summaryPoints(factor);
   const described = factor.value === "" ? "" : describe(factor).map((part) => part.text).join("");
   const summary = factor.id + points + described + factor.message;
-  return `${factor.id} ${factor.kind} ${KIND_LABELS[factor.kind].label} ${summary}`.toLowerCase();
+  return foldFind(`${factor.id} ${factor.kind} ${KIND_LABELS[factor.kind].label} ${summary}`);
 }
 
 /** 項目の数。絞り込んでいるときは「一致 / 全体（開いたまま N）」 */

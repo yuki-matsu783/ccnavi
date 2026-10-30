@@ -31,6 +31,7 @@ import { TargetSelect } from "../TargetSelect.js";
 import { HandoffLink } from "../shared/HandoffLink.js";
 import { post } from "./post.js";
 import { Code } from "../shared/Code.js";
+import { foldFind } from "../shared/find.js";
 import { COMMON_NOTE, commonIdNote, commonTitleNote, countText, duplicateNote, emptyNote, findText, hasMore } from "./text.js";
 import { commonClashes, draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
 
@@ -100,6 +101,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const [status, setStatus] = useState<Status | undefined>(undefined);
   const [lock, setLock] = useState<Lock>(() => pageOf(initial)?.lock ?? NO_LOCK);
   const [changed, setChanged] = useState(false);
+  /** 保存が通ったときの検証の warn の本文。帯に出し、次の編集か更新（中身の入れ替え）で消す */
+  const [saveWarns, setSaveWarns] = useState<readonly string[]>([]);
   const [find, setFind] = useState("");
   const [focusKey, setFocusKey] = useState<string | undefined>(undefined);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -135,7 +138,10 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       setBusy(false);
       setStatus(undefined);
       setChanged(false);
+      setSaveWarns([]);
       setLock(pageOf(next)?.lock ?? NO_LOCK);
+    } else if (message.type === "saved") {
+      setSaveWarns(message.warns ?? []);
     } else if (message.type === "failed") {
       setBusy(false);
       setStatus({ text: String(message.message ?? ""), error: true });
@@ -218,6 +224,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     }
     setEditing((now) => ({ ...now, draft: next, open: open ?? now.open }));
     setDirty(true);
+    setSaveWarns([]);
     // id が重なっている間はその文面だけを出す。直前の失敗の文面は今のことではない
     if (duplicates(next).size > 0) {
       setStatus(undefined);
@@ -308,7 +315,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const dup = touring ? new Set<string>() : duplicates(draft);
   const common = touring ? [] : (page?.common ?? []);
   const clash = commonClashes(touring ? { rows: [] } : draft, common);
-  const query = shownFind.trim().toLowerCase();
+  const query = foldFind(shownFind.trim());
   const rows = shownDraft.rows.map((row) => {
     const text = findText(row.phase);
     return { ...row, find: text, hidden: query !== "" && !text.includes(query) };
@@ -339,6 +346,11 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       {(touring ? [] : page?.notices ?? []).map((notice, index) => (
         <div key={index} className="banner warn">
           {notice}
+        </div>
+      ))}
+      {(touring ? [] : saveWarns).map((warn, index) => (
+        <div key={`save-warn-${index}`} className="banner warn" data-banner="save-warn">
+          <Code text={warn} />
         </div>
       ))}
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
@@ -476,6 +488,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
               onToggle={() => toggle(row.key)}
               onToggleMore={(value) => toggleMore(row.key, value)}
               onChange={(phase) => editRow(row.key, phase)}
+              finding={query !== ""}
               first={index === 0}
               last={index === rows.length - 1}
               onMove={(delta) => move(row.key, delta)}

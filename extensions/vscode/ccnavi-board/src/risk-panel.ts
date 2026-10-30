@@ -38,6 +38,7 @@ import { followAppearance, postAppearance, readAppearance } from "./appearance.j
 import { loadBoard, runLint, type LintOverride } from "./ccnavi.js";
 import { LAYER_SELF, projectLayer, selfLayer } from "./core/layers.js";
 import { loadingText } from "./core/loading-render.js";
+import { warnLinesOf } from "./core/lintmodel.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asRiskForm, BUILTIN_RISK_TEXT, readRisk, type RiskDocument } from "./core/risk-doc.js";
 import { renderRiskPage } from "./core/risk-render.js";
@@ -649,6 +650,11 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
     return;
   }
   await reload(current);
+  // warn の本文は画面上部の帯に出す（通知は件数だけ）。中身（data）を渡したあとに送る
+  const warns = warnLinesOf(lint.value.report, tmp, loaded.riskRel);
+  if (warns.length > 0 && alive(current)) {
+    current.host.post({ type: "saved", warns } satisfies ToRisk);
+  }
   const tail = lint.value.report.split("\n").filter((l) => l.trim() !== "").pop() ?? "";
   vscode.window.showInformationMessage(`${loaded.riskRel} に保存しました（${tail}）`);
 }

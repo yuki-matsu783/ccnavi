@@ -8,6 +8,7 @@ import type { JSX, ReactNode } from "react";
 
 import { KINDS, KIND_LABELS, type FactorForm, type FactorKind } from "../../core/risk-view.js";
 import { describe, kindTitle, summaryId, summaryPoints, valueLabel } from "./text.js";
+import { moveTitle } from "../shared/find.js";
 
 /** 加点条件の欄のツールチップに出すキーの一覧 */
 const KINDS_KEYS = KINDS.join(" / ");
@@ -32,6 +33,8 @@ export interface FactorProps {
   /** 先頭の行は「上へ」、末尾の行は「下へ」を押せないようにする */
   readonly first: boolean;
   readonly last: boolean;
+  /** 絞り込み中（検索語が空でない）。並べ替えを止める */
+  readonly finding: boolean;
   readonly onMove: (delta: number) => void;
   readonly onRemove: () => void;
 }
@@ -156,10 +159,10 @@ export function Factor(props: FactorProps): JSX.Element {
           {text("message", "f-message", "加点の理由として依頼文とクローズしたときの出力に出る短い文です。空なら id をそのまま使います")}
         </Captioned>
         <span className="buttons" {...mark("factor-buttons")}>
-          <button type="button" className="action small" title="上へ" disabled={disabled || props.first} onClick={() => props.onMove(-1)}>
+          <button type="button" className="action small" title={moveTitle("上へ", props.finding)} disabled={disabled || props.first || props.finding} onClick={() => props.onMove(-1)}>
             ↑
           </button>
-          <button type="button" className="action small" title="下へ" disabled={disabled || props.last} onClick={() => props.onMove(1)}>
+          <button type="button" className="action small" title={moveTitle("下へ", props.finding)} disabled={disabled || props.last || props.finding} onClick={() => props.onMove(1)}>
             ↓
           </button>
           <button type="button" className="action small" disabled={disabled} onClick={() => props.onRemove()}>

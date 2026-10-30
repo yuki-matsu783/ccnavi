@@ -6,6 +6,7 @@
  */
 import type { RuleForm, Section } from "../../core/rules-view.js";
 import { condPatterns } from "../../core/rules-when.js";
+import { foldFind } from "../shared/find.js";
 
 /** 1 行に縮める。空白をまとめて、長ければ後ろを省く */
 function excerpt(text: string, max: number): string {
@@ -64,7 +65,7 @@ export function staleMessage(section: Section): string {
  */
 export function findText(rule: RuleForm): string {
   const patterns = rule.when === undefined ? rule.pattern : condPatterns(rule.when).join(" ");
-  return `${rule.id} ${rule.match} ${patterns} ${rule.message} ${rule.additionalContext} ${rule.additionalContextOnce}`.toLowerCase();
+  return foldFind(`${rule.id} ${rule.match} ${patterns} ${rule.message} ${rule.additionalContext} ${rule.additionalContextOnce}`);
 }
 
 /**
