@@ -499,6 +499,10 @@ def _core_hit(
         return CORE_STORE
     if _in_review(conf, word, full, sub):
         return CORE_REVIEW
+    if sub == "rm" and not glob and selfguard_shell.handoff_delete_word(root, base, word):
+        # 下書きの置き場の中の削除は守る場所の外。承認済み・レビュー待ちの置き場を先に見る。
+        # グロブは外さない（シェルの側と同じ。`.?` が `..` に当たりうる）。
+        return ""
     if compiled.search("rm " + word):
         return CORE_HIT
     if full is None:
