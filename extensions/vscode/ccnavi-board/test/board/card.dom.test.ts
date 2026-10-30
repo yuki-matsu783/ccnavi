@@ -351,7 +351,7 @@ test("CB-D708 消すもの: base / 合流の sha・マーカー名・「承認�
   }
 });
 
-test("CB-D709 詳細は畳んである。MR・issue・ブランチ・ワークツリー名・リスク・人間レビューの要否と理由・フェーズごとのレビューの要否とリスク（JSON の文言のまま）を開くと見られる", async () => {
+test("CB-D709 詳細は畳んである。MR は詳細に無く位置の下にある。issue・ブランチ・ワークツリー名・リスク・人間レビューの要否と理由・フェーズごとのレビューの要否とリスク（JSON の文言のまま）は、詳細を開くと見られる", async () => {
   const page = await openBoard(scene());
   try {
     const parent = card(page, "busy");
