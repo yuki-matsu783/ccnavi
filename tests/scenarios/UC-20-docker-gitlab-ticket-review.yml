@@ -61,23 +61,22 @@ steps:
     instruction: >-
       人間役でスレッド t1 を解決し、MR を承認する（runner が API を呼ぶ。止まらない）。
   - prompt: >-
-      レビューが済んだ。`sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1` で確認して、結果を報告して。
+      レビューが済んだ。`sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1` で確認して、通ったか通らなかったかと出力を報告して。
       親の finish と ready はまだしないで。
     resume: true
   - prompt: >-
       親の finish にはフィードバック計画（`feedback: []` の改版）の承認が要る。
+      スレッドは人間が解決済みで、指摘への対応は不要（見送り）と決めた。確認はいらないので、そのまま `feedback: []` の改版を作って。
       `.ccnavi/docs/ticket-flow.md` の「小さい作業のとき」の節と `.ccnavi/docs/decisions.md` のフィードバック計画の改版の説明を読み、
       親と同じ識別子の改版を wip/proposals/todo/ に書いて、`ccnavi-ticket.sh propose` で送り、承認を依頼するところで止めて。
       改版は `started_at`・`completed_at`・`base_sha`・`merged_sha`・`cancelled_at` などを空にして `feedback: []` を足す。
       親のチケットを手で編集するなどの承認の迂回はしない。書き方が分からず止まるなら、止まった理由を報告して止まって。
     resume: true
   - human: true
-    human_run:
-      script: agree
-      answers: ["y"]
     instruction: >-
-      代役の git の環境の中で、擬似 tty を使って `sh .ccnavi/scripts/ccnavi-user-agree.sh <親の識別子>` を打つ（フィードバック計画の改版の承認。
-      runner が人間役として打つ。手動なら `scenario_tools.py agree <出力の置き場> <親>`）。素の shell で打たない。
+      step 3 と同じ要領で、代役の git の環境の中で、擬似 tty を使って `sh .ccnavi/scripts/ccnavi-user-agree.sh <親の識別子>` を代行して打つ
+      （フィードバック計画の改版の承認。`scenario_tools.py agree <出力の置き場> <親>`）。素の shell で打たない。
+      `human_run` は使えない: 親の改版は識別子が承認済みと同じなので「新しく承認済みになった」と数えられず、打っても halt する（4 回目の次の回で確認）。
     check:
       - "承認画面が、フィードバック計画（feedback: []）の改版であることを示している"
   - prompt: >-
