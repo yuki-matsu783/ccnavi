@@ -2,7 +2,7 @@ id: UC-20
 title: Docker の GitLab で、ccnavi の sh が MR を作り、スレッドの指摘・解決・承認までチケット作業を通す
 layer: 3
 reqs: [REQ-APV-01, REQ-TKT-01, REQ-TKT-26]
-status: draft
+status: verified
 model: haiku
 budget_usd: 4.0                  # human でない step（prompt 4 本）で割って 1 本 1.0 USD
 test_repo: true                  # projects/test-repo の origin を使い捨ての GitLab のプロジェクトへ向ける。回す前に確認事項 2 を確かめる
@@ -76,7 +76,6 @@ expect:
 
 unconfirmed:
   - 前提: projects/test-repo の .ccnavi/config/common/ のミラーが共通と揃っていないと、step 6 の指摘対応で親に ccnavi の同期コミットが入り、confirm が「依頼のあとに HEAD が動いた」で止まる（1 回目の実行で確認）。回す前に acceptance-scenarios.md の「プロジェクトを使うシナリオの前提」で揃えてコミットしておく
-  - 回す前に projects/test-repo の refs/remotes/origin/* に、新規のプロジェクトの issue #1 と同じ番号のブランチ（例 fix-1-…）が無いこと。あると --issue 1 が候補ありで止まる（道具の不足は #730）
   - ccnavi-start.sh --issue を打ち直すと MR が重複して作られるか（冪等性。未確認）
   - step 5（1 始まり。スレッドを立てる human_api）の前に、プロジェクトの MR がちょうど 1 件かを expect_after.state で機械的に確かめられるか（state のコマンドにトークンを渡せないので未確認。halt になるまで気づけない）
   - "ready まで届くか。3 回目の実行では、confirm は通ったが、親の finish がフィードバック計画（feedback: [] の改版）の承認待ちで止まり、ready に届かなかった。届かせるには人間の承認の step を足す必要がある（このシナリオでは足さない）"
