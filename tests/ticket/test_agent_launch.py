@@ -341,8 +341,8 @@ class AvailabilityTest(LaunchHarness):
         text = out["permissionDecisionReason"]
         self.assertIn("ワークツリーがありません", text)
         self.assertIn(f"start {CHILD}", text)
-        # 登録の無いパスを書いたときは TARGET_INVALID
-        out = self.call(self.root, description="d", prompt=f".claude/worktrees/{CHILD}/ を直す")
+        # 登録の無いパスだけを書いたときは TARGET_INVALID
+        out = self.call(self.root, description="d", prompt=".claude/worktrees/gone/ を直す")
         self.assert_stopped(out, "DENY_AGENT_TARGET_INVALID")
 
     def git_remove(self, path):
@@ -391,10 +391,10 @@ class InvalidPathTest(LaunchHarness):
             os.symlink(child_tree, link)
         except (OSError, NotImplementedError):
             link = ""
-        other = os.path.join("/tmp", "elsewhere-ws", ".claude", "worktrees", CHILD)
+        other = os.path.join("/tmp", "elsewhere-ws", ".claude", "worktrees", "plain")
         cases = {
             "directory without a registration": f"{plain} で作業する",
-            "dot dot": f".claude/worktrees/../worktrees/{CHILD} で作業する",
+            "dot dot": ".claude/worktrees/../worktrees/plain で作業する",
             "another workspace": f"{other} で作業する",
             "no name": ".claude/worktrees/ の下で作業する",
         }
@@ -405,13 +405,46 @@ class InvalidPathTest(LaunchHarness):
                 out = self.call(self.root, description="d", prompt=prompt)
                 self.assert_stopped(out, "DENY_AGENT_TARGET_INVALID")
 
-    def test_an_invalid_path_wins_over_a_valid_identifier(self):
+    def test_an_unregistered_spelling_is_ignored_when_one_target_is_registered(self):
+        child_tree = self.one_child()
+        rooted = f"{self.root}/.claude/worktrees/"
+        for name, prompt in {
+            "identifier": f"{CHILD} を、.claude/worktrees/nope/ で直す",
+            "path": f"{child_tree} を直す。例は {rooted}nope や {rooted} や .claude/worktrees/ 。",
+        }.items():
+            with self.subTest(name=name):
+                out = self.call(self.root, description="d", prompt=prompt)
+                self.assertIn(CHILD, self.updated(out)["prompt"])
+
+    def test_two_registered_targets_are_still_ambiguous(self):
+        first, second = self.two_children()
+        out = self.call(
+            self.root, description="d", prompt=f"{first} と {second} と .claude/worktrees/nope"
+        )
+        self.assert_stopped(out, "DENY_AGENT_MULTI_TARGET")
+
+    def test_only_unregistered_spellings_stop_with_the_new_guidance(self):
         self.one_child()
         out = self.call(
-            self.root, description="d", prompt=f"{CHILD} を、.claude/worktrees/nope/ で直す"
+            self.root, description="d", prompt="例は .claude/worktrees/nope と .claude/worktrees/"
         )
         self.assert_stopped(out, "DENY_AGENT_TARGET_INVALID")
-        self.assertIn("nope", out["permissionDecisionReason"])
+        self.assertIn("WT 置き場", out["permissionDecisionReason"])
+
+    def test_many_paths_stop_even_with_a_registered_target(self):
+        self.one_child()
+        words = " ".join(f".claude/worktrees/n{i}" for i in range(agentlaunch.MAX_PATHS + 5))
+        out = self.call(self.root, description="d", prompt=f"{CHILD} {words}")
+        self.assert_stopped(out, "DENY_AGENT_TARGET_INVALID")
+
+    def test_the_parent_tree_still_stops_beside_an_unregistered_spelling(self):
+        self.one_child()
+        out = self.call(
+            self.root,
+            description="d",
+            prompt=f"{self.parent_tree} で作業する。例は .claude/worktrees/nope",
+        )
+        self.assert_stopped(out, "DENY_AGENT_PARENT_TREE")
 
 
 class ReviewHoldTest(LaunchHarness):
