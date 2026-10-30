@@ -16,7 +16,7 @@ frontmatter に `name` と `description`、必要なら同じディレクトリ�
 
 プロジェクトが自前の `.claude/skills/` を持つ場合は、Claude Code がそれを別に読む。ワークスペースから起動した場合、プロジェクトの `.claude/skills` が読み込まれるかは、`projects/` がワークスペースの git で無視されているかで変わる（Claude Code 2.1.303 で確かめた）。無視されている標準の構成では読み込まれない。ccnavi は `projects/` を無視させるので、ワークスペースから起動してプロジェクトの `.claude/skills` に頼ることはできない。プロジェクトで起動すれば、そのプロジェクトの `.claude/` のスキルと hook だけが使われる。読み込まれた場合に限り、ワークスペースのスキルと同名なら、素の名前はワークスペースのもので、プロジェクトのものは `projects/<名前>:<スキル名>` になる。目録に載るのは `skills/` の分だけ。
 
-`skills/` はプロジェクトだけを clone した人の手元にも git で入る。ただし、目録を出す hook はワークスペースの `.claude` にしかなく、`projskills.project_of` は単体 clone で空文字を返す。単体 clone では目録が出ず、単体 clone であることも検出していない（未解決。[11.14](standalone-clone-gaps.md) の C2）。単体 clone で Claude Code が自動で読むのは、`skills/` ではなく `.claude/skills/` のほうである。
+`skills/` はプロジェクトだけを clone した人の手元にも git で入る。ただし、目録を出す hook はワークスペースの `.claude` にしかなく、`projskills.project_of` は単体 clone で空文字を返す。単体 clone では目録が出ず、単体 clone であることも検出していない（11.14 の調査記録の C2）。単体 clone で Claude Code が自動で読むのは、`skills/` ではなく `.claude/skills/` のほうである。
 
 | いつ | どう |
 |---|---|
@@ -47,7 +47,7 @@ frontmatter に `name` と `description`、必要なら同じディレクトリ�
 
 `distribute: true` を持つスキル（`ccnavi-config`）は、配布先へ配るだけで、このコピーの対象にしない。
 
-単体 clone では、コピーした reference は `ccnavi --docs`（`--type skill-reference`）で引ける。入口の `SKILL.md` を読ませるのは目録だけで、単体 clone では出ないので、入口は渡っていない（未解決）。
+単体 clone では、コピーした reference は `ccnavi --docs`（`--type skill-reference`）で引ける。入口の `SKILL.md` を読ませるのは目録だけで、単体 clone では出ないので、入口は渡っていない。
 
 - `common/` は共通のコピーなので、共通レイヤーのミラー（11.12）と同じく、共通側から無くなった `.md` はコピー先からも消し、空になったディレクトリも `common/` の下から片付ける。消す対象は `common/` の `.md` だけで、`SKILL.md` は消さない。`project/` はコピーせず触れないので、プロジェクト固有の reference は上書きも削除もされない。`common/` の `.md` 以外のファイルにも触れない
 - `common/` の同じパスのファイルは共通の中身で上書きする
