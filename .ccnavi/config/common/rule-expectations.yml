@@ -442,6 +442,12 @@ allow:
       通す。ccnavi-git-worktree-add が、先に fetch して遅れを確かめる案内をセッションに一度だけ添える
       （遅れの判定で止めるのは ccnavi-git.sh の中）
   - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-git.sh integrate foo"
+    why: 通す。integrate-report-first が、integrate-done の前にユーザへ報告する指示を毎回添える
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-git.sh integrate --abort foo"
+    why: 通す。取りやめには報告の指示を添えない
+  - tool: Bash
     subject: "grep -n TODO src/ccnavi/cli.py"
     why: 読むだけ。prefer-read-grep が適用して通す
   - tool: Bash

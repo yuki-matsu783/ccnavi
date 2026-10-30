@@ -219,6 +219,27 @@ class RepoRulesTest(unittest.TestCase):
             ),
         )
 
+    def test_integrate_は通して_確定の前の報告の指示を添える(self):
+        script = "sh /repo/.ccnavi/scripts/ccnavi-git.sh"
+        for subject in (
+            f"{script} integrate foo",
+            f"cd /repo/.claude/worktrees/foo && {script} integrate foo",
+            f"cd /repo && {script} integrate foo-1",
+        ):
+            with self.subTest(subject=subject):
+                body = self.assert_verdict(subject, "allow", "integrate-report-first")
+                self.assertIn("integrate-done の前", body["response"])
+                self.assertIn("DENY_NEEDS_USER_TURN", body["response"])
+        # 確定・取りやめ・名前なしには添えない。
+        for subject in (
+            f"{script} integrate-done foo -m x",
+            f"{script} integrate --abort foo",
+            f"{script} integrate",
+            f"{script} status",
+        ):
+            with self.subTest(subject=subject):
+                self.assertNotIn("integrate-report-first", hit(judge("Bash", subject)))
+
     def test_ワークツリー側の共通レイヤーの設定は_guard_ccnavi_config_が止める(self):
         # 止めるのは組み込みの builtin:guard-ccnavi-config。ヒットしたルールの id で見る。
         for name in ("rules", "phases", "risks"):

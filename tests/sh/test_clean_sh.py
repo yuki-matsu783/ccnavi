@@ -156,7 +156,10 @@ class CleanBase:
         # 並べると ext/out と ext/out/node_modules の間に来る。
         write(os.path.join(top, "ext", "out-x", "node_modules", "w", "index.js"))
         write(os.path.join(top, "ext", "node_modules", "y", "index.js"))
+        write(os.path.join(top, "ext", "dist", "bundle.js"))
+        write(os.path.join(top, "ext", ".cache", "c"))
         write(os.path.join(top, "docs", "out", "keep.txt"), "keep")  # package.json の隣ではない
+        write(os.path.join(top, "docs", "dist", "keep.txt"), "keep")
         write(os.path.join(top, ".venv", "pyvenv.cfg"))
         write(os.path.join(top, "pkg", "__pycache__", "m.pyc"))
         write(os.path.join(top, ".pytest_cache", "v", "cache"))
@@ -171,9 +174,14 @@ class CleanCases(CleanBase):
         top = self.make_shell("shell")
         result = self.run_clean("shell")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(files_under(top), ["docs/out/keep.txt", "ext/package.json", "src/a.txt"])
+        self.assertEqual(
+            files_under(top),
+            ["docs/dist/keep.txt", "docs/out/keep.txt", "ext/package.json", "src/a.txt"],
+        )
         self.assertIn("removed node_modules", result.stdout)
         self.assertIn("removed ext/out\n", result.stdout)
+        self.assertIn("removed ext/dist\n", result.stdout)
+        self.assertIn("removed ext/.cache\n", result.stdout)
         self.assertIn("removed ext/out-x/node_modules", result.stdout)
         self.assertNotIn("ext/out/node_modules", result.stdout)
 
