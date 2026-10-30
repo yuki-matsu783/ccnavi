@@ -50,7 +50,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 
 ### 4.2.1 放置したセッションの引き継ぎ促し
 
-会話が大きく育ったまま放置されると、プロンプトキャッシュが時間切れで消え、続きの送り直しの費用が増える。消える前に、次のセッションへの引き継ぎ文書を書かせる。判定は `records/idlehandoff.py`、入口は `entry/cli_idle.py`（`ccnavi idle notice|start|check|reset`）、待機は `.ccnavi/scripts/ccnavi-idle.sh`（`notice`・`start`・`reset`）が受け持つ。導入スクリプトは、本体とは別の 3 行として登録する（`--no-idle` で外す）。
+会話が大きく育ったまま放置されると、プロンプトキャッシュが時間切れで消え、続きの送り直しの費用が増える。消える前に、次のセッションへの引き継ぎプロンプトを書かせる。判定は `records/idlehandoff.py`、入口は `entry/cli_idle.py`（`ccnavi idle notice|start|check|reset`）、待機は `.ccnavi/scripts/ccnavi-idle.sh`（`notice`・`start`・`reset`）が受け持つ。導入スクリプトは、本体とは別の 3 行として登録する（`--no-idle` で外す）。
 
 | 登録 | 呼ぶもの | すること |
 |---|---|---|
