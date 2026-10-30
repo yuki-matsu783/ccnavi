@@ -3,7 +3,7 @@ version: 1
 ticket: feature-744-human-run-revise-approval
 issue: 744
 mr: 749
-title: "[Bug] human_run が親の改版（同じ識別子）の承認を成功と数えず halt する"
+title: '[Bug] human_run が親の改版（同じ識別子）の承認を成功と数えず halt する'
 phases:
   quick-work:
     kind: work
@@ -12,16 +12,19 @@ phases:
     scope: inherit
     when: 設計判断や並行作業が要らないとき
 plan:
-  - quick-work
-rationale: |
-  UC-20 の step 10（親の改版の承認）で human_run が承認と push を通したのに、runner が「新しく承認済みにならなかった」として halt した（#744）。改版は親と同じ識別子で、打つ前から承認済みなので、成否の見方が合わない。
+- quick-work
+rationale: 'UC-20 の step 10（親の改版の承認）で human_run が承認と push を通したのに、runner が「新しく承認済みにならなかった」として
+  halt した（#744）。改版は親と同じ識別子で、打つ前から承認済みなので、成否の見方が合わない。
+
+  '
 allow:
-  - match: Write|Edit
-    glob: "tests/scenarios/**"
-  - match: Write|Edit
-    glob: ".agents/docs/acceptance-scenarios.md"
-started_at: "2026-10-31T04:35:05+0900"
-base_sha: "b8b9c8a92acc4427928e822194712e8c22b51be0"
+- match: Write|Edit
+  glob: tests/scenarios/**
+- match: Write|Edit
+  glob: .agents/docs/acceptance-scenarios.md
+started_at: 2026-10-31T04:35:05+0900
+base_sha: b8b9c8a92acc4427928e822194712e8c22b51be0
+feedback: []
 ---
 ## 目的
 
