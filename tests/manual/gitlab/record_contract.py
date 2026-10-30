@@ -65,8 +65,9 @@ class Scene:
     """本物の GitLab に場面を組む。`context` は `${名前}` の置き換え先。
     場面の中身は `tests/contract/fakeside.py` の `scene_state()` と同じ。"""
 
-    def __init__(self, client, token: str, reviewer_id: int):
+    def __init__(self, client, token: str, reviewer_id: int, reviewer_token: str):
         self.client, self.token, self.reviewer_id = client, token, reviewer_id
+        self.reviewer_token = reviewer_token
         self.project_id = 0
         self.context: dict[str, str] = {}
 
@@ -108,6 +109,10 @@ class Scene:
             "merged にする MR", c.create_mr_described(t, pid, "done", "main", "scene merged", "")
         )
         self.need("MR の判定待ち", c.wait_mr_checked(t, pid, done["iid"]))
+        # 承認は merged の MR にだけ付ける（open の MR に付けると、承認の system メモが
+        # MR のメモ・スレッド・レビュアーの応答に混ざる）。作者は自分の MR を承認できないので、
+        # レビュアーで付ける
+        self.need("MR の承認", c.approve(self.reviewer_token, pid, done["iid"]))
         merged = self.need("MR のマージ", c.merge_mr(t, pid, done["iid"]))
         if merged.get("state") != "merged":
             raise SceneError("MR がマージされなかった（merged にならないまま待ちを終えた）")
@@ -135,6 +140,7 @@ class Scene:
                 "mr.iid": str(mr["iid"]),
                 "mr.branch": "feature",
                 "mr.merged_branch": "done",
+                "mr.merged_iid": str(done["iid"]),
                 "mr.new_branch": "fresh",
                 "issue.iid": str(issue["iid"]),
                 "discussion.id": thread["id"],
@@ -172,9 +178,9 @@ def send(client, token: str, req: dict, context: dict[str, str]) -> tuple[int, o
     return client.call(req["method"], path, token if req["token"] == "main" else "", body)
 
 
-def record_once(client, token: str, reviewer_id: int, requests: list[dict]):
+def record_once(client, token: str, reviewer_id: int, reviewer_token: str, requests: list[dict]):
     """プロジェクトを 1 つ作って列を送る。(応答 {名前: (status, body)}, 形 {名前: {...}})。"""
-    scene = Scene(client, token, reviewer_id)
+    scene = Scene(client, token, reviewer_id, reviewer_token)
     answers: dict[str, tuple[int, object]] = {}
     shapes: dict[str, dict] = {}
     try:
@@ -219,7 +225,8 @@ def record(argv: list[str]) -> int:
         values[key] = os.environ.get(key) or values.get(key, "")
     base = os.environ.get("CCNAVI_PROBE_GITLAB") or docker_gitlab.BASE
     token = values.get("GITLAB_TOKEN", "")
-    if not token or not values.get("CCNAVI_PROBE_REVIEWER_ID"):
+    reviewer_token = values.get("CCNAVI_PROBE_REVIEWER_TOKEN", "")
+    if not token or not reviewer_token or not values.get("CCNAVI_PROBE_REVIEWER_ID"):
         sys.stderr.write("トークンが無い。docker_gitlab.py status で確かめる\n")
         return 2
     client = gitlab_api.Client(base)
@@ -229,8 +236,8 @@ def record(argv: list[str]) -> int:
         return 2
     requests = shape.load_data("requests.json")["requests"]  # 全要求（sh と拡張）
     reviewer_id = int(values["CCNAVI_PROBE_REVIEWER_ID"])
-    first_answers, first_shapes = record_once(client, token, reviewer_id, requests)
-    _, second_shapes = record_once(client, token, reviewer_id, requests)
+    first_answers, first_shapes = record_once(client, token, reviewer_id, reviewer_token, requests)
+    _, second_shapes = record_once(client, token, reviewer_id, reviewer_token, requests)
     problems = [
         f"2 回の記録で reads の形が違う: {d}"
         for d in reads_differences(requests, first_shapes, second_shapes)

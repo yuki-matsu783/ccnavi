@@ -67,6 +67,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 | `${user.id}` | `user` の応答の `id`（`save` で置く） |
 | `${mr.iid}` | 場面の open の MR の iid |
 | `${mr.branch}` / `${mr.merged_branch}` / `${mr.new_branch}` | open の MR の元ブランチ / merged の MR の元ブランチ / MR をこれから作るブランチ（存在するが MR は無い） |
+| `${mr.merged_iid}` | 場面の merged の MR の iid（承認が付いている。`approvals_get` が使う） |
 | `${issue.iid}` | 場面の issue の iid |
 | `${discussion.id}` | 場面のスレッドの id（録る側は場面を組んだときの応答から取る） |
 
@@ -77,7 +78,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 - プロジェクト 1 つ。`main` に最初のコミット。`feature`・`done`・`fresh` の 3 ブランチ（それぞれ `main` から切り、ファイルを 1 つ足す）
 - issue が 1 件（メモ 1 件）
 - open の MR が 1 本（`feature` から `main` へ。本文は `Closes #<issue>`）。スレッド 1 つ（未解決、メモ 1 件）、レビュアー 1 人（`CCNAVI_PROBE_REVIEWER_ID` を member にして入れる）、MR のメモ 2 件。実物のスレッド一覧にはレビュアー割り当ての system メモも混じる（模擬の場面にも 1 件入れてある）
-- merged の MR が 1 本（`done`）
+- merged の MR が 1 本（`done`）。merge の前に、レビュアーのトークン（`CCNAVI_PROBE_REVIEWER_TOKEN`）で承認する（`approved_by` が 1 件になる）。承認は open の MR には付けない（承認の system メモが MR のメモ・スレッド・レビュアーの応答に混ざり、ほかの要求の形が変わるため）。承認すると、本物は承認者を `reviewers` に入れる（`mrs_merged` の `[].reviewers` は空でなくなる。`reads` には無い）
 - `fresh` は存在するブランチで、MR は無い
 - 拡張だけの要求のために、`feature` にもう 1 コミット（`docs/note.txt`。ディレクトリと、2 つの履歴を作る）。`sha.main`（`main` の先頭）・`sha.feature`（`feature` の先頭）・`blob.sha`（`feature.txt` の blob の sha）を `context` に積む
 
@@ -240,7 +241,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 - 値（ID・時刻・SHA）の一致。`state`・`source_branch` の絞り込みが効くか、`order_by`・`sort` の並び、日時の書式は、型が同じなら緑になる
 - `web_url` は sh が読むが、環境で変わる欄として形から落とすので、模擬が返さなくなっても検出できない
 - TS の比較器との既知の差。`1.0` のように小数点以下が 0 の値は、Python では `number`、JS の `JSON.parse` では `integer` になる。`DATETIME` の正規表現は、Python の `\d` が Unicode の数字にも、`$` が末尾の改行の前にも当たるのに対し、JS は ASCII の数字だけに当たり、`$` は末尾だけに当たる（JS の方が厳しい）
-- Chrome 拡張の比較は `reads` の範囲と、`used_by` に `chrome` を持つ要求だけ。見本由来の応答と、`mrs_opened`、ページを繰る 2 ページ目以降、Commits API の `update`・`delete`、`compare` の `collapsed`・`too_large`（本物は立つときだけ返し、場面で立てていない）、`approvals` で承認が付いた形（`approved_by` が空）は対象外
+- Chrome 拡張の比較は `reads` の範囲と、`used_by` に `chrome` を持つ要求だけ。見本由来の応答と、`mrs_opened`、ページを繰る 2 ページ目以降、Commits API の `update`・`delete`、`compare` の `collapsed`・`too_large`（本物は立つときだけ返し、場面で立てていない）、`approvals` で承認が付いた形（`approved_by` が空）は対象外。承認が付いた形は `approvals_get`（merged の MR）が `approved_by[].approved_at` だけ比べる（`approved_by[].user.username` は環境で変わる欄で、`reads` に載せられない）
 - 空の配列の要素の形（録るときに、`NON_EMPTY` の要求が空でないことを確かめる）
 - 録った場面の外（差分への指摘のスレッド、複数ページ、フォークからの MR、グループ配下のプロジェクトで `group_access` が整数になる形など）
 

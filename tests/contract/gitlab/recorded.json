@@ -6,7 +6,7 @@
   "page2",
   "error_403"
  ],
- "recorded_at": "2026-10-29",
+ "recorded_at": "2026-10-30",
  "requests": {
   "approvals": {
    "shape": {
@@ -47,6 +47,45 @@
       ]
      },
      "approved_by": {
+      "items": {
+       "keys": {
+        "approved_at": {
+         "t": [
+          "datetime"
+         ]
+        },
+        "user": {
+         "keys": {
+          "id": {
+           "t": [
+            "integer"
+           ]
+          },
+          "locked": {
+           "t": [
+            "boolean"
+           ]
+          },
+          "name": {
+           "t": [
+            "string"
+           ]
+          },
+          "state": {
+           "t": [
+            "string"
+           ]
+          }
+         },
+         "t": [
+          "object"
+         ]
+        }
+       },
+       "t": [
+        "object"
+       ]
+      },
       "t": [
        "array"
       ]
@@ -5115,6 +5154,33 @@
        ]
       },
       "reviewers": {
+       "items": {
+        "keys": {
+         "id": {
+          "t": [
+           "integer"
+          ]
+         },
+         "locked": {
+          "t": [
+           "boolean"
+          ]
+         },
+         "name": {
+          "t": [
+           "string"
+          ]
+         },
+         "state": {
+          "t": [
+           "string"
+          ]
+         }
+        },
+        "t": [
+         "object"
+        ]
+       },
        "t": [
         "array"
        ]
