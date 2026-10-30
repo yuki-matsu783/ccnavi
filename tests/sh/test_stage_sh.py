@@ -87,6 +87,7 @@ class StageShTest(unittest.TestCase):
         取り込みの手順はそのワークツリーを --root に指す。"""
         wt = os.path.join(self.ws, ".claude", "worktrees", "scratch-1-x")
         os.makedirs(os.path.join(wt, "src"))
+        write(os.path.join(wt, ".ccnavi", "config", "common", "rules.yml"), "version: 1\n")
         r = self.stage(self.rules, cwd=os.path.join(wt, "src"))
         self.assertEqual(0, r.returncode, r.stderr)
         draft = os.path.join(wt, "wip", "handoff", ".ccnavi", "config", "common", "rules.yml")
@@ -114,6 +115,56 @@ class StageShTest(unittest.TestCase):
         r = self.stage(".ccnavi/config/common/rules.yml", cwd=wt)
         self.assertEqual(0, r.returncode, r.stderr)
         self.assertIn(f"--commands {inner}", r.stdout)
+
+    def worktree(self, name="scratch-1-x", text="version: 1\n"):
+        wt = os.path.join(self.ws, ".claude", "worktrees", name)
+        write(os.path.join(wt, ".ccnavi", "config", "common", "rules.yml"), text)
+        return wt
+
+    def test_inside_a_worktree_every_way_of_naming_the_file_gives_the_same_draft(self):
+        wt = self.worktree()
+        draft = os.path.join(wt, "wip", "handoff", ".ccnavi", "config", "common", "rules.yml")
+        inner = os.path.join(wt, ".ccnavi", "config", "common", "rules.yml")
+        for arg in (".ccnavi/config/common/rules.yml", inner, self.rules):
+            with self.subTest(arg=arg):
+                shutil.rmtree(os.path.join(wt, "wip"), ignore_errors=True)
+                r = self.stage(arg, cwd=wt)
+                self.assertEqual(0, r.returncode, r.stderr)
+                self.assertEqual("version: 1\n", read(draft))
+                handoff = os.path.join(wt, "wip", "handoff")
+                self.assertEqual([".ccnavi"], os.listdir(handoff), "深い階層に置かない")
+
+    def test_inside_a_worktree_the_draft_starts_from_the_worktrees_version(self):
+        wt = self.worktree(text="version: wt\n")
+        r = self.stage(self.rules, cwd=wt)
+        self.assertEqual(0, r.returncode, r.stderr)
+        draft = os.path.join(wt, "wip", "handoff", ".ccnavi", "config", "common", "rules.yml")
+        self.assertEqual("version: wt\n", read(draft))
+        self.assertEqual("version: 1\n", read(self.rules))
+        write(draft, "version: edited\n")
+        r = self.stage("--commands", self.rules, cwd=wt)
+        self.assertEqual(0, r.returncode, r.stderr)
+        self.assertIn("--root", r.stdout)
+
+    def test_inside_a_worktree_a_file_only_the_root_has_is_refused(self):
+        wt = self.worktree()
+        r = self.stage(self.hook, cwd=wt)
+        self.assertEqual(2, r.returncode, r.stdout)
+        searched = os.path.join(wt, ".claude", "hooks", "lint-py.sh").replace(os.sep, "/")
+        self.assertIn(searched, r.stderr.replace(os.sep, "/"))
+        self.assertIn("実在するファイルではありません", r.stderr)
+        self.assertFalse(os.path.exists(os.path.join(wt, "wip")))
+
+    def test_from_the_root_another_worktrees_file_is_refused(self):
+        wt = self.worktree()
+        inner = os.path.join(wt, ".ccnavi", "config", "common", "rules.yml")
+        r = self.stage(inner)
+        self.assertEqual(2, r.returncode, r.stdout)
+        self.assertIn("別のワークツリー", r.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.ws, "wip")))
+        # ワークツリーの置き場の綴りが違っても同じ
+        r = self.stage(inner.replace(".claude", ".CLAUDE"))
+        self.assertEqual(2, r.returncode, r.stdout)
 
     def test_a_linked_handoff_directory_is_refused(self):
         wt = os.path.join(self.ws, ".claude", "worktrees", "scratch-1-x")
