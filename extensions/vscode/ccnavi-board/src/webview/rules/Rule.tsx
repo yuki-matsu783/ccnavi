@@ -159,7 +159,7 @@ export function Rule(props: RuleProps): JSX.Element {
           </Picker>
         </Captioned>
         <Captioned name="タイプ" yamlKey="deny / ask / allow" tour={tour("type")}>
-          <select className="f-section" value={section} onChange={(event) => props.onMoveSection(event.target.value as Section)}>
+          <select className="f-section" value={section} disabled={props.finding} title={props.finding ? moveTitle("上へ", true) : undefined} onChange={(event) => props.onMoveSection(event.target.value as Section)}>
             {SECTIONS.map((name) => (
               <option key={name} value={name}>
                 {name}

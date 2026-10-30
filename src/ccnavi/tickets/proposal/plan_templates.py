@@ -76,7 +76,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from ...infra import pathsafe, settings, tree
+from ...infra import pathcase, pathsafe, settings, tree
 from ...policy import ruleload
 from ...policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 from ..config import phasetypes, workflow
@@ -116,7 +116,7 @@ def new_name_problem(name: str) -> str:
         return f"英数字で始め、英数字と `._-` だけ。{NAME_LIMIT} 字まで"
     if name.endswith("."):
         return "末尾に `.` は付けられない（Windows でファイル名にできない）"
-    if name.split(".", 1)[0].casefold() in WINDOWS_RESERVED:
+    if pathcase.fold(name.split(".", 1)[0]) in WINDOWS_RESERVED:
         return "Windows の予約名（con prn aux nul com1-9 lpt1-9）は使えない"
     return ""
 

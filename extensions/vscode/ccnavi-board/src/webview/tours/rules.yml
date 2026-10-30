@@ -761,7 +761,7 @@ courses:
         scene: { tab: rules, open: no-rm-rf }
       - target: rule-no-rm-rf-type
         title: タイプを移す
-        body: 「タイプ」の欄で deny / ask / allow を替えると、行は移した先の末尾に移ります。止めすぎだと分かった deny を ask に下げる、のように使います。ask と allow に message が残ると lint が error にするので、移したら message を additionalContext へ移します。
+        body: 「タイプ」の欄で deny / ask / allow を替えると、行は移した先の末尾に移ります。絞り込み中は動かせないので、検索欄を空にしてから動かします。止めすぎだと分かった deny を ask に下げる、のように使います。ask と allow に message が残ると lint が error にするので、移したら message を additionalContext へ移します。
         scene: { tab: rules, open: no-rm-rf }
       - target: save
         title: 保存

@@ -312,6 +312,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     }
     setEditing((now) => ({ ...now, draft: replace(now.draft, found.section, key, { ...found.row.rule, [field]: path }) }));
     setDirty(true);
+    setSaveWarns([]);
   };
 
   /**

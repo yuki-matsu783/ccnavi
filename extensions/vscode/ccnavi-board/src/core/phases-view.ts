@@ -26,7 +26,7 @@ import type { TargetOption } from "./targets.js";
 export const PHASE_KINDS = ["work", "feedback"] as const;
 export type PhaseKind = (typeof PHASE_KINDS)[number];
 
-/** レビューの既定。phasetypes.REVIEWS と同じ順 */
+/** レビューの並び。phasetypes.REVIEWS と同じ順 */
 export const REVIEWS = ["none", "mr"] as const;
 export type Review = (typeof REVIEWS)[number];
 
