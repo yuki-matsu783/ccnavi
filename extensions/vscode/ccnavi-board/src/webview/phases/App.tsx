@@ -200,11 +200,11 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     return (
       <>
         <p className="empty">
-          フェーズ管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に替わります。
+          フェーズ管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に変わります。
         </p>
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" title="ファイルを再読み込みします" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
+        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
           更新
         </button>
       </>
@@ -343,7 +343,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <div id="changed" data-tour="changed" className={shownChanged ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。更新してください。
-        <button type="button" className="action" data-action="reload" title="ファイルを再読み込みします" disabled={shownBusy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={reload}>
           更新
         </button>
       </div>
@@ -364,7 +364,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           <button type="button" className="action" data-action="open-phases" data-tour="open-file" disabled={shownPage?.exists !== true} onClick={() => act({ type: "openFile" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" title="ファイルを再読み込みします" disabled={shownBusy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={reload}>
             更新
           </button>
           <button
@@ -510,7 +510,7 @@ function CommonList(props: { readonly common: readonly CommonPhase[] }): JSX.Ele
       <ul className="list">
         {props.common.map((phase) => (
           <li key={phase.id} className="common-phase" data-id={phase.id} data-source="common">
-            <code>{phase.id}</code> {phase.title} <span>（{phase.kind} / review: {phase.review} / scope: {phase.scope.join(", ")}）</span>
+            <code>{phase.id}</code> {phase.title} <span>（区分 {phase.kind} / レビュー {phase.review} / 編集可能な範囲 {phase.scope.join(", ")}）</span>
           </li>
         ))}
       </ul>
