@@ -165,13 +165,13 @@ export function validTemplateName(name: string): boolean {
 }
 
 /**
- * Windows でファイル名にできない予約名（拡張子が付いても同じ）。比べるためでなく、断るための一覧。
+ * Windows でファイル名にできない予約名の一覧。拡張子が付いても同じ名前になる。比べるためではなく、新しい名前を断るために使う。
  * 実行ファイルの `plan_templates.WINDOWS_RESERVED` と同じ
  */
 export const WINDOWS_RESERVED_NAMES: readonly string[] = ["con", "prn", "aux", "nul", ...[1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap((n) => [`com${n}`, `lpt${n}`])];
 
 /** 新しい名前を断るときに画面へ出す、決まりの説明 */
-export const NEW_TEMPLATE_NAME_RULE = "英数字で始め、英数字と . _ - のみ、64 字まで。末尾に . は付けられず、Windows の予約名（con・prn・aux・nul・com1〜9・lpt1〜9。拡張子付きも）は使えません";
+export const NEW_TEMPLATE_NAME_RULE = "英数字で始め、英数字と . _ - だけを使い、64 字までです。末尾に . は使えません。Windows の予約名は使えません（con・prn・aux・nul・com1〜9・lpt1〜9。拡張子を付けても同じです）";
 
 /**
  * 新しく作るテンプレートの名前に使えるか。`validTemplateName` に加えて、末尾の `.` と Windows の予約名を断る

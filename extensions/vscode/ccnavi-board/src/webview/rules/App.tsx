@@ -475,7 +475,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const isShownOpen = (row: { readonly key: string; readonly rule: RuleForm }): boolean => (touring ? sceneOpen.has(row.rule.id) : isOpen(row.key));
 
   const query = foldFind(shownFind.trim());
-  // 3 タイプとも、絞り込みに一致する行も開いたまま見えている行も無いときだけ案内を出す
+  // 3 タイプとも、絞り込みに一致する行も、開いたまま見えている行も無いときだけ案内を出す
   const allRows = SECTIONS.flatMap((section) => shownDraft[section]);
   const nothingFound = query !== "" && allRows.length > 0 && allRows.every((row) => !findText(row.rule).includes(query) && !isShownOpen(row));
 
