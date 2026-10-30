@@ -79,6 +79,7 @@ import {
 import { fitStalled, PLAN_FIT_MAX_ZOOM, PLAN_FIT_MIN_ZOOM, viewportAtStart } from "../../core/plan-graph.js";
 import { maximizeClass, MaximizeButton, RefitOnChange, useMaximize } from "../shared/Maximize.js";
 import { badgeOf, summaryOf, type Badge } from "./text.js";
+import { FLOW_ARIA_LABELS } from "../shared/flow-aria.js";
 
 /** いま選んでいるもの。線はリストの位置で指す（id が無い線もある） */
 export type Selection = { readonly kind: "node"; readonly id: string } | { readonly kind: "edge"; readonly index: number };
@@ -519,7 +520,7 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, marks 
           nodesDraggable={!readOnly}
           nodesConnectable={!readOnly}
           fitView={!readableFit}
-          ariaLabelConfig={{ "controls.zoomIn.ariaLabel": "拡大", "controls.zoomOut.ariaLabel": "縮小", "controls.fitView.ariaLabel": "全体を表示" }}
+          ariaLabelConfig={FLOW_ARIA_LABELS}
           minZoom={0.2}
           maxZoom={1.8}
           // Shift を押しながら押すと選び足し、Shift を押しながら何も無いところからドラッグして囲むと、囲んだものを選ぶ

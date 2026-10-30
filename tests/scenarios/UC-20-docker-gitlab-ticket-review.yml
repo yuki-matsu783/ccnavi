@@ -101,4 +101,6 @@ unconfirmed:
   - 回す前に projects/test-repo の refs/remotes/origin/* に、新規のプロジェクトの issue #1 と同じ番号のブランチ（例 fix-1-…）が無いこと。あると --issue 1 が候補ありで止まる（道具の不足は #730）
   - step 5（スレッドを立てる human_api）の前に、プロジェクトの MR がちょうど 1 件かを機械的に確かめることはできない（expect_after.state は state のコマンドにトークンを渡せず、project_id も YAML に書けず、human の step に付けられない）。step 5 の human_api が thread の前に MR の件数を数え、違えば halt するのが代わり
   - step 10 に human_run は使えない。親の改版は識別子が承認済みと同じで「新しく承認済みになった」と数えられず、承認が通っても halt する（#744）。step 3・10 とも scenario_tools.py agree の手動代行で打つ
+  - 4 回目の実行（改訂後）は機械判定がすべて pass（judge は読み待ち）。step 8 は confirm が通り、親の finish はフィードバック計画の方針（指摘に対応するか見送るか）をユーザに聞いて止まった。ready には届いていない
   - 5 回目の実行（step 10 を手動代行にした 2 回目、`UC-20-20261030-215059`）で ready まで届いた。MR の draft が false、ready の note と request の note が MR に付き、approve（HTTP 201）が host-N.json の approvals に出た。judge は実装者が読んで OK。ccnavi-start.sh --issue の打ち直しは、別の使い捨てのプロジェクトで MR が 1 件のまま、終了コード 0 で続行した（冪等）
+  - ccnavi-start.sh --issue を打ち直すと MR が重複して作られるか（冪等性。未確認）

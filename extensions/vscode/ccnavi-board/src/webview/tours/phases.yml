@@ -128,7 +128,7 @@ diagrams:
         value: 'feedback の定義に review: none を書くと、error で保存しない'
       - id: lock
         from: フェーズ管理画面
-        text: 作業中のチケット（doing）があると、進行中の作業の判定が途中で変わるため保存できない。エージェントがターン中なら、確認が出る
+        text: 作業中のチケット（doing）があると、進行中の作業の判定が途中で変わるため保存できない。エージェントが応答中なら、確認が出る
       - id: write
         from: フェーズ管理画面
         to: phases.yml
@@ -162,7 +162,7 @@ diagrams:
       - id: read
         from: ccnavi
         to: phases.yml
-        text: 計画のステップが使う定義だけを読む（共通の設定と、親の project が指す設定の和）
+        text: 計画のステップが使う定義だけを読む（共通の設定に、親の project が指す設定を重ねたもの）
       - id: write
         from: ccnavi
         to: 親の提案
@@ -187,7 +187,7 @@ diagrams:
       - id: finish
         from: 親（メインエージェント）
         to: ccnavi
-        text: 1 番目のフェーズ（research）の子を閉じる
+        text: 一つ目のフェーズ（research）の子を閉じる
         value: sh .ccnavi/scripts/ccnavi-ticket.sh finish <子>
       - id: deliverables
         from: ccnavi
@@ -217,7 +217,7 @@ diagrams:
       - id: finish
         from: 親（メインエージェント）
         to: ccnavi
-        text: 2 番目のフェーズ（design）の最後の子を閉じる
+        text: 二つ目のフェーズ（design）の最後の子を閉じる
         value: sh .ccnavi/scripts/ccnavi-ticket.sh finish <子>
       - id: ended
         from: ccnavi
@@ -228,7 +228,7 @@ diagrams:
       - id: reply
         from: ccnavi
         to: 親（メインエージェント）
-        text: すべての子が合流済みと確かめ、レビューを頼み、ターンを終えてユーザを待てと返す
+        text: すべての子が合流済みと確かめ、レビューを頼み、応答を終えてユーザを待てと返す
         value: 'マーカー: pending'
       - id: stop
         from: ccnavi
@@ -294,8 +294,8 @@ diagrams:
       - id: gate
         from: ユーザ
         to: ccnavi
-        text: 4 番目の子を承認しようとする
-        value: 3 番目が閉じてレビューが済むまで、承認されない
+        text: 四つ目の子を承認しようとする
+        value: 三つ目が閉じてレビューが済むまで、承認されない
       - id: fixed
         from: ccnavi
         text: 先行は親の計画から計算する。承認のあとに phases.yml を直しても変わらない
@@ -336,7 +336,7 @@ courses:
         focus: edit
       - target: save
         title: 保存すると、まず検証される
-        body: ［保存］を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します。error が 1 件でもあれば、何も保存しません。作業中のチケットがあるときは、進行中の作業の判定が途中で変わるため保存できません。エージェントがターン中なら、確認が出ます。
+        body: ［保存］を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します。error が 1 件でもあれば、何も保存しません。作業中のチケットがあるときは、進行中の作業の判定が途中で変わるため保存できません。エージェントが応答中なら、確認が出ます。
         scene: { open: research, dirty: true }
         diagram: phase-save
         focus: save, lock
@@ -363,12 +363,12 @@ courses:
         focus: agree
       - target: phases
         title: 順序は計画の after が決める
-        body: 定義には順序の欄がありません。どのフェーズにどのフェーズが先行するかは、計画のステップの after が決めます。4 番目の implement には、3 → 2 → 1 を辿って 1, 2, 3 が先行します。
+        body: 定義には順序の欄がありません。どのフェーズにどのフェーズが先行するかは、計画のステップの after が決めます。四つ目の implement には、3 → 2 → 1 を辿って 1, 2, 3 が先行します。
         diagram: phase-order
         focus: after, waits
       - target: phases
         title: 先行は承認で効く
-        body: 4 番目の子は、3 番目が閉じてレビューが済むまで承認されません。先行は計画から計算するので、承認のあとに phases.yml を直しても変わりません。after の書き漏れは並行として通るので、承認の画面の「すぐ始まる」の一覧で確かめます。
+        body: 四つ目の子は、三つ目が閉じてレビューが済むまで承認されません。先行は計画から計算するので、承認のあとに phases.yml を直しても変わりません。after の書き漏れは並行として通るので、承認の画面の「すぐ始まる」の一覧で確かめます。
         diagram: phase-order
         focus: gate, fixed
 
@@ -395,7 +395,7 @@ courses:
         focus: finish, ended
       - target: phases
         title: mr は、ユーザを待って止まる
-        body: 返る文は、すべての子が合流済みと確かめ、レビューを頼み、ターンを終えてユーザを待て、です。レビュー済みになるまで、その親の cwd からのサブエージェントの起動と Bash が止まります。次のフェーズの計画を書く Write と Edit は通ります。
+        body: 返す文は「すべての子が合流済みと確かめ、レビューを頼み、応答を終えてユーザを待て」です。レビュー済みになるまで、その親の cwd からのサブエージェントの起動と Bash が止まります。次のフェーズの計画を書く Write と Edit は通ります。
         diagram: phase-end-mr
         focus: reply, stop
       - target: phases
@@ -429,7 +429,7 @@ courses:
           add: blank
       - target: phase-title
         title: タイトルを付ける
-        body: 表示名です。空なら id をそのまま使います。id と同じく、ほかの定義と重複させられません。
+        body: タイトルです。空なら id をそのまま使います。id と同じく、ほかの定義と重なるものは使えません。
         scene:
           add: blank
       - target: phase-kind
@@ -444,7 +444,7 @@ courses:
           add: filled
       - target: phase-deliverables
         title: 必須成果物を決める
-        body: 子をクローズする前に存在し、git に追跡されているべきファイルです。複数あるときは , で区切ります。空なら求めません。
+        body: 子を閉じる前に存在し、git に追跡されているべきファイルです。複数あるときは , で区切ります。空なら確かめません。
         scene:
           add: filled
       - target: save
@@ -544,7 +544,7 @@ courses:
         body: 見本のワークスペースには、調査・設計・受入テスト作成・実装とテストなどの作業の定義と、フィードバック対応の定義があります。
       - target: target
         title: プロジェクトを選ぶ
-        body: プロジェクトを選ぶと、このタブの中身がそのプロジェクトの定義に替わります。タブは 1 枚のままです。見本では lib を選んでいます。
+        body: プロジェクトを選ぶと、このタブの中身がそのプロジェクトの定義に変わります。タブは 1 枚のままです。見本では lib を選んでいます。
         scene:
           target: lib
       - target: path
@@ -553,8 +553,8 @@ courses:
         scene:
           target: lib
       - target: phases
-        title: 共通の設定との和
-        body: 使われるのは、共通の設定の定義と、親チケットの project が指す 1 本の和です。ワークスペースの定義とプロジェクトの定義は合算されません。同じ id で中身が違う定義と、表示名が重なる定義は、保存の検査で止まります。
+        title: 共通の設定との重ね合わせ
+        body: 使われるのは、共通の設定の定義と、親チケットの project が指す 1 本を重ねたものです。ワークスペースの定義とプロジェクトの定義は合算されません。同じ id で中身が違う定義と、タイトルが重なる定義は、保存の検査で止まります。
         scene:
           target: lib
       - target: target
@@ -599,7 +599,7 @@ courses:
           locked: true
       - target: changed
         title: 外で変わったとき
-        body: エディタなどでファイルが変わると、帯が出ます。「更新」を押すと再読み込みし、画面の編集中の内容は、再読み込みした内容に替わります。
+        body: エディタなどでファイルが変わると、画面上部に帯が出ます。「更新」を押すと読み直し、画面で編集中の内容は読み直した内容に置き換わります。
         scene:
           changed: true
       - target: open-file

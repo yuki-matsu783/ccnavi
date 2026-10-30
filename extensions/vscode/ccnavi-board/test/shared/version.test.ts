@@ -67,7 +67,7 @@ test("CB-T270 使うフラグを実行ファイルが知っているかを版の
 
   const missing = missingFlags(ok({ flags: ["--lint", "--version"] }), ["--flow"], what, false) ?? "";
   assert.match(missing, /--flow に対応していません（古い版です）/);
-  assert.match(missing, /ccnavi --lint --json --flow で確認できない/);
+  assert.match(missing, /「ccnavi --lint --json --flow」は使えない/);
   assert.match(missing, /ccnavi-setup\.sh/);
 
   const failed = missingFlags({ kind: "failed", error: "打ち切った" }, ["--flow"], what, false) ?? "";
@@ -91,7 +91,7 @@ test("CB-T568 使う機能を実行ファイルが持つかを features で見�
   const missing = missingFeatures(ok({ features: ["handoff"] }), ["handoff", "user-entry"], what, false) ?? "";
   assert.match(missing, /user-entry の機能に対応していません/);
   assert.doesNotMatch(missing, /handoff /);
-  assert.match(missing, /取り込み待ち画面 で確認できない/);
+  assert.match(missing, /「取り込み待ち画面」は使えない/);
 
   const failed = missingFeatures({ kind: "failed", error: "打ち切った" }, ["handoff"], what, false) ?? "";
   assert.match(failed, /打ち切った/);
@@ -121,6 +121,6 @@ test("CB-T1100 user-entry を持たない実行ファイルには、ユーザ専
 
   const stale = missingFeatures(ok({ compat: 12, features: ["handoff"] }), ["user-entry"], what, true) ?? "";
   assert.match(stale, /user-entry の機能に対応していません（古い版です）/);
-  assert.match(stale, /ccnavi user agree --yes で確認できない/);
+  assert.match(stale, /「ccnavi user agree --yes」は使えない/);
   assert.match(stale, /組み立て直して/);
 });
