@@ -43,12 +43,12 @@ export interface RiskSum {
 
 /** 統合結果を選ぶ欄の表記 */
 export function sumLabel(name: string): string {
-  return name === "self" ? "共通 + ワークスペース" : `共通 + プロジェクト ${name}`;
+  return name === "self" ? "共通 + ワークスペース" : `共通 + プロジェクト（${name}）`;
 }
 
 /** 層の名前（`common` / `self` / プロジェクト名）を画面の言い方にする */
 export function layerLabel(name: string): string {
-  return name === "common" ? "共通" : name === "self" ? "ワークスペース" : `プロジェクト ${name}`;
+  return name === "common" ? "共通" : name === "self" ? "ワークスペース" : `プロジェクト（${name}）`;
 }
 
 /** 統合結果の層を「共通 + ワークスペース」の形に並べる */

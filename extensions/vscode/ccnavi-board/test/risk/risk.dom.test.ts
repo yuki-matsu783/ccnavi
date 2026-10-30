@@ -463,7 +463,7 @@ test("CB-T316 統合結果は読み取り専用で、境目の点・項目・由
     assert.equal(select.value, "lib");
     assert.match(dom.one("#sum-levels").textContent, /MEDIUM 20.*HIGH 40.*CRITICAL 50/);
     const rows = () => dom.all("#sum tbody tr").map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
-    assert.deepEqual(rows().map((r) => [r[0], r[2], r[3]]), [["big-diff", "25", "共通"], ["schema", "30", "プロジェクト lib"]]);
+    assert.deepEqual(rows().map((r) => [r[0], r[2], r[3]]), [["big-diff", "25", "共通"], ["schema", "30", "プロジェクト（lib）"]]);
     dom.change(select, "self");
     await dom.settle();
     assert.match(dom.one("#sum-levels").textContent, /CRITICAL 70/);
