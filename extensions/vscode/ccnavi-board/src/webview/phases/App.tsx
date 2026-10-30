@@ -30,6 +30,7 @@ import phasesTour from "../tours/phases.yml";
 import { TargetSelect } from "../TargetSelect.js";
 import { HandoffLink } from "../shared/HandoffLink.js";
 import { post } from "./post.js";
+import { Code } from "../shared/Code.js";
 import { COMMON_NOTE, commonIdNote, commonTitleNote, countText, duplicateNote, emptyNote, findText, hasMore } from "./text.js";
 import { commonClashes, draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
 
@@ -393,7 +394,9 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       {!touring && page !== undefined && page.model.problems.length > 0 && (
         <ul className="problems">
           {page.model.problems.map((problem, index) => (
-            <li key={index}>{problem}</li>
+            <li key={index}>
+              <Code text={problem} />
+            </li>
           ))}
         </ul>
       )}
@@ -457,7 +460,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           </div>
         )}
         <ul className="list" id="phases" data-tour="phases">
-          {rows.map((row) => (
+          {rows.map((row, index) => (
             <Phase
               key={row.key}
               phaseKey={row.key}
@@ -473,10 +476,13 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
               onToggle={() => toggle(row.key)}
               onToggleMore={(value) => toggleMore(row.key, value)}
               onChange={(phase) => editRow(row.key, phase)}
+              first={index === 0}
+              last={index === rows.length - 1}
               onMove={(delta) => move(row.key, delta)}
               onRemove={() => remove(row.key)}
             />
           ))}
+          {rows.length > 0 && shown + kept === 0 && <li className="empty">絞り込みにヒットする定義がありません。語を変えるか、絞り込み欄を空にしてください</li>}
           {shownDraft.rows.length === 0 && <li className="empty">{emptyNote(shownPage?.exists === true)}</li>}
         </ul>
         {clash.ids.size > 0 && (
@@ -489,7 +495,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
       <footer className={shownStatus?.error === true ? "foot error" : "foot"}>
         <span id="status" data-tour="status">
-          {shownStatus?.text ?? ""}
+          <Code text={shownStatus?.text ?? ""} />
         </span>
       </footer>
     </>

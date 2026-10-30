@@ -105,6 +105,8 @@ def scene_state() -> dict:
                 "discussions": [],
                 "reviewers": [],
                 "notes": [],
+                # 本物では、レビュアーが merge の前に承認した
+                "approved_by": [{"approved_at": ISO, "user": {"id": 2, "username": "reviewer"}}],
             },
         ],
     }
@@ -116,6 +118,7 @@ def scene_context() -> dict[str, str]:
         "mr.iid": "1",
         "mr.branch": "feature",
         "mr.merged_branch": "done",
+        "mr.merged_iid": "2",
         "mr.new_branch": "fresh",
         "issue.iid": "1",
         "discussion.id": "d50",

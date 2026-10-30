@@ -24,6 +24,7 @@ import { Captioned, Factor } from "./Factor.js";
 import { Sum } from "./Sum.js";
 import { post } from "./post.js";
 import { countText, findText } from "./text.js";
+import { Code } from "../shared/Code.js";
 import { draftOf, emptyFactor, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
 
 /** 中身が読めなかったときの錠。画面は保存させない（押せる形で出して異常終了させない） */
@@ -346,7 +347,9 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       {!touring && page !== undefined && page.model.problems.length > 0 && (
         <ul className="problems">
           {page.model.problems.map((problem, index) => (
-            <li key={index}>{problem}</li>
+            <li key={index}>
+              <Code text={problem} />
+            </li>
           ))}
         </ul>
       )}
@@ -439,7 +442,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           </p>
         </details>
         <ul className="list" id="factors" data-tour="factors">
-          {rows.map((row) => (
+          {rows.map((row, index) => (
             <Factor
               key={row.key}
               factorKey={row.key}
@@ -451,10 +454,13 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
               tour={row.key === tourRowKey}
               onToggle={() => toggle(row.key)}
               onChange={(factor) => editRow(row.key, factor)}
+              first={index === 0}
+              last={index === rows.length - 1}
               onMove={(delta) => move(row.key, delta)}
               onRemove={() => remove(row.key)}
             />
           ))}
+          {rows.length > 0 && shown + kept === 0 && <li className="empty">絞り込みにヒットする項目がありません。語を変えるか、絞り込み欄を空にしてください</li>}
           {shownDraft.rows.length === 0 && <li className="empty">項目がありません。加点する項目がなければ、どの子も LOW のまま閉じられます</li>}
         </ul>
       </section>
@@ -469,7 +475,9 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       )}
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
       <footer className={!touring && status?.error === true ? "foot error" : "foot"}>
-        <span id="status">{touring ? "" : status?.text ?? ""}</span>
+        <span id="status">
+          <Code text={touring ? "" : (status?.text ?? "")} />
+        </span>
       </footer>
     </>
   );

@@ -273,3 +273,8 @@ const TMP_RULES = new RegExp(`(?:[A-Za-z]:)?(?:\\.\\.[\\\\/])*[^\\s:()]*${TMP_RU
 export function tmpName(text: string): string {
   return text.replace(TMP_RULES, "rules.yml:");
 }
+
+/** 判定の rule.id（`rules.yml:<id>`）から、編集中の行の id（`<id>`）だけを取り出す。接頭辞が無ければそのまま返す */
+export function bareRuleId(id: string): string {
+  return tmpName(id).replace(/^rules\.yml:/, "");
+}

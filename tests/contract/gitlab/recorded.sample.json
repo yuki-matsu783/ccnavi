@@ -464,7 +464,31 @@
      "approved_by": {
       "t": [
        "array"
-      ]
+      ],
+      "items": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "approved_at": {
+         "t": [
+          "datetime"
+         ]
+        },
+        "user": {
+         "t": [
+          "object"
+         ],
+         "keys": {
+          "id": {
+           "t": [
+            "integer"
+           ]
+          }
+         }
+        }
+       }
+      }
      },
      "user_can_approve": {
       "t": [

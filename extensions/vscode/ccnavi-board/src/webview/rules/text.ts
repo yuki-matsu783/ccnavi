@@ -18,9 +18,9 @@ export function summaryId(rule: RuleForm): string {
   return rule.id === "" ? "（id 未設定）" : rule.id;
 }
 
-/** 要約のツール。空は「全ツール」＝ どのツールにもヒットする */
+/** 要約のツール。空は「どのツールにもヒットしない」（実行ファイルは match の無いルールを error にする） */
 export function summaryMatch(rule: RuleForm): string {
-  return rule.match === "" ? "（全ツール）" : rule.match;
+  return rule.match === "" ? "（match 未設定）" : rule.match;
 }
 
 /**

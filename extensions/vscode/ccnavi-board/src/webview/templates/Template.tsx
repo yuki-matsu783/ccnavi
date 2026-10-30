@@ -9,6 +9,7 @@ import type { FlowSummary, TemplateCheck, TemplateDetail, TemplateEntry } from "
 import { Diagrams } from "./Diagrams.js";
 import { Plan } from "./Plan.js";
 import { Problems } from "./Problems.js";
+import { Code } from "../shared/Code.js";
 import { droppedLabel, flowText, layerLabel } from "./text.js";
 
 export interface TemplateProps {
@@ -58,7 +59,11 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
         <StateTags entry={entry} />
         {entry.description !== "" && <span className="tpl-desc">{entry.description}</span>}
       </div>
-      {dropped !== null && <p className="hint tpl-dropped">{dropped.detail}</p>}
+      {dropped !== null && (
+        <p className="hint tpl-dropped">
+          <Code text={dropped.detail} />
+        </p>
+      )}
       {open && (
         <div className="row-body tpl-body">
           {entry.when !== "" && (

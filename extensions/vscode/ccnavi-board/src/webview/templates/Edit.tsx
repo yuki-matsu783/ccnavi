@@ -20,6 +20,7 @@ import { FlowEdit } from "./FlowEdit.js";
 import { PlanEdit } from "./PlanEdit.js";
 import { post } from "./post.js";
 import { Problems } from "./Problems.js";
+import { Code } from "../shared/Code.js";
 import { layerLabel } from "./text.js";
 
 /** 直して読ませるまでの待ち（ミリ秒）。打つたびに実行ファイルを呼ばない */
@@ -244,7 +245,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
       )}
       {status !== undefined && (
         <p className={status.error ? "status failed" : "status"} role="status" data-role="edit-status">
-          {status.text}
+          <Code text={status.text} />
         </p>
       )}
       {checkError !== "" && (

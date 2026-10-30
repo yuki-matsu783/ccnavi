@@ -90,6 +90,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
   useHostMessages<ToTemplates>((message) => {
     if (message.type === "data" && message.data !== undefined) {
       setData(message.data);
+      setEditError("");
       setBusy(false);
       setDetails({});
       setPreviews({});
@@ -302,6 +303,12 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                   >
                     作る
                   </button>
+                  {validTemplateName(newName) && templateNameTaken(page.data.layers, layer.name, newName) !== undefined && (
+                    <span className="hint" role="status" data-role="name-taken">
+                      {" "}
+                      同じ名前のテンプレートが既にあります（大文字小文字は区別しません）
+                    </span>
+                  )}
                 </p>
               )}
               {shownTemplates.length === 0 ? (
