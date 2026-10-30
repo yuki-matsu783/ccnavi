@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import TextIO
 
-from . import settings
+from . import settings, toolnames
 
 # 終了コード。
 EXIT_OK = 0  # 判定を書いた、あるいは言うことが無かった
@@ -126,18 +126,6 @@ def holds_in_dry_run(kind: str) -> bool:
     return kind in (GATE, AUX)
 
 
-# サブエージェントの起動ツール。Claude Code の版によって Agent か Task で来る。
-AGENT_TOOLS = ("Agent", "Task")
-# サブエージェントが親へ報告を返すためのツール。判定に達せなかったときも止めない
-# （止めると、体が報告を返せずに終われない）。
-REPORT_TOOLS = ("SubagentHandback", "StructuredOutput")
-
-# ツールの種類ごとの、判定に達せなかったときの扱い。
-STRICT_TOOLS = ("Write", "Edit", "NotebookEdit", *AGENT_TOOLS)
-READ_TOOLS = ("Read", "Grep", "Glob")
-SHELL_TOOLS = ("Bash", "PowerShell")
-
-
 def fail_closed(mode: str, tool: str | None = None, *, safe: bool = False) -> int:
     """「判定に達せなかった」ときの終了コード。
 
@@ -149,7 +137,7 @@ def fail_closed(mode: str, tool: str | None = None, *, safe: bool = False) -> in
     確かめた呼び出し（`hook.failsafe`）。
 
     - 空（payload が読めずツールが分からない）: 止める
-    - 報告用のツール（`REPORT_TOOLS`）: モードに関係なく通す
+    - 報告用のツール（`toolnames.REPORT_TOOLS`）: モードに関係なく通す
     - Write・Edit・NotebookEdit・Agent・Task: dry-run でも止める
     - Read・Grep・Glob・Bash・PowerShell: `safe` のときだけ通す。dry-run でも同じ
     - 知らないツール: enable は止め、dry-run は通す
@@ -158,10 +146,10 @@ def fail_closed(mode: str, tool: str | None = None, *, safe: bool = False) -> in
         return EXIT_OK if mode == DRY_RUN else EXIT_BLOCK
     if tool == "":
         return EXIT_BLOCK
-    if tool in REPORT_TOOLS:
+    if tool in toolnames.REPORT_TOOLS:
         return EXIT_OK
-    if tool in STRICT_TOOLS:
+    if tool in toolnames.STRICT_TOOLS:
         return EXIT_BLOCK
-    if tool in READ_TOOLS or tool in SHELL_TOOLS:
+    if tool in toolnames.READ_TOOLS or tool in toolnames.SHELL_TOOLS:
         return EXIT_OK if safe else EXIT_BLOCK
     return EXIT_OK if mode == DRY_RUN else EXIT_BLOCK

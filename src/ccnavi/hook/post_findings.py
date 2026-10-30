@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
-from ..infra import fsio, gitcmd, gitstate, pathcase, tree
+from ..infra import fsio, gitcmd, gitstate, pathcase, toolnames, tree
 from ..policy import rules
 from ..tickets.approval import write_and_push
 from ..tickets.model import archive, ticket_fields, ticket_model, ticket_places
@@ -16,7 +16,6 @@ from ..tickets.phase import scope as phase_scope
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
 # そのルールは「この場所に書かせない」を言っている。
-WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
 # 返す文に載せる理由コード。cli.py の表と同じ体系から借りている。
 # 監査に残す事象名がそのまま POST_VIOLATION。
@@ -633,4 +632,4 @@ def _guards_writes(rule: rules.Rule, path: str) -> bool:
     書くと、同じルールが実行前と実行後で違う場所にヒットすることになり、
     どちらが正しいのかを誰も言えなくなる。
     """
-    return any(rule.matches(tool, path) for tool in WRITE_TOOLS)
+    return any(rule.matches(tool, path) for tool in toolnames.WRITE_TOOLS)

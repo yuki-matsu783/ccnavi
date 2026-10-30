@@ -21,7 +21,7 @@ import os
 import re
 from dataclasses import dataclass, field
 
-from ..infra import modes, pathcase, pathsafe, settings, tree
+from ..infra import modes, pathcase, pathsafe, settings, toolnames, tree
 from ..policy import texts
 from ..tickets.approval import checks as approval_checks
 from ..tickets.approval import store as approval
@@ -190,7 +190,7 @@ def decide(
        どれにもヒットしなければ更新の計画を返す（`_plan`）。
     7. 言及が 0 件で、親のワークツリーから編集する起動なら、子の指定を求めて止める（`_no_child`）。
     """
-    if payload.tool_name not in modes.AGENT_TOOLS:
+    if payload.tool_name not in toolnames.AGENT_TOOLS:
         return Result()
     tool_input = payload.tool_input
     # isolation は値に関係なく止める。作業場所は ccnavi が決め、isolation のワークツリー

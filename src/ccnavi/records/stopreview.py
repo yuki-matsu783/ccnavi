@@ -23,7 +23,7 @@ import re
 import time
 from typing import Any
 
-from ..infra import fsio, modes, settings
+from ..infra import fsio, modes, settings, tunables
 
 STOP_REVIEW_ENV = settings.STOP_REVIEW_ENV
 # 登録した agent hook の prompt の先頭行（scripts/ccnavi-stop-review.sh と同じ）。
@@ -89,7 +89,7 @@ REWRITE_QUESTION = (
 )
 
 # 判定計画を待つ時間、試行の期限。値は成立性の検証の後に決める（暫定）。
-DEFAULT_TTL_SECONDS = 600.0
+DEFAULT_TTL_SECONDS = tunables.STOP_REVIEW_TTL.value()
 
 
 def setting(mode: str, declared: str) -> str:

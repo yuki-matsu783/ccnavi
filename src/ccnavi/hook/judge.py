@@ -13,7 +13,7 @@ from collections.abc import Callable
 from typing import TextIO
 
 from ..catalog import docsearch, projskills
-from ..infra import fsio, hookio, modes, settings, shellread, tree
+from ..infra import fsio, hookio, modes, settings, shellread, toolnames, tree, tunables
 from ..infra.modes import AUX, EXIT_OK, GATE, GENERAL
 from ..policy import (
     builtin,
@@ -47,7 +47,7 @@ from . import (
 # 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を破棄するので、
 # それより先に自前の判定を出し終えることが、遅い判定が何も返さないまま許可として扱われて
 # しまうのを防ぐ。
-DEADLINE_SECONDS = 3.0
+DEADLINE_SECONDS = tunables.HOOK_DEADLINE.value()
 
 # Claude Code 側の権限モード。ルールがどこも言及しなかった呼び出しの結末が、
 # ここで変わる。ccnavi 自身のモード（上の 3 つ）とは別のもので、あちらは
@@ -79,16 +79,13 @@ DRY_RUN_HOLDS_NOTE = (
     "protections that keep them from being bypassed are enforced in every mode except disable."
 )
 
-# 範囲の中かどうかを問うツール。ワークツリーを書き換えるものだけ。
+# 範囲の中かどうかを問うツールは `toolnames.WRITE_TOOLS`（ワークツリーを書き換えるものだけ）。
 # Bash は入れていない。コマンド文字列に現れるパスは追えないので、ここで
 # 適用するとヒットしたりヒットしなかったりする判定になる。シェル経由の書き込みは
 # 実行後チェックがワークツリーの実物を見て拾う。
-SCOPE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
 # ルールを適用する欄の表と選び方は `policy.subjects` にある（ルールファイルの検査も同じ表を読む）。
 SUBJECT_FIELDS = subjects.SUBJECT_FIELDS
-PATH_TOOLS = subjects.PATH_TOOLS
-SEARCH_TOOLS = subjects.SEARCH_TOOLS
 
 # シェルから書き込む形を止める組み込みの保護。どれも書き込む動詞の式
 # （selfguard_shell._WRITE_VERBS）を持ち、生の文字列では `>` の個数に対して 2 乗で遅くなる。
@@ -324,7 +321,7 @@ def decide_before(
     # （phase_forms.prune_form）。実行ファイルのターミナル要求は擬似ターミナルを使えば通れる。
     # 記録と state の
     # 置き場をシェルの書き込みから守る組み込み（selfguard）と同じく、ガード自身を守る設定で切れる。
-    if payload.tool_name in phase_forms.SHELL_TOOLS and core_files_on:
+    if payload.tool_name in toolnames.SHELL_TOOLS and core_files_on:
         found = phase_forms.prune_form(record.subject, conf.bin) or phase_forms.user_prune_form(
             record.subject, conf.bin
         )
@@ -357,7 +354,7 @@ def decide_before(
     if (
         conf.tickets_enabled
         and conf.guard_ticket_approval != selfguard.DISABLE
-        and payload.tool_name in phase_forms.SHELL_TOOLS
+        and payload.tool_name in toolnames.SHELL_TOOLS
     ):
         kind, found = phase_forms.human_path_form(record.subject)
         if found:
@@ -449,7 +446,7 @@ def decide_before(
     # 付き添いのあるセッションでは、`ask_if_attended` の宣言は発言を待たず、B を確認に出す
     # （同じコマンドに A と B を並べた呼び出しだけは止める）。サブエージェントの呼び出しは対話でも
     # 発言を待つ関門のままにする。確認で先に返すと、後段のサブエージェントの禁止に届かないため。
-    if payload.tool_name in phase_forms.SHELL_TOOLS:
+    if payload.tool_name in toolnames.SHELL_TOOLS:
         gate_texts = [subject, *(layer for runner, layer, _ in inner if runner != shellread.MOVED)]
         waited, asked = turngate.split_by_attendance(
             turngate.BUILTIN, not ccnavimd.unattended() and not payload.agent_id
@@ -511,7 +508,7 @@ def decide_before(
     if (
         conf.tickets_enabled
         and payload.agent_id
-        and payload.tool_name in phase_forms.SHELL_TOOLS
+        and payload.tool_name in toolnames.SHELL_TOOLS
         and phase_forms.forbidden(subject, shellread.SEP.join(layer for _, layer, _ in inner))
     ):
         # 禁止は中で実行されるコマンドにも適用する。`env sh …ccnavi-ticket.sh start` を
@@ -557,7 +554,7 @@ def decide_before(
                 )
                 if where:
                     message = wrapguard.parent_write_message(root, what, where, kind)
-        elif payload.tool_name in SCOPE_TOOLS:
+        elif payload.tool_name in toolnames.WRITE_TOOLS:
             # 書き込み先のパスが `.claude/worktrees/<名前>` の中で、その名前が親のチケットか
             # （ワークツリーが git に登録されているかは問わない。sh の検査と同じ広さ）。
             # 提案・下書き・ELI5 の置き場（`wip/proposals/` `wip/handoff/` `wip/eli5/` と承認済みの
@@ -624,7 +621,7 @@ def decide_before(
     # プロンプトに書き足す）は持ったまま判定を進め、最後の応答で 1 つの JSON に合成する。
     # ルールには書き足す前の入力を適用する。
     launch = agentlaunch.Result()
-    if payload.tool_name in modes.AGENT_TOOLS:
+    if payload.tool_name in toolnames.AGENT_TOOLS:
         launch = agentlaunch.decide(conf, root, payload, raw)
         if launch.stop is not None:
             record.code, record.rules = launch.stop.code, [launch.stop.rule]
@@ -656,7 +653,7 @@ def decide_before(
         conf.tickets_enabled
         and target is not None
         and not target.is_main
-        and payload.tool_name in SCOPE_TOOLS
+        and payload.tool_name in toolnames.WRITE_TOOLS
     ):
         if raw is None:
             raw = approval.read_raw(conf, root)
@@ -665,7 +662,7 @@ def decide_before(
 
     # ワークツリーの元リポジトリと承認済みチケットの `project:` の食い違いは、ルールより先に見る。
     # 範囲の宣言ではなく取り違えなので、ルールが allow と言っていても通さない。
-    if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
+    if conf.tickets_enabled and target is not None and payload.tool_name in toolnames.WRITE_TOOLS:
         mismatch = project_mismatch(conf, root, target, record.subject, index)
         if mismatch:
             record.code, record.rules = (
@@ -686,7 +683,7 @@ def decide_before(
     # 着手中の子のフローは書き換えさせない。ルールより先に見る。
     # 置き場は承認済みの領域で、エージェントの書き込みは組み込みの保護でも止まる。ロックは
     # その保護を切った設定でも該当し、止めた理由（着手中）を名指しする（厳しくする向きだけ）。
-    if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
+    if conf.tickets_enabled and target is not None and payload.tool_name in toolnames.WRITE_TOOLS:
         locked, scanned = flow_lock(conf, root, payload, record.subject, scanned)
         if index is None and scanned is not None:
             index = approval_checks.by_id(scanned)
@@ -749,7 +746,7 @@ def decide_before(
     # 読み解けた形なので、保護もそのまま適用する。
     # 外す保護がこのツールにヒットしないなら（既定の組み込みの 1 本は Bash だけ）、上限も掛けない。
     unread = bool(record.degraded) or (
-        payload.tool_name in phase_forms.SHELL_TOOLS and payload.tool_name != "Bash"
+        payload.tool_name in toolnames.SHELL_TOOLS and payload.tool_name != "Bash"
     )
     capped = (
         unread
@@ -1486,7 +1483,7 @@ def ticket_verdict(
     5. ASK と DENY の文面を組む。ルールの判定より強いときは、ルールの id を名指しする。
     6. 止めた上限（フェーズの型・親・範囲の外）ごとに、次にすることを文面に書く。
     """
-    if not conf.tickets_enabled or tool not in SCOPE_TOOLS:
+    if not conf.tickets_enabled or tool not in toolnames.WRITE_TOOLS:
         return "", "", "", ""
     if t is None or t.is_main:
         return "", "", "", ""

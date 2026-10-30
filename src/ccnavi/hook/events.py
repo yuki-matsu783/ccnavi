@@ -17,7 +17,17 @@ import time
 from typing import TextIO
 
 from ..catalog import docsearch, projskills
-from ..infra import directrec, hookio, modes, pathcase, settings, shellread, tree
+from ..infra import (
+    directrec,
+    hookio,
+    modes,
+    pathcase,
+    settings,
+    shellread,
+    toolnames,
+    tree,
+    tunables,
+)
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import (
     builtin,
@@ -63,7 +73,7 @@ from . import (
 )
 
 # SessionStart で、終わっていない integrate の記録を確かめる時間の上限（秒）。
-PENDING_SECONDS = 2.0
+PENDING_SECONDS = tunables.INTEGRATE_PENDING.value()
 
 # `match: Stop` のルールで止めた回の理由コード。記録の `code` と、止めた文の頭に出る。
 CODE_RULE_NUDGE = "NUDGE_STOP_RULE"
@@ -196,7 +206,7 @@ def watched_for(
         trees = tree.all_trees(root, conf.projects)
     else:
         trees = [ws]
-        where = record.subject if payload.tool_name in ruleload.PATH_TOOLS else payload.cwd
+        where = record.subject if payload.tool_name in toolnames.PATH_TOOLS else payload.cwd
         t = tree.tree_of(root, where, conf.projects)
         if t is not None and t.root != ws.root:
             trees.append(t)
@@ -543,7 +553,7 @@ def _track_proposals_inner(conf: settings.Settings, payload: hookio.Input) -> No
         file_path = payload.tool_input.get("file_path")
         if (
             payload.event == hookio.POST_TOOL_USE
-            and payload.tool_name in ("Write", "Edit", "MultiEdit")
+            and payload.tool_name in toolnames.WRITTEN_FILE_TOOLS
             and isinstance(file_path, str)
         ):
             ident = stopops.written_ident(file_path, conf.tickets)
