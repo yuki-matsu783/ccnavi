@@ -8,7 +8,7 @@ keywords: [コメント, 粒度, docstring, モジュール, requirements, desig
 
 # 要件書・設計書・ADRの書き分け
 
-`docs/`の`11_requirements`・`21_design`・`30_adr`に書くときの決まり。
+`docs/`の`11_requirements`・`21_design`・`30_adr`に書くときの決まり。文書全体の置き場、読み手、リンクの向きは[文書の置き場・読み手・リンクの向き](docs-structure.md)にある。
 
 ## 何をどこに書くか
 

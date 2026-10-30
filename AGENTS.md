@@ -24,9 +24,10 @@ ccnavi の使い方（`.ccnavi/docs/`）は `.ccnavi/CCNAVI.md` の表に記載�
 
 | 読むとき | 開くファイル |
 |---|---|
-| ccnavi の開発の入口（環境・テスト・build・構成・文書の置き場）を確かめる、利用者向けの手引き（`docs/41_guide/`）を足す・直す | `docs/40_development.md` |
+| ccnavi の開発の入口（環境・テスト・build・構成・文書の置き場）を確かめる、利用者向けの手引き（`docs/50_guide/`）を足す・直す | `docs/40_development.md` |
 | ccnavi のリポジトリの md に付ける frontmatter の `type` の値を確かめる | `.agents/docs/frontmatter.md`（付け方は `.ccnavi/docs/frontmatter.md`） |
 | 思想（`docs/00_idea.md`・`docs/01_idea/`）を書く・直す（ユーザが依頼しない限り直さない） | `.agents/docs/idea-writing.md` |
+| 文書（`docs/`・`.ccnavi/docs/`・`.agents/docs/`・`README.md`）を足す・動かす・改名する、どの読み手向けの文書か・どこに置くかを決める、文書から別の文書へリンクを張る（上位から下位へ張ってよいか） | `.agents/docs/docs-structure.md` |
 | 要件書・設計書・ADR（`docs/11_requirements`・`docs/21_design`・`docs/30_adr`）を書く・直す、これらの文書から別の文書を指す | `.agents/docs/docs-writing.md` |
 | sh やスクリプトを書く、パス・名前を比べる、文書・コメント・ユーザに見える文言で ADR に触れたくなった | `.agents/docs/environment.md` |
 | ccnavi の実行ファイル（`src/ccnavi/`）か `.ccnavi/scripts/` の sh を直す | `.agents/docs/exe-boundary.md` |
