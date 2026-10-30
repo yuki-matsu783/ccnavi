@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>#743 の後工程のまとめ</title>
+<style>
+body { font-family: sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 16px; line-height: 1.7; color: #222; background: #fff; }
+h1 { font-size: 1.4rem; }
+h2 { font-size: 1.1rem; margin-top: 2rem; border-bottom: 1px solid #ccc; }
+.box { background: #f4f6f8; border-radius: 8px; padding: 12px 16px; margin: 12px 0; }
+table { border-collapse: collapse; width: 100%; }
+td, th { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; }
+@media (prefers-color-scheme: dark) {
+  body { background: #1b1d20; color: #e6e6e6; }
+  .box { background: #2a2d31; }
+  td, th { border-color: #555; }
+  h2 { border-color: #555; }
+}
+</style>
+</head>
+<body>
+<h1>フェーズ 1 のあとに、取り込みと点検をしました</h1>
+
+<p>フェーズ 1 では、管理画面の「要確認」項目（#743）を直しました。そのあとで、次の 4 つを行いました。</p>
+
+<h2>1. 統合先の最新を取り込んだ</h2>
+<div class="box">
+<p>統合先（main）に、別の人の修正（#741: 管理画面の日本語の直し、#748: テスト用の設定）が入っていました。#741 が同じ箇所を書き換えていたため、4 ファイルで衝突しました。両方の変更を残して解きました。</p>
+<ul>
+<li>保存後の通知は、#741 の関数（<code>lintSummary</code>）を使う。警告の帯は残す</li>
+<li>ルール画面の要件書は、#741 の語に、こちらの追記を足す</li>
+</ul>
+<p>この取り込みは、ccnavi の範囲検査の都合で、あなたが手で親のブランチへ取り込みました。</p>
+</div>
+
+<h2>2. 漏れを調べて直した</h2>
+<table>
+<tr><th>直したもの</th><th>理由</th></tr>
+<tr><td>設計書のテンプレート名の決まりに、予約名と末尾ピリオドを書いた</td><td>実装と文書がずれていた</td></tr>
+<tr><td>ルール画面の「タイプを移す」も、絞り込み中は止めた</td><td>↑↓と同じ理由で、見えない位置へ動くため</td></tr>
+<tr><td>ファイル選択で警告の帯が消えなかったのを直した</td><td>「次の編集で消える」という決まりに合わせた</td></tr>
+<tr><td>予約名の比べを、決まりの関数（<code>pathcase.fold</code>）を通す形にした</td><td>AGENTS.md の決まり</td></tr>
+<tr><td>ツアーの文に「絞り込み中は動かせない」を足した</td><td>操作の説明を合わせた</td></tr>
+</table>
+<p>直さなかったもの: 取り込み時の名前の検査と、画面の再検査。まれな異常状態のための作り込みで、実害が無いためです。</p>
+
+<h2>3. 日本語を読みやすく直した</h2>
+<p>#743 で足した文（要件書・画面の文言・コメント）を、17 箇所、読みやすく直しました。意味は変えていません。#741 が揃えた語は変えていません。</p>
+
+<h2>4. 敵対的レビューをして、指摘を絞った</h2>
+<div class="box">
+<p>文脈を渡さない別のレビュアー 2 人（sonnet と haiku）が差分を読み、12 件の指摘を出しました。別の sonnet が、コードを読み直して事実か、過剰ではないかを評価しました。</p>
+<ul>
+<li>採用 2 件: 要件書の「同じ文面」という書き方が事実と違う点と、<code>find.ts</code> の説明コメントがずれている点</li>
+<li>不採用 10 件: 実害の出る経路が無いもの、好みの範囲のもの、まれな異常状態のためのもの、既存のやり方に沿ったもの</li>
+</ul>
+</div>
+
+<h2>確かめてほしいこと</h2>
+<div class="box">
+<p>実機で確かめる 3 点は、フェーズ 1 から変わっていません（警告の帯、編集中の切り替えの通知、操作列の固定）。テストは、拡張で 562 件、Python で 71 件が通っています。</p>
+</div>
+</body>
+</html>
