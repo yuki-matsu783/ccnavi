@@ -108,8 +108,7 @@ Chrome 拡張のレビュー済みと `decide` のワークツリーは、親の
 
 受け入れは親全体に該当する。`confirm` が数えるのはホスト上の未解決のスレッドから、受け入れ台帳（`phases/<親>/accepted.json`。後述）に版つきで受け入れた指摘を除いたもので、解決して受け入れたスレッドを他の人が
 開き直せば、また数える。返信か解決のあとで置けずに終わると、解決済みのスレッドだけが残る。sh は計画を残して
-そのパスを言う（打ち直すと、解決済みのスレッドは見せる指摘から外れる）。操作記録（`logs/state/ops/`）が残るので、`ccnavi-user-decide.sh --resume <操作ID>` でも続きを送れる。確かめていないこと・守らないことは
-ADR に書いた（レビュー待ちの返信が公開されない場合、同時に `decide` を打つ場合）。
+そのパスを言う（打ち直すと、解決済みのスレッドは見せる指摘から外れる）。操作記録（`logs/state/ops/`）が残るので、`ccnavi-user-decide.sh --resume <操作ID>` でも続きを送れる。同じ親・同じフェーズで `decide` を同時に打つ排他は持たない。
 
 ボードも同じ道を通る。ボードは `--preview` で一覧とダイジェストを受け取り、ユーザが選んだものを
 `ccnavi-user-decide.sh <N> --choices <JSON> --digest <ダイジェスト>` で渡す。この道でも、sh は上の順で実行ファイルを `--yes` 付きで呼び、実行ファイルは
@@ -187,21 +186,15 @@ write-and-push の書いたパスの一覧の検査は、`review ready` が消�
    ターンを終える。sh は crit を起動しない（crit は閉じるまで戻らない）
 4. ユーザはツリーのルート（か、同じブランチのチェックアウトのルート）で `crit review <相対パス>` を開き、HTML のソースの行に指摘を付けて、
    `crit push <番号>` で送る。`crit <相対パス>` だけだと描画のプレビューになり、そこで付けたピンは `crit push` で送られない（crit v0.21.0 で確認）。crit push は GitHub では `gh`、GitLab では `glab` を使い、マージリクエストの差分にあるファイルの行にだけ送れる。
-   **実測で確かめたこと（GitHub、1 アカウントだけ）:** 手で組んだ `POST pulls/<番号>/reviews`（`event: COMMENT` と `comments[]` の
-   `path`・`line`・`side`。crit が送ると見た JSON と同じ欄）は実物が受け付け、行のスレッドになって sh の `fetch` / `confirm` が未解決として数える。
-   差分に無い行・ファイルへのレビューは 422（`Line could not be resolved` / `Path could not be resolved`）で拒まれ、レビューは作られない。
-   手順は `tests/manual/github/probe_github.py`（crit 自身は起動していない）。
-   **確かめていないこと:** 実際の crit が `gh` で送った通し（crit が送る本文・欄が上の JSON と同じかも含む）、GitLab（`glab`）での crit push
-   （偽の `gh` で GitHub の送り方だけを見た）、`CHANGES_REQUESTED` のレビューを実物のホストが返す形（自分の PR には変更要求を出せず、別のアカウントが要る）。また、ユーザの手元のチェックアウトがマージリクエストの先頭より古いと、crit が送る行の番号が
+   手元のチェックアウトがマージリクエストの先頭より古いと、crit が送る行の番号が
    ずれる。`crit review` を開く前に、手元をマージリクエストの先頭に合わせる
 5. 送られた指摘はユーザのスレッドで、本文が目印で始まらないので、`confirm` は未解決として数えて止め、`decide` は 1 件ずつ行き先を選ばせる
-   （`review_host._unresolved`。依頼者と同じアカウントが送っても数える。GitHub の実物では、依頼者と同じアカウントの行コメントが
-   未解決のスレッドとして `confirm` を止め、`decide` で受け入れられることを確かめた）。`crit push --event request-changes` は変更要求のレビューに
-   なり、`decide` でも通せない設計だが、実物のホストでは確かめていない（fixture の試験だけ）
+   （`review_host._unresolved`。依頼者と同じアカウントが送っても数える）。`crit push --event request-changes` は変更要求のレビューに
+   なり、`decide` でも通せない
 6. 依頼の後に `wip/eli5/` の下だけを変えたコミットは「ユーザが見るものが動いた」に数えない。直したら push するだけで、
    `confirm` は止まらず、`request` の打ち直しも要らない（打つと「依頼済み」で止まる）。**代わりに、直した ELI5 をユーザが見直す保証は無い。**
    直す前の行に付いたスレッドは未解決のまま残るので、ユーザが resolve する（か `decide` で決める）。ELI5 とほかのファイルを一緒に変えた
-   コミットは今までどおり動いたと数え、打ち直しを求める
+   コミットは動いたと数え、打ち直しを求める
 7. `wip/` は `ready` の前に丸ごと消してコミットする（`ready` の前提）。ELI5 もここで消え、squash した成果物には残らない。`ready` の前提は大文字小文字を区別せず（`WIP/` も）、名前が `wip\` で始まる 1 ファイルも残りとして止める
 
 **`confirm`** は `requested` が無ければ拒む。依頼のマーカーにあるホストとマージリクエストの番号が承認済みチケットと
@@ -221,22 +214,17 @@ ccnavi 自身の置き場（`.ccnavi/approved/` と `wip/proposals/`）だけを
 
 | 結果 | 動き |
 |---|---|
-| 変更要求のレビューがある | マーカーを置かない。`decide` でも通せない。解除のしかたはホストで違うので、拒否文はホスト（取得した結果の `host`）ごとに変える（下の表）。拒否文は、変更要求があること・解除のしかたと、修正を始める道（同じフェーズに新しい子を提案して承認を受ける）を分けて言う |
+| 変更要求のレビューがある | マーカーを置かない。`decide` でも通せない。解除のしかたはホストで違うので、拒否文はホスト（取得した結果の `host`）ごとに変える。拒否文は、変更要求があること・解除のしかたと、修正を始める道（同じフェーズに新しい子を提案して承認を受ける）を分けて言う |
 
 変更要求の案内は、判定は変えず、文面だけをホストで分ける。`confirm`・`decide`・`close-early`・手で動かした子の確定の拒否・Chrome 拡張が同じ文面を使う。
-
-| ホスト | 案内 |
-|---|---|
-| GitLab | 変更を依頼（Request changes）が出ています。解除はレビュアーの承認（Approve）で行います。作成者によるレビューの再依頼（Re-request review）で状態が戻るかは未検証です。再依頼した場合も、ccnavi で状態を取り直して確かめます |
-| GitHub | 変更要求（Changes requested）が出ています。解除はレビュアーの Approve か、レビューの dismiss で行います |
 
 GitLab に GitHub の dismiss にヒットする操作は適用していないので、GitLab では dismiss を案内しない。
 | 未解決のスレッドがある | マーカーを置かず、一覧（URL・場所・要旨）を返す。台帳に受け入れた指摘は、版と最後のコメントの id が同じ間は含めない |
 | どちらも無い | `reviewed` を置く。止まっていた状態が解除される |
 
-**手で動かした子の確定（受け入れ台帳）。** ユーザが子を `review/` から `done/` へ手で動かして commit・push した（共有済み）とき、`confirm` は移動の前に付いた未解決の指摘をホストで解決せずに、版つき（キー・指摘の版・最後のコメントの id）で `phases/<親>/accepted.json` に足して `reviewed` を置く（マーカーに `via: manual` と `moved`）。`decide`・`close-early` の受け入れでは廃止した `accepted.json` を、この確定にだけ台帳として復活させた。台帳に受け入れた指摘は、版と最後のコメントの id が同じ間は、`confirm`・`decide`・`close-early` のどれでも未解決として数えない（`review_host._unresolved` の `ledger` 引数）。本文が変わる・受け入れの後にコメントが付く指摘は数える。移動の後に付いた指摘が残れば確定せず、`decide` へ案内する。判定は指摘の最初と最後のコメントの両方で見る。変更要求は保留する。Stop は共有済みの手動移動を見つけたら `confirm` を 1 回促し（`STEP_CONFIRM`）、`status` は「レビュー完了確認待ち」「移動が未共有」を出す。Chrome 拡張の確定も同じ。git が無いので、移動の時刻は拡張がホストの履歴（そのパスを最初に加えたコミット）から読んで渡す。
+**手で動かした子の確定（受け入れ台帳）。** ユーザが子を `review/` から `done/` へ手で動かして commit・push した（共有済み）とき、`confirm` は移動の前に付いた未解決の指摘をホストで解決せずに、版つき（キー・指摘の版・最後のコメントの id）で `phases/<親>/accepted.json` に足して `reviewed` を置く（マーカーに `via: manual` と `moved`）。`accepted.json` は、この確定にだけ使う台帳である。台帳に受け入れた指摘は、版と最後のコメントの id が同じ間は、`confirm`・`decide`・`close-early` のどれでも未解決として数えない（`review_host._unresolved` の `ledger` 引数）。本文が変わる・受け入れの後にコメントが付く指摘は数える。移動の後に付いた指摘が残れば確定せず、`decide` へ案内する。判定は指摘の最初と最後のコメントの両方で見る。変更要求は保留する。Stop は共有済みの手動移動を見つけたら `confirm` を 1 回促し（`STEP_CONFIRM`）、`status` は「レビュー完了確認待ち」「移動が未共有」を出す。Chrome 拡張の確定も同じ。git が無いので、移動の時刻は拡張がホストの履歴（そのパスを最初に加えたコミット）から読んで渡す。
 
-**依頼のあとに HEAD が動いたときの説明。** 判定は変えない（`review.moved_since` / `_moved_since_request` の結果をそのまま使う）。判定で止めたあと、理由の説明を足す（`review.moved_explanation`。`confirm`・`decide`・Chrome 拡張が同じ文）。説明は何が変わったかを断定しない固定の 1 文で、「依頼時のコミットといまの HEAD が違う。何が変わったかユーザに確かめてもらい、依頼し直す」。依頼時のコミットが祖先でない・読めない場合もあるので、コミットの一覧や `git log` の範囲は出さない。プロジェクトの親で、レビューの対象を動かしたのがミラー側（共通レイヤーのコピーか `skills/`）だけのときは、直し方が違うので「動かしたのはミラーのずれのコミット」の 1 文を足す。依頼時の HEAD の記録が無い・HEAD を読めない・push されていないだけのときは、判定の文だけで説明は足さない。依頼を打ち直す手順は今までどおり。依頼のあとに変えたものを元へ戻した（revert で差分が空になった）場合は、判定は今までどおり通る。
+**依頼のあとに HEAD が動いたときの説明。** 判定は変えない（`review.moved_since` / `_moved_since_request` の結果をそのまま使う）。判定で止めたあと、理由の説明を足す（`review.moved_explanation`。`confirm`・`decide`・Chrome 拡張が同じ文）。説明は何が変わったかを断定しない固定の 1 文で、「依頼時のコミットといまの HEAD が違う。何が変わったかユーザに確かめてもらい、依頼し直す」。依頼時のコミットが祖先でない・読めない場合もあるので、コミットの一覧や `git log` の範囲は出さない。プロジェクトの親で、レビューの対象を動かしたのがミラー側（共通レイヤーのコピーか `skills/`）だけのときは、直し方が違うので「動かしたのはミラーのずれのコミット」の 1 文を足す。依頼時の HEAD の記録が無い・HEAD を読めない・push されていないだけのときは、判定の文だけで説明は足さない。依頼を打ち直す手順は変わらない。依頼のあとに変えたものを元へ戻した（revert で差分が空になった）場合は、判定は通る。
 
 **fix で直した指摘は、ユーザが resolve する。** `decide` の「このフェーズで直す」を選んだスレッドは、ホスト上で未解決のまま残るのが仕様で、続きの子で直したあと、ユーザが確かめて resolve する。案内の文は、ホストを問わず同じで、「修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。エージェントは fix を理由に resolve しない」。入れる場所は、`decide` の結果の文（`review.decide._decided_prompt`。fix があるとき）、VS Code ボードの `decided` の note、依頼の本文の末尾の固定の 1 文（`review.RESOLVE_NOTE`。`HANDOFF_NOTE` のあとに足す）。依頼の目印のキーは、この 1 文を足す前の本文と親のブランチの先頭から作るので、1 文を足す前に投稿した依頼を打ち直しても二重に投稿されない。keep・issue を選んだスレッドに sh が返信して resolve する仕組み（受け入れの返信と解決）は、この案内の対象外。
 
@@ -250,7 +238,7 @@ GitLab に GitHub の dismiss にヒットする操作は適用していない�
 | `ghe.com`・`*.ghe.com`（GHE.com） | GitHub | `https://api.<分類に使うホスト>` | `https://api.<分類に使うホスト>/graphql` |
 | 上のどれにもヒットしないもの全部（`gitlab.com`・`*.aslead.cloud`・セルフホスト・未知のホスト） | GitLab | origin の scheme・ホスト・ポートを保った `<scheme>://<ホスト[:ポート]>/api/v4` | 使わない（REST だけ） |
 
-ポートを除くのは分類のときだけで、GitLab の接続先はポートを保つ。GHE.com の origin にポートが付いていると API の URL を組めないので、理由を言って止まる。**GHE.com の API と GraphQL の URL の規則は、実物では未検証**（この表は前提として固定したもの）。`gh api --hostname` の疎通の確認は今までどおり。判定は sh（`ccnavi_host_parse`）・実行ファイル（`review_host.classify`・`transport_problem`）・Chrome 拡張（`hostclass.ts`）の 3 か所に同じ規則で置き、`tests/fixtures/host-kinds.json` の同じ表で突き合わせる。Chrome 拡張では、この表は自動判定に使い、設定画面でユーザが明示した種類（GitHub / GitLab）は、これより優先する（未知のホストを GitHub として登録すれば Enterprise Server の `/api/v3`・`/api/graphql`。GHE.com を GitHub として登録した場合だけ上の表の接続先）。登録していないホストへ自動で通信したり PAT を送ったりはしない。権限は画面の origin だけでなく API と GraphQL の origin に対しても取る（GHE.com は画面と API の origin が違う）。
+ポートを除くのは分類のときだけで、GitLab の接続先はポートを保つ。GHE.com の origin にポートが付いていると API の URL を組めないので、理由を言って止まる。GHE.com の API と GraphQL の URL の規則は、この表を前提として固定している。判定は sh（`ccnavi_host_parse`）・実行ファイル（`review_host.classify`・`transport_problem`）・Chrome 拡張（`hostclass.ts`）の 3 か所に同じ規則で置き、`tests/fixtures/host-kinds.json` の同じ表で突き合わせる。Chrome 拡張では、この表は自動判定に使い、設定画面でユーザが明示した種類（GitHub / GitLab）は、これより優先する（未知のホストを GitHub として登録すれば Enterprise Server の `/api/v3`・`/api/graphql`。GHE.com を GitHub として登録した場合だけ上の表の接続先）。登録していないホストへ自動で通信したり PAT を送ったりはしない。権限は画面の origin だけでなく API と GraphQL の origin に対しても取る（GHE.com は画面と API の origin が違う）。
 
 **GraphQL が使えない環境。** Claude Code のクラウドでは、GitHub の GraphQL が 403 で拒否される（REST は通る）。GitHub の次の 4 か所は、GraphQL を先に試し、使えない 403 のときだけ REST（`ccr` の道）に替える。GraphQL が通る環境の動きは変わらない。GitLab は変えない。「使えない 403」とは、gh なら本文が `GraphQL is not available` を含むもの、curl なら番号だけの 403 を指す。curl は本文を捨てるので、認証の失敗と見分けが付かない。curl の 403 は替えて、それも失敗したら元の文面を言う。401 と別の理由の 403 は替えない。判定は `ccnavi_host_graphql_blocked`、GraphQL を打つ入口は `gql`（戻り値 3 が「使えない」）。
 
@@ -263,7 +251,7 @@ GitLab に GitHub の dismiss にヒットする操作は適用していない�
 
 REST の代わりの道も失敗したときは、ユーザに接続（認証と権限）の確認を頼んで止まる案内を出す（`rest_fallback_failed`）。スレッドとレビューの JSON を作って実行ファイルに直接渡す手順は案内しない（write-and-push の検査で止まるため）。`ccr` の道は通常の GitHub では 404 になる。
 
-**GitLab の依頼コメントへの返信。** GitLab では、ccnavi の依頼コメント（`<!-- ccnavi:request`）にユーザが返信するとスレッドになる（実物での挙動は未検証で、見本は手で組んだもの）。スレッドの判定に使う note は、discussion の note から `system: true` を除いたもの（空なら discussion ごと除く）。note が 1 つでも `resolvable` なら対象にし、全部 `resolvable` でないもの（MR 画面の普通のコメント）は数えない。`resolved` は、`resolvable` な note が全部 resolved のとき。**代表の note**（本文・URL・位置・作成日時・書き手）は、本文が `<!-- ccnavi:` で始まらない最初の note（無ければ先頭）。依頼コメントへの返信があれば返信が代表になり、`decide` が見せる本文、issue と続きの子に転記する本文、キー（URL）、版は返信のものになる。`own` は note の本文が全部目印で始まるときだけ真（JSON の真偽値）で、実行ファイルは `true` / `false` だけを受け、それ以外は `own` が無いものとして従来の判定（本文の目印と書き手）に戻る。ccnavi の投稿として未解決から除くのは、書き手が依頼を投稿したアカウントで、`own` が真のとき。依頼したアカウントが目印なしで返信したスレッドは数える。`ccnavi:accept` の返信を足しても、代表の note・URL・版は変わらない。`last_*`（最後のコメントの id・時刻・書き手）は system を除いた集合の最後の note になった。受け入れ台帳（`accepted.json`）は最後のコメントの id で再提起を見分けるので、system note（コミットの追加・行の変更・解決の通知）が付くだけでは再提起にならなくなり、system note の id を最後のコメントとして残している古い項目は一度合わなくなって未解決として数え直される（隠さない側に倒れる）。**制約（今回は変えない）:** `decide` のダイジェストはキーと代表の本文の版だけで照合する。preview のあとに代表の note が消える・変わると止まるが、同じ discussion へ別の返信が付いても検知しない。`last_*` を使うのは、手で動かした子の確定と受け入れ台帳での再提起の判定だけ。
+**GitLab の依頼コメントへの返信。** GitLab では、ccnavi の依頼コメント（`<!-- ccnavi:request`）にユーザが返信するとスレッドになる。スレッドの判定に使う note は、discussion の note から `system: true` を除いたもの（空なら discussion ごと除く）。note が 1 つでも `resolvable` なら対象にし、全部 `resolvable` でないもの（MR 画面の普通のコメント）は数えない。`resolved` は、`resolvable` な note が全部 resolved のとき。**代表の note**（本文・URL・位置・作成日時・書き手）は、本文が `<!-- ccnavi:` で始まらない最初の note（無ければ先頭）。依頼コメントへの返信があれば返信が代表になり、`decide` が見せる本文、issue と続きの子に転記する本文、キー（URL）、版は返信のものになる。`own` は note の本文が全部目印で始まるときだけ真（JSON の真偽値）で、実行ファイルは `true` / `false` だけを受け、それ以外は `own` が無いものとして、本文の目印と書き手で判定する。ccnavi の投稿として未解決から除くのは、書き手が依頼を投稿したアカウントで、`own` が真のとき。依頼したアカウントが目印なしで返信したスレッドは数える。`ccnavi:accept` の返信を足しても、代表の note・URL・版は変わらない。`last_*`（最後のコメントの id・時刻・書き手）は system を除いた集合の最後の note である。受け入れ台帳（`accepted.json`）は最後のコメントの id で再提起を見分けるので、system note（コミットの追加・行の変更・解決の通知）が付くだけでは再提起にならない。**制約:** `decide` のダイジェストはキーと代表の本文の版だけで照合する。preview のあとに代表の note が消える・変わると止まるが、同じ discussion へ別の返信が付いても検知しない。`last_*` を使うのは、手で動かした子の確定と受け入れ台帳での再提起の判定だけ。
 
 sh は GitLab と GitHub をリモート URL のホストで見分け（`github.com` と GHE.com なら GitHub、それ以外は
 GitLab。上の「ホストの分類」）、`gh` / `glab` がそのホストで認証されていれば（起動時に 1 度実行して確かめる）それを、

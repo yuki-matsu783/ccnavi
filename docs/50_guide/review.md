@@ -9,24 +9,16 @@ keywords: [レビュー, request, confirm, decide, comment, ELI5, crit, crit rev
 # レビューの依頼と確認
 
 見る場所が `mr` のフェーズでは、エージェントがマージリクエストにレビューを依頼し、ユーザが指摘を付け、指摘が片付いたらレビュー済みにする。
-この文書は、その間にユーザが何を見て何を打つかをまとめる。チケット全体の流れは [チケットによる作業範囲の使い方](tickets.md)、仕組みは
-[設計 9.10](../21_design/tickets/review.md) と [設計 9.11](../21_design/tickets/close.md)。
+この文書は、その間にユーザが何を見て何を打つかをまとめる。チケット全体の流れは [チケットによる作業範囲の使い方](tickets.md)。
 
 ## 依頼から確認までの流れ
 
-エージェントが打つ 3 本は次のとおり。
+エージェントが `ccnavi-review.sh` の `request`・`confirm`・`comment` を打つ。
 
-```sh
-sh .ccnavi/scripts/ccnavi-review.sh request --phase 2 --body-file scratchpad/request.md --eli5 wip/eli5/phase-2.html
-sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 2
-sh .ccnavi/scripts/ccnavi-review.sh comment --body-file scratchpad/decision.md
-```
-
-- `request` が成功すると、`--body-file` が `scratchpad/` の中の依頼文は `request` が消す（レビュー待ちの間はシェルが止まって `rm` を打てないため）。残したいファイルは `scratchpad/` の外に置く。
-- `request` は、前提（フェーズが終わっている・レビューが延期されていない・すべての子が親に合流済み・未コミット無し・push 済み・未依頼）を確かめ、1 つでも欠けたら全件を列挙して何もしない。通れば依頼コメントを投稿する。マージリクエストは作らない（親のブランチの open の MR が無ければ止まる。作るのは `ccnavi-start.sh`）
+- `request` は、フェーズが終わっていて、すべての子が親に合流済みで、未コミットが無く、push 済みであることを確かめる。1 つでも欠けたら全件を列挙して何もしない。通れば、親のブランチの open の MR に依頼コメントを投稿する。MR は作らない（作るのは `ccnavi-start.sh`）
 - 依頼後に親の HEAD が動いたら、レビュー済みになる前なら `request` を打ち直せる
-- `confirm` は、依頼時の HEAD と今の HEAD が同じで push 済みであることを求め、今残っている未解決スレッドを数える。未解決も変更要求も無ければレビュー済みになり、そのフェーズの `review/` の子が `done/` へ動く。残るなら一覧を返す
-- `comment` は、このセッションで受けた承認や判断をマージリクエストのコメントにコピーする
+- `confirm` は、依頼したときから変わっていなくて push 済みであることを求め、今残っている未解決のスレッドを数える。未解決も変更要求も無ければレビュー済みになり、そのフェーズの `review/` の子が `done/` へ動く。残るなら一覧を返す
+- `comment` は、このセッションで受けた承認や判断を MR のコメントにコピーする
 
 ## ELI5 を見て、crit で指摘を付ける
 
@@ -48,8 +40,8 @@ ELI5 を見る: ユーザがターミナルで cd <ルート> してから crit 
 - 手元のチェックアウトがマージリクエストの先頭より古いと行の番号がずれるので、先に合わせる。差分の外の行がホストに拒まれるかは未確認である
 - 送った指摘はユーザのスレッドなので、`confirm` が未解決として数えて止め、`decide` で 1 件ずつ行き先を選べる
 
-依頼の後に `wip/eli5/` の下だけを直したコミットは、HEAD が動いたとは数えない。push すれば `confirm` は止まらず、打ち直しも要らない。
-直した ELI5 をユーザが見直す保証は無く、直す前の行のスレッドは残るのでユーザが resolve する。ほかのファイルと一緒に変えたコミットは今までどおり打ち直しが要る。
+依頼の後に ELI5 の HTML だけを直したときは、打ち直しが要らない。push すれば `confirm` は止まらない。
+直す前の行に付けたスレッドは残るので、ユーザが resolve する。ほかのファイルと一緒に直したときは、`request` の打ち直しが要る。
 `wip/` は `ready` の前に丸ごと消すので、squash した成果物に HTML は残らない。
 
 ## レビュー済みにする場所
@@ -62,7 +54,7 @@ ELI5 を見る: ユーザがターミナルで cd <ルート> してから crit 
 - 下の `decide`。指摘が 0 件、またはどれも直さないときにレビュー済みにする
 
 ユーザが子を手で `done/` に動かして commit・push した場合は、`confirm` が移動の前に付いた未解決の指摘を受け入れ台帳に足して確定する。
-移動の後に付いた指摘が残れば確定せず、変更要求があれば保留する。仕組みは [設計 9.10](../21_design/tickets/review.md)。
+移動の後に付いた指摘が残れば確定せず、変更要求があれば保留する。
 
 ## 残った指摘への対応方針（decide）
 
@@ -91,8 +83,6 @@ Chrome 拡張のボードにも、同じ内容を決める「残った指摘の�
 | GitLab | 変更を依頼（Request changes）が出ています。解除はレビュアーの承認（Approve）で行います。作成者によるレビューの再依頼（Re-request review）で状態が戻るかは未検証です。再依頼した場合も、ccnavi で状態を取り直して確かめます |
 | GitHub | 変更要求（Changes requested）が出ています。解除はレビュアーの Approve か、レビューの dismiss で行います |
 
-この文面の正本は [設計 9.10](../21_design/tickets/review.md) である。エージェント向けの案内は [.ccnavi/docs/decisions.md](../../.ccnavi/docs/decisions.md) にある。
-
 ## 必要な道具と認証
 
 リモートを読み書きするのは `ccnavi-review.sh` で、ccnavi の実行ファイルはネットワークに出ない。
@@ -102,8 +92,6 @@ Chrome 拡張のボードにも、同じ内容を決める「残った指摘の�
 - origin の表記はポートと scheme をそのまま使う（`http://localhost:8929/g/p.git` なら `http://localhost:8929/api/v4`）。URL に埋めた資格情報は読み飛ばし、出力では伏せる
 - push の認証は、gh / glab でログイン済みならそのまま通る。それ以外は git の設定側（Git Credential Manager か `credential.helper`）に置く。git のラッパースクリプトは環境変数での差し替えも認証画面も使えない
 - origin の読み方が合わないときは `sh .ccnavi/scripts/ccnavi-review.sh origin` で、ホスト・scheme・API の URL・使う道具を確かめる
-
-認証の仕組みと GitLab の実物で分かった注意点は [設計 9.10](../21_design/tickets/review.md) と [付録 C](../21_design/appendix.md)。
 
 ## 親を閉じるとき
 

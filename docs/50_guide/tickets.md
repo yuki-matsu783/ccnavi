@@ -14,7 +14,7 @@ keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケッ�
 チケットは複数を同時に有効にできる。親（メインエージェント）が作業を子チケットに分け、子は別々のワークツリーでサブエージェントが実行する。
 
 別の PC・セッション・人で進める場合は [複数人・別 PC・別セッションで進める](multi-pc.md)、レビューの受け方は [レビューの依頼と確認](review.md) を読む。
-仕組みは [設計 9](../21_design/tickets.md)、外から観測できる約束は [要件 REQ-TKT](../11_requirements/tickets.md) にある。
+外から観測できる約束は [要件 REQ-TKT](../11_requirements/tickets.md) にある。
 
 ## 使うかどうかはワークスペースが決める
 
@@ -27,10 +27,8 @@ keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケッ�
 - **直接作業**: 調査や小さな修正。チケットを起こさず、判定は全体ルールだけ。ワークスペースルート直下と、承認済みチケットの無いワークツリーがこれ。新しく切るワークツリーとブランチの名前は `<先頭の語>-<番号>-<slug>` の形にそろえる（形に合わないと `--lint` が warn で名指しする。拒否はしない）
 - **チケット作業**: 設計に触れる・複数のフェーズに分かれる・ユーザのレビューが要る修正。提案を書き、`ccnavi-ticket.sh propose` で親のブランチへ送って（別のPCでも承認できる）承認を受け、フェーズとリスクの配点に従って進める
 
-どちらで進めるかはモデルが決める。ccnavi はセッション開始時に、作業の進め方を `.ccnavi/CCNAVI.md` から渡す（サブエージェントには渡さない）。
-渡す内容は [.ccnavi/docs/ticket-work.md](../../.ccnavi/docs/ticket-work.md) と [.ccnavi/docs/ccnavi-md.md](../../.ccnavi/docs/ccnavi-md.md) にある。
-「作業の進め方」の末尾には、`CCNAVI_MODE` が `dry-run` のときだけ出る一文がある。内容は「一般の deny は止まらないが、チケットの関門と補助の保護で止まる。通ったことを許可と読まず、表示された案内に従う」である。
-それ以外の手順（レビューの sh、`review: mr`、配点の書き方、後工程）は、必要になった場所で改めて届く。
+どちらで進めるかはモデルが決める。ccnavi はセッション開始時に、作業の進め方をエージェントへ渡す（サブエージェントには渡さない）。
+エージェントが従う手順は [.ccnavi/docs/ticket-work.md](../../.ccnavi/docs/ticket-work.md) にある。
 
 ## 置き場と状態
 
@@ -59,8 +57,6 @@ keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケッ�
 - 動かすスクリプトと push はサブエージェントには打てない。サブエージェントは子のワークツリーで手元にコミットするだけで、親のワークツリーへの書き込みも止まる。子の合流と push は、メインエージェントが打つ子の `finish` が行う。親を閉じる（レビューの依頼・`ready`）のもメインエージェント
 - 再開するときはユーザが `done/` から `doing/` へ戻す
 
-フェーズのマーカーを含む遷移は [設計 9.6](../21_design/tickets/state-transitions.md)。サブエージェントが止まる条件の詳細は [設計 9.12](../21_design/tickets/subagents.md)。
-
 ## 識別子とブランチ名
 
 - 親の識別子は `<先頭の語>-<番号>-<slug>`（`feature-63-integration-branch`、`hotfix-64-統合先の解決`）。先頭の語は既定で `feature` `hotfix` `fix` `bugfix` `chore` `refactor` `docs` のどれか。チャットで「hotfix で」と言えばエージェントがその語で書く
@@ -68,13 +64,13 @@ keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケッ�
 - 番号は issue の番号（通し番号は直接作業のワークツリー名だけに使う）。slug には日本語も指定できる。issue のタイトルが長いと、`ccnavi-start.sh --issue` は名前を作らずに止まり、エージェントが短い英語の `--slug` を考えて打ち直す。`--slug` で渡す語は小文字・数字・ハイフンだけ。Chrome 拡張の「始める」は、タイトルから作った名前を語の区切りで切って進む
 - 子の識別子は `<親>-<2 桁のフェーズ番号>-<2 桁のフェーズ内の連番>`。ワークツリーの名前は識別子と同じ
 
-提案の書式は [.ccnavi/docs/proposal-format.md](../../.ccnavi/docs/proposal-format.md)（配布先にも配る）。親のワークツリーの扱いと、深さと件数の上限は [設計 9.3](../21_design/tickets/proposal-format.md) にある。ワークツリーの名前の決まりは [.ccnavi/docs/worktree.md](../../.ccnavi/docs/worktree.md)。
+提案の書式は [.ccnavi/docs/proposal-format.md](../../.ccnavi/docs/proposal-format.md)（配布先にも配る）、ワークツリーの名前の決まりは [.ccnavi/docs/worktree.md](../../.ccnavi/docs/worktree.md) にある。
 提案はエージェントが書くので、ユーザが frontmatter を直接書くことはほとんどない。ユーザが見るのは承認の画面である。
 
 ## 効くのは承認したものだけ
 
 判定が読むのは `.ccnavi/approved/doing/` の承認済みチケットで、`wip/proposals/todo/` の提案ではない。承認のあとに同じ識別子の
-提案を書いても範囲は適用されない（親の改版〔計画・`phases:`・範囲〕だけが承認の対象に入る）。承認の詳細は [設計 9.4](../21_design/tickets/approval.md)。
+提案を書いても範囲は適用されない（親の改版〔計画・`phases:`・範囲〕だけが承認の対象に入る）。
 
 ```sh
 sh .ccnavi/scripts/ccnavi-user-agree.sh
@@ -93,12 +89,12 @@ sh .ccnavi/scripts/ccnavi-user-agree.sh i0002 i0002-01-01   # 並べた識別子
 - 合意は全部 `ccnavi-user-agree.sh` を通る。全体計画は親の承認、各フェーズの計画はその番号の子の承認、フィードバック計画は `feedback:` を足した親の改版の承認
 
 承認する場所は 4 つある。どこで承認しても**承認はチケットの中身を変えない**。提案のファイルを
-`todo/` から `doing/` へ動かすだけで、欄を書き足さず、改行も BOM も変えない。手で動かした承認と ccnavi の承認は、承認済みチケットが
-提案とバイト単位で同じになり、見分けが付かない（欄が無いことや未コミットであることは、承認が途中で止まった印ではない）。
+`todo/` から `doing/` へ動かすだけで、中身は変えない。手で動かした承認と ccnavi の承認は、承認済みチケットが
+提案と同じになり、見分けが付かない（欄が無いことや未コミットであることは、承認が途中で止まった印ではない）。
 
 | 経路 | 形 |
 |---|---|
-| ターミナル | `sh .ccnavi/scripts/ccnavi-user-agree.sh [<識別子>...]`。一覧を見せて y/N を取り、y のあとに提案が更新されていれば「内容が更新されました」と最新を表示し直して確認し直す。通れば `ccnavi-user-push-approved.sh` でコミットして push する。一部だけ書けたときも、書けた分をコミットして push し、書けなかった提案と未送信のパスを言う |
+| ターミナル | `sh .ccnavi/scripts/ccnavi-user-agree.sh [<識別子>...]`。一覧を見せて y/N を取り、y のあとに提案が更新されていれば「内容が更新されました」と最新を表示し直して確認し直す。通れば `ccnavi-user-push-approved.sh` でコミットして push する。一部だけ書けたときは、書けた分を送り、書けなかった提案を言う |
 | ボード | VS Code のボードで承認の一覧から選んで承認する。見せたあとに提案が更新されていれば承認せず、「内容が更新されました」と最新に読み直す。1 件以上書けたら `ccnavi-user-push-approved.sh` を統合ターミナルへ送る |
 | Chrome 拡張のボード | ブラウザと PAT だけで、リモートのブランチの承認待ちを見て承認する。承認は 1 コミットとしてリモートのブランチに書かれる（[拡張の README](../../extensions/chrome/ccnavi-approval/README.md)） |
 | ファイルを動かす | 提案を `.ccnavi/approved/doing/` へ動かす。GitLab や GitHub の画面しか利用できないユーザ向け。承認の画面を通らないぶん、構造の検査は判定のときに行い、引っかかれば `DENY_TICKET_BLOCKED` で止まる（`--lint` でも分かる） |
@@ -122,7 +118,6 @@ sh .ccnavi/scripts/ccnavi-user-agree.sh i0002 i0002-01-01   # 並べた識別子
 | 2 | 引数の誤り、ワークスペースルートが見つからない |
 
 `ccnavi-user-agree.sh` は承認が通れば、承認の push の段が 1 で終わっても 0 を返す（未送信のパスは文面で言う）。
-内部の詳細（部分的に書けたときの扱い）は [設計 9.4](../21_design/tickets/approval.md)。
 
 消えた親ブランチを作り直す push は拒否される。迂回は、ユーザがターミナルで `git push origin <B>` を一度打つこと。詳しくは [複数人・別 PC・別セッションで進める](multi-pc.md)。
 
@@ -147,7 +142,6 @@ sh .ccnavi/scripts/ccnavi-ticket.sh status i0002    # その親子だけ（子�
 チケットごとに、置き場とツリー、承認の時刻、着手しているか、置き場のファイルが未コミットか・コミット済みで未 push か、止まっている理由、
 次の一手を出す。読むだけで何も書かない。push 済みかどうかは、最後に取得したリモートの状態に基づくため、最新の状態と異なる場合がある。最新にしたければ先に `ccnavi-sync.sh` を打つ。
 未コミットの承認済みチケットがあるときは、ユーザが `ccnavi-user-push-approved.sh <親>` を打つ。親を渡して何も見つからなければ終了コード 1。
-出力の読み方は [設計 9.4](../21_design/tickets/approval.md)。
 
 ## 止まったときの見方
 
@@ -155,17 +149,11 @@ Write / Edit の対象が `.claude/worktrees/<名前>/` の中なら、その名
 呼び出し元の cwd も、サブエージェントかどうかも見ない。ワークスペースルート直下と、チケットの無いワークツリーはルールだけで判定する。
 ルールとチケットの判定を両方出し、**強い側を採る**（`deny` > `ask` > `allow` > 何も言わない）。同じ強さならルールの判定と文面を使う。
 
-| ルール | チケット | 結果 |
-|---|---|---|
-| `deny` にヒットする | どれでも | 止まる（ルールの文面） |
-| `ask` / `allow` にヒットする | 範囲の外、または `deny` の項 | 止まる（`DENY_TICKET_SCOPE`） |
-| `ask` にヒットする | 範囲の中（ask / allow）、またはチケットが無い | ユーザに確認が出る（`RULE_ASK`） |
-| `allow` にヒットする | 範囲の中（ask） | ユーザに確認が出る（`TICKET_ASK`） |
-| `allow` にヒットする | 範囲の中（allow）、またはチケットが無い | 通る |
-| 何も言わない | 範囲の中（allow） | 通る |
-| 何も言わない | 範囲の中（ask） | ユーザに確認が出る（`TICKET_ASK`） |
-| 何も言わない | 範囲の外、または `deny` の項 | 止まる（`DENY_TICKET_SCOPE`） |
-| 何も言わない | ワークツリーにチケットが無い | 権限モードに従う（`UNDECLARED`） |
+- ルールが `deny` なら、チケットに関わらず止まる（ルールの文面）
+- チケットの範囲の外、またはチケットの `deny` の項なら止まる（`DENY_TICKET_SCOPE`）
+- ルールかチケットが `ask` なら、ユーザに確認が出る（`RULE_ASK`、`TICKET_ASK`）
+- 範囲の中で、どちらも止めなければ通る
+- ワークツリーにチケットが無く、ルールも何も言わなければ、権限モードに従う（`UNDECLARED`）
 
 チケットの判定がルールの判定より強かった回は、文面の頭に `rule: <id> (allow) lets this through, but the ticket for this worktree narrows it` が載る。
 上限で止めたときは、文面の頭に `limit: phase type 設計 (design): wip/design/*, docs/*` や `limit: parent i0001: src/*, tests/*` の形で 1 行載る。
@@ -177,17 +165,15 @@ Write / Edit の対象が `.claude/worktrees/<名前>/` の中なら、その名
 - 下書きの置き場。ツリーのルート直下の `wip/handoff/` の下で、大文字小文字は区別しない
 - ELI5 の HTML の置き場。ワークツリーのルートからの `wip/eli5/` の下で、大文字小文字は区別しない
 
-シェルが書いたものは実行後チェックが `POST_TICKET_SCOPE` で報告する。子のワークツリーは、サブエージェントの終了時に基準点からのコミット済みの差分と未コミットの両方を見て、範囲外が残っていれば 1 回だけ差し戻す。
+シェルが書いたものは実行後チェックが `POST_TICKET_SCOPE` で報告する。サブエージェントが範囲外の変更を残して終わると、1 回だけ差し戻される。
 
 ワークツリーへの書き込みを `allow` で許しているルールがあっても、承認済みチケットに結び付いたワークツリーの書き込みはチケットの範囲に制限される。
-止まったら、ルールを緩めるのではなく、その場所を範囲に持つチケットを提案する。判定の仕組みは [設計 9.5](../21_design/tickets/judging-by-path.md)。
-記録からルールを狭めた回を拾う `jq` の例も設計 9.5 にある。
+止まったら、ルールを緩めるのではなく、その場所を範囲に持つチケットを提案する。
 
 ## フェーズとレビュー
 
 フェーズの終わりは、ユーザの手が入るところ（HITL ポイント）の 1 つ。ユーザが関わるのは、範囲の承認・レビュー・未解決の受け入れの 3 か所にまとめてある。
 同じ親の同じ `phase` の子が `doing/` に 1 枚も無く、`review/` か `done/` に 1 枚以上あれば、そのフェーズは終わり。取り消しだけのフェーズは終わらない。
-設計は [9.8](../21_design/tickets/hitl.md)。
 
 ユーザがどこで見るかは `none` / `mr` の 2 つで、次のうち厳しい側が採られる（`none` < `mr`）。
 
@@ -204,8 +190,7 @@ Write / Edit の対象が `.claude/worktrees/<名前>/` の中なら、その名
 | 先へ進める者 | `ccnavi-review.sh confirm` / `ccnavi-user-decide.sh`、Chrome 拡張のレビュー済み | — |
 | `review/` の子 | レビュー済みで `.ccnavi/approved/done/` へ動く | `finish` の時点で `done/` へ |
 
-止めている間は、その親の cwd からのサブエージェントの起動と Bash が止まる（`DENY_PHASE_REVIEW`）。通すのは `ccnavi-ticket.sh` `ccnavi-review.sh`
-`ccnavi-git.sh` の 3 本だけ。Write / Edit は通すので、次のフェーズの計画はレビュー前に進められる。
+止めている間は、その親でのサブエージェントの起動と Bash が止まる（`DENY_PHASE_REVIEW`）。ファイルの書き込みは通すので、次のフェーズの計画はレビュー前に進められる。
 止めている間は、依頼を出すまでが「レビュー準備中」（次に動くのはエージェント）、出してからが「レビュー待ち」（次に動くのはユーザ）。
 レビュー待ちで止めるのは親ごとなので、どれかの枝がレビューを待つ間は別の枝にも子を起こせない。
 
@@ -215,7 +200,7 @@ Write / Edit の対象が `.claude/worktrees/<名前>/` の中なら、その名
 
 `phases.yml` に**フェーズ定義**を書き、親が `plan:` にその並びと順序（ステップの `after`）を書くと、フェーズに意味が付く。
 フェーズ定義はユーザが持つ設定で、エージェントは書き換えない。親は `plan:` を持つことが必須で、計画の無い親は `ticket start` が止まる。
-書き方と置き場は [設計 9.7](../21_design/tickets/phases.md) と [.ccnavi/docs/grow-phases.md](../../.ccnavi/docs/grow-phases.md)。設定の追加や確かめには `ccnavi-config` スキルを使う。
+書き方と置き場は [.ccnavi/docs/grow-phases.md](../../.ccnavi/docs/grow-phases.md)。設定の追加や確かめには `ccnavi-config` スキルを使う。
 
 ユーザが気にするのは次の点である。
 
@@ -227,7 +212,7 @@ Write / Edit の対象が `.claude/worktrees/<名前>/` の中なら、その名
 
 すぐ始まるステップに子の提案が無い親の提案は、承認の確認と `propose` が警告する（止めないが、親だけを承認すると子の承認がもう 1 回要る）。承認済みの親の改版の雛形は、エージェントが `ccnavi ticket revise` で作る。親を閉じる前の、フィードバック計画なし（`feedback: []`）の改版は `--feedback` を付ける。
 
-提案の雛形は、エージェントが `ccnavi ticket new` で作る（書式は [.ccnavi/docs/proposal-format.md](../../.ccnavi/docs/proposal-format.md)、設計は [設計 9.3](../21_design/tickets/proposal-format.md)）。
+提案の雛形は、エージェントが `ccnavi ticket new` で作る（書式は [.ccnavi/docs/proposal-format.md](../../.ccnavi/docs/proposal-format.md)）。
 
 ## 実績のリスク
 
@@ -235,7 +220,7 @@ Write / Edit の対象が `.claude/worktrees/<名前>/` の中なら、その名
 **HIGH 以上なら、宣言に関わらずそのフェーズはユーザのレビューが要る扱いになる。** 宣言が `none` なら `mr` に上がる。
 
 点と加点した理由は、閉じたときの出力、フェーズの終わりの文面、`--explain`、レビューの依頼文の先頭
-（「このレビューのリスク: 58 (HIGH) — 行数が多い（…）」）に出る。配点の書き方と測り方は [設計 9.9](../21_design/tickets/risk.md)、配点の育て方は [.ccnavi/docs/grow-risks.md](../../.ccnavi/docs/grow-risks.md)。
+（「このレビューのリスク: 58 (HIGH) — 行数が多い（…）」）に出る。配点の書き方と育て方は [.ccnavi/docs/grow-risks.md](../../.ccnavi/docs/grow-risks.md)。
 不正な `risks.yml` は組み込みの配点を使い、`--lint` と閉じたときの出力がそのことを示す。
 
 ## 親を閉じる
@@ -247,25 +232,22 @@ Write / Edit の対象が `.claude/worktrees/<名前>/` の中なら、その名
 - `ready` は、親の承認済みチケットが `done/` にあること、`wip/` に未追跡のファイルが無いこと、未コミットが無いこと、push 済みであることを求める。`wip/` の追跡済みのファイルは `ready` が消す。未追跡のものは履歴から戻せないので、あれば消さずに名指しして止まる
 - `ready` は親のワークツリーの中からも、外から `ready --parent <親>` でも打てる
 
-設計は [9.11](../21_design/tickets/close.md)。
-
 ### まだ残っているが早めに閉じたいとき
 
 ユーザがターミナルで `ccnavi-user-close-early.sh --reason <理由>` を打つ。作業中の子がいる間は打てない。残っているものを全部見せてから y/N を取る。
+承認のあとで着手していない子は、自動で取り消される（`cancel` と同じ扱いで、理由に `close-early` が付く）。残りは issue に書き出される（`--no-issue` で書き出さない）。
 Draft は親が片付けて push したあとの `ready` で外す。
 
 ### ワークツリーは ccnavi が片付ける
 
 マージを待たずに片付ける。閉じた子のワークツリーは完了でも取り消しでも消し、`ready` が Draft を外したあとの最後に、子と親を片付ける。
-未コミットの変更や git が無視しているファイルがあるワークツリーは、理由を出して残す。親の手元のブランチは MR がマージされるまで残す。
-取り消した子の手元のブランチは一覧を出すだけで、消すのはユーザ（先頭に `!` を付けて `ccnavi-user-clean-branch.sh <子の識別子> --confirmed`）。
-条件、cwd が中にあるとき、自動モードの分類器に止められたときの許可は [.ccnavi/docs/worktree-cleanup.md](../../.ccnavi/docs/worktree-cleanup.md) にある。
+未コミットの変更や git が無視しているファイルがあるワークツリーは、理由を出して残す。取り消した子の手元のブランチは一覧を出すだけで、消すのはユーザ。
+条件と、ユーザが打つ片付けは [.ccnavi/docs/worktree-cleanup.md](../../.ccnavi/docs/worktree-cleanup.md) にある。
 
 ### 閉じたチケットは既定のブランチに残らない
 
 `ready` は、閉じた親子のチケットをワークスペースの `logs/archive/` へ移す。`logs/` は git が追跡しないので、git の上では削除になる。
 その削除を push してから Draft を外すので、squash でマージすると既定のブランチにはチケットが残らない。退避は手元の機械にだけ残るバックアップで、閉じたかの判定には使わない。
-仕組みは [設計 9.11](../21_design/tickets/close.md)。
 
 ### MR がマージされたあと
 
@@ -274,52 +256,43 @@ Draft は親が片付けて push したあとの `ready` で外す。
 
 ## issue・MR を指定された依頼
 
-「#152 を直して」「!5 の指摘に対応して」のように issue や MR を指定して頼むと、ccnavi が依頼文から指定（`#152`・`issue 152`・`.../issues/152`、`!5`・`MR 5`・`PR #12`・`.../pull/5`・`.../-/merge_requests/5`）を見つけ、
-実装の依頼なら着手の前に `ccnavi-start.sh --check` と `ccnavi-start.sh` を打つよう、エージェントに指示を足す（出力の「次:」に従う）。調べ・質問に答えるだけなら、チケット作業にせずそのまま答えてよい。コードブロックやインラインコードの中、`手順#2` のように語に付いた番号は拾わない。指示を足すだけである。チケット制御が disable なら足さない。
+「#152 を直して」「!5 の指摘に対応して」のように issue や MR を指定して頼むと、ccnavi が依頼文から指定（`#152`・`issue 152`・`.../issues/152`、`!5`・`MR 5`・`PR #12`・`.../pull/5` など）を見つけ、
+実装の依頼なら着手の前に `ccnavi-start.sh` を打つよう、エージェントに指示を足す。調べ・質問に答えるだけなら、チケット作業にせずそのまま答えてよい。コードブロックやインラインコードの中、`手順#2` のように語に付いた番号は拾わない。チケット制御が disable なら足さない。
 
-issue・MR を指定された実装は、直接作業にせずチケット作業で進める。例外は、ユーザが「直接作業で」「承認は要らない」のように直接作業を明示したときだけで、その指示に従う。指定しただけで明示が無いときは、チケット作業のまま。issue がある依頼をユーザが直接作業と明示したときは、`ccnavi-start.sh` は使わず、`ccnavi-worktree.sh` で切ったワークツリーに書く。ブランチを push して MR を作り、ユーザに確認を頼む（`integrate` は打たない。場合分けは `.ccnavi/docs/ticket-work.md` の「作業のパターン」を参照する）。直接作業へ切り替えると、承認待ちの提案（`wip/proposals/todo/`）と MR は残る。提案は削除する（`cancel` は `doing/` のチケット用）。着手済みの子は `ccnavi-ticket.sh cancel <子> --reason <理由>` で取り下げる。親ごと早めに閉じるときは、ユーザが `ccnavi-user-close-early.sh` を打つ。MR を閉じる操作は ccnavi に無く、ユーザがホストで決める。詳しくは `.ccnavi/docs/ticket-work.md`。
+issue・MR を指定された実装は、直接作業にせずチケット作業で進める。例外は、ユーザが「直接作業で」「承認は要らない」のように直接作業を明示したときだけで、その指示に従う。
+指定しただけで明示が無いときは、チケット作業のままである。直接作業へ切り替えたあとの承認待ちの提案と MR の扱いは、[.ccnavi/docs/ticket-work.md](../../.ccnavi/docs/ticket-work.md) にある。
+親ごと早めに閉じるときは、ユーザが `ccnavi-user-close-early.sh` を打つ。MR を閉じる操作は ccnavi に無く、ユーザがホストで決める。
 
-チケット作業は必ず issue と MR のセットで進める。最初に、ホストの API（認証・リポジトリの有無・書き込みの権限）と git のリモートが利用できる状態かを確かめる。
+チケット作業は必ず issue と MR のセットで進める。エージェントは着手の前に、ホストの API と git のリモートが使える状態かを確かめ、`ccnavi-start.sh --issue 152`（MR なら `--mr 5`）で Draft MR・ワークツリー・ブランチを作る。
+提案には、その MR と、MR が閉じる issue を書く。どちらかが無い親の提案は、`ccnavi ticket new`・承認・`--lint` が止める。
 
-```sh
-sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --check   # 0 使える / 1 不備 / 4 確かめられない項目がある
-```
+ユーザに聞かれる場面は次のとおり。
 
-そのうえで次の 1 本を打つ。既存の候補が無ければ、Draft MR・ワークツリー・ブランチを作る。
+- 既存のブランチや MR の候補が複数あるとき。「既存のブランチで続ける・新しく切る・やめる」から選ぶ
+- issue が closed で MR が無いとき。reopen する・closed のまま続ける・別の issue にする・やめる、から選ぶ
+- 紐づく open の MR がすでにあり、この PC にそのブランチのワークツリーが無いとき。他の PC や他のセッションの作業かもしれないので聞く。続けるなら MR の番号も指定して打ち直す
+- issue がまだ無いとき。エージェントが issue を作る前に、タイトルの似た open の issue・MR があれば、一覧を見せて同じ作業かを聞く
 
-```sh
-sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue 152   # MR なら --mr 5。両方も渡せる
-```
-
-終了コード 0 で終わったら、採用した MR と、その MR が閉じる issue と、元ブランチが確定している。出力の「必須」の行の `issue:` と `mr:` を提案に書く。どちらかが無い親の提案は、`ccnavi ticket new`・承認・`--lint` が止める。
-候補が複数あるときは、エージェントが一覧を見せて「既存のブランチで続ける・新しく `<先頭の語>-<番号>-<slug>` を切る・やめる」を聞くので、答える。
-issue が closed で MR が無いときも、`ccnavi-start.sh` は終了コード 3 で止まり、「次の手:」に reopen する・closed のまま続ける・別の issue にする・やめる、を並べる。ユーザが closed と承知で続けると言ったときだけ `--reopened` を付けて打ち直す（詳細は `.ccnavi/docs/worktree-start.md`）。
-`--issue` だけで来て、紐づく open の MR がすでにあり、この PC にそのブランチのワークツリーが無いときも、他の PC や他のセッションの作業かもしれないので、エージェントが聞く。続けるなら `--issue <番号> --mr <MR の番号>` で打ち直す（自分の作業の再開は聞かない）。
-
-issue がまだ無いときは、エージェントが `ccnavi-start.sh --new-issue <タイトル>` で issue を作ってから進む。作る前に、タイトルの似た open の issue・MR（タイトルの 2 文字組の一致率 0.5 以上）を確かめ、あれば作らずに一覧を見せて、同じ作業かを聞く。似たものが無くても、haiku のサブエージェントが open の issue・MR の一覧（`--list-open`）を読んで意味の近いものを探し、該当が無いと分かってから作る。別の作業だと答えたときは、エージェントが `--similar-checked` を付けて打ち直す。ホストに届かず作れないときは、GitHub は MCP で、GitLab はユーザが issue を作って番号を伝える。
-終了コード、ホストに届かないときの代行（GitHub は MCP、GitLab はユーザに認証を頼む）、`projects/<名前>` の依頼（`--repo`）、候補の探し方は [.ccnavi/docs/worktree-start.md](../../.ccnavi/docs/worktree-start.md) と [設計 9.13](../21_design/tickets/branch-lookup.md)。
+ホストに届かず issue を作れないときは、GitHub はエージェントが MCP で作り、GitLab はユーザが issue を作って番号を伝える。
+終了コード、`projects/<名前>` の依頼、候補の探し方は [.ccnavi/docs/worktree-start.md](../../.ccnavi/docs/worktree-start.md) にある。
 
 ## プロジェクトのスキル
 
 プロジェクト向けのスキルの形の手順書は、プロジェクトの git で育てるため、`projects/<名前>/skills/<スキル>/SKILL.md` に置く（頭の frontmatter に `name` と `description`）。
 Claude Code はそこをスキルとして読まないので、ccnavi が目録（名前・説明・場所）をエージェントに渡す。本文はエージェントが要るときに参考に開く。
 
-- プロジェクトが自前の `.claude/skills/` を持つなら、Claude Code がそれを別に読む。ただし、ワークスペースから起動した場合に読み込まれるかは、`projects/` がワークスペースの git で無視されているかで変わる。ccnavi は `projects/` を無視させるので、ワークスペースから起動してプロジェクトの `.claude/skills` に頼ることはできない。プロジェクトで起動すれば、そのプロジェクトの `.claude/` のスキルと hook だけが使われる
+- プロジェクトが自前の `.claude/skills/` を持つなら、Claude Code がそれを別に読む。ただしワークスペースから起動した場合は、`projects/` がワークスペースの git で無視されるため、プロジェクトの `.claude/skills` は読まれない。プロジェクトで起動すれば、そのプロジェクトの `.claude/` のスキルと hook だけが使われる
 - `skills/` はプロジェクトだけを clone した人の手元にも git で入るが、目録は渡らない
-
-目録の渡し方、上限、名前の規則は [設計 11.13](../21_design/multi-repo/skills.md)。
 
 ## プロジェクトを clone したあと
 
 プロジェクト管理画面の clone は、`git clone` をターミナルへ送るだけで、リポジトリを取得する操作である。ccnavi の導入（setup）は含まない。
-そのプロジェクトで親チケットに着手（`ticket start`）したあとは、ユーザの発言のたびに、共通レイヤーのミラーを親のワークツリーへ揃える（差分が無ければ何もしない）。`ticket start` 自身は書かない。子と、ワークスペース自身の作業には配らない。
-ワークスペースの中では共通レイヤーをルートから読み、ミラーは使わない。ミラーが使われるのは、プロジェクトだけを clone して使うとき（単体利用）である。
-ミラーが共通レイヤーとずれていないかは `sh .ccnavi/scripts/ccnavi-user-mirror.sh` で見て、`sh .ccnavi/scripts/ccnavi-user-mirror.sh --yes --expect <値>` で揃える（ユーザだけが実行する操作。VS Code のプロジェクト管理画面からも、5 分ごとの確認とボタンで同じことができる）。揃えるのはプロジェクトのチェックアウトのミラー（`.ccnavi/config/common/`）と工程スキルのコピー（`skills/<工程>/` の `SKILL.md` と `references/common/`）だけで、コミットはしない。
-ミラーや `skills/` が古いと、親のワークツリーへのコピーが未コミットの差分になり、`ready` などが止まる。止まったときは、エージェントがコミットも取り消しもせず、ユーザに `ccnavi-user-mirror.sh <プロジェクト名>` での揃えを頼むよう案内する。ユーザは先にプロジェクトの統合先で、ミラーと `skills/` を揃えてコミットしておく。
-`finish` が親のワークツリーの未コミットで止まるときも、プロジェクトの親ならミラー側のパスは同じ扱いになる（ワークスペース自身の親では、`.ccnavi/config/common/` は共通レイヤー本体なので従来の案内）。`confirm` が「依頼の後に親の HEAD が動いている」で止まるときは、動かしたのがミラーのずれのコミットだけなら、そう説明に足す（止める判定は変わらず、再 `request` が要る）。承認時の警告（`dirty_parents`）はワークスペース自身の親だけを数えるので、変えない。
-単体利用の手順と、まだ対応していない用途は [単体 clone の未解決事項](../21_design/multi-repo/standalone-clone-gaps.md)にある。ここに無い用途を「利用できる」と読まない。
+ワークスペースの中では共通レイヤーをルートから読む。プロジェクトだけを clone して使うとき（単体利用）は、共通レイヤーのコピー（ミラー）を使う。
+親チケットに着手したあとは、ユーザの発言のたびに、ミラーが親のワークツリーへ揃えられる。
+ミラーがずれているかは `sh .ccnavi/scripts/ccnavi-user-mirror.sh` で見て、`--yes --expect <値>` を付けて揃える（ユーザだけが実行する操作。VS Code のプロジェクト管理画面からもできる）。揃えるだけで、コミットはしない。
+ミラーや `skills/` が古いと、親のワークツリーに未コミットの差分ができ、`ready` などが止まる。止まったら、エージェントが案内するので、ユーザが `ccnavi-user-mirror.sh <プロジェクト名>` で揃える。ユーザは先にプロジェクトの統合先で、ミラーと `skills/` を揃えてコミットしておく。
 
 ## 作業・レビュー計画のテンプレート
 
 完了した作業の計画とフローを、次の作業で使い回すひな形である。下書きはエージェントが作り、ユーザが `sh .ccnavi/scripts/ccnavi-user-handoff.sh` か VS Code 拡張の「取り込み待ち」「テンプレート管理」で読んで取り込む。
-一覧・下書き・取り込み・提案の作り方・画面・古くなったときの扱いは [.ccnavi/docs/templates.md](../../.ccnavi/docs/templates.md)、形と検査の規則は [設計 9.15](../21_design/tickets/templates.md)、取り込みの規則は [設計 9.19](../21_design/tickets/handoff.md)にある。
+一覧・下書き・取り込み・提案の作り方・画面・古くなったときの扱いは [.ccnavi/docs/templates.md](../../.ccnavi/docs/templates.md) にある。
