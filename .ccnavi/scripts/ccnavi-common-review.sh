@@ -16,7 +16,7 @@
 #   review_wap              write-and-push の支度（ccnavi_wap_*・wap_on）
 #
 # 置くのは、ホストを読む関数（api・pages・find_mr・threads・reviews・fetch_all・refetch・account）と、
-# エージェントも使う書く関数（comment。ccnavi-review.sh の request・comment が投稿に使う）と、write-and-push を回す関数
+# エージェントも使う書く関数（comment。ccnavi-review.sh の review-request・comment が投稿に使う）と、write-and-push を回す関数
 # （wap_start・wap_ccnavi）だけ。ユーザの判断を書く処理（指摘のスレッドへの返信と解決、issue を作る、
 # ユーザの判断を承認の push で送る）はここに置かない。ユーザ専用の sh（ccnavi-user-*.sh）の中だけに置く。
 # 共通のファイルに置くと、`sh -c '. …common….sh; 関数'` の形で、ユーザ専用の sh の名前を出さずに
@@ -431,7 +431,7 @@ find_marked() {
 	esac
 }
 
-# ---- エージェントの単発の投稿（request・comment・ready の補助コメント、close-early の issue とコメント）を、
+# ---- エージェントの単発の投稿（review-request・comment・ready の補助コメント、close-early の issue とコメント）を、
 # 操作記録に載せて送る。
 #
 # staged_send <操作の種類> <キー> <段階ID> <note|issue> <MR の番号> <MR の URL> <本文のファイル>

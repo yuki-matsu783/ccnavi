@@ -15,7 +15,7 @@ test_repo: true                  # 親チケットの着手のあとの発言で
 steps:
   - prompt: >-
       projects/test-repo の README.md の末尾に「ミラー確認」と 1 行足す小さい作業を、project: test-repo のチケット（quick の親 1・子 1）で進めたい。
-      提案を wip/proposals/todo/ に書いて、`ccnavi --agree --preview --verify` で自己検証して、ユーザに承認を依頼するところで止めて。
+      提案を wip/proposals/todo/ に書いて、`sh .ccnavi/scripts/ccnavi-ticket.sh approval-request <親の識別子> --check` で自己検証して、ユーザに承認を依頼するところで止めて。
       実装はまだしないで。
   - human: true
     instruction: >-

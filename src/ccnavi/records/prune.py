@@ -27,7 +27,7 @@ state（`logs/state/`）。 消すのはセッションを名前に持つもの�
 消さない。チケットやレビューの寿命で使われるか、ユーザのファイルそのものなので、セッションの
 日付では決められない。
 
-Stop の AI 判定の記録は例外で、それ自身の日付で消す。計画・試行・propose の操作の記録
+Stop の AI 判定の記録は例外で、それ自身の日付で消す。計画・試行・approval-request の操作の記録
 （`stopreview-plan-*`・`stopreview-attempt-*`・`stopops-*`）は state の保持日数で、
 再評価用の材料（`logs/stop-review/material/`）と試行のイベント（`logs/stop-review/events.jsonl`）は
 評価の途中で消えないよう、別の保持日数（CCNAVI_STOP_REVIEW_KEEP_DAYS。既定 90 日）で消す。

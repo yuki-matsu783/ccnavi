@@ -1,6 +1,7 @@
 """操作記録。ユーザの判断と外部への書き込みを、実行する前に保存する。
 
-decide・close-early・request・comment・ready は、ホストへの返信・解決・投稿とローカルへの適用が
+decide・close-early・review-request・comment・ready は、
+ホストへの返信・解決・投稿とローカルへの適用が
 複数の段階に分かれ、途中で止まりうる。止まったあとに「どこまで済んだか」を同じ記録から読み、
 打ち直しや `--resume` で続きから進める。
 
@@ -86,7 +87,7 @@ def new_id() -> str:
 def id_for(*parts: str) -> str:
     """内容から決まる操作ID（32 桁の 16 進）。
 
-    エージェントの操作（request・comment・ready）は、同じ操作を打ち直して復旧する。打ち直しが
+    エージェントの操作（review-request・comment・ready）は、同じ操作を打ち直して復旧する。打ち直しが
     同じ記録にヒットするよう、操作のキー（種類・親・MR・本文のキーなど）から ID を決める。
     """
     joined = "\x1f".join(parts)

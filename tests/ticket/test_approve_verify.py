@@ -22,7 +22,7 @@ import os
 import tempfile
 
 from tests.ticket.test_phases import PhaseHarness
-from tests.ticket.test_ticket import write
+from tests.ticket.test_ticket import git, write
 from tests.ticketsample import child_text, parent_text
 
 APPROVE_VERSION = 1
@@ -197,6 +197,54 @@ class ApproveVerifyTest(PhaseHarness):
         self.assertEqual(body["verify"], {"ok": False, "reason": "nothing-pending"})
         self.assertTrue(any("broken.md" in p for p in body["problems"]))
 
+    # ---- 2c. 親のワークツリーの状態（approval-request が止まる条件と同じ）
+
+    def sound_proposal(self):
+        self.propose("i0001", parent_text("i0001", ["research", "design"]))
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
+        self.commit_parent()
+
+    def with_origin(self):
+        bare = os.path.join(self.root, "origin.git")
+        git(self.root, "init", "--quiet", "--bare", bare)
+        git(self.root, "remote", "add", "origin", bare)
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+
+    def test_an_uncommitted_change_in_the_parent_fails_the_check(self):
+        self.sound_proposal()
+        write(os.path.join(self.parent_tree, "src", "keep.py"), "print(2)\n")
+
+        result = self.verify("--json")
+        self.assertEqual(result.returncode, ANSWER_NO, result.stdout + result.stderr)
+        body = json.loads(result.stdout)
+        self.assertEqual(body["verify"], {"ok": False, "reason": "dirty_parent"})
+        self.assertIn("src/keep.py", result.stderr + json.dumps(body, ensure_ascii=False))
+        text = self.verify()
+        self.assertEqual(text.returncode, ANSWER_NO)
+        self.assertIn("src/keep.py", text.stdout)
+        self.assertNotIn("承認を依頼してよい", text.stdout)
+
+    def test_unpushed_code_in_the_parent_fails_the_check(self):
+        self.sound_proposal()
+        self.with_origin()
+        write(os.path.join(self.parent_tree, "src", "new.py"), "x = 1\n")
+        self.commit_parent("code")
+
+        result = self.verify("--json")
+        self.assertEqual(result.returncode, ANSWER_NO, result.stdout + result.stderr)
+        body = json.loads(result.stdout)
+        self.assertEqual(body["verify"], {"ok": False, "reason": "unpushed_code"})
+        self.assertIn("src/new.py", self.verify().stdout)
+
+    def test_a_pushed_clean_parent_still_passes(self):
+        self.sound_proposal()
+        self.with_origin()
+        result = self.verify("--json")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(result.stdout)["verify"], {"ok": True, "reason": "ok"})
+
     def test_a_broken_proposal_elsewhere_does_not_fail_a_sound_one(self):
         """読めない提案は終了コードを動かさない。`--agree` もそこでは失敗しないから。
 
@@ -295,15 +343,15 @@ class ApproveVerifyTest(PhaseHarness):
     def test_writing_a_proposal_tells_the_agent_to_check_first(self):
         target = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0002.md")
         first = self.hook("PreToolUse", "Write", self.parent_tree, file_path=target)
-        self.assertIn("--agree --preview --verify", context(first))
+        self.assertIn("approval-request <親の識別子> --check", context(first))
         self.assertIn("承認を依頼する前に", context(first))
 
     def test_the_notice_comes_once_per_context(self):
         todo = os.path.join(self.parent_tree, "wip", "proposals", "todo")
         first = self.hook("PreToolUse", "Write", self.parent_tree, file_path=todo + "/i0002.md")
-        self.assertIn("--agree --preview --verify", context(first))
+        self.assertIn("approval-request <親の識別子> --check", context(first))
         again = self.hook("PreToolUse", "Write", self.parent_tree, file_path=todo + "/i0003.md")
-        self.assertNotIn("--agree --preview --verify", context(again))
+        self.assertNotIn("approval-request <親の識別子> --check", context(again))
 
     def test_the_notice_changes_no_verdict(self):
         """案内は判定の表に足さない。だから `todo/` の扱いは、案内を入れる前と同じ。
@@ -333,7 +381,7 @@ class ApproveVerifyTest(PhaseHarness):
                 # 止めた回にも文は届く（判定とは別の欄）。1 つの文脈で 1 度だけなので、
                 # 最初の 1 回だけを見る。
                 if mode == "bypassPermissions":
-                    self.assertIn("--agree --preview --verify", context(inside))
+                    self.assertIn("approval-request <親の識別子> --check", context(inside))
 
     def test_the_notice_stays_inside_the_workspace(self):
         """ワークスペースの外に同じディレクトリ構成を掘っても、提案を書いたことにはしない。

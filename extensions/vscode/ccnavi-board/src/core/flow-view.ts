@@ -260,7 +260,7 @@ export type ToFlow =
   | { readonly type: "offer"; readonly request?: string; readonly offer?: FlowOffer }
   /** 開いた下書き（`openProposal` の答え）。取り込めなければ `error` */
   | { readonly type: "proposal"; readonly proposal?: FlowProposal; readonly error?: string }
-  /** 依頼の文（`request` の答え）。画面は文と「コピー / 新しいセッションで開く」を出す */
+  /** 依頼の文（`review-request` の答え）。画面は文と「コピー / 新しいセッションで開く」を出す */
   | { readonly type: "requestText"; readonly prompt: string }
   | AppearanceMessage;
 

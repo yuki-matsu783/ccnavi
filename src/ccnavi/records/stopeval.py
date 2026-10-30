@@ -313,7 +313,7 @@ def render(summary: dict[str, Any], unlinked: int = 0) -> str:
 
 
 def unlinked_total(state: str) -> int:
-    """未連携の propose 呼び出しの数（全セッション）。"""
+    """未連携の approval-request 呼び出しの数（全セッション）。"""
     total = 0
     try:
         names = sorted(fsio.listdir(state)) if state else []

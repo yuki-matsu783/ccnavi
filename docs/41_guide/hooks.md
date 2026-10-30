@@ -69,7 +69,7 @@ undo: rm -- ".ccnavi/config/common/probe.json"
 
 - チケット作業で`finish`を打たずに終えようとしたとき（`NUDGE_TICKET_FINISH`）。まだ続けるなら、理由を書いてから終える
 - レビューの依頼までの道の途中で、ユーザの許可を待って終えようとしたとき（`NUDGE_TICKET_REQUEST`）。この道にユーザの許可は要らない
-- 全体計画のレビューが済み、フィードバック計画が決まらないまま終えようとしたとき（`NUDGE_TICKET_FEEDBACK`）。改版（`feedback: []` か対応のフェーズ）を書いて `propose` で送り、ユーザに承認を頼む
+- 全体計画のレビューが済み、フィードバック計画が決まらないまま終えようとしたとき（`NUDGE_TICKET_FEEDBACK`）。改版（`feedback: []` か対応のフェーズ）を書いて `approval-request` で送り、ユーザに承認を頼む
 - 終わったサブエージェントが、範囲外の変更を残したか範囲を確かめられないまま終わったとき（`NUDGE_SUBAGENT_OUTCOME`）
 - チケットに結び付かない直接作業のワークツリーに、取り込み先に入っていないコミットがあるのに`integrate`を打っていないとき（`NUDGE_INTEGRATE`）。差分を確かめてもらい、了承を得てから取り込む。直接作業のコミットは`integrate`の直前にまとめて打つので、未コミットの変更だけのときと、`integrate`のあとで確定を待っているときは促さない
 - `match: Stop`のルールが渡す回（`NUDGE_STOP_RULE`。[rules.md](rules.md)）

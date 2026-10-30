@@ -565,7 +565,7 @@ class DagApprovalTest(PhaseHarness):
         self.propose(
             "i0001-03-03", child_text("i0001-03-03", "i0001", 3, ["src/a/*"], review=False)
         )
-        self.commit_parent("propose 02 03")
+        self.commit_parent("approval-request 02 03")
         return self.approve()
 
     def approved_child(self, name):
@@ -586,7 +586,7 @@ class DagApprovalTest(PhaseHarness):
         self.assertTrue(self.approved_child("i0001-03-03"))
         # 合流点は、両方の枝が閉じるまで承認しない。
         self.propose("i0001-04-04", child_text("i0001-04-04", "i0001", 4, ["wip/d/*"]))
-        self.commit_parent("propose 04")
+        self.commit_parent("approval-request 04")
         refused = self.approve()
         self.assertFalse(self.approved_child("i0001-04-04"))
         self.assertIn("閉じるまで承認しない", refused.stderr)
@@ -727,7 +727,7 @@ class DagApprovalTest(PhaseHarness):
         self.propose(
             "i0001-03-03", child_text("i0001-03-03", "i0001", 3, ["src/a/*"], review=False)
         )
-        self.commit_parent("propose 03")
+        self.commit_parent("approval-request 03")
         self.assertEqual(self.approve().returncode, 0)
         self.assertTrue(self.approved_child("i0001-03-03"))
         # 子の無い 2 を別の定義に替え、文書の前に 1 ステップ足す。

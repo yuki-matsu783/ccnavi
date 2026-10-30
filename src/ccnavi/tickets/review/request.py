@@ -57,6 +57,7 @@ from ..approval import marks as approval_marks
 from ..approval import ops as approval_ops
 from ..approval import store as approval
 from ..lifecycle import close as ops_close
+from ..lifecycle import treegate
 from ..model import phase_forms, review_host, ticket_fields, ticket_model, ticket_places, via
 from ..phase import gates as phase
 from ..sync import handoff, mirror_gap
@@ -491,24 +492,6 @@ def thread_version(t: review_host.Thread) -> str:
     return review_host.thread_version(t)
 
 
-def _approved_rel(conf: settings.Settings) -> str:
-    """ccnavi 自身の置き場（ツリーのルートからの相対）。末尾の `/` は付けない。"""
-    return (conf.approved or settings.DEFAULT_APPROVED).strip("/")
-
-
-def _own_places(conf: settings.Settings) -> tuple[str, ...]:
-    """ccnavi 自身が動かす置き場。承認済みチケットと提案の 2 つ。
-
-    チケットは 2 つの置き場を行き来するので、片方だけを外すと `finish` の移動
-    （`doing/` → `review/`）が「ユーザが見るものが動いた」に数えられる。
-    """
-    return (_approved_rel(conf), (conf.tickets or settings.DEFAULT_TICKETS).strip("/"))
-
-
-def _is_own_place(conf: settings.Settings, path: str) -> bool:
-    return any(path.startswith(place + "/") for place in _own_places(conf))
-
-
 def _unseen_by_review(conf: settings.Settings, path: str) -> bool:
     """依頼の後に変わっても「ユーザが見るものが動いた」に数えない場所か。
 
@@ -517,12 +500,12 @@ def _unseen_by_review(conf: settings.Settings, path: str) -> bool:
     説明を直すたびに依頼のコメントが増え、レビュー済みにしにくくなる。代わりに、
     直した ELI5 をユーザが見直す保証は無くなる。
 
-    未コミットの検査（`_dirty_paths`）と push の検査（`_unpushed`）はこれを使わない。
+    未コミットと push の検査（`treegate`）はこれを使わない。
     ELI5 の未コミットは sh が依頼のときに止め、push していない ELI5 はマージリクエストの差分に無い
     （crit push が届かない）。
     """
-    # git の `-z` の表記をそのまま見る（`\` を `/` に直さない。`_outside_approved` と同じ理由）。
-    return _is_own_place(conf, path) or path.startswith(ticket_places.ELI5 + "/")
+    # git の `-z` の表記をそのまま見る（`\` を `/` に直さない。`treegate.diff_paths` と同じ理由）。
+    return treegate.in_place(conf, path) or path.startswith(ticket_places.ELI5 + "/")
 
 
 # 依頼のマーカーに記録された HEAD。git の revision として使う前に、この形であることを求める。
@@ -540,94 +523,11 @@ def is_sha(value: str) -> bool:
     return bool(_SHA.match(value))
 
 
-def _outside_approved(
-    tree_root: str, conf: settings.Settings, ref: str, eli5: bool = False
-) -> tuple[list[str], str]:
-    """`ref..HEAD` の差分のうち、ccnavi 自身の置き場の外にあるパス。2 つめは読めなかった理由。
-
-    NUL 区切りで読む理由は phase_scope.scope_findings と同じ。既定の出力は非 ASCII を
-    引用符で囲んで 8 進でエスケープするので、そのまま照らし合わせると日本語のファイルが
-    置き場の外か中かを読み違える。`--no-renames` を付けるのは、改名を 1 行にまとめられると
-    移動元のパスが出力に出ず、置き場の外から中へ動かしたファイルが「置き場の中だけ」に見えるため。
-    `--ignore-submodules=none` は、`.gitmodules` の `ignore = all` で submodule の
-    進みが差分にまったく出なくなるのを防ぐ（`.gitmodules` は追跡されるので、外から届く）。
-
-    `-z` が返すパスはもう正規化されているので、こちらでは何も直さない。空白を除いたり
-    `\\` を `/` に直したりすると、`.ccnavi\\tickets\\x.py` という名前のファイル 1 個が
-    置き場の中のパスになってしまい、除外の側に入る。
-
-    `eli5` なら ELI5 の置き場も外す（`_unseen_by_review`。依頼済みの見分けだけが使う）。
-    """
-    paths, failed = _diff_paths(tree_root, ref)
-    keep = _unseen_by_review if eli5 else _is_own_place
-    return [p for p in paths if not keep(conf, p)], failed
-
-
-def _diff_paths(tree_root: str, ref: str) -> tuple[list[str], str]:
-    """`ref..HEAD` で変わったパス（置き場で絞らない）。2 つめは読めなかった理由。"""
-    if not ref:
-        return [], "比べる相手がありません。"
-    rc, out = _git(
-        tree_root,
-        ["diff", "--name-only", "--no-renames", "--ignore-submodules=none", "-z", f"{ref}..HEAD"],
-    )
-    if rc != 0:
-        return [], f"{ref[:12]} からの差分を読めない"
-    return [path for path in out.split("\0") if path], ""
-
-
-def _dirty_paths(tree_root: str, conf: settings.Settings, wip_removals: bool = False) -> list[str]:
-    """ワークツリーの、ccnavi 自身の置き場を除いた未コミットの変更のパス。読めなければ `[""]`。
-
-    承認済みチケットとマーカーはこのワークツリーの `.ccnavi/` に置かれ、git が追跡する。
-    マーカーはフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
-    マーカーをコミットしろ」と言い続けることになる。
-    マーカーと承認済みチケットをコミットして push するのは `ccnavi-review.sh` と
-    `ccnavi-user-agree.sh` の仕事で、ユーザの作業による未コミットの変更とは別に扱う。
-    """
-    rc, status = _git(
-        tree_root, ["status", "--porcelain", "-z", "--untracked-files=no", "--no-renames"]
-    )
-    if rc != 0:
-        return [""]
-    # `-z` で読む。既定の出力は非 ASCII を引用符で囲んで 8 進でエスケープするので、置き場の中の
-    # 日本語のファイルが置き場の外と判定され、「未コミットがある」で依頼が止まる。
-    # `--no-renames` は、改名のときに出る 2 つめのパス（移動元）が XY を持たない形で
-    # 入り込むのを避けるため。phase_scope.scope_findings と同じ読み方。
-    paths: list[str] = []
-    for entry in status.split("\0"):
-        if len(entry) > 3 and entry[2] == " " and not _is_own_place(conf, entry[3:]):
-            if wip_removals and "D" in entry[:2] and in_wip(entry[3:]):
-                # `ready` が消した（追跡済みの）`wip/` のファイル。write-and-push がコミットするか、
-                # write-and-push の外では sh がコミットと push を求めて止める。打ち直しの ready
-                # は止めない。
-                continue
-            paths.append(entry[3:])
-    return paths
-
-
-def _dirty_problem(conf: settings.Settings, paths: list[str]) -> str:
-    """未コミットの変更があるために止めるときの文面。
-
-    変更がミラーのコピー先（共通レイヤー・工程スキル）にあるなら、作業の変更ではなく、
-    共通レイヤーとのずれである。承認の範囲を超えるコミットは促さず、
-    揃える手順（ユーザの操作）を案内する。
-    """
-    base = "親のワークツリーに未コミットの変更がある"
-    mirrored, others = mirror_gap.split(conf, paths)
-    if not mirrored:
-        return base
-    lead = f"{base}（{mirror_gap.label(mirrored)}）。{mirror_gap.NOT_WORK}"
-    return lead + mirror_gap.others_note(len(others)) + mirror_gap.ASK
-
-
-def in_wip(path: str) -> bool:
-    """git が出したパスが、途中の作業の置き場（`wip`）の下か。
-    大文字小文字と `\\` の区切りを問わない。"""
-    folded = path.lower()
-    return folded == ticket_places.WIP_ROOT or folded.startswith(
-        (ticket_places.WIP_ROOT + "/", ticket_places.WIP_ROOT + "\\")
-    )
+def _seen_changes(tree_root: str, conf: settings.Settings, ref: str) -> tuple[list[str], str]:
+    """`ref..HEAD` の差分のうち、ユーザが見るもの（置き場と ELI5 の外）のパス。
+    2 つめは読めなかった理由。"""
+    paths, failed = treegate.diff_paths(tree_root, ref)
+    return [p for p in paths if not _unseen_by_review(conf, p)], failed
 
 
 def wip_tracked(tree_root: str) -> list[str] | None:
@@ -644,7 +544,7 @@ def wip_tracked(tree_root: str) -> list[str] | None:
     rc, tracked = _git(tree_root, ["ls-files", "-z"])
     if rc != 0:
         return None
-    return [p for p in tracked.split("\0") if p and in_wip(p)]
+    return [p for p in tracked.split("\0") if p and ticket_places.in_wip(p)]
 
 
 def _wip_untracked(tree_root: str) -> list[str] | None:
@@ -652,7 +552,7 @@ def _wip_untracked(tree_root: str) -> list[str] | None:
     rc, out = _git(tree_root, ["ls-files", "-z", "--others", "--exclude-standard"])
     if rc != 0:
         return None
-    return [p for p in out.split("\0") if p and in_wip(p)]
+    return [p for p in out.split("\0") if p and ticket_places.in_wip(p)]
 
 
 def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[str]:
@@ -709,16 +609,7 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
             "`ccnavi-user-handoff.sh` で取り込んでもらうか、要らない下書きを削除してから"
             "再実行してください"
         )
-    dirty = _dirty_paths(tree_root, conf, wip_removals=True)
-    if dirty:
-        problems.append(_dirty_problem(conf, dirty))
-    branch = _branch(tree_root)
-    if not branch:
-        problems.append("親ブランチの名前を読めない")
-    else:
-        rc, ahead = _git(tree_root, ["rev-list", f"origin/{branch}..HEAD"])
-        if rc != 0 or ahead.strip():
-            problems.append("親ブランチの HEAD が push されていない")
+    problems += [r.line for r in treegate.check(treegate.READY, tree_root, conf)]
     return problems
 
 
@@ -953,14 +844,7 @@ def _unmet(root: str, tree_root: str, conf: settings.Settings, ph: phase.Phase) 
             )
     # 未追跡は数えない。依頼文そのものをワークツリーに置く使い方が普通にあり、未追跡で
     # 前提を満たさないと判定すると依頼文を書く場所が無くなる。未追跡はマージリクエストに載らない。
-    dirty = _dirty_paths(tree_root, conf)
-    if dirty:
-        unmet.append(_dirty_problem(conf, dirty))
-    branch = _branch(tree_root)
-    if not branch:
-        unmet.append("親ブランチの名前を読めない")
-    elif _unpushed(tree_root, conf, branch):
-        unmet.append("親ブランチの HEAD が push されていない")
+    unmet += [r.line for r in treegate.check(treegate.REVIEW_REQUEST, tree_root, conf)]
     return unmet
 
 
@@ -970,26 +854,6 @@ def _unmerged_fix(root: str, tree_root: str, child: ticket_model.Ticket) -> str:
     中身は `ops_close.unmerged_fix`。Stop の促しも同じ関数で確かめる。
     """
     return ops_close.unmerged_fix(root, tree_root, child, TIMEOUT_SECONDS)
-
-
-def _unpushed(tree_root: str, conf: settings.Settings, branch: str) -> bool:
-    """ユーザが見るものが、まだリモートに届いていないか。
-
-    ccnavi 自身の置き場だけが手元に残っている形は、届いていると数える。ユーザがレビューで
-    見るのはコードで、置き場をコミットして push するのは `ccnavi-user-push-approved.sh` の仕事
-    （push が失敗してもコミットは残す）。数えると、レビュー待ちの間に失敗した push が
-    次の依頼を止める。`confirm` の側（`_moved_since_request`）と同じ基準。
-
-    `ready` の前提（`_merge_problems`）はこれを使わない。あちらはユーザがリモートを見て
-    マージするところで、マーカーも本当に届いていないと他の機械へ渡らない。
-    """
-    rc, ahead = _git(tree_root, ["rev-list", f"origin/{branch}..HEAD"])
-    if rc != 0:
-        return True
-    if not ahead.strip():
-        return False
-    changed, failed = _outside_approved(tree_root, conf, f"origin/{branch}")
-    return bool(failed or changed)
 
 
 def _result(stderr: TextIO, path: str) -> review_host.Result | None:
@@ -1024,11 +888,6 @@ def _poster(parent: ticket_model.Ticket, phase_no: int, root: str, conf: setting
     return str((mark or {}).get("poster") or "")
 
 
-def _branch(tree_root: str) -> str:
-    rc, out = _git(tree_root, ["rev-parse", "--abbrev-ref", "HEAD"])
-    return out.strip() if rc == 0 else ""
-
-
 def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark: dict) -> str:
     """依頼の後に、ユーザが見るものが動いたか。動いていれば、その説明（判定の文。理由の説明は
     `moved_explanation`）。`_moved_detail` の `text`。"""
@@ -1049,8 +908,8 @@ def _moved_detail(
     数えると「依頼 → マーカー → コミット」の順のせいで、依頼の直後に必ず自分のマーカーの
     コミットで「動いた」と判定され、
     承認の push（`ccnavi-user-push-approved.sh`）が置き場をまとめてコミットするので、レビューを
-    待っている間の承認でも依頼が無効になる。未コミットの側は `_dirty_paths` が同じ理由で外しており、
-    基準をそこに揃える。ユーザがレビューで見るものは 1 バイトも変わらない。
+    待っている間の承認でも依頼が無効になる。未コミットの側は `treegate.tree_dirty` が
+    同じ理由で外しており、基準をそこに揃える。ユーザがレビューで見るものは 1 バイトも変わらない。
 
     push の判定も同じ基準で見る。置き場だけが手元に残っていても、リモートにあるものと
     ユーザが見るものは同じ。
@@ -1065,13 +924,13 @@ def _moved_detail(
     recorded = str(requested_mark.get("head") or "")
     paths: list[str] | None = None
     if recorded and head != recorded and is_sha(recorded):
-        found, failed = _diff_paths(tree_root, recorded)
+        found, failed = treegate.diff_paths(tree_root, recorded)
         paths = None if failed else found
     moved = moved_detail(conf, requested_mark, head, paths, project)
     if moved.text:
         return moved
-    branch = _branch(tree_root)
-    if not branch or _unpushed(tree_root, conf, branch):
+    branch = tree.branch_of(tree_root) or ""
+    if not branch or treegate.unpushed(tree_root, conf, branch, ignore_places=True) != []:
         return Moved("親ブランチの HEAD が push されていない")
     return Moved()
 
@@ -1158,7 +1017,7 @@ def moved_explanation(moved: Moved) -> list[str]:
     if moved.kind == KIND_MIRROR:
         lines.append(
             "動かしたのはミラーのずれ（共通レイヤーのコピーか `skills/`）のコミット。"
-            "ユーザが見たものと HEAD が違うので、再 `request` が要る。"
+            "ユーザが見たものと HEAD が違うので、再 `review-request` が要る。"
         )
     return lines
 
@@ -1192,7 +1051,7 @@ def _already_requested(
     if rc == 0 and head.strip() != recorded:
         if not is_sha(recorded):
             return ""
-        changed, failed = _outside_approved(tree_root, conf, recorded, eli5=True)
+        changed, failed = _seen_changes(tree_root, conf, recorded)
         if failed or changed:
             return ""
     return f"フェーズ {phase_no} は依頼済み（ユーザが見るものは依頼時のまま）"
@@ -1202,7 +1061,7 @@ def _redo_request(root: str, phase_no: int) -> str:
     """HEAD が動いたときの案内。push 済みの今の HEAD で依頼を出し直す。"""
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     return (
-        f"push してから '{review_sh} request --phase {phase_no} --body-file <依頼文> "
+        f"push してから '{review_sh} review-request --phase {phase_no} --body-file <依頼文> "
         f"--eli5 wip/eli5/phase-{phase_no}.html' で"
         "依頼を出し直してください"
     )

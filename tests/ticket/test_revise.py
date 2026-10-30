@@ -49,7 +49,7 @@ class ReviseTest(PhaseHarness):
         self.assertIn("feedback: []", text)
         for name in ticket_model.SCRIPT_FIELDS:
             self.assertNotRegex(text, rf"(?m)^{name}: \S", name)
-        self.assertIn("--agree --preview --verify i0001", made.stdout)
+        self.assertIn("approval-request i0001 --check", made.stdout)
         self.assertEqual(sum(1 for x in made.stdout.splitlines() if x.startswith("次: ")), 1)
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "revise")
@@ -131,7 +131,7 @@ class ReviseTest(PhaseHarness):
         self.assertEqual(len([x for x in lines if x.startswith("次: ")]), 1, made.stdout)
         notes = "\n".join(x for x in lines if x.startswith("案内: "))
         self.assertIn("ccnavi-ticket.sh cancel <子>", notes)
-        self.assertIn("--agree --preview --verify i0001", notes)
+        self.assertIn("approval-request i0001 --check", notes)
 
     # ---- 5. finish の案内
 

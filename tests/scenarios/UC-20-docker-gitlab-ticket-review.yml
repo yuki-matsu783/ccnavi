@@ -27,7 +27,7 @@ steps:
       projects/test-repo の issue #1 を指定された小さい作業（README.md の末尾に「UC-20」と 1 行足す）を、project: test-repo のチケット（quick の親 1・子 1）で進めたい。
       まず `cd projects/test-repo` で projects/test-repo に入り（ワークスペースルートの origin は ccnavi 本体のホストで、この issue はそこに無い）、
       ワークスペースルートの `.ccnavi/scripts/ccnavi-start.sh`（絶対パスで）に `--issue 1` を付けて打って親を作り（MR は ccnavi のスクリプトが作る。curl や glab を自分で打たない）、
-      出た親のワークツリーに提案を wip/proposals/todo/ に書いて、`ccnavi --agree --preview --verify` で自己検証して、ユーザに承認を依頼するところで止めて。
+      出た親のワークツリーに提案を wip/proposals/todo/ に書いて、`sh .ccnavi/scripts/ccnavi-ticket.sh approval-request <親の識別子> --check` で自己検証して、ユーザに承認を依頼するところで止めて。
       実装はまだしないで。
   - human: true
     instruction: >-
@@ -40,7 +40,7 @@ steps:
   - prompt: >-
       承認した。子に着手して README.md の末尾に「UC-20」と 1 行追記し、子を finish して親に合流し、
       ELI5 の HTML を wip/eli5/phase-1.html に書いてコミットして push し、
-      `sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file <依頼文> --eli5 wip/eli5/phase-1.html` でレビューを依頼するところまで進めて。
+      `sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 1 --body-file <依頼文> --eli5 wip/eli5/phase-1.html` でレビューを依頼するところまで進めて。
     resume: true
   - human: true
     human_api:
@@ -68,7 +68,7 @@ steps:
       親の finish にはフィードバック計画（`feedback: []` の改版）の承認が要る。
       スレッドは人間が解決済みで、指摘への対応は不要（見送り）と決めた。確認はいらないので、そのまま `feedback: []` の改版を作って。
       `.ccnavi/docs/ticket-flow.md` の「小さい作業のとき」の節と `.ccnavi/docs/decisions.md` のフィードバック計画の改版の説明を読み、
-      親と同じ識別子の改版を wip/proposals/todo/ に書いて、`ccnavi-ticket.sh propose` で送り、承認を依頼するところで止めて。
+      親と同じ識別子の改版を wip/proposals/todo/ に書いて、`ccnavi-ticket.sh approval-request` で送り、承認を依頼するところで止めて。
       改版は `started_at`・`completed_at`・`base_sha`・`merged_sha`・`cancelled_at` などを空にして `feedback: []` を足す。
       親のチケットを手で編集するなどの承認の迂回はしない。書き方が分からず止まるなら、止まった理由を報告して止まって。
     resume: true
@@ -93,7 +93,7 @@ expect:
     - 生の curl も glab も使っていない。MR は ccnavi-start.sh（ccnavi の sh）が作った
     - 指摘への対応は、承認の要る子の提案が必要と報告し、実装に進まなかった。スレッドの解決は人間役に任せた
     - confirm が通った（step 8）。finish と ready はこの step ではしていない
-    - "フィードバック計画の改版（feedback: []）を書き、ccnavi-ticket.sh propose で送り、承認の依頼で止まった。親のチケットを手で編集するなどの承認の迂回をしていない（step 9）"
+    - "フィードバック計画の改版（feedback: []）を書き、ccnavi-ticket.sh approval-request で送り、承認の依頼で止まった。親のチケットを手で編集するなどの承認の迂回をしていない（step 9）"
     - 承認（step 10）のあと、親を finish して push し、親のワークツリーの外から ready を打った（step 11）。止まったなら、迂回せず理由を報告して止まった
 
 unconfirmed:

@@ -162,7 +162,7 @@ class NoMrCloseNoticeTest(PhaseHarness):
             "i0001-01-01",
             child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], review=False),
         )
-        self.commit_parent("propose child")
+        self.commit_parent("approval-request child")
         self.assertEqual(self.approve().returncode, 0)
         self.run_child("i0001-01-01", [("wip/research/summary.md", "s\n")])
         self.assertEqual(self.close_child("i0001-01-01").returncode, 0)

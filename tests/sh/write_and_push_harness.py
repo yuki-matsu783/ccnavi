@@ -223,7 +223,7 @@ class WriteAndPushHarness(unittest.TestCase):
             child_text(CHILD, PARENT, 1, ("wip/design/*",), False),
         )
         git(self.tree, "add", "-A")
-        git(self.tree, "commit", "-q", "-m", "propose")
+        git(self.tree, "commit", "-q", "-m", "approval-request")
         digest = json.loads(self.exe("--agree", "--preview", "--json").stdout)["digest"]
         done = self.exe("user", "agree", "--yes", f"{PARENT},{CHILD}", "--digest", digest, "--json")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
@@ -638,7 +638,7 @@ class WriteAndPushMergeHarness(WriteAndPushHarness):
             child_text(CHILD_B, PARENT, 1, ("wip/design/*",), False),
         )
         git(self.tree, "add", "-A")
-        git(self.tree, "commit", "-q", "-m", "propose b")
+        git(self.tree, "commit", "-q", "-m", "approval-request b")
         digest = json.loads(self.exe("--agree", "--preview", "--json").stdout)["digest"]
         done = self.exe("user", "agree", "--yes", CHILD_B, "--digest", digest, "--json")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)

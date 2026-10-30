@@ -34,7 +34,7 @@ class LintOpsTest(PhaseHarness):
         base = os.path.join(self.root, ".claude", "worktrees", tree_name)
         path = write(os.path.join(base, "wip", "proposals", "todo", name + ".md"), text)
         git(base, "add", "-A")
-        git(base, "commit", "--quiet", "-m", "propose " + name)
+        git(base, "commit", "--quiet", "-m", "approval-request " + name)
         return path
 
     # ---- 1. 置き場所

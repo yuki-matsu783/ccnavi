@@ -32,10 +32,10 @@ from ...policy import rules
 from ..approval import checks as approval_checks
 from ..approval import store as approval
 from ..approval import write_and_push
-from ..model import ticket_model, ticket_places
+from ..model import ticket_model
 from ..phase import scope as phase_scope
-from ..sync import mirror_gap
 from . import close as ops_close
+from . import treegate
 
 _TIMEOUT = 20.0
 _SHOWN = 8
@@ -70,7 +70,8 @@ def plan(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> int:
     処理フロー:
     1. 識別子が親なら、合流しないので skip して終わる（`write_and_push.family_of`）。
     2. `ops_close.find` で子の承認済みチケットを引く。作業中で着手済みでなければ skip する。
-    3. `_tree_problem` で親と子のワークツリーを見る。問題があれば stop する。
+    3. `_tree_problem` で親と子のワークツリーを見る（親の未コミットは `treegate`）。
+       問題があれば stop する。
     4. 子と親の先頭を `gitstate.head` で 1 回ずつ読む。検査と合流は、この子の sha を使う。
     5. `phase_scope.merge_findings` で、子のコミットにある置き場の変更と範囲の外のパスを見る。
     6. `gitstate.child_base` で子の仕事の始まりを求め、
@@ -209,42 +210,9 @@ def _tree_problem(
     揃えてもらう（`ready` と同じ案内）。ワークスペース自身の親では、`.ccnavi/config/common/` は
     共通レイヤー本体なので、従来の案内のまま。
     """
-    ok, out = _git(
-        parent_tree, ["status", "--porcelain", "-z", "--untracked-files=no", "--no-renames"]
-    )
-    if not ok:
-        return "親のワークツリーの状態を読めない。何も変えずに止めた", []
-    dirty = [
-        entry[3:]
-        for entry in _names(out)
-        if len(entry) > 3
-        and not ticket_places.is_ticket_place(entry[3:], conf.tickets, conf.approved)
-    ]
-    if dirty:
-        mirrored, others = mirror_gap.split(conf, dirty) if project else ([], dirty)
-        restore = (
-            "親のワークツリー（メインの作業場）には、状態の置き場以外の変更を残さない。"
-            "子のワークツリーへ移してコミットするか、親のワークツリーで "
-            "ccnavi-git.sh restore --staged --worktree -- <パス>（1 つずつ名指し）を打って"
-            "変更を取り除いてから、finish をやり直す"
-        )
-        if not mirrored:
-            return (
-                f"親のワークツリーに未コミットの変更がある（{_shown(dirty)}）。"
-                "サブエージェントの作業がコミットされていません。何も変えずに止めた",
-                [restore],
-            )
-        gap = f"{mirror_gap.label(mirrored)}。{mirror_gap.NOT_WORK}"
-        if not others:
-            return f"親のワークツリーに未コミットの変更がある（{gap}）。何も変えずに止めた", [
-                mirror_gap.ASK
-            ]
-        return (
-            f"親のワークツリーに未コミットの変更がある（{gap}）。"
-            f"ずれ以外の変更が {len(others)} 件ある（{_shown(others)}）。"
-            "サブエージェントの作業がコミットされていません。何も変えずに止めた",
-            [restore + "（ミラーのずれは対象外）", mirror_gap.ASK],
-        )
+    refusals = treegate.check(treegate.FINISH, parent_tree, conf, mirror_guidance=project)
+    if refusals:
+        return refusals[0].reason, list(refusals[0].hints)
     if not os.path.isdir(child_tree):
         return (
             f"子 {ident} のワークツリー（{child_tree}）が無い。何も変えずに止めた",

@@ -467,7 +467,7 @@ class ApprovedPreTest(Workspace):
         for text in (
             f"{ticket} status",
             f"{ticket} finish <識別子>",
-            f"{ticket} propose <識別子>",
+            f"{ticket} approval-request <識別子>",
             "ccnavi-user-agree.sh",
             "wip/proposals/todo/",
         ):

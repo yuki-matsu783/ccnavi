@@ -446,17 +446,19 @@ def run(
         "書き換える。目印が残っていると承認で止まる。"
         f"allow を実際の作業に合わせて絞る・足す。{tail}\n"
     )
-    # 子が無いと承認の確認と propose が警告する（`workflow.childless_ready`）。必須の行で独立させる
+    # 子が無いと承認の確認と approval-request が警告する（`workflow.childless_ready`）。
+    # 必須の行で独立させる
     stdout.write(
         f"必須: 子の提案（'{ident}-<フェーズ番号 2 桁>-<連番 2 桁>'。例: '{ident}-01-01'）を、"
         "すぐ始まるステップごとに 1 つ以上 wip/proposals/todo/ に手で書く。"
         "親と同じ承認で通すので、先に書く（書式は ccnavi --docs --keyword 提案書式）。"
-        "無いと --agree --preview --verify と propose が警告し、子の承認がもう 1 回要る\n"
+        "無いと approval-request（--check も）が警告し、子の承認がもう 1 回要る\n"
     )
     stdout.write(
         f"案内: 書けたら '{launcher} --lint' で確かめ、"
-        f"'{launcher} --agree --preview --verify {ident}' が通ったら、"
-        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} propose {ident}'"
+        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} approval-request {ident} --check'"
+        " が通ったら、"
+        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} approval-request {ident}'"
         "（親の識別子で打つ。子の識別子では打たない）で提案を親のブランチへ送り、"
         "承認をユーザに頼んで返事を待つ。承認が済むまで実装はしない\n"
     )
