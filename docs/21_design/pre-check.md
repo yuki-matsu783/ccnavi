@@ -303,12 +303,13 @@ payload にセッションが無ければ数えず、記録を読めない・書
 
 ccnavi は判定を返さず、Claude Code の権限モードに従う（REQ-PRE-10）。
 
-| `permission_mode` | 結末 | 記録の `decision` |
-|---|---|---|
-| `auto` | classifier が判断する | `handover` |
-| `default` / `acceptEdits` / `plan` | Claude Code 自身の権限の仕組みが決める | `handover` |
-| 空 / 不明 | ユーザに確認が出る | `ask` |
-| `dontAsk` / `bypassPermissions` | 通さない（REQ-PRE-08）。`CCNAVI_GUARD_UNWATCHED=disable` なら委ねる | `deny` |
+結末は、`auto` なら classifier、`default` / `acceptEdits` / `plan` なら Claude Code 自身の権限の仕組み、空・不明ならユーザへの確認、`dontAsk` / `bypassPermissions` なら通さない（REQ-PRE-08）。記録の `decision` は次のとおり。
+
+| `permission_mode` | 記録の `decision` |
+|---|---|
+| `auto` / `default` / `acceptEdits` / `plan` | `handover` |
+| 空 / 不明 | `ask` |
+| `dontAsk` / `bypassPermissions` | `deny`（`CCNAVI_GUARD_UNWATCHED=disable` なら `handover`） |
 
 渡した回も記録には `decision` が `handover` の行で残り、ユーザに聞いた回の `ask` とは混ざらない。集計は次のように取れる。
 
@@ -365,11 +366,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 
 `every: N` を書くと、そのルールがヒットした回数が `N` の倍数になった回だけが渡す回になる。書かなければヒットするたびが渡す回。
 
-| 欄 | いつ渡るか | `every: 5` のとき |
-|---|---|---|
-| `additionalContext` | 渡す回のたび | 5・10・15… 回目 |
-| `additionalContextOnce` | 渡す回の最初の 1 回 | 5 回目だけ |
-
+`additionalContext` は渡す回のたび、`additionalContextOnce` は渡す回の最初の 1 回だけ渡す（`every: 5` なら前者は 5・10・15… 回目、後者は 5 回目だけ）。
 本文のファイルも同じで、`additionalContextFile` は `additionalContext` に、`additionalContextOnceFile` は `Once` に従う。
 数えるのはそのルールがヒットした回数で、ファイルの本数でも時間でもない。
 「1 回目に言いたいこと」と「たまったところで言いたいこと」を両方言うならルールを 2 件書く。
@@ -379,18 +376,10 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 `every: 1` は `--lint` が何も言わない。刻みとして読めない値（`0`・負・整数でない）は error で名指しし、判定は 1 として扱って通す。
 
 刻みは `SessionStart`（compact の後を含む）で 0 に戻るので、長い作業で正確に N 回ごとは守らない。compact がいつ起きるかは ccnavi から見えない。
+0 に戻ると、`additionalContext` は届くのが遅れ（戻りが続けば一度も届かない）、`additionalContextOnce` はセッション全体で 1 度より多く届く。
 
-| 書き方 | 0 に戻ると |
-|---|---|
-| `additionalContext` + `every: N` | 届くのが遅れる。戻りが続けば一度も届かないこともある |
-| `additionalContextOnce` + `every: N` | セッション全体では 1 度より多く届く |
-
-| タイプ | どう届くか |
-|---|---|
-| `allow` | 応答の `additionalContext` として届く |
-| `ask` | ユーザが Yes を押したときだけ届く。No なら拒否の定型文だけがモデルに届いてターンが終わる |
-| `deny` | `permissionDecisionReason` と一緒に届く |
-| `dry-run` | 止める代わりに返す文に続けて届く |
+判定のタイプごとの届き方は、`allow` は応答の `additionalContext`、`deny` は `permissionDecisionReason` と一緒に、`dry-run` は止める代わりに返す文に続けて届ける。
+`ask` はユーザが Yes を押したときだけ届け、No なら拒否の定型文だけがモデルに届いてターンが終わる。
 
 ファイル（`additionalContextFile` / `additionalContextOnceFile`）は、行き先のワークツリー → 元リポジトリの
 プロジェクト → ワークスペースルートの順に探し、最初に在ったものを読む。絶対パスと `..` で上に
@@ -425,7 +414,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 - 保護領域の報告（7.4）と繰り返しの拒否の知らせは、止めたときも同じ応答の `systemMessage` に載る
 - `--lint` は warn で言う: `deny` / `ask` に書いたもの（`Bash|Stop` なら `Stop` の部分だけ）、プロジェクトのレイヤーに書いたもの、`(stop)` にヒットしない表記、`every` の無いもの
 - `--test Stop "(stop)"` と期待（`tool: Stop`）は、使われるルールを並べる。あれば `allow`、無ければ判定に入らない（10 章）
-- 書いたルールが無ければ、今までどおり止めない
+- 書いたルールが無ければ、止めない
 
 #### `finish` の打ち忘れを促す
 
@@ -470,7 +459,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 
 宣言は組み込みの表（`BUILTIN`）だけにある。ユーザの了承の関門を、配布先のルールファイルで外させないため。止めるのは B の側だけで、A と B が同じターンに起きたことを、あとから点検する処理は無い。
 
-**宣言。** `id`、A と B の条件（`regex` か `glob`。読み方はルールと同じで、`rules.compile_condition` が組む。コマンドを `;` や `&&` で分けた 1 つずつに適用し、実行役が中で実行するコマンドも含む。`but` は同じコマンドにあればヒットしない除外）、キー（A と B の両方の `regex` に名前つきグループ `key` を書くと、同じキーの組だけを対象にする。書かなければ宣言ごとに 1 組）、文面の素材（A と B の呼び名・「なぜ」・「次の一手」）、付き添いのあるセッションで B を確認に出すか（`ask_if_attended`）と確認の文（`ask_message`）を持つ。キーは大文字小文字を区別せずに比べる。変数や置換などで値に解けないキー（`$name`）は、どのキーとも一致する扱いで、A の側なら、どの B も止める。足し方は[止め方の型と選び方](../../.agents/docs/stop-patterns.md)の「ターン分離の関門」。
+**宣言。** `id`、A と B の条件（`regex` か `glob`。読み方はルールと同じで、`rules.compile_condition` が組む。コマンドを `;` や `&&` で分けた 1 つずつに適用し、実行役が中で実行するコマンドも含む。`but` は同じコマンドにあればヒットしない除外）、キー（A と B の両方の `regex` に名前つきグループ `key` を書くと、同じキーの組だけを対象にする。書かなければ宣言ごとに 1 組）、文面の素材（A と B の呼び名・「なぜ」・「次の一手」）、付き添いのあるセッションで B を確認に出すか（`ask_if_attended`）と確認の文（`ask_message`）を持つ。キーは大文字小文字を区別せずに比べる。変数や置換などで値に解けないキー（`$name`）は、どのキーとも一致する扱いで、A の側なら、どの B も止める。
 
 **状態。**
 
@@ -502,4 +491,4 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 | 空の発言、サブエージェントの中、`UserPromptSubmit` 以外のイベント | 数えない | |
 | 予約した実行（`session_crons`・`ScheduleWakeup`・`send_later`）の `prompt` | 数える側に残る | 保存した文そのままで来る。payload にユーザの発言と言い切れる欄（来歴）が無く、見分けられない |
 
-`<task-notification>` を含むかは先頭に限らない。ユーザがその文字列を自分で打っても関門は開かない（開かないのは安全側。普通に打ち直せば通る）。動かしている作業が残っていること（`busy`）は、発言を数えない理由にしない（ユーザの手による変更かを決める材料であって、発言かどうかではない）。`Stop` の促しで続けたターンは `UserPromptSubmit` を起こさないので、数えない。ターンの印（8.4）と、ユーザの手による変更の受け入れ（8.3）は、これまでどおり `from_background_task` で決める。
+`<task-notification>` を含むかは先頭に限らない。ユーザがその文字列を自分で打っても関門は開かない（開かないのは安全側。普通に打ち直せば通る）。動かしている作業が残っていること（`busy`）は、発言を数えない理由にしない（ユーザの手による変更かを決める材料であって、発言かどうかではない）。`Stop` の促しで続けたターンは `UserPromptSubmit` を起こさないので、数えない。ターンの印（8.4）と、ユーザの手による変更の受け入れ（8.3）は、`from_background_task` で決める。

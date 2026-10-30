@@ -54,7 +54,7 @@ keywords: [導入, dry-run, enable, ccnavi-setup.sh, 配布, 実行ファイル,
 ccnavi --lint
 ```
 
-`dry-run` の間は、モードが `dry-run` であることを知らせる `warn` が出続ける。Claude Code のセッションの中で打つと 1 件。`env` を渡さないターミナルで `CCNAVI_MODE=dry-run` だけを付けて打つと、戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY`・`CCNAVI_GUARD_CORE_FILES`）の `warn` も出て、3 件になる。終了コードは 0 のまま。
+`dry-run` の間は、次の `warn` が出続ける。モードが `dry-run` であること（`(mode)`）が 1 件、戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY`・`CCNAVI_GUARD_CORE_FILES`）が実際は `dry-run` で働くこと（`(restore)`）が 2 件で、合わせて 3 件。`allow` が空ならさらに 1 件付く。終了コードは 0 のまま。`enable` に切り替えると消える。
 
 `env` の変更はセッションを開き直すまで反映されない。
 
