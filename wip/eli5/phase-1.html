@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>#743 管理画面の要確認の挙動</title>
+<style>
+body { font-family: sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 16px; line-height: 1.7; color: #222; background: #fff; }
+h1 { font-size: 1.4rem; }
+h2 { font-size: 1.1rem; margin-top: 2rem; border-bottom: 1px solid #ccc; }
+.box { background: #f4f6f8; border-radius: 8px; padding: 12px 16px; margin: 12px 0; }
+.no { color: #a33; }
+table { border-collapse: collapse; width: 100%; }
+td, th { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; }
+@media (prefers-color-scheme: dark) {
+  body { background: #1b1d20; color: #e6e6e6; }
+  .box { background: #2a2d31; }
+  td, th { border-color: #555; }
+  h2 { border-color: #555; }
+}
+</style>
+</head>
+<body>
+<h1>管理画面の「あやしい挙動」を、決まりに合わせて直しました</h1>
+
+<p>ccnavi の VS Code 拡張には、ルール・フェーズ・リスク・テンプレートを直す「管理画面」があります。前の作業（#740）で直しきれず、「決まりを確かめてから」と残した項目（#743）を、決まりと照らして直しました。</p>
+
+<h2>何が変わったか（画面ごと）</h2>
+<table>
+<tr><th>画面</th><th>前</th><th>後</th></tr>
+<tr><td>ルール・リスク・フェーズ</td><td>保存すると警告（warn）があっても、件数しか見えなかった</td><td>警告の本文が画面の上の帯に出る。次の編集か更新で消える</td></tr>
+<tr><td>ルール</td><td>「期待と食い違う」行の「ヒットしたルール」が、組み込みの保護が理由だと空だった</td><td>「（ルールファイル外の根拠）」と出る</td></tr>
+<tr><td>ルール</td><td>絞り込みで 0 件でも何も出なかった</td><td>「絞り込みに一致するルールがありません」と出る</td></tr>
+<tr><td>3 画面</td><td>絞り込み中に「↑」「↓」を押すと、隠れた行をまたいで動いた</td><td>絞り込み中は並べ替えボタンが押せない</td></tr>
+<tr><td>3 画面</td><td>全角の英字（「ＡＢ」）で絞り込めなかった</td><td>半角と同じように一致する</td></tr>
+<tr><td>テンプレート</td><td>編集中に、外から別のテンプレートに切り替えると古い編集欄が残った</td><td>編集中は切り替えず、「保存か破棄してから」と知らせる</td></tr>
+<tr><td>テンプレート</td><td>子のフロー編集の案内に、無い機能（グループ化・コピー）が載っていた</td><td>無い機能の案内を外した</td></tr>
+<tr><td>テンプレート</td><td>名前に <code>con</code> や <code>a.</code> が付けられた（Windows ではファイルにできない）</td><td>新しく作る名前と下書きの名前では断る</td></tr>
+<tr><td>テンプレート</td><td>狭い画面で、計画の表の操作ボタンが横にスクロールしないと見えなかった</td><td>操作の列を右端に固定した</td></tr>
+<tr><td>フェーズ</td><td>「none（既定）」と出ていたが、本当の既定は mr だった</td><td>「既定」の文字を消した</td></tr>
+<tr><td>フェーズ</td><td>区切りの注意が無く、全角の「、」で打つと 1 つの値になった</td><td>入力欄に「区切りは半角 ,」と書いた</td></tr>
+</table>
+
+<h2>あえて直さなかったこと</h2>
+<div class="box">
+<ul>
+<li class="no">同じ id を重複させて保存すると古い行も開く件：重複 id は警告で直す状態で、仕様どおり</li>
+<li class="no">全角の「、」を区切りとして受け取ること：決まりでは半角 , のみ</li>
+<li class="no">狭い画面で計画の表を縦に積み替えること：作り込みが大きく、操作列の固定で足りる</li>
+</ul>
+</div>
+
+<h2>決まりの文書も直した</h2>
+<p>決まりが書かれていなかった挙動は、先に要件書へ 1 文足してから直しました（ルール・フェーズ・リスク・テンプレートの 4 本）。</p>
+
+<h2>確かめてほしいこと（実機）</h2>
+<div class="box">
+<ul>
+<li>保存後に警告の帯が出て、次の編集で消えるか</li>
+<li>テンプレートを編集中に、外から別のテンプレートを開こうとして、通知が出て切り替わらないか</li>
+<li>狭い幅で計画の編集欄を開いて、操作の列が右に固定されて見えるか</li>
+</ul>
+<p>自動テストは変えた範囲で通っています（TypeScript 309 件、Python 26 件）。上の 3 点だけは、テストでは確かめられていません。</p>
+</div>
+</body>
+</html>
