@@ -15,7 +15,7 @@ keywords: [見本, sample, rule-samples, rule-expectations, expectations, --test
 （`rule-samples.yml`・`samples:`・`--test-samples`・拡張の設定 `ccnaviBoard.samplesPath`）。
 中身は「この呼び出しはこう判定されるはず」という期待する判定で、見本ではない。
 しかも「見本」は、録ったホスト応答の fixtures、初回案内のダミー、計画の見本の表にも使っていて、
-語が衝突し、grep で意味を分けられなかった。古い名前は過去の ADR 0016・0032・0035・0042・0051・0067 にも残っている（2026-10-11、ユーザの決定）。
+語が衝突し、grep で意味を分けられなかった。古い名前は過去の ADR 0016・0032・0035・0042・0051・0067 にも残っている（ユーザの決定）。
 
 ## 決定
 
