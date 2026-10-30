@@ -59,6 +59,11 @@ export interface InspectorProps {
   readonly onSelect: (selection: Selection | undefined) => void;
   /** 実行ファイルが挙げた、選べるサブエージェントとスキルの名前。無ければ候補を出さない */
   readonly candidates?: LintFlowCandidates;
+  /**
+   * グループ化・コピー・Ctrl+Z を持たない画面（テンプレートの子のフロー編集）。案内文から、その機能の案内を外す。
+   * フロー編集画面は指定しない
+   */
+  readonly noGrouping?: boolean;
 }
 
 /** 候補の出どころの呼び名 */
@@ -75,7 +80,7 @@ function str(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect, candidates }: InspectorProps): JSX.Element {
+export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect, candidates, noGrouping }: InspectorProps): JSX.Element {
   if (selected?.kind === "node") {
     const node = doc.nodes.find((n) => n.id === selected.id);
     if (node !== undefined) {
@@ -136,7 +141,12 @@ export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect,
         <span title="description">説明</span>
         <textarea className="f-flow-description" rows={3} value={str(doc.description)} disabled={readOnly} onChange={(event) => onChange(setMeta(doc, { description: event.target.value }), "flow:description")} />
       </label>
-      <p className="hint">ノードを押すと、ここに欄が出ます。ノードの右の点から左の点へドラッグすると、線でつながります。線を押すと条件を入力できます。ノードや線にポインタを載せると × が出て、押すと削除できます。Shift を押しながらノードを選ぶと、「グループ化」で枠にまとめられます。Ctrl+Z で元に戻せます。選んだノードは Ctrl+C でコピー、Ctrl+V で貼り付け、Ctrl+D で複製できます。</p>
+      <p className="hint">
+        ノードを押すと、ここに欄が出ます。ノードの右の点から左の点へドラッグすると、線でつながります。線を押すと条件を入力できます。ノードや線にポインタを載せると × が出て、押すと削除できます。
+        {noGrouping
+          ? "元に戻すときは、画面上の「元に戻す」を押します。"
+          : "Shift を押しながらノードを選ぶと、「グループ化」で枠にまとめられます。Ctrl+Z で元に戻せます。選んだノードは Ctrl+C でコピー、Ctrl+V で貼り付け、Ctrl+D で複製できます。"}
+      </p>
     </aside>
   );
 }

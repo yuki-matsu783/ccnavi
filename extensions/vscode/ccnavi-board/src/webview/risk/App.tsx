@@ -25,6 +25,7 @@ import { Sum } from "./Sum.js";
 import { post } from "./post.js";
 import { countText, findText } from "./text.js";
 import { Code } from "../shared/Code.js";
+import { foldFind } from "../shared/find.js";
 import { draftOf, emptyFactor, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
 
 /** 中身が読めなかったときの錠。画面は保存させない（押せる形で出して異常終了させない） */
@@ -86,6 +87,8 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   const [lock, setLock] = useState<Lock>(() => pageOf(initial)?.lock ?? NO_LOCK);
   /** ファイルが外で変わった。破棄して読み直すかはユーザが決める */
   const [changed, setChanged] = useState(false);
+  /** 保存が通ったときの検証の warn の本文。帯に出し、次の編集か更新（中身の入れ替え）で消す */
+  const [saveWarns, setSaveWarns] = useState<readonly string[]>([]);
   const [find, setFind] = useState("");
   /** 足した直後の行。id の欄に焦点を移したら忘れる */
   const [focusKey, setFocusKey] = useState<string | undefined>(undefined);
@@ -134,7 +137,10 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       setBusy(false);
       setStatus(undefined);
       setChanged(false);
+      setSaveWarns([]);
       setLock(pageOf(next)?.lock ?? NO_LOCK);
+    } else if (message.type === "saved") {
+      setSaveWarns(message.warns ?? []);
     } else if (message.type === "failed") {
       setBusy(false);
       setStatus({ text: String(message.message ?? ""), error: true });
@@ -204,6 +210,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
     }
     setEditing((now) => ({ draft: next, open: open ?? now.open }));
     setDirty(true);
+    setSaveWarns([]);
   };
 
   const editRow = (key: string, factor: FactorForm): void => {
@@ -273,7 +280,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   const isShownOpen = (row: { readonly key: string; readonly factor: FactorForm }): boolean => (touring ? sceneOpen.has(row.factor.id) : open.has(row.key));
   const shownFind = touring ? (typeof scene.find === "string" ? scene.find : "") : find;
 
-  const query = shownFind.trim().toLowerCase();
+  const query = foldFind(shownFind.trim());
   const rows = shownDraft.rows.map((row) => {
     const text = findText(row.factor);
     return { ...row, find: text, hidden: query !== "" && !text.includes(query) };
@@ -289,6 +296,11 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       {(touring ? [] : page?.notices ?? []).map((notice, index) => (
         <div className="banner warn" key={index}>
           {notice}
+        </div>
+      ))}
+      {(touring ? [] : saveWarns).map((warn, index) => (
+        <div className="banner warn" data-banner="save-warn" key={`save-warn-${index}`}>
+          <Code text={warn} />
         </div>
       ))}
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
@@ -454,6 +466,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
               tour={row.key === tourRowKey}
               onToggle={() => toggle(row.key)}
               onChange={(factor) => editRow(row.key, factor)}
+              finding={query !== ""}
               first={index === 0}
               last={index === rows.length - 1}
               onMove={(delta) => move(row.key, delta)}

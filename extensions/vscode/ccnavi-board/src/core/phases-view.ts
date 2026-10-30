@@ -79,9 +79,9 @@ export const KIND_LABELS: Readonly<Record<PhaseKind, string>> = {
   feedback: "feedback（フィードバック計画 feedback: に並べる定義。レビューは mr 固定）",
 };
 
-/** レビューの既定の説明。select のラベル */
+/** レビューの説明。select のラベル（追加した定義の既定は mr で、none は既定ではない） */
 export const REVIEW_LABELS: Readonly<Record<Review, string>> = {
-  none: "none（既定。レビューを求めない。ただし実績のリスクが HIGH 以上ならレビューが必要です）",
+  none: "none（レビューを求めない。ただし実績のリスクが HIGH 以上ならレビューが必要です）",
   mr: "mr（マージリクエストのレビューを受ける）",
 };
 
@@ -133,6 +133,8 @@ export type ToPhases =
   | { readonly type: "failed"; readonly message: string }
   | { readonly type: "lock"; readonly lock: Lock }
   | { readonly type: "changed" }
+  /** 保存が通った（中身 `data` を渡した直後に送る）。検証の warn の本文。画面は上部の帯に出し、次の編集か更新で消す */
+  | { readonly type: "saved"; readonly warns: readonly string[] }
   /** 頼んだ往復が起きなかった（ユーザが「破棄して読み直す？」をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
   /** この画面の案内をまだ見ていない（拡張ホストの `globalState`）。画面は吹き出しの案内を出す */

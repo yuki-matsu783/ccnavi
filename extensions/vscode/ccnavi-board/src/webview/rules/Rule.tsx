@@ -15,6 +15,7 @@ import { isToolName, KNOWN_TOOLS, SECTIONS, type FileField, type PatternKind, ty
 import { condProblems, condSummary, toWhenBlocker, treeOfPattern } from "../../core/rules-when.js";
 import { contextSummary, hasContext, staleMessage, summaryId, summaryMatch, summaryNote } from "./text.js";
 import { When } from "./When.js";
+import { moveTitle } from "../shared/find.js";
 
 /** 1 行の欄（input）で受ける値 */
 type TextKey = "id" | "match" | "pattern" | "every" | "additionalContextFile" | "additionalContextOnceFile";
@@ -40,6 +41,8 @@ export interface RuleProps {
   /** 並びの先頭・末尾の行は、動かせない向きのボタンを無効にする */
   readonly first: boolean;
   readonly last: boolean;
+  /** 絞り込み中（検索語が空でない）。並べ替えを止める */
+  readonly finding: boolean;
   readonly onMove: (delta: number) => void;
   readonly onRemove: () => void;
   readonly onOpenPicker: () => void;
@@ -246,10 +249,10 @@ export function Rule(props: RuleProps): JSX.Element {
           </div>
         </details>
         <span className="buttons" data-tour={tour("buttons")}>
-          <button type="button" className="action small" title="上へ" disabled={props.first} onClick={() => props.onMove(-1)}>
+          <button type="button" className="action small" title={moveTitle("上へ", props.finding)} disabled={props.first || props.finding} onClick={() => props.onMove(-1)}>
             ↑
           </button>
-          <button type="button" className="action small" title="下へ" disabled={props.last} onClick={() => props.onMove(1)}>
+          <button type="button" className="action small" title={moveTitle("下へ", props.finding)} disabled={props.last || props.finding} onClick={() => props.onMove(1)}>
             ↓
           </button>
           <button type="button" className="action small" onClick={() => props.onRemove()}>

@@ -294,7 +294,8 @@ class MakeTest(Drafts):
 
     def test_a_bad_name_is_refused(self):
         self.done_parent(["design"])
-        for name in ("bad name", "../x", "a" * 65):
+        # Windows の予約名（拡張子付きも、大文字小文字違いも）と末尾の `.` も断る
+        for name in ("bad name", "../x", "a" * 65, "con", "NUL.x", "com1", "lpt9.txt", "a."):
             result = self.draft("i0001", f"--name={name}")
             self.assertEqual(result.returncode, 1, name)
             self.assertIn("下書きの名前", result.stderr)

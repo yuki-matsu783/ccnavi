@@ -21,3 +21,5 @@
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 /* 狭い幅では計画の表が枠を越えないよう、表だけを横にスクロールさせる */
 .tpl-edit-plan { overflow-x: auto; max-width: 100%; }
+/* 横にスクロールしても、操作の列は右端に残す（背景を付けて、後ろの列が透けないようにする） */
+.tpl-edit-items th:last-child, .tpl-edit-items td.tpl-edit-ops { position: sticky; right: 0; background: var(--vscode-editor-background); }

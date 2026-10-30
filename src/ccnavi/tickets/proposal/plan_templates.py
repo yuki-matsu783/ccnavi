@@ -94,6 +94,32 @@ TODO_MARK = "TODO"
 # 名前に使える文字。ファイル名になるので、区切りも空白も入れない。
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 NAME_LIMIT = 64
+# Windows でファイル名にできない予約名（拡張子が付いても同じ）。比べるためでなく、断るための一覧。
+# 新しく作る名前（下書き・管理画面の新規作成）だけを断る。
+# 読み込みの側は、置いてあるファイルを断らない。
+WINDOWS_RESERVED = frozenset(
+    ["con", "prn", "aux", "nul"]
+    + [f"com{n}" for n in range(1, 10)]
+    + [f"lpt{n}" for n in range(1, 10)]
+)
+
+
+def new_name_problem(name: str) -> str:
+    """新しく作るテンプレートの名前を断る理由。通れば空文字。
+
+    読み込みと同じ形（`NAME_RE`・`NAME_LIMIT`）に加えて、末尾の `.` と Windows の予約名
+    （`con` `prn` `aux` `nul` `com1`-`com9` `lpt1`-`lpt9`。`con.x` のように
+    拡張子が付いても同じ）を断る。
+    管理画面（`templatesmodel.ts` の `validNewTemplateName`）と同じ決まり。
+    """
+    if not NAME_RE.match(name) or len(name) > NAME_LIMIT:
+        return f"英数字で始め、英数字と `._-` だけ。{NAME_LIMIT} 字まで"
+    if name.endswith("."):
+        return "末尾に `.` は付けられない（Windows でファイル名にできない）"
+    if name.split(".", 1)[0].casefold() in WINDOWS_RESERVED:
+        return "Windows の予約名（con prn aux nul com1-9 lpt1-9）は使えない"
+    return ""
+
 
 LAYER_COMMON = settings.LAYER_COMMON
 LAYER_SELF = settings.LAYER_SELF

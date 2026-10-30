@@ -428,7 +428,7 @@ def make(
 
     処理フロー:
     1. `_find_parent` で、完了した親と子の一覧を引く。
-    2. 下書きの名前（既定は親の識別子）を `plan_templates.NAME_RE` と `NAME_LIMIT` で検査する。
+    2. 下書きの名前（既定は親の識別子）を `plan_templates.new_name_problem` で検査する。
     3. `_target_of` で取り込み先（テンプレートの置き場と、そのレイヤー）を決める。
     4. `handoff.spelled` で親のツリーからの綴りを求め、
        取り込み先に同名のテンプレートが在れば止める。
@@ -443,12 +443,11 @@ def make(
     if found is None:
         return Made(False, error=why)
     name = (name or parent).strip()
-    if not plan_templates.NAME_RE.match(name) or len(name) > plan_templates.NAME_LIMIT:
+    problem = plan_templates.new_name_problem(name)
+    if problem:
         return Made(
             False,
-            error=f"下書きの名前 {_line(name)!r} は指定できない"
-            "（英数字で始め、英数字と `._-` だけ。"
-            f"{plan_templates.NAME_LIMIT} 字まで）。--name で付ける",
+            error=f"下書きの名前 {_line(name)!r} は指定できない（{problem}）。--name で付ける",
         )
     target_rel, target_layer, why = _target_of(conf, root, found, name, to or TO_PROJECT, layer)
     if why:

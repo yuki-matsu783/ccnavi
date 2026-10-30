@@ -165,6 +165,26 @@ export function validTemplateName(name: string): boolean {
 }
 
 /**
+ * Windows でファイル名にできない予約名（拡張子が付いても同じ）。比べるためでなく、断るための一覧。
+ * 実行ファイルの `plan_templates.WINDOWS_RESERVED` と同じ
+ */
+export const WINDOWS_RESERVED_NAMES: readonly string[] = ["con", "prn", "aux", "nul", ...[1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap((n) => [`com${n}`, `lpt${n}`])];
+
+/** 新しい名前を断るときに画面へ出す、決まりの説明 */
+export const NEW_TEMPLATE_NAME_RULE = "英数字で始め、英数字と . _ - のみ、64 字まで。末尾に . は付けられず、Windows の予約名（con・prn・aux・nul・com1〜9・lpt1〜9。拡張子付きも）は使えません";
+
+/**
+ * 新しく作るテンプレートの名前に使えるか。`validTemplateName` に加えて、末尾の `.` と Windows の予約名を断る
+ * （実行ファイルの `plan_templates.new_name_problem` と同じ決まり）。すでに置いてあるファイルの読み込みには使わない
+ */
+export function validNewTemplateName(name: string): boolean {
+  if (!validTemplateName(name) || name.endsWith(".")) {
+    return false;
+  }
+  return !WINDOWS_RESERVED_NAMES.includes(name.split(".")[0].toLowerCase());
+}
+
+/**
  * 新しいテンプレートの名前が、共通の層か `layer` の層の既存の名前と重なるか。大文字小文字は区別しない（別の機械で 2 本が 1 本に重なる）。
  * 重なる既存の 1 件を返す。無ければ undefined
  */

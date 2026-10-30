@@ -133,6 +133,8 @@ export type ToRisk =
   | { readonly type: "failed"; readonly message: string }
   | { readonly type: "lock"; readonly lock: Lock }
   | { readonly type: "changed" }
+  /** 保存が通った（中身 `data` を渡した直後に送る）。検証の warn の本文。画面は上部の帯に出し、次の編集か更新で消す */
+  | { readonly type: "saved"; readonly warns: readonly string[] }
   /** 頼んだ往復が起きなかった（ユーザが「破棄して読み直す？」をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
   /** 初回の吹き出しの案内を出す。画面は指す先が出てから始める（`src/tour.ts`） */

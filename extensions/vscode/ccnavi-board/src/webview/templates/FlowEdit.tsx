@@ -83,7 +83,7 @@ export function FlowEdit({ doc, onChange }: FlowEditProps): JSX.Element {
         }}
       />
       <div className="flow-side">
-        <Inspector doc={doc} selected={selected} readOnly={false} onChange={onChange} onSelect={setSelected} />
+        <Inspector doc={doc} selected={selected} readOnly={false} noGrouping onChange={onChange} onSelect={setSelected} />
       </div>
     </div>
   );
