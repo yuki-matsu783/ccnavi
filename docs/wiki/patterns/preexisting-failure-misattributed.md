@@ -1,6 +1,8 @@
 ---
 title: 既存の失敗の取り違え
 type: learning-wiki
+target: skill
+sources: [feature-207]
 description: 合流後の親のブランチで見た失敗を「既存」と報告し、実は他の子の変更が原因だったパターン
 tags: [skills, feedback]
 keywords: [既存の失敗, 既知の失敗, 再現, 統合先, 合流, 原因, 報告, レビュー]

@@ -1,6 +1,8 @@
 ---
 title: 古くなった手動の probe
 type: learning-wiki
+target: skill
+sources: [feature-207]
 description: tests/manual/ の probe が仕様変更に追いつかず古くなり、止まった理由を見ずに偽陽性の PASS を出すパターン
 tags: [skills, feedback]
 keywords: [probe, manual, tests/manual, 手動, 偽陽性, PASS, 前提]
