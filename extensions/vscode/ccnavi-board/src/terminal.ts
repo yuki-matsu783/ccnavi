@@ -22,8 +22,17 @@ export function runInTerminal(root: string, command: string): void {
       options.shellPath = shell;
     }
     terminal = vscode.window.createTerminal(options);
+    terminal.show(true);
+    sendWhenReady(terminal, command);
+    return;
   }
   terminal.show(true);
+  const waiting = pending.get(terminal);
+  if (waiting !== undefined) {
+    // 作った直後でまだ送っていない行がある。追い越さないよう後ろに並べる
+    waiting.push(command);
+    return;
+  }
   terminal.sendText(command, true);
 }
 
@@ -39,7 +48,54 @@ export function runInNewTerminal(root: string, name: string, command: string): v
   }
   const terminal = vscode.window.createTerminal(options);
   terminal.show(true);
-  terminal.sendText(command, true);
+  sendWhenReady(terminal, command);
+}
+
+/**
+ * 作った直後のシェルはまだ起動中で、すぐ送った行が行入力の途中で中断されることがある。立ち上がりを待つ時間の上限。
+ * シェルの起動がこれより遅いと、待ちきれずに送るので防げない
+ */
+const READY_TIMEOUT_MS = 3000;
+
+/** シェルの準備を待っていて、まだ送っていない行（ターミナルごと。送ったら消える） */
+const pending = new WeakMap<vscode.Terminal, string[]>();
+
+/**
+ * 作ったばかりのターミナルで、シェル統合が立ち上がってから行を送る。待っている間に runInTerminal が
+ * 積んだ行も、送った順に送る。シェル統合の API が無い版では待たずに送る。API があっても統合が働かない
+ * 環境（設定で無効・対応しないシェルなど）では、上限の時間まで待ってから送る
+ */
+function sendWhenReady(terminal: vscode.Terminal, command: string): void {
+  const window = vscode.window as unknown as {
+    onDidChangeTerminalShellIntegration?: (
+      listener: (e: { terminal: vscode.Terminal }) => void,
+    ) => vscode.Disposable;
+  };
+  if (window.onDidChangeTerminalShellIntegration === undefined) {
+    terminal.sendText(command, true);
+    return;
+  }
+  const queue = [command];
+  pending.set(terminal, queue);
+  let sent = false;
+  const send = (): void => {
+    if (sent) {
+      return;
+    }
+    sent = true;
+    subscription.dispose();
+    clearTimeout(timer);
+    pending.delete(terminal);
+    for (const line of queue) {
+      terminal.sendText(line, true);
+    }
+  };
+  const subscription = window.onDidChangeTerminalShellIntegration((e) => {
+    if (e.terminal === terminal) {
+      send();
+    }
+  });
+  const timer = setTimeout(send, READY_TIMEOUT_MS);
 }
 
 /**
