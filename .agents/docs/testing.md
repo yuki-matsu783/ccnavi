@@ -11,7 +11,7 @@ keywords: [テスト, 全件, discover, グループ, python -m tests, 時間切
 ## 全件を1本で回さない
 
 全件を`uv run python -m unittest discover -s tests -t .`の1本で回さない。
-数十分かかり、セッションの時間の上限（30分など）で途中で打ち切られる。打ち切られると終了コードも失敗の一覧も残らないので、通ったかどうか分からない。
+直列では長くかかり、セッションの時間の上限で途中で打ち切られることがある。打ち切られると終了コードも失敗の一覧も残らないので、通ったかどうか分からない。
 
 次のどちらかで回す。
 
@@ -26,12 +26,12 @@ uv run python -m tests --plan          # 何をどの順で回すかだけ出す
 
 ## どのグループを回すか
 
-変えたファイルから回すグループを決める。表と時間の目安は`.claude/skills/commit/references/test-groups.md`にある。
+変えたファイルから回すグループを決める。表は`.claude/skills/commit/references/test-groups.md`にある。
 表に該当しない変更や、統合先に取り込む前・MRに出す前は、全件を回す。
 
-`tests/fake_gitlab.py`（GitLab の模擬）、`tests/sh/gitlab_host.py` とその見本（`extensions/chrome/ccnavi-approval/test/fixtures/host/gitlab/`）の応答を変えたら、`contract`（`uv run python -m tests tests/contract`。約 15 秒）を必ず回す。本物から録った応答の形と比べる試験で、模擬が本物とずれると落ちる。落ちたら本物に合わせて模擬を直す。仕様と録り直しは [gitlab-contract.md](gitlab-contract.md)。
+`tests/fake_gitlab.py`（GitLab の模擬）、`tests/sh/gitlab_host.py` とその見本（`extensions/chrome/ccnavi-approval/test/fixtures/host/gitlab/`）の応答を変えたら、`contract`（`uv run python -m tests tests/contract`）を必ず回す。本物から録った応答の形と比べる試験で、模擬が本物とずれると落ちる。落ちたら本物に合わせて模擬を直す。仕様と録り直しは [gitlab-contract.md](gitlab-contract.md)。
 
-`tests/contract/shape.py`・`normalize-cases.json`・`requests.json`・`recorded.json` を直したら、`extensions/chrome/ccnavi-approval` の `pnpm test` も回す（TS の比較器が同じ表を読む）。Chrome 拡張の `MockGitLab` を直したときも `pnpm test` を回す。拡張だけの要求（`used_by` が `["chrome"]`）は `python -m tests tests/contract` では `fake_gitlab.py` に送らず、`pnpm test` でだけ `MockGitLab` と比べる。`python -m tests tests/contract` は TS を回さないので、食い違いは `pnpm test` を回すまで見つからない。CI で `pnpm` が回るかは未確認（`.github/workflows/` に記述がない）。
+`tests/contract/shape.py` と、`tests/contract/gitlab/` の `normalize-cases.json`・`requests.json`・`recorded.json` を直したら、`extensions/chrome/ccnavi-approval` の `pnpm test` も回す（TS の比較器が同じ表を読む）。Chrome 拡張の `MockGitLab` を直したときも `pnpm test` を回す。拡張だけの要求（`used_by` が `["chrome"]`）は `python -m tests tests/contract` では `fake_gitlab.py` に送らず、`pnpm test` でだけ `MockGitLab` と比べる。`python -m tests tests/contract` は TS を回さないので、食い違いは `pnpm test` を回すまで見つからない。
 
 ## 待つとき
 

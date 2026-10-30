@@ -20,8 +20,10 @@ ccnavi の文書を足す・直す・動かすときの決まり。要件書・�
 | 利用者のエージェント | `.ccnavi/CCNAVI.md`、`.ccnavi/docs/` | 作業の決まりと手順。配布先にも配るので、配布先で成り立つ書き方にする | `.ccnavi/CCNAVI.md` の「詳細」の表 |
 | 開発者（人） | `docs/40_development.md`、`docs/00_idea.md`・`docs/10_requirements.md`・`docs/20_design.md`・`docs/30_adr.md` とその配下 | 開発の入口、思想、要件、設計、判断の記録 | `docs/40_development.md` |
 | 開発者のエージェント | `AGENTS.md`、`.agents/docs/` | ccnavi の開発で常に守る決まり。配布しない | `AGENTS.md` の「詳細」の表 |
-| 実行時にコードが読む | `docs/CONTEXT.md`、`docs/wiki/` | 用語集、学びの蓄積。コードが固定のパスと書式で読む | `docs/40_development.md` |
+| 実行時にコードが読む | `docs/wiki/` | 学びの蓄積。コードが固定のパスと書式で読む | `docs/40_development.md` |
+| 用語集 | `docs/CONTEXT.md` | ccnavi の概念の定義。コードは読まない | `docs/40_development.md` |
 
+- 開発の決まり（`.agents/docs/`）の一覧は `AGENTS.md` の「詳細」の表にある。開発環境、開発用 hook、組み立てと配布物は `docs/40_development.md` の案内表から辿れる。
 - 利用者向けの文書（`docs/50_guide/`、`.ccnavi/docs/`）に、開発者向けの置き場（`docs/10〜30`、`.agents/docs/`、`src/`、`tests/`）のパスや節番号を書かない。配布先には無い。
 - `.ccnavi/docs/` は配布先のエージェントが引く。配布先に無いパス（`src/`、`tests/`、`docs/`、`.agents/`、`scripts/`）を、読む手がかりとして書かない。
 - `docs/50_guide/` は人が通して読む。同じ話題を `.ccnavi/docs/` が手順として持つなら、手引きは「何ができるか・なぜか」、使い方の文書は「どう打つか」と分け、同じ文を二重に書かない。
@@ -55,7 +57,7 @@ ccnavi の文書を足す・直す・動かすときの決まり。要件書・�
 
 - 設計書・決まりの文書に、調査の記録、未実施の予定、進捗の表、「以前は」の経緯を置かない。経緯は ADR に、日付は git の履歴にある。
 - 進捗を書く文書は、陳腐化する前提で、「済み」「残り」の2つの表だけにする。計画や決めたことは ADR に置く。
-- 作業中の下書きは `wip/` に置く。main に入れる前に消す。
+- 作業中の下書きは作業ブランチの `wip/` に置く。git 管理外ではないが、main に入れる前に消す。
 
 ## 呼び名
 
@@ -82,7 +84,7 @@ ccnavi の文書を足す・直す・動かすときの決まり。要件書・�
 | 40 | `40_development.md` | （配下を持たない） |
 | 50 | `50_guide/index.md` | `50_guide/` |
 
-実行時に読むもの（`CONTEXT.md`、`wiki/`）は番号を付けない。
+`CONTEXT.md` と `wiki/` は、入口と詳細の対に当たらないので番号を付けない。`wiki/` はコードが固定のパスで読む。
 
 ## 文書を足す・動かすとき
 

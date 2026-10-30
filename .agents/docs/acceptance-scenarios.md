@@ -294,13 +294,13 @@ setup:
 
 **`docker-gitlab`。** 動いている Docker の GitLab（`tests/manual/gitlab/docker_gitlab.py`。立て方と既知の制約は [gitlab-manual.md](gitlab-manual.md)）に、回すたびに使い捨てのプロジェクトを作り、回したあとに消す。
 
-- 起動: 回す前に `docker_gitlab.py status` で動いているかを見る。止まっていれば `up`（他の回が使っているかもしれないので、`down`・`up --rotate` は打たない）。止まっているシナリオは、`run` が `次:` で `up` を案内して止まる（終了コード 3）。`run-all` は、そのシナリオだけを飛ばし、ほかの相手のシナリオは回す
+- 起動: 回す前に `docker_gitlab.py status` で動いているかを見る。止まっていれば `up`（共用の注意は [gitlab-manual.md](gitlab-manual.md) の「ほかの作業が使っているとき」）。止まっているシナリオは、`run` が `次:` で `up` を案内して止まる（終了コード 3）。`run-all` は、そのシナリオだけを飛ばし、ほかの相手のシナリオは回す
 - 作るもの: プロジェクト `sc-<シナリオ ID を fold した綴り>-<時刻>-<乱数>`（root の名前空間、`main` が既定のブランチ）。人間役 `ccnavi-reviewer` を Developer のメンバーに加え、対象の `main` を push し、続けて `git fetch --prune --no-tags origin` を 1 回打つ（対象に残る本物の origin の古い `refs/remotes/origin/*` が、新規プロジェクトの issue #1 などに番号で当たってブランチ候補になるのを防ぐ。戻すのは後片付けの `refs/remotes/origin/*` の巻き戻し）。push するのは `main` だけで、ほかのブランチ・タグが要るシナリオは対象外
 - origin: `bare` と同じ git の代役で、`-c url.<プロジェクトの URL>.insteadOf=<本物の origin>` を足す。加えて `credential.http://127.0.0.1:<port>.helper` を、空で打ち消してから、環境変数 `GITLAB_TOKEN` を返す helper にする（利用者の credential helper に root の PAT を渡さない。URL は `127.0.0.1` にそろえる）。runner 自身の git（初回の push と `setup.git`）にも同じ `-c` を足し、`GITLAB_TOKEN` はその git にだけ渡す。`curl` は本物（代役を置かない）、`gh`・`glab` は失敗する代役
 - 後片付け: `bare` と同じ経路でプロジェクトを削除する。GitLab 19 は遅延削除で、`DELETE /projects/:id`（202）のあとも GET が 200（`marked_for_deletion_on` 付き）のまま、パスが `…-deletion_scheduled-<id>` に変わる。そこで、印が付いたら `permanently_remove=true&full_path=<改名後のパス>` で 2 回目を打ち、404 になるまで最大 60 秒待つ。消せなかったときは `案内:` にプロジェクトの URL と ID を出し、`report` に `host-delete` の行（fail）を足して終了コード 3（手作業で消す）。終了コード 10 では残し、ID と URL を出す。`next` が最後まで終わるか `restore` で消える
 - 残ったプロジェクトは、接頭辞 `sc-` で一覧して手で消す。掃除の道具は無いので、GitLab の「プロジェクト」画面で `sc-` を検索する
 - 資格情報: `claude` にはエージェント役 `GITLAB_TOKEN`（root の PAT）を渡し、人間役のトークンは渡さない。トークンは回すたびに `tokens.env` から読み、`state.json` には識別子と URL だけを残す。ccnavi が書く記録（`state.json`・`evidence.md`・`messages.md`・`report.*`・`host-N.json`・診断ログ）には出さない。`step-N.jsonl` は `claude` の出力そのもので、エージェントが `tokens.env` を読めば混ざる
-- 限界: 同じ uid のエージェントは `tokens.env` を読め、root の PAT で管理者 API から人間役のトークンを作れる。人間役の独立は保証しない（確かめたいのは ccnavi の振る舞いで、人間役の偽装ではない）。CE に無い機能（変更要求の `request_changes` は 404）は確かめられない。人間役の API 操作は `human_api`（下の「人間役の API 操作」）で呼べる。`human_api` に無い操作（issue の作成など）は、操作者が `tokens.env` を読んで `gitlab_api.Client` を呼び、`next` で続ける。`setup.issue` とは併用できない（`make_issue` は本物の `projects/test-repo` に立てるため）
+- 限界: 同じ uid のエージェントは `tokens.env` を読め、root の PAT で管理者 API から人間役のトークンを作れる。人間役の独立は保証しない（理由は [gitlab-manual.md](gitlab-manual.md) の「トークン」。確かめたいのは ccnavi の振る舞いで、人間役の偽装ではない）。CE に無い機能（変更要求の `request_changes` は 404）は確かめられない。人間役の API 操作は `human_api`（下の「人間役の API 操作」）で呼べる。`human_api` に無い操作（issue の作成など）は、操作者が `tokens.env` を読んで `gitlab_api.Client` を呼び、`next` で続ける。`setup.issue` とは併用できない（`make_issue` は本物の `projects/test-repo` に立てるため）
 
 **`bare` で許す依頼。** `gh` / `glab` が失敗するので、エージェントが issue や MR を作る依頼は通らない。`bare` を選べるのは、依頼がホストの API を要しないシナリオだけ。`judge` に「`gh` が使えない状況で詰まったのは ccnavi の不具合ではない」を書く。MR・スレッドを読む依頼は `fake-gitlab` にする。
 
@@ -463,7 +463,7 @@ steps:
 - 失敗（HTTP が 2xx でない、接続失敗、MR が 1 件でない）は、再試行せず、`halt`（`kind: human_api`）を立てて止める。後片付け（プロジェクトの削除まで）は `finish` が通す。プロセスの終了コードは `finish` の判定に従い、失敗の行（`human-api`）が fail になる
 - 記録: 操作の結果は 1 件ごとに `state.json`（`human_ops`、名前と discussion の対応 `threads`）に書き、`next` で再開しても同じ操作は二度実行しない。`evidence.md` に「人間役の操作」の節、`report.*` に `human-api` の 1 行（件数と成功・失敗）を出す。トークンは、値も変数名も、記録・診断ログ・例外の文字列に出さない
 - `run-all` の対象外のまま（human step があるシナリオは除く規則は変えない。`claude` を呼ぶシナリオは 1 本ずつ確認して回す）
-- 限界: エージェント役の root PAT は管理者 API で人間役のトークンを作れる。人間役の独立は保証しない。CE に無い機能（`request_changes` は 404）は使えない
+- 限界: 人間役の独立と CE に無い機能は、上の `docker-gitlab` の「限界」と同じ
 
 ### 人間役が端末で打つ sh（`human_run`）
 
