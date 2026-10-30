@@ -8,7 +8,7 @@ keywords: [開発, 開発環境, テスト, unittest, ruff, build.py, PyInstalle
 
 # 開発の入口
 
-ccnavi 自身を開発する人向けの入口である。使う人向けの手引きは[手引きの目次](41_guide/index.md)にある。
+ccnavi 自身を開発する人向けの入口である。使う人向けの手引きは[手引きの目次](50_guide/index.md)にある。
 
 ## 文書の案内表
 
@@ -23,7 +23,7 @@ ccnavi 自身を開発する人向けの入口である。使う人向けの手�
 | 判断の理由と経緯、採らなかった案 | [30_adr.md](30_adr.md) |
 | 実測で確かめた前提と、環境固有の落とし穴 | [設計の付録 C](21_design/appendix.md)、[.agents/docs/environment.md](../.agents/docs/environment.md) |
 | 開発で常に守る決まり（テストの回し方、ログ、sh、出力の案内など） | `.agents/docs/`（入口は [AGENTS.md](../AGENTS.md) の「詳細」の表） |
-| ccnavi の使い方 | [41_guide/index.md](41_guide/index.md) |
+| ccnavi の使い方 | [50_guide/index.md](50_guide/index.md) |
 
 ## 開発環境
 
@@ -161,7 +161,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `.claude/hooks/mark-ext.sh` / `test-ext.sh` | 同じく拡張のぶん。触ったことの書き残しと、ターンの終わりに関わるグループだけ回すテスト |
 | `extensions/vscode/ccnavi-board/scripts/test-groups.js` | 拡張のテストの入口。触ったファイルから回すグループを決め、コンパイルは 1 回で済ませる |
 | `.claude/skills/` | このリポジトリのスキル。設定 3 本を足す・確かめる `ccnavi-config`、ccnavi を入れる・更新する `ccnavi-install`、コミットの手順 `commit`、気づきを記録に足す `learn`、図解の説明 `eli5` / `eli10`、文章の推敲 `yomiyasu`、工程の考え方の入口 `process-*`（`process: true` と `distribute: true` のものは `scripts/ccnavi-setup.sh` が配る） |
-| `.ccnavi/scripts/` | 配布する sh。一覧と役割は[配布するスクリプト](41_guide/scripts.md) |
+| `.ccnavi/scripts/` | 配布する sh。一覧と役割は[配布するスクリプト](50_guide/scripts.md) |
 | `scripts/ccnavi-install.sh` | ccnavi を入れる入口。状況を調べ（`ccnavi-doctor.sh`）、入れる先に配り（`ccnavi-setup.sh`）、最後に lint で確かめる |
 | `scripts/ccnavi-check-no-wip.sh` | main へ入れる PR の差分に `wip/` の追跡済みファイルがあれば止める。ただし `wip/handoff/` は数えない。`.github/workflows/no-wip.yml` が Draft でない PR で呼ぶ。Draft はチケット作業中のため `wip/proposals/` が載っていても見ない。`ready` は `wip/` を消してから Draft を外す |
 | `scripts/ccnavi-doctor.sh` | 入れる前に、この機械の状況を調べて 1 項目 1 行で報告する。何も書き換えない |
@@ -170,7 +170,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `scripts/ccnavi-stop-review.sh` | Stop の AI 判定の agent 型 Stop hook を `.claude/settings.json` に登録・解除・点検する |
 | `scripts/check_rules.py` | このリポジトリの共通レイヤーの `rules.yml` と `rule-expectations.yml` で `ccnavi --test-expectations` を呼ぶだけの薄いラッパースクリプト。引数でルールファイル（下書き）を差し替えられる。`CCNAVI_*` を外した環境で、承認済みチケット・state・記録を使わずに回し、終了コードは実行ファイルのまま返す（食い違いがあれば 1）。判定は実行ファイル側で行い、ここでは作らない。全件テスト（`tests/core/test_check_rules.py`）も同じ引数を使う。配布先には無く、そこでは `ccnavi --test-expectations` を直接打つ（`/ccnavi-config` スキルもそう打つ） |
 | `extensions/` | VS Code 拡張（`vscode/ccnavi-board`）と Chrome 拡張（`chrome/ccnavi-approval`）、共有の設定（`shared/`） |
-| `docs/` | 設計・要件・ADR・手引き。置き場は番号順に `10_requirements.md`・`11_requirements/`（要件）、`20_design.md`・`21_design/`（設計）、`30_adr.md`・`30_adr/`（ADR）、`40_development.md`・`41_guide/`（手引き）。ccnavi の開発の決まりは `docs/` でなく `.agents/docs/` に置く。`wiki/` と `CONTEXT.md` は実行時に読むため、番号を付けない |
+| `docs/` | 設計・要件・ADR・手引き。置き場は番号順に `10_requirements.md`・`11_requirements/`（要件）、`20_design.md`・`21_design/`（設計）、`30_adr.md`・`30_adr/`（ADR）、`40_development.md`・`50_guide/`（手引き）。ccnavi の開発の決まりは `docs/` でなく `.agents/docs/` に置く。`wiki/` と `CONTEXT.md` は実行時に読むため、番号を付けない |
 | `.agents/docs/` | ccnavi の開発で常に守る決まり（テストの回し方、ログ、sh、出力の案内など）。入口は [AGENTS.md](../AGENTS.md) の「詳細」の表。配布しない |
 | `wip/` | 作業中の下書き（`design/`・`handoff/`・`proposals/`） |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る。例外は 2 つ。`tests/scenarios/test_runner.py` は、受入シナリオの実行器の内部を呼ぶ単体テストで、`claude` は呼ばない。`tests/scenarios/hostenv.py` は、シナリオの `setup.host` が使う代役と模擬を起こして片付ける補助 |

@@ -458,7 +458,7 @@ allow:
     why: >-
       引用された語は実行位置ではないので builtin:guard-raw-git にはヒットしない。引用の中の空白は
       語の中の目印（\x01）になり、コマンドの区切り（\x00）とは別なので、「後ろにコマンドが続かない」を
-      求める prefer-read-grep が適用して通す。ccnavi のリポジトリの docs/41_guide/bash-reading.md「Bash のコマンドは実行される部分だけを見る」
+      求める prefer-read-grep が適用して通す。ccnavi のリポジトリの docs/50_guide/bash-reading.md「Bash のコマンドは実行される部分だけを見る」
   - tool: Bash
     subject: 'grep -n "rm -rf" /repo/.ccnavi/config/common/rules.yml'
     why: 引用の中の rm -rf は recursive-delete にヒットしない。上と同じ理由で prefer-read-grep が通す
@@ -472,7 +472,7 @@ allow:
     why: >-
       引用の中で他の字と並んだ << は語の中の目印で 1 字ずつ区切られ、heredoc にはヒットしない。
       prefer-read-grep が通す。引用が << だけの 1 語（grep -n "<<" f）は区別が付かず止まる。
-      ccnavi のリポジトリの docs/41_guide/bash-reading.md「読み切れないとき」
+      ccnavi のリポジトリの docs/50_guide/bash-reading.md「読み切れないとき」
   - tool: Bash
     subject: "# git push origin main"
     why: コメントだけの行は何も走らない

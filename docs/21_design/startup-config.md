@@ -68,7 +68,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 
 設定は環境変数 `CCNAVI_*` で渡す。プロジェクトは `.claude/settings.json` の `env` ブロックに書く。読む順は
 プロセス環境 → `ccnavi.settings.local.json`（ccnavi 自身のソースツリーでだけ読む、1 人の上書き）→
-コマンドラインのオプション。変数の一覧と意味は[利用者向けの設定の手引き](../41_guide/settings.md)、内部の挙動は 4.3.1。
+コマンドラインのオプション。変数の一覧と意味は[利用者向けの設定の手引き](../50_guide/settings.md)、内部の挙動は 4.3.1。
 
 `disable` は起動側の環境で指定したときしか有効にならない（REQ-CMN-04）。`ccnavi.settings.local.json` の `disable` は無視して理由を出す。
 `.claude/settings.json` の `env` の `disable` はプロセス環境と区別できないので、書く経路を閉じる。`.claude/settings.json` は
@@ -80,7 +80,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 
 ### 4.3.1 環境変数の内部の挙動
 
-利用者向けの表（[設定の手引き](../41_guide/settings.md)）に書かなかった、変数ごとの内部の挙動。
+利用者向けの表（[設定の手引き](../50_guide/settings.md)）に書かなかった、変数ごとの内部の挙動。
 
 - `CCNAVI_RESTORE_IF_DENY`: 横で作業する記録が有効なユーザのチェックアウトの変更は、`enable` でも戻さず報告するだけにする。
 - `CCNAVI_GUARD_CORE_FILES`: 書き込みを止める側と、バックアップして戻す側の両方が切り替わる。承認済みの置き場と操作記録への書き込み、
@@ -281,7 +281,7 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 
 ### 4.6.1 導入スクリプトと配布の細部
 
-4.6 の表に収まらない、`scripts/ccnavi-setup.sh` の動きの細部。使い方は[導入と配布の手引き](../41_guide/install.md)にある。
+4.6 の表に収まらない、`scripts/ccnavi-setup.sh` の動きの細部。使い方は[導入と配布の手引き](../50_guide/install.md)にある。
 
 **設定の書き方。**
 
