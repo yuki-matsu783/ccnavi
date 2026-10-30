@@ -43,7 +43,7 @@ test("CB-T61 ローカルパス・file・資格情報入りの URL は通さな�
   assert.equal(remoteKeyOf("/local/path"), "");
 });
 
-test("CB-T62 名前は ASCII に絞り、既存のツリー名と大文字小文字違いでも衝突する", () => {
+test("CB-T62 名前は ASCII に絞り、既存のプロジェクトかワークツリーの名前と大文字小文字違いでも衝突する", () => {
   assert.deepEqual(checkName(" lib ", []), { ok: true, name: "lib" });
   assert.ok(checkName("my.repo_1-x", []).ok);
   for (const bad of ["", ".hidden", "ライブラリ", "a/b", "a b", "-x"]) {
@@ -52,6 +52,7 @@ test("CB-T62 名前は ASCII に絞り、既存のツリー名と大文字小文
   const clash = checkName("Lib", ["", "lib", "i0001"]);
   assert.ok(!clash.ok);
   assert.match(clash.error, /lib/);
+  assert.match(clash.error, /プロジェクトかワークツリーが既にあります/);
   const worktree = checkName("i0001", ["", "i0001"]);
   assert.ok(!worktree.ok);
 });

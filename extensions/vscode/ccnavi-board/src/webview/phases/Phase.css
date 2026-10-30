@@ -12,3 +12,5 @@
 }
 .sum .tag.work { color: var(--vscode-descriptionForeground); }
 .sum .tag.feedback { color: var(--info-text); }
+/* 選択肢の文が長いので、狭い幅では枠に収める */
+select.f-scope { max-width: 100%; min-width: 0; }

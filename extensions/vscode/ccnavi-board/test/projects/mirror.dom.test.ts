@@ -61,7 +61,7 @@ test("CB-D734 カードにミラーの状態が出る。ずれの中身は畳ん
     const state = (name: string): string => text(dom.one(`${cardSelector(name)} .mirror-state`));
     assert.equal(state("app"), "同期済み");
     assert.equal(state("web"), "ずれ 3 件");
-    assert.equal(state("x"), "調べられません 書き込めません");
+    assert.equal(state("x"), "確認できません 書き込めません");
     const details = dom.one(`${cardSelector("web")} details.mirror-changes`);
     assert.equal(details.hasAttribute("open"), false);
     assert.deepEqual(
@@ -112,11 +112,11 @@ test("CB-D736 同期中はどのボタンも押せない。終われば（busy �
   }
 });
 
-test("CB-D737 古い実行ファイル・調べられない・コピーするものが無いときは帯に理由を出し、ボタンは押せない", async () => {
+test("CB-D737 古い実行ファイル・確認できない・コピーするものが無いときは帯に理由を出し、ボタンは押せない", async () => {
   const cases: [MirrorStatus, RegExp][] = [
-    [{ kind: "unsupported", reason: "mirror の機能に対応していません（古い版です）" }, /ミラーのずれを調べられません。mirror の機能に対応していません（古い版です）/],
-    [{ kind: "failed", error: "60 秒で中断しました" }, /調べられませんでした。60 秒で中断しました/],
-    [{ kind: "ok", list: list({ ok: false, error: "共通レイヤーを読み込めません" }) }, /調べられませんでした。共通レイヤーを読み込めません/],
+    [{ kind: "unsupported", reason: "mirror の機能に対応していません（古い版です）" }, /ミラーのずれを確認できません。mirror の機能に対応していません（古い版です）/],
+    [{ kind: "failed", error: "60 秒で中断しました" }, /確認できませんでした。60 秒で中断しました/],
+    [{ kind: "ok", list: list({ ok: false, error: "共通レイヤーを読み込めません" }) }, /確認できませんでした。共通レイヤーを読み込めません/],
     [{ kind: "ok", list: list({ common_empty: true }) }, /コピーするものがありません/],
   ];
   for (const [status, banner] of cases) {
@@ -132,7 +132,7 @@ test("CB-D737 古い実行ファイル・調べられない・コピーするも
   }
 });
 
-test("CB-D738 ミラーをまだ調べていない中身（mirror が無い）では、ミラーの欄もボタンも出さない。調べている間は「調べています」", async () => {
+test("CB-D738 ミラーをまだ確認していない中身（mirror が無い）では、ミラーの欄もボタンも出さない。確認している間は「確認しています」", async () => {
   const none = await openPage({ kind: "page", page: page(ROWS) });
   try {
     assert.equal(none.all(".mirror-field").length, 0);
@@ -143,7 +143,7 @@ test("CB-D738 ミラーをまだ調べていない中身（mirror が無い）�
   }
   const waiting = await open(mirror({ kind: "waiting" }, false, ""));
   try {
-    assert.equal(text(waiting.one(`${cardSelector("web")} .mirror-state`)), "調べています…");
+    assert.equal(text(waiting.one(`${cardSelector("web")} .mirror-state`)), "確認しています…");
     assert.equal(waiting.all(".mirror-checked").length, 0);
     assert.equal(waiting.one<HTMLButtonElement>('button[data-action="mirror-sync-all"]').disabled, true);
   } finally {

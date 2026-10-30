@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
 
 import { lockClass, type Lock } from "../../core/lock.js";
-import { isToolName, KNOWN_TOOLS, SECTIONS, SECTION_LABELS, modeBanner, tmpName, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
+import { isToolName, KNOWN_TOOLS, SECTIONS, SECTION_LABELS, bareRuleId, modeBanner, tmpName, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
 import type { SuggestJson } from "../../core/suggestmodel.js";
 import type { ExpectationsJson } from "../../core/testmodel.js";
 import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
@@ -29,6 +29,7 @@ import { HandoffLink } from "../shared/HandoffLink.js";
 import { defaultSum } from "../../core/sums.js";
 import { Sum } from "./Sum.js";
 import { mutePosts, post } from "./post.js";
+import { Code } from "../shared/Code.js";
 import { Rule } from "./Rule.js";
 import {
   draftOf,
@@ -213,7 +214,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       setBusy(false);
       setStatus(undefined);
       setJudged({ result, hooks: (message.hooks ?? []) as Judged["hooks"] });
-      unfoldHits(result.rules.map((rule) => rule.id));
+      unfoldHits(result.rules.map((rule) => bareRuleId(rule.id)));
       showTab("judge");
     } else if (message.type === "expectationsChecked") {
       setBusy(false);
@@ -456,7 +457,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     : judged;
   const shownChecked = touring ? (scene.checked === true ? SAMPLE.checked : undefined) : checked;
   const shownSuggested = touring ? (scene.suggested === true ? SAMPLE.suggested : undefined) : suggested;
-  const shownHits: ReadonlySet<string> = touring ? new Set(sceneJudge?.rules.map((rule) => rule.id) ?? []) : hits;
+  const shownHits: ReadonlySet<string> = touring ? new Set(sceneJudge?.rules.map((rule) => bareRuleId(rule.id)) ?? []) : hits;
   const shownDirty = touring ? false : dirty;
   // 保存前の検証エラーの見本（`sample.save_error`）。実際の直前の操作の一言は、案内の間は出さない
   const shownStatus: Status | undefined = touring ? (scene.error === true && SAMPLE.saveError !== "" ? { text: SAMPLE.saveError, error: true } : undefined) : status;
@@ -533,7 +534,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       {!touring && page !== undefined && page.model.problems.length > 0 && (
         <ul className="problems">
           {page.model.problems.map((problem, index) => (
-            <li key={index}>{problem}</li>
+            <li key={index}>
+              <Code text={problem} />
+            </li>
           ))}
         </ul>
       )}
@@ -586,7 +589,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
                 </button>
               </h2>
               <ul className="list" data-list={section}>
-                {rows.map((row) => (
+                {rows.map((row, index) => (
                   <Rule
                     key={row.key}
                     ruleKey={row.key}
@@ -601,6 +604,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
                     onToggle={() => toggle(row.key)}
                     onChange={(rule) => editRule(section, row.key, rule)}
                     onMoveSection={(to) => moveSection(section, row.key, to)}
+                    first={index === 0}
+                    last={index === rows.length - 1}
                     onMove={(delta) => move(section, row.key, delta)}
                     onRemove={() => remove(section, row.key)}
                     onOpenPicker={() => (tour.touring ? undefined : setPickerKey(row.key))}
@@ -713,7 +718,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       </section>
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
       <footer className={shownStatus?.error === true ? "foot error" : "foot"} data-tour="status">
-        <span id="status">{shownStatus?.text ?? ""}</span>
+        <span id="status">
+          <Code text={shownStatus?.text ?? ""} />
+        </span>
       </footer>
     </>
   );

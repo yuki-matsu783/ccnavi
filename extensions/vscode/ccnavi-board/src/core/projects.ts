@@ -115,7 +115,7 @@ export function checkName(raw: string, existing: readonly string[]): NameCheck {
   const lower = name.toLowerCase();
   const clash = existing.find((e) => e !== "" && e.toLowerCase() === lower);
   if (clash !== undefined) {
-    return { ok: false, error: `${clash} という名前のツリーが既にあります` };
+    return { ok: false, error: `${clash} という名前のプロジェクトかワークツリーが既にあります` };
   }
   return { ok: true, name };
 }
