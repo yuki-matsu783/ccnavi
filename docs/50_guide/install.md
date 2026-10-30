@@ -11,17 +11,22 @@ keywords: [導入, dry-run, enable, ccnavi-setup.sh, 配布, 実行ファイル,
 どんなコマンドが打たれ、ルールが何にヒットするかは、動かしてみるまで分からない。`dry-run` で導入し、記録を読みながらルールを直し、記録が落ち着いてから `enable` に切り替える。
 このページは、その手順と、導入スクリプトで配布先に設定と道具を置く方法を書く。入口は[手引きの目次](index.md)にある。
 
+## どこで打つか
+
+`sh scripts/ccnavi-setup.sh` のように `scripts/` から始まる sh（`ccnavi-setup.sh`・`ccnavi-install.sh`・`ccnavi-doctor.sh`・`ccnavi-package.sh`・`ccnavi-stop-review.sh`）は、**ccnavi の根**で打つ。ccnavi の根は、配布物の zip を展開したフォルダか、clone した ccnavi のリポジトリである。入れた先（配布先）の `.ccnavi/scripts/` には、これらの sh は入らない。`.ccnavi/scripts/` の sh（`ccnavi-git.sh` など）は、配布先のワークスペースルートで打つ（[配布するスクリプト](scripts.md)）。
+
+以降の例の `<ワークスペースルート>` は入れる先のフォルダで、`ccnavi --lint` などの `ccnavi` は配布先で打つ。
+
 ## 入口: Claude Code に「ccnavi を入れて」と頼む
 
-配る側が `sh scripts/ccnavi-package.sh --build` で zip（と `.sha256`）を作り、共有フォルダに置く。使う側は zip を
+配る側が ccnavi のリポジトリで `sh scripts/ccnavi-package.sh --build` で zip（と `.sha256`）を作り、共有フォルダに置く。使う側は zip を
 受け取ってチェックサムを確かめ、自分で展開し、展開したフォルダで `claude` を起動して「ccnavi を入れて」と頼む
 （`ccnavi-install` スキル）。スキルは `scripts/ccnavi-doctor.sh` で OS・git・jq・curl・GitLab の認証・既存の導入を調べ、
 足りないものは入れ方を案内してから、`scripts/ccnavi-install.sh <入れる先> --check` を打ち、続けて本番を打つ。glab は必須ではなく、
 無くても git の資格情報と `GITLAB_TOKEN` で足りる。
 
 ソースから使うときは `--build` を付けて実行ファイルを組み立てる（`--build --check` で副作用を見てから）。
-更新は `--force` で行い、バックアップは入れる先の外に作られる。手順は
-[`.claude/skills/ccnavi-install/`](../../.claude/skills/ccnavi-install/SKILL.md) と、展開した zip の `INSTALL.md`。
+更新は `--force` で行い、バックアップは入れる先の外に作られる。手順は展開した zip の `INSTALL.md` にある。
 下の 1 以降は、入ったあとの進め方を説明する。
 
 ## 1. dry-run で立てる
@@ -49,7 +54,7 @@ keywords: [導入, dry-run, enable, ccnavi-setup.sh, 配布, 実行ファイル,
 ccnavi --lint
 ```
 
-`dry-run` の間は `warn` が 2 件出続ける（モードが `dry-run`、`allow` が空）。終了コードは 0 のまま。
+`dry-run` の間は、モードが `dry-run` であることを知らせる `warn` が出続ける。Claude Code のセッションの中で打つと 1 件。`env` を渡さないターミナルで `CCNAVI_MODE=dry-run` だけを付けて打つと、戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY`・`CCNAVI_GUARD_CORE_FILES`）の `warn` も出て、3 件になる。終了コードは 0 のまま。
 
 `env` の変更はセッションを開き直すまで反映されない。
 
@@ -84,7 +89,7 @@ jq -r 'select(.event=="PreToolUse" and .decision=="allow")|[((.rules//[])|join("
 
 `decision` が `skip` の行は判定まで進まなかった回で、`reason` に理由が入る。
 `paths` が付いた行は実行後チェックが拾った変更で、引数に現れない書き込みはここで分かる。
-欄の意味は[記録の 1 行](../21_design/appendix.md)にある。
+欄の意味は[記録と振り返り](records.md)にある。
 
 記録には絶対パスとコマンド全文が入る。`logs/` はコミットしない。
 
@@ -101,10 +106,10 @@ jq -r 'select(.event=="PreToolUse" and .decision=="allow")|[((.rules//[])|join("
 ```sh
 ccnavi --lint                              # 防御を無効化しうる記述が無いか
 ccnavi --test Bash "cd /repo && git push"  # 1 件が何にヒットするか
-uv run python scripts/check_rules.py       # 期待する判定をまとめて回す
+ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml  # 期待する判定をまとめて回す
 ```
 
-3 本目は ccnavi のリポジトリで打つ形である。配布先では `ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml` で同じ期待する判定を回す（[設定の確かめ方](check.md)）。
+期待する判定の書き方は[設定の確かめ方](check.md)にある。
 
 ルールを 1 件足したら期待する判定も 1 行足す（[設定の確かめ方](check.md)）。止めたくないものも必ず一緒に置く。
 `/ccnavi-config` スキルがこの流れをまとめて回す。記録を数えて `deny` / `ask` の下書きを起こすのは `ccnavi --suggest`
@@ -124,79 +129,54 @@ uv run python scripts/check_rules.py       # 期待する判定をまとめて�
 `disable` は `.claude/settings.json` に書いても有効にならない（[設定](settings.md)の「動作モード」）。
 一時的に外すなら、セッションを起動する側の環境から渡す。
 
-## 導入スクリプトで設定を書く
+## 導入スクリプトで設定と道具を置く
 
-設定は環境変数で、`.claude/settings.json` の `env` ブロックに書く（Claude Code の設定スキーマは
-独自のキーを受け付けない）。hook には実行ファイルだけを登録すればよい。
+設定は環境変数で、`.claude/settings.json` の `env` ブロックに書く。hook には実行ファイルだけを登録すればよい。ccnavi の根で打つ。
 
 ```sh
 sh scripts/ccnavi-setup.sh <ワークスペースルート>
 ```
 
-このスクリプトが hook と `env` を書く。書く形は[設定](settings.md)の例にある。何度打っても同じ形に
-なり、既にある値と、ccnavi と関係のない hook はそのまま残る。書かずに揃っていない
-ところだけを見たいときは `--check` を付ける。同じ 1 回で `.vscode/settings.json` にも書く（[VS Code からワークツリーを見る](#vs-code-からワークツリーを見る)）。触ってほしくないときは `--no-vscode`。
-セッション開始時の入口（`ccnavi-session-start.sh`。取り込みの `ccnavi-fetch.sh` と、`projects/` の clone 済みリポジトリ一覧の `ccnavi-dirs.sh` を順に呼ぶ）も `SessionStart` に別の 1 行で登録する。
-1 台だけで使いリモートに合わせる必要が無ければ `--no-fetch` で外す（clone 済みリポジトリの一覧も出なくなる）。
-放置したセッションの引き継ぎ促し（`ccnavi-idle.sh`）も、`Stop` に 2 行と `UserPromptSubmit` に 1 行で別に登録する。会話が大きく育ったまま放置されたとき、記憶（プロンプトキャッシュ）が切れる前に、次のセッションへの引き継ぎ文書を書かせる仕組みである。要らなければ `--no-idle` を付けて、登録しないようにする。環境変数 `CCNAVI_HANDOFF_SUGGEST_TOKENS` を `0` にしても止まる（[設定](settings.md)の「大きな会話を放置したとき」）。
+このスクリプトが hook と `env` を書く。書く形は[設定](settings.md)の例にある。何度打っても同じ形になり、既にある値と、ccnavi と関係のない hook はそのまま残る。
 
-既にある値は置き換えず、違えば並べて見せる。置き換えるのは `--mode` か `--ticket-control` を
-名指しして `--force` を付けたときだけで、名指ししていない値はそのままにする。
+| 付けるもの | 働き |
+|---|---|
+| `--check` | 何も書かず、揃っていないところだけを見る |
+| `--mode <値>` | `CCNAVI_MODE` を指定する。`disable` は断る |
+| `--force` | 既にある値や配布物を入れ替える。`--mode` か `--ticket-control` を名指しして付けたときだけ、その値を置き換える。名指ししていない値はそのまま |
+| `--no-vscode` | `.vscode/settings.json` に触らない（[VS Code からワークツリーを見る](#vs-code-からワークツリーを見る)） |
+| `--no-fetch` | セッション開始時の取り込み（`ccnavi-fetch.sh`）と、`projects/` の clone 済みリポジトリの一覧を登録しない。1 台だけで使いリモートに合わせる必要が無いとき |
+| `--no-idle` | 放置したセッションの引き継ぎ促しを登録しない（[設定](settings.md)の「大きな会話を放置したとき」） |
+| `--deploy <ccnavi の根>` / `--no-deploy` | 配布元を名指しする / 配布物を置かず設定だけ書く |
+| `--bin user` | 実行ファイルをホームディレクトリの下に置く（下の節） |
 
-hook は、そのイベントに ccnavi が登録されていなければ足す。別の表記で登録されているように
-見えるイベントは、足さずに名前を挙げる（知らせずに足すと判定が 2 回走る）。
+既にある値は置き換えず、違えば並べて見せる。hook は、そのイベントに ccnavi が登録されていなければ足す。別の表記で登録されているように見えるイベントは、足さずに名前を挙げる（足すと判定が 2 回走るため）。
 
-戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES`）は `CCNAVI_MODE` と
-同じ値で書く。`CCNAVI_MODE` が `dry-run` のうちは、この 2 つも `dry-run` になる。
-`enable` へ切り替える前に、記録の `would-restore` で何が戻るはずだったかを確かめられる。
-`dry-run` で入れたままだとこの 2 つも `dry-run` のまま残るので、`--mode enable` で打ち直すか 3 行を書き換える。
+戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES`）は `CCNAVI_MODE` と同じ値で書く。`dry-run` で入れたままだとこの 2 つも `dry-run` のまま残るので、`enable` へ切り替えるときは `--mode enable` で打ち直す。切り替える前に、記録の `would-restore` で何が戻るはずだったかを確かめられる。
+`CCNAVI_GUARD_TICKET_APPROVAL` はモードに合わせず、いつも `enable` で書く。`dry-run` と書かれていたら `--lint` が error にする。
 
-`CCNAVI_GUARD_TICKET_APPROVAL` はモードに合わせず、いつも `enable` で書く。
-`dry-run` と書かれていたら `--lint` が error にする。
-
-入れ終わったところで、ワークスペースの git の索引に `projects/` の下が載っていないかも見る。
-問題があれば直し方を案内するだけで、止めず、終了コードも変えない。索引も `.gitignore` も変えない（直すのはユーザ）。
+入れ終わったところで、ワークスペースの git の索引に `projects/` の下が載っていないかも見る。問題があれば直し方を案内するだけで、止めず、終了コードも変えない。索引も `.gitignore` も変えない（直すのはユーザ）。
 
 置き場は固定で env には書かない（[設定](settings.md)の「置き場」）。
-細部は[導入スクリプトと配布の細部](../21_design/startup-config.md)にある。
 
 ## 実行ファイルとルールを配る
 
-`CCNAVI_ENTRY_PATH` が指す実行ファイル、`rules.yml`、拒否の文面が案内する sh が、対象プロジェクトの中に要る。
-`dist/` は `.gitignore` に入っていて、`CCNAVI_ENTRY_PATH` は絶対パスも `..` も受け付けないので、
-設定を書く 1 回で配布物も置く。
+hook が起動する実行ファイル、`rules.yml`、拒否の文面が案内する sh が、対象プロジェクトの中に要る。設定を書く 1 回で、配布物も置く。
 
 ```sh
-# ccnavi のリポジトリで、まず組み立てる
+# ソースから使うときだけ。ccnavi のリポジトリで、先に実行ファイルを組み立てる
 uv run --with pyinstaller python build.py
 
 # 対象プロジェクトへ、設定を書いて実行ファイルを配る
 sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run
 ```
 
-配布元は既定で、打ったスクリプトの置き場の 1 つ上（ccnavi のリポジトリ）。
-よそから配るときは `--deploy <ccnavi の根>` で名指しする。配布物が要らないときは `--no-deploy`。
+配布元は既定で、ccnavi の根である。よそから配るときは `--deploy <ccnavi の根>` で名指しする。
 
-実行ファイルは組み立てた機械の OS と CPU でしか動かないが、`settings.json` は Windows・WSL・Linux・macOS で
-共有し、hook の `command` は 1 行しか書けない。そこで実行ファイルは機械ごとに置き場を分け、hook は振り分けの sh
-（`.ccnavi/scripts/ccnavi-launcher.sh`）を起動する。sh は起動のたびに `uname` を 1 回読み、自分の 1 つ上の
-`bin/<os>-<arch>/` から合う実行ファイルを選んで、引数と標準入力をそのまま渡す。`bin/` に合うものが無いときだけ、PATH の `ccnavi`（`ccnavi.exe`）を使う（絶対パスの項目だけを見る）。
+実行ファイルは、配布先の `.ccnavi/bin/<os>-<arch>/` に入る。`<os>-<arch>` は組み立てた機械で決まる。hook は `.ccnavi/scripts/ccnavi-launcher.sh` を起動し、この sh がその機械に合う実行ファイルを選ぶので、`settings.json` を Windows・WSL・Linux・macOS で共有できる。実行ファイルは組み立てた機械の OS と CPU でしか動かない。別の機械向けの組み立ても、その機械の置き場に入るだけなので配る。Windows と WSL で同じフォルダを開くなら、それぞれの機械で打てば両方が並ぶ。
 
-```
-.ccnavi/scripts/ccnavi-launcher.sh      ← CCNAVI_ENTRY_PATH が指す振り分けの sh（追跡する）
-.ccnavi/scripts/ccnavi-ticket.sh など   ← 代わりに通る sh（同じ置き場）
-.ccnavi/bin/darwin-arm64/ccnavi         ← 機械ごとの組み立て（_internal/ も同じ置き場。無視する）
-.ccnavi/bin/linux-x86_64/ccnavi
-.ccnavi/bin/windows-x86_64/ccnavi.exe
-```
-
-置き場は 2 つとも固定で、原本と配布先で同じパスになる。`.ccnavi/bin/` には実行ファイルだけが並ぶ。
-
-別の機械向けの組み立てでも、その機械の置き場に入るだけなので配る。Windows と WSL で同じフォルダを開くなら、
-それぞれの機械で打てば両方が並ぶ。この機械で動くものが（`bin/` にも PATH にも）無ければ、1 行の出力と最後の「まだ無いもの」の一覧で知らせる。
-`bin/` にも PATH にも合う実行ファイルが無ければ sh は、この機械の `<os>-<arch>` と探した置き場を示して終了コード 127 で終わる。PATH に通すのは、隣に `_internal/` がある `dist/ccnavi/` かそこへのリンクで、実行ファイル単体のコピーは動かない。実行できないときは 126。
-目印が無いか読めない配布元からは配らない。名指しの `--deploy` なら終了コード 2 で断り、
-既定の配布元なら理由を出して設定だけ書く。振り分けの仕組みと代償は[導入と配布の設計](../21_design/startup-config.md)にある。
+この機械で動く実行ファイルが無ければ、導入スクリプトは出力の「まだ無いもの」で知らせる。実行時に見つからないときは終了コード 127、実行できないときは 126 で終わる（[つまずきやすい点](troubleshooting.md)）。
+目印が無いか読めない配布元からは配らない。名指しの `--deploy` なら終了コード 2 で断り、既定の配布元なら理由を出して設定だけ書く。
 
 ### 実行ファイルをホームディレクトリの下に置く（`--bin user`）
 
@@ -211,12 +191,13 @@ sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run
 sh scripts/ccnavi-setup.sh /path/to/project --bin user
 ```
 
-ホームディレクトリに書き込むので、ターミナルで確認を求める（`続けますか？ [y/N]`）。ターミナルでなければ、何も書かずに断る。確認を飛ばす指定は無い（`n` などで中止したときの終了コードは 1）。ただし、疑似ターミナルで答えれば確認は通るので、エージェントに実行させない運用が前提になる。
-中身が配布元と同じなら、確認なしで終わる。違えば、また確認して置き換える。`~/.local/bin/ccnavi` に別のファイルが既にあれば触らない（置き換えるなら `--force`。ディレクトリは `--force` でも置き換えない）。配布先の `.ccnavi/bin/` に実行ファイルが残っていると、振り分けの sh はそちらを先に使うので、残っていることを案内に出す。
-`--check` は書かず、確認も求めない。
+ホームディレクトリに書き込むので、ターミナルで確認を求める（`続けますか？ [y/N]`）。ターミナルでなければ、何も書かずに断る。確認を飛ばす指定は無い（`n` などで中止したときの終了コードは 1）。エージェントに実行させない運用が前提になる。
+中身が配布元と同じなら、確認なしで終わる。違えば、また確認して置き換える。`~/.local/bin/ccnavi` に別のファイルが既にあれば触らない（置き換えるなら `--force`）。配布先の `.ccnavi/bin/` に実行ファイルが残っていると、そちらが先に使われるので、残っていることを案内に出す。`--check` は書かず、確認も求めない。
+`--bin` は `ccnavi-install.sh` に渡せない。`ccnavi-setup.sh` を直接打つ。
 
-PATH に通すフォルダ（macOS・Linux・WSL は `~/.local/bin`、Windows は実体のフォルダ）が PATH に入っていなければ、環境に合った足し方を知らせる。
-シェルの設定ファイルも Windows の環境変数も、書き換えない。
+実体は同じ機械の全プロジェクトが使うので、1 つのプロジェクトで再実行して置き換えると、ほかのプロジェクトにも効く。PATH に通すのは、隣に `_internal/` がある実体のフォルダで、実行ファイル単体のコピーは動かない。この機械で動く実行ファイルだけを置ける。
+
+PATH に通すフォルダが PATH に入っていなければ、環境に合った足し方を知らせる。シェルの設定ファイルも Windows の環境変数も、書き換えない。
 
 | 環境 | 案内する足し方 |
 |---|---|
@@ -227,41 +208,30 @@ PATH に通すフォルダ（macOS・Linux・WSL は `~/.local/bin`、Windows �
 | fish | `fish_add_path $HOME/.local/bin`（1 度実行すれば保存される） |
 | そのほか | `~/.profile` に同じ行を追加する |
 
-実体は隣に `_internal/` が要るので、単体のコピーは動かない。この実体は同じ機械の全プロジェクトが使うので、1 つのプロジェクトで再実行して置き換えると、ほかのプロジェクトにも効く。`--bin` は `ccnavi-install.sh` に渡せない（確認をターミナルに出す必要があるため）。`ccnavi-setup.sh` を直接実行する。macOS・Linux・WSL はリンクで張り、Windows は実体のフォルダを PATH に通す。
-この機械で動く実行ファイルだけを置ける。
-
 ### 何がどこへ配られるか
 
-| 配布元 | 配布先 |
+| 配布元（ccnavi の根） | 配布先 |
 |---|---|
-| `dist/ccnavi/`（中身ごと） | `.ccnavi/bin/<os>-<arch>/`（`<os>-<arch>` は組み立てた機械で決まる） |
-| `.ccnavi/config/common/rules.yml` | 同じパス |
-| `.ccnavi/config/common/risks.yml` | 同じパス |
-| `.ccnavi/config/common/phases.yml` | 同じパス |
-| `.ccnavi/scripts/` の sh（`ccnavi-*.sh`）と `ccnavi-clean.js` | 同じパス |
-| `.ccnavi/scripts/ccnavi-launcher.sh` | 同じパス。配ったあと実行ビットを付ける |
+| `dist/ccnavi/`（中身ごと） | `.ccnavi/bin/<os>-<arch>/` |
+| `.ccnavi/config/common/` の `rules.yml`・`risks.yml`・`phases.yml` | 同じパス |
+| `.ccnavi/config/common/templates/` の計画テンプレート | 同じパス |
+| `.ccnavi/scripts/` の sh（`ccnavi-*.sh`）と `ccnavi-clean.js` | 同じパス。振り分けの sh には実行ビットを付ける |
+| `.ccnavi/CCNAVI.md` | 同じパス |
+| `.ccnavi/docs/`（エージェント向けの使い方の文書） | 同じパス |
+| `.ccnavi/messages/`（拒否と案内の文面） | 同じパス |
+| `.claude/skills/` の工程スキルと `ccnavi-config` | 同じパス |
 
-配る sh の全部の名前は[導入と配布の設計](../21_design/startup-config.md)の表にある。
+`scripts/` の `ccnavi-setup.sh`・`ccnavi-install.sh`・`ccnavi-doctor.sh` は配布先へ配られない。ccnavi の根に残り、そこから打つ。
 
-ルールと配点とフェーズ定義のひな形は、共通レイヤー（`.ccnavi/config/common/`）へ配る。ワークスペース自身のレイヤーの `phases.yml` は配らない
-（レイアウトに依存する定義を共通レイヤーに置くと全プロジェクトに適用されてしまうため。[ルールの書き方](rules.md)の「3 つのレイヤー」）。要るならユーザが書く。
-配布先に既にある共通レイヤーのファイルは、`--force` が無ければ入れ替えない。
+ルールと配点とフェーズ定義のひな形は、共通レイヤー（`.ccnavi/config/common/`）へ配る。ワークスペース自身のレイヤーの `phases.yml` は配らない（レイアウトに依存する定義を共通レイヤーに置くと全プロジェクトに適用されてしまうため。[ルールの書き方](rules.md)の「3 つのレイヤー」）。要るならユーザが書く。
 
-配布先に既にあるものは触らず、並べて見せる。入れ替えるのは `--force` を付けたときだけ
-（ルールも sh も配布先で直されている前提）。例外は、この機械の実行ファイル（`.ccnavi/bin/<os>-<arch>/`）で、
-配布元と中身が違えば `--force` が無くても置き換える（組み立て直した実行ファイルが古いまま残らないように。中身が同じなら触らない。
-`--check` は、中身が違うものを揃っていないものに数える）。実行ファイルを置き換えるときは、配布先に残っていた同梱物を先に消してから配る
-（前の版が残ると新しい実行ファイルがそれを読み込んでしまう）。
+配布先に既にあるものは触らず、並べて見せる。入れ替えるのは `--force` を付けたときだけ（ルールも sh も配布先で直されている前提）。例外は、この機械の実行ファイル（`.ccnavi/bin/<os>-<arch>/`）で、配布元と中身が違えば `--force` が無くても置き換える（組み立て直した実行ファイルが古いまま残らないように。`--check` は、中身が違うものを揃っていないものに数える）。
 
-振り分けの sh は hook が直に起動するので実行ビットが要る。配った回は付け、配らない回でも外れていれば付け直す。
-`--check` は実行ビットの外れた sh を揃っていないものに数え、`--lint` は error として報告する（[設定の確かめ方](check.md)）。
-別の機械で clone した直後に実行ビットが無いことがあるのは、Windows で足した sh が実行ビットを持たないため。
+振り分けの sh は hook が直に起動するので実行ビットが要る。配った回は付け、配らない回でも外れていれば付け直す。別の機械で clone した直後に実行ビットが無いことがあるのは、Windows で足した sh が実行ビットを持たないため。`--check` は実行ビットの外れた sh を揃っていないものに数え、`--lint` は error として報告する（[設定の確かめ方](check.md)）。
 
 ### .gitignore
 
-配布先が git のリポジトリなら、配った組み立ての置き場を `.gitignore` にも足す（入れると履歴から消すのが難しい）。
-置き場は配った機械のぶんだけ足す。同じ回に、配った実行ファイルの `--docs` が索引を書けるよう `**/ccnavi-index.jsonl` も足す（[ドキュメントの索引](docs-search.md)）。あわせて、使い捨ての置き場 `/scratchpad`、実行時の記録の置き場 `/logs/`、ワークツリーの置き場 `/.claude/worktrees/` も足す。
-ccnavi が足した行は、目印の行（`# ---ccnavi begin---` と `# ---ccnavi end---`）で囲んだ 1 つの領域にまとまる。足りない行は end の直前に足し、領域の中のほかの行は書き換えない。目印の行が壊れているときは何も足さず、行番号と直し方を知らせる。
+配布先が git のリポジトリなら、導入スクリプトが `.gitignore` に次の行を足す。配った実行ファイルの置き場は、入れると履歴から消すのが難しいために足す。
 
 ```
 # ---ccnavi begin--- (scripts/ccnavi-setup.sh が管理する範囲)
@@ -278,15 +248,14 @@ ccnavi が足した行は、目印の行（`# ---ccnavi begin---` と `# ---ccna
 # ---ccnavi end---
 ```
 
-足すのはワークスペースの `.gitignore` だけ。`projects/<名前>/` の各プロジェクトには触らない。
-`.ccnavi/` を丸ごと無視すると sh と `rules.yml` が git から消えるため、足すのは `/.ccnavi/bin/<os>-<arch>/` だけにしてある。
-同等の行が既にあるとき、索引・`scratchpad`・`logs`・`.claude/worktrees` を `!` で否定する行があるとき（ユーザが追跡すると決めているとみなす）は足さない。細部は[導入と配布の設計](../21_design/startup-config.md)にある。
+- ccnavi が足した行は、目印の行で囲んだ 1 つの領域にまとまる。領域の中のほかの行は書き換えない。目印の行が壊れているときは何も足さず、行番号と直し方を知らせる
+- 同等の行が既にあるとき、またはそれらを `!` で否定する行があるとき（ユーザが追跡すると決めているとみなす）は足さない
+- 足すのはワークスペースの `.gitignore` だけ。`projects/<名前>/` の各プロジェクトには触らない
+- `.ccnavi/` を丸ごと無視すると sh と `rules.yml` が git から消えるため、足すのは `/.ccnavi/bin/<os>-<arch>/` だけ
 
 ### 失敗したとき
 
-名指しした `--deploy` が組み立てられていなければ、終了コード 2 で断る。
-既定の配布元が使えないとき（組み立てていない、配布先が ccnavi 自身）は断らず、
-配るのを諦めた理由を 1 行出して `.claude/settings.json` は書く。
+名指しした `--deploy` が組み立てられていなければ、終了コード 2 で断る。既定の配布元が使えないとき（組み立てていない、配布先が ccnavi 自身）は断らず、配るのを諦めた理由を 1 行出して `.claude/settings.json` は書く。
 
 ## VS Code からワークツリーを見る
 
@@ -301,7 +270,7 @@ ccnavi は作業を `.claude/worktrees/` の中でさせる。VS Code の設定�
 2 行目は `projects/<名前>/` のようにワークスペースルートから 2 階層下にあるリポジトリを見つけるための設定で、
 既定の 1 だとルートの直下の階層までしか探さない。
 
-`sh scripts/ccnavi-setup.sh <ワークスペースルート>` が、`.claude/settings.json` と同じ 1 回で
+ccnavi の根で打つ `sh scripts/ccnavi-setup.sh <ワークスペースルート>` が、`.claude/settings.json` と同じ 1 回で
 `.vscode/settings.json` にもこれらを書く。無ければ作り、あれば足りないキーだけを足す。
 VS Code の他の設定は残し、`false` と書いてあれば変えずに並べて見せる。
 
