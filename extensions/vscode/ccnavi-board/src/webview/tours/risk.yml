@@ -107,7 +107,7 @@ courses:
         body: 子チケットのリスクの点がこの値以上になると、リスクレベルが上がります（LOW → MEDIUM → HIGH → CRITICAL）。HIGH 以上になると、レビューが終わるまでフェーズは先へ進めません。空欄なら組み込みの値を使います。
       - target: factors
         title: 項目
-        body: 子チケットをクローズするとき、その差分に適用して加点する項目です。行を押すと欄が開き、加点条件と点を直せます。「＋ 項目を追加」で追加できます。
+        body: 子チケットを閉じるとき、その差分に適用して加点する項目です。行を押すと欄が開き、加点条件と点を直せます。「＋ 項目を追加」で追加できます。
       - target: save
         title: 保存
         body: 保存すると、実行ファイルが検証し、通ればファイルに反映します。通らなければ、下に理由が出ます。
@@ -197,7 +197,7 @@ courses:
         focus: effect
       - target: level-high
         title: 同じ 40 点でも、境目が変わると結果が変わる
-        body: HIGH が 40 のときは、40 点の子は HIGH です。50 に直したあとに閉じる 40 点の子は MEDIUM で、実績では人間レビューが要る扱いになりません。宣言の mr は下がりません。
+        body: HIGH が 40 のときは、40 点の子は HIGH です。50 に直したあとに閉じる 40 点の子は MEDIUM で、実績ではユーザのレビューが要る扱いになりません。宣言の mr は下がりません。
         diagram: risk-level-edit
       - target: sum
         title: 実際に使うのは、共通の設定との和
@@ -213,7 +213,7 @@ courses:
         focus: diff, score, level
       - target: level-high
         title: HIGH 以上のとき変わること
-        body: 宣言が review の none でも、そのフェーズは人間レビューが要る扱いの mr に上がります。レビューが済むまで、親のワークツリーでのサブエージェントの起動と Bash は止まります。依頼文の先頭には、リスクの点とレベルが付きます。
+        body: 宣言が review の none でも、そのフェーズはユーザのレビューが要る扱いの mr に上がります。レビューが済むまで、親のワークツリーでのサブエージェントの起動と Bash は止まります。依頼文の先頭には、リスクの点とレベルが付きます。
         diagram: risk-high-review
         focus: raise, block, request
 
@@ -223,7 +223,7 @@ courses:
     steps:
       - target: levels
         title: 境目の点で決まること
-        body: 子チケットをクローズするとき、項目に該当した点を足し合わせます。合計がここの値以上になると、リスクレベルが上がります（LOW → MEDIUM → HIGH → CRITICAL）。LOW には境目がありません。
+        body: 子チケットを閉じるとき、項目に該当した点を足し合わせます。合計がしきい値以上になると、リスクレベルが上がります（LOW → MEDIUM → HIGH → CRITICAL）。LOW には境目がありません。
       - target: level-high
         title: 止めるのは HIGH から
         body: HIGH 以上になったフェーズは、レビューが終わるまで先へ進めません。計画のときに「レビュー不要」と宣言していても同じです。レビューを求める基準を厳しくするなら HIGH を下げ、緩めるなら上げます。
@@ -248,7 +248,7 @@ courses:
         body: 「＋ 項目を追加」を押すと、空の項目が末尾に追加され、欄が開いて id の欄にカーソルが移ります。1 件につき加点条件は 1 つです。
       - target: factor-id
         title: id を付ける
-        body: id は項目の名前です。子をクローズしたときの出力や、judge の記録（record-risk）がこの名前で項目を指すので、内容が分かる短い名前にします。
+        body: id は項目の名前です。子を閉じたときの出力や、judge の記録（record-risk）がこの名前で項目を指すので、内容が分かる短い名前にします。
         scene:
           open: big-diff
       - target: factor-points
@@ -263,7 +263,7 @@ courses:
           open: big-diff
       - target: factor-message
         title: 理由を入力する
-        body: 加点の理由として、依頼文とクローズしたときの出力に出る短い文です。空なら id をそのまま使います。
+        body: 加点の理由です。レビュー依頼文と、子を閉じたときの出力に出ます。空なら id を使います。
         scene:
           open: big-diff
       - target: save
@@ -335,11 +335,11 @@ courses:
 
   - id: sum
     title: 共通の設定との統合結果を確認したいとき
-    summary: 子をクローズするときに実際に使う、共通の設定と 1 つの設定の和を読む
+    summary: 子を閉じるときに実際に使う、共通の設定に選んだ設定を重ねた結果を読む
     steps:
       - target: sum
         title: 統合結果の枠
-        body: 子チケットをクローズするときの配点は、共通の設定と、親の project が指す設定の和です。この枠は、その結果を実行ファイルが出したまま、読み取り専用で表示します。
+        body: 子チケットを閉じるときの配点は、共通の設定に、親の project が指す設定を重ねたものです。この枠は、その結果を実行ファイルが出したまま、読み取り専用で表示します。
         scene:
           sum: self
       - target: sum-pick
@@ -506,7 +506,7 @@ diagrams:
       - id: p40
         from: ccnavi
         text: 合計が 40 点
-        value: 40 ≥ 40 → HIGH（人間レビューが要る扱いに）
+        value: 40 ≥ 40 → HIGH（ユーザのレビューが要る扱いに）
       - id: p70
         from: ccnavi
         text: 合計が 70 点
@@ -535,7 +535,7 @@ diagrams:
         text: 同じ 40 点の別の子
         value: |-
           40 < 50 かつ 40 ≥ 20 → MEDIUM
-          実績では人間レビューが要る扱いにならない
+          実績ではユーザのレビューが要る扱いにならない
       - id: kept
         from: ccnavi
         text: すでに閉じた子の記録（risk.json）は書き直さない
@@ -556,7 +556,7 @@ diagrams:
         value: error が 1 件でもあれば保存しない
       - id: lock
         from: リスク管理画面
-        text: 作業中のチケット（doing）があると、進行中の作業の判定が途中で変わるため保存できない。エージェントがターン中なら、確認が出る
+        text: 作業中のチケット（doing）があると、進行中の作業の判定が途中で変わるため保存できない。エージェントが応答中なら、確認が出る
       - id: write
         from: リスク管理画面
         to: risks.yml

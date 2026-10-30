@@ -219,7 +219,7 @@ diagrams:
         value: error が 1 件でもあれば保存しない（warn だけなら保存する）
       - id: lock
         from: ルール管理画面
-        text: 作業中のチケット（doing）があると、進行中の作業の判定が途中で変わるため保存できない。エージェントがターン中なら、確認が出る
+        text: 作業中のチケット（doing）があると、進行中の作業の判定が途中で変わるため保存できない。エージェントが応答中なら、確認が出る
       - id: write
         from: ルール管理画面
         to: rules.yml
@@ -408,7 +408,7 @@ courses:
         scene: { tab: rules, open: git-push }
       - target: find
         title: 絞り込み
-        body: id・ツール・パターン・メッセージで絞り込みます。畳んだタイプの中も探します。
+        body: id・ツール・パターン・メッセージ・プロンプトで絞り込みます。畳んだタイプの中も探します。
         scene: { tab: rules, find: env }
       - target: judge-form
         title: 判定を試す
@@ -485,7 +485,7 @@ courses:
         focus: edit
       - target: save
         title: 保存すると、まず検証される
-        body: ［保存］を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します。error が 1 件でもあれば、何も保存しません。作業中のチケットがあるときは保存できません。エージェントがターン中なら、確認が出ます。
+        body: ［保存］を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します。error が 1 件でもあれば、何も保存しません。作業中のチケットがあるときは保存できません。エージェントが応答中なら、確認が出ます。
         scene: { tab: rules, open: git-push }
         diagram: rule-save
         focus: save, lock
