@@ -111,15 +111,12 @@ class Decision:
     ph: phase.Phase
     result: review_host.Result
     unresolved: list[review_host.Thread]
-    # issue に回せるか。いつでも真（JSON の欄は互換のために残す）。回せる範囲は、decide が
-    # 求める前提（依頼の記録・HEAD が動いていない・変更要求が無い）を満たした範囲に限る。
-    can_issue: bool
     # 見せたあとに追加された未解決の指摘。今回の判断の対象ではなく、未対応として残す。
     extra: list[review_host.Thread] = field(default_factory=list)
 
 
 def _base_digest(d: Decision) -> str:
-    """指摘の一覧以外の、見せた材料（親・フェーズ・MR・issue に回せるか）のダイジェスト。
+    """指摘の一覧以外の、見せた材料（親・フェーズ・MR）のダイジェスト。
 
     部分ごとの SHA-256 を件数と一緒に並べ、その全体の SHA-256。
     区切りでつなぐと、本文に区切りを書いてつなぎ目をずらせる。
@@ -130,7 +127,6 @@ def _base_digest(d: Decision) -> str:
         str(d.ph.number),
         str(d.result.mr.number),
         d.result.mr.url,
-        str(d.can_issue),
     ]
     lines = [str(len(parts))] + [hashlib.sha256(p.encode("utf-8")).hexdigest() for p in parts]
     return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
@@ -238,7 +234,7 @@ def _decision(
         )
     }
     unresolved = [t for t in result.threads if id(t) in open_now or (t.id and t.id in carry)]
-    return Decision(parent, ph, result, unresolved, True)
+    return Decision(parent, ph, result, unresolved)
 
 
 def decision_json(d: Decision) -> dict:
@@ -249,7 +245,6 @@ def decision_json(d: Decision) -> dict:
         "parent": d.parent.ticket,
         "phase": d.ph.number,
         "mr": {"number": d.result.mr.number, "url": d.result.mr.url},
-        "can_issue": d.can_issue,
         "threads": [
             {
                 "key": review.thread_key(t),
@@ -643,7 +638,7 @@ def _begin_op(
             request_head=str(mark.get("head") or ""),
             shown=shown,
             choices=choices,
-            plan={"digest": shown_digest, "can_issue": d.can_issue},
+            plan={"digest": shown_digest},
             stages=stages,
         )
         oplog.discard_untouched(conf.state, oplog.KIND_DECIDE, d.parent.ticket, d.ph.number, op_id)

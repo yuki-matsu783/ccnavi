@@ -1578,8 +1578,7 @@ class TicketTest(unittest.TestCase):
         data = json.loads(shown.stdout)
         self.assertEqual([t["key"] for t in data["threads"]], ["u1", "u2"])
         self.assertEqual(data["parent"], "i0001")
-        # フィードバック計画が無くても、issue に回せる（欄は互換のために残る）
-        self.assertTrue(data["can_issue"])
+        self.assertNotIn("can_issue", data)
         self.assertRegex(data["digest"], r"^v2\.[A-Za-z0-9_-]+$")
         phases = os.path.join(self.approved, "phases", "i0001")
         self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))

@@ -9,16 +9,17 @@ sh を外から呼び、GitLab の代役と実行ファイルの代役で 1 周�
 見るのは sh の仕事だけ。
 
 1. `--preview` は実行ファイルの答えをそのまま返し、何も投稿しない
-2. `--choices … --digest …` は実行ファイルが書いた下書きから issue を作り、決めた内容をコメントに
-   書き出して下書きを消す。答えに issue の URL を足す
-3. 投稿に失敗したら下書きを残し、警告を答えに載せる（置いたことは戻さない）
+2. `--choices … --digest …` は、受け入れの計画の操作 ID で issue とコメントを投稿し、答えに issue の
+   URL を足す
+3. 投稿に失敗したら操作記録を残し、警告を答えに載せる（置いたことは戻さない）。計画に操作 ID が
+   無ければ、何も送らずに止める
 4. フェーズ番号の表記を揃える（`01` でも、実行ファイルが `1` で書いた下書きを拾う）
 5. 引数の組み合わせの誤りは、実行ファイルを起こす前に断る。ccnavi-review.sh の decide の置く形と、
    ccnavi-user-decide.sh の --preview も断る
 6. 抜けるときの片付け（EXIT の trap）で rm が失敗しても、元の終了コードで抜ける（dash と bash）
 
-実行ファイルは代役（引数を記録し、決まった答えと下書きを書く sh）。判定そのものは
-`tests/ticket` が見る。GitLab は同じプロセスの小さな HTTP サーバで、sh が呼ぶ経路だけを返す。
+実行ファイルは代役（`decide_support.py`。`ops` は本物に渡し、ほかは引数を記録して答える）。
+判定そのものは `tests/ticket` が見る。GitLab は同じプロセスの小さな HTTP サーバで、sh が呼ぶ経路だけを返す。
 
 `CCNAVI_SH_DIR` で、コピーする sh の出どころを差し替えられる。既定はこのツリーの
 `.ccnavi/scripts/`（テストしているソースそのもの）。
@@ -30,48 +31,21 @@ import http.server
 import json
 import os
 import shutil
-import stat
 import subprocess
+import sys
 import tempfile
 import threading
 import unittest
 
-from ccnavi.entry import version
 from ccnavi.tickets.model import review_host
 from tests import ROOT, common_sh
+from tests.sh import decide_support
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
 NEEDS = [tool for tool in ("jq", "curl") if shutil.which(tool) is None]
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 TOKEN = "t0k"
-
-# 実行ファイルの代役。引数を 1 行ずつ記録し、`--preview` なら一覧、`--accept-plan` なら受け入れの
-# 計画（スレッド d1 に返信する）、`--yes` なら下書きを書いて答える。
-STUB = """#!/bin/sh
-case " $* " in
-*" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
-*" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
-esac
-printf '%s\\n' "$*" >>"$STUB_LOG"
-root="$2"
-case " $* " in
-*" --preview "*) printf '{"version":1,"threads":[{"key":"u1"}],"digest":"d0"}\\n' ;;
-*" --accept-plan "*)
-  plan=""; prev=""
-  for a in "$@"; do [ "$prev" = --accept-plan ] && plan="$a"; prev="$a"; done
-  if [ -n "$STUB_PLAN" ]; then cp "$STUB_PLAN" "$plan"; else
-    thread='{"id":"d1","key":"u1","reply":"<!-- ccnavi:accept -->\\nok\\n"}'
-    printf '{"version":1,"digest":"d0","threads":[%s]}\\n' "$thread" >"$plan"
-  fi ;;
-*" --yes "*)
-  [ -z "$STUB_FAIL_YES" ] || { echo "置けない" >&2; exit 1; }
-  printf 'issue のタイトル\\n\\n本文\\n' >"$root/logs/state/review-issue-i0001-1.md"
-  printf '<!-- ccnavi:decide -->\\n決めた\\n' >"$root/logs/state/review-decide-i0001-1.md"
-  printf '{"version":1,"ok":true,"reviewed":true,"followup":""}\\n' ;;
-esac
-"""
-
 
 WINDOWS = os.name == "nt"
 
@@ -296,10 +270,8 @@ class ReviewDecideShTest(unittest.TestCase):
         origin = f"http://127.0.0.1:{GitLab.port}/demo/greeter.git"
         subprocess.run([GIT, "-C", self.tree, "remote", "add", "origin", origin], check=True)
         self.stub = os.path.join(self.work, "stub-ccnavi")
-        with open(self.stub, "w", encoding="utf-8") as f:
-            f.write(STUB.replace("{compat}", str(version.COMPAT)))
-        os.chmod(self.stub, os.stat(self.stub).st_mode | stat.S_IXUSR)
         self.log = os.path.join(self.work, "stub.log")
+        decide_support.install(self, GitLab)
 
     def decide(
         self,
@@ -326,6 +298,7 @@ class ReviewDecideShTest(unittest.TestCase):
             CCNAVI_WORKSPACE=self.ws,
             CCNAVI_ENTRY_PATH=self.stub,
             GITLAB_TOKEN=TOKEN,
+            **decide_support.stub_env(self),
             STUB_LOG=self.log,
             STUB_PLAN="",
             STUB_FAIL_YES="",
@@ -347,6 +320,10 @@ class ReviewDecideShTest(unittest.TestCase):
             # Windows は MSYS の起動が遅く、1 回に 12〜24 秒かかる
             timeout=180 if WINDOWS else 60,
         )
+
+    def leftovers(self) -> list[str]:
+        """state に残ったファイル。操作記録の置き場（ops・locks）は数えない。"""
+        return sorted(name for name in os.listdir(self.state) if name not in ("ops", "locks"))
 
     def calls(self) -> list[str]:
         if not os.path.exists(self.log):
@@ -385,19 +362,26 @@ class ReviewDecideShTest(unittest.TestCase):
         self.assertTrue(reply["body"].startswith("<!-- ccnavi:accept -->"))
         self.assertTrue(resolve["path"].endswith("/merge_requests/1/discussions/d1"))
         self.assertIs(resolve["resolved"], True)
-        self.assertEqual(GitLab.posted[2][1]["title"], "issue のタイトル")
+        self.assertTrue(GitLab.posted[2][1]["title"].startswith("レビューで残った指摘"))
         note = GitLab.posted[3][1]["body"]
         self.assertTrue(note.startswith("<!-- ccnavi:decide -->"))
         self.assertIn("issue に回した分: #1", note)
-        self.assertEqual(os.listdir(self.state), [])
+        self.assertEqual(self.leftovers(), [])
 
-    def test_a_failed_comment_keeps_the_draft_and_warns(self):
-        GitLab.fail_notes = True
+    def test_a_failed_comment_warns_and_keeps_the_record(self):
+        decide_support.STORE["reject"].add("note")
         done = self.decide("1", "--choices", '{"u1":"issue"}', "--digest", "d0")
         self.assertEqual(done.returncode, 0, done.stderr)
         answer = json.loads(done.stdout.strip().splitlines()[-1])
-        self.assertIn("コメントを残せなかった", answer["warning"])
-        self.assertIn("review-decide-i0001-1.md", os.listdir(self.state))
+        self.assertIn("引き継ぎ未完了", answer["warning"])
+        self.assertEqual(len(os.listdir(os.path.join(self.state, "ops"))), 1)
+
+    def test_a_plan_without_an_op_id_stops_and_sends_nothing(self):
+        path = self.plan_file("d1", op="")
+        stopped = self.decide("1", "--choices", '{"u1":"keep"}', "--digest", "d0", STUB_PLAN=path)
+        self.assertEqual(stopped.returncode, 1, stopped.stderr)
+        self.assertIn("操作 ID が無く", stopped.stderr)
+        self.assertNotIn("--accept-done", " ".join(self.calls()))
 
     def test_the_phase_number_is_normalized(self):
         done = self.decide("01", "--choices", '{"u1":"keep"}', "--digest", "d0")
@@ -416,7 +400,7 @@ class ReviewDecideShTest(unittest.TestCase):
             "--yes", " ".join(call for call in self.calls() if "--accept-plan" not in call)
         )
         self.assertEqual(GitLab.posted, [])
-        self.assertEqual(os.listdir(self.state), [])
+        self.assertEqual(self.leftovers(), [])
 
     def test_a_failed_resolve_stops_before_anything_is_placed(self):
         GitLab.fail_resolve = True
@@ -426,9 +410,9 @@ class ReviewDecideShTest(unittest.TestCase):
         self.assertEqual([kind for kind, _ in GitLab.posted], ["reply"])
         self.assertTrue(all("--accept-plan" in call for call in self.calls()))
         # 返信は書いたので、計画を残す
-        self.assertEqual(os.listdir(self.state), ["review-accept-i0001-1.json"])
+        self.assertEqual(self.leftovers(), ["review-accept-i0001-1.json"])
 
-    def plan_file(self, *ids: str) -> str:
+    def plan_file(self, *ids: str, op: str | None = None) -> str:
         """実物の書き手（実行ファイルが使う `review_host.write_accept_plan`）で書いた計画。
 
         sh と実行ファイルの契約を、両側が同じ書き手と同じ読み方で通ることで確かめる。
@@ -438,7 +422,17 @@ class ReviewDecideShTest(unittest.TestCase):
             (review_host.Thread(id=i, url=f"u/{i}"), review_host.accept_reply("テスト"))
             for i in ids
         ]
-        self.assertEqual(review_host.write_accept_plan(path, items, "d0"), "")
+        if op is None:
+            # 実行ファイルと同じく、本物の操作記録を作って、その操作ID を計画に書く
+            made = os.path.join(self.work, "plan-op.json")
+            subprocess.run(
+                [sys.executable, self.begin, self.state, made, self.mr_url],
+                check=True,
+                env={**os.environ, **decide_support.stub_env(self)},
+            )
+            with open(made, encoding="utf-8") as f:
+                op = json.load(f)["op"]
+        self.assertEqual(review_host.write_accept_plan(path, items, "d0", op), "")
         return path
 
     def test_all_replies_come_before_any_resolve_and_a_partial_failure_stops(self):
@@ -460,7 +454,7 @@ class ReviewDecideShTest(unittest.TestCase):
         self.assertNotIn("--accept-done", " ".join(self.calls()))
         # ホストに書いたので、計画は残す（打ち直すと d1 は見せる指摘から外れる）
         self.assertIn("計画を残した", stopped.stderr)
-        self.assertEqual(os.listdir(self.state), ["review-accept-i0001-1.json"])
+        self.assertEqual(self.leftovers(), ["review-accept-i0001-1.json"])
 
     def test_nothing_is_written_when_the_plan_does_not_match_the_fetched_result(self):
         """計画の id が結果に無い、または API の経路に使えない字なら、ホストに書かない。"""
@@ -488,14 +482,14 @@ class ReviewDecideShTest(unittest.TestCase):
         self.assertTrue(reply["body"].startswith(review_host.MARKER_ACCEPT))
         self.assertEqual(GitLab.discussions, {"d1": True})
         # 置けて終わったら計画は消える
-        self.assertEqual(os.listdir(self.state), [])
+        self.assertEqual(self.leftovers(), [])
 
     def test_a_failed_placement_after_the_host_was_written_keeps_the_plan(self):
         failed = self.decide("1", "--choices", '{"u1":"keep"}', "--digest", "d0", STUB_FAIL_YES="1")
         self.assertEqual(failed.returncode, 1, failed.stderr)
         self.assertEqual([k for k, _ in GitLab.posted], ["reply", "resolve"])
         self.assertIn("置けなかった", failed.stderr)
-        self.assertEqual(os.listdir(self.state), ["review-accept-i0001-1.json"])
+        self.assertEqual(self.leftovers(), ["review-accept-i0001-1.json"])
 
     def test_wrong_arguments_are_refused_before_anything_runs(self):
         for args in (
@@ -525,7 +519,7 @@ class ReviewDecideShTest(unittest.TestCase):
         self.assertEqual(self.calls(), [])
         self.assertEqual(GitLab.posted, [])
         self.assertEqual(GitLab.fetches, 0)
-        self.assertEqual(os.listdir(self.state), [])
+        self.assertEqual(self.leftovers(), [])
 
     def test_the_user_script_points_the_preview_back(self):
         """見るだけの --preview は ccnavi-review.sh に残る。ユーザ専用の sh は断って案内する。"""

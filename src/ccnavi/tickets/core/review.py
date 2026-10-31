@@ -518,7 +518,7 @@ def _decision(
     unresolved = [
         t for t in result.threads if id(t) in open_now or review_host.thread_key(t) in carry
     ]
-    return review_decide.Decision(parent, ph, result, unresolved, True)
+    return review_decide.Decision(parent, ph, result, unresolved)
 
 
 def decide_preview(

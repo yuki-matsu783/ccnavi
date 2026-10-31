@@ -239,7 +239,8 @@ issue_note() {
 
 # ---- 操作記録。判断を保存した記録（`ccnavi ops`）に、投稿の段階を記録し、投稿の前に照合する。
 #
-# 操作ID は受け入れの計画（`--accept-plan` が書く）が持つ。計画を使わない呼び出し（close-early）では
+# 操作ID は受け入れの計画（`--accept-plan` が書く）が持つ。計画に無ければ（実行ファイルが古い）、
+# op_use_plan が状態と直し方を言って止める。計画を使わない呼び出し（close-early）では
 # op_id が空のままで、ここの関数は何もしない。
 # 投稿の本文は記録に持たない。`ccnavi ops post-text` が保存した判断から作り直す。
 # 本文の末尾に目印 `<!-- ccnavi:op=<操作ID> stage=<段階ID> -->` を足すので、送ったかどうかを
@@ -251,6 +252,8 @@ op_who_read=""
 
 op_use_plan() {
 	op_id=$("$JQ" -r '.op // empty' "$1" 2>/dev/null || :)
+	[ -n "$op_id" ] ||
+		fail decide-no-op "受け入れの計画に操作 ID が無く、何も送らず止めた。実行ファイルが sh より古い。ccnavi を更新して（ccnavi-install）から打ち直してください。" 1
 }
 
 op_set() {

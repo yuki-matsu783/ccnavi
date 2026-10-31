@@ -193,37 +193,8 @@ accept_before_place() {
 # 下書きは残す（打ち直せば投稿できる）。下書きの名前は exe と揃える（親の識別子。ブランチ名と違うことがある）。
 
 post_decision() {
-	if [ -n "$op_id" ]; then
-		# 取れなければ post_warning に言う（置いたあとなので決めたことは戻さない）
-		post_decision_staged || :
-		return 0
-	fi
-	issue_url=""
-	post_warning=""
-	number=$("$JQ" '.mr.number' "$result")
-	url=$("$JQ" -r '.mr.url' "$result")
-	issue_draft="$state/review-issue-$family-$1.md"
-	noted="$state/review-decide-$family-$1.md"
-	if [ -f "$issue_draft" ]; then
-		issue=$(create_issue "$issue_draft" || :)
-		if [ -n "$issue" ]; then
-			issue_url=$(printf '%s' "$issue" | "$JQ" -r '.url')
-			issue_no=$(printf '%s' "$issue" | "$JQ" -r '.number')
-			[ -f "$noted" ] && printf '\nissue に回した分: #%s %s\n' "$issue_no" "$issue_url" >>"$noted"
-			rm -f "$issue_draft"
-		else
-			post_warning="issue を作れなかった。下書きは $issue_draft にある"
-		fi
-	fi
-	if [ -f "$noted" ]; then
-		# comment は api と jq のパイプで、終了コードは jq のもの。投稿の失敗は URL が空で見分ける
-		posted=$(comment "$number" "$url" "$noted" || :)
-		if [ -n "$(printf '%s' "$posted" | "$JQ" -r '.url // empty' 2>/dev/null)" ]; then
-			rm -f "$noted"
-		else
-			post_warning="${post_warning:+${post_warning}。}マージリクエストにコメントを残せなかった。下書きは $noted にある"
-		fi
-	fi
+	# 取れなければ post_warning に言う（置いたあとなので決めたことは戻さない）
+	post_decision_staged || :
 }
 
 # --resume の終わりに言うこと。

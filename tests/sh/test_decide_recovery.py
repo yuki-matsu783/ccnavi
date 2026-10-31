@@ -21,6 +21,7 @@ import time
 import unittest
 
 from ccnavi.tickets.model import oplog
+from tests.sh import decide_support as support
 from tests.sh import test_decide_ops as ops
 from tests.sh import test_review_decide as base
 
@@ -28,7 +29,7 @@ GitLab = ops.GitLab
 STORE = ops.STORE
 
 # `--yes` の代役に「置く段階で失敗する」「ホストに書いたあとの照合が外れた」形を足す。
-STUB = ops.STUB.replace(
+STUB = support.STUB.replace(
     '  [ -z "$STUB_FAIL_YES" ] || { echo "置けない" >&2; exit 1; }\n',
     '  [ -z "$STUB_FAIL_YES" ] || { echo "置けない" >&2; exit 1; }\n'
     '  if [ -n "$STUB_MISMATCH" ]; then\n'
@@ -50,7 +51,7 @@ class DecideRecoveryShTest(unittest.TestCase):
     def setUp(self):
         ops.DecideOpsShTest.setUp(self)
         with open(self.stub, "w", encoding="utf-8") as f:
-            f.write(STUB.replace("{compat}", str(ops.version.COMPAT)))
+            f.write(STUB.replace("{compat}", str(support.version.COMPAT)))
         # 以降の run_decide が使う cwd（AT25 で替える）
         self.cwd = self.tree
 
@@ -61,11 +62,11 @@ class DecideRecoveryShTest(unittest.TestCase):
 
     def run_decide(self, *args: str, stdin: str = "", **extra: str):
         env = dict(
-            STUB_PY=ops.sys.executable,
+            STUB_PY=support.sys.executable,
             STUB_BEGIN=self.begin,
             STUB_MRURL=self.mr_url,
             STUB_MISMATCH="",
-            PYTHONPATH=os.path.join(ops.ROOT, "src"),
+            PYTHONPATH=os.path.join(support.ROOT, "src"),
         )
         env.update(extra)
         return self.decide_with_input(args, stdin, env)
