@@ -8,14 +8,13 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 
 # プロジェクトを置いて作業する
 
-ワークスペースの下に別のリポジトリをcloneして、そのリポジトリを直すことがある（設計11）。置き場は
+ワークスペースの下に別のリポジトリをcloneして、そのリポジトリを直すことがある。置き場は
 `projects/<名前>/`の直下1段だけで、それより深い場所や置き場の外にあるものはプロジェクトとして扱わない。
 `projects/`が無いか空なら、以下の説明はすべてワークスペース自身の作業に適用して読む。
 
 - プロジェクトで作業するときは、`cd projects/<名前>`してから`ccnavi-git.sh`を実行する。gitの操作はそのリポジトリに対して行われる
 - チケットは`project:`キーを持つ。値は`projects/`の下の名前で、ユーザが承認するときに決まる。エージェントが申告した値は判定に使われない
-- プロジェクトのissueから始める親の識別子は`feature-<番号>-<プロジェクト名>-<slug>`にする。issueの番号はリポジトリごとなので、slugの頭のプロジェクト名でワークスペースのissueと名前を分ける
-- 親の識別子は親のブランチ名の`/`を`-`に置き換えたもの。プロジェクトに既にある`/`を含むブランチで作業するときも、`ccnavi-start.sh`がそのブランチを直接チェックアウトしたワークツリーを作る。識別子・ファイル名・ワークツリー名・ロックのキーは`/`を含まない。親のブランチ名は親のワークツリーのHEADから読む
+- プロジェクトのissueから始める親の識別子は`feature-<番号>-<プロジェクト名>-<slug>`にする。issueの番号はリポジトリごとなので、slugの頭のプロジェクト名でワークスペースのissueと名前を分ける。識別子の一般の決まりは[worktree-start.md](worktree-start.md)と[worktree.md](worktree.md)
 
 ## 何がどこに置かれるか
 
@@ -24,20 +23,20 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 | 提案（承認待ち`todo/`、レビュー待ち`review/`） | そのツリーの`wip/proposals/<状態>/`。プロジェクト向けは`projects/<名前>/wip/proposals/<状態>/` |
 | 承認済みチケット（作業中`doing/`、閉じた`done/`）、フェーズのマーカー、子の記録（`.risk.json`など） | 親チケットのツリーの`.ccnavi/approved/`。プロジェクト向けは`projects/<名前>/.ccnavi/approved/` |
 | gitのラッパースクリプトの記録 | ワークスペースの`logs/<プロジェクト>/`。ワークスペース自身の記録は`logs/` |
-| 判定の記録とstateの置き場 | ワークスペースの`logs/decisions.jsonl`と`logs/state/`（親を閉じたあとの片付けの記録は`logs/state/retire/<親の識別子>.json`で、ロックは`logs/state/locks/<リポジトリ>/<親の識別子>`。親子ごとの取り込み状態は持たない） |
+| 判定の記録とstateの置き場 | ワークスペースの`logs/decisions.jsonl`と`logs/state/` |
 | ワークツリー | ワークスペースの`.claude/worktrees/<名前>` |
 | 子のフロー（担当のサブエージェントが読む手順書） | 親チケットのツリーの`.ccnavi/approved/flows/<子>.yml`。置き場は固定。中身はYAML。チケットの欄で場所を指定しない |
 | 閉じたチケットの退避（`ready`がDraftを外す前に、閉じた親子のチケットの`done/`・`phases/<親>/`・`flows/`を移す）。手元の機械にだけ残る | ワークスペースの`logs/archive/<リポジトリ>/`。ワークスペース自身は`self`、プロジェクトはその名前。その下は承認済みの領域と同じ構成 |
 | 子のフローの下書き（エージェントが書く。効力は無い） | フローを保存するツリーと同じツリーの`wip/proposals/flows/<子>.yml`。プロジェクト向けは`projects/<名前>/wip/proposals/flows/<子>.yml` |
-| 作業・レビュー計画のテンプレート（効力のあるもの。計画と子のフローの一式） | 共通は`.ccnavi/config/common/templates/<名前>.yml`、プロジェクトは`.ccnavi/config/project/templates/<名前>.yml`。取り込むのはユーザ（`.ccnavi/docs/templates.md`） |
+| 作業・レビュー計画のテンプレート（効力のあるもの。計画と子のフローの一式） | 共通は`.ccnavi/config/common/templates/<名前>.yml`、プロジェクトは`.ccnavi/config/project/templates/<名前>.yml`。取り込むのはユーザ（[templates.md](templates.md)） |
 | テンプレートの下書き（エージェントが書く。効力は無い） | 反映する先と同じ相対パスで`wip/handoff/`の下（`wip/handoff/.ccnavi/config/project/templates/<名前>.yml`など）。プロジェクト向けは`projects/<名前>/wip/handoff/…`。取り込むのはユーザ（`ccnavi-user-handoff.sh`） |
 | ユーザに渡す物（保護対象を直したコピーなど） | ワークスペースのワークツリーの`wip/handoff/`（追跡する。直接作業では`integrate`が取り込み結果から外す） |
-| 使い捨てのファイル・コミットしたくないもの | ワークスペースルート直下の`scratchpad/`（`.gitignore`で追跡から外す。`.ccnavi/docs/scratchpad.md`）。セッションのスクラッチパッドには置かない。プロジェクトの`projects/<名前>/`には`wip/`の規約が無いので、プロジェクトの作業中の置き物もワークスペース側に置く |
+| 使い捨てのファイル・コミットしたくないもの | ワークスペースルート直下の`scratchpad/`（`.gitignore`で追跡から外す。[scratchpad.md](scratchpad.md)）。セッションのスクラッチパッドには置かない。プロジェクトの`projects/<名前>/`には`wip/`の規約が無いので、プロジェクトの作業中の置き物もワークスペース側に置く |
 | ワークスペースのルール | 共通レイヤーの`.ccnavi/config/common/rules.yml`。リスクの配点とフェーズ定義（`phases.yml`）も同じ場所。レイアウトに依存するフェーズ定義は自身のレイヤーの`.ccnavi/config/project/phases.yml` |
-| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/project/`（`rules.yml`・`phases.yml`・`risks.yml`）。ここはプロジェクト専用で、着手では上書きされない。親チケットに着手したあと、ユーザの発言のたびに、共通レイヤーは親のワークツリーのプロジェクトの`.ccnavi/config/common/`にミラーされる（設計11.12。ずれは`ccnavi-user-mirror.sh`で見て、揃えるのはユーザ。`skills/`の工程スキルも同じ入口で揃う）。フェーズ定義は共通レイヤーと`config/project/`の和 |
+| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/project/`（`rules.yml`・`phases.yml`・`risks.yml`）。ここはプロジェクト専用で、着手では上書きされない。親チケットに着手したあと、ユーザの発言のたびに、共通レイヤーは親のワークツリーのプロジェクトの`.ccnavi/config/common/`にミラーされる（ずれは`ccnavi-user-mirror.sh`で見て、揃えるのはユーザ。`skills/`の工程スキルも同じ入口で揃う）。フェーズ定義は共通レイヤーと`config/project/`の和 |
 
 プロジェクトのgitリポジトリに入るのは、提案、承認済みチケットとマーカー、プロジェクトの設定の3つ。
-承認とフェーズの進み具合は親チケットのブランチに含まれて他の機械へ届くので、cloneすれば続きから作業できる（設計9.2、REQ-MLT-14）。
+承認とフェーズの進み具合は親チケットのブランチに含まれて他の機械へ届くので、cloneすれば続きから作業できる。
 別の機械で続きをするのに必要な、依頼時のHEAD、リスクの点は、すべて`.ccnavi/approved/phases/<親>/`にある。
 Draftを外したマーカー（`ready.json`）は、`ready`が閉じたチケットと一緒にワークスペースの`logs/archive/`へ退避するので、
 ブランチでは他の機械へ届かない。記録とstateの置き場（`logs/`）とワークツリーはワークスペース側に置き、gitには入れない。

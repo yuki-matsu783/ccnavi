@@ -21,7 +21,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 
 | ファイル | 中身 |
 |---|---|
-| `requests.json` | GitLab API の列（40 本。sh が打つ 23 本、Chrome 拡張だけが打つ 16 本、受入シナリオの相手側の記録だけが読む 1 本）。本物には全部、`fake_gitlab.py` には `sh` と `scenarios` の要求、`MockGitLab` には `chrome` の要求だけを送る。各要求に `expect_status` と `reads` を持つ |
+| `requests.json` | GitLab API の列（sh が打つもの、Chrome 拡張だけが打つもの、受入シナリオの相手側の記録だけが読むもの）。本物には全部、`fake_gitlab.py` には `sh` と `scenarios` の要求、`MockGitLab` には `chrome` の要求だけを送る。各要求に `expect_status` と `reads` を持つ |
 | `recorded.json` | 本物から録った形。**本物だけ**。`uv run python tests/manual/gitlab/record_contract.py` で作る |
 | `recorded.sample.json` | 模擬から作ったサンプル（`"source": "sample"`）。`uv run python -m tests.contract.fakeside` で作り直す |
 | `normalize-cases.json` | 正規化の入力と期待の対の表。Python のテストと、Chrome 拡張の TypeScript の試験（`test/helpers/shape.ts`）が同じ表を読む |
@@ -138,7 +138,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
   "source": "gitlab",
   "gitlab_image": "gitlab/gitlab-ce@sha256:…（docker_gitlab.py の GITLAB_IMAGE）",
   "gitlab_version": "19.4.1",
-  "recorded_at": "2026-10-26",
+  "recorded_at": "<録った日>",
   "not_recorded": ["headers", "page2", "error_403"],
   "requests": {
     "mr_get": {"status": 200, "shape": {"t": ["object"], "keys": {"iid": {"t": ["integer"]}}}}
@@ -159,19 +159,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 - 許可したのに実際は差が出ていない項目は失敗する（古い許可の検出）。模擬を直したら外す
 - `not_recorded` は、録らないものの宣言（ヘッダ・2 ページ目・403）。比べる対象ではない
 
-**`entries`（fake 側）と `chrome_entries` の項目は 0 件**。`reads` で絞ったうえで、録った差は全部模擬を直して消した。版差や EE の機能（直せない差）が出たら、理由つきで足す。見本の許可は別キーの `host_entries`（下の「見本」）。
-
-### 契約テストが見つけた模擬の誤り
-
-録った本物と比べて見つかり、模擬（`tests/fake_gitlab.py`・`fakeside.scene_state()`）を直したもの。
-
-- issue の応答に、状態が内部に持つ `notes` が漏れていた（`issue_get` など）
-- `closes_issues` が `references` を返していた。本物は返さないので、sh の `.references.full // …` の代替の枝が、模擬では通っていなかった
-- スレッドへの返信のメモが `system`・`resolvable`・`resolved` を持たなかった
-- `project` が `archived`・`issues_enabled`・`issues_access_level`・`permissions` を返さなかった（拡張の権限の検査が読む）
-- MR の応答が `draft`・`sha`・`description` を返さなかった（sh が `.draft` と `.sha` を読む）
-- 作成・取得したメモと issue の `author` が無かった
-- スレッドのメモに `type`（`DiscussionNote`。system のメモは null）が無かった
+`entries`（fake 側）と `chrome_entries` は、録った差を模擬を直して消し、0 件に保つ。版差や EE の機能（直せない差）が出たら、理由つきで足す。見本の許可は別キーの `host_entries`（下の「見本」）。
 
 ## 見本（gitlab_host.py）
 
@@ -220,14 +208,12 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 
 `extensions/chrome/ccnavi-approval/test/gitlab-contract.test.ts`（`pnpm test`。`--e2e` には入れない）が、`MockGitLab` の `handle` を直接呼び、`used_by` に `chrome` を持つ要求だけを `recorded.json` と `reads` で比べる。比較器 `test/helpers/shape.ts` は `shape.py` の写しで、名前も規則も同じ。正本は Python で、規則を変えたいときは Python を直し、`normalize-cases.json` を直してから TS を合わせる。
 
-- 比べる要求（`used_by` に `chrome` を持つ 22 本）: `user`・`project`・`mrs_merged`・`mr_create`・`error_401`・`error_404` と、拡張だけの 16 本（上の「要求の列」）。`MockGitLab` が 404 か形の違う応答を返す要求（`member` など）は `chrome` を付けず、比べない
-- 拡張だけの要求は、`MockGitLab` の `GET repository/commits` が `ref_name` にブランチ名を取り `committed_date` を返すこと、`GET personal_access_tokens/self` が `scopes` を返せること（`glScopes`）を、本物に合わせて直した。`chrome_entries` は 0 件のまま
+- 比べる要求（`used_by` に `chrome` を持つもの）: `user`・`project`・`mrs_merged`・`mr_create`・`error_401`・`error_404` と、拡張だけの要求（上の「要求の列」）。`MockGitLab` が 404 か形の違う応答を返す要求（`member` など）は `chrome` を付けず、比べない
 - 場面は `gitlab-contract.test.ts` の `mock()` が組む（上の「場面の分担」）
 - `mrs_opened` は比べない。`source_branch` を付けると `MockGitLab` は `pulls` から `iid`・`source_project_id`・`web_url` だけを返し、場面を付けると見本から返すため、`reads` の範囲で答える経路がない
 - 見本（`test/fixtures/host/gitlab/*`）から返す応答は比べない。手で組んだもので、本物の形を写していない
 - 許可リストは `chrome_entries`（`entries` に混ぜない。`apply_allow` が当たらない項目を古い許可として落とす）
 - 同じ生の入力を Python と TS で正規化して一致することも確かめる。`uv` が無ければ、その試験は skip と出る
-- `shape.py`・`normalize-cases.json`・`requests.json`・`recorded.json` を直したら、`pnpm test` も回す。`python -m tests tests/contract` は TS を回さないので、食い違いは `pnpm test` を回すまで見つからない
 
 ## 限界
 
@@ -247,15 +233,15 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 
 ## 模擬を直したとき
 
-`tests/fake_gitlab.py` の応答、または見本（`tests/sh/gitlab_host.py`・`extensions/chrome/ccnavi-approval/test/fixtures/host/gitlab/`）を変えたら、**必ず** `uv run python -m tests tests/contract` を回す（`tests/fake_gitlab.py` を変えるコミットの前）。Chrome 拡張の `MockGitLab`（`test/helpers/mock-gitlab.ts`）を変えたら、`extensions/chrome/ccnavi-approval` で `pnpm test` を回す。落ちたら、本物に合わせて模擬を直す（基本）。版差・EE など直せない差だけ、意図した差として許可リストに理由つきで足す。サンプルが古くなって落ちたら `uv run python -m tests.contract.fakeside` で作り直す（本物の記録 `recorded.json` は作り直さない）。
+回すテスト（`contract` と、Chrome 拡張の `pnpm test`）は[ccnaviのPythonのテストを回す](testing.md)の「どのグループを回すか」に従う。落ちたら、本物に合わせて模擬を直す（基本）。版差・EE など直せない差だけ、意図した差として許可リストに理由つきで足す。サンプルが古くなって落ちたら `uv run python -m tests.contract.fakeside` で作り直す（本物の記録 `recorded.json` は作り直さない）。
 
 ## 録り直し（本物の GitLab）
 
-録り直すのは「模擬が返すキーを足して `reads` を変えたとき」「sh や拡張が読むキーが変わったとき」「GitLab の版（`GITLAB_IMAGE`）を上げるとき」。録るのは手動で、自動テストは Docker を使わない。
+録り直すのは「模擬が返すキーを足して `reads` を変えたとき」「sh や拡張が読むキーが変わったとき」「GitLab の版（`GITLAB_IMAGE`）を上げるとき」。録るのは手動で、自動テストは Docker を使わない。GitLab の起動・トークン・他の作業との共用は[手動の GitLab](gitlab-manual.md)に従う。
 
-1. `uv run python tests/manual/gitlab/docker_gitlab.py status` で、コンテナが healthy・トークンが「有効」であることを確かめる。動いていなければ [gitlab-manual.md](gitlab-manual.md) のとおりに起こす（`record_contract.py` は起動も停止もしない）。他の作業が使っているかもしれないので、`down`・`up --rotate`・`docker restart` などは打たない。トークンは `docker_gitlab.py` が書く `tokens.env` から読む
+1. `uv run python tests/manual/gitlab/docker_gitlab.py status` で、コンテナが healthy・トークンが「有効」であることを確かめる。動いていなければ [gitlab-manual.md](gitlab-manual.md) のとおりに起こす（`record_contract.py` は起動も停止もしない。トークンは `tokens.env` から読む）
 2. `uv run python tests/manual/gitlab/record_contract.py --dry-run > /dev/null` で試す（置かない。検査に当たれば理由を標準エラーに出す）
-3. `uv run python tests/manual/gitlab/record_contract.py` で録る。約 1 分。使い捨てのプロジェクト `p551-<乱数>` を作って場面を組み、`requests.json` の列を送り、終わったら消す（自分が作ったものだけ。途中で失敗しても消す。`CCNAVI_PROBE_KEEP=1` で残せる）。**2 回録り（2 回目は別のプロジェクト）、`reads` の各キーの型が一致すること**を確かめる。一致しないキーは、`reads` から外すか、型の和集合で済むかを判断する
+3. `uv run python tests/manual/gitlab/record_contract.py` で録る。使い捨てのプロジェクト `p551-<乱数>` を作って場面を組み、`requests.json` の列を送り、終わったら消す（自分が作ったものだけ。途中で失敗しても消す。`CCNAVI_PROBE_KEEP=1` で残せる）。**2 回録り（2 回目は別のプロジェクト）、`reads` の各キーの型が一致すること**を確かめる。一致しないキーは、`reads` から外すか、型の和集合で済むかを判断する
 4. 置く前の検査に 1 つでも当たれば `recorded.json` を置かない: 期待のステータスと違う応答、`NON_EMPTY` の配列が空、`reads` のキーが記録に無い、禁止文字列、動いているコンテナのイメージが `GITLAB_IMAGE` と違う。通れば同じ場所の一時ファイルに書いて `os.replace` で置く
 5. `uv run python -m tests tests/contract` を回す。落ちたら、本物に合わせて模擬を直す。意図した差なら許可リストに理由つきで足す
 

@@ -14,7 +14,7 @@ keywords: [Stop, nudge, dry-run, 促し, finish, "match: Stop", NUDGE_STOP_RULE]
 ADR-0087（`finish` の促し）と ADR-0090（`match: Stop` のルール）は、`dry-run` では止めず、
 止めたはずの文を `systemMessage` に載せていた。`systemMessage` はユーザにしか届かない。
 `Stop` でモデルに文を届ける経路は、止めて `reason` に書くことしか無いので、`dry-run` のワークスペースでは
-促しがモデルに一度も届かず、振り返りも `finish` の打ち忘れの指摘も働かなかった（2026-10-11、ユーザの指摘）。
+促しがモデルに一度も届かず、振り返りも `finish` の打ち忘れの指摘も働かなかった（ユーザの指摘）。
 
 ## 決定
 

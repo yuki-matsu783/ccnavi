@@ -122,7 +122,7 @@ keywords: [拡張, テスト, ターン終わり, グループ, Stop, hook, 効�
   絞るには入口の一覧を組み立てることになる。型の検査が「テストが読むぶんだけ」に狭まり、
   拡張ホスト側の型の誤りが落ちなくなる
 
-## 追記（2026-10-11）
+## 追記: 拡張の置き場
 
 - 拡張の置き場は、いまは `vscode-extension/ccnavi-board` ではなく `extensions/vscode/ccnavi-board`。
   入口は `extensions/vscode/ccnavi-board/scripts/test-groups.js`。グループに `workflow` が加わった

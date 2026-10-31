@@ -7,7 +7,7 @@ keywords: [ccnavi-index.jsonl, index.jsonl, 索引, .gitignore, プロジェク�
 ---
 # ADR-0112: 索引を ccnavi-index.jsonl にし、無視の行が無いツリーには .gitignore に足して索引の対象にする
 
-状態: 採用（2026-10-11 にユーザが決めた）
+状態: 採用（ユーザが決めた）
 
 ## 状況
 

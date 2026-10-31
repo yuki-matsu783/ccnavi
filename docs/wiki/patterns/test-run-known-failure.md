@@ -1,6 +1,8 @@
 ---
 title: 既知の失敗がある間の全件テスト
 type: learning-wiki
+target: skill
+sources: [feature-207]
 description: 既知の失敗で python -m tests が途中で止まり、bench が数分かかり、レビュー準備中は全件を回せないパターン
 tags: [skills, feedback]
 keywords: [テスト, 全件, 既知の失敗, python -m tests, discover, bench, レビュー準備中, finish]

@@ -18,12 +18,12 @@ state を内部で外す。拡張と `scripts/check_rules.py` は念のため `-
 |---|---|---|
 | `--test <ツール> <対象> [--json] [--cwd <ディレクトリ>] [--permission-mode <モード>] [--agent-id <id>]` | 判定・根拠コード・判定に渡した payload・ヒットしたルール（タイプ、書いた式、翻訳後の正規表現、`file` か `outside`）・行き着く先・縮退したか既定を使ったか・ヒットした中で実行されるコマンド（`unwrapped`、6.3.1）・返る文面。ヒットしたルールは判定が適用したもの（`Record.hits`）そのもので、ルールファイルを読み直さない。組み込み（保護・退避した既定）は `outside` で、式は頭だけに切る。モードは常に `enable`。payload の 3 つの欄は hook が Claude Code から受け取るもので、既定はルート・権限モード無し・メイン。知らない権限モードと無いディレクトリは断る。切り替えの環境変数（`CCNAVI_GUARD_UNWATCHED` など）は hook と同じ関数で解いてから判定に渡す。`--test Stop "(stop)"` はターンの終わりに使われるルール（6.6）を並べ、あれば `allow`、無ければ `skip`。期待の `tool: Stop` も同じ | 0。payload の欄の誤り・2 語（ツールと対象）にオプションが入った形・余った語は 1 |
 | `--test-expectations <期待> [--json]` | 期待する判定をすべて判定に掛け、期待と食い違ったものを名指し | 文字の出力は食い違いがあれば 1、JSON は常に 0、期待のファイルが読めなければ 1 |
-| `--explain [--json]` | タイプごとのルール、プロジェクトの一覧とルールの可否、権限モードの扱い（権限モード × 読めたか読み切れないかの結末を、判定と同じ `judge.undeclared_verdict` で組む）、チケット制御の値、元のプロジェクトが無いワークツリー（節「■ 元のプロジェクトが無いワークツリー」。該当があるときだけ。11.3）、承認済みチケットの一覧、親の局面、フェーズごとの状態・マーカー・止まっているか・リスク、上位の設定に却下された要求（節「■ 上位の設定に却下された要求」。全件を 1 件 1 行で、該当があるときだけ。REQ-SES-02） | 0 |
+| `--explain [--json]` | タイプごとのルール、プロジェクトの一覧とルールの可否、権限モードの扱い（権限モード × 読めたか読み切れないかの結末を、判定と同じ `judge.undeclared_verdict` で組む）、チケット制御の値、元のプロジェクトが無いワークツリー（節「■ 元のプロジェクトが無いワークツリー」。該当があるときだけ。11.3）、「dry-run のときに止めるもの」と「判定に達せなかったとき」（内部の例外・期限切れ・payload が読めない。ツールごとの扱い）、承認済みチケットの一覧、親の局面、フェーズごとの状態・マーカー・止まっているか・リスク、上位の設定に却下された要求（節「■ 上位の設定に却下された要求」。全件を 1 件 1 行で、該当があるときだけ。REQ-SES-02） | 0 |
 | `--lint [--json]` | 判定を行わず、防御を無効化しうる記述を error と warn に分けて報告。ルール・フェーズ定義・配点・settings.json の登録・チケット・プロジェクトを見る | error があれば 1 |
-| `--suggest [--json]` | 記録（`decisions.jsonl` と、同じ置き場で回した `decisions.*.jsonl`）から、ルールの候補を `rules.yml` と `rule-expectations.yml` の形の下書きで出す。どのルールも言及せず何度も渡った形は `ask` のルールの候補、同じ呼び出しを N 回以上止めた `deny` は `message` を見直す候補。候補ごとに `--lint` と同じ読みと `--test-expectations` と同じ判定で確かめ、通ったものだけを出す（ルールを足す候補は共通レイヤーのコピーに足した一時ファイルで試す） | 常に 0 |
+| `--suggest [--json]` | 記録（`decisions.jsonl` と、同じ置き場で回した `decisions.*.jsonl`）から、ルールの候補を `rules.yml` と `rule-expectations.yml` の形の下書きで出す。どのルールも言及せず 5 回以上渡った形は `ask` のルールの候補（形は Bash なら先頭のコマンドとサブコマンド、パスのツールならディレクトリの下、WebFetch ならホストの下）、同じ呼び出しを `CCNAVI_DENY_REPEAT` 回以上止めた `deny` は `message` を見直す候補。出すのは `deny` と `ask` だけ。候補ごとに `rules:` 1 タイプぶんと `expectations:`（記録の呼び出しを 3 件まで、ルートは `/repo`）1 タイプぶんを YAML の文書 1 つで並べる。候補ごとに `--lint` と同じ読みと `--test-expectations` と同じ判定で確かめ、通ったものだけを出す（ルールを足す候補は共通レイヤーのコピーに足した一時ファイルで試す）。通らなかった形（いまのルールでは別の判定になる形、ルールファイルの外から来た根拠の拒否）は数だけを出す。読み切れなかった呼び出し（`degraded`）と、上限で切れた `subject` は数えない | 常に 0 |
 | `--version [--json]` | 版・組み立ての元のコミット（`build.py` が埋める。ソースでは `unknown`）・互換の版・受け付けるフラグ（引数の定義から引く）・読む書式の版。設定もワークスペースも読まない（docs/11_requirements/json-shapes.md「版の JSON」） | 0 |
 | `--lint [--json] --flow <パス>` | 上に加えて、子のフロー 1 本（9.3.1）を `SubagentStart` と同じ読み手・同じ検査で読み、読めなければ場所 `(flow)` の error で言う。読めたフローの構造と名前の怪しいところは warn。`--json` なら読めた中身を `flow.data`、渡る手順の行を `flow.rendered` に載せ（読めなければどちらも `null`）、選べる名前を `flow.candidates` に載せる。パスは起動した場所からの相対でよい | error があれば 1 |
-| `--docs [絞り込み] [--sort …] [-r] [--limit N] [--format table\|path\|detail\|json\|jsonl\|count]` | ワークスペースと、プロジェクトの置き場の直下の各プロジェクト（別の git）の md（それぞれの `git ls-files --cached --others --exclude-standard`、ccnavi ディレクトリの下は除く。ただし `.ccnavi/docs/` は載せる）を、頭の frontmatter の索引で横断して引く（`docsearch`）。パスはワークスペースルートから。md が直下にあるディレクトリごとの `ccnavi-index.jsonl` を差分で新しくしてから引く。書くのは git がそこの `ccnavi-index.jsonl` を無視しているときだけで、どのディレクトリでも無視していないツリーは、書く前にそのツリーの `.gitignore` に `**/ccnavi-index.jsonl` を 1 行だけ足して（ワークスペースもプロジェクトも同じ。足したことは標準エラーと SessionStart の案内で名指しする。未コミットの差分が残る）確かめ直す。`!` で否定する行がある（ユーザが追跡している）・足せない・足しても無視されないツリーだけが対象外になり、名指しされる。ccnavi の形でない `ccnavi-index.jsonl` はそのまま残し、実体がツリーの外に出るディレクトリは対象外にする。一時ファイルは `.git/` の中に作る（`.git` が別のファイルシステムなら、そのディレクトリの下の git に無視される `.ccnavi-tmp-*/ccnavi-index.jsonl`）。git への問い合わせの失敗は対象外と分けて言う。形は docs/21_design/diagnostics.md の 10.1「ドキュメントの索引」 | 引ければ 0（0 件でも）。使い方の誤りは 1 |
+| `--docs [絞り込み] [--sort …] [-r] [--limit N] [--format table\|path\|detail\|json\|jsonl\|count]` | ワークスペースと、プロジェクトの置き場の直下の各プロジェクト（別の git）の md（それぞれの `git ls-files --cached --others --exclude-standard`、ccnavi ディレクトリの下は除く。ただし `.ccnavi/docs/` は載せる）を、頭の frontmatter の索引で横断して引く（`docsearch`）。パスはワークスペースルートから。md が直下にあるディレクトリごとの `ccnavi-index.jsonl` を差分で新しくしてから引く。書くのは git がそこの `ccnavi-index.jsonl` を無視しているときだけで、どのディレクトリでも無視していないツリーは、書く前にそのツリーの `.gitignore` に `**/ccnavi-index.jsonl` を 1 行だけ足して（ワークスペースもプロジェクトも同じ。足したことは標準エラーと SessionStart の案内で名指しする。未コミットの差分が残る）確かめ直す。`!` で否定する行がある（ユーザが追跡している）・足せない・足しても無視されないツリーだけが対象外になり、名指しされる。ccnavi の形でない `ccnavi-index.jsonl` はそのまま残し、実体がツリーの外に出るディレクトリは対象外にする。一時ファイルは `.git/` の中に作る（`.git` が別のファイルシステムなら、そのディレクトリの下の git に無視される `.ccnavi-tmp-*/ccnavi-index.jsonl`）。git への問い合わせの失敗は対象外と分けて言う。形は 10.1「`--docs` の索引」 | 引ければ 0（0 件でも）。使い方の誤りは 1 |
 
 **レイヤーの置き場を動かすフラグは 8 本あり、どれも診断でだけ有効になる**。共通レイヤーの中身は
 `--rules` / `--phases` / `--risk`、レイヤーを探す先は `--projects`（プロジェクトのレイヤーの置き場）と
@@ -111,14 +111,18 @@ error がある間は配点もフェーズ定義も保存できない。
 - `parse_args` の `SystemExit` は捕まえて終了コード 1 にする
 - `ccnavi write-and-push family <親>` の答え（1 行目 `write-and-push 1`、`target yes|no|stop`）は、sh（write-and-push）だけでなく拡張も読む。
   フローを保存した後に承認の push を送るかを、これで決める
-- 診断ログ（`logs/diag/`）の行の形・置き場・レベルは、sh・Python・拡張の 3 つの logger で揃える（`.agents/docs/logging.md`）。
+- 診断ログ（`logs/diag/`）の行の形・置き場・レベルは、sh・Python・拡張の 3 つの logger で揃える。
   `tests/core/test_diaglog.py` が 3 つの行を突き合わせる
 - Chrome 拡張は `src/ccnavi/` を Pyodide に同梱し、公開の入口 `entry/ext.py` が再公開するモジュールを通して、判定のコア（`tickets/core/api.py`（実体は `core.base`・`core.approve`・`core.review`）の
-  Snapshot → 判定 → Changes）と `cli.run` を直接呼ぶ。呼ぶ名前の一覧は REQ-EXT-27 の表にある
+  Snapshot → 判定 → Changes）と `cli.run` を直接呼ぶ。拡張が呼ぶ名前は `entry/ext.py` の再公開に限り、一覧はその再公開（コード）が正で、ここには写さない。
+  本体のモジュールを動かすときは `ext.py` の行だけを直す。拡張は同じ版の本体と一緒に同梱するので、別の版の本体と拡張は組み合わさらない。
+  互換の版は、拡張が統合先のデータや出力の形を読み違えるような変更のときに上げ、呼び出しの名前だけを変えるときは上げない
+- 互換の版の書き方: 実行ファイル側は `entry/version.py` の行頭から始まる 1 行 `COMPAT = <整数>` で、Chrome 拡張の組み立てが正規表現で読む。
+  VS Code 拡張側は `EXTENSION_COMPAT`。3 か所（実行ファイル・sh の `CCNAVI_COMPAT`・拡張）の突き合わせは `tests/sh/test_compat_skew.py` が見る
 
 ### 10.1 `--docs` の索引
 
-使い方は [ドキュメントの索引の使い方](../41_guide/docs-search.md)。ここは索引の作り方と形を書く。
+ここは索引の作り方と形を書く。
 
 引くのはワークスペースと、プロジェクトの置き場の直下の各プロジェクト（それぞれ別の git）を合わせたもの。どこから打っても同じで、
 パス（`concept_id`）はワークスペースルートから書く（`projects/lib/docs/x`）。`--path projects/lib` で 1 つのプロジェクトに絞れる。
@@ -174,7 +178,7 @@ argparse が止めていた打ち間違いを、知らせずに通さないた�
 `ccnavi-index.jsonl` と `--format jsonl` の 1 行、`--format json` の配列の要素は同じ形。
 
 ```json
-{"concept_id":".ccnavi/docs/worktree","directory":".ccnavi/docs","frontmatter":{"type":"guide","tags":["worktree","git"]},"mtime":"2026-09-27T19:56:23"}
+{"concept_id":".ccnavi/docs/worktree","directory":".ccnavi/docs","frontmatter":{"type":"guide","tags":["worktree","git"]},"mtime":"<更新日時>"}
 ```
 
 | キー | 何 |

@@ -73,7 +73,7 @@ set -eu
 SETTINGS_REL=".claude/settings.json"
 # VS Code へ渡す設定。値ではなくキーがあるかどうかを見て、足りないものだけを足す。
 # `git.detectWorktrees` は、.claude/worktrees/ の中のワークツリーをソース管理の
-# ビューに表示する（docs/41_guide/install.md「VS Code からワークツリーを見る」）。
+# ビューに表示する（docs/50_guide/install.md「VS Code からワークツリーを見る」）。
 # `git.repositoryScanMaxDepth` は、projects/<名前>/ のようにワークスペースルートから 2 階層下の
 # リポジトリを見つけるために 2 にする（既定は 1 で、ルートの直下の階層までしか探さない）。
 VSCODE_REL=".vscode/settings.json"
@@ -83,7 +83,7 @@ VSCODE_KEYS='{"git.detectWorktrees": true, "git.repositoryScanMaxDepth": 2}'
 HOOK_COMMAND='"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}"'
 HOOK_TIMEOUT=10
 # 8 つのイベントすべてに登録する。1 つでも欠けると、そのイベントでしかできない処理が、
-# 気づかないうちに行われなくなる。何が行われなくなるかは docs/41_guide/settings.md「設定」の表にある。
+# 気づかないうちに行われなくなる。何が行われなくなるかは docs/50_guide/settings.md「設定」の表にある。
 EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse PostToolUseFailure Stop SubagentStart SubagentStop"
 # セッションの開始時に、承認済みチケットとマーカー（親ブランチに含まれて届く）と、ワークツリーの
 # 起点になる統合先ブランチを取得する sh。本体とは別の 1 行として SessionStart に登録する。
@@ -141,7 +141,7 @@ DEPLOY_TEMPLATES_DIR=".ccnavi/config/common/templates"
 # *.yml を全部配る。ccnavi の仕組み側のもので、設定ではないので .ccnavi/config/ の外に置く。
 # 無いと sh と hook の文は短い既定の文に落ちる（止める・止めないは変わらない）。
 DEPLOY_MESSAGES_DIR=".ccnavi/messages"
-# 旧い置き場。自動では消さない（古い実行ファイルが走っている間に消すと、文が既定の文に落ちる）。
+# 古い置き場。自動では消さない（古い実行ファイルが走っている間に消すと、文が既定の文に落ちる）。
 DEPLOY_OLD_MESSAGES_DIR=".ccnavi/config/common/messages"
 # 配布先へ配るスキル。配布元の .claude/skills/ の中で、SKILL.md の frontmatter に `process: true`（共通の工程スキル）
 # か `distribute: true`（配るだけのスキル。ccnavi-config）を持つものだけを配る（.ccnavi/docs/skill-processes.md）。

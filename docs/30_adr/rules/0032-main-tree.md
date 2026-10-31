@@ -13,7 +13,7 @@ keywords: [ワークスペース, main, ルール, 保護, 編集, 直下]
 ## 状況
 
 「編集は worktree で」は AGENTS.md の指示だけで、hook はワークスペースルート直下の Write / Edit を
-通していた（allow の `source` と `project-files`）。2026-09-11。
+通していた（allow の `source` と `project-files`）。
 
 ## 決定
 

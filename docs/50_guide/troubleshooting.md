@@ -8,7 +8,7 @@ keywords: [つまずき, トラブル, hook が動かない, env, 再読み込�
 
 # つまずきやすい点
 
-導入や設定で起きやすいつまずきを、症状から引けるように並べる。実測の根拠は[実測で確かめた前提](../21_design/appendix.md)（Claude Code の挙動）にある。
+導入や設定で起きやすいつまずきを、症状から引けるように並べる。`scripts/` から始まる sh は ccnavi の根（zip を展開したフォルダか、clone した ccnavi のリポジトリ）で打つ（[導入と配布](install.md)の「どこで打つか」）。
 
 ## 設定が反映されない
 
@@ -20,15 +20,15 @@ keywords: [つまずき, トラブル, hook が動かない, env, 再読み込�
 
 ## hook が動かない
 
-- hook が起動しない。`env` から `CCNAVI_ENTRY_PATH` の 1 行が消えると、hook が起動しなくなる。`sh scripts/ccnavi-setup.sh <ワークスペースルート> --check` で揃っていないところを見る（[導入と配布](install.md)）
+- hook が起動しない。`env` から `CCNAVI_ENTRY_PATH` の 1 行が消えると、hook が起動しなくなる。ccnavi の根で `sh scripts/ccnavi-setup.sh <ワークスペースルート> --check` を打ち、揃っていないところを見る（[導入と配布](install.md)）
 - 一部のツールで hook が起動しない。`matcher` を絞ると、書かなかったツールで hook 自体が起動しなくなる。`matcher` は絞らない（[設定](settings.md)）
-- `projects/` のプロジェクトの中で hook が動かない。プロジェクトの中で Claude Code を起動すると `CLAUDE_PROJECT_DIR` がプロジェクトになり、ワークスペースの `.claude/settings.json` が読まれない。ワークスペースルートで起動して `cd` で入る
-- `ccnavi` をターミナルで直接打ったら、意図しない場所が根と見なされた。`CLAUDE_PROJECT_DIR` が無いターミナルや Bash ツールから `.claude/` を持つプロジェクトの中で打つと、`--root` を渡さない限りそのプロジェクトが根になる。`--root` を付けるか、sh のラッパーを通す
+- `projects/` のプロジェクトの中で hook が動かない。プロジェクトの中で Claude Code を起動すると `CLAUDE_PROJECT_DIR` がプロジェクトになり、ワークスペースの `.claude/settings.json` が読まれない。ワークスペースルートで起動して `cd` で入る（[設定](settings.md)の「置き場」）
+- `ccnavi` をターミナルで直接打ったら、意図しない場所が根と見なされた。`CLAUDE_PROJECT_DIR` が無いターミナルや Bash ツールから `.claude/` を持つプロジェクトの中で打つと、`--root` を渡さない限りそのプロジェクトが根になる。`--root` を付けるか、sh のラッパーを通す（[設定](settings.md)の「ワークスペースルートの決まり方」）
 
 ## 実行ファイルが見つからない・動かない
 
 - 終了コード 127。この機械の `<os>-<arch>` に合う実行ファイルが `.ccnavi/bin/` にも PATH にも無い。メッセージに探した置き場が出る。その機械で組み立てて配る（[導入と配布](install.md)）。PATH に通すなら、実行ファイル単体ではなく、隣に `_internal/` がある `dist/ccnavi/` を通す（単体のコピーは動かない）。PATH の ccnavi は sh と版を揃えて配られないので、古い版が動いていないか `ccnavi --version` で確かめる
-- 終了コード 126。実行ファイルか、振り分けの sh の実行ビットが外れている。別の機械で clone した直後に起きることがある。`sh scripts/ccnavi-setup.sh <ワークスペースルート>` を打ち直すと付け直す。`ccnavi --lint` も error として報告する
+- 終了コード 126。実行ファイルか、振り分けの sh の実行ビットが外れている。別の機械で clone した直後に起きることがある。ccnavi の根で `sh scripts/ccnavi-setup.sh <ワークスペースルート>` を打ち直すと付け直す。`ccnavi --lint` も error として報告する
 - 別の機械で組み立てたものが動かない。実行ファイルは組み立てた機械の OS と CPU でしか動かない。その機械で配る（[導入と配布](install.md)）
 
 ## 記録
@@ -38,7 +38,7 @@ keywords: [つまずき, トラブル, hook が動かない, env, 再読み込�
 
 ## ワークツリー
 
-- Windows でワークツリーが消せない。誰かのテストが同じ実体のファイルを読み込んでいる間は消せない。テストが走っていないときにやり直す。失敗したら、残ったディレクトリを `mv` で `.claude/worktrees/` の外へ出して `git worktree prune`。先に `sh .ccnavi/scripts/ccnavi-clean.sh <名前>` で生成物を消すと、`node_modules` で止まる分は避けられる（node が無ければ何も消さず、ユーザが打つ削除の 1 本を出して止まる）。理由と詳細は[実行環境の決まり](../../.agents/docs/environment.md)にある
+- Windows でワークツリーが消せない。誰かのテストが同じ実体のファイルを読み込んでいる間は消せない。テストが走っていないときにやり直す。失敗したら、残ったディレクトリを `mv` で `.claude/worktrees/` の外へ出して `git worktree prune`。先に `sh .ccnavi/scripts/ccnavi-clean.sh <名前>` で生成物を消すと、`node_modules` で止まる分は避けられる（node が無ければ何も消さず、ユーザが打つ削除の 1 本を出して止まる）
 - VS Code からワークツリーが見えない。`.vscode/settings.json` に `git.detectWorktrees` と `git.repositoryScanMaxDepth` が無い。導入スクリプトが書くが、`false` と書いてあれば変えない。`.vscode/settings.json` にコメントや末尾のカンマがあると何を足せばよいかだけを出す（[導入と配布](install.md)の「VS Code からワークツリーを見る」）
 
 ## ルール

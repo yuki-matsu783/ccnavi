@@ -16,7 +16,7 @@ ADR-0094 の置き場・crit の指摘の書き出し方・依頼文の末尾の
 ADR-0094 で、レビューの依頼（`ccnavi-review.sh request`）に ELI5 の HTML（`--eli5`）を必須にした。置き場は
 依頼文と同じ追跡しない場所（`wip/tmp/` など）で、ユーザは手元で `crit <パス>` を打って見て、crit で付けた指摘は
 エージェントが読んで `comment --body-file` でマージリクエストに書き出す手順だった。これには 2 つの問題があった
-（2026-10-01、ユーザと確かめた）。
+（ユーザと確かめた）。
 
 - 書き出す手間が手作業になる。エージェントが crit の出力を読み、本文を書き、投稿する
 - `comment` の投稿は機構の投稿（`<!-- ccnavi:comment -->`）で、`confirm` の未解決に数えないのが普通。
@@ -40,7 +40,7 @@ GitLab は `glab` を使う）。ただし送れるのはマージリクエス�
 **hook の側に置けないか（.agents/docs/exe-boundary.md）。** ADR-0094 と同じ理由で sh に置いた。加えて、HEAD に入っているかは
 git に聞く検査で、hook がコマンド行から決められるものではない。
 
-### crit の確認（2026-10-01、crit v0.21.0 の公開バイナリと、そのソース）
+### crit の確認（crit v0.21.0 の公開バイナリと、そのソース）
 
 - `crit <file.html>`（引数がその 1 つだけ）は preview モードになり、描画した HTML の要素に「ピン」を付ける。ピンは行を持たず
   （`start_line` 0、`dom_anchor` あり）、`crit push` は GitHub でも GitLab でもピンを送らない（`push --dry-run` で 0 件。ソースでは
@@ -48,7 +48,7 @@ git に聞く検査で、hook がコマンド行から決められるもので�
 - `crit review <file.html>` はファイルのモードになり、HTML のソースに行の指摘を付けられる。偽の `gh` で `crit push <番号>` を
   打つと、`POST repos/{owner}/{repo}/pulls/<番号>/reviews` に `{"event":"COMMENT","comments":[{"path":"wip/eli5/phase-1.html","line":4,"side":"RIGHT"}]}`
   を送った。GitHub ではレビューのコメント（`reviewThreads` の 1 件）になり、sh の `fetch` が未解決のスレッドとして取得する
-- 実物の GitHub（2026-10-12 に 1 アカウントで実測）: 手で組んだ同じ欄の `POST pulls/<番号>/reviews` を受け付け、`reviewThreads` の 1 件に
+- 実物の GitHub（1 アカウントで実測）: 手で組んだ同じ欄の `POST pulls/<番号>/reviews` を受け付け、`reviewThreads` の 1 件に
   なって sh の `fetch` が未解決として取る。差分に無い行・ファイルへのレビューは 422 で拒まれ、作られない
   （`tests/manual/github/probe_github.py`。crit 自身は起動していない）
 - 確かめていないもの: 実際の crit が `gh` で送る通し（送る欄が上の JSON と同じか）、`CHANGES_REQUESTED` を実物のホストが返す形（別のアカウントが要る）、本物の GitLab が受け付けるか（認証済みの `glab` と実物のマージリクエストが要る）、GitLab の
@@ -62,7 +62,7 @@ git に聞く検査で、hook がコマンド行から決められるもので�
 と、`tests/ticket/test_review_actor.py` の `test_a_crit_push_thread_is_counted_even_from_the_poster` が根拠。
 
 `crit push --event request-changes` は変更要求のレビューを出す。これは `decide` でも通せず、解くのはレビュアーの approve か dismiss だけ
-（9.10 の `confirm` の表）。
+（設計書の「レビューの依頼と確認」の節にある `confirm` の表）。
 
 ## 得たもの・失ったもの
 

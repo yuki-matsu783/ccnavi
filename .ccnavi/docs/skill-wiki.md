@@ -21,12 +21,19 @@ keywords: [wiki, パターン, impact, sources, target, purpose.md, 知識, 蓄�
 
 | ファイル | 書くこと |
 |---|---|
-| `patterns/<名前>.md` | 失敗や有効だった進め方 1 つ。説明、原因（なぜ起きるか）、実際の操作の例、回避策。10〜30 行に収める。成功したやり方も書く。frontmatter に `target`（反映先 1 つ）と `sources`（観測元の ID の一覧）を持つ |
-| `impact/<提案>.md` | 提案 1 本の対象・差分・決着（`status`: 承認待ち・承認・却下・延期）と理由。却下された提案は差分ごと残す |
+| `patterns/<名前>.md` | 失敗や有効だった進め方 1 つ。説明、原因（なぜ起きるか）、実際の操作の例、回避策。10〜30 行に収める。成功したやり方も書く |
+| `impact/<提案>.md` | 提案 1 本の対象・要点・差分・決着と理由。本文に要点と差分を書く。却下された提案は差分ごと残す |
+
+`ccnavi --learnings` はこの 2 つの frontmatter を読む。キーが足りないファイルは壊れたものとして名指しされ、数えられない。
+
+| ファイル | 必須のキー |
+|---|---|
+| `patterns/<名前>.md` | `type: learning-wiki`、`target`（反映先 1 つ。`rule` `risk` `phase` `template` `skill` `docs` のどれか）、`sources`（観測元の ID の一覧。空にしない） |
+| `impact/<提案>.md` | `type: learning-wiki`、`proposal`（提案の名前）、`target`、`files`（対象のパスの一覧）、`patterns`（動機のパターン名: そのときの観測元の数）、`status`（承認待ち・承認・却下・延期）、`decided_at`（決着の日時。タイムゾーン付き。承認待ちのときだけ空にできる）。決着の理由は `reason` に書く |
 
 一覧は `ccnavi --learnings`、経過は git の履歴で見る（`index.md` と `log.md` は置かない）。
 
-- 各ファイルの frontmatter は `.ccnavi/docs/frontmatter.md` に従う。`type` は `learning-wiki` にする
+- `title` `description` `tags` `keywords` は `.ccnavi/docs/frontmatter.md` に従う
 - パターンは重複して作らない。似たものがあれば、そのページに根拠を足すか言い直す。1 つの事実は 1 か所に書く
 - 溜めるのは「拾うもの」にヒットするものだけ。「拾わないもの」は wiki にも書かない
 - 採否は MR の結果か、ユーザの承認・却下で決まる。エージェントが推測で書かない。決着は MR の中で `impact/<提案>.md` に書いてマージする（手順は `learning-propose.md`）

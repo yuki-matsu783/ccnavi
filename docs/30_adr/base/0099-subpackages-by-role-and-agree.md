@@ -11,7 +11,7 @@ keywords: [サブパッケージ, 段, 循環, import, approval, agree, --agree,
 
 ## 状況
 
-2026-10-03。`ccnavi/` は 49 本のモジュールが 1 つのディレクトリに並んでいた。読む向きは
+`ccnavi/` は 49 本のモジュールが 1 つのディレクトリに並んでいた。読む向きは
 `tests/core/test_module_layers.py` の段（7 段）だけが持ち、ディレクトリにも名前にも現れなかった。
 段の検査は循環を 2 組だけ既知として通していた。
 
@@ -63,7 +63,7 @@ keywords: [サブパッケージ, 段, 循環, import, approval, agree, --agree,
 
 ## 後の変更: 7 つ目のサブパッケージ `catalog`
 
-2026-10-28。`hook/` に、hook の判定ではないモジュール（`docsearch.py`・`docsearch_index.py`・`docsearch_query.py`・`projskills.py`。約 1,700 行）が残っていた。文書の索引と `--docs` の引き方、プロジェクトのスキルの目録で、hook の他のモジュール（judge・post・events など）に依存しない。
+`hook/` に、hook の判定ではないモジュール（`docsearch.py`・`docsearch_index.py`・`docsearch_query.py`・`projskills.py`。約 1,700 行）が残っていた。文書の索引と `--docs` の引き方、プロジェクトのスキルの目録で、hook の他のモジュール（judge・post・events など）に依存しない。
 
 | 決めたこと | なぜ | 採らなかった側 |
 |---|---|---|

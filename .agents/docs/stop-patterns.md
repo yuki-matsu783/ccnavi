@@ -44,7 +44,7 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 
 ## 拒否の文面の型
 
-拒否の文は、それだけで読んで成立する。順に 4 つを書く。文は[文面ファイル](message-files.md)に置き、4 つの段は `deny` の欄（`what` `why` `next` `no_bypass`）になる。欄の欠け、`次:` の数、値の埋まり方は、文面ファイルの検査（`--lint` と `tests/core/test_texts_catalog.py`）が見る。
+拒否の文は、それだけで読んで成立する。順に 4 つを書く。文は[文面ファイル](message-files.md)に置き、4 つの段は `deny` の欄（`what` `why` `next` `no_bypass`）になる。欄の定義は設計書の文面ファイルの設計（`messages.md`）の「形式」の節にある。欄の欠け、`次:` の数、値の埋まり方は、文面ファイルの検査（`--lint` と `tests/core/test_texts_catalog.py`）が見る。
 
 | 段 | 書くこと |
 |---|---|
@@ -55,7 +55,7 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 
 - 組み込みルールの文（`RULE_*`。`RULE_ASK` の系統を除く）は `what` だけが必須で、`why` `next` `no_bypass` は省くか空にしてよい。ルールごとに止める対象が違い、言うことが無い段を作り足すと偽の文になるため。緩めるのは `RULE_*` に限る。`DENY_*` と `RULE_ASK` の系統は、行き止まりを作らないよう 4 つを必ず書く。`次:` を省いた `RULE_*` の文は、読むだけなら通ることや、頼む先（ユーザ）を `what` か `note` で言って、エージェントが次に何をするかが分かるようにする
 - 拒否コード（`DENY_*`）は、判定の根拠の種類を指す。1 つの種類に複数の宣言があるときは、コードを分けず、記録の `rules`（`builtin:` で始まる名前）と文面に、宣言の id を出す。コードを足したら、設計書の付録の理由コードの表と組み込みの名前の表に行を足す
-- 組み込みの拒否は `reasons.builtin_refusal(code, rule_id, subject, text)` で組む。先頭の行に、コードと記録の `rules` と同じ名前が並ぶ。`text` は `texts.say` が文面ファイルから組む（移した拒否。まだ移していないものは[文面の移行の一覧](message-migration.md)にある）
+- 組み込みの拒否は `reasons.builtin_refusal(code, rule_id, subject, text)` で組む。先頭の行に、コードと記録の `rules` と同じ名前が並ぶ。`text` は `texts.say` が文面ファイルから組む（まだ移していないものは[文面の移行の一覧](message-migration.md)にある）
 - 文言に ADR 番号を書かない（[実行環境とADRの扱い](environment.md)）
 - 経緯は書かない。いまの理由だけ書く
 - 点検項目:
@@ -64,8 +64,6 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
   - 確認（ask）が、あとの拒否を隠さない（上の節）
   - 記録が読めない・書けないときは、閉じる側に倒しても、文面が次の一手を言う
   - `dry-run` で止めるかを、分類（`GENERAL`・`GATE`・`AUX`）で決めた
-
-行き止まりの例（直した）: `ccnavi-git.sh integrate` が「直接作業の記録がありません」と言って `--adopt` を案内し、その `--adopt` が「チケットに結び付くワークツリーです」と断った。チケットに結び付く名前のとき、`integrate` は `--adopt` を言わず、マージリクエストで出すと言う。結び付くかの判定は `--adopt` と共通（`ccnavi_tree_bound`）。
 
 ## ターン分離の関門
 
