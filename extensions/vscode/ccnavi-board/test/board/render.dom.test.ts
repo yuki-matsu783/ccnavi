@@ -104,7 +104,7 @@ test("CB-T205 残った指摘は既定で全部「このフェーズで直す」
   });
   try {
     assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "decidePreview");
-    assert.equal(text(page, "#approval-title"), "フェーズ 2 で未解決（Unresolved）の指摘 2 件の対応方針");
+    assert.equal(text(page, "#approval-title"), "フェーズ 2 の指摘 2 件の対応方針");
     assert.ok(texts(page, ".approval-note").join(" ").includes("「このフェーズで直す」を 1 件でも選ぶと"));
     // 本文は 1 行目を出し、2 行以上あれば <details> で全文。HTML は文字として出す
     assert.deepEqual(texts(page, ".decide-first"), ["命名を直す", "<b>テスト</b>"]);

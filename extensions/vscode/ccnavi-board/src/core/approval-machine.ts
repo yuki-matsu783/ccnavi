@@ -64,7 +64,7 @@
  * ガードを 1 つ消したらテストが失敗することまで見るので、ガードを足したらそちらにも足す。
  */
 import type { ApprovalOverlay } from "./board-view.js";
-import { changedSinceSave, partialMessage, unsavedParents, unsavedText, type ApproveOutcome, type ApprovePreview, type PreviewParse } from "./approvemodel.js";
+import { changedSinceSave, HANDOVER_NOTE, partialMessage, unsavedParents, unsavedText, type ApproveOutcome, type ApprovePreview, type PreviewParse } from "./approvemodel.js";
 import { choicesProblem, type DecideOutcome, type DecidePreviewParse } from "./decidemodel.js";
 import type { PhaseChip } from "./board.js";
 import { consultPrompt, PUSH_APPROVED_SCRIPT } from "./commands.js";
@@ -532,7 +532,7 @@ function decideOpened(
   if (tree === undefined || chip === undefined) {
     return stay(state, {
       kind: "warn",
-      text: `親 ${parent} のワークツリーかフェーズ ${phase} がないので、未解決（Unresolved）の指摘を読み込めません`,
+      text: `親 ${parent} のワークツリーかフェーズ ${phase} がないので、レビューの指摘を読み込めません`,
     });
   }
   // 残った指摘を決めるのは、依頼を出してからユーザが見ている間だけ。待ちでなければ依頼の記録が無い
@@ -648,27 +648,27 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
     }
     const extra = value.pending_extra.length;
     const issued = value.issue_url ? ` issue に回した分: ${value.issue_url}` : "";
-    const handover = " Claude Code に伝えるプロンプトを用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。「ターミナルで実行」は、押すとすぐ確認なしで実行されます。";
+    const handover = ` ${HANDOVER_NOTE}`;
     const overlay = state.overlay;
     const where = overlay?.kind === "deciding" ? { parent: overlay.preview.parent, phase: overlay.preview.phase } : { parent: value.parent, phase: value.phase };
     let title: string;
     let note: string;
     if (value.followup) {
-      title = `フェーズ ${value.phase} の未解決（Unresolved）指摘の対応方針を決めました`;
+      title = "対応方針を確定しました";
       note =
-        `直す指摘を含む追加対応用の子チケット ${value.followup} を作成しました。フェーズを再開しました。` +
+        `直す指摘は、子チケット ${value.followup} に載せました（承認済み）。フェーズ ${value.phase} は作業に戻ります。` +
         // fix のスレッドはホスト上で未解決のまま残る。keep・issue のときに sh が返信して resolve する仕組みは対象外
-        "修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。エージェントは fix を理由に resolve しない。" +
-        (extra > 0 ? `表示した後に追加された指摘 ${extra} 件は判断待ちです（今回の判断の対象外です）。` : "");
+        "直したあとの確認と、MR 上の指摘を解決済みにするのは、あなたです。" +
+        (extra > 0 ? `表示した後に増えた指摘 ${extra} 件は、今回は判断していません。` : "");
     } else if (value.reviewed) {
       title = `フェーズ ${value.phase} をレビュー済みにしました`;
       note = "フェーズはレビュー済みになりました。";
     } else if (extra > 0) {
-      title = "表示した後に指摘が追加されたため、レビュー済みにしていません";
-      note = `今回の判断は適用済みです。追加された指摘 ${extra} 件は判断待ちです（フェーズ ${value.phase} はレビュー済みにしていません）。指摘を読み直して、決め直してください。`;
+      title = "指摘が増えたため、レビュー済みにしていません";
+      note = `今回の判断は反映しました。表示した後に増えた指摘 ${extra} 件は未判断です。「指摘を読み直して決め直す」を押してください。`;
     } else {
       title = `フェーズ ${value.phase} は、まだレビュー済みになっていません`;
-      note = "実行ファイルの答えでは、レビュー済みになっていません。チケット管理画面を更新して、フェーズの状態を確かめてください。";
+      note = "フェーズはレビュー済みになっていません。「更新」を押して、状態を確かめてください。";
     }
     const retry = !value.followup && !value.reviewed && extra > 0;
     return move(

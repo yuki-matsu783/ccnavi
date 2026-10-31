@@ -96,7 +96,7 @@ test("CB-D733 表示した後に指摘が追加されたとき: 「レビュー�
   const retry = await openBoard(fixture(), {
     approval: {
       kind: "prompt",
-      title: "表示した後に指摘が追加されたため、レビュー済みにしていません",
+      title: "指摘が増えたため、レビュー済みにしていません",
       note: "今回の判断は適用済みです。",
       prompt: "[ccnavi] …",
       what: "対応方針のプロンプト",
@@ -105,7 +105,7 @@ test("CB-D733 表示した後に指摘が追加されたとき: 「レビュー�
     },
   });
   try {
-    assert.equal(text(retry, "#approval-title"), "表示した後に指摘が追加されたため、レビュー済みにしていません");
+    assert.equal(text(retry, "#approval-title"), "指摘が増えたため、レビュー済みにしていません");
     const button = retry.one('button[data-action="decide-retry"]');
     assert.equal(button.textContent, "指摘を読み直して決め直す");
     retry.click(button);

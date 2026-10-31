@@ -14,7 +14,7 @@
  */
 import { Fragment, useEffect, useRef, type JSX } from "react";
 
-import { summarize, unsavedParents, unsavedText, type ApprovePlan, type ApprovePreview } from "../../core/approvemodel.js";
+import { HANDOVER_NOTE, summarize, unsavedParents, unsavedText, type ApprovePlan, type ApprovePreview } from "../../core/approvemodel.js";
 import type { ApprovalOverlay } from "../../core/board-view.js";
 import { Dialog, DialogActions } from "../shared/Dialog.js";
 import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
@@ -72,9 +72,7 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
         <>
           <h2 id="approval-title">{overlay.count} 件を承認しました</h2>
           {overlay.carried === true ? <p className="approval-note">承認済みチケットをコミット・push するコマンドをターミナルに送信しました。</p> : null}
-          <p className="approval-note">
-            Claude Code に伝えるプロンプトを用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください（送るときは自分で Enter を押す）。「ターミナルで実行」は、押すとすぐ確認なしで実行されます。
-          </p>
+          <p className="approval-note">{HANDOVER_NOTE}</p>
           <HandOver />
           <details className="approval-more" data-tour="approval-prompt">
             <summary>次に打つコマンドを含む案内</summary>
@@ -87,14 +85,17 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
         <>
           <h2 id="approval-title">{overlay.title}</h2>
           <p className="approval-note">{overlay.note}</p>
-          <pre className="approval-text" data-tour="approval-prompt">{overlay.prompt}</pre>
           <HandOver retry={overlay.retry} />
+          <details className="approval-more" data-tour="approval-prompt">
+            <summary>渡す文を見る</summary>
+            <pre className="approval-text">{overlay.prompt}</pre>
+          </details>
         </>
       );
     case "decideLoading":
       return (
         <>
-          <p className="approval-note">フェーズ {overlay.phase} の未解決（Unresolved）指摘を読み込み中…</p>
+          <p className="approval-note">フェーズ {overlay.phase} のレビューの指摘を読み込み中…</p>
           <DialogActions className="approval-actions">
             <Cancel label="キャンセル" />
           </DialogActions>
@@ -326,7 +327,7 @@ function HandOver({ retry }: { readonly retry?: { readonly parent: string; reado
         type="button"
         className="action"
         data-action="prompt-run"
-        title="ボードのターミナルで claude -p を実行します（auto モード）。止めるときはターミナルで Ctrl+C"
+        title="ボードのターミナルで claude -p を実行します（auto モード）。押すとすぐ、確認なしで実行されます。止めるときはターミナルで Ctrl+C"
         onClick={() => post({ type: "promptRun" })}
       >
         ターミナルで実行
