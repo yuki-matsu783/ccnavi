@@ -70,7 +70,7 @@ trap 'review_exit=$?; ccnavi_wap_end; accept_cleanup "$review_exit"; rm -f "$res
 trap 'ccnavi_wap_end; exit 130' INT TERM HUP
 
 review_wap
-# 親子のチケットを書いて送れないなら、ホストにも手元にも触る前に止める（返信・解決・issue・コメントの後で止めない）。
+# 親子のチケットの write-and-push が止まるなら、ホストにも手元にも触る前に止める（返信・解決・issue・コメントの後では止めない）。
 ccnavi_wap_family "$family"
 case "$ccnavi_wap_target" in
 stop)

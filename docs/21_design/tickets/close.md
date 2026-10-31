@@ -35,7 +35,7 @@ write-and-push がその削除をコミットして push してから Draft を�
 （`confirm`・`finish`・`cancel` のあとにも、その時点で閉じた子を消す）、子の手元のブランチは、合流した子なら先頭が
 `merged_sha` と同じでその先頭が push 済みの親の祖先のときに消す。取り消した子のブランチは、一覧をユーザに見せて確認が取れてから
 （`ccnavi-user-clean-branch.sh <子> --confirmed`）消す。続けて親のワークツリーを消す
-（消せるかは子に触る前に確かめてあり、cwd がその中にあれば断って、外から打ち直す `ccnavi-launcher.sh worktree retire <親>` を出す）。
+（子に触る前に消せるかを確かめ、cwd がその中なら断る。外から打ち直す `ccnavi-launcher.sh worktree retire <親>` を出す）。
 子のワークツリーも、未コミットの変更や git が無視しているファイルがあれば、理由を出して残す。閉じた子の一覧は、`ready` が子のチケットを退避へ移す前に状態の置き場の `retire/<親>.json` に書く。
 `ready` の打ち直しは、MR がまだ Draft であることと親のブランチのツリーの様子で決める。
 

@@ -112,8 +112,8 @@ def retry_command(root: str, name: str) -> str:
 
 
 def _screen(root: str, name: str, cwd: str) -> tuple[Dropped | None, str]:
-    """消してよいかの判定（消さずに読むだけ）。止める理由か ABSENT なら `Dropped`、通れば
-    (None, 持ち主のリポジトリ)。`drop` の関門で、`blocked` も同じものを使う。
+    """消してよいかを判定する（消さずに読むだけ）。止める理由があれば（もともと無い場合の ABSENT も含む）`Dropped` を、
+    通れば (None, 持ち主のリポジトリ) を返す。`drop` の関門で、`blocked` も同じものを使う。
 
     1. 名前にパスの区切りや `.`・`..` が無いかを見る。
     2. 無ければ ABSENT。リンクやジャンクションなら REFUSED（リンクの先は消さない）。
