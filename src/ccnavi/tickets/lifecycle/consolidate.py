@@ -23,6 +23,7 @@ sh（`ccnavi-ticket.sh consolidate`）が write-and-push の手順で、親の�
 
 from __future__ import annotations
 
+import io
 import os
 from typing import TextIO
 
@@ -132,34 +133,107 @@ def build(
     return ident, text, ""
 
 
+def gate(
+    stderr: TextIO, root: str, conf: settings.Settings, parent_id: str
+) -> tuple[ticket_model.Ticket, ticket_mod.Ticket | None, learning_records.Pending | None] | None:
+    """`consolidate` の、書く前に分かる検査。断ったら理由と `次:` を stderr に出して None。
+
+    通れば（親、開いている統合の子、処理すべき気づき）。開いている統合の子があれば、気づきは調べない。
+    本体（`run`）と `check` が同じものを呼ぶ。
+    """
+    found = _found(stderr, root, conf, parent_id)
+    if found is None:
+        stderr.write(
+            texts.say(
+                root,
+                "NEXT_OPS_REFUSED",
+                {"verb": "consolidate", "ticket": parent_id},
+            )
+            + "\n"
+        )
+        return None
+    return found
+
+
+def _found(
+    stderr: TextIO, root: str, conf: settings.Settings, parent_id: str
+) -> tuple[ticket_model.Ticket, ticket_mod.Ticket | None, learning_records.Pending | None] | None:
+    if not conf.learning_enabled:
+        stderr.write(f"ccnavi: 学びの蓄積が disable（{settings.LEARNING_ENV}）なので動かない\n")
+        return None
+    found = ops_close.find(stderr, root, conf, parent_id)
+    if found is None:
+        return None
+    if found.is_child:
+        stderr.write(f"ccnavi: consolidate には親の識別子を指定してください（{parent_id} は子）\n")
+        return None
+    if found.state != ticket_model.DOING or not found.started_at:
+        stderr.write(f"ccnavi: {parent_id} は作業中の着手済みの親ではない（{found.state}/）\n")
+        return None
+    existing = _open_consolidate(conf, root, parent_id)
+    if existing is not None:
+        return found, existing, None
+    if ops_close.misplaced_home(stderr, root, conf, found):
+        return None
+    problems = ops_close.close_problems(root, conf, parent_id)
+    if problems:
+        for p in problems:
+            stderr.write(f"ccnavi: {p}\n")
+        stderr.write("  親の finish の学び以外の検査を通ってから consolidate を打ってください\n")
+        return None
+    parent_tree = tree.worktree_path(root, parent_id)
+    if not os.path.isdir(parent_tree):
+        stderr.write(f"ccnavi: 親のワークツリー {parent_tree} が無い\n")
+        return None
+    dirty = learning_records.uncommitted(parent_tree)
+    if dirty:
+        stderr.write(
+            f"ccnavi: 学びの置き場に未コミットか未追跡の変更がある: {', '.join(dirty)}。"
+            "コミットしてから打ち直してください\n"
+        )
+        return None
+    pending = learning_records.pending(parent_tree)
+    if pending.broken:
+        learning.write_broken(stderr, pending)
+        return None
+    if not pending.items:
+        stderr.write(f"ccnavi: {parent_id} には処理すべき気づきが無い（統合の子は作らない）\n")
+        return None
+    return found, None, pending
+
+
+def check(
+    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, parent_id: str
+) -> int:
+    """`ticket consolidate <親> --check`。書く前の検査だけを通す（読むだけ）。"""
+    if ops_close.find(io.StringIO(), root, conf, parent_id) is None:
+        stdout.write(f"案内: {parent_id} は手元で引けない。取り込みのあとに本体が確かめます\n")
+        return 0
+    if gate(stderr, root, conf, parent_id) is None:
+        return 1
+    stdout.write("確認: ok（consolidate を打てる状態。何も変えていません）\n")
+    return 0
+
+
 def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, parent_id: str) -> int:
     """`ticket consolidate <親>` の本体。
 
     終了コードは 0（作った、または開いている統合の子を出した）か 1。
 
     処理フロー:
-    1. 学びの蓄積が enable かを見る。親を `ops_close.find` で引き、作業中で着手済みかを見る
-    2. 開いている統合の子があれば、それを出して終わる（`_open_consolidate`）。
-       新しくは作らない
-    3. 親の `finish` の学び以外の検査を通すかを見る（`ops_close.close_problems`）
-    4. 親の学びの置き場に未コミットの変更が無いか、処理すべき気づきが在るかを見る
+    1. `gate` で次を確かめる（`check` も同じ関数で通す）。
+       学びの蓄積が enable か、親を `ops_close.find` で引いて作業中で着手済みか、
+       親の `finish` の学び以外の検査を通すか（`ops_close.close_problems`）、
+       親の学びの置き場に未コミットの変更が無いか、処理すべき気づきが在るか
        （`learning_records.uncommitted`・`learning_records.pending`）
-    5. `build` で子の文面を作り、親の置き場に書く（`approval_marks.write_ticket`）
+    2. 開いている統合の子があれば、それを出して終わる。新しくは作らない
+    3. `build` で子の文面を作り、親の置き場に書く（`approval_marks.write_ticket`）
     書いたパスは sh が write-and-push でコミットする。ここではコミットしない。
     """
-    if not conf.learning_enabled:
-        stderr.write(f"ccnavi: 学びの蓄積が disable（{settings.LEARNING_ENV}）なので動かない\n")
+    passed = gate(stderr, root, conf, parent_id)
+    if passed is None:
         return 1
-    found = ops_close.find(stderr, root, conf, parent_id)
-    if found is None:
-        return 1
-    if found.is_child:
-        stderr.write(f"ccnavi: consolidate には親の識別子を指定してください（{parent_id} は子）\n")
-        return 1
-    if found.state != ticket_model.DOING or not found.started_at:
-        stderr.write(f"ccnavi: {parent_id} は作業中の着手済みの親ではない（{found.state}/）\n")
-        return 1
-    existing = _open_consolidate(conf, root, parent_id)
+    found, existing, pending = passed
     if existing is not None:
         # 書いたパスの一覧に載せる。前の回の push が済んでいなければ write-and-push が送り直す。
         fsio.note_input(existing.path)
@@ -168,32 +242,7 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, pare
             f"\n{_next_words(root, existing.ticket)}\n"
         )
         return 0
-    if ops_close.misplaced_home(stderr, root, conf, found):
-        return 1
-    problems = ops_close.close_problems(root, conf, parent_id)
-    if problems:
-        for p in problems:
-            stderr.write(f"ccnavi: {p}\n")
-        stderr.write("  親の finish の学び以外の検査を通ってから consolidate を打ってください\n")
-        return 1
-    parent_tree = tree.worktree_path(root, parent_id)
-    if not os.path.isdir(parent_tree):
-        stderr.write(f"ccnavi: 親のワークツリー {parent_tree} が無い\n")
-        return 1
-    dirty = learning_records.uncommitted(parent_tree)
-    if dirty:
-        stderr.write(
-            f"ccnavi: 学びの置き場に未コミットか未追跡の変更がある: {', '.join(dirty)}。"
-            "コミットしてから打ち直してください\n"
-        )
-        return 1
-    pending = learning_records.pending(parent_tree)
-    if pending.broken:
-        learning.write_broken(stderr, pending)
-        return 1
-    if not pending.items:
-        stderr.write(f"ccnavi: {parent_id} には処理すべき気づきが無い（統合の子は作らない）\n")
-        return 1
+    assert pending is not None
     ident, text, why = build(conf, root, found, pending.items)
     if why:
         stderr.write(f"ccnavi: {why}\n")
