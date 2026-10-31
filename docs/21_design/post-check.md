@@ -31,14 +31,14 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 記録と state の置き場（`logs/decisions.jsonl`、`logs/state/` の下）は除く。
 
 チケットの置き場（`wip/proposals/`、`.ccnavi/approved/`）に現れた変更は、ccnavi のサブコマンド
-（`ticket start` / `finish` / `cancel` と `review request` / `confirm` / `ready`）が書いたと内容から読めるぶんだけ除く。
+（`ticket start` / `finish` / `cancel` と `review-request` / `confirm` / `ready`）が書いたと内容から読めるぶんだけ除く。
 見るのはコミット済みの版との差で、除くのは次の 3 つ。
 
 | 何 | 外す条件 |
 |---|---|
 | frontmatter を持たないファイル | どちらの版も持たない。マーカー・`.risk.json`・`.judge.json`・閉じの記録のほか、チケットでないファイルはすべてここに入る |
 | チケットへの書き足し | `ticket_model.SCRIPT_FIELDS` のうちコミット済みの版がまだ持っていない欄以外が 1 文字も変わっていない（`ticket_fields.script_shape`） |
-| `mr:` の書き足し（例外 1 つ） | コミット済みの版に frontmatter があって `mr:` が空（欄なし・値なし・続きの行なし）、いまの版の `mr:` が `mr: 12` の 1 行だけの正の整数で、`mr:` の行を除いたほかが 1 文字も変わっていない（`post_findings._mr_filled`）。`review request` が親ブランチの MR を確かめた後に親の承認済みチケットへ書き足すぶん。整数から別の整数・整数から空・`"12"` や注釈つきの書き方・ほかの欄や本文の変更は報告する。`mr` は `SCRIPT_FIELDS` には入れない（提案者が書ける欄で、`script_fields_set` の対象でもない）。除く条件は最初の比べだけで、`finish`・`cancel` の移動の組には使わない |
+| `mr:` の書き足し（例外 1 つ） | コミット済みの版に frontmatter があって `mr:` が空（欄なし・値なし・続きの行なし）、いまの版の `mr:` が `mr: 12` の 1 行だけの正の整数で、`mr:` の行を除いたほかが 1 文字も変わっていない（`post_findings._mr_filled`）。`review-request` が親ブランチの MR を確かめた後に親の承認済みチケットへ書き足すぶん。整数から別の整数・整数から空・`"12"` や注釈つきの書き方・ほかの欄や本文の変更は報告する。`mr` は `SCRIPT_FIELDS` には入れない（提案者が書ける欄で、`script_fields_set` の対象でもない）。除く条件は最初の比べだけで、`finish`・`cancel` の移動の組には使わない |
 | `finish` / `cancel` の移動 | 正規化した内容が同じチケットが `doing/` か `review/` から消え、`review/` か `done/` に現れた組。両側とも 1 件ずつのときだけ |
 
 範囲・親・フェーズ・本文が変わったチケット、既に値のあるスクリプトの欄（`base_sha` など）の書き換え、新しく現れた

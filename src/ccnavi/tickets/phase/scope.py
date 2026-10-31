@@ -157,6 +157,8 @@ def scope_findings(
     if rc != 0:
         return [], "子の仕事の始まりからの差分を読めない"
     paths.update(p for p in out.split("\0") if p)
+    # 統合先を取り込んだ merge が持ち込んだだけのパスは、子が書いたものではないので数えない。
+    paths -= gitstate.taken_from_remote(worktree, base, "HEAD", phase.TIMEOUT_SECONDS)
     rc, out = _git(
         worktree,
         [
@@ -247,7 +249,10 @@ def merge_findings(
     if rc != 0:
         return [], [], "子の仕事の始まりからの差分を読めない"
     places: list[str] = []
-    outside = _outside(conf, child, parent, {p for p in out.split("\0") if p}, places)
+    paths = {p for p in out.split("\0") if p}
+    # 統合先を取り込んだ merge が持ち込んだだけのパスは、子が書いたものではないので数えない。
+    paths -= gitstate.taken_from_remote(worktree, base, head, phase.TIMEOUT_SECONDS)
+    outside = _outside(conf, child, parent, paths, places)
     return places, outside, ""
 
 

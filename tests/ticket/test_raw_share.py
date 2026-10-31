@@ -102,7 +102,7 @@ class RawShareTest(PhaseHarness):
         other = self.worktree("i0002", "main")
         self.propose("i0002", parent_text("i0002", ["chores"]), tree=other)
         git(other, "add", "-A")
-        git(other, "commit", "--quiet", "-m", "propose i0002")
+        git(other, "commit", "--quiet", "-m", "approval-request i0002")
         self.assertEqual(self.approve().returncode, 0)
         self.worktree("x1", "i0001")
         self.worktree("x2", "i0001")
@@ -126,7 +126,7 @@ class RawShareTest(PhaseHarness):
         result, reads = self.counted(
             lambda: self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         )
-        self.assertIn("request --phase 1", self.reason(result))
+        self.assertIn("review-request --phase 1", self.reason(result))
         self.assertEqual(reads.counts(), ONCE)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.pending")))
 

@@ -260,7 +260,7 @@ class RecordTreeTest(AuthorityHarness):
     def test_writing_outside_the_places_is_an_error_and_the_list_is_kept(self):
         # 承認は提案（wip/proposals/todo/）を消す。write-and-push の置き場の外なので error。
         self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
-        self.commit_parent("propose")
+        self.commit_parent("approval-request")
         preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         result, listed = self.run_recorded(
             "user", "agree", "--yes", "i0001-01-02", "--digest", preview["digest"], "--json"

@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import re
 
-from ...infra import modes, settings, shellread, shellread_words
+from ...infra import shellread, shellread_words, toolnames
 from ...policy import rules, selfguard_shell, texts
 from . import user_only
 
@@ -45,11 +45,8 @@ _FORBIDDEN_COMMAND = re.compile(
     re.IGNORECASE,
 )
 
-# シェルとして扱うツール。PowerShell は shellread で読めないので生の文字列に適用する。
-SHELL_TOOLS = ("Bash", "PowerShell")
-
 # レビューが済むまで止めるツール。
-HELD_TOOLS = (*modes.AGENT_TOOLS, *SHELL_TOOLS)
+HELD_TOOLS = (*toolnames.AGENT_TOOLS, *toolnames.SHELL_TOOLS)
 
 # ccnavi 自身の実行ファイルを、ユーザの判断の経路に使う形。`--agree` `--reviewed`
 # `--close-early` と、状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
@@ -363,7 +360,7 @@ EXE_OPTIONS = frozenset(
     {
         "--abandon", "--accept-check", "--accept-done", "--accept-plan",
         "--accept-unresolved", "--actor", "--agent-id", "--agree", "--all", "--approved",
-        "--body-file", "--check-file",
+        "--body-file", "--check", "--check-file",
         "--choose-out", "--close-early", "--cwd", "--digest", "--docs", "--draft",
         "--expect",
         "--explain", "--feedback", "--fill-phases", "--flow", "--format", "--guard-core-files",
@@ -969,7 +966,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     )
     rule = rules.Rule(
         id=TICKET_APPROVAL_RULE_ID,
-        match="|".join(SHELL_TOOLS),
+        match="|".join(toolnames.SHELL_TOOLS),
         regex=expression,
         root=root,
         **texts.spec("RULE_GUARD_TICKET_APPROVAL"),

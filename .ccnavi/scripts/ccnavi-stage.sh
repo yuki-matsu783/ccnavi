@@ -11,9 +11,11 @@
 # wip/handoff/。
 # defense の差し替えの mv は、フルパスを手で組むと書き間違えやすいので、このスクリプトが組む。
 #
-# <パス> は元のファイル。cwd からの相対でも絶対でもよく、ワークスペースルートの下の実在するファイルだけを受け付ける
-# （リンクと、途中のリンクでワークスペースの外に出るものは断る）。
-# 下書きは <置き場>/wip/handoff/<ワークスペースルートからの相対パス> に置く（元と同じ階層を保つので、違う元のファイルが同じ下書きに落ちない）。
+# <パス> は元のファイル。cwd からの相対でも絶対でもよく、置き場の根（cwd がワークツリーならそのワークツリー、
+# それ以外はワークスペースルート）の下の実在するファイルだけを受け付ける（リンクと、途中のリンクで根の外に出るものは断る）。
+# cwd がワークツリーのとき、ワークスペースルートの絶対パスを渡しても、同じ相対パスのワークツリー側のファイルを元にする
+# （無ければ断る）。別のワークツリーのファイルと、下書きの置き場の中は断る。
+# 下書きは <置き場の根>/wip/handoff/<置き場の根からの相対パス> に置く（元と同じ階層を保つので、違う元のファイルが同じ下書きに落ちない）。
 # ただし、相対パスの中の .claude の階層は handoff-.claude に読み替えて置く（深さを問わない。
 # .claude/settings.json → wip/handoff/handoff-.claude/settings.json）。Claude Code 本体は .claude という名前の
 # 階層を機密パスとして扱い、非対話（claude -p）では編集を許可できないため。取り込み（ccnavi-user-handoff.sh）が
@@ -45,11 +47,12 @@ usage() {
 sh .ccnavi/scripts/ccnavi-stage.sh <パス>...
 sh .ccnavi/scripts/ccnavi-stage.sh --commands <パス>...
 
-  <パス>      直したい元のファイル（ワークスペースルートの下）。cwd からの相対でも絶対でもよい
+  <パス>      直したい元のファイル（置き場の根の下。根は cwd がワークツリーならそのワークツリー、それ以外はワークスペースルート）。cwd からの相対でも絶対でもよい
   --commands  編集が済んだあとに実行します。元と違う下書きだけを、種類ごとに分けて出します
               （template・messages・layer-config・docs は ccnavi-user-handoff.sh の手順。defense は差し替えの mv を、フルパスで出します）
 
-下書きは <cwd のワークツリー（無ければワークスペースルート）>/wip/handoff/<ワークスペースルートからの相対パス> に cp する
+下書きは <置き場の根>/wip/handoff/<置き場の根からの相対パス> に cp する
+（置き場の根は、cwd がワークツリーならそのワークツリー、それ以外はワークスペースルート）
 （既にあれば上書きしない）。.claude の階層は handoff-.claude に読み替えて置く
 （.claude/settings.json → wip/handoff/handoff-.claude/settings.json）。取り込みで元に戻す。
 複数ファイルを直すときは、すべての下書きを作ってから --commands を実行し、ターンを終える。
@@ -81,7 +84,8 @@ root=$(ccnavi_workspace) || {
 	printf 'ccnavi-stage: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2
 }
-# 下書きの置き場。cwd が .claude/worktrees/<名前> の中ならそのワークツリー、それ以外はワークスペースルート。
+# 置き場の根 base。cwd が .claude/worktrees/<名前> の中ならそのワークツリー、それ以外はワークスペースルート。
+# 元のファイルの相対パス・元の読み取り・下書きは、すべて base を根にする。
 # cwd とルートは、リンクや表記の違い（macOS の /private、Windows の C:/ と /c/ など）を解いてから比べる。
 here=$(ccnavi_abs .) || here=""
 here=$(ccnavi_phys "$here")
@@ -89,10 +93,11 @@ root_phys=$(ccnavi_phys "$root")
 case "$here" in
 "$root_phys"/.claude/worktrees/*)
 	stage_wt="${here#"$root_phys"/.claude/worktrees/}"
-	handoff="$root/.claude/worktrees/${stage_wt%%/*}/wip/handoff"
+	base="$root/.claude/worktrees/${stage_wt%%/*}"
 	;;
-*) handoff="$root/wip/handoff" ;;
+*) base="$root" ;;
 esac
+handoff="$base/wip/handoff"
 # 置き場（か wip/）がリンクなら、cp と mkdir がリンクの先へ書いてしまう。ワークツリーの置き場はブランチの
 # 内容で決まるので、リンクを含むブランチでは書き先が外へ出る。書かずに断る。
 if [ -z "$commands" ] && { [ -L "$handoff" ] || [ -L "$(dirname "$handoff")" ]; }; then
@@ -159,24 +164,34 @@ $ad_lines
 EOF
 }
 
-# 元のファイルの、ワークスペースルートからの相対パスを出す。使えないパスは理由を言って 1 を返す。
+# 元のファイルの、置き場の根 base からの相対パスを出す。使えないパスは理由を言って 1 を返す。
+# base の下ならその相対パス。そうでなければワークスペースルートの下の相対パス（互換。base がワークツリー
+# なら、base 側に同じ相対パスのファイルがあるものとして扱う）。
 relative_of() {
 	rl_abs=$(ccnavi_abs "$1") || {
 		printf 'ccnavi-stage: %s を絶対パスに直せません。\n' "$1" >&2
 		return 1
 	}
 	case "$rl_abs" in
+	"$base"/*) rl_rel="${rl_abs#"$base"/}" ;;
 	"$root"/*) rl_rel="${rl_abs#"$root"/}" ;;
 	*)
 		printf 'ccnavi-stage: %s はワークスペースルート（%s）の下にありません。\n' "$1" "$root" >&2
 		return 1
 		;;
 	esac
-	case "$rl_rel" in
-	wip/handoff/* | .claude/worktrees/*/wip/handoff/*)
+	rl_lc=$(printf '%s' "$rl_rel" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+	case "$rl_lc" in
+	wip/handoff/*)
 		printf 'ccnavi-stage: %s は下書きの置き場の中です。直したい元のファイルを渡してください。\n' "$1" >&2
 		return 1
 		;;
+	.claude/worktrees/*)
+		printf 'ccnavi-stage: %s は別のワークツリーのファイルです。そのワークツリーの中で実行してください。\n' "$1" >&2
+		return 1
+		;;
+	esac
+	case "$rl_rel" in
 	*"'"* | *'
 '*)
 		printf 'ccnavi-stage: %s には引用符か改行が入っていて、mv の 1 行に安全に書けません。\n' "$1" >&2
@@ -185,25 +200,25 @@ relative_of() {
 	esac
 	scan_parts "$rl_rel"
 	if [ -n "$ad_reserved" ]; then
-		printf 'ccnavi-stage: %s の `%s` は、下書きでの階層名として予約されています（表: %s）。この名前の階層を含むファイルは下書きにできません。\n' "$root/$rl_rel" "$ad_reserved" "$names_file" >&2
+		printf 'ccnavi-stage: %s の `%s` は、下書きでの階層名として予約されています（表: %s）。この名前の階層を含むファイルは下書きにできません。\n' "$base/$rl_rel" "$ad_reserved" "$names_file" >&2
 		return 1
 	fi
-	if [ ! -f "$root/$rl_rel" ]; then
-		printf 'ccnavi-stage: %s は実在するファイルではありません。\n' "$root/$rl_rel" >&2
+	if [ ! -f "$base/$rl_rel" ]; then
+		printf 'ccnavi-stage: %s は実在するファイルではありません。\n' "$base/$rl_rel" >&2
 		return 1
 	fi
-	# リンクは解かれた先がワークスペースの外かもしれない。元がリンクなら、mv がリンクを通常のファイルに
+	# リンクは解かれた先が置き場の根の外かもしれない。元がリンクなら、mv がリンクを通常のファイルに
 	# 置き換えてしまう。どちらも断る（リンクの先の実体を直接渡す）。
-	if [ -L "$root/$rl_rel" ]; then
-		printf 'ccnavi-stage: %s はシンボリックリンクです。リンクの先の実体を渡してください。\n' "$root/$rl_rel" >&2
+	if [ -L "$base/$rl_rel" ]; then
+		printf 'ccnavi-stage: %s はシンボリックリンクです。リンクの先の実体を渡してください。\n' "$base/$rl_rel" >&2
 		return 1
 	fi
-	rl_dir=$(ccnavi_phys "$(dirname "$root/$rl_rel")")
-	rl_root=$(ccnavi_phys "$root")
+	rl_dir=$(ccnavi_phys "$(dirname "$base/$rl_rel")")
+	rl_root=$(ccnavi_phys "$base")
 	case "$rl_dir" in
 	"$rl_root" | "$rl_root"/*) ;;
 	*)
-		printf 'ccnavi-stage: %s は、途中のリンクを解くとワークスペースルートの外（%s）に出ます。\n' "$root/$rl_rel" "$rl_dir" >&2
+		printf 'ccnavi-stage: %s は、途中のリンクを解くと置き場の根（%s）の外（%s）に出ます。\n' "$base/$rl_rel" "$rl_root" "$rl_dir" >&2
 		return 1
 		;;
 	esac
@@ -256,7 +271,7 @@ for arg in "$@"; do
 		bad=1
 		continue
 	}
-	orig="$root/$rel"
+	orig="$base/$rel"
 	scan_parts "$rel"
 	draft="$handoff/$ad_out"
 	if [ -n "$commands" ]; then
@@ -277,7 +292,7 @@ for arg in "$@"; do
 		fi
 		continue
 	fi
-	staged="${staged:+$staged }$root/$rel"
+	staged="${staged:+$staged }$base/$rel"
 	if [ -e "$draft" ]; then
 		if cmp -s "$orig" "$draft"; then
 			printf '下書きは既にある（元と同じ）: %s\n' "$draft"
@@ -310,10 +325,9 @@ if [ -z "$mvs$imps" ]; then
 fi
 guide=""
 if [ -n "$imps" ]; then
-	# 下書きのあるツリー（ワークツリーの中で作った下書きは、そのワークツリーが根）
-	tree=${handoff%/wip/handoff}
+	# 下書きのあるツリー base（ワークツリーの中で作った下書きは、そのワークツリーが根）
 	rootopt=""
-	[ "$tree" = "$root" ] || rootopt=" --root '$tree'"
+	[ "$base" = "$root" ] || rootopt=" --root '$base'"
 	hsh="sh '$root/.ccnavi/scripts/ccnavi-user-handoff.sh'$rootopt"
 	printf '取り込みは、ユーザが次の順で行います（検査・差分・ハッシュを見て、読んだうえで取り込む。差し替えはしない）:\n'
 	printf '%s %s\n' "$hsh" "$imps"

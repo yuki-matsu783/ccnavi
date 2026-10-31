@@ -41,7 +41,7 @@ import os
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from ..infra import hookio, settings, tree
+from ..infra import hookio, settings, toolnames, tree
 from ..records import audit
 from . import builtin, rules
 from .rules import SEVERITY_INFO, SEVERITY_WARN, Problem
@@ -143,9 +143,8 @@ def add_read_allow(rule_set: rules.RuleSet) -> None:
     rule_set.allow.extend(allow)
 
 
-# 行き先のレイヤーで判定するツール。subject に解決済みのパスが入っている（judge.subject_of）。
-# Grep と Glob は探す場所を省けば cwd。ここに無いツールは全部のレイヤーの和で判定する。
-PATH_TOOLS = ("Read", "Grep", "Glob", "Edit", "Write", "NotebookEdit")
+# 行き先のレイヤーで判定するツールは `toolnames.PATH_TOOLS`（subject に解決済みのパスが入っている。
+# judge.subject_of）。Grep と Glob は探す場所を省けば cwd。ここに無いツールは全部のレイヤーの和で判定する。
 
 
 def layers(conf: settings.Settings, root: str) -> list[Layer]:
@@ -210,7 +209,7 @@ def rules_for(
 ) -> tuple[rules.RuleSet, str, tree.Tree | None]:
     """この呼び出しに適用するルール集合と、その出所と、行き先のツリー。
 
-    パスを持つツール（PATH_TOOLS）は行き先で 1 本に決まる。
+    パスを持つツール（toolnames.PATH_TOOLS）は行き先で 1 本に決まる。
     共通レイヤーに、行き先のツリーのレイヤーを足す。
     行き先がプロジェクトならそのレイヤー、ワークスペースのツリーなら自身のレイヤー。
 
@@ -221,7 +220,7 @@ def rules_for(
     なる。読めないレイヤーは和から外し、外したことを記録に残す。
     """
     target = None
-    if payload.tool_name in PATH_TOOLS:
+    if payload.tool_name in toolnames.PATH_TOOLS:
         target = tree.tree_of(root, record.subject, conf.projects)
 
     rule_set, source = load_rules(stderr, conf, record, root)
@@ -230,7 +229,7 @@ def rules_for(
         # レイヤーを足しても、何が判定に使われているのかをユーザが読めない。
         return rule_set, source, target
 
-    by_path = payload.tool_name in PATH_TOOLS
+    by_path = payload.tool_name in toolnames.PATH_TOOLS
     chosen = layer_for(conf, root, target) if by_path else layers(conf, root)
     add_layers(stderr, rule_set, chosen, root, record)
     if bare(conf, record, chosen):

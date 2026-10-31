@@ -29,7 +29,7 @@ keywords: [承認, user agree, ターミナル, todo, 親, 子]
 
 親の提案は、新規も改版も `issue:` と `mr:` の両方が要る（書いていなければ承認しない。子には求めない）。
 承認は提案の中身を変えないので、提案に書いた `mr:` はそのまま承認済みチケットに入り、ダイジェストにも入る（提案の全文）。
-承認のあとに `review request` が書き足す `mr:`（空のときだけ。`proposal-format.md`）はダイジェストの外で、改版の不変検査は
+承認のあとに `review-request` が書き足す `mr:`（空のときだけ。`proposal-format.md`）はダイジェストの外で、改版の不変検査は
 両方に値があって違うときだけ error にする。
 
 順序は「承認 → コミット（と push）→ 子のワークツリーを作る → `start`」。コミットの前にワークツリーを
@@ -253,7 +253,9 @@ write-and-push の対象の親子のチケットでは、親のワークツリ�
 （改版は warn で外さない。親の必須の見出しの欠けも warn。提案の書式 9.3）。ただし「まだ承認できない」もの（前のフェーズが閉じていない子。
 `rules.KIND_NOT_YET`）は `--lint` では warn。
 
-提案を `todo/` に書いた回に、この確認を勧める文を 1 度だけ渡す（REQ-APV-14、`ticket_guard.propose_notice`）。
+エージェントは、同じ検査を `ccnavi-ticket.sh approval-request <親> --check` で通す。`--check` は承認の画面と同じ `gather` に加えて、親の状態（`lifecycle.treegate` の `APPROVAL_REQUEST`）を見る。置き場の外の未コミットの変更は、承認の後に子の `finish` を止める。未 push のコードは、送る提案と一緒に公開される。ホスト・git のリモートの事前確認もして、何も送らない。判定は `core.approve.readiness` の 1 か所にあり、本番の `approval-request` の gate（`approval_request_gate`）と `--agree --preview --verify` が同じ関数を通す。sh は親の状態を判定しない。`--verify` の `verify.reason` には、この理由が `dirty_parent`・`unpushed_code` として出る。承認そのもの（`--yes`）は、親の未コミットの変更を警告にとどめ、拒否しない。
+
+提案を `todo/` に書いた回に、この確認（`approval-request --check`）を勧める文を 1 度だけ渡す（REQ-APV-14、`ticket_guard.propose_notice`）。
 判定には足さず、ルールの文と同じ `PreToolUse` の `additionalContext` の経路で渡す。
 
 `CCNAVI_MODE=dry-run` の間も、承認の経路は関門なので止まり、エージェントは `--yes` を打てない。承認の経路だけを

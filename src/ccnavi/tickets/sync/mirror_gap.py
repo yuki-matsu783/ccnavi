@@ -37,14 +37,22 @@ def split(conf: settings.Settings, paths: list[str]) -> tuple[list[str], list[st
     return mirrored, [p for p in paths if not pathcase.fold(p).startswith(marks)]
 
 
+def _names(paths: list[str]) -> str:
+    shown = "、".join(paths[:_SHOWN])
+    if len(paths) > _SHOWN:
+        shown += f" ほか {len(paths) - _SHOWN} 件"
+    return shown
+
+
 def label(mirrored: list[str]) -> str:
     """ずれたパスの表示（先頭 10 件まで）。"""
-    shown = "、".join(mirrored[:_SHOWN])
-    if len(mirrored) > _SHOWN:
-        shown += f" ほか {len(mirrored) - _SHOWN} 件"
-    return f"共通レイヤーのコピーとのずれ: {shown}"
+    return f"共通レイヤーのコピーとのずれ: {_names(mirrored)}"
 
 
-def others_note(others: int) -> str:
+def others_note(others: list[str]) -> str:
     """ずれ以外の変更があるときの一文。無ければ空。"""
-    return f"ずれ以外の変更が {others} 件ある。そちらは作業の変更として扱う。" if others else ""
+    if not others:
+        return ""
+    return (
+        f"ずれ以外の変更が {len(others)} 件ある（{_names(others)}）。そちらは作業の変更として扱う。"
+    )

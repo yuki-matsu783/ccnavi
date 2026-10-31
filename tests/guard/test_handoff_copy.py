@@ -95,5 +95,128 @@ class HandoffCopyTest(unittest.TestCase):
                 self.assertEqual(RULE_ID, self.decide(command))
 
 
+GIT = "sh .ccnavi/scripts/ccnavi-git.sh "
+
+
+class HandoffDeleteTest(unittest.TestCase):
+    """置き場の中の写しの削除は通す。守る場所そのものと、置き場の外へ出る形は止める。"""
+
+    decide = HandoffCopyTest.decide
+
+    def setUp(self):
+        HandoffCopyTest.setUp(self)
+        write(os.path.join(self.pad, ".ccnavi", "docs", "x.md"), "x\n")
+        write(os.path.join(self.repo, ".ccnavi", "docs", "x.md"), "x\n")
+
+    def stopped(self, command, cwd=None):
+        self.decide(command, cwd)
+        return '"deny"' in self.said
+
+    def forms(self, rel):
+        """素の rm（絶対パス）とラッパーの rm（相対パス）の、同じ対象を消す 2 つの形。"""
+        return (f"rm {os.path.join(self.repo, *rel.split('/'))}", GIT + f"rm {rel}")
+
+    def test_deleting_a_copy_in_the_place_is_allowed(self):
+        copy = "wip/handoff/.ccnavi/docs/x.md"
+        absolute = f"{self.pad}/.ccnavi/docs/x.md"
+        for command in (
+            f"rm {absolute}",
+            f"rm -f -- {absolute}",
+            f"rm -r {self.pad}/.ccnavi",
+            f"rm {self.repo}/WIP/Handoff/.ccnavi/docs/x.md",
+            f"rm {absolute} && echo done",
+            GIT + f"rm {copy}",
+            GIT + f"rm -f {copy}",
+            GIT + "rm WIP/Handoff/.ccnavi/docs/x.md",
+            GIT + f"rm {absolute}",
+        ):
+            with self.subTest(command=command):
+                self.assertFalse(self.stopped(command), self.said)
+
+    def test_a_relative_plain_rm_is_stopped(self):
+        # 素の rm は絶対パスだけ外す（sh -c や find -execdir の中の cd が見えない）。
+        for command in (
+            "rm wip/handoff/.ccnavi/docs/x.md",
+            "sh -c 'cd /tmp && rm wip/handoff/.ccnavi/docs/x.md'",
+            "find /tmp -maxdepth 0 -execdir rm wip/handoff/.ccnavi/docs/x.md ;",
+        ):
+            with self.subTest(command=command):
+                self.assertTrue(self.stopped(command), self.said)
+
+    def test_deleting_the_real_files_is_stopped(self):
+        copy = f"{self.pad}/.ccnavi/docs/x.md"
+        for command in (
+            "rm .ccnavi/docs/x.md",
+            f"rm {copy} .ccnavi/docs/x.md",
+            f"rm {copy} && rm .ccnavi/docs/x.md",
+            f"rm {copy} > .ccnavi/docs/x.md",
+            "cd .ccnavi && rm docs/x.md",
+            GIT + "rm .ccnavi/docs/x.md",
+            GIT + "rm wip/handoff/.ccnavi/docs/x.md .ccnavi/docs/x.md",
+            GIT + "rm wip/handoff/.ccnavi/docs/x.md && " + GIT + "rm .ccnavi/docs/x.md",
+        ):
+            with self.subTest(command=command):
+                self.assertTrue(self.stopped(command), self.said)
+
+    def test_a_home_or_expanded_word_is_stopped_even_inside_the_place(self):
+        for command in (
+            "rm ~/.claude/settings.json",
+            "rm ~/.ccnavi/docs/x.md",
+            "rm ~root/.ccnavi/docs/x.md",
+            GIT + "rm ~/.claude/settings.json",
+            GIT + "rm ~/.ccnavi/docs/x.md",
+            GIT + "rm ~root/.ccnavi/docs/x.md",
+        ):
+            with self.subTest(command=command):
+                self.assertTrue(self.stopped(command, self.pad), self.said)
+
+    def test_a_glob_is_stopped(self):
+        for rel in ("wip/handoff/.ccnavi/docs/*", "wip/handoff/.ccnavi/docs/x.m?"):
+            for command in self.forms(rel):
+                with self.subTest(command=command):
+                    self.assertTrue(self.stopped(command), self.said)
+
+    def test_a_place_not_right_under_the_tree_or_leaving_it_is_stopped(self):
+        for rel in (
+            "docs/wip/handoff/.ccnavi/docs/x.md",
+            "wip/handoff/../.ccnavi/docs/x.md",
+            "wip/handoff/../../.ccnavi/docs/x.md",
+            "wip/handoffx/.ccnavi/docs/x.md",
+        ):
+            for command in self.forms(rel):
+                with self.subTest(command=command):
+                    self.assertTrue(self.stopped(command), self.said)
+
+    def test_a_linked_copy_is_stopped(self):
+        real = os.path.join(self.repo, ".ccnavi", "docs", "x.md")
+        os.makedirs(os.path.join(self.pad, ".ccnavi", "docs"), exist_ok=True)
+        hard = os.path.join(self.pad, ".ccnavi", "docs", "hard.md")
+        try:
+            os.link(real, hard)
+        except OSError:
+            self.skipTest("ハードリンクを作れない機械")
+        for command in self.forms("wip/handoff/.ccnavi/docs/hard.md"):
+            with self.subTest(command=command):
+                self.assertTrue(self.stopped(command), self.said)
+        os.remove(hard)
+        shutil.rmtree(os.path.join(self.pad, ".ccnavi"))
+        try:
+            os.symlink(os.path.join(self.repo, ".ccnavi"), os.path.join(self.pad, ".ccnavi"))
+        except OSError:
+            self.skipTest("シンボリックリンクを作れない機械")
+        for command in self.forms("wip/handoff/.ccnavi/docs/x.md"):
+            with self.subTest(command=command):
+                self.assertTrue(self.stopped(command), self.said)
+
+    def test_writing_into_the_place_is_still_stopped(self):
+        for command in (
+            "cp .ccnavi/docs/x.md wip/handoff/.ccnavi/docs/x.md",
+            "mv /tmp/a wip/handoff/.ccnavi/docs/x.md",
+            "echo x > wip/handoff/.ccnavi/docs/x.md",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(RULE_ID, self.decide(command))
+
+
 if __name__ == "__main__":
     unittest.main()

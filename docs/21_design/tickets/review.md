@@ -15,17 +15,18 @@ keywords: [レビュー, 依頼, 確認, mr, ccnavi-review.sh, GraphQL, 403, RES
 リモート（GitHub / GitLab）を読み書きするのは `.ccnavi/scripts/ccnavi-review.sh` で、実行ファイルは
 ネットワークに出ない（P11）。実行ファイルが持つのはワークツリーの中で分かる前提検査と、
 sh が取得して JSON ファイルに書き、そのパスを `--result` で渡す。実行ファイルはその JSON の判定とマーカーの操作だけを持つ。sh と実行ファイルの間の契約は、この JSON の形で決まる。
-実行ファイルの側では、JSON を読む形と投稿の目印は `tickets/model/review_host.py`、`request` と `confirm` の段は `tickets/review/request.py`、
+実行ファイルの側では、JSON を読む形と投稿の目印は `tickets/model/review_host.py`、`review-request` と `confirm` の段は `tickets/review/request.py`、
 `decide` の段は `tickets/review/decide.py`、`ready` と `close-early` の段は `tickets/review/close.py` が持つ。
 
 | `--result` の JSON | 形 |
 |---|---|
 | `confirm` / `decide` が受け取るもの | `{host: github\|gitlab, mr: {number, url}, threads: [{id, resolved, url, path, line, body, created_at, author}], reviews: [{state, url, submitted_at, author}], fetched_at}` |
-| `request` の投稿の結果 | `{host, mr, url, created_at}` |
+| `review-request` の投稿の結果 | `{host, mr, url, created_at}` |
 
 | sh の呼び方 | 実行ファイルの段 |
 |---|---|
-| `request --phase <N> --body-file <文> --eli5 <HTML>`（成功後、`--body-file` が workspace 直下の `scratchpad/` の中なら sh が消す。外のファイルは消さない。消せなければ警告のみで終了コードは変えない） | sh が `--eli5` を確かめる → `review prepare` → sh が親ブランチの open のマージリクエストを探し（無ければ作らずに止める。元ブランチが HEAD と一致し、マージ先が統合先であることも確かめる）、依頼を投稿 → `review requested` |
+| `review-request --phase <N> --body-file <文> --eli5 <HTML>`（成功後、`--body-file` が workspace 直下の `scratchpad/` の中なら sh が消す。外のファイルは消さない。消せなければ警告のみで終了コードは変えない） | sh が `--eli5` を確かめる → `review prepare` → sh が親ブランチの open のマージリクエストを探し（無ければ作らずに止める。元ブランチが HEAD と一致し、マージ先が統合先であることも確かめる）、依頼を投稿 → `review requested` |
+| `review-request --phase <N> --eli5 <HTML> --check` | 読むだけ。ロックも取り込みもせず、`review-request` の前提（ELI5・`review prepare`・MR の確認）を通して、投稿とマーカーの前で `確認: ok` を出して終わる |
 | `confirm --phase <N>` | sh がスレッドとレビューを取ってくる → `review confirm` |
 | `decide <N> --preview` | 一覧とダイジェストを見るだけ（`--reviewed N --accept-unresolved --preview`）。書く側は `ccnavi-user-decide.sh <N>`（下の行） |
 | `ccnavi-user-decide.sh <N>` | ユーザが打つ。`ccnavi-review.sh` には無い。sh が取ってくる → `user reviewed N --accept-unresolved` → sh が投稿。途中で失敗した送信は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送る（操作記録は `logs/state/ops/`） |
@@ -34,7 +35,7 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 | `ccnavi-user-close-early.sh --reason <理由> [--no-issue]` | ユーザがターミナルで打つ。`ccnavi-review.sh` には無い。`user close-early` → sh が残りを issue に書き出し、コメントを投稿する |
 | `fetch` / `origin` | 取得した JSON を標準出力へ / origin をどう読んだか |
 
-**`request` の段**。次の順に進む。
+**`review-request` の段**。次の順に進む。
 
 1. sh が `--eli5` を確かめる。確かめるのはロックを取る前。`--eli5` が無い、値が無い、
    拡張子が `.html` / `.htm` でない、のどれかなら終了コード 2 で止まる。次にヒットするものがあれば、ヒットしたものを
@@ -142,7 +143,7 @@ write-and-push の書いたパスの一覧の検査は、`review ready` が消�
 続いて write-and-push が退避と `wip/` の削除をコミットして push し、sh が Draft を外し、コメントを投稿し、最後に `worktree drop <親>` で
 親のワークツリーを消す（cwd が中にあれば消さず、外から打つ `ccnavi-clean.sh --worktree <親>` を出す。Draft を外す前と、
 外せなかったときは消さない）。互換の版が食い違っていても止めず、組み立て直しはユーザに頼むと言う。
-親は cwd から引くので、`request`・`confirm`・`decide`・`ready`（`--parent` なし）を統合先のブランチの上（ワークスペースルートなど）で打つと、sh はホストへ繋ぐ前に止まる。cwd を示して「親のワークツリーの中で打ってください」と言い、`次:` に `cd` 付きの打ち直しを出す。ホストは cwd の origin で決まるので、先に繋ぐと親のプロジェクトとは別のホストで止まってしまう。
+親は cwd から引くので、`review-request`・`confirm`・`decide`・`ready`（`--parent` なし）を統合先のブランチの上（ワークスペースルートなど）で打つと、sh はホストへ繋ぐ前に止まる。cwd を示して「親のワークツリーの中で打ってください」と言い、`次:` に `cd` 付きの打ち直しを出す。ホストは cwd の origin で決まるので、先に繋ぐと親のプロジェクトとは別のホストで止まってしまう。
 `ready --parent <親>` は親のワークツリーの外から打つ形。sh は `.claude/worktrees/<親>` へ移ってから origin・ブランチ・親の識別子を
 読み、実行ファイルにもそこを cwd として渡すので、条件の確かめ・退避・write-and-push・Draft 外しは中から打ったときと同じに進む。
 最後の `worktree drop` だけは打った場所へ戻ってから、打った場所を cwd として渡すので、親のワークツリーが消える。GitLab では、Draft を外すときに `squash` も
@@ -163,7 +164,7 @@ write-and-push の書いたパスの一覧の検査は、`review ready` が消�
 - 未解決のスレッドを受け入れる（返信を残して解決済みにしてある。マーカーの `accepted` 欄にキーを残す。台帳には書かない）
 - `close-early.json` を置く
 
-**`request` の前提**は 6 つ。フェーズが終わっている、その番号が延期でない、閉じた（`review/` か `done/`）子の
+**`review-request` の前提**は 6 つ。フェーズが終わっている、その番号が延期でない、閉じた（`review/` か `done/`）子の
 ブランチが全部親ブランチに取り込まれている（子はブランチ名で引く。引けなければ未充足）、親の
 ワークツリーに追跡されている未コミットの変更が無い、親ブランチの HEAD が push 済み、
 まだ依頼していない（依頼の後に親の HEAD が動き、まだレビュー済みでなければ出し直せる。依頼文を
@@ -171,7 +172,7 @@ write-and-push の書いたパスの一覧の検査は、`review ready` が消�
 無くても（`close-early` が置いた形）拒む）。1 つでも欠けたら全件を列挙して拒み、何もしない。その前に sh が ELI5 の HTML を確かめる（下の「ELI5 と crit」）。マージリクエストのタイトル・本文・
 `Closes #<課題>` は親チケットの `title` / `rationale` / 本文 / `issue` からコピーする。
 
-**ELI5 と crit**。`request` には、変更をやさしく説明した HTML を `--eli5` で必ず添える。HTML は
+**ELI5 と crit**。`review-request` には、変更をやさしく説明した HTML を `--eli5` で必ず添える。HTML は
 マージリクエストの差分に載せ、ユーザは手元のターミナルで外部の CLI `crit` で開いて、指摘を `crit push` でマージリクエストの行のスレッドとして送る。
 手順は次のとおり。
 
@@ -181,7 +182,7 @@ write-and-push の書いたパスの一覧の検査は、`review ready` が消�
    （9.5）、親チケットの範囲に書き足さなくてよい
 2. 中身の目安: 変更の目的・何が変わるか・リスクを専門用語なしで書く。1 枚で完結させ、外部の読み込み（CSS・JS・画像・フォントの URL）を
    使わない。スタイルは `<style>` に入れる
-3. `request --phase <N> --body-file <依頼文> --eli5 wip/eli5/phase-<N>.html` を打つ。投稿が済むと
+3. `review-request --phase <N> --body-file <依頼文> --eli5 wip/eli5/phase-<N>.html` を打つ。投稿が済むと
    `ELI5 を見る: ユーザがターミナルで cd <ルート> してから crit review <相対パス> を打ち、… crit push <番号> で …` が出るので、その行をユーザに渡して
    ターンを終える。sh は crit を起動しない（crit は閉じるまで戻らない）
 4. ユーザはツリーのルート（か、同じブランチのチェックアウトのルート）で `crit review <相対パス>` を開き、HTML のソースの行に指摘を付けて、
@@ -192,7 +193,7 @@ write-and-push の書いたパスの一覧の検査は、`review ready` が消�
    （`review_host._unresolved`。依頼者と同じアカウントが送っても数える）。`crit push --event request-changes` は変更要求のレビューに
    なり、`decide` でも通せない
 6. 依頼の後に `wip/eli5/` の下だけを変えたコミットは「ユーザが見るものが動いた」に数えない。直したら push するだけで、
-   `confirm` は止まらず、`request` の打ち直しも要らない（打つと「依頼済み」で止まる）。**代わりに、直した ELI5 をユーザが見直す保証は無い。**
+   `confirm` は止まらず、`review-request` の打ち直しも要らない（打つと「依頼済み」で止まる）。**代わりに、直した ELI5 をユーザが見直す保証は無い。**
    直す前の行に付いたスレッドは未解決のまま残るので、ユーザが resolve する（か `decide` で決める）。ELI5 とほかのファイルを一緒に変えた
    コミットは動いたと数え、打ち直しを求める
 7. `wip/` は `ready` の前に丸ごと消してコミットする（`ready` の前提）。ELI5 もここで消え、squash した成果物には残らない。`ready` の前提は大文字小文字を区別せず（`WIP/` も）、名前が `wip\` で始まる 1 ファイルも残りとして止める
@@ -200,8 +201,8 @@ write-and-push の書いたパスの一覧の検査は、`review ready` が消�
 **`confirm`** は `requested` が無ければ拒む。依頼のマーカーにあるホストとマージリクエストの番号が承認済みチケットと
 一致しなければ拒む。依頼時の HEAD と今の HEAD が同じで push 済みであることを求める。ただし
 ccnavi 自身の置き場（`.ccnavi/approved/` と `wip/proposals/`）だけを変えたコミットは、
-動いたとも未 push とも数えない（マーカーやチケットの移動で依頼が止まらないように）。出し直し（`request`）の
-「依頼済み」の判定と、`request` の push の前提（`_unmet`）も同じ基準で見る。ELI5 の置き場（`wip/eli5/`）だけを変えた
+動いたとも未 push とも数えない（マーカーやチケットの移動で依頼が止まらないように）。出し直し（`review-request`）の
+「依頼済み」の判定と、`review-request` の push の前提（`_unmet`）も同じ基準で見る。ELI5 の置き場（`wip/eli5/`）だけを変えた
 コミットも、動いたとは数えない（`review._unseen_by_review`。Chrome のレビュー済みも同じ `moved_since` を通る）。
 ただし push は求める（未 push の ELI5 はマージリクエストの差分に無く、crit push で送れない）。`ready` の前提
 （`_merge_problems`）だけは、置き場も含めて完全に push させる。
@@ -228,7 +229,7 @@ GitLab に GitHub の dismiss にヒットする操作は適用していない�
 
 **fix で直した指摘は、ユーザが resolve する。** `decide` の「このフェーズで直す」を選んだスレッドは、ホスト上で未解決のまま残るのが仕様で、続きの子で直したあと、ユーザが確かめて resolve する。案内の文は、ホストを問わず同じで、「修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。エージェントは fix を理由に resolve しない」。入れる場所は、`decide` の結果の文（`review.decide._decided_prompt`。fix があるとき）、VS Code ボードの `decided` の note、依頼の本文の末尾の固定の 1 文（`review.RESOLVE_NOTE`。`HANDOFF_NOTE` のあとに足す）。依頼の目印のキーは、この 1 文を足す前の本文と親のブランチの先頭から作るので、1 文を足す前に投稿した依頼を打ち直しても二重に投稿されない。keep・issue を選んだスレッドに sh が返信して resolve する仕組み（受け入れの返信と解決）は、この案内の対象外。
 
-**依頼の目印。** 依頼文の 1 行目は目印 `<!-- ccnavi:request <親>:<フェーズ番号> key=<キー> -->` で、キーは依頼文の本文と親のブランチの先頭（HEAD）から作る（`review prepare`）。`request` はマージリクエストのコメントに同じ目印で始まるものがあれば投稿し直さず、その投稿を記録に使う。打ち直しや write-and-push のやり直しで依頼が二重にならない。子を足してやり直した依頼は先頭が違うので、キーが変わり別に投稿する。**限界:** 1 回目と 2 回目の間に親のブランチが動くとキーが変わり、同じ依頼がもう 1 度投稿される（見つけたらユーザが古いほうのコメントを消す）。コメントの一覧を取れなければ、投稿せずに止まる（`request-posted-unknown`）。
+**依頼の目印。** 依頼文の 1 行目は目印 `<!-- ccnavi:request <親>:<フェーズ番号> key=<キー> -->` で、キーは依頼文の本文と親のブランチの先頭（HEAD）から作る（`review prepare`）。`review-request` はマージリクエストのコメントに同じ目印で始まるものがあれば投稿し直さず、その投稿を記録に使う。打ち直しや write-and-push のやり直しで依頼が二重にならない。子を足してやり直した依頼は先頭が違うので、キーが変わり別に投稿する。**限界:** 1 回目と 2 回目の間に親のブランチが動くとキーが変わり、同じ依頼がもう 1 度投稿される（見つけたらユーザが古いほうのコメントを消す）。コメントの一覧を取れなければ、投稿せずに止まる（`request-posted-unknown`）。
 
 **ホストの分類。** ホストの分類は、origin から取り出したホストを小文字にしてポートを除いたもの（分類に使うホスト）を、`.` の区切りで照合して決める（`evilgithub.com`・`github.com.evil`・`evilghe.com`・`ghe.com.evil` は GitHub にならない）。scheme の大文字小文字は区別しない（`HTTPS://` も読む）。
 

@@ -34,6 +34,13 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     return any(_under(rel, place) for place in (tickets_rel, approved_rel))
 
 
+def in_wip(path: str) -> bool:
+    """git が出したパスが、途中の作業の置き場（`wip`）の下か。
+    大文字小文字と `\\` の区切りを問わない。"""
+    folded = path.lower()
+    return folded == WIP_ROOT or folded.startswith((WIP_ROOT + "/", WIP_ROOT + "\\"))
+
+
 def _under(rel: str, place_rel: str) -> bool:
     """ツリーのルートからの相対パスが、その置き場の下にあるか。
 

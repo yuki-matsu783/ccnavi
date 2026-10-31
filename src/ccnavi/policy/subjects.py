@@ -7,12 +7,7 @@
 
 from __future__ import annotations
 
-from ..infra import fsio, hookio, modes
-from . import ruleload
-
-# サブエージェントの起動ツール（Agent・Task）。レビューが済むまで止める対象で、対象の文字列を
-# 持たないので見出しだけを subject にする。一覧は infra.modes が持つ。
-AGENT_TOOLS = modes.AGENT_TOOLS
+from ..infra import fsio, hookio, toolnames
 
 # ツールごとに、ルールを適用する欄。ここに無いツールは対象を持たず、判定に届かない
 # まま通る。名前は Claude Code の権限ルール `ToolName(指定子)` から括弧の中を
@@ -36,15 +31,6 @@ SUBJECT_FIELDS: dict[str, str] = {
     "WebFetch": "url",
 }
 
-# 行き着く先まで解いてから適用するツール（パスを対象にするもの）。行き先のレイヤーを選ぶ一覧と
-# 同じものを使う。
-# 別に持つと、判定はパスに適用するのにレイヤーは共通レイヤーだけ、という食い違いが起きる。
-PATH_TOOLS = ruleload.PATH_TOOLS
-
-# 探す場所を省略できるツール。省略は「いま居る場所」の意味なので、cwd を対象にする。
-# 空のままにすると、場所を書かない呼び出しがどのルールにもヒットせずに通る。
-SEARCH_TOOLS = ("Grep", "Glob")
-
 
 def subject_of(payload: hookio.Input) -> str:
     """このツールでルールを適用する欄を選ぶ。欄は SUBJECT_FIELDS が持つ。"""
@@ -52,15 +38,15 @@ def subject_of(payload: hookio.Input) -> str:
     field = SUBJECT_FIELDS.get(tool)
     if field is None:
         return ""
-    if tool in AGENT_TOOLS:
+    if tool in toolnames.AGENT_TOOLS:
         # 起動には対象の文字列が無い。レビューが済むまで止める対象なので、見出しを subject に
         # して判定に入れる。
         return payload.field_value(field) or payload.field_value("prompt") or "(agent)"
     value = payload.field_value(field)
     if tool == "NotebookEdit":
         value = value or payload.field_value("file_path")
-    if tool in SEARCH_TOOLS:
+    if tool in toolnames.SEARCH_TOOLS:
         value = value or "."
-    if tool in PATH_TOOLS:
+    if tool in toolnames.PATH_TOOLS:
         return fsio.full_path(value, payload.cwd)
     return value

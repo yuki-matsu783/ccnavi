@@ -578,6 +578,93 @@ def handoff_write_exempt(root: str) -> Callable[[str], str] | None:
     return exempt
 
 
+def handoff_delete_path(root: str, path: str) -> bool:
+    """削除の対象 1 つ（絶対パス。`..` は畳まない綴り）が、置き場の中で、つながっていないか。
+
+    `handoff_write_exempt` と同じ条件（ツリー直下の `wip/handoff/` の下、`..` なし、
+    リンクを通らない、ハードリンクでほかの名前とつながらない）。通すのは削除だけで、
+    書き込みは今のとおり止める。
+    """
+    if not root or not os.path.isabs(path):
+        return False
+    spelled = pathcase.fold(path).replace("\\", "/")
+    return bool(_handoff_place(root).match(spelled)) and not _handoff_linked(path, spelled)
+
+
+# 削除の対象として読む語。シェルが展開しない文字だけ（`~` `$` `*` `{` `=` `!`・バックスラッシュ・
+# 引用符・空白は、シェルが別のパスに直す）。素の rm とラッパーの rm が同じ検査を通る
+# （`handoff_delete_word`）。
+_PLAIN_WORD = re.compile(r"[A-Za-z0-9_./:@+,%-]+")
+
+
+def handoff_delete_word(root: str, base: str | None, word: str) -> bool:
+    """削除の対象の語 1 つが、置き場の中の、つながっていないファイルか。
+
+    語が許す文字だけで、絶対パスか、`base`（そのコマンドが居る場所）から解ける相対パスのとき、
+    `handoff_delete_path` で決める。`base` が無ければ絶対パスだけ。
+    """
+    if not _PLAIN_WORD.fullmatch(word):
+        return False
+    if os.path.isabs(word):
+        return handoff_delete_path(root, word)
+    if not base:
+        return False
+    return handoff_delete_path(root, os.path.join(os.path.realpath(base), word))
+
+
+def _delete_targets(words: list[str]) -> list[str]:
+    """削除コマンド 1 本の語から、対象の語を取り出す。削除と読めない形・読み切れない形は空。"""
+    k = 1 if words and _base(words[0]) in ("sh", "bash") else 0
+    if k >= len(words):
+        return []
+    name = _base(words[k])
+    if name == "rm":
+        rest = words[k + 1 :]
+    elif name in ("git", "ccnavi-git.sh") and k + 1 < len(words) and words[k + 1] == "rm":
+        rest = words[k + 2 :]
+    else:
+        return []
+    targets: list[str] = []
+    dashes = False
+    for word in rest:
+        if not dashes and word == "--":
+            dashes = True
+        elif dashes or not word.startswith("-"):
+            targets.append(word)
+        elif word.startswith("--pathspec"):
+            return []
+    return targets
+
+
+def handoff_delete_exempt(root: str) -> Callable[[str], str] | None:
+    """シェルの保護から、下書きの置き場（`wip/handoff/`）の中だけを削除するコマンドを外す関数。
+
+    不要になった下書きを消せないと、取り込みが「下書きがある」と断るので先へ進めない。
+    削除のコマンド（`rm`・`git rm`・`ccnavi-git.sh rm`）の対象がすべて、`handoff_delete_word` で
+    置き場の中と読めるときだけ、そのコマンドを対象から取り除く。
+    1 つでも外れる語（守る場所そのもの・変数や置換を含む語・`>` など）があれば、そのコマンドは残す。
+    ほかのコマンドは、そのまま残す。書き込み（`cp` `mv` やリダイレクト）は外さない。
+
+    外すのは絶対パスの語だけ。この対象は `sh -c` や `find -execdir` の中身も別の層として含み、
+    層の中の `cd` は見えないので、相対パスの行き先を決められない。相対パスは、居場所を追える
+    `ccnavi-git.sh rm` の側（wrapguard）で外す。
+    """
+    if not root:
+        return None
+
+    def exempt(subject: str) -> str:
+        commands = subject.split(shellread.SEP)
+        kept = []
+        for command in commands:
+            targets = [] if shellread.WORD_SEP in command else _delete_targets(command.split(" "))
+            if targets and all(handoff_delete_word(root, None, t) for t in targets):
+                continue
+            kept.append(command)
+        return shellread.SEP.join(kept) if len(kept) < len(commands) else subject
+
+    return exempt
+
+
 def handoff_link_target(root: str) -> Callable[[str], str] | None:
     """名指しのツールで、置き場（`wip/handoff/`）の中のリンク・ハードリンクに書く形だけを残す関数。
 
@@ -1065,6 +1152,8 @@ def add_rules(
                 ),
             },
             root,
+            # 下書きの置き場の中だけを消すコマンドは外す。書き込みは外さない。
+            exempt=handoff_delete_exempt(root),
         )
     clause = binary_clause(bin_path)
     if clause:

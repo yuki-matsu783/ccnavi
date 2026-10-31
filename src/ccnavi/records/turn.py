@@ -32,11 +32,11 @@ import re
 import time
 from dataclasses import dataclass
 
-from ..infra import fsio
+from ..infra import fsio, tunables
 
 # 更新が無いまま、これだけ経った印は古い。ツール 1 回の長さ（ビルドなど）より長く取る。
 # 短くすると、長いツール呼び出しの最中に印が古くなり、いちばん危ない時間に警告が消える。
-STALE_SECONDS = 30 * 60
+STALE_SECONDS = tunables.TURN_STALE.value()
 
 PREFIX = "turn-"
 SUFFIX = ".json"

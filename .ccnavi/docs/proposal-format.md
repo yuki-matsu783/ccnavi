@@ -3,7 +3,7 @@ title: 提案の書式
 type: guide
 description: 親の提案・子の提案の frontmatter と本文、plan / after / phases のコピー、子のフロー、雛形を作る ccnavi ticket new と、書いたあとに打つ検査。フェーズの型の選び方の引き先
 tags: [ticket, phase]
-keywords: [proposal-format, 提案書式, 提案, 子の提案, 親の提案, 書式, phases, フェーズ, plan, after, 計画, frontmatter, ticket new, ticket revise, 改版, 雛形, lint, flows, フロー]
+keywords: [proposal-format, 提案書式, 提案, 子の提案, 親の提案, 書式, phases, フェーズ, plan, after, 計画, frontmatter, ticket new, ticket revise, 改版, 雛形, lint, flows, フロー, feedback, フィードバック計画]
 ---
 
 # 提案の書式
@@ -35,7 +35,7 @@ ccnavi ticket new <識別子> --title <タイトル> --plan <型,型,...> --issu
 - 作るのは親だけ。`todo/<識別子>.md` に、frontmatter（`version` `ticket` `issue` `mr` `title` `phases` `plan` `rationale` `allow`）と、本文の見出し `## 目的` `## 範囲` `## 対象外` `## 完了の確かめ方` `## 計画の理由` が入る
 - `rationale` と各見出しの下の `（ここに〜を書く）` は空欄の目印で、これが残ったままの新しい提案は、承認と `--lint` が止めるので、すべて書き換える
 - 止まったときは、何も書かれない（子の識別子を渡した、識別子と同名のワークツリーの外で打った、同じ識別子の提案が既にある、など）。出力の案内に従う
-- 子の提案は雛形が作らない。すぐ始まるステップ（`after` の無いステップ）ごとに、子を 1 つ以上同じ承認で通す。無いと `--agree --preview --verify` と `propose` が警告する（止めないが、子の承認がもう 1 回要る）。`ccnavi ticket new` の出力も、「必須:」の行で同じことを言う。先行のあるステップの子は、先行のレビューを見てから足してよい
+- 子の提案は雛形が作らない。すぐ始まるステップ（`after` の無いステップ）ごとに、子を 1 つ以上同じ承認で通す。無いと `approval-request`（`--check` も）が警告する（止めないが、子の承認がもう 1 回要る）。`ccnavi ticket new` の出力も、「必須:」の行で同じことを言う。先行のあるステップの子は、先行のレビューを見てから足してよい
 - `allow` は、雛形が計画の型の `scope` を集めて入れたもの。この作業で触るファイルに合わせて、手で絞るか足す。承認しても書けない項があれば、警告で名指しされる
 
 ## 承認済みの親の改版の雛形を作る
@@ -50,7 +50,7 @@ ccnavi ticket revise <識別子> [--feedback]
 - `--feedback` は `feedback: []`（対応なし）を足す。全体計画のフェーズが全部閉じてレビューが済んだあと（局面が「フィードバック計画待ち」）だけ。フィードバック計画が既にあれば止まる。対応のフェーズを並べるときは、雛形の `feedback:` を直す
 - `--feedback` を付けないときは、写しだけを作る。`plan`・`phases`・`allow`・`ask`・`deny` を直す（範囲を変えるときは、作業中の子を先に取り消す。[decisions.md](decisions.md)）
 - `todo/` に同じ識別子の提案が既にあるときは、上書きせず止まる
-- 書けたら `--agree --preview --verify <識別子>` を通し、`ccnavi-ticket.sh propose <識別子>` で送る
+- 書けたら `ccnavi-ticket.sh approval-request <識別子> --check` を通し、`ccnavi-ticket.sh approval-request <識別子>` で送る
 
 ## 親の提案の frontmatter
 
@@ -98,10 +98,12 @@ ask:                       # 無くてよい。allow か ask のどちらかが 
 - 親の `phases:` は、計画が使う型の定義**だけ**のコピー。手で写さず `ccnavi --plan-order <識別子> --fill-phases` で差し込む（`ticket new` は書いた直後に同じことをする）。
   承認のあとは、このコピーを読んで判定し、`phases.yml` は読まない。`phases.yml` を直したら、承認待ちの提案は `--fill-phases` を打ち直す
 - `feedback:` は、レビューを受けたあとの改版で足すフィードバック計画（番号は全体計画の続き）。最初の提案には書かない
+  - フィードバック計画に置けるのは feedback 型（`implement-feedback`・`design-feedback`・`skill-improve` など）だけ。work 型は断られ、`after` が指せるのもフィードバック計画の番号だけ
+  - 対応のための実装の子は、フィードバック計画の feedback 型のフェーズに足す。同じフェーズに子を足す提案で出してもよい
 
 ## 子の提案
 
-子はフェーズごとに 1 枚以上作る。最初のフェーズの子は、親の提案と一緒に `todo/` に置き、`propose` は親の識別子で打つ。
+子はフェーズごとに 1 枚以上作る。最初のフェーズの子は、親の提案と一緒に `todo/` に置き、`approval-request` は親の識別子で打つ。
 後ろのフェーズの子は、前のフェーズが閉じて（レビューがあれば済んで）から出す。先に出すと承認で止まる。
 
 ```yaml
@@ -140,10 +142,10 @@ allow:
 
 ```
 ccnavi --lint
-ccnavi --agree --preview --verify <識別子>
+sh .ccnavi/scripts/ccnavi-ticket.sh approval-request <識別子> --check
 ```
 
-- `--lint` は提案と設定の形を検査する。`--agree --preview --verify` は、承認するときの検査を、承認せずに先に通す。どちらも承認と同じ規則で提案を調べる。後者はさらに、承認の対象に入るかも答える
+- `--lint` は提案と設定の形を検査する。`approval-request --check` は、何も送らずに、ユーザに承認を頼める状態かを確かめる。承認の画面と同じ規則で提案を調べ、承認の対象に入るかを見る。さらに、親のワークツリーの未コミットの変更と、ホストの API・git のリモートが使えるかも見る。本番の `approval-request` も同じ検査を送る前に通すため、`--check` が通れば本番も通る。`--agree --preview --verify` は、ユーザとボードが使う入口で、同じ検査の実装を共有する
 - error が出たら直して、同じコマンドを打ち直す。「通る」（終了コード 0）は警告が無いという意味ではない。警告のうち、承認のあとに取り返せなくなるもの（提案を識別子と違う名前のワークツリーに書いた、など）は、承認を頼む前に直す
-- 通ったら `ccnavi-ticket.sh propose <識別子>` で親のブランチへ送り、ユーザに承認を頼む（[ticket-flow.md](ticket-flow.md)）。`propose` も、親の提案の計画の `after` の形と終端だけを送る前に検査し、誤りなら何も送らずに止まる
+- 通ったら `ccnavi-ticket.sh approval-request <識別子>` で親のブランチへ送り、ユーザに承認を頼む（[ticket-flow.md](ticket-flow.md)）。`approval-request` は、送る前に親の提案の計画の `after` の形と終端だけを検査し、誤りがあれば何も送らずに止まる
 - 空欄の目印の残り、`allow` と計画の型の `scope` が重ならない、`phases:` のコピーが `phases.yml` と食い違う、といった問題は、ここで名指しされる。出力の案内を読んで直す

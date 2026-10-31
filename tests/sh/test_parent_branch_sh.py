@@ -240,7 +240,7 @@ class ParentBranchShTest(unittest.TestCase):
             child_text(CHILD, PARENT, 1, ("wip/design/*",), False),
         )
         git(tree, "add", "-A")
-        git(tree, "commit", "-q", "-m", "propose")
+        git(tree, "commit", "-q", "-m", "approval-request")
 
     def approve(self):
         preview = self.ok(self.exe("--agree", "--preview", "--json"))

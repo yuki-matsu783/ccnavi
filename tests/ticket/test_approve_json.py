@@ -916,7 +916,7 @@ class ApproveJsonTest(PhaseHarness):
 
         self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/design/*"]))
         self.propose("i0001-01-03", child_text("i0001-01-03", "i0001", 1, ["wip/design/*"]))
-        self.commit_parent("propose 02 03")
+        self.commit_parent("approval-request 02 03")
         os.makedirs(os.path.join(self.approved, "doing", "i0001-01-03.md"))
         result = self.yes(["i0001-01-02", "i0001-01-03"])
         self.assertEqual(result.returncode, 1)

@@ -35,7 +35,7 @@ import os
 from dataclasses import dataclass, field, replace
 from typing import TextIO
 
-from ...infra import modes, settings, tree
+from ...infra import settings, toolnames, tree
 from ...policy import rules, texts
 from ..approval import checks as approval_checks
 from ..approval import marks as approval_marks
@@ -229,7 +229,7 @@ class Phase:
         """依頼を出したあとの待ちを言う。ボードの「受け入れ」はこの欄で出し分ける。
 
         ボードはこれをそのまま使うだけで、止まっているかとマーカーから組み直さない。依頼していない
-        フェーズは止まっていても待ちではなく（レビュー準備中）、先に親が request を打つ。
+        フェーズは止まっていても待ちではなく（レビュー準備中）、先に親が review-request を打つ。
         """
         return self.gate_closed and approval_marks.MARK_REQUESTED in self.marks
 
@@ -421,7 +421,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
         "phase": str(phase.number),
         "label": phase.label,
         "review_label": phase.review_label,
-        "blocked": "サブエージェントの起動" if tool in modes.AGENT_TOOLS else "このシェル実行",
+        "blocked": "サブエージェントの起動" if tool in toolnames.AGENT_TOOLS else "このシェル実行",
         "risk_line": phase.risk_line or "",
     }
     if phase.risk_escalates:
@@ -441,7 +441,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
             f"{phase.review_label})",
             said,
             PARALLEL_REQUEST_NOTE,
-            *([] if tool in modes.AGENT_TOOLS else [phase_forms.EXEMPT_NOTE]),
+            *([] if tool in toolnames.AGENT_TOOLS else [phase_forms.EXEMPT_NOTE]),
         ]
     )
 
@@ -537,7 +537,7 @@ def announce(
                 f"（{LABEL_PREPARING}）。{who}"
                 "子が合流済み（finish 済み）であることを確かめ、ELI5 の HTML を "
                 f"wip/eli5/phase-{n}.html に書いてコミットして push し、"
-                f"'{settings.script_command(root, 'ccnavi-review.sh')} request --phase {n} "
+                f"'{settings.script_command(root, 'ccnavi-review.sh')} review-request --phase {n} "
                 f"--body-file <依頼文> --eli5 wip/eli5/phase-{n}.html' "
                 f"でレビュー{covers}を頼み、{phase_forms.TURN_DEFINED}を終えてユーザを待ってください。"
                 f"{hold_note}"
@@ -664,7 +664,7 @@ def review_next(
     """レビュー待ち（`review/`）の子について、ユーザに回るまでに誰が何をするかの 1 文。
 
     `finish` の出力と `status` の「次の一手」が使う。子を `review/` に置いただけでは、ユーザには
-    回らない。親が合流・ELI5・`request` を済ませて初めて「レビュー待ち」になる（それまでは
+    回らない。親が合流・ELI5・`review-request` を済ませて初めて「レビュー待ち」になる（それまでは
     「レビュー準備中」）。依頼の前に「ユーザのレビューを待つ」と言うと、依頼を打ち忘れる。
 
     言い分けるのは次のとおり。見るのは子のフェーズのレビューを引き受けるフェーズ（延期なら
@@ -697,7 +697,8 @@ def review_next(
             f"{conf.approved}/{ticket_model.DONE}/ へ動く"
         )
     request = (
-        f"'{review_sh} request --phase {n} --body-file <依頼文> --eli5 wip/eli5/phase-{n}.html'"
+        f"'{review_sh} review-request --phase {n} --body-file <依頼文> "
+        f"--eli5 wip/eli5/phase-{n}.html'"
     )
     requested = owner.marks.get(approval_marks.MARK_REQUESTED)
     if requested is not None:

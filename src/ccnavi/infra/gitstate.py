@@ -208,6 +208,64 @@ def child_base(
     return found, ""
 
 
+def _z_paths(top: str, args: list[str], timeout: float) -> set[str] | None:
+    done = gitcmd.run(top, args, timeout, raw_paths=True)
+    if not done.ok:
+        return None
+    return {p for p in done.out.split("\0") if p}
+
+
+def taken_from_remote(
+    top: str, base: str, head: str = "HEAD", timeout: float = TIMEOUT_SECONDS
+) -> set[str]:
+    """`base..head` のうち、統合先（リモート追跡ブランチ）から取り込んだだけのパス。
+
+    子が統合先を merge すると、`base..head` の差分に他人の変更のパスが入る。それは子が書いた
+    変更ではないので、範囲の検査とリスクの計測から外す。外すのは、`base..head` の first-parent
+    にある merge のうち、親の 2 つめ以降がリモート追跡ブランチに入っているものについて、
+    (1) merge が 1 つめの親から変えたパスで、(2) `head` の中身が取り込んだ側と同じもの。
+    衝突を解いて書き換えたパスは取り込んだ側と中身が違うので残り、merge のあとに子が直したパスも
+    残る。読めなかったときは何も外さない（数える側へ倒す）。
+    """
+    if not (top and base and head):
+        return set()
+    merges = gitcmd.run(
+        top, ["rev-list", "--merges", "--first-parent", "--parents", f"{base}..{head}"], timeout
+    )
+    if not merges.ok:
+        return set()
+    taken: set[str] = set()
+    flags = ["diff", "--name-only", "--no-renames", "--ignore-submodules=none", "-z"]
+    for line in merges.out.splitlines():
+        shas = line.split()
+        if len(shas) < 3:
+            continue
+        merge, first = shas[0], shas[1]
+        brought: set[str] | None = None
+        for other in shas[2:]:
+            on_remote = gitcmd.run(
+                top,
+                [
+                    "for-each-ref",
+                    "--contains",
+                    other,
+                    "--count=1",
+                    "--format=%(refname)",
+                    "refs/remotes/",
+                ],
+                timeout,
+            )
+            if not (on_remote.ok and on_remote.out.strip()):
+                continue
+            if brought is None:
+                brought = _z_paths(top, [*flags, first, merge], timeout)
+            differ = _z_paths(top, [*flags, other, head], timeout)
+            if brought is None or differ is None:
+                continue
+            taken |= brought - differ
+    return taken
+
+
 def branch_names(top: str, timeout: float = TIMEOUT_SECONDS) -> set[str]:
     """手元のブランチと origin のブランチの名前。
 

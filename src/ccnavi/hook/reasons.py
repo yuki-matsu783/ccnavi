@@ -106,11 +106,6 @@ CODE_REWRITE = {
     shellread.FORM_AMBIGUOUS: "DENY_AMBIGUOUS_FORM",
 }
 
-# 理由に載せる対象の長さの上限。対象はエージェントが今書いたものなので、
-# ここでは同じものを指せれば足りる。ヒアドキュメントには 1 ファイル分を丸ごと書けるので、
-# 全文を載せると理由の本体が下へ流れて読まれなくなる。
-SUBJECT_LIMIT = 200
-
 
 def code_for(tool: str, degraded: str) -> str:
     """拒否の根拠コード。対象がコマンドかパスかで分かれる。"""
@@ -338,8 +333,8 @@ def _shorten(text: str) -> str:
     改行や空白の続きまで残りに入り、見えていない字数を多く言う。
     """
     shown = " ".join(text.split())
-    if len(shown) > SUBJECT_LIMIT:
-        shown = shown[:SUBJECT_LIMIT] + f"…(+{len(shown) - SUBJECT_LIMIT})"
+    if len(shown) > texts.SUBJECT_LIMIT:
+        shown = shown[: texts.SUBJECT_LIMIT] + f"…(+{len(shown) - texts.SUBJECT_LIMIT})"
     return shown
 
 

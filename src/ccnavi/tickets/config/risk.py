@@ -63,7 +63,7 @@ from dataclasses import dataclass, field, replace
 
 import yaml
 
-from ...infra import gitcmd, globmatch, settings, tree, yamlread
+from ...infra import gitcmd, gitstate, globmatch, settings, tree, yamlread
 from ...policy.rules import ID_SEPARATOR, SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 
 VERSION = 1
@@ -765,7 +765,8 @@ def measure(worktree: str, base: str, head: str = "HEAD") -> tuple[Diff | None, 
     3. `git diff --name-status -z` で変更の種類（先頭の 1 文字）を読む。numstat に無い path
        は行数 0 で足す。読めなければ止める（0 件と数えない）。
     4. `rev-parse` で head を sha にする。読めなければ止める。
-    5. Diff にして返す。Diff.head は引数の head ではなく、その sha になる。
+    5. 統合先を取り込んだ merge が持ち込んだだけのパス（`gitstate.taken_from_remote`）を外す。
+    6. Diff にして返す。Diff.head は引数の head ではなく、その sha になる。
     """
     if not base:
         return None, "子の仕事の始まり（親との共通の祖先）がありません。"
@@ -820,6 +821,9 @@ def measure(worktree: str, base: str, head: str = "HEAD") -> tuple[Diff | None, 
             changes[path].status = status[:1]
         else:
             changes[path] = Change(path=path, status=status[:1])
+    # 統合先を取り込んだ merge が持ち込んだだけのパスは、子が書いたものではないので数えない。
+    for path in gitstate.taken_from_remote(worktree, base, head, GIT_TIMEOUT_SECONDS):
+        changes.pop(path, None)
     # 測った先の commit を sha にして、戻り値に入れる。
     rc, sha = _git(worktree, ["rev-parse", head])
     if rc != 0 or not sha.strip():

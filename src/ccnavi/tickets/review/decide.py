@@ -212,7 +212,7 @@ def _decision(
     parent, ph = found
     requested_mark = ph.marks.get(approval_marks.MARK_REQUESTED)
     if requested_mark is None:
-        stderr.write("ccnavi: 依頼の記録がありません。先に request してください\n")
+        stderr.write("ccnavi: 依頼の記録がありません。先に review-request してください\n")
         return None
     tree_root = tree.worktree_path(root, parent.ticket)
     moved = review._moved_detail(tree_root, conf, requested_mark, bool(parent.project))

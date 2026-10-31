@@ -17,7 +17,17 @@ import time
 from typing import TextIO
 
 from ..catalog import docsearch, projskills
-from ..infra import directrec, hookio, modes, pathcase, settings, shellread, tree
+from ..infra import (
+    directrec,
+    hookio,
+    modes,
+    pathcase,
+    settings,
+    shellread,
+    toolnames,
+    tree,
+    tunables,
+)
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import (
     builtin,
@@ -63,7 +73,7 @@ from . import (
 )
 
 # SessionStart で、終わっていない integrate の記録を確かめる時間の上限（秒）。
-PENDING_SECONDS = 2.0
+PENDING_SECONDS = tunables.INTEGRATE_PENDING.value()
 
 # `match: Stop` のルールで止めた回の理由コード。記録の `code` と、止めた文の頭に出る。
 CODE_RULE_NUDGE = "NUDGE_STOP_RULE"
@@ -196,7 +206,7 @@ def watched_for(
         trees = tree.all_trees(root, conf.projects)
     else:
         trees = [ws]
-        where = record.subject if payload.tool_name in ruleload.PATH_TOOLS else payload.cwd
+        where = record.subject if payload.tool_name in toolnames.PATH_TOOLS else payload.cwd
         t = tree.tree_of(root, where, conf.projects)
         if t is not None and t.root != ws.root:
             trees.append(t)
@@ -434,7 +444,8 @@ def decide_at_stop(
     経路は止めて `reason` に書くことしか無く、止めないと促しがモデルに届かないため。
     止めるときも報告は同じ応答の `systemMessage` で返す。
 
-    `finish` を促さなかった回に限り、レビューの依頼（`request`）までの道の途中なら止めて、次の一手を
+    `finish` を促さなかった回に限り、レビューの依頼（`review-request`）
+    までの道の途中なら止めて、次の一手を
     促す（`_request_nudge`）。承認済みの親に作業中の子が残っているか、子が全部閉じたのに
     依頼のマーカーが無いとき。止め方とモードの扱いは `finish` の促しと同じ。
 
@@ -512,14 +523,16 @@ def _track_proposals(conf: settings.Settings, payload: hookio.Input) -> None:
     try:
         _track_proposals_inner(conf, payload)
     except Exception as exc:  # 記録は判定の材料でしかない。落ちても作業を止めない
-        sys.stderr.write(f"ccnavi: propose の操作実績を記録できない: {type(exc).__name__}: {exc}\n")
+        sys.stderr.write(
+            f"ccnavi: approval-request の操作実績を記録できない: {type(exc).__name__}: {exc}\n"
+        )
 
 
 def _track_proposals_inner(conf: settings.Settings, payload: hookio.Input) -> None:
-    """propose の操作実績とターンの開始を、state に記録する（Stop の AI 判定の材料）。
+    """approval-request の操作実績とターンの開始を、state に記録する（Stop の AI 判定の材料）。
 
     agent hook を登録していなければ何もしない。判定にも出力にも影響しない。サブエージェントの
-    呼び出しは数えない（propose はサブエージェントから呼べない）。
+    呼び出しは数えない（approval-request はサブエージェントから呼べない）。
     """
     if not (conf.stop_review_agent and conf.state and payload.session_id) or payload.agent_id:
         return
@@ -540,7 +553,7 @@ def _track_proposals_inner(conf: settings.Settings, payload: hookio.Input) -> No
         file_path = payload.tool_input.get("file_path")
         if (
             payload.event == hookio.POST_TOOL_USE
-            and payload.tool_name in ("Write", "Edit", "MultiEdit")
+            and payload.tool_name in toolnames.WRITTEN_FILE_TOOLS
             and isinstance(file_path, str)
         ):
             ident = stopops.written_ident(file_path, conf.tickets)
@@ -600,7 +613,7 @@ _NOT_CANDIDATE_FINAL = {
 def _submitted(
     conf: settings.Settings, root: str, raw: approval.Raw | None, session: str
 ) -> list[dict]:
-    """このセッションで propose した提案と、今の承認状態。"""
+    """このセッションで approval-request した提案と、今の承認状態。"""
     idents = sorted({op["ident"] for op in stopops.turn_ops(conf.state, session, 0)})
     if not idents:
         return []
@@ -712,7 +725,8 @@ def _plan_stop_review_inner(
         }
         for op in ops
     ]
-    # 同じ識別子の propose の操作があれば（止めた・失敗した理由が分かる）、未送信としては重ねない。
+    # 同じ識別子の approval-request の操作があれば（止めた・失敗した理由が分かる）、
+    # 未送信としては重ねない。
     operated = {op["ident"].casefold() for op in turn}
     unsent = [row for row in unsent if row["ident"].casefold() not in operated]
     proposals += [

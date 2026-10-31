@@ -8,15 +8,11 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
-from ..infra import fsio, gitcmd, gitstate, pathcase, tree
+from ..infra import fsio, gitcmd, gitstate, pathcase, toolnames, tree
 from ..policy import rules
 from ..tickets.approval import write_and_push
 from ..tickets.model import archive, ticket_fields, ticket_model, ticket_places
 from ..tickets.phase import scope as phase_scope
-
-# 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
-# そのルールは「この場所に書かせない」を言っている。
-WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
 # 返す文に載せる理由コード。cli.py の表と同じ体系から借りている。
 # 監査に残す事象名がそのまま POST_VIOLATION。
@@ -192,7 +188,7 @@ def _findings(
 
     チケットの置き場に現れた変更も、ccnavi のサブコマンドが書いたと内容から読めるぶんだけ
     除く（`_script_writes`）。除かないと、`ticket start` が着手の時刻を書くたび、
-    `review request` がマーカーを置くたびに、ccnavi 自身の書き込みが
+    `review-request` がマーカーを置くたびに、ccnavi 自身の書き込みが
     「エージェントによる書き換え」として報告され、戻す設定では戻されて手順が進まない。
 
     ルールの deny と ask にヒットした変更は、範囲の外でもルールの側で報告する。
@@ -235,7 +231,7 @@ def _script_writes(
 ) -> set[str]:
     """チケットの置き場の変更のうち、ccnavi のサブコマンドが書いたと読めるものの実パス。
 
-    `ticket start` / `finish` / `cancel` と `review request` / `confirm` / `ready` は、
+    `ticket start` / `finish` / `cancel` と `review-request` / `confirm` / `ready` は、
     承認済みチケットとマーカーを書く。書いた先は `deny` と宣言された場所なので、外さないと
     自分の手順を自分で違反として報告し、戻す設定では自分で戻す。
 
@@ -245,7 +241,7 @@ def _script_writes(
 
     外すのは 3 つ（と、`mr:` の書き足し 1 つ）。
 
-    * `review request` が親の承認済みチケットに足す `mr:`。コミット済みの版で `mr:` が空
+    * `review-request` が親の承認済みチケットに足す `mr:`。コミット済みの版で `mr:` が空
       （欄なし・値なし）、いまの版が `mr: 12` の 1 行だけの正の整数で、ほかの欄・本文が
       1 文字も変わっていないものだけ（`_mr_filled`）。`mr:` の値の変更（整数から別の整数・
       整数から空）やほかの欄の書き換えは、今までどおり報告する
@@ -587,7 +583,7 @@ def _droppable(before: str | None) -> tuple[str, ...]:
 
 
 def _mr_filled(before: str | None, now: str | None) -> tuple[str, ...]:
-    """`review request` が親の承認済みチケットに書き足す `mr:` を、比べるときだけ省く欄。
+    """`review-request` が親の承認済みチケットに書き足す `mr:` を、比べるときだけ省く欄。
 
     ccnavi 自身の書き込みと見なす例外で、判定が緩む向きなので条件を狭くしている。
     コミット済みの版に frontmatter があって `mr:` が空（欄なし・値なし）で、いまの版の
@@ -633,4 +629,4 @@ def _guards_writes(rule: rules.Rule, path: str) -> bool:
     書くと、同じルールが実行前と実行後で違う場所にヒットすることになり、
     どちらが正しいのかを誰も言えなくなる。
     """
-    return any(rule.matches(tool, path) for tool in WRITE_TOOLS)
+    return any(rule.matches(tool, path) for tool in toolnames.WRITE_TOOLS)

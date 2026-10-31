@@ -25,10 +25,8 @@ from __future__ import annotations
 import os
 import time
 
-from ...infra import fsio, hookio, pathcase, settings, tree
+from ...infra import fsio, hookio, pathcase, settings, toolnames, tree
 
-# 候補にする書き込みのツール。
-TOOLS = ("Write", "Edit", "NotebookEdit")
 # 記録の上限。
 MAX_ENTRIES = 50
 # 同じ候補が末尾にあり、これ以内に見たばかりなら書き直さない（秒）。
@@ -125,7 +123,7 @@ def touch(
     メインにもサブエージェントにも効く（サブエージェントも親のセッションの候補になる）。
     保存できなければ何も言わない。
     """
-    if payload.tool_name not in TOOLS or not conf.state or not payload.session_id:
+    if payload.tool_name not in toolnames.WRITE_TOOLS or not conf.state or not payload.session_id:
         return
     full = _target(payload)
     if not full:

@@ -554,7 +554,7 @@ def run_probe() -> None:
         tree = worktree(child, "i0001")
         started = sh(TICKET_SH, parent_tree, "start", child)
         record(f"ticket start {child}", started.returncode == 0, started.stderr.strip()[:200])
-        # 子の allow（propose の src/a/*・src/b/*）の範囲に入るパスに書く
+        # 子の allow（approval-request の src/a/*・src/b/*）の範囲に入るパスに書く
         write(
             os.path.join(tree, "src", {"i0001-01-01": "a", "i0001-01-02": "b"}[child], "work.py"),
             f"# {child}\n",
@@ -606,7 +606,15 @@ def run_probe() -> None:
     write(os.path.join(parent_tree, "src", "a", "unpushed.py"), "# 未 push\n")
     commit_all(parent_tree, "未 push の変更")
     early = sh(
-        REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body, "--eli5", EXPLAINER
+        REVIEW_SH,
+        parent_tree,
+        "review-request",
+        "--phase",
+        "1",
+        "--body-file",
+        body,
+        "--eli5",
+        EXPLAINER,
     )
     record(
         "push 前の request は前提で止まる",
@@ -633,7 +641,15 @@ def run_probe() -> None:
     )
 
     requested = sh(
-        REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body, "--eli5", EXPLAINER
+        REVIEW_SH,
+        parent_tree,
+        "review-request",
+        "--phase",
+        "1",
+        "--body-file",
+        body,
+        "--eli5",
+        EXPLAINER,
     )
     say("request:\n" + redact(requested.stdout + requested.stderr))
     record("request が通る（MR を作って投稿してマーカー）", requested.returncode == 0)
@@ -655,7 +671,15 @@ def run_probe() -> None:
         request_marked(pid, iid),
     )
     again = sh(
-        REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body, "--eli5", EXPLAINER
+        REVIEW_SH,
+        parent_tree,
+        "review-request",
+        "--phase",
+        "1",
+        "--body-file",
+        body,
+        "--eli5",
+        EXPLAINER,
     )
     record(
         "2 度目の request は依頼済みで止まる", again.returncode != 0 and "依頼済み" in again.stderr
@@ -947,7 +971,7 @@ def decide_section(pid: int, reviewer_id: int) -> None:
     )
     body = write(os.path.join(OUT, "request-3.md"), "見てほしい点\n\n- src/d を足した\n")
     requested = sh(
-        REVIEW_SH, tree, "request", "--phase", "1", "--body-file", body, "--eli5", EXPLAINER
+        REVIEW_SH, tree, "review-request", "--phase", "1", "--body-file", body, "--eli5", EXPLAINER
     )
     record("i0003 の request が通る", requested.returncode == 0, redact(requested.stderr)[-200:])
     status, disc = CLIENT.create_discussion(

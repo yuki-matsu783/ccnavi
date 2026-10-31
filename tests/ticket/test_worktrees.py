@@ -41,7 +41,7 @@ class ReviewTurnTest(PhaseHarness):
 
     def child(self, name):
         self.propose(name, child_text(name, "i0001", 1, ["src/*"]))
-        self.commit_parent(f"propose {name}")
+        self.commit_parent(f"approval-request {name}")
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         tree = self.run_child(name, [(f"src/{name}.py", "x = 1\n")])
@@ -67,7 +67,7 @@ class ReviewTurnTest(PhaseHarness):
         tree, closed = self.child("i0001-01-01")
         # 依頼の前。ユーザには回っていない
         self.assertIn("レビュー準備中", closed.stdout)
-        self.assertIn("request --phase 1", closed.stdout)
+        self.assertIn("review-request --phase 1", closed.stdout)
         self.assertNotIn("ユーザのレビューを待つ", closed.stdout)
         # 誰が done/ へ動かすかは 1 度だけ言う（重ねない）
         self.assertEqual(closed.stdout.count("done/ へ動"), 1, closed.stdout)
@@ -250,12 +250,17 @@ class DropTest(PhaseHarness):
 
     def test_drops_the_worktree_after_cleaning_the_build_outputs(self):
         tree = self.worktree("i0002", "main")
-        write(os.path.join(tree, ".gitignore"), "node_modules/\nout/\n.venv/\n__pycache__/\n")
+        write(
+            os.path.join(tree, ".gitignore"),
+            "node_modules/\nout/\ndist/\n.cache/\n.venv/\n__pycache__/\n",
+        )
         write(os.path.join(tree, "ext", "package.json"), "{}")
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "ignore")
         write(os.path.join(tree, "node_modules", ".pnpm", "x", "index.js"), "")
         write(os.path.join(tree, "ext", "out", "extension.js"), "")
+        write(os.path.join(tree, "ext", "dist", "bundle.js"), "")
+        write(os.path.join(tree, "ext", ".cache", "c"), "")
         write(os.path.join(tree, ".venv", "pyvenv.cfg"), "")
         dropped = self.drop("i0002")
         self.assertEqual(dropped.returncode, 0, dropped.stdout + dropped.stderr)

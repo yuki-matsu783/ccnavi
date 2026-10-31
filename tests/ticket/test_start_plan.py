@@ -44,11 +44,11 @@ class StartPlanTest(PhaseHarness):
         started = self.ccnavi("ticket", "start", "i0001")
         self.assertEqual(started.returncode, 0, started.stderr)
         self.assertIn(f"{HEAD}: 1（調査）, 2（設計）", started.stdout)
-        # 次の一手は、子の提案を書いて propose で送ること（識別子の例を埋めて言う）
+        # 次の一手は、子の提案を書いて approval-request で送ること（識別子の例を埋めて言う）
         nexts = [x for x in started.stdout.splitlines() if x.startswith("次: ")]
         self.assertEqual(len(nexts), 1, started.stdout)
         self.assertIn("子の提案（例: 'i0001-01-01'）", nexts[0])
-        self.assertIn("propose i0001", nexts[0])
+        self.assertIn("approval-request i0001", nexts[0])
         self.assertIn("`finish` で", started.stdout)
         self.assertEqual(started.stderr, "")
 
@@ -77,7 +77,7 @@ class StartPlanTest(PhaseHarness):
         self.assertEqual(self.approve().returncode, 0)
         # 2 番目のフェーズの子は、まだ承認されていない提案
         self.propose("i0001-02-01", child_text("i0001-02-01", "i0001", 2, ["wip/design/*"]))
-        self.commit_parent("propose 02")
+        self.commit_parent("approval-request 02")
         started = self.ccnavi("ticket", "start", "i0001")
         self.assertEqual(started.returncode, 0, started.stderr)
         self.assertIn(f"{HEAD}: 1（調査）", started.stdout)
@@ -89,7 +89,7 @@ class StartPlanTest(PhaseHarness):
         self.commit_parent()
         self.approve()
         self.propose("i0001-02-01", child_text("i0001-02-01", "i0001", 2, ["wip/design/*"]))
-        self.commit_parent("propose 02")
+        self.commit_parent("approval-request 02")
         started = self.ccnavi("ticket", "start", "i0001")
         self.assertEqual(started.returncode, 0, started.stderr)
         self.assertNotIn(HEAD, started.stdout)

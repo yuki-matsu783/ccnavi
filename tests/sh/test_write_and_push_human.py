@@ -127,7 +127,7 @@ class WriteAndPushChromeConfirmTest(PhaseOne, WriteAndPushHarness):
 
     取り込み済みの親子のチケットでは、手元の CLI を直に打つと write-and-push に断られる
     （`--record-tree` が無い）。そこで write-and-push と同じ手順
-    （`ccnavi-review.sh request` と `confirm`。GitHub の代役は録った見本）で手元を
+    （`ccnavi-review.sh review-request` と `confirm`。GitHub の代役は録った見本）で手元を
     回し、同じ状態から Chrome の入口が出す書くものと、write-and-push
     が親のブランチへ書いて送ったものを比べる。
     違ってよいのは経路（`via`）と時刻（`at`）だけ。アカウント（`actor`）は、手元は sh が
@@ -249,7 +249,9 @@ class WriteAndPushChromeConfirmTest(PhaseOne, WriteAndPushHarness):
     def request(self):
         body = write(os.path.join(self._base, "body.md"), "見てほしい\n")
         html = self.eli5()
-        requested = self.review("request", "--phase", "1", "--body-file", body, "--eli5", html)
+        requested = self.review(
+            "review-request", "--phase", "1", "--body-file", body, "--eli5", html
+        )
         self.assertEqual(requested.returncode, 0, requested.stdout + requested.stderr)
         self.assertIn(self.requested, self.committed())
         return body

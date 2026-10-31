@@ -18,6 +18,8 @@ keywords: [実画面, code-server, 日本語, ユーザ目線, 画面確認, Chr
 VS Code 本体の配布元、GitHub のリリース、Open VSX は 403 で、`code` や `@vscode/test-electron` は使えない。
 そのため VS Code は npm の `code-server`（ブラウザで開く VS Code）で代える。手順は Linux で動かした。macOS や Git Bash では、`setsid`・`disown`・`python3` を読み替える（未確認）。
 
+`code-server` と `playwright` が環境に入っていれば（`command -v code-server`、`playwright --version`）、それを使う。無ければ [1.0](#10-道具があるか確かめる) で入れる。入っていれば、1.5 の code-server の取得は要らない。
+
 ## 1. 前提と準備
 
 必要なもの。
@@ -27,8 +29,34 @@ VS Code 本体の配布元、GitHub のリリース、Open VSX は 403 で、`co
 | Node.js 22.13.1 以上と npm | 拡張の組み立て、code-server | `node -v` |
 | pnpm 10 | 拡張の組み立て | `pnpm -v`（壊れていたら詰まりどころの表） |
 | uv と Python 3.12 以上 | ccnavi の組み立て、チケットの見本を作る | `uv --version` |
-| Playwright の Chromium | 撮影 | `ls -d /opt/pw-browsers/chromium-*/chrome-linux*/chrome` |
+| Playwright の Chromium | 撮影 | Playwright のブラウザの置き場（環境変数 `PLAYWRIGHT_BROWSERS_PATH`。無ければ Linux は `~/.cache/ms-playwright`、macOS は `~/Library/Caches/ms-playwright`、Windows は `%LOCALAPPDATA%\ms-playwright`）の `chromium*`。クラウドのコンテナでは `/opt/pw-browsers/` のこともある |
 | git | 検証用コピーのワークツリー | `git --version` |
+
+### 1.0 道具があるか確かめる
+
+先に、環境にあるかを確かめる。あれば、そのまま使う（入れ直さない）。
+
+```sh
+command -v code-server && code-server --version      # 無ければ入れる
+command -v playwright && playwright --version        # 無ければ入れる（ブラウザの取得用）
+ls -d "${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"/chromium* 2>/dev/null   # macOS は ~/Library/Caches/ms-playwright
+```
+
+無いものは、入れる前に、グローバルに入れるかローカルに入れるかをユーザに確かめる（入れてよいことは [real-screen-verification.md](../../../../../.agents/docs/real-screen-verification.md) にある。入れ方の選びはユーザが決める）。
+
+```sh
+# グローバル（今後の確認でも使い回せる）
+pnpm add -g code-server@4.144.0 playwright@1.64.1   # 無いものだけ。版は固定する
+# ローカル（このリポジトリの追跡されるファイルの外。例: $W/cs の下）
+mkdir -p "$W/cs" && cd "$W/cs" && pnpm add code-server@4.144.0 playwright@1.64.1
+playwright install chromium                         # Chromium が無いとき（ローカルなら pnpm exec playwright install chromium）
+```
+
+- `pnpm add -g` が「global bin directory が無い」で止まったときは、`pnpm setup` が要る。`pnpm setup` はシェルの設定ファイル（`~/.zshrc` など）を書き換えるので、エージェントは打たず、ユーザに頼む。環境変数 `PNPM_HOME` を渡して入れる方法もあるが、PATH には載らないので、実行ファイルはフルパスで呼ぶ
+- 動かした版は、code-server 4.144.0（VS Code 1.144.0）と playwright 1.64.1。版を上げたときは、1.5 の起動が通るかを確かめ直す
+- pnpm が「code-server と argon2 のビルド用スクリプトを飛ばした」と警告することがある。`code-server --version` は動く。画面を立ち上げて、パスワード関連で問題が出たときだけ `pnpm approve-builds -g` を使う（未確認）
+- Playwright が探す Chromium の版（例: 1194）と、入っている版（例: 1200）が食い違うことがある。撮影のスクリプトでは、実行ファイルを `executablePath`（`CHROME`）で明示する
+- グローバルの `playwright` は、CLI（ブラウザの取得）用。撮影のスクリプトは、拡張の `node_modules/` の `playwright-core` を使う（1.4）
 
 以降で使う変数。値は自分の環境に合わせて直す。
 
@@ -38,7 +66,7 @@ TESTREPO=/home/user/test-repo       # 配布先の見本。ここは触らない
 UC=/home/user/uc-repo               # 検証用コピー（チケットを並べて撮る）
 W=${TMPDIR:-/tmp}/ccnavi-real       # 作業と画像の置き場。リポジトリの外
 BOARD=$CCNAVI/extensions/vscode/ccnavi-board
-CHROME=$(ls -d /opt/pw-browsers/chromium-*/chrome-linux*/chrome | head -1)
+CHROME=$(ls -d /opt/pw-browsers/chromium-*/chrome-linux*/chrome | head -1)   # 1.0 で見つけた Chromium の実行ファイルに直す
 mkdir -p "$W/shots"
 ```
 
@@ -183,6 +211,8 @@ cd "$BOARD" && sh scripts/package.sh | tail -2     # $CCNAVI/dist/ccnavi-board-<
 
 ### 1.5 code-server を入れて起動する
 
+1.0 で `code-server` が環境にあれば、次の取得（`npm install`）は飛ばしてよい。起動は、`node node_modules/code-server/out/node/entry.js` の代わりに、環境の `code-server` を同じ引数で呼ぶ（未確認。通ったら、ここを直す）。
+
 ```sh
 mkdir -p "$W/cs" && cd "$W/cs"
 npm install code-server --ignore-scripts --no-audit --no-fund
@@ -282,6 +312,12 @@ node "$W/shoot.js" "$UC" board 1280 760 チケット管理      # 最初の 1 �
 | Playwright が `strict mode violation`（同じ placeholder の入力欄が 16 個）や `element is not visible` で落ちる | ルールなどの一覧は、行ごとに隠れた入力欄を持つ。新しく足した行は値が空 | `input[placeholder="git-push"][value=""]` や `textarea.f-message:visible` のように、空の値・見えているものに絞る |
 | 画面を開いた直後に撮ると、中身が空や古い | webview は拡張が中身を渡すまで読み込み中 | 開いてから 5 秒待つ。ボードは `ccnavi --explain --json` を呼ぶので、遅いときは増やす |
 | VS Code の表示が英語のまま（`locale: ja` を設定しても変わらない） | 日本語言語パックを入れていない（Open VSX に出られない） | 未確認の宿題（5 章）。拡張の文言は日本語で出るので、ccnavi の画面の確認には影響しない |
+| 保存したあと、画面上部の警告の帯が撮れない | 保存すると、画面は編集した行の高さのままで、上部の帯が画面の外にある | webview の中のスクロールする要素を、すべて `scrollTop = 0` にしてから撮る |
+| 「編集中は外から別の対象を開いても切り替えない」通知が出ない | コマンド（`ccnaviBoard.openTemplates`）とサイドパネルは、対象がワークスペース自身（`self`）。画面が `self` を開いていると、対象が同じで切り替えが起きない | テンプレート画面の設定を「共通の設定」か「プロジェクト」にして、新しいテンプレートの編集欄を開き、サイドパネルの「テンプレート管理」を押す。画面内の設定の選択欄は、編集中は押せない |
+| 警告の帯が、保存したファイルと関係のない warn で長くなる | 帯は、保存時点の検査全体の warn を並べる。検証用ワークスペースに git の origin が無いと、「統合先と違う」系が 10 件前後出る | 検証用ワークスペースを git のリポジトリにして origin を付ける（`git remote remove origin` で外すのは承認の確認用だけ）か、無関係な warn が出ることを承知で確認する |
+| 終わったあと、code-server の子プロセスが残る | `pgrep -f "[c]ode-server/out/node/entry"` では、ファイル監視の子（`--type=fileWatcher`）が見つからない | 親の PID に加えて、`--type=fileWatcher` の子プロセスも止める。一時ファイルは `rm -r` で消す（`rm -rf` と `find -delete` はガードに拒否される） |
+| macOS で `setsid` が無い | macOS には `setsid` が標準で無い | `nohup … &` だけで動く（`disown` も不要だった）。Chromium は、Playwright のブラウザの置き場の `chromium_headless_shell-*/chrome-headless-shell-*/chrome-headless-shell` を `CCNAVI_CHROMIUM`（`CHROME`）に指す |
+| 拡張を入れ直すたびに vsix を作るのが重い | `package.sh` は install と compile を含む | compile 済みの出力（`package.json`、`media/`、`out/extension.js`、`out/webview/`）を、拡張の置き場へコピーするだけでも動いた。コピー元が現在のソースと合っているかは、先に compile して確かめる |
 
 code-server 由来のため、評価には入れなかったもの。
 

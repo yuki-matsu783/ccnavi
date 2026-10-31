@@ -21,7 +21,7 @@ import os
 import re
 from dataclasses import dataclass, field
 
-from ..infra import modes, pathcase, pathsafe, settings, tree
+from ..infra import modes, pathcase, pathsafe, settings, toolnames, tree
 from ..policy import texts
 from ..tickets.approval import checks as approval_checks
 from ..tickets.approval import store as approval
@@ -118,6 +118,8 @@ class Mention:
     # パスの検証の結果。空なら有効。
     invalid: str = ""
     worktree: tree.Tree | None = None
+    # 数え切れない（パスが多すぎる）。担当が決まっていても止める。
+    fatal: bool = False
 
 
 @dataclass
@@ -182,15 +184,16 @@ def decide(
     処理フロー:
     1. 起動ツールでなければ空を返す。`isolation` の指定は値によらず止める（`_isolation`）。
     2. プロンプトの言及を拾う（`mentions`）。cwd の所属ツリーを `tree.tree_of` で求める。
-    3. 無効なパスが 1 つでもあれば止める（`_target_invalid`）。
-    4. 言及を担当にまとめ（`_targets`）、入れ子なら呼び手の子（`_caller_child`）を足す。
+    3. 言及を担当にまとめる（`_targets`。登録にない綴りのパスは担当にせず無視する）。
+       担当が 0 件で無効なパスがあるか、パスが多すぎるときは止める（`_target_invalid`）。
+    4. 入れ子なら呼び手の子（`_caller_child`）を足す。
     5. 担当先が 2 つ以上なら止める（`_multi_target`）。
     6. 担当先が 1 つなら、親（`_parent_tree`）・子で担当にできない（`unavailable`、
        `_child_unavailable`）・既存の cwd との食い違い（`_cwd_conflict`）の順に止める。
        どれにもヒットしなければ更新の計画を返す（`_plan`）。
     7. 言及が 0 件で、親のワークツリーから編集する起動なら、子の指定を求めて止める（`_no_child`）。
     """
-    if payload.tool_name not in modes.AGENT_TOOLS:
+    if payload.tool_name not in toolnames.AGENT_TOOLS:
         return Result()
     tool_input = payload.tool_input
     # isolation は値に関係なく止める。作業場所は ccnavi が決め、isolation のワークツリー
@@ -204,12 +207,12 @@ def decide(
     found = mentions(conf, root, prompt, book)
     here = tree.tree_of(root, payload.cwd, conf.projects) if payload.cwd else None
 
-    # 1. 無効なパスが 1 つでもあれば止める。
-    bad = [m for m in found if m.kind == "path" and m.invalid]
-    if bad:
-        return Result(stop=_target_invalid(root, bad))
-
+    # 1. 担当にできる言及が 1 つも無いのに無効なパスがあるとき、またはパスが多すぎるときは止める。
+    #    担当が決まっているなら、登録にない綴り（説明に書いた例など）は無視する。
     targets = _targets(conf, root, found, book)
+    bad = [m for m in found if m.kind == "path" and m.invalid]
+    if bad and (not targets or any(m.fatal for m in bad)):
+        return Result(stop=_target_invalid(root, bad))
     caller = _caller_child(book, here) if payload.agent_id and book is not None else None
     groups = {t.key: t for t in targets}
     if caller is not None:
@@ -279,6 +282,7 @@ def mentions(conf: settings.Settings, root: str, prompt: str, book: Book | None)
                 "path",
                 tokens[0],
                 invalid=f"パスの指定が {len(tokens)} 件あり、多すぎます（上限 {MAX_PATHS} 件）",
+                fatal=True,
             )
         )
         return found

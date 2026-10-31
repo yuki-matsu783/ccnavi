@@ -26,7 +26,7 @@ import os
 import time
 from dataclasses import dataclass, field
 
-from ...infra import settings, tree
+from ...infra import settings, toolnames, tree
 from ...policy import builtin, ruleload, rules, selfguard, selfguard_shell, texts
 from ...records import audit
 from ..approval import checks as approval_checks
@@ -35,8 +35,6 @@ from ..config import phasetypes
 from ..model import ticket_guard, ticket_model
 from ..phase import scope as phase_scope
 
-# 適用するツール。チケットの範囲が効くのは書き込み系で、項はツールを持たない。
-_TOOLS = ("Write", "Edit", "NotebookEdit")
 # 文に出す却下の件数の上限。残りは件数で言い、`--explain` へ誘う（常駐の文脈を増やさない）。
 SHOWN = 3
 # 走査に使う時間の上限（秒）。SessionStart の期限（`judge.DEADLINE_SECONDS`）の残りと
@@ -109,7 +107,7 @@ def _rule_set(conf: settings.Settings, root: str, target: tree.Tree) -> rules.Ru
 
 def _denied_by(rule_set: rules.RuleSet, full: str) -> rules.Rule | None:
     """このパスへの書き込みを止める deny。レイヤーの deny を土台より先に採る（判定の名指し）。"""
-    hits = [r for r in rule_set.deny if any(r.matches(t, full) for t in _TOOLS)]
+    hits = [r for r in rule_set.deny if any(r.matches(t, full) for t in toolnames.WRITE_TOOLS)]
     if not hits:
         return None
     named = [r for r in hits if not r.base]

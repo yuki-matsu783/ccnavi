@@ -31,7 +31,7 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 表から作られるもの: hook の正規表現とオプションの一覧（`phase_forms`）、実行ファイルの読み替えと断り（`rewrite`・`refused`）、
 ターミナル要求のときの表示名（`terminal`）。操作を足すときは、この表の行を直す。
 
-実行ファイルを通さず sh が呼ぶだけの操作（`ticket start/finish/cancel/propose/consolidate/record-risk/prepare/requested/confirm/ready`、`review confirm`、
+実行ファイルを通さず sh が呼ぶだけの操作（`ticket start/finish/cancel/approval-request/consolidate/record-risk/prepare/requested/confirm/ready`、`review confirm`、
 `sync tidy`、`worktree retire/branch`）は `ccnavi user` に入れず、`SUBS` に置く。
 
 #### `ccnavi user` の入口

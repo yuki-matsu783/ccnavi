@@ -1,12 +1,12 @@
 #!/bin/sh
-# ccnavi-idle 放置したセッションに、次のセッションへの引き継ぎ文書を書かせる待機を受け持つ。
+# ccnavi-idle 放置したセッションに、次のセッションへの引き継ぎプロンプトを書かせる待機を受け持つ。
 #
 #   sh .ccnavi/scripts/ccnavi-idle.sh start     Stop に登録する（asyncRewake: true、timeout: 3600）
 #   sh .ccnavi/scripts/ccnavi-idle.sh notice    Stop に登録する。ユーザへの知らせ（1 セッション 1 回）
 #   sh .ccnavi/scripts/ccnavi-idle.sh reset     UserPromptSubmit に登録する。ユーザが打ったら待機をやめる
 #
 # 会話が大きく育ったまま放置されると、モデルが覚えている会話のコピー（プロンプトキャッシュ）が
-# 時間切れで消え、続きを送り直す料金が大きく増える。消える前に引き継ぎ文書を書かせておくための待機で、
+# 時間切れで消え、続きを送り直す料金が大きく増える。消える前に引き継ぎプロンプトを書かせておくための待機で、
 # 判断は実行ファイル（`ccnavi idle start|check|notice|reset`）に任せ、ここは待つだけ。
 # `notice` と `reset` は、payload を実行ファイルに渡すだけ（待たない）。
 #

@@ -131,7 +131,7 @@ feedback:
 - 親は計画・依頼だけを受け持つ（合流は子の `finish`）。作業は子が行う（P12 のまま）
 - 親の提案には `feedback: []` も書く（対応が無くても空で出す。無いと親を閉じられない）
 - 流れ: 承認 → 親に着手 → 子に着手 → 子で作業して `finish`（子は `review/`。親のブランチへの合流と push も `finish` が行う） → 親が ELI5 の HTML を
-  `wip/eli5/phase-1.html` に書いてコミットして push し、`ccnavi-review.sh request --phase 1 --body-file <依頼文>
+  `wip/eli5/phase-1.html` に書いてコミットして push し、`ccnavi-review.sh review-request --phase 1 --body-file <依頼文>
   --eli5 wip/eli5/phase-1.html` で、開始のときに用意したマージリクエストへ依頼 → ユーザが `crit review` で指摘を付ける → 親が `confirm`
   （指摘が残れば `decide`。子が `done/`） → 親を `finish`（親は `done/`） → push して `ready`（Draft を外す）。各段の前提は 9.10
 

@@ -30,8 +30,7 @@ from ..tickets.approval import store as approval
 from ..tickets.approval import write_and_push
 from ..tickets.core import api as core
 from ..tickets.lifecycle import branchfind, write_and_push_merge
-from ..tickets.model import user_only, via
-from ..tickets.review import request as review
+from ..tickets.model import ticket_places, user_only, via
 from . import (
     cli_args,
     cli_handoff,
@@ -340,6 +339,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", action="append", default=None)
     parser.add_argument("--phase", type=int, default=None)
+    # `ticket approval-request <識別子> --check`。送れる状態かを確かめるだけで、何も載せない。
+    parser.add_argument("--check", action="store_true")
     # `worktree retire --abandon <親>`。放棄した親の片付けの記録を消す（ユーザがターミナルで打つ）。
     parser.add_argument("--abandon", default=None, metavar="PARENT")
     parser.add_argument("--body-file", default="")
@@ -594,7 +595,7 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
         base, (conf.tickets or settings.DEFAULT_TICKETS).replace("/", os.sep), "review"
     )
     places = [cli_args._real(approved), cli_args._real(review_dir)]
-    if list(args.command[:2]) == ["ticket", "propose"]:
+    if list(args.command[:2]) == ["ticket", "approval-request"]:
         # 提案を送る操作だけは、承認待ちの提案（todo/）と子のフローの下書き（flows/）も
         # 置き場に数える。
         tickets_dir = (conf.tickets or settings.DEFAULT_TICKETS).replace("/", os.sep)
@@ -615,7 +616,7 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
 def _ready_removed_wip(real: str, base: str) -> bool:
     """`review ready` が消した途中の作業の置き場（`wip/`）の下のファイルか。
 
-    `ready` が消すものを選ぶのと同じ判定（`review.in_wip`。大文字小文字と `\\` の区切りを
+    `ready` が消すものを選ぶのと同じ判定（`ticket_places.in_wip`。大文字小文字と `\\` の区切りを
     問わない）を、write-and-push のツリー（`base`）からの相対に適用する。通すのは、
     そのツリーの中で、
     今は無い
@@ -630,7 +631,7 @@ def _ready_removed_wip(real: str, base: str) -> bool:
     parts = rel.split(os.sep)
     if any(p in ("", ".", "..") for p in parts):
         return False
-    return review.in_wip("/".join(parts))
+    return ticket_places.in_wip("/".join(parts))
 
 
 def _record_place_problem(place: str, target: str, given: str) -> str:
@@ -966,7 +967,8 @@ def _parsed(
 
     # チケットの状態とレビューの操作。payload を読まない。
     # 操作記録（`logs/state/ops/`）の読み書き。sh が送信の段階を記録するために呼ぶ。
-    # チケット制御の有無に依らない（decide・request などの段階は、制御が有効なときだけ使われる）。
+    # チケット制御の有無に依らない（decide・review-request などの段階は、
+    # 制御が有効なときだけ使われる）。
     if args.command and args.command[0] == "ops":
         return cli_ops.ops_command(stdout, stderr, conf, list(args.command[1:]))
     # 取り込みの sh（`ccnavi-sync.sh`）がパスを聞く経路。読むだけで、チケット制御の有無に依らない。
