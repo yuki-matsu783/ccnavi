@@ -7,7 +7,7 @@
  * Claude の配色を選んでもそのまま反映される。
  *
  * 配色そのもの（変数の上書き）は画面の側の `src/webview/styles/appearance.css` にあり、ここが持つのは
- * 設定の値・body に付けるクラス・送るメッセージの形だけ。切り替えるのは `src/webview/appearance.ts`。
+ * 設定の値（配色と拡大率）・body に付けるクラス・送るメッセージの形だけ。切り替えるのは `src/webview/appearance.ts`。
  */
 
 export const APPEARANCES = ["vscode", "claude-light", "claude-dark"] as const;
