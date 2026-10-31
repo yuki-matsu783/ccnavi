@@ -25,7 +25,7 @@ export const DEFAULT_ZOOM = 1;
 export const MIN_ZOOM = 0.8;
 export const MAX_ZOOM = 2;
 
-/** 拡大率の設定を読む。数でない値は既定、範囲の外は端に寄せる */
+/** 拡大率の設定を読む。数でない値は既定、範囲の外は端に丸める */
 export function parseZoom(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return DEFAULT_ZOOM;
@@ -53,7 +53,7 @@ export function bodyTag(appearance: Appearance | undefined): string {
 export interface AppearanceMessage {
   readonly type: "appearance";
   readonly value: Appearance;
-  /** 文字と画面全体の拡大率（`ccnaviBoard.zoom`）。省略は等倍 */
+  /** 文字を含む画面全体の拡大率（`ccnaviBoard.zoom`）。省略は等倍 */
   readonly zoom?: number;
 }
 

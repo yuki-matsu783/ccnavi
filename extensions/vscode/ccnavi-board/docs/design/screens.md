@@ -77,7 +77,7 @@ keywords: [設計, 画面, approval-machine, 状態のバッジ, ユーザ待ち
 
 ## 見た目
 
-実装は body のクラスの下でテーマ変数を上書きするのと、拡大率を body の `style.zoom` に当てるだけ（配色は `src/webview/styles/appearance.css`、切り替えは `src/core/appearance.ts` と `src/webview/appearance.ts`。画面が受けるのは `src/webview/useHostMessages.ts`）。配色と拡大率（`ccnaviBoard.zoom`）は、ほかの中身と同じ段取り（`ScreenHost`）で 1 つのメッセージ `{ type: "appearance", value, zoom? }` に載せて送る（等倍のときは `zoom` を付けない。画面は付いていなければ拡大を外す）。拡大率は HTML には埋めないので、組み上がる（`ready`）までは等倍で描かれる。組み上がっていない画面と破棄された画面には送らない。保持しない画面には作り直されたあと `ready` で、保持する画面には再表示されたところで送り直す。ハイコントラストのテーマでは Claude の配色を適用しない。設定を書く先は、いま値が定義されている場所（フォルダ → ワークスペース → ユーザ）。
+実装は body のクラスの下でテーマ変数を上書きし、拡大率を body の `style.zoom` に当てるだけ（配色は `src/webview/styles/appearance.css`、切り替えは `src/core/appearance.ts` と `src/webview/appearance.ts`。画面が受けるのは `src/webview/useHostMessages.ts`）。配色と拡大率（`ccnaviBoard.zoom`）は、ほかの中身と同じ段取り（`ScreenHost`）で 1 つのメッセージ `{ type: "appearance", value, zoom? }` に載せて送る（等倍のときは `zoom` を付けない。画面は付いていなければ拡大を外す）。拡大率は HTML には埋めないので、組み上がる（`ready`）までは等倍で描かれる。組み上がっていない画面と破棄された画面には送らない。保持しない画面には作り直されたあと `ready` で、保持する画面には再表示されたところで送り直す。ハイコントラストのテーマでは Claude の配色を適用しない。設定を書く先は、いま値が定義されている場所（フォルダ → ワークスペース → ユーザ）。
 
 ## 機能や画面を足すとき
 
