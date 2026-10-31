@@ -1258,8 +1258,10 @@ def fail_streak_hint(conf: settings.Settings, root: str, record: audit.Record) -
     """
     n = failstreak.threshold(conf.fail_streak_count)
     try:
-        got = failstreak.fail(conf.state, record.session, record.agent, n)
-        return docsearch.fail_streak_note(conf, root, got) if got else ""
+        kind, got = failstreak.fail(conf.state, record.session, record.agent, n)
+        if not kind:
+            return ""
+        return docsearch.fail_streak_note(conf, root, got, kind == failstreak.FIRST)
     except Exception:  # noqa: BLE001  案内の失敗で判定を止めない
         return ""
 

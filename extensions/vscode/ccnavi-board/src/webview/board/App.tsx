@@ -439,7 +439,9 @@ function Column({
     const handle = event.currentTarget;
     const element = section.current;
     const startX = event.clientX;
-    const startWidth = element.getBoundingClientRect().width;
+    // 画面を拡大している（body の zoom）と、矩形とポインタの座標は見た目の px、`style.width` は CSS の px になる。その比で換算する
+    const scale = Number.parseFloat(document.body.style.zoom) || 1;
+    const startWidth = element.getBoundingClientRect().width / scale;
     let last = Math.max(MIN_WIDTH, Math.round(startWidth));
     // 動かさずに押して離しただけなら、幅は決めない。押しただけで px に固定されると、
     // その列は窓の幅に追従しなくなる
@@ -448,7 +450,7 @@ function Column({
     document.body.classList.add("resizing");
     handle.setPointerCapture(event.pointerId);
     const move = (moved: PointerEvent): void => {
-      last = Math.max(MIN_WIDTH, Math.round(startWidth + moved.clientX - startX));
+      last = Math.max(MIN_WIDTH, Math.round(startWidth + (moved.clientX - startX) / scale));
       dragged = true;
       element.classList.add("sized");
       element.style.width = `${last}px`;
