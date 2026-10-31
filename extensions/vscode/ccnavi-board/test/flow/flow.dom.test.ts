@@ -81,7 +81,7 @@ test("CB-D108 ファイルがなければ雛形を見せ、そのまま保存で
     assert.match(dom.one("#status").textContent ?? "", /着手中でないかを確認して保存中/);
     // 拡張ホストが断った（錠を聞き直したら着手中だった）
     await dom.send({ type: "failed", message: lockedReason("i0001-01-01") });
-    assert.match(dom.one("#status").textContent ?? "", /DENY_TICKET_FLOW_LOCKED/);
+    assert.match(dom.one("#status").textContent ?? "", /着手中かレビュー中のため、フローを変更できません/);
     assert.ok(dom.one(".foot").classList.contains("error"));
   } finally {
     await dom.close();
@@ -94,7 +94,7 @@ test("CB-D109 錠が掛かっていれば読むだけ。理由の帯を出し、
   try {
     const banner = dom.one("#lock").textContent ?? "";
     assert.match(banner, /着手中かレビュー中のため、フローを変更できません/);
-    assert.match(banner, /finish で終わるか cancel で取り消されると外れます/);
+    assert.match(banner, /終わる（finish）か取り消される（cancel）と変更できます/);
     for (const button of dom.all<HTMLButtonElement>('[data-action="add-node"]')) {
       assert.ok(button.disabled);
     }

@@ -62,6 +62,9 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
     assert.deepEqual(texts(page, ".approval > h3"), ["承認対象外の提案"]);
     assert.ok(text(page, ".approval-rejected").includes("i0001-05-05"));
     assert.ok(text(page, ".approval-rejected").includes("計画にありません"));
+    // 実行ファイルの行頭の「error: 」と、見出しに出している識別子の重複は出さない
+    assert.ok(!text(page, ".approval-rejected").includes("error:"));
+    assert.equal(text(page, ".approval-rejected").split("i0001-05-05").length, 2);
     assert.equal(page.all(".approval-problems").length, 0);
     // 承認の操作の列は共通の Dialog 部品の列に含まれる
     assert.ok(page.all(".approval .overlay-actions.approval-actions").length > 0);

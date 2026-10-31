@@ -21,7 +21,7 @@ import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
 import { PlanGraph } from "../shared/PlanGraph.js";
 import { DecideBody } from "./Decide.js";
 import { post } from "./post.js";
-import { approvalBody } from "./text.js";
+import { approvalBody, rejectedReason } from "./text.js";
 
 export function Approval({ overlay, unsaved = [] }: { readonly overlay: ApprovalOverlay; readonly unsaved?: readonly string[] }): JSX.Element {
   const box = useRef<HTMLElement>(null);
@@ -204,7 +204,7 @@ function Body({
               <li key={r.ticket}>
                 <span className="approval-id">{r.ticket}</span>
                 {r.problems.map((p, i) => (
-                  <div key={i}>{p}</div>
+                  <div key={i}>{rejectedReason(r.ticket, p)}</div>
                 ))}
               </li>
             ))}
