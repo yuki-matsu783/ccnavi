@@ -53,6 +53,7 @@ from typing import TextIO
 
 from ...infra import fsio, pathsafe, settings, tree
 from ...infra.modes import EXIT_ERROR, EXIT_OK
+from ...policy import texts
 from ...policy.rules import SEVERITY_ERROR
 from ..config import phasetypes
 from ..flow import graph as flow
@@ -434,17 +435,10 @@ def run(
         stdout.write(f"  {ALLOW_MATCH} {glob}\n")
     for p in over:
         stdout.write(f"案内: 承認しても書けない: {p.detail}\n")
-    tail = (
-        "並行させたいステップは after を直す。"
-        if used is None
-        else "計画のステップと文の固有名を直す。"
-    )
-    # ccnavi を PATH に持たない環境でも、そのまま打てるように、起動の sh 経由で書く
-    launcher = settings.script_command(root, "ccnavi-launcher.sh")
+    stdout.write(texts.say(root, "NEXT_NEW_REWRITE", {"path": path}) + "\n")
     stdout.write(
-        f"次: {path} の rationale と、見出しの下の目印（「（ここに〜を書く）」）を実際の内容に"
-        "書き換える。目印が残っていると承認で止まる。"
-        f"allow を実際の作業に合わせて絞る・足す。{tail}\n"
+        texts.say(root, "NOTE_NEW_TAIL", variants={"note": "plan" if used is None else "template"})
+        + "\n"
     )
     # 子が無いと承認の確認と approval-request が警告する（`workflow.childless_ready`）。
     # 必須の行で独立させる
@@ -454,19 +448,7 @@ def run(
         "親と同じ承認で通すので、先に書く（書式は ccnavi --docs --keyword 提案書式）。"
         "無いと approval-request（--check も）が警告し、子の承認がもう 1 回要る\n"
     )
-    stdout.write(
-        f"案内: 書けたら '{launcher} --lint' で確かめ、"
-        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} approval-request {ident} --check'"
-        " が通ったら、"
-        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} approval-request {ident}'"
-        "（親の識別子で打つ。子の識別子では打たない）で提案を親のブランチへ送り、"
-        "承認をユーザに頼んで返事を待つ。承認が済むまで実装はしない\n"
-    )
-    stdout.write(
-        f"案内: plan を変えたら '{launcher} --plan-order {ident} --fill-phases' "
-        "で phases: を再実行します。"
-        "承認が通らないなど詰まったら、直接実装に切り替えず、ユーザに報告して止まる\n"
-    )
+    stdout.write(texts.say(root, "NOTE_NEW_SEND", {"ident": ident}) + "\n")
     return EXIT_OK
 
 

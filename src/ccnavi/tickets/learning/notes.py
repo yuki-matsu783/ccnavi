@@ -16,6 +16,7 @@ import shlex
 from typing import TextIO
 
 from ...infra import fsio, gitcmd, pathsafe, settings, toolnames, tree
+from ...policy import texts
 from ...records import audit, redact
 from ..approval import checks as approval_checks
 from ..approval import marks as approval_marks
@@ -511,12 +512,9 @@ def run(
         if msg:
             stderr.write(f"ccnavi: 書けない（{msg}）\n")
             return 1
-        stdout.write(
-            f"記録: {record_rel(ident)}"
-            "（気づきを書いて git add と git commit をする。"
-            "無ければ learnings: none のまま）\n"
-        )
-        stdout.write(f"要約: {digest_rel(ident)}（git add と git commit をする）\n")
+        stdout.write(f"記録: {record_rel(ident)}\n")
+        stdout.write(f"要約: {digest_rel(ident)}\n")
+        stdout.write(texts.say(root, "NEXT_LEARN_SCAFFOLD_COMMIT", {}) + "\n")
         return 0
 
     # --note があるときは、本文を組んで記録か受信箱へ書く
@@ -559,6 +557,7 @@ def run(
             stderr.write(f"ccnavi: 書けない（{msg}）\n")
             return 1
         stdout.write(f"追記した: {record_rel(ident)}\n")
+        stdout.write(texts.say(root, "NEXT_LEARN_NOTE_COMMIT", {}) + "\n")
         return 0
 
     # 結び付かないときは受信箱に、名前が重ならない新しいファイルを書く

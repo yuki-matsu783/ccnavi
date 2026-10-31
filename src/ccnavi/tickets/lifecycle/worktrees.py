@@ -53,6 +53,7 @@ from dataclasses import dataclass
 from typing import TextIO
 
 from ...infra import gitcmd, pathcase, settings, tree
+from ...policy import texts
 from ..approval import checks as approval_checks
 from ..approval import store as approval
 from ..model import ticket as ticket_mod
@@ -209,11 +210,16 @@ def report(stdout: TextIO, root: str, d: Dropped, after: str = "。ブランチ�
         stdout.write(f"ワークツリー {d.name} はありません（削除するものがありません）\n")
     elif d.status == CWD_INSIDE:
         stdout.write(
-            f"cwd がワークツリー {d.name} の中にあるので削除しませんでした。"
-            "外（ワークスペースルートなど。エージェントは ExitWorktree か cd で出る）に出てから、"
-            "次を実行する:\n"
-            f"  {retry_command(root, d.name)}\n"
-            f"  {classifier_note(root, retry_command(root, d.name))}\n"
+            f"cwd がワークツリー {d.name} の中にあるので削除しませんでした。\n"
+            + texts.say(
+                root,
+                "NEXT_OPS_DROP_OUTSIDE",
+                {
+                    "command": retry_command(root, d.name),
+                    "classifier_note": classifier_note(root, retry_command(root, d.name)),
+                },
+            )
+            + "\n"
         )
     elif d.status == DIRTY:
         stdout.write(

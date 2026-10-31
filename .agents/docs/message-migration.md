@@ -39,6 +39,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | `DENY_RETIRE_PARENT` | `tickets/lifecycle/retire.py` の `run_retire`（親のワークツリーを消せないとき、子に触る前に断る。`deny-retire.yml`） | 理由（cwd・未コミット・無視ファイル・そのほか）で `what` と `next` を場合分けする。判定は `worktrees.blocked` |
 | `NOTICE_DIRECT_COMMIT` | `hook/commitnote.py` の直接作業のコミットのあとの案内（`notice.yml`） | 見出しは無く、`what` の 1 行と `次:`。数えは `ctxfile` の `additionalContextOnce` と同じ |
 | `NOTICE_DIRECT_WORKTREES_HEAD`・`_MORE`・`_TAIL` | `tickets/notice/direct_worktrees.py` の SessionStart の一覧（`notice.yml`） | 1 本ごとの行（名前・未コミット・コミット数・記録の有無）はコードに残る |
+| `NEXT_OPS_START_PARENT`・`NEXT_OPS_START_CHILDLESS`・`NEXT_OPS_RECORD_RISK`・`NEXT_OPS_DROP_OUTSIDE`・`NEXT_REVIEW_CONFIRMED`・`NEXT_REVIEW_LAST`・`NEXT_REVIEW_REQUESTED`・`NEXT_DECIDE_FOLLOWUP`・`NEXT_APPROVAL_REQUEST_CHECKED`・`NEXT_PLAN_VERIFY`・`NEXT_LEARN_*`・`NEXT_NEW_REWRITE`・`NOTE_NEW_*`・`NEXT_REVISE`・`NOTE_REVISE_FEEDBACK`・`NEXT_VERIFY_*`・`NEXT_CONSOLIDATE`・`NEXT_TEMPLATE_DRAFT` | `tickets/lifecycle/`（`commands.py`・`plan.py`・`worktrees.py`・`consolidate.py`）、`tickets/core/review.py`、`tickets/review/`（`request.py`・`decide.py`）、`tickets/proposal/`（`propose.py`・`scaffold.py`・`revise.py`・`agree.py`）、`tickets/learning/notes.py`、`entry/cli_plan.py`・`entry/cli_templates.py` の `次:`・補足の `案内:`（`next-cli.yml`） | 成功したのに次を言わなかった操作に足し、直書きの `次:` を移した。`NEXT_DECIDE_FOLLOWUP` の値は `_followup_next` の文で、`decide` が起こす指示の文と共有するので値として渡す。`NEXT_REVIEW_LAST` は `次:` を `finish` の 1 行にし、後の手は `案内:` に置いた |
 
 ## 残り
 
@@ -46,7 +47,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 |---|---|---|
 | 組み込みの拒否（Python） | `hook/reasons.py` の `internal_error_notice`（ツールの呼び出しを持たないイベントで、ccnavi 自身に不具合があるときの文。文面ファイルに頼らない）、`hook/wrapguard.py` などが組んで渡す他の文 | 移さない（`internal_error_notice`）。ほかは未移行 |
 | 英語の文面 | `hook/reasons.py` の一部 | 未移行（日本語と英語の混在の整理は別に進めている。移すときは文をそのまま写す） |
-| 日本語の直書き（Python の拒否・次の一手） | `tickets/proposal/propose.py`（計画の誤りで断るときの `次:`）、`tickets/approval/checks.py` の残り（`root` を持たず `Problem.detail` に入る文）、`tickets/review/request.py` の残り（問題の一覧の要素・`root` を持たない関数の文）、`tickets/phase/gates.py`（`review_next`・`_next_hint` の状態を伝える文）、`tickets/flow/graph.py`（サブエージェント向けの手順）、`policy/selfguard.py`（設定ファイルを戻したときの知らせ） | 未移行。1 まとまりずつ移す。`hook/post.py` の状態を報告する行と、`catalog/docsearch.py` の `stderr` の診断は移さない |
+| 日本語の直書き（Python の拒否・次の一手） | `tickets/proposal/propose.py`（計画の誤りで断るときの `次:`）、`tickets/approval/checks.py` が `Problem.detail` に足す `次:`、`tickets/approval/checks.py` の残り（`root` を持たず `Problem.detail` に入る文）、`tickets/review/request.py` の残り（問題の一覧の要素・`root` を持たない関数の文）、`tickets/phase/gates.py`（`review_next`・`_next_hint` の状態を伝える文）、`tickets/flow/graph.py`（サブエージェント向けの手順）、`policy/selfguard.py`（設定ファイルを戻したときの知らせ） | 未移行。1 まとまりずつ移す。`hook/post.py` の状態を報告する行と、`catalog/docsearch.py` の `stderr` の診断は移さない |
 | 共有する定数の文 | `PARALLEL_REQUEST_NOTE`・`EXEMPT_NOTE`・`USER_STOP_NOTE`・`TURN_DEFINED` など、複数の出力と下位の層が使う値 | 移さない（コードに残る） |
 | sh の残りの `次の手:`・`次:`・`案内:` | `ccnavi-ticket.sh` の `次の手:` の選択肢、`ccnavi-git.sh`（`ig_note`）・`ccnavi-worktree.sh`・`ccnavi-start.sh` の状態を報告する `案内:`、`ccnavi-dirs.sh`・`ccnavi-review.sh` の `案内:` | 移さない（状態の報告に近い）。次の一手を含む `案内:` が見つかったら、その行だけを `ccnavi_text` に分けて移す |
 | ルールの文 | `rules.yml` の `message`・`additionalContext`・`additionalContextOnce`（インライン） | 移さない（識別子で引く `message_id` を持たない。`additionalContextFile` で md の本文を出せる） |

@@ -10,7 +10,7 @@
 # 判断は実行ファイル（`ccnavi idle start|check|notice|reset`）に任せ、ここは待つだけ。
 # `notice` と `reset` は、payload を実行ファイルに渡すだけ（待たない）。
 #
-# 流れ:
+# 手順:
 #   1. Stop の payload（標準入力）を `ccnavi idle start` に渡す。促す対象でなければ `skip` が返り、何もせず 0 で終わる。
 #   2. 対象なら `wait <秒>`・`session <id>`・`token <印>` が返る。その秒数だけ `sleep` する。
 #   3. その間にユーザが打てば、状態が戻って印が合わなくなる（UserPromptSubmit の `ccnavi idle reset`）。

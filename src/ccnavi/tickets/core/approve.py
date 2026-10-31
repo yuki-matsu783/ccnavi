@@ -489,7 +489,7 @@ def verify(
         held = None if ready.ok else (ready.reason, ready.text())
         if held and as_json:  # JSON の本体には理由が無いので標準エラーへ出す
             stderr.write(held[1])
-    verdict = agree.verify_verdict(gathered, conf.tickets, held)
+    verdict = agree.verify_verdict(root, gathered, conf.tickets, held)
     # 新規の親のブランチ名が既にあるブランチと同じか。warn なので答えは変えない。
     fresh = [c.ticket for c in gathered.batch if not c.is_revision and not c.ticket.is_child]
     branches = agree_candidates.existing_branch_warnings(root, conf, fresh, [], [], [])

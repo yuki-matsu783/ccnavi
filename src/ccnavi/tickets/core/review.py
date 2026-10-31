@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import TextIO
 
 from ...infra import fsio, settings, tree
+from ...policy import texts
 from ..approval import checks as approval_checks
 from ..approval import marks as approval_marks
 from ..approval import ops as approval_ops
@@ -257,9 +258,7 @@ def confirm_local(
         return 1
     code = core_base.write_fs(stdout, stderr, checked.changes.planned).code
     if code == 0:
-        after = after_last_review(root, conf, parent.ticket)
-        if after:
-            stdout.write(after + "\n")
+        stdout.write(next_after_confirm(root, conf, parent.ticket) + "\n")
     return code
 
 
@@ -290,33 +289,24 @@ def _manual_notes(manual: manual_settle.Manual | None) -> list[str]:
     return [f"ccnavi: {line}"] if line else []
 
 
-def after_last_review(root: str, conf: settings.Settings, parent_id: str) -> str:
-    """最後のレビューが済んだときに、親を閉じてから Draft を外すまでの流れ。まだ先があれば空。
+def next_after_confirm(root: str, conf: settings.Settings, parent_id: str) -> str:
+    """レビュー済みを書いたあとの出力。次のフェーズがあれば status を促し、最後なら親を閉じる流れ。
 
     「最後」は、親を閉じられる状態（`ops_close.close_problems` が空）になったこと。
-    `confirm` の知らせが「次のフェーズへ進める」だけだと、最後のフェーズのあとに何をするか
-    （親の finish、push、ready）が、親の finish の出力で初めて出てくる。
+    最後のフェーズのあとに何をするか（親の finish、push、ready）が、親の finish の出力で
+    初めて出てくるのを避ける。次の子か親の finish かは、状態から決まるので status が言う。
     """
     if ops_close.close_problems(root, conf, parent_id):
-        return ""
-    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
-    return "\n".join(
-        [
-            f"全部のフェーズのレビューが済み、親 {parent_id} を閉じられる。"
-            "ここから Draft を解除するまでの流れ:",
-            f"  1. '{ticket_sh} finish {parent_id}' で親を閉じる"
-            "（取り込み済みの親子なら、finish が移動をコミットして push する。"
-            "そうでなければ、移動をコミットして push する）。"
-            "残っている子のワークツリーも片付く",
-            f"  2. 親のワークツリーの外（ワークスペースルートなど）に出て、"
-            f"'{ops.ready_command(root, parent_id)}' で Draft を解除する。"
-            "ready はクローズ済みのチケットの記録と"
-            f" `{ticket_places.WIP_ROOT}/` の追跡済みのファイルを削除してコミットし、push してから"
-            " Draft を解除し、最後に親のワークツリーを削除します"
-            "（--parent を付けずに打つと、何もせず外から打つコマンドを表示して止まる）",
-            "  マージはユーザが squash で行う",
-            f"  {ops.READY_FLOW_AGREED}",
-        ]
+        return texts.say(root, "NEXT_REVIEW_CONFIRMED", {"parent": parent_id})
+    return f"全部のフェーズのレビューが済み、親 {parent_id} を閉じられる。\n" + texts.say(
+        root,
+        "NEXT_REVIEW_LAST",
+        {
+            "parent": parent_id,
+            "ready_command": ops.ready_command(root, parent_id),
+            "wip": ticket_places.WIP_ROOT,
+            "flow_agreed": ops.READY_FLOW_AGREED,
+        },
     )
 
 

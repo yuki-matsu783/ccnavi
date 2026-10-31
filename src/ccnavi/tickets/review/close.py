@@ -599,7 +599,12 @@ def _settle(
     """
     cancelled: list[str] = []
     for t in left.todo:
-        if ops.cancel(stdout, stderr, root, conf, t.ticket, f"close-early: {reason.strip()}") != 0:
+        if (
+            ops.cancel(
+                stdout, stderr, root, conf, t.ticket, f"close-early: {reason.strip()}", advise=False
+            )
+            != 0
+        ):
             return None
         cancelled.append(t.ticket)
     skipped: list[int] = []
