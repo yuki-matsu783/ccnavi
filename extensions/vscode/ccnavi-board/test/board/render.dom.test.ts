@@ -83,13 +83,12 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
   }
 });
 
-function decidePreview(canIssue: boolean): DecidePreview {
+function decidePreview(): DecidePreview {
   return {
     version: 2,
     parent: "i0001",
     phase: 2,
     mr: { number: 7, url: "https://example.com/mr/7" },
-    can_issue: canIssue,
     threads: [
       { key: "u1", url: "u1", path: "src/a.py", line: 3, body: "命名を直す\n詳しく", version: "v".repeat(32), last_comment: { id: "", at: "", author: "" } },
       { key: "u2", url: "u2", path: "", line: 0, body: "<b>テスト</b>", version: "v".repeat(32), last_comment: { id: "", at: "", author: "" } },
@@ -100,7 +99,7 @@ function decidePreview(canIssue: boolean): DecidePreview {
 
 test("CB-T205 残った指摘は既定で全部「このフェーズで直す」。1 件ずつ・一括で選び直せる。選んだ対応方針をキーごとに送る", async () => {
   const page = await openBoard(fixture(), {
-    approval: { kind: "decidePreview", preview: decidePreview(false), tree: "/w/.claude/worktrees/i0001" },
+    approval: { kind: "decidePreview", preview: decidePreview(), tree: "/w/.claude/worktrees/i0001" },
   });
   try {
     assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "decidePreview");
@@ -153,7 +152,7 @@ test("CB-T205 残った指摘は既定で全部「このフェーズで直す」
     await page.close();
   }
   const issued = await openBoard(fixture(), {
-    approval: { kind: "decidePreview", preview: decidePreview(true), tree: "/w" },
+    approval: { kind: "decidePreview", preview: decidePreview(), tree: "/w" },
   });
   try {
     assert.equal(issued.all('input[data-choice="issue"]').length, 2);
@@ -162,7 +161,7 @@ test("CB-T205 残った指摘は既定で全部「このフェーズで直す」
   }
   // 置いている最中は選べず、決められず、やめられない
   const deciding = await openBoard(fixture(), {
-    approval: { kind: "deciding", preview: decidePreview(false), tree: "/w" },
+    approval: { kind: "deciding", preview: decidePreview(), tree: "/w" },
   });
   try {
     assert.equal(deciding.one<HTMLButtonElement>('button[data-action="decide-confirm"]').disabled, true);
@@ -174,7 +173,7 @@ test("CB-T205 残った指摘は既定で全部「このフェーズで直す」
   }
   // 未解決が 0 件なら、選び方の注意（「このフェーズで直す」を選ぶと…）は出さない
   const none = await openBoard(fixture(), {
-    approval: { kind: "decidePreview", preview: { ...decidePreview(false), threads: [] }, tree: "/w" },
+    approval: { kind: "decidePreview", preview: { ...decidePreview(), threads: [] }, tree: "/w" },
   });
   try {
     assert.equal(text(none, "#approval-title"), "フェーズ 2 に未解決の指摘はありません");

@@ -236,7 +236,6 @@ sample:
       parent: sample-c
       phase: 1
       mr: { number: 12, url: "https://example.com/sample/pulls/12" }
-      can_issue: true
       digest: "v2.eyJiIjoiYSIsInQiOnt9fQ"
       threads:
         - { key: thread-1, url: "https://example.com/sample/pulls/12#discussion_r1", path: src/log.ts, line: 42, body: "レベルの名前を定数にまとめてほしい\n同じ文字列が 3 か所にある" }

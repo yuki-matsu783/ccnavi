@@ -755,7 +755,7 @@ class PhaseTest(PhaseHarness):
         )
         self.assertEqual(last.returncode, 0, last.stderr)
         last_preview = json.loads(last.stdout)
-        self.assertTrue(last_preview["can_issue"])
+        self.assertNotIn("can_issue", last_preview)
         settled = self.ccnavi(
             "--cwd",
             self.parent_tree,
@@ -818,7 +818,7 @@ class PhaseTest(PhaseHarness):
         )
         self.assertEqual(shown.returncode, 0, shown.stderr)
         preview = json.loads(shown.stdout)
-        self.assertTrue(preview["can_issue"])
+        self.assertNotIn("can_issue", preview)
         choices = json.dumps({"u/7#t0": "keep", "u/7#t1": "issue"})
         self.assertNotEqual(self.confirm(fixture, 2).returncode, 0)
         done = self.ccnavi(

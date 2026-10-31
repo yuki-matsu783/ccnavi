@@ -282,15 +282,13 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 ```json
 {"version": 2, "parent": "i0050", "phase": 2,
  "mr": {"number": 7, "url": "https://…/merge_requests/7"},
- "can_issue": true,
  "threads": [{"key": "https://…#note_1", "url": "https://…#note_1", "path": "src/a.py", "line": 3, "body": "…",
               "version": "<指摘の版>", "last_comment": {"id": "…", "at": "…", "author": "…"}}],
  "digest": "v2.<不透明な文字列>"}
 ```
 
 - `key` は選択を指摘に結び付けるキー（URL か、無ければスレッドの id）。`reviewed` のマーカーの `accepted` 欄にもこの値が入る
-- `can_issue` は issue に回せるか。常に真（互換のために欄を残す）
-- `digest` は見せた指摘のダイジェスト。`v2.` で始まる不透明な文字列で、中身は読まない。親・フェーズ・マージリクエストの番号・`can_issue`・各指摘のキーと場所と本文に加え、指摘ごとの版（`thread_version`）も含む。指摘ごとの版は、見せたあとに指摘が書き換わったかを見分けるために使う
+- `digest` は見せた指摘のダイジェスト。`v2.` で始まる不透明な文字列で、中身は読まない。親・フェーズ・マージリクエストの番号・各指摘のキーと場所と本文に加え、指摘ごとの版（`thread_version`）も含む。指摘ごとの版は、見せたあとに指摘が書き換わったかを見分けるために使う
 
 `ccnavi-user-decide.sh <N> --choices <JSON> --digest <ダイジェスト>`（実行ファイルは `user reviewed N --accept-unresolved --yes <JSON> --digest <ダイジェスト> --json`）は
 `{"<key>": "keep" | "fix" | "issue", …}` を受け、見せた指摘の全部に 1 つずつ付いていることを求める。
@@ -309,7 +307,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 - `issue_url` と `warning` は sh が足す。置いたあとの投稿（issue とコメント）で起きたことで、置いたことは戻さない
 - 見せた指摘のうち書き換わった・消えたものがあれば（増えただけなら止まらない）、何も置かずに
   `{"version": 2, "ok": false, "mismatch": true, "digest": {"expected", "current"}, "changed": ["<キー>", …]}` を
-  返して 1 で終わる。`changed` は食い違った指摘のキー（親・フェーズ・マージリクエスト・`can_issue` が変わったときは `target`）
+  返して 1 で終わる。`changed` は食い違った指摘のキー（親・フェーズ・マージリクエストが変わったときは `target`）
 - 操作の途中で失敗した送信は、`ccnavi-user-decide.sh --resume <操作ID>` で続きを送る（操作記録は `logs/state/ops/`）
 
 ## ミラーの JSON
