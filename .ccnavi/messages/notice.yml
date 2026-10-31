@@ -120,6 +120,14 @@ messages:
     what: |-
       [ccnavi] ツール呼び出しの失敗か拒否が {n} 回続いています。同じ操作を言い換えて再実行したり、止められた操作の迂回を探したりせず、止まった理由と決まった手順を資料で確かめてください。確かめても分からなければ、ユーザに相談してください。資料は
 
+  # ---- hook/events.py（Artifact ツールが失敗したとき。PostToolUseFailure）
+  # セッションのスクラッチパッドは書き込みを止めているので、HTML はワークスペースルートの置き場に出す。
+  NOTICE_ARTIFACT_FAILED:
+    kind: notice
+    values: [scratch]
+    what: |-
+      [ccnavi] Artifact ツールが失敗しました。HTML はワークスペースルート直下の scratchpad/（{scratch}）に出力してください。そのスクラッチパッドは置き場にしません。書き出した HTML のパスもユーザに伝えてください。
+
   # frontmatter の無い md を書いたとき。`code` は見出しの理由コード、`shown` は md のパス。
   NOTICE_DOCS_FRONTMATTER__NONE:
     kind: notice

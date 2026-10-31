@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import os
+
 from . import ticket_model
 
 
@@ -94,6 +96,11 @@ HANDOFF = "wip/handoff"
 # （ワークスペースルートはユーザのチェックアウトで、範囲を持たない）。
 # コミットされず、片付けでも消えない。
 SCRATCH_ROOT = "scratchpad"
+
+
+def scratch_dir(root: str) -> str:
+    """ワークスペースルート直下の `scratchpad/` の絶対パス。区切りは `/` にそろえる。"""
+    return os.path.join(root, SCRATCH_ROOT).replace("\\", "/")
 
 
 def is_handoff_place(rel: str) -> bool:

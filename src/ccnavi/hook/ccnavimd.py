@@ -346,7 +346,7 @@ def values_for(conf: settings.Settings, root: str) -> dict[str, str]:
         "stage_sh": settings.script_command(root, "ccnavi-stage.sh"),
         "worktree_sh": settings.script_command(root, "ccnavi-worktree.sh"),
         "handoff": ticket_places.HANDOFF,
-        "scratch": os.path.join(root, ticket_places.SCRATCH_ROOT).replace("\\", "/"),
+        "scratch": ticket_places.scratch_dir(root),
         "projects": projects,
         "tickets_dir": conf.tickets,
         "approved_dir": conf.approved,
