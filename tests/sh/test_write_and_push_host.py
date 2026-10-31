@@ -68,7 +68,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         ready = self.review("ready", CCNAVI_ENTRY_PATH=logger)
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/ready.json")
-        # 最後に親のワークツリーを消そうとするが、cwd が中にあるので消さず、外から打つ 1 本を出す
+        # 最後の retire は、cwd が親のワークツリーの中にあるので、子に触る前に断り、外から打ち直す 1 本を出す
         with open(log, encoding="utf-8") as f:
             logged = f.read()
         self.assertIn(f"worktree retire {PARENT}", logged)
@@ -76,11 +76,9 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         self.assertLess(
             logged.index(f"worktree retire {PARENT}"), logged.index(f"worktree remaining {PARENT}")
         )
-        self.assertIn(f"cwd がワークツリー {PARENT} の中にあるので削除しませんでした", ready.stdout)
-        self.assertIn(f"ccnavi-clean.sh --worktree {PARENT}", ready.stdout)
-        self.assertLess(
-            ready.stdout.index("Draft を解除した"), ready.stdout.index("cwd がワークツリー")
-        )
+        self.assertIn(f"親 {PARENT} のワークツリーの中から片付けを打ったので", ready.stderr)
+        self.assertIn(f"ccnavi-launcher.sh worktree retire {PARENT}", ready.stderr)
+        self.assertIn("Draft を解除した", ready.stdout)
         self.assertTrue(os.path.isdir(self.tree))
 
     def test_ready_commits_and_pushes_the_archive_removals_before_undrafting(self):
@@ -360,6 +358,32 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         closed = self.review("--reason", "r", "--no-issue", script="ccnavi-user-close-early.sh")
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/2.skipped")
+
+    def test_close_early_refuses_first_when_the_family_cannot_be_written(self):
+        log = os.path.join(self._base, "calls.log")
+        refusing = executable(
+            os.path.join(self._base, "bin", "refusing"),
+            "#!/bin/sh\n"
+            f"printf '%s\\n' \"$*\" >>'{log}'\n"
+            'case " $* " in\n'
+            '*" write-and-push family "*) exit 1 ;;\n'
+            "esac\n"
+            f"exec '{self.half}' \"$@\"\n",
+        )
+        before = self.committed()
+        closed = self.review(
+            "--reason",
+            "r",
+            script="ccnavi-user-close-early.sh",
+            CCNAVI_ENTRY_PATH=refusing,
+        )
+        self.assertEqual(closed.returncode, 1, closed.stdout + closed.stderr)
+        self.assertIn("書かずに止めた", closed.stderr)
+        # 受け入れの計画・ホストへの返信・issue・コメントの前に止まり、何も変わらない
+        with open(log, encoding="utf-8") as f:
+            self.assertNotIn("close-early", f.read())
+        self.assertEqual([], Host.notes)
+        self.assertEqual(before, self.committed())
 
 
 @unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
