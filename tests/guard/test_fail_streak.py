@@ -222,7 +222,7 @@ class FailStreakTest(unittest.TestCase):
                 }
             )
             self.assertNotIn(NOTE, result.stdout)
-        # 数えていないので、最初の失敗はまだ最初の 1 回のまま。
+        # 数えていないので、最初の 1 回の案内はこの失敗で初めて出る。
         said = self._context(self._fail())
         self.assertIn(FIRST, said)
         self.assertNotIn(NOTE, said)

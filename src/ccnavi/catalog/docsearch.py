@@ -391,7 +391,8 @@ def guide_lines(conf: settings.Settings, root: str, lead: str) -> list[str]:
 
 
 def fail_streak_note(conf: settings.Settings, root: str, n: int, first: bool = False) -> str:
-    """最初の失敗か拒否のとき（`first`）と、n 回続いたときの案内。資料の索引を引くよう促す。
+    """最初の失敗か拒否のとき（`first`）と、連続が n の倍数になったときの案内。
+    資料の索引を引くよう促す。
 
     止められた呼び出しを迂回する案内にはしない。止まった理由と決まった手順を確かめるために
     引かせ、見つからなければユーザに相談させる。
