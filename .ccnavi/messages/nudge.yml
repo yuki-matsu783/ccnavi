@@ -28,8 +28,7 @@ messages:
       作業が終わったなら `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate {name}` を実行して止める。取り込み結果は一時ワークツリーに用意され、ユーザのチェックアウトは変わらない
     note: |-
       hook は integrate を実行しません。
-      続き: 出力の差分と変わるファイルの一覧をユーザに見せます。対話セッションでは、そのまま integrate-done を打つと出るユーザの確認で許可を得て確定します。非対話セッションでは、返事を待ってターンを終え、ユーザの次の発言のあとに始まるターンで integrate-done を打ちます。この同じターンでは打てません。
-      ユーザの了承（対話では確認の許可、非対話では次の発言）を得ていれば `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate-done {name} -m '<メッセージ>'` で取り込んで片付けます。やめるなら `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate --abort {name}`。
+      integrate のあとの報告と、確定（`cd {integ_tree:path} && {script:ccnavi-git.sh} integrate-done {name} -m '<メッセージ>'`）の進め方は、integrate を打ったときの追加の文脈に従います。やめるなら `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate --abort {name}`。
 
   NOTE_INTEGRATE_COMMIT_FIRST:
     kind: note
