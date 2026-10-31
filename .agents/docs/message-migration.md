@@ -36,6 +36,8 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | `DENY_SHELL_WORKSPACE_ROOT` | `hook/rootwrite.py`（`deny-post.yml`） | 4 欄に分けたので、`なぜ:`・`次:`・`迂回しない:` の行で出る。`迂回しない` は元の文に無く、足した |
 | `NOTICE_DOCS_GUIDE`・`NOTICE_DOCS_FAIL_STREAK_LEAD`・`NOTICE_DOCS_FRONTMATTER__*` | `catalog/docsearch.py` の索引の案内と、frontmatter が無い md を書いたときの案内（`notice.yml`） | `stderr` の診断は残る |
 | `NEXT_OPS_*`・`NEXT_AGREE_FOLLOWUP`・`NEXT_REVIEW_MR_DIFFERS`・`NEXT_APPROVAL_*` | `tickets/lifecycle/commands.py`（着手・クローズ・完了の `次:`）、`tickets/proposal/agree_screen.py`（承認後の `次:`）、`tickets/review/request.py`（`mr:` に別の値があるときの警告）、`tickets/approval/checks.py`（提案の置き場の誤りで承認しない理由）（`next-cli.yml`） | 状態の報告はコードに残し、次の一手だけを引く。`tickets/approval/checks.py` の 2 件は `Problem.detail` が 2 行になる |
+| `NOTICE_DIRECT_COMMIT` | `hook/commitnote.py` の直接作業のコミットのあとの案内（`notice.yml`） | 見出しは無く、`what` の 1 行と `次:`。数えは `ctxfile` の `additionalContextOnce` と同じ |
+| `NOTICE_DIRECT_WORKTREES_HEAD`・`_MORE`・`_TAIL` | `tickets/notice/direct_worktrees.py` の SessionStart の一覧（`notice.yml`） | 1 本ごとの行（名前・未コミット・コミット数・記録の有無）はコードに残る |
 
 ## 残り
 
