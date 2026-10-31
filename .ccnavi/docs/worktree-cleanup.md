@@ -31,8 +31,8 @@ keywords: [片付け, ワークツリー, worktree remove, ccnavi-clean.sh, 分�
   - 消し方は生成物の掃除（`ccnavi-clean.sh`と同じもの）のあと`worktree remove`（`--force`なし）。ワークツリーを消してもブランチは消えない
     （ブランチは上の条件か、下の「MRがマージされたあと」で片付ける）
   - cwdが消す対象の中にあると消さず、「cwdが中にあるので消さなかった」と、外に出てから打つ1本
-    （`sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-clean.sh --worktree <名前>`）が出る。`ready`を親のワークツリーの中から
-    `--parent`なしで打ったときはこの形になる。ExitWorktreeか`cd`でワークスペースルートに出てから、出た1本をそのまま打つ
+    （`sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-clean.sh --worktree <名前>`）が出る。`worktree drop`や`worktree retire`を親のワークツリーの中から
+    直接打ったときはこの形になる（`ready`は外から`--parent`を付けて打つので、この形にならない）。ExitWorktreeか`cd`でワークスペースルートに出てから、出た1本をそのまま打つ
   - 未コミットの変更があるワークツリーは、何も消さずに止まる（中身は`git -C <パス> status`で見る）。別のセッションの作業かもしれないので、ユーザに確かめる
   - gitが無視しているファイル（`.env`など）があるワークツリーも、何も消さずに名指しされる。`worktree remove`はそれごと消し、
     履歴から戻せないため。残したいならワークツリーの外へ退避し、要らないならユーザに確かめて消してから打ち直す。

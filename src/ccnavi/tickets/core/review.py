@@ -313,7 +313,7 @@ def after_last_review(root: str, conf: settings.Settings, parent_id: str) -> str
             "ready はクローズ済みのチケットの記録と"
             f" `{ticket_places.WIP_ROOT}/` の追跡済みのファイルを削除してコミットし、push してから"
             " Draft を解除し、最後に親のワークツリーを削除します"
-            "（中から --parent なしで実行すると消さず、外に出てから実行するコマンドを表示する）",
+            "（--parent を付けずに打つと、何もせず外から打つコマンドを表示して止まる）",
             "  マージはユーザが squash で行う",
             f"  {ops.READY_FLOW_AGREED}",
         ]

@@ -65,10 +65,10 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         # done/ へ動いた子のワークツリーの片付けを、送った後に実行ファイルへ頼む
         with open(log, encoding="utf-8") as f:
             self.assertIn(f"worktree tidy {PARENT} --phase 1", f.read())
-        ready = self.review("ready", CCNAVI_ENTRY_PATH=logger)
+        ready = self.review("ready", "--parent", PARENT, cwd=self.ws, CCNAVI_ENTRY_PATH=logger)
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
-        self.carried(f"{APPROVED}/phases/{PARENT}/ready.json")
-        # 最後に親のワークツリーを消そうとするが、cwd が中にあるので消さず、外から打つ 1 本を出す
+        self.carried_after_drop(f"{APPROVED}/phases/{PARENT}/ready.json")
+        # 最後に親のワークツリーを外から消す
         with open(log, encoding="utf-8") as f:
             logged = f.read()
         self.assertIn(f"worktree retire {PARENT}", logged)
@@ -76,12 +76,12 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         self.assertLess(
             logged.index(f"worktree retire {PARENT}"), logged.index(f"worktree remaining {PARENT}")
         )
-        self.assertIn(f"cwd がワークツリー {PARENT} の中にあるので削除しませんでした", ready.stdout)
-        self.assertIn(f"ccnavi-clean.sh --worktree {PARENT}", ready.stdout)
+        self.assertIn(f"ワークツリー {PARENT} を削除しました", ready.stdout)
         self.assertLess(
-            ready.stdout.index("Draft を解除した"), ready.stdout.index("cwd がワークツリー")
+            ready.stdout.index("Draft を解除した"),
+            ready.stdout.index(f"ワークツリー {PARENT} を削除しました"),
         )
-        self.assertTrue(os.path.isdir(self.tree))
+        self.assertFalse(os.path.exists(self.tree))
 
     def test_ready_commits_and_pushes_the_archive_removals_before_undrafting(self):
         """ready の退避（閉じたチケットの削除）は、write-and-push がコミットして push してから
@@ -106,12 +106,13 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             "esac\n"
             f"exec '{self.half}' \"$@\"\n",
         )
-        ready = self.review("ready", CCNAVI_ENTRY_PATH=mover)
+        ready = self.review("ready", "--parent", PARENT, cwd=self.ws, CCNAVI_ENTRY_PATH=mover)
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.assertIn("Draft を解除した", ready.stdout)
-        self.carried(old)
-        self.assertFalse(os.path.exists(os.path.join(self.tree, *old.split("/"))))
-        self.assertEqual(git(self.tree, "ls-tree", "HEAD", "--", old).stdout, "")
+        self.assertFalse(os.path.exists(self.tree))
+        self.assertEqual(self.remote_sha(), self.sha(self.ws, PARENT))
+        self.assertIn(old, self.committed(PARENT, self.ws))
+        self.assertEqual(git(self.ws, "ls-tree", PARENT, "--", old).stdout, "")
 
     def test_ready_from_outside_drops_the_parent_worktree_after_undrafting(self):
         """`ready --parent <親>` を親のワークツリーの外（ワークスペースルート）から打つ。
@@ -241,13 +242,13 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             "esac\n"
             f"exec '{self.half}' \"$@\"\n",
         )
-        ready = self.review("ready", CCNAVI_ENTRY_PATH=mover)
+        ready = self.review("ready", "--parent", PARENT, cwd=self.ws, CCNAVI_ENTRY_PATH=mover)
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.assertIn("wip/ の追跡済みのファイルを削除しました（1 件", ready.stdout)
         self.assertIn(head[:12], ready.stdout)
         self.assertIn(f"  {ELI5}", ready.stdout)
-        self.carried(ELI5)
-        self.assertEqual(git(self.tree, "ls-tree", "HEAD", "--", ELI5).stdout, "")
+        self.carried_after_drop(ELI5)
+        self.assertEqual(git(self.ws, "ls-tree", PARENT, "--", ELI5).stdout, "")
 
     def test_the_real_ready_moves_the_rest_again_after_a_failed_push(self):
         """実際の実行ファイルの ready（退避を始めた後の打ち直し）を write-and-push の中で通す。
@@ -289,16 +290,14 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             os.path.join(self.remote, "hooks", "pre-receive"),
             f"#!/bin/sh\n[ -e '{once}' ] && exit 0\n: >'{once}'\necho refused >&2\nexit 1\n",
         )
-        ready = self.review("ready", CCNAVI_ENTRY_PATH=self.bin)
+        ready = self.review("ready", "--parent", PARENT, cwd=self.ws, CCNAVI_ENTRY_PATH=self.bin)
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.assertTrue(os.path.exists(once))
         self.assertIn("push が通らなかった", ready.stderr)
         self.assertIn("Draft を解除した", ready.stdout)
-        self.carried(f"{APPROVED}/done/old.md")
+        self.carried_after_drop(f"{APPROVED}/done/old.md")
         for rel in ("done/old.md", "phases/old/closed.json"):
-            self.assertEqual(
-                git(self.tree, "ls-tree", "HEAD", "--", f"{APPROVED}/{rel}").stdout, ""
-            )
+            self.assertEqual(git(self.ws, "ls-tree", PARENT, "--", f"{APPROVED}/{rel}").stdout, "")
             self.assertTrue(os.path.isfile(os.path.join(archive_base, *rel.split("/"))), rel)
 
     def test_a_request_is_not_posted_twice_across_runs(self):

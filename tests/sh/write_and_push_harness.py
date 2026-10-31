@@ -598,7 +598,7 @@ class WriteAndPushHostHarness(WriteAndPushHarness):
             HOST_HALF.format(root=ROOT, python=sys.executable),
         )
 
-    def review(self, *args, stdin="", script="ccnavi-review.sh", **extra):
+    def review(self, *args, stdin="", script="ccnavi-review.sh", cwd=None, **extra):
         env = {
             "PATH": self.path,
             "GITLAB_TOKEN": "t0k",
@@ -606,7 +606,13 @@ class WriteAndPushHostHarness(WriteAndPushHarness):
             "HALF_TREE": self.tree,
         }
         env.update(extra)
-        return self.sh(script, *args, cwd=self.tree, stdin=stdin, **env)
+        return self.sh(script, *args, cwd=cwd or self.tree, stdin=stdin, **env)
+
+    def carried_after_drop(self, rel):
+        """ready が親のワークツリーを消した後。親のブランチ（ワークスペースの側）で見る。"""
+        self.assertFalse(os.path.exists(self.tree))
+        self.assertIn(rel, self.committed(PARENT, self.ws))
+        self.assertEqual(self.remote_sha(), self.sha(self.ws, PARENT))
 
     def carried(self, rel):
         self.assertIn(rel, self.committed())

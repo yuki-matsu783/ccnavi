@@ -18,7 +18,7 @@
   ワークツリーを全部。子の finish・cancel でも、その子に限らず同じ親子の閉じた子を
   まとめて片付ける。親の finish では取りこぼしを拾う備えになる
 - `ready` が Draft を外した後（`ccnavi-review.sh ready`）: 親のワークツリー。外から
-  `ready --parent <親>` で打てば消える
+  `ready --parent <親>` で打つ（`--parent` なしは打たせない）
 
 write-and-push の中では書いたものが push の失敗で戻ることがあるので、write-and-push
 が送り終えてから呼ぶ。

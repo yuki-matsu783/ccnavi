@@ -98,7 +98,10 @@ class PostFailureTest(WriteAndPushHostHarness):
         cases = {
             "request": (self.request_args(), {}),
             "comment": (("comment", "--body-file", comment_body), {}),
-            "ready": (("ready",), {"CCNAVI_ENTRY_PATH": self.ready_exe()}),
+            "ready": (
+                ("ready", "--parent", PARENT),
+                {"CCNAVI_ENTRY_PATH": self.ready_exe(), "cwd": self.ws},
+            ),
         }
         for name, bad in BAD_POSTS:
             for kind, (args, extra) in cases.items():
