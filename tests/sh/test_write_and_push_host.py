@@ -360,6 +360,32 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/2.skipped")
 
+    def test_close_early_refuses_first_when_the_family_cannot_be_written(self):
+        log = os.path.join(self._base, "calls.log")
+        refusing = executable(
+            os.path.join(self._base, "bin", "refusing"),
+            "#!/bin/sh\n"
+            f"printf '%s\\n' \"$*\" >>'{log}'\n"
+            'case " $* " in\n'
+            '*" write-and-push family "*) exit 1 ;;\n'
+            "esac\n"
+            f"exec '{self.half}' \"$@\"\n",
+        )
+        before = self.committed()
+        closed = self.review(
+            "--reason",
+            "r",
+            script="ccnavi-user-close-early.sh",
+            CCNAVI_ENTRY_PATH=refusing,
+        )
+        self.assertEqual(closed.returncode, 1, closed.stdout + closed.stderr)
+        self.assertIn("書かずに止めた", closed.stderr)
+        # 受け入れの計画・ホストへの返信・issue・コメントの前に止まり、何も変わらない
+        with open(log, encoding="utf-8") as f:
+            self.assertNotIn("close-early", f.read())
+        self.assertEqual([], Host.notes)
+        self.assertEqual(before, self.committed())
+
 
 @unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
 class WriteAndPushReviewTest(WriteAndPushHarness):
