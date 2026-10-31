@@ -133,4 +133,3 @@ fi
 # 取り込み済みの親子のチケットなら、早めに閉じたマーカー（ユーザの判断）を承認の push で送る。
 carry_human "$family" || exit 1
 printf 'OK: 早めに閉じた（%s）\n' "$url"
-ccnavi_text "$root" NEXT_CLOSE_EARLY
