@@ -699,7 +699,7 @@ def _parsed(
     検証（`--verify`）は 0 か `modes.EXIT_ANSWER_NO` を返し、承認が途中で止まったときは
     `modes.EXIT_PARTIAL` をそのまま返す。
     """
-    # 版だけを出す。フラグは上の定義から引くので、足したものはそのまま並ぶ。
+    # 版だけを出す。受け付けるオプションの一覧は出さない（ADR-0226）。
     if args.version:
         return version.report(stdout, args.json)
     if not cli_args._one_wrapper_flag_each(stderr, args):

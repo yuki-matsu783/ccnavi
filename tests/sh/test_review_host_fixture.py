@@ -81,7 +81,7 @@ def script_and_args(ws: str, args) -> list[str]:
 STUB = """#!/bin/sh
 case " $* " in
 *" --version --json "*)
-  printf '{{"compat": {compat}, "flags": ["--accept-unresolved", "--actor", "--via"]}}\\n'
+  printf '{{"compat": {compat}}}\\n'
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
