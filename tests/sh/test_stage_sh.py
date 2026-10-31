@@ -194,12 +194,16 @@ class StageShTest(unittest.TestCase):
         self.assertEqual(1, len(nexts), result.stdout)
         # `<パス>` のままにせず、いま下書きを作ったパスを埋める
         self.assertNotIn("<パス>", nexts[0])
+        notes = [line for line in result.stdout.splitlines() if line.startswith("案内: ")]
         self.assertTrue(
-            nexts[0].endswith(
-                f"--commands {self.rules} {self.hook} を打つ"
-                "（種類ごとに、取り込みの手順か差し替えの mv が出る）"
+            any(
+                line.endswith(
+                    f"--commands {self.rules} {self.hook} を打つ"
+                    "（種類ごとに、取り込みの手順か差し替えの mv が出る）"
+                )
+                for line in notes
             ),
-            nexts[0],
+            result.stdout,
         )
         # 下書きが既にあるだけでも、次の一手は消えない
         again = self.stage(".ccnavi/config/common/rules.yml")

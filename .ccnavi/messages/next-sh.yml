@@ -6,7 +6,9 @@ messages:
     kind: next
     values: [integ]
     next: |-
-      {script:ccnavi-worktree.sh} <名前> でワークツリーを切り、その中で {script:ccnavi-git.sh} merge {integ:sh} を打って衝突を解いてコミットし、{script:ccnavi-git.sh} integrate <名前> で取り込む
+      {script:ccnavi-worktree.sh} <名前> でワークツリーを切る
+    note: |-
+      切ったワークツリーの中で {script:ccnavi-git.sh} merge {integ:sh} を打って衝突を解いてコミットし、{script:ccnavi-git.sh} integrate <名前> で取り込む
 
   NEXT_GIT_INTEGRATE_EMPTY:
     kind: next
@@ -18,7 +20,10 @@ messages:
     kind: next
     values: [head, result, name]
     next: |-
-      差分は {script:ccnavi-git.sh} diff {head:sh} {result:sh}。報告のあと、{script:ccnavi-git.sh} integrate-done {name:sh} -m '<メッセージ>' で確定する（報告と進め方は、integrate を打ったときの追加の文脈に従う）。やめるなら {script:ccnavi-git.sh} integrate --abort {name:sh}
+      差分を {script:ccnavi-git.sh} diff {head:sh} {result:sh} で確かめる
+    note: |-
+      報告のあと、{script:ccnavi-git.sh} integrate-done {name:sh} -m '<メッセージ>' で確定する（報告と進め方は、integrate を打ったときの追加の文脈に従う）
+      やめるなら {script:ccnavi-git.sh} integrate --abort {name:sh}
 
   NEXT_GIT_PUSH_USER:
     kind: next
@@ -53,7 +58,9 @@ messages:
     kind: next
     values: [staged_q]
     next: |-
-      下書きを編集する。すべて直したら、下書きを作ったのと同じツリーの中で {script:ccnavi-stage.sh} --commands {staged_q} を打つ（種類ごとに、取り込みの手順か差し替えの mv が出る）
+      下書きを編集する
+    note: |-
+      すべて直したら、下書きを作ったのと同じツリーの中で {script:ccnavi-stage.sh} --commands {staged_q} を打つ（種類ごとに、取り込みの手順か差し替えの mv が出る）
 
   NEXT_STAGE_GUIDE:
     kind: next
