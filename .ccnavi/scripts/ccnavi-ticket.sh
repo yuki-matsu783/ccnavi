@@ -223,11 +223,7 @@ if [ "$1" = approval-request ] && [ -z "${CCNAVI_PROPOSE_INNER:-}" ] && [ -z "$p
 fi
 
 # 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
-if ccnavi_wap_use_exe "$root"; then
-	if [ -n "$ccnavi_wap_bin" ]; then
-		skew=$(ccnavi_compat_skew "$root" "$ccnavi_wap_bin") || printf 'ccnavi-ticket: %s\n' "$skew" >&2
-	fi
-else
+if ! ccnavi_wap_use_exe "$root"; then
 	printf 'ccnavi-ticket: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2
 fi

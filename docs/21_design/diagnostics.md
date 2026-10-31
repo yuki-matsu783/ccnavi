@@ -42,10 +42,9 @@ state を内部で外す。拡張と `scripts/check_rules.py` は念のため `-
 write-and-push の書いたパスの一覧（`--record-writes`）も、診断の外では `--state` を見ずに既定の state の置き場だけを一覧から外す。
 
 **互換の版**（`src/ccnavi/entry/version.py` の `COMPAT`）は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh の `CCNAVI_COMPAT`、拡張の
-`EXTENSION_COMPAT`）の契約の版で、3 か所に同じ値を書く。sh は実行ファイルを起動する前に、拡張は起動のときに `--version` を読んで
-比べ、`--lint` は sh の値と比べる（`(version)` の warn）。食い違えば、どれも直し方（ccnavi のリポジトリなら組み立て直し、配布先なら
-配り直し、拡張が古ければ入れ直し）を名指しする。新しいフラグを使う前は、渡してみて argparse のエラーで見分けるのでは
-なく `flags` を見る。sh は `--version` の答えから互換の版を読めなければ「不明」として食い違いに数える。拡張は版を聞けなかったとき、起動では何も言わず、フラグを使う前に理由を出して先へ進まない。レイヤーは頭の `version:` が書式の版を示す。
+`EXTENSION_COMPAT`）の契約の版で、3 か所に同じ値を書く。sh と拡張は実行時に実行ファイルの版を比べず、食い違いを断らない（sh と実行ファイルは
+必ず同時に配る前提）。`--lint` だけが sh の値と比べる（`(version)` の warn）。新しいフラグを使う前は、渡してみて
+argparse のエラーで見分けるのではなく `flags` を見る。拡張は版を聞けなかったとき、フラグを使う前に理由を出して先へ進まない。レイヤーは頭の `version:` が書式の版を示す。
 読めない版は読む側が error にする。
 
 `--flow <パス>` も診断でだけ有効で、読むのは `--lint` だけ。`--test` / `--test-expectations` / `--explain` に渡すと
@@ -118,7 +117,7 @@ error がある間は配点もフェーズ定義も保存できない。
   本体のモジュールを動かすときは `ext.py` の行だけを直す。拡張は同じ版の本体と一緒に同梱するので、別の版の本体と拡張は組み合わさらない。
   互換の版は、拡張が統合先のデータや出力の形を読み違えるような変更のときに上げ、呼び出しの名前だけを変えるときは上げない
 - 互換の版の書き方: 実行ファイル側は `entry/version.py` の行頭から始まる 1 行 `COMPAT = <整数>` で、Chrome 拡張の組み立てが正規表現で読む。
-  VS Code 拡張側は `EXTENSION_COMPAT`。3 か所（実行ファイル・sh の `CCNAVI_COMPAT`・拡張）の突き合わせは `tests/sh/test_compat_skew.py` が見る
+  VS Code 拡張側は `EXTENSION_COMPAT`。3 か所（実行ファイル・sh の `CCNAVI_COMPAT`・拡張）の突き合わせは `tests/core/test_version.py` が見る
 
 ### 10.1 `--docs` の索引
 

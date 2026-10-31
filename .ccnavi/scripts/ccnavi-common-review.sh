@@ -63,23 +63,10 @@ review_place() {
 
 # ---- 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 
-# 実行ファイルと互換の版が食い違っていれば、最初に呼ぶときに 1 度だけ言う（止めない）。
-# 引数の誤りで断る経路と、実行ファイルを使わないサブコマンド（origin / fetch / comment）では起こさない。
-# `$( )` の中から呼ぶと、1 度言ったことの目印（told_skew）が親に残らないので、そう呼ぶ前には親で先に tell_skew を打つ。
-told_skew=""
-tell_skew() {
-	[ -z "$told_skew" ] || return 0
-	told_skew=1
-	# ソースで動かすとき（bin が無い）は、sh と同じツリーのものを動かすので比べない。
-	[ -n "${bin:-}" ] || return 0
-	skew=$(ccnavi_compat_skew "$root" "$bin") || printf '%s: %s\n' "$review_label" "$skew" >&2
-}
-
 # 見つからなければ 1（止めるかどうかは呼ぶ側が決める。merged は実行ファイルを起こさないので、無くても進める）。
 review_exe() {
 	if bin=$(ccnavi_bin "$root"); then
 		ccnavi() {
-			tell_skew
 			"$bin" --root "$root" --cwd "$exe_cwd" "$@"
 		}
 		return 0
@@ -646,7 +633,7 @@ wap_on=no
 review_wap() {
 	ccnavi_wap_root="$root"
 	ccnavi_wap_sh="$script_dir"
-	# 実行ファイルの起こし方は review_exe が決めた ccnavi（--cwd と互換の版の確かめつき）。
+	# 実行ファイルの起こし方は review_exe が決めた ccnavi（--cwd つき）。
 	ccnavi_wap_exe() { ccnavi "$@"; }
 	ccnavi_wap_label="$review_label"
 }

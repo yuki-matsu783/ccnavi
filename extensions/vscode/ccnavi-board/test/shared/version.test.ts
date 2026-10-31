@@ -1,5 +1,5 @@
 /**
- * 実行ファイルの版の JSON（`ccnavi --version --json`）の読み方と、拡張との食い違いの言い分け（`core/version.ts`）。
+ * 実行ファイルの版の JSON（`ccnavi --version --json`）の読み方と、使う前の対応の確かめ（`core/version.ts`）。
  * 実行ファイルの答えは組んで渡す偽物。
  */
 import { test } from "node:test";
@@ -10,8 +10,6 @@ import {
   missingFeatures,
   missingFlags,
   parseVersionJson,
-  skewMessage,
-  UPDATE_EXTENSION_HINT,
   VERSION_SCHEMA,
   type VersionInfo,
   type VersionProbe,
@@ -43,22 +41,6 @@ test("CB-T268 版の JSON を読む。形の版が違う・compat か flags が�
   assert.equal(parseVersionJson(JSON.stringify({ ...body, compat: "1" })).ok, false);
   assert.equal(parseVersionJson(JSON.stringify({ ...body, flags: undefined })).ok, false);
   assert.equal(parseVersionJson("usage: ccnavi").ok, false);
-});
-
-test("CB-T269 起動のときの知らせ。揃っていれば言わず、古い側と直し方を名指しする", () => {
-  assert.equal(skewMessage(ok(), false), undefined);
-  // 聞けなかったことは起動では言わない（画面を開いたときに言う）
-  assert.equal(skewMessage({ kind: "failed", error: "x" }, false), undefined);
-
-  const exeOld = skewMessage(ok({ compat: EXTENSION_COMPAT - 1 }), true) ?? "";
-  assert.match(exeOld, /実行ファイルが古い版/);
-  assert.match(exeOld, /0123456789ab/);
-  assert.match(exeOld, /組み立て直して/);
-
-  const extOld = skewMessage(ok({ compat: EXTENSION_COMPAT + 1, commit: "unknown" }), true) ?? "";
-  assert.match(extOld, /拡張が古い版/);
-  assert.match(extOld, /コミット不明/);
-  assert.ok(extOld.endsWith(UPDATE_EXTENSION_HINT), extOld);
 });
 
 test("CB-T270 使うフラグを実行ファイルが知っているかを版の JSON の flags で見る。確認できなければ進めない", () => {
