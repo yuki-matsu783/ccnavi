@@ -136,14 +136,10 @@ class FailStreakTest(unittest.TestCase):
         self.assertEqual("PostToolUseFailure", out["hookEventName"])
 
     def test_note_does_not_urge_bypass(self):
-        for text in (
-            self._context(self._fail()),
-            self._context(self._fail()),
-            self._context(self._fail()),
-        ):
-            if text:
-                self.assertIn("迂回", text)
-                self.assertIn("ユーザに相談", text)
+        said = [self._context(self._fail()) for _ in range(3)]
+        for text in (said[0], said[2]):
+            self.assertIn("迂回", text)
+            self.assertIn("ユーザに相談", text)
 
     def test_success_resets_the_count_but_keeps_the_first_mark(self):
         self.assertIn(FIRST, self._context(self._fail()))
@@ -222,7 +218,7 @@ class FailStreakTest(unittest.TestCase):
                 }
             )
             self.assertNotIn(NOTE, result.stdout)
-        # 数えていないので、最初の失敗はまだ最初の 1 回のまま。
+        # 数えていないので、最初の 1 回の案内はこの失敗で初めて出る。
         said = self._context(self._fail())
         self.assertIn(FIRST, said)
         self.assertNotIn(NOTE, said)

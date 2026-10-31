@@ -93,9 +93,9 @@ async function watchServiceWorkers(profile, push) {
   };
 }
 
-/** 環境が揃っていないときに、出力の末尾へ足す。直し方の書いた文書（frontmatter が無く、索引には載らない） */
+/** 環境が揃っていないときに、出力の末尾へ足す。直し方を書いた文書（frontmatter が無く、索引には載らない） */
 const NOT_READY_HINT =
-  "案内: 前提と直し方は extensions/chrome/ccnavi-approval/VERIFY.md の「4.0 ツールで描いて確かめる」と README.md を見る";
+  "案内: 前提と直し方は extensions/chrome/ccnavi-approval/VERIFY.md の「4.0 ツールで描いて確かめる」と README.md を見てください";
 
 async function main(argv) {
   let lib;
