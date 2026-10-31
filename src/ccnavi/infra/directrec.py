@@ -126,7 +126,7 @@ def active_names(root: str, main: tree.Tree) -> list[str]:
     """このユーザのチェックアウトの、作業中の直接作業の名前（横で作業する指定の有無は問わない）。
 
     記録（`ccnavi-direct/<名前>`、版 4）があり、作業ワークツリーのディレクトリが残っているもの。
-    compact などで会話が覚えていない続きの作業を、知らせたり別に切るのを確かめたりするために使う。
+    compact などで会話が覚えていない続きの作業を知らせ、別に切るときに確かめるために使う。
     """
     common = common_dir(main.root)
     if common is None:
