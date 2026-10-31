@@ -812,10 +812,6 @@ class CheckFileTest(Harness):
         self.assertNotEqual(alone.returncode, 0)
         self.assertIn("--templates と一緒に使う", alone.stderr)
 
-    def test_the_flag_is_listed_in_the_version(self):
-        out = self.ccnavi("--version", "--json")
-        self.assertIn("--check-file", json.loads(out.stdout)["flags"])
-
     def test_the_answer_matches_the_fixture(self):
         got = self.check(FEATURE)
         got["sha"] = "<sha>"

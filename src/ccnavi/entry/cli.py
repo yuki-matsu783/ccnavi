@@ -701,7 +701,7 @@ def _parsed(
     """
     # 版だけを出す。フラグは上の定義から引くので、足したものはそのまま並ぶ。
     if args.version:
-        return version.report(stdout, parser, args.json)
+        return version.report(stdout, args.json)
     if not cli_args._one_wrapper_flag_each(stderr, args):
         return EXIT_ERROR
     if cli_templates.asked(args):

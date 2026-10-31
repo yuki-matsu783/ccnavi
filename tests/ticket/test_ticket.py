@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import hashlib
 import io
@@ -2746,9 +2747,21 @@ class TicketTest(unittest.TestCase):
 
     def test_executable_options_list_matches_the_parser(self):
         """入口の止めが知っている実行ファイルのオプションは、実行ファイルが受けるオプションと同じ。"""
-        out = io.StringIO()
-        cli.run(io.StringIO(), out, io.StringIO(), ["--version", "--json"])
-        flags = set(json.loads(out.getvalue())["flags"]) | {"-h", "-r"}
+        seen = []
+        real = argparse.ArgumentParser.parse_args
+
+        def spy(parser, *args, **kwargs):
+            seen.append(parser)
+            return real(parser, *args, **kwargs)
+
+        with mock.patch.object(argparse.ArgumentParser, "parse_args", spy):
+            cli.run(io.StringIO(), io.StringIO(), io.StringIO(), ["--version"])
+        flags = {
+            option
+            for action in seen[0]._actions
+            for option in action.option_strings
+            if option.startswith("--")
+        } | {"-h", "-r"}
         self.assertEqual(flags, set(phase_forms.EXE_OPTIONS))
 
     def test_turning_off_the_terminal_requirement_is_denied(self):

@@ -15,8 +15,6 @@ sh の互換の版の `--lint` での確かめは tests/core/test_lint_compat.py
 
 from __future__ import annotations
 
-import argparse
-import io
 import json
 import os
 import re
@@ -50,7 +48,7 @@ def write(path: str, text: str) -> str:
 
 
 class VersionFlagTest(unittest.TestCase):
-    def test_v10_json_says_the_version_the_commit_the_flags_and_the_compat(self):
+    def test_v10_json_says_the_version_the_commit_and_the_compat(self):
         """V10"""
         result = ccnavi("--version", "--json")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -61,9 +59,8 @@ class VersionFlagTest(unittest.TestCase):
         self.assertEqual(body["commit"], version.UNKNOWN)
         self.assertIs(body["built"], False)
         self.assertEqual(body["compat"], version.COMPAT)
-        self.assertEqual(body["flags"], sorted(body["flags"]))
-        for flag in ("--version", "--json", "--lint", "--flow", "--explain", "--root"):
-            self.assertIn(flag, body["flags"])
+        self.assertNotIn("flags", body)
+        self.assertNotIn("features", body)
         self.assertEqual(
             set(body["formats"]), {"rules", "phases", "risks", "ticket"}, body["formats"]
         )
@@ -75,7 +72,6 @@ class VersionFlagTest(unittest.TestCase):
         self.assertTrue(result.stdout.startswith(f"ccnavi {version.VERSION}\n"), result.stdout)
         self.assertRegex(result.stdout, rf"(?m)^compat: {version.COMPAT}$")
         self.assertRegex(result.stdout, r"(?m)^commit: unknown$")
-        self.assertRegex(result.stdout, r"(?m)^flags: .*--version")
 
     def test_v12_it_reads_no_settings_and_no_workspace(self):
         """V12 読めない設定のワークスペースでも、在らないルートでも答える。"""
@@ -86,17 +82,6 @@ class VersionFlagTest(unittest.TestCase):
         self.assertEqual(broken.stderr, "")
         missing = ccnavi("--version", "--json", root=os.path.join(ROOT, "no-such-dir"))
         self.assertEqual(missing.returncode, 0, missing.stderr)
-
-    def test_v13_flags_come_from_the_argument_definition(self):
-        """V13 定義に足したフラグは、何も書き足さずに並ぶ。短い表記と位置引数は並べない。"""
-        parser = argparse.ArgumentParser(add_help=False)
-        parser.add_argument("--zeta", action="store_true")
-        parser.add_argument("-a", "--alpha", default="")
-        parser.add_argument("words", nargs="*")
-        self.assertEqual(version.flags(parser), ["--alpha", "--zeta"])
-        out = io.StringIO()
-        self.assertEqual(version.report(out, parser, as_json=True), 0)
-        self.assertEqual(json.loads(out.getvalue())["flags"], ["--alpha", "--zeta"])
 
     def test_v14_the_version_agrees_with_pyproject(self):
         """V14"""

@@ -611,7 +611,7 @@ ccnavi-review.sh decide N --preview が呼び、エージェントも実行で�
 
 # (話題, 引き方, 一覧に出す 1 行, 本文)。一覧と全文はこの順で並ぶ。
 TOPICS = (
-    ("version", "ccnavi --version", "版・ビルド情報・受け付けるフラグを出す", _VERSION),
+    ("version", "ccnavi --version", "版・ビルド情報・互換の版を出す", _VERSION),
     ("lint", "ccnavi --lint", "ルール・フェーズ・リスクの設定を検証する", _LINT),
     ("test", "ccnavi --test", "ツールを動かさずにルールの判定を試す", _TEST),
     ("explain", "ccnavi --explain", "チケットとその置き場を、機械が読める形で一覧する", _EXPLAIN),

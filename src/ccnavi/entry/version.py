@@ -1,9 +1,8 @@
 """実行ファイルが自分について言うこと（`ccnavi --version [--json]`）。
 
-言うのは 6 つ。版・組み立ての元になったコミット・受け付けるフラグ・互換の版・読み書きする
-書式の版・実行ファイルが持つ振る舞い（`features`）。VS Code 拡張と `.ccnavi/scripts/` の sh は、
-起動のときにこれを読んで自分と合っているかを見る。受け付けるフラグから読めない振る舞い
-（JSON の欄の有無など）は `features` で言う。
+言うのは 5 つ。版・組み立ての元になったコミット・互換の版・読み書きする書式の版。
+読まれているのは、sh が読む互換の版（`compat:`）と、配布の組み立て
+（`scripts/ccnavi-package.sh`）が読むコミットなど。受け付けるフラグや振る舞いの一覧は言わない（読み手が無い）。
 
 互換の版（COMPAT）は、実行ファイルと、それを呼ぶ側（`.ccnavi/scripts/` の sh と
 VS Code 拡張）との契約の版。sh と拡張は実行時に比べて断らない（必ず同時に配る前提）。
@@ -14,10 +13,7 @@ VS Code 拡張）との契約の版。sh と拡張は実行時に比べて断ら
 Chrome 拡張は組み立てのときにここの値を埋め込む。
 
 データの形（承認済みの置き場に置くものの並び、先行関係の読み方など）が変わるときも上げる。
-フラグが同じでも読み違えるため。sh が実行ファイルの新しいサブコマンドを呼ぶようになったときも同じ。
-
-フラグを足すだけ、JSON の欄を足すだけで、データの形も変わらないなら上げない。足したものが
-在るかは `flags` を見れば分かる。
+sh が実行ファイルの新しいサブコマンドを呼ぶようになったときも同じ。
 
 レイヤー（共通レイヤー・自身のレイヤー・プロジェクトのレイヤー）の 3 本は、
 ファイルの頭の `version:` に書式の版を
@@ -34,7 +30,6 @@ Chrome 拡張は組み立てのときにここの値を埋め込む。
 
 from __future__ import annotations
 
-import argparse
 import json
 import sys
 from typing import TextIO
@@ -72,17 +67,6 @@ VERSION = "0.1.0"
 COMPAT = 20
 # `--version --json` の形の版。欄を足すだけなら上げない。
 SCHEMA = 1
-# 実行ファイルが持つ振る舞い。オプションや JSON の欄の有無を `flags` から読めないものを足す。
-# 足すだけなら COMPAT は上げない。
-FEATURES: tuple[str, ...] = (
-    "user-entry",
-    # `user` の入口の印（`--entry sh|board`）。印が無い `user …` は断る。
-    "entry-marker",
-    # 保護対象の下書きの取り込み（`ccnavi user handoff`）。
-    "handoff",
-    # 共通レイヤーのミラーの同期（`ccnavi user mirror`）。
-    "mirror",
-)
 # 組み立ての元のコミットが分からないときの表記。
 UNKNOWN = "unknown"
 # build.py が組み立てのときに書く部品の名前。パッケージの外に置くので、ソースで動かしている
@@ -106,17 +90,6 @@ def built() -> bool:
     return bool(getattr(sys, "frozen", False))
 
 
-def flags(parser: argparse.ArgumentParser) -> list[str]:
-    """受け付けるフラグ。引数の定義（argparse）から引くので、足したフラグはそのまま並ぶ。"""
-    found = {
-        option
-        for action in parser._actions
-        for option in action.option_strings
-        if option.startswith("--")
-    }
-    return sorted(found)
-
-
 def formats() -> dict[str, int]:
     """読む設定とチケットの書式の版。レイヤーのファイルの `version:` と比べるもの。"""
     return {
@@ -127,7 +100,7 @@ def formats() -> dict[str, int]:
     }
 
 
-def describe(parser: argparse.ArgumentParser) -> dict[str, object]:
+def describe() -> dict[str, object]:
     """`--version --json` の中身。"""
     return {
         "schema": SCHEMA,
@@ -135,16 +108,14 @@ def describe(parser: argparse.ArgumentParser) -> dict[str, object]:
         "commit": commit(),
         "built": built(),
         "compat": COMPAT,
-        "features": list(FEATURES),
-        "flags": flags(parser),
         "formats": formats(),
     }
 
 
-def report(stdout: TextIO, parser: argparse.ArgumentParser, as_json: bool) -> int:
+def report(stdout: TextIO, as_json: bool) -> int:
     """版を書く。ユーザ向けの形も 1 行 1 項目の `<名前>: <値>` にして、
     sh が sed で読めるようにする。"""
-    body = describe(parser)
+    body = describe()
     if as_json:
         stdout.write(json.dumps(body, ensure_ascii=True, indent=1))
         stdout.write("\n")
@@ -156,8 +127,6 @@ def report(stdout: TextIO, parser: argparse.ArgumentParser, as_json: bool) -> in
     stdout.write(f"compat: {body['compat']}\n")
     stdout.write(f"schema: {body['schema']}\n")
     stdout.write(f"formats: {_pairs(body['formats'])}\n")
-    stdout.write(f"features: {' '.join(body['features'])}\n")
-    stdout.write(f"flags: {' '.join(body['flags'])}\n")
     return EXIT_OK
 
 
