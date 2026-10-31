@@ -13,7 +13,7 @@ import time
 from typing import TextIO
 
 from ..catalog import projskills
-from ..infra import fsio, hookio, modes, pathcase, settings, tree
+from ..infra import fsio, hookio, modes, pathcase, settings, toolnames, tree, tunables
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import ctxfile, rules
 from ..records import audit
@@ -328,7 +328,7 @@ RUNNING_SUFFIX = ".running"
 # 長すぎる分の害は、
 # 取りこぼした印が促しを止める時間が伸びるだけ（促しが 1 回出ないだけで、他は壊れない）。
 # 短すぎると、長く走る体を待つ回で誤って止める。迷ったら止めない側に倒す。
-RUNNING_MAX_SECONDS = 4 * 3600
+RUNNING_MAX_SECONDS = tunables.SUBAGENT_RUNNING_MAX.value()
 
 
 def _running_path(state_dir: str, session: str, who: str) -> str:
@@ -592,7 +592,7 @@ def ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
     言うのは、終了結果が `outside`（直らないまま終わった）のときだけ。差し戻しの後に直った
     （`fixed`）なら言わない。結果の記録が無い体（記録を入れる前の終了）は今までどおり言う。
     """
-    if payload.tool_name not in modes.AGENT_TOOLS:
+    if payload.tool_name not in toolnames.AGENT_TOOLS:
         return ""
     agent_id = str(payload.tool_response.get("agentId") or "")
     if not agent_id or not _bounced(state_dir, payload.session_id, agent_id):
@@ -628,7 +628,7 @@ def unchecked_scope(state_dir: str, payload: hookio.Input) -> str:
     if not state_dir:
         return ""
     paths: list[tuple[str, str]] = []
-    if payload.tool_name in modes.AGENT_TOOLS:
+    if payload.tool_name in toolnames.AGENT_TOOLS:
         agent_id = str(payload.tool_response.get("agentId") or "")
         if agent_id:
             paths.append((agent_id, _unchecked_path(state_dir, payload.session_id, agent_id)))

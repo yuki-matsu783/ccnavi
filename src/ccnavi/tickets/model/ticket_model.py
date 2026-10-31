@@ -38,9 +38,6 @@ FINISHED = (REVIEW, DONE, CANCELLED)
 # 直接の作成・移動を止める置き場。todo/ への作成と編集は自由。
 GUARDED_STATES = (REVIEW,)
 
-# 範囲の項として判定に使われるツール。これ以外を match に書いた項は使われない。
-WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
-
 # スクリプトだけが書く欄。ユーザもエージェントも書かない。承認済みチケットの側で
 # 行単位に書き換える（`ticket_fields.set_fields`）。承認は提案の中身を変えずに動かすので、
 # 提案に書いた値はそのまま承認済みチケットの値になる。だから提案に空でない値があれば

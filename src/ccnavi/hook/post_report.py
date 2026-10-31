@@ -13,9 +13,6 @@ from . import post_findings
 # 「直前の実行が壊したもの」と「元から汚れていたもの」を見分ける方法が無くなる。
 CODE_PREEXISTING = "POST_PREEXISTING"
 
-# 対象の文字列を載せるときの長さの上限。
-SUBJECT_LIMIT = 200
-
 
 def _violation(
     finding: post_findings.Finding,
@@ -157,6 +154,6 @@ def _call(payload: hookio.Input) -> str:
     if not isinstance(subject, str) or not subject:
         return payload.tool_name or "(unknown tool)"
     shown = " ".join(subject.split())
-    if len(shown) > SUBJECT_LIMIT:
-        shown = shown[:SUBJECT_LIMIT] + "…"
+    if len(shown) > texts.SUBJECT_LIMIT:
+        shown = shown[: texts.SUBJECT_LIMIT] + "…"
     return f"{payload.tool_name}({shown})"

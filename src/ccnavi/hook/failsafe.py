@@ -10,7 +10,7 @@
 - Bash・PowerShell は、読み切れて、連結・置換・リダイレクト・glob を含まない単独のコマンドで、
   下の許可リストにヒットし、引数のパス（引数の無い `ls` は cwd）が最低限の deny にヒットしない
   ときだけ通す
-- 報告用のツール（`modes.REPORT_TOOLS`）は通す（体が報告を返せなくなるのを避ける）
+- 報告用のツール（`toolnames.REPORT_TOOLS`）は通す（体が報告を返せなくなるのを避ける）
 - それ以外のツールは通さない（呼び出し側が `modes.fail_closed` で扱いを決める）
 
 `phase_forms._READERS` は流用しない。あれは区切りで分けた各コマンドの先頭の語しか見ず、
@@ -23,10 +23,7 @@ from __future__ import annotations
 import os
 import re
 
-from ..infra import fsio, hookio, modes, pathcase, shellread
-
-READ_TOOLS = ("Read", "Grep", "Glob")
-SHELL_TOOLS = ("Bash", "PowerShell")
+from ..infra import fsio, hookio, pathcase, shellread, toolnames
 
 # 認証情報の形、`.git` の中、操作記録の置き場。通常の判定の `builtin:credentials` が止める形のうち、
 # 設定を読まずに言える分をコピーする。
@@ -122,7 +119,7 @@ def read_is_safe(payload: hookio.Input, root: str = "") -> bool:
         found = _paths(payload)
         # 探す場所を省いた Grep・Glob は cwd を探す。`glob` だけ書いても探す場所は省かれたまま。
         # cwd が操作記録の置き場や `.git` の中でない限り、省略は通す。
-        if payload.tool_name in ("Grep", "Glob"):
+        if payload.tool_name in toolnames.SEARCH_TOOLS:
             omitted = not payload.field_value("path")
         else:
             omitted = not found
@@ -165,10 +162,10 @@ def shell_is_safe(payload: hookio.Input, root: str = "") -> bool:
 
 def is_safe(payload: hookio.Input, root: str = "") -> bool:
     """判定に達せなかった呼び出しのうち、通してよいもの。"""
-    if payload.tool_name in modes.REPORT_TOOLS:
+    if payload.tool_name in toolnames.REPORT_TOOLS:
         return True
-    if payload.tool_name in READ_TOOLS:
+    if payload.tool_name in toolnames.READ_TOOLS:
         return read_is_safe(payload, root)
-    if payload.tool_name in SHELL_TOOLS:
+    if payload.tool_name in toolnames.SHELL_TOOLS:
         return shell_is_safe(payload, root)
     return False

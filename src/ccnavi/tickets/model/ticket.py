@@ -77,7 +77,7 @@ import re
 
 import yaml
 
-from ...infra import fsio, globmatch, tree, yamlread
+from ...infra import fsio, globmatch, toolnames, tree, yamlread
 from ...policy import rules
 from ...policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 from . import ticket_fold, ticket_ids, ticket_model
@@ -765,7 +765,7 @@ def _entries(front: dict, name: str) -> tuple[list[ticket_model.Entry], list[Pro
             # 書き込みのツールを含む項目だけを読む。
             match = _text(raw.get("match"))
             tools = [w.strip() for w in match.split("|") if w.strip()]
-            if not any(t in ticket_model.WRITE_TOOLS for t in tools):
+            if not any(t in toolnames.WRITE_TOOLS for t in tools):
                 problems.append(
                     Problem(
                         SEVERITY_WARN,

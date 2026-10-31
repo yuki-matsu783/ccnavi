@@ -9,10 +9,10 @@ from __future__ import annotations
 import unittest
 
 from ccnavi.hook import reasons
-from ccnavi.policy import rules
+from ccnavi.policy import rules, texts
 from tests import ROOT
 
-LIMIT = reasons.SUBJECT_LIMIT
+LIMIT = texts.SUBJECT_LIMIT
 
 
 def subject_line(text: str) -> str:
