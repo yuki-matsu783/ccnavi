@@ -5,18 +5,23 @@
  */
 import * as vscode from "vscode";
 
-import { APPEARANCE_LABELS, APPEARANCES, type Appearance, type AppearanceSink, parseAppearance, sendAppearance } from "./core/appearance.js";
+import { APPEARANCE_LABELS, APPEARANCES, type Appearance, type AppearanceSink, parseAppearance, parseZoom, sendAppearance } from "./core/appearance.js";
 
 const KEY = "appearance";
+const ZOOM_KEY = "zoom";
+
+export function readZoom(): number {
+  return parseZoom(vscode.workspace.getConfiguration("ccnaviBoard").get<number>(ZOOM_KEY));
+}
 
 export function readAppearance(): Appearance {
   return parseAppearance(vscode.workspace.getConfiguration("ccnaviBoard").get<string>(KEY));
 }
 
-/** 設定が変わったら呼ぶ。開いている画面はこれで body のクラスを切り替える */
+/** 見た目か拡大率の設定が変わったら呼ぶ。開いている画面はこれで body のクラスを切り替える */
 export function onDidChangeAppearance(listener: (appearance: Appearance) => void): vscode.Disposable {
   return vscode.workspace.onDidChangeConfiguration((event) => {
-    if (event.affectsConfiguration(`ccnaviBoard.${KEY}`)) {
+    if (event.affectsConfiguration(`ccnaviBoard.${KEY}`) || event.affectsConfiguration(`ccnaviBoard.${ZOOM_KEY}`)) {
       listener(readAppearance());
     }
   });
@@ -30,7 +35,7 @@ export function onDidChangeAppearance(listener: (appearance: Appearance) => void
  * 画面が組み上がったところで呼ぶ側が送り直すので、どちらの経路でもいまの値が後から渡る。
  */
 export function postAppearance(host: AppearanceSink): boolean {
-  return sendAppearance(host, readAppearance());
+  return sendAppearance(host, readAppearance(), readZoom());
 }
 
 /**
@@ -45,7 +50,7 @@ export function postAppearance(host: AppearanceSink): boolean {
  */
 export function followAppearance(panel: vscode.WebviewPanel, host: AppearanceSink): void {
   const sub = onDidChangeAppearance((appearance) => {
-    sendAppearance(host, appearance);
+    sendAppearance(host, appearance, readZoom());
   });
   panel.onDidDispose(() => {
     sub.dispose();

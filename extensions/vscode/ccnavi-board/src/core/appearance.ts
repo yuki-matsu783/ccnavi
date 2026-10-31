@@ -21,6 +21,18 @@ export const APPEARANCE_LABELS: Readonly<Record<Appearance, string>> = {
   "claude-dark": "Claude ダーク",
 };
 
+export const DEFAULT_ZOOM = 1;
+export const MIN_ZOOM = 0.8;
+export const MAX_ZOOM = 2;
+
+/** 拡大率の設定を読む。数でない値は既定、範囲の外は端に寄せる */
+export function parseZoom(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_ZOOM;
+  }
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
+}
+
 /** 設定の値を読む。知らない値と型違いは既定 */
 export function parseAppearance(value: unknown): Appearance {
   return typeof value === "string" && (APPEARANCES as readonly string[]).includes(value) ? (value as Appearance) : DEFAULT_APPEARANCE;
@@ -41,6 +53,8 @@ export function bodyTag(appearance: Appearance | undefined): string {
 export interface AppearanceMessage {
   readonly type: "appearance";
   readonly value: Appearance;
+  /** 文字と画面全体の拡大率（`ccnaviBoard.zoom`）。省略は等倍 */
+  readonly zoom?: number;
 }
 
 /**
@@ -62,6 +76,6 @@ export interface AppearanceSink {
  * 直に `webview.postMessage` を呼ぶと、この 2 つのどちらも通らない画面へ送ることになり、
  * 送ったつもりでも届いていないことを段取りの側で把握できなくなる。
  */
-export function sendAppearance(sink: AppearanceSink, value: Appearance): boolean {
-  return sink.post({ type: "appearance", value });
+export function sendAppearance(sink: AppearanceSink, value: Appearance, zoom: number = DEFAULT_ZOOM): boolean {
+  return sink.post(zoom === DEFAULT_ZOOM ? { type: "appearance", value } : { type: "appearance", value, zoom });
 }
