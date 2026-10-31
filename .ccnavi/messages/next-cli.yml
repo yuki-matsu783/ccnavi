@@ -41,7 +41,7 @@ messages:
     kind: next
     values: [example, parent]
     next: |-
-      子の提案（例: '{example}'）を wip/proposals/todo/ に書き、'{script:ccnavi-ticket.sh} approval-request {parent}' で送って、承認をユーザに頼む（子の着手は親が着手済みであることが条件。親と別の承認になる）
+      子の提案（例: '{example}'）を wip/proposals/todo/ に書き、'{script:ccnavi-ticket.sh} approval-request {parent}' で送って、承認をユーザに頼む（子は親とは別に承認される。子の着手には、親が着手済みであることが条件）
     note: |-
       子のないまま親で進めても、`finish` で「終わっていないフェーズがある」と止まります
 
@@ -67,7 +67,7 @@ messages:
     next: |-
       '{script:ccnavi-ticket.sh} finish {parent}' で親を閉じる（取り込み済みの親子なら、finish が移動をコミットして push する。そうでなければ、移動をコミットして push する）
     note: |-
-      finish のあと、親のワークツリーの外に出て '{ready_command}' で Draft を解除する。ready はクローズ済みのチケットの記録と `{wip}/` の追跡済みのファイルを削除してコミットし、push してから Draft を解除し、最後に親のワークツリーを削除します（中から --parent なしで実行すると消さず、外に出てから実行するコマンドを表示する）
+      finish のあと、親のワークツリーの外に出て '{ready_command}' で Draft を解除する。ready はクローズ済みのチケットの記録と `{wip}/` の追跡済みのファイルを削除してコミットし、push してから Draft を解除し、最後に親のワークツリーを削除します（ワークツリーの中から --parent なしで実行すると削除せず、外から実行するコマンドを表示する）
       残っている子のワークツリーは finish が片付ける。マージはユーザが squash で行う。{flow_agreed}
 
   # ---- tickets/review/decide.py（続きの子を起こしたあと。ユーザの端末に出る行）
@@ -204,7 +204,7 @@ messages:
         {path} の plan・phases・allow などを直す
     note:
       feedback: |-
-        送る前の確かめは、上の `次:` の 1 本目
+        送る前の確かめ（`--check`）は、上の `次:` のとおり
       edit: |-
         範囲を変えるときは、作業中の子を先に '{script:ccnavi-ticket.sh} cancel <子> --reason <理由>' で取り消す
         直したら、'{script:ccnavi-ticket.sh} approval-request {ident} --check' が通ったあと '{script:ccnavi-ticket.sh} approval-request {ident}' で親のブランチへ送り、承認をユーザに頼んで返事を待つ
@@ -236,8 +236,9 @@ messages:
     kind: next
     values: [ident]
     next: |-
-      '{script:ccnavi-ticket.sh} start {ident}' で着手し、サブエージェントに処理を任せる。終わってコミットされたら '{script:ccnavi-ticket.sh} finish {ident}' を打つ
+      '{script:ccnavi-ticket.sh} start {ident}' で着手する
     note: |-
+      着手したら、サブエージェントに処理を任せる。終わってコミットされたら '{script:ccnavi-ticket.sh} finish {ident}' を打つ
       子のワークツリー .claude/worktrees/{ident} は start が作る。作れないときは '{script:ccnavi-git.sh} worktree add ".claude/worktrees/{ident}" -b {ident}'
 
   # ---- entry/cli_templates.py（テンプレートの下書きを書いたあと）
@@ -245,7 +246,7 @@ messages:
     kind: next
     values: [target, tree_root]
     next: |-
-      description と when を固有名の無い言い方に直し、計画とフローの不要な手順を削る。効力が無い下書きで、取り込む（利用できるようにする）のはユーザ
+      description と when を固有名の無い言い方に直し、計画とフローの不要な手順を削る。下書きには効力が無く、利用できるように取り込むのはユーザ
     note: |-
       取り込みは、ユーザがこのツリー（{tree_root}）で `ccnavi-user-handoff.sh {target}` を打って行う
       下書きは未追跡のファイルで、残っていると親の ready が止まる。取り込むか、ready の前に下書きを削除します（またはコミットする）

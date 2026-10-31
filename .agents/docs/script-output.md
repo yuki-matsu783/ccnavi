@@ -53,7 +53,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チ
 
 | 場面 | 出力元 | 次 |
 |---|---|---|
-| 子の `ticket cancel` | `tickets/lifecycle/commands.py`（`NEXT_OPS_CHILD_DONE`） | 親の `status` を確かめる。親の取り消しと close-early が束ねる取り消しは言わない |
+| 子の `ticket cancel` | `tickets/lifecycle/commands.py`（`NEXT_OPS_CHILD_DONE`） | 親の `status` を確かめる。親の取り消しと、close-early がまとめて行う取り消しでは言わない |
 | `ticket record-risk` | 同上（`NEXT_OPS_RECORD_RISK`） | `finish` を打ち直す |
 | 親の `ticket start` | 同上・`tickets/lifecycle/plan.py`（`NEXT_OPS_START_PARENT`・`NEXT_OPS_START_CHILDLESS`） | `status` で承認済みの子を確かめる。子のないフェーズがあれば、子の提案を書く |
 | `ccnavi-review.sh confirm` | `tickets/core/review.py`（`NEXT_REVIEW_CONFIRMED`・`NEXT_REVIEW_LAST`） | 途中は親の `status`。最後のフェーズは親の `finish`（そのあとの ready は `案内:`） |

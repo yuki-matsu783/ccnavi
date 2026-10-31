@@ -336,7 +336,7 @@ def _unreadable(gathered: Gathered) -> str:
 def _note_line(note: str) -> str:
     """行の下に添える 1 件。改行を含む苦情（ルールの `message` は複数行を書ける）は、
     2 行目からも同じだけ下げる。下げないと、次の行が新しい段落に見える。
-    ただし、行頭が `次: ` の行は下げない。機械が数える行頭の語なので、行頭に置く。"""
+    ただし、行頭が `次: ` の行は下げない。機械が行頭の語を数えるので、下げずに行頭に置く。"""
     head, *rest = note.splitlines() or [""]
     return "".join(
         [f"      - {head}\n"]
