@@ -171,7 +171,7 @@ def _leftovers(root: str, top: str, reported: set[str], deadline: float) -> list
 
     作業中の記録（`ccnavi-direct`）・`s`・`pending` のref・作業ワークツリーは、普通の状態なので
     挙げない。`pending` は `ccnavi-worktree.sh` がワークツリーを切る前の確認待ちに置く印で、
-    取り込み（integrate）の跡ではない。次に切れば消える。
+    取り込み（integrate）の跡ではない。次にワークツリーを切ると消える。
     """
     common = directrec.common_dir(top)
     if common is None:
