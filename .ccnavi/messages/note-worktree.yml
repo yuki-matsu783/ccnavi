@@ -31,3 +31,10 @@ messages:
     values: [mr]
     note: |-
       MR {mr} が残っている。ccnavi には MR を閉じる操作が無く、Draft のまま残すか閉じるかはユーザがホストで決める（エージェントは閉じない）。MR のブランチは変わらず、直接作業の変更はこのワークツリーのブランチに入る
+
+  # SessionStart。作業中の直接作業のワークツリーがあるとき。compact で会話が忘れた続きを、別に切り直さないため。
+  NOTE_WORKTREE_ACTIVE_AT_START:
+    kind: note
+    values: [worktrees]
+    note: |-
+      作業中の直接作業のワークツリーがある: {worktrees}。この作業の続きなら、新しく切らずそこで編集する。別の作業として切るときは、ユーザに確かめる（ccnavi-worktree.sh が確認を求める）

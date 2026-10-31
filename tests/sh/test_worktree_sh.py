@@ -233,6 +233,25 @@ class WorktreeShTest(unittest.TestCase):
 
     # ---- ずれが無いとき
 
+    def test_a_second_direct_worktree_needs_the_accept_code_and_names_the_first(self):
+        first = self.run_sh("first")
+        self.assertEqual(0, first.returncode, first.stderr + first.stdout)
+        result = self.run_sh("second")
+        self.assertEqual(3, result.returncode, result.stderr + result.stdout)
+        self.assertIn("直接作業のワークツリーが既にある: first", result.stdout)
+        self.assertIn("続きなら", result.stdout)
+        self.assertFalse(os.path.isdir(self.wt("second")))
+        code = result.stdout.split("--accept ")[1].split()[0]
+        again = self.run_sh("second", "--accept", code)
+        self.assertEqual(0, again.returncode, again.stderr + again.stdout)
+        self.assertTrue(os.path.isdir(self.wt("second")))
+
+    def test_a_removed_first_worktree_no_longer_blocks_a_new_one(self):
+        self.assertEqual(0, self.run_sh("first").returncode)
+        shutil.rmtree(self.wt("first"))
+        result = self.run_sh("second")
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+
     def test_cuts_from_the_base_head_without_asking_when_nothing_is_off(self):
         result = self.run_sh("topic")
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
