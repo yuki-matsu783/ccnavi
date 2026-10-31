@@ -440,7 +440,7 @@ find_marked() {
 # 標準出力は note なら `comment`、issue なら `create_issue` と同じ形の JSON（送り済みと分かったときは
 # {url}、issue はそれに {number}）。送り済みなら送らず、前に試した形跡があれば先にホストを目印で照合する。
 # 確定できないときは止めて 1（自動では送り直さない）。
-# 記録を作れないときは、二重に送らないよう送らずに止める。
+# 記録を作れないときは、二重投稿を防ぐため、送らずに止める。
 
 cs_set() {
 	ccnavi ops stage-set "$cs_id" "$cs_stage" "$@" 2>/dev/null || {
@@ -472,8 +472,8 @@ staged_send() {
 	cs_file="$7"
 	cs_id=$(ccnavi ops begin "$cs_kind" "${branch:-}" 0 "$cs_mr" "$cs_key" "$cs_stage:$cs_stage" 2>/dev/null) || cs_id=""
 	if [ -z "$cs_id" ]; then
-		# 記録が無いと二重に送りうる。送らずに止める
-		printf '%s: 操作記録を作れなかった。二重に送らないよう何も送らずに止めた。logs/state/ops/ に書けるか、ccnavi と配布した sh の版が合っているかを確かめて、打ち直してください。\n' "${review_label:-ccnavi-review}" >&2
+		# 記録が無いと二重に送るおそれがあるため、送らずに止める
+		printf '%s: 操作記録を作れなかった。二重投稿を防ぐため、何も送らずに止めた。logs/state/ops/ に書けるか、ccnavi と配布した sh の版が揃っているかを確かめて、打ち直してください。\n' "${review_label:-ccnavi-review}" >&2
 		return 1
 	fi
 	# 同じ操作を同時に送らない（照合の前に 2 つが「未送信」と見て、両方が投稿するのを防ぐ）。

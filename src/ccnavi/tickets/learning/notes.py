@@ -177,7 +177,7 @@ def append_entry(text: str, entry: str, ident: str = "", parent: str = "") -> st
     if not text.strip():
         text = scaffold_text(ident, parent)
     elif not _has_usable_frontmatter(text):
-        # 手で書いた記録だけがここに来る。雛形を推して前置せず、止めて直し方を言う
+        # 手で書いた記録だけがここに来る。雛形を推測して先頭に付けず、止めて直し方を言う
         raise ValueError("先頭に learnings: を持つ frontmatter がありません")
     if not text.endswith("\n"):
         text += "\n"
@@ -550,7 +550,7 @@ def run(
             new_text = append_entry(text, entry, ident, parent)
         except ValueError as e:
             stderr.write(
-                f"ccnavi: 気づきの記録 {record_rel(ident)} を読み取れない（{e}）。"
+                f"ccnavi: 気づきの記録 {record_rel(ident)} を読み取れません（{e}）。"
                 "直すか、消してから打ち直してください\n"
             )
             return 1

@@ -137,7 +137,7 @@ class PostFailureTest(WriteAndPushHostHarness):
         self.assertIn("unknown", self.stage_states("comment"))
 
     def test_a_post_without_an_op_record_is_stopped_before_sending(self):
-        """ops begin が失敗したら、二重に送らないよう何も送らずに止める。"""
+        """ops begin が失敗したら、二重投稿を防ぐため、何も送らずに止める。"""
         comment_body = write(os.path.join(self._base, "comment.md"), "コメント\n")
         no_begin = executable(
             os.path.join(self._base, "bin", "nobegin"),
