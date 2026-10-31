@@ -170,12 +170,13 @@ def _leftovers(root: str, top: str, reported: set[str], deadline: float) -> list
     （名前, 知らせの 1 行）の組を名前の順に返す。
 
     作業中の記録（`ccnavi-direct`）・`s`・`pending` のref・作業ワークツリーは、普通の状態なので
-    挙げない。
+    挙げない。`pending` は `ccnavi-worktree.sh` がワークツリーを切る前の確認待ちに置く印で、
+    取り込み（integrate）の跡ではない。同じ名前でワークツリーを切ると消える。
     """
     common = directrec.common_dir(top)
     if common is None:
         return []
-    # 名前ごとに、残っている跡を集める（一時ワークツリー・専用の ref・書きかけの候補）
+    # 名前ごとに、残っている跡を集める（一時ワークツリー・専用の ref）
     names: dict[str, list[str]] = {}
     tmp_base = os.path.join(root, "logs", "direct-tmp", repo_key(root, top))
     try:
@@ -191,10 +192,6 @@ def _leftovers(root: str, top: str, reported: set[str], deadline: float) -> list
         # refs/ccnavi/direct/<名前>/<種類>
         if len(parts) >= 5 and parts[4] in ("t", "c", "k"):
             names.setdefault(parts[3], []).append(f"専用の ref（{ref}）")
-        elif len(parts) >= 5 and parts[4] == "pending":
-            direct = os.path.join(common, directrec.DIRECT_DIR, parts[3])
-            if not os.path.isfile(direct):
-                names.setdefault(parts[3], []).append(f"使われなかった書きかけの候補（{ref}）")
     # done の記録の残り（作業ワークツリー・ブランチ・直接作業の記録）
     done_dir = os.path.join(common, osi._DONE_DIR)
     try:
