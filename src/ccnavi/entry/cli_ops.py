@@ -475,14 +475,7 @@ def _write_and_push_bypass(
         family_id = write_and_push.family_of(words[2])
     elif (
         len(words) >= 2 and words[0] == "review" and words[1] in ("requested", "confirm", "ready")
-    ) or (
-        args.reviewed is not None
-        and args.accept_unresolved
-        and not args.preview
-        and not args.check
-        and not args.choose_out
-        and not args.accept_plan
-    ):
+    ) or _decide_writes(args):
         where = cwd[-1] if isinstance(cwd, list) and cwd else cwd
         parent = phase.parent_for_cwd(root, conf, where) if where else None
         if parent is not None:
