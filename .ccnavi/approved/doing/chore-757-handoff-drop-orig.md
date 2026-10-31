@@ -32,6 +32,8 @@ allow:
     glob: "extensions/vscode/ccnavi-board/*"
   - match: Write|Edit
     glob: "extensions/chrome/ccnavi-approval/*"
+started_at: "2026-10-31T11:41:55+0900"
+base_sha: "d849655a657ed66ed0b8474ccb6e1cc6a10ee821"
 ---
 ## 目的
 
