@@ -12,18 +12,7 @@ messages:
     next: |-
       サブエージェントに、子のワークツリー（.claude/worktrees/{ticket}）での実装を任せる。終わってコミットされたら '{script:ccnavi-ticket.sh} finish {ticket}' を打つ
 
-  # 親を閉じたあと。マージリクエストで見るフェーズが無いとき。
-  NEXT_OPS_CLOSE_NO_MR:
-    kind: next
-    values: [wip, classifier_note]
-    next: |-
-      この移動をコミットし、`{wip}/` を削除して（'{script:ccnavi-git.sh} rm -r {wip}'）コミットし、統合先のブランチに取り込んでください。
-    note: |-
-      このチケットにはマージリクエストで見るフェーズが無いので、Draft を解除する手順はありません。途中の作業は既定のブランチに残さない。
-      `{wip}/` で消えるのは追跡済みのファイルだけで、削除する前のコミットから戻せる。
-      {classifier_note}
-
-  # 親を閉じたあと。マージリクエストがあるとき。
+  # 親を閉じたあと。
   NEXT_OPS_CLOSE_MR:
     kind: next
     values: [ready_command, approved, wip, flow_agreed]
@@ -31,7 +20,7 @@ messages:
       この移動をコミットして push し（取り込み済みの親子では、この finish が済ませている）、'{ready_command}' で Draft を解除してください（「マージに進んでよい」の合図）
     note: |-
       ready は Draft を解除する前に、クローズ済みのチケットとその記録（`{approved}/` の done/・phases/・flows/）を手元の logs/archive/ へ移し、`{wip}/` の追跡済みのファイルを削除して、その削除をコミットして push する（`{wip}/` に未追跡のファイルがあれば削除せずに止まる。削除したものは履歴から戻せる）。
-      Draft を解除したあと、ready は親のワークツリーを削除します（親のワークツリーの外から --parent で実行すれば消える。中から --parent なしで実行すると消さず、外に出てから実行するコマンドを表示する）。
+      Draft を解除したあと、ready は親のワークツリーを削除します。ready は親のワークツリーの外から --parent <親> を付けて打ちます。付けないと何もせず、外から打つコマンドを表示して止まります。
       途中の作業もチケットも既定のブランチに残さない。マージはユーザが squash で行う。{flow_agreed}
 
   # 子を done/ へ動かしたあと。
@@ -40,6 +29,128 @@ messages:
     values: [parent]
     next: |-
       '{script:ccnavi-ticket.sh} status {parent}' で、親の次の一手を確かめる
+
+  # 親の着手のあと。子のないフェーズの案内が無いとき。
+  NEXT_OPS_START_PARENT:
+    kind: next
+    next: |-
+      '{script:ccnavi-ticket.sh} status' で承認済みの子を確かめ、着手できる子を start する
+
+  # 親の着手のあと。子のないフェーズがあるとき（子のないフェーズの名前はコードが言う）。
+  NEXT_OPS_START_CHILDLESS:
+    kind: next
+    values: [example, parent]
+    next: |-
+      子の提案（例: '{example}'）を wip/proposals/todo/ に書き、'{script:ccnavi-ticket.sh} approval-request {parent}' で送って、承認をユーザに頼む（子は親とは別に承認される。子の着手には、親が着手済みであることが条件）
+    note: |-
+      子のないまま親で進めても、`finish` で「終わっていないフェーズがある」と止まります
+
+  # start・finish・cancel・consolidate が、書く前に分かる条件で断ったあと（理由の行のあとに 1 行）。
+  NEXT_OPS_REFUSED:
+    kind: next
+    values: [verb, ticket]
+    next: |-
+      上の理由を直して、'{script:ccnavi-ticket.sh} {verb} {ticket}' を打ち直す
+
+  # cancel は --reason を添える。
+  NEXT_OPS_REFUSED__CANCEL:
+    kind: next
+    values: [ticket]
+    next: |-
+      上の理由を直して、'{script:ccnavi-ticket.sh} cancel {ticket} --reason <理由>' を打ち直す
+
+  # review-request が、取り込みの前に分かる前提で断ったあと（理由の行のあとに 1 行）。
+  NEXT_REVIEW_REQUEST_REFUSED:
+    kind: next
+    values: [phase]
+    next: |-
+      上の理由を直して、'{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文> --eli5 <HTML>' を打ち直す
+
+  # confirm が、取り込みの前に分かる前提で断ったあと（理由の行のあとに 1 行）。
+  NEXT_CONFIRM_REFUSED:
+    kind: next
+    values: [phase]
+    next: |-
+      上の理由を直して、'{script:ccnavi-review.sh} confirm --phase {phase}' を打ち直す
+
+  # ready が、取り込みの前に分かる前提で断ったあと（理由の行のあとに 1 行）。
+  NEXT_READY_REFUSED:
+    kind: next
+    values: [parent]
+    next: |-
+      上の理由を直して、親のワークツリーの外から '{script:ccnavi-review.sh} ready --parent {parent}' を打ち直す
+
+  # decide が、取り込みの前に分かる前提で断ったあと（理由の行のあとに 1 行）。
+  NEXT_DECIDE_REFUSED:
+    kind: next
+    values: [phase]
+    next: |-
+      上の理由を直して、ユーザが '{script:ccnavi-user-decide.sh} {phase}' を打ち直す
+
+  # 定性のリスク項目の判定を記録したあと。
+  NEXT_OPS_RECORD_RISK:
+    kind: next
+    values: [ticket]
+    next: |-
+      '{script:ccnavi-ticket.sh} finish {ticket}' を打ち直す
+
+  # ---- tickets/core/review.py（confirm_local の成功のあと）
+  # まだ先のフェーズがあるとき。
+  NEXT_REVIEW_CONFIRMED:
+    kind: next
+    values: [parent]
+    next: |-
+      '{script:ccnavi-ticket.sh} status {parent}' で、次の子か親の finish かを確かめる
+
+  # 最後のフェーズが済んだとき。親を閉じてから Draft を外すまで。
+  NEXT_REVIEW_LAST:
+    kind: next
+    values: [parent, ready_command, wip, flow_agreed]
+    next: |-
+      '{script:ccnavi-ticket.sh} finish {parent}' で親を閉じる（取り込み済みの親子なら、finish が移動をコミットして push する。そうでなければ、移動をコミットして push する）
+    note: |-
+      finish のあと、親のワークツリーの外に出て '{ready_command}' で Draft を解除する。ready はクローズ済みのチケットの記録と `{wip}/` の追跡済みのファイルを削除してコミットし、push してから Draft を解除し、最後に親のワークツリーを削除します（--parent なしで実行すると、何も変えずに止まり、外から実行するコマンドを表示する）
+      残っている子のワークツリーは finish が片付ける。マージはユーザが squash で行う。{flow_agreed}
+
+  # ---- tickets/review/decide.py（続きの子を起こしたあと。ユーザの端末に出る行）
+  NEXT_DECIDE_FOLLOWUP:
+    kind: next
+    values: [words]
+    next: |-
+      {words}
+
+  # ---- tickets/proposal/propose.py（--check が通ったあと）
+  NEXT_APPROVAL_REQUEST_CHECKED:
+    kind: next
+    values: [parent]
+    next: |-
+      '{script:ccnavi-ticket.sh} approval-request {parent}' を打つ（本番。提案を送る）
+
+  # ---- entry/cli_plan.py（--fill-phases・--plan-order --write のあと）
+  NEXT_PLAN_VERIFY:
+    kind: next
+    next: |-
+      `ccnavi --lint` か `ccnavi --agree --preview --verify` で確かめる
+
+  # ---- tickets/learning/notes.py（ticket learn のあと）
+  NEXT_LEARN_NOTE_COMMIT:
+    kind: next
+    next: |-
+      気づきの記録をステージしてコミットする（しないと finish が止まる）
+
+  NEXT_LEARN_SCAFFOLD_COMMIT:
+    kind: next
+    next: |-
+      気づきを書いて、記録と要約のファイルをステージしてコミットする（気づきが無ければ learnings: none のまま）
+
+  # ---- tickets/lifecycle/worktrees.py（cwd がワークツリーの中にあって削除しなかったあと）
+  NEXT_OPS_DROP_OUTSIDE:
+    kind: next
+    values: [command, classifier_note]
+    next: |-
+      外（ワークスペースルートなど。エージェントは ExitWorktree か cd で出る）に出てから、'{command}' を実行する
+    note: |-
+      {classifier_note}
 
   # ---- tickets/proposal/agree_screen.py（承認されたあとの案内）
   # 場合は、この回に承認された親が居るか（parent）と、子の開始の仕方（child: 子のワークツリーを切る手順も言う、
@@ -62,6 +173,15 @@ messages:
         後工程を進める。親は自分のワークツリーで '{script:ccnavi-ticket.sh} start <親>' を先に実行してください。子は'{script:ccnavi-ticket.sh} start <識別子>' で開始してください（親が未着手だと止まります）。
 
   # ---- tickets/review/request.py
+  # レビューを依頼したあと。次はユーザの操作なので、待つ形で言う。
+  NEXT_REVIEW_REQUESTED:
+    kind: next
+    values: [turn, parallel]
+    next: |-
+      {turn}を終えて、ユーザのレビューを待つ（レビューは依頼済み）
+    note: |-
+      {parallel}
+
   # 依頼のとき、親の `mr:` に別の値が既にあった。状態（上書きしないこと・今回の MR の番号）はコードが言う。
   NEXT_REVIEW_MR_DIFFERS:
     kind: next
@@ -76,9 +196,105 @@ messages:
     next: |-
       親のワークツリー（.claude/worktrees/{family}）で書き、'{script:ccnavi-ticket.sh} approval-request {family}' で親のブランチへ送ってから承認を頼む
 
+  # tickets/core/approve.py（承認を頼む前の検査で、提案の不備を直す）。
+  NEXT_APPROVAL_FIX_PROPOSAL:
+    kind: next
+    next: |-
+      上の理由を直して、approval-request を打ち直す（何も送っていません）
+
   # 提案を識別子と違う名前のワークツリーに書いている。
   NEXT_APPROVAL_PLACE:
     kind: next
     values: [family]
     next: |-
       '{script:ccnavi-worktree.sh} {family}' で切り、提案を移して元を削除してから承認を頼む
+
+  # ---- tickets/proposal/scaffold.py（ticket new の雛形を書いたあと。`必須:` の行はコードが言う）
+  NEXT_NEW_REWRITE:
+    kind: next
+    values: [path]
+    next: |-
+      {path} の rationale と、見出しの下の目印（「（ここに〜を書く）」）を実際の内容に書き換える。目印が残っていると承認で止まる
+
+  # 雛形の書き換えに添える補足。plan は --plan の雛形、template はテンプレートからの雛形。
+  NOTE_NEW_TAIL:
+    kind: note
+    note:
+      plan: |-
+        allow を実際の作業に合わせて絞る・足す
+        並行させたいステップは after を直す
+      template: |-
+        allow を実際の作業に合わせて絞る・足す
+        計画のステップと文の固有名を直す
+
+  NOTE_NEW_SEND:
+    kind: note
+    values: [ident]
+    note: |-
+      書けたら '{script:ccnavi-launcher.sh} --lint' で確かめ、'{script:ccnavi-ticket.sh} approval-request {ident} --check' が通ったら、'{script:ccnavi-ticket.sh} approval-request {ident}'（親の識別子で打つ。子の識別子では打たない）で提案を親のブランチへ送り、承認をユーザに頼んで返事を待つ。承認が済むまで実装はしない
+      plan を変えたら '{script:ccnavi-launcher.sh} --plan-order {ident} --fill-phases' で phases: を再実行します。承認が通らないなど詰まったら、直接実装に切り替えず、ユーザに報告して止まる
+
+  # ---- tickets/proposal/revise.py（ticket revise の雛形を書いたあと）
+  NOTE_REVISE_FEEDBACK:
+    kind: note
+    values: [path]
+    note: |-
+      全体計画のレビューで残った指摘を対応のフェーズにするときは、{path} の `feedback: []` を、対応のフェーズを並べた `feedback:` に直してから確かめる
+
+  # feedback は、フィードバック計画を空にした回（そのまま送れる）。edit は、直してから送る回。
+  NEXT_REVISE:
+    kind: next
+    values: [ident, path]
+    next:
+      feedback: |-
+        '{script:ccnavi-ticket.sh} approval-request {ident} --check' が通ったら、'{script:ccnavi-ticket.sh} approval-request {ident}' で親のブランチへ送り、承認をユーザに頼んで返事を待つ
+      edit: |-
+        {path} の plan・phases・allow などを直す
+    note:
+      feedback: |-
+        送る前の確かめ（`--check`）は、上の `次:` のとおり
+      edit: |-
+        範囲を変えるときは、作業中の子を先に '{script:ccnavi-ticket.sh} cancel <子> --reason <理由>' で取り消す
+        直したら、'{script:ccnavi-ticket.sh} approval-request {ident} --check' が通ったあと '{script:ccnavi-ticket.sh} approval-request {ident}' で親のブランチへ送り、承認をユーザに頼んで返事を待つ
+
+  # ---- tickets/proposal/agree.py（--agree --preview --verify の終わり）
+  NEXT_VERIFY_REJECTED:
+    kind: next
+    next: |-
+      提案を直してから、同じ --agree --preview --verify を打ち直す
+    note: |-
+      通ったら、'{script:ccnavi-ticket.sh} approval-request <識別子>' で親のブランチへ送り、ユーザに承認を依頼する
+
+  NEXT_VERIFY_CHILDLESS:
+    kind: next
+    next: |-
+      子の提案が無い親がある（上の warn）。子の提案を wip/proposals/todo/ に書いてから、同じ --agree --preview --verify を打ち直す。承認が済むまで実装はしない
+    note: |-
+      親だけを先に承認する進め方なら、'{script:ccnavi-ticket.sh} approval-request <識別子>' で送り、子の承認がもう 1 回要ることをユーザに伝える
+
+  NEXT_VERIFY_OK:
+    kind: next
+    next: |-
+      '{script:ccnavi-ticket.sh} approval-request <識別子>' で提案を親のブランチへ送ってから、ユーザに承認を依頼してよい
+    note: |-
+      承認が済むまで実装はしない
+
+  # ---- tickets/lifecycle/consolidate.py（統合の子を作った・開いているとき）
+  NEXT_CONSOLIDATE:
+    kind: next
+    values: [ident]
+    next: |-
+      '{script:ccnavi-ticket.sh} start {ident}' で着手する
+    note: |-
+      着手したら、サブエージェントに処理を任せる。終わってコミットされたら '{script:ccnavi-ticket.sh} finish {ident}' を打つ
+      子のワークツリー .claude/worktrees/{ident} は start が作る。作れないときは '{script:ccnavi-git.sh} worktree add ".claude/worktrees/{ident}" -b {ident}'
+
+  # ---- entry/cli_templates.py（テンプレートの下書きを書いたあと）
+  NEXT_TEMPLATE_DRAFT:
+    kind: next
+    values: [target, tree_root]
+    next: |-
+      description と when を固有名の無い言い方に直し、計画とフローの不要な手順を削る。下書きには効力が無く、利用できるように取り込むのはユーザ
+    note: |-
+      取り込みは、ユーザがこのツリー（{tree_root}）で `ccnavi-user-handoff.sh {target}` を打って行う
+      下書きは未追跡のファイルで、残っていると親の ready が止まる。取り込むか、ready の前に下書きを削除します（またはコミットする）

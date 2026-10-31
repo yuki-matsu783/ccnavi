@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import TextIO
 
 from ...infra import fsio, settings, tree
+from ...policy import texts
 from ..approval import checks as approval_checks
 from ..approval import marks as approval_marks
 from ..approval import store as approval
@@ -72,33 +73,8 @@ def ready(
     if archived is not None:
         return _ready_again(stdout, stderr, root, conf, archived, result_path)
     # 親を閉じられるかを確かめる。苦情が在れば、何も置かずに止める。
-    parent = review._parent_any(stderr, root, conf, cwd)
+    parent = ready_gate(stderr, root, conf, cwd)
     if parent is None:
-        return 1
-    problems = ops_close.close_problems(root, conf, parent.ticket)
-    # 親のチケットが done/ に無いまま Draft を外すと、
-    # そのままマージされたときに done/ に親が無いまま親のブランチが消え、
-    # 親子のチケットの判定が「決まらない」になる。それを防ぐ（判定を厳しくする向き）。
-    if parent.state != ticket_model.DONE:
-        problems.append(
-            f"親 {parent.ticket} の承認済みチケットが {conf.approved}/{ticket_model.DONE}/"
-            " にありません"
-            f"（いまは {parent.state}/）。先に "
-            f"'{settings.script_command(root, 'ccnavi-ticket.sh')} finish {parent.ticket}' で"
-            "親を閉じ、コミットして push してから再実行してください"
-        )
-    problems += review._merge_problems(tree.worktree_path(root, parent.ticket), conf, root)
-    # 苦情が在れば、残りを言って止まる。
-    if problems:
-        stderr.write("ccnavi: まだ Draft を解除できません:\n")
-        for p in problems:
-            stderr.write(f"  - {p}\n")
-        stderr.write(
-            "全部片付けてから再実行してください。"
-            "まだ残るものを承知で早めに閉じるなら、ユーザがターミナルで "
-            f"'{settings.script_command(root, 'ccnavi-user-close-early.sh')} --reason <理由>' "
-            "を実行します。\n"
-        )
         return 1
     # MR の結果と、state の置き場を得る。
     result = review._result_with_mr(stderr, result_path)
@@ -134,6 +110,60 @@ def ready(
         return 1
     # 閉じた親子のチケットを手元の退避へ移す。条件は確かめてあり、今回の親は done/ にある。
     return _archive_closed(stdout, stderr, root, conf, parent, where, path, result.mr.number)
+
+
+def ready_gate(
+    stderr: TextIO, root: str, conf: settings.Settings, cwd: str
+) -> ticket_model.Ticket | None:
+    """ready の、ホストに聞かずに分かる前提の検査。通れば親。
+
+    親を閉じられること（`ops_close.close_problems`）、親の承認済みチケットが `done/` にあること、
+    ワークツリーの側の条件（`review._merge_problems`）。
+    本体（`ready`）と `check_ready` が同じものを通る。断ったときは理由のあとに `次:` を 1 行足す。
+    MR の状態（Draft か）は見ない。それは sh が取ってくる。
+    """
+    parent = review._parent_any(stderr, root, conf, cwd)
+    if parent is None:
+        return None
+    problems = ops_close.close_problems(root, conf, parent.ticket)
+    # 親のチケットが done/ に無いまま Draft を外すと、
+    # そのままマージされたときに done/ に親が無いまま親のブランチが消え、
+    # 親子のチケットの判定が「決まらない」になる。それを防ぐ（判定を厳しくする向き）。
+    if parent.state != ticket_model.DONE:
+        problems.append(
+            f"親 {parent.ticket} の承認済みチケットが {conf.approved}/{ticket_model.DONE}/"
+            " にありません"
+            f"（いまは {parent.state}/）。先に "
+            f"'{settings.script_command(root, 'ccnavi-ticket.sh')} finish {parent.ticket}' で"
+            "親を閉じ、コミットして push してから再実行してください"
+        )
+    problems += review._merge_problems(tree.worktree_path(root, parent.ticket), conf, root)
+    if not problems:
+        return parent
+    stderr.write("ccnavi: まだ Draft を解除できません:\n")
+    for p in problems:
+        stderr.write(f"  - {p}\n")
+    stderr.write(
+        "まだ残るものを承知で早めに閉じるなら、ユーザがターミナルで "
+        f"'{settings.script_command(root, 'ccnavi-user-close-early.sh')} --reason <理由>' "
+        "を実行します。\n"
+    )
+    stderr.write(texts.say(root, "NEXT_READY_REFUSED", {"parent": parent.ticket}) + "\n")
+    return None
+
+
+def check_ready(
+    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, cwd: str
+) -> int:
+    """`review ready --check`。`ready_gate` を通すだけ（何も書かない）。sh が取り込みの前に呼ぶ。
+
+    退避の打ち直し（前の回が退避を始めている）は、Draft かどうかをホストの結果で決めるので、
+    ここでは通して本体に任せる。
+    """
+    if _restarted_tree(root, conf, cwd) is None and ready_gate(stderr, root, conf, cwd) is None:
+        return 1
+    stdout.write("確認: ok（ready を打てる状態。何も変えていません）\n")
+    return 0
 
 
 def _archive_closed(
@@ -232,6 +262,22 @@ def _ready_note(conf: settings.Settings, parent: str, wrapped: dict | None) -> t
     return path, review._write_text(path, "\n".join(text) + "\n")
 
 
+def _restarted_tree(root: str, conf: settings.Settings, cwd: str) -> tree.Tree | None:
+    """cwd のワークツリーが、ready の退避を始めた後なら、そのツリー。
+
+    作業中に親が無く、始めた目印が今のツリーのもの。無ければ None。
+    Draft かどうかは見ない（`_archived_parent`）。"""
+    t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
+    if t is None or t.is_main:
+        return None
+    approved = settings.approved_dir(conf, t.root)
+    if os.path.lexists(os.path.join(approved, ticket_model.DOING, f"{t.name}.md")):
+        return None
+    if not archive.ready_started(root, t.project, t.name, t.root):
+        return None
+    return t
+
+
 def _archived_parent(
     root: str, conf: settings.Settings, cwd: str, result_path: str
 ) -> ticket_model.Ticket | None:
@@ -250,14 +296,10 @@ def _archived_parent(
     か、`done/` に残っている（退避が途中で止まった）とき。前の回が条件を確かめているので、
     打ち直しではワークツリーの側の条件だけを見て、残りを移す。
     """
-    t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
-    if t is None or t.is_main:
+    t = _restarted_tree(root, conf, cwd)
+    if t is None:
         return None
     approved = settings.approved_dir(conf, t.root)
-    if os.path.lexists(os.path.join(approved, ticket_model.DOING, f"{t.name}.md")):
-        return None
-    if not archive.ready_started(root, t.project, t.name, t.root):
-        return None
     result = review._result(io.StringIO(), result_path)
     if result is None or result.mr is None or result.mr.draft is not True:
         return None
@@ -465,7 +507,7 @@ def close_early(
     stdout.write(
         f"OK: {parent.ticket} を早めに閉じた。あとは親に、状態の移動をコミットし、"
         f"'ticket finish {parent.ticket}' で閉じて push し、"
-        "'ccnavi-review.sh ready' で Draft を解除させる"
+        f"'{ops.ready_command(root, parent.ticket)}' で Draft を解除させる"
         f"（`{ticket_places.WIP_ROOT}/` の追跡済みのファイルは ready が削除します）\n"
     )
     return 0
@@ -599,7 +641,12 @@ def _settle(
     """
     cancelled: list[str] = []
     for t in left.todo:
-        if ops.cancel(stdout, stderr, root, conf, t.ticket, f"close-early: {reason.strip()}") != 0:
+        if (
+            ops.cancel(
+                stdout, stderr, root, conf, t.ticket, f"close-early: {reason.strip()}", advise=False
+            )
+            != 0
+        ):
             return None
         cancelled.append(t.ticket)
     skipped: list[int] = []

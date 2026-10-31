@@ -80,14 +80,14 @@ test("CB-T462 フェーズの見本は、work と feedback、inherit と glob、
     assert.equal(new Set(phases.map((phase) => phase.id)).size, phases.length);
     assert.equal(new Set(phases.map((phase) => phase.title)).size, phases.length);
     assert.ok(phases.some((phase) => phase.kind === "work") && phases.some((phase) => phase.kind === "feedback"));
-    assert.ok(phases.filter((phase) => phase.kind === "feedback").every((phase) => phase.review === "mr"), "feedback は mr");
+    assert.ok(phases.filter((phase) => phase.kind === "feedback").every((phase) => phase.review === true), "feedback は true");
     assert.ok(phases.some((phase) => phase.inherit) && phases.some((phase) => !phase.inherit));
   }
   const phases = sample.page.model.form.phases;
   assert.ok(phases.some((phase) => phase.agent !== "" && phase.when !== ""), "補足を両方書いた定義");
   assert.ok(phases.some((phase) => phase.agent === "" && phase.when !== ""), "使う場面だけの定義");
   assert.ok(phases.some((phase) => phase.deliverables.length > 0) && phases.some((phase) => phase.deliverables.length === 0));
-  assert.ok(phases.some((phase) => phase.review === "none"), "review none の定義");
+  assert.ok(phases.some((phase) => phase.review === false), "review false の定義");
   assert.equal(phases.filter((phase) => phase.kind === "feedback").length >= 2, true, "feedback の使い分けを見せるには 2 つ要る");
   assert.deepEqual(
     phases.map((phase) => phase.origin),
@@ -192,6 +192,6 @@ test("CB-T467 見本の形が壊れていれば、読み取りが名指しして
   assert.throws(() => parsePhasesSample({ ...base, project: undefined }), /sample\.project/);
   // 区分と既定のレビューは、実際の読み取りと同じ既定（work / mr / inherit）に落ちる
   const one = parsePhasesSample({ ...base, phases: { version: 1, phases: { x: { kind: "nonsense" } } } });
-  assert.deepEqual(one.page.model.form.phases[0], { origin: 0, id: "x", title: "", kind: "work", review: "mr", inherit: true, scope: [], deliverables: [], agent: "", when: "" });
+  assert.deepEqual(one.page.model.form.phases[0], { origin: 0, id: "x", title: "", kind: "work", review: true, inherit: true, scope: [], deliverables: [], agent: "", when: "" });
   assert.deepEqual(readPhases(stringify({ version: 1, phases: { x: { kind: "nonsense" } } })).model.form.phases[0], one.page.model.form.phases[0]);
 });

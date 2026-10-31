@@ -48,7 +48,7 @@ export function page(overrides: Partial<RiskPage> = {}): RiskPage {
     riskPath: ".ccnavi/config/common/risks.yml",
     exists: true,
     model: readRisk(RISK).model,
-    lock: { locked: false, reason: "", doing: [] },
+    lock: { locked: false, reason: "", doing: [], turns: [] },
     ...overrides,
   };
 }

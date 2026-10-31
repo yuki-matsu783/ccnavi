@@ -33,8 +33,8 @@ import type { Lock } from "../../src/core/lock.js";
 import { fixture } from "../helpers/fixture.js";
 import { entry, list, sampleEntries } from "../helpers/handoff.js";
 
-const OPEN: Lock = { locked: false, reason: "", doing: [] };
-const LOCKED: Lock = { locked: true, reason: "作業中のチケットがあります（T1）", doing: ["T1"] };
+const OPEN: Lock = { locked: false, reason: "", doing: [], turns: [] };
+const LOCKED: Lock = { locked: true, reason: "作業中のチケットがあります（T1）", doing: ["T1"], turns: [] };
 
 /** 見るだけの答えの JSON（実行ファイルの標準出力と同じ文字列） */
 function listText(overrides: Record<string, unknown> = {}): string {
@@ -274,15 +274,12 @@ test("CB-T1118 見るツリーの錠は、プロジェクトならそのプロ�
   assert.ok(main !== undefined);
   const whole = lockForTree(board, main);
   const doing = board.tickets.filter((t) => t.in_progress === true).map((t) => t.ticket);
-  assert.equal(whole.locked, doing.length > 0 || board.tickets.some((t) => t.in_progress === null));
+  assert.equal(whole.locked, doing.length > 0);
   // 別のプロジェクトの作業中は、そのプロジェクトのツリーを止めない
   const other = { name: "lib", root: "/ws/projects/lib", project: "lib", kind: "project" } as const;
   const noDoing = { ...board, tickets: board.tickets.map((t) => ({ ...t, project: "other", in_progress: true })) };
   assert.equal(lockForTree(noDoing, other).locked, false);
   assert.equal(lockForTree(noDoing, main).locked, true);
-  // 作業中かを答えない古い実行ファイルは、止める側
-  const unknown = { ...board, tickets: board.tickets.map((t) => ({ ...t, project: "lib", in_progress: null })) };
-  assert.equal(lockForTree(unknown, other).locked, true);
 });
 
 test("CB-T1119 一覧の見本は、種類と状態を網羅している（画面のテストが同じ見本を使う）", () => {
@@ -291,15 +288,8 @@ test("CB-T1119 一覧の見本は、種類と状態を網羅している（画�
   assert.deepEqual([...new Set(entries.map((e) => e.state))].sort(), ["changed", "new", "unchanged"]);
 });
 
-test("CB-T1228 ignored_paths は形が正しいときだけ読む（欄なし・配列でない・欠けた欄は件数だけ）", () => {
-  const read = (overrides: Record<string, unknown>) => {
-    const parsed = parseHandoffList(listText(overrides));
-    assert.ok(parsed.ok);
-    return parsed.ok ? parsed.value : undefined;
-  };
-  assert.deepEqual(read({ ignored_paths: [{ path: "a.sh", why: "not-allowed" }] })?.ignored_paths, [{ path: "a.sh", why: "not-allowed" }]);
-  assert.equal(read({})?.ignored_paths, undefined);
-  assert.equal(read({ ignored_paths: "x" })?.ignored_paths, undefined);
-  assert.equal(read({ ignored_paths: [{ path: "a.sh" }] })?.ignored_paths, undefined);
-  assert.equal(read({ ignored_paths: [{ why: "linked-dir" }] })?.ignored_paths, undefined);
+test("CB-T1228 ignored_paths は対象外の名前と理由を読む", () => {
+  const parsed = parseHandoffList(listText({ ignored_paths: [{ path: "a.sh", why: "not-allowed" }] }));
+  assert.ok(parsed.ok);
+  assert.deepEqual(parsed.ok ? parsed.value.ignored_paths : undefined, [{ path: "a.sh", why: "not-allowed" }]);
 });

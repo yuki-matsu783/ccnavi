@@ -101,7 +101,7 @@ function sumOf(raw: unknown, index: number): RiskSum {
 export function parseRiskSample(raw: unknown): RiskSample {
   const root = object(raw, "sample");
   const path = str(root.path);
-  const unlocked = { locked: false, reason: "", doing: [] };
+  const unlocked = { locked: false, reason: "", doing: [], turns: [] };
   const sums = Array.isArray(root.sums) ? root.sums.map((item, index) => sumOf(item, index)) : [];
   const page: RiskPage = {
     root: "",

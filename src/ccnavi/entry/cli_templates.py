@@ -22,7 +22,7 @@ from typing import TextIO
 
 from ..infra import settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
-from ..policy import ruleload
+from ..policy import ruleload, texts
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN
 from ..tickets.proposal import plan_templates
 from ..tickets.sync import handoff, template_drafts
@@ -332,12 +332,8 @@ def _draft(
     for problem in made.problems:
         stdout.write(f"  {_label(problem.severity)} {problem.detail}\n")
     stdout.write(
-        "次: description と when を固有名の無い言い方に直し、計画とフローの不要な手順を削る。"
-        "効力が無い下書きで、取り込む（利用できるようにする）のはユーザ\n"
-        f"案内: 取り込みは、ユーザがこのツリー（{made.tree_root}）で "
-        f"`ccnavi-user-handoff.sh {made.target}` を打って行う\n"
-        "案内: 下書きは未追跡のファイルで、残っていると親の ready が止まる。取り込むか、"
-        "ready の前に下書きを削除します（またはコミットする）\n"
+        texts.say(root, "NEXT_TEMPLATE_DRAFT", {"target": made.target, "tree_root": made.tree_root})
+        + "\n"
     )
     return EXIT_OK
 
@@ -406,7 +402,9 @@ def _show(
             if item["after"]:
                 extra.append("after " + ", ".join(str(n) for n in item["after"]))
             if item["review"]:
-                extra.append(f"review {item['review']}")
+                extra.append("review true")
+            if item["deferred"]:
+                extra.append("deferred true")
             tail = f"（{'; '.join(extra)}）" if extra else ""
             stdout.write(f"    {item['index']}. {item['type']}{tail}\n")
     if row["flows"]:

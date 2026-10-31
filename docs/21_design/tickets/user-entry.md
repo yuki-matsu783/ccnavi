@@ -83,7 +83,7 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 印が無い `user <操作>` は、設定を読んでガードを解いた直後に、見るだけの形も含めて断る（`direct_refusal`。終了コード 2）。
 断りの文は、その操作の sh を案内する。`CCNAVI_GUARD_TICKET_APPROVAL=disable` のときは印が無くても通す。これは端末要求を切る
 切り替えと同じで、テストと端末の無い実行環境のための逃げ道。印は断りの案内を出すための印で、守りではない。エージェントが打つ形は
-hook が止める。`--version --json` の `features` に `entry-marker` を持つ。
+hook が止める。
 
 `ccnavi-review.sh decide <N> --preview`（一覧を見るだけ）は `ccnavi-review.sh` に残る。書く処理（返信・解決・マーカーを置く呼び出し）は
 `ccnavi-user-*.sh` の中だけに置き、共通のファイルには読む側と、エージェントも使うホスト API の関数だけを置く。
@@ -102,7 +102,7 @@ argparse が読んだ後、`entry` が空（`user` の外）で、`user_only.ref
 `unless` の条件にヒットする形（`--agree --preview`、`--prune --preview`、`--reviewed … --preview`）は断らない。`--handoff` と `--mirror` は `--yes` の有無によらず断る。
 断りの文は、対応する sh（`ccnavi-user-agree.sh` など。`Verb` の `script`）と、見るだけの形があればそれを案内する。
 
-`--version --json` は互換の版（`compat`）19 を返し、`features` に `user-entry`・`entry-marker`・`handoff`・`mirror` を持つ。
+`--version --json` は互換の版（`compat`）20 を返す。
 
 #### hook の止め
 

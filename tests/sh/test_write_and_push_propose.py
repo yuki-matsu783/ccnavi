@@ -679,9 +679,8 @@ class WriteAndPushNoStateTest(WriteAndPushHarness):
         self.assertIn(f"{APPROVED}/doing/{PARENT}.md", self.dirty())
 
 
-class WriteAndPushWithoutMrTest(WriteAndPushHarness):
-    """10. マージリクエストで見るフェーズが無い親子のチケットも write-and-push
-    の対象（外した条件）。"""
+class WriteAndPushNoReviewPlanTest(WriteAndPushHarness):
+    """10. レビューで見るフェーズが無い計画の親子のチケットも write-and-push の対象。"""
 
     plan = ("research",)
 

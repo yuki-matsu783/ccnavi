@@ -150,6 +150,25 @@ def check_child_push(
     return "", "", ""
 
 
+def git_calls(
+    cwd: str, subject: str, degraded: str, sub: str
+) -> list[tuple[list[str], str | None]]:
+    """コマンド行の `ccnavi-git.sh <sub>` の呼び出しごとの（サブコマンドの後ろの引数, 走る場所）。
+
+    走る場所は payload の cwd から `cd` と実行役の行き先を追った先。追えなければ None。
+    読み切れないコマンド行（`degraded`）は空。
+    """
+    if degraded or not cwd:
+        return []
+    found: list[tuple[list[str], str | None]] = []
+    for words, here in shellread.placed(subject):
+        call = _script_call_at(words)
+        if not call or not _is_git_script(call[0]) or call[1][:1] != [sub]:
+            continue
+        found.append((call[1][1:], _call_place(cwd, here, call[2])))
+    return found
+
+
 # サブエージェントが親のワークツリーで打てないラッパーのサブコマンド。
 # 親のワークツリーの中身・
 # 索引・ブランチの先頭を動かすもの。読むサブコマンド（status・log・diff など）は止めない。

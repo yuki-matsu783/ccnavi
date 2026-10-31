@@ -300,9 +300,9 @@ class PhaseTest(PhaseHarness):
         self.assertTrue(any("表示名" in p.detail for p in problems), problems)
         # フィードバック対応はユーザが見ない経路を作らない。
         _, problems = phasetypes.parse(
-            "version: 1\nphases:\n  fb: {title: 対応, kind: feedback, review: none}\n"
+            "version: 1\nphases:\n  fb: {title: 対応, kind: feedback, review: false}\n"
         )
-        self.assertTrue(any("review: none" in p.detail for p in problems), problems)
+        self.assertTrue(any("review: false" in p.detail for p in problems), problems)
         # `chat` は廃止した値。読めない。
         _, problems = phasetypes.parse(
             "version: 1\nphases:\n  fb: {title: 対応, kind: feedback, review: chat}\n"
@@ -347,7 +347,7 @@ class PhaseTest(PhaseHarness):
             text = f.read()
         self.assertIn("plan:", text)
         self.assertIn("research", text)
-        self.assertIn("defer", text)
+        self.assertIn("deferred: true", text)
         result = self.ccnavi("--explain")
         self.assertIn("局面: 作業中（1（調査））", result.stdout)
         self.assertIn("フェーズ 2（設計）: 未計画", result.stdout)
@@ -755,7 +755,7 @@ class PhaseTest(PhaseHarness):
         )
         self.assertEqual(last.returncode, 0, last.stderr)
         last_preview = json.loads(last.stdout)
-        self.assertTrue(last_preview["can_issue"])
+        self.assertNotIn("can_issue", last_preview)
         settled = self.ccnavi(
             "--cwd",
             self.parent_tree,
@@ -818,7 +818,7 @@ class PhaseTest(PhaseHarness):
         )
         self.assertEqual(shown.returncode, 0, shown.stderr)
         preview = json.loads(shown.stdout)
-        self.assertTrue(preview["can_issue"])
+        self.assertNotIn("can_issue", preview)
         choices = json.dumps({"u/7#t0": "keep", "u/7#t1": "issue"})
         self.assertNotEqual(self.confirm(fixture, 2).returncode, 0)
         done = self.ccnavi(
@@ -867,6 +867,25 @@ class PhaseTest(PhaseHarness):
             stdin=answer + "\n",
         )
 
+    def test_check_stops_review_confirm_and_ready_without_writing(self):
+        """`--check review confirm` は依頼の記録が無ければ 1 と `次:` を返す。`--check review ready`
+        は条件を満たさなければ 1 を返す。"""
+        self.family(plan=["design"])
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        fixture = self.remote()
+        checked = self.ccnavi(
+            "--check", "--cwd", self.parent_tree, "--phase", "1", "review", "confirm",
+            "--result", fixture,
+        )  # fmt: skip
+        self.assertEqual(checked.returncode, 1, checked.stderr)
+        self.assertIn("次:", checked.stderr)
+        checked = self.ccnavi(
+            "--check", "--cwd", self.parent_tree, "review", "ready", "--result", fixture
+        )
+        self.assertEqual(checked.returncode, 1, checked.stderr)
+
     def test_ready_needs_the_parent_to_be_closable(self):
         """Draft を外せるのは、親を閉じられる状態と同じ。閉じたあとでも打てる。"""
         self.family(plan=["design"])
@@ -909,9 +928,9 @@ class PhaseTest(PhaseHarness):
         self.assertIn("合意した範囲に入る", closed.stdout)
         self.assertIn("確認を取り直さずに進める", closed.stdout)
         self.assertIn("squash", closed.stdout)
-        # 閉じた記録は進め方によらず置く。
+        # 閉じた記録（どのフェーズをどこで見たか）を置く。
         record = read_json(os.path.join(self.approved, "phases", "i0001", "closed.json"))
-        self.assertEqual(record["reviews"], {"1": "mr"})
+        self.assertEqual(record["reviews"], {"1": True})
         self.commit_parent("状態の移動")
         # push していなければまだ外せない。
         refused = self.ready(fixture)
@@ -1363,7 +1382,7 @@ phases:
   open:
     kind: work
     title: 自由
-    review: none
+    review: false
     scope: inherit
 """
 
@@ -1394,16 +1413,16 @@ class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
     """`ticket` のサブコマンドに `--phases` を足しても、定義は共通レイヤーのまま（issue #65）。
 
     `.ccnavi/scripts/ccnavi-ticket.sh` が引数をそのまま渡すので、この形はエージェントが
-    Bash で打てる。通していた頃は、`review: mr` の定義を `review: none` と宣言する
+    Bash で打てる。通していた頃は、`review: true` の定義を `review: false` と宣言する
     ファイルに差し替えて、レビュー待ちを飛ばせた。
     """
 
     def test_a_phases_flag_on_ticket_done_does_not_drop_the_review(self):
-        # 同じ `design` を `review: none` と宣言するファイル。
+        # 同じ `design` を `review: false` と宣言するファイル。
         loose = write(
             os.path.join(self.root, "loose.yml"),
             "version: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n"
-            '    review: none\n    scope: ["wip/design/*"]\n',
+            '    review: false\n    scope: ["wip/design/*"]\n',
         )
         self.family(plan=["design"])
         self.propose(
@@ -1417,7 +1436,7 @@ class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
 
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("--phases は診断", closed.stderr, "無視したことを言っていない")
-        # `review: mr` のまま。閉じた先はレビュー待ちで、`.ccnavi/approved/done/` ではない。
+        # `review: true` のまま。閉じた先はレビュー待ちで、`.ccnavi/approved/done/` ではない。
         self.assertTrue(
             os.path.exists(
                 os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-01.md")

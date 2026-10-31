@@ -41,10 +41,10 @@ export function formOf(draft: Draft): PhasesForm {
 
 /**
  * 新しい定義。既定の範囲は inherit（`scope: []` の定義を、glob を埋め忘れただけで作らないため）。
- * レビューは mr（足した定義が気づかないうちにレビュー無しにならないように）。
+ * レビューは true（足した定義が気づかないうちにレビュー無しにならないように）。
  */
 export function emptyPhase(): PhaseForm {
-  return { origin: null, id: "", title: "", kind: "work", review: "mr", inherit: true, scope: [], deliverables: [], agent: "", when: "" };
+  return { origin: null, id: "", title: "", kind: "work", review: true, inherit: true, scope: [], deliverables: [], agent: "", when: "" };
 }
 
 /**

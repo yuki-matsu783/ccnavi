@@ -18,164 +18,16 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import stat
 import subprocess
-import sys
 import unittest
-from unittest import mock
 
-from ccnavi.entry import version
 from ccnavi.tickets.model import oplog
-from tests import ROOT
+from tests.sh import decide_support as support
 from tests.sh import test_review_decide as base
 
 GitLab = base.GitLab
 
-# 実行ファイルの代役。`ops` は本物へ渡す。`--accept-plan` は本物の操作記録に判断を保存して
-# 計画を書き、`--yes` は計画の操作ID に「適用した」を記録する。
-STUB = """#!/bin/sh
-case " $* " in
-*" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
-*" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
-*" ops "*) exec "$STUB_PY" -m ccnavi "$@" ;;
-esac
-printf '%s\\n' "$*" >>"$STUB_LOG"
-root="$2"
-case " $* " in
-*" --accept-plan "*)
-  plan=""; prev=""
-  for a in "$@"; do [ "$prev" = --accept-plan ] && plan="$a"; prev="$a"; done
-  "$STUB_PY" "$STUB_BEGIN" "$root/logs/state" "$plan" "$STUB_MRURL" ;;
-*" --yes "*)
-  [ -z "$STUB_FAIL_YES" ] || { echo "置けない" >&2; exit 1; }
-  done_plan=""; prev=""
-  for a in "$@"; do [ "$prev" = --accept-done ] && done_plan="$a"; prev="$a"; done
-  op=$(sed -n 's/.*"op": "\\([0-9a-f]*\\)".*/\\1/p' "$done_plan")
-  [ -z "$op" ] || "$STUB_PY" -m ccnavi --root "$root" ops applied "$op" local true
-  printf '{"version":2,"ok":true,"reviewed":true,"followup":""}\\n' ;;
-esac
-"""
-
-# 操作記録を作って受け入れの計画を書く（`--accept-plan` の代役）。
-BEGIN = """import json
-import sys
-
-from ccnavi.tickets.model import oplog
-
-state, plan, mr_url = sys.argv[1:4]
-op = oplog.begin(
-    state,
-    "decide",
-    repo={"host": "gitlab", "mr_url": mr_url},
-    parent="i0001",
-    phase=1,
-    mr=1,
-    shown=[
-        {"key": "u1", "id": "d1", "url": "u1", "path": "a.py", "line": 3, "version": "v1",
-         "body": "指摘の本文\\n```py\\nx\\n```"},
-    ],
-    choices={"u1": "issue"},
-    plan={"digest": "d0"},
-    stages=[("reply", "reply"), ("issue", "issue"), ("note", "comment")],
-)
-body = {
-    "version": 1,
-    "digest": "d0",
-    "op": op,
-    "threads": [{"id": "d1", "key": "u1", "reply": "<!-- ccnavi:accept -->\\nok\\n"}],
-}
-with open(plan, "w", encoding="utf-8") as f:
-    json.dump(body, f)
-"""
-
-# 代役のホストが覚えている投稿。
-STORE: dict = {}
-
-
-def reset_store() -> None:
-    STORE.clear()
-    STORE.update(
-        issues=[],
-        notes=[],
-        issue_notes=[],
-        user="me",
-        # 保存してから 500 を返す種類（送れたのに応答だけ失敗した形）
-        lost_response=set(),
-        # 保存せずに 500 を返す種類
-        reject=set(),
-    )
-
-
-def _item(kind: str, data: dict, url: str, ident: int) -> dict:
-    return {
-        "id": ident,
-        "iid": ident,
-        "web_url": url,
-        "body": data.get("body", ""),
-        "description": data.get("description", ""),
-        "author": {"username": STORE["user"]},
-    }
-
-
-def do_get(self):
-    path = self.path
-    if path.split("?")[0].endswith("/user"):
-        self.reply(200, {"username": STORE["user"]})
-        return
-    if "per_page" in path:
-        page1 = "page=1" in path
-        if "/merge_requests/1/notes" in path:
-            self.reply(200, STORE["notes"] if page1 else [])
-            return
-        if "/issues/1/notes" in path:
-            self.reply(200, STORE["issue_notes"] if page1 else [])
-            return
-        if "/issues?" in path:
-            self.reply(200, STORE["issues"] if page1 else [])
-            return
-    ORIGINAL_GET(self)
-
-
-def do_post(self):
-    path = self.path
-    if "/discussions/" in path:
-        # 返信は元の代役に任せる
-        ORIGINAL_POST(self)
-        return
-    length = int(self.headers.get("Content-Length", "0") or 0)
-    data = json.loads(self.rfile.read(length) or b"{}")
-    if path.endswith("/issues"):
-        kind, store, url = (
-            "issue",
-            STORE["issues"],
-            f"http://127.0.0.1:{self.port}/demo/greeter/-/issues/1",
-        )
-        entry = _item(kind, data, url, 1)
-        reply = {"iid": 1, "web_url": url}
-    elif path.endswith("/issues/1/notes"):
-        kind, store = "issue-note", STORE["issue_notes"]
-        entry = _item(kind, data, f"{path}#note_{len(store) + 20}", len(store) + 20)
-        reply = {"id": entry["id"]}
-    elif path.endswith("/notes"):
-        kind, store = "note", STORE["notes"]
-        entry = _item(kind, data, f"{path}#note_{len(store) + 30}", len(store) + 30)
-        reply = {"id": entry["id"], "created_at": "2026-09-23T00:00:00Z"}
-    else:
-        self.reply(405, {"message": "405"})
-        return
-    if kind in STORE["reject"]:
-        self.reply(500, {"message": "500 boom"})
-        return
-    store.append(entry)
-    GitLab.posted.append((kind, data))
-    if kind in STORE["lost_response"]:
-        self.reply(500, {"message": "500 lost"})
-        return
-    self.reply(201, reply)
-
-
-ORIGINAL_GET = GitLab.do_GET
-ORIGINAL_POST = GitLab.do_POST
+STORE = support.STORE
 
 
 @unittest.skipIf(
@@ -184,29 +36,12 @@ ORIGINAL_POST = GitLab.do_POST
 class DecideOpsShTest(unittest.TestCase):
     def setUp(self):
         base.ReviewDecideShTest.setUp(self)
-        reset_store()
-        for target, name in ((GitLab, "do_GET"), (GitLab, "do_POST")):
-            patcher = mock.patch.object(target, name, {"do_GET": do_get, "do_POST": do_post}[name])
-            patcher.start()
-            self.addCleanup(patcher.stop)
-        self.begin = os.path.join(self.work, "begin_op.py")
-        with open(self.begin, "w", encoding="utf-8") as f:
-            f.write(BEGIN)
-        with open(self.stub, "w", encoding="utf-8") as f:
-            f.write(STUB.replace("{compat}", str(version.COMPAT)))
-        os.chmod(self.stub, os.stat(self.stub).st_mode | stat.S_IXUSR)
-        self.mr_url = f"http://127.0.0.1:{GitLab.port}/demo/greeter/-/merge_requests/1"
 
     # 既存の道具を借りる。
     calls = base.ReviewDecideShTest.calls
 
     def run_decide(self, *args: str, stdin: str = "", **extra: str):
-        env = dict(
-            STUB_PY=sys.executable,
-            STUB_BEGIN=self.begin,
-            STUB_MRURL=self.mr_url,
-            PYTHONPATH=os.path.join(ROOT, "src"),
-        )
+        env = support.stub_env(self)
         env.update(extra)
         return self.decide_with_input(args, stdin, env)
 

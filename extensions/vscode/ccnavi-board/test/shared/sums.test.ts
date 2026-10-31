@@ -17,7 +17,7 @@ test("CB-T307 統合結果は実行ファイルの sums[] をそのまま渡す�
   assert.deepEqual(risk[1].factors.map((f) => [f.id, f.source, f.value]), [["big-diff", "common", "300"], ["schema", "lib", "db/**"]]);
   assert.deepEqual(risk[1].levels, { medium: 20, high: 40, critical: 50 });
   assert.equal(risk[0].levels.critical, 70);
-  // ボードを読めなかったとき（undefined）と、sums が無い古い実行ファイルでは空
+  // ボードを読めなかったとき（undefined）は空
   assert.deepEqual(rulesSums(undefined), []);
   assert.deepEqual(riskSums(undefined), []);
 });

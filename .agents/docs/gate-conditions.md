@@ -18,6 +18,12 @@ ccnavi の開発で、操作を止める条件を足す・直すとき、実装�
 - 「どの操作がどの条件を見るか」は、条件の側で宣言する。操作の側に条件を書き並べない。条件を足したら、見る操作を宣言に足す
 - 条件が返すのは、理由と次の一手を持つ共通の形（Problem）。表示（ターミナルの文・ボードの JSON・案内）は、その結果を言い換えるだけにする。表示の入口が複数あっても、判定の実装は 1 つ
 
+`start`・`finish`・`cancel`・`consolidate` の書く前の検査は、`lifecycle/commands.py` の `start_gate`・`finish_gate`・`cancel_gate` と `consolidate.py` の `gate` に置き、本体と `--check`（sh が取り込みの前に呼ぶ）が同じ関数を通る。合流のあとでないと分からない検査だけが本体に残る。
+
+`review-request` の前提は `tickets/review/request.py` の `request_gate`、`decide` の依頼の記録・動きの検査は `tickets/review/decide.py` の `decide_gate` に置く。本体と `--check`（`ccnavi --check review prepare`・`ccnavi --entry sh --check user reviewed N --accept-unresolved`。sh がロック・取り込みの前に呼ぶ）が同じ関数を通る。`approval-request`・`review confirm`・`ready` も同じ型で、sh がロック・取り込みの前に `--check` を呼び、本体と同じ関数で断る（`confirm_gate`・`ready_gate`。断るときは `次:` を足す。`ready --check` は、前の回が退避を始めている打ち直しなら通して本体に任せる。Draft かどうかはホストの結果が要る）。マージリクエストの有無など、ホストの API が要る条件は事前には判断しない。
+
+親のワークツリーの未コミットの変更と親ブランチの未 push は、`lifecycle/treegate.py`（`check`）に寄せた。操作が見る条件は `WATCHES` に宣言する。git の呼び出しが重複していないことは `tests/core/test_gate_single_source.py`、操作ごとの拒否は `tests/core/test_treegate.py` が守る。置き場の判定は `ticket_places.is_ticket_place` に一本化した。
+
 ## ユーザに頼む操作は、後の関門で止まる条件を先に拒否する
 
 承認を頼む操作（`approval-request`）とレビューを頼む操作（`review-request`）は、ユーザが次の一手を打てる状態でなければ、何も送らずに拒否する。
@@ -25,6 +31,15 @@ ccnavi の開発で、操作を止める条件を足す・直すとき、実装�
 - 頼んだあとに、ユーザが拒否を見る、または承認・レビューのあとで作業が止まる、という往復を作らない
 - 承認やレビューのあとに操作（`start`・`finish`・`ready` など）を止める条件のうち、頼む時点で分かるもの（環境だけで決まるもの）は、頼む操作も同じ関数で調べる。後の関門に条件を足したら、頼む操作にも足す。足し忘れは、関数を共有していれば起きない
 - `--check` は、頼む操作と同じ拒否条件を通すだけの読み取り専用の入口。条件を別に持たない
+
+## 開始前に分かる条件は、何も変えずに最初に断る
+
+操作を止める条件のうち、操作を始める前に分かるもの（cwd・ファイルの有無・git の状態・引数の形・ローカルの記録）は、処理に入る前に断る。副作用（ファイルの書き込み・移動・git の変更・ホストへの投稿）のあとで気づいて案内を出すと、直す側は「どこまで進んだか」を読み取る手間を負う。
+
+- 断るときは、何も変えず、`次:` で直し方を示す。エージェントが案内どおり直して打ち直せば済む形にする
+- 判定は、最初に断る側と、あとの処理が使う側で同じ関数を共用する（同じ条件を 2 か所に書かない）
+- 実行して結果を見ないと分からない条件（git の結果・ホストの API・入出力の失敗）は、途中で止めてよい。ホストの API のように事前確認の口が無いものは、最初には判断できない
+- 理由と実例は ADR-0217
 
 ## 条件を足す・直すときの手順
 
@@ -65,5 +80,3 @@ ccnavi の開発で、操作を止める条件を足す・直すとき、実装�
 次は、同じ条件が別々に書かれている箇所。上の決まりに沿って 1 つに寄せる。
 
 - 子が親に合流済みか: `write_and_push_merge.py:plan` と `review/request.py:_unmet`
-
-親のワークツリーの未コミットの変更と親ブランチの未 push は、`lifecycle/treegate.py`（`check`）に寄せた。操作が見る条件は `WATCHES` に宣言する。git の呼び出しが重複していないことは `tests/core/test_gate_single_source.py`、操作ごとの拒否は `tests/core/test_treegate.py` が守る。置き場の判定は `ticket_places.is_ticket_place` に一本化した。

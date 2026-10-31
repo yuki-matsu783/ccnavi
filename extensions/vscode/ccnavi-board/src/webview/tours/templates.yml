@@ -33,11 +33,11 @@ sample:
           review: required
           after: []
         - type: implement
-          review: none
+          review: false
           after: [0]
       feedback:
         - type: fix
-          review: none
+          review: false
           after: []
       flows:
         - name: implement
@@ -52,7 +52,7 @@ sample:
       when: 先に調べてから決めるとき
       plan:
         - type: investigate
-          review: none
+          review: false
           after: []
       dropped:
         reason: conflict

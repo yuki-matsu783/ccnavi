@@ -38,7 +38,7 @@ test("CB-T1135 埋め込みの JSON に data が入り、< は生で入らない
 });
 
 test("CB-T1136 呼ぶたびに渡された nonce が使われる", () => {
-  const data: HandoffData = { kind: "disabled", reason: "古い版です" };
+  const data: HandoffData = { kind: "error", error: "読めません" };
   const a = render(data, "AAAA");
   const b = render(data, "BBBB");
   assert.ok(a.includes('nonce="AAAA"') && !a.includes("BBBB"));

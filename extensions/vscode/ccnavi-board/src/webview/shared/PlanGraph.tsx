@@ -17,7 +17,7 @@
  * `withLayout`）。計画編集タブは、番号が振り直っても点を動かさないためにこれを使う。開いたときの見え方
  * （全体を枠に収める）は `fitKey` が変わったときだけ合わせ直す（渡さなければ計画が替わるたび）。
  *
- * **`detail` が真なら、ステップを押すと右に詳細の欄を出す**（計画編集タブ）。番号・定義・タイトル・見る場所・延期先・固定・
+ * `detail` が真なら、ステップを押すと右に詳細の欄を出す（計画編集タブ）。番号・定義・タイトル・レビューの要否・延期先・固定・
  * 先行と後続・すぐ始まるか・終端に届かないかを、実行ファイルの値のまま読むだけで出す（直すのは線）。欄は畳める
  * （畳んだかは画面が覚える）。
  *
@@ -72,19 +72,15 @@ type EndNode = Node<ItemData, "planEnd">;
 type PlanNode = ItemNode | EndNode;
 
 /**
- * 見る場所の言葉。同じオーバーレイの本文（承認画面。`agree_screen.py`）の「レビュー不要」
- * 「レビュー要: マージリクエスト」を、点の幅に収まる短さにしたもの。
- * 知らない表記はそのまま出す
+ * レビューの要否の言葉。同じオーバーレイの本文（承認画面。`agree_screen.py`）の「レビュー不要」
+ * 「レビュー必須: マージリクエスト」を、点の幅に収まる短さにしたもの。
+ * 定義が読めない（null）なら「?」
  */
-function reviewText(review: string): string {
-  switch (review) {
-    case "none":
-      return "レビュー不要";
-    case "mr":
-      return "レビュー必須（MR）";
-    default:
-      return `レビュー: ${review === "" ? "?" : review}`;
+function reviewText(review: boolean | null): string {
+  if (review === null) {
+    return "レビュー: ?";
   }
+  return review ? "レビュー必須（MR）" : "レビュー不要";
 }
 
 /** 延期したステップの言葉。本文の先行の一覧（「レビューは 4 と一緒に」）と同じ言い方 */
@@ -92,7 +88,7 @@ function deferText(reviewAt: number | null): string {
   return reviewAt === null ? "レビューを受け持つステップがありません" : `レビューは ${reviewAt} と一緒に`;
 }
 
-/** ステップの点。番号・定義のタイトル・見る場所と、延期・固定・終端に届かない印 */
+/** ステップの点。番号・定義のタイトル・レビューの要否と、延期・固定・終端に届かない印 */
 function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
   const { node, editable } = data;
   const title = [
@@ -116,11 +112,11 @@ function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
       <span className="plan-node-number">{node.number}</span>
       <span className="plan-node-title">{node.label}</span>
       <span className="plan-node-tags">
-        {/* 延期したステップは見る場所を出さず、引き受け手を言う（本文も延期したステップに見る場所を書かない） */}
+        {/* 延期したステップはレビューの要否を出さず、引き受け手を言う（本文も延期したステップにレビューの要否を書かない） */}
         {node.deferred ? (
           <span className="tag deferred">{deferText(node.reviewAt)}</span>
         ) : (
-          <span className="tag" data-review={node.review}>
+          <span className="tag" data-review={String(node.review)}>
             {reviewText(node.review)}
           </span>
         )}
@@ -345,7 +341,7 @@ function Detail({ plan, graph, id }: { readonly plan: ApprovePlan; readonly grap
     ["提案での番号", node.from === null ? "" : String(node.from)],
     ["タイトル", node.label],
     ["定義", node.type],
-    ["見る場所", node.deferred ? deferText(node.reviewAt) : reviewText(node.review)],
+    ["レビュー", node.deferred ? deferText(node.reviewAt) : reviewText(node.review)],
     ["先行ステップ", listOf(before)],
     ["後続ステップ", listOf(after)],
     ["すぐ始まる", plan.ready.includes(number) ? "はい" : "いいえ"],

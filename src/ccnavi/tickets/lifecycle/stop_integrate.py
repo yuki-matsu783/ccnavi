@@ -16,7 +16,8 @@
 `direct_candidates`）。チケット制御の有無は問わない。1 本のツリーが次の全部を満たすとき。
 
 - `.claude/worktrees/<名前>` のワークツリーで、今のブランチが名前と同じ
-- チケットに結び付かない。`ccnavi-git.sh integrate` と同じ判定（`bound_reason`。全ツリーの
+- チケットに結び付かない。`ccnavi-git.sh integrate` と同じ判定（`bound_reason`。`direct_check` が、
+  その前に、ブランチ名と統合できる名前の確認を足す。全ツリーの
   承認済みチケット・提案の `<名前>.md`、手元の退避、origin に在る親のブランチのワークツリー。
   最後の1つは、直接作業の記録（`ccnavi-direct/<名前>`）があるワークツリーを外す）を
   使うので、促したのに `integrate` が断る食い違いは起きない
@@ -83,8 +84,8 @@ CODE_INTEGRATE_NUDGE = "NUDGE_INTEGRATE"
 # 記録のキーの頭。チケットの識別子・`request:` のキーと分ける。
 _KEY_HEAD = "integrate:"
 # `ccnavi-git.sh integrate` が記録を置く、統合先のツリーの git ディレクトリの中の名前。
-_RECORD_DIR = "ccnavi-integrate"
-_DONE_DIR = "ccnavi-integrate-done"
+RECORD_DIR = "ccnavi-integrate"
+DONE_DIR = "ccnavi-integrate-done"
 # 統合先のツリーで、あれば `integrate` が断る途中の操作の目印のうち、`tree.BUSY_MARKS` に無いもの。
 _SQUASH_MSG = "SQUASH_MSG"
 
@@ -107,7 +108,7 @@ class Direct:
     blocked: str = ""
     # 取り込み先のブランチ。記録があるときだけ入る（無いときは統合先で数える）。
     base: str = ""
-    # 記録が無い（更新前に切った・手で切った）。integrateは断るので、`--adopt` を案内する。
+    # 記録が無い（手で切った）。integrateは断るので、`--adopt` を案内する。
     no_record: bool = False
     # 取り込みの途中のmarker。"" なし、"v4" 版 4、"unknown" 版を知らない（壊れた記録）。
     marker: str = ""
@@ -246,17 +247,10 @@ def probe(
        UNKNOWN。統合先が決まらない・取り込み先のツリーが無いときは、ユーザに確かめる理由
        （`blocked`）を付けて HIT にする。
     6. 取り込みのマーカー（`marker_kind`）が版 4 なら CLEAR、版を知らなければ HIT。統合先に
-       同じ HEAD の記録（`_recorded`）があれば CLEAR。無ければ、統合先の作業の空き
+       同じ HEAD の記録（`has_record`）があれば CLEAR。無ければ、統合先の作業の空き
        （`_integration_busy`）を理由に HIT にする。
     """
-    branch = tree.branch_of(here.root)
-    if branch is None:
-        return Probe(UNKNOWN)
-    if branch != here.name:
-        return Probe(CLEAR, drop=True)
-    if not _integrable_name(here.name):
-        return Probe(CLEAR, drop=True)
-    reason, unsure = bound_check(root, conf, here, deadline)
+    reason, unsure = direct_check(root, conf, here, deadline)
     if reason:
         return Probe(CLEAR, drop=True)
     if unsure:
@@ -305,7 +299,7 @@ def probe(
             "どのツリーで取り込むかをユーザに確かめてください"
         )
         return Probe(HIT, found)
-    marks = _git_path(found.integ_tree, _RECORD_DIR, deadline)
+    marks = _git_path(found.integ_tree, RECORD_DIR, deadline)
     if marks is None:
         return Probe(UNKNOWN)
     found.marker = marker_kind(marks, here.name)
@@ -314,7 +308,7 @@ def probe(
     if found.marker:
         found.no_record = False
         return Probe(HIT, found)
-    recorded = _recorded(found.integ_tree, here.name, head, dirty, deadline)
+    recorded = has_record(found.integ_tree, here.name, head, dirty, deadline)
     if recorded is None:
         return Probe(UNKNOWN)
     if recorded:
@@ -401,7 +395,7 @@ def _probe_recorded(
             "違います。別のリポジトリの記録かもしれないので、操作せずユーザに確かめてください"
         )
         return Probe(HIT, found)
-    marks = os.path.join(rec["_common"], _RECORD_DIR)
+    marks = os.path.join(rec["_common"], RECORD_DIR)
     found.marker = marker_kind(marks, here.name)
     current = tree.branch_of(owner)
     if current != base:
@@ -426,17 +420,23 @@ def _probe_recorded(
             "操作せず、ユーザに確かめてください"
         )
         return Probe(HIT, found)
-    counted = _run(here.root, ["rev-list", "--count", f"{rec['snap_sha']}..HEAD"], deadline)
-    out = counted.out.strip()
-    if not (counted.ok and out.isdigit()):
+    ahead = ahead_since(here.root, rec["snap_sha"], deadline)
+    if ahead is None:
         return Probe(UNKNOWN)
-    found.ahead = int(out)
+    found.ahead = ahead
     found.origin_ahead = _origin_ahead(owner, base, deadline)
     if found.marker == "unknown":
         return Probe(HIT, found)
     if found.marker or not found.ahead:
         return Probe(CLEAR)
     return Probe(HIT, found)
+
+
+def ahead_since(worktree: str, snap: str, deadline: float | None = None) -> int | None:
+    """記録の起点 S から先頭までのコミットの数。数えられなければ None。"""
+    counted = _run(worktree, ["rev-list", "--count", f"{snap}..HEAD"], deadline)
+    out = counted.out.strip()
+    return int(out) if counted.ok and out.isdigit() else None
 
 
 def _integrable_name(name: str) -> bool:
@@ -586,6 +586,25 @@ def bound_check(
     return "", unsure
 
 
+def direct_check(
+    root: str, conf: settings.Settings, here: tree.Tree, deadline: float | None = None
+) -> tuple[str, bool]:
+    """このワークツリーが直接作業か。`(対象外の理由, 決められなかったか)`。
+
+    理由も「決められなかった」も無ければ直接作業。直接作業とは、ブランチがツリーの名前と同じで、
+    名前が統合できる形で、チケットに結び付かない（`bound_check`）もの。Stop の促し・
+    コミット後の案内・SessionStart の一覧が、この 1 か所の判定を使う。
+    """
+    branch = tree.branch_of(here.root)
+    if branch is None:
+        return "", True
+    if branch != here.name:
+        return "ブランチがワークツリーの名前と違う", False
+    if not _integrable_name(here.name):
+        return "名前が統合できる形でない", False
+    return bound_check(root, conf, here, deadline)
+
+
 def _dirty(worktree: str, deadline: float | None = None) -> bool | None:
     """ワークツリーに未コミットの変更があるか（追跡していないものも数える）。読めなければ None。"""
     done = _run(worktree, ["status", "--porcelain", "--untracked-files=all"], deadline)
@@ -664,7 +683,7 @@ def _read_record(path: str) -> dict[str, str]:
     return out
 
 
-def _recorded(
+def has_record(
     integ_tree: str,
     name: str,
     head: str = "",
@@ -680,12 +699,12 @@ def _recorded(
     - `dirty` が不明なら、取り込み済みとみなさず、判定全体を不明にする。
     - コピーを読めないときは「記録なし」（促す側に倒す）。
     """
-    marks = _git_path(integ_tree, _RECORD_DIR, deadline)
+    marks = _git_path(integ_tree, RECORD_DIR, deadline)
     if marks is None:
         return None
     if os.path.lexists(os.path.join(marks, name)):
         return True
-    done = _git_path(integ_tree, _DONE_DIR, deadline)
+    done = _git_path(integ_tree, DONE_DIR, deadline)
     if done is None:
         return None
     copy = os.path.join(done, name)

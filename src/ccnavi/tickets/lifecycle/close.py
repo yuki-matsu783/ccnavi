@@ -107,6 +107,14 @@ def _undecided(
     )
 
 
+def absent(root: str, conf: settings.Settings, ticket_id: str) -> bool:
+    """この識別子のチケットが、どの置き場にも見つからなければ True（`--check` が通す）。
+
+    2 か所以上に在る・family が停止中は「無い」ではない。`find` と同じ `*_gate` で断る。
+    """
+    return not _places(root, conf, ticket_id)[0]
+
+
 def find(
     stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
 ) -> ticket_model.Ticket | None:

@@ -5,7 +5,7 @@
  * （画面が描く形）にする。案内の間に描くだけで、保存にも判定にも使わない。`phases-doc.ts` は YAML の解析器を持つので画面から読めない。
  * 同じ読み方をここで小さく持ち、そろっていることはテストが見る。
  */
-import { PHASE_KINDS, REVIEWS, type PhaseForm, type PhaseKind, type PhasesForm, type PhasesPage, type Review } from "./phases-view.js";
+import { PHASE_KINDS, type PhaseForm, type PhaseKind, type PhasesForm, type PhasesPage } from "./phases-view.js";
 import type { TargetOption } from "./targets.js";
 
 export interface PhasesSample {
@@ -36,7 +36,6 @@ function list(value: unknown): string[] {
 function phaseOf(origin: number | null, id: string, raw: unknown): PhaseForm {
   const map = object(raw, `phases.${id}`);
   const kindText = str(map.kind) || "work";
-  const reviewText = str(map.review) || "mr";
   // scope は glob のリストなら上限、それ以外（inherit・欄なし）は親の範囲そのまま
   const inherit = !Array.isArray(map.scope);
   return {
@@ -44,7 +43,7 @@ function phaseOf(origin: number | null, id: string, raw: unknown): PhaseForm {
     id,
     title: str(map.title),
     kind: (PHASE_KINDS as readonly string[]).includes(kindText) ? (kindText as PhaseKind) : "work",
-    review: (REVIEWS as readonly string[]).includes(reviewText) ? (reviewText as Review) : "mr",
+    review: map.review !== false,
     inherit,
     scope: inherit ? [] : list(map.scope),
     deliverables: list(map.deliverables),
@@ -73,7 +72,7 @@ function pageOf(raw: unknown, at: string, path: string, target: TargetOption, ta
     exists: true,
     model: { version, form: phasesFormOf(root, at), problems: [] },
     // 錠の文は scene の locked で見せる。錠そのものは案内の間は掛けない（見本は保存できる状態から始める）
-    lock: { locked: false, reason: "", doing: [] },
+    lock: { locked: false, reason: "", doing: [], turns: [] },
     target: { kind: target.kind, name: target.name },
     targets,
   };

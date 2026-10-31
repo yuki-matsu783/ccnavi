@@ -67,7 +67,7 @@ issue（または MR）を指定され、かつユーザが直接作業を明示
 | 状態 | 切り替え | 切り替える前の取り下げ |
 |---|---|---|
 | 承認前の提案だけ（`doing/` の子なし） | 通す | 提案のファイルは削除できる（`cancel` は `doing/` のチケット用で、提案には使えない）。削除できない・`approval-request` で送った分が親のブランチに残るときは、状態を報告してユーザの判断を仰ぐ |
-| 親が承認済み | 断る | ユーザが親のワークツリーで `sh .ccnavi/scripts/ccnavi-user-close-early.sh --reason <理由>` を打つ。エージェントは打てず、判断もしない。残りは issue に書き出す。`--no-issue` を付けると書き出さない。作業中の子がいる間は打てない。未着手の子は自動で `cancel` される。そのあと親で `ccnavi-ticket.sh finish` して push し、`ccnavi-review.sh ready` を実行する。マージリクエストが無い・変更要求が残るときは、ここでも通らない |
+| 親が承認済み | 断る | ユーザが親のワークツリーで `sh .ccnavi/scripts/ccnavi-user-close-early.sh --reason <理由>` を打つ。エージェントは打てず、判断もしない。残りは issue に書き出す。`--no-issue` を付けると書き出さない。作業中の子がいる間は打てない。未着手の子は自動で `cancel` される。そのあと親で `ccnavi-ticket.sh finish` して push し、親のワークツリーの外から `ccnavi-review.sh ready --parent <親>` を実行する。マージリクエストが無い・変更要求が残るときは、ここでも通らない |
 | 着手済みの子がある（`doing/` の子が 1 件以上） | 断る | メインが `ccnavi-ticket.sh cancel <子の識別子> --reason <理由>` を打つ。`--reason` が要り、サブエージェントは打てない |
 | 親が完了済みでレビュー待ち | 断る | 早めに閉じる操作の対象ではない。レビューの結果を待つ |
 

@@ -18,7 +18,7 @@
  * 実行ファイルに聞く（`user mirror --json`。読むだけ）。一覧の読み直し（`update`）とは別に回し、結果は `ProjectsData` の `mirror` に載せる。
  * 処理の流れ:
  *
- * 1. `refreshMirror` が `checkMirror`（実行ファイルが `user mirror` を持つか）→ `runMirror` の順に聞き、終わったら次の回を予約する。
+ * 1. `refreshMirror` が `runMirror` で実行ファイルに聞き、終わったら次の回を予約する。
  *    読み込み中に呼ばれたら、終わった後にもう 1 回だけ回す（`update` と同じ重ならない作り）。パネルを閉じたら予約を消して止める
  * 2. 画面の「ミラーを同期」「すべて同期」で `mirrorSync` が届いたら `runMirrorYes` を呼ぶ。書くのは実行ファイルで、
  *    各プロジェクトのワークツリーへ（コミットはしない）。結果は VS Code の通知で知らせ、すぐ調べ直す
@@ -30,7 +30,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { checkMirror, loadBoard, runLintJson, runMirror, runMirrorYes } from "./ccnavi.js";
+import { loadBoard, runLintJson, runMirror, runMirrorYes } from "./ccnavi.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
 import { clockText, syncNotice, unknownSyncNames, type MirrorStatus } from "./core/mirrormodel.js";
 import {
@@ -438,10 +438,6 @@ async function refreshMirror(): Promise<void> {
 
 /** 実行ファイルに、`user mirror` を持つかとミラーのずれを聞く */
 async function readMirror(root: string): Promise<MirrorStatus> {
-  const unsupported = await checkMirror(root, binSetting());
-  if (unsupported !== undefined) {
-    return { kind: "unsupported", reason: unsupported };
-  }
   const result = await runMirror(root, binSetting());
   return result.ok ? { kind: "ok", list: result.value } : { kind: "failed", error: result.error };
 }

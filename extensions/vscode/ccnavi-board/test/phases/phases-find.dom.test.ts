@@ -3,7 +3,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { REVIEW_LABELS } from "../../src/core/phases-view.js";
+import { REVIEW_OPTIONS } from "../../src/core/phases-view.js";
 import { openPhases, page } from "../helpers/phases.js";
 import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
 
@@ -52,8 +52,9 @@ test("CB-D1242 保存後の warn の本文を上部の帯に出し、次の編�
   }
 });
 
-test("CB-D1243 review の none に「既定」と書かず、リスト欄の placeholder で区切りは半角 , と言う", async () => {
-  assert.ok(!REVIEW_LABELS.none.includes("既定"), REVIEW_LABELS.none);
+test("CB-D1243 review の false に「既定」と書かず、リスト欄の placeholder で区切りは半角 , と言う", async () => {
+  const falseOption = REVIEW_OPTIONS.find((option) => option.value === "false");
+  assert.ok(falseOption !== undefined && !falseOption.label.includes("既定"), falseOption?.label);
   const dom = await openPhases();
   try {
     dom.click(dom.one('.phase[data-key="p2"] .row-head'));

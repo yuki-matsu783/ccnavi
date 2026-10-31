@@ -237,11 +237,7 @@ def problems(
                 continue
             target_item = numbered[target]
             tpt = (types or {}).get(target_item.type)
-            if (
-                tpt is not None
-                and tpt.review == phasetypes.REVIEW_NONE
-                and target_item.review != ticket_model.PLAN_REVIEW_MR
-            ):
+            if tpt is not None and not tpt.review and not target_item.review:
                 error(f"`{key}[{i}]` を延期した先の `{target_item.type}` にレビューがありません。")
     return found
 

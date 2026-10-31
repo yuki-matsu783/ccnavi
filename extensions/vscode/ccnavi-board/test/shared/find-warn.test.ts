@@ -15,7 +15,7 @@ import type { FactorForm } from "../../src/core/risk-view.js";
 
 // 各画面の `state.ts` は VS Code の API を読み込むので、テストでは同じ形の値を直に書く
 const emptyRule = (): RuleForm => ({ origin: null, id: "", match: "", kind: "glob", pattern: "", message: "", additionalContext: "", additionalContextOnce: "", additionalContextFile: "", additionalContextOnceFile: "", every: "" });
-const emptyPhase = (): PhaseForm => ({ origin: null, id: "", title: "", kind: "work", review: "mr", inherit: true, scope: [], deliverables: [], agent: "", when: "" });
+const emptyPhase = (): PhaseForm => ({ origin: null, id: "", title: "", kind: "work", review: true, inherit: true, scope: [], deliverables: [], agent: "", when: "" });
 const emptyFactor = (): FactorForm => ({ origin: null, id: "", points: "", kind: "lines_over", value: "", max: "", include: "", exclude: "", message: "" });
 
 test("CB-T1238 絞り込みは NFKC で正規化して小文字にする。全角英数字・半角カナも同じに探せる", () => {

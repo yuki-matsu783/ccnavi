@@ -17,7 +17,6 @@
  * `user mirror [<名前>…] --json`（共通レイヤーのミラーのずれを見る。プロジェクト管理画面が 5 分ごとに読む）と
  * `user mirror [<名前>…] --yes --expect <値> --via board --json`（ミラーの同期。書くのは実行ファイルで、各プロジェクトのワークツリーへ。
  * ユーザが画面で押したときだけ）。
- * ほかに `--version --json`（版・互換の版・受け付けるフラグ）を、起動のときと新しいフラグを使う前に聞く。
  * 判定と検証はルールファイルを差し替えられる。
  * 共通の設定のルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
  * 検証はリスクの配点も差し替えられる。共通の設定は `--risk`、プロジェクトの設定は `--project-risk-file <名前>=<パス>`
@@ -90,7 +89,6 @@ import {
   type ExpectationsJson,
   type TestJson,
 } from "./core/testmodel.js";
-import { missingFeatures, missingFlags, parseVersionJson, type VersionProbe } from "./core/version.js";
 
 export type LoadResult =
   | { readonly ok: true; readonly board: BoardJson; readonly launcher: Launcher }
@@ -308,10 +306,6 @@ export async function runApproveYes(
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const refused = await checkUserEntry(root, setting, "ccnavi user agree --yes");
-  if (refused !== undefined) {
-    return { ok: false, error: refused };
-  }
   const ran = await run(launcher, root, approveArgs(tickets, digest, only), APPROVE_TIMEOUT_MS);
   // 打ち切りは読む前に見る。承認済みチケットは 1 件ずつ置かれる（tickets/proposal/agree.py の for cand in batch）ので、
   // 途中で強制終了されると一部だけ置かれた状態が残る。stdout も途中で切れていて「読み取れない」になるため、
@@ -386,10 +380,6 @@ export async function runDecideYes(
   choices: Readonly<Record<string, string>>,
   digest: string,
 ): Promise<DecideOutcome> {
-  const refused = await checkUserEntry(root, setting, "ccnavi-user-decide.sh");
-  if (refused !== undefined) {
-    return { ok: false, error: refused };
-  }
   const ran = await runScript(shell, root, USER_DECIDE_SCRIPT, tree, decideArgs(phase, choices, digest), DECIDE_TIMEOUT_MS);
   if (ran.killed) {
     return {
@@ -585,47 +575,10 @@ export async function runLintJson(root: string, setting: string): Promise<RunRes
  * 子チケットのフロー 1 本を実行ファイルに確かめさせる（`--lint --json --flow <パス>`）。
  * フロー編集画面が、開くときと保存の前に編集中の本文を一時ファイルに書いて渡す。読み手と検査は
  * SubagentStart と同じもので、答えは `(flow)` の苦情（`problemsOfFlow`）。
- * 先に `--version --json` で `--flow` を知っているかを見る。知らない、または確かめられないときは
- * 失敗にする（開かない・保存しない側）。
  */
 export async function runFlowLint(root: string, setting: string, flowPath: string): Promise<RunResult<LintJson>> {
   const what = "ccnavi --lint --json --flow";
-  const probe = await probeVersion(root, setting);
-  if (probe === undefined) {
-    return { ok: false, error: NOT_FOUND };
-  }
-  const refused = missingFlags(probe, ["--flow"], what, hasSource(root));
-  if (refused !== undefined) {
-    return { ok: false, error: refused };
-  }
   return lintJson(root, setting, ["--flow", flowPath], what);
-}
-
-/**
- * 実行ファイルに版を聞く（`--version --json`）。実行ファイルが見つからなければ undefined。
- */
-export async function probeVersion(root: string, setting: string): Promise<VersionProbe | undefined> {
-  const launcher = findLauncher(root, setting);
-  if (launcher === undefined) {
-    return undefined;
-  }
-  const ran = await run(launcher, root, ["--version", "--json"], DIAGNOSE_TIMEOUT_MS);
-  if (ran.killed) {
-    return { kind: "failed", error: cutOff("ccnavi --version --json", DIAGNOSE_TIMEOUT_MS) };
-  }
-  if (ran.code !== 0) {
-    return { kind: "failed", error: `ccnavi --version --json が失敗しました: ${firstLine(ran.stderr)}` };
-  }
-  const parsed = parseVersionJson(ran.stdout);
-  return parsed.ok ? { kind: "ok", info: parsed.value } : { kind: "failed", error: parsed.error };
-}
-
-/**
- * ワークスペースが ccnavi のリポジトリ（組み立てる元の build.py とソースがある）か。
- * 実行ファイルが古いときの直し方が、組み立て直しか配り直しかで分かれる
- */
-export function hasSource(root: string): boolean {
-  return fs.existsSync(path.join(root, "build.py")) && fs.existsSync(path.join(root, "src", "ccnavi", "__main__.py"));
 }
 
 async function lintJson(root: string, setting: string, extra: readonly string[], what: string): Promise<RunResult<LintJson>> {
@@ -663,64 +616,11 @@ export async function runWriteAndPushTarget(root: string, setting: string, paren
   return ran.code === 0 ? writeAndPushTargetOf(ran.stdout) : "";
 }
 
-/** 計画編集タブの 2 本が求めるフラグ。知らない古い実行ファイルは、確かめられないとして失敗にする */
-const PLAN_ORDER_FLAGS = ["--plan-order", "--order", "--expect", "--write"] as const;
-
-/** テンプレート管理画面が求めるフラグ。知らない古い実行ファイルは、確かめられないとして失敗にする */
-const TEMPLATES_FLAGS = ["--templates", "--show"] as const;
-
-/** テンプレートの編集が求めるフラグ。知らない古い実行ファイルは、読ませて確かめられないので編集を始めない */
-const TEMPLATE_EDIT_FLAGS = ["--templates", "--check-file"] as const;
-
-/**
- * 取り込み待ち画面が求める機能（`ccnavi user handoff` を実行ファイルが持つ）。持たない古い実行ファイルは `user handoff` を知らず、
- * argparse の苦情（不明瞭な断り）で返すので、画面を開くときに見て「古い版です」と言い、画面を無効にする
- */
-const HANDOFF_FEATURES = ["handoff", "entry-marker"] as const;
-
-/**
- * プロジェクト管理画面のミラーの表示と同期が求める機能（`ccnavi user mirror` を実行ファイルが持つ）。持たない古い実行ファイルは
- * `user mirror` を知らず、argparse の苦情で返すので、調べる前に見て「古い版です」と言い、ボタンを無効にする
- */
-const MIRROR_FEATURES = ["mirror", "entry-marker"] as const;
-
-/**
- * ユーザ専用の入口（`ccnavi user <操作>`）を実行ファイルが持つことを示す機能名。持たない古い実行ファイルは
- * `user` を知らず、argparse の苦情（不明瞭な断り）で返すので、打つ前に見て「古い版です」と言う
- */
-const USER_ENTRY_FEATURES = ["user-entry", "entry-marker"] as const;
-
-/**
- * ユーザ専用の操作（承認・対応方針）を打つ前に、実行ファイルが `user-entry` を持つかを聞く。
- * 知っていれば undefined、知らなければ（確かめられないときも）理由。起動時の互換の版の比べ（`warnVersionSkew`）は
- * 知らせるだけで止めないので、止めるのはここ。`what` は使おうとしたもの
- */
-export async function checkUserEntry(root: string, setting: string, what: string): Promise<string | undefined> {
-  const probe = await probeVersion(root, setting);
-  if (probe === undefined) {
-    return NOT_FOUND;
-  }
-  return missingFeatures(probe, USER_ENTRY_FEATURES, what, hasSource(root));
-}
-
-/**
- * 実行ファイルが `--plan-order` を知っているかを聞く（`--version --json`）。知っていれば undefined、知らなければ理由。
- * 計画編集タブは読み込むたびに 1 回聞く（線を変えるたびには聞かない。往復が倍になるため）
- */
-export async function checkPlanOrder(root: string, setting: string, what = "計画編集タブ"): Promise<string | undefined> {
-  const probe = await probeVersion(root, setting);
-  if (probe === undefined) {
-    return NOT_FOUND;
-  }
-  return missingFlags(probe, PLAN_ORDER_FLAGS, what, hasSource(root));
-}
-
 /**
  * 親の提案の計画を、振り直した答えで読む（`--plan-order <親> --json [--order <JSON>]`）。何も書かない。
  * `order` は元の番号での直接の先行で、空なら提案のまま。番号の振り直しと検査は実行ファイルが答える。
  * `--plan-order` は `user` の外の独立したオプションなので、組み込みの止めにもターミナルの確かめにもヒットしない。
- * 失敗（実行ファイルが無い・非 0 終了・JSON でない）は理由の文にして返し、画面は壊さない。古い実行ファイルかは
- * 呼び手が先に `checkPlanOrder` で聞く
+ * 失敗（実行ファイルが無い・非 0 終了・JSON でない）は理由の文にして返し、画面は壊さない
  */
 export async function runPlanOrder(root: string, setting: string, parent: string, order: PlanOrder = {}): Promise<RunResult<PlanOrderAnswer>> {
   const what = "ccnavi --plan-order --json";
@@ -774,54 +674,6 @@ export async function runPlanOrderWrite(root: string, setting: string, parent: s
     return { kind: "unchanged", answer };
   }
   return { kind: "refused", answer, reason: ran.stderr.trim() || "ccnavi が変更しませんでした" };
-}
-
-/**
- * 実行ファイルが `--templates` と `--show` を知っているかを聞く（`--version --json`）。知っていれば undefined、知らなければ理由。
- * テンプレート管理画面は読み込むたびに 1 回聞く。
- */
-export async function checkTemplates(root: string, setting: string): Promise<string | undefined> {
-  const probe = await probeVersion(root, setting);
-  if (probe === undefined) {
-    return NOT_FOUND;
-  }
-  return missingFlags(probe, TEMPLATES_FLAGS, "テンプレート管理画面", hasSource(root));
-}
-
-/**
- * 実行ファイルが `--templates --check-file` を知っているかを聞く（`--version --json`）。知っていれば undefined、知らなければ理由。
- * テンプレートの編集を始めるたびに 1 回聞く。知らなければ編集の入口を無効にして、この理由を言う。
- */
-export async function checkTemplateEdit(root: string, setting: string): Promise<string | undefined> {
-  const probe = await probeVersion(root, setting);
-  if (probe === undefined) {
-    return NOT_FOUND;
-  }
-  return missingFlags(probe, TEMPLATE_EDIT_FLAGS, "テンプレートの編集", hasSource(root));
-}
-
-/**
- * 実行ファイルが `user handoff` を持つか（`features` に `handoff`）を聞く。持っていれば undefined、持たなければ理由
- * （取り込み待ち画面を無効にして、この理由を言う）。取り込み待ち画面は読み込むたびに 1 回聞く。
- */
-export async function checkHandoff(root: string, setting: string): Promise<string | undefined> {
-  const probe = await probeVersion(root, setting);
-  if (probe === undefined) {
-    return NOT_FOUND;
-  }
-  return missingFeatures(probe, HANDOFF_FEATURES, "取り込み待ち画面", hasSource(root));
-}
-
-/**
- * 実行ファイルが `user mirror` を持つか（`features` に `mirror`）を聞く。持っていれば undefined、持たなければ理由
- * （プロジェクト管理画面はミラーの欄にこの理由を出し、同期のボタンを無効にする）。ミラーを調べるたびに 1 回聞く。
- */
-export async function checkMirror(root: string, setting: string): Promise<string | undefined> {
-  const probe = await probeVersion(root, setting);
-  if (probe === undefined) {
-    return NOT_FOUND;
-  }
-  return missingFeatures(probe, MIRROR_FEATURES, "ミラーの同期", hasSource(root));
 }
 
 /** 失敗の答え（`{ok:false,error}`）の error。読めなければ空 */
@@ -995,7 +847,7 @@ export async function runHandoffYes(workspace: string, setting: string, tree: st
  * 共通レイヤーのミラーのずれを見る（`user mirror [<名前>…] --json`）。何も書かない。
  * `--root` はワークスペースのルート（ミラーの元の共通レイヤーと、コピーする先の `projects/` を持つ側）。
  * 見るだけの結果は、プロジェクトにずれや error があっても終了コード 0 で返る。`ok` が偽の結果（共通レイヤーが読めないなど）も
- * 読めた結果として返し、理由は呼び手が出す。古い実行ファイルかは呼び手が先に `checkMirror` で聞く
+ * 読めた結果として返し、理由は呼び手が出す
  */
 export async function runMirror(root: string, setting: string, names: readonly string[] = []): Promise<RunResult<MirrorList>> {
   const what = "ccnavi user mirror --json";

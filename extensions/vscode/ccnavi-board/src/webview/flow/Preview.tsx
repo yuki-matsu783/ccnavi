@@ -21,9 +21,6 @@ function body(checks: FlowChecks | undefined): JSX.Element {
   if (checks === undefined) {
     return <p className="dim small">まだ実行ファイルで確認していません。</p>;
   }
-  if (checks.rendered === undefined) {
-    return <p className="dim small">実行ファイルが古いため、担当に渡る手順を表示できません（lint の出力に rendered がありません）。実行ファイルを更新してください。</p>;
-  }
   if (checks.rendered === null) {
     return <p className="dim small">実行ファイルがこのフローを手順に並べられませんでした（中身を読み込めません）。担当にはフローの手順が渡りません。</p>;
   }

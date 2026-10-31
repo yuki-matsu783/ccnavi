@@ -7,18 +7,22 @@
 # 同じディレクトリを指す。この読み込みと、下の部品の読み込みにだけ `$0` を使い、ワークスペースルートの
 # 決定には使わない（下の ccnavi_workspace の但し書き）。
 #
-# ここにあるのは 9 つ。標準出力と終了コードだけを返し、標準エラーには何も書かない。
+# ここにあるのは 13 個。`ccnavi_load` 以外は、標準出力と終了コードだけを返し、標準エラーには何も書かない。
 # 失敗したときの文面は呼ぶ側が決める（reject と fail で書き方が違うため）。
 #
 #   ccnavi_abs <パス>          相対を絶対に直す
+#   ccnavi_sh_quote <文字列>   単引用符で囲んで、そのまま打てる形にする
+#   ccnavi_phys <パス>         リンクを解いたパス（無ければそのまま）
 #   ccnavi_workspace           ワークスペースルートの絶対パス
 #   ccnavi_bin <ワークスペースルート>  起動する実行ファイルのパス
-#   ccnavi_compat_skew <ワークスペースルート> <実行ファイル>  実行ファイルと互換の版が食い違えば直し方を出す
+#   ccnavi_bin_path <振り分けの sh>  PATH の ccnavi（これ自身へのリンクは飛ばす）
+#   ccnavi_bin_try <パス>      そのパス（または .exe）が実行できれば返す
 #   ccnavi_project <ディレクトリ>  そこが属するプロジェクトの名前（ワークスペース自身なら空）
 #   ccnavi_mask_url <URL>      埋まった資格情報を伏せる
 #   ccnavi_is_ident <語>       識別子として受けてよい書き方か（終了コードで返す）
 #   ccnavi_is_branch <語>      親のブランチ名として受けてよい書き方か（終了コードで返す）
 #   ccnavi_branch_to_id <ブランチ>  親のブランチ名から親の識別子を作る（/ を - に置き換える）
+#   ccnavi_load <ファイル名>   呼ぶ側が読む部品を読む（無ければ標準エラーに書いて 1 で終わる）
 #
 # 残りの関数は、同じディレクトリの部品 5 本に分けてあり、このファイルの最後で読む。
 # 部品は単体では読まない。呼ぶ側は今までどおりこのファイルだけを読む。
@@ -44,7 +48,7 @@
 # VS Code 拡張の EXTENSION_COMPAT と同じ値に揃える。上げるのは、sh が頼るフラグや出力の形を
 # sh を直さないと動かない形に変えたときと、データの形（先行関係の置き場など）が
 # 変わるとき（上げ方は src/ccnavi/entry/version.py の説明）。`ccnavi --lint` もこの行を読んで比べる。
-CCNAVI_COMPAT=19
+CCNAVI_COMPAT=20
 
 # 相対パスを絶対に直す。
 #
@@ -226,27 +230,6 @@ ccnavi_bin() {
 	/* | [A-Za-z]:*) ccnavi_bin_try "$CCNAVI_ENTRY_PATH" ;;
 	*) ccnavi_bin_try "$1/$CCNAVI_ENTRY_PATH" ;;
 	esac
-}
-
-# 実行ファイルの `--version` が言う互換の版と CCNAVI_COMPAT を比べる。揃っていれば何も出さずに 0、
-# 食い違えば直し方を含む 1 行を標準出力に出して 1 を返す。呼ぶ側はその行を標準エラーへ書き、止めずに先へ進む。
-# 止めるか通すかは実行ファイルと hook が判定する。
-#
-# 直し方は、ccnavi のリポジトリ（build.py とソースがある）なら組み立て直し、配布先なら実行ファイルと sh の配り直し
-# （scripts/ccnavi-setup.sh --force）。
-ccnavi_compat_skew() {
-	ccnavi_cs_out=$("$2" --version </dev/null 2>/dev/null) || ccnavi_cs_out=""
-	ccnavi_cs_have=$(printf '%s\n' "$ccnavi_cs_out" | sed -n 's/^compat:[[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p' | head -n 1)
-	if [ -f "$1/build.py" ] && [ -f "$1/src/ccnavi/__main__.py" ]; then
-		ccnavi_cs_fix="build.py を実行して組み立て直してください（uv run --with pyinstaller python build.py）"
-	else
-		# sh が古いと、新しい実行ファイルは古い形の呼び出し（ユーザ専用の操作を `user` の外で使う形）を断る。
-		# 配り直しは sh も入れ替える。
-		ccnavi_cs_fix="ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルと sh を配り直してください"
-	fi
-	[ "$ccnavi_cs_have" = "$CCNAVI_COMPAT" ] && return 0
-	printf '実行ファイル %s は互換 %s、sh は互換 %s で食い違っています。%s。\n' "$2" "${ccnavi_cs_have:-不明}" "$CCNAVI_COMPAT" "$ccnavi_cs_fix"
-	return 1
 }
 
 # PATH の ccnavi。振り分けの sh（ccnavi-launcher.sh の ccnavi_launcher_path）と同じ規則:

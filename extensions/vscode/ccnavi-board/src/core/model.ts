@@ -39,7 +39,7 @@ export interface ProposalJson {
   readonly path: string;
   /**
    * 親の提案が全体計画（`plan:`）を持つか。`feedback:` だけの親と子は偽（計画編集タブは `plan:` の無い親を開けない）。ボードは計画を読まず、これで親の提案のカードの
-   * 「計画編集」を出し分ける。欄の無い答え（古い実行ファイル）は偽
+   * 「計画編集」を出し分ける
    */
   readonly has_plan: boolean;
 }
@@ -85,10 +85,10 @@ export interface FlowJson {
   readonly locked: boolean;
   /**
    * 錠の種類（`locked` が真のとき）。`doing` は着手中、`review` はレビュー中（実行ファイルの答え）。
-   * 止めていなければ null。この欄を出さない古い実行ファイルでは undefined（種類が分からないので両方を 1 つの言葉で言う）
+   * 止めていなければ null
    */
-  readonly lock_kind?: "doing" | "review" | null;
-  /** エージェントが書く下書き。置き場はフローと同じツリーの提案の置き場。この欄を出さない古い実行ファイルでは null */
+  readonly lock_kind: "doing" | "review" | null;
+  /** エージェントが書く下書き。置き場はフローと同じツリーの提案の置き場 */
   readonly draft: FlowDraftJson | null;
 }
 
@@ -132,18 +132,18 @@ export interface TicketJson {
   readonly title: string;
   readonly project: string;
   readonly issue: number | null;
-  /** 親だけ。親を載せる MR の番号（親チケットの `mr:`）。無ければ null。この欄を出さない古い実行ファイルも null */
+  /** 親だけ。親を載せる MR の番号（親チケットの `mr:`）。無ければ null */
   readonly mr: number | null;
-  /** 親だけ。親のブランチ名。子と、この欄を出さない古い実行ファイルは空 */
+  /** 親だけ。親のブランチ名。子は空 */
   readonly branch: string;
-  /** 親だけ。親のワークツリーがあるときのリモートとの差。子・ワークツリーなし・古い実行ファイルは null */
+  /** 親だけ。親のワークツリーがあるときのリモートとの差。子・ワークツリーなしは null */
   readonly remote: RemoteJson | null;
   readonly predecessors: readonly string[];
-  /** 満たしていない先行。空なら満たしている（先行が無い・閉じたチケット・この欄を出さない古い実行ファイルも空） */
+  /** 満たしていない先行。空なら満たしている（先行が無い・閉じたチケットも空） */
   readonly predecessors_unmet: readonly PredecessorUnmetJson[];
   readonly human_review: { readonly required: boolean; readonly reason: string };
   readonly proposal: ProposalJson | null;
-  /** 完了した計画付きの親から、テンプレートの下書きを作れるか。この欄を出さない古い実行ファイルは偽 */
+  /** 完了した計画付きの親から、テンプレートの下書きを作れるか */
   readonly template_draft: boolean;
   /**
    * 空でなければ「読めるが信頼できない」理由（親が引けないなど、範囲をどこで切り詰めるか決まらない）。判定はこのチケットの
@@ -162,15 +162,15 @@ export interface TicketJson {
   readonly cancel_reason: string;
   /**
    * 作業中か（承認済みチケットが `doing/` にあり、着手していて、終わってもいないし取り消されてもいない）。
-   * 実行ファイルが決め、拡張は `started_at` などから組み直さない。この欄を出さない古い実行ファイルでは null
+   * 実行ファイルが決め、拡張は `started_at` などから組み直さない
    */
-  readonly in_progress: boolean | null;
+  readonly in_progress: boolean;
   readonly seen_in: readonly SeenInJson[];
   /** どれが正か決まらないチケットの全部。決まっていれば空 */
   readonly scattered: readonly SeenInJson[];
   readonly risk: Record<string, unknown> | null;
   readonly judge: Record<string, unknown> | null;
-  /** 子のフロー。親と、この欄を出さない古い実行ファイルでは null */
+  /** 子のフロー。親は null */
   readonly flow: FlowJson | null;
   /** 読み手が気づくべき不備の文。実行ファイルが組み、ボードはそのまま出す */
   readonly issues: readonly string[];
@@ -298,7 +298,7 @@ export interface SumPhaseJson {
   readonly source: string;
   readonly kind: string;
   readonly title: string;
-  readonly review: string;
+  readonly review: boolean;
   readonly scope: readonly string[];
 }
 
@@ -349,7 +349,7 @@ export interface BoardJson {
   readonly settings: {
     /**
      * 動作モード。hook がいま使うはずの値を実行ファイルが解決したもの（enable / dry-run / disable）。
-     * 読めない値は enable になっている。この欄を出さない古い実行ファイルでは空
+     * 読めない値は enable になっている
      */
     readonly mode: string;
     /** チケット制御を使うか。実行ファイルが解決した値（enable / disable） */
@@ -361,20 +361,20 @@ export interface BoardJson {
   readonly trees: readonly TreeJson[];
   /** 順序は 共通の設定 → ワークスペースの設定 → プロジェクトの設定（名前順） */
   readonly layers: readonly LayerJson[];
-  /** 順序は ワークスペースの統合結果 → プロジェクトの統合結果（名前順）。古い実行ファイルでは空 */
+  /** 順序は、ワークスペースの統合結果 → プロジェクトの統合結果（名前順） */
   readonly sums: readonly SumJson[];
   readonly projects: readonly string[];
   readonly problems: readonly string[];
   readonly pending_approval: readonly string[];
   readonly tickets: readonly TicketJson[];
   readonly parents: readonly ParentJson[];
-  /** 手元の退避にある閉じたチケット（表示用）。任意の欄で、この欄を出さない古い実行ファイルでは空か無し */
-  readonly archived?: readonly ArchivedTicketJson[];
+  /** 手元の退避にある閉じたチケット（表示用） */
+  readonly archived: readonly ArchivedTicketJson[];
   /**
    * いまターンの途中にいるセッション。ターン中に設定ファイルを直すと、次のツール呼び出しで
-   * 戻されることがある。この欄を出さない古い実行ファイルでは空か無し
+   * 戻されることがある
    */
-  readonly turns?: readonly TurnJson[];
+  readonly turns: readonly TurnJson[];
 }
 
 export type ParseResult =
@@ -487,7 +487,7 @@ function sum(raw: Record<string, unknown>): SumJson {
       unreadable: str(phases.unreadable),
       types: list(phases.types)
         .filter(isRecord)
-        .map((t) => ({ id: str(t.id), source: str(t.source), kind: str(t.kind), title: str(t.title), review: str(t.review), scope: list(t.scope).map(str) })),
+        .map((t) => ({ id: str(t.id), source: str(t.source), kind: str(t.kind), title: str(t.title), review: t.review !== false, scope: list(t.scope).map(str) })),
     },
   };
 }
@@ -539,7 +539,7 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     merged_sha: str(raw.merged_sha),
     cancelled_at: str(raw.cancelled_at),
     cancel_reason: str(raw.cancel_reason),
-    in_progress: typeof raw.in_progress === "boolean" ? raw.in_progress : null,
+    in_progress: raw.in_progress === true,
     seen_in: seenIn(raw.seen_in),
     scattered: seenIn(raw.scattered),
     risk: isRecord(raw.risk) ? raw.risk : null,
@@ -581,12 +581,9 @@ function flow(raw: Record<string, unknown>): FlowJson | null {
     rel: str(raw.rel),
     tree: str(raw.tree),
     exists: raw.exists === true,
-    // 欄が欠けていたら書かない扱いにする（リンクかを確かめられない）
-    linked: raw.linked !== false,
-    // 欄が欠けていたら止まっている扱いにする（止まっているかを確かめられないので、書かせない）
-    locked: raw.locked !== false,
-    // 種類の欄が無い古い実行ファイルは undefined のまま（両方を 1 つの言葉で言う）
-    lock_kind: raw.lock_kind === undefined ? undefined : raw.lock_kind === "doing" || raw.lock_kind === "review" ? raw.lock_kind : null,
+    linked: raw.linked === true,
+    locked: raw.locked === true,
+    lock_kind: raw.lock_kind === "doing" || raw.lock_kind === "review" ? raw.lock_kind : null,
     draft: isRecord(raw.draft) ? flowDraft(raw.draft) : null,
   };
 }
@@ -596,8 +593,7 @@ function flowDraft(raw: Record<string, unknown>): FlowDraftJson | null {
   if (path === "") {
     return null;
   }
-  // 欄が欠けていたらリンクの扱いにする（読まない）
-  return { path, rel: str(raw.rel), exists: raw.exists === true, linked: raw.linked !== false };
+  return { path, rel: str(raw.rel), exists: raw.exists === true, linked: raw.linked === true };
 }
 
 function seenIn(value: unknown): readonly SeenInJson[] {

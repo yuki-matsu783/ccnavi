@@ -133,7 +133,7 @@ rename するか、バイト単位でコピーして元を消す。欄を書き�
 | ターミナルの `ccnavi-user-agree.sh` | 承認が通ったあとに sh から `--path <パス>...` つきで呼ぶ。渡すのは、この承認が書いた・消したパス（実行ファイルの `--record-writes` の一覧）だけで、同じ置き場の承認と無関係な変更は入れない。承認の push に失敗しても承認は 0 で終わる（コミットは残り、打ち直せば送れる。未送信のパスは文面で言う）。一部だけ書けたとき（実行ファイルの終了コード 4）も、書けた分をコミットして push し、書けた分と書けなかった提案を `--placed-out` の JSON で言う（終了コードは 1） |
 | ボードの承認 | 1 件以上承認したら、`ccnavi-user-push-approved.sh --path <パス>...`（`--yes --json` の `written` のパス）を絶対パスでターミナルに送り、Enter まで送る。途中で止まったときも、書けた分（`partial.placed` が空でないとき）は `partial.written` で同じように送り、書けなかった提案と未送信かどうかを画面に出す。sh が無ければ送らず、導入スクリプトで配るよう警告で言う |
 | ボードのフローの保存 | 保存したら `ccnavi-user-push-approved.sh <親>` をターミナルに送る |
-| ユーザの判断の入口（`ccnavi-user-close-early.sh`） | 実行ファイルが書いた後、write-and-push の対象の親子のチケットなら `ccnavi-user-push-approved.sh <親>` を呼ぶ |
+| ユーザの判断の入口（`ccnavi-user-close-early.sh`） | 始めに write-and-push の状態を確かめ、親子のチケットの write-and-push が止まるなら、ホストにも手元にも触らずに止める。実行ファイルが書いた後、write-and-push の対象の親子のチケットなら `ccnavi-user-push-approved.sh <親>` を呼ぶ |
 
 write-and-push の対象の親子のチケットでは、親のワークツリーで write-and-push と同じく親子のチケットのロックを取り、途中の操作が無いことを
 確かめ、`ccnavi-sync.sh` で取り込んでから置き場（承認済みと、レビュー待ちの `review/` と、消えた `todo/` の提案）を
@@ -253,7 +253,7 @@ write-and-push の対象の親子のチケットでは、親のワークツリ�
 （改版は warn で外さない。親の必須の見出しの欠けも warn。提案の書式 9.3）。ただし「まだ承認できない」もの（前のフェーズが閉じていない子。
 `rules.KIND_NOT_YET`）は `--lint` では warn。
 
-エージェントは、同じ検査を `ccnavi-ticket.sh approval-request <親> --check` で通す。`--check` は承認の画面と同じ `gather` に加えて、親の状態（`lifecycle.treegate` の `APPROVAL_REQUEST`）を見る。置き場の外の未コミットの変更は、承認の後に子の `finish` を止める。未 push のコードは、送る提案と一緒に公開される。ホスト・git のリモートの事前確認もして、何も送らない。判定は `core.approve.readiness` の 1 か所にあり、本番の `approval-request` の gate（`approval_request_gate`）と `--agree --preview --verify` が同じ関数を通す。sh は親の状態を判定しない。`--verify` の `verify.reason` には、この理由が `dirty_parent`・`unpushed_code` として出る。承認そのもの（`--yes`）は、親の未コミットの変更を警告にとどめ、拒否しない。
+エージェントは、同じ検査を `ccnavi-ticket.sh approval-request <親> --check` で通す。`--check` は承認の画面と同じ `gather` に加えて、親の状態（`lifecycle.treegate` の `APPROVAL_REQUEST`）を見る。置き場の外の未コミットの変更は、承認の後に子の `finish` を止める。未 push のコードは、送る提案と一緒に公開される。ホスト・git のリモートの事前確認もして、何も送らない。判定は `core.approve.readiness` の 1 か所にあり、本番の `approval-request` の gate（`approval_request_gate`）と `--agree --preview --verify` が同じ関数を通す。sh は親の状態を判定しない。`--verify` の `verify.reason` には、この理由が `dirty_parent`・`unpushed_code` として出る。承認そのもの（`--yes`）は、親の未コミットの変更を警告にとどめ、拒否しない。`approval-request` の本体も、sh がロック・取り込みをする前に、同じ検査（`--check`）を先に通して断る。
 
 提案を `todo/` に書いた回に、この確認（`approval-request --check`）を勧める文を 1 度だけ渡す（REQ-APV-14、`ticket_guard.propose_notice`）。
 判定には足さず、ルールの文と同じ `PreToolUse` の `additionalContext` の経路で渡す。

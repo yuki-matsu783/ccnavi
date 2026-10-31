@@ -26,55 +26,55 @@ screen: phases
 sample:
   path: .ccnavi/config/project/phases.yml
   lock: 作業中のチケットがあります（2026-10-03-search-api）。いま保存すると、進行中の作業の判定が途中で変わるため、作業が終わってから保存してください。
-  error: 定義 design-feedback は feedback なので review は mr にしてください（none は指定できません）
+  error: 定義 design-feedback は feedback なので review は true にしてください（false は指定できません）
   phases:
     version: 1
     phases:
       research:
         kind: work
         title: 調査
-        review: none
+        review: false
         scope: ["wip/research/*"]
         deliverables: ["wip/research/summary.md"]
         when: 既存の振る舞いや依存が分からないとき。分かっているなら省略する
       design:
         kind: work
         title: 設計
-        review: mr
+        review: true
         scope: ["wip/design/*", "docs/*"]
         deliverables: ["wip/design/*.md"]
         when: 変更箇所が 3 か所を超えるか、外から見える振る舞いが変わるとき
       acceptance:
         kind: work
         title: 受入テスト作成
-        review: mr
+        review: true
         scope: ["tests/*"]
         agent: acceptance-tester
         when: 振る舞いが変わるとき。設計のあと、実装より先に書く
       implement:
         kind: work
         title: 実装とテスト
-        review: mr
+        review: true
         scope: ["src/*", "tests/*"]
         agent: implementer
         when: 振る舞いを変えるとき。受入テスト作成を先に置く
       design-feedback:
         kind: feedback
         title: 設計フィードバック対応
-        review: mr
+        review: true
         scope: ["wip/design/*", "docs/*"]
         when: 設計への指摘だけに対応するとき
       implement-feedback:
         kind: feedback
         title: 実装フィードバック対応
-        review: mr
+        review: true
         scope: inherit
         when: フィードバック計画の最後に置き、ほかの対応を受ける
   added:
     security-review:
       kind: work
       title: セキュリティ確認
-      review: mr
+      review: true
       scope: ["wip/security/*"]
       deliverables: ["wip/security/report.md"]
       agent: security-reviewer
@@ -89,20 +89,20 @@ sample:
         quick:
           kind: work
           title: 小さい作業
-          review: mr
+          review: true
           scope: inherit
           when: 設計判断が要らないとき
         api-change:
           kind: work
           title: 公開 API の変更
-          review: mr
+          review: true
           scope: ["src/api/*", "tests/*", "docs/api/*"]
           deliverables: ["docs/api/changes.md"]
           when: 公開 API を変えるとき。利用者への影響を変更履歴に書く
         quick-feedback:
           kind: feedback
           title: 小さい作業への指摘対応
-          review: mr
+          review: true
           scope: inherit
 
 # 案内の手順が引く時系列の図。登場者を左から並べ、矢印を上から下へ時間順に並べる。矢印の `value` は実際に入れる値や出る答えの例（等幅）で、
@@ -118,14 +118,14 @@ diagrams:
         to: フェーズ管理画面
         text: research の定義を直す
         value: |-
-          review: none
+          review: false
           scope: ["wip/research/*"]
           deliverables: ["wip/research/summary.md"]
       - id: save
         from: フェーズ管理画面
         to: ccnavi
         text: ［保存］を押すと、編集中の内容を一時ファイルに書いて検証する（--lint）
-        value: 'feedback の定義に review: none を書くと、error で保存しない'
+        value: 'feedback の定義に review: false を書くと、error で保存しない'
       - id: lock
         from: フェーズ管理画面
         text: 作業中のチケット（doing）があると、進行中の作業の判定が途中で変わるため保存できない。エージェントが応答中なら、確認が出る
@@ -169,10 +169,10 @@ diagrams:
         text: 'phases: の値を、使う定義に差し替える（抜粋）'
         value: |-
           phases:
-            research: {review: none, scope: ["wip/research/*"]}
-            design: {review: mr, scope: ["wip/design/*", "docs/*"]}
-            acceptance: {review: mr, scope: ["tests/*"]}
-            implement: {review: mr, scope: ["src/*", "tests/*"]}
+            research: {review: false, scope: ["wip/research/*"]}
+            design: {review: true, scope: ["wip/design/*", "docs/*"]}
+            acceptance: {review: true, scope: ["tests/*"]}
+            implement: {review: true, scope: ["src/*", "tests/*"]}
           # ステップが使わない design-feedback などはコピーしない
       - id: agree
         from: ユーザ
@@ -180,8 +180,8 @@ diagrams:
         text: 承認すると、計画とコピーが親に固定される
         value: ccnavi user agree <親>
 
-  # 子が終わって、フェーズが終わる。review: none の例（research）
-  phase-end-none:
+  # 子が終わって、フェーズが終わる。review: false の例（research）
+  phase-end-false:
     actors: [親（メインエージェント）, ccnavi]
     steps:
       - id: finish
@@ -202,16 +202,16 @@ diagrams:
           → フェーズ 1 は終わり
       - id: kind
         from: ccnavi
-        text: 見る場所を決める。定義は none、計画のステップに mr は無く、実績のリスクは HIGH に届かない
-        value: 'review: none → none'
+        text: レビューの要否を決める。定義は false で、計画のステップに review の true は無く、実績のリスクも HIGH に届いていない
+        value: 'review: false → 要らない'
       - id: reply
         from: ccnavi
         to: 親（メインエージェント）
-        text: レビューを省略して、次のフェーズに進めと返す。子は finish の時点で done/ に入る
+        text: レビューを省略し、次のフェーズへ進むよう返す。子は finish の時点で done/ に入る
         value: 'マーカー: skipped'
 
-  # 同じく子が終わる。review: mr の例（design）
-  phase-end-mr:
+  # 同じく子が終わる。review: true の例（design）
+  phase-end-true:
     actors: [親（メインエージェント）, ccnavi, マージリクエスト, ユーザ]
     steps:
       - id: finish
@@ -221,10 +221,10 @@ diagrams:
         value: sh .ccnavi/scripts/ccnavi-ticket.sh finish <子>
       - id: ended
         from: ccnavi
-        text: フェーズが終わり、見る場所は mr になる
+        text: フェーズが終わり、レビューが要る扱いになる
         value: |-
           phase: 2 の子は done に 1 本
-          review: mr → mr
+          review: true → 要る
       - id: reply
         from: ccnavi
         to: 親（メインエージェント）
@@ -249,7 +249,7 @@ diagrams:
         text: review/ の子が done/ へ動き、止めが外れる
         value: 'マーカー: reviewed'
 
-  # 見る場所は none < mr の厳しい側。定義が none でも mr になる例（research）
+  # レビューが要るかは、定義・計画のステップ・引き受けた延期のどれか 1 つでも要ると言えば要る。定義が false でも要る扱いになる例（research）
   phase-review-up:
     actors: [フェーズ定義, 親の計画, ccnavi]
     steps:
@@ -257,20 +257,20 @@ diagrams:
         from: フェーズ定義
         to: ccnavi
         text: research の定義は、レビューを省略する
-        value: 'review: none'
+        value: 'review: false'
       - id: plan
         from: 親の計画
         to: ccnavi
-        text: 計画のステップに mr を書くと、定義が none でも mr にする
-        value: '- {type: research, review: mr}'
+        text: 計画のステップに review の true を書くと、定義が false でも要るにする
+        value: '- {type: research, review: true}'
       - id: pick
         from: ccnavi
-        text: 厳しい側を採る（none < mr）
-        value: none と mr → mr
+        text: 1 つでも要ると言えば要る
+        value: false と true → 要る
       - id: risk
         from: ccnavi
-        text: ステップに mr が無くても、閉じた子の実績のリスクが HIGH 以上なら、none を mr に上げる
-        value: 'リスク: 58 (HIGH) — 行数が多い → mr'
+        text: ステップに review の true が無くても、閉じた子の実績のリスクが HIGH 以上なら、要らない判定を要るに上げる
+        value: 'リスク: 58 (HIGH) — 行数が多い → 要る'
 
   # 順序は計画のステップの after が決める（定義には順序の欄が無い）
   phase-order:
@@ -330,7 +330,7 @@ courses:
     steps:
       - target: phase-review
         title: 例の定義
-        body: 見本の調査（research）の定義で追います。レビューは none、編集可能な範囲は wip/research/*、必須成果物は wip/research/summary.md です。直している間は「未保存」の印が付くだけで、ファイルは変わりません。
+        body: 見本の調査（research）の定義で追います。レビューは false、編集可能な範囲は wip/research/*、必須成果物は wip/research/summary.md です。直している間は「未保存」の印が付くだけで、ファイルは変わりません。
         scene: { open: research }
         diagram: phase-save
         focus: edit
@@ -374,44 +374,44 @@ courses:
 
   - id: how-phase-ends
     title: フェーズが終わったあとの動きが、review でどう変わるかを知りたいとき
-    summary: review が none と mr のときの違い。定義・計画のステップ・リスクで mr に上がる条件
+    summary: review が false と true のときの違い。定義・計画のステップ・リスクでレビューが要る扱いになる条件
     steps:
       - target: phase-review
-        title: review が none の定義
-        body: 調査（research）は review が none です。最後の子を finish で閉じるとき、必須成果物 wip/research/summary.md が git に追跡されていないと、finish は拒みます。
+        title: review が false の定義
+        body: 調査（research）は review が false です。最後の子を finish で閉じるとき、必須成果物 wip/research/summary.md が git に追跡されていないと、finish は拒みます。
         scene: { open: research }
-        diagram: phase-end-none
+        diagram: phase-end-false
         focus: finish, deliverables
       - target: phases
-        title: none は省略して進む
-        body: 同じ phase の子が doing にも todo にも無く、done に 1 枚以上あれば、フェーズは終わりです。見る場所が none なら、レビューを省略して次のフェーズへ進めと返ります。ユーザの手は入りません。
-        diagram: phase-end-none
+        title: false は省略して進む
+        body: 同じ phase の子が doing にも todo にも無く、done に 1 枚以上あれば、フェーズは終わりです。レビューが要らないなら、レビューを省略して次のフェーズへ進むよう返します。ユーザの手は入りません。
+        diagram: phase-end-false
         focus: ended, kind, reply
       - target: phase-review
-        title: review が mr の定義
-        body: 設計（design）は review が mr です。最後の子を閉じてフェーズが終わると、見る場所は mr になります。
+        title: review が true の定義
+        body: 設計（design）は review が true です。最後の子を閉じてフェーズが終わると、レビューが要ります。
         scene: { open: design }
-        diagram: phase-end-mr
+        diagram: phase-end-true
         focus: finish, ended
       - target: phases
-        title: mr は、ユーザを待って止まる
+        title: true なら、ユーザを待って止まる
         body: 返す文は「すべての子が合流済みと確かめ、レビューを頼み、応答を終えてユーザを待て」です。レビュー済みになるまで、その親の cwd からのサブエージェントの起動と Bash が止まります。次のフェーズの計画を書く Write と Edit は通ります。
-        diagram: phase-end-mr
+        diagram: phase-end-true
         focus: reply, stop
       - target: phases
         title: 依頼してから、レビュー済みまで
         body: エージェントがマージリクエストにレビューを依頼し、ユーザが指摘を付けます。指摘が片付いたら、ボードの［レビュー完了］か confirm でレビュー済みにします。review/ の子が done/ へ動き、止めが外れます。
-        diagram: phase-end-mr
+        diagram: phase-end-true
         focus: request, confirm, open
       - target: phase-review
-        title: 定義が none でも、計画のステップで mr にできる
-        body: 見る場所は、定義の review と計画のステップの mr の、厳しい側（none < mr）です。計画のステップに mr を書くと、research の定義が none のままでも、そのフェーズは mr になります。
+        title: 定義が false でも、計画のステップで true にできる
+        body: 定義の review と計画のステップの review のどちらかが true なら、そのフェーズはレビューが要ります。計画のステップに review の true を書くと、research の定義が false のままでも、そのフェーズはレビューが要ります。
         scene: { open: research }
         diagram: phase-review-up
         focus: def, plan, pick
       - target: phases
-        title: リスクが高ければ、none も mr に上がる
-        body: 閉じた子の実績のリスクが HIGH 以上なら、宣言が none でも mr に上がります。点と理由は、閉じたときの出力とレビューの依頼文の先頭に出ます。feedback の定義は、もとから none を書けません。
+        title: リスクが高ければ、false も要るに上がる
+        body: 閉じた子の実績のリスクが HIGH 以上なら、宣言が false でも、レビューが要る扱いになります。点と理由は、閉じたときの出力とレビューの依頼文の先頭に出ます。feedback の定義は、もとから false を書けません。
         diagram: phase-review-up
         focus: risk
 
@@ -421,7 +421,7 @@ courses:
     steps:
       - target: add
         title: 定義を追加する
-        body: 「＋ 定義を追加」を押すと、空の定義が末尾に追加され、行が開いて id の欄にカーソルが移ります。追加した定義の既定は、区分が work、レビューが mr、編集可能な範囲が inherit です。保存するまでファイルには反映されません。
+        body: 「＋ 定義を追加」を押すと、空の定義が末尾に追加され、行が開いて id の欄にカーソルが移ります。追加した定義の既定は、区分が work、レビューが true、編集可能な範囲が inherit です。保存するまでファイルには反映されません。
       - target: phase-id
         title: id を付ける
         body: id は定義の名前で、親チケットの計画に並べるときにこの名前で指します。英数字で始め、入力できるのは英数字と . _ - です。ほかの定義と重複すると、保存できません。
@@ -434,7 +434,7 @@ courses:
           add: blank
       - target: phase-kind
         title: 区分を選ぶ
-        body: 計画に並べる定義は work、レビューのあとのフィードバック計画に並べる定義は feedback です。feedback のレビューは mr になります。
+        body: 計画に並べる定義は work、レビューのあとに対応するフィードバック計画に並べる定義は feedback です。feedback のレビューは true になります。
         scene:
           add: blank
       - target: phase-scope
@@ -506,8 +506,8 @@ courses:
         scene:
           open: implement-feedback
       - target: phase-review
-        title: レビューは mr のまま
-        body: feedback の定義は、レビューを mr にします。none にすると検証が通らず、保存できません。対応した結果も、必ずレビューを受けます。
+        title: レビューは true のまま
+        body: feedback の定義は、レビューを true にします。false にすると検証が通らず、保存できません。対応した結果も、必ずレビューを受けます。
         scene:
           open: implement-feedback
       - target: phase-scope
@@ -587,7 +587,7 @@ courses:
           dirty: true
       - target: status
         title: 通らなかったとき
-        body: 検証が通らなければ、保存せずに下へ理由を出します。たとえば feedback の定義でレビューを none にしたとき、識別子に使用できない id、重複したタイトルなどです。同じ id が 2 つあるときは、画面が先に止めます。
+        body: 検証が通らなければ、保存せずに下へ理由を出します。検証に通らない例は、識別子に使えない id、重複したタイトル、feedback の定義で review を false にしたことです。同じ id が 2 つあるときは、画面が先に止めます。
         scene:
           dirty: true
           error: true

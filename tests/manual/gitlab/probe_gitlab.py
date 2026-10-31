@@ -798,7 +798,7 @@ def run_probe() -> None:
         redact(pushed.stdout + pushed.stderr).strip()[:120],
     )
     stray = write(os.path.join(parent_tree, "wip", "stray.txt"), "未追跡\n")
-    blocked = sh(REVIEW_SH, parent_tree, "ready")
+    blocked = sh(REVIEW_SH, ROOT, "ready", "--parent", "i0001")
     record(
         "wip/ に未追跡ファイルがあると ready が止まる",
         blocked.returncode != 0,
@@ -807,7 +807,7 @@ def run_probe() -> None:
     held = mr_of(pid, "i0001")
     record("止まったとき MR は Draft のまま", bool(held) and bool(held.get("draft")))
     os.remove(stray)
-    ready = sh(REVIEW_SH, parent_tree, "ready")
+    ready = sh(REVIEW_SH, ROOT, "ready", "--parent", "i0001")
     say("ready:\n" + redact(ready.stdout + ready.stderr))
     record("ready が通る", ready.returncode == 0)
     mr = mr_of(pid, "i0001")

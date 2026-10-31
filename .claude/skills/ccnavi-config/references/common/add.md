@@ -169,32 +169,32 @@ phases:
   research:
     kind: work                  # work は全体計画に、feedback はフィードバック計画にだけ置ける
     title: 調査                 # id と title はどちらも一意
-    review: none                # none | mr。既定であって上限ではない（計画のステップで mr に強められる）
+    review: false                # true | false。既定（true）であって上限ではない（計画のステップで true に強められる）
     scope: ["wip/research/*"]   # 子が宣言できる範囲の上限。inherit なら親の範囲そのまま
     deliverables: ["wip/research/summary.md"]   # 閉じる前に親のワークツリーに在って追跡されているべきもの
     when: 既存の振る舞いや依存が分からないとき   # 案内。次のフェーズを促す文に出る
   implement:
     kind: work
     title: 実装とテスト
-    review: mr
+    review: true
     scope: ["src/*", "tests/*"]
     when: 振る舞いを変えるとき。受入テスト作成を先に置く   # 一緒に置くべき定義の組は when に書く
   acceptance:
     kind: work
     title: 受入テスト作成
-    review: mr
+    review: true
     scope: ["tests/*"]
   implement-feedback:
     kind: feedback
     title: 実装フィードバック対応
-    review: mr                  # feedback は mr（none は書けない）
+    review: true                  # feedback は true（false は書けない）
     scope: inherit
     when: フィードバック計画の最後に置き、ほかの対応を受ける
 ```
 
 決めるときに考えること:
 
-- `review: none` にしてよいのは、その成果をユーザが見なくても次に進んで困らないフェーズ定義だけ。
+- `review: false` にしてよいのは、その成果をユーザが見なくても次に進んで困らないフェーズ定義だけ。
   ただし実績のリスクが HIGH 以上なら宣言に関わらずレビューが済むまで止まる（risks.yml の側）
 - `scope` は子 ⊆ フェーズ定義 ⊆ 親の真ん中。rules.yml の deny が止める場所を入れても deny が勝つ。
   glob はワークツリーのルートからの相対で、`..` `~` `$` と絶対パスは受け付けない
@@ -204,8 +204,8 @@ phases:
   小さい作業のように気づきを求める意味が薄い定義にだけ書く。既定は `on`。YAML は引用符なしの `on` / `off` を真偽値に読むが、どちらも読める
 - フェーズ定義に順序は書かない。並行させたいかは計画ごとに、親の計画のステップの `after` で書く（線を引かないステップは並行する）。一緒に置くべき定義の組は `when` に書く
 - `scope` と `deliverables` はそれぞれ 20 件まで
-- `feedback` のフェーズ定義に `review: none` は書けない
-- 小さい作業を親 1 本・子 1 本で回すなら、`review: mr`・`scope: inherit` の定義（例: `quick`）を 1 つ置き、親は `plan: [quick]`・`feedback: []` にする
+- `feedback` のフェーズ定義に `review: false` は書けない
+- 小さい作業を親 1 本・子 1 本で回すなら、`review: true`・`scope: inherit` の定義（例: `quick`）を 1 つ置き、親は `plan: [quick]`・`feedback: []` にする
   （親の `phases:` は `ccnavi --plan-order <親> --fill-phases` で差し込む）
 - `when` と `agent` は判定に使われない案内。`when` は「次は X の計画です（定義の案内: …）」の
   形でモデルに届くので、そのフェーズ定義を飛ばしてよい条件まで書く

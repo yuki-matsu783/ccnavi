@@ -1,7 +1,7 @@
 ---
 type: design
 title: 9.10 レビューの依頼と確認
-description: mr のフェーズでのレビューの依頼と確認の流れ
+description: レビューが要るフェーズでのレビューの依頼と確認の流れ
 tags: [design-doc, ticket, review]
 keywords: [レビュー, 依頼, 確認, mr, ccnavi-review.sh, GraphQL, 403, REST, ccr]
 ---
@@ -10,7 +10,7 @@ keywords: [レビュー, 依頼, 確認, mr, ccnavi-review.sh, GraphQL, 403, RES
 
 ### 9.10 レビューの依頼と確認
 
-この節は、見る場所が `mr` のフェーズの話。
+この節は、レビューが要る（`review: true`）フェーズの話。
 
 リモート（GitHub / GitLab）を読み書きするのは `.ccnavi/scripts/ccnavi-review.sh` で、実行ファイルは
 ネットワークに出ない（P11）。実行ファイルが持つのはワークツリーの中で分かる前提検査と、
@@ -25,13 +25,13 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 
 | sh の呼び方 | 実行ファイルの段 |
 |---|---|
-| `review-request --phase <N> --body-file <文> --eli5 <HTML>`（成功後、`--body-file` が workspace 直下の `scratchpad/` の中なら sh が消す。外のファイルは消さない。消せなければ警告のみで終了コードは変えない） | sh が `--eli5` を確かめる → `review prepare` → sh が親ブランチの open のマージリクエストを探し（無ければ作らずに止める。元ブランチが HEAD と一致し、マージ先が統合先であることも確かめる）、依頼を投稿 → `review requested` |
+| `review-request --phase <N> --body-file <文> --eli5 <HTML>`（成功後、`--body-file` が workspace 直下の `scratchpad/` の中なら sh が消す。外のファイルは消さない。消せなければ警告のみで終了コードは変えない） | sh が `--eli5` を確かめる → `review prepare --check`（ロック・取り込みの前に断る）→ ロックと取り込み → `review prepare` → sh が親ブランチの open のマージリクエストを探し（無ければ作らずに止める。元ブランチが HEAD と一致し、マージ先が統合先であることも確かめる）、依頼を投稿 → `review requested` |
 | `review-request --phase <N> --eli5 <HTML> --check` | 読むだけ。ロックも取り込みもせず、`review-request` の前提（ELI5・`review prepare`・MR の確認）を通して、投稿とマーカーの前で `確認: ok` を出して終わる |
-| `confirm --phase <N>` | sh がスレッドとレビューを取ってくる → `review confirm` |
+| `confirm --phase <N>` | `review confirm --check`（ロック・取り込みの前に断る）→ sh がスレッドとレビューを取ってくる → `review confirm` |
 | `decide <N> --preview` | 一覧とダイジェストを見るだけ（`--reviewed N --accept-unresolved --preview`）。書く側は `ccnavi-user-decide.sh <N>`（下の行） |
-| `ccnavi-user-decide.sh <N>` | ユーザが打つ。`ccnavi-review.sh` には無い。sh が取ってくる → `user reviewed N --accept-unresolved` → sh が投稿。途中で失敗した送信は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送る（操作記録は `logs/state/ops/`） |
+| `ccnavi-user-decide.sh <N>` | ユーザが打つ。`ccnavi-review.sh` には無い。`user reviewed N --accept-unresolved --check`（ロック・取り込みの前に断る）→ sh が取ってくる → `user reviewed N --accept-unresolved` → sh が投稿。途中で失敗した送信は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送る（操作記録は `logs/state/ops/`） |
 | `comment --body-file <本文>` | sh が投稿する。実行ファイルは関わらず、レビューの状態も変えない |
-| `ready` | `review ready`（条件を確かめ、マーカーを置き、閉じた親子のチケットを `logs/archive/` へ退避する。`wip/` の追跡済みのファイルを消す。標準出力は 1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`、続けて消したものがあれば `wip-from <消す前の HEAD>` と `wip <パス>`）→ write-and-push が退避と `wip/` の削除をコミットして push する（write-and-push の外なら、sh が 2 行目のツリーの置き場と `wip/` に未コミットの変更が無いことを確かめ、あれば止める）→ sh が Draft を外し、コメントを投稿する → sh が実行ファイルの `worktree drop <親>` で親のワークツリーを消す（cwd が中なら消さず、外から打つ 1 本を出す）。`--parent <親>` なら親のワークツリーの外から打てる（sh が親のワークツリーへ移って同じ段を回し、消す前に打った場所へ戻る） |
+| `ready` | `review ready --check`（ロック・取り込みの前に断る。前の回が退避を始めている打ち直しなら通して本体に任せる。Draft かどうかはホストの結果が要る）→ `review ready`（条件を確かめ、マーカーを置き、閉じた親子のチケットを `logs/archive/` へ退避する。`wip/` の追跡済みのファイルを消す。標準出力は 1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`、続けて消したものがあれば `wip-from <消す前の HEAD>` と `wip <パス>`）→ write-and-push が退避と `wip/` の削除をコミットして push する（write-and-push の外なら、sh が 2 行目のツリーの置き場と `wip/` に未コミットの変更が無いことを確かめ、あれば止める）→ sh が Draft を外し、コメントを投稿する → sh が実行ファイルの `worktree retire <親>` で子と親のワークツリーを消す。`ready` は `--parent <親>` を付けて親のワークツリーの外から打つ形だけ（sh が親のワークツリーへ移って同じ段を回し、消す前に打った場所へ戻る） |
 | `ccnavi-user-close-early.sh --reason <理由> [--no-issue]` | ユーザがターミナルで打つ。`ccnavi-review.sh` には無い。`user close-early` → sh が残りを issue に書き出し、コメントを投稿する |
 | `fetch` / `origin` | 取得した JSON を標準出力へ / origin をどう読んだか |
 
@@ -48,20 +48,21 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
    - 手元の中身が HEAD と違う
 
    `--eli5` は実行ファイルには渡さない。
-2. `review prepare` が前提を確かめ、依頼の本文とマージリクエストの下書きを state の置き場に書き出す。
+2. `ccnavi --check review prepare` が前提（フェーズの終了・合流・未コミット・push・依頼済み・依頼文）を、ロックも取り込みもせずに確かめる。通らなければここで断る。通れば sh がロックを取り、取り込む。
+3. `review prepare` が、取り込みのあとの状態で前提をもう一度確かめ、依頼の本文とマージリクエストの下書きを state の置き場に書き出す。
    どちらの末尾にも固定の一文「`wip/handoff/` 配下はユーザに渡すコピーで、レビューの対象外。integrate で消える。」を足す
    （`review.HANDOFF_NOTE`）。レビュアーは `wip/handoff/` の下の変更を読まなくてよい。
-3. sh が依頼を投稿する。マージリクエストが無ければ、先に下書きで作る。投稿する本文の末尾には
+4. sh が依頼を投稿する。マージリクエストが無ければ、先に下書きで作る。投稿する本文の末尾には
    「ELI5 は差分の `<相対パス>`。ルートで `crit review <相対パス>` を開いてソースの行に指摘を付け、`crit push <番号>` で送る」
    という 1 行を足す。
-4. `review requested` が HEAD が動いていないことを確かめ、`{head, mr, url, host, since}` をマーカーに置く。続けて、親の
+5. `review requested` が HEAD が動いていないことを確かめ、`{head, mr, url, host, since}` をマーカーに置く。続けて、親の
    承認済みチケットの `mr:` が空なら、この MR の番号を書き足す（`approval.ops.note_mr`。書いたパスは write-and-push のコミットに入る）。
    同じ番号が既にあれば何もせず、違う値があれば上書きせず「`mr:` に別の値が既にある」と警告する（依頼は通る）。
    実行後チェックはこの書き足しだけを ccnavi の書き込みと見なす（post-check.md の `mr:` の例外）。
-5. 終わったら、sh はユーザが打つ `cd '<ツリーのルート>'`・`crit review <相対パス>`・`crit push <番号>` を標準出力に出す。
+6. 終わったら、sh はユーザが打つ `cd '<ツリーのルート>'`・`crit review <相対パス>`・`crit push <番号>` を標準出力に出す。
    ツリーのルートはいつも `'…'` で包み、中の `'` は `'\''` に置き換える。
 
-**`confirm` の段**。sh がスレッドとレビューを取ってきて、`review confirm` に渡す。`review confirm` は判定し、
+`confirm` の段。sh は、ロック・取り込みの前に `review confirm --check` で断れる条件を通してから、スレッドとレビューを取ってきて、`review confirm` に渡す。`review confirm` は判定し、
 通れば `reviewed` のマーカーを置いて、そのフェーズと引き受けた延期の分の `review/` の子を `done/` へ動かす。
 sh がトークンの持ち主を引けたら `--actor` で渡し、マーカーに `actor` と `via: cli` を残す。引けないときは渡さないので、
 マーカーに `actor` が無い。
@@ -74,13 +75,13 @@ Chrome 拡張も `decide` を行える。拡張が issue・返信・解決をホ
 `done/` へ動いた子のワークツリーを消す（未コミットがあるもの・cwd が中のものは消さずに言う）。
 Chrome 拡張のレビュー済みと `decide` のワークツリーは、親の `finish` の片付けが消す。
 
-**`decide` の段**（`ccnavi-user-decide.sh`）。ユーザがボードの［レビュー完了］かターミナルで打つ。sh がスレッドとレビューを取ってきて、実行ファイルを
+`decide` の段（`ccnavi-user-decide.sh`）。ユーザがボードの［レビュー完了］かターミナルで打つ。sh は、アカウントの問い合わせ・ロック・取り込みの前に、`ccnavi --entry sh --check user reviewed N --accept-unresolved`（親とフェーズ・依頼の記録・依頼のあとに動いていないこと。選択とダイジェストを渡すときは `--yes` と `--digest` も）で断れる条件を通す。そのあと、スレッドとレビューを取ってきて、実行ファイルを
 `user reviewed N --accept-unresolved` で呼ぶ。実行ファイルは残っているスレッドを 1 件ずつ見せ、ユーザに対応方針を
 選ばせる。方針は次の 3 つ。
 
 - 対応しない。受け入れる（スレッドに返信を残して解決する。下の「受け入れの返信と解決」）
 - このフェーズで直す。続きの子チケットを同じフェーズの番号で `.ccnavi/approved/doing/` に直に置く。本文は「### 指摘 N」の見出しごとの全文転記で、frontmatter に操作記録の ID `ccnavi_op` が入る
-- issue に回す。受け入れたうえで、issue の下書きを書く。フィードバック計画の有無に関わらず、いつでも選べる。ただし `decide` が求める前提（依頼の記録があること、HEAD が動いていないこと、変更要求が無いこと）を満たすときに限る。JSON の `can_issue` は互換のために残しており、常に真。本文が 60000 字に収まらなければ、本文に目次（キー・URL・版）だけを置き、全文は同じ issue への続きのコメントに分ける
+- issue に回す。受け入れたうえで、issue の下書きを書く。フィードバック計画の有無に関わらず、いつでも選べる。ただし `decide` が求める前提（依頼の記録があること、HEAD が動いていないこと、変更要求が無いこと）を満たすときに限る。本文が 60000 字に収まらなければ、本文に目次（キー・URL・版）だけを置き、全文は同じ issue への続きのコメントに分ける
 
 直す指摘が無く、見せたあとに増えた指摘（追加分）も無ければ `reviewed` のマーカーを置き、直す指摘があればマーカーを消す。この 2 つの場合は `review/` の子を `done/` へ動かす。
 追加分は止めずに `pending_extra` として未対応のまま残す。直す指摘が無く追加分だけが残るときは、マーカーを置かず、子も動かさない（次の `decide` で扱う）。
@@ -125,8 +126,7 @@ sh はスレッドごとに最後のコメントの id・時刻・作成者も�
 要約と保存先だけを渡し、担当のサブエージェントは子の本文から全文を読む。
 
 sh がトークンの持ち主を引けたら `--actor=<名前> --via=<terminal|board>` で渡し、`reviewed` のマーカーに
-`actor` と `via` を残す。引けないときと、実行ファイルの flags に `--actor` と `--via` のどちらかが無いときは渡さないので、
-マーカーは前と同じ中身になる。実行ファイルは、`--yes` の無い呼び方では `--via board` を受け付けない。
+`actor` と `via` を残す。引けないときは `--actor` を渡さず、マーカーに `actor` を残さない。`--via` は無条件に渡す。実行ファイルは、`--yes` の無い呼び方では `--via board` を受け付けない。
 
 **`comment` の段**。crit の指摘は、ユーザが `crit push` で送る
 （下の「ELI5 と crit」）。
@@ -140,13 +140,13 @@ push 済みであること。満たしていれば `ready.json` とコメント�
 2 行目が `tree <退避したツリーのルート>` で、sh はこの 2 行目のツリーで未コミットを確かめる（sh と実行ファイルの約束）。
 `wip/` から消したものがあれば、続けて `wip-from <消す前の HEAD>` と `wip <パス>`（1 行 1 本）を出し、sh がユーザに見せる。
 write-and-push の書いたパスの一覧の検査は、`review ready` が消した `wip/` の下のファイル（今は無いもの）だけを置き場の外でも通す。
-続いて write-and-push が退避と `wip/` の削除をコミットして push し、sh が Draft を外し、コメントを投稿し、最後に `worktree drop <親>` で
-親のワークツリーを消す（cwd が中にあれば消さず、外から打つ `ccnavi-clean.sh --worktree <親>` を出す。Draft を外す前と、
-外せなかったときは消さない）。互換の版が食い違っていても止めず、組み立て直しはユーザに頼むと言う。
-親は cwd から引くので、`review-request`・`confirm`・`decide`・`ready`（`--parent` なし）を統合先のブランチの上（ワークスペースルートなど）で打つと、sh はホストへ繋ぐ前に止まる。cwd を示して「親のワークツリーの中で打ってください」と言い、`次:` に `cd` 付きの打ち直しを出す。ホストは cwd の origin で決まるので、先に繋ぐと親のプロジェクトとは別のホストで止まってしまう。
-`ready --parent <親>` は親のワークツリーの外から打つ形。sh は `.claude/worktrees/<親>` へ移ってから origin・ブランチ・親の識別子を
-読み、実行ファイルにもそこを cwd として渡すので、条件の確かめ・退避・write-and-push・Draft 外しは中から打ったときと同じに進む。
-最後の `worktree drop` だけは打った場所へ戻ってから、打った場所を cwd として渡すので、親のワークツリーが消える。GitLab では、Draft を外すときに `squash` も
+続いて write-and-push が退避と `wip/` の削除をコミットして push し、sh が Draft を外し、コメントを投稿し、最後に `worktree retire <親>` で
+子と親のワークツリーを消す（親が消せない条件（cwd が親の中・未コミット・無視ファイル）があれば、何も消さずに断り、直し方を出す。Draft を外す前と、
+外せなかったときは消さない）。
+親は cwd から引くので、`review-request`・`confirm`・`decide` を統合先のブランチの上（ワークスペースルートなど）で打つと、sh はホストへ繋ぐ前に止まる。cwd を示して「親のワークツリーの中で打ってください」と言い、`次:` に `cd` 付きの打ち直しを出す。ホストは cwd の origin で決まるので、先に繋ぐと親のプロジェクトとは別のホストで止まってしまう。
+`ready` は親のワークツリーの外から `--parent <親>` を付けて打つ形だけ。`--parent` が無ければ、sh はホストへ繋ぐ前に止まり、何も変えず、外から打つ 1 本を `次:` に出す（cwd が親のワークツリーの中なら親の識別子を埋める）。付いていれば、sh は `.claude/worktrees/<親>` へ移ってから origin・ブランチ・親の識別子を
+読み、実行ファイルにもそこを cwd として渡す。最後は打った場所へ戻ってから、親のワークツリーを消す。
+最後の `worktree retire` だけは打った場所へ戻ってから、打った場所を cwd として渡すので、親のワークツリーも消せる（消せない条件があれば、子にも触らずに断る）。GitLab では、Draft を外すときに `squash` も
 有効にする。同じ親に 2 度打っても通る。退避を始めた後の打ち直しは、ready のマーカーが今のツリーのもので、`ready.json` のマージリクエストの
 番号が今回と同じときだけ、ワークツリーの側の条件だけを見て残りを移す。マージするのはユーザ。
 

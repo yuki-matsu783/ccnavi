@@ -31,7 +31,7 @@ Write は止まる。組み込みの既定は持たない。
       research:
         kind: work            # work | feedback
         title: 調査
-        review: none          # none | mr
+        review: false         # true | false（既定 true。true はレビューが要る）
         scope: ["wip/research/*"]   # 子の範囲の上限。inherit なら親の範囲
         deliverables: ["wip/research/summary.md"]
         agent: explorer       # 案内にだけ使う
@@ -70,21 +70,6 @@ KIND_WORK = "work"
 KIND_FEEDBACK = "feedback"
 KINDS = (KIND_WORK, KIND_FEEDBACK)
 
-REVIEW_NONE = "none"
-# mr はホストのマージリクエストで見る。
-REVIEW_MR = "mr"
-REVIEWS = (REVIEW_NONE, REVIEW_MR)
-
-# 見る場所の強さ。厳しい側を採るときに使う（none < mr）。
-REVIEW_RANK = {REVIEW_NONE: 0, REVIEW_MR: 1}
-
-
-def stricter(a: str, b: str) -> str:
-    """見る場所の厳しい側。どちらかが知らない表記なら mr として扱う。"""
-    if a not in REVIEW_RANK or b not in REVIEW_RANK:
-        return REVIEW_MR
-    return a if REVIEW_RANK[a] >= REVIEW_RANK[b] else b
-
 
 class PhaseTypes(dict):
     """定義の集合。id → 定義のマップ。"""
@@ -111,7 +96,8 @@ class PhaseType:
     id: str
     title: str = ""
     kind: str = KIND_WORK
-    review: str = REVIEW_MR
+    # このフェーズの終わりにユーザのレビューが要るか。レビューはマージリクエストで見る。
+    review: bool = True
     # None なら inherit（親の範囲そのまま）。
     scope: list[ticket_model.Entry] | None = None
     scope_globs: list[str] = field(default_factory=list)
@@ -259,7 +245,7 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
 
     処理フロー:
     1. 表示名（`title`）、種類（`kind`）、レビュー（`review`）を読む。知らない値は断る
-    2. 種類がフィードバック対応で、レビューが無しのものは断る（結果を見る場所は MR になる）
+    2. 種類がフィードバック対応で、レビューが無しのものは断る（レビューは MR で行う）
     3. 範囲（`scope`）を読む。無しと `inherit` は親から継ぐ（None）。
        glob のリストは `_globs` で式にする
     4. 成果物（`deliverables`）は文字列のリストに限る。
@@ -277,19 +263,25 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         problems.append(Problem(SEVERITY_ERROR, ident, f"`kind` は {' か '.join(KINDS)}"))
         return None, problems
     pt.kind = kind
-    review = str(body.get("review") or REVIEW_MR).strip()
-    if review not in REVIEWS:
-        problems.append(Problem(SEVERITY_ERROR, ident, f"`review` は {' か '.join(REVIEWS)}"))
-        return None, problems
-    pt.review = review
-    if kind == KIND_FEEDBACK and review == REVIEW_NONE:
-        # フィードバック対応の結果をユーザが見ない経路は作らない。見る場所は mr になる。
+    review = body.get("review", True)
+    if not isinstance(review, bool):
         problems.append(
             Problem(
                 SEVERITY_ERROR,
                 ident,
-                f"フィードバック対応の定義に `review: {REVIEW_NONE}` は書けない"
-                f"（`{REVIEW_MR}` にする）",
+                f"`review` は true か false で書く（`{review}` は読めない。"
+                "以前の `none` は false、`mr` は true に書き直す）",
+            )
+        )
+        return None, problems
+    pt.review = review
+    if kind == KIND_FEEDBACK and not review:
+        # フィードバック対応の結果をユーザが見ない経路は作らない。
+        problems.append(
+            Problem(
+                SEVERITY_ERROR,
+                ident,
+                "フィードバック対応の定義に `review: false` は書けない（`true` にする）",
             )
         )
         return None, problems
@@ -408,7 +400,7 @@ def consolidate_type() -> PhaseType:
             id=ticket_model.MAINTENANCE_CONSOLIDATE,
             title="学びの統合",
             kind=KIND_FEEDBACK,
-            review=REVIEW_NONE,
+            review=False,
             scope=entries,
             scope_globs=[e.glob for e in entries],
             learning=LEARNING_OFF,
@@ -506,7 +498,7 @@ def parent_scope_problems(parent: ticket_model.Ticket) -> list[Problem]:
 # 計画を持つ親は、計画（`plan:` / `feedback:`）が使う定義**だけ**のコピーを frontmatter の
 # `phases:` に持つ。欄は `phases.yml` の定義と同じで、定義の id をキーにしたマップ。承認したときの
 # 定義が親に固定され、承認のあとの判定はコピーを読み、`phases.yml` を読まない（直しても進行中の親の
-# 範囲・見る場所・成果物は変わらない）。コピーが `phases.yml` と同じかを確かめるのは承認
+# 範囲・レビューの要否・成果物は変わらない）。コピーが `phases.yml` と同じかを確かめるのは承認
 # （`agree_candidates.plan_problems`）で、手で動かした承認ではその検査は働かずコピーがそのまま効く
 # （承認を本物とするのは置き場で、置き場へ動かしたユーザが中身を承認したと読む）。
 
@@ -610,7 +602,7 @@ def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
     - 定義の `kind` が置いた計画と合わない（error）
     - `phases:` にあって、どのステップも使わない定義（warn。判定はどのステップからも引かないので、
     範囲・
-      見る場所・成果物は変わらない）
+      レビューの要否・成果物は変わらない）
     """
     found: list[Problem] = []
     name = t.ticket
