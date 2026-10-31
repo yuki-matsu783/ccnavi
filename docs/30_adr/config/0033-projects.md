@@ -83,4 +83,4 @@ Claude Code 2.1.303 で確かめた、起動する場所ごとの挙動は次の
 
 決定の「拒否の文面が案内する sh のパスは `{root}/.claude/scripts/...`」の置き場は古い。いまの置き場は `.ccnavi/scripts/` である（ADR-0044）。
 
-Bash ツールの環境に `CLAUDE_PROJECT_DIR` が来ないことは、今も変わらない。そのため、`CLAUDE_PROJECT_DIR` が無いターミナルや Bash ツールから、`.claude/` を持つプロジェクトの中で `ccnavi` を直接打つと、`--root` を渡さない限りそのプロジェクトが根と見なされる。`--root` を付けるか、sh のラッパーを通す。これは未解決で、洗い出しは `docs/21_design/multi-repo/standalone-clone-gaps.md` の A2 にある。
+Bash ツールの環境に `CLAUDE_PROJECT_DIR` が来ないことは、今も変わらない。そのため、`CLAUDE_PROJECT_DIR` が無いターミナルや Bash ツールから、`.claude/` を持つプロジェクトの中で `ccnavi` を直接打つと、`--root` を渡さない限りそのプロジェクトが根と見なされる。`--root` を付けるか、sh のラッパーを通す。これは未解決で、単体 clone での根の動きは、設計書「複数のリポジトリ」の「単体 clone での動作」の根の決め方の項にある。

@@ -20,7 +20,7 @@ keywords: [統合先, origin/HEAD, CCNAVI_INTEGRATION_BRANCH, --integration-bran
 
 決める場所は 2 つ。sh は `ccnavi-common-state.sh` の `ccnavi_integration`、Python は `ops_stop_integrate.integration_name`（Python にはさらに `--integration-branch` が挟まる）。
 
-1 と 2 はワークスペースで 1 つの値なので、`projects/` の下のどのプロジェクトにも同じ名前が該当する（`docs/21_design/multi-repo/standalone-clone-gaps.md` の B1）。
+1 と 2 はワークスペースで 1 つの値なので、`projects/` の下のどのプロジェクトにも同じ名前が該当する。プロジェクトごとの統合先とずれるため、プロジェクトの統合先への push を止められず、Python の `--lint` の識別子の予約（識別子が統合先の名前と同じものを断る検査）もプロジェクトの統合先を見なかった。設計書の「単体 clone での動作」（multi-repo）が洗い出したこの不都合を、この ADR では「B1」と呼ぶ。
 
 ## 決定
 
@@ -35,7 +35,7 @@ keywords: [統合先, origin/HEAD, CCNAVI_INTEGRATION_BRANCH, --integration-bran
 ## 理由
 
 - ホストの既定ブランチ以外へマージする使い方はほぼ無いので、上書きの手段を持つ意味は小さい
-- ワークスペースで 1 つの値が B1 を生んでいた。プロジェクトの統合先への push を止められず、Python の `--lint` の識別子の予約もプロジェクトの統合先で効かなかった
+- ワークスペースで 1 つの値が B1（状況に書いた、プロジェクトの統合先とのずれ）を生んでいた。プロジェクトの統合先への push を止められず、Python の `--lint` の識別子の予約もプロジェクトの統合先で効かなかった
 - `settings.local.json` はエージェントが書き換えられるファイルで、sh はその内容をその場で読むため、エージェントが統合先を変えられた
 - Chrome 拡張はもともとホスト API の `default_branch` を見ており、sh・Python とずれていた。廃止すると sh・Python と揃う。ただし拡張のリポジトリごとの「統合先の名前」設定欄はこの変更の対象外で残っており、sh・Python との統一は欄の扱いの判断待ちである
 

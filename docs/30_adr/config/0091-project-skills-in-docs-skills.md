@@ -58,4 +58,4 @@ keywords: [スキル, プロジェクト, docs/skills, 目録, SKILL.md, 振り�
 - プロジェクトの `skills/` は、プロジェクトだけを clone した人の手元にも git で入る。ただし目録は渡らない。目録を渡す hook はワークスペースの `.claude` にしかなく、`project_of` も単体 clone では空文字を返す。単体 clone を検出して縮退するのではなく、黙って何も出さない。単体 clone で Claude Code が自動で読むのは、この ADR が退けた `.claude/skills/` のほうである
 - ワークスペースの `.claude/skills/` の工程スキルを `skills/<工程>/` にコピーする ADR-0111 の決定も同じで、コピーは git に入り、reference は `ccnavi --docs` で引けるが、入口の SKILL.md を目録で渡すのはワークスペースから起動したときだけである
 
-この扱いと単体 clone の現状は ADR-0145 と `docs/21_design/multi-repo/standalone-clone-gaps.md` の C2 にまとめた。`.claude/skills/` へ置き場を移すかどうかは、この ADR では決めていない。
+この扱いと単体 clone の現状は ADR-0145 と、設計書「複数のリポジトリ」の「単体 clone での動作」のプロジェクトのスキルの項にまとめた。`.claude/skills/` へ置き場を移すかどうかは、この ADR では決めていない。
