@@ -3,7 +3,7 @@ version: 1
 ticket: chore-757-handoff-drop-orig
 issue: 757
 mr: 758
-title: "保護対象の下書きの控え（.orig）をやめ、取り込み時の確認を --expect のハッシュだけにする"
+title: 保護対象の下書きの控え（.orig）をやめ、取り込み時の確認を --expect のハッシュだけにする
 phases:
   quick-work:
     kind: work
@@ -12,28 +12,32 @@ phases:
     scope: inherit
     when: 設計判断や並行作業が要らないとき
 plan:
-  - quick-work
-rationale: |
-  方針（.orig をやめる）は、ユーザが決めた。調べる範囲は広い（取り込みの実体・下書きを作る sh・2 つの拡張・設計書）が、
+- quick-work
+rationale: '方針（.orig をやめる）は、ユーザが決めた。調べる範囲は広い（取り込みの実体・下書きを作る sh・2 つの拡張・設計書）が、
+
   設計の選択肢は残っていないので、調査と設計のフェーズは分けず、子が先に依存を洗い出してから直す。
+
   ユーザに見える変更（--expect の形式、拡張の conflict の表示）は、MR のレビューで確かめてもらう。
+
+  '
 allow:
-  - match: Write|Edit
-    glob: ".ccnavi/scripts/ccnavi-stage.sh"
-  - match: Write|Edit
-    glob: ".ccnavi/docs/*"
-  - match: Write|Edit
-    glob: "src/*"
-  - match: Write|Edit
-    glob: "tests/*"
-  - match: Write|Edit
-    glob: "docs/21_design/*"
-  - match: Write|Edit
-    glob: "extensions/vscode/ccnavi-board/*"
-  - match: Write|Edit
-    glob: "extensions/chrome/ccnavi-approval/*"
-started_at: "2026-10-31T11:41:55+0900"
-base_sha: "d849655a657ed66ed0b8474ccb6e1cc6a10ee821"
+- match: Write|Edit
+  glob: .ccnavi/scripts/ccnavi-stage.sh
+- match: Write|Edit
+  glob: .ccnavi/docs/*
+- match: Write|Edit
+  glob: src/*
+- match: Write|Edit
+  glob: tests/*
+- match: Write|Edit
+  glob: docs/21_design/*
+- match: Write|Edit
+  glob: extensions/vscode/ccnavi-board/*
+- match: Write|Edit
+  glob: extensions/chrome/ccnavi-approval/*
+started_at: 2026-10-31T11:41:55+0900
+base_sha: d849655a657ed66ed0b8474ccb6e1cc6a10ee821
+feedback: []
 ---
 ## 目的
 
