@@ -18,6 +18,10 @@ ccnavi の開発で、操作を止める条件を足す・直すとき、実装�
 - 「どの操作がどの条件を見るか」は、条件の側で宣言する。操作の側に条件を書き並べない。条件を足したら、見る操作を宣言に足す
 - 条件が返すのは、理由と次の一手を持つ共通の形（Problem）。表示（ターミナルの文・ボードの JSON・案内）は、その結果を言い換えるだけにする。表示の入口が複数あっても、判定の実装は 1 つ
 
+`start`・`finish`・`cancel`・`consolidate` の書く前の検査は、`lifecycle/commands.py` の `start_gate`・`finish_gate`・`cancel_gate` と `consolidate.py` の `gate` に置き、本体と `--check`（sh が取り込みの前に呼ぶ）が同じ関数を通る。合流のあとでないと分からない検査だけが本体に残る。
+
+親のワークツリーの未コミットの変更と親ブランチの未 push は、`lifecycle/treegate.py`（`check`）に寄せた。操作が見る条件は `WATCHES` に宣言する。git の呼び出しが重複していないことは `tests/core/test_gate_single_source.py`、操作ごとの拒否は `tests/core/test_treegate.py` が守る。置き場の判定は `ticket_places.is_ticket_place` に一本化した。
+
 ## ユーザに頼む操作は、後の関門で止まる条件を先に拒否する
 
 承認を頼む操作（`approval-request`）とレビューを頼む操作（`review-request`）は、ユーザが次の一手を打てる状態でなければ、何も送らずに拒否する。
@@ -74,7 +78,3 @@ ccnavi の開発で、操作を止める条件を足す・直すとき、実装�
 次は、同じ条件が別々に書かれている箇所。上の決まりに沿って 1 つに寄せる。
 
 - 子が親に合流済みか: `write_and_push_merge.py:plan` と `review/request.py:_unmet`
-
-`start`・`finish`・`cancel`・`consolidate` の書く前の検査は、`lifecycle/commands.py` の `start_gate`・`finish_gate`・`cancel_gate` と `consolidate.py` の `gate` に置き、本体と `--check`（sh が取り込みの前に呼ぶ）が同じ関数を通る。合流のあとでないと分からない検査だけが本体に残る。
-
-親のワークツリーの未コミットの変更と親ブランチの未 push は、`lifecycle/treegate.py`（`check`）に寄せた。操作が見る条件は `WATCHES` に宣言する。git の呼び出しが重複していないことは `tests/core/test_gate_single_source.py`、操作ごとの拒否は `tests/core/test_treegate.py` が守る。置き場の判定は `ticket_places.is_ticket_place` に一本化した。
