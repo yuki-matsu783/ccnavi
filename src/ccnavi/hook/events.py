@@ -1220,8 +1220,8 @@ def decide_after_failure(
     （is_interrupt）も、中断までに書かれたぶんは残るので同じ。
 
     止められるイベントではないので、返せるのは文だけ。照合の結果は `additionalContext` で渡す。
-    連続は閾値に達した回に資料を引く案内を返す。中断はユーザが止めたもので、ツールの誤りでは
-    ないので数えない。数えの失敗や案内を組む失敗で、ツールの結果は変わらない。
+    最初の 1 回と、連続が閾値の倍数になった回に、資料を引く案内を返す。
+    中断はユーザが止めたもので、ツールの誤りではないので数えない。数えの失敗や案内を組む失敗で、ツールの結果は変わらない。
     """
     record.decision, record.reason = audit.SKIP, audit.REASON_EVENT_NOT_CHECKED
     # 失敗した呼び出しは、ターン分離の関門の A に数えない（実行前に残した記録を消す）。
@@ -1247,13 +1247,7 @@ def decide_after_failure(
     )
     texts.append(text)
     if not payload.is_interrupt:
-        n = failstreak.threshold(conf.fail_streak_count)
-        try:
-            kind, got = failstreak.fail(conf.state, payload.session_id, payload.agent_id, n)
-            if kind:
-                texts.append(docsearch.fail_streak_note(conf, root, got, kind == failstreak.FIRST))
-        except Exception:  # noqa: BLE001  案内の失敗でツールの結果を変えない
-            pass
+        texts.append(judge.fail_streak_hint(conf, root, payload.session_id, payload.agent_id))
     said = "\n\n".join(p for p in texts if p)
     if said:
         hookio.write_context(stdout, hookio.POST_TOOL_USE_FAILURE, said)

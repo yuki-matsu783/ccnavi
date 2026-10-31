@@ -390,9 +390,9 @@ def guide_lines(conf: settings.Settings, root: str, lead: str) -> list[str]:
     return [line]
 
 
-def fail_streak_note(conf: settings.Settings, root: str, n: int, first: bool = False) -> str:
-    """最初の失敗か拒否のとき（`first`）と、連続が n の倍数になったときの案内。
-    資料の索引を引くよう促す。
+def fail_streak_note(conf: settings.Settings, root: str, count: int, first: bool = False) -> str:
+    """最初の失敗か拒否のとき（`first`）と、連続が閾値の倍数になったときの案内。
+    `count` は今の連続の長さ。資料の索引を引くよう促す。
 
     止められた呼び出しを迂回する案内にはしない。止まった理由と決まった手順を確かめるために
     引かせ、見つからなければユーザに相談させる。
@@ -400,7 +400,7 @@ def fail_streak_note(conf: settings.Settings, root: str, n: int, first: bool = F
     if first:
         lead = texts.say(root, "NOTICE_DOCS_FAIL_FIRST_LEAD", {})
     else:
-        lead = texts.say(root, "NOTICE_DOCS_FAIL_STREAK_LEAD", {"n": str(n)})
+        lead = texts.say(root, "NOTICE_DOCS_FAIL_STREAK_LEAD", {"n": str(count)})
     return "\n".join(guide_lines(conf, root, lead))
 
 
