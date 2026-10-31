@@ -11,3 +11,4 @@ keywords: [process-review, 経過, 動機, パターン]
 | 変更 | 動機のパターン |
 |---|---|
 | `preexisting-failures.md` を足した | preexisting-failure-misattributed |
+| `verify-claims-in-flat-eval.md` を足した | flat-eval-unverified-rejection |
