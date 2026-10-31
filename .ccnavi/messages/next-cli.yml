@@ -67,7 +67,7 @@ messages:
     next: |-
       '{script:ccnavi-ticket.sh} finish {parent}' で親を閉じる（取り込み済みの親子なら、finish が移動をコミットして push する。そうでなければ、移動をコミットして push する）
     note: |-
-      finish のあと、親のワークツリーの外に出て '{ready_command}' で Draft を解除する。ready はクローズ済みのチケットの記録と `{wip}/` の追跡済みのファイルを削除してコミットし、push してから Draft を解除し、最後に親のワークツリーを削除します（ワークツリーの中から --parent なしで実行すると削除せず、外から実行するコマンドを表示する）
+      finish のあと、親のワークツリーの外に出て '{ready_command}' で Draft を解除する。ready はクローズ済みのチケットの記録と `{wip}/` の追跡済みのファイルを削除してコミットし、push してから Draft を解除し、最後に親のワークツリーを削除します（--parent なしで実行すると、何も変えずに止まり、外から実行するコマンドを表示する）
       残っている子のワークツリーは finish が片付ける。マージはユーザが squash で行う。{flow_agreed}
 
   # ---- tickets/review/decide.py（続きの子を起こしたあと。ユーザの端末に出る行）

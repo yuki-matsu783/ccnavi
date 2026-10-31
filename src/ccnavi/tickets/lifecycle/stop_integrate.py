@@ -16,7 +16,8 @@
 `direct_candidates`）。チケット制御の有無は問わない。1 本のツリーが次の全部を満たすとき。
 
 - `.claude/worktrees/<名前>` のワークツリーで、今のブランチが名前と同じ
-- チケットに結び付かない。`ccnavi-git.sh integrate` と同じ判定（`bound_reason`。全ツリーの
+- チケットに結び付かない。`ccnavi-git.sh integrate` と同じ判定（`bound_reason`。`direct_check` が、
+  その前に、ブランチ名と統合できる名前の確認を足す。全ツリーの
   承認済みチケット・提案の `<名前>.md`、手元の退避、origin に在る親のブランチのワークツリー。
   最後の1つは、直接作業の記録（`ccnavi-direct/<名前>`）があるワークツリーを外す）を
   使うので、促したのに `integrate` が断る食い違いは起きない

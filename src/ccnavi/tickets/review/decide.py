@@ -81,8 +81,7 @@ def _followup_from_choice(
         "フェーズは再び開かれ、マーカーは消えた。\n"
     )
     stdout.write(
-        texts.say(root, "NEXT_DECIDE_FOLLOWUP", {"words": _followup_next(root, parent, ident)})
-        + "\n"
+        texts.say(root, "NEXT_DECIDE_FOLLOWUP", {"words": _followup_next(root, ident)}) + "\n"
     )
     for line in phase.reopen_impact(root, conf, parent.ticket, ph.number):
         stdout.write(line + "\n")
@@ -98,7 +97,7 @@ def _status_line(root: str, parent: ticket_model.Ticket) -> str:
     )
 
 
-def _followup_next(root: str, parent: ticket_model.Ticket, ident: str) -> str:
+def _followup_next(root: str, ident: str) -> str:
     """続きの子を起こしたあと、エージェントが打つ 1 手。ワークツリーは start が切る。"""
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
     return f"エージェントが '{ticket_sh} start {ident}' で着手する"
@@ -1160,7 +1159,7 @@ def _decided_prompt(
         )  # 要約。全文は子の本文
         return (
             f"{head}\n直す指摘は続きの子チケット {followup} に載せ、承認済みにしてある。"
-            f"{_followup_next(root, d.parent, followup)}。指摘:\n{items}\n"
+            f"{_followup_next(root, followup)}。指摘:\n{items}\n"
             "状態の操作（start・finish）はメインが打つ。実装はサブエージェントに任せてよい。\n"
             # fix のスレッドはホスト上で未解決のまま残る。keep・issue のときに sh が返信して
             # resolve する仕組みは、この文の対象外

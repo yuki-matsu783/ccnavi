@@ -97,6 +97,9 @@ def _just_committed(worktree: str, deadline: float) -> bool:
 
     `--dry-run` や、コミットが積まれなかった呼び出しでは HEAD が動かない。そのとき最後の項目は
     古い commit のままなので、時刻で切る。
+
+    近似なので、失敗した commit でも、直前の 10 分以内に別の commit があれば真になる。
+    案内はワークツリー名ごとに 1 回なので、誤って出ても害は小さい。
     """
     done = gitcmd.run_until(worktree, ["reflog", "-1", "--date=unix", "--format=%gd|%gs"], deadline)
     if not done.ok:
