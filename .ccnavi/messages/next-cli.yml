@@ -76,6 +76,12 @@ messages:
     next: |-
       親のワークツリー（.claude/worktrees/{family}）で書き、'{script:ccnavi-ticket.sh} approval-request {family}' で親のブランチへ送ってから承認を頼む
 
+  # tickets/core/approve.py（承認を頼む前の検査で、提案の不備を直す）。
+  NEXT_APPROVAL_FIX_PROPOSAL:
+    kind: next
+    next: |-
+      上の理由を直して、approval-request を打ち直す（何も送っていません）
+
   # 提案を識別子と違う名前のワークツリーに書いている。
   NEXT_APPROVAL_PLACE:
     kind: next
