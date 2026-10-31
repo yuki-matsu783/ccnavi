@@ -37,4 +37,4 @@ messages:
     kind: note
     values: [worktrees]
     note: |-
-      作業中の直接作業のワークツリーがある: {worktrees}。この作業の続きなら、新しく切らずそこで編集する。別の作業として切るときは、ユーザに確かめる（ccnavi-worktree.sh が確認を求める）
+      作業中の直接作業のワークツリーがある: {worktrees}。別に切ろうとすると、ccnavi-worktree.sh が確認を求める
