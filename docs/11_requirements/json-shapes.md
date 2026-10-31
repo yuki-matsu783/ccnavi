@@ -354,7 +354,7 @@ ccnavi --entry board user mirror [<プロジェクト名>…] --yes --expect <�
 ## 版の JSON
 
 ```sh
-ccnavi --version          # 1 行 1 項目（`compat: 19` など。sh が読む）
+ccnavi --version          # 1 行 1 項目（`compat: 20` など。sh が読む）
 ccnavi --version --json
 ```
 
@@ -362,9 +362,7 @@ ccnavi --version --json
 `.ccnavi/scripts/` の sh。どちらも起動のときに互換の版を比べて断ることはしない（下の「sh と VS Code 拡張は、実行ファイルとの食い違いを…」を見る）。
 
 ```json
-{"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 19,
- "features": ["user-entry", "handoff", "mirror"],
- "flags": ["--accept-unresolved", "--agree", "…", "--version", "--yes"],
+{"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 20,
  "formats": {"phases": 1, "risks": 1, "rules": 1, "ticket": 1}}
 ```
 
@@ -375,22 +373,15 @@ ccnavi --version --json
 | `commit` | 組み立ての元のコミット。組み立てのときに埋め、未コミットの変更があれば `-dirty` が付く。ソースで動かしているときは `unknown` |
 | `built` | 組み立てた実行ファイルなら真、ソースで動いていれば偽 |
 | `compat` | 互換の版。実行ファイルと、それを呼ぶ側（sh と拡張）の契約の版（下） |
-| `flags` | 受け付けるフラグ。引数の定義から引くので、フラグを足せばここにも並ぶ |
 | `formats` | 読む書式の版。レイヤーのファイル（`rules.yml` / `phases.yml` / `risks.yml`）とチケットの頭の `version:` と比べるもの |
-| `features` | オプションから読めない振る舞いの名前（文字列の配列）。現在の名前は `user-entry`（ユーザ専用の入口 `user <操作>`）、`handoff`（保護対象の取り込み）、`mirror`（共通レイヤーのミラーの同期）。呼ぶ側が振る舞いの有無を見分けるためのもので、追加しても `compat` は上げない |
 
 **互換の版**は 3 か所に同じ値で持つ。実行ファイル（`--version --json` の `compat`）、sh（`ccnavi-common.sh` の
 `CCNAVI_COMPAT`）、VS Code 拡張。Chrome 拡張は組み立てのときに実行ファイルの値を埋め込む。
 sh や拡張が頼るフラグや出力の形を、呼ぶ側を直さないと動かない形に変えたときに上げる。データの形（承認済みの置き場に置くものの並び、
 先行関係の置き場など）が変わるときも上げる。古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）が
-新しい形のデータを読み違えるため。フラグや欄を足すだけで、データの形も変わらないなら上げない（拡張は使う前に `flags` を見る）。
+新しい形のデータを読み違えるため。フラグや欄を足すだけで、データの形も変わらないなら上げない。
 レイヤーのファイルは頭の `version:` が書式の版を示し、読めない版は `--lint` が既に error を出すので、レイヤーに別の版は足さない。
 
-sh と VS Code 拡張は、実行ファイルとの食い違いを実行時に断らない・知らせない（sh と実行ファイルは必ず同時に配る前提）。見つける場所は 2 つ。
-
-| 見つける場所 | 言うこと |
-|---|---|
-| VS Code 拡張 | `--flow` などを使う前に `flags`（機能は `features`）を見て、無ければ画面を開かない・保存しない。版を聞けなかったときも先へ進まない |
-| `ccnavi --lint` | sh の `CCNAVI_COMPAT` と比べ、`(version)` の warn を出す |
+sh と VS Code 拡張は、実行ファイルとの食い違いを実行時に断らない・知らせない（sh と実行ファイルは必ず同時に配る前提）。使うフラグや機能の有無も事前に確かめず、版のずれは実行ファイルの断りの文面をそのまま見せる。見つける場所は `ccnavi --lint` だけで、sh の `CCNAVI_COMPAT` と比べ、`(version)` の warn を出す。
 
 直し方は、ccnavi のリポジトリで実行ファイルを組み立て直し、`sh scripts/ccnavi-setup.sh <ワークスペース>` で配り直す（実行ファイルは配布元と中身が違えば置き換わる）。sh も配り直すなら `--force` を付ける。

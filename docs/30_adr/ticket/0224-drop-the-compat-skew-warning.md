@@ -22,7 +22,7 @@ ccnavi は sh（`.ccnavi/scripts/`）と実行ファイルの 2 つで動き、�
 | sh と実行ファイルは必ず同時に配る前提にする。`ccnavi_compat_skew`・`tell_skew` と、全ての呼び出し・文面を消す | 後方互換は考えない決まり。まれな異常状態のために、全ての操作の入口で毎回 `--version` を起こして比べる処理を持たない | 全ての呼び出しを残す。呼び出しを 1 本の関数にまとめて残す |
 | VS Code 拡張の起動時の食い違いの通知（`skewMessage`・`warnVersionSkew`）を消す | 同じ前提（拡張は同じ版の実行ファイルと一緒に配る） | 通知だけ残す |
 | 互換の版の宣言（`COMPAT`・`CCNAVI_COMPAT`・`EXTENSION_COMPAT`）、`--version` の `compat`、`--lint` の `(version)` の warn は残す | Chrome 拡張は同梱の実行ファイルと統合先の sh の版を、書く操作の前に比べて断る（別の配布経路で、同時に配れない）。`--lint` と配布の組み立ては、食い違いを見つけるための報告 | 宣言ごと消す |
-| 拡張が `flags`・`features` を見て、無い機能の画面を開かない処理（`missingFlags`・`missingFeatures`）は残す | 食い違いの通知ではなく、使う機能の有無で動作を分ける処理 | — |
+| 拡張が `flags`・`features` を見て、無い機能の画面を開かない処理（`missingFlags`・`missingFeatures`）は残す（ADR-0226 で覆した） | 食い違いの通知ではなく、使う機能の有無で動作を分ける処理 | — |
 | 3 か所の宣言が同じ値かを見るテストを `tests/core/test_version.py` に移し、`tests/sh/test_compat_skew.py` を消す | 比べる処理が無いので sh のテストは要らない。宣言の一致は残す | 一致の確認も消す |
 
 ## 得たもの・失ったもの

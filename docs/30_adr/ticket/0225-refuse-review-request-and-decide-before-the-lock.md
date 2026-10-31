@@ -22,7 +22,7 @@ ADR-0217・0221 は、開始前に分かる条件を、何も変えずに最初�
 |---|---|---|
 | `review-request` は、`wap_start` の前に `ccnavi --check review prepare` を通す。`prepare` の検査は `request_gate` に切り出し、本体の `prepare` と `prepare --check` が同じ関数を通る。取り込みのあとに `prepare` を通し直す（取り込みで状態が変わった場合も同じ関数で断る） | 取り込みとコミットの前に何も変えずに断る。ADR-0221 と同じ型 | `prepare` の呼び出しを `wap_start` の前に動かす（取り込みのあとの状態で見る検査が消える） |
 | `review-request --check` は、`prepare --check` のあと、本文を書き出さずにマージリクエストの確認へ進む | `--check` が state に書かない。確認は同じ前提を通る | 従来どおり `prepare` を実行して本文を消す |
-| `decide` は、アカウントの問い合わせ・ロック・取り込みの前に、`ccnavi --check --reviewed N --accept-unresolved`（選択とダイジェストを渡されたときは `--yes` と `--digest` も）を通す。検査は `decide_gate`（親とフェーズ・依頼の記録・依頼のあとに動いていないこと）と、選択とダイジェストの形（`_parse_choices`）で、本体（`_decision`・`decide_yes`）と同じ関数 | ユーザが選ぶ前、取り込みの前に断る。`--resume` の形も、選択を復元したあとに同じ検査を通る | 選び終えたあとに断る |
+| `decide` は、アカウントの問い合わせ・ロック・取り込みの前に、`ccnavi --entry sh --check user reviewed N --accept-unresolved`（選択とダイジェストを渡されたときは `--yes` と `--digest` も）を通す。検査は `decide_gate`（親とフェーズ・依頼の記録・依頼のあとに動いていないこと）と、選択とダイジェストの形（`_parse_choices`）で、本体（`_decision`・`decide_yes`）と同じ関数 | ユーザが選ぶ前、取り込みの前に断る。`--resume` の形も、選択を復元したあとに同じ検査を通る | 選び終えたあとに断る |
 | 断るときは、理由のあとに `次:` を 1 行足す（`NEXT_REVIEW_REQUEST_REFUSED`・`NEXT_DECIDE_REFUSED`） | 直して打ち直せば済む形にする | 理由だけを出す |
 | `--check` は終了コードで返し、ターミナルを求めない。書く形の decide と見なさず、write-and-push を通さない | 読むだけの口にする | 書く形と同じ扱い |
 

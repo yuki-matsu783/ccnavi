@@ -31,5 +31,5 @@ ccnavi と配布した sh は同じ版で動く。それでも、操作記録が
 ## 採らなかった案
 
 - 作りかけの `ccnavi-start.sh` の再開と `ROUTE_UNKNOWN`（finish を通らず手で `done/` に動かした子への案内）は、普段の経路から届きうるので残した
-- `ccnavi-user-decide.sh` の `post_decision`（操作 ID の無い計画のときの直接投稿）は残した。現行の実行ファイルは計画に必ず操作 ID を書くので本番では届かないが、`tests/sh/test_review_decide.py` の代用品がこの経路を通る。消すには、代用品を本物の `ops` を通す形に書き直す必要がある
-- `ccnavi_compat_skew`・`tell_skew`（約 14 か所の呼び出し）は触らなかった。sh と実行ファイルを必ず同時に配る前提かどうかを先に決める
+- `ccnavi-user-decide.sh` の `post_decision`（操作 ID の無い計画のときの直接投稿）は残した。現行の実行ファイルは計画に必ず操作 ID を書くので本番では届かないが、`tests/sh/test_review_decide.py` の代用品がこの経路を通る。消すには、代用品を本物の `ops` を通す形に書き直す必要がある（ADR-0222 で覆した）
+- `ccnavi_compat_skew`・`tell_skew`（約 14 か所の呼び出し）は触らなかった。sh と実行ファイルを必ず同時に配る前提かどうかを先に決める（ADR-0224 で覆した）

@@ -124,9 +124,7 @@ literal で表せない文字列（行末の空白、先頭の空白・改行、
 親のワークツリーの中）は共通レイヤーのコピーで誰も編集しないので、`writable` は `false`。レイヤーの置き場は常に `true`。
 ミラーへの配布は「案内と配布」の節のとおり。
 
-`drafts[]` には下書きの本文そのまま（`text`）を足す（`--show --json` の `template.text` と同じ読み方）。`--version --json` は `features`
-（文字列の配列。取り込みの `handoff` など）を足し、オプションから読めない振る舞いを見分ける。
-`features` を足しても互換の版（COMPAT）は上げない。
+`drafts[]` には下書きの本文そのまま（`text`）を足す（`--show --json` の `template.text` と同じ読み方）。
 
 **`--lint`。** `lint_templates` が `plan_templates.scan` の苦情を `(templates)`（共通）・`(templates/<レイヤー>)` の場所で出す。
 置き場の無いワークスペースでは何も言わない。読むのは設定の置き場だけなので、走査にコピー（`copies`）を
