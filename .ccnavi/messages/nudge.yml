@@ -15,7 +15,7 @@ messages:
     what: |-
       ワークツリー .claude/worktrees/{name} はチケットに結び付かない直接作業で、{left}があり、取り込みの記録（ccnavi-direct）がありません。
     why: |-
-      記録の無いワークツリー（更新前に切った・手で切った）は、integrate が断ります。
+      記録の無いワークツリー（手で切った）は、integrate が断ります。
     next: |-
       ユーザに取り込み先を確かめてから、`cd {integ_tree:path} && {script:ccnavi-worktree.sh} {name} --adopt --base {base:sh}` で引き取る。出力の範囲と差分をユーザに見せ、了承を得て確認コードを付けて打ち直す
 

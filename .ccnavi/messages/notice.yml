@@ -160,13 +160,13 @@ messages:
     what: |-
       ワークツリー .claude/worktrees/{name}（チケットに結び付かない直接作業）にコミットしました。
     next: |-
-      コミットがほかにも続くなら全部済んでから、haiku のサブエージェントで差分の敵対的レビュー（単純化・共通化の余地も見る）、続けて別の haiku でフラットな評価（過剰な作り込みも見る）を行い、取り入れる指摘を新しいコミットで直してから integrate を打つ。レビュー済みなら、そのまま integrate を打つ（手順は .ccnavi/docs/direct-flow.md）
+      コミットがほかにも続くなら全部済んでから、取り込み先が進んでいれば先に取り込み（direct-flow.md の手順 4）、haiku のサブエージェントで差分の敵対的レビュー（単純化・共通化の余地も見る）、続けて別の haiku でフラットな評価（過剰な作り込みも見る）を行う。取り入れる指摘は新しいコミットで直してから integrate を打つ。レビュー済みなら、そのまま integrate を打つ（手順は .ccnavi/docs/direct-flow.md）
 
   # ---- tickets/notice/direct_worktrees.py（SessionStart の直接作業のワークツリーの一覧。1 本ごとの行はコードが組む）
   NOTICE_DIRECT_WORKTREES_HEAD:
     kind: notice
     what: |-
-      [ccnavi] このPCの直接作業のワークツリー（チケットに結び付かないもの。新しい順）:
+      [ccnavi] このPCの直接作業のワークツリーは次のとおりです（チケットに結び付かないもの。新しい順）。
 
   NOTICE_DIRECT_WORKTREES_MORE:
     kind: notice

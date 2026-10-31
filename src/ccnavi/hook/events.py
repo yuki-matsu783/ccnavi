@@ -1111,7 +1111,7 @@ def decide_at_start(
         pending = pending_integrate.pending_notice(
             root, conf, limit if deadline is None else min(deadline, limit)
         )
-        # 直接作業のワークツリーの一覧（事実だけ）。モデルにだけ出す。期限は同じ作り方で別に取る。
+        # 直接作業のワークツリーの一覧（事実だけ）。モデルにだけ出す。期限は、ほかの知らせと同じ作り方で別に取る。
         limit = time.monotonic() + PENDING_SECONDS
         direct = direct_worktrees.session_text(
             root, conf, limit if deadline is None else min(deadline, limit)

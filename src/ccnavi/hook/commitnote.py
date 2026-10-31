@@ -10,7 +10,7 @@ Stop の促しはターンを伸ばすので、案内の主経路にしない。
 
 - メインのエージェントの Bash（サブエージェントの中ではない）
 - `ccnavi-git.sh commit` を打った場所が、直接作業のワークツリー（`.claude/worktrees/<名前>`。
-  ブランチが名前と同じで、チケットに結び付かない。判定は Stop の促しと同じ `bound_check`）
+  ブランチが名前と同じで、チケットに結び付かない。判定は Stop の促しと同じ `direct_check`）
 - 実際にコミットが積まれた（`--dry-run` の類いではなく、HEAD の履歴の最後が直前の commit）
 
 ワークツリーの名前ごとにセッションで 1 回だけ出す。覚え方は `additionalContextOnce` と同じ
@@ -26,7 +26,6 @@ from typing import TextIO
 from ..infra import gitcmd, hookio, pathcase, settings, shellread, tree
 from ..policy import ctxfile, rules, texts
 from ..tickets.lifecycle import stop_integrate as osi
-from ..tickets.model import direct_candidates
 from . import wrapguard
 
 # 数えのキー（`ctxfile` の記録）。ワークツリーの名前ごとに分ける。
@@ -85,11 +84,9 @@ def _notice(
 def _direct_name(root: str, conf: settings.Settings, place: str, deadline: float) -> str:
     """`place` が、いま直前にコミットが積まれた直接作業のワークツリーなら、その名前。違えば空。"""
     here = tree.tree_of(root, place, conf.projects)
-    if here is None or here.is_main or tree.branch_of(here.root) != here.name:
+    if here is None or here.is_main:
         return ""
-    if not direct_candidates.integrable_name(here.name):
-        return ""
-    reason, unsure = osi.bound_check(root, conf, here, deadline)
+    reason, unsure = osi.direct_check(root, conf, here, deadline)
     if reason or unsure or not _just_committed(here.root, deadline):
         return ""
     return here.name
@@ -98,7 +95,7 @@ def _direct_name(root: str, conf: settings.Settings, place: str, deadline: float
 def _just_committed(worktree: str, deadline: float) -> bool:
     """HEAD の履歴の最後が、直前の commit か。読めなければ偽。
 
-    `--dry-run` や、コミットが積まれなかった呼び出しでは HEAD が動かない。そのとき最後の項目が
+    `--dry-run` や、コミットが積まれなかった呼び出しでは HEAD が動かない。そのとき最後の項目は
     古い commit のままなので、時刻で切る。
     """
     done = gitcmd.run_until(worktree, ["reflog", "-1", "--date=unix", "--format=%gd|%gs"], deadline)
