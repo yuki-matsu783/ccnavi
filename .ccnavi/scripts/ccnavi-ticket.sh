@@ -50,7 +50,7 @@
 # start・finish・approval-request・consolidate は、ロックの前に事前確認（ホストの API と git のリモートが使える状態か）を打つ。
 #   直接作業では確かめない。標準出力には何も足さず、ok でない項目だけを標準エラーに出す（ticket_preflight）。
 #
-# 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）の
+# 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの）の
 # start・finish・cancel・approval-request・consolidate は write-and-push で回す。Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため、次を 1 操作にする。
 # ロック → 途中の操作の確認 → hook のマーカーを先にコミット →
 # 取り込み（ccnavi-sync.sh）→ 未送信の確かめ → 書く → 書いたパスだけ commit --only → push。push が
@@ -191,11 +191,13 @@ ticket_id() {
 # 道は、中が申し送り（CCNAVI_PROPOSE_NOTE の route=）に書く。書かれていなければ、終了コードで決める。
 # --check は確かめるだけで何も送らない。結果ファイルも書かない（送ったかどうかの記録に混ぜない）。
 po_check=""
-if [ "$1" = approval-request ]; then
+case "$1" in
+start | finish | cancel | approval-request | consolidate)
 	for po_arg in "$@"; do
 		[ "$po_arg" != --check ] || po_check=yes
 	done
-fi
+	;;
+esac
 if [ "$1" = approval-request ] && [ -z "${CCNAVI_PROPOSE_INNER:-}" ] && [ -z "$po_check" ]; then
 	po_id=$(ticket_id "$@")
 	po_dir="$root/logs/state/stopops-result"
@@ -367,12 +369,18 @@ start | finish | cancel | approval-request | consolidate)
 		esac
 		# 取り消しは事前確認しない（ホストに届かない・権限が足りないときでも、取り消せるようにする）
 		[ "$1" = cancel ] || ticket_preflight || exit 1
-		# approval-request --check は、ロックも取り込みもせず、送る前の検査だけを実行ファイルで行う。
+		# --check は、ロックも取り込みもせず、書く前の検査だけを実行ファイルで行う。
 		if [ -n "$po_check" ]; then
 			ccnavi_wap_end
 			trap - EXIT INT TERM HUP
 			ccnavi_wap_exe ticket "$@" || exit $?
 			exit 0
+		fi
+		# 開始前に分かる条件は、ロック・取り込み・コミット・子のワークツリーの作成の前に、何も変えずに断る。
+		# 検査は実行ファイルの本体と同じ関数（読むだけ）。通ったときの標準出力は捨てる。`--check` は位置引数の前に置く。
+		# approval-request は上の事前確認の流れで検査が済む（--check と本体が同じ検査を通る）。
+		if [ "$1" != approval-request ]; then
+			ccnavi_wap_exe --check ticket "$@" >/dev/null || exit $?
 		fi
 		ccnavi_wap_begin || {
 			ticket_unsent_parent_next "$1"

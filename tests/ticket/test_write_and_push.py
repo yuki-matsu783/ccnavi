@@ -8,8 +8,8 @@ write-and-push は、親子のチケットで状態を書く操作を
 tests/sh/test_write_and_push_*.py（道具は tests/sh/write_and_push_harness.py）が見る。
 
 1. `ccnavi write-and-push family <識別子>`: 親子のチケット（子なら親）と、write-and-push の対象か。
-   origin の無い親のワークツリーと置き場が絶対パスの親子のチケットは対象外
-   （マージリクエストで見るフェーズの有無は問わない）、決まらない親子のチケットは stop
+   origin の無い親のワークツリーと置き場が絶対パスの親子のチケットは対象外、
+   決まらない親子のチケットは stop
 2. `ccnavi write-and-push sort <親> [<版>]`: 置き場の変更の見分け（ccnavi
 が書いたと内容で分かるもの・
    ユーザがコミットして push するもの・見分けられないもの、数えない一時ファイル、

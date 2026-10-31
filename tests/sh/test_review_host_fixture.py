@@ -253,7 +253,7 @@ class HostFixtureTest(unittest.TestCase):
 
     def test_confirm_on_the_integration_branch_says_to_type_it_in_the_parent_worktree(self):
         self.on_integration_branch()
-        for sub, rest in (("confirm", ("--phase", "1")), ("ready", ())):
+        for sub, rest in (("confirm", ("--phase", "1")),):
             with self.subTest(sub=sub):
                 done = self.review("resolved", sub, *rest)
                 self.assertEqual(done.returncode, 2, done.stdout + done.stderr)

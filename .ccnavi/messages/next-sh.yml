@@ -1,4 +1,4 @@
-# ccnavi-git.sh・ccnavi-worktree.sh・ccnavi-stage.sh・ccnavi-ticket.sh・ccnavi-user-close-early.sh が出す次の一手。
+# ccnavi-git.sh・ccnavi-worktree.sh・ccnavi-stage.sh・ccnavi-ticket.sh が出す次の一手。
 # 条件の分岐は sh 側にある。引数の並び（args_q など）は sh が引用を済ませて渡す。
 version: 1
 messages:
@@ -30,7 +30,7 @@ messages:
     kind: next
     values: [dest]
     next: |-
-      編集はこのワークツリーの下で行います（Write / Edit に渡すパス: {dest}/…）。git は `cd {dest:path} && {script:ccnavi-git.sh} <サブコマンド>` の形で実行します。コミットは作業を終えてからまとめて打ち、続けて integrate を打ちます（ユーザの確認を待つ間はコミットしません）
+      編集はこのワークツリーの下で行います（Write / Edit に渡すパス: {dest}/…）。git は `cd {dest:path} && {script:ccnavi-git.sh} <サブコマンド>` の形で実行します。コミットは作業を終えてからまとめて打ち、レビューが済んでから integrate を打ちます（レビューの手順は、コミットのあとに案内が出ます。ユーザの確認を待つ間はコミットしません）
 
   NEXT_WORKTREE_ADOPT:
     kind: next
@@ -65,8 +65,3 @@ messages:
     kind: next
     next: |-
       ユーザに承認を頼んで返事を待つ。承認が済むまで実装はしない
-
-  NEXT_CLOSE_EARLY:
-    kind: next
-    next: |-
-      親で、閉じた子を片付けて push し、ready を実行させる。マージはユーザが行う

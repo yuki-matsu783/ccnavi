@@ -440,7 +440,7 @@ find_marked() {
 # 標準出力は note なら `comment`、issue なら `create_issue` と同じ形の JSON（送り済みと分かったときは
 # {url}、issue はそれに {number}）。送り済みなら送らず、前に試した形跡があれば先にホストを目印で照合する。
 # 確定できないときは止めて 1（自動では送り直さない）。
-# 記録を作れない（古い実行ファイル・書けない）ときは、前と同じ送り方に戻る。
+# 記録を作れないときは、二重投稿を防ぐため、送らずに止める。
 
 cs_set() {
 	ccnavi ops stage-set "$cs_id" "$cs_stage" "$@" 2>/dev/null || {
@@ -472,12 +472,9 @@ staged_send() {
 	cs_file="$7"
 	cs_id=$(ccnavi ops begin "$cs_kind" "${branch:-}" 0 "$cs_mr" "$cs_key" "$cs_stage:$cs_stage" 2>/dev/null) || cs_id=""
 	if [ -z "$cs_id" ]; then
-		# 記録なしの直接投稿。API が失敗すると、パイプの最後の jq は空入力でも 0 で終わるので、
-		# 終了コードだけでなく出力の有無でも失敗と読む（空の出力を成功として返さない）。
-		if [ "$cs_skind" = issue ]; then cs_direct=$(create_issue "$cs_file") || return 1; else cs_direct=$(comment "$cs_mr" "$cs_url" "$cs_file") || return 1; fi
-		[ -n "$cs_direct" ] || return 1
-		printf '%s\n' "$cs_direct"
-		return 0
+		# 記録が無いと二重に送るおそれがあるため、送らずに止める
+		printf '%s: 操作記録を作れなかった。二重投稿を防ぐため、何も送らずに止めた。logs/state/ops/ に書けるか、ccnavi と配布した sh の版が揃っているかを確かめて、打ち直してください。\n' "${review_label:-ccnavi-review}" >&2
+		return 1
 	fi
 	# 同じ操作を同時に送らない（照合の前に 2 つが「未送信」と見て、両方が投稿するのを防ぐ）。
 	# ロックが使えない構成（root が無い）では、取らずに進む。

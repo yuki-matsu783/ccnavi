@@ -70,6 +70,14 @@ trap 'review_exit=$?; ccnavi_wap_end; accept_cleanup "$review_exit"; rm -f "$res
 trap 'ccnavi_wap_end; exit 130' INT TERM HUP
 
 review_wap
+# 親子のチケットの write-and-push が止まるなら、ホストにも手元にも触る前に止める（返信・解決・issue・コメントの後では止めない）。
+ccnavi_wap_family "$family"
+case "$ccnavi_wap_target" in
+stop)
+	ccnavi_wap_refuse
+	exit 1
+	;;
+esac
 
 # ユーザの判断をコミットして push する。取り込み済みの親子のチケットだけ、承認の push を <親> で呼ぶ。それ以外は今のまま何もしない。
 carry_human() {
@@ -81,10 +89,6 @@ carry_human() {
 				"$review_label" "$ccnavi_wap_sh" "$ccnavi_wap_family_id" >&2
 			return 1
 		}
-		;;
-	stop)
-		ccnavi_wap_refuse
-		return 1
 		;;
 	esac
 	return 0
@@ -129,4 +133,3 @@ fi
 # 取り込み済みの親子のチケットなら、早めに閉じたマーカー（ユーザの判断）を承認の push で送る。
 carry_human "$family" || exit 1
 printf 'OK: 早めに閉じた（%s）\n' "$url"
-ccnavi_text "$root" NEXT_CLOSE_EARLY

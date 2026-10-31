@@ -811,8 +811,7 @@ def _erase_steps(
     return (
         "レビューをやり直すならマーカーを削除してください"
         f"（消し方: ユーザが{_marker_tree(root, conf, child)}で '{git} rm {mark}' を実行し、"
-        "削除をコミットする。取り込み済みで origin があり、"
-        "マージリクエストで見るフェーズがある親子なら "
+        "削除をコミットする。取り込み済みで origin がある親子なら "
         f"'{push} {child.parent}' が取り込んでから送る。それ以外は何もしないので、"
         "ユーザが自分でコミットする）。"
         "続きの作業だけなら、そのままで構いません。"
@@ -964,19 +963,6 @@ def plan_finished(root: str, conf: settings.Settings, parent: ticket_model.Ticke
 def review_venues(root: str, conf: settings.Settings, parent_id: str) -> dict[int, str]:
     """この親のフェーズ番号 → ユーザがどこで見るか（`none` / `mr`）。"""
     return {p.number: p.review_kind for p in phases_of(root, conf, parent_id)}
-
-
-def without_mr(
-    root: str, conf: settings.Settings, parent_id: str, venues: dict[int, str] | None = None
-) -> bool:
-    """マージリクエストに出さない進め方か。フェーズが 1 つも無ければ False。
-
-    1 つでも `mr` で見るフェーズがあれば、その親にはマージリクエストが在る（レビューの依頼が作る）
-    ので、早めに閉じたあとも Draft を外す手順を通る。`venues` は数え直しを省くために呼ぶ側が渡す値。
-    """
-    if venues is None:
-        venues = review_venues(root, conf, parent_id)
-    return bool(venues) and phasetypes.REVIEW_MR not in venues.values()
 
 
 # 全体計画が全部閉じてレビューも済み、フィードバック計画（`feedback:`）がまだ無い局面の呼び名。

@@ -223,9 +223,13 @@ def requested(
     # 依頼した（または依頼し直した）ことを 1 行で言う。
     done = "依頼し直した" if again else "依頼した"
     stdout.write(
-        f"OK: レビューを{done}（{result.mr.url or result.url}）。"
-        f"{phase_forms.TURN_DEFINED}を終えてユーザを待ってください\n"
-        f"{phase.PARALLEL_REQUEST_NOTE}\n"
+        f"OK: レビューを{done}（{result.mr.url or result.url}）\n"
+        + texts.say(
+            root,
+            "NEXT_REVIEW_REQUESTED",
+            {"turn": phase_forms.TURN_DEFINED, "parallel": phase.PARALLEL_REQUEST_NOTE},
+        )
+        + "\n"
     )
     return 0
 

@@ -629,13 +629,7 @@ def revision_problems(
     # 比べるのは定義・`review`・推移的な先行の並び（`after` だけの違いも違いとして拾う）。
     if approval.plan_signature(revised, "feedback") != approval.plan_signature(current, "feedback"):
         if current.feedback is not None:
-            # 残りの切り出し先は進め方で違う。マージリクエストがあれば issue に切り出せるが、
-            # マージリクエストを持たない親はホストに何も無いので、新しい親チケットの提案にする。
-            elsewhere = (
-                "残りは新しい親チケットの提案として wip/proposals/todo/ に書いてください"
-                if phase.without_mr(root, conf, current.ticket)
-                else "残りは別 issue に回してください（ccnavi-user-decide.sh）"
-            )
+            elsewhere = "残りは別 issue に回してください（ccnavi-user-decide.sh）"
             problems.append(
                 rules.Problem(
                     rules.SEVERITY_ERROR,

@@ -20,10 +20,11 @@ from types import SimpleNamespace
 from typing import TextIO
 
 from ...infra import fsio, settings, tree
+from ...policy import texts
 from ..approval import marks as approval_marks
 from ..approval import ops as approval_ops
 from ..approval import store as approval
-from ..model import oplog, review_host, standing, ticket_model, via
+from ..model import oplog, review_host, ticket_model, via
 from ..phase import gates as phase
 from . import request as review
 
@@ -78,7 +79,9 @@ def _followup_from_choice(
         f"続きの子チケット {ident} を {conf.approved}/{ticket_model.DOING}/ に起こした"
         f"（フェーズ {ph.number}、範囲は見た子の和、本文に指摘 {len(items)} 件）。"
         "フェーズは再び開かれ、マーカーは消えた。\n"
-        f"次は{_followup_next(root, parent, ident)}\n"
+    )
+    stdout.write(
+        texts.say(root, "NEXT_DECIDE_FOLLOWUP", {"words": _followup_next(root, ident)}) + "\n"
     )
     for line in phase.reopen_impact(root, conf, parent.ticket, ph.number):
         stdout.write(line + "\n")
@@ -94,19 +97,10 @@ def _status_line(root: str, parent: ticket_model.Ticket) -> str:
     )
 
 
-def _followup_next(root: str, parent: ticket_model.Ticket, ident: str) -> str:
-    """続きの子を起こしたあと、エージェントが打つ 2 手。"""
-    git_sh = settings.script_command(root, "ccnavi-git.sh")
+def _followup_next(root: str, ident: str) -> str:
+    """続きの子を起こしたあと、エージェントが打つ 1 手。ワークツリーは start が切る。"""
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
-    if tree.has_origin(root):
-        # origin があれば、start がワークツリーを切る。手で切る手順は添えない。
-        return f"エージェントが '{ticket_sh} start {ident}' で着手する"
-    base = standing.head_branch(tree.worktree_path(root, parent.ticket), parent.ticket)
-    return (
-        f"エージェントが '{git_sh} worktree add .claude/worktrees/{ident} -b {ident} "
-        f"{base or '<親のブランチ>'}' でワークツリーを切り、'{ticket_sh} start {ident}' で"
-        "着手する"
-    )
+    return f"エージェントが '{ticket_sh} start {ident}' で着手する"
 
 
 @dataclass
@@ -1165,7 +1159,7 @@ def _decided_prompt(
         )  # 要約。全文は子の本文
         return (
             f"{head}\n直す指摘は続きの子チケット {followup} に載せ、承認済みにしてある。"
-            f"{_followup_next(root, d.parent, followup)}。指摘:\n{items}\n"
+            f"{_followup_next(root, followup)}。指摘:\n{items}\n"
             "状態の操作（start・finish）はメインが打つ。実装はサブエージェントに任せてよい。\n"
             # fix のスレッドはホスト上で未解決のまま残る。keep・issue のときに sh が返信して
             # resolve する仕組みは、この文の対象外

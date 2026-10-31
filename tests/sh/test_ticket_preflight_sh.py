@@ -87,7 +87,7 @@ class TicketPreflightTest(WriteAndPushHarness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("確認: api: 未確認", result.stderr)
         self.assertIn("確認: access: 省略", result.stderr)
-        self.assertIn("このあとの request・confirm・ready はホストの API が要る", result.stderr)
+        self.assertIn("このあとの review-request・confirm・ready はホストの API が要る", result.stderr)
         self.assertNotIn("確認:", result.stdout)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 

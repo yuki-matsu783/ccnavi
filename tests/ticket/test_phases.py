@@ -909,7 +909,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("合意した範囲に入る", closed.stdout)
         self.assertIn("確認を取り直さずに進める", closed.stdout)
         self.assertIn("squash", closed.stdout)
-        # 閉じた記録は進め方によらず置く。
+        # 閉じた記録（どのフェーズをどこで見たか）を置く。
         record = read_json(os.path.join(self.approved, "phases", "i0001", "closed.json"))
         self.assertEqual(record["reviews"], {"1": "mr"})
         self.commit_parent("状態の移動")

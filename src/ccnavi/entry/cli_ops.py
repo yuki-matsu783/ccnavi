@@ -209,7 +209,10 @@ def operate(
             gate=lambda idents: approve.approval_request_gate(stderr, root, conf, idents),
         )
     elif kind == "ticket" and verb in ("start", "finish", "cancel") and target:
-        if verb == "start":
+        if args.check:
+            # 副作用の前に分かる検査だけ（読むだけ）。sh が取り込みやコミットの前に呼ぶ。
+            code = ops.check(stdout, stderr, root, conf, verb, target, args.reason)
+        elif verb == "start":
             code = ops.start(stdout, stderr, root, conf, target)
         elif verb == "finish":
             code = ops.finish(stdout, stderr, root, conf, target)
@@ -218,7 +221,10 @@ def operate(
     elif kind == "ticket" and verb == "consolidate" and target:
         # ticket consolidate <親>。統合の子を doing/ に作る。コミットと push は sh
         # （ccnavi-ticket.sh consolidate）が write-and-push の手順で行う。
-        code = consolidate.run(stdout, stderr, root, conf, target)
+        if args.check:
+            code = consolidate.check(stdout, stderr, root, conf, target)
+        else:
+            code = consolidate.run(stdout, stderr, root, conf, target)
     elif kind == "ticket" and verb == "learn" and len(words) <= 3:
         # ticket learn [<識別子>] [--note <本文> [--target <種類>] [--signal <信号>]]。
         # 気づきの記録の雛形と要約、または気づき 1 件の追記（直接作業では受信箱）。
@@ -408,6 +414,12 @@ def _worktree(
     return EXIT_OK if code == 0 else EXIT_ERROR
 
 
+# `--check` で検査だけを通せる状態の操作（書かないので write-and-push を通らなくてよい）。
+_CHECKABLE = [
+    ["ticket", verb] for verb in ("start", "finish", "cancel", "approval-request", "consolidate")
+]
+
+
 def _write_and_push_bypass(
     root: str, conf: settings.Settings, args: argparse.Namespace, cwd
 ) -> str:
@@ -421,10 +433,10 @@ def _write_and_push_bypass(
     write-and-push を通っていない。
     ユーザの判断の操作（`--close-early`）と、
     書かない形（`--preview`・`--choose-out`・`--accept-plan`・`review prepare`・
-    `ticket approval-request --check`）は見ない。`--check` を読むのは `approval-request` だけ。
+    `ticket start|finish|cancel|approval-request|consolidate --check`）は見ない。
     """
     words = list(args.command)
-    if args.record_tree or (args.check and words[:2] == ["ticket", "approval-request"]):
+    if args.record_tree or (args.check and words[:2] in _CHECKABLE):
         return ""
     family_id = ""
     if (

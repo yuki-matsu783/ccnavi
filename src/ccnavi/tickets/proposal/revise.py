@@ -30,6 +30,7 @@ from typing import TextIO
 
 from ...infra import fsio, settings
 from ...infra.modes import EXIT_ERROR, EXIT_OK
+from ...policy import texts
 from ..approval import checks as approval_checks
 from ..approval import store as approval
 from ..model import ticket_fields, ticket_ids, ticket_model
@@ -128,28 +129,17 @@ def run(
     if failed:
         return refuse(f"{path} に保存できませんでした（{failed}）")
 
-    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
     stdout.write(
         f"{ident} の改版の雛形を {path} に書いた"
         "（承認済みチケットのコピー。スクリプトだけが書く欄は外した）\n"
     )
-    verify = f"'{ticket_sh} approval-request {ident} --check' が通ったら、"
-    send = (
-        f"'{ticket_sh} approval-request {ident}' で親のブランチへ送り、"
-        "承認をユーザに頼んで返事を待つ"
-    )
+    case = "feedback" if feedback else "edit"
     if feedback:
         stdout.write("フィードバック計画は `feedback: []`（対応なし）にした\n")
         # 対応のフェーズを並べる場合は、確かめる前に直す。先に言ってから次の一手を言う
-        stdout.write(
-            "案内: 全体計画のレビューで残った指摘を対応のフェーズにするときは、"
-            f"{path} の `feedback: []` を、対応のフェーズを並べた `feedback:` に直してから"
-            "確かめる\n"
-        )
-        stdout.write(f"次: {verify}{send}\n")
-    else:
-        cancel = f"{ticket_sh} cancel <子> --reason <理由>"
-        stdout.write(f"次: {path} の plan・phases・allow などを直す\n")
-        stdout.write(f"案内: 範囲を変えるときは、作業中の子を先に '{cancel}' で取り消す\n")
-        stdout.write(f"案内: 直したら、{verify}{send}\n")
+        stdout.write(texts.say(root, "NOTE_REVISE_FEEDBACK", {"path": path}) + "\n")
+    stdout.write(
+        texts.say(root, "NEXT_REVISE", {"ident": ident, "path": path}, {"next": case, "note": case})
+        + "\n"
+    )
     return EXIT_OK
