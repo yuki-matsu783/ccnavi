@@ -8,7 +8,7 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた時点の状態を JSON で見る）
 #   sh .ccnavi/scripts/ccnavi-review.sh merged [<番号>]       （MR がマージ済みか。番号で聞くこともできる。ccnavi-sync.sh が使う）
 #   sh .ccnavi/scripts/ccnavi-review.sh mr-state <番号>       （MR の今の状態を読むだけ。ボードの「MR の状況を確認」が使う）
-#   sh .ccnavi/scripts/ccnavi-review.sh ready [--parent <親>]                  （閉じたチケットを logs/archive/ へ退避し、MR の Draft を外し、子と親のワークツリーと合流済みの子のブランチを片付ける）
+#   sh .ccnavi/scripts/ccnavi-review.sh ready --parent <親>                    （閉じたチケットを logs/archive/ へ退避し、MR の Draft を外し、子と親のワークツリーと合流済みの子のブランチを片付ける）
 #   sh .ccnavi/scripts/ccnavi-review.sh origin                                 （origin をどう読んだか。ホスト・scheme・API の URL）
 #
 # ユーザだけが打つ操作は、ユーザ専用の sh（ccnavi-user-*.sh）に分けた。エージェントからは hook が名前で止める。
@@ -53,10 +53,12 @@
 # ホストに触り、実行ファイルが書いたパスだけを commit --only して push する。送れなければ戻す。
 # それ以外は今のまま。
 #
-# 親のワークツリーの中で実行すること。どの親かは cwd から引く。ready だけは `--parent <親>` で
-# 外（ワークスペースルートなど）からも打てる（ほかのサブコマンドに --parent を渡すと拒否する）。
-# review-request・confirm・decide・ready（--parent なし）を統合先のブランチの上（ワークスペースルートなど）で打つと、
-# 親が決まらないので、ホストへ繋ぐ前に「親のワークツリーの中で打ってください」と止める（理由に cwd を示し、`次:` に cd 付きの打ち直しを出す）。ready は --parent を付ければ外から打てる。外から打つと、Draft を外したあとに親のワークツリーも消える。
+# review-request・confirm・decide は親のワークツリーの中で実行すること。どの親かは cwd から引く。
+# ready だけは親のワークツリーの外（ワークスペースルートなど）から `--parent <親>` を付けて打つ
+# （ほかのサブコマンドに --parent を渡すと拒否する）。外から打つと、Draft を外したあとに親のワークツリーも消える。
+# review-request・confirm・decide を統合先のブランチの上（ワークスペースルートなど）で打つと、
+# 親が決まらないので、ホストへ繋ぐ前に「親のワークツリーの中で打ってください」と止める（理由に cwd を示し、`次:` に cd 付きの打ち直しを出す）。
+# ready を --parent なしで打つと、ホストへ繋ぐ前に止めて、何も変えず、外から打つ 1 本を `次:` に出す。
 # 終了コード: 0 成功 / 1 前提の未充足 / 2 引数か環境の誤り /
 #             3 merged だけ: MR がマージ済みかを確かめられなかった（"unknown" を出す。推定せずに止める）
 #
@@ -93,7 +95,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <review-request|confirm|comment|decide|ready
   confirm      --phase <N>                        未解決（Unresolved）のスレッドが 1 つも無ければマーカーを置く（未解決のスレッドは依頼の時刻に関わらずすべて数える。手で done/ に動かして共有した子は、移動の前の指摘を台帳 accepted.json に版つきで受け入れて確定する）
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに書き出す
   decide       <N> --preview                      未解決（Unresolved）の指摘と、選べる対応方針の一覧を JSON で見るだけ。何も置かない
-  ready        [--parent <親>]                    閉じられて push 済みなら、クローズ済みのチケットを logs/archive/ へ退避し wip/ の追跡済みのファイルを削除して削除を push し、Draft を解除する（「マージに進んでよい」の合図。マージはユーザが squash で）。最後に親のワークツリーを削除します（中から実行したときは消さず、外から実行する 1 本を出す）。--parent なら親のワークツリーの外から実行できる
+  ready        --parent <親>                      閉じられて push 済みなら、クローズ済みのチケットを logs/archive/ へ退避し wip/ の追跡済みのファイルを削除して削除を push し、Draft を解除する（「マージに進んでよい」の合図。マージはユーザが squash で）。最後に親のワークツリーを削除します。親のワークツリーの外から打ちます。--parent を付けないと、何もせず外から打つ 1 本を出して止まる
   fetch                                           リモートから取ってきた時点の状態を JSON で標準出力へ
   origin                                          origin をどう読んだか（ホスト・scheme・API の URL）
   merged [<番号>]                                 マージリクエスト（番号で指定、省けばいまのブランチのもの）がマージ済みなら "merged <番号> <先頭の sha> <元ブランチ>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が閉じたかを確かめる）
@@ -354,17 +356,29 @@ if [ "$sub" = mr-state ]; then
 	mr_state "$mr_state_number"
 fi
 
-# ---- ready --parent <親>。親のワークツリーの外（ワークスペースルートなど）から打つ形。
+# ---- ready --parent <親>。親のワークツリーの外（ワークスペースルートなど）から打つ形だけ。
 #
 # 親は cwd から引く決まりなので、ここで親のワークツリーへ移ってから先へ進む。git（origin・ブランチ・
-# 親の識別子）と実行ファイルの cwd は親のワークツリーになり、中から打ったときと同じに動く。
-# 打った場所（here）は覚えておき、最後に親のワークツリーを消すときの cwd に使う（外から打てば消せる）。
+# 親の識別子）と実行ファイルの cwd は親のワークツリーになる。
+# 打った場所（here）は覚えておき、最後に親のワークツリーを消すときの cwd に使う。
 # 消す前に打った場所へ戻る（自分の cwd が消す対象の中にあると、Windows では消せない）。
+# --parent が無ければ、ホストへ繋ぐ前に止めて、外から打つ 1 本を案内する（何も変えない）。
+ready_need_parent() {
+	review_tree
+	rn_parent="<親の識別子>"
+	rn_hint="親の識別子は 'sh $script_dir/ccnavi-ticket.sh status' か 'sh $script_dir/ccnavi-git.sh worktree list' で確かめる。"
+	if [ "$review_in_tree" = yes ]; then
+		rn_parent="$family"
+		rn_hint="ready は親のワークツリーの中では打たない（親のワークツリーを消すのは外から）。"
+	fi
+	fail ready-parent-required "ready は親のワークツリーの外から --parent <親の識別子> を付けて打ってください。いまの cwd（${here}）では何も変えていません。
+次: cd $(ccnavi_sh_quote "$root") && sh $(ccnavi_sh_quote "$script_dir/ccnavi-review.sh") ready --parent ${rn_parent}
+案内: ${rn_hint}" 2
+}
 ready_parent=""
 ready_from=""
 if [ "$sub" = ready ]; then
-	# `--parent` は 1 度だけ、値は空でないこと。`--parent=`（空）や `--parent X --parent` を黙って
-	# 読み飛ばすと、外から打ったつもりが中から打つ形で進む。
+	# `--parent` は 1 度だけ、値は空でないこと。`--parent=`（空）や `--parent X --parent` を黙って読み飛ばさない。
 	rp_prev=""
 	rp_count=0
 	for rp_arg in "$@"; do
@@ -388,42 +402,38 @@ if [ "$sub" = ready ]; then
 		fail ready-parent-missing "ready の --parent には親の識別子が必要です。" 2
 	fi
 	[ "$rp_count" -le 1 ] || fail ready-parent-twice "ready の --parent は 1 度だけ渡せる。" 2
-	if [ -n "$ready_parent" ]; then
-		ccnavi_is_ident "$ready_parent" ||
-			fail ready-parent-ident "ready の --parent の値（${ready_parent}）は有効な識別子の形式ではありません。" 2
-		ready_dir="$root/.claude/worktrees/$ready_parent"
-		[ -d "$ready_dir" ] && [ ! -L "$ready_dir" ] && [ -e "$ready_dir/.git" ] ||
-			fail ready-parent-tree "親 ${ready_parent} のワークツリー（${ready_dir}）がありません。ready は親のワークツリーで行う。" 2
-		ready_from="$(pwd)"
-		cd "$ready_dir" || fail ready-parent-cd "親 ${ready_parent} のワークツリー（${ready_dir}）に移れない。" 2
-		exe_cwd="$(pwd -W 2>/dev/null || pwd)"
-	fi
+	[ -n "$ready_parent" ] || ready_need_parent
+	ccnavi_is_ident "$ready_parent" ||
+		fail ready-parent-ident "ready の --parent の値（${ready_parent}）は有効な識別子の形式ではありません。" 2
+	ready_dir="$root/.claude/worktrees/$ready_parent"
+	[ -d "$ready_dir" ] && [ ! -L "$ready_dir" ] && [ -e "$ready_dir/.git" ] ||
+		fail ready-parent-tree "親 ${ready_parent} のワークツリー（${ready_dir}）がありません。ready は親のワークツリーで行う。" 2
+	ready_from="$(pwd)"
+	cd "$ready_dir" || fail ready-parent-cd "親 ${ready_parent} のワークツリー（${ready_dir}）に移れない。" 2
+	exe_cwd="$(pwd -W 2>/dev/null || pwd)"
 fi
 
 # ---- 実行ファイル。merged は実行ファイルを起こさない（ホストに聞くだけ）ので、無くても進める。
 review_exe || [ "$sub" = merged ] || review_no_bin
 
-# 親のワークツリーの外で、親を cwd から引くサブコマンド（review-request・confirm・decide・ready）を打ったとき、
+# 親のワークツリーの外で、親を cwd から引くサブコマンド（review-request・confirm・decide）を打ったとき、
 # ホストへ繋ぐ前に止めて案内する。
 #
 # 親のワークツリーの外で居るブランチを親の識別子と読むと、統合先（main など）を親と読んでしまい、
 # 「親のワークツリーを切り直せ」という見当違いの案内になる。ホストは cwd の origin で決まるので、先に繋ぐと
 # 親のプロジェクトとは別のホスト（ワークスペース自身の origin）に繋ぎ、別の理由で止まる。原因は、親のワークツリーの中で
 # 打っていないことにある。居るブランチが統合先のときだけ止める。統合先が決まらないときは、前どおり進める。
-# ready は --parent で外から打てる（上で親のワークツリーへ移ってあるので、ここでは中として通る）。
 need_parent_tree() {
 	review_tree
 	[ "$review_in_tree" = yes ] && return 0
 	np_tree=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	np_name=$(ccnavi_integration "${np_tree:-.}" 2>/dev/null) || np_name=""
 	[ -n "$np_name" ] && [ "$np_name" = "$branch" ] || return 0
-	np_hint=""
-	[ "$sub" != ready ] || np_hint="外から打つなら --parent <親の識別子> を付けます。"
 	np_args=""
 	for np_a in "$@"; do
 		np_args="$np_args $(ccnavi_sh_quote "$np_a")"
 	done
-	fail not-in-parent-tree "$sub は親のワークツリー（$root/.claude/worktrees/<親の識別子>）の中で打ってください。いまの cwd（${here}）は統合先のブランチ（${branch}）の上で、親を決められません。${np_hint}
+	fail not-in-parent-tree "$sub は親のワークツリー（$root/.claude/worktrees/<親の識別子>）の中で打ってください。いまの cwd（${here}）は統合先のブランチ（${branch}）の上で、親を決められません。
 次: cd $(ccnavi_sh_quote "$root/.claude/worktrees/<親の識別子>") && sh $(ccnavi_sh_quote "$script_dir/ccnavi-review.sh") ${sub}${np_args}
 案内: 親の識別子は 'sh $script_dir/ccnavi-ticket.sh status' か 'sh $script_dir/ccnavi-git.sh worktree list' で確かめる。--body-file・--eli5 などの相対パスは cd で指す先が変わるので、絶対パスで打ち直す。" 2
 }
@@ -431,7 +441,6 @@ need_parent_tree() {
 # ---- 親を cwd から引くサブコマンドは、ホストへ繋ぐ前に cwd を確かめる。
 case "$sub" in
 review-request | confirm | decide) need_parent_tree "$@" ;;
-ready) [ -n "$ready_parent" ] || need_parent_tree "$@" ;;
 esac
 
 # ---- リモート。
@@ -946,11 +955,9 @@ ready)
 	# 閉じた子のワークツリー（レビュー待ちだったものも）、子の手元のブランチ（合流した子は条件を確かめて削除。
 	# 取り消した子は一覧を出すだけで、ユーザの確認が取れてから消す）、親のワークツリーの順。未コミットの変更や
 	# git が無視しているファイルがあるワークツリーは、理由を出して残す。条件の確認も削除も実行ファイルが行う
-	# （エージェントに git branch -D は開けない）。打った場所（--parent なら外）を cwd として渡す。中から
-	# 打っていれば実行ファイルは消さず、外に出てから打つ 1 本を出す。消せなくても ready は成功のまま。
-	if [ -n "$ready_from" ]; then
-		cd "$ready_from" || cd "$root"
-	fi
+	# （エージェントに git branch -D は開けない）。打った場所（親のワークツリーの外）を cwd として渡す。
+	# 消せなくても ready は成功のまま。
+	cd "$ready_from" || cd "$root"
 	exe_cwd="$here"
 	ccnavi worktree retire "$family" || :
 	# 親と名前が違うワークツリーや、下書きがあって消されなかった子のワークツリーは、drop では消えない。
