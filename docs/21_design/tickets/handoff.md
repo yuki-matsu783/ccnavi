@@ -29,7 +29,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, user handoff, 許可�
 
 - `--yes` が無い形は見るだけで、何も書かない。パスを省くと、種類の表に該当する下書き全部が対象になる
 - 見るだけの形を含めて、すべてユーザ専用（`user` の入口の中。外では断る）。エージェントは `ccnavi-stage.sh --commands` で状態を見る
-- `ccnavi-stage.sh --commands` は、取り込める種類の下書きにこのコマンドの手順を出し、`mv` は `defense` にだけ出す（`mv` は検査・差分・ハッシュ確認を通らず、下書きを作ったあとの元の変更も検知しない。同じファイルを他の人が直した可能性があるときは、`mv` の前に `git diff` で元を確かめる。戻すのは git の履歴）。取り込めるかの判定は sh の `is_importable` が `KINDS` と同じ表を持つ（ずれはテストで見つかる）
+- `ccnavi-stage.sh --commands` は、編集済みの下書きに、`defense` を含む全種類で、このコマンドの手順（見るだけと `--yes --expect`）を出す。`mv` は出さない（`mv` は検査・差分・`--expect` を通らず、下書きを作ったあとに直された元を黙って上書きする）。表の外のパスには手順を出さず、取り込めないと標準エラーに言う（sh の `is_importable` が `KINDS` と同じ表を持ち、ずれはテストで見つかる）。`defense` は取り込み先の無いファイルを作れないが、`ccnavi-stage.sh` が元の無いパスを断るので、元の無い `defense` の下書きは `--commands` に届かない（手で `wip/handoff/` に置いた下書きは届くが、取り込み先が無いので取り込みが断る。`defense` は新規作成できない）
 
 **ツリー。** `--root` で指した 1 本のツリーだけを見る。ほかのツリーの `wip/handoff/` は読まない。`ccnavi-stage.sh` と `user handoff` は
 同じツリーの決め方（`ccnavi_workspace` と同じ規則）を使う。取り込み先は、下書きがあるツリーの、階層名の読み替えを戻した相対パス。
@@ -63,7 +63,7 @@ Claude Code 本体は `.claude` という名前の階層（深さを問わない
 | `messages` | `.ccnavi/messages/<名前>.yml`（ワークスペースルート直下だけ。`projects/<名前>/` の下の `messages/` は読まれないので対象外） | できる | 不可 | 文面ファイルの検査（`policy/texts.py`。欄・差し込みの名前・`次:` の数・長さ・ADR 番号・相対の script 呼び出し。[文面ファイル](../messages.md)）。error のある下書きは取り込めない |
 | `layer-config` | `.ccnavi/config/{common,project}/{rules,phases,risks}.yml`、`projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` | できない | 可（`rules.yml` で防御の記述を動かすものは不可。下記） | `ccnavi --lint` が同じファイルに掛ける検査と同じ水準（下の「検査の共有」） |
 | `docs` | `.ccnavi/docs/**/*.md`、`.ccnavi/CCNAVI.md` | できない | 可 | UTF-8 であること |
-| `defense` | `.ccnavi/scripts/**/*.sh`、`.claude/hooks/**`、`.claude/settings.json`、`.claude/settings.local.json`、`.claude/skills/**/*.md`（スキルの frontmatter は使えるツールや hook を持てる） | できない | 不可（`--via board` は断る。ターミナルの前のユーザだけ） | `.sh` は CRLF を error にして `sh -n`。`settings*.json` は JSON として読めること |
+| `defense` | `.ccnavi/scripts/**`、`.claude/hooks/**`、`.claude/settings.json`、`.claude/settings.local.json`、`.claude/skills/**/*.md`（スキルの frontmatter は使えるツールや hook を持てる） | できない | 不可（`--via board` は断る。ターミナルの前のユーザだけ） | `.sh` は CRLF を error にして `sh -n`。`settings*.json` は JSON として読めること |
 
 `layer-config` の `rules.yml` のうち、防御の記述を動かす取り込みは、`defense` と同じくターミナルに限る（`--via board` は断り、`--json` の `board` は偽になる）。防御の記述とみなすのは、次の 2 つ。1 つめは `guard-` で始まる id のルールを足す・消す・判定を移す・`except` を含む中身を変える場合で、この id は利用者が防御のルールに付ける印（ccnavi 自身の保護は組み込みの `builtin:guard-*` にあり、共通のルールファイルには無い）。2 つめは今ある deny を消す・中身を変える場合。deny を足すのは止める側への変更なので数えない。今の中身か下書きが読めなければ、確かめられないのでターミナルに限る（`handoff._defense_change`）。共通のルールファイルが読めない間の修復はこの経路になる。エージェントは `wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（`builtin:guard-ccnavi-config` が共通のルールファイルへの直接の書き込みを止めるが、置き場のコピーは例外で書ける）、ユーザがターミナルの `ccnavi user handoff` で取り込む。そのため、ボードからの取り込みは断られる。`phases.yml`・`risks.yml` はこの判定の外。
 

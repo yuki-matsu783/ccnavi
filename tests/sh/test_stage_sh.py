@@ -2,8 +2,7 @@
 
 確かめるのは 4 つ。元ファイルが wip/handoff/ の同じ階層へ cp されること。既にある下書きを
 上書きしないこと。ワークスペースの外や下書きの置き場の中を断ること。--commands が、元と違う
-下書きだけを、種類ごとに分けて出すこと（取り込める種類は ccnavi-user-handoff.sh の手順、defense は
-フルパスの mv）。
+下書きだけに、取り込みの手順（ccnavi-user-handoff.sh。defense を含む全種類）を出し、mv を出さないこと。
 """
 
 from __future__ import annotations
@@ -96,7 +95,7 @@ class StageShTest(unittest.TestCase):
         write(draft, "version: 2\n")
         r = self.stage("--commands", self.rules, cwd=wt)
         self.assertEqual(0, r.returncode, r.stderr)
-        # 取り込める種類は mv ではなく、--root にワークツリーを指した取り込みの手順
+        # mv ではなく、--root にワークツリーを指した取り込みの手順
         self.assertNotIn("mv ", r.stdout)
         self.assertIn(
             f"--root '{wt}' '.ccnavi/config/common/rules.yml'", r.stdout.replace(os.sep, "/")
@@ -197,7 +196,7 @@ class StageShTest(unittest.TestCase):
         self.assertTrue(
             nexts[0].endswith(
                 f"--commands {self.rules} {self.hook} を打つ"
-                "（種類ごとに、取り込みの手順か差し替えの mv が出る）"
+                "（取り込みの手順が出る）"
             ),
             nexts[0],
         )
@@ -234,14 +233,18 @@ class StageShTest(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertIn("引用符", result.stderr)
 
-    def test_commands_print_full_path_mv_for_edited_defense_drafts_only(self):
+    def handoff_cmd(self):
+        return f"sh '{self.ws}/.ccnavi/scripts/ccnavi-user-handoff.sh'".replace(os.sep, "/")
+
+    def test_commands_print_handoff_not_mv_for_edited_defense_drafts(self):
         self.stage(".ccnavi/config/common/rules.yml", ".claude/hooks/lint-py.sh")
         write(self.draft_hook, "echo lint2\n")
         result = self.stage(
             "--commands", ".ccnavi/config/common/rules.yml", ".claude/hooks/lint-py.sh"
         )
-        mvs = [line for line in result.stdout.splitlines() if line.startswith("mv ")]
-        self.assertEqual([f"mv '{self.draft_hook}' '{self.hook}'".replace(os.sep, "/")], mvs)
+        self.assertNotIn("mv ", result.stdout)
+        self.assertIn(f"{self.handoff_cmd()} '.claude/hooks/lint-py.sh'\n", result.stdout)
+        self.assertIn("--yes --expect <上のハッシュ>", result.stdout)
         self.assertEqual(
             1, result.returncode, "編集していない下書きが残るので、揃っていないと知らせる"
         )
@@ -257,13 +260,35 @@ class StageShTest(unittest.TestCase):
         write(self.draft_hook, "echo lint2\n")
         result = self.stage("--commands", ".claude/hooks/lint-py.sh")
         self.assertEqual(0, result.returncode, result.stderr)
-        self.assertEqual(1, len([ln for ln in result.stdout.splitlines() if ln.startswith("mv ")]))
-        self.assertNotIn("ccnavi-user-handoff.sh", result.stdout)
+        self.assertNotIn("mv ", result.stdout)
+        self.assertIn(f"{self.handoff_cmd()} '.claude/hooks/lint-py.sh'\n", result.stdout)
         nexts = [line for line in result.stdout.splitlines() if line.startswith("次: ")]
         self.assertEqual(1, len(nexts), result.stdout)
-        self.assertIn("mvをユーザに案内してターンを終える", nexts[0])
+        self.assertIn("取り込みの手順をユーザに案内してターンを終える", nexts[0])
 
-    def test_commands_point_importable_kinds_to_user_handoff_not_mv(self):
+    def test_commands_still_print_handoff_after_the_original_changed(self):
+        # 下書きを作った後に元が直されても、mv のように黙って上書きする案内は出さない。
+        # 取り込みの --expect（取り込み先の今のハッシュを含む確認）が、取り込みの時に止める。
+        self.stage(".claude/hooks/lint-py.sh")
+        write(self.draft_hook, "echo lint2\n")
+        write(self.hook, "echo someone-else\n")
+        result = self.stage("--commands", ".claude/hooks/lint-py.sh")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertNotIn("mv ", result.stdout)
+        self.assertIn(f"{self.handoff_cmd()} '.claude/hooks/lint-py.sh' --yes", result.stdout)
+        self.assertEqual("echo someone-else\n", read(self.hook))
+
+    def test_commands_refuse_paths_outside_the_kinds_table(self):
+        write(os.path.join(self.ws, "notes.txt"), "a\n")
+        self.stage("notes.txt")
+        write(os.path.join(self.ws, "wip", "handoff", "notes.txt"), "b\n")
+        result = self.stage("--commands", "notes.txt")
+        self.assertEqual(1, result.returncode)
+        self.assertNotIn("mv ", result.stdout)
+        self.assertNotIn("ccnavi-user-handoff.sh", result.stdout)
+        self.assertIn("取り込みの対象外", result.stderr)
+
+    def test_commands_point_importable_kinds_to_user_handoff(self):
         write(
             os.path.join(self.ws, ".ccnavi", "config", "common", "templates", "quickfix.yml"),
             "a: 1\n",
@@ -285,7 +310,7 @@ class StageShTest(unittest.TestCase):
         self.assertEqual(1, len(nexts), result.stdout)
         self.assertIn("取り込みの手順をユーザに案内してターンを終える", nexts[0])
 
-    def test_commands_split_mixed_kinds(self):
+    def test_commands_join_mixed_kinds_in_one_handoff_line(self):
         self.stage(".ccnavi/config/common/rules.yml", ".claude/hooks/lint-py.sh")
         write(self.draft_rules, "version: 2\n")
         write(self.draft_hook, "echo lint2\n")
@@ -293,16 +318,14 @@ class StageShTest(unittest.TestCase):
             "--commands", ".ccnavi/config/common/rules.yml", ".claude/hooks/lint-py.sh"
         )
         self.assertEqual(0, result.returncode, result.stderr)
-        lines = result.stdout.splitlines()
-        self.assertEqual(1, len([ln for ln in lines if ln.startswith("mv ")]))
-        self.assertIn(f"mv '{self.draft_hook}' '{self.hook}'".replace(os.sep, "/"), lines)
-        self.assertEqual(
-            1, len([ln for ln in lines if "ccnavi-user-handoff.sh" in ln and "--yes" not in ln])
+        self.assertNotIn("mv ", result.stdout)
+        self.assertIn(
+            f"{self.handoff_cmd()} '.ccnavi/config/common/rules.yml' '.claude/hooks/lint-py.sh'\n",
+            result.stdout,
         )
-        self.assertNotIn(f"mv '{self.draft_rules}'".replace(os.sep, "/"), result.stdout)
-        nexts = [ln for ln in lines if ln.startswith("次: ")]
+        nexts = [ln for ln in result.stdout.splitlines() if ln.startswith("次: ")]
         self.assertEqual(1, len(nexts), result.stdout)
-        self.assertIn("取り込みの手順 と mv", nexts[0])
+        self.assertIn("取り込みの手順をユーザに案内", nexts[0])
 
     def test_importable_classification_matches_the_python_kinds(self):
         """sh の is_importable が、実行ファイルの KINDS と同じ答えを返す（表のずれを見つける）。"""
@@ -328,7 +351,14 @@ class StageShTest(unittest.TestCase):
             ".ccnavi/scripts/ccnavi-stage.sh",
             ".claude/hooks/lint-py.sh",
             ".claude/settings.json",
+            ".claude/settings.local.json",
+            ".claude/hooks/a/b/c.py",
+            ".ccnavi/scripts/ccnavi-clean.js",
+            ".ccnavi/scripts/ccnavi-handoff-names.txt",
+            ".ccnavi/scripts/sub/x.sh",
             ".claude/skills/x/SKILL.md",
+            ".claude/skills/x/y/z.md",
+            ".claude/skills/x/y/z.txt",
             "README.md",
         ]
         script = os.path.join(SH_DIR, "ccnavi-stage.sh")
@@ -343,7 +373,7 @@ class StageShTest(unittest.TestCase):
         for rel in paths:
             with self.subTest(rel=rel):
                 kind = handoff.kind_of(handoff.key_of(rel))
-                want = kind is not None and kind.id != handoff.KIND_DEFENSE
+                want = kind is not None
                 got = (
                     subprocess.run(
                         [SHELL, "-c", f"{func}\nis_importable '{rel}'"], capture_output=True

@@ -47,11 +47,11 @@ Claude Codeのセッションが示すスクラッチパッド（Environment欄�
 
 保護対象のファイル（`rules.yml`・hook・ラッパースクリプト・テンプレートなど）や、チェックアウトしたブランチ直下のように書き込みを止められている場所を直したいときは、`wip/handoff/`に`ccnavi-stage.sh`で元ファイルを写して、そちらを編集する。取り込むのはユーザ。
 下書きは、cwdがワークツリー（`.claude/worktrees/<名前>`）の中ならそのワークツリーの`wip/handoff/`に、それ以外はワークスペースルートの`wip/handoff/`に置かれ、置き場の根（そのワークツリー、またはワークスペースルート）からの相対パスと同じ階層を保つ。`<元のパス>`は、置き場の根の下の実在するファイルで、cwdがワークツリーのときにワークスペースルートの絶対パスを渡しても、ワークツリー側の同じ相対パスのファイルを元にする（無ければ断る）。別のワークツリーのファイルは断る。ただし`.claude`という名前の階層は、深さを問わず`handoff-.claude`に読み替えて置く（`.claude/settings.json`は`wip/handoff/handoff-.claude/settings.json`）。大文字小文字は区別しない。取り込み（`ccnavi-user-handoff.sh`）が読み替えを戻す。既にある下書きは上書きしない。ワークツリーの下書きはそのブランチに載るので、非対話セッションでもpushできる。`wip/handoff/`へ手で`cp`すると、行き先のパスに守る名前が含まれるときは止められるので、`ccnavi-stage.sh`を使う。`--commands`も、下書きを作ったのと同じツリーの中で打つ。
-全部の下書きがそろってから`ccnavi-stage.sh --commands <元のパス>...`を打つ。編集済みの下書きを種類で分け、取り込める種類（`template`・`messages`・`layer-config`・`docs`）には`ccnavi-user-handoff.sh`の手順（下見→`--yes --expect <ハッシュ>`）を、`defense`には差し替えの`mv`を出す。取り込むのはユーザの手で、スクリプトは元のファイルを動かさない。そのあとはセッションの種類で分かれる。
+全部の下書きがそろってから`ccnavi-stage.sh --commands <元のパス>...`を打つ。編集済みの下書きに、全種類（`defense`を含む）で`ccnavi-user-handoff.sh`の手順（下見→`--yes --expect <ハッシュ>`）を出す。取り込むのはユーザの手で、スクリプトは元のファイルを動かさない。そのあとはセッションの種類で分かれる。
 
 1. `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-stage.sh <元のパス>...`で、元のファイルを`wip/handoff/`にコピーする。下書きは、置き場の根からの元と同じ相対パス（`wip/handoff/.ccnavi/config/common/rules.yml`など。`.claude`の階層だけ`handoff-.claude`に読み替える）に置かれ、既にある下書きは上書きしない。新規のテンプレートはコピーする元が無いので、`ccnavi --templates --draft <親>`で作る（[templates.md](templates.md)）
 2. `wip/handoff/`の下書きを編集する。複数のファイルを同時に直すときは、すべてそろえてからターンを終える
-3. ユーザが`ccnavi-user-handoff.sh [<相対パス>...]`で差分を見て、`--yes --expect <ハッシュ>`で取り込む。`ccnavi-user-handoff.sh`はユーザ専用で、見るだけの形もエージェントは打てない。`defense`の種類はボードからも取り込めないので、`--commands`が出す`mv`をターミナルのユーザが打つ
+3. ユーザが`ccnavi-user-handoff.sh [<相対パス>...]`で差分を見て、`--yes --expect <ハッシュ>`で取り込む。`ccnavi-user-handoff.sh`はユーザ専用で、見るだけの形もエージェントは打てない。`defense`の種類はボードからは取り込めないので、ターミナルのユーザが打つ
 
 コピー先は、下書きがあるツリーの同じ相対パス。取り込める保護対象は次の表の5種類で、表にヒットしない下書き（`learnings/`・`inbox/`・再現用のスクリプトなど）は対象外になる。
 
@@ -61,11 +61,11 @@ Claude Codeのセッションが示すスクラッチパッド（Environment欄�
 | `messages` | `.ccnavi/messages/<名前>.yml`（レイヤーごとの`messages/`は読まれないので対象外） | できる | 不可（ターミナルのユーザだけ） |
 | `layer-config` | `rules.yml`・`phases.yml`・`risks.yml` | できない | 可（`rules.yml`の`guard-*`のルールか今あるdenyを動かす取り込みは不可） |
 | `docs` | `.ccnavi/docs/**/*.md`・`.ccnavi/CCNAVI.md` | できない | 可 |
-| `defense` | `.ccnavi/scripts/**/*.sh`・`.claude/hooks/**`・`.claude/settings*.json`・`.claude/skills/**/*.md` | できない | 不可（ターミナルのユーザだけ） |
+| `defense` | `.ccnavi/scripts/**`・`.claude/hooks/**`・`.claude/settings*.json`・`.claude/skills/**/*.md` | できない | 不可（ターミナルのユーザだけ） |
 
 `wip/handoff/`の下書きは`ccnavi-stage.sh`でコピーして作る。`ln`でリンクを作ったり、ハードリンクでつながった下書きを書いたりする形は止まる。
 
-検査に通らない下書きが1つでもあると、そのときは何も取り込まれない。取り込むと下書きは消える。`--commands`は取り込める種類に`mv`を出さない（`mv`は検査も差分もハッシュ確認も通らない）。`defense`だけが`mv`で、ユーザが端末で打つ。
+検査に通らない下書きが1つでもあると、そのときは何も取り込まれない。取り込むと下書きは消える。`--commands`は`mv`を出さない（`mv`は検査も差分もハッシュ確認も通らない）。`defense`も取り込みで、ユーザが端末で打つ。`defense`は取り込み先が無いファイルを新しく作れないので、元のあるファイルだけを下書きにできる（`ccnavi-stage.sh`も元が無いパスは断る）。
 
 - 対話セッション: 下書きの相対パスを挙げて、`ccnavi-user-handoff.sh`での取り込みをユーザに案内し、ターンを終える。直接作業のワークツリーの下書きなら、作業ワークツリーで打つよう案内する（`cd <ワークスペースルート>/.claude/worktrees/<名前> && ccnavi-user-handoff.sh`）。取り込んだ変更は作業ワークツリーでコミットしてから`integrate`を打つ。要らない下書きは消してコミットする（消し方は下の「下書きを消す」）。`integrate`は、取り込み待ちの下書きが残っていると断る
 - 非対話セッション: `wip/handoff/`の編集済みファイルをpushして、ユーザに確認と取り込みを頼み、ターンを終える
@@ -83,9 +83,9 @@ Claude Codeのセッションが示すスクラッチパッド（Environment欄�
 
 ### 承認の経路で直すとき（`staging`フェーズ）
 
-上の`wip/handoff/`は、ユーザが差し替える前提のコピーの置き場。チケットの承認を通して保護済みファイルを直すときは、別の経路になる。
+上の`wip/handoff/`は、ユーザが取り込む前提のコピーの置き場。チケットの承認を通して保護済みファイルを直すときは、別の経路になる。
 `implement`フェーズは保護済みファイル（`.ccnavi/scripts/`・`.claude/hooks/`・`rules.yml`）を承認しない。承認の対象になるのは`staging`フェーズだけ。
 
 - 親の計画に`staging`のステップを置き、その前に受入テスト作成のステップを置く（`.ccnavi/config/project/phases.yml`の`staging`の定義）
 - `staging`の子では、完成品を`wip/design/scripts/`に全文で置く。元のファイルは書き換えない
-- 差し替えはユーザが行う。コピーする順は`ccnavi-common.sh`が先（起動時に読むスクリプトがこれに依るため）
+- 取り込みはユーザが行う。コピーする順は`ccnavi-common.sh`が先（起動時に読むスクリプトがこれに依るため）
