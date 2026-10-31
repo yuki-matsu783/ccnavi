@@ -145,7 +145,7 @@ test("CB-D329 下書きの節に「取り込み待ちを開く」があり、押
   } finally {
     await dom.close();
   }
-  const reason = "実行ファイルが古い版です。組み立て直してください";
+  const reason = "取り込みの案内の間は開けません";
   const old = await openTemplates({ handoff: { enabled: false, reason } });
   try {
     const button = old.one<HTMLButtonElement>('[data-action="open-handoff"]');

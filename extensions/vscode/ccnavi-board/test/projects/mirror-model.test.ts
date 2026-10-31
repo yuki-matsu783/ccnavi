@@ -121,7 +121,7 @@ test("CB-T1159 実行ファイルの出力の読み方: 読める答えは終了
   const list = mirrorListOf({ code: 0, stdout: LIST_TEXT, stderr: "" });
   assert.ok(list.ok);
   assert.equal(list.value.projects.length, 3);
-  // 古い実行ファイルは argparse の苦情を標準エラーに出して 2 で終わる
+  // 実行ファイルが argparse の苦情を標準エラーに出して 2 で終わる場合
   const usage = mirrorListOf({ code: 2, stdout: "", stderr: "usage: ccnavi user ...\nccnavi user: error: invalid choice: 'mirror'" });
   assert.ok(!usage.ok);
   assert.equal(usage.error, "ccnavi user mirror --json が失敗しました: usage: ccnavi user ...");

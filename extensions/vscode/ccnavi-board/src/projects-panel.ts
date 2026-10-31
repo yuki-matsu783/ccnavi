@@ -18,7 +18,7 @@
  * 実行ファイルに聞く（`user mirror --json`。読むだけ）。一覧の読み直し（`update`）とは別に回し、結果は `ProjectsData` の `mirror` に載せる。
  * 処理の流れ:
  *
- * 1. `refreshMirror` が `checkMirror`（実行ファイルが `user mirror` を持つか）→ `runMirror` の順に聞き、終わったら次の回を予約する。
+ * 1. `refreshMirror` が `runMirror` で実行ファイルに聞き、終わったら次の回を予約する。
  *    読み込み中に呼ばれたら、終わった後にもう 1 回だけ回す（`update` と同じ重ならない作り）。パネルを閉じたら予約を消して止める
  * 2. 画面の「ミラーを同期」「すべて同期」で `mirrorSync` が届いたら `runMirrorYes` を呼ぶ。書くのは実行ファイルで、
  *    各プロジェクトのワークツリーへ（コミットはしない）。結果は VS Code の通知で知らせ、すぐ調べ直す
