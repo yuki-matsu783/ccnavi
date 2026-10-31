@@ -18,7 +18,6 @@ import unittest
 from unittest import mock
 
 from ccnavi.tickets.model import handoff_names
-from ccnavi.tickets.sync import handoff
 from tests import ROOT, common_sh
 from tests.handoff_names_samples import RESERVED, SAMPLES
 
@@ -78,8 +77,7 @@ class StageNamesTest(unittest.TestCase):
         found = []
         for parent, _, files in os.walk(base):
             for name in files:
-                if not name.endswith(handoff.ORIG_SUFFIX):
-                    found.append(os.path.relpath(os.path.join(parent, name), base))
+                found.append(os.path.relpath(os.path.join(parent, name), base))
         self.assertEqual(1, len(found), (rel, found))
         return found[0].replace(os.sep, "/")
 

@@ -26,6 +26,8 @@ ccnavi のチケットが、どのワークツリーでどこまで進んでい�
 | `ccnaviBoard.bashPath` | Windows で使うシェル。空なら Git Bash |
 | `ccnaviBoard.expectationsPath` | ルール管理画面が一括で確かめる期待する判定のファイル。既定は `.ccnavi/config/common/rule-expectations.yml`。相対ならワークスペースルートから。ファイルが無いときは、実行ファイルを呼ばずに作り方を案内する |
 | `ccnaviBoard.ffmpegPath` | バグ報告の録画に使う ffmpeg の絶対パス。WSL では Windows 側の `ffmpeg.exe` を指す（例 `/mnt/c/ffmpeg/bin/ffmpeg.exe`）。空なら OS ごとの候補を探す |
+| `ccnaviBoard.appearance` | 画面の配色。`vscode`（テーマに従う）・`claude-light`・`claude-dark` |
+| `ccnaviBoard.zoom` | 画面全体の拡大率（0.8〜2、既定 1）。文字が細かいときに上げる |
 | `ccnaviBoard.flowSaveReview` | フロー編集画面で保存の前に変更の一覧を出すか。既定は出す |
 
 ルールファイルの場所は `.ccnavi/config/common/rules.yml` 固定。

@@ -212,6 +212,13 @@
           ],
           "default": "vscode",
           "description": "ccnavi の 7 つの画面の配色です。vscode なら VS Code のテーマ変数に従います。claude-light / claude-dark は、背景・枠・文字の色と、意味を表す色を Claude の配色に置き換えます（ハイコントラストのテーマでは置き換えません）。サイドパネルのタイトルバーの配色のアイコンからも切り替えられます（今の値は見出しの横に出ます）。切り替えると、開いている画面にもその場で反映されます。"
+        },
+        "ccnaviBoard.zoom": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0.8,
+          "maximum": 2,
+          "description": "ccnavi の画面全体の拡大率です。文字が細かいときは 1.2 や 1.5 にします（0.8〜2）。VS Code 全体の拡大（window.zoomLevel）とは別に、ccnavi の画面だけが拡大されます。変えると、開いている画面にもその場で反映されます。"
         }
       }
     },

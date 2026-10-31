@@ -27,8 +27,7 @@
 #   取り込める種類（template・messages・layer-config・docs。表は handoff.KINDS）: ユーザが ccnavi-user-handoff.sh で
 #     下見（検査・差分・ハッシュ）をしてから --yes --expect で取り込む。mv は出さない（検査も差分も通らないため）
 #   defense（.ccnavi/scripts の sh・.claude の hook・settings・skills）: 差し替えの mv を、フルパスで 1 行ずつ出す
-# 元と同じ（まだ編集していない）もの、下書きがまだ無いもの、下書きを作ったあとに元が変わったもの
-# （作ったときの <下書き>.orig と比べる。mv すると他の人の変更を上書きする）は、その旨を標準エラーに出し、mv は出さない。
+# 元と同じ（まだ編集していない）もの、下書きがまだ無いものは、その旨を標準エラーに出し、mv は出さない。
 # 複数ファイルを直すときは、すべての下書きを作ってから --commands を打つ。
 #
 # 打ったあとの進め方（CLAUDE.md）:
@@ -272,7 +271,6 @@ staged=""
 mvs=""
 same=""
 missing=""
-changed=""
 for arg in "$@"; do
 	rel=$(relative_of "$arg") || exit 2
 	orig="$base/$rel"
@@ -283,9 +281,6 @@ for arg in "$@"; do
 			missing="${missing:+$missing }$rel"
 		elif cmp -s "$orig" "$draft"; then
 			same="${same:+$same }$rel"
-		elif [ -f "$draft.orig" ] && ! cmp -s "$orig" "$draft.orig"; then
-			# 下書きを作った後に元が変わった。mv すると、その変更を黙って上書きする。
-			changed="${changed:+$changed }$rel"
 		else
 			if is_importable "$rel"; then
 				imps="${imps:+$imps }'$rel'"
@@ -306,8 +301,6 @@ for arg in "$@"; do
 	else
 		mkdir -p "$(dirname "$draft")"
 		cp "$orig" "$draft"
-		# 作った時点の元のコピー。--commands が、元が後から変わっていないかを確かめるのに使う。
-		cp "$orig" "$draft.orig"
 		printf '下書きを作った: %s\n' "$draft"
 		made=1
 	fi
@@ -320,7 +313,6 @@ fi
 
 [ -z "$missing" ] || printf 'ccnavi-stage: 下書きがまだ無い（先に <パス> だけで実行します）: %s\n' "$missing" >&2
 [ -z "$same" ] || printf 'ccnavi-stage: 下書きが元と同じ（まだ編集していない）: %s\n' "$same" >&2
-[ -z "$changed" ] || printf 'ccnavi-stage: 下書きを作った後に元のファイルが変わっている（別のセッションかユーザの変更かもしれない。mv は出さない。元の差分を確かめ、下書きに取り込んでから、下書きと %s.orig を作り直す）: %s\n' '<下書き>' "$changed" >&2
 if [ -z "$mvs$imps" ]; then
 	printf 'ccnavi-stage: 差し替える編集済みの下書きがありません。\n' >&2
 	exit 1
@@ -341,6 +333,6 @@ if [ -n "$mvs" ]; then
 	printf '%s' "$mvs"
 	guide="${guide:+$guide と }mv"
 fi
-[ -z "$missing$same$changed" ] || exit 1
+[ -z "$missing$same" ] || exit 1
 ccnavi_text "$root" NEXT_STAGE_GUIDE "guide=$guide"
 ccnavi_text "$root" NOTE_STAGE_NONINTERACTIVE

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { appearanceClass, bodyTag, parseAppearance, sendAppearance } from "../../src/core/appearance.js";
+import { appearanceClass, bodyTag, parseAppearance, parseZoom, sendAppearance } from "../../src/core/appearance.js";
 import { retainedHost, screenHost, type Surface } from "../../src/core/screen-host.js";
 import type { ToBoard } from "../../src/core/board-view.js";
 import type { ToFlow } from "../../src/core/flow-view.js";
@@ -259,4 +259,20 @@ test("CB-T184 見た目のメッセージは 9 画面すべての契約に入っ
   for (const message of IN_EVERY_CONTRACT) {
     assert.deepEqual(message, { type: "appearance", value: "claude-dark" });
   }
+});
+
+test("CB-T1243 拡大率の設定は 0.8〜2 に収め、数でない値は等倍にする。等倍以外のときだけメッセージに乗る", () => {
+  assert.equal(parseZoom(1.5), 1.5);
+  assert.equal(parseZoom(5), 2);
+  assert.equal(parseZoom(0.1), 0.8);
+  assert.equal(parseZoom("1.5"), 1);
+  assert.equal(parseZoom(undefined), 1);
+  assert.equal(parseZoom(Number.NaN), 1);
+  assert.equal(parseZoom(Number.POSITIVE_INFINITY), 1);
+  assert.equal(parseZoom(0.8), 0.8);
+  assert.equal(parseZoom(2), 2);
+  const sent: unknown[] = [];
+  sendAppearance({ post: (m) => (sent.push(m), true) }, "vscode", 1.5);
+  sendAppearance({ post: (m) => (sent.push(m), true) }, "vscode");
+  assert.deepEqual(sent, [{ type: "appearance", value: "vscode", zoom: 1.5 }, { type: "appearance", value: "vscode" }]);
 });

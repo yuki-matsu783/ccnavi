@@ -31,9 +31,8 @@ export const OPEN_LOCK: FlowLock = { locked: false, reason: "" };
 /** 実行ファイルが着手中と言った子の錠の文面。いつ外れるかまで言う */
 export function lockedReason(ticket: string): string {
   return (
-    `子チケット ${ticket} は着手中かレビュー中のため、フローを変更できません（ccnavi が DENY_TICKET_FLOW_LOCKED で止めています）。` +
-    "担当のサブエージェントが読んでいる手順が、作業の途中で変わるのを防ぐためです。" +
-    `ロックは、${ticket} が finish で終わるか cancel で取り消されると外れます。手順を直すなら、終わってから直すか、次の子チケットのフローで修正してください`
+    `子チケット ${ticket} は着手中かレビュー中のため、フローを変更できません。` +
+    `${ticket} が終わる（finish）か取り消される（cancel）と変更できます。手順を直すなら、それまで待つか、次の子チケットのフローで直してください`
   );
 }
 

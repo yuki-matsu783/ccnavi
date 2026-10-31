@@ -97,8 +97,10 @@ LEARNING_ENV = "CCNAVI_LEARNING"
 # DENY_REPEAT_ENV は、同じ理由で同じ呼び出しを何回止めたら「言い換えずに相談せよ」と
 # つけるか（repeat）。既定は 3。判定は変わらず、文面とユーザへの報告が変わるだけ。
 DENY_REPEAT_ENV = "CCNAVI_DENY_REPEAT"
-# FAIL_STREAK_COUNT_ENV は、ツール呼び出しの失敗か ccnavi の拒否が何回続けて起きたら
-# 「資料を検索する」案内を出すか（failstreak）。既定は 3。0 なら数えも案内もしない。
+# FAIL_STREAK_COUNT_ENV は、ツール呼び出しの失敗か ccnavi の拒否が何回続けて起きるたびに
+# 「資料を検索する」案内を出すか（failstreak。3・6・9 回目）。既定は 3。
+# セッション（サブエージェントの中は別）で最初の失敗か拒否のときも別に出す。
+# 0 なら数えも案内もしない。
 # 読めない値と負数は既定に戻る。判定は変わらない。
 FAIL_STREAK_COUNT_ENV = "CCNAVI_FAIL_STREAK_COUNT"
 # LEARNING_SOURCES_ENV は、パターンの観測元の数がいくつ以上なら「提案に足りる」とみなすか。

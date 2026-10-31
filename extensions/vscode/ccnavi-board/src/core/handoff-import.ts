@@ -113,7 +113,7 @@ export interface TerminalGuide {
 /**
  * `board` が偽の対象（`defense`）をターミナルで取り込むときの、打つコマンドを作る。
  * ボードは取り込まない。`expect` は、そのパスだけを指して見るだけをもう一度呼んだ答えのもの。
- * 取り込めない状態（conflict・rejected・error・unchanged）の対象には、コマンドを出さず理由を返す。
+ * 取り込めない状態（rejected・error・unchanged）の対象には、コマンドを出さず理由を返す。
  */
 export async function terminalGuide(
   deps: Pick<HandoffDeps, "view">,

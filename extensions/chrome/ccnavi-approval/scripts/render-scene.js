@@ -93,12 +93,17 @@ async function watchServiceWorkers(profile, push) {
   };
 }
 
+/** 環境が揃っていないときに、出力の末尾へ足す。直し方を書いた文書（frontmatter が無く、索引には載らない） */
+const NOT_READY_HINT =
+  "案内: 前提と直し方は extensions/chrome/ccnavi-approval/VERIFY.md の「4.0 ツールで描いて確かめる」と README.md を見てください";
+
 async function main(argv) {
   let lib;
   try {
     lib = await load("render-scene-lib.js");
   } catch (error) {
     console.error(`render-scene: ${error.message}`);
+    console.error(NOT_READY_HINT);
     return 3;
   }
   const { EXIT, ToolError, USAGE, parseArgs, isInside, failuresOf, logLine, redact } = lib;
@@ -233,6 +238,9 @@ async function main(argv) {
   } catch (error) {
     if (error instanceof ToolError) {
       console.error(`render-scene: ${error.message}`);
+      if (error.code === EXIT.NOT_READY) {
+        console.error(NOT_READY_HINT);
+      }
       return error.code;
     }
     console.error(`render-scene: ${redact(error && error.stack ? error.stack : String(error), [])}`);

@@ -1,7 +1,7 @@
 """失敗や拒否が続いたとき、資料を引く案内を出すこと（issue #270）。
 
 外から道具を動かし、読み返すのは応答の JSON と state の置き場だけ。判定そのもの（deny）は変わらず、
-閾値（CCNAVI_FAIL_STREAK_COUNT、既定 3）に達した回に 1 度だけ、`--docs` で索引を引く案内が付く。
+連続が閾値（CCNAVI_FAIL_STREAK_COUNT、既定 3）の倍数になった回に、`--docs` で索引を引く案内が付く。
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from tests.inproc import run_ccnavi
 
 FIXTURE = "rules-undeclared.yml"
 NOTE = "失敗か拒否が"
+FIRST = "失敗したか、ccnavi に拒否されました"
 DOCS = "--docs"
 
 
@@ -114,46 +115,52 @@ class FailStreakTest(unittest.TestCase):
         names = os.listdir(self.state) if os.path.isdir(self.state) else []
         return [n for n in names if n.startswith("failstreak-")]
 
-    def test_note_comes_at_the_threshold_once(self):
+    def test_note_comes_every_threshold_failures(self):
         said = []
-        for _ in range(5):
+        for _ in range(7):
             result = self._fail()
             self.assertEqual(0, result.returncode, result.stderr)
             said.append(self._context(result))
-        self.assertEqual(["", ""], said[:2])
+        self.assertIn(FIRST, said[0])
+        self.assertNotIn(NOTE, said[0])
+        self.assertEqual("", said[1])
         self.assertIn(NOTE, said[2])
         self.assertIn("3 回続いて", said[2])
         self.assertIn(DOCS, said[2])
-        self.assertEqual(["", ""], said[3:])
-        out = json.loads(self._fail().stdout or "{}")
-        self.assertEqual({}, out)
+        self.assertEqual(["", ""], said[3:5])
+        self.assertIn("6 回続いて", said[5])
+        self.assertEqual("", said[6])
 
     def test_note_event_name_is_the_failure_event(self):
-        for _ in range(2):
-            self._fail()
         out = json.loads(self._fail().stdout)["hookSpecificOutput"]
         self.assertEqual("PostToolUseFailure", out["hookEventName"])
 
     def test_note_does_not_urge_bypass(self):
-        for _ in range(2):
-            self._fail()
-        text = self._context(self._fail())
-        self.assertIn("迂回", text)
-        self.assertIn("ユーザに相談", text)
+        said = [self._context(self._fail()) for _ in range(3)]
+        for text in (said[0], said[2]):
+            self.assertIn("迂回", text)
+            self.assertIn("ユーザに相談", text)
 
-    def test_success_resets_the_count_and_the_told_flag(self):
+    def test_success_resets_the_count_but_keeps_the_first_mark(self):
+        self.assertIn(FIRST, self._context(self._fail()))
         self._fail()
-        self._fail()
+        self._ok()
+        # 連続は 0 に戻り、最初の 1 回を案内した印だけが残る。
+        [name] = self._files()
+        with open(os.path.join(self.state, name), encoding="utf-8") as f:
+            self.assertEqual({"first": True}, json.load(f))
+        self.assertEqual("", self._context(self._fail()))
+        self.assertEqual("", self._context(self._fail()))
+        self.assertIn(NOTE, self._context(self._fail()))
+        # 案内のあとに成功が入れば、数え直してまた 3 回目で案内する。最初の 1 回の案内は出ない。
+        self._ok()
+        said = [self._context(self._fail()) for _ in range(3)]
+        self.assertEqual(["", ""], said[:2])
+        self.assertIn(NOTE, said[2])
+
+    def test_success_without_a_streak_writes_nothing(self):
         self._ok()
         self.assertEqual([], self._files())
-        self.assertEqual("", self._context(self._fail()))
-        self.assertEqual("", self._context(self._fail()))
-        self.assertIn(NOTE, self._context(self._fail()))
-        # 案内のあとに成功が入れば、次の連続でまた案内する。
-        self._ok()
-        self._fail()
-        self._fail()
-        self.assertIn(NOTE, self._context(self._fail()))
 
     def test_zero_disables_counting(self):
         for _ in range(5):
@@ -168,11 +175,12 @@ class FailStreakTest(unittest.TestCase):
         for bad in ("abc", "-2"):
             self._reset_state()
             said = [self._context(self._fail(CCNAVI_FAIL_STREAK_COUNT=bad)) for _ in range(3)]
-            self.assertEqual(["", ""], said[:2], bad)
+            self.assertIn(FIRST, said[0], bad)
+            self.assertEqual("", said[1], bad)
             self.assertIn(NOTE, said[2], bad)
 
     def test_threshold_follows_the_environment(self):
-        self.assertEqual("", self._context(self._fail(CCNAVI_FAIL_STREAK_COUNT="2")))
+        self.assertIn(FIRST, self._context(self._fail(CCNAVI_FAIL_STREAK_COUNT="2")))
         self.assertIn(NOTE, self._context(self._fail(CCNAVI_FAIL_STREAK_COUNT="2")))
 
     def test_deny_is_counted_and_keeps_its_verdict(self):
@@ -210,7 +218,10 @@ class FailStreakTest(unittest.TestCase):
                 }
             )
             self.assertNotIn(NOTE, result.stdout)
-        self.assertEqual("", self._context(self._fail()))
+        # 数えていないので、最初の 1 回の案内はこの失敗で初めて出る。
+        said = self._context(self._fail())
+        self.assertIn(FIRST, said)
+        self.assertNotIn(NOTE, said)
 
     def test_interrupt_is_not_counted(self):
         for _ in range(4):

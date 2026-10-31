@@ -41,12 +41,11 @@ test("CB-D366 一覧は対象ごとに 1 行。パス・種類・状態のバッ
     assert.equal(text(dom.one(`${row(TEMPLATE)} [data-role="state"]`)), "新規");
     assert.equal(text(dom.one(`${row(RULES)} [data-role="kind"]`)), "設定");
     assert.equal(text(dom.one(`${row(RULES)} [data-role="state"]`)), "変更あり");
-    assert.equal(text(dom.one(`${row(".ccnavi/config/project/phases.yml")} [data-role="state"]`)), "衝突");
     assert.equal(text(dom.one(`${row(".ccnavi/docs/same.md")} [data-role="state"]`)), "変更なし");
     assert.match(text(dom.one(row(".ccnavi/docs/broken.md"))), /error 1/);
     assert.match(text(dom.one(row(DOCS))), /warn 1/);
-    // 要約: 対象 7 件、取り込める 3 件（template・layer-config の changed・docs）、選択 0 件、対象外 2 件
-    assert.equal(text(dom.one("#counts")), "対象 7 件・取り込める 3 件・選択 0 件・対象外 2 件");
+    // 要約: 対象 6 件、取り込める 3 件（template・layer-config の changed・docs）、選択 0 件、対象外 2 件
+    assert.equal(text(dom.one("#counts")), "対象 6 件・取り込める 3 件・選択 0 件・対象外 2 件");
     const ignored = text(dom.one("#ignored-paths"));
     assert.match(ignored, /repro\.sh: 取り込める種類の表に無い/);
     assert.match(ignored, /linked: リンクのディレクトリ/);
@@ -82,7 +81,7 @@ test("CB-D367 見出しを押すと開き、差分と errors / warnings を出�
   }
 });
 
-test("CB-D368 取り込めない対象は選べず、理由を出す。conflict・error・unchanged・defense（ターミナルのみ）", async () => {
+test("CB-D368 取り込めない対象は選べず、理由を出す。error・unchanged・defense（ターミナルのみ）", async () => {
   const dom = await openHandoff();
   try {
     for (const path of [TEMPLATE, RULES, DOCS]) {
@@ -90,7 +89,6 @@ test("CB-D368 取り込めない対象は選べず、理由を出す。conflict�
       assert.equal(dom.all(`${row(path)} [data-role="reason"]`).length, 0, `${path} に理由は出ない`);
     }
     const reasons: [string, RegExp][] = [
-      [".ccnavi/config/project/phases.yml", /取り込めません: .*conflict/],
       [".ccnavi/docs/broken.md", /取り込めません: 検査で error があります/],
       [".ccnavi/docs/same.md", /取り込めません: 取り込み先と同じ内容/],
       [HOOK, /取り込めません: ボードからは取り込めません。ターミナルで取り込みます/],
@@ -112,7 +110,7 @@ test("CB-D369 選んで「取り込む…」を押すと確認の帯が出て、
     assert.equal(open.disabled, true, "何も選んでいない間は押せない");
     await check(dom, TEMPLATE);
     await check(dom, DOCS);
-    assert.equal(text(dom.one("#counts")), "対象 7 件・取り込める 3 件・選択 2 件・対象外 2 件");
+    assert.equal(text(dom.one("#counts")), "対象 6 件・取り込める 3 件・選択 2 件・対象外 2 件");
     dom.click(open);
     await dom.settle();
     assert.deepEqual(
@@ -136,7 +134,7 @@ test("CB-D369 選んで「取り込む…」を押すと確認の帯が出て、
   }
 });
 
-test("CB-D370 取り込める対象をすべて選ぶ／選択を外す。選ぶのは取り込める 3 件だけで、conflict・error・unchanged・defense は入らない", async () => {
+test("CB-D370 取り込める対象をすべて選ぶ／選択を外す。選ぶのは取り込める 3 件だけで、error・unchanged・defense は入らない", async () => {
   const dom = await openHandoff();
   try {
     dom.click(dom.one('[data-action="select-all"]'));
@@ -185,7 +183,7 @@ test("CB-D372 錠が掛かった状態で開いても、template と layer-confi
     assert.equal(pick(locked, RULES).disabled, true);
     assert.equal(pick(locked, DOCS).disabled, false);
     assert.ok(!locked.one("#lock").classList.contains("hidden"));
-    assert.equal(text(locked.one("#counts")), "対象 7 件・取り込める 1 件・選択 0 件・対象外 2 件");
+    assert.equal(text(locked.one("#counts")), "対象 6 件・取り込める 1 件・選択 0 件・対象外 2 件");
   } finally {
     await locked.close();
   }
