@@ -1249,9 +1249,9 @@ def decide_after_failure(
     if not payload.is_interrupt:
         n = failstreak.threshold(conf.fail_streak_count)
         try:
-            got = failstreak.fail(conf.state, payload.session_id, payload.agent_id, n)
-            if got:
-                texts.append(docsearch.fail_streak_note(conf, root, got))
+            kind, got = failstreak.fail(conf.state, payload.session_id, payload.agent_id, n)
+            if kind:
+                texts.append(docsearch.fail_streak_note(conf, root, got, kind == failstreak.FIRST))
         except Exception:  # noqa: BLE001  案内の失敗でツールの結果を変えない
             pass
     said = "\n\n".join(p for p in texts if p)

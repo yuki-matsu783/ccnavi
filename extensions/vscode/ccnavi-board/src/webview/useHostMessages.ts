@@ -18,7 +18,7 @@ export function useHostMessages<T extends { type?: string }>(handler: (message: 
     const onMessage = (event: MessageEvent): void => {
       const message = (event.data ?? {}) as Partial<T> & Record<string, unknown>;
       if (message.type === "appearance") {
-        applyAppearance(message.value);
+        applyAppearance(message.value, message.zoom);
         return;
       }
       latest.current(message);

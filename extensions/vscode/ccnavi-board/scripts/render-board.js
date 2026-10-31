@@ -27,6 +27,10 @@ const ROOT = path.resolve(__dirname, "..");
 
 const EXIT = { OK: 0, FAILED: 1, USAGE: 2, NOT_READY: 3 };
 
+/** 環境が揃っていないときに、出力の末尾へ足す。直し方の書いた文書と、その索引の引き方 */
+const NOT_READY_HINT =
+  "案内: 前提と直し方は extensions/vscode/ccnavi-board/docs/design/development.md の「前提と依存」（ccnavi --docs --keyword render-board でも引ける）";
+
 const DEFAULT_APPEARANCE = "claude-light";
 const DEFAULT_WIDTH = 1400;
 const MIN_WIDTH = 320;
@@ -327,6 +331,9 @@ async function main(argv) {
   } catch (error) {
     if (error instanceof ToolError) {
       console.error(`render-board: ${error.message}`);
+      if (error.code === EXIT.NOT_READY) {
+        console.error(NOT_READY_HINT);
+      }
       return error.code;
     }
     console.error(`render-board: ${error && error.stack ? error.stack : String(error)}`);
