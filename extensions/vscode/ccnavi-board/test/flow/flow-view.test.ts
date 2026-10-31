@@ -56,8 +56,6 @@ test("CB-T227 カードのボタンの言葉は、在るか・錠の種類（実
   assert.equal(flowButtonLabel({ ...base, exists: true, locked: true, lock_kind: "review" }), "フロー: 閲覧（レビュー中）");
   // 無いまま着手した子も、読むだけ
   assert.equal(flowButtonLabel({ ...base, exists: false, locked: true, lock_kind: "doing" }), "フロー: 閲覧（着手中）");
-  // 種類を返さない古い実行ファイルは、両方を 1 つの言葉で言う
-  assert.equal(flowButtonLabel({ ...base, exists: true, locked: true }), "フロー: 閲覧（着手中・レビュー中）");
 });
 
 test("CB-T228 錠は実行ファイルの flow.locked をそのまま使う。親・ない子・欄のない子は引けない", () => {
@@ -122,7 +120,7 @@ test("CB-T229 ボードの JSON の flow は子だけが持ち、locked が欠�
   assert.equal(flowCardOf(built, "i0001-02-05"), undefined);
 });
 
-test("CB-T534 錠の種類（lock_kind）はボードの JSON から読む。doing・review はそのまま、知らない値は null、欄がないときは undefined", () => {
+test("CB-T534 錠の種類（lock_kind）はボードの JSON から読む。doing・review はそのまま、知らない値は null", () => {
   const raw = JSON.parse(fixtureText()) as { tickets: { ticket: string; flow: Record<string, unknown> | null }[] };
   const flowOf = (ticket: string): Record<string, unknown> => {
     const flow = raw.tickets.find((t) => t.ticket === ticket)?.flow;
@@ -132,43 +130,12 @@ test("CB-T534 錠の種類（lock_kind）はボードの JSON から読む。doi
   flowOf("i0001-02-02").lock_kind = "doing";
   flowOf("i0001-02-04").lock_kind = "review";
   flowOf("i0001-01-01").lock_kind = "bogus";
-  delete flowOf("i0001-02-03").lock_kind;
   const parsed = parseBoardJson(JSON.stringify(raw));
   assert.ok(parsed.ok);
   const kindOf = (ticket: string) => parsed.board.tickets.find((t) => t.ticket === ticket)?.flow?.lock_kind;
   assert.equal(kindOf("i0001-02-02"), "doing");
   assert.equal(kindOf("i0001-02-04"), "review");
   assert.equal(kindOf("i0001-01-01"), null);
-  assert.equal(kindOf("i0001-02-03"), undefined);
-});
-
-test("CB-T241 クローズした子（完了・取り消し）でファイルがなければ、古い実行ファイルの答えでもカードにフローを載せない", () => {
-  const board = fixture();
-  // 古い実行ファイルは閉じた子にも exists: false の flow を返していた
-  const flowOf = (ticket: string, exists: boolean) => ({
-    path: `<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/${ticket}.yml`,
-    rel: `.ccnavi/approved/flows/${ticket}.yml`,
-    tree: "<root>/.claude/worktrees/i0001",
-    exists,
-    linked: false,
-    locked: false,
-    draft: null,
-  });
-  const old: BoardJson = {
-    ...board,
-    tickets: board.tickets.map((t) => (t.ticket === "i0001-01-01" || t.ticket === "i0001-02-05" ? { ...t, flow: flowOf(t.ticket, false) } : t)),
-  };
-  const built = buildBoard(old);
-  const card = (id: string) => built.columns.flatMap((column) => column.cards).find((c) => c.id === id);
-  assert.equal(card("i0001-01-01")?.column, "done");
-  assert.equal(card("i0001-01-01")?.flow, null);
-  assert.equal(card("i0001-02-05")?.column, "cancelled");
-  assert.equal(card("i0001-02-05")?.flow, null);
-  assert.equal(flowCardOf(built, "i0001-01-01"), undefined);
-  // 閉じた子でもファイルが在れば残す（中身を見られる）。開いている子はファイルが無くても載る（作成）
-  assert.equal(flowCardOf(buildBoard(board), "i0001-01-01")?.flow?.exists, true);
-  assert.equal(card("i0001-02-04")?.flow?.exists, false);
-  assert.equal(card("i0001-02-03")?.flow?.exists, false);
 });
 
 test("CB-T557 置き場かその途中がリンクなら、着手前でも読むだけ。ツリーの欄がない古い答えも書かない側", () => {

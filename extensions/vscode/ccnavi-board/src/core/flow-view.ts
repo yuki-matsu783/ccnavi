@@ -104,11 +104,7 @@ export function flowButtonLabel(flow: FlowJson, closed = false): string {
     if (flow.lock_kind === "doing") {
       return "フロー: 閲覧（着手中）";
     }
-    if (flow.lock_kind === "review") {
-      return "フロー: 閲覧（レビュー中）";
-    }
-    // 種類を返さない古い実行ファイル
-    return "フロー: 閲覧（着手中・レビュー中）";
+    return "フロー: 閲覧（レビュー中）";
   }
   if (closed) {
     return "フロー: 閲覧（終了済み）";

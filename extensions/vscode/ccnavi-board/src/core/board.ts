@@ -211,7 +211,7 @@ export function buildBoard(json: BoardJson): Board {
   // 退避のカードは置き場のカードと識別子が重ならないものだけ（重なれば置き場の側が正）
   // キーはプロジェクトと識別子。ワークスペースとプロジェクトで同じ識別子を使っていても取り違えない
   const liveKeys = new Set(json.tickets.map((t) => `${t.project}\u0000${t.ticket}`));
-  const archived = (json.archived ?? []).filter((a) => !liveKeys.has(`${a.project}\u0000${a.ticket}`)).map(toArchivedCard);
+  const archived = json.archived.filter((a) => !liveKeys.has(`${a.project}\u0000${a.ticket}`)).map(toArchivedCard);
   const cards = [...live, ...archived];
   cards.sort(compareCards);
 
@@ -319,7 +319,7 @@ function toCard(
     branch: isParent ? (t.remote?.branch || t.branch) : "",
     remote: isParent ? t.remote : null,
     attention: t.attention,
-    flow: isParent ? null : flowOf(t.flow, column),
+    flow: isParent ? null : t.flow,
     workflow: isParent && t.proposal?.state === "todo" && t.proposal.has_plan === true,
     templateDraft: isParent && t.template_draft,
     predecessorsUnmet: t.predecessors_unmet,
@@ -399,18 +399,6 @@ function toArchivedCard(a: ArchivedTicketJson): Card {
     templateDraft: false,
     predecessorsUnmet: [],
   });
-}
-
-/**
- * カードに載せる子のフロー。閉じた子（完了・取り消し）でファイルが無ければ null（作る先が無いので「作成」を出さない）。
- * 実行ファイルもこの子には `flow` を null で返すが、古い実行ファイルの答えでもボタンを出さないための念押し。
- * ファイルが在れば閉じた子でも残す（中身を見られる）
- */
-function flowOf(flow: FlowJson | null, column: ProposalState): FlowJson | null {
-  if (flow === null) {
-    return null;
-  }
-  return (column === "done" || column === "cancelled") && !flow.exists ? null : flow;
 }
 
 /** 依頼のマーカーの URL は依頼の投稿（`#note-…`）を指すので、断片を除いてマージリクエスト自体にする */

@@ -276,15 +276,12 @@ test("CB-T1118 見るツリーの錠は、プロジェクトならそのプロ�
   assert.ok(main !== undefined);
   const whole = lockForTree(board, main);
   const doing = board.tickets.filter((t) => t.in_progress === true).map((t) => t.ticket);
-  assert.equal(whole.locked, doing.length > 0 || board.tickets.some((t) => t.in_progress === null));
+  assert.equal(whole.locked, doing.length > 0);
   // 別のプロジェクトの作業中は、そのプロジェクトのツリーを止めない
   const other = { name: "lib", root: "/ws/projects/lib", project: "lib", kind: "project" } as const;
   const noDoing = { ...board, tickets: board.tickets.map((t) => ({ ...t, project: "other", in_progress: true })) };
   assert.equal(lockForTree(noDoing, other).locked, false);
   assert.equal(lockForTree(noDoing, main).locked, true);
-  // 作業中かを答えない古い実行ファイルは、止める側
-  const unknown = { ...board, tickets: board.tickets.map((t) => ({ ...t, project: "lib", in_progress: null })) };
-  assert.equal(lockForTree(unknown, other).locked, true);
 });
 
 test("CB-T1119 一覧の見本は、種類と状態を網羅している（画面のテストが同じ見本を使う）", () => {

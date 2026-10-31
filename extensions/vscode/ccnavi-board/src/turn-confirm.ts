@@ -28,5 +28,5 @@ export async function confirmTurns(sessions: readonly string[]): Promise<boolean
  */
 export async function confirmIfTurn(root: string, setting: string): Promise<boolean> {
   const board = await loadBoard(root, setting);
-  return confirmTurns(board.ok ? (board.board.turns ?? []).map((t) => t.session) : []);
+  return confirmTurns(board.ok ? (board.board.turns).map((t) => t.session) : []);
 }
