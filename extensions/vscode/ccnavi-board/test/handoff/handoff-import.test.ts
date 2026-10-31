@@ -24,7 +24,7 @@ const DONE: HandoffResult = { ok: true, applied: [{ path: TEMPLATE, kind: "templ
 function viewer(entries: readonly HandoffEntry[], override: (paths: readonly string[], answer: HandoffList) => HandoffList = (_, a) => a) {
   return (paths: readonly string[]): ViewAnswer => {
     const chosen = entries.map((e) => ({ ...e, selected: paths.includes(e.path) }));
-    return { ok: true, value: override(paths, list(chosen, { expect: `expect-of(${paths.join(",")})`, ok: chosen.filter((e) => e.selected).every((e) => e.errors.length === 0 && e.state !== "conflict" && e.state !== "rejected") })) };
+    return { ok: true, value: override(paths, list(chosen, { expect: `expect-of(${paths.join(",")})`, ok: chosen.filter((e) => e.selected).every((e) => e.errors.length === 0 && e.state !== "rejected") })) };
   };
 }
 
@@ -118,9 +118,8 @@ test("CB-T1127 defense はターミナルのみ。錠が空いていてもボー
   assert.deepEqual(mixed.applied, []);
 });
 
-test("CB-T1128 取り込めない対象（conflict・error・unchanged）と、一覧にない対象と、空の選択は、実行ファイルを呼ばずに理由を返す", async () => {
+test("CB-T1128 取り込めない対象（error・unchanged）と、一覧にない対象と、空の選択は、実行ファイルを呼ばずに理由を返す", async () => {
   const cases: [string, readonly string[], RegExp][] = [
-    ["conflict", [".ccnavi/config/project/phases.yml"], /conflict/],
     ["error あり", [".ccnavi/docs/broken.md"], /error/],
     ["unchanged", [".ccnavi/docs/same.md"], /同じ内容/],
     ["一覧にない", [".ccnavi/docs/none.md"], /一覧にない対象です/],
@@ -185,12 +184,10 @@ test("CB-T1132 ターミナルの案内は、そのパスだけを指して見�
   assert.deepEqual(guide, { command: `sh .ccnavi/scripts/ccnavi-user-handoff.sh --root /ws ${HOOK} --yes --expect expect-of(${HOOK})`, error: "" });
 });
 
-test("CB-T1133 ターミナルの案内を出さない場合。ボードから取り込める対象・取り込めない状態・error・一覧にない・見せたあとの変更・見るだけの失敗", async () => {
+test("CB-T1133 ターミナルの案内を出さない場合。ボードから取り込める対象・error・一覧にない・見せたあとの変更・見るだけの失敗", async () => {
   const r = rig();
   assert.match((await terminalGuide(r.deps, shown, DOCS)).error, /ボードから取り込めます/);
   assert.match((await terminalGuide(r.deps, shown, "none")).error, /一覧にない対象です/);
-  const conflictHook = list([entry({ path: HOOK, kind: "defense", state: "conflict", board: false })]);
-  assert.match((await terminalGuide(r.deps, conflictHook, HOOK)).error, /conflict/);
   const errorHook = list([entry({ path: HOOK, kind: "defense", board: false, errors: ["CRLF"] })]);
   assert.match((await terminalGuide(r.deps, errorHook, HOOK)).error, /error/);
   assert.deepEqual(r.calls, [], "出さない場合は見るだけも呼ばない");

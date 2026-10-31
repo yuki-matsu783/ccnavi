@@ -108,6 +108,12 @@ messages:
       convention: |-
         {lead} '{command} --docs --keyword <語>' で frontmatter の索引を引いてください（--keyword のほかに --type・--tag・--path・--text でも絞れる。絞り方の一覧は '{command} --docs --help' で見られる。ワークスペースとプロジェクトを横断し、パスはワークスペースルートから）。grep は本文中の文字列を探すときか、0 件だったときに使ってください。書き方の決まりは '{command} --docs --keyword frontmatter' で引けます。
 
+  NOTICE_DOCS_FAIL_FIRST_LEAD:
+    kind: notice
+    values: []
+    what: |-
+      [ccnavi] ツール呼び出しが失敗したか、ccnavi に拒否されました。同じ操作を言い換えて再実行したり、止められた操作の迂回を探したりする前に、失敗や拒否の理由と決まった手順を資料で確かめてください。確かめても分からなければ、ユーザに相談してください。資料は
+
   NOTICE_DOCS_FAIL_STREAK_LEAD:
     kind: notice
     values: [n]

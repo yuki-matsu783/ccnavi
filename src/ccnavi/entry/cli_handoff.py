@@ -135,8 +135,8 @@ def run(
 def _plan_text(stdout: TextIO, plan: handoff.Plan, wanted: list[str] | None, root: str) -> None:
     """取り込みの計画を人が読む形で書く。何も反映せず、次に打つコマンドを添える。
 
-    下書きの 1 件ごとに、選ばれたか・状態・error と warn・ターミナルのみの理由・conflict を出す。
-    選ばれた下書きが無いか、error か conflict があれば、取り込めない理由を言って終える。
+    下書きの 1 件ごとに、選ばれたか・状態・error と warn・ターミナルのみの理由を出す。
+    選ばれた下書きが無いか、error があれば、取り込めない理由を言って終える。
     取り込めるときだけ、`--expect` の値を含む `ccnavi-user-handoff.sh` の行を出す。
     ボードからは取り込めない種類を含むときは、ターミナルで実行するよう添える。
     """
@@ -152,12 +152,6 @@ def _plan_text(stdout: TextIO, plan: handoff.Plan, wanted: list[str] | None, roo
             stdout.write(f"    warn  {line}\n")
         if entry.defense:
             stdout.write(f"    ターミナルのみ {entry.defense}。ボードからは取り込めません\n")
-        if entry.conflict:
-            stdout.write(
-                f"    conflict コピーしたあとに取り込み先が変わりました"
-                f"（コピーした時点の元は {handoff.ORIG_SUFFIX}）。"
-                "下書きに今の取り込み先の変更を入れてから、下書きと .orig を作り直してください\n"
-            )
         if entry.selected and entry.diff:
             for line in entry.diff.split("\n"):
                 stdout.write(f"    {line}\n")
@@ -169,7 +163,7 @@ def _plan_text(stdout: TextIO, plan: handoff.Plan, wanted: list[str] | None, roo
         return
     if not plan.ok:
         stdout.write(
-            "選んだ対象に error か conflict があるため、取り込めません。"
+            "選んだ対象に error があるため、取り込めません。"
             "直すか、パスを選び直してください。何も反映していません。\n"
         )
         return

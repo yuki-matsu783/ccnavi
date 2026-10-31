@@ -6,6 +6,12 @@
 import { COLUMNS, type Card, type PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
 
+/** 承認対象外の提案の理由。実行ファイルの行頭の「error: 」「warn: 」と、見出しに出している識別子を外し、理由だけを残す */
+export function rejectedReason(ticket: string, problem: string): string {
+  const body = problem.replace(/^(error|warn): /, "");
+  return body.startsWith(`${ticket}: `) ? body.slice(ticket.length + 2) : body;
+}
+
 /** ツールバーの絞り込みのチェックボックスの言葉 */
 export const FILTER_LABELS = {
   attention: "ユーザ待ちのみ",

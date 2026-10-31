@@ -846,7 +846,7 @@ test("CB-T177 ［レビュー完了］は残った指摘を読む。待ちでな
   const noTree = approvalStep(CLOSED, { ...input, tree: undefined } as ApprovalInput);
   assert.equal(noTree.state.overlay, undefined);
   assert.deepEqual(noTree.effects, [
-    { kind: "warn", text: "親 i0001 のワークツリーかフェーズ 1 がないので、未解決（Unresolved）の指摘を読み込めません" },
+    { kind: "warn", text: "親 i0001 のワークツリーかフェーズ 1 がないので、レビューの指摘を読み込めません" },
   ]);
   // ユーザのレビュー待ちでなければ、ボタンの前提が無い。言って読み直す
   const notWaiting = approvalStep(CLOSED, { ...input, chip: chipOf({ reviewWaiting: false }) } as ApprovalInput);
@@ -920,8 +920,8 @@ test("CB-T177d 確定した結果は実行ファイルの答えに従う。revie
   assert.equal(reviewed?.keep, true);
   // 見せたあとに指摘が追加された: レビュー済みにしていないと言い、決め直しへ戻れる。取り返せるのでプロンプトを kept にしない
   const extra = overlayOf({ reviewed: false, pending_extra: ["u3", "u4"] });
-  assert.equal(extra?.title, "表示した後に指摘が追加されたため、レビュー済みにしていません");
-  assert.match(extra?.note ?? "", /追加された指摘 2 件は判断待ちです/);
+  assert.equal(extra?.title, "指摘が増えたため、レビュー済みにしていません");
+  assert.match(extra?.note ?? "", /増えた指摘 2 件は未判断です/);
   assert.deepEqual(extra?.retry, { parent: "i0001", phase: 1 });
   assert.equal(extra?.keep, false);
   // 続きの子が起きたときは、追加分があっても取り返せない（プロンプトを kept にして、決め直しは出さない）
@@ -929,7 +929,7 @@ test("CB-T177d 確定した結果は実行ファイルの答えに従う。revie
   assert.equal(fixed?.retry, undefined);
   assert.equal(fixed?.keep, true);
   assert.match(fixed?.note ?? "", /i0001-02-03/);
-  assert.match(fixed?.note ?? "", /追加された指摘 1 件は判断待ち/);
+  assert.match(fixed?.note ?? "", /増えた指摘 1 件は、今回は判断していません/);
   // 答えが「レビュー済みでない」のに理由が見ヒットしないときは、レビュー済みになったとは言わない
   const odd = overlayOf({ reviewed: false });
   assert.doesNotMatch(odd?.title ?? "", /をレビュー済みにしました/);
@@ -1031,7 +1031,7 @@ test("CB-T204 置けたら渡す文を見せて再読み込みする。投稿の
   assert.equal(done.state.overlay?.kind === "prompt" ? done.state.overlay.prompt : "", "決めた文");
   // fix のスレッドはホスト上で未解決のまま残る。resolve するのはユーザ（keep・issue の返信と解決は対象外）
   const note = done.state.overlay?.kind === "prompt" ? done.state.overlay.note : "";
-  assert.match(note, /修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。エージェントは fix を理由に resolve しない。/);
+  assert.match(note, /MR 上の指摘を解決済みにするのは、あなたです/);
   assert.deepEqual(kinds(done.effects), ["warn", "refresh"]);
   const copied = approvalStep(done.state, { kind: "handOver", how: "promptCopy" });
   assert.deepEqual(copied.effects, [{ kind: "copy", prompt: "決めた文", what: "対応方針のプロンプト" }]);

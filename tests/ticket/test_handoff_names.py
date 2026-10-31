@@ -143,7 +143,6 @@ class RoundTripTest(HandoffCase):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual(self.NEW, slurp(self.target(SETTINGS)))
         self.assertFalse(os.path.exists(draft))
-        self.assertFalse(os.path.exists(draft + handoff.ORIG_SUFFIX))
 
     def test_either_path_form_selects_the_draft(self):
         self.stage(SETTINGS, self.NEW)

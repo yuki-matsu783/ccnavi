@@ -33,7 +33,6 @@ export function sampleEntries(): HandoffEntry[] {
     entry({ path: ".ccnavi/config/project/rules.yml", kind: "layer-config", state: "changed", diff: "-a\n+b\n", entry_sha: "b".repeat(16) }),
     entry({ path: ".ccnavi/docs/guide.md", kind: "docs", state: "changed", warnings: ["見出しが無い"], diff: "-x\n+y\n", entry_sha: "c".repeat(16) }),
     entry({ path: ".claude/hooks/guard.sh", kind: "defense", state: "changed", board: false, diff: "-old\n+new\n", entry_sha: "d".repeat(16) }),
-    entry({ path: ".ccnavi/config/project/phases.yml", kind: "layer-config", state: "conflict", errors: [], entry_sha: "e".repeat(16) }),
     entry({ path: ".ccnavi/docs/broken.md", kind: "docs", state: "new", errors: ["UTF-8 として読めない"], entry_sha: "f".repeat(16) }),
     entry({ path: ".ccnavi/docs/same.md", kind: "docs", state: "unchanged", entry_sha: "1".repeat(16) }),
   ];

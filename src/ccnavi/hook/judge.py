@@ -1207,14 +1207,15 @@ def refuse(
     緩めることではない）。
 
     拒否は、失敗の連続（failstreak）にも数える。こちらは dry-run の deny も数える（dry-run は
-    判定を変えないので、案内を出してよい）。連続が閾値に達した回は、文面の末尾に資料を引く案内を足す。
+    判定を変えないので、案内を出してよい）。最初の 1 回と、連続が閾値の倍数になった回は、
+    文面の末尾に資料を引く案内を足す。
     """
     # 空行で区切るのは、1 件ずつが閉じた文であることを見た目でも保つため。
     reason = "\n\n".join(parts)
     decision = audit.DENY if verdict == rules.DENY else audit.ASK
     streak = ""
     if conf is not None and verdict == rules.DENY:
-        streak = fail_streak_hint(conf, root, record)
+        streak = fail_streak_hint(conf, root, record.session, record.agent)
 
     if mode == modes.DRY_RUN and modes.holds_in_dry_run(kind):
         reason += "\n\n" + DRY_RUN_HOLDS_NOTE
@@ -1251,15 +1252,18 @@ def refuse(
     return EXIT_OK
 
 
-def fail_streak_hint(conf: settings.Settings, root: str, record: audit.Record) -> str:
-    """拒否を失敗の連続に 1 回数え、案内を出す回ならその文を返す。出さない回と数えられない回は空。
+def fail_streak_hint(conf: settings.Settings, root: str, session: str, agent: str) -> str:
+    """失敗か拒否を連続に 1 回数え、案内を出す回ならその文を返す。出さない回と数えられない回は空。
 
-    数えの失敗や案内を組む失敗で、判定を止めない。
+    ツール自体の失敗（`events.decide_after_failure`）と、拒否（`deny_hint`）が同じ連続に数える。
+    数えの失敗や案内を組む失敗で、判定もツールの結果も止めない。
     """
     n = failstreak.threshold(conf.fail_streak_count)
     try:
-        got = failstreak.fail(conf.state, record.session, record.agent, n)
-        return docsearch.fail_streak_note(conf, root, got) if got else ""
+        kind, got = failstreak.fail(conf.state, session, agent, n)
+        if not kind:
+            return ""
+        return docsearch.fail_streak_note(conf, root, got, kind == failstreak.FIRST)
     except Exception:  # noqa: BLE001  案内の失敗で判定を止めない
         return ""
 
