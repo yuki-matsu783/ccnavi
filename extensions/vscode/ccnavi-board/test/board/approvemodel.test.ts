@@ -176,9 +176,16 @@ test("CB-T158 途中で止まった承認を読む（置いたぶんを拾い、
   }
   // 1 件も置かれなかった形
   const none = parseApproveResult(
-    JSON.stringify({ version: APPROVE_VERSION, partial: { placed: [], ticket: "i0001", reason: "書けない", lines: [] } }),
+    JSON.stringify({ version: APPROVE_VERSION, partial: { placed: [], written: [], ticket: "i0001", reason: "書けない", lines: [] } }),
   );
   assert.ok(!none.ok && "partial" in none && none.partial.placed.length === 0);
+  // `written` が無い答えは、絞れないので読まずに止める（空配列は書いたものが無い正常な形）
+  const lacking = parseApproveResult(
+    JSON.stringify({ version: APPROVE_VERSION, partial: { placed: ["i0001"], ticket: "i0001", reason: "書けない", lines: [] } }),
+  );
+  assert.ok(!lacking.ok && "error" in lacking && lacking.error.includes("written"));
+  const lackingOk = parseApproveResult(JSON.stringify({ version: APPROVE_VERSION, approved: ["i0001"], copies: [], lines: [], prompt: "" }));
+  assert.ok(!lackingOk.ok && "error" in lackingOk && lackingOk.error.includes("written"));
 });
 
 test("CB-T159 途中で止まったことを伝える文（置いた件数・後始末で止まった場合・進捗の行）", () => {
@@ -232,7 +239,7 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
   assert.match(unknown, /--yes が止まりました/, unknown);
 });
 
-test("CB-T398 承認した子のワークツリーの計画を読む（古い実行ファイルの答えには無く、空として読む）", () => {
+test("CB-T398 承認した子のワークツリーの計画を読む（欠けた欄は空として読む）", () => {
   const done = parseApproveResult(fixtureText("approve-yes.json"));
   assert.ok(done.ok);
   if (done.ok) {
@@ -247,7 +254,7 @@ test("CB-T398 承認した子のワークツリーの計画を読む（古い実
       },
     ]);
   }
-  const old = parseApproveResult('{"version":1,"approved":["i0001"],"copies":[],"lines":[],"prompt":"x"}');
+  const old = parseApproveResult('{"version":1,"approved":["i0001"],"copies":[],"written":[],"lines":[],"prompt":"x"}');
   assert.ok(old.ok);
   if (old.ok) {
     assert.deepEqual(old.value.worktrees, []);

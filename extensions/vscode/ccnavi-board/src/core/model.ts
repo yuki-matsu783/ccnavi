@@ -361,7 +361,7 @@ export interface BoardJson {
   readonly trees: readonly TreeJson[];
   /** 順序は 共通の設定 → ワークスペースの設定 → プロジェクトの設定（名前順） */
   readonly layers: readonly LayerJson[];
-  /** 順序は ワークスペースの統合結果 → プロジェクトの統合結果（名前順） */
+  /** 順序は、ワークスペースの統合結果 → プロジェクトの統合結果（名前順） */
   readonly sums: readonly SumJson[];
   readonly projects: readonly string[];
   readonly problems: readonly string[];

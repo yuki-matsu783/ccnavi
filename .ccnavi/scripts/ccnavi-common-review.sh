@@ -460,7 +460,7 @@ staged_send() {
 	cs_id=$(ccnavi ops begin "$cs_kind" "${branch:-}" 0 "$cs_mr" "$cs_key" "$cs_stage:$cs_stage" 2>/dev/null) || cs_id=""
 	if [ -z "$cs_id" ]; then
 		# 記録が無いと二重に送るおそれがあるため、送らずに止める
-		printf '%s: 操作記録を作れなかった。二重投稿を防ぐため、何も送らずに止めた。logs/state/ops/ に書けるか、ccnavi と配布した sh の版が揃っているかを確かめて、打ち直してください。\n' "${review_label:-ccnavi-review}" >&2
+		printf '%s: 操作記録を作れなかった。二重投稿を防ぐため、何も送らずに止めた。logs/state/ops/ に書けるかを確かめて、打ち直してください。\n' "${review_label:-ccnavi-review}" >&2
 		return 1
 	fi
 	# 同じ操作を同時に送らない（照合の前に 2 つが「未送信」と見て、両方が投稿するのを防ぐ）。

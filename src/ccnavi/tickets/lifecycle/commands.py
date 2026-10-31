@@ -63,7 +63,7 @@ def ready_command(root: str, parent_id: str) -> str:
 
 
 def _refused(stderr: TextIO, root: str, verb: str, ticket_id: str) -> None:
-    """断った理由（呼び手が書いたあと）に、打ち直す 1 手を `次:` で足す。"""
+    """断った理由を書いたあとに、打ち直す 1 手を `次:` で足す。"""
     if verb == "cancel":
         line = texts.say(root, "NEXT_OPS_REFUSED__CANCEL", {"ticket": ticket_id})
     else:
@@ -403,7 +403,7 @@ def _close_parent(
 def _cancel_found(
     stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str, reason: str
 ) -> ticket_model.Ticket | None:
-    """`cancel` の検査。通ったチケット、断ったら None。全部、開始前に分かる。"""
+    """`cancel` の検査。通ったチケット、断ったら None。どの条件も、書く前に分かる。"""
     if not reason.strip():
         stderr.write("ccnavi: 取り消しには --reason <理由> が必要です。\n")
         return None

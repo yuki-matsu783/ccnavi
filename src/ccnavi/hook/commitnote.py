@@ -67,7 +67,7 @@ def notice(stderr: TextIO, conf: settings.Settings, root: str, payload: hookio.I
 def _commit_names(
     root: str, conf: settings.Settings, payload: hookio.Input, command: str, deadline: float
 ) -> list[str]:
-    """`commit` の呼び出しごとに、走った場所が直前にコミットの積まれた直接作業なら、その名前。"""
+    """`commit` の呼び出しごとに、実行された場所が直前にコミットの積まれた直接作業なら、その名前。"""
     found: list[str] = []
     for args, place in wrapguard.git_calls(
         payload.cwd, command, shellread.read(command).degraded, "commit"
@@ -93,7 +93,7 @@ def _carry(
     payload: hookio.Input,
     found: list[str],
 ) -> str:
-    """名前ごとに 1 回だけの文脈として、文面を渡す。コミット後の案内の唯一の組み立て口。"""
+    """名前ごとに 1 回だけ文脈として文面を返す。コミット後の案内は、この関数だけで組み立てる。"""
     names: dict[str, str] = {}
     for name in found:
         if name:

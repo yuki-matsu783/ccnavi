@@ -385,7 +385,7 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
-    # ---- 開始前に分かる条件は、何も変えずに最初に断る
+    # ---- 書く前に分かる条件は、何も変えずに最初に断る
 
     def assert_nothing_changed(self, before, pending):
         """断ったあと、親のブランチ・リモート・ロック・hook のマーカーが動いていない。"""
@@ -399,7 +399,7 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
 
     def test_start_refused_up_front_leaves_no_child_worktree_or_commit(self):
         # 親に着手していない子の start は断られる。hook のマーカーを (b) でコミットしない。
-        pending = self.mark(1, "pending", {"review": "mr", "at": "2026-09-29T00:00:00+0900"})
+        pending = self.mark(1, "pending", {"review": True, "at": "2026-09-29T00:00:00+0900"})
         before = self.sha(self.tree, "HEAD")
         result = self.ticket("start", CHILD)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
@@ -412,7 +412,7 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         self.assert_nothing_changed(before, pending)
 
     def test_cancel_without_a_reason_is_refused_before_the_take_in_and_commit(self):
-        pending = self.mark(1, "pending", {"review": "mr", "at": "2026-09-29T00:00:00+0900"})
+        pending = self.mark(1, "pending", {"review": True, "at": "2026-09-29T00:00:00+0900"})
         before = self.sha(self.tree, "HEAD")
         result = self.ticket("cancel", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
@@ -425,7 +425,7 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
     def test_finish_of_an_unstarted_child_is_refused_before_the_merge(self):
         self.assertEqual(self.ticket("start", PARENT).returncode, 0)
         tree = self.child_tree()
-        pending = self.mark(1, "pending", {"review": "mr", "at": "2026-09-29T00:00:00+0900"})
+        pending = self.mark(1, "pending", {"review": True, "at": "2026-09-29T00:00:00+0900"})
         before = self.sha(self.tree, "HEAD")
         result = self.ticket("finish", CHILD)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)

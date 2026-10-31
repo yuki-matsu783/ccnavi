@@ -156,7 +156,7 @@ export interface ApproveResult {
   readonly copies: readonly string[];
   /**
    * この承認で書いた・消したパス（ワークスペースルートからの相対、`/` 区切り）。承認の push の sh に
-   * `--path` で渡し、これだけをコミット・push させる。古い実行ファイルは返さない（空）
+   * `--path` で渡し、これだけをコミット・push させる。書いたものが無ければ空配列
    */
   readonly written: readonly string[];
   /** ターミナルなら標準出力に出ていた行 */
@@ -305,6 +305,9 @@ export function parseApprovePreview(text: string): PreviewParse {
   };
 }
 
+const WRITTEN_MISSING =
+  "実行ファイルの答えに `written` がありません。承認の push を絞れないので送りません。ccnavi を更新して、承認を打ち直してください";
+
 /** `--yes` の答え。承認できたか、一覧が変わっていたか、読めなかったか */
 export function parseApproveResult(text: string): ResultParse {
   const top = parseTop(text);
@@ -325,6 +328,9 @@ export function parseApproveResult(text: string): ResultParse {
   }
   // 途中で止まった。置いたものは戻らないので、mismatch と同じく成功にはしない。
   if (isRecord(raw.partial)) {
+    if (!Array.isArray(raw.partial.written)) {
+      return { ok: false, error: WRITTEN_MISSING };
+    }
     return {
       ok: false,
       partial: {
@@ -336,6 +342,10 @@ export function parseApproveResult(text: string): ResultParse {
         lines: list(raw.partial.lines).map(str),
       },
     };
+  }
+  // `written` が無いと、承認の push が絞れず広く送ってしまう。推測せず止める
+  if (!Array.isArray(raw.written)) {
+    return { ok: false, error: WRITTEN_MISSING };
   }
   return {
     ok: true,

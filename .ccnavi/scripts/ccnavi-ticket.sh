@@ -77,9 +77,9 @@ usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-ticket.sh status [<親>]
 sh .ccnavi/scripts/ccnavi-ticket.sh next-id [<先頭の語> <slug>]
-sh .ccnavi/scripts/ccnavi-ticket.sh <start|finish|cancel|approval-request> <識別子> [--reason <理由>]
-  （approval-request は --check を付けると、送る前の検査だけをして何も送らない）
-sh .ccnavi/scripts/ccnavi-ticket.sh consolidate <親>
+sh .ccnavi/scripts/ccnavi-ticket.sh <start|finish|cancel|approval-request> <識別子> [--reason <理由>] [--check]
+  （--check を付けると、書く前の検査だけをして何も変えない。approval-request は何も送らない）
+sh .ccnavi/scripts/ccnavi-ticket.sh consolidate <親> [--check]
 sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>
 sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] [--signal <信号>]
 （親の提案の雛形はこのスクリプトに無い: ccnavi ticket new <識別子> --title <タイトル> --plan <型,…> --issue <値> --mr <番号>）
@@ -372,7 +372,7 @@ start | finish | cancel | approval-request | consolidate)
 			ccnavi_wap_exe ticket "$@" || exit $?
 			exit 0
 		fi
-		# 開始前に分かる条件は、ロック・取り込み・コミット・子のワークツリーの作成の前に、何も変えずに断る。
+		# 書く前に分かる条件は、ロック・取り込み・コミット・子のワークツリーの作成より前に、何も変えずに断る。
 		# 検査は実行ファイルの本体と同じ関数（読むだけ）。通ったときの標準出力は捨てる。`--check` は位置引数の前に置く。
 		# approval-request は上の事前確認の流れで検査が済む（--check と本体が同じ検査を通る）。
 		if [ "$1" != approval-request ]; then

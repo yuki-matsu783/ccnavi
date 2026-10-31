@@ -253,7 +253,7 @@ op_who_read=""
 op_use_plan() {
 	op_id=$("$JQ" -r '.op // empty' "$1" 2>/dev/null || :)
 	[ -n "$op_id" ] ||
-		fail decide-no-op "受け入れの計画に操作 ID が無く、何も送らず止めた。実行ファイルが sh より古い。ccnavi を更新して（ccnavi-install）から打ち直してください。" 1
+		fail decide-no-op "受け入れの計画に操作 ID が無く、何も送らずに止めました。実行ファイルが sh より古いので、ccnavi を更新（ccnavi-install）してから打ち直してください。" 1
 }
 
 op_set() {

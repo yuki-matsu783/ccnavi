@@ -202,12 +202,12 @@ diagrams:
           → フェーズ 1 は終わり
       - id: kind
         from: ccnavi
-        text: レビューの要否を決める。定義は false、計画のステップに review の true は無く、実績のリスクは HIGH に届かない
+        text: レビューの要否を決める。定義は false で、計画のステップに review の true は無く、実績のリスクも HIGH に届いていない
         value: 'review: false → 要らない'
       - id: reply
         from: ccnavi
         to: 親（メインエージェント）
-        text: レビューを省略して、次のフェーズに進めと返す。子は finish の時点で done/ に入る
+        text: レビューを省略し、次のフェーズへ進むよう返す。子は finish の時点で done/ に入る
         value: 'マーカー: skipped'
 
   # 同じく子が終わる。review: true の例（design）
@@ -221,7 +221,7 @@ diagrams:
         value: sh .ccnavi/scripts/ccnavi-ticket.sh finish <子>
       - id: ended
         from: ccnavi
-        text: フェーズが終わり、レビューが要るになる
+        text: フェーズが終わり、レビューが要る扱いになる
         value: |-
           phase: 2 の子は done に 1 本
           review: true → 要る
@@ -249,7 +249,7 @@ diagrams:
         text: review/ の子が done/ へ動き、止めが外れる
         value: 'マーカー: reviewed'
 
-  # レビューが要るかは、定義・計画のステップ・引き受けた延期のどれか 1 つでも要ると言えば要る。定義が false でも要るになる例（research）
+  # レビューが要るかは、定義・計画のステップ・引き受けた延期のどれか 1 つでも要ると言えば要る。定義が false でも要る扱いになる例（research）
   phase-review-up:
     actors: [フェーズ定義, 親の計画, ccnavi]
     steps:
@@ -269,7 +269,7 @@ diagrams:
         value: false と true → 要る
       - id: risk
         from: ccnavi
-        text: ステップに review の true が無くても、閉じた子の実績のリスクが HIGH 以上なら、要らないを要るに上げる
+        text: ステップに review の true が無くても、閉じた子の実績のリスクが HIGH 以上なら、要らない判定を要るに上げる
         value: 'リスク: 58 (HIGH) — 行数が多い → 要る'
 
   # 順序は計画のステップの after が決める（定義には順序の欄が無い）
@@ -374,7 +374,7 @@ courses:
 
   - id: how-phase-ends
     title: フェーズが終わったあとの動きが、review でどう変わるかを知りたいとき
-    summary: review が false と true のときの違い。定義・計画のステップ・リスクでレビューが要るになる条件
+    summary: review が false と true のときの違い。定義・計画のステップ・リスクでレビューが要る扱いになる条件
     steps:
       - target: phase-review
         title: review が false の定義
@@ -384,17 +384,17 @@ courses:
         focus: finish, deliverables
       - target: phases
         title: false は省略して進む
-        body: 同じ phase の子が doing にも todo にも無く、done に 1 枚以上あれば、フェーズは終わりです。レビューが要らないなら、レビューを省略して次のフェーズへ進めと返ります。ユーザの手は入りません。
+        body: 同じ phase の子が doing にも todo にも無く、done に 1 枚以上あれば、フェーズは終わりです。レビューが要らないなら、レビューを省略して次のフェーズへ進むよう返します。ユーザの手は入りません。
         diagram: phase-end-false
         focus: ended, kind, reply
       - target: phase-review
         title: review が true の定義
-        body: 設計（design）は review が true です。最後の子を閉じてフェーズが終わると、レビューが要るになります。
+        body: 設計（design）は review が true です。最後の子を閉じてフェーズが終わると、レビューが要ります。
         scene: { open: design }
         diagram: phase-end-true
         focus: finish, ended
       - target: phases
-        title: true は、ユーザを待って止まる
+        title: true なら、ユーザを待って止まる
         body: 返す文は「すべての子が合流済みと確かめ、レビューを頼み、応答を終えてユーザを待て」です。レビュー済みになるまで、その親の cwd からのサブエージェントの起動と Bash が止まります。次のフェーズの計画を書く Write と Edit は通ります。
         diagram: phase-end-true
         focus: reply, stop
@@ -405,13 +405,13 @@ courses:
         focus: request, confirm, open
       - target: phase-review
         title: 定義が false でも、計画のステップで true にできる
-        body: レビューが要るかは、定義の review と計画のステップの review のどちらかが true なら要るです。計画のステップに review の true を書くと、research の定義が false のままでも、そのフェーズはレビューが要るになります。
+        body: 定義の review と計画のステップの review のどちらかが true なら、そのフェーズはレビューが要ります。計画のステップに review の true を書くと、research の定義が false のままでも、そのフェーズはレビューが要ります。
         scene: { open: research }
         diagram: phase-review-up
         focus: def, plan, pick
       - target: phases
         title: リスクが高ければ、false も要るに上がる
-        body: 閉じた子の実績のリスクが HIGH 以上なら、宣言が false でもレビューが要るに上がります。点と理由は、閉じたときの出力とレビューの依頼文の先頭に出ます。feedback の定義は、もとから false を書けません。
+        body: 閉じた子の実績のリスクが HIGH 以上なら、宣言が false でも、レビューが要る扱いになります。点と理由は、閉じたときの出力とレビューの依頼文の先頭に出ます。feedback の定義は、もとから false を書けません。
         diagram: phase-review-up
         focus: risk
 
@@ -434,7 +434,7 @@ courses:
           add: blank
       - target: phase-kind
         title: 区分を選ぶ
-        body: 計画に並べる定義は work、レビューのあとのフィードバック計画に並べる定義は feedback です。feedback のレビューは true になります。
+        body: 計画に並べる定義は work、レビューのあとに対応するフィードバック計画に並べる定義は feedback です。feedback のレビューは true になります。
         scene:
           add: blank
       - target: phase-scope
@@ -587,7 +587,7 @@ courses:
           dirty: true
       - target: status
         title: 通らなかったとき
-        body: 検証が通らなければ、保存せずに下へ理由を出します。たとえば feedback の定義でレビューを false にしたとき、識別子に使用できない id、重複したタイトルなどです。同じ id が 2 つあるときは、画面が先に止めます。
+        body: 検証が通らなければ、保存せずに下へ理由を出します。検証に通らない例は、識別子に使えない id、重複したタイトル、feedback の定義で review を false にしたことです。同じ id が 2 つあるときは、画面が先に止めます。
         scene:
           dirty: true
           error: true

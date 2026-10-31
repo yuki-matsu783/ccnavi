@@ -2,7 +2,7 @@
 
 実行ファイルの代役（`STUB`）は、`ops …` を本物の `ccnavi ops` に渡し、受け入れの計画を本物の
 操作記録（`tickets/model/oplog.py`）で書く。ホストの代役（`tests/sh/test_review_decide.py` の
-`GitLab`）には、issue・コメントの作成と一覧を足す（`install`。送った物は `STORE` に積む）。
+`GitLab`）には、issue・コメントの作成と一覧を足す（`install`。送ったものは `STORE` に積む）。
 """
 
 from __future__ import annotations

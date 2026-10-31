@@ -197,7 +197,7 @@ courses:
         focus: effect
       - target: level-high
         title: 同じ 40 点でも、境目が変わると結果が変わる
-        body: HIGH が 40 のときは、40 点の子は HIGH です。50 に直したあとに閉じる 40 点の子は MEDIUM で、実績ではユーザのレビューが要る扱いになりません。宣言の true は下がりません。
+        body: HIGH の境目が 40 点のとき、40 点の子は HIGH です。境目を 50 に直したあとに閉じる 40 点の子は MEDIUM で、実績ではユーザのレビューが要る扱いになりません。宣言の true は下がりません。
         diagram: risk-level-edit
       - target: sum
         title: 実際に使うのは、共通の設定との重ね合わせ
@@ -213,7 +213,7 @@ courses:
         focus: diff, score, level
       - target: level-high
         title: HIGH 以上のとき変わること
-        body: 宣言が review の false でも、そのフェーズはユーザのレビューが要る扱いに上がります。レビューが済むまで、親のワークツリーでのサブエージェントの起動と Bash は止まります。依頼文の先頭には、リスクの点とレベルが付きます。
+        body: review の false と宣言していても、そのフェーズはユーザのレビューが要る扱いに上がります。レビューが済むまで、親のワークツリーでのサブエージェントの起動と Bash は止まります。依頼文の先頭には、リスクの点とレベルが付きます。
         diagram: risk-high-review
         focus: raise, block, request
 

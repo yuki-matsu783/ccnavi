@@ -193,7 +193,7 @@ accept_before_place() {
 # 下書きは残す（打ち直せば投稿できる）。下書きの名前は exe と揃える（親の識別子。ブランチ名と違うことがある）。
 
 post_decision() {
-	# 取れなければ post_warning に言う（置いたあとなので決めたことは戻さない）
+	# 取れなければ post_warning で知らせる（置いたあとなので、決めたことは戻さない）
 	post_decision_staged || :
 }
 

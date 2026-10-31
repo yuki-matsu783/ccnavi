@@ -159,7 +159,7 @@ messages:
     next: |-
       確認の前に、integrate の出力にある差分と変わるファイルを、文章でユーザに見せておく。許可されたら確定し、断られたら取り込まず、やめるなら {script:ccnavi-git.sh} integrate --abort {key} を打つ
 
-  # ---- hook/commitnote.py（直接作業のコミットのあとの案内。メインのエージェントの commit が成功したとき、ワークツリーごとに 1 回）
+  # ---- hook/commitnote.py（直接作業のコミットのあとの案内。メインのエージェントの commit が成功したとき、またはメインの Agent ツールが返ったとき（サブエージェントのコミットを拾う）、ワークツリーごとに 1 回）
   NOTICE_DIRECT_COMMIT:
     kind: notice
     values: [name]

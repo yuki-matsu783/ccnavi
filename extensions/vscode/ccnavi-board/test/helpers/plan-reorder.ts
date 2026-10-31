@@ -13,7 +13,7 @@ import * as path from "node:path";
 import type { ApprovePlan, ApprovePlanItem } from "../../src/core/approvemodel.js";
 
 /** 表の計画のステップ。名前だけか、`type`・`review`・`after` を持つマップ */
-export type RawItem = string | { readonly type: string; readonly review?: string; readonly after?: readonly number[] };
+export type RawItem = string | { readonly type: string; readonly review?: boolean; readonly deferred?: boolean; readonly after?: readonly number[] };
 
 export interface ReorderCase {
   readonly name: string;
@@ -54,7 +54,7 @@ export function plansOf(plan: readonly RawItem[], feedback: readonly RawItem[] |
       type: typeOf(item),
       title: typeOf(item),
       review: true,
-      deferred: typeof item !== "string" && item.review === "defer",
+      deferred: typeof item !== "string" && item.deferred === true,
       review_at: null,
       locked: fixed.includes(first + index),
     }));

@@ -18,7 +18,7 @@ sh（`ccnavi-ticket.sh consolidate`）が write-and-push の手順で、親の�
 
 ## 打ち直し
 開いている統合の子がすでにあれば新しく作らず、その識別子を出す。そのチケットを書いたパスの一覧に
-載せるので、前の回の push が済んでいなければ write-and-push が送り直す。
+載せるので、前回の push が済んでいなければ、write-and-push が送り直す。
 """
 
 from __future__ import annotations
@@ -235,7 +235,7 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, pare
         return 1
     found, existing, pending = passed
     if existing is not None:
-        # 書いたパスの一覧に載せる。前の回の push が済んでいなければ write-and-push が送り直す。
+        # 書いたパスの一覧に載せる。前回の push が済んでいなければ、write-and-push が送り直す。
         fsio.note_input(existing.path)
         stdout.write(
             f"開いている統合の子 {existing.ticket} がある。新しくは作らない。"
