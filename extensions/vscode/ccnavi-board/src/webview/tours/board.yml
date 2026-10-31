@@ -391,7 +391,7 @@ courses:
         scene: { overlay: decide, parent: sample-c }
       - target: decide-confirm
         title: 方針を確定する
-        body: 何も選ばなくても、「この対応方針を確定」を押せます。何も選ばなければ、全件を「このフェーズで直す」として確定します。押すと、選んだ内容が記録されます。「このフェーズで直す」を選んだ指摘があると、追加対応用の子チケットが作られ、フェーズが開き直ります。
+        body: 何も選ばなくても、「この対応方針を確定」を押せます。何も選ばなければ、全件を「このフェーズで直す」として確定します。押すと、選んだ内容が記録されます。「このフェーズで直す」を選んだ指摘があると、直すための子チケットが作られ、フェーズが作業に戻ります。
         scene: { overlay: decide, parent: sample-c }
       - target: approval-handover
         title: 決めた結果をClaude Codeに伝える

@@ -462,4 +462,4 @@ function str(value: unknown): string {
 }
 
 /** 承認や対応方針の確定のあと、Claude Code に文を渡す方法の案内（コピー / 新しいセッション）。「ターミナルで実行」の注意はそのボタンのツールチップに置く */
-export const HANDOVER_NOTE = "Claude Code に渡す文を用意しました。「コピー」して貼るか、「新しいセッションで開く」を押してください。";
+export const HANDOVER_NOTE = "Claude Code に渡す文を用意しました。「コピー」して貼るか、「新しいセッションで開く」を押してください。送るときは、自分で Enter を押します。";
