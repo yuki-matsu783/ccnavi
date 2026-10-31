@@ -162,9 +162,9 @@ export interface TicketJson {
   readonly cancel_reason: string;
   /**
    * 作業中か（承認済みチケットが `doing/` にあり、着手していて、終わってもいないし取り消されてもいない）。
-   * 実行ファイルが決め、拡張は `started_at` などから組み直さない。答えが欠けていれば null
+   * 実行ファイルが決め、拡張は `started_at` などから組み直さない
    */
-  readonly in_progress: boolean | null;
+  readonly in_progress: boolean;
   readonly seen_in: readonly SeenInJson[];
   /** どれが正か決まらないチケットの全部。決まっていれば空 */
   readonly scattered: readonly SeenInJson[];
@@ -539,7 +539,7 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     merged_sha: str(raw.merged_sha),
     cancelled_at: str(raw.cancelled_at),
     cancel_reason: str(raw.cancel_reason),
-    in_progress: typeof raw.in_progress === "boolean" ? raw.in_progress : null,
+    in_progress: raw.in_progress === true,
     seen_in: seenIn(raw.seen_in),
     scattered: seenIn(raw.scattered),
     risk: isRecord(raw.risk) ? raw.risk : null,
@@ -581,10 +581,8 @@ function flow(raw: Record<string, unknown>): FlowJson | null {
     rel: str(raw.rel),
     tree: str(raw.tree),
     exists: raw.exists === true,
-    // 欄が欠けていたら書かない扱いにする（リンクかを確かめられない）
-    linked: raw.linked !== false,
-    // 欄が欠けていたら止まっている扱いにする（止まっているかを確かめられないので、書かせない）
-    locked: raw.locked !== false,
+    linked: raw.linked === true,
+    locked: raw.locked === true,
     lock_kind: raw.lock_kind === "doing" || raw.lock_kind === "review" ? raw.lock_kind : null,
     draft: isRecord(raw.draft) ? flowDraft(raw.draft) : null,
   };
@@ -595,8 +593,7 @@ function flowDraft(raw: Record<string, unknown>): FlowDraftJson | null {
   if (path === "") {
     return null;
   }
-  // 欄が欠けていたらリンクの扱いにする（読まない）
-  return { path, rel: str(raw.rel), exists: raw.exists === true, linked: raw.linked !== false };
+  return { path, rel: str(raw.rel), exists: raw.exists === true, linked: raw.linked === true };
 }
 
 function seenIn(value: unknown): readonly SeenInJson[] {

@@ -54,16 +54,6 @@ test("CB-D366 一覧は対象ごとに 1 行。パス・種類・状態のバッ
   }
 });
 
-test("CB-D1229 古い実行ファイル（ignored_paths が無い）は、件数だけで折りたたみを出さない", async () => {
-  const dom = await openHandoff({ list: list(undefined, { ignored_paths: undefined }) });
-  try {
-    assert.match(text(dom.one("#counts")), /対象外 2 件/);
-    assert.equal(dom.all("#ignored-paths").length, 0);
-  } finally {
-    await dom.close();
-  }
-});
-
 test("CB-D367 見出しを押すと開き、差分と errors / warnings を出す。差分が空なら無いと言う", async () => {
   const dom = await openHandoff({ list: list([entry(), entry({ path: ".ccnavi/docs/guide.md", kind: "docs", warnings: ["見出しが無い"], errors: ["UTF-8 ではない"], diff: "", entry_sha: "c".repeat(16) })]) });
   try {

@@ -40,3 +40,14 @@ keywords: [後方互換, can_issue, 欄の読み分け, 操作 ID, 直接投稿,
 ## 採らなかった案
 
 上の表のとおり。拡張の読み取りには、実行ファイルが条件つきで出す欄（無いのが正常な欄）と、機能の有無を `features` で確かめる処理が残る。これらは以前の形式を読む処理ではないので、消していない。
+
+## 追記: 拡張に残っていた読み分けを消した
+
+上の「読み取りの既定値は残す」とした範囲のうち、実行ファイルが常に出す項目を無いかもしれないとして読む処理を、さらに消した。
+
+- lint の JSON の `flow.rendered`・`flow.candidates`（`LintFlow`・`FlowChecks`）を必須にした。欄が無いときの「実行ファイルが古いため…表示できません」の表示と、欄ごと省く組み立てを消した
+- ボードの JSON の `flow.linked`・`flow.locked`・`flow.draft.linked` は、欠けたら閉じる側に読む処理をやめ、`true` のときだけ真とした。`tickets[].in_progress` は null をやめて真偽値にし、`lockFromBoard` の「作業中かを答えません」の分岐を消した
+- 取り込み待ちの JSON の `ignored_paths` を必須にした。欄が無い・形が違うときに件数だけを出す分岐（`undefined`）と、画面の `?.` を消した
+- `flow.tree` が空のときの「実行ファイルが古いためです」の錠（`flowTargetOf`）を消した
+
+残したもの: 条件つきの欄（`written?`・`sum?`・`lint.flow` の `--flow` 指定時のみ）、`features`・`flags` の有無の確認（ADR-0224）、`Lock.turns?`（錠を作る側の多くが応答中のセッションを知らない）、壊れた JSON でも他の項目は描く共通の読み取り（`str`・`list`・`num`）。

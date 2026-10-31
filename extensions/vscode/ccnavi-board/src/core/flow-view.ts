@@ -75,7 +75,7 @@ export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult
     return { ok: false, error: `${ticket} は親チケットです。フローがあるのは子チケットだけです` };
   }
   if (found.flow === null) {
-    return { ok: false, error: `${ticket} のフローの置き場が実行ファイルの出力にありません（完了・取り消しの子でファイルがないか、実行ファイルが古いかのどちらかです）` };
+    return { ok: false, error: `${ticket} のフローの置き場が実行ファイルの出力にありません（完了・取り消しの子でファイルがありません）` };
   }
   return {
     ok: true,
@@ -90,9 +90,7 @@ export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult
         ? { locked: true, reason: lockedReason(ticket) }
         : found.flow.linked
           ? { locked: true, reason: linkedReason(found.flow.rel) }
-          : found.flow.tree === ""
-            ? lockFromFailure("フローのあるツリーが実行ファイルの出力にありません（実行ファイルが古いためです）")
-            : OPEN_LOCK,
+          : OPEN_LOCK,
     },
   };
 }
@@ -197,11 +195,11 @@ export interface FlowChecks {
   /** `(flow)` の warn（線の構造・名前の表記）。一時ファイルのパスは対象のファイルのパスに直してある */
   readonly warns: readonly string[];
   /**
-   * `SubagentStart` で担当に渡る手順の行。null は並べられなかった。無ければ実行ファイルが古くて答えに欄が無い
+   * `SubagentStart` で担当に渡る手順の行。null は並べられなかった
    */
-  readonly rendered?: readonly string[] | null;
-  /** フローで選べるサブエージェントとスキルの名前。無ければ実行ファイルが古い */
-  readonly candidates?: LintFlowCandidates;
+  readonly rendered: readonly string[] | null;
+  /** フローで選べるサブエージェントとスキルの名前 */
+  readonly candidates: LintFlowCandidates;
 }
 
 export interface FlowPage {

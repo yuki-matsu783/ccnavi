@@ -39,9 +39,6 @@ export function turnWarning(lock: Lock): string {
  */
 export function lockFromBoard(board: BoardJson, project?: string): Lock {
   const mine = board.tickets.filter((t) => project === undefined || t.project === project);
-  if (mine.some((t) => t.in_progress === null)) {
-    return lockFromError("実行ファイルが作業中かを答えません");
-  }
   const doing = mine.filter((t) => t.in_progress === true).map((t) => t.ticket);
   const turns = board.turns.map((t) => t.session);
   if (doing.length === 0) {

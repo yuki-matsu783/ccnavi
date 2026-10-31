@@ -79,7 +79,7 @@ test("CB-T228 錠は実行ファイルの flow.locked をそのまま使う。�
   // 取り消しの子でファイルが無ければ、実行ファイルは flow を null で返す。開く先が無い
   const cancelled = flowTargetOf(board, "i0001-02-05");
   assert.equal(cancelled.ok, false);
-  assert.match(cancelled.ok ? "" : cancelled.error, /完了・取り消しの子でファイルがない/);
+  assert.match(cancelled.ok ? "" : cancelled.error, /完了・取り消しの子でファイルがありません/);
   // 画面は started_at を見て組み直さない。答えが locked: false と言えば、着手済みに見えても開く
   const trusted: BoardJson = {
     ...board,
@@ -92,7 +92,7 @@ test("CB-T228 錠は実行ファイルの flow.locked をそのまま使う。�
   assert.equal(lockFromFailure("返らない").locked, true);
 });
 
-test("CB-T229 ボードの JSON の flow は子だけが持ち、locked が欠けたら閉じる側に読む", () => {
+test("CB-T229 ボードの JSON の flow は子だけが持つ", () => {
   const board = fixture();
   assert.equal(board.tickets.find((t) => t.ticket === "i0001")?.flow, null);
   const child = board.tickets.find((t) => t.ticket === "i0001-01-01")?.flow;
@@ -101,16 +101,6 @@ test("CB-T229 ボードの JSON の flow は子だけが持ち、locked が欠�
   assert.equal(board.tickets.find((t) => t.ticket === "i0001-02-05")?.flow, null);
   assert.equal(child.linked, false);
   assert.equal(child.tree, "<root>/.claude/worktrees/i0001");
-  // locked の欠けた答え（古い実行ファイルか不正な出力）は、止まっているものとして読む
-  const raw = JSON.parse(fixtureText()) as { tickets: { ticket: string; flow: Record<string, unknown> | null }[] };
-  for (const t of raw.tickets) {
-    if (t.flow !== null) {
-      delete t.flow.locked;
-    }
-  }
-  const parsed = parseBoardJson(JSON.stringify(raw));
-  assert.ok(parsed.ok);
-  assert.ok(parsed.board.tickets.filter((t) => t.flow !== null).every((t) => t.flow?.locked === true));
 
   // カードにも反映され、親のカードには無い。ボタンの開く先は子のカードだけ
   const built = buildBoard(board);
@@ -138,7 +128,7 @@ test("CB-T534 錠の種類（lock_kind）はボードの JSON から読む。doi
   assert.equal(kindOf("i0001-01-01"), null);
 });
 
-test("CB-T557 置き場かその途中がリンクなら、着手前でも読むだけ。ツリーの欄がない古い答えも書かない側", () => {
+test("CB-T557 置き場かその途中がリンクなら、着手前でも読むだけ", () => {
   const board = fixture();
   const edit = (change: (flow: NonNullable<BoardJson["tickets"][number]["flow"]>) => object): BoardJson => ({
     ...board,
@@ -148,22 +138,9 @@ test("CB-T557 置き場かその途中がリンクなら、着手前でも読む
   assert.ok(linked.ok);
   assert.equal(linked.target.lock.locked, true);
   assert.match(linked.target.lock.reason, /シンボリックリンク/);
-  const old = flowTargetOf(edit(() => ({ tree: "" })), "i0001-01-01");
-  assert.ok(old.ok);
-  assert.equal(old.target.lock.locked, true);
-  // linked の欠けた答えは、リンクかを確かめられないので書かない側に読む
-  const raw = JSON.parse(fixtureText()) as { tickets: { flow: Record<string, unknown> | null }[] };
-  for (const t of raw.tickets) {
-    if (t.flow !== null) {
-      delete t.flow.linked;
-    }
-  }
-  const parsed = parseBoardJson(JSON.stringify(raw));
-  assert.ok(parsed.ok);
-  assert.ok(parsed.board.tickets.filter((t) => t.flow !== null).every((t) => t.flow?.linked === true));
 });
 
-test("CB-T293 下書きの置き場は実行ファイルの flow.draft のコピー。欠けた欄はリンクの側、ない答えは null", () => {
+test("CB-T293 下書きの置き場は実行ファイルの flow.draft のコピー", () => {
   const board = fixture();
   const child = board.tickets.find((t) => t.ticket === "i0001-02-03")?.flow;
   assert.ok(child !== null && child !== undefined);
@@ -173,29 +150,6 @@ test("CB-T293 下書きの置き場は実行ファイルの flow.draft のコピ
     exists: false,
     linked: false,
   });
-  const raw = JSON.parse(fixtureText()) as { tickets: { ticket: string; flow: Record<string, unknown> | null }[] };
-  for (const t of raw.tickets) {
-    if (t.flow !== null && t.ticket === "i0001-02-03") {
-      delete (t.flow.draft as Record<string, unknown>).linked;
-    }
-    if (t.flow !== null && t.ticket === "i0001-02-04") {
-      delete t.flow.draft;
-    }
-  }
-  const parsed = parseBoardJson(JSON.stringify(raw));
-  assert.ok(parsed.ok);
-  assert.equal(parsed.board.tickets.find((t) => t.ticket === "i0001-02-03")?.flow?.draft?.linked, true);
-  assert.equal(parsed.board.tickets.find((t) => t.ticket === "i0001-02-04")?.flow?.draft, null);
-  // 着手の前かは、ボタンを出すかだけに使う（錠は flow.locked のまま）
-  const before = flowTargetOf(board, "i0001-02-03");
-  assert.ok(before.ok);
-  assert.equal(before.target.beforeStart, true);
-  const started = flowTargetOf(board, "i0001-02-02");
-  assert.ok(started.ok);
-  assert.equal(started.target.beforeStart, false);
-  const closed = flowTargetOf(board, "i0001-01-01");
-  assert.ok(closed.ok);
-  assert.equal(closed.target.beforeStart, false);
 });
 
 test("CB-T294 依頼のボタンは着手の前で錠がないときだけ。フローがなければ作成、在れば直し、下書きが在れば頼み直す", () => {

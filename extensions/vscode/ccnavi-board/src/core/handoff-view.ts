@@ -50,7 +50,7 @@ export interface HandoffList {
   /** 取り込める種類の表に無いパスと、リンクのディレクトリの件数 */
   readonly ignored: number;
   /** 対象外の名前と理由（置き場からの相対パス）。古い実行ファイルは返さない。`ignored` と件数が一致する */
-  readonly ignored_paths?: readonly HandoffIgnored[];
+  readonly ignored_paths: readonly HandoffIgnored[];
   readonly entries: readonly HandoffEntry[];
   /** 選んだ対象の集合のハッシュ。拡張は組み直さず、取り込みたいパスを指した答えのものを使う */
   readonly expect: string;

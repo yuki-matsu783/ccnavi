@@ -83,8 +83,8 @@ export async function lintFlowText(
     }
     const checks: FlowChecks = {
       warns: problems.filter((p) => p.severity === "warn").map((p) => rename(p.detail)),
-      ...(flow.rendered === undefined ? {} : { rendered: flow.rendered }),
-      ...(flow.candidates === undefined ? {} : { candidates: flow.candidates }),
+      rendered: flow.rendered,
+      candidates: flow.candidates,
     };
     return { ok: true, data: flow.data, checks };
   } finally {

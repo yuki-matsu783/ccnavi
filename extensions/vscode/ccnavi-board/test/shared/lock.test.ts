@@ -31,14 +31,6 @@ test("CB-T36 ボードが読めなければ閉じる側にする", () => {
   assert.equal(lock.reason, "保存できるか確認できません: 実行ファイルがありません");
 });
 
-test("CB-T391 作業中かを答えない実行ファイルでは保存できない", () => {
-  const board = fixture();
-  const tickets = board.tickets.map((t, i) => (i === 0 ? { ...t, in_progress: null } : { ...t, in_progress: false }));
-  const lock = lockFromBoard({ ...board, tickets });
-  assert.equal(lock.locked, true);
-  assert.match(lock.reason, /作業中かを答えません/);
-});
-
 test("CB-T392 プロジェクトを渡したときは、そのプロジェクトのチケットの答えだけを見る", () => {
   const board = fixture();
   const tickets = board.tickets.map((t) => ({ ...t, project: t.ticket === "i0001-02-02" ? "lib" : "" }));

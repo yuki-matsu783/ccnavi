@@ -362,7 +362,7 @@ function draftExists(target: FlowTarget): boolean {
 }
 
 /**
- * 依頼のボタンの言葉。下書きの置き場を答えない古い実行ファイルなら出さない。着手の前かは、読み込んだあとに錠を
+ * 依頼のボタンの言葉。下書きの置き場が無い（完了・取り消しの子）なら出さない。着手の前かは、読み込んだあとに錠を
  * 聞き直していればその答え（`current.beforeStart`）を使う（読み込んだあとに着手・終わり・取り消しがあっても出さない）
  */
 function requestOf(current: PanelState, loaded: Loaded): string | undefined {
