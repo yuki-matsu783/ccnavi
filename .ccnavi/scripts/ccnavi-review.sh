@@ -46,7 +46,7 @@
 #            ここが取ってくる → `ccnavi --reviewed N --accept-unresolved --preview` が見せる一覧を JSON で返す。
 #            何も置かない（見るだけ）。選んだものを置くのは ccnavi-user-decide.sh
 #
-# 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）では、状態を書く
+# 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの）では、状態を書く
 # review-request（マーカー）・confirm・ready を write-and-push で回す
 # （Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため）。
 # ロック → 途中の操作の確認 → hook のマーカーを先にコミット → 取り込み → 未送信の確かめを済ませてから

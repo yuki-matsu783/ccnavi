@@ -40,7 +40,6 @@ from ..sync import template_drafts
 from . import close as ops_close
 from . import plan as ops_plan
 from . import stop as ops_stop
-from . import worktrees
 
 # 最後のレビューのあと、Draft を外すまでの手順がユーザの合意の範囲に入ることの言い切り。
 # `confirm` の知らせ（core_review.after_last_review）と親の `finish` の出力が同じ文を使う。
@@ -299,11 +298,9 @@ def _close_parent(
     """親を閉じたあとの記録と案内。
 
     記録（`closed.json`）は、どのフェーズをどこで見たかを親のブランチに残す。提案は
-    統合先に取り込む前に `wip/` ごと消えるので、マージリクエストを作らない進め方では
-    閉じた事実の残る先がここしか無い。
+    統合先に取り込む前に `wip/` ごと消えるので、閉じた事実の残る先がここしか無い。
 
-    案内は進め方で分かれる。マージリクエストがあるなら Draft を外す合図まで、
-    無いなら統合先に取り込むところまで。
+    案内は Draft を外す合図まで。
     Draft を外す `ready` は、閉じたチケットとその記録を手元の `logs/archive/` へ退避してから外す
     （`review_close.ready`・tickets/model/archive.py）。この記録（`closed.json`）も一緒に退避される。
     """
@@ -317,23 +314,7 @@ def _close_parent(
     )
     if failed:
         stderr.write(f"ccnavi: クローズ済みの記録を保存できませんでした: {failed}\n")
-    git_sh = settings.script_command(root, "ccnavi-git.sh")
     wip = ticket_places.WIP_ROOT
-    if phase.without_mr(root, conf, found.ticket, venues):
-        stdout.write(
-            texts.say(
-                root,
-                "NEXT_OPS_CLOSE_NO_MR",
-                {
-                    "wip": wip,
-                    "classifier_note": worktrees.classifier_note(root, f"{git_sh} rm -r {wip}"),
-                },
-            )
-            + "\n"
-        )
-        # 材料（`done/`）は取り込みまで残るので、`wip/` を消す前の今なら下書きが作れる。
-        stdout.write(template_drafts.close_notice(conf, root, found.ticket, mr=False))
-        return
     if approval_marks.read_parent_mark(where, found.ticket, approval_marks.PARENT_MARK_READY):
         # ready は印を置いたあとに `done/` を `logs/archive/` へ退避するので、材料は拾えず、
         # `close_notice` も空を返す。案内を足さないのはそのため。この分岐に来るのは、ready の印が

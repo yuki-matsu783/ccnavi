@@ -12,18 +12,7 @@ messages:
     next: |-
       サブエージェントに、子のワークツリー（.claude/worktrees/{ticket}）での実装を任せる。終わってコミットされたら '{script:ccnavi-ticket.sh} finish {ticket}' を打つ
 
-  # 親を閉じたあと。マージリクエストで見るフェーズが無いとき。
-  NEXT_OPS_CLOSE_NO_MR:
-    kind: next
-    values: [wip, classifier_note]
-    next: |-
-      この移動をコミットし、`{wip}/` を削除して（'{script:ccnavi-git.sh} rm -r {wip}'）コミットし、統合先のブランチに取り込んでください。
-    note: |-
-      このチケットにはマージリクエストで見るフェーズが無いので、Draft を解除する手順はありません。途中の作業は既定のブランチに残さない。
-      `{wip}/` で消えるのは追跡済みのファイルだけで、削除する前のコミットから戻せる。
-      {classifier_note}
-
-  # 親を閉じたあと。マージリクエストがあるとき。
+  # 親を閉じたあと。
   NEXT_OPS_CLOSE_MR:
     kind: next
     values: [ready_command, approved, wip, flow_agreed]

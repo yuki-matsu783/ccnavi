@@ -50,7 +50,7 @@
 # start・finish・approval-request・consolidate は、ロックの前に事前確認（ホストの API と git のリモートが使える状態か）を打つ。
 #   直接作業では確かめない。標準出力には何も足さず、ok でない項目だけを標準エラーに出す（ticket_preflight）。
 #
-# 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）の
+# 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの）の
 # start・finish・cancel・approval-request・consolidate は write-and-push で回す。Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため、次を 1 操作にする。
 # ロック → 途中の操作の確認 → hook のマーカーを先にコミット →
 # 取り込み（ccnavi-sync.sh）→ 未送信の確かめ → 書く → 書いたパスだけ commit --only → push。push が
