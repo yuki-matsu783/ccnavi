@@ -24,6 +24,9 @@ allow:
     glob: "extensions/chrome/ccnavi-approval/*"
 started_at: "2026-10-31T11:42:11+0900"
 base_sha: "4e072b78cf65b3365f042fbb27b1e0c591921a8c"
+completed_at: "2026-10-31T12:13:02+0900"
+merged_sha: "b3932fe9a8e85c69206d509fb39f550793be29e2"
+finished_to: "review"
 ---
 親の「範囲」のとおりに、`.orig` と `conflict` の判定をやめる。
 

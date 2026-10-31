@@ -7,17 +7,16 @@
    件数だけを数える。パスは全要素を NFC と fold にそろえてから適用する。表と docs が食い違わない
 2. 断る形: リンク（途中も）・ふつうのファイルでない・ハードリンク・`.git` で始まる要素・
    同じ取り込み先に落ちる 2 本・バイナリ・新規作成を許さない種類・引数の絶対パスと `..`
-3. `--expect`: 定義どおりの値。下書き・取り込み先・`.orig` のどれが変わっても値が変わり、
+3. `--expect`: 定義どおりの値。下書き・取り込み先のどれが変わっても値が変わり、
    違えば何も書かない
-4. `conflict`: `.orig` と今の取り込み先が違えば、選んだ対象のどれも書かない
-5. 差分の見え方: CRLF・BOM・末尾の改行・ゼロ幅の文字を見える形にする。見えない違いは断る
-6. 書き込み: 一時ファイル → fsync → 差し替え。書く直前の確かめ直し。途中で失敗したら元に戻す。
-   下書きと `.orig` は、取り込んだものと同じときだけ消す
-7. 経路: 書くにはターミナルか `--via board`（`--expect` と `--json` が要る）。
+4. 差分の見え方: CRLF・BOM・末尾の改行・ゼロ幅の文字を見える形にする。見えない違いは断る
+5. 書き込み: 一時ファイル → fsync → 差し替え。書く直前の確かめ直し。途中で失敗したら元に戻す。
+   下書きは、取り込んだものと同じときだけ消す
+6. 経路: 書くにはターミナルか `--via board`（`--expect` と `--json` が要る）。
 `defense` はボードから断る
-8. 中身の検査: レイヤーの設定は `--lint` と同じ関数で、同じ回の対象を取り込んだあとの状態で見る。
+7. 中身の検査: レイヤーの設定は `--lint` と同じ関数で、同じ回の対象を取り込んだあとの状態で見る。
    テンプレートの検査、`defense` の `.sh` と `settings*.json`
-9. `ready` の止め: 取り込んでいない下書きが残っていれば止める
+8. `ready` の止め: 取り込んでいない下書きが残っていれば止める
 """
 
 from __future__ import annotations
@@ -90,11 +89,9 @@ class HandoffCase(unittest.TestCase):
         return os.path.join(self.root, "wip", "handoff", *handoff_names.to_draft(rel).split("/"))
 
     def stage(self, rel: str, data: bytes | None = None) -> str:
-        """`ccnavi-stage.sh` と同じく、元を下書きと `.orig` にコピーし、下書きを `data` にする。"""
+        """`ccnavi-stage.sh` と同じく、元を下書きにコピーし、下書きを `data` にする。"""
         current = slurp(self.target(rel)) if os.path.exists(self.target(rel)) else None
         path = self.draft_path(rel)
-        if current is not None:
-            put(path + handoff.ORIG_SUFFIX, current)
         put(path, current if data is None else data)
         return path
 
@@ -228,12 +225,6 @@ class AllowListTest(HandoffCase):
         answer = self.view()
         self.assertEqual(answer["ignored"], 1)
         self.assertEqual(answer["ignored_paths"], [{"path": "linked", "why": "linked-dir"}])
-
-    def test_the_orig_file_is_not_a_draft(self):
-        self.stage(SCRIPT, b"#!/bin/sh\necho new\n")
-        answer = self.view()
-        self.assertEqual([e["path"] for e in answer["entries"]], [SCRIPT])
-        self.assertEqual(answer["ignored"], 0)
 
     def test_the_table_and_the_design_document_agree(self):
         # 表を直したら、設計の文書の表も直す。文書に無い行を表に足さない。
@@ -382,7 +373,6 @@ class ExpectTest(HandoffCase):
                     kind,
                     sha(slurp(self.draft_path(rel))),
                     sha(slurp(self.target(rel))),
-                    sha(slurp(self.draft_path(rel) + ".orig")),
                 )
             )
             records.append(record)
@@ -391,21 +381,20 @@ class ExpectTest(HandoffCase):
             )
         self.assertEqual(answer["expect"], hashlib.sha256(b"".join(records)).hexdigest())
 
-    def test_the_hash_changes_with_any_of_the_three(self):
+    def test_the_hash_changes_with_the_draft_or_the_target(self):
         self.stage(DOCS, b"new\n")
         first = self.view()["expect"]
-        put(self.draft_path(DOCS) + ".orig", slurp(self.target(DOCS)) + b"x")
         put(self.target(DOCS), slurp(self.target(DOCS)) + b"x")
         second = self.view()["expect"]
         self.assertNotEqual(first, second)
         put(self.draft_path(DOCS), b"newer\n")
         self.assertNotEqual(second, self.view()["expect"])
 
-    def test_a_missing_target_and_orig_are_a_dash(self):
+    def test_a_missing_target_is_a_dash(self):
         rel = ".ccnavi/config/project/templates/feature.yml"
         write(self.draft_path(rel), TEMPLATE)
         entry = self.plan().entries[0]
-        self.assertIn(b"1:-1:-", entry.record())
+        self.assertTrue(entry.record().endswith(b"1:-"))
 
     def test_a_wrong_expect_writes_nothing(self):
         self.stage(DOCS, b"new\n")
@@ -437,31 +426,7 @@ class ExpectTest(HandoffCase):
         self.assertEqual(slurp(self.target(SCRIPT)), b"#!/bin/sh\necho old\n")
 
 
-class ConflictTest(HandoffCase):
-    def test_a_target_changed_after_staging_is_a_conflict_and_nothing_is_written(self):
-        self.stage(DOCS, b"new\n")
-        self.stage(SCRIPT, b"#!/bin/sh\necho new\n")
-        write(self.target(DOCS), "# 手引き\n\nほかの人の変更\n")
-        answer = self.view()
-        self.assertEqual(self.entry(answer, DOCS)["state"], "conflict")
-        self.assertEqual(self.entry(answer, SCRIPT)["state"], "changed")
-        self.assertFalse(answer["ok"])
-        result = self.take(expect=answer["expect"])
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("conflict", json.loads(result.stdout)["error"])
-        self.assertEqual(slurp(self.target(SCRIPT)), b"#!/bin/sh\necho old\n")
-
-    def test_without_an_orig_there_is_no_conflict_check(self):
-        write(self.draft_path(DOCS), "new\n")
-        self.assertEqual(self.entry(self.view(), DOCS)["state"], "changed")
-
-    def test_the_other_drafts_can_be_chosen_instead(self):
-        self.stage(DOCS, b"new\n")
-        self.stage(SCRIPT, b"#!/bin/sh\necho new\n")
-        write(self.target(DOCS), "changed\n")
-        self.assertTrue(self.view(SCRIPT)["ok"])
-        self.assertEqual(self.take(SCRIPT).returncode, 0)
-
+class SelectionTest(HandoffCase):
     def test_an_unchanged_draft_is_not_chosen_by_default(self):
         self.stage(DOCS)
         answer = self.view()
@@ -525,7 +490,7 @@ class DiffTest(HandoffCase):
 
 
 class WriteTest(HandoffCase):
-    def test_yes_writes_and_cleans_the_draft_and_the_orig(self):
+    def test_yes_writes_and_cleans_the_draft(self):
         draft = self.stage(DOCS, b"new\n")
         result = self.take()
         self.assertEqual(result.returncode, 0, result.stdout)
@@ -536,13 +501,12 @@ class WriteTest(HandoffCase):
                 "version": 1,
                 "ok": True,
                 "applied": [{"path": DOCS, "kind": "docs"}],
-                "removed_drafts": [f"wip/handoff/{DOCS}", f"wip/handoff/{DOCS}.orig"],
+                "removed_drafts": [f"wip/handoff/{DOCS}"],
                 "kept_drafts": [],
             },
         )
         self.assertEqual(slurp(self.target(DOCS)), b"new\n")
         self.assertFalse(os.path.lexists(draft))
-        self.assertFalse(os.path.lexists(draft + ".orig"))
 
     def test_a_new_template_is_written(self):
         rel = ".ccnavi/config/project/templates/feature.yml"

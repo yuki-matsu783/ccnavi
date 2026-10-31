@@ -32,8 +32,6 @@ export function stateLabel(state: string): string {
       return "変更あり";
     case "unchanged":
       return "変更なし";
-    case "conflict":
-      return "衝突";
     case "rejected":
       return "受け付けない";
     default:

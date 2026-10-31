@@ -157,7 +157,6 @@ test("CB-T1109 取り込めるのは board が真・状態が new か changed・
   assert.equal(isImportable(entry()), true);
   assert.equal(isImportable(entry({ state: "changed" })), true);
   assert.equal(isImportable(entry({ state: "unchanged" })), false);
-  assert.equal(isImportable(entry({ state: "conflict" })), false);
   assert.equal(isImportable(entry({ state: "rejected" })), false);
   assert.equal(isImportable(entry({ state: "later" })), false, "知らない状態は取り込めると決めない");
   assert.equal(isImportable(entry({ errors: ["x"] })), false);
@@ -166,16 +165,15 @@ test("CB-T1109 取り込めるのは board が真・状態が new か changed・
   assert.equal(isImportable(entry({ warnings: ["TODO"] })), true);
 });
 
-test("CB-T1110 取り込めない対象には理由を言う。ターミナルのみ・conflict・rejected・unchanged・error・知らない状態", () => {
+test("CB-T1110 取り込めない対象には理由を言う。ターミナルのみ・rejected・unchanged・error・知らない状態", () => {
   assert.equal(refusalReason(entry()), "");
   assert.match(refusalReason(entry({ board: false, kind: "defense" })), /ボードからは取り込めません。ターミナルで取り込みます/);
-  assert.match(refusalReason(entry({ state: "conflict" })), /conflict/);
   assert.match(refusalReason(entry({ state: "rejected" })), /rejected/);
   assert.match(refusalReason(entry({ state: "unchanged" })), /同じ内容/);
   assert.match(refusalReason(entry({ errors: ["x"] })), /error/);
   assert.match(refusalReason(entry({ state: "later" })), /未知の状態です（later）/);
   // ターミナルのみの対象は、状態より先にターミナルで取り込むことを言う
-  assert.match(refusalReason(entry({ board: false, state: "conflict" })), /ターミナルで取り込みます/);
+  assert.match(refusalReason(entry({ board: false, state: "rejected" })), /ターミナルで取り込みます/);
 });
 
 test("CB-T1111 作業中の錠は template と layer-config にだけ掛かる。docs と defense には掛けない", () => {
@@ -189,7 +187,7 @@ test("CB-T1111 作業中の錠は template と layer-config にだけ掛かる�
   assert.equal(blockReason(entry(), OPEN), "");
   assert.equal(blockReason(entry(), LOCKED), LOCKED.reason);
   assert.equal(blockReason(entry({ kind: "docs" }), LOCKED), "");
-  assert.match(blockReason(entry({ state: "conflict" }), LOCKED), /conflict/);
+  assert.match(blockReason(entry({ state: "rejected" }), LOCKED), /rejected/);
 });
 
 test("CB-T1112 選べる対象は、取り込めて錠が止めないもの。錠が掛かると template と layer-config が外れ、docs は残る", () => {
@@ -208,10 +206,10 @@ test("CB-T1113 読み直したあとの選択は、同じパスで entry_sha が
   const entries: HandoffEntry[] = [
     entry(),
     entry({ path: ".ccnavi/config/project/rules.yml", kind: "layer-config", state: "changed", entry_sha: "9".repeat(16) }),
-    entry({ path: ".ccnavi/docs/guide.md", kind: "docs", state: "conflict", entry_sha: "c".repeat(16) }),
+    entry({ path: ".ccnavi/docs/guide.md", kind: "docs", state: "rejected", entry_sha: "c".repeat(16) }),
   ];
   const kept = reconcileSelection(before, entries, OPEN);
-  assert.deepEqual([...kept.keys()], [".ccnavi/config/project/templates/login.yml"], "sha が変わった・conflict になった・消えた対象は外す");
+  assert.deepEqual([...kept.keys()], [".ccnavi/config/project/templates/login.yml"], "sha が変わった・rejected になった・消えた対象は外す");
   // 錠が掛かれば template も外れる
   assert.equal(reconcileSelection(before, entries, LOCKED).size, 0);
 });
@@ -290,7 +288,7 @@ test("CB-T1118 見るツリーの錠は、プロジェクトならそのプロ�
 test("CB-T1119 一覧の見本は、種類と状態を網羅している（画面のテストが同じ見本を使う）", () => {
   const entries = list().entries;
   assert.deepEqual([...new Set(entries.map((e) => e.kind))].sort(), ["defense", "docs", "layer-config", "template"]);
-  assert.deepEqual([...new Set(entries.map((e) => e.state))].sort(), ["changed", "conflict", "new", "unchanged"]);
+  assert.deepEqual([...new Set(entries.map((e) => e.state))].sort(), ["changed", "new", "unchanged"]);
 });
 
 test("CB-T1228 ignored_paths は形が正しいときだけ読む（欄なし・配列でない・欠けた欄は件数だけ）", () => {

@@ -30,7 +30,7 @@ keywords: [要件, 取り込み待ち, handoff, wip/handoff, 下書き, 取り�
 
 見るだけの呼び出し（`user handoff --json`。何も書かない）の答えを、対象ごとに 1 行で出す。
 
-- パス（ツリーからの相対）、種類（`template`・`messages`・`layer-config`・`docs`・`defense`。`messages` は `board` が偽で、ターミナルで取り込む）、状態（`new`・`changed`・`unchanged`・`conflict`・`rejected`）のバッジ
+- パス（ツリーからの相対）、種類（`template`・`messages`・`layer-config`・`docs`・`defense`。`messages` は `board` が偽で、ターミナルで取り込む）、状態（`new`・`changed`・`unchanged`・`rejected`）のバッジ
 - errors と warnings の件数。見出しを押して開くと、errors・warnings の本文と差分を出す。差分は実行ファイルの文のまま出し（改行コード・BOM・制御文字・ゼロ幅の文字は見える形に直して返る）、拡張は整形しない
 - 要約の行に、対象の件数・取り込める件数・選択の件数・対象外（許可リストにヒットしない・リンクのディレクトリ）の件数。実行ファイルが `ignored_paths` を返すときは、要約の外の折りたたみに名前と理由（種類の表に無い・リンクのディレクトリ）を出す。無い・形が違うときは件数だけ
 
@@ -41,7 +41,6 @@ keywords: [要件, 取り込み待ち, handoff, wip/handoff, 下書き, 取り�
 | ヒットするもの | 出す理由 |
 |---|---|
 | `board` が偽（`defense`） | ボードからは取り込めない。ターミナルで取り込む |
-| `conflict` | 下書きをコピーしたあとで取り込み先が変わっている。コピーし直してから確かめる |
 | `rejected` | 取り込み先として受け付けない対象。errors を直す |
 | `unchanged` | 取り込み先と同じ内容で、取り込むものが無い |
 | errors がある | 検査で error がある。直してから取り込む |
@@ -76,7 +75,7 @@ warnings だけの対象は取り込める（warnings は行に出す）。
 
 - 「ターミナルのコマンドを出す」を押すと、そのパスだけを指して見るだけの呼び出しをもう一度行い、返った `expect` で `ccnavi-user-handoff.sh <パス> --yes --expect <ハッシュ>` を出す。ユーザがターミナルで打つ
 - 「コピー」でクリップボードへコピーできる
-- 取り込めない状態（`conflict`・`rejected`・`unchanged`）や errors のある対象には、コマンドを出さず、理由を出す
+- 取り込めない状態（`rejected`・`unchanged`）や errors のある対象には、コマンドを出さず、理由を出す
 
 ## 取り込みの結果
 
@@ -110,7 +109,7 @@ warnings だけの対象は取り込める（warnings は行に出す）。
 | ID | 区分 | 要件 |
 |---|---|---|
 | REQ-VSC-24 | 状態 | 取り込み待ち画面の一覧は、実行ファイルの `user handoff --json`（見るだけ）の答えを、種類・状態・errors・warnings・差分のまま出すこと。取り込みの可否の根拠（種類・状態・検査・差分）を拡張が自分で決めないこと |
-| REQ-VSC-25 | 状態 | 取り込める対象は、`board` が真で、`state` が `new` か `changed` で、errors が無いものだけであること。それ以外（`conflict`・`rejected`・`unchanged`・errors あり・`board` が偽・知らない状態）は選べず、取り込めない理由を出すこと |
+| REQ-VSC-25 | 状態 | 取り込める対象は、`board` が真で、`state` が `new` か `changed` で、errors が無いものだけであること。それ以外（`rejected`・`unchanged`・errors あり・`board` が偽・知らない状態）は選べず、取り込めない理由を出すこと |
 | REQ-VSC-26 | 事象 | 「この内容で取り込む」を押したとき、拡張は、取り込むパスだけを指して見るだけの呼び出しをもう一度行い、返った `expect` を `--expect` で渡し、`--via board` を付けて実行ファイルに取り込ませること。拡張がハッシュを組み直さないこと。見せたあとに対象の `entry_sha` が変わっていたら、何も書かずに理由を出すこと |
 | REQ-VSC-27 | 状態 | 作業中のチケットがあるあいだ、種類が `template` と `layer-config` の取り込みを止めること（見るツリーがプロジェクトならそのプロジェクトの作業中だけ）。`docs` と `defense` には掛けないこと。錠は取り込みを押した時点で取り直すこと。実行ファイルには錠を足さないこと |
 | REQ-VSC-28 | 状態 | `board` が偽の対象（`defense`）はボードから取り込まず、ターミナルで `ccnavi-user-handoff.sh <パス> --yes --expect <ハッシュ>` を打つ案内を出すこと。ハッシュはそのパスだけを指して見るだけの呼び出しをもう一度行って得ること |
