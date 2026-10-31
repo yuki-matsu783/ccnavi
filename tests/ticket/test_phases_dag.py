@@ -40,12 +40,12 @@ from tests.ticketsample import parent_text as _parent_text
 DEFS = """
 version: 1
 phases:
-  design: {title: 設計, review: none, scope: ["wip/*"]}
-  acceptance: {title: 受入, review: none, scope: ["tests/*"]}
-  implement: {title: 実装, review: none, scope: ["src/*"]}
-  docs: {title: 文書, review: mr, scope: inherit}
-  extra: {title: 追加, review: none, scope: ["wip/*"]}
-  fixup: {kind: feedback, title: 対応, review: mr, scope: inherit}
+  design: {title: 設計, review: false, scope: ["wip/*"]}
+  acceptance: {title: 受入, review: false, scope: ["tests/*"]}
+  implement: {title: 実装, review: false, scope: ["src/*"]}
+  docs: {title: 文書, review: true, scope: inherit}
+  extra: {title: 追加, review: false, scope: ["wip/*"]}
+  fixup: {kind: feedback, title: 対応, review: true, scope: inherit}
 """
 
 
@@ -67,8 +67,11 @@ PLAN = [
 PLAN_WAITS = os.path.join(ROOT, "tests", "fixtures", "plan-waits.json")
 
 
-def item(kind, review="", after=()):
-    return ticket_model.PlanItem(type=kind, review=review, after=list(after))
+def item(kind, mode="", after=()):
+    """`mode` は "" / "review"（`review: true`）/ "defer"（`deferred: true`）。"""
+    return ticket_model.PlanItem(
+        type=kind, review=mode == "review", deferred=mode == "defer", after=list(after)
+    )
 
 
 def parent_of(plan, feedback=None):
@@ -100,8 +103,8 @@ class TypesTest(unittest.TestCase):
         """定義の順序の欄は読まない（warn も error も出さない）。"""
         text = (
             "version: 1\norder: dag\nphases:\n"
-            "  design: {title: 設計, review: none, overlap: [docs]}\n"
-            "  docs: {title: 文書, review: mr, after: [design], requires: [design]}\n"
+            "  design: {title: 設計, review: false, overlap: [docs]}\n"
+            "  docs: {title: 文書, review: true, after: [design], requires: [design]}\n"
         )
         types, problems = phasetypes.parse(text)
         self.assertIsNotNone(types, problems)
@@ -181,7 +184,7 @@ class AfterReadingTest(unittest.TestCase):
 
     def test_a_deferred_last_item_is_read_and_refused_by_the_check(self):
         """最後のステップの延期は読む段では落とさない（落とすと承認済みチケットが索引に入らない）。"""
-        t = parsed("plan:\n  - design\n  - {type: docs, review: defer, after: [1]}\n")
+        t = parsed("plan:\n  - design\n  - {type: docs, deferred: true, after: [1]}\n")
         self.assertTrue(t.plan[1].deferred)
         errors = [p.detail for p in workflow.problems(t) if p.severity == "error"]
         self.assertTrue(any("最後のステップは延期できない" in d for d in errors), errors)
@@ -351,7 +354,7 @@ class PlanProblemsTest(unittest.TestCase):
         self.assertTrue(any("レビューがありません" in d for d in found), found)
         # 定義を渡さなければ（判定の側）、定義を読む検査は適用しない。
         self.assertFalse(any("レビューがありません" in d for d in self.problems(plan)))
-        plan[1] = item("extra", "mr", [1])
+        plan[1] = item("extra", "review", [1])
         self.assertEqual(self.problems(plan, types=types), [])
 
     def test_lines_list_every_number_and_what_starts_at_once(self):

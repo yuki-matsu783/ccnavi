@@ -111,16 +111,29 @@ class Entry:
         return self.glob[:cut]
 
 
-# 計画のステップが書けるレビューの指定。`mr` は定義が none でも要る（強める）、`defer` は
-# 次にレビューがあるフェーズと一緒に見る（延期）。弱める向き（none）は書けない。
-PLAN_REVIEW_MR = "mr"
-PLAN_REVIEW_DEFER = "defer"
-PLAN_REVIEWS = (PLAN_REVIEW_MR, PLAN_REVIEW_DEFER)
+def step_flags(entry: dict, where: str) -> tuple[bool, bool, str]:
+    """計画のステップの `review` と `deferred` を読む。(review, deferred, 誤りの文)。
+
+    `review: true` は、定義が `review: false` でも要る（強める）。`deferred: true` は、次に
+    レビューがあるフェーズと一緒に見る（延期）。どちらも `true` だけを書け、弱める向き
+    （`review: false`）は書けない。2 つは同時に書けない（延期は自分では見ない）。
+    ステップの形を読む入口（ticket.py と plan_templates.py）は、この関数だけを通る。
+    """
+    flags = []
+    for key in ("review", "deferred"):
+        value = entry.get(key)
+        if value is not None and value is not True:
+            return False, False, f"{where} の `{key}` は true だけ書ける（弱める向きは書けない）"
+        flags.append(value is True)
+    if all(flags):
+        return False, False, f"{where} に `review: true` と `deferred: true` は同時に書けない"
+    return flags[0], flags[1], ""
 
 
 @dataclass
 class PlanItem:
-    """親の計画の 1 ステップ。フェーズ定義の名前と、レビューの指定と、先行（`after`）。
+    """親の計画の 1 ステップ。フェーズ定義の名前と、レビューの指定（`review`・`deferred`）と、
+    先行（`after`）。
 
     `after` は、このステップより先に閉じてレビューが済んでいるべきステップの番号（計画の番号。
     フィードバック計画も全体計画の続きの番号）。読めた正しい番号（1 以上、自分より小さい、
@@ -131,21 +144,20 @@ class PlanItem:
     """
 
     type: str
-    review: str = ""
+    review: bool = False
+    deferred: bool = False
     after: list[int] = field(default_factory=list)
     after_errors: list[tuple[object, str]] = field(default_factory=list)
     after_repeated: list[int] = field(default_factory=list)
 
-    @property
-    def deferred(self) -> bool:
-        return self.review == PLAN_REVIEW_DEFER
-
     def as_raw(self):
-        if not self.review and not self.after:
+        if not self.review and not self.deferred and not self.after:
             return self.type
         raw: dict = {"type": self.type}
         if self.review:
-            raw["review"] = self.review
+            raw["review"] = True
+        if self.deferred:
+            raw["deferred"] = True
         if self.after:
             raw["after"] = list(self.after)
         return raw
@@ -154,7 +166,10 @@ class PlanItem:
         # `after` は入れない。改版かどうかは推移的な先行で比べる（`approval.plan_differs`）。
         # 「先行 1, 2」をコピーした `after` と、直接の先行だけを書いた `after` は同じ先行になる。
         return (
-            isinstance(other, PlanItem) and self.type == other.type and self.review == other.review
+            isinstance(other, PlanItem)
+            and self.type == other.type
+            and self.review == other.review
+            and self.deferred == other.deferred
         )
 
 

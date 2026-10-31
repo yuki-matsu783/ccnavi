@@ -927,7 +927,7 @@ class LayerConfigTest(HandoffCase):
             "  brand-new:\n"
             "    kind: work\n"
             "    title: 新しい型\n"
-            "    review: mr\n"
+            "    review: true\n"
             '    scope: ["src/*"]\n'
         )
         self.stage(self.PHASES_REL, new_phases.encode())

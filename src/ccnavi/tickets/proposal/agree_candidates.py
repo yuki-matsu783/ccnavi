@@ -433,7 +433,7 @@ def plan_problems(
     for key, items in (("plan", t.plan), ("feedback", t.feedback or [])):
         for i, item in enumerate(items):
             pt = types.get(item.type)
-            if pt is not None and item.deferred and pt.review == phasetypes.REVIEW_NONE:
+            if pt is not None and item.deferred and not pt.review:
                 problems.append(
                     rules.Problem(
                         rules.SEVERITY_ERROR,
@@ -751,7 +751,11 @@ def lock_problems(
         before, after = held_items.get(n), new_items.get(n)
         if before is None:
             continue
-        if after is None or (after.type, after.review) != (before.type, before.review):
+        if after is None or (after.type, after.review, after.deferred) != (
+            before.type,
+            before.review,
+            before.deferred,
+        ):
             shown = f"{after.type}" if after is not None else "無い"
             error(
                 f"{n} 番目（{before.type}）は子が承認されているので、"
@@ -769,7 +773,11 @@ def lock_problems(
             if m in fixed:
                 continue
             was, now = held_items.get(m), new_items.get(m)
-            if now is None or was is None or (now.type, now.review) != (was.type, was.review):
+            if (
+                now is None
+                or was is None
+                or (now.type, now.review, now.deferred) != (was.type, was.review, was.deferred)
+            ):
                 error(
                     f"{n} 番目に子の無い {m} 番目が先行しているので、{m} 番目のステップ"
                     f"（{was.type if was is not None else '?'}）を入れ替えられない"

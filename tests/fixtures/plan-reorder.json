@@ -260,7 +260,7 @@
     "design",
     {
      "type": "acceptance",
-     "review": "defer",
+     "deferred": true,
      "after": [
       1
      ]
@@ -306,7 +306,7 @@
      },
      {
       "type": "acceptance",
-      "review": "defer",
+      "deferred": true,
       "after": [
        1,
        2

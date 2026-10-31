@@ -135,7 +135,7 @@ class SortTest(AuthorityHarness):
     def test_hook_marks_are_b(self):
         pending = f"{APPROVED}/phases/i0001/2.pending"
         skipped = f"{APPROVED}/phases/i0001/3.skipped"
-        self.put(pending, json.dumps({"review": "mr", "source": "common", "at": "t"}))
+        self.put(pending, json.dumps({"review": True, "source": "common", "at": "t"}))
         self.put(skipped, json.dumps({"deferred_to": 4, "at": "t"}))
         self.assertEqual(self.sort(), sorted([("b", pending), ("b", skipped)]))
 
@@ -143,8 +143,8 @@ class SortTest(AuthorityHarness):
         """別の親・全角の数字のマーカーは (b) にしない。"""
         other = f"{APPROVED}/phases/i0099/2.pending"
         wide = f"{APPROVED}/phases/i0001/２.pending"
-        self.put(other, json.dumps({"review": "mr", "at": "t"}))
-        self.put(wide, json.dumps({"review": "mr", "at": "t"}))
+        self.put(other, json.dumps({"review": True, "at": "t"}))
+        self.put(wide, json.dumps({"review": True, "at": "t"}))
         found = dict((path, kind) for kind, path in self.sort())
         self.assertEqual(found[other], "d")
         self.assertEqual(found[wide], "d")
@@ -155,7 +155,7 @@ class SortTest(AuthorityHarness):
         review = "wip/proposals/review/i0001-01-01.md"
         self.put(review, child_text("i0001-01-01", "i0001", 1, ["wip/research/*"]))
         mark = f"{APPROVED}/phases/i0001/1.pending"
-        self.put(mark, json.dumps({"review": "mr", "at": "t"}))
+        self.put(mark, json.dumps({"review": True, "at": "t"}))
         self.commit_parent("in review")
         os.remove(os.path.join(self.parent_tree, *review.split("/")))
         os.remove(os.path.join(self.parent_tree, *mark.split("/")))
@@ -170,7 +170,7 @@ class SortTest(AuthorityHarness):
         extra = f"{APPROVED}/phases/i0001/3.pending"
         self.put(reviewed, json.dumps({"by": "decide", "at": "t"}))
         self.put(early, json.dumps({"by": "close-early", "at": "t"}))
-        self.put(extra, json.dumps({"review": "mr", "at": "t", "reviewed": True}))
+        self.put(extra, json.dumps({"review": True, "at": "t", "reviewed": True}))
         found = dict((path, kind) for kind, path in self.sort())
         self.assertEqual(found[reviewed], "c")
         self.assertEqual(found[early], "c")
@@ -178,9 +178,9 @@ class SortTest(AuthorityHarness):
 
     def test_a_rewritten_hook_mark_is_not_b(self):
         rel = f"{APPROVED}/phases/i0001/2.pending"
-        self.put(rel, json.dumps({"review": "mr", "at": "t"}))
+        self.put(rel, json.dumps({"review": True, "at": "t"}))
         self.commit_parent("mark")
-        self.put(rel, json.dumps({"review": "mr", "at": "u"}))
+        self.put(rel, json.dumps({"review": True, "at": "u"}))
         self.assertEqual(self.sort(), [("d", rel)])
 
     def test_flows_approvals_and_other_files(self):
@@ -216,7 +216,7 @@ class SortTest(AuthorityHarness):
         base = git(self.parent_tree, "rev-parse", "HEAD").strip()
         pending = f"{APPROVED}/phases/i0001/2.pending"
         reviewed = f"{APPROVED}/phases/i0001/1.reviewed"
-        self.put(pending, json.dumps({"review": "mr", "at": "t"}))
+        self.put(pending, json.dumps({"review": True, "at": "t"}))
         self.put(reviewed, json.dumps({"by": "decide", "at": "t"}))
         self.put("src/code.py", "x = 1\n")
         self.commit_parent("unsent")

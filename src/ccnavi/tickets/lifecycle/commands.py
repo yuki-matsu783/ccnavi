@@ -210,7 +210,7 @@ def finish(
     if merged:
         fields["merged_sha"] = merged
     state = ticket_model.REVIEW if _needs_review(root, conf, found) else ticket_model.DONE
-    # 置き場の状態だけでは、あとから「review 行きだったか」は求まらない（review_kind は
+    # 置き場の状態だけでは、あとから「review 行きだったか」は求まらない（review_required は
     # 実績のリスクなどで変わる）。置いた先を残し、手で動かしたかどうかの判定
     # （settled_by の有無）の根拠にする。
     fields["finished_to"] = state

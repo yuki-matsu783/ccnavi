@@ -86,7 +86,7 @@ class CopyAgreeTest(PhaseHarness):
     def test_a_copy_whose_values_differ_from_phases_yml_is_refused(self):
         text = with_phases(
             parent_text("i0001", ["research", "design"], copy=None),
-            {"research": RESEARCH, "design": {**DESIGN, "review": "none"}},
+            {"research": RESEARCH, "design": {**DESIGN, "review": False}},
         )
         result = self.propose_parent(text)
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -110,7 +110,7 @@ class CopyAgreeTest(PhaseHarness):
     def test_a_copy_name_missing_from_phases_yml_is_refused(self):
         text = with_phases(
             parent_text("i0001", ["research", "extra"], copy=None),
-            {"research": RESEARCH, "extra": {"kind": "work", "title": "余分", "review": "none"}},
+            {"research": RESEARCH, "extra": {"kind": "work", "title": "余分", "review": False}},
         )
         result = self.propose_parent(text)
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -221,13 +221,13 @@ class CopyJudgeTest(PhaseHarness):
         write(
             self.phases,
             PHASES.replace(
-                "    title: 調査\n    review: none\n", "    title: 調べ\n    review: mr\n"
+                "    title: 調査\n    review: false\n", "    title: 調べ\n    review: true\n"
             ).replace("agent: explorer", "agent: planner"),
         )
         board = json.loads(self.ccnavi("--explain", "--json").stdout)
         owner = next(p for p in board["parents"] if p["ticket"] == "i0001")
-        shown = [(p["number"], p["review_kind"], p["title"]) for p in owner["phases"]]
-        self.assertEqual(shown, [(1, "none", "調査"), (2, "mr", "設計")])
+        shown = [(p["number"], p["review_required"], p["title"]) for p in owner["phases"]]
+        self.assertEqual(shown, [(1, False, "調査"), (2, True, "設計")])
         said = self.reason(self.hook("SubagentStart", "", tree, agent_id="sub-1"))
         self.assertIn("1: 調査", said)
         self.assertIn("explorer", said)
@@ -436,14 +436,14 @@ class FillPhasesTest(PhaseHarness):
             "i0001",
             with_phases(
                 parent_text("i0001", ["research", "design"], copy=None),
-                {"design": {**DESIGN, "review": "none"}, "acceptance": acceptance},
+                {"design": {**DESIGN, "review": False}, "acceptance": acceptance},
             ),
         )
         result = self.fill()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         front = front_of(self.read())
         self.assertEqual(set(front["phases"]), {"research", "design"})
-        self.assertEqual(front["phases"]["design"]["review"], "mr")
+        self.assertIs(front["phases"]["design"]["review"], True)
         # 2 度打っても変わらない。
         before = self.read()
         again = self.fill()

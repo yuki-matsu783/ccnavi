@@ -1,18 +1,18 @@
 {
  "about": "親の phases:（計画が使うフェーズ定義のコピー）を承認（--agree）で確かめる決まりの見本の表。コピーの各定義は承認したときの phases.yml の同じ名前の定義と読んだ形で同じでなければ error、使う定義はコピーに書く（無ければ error）、コピーの名前が phases.yml に無ければ error、phases.yml にあってコピーに無い定義は何も言わない、コピーにあってどのステップも使わない定義は warn。errors と warns は、その重さの苦情の文に含まれる語句（順不同、全部が出る）。空なら、その重さの苦情は 1 つも出ない。tests/ticket/test_parent_phases.py が確かめる。決まりを直すときは、この表も一緒に直す",
  "phases_yml": {
-  "research": {"kind": "work", "title": "調査", "review": "none", "scope": ["wip/research/*"], "deliverables": ["wip/research/summary.md"]},
-  "design": {"kind": "work", "title": "設計", "review": "mr", "scope": ["wip/design/*"]},
-  "implement": {"kind": "work", "title": "実装", "review": "mr", "scope": "inherit"},
-  "implement-feedback": {"kind": "feedback", "title": "実装フィードバック対応", "review": "mr"}
+  "research": {"kind": "work", "title": "調査", "review": false, "scope": ["wip/research/*"], "deliverables": ["wip/research/summary.md"]},
+  "design": {"kind": "work", "title": "設計", "review": true, "scope": ["wip/design/*"]},
+  "implement": {"kind": "work", "title": "実装", "review": true, "scope": "inherit"},
+  "implement-feedback": {"kind": "feedback", "title": "実装フィードバック対応", "review": true}
  },
  "cases": [
   {
    "name": "コピーが phases.yml と同じ",
    "plan": ["research", {"type": "design", "after": [1]}],
    "phases": {
-    "research": {"kind": "work", "title": "調査", "review": "none", "scope": ["wip/research/*"], "deliverables": ["wip/research/summary.md"]},
-    "design": {"kind": "work", "title": "設計", "review": "mr", "scope": ["wip/design/*"]}
+    "research": {"kind": "work", "title": "調査", "review": false, "scope": ["wip/research/*"], "deliverables": ["wip/research/summary.md"]},
+    "design": {"kind": "work", "title": "設計", "review": true, "scope": ["wip/design/*"]}
    },
    "errors": [],
    "warns": []
@@ -22,7 +22,7 @@
    "plan": ["design", {"type": "implement", "after": [1]}],
    "phases": {
     "design": {"scope": ["wip/design/*"], "title": "設計", "kind": "work"},
-    "implement": {"title": "実装", "review": "mr"}
+    "implement": {"title": "実装", "review": true}
    },
    "errors": [],
    "warns": []
@@ -30,7 +30,7 @@
   {
    "name": "値が違う",
    "plan": ["design"],
-   "phases": {"design": {"kind": "work", "title": "設計", "review": "none", "scope": ["wip/design/*"]}},
+   "phases": {"design": {"kind": "work", "title": "設計", "review": false, "scope": ["wip/design/*"]}},
    "errors": ["`design` が phases.yml の定義と違う", "review", "--fill-phases"],
    "warns": []
   },
@@ -45,7 +45,7 @@
    "name": "ステップの定義がコピーに無い",
    "plan": ["research", {"type": "design", "after": [1]}],
    "phases": {
-    "research": {"kind": "work", "title": "調査", "review": "none", "scope": ["wip/research/*"], "deliverables": ["wip/research/summary.md"]}
+    "research": {"kind": "work", "title": "調査", "review": false, "scope": ["wip/research/*"], "deliverables": ["wip/research/summary.md"]}
    },
    "errors": ["`design` が `phases:` にありません"],
    "warns": []
@@ -61,8 +61,8 @@
    "name": "どのステップも使わない定義は warn",
    "plan": ["design"],
    "phases": {
-    "design": {"kind": "work", "title": "設計", "review": "mr", "scope": ["wip/design/*"]},
-    "implement": {"kind": "work", "title": "実装", "review": "mr"}
+    "design": {"kind": "work", "title": "設計", "review": true, "scope": ["wip/design/*"]},
+    "implement": {"kind": "work", "title": "実装", "review": true}
    },
    "errors": [],
    "warns": ["`implement` はどのステップも使っていない"]
@@ -70,7 +70,7 @@
   {
    "name": "kind が置いた計画と合わない",
    "plan": ["implement-feedback"],
-   "phases": {"implement-feedback": {"kind": "feedback", "title": "実装フィードバック対応", "review": "mr"}},
+   "phases": {"implement-feedback": {"kind": "feedback", "title": "実装フィードバック対応", "review": true}},
    "errors": ["kind `feedback`"],
    "warns": []
   },

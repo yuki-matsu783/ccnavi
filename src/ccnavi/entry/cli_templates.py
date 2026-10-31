@@ -406,7 +406,9 @@ def _show(
             if item["after"]:
                 extra.append("after " + ", ".join(str(n) for n in item["after"]))
             if item["review"]:
-                extra.append(f"review {item['review']}")
+                extra.append("review true")
+            if item["deferred"]:
+                extra.append("deferred true")
             tail = f"（{'; '.join(extra)}）" if extra else ""
             stdout.write(f"    {item['index']}. {item['type']}{tail}\n")
     if row["flows"]:

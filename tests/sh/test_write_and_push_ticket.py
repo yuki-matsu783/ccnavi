@@ -69,7 +69,7 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
     # ---- 8. hook の書きかけ（b）は先にコミットする。ユーザの判断（c）と知らない変更（d）は止める
 
     def test_hook_marks_are_committed_before_the_take_in(self):
-        pending = self.mark(1, "pending", {"review": "mr", "at": "2026-09-29T00:00:00+0900"})
+        pending = self.mark(1, "pending", {"review": True, "at": "2026-09-29T00:00:00+0900"})
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(
@@ -161,7 +161,7 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         self.assertFalse(os.path.exists(self.lock_dir()))
 
     def test_a_diverged_parent_is_merged_before_writing(self):
-        self.mark(1, "pending", {"review": "mr", "at": "t"})
+        self.mark(1, "pending", {"review": True, "at": "t"})
         self.remote_commit("src/remote.py", "y = 2\n")
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -172,10 +172,10 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
 
     def test_a_conflicting_take_in_writes_nothing(self):
         pending = f"{APPROVED}/phases/{PARENT}/1.pending"
-        self.mark(1, "pending", {"review": "mr", "at": "l"})
+        self.mark(1, "pending", {"review": True, "at": "l"})
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "hook")
-        self.remote_commit(pending, json.dumps({"review": "mr", "at": "r"}))
+        self.remote_commit(pending, json.dumps({"review": True, "at": "r"}))
         head = self.sha(self.tree, "HEAD")
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
@@ -188,7 +188,7 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
     def test_a_hook_writing_between_sorting_and_taking_in_stops_and_a_rerun_passes(self):
         """3 と 4 の間に hook が書いて取り込みが重なったら、やり直さずに止める。再実行は通る。"""
         rel = f"{APPROVED}/phases/{PARENT}/2.pending"
-        body = json.dumps({"review": "mr", "at": "t"})
+        body = json.dumps({"review": True, "at": "t"})
         self.remote_commit(rel, body)
         once = os.path.join(self._base, "once")
         shim = os.path.join(self._base, "hookshim")

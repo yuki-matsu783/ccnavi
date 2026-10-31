@@ -141,7 +141,7 @@ def _clear_policy(path: str, phase: int, kind: str) -> dict:
 #   closed.json  親を閉じた（`ticket finish <親>`）。どのフェーズをどこで見たかを残す
 #
 # closed.json が要るのは、提案（wip/）が統合先に取り込む前に消えるから。マージリクエストを
-# 作らない進め方（全フェーズが `review: none`）では、親を閉じた事実の残る先がここしか無い。
+# 作らない進め方（全フェーズが `review: false`）では、親を閉じた事実の残る先がここしか無い。
 PARENT_MARK_READY = "ready"
 PARENT_MARK_CLOSE_EARLY = "close-early"
 PARENT_MARK_CLOSED = "closed"

@@ -304,7 +304,9 @@ def _relative_items(
                     f"{key}[{i}] の after {value} は{key}の中のステップを指さないので落とした"
                 )
         out.append(
-            plan_templates.Item(type=item.type, review=item.review, after=sorted(set(after)))
+            plan_templates.Item(
+                type=item.type, review=item.review, deferred=item.deferred, after=sorted(set(after))
+            )
         )
     return out
 

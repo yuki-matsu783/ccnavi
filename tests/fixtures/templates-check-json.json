@@ -93,7 +93,7 @@
       "from": 1,
       "type": "design",
       "title": "設計",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -103,7 +103,7 @@
       "from": 2,
       "type": "implement",
       "title": "実装とテスト",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -136,7 +136,7 @@
       "from": 3,
       "type": "implement-feedback",
       "title": "実装フィードバック対応",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -157,43 +157,43 @@
     "id": "acceptance",
     "title": "受入テスト作成",
     "kind": "work",
-    "review": "mr"
+    "review": true
    },
    {
     "id": "chores",
     "title": "片付け",
     "kind": "work",
-    "review": "mr"
+    "review": true
    },
    {
     "id": "chores-feedback",
     "title": "片付けフィードバック対応",
     "kind": "feedback",
-    "review": "mr"
+    "review": true
    },
    {
     "id": "design",
     "title": "設計",
     "kind": "work",
-    "review": "mr"
+    "review": true
    },
    {
     "id": "implement",
     "title": "実装とテスト",
     "kind": "work",
-    "review": "mr"
+    "review": true
    },
    {
     "id": "implement-feedback",
     "title": "実装フィードバック対応",
     "kind": "feedback",
-    "review": "mr"
+    "review": true
    },
    {
     "id": "research",
     "title": "調査",
     "kind": "work",
-    "review": "none"
+    "review": false
    }
   ]
  }
