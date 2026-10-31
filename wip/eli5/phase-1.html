@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>下書きの控えをやめる</title>
+<style>
+/* 配置: 1 本の縦長ページ。大きな図 3 枚（困りごと・変更後・残る弱点）と短い文。緑が自分たち、黄が他の人、赤が問題 */
+:root {
+  --bg: #f6f7f4; --fg: #1d2420; --muted: #5b655f; --line: #cfd5cc; --panel: #ffffff;
+  --accent: #1f6f5c; --accent-soft: #dcefe8; --bad: #a3361f; --bad-soft: #f8e4de; --other: #8a6a1f;
+  --code-bg: #eceee9;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14191a; --fg: #e6ebe7; --muted: #9aa6a0; --line: #36413c; --panel: #1b2223;
+    --accent: #6cc7ac; --accent-soft: #1f3a33; --bad: #f0907a; --bad-soft: #3a2620; --other: #d9b35a;
+    --code-bg: #232b2a; color-scheme: dark;
+  }
+}
+body {
+  background: var(--bg); color: var(--fg); margin: 0; line-height: 1.8; font-size: 16px;
+  font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
+  padding: 32px 16px 56px;
+}
+main { max-width: 720px; margin: 0 auto; }
+h1 { font-size: 1.6rem; line-height: 1.4; margin: 0 0 8px; }
+h2 { font-size: 1.2rem; margin: 40px 0 8px; }
+p { margin: 8px 0; }
+.lead { color: var(--muted); }
+code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.86em; background: var(--code-bg); padding: 1px 6px; border-radius: 4px; overflow-wrap: anywhere; }
+figure { margin: 16px 0; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.scroll { overflow-x: auto; }
+svg { display: block; width: 100%; height: auto; min-width: 460px; }
+svg text { font-size: 13px; fill: var(--fg); }
+svg .m { fill: var(--muted); }
+svg .edge { stroke: var(--muted); stroke-width: 3; fill: none; }
+svg .box { fill: var(--panel); stroke: var(--line); stroke-width: 2; }
+svg .ours { fill: var(--accent); }
+svg .theirs { fill: var(--other); }
+svg .bad { fill: var(--bad); }
+.note { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 14px 0; }
+.note.bad { border-color: var(--bad); background: var(--bad-soft); }
+.note.good { border-color: var(--accent); background: var(--accent-soft); }
+</style>
+</head>
+<body>
+<main>
+  <h1>下書きの「控え」をやめる</h1>
+  <p class="lead">保護されたファイルを直すときの、下書きの控え（<code>.orig</code>）を、なくす変更です。</p>
+
+  <h2>1. 何があったか</h2>
+  <p>AI は、保護されたファイルを直接直せません。そこで、まず下書きを作り、人が取り込みます。このとき、下書きを作った瞬間の元を、もう 1 枚コピーして残していました。それが控え（<code>.orig</code>）です。</p>
+
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 640 170" role="img" aria-label="元のファイルから、下書きと控えの 2 枚ができる図">
+      <rect class="box" x="10" y="60" width="130" height="50" rx="8"/><text x="28" y="90">元のファイル</text>
+      <path class="edge" d="M140 78 L260 40"/><path class="edge" d="M140 92 L260 130"/>
+      <rect class="box" x="260" y="15" width="150" height="50" rx="8"/><text x="285" y="45">下書き（直す）</text>
+      <rect class="box" x="260" y="105" width="150" height="50" rx="8"/><text x="278" y="135">控え（.orig）</text>
+      <text class="m" x="430" y="140">取り込み前に「元が変わっていないか」を比べるため</text>
+    </svg>
+    </div>
+  </figure>
+
+  <h2>2. 困っていたこと</h2>
+  <p>控えは、<code>wip/handoff/</code> に残ります。残った控えは、Git が追跡していないファイルなので、取り込み（<code>integrate</code>）と後片付けを止めました。今回の作業でも、3 回止まりました。</p>
+  <div class="note bad">
+    <p>しかも、控えの役目は「助言」でした。本当の歯止めは、別の確認（<code>--expect</code>。取り込み先の今のハッシュを含む）です。</p>
+  </div>
+
+  <h2>3. 変えたこと</h2>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 640 140" role="img" aria-label="控えをなくして、下書きだけにする図">
+      <rect class="box" x="10" y="45" width="130" height="50" rx="8"/><text x="28" y="75">元のファイル</text>
+      <path class="edge" d="M140 70 L260 70"/>
+      <rect class="box" x="260" y="45" width="150" height="50" rx="8"/><text x="285" y="75">下書き（直す）</text>
+      <text class="m" x="430" y="68">控えは作らない。</text>
+      <text class="m" x="430" y="88">確認は <tspan font-weight="700">--expect</tspan> だけ</text>
+    </svg>
+    </div>
+  </figure>
+  <p>実行ファイル、下書きを作る sh、VS Code 拡張の画面（「衝突」の表示）、設計書、テストから、控えと「衝突」の判定を全部取り除きました。</p>
+
+  <h2>4. 弱くなるところ（レビューで見てほしい点）</h2>
+  <p>取り込める種類（文書・設定・メッセージ・テンプレート）は、<code>--expect</code> が守ります。</p>
+  <p>守れないのは、<b>defense</b>（hook や sh など、人が <code>mv</code> で差し替えるもの）です。<code>mv</code> は、元々 <code>--expect</code> を通りません。控えが、唯一の確認でした。</p>
+
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 640 170" role="img" aria-label="下書きを作ったあとに他の人が元を直し、mv で上書きされる図">
+      <rect class="box" x="10" y="20" width="130" height="44" rx="8"/><text x="22" y="47">元（A の内容）</text>
+      <circle class="ours" cx="200" cy="42" r="12"/><text x="222" y="47">下書きを作る</text>
+      <circle class="theirs" cx="200" cy="92" r="12"/><text x="222" y="97">他の人が元を直す（B）</text>
+      <circle class="bad" cx="200" cy="142" r="12"/><text x="222" y="147">mv すると、B が消える</text>
+    </svg>
+    </div>
+  </figure>
+  <div class="note good">
+    <p>それでも進める理由: defense のファイルは Git で管理されていて、<code>git diff</code> と履歴で戻せます。起きるのは、同じファイルを下書き中に他の人が直した、まれな場合だけです。設計書に、<code>mv</code> の前に <code>git diff</code> で元を確かめる、と書きました。</p>
+  </div>
+
+  <h2>5. 残る後始末</h2>
+  <p>すでにある控えは、読まれなくなるだけで、自動では消えません。<code>wip/handoff/</code> の下の <code>.orig</code> は、手で消してかまいません。</p>
+</main>
+</body>
+</html>
