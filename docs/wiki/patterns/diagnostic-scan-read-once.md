@@ -1,6 +1,8 @@
 ---
 title: 診断に走査を足すときの読みの回数と lint のテスト
 type: learning-wiki
+target: skill
+sources: [feature-207]
 description: --explain と --lint に走査を足すと、置き場の読み直しで test_raw_share が、新しい警告で test_lint_ops が落ちるパターン
 tags: [skills, feedback]
 keywords: [explain, lint, 診断, 走査, 置き場, copies, test_raw_share, test_lint_ops, 合流]

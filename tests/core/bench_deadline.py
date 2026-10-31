@@ -5,7 +5,7 @@
 見たいのは「どの入力が期限の何割を使うか」と「期限を超えたあとの実際の長さ」。
 
     uv run python -m tests.core.bench_deadline          # 小さい入力(数分)
-    uv run python -m tests.core.bench_deadline --big    # 設計の目安の大きさまで(長い)
+    uv run python -m tests.core.bench_deadline --big    # 置換 8 万個、400KB の尾の大きさまで(長い)
 
 期限の確認は、ルールを 1 つ照合するたびに見る（`judge.decide_before`）。1 つのルールの照合の途中と、
 その前の読み（`shellread`）は途中で切れないので、1 回がそれより長いと、超えた時間はそのまま延びる。
@@ -55,7 +55,7 @@ def workspace() -> str:
 def cases(big: bool) -> list[tuple[str, str, dict[str, str]]]:
     """(名前, ツール, tool_input) の並び。同じ形で大きさを 4 倍ずつ上げ、伸び方が分かるようにする。
 
-    `big` を付けると、設計の目安（置換 8 万個、400KB の尾）まで測る。1 行に数分から数十分かかる。
+    `big` を付けると、置換 8 万個、400KB の尾の大きさまで測る。1 行に数分から数十分かかる。
     """
     plain = (2_000, 5_000, 10_000, 20_000) + ((100_000, 400_000) if big else ())
     subs = (500, 2_000, 5_000) + ((20_000, 80_000) if big else ())

@@ -1493,6 +1493,73 @@ class MergeOnTargetTest(Fixture):
         self.assertOk(r)
         self.assertEqual("y\n", read(os.path.join(self.wt, "other.txt")))
 
+    def parents_of_head(self, wt):
+        return len(git(wt, "rev-list", "--parents", "-n", "1", "HEAD").split()) - 1
+
+    def test_merge_in_a_worktree_without_own_commits_makes_a_merge_commit(self):
+        # 自分のコミットが無いと git は早送りで済ませる。印が残るよう --no-ff を補う。
+        self.advance_main()
+        main_head = git(self.ws, "rev-parse", "HEAD").strip()
+        self.assertOk(self.run_git_sh("merge", "main", "--no-edit", cwd=self.wt))
+        self.assertEqual(2, self.parents_of_head(self.wt))
+        self.assertEqual(main_head, git(self.wt, "rev-parse", "HEAD^2").strip())
+        self.assertEqual("y\n", read(os.path.join(self.wt, "other.txt")))
+
+    def test_merge_in_a_worktree_with_a_message_adds_no_ff(self):
+        self.advance_main()
+        self.assertOk(self.run_git_sh("merge", "main", "-m", "main を取り込む", cwd=self.wt))
+        self.assertEqual(2, self.parents_of_head(self.wt))
+        self.assertEqual("main を取り込む", git(self.wt, "log", "-1", "--format=%s").strip())
+
+    def test_ff_only_in_a_worktree_fast_forwards(self):
+        self.advance_main()
+        main_head = git(self.ws, "rev-parse", "HEAD").strip()
+        self.assertOk(self.run_git_sh("merge", "--ff-only", "main", cwd=self.wt))
+        self.assertEqual(main_head, git(self.wt, "rev-parse", "HEAD").strip())
+        self.assertEqual(1, self.parents_of_head(self.wt))
+
+    def test_explicit_ff_and_no_ff_in_a_worktree_are_kept(self):
+        other = self.cut("wt2")
+        self.advance_main()
+        main_head = git(self.ws, "rev-parse", "HEAD").strip()
+        self.assertOk(self.run_git_sh("merge", "--ff", "main", cwd=self.wt))
+        self.assertEqual(main_head, git(self.wt, "rev-parse", "HEAD").strip())
+        self.assertEqual(1, self.parents_of_head(self.wt))
+        self.assertOk(self.run_git_sh("merge", "--no-ff", "main", "--no-edit", cwd=other))
+        self.assertEqual(2, self.parents_of_head(other))
+
+    def test_already_up_to_date_adds_no_commit_in_a_worktree(self):
+        before = git(self.wt, "rev-parse", "HEAD").strip()
+        self.assertOk(self.run_git_sh("merge", "main", "--no-edit", cwd=self.wt))
+        self.assertEqual(before, git(self.wt, "rev-parse", "HEAD").strip())
+
+    def test_a_message_value_that_looks_like_ff_is_not_a_form_option(self):
+        self.advance_main()
+        self.assertOk(self.run_git_sh("merge", "-m", "--ff", "main", cwd=self.wt))
+        self.assertEqual(2, self.parents_of_head(self.wt))
+
+    def test_no_commit_in_a_worktree_stops_before_committing(self):
+        self.advance_main()
+        before = git(self.wt, "rev-parse", "HEAD").strip()
+        self.assertOk(self.run_git_sh("merge", "--no-commit", "main", cwd=self.wt))
+        self.assertEqual(before, git(self.wt, "rev-parse", "HEAD").strip())
+        self.assertTrue(
+            os.path.exists(os.path.join(self.common_dir(), "worktrees", "wt", "MERGE_HEAD"))
+        )
+
+    def test_merge_from_a_subdirectory_of_a_worktree_adds_no_ff(self):
+        self.advance_main()
+        sub = os.path.join(self.wt, "sub")
+        os.makedirs(sub)
+        self.assertOk(self.run_git_sh("merge", "main", "--no-edit", cwd=sub))
+        self.assertEqual(2, self.parents_of_head(self.wt))
+
+    def test_squash_in_a_worktree_is_not_given_no_ff(self):
+        self.advance_main()
+        before = git(self.wt, "rev-parse", "HEAD").strip()
+        self.assertOk(self.run_git_sh("merge", "--squash", "main", cwd=self.wt))
+        self.assertEqual(before, git(self.wt, "rev-parse", "HEAD").strip())
+
     def test_abort_continue_and_quit_pass_on_the_target(self):
         # 途中の merge を終わらせる操作は、止める判定の対象外で、git の結果がそのまま返る。
         for flag in ("--abort", "--quit", "--continue"):

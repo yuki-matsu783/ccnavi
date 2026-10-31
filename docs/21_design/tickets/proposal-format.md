@@ -14,45 +14,21 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
 `Write` `Edit` `NotebookEdit` を含む項だけ。`tools` `deny_commands` `target_directories` は
 「効かない」と警告して無視する。
 
-```yaml
----
-version: 1
-ticket: feature-50-settings-split-02-01
-issue: 50                # 親だけ。必須。この MR が閉じる issue（別のリポジトリなら owner/repo#50）
-mr: 12                   # 親だけ。仕事を載せる MR の番号（同じリポジトリ）。必須。依頼文の MR の番号をこのチケットに結び付ける
-project: lib             # 置き場と同じ名前。省ける（決めるのは置き場。11）
-parent: feature-50-settings-split  # 子だけ
-phase: 2                 # 子だけ。同じ親の同じ番号が 1 つのまとまり。0 以上の整数。計画があれば 1 から
-predecessors: [feature-50-settings-split-01-01] # 子だけ。先に閉じているべき子。承認と着手で求める
-human_review:
-  required: true         # 既定。省くなら理由を書く
-  reason: 設定の読み込み経路を変えるため
-phases:                          # 親だけ。計画が使うフェーズ定義のコピー（9.7）。--fill-phases で作る
-  research: {kind: work, title: 調査, review: none, scope: ["wip/research/*"]}
-  implement: {kind: work, title: 実装, review: mr, scope: ["src/*"]}
-  implement-feedback: {kind: feedback, title: 実装フィードバック対応, review: mr, scope: inherit}
-plan:                            # 親だけ。全体計画（9.7）
-  - research                     # 1。先行なし
-  - {type: implement, after: [1]}  # 2。after は先に済んでいるべきステップの番号（自分より小さい番号だけ）
-feedback:                        # 親だけ。フィードバック計画（番号は全体計画の続き）
-  - implement-feedback           # 3。after はフィードバック計画の番号だけを指せる
-title: 設定画面の分割
-rationale: |
-  Settings 配下のコンポーネント分割。
-allow:
-  - match: Write|Edit
-    glob: "src/components/Settings/*"
-ask:
-  - match: Write|Edit
-    glob: "src/components/*"
-started_at: ""           # 以下はスクリプトが書く
-completed_at: ""
-base_sha: ""
----
-本文は自由。承認済みチケットにそのままコピーされ、マージリクエストの下書きの本文に使う。
-```
+| 欄 | 対象 | 中身と検査 |
+|---|---|---|
+| `version` `ticket` | 全部 | `ticket` はファイル名（拡張子を除く）と一致する |
+| `issue` | 親 | 必須。この MR が閉じる issue（別のリポジトリなら `owner/repo#50`） |
+| `mr` | 親 | 必須。仕事を載せる MR の番号（下の `mr` の項） |
+| `project` | 全部 | 置き場と同じ名前。省ける。決めるのは置き場（11） |
+| `parent` `phase` `predecessors` | 子 | 同じ親の同じ `phase` が 1 つのまとまり。0 以上の整数で、計画があれば 1 から。`predecessors` は先に閉じているべき子 |
+| `human_review` | 子 | `required`（既定 `true`）と `reason` |
+| `phases` `plan` `feedback` | 親 | フェーズ定義のコピーと、全体計画・フィードバック計画（9.7） |
+| `title` `rationale` | 全部 | タイトルと理由 |
+| `allow` `ask` `deny` | 全部 | 書ける範囲 |
+| `started_at` `completed_at` `base_sha` `merged_sha` `cancelled_at` `cancel_reason` | 全部 | スクリプトが書く欄 |
 
-- ファイル名（拡張子を除く）と `ticket:` は一致すること
+本文は自由。承認済みチケットにそのままコピーされ、マージリクエストの下書きの本文に使う。
+
 - 識別子は、親が 1 語、子が `<親>-<2 桁のフェーズ番号>-<2 桁のフェーズ内の連番>`
   （親 feature-50-settings-split のフェーズ 2 の 1 枚目は `feature-50-settings-split-02-01`）。フェーズ番号は `phase:` と
   同じ値で、食い違えば error。親の識別子が名前空間になり、別の親の子と衝突しない。識別子だけから親を割り出すときは、
@@ -63,7 +39,7 @@ base_sha: ""
   どれか。番号は issue の番号を使う（親は `issue:` が必須。通し番号は直接作業のワークツリー名だけに使う）。通し番号は、呼んだ時点で今ある名前の番号の最大値に 1 を足したものである。親チケットと提案に加え、手元のブランチとワークツリーの名前も数える。プロジェクトの
   issue なら slug の頭を `<プロジェクト名>-` にする。形に合わない新規の提案、issue と番号の食い違い、同じリポジトリの
   番号の重なり、48 文字を超える長さ、既にあるブランチと同じ名前、末尾が `-<2 桁>` の親は `--lint` の warn（承認は
-  止めない）。前の形（`i0055` など）の承認済みチケットはそのまま読む
+  止めない）。`i0055` のような形の承認済みチケットも読む
 - ワークツリーの名前は識別子と同じ
 - 親の識別子は、親のブランチ名の `/` を `-` に置き換えたもの（`feature/123-login` は `feature-123-login`）。変換は
   `ticket_ids.branch_to_id`（Python）・`ccnavi_branch_to_id`（sh）・拡張の `branchToId`（TS）に同じものがあり、
@@ -111,8 +87,8 @@ base_sha: ""
   - `plan` は各ステップが前のステップを `after` に書いた一直線（終端が 1 つになり、承認の検査を通る）。並行させたいステップはユーザが `after` を直す
   - `phases:` は書いた直後に `plan_phases.fill`（`--fill-phases` と同じ関数）で差し込む。失敗したら雛形も消す
 - 承認済みの親の改版の雛形は `ccnavi ticket revise <識別子> [--feedback]` で作る（`tickets/proposal/revise.py`。REQ-TKT-62）。承認済みの置き場の `doing/<識別子>.md` を写し、スクリプトだけが書く欄と `followup_of` を外して `<提案の置き場>/todo/<識別子>.md` に書く。`--feedback` は `feedback: []` を足し、局面が「フィードバック計画待ち」（`phase.STAGE_FEEDBACK_WAITING`）のときだけ。親のワークツリーの中かどうかの検査は `ticket new` と共通（`scaffold.parent_worktree`）
-  - 書いたあと、`allow` の項が計画のどのフェーズ定義の `scope` とも重ならないとき（例: `--plan implement --scope "docs/**"`）は、「承認しても書けない」と名指しする（警告で、書いた提案は残る。承認の確認 `--agree --preview --verify` も同じ文を出す）。子はその項に書けないので、`--plan quick-work` に切り替える。計画に `scope: inherit` の型が 1 つでもあれば、上限が無いので何も言わない
-  - `quick-work` のような `scope: inherit` の型は範囲を持たないので、今回触るファイルを `--scope <glob>`（繰り返せる。ワークツリーのルートからの相対）で渡す（例: `--plan quick-work --scope src/ui/error.ts`）。渡さずに止まったときの案内は、範囲を持つ型を足すのではなく `--scope` を示す
+  - 書いたあと、`allow` の項が計画のどのフェーズ定義の `scope` とも重ならないときは、「承認しても書けない」と名指しする（警告で、書いた提案は残る。承認の確認 `--agree --preview --verify` も同じ文を出す）。計画に `scope: inherit` の型が 1 つでもあれば、上限が無いので何も言わない
+  - `scope: inherit` の型は範囲を持たないので、`--scope <glob>`（繰り返せる。ワークツリーのルートからの相対）で触るファイルを渡す。渡さずに止まったときの案内は、範囲を持つ型を足すのではなく `--scope` を示す
   - 止める場合は何も書かない。共通レイヤーとレイヤーの `phases.yml` がどちらも無いか読めない（承認の検査を通る plan とコピーを作れない。9.7）、plan の型が無い・
     `feedback` の定義、`scope: inherit` の型だけで `allow` が空（`allow` か `ask` が 1 件は要る）、子の識別子（`<親>-<NN>-<NN>`。
     雛形は親だけ）、識別子の形の誤り、cwd が識別子と同名のワークツリーの中でない（切り方を案内する）、同じ識別子の提案か承認済みチケットが既に在る
@@ -130,21 +106,21 @@ base_sha: ""
     - 親の必須の見出しが本文に欠けている: 親の新規の提案だけ warn で 1 件にまとめて挙げる。子と改版には言わない。
       見出しはコードフェンス（行頭が ``` か ~~~）の外にある `## <名前>` の行で、名前が前後の空白を除いてちょうど一致するものだけ数える
       （`###` など深さの違う見出しは数えない）
-  - `ccnavi-ticket.sh` は `new` を通さない（保護対象の sh を直さないため）。`--fill-phases` と同じく実行ファイルを直接打つ。
+  - `ccnavi-ticket.sh` は `new` を通さない。`--fill-phases` と同じく実行ファイルを直接打つ。
     `new` は承認ではなく、`todo/` に書くだけなので、組み込みの止め（9.2）にはヒットしない
 - `started_at` `completed_at` `base_sha` `merged_sha` `cancelled_at` `cancel_reason` はスクリプトの欄。スクリプトが
   承認済みチケットの行を書き換える（本文とユーザの書いた行は保つ）。`merged_sha` は `finish` が親のブランチへ合流した
   子の先頭で、子にだけ付く
-- `mr` は親の任意の欄で、仕事を載せるマージリクエストの番号（正の整数。`"!12"`・`"#12"` も可）。同じリポジトリのものだけで、
+- `mr` は親の欄で、仕事を載せるマージリクエストの番号（正の整数。`"!12"`・`"#12"` も可）。同じリポジトリのものだけで、
   `owner/repo` の形や 0・数でないものは error、子に書くと warn で無視する。`issue` と並べて検索に使い、
   UserPromptSubmit の hook（`branchfind`）が依頼文の MR の番号を「すでにあるチケットに結び付く」と判定する
   （提案も承認済みも対象）。親には必須で、書いていない親の承認と `--lint` は止まる。書くのは (1) 提案者
-  （`ccnavi-start.sh` が MR を採用するか Draft MR を作ると、出力が「必須:」の行で「提案の frontmatter に `issue: <値>` と `mr: <番号>` を書く」と案内する。
+  （`ccnavi-start.sh` が MR を採用するか Draft MR を作ると、出力の「必須:」の行で値を案内する。
   `ccnavi ticket new --issue <値> --mr <番号>` が書く。`issue` も親には必須で、書いていない親は同じく止まる）、(2) 承認のあとの `review-request` が、親ブランチの MR の番号を確かめたとき、
   ccnavi が親の承認済みチケットの **空の `mr:` にだけ**書き足す。同じ値なら何もせず、違う値が既にあれば上書きせず警告する。スクリプトだけが書く欄（`SCRIPT_FIELDS`）では
   ないので、提案に書いてよく、承認はそのままコピーする。改版の不変検査は、承認済みと改版の両方に値があって違うときだけ error
   （書き足しの後に、書き足す前のコピーで改版しても弾かない）
-- フロー（次の節）はチケットの欄では指さない。欄 `flow` は廃止
+- フロー（次の節）はチケットの欄では指さない
 
 #### 9.3.1 子のフロー
 

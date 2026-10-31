@@ -121,12 +121,24 @@ function problem(raw: Record<string, unknown>): LintProblem {
 /**
  * `--lint` の報告（文面）から warn の行だけを取り出す。行は `warn: <場所>: <中身>`。
  * 保存が通ったあとに画面の帯へ出す。一時ファイルのパスは対象のファイルのパスに直す。
+ * 帯が長くならないよう、先頭 `MAX_WARN_LINES` 件までにし、残りは「ほか N 件」の 1 行にまとめる。
+ * 保存したファイルの warn だけに絞る印は、報告の行に無い（場所はルール id や `(risk)` など
+ * まちまち）ので、絞らない。
  */
+export const MAX_WARN_LINES = 5;
+
 export function warnLinesOf(report: string, tmp: string, shown: string): string[] {
-  return report
+  const all = report
     .split(/\r?\n/)
     .filter((line) => line.startsWith("warn: "))
     .map((line) => line.split(tmp).join(shown));
+  if (all.length <= MAX_WARN_LINES) {
+    return all;
+  }
+  return [
+    ...all.slice(0, MAX_WARN_LINES),
+    `ほか ${all.length - MAX_WARN_LINES} 件。\`ccnavi --lint\` で全部見られます`,
+  ];
 }
 
 /** そのプロジェクトについての苦情。`where` が `(projects/<名前>)` で始まるもの */

@@ -336,7 +336,7 @@ test("CB-D707a 承認待ち（ワークツリー未作成）は警告色にせ�
   }
 });
 
-test("CB-D708 消すもの: base / 合流の sha・マーカー名・「承認済み」「着手済み」「未着手」の常時表示・旧い言葉は、どのカードにも出ない（詳細を開いても）", async () => {
+test("CB-D708 消すもの: base / 合流の sha・マーカー名・「承認済み」「着手済み」「未着手」の常時表示・古い言葉は、どのカードにも出ない（詳細を開いても）", async () => {
   const everything = scene().tickets.map((t) => `${detailsKey(t.project, t.ticket)}`);
   const page = await openBoard(scene(), { state: { details: everything } });
   try {

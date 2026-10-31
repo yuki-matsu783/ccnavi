@@ -1971,10 +1971,12 @@ merge)
 	ow_spec "ff no-ff ff-only edit no-edit commit no-commit stat no-stat no-log squash no-squash quiet verbose progress no-progress abort continue quit signoff no-signoff allow-unrelated-histories summary no-summary verify no-verify autostash no-autostash overwrite-ignore no-overwrite-ignore" \
 		"message file strategy strategy-option" "log" "qvne" "mFsX"
 	mg_finish=no
+	mg_form=no
 	merge_cb() {
 		[ "$1" = opt ] || return 0
 		case "$2" in
 		--abort | --continue | --quit) mg_finish=yes ;;
+		--squash | --ff | --no-ff | --ff-only) mg_form=yes ;;
 		esac
 		case "$2:${3:-}" in
 		--strategy:ours | --strategy:theirs | -s:ours | -s:theirs | --strategy-option:ours | --strategy-option:theirs | -X:ours | -X:theirs)
@@ -1998,6 +2000,15 @@ merge)
 		reject merge-on-target "統合先 $mg_integ のユーザのチェックアウトでは merge できません。統合先へは直接 merge しない決まりなので、取り込みは integrate が行います。
 $(merge_on_target_next)
 $(ccnavi_text "$WS" NOTE_GIT_MERGE_ON_TARGET_ALLOWED)"
+	fi
+	# ワークツリーの中の merge は、形の指定が無ければ --no-ff を補う。自分のコミットがまだ無いと git は
+	# 合流のコミットを作らず早送りで済ませ、取り込んだだけのファイルを範囲の検査が見分ける印（2 つの親を持つ
+	# コミット）が残らない。--ff-only・--ff・--no-ff・--squash の指定は利用者の意図なのでそのまま通す。
+	if [ "$mg_finish" = no ] && [ "$mg_form" = no ]; then
+		mg_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
+		if [ -n "$mg_top" ] && ! user_checkout_is "$mg_top"; then
+			set -- --no-ff ${1+"$@"}
+		fi
 	fi
 	;;
 

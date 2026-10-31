@@ -56,7 +56,7 @@ __pycache__/
 settings.local.json*
 
 # 参照専用の他プロジェクト。.claude/ を持つ外部リポジトリは、--root なしの端末の
-# ccnavi が根を取り違える（洗い出しは docs/21_design/multi-repo/standalone-clone-gaps.md の A2）ので、
+# ccnavi が根を取り違える（設計書の「単体 clone での動作」の根の決め方の項）ので、
 # 読み終えたら外へ出す。置いている間だけ無視する。
 /参考/
 

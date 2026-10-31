@@ -16,9 +16,9 @@ keywords: [チケット, 置き場, wip/proposals, .ccnavi/approved, レビュ�
 承認のときにコピーする承認済みチケット（`.ccnavi/tickets/`）の 2 本である。状態は提案の側の置き場
 （`todo` / `doing` / `done` / `cancelled`）で表し、承認済みチケットの置き場は開（直下）と閉（`closed/`）の
 2 段だけだった。判定は承認済みチケットを読み、フェーズの終わりは提案の置き場で決め、
-レビューの進み具合はマーカーで見る。このように 3 か所を読み合わせていた（設計 9.6）。
+レビューの進み具合はマーカーで見る。このように 3 か所を読み合わせていた（設計書の「状態遷移」の節）。
 
-2026-09-16 の時点で、困っていたことが 3 つあった。
+困っていたことが 3 つあった。
 
 - **同じチケットが 2 か所にあり、毎回どちらを見ればよいか迷う。** 承認したあとの提案は
   判定に使われないのに置き場に残る。書き足しても判定に反映されないことが、読み手には分からない。承認済み
@@ -35,7 +35,7 @@ keywords: [チケット, 置き場, wip/proposals, .ccnavi/approved, レビュ�
 チケットは **1 本のファイル**にする。このファイルは、**ユーザが動かすときは `.ccnavi/approved/` へ、エージェントが動かす
 ときは `wip/proposals/` へ**、という規則で 2 つの置き場を行き来する。
 
-置き場（`wip/proposals/{todo,review}/` と `.ccnavi/approved/{doing,done}/`）の意味、状態の遷移の図、誰が書くかは、設計書の [9.2 置き場](../../21_design/tickets/places.md) と [9.6 状態遷移](../../21_design/tickets/state-transitions.md) にある。決めたのは、次の 2 点。
+置き場（`wip/proposals/{todo,review}/` と `.ccnavi/approved/{doing,done}/`）の意味、状態の遷移の図、誰が書くかは、設計書の [置き場](../../21_design/tickets/places.md) と [状態遷移](../../21_design/tickets/state-transitions.md) にある。決めたのは、次の 2 点。
 
 - ユーザが動かすときは `.ccnavi/approved/` へ、エージェントが動かすときは `wip/proposals/` へ動かす。`approved/` にはエージェントが書けず、判定が範囲を読むのは `approved/doing/` だけ
 - レビュー待ちは `wip/proposals/review/` に置く。取り消しは `cancelled_at` を持って `approved/done/` に入る（`cancelled/` を持たない）
@@ -46,7 +46,7 @@ keywords: [チケット, 置き場, wip/proposals, .ccnavi/approved, レビュ�
 承認はコピーではなく移動になる（`todo/` から `approved/doing/` へ動かす）。`ticket start` は置き場を動かさず、`approved/doing/` のキーだけを書く。
 未解決の指摘を残す判断では、受け入れて進むか、続きの子チケットを `approved/doing/` に起こすかをユーザがターミナルで選ぶ。
 
-親子とフェーズの仕組み（9.7〜9.9）は変えない。「レビュー対象か」を決めるのは今までどおり
+親子とフェーズの仕組み（設計書の「フェーズ定義と計画」「フェーズの終わりと HITL ポイント」「実績で測るリスク」の各節）は変えない。「レビュー対象か」を決めるのは今までどおり
 フェーズの見る場所（種類・計画のステップ・子の宣言・実績のリスク）で、子ごとに `review/` へ行くかどうかは
 その子を閉じた時点のフェーズの答えで決める。
 

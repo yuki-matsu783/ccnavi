@@ -22,13 +22,13 @@ keywords: [文面, 文面ファイル, messages, 識別子, 差し込み, ccnavi
 | `policy/texts.py` | 読み込み、検査、差し込み、組み立て、壊れたときの既定の文 | 判定 |
 | `ccnavi text` | sh から `texts` を引く入口 | 文面ファイルの直接の読み書き |
 
-組み込みの拒否・促し（Python）は `texts.say` を呼ぶ。通知（`NOTICE_*`）は、見出し（`[ccnavi] <コード> (…)`）と `subject:` などの状態の行をコードに残し、本文だけを `texts.say` で引く。組み込みルールの文は、ルールが識別子と値を持ち、拒否に当たった回に `texts.spoken` が引く（13.4）。まだ移していない文（ルールの `message`、種類を決められない通知など）は呼ばず、[文面の移行の一覧](../../.agents/docs/message-migration.md)にある。sh は文面ファイルを読まず、`ccnavi text` を `ccnavi_text`（`ccnavi-common-state.sh`）で呼ぶ。
+組み込みの拒否・促し（Python）は `texts.say` を呼ぶ。通知（`NOTICE_*`）は、見出し（`[ccnavi] <コード> (…)`）と `subject:` などの状態の行をコードに残し、本文だけを `texts.say` で引く。組み込みルールの文は、ルールが識別子と値を持ち、拒否に当たった回に `texts.spoken` が引く（13.4）。文面ファイルに移していない文（ルールの `message`、種類を決められない通知など）は呼ばない。ルールの `message` は、ルールファイルにインラインで書いた自由文のまま使う。識別子で引く形はルールファイルからは書けず、持つのは組み込みのルールだけ。sh は文面ファイルを読まず、`ccnavi text` を `ccnavi_text`（`ccnavi-common-state.sh`）で呼ぶ。
 
 ### 13.2 置き場とレイヤー
 
-- 置き場: ワークスペースルートの `.ccnavi/messages/*.yml`。ccnavi が配る。文は ccnavi の仕組み側のもので、利用者が書く設定ではないので `.ccnavi/config/` の外に置く
-- 各レイヤー: 持たない。`.ccnavi/config/project/messages/` や以前の置き場 `.ccnavi/config/common/messages/` に置いても読まない（13.5）。共通レイヤーのミラー（`config/common/` を各プロジェクトへコピーするもの）の対象でもなく、文面はワークスペースルートでだけ読まれる
-- プロジェクトのレイヤー（`projects/<名前>/`）は読まない。文面はワークスペースの文であり、呼び出しを受けるツリーのものではないから
+- 置き場: ワークスペースルートの `.ccnavi/messages/*.yml`。ccnavi が配る。`.ccnavi/config/` の外に置く
+- 各レイヤー: 持たない。`.ccnavi/config/project/messages/` などに置いても読まない（13.5）。共通レイヤーのミラー（`config/common/` を各プロジェクトへコピーするもの）の対象でもなく、文面はワークスペースルートでだけ読まれる
+- プロジェクトのレイヤー（`projects/<名前>/`）は読まない。文面はワークスペースのもの
 - 置き場の中のファイルは名前順に読み、別のファイルに同じ識別子が現れたら、後ろを捨てて `--lint` が error を出す（1 つのファイルの中の重複は YAML の読みが後ろを採るので見分けられない）。ファイルの分け方（`deny.yml`・`nudge.yml`・`next-start.yml`）に意味は無い
 - 1 件を引くとき（`texts.say`・`ccnavi text`）は、識別子の字を含むファイルだけを名前順に YAML として読み、その識別子を検査を通る形で持つ最初のファイルの 1 件を採る。全件を読んだときと同じ 1 件になる。hook は呼び出しごとに別のプロセスで、文 1 件のために全部のファイルを読むと時間がかかるため。全件を読むのは `--lint` と点検（`texts.load`）だけ
 
@@ -130,7 +130,7 @@ ccnavi_text <ワークスペースルート> <識別子> [名前=値]... [@欄=�
 | 入口 | `ccnavi text <識別子> [名前=値]... [@欄=場合]...` |
 | 標準出力 | 組み立てた文。末尾に改行 |
 | 終了コード | 0 成功。1 引けない（識別子が無い・値の不足・文面ファイルが壊れている）。標準出力は空、理由は標準エラー。2 引数の誤り |
-| 呼ぶ回数 | 1 回の起動で 1 件。1 回の実行で出る文は多くて 3 件なので、まとめて引く形は持たない |
+| 呼ぶ回数 | 1 回の起動で 1 件。まとめて引く形は持たない |
 
 ### 13.7 点検
 
@@ -164,17 +164,6 @@ ccnavi のリポジトリのテストは、次も見る（呼ぶ側が手元の�
 | 文面ファイルが無い、読めない、識別子が無い | 種類ごとの既定の短い文（コード内）。止める判定は同じ。文は、文面ファイルが読めないことと、ユーザに `--lint` を頼む次の一手を伝える |
 | 値が足りない、場合を選べない | 既定の文 |
 | 実行ファイルが無い、版が合わない（sh） | sh の既定の文（種類ごと。`CHOICES_*` は `次の手:` と番号つきの 1 行、`NOTE_*` は `案内:`、それ以外は `次:` を 1 行）。判定は変えない |
-| 配布先に文面ファイルが無い | 文面ファイルが無いのと同じ。`ccnavi-setup.sh` が文面ファイルを `.ccnavi/messages/` へ配る。以前の置き場 `.ccnavi/config/common/messages/` が配布先に残っていても消さず、不要と案内するだけ |
+| 配布先に文面ファイルが無い | 文面ファイルが無いのと同じ。`ccnavi-setup.sh` が文面ファイルを `.ccnavi/messages/` へ配る |
 
 既定の文は 1 つの関数（`texts.fallback`）が組む。種類ごとに数行で、個々の文を持たない（文が 2 か所に残らない）。
-
-### 13.9 移行の範囲
-
-この設計に沿って、次を文面ファイルに移した。残りと進め方は `.agents/docs/message-migration.md` の一覧表と「残りの進め方」が持つ。
-
-- 拒否: シェルからルート直下へ書く形（`DENY_SHELL_WORKSPACE_ROOT`）、承認された作業範囲の外の報告（`RULE_TICKET_SCOPE__*`）、組み込みルールの文（`RULE_*`。`builtin:` で始まる id のルール。判定のたびに組み立てるので、識別子と値だけを持たせ、拒否に当たった回に引く）、組み込みの拒否の大半（`DENY_TICKET_*`・`DENY_PHASE_REVIEW`・`DENY_NEEDS_USER_TURN`・`DENY_AGENT_*`・ラッパーと関門の `DENY_*`・書き直しを求める拒否・`DENY_REDIRECT_LIMIT`）と、確認の理由（`RULE_ASK`）
-- 通知: `fallen_back`・`undeclared`（`NOTICE_FALLEN_BACK`・`NOTICE_UNDECLARED__*`）、実行後の報告の案内（`NOTICE_POST_*`・`NOTE_POST_*`）、md の索引の案内（`NOTICE_DOCS_*`）、ターン分離の関門が確認に出すときの文（`NOTICE_ASK_USER_CONFIRM__*`）。`internal_error_notice` は、ccnavi 自身に不具合があるときに出る文で、文面ファイルに頼らないので移さない
-- 促し: `NUDGE_INTEGRATE`・`NUDGE_TICKET_*`・`NUDGE_SUBAGENT_OUTCOME`・`NUDGE_STOP_RULE`、`standing` の案内
-- sh の `次:`: `ccnavi-start.sh` の `次:` と `次の手:` の全部、`ccnavi_pf_next`（事前確認）、`ccnavi-git.sh`・`ccnavi-worktree.sh`・`ccnavi-stage.sh`・`ccnavi-ticket.sh`・`ccnavi-user-close-early.sh` の `次:`
-
-`rules.yml` のインラインの `message` は、そのまま残す。識別子で引く形（`message_id:`）はルールファイルからは書けず、持つのは組み込みのルール（`from_file` が偽のもの）だけ。ルールの書式の版（`rules.VERSION`）、レイヤーの合成、`--lint`、`--explain` に手を入れることになり、配布先が書く文は、その場で読める自由文のほうが書きやすいため。

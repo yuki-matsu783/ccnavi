@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { warnLinesOf } from "../../src/core/lintmodel.js";
+import { MAX_WARN_LINES, warnLinesOf } from "../../src/core/lintmodel.js";
 import { foldFind, moveTitle } from "../../src/webview/shared/find.js";
 import { findText as ruleFind } from "../../src/webview/rules/text.js";
 import { findText as phaseFind } from "../../src/webview/phases/text.js";
@@ -46,4 +46,15 @@ test("CB-T1240 --lint の報告から warn の行だけを取り出し、一時�
     "warn: (file): 重なっています",
   ]);
   assert.deepEqual(warnLinesOf("error 0 件、warn 0 件、info 0 件", "/tmp/x", "y"), []);
+});
+
+test("CB-T1241 warn の帯は先頭 MAX_WARN_LINES 件までで、超えた分は「ほか N 件」の 1 行にする。以下ならそのまま", () => {
+  const warns = (n: number) => Array.from({ length: n }, (_, i) => `warn: w${i}: 本文`).join("\n");
+  const atLimit = warnLinesOf(warns(MAX_WARN_LINES), "/tmp/x", "y");
+  assert.equal(atLimit.length, MAX_WARN_LINES);
+  assert.ok(atLimit.every((line) => line.startsWith("warn: ")));
+  const over = warnLinesOf(warns(MAX_WARN_LINES + 3), "/tmp/x", "y");
+  assert.equal(over.length, MAX_WARN_LINES + 1);
+  assert.equal(over[0], "warn: w0: 本文");
+  assert.equal(over[MAX_WARN_LINES], "ほか 3 件。`ccnavi --lint` で全部見られます");
 });

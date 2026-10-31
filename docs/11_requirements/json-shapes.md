@@ -3,7 +3,7 @@ type: requirements
 title: 拡張との取り決め JSON の形
 description: VS Code 拡張・Chrome 拡張・sh が読む JSON の形（候補・試験・lint・ボード・承認・残った指摘・版）。拡張との契約
 tags: [design-doc, extension]
-keywords: [JSON, 候補, 試験, lint, ボード, 承認, 残った指摘, 版, compat, COMPAT, version, 拡張, 契約, fixtures]
+keywords: [JSON, 候補, 試験, lint, ボード, 承認, 残った指摘, 版, compat, COMPAT, version, 拡張, 契約]
 ---
 
 [ccnavi 要件書](../10_requirements.md) に戻る。取り決め本体は [2.13 拡張との取り決め](extension-if.md)。
@@ -33,8 +33,6 @@ ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml --json
 
 `--test` と `--test-expectations` の結果を JSON で出す。読み手は VS Code 拡張のルール管理画面。判定は文字で出すときと同じ関数を通る
 （REQ-DIA-03）。`--json` のときは終了コードが常に 0 で、食い違いの数は `mismatches` で読む（`--test` の payload の欄の誤りだけは、JSON を出さずに 1）。
-実例は `extensions/vscode/ccnavi-board/test/fixtures/test.json` と `expectations.json`。`tests/core/test_test_json.py` が同じ例で形を確かめる
-（形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてそのテストを走らせ、例を書き直す）。
 
 `--test --json` の最上位。
 
@@ -87,7 +85,7 @@ ccnavi --lint --json
 `problems[].where` は、ユーザ向けの文面で `error:` の後ろに出る場所。`(projects/lib) rule-id` や `(self) (phases) design` のような形で、
 `--flow` で渡したフローへの指摘なら `(flow)` になる。ファイル全体への指摘なら空。
 
-`flow.rendered` は文字列の配列で、`flow.render.render` が返したままのもの。子のパスやロックの案内は入らない。
+`flow.rendered` は文字列の配列で、`SubagentStart` で渡す手順の行そのまま。子のパスやロックの案内は入らない。
 
 `flow.candidates` の `source` は `builtin` か `project`。`builtin` は `general-purpose`・`Explore`・`Plan` の 3 つで、`project` は
 ワークスペースの `.claude/agents/*.md` と `.claude/skills/*/SKILL.md` から読む。`project` の名前は frontmatter の `name` で、
@@ -101,7 +99,7 @@ ccnavi --lint --json
 ccnavi --lint --json --flow /tmp/flow.yml
 ```
 
-`--flow <パス>` は、子チケットのフロー（設計 9.3.1）1 本を、`SubagentStart` が読むのと同じ読み手・同じ検査
+`--flow <パス>` は、子チケットのフロー 1 本を、`SubagentStart` が読むのと同じ読み手・同じ検査
 （大きさ、リンク・ふつうのファイルでない・ハードリンク、UTF-8 として読めない、YAML として読めない、別名、形）で読む。
 読めなければ場所 `(flow)` の error として報告し、`detail` は渡したパスで始まる。無いファイルも error。VS Code の拡張の
 フロー編集画面が、開くときと保存の前に本文を一時ファイルに書いて渡し、`(flow)` の指摘と `flow.data` を読む
@@ -113,7 +111,7 @@ ccnavi --lint --json --flow /tmp/flow.yml
 （大文字小文字だけ違えば正しい表記を添える。空の欄と `:` を含むプラグインのスキルは報告しない）。`loop` の繰り返す側を通る巡回は報告しない。
 `detail` は error と同じく渡したパスで始まる。
 
-`flow.data` は読めた中身を JSON にしたもの（`flow.as_json`）。PyYAML（YAML 1.1）の読みのままで、`0755` は 493、
+`flow.data` は読めた中身を JSON にしたもの。YAML 1.1 の読みのままで、`0755` は 493、
 `yes` は `true`、`0o17` は文字列になる。JSON にそのまま載らない値は `{"$ccnavi": <種類>, ...}` の形で包む。
 
 | 読めた値 | `data` での形 |
@@ -126,7 +124,7 @@ ccnavi --lint --json --flow /tmp/flow.yml
 | キーが文字列でないマップ | `{"$ccnavi": "map", "items": [[キー, 値], ...]}` |
 | 日付・日時・バイト列（`!!binary`）・集合（`!!set`）・組（`!!omap` / `!!pairs`） | `{"$ccnavi": "date" \| "datetime" \| "bytes" \| "set" \| "tuple", "text": <表記>}`。ほかは `"other"` |
 
-フロー編集画面は、開くときに自分の読み手（`yaml`、YAML 1.2）で読んだ中身とこれを見比べ、食い違えば開かない。
+フロー編集画面は、開くときに自分の読み手（YAML 1.2）で読んだ中身とこれを見比べ、食い違えば開かない。
 保存の前には、書き出す本文をこれに掛けて、画面が書こうとした中身と同じに読まれるときだけ書く。値の意味を
 拡張が自分で決めないため。
 読むのは `--lint` だけで、診断の外では無視し、`--test` / `--test-expectations` / `--explain` でも「`--lint` でだけ読む」と
@@ -145,7 +143,7 @@ ccnavi --lint --json --project-risk-file lib=/tmp/risks.yml
 
 - `--project-rules-file <名前>=<パス>` は、その名前のプロジェクトのルールファイルの代わりに `<パス>` を読む
 - `--project-phases-file <名前>=<パス>` は、その名前のレイヤー（`self` は自身のレイヤー）のフェーズ定義の代わりに `<パス>` を読み、共通レイヤーの `phases.yml` と足した形で確かめる（同 `id` で中身が違う、`title` の重なり）。配点（risk）のレイヤーには次の `--project-risk-file` がある
-- `--project-risk-file <名前>=<パス>` は、その名前のレイヤー（`self` は自身のレイヤー）の配点の代わりに `<パス>` を読む。phases と同じく統合結果なので、共通レイヤーの配点と合わせて確かめる（境目の `levels` が合成後に逆転していないか、同 `id` で中身が違う衝突の warn、`script:` が指す先がそのレイヤーの git プロジェクトルートの `.ccnavi/scripts/` に在るか）。共通レイヤーの配点は今までどおり `--risk`。ファイルの無いレイヤーに渡しても、そのレイヤーの配点として合成する
+- `--project-risk-file <名前>=<パス>` は、その名前のレイヤー（`self` は自身のレイヤー）の配点の代わりに `<パス>` を読む。phases と同じく統合結果なので、共通レイヤーの配点と合わせて確かめる（境目の `levels` が合成後に逆転していないか、同 `id` で中身が違う衝突の warn、`script:` が指す先がそのレイヤーの git プロジェクトルートの `.ccnavi/scripts/` に在るか）。共通レイヤーの配点は `--risk`。ファイルの無いレイヤーに渡しても、そのレイヤーの配点として合成する
 - レイヤーの置き場を動かすフラグ 8 本（`--rules` / `--phases` / `--risk` / `--projects` / `--project-home` と上の 3 本）は、`--test` / `--test-expectations` /
   `--lint` / `--explain` でだけ有効になる。診断の外（hook からの判定、`ticket` / `review` のサブコマンド）に渡すと無視し、標準エラーにその旨を出す。
   守る対象（コアファイル）も差し替えを見ない
@@ -159,8 +157,6 @@ ccnavi --explain --json
 
 `--explain` のうちチケットに関わる部分を JSON で出す。読み手は VS Code の拡張「ccnavi ボード」。拡張はこれを並べるだけで、提案やマーカーを
 自分では読まない。`version` が拡張の知っている版（いま 1）と違えば、拡張は読まずに版の違いを伝える。
-実例は `extensions/vscode/ccnavi-board/test/fixtures/board.json`。`tests/ticket/test_board.py` が同じ例で形を確かめる
-（形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてそのテストを走らせ、例を書き直す）。
 
 | キー | 何 |
 |---|---|
@@ -189,21 +185,21 @@ ccnavi --explain --json
 | `template_draft` | 完了した（`done/` の）計画付きの親か（取り消した親・子・計画の無い親は `false`）。ボードはこれで親のカードに『テンプレートの下書きを作る』ボタンを出す（`ccnavi --templates --draft <親>` を呼ぶ）。足しただけの欄で、読まない拡張はそのまま動く。この欄を出さない古い実行ファイルでは `false` と読む |
 | `copy` | `{status, approved_at, approved_from, path}`。`status` は `none`（未承認。このときは `{status}` だけ）/ `open`（`doing/`）/ `review`（`wip/proposals/review/`）/ `closed`（`done/`）。`approved_at` は承認の時刻で、承認済みチケットの欄ではなく、`doing/<識別子>.md` を足したコミットから引く。`approved_from` はどこから引いたか（`commit` / `uncommitted`（コミットが無い。手で置いてまだコミットしていない）/ 空（分からない。git を打たない場））。`uncommitted` と空のとき `approved_at` は空。 |
 | `blocked` | 空でなければ「読めるが信じられない」理由。判定はこのチケットのワークツリーへの書き込みを `DENY_TICKET_BLOCKED` で全部止める。`status` は `open` のままなので、止まっていることはこの欄でしか分からない |
-| `worktree` | `{exists, path, project}`（無いときは `{exists: false, path}`）。`.claude/worktrees/<識別子>` が実際のワークツリーか（設計 9.5 の相互参照） |
+| `worktree` | `{exists, path, project}`（無いときは `{exists: false, path}`）。`.claude/worktrees/<識別子>` が実際のワークツリーか |
 | `started_at` / `completed_at` / `base_sha` / `merged_sha` / `cancelled_at` / `cancel_reason` | スクリプトが書く欄。`merged_sha` は `finish` が親のブランチへ合流した子の先頭（表示だけ。ボードは閉じた子に「合流」を出す） |
 | `in_progress` | 作業中か。承認済みチケットが `doing/` にあり、着手していて、終わってもいないし取り消されてもいないとき真。`flow.locked` と同じ読み方。承認しただけで着手していないもの・レビュー待ち・閉じたものは偽。ボードはルール・配点・フェーズ定義の保存を止めるかをこれで決め、`started_at` などから組み直さない。足しただけの欄で、この欄を持たない古い実行ファイルの答えでは、ボードは作業中かを確かめられないとして保存しない |
 | `seen_in[]` | 同じ識別子のチケットがある場所の全部。`{tree, state, path}`。子のワークツリーは親のブランチから切るので、子のワークツリーにも親の提案があるのが普通 |
 | `scattered[]` | どれが正か決まらない、チケットがある場所の全部。`{tree, state, path}`。決まっていれば空。正とする側のツリー（親のツリー → 元ツリーの順）で絞り込んでも 2 つ以上残り、その残りが 2 つの置き場にまたがるか同じ置き場に重なるときに入る。状態の操作が「複数の場所にある」で止まる条件と、`--lint` が ERROR を出す条件と同じ。`seen_in` の数は食い違いを意味しない |
-| `flow` | 子のフロー（設計 9.3.1）。親と、フローが無い閉じた子（終わった・取り消した）は `null`（ボードはこのとき「フローを作る」を出さない）。`{path, rel, tree, exists, linked, locked, lock_kind, draft}`。`path` は読む先の絶対パス、`rel` はツリーのルートからの相対、`tree` はそのファイルを持つツリーのルート、`exists` はファイルが在るか、`linked` はファイルかツリーのルートからそこまでの途中がシンボリックリンクか（真なら読まないし書かない）、`locked` は判定がいまその書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中・レビュー中）、`lock_kind` はその種類（`doing` は着手中、`review` はレビュー中、止めていなければ null。種類の欄が無い古い実行ファイルでは出ない）、`draft` はエージェントが書く下書き（効力は無い）の `{path, rel, exists, linked}`。`path` が指すのは正とする側のツリー＝承認済みチケットが在るツリーの版だけで、子のワークツリー上のフローは読まない。承認の前は提案が在るツリーで、承認でフローもチケットと一緒に動く。`rel` は承認済みの領域の固定の置き場 `.ccnavi/approved/flows/<子>.yml` で、中身は YAML。`draft` の置き場はフローと同じツリーの `wip/proposals/flows/<子>.yml` で、ボードはパスを組まずにこれを読み、いまのフローと違えば「提案あり」を出す。読むのは承認済みチケット（無ければ提案）の欄。ボードは `locked` をそのままコピーし、自分で組み直さない |
+| `flow` | 子のフロー。親と、フローが無い閉じた子（終わった・取り消した）は `null`（ボードはこのとき「フローを作る」を出さない）。`{path, rel, tree, exists, linked, locked, lock_kind, draft}`。`path` は読む先の絶対パス、`rel` はツリーのルートからの相対、`tree` はそのファイルを持つツリーのルート、`exists` はファイルが在るか、`linked` はファイルかツリーのルートからそこまでの途中がシンボリックリンクか（真なら読まないし書かない）、`locked` は判定がいまその書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中・レビュー中）、`lock_kind` はその種類（`doing` は着手中、`review` はレビュー中、止めていなければ null。種類の欄が無い古い実行ファイルでは出ない）、`draft` はエージェントが書く下書き（効力は無い）の `{path, rel, exists, linked}`。`path` が指すのは正とする側のツリー＝承認済みチケットが在るツリーの版だけで、子のワークツリー上のフローは読まない。承認の前は提案が在るツリーで、承認でフローもチケットと一緒に動く。`rel` は承認済みの領域の固定の置き場 `.ccnavi/approved/flows/<子>.yml` で、中身は YAML。`draft` の置き場はフローと同じツリーの `wip/proposals/flows/<子>.yml` で、ボードはパスを組まずにこれを読み、いまのフローと違えば「提案あり」を出す。読むのは承認済みチケット（無ければ提案）の欄。ボードは `locked` をそのままコピーし、自分で組み直さない |
 | `risk` / `judge` | 子の記録 `phases/<親>/<子>.risk.json` と `.judge.json` の中身。無ければ `null` |
 | `issues[]` | 読み手が気づくべき不備の文。この順に入る。`blocked` が空でなければ `書き込みが止まっています: <blocked>`、提案が無く `copy.status` が `open` でも `closed` でもなければ `提案が見つかりません（承認済みチケットだけがあります）`、子で親の識別子のチケットが `tickets[]` に無ければ `親 <親> が見つかりません`。無ければ空。ボードはこれをそのまま出し、自分では組み直さない |
-| `attention` | ユーザが動く必要があるか。真になるのは、`pending_approval` に入っている、子で自分のフェーズが `gate_closed` か `review_waiting`、未着手・作業中（提案が無く `closed` のもの以外）なのにワークツリーが無い、自分の `risk` の水準が HIGH 以上、`scattered[]` が空でない、`issues[]` が空でない、親でフェーズのどれかが `gate_closed` / `review_waiting` / `risk_escalates` のとき（`src/ccnavi/entry/diagnose_board.py` の `_mark_attention`）。ボードの「ユーザ待ちのみ」はこれで絞るだけ |
+| `attention` | ユーザが動く必要があるか。真になるのは、`pending_approval` に入っている、子で自分のフェーズが `gate_closed` か `review_waiting`、未着手・作業中（提案が無く `closed` のもの以外）なのにワークツリーが無い、自分の `risk` の水準が HIGH 以上、`scattered[]` が空でない、`issues[]` が空でない、親でフェーズのどれかが `gate_closed` / `review_waiting` / `risk_escalates` のとき。ボードの「ユーザ待ちのみ」はこれで絞るだけ |
 
 `parents[]` の 1 件。
 
 | キー | 何 |
 |---|---|
-| `ticket` / `closed` / `stage` | 識別子、閉じた承認済みチケットか、いまの局面（設計 9.7 の文。閉じた親は空文字） |
+| `ticket` / `closed` / `stage` | 識別子、閉じた承認済みチケットか、いまの局面（レビュー準備中・レビュー待ちなど、ユーザに見せる言葉。閉じた親は空文字） |
 | `plan` / `feedback` | 全体計画とフィードバック計画（`null` は未計画） |
 | `close_early` / `ready` / `closed_record` | 親のマーカー `close-early.json` / `ready.json` / `closed.json` の中身。無ければ `null`。`closed.json` は親を閉じたときに置かれ、どのフェーズをどこで見たか（`reviews`）を持つ |
 | `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, review_kind, gate_closed, review_waiting, deferred, review_at, covers, risk, risk_escalates, risk_line, manual}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`review_kind` はユーザがどこで見るか（`none` / `mr`）。`gate_closed` は判定が使うのと同じ値で、レビューが済むまで止めているかを示す（ユーザに見せる名前は「レビュー準備中」「レビュー待ち」）。`review_waiting` は依頼を出したのに止まったまま（ユーザのレビュー待ち）で、ボードはこれをコピーするだけで組み直さない。`manual` は、手で `done/` に動かされた子の確認待ち・移動が未共有など、手で動かした子についての 1 行（無ければ空文字）。VS Code のフェーズ行に出す。 |
@@ -221,9 +217,7 @@ ccnavi --entry board user agree --yes <識別子,…> --digest <値> --json [<�
 ```
 
 VS Code の拡張が、承認をボードのオーバーレイで行うための形。承認の対象を組むのは `user agree` と同じ関数で、`--explain --json` の
-`pending_approval` と答えが食い違わない。実例は `extensions/vscode/ccnavi-board/test/fixtures/approve-preview.json` ほか。
-`tests/ticket/test_approve_json.py` が同じ例で形を確かめる（形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてそのテストを走らせ、例を書き直す）。
-`version` が拡張の知っている版（いま 1）と違えば、拡張は読まずに版の違いを伝える。
+`pending_approval` と答えが食い違わない。`version` が拡張の知っている版（いま 1）と違えば、拡張は読まずに版の違いを伝える。
 
 `--preview` の答え。
 
@@ -237,7 +231,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 | `digest` | 承認の対象の提案の識別子の一覧と、各提案ファイルの元のバイト列全体から作るダイジェスト（SHA-256 の 16 進）。`--yes` の `--digest` にそのまま渡す。承認画面の本文は入らない |
 | `rejected[]` | 承認の対象にしない提案。`{ticket, problems[]}`。載るのは形の不正な提案（親が承認されていない、計画に無い番号、順序、先行（`predecessors`）が `done/` に無いか取り消し済みなど）だけで、範囲の超過だけの子は `batch[]` に載る |
 | `problems[]` | 読めない提案や承認済みチケットの説明 |
-| `plans[]` | 承認の対象に入った計画を持つ親の、計画ごとの図の中身。`ccnavi --plan-order <親> --json` の `plans` と同じ関数で作る（`--order` は渡さないので、承認する提案そのものの順序）。`{ticket, part, source_sha, items[], after, proposed, current, loose, ready, problems}`。`items[]` は `{number, from, type, title, review, deferred, review_at, locked}`。形は設計 9.4（docs/21_design/tickets/approval.md） |
+| `plans[]` | 承認の対象に入った計画を持つ親の、計画ごとの図の中身。`ccnavi --plan-order <親> --json` の `plans` と同じ関数で作る（`--order` は渡さないので、承認する提案そのものの順序）。`{ticket, part, source_sha, items[], after, proposed, current, loose, ready, problems}`。`items[]` は `{number, from, type, title, review, deferred, review_at, locked}` |
 
 `--preview` 自身は、対象にしない提案があっても 0 で返る。答えが要るときだけ `--verify` を足す。
 `--verify` の答えは `--preview` の答えに `verify` を足したもの。終了コードが答えそのもの（0 = はい、3 = いいえ。1 は使い方か設定の誤り）。
@@ -379,16 +373,16 @@ ccnavi --version --json
 | キー | 何 |
 |---|---|
 | `schema` | この JSON の形の版（いま 1）。欄を足すだけなら上げない |
-| `version` | ccnavi の版（`pyproject.toml` の `version`） |
-| `commit` | 組み立ての元のコミット。`build.py` が組み立てのときに埋め、未コミットの変更があれば `-dirty` が付く。ソースで動かしているときは `unknown` |
+| `version` | ccnavi の版 |
+| `commit` | 組み立ての元のコミット。組み立てのときに埋め、未コミットの変更があれば `-dirty` が付く。ソースで動かしているときは `unknown` |
 | `built` | 組み立てた実行ファイルなら真、ソースで動いていれば偽 |
 | `compat` | 互換の版。実行ファイルと、それを呼ぶ側（sh と拡張）の契約の版（下） |
 | `flags` | 受け付けるフラグ。引数の定義から引くので、フラグを足せばここにも並ぶ |
 | `formats` | 読む書式の版。レイヤーのファイル（`rules.yml` / `phases.yml` / `risks.yml`）とチケットの頭の `version:` と比べるもの |
 | `features` | オプションから読めない振る舞いの名前（文字列の配列）。現在の名前は `user-entry`（ユーザ専用の入口 `user <操作>`）、`handoff`（保護対象の取り込み）、`mirror`（共通レイヤーのミラーの同期）。呼ぶ側が振る舞いの有無を見分けるためのもので、追加しても `compat` は上げない |
 
-**互換の版**は 3 か所に同じ値で書く。実行ファイル（`src/ccnavi/entry/version.py` の `COMPAT`）、sh（`ccnavi-common.sh` の
-`CCNAVI_COMPAT`）、拡張（`extensions/vscode/ccnavi-board/src/core/version.ts` の `EXTENSION_COMPAT`）。Chrome 拡張は組み立てのときに実行ファイルの値を埋め込む。
+**互換の版**は 3 か所に同じ値で持つ。実行ファイル（`--version --json` の `compat`）、sh（`ccnavi-common.sh` の
+`CCNAVI_COMPAT`）、VS Code 拡張。Chrome 拡張は組み立てのときに実行ファイルの値を埋め込む。
 sh や拡張が頼るフラグや出力の形を、呼ぶ側を直さないと動かない形に変えたときに上げる。データの形（承認済みの置き場に置くものの並び、
 先行関係の置き場など）が変わるときも上げる。古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）が
 新しい形のデータを読み違えるため。フラグや欄を足すだけで、データの形も変わらないなら上げない（拡張は使う前に `flags` を見る）。
@@ -402,6 +396,5 @@ sh や拡張が頼るフラグや出力の形を、呼ぶ側を直さないと�
 | VS Code 拡張 | 起動のときに 1 度問い合わせ、食い違えば通知を出す。`--flow` を使う前には `flags` を見て、無ければフロー編集画面を開かない・保存しない |
 | `ccnavi --lint` | sh の `CCNAVI_COMPAT` と比べ、`(version)` の warn を出す |
 
-直し方は、ccnavi のリポジトリ（`build.py` とソースがある）なら `uv run --with pyinstaller python build.py` で組み立て直し、
-配布先なら ccnavi のリポジトリで組み立てて `sh scripts/ccnavi-setup.sh <ワークスペース>` を実行する（実行ファイルは配布元と中身が違えば置き換わる）。sh も配り直すなら `--force` を付ける。
+直し方は、ccnavi のリポジトリで実行ファイルを組み立て直し、`sh scripts/ccnavi-setup.sh <ワークスペース>` で配り直す（実行ファイルは配布元と中身が違えば置き換わる）。sh も配り直すなら `--force` を付ける。
 拡張のほうが古ければ拡張を入れ直す。sh は `--version` の答えから互換の版を読めなければ「不明」として食い違いに数える。拡張は版を聞けなかったとき、起動では何も言わず、フラグを使う前に理由を出して先へ進まない。

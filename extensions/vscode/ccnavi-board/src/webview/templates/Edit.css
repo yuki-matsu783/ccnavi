@@ -23,3 +23,5 @@
 .tpl-edit-plan { overflow-x: auto; max-width: 100%; }
 /* 横にスクロールしても、操作の列は右端に残す（背景を付けて、後ろの列が透けないようにする） */
 .tpl-edit-items th:last-child, .tpl-edit-items td.tpl-edit-ops { position: sticky; right: 0; background: var(--vscode-editor-background); }
+/* 狭い幅でも見出しは縦に折れない。表は枠の中で横にスクロールする */
+.tpl-edit-items th { white-space: nowrap; }

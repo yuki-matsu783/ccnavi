@@ -1,9 +1,9 @@
 ---
 type: guide
 title: 実行環境とADRの扱い
-description: ccnaviの開発で対応する実行環境（Windows、macOS、Linux）と、sh・Pythonを書くときの決まり、実測で分かった環境固有の落とし穴、文書やコメントでのADRへの触れ方
+description: ccnaviの開発で対応する実行環境（Windows、macOS、Linux）と必要な道具の版、sh・Pythonを書くときの決まり、実測で分かった環境固有の落とし穴、コードのコメントの粒度、文書やコメントでのADRへの触れ方
 tags: [sh-scripts, environment]
-keywords: [落とし穴, uv, jq, CP932, Docker, PyInstaller, gitdir, 大文字小文字, casefold, normcase, pathcase, 実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, sh, bash, BSD, ADR, ADR番号, コメント]
+keywords: [コメント, 粒度, docstring, 処理フロー, 版, PyYAML, 落とし穴, uv, jq, CP932, Docker, PyInstaller, gitdir, 大文字小文字, casefold, normcase, pathcase, 実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, sh, bash, BSD, ADR, ADR番号, コメント]
 ---
 
 # 実行環境とADRの扱い
@@ -18,6 +18,7 @@ keywords: [落とし穴, uv, jq, CP932, Docker, PyInstaller, gitdir, 大文字�
   空のファイルを作るだけのときも同じで、Writeで作る。
   ヒアドキュメントで書いたファイルは、Write / Editに掛かる権限の宣言も、編集後の検査も通らないため
 - 使える道具は`jq` 1.6、Node 22.13.1 以上（pnpm 10）、Python 3.12 以上（uv）、goだけ。これ以外の道具がある前提で書かない。
+  Pythonの実行時の依存はPyYAML 1本だけ（`pyproject.toml`）。組み立てと検査の道具（PyInstaller、ruff）は開発時にしか要らない。
   例外は、ホスト（GitHub・GitLab）と話すsh（`ccnavi-review.sh`・`ccnavi-branches.sh`・`ccnavi-start.sh`など）で、
   `gh`・`glab`・`curl`を使う。無ければ何を用意すればよいかを案内して止まる。ソースで動かしているccnaviのリポジトリでは、
   shが実行ファイルの代わりに`uv run python -m ccnavi`で起こすことがある（`uv`が無ければその道は使わない）
@@ -73,6 +74,23 @@ Claude Codeの振る舞いについて測った前提は設計書の付録C（[a
 - 例外は、git が追跡する綴りに依る名前。状態のディレクトリ（`todo` `doing` `review` `done`）は綴りまで求め、
   違う綴りは読まずに警告する。ブランチ名は git が区別するので、そのまま比べる。`.gitignore`の`/scratchpad`も git が
   区別する。例外を足すときはこの節に書く（`wip/`の置き場は例外ではない。区別しない）
+
+## コードのコメントの粒度
+
+粒度は3段で決める。周りのコードのコメントの密度に合わせる。
+
+| 場所 | 書くこと |
+|---|---|
+| モジュール先頭の docstring | 役割を1文。入出力の契約、触る状態と置き場、失敗したときの振る舞い、呼ぶ側との境界（何をしない・何を呼び側に任せるか） |
+| 公開する関数・クラスの docstring | 名前と型から読み取れないものだけ。前提条件、戻り値の意味、例外や終了コード、副作用 |
+| 手順が複数ある関数の docstring | `処理フロー:` の見出しのあとに、処理を番号つきで並べる（呼ぶ先の名前を添える）。コードを開かなくても、入口から出口までの流れが追える |
+| 関数の中のコメント | 処理のまとまりごとに、何をするかの概要を1行（長い関数の段落の見出しとして、上から読めば流れが分かる）。理由（なぜそうするか）、落とし穴、順序に依存するところは、そこに足す |
+
+- 概要は段落ごとに1行にする。1行ごとの実況（`i を 1 足す`など、コードを読めば分かること）は書かない
+- 経緯（以前は〜だった）、ADRの番号、日付は書かない。経緯はADRに、日付は git の履歴にある
+- 設計書や要件書の内容をコピーしない。ほかの文書に正があるなら、その文書を指す
+- 変更したら、同じ変更の中でコメントも直す。コードと食い違ったコメントは、無いより悪い
+- どの文書にどこまで書くかは[要件書・設計書・ADRの書き分け](docs-writing.md)の「1つのモジュールで閉じる話はコードに書く」にある
 
 ## 文書とコメントでのADRの扱い
 

@@ -8,7 +8,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, �
 
 # ADR-0144: 保護対象の変更は、すべて handoff を通して取り込む
 
-状態: 採用（2026-10-18 に実装）
+状態: 採用（実装済み）
 
 ## 状況
 
@@ -35,7 +35,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, �
 
 取り込み先は「禁止の一覧」ではなく、種類の表に載せたものだけにする。下書きのパスは、リンクを解いた実パスの全要素を `pathcase.fold` と NFC に正規化してから、表に適用する。表に該当しないパスは「対象外」とし、一覧に件数だけ出す。error には数えない（`wip/handoff/` には ccnavi が書く `learnings/`・`inbox/` や、再現用のスクリプトも置かれる）。
 
-種類（`template`・`layer-config`・`docs`・`defense`）ごとのパス・新規作成の可否・ボードの可否・検査の表は、設計書の [9.19 保護対象の変更の取り込み](../../21_design/tickets/handoff.md) にある。`defense` はボードから取り込めず、ターミナルの前のユーザだけが取り込む。
+種類（`template`・`layer-config`・`docs`・`defense`）ごとのパス・新規作成の可否・ボードの可否・検査の表は、設計書の [保護対象の変更の取り込み（handoff）](../../21_design/tickets/handoff.md) にある。`defense` はボードから取り込めず、ターミナルの前のユーザだけが取り込む。
 
 `layer-config` の `rules.yml` のうち、防御の記述を動かす取り込みは、`defense` と同じくターミナルに限る（`--via board` は断り、`--json` の `board` は偽になる）。防御の記述とみなすのは、`guard-` で始まる id のルール（足す・消す・判定を移す・`except` を含む中身を変える）と、今ある deny（消す・中身を変える）。deny を足すのは止める側への変更なので数えない。今の中身か下書きが読めなければ、確かめられないのでターミナルに限る（`handoff._defense_change`）。`phases.yml`・`risks.yml` はこの判定の外。
 

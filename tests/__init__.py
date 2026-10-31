@@ -308,8 +308,8 @@ def put_ccnavi_md(root: str) -> str:
 def _repo_messages() -> str:
     """このリポジトリの文面ファイルの置き場。
 
-    `git mv` で `.ccnavi/messages/` へ移すまでは旧い置き場にある（#661）。
-    移したら旧い側の分岐は要らない。
+    `git mv` で `.ccnavi/messages/` へ移すまでは古い置き場にある（#661）。
+    移したら古い側の分岐は要らない。
     """
     new = os.path.join(ROOT, ".ccnavi", "messages")
     if os.path.isdir(new):
