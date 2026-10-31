@@ -261,7 +261,10 @@ class Readiness:
 
 def _follow(steps: list[str]) -> list[str]:
     """次の手の並びを出力の行にする。`次:` は 1 行（最初の手）、後の手は `案内:`。"""
-    return [f"{'次' if i == 0 else '案内'}: {step}" for i, step in enumerate(steps)]
+    return [
+        (texts.LABELS["next"] if i == 0 else texts.NOTE_LABEL) + step
+        for i, step in enumerate(steps)
+    ]
 
 
 # 承認の画面が外す理由（提案を読めない・承認の対象にならない）。

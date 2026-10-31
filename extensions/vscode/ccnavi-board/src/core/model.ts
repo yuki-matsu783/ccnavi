@@ -162,9 +162,9 @@ export interface TicketJson {
   readonly cancel_reason: string;
   /**
    * 作業中か（承認済みチケットが `doing/` にあり、着手していて、終わってもいないし取り消されてもいない）。
-   * 実行ファイルが決め、拡張は `started_at` などから組み直さない
+   * 実行ファイルが決め、拡張は `started_at` などから組み直さない。答えが欠けていれば null
    */
-  readonly in_progress: boolean;
+  readonly in_progress: boolean | null;
   readonly seen_in: readonly SeenInJson[];
   /** どれが正か決まらないチケットの全部。決まっていれば空 */
   readonly scattered: readonly SeenInJson[];
@@ -539,7 +539,7 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     merged_sha: str(raw.merged_sha),
     cancelled_at: str(raw.cancelled_at),
     cancel_reason: str(raw.cancel_reason),
-    in_progress: raw.in_progress === true,
+    in_progress: typeof raw.in_progress === "boolean" ? raw.in_progress : null,
     seen_in: seenIn(raw.seen_in),
     scattered: seenIn(raw.scattered),
     risk: isRecord(raw.risk) ? raw.risk : null,

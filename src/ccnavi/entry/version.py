@@ -66,7 +66,10 @@ VERSION = "0.1.0"
 # 19: `user <操作>` の入口に、呼び出し元の印（`--entry sh|board`）を求める。印の無い入口は断る。
 # 古い sh（印を付けない）は新しい実行ファイルに断られ、新しい sh は古い実行ファイルの
 # `--entry` を読めない。sh に `ccnavi-user-handoff.sh`・`-mirror.sh`・`-prune.sh` を足した。
-COMPAT = 19
+# 20: sh が `ccnavi --check ticket start|finish|cancel|consolidate` を呼ぶようになった。
+# decide の JSON から判断欄を消した。`review` を真偽値にして、`deferred` を足した。
+# ボード JSON の欄を必須にした。
+COMPAT = 20
 # `--version --json` の形の版。欄を足すだけなら上げない。
 SCHEMA = 1
 # 実行ファイルが持つ振る舞い。オプションや JSON の欄の有無を `flags` から読めないものを足す。

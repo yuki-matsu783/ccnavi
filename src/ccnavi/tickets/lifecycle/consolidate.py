@@ -23,7 +23,6 @@ sh（`ccnavi-ticket.sh consolidate`）が write-and-push の手順で、親の�
 
 from __future__ import annotations
 
-import io
 import os
 from typing import TextIO
 
@@ -206,7 +205,7 @@ def check(
     stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, parent_id: str
 ) -> int:
     """`ticket consolidate <親> --check`。書く前の検査だけを通す（読むだけ）。"""
-    if ops_close.find(io.StringIO(), root, conf, parent_id) is None:
+    if ops_close.absent(root, conf, parent_id):
         stdout.write(f"案内: {parent_id} は手元で引けない。取り込みのあとに本体が確かめます\n")
         return 0
     if gate(stderr, root, conf, parent_id) is None:

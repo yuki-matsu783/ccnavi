@@ -919,7 +919,8 @@ class CoreChromeTest(CoreHarness):
         local = self.confirm(fixture, 1)
         self.assertEqual(local.returncode, 0, local.stdout + local.stderr)
         self.assertIsNone(answer["stopped"])
-        # 手元の CLI だけが、エージェント向けの `次:` の行を足す。Chrome を押すのはユーザなので返さない。
+        # 手元の CLI だけが、エージェント向けの `次:` の行を足す。
+        # Chrome を押すのはユーザなので返さない。
         cli_lines = [line for line in local.stdout.splitlines() if not line.startswith("次: ")]
         self.assertEqual(_flat(answer["lines"]), cli_lines)
         self.assertEqual(

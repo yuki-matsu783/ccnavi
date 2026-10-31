@@ -16,7 +16,7 @@ export const VERSION_SCHEMA = 1;
  * （scripts/ccnavi-package.sh が配るときに見比べる）。起動のときに実行ファイルと比べはしない。
  * 上げ方は src/ccnavi/entry/version.py の説明のとおり
  */
-export const EXTENSION_COMPAT = 19;
+export const EXTENSION_COMPAT = 20;
 
 export interface VersionInfo {
   readonly schema: number;

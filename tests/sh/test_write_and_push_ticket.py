@@ -443,6 +443,17 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         self.assertEqual(self.sha(self.tree, "HEAD"), before)
         self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
 
+    def test_check_flag_refuses_an_id_in_two_places_without_a_child_worktree(self):
+        done = self.copy(CHILD, "done")
+        os.makedirs(os.path.dirname(done), exist_ok=True)
+        write(done, self.read(self.copy(CHILD)))
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("start", CHILD, "--check")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("複数の場所", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.ws, ".claude", "worktrees", CHILD)))
+        self.assertEqual(self.sha(self.tree, "HEAD"), before)
+
     # ---- write-and-push を飛ばさせない
 
     def test_a_double_dash_does_not_slip_past_write_and_push(self):

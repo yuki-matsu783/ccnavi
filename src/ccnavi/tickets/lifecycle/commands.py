@@ -21,7 +21,6 @@ finish の前にワークツリーを
 
 from __future__ import annotations
 
-import io
 import os
 from dataclasses import replace
 from typing import TextIO
@@ -446,11 +445,10 @@ def check(
     """`ticket start|finish|cancel <識別子> --check`。副作用の前に分かる検査だけを通す（読むだけ）。
 
     sh が取り込み・コミット・子のワークツリーの作成の前に呼ぶ。本体と同じ `*_gate` を使う。
-    手元に無いチケットは判断しない（別の PC で承認・着手された分は、取り込みのあとに本体が見る）。
+    どの置き場にも無いチケットは判断しない
+    （別の PC で承認・着手された分は、取り込みのあとに本体が見る）。
     """
-    if verb == "cancel" and not reason.strip():
-        return 0 if cancel_gate(stderr, root, conf, ticket_id, reason) else 1
-    if ops_close.find(io.StringIO(), root, conf, ticket_id) is None:
+    if ops_close.absent(root, conf, ticket_id):
         stdout.write(f"案内: {ticket_id} は手元で引けない。取り込みのあとに本体が確かめます\n")
         return 0
     if verb == "start":

@@ -67,7 +67,7 @@ def notice(stderr: TextIO, conf: settings.Settings, root: str, payload: hookio.I
 def _commit_names(
     root: str, conf: settings.Settings, payload: hookio.Input, command: str, deadline: float
 ) -> list[str]:
-    """`commit` の呼び出しごとに、実行された場所が直前にコミットの積まれた直接作業なら、その名前。"""
+    """`commit` の呼び出しごとに、実行された場所が直前にコミットされた直接作業なら、その名前。"""
     found: list[str] = []
     for args, place in wrapguard.git_calls(
         payload.cwd, command, shellread.read(command).degraded, "commit"
@@ -112,8 +112,10 @@ def _direct_name(root: str, conf: settings.Settings, here: tree.Tree, deadline: 
     """`here` が、いま直前にコミットが積まれた直接作業のワークツリーなら、その名前。違えば空。"""
     if here.is_main:
         return ""
+    if not _just_committed(here.root, deadline):
+        return ""
     reason, unsure = osi.direct_check(root, conf, here, deadline)
-    if reason or unsure or not _just_committed(here.root, deadline):
+    if reason or unsure:
         return ""
     return here.name
 

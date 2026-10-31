@@ -19,7 +19,8 @@ sh を外から呼び、GitLab の代役と実行ファイルの代役で 1 周�
 6. 抜けるときの片付け（EXIT の trap）で rm が失敗しても、元の終了コードで抜ける（dash と bash）
 
 実行ファイルは代役（`decide_support.py`。`ops` は本物に渡し、ほかは引数を記録して答える）。
-判定そのものは `tests/ticket` が見る。GitLab は同じプロセスの小さな HTTP サーバで、sh が呼ぶ経路だけを返す。
+判定そのものは `tests/ticket` が見る。
+GitLab は同じプロセスの小さな HTTP サーバで、sh が呼ぶ経路だけを返す。
 
 `CCNAVI_SH_DIR` で、コピーする sh の出どころを差し替えられる。既定はこのツリーの
 `.ccnavi/scripts/`（テストしているソースそのもの）。
@@ -51,7 +52,8 @@ WINDOWS = os.name == "nt"
 
 
 # 子プロセスの PATH に並べる標準コマンド。PATH は偽の道具の bin とシェル本体の置き場だけで組む。
-# sh が使うコマンドはここに足す。macOS は awk などが /bin にないが、/usr/bin を足すと gh と glab も見つかってしまう。
+# sh が使うコマンドはここに足す。macOS は awk などが /bin にないが、
+# /usr/bin を足すと gh と glab も見つかってしまう。
 STANDARD_TOOLS = (
     "jq",
     "curl",
