@@ -13,6 +13,7 @@ import tempfile
 import unittest
 
 from ccnavi.records import failstreak
+from ccnavi.tickets.model import ticket_places
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -141,7 +142,7 @@ class FailStreakTest(unittest.TestCase):
         }
         said = self._context(self._run(payload))
         self.assertIn("Artifact ツールが失敗しました", said)
-        self.assertIn(os.path.join(self.ws, "scratchpad"), said)
+        self.assertIn(ticket_places.scratch_dir(self.ws), said)
 
     def test_artifact_interrupt_says_nothing_about_scratchpad(self):
         payload = {

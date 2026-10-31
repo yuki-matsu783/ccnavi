@@ -1248,7 +1248,7 @@ def decide_after_failure(
     parts.append(text)
     if payload.tool_name == "Artifact" and not payload.is_interrupt:
         # Artifact はファイルを渡して publish する。失敗の理由を問わず、HTML の置き場を知らせる。
-        scratch = os.path.join(root, ticket_places.SCRATCH_ROOT).replace("\\", "/")
+        scratch = ticket_places.scratch_dir(root)
         parts.append(texts.say(root, "NOTICE_ARTIFACT_FAILED", {"scratch": scratch}))
     if not payload.is_interrupt:
         parts.append(judge.fail_streak_hint(conf, root, payload.session_id, payload.agent_id))
