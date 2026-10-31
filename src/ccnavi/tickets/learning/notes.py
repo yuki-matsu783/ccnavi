@@ -15,7 +15,7 @@ import re
 import shlex
 from typing import TextIO
 
-from ...infra import fsio, gitcmd, pathsafe, settings, tree
+from ...infra import fsio, gitcmd, pathsafe, settings, toolnames, tree
 from ...records import audit, redact
 from ..approval import checks as approval_checks
 from ..approval import marks as approval_marks
@@ -275,7 +275,7 @@ def build_digest(records: list[dict], recorded: bool, tree_name: str | None = No
         rule = rules[0]
         tool = str(rec.get("tool") or "")
         word = ""
-        if tool in ("Bash", "PowerShell"):
+        if tool in toolnames.SHELL_TOOLS:
             subject = rec.get("subject")
             if isinstance(subject, str):
                 word = command_word(subject)

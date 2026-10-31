@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from typing import TextIO
 
-from ...infra import hookio, settings
+from ...infra import hookio, settings, toolnames
 from ...policy import ctxfile, rules, selfguard_shell, texts
 from . import ticket_model
 
@@ -71,7 +71,7 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     spec = texts.spec("RULE_TICKET_STATE")
     write_rule = rules.Rule(
         id=STATE_RULE_ID,
-        match="|".join(ticket_model.WRITE_TOOLS),
+        match="|".join(toolnames.WRITE_TOOLS),
         regex=place,
         root=root,
         decision=rules.DENY,
@@ -122,7 +122,7 @@ def _dir_rules(
     path = rf"(^|[\\/]){place}[\\/]"
     write_rule = rules.Rule(
         id=rule_id,
-        match="|".join(ticket_model.WRITE_TOOLS),
+        match="|".join(toolnames.WRITE_TOOLS),
         regex=path,
         root=root,
         decision=rules.DENY,
@@ -267,7 +267,7 @@ def propose_notice(
     判定には一切現れない）。提案を 1 本書くたびに同じ文を積むと、
     長いセッションではそれだけでコンテキストを使ってしまう。
     """
-    if payload.tool_name not in ticket_model.WRITE_TOOLS or not subject:
+    if payload.tool_name not in toolnames.WRITE_TOOLS or not subject:
         return ""
     if not _propose_place(conf.tickets, root).search(subject):
         return ""

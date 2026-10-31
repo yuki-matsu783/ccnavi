@@ -35,7 +35,7 @@ import os
 from dataclasses import dataclass, field, replace
 from typing import TextIO
 
-from ...infra import modes, settings, tree
+from ...infra import settings, toolnames, tree
 from ...policy import rules, texts
 from ..approval import checks as approval_checks
 from ..approval import marks as approval_marks
@@ -421,7 +421,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
         "phase": str(phase.number),
         "label": phase.label,
         "review_label": phase.review_label,
-        "blocked": "サブエージェントの起動" if tool in modes.AGENT_TOOLS else "このシェル実行",
+        "blocked": "サブエージェントの起動" if tool in toolnames.AGENT_TOOLS else "このシェル実行",
         "risk_line": phase.risk_line or "",
     }
     if phase.risk_escalates:
@@ -441,7 +441,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
             f"{phase.review_label})",
             said,
             PARALLEL_REQUEST_NOTE,
-            *([] if tool in modes.AGENT_TOOLS else [phase_forms.EXEMPT_NOTE]),
+            *([] if tool in toolnames.AGENT_TOOLS else [phase_forms.EXEMPT_NOTE]),
         ]
     )
 

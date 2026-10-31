@@ -39,7 +39,7 @@ from urllib.parse import urlsplit
 import yaml
 
 from ..hook import reasons
-from ..infra import hookio, settings, yamlread
+from ..infra import hookio, settings, toolnames, yamlread
 from ..policy import rule_lint, ruleload, rules
 from ..records import audit, repeat
 from . import diagnose
@@ -172,7 +172,7 @@ def _shape(tool: str, subject: str, root: str) -> tuple[str, dict, str] | None:
             pattern += r"\s+" + re.escape(sub)
         pattern += r"(\s|$)"
         return spelled, {"regex": pattern}, spelled
-    if tool in ruleload.PATH_TOOLS:
+    if tool in toolnames.PATH_TOOLS:
         where = os.path.dirname(subject.replace("\\", "/"))
         top = rules.root_glob(root)
         if not where or _GLOB_META.search(where):

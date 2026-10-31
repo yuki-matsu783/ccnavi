@@ -31,7 +31,7 @@ import os
 import unittest
 
 from ccnavi.hook import agentlaunch
-from ccnavi.infra import hookio, settings
+from ccnavi.infra import hookio, settings, toolnames
 from ccnavi.tickets.model import ticket_model
 from tests import common_path
 from tests.ticket.test_flow import WORKFLOW_YAML
@@ -50,7 +50,7 @@ PARALLEL = [
     {"type": "design", "after": []},
     {"type": "implement", "after": [1, 2]},
 ]
-TOOLS = ("Agent", "Task")
+TOOLS = toolnames.AGENT_TOOLS
 
 RULES_WITH_AGENTS = {
     **RULES,

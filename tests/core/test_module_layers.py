@@ -169,6 +169,8 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "infra.settings",
                 "infra.shellread_scan",
                 "infra.shellread_words",
+                "infra.toolnames",
+                "infra.tunables",
                 "infra.tree",
                 "infra.yamlread",
                 "records.redact",

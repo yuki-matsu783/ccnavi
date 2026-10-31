@@ -8,7 +8,7 @@ import unicodedata
 from typing import TextIO
 
 from ..hook import judge
-from ..infra import modes, settings, tree
+from ..infra import modes, settings, toolnames, tree
 from ..policy import builtin, ruleload, rules, selfguard
 from ..tickets.approval import checks as approval_checks
 from ..tickets.approval import marks as approval_marks
@@ -195,23 +195,23 @@ def _explain_modes(stdout: TextIO, conf: settings.Settings) -> None:
             f"  {settings.TICKET_CONTROL_ENV}=disable なので、関門と補助の保護も効いていない\n"
         )
     stdout.write("\n■ 判定に達せなかったとき（内部の例外・期限切れ・payload が読めない）\n")
-    for tool in ("", "Write", "Read", "Bash", "SubagentHandback", "Foo"):
-        label = {
-            "": "ツールが分からない",
-            "Write": "Write・Edit・NotebookEdit・Agent・Task",
-            "Read": "Read・Grep・Glob",
-            "SubagentHandback": "サブエージェントの報告用（SubagentHandback・StructuredOutput）",
-            "Bash": "Bash",
-            "Foo": "知らないツール",
-        }[tool]
+    labels = {
+        "": "ツールが分からない",
+        "Write": "Write・Edit・NotebookEdit・Agent・Task",
+        "Read": "Read・Grep・Glob",
+        "SubagentHandback": "サブエージェントの報告用（SubagentHandback・StructuredOutput）",
+        "Bash": "Bash",
+        "Foo": "知らないツール",
+    }
+    for tool, label in labels.items():
         enable = "止める" if modes.fail_closed(modes.ENABLE, tool) else "通す"
         dry = "止める" if modes.fail_closed(modes.DRY_RUN, tool) else "通す"
         safe = "止める" if modes.fail_closed(modes.ENABLE, tool, safe=True) else "通す"
-        if tool in modes.READ_TOOLS:
+        if tool in toolnames.READ_TOOLS:
             stdout.write(
                 f"  {label}: 最低限の deny にヒットしなければ{safe}、ヒットすれば{enable}\n"
             )
-        elif tool in modes.SHELL_TOOLS:
+        elif tool in toolnames.SHELL_TOOLS:
             stdout.write(
                 f"  {label}: 最低限の許可リストにヒットすれば{safe}、ヒットしなければ{enable}\n"
             )

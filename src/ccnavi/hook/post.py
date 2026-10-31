@@ -49,19 +49,11 @@ import time
 from dataclasses import dataclass
 from typing import TextIO
 
-from ..infra import fsio, gitstate, hookio, pathcase, settings, tree
+from ..infra import fsio, gitstate, hookio, pathcase, settings, toolnames, tree
 from ..policy import rules, selfguard, texts
 from ..records import audit
 from ..tickets.model import phase_forms, ticket_places
 from . import post_findings, post_report
-
-# ワークツリーを変えようがないツール。ここを飛ばすぶん git を起こす回数が減る。
-# 飛ばしてよいのは「このツールが走った直後に確かめなくても、次に走る
-# 書き込みうるツールの直後に同じ変更が見える」から。見落としではなく遅れ。
-#
-# 名前を並べる側は狭く保つ。MCP のツールは名前を自由に付けられるので、
-# 知らない名前は「書けるかもしれない」側に置く。
-READ_ONLY_TOOLS = ("Read", "Grep", "Glob", "WebFetch", "WebSearch")
 
 # 判定に至らなかった理由のうち、このチェックだけが出すもの。
 REASON_TOOL_CANNOT_WRITE = "tool-cannot-write"
@@ -113,7 +105,7 @@ def check(
     ccnavi のサブコマンドが書いたと内容から読めるものを外す（`_script_writes`）。
 
     処理フロー:
-    1. 読み取りだけのツールなら何もせず抜ける（`READ_ONLY_TOOLS`）。
+    1. 読み取りだけのツールなら何もせず抜ける（`toolnames.READ_ONLY_TOOLS`）。
     2. 見るツリーを読み（`_read_all`）、ターンの基準に居ないツリーの HEAD を記録する
        （`_note_new_trees`）。
     3. 報告済みの記録と基準を読み、違反を集める（`_found`）。無ければ基準を作って抜ける。
@@ -126,7 +118,7 @@ def check(
     8. 違反ごとの文（`post_report._violation`・`post_report._preexisting`）を組み、
        件数の上限で切って返す。
     """
-    if payload.tool_name in READ_ONLY_TOOLS:
+    if payload.tool_name in toolnames.READ_ONLY_TOOLS:
         record.decision, record.reason = audit.SKIP, REASON_TOOL_CANNOT_WRITE
         return "", False
 

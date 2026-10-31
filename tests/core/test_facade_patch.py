@@ -176,7 +176,7 @@ class FacadePatchTest(unittest.TestCase):
         self.assertLessEqual(
             {"types_path", "layer_types", "load_types"}, facades["tickets.phase.gates"]
         )
-        self.assertIn("PATH_TOOLS", facades["hook.judge"])
+        self.assertIn("SUBJECT_FIELDS", facades["hook.judge"])
         self.assertNotIn("DOING_DIR", facades.get("tickets.approval.store", set()))
 
     def test_the_scan_finds_each_form(self):

@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import re
 
-from ..infra import hookio
+from ..infra import hookio, toolnames
 from . import ctxfile, rules, subjects
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
@@ -300,10 +300,6 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
     return problems
 
 
-# 適用する文字列にコマンド列の全体を使うツール。except はこの全体に適用するので、
-# コマンドのどこかに除く語を足すだけでルールが外れる。
-_COMMAND_TOOLS = ("Bash", "PowerShell")
-
 # 「何にでもヒットする」を見る文字列。空の文字列と、パスにもコマンドにも出ない制御文字の 1 字。
 # どちらにもヒットする式は、適用する語を持たずに先頭でヒットしている。
 _ANYTHING_PROBES = ("", "\x02")
@@ -342,7 +338,7 @@ def _except_problems(rule: rules.Rule, name: str) -> list[Problem]:
                 )
             )
     tools = [want.strip() for want in rule.match.split("|")]
-    shells = [t for t in _COMMAND_TOOLS if t in tools]
+    shells = [t for t in toolnames.SHELL_TOOLS if t in tools]
     loose = [e for e in rule.excepts if e.compiled and not _bound_to_command(e.compiled.pattern)]
     if shells and rule.decision in (rules.DENY, rules.ASK) and loose:
         problems.append(
@@ -516,7 +512,7 @@ def _when_problems(rule: rules.Rule, name: str) -> list[Problem]:
         )
 
     tools = [want.strip() for want in rule.match.split("|")]
-    shells = [t for t in _COMMAND_TOOLS if t in tools]
+    shells = [t for t in toolnames.SHELL_TOOLS if t in tools]
     has_not = any(n.kind == rules.WHEN_NOT for n in tree.walk())
     if shells and has_not and rule.decision in (rules.DENY, rules.ASK):
         problems.append(
