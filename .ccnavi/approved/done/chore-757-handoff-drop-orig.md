@@ -38,6 +38,8 @@ allow:
 started_at: 2026-10-31T11:41:55+0900
 base_sha: d849655a657ed66ed0b8474ccb6e1cc6a10ee821
 feedback: []
+completed_at: "2026-10-31T12:18:38+0900"
+finished_to: "done"
 ---
 ## 目的
 
