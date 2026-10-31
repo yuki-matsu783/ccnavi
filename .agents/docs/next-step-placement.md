@@ -33,6 +33,7 @@ keywords: [次の一手, 置き場, 分担, SessionStart, UserPromptSubmit, PreT
 | スクリプト・実行ファイルの出力 | `次:`・`案内:`・`次の手:`（書き方は[スクリプトの出力に次の一手を書く](script-output.md)）。状態を動かす操作の結果は、その操作が出す（`tickets/lifecycle/commands.py` の `finish`・`start`、`tickets/lifecycle/plan.py`） | 操作が動かした状態 | 標準出力。止まるときは標準エラー |
 | `ccnavi-ticket.sh status`（`entry/status.py`） | 「次の操作」の行。レビュー待ちの子は `tickets/phase/gates.py` の `review_next`（`finish` の出力も使う）。立ち位置が決まらないときの解き方は `tickets/model/standing.py` の `guidance()` | 承認済みチケットと提案の置き場、git、親子の立ち位置。読むだけで書かない | 標準出力 |
 
+- スクリプト・実行ファイルの出力が、成功のあとに `次:` を言うか（次を言う・ユーザ待ち・終わり・対象外）の区分は、[スクリプトの出力に次の一手を書く](script-output.md)の「次の一手を言う操作の区分」にある
 - `status` の「次の操作」と `review_next` の文は、文面ファイルに移していない（識別子なし。コード内）。`guidance()` の文は `NEXT_STANDING`（`nudge-stop.yml`）
 - 促しの文は `nudge-stop.yml`・`nudge.yml`、通知は `notice.yml`、sh の `次:` は `next-sh.yml`・`next-start.yml`、実行ファイルの `次:` は `next-cli.yml`。どれが移ったかは移行の一覧にある
 

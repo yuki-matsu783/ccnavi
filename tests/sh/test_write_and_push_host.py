@@ -131,6 +131,10 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.assertIn("Draft を解除した", ready.stdout)
         self.assertIn(f"ワークツリー {PARENT} を削除しました", ready.stdout)
+        # 成功の終わりに、次の一手（ユーザのマージ待ち）を 1 行だけ言う
+        self.assertEqual(
+            1, len([ln for ln in ready.stdout.splitlines() if ln.startswith("次: ")]), ready.stdout
+        )
         self.assertLess(
             ready.stdout.index("Draft を解除した"),
             ready.stdout.index(f"ワークツリー {PARENT} を削除しました"),
