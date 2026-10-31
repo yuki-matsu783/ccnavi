@@ -126,7 +126,7 @@ messages:
     kind: notice
     values: [scratch]
     what: |-
-      [ccnavi] Artifact ツールが失敗しました。HTML はワークスペースルート直下の scratchpad/（{scratch}）に書き出し、そのパスを file_path に渡して publish し直してください。セッションが示す /tmp/claude-* の下のスクラッチパッドには書けません。書き出した HTML のパスもユーザに伝えてください。
+      [ccnavi] Artifact ツールが失敗しました。HTML はワークスペースルート直下の scratchpad/（{scratch}）に出力してください。セッションが示す /tmp/claude-* の下のスクラッチパッドには書けません。書き出した HTML のパスもユーザに伝えてください。
 
   # frontmatter の無い md を書いたとき。`code` は見出しの理由コード、`shown` は md のパス。
   NOTICE_DOCS_FRONTMATTER__NONE:
