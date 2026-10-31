@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import TextIO
 
 from ...infra import fsio, modes, pathcase, settings, tree
+from ...policy import texts
 from ..approval import store as approval
 from ..approval import write_and_push
 from ..lifecycle import treegate, worktrees
@@ -236,12 +237,13 @@ class Readiness:
     """承認を頼める状態か。`reason` が空なら頼める。
 
     `reason` は承認の画面が外す理由（`READY_PROPOSAL`）か、親のワークツリーの状態
-    （`treegate.DIRTY_PARENT`・`treegate.UNPUSHED_CODE`）。`lines` は理由、`steps` は次の一手。
+    （`treegate.DIRTY_PARENT`・`treegate.UNPUSHED_CODE`）。`lines` は理由、`follow` は
+    `次:`（1 行。最初の手）と `案内:`（後の手）の行。
     """
 
     reason: str = ""
     lines: list[str] = field(default_factory=list)
-    steps: list[str] = field(default_factory=list)
+    follow: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -250,13 +252,16 @@ class Readiness:
     def say(self, stderr: TextIO) -> None:
         for line in self.lines:
             stderr.write(line + "\n")
-        for step in self.steps:
-            stderr.write(f"次: {step}\n")
+        for line in self.follow:
+            stderr.write(line + "\n")
 
     def text(self) -> str:
-        return "".join(f"{line}\n" for line in self.lines) + "".join(
-            f"次: {step}\n" for step in self.steps
-        )
+        return "".join(f"{line}\n" for line in self.lines + self.follow)
+
+
+def _follow(steps: list[str]) -> list[str]:
+    """次の手の並びを出力の行にする。`次:` は 1 行（最初の手）、後の手は `案内:`。"""
+    return [f"{'次' if i == 0 else '案内'}: {step}" for i, step in enumerate(steps)]
 
 
 # 承認の画面が外す理由（提案を読めない・承認の対象にならない）。
@@ -288,7 +293,12 @@ def readiness(
             return Readiness(
                 READY_PROPOSAL,
                 [f"ccnavi: 提案を読めない（UTF-8 でないファイルがある）: {exc}"],
-                ["提案を UTF-8 で保存し直して、approval-request を打ち直す（何も送っていません）"],
+                _follow(
+                    [
+                        "提案を UTF-8 で保存し直して、approval-request を打ち直す"
+                        "（何も送っていません）"
+                    ]
+                ),
             )
     lines = [
         f"ccnavi: {text}"
@@ -300,8 +310,7 @@ def readiness(
             lines.append(f"ccnavi: {t.ticket} は承認の対象にならない")
             lines += [f"  {problem}" for problem in found]
     if lines:
-        step = "上の理由を直して、approval-request を打ち直す（何も送っていません）"
-        return Readiness(READY_PROPOSAL, lines, [step])
+        return Readiness(READY_PROPOSAL, lines, [texts.say(root, "NEXT_APPROVAL_FIX_PROPOSAL")])
     # 承認の画面の対象に入らない提案（承認済みと同じ中身の改版など）も、親のワークツリーは同じ。
     # 対象の組み（batch）には頼らず、送る提案の識別子から親を引く。
     projects = {t.ticket for t in gathered.proposals if t.project}
@@ -314,7 +323,7 @@ def readiness(
     if not refusals:
         return Readiness()
     steps = list(dict.fromkeys(h for r in refusals for h in r.hints))
-    return Readiness(refusals[0].kind, [f"ccnavi: {r.reason}" for r in refusals], steps)
+    return Readiness(refusals[0].kind, [f"ccnavi: {r.reason}" for r in refusals], _follow(steps))
 
 
 def approval_request_gate(
@@ -489,7 +498,7 @@ def verify(
         held = None if ready.ok else (ready.reason, ready.text())
         if held and as_json:  # JSON の本体には理由が無いので標準エラーへ出す
             stderr.write(held[1])
-    verdict = agree.verify_verdict(gathered, conf.tickets, held)
+    verdict = agree.verify_verdict(root, gathered, conf.tickets, held)
     # 新規の親のブランチ名が既にあるブランチと同じか。warn なので答えは変えない。
     fresh = [c.ticket for c in gathered.batch if not c.is_revision and not c.ticket.is_child]
     branches = agree_candidates.existing_branch_warnings(root, conf, fresh, [], [], [])

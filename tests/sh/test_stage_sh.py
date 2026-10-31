@@ -194,12 +194,16 @@ class StageShTest(unittest.TestCase):
         self.assertEqual(1, len(nexts), result.stdout)
         # `<パス>` のままにせず、いま下書きを作ったパスを埋める
         self.assertNotIn("<パス>", nexts[0])
+        notes = [line for line in result.stdout.splitlines() if line.startswith("案内: ")]
         self.assertTrue(
-            nexts[0].endswith(
-                f"--commands {self.rules} {self.hook} を打つ"
-                "（種類ごとに、取り込みの手順か差し替えの mv が出る）"
+            any(
+                line.endswith(
+                    f"--commands {self.rules} {self.hook} を打つ"
+                    "（種類ごとに、取り込みの手順か差し替えの mv が出る）"
+                )
+                for line in notes
             ),
-            nexts[0],
+            result.stdout,
         )
         # 下書きが既にあるだけでも、次の一手は消えない
         again = self.stage(".ccnavi/config/common/rules.yml")
@@ -227,6 +231,13 @@ class StageShTest(unittest.TestCase):
                 self.assertEqual(2, result.returncode)
                 self.assertIn(why, result.stderr)
         self.assertFalse(os.path.exists(self.draft_rules))
+
+    def test_a_bad_argument_after_a_good_one_writes_no_draft_at_all(self):
+        result = self.stage(".ccnavi/config/common/rules.yml", ".ccnavi/config/common/nothing.yml")
+        self.assertEqual(2, result.returncode)
+        self.assertIn("実在するファイルではありません", result.stderr)
+        self.assertFalse(os.path.exists(self.draft_rules))
+        self.assertFalse(os.path.exists(self.draft_rules + ".orig"))
 
     def test_refuses_quote_in_name(self):
         write(os.path.join(self.ws, "it's.md"), "x")

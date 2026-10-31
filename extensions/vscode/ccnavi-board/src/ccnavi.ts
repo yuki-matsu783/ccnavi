@@ -692,8 +692,7 @@ const USER_ENTRY_FEATURES = ["user-entry", "entry-marker"] as const;
 
 /**
  * ユーザ専用の操作（承認・対応方針）を打つ前に、実行ファイルが `user-entry` を持つかを聞く。
- * 知っていれば undefined、知らなければ（確かめられないときも）理由。起動時の互換の版の比べ（`warnVersionSkew`）は
- * 知らせるだけで止めないので、止めるのはここ。`what` は使おうとしたもの
+ * 知っていれば undefined、知らなければ（確かめられないときも）理由。止めるのはここ。`what` は使おうとしたもの
  */
 export async function checkUserEntry(root: string, setting: string, what: string): Promise<string | undefined> {
   const probe = await probeVersion(root, setting);

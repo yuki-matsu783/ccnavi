@@ -44,11 +44,11 @@ def _records_dir(top: str, deadline: float) -> str:
     """そのツリーの `ccnavi-integrate/`。無ければ空。"""
     dot = os.path.join(top, ".git")
     if os.path.isdir(dot):
-        path = os.path.join(dot, osi._RECORD_DIR)
+        path = os.path.join(dot, osi.RECORD_DIR)
         return path if os.path.isdir(path) else ""
     if not os.path.exists(dot):
         return ""
-    path = osi._git_path(top, osi._RECORD_DIR, deadline) or ""
+    path = osi._git_path(top, osi.RECORD_DIR, deadline) or ""
     return path if path and os.path.isdir(path) else ""
 
 
@@ -66,7 +66,6 @@ def _unknown_line(root: str, top: str, name: str, version: str) -> str:
     return (
         f"{name}（取り込み先のツリー {t}）: 記録の版（{version or '無し'}）を知りません。操作せず、"
         f"`{cd} status` の結果をユーザに見せて確かめてください。"
-        "版 4 でない記録は ccnavi が読めません。"
         f"不要なら、ユーザが git reset --merge で統合先の staged を戻し、"
         f"ccnavi-integrate/{name} を手で消します"
     )
@@ -196,7 +195,7 @@ def _leftovers(root: str, top: str, reported: set[str], deadline: float) -> list
             if not os.path.isfile(direct):
                 names.setdefault(parts[3], []).append(f"使われなかった書きかけの候補（{ref}）")
     # done の記録の残り（作業ワークツリー・ブランチ・直接作業の記録）
-    done_dir = os.path.join(common, osi._DONE_DIR)
+    done_dir = os.path.join(common, osi.DONE_DIR)
     try:
         for entry in sorted(os.listdir(done_dir)):
             fields = osi._read_record(os.path.join(done_dir, entry))

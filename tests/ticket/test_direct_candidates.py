@@ -310,12 +310,12 @@ class DirectCandidatesTest(base.IntegrateNudgeTest):
             self.root, git(self.root, "rev-parse", "--git-path", "ccnavi-integrate-done").strip()
         )
         write(os.path.join(gitdir, "scratch"), f"state staged\nbranch_sha {head}\n")
-        self.assertIsNone(ops_stop_integrate._recorded(self.root, "scratch", head, None))
-        self.assertTrue(ops_stop_integrate._recorded(self.root, "scratch", head, False))
-        self.assertFalse(ops_stop_integrate._recorded(self.root, "scratch", head, True))
+        self.assertIsNone(ops_stop_integrate.has_record(self.root, "scratch", head, None))
+        self.assertTrue(ops_stop_integrate.has_record(self.root, "scratch", head, False))
+        self.assertFalse(ops_stop_integrate.has_record(self.root, "scratch", head, True))
         # コピーを読めなければ「記録なし」（促す側）。
         write(os.path.join(gitdir, "scratch"), "")
-        self.assertFalse(ops_stop_integrate._recorded(self.root, "scratch", head, False))
+        self.assertFalse(ops_stop_integrate.has_record(self.root, "scratch", head, False))
 
 
 if __name__ == "__main__":

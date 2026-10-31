@@ -1,14 +1,16 @@
 """`ccnavi --version [--json]` と、互換の版を宣言する側（組み立て・sh）の検査。
 
-見るのは 3 つ。
+見るのは 4 つ。
 
 1. `--version` が版・組み立ての元のコミット・受け付けるフラグ・互換の版・書式の版を言い、
    設定もワークスペースも読まずに 0 で終わること
 2. フラグは引数の定義から引くので、定義に足したフラグがそのまま並ぶこと
 3. 組み立ての元のコミットは build.py が埋めた部品から読み、無ければ `unknown` と言うこと
 
-sh の互換の版との食い違いは tests/core/test_lint_compat.py（`--lint`）と
-tests/sh/test_compat_skew.py（sh）が見る。
+4. 互換の版が、実行ファイル・sh・VS Code 拡張で同じ値であること
+
+実行時に版の食い違いを断る処理は無い（sh と実行ファイルは同時に配る前提）。
+sh の互換の版の `--lint` での確かめは tests/core/test_lint_compat.py が見る。
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ import argparse
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -100,6 +103,23 @@ class VersionFlagTest(unittest.TestCase):
         with open(os.path.join(ROOT, "pyproject.toml"), "rb") as f:
             declared = tomllib.load(f)["project"]["version"]
         self.assertEqual(version.VERSION, declared)
+
+
+class CompatDeclaredTest(unittest.TestCase):
+    def test_v6_the_exe_the_sh_and_the_extension_declare_the_same_compat(self):
+        """V6"""
+        sh = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-common.sh")
+        ts = os.path.join(ROOT, "extensions", "vscode", "ccnavi-board", "src", "core", "version.ts")
+        found = []
+        for path, pattern in (
+            (sh, r"^CCNAVI_COMPAT=([0-9]+)$"),
+            (ts, r"^export const EXTENSION_COMPAT = ([0-9]+);$"),
+        ):
+            with open(path, encoding="utf-8") as f:
+                match = re.search(pattern, f.read(), re.MULTILINE)
+            self.assertIsNotNone(match, path)
+            found.append(int(match.group(1)))
+        self.assertEqual(found, [version.COMPAT, version.COMPAT])
 
 
 class BuildInfoTest(unittest.TestCase):

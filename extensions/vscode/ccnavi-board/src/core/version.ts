@@ -1,12 +1,11 @@
 /**
- * `ccnavi --version --json`（版の JSON）の読み方と、拡張との食い違いの見分け方。
+ * `ccnavi --version --json`（版の JSON）の読み方と、使う前の対応の確かめ方。
  * 形の定義は ccnavi の docs/11_requirements/json-shapes.md「版の JSON」。VS Code の API は使わない（単体テストで確かめる）。
  *
- * 見るのは 2 つ。
+ * 拡張と実行ファイルは同時に配る前提なので、互換の版（`compat`）の食い違いは見ない。見るのは次の 2 つ。
  *
- * - 互換の版（`compat`）。実行ファイルと、それを呼ぶ側（拡張と `.ccnavi/scripts/` の sh）の契約の版。
- *   拡張は起動のときに自分の `EXTENSION_COMPAT` と比べ、違えばどちらを新しくするかを名指しする
  * - 受け付けるフラグ（`flags`）。新しいフラグ（`--flow` など）を使う前に、実行ファイルが知っているかを見る
+ * - 振る舞い（`features`）。フラグから読めない機能を使う前に、実行ファイルが持つかを見る
  */
 
 /** 拡張が読める版の JSON の形の版（`schema`） */
@@ -14,7 +13,8 @@ export const VERSION_SCHEMA = 1;
 
 /**
  * 拡張が頼る実行ファイルの契約の版。src/ccnavi/entry/version.py の COMPAT、ccnavi-common.sh の CCNAVI_COMPAT と揃える
- * （tests/sh/test_compat_skew.py が 3 か所を見比べる）。上げ方は src/ccnavi/entry/version.py の説明のとおり
+ * （scripts/ccnavi-package.sh が配るときに見比べる）。起動のときに実行ファイルと比べはしない。
+ * 上げ方は src/ccnavi/entry/version.py の説明のとおり
  */
 export const EXTENSION_COMPAT = 19;
 
@@ -80,32 +80,10 @@ export function rebuildHint(fromSource: boolean): string {
     : "ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> --force で配り直してください";
 }
 
-/** 拡張を新しくする直し方 */
-export const UPDATE_EXTENSION_HINT =
-  "拡張を新しくしてください（ccnavi のリポジトリの extensions/vscode/ccnavi-board で pnpm package して入れ直します）";
-
 /** 表示に使う実行ファイルの版とコミット（`0.1.0 abc1234`） */
 function named(info: VersionInfo): string {
   const commit = info.commit === "unknown" ? "コミット不明" : info.commit.slice(0, 12);
   return `${info.version} ${commit}`;
-}
-
-/**
- * 起動のときに言う食い違い。揃っていれば undefined。聞けなかった（`failed`）ときも言わない
- * （起動の知らせは食い違いだけにする。実行ファイルが無い・破損しているは画面を開いたときに言う）
- */
-export function skewMessage(probe: VersionProbe, fromSource: boolean): string | undefined {
-  if (probe.kind === "failed") {
-    return undefined;
-  }
-  const { info } = probe;
-  if (info.compat < EXTENSION_COMPAT) {
-    return `ccnavi の実行ファイル（${named(info)}）は互換 ${info.compat}、拡張は互換 ${EXTENSION_COMPAT} で、実行ファイルが古い版です。${rebuildHint(fromSource)}`;
-  }
-  if (info.compat > EXTENSION_COMPAT) {
-    return `ccnavi の実行ファイル（${named(info)}）は互換 ${info.compat}、拡張は互換 ${EXTENSION_COMPAT} で、拡張が古い版です。${UPDATE_EXTENSION_HINT}`;
-  }
-  return undefined;
 }
 
 /**

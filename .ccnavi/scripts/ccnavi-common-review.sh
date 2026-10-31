@@ -63,23 +63,10 @@ review_place() {
 
 # ---- 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 
-# 実行ファイルと互換の版が食い違っていれば、最初に呼ぶときに 1 度だけ言う（止めない）。
-# 引数の誤りで断る経路と、実行ファイルを使わないサブコマンド（origin / fetch / comment）では起こさない。
-# `$( )` の中から呼ぶと、1 度言ったことの目印（told_skew）が親に残らないので、そう呼ぶ前には親で先に tell_skew を打つ。
-told_skew=""
-tell_skew() {
-	[ -z "$told_skew" ] || return 0
-	told_skew=1
-	# ソースで動かすとき（bin が無い）は、sh と同じツリーのものを動かすので比べない。
-	[ -n "${bin:-}" ] || return 0
-	skew=$(ccnavi_compat_skew "$root" "$bin") || printf '%s: %s\n' "$review_label" "$skew" >&2
-}
-
 # 見つからなければ 1（止めるかどうかは呼ぶ側が決める。merged は実行ファイルを起こさないので、無くても進める）。
 review_exe() {
 	if bin=$(ccnavi_bin "$root"); then
 		ccnavi() {
-			tell_skew
 			"$bin" --root "$root" --cwd "$exe_cwd" "$@"
 		}
 		return 0
@@ -440,7 +427,7 @@ find_marked() {
 # 標準出力は note なら `comment`、issue なら `create_issue` と同じ形の JSON（送り済みと分かったときは
 # {url}、issue はそれに {number}）。送り済みなら送らず、前に試した形跡があれば先にホストを目印で照合する。
 # 確定できないときは止めて 1（自動では送り直さない）。
-# 記録を作れない（古い実行ファイル・書けない）ときは、前と同じ送り方に戻る。
+# 記録を作れないときは、二重投稿を防ぐため、送らずに止める。
 
 cs_set() {
 	ccnavi ops stage-set "$cs_id" "$cs_stage" "$@" 2>/dev/null || {
@@ -472,12 +459,9 @@ staged_send() {
 	cs_file="$7"
 	cs_id=$(ccnavi ops begin "$cs_kind" "${branch:-}" 0 "$cs_mr" "$cs_key" "$cs_stage:$cs_stage" 2>/dev/null) || cs_id=""
 	if [ -z "$cs_id" ]; then
-		# 記録なしの直接投稿。API が失敗すると、パイプの最後の jq は空入力でも 0 で終わるので、
-		# 終了コードだけでなく出力の有無でも失敗と読む（空の出力を成功として返さない）。
-		if [ "$cs_skind" = issue ]; then cs_direct=$(create_issue "$cs_file") || return 1; else cs_direct=$(comment "$cs_mr" "$cs_url" "$cs_file") || return 1; fi
-		[ -n "$cs_direct" ] || return 1
-		printf '%s\n' "$cs_direct"
-		return 0
+		# 記録が無いと二重に送るおそれがあるため、送らずに止める
+		printf '%s: 操作記録を作れなかった。二重投稿を防ぐため、何も送らずに止めた。logs/state/ops/ に書けるか、ccnavi と配布した sh の版が揃っているかを確かめて、打ち直してください。\n' "${review_label:-ccnavi-review}" >&2
+		return 1
 	fi
 	# 同じ操作を同時に送らない（照合の前に 2 つが「未送信」と見て、両方が投稿するのを防ぐ）。
 	# ロックが使えない構成（root が無い）では、取らずに進む。
@@ -649,7 +633,7 @@ wap_on=no
 review_wap() {
 	ccnavi_wap_root="$root"
 	ccnavi_wap_sh="$script_dir"
-	# 実行ファイルの起こし方は review_exe が決めた ccnavi（--cwd と互換の版の確かめつき）。
+	# 実行ファイルの起こし方は review_exe が決めた ccnavi（--cwd つき）。
 	ccnavi_wap_exe() { ccnavi "$@"; }
 	ccnavi_wap_label="$review_label"
 }
