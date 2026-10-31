@@ -174,8 +174,11 @@ def _count_entries(text: str) -> str:
 
 def append_entry(text: str, entry: str, ident: str = "", parent: str = "") -> str:
     text = text.lstrip("﻿").replace("\r\n", "\n")
-    if not _has_usable_frontmatter(text):
-        text = scaffold_text(ident, parent) + text.lstrip("\n")
+    if not text.strip():
+        text = scaffold_text(ident, parent)
+    elif not _has_usable_frontmatter(text):
+        # 手で書いた記録だけがここに来る。雛形を推して前置せず、止めて直し方を言う
+        raise ValueError("先頭に learnings: を持つ frontmatter がありません")
     if not text.endswith("\n"):
         text += "\n"
     if not text.endswith("\n\n"):
@@ -543,7 +546,15 @@ def run(
         except (OSError, ValueError) as e:
             stderr.write(f"ccnavi: 書けない（{e}）\n")
             return 1
-        msg = fsio.write_text_atomic(rec_path, append_entry(text, entry, ident, parent))
+        try:
+            new_text = append_entry(text, entry, ident, parent)
+        except ValueError as e:
+            stderr.write(
+                f"ccnavi: 気づきの記録 {record_rel(ident)} を読み取れない（{e}）。"
+                "直すか、消してから打ち直してください\n"
+            )
+            return 1
+        msg = fsio.write_text_atomic(rec_path, new_text)
         if msg:
             stderr.write(f"ccnavi: 書けない（{msg}）\n")
             return 1
