@@ -1,7 +1,7 @@
 ---
 type: design
 title: git のラッパースクリプト
-description: ccnavi-git.sh が通す形と止める形、止める理由、限界、記録
+description: ccnavi-git.sh が通す形と止める形、限界、記録
 tags: [design-doc, git, sh-scripts]
 keywords: [ccnavi-git.sh, git, ラッパースクリプト, push, fetch, pull, refspec, DENY_WRAPPER_CORE_PATH, DENY_SUBAGENT_TICKET_OP, GIT_CONFIG_COUNT, GIT_EXTERNAL_DIFF, 通す, 止める]
 ---
@@ -22,13 +22,12 @@ keywords: [ccnavi-git.sh, git, ラッパースクリプト, push, fetch, pull, r
   （手元の `origin/HEAD`、無ければ `origin/main`・`origin/master`。プロジェクトは、そのプロジェクト自身の `origin/HEAD` で決まる。
   `develop-v1.0.0` のような名前でもよい）へ直接は送れない。統合先が決まらなければ固定のリストだけで判定する。マージはユーザの側に残す。送り先が origin で、親のワークツリーのブランチなら、前の「push の関門」も通す
 - `fetch`・`pull` は**リモート名とブランチ名だけ**を通す。`:` か `+` を含む引数（refspec と URL）は通さない。統合先のユーザのチェックアウト（`git worktree list` の先頭のツリーで、現在のブランチが統合先のもの）の `pull` は、`merge` と同じ判定（`merge_target_is_here`）を使う。引数なしと、現在のブランチのリモート + 現在のブランチと同名（完全一致）の形だけを通す。それ以外は `merge-on-target` で止める。ワークツリーの中、統合先でないブランチ、統合先が決まらないとき（origin/HEAD が無いなど）は止めない。`fetch` のあとの `merge FETCH_HEAD` は `merge` の拒否で止まる。
-  `branch` の `-M`（強制の改名）と `-C`（強制の複製）も通さない。親のブランチを別のコミットへ移すと、親のブランチ上の承認済みチケットが差し替わるため
+  `branch` の `-M`（強制の改名）と `-C`（強制の複製）も通さない
 - 承認済みチケットの置き場（`.ccnavi/approved/`）とレビュー待ち（`wip/proposals/review/`）にヒットするパスには、
-  `checkout <ref> <パス>`・`restore --source <ref>`・`restore --ours / --theirs` を通さない。置き場を過去の中身に戻したり、
-  衝突を片側に寄せたりすると、承認が無かったことにも戻ったことにもなる
+  `checkout <ref> <パス>`・`restore --source <ref>`・`restore --ours / --theirs` を通さない
 - ccnavi 自身を守る場所（`.ccnavi/`・`.claude/settings*.json`・`.claude/hooks/`・記録と state・`ccnavi-git.sh`）には、
   `rm`・`restore --source <ref>`・`checkout <ref> <パス>` を通さない。hook が先に止め、ラッパースクリプトも 2 重目に止める。
-  生の git の止めは組み込みでいつも働くので、ラッパースクリプト自身を消しても外れない。衝突の解決（`restore --ours / --theirs`）は通る
+  生の git の止めは組み込みでいつも働き、ラッパースクリプト自身を消しても外れない。衝突の解決（`restore --ours / --theirs`）は通る
 - 親のワークツリーでは、今のブランチと、ブランチ名の `/` を `-` に置き換えたものがフォルダ名（識別子）になるブランチのほかへ
   `checkout`・`switch` で移れない。`worktree add` は行き先の名前がブランチ名の `/` を `-` に置き換えたものになる形だけ
 - 送るのは親だけ。子チケットのワークツリーからの push はラッパースクリプトが拒み、サブエージェントからの push は hook が拒む（`DENY_SUBAGENT_TICKET_OP`）

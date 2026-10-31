@@ -106,7 +106,7 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
     - 親の必須の見出しが本文に欠けている: 親の新規の提案だけ warn で 1 件にまとめて挙げる。子と改版には言わない。
       見出しはコードフェンス（行頭が ``` か ~~~）の外にある `## <名前>` の行で、名前が前後の空白を除いてちょうど一致するものだけ数える
       （`###` など深さの違う見出しは数えない）
-  - `ccnavi-ticket.sh` は `new` を通さない（保護対象の sh を直さないため）。`--fill-phases` と同じく実行ファイルを直接打つ。
+  - `ccnavi-ticket.sh` は `new` を通さない。`--fill-phases` と同じく実行ファイルを直接打つ。
     `new` は承認ではなく、`todo/` に書くだけなので、組み込みの止め（9.2）にはヒットしない
 - `started_at` `completed_at` `base_sha` `merged_sha` `cancelled_at` `cancel_reason` はスクリプトの欄。スクリプトが
   承認済みチケットの行を書き換える（本文とユーザの書いた行は保つ）。`merged_sha` は `finish` が親のブランチへ合流した

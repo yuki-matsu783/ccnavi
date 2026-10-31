@@ -31,9 +31,9 @@ Claude Code はワークスペースを開く。要求は [要件 REQ-MLT](../11
 - 工程スキル: 共通レイヤーのミラーと同じく、ユーザの発言のたびに、着手済みの親のワークツリーのプロジェクトの `skills/<工程>/` へコピーする。コピーは git に入り、reference は `ccnavi --docs` で引ける。入口の SKILL.md を読ませる目録は、単体 clone では出ない（縮退。11.13）
 - プロジェクトのスキル: プロジェクトの git に入る。目録は単体 clone では出ない（縮退。11.13）
 
-個別の不都合は 11.14 の調査記録にまとめてある。
+処理のまとまりごとの単体 clone での動作は 11.14 にまとめてある。
 
-ワークスペース内 clone は、ワークスペースの `projects/` の下にある clone で、そのプロジェクト 1 つを指す呼び方になる。単体 clone は、ワークスペースを持たず、clone 済みのプロジェクトから起動する形（利用形態の 2 つ目）で使う clone である。ワークスペース内 clone でも、プロジェクトのディレクトリで Claude Code を起動すると、ワークスペースの hook は動かず、ccnavi の見え方は単体 clone に近くなる。この形も対象に含む。前提は要件書の「想定する使い方」にある。ルートの決め方が食い違うなど、まだ直っていない点は 11.14 の調査記録にある。
+ワークスペース内 clone は、ワークスペースの `projects/` の下にある clone で、そのプロジェクト 1 つを指す呼び方になる。単体 clone は、ワークスペースを持たず、clone 済みのプロジェクトから起動する形（利用形態の 2 つ目）で使う clone である。ワークスペース内 clone でも、プロジェクトのディレクトリで Claude Code を起動すると、ワークスペースの hook は動かず、ccnavi の見え方は単体 clone に近くなる。この形も対象に含む。前提は要件書の「想定する使い方」にある。ルートの決め方がワークスペース内 clone で食い違う形は 11.14 にある。
 
 ### 11.1 何を解くか
 
@@ -60,4 +60,4 @@ Claude Code はワークスペースを開く。要求は [要件 REQ-MLT](../11
 | 11.11 | [multi-repo/out-of-scope.md](multi-repo/out-of-scope.md) | 見ないもの、入れないもの |
 | 11.12 | [multi-repo/distribute-common.md](multi-repo/distribute-common.md) | 共通レイヤーをプロジェクトの `.ccnavi/config/common/` へミラーする。ずれの確認と同期は `user mirror` |
 | 11.13 | [multi-repo/skills.md](multi-repo/skills.md) | プロジェクトのスキルの置き場と目録 |
-| 11.14 | [multi-repo/standalone-clone-gaps.md](multi-repo/standalone-clone-gaps.md) | 単体 clone で不都合な処理の調査記録（いまの設計ではない） |
+| 11.14 | [multi-repo/standalone-clone-gaps.md](multi-repo/standalone-clone-gaps.md) | 単体 clone での動作。処理のまとまりごとの、ワークスペース内 clone との違いと、動く・縮退する・働かないの別 |
