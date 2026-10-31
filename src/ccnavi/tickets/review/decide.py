@@ -217,18 +217,27 @@ def _refused(stderr: TextIO, root: str, phase_no: int) -> None:
 
 
 def _parse_choices(
+    stderr: TextIO, root: str, phase_no: int, choices_text: str, digest: str
+) -> tuple[tuple[str, dict[str, str]], dict] | None:
+    """`--yes` の選択とダイジェストの形を検める。通れば (ダイジェストの中身, 選択)。何も置かない。
+
+    断ったときは理由のあとに `次:` を 1 行足す（`decide_gate` と同じ `_refused`）。
+    """
+    parsed = _parse_choices_raw(stderr, choices_text, digest)
+    if parsed is None:
+        _refused(stderr, root, phase_no)
+    return parsed
+
+
+def _parse_choices_raw(
     stderr: TextIO, choices_text: str, digest: str
 ) -> tuple[tuple[str, dict[str, str]], dict] | None:
-    """`--yes` の選択とダイジェストの形を検める。通れば (ダイジェストの中身, 選択)。何も置かない。"""
     if not digest.strip():
         stderr.write("ccnavi: --yes には --digest（見せた指摘のダイジェスト）が必要です。\n")
         return None
     want = parse_digest(digest.strip())
     if want is None:
-        stderr.write(
-            "ccnavi: --digest を読めない（古い版のボードが渡した値かもしれない）。"
-            "拡張を更新して、指摘を見せ直してください。何も置いていない\n"
-        )
+        stderr.write("ccnavi: --digest を読めない。指摘を見せ直してください。何も置いていない\n")
         return None
     try:
         raw = json.loads(choices_text)
@@ -253,15 +262,17 @@ def check(
     choices_text: str = "",
     digest: str = "",
 ) -> int:
-    """`--reviewed N --accept-unresolved --check`。置く前に分かる前提だけを通す（読むだけ）。
+    """`ccnavi --entry sh --check user reviewed N --accept-unresolved`。
+    置く前に分かる前提だけを通す（読むだけ）。
 
     `decide_gate` に加えて、選択とダイジェストを渡されたときはその形も検める
     （`decide_yes` と同じ `_parse_choices`）。sh が取り込み・ロックの前に呼ぶ。
     """
     if decide_gate(stderr, root, conf, cwd, phase_no) is None:
         return 1
-    if (choices_text or digest) and _parse_choices(stderr, choices_text, digest) is None:
-        _refused(stderr, root, phase_no)
+    if (choices_text or digest) and _parse_choices(
+        stderr, root, phase_no, choices_text, digest
+    ) is None:
         return 1
     stdout.write("確認: ok（decide を打てる状態。何も変えていません）\n")
     return 0
@@ -508,7 +519,7 @@ def decide_yes(
     結果は JSON で返す。違えば置かずに `mismatch` を返す（返信・解決を済ませた分は操作記録に残す）。
     """
     # 入力の形を検める。ここで断るときは、まだ何も置いていない。
-    parsed = _parse_choices(stderr, choices_text, digest)
+    parsed = _parse_choices(stderr, root, phase_no, choices_text, digest)
     if parsed is None:
         return 1
     want, raw = parsed

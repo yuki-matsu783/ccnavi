@@ -66,6 +66,20 @@ messages:
     next: |-
       上の理由を直して、'{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文> --eli5 <HTML>' を打ち直す
 
+  # confirm が、取り込みの前に分かる前提で断ったあと（理由の行のあとに 1 行）。
+  NEXT_CONFIRM_REFUSED:
+    kind: next
+    values: [phase]
+    next: |-
+      上の理由を直して、'{script:ccnavi-review.sh} confirm --phase {phase}' を打ち直す
+
+  # ready が、取り込みの前に分かる前提で断ったあと（理由の行のあとに 1 行）。
+  NEXT_READY_REFUSED:
+    kind: next
+    values: [parent]
+    next: |-
+      上の理由を直して、親のワークツリーの外から '{script:ccnavi-review.sh} ready --parent {parent}' を打ち直す
+
   # decide が、取り込みの前に分かる前提で断ったあと（理由の行のあとに 1 行）。
   NEXT_DECIDE_REFUSED:
     kind: next

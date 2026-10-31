@@ -92,26 +92,10 @@ def confirm(
             CODE_CONFIRM_NO_PHASE,
             [f"ccnavi: {parent.ticket} にフェーズ {phase_no} の子がありません。"],
         )
-    if approval_marks.MARK_REVIEWED in ph.marks:
-        # 重ね打ちでマーカーを書き直さない（`_already_requested` と同じ文面の形）
-        return core_base.refused(
-            CODE_CONFIRM_ALREADY_REVIEWED, [f"ccnavi: フェーズ {phase_no} はレビュー済み"]
-        )
-    requested_mark = ph.marks.get(approval_marks.MARK_REQUESTED)
-    if requested_mark is None:
-        return core_base.refused(
-            CODE_CONFIRM_NOT_REQUESTED,
-            ["ccnavi: 依頼の記録がありません。先に review-request してください"],
-        )
-    if changed_since_request:
-        return core_base.refused(
-            CODE_CONFIRM_MOVED,
-            [
-                f"ccnavi: {changed_since_request}。ユーザが見たものと今の HEAD が違う。"
-                f"{review._redo_request(root, phase_no)}",
-                *(review.moved_explanation(moved) if moved is not None else []),
-            ],
-        )
+    refused = _precondition(root, ph, phase_no, changed_since_request, moved)
+    if refused is not None:
+        return refused
+    requested_mark = ph.marks[approval_marks.MARK_REQUESTED]
     problems = review.matching_problems(result, requested_mark)
     if problems:
         return core_base.refused(CODE_CONFIRM_RESULT_MISMATCH, problems)
@@ -147,6 +131,40 @@ def confirm(
             ledger,
         )
     return core_base.Checked([], core_base.Changes(agree.Planned(stage, stopped), root, conf))
+
+
+def _precondition(
+    root: str,
+    ph: phase.Phase,
+    phase_no: int,
+    changed_since_request: str,
+    moved: review.Moved | None,
+) -> core_base.Checked | None:
+    """レビュー済みにする前の、ホストの結果を見ずに分かる前提。通れば None。
+
+    レビュー済みでないこと、依頼の記録が在ること、依頼のあとに見たものが動いていないこと。
+    `confirm` と手元の `confirm_gate` が同じものを通る。
+    """
+    if approval_marks.MARK_REVIEWED in ph.marks:
+        # 重ね打ちでマーカーを書き直さない（`_already_requested` と同じ文面の形）
+        return core_base.refused(
+            CODE_CONFIRM_ALREADY_REVIEWED, [f"ccnavi: フェーズ {phase_no} はレビュー済み"]
+        )
+    if ph.marks.get(approval_marks.MARK_REQUESTED) is None:
+        return core_base.refused(
+            CODE_CONFIRM_NOT_REQUESTED,
+            ["ccnavi: 依頼の記録がありません。先に review-request してください"],
+        )
+    if changed_since_request:
+        return core_base.refused(
+            CODE_CONFIRM_MOVED,
+            [
+                f"ccnavi: {changed_since_request}。ユーザが見たものと今の HEAD が違う。"
+                f"{review._redo_request(root, phase_no)}",
+                *(review.moved_explanation(moved) if moved is not None else []),
+            ],
+        )
+    return None
 
 
 def _manual_refusal(root, conf, parent, phase_no, result, manual) -> core_base.Checked | None:
@@ -221,26 +239,16 @@ def confirm_local(
     あればマーカーに `actor` と `via: cli` を書く。空（引けなかった）
     ならマーカーは前と同じ。
     """
-    found = review._parent_phase(stderr, root, conf, cwd, phase_no)
-    if found is None:
+    gated = confirm_gate(stderr, root, conf, cwd, phase_no)
+    if gated is None:
         return 1
-    parent, ph = found
-    requested_mark = ph.marks.get(approval_marks.MARK_REQUESTED)
-    moved = review.Moved()
-    result = None
-    # 読む順は前と同じ。依頼の記録が無ければ差分も取得した結果も見ない。
-    # 動いていれば取得した結果を読まない。レビュー済みなら差分も取得した結果も読まない
-    # （コアが「レビュー済み」で止める。Chrome と同じ文面）
-    if requested_mark is not None and approval_marks.MARK_REVIEWED not in ph.marks:
-        moved = review._moved_detail(
-            tree.worktree_path(root, parent.ticket), conf, requested_mark, bool(parent.project)
-        )
-        if not moved.text:
-            result = review._result(stderr, result_path)
-            if result is None:
-                return 1
+    parent, ph, moved = gated
+    # 通った時点で、依頼の記録は在り、依頼のあとに動いておらず、レビュー済みでもない。
+    result = review._result(stderr, result_path)
+    if result is None:
+        return 1
     who = core_base.Actor(actor, via.VIA_CLI) if actor else core_base.Actor()
-    manual = manual_settle.assess(root, conf, parent, ph) if result is not None else None
+    manual = manual_settle.assess(root, conf, parent, ph)
     for line in _manual_notes(manual):
         stdout.write(line + "\n")
     checked = confirm(
@@ -248,7 +256,7 @@ def confirm_local(
         parent.ticket,
         phase_no,
         result,
-        moved.text,
+        "",
         manual,
         moved,
     )
@@ -260,6 +268,53 @@ def confirm_local(
     if code == 0:
         stdout.write(next_after_confirm(root, conf, parent.ticket) + "\n")
     return code
+
+
+def confirm_gate(
+    stderr: TextIO, root: str, conf: settings.Settings, cwd: str, phase_no: int
+) -> tuple[ticket_model.Ticket, phase.Phase, review.Moved] | None:
+    """confirm の、ホストに聞かずに分かる前提の検査。通れば (親, フェーズ, 動きの詳細)。
+
+    親とフェーズがあること、レビュー済みでないこと、依頼の記録があること、依頼のあとに見たものが
+    動いていないこと。本体（`confirm_local`）と `check_confirm` が同じものを通る。
+    断ったときは理由のあとに `次:` を 1 行足す。ホストの結果（未解決の指摘など）は見ない。
+    """
+    found = review._parent_phase(stderr, root, conf, cwd, phase_no)
+    if found is None:
+        _refused(stderr, root, phase_no)
+        return None
+    parent, ph = found
+    requested_mark = ph.marks.get(approval_marks.MARK_REQUESTED)
+    moved = review.Moved()
+    # 読む順は前と同じ。依頼の記録が無ければ差分は見ない。レビュー済みなら差分も読まない
+    # （`_precondition` が「レビュー済み」で止める。Chrome と同じ文面）
+    if requested_mark is not None and approval_marks.MARK_REVIEWED not in ph.marks:
+        moved = review._moved_detail(
+            tree.worktree_path(root, parent.ticket), conf, requested_mark, bool(parent.project)
+        )
+    refused = _precondition(root, ph, phase_no, moved.text, moved)
+    if refused is not None:
+        for line in refused.problems:
+            stderr.write(line + "\n")
+        _refused(stderr, root, phase_no)
+        return None
+    return parent, ph, moved
+
+
+def _refused(stderr: TextIO, root: str, phase_no: int) -> None:
+    """断った理由のあとに、打ち直す 1 手を `次:` で足す。"""
+    stderr.write(texts.say(root, "NEXT_CONFIRM_REFUSED", {"phase": str(phase_no)}) + "\n")
+
+
+def check_confirm(
+    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, cwd: str, phase_no: int
+) -> int:
+    """`review confirm --check`。`confirm_gate` を通すだけ（何も書かない）。
+    sh が取り込みの前に呼ぶ。"""
+    if confirm_gate(stderr, root, conf, cwd, phase_no) is None:
+        return 1
+    stdout.write("確認: ok（confirm を打てる状態。何も変えていません）\n")
+    return 0
 
 
 def manual_for(

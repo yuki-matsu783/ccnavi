@@ -374,10 +374,8 @@ start | finish | cancel | approval-request | consolidate)
 		fi
 		# 書く前に分かる条件は、ロック・取り込み・コミット・子のワークツリーの作成より前に、何も変えずに断る。
 		# 検査は実行ファイルの本体と同じ関数（読むだけ）。通ったときの標準出力は捨てる。`--check` は位置引数の前に置く。
-		# approval-request は上の事前確認の流れで検査が済む（--check と本体が同じ検査を通る）。
-		if [ "$1" != approval-request ]; then
-			ccnavi_wap_exe --check ticket "$@" >/dev/null || exit $?
-		fi
+		# approval-request も同じ型で、承認の画面と同じ検査（approval_request_gate）を先に通す。
+		ccnavi_wap_exe --check ticket "$@" >/dev/null || exit $?
 		ccnavi_wap_begin || {
 			ticket_unsent_parent_next "$1"
 			exit 1

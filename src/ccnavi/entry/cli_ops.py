@@ -293,6 +293,13 @@ def operate(
             code = review.check_request(stdout, stderr, root, conf, cwd, args.phase, args.body_file)
         else:
             code = review.prepare(stdout, stderr, root, conf, cwd, args.phase, args.body_file)
+    elif kind == "review" and verb == "confirm" and args.check:
+        if args.phase is None:
+            stderr.write("ccnavi: review confirm --check には --phase <N> を指定してください。\n")
+        else:
+            code = core.check_confirm(stdout, stderr, root, conf, cwd, args.phase)
+    elif kind == "review" and verb == "ready" and args.check:
+        code = review_close.check_ready(stdout, stderr, root, conf, cwd)
     elif kind == "review" and verb in ("requested", "confirm"):
         if args.phase is None or not args.result:
             stderr.write(
@@ -424,7 +431,12 @@ def _worktree(
 
 # `--check` で検査だけを通せる状態の操作（書かないので write-and-push を通らなくてよい）。
 _CHECKABLE = [
-    ["ticket", verb] for verb in ("start", "finish", "cancel", "approval-request", "consolidate")
+    *(
+        ["ticket", verb]
+        for verb in ("start", "finish", "cancel", "approval-request", "consolidate")
+    ),
+    ["review", "confirm"],
+    ["review", "ready"],
 ]
 
 

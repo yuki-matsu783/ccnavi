@@ -636,6 +636,10 @@ confirm)
 		--actor | --actor=*) fail confirm-actor "confirm は --actor を受けない。マーカーに記すアカウントは、トークンの持ち主をホストに問い合わせて入れる。" 2 ;;
 		esac
 	done
+	# ホストの API・ロック・取り込みより前に、ワークツリーの中で分かる前提（親とフェーズ・依頼の記録・
+	# 依頼のあとに動いていないこと）を、何も変えずに断る。検査は本体と同じ関数（読むだけ）。
+	# `--check` は位置引数の前に置く。
+	ccnavi --check review confirm "$@" >/dev/null || exit $?
 	# マーカーに残すアカウント。ロックを取る前に引く（引けなくても止めず、マーカーにアカウントを入れない）
 	actor=$(account || :)
 	log_debug マーカーのアカウント -- "actor=${actor:+set}"
@@ -916,6 +920,9 @@ ready)
 	# 閉じた親子のチケット（done/ の親子・phases/<親>/・flows/）を手元の logs/archive/ へ
 	# 退避する（git の上では削除）。write-and-push の中なら、その削除をコミットして push してから、ここが外して
 	# コメントを投稿する。マージはユーザ（squash。既定のブランチにチケットを残さない）。
+	# ロック・取り込みより前に、ワークツリーの中で分かる前提（親を閉じられるか・未コミット・push 済みか）を、
+	# 何も変えずに断る。検査は本体と同じ関数（読むだけ）。`--check` は位置引数の前に置く。
+	ccnavi --check review ready >/dev/null || exit $?
 	wap_start "$family"
 	fetch_all >"$result"
 	# 打ち直しの判断（Draft を外し損ねたか）に、MR がまだ Draft かを結果に足す。
