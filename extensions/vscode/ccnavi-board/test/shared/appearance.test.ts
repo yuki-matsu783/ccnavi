@@ -267,6 +267,10 @@ test("CB-T1243 拡大率の設定は 0.8〜2 に収め、数でない値は等�
   assert.equal(parseZoom(0.1), 0.8);
   assert.equal(parseZoom("1.5"), 1);
   assert.equal(parseZoom(undefined), 1);
+  assert.equal(parseZoom(Number.NaN), 1);
+  assert.equal(parseZoom(Number.POSITIVE_INFINITY), 1);
+  assert.equal(parseZoom(0.8), 0.8);
+  assert.equal(parseZoom(2), 2);
   const sent: unknown[] = [];
   sendAppearance({ post: (m) => (sent.push(m), true) }, "vscode", 1.5);
   sendAppearance({ post: (m) => (sent.push(m), true) }, "vscode");
