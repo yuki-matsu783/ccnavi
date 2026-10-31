@@ -867,6 +867,25 @@ class PhaseTest(PhaseHarness):
             stdin=answer + "\n",
         )
 
+    def test_check_stops_review_confirm_and_ready_without_writing(self):
+        """`--check review confirm` は依頼の記録が無ければ 1 と `次:` を返す。`--check review ready`
+        は条件を満たさなければ 1 を返す。"""
+        self.family(plan=["design"])
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        fixture = self.remote()
+        checked = self.ccnavi(
+            "--check", "--cwd", self.parent_tree, "--phase", "1", "review", "confirm",
+            "--result", fixture,
+        )  # fmt: skip
+        self.assertEqual(checked.returncode, 1, checked.stderr)
+        self.assertIn("次:", checked.stderr)
+        checked = self.ccnavi(
+            "--check", "--cwd", self.parent_tree, "review", "ready", "--result", fixture
+        )
+        self.assertEqual(checked.returncode, 1, checked.stderr)
+
     def test_ready_needs_the_parent_to_be_closable(self):
         """Draft を外せるのは、親を閉じられる状態と同じ。閉じたあとでも打てる。"""
         self.family(plan=["design"])
