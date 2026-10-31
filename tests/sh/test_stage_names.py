@@ -4,7 +4,7 @@
 
 1. 表に仮の 1 行を足した場合も含め、sh と Python が同じ変換結果を返す（同じ見本を両方に通す）
 2. 元のパスに予約名（`handoff-.claude`）の階層があれば、stage が断る
-3. stage → 編集 → `--commands` で、差し替えの mv が、読み替えた下書きを元の場所へ戻す
+3. stage → 編集 → `--commands` で、取り込みの手順が、読み替えを戻した元のパスを指す
 4. 表のファイルが無い・読めない行があれば、stage は何も作らずに断る
 """
 
@@ -123,7 +123,7 @@ class StageNamesTest(unittest.TestCase):
                 self.assertIn("予約", result.stderr)
                 self.assertFalse(os.path.exists(os.path.join(ws, "wip")), "何も作らない")
 
-    def test_commands_point_the_mv_from_the_renamed_draft_to_the_original(self):
+    def test_commands_point_the_handoff_at_the_original_path_not_the_renamed_draft(self):
         ws = self.workspace()
         orig = os.path.join(ws, ".claude", "settings.json")
         write(orig, '{"a": 1}\n')
@@ -133,7 +133,9 @@ class StageNamesTest(unittest.TestCase):
         write(draft, '{"a": 2}\n')
         result = self.stage(ws, "--commands", ".claude/settings.json")
         self.assertEqual(0, result.returncode, result.stderr)
-        self.assertIn(f"mv '{draft}' '{orig}'", result.stdout)
+        self.assertNotIn("mv ", result.stdout)
+        self.assertIn(f"'.claude/settings.json' --yes --expect <上のハッシュ>", result.stdout)
+        self.assertNotIn("handoff-.claude", result.stdout)
         self.assertNotIn("wip/handoff/.claude", result.stdout)
 
     def test_a_missing_table_stops_before_anything_is_made(self):

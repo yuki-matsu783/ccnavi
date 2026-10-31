@@ -5,11 +5,10 @@
 #   sh .ccnavi/scripts/ccnavi-stage.sh --commands <パス>...
 #
 # 保護対象のファイル（rules.yml・hook・ラッパースクリプトなど）は書けない。直すときは、cwd のツリーの
-# wip/handoff/ に元ファイルを cp して、そちらを編集し、できたものを元の場所へ差し替えてもらう。
+# wip/handoff/ に元ファイルを cp して、そちらを編集し、できたものを元の場所へ取り込んでもらう。
 # cwd が .claude/worktrees/<名前> の中なら、そのワークツリーの wip/handoff/（ブランチに載るので、
 # 非対話セッションで push でき、直接作業なら integrate が取り込みのときに外す）。それ以外はワークスペースルートの
 # wip/handoff/。
-# defense の差し替えの mv は、フルパスを手で組むと書き間違えやすいので、このスクリプトが組む。
 #
 # <パス> は元のファイル。cwd からの相対でも絶対でもよく、置き場の根（cwd がワークツリーならそのワークツリー、
 # それ以外はワークスペースルート）の下の実在するファイルだけを受け付ける（リンクと、途中のリンクで根の外に出るものは断る）。
@@ -23,16 +22,16 @@
 # 表の下書きでの名前（handoff-.claude）は予約した名前で、元のパスにその名前の階層があるファイルは断る。
 # 下書きが既にあれば上書きしない（編集中のものを消さないため）。
 #
-# --commands は、編集が済んだあとに打つ。元と違う下書きだけを、種類ごとに分けて出す。
-#   取り込める種類（template・messages・layer-config・docs。表は handoff.KINDS）: ユーザが ccnavi-user-handoff.sh で
-#     下見（検査・差分・ハッシュ）をしてから --yes --expect で取り込む。mv は出さない（検査も差分も通らないため）
-#   defense（.ccnavi/scripts の sh・.claude の hook・settings・skills）: 差し替えの mv を、フルパスで 1 行ずつ出す
-# 元と同じ（まだ編集していない）もの、下書きがまだ無いものは、その旨を標準エラーに出し、mv は出さない。
+# --commands は、編集が済んだあとに打つ。元と違う下書きに、取り込みの手順を出す（全種類が同じ手順。
+# 種類の表は handoff.KINDS）。ユーザが ccnavi-user-handoff.sh で下見（検査・差分・ハッシュ）をしてから
+# --yes --expect で取り込む。mv で差し替える案内は出さない（検査も差分も --expect も通らず、下書きを作った後に
+# 直された元を黙って上書きするため）。
+# 元と同じ（まだ編集していない）もの、下書きがまだ無いもの、表の外のもの（取り込めない）は、その旨を標準エラーに出す。
 # 複数ファイルを直すときは、すべての下書きを作ってから --commands を打つ。
 #
 # 打ったあとの進め方（CLAUDE.md）:
-#   対話セッション   取り込みの手順か mv をユーザに案内してターンを終える
-#   非対話セッション wip/handoff/ の編集済みファイルを push し、ユーザに確認と取り込み（差し替え）を頼んでターンを終える
+#   対話セッション   取り込みの手順をユーザに案内してターンを終える
+#   非対話セッション wip/handoff/ の編集済みファイルを push し、ユーザに確認と取り込みを頼んでターンを終える
 #
 # 終了コード: 0 成功 / 1 前提の未充足（編集済みの下書きが 1 つも無い、など） / 2 引数か環境の誤り
 
@@ -48,7 +47,7 @@ sh .ccnavi/scripts/ccnavi-stage.sh --commands <パス>...
 
   <パス>      直したい元のファイル（置き場の根の下。根は cwd がワークツリーならそのワークツリー、それ以外はワークスペースルート）。cwd からの相対でも絶対でもよい
   --commands  編集が済んだあとに実行します。元と違う下書きだけを、種類ごとに分けて出します
-              （template・messages・layer-config・docs は ccnavi-user-handoff.sh の手順。defense は差し替えの mv を、フルパスで出します）
+              （取り込みは ccnavi-user-handoff.sh の手順。下見のあと --yes --expect で取り込みます）
 
 下書きは <置き場の根>/wip/handoff/<置き場の根からの相対パス> に cp する
 （置き場の根は、cwd がワークツリーならそのワークツリー、それ以外はワークスペースルート）
@@ -193,7 +192,7 @@ relative_of() {
 	case "$rl_rel" in
 	*"'"* | *'
 '*)
-		printf 'ccnavi-stage: %s には引用符か改行が入っていて、mv の 1 行に安全に書けません。\n' "$1" >&2
+		printf 'ccnavi-stage: %s には引用符か改行が入っていて、取り込みコマンドの 1 行に安全に書けません。\n' "$1" >&2
 		return 1
 		;;
 	esac
@@ -224,8 +223,8 @@ relative_of() {
 	printf '%s\n' "$rl_rel"
 }
 
-# 元の相対パス <$1> が、ccnavi-user-handoff.sh で取り込める種類（template・messages・layer-config・docs）なら 0。
-# 表は src/ccnavi/tickets/sync/handoff.py の KINDS（defense と対象外は 1 を返し、mv の道に残す）。
+# 元の相対パス <$1> が、ccnavi-user-handoff.sh で取り込める種類（template・messages・layer-config・docs・defense）なら 0。
+# 表は src/ccnavi/tickets/sync/handoff.py の KINDS（表の外は 1）。
 # 比べ方は ASCII の大文字小文字を区別しない（Python 側は NFC と fold）。表を変えたら、test_stage_sh の例も直す。
 is_importable() {
 	im_k=$(printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
@@ -252,6 +251,8 @@ is_importable() {
 	.ccnavi/config/common/rules.yml | .ccnavi/config/common/phases.yml | .ccnavi/config/common/risks.yml) return 0 ;;
 	.ccnavi/config/project/rules.yml | .ccnavi/config/project/phases.yml | .ccnavi/config/project/risks.yml) return 0 ;;
 	.ccnavi/docs/*.md | .ccnavi/ccnavi.md) return 0 ;;
+	.ccnavi/scripts/* | .claude/hooks/* | .claude/settings.json | .claude/settings.local.json) return 0 ;;
+	.claude/skills/*.md) return 0 ;;
 	esac
 	return 1
 }
@@ -266,11 +267,11 @@ done
 
 made=""
 imps=""
-# 下書きがある（作った・既にあった）パスの並び。差し替えの次の一手に、そのまま埋める
+# 下書きがある（作った・既にあった）パスの並び。取り込みの次の一手に、そのまま埋める
 staged=""
-mvs=""
 same=""
 missing=""
+outside=""
 for arg in "$@"; do
 	rel=$(relative_of "$arg") || exit 2
 	orig="$base/$rel"
@@ -285,8 +286,7 @@ for arg in "$@"; do
 			if is_importable "$rel"; then
 				imps="${imps:+$imps }'$rel'"
 			else
-				mvs="${mvs}mv '$draft' '$orig'
-"
+				outside="${outside:+$outside }$rel"
 			fi
 		fi
 		continue
@@ -313,26 +313,18 @@ fi
 
 [ -z "$missing" ] || printf 'ccnavi-stage: 下書きがまだ無い（先に <パス> だけで実行します）: %s\n' "$missing" >&2
 [ -z "$same" ] || printf 'ccnavi-stage: 下書きが元と同じ（まだ編集していない）: %s\n' "$same" >&2
-if [ -z "$mvs$imps" ]; then
-	printf 'ccnavi-stage: 差し替える編集済みの下書きがありません。\n' >&2
+[ -z "$outside" ] || printf 'ccnavi-stage: 取り込みの対象外のパスです（種類の表にありません。取り込めないので、保護対象でなければ直接直します）: %s\n' "$outside" >&2
+if [ -z "$imps" ]; then
+	printf 'ccnavi-stage: 取り込む編集済みの下書きがありません。\n' >&2
 	exit 1
 fi
-guide=""
-if [ -n "$imps" ]; then
-	# 下書きのあるツリー base（ワークツリーの中で作った下書きは、そのワークツリーが根）
-	rootopt=""
-	[ "$base" = "$root" ] || rootopt=" --root '$base'"
-	hsh="sh '$root/.ccnavi/scripts/ccnavi-user-handoff.sh'$rootopt"
-	printf '取り込みは、ユーザが次の順で行います（検査・差分・ハッシュを見て、読んだうえで取り込む。差し替えはしない）:\n'
-	printf '%s %s\n' "$hsh" "$imps"
-	printf '%s %s --yes --expect <上のハッシュ>\n' "$hsh" "$imps"
-	guide="取り込みの手順"
-fi
-if [ -n "$mvs" ]; then
-	printf '差し替えは、ユーザが次を実行します（元のファイルは保護対象なので、エージェントは差し替えない。取り込みの対象外の種類）:\n'
-	printf '%s' "$mvs"
-	guide="${guide:+$guide と }mv"
-fi
-[ -z "$missing$same" ] || exit 1
-ccnavi_text "$root" NEXT_STAGE_GUIDE "guide=$guide"
+# 下書きのあるツリー base（ワークツリーの中で作った下書きは、そのワークツリーが根）
+rootopt=""
+[ "$base" = "$root" ] || rootopt=" --root '$base'"
+hsh="sh '$root/.ccnavi/scripts/ccnavi-user-handoff.sh'$rootopt"
+printf '取り込みは、ユーザが次の順で行います（検査・差分・ハッシュを見て、読んだうえで取り込む。差し替えはしない）:\n'
+printf '%s %s\n' "$hsh" "$imps"
+printf '%s %s --yes --expect <上のハッシュ>\n' "$hsh" "$imps"
+[ -z "$missing$same$outside" ] || exit 1
+ccnavi_text "$root" NEXT_STAGE_GUIDE "guide=取り込みの手順"
 ccnavi_text "$root" NOTE_STAGE_NONINTERACTIVE

@@ -57,7 +57,7 @@ from ..tickets.lifecycle import stop as ops_stop
 from ..tickets.lifecycle import stop_feedback as ops_stop_feedback
 from ..tickets.lifecycle import stop_integrate as ops_stop_integrate
 from ..tickets.lifecycle import stop_request as ops_stop_request
-from ..tickets.model import direct_candidates, ticket_guard
+from ..tickets.model import direct_candidates, ticket_guard, ticket_places
 from ..tickets.notice import (
     direct_worktrees,
     learning_notice,
@@ -1246,7 +1246,7 @@ def decide_after_failure(
         # ユーザの中断。Stop は来ないことがあるので、ここでターンの終わりにする。
         # 下の照合は中断までに書かれたぶんを戻すので、印を先に消してよい（消す前でも結果は同じ）。
         turn.end(conf.state, payload.session_id)
-    texts = [judge.guard_setting_files(mode, conf, root, payload, record, selfguard.after)]
+    parts = [judge.guard_setting_files(mode, conf, root, payload, record, selfguard.after)]
     raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
     text, _ = post.check(
         stderr,
@@ -1261,10 +1261,14 @@ def decide_after_failure(
         places=(conf.tickets, conf.approved),
         root=root,
     )
-    texts.append(text)
+    parts.append(text)
+    if payload.tool_name == "Artifact" and not payload.is_interrupt:
+        # Artifact はファイルを渡して publish する。失敗の理由を問わず、HTML の置き場を知らせる。
+        scratch = ticket_places.scratch_dir(root)
+        parts.append(texts.say(root, "NOTICE_ARTIFACT_FAILED", {"scratch": scratch}))
     if not payload.is_interrupt:
-        texts.append(judge.fail_streak_hint(conf, root, payload.session_id, payload.agent_id))
-    said = "\n\n".join(p for p in texts if p)
+        parts.append(judge.fail_streak_hint(conf, root, payload.session_id, payload.agent_id))
+    said = "\n\n".join(p for p in parts if p)
     if said:
         hookio.write_context(stdout, hookio.POST_TOOL_USE_FAILURE, said)
     return EXIT_OK

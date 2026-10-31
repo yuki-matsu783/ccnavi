@@ -162,14 +162,14 @@ KINDS: tuple[Kind, ...] = (
     Kind(
         KIND_DEFENSE,
         (
-            ".ccnavi/scripts/**/*.sh",
+            ".ccnavi/scripts/**",
             ".claude/hooks/**",
             ".claude/settings.json",
             ".claude/settings.local.json",
             ".claude/skills/**/*.md",
         ),
         (
-            rf"\.ccnavi/scripts/{_DEEP}\.sh",
+            rf"\.ccnavi/scripts/{_DEEP}",
             rf"\.claude/hooks/{_DEEP}",
             r"\.claude/settings\.json",
             r"\.claude/settings\.local\.json",

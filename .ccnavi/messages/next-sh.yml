@@ -58,9 +58,7 @@ messages:
     kind: next
     values: [staged_q]
     next: |-
-      下書きを編集する
-    note: |-
-      すべて直したら、下書きを作ったのと同じツリーの中で {script:ccnavi-stage.sh} --commands {staged_q} を打つ（種類ごとに、取り込みの手順か差し替えの mv が出る）
+      下書きを編集する。すべて直したら、下書きを作ったのと同じツリーの中で {script:ccnavi-stage.sh} --commands {staged_q} を打つ（取り込みの手順が出る）
 
   NEXT_STAGE_GUIDE:
     kind: next

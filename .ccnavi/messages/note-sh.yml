@@ -189,7 +189,7 @@ messages:
   NOTE_STAGE_NONINTERACTIVE:
     kind: note
     note: |-
-      非対話セッションでは、編集済みの下書きを push し、確認と取り込み（差し替え）をユーザに頼んでターンを終える
+      非対話セッションでは、編集済みの下書きを push し、確認と取り込みをユーザに頼んでターンを終える
 
   # ---- ccnavi-sync.sh
   NOTE_SYNC_RETIRED_UNANSWERED:
