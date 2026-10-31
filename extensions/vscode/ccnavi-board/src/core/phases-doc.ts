@@ -17,7 +17,7 @@
  */
 import { isMap, isNode, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document, type Pair } from "yaml";
 
-import { PHASE_KINDS, REVIEWS, type PhaseForm, type PhaseKind, type PhasesForm, type PhasesModel, type Review } from "./phases-view.js";
+import { PHASE_KINDS, type PhaseForm, type PhaseKind, type PhasesForm, type PhasesModel } from "./phases-view.js";
 import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
@@ -106,10 +106,10 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
   if (kind !== kindText) {
     problems.push(`定義 ${id} の kind \`${kindText}\` は ${PHASE_KINDS.join("・")} のどれでもありません。画面は work として出し、保存すると work になります`);
   }
-  const reviewText = scalarText(map, "review") || "mr";
-  const review: Review = (REVIEWS as readonly string[]).includes(reviewText) ? (reviewText as Review) : "mr";
-  if (review !== reviewText) {
-    problems.push(`定義 ${id} の review \`${reviewText}\` は ${REVIEWS.join("・")} のどれでもありません。画面は mr として出し、保存すると mr になります`);
+  const rawReview = map.get("review");
+  const review = typeof rawReview === "boolean" ? rawReview : true;
+  if (rawReview !== undefined && rawReview !== null && typeof rawReview !== "boolean") {
+    problems.push(`定義 ${id} の review \`${String(rawReview)}\` は true か false ではありません。画面は true として出し、保存すると true になります（\`none\` は false、\`mr\` は true に書き直します）`);
   }
 
   const rawScope = map.get("scope", true);
@@ -287,12 +287,12 @@ function keepSpacing(before: readonly Pair[], after: readonly Pair[]): void {
 
 /** 欄を順に書く。変わっていない欄は触らず、元の書き方（引用符）を残す。新しい定義は kind と review を必ず書く */
 function writePhase(doc: Document, node: YAMLMap, form: PhaseForm, isNew: boolean): void {
-  // kind と review は実行ファイルに既定がある（work / mr）。元から欄が無くて既定のままなら足さない。
+  // kind と review は実行ファイルに既定がある（work / true）。元から欄が無くて既定のままなら足さない。
   if (isNew || node.has("kind") || form.kind !== "work") {
     setValue(doc, node, "kind", form.kind, Scalar.PLAIN);
   }
   setOrDelete(doc, node, "title", form.title.trim(), Scalar.PLAIN);
-  if (isNew || node.has("review") || form.review !== "mr") {
+  if (isNew || node.has("review") || !form.review) {
     setValue(doc, node, "review", form.review, Scalar.PLAIN);
   }
 
@@ -376,14 +376,17 @@ function setOrDelete(doc: Document, node: YAMLMap, key: string, value: string, s
   setValue(doc, node, key, value, style);
 }
 
-function setValue(doc: Document, node: YAMLMap, key: string, value: string, style: Scalar.Type): void {
+function setValue(doc: Document, node: YAMLMap, key: string, value: string | boolean, style: Scalar.Type): void {
   const current = node.get(key, true);
   if (current instanceof Scalar) {
     // 書き方（引用符）は元のまま。値が変わっても書き方まで変えない。
     // ただし実行ファイル（PyYAML）が別の型に読む語を裸で書くことになるなら囲む。
     if (current.value !== value) {
       current.value = value;
-      if (current.type === Scalar.PLAIN && yaml11Ambiguous(value)) {
+      if (typeof value === "boolean") {
+        // 引用符で書かれた古い値（"mr"）を真偽値に直すとき、引用符のまま残すと文字列になる。
+        current.type = Scalar.PLAIN;
+      } else if (current.type === Scalar.PLAIN && yaml11Ambiguous(value)) {
         current.type = Scalar.QUOTE_DOUBLE;
       }
     }
@@ -393,7 +396,7 @@ function setValue(doc: Document, node: YAMLMap, key: string, value: string, styl
     node.delete(key);
   }
   const scalar = doc.createNode(value) as Scalar;
-  scalar.type = style === Scalar.PLAIN && yaml11Ambiguous(value) ? Scalar.QUOTE_DOUBLE : style;
+  scalar.type = style === Scalar.PLAIN && typeof value === "string" && yaml11Ambiguous(value) ? Scalar.QUOTE_DOUBLE : style;
   insertAfter(doc, node, key, scalar, before(key, node));
 }
 
@@ -456,7 +459,7 @@ function asPhase(raw: unknown): PhaseForm | undefined {
   if (typeof r.kind !== "string" || !(PHASE_KINDS as readonly string[]).includes(r.kind)) {
     return undefined;
   }
-  if (typeof r.review !== "string" || !(REVIEWS as readonly string[]).includes(r.review)) {
+  if (typeof r.review !== "boolean") {
     return undefined;
   }
   // 順序の欄（after / overlap / requires）は受け取らない（読まない欄は書き戻さない）
@@ -469,7 +472,7 @@ function asPhase(raw: unknown): PhaseForm | undefined {
     id: text(r.id),
     title: text(r.title),
     kind: r.kind as PhaseKind,
-    review: r.review as Review,
+    review: r.review,
     inherit: r.inherit === true,
     scope: lists[0] as string[],
     deliverables: lists[1] as string[],

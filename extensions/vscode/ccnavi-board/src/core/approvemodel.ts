@@ -39,9 +39,9 @@ export interface ApprovePlanItem {
   readonly type: string;
   /** 定義のタイトル（親の `phases:` から） */
   readonly title: string;
-  /** 見る場所（`none` / `mr`。ステップの `review: mr` は `mr`） */
-  readonly review: string;
-  /** ステップの `review: defer`（レビューを後ろのステップへ延ばす） */
+  /** レビューが要るか（ステップの `review: true` は true）。定義が読めなければ null */
+  readonly review: boolean | null;
+  /** ステップの `deferred: true`（レビューを後ろのステップへ延ばす） */
   readonly deferred: boolean;
   /** 延期したレビューを引き受ける番号。延期していなければ null */
   readonly review_at: number | null;
@@ -435,7 +435,7 @@ function plan(raw: Record<string, unknown>): ApprovePlan {
         from: isNumber(item.from) ? item.from : (item.number as number),
         type: str(item.type),
         title: str(item.title),
-        review: str(item.review),
+        review: typeof item.review === "boolean" ? item.review : null,
         deferred: item.deferred === true,
         review_at: isNumber(item.review_at) ? item.review_at : null,
         locked: item.locked === true,

@@ -27,7 +27,7 @@ export function Plan({ title, items }: { readonly title: string; readonly items:
             <tr key={item.index}>
               <td className="mono">{item.number}</td>
               <td className="mono">{item.type}</td>
-              <td>{item.review === "" ? "既定" : item.review}</td>
+              <td>{item.review ? "review: true" : item.deferred ? "deferred: true" : "既定"}</td>
               <td>{afterText(afterNumbers(item, items))}</td>
             </tr>
           ))}

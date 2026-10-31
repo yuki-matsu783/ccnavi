@@ -44,8 +44,8 @@ export interface PlanGraphNode {
   readonly label: string;
   /** 定義の名前。start と end は空 */
   readonly type: string;
-  /** 見る場所（実行ファイルの値のまま）。start と end は空 */
-  readonly review: string;
+  /** レビューが要るか（実行ファイルの値のまま）。定義が読めなければ null。start と end も null */
+  readonly review: boolean | null;
   readonly deferred: boolean;
   /** 延期したレビューを引き受ける番号（実行ファイルの値のまま） */
   readonly reviewAt: number | null;
@@ -152,7 +152,7 @@ export function planGraphOf(plan: ApprovePlan): PlanGraph {
 
   const ends = ENDS[plan.part === "feedback" ? "feedback" : "plan"];
   const loose = new Set(plan.loose);
-  const blank = { from: null, type: "", review: "", deferred: false, reviewAt: null, locked: false, loose: false } as const;
+  const blank = { from: null, type: "", review: null, deferred: false, reviewAt: null, locked: false, loose: false } as const;
   const nodes: PlanGraphNode[] = [{ id: "start", kind: "start", number: null, label: ends.start, ...blank, column: 0, x: 0, y: yOf(0, 1) }];
   for (const item of plan.items) {
     const column = depth.get(item.number) ?? 1;

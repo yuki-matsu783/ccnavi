@@ -256,7 +256,7 @@ const LEGEND: readonly (readonly [string, string])[] = [
   ["deny", "このチケットでも編集できない場所"],
   ["after", "先に閉じてレビューが済んでいるべきステップ（先行。自分より小さい番号だけ）"],
   ["scope", "そのフェーズで編集できる範囲（inherit は親の範囲を引き継ぐ）"],
-  ["review", "フェーズが終わったあとの人間のレビュー（none は不要、mr はマージリクエスト）"],
+  ["review", "フェーズが終わったあとの人間のレビュー（false は不要、true はマージリクエストで見る）"],
 ];
 
 function Legend(): JSX.Element {

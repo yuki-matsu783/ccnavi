@@ -529,7 +529,7 @@ function CommonList(props: { readonly common: readonly CommonPhase[] }): JSX.Ele
       <ul className="list">
         {props.common.map((phase) => (
           <li key={phase.id} className="common-phase" data-id={phase.id} data-source="common">
-            <code>{phase.id}</code> {phase.title} <span>（区分 {phase.kind} / レビュー {phase.review} / 編集可能な範囲 {phase.scope.join(", ")}）</span>
+            <code>{phase.id}</code> {phase.title} <span>（区分 {phase.kind} / レビュー {String(phase.review)} / 編集可能な範囲 {phase.scope.join(", ")}）</span>
           </li>
         ))}
       </ul>

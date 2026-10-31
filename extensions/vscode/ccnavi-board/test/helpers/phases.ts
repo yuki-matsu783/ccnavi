@@ -44,7 +44,7 @@ phases:
   research:
     kind: work
     title: 調査
-    review: none
+    review: false
     scope: ["wip/research/*"]
     deliverables: ["wip/research/summary.md"]
     when: 既存の振る舞いや依存が分からないとき。分かっているなら飛ばす
@@ -52,7 +52,7 @@ phases:
   design:
     kind: work
     title: 設計
-    review: mr
+    review: true
     scope: ["wip/design/*", "docs/*"]
     deliverables: ["wip/design/*.md"]
     when: 触る場所が 3 か所を超えるか、外から見える振る舞いが変わるとき
@@ -60,20 +60,20 @@ phases:
   acceptance:
     kind: work
     title: 受入テスト作成
-    review: mr
+    review: true
     scope: ["tests/*"]
     when: 振る舞いが変わるとき。設計のあと、実装より先に書く
 
   implement:
     kind: work
     title: 実装とテスト
-    review: mr
+    review: true
     scope: ["src/*", "tests/*"]
 
   implement-feedback:
     kind: feedback
     title: 実装フィードバック対応
-    review: mr
+    review: true
     scope: inherit
     when: フィードバック計画の最後に置き、ほかの対応を受ける
 `;

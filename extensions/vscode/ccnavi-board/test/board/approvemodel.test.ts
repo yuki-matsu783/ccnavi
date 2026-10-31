@@ -66,8 +66,8 @@ test("CB-T354 承認の preview の plans を読む（計画を持つ親の図�
   assert.deepEqual(
     plan.items.map((item) => [item.number, item.from, item.type, item.title, item.review, item.deferred, item.review_at, item.locked]),
     [
-      [1, 1, "research", "調査", "none", false, null, false],
-      [2, 2, "design", "設計", "mr", false, null, false],
+      [1, 1, "research", "調査", false, false, null, false],
+      [2, 2, "design", "設計", true, false, null, false],
     ],
   );
   assert.deepEqual(plan.after, { "2": [1] });

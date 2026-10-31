@@ -67,7 +67,7 @@ function planOf(ticket: string, sha: string, part = "plan"): ApprovePlan {
     ticket,
     part,
     source_sha: sha,
-    items: [{ number: 1, from: 1, type: "research", title: "調査", review: "none", deferred: false, review_at: null, locked: false }],
+    items: [{ number: 1, from: 1, type: "research", title: "調査", review: false, deferred: false, review_at: null, locked: false }],
     after: {},
     proposed: {},
     current: null,

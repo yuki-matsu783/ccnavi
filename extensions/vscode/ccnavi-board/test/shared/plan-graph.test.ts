@@ -79,11 +79,11 @@ test("CB-T358 点は定義のタイトル・見る場所・延期の引き受け
   const graph = planGraphOf({
     ...base,
     items: base.items.map((item) =>
-      item.number === 2 ? { ...item, title: "設計", review: "mr", deferred: true, review_at: 4 } : item.number === 1 ? { ...item, title: "調査", review: "none", locked: true } : item,
+      item.number === 2 ? { ...item, title: "設計", review: true, deferred: true, review_at: 4 } : item.number === 1 ? { ...item, title: "調査", review: false, locked: true } : item,
     ),
   });
   const node = (id: string) => graph.nodes.find((n) => n.id === id);
-  assert.deepEqual([node("n1")?.label, node("n1")?.review, node("n1")?.locked, node("n1")?.deferred], ["調査", "none", true, false]);
+  assert.deepEqual([node("n1")?.label, node("n1")?.review, node("n1")?.locked, node("n1")?.deferred], ["調査", false, true, false]);
   assert.deepEqual([node("n2")?.label, node("n2")?.deferred, node("n2")?.reviewAt, node("n2")?.locked], ["設計", true, 4, false]);
   assert.equal(node("n2")?.type, "design");
 });

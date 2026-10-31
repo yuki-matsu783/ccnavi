@@ -72,19 +72,15 @@ type EndNode = Node<ItemData, "planEnd">;
 type PlanNode = ItemNode | EndNode;
 
 /**
- * 見る場所の言葉。同じオーバーレイの本文（承認画面。`agree_screen.py`）の「レビュー不要」
- * 「レビュー要: マージリクエスト」を、点の幅に収まる短さにしたもの。
- * 知らない表記はそのまま出す
+ * レビューの要否の言葉。同じオーバーレイの本文（承認画面。`agree_screen.py`）の「レビュー不要」
+ * 「レビュー必須: マージリクエスト」を、点の幅に収まる短さにしたもの。
+ * 定義が読めない（null）なら「?」
  */
-function reviewText(review: string): string {
-  switch (review) {
-    case "none":
-      return "レビュー不要";
-    case "mr":
-      return "レビュー必須（MR）";
-    default:
-      return `レビュー: ${review === "" ? "?" : review}`;
+function reviewText(review: boolean | null): string {
+  if (review === null) {
+    return "レビュー: ?";
   }
+  return review ? "レビュー必須（MR）" : "レビュー不要";
 }
 
 /** 延期したステップの言葉。本文の先行の一覧（「レビューは 4 と一緒に」）と同じ言い方 */
@@ -120,7 +116,7 @@ function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
         {node.deferred ? (
           <span className="tag deferred">{deferText(node.reviewAt)}</span>
         ) : (
-          <span className="tag" data-review={node.review}>
+          <span className="tag" data-review={String(node.review)}>
             {reviewText(node.review)}
           </span>
         )}
@@ -345,7 +341,7 @@ function Detail({ plan, graph, id }: { readonly plan: ApprovePlan; readonly grap
     ["提案での番号", node.from === null ? "" : String(node.from)],
     ["タイトル", node.label],
     ["定義", node.type],
-    ["見る場所", node.deferred ? deferText(node.reviewAt) : reviewText(node.review)],
+    ["レビュー", node.deferred ? deferText(node.reviewAt) : reviewText(node.review)],
     ["先行ステップ", listOf(before)],
     ["後続ステップ", listOf(after)],
     ["すぐ始まる", plan.ready.includes(number) ? "はい" : "いいえ"],

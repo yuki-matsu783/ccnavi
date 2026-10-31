@@ -19,12 +19,12 @@ phases:
   research:
     kind: work
     title: 調査
-    review: none
+    review: false
     scope: ["wip/research/*"]
   design:
     kind: work
     title: 設計
-    review: mr
+    review: true
     scope: ["wip/design/*"]
 `;
 
@@ -38,8 +38,8 @@ CCNAVI_COMPAT=${compat}
 
 /** 見本の phases.yml（PHASES）の定義の欄。親の `phases:`（計画が使う定義のコピー）にコピーする */
 const DEFINITIONS: Record<string, string[]> = {
-  research: ["    kind: work", "    title: 調査", "    review: none", '    scope: ["wip/research/*"]'],
-  design: ["    kind: work", "    title: 設計", "    review: mr", '    scope: ["wip/design/*"]'],
+  research: ["    kind: work", "    title: 調査", "    review: false", '    scope: ["wip/research/*"]'],
+  design: ["    kind: work", "    title: 設計", "    review: true", '    scope: ["wip/design/*"]'],
 };
 
 /** 親の `phases:` の行。計画が使う定義だけを、PHASES と同じ中身でコピーする（`--plan-order <親> --fill-phases` と同じ） */

@@ -14,7 +14,7 @@
       "from": 1,
       "type": "research",
       "title": "調査",
-      "review": "none",
+      "review": false,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -24,7 +24,7 @@
       "from": 2,
       "type": "design",
       "title": "設計",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -34,7 +34,7 @@
       "from": 3,
       "type": "implement",
       "title": "実装とテスト",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -44,7 +44,7 @@
       "from": 4,
       "type": "docs",
       "title": "docs",
-      "review": "",
+      "review": null,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -91,7 +91,7 @@
       "from": 5,
       "type": "design-feedback",
       "title": "design-feedback",
-      "review": "",
+      "review": null,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -101,7 +101,7 @@
       "from": 6,
       "type": "implement-feedback",
       "title": "実装フィードバック対応",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -149,7 +149,7 @@
       "from": 1,
       "type": "research",
       "title": "調査",
-      "review": "none",
+      "review": false,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -159,7 +159,7 @@
       "from": 3,
       "type": "implement",
       "title": "実装とテスト",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -169,7 +169,7 @@
       "from": 2,
       "type": "design",
       "title": "設計",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -179,7 +179,7 @@
       "from": 4,
       "type": "docs",
       "title": "docs",
-      "review": "",
+      "review": null,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -226,7 +226,7 @@
       "from": 5,
       "type": "design-feedback",
       "title": "design-feedback",
-      "review": "",
+      "review": null,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -236,7 +236,7 @@
       "from": 6,
       "type": "implement-feedback",
       "title": "実装フィードバック対応",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -305,7 +305,7 @@
       "from": 1,
       "type": "research",
       "title": "調査",
-      "review": "none",
+      "review": false,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -315,7 +315,7 @@
       "from": 2,
       "type": "design",
       "title": "設計",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -325,7 +325,7 @@
       "from": 3,
       "type": "implement",
       "title": "実装とテスト",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -335,7 +335,7 @@
       "from": 4,
       "type": "docs",
       "title": "docs",
-      "review": "",
+      "review": null,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -382,7 +382,7 @@
       "from": 5,
       "type": "design-feedback",
       "title": "design-feedback",
-      "review": "",
+      "review": null,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -392,7 +392,7 @@
       "from": 6,
       "type": "implement-feedback",
       "title": "実装フィードバック対応",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -446,7 +446,7 @@
       "from": 1,
       "type": "research",
       "title": "調査",
-      "review": "none",
+      "review": false,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -456,7 +456,7 @@
       "from": 2,
       "type": "design",
       "title": "設計",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -466,7 +466,7 @@
       "from": 3,
       "type": "implement",
       "title": "実装とテスト",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -476,7 +476,7 @@
       "from": 4,
       "type": "docs",
       "title": "docs",
-      "review": "",
+      "review": null,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -526,7 +526,7 @@
       "from": 5,
       "type": "design-feedback",
       "title": "design-feedback",
-      "review": "",
+      "review": null,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -536,7 +536,7 @@
       "from": 6,
       "type": "implement-feedback",
       "title": "実装フィードバック対応",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -588,7 +588,7 @@
       "from": 1,
       "type": "research",
       "title": "調査",
-      "review": "none",
+      "review": false,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -598,7 +598,7 @@
       "from": 3,
       "type": "implement",
       "title": "実装とテスト",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -608,7 +608,7 @@
       "from": 2,
       "type": "design",
       "title": "設計",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -618,7 +618,7 @@
       "from": 4,
       "type": "docs",
       "title": "docs",
-      "review": "",
+      "review": null,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -665,7 +665,7 @@
       "from": 5,
       "type": "design-feedback",
       "title": "design-feedback",
-      "review": "",
+      "review": null,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -675,7 +675,7 @@
       "from": 6,
       "type": "implement-feedback",
       "title": "実装フィードバック対応",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -745,7 +745,7 @@
       "from": 1,
       "type": "research",
       "title": "調査",
-      "review": "none",
+      "review": false,
       "deferred": false,
       "review_at": null,
       "locked": true
@@ -755,7 +755,7 @@
       "from": 3,
       "type": "acceptance",
       "title": "受入テスト作成",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -765,7 +765,7 @@
       "from": 4,
       "type": "chores",
       "title": "片付け",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -775,7 +775,7 @@
       "from": 2,
       "type": "design",
       "title": "設計",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
@@ -785,7 +785,7 @@
       "from": 5,
       "type": "implement",
       "title": "実装とテスト",
-      "review": "mr",
+      "review": true,
       "deferred": false,
       "review_at": null,
       "locked": false
