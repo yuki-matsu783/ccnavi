@@ -66,8 +66,8 @@ test("CB-T228 錠は実行ファイルの flow.locked をそのまま使う。�
   const locked = flowTargetOf(board, "i0001-02-02");
   assert.ok(locked.ok);
   assert.equal(locked.target.lock.locked, true);
-  assert.match(locked.target.lock.reason, /DENY_TICKET_FLOW_LOCKED/);
-  assert.match(locked.target.lock.reason, /finish で終わるか cancel で取り消されると外れます/);
+  assert.match(locked.target.lock.reason, /着手中かレビュー中のため、フローを変更できません/);
+  assert.match(locked.target.lock.reason, /終わる（finish）か取り消される（cancel）と変更できます/);
   assert.equal(locked.target.parent, "i0001");
   assert.match(locked.target.flow.rel, /^\.ccnavi\/approved\/flows\/i0001-02-02\.yml$/);
   const open = flowTargetOf(board, "i0001-01-01");

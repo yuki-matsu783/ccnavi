@@ -206,7 +206,7 @@ export function consultPrompt(input: {
   const { root, parent, phase, mrUrl } = input;
   const tree = toPosixPath(input.parentTree);
   const lines = [
-    `[ccnavi] 親 ${parent} のフェーズ ${phase} のレビューで残った未解決（Unresolved）の指摘について、ユーザが対応方針を決めるための相談に乗る。`,
+    `[ccnavi] 親 ${parent} のフェーズ ${phase} のレビューで残った未解決の指摘について、ユーザが対応方針を決めるための相談に乗る。`,
     `- 親: ${parent}`,
     `- フェーズ: ${phase}`,
   ];

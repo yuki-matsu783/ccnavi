@@ -78,7 +78,7 @@ test("CB-D140 未保存の変更があれば破棄することを言ってから
     // 着手された（錠が掛かった）。取り込みも止まる
     await dom.send({ type: "lock", lock: { locked: true, reason: lockedReason("i0001-01-01") } });
     assert.ok(dom.one<HTMLButtonElement>('[data-action="import-proposal"]').disabled);
-    assert.match(dom.one(".proposal-locked").textContent ?? "", /DENY_TICKET_FLOW_LOCKED/);
+    assert.match(dom.one(".proposal-locked").textContent ?? "", /着手中かレビュー中のため、フローを変更できません/);
     dom.key("Escape");
     await dom.settle();
     assert.equal(dom.all("#proposal-review").length, 0);

@@ -51,15 +51,15 @@ export function DecideBody({
       <h2 id="approval-title">
         {count === 0
           ? `フェーズ ${preview.phase} に未解決の指摘はありません`
-          : `フェーズ ${preview.phase} で未解決（Unresolved）の指摘 ${count} 件の対応方針`}
+          : `フェーズ ${preview.phase} の指摘 ${count} 件の対応方針`}
       </h2>
       {notice ? <p className="approval-note warn">{notice}</p> : null}
       <p className="approval-note">
-        親 {preview.parent} のマージリクエスト{preview.mr.url ? ` ${preview.mr.url}` : ""}。
+        親 {preview.parent} の MR で残っている指摘です。
         {/* 選ぶものが無いときは、選び方の注意を出さない。0 件なら押すとレビュー済みになるだけ */}
         {count === 0
           ? "このフェーズをレビュー済みにしますか？"
-          : "「このフェーズで直す」を 1 件でも選ぶと、追加対応用の子チケットを作成し、このフェーズを再開します。"}
+          : "「このフェーズで直す」を 1 件でも選ぶと、直すための子チケットを作り、フェーズを作業に戻します。"}
       </p>
       {/* 2 件以上のときだけ、全部を同じ対応方針にする小さな行を出す。個別の選択は上書きされる */}
       {count < 2 ? null : (
@@ -88,8 +88,8 @@ export function DecideBody({
                 {/* 指摘の URL。http(s) のときだけリンクにする（そうでなければ文字として出すだけ） */}
                 {t.url ? (
                   isHttpUrl(t.url) ? (
-                    <a className="decide-url" href={t.url}>
-                      {t.url}
+                    <a className="decide-url" href={t.url} title={t.url}>
+                      MR で開く
                     </a>
                   ) : (
                     <span className="decide-url">{t.url}</span>
