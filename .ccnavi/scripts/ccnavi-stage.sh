@@ -257,7 +257,14 @@ is_importable() {
 	return 1
 }
 
+# 下書きを書く前に、全引数が使えるかを確かめる。1 つでも不正なら、何も書かずに止める
+# （先の引数の下書きと .orig を残さない）。
 bad=0
+for arg in "$@"; do
+	relative_of "$arg" >/dev/null || bad=1
+done
+[ "$bad" -eq 0 ] || exit 2
+
 made=""
 imps=""
 # 下書きがある（作った・既にあった）パスの並び。差し替えの次の一手に、そのまま埋める
@@ -267,10 +274,7 @@ same=""
 missing=""
 changed=""
 for arg in "$@"; do
-	rel=$(relative_of "$arg") || {
-		bad=1
-		continue
-	}
+	rel=$(relative_of "$arg") || exit 2
 	orig="$base/$rel"
 	scan_parts "$rel"
 	draft="$handoff/$ad_out"
@@ -308,8 +312,6 @@ for arg in "$@"; do
 		made=1
 	fi
 done
-
-[ "$bad" -eq 0 ] || exit 2
 
 if [ -z "$commands" ]; then
 	[ -z "$staged" ] || ccnavi_text "$root" NEXT_STAGE_EDIT "staged_q=$staged"
