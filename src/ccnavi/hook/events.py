@@ -57,7 +57,7 @@ from ..tickets.lifecycle import stop as ops_stop
 from ..tickets.lifecycle import stop_feedback as ops_stop_feedback
 from ..tickets.lifecycle import stop_integrate as ops_stop_integrate
 from ..tickets.lifecycle import stop_request as ops_stop_request
-from ..tickets.model import direct_candidates, ticket_guard
+from ..tickets.model import direct_candidates, ticket_guard, ticket_places
 from ..tickets.notice import learning_notice, overview, pending_integrate, session_rejects
 from ..tickets.phase import gates as phase
 from ..tickets.sync import promptsync
@@ -1248,7 +1248,7 @@ def decide_after_failure(
     parts.append(text)
     if payload.tool_name == "Artifact" and not payload.is_interrupt:
         # Artifact はファイルを渡して publish する。失敗の理由を問わず、HTML の置き場を知らせる。
-        scratch = os.path.join(root, "scratchpad")
+        scratch = os.path.join(root, ticket_places.SCRATCH_ROOT).replace("\\", "/")
         parts.append(texts.say(root, "NOTICE_ARTIFACT_FAILED", {"scratch": scratch}))
     if not payload.is_interrupt:
         parts.append(judge.fail_streak_hint(conf, root, payload.session_id, payload.agent_id))
