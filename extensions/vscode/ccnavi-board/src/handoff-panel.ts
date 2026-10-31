@@ -11,14 +11,13 @@
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は選んだ対象や開いた行を持つので
  * `retainContextWhenHidden` が真で、入れ物（HTML）は 1 度しか入らない。
  *
- * `features` に `handoff` を持たない実行ファイルでは、画面を無効にして「古い版です」と言う。
  * チケット制御が disable でも開ける（作業中の錠は、チケットが無ければ掛からない）。
  */
 import * as crypto from "node:crypto";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { checkHandoff, loadBoard, runHandoff, runHandoffYes } from "./ccnavi.js";
+import { loadBoard, runHandoff, runHandoffYes } from "./ccnavi.js";
 import { importSelected, terminalGuide, type HandoffDeps } from "./core/handoff-import.js";
 import { renderHandoffPage } from "./core/handoff-render.js";
 import type { HandoffData, HandoffList, HandoffMessage, HandoffTreeOption, ToHandoff } from "./core/handoff-view.js";
@@ -46,8 +45,7 @@ type Loaded =
       readonly list: HandoffList;
       readonly trees: readonly HandoffTreeOption[];
       readonly lock: Lock;
-    }
-  | { readonly kind: "disabled"; readonly key: string; readonly reason: string };
+    };
 
 interface PanelState {
   /** いま見ているツリーのキー。別のツリーを開くと入れ替わる（タブは 1 枚） */
@@ -152,11 +150,6 @@ function mainTree(root: string): TreeJson {
 }
 
 async function readPage(workspace: string, key: string): Promise<Loaded> {
-  // 実行ファイルが `handoff` を持たなければ、一覧を呼ばずに画面を無効にする
-  const unsupported = await checkHandoff(workspace, binSetting());
-  if (unsupported !== undefined) {
-    return { kind: "disabled", key, reason: unsupported };
-  }
   const board = await loadBoard(workspace, binSetting());
   if (!board.ok) {
     throw new Error(`ボードを実行ファイルから取得できません: ${board.error}`);
@@ -293,10 +286,6 @@ function show(current: PanelState): void {
     return;
   }
   current.error = undefined;
-  if (loaded.kind === "disabled") {
-    current.host.send({ kind: "disabled", reason: loaded.reason });
-    return;
-  }
   current.host.send({
     kind: "page",
     page: {

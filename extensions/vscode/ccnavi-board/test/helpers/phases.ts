@@ -90,7 +90,7 @@ export function page(overrides: Partial<PhasesPage> = {}): PhasesPage {
     phasesPath: ".ccnavi/config/project/phases.yml",
     exists: true,
     model: readPhases(SAMPLE_PHASES_TEXT).model,
-    lock: { locked: false, reason: "", doing: [] },
+    lock: { locked: false, reason: "", doing: [], turns: [] },
     ...overrides,
   };
 }

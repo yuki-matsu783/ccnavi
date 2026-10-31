@@ -17,18 +17,16 @@ export interface Lock {
   /**
    * いまターンの途中にいるセッション。ターン中の保存は、保存できても、次のツール呼び出しの
    * 実行後チェックに戻されることがある。保存を止める理由ではなく、保存の前に確かめる印。
-   * 渡さない（`undefined`）なら応答中のセッションは無いものとして扱う
    */
-  readonly turns?: readonly string[];
+  readonly turns: readonly string[];
 }
 
 /** 応答中の保存の前に見せる文。応答中のセッションが無ければ空 */
 export function turnWarning(lock: Lock): string {
-  const turns = lock.turns ?? [];
-  if (turns.length === 0) {
+  if (lock.turns.length === 0) {
     return "";
   }
-  return `エージェントが応答の途中です（セッション ${turns.join(", ")}）。いま保存すると、次のツール呼び出しで元に戻されることがあります。応答が終わってから保存すると確実です。`;
+  return `エージェントが応答の途中です（セッション ${lock.turns.join(", ")}）。いま保存すると、次のツール呼び出しで元に戻されることがあります。応答が終わってから保存すると確実です。`;
 }
 
 /**
@@ -70,5 +68,6 @@ export function lockFromError(error: string): Lock {
     locked: true,
     reason: `保存できるか確認できません: ${error}`,
     doing: [],
+    turns: [],
   };
 }

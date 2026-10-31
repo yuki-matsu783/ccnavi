@@ -18,7 +18,7 @@ function tmpDir(): string {
   return dir;
 }
 
-/** 答えに `flow` を載せない（`--flow` を知らない古い実行ファイル） */
+/** 答えに `flow` を載せない */
 const ABSENT = Symbol("absent");
 
 /** 実行ファイルの `--lint --json --flow` の答え（偽物） */

@@ -33,8 +33,8 @@ import type { Lock } from "../../src/core/lock.js";
 import { fixture } from "../helpers/fixture.js";
 import { entry, list, sampleEntries } from "../helpers/handoff.js";
 
-const OPEN: Lock = { locked: false, reason: "", doing: [] };
-const LOCKED: Lock = { locked: true, reason: "作業中のチケットがあります（T1）", doing: ["T1"] };
+const OPEN: Lock = { locked: false, reason: "", doing: [], turns: [] };
+const LOCKED: Lock = { locked: true, reason: "作業中のチケットがあります（T1）", doing: ["T1"], turns: [] };
 
 /** 見るだけの答えの JSON（実行ファイルの標準出力と同じ文字列） */
 function listText(overrides: Record<string, unknown> = {}): string {

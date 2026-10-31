@@ -49,7 +49,7 @@ export interface HandoffList {
   readonly tree: string;
   /** 取り込める種類の表に無いパスと、リンクのディレクトリの件数 */
   readonly ignored: number;
-  /** 対象外の名前と理由（置き場からの相対パス）。古い実行ファイルは返さない。`ignored` と件数が一致する */
+  /** 対象外の名前と理由（置き場からの相対パス）。`ignored` と件数が一致する */
   readonly ignored_paths: readonly HandoffIgnored[];
   readonly entries: readonly HandoffEntry[];
   /** 選んだ対象の集合のハッシュ。拡張は組み直さず、取り込みたいパスを指した答えのものを使う */
@@ -101,8 +101,6 @@ export interface HandoffPage {
 /** 画面に見せる中身。読み直せなかったときは一覧の代わりに文面を渡す */
 export type HandoffData =
   | { readonly kind: "page"; readonly page: HandoffPage }
-  /** 実行ファイルが `handoff` の機能を持たない。画面は無効にして理由を言う */
-  | { readonly kind: "disabled"; readonly reason: string }
   /** `trees` は読めなかった画面から別のツリーへ戻るための欄。ボードを読めていないので、ワークスペースだけを載せる */
   | { readonly kind: "error"; readonly error: string; readonly tree?: string; readonly trees?: readonly HandoffTreeOption[] }
   /** ツリーを切り替えて新しいツリーを読んでいる間の表示 */

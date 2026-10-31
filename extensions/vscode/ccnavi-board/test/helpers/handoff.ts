@@ -53,7 +53,7 @@ export function page(overrides: Partial<HandoffPage> = {}): HandoffPage {
       { key: "project:lib", label: "プロジェクト lib" },
     ],
     list: list(),
-    lock: { locked: false, reason: "", doing: [] },
+    lock: { locked: false, reason: "", doing: [], turns: [] },
     notices: [],
     ...overrides,
   };

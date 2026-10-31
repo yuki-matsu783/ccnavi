@@ -156,15 +156,12 @@ test("CB-T1161 「すべて同期」の対象は differs のプロジェクト�
   assert.equal(syncAllButton(ok(noExpect), false).enabled, false);
 });
 
-test("CB-T1162 ボタンを押せないとき: 同期中、確認する前、古い実行ファイル、確認できない、コピーするものが無い。理由を返す", () => {
+test("CB-T1162 ボタンを押せないとき: 同期中、確認する前、確認できない、コピーするものが無い。理由を返す", () => {
   const list = listOf();
   assert.deepEqual(projectSyncButton(ok(list), false, "web"), { enabled: true, reason: "" });
   assert.match(projectSyncButton(ok(list), true, "web").reason, /同期しています/);
   assert.equal(syncAllButton(ok(list), true).enabled, false);
   assert.match(projectSyncButton({ kind: "waiting" }, false, "web").reason, /確認しています/);
-  const old: MirrorStatus = { kind: "unsupported", reason: "実行ファイル（ccnavi 0.1.0）が mirror の機能に対応していません（古い版です）" };
-  assert.deepEqual(projectSyncButton(old, false, "web"), { enabled: false, reason: old.reason });
-  assert.deepEqual(syncAllButton(old, false), { enabled: false, reason: old.reason, count: 0 });
   assert.match(projectSyncButton({ kind: "failed", error: "期限切れ" }, false, "web").reason, /確認できませんでした/);
   const empty = listOf(LIST_TEXT.replace('"common_empty":false', '"common_empty":true'));
   assert.match(projectSyncButton(ok(empty), false, "web").reason, /コピーするものがありません/);

@@ -144,7 +144,7 @@ export interface Card {
   readonly parentMr: number | null;
   /** 親だけ。親のブランチ名（ワークツリーが今いるブランチを先に、無ければ親チケットの値）。子は空 */
   readonly branch: string;
-  /** 親だけ。親のワークツリーのリモートとの差。ワークツリーが無い・子・古い実行ファイルは null */
+  /** 親だけ。親のワークツリーのリモートとの差。ワークツリーが無い・子は null */
   readonly remote: RemoteJson | null;
   /**
    * ユーザが動く必要があるか。「ユーザ待ちのみ」の絞り込みが見る。実行ファイルの `attention` をそのまま持ち、

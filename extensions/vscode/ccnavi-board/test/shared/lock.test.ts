@@ -84,5 +84,5 @@ test("CB-T1222 作業中の理由は「整合性」を使わず、チケット�
   assert.match(locked.reason, /i0001-02-02/);
   assert.equal(lockClass(locked), "lock info");
   assert.equal(lockClass(lockFromError("読めない")), "lock");
-  assert.equal(lockClass({ locked: false, reason: "", doing: [] }), "lock hidden");
+  assert.equal(lockClass({ locked: false, reason: "", doing: [], turns: [] }), "lock hidden");
 });

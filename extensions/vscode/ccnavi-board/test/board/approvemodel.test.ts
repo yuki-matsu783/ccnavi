@@ -117,17 +117,6 @@ test("CB-T354 承認の preview の plans を読む（計画を持つ親の図�
   assert.deepEqual(fb.problems, ["最後のステップにほかのステップが先行していない"]);
 });
 
-test("CB-T104b 超過の欄がない古い答えは、空の配列として読む", () => {
-  const parsed = parseApprovePreview(
-    JSON.stringify({
-      version: APPROVE_VERSION,
-      batch: [{ ticket: "i0001", title: "親", parent: null, phase: null, revision: false, tree: "", path: "" }],
-    }),
-  );
-  assert.ok(parsed.ok);
-  assert.ok(parsed.ok && parsed.value.batch[0].overflow.length === 0);
-});
-
 test("CB-T105 承認の答えを読む（承認した / 一覧が違った）", () => {
   const done = parseApproveResult(fixtureText("approve-yes.json"));
   assert.ok(done.ok);

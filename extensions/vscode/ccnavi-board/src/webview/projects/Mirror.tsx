@@ -107,9 +107,6 @@ export function CheckedAt({ mirror }: { readonly mirror: MirrorData }): JSX.Elem
 /** ミラーを確認できないとき・コピーするものが無いときの帯 */
 export function MirrorBanners({ mirror }: { readonly mirror: MirrorData }): JSX.Element | null {
   const status = mirror.status;
-  if (status.kind === "unsupported") {
-    return <div className="banner warn mirror-banner">ミラーのずれを確認できません。{status.reason}</div>;
-  }
   if (status.kind === "failed") {
     return <div className="banner warn mirror-banner">ミラーのずれを確認できませんでした。{status.error}</div>;
   }

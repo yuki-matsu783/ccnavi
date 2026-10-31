@@ -30,7 +30,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { checkMirror, loadBoard, runLintJson, runMirror, runMirrorYes } from "./ccnavi.js";
+import { loadBoard, runLintJson, runMirror, runMirrorYes } from "./ccnavi.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
 import { clockText, syncNotice, unknownSyncNames, type MirrorStatus } from "./core/mirrormodel.js";
 import {
@@ -438,10 +438,6 @@ async function refreshMirror(): Promise<void> {
 
 /** 実行ファイルに、`user mirror` を持つかとミラーのずれを聞く */
 async function readMirror(root: string): Promise<MirrorStatus> {
-  const unsupported = await checkMirror(root, binSetting());
-  if (unsupported !== undefined) {
-    return { kind: "unsupported", reason: unsupported };
-  }
   const result = await runMirror(root, binSetting());
   return result.ok ? { kind: "ok", list: result.value } : { kind: "failed", error: result.error };
 }

@@ -32,8 +32,8 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { checkTemplateEdit, checkTemplates, loadBoard, runTemplateCheck, runTemplates, runTemplateShow } from "./ccnavi.js";
-import { openHandoffFrom, readHandoffEntry } from "./handoff-entry.js";
+import { loadBoard, runTemplateCheck, runTemplates, runTemplateShow } from "./ccnavi.js";
+import { HANDOFF_ENTRY, openHandoffFrom } from "./handoff-entry.js";
 import type { HandoffEntry } from "./core/handoff-entry.js";
 import { yamlText } from "./core/flow-doc.js";
 import { decodeFlowBytes, readFlowFile, writeFlowFile } from "./core/flow-write.js";
@@ -210,20 +210,13 @@ async function readPage(root: string, target: TemplatesTarget): Promise<Loaded> 
   if (!board.ok) {
     throw new Error(`ボードを実行ファイルから取得できません: ${board.error}`);
   }
-  // テンプレートのフラグを知らない古い実行ファイルでは、一覧を読めない。理由をそのまま出す
-  const unsupported = await checkTemplates(root, binSetting());
-  if (unsupported !== undefined) {
-    throw new Error(unsupported);
-  }
   const key = currentKey(target);
   const targets = targetOptions(board.board, COMMON_KIND, key);
   const result = await runTemplates(root, binSetting(), templatesLayerOf(key));
   if (!result.ok) {
     throw new Error(result.error);
   }
-  // 取り込み待ち画面を開けるかは一覧とは別に確かめる。`handoff` を持たない古い実行ファイルでは、開く入口だけを無効にする
-  const handoff = await readHandoffEntry(root, binSetting());
-  return { target, data: result.value, targets, handoff, notices: [] };
+  return { target, data: result.value, targets, handoff: HANDOFF_ENTRY, notices: [] };
 }
 
 function registerPanelHandlers(current: PanelState): void {
@@ -715,12 +708,7 @@ async function preview(current: PanelState, name: string, layerName: string): Pr
 
 async function editOpen(current: PanelState, session: number, name: string, layerName: string): Promise<void> {
   const target = current.target;
-  const unsupported = await checkTemplateEdit(current.folder.uri.fsPath, binSetting());
   if (abandoned(current, target, (e) => postOpened(current, session, null, e))) {
-    return;
-  }
-  if (unsupported !== undefined) {
-    postOpened(current, session, null, unsupported);
     return;
   }
   const where = editableLayer(current, layerName);
@@ -768,12 +756,7 @@ async function editOpen(current: PanelState, session: number, name: string, laye
 
 async function editNew(current: PanelState, session: number, name: string): Promise<void> {
   const target = current.target;
-  const unsupported = await checkTemplateEdit(current.folder.uri.fsPath, binSetting());
   if (abandoned(current, target, (e) => postOpened(current, session, null, e))) {
-    return;
-  }
-  if (unsupported !== undefined) {
-    postOpened(current, session, null, unsupported);
     return;
   }
   const layerName = shownLayerOf(currentKey(current.target));

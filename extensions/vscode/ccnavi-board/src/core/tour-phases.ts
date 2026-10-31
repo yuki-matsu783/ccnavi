@@ -72,7 +72,7 @@ function pageOf(raw: unknown, at: string, path: string, target: TargetOption, ta
     exists: true,
     model: { version, form: phasesFormOf(root, at), problems: [] },
     // 錠の文は scene の locked で見せる。錠そのものは案内の間は掛けない（見本は保存できる状態から始める）
-    lock: { locked: false, reason: "", doing: [] },
+    lock: { locked: false, reason: "", doing: [], turns: [] },
     target: { kind: target.kind, name: target.name },
     targets,
   };

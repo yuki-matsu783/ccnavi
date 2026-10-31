@@ -8,7 +8,7 @@ import { turnWarning, type Lock } from "./core/lock.js";
  * として戻すことがある。保存は止めず、押した時点で知らせて選ばせる。
  */
 export async function confirmDuringTurn(lock: Lock): Promise<boolean> {
-  return confirmTurns(lock.turns ?? []);
+  return confirmTurns(lock.turns);
 }
 
 /** `confirmDuringTurn` の、セッションの一覧を直に渡す形（保存の錠を持たない画面が使う） */

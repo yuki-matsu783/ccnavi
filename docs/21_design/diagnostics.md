@@ -43,8 +43,7 @@ write-and-push の書いたパスの一覧（`--record-writes`）も、診断の
 
 **互換の版**（`src/ccnavi/entry/version.py` の `COMPAT`）は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh の `CCNAVI_COMPAT`、拡張の
 `EXTENSION_COMPAT`）の契約の版で、3 か所に同じ値を書く。sh と拡張は実行時に実行ファイルの版を比べず、食い違いを断らない（sh と実行ファイルは
-必ず同時に配る前提）。`--lint` だけが sh の値と比べる（`(version)` の warn）。新しいフラグを使う前は、渡してみて
-argparse のエラーで見分けるのではなく `flags` を見る。拡張は版を聞けなかったとき、フラグを使う前に理由を出して先へ進まない。レイヤーは頭の `version:` が書式の版を示す。
+必ず同時に配る前提）。`--lint` だけが sh の値と比べる（`(version)` の warn）。拡張もフラグや機能の有無を事前に確かめない（版のずれは断らず、実行ファイルの断りの文面に任せる）。レイヤーは頭の `version:` が書式の版を示す。
 読めない版は読む側が error にする。
 
 `--flow <パス>` も診断でだけ有効で、読むのは `--lint` だけ。`--test` / `--test-expectations` / `--explain` に渡すと

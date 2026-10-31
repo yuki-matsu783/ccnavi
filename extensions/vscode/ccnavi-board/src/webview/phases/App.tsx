@@ -36,7 +36,7 @@ import { COMMON_NOTE, commonIdNote, commonTitleNote, countText, duplicateNote, e
 import { commonClashes, draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
 
 /** 中身が読めなかったときの錠。画面は保存させない */
-const NO_LOCK: Lock = { locked: true, reason: "", doing: [] };
+const NO_LOCK: Lock = { locked: true, reason: "", doing: [], turns: [] };
 
 const EMPTY_DRAFT: Draft = { rows: [] };
 
@@ -301,8 +301,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const sampleLocked = touring && scene.locked === true;
   const shownLock: Lock = touring
     ? sampleLocked
-      ? { locked: true, reason: sampleLib ? TEXTS.locks.lib : TEXTS.locks.self, doing: [sampleLib ? "2026-10-05-lib-parser" : "2026-10-03-search-api"] }
-      : { locked: false, reason: "", doing: [] }
+      ? { locked: true, reason: sampleLib ? TEXTS.locks.lib : TEXTS.locks.self, doing: [sampleLib ? "2026-10-05-lib-parser" : "2026-10-03-search-api"], turns: [] }
+      : { locked: false, reason: "", doing: [], turns: [] }
     : lock;
   const sceneOpen = sceneList(scene.open);
   const sceneMore = sceneList(scene.more);
