@@ -103,7 +103,7 @@ keywords: [設定, settings.json, env, 環境変数, hook, CCNAVI_HANDOFF_SUGGES
 | `UserPromptSubmit` | ターンの終わりの報告が出ない（コミットに入った変更も見えない） |
 | `PreToolUse` | 判定そのものが働かない |
 | `PostToolUse` | 引数に現れない書き込みを取りこぼす。フェーズの終わりが伝わらない。frontmatter の無い md を新しく作っても、書き方の案内が出ない |
-| `PostToolUseFailure` | 失敗の連続を数えられず、案内が出ない |
+| `PostToolUseFailure` | 失敗の連続を数えられず、案内が出ない。Artifact ツールが失敗したときの scratchpad/ の案内も出ない |
 | `Stop` | 変更がユーザの目に触れない。閉じ忘れたチケットが作業中に残る。同じ呼び出しを繰り返し止めたことがユーザに伝わらない。ターンの終わりの促しが届かない |
 | `SubagentStart` | サブエージェントが自分の範囲を知らずに始める |
 | `SubagentStop` | 範囲外のコミット済みの変更が親に届く |

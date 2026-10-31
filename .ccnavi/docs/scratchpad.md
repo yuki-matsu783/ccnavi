@@ -41,6 +41,8 @@ keywords: [scratchpad, handoff, user handoff, 取り込み, 保護対象, wip/ha
 
 ## セッションのスクラッチパッドには置かない
 
+Artifactツールが失敗したとき、ccnaviはHTMLの出力先としてこの`scratchpad/`を知らせる。
+
 Claude Codeのセッションが示すスクラッチパッド（Environment欄の`.../scratchpad`、`/tmp/claude-*`の下）は、置き場ではない。使い捨ては`scratchpad/`、ユーザに渡す物は`wip/handoff/`に置く。セッションのスクラッチパッドへの書き込みは、ccnaviがこの2つへ案内して止める。
 
 ## 書き込みを止められている場所を直したいとき
