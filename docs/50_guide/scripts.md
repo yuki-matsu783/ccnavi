@@ -1,9 +1,9 @@
 ---
 title: 配布するスクリプト
 type: guide
-description: .ccnavi/scripts/ にある sh の一覧。どの sh が何をし、誰が打つか（エージェント・ユーザ・hook）。ユーザ専用の sh、ワークツリーと git の入口、チケットとレビューの入口、共有の部品
+description: .ccnavi/scripts/ にある sh の一覧。どの sh が何をし、誰が打つか（エージェント・ユーザ・hook）。ユーザ専用の sh、ワークツリーと git の入口、チケットとレビューの入口、直接は打たないファイル
 tags: [user-guide, scripts]
-keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.sh, ccnavi-worktree.sh, ccnavi-user, launcher, ラッパー, 保護済み]
+keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.sh, ccnavi-worktree.sh, ccnavi-user, ccnavi-handoff-names.txt, launcher, ラッパー, 保護済み]
 ---
 
 # 配布するスクリプト
@@ -23,7 +23,7 @@ keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.s
 | `ccnavi-session-start.sh` | セッション開始の入口。下の `ccnavi-fetch.sh` と `ccnavi-dirs.sh` を順に呼ぶ | hook |
 | `ccnavi-fetch.sh` | リモートの最新を取る。親ブランチと、ワークツリーの起点になる統合先ブランチ。進めるのは fast-forward だけ | hook |
 | `ccnavi-dirs.sh` | `projects/` に clone 済みの外リポジトリを、最新コミットが新しい順に出す | hook |
-| `ccnavi-idle.sh` | 大きな会話が放置されたとき、記憶（プロンプトキャッシュ）が切れる前に、次のセッションへの引き継ぎプロンプトを書かせる。`start`（待機）・`notice`（ユーザへの知らせ）・`reset`（入力で待機をやめる）。[設定](settings.md)の「大きな会話を放置したとき」 | hook |
+| `ccnavi-idle.sh` | 大きな会話が放置されたとき、時間が経って会話の再利用が効かなくなる前に、次のセッションへの引き継ぎプロンプトを書かせる。`start`（待機）・`notice`（ユーザへの知らせ）・`reset`（入力で待機をやめる）。[設定](settings.md)の「大きな会話を放置したとき」 | hook |
 
 ## git・ワークツリー
 
@@ -33,7 +33,7 @@ keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.s
 | `ccnavi-worktree.sh` | 直接作業のワークツリーを、取り込み先から切る。状況にずれや書きかけがあれば、切らずに状態と確認コードを出し、ユーザの了承を得て打ち直す。親のワークツリーの中からは、親の提案が承認前のときだけ切り替えられる（それ以外は断る） | エージェント |
 | `ccnavi-sync.sh` | 親のブランチをリモートから取り込む。リモートから消えた親のブランチを診断する | エージェント |
 | `ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`--worktree` で、掃除とワークツリーの削除を 1 本で行う | エージェント |
-| `ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/` へコピーして、下書きで直せるようにする（`.claude` の階層は `handoff-.claude` に読み替えて置く）。元の場所へ取り込むのはユーザ（`sh .ccnavi/scripts/ccnavi-user-handoff.sh`） | エージェント |
+| `ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/` へコピーして、下書きで直せるようにする（`.claude` の下は、`wip/handoff/` では `handoff-.claude` の名前で置かれる）。元の場所へ取り込むのはユーザ（`sh .ccnavi/scripts/ccnavi-user-handoff.sh`） | エージェント |
 
 ## issue・MR・チケット・レビュー
 
@@ -57,13 +57,7 @@ keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.s
 | `ccnavi-user-mirror.sh` | 共通レイヤーのミラーと工程スキル（`skills/`）のずれを見て、プロジェクトへ揃える。引数なしは見せるだけ | ユーザ |
 | `ccnavi-user-prune.sh` | 判定ログと state を整理する。`--preview` は動かすものを並べるだけ | ユーザ |
 
-## 共有の部品
+## 直接は打たないファイル
 
-単体では動かない。他の sh が読み込む。
-
-| sh | 役割 |
-|---|---|
-| `ccnavi-common.sh` | 保護済み sh の共通の入口。パスの絶対化、ワークスペースルート、実行ファイルの場所など。下の部品を最後に読み込む |
-| `ccnavi-common-state.sh` / `-lock.sh` / `-write-and-push.sh` / `-host.sh` / `-log.sh` | state の置き場と親ブランチの push の関門、親子のチケットのロック、write-and-push、ホスト（GitHub / GitLab）への接続、診断ログ |
-| `ccnavi-common-review.sh` | ホストのマージリクエストを読む部品。レビューの sh だけが読む |
-| `ccnavi-user-lib-review.sh` | ユーザの判断をホストに書く部品。ユーザ専用のレビューの sh が読む |
+`.ccnavi/scripts/` には、上の sh のほかに、他の sh が読み込む部品（`ccnavi-common*.sh`・`ccnavi-user-lib-review.sh`）と、
+下書きの置き場で読み替える `.claude` の階層名の表（`ccnavi-handoff-names.txt`。sh ではなくデータ）がある。どれも直接は打たない。

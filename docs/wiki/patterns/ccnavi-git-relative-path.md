@@ -1,6 +1,8 @@
 ---
 title: ワークツリーから相対パスで ccnavi-git.sh を呼ぶ
 type: learning-wiki
+target: skill
+sources: [feature-207]
 description: ワークツリーの中で ../../../.ccnavi/scripts/ccnavi-git.sh と相対パスで呼ぶと、cwd によって届かないパターン
 tags: [skills, feedback]
 keywords: [ccnavi-git.sh, 相対パス, 絶対パス, ワークツリー, cwd, git, 入口, DENY_COMMAND_NAME_EXPANSION]
@@ -16,7 +18,7 @@ keywords: [ccnavi-git.sh, 相対パス, 絶対パス, ワークツリー, cwd, g
 
 相対パスは cwd がワークツリーの最上段のときしか合わない。サブディレクトリに cd した後や、cwd が別のツリーに戻ったときは外れる。
 commit スキルの「git の入口」と `.ccnavi/docs/worktree.md` の「基本」の表がこの書き方で、git を直接呼んだときの拒否の案内（絶対パスの形）と食い違っている。
-`.ccnavi/docs/worktree.md` の直しは `chore-212-worktree-doc-absolute-path` で出した（スキルではないので `skill-impact.md` には載せない）。
+`.ccnavi/docs/worktree.md` の直しは `chore-212-worktree-doc-absolute-path` で出した（スキルの提案ではないので `impact/` には載せない）。
 
 ## 操作の例
 

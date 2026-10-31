@@ -52,7 +52,7 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 
 付随する `--yes`・`--digest`・`--expect`・`--via`・`--reason`・`--result`・`--json` などは、内部の形のときと同じ位置と意味で読む。
 
-見るだけの形のうち、`user` に入れず今までの形のまま通すのは次の 3 つ: `--agree --preview [--verify] [--json]`、`--prune --preview`、
+見るだけの形のうち、`user` に入れずそのまま通すのは次の 3 つ: `--agree --preview [--verify] [--json]`、`--prune --preview`、
 `--reviewed N --accept-unresolved --preview`（`ccnavi-review.sh decide <N> --preview` が内部で呼ぶ）。
 `user handoff` と `user mirror` は見るだけの形（`--yes` なし）も `user` の入口の中に置き、外では断る（見るだけの形を通す `unless` を持たない）。
 

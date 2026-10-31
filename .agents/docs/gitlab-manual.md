@@ -31,7 +31,7 @@ uv run python tests/manual/gitlab/docker_gitlab.py down --purge  # ボリュー�
 ```
 
 - `up` は、イメージが無いとき取得せずに止まる。取得は `--pull` を付けたときだけ。
-- `up` は、動いていれば起動しない。健康になり、`/api/v4/version` が応答するまで待つ（上限 15 分）。実測（GitLab 19.4.1、イメージ取得済み）では、停止後の再起動に約 2 分、`up --pull` の全体に約 1 分かかる。イメージを初めて取る時間は、この実測には含まない。
+- `up` は、動いていれば起動しない。健康になり、`/api/v4/version` が応答するまで待つ（上限 15 分）。起動には数分かかる（イメージを初めて取る時間は含まない）。
 - CE は 4GB のメモリが要る。コンテナの上限は余裕をとって 6g（`MEM_LIMIT`）。Docker に割り当てたメモリが 6GB 未満なら、`up` が `次:` で警告する。足りないと engine ごと落ちる。
 - 公開ポートは `127.0.0.1` の `CCNAVI_GITLAB_PORT`（既定 8929）だけ。LAN には公開しない。`probe_gitlab.py` の既定の接続先と `external_url` も、この値から作る。`external_url` と公開ポートは同じ値にする（ずれると clone URL と `web_url` が壊れる）。
 - `restart: "no"`。Docker Desktop の起動時に自動では起動しないようにしている。
@@ -39,15 +39,20 @@ uv run python tests/manual/gitlab/docker_gitlab.py down --purge  # ボリュー�
 
 ## 版の固定
 
-版は `docker_gitlab.py` の `GITLAB_IMAGE` の 1 か所で、ダイジェストで固定する。タグ（`19.4.1-ce.0` など）は使わない。
-`latest` は使わない。版を上げるときは、この値を書き換えて `up --pull` を打つ。
+版は `docker_gitlab.py` の `GITLAB_IMAGE` の 1 か所で、ダイジェストで固定する。ここが版の正で、ほかの文書に版の数字を写さない（契約テストの記録 `recorded.json` は、録った版を `gitlab_version` に持つ）。
+タグ（`<版>-ce.0` など）と `latest` は使わない。版を上げるときは、この値を書き換えて `up --pull` を打つ。
+
+## ほかの作業が使っているとき
+
+同じ GitLab を、ほかのセッションの probe・受入シナリオ・契約の録り直しが使っているかもしれない。動いていなければ `up` で起こすが、`down`・`up --rotate`・`docker restart` は打たない（実行中の作業のトークンと接続が切れる）。
 
 ## トークン
 
 - `up` は、有効なトークンがあれば作り直さない。作り直すと、既存のトークンが失効するため。
 - `up --rotate` のときだけ作り直す。既存は失効する。
 - トークンは `~/.cache/ccnavi/gitlab/tokens.env`（`XDG_CACHE_HOME` があればその下）に 0600 で書く。リポジトリの外。端末には出さない。
-- 使うときは、`set -a; . <status が出すパス>; set +a` で環境変数に載せる。
+- 使うときは、`set -a; . <status が出すパス>; set +a` で環境変数に載せる。受入シナリオの実行器と契約の録り直しは、回すたびにこのファイルから読む。
+- 同じ uid のエージェントはこのファイルを読め、root のトークンで管理者 API から人間役のトークンを作れる。人間役の独立は保証しない。
 - トークンの有効期限は 7 日。期限が切れたら、`up` が失効（401）を見て自動で作り直す。`--rotate` は有効なものも作り直したいときだけ。
 
 ## probe_gitlab.py で 1 周する
@@ -74,7 +79,7 @@ uv run python tests/manual/gitlab/probe_gitlab.py
 ## CE の限界
 
 - 変更要求（`request_changes`）は GitLab EE の機能。CE では 404 になる。probe は 404 のとき、その段を SKIP とする（PASS に数えない）。EE では出して、続く「変更要求が立っていると confirm は止まる」段も通す。
-  この 404 は、実機の CE（19.4.1）で probe を回して確かめた（`request_changes` が `status=404`）。ほかの版では未確認。
+  この 404 は、実機の CE（版は `GITLAB_IMAGE`）で probe を回して確かめた（`request_changes` が `status=404`）。ほかの版では未確認。
 
 ## 手動の通し確認
 

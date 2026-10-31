@@ -7,7 +7,7 @@ keywords: [scratchpad, handoff, wip/handoff, 置き場, 下書き, gitignore, in
 ---
 # ADR-0129: 置き場を wip/handoff/ と ルート直下の scratchpad/ の 2 つに分ける
 
-状態: 採用（2026-10-12 にユーザが決めた。ADR-0110 の「置き場をひとつにする」を改める。`wip/` に置く側の扱いは ADR-0110 のまま）
+状態: 採用（ユーザが決めた。ADR-0110 の「置き場をひとつにする」を改める。`wip/` に置く側の扱いは ADR-0110 のまま）
 
 ## 状況
 

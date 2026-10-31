@@ -21,19 +21,19 @@ Claude Code はワークスペースを開く。要求は [要件 REQ-MLT](../11
 - チケットのプロジェクトは提案を置いた場所で決まる
 - 着手済みの親があるとき、ユーザの発言のたびに、ワークスペースルートの共通レイヤーを親のワークツリーのプロジェクトの `.ccnavi/config/common/` へミラーする。プロジェクトの config には触れない。ワークスペースの中ではルートの共通レイヤーだけを読み、ミラーはプロジェクトを単体で clone したときだけ共通レイヤーとして読まれる（11.12）
 
-### 11.0 使い方は 2 通りある
+### 11.0 プロジェクトの置き方は 2 通りある
 
-プロジェクトは、ワークスペースの `projects/<名前>/` に clone して使う形（ワークスペース内 clone）と、そのリポジトリだけを clone して使う形（単体 clone）のどちらでも使われる。ccnavi はどちらでも動かす。判断の経緯は [ワークスペース内 clone と単体 clone の両方で動かす](../30_adr/config/0145-work-in-workspace-and-standalone-clone.md)。
+プロジェクトは、ワークスペースの `projects/<名前>/` に clone して使う形（ワークスペース内 clone）と、そのリポジトリだけを clone して使う形（単体 clone）のどちらでも使われる。ccnavi はどちらでも動かす。
 
 ワークスペースにあるものに頼る機能は、単体 clone で「動く」「縮退して動く」「動かない」のどれになるかを、足すときに決める。いまの状態は次のとおり。
 
 - 共通レイヤー: ワークスペースの中ではルートのものだけを読み、単体 clone では配られたミラーを読む。動く（11.4、11.12）
-- 工程スキル: 共通レイヤーのミラーと同じく、ユーザの発言のたびに、着手済みの親のワークツリーのプロジェクトの `skills/<工程>/` へコピーする。コピーは git に入り、reference は `ccnavi --docs` で引ける。入口の SKILL.md を読ませる目録は、単体 clone では出ない。縮退で、未解決（11.13）
-- プロジェクトのスキル: プロジェクトの git に入る。目録は単体 clone では出ない。縮退しており、この点は未解決（11.13）
+- 工程スキル: 共通レイヤーのミラーと同じく、ユーザの発言のたびに、着手済みの親のワークツリーのプロジェクトの `skills/<工程>/` へコピーする。コピーは git に入り、reference は `ccnavi --docs` で引ける。入口の SKILL.md を読ませる目録は、単体 clone では出ない（縮退。11.13）
+- プロジェクトのスキル: プロジェクトの git に入る。目録は単体 clone では出ない（縮退。11.13）
 
-個別の不都合は [11.14 単体 clone で不都合な処理の一覧](multi-repo/standalone-clone-gaps.md) にまとめた。
+処理のまとまりごとの単体 clone での動作は 11.14 にまとめてある。
 
-「モード A / モード B」は、手引きと sh のコメントなどで使う、ワークスペース全体の形（`projects/` の有無）の呼び分けで、この設計書には定義が無い。ワークスペース内 clone は、モード B でそのプロジェクト 1 つを指す呼び方になる。単体 clone にはワークスペースが無いので、どちらでもない。ワークスペース内 clone でも、プロジェクトのディレクトリで Claude Code を起動すると、ワークスペースの hook は動かず、ccnavi の見え方は単体 clone に近くなる。この形も対象に含む。前提は要件書の「想定する使い方」にある。ルートの決め方が食い違うなど、まだ直っていない点は [11.14](multi-repo/standalone-clone-gaps.md) にある。
+ワークスペース内 clone は、ワークスペースの `projects/` の下にある clone で、そのプロジェクト 1 つを指す呼び方になる。単体 clone は、ワークスペースを持たず、clone 済みのプロジェクトから起動する形（利用形態の 2 つ目）で使う clone である。ワークスペース内 clone でも、プロジェクトのディレクトリで Claude Code を起動すると、ワークスペースの hook は動かず、ccnavi の見え方は単体 clone に近くなる。この形も対象に含む。前提は要件書の「想定する使い方」にある。ルートの決め方がワークスペース内 clone で食い違う形は 11.14 にある。
 
 ### 11.1 何を解くか
 
@@ -56,8 +56,8 @@ Claude Code はワークスペースを開く。要求は [要件 REQ-MLT](../11
 | 11.7 | [multi-repo/post-check.md](multi-repo/post-check.md) | ツリーごとの実行後チェック |
 | 11.8 | [multi-repo/scripts.md](multi-repo/scripts.md) | 保護済みスクリプトの案内と `{root}` |
 | 11.9 | [multi-repo/diagnostics.md](multi-repo/diagnostics.md) | レイヤーごとの診断と記録 |
-| 11.10 | [multi-repo/to-measure.md](multi-repo/to-measure.md) | 実装時に実測するもの |
+| 11.10 | [multi-repo/to-measure.md](multi-repo/to-measure.md) | 実測で確かめた前提 |
 | 11.11 | [multi-repo/out-of-scope.md](multi-repo/out-of-scope.md) | 見ないもの、入れないもの |
 | 11.12 | [multi-repo/distribute-common.md](multi-repo/distribute-common.md) | 共通レイヤーをプロジェクトの `.ccnavi/config/common/` へミラーする。ずれの確認と同期は `user mirror` |
 | 11.13 | [multi-repo/skills.md](multi-repo/skills.md) | プロジェクトのスキルの置き場と目録 |
-| 11.14 | [multi-repo/standalone-clone-gaps.md](multi-repo/standalone-clone-gaps.md) | 単体 clone で不都合な処理の一覧（調査の記録。直し方は未決） |
+| 11.14 | [multi-repo/standalone-clone-gaps.md](multi-repo/standalone-clone-gaps.md) | 単体 clone での動作。処理のまとまりごとの、ワークスペース内 clone との違いと、動く・縮退する・働かないの別 |

@@ -51,4 +51,4 @@ MR #313 のフェーズ 1 で、エージェントが道の各所（`finish`・�
 
 ## 後続の変更
 
-この ADR の決定のあと、直接作業の `integrate` を促す促しが `finish` の促し → 依頼までの道の促しの次に加わった。1 回の Stop で止める理由が 1 つなのは変わらず、順序は `finish` → 依頼までの道 → `integrate` → `match: Stop` のルールになった（`docs/21_design/pre-check.md` 6.6）。
+この ADR の決定のあと、直接作業の `integrate` を促す促しが `finish` の促し → 依頼までの道の促しの次に加わった。1 回の Stop で止める理由が 1 つなのは変わらず、順序は `finish` → 依頼までの道 → `integrate` → `match: Stop` のルールになった（`docs/21_design/pre-check.md` の「モデルへ渡す文」の節）。
