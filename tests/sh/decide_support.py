@@ -19,6 +19,7 @@ from tests import ROOT
 # 実行ファイルの代役。`ops` は本物へ渡す。`--preview` は決まった一覧を返し、`STUB_PLAN` があれば
 # その計画を使う。`--accept-plan` は本物の操作記録に判断を保存して
 # 計画を書き、`--yes` は計画の操作ID に「適用した」を記録する。
+# `--check` は `STUB_FAIL_CHECK` があれば断る。
 STUB = """#!/bin/sh
 case " $* " in
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
@@ -28,6 +29,7 @@ esac
 printf '%s\\n' "$*" >>"$STUB_LOG"
 root="$2"
 case " $* " in
+*" --check "*) [ -z "$STUB_FAIL_CHECK" ] || { echo "断った" >&2; exit 1; }; exit 0 ;;
 *" --preview "*) printf '{"version":1,"threads":[{"key":"u1"}],"digest":"d0"}\\n' ;;
 *" --accept-plan "*)
   plan=""; prev=""

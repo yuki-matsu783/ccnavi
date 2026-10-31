@@ -59,6 +59,20 @@ messages:
     next: |-
       上の理由を直して、'{script:ccnavi-ticket.sh} cancel {ticket} --reason <理由>' を打ち直す
 
+  # review-request が、取り込みの前に分かる前提で断ったあと（理由の行のあとに 1 行）。
+  NEXT_REVIEW_REQUEST_REFUSED:
+    kind: next
+    values: [phase]
+    next: |-
+      上の理由を直して、'{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文> --eli5 <HTML>' を打ち直す
+
+  # decide が、取り込みの前に分かる前提で断ったあと（理由の行のあとに 1 行）。
+  NEXT_DECIDE_REFUSED:
+    kind: next
+    values: [phase]
+    next: |-
+      上の理由を直して、ユーザが '{script:ccnavi-user-decide.sh} {phase}' を打ち直す
+
   # 定性のリスク項目の判定を記録したあと。
   NEXT_OPS_RECORD_RISK:
     kind: next

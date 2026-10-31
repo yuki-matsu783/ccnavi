@@ -3449,6 +3449,73 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(len(prepared.stdout.splitlines()), 1, prepared.stdout)
         self.assertEqual([n for n in os.listdir(self.state) if n.startswith("review-mr-")], [])
 
+    def test_prepare_check_refuses_like_prepare_and_writes_nothing(self):
+        """`prepare --check` は本体と同じ前提で断り、何も書かない（フェーズが終わっていない）。"""
+        self.family()
+        body = write(os.path.join(self.root, "body.md"), "見てほしい点\n")
+        args = ("--cwd", self.parent_tree, "--phase", "1", "--body-file", body)
+        before = sorted(os.listdir(self.state)) if os.path.isdir(self.state) else []
+        checked = self.ccnavi("--check", *args, "review", "prepare")
+        real = self.ccnavi(*args, "review", "prepare")
+        self.assertEqual(checked.returncode, 1, checked.stdout + checked.stderr)
+        self.assertEqual(real.returncode, 1, real.stdout + real.stderr)
+        self.assertEqual(checked.stderr, real.stderr)
+        self.assertIn("フェーズが終わっていない", checked.stderr)
+        self.assertEqual(len([ln for ln in checked.stderr.splitlines() if "次:" in ln]), 1)
+        after = sorted(os.listdir(self.state)) if os.path.isdir(self.state) else []
+        self.assertEqual(before, after)
+
+    def test_prepare_check_passes_without_writing_the_body(self):
+        self.family()
+        self.close_phase()
+        self.remote()
+        body = write(os.path.join(self.root, "body.md"), "見てほしい点\n")
+        checked = self.ccnavi(
+            "--check", "--cwd", self.parent_tree, "--phase", "1", "--body-file", body,
+            "review", "prepare",
+        )  # fmt: skip
+        self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+        self.assertIn("何も変えていません", checked.stdout)
+        self.assertFalse(os.path.isdir(self.state) and os.listdir(self.state))
+
+    def test_decide_check_refuses_without_a_request_and_writes_nothing(self):
+        """依頼の記録が無ければ、`--check` は本体（`--preview`）と同じ理由で断る。"""
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        base = ("--cwd", self.parent_tree, "user", "reviewed", "1", "--accept-unresolved")
+        head = git(self.parent_tree, "rev-parse", "HEAD")
+        checked = self.ccnavi(*base, "--check")
+        shown = self.ccnavi(*base, "--preview", "--json", "--result", fixture)
+        self.assertEqual(checked.returncode, 1, checked.stdout + checked.stderr)
+        self.assertEqual(shown.returncode, 1, shown.stdout + shown.stderr)
+        self.assertEqual(checked.stderr, shown.stderr)
+        self.assertIn("依頼の記録がありません", checked.stderr)
+        self.assertEqual(len([ln for ln in checked.stderr.splitlines() if "次:" in ln]), 1)
+        self.assertEqual(git(self.parent_tree, "rev-parse", "HEAD"), head)
+        self.assertEqual(git(self.parent_tree, "status", "--porcelain"), "")
+
+    def test_decide_check_passes_after_a_request_and_checks_the_choices_shape(self):
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        base = (
+            "--cwd",
+            self.parent_tree,
+            "user",
+            "reviewed",
+            "1",
+            "--accept-unresolved",
+            "--check",
+        )
+        ok = self.ccnavi(*base)
+        self.assertEqual(ok.returncode, 0, ok.stdout + ok.stderr)
+        self.assertIn("何も変えていません", ok.stdout)
+        bad = self.ccnavi(*base, "--yes", "not-json", "--digest", "d0")
+        self.assertEqual(bad.returncode, 1, bad.stdout + bad.stderr)
+        self.assertEqual(len([ln for ln in bad.stderr.splitlines() if "次:" in ln]), 1)
+
     def confirm(self, fixture, phase="1"):
         return self.ccnavi(
             "--cwd", self.parent_tree, "--phase", phase, "review", "confirm", "--result", fixture

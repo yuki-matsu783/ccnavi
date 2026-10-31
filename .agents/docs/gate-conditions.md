@@ -20,6 +20,8 @@ ccnavi の開発で、操作を止める条件を足す・直すとき、実装�
 
 `start`・`finish`・`cancel`・`consolidate` の書く前の検査は、`lifecycle/commands.py` の `start_gate`・`finish_gate`・`cancel_gate` と `consolidate.py` の `gate` に置き、本体と `--check`（sh が取り込みの前に呼ぶ）が同じ関数を通る。合流のあとでないと分からない検査だけが本体に残る。
 
+`review-request` の前提は `tickets/review/request.py` の `request_gate`、`decide` の依頼の記録・動きの検査は `tickets/review/decide.py` の `decide_gate` に置く。本体と `--check`（`ccnavi --check review prepare`・`ccnavi --check --reviewed N --accept-unresolved`。sh がロック・取り込みの前に呼ぶ）が同じ関数を通る。マージリクエストの有無など、ホストの API が要る条件は事前には判断しない。
+
 親のワークツリーの未コミットの変更と親ブランチの未 push は、`lifecycle/treegate.py`（`check`）に寄せた。操作が見る条件は `WATCHES` に宣言する。git の呼び出しが重複していないことは `tests/core/test_gate_single_source.py`、操作ごとの拒否は `tests/core/test_treegate.py` が守る。置き場の判定は `ticket_places.is_ticket_place` に一本化した。
 
 ## ユーザに頼む操作は、後の関門で止まる条件を先に拒否する

@@ -1089,7 +1089,11 @@ def _parsed(
         # オーバーレイで押した `--yes` はターミナルを求めない。
         # `--yes` を守るのは、見せた指摘のダイジェストの一致と、
         # シェルから打つ形を止める組み込みの deny。
-        board = args.reviewed is not None and args.accept_unresolved and (args.preview or args.yes)
+        board = (
+            args.reviewed is not None
+            and args.accept_unresolved
+            and (args.preview or args.yes or args.check)
+        )
         if (
             args.reviewed is not None
             and not board

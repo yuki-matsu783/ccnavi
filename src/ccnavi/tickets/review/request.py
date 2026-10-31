@@ -85,25 +85,29 @@ RESOLVE_NOTE = (
 )
 
 
-def prepare(
-    stdout: TextIO,
+def request_gate(
     stderr: TextIO,
     root: str,
     conf: settings.Settings,
     cwd: str,
     phase_no: int,
     body_file: str,
-) -> int:
-    """前提を全部確かめ、投稿する本文を state の置き場に書き出す。標準出力はその置き場。"""
+) -> tuple[ticket_model.Ticket, phase.Phase, str, str] | None:
+    """`review-request` の、ワークツリーの中で分かる前提の検査。通れば (親, フェーズ, 親のツリー, 依頼文)。
+
+    本体（`prepare`）と `prepare --check` が同じものを通る。断ったときは理由のあとに `次:` を 1 行足す。
+    ホストの状態（マージリクエストの有無・向き先）は見ない。それは sh が取ってくる。
+    """
     found = _parent_phase(stderr, root, conf, cwd, phase_no)
     if found is None:
-        return 1
+        _refused(stderr, root, phase_no)
+        return None
     parent, ph = found
+    unmet: list[str] = []
     if not conf.state:
-        stderr.write("ccnavi: state の置き場が空。投稿する本文を置く場所がありません。\n")
-        return 1
+        unmet.append("state の置き場が空。投稿する本文を置く場所がありません")
     tree_root = tree.worktree_path(root, parent.ticket)
-    unmet = _unmet(root, tree_root, conf, ph)
+    unmet += _unmet(root, tree_root, conf, ph)
     body = _read_body(_resolve(cwd, body_file))
     if body is None:
         unmet.append(f"依頼文を読めない ({body_file})")
@@ -122,7 +126,46 @@ def prepare(
         stderr.write(f"ccnavi: 依頼の前提が {len(unmet)} 件満たされていない\n")
         for line in unmet:
             stderr.write(f"  - {line}\n")
+        _refused(stderr, root, phase_no)
+        return None
+    return parent, ph, tree_root, body
+
+
+def _refused(stderr: TextIO, root: str, phase_no: int) -> None:
+    """断った理由のあとに、打ち直す 1 手を `次:` で足す。"""
+    stderr.write(texts.say(root, "NEXT_REVIEW_REQUEST_REFUSED", {"phase": str(phase_no)}) + "\n")
+
+
+def check_request(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    cwd: str,
+    phase_no: int,
+    body_file: str,
+) -> int:
+    """`review prepare --check`。`request_gate` を通すだけ（何も書かない）。sh が取り込みの前に呼ぶ。"""
+    if request_gate(stderr, root, conf, cwd, phase_no, body_file) is None:
         return 1
+    stdout.write("確認: ok（review-request を打てる状態。何も変えていません）\n")
+    return 0
+
+
+def prepare(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    cwd: str,
+    phase_no: int,
+    body_file: str,
+) -> int:
+    """前提を全部確かめ、投稿する本文を state の置き場に書き出す。標準出力はその置き場。"""
+    gated = request_gate(stderr, root, conf, cwd, phase_no, body_file)
+    if gated is None:
+        return 1
+    parent, ph, tree_root, body = gated
     # 計画があれば、このレビューが含むフェーズを機械が先頭に書く。延期した分を
     # ユーザが読み落とさないように。
     body = _covered_header(root, conf, parent, ph) + body

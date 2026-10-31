@@ -181,6 +181,92 @@ def changed_since_shown(d: Decision, base: str, versions: dict[str, str]) -> lis
     return out
 
 
+def decide_gate(
+    stderr: TextIO, root: str, conf: settings.Settings, cwd: str, phase_no: int
+) -> tuple[ticket_model.Ticket, phase.Phase, dict] | None:
+    """decide の、ホストに聞かずに分かる前提の検査。通れば (親, フェーズ, 依頼のマーカー)。
+
+    親とフェーズがあること、依頼の記録があること、依頼のあとに見せたものが動いていないこと。
+    本体（`_decision`）と `check` が同じものを通る。断ったときは理由のあとに `次:` を 1 行足す。
+    ホストの状態（変更要求・未解決の指摘・ダイジェスト）は見ない。それは sh が取ってくる。
+    """
+    found = review._parent_phase(stderr, root, conf, cwd, phase_no)
+    if found is None:
+        _refused(stderr, root, phase_no)
+        return None
+    parent, ph = found
+    requested_mark = ph.marks.get(approval_marks.MARK_REQUESTED)
+    if requested_mark is None:
+        stderr.write("ccnavi: 依頼の記録がありません。先に review-request してください\n")
+        _refused(stderr, root, phase_no)
+        return None
+    tree_root = tree.worktree_path(root, parent.ticket)
+    moved = review._moved_detail(tree_root, conf, requested_mark, bool(parent.project))
+    if moved.text:
+        stderr.write(f"ccnavi: {moved.text}。{review._redo_request(root, phase_no)}\n")
+        for line in review.moved_explanation(moved):
+            stderr.write(f"{line}\n")
+        _refused(stderr, root, phase_no)
+        return None
+    return parent, ph, requested_mark
+
+
+def _refused(stderr: TextIO, root: str, phase_no: int) -> None:
+    """断った理由のあとに、打ち直す 1 手を `次:` で足す。"""
+    stderr.write(texts.say(root, "NEXT_DECIDE_REFUSED", {"phase": str(phase_no)}) + "\n")
+
+
+def _parse_choices(
+    stderr: TextIO, choices_text: str, digest: str
+) -> tuple[tuple[str, dict[str, str]], dict] | None:
+    """`--yes` の選択とダイジェストの形を検める。通れば (ダイジェストの中身, 選択)。何も置かない。"""
+    if not digest.strip():
+        stderr.write("ccnavi: --yes には --digest（見せた指摘のダイジェスト）が必要です。\n")
+        return None
+    want = parse_digest(digest.strip())
+    if want is None:
+        stderr.write(
+            "ccnavi: --digest を読めない（古い版のボードが渡した値かもしれない）。"
+            "拡張を更新して、指摘を見せ直してください。何も置いていない\n"
+        )
+        return None
+    try:
+        raw = json.loads(choices_text)
+    except ValueError:
+        stderr.write("ccnavi: --yes の選択を JSON として読めない\n")
+        return None
+    if not isinstance(raw, dict) or not all(
+        isinstance(k, str) and v in CHOICES for k, v in raw.items()
+    ):
+        stderr.write(f"ccnavi: --yes の選択は {{キー: {' / '.join(CHOICES)}}} の形で渡す\n")
+        return None
+    return want, raw
+
+
+def check(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    cwd: str,
+    phase_no: int,
+    choices_text: str = "",
+    digest: str = "",
+) -> int:
+    """`--reviewed N --accept-unresolved --check`。置く前に分かる前提だけを通す（読むだけ）。
+
+    `decide_gate` に加えて、選択とダイジェストを渡されたときはその形も検める
+    （`decide_yes` と同じ `_parse_choices`）。sh が取り込み・ロックの前に呼ぶ。
+    """
+    if decide_gate(stderr, root, conf, cwd, phase_no) is None:
+        return 1
+    if (choices_text or digest) and _parse_choices(stderr, choices_text, digest) is None:
+        _refused(stderr, root, phase_no)
+        return 1
+    stdout.write("確認: ok（decide を打てる状態。何も変えていません）\n")
+    return 0
+
+
 def _decision(
     stderr: TextIO,
     root: str,
@@ -196,21 +282,10 @@ def _decision(
     解決済みになっているが、見せた指摘の一部として数え直す（見せたときと同じ並びでダイジェストを
     組み直し、見せたあとに指摘が増えたり変わったりしていないことを確かめるため）。
     """
-    found = review._parent_phase(stderr, root, conf, cwd, phase_no)
-    if found is None:
+    gated = decide_gate(stderr, root, conf, cwd, phase_no)
+    if gated is None:
         return None
-    parent, ph = found
-    requested_mark = ph.marks.get(approval_marks.MARK_REQUESTED)
-    if requested_mark is None:
-        stderr.write("ccnavi: 依頼の記録がありません。先に review-request してください\n")
-        return None
-    tree_root = tree.worktree_path(root, parent.ticket)
-    moved = review._moved_detail(tree_root, conf, requested_mark, bool(parent.project))
-    if moved.text:
-        stderr.write(f"ccnavi: {moved.text}。{review._redo_request(root, phase_no)}\n")
-        for line in review.moved_explanation(moved):
-            stderr.write(f"{line}\n")
-        return None
+    parent, ph, requested_mark = gated
     result = review._matching(stderr, result_path, requested_mark)
     if result is None:
         return None
@@ -433,26 +508,10 @@ def decide_yes(
     結果は JSON で返す。違えば置かずに `mismatch` を返す（返信・解決を済ませた分は操作記録に残す）。
     """
     # 入力の形を検める。ここで断るときは、まだ何も置いていない。
-    if not digest.strip():
-        stderr.write("ccnavi: --yes には --digest（見せた指摘のダイジェスト）が必要です。\n")
+    parsed = _parse_choices(stderr, choices_text, digest)
+    if parsed is None:
         return 1
-    want = parse_digest(digest.strip())
-    if want is None:
-        stderr.write(
-            "ccnavi: --digest を読めない（古い版のボードが渡した値かもしれない）。"
-            "拡張を更新して、指摘を見せ直してください。何も置いていない\n"
-        )
-        return 1
-    try:
-        raw = json.loads(choices_text)
-    except ValueError:
-        stderr.write("ccnavi: --yes の選択を JSON として読めない\n")
-        return 1
-    if not isinstance(raw, dict) or not all(
-        isinstance(k, str) and v in CHOICES for k, v in raw.items()
-    ):
-        stderr.write(f"ccnavi: --yes の選択は {{キー: {' / '.join(CHOICES)}}} の形で渡す\n")
-        return 1
+    want, raw = parsed
     # 計画の段（--accept-done）なら、sh が取り直した結果と計画を読む。
     planned = None
     if plan_done:

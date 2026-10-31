@@ -56,6 +56,7 @@ class DecideRecoveryShTest(unittest.TestCase):
         self.cwd = self.tree
 
     calls = base.ReviewDecideShTest.calls
+    all_calls = base.ReviewDecideShTest.all_calls
     record = ops.DecideOpsShTest.record
     choose = ops.DecideOpsShTest.choose
     age = ops.DecideOpsShTest.age

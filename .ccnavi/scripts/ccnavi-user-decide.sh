@@ -213,6 +213,15 @@ trap 'ccnavi_wap_end; exit 130' INT TERM HUP
 
 review_wap
 
+# ホストの API・ロック・取り込みより前に、ワークツリーの中で分かる前提（親とフェーズ・依頼の記録・
+# 依頼のあとに動いていないこと・選択とダイジェストの形）を、何も変えずに断る。
+# 検査は本体と同じ関数（読むだけ）。`--check` は位置引数の前に置く。
+if [ -n "$choices" ]; then
+	ccnavi --entry sh --check user reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" >/dev/null || exit $?
+else
+	ccnavi --entry sh --check user reviewed "$n" --accept-unresolved >/dev/null || exit $?
+fi
+
 # マーカーに残すアカウント。confirm と同じくトークンの持ち主をホストに聞き、
 # ロックを取る前に引く。引けなければ渡さず、マーカーにアカウントを入れない。
 # 経路は、ボードの押した選択（--choices）なら board、ターミナルで選ぶ形なら terminal。

@@ -763,12 +763,20 @@ review-request)
 		fail explainer-unmet "ELI5 の HTML ($eli5) が依頼の前提を満たさない:${eli5_unmet}
 ${eli5_how}"
 	log_debug ELI5 を確かめた -- "eli5=set"
-	# 段 0: 取り込み済みの親子のチケットなら write-and-push の前半（ロック・取り込み）を先に済ませる。
+	# 段 0: ワークツリーの中で分かる前提（フェーズの終了・合流・未コミット・push・依頼済みなど）は、
+	# ロック・取り込みより前に、何も変えずに断る。検査は段 1 の prepare と同じ関数（読むだけ）。
+	# `--check` は位置引数の前に置く。
+	ccnavi --check review prepare "$@" >/dev/null || exit $?
+	# 取り込み済みの親子のチケットなら write-and-push の前半（ロック・取り込み）を先に済ませる。
 	# --check は読むだけなので、ロックも取り込みもしない。
 	[ -n "$rr_check" ] || wap_start "$family"
-	# 段 1: 前提。exe が依頼の本文を書き出す。
-	prepared=$(ccnavi review prepare "$@") || exit $?
-	file=$(printf '%s\n' "$prepared" | sed -n 1p)
+	# 段 1: 前提。exe が依頼の本文を書き出す（取り込みのあとの状態で、段 0 と同じ前提をもう一度通す）。
+	# --check は本文を書かず、段 0 で済んでいる。
+	file=""
+	if [ -z "$rr_check" ]; then
+		prepared=$(ccnavi review prepare "$@") || exit $?
+		file=$(printf '%s\n' "$prepared" | sed -n 1p)
+	fi
 	# 段 1.5: マージリクエストの確認。無ければ作らずに止める（作るのは ccnavi-start.sh）。
 	# 元ブランチがこのツリーの HEAD のブランチと同じで、マージ先が統合先であること。
 	mr=$(find_mr)
@@ -784,9 +792,8 @@ ${eli5_how}"
 	number=$(printf '%s' "$mr" | "$JQ" '.number')
 	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
 	mr=$(printf '%s' "$mr" | "$JQ" -c '{number: .number, url: .url}')
-	# --check はここまでの前提を全部通ったところで終える。投稿もマーカーも置かない（本文の書き出しは state の一時ファイルだけ）。
+	# --check はここまでの前提を全部通ったところで終える。何も書かない（本文も書き出さない）。
 	if [ -n "$rr_check" ]; then
-		rm -f "$file" 2>/dev/null || :
 		printf '確認: ok（前提は通った。取り込みとロックは確かめていない。MR #%s）\n' "$number"
 		exit 0
 	fi

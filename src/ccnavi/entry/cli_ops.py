@@ -112,6 +112,12 @@ def operate(
             no_issue=args.no_issue,
         )
         return EXIT_OK if code == 0 else EXIT_ERROR
+    if args.reviewed is not None and args.accept_unresolved and args.check:
+        # 置く前に分かる前提だけ（読むだけ）。sh が取り込み・ロックの前に呼ぶ。
+        code = review_decide.check(
+            stdout, stderr, root, conf, cwd, args.reviewed, args.yes, args.digest
+        )
+        return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None and args.accept_unresolved and (args.preview or args.yes):
         if args.preview and args.yes:
             stderr.write("ccnavi: --preview と --yes は同時に指定できません。\n")
@@ -283,6 +289,8 @@ def operate(
                 "ccnavi: review prepare には --phase <N> と --body-file <path> を指定してください。"
                 "\n"
             )
+        elif args.check:
+            code = review.check_request(stdout, stderr, root, conf, cwd, args.phase, args.body_file)
         else:
             code = review.prepare(stdout, stderr, root, conf, cwd, args.phase, args.body_file)
     elif kind == "review" and verb in ("requested", "confirm"):
@@ -433,7 +441,8 @@ def _write_and_push_bypass(
     write-and-push を通っていない。
     ユーザの判断の操作（`--close-early`）と、
     書かない形（`--preview`・`--choose-out`・`--accept-plan`・`review prepare`・
-    `ticket start|finish|cancel|approval-request|consolidate --check`）は見ない。
+    `ticket start|finish|cancel|approval-request|consolidate --check`・
+    `--reviewed N --accept-unresolved --check`）は見ない。
     """
     words = list(args.command)
     if args.record_tree or (args.check and words[:2] in _CHECKABLE):
@@ -458,6 +467,7 @@ def _write_and_push_bypass(
         args.reviewed is not None
         and args.accept_unresolved
         and not args.preview
+        and not args.check
         and not args.choose_out
         and not args.accept_plan
     ):
@@ -688,6 +698,7 @@ def _decide_writes(args) -> bool:
         args.reviewed is not None
         and args.accept_unresolved
         and not args.preview
+        and not args.check
         and not args.choose_out
         and not args.accept_plan
     )

@@ -304,6 +304,7 @@ class ReviewDecideShTest(unittest.TestCase):
             STUB_LOG=self.log,
             STUB_PLAN="",
             STUB_FAIL_YES="",
+            STUB_FAIL_CHECK="",
             PATH=tools + os.pathsep + os.path.dirname(shell),
         )
         env.update(extra)
@@ -327,11 +328,15 @@ class ReviewDecideShTest(unittest.TestCase):
         """state に残ったファイル。操作記録の置き場（ops・locks）は数えない。"""
         return sorted(name for name in os.listdir(self.state) if name not in ("ops", "locks"))
 
-    def calls(self) -> list[str]:
+    def all_calls(self) -> list[str]:
         if not os.path.exists(self.log):
             return []
         with open(self.log, encoding="utf-8") as f:
             return f.read().splitlines()
+
+    def calls(self) -> list[str]:
+        """置く・計画の段の呼び出し。事前の検査（`--check`）は `all_calls` にだけ入る。"""
+        return [c for c in self.all_calls() if " --check " not in f" {c} "]
 
     def test_preview_passes_the_answer_through_and_posts_nothing(self):
         shown = self.decide("1", "--preview", script="ccnavi-review.sh")
@@ -492,6 +497,20 @@ class ReviewDecideShTest(unittest.TestCase):
         self.assertEqual([k for k, _ in GitLab.posted], ["reply", "resolve"])
         self.assertIn("置けなかった", failed.stderr)
         self.assertEqual(self.leftovers(), ["review-accept-i0001-1.json"])
+
+    def test_the_gate_refuses_before_the_host_the_lock_and_the_choosing(self):
+        """前提を満たさなければ、ホストへの問い合わせ・取り込み・選ぶ操作の前に断る。"""
+        for args in (("1",), ("1", "--choices", '{"u1":"keep"}', "--digest", "d0")):
+            with self.subTest(args=args):
+                stopped = self.decide(*args, STUB_FAIL_CHECK="1")
+                self.assertEqual(stopped.returncode, 1, stopped.stderr)
+                self.assertEqual(self.calls(), [])
+                self.assertEqual(len(self.all_calls()), 1)
+                self.assertIn(" --check user reviewed 1 --accept-unresolved", self.all_calls()[0])
+                self.assertEqual(GitLab.posted, [])
+                self.assertEqual(GitLab.fetches, 0)
+                self.assertEqual(self.leftovers(), [])
+                os.remove(self.log)
 
     def test_wrong_arguments_are_refused_before_anything_runs(self):
         for args in (
