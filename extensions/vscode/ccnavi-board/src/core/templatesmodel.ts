@@ -129,7 +129,7 @@ export function parseTemplateCheck(text: string): TemplateCheckParse {
       plans: valid ? readPlans(raw.plans) : [],
       types: list(raw.types)
         .filter(isRecord)
-        .map((t): PhaseTypeInfo => ({ id: str(t.id), title: str(t.title), kind: str(t.kind), review: str(t.review) })),
+        .map((t): PhaseTypeInfo => ({ id: str(t.id), title: str(t.title), kind: str(t.kind), review: t.review !== false })),
     },
   };
 }
@@ -295,7 +295,8 @@ function readPlanItems(value: unknown): PlanItem[] {
       index: num(p.index),
       number: num(p.number),
       type: str(p.type),
-      review: str(p.review),
+      review: p.review === true,
+      deferred: p.deferred === true,
       after: numbers(p.after),
     }));
 }

@@ -433,7 +433,7 @@ def plan_signature(t: ticket_model.Ticket, part: str) -> tuple | None:
     start = 1 if part == "plan" else len(t.plan) + 1
     items = t.plan if part == "plan" else (t.feedback or [])
     return tuple(
-        (item.type, item.review, tuple(wf.waits.get(n, [])))
+        (item.type, item.review, item.deferred, tuple(wf.waits.get(n, [])))
         for n, item in enumerate(items, start=start)
     )
 

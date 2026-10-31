@@ -34,11 +34,11 @@ HOME = ".ccnavi"
 COMMON_RISK = "version: 1\nlevels: {medium: 20, high: 40, critical: 70}\nfactors: {}\n"
 COMMON_PHASES = (
     "version: 1\nphases:\n  implement:\n    kind: work\n    title: 実装とテスト\n"
-    '    review: mr\n    scope: ["src/*", "tests/*"]\n'
+    '    review: true\n    scope: ["src/*", "tests/*"]\n'
 )
 OWN_PHASES = (
     "version: 1\nphases:\n  docs:\n    kind: work\n    title: 文書\n"
-    '    review: mr\n    scope: ["docs/*"]\n'
+    '    review: true\n    scope: ["docs/*"]\n'
 )
 
 

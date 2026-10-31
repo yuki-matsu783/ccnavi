@@ -151,11 +151,13 @@ def _scalar(text: str) -> str:
 
 def _item_line(item: plan_templates.Item) -> str:
     """計画の 1 ステップ（`ticket.parse` が読める形。`PlanItem.as_raw` と同じ書き分け）。"""
-    if not item.review and not item.after:
+    if not item.review and not item.deferred and not item.after:
         return f"  - {_scalar(item.type)}"
     parts = [f"type: {_scalar(item.type)}"]
     if item.review:
-        parts.append(f"review: {_scalar(item.review)}")
+        parts.append("review: true")
+    if item.deferred:
+        parts.append("deferred: true")
     if item.after:
         parts.append(f"after: [{', '.join(str(n) for n in item.after)}]")
     return "  - {" + ", ".join(parts) + "}"
@@ -579,7 +581,9 @@ def _plan_text(items: list[plan_templates.Item], first: int) -> str:
         if item.after:
             extra.append("先行 " + ",".join(str(n) for n in item.after))
         if item.review:
-            extra.append(item.review)
+            extra.append("review")
+        if item.deferred:
+            extra.append("deferred")
         parts.append(f"{number} {item.type}" + (f"（{'・'.join(extra)}）" if extra else ""))
     return " / ".join(parts)
 

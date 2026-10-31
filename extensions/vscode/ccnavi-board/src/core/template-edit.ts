@@ -26,8 +26,10 @@ export type PlanPart = "plan" | "feedback";
 /** 計画の 1 ステップ。`after` は計画の中の添字（1 始まり） */
 export interface EditItem {
   readonly type: string;
-  /** ステップの `review`（`mr` / `defer`）。既定は空 */
-  readonly review: string;
+  /** ステップの `review: true`（定義が `review: false` でも要る）。既定は false */
+  readonly review: boolean;
+  /** ステップの `deferred: true`（レビューを後ろのステップへ延ばす）。既定は false。`review` と同時には真にならない */
+  readonly deferred: boolean;
   readonly after: readonly number[];
 }
 
@@ -44,8 +46,13 @@ export interface EditTemplate {
   readonly extra: Readonly<Record<string, unknown>>;
 }
 
-/** ステップの `review` の選べる値（空は定義の既定） */
-export const ITEM_REVIEWS = ["", "mr", "defer"] as const;
+/** ステップのレビューの指定（画面の選択肢）。空は定義のまま、`review` は `review: true`、`deferred` は `deferred: true` */
+export const ITEM_MODES = ["", "review", "deferred"] as const;
+export type ItemMode = (typeof ITEM_MODES)[number];
+
+export function modeOf(item: EditItem): ItemMode {
+  return item.review ? "review" : item.deferred ? "deferred" : "";
+}
 
 const KNOWN = new Set(["name", "description", "when", "plan", "feedback", "flows"]);
 
@@ -63,10 +70,10 @@ function readItems(value: unknown): EditItem[] | undefined {
   const out: EditItem[] = [];
   for (const entry of value) {
     if (typeof entry === "string") {
-      out.push({ type: entry, review: "", after: [] });
+      out.push({ type: entry, review: false, deferred: false, after: [] });
     } else if (isRecord(entry) && typeof entry.type === "string") {
       const after = Array.isArray(entry.after) ? entry.after.filter((n): n is number => typeof n === "number") : [];
-      out.push({ type: entry.type, review: typeof entry.review === "string" ? entry.review : "", after: [...new Set(after)].sort((a, b) => a - b) });
+      out.push({ type: entry.type, review: entry.review === true, deferred: entry.deferred === true && entry.review !== true, after: [...new Set(after)].sort((a, b) => a - b) });
     } else {
       return undefined;
     }
@@ -112,7 +119,7 @@ export function fromData(raw: unknown): EditTemplate | undefined {
 
 /** 空の名前から始める新しいテンプレート。`type` は最初のステップの型 */
 export function blankTemplate(name: string, type: string): EditTemplate {
-  return { name, description: "", when: "", plan: [{ type, review: "", after: [] }], feedback: [], flows: {}, extra: {} };
+  return { name, description: "", when: "", plan: [{ type, review: false, deferred: false, after: [] }], feedback: [], flows: {}, extra: {} };
 }
 
 /** まだ何も入力していないか。`blank` は `blankTemplate` で作った開いた直後の中身。書き出す形で比べる */
@@ -122,13 +129,15 @@ export function untouched(template: EditTemplate, blank: EditTemplate): boolean 
 
 function itemData(item: EditItem): unknown {
   const type = item.type.trim();
-  const review = item.review.trim();
-  if (review === "" && item.after.length === 0) {
+  if (!item.review && !item.deferred && item.after.length === 0) {
     return type;
   }
   const out: Record<string, unknown> = { type };
-  if (review !== "") {
-    out.review = review;
+  if (item.review) {
+    out.review = true;
+  }
+  if (item.deferred) {
+    out.deferred = true;
   }
   if (item.after.length > 0) {
     out.after = [...item.after].sort((a, b) => a - b);
@@ -207,8 +216,8 @@ function partOf(template: EditTemplate, part: PlanPart): readonly EditItem[] {
 
 // ---- ステップの編集（どれも新しいコピーを返す。できない編集は元のまま返す）
 
-/** ステップの型・`review` を差し替える */
-export function setItem(template: EditTemplate, part: PlanPart, index: number, patch: { readonly type?: string; readonly review?: string }): EditTemplate {
+/** ステップの型・レビューの指定（`mode`）を差し替える */
+export function setItem(template: EditTemplate, part: PlanPart, index: number, patch: { readonly type?: string; readonly mode?: ItemMode }): EditTemplate {
   const items = partOf(template, part);
   if (index < 1 || index > items.length) {
     return template;
@@ -216,7 +225,7 @@ export function setItem(template: EditTemplate, part: PlanPart, index: number, p
   return withPart(
     template,
     part,
-    items.map((item, i) => (i === index - 1 ? { ...item, ...(patch.type === undefined ? {} : { type: patch.type }), ...(patch.review === undefined ? {} : { review: patch.review }) } : item)),
+    items.map((item, i) => (i === index - 1 ? { ...item, ...(patch.type === undefined ? {} : { type: patch.type }), ...(patch.mode === undefined ? {} : { review: patch.mode === "review", deferred: patch.mode === "deferred" }) } : item)),
   );
 }
 
@@ -224,7 +233,7 @@ export function setItem(template: EditTemplate, part: PlanPart, index: number, p
 export function addItem(template: EditTemplate, part: PlanPart, type: string): EditTemplate {
   const items = partOf(template, part);
   const after = items.length === 0 ? [] : [items.length];
-  return withPart(template, part, [...items, { type, review: "", after }]);
+  return withPart(template, part, [...items, { type, review: false, deferred: false, after }]);
 }
 
 /** ステップを `order`（新しい添字の順に、古い添字を並べたもの。入れない古い添字は落とす）で並べ直す。全体計画ならフローのキーも合わせる */

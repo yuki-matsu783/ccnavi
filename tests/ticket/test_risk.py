@@ -191,7 +191,7 @@ class RiskTest(PhaseHarness):
         # 範囲の上限が無く、レビュー不要の定義。宣言では「レビュー不要」な作業を実績で上書きする。
         self.phases_text = (
             "version: 1\nphases:\n  work:\n    kind: work\n    title: 作業\n"
-            "    review: none\n    scope: inherit\n"
+            "    review: false\n    scope: inherit\n"
         )
         write(self.phases, self.phases_text)
 
@@ -238,7 +238,7 @@ class RiskTest(PhaseHarness):
         self.assertEqual(
             {"big-diff", "many-files", "ci", "deletes"}, {h["id"] for h in record["hits"]}
         )
-        # 定義は review: none、子も required: false。それでもレビューで止まる。
+        # 定義は review: false、子も required: false。それでもレビューで止まる。
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertIn("実績のリスクが高い", self.reason(said))
         self.commit_parent("close 01")

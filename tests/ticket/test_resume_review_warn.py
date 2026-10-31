@@ -7,7 +7,7 @@
 1. 作業中の子があり、レビューが要るフェーズに `reviewed` が残っていれば、lint と status が言う
 2. 言わないもの: `reviewed` が無い、子が閉じている（`done/`）、レビューが要らないフェーズ
 3. 警告は判定と `start` を止めない
-4. 定義が `review: none` でも、再開された子が `human_review` を求めれば言う（閉じ直すと要る）
+4. 定義が `review: false` でも、再開された子が `human_review` を求めれば言う（閉じ直すと要る）
 5. 延期したフェーズの子が作業中で、そのフェーズが一度終わった印（`skipped`）が残っていれば言う。
    引き受け手は辿らず、マーカーの置き場と消し方（番号は `<番号>`）を言う
 """
@@ -112,7 +112,7 @@ class ResumedReviewWarnTest(PhaseHarness):
         self.assertNotIn(MARKER_WORDS, self.status_of_child())
 
     def test_no_warning_for_a_phase_that_needs_no_review(self):
-        # 調査は review: none。マーカーが残っていても、止める条件に入らないので言わない。
+        # 調査は review: false。マーカーが残っていても、止める条件に入らないので言わない。
         self.setup_child("research", False, marker=True)
         self.assertNotIn(MARKER_WORDS, self.lint())
         self.assertNotIn(MARKER_WORDS, self.status_of_child())
@@ -184,10 +184,10 @@ class ResumedReviewWarnTest(PhaseHarness):
         self.assertEqual(warned.returncode, 0, warned.stdout)
         self.assertIn("error 0 件", warned.stdout)
 
-    # ---- 5. 定義が review: none でも、再開された子が human_review を求める
+    # ---- 5. 定義が review: false でも、再開された子が human_review を求める
 
     def test_a_resumed_child_asking_for_review_is_warned_even_if_the_kind_needs_none(self):
-        # 調査は review: none。doing の子は review_kind に数えられないが、閉じ直すと要る。
+        # 調査は review: false。doing の子は review_required に数えられないが、閉じ直すと要る。
         self.setup_child("research", True, marker=True)
         for text in (self.lint(), self.status_of_child()):
             self.assertIn(MARKER_WORDS, text)

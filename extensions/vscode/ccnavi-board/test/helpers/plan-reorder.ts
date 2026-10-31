@@ -53,7 +53,7 @@ export function plansOf(plan: readonly RawItem[], feedback: readonly RawItem[] |
       from: first + index,
       type: typeOf(item),
       title: typeOf(item),
-      review: "mr",
+      review: true,
       deferred: typeof item !== "string" && item.review === "defer",
       review_at: null,
       locked: fixed.includes(first + index),

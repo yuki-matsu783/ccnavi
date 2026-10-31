@@ -14,7 +14,7 @@ const raw = def.sample as { phases: { phases: Record<string, { kind: string; rev
 const sample = raw.phases.phases;
 
 /** この担当で足した図と、それを引く案内 */
-const DIAGRAMS = ["phase-save", "phase-fill", "phase-end-none", "phase-end-mr", "phase-review-up", "phase-order"];
+const DIAGRAMS = ["phase-save", "phase-fill", "phase-end-false", "phase-end-true", "phase-review-up", "phase-order"];
 const COURSES = ["how-phase-works", "how-phase-ends"];
 
 function value(name: string, id: string): string {
@@ -58,7 +58,7 @@ test("CB-T1190 図の中の値は、見本の定義（research・design など�
   assert.equal(sample["design-feedback"].kind, "feedback", "保存の図の例（feedback に none）が成り立つ定義");
 
   // コピーの図: コピーする定義は、見本の review と scope のまま
-  const copied = (parse(value("phase-fill", "write")) as { phases: Record<string, { review: string; scope: unknown }> }).phases;
+  const copied = (parse(value("phase-fill", "write")) as { phases: Record<string, { review: boolean; scope: unknown }> }).phases;
   const plan = planOf(value("phase-fill", "plan"));
   assert.deepEqual(Object.keys(copied).sort(), [...new Set(plan.map((item) => item.type))].sort(), "コピーは計画のステップが使う定義だけ");
   for (const [id, entry] of Object.entries(copied)) {
@@ -67,19 +67,19 @@ test("CB-T1190 図の中の値は、見本の定義（research・design など�
   assert.ok(!Object.keys(copied).includes("design-feedback"), "使わない定義はコピーしない");
   assert.match(value("phase-fill", "write"), /design-feedback/);
 
-  // review の図: 定義が none の research に、計画のステップの mr を足す
-  assert.equal(research.review, "none");
+  // review の図: 定義が false の research に、計画のステップの review: true を足す
+  assert.equal(research.review, false);
   assert.deepEqual(parse(value("phase-review-up", "def")), { review: research.review });
-  assert.deepEqual(parse(value("phase-review-up", "plan")), [{ type: "research", review: "mr" }]);
-  assert.match(value("phase-review-up", "pick"), /none/);
+  assert.deepEqual(parse(value("phase-review-up", "plan")), [{ type: "research", review: true }]);
+  assert.match(value("phase-review-up", "pick"), /false/);
   assert.match(value("phase-review-up", "risk"), /HIGH/);
 
-  // 終わりの図: none の例は research、mr の例は design。成果物は定義の値
-  assert.equal(research.review, "none");
-  assert.equal(sample.design.review, "mr");
-  assert.ok(research.deliverables !== undefined && value("phase-end-none", "deliverables").includes(research.deliverables[0]));
-  assert.match(value("phase-end-none", "kind"), new RegExp(`review: ${research.review}`));
-  assert.match(value("phase-end-mr", "ended"), new RegExp(`review: ${sample.design.review}`));
+  // 終わりの図: false の例は research、true の例は design。成果物は定義の値
+  assert.equal(research.review, false);
+  assert.equal(sample.design.review, true);
+  assert.ok(research.deliverables !== undefined && value("phase-end-false", "deliverables").includes(research.deliverables[0]));
+  assert.match(value("phase-end-false", "kind"), new RegExp(`review: ${research.review}`));
+  assert.match(value("phase-end-true", "ended"), new RegExp(`review: ${sample.design.review}`));
 });
 
 test("CB-T1191 計画の番号と先行は、図どうしで揃う。ステップは work の定義、after は小さい番号だけ、最後のステップに全部が先行する", () => {
@@ -118,14 +118,14 @@ test("CB-T1191 計画の番号と先行は、図どうしで揃う。ステッ�
     assert.ok(match !== null, `${name}/${id} の本文に「N つ目のフェーズ（定義）」がない`);
     return ["一二三四五六七八九".indexOf(match[1]) + 1, match[2]];
   };
-  const [noneNumber, noneType] = numbered("phase-end-none", "finish");
-  const [mrNumber, mrType] = numbered("phase-end-mr", "finish");
+  const [noneNumber, noneType] = numbered("phase-end-false", "finish");
+  const [mrNumber, mrType] = numbered("phase-end-true", "finish");
   assert.equal(plan[noneNumber - 1].type, noneType);
   assert.equal(plan[mrNumber - 1].type, mrType);
-  assert.match(value("phase-end-none", "ended"), new RegExp(`phase: ${noneNumber} `));
-  assert.match(value("phase-end-mr", "ended"), new RegExp(`phase: ${mrNumber} `));
-  assert.match(value("phase-end-mr", "request"), new RegExp(`--phase ${mrNumber}\\b`));
-  assert.match(value("phase-end-mr", "confirm"), new RegExp(`--phase ${mrNumber}\\b`));
+  assert.match(value("phase-end-false", "ended"), new RegExp(`phase: ${noneNumber} `));
+  assert.match(value("phase-end-true", "ended"), new RegExp(`phase: ${mrNumber} `));
+  assert.match(value("phase-end-true", "request"), new RegExp(`--phase ${mrNumber}\\b`));
+  assert.match(value("phase-end-true", "confirm"), new RegExp(`--phase ${mrNumber}\\b`));
   assert.match(value("phase-order", "gate"), new RegExp(`${"一二三四五六七八九"[plan.length - 2]}つ目`));
 });
 

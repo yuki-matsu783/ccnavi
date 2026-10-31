@@ -31,7 +31,7 @@ Write は止まる。組み込みの既定は持たない。
       research:
         kind: work            # work | feedback
         title: 調査
-        review: none          # none | mr
+        review: false         # true | false（既定 true。true はレビューが要る）
         scope: ["wip/research/*"]   # 子の範囲の上限。inherit なら親の範囲
         deliverables: ["wip/research/summary.md"]
         agent: explorer       # 案内にだけ使う
@@ -70,21 +70,6 @@ KIND_WORK = "work"
 KIND_FEEDBACK = "feedback"
 KINDS = (KIND_WORK, KIND_FEEDBACK)
 
-REVIEW_NONE = "none"
-# mr はホストのマージリクエストで見る。
-REVIEW_MR = "mr"
-REVIEWS = (REVIEW_NONE, REVIEW_MR)
-
-# 見る場所の強さ。厳しい側を採るときに使う（none < mr）。
-REVIEW_RANK = {REVIEW_NONE: 0, REVIEW_MR: 1}
-
-
-def stricter(a: str, b: str) -> str:
-    """見る場所の厳しい側。どちらかが知らない表記なら mr として扱う。"""
-    if a not in REVIEW_RANK or b not in REVIEW_RANK:
-        return REVIEW_MR
-    return a if REVIEW_RANK[a] >= REVIEW_RANK[b] else b
-
 
 class PhaseTypes(dict):
     """定義の集合。id → 定義のマップ。"""
@@ -111,7 +96,8 @@ class PhaseType:
     id: str
     title: str = ""
     kind: str = KIND_WORK
-    review: str = REVIEW_MR
+    # このフェーズの終わりにユーザのレビューが要るか。レビューはマージリクエストで見る。
+    review: bool = True
     # None なら inherit（親の範囲そのまま）。
     scope: list[ticket_model.Entry] | None = None
     scope_globs: list[str] = field(default_factory=list)
@@ -277,19 +263,25 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         problems.append(Problem(SEVERITY_ERROR, ident, f"`kind` は {' か '.join(KINDS)}"))
         return None, problems
     pt.kind = kind
-    review = str(body.get("review") or REVIEW_MR).strip()
-    if review not in REVIEWS:
-        problems.append(Problem(SEVERITY_ERROR, ident, f"`review` は {' か '.join(REVIEWS)}"))
-        return None, problems
-    pt.review = review
-    if kind == KIND_FEEDBACK and review == REVIEW_NONE:
-        # フィードバック対応の結果をユーザが見ない経路は作らない。見る場所は mr になる。
+    review = body.get("review", True)
+    if not isinstance(review, bool):
         problems.append(
             Problem(
                 SEVERITY_ERROR,
                 ident,
-                f"フィードバック対応の定義に `review: {REVIEW_NONE}` は書けない"
-                f"（`{REVIEW_MR}` にする）",
+                f"`review` は true か false で書く（`{review}` は読めない。"
+                "以前の `none` は false、`mr` は true に書き直す）",
+            )
+        )
+        return None, problems
+    pt.review = review
+    if kind == KIND_FEEDBACK and not review:
+        # フィードバック対応の結果をユーザが見ない経路は作らない。
+        problems.append(
+            Problem(
+                SEVERITY_ERROR,
+                ident,
+                "フィードバック対応の定義に `review: false` は書けない（`true` にする）",
             )
         )
         return None, problems
@@ -408,7 +400,7 @@ def consolidate_type() -> PhaseType:
             id=ticket_model.MAINTENANCE_CONSOLIDATE,
             title="学びの統合",
             kind=KIND_FEEDBACK,
-            review=REVIEW_NONE,
+            review=False,
             scope=entries,
             scope_globs=[e.glob for e in entries],
             learning=LEARNING_OFF,

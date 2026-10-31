@@ -217,9 +217,9 @@ sample:
           part: plan
           source_sha: sample
           items:
-            - { number: 1, type: research, title: 調査, review: none }
-            - { number: 2, type: design, title: 設計, review: mr }
-            - { number: 3, type: implement, title: 実装とテスト, review: mr }
+            - { number: 1, type: research, title: 調査, review: false }
+            - { number: 2, type: design, title: 設計, review: true }
+            - { number: 3, type: implement, title: 実装とテスト, review: true }
           after: { "2": [1], "3": [2] }
           proposed: { "2": [1], "3": [2] }
           ready: [1]

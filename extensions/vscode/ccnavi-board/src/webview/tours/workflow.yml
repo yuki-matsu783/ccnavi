@@ -38,16 +38,16 @@ sample:
     open:
       plan:
         items:
-          - { number: 1, type: research, title: 調査, review: none }
-          - { number: 2, type: design, title: 設計, review: mr }
-          - { number: 3, type: implement, title: 実装とテスト, review: mr }
-          - { number: 4, type: docs, title: 文書, review: mr }
+          - { number: 1, type: research, title: 調査, review: false }
+          - { number: 2, type: design, title: 設計, review: true }
+          - { number: 3, type: implement, title: 実装とテスト, review: true }
+          - { number: 4, type: docs, title: 文書, review: true }
         after: { 2: [1], 3: [1], 4: [2, 3] }
         ready: [1]
       feedback: &feedback
         items:
-          - { number: 5, type: design-feedback, title: 設計フィードバック対応, review: mr }
-          - { number: 6, type: implement-feedback, title: 実装フィードバック対応, review: mr }
+          - { number: 5, type: design-feedback, title: 設計フィードバック対応, review: true }
+          - { number: 6, type: implement-feedback, title: 実装フィードバック対応, review: true }
         after: { 6: [5] }
         ready: [5]
 
@@ -55,10 +55,10 @@ sample:
     chain:
       plan:
         items:
-          - { number: 1, type: research, title: 調査, review: none }
-          - { number: 2, type: design, title: 設計, review: mr }
-          - { number: 3, type: implement, title: 実装とテスト, review: mr }
-          - { number: 4, type: docs, title: 文書, review: mr }
+          - { number: 1, type: research, title: 調査, review: false }
+          - { number: 2, type: design, title: 設計, review: true }
+          - { number: 3, type: implement, title: 実装とテスト, review: true }
+          - { number: 4, type: docs, title: 文書, review: true }
         after: { 2: [1], 3: [2], 4: [3] }
         ready: [1]
       feedback: *feedback
@@ -67,10 +67,10 @@ sample:
       base: chain
       plan:
         items:
-          - { number: 1, type: research, title: 調査, review: none }
-          - { number: 2, type: design, title: 設計, review: mr }
-          - { number: 3, type: implement, title: 実装とテスト, review: mr }
-          - { number: 4, type: docs, title: 文書, review: mr }
+          - { number: 1, type: research, title: 調査, review: false }
+          - { number: 2, type: design, title: 設計, review: true }
+          - { number: 3, type: implement, title: 実装とテスト, review: true }
+          - { number: 4, type: docs, title: 文書, review: true }
         after: { 2: [1], 3: [2], 4: [2, 3] }
         ready: [1]
     # 3 に 1 も先行する
@@ -78,10 +78,10 @@ sample:
       base: chain
       plan:
         items:
-          - { number: 1, type: research, title: 調査, review: none }
-          - { number: 2, type: design, title: 設計, review: mr }
-          - { number: 3, type: implement, title: 実装とテスト, review: mr }
-          - { number: 4, type: docs, title: 文書, review: mr }
+          - { number: 1, type: research, title: 調査, review: false }
+          - { number: 2, type: design, title: 設計, review: true }
+          - { number: 3, type: implement, title: 実装とテスト, review: true }
+          - { number: 4, type: docs, title: 文書, review: true }
         after: { 2: [1], 3: [1, 2], 4: [2, 3] }
         ready: [1]
     # 3 に 2 が先行しなくなり、2 と 3 が並列になった
@@ -89,10 +89,10 @@ sample:
       base: chain
       plan:
         items:
-          - { number: 1, type: research, title: 調査, review: none }
-          - { number: 2, type: design, title: 設計, review: mr }
-          - { number: 3, type: implement, title: 実装とテスト, review: mr }
-          - { number: 4, type: docs, title: 文書, review: mr }
+          - { number: 1, type: research, title: 調査, review: false }
+          - { number: 2, type: design, title: 設計, review: true }
+          - { number: 3, type: implement, title: 実装とテスト, review: true }
+          - { number: 4, type: docs, title: 文書, review: true }
         after: { 2: [1], 3: [1], 4: [2, 3] }
         ready: [1]
     # 4 → 2 の合流を作らずに 2 → 3 を消した形。2 が終端に届かず error
@@ -100,10 +100,10 @@ sample:
       base: chain
       plan:
         items:
-          - { number: 1, type: research, title: 調査, review: none }
-          - { number: 2, type: design, title: 設計, review: mr }
-          - { number: 3, type: implement, title: 実装とテスト, review: mr }
-          - { number: 4, type: docs, title: 文書, review: mr }
+          - { number: 1, type: research, title: 調査, review: false }
+          - { number: 2, type: design, title: 設計, review: true }
+          - { number: 3, type: implement, title: 実装とテスト, review: true }
+          - { number: 4, type: docs, title: 文書, review: true }
         after: { 2: [1], 3: [1], 4: [3] }
         loose: [2]
         ready: [1]
@@ -115,20 +115,20 @@ sample:
       base: open
       plan:
         items:
-          - { number: 1, type: research, title: 調査, review: none }
-          - { number: 2, type: design, title: 設計, review: mr }
-          - { number: 3, type: implement, title: 実装とテスト, review: mr }
-          - { number: 4, type: docs, title: 文書, review: mr }
+          - { number: 1, type: research, title: 調査, review: false }
+          - { number: 2, type: design, title: 設計, review: true }
+          - { number: 3, type: implement, title: 実装とテスト, review: true }
+          - { number: 4, type: docs, title: 文書, review: true }
         after: { 2: [1], 3: [1, 2], 4: [2, 3] }
         ready: [1]
     after-23-cut:
       base: open
       plan:
         items:
-          - { number: 1, type: research, title: 調査, review: none }
-          - { number: 2, type: design, title: 設計, review: mr }
-          - { number: 3, type: implement, title: 実装とテスト, review: mr }
-          - { number: 4, type: docs, title: 文書, review: mr }
+          - { number: 1, type: research, title: 調査, review: false }
+          - { number: 2, type: design, title: 設計, review: true }
+          - { number: 3, type: implement, title: 実装とテスト, review: true }
+          - { number: 4, type: docs, title: 文書, review: true }
         after: { 2: [1], 3: [2], 4: [2, 3] }
         ready: [1]
 
@@ -137,10 +137,10 @@ sample:
       base: open
       plan:
         items:
-          - { number: 1, type: research, title: 調査, review: none }
-          - { number: 2, from: 3, type: implement, title: 実装とテスト, review: mr }
-          - { number: 3, from: 2, type: design, title: 設計, review: mr }
-          - { number: 4, type: docs, title: 文書, review: mr }
+          - { number: 1, type: research, title: 調査, review: false }
+          - { number: 2, from: 3, type: implement, title: 実装とテスト, review: true }
+          - { number: 3, from: 2, type: design, title: 設計, review: true }
+          - { number: 4, type: docs, title: 文書, review: true }
         after: { 2: [1], 3: [1, 2], 4: [2, 3] }
         ready: [1]
       children: &children
@@ -151,10 +151,10 @@ sample:
     swapped-saved:
       plan:
         items:
-          - { number: 1, type: research, title: 調査, review: none }
-          - { number: 2, type: implement, title: 実装とテスト, review: mr }
-          - { number: 3, type: design, title: 設計, review: mr }
-          - { number: 4, type: docs, title: 文書, review: mr }
+          - { number: 1, type: research, title: 調査, review: false }
+          - { number: 2, type: implement, title: 実装とテスト, review: true }
+          - { number: 3, type: design, title: 設計, review: true }
+          - { number: 4, type: docs, title: 文書, review: true }
         after: { 2: [1], 3: [1, 2], 4: [2, 3] }
         ready: [1]
       feedback: *feedback
@@ -164,8 +164,8 @@ sample:
       base: open
       feedback:
         items:
-          - { number: 5, from: 6, type: implement-feedback, title: 実装フィードバック対応, review: mr }
-          - { number: 6, from: 5, type: design-feedback, title: 設計フィードバック対応, review: mr }
+          - { number: 5, from: 6, type: implement-feedback, title: 実装フィードバック対応, review: true }
+          - { number: 6, from: 5, type: design-feedback, title: 設計フィードバック対応, review: true }
         after: { 6: [5] }
         proposed: { 6: [5] }
         ready: [5]
@@ -175,10 +175,10 @@ sample:
       base: open
       plan:
         items:
-          - { number: 1, type: research, title: 調査, review: none }
-          - { number: 2, type: design, title: 設計, review: mr }
-          - { number: 3, type: implement, title: 実装とテスト, review: mr }
-          - { number: 4, type: docs, title: 文書, review: mr }
+          - { number: 1, type: research, title: 調査, review: false }
+          - { number: 2, type: design, title: 設計, review: true }
+          - { number: 3, type: implement, title: 実装とテスト, review: true }
+          - { number: 4, type: docs, title: 文書, review: true }
         after: { 2: [1], 3: [1], 4: [2] }
         loose: [3]
         ready: [1]
@@ -189,10 +189,10 @@ sample:
     locked-open:
       plan:
         items:
-          - { number: 1, type: research, title: 調査, review: none }
-          - { number: 2, type: design, title: 設計, review: mr }
-          - { number: 3, type: implement, title: 実装とテスト, review: mr, locked: true }
-          - { number: 4, type: docs, title: 文書, review: mr }
+          - { number: 1, type: research, title: 調査, review: false }
+          - { number: 2, type: design, title: 設計, review: true }
+          - { number: 3, type: implement, title: 実装とテスト, review: true, locked: true }
+          - { number: 4, type: docs, title: 文書, review: true }
         after: { 2: [1], 3: [2], 4: [1, 3] }
         current: { 2: [1], 3: [2], 4: [1, 3] }
         ready: [1]
@@ -202,10 +202,10 @@ sample:
       base: locked-open
       plan:
         items:
-          - { number: 1, type: research, title: 調査, review: none }
-          - { number: 2, type: design, title: 設計, review: mr }
-          - { number: 3, type: implement, title: 実装とテスト, review: mr, locked: true }
-          - { number: 4, type: docs, title: 文書, review: mr }
+          - { number: 1, type: research, title: 調査, review: false }
+          - { number: 2, type: design, title: 設計, review: true }
+          - { number: 3, type: implement, title: 実装とテスト, review: true, locked: true }
+          - { number: 4, type: docs, title: 文書, review: true }
         after: { 3: [2], 4: [1, 3] }
         current: { 2: [1], 3: [2], 4: [1, 3] }
         ready: [1, 2]
@@ -222,10 +222,10 @@ sample:
       base: open
       plan:
         items:
-          - { number: 1, type: research, title: 調査, review: none }
-          - { number: 2, from: 3, type: implement, title: 実装とテスト, review: mr }
-          - { number: 3, from: 2, type: design, title: 設計, review: mr }
-          - { number: 4, type: docs, title: 文書, review: mr }
+          - { number: 1, type: research, title: 調査, review: false }
+          - { number: 2, from: 3, type: implement, title: 実装とテスト, review: true }
+          - { number: 3, from: 2, type: design, title: 設計, review: true }
+          - { number: 4, type: docs, title: 文書, review: true }
         after: { 2: [1], 3: [1, 2], 4: [2, 3] }
         ready: [1]
       children: *children
@@ -238,10 +238,10 @@ sample:
     outside:
       plan:
         items:
-          - { number: 1, type: research, title: 調査, review: none }
-          - { number: 2, type: design, title: 設計, review: mr }
-          - { number: 3, type: implement, title: 実装とテスト, review: mr }
-          - { number: 4, type: docs, title: 文書, review: mr }
+          - { number: 1, type: research, title: 調査, review: false }
+          - { number: 2, type: design, title: 設計, review: true }
+          - { number: 3, type: implement, title: 実装とテスト, review: true }
+          - { number: 4, type: docs, title: 文書, review: true }
         after: { 2: [1], 3: [1, 2], 4: [3] }
         ready: [1]
       feedback: *feedback
@@ -280,7 +280,7 @@ courses:
       - target: graph-plan
         title: まず図を確認する
         body: >-
-          点は計画のステップで、番号・定義のタイトル・見る場所（レビューの要否）を表示します。線は「右のステップに左のステップが先行する」ことを表し、開始から出る線と終了へ入る線は図だけの目印です。
+          点は計画のステップで、番号・定義のタイトル・レビューの要否を表示します。線は「右のステップに左のステップが先行する」ことを表し、開始から出る線と終了へ入る線は図だけの目印です。
           ここでは設計（2）と実装とテスト（3）の先行が、どちらも調査（1）だけです。
         scene: { answer: open }
       - target: node-2

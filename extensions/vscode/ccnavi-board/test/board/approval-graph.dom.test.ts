@@ -30,7 +30,7 @@ function samplePlans(): ApprovePlan[] {
     {
       ...main,
       items: main.items.map((item) =>
-        item.number === 1 ? { ...item, title: "調査", review: "none" } : item.number === 2 ? { ...item, title: "設計", deferred: true, review_at: 4 } : item,
+        item.number === 1 ? { ...item, title: "調査", review: false } : item.number === 2 ? { ...item, title: "設計", deferred: true, review_at: 4 } : item,
       ),
       ready: [1],
     },

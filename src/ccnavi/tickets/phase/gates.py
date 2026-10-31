@@ -75,9 +75,9 @@ class Phase:
     owner: ticket_model.Ticket | None = None
     # 子ごとの実績のリスク（閉じるときに数えた記録）。子の識別子 → 記録。
     risks: dict[str, dict] = field(default_factory=dict)
-    # 延期を引き受けた前のフェーズが、定義として宣言している「見る場所」。引き受けた側は
-    # 厳しい側で見る（`review_kind`）。組むのは `phases_of`。
-    covered_reviews: list[str] = field(default_factory=list)
+    # 延期を引き受けた前のフェーズが、定義として宣言している「レビューが要るか」。引き受けた側は
+    # 1 つでも要れば要る（`review_required`）。組むのは `phases_of`。
+    covered_reviews: list[bool] = field(default_factory=list)
 
     @property
     def risk(self) -> dict | None:
@@ -158,59 +158,45 @@ class Phase:
         return any(s in (ticket_model.REVIEW, ticket_model.DONE) for s in states)
 
     @property
-    def declared_review(self) -> str | None:
-        """このフェーズ定義と計画のステップが言う「見る場所」。宣言が無ければ None。
+    def declared_review(self) -> bool | None:
+        """このフェーズ定義と計画のステップが言う「レビューが要るか」。宣言が無ければ None。
 
-        計画のステップは `mr` にだけ強められる（`ticket_model.PLAN_REVIEWS`）ので、ステップが
-        `mr` なら定義より優先する。定義の無い番号（計画が無い、定義のファイルが無い、その名前の
+        計画のステップは「要る」にだけ強められる（`review: true`）ので、ステップが要ると言えば
+        定義より優先する。定義の無い番号（計画が無い、定義のファイルが無い、その名前の
         定義が読めない）は、言っている者が居ないので None。
         """
-        if self.item is not None and self.item.review == ticket_model.PLAN_REVIEW_MR:
-            return phasetypes.REVIEW_MR
+        if self.item is not None and self.item.review:
+            return True
         if self.type is not None:
             return self.type.review
         return None
 
     @property
-    def review_kind(self) -> str:
-        """このフェーズの終わりにユーザがどこで見るか。`none` / `mr`。
+    def review_required(self) -> bool:
+        """このフェーズの終わりにユーザのレビューが要るか。
 
-        見る場所を言えるのは、定義と計画のステップと、引き受けた延期だけ。そのうち厳しい側を
-        採る。子の宣言（`human_review.required`）と実績のリスクは「要る」とだけ言い、
-        場所は言わないので、宣言が「見ない」だったフェーズを `mr` へ上げる。
-        どちらも止める向きにしか働かない。
+        要るかを言えるのは、定義と計画のステップと、引き受けた延期だけ。そのうち 1 つでも
+        要ると言えば要る。子の宣言（`human_review.required`）と実績のリスクは「要る」とだけ
+        言うので、宣言が「要らない」だったフェーズを要るへ上げる。どちらも止める向きにしか働かない。
 
-        場所を言う者が 1 人も居なければ（計画が無い、定義が読めない）今までどおりで、
-        子が「ユーザが見る」と言うか実績が高ければ `mr`。緩い側を採ると、定義のファイルが
-        読めないときにレビューの行き先が消える。延期を引き受けている番号は、覆っている分の
-        宣言が読めなくても `mr` を受け取る（`_covered_review`）ので、この扱いにはならない。
+        要るかを言う者が 1 人も居なければ（計画が無い、定義が読めない）、子が「ユーザが見る」と
+        言うか実績が高ければ要る。緩い側を採ると、定義のファイルが読めないときにレビューが消える。
+        延期を引き受けている番号は、覆っている分の宣言が読めなくても要るを受け取る
+        （`_covered_review`）ので、この扱いにはならない。
 
-        延期したフェーズは自分では見る場所を持たず、次に見るフェーズが引き受ける。
+        延期したフェーズは自分では要らず、次に見るフェーズが引き受ける。
         """
         if self.deferred:
-            return phasetypes.REVIEW_NONE
+            return False
         from_children = any(
             t.review_required
             for t in self.tickets
             if self.states.get(t.ticket) in (ticket_model.REVIEW, ticket_model.DONE)
         )
-        # 実績のリスクは、宣言を厳しい側にだけ上書きする（tickets/config/risk.py）。
+        # 実績のリスクは、宣言を要るの側にだけ上書きする（tickets/config/risk.py）。
         needed = from_children or self.risk_escalates
         declared = [d for d in [self.declared_review, *self.covered_reviews] if d is not None]
-        if not declared:
-            return phasetypes.REVIEW_MR if needed else phasetypes.REVIEW_NONE
-        where = declared[0]
-        for covered in declared[1:]:
-            where = phasetypes.stricter(where, covered)
-        # 「要る」としか言われていないフェーズは `mr` まで上げる。
-        if needed and where == phasetypes.REVIEW_NONE:
-            where = phasetypes.REVIEW_MR
-        return where
-
-    @property
-    def review_required(self) -> bool:
-        """このフェーズの終わりにユーザのレビューが要るか。見る場所が `none` でなければ要る。"""
-        return self.review_kind != phasetypes.REVIEW_NONE
+        return any(declared) or needed
 
     @property
     def gate_closed(self) -> bool:
@@ -250,10 +236,10 @@ layer_types = phasetypes.layer_types
 load_types = phasetypes.load_types
 
 
-def _covered_review(phase: Phase | None) -> str:
-    """延期を引き受けた側に渡す「覆っている分の見る場所」。読めなければ `mr`。"""
+def _covered_review(phase: Phase | None) -> bool:
+    """延期を引き受けた側に渡す「覆っている分のレビューが要るか」。読めなければ要る。"""
     if phase is None or phase.declared_review is None:
-        return phasetypes.REVIEW_MR
+        return True
     return phase.declared_review
 
 
@@ -286,7 +272,8 @@ def phases_of(
         owner = proposed
     if owner is not None and owner.has_plan:
         # 定義は親に固定したコピー（`phases:`）から引く。`phases.yml` は読まない（承認のあとに
-        # 直しても、進行中の親のフェーズのタイトル・見る場所・案内は変わらない）。提案の親（`proposed`）は
+        # 直しても、進行中の親のフェーズのタイトル・レビューの要否・案内は変わらない）。
+        # 提案の親（`proposed`）は
         # その提案のコピーから引く。
         types = phasetypes.types_of(owner)
         if owner.workflow is None:
@@ -295,11 +282,11 @@ def phases_of(
             owner = replace(owner, workflow=workflow.compute(owner))
         for n, item in owner.numbered():
             by_number[n] = Phase(parent_id, n, item=item, type=types.get(item.type), owner=owner)
-        # 延期を引き受けた側に、引き受けた分の「見る場所」を渡す。厳しい側を採るのは
-        # `review_kind`。
+        # 延期を引き受けた側に、引き受けた分の「レビューが要るか」を渡す。まとめるのは
+        # `review_required`。
         #
-        # 覆っている分の宣言が読めない番号は `mr` として扱う。延期できるのはレビューのある
-        # 定義だけ（承認が確かめる）なので、そこには必ず見る場所を言った者が居た。
+        # 覆っている分の宣言が読めない番号は「要る」として扱う。延期できるのはレビューのある
+        # 定義だけ（承認が確かめる）なので、そこには必ず要ると言った者が居た。
         # 読めなくなったことを理由に、その番号のレビューが消えてはいけない。
         for phase in by_number.values():
             phase.covered_reviews = [_covered_review(by_number.get(c)) for c in phase.covers]
@@ -512,7 +499,7 @@ def announce(
                 parent.ticket,
                 n,
                 approval_marks.MARK_PENDING,
-                {"review": phase.review_kind, **_type_source(phase, common)},
+                {"review": True, **_type_source(phase, common)},
             )
             if failed:
                 stderr.write(f"ccnavi: フェーズのマーカーを保存できませんでした: {failed}\n")
@@ -757,7 +744,7 @@ def resumed_review(
 
     延期したフェーズの子は、そのフェーズが一度終わった印（`skipped`）が残っているときに言う。
     消すのは引き受けた側のマーカーだが、引き受け手は辿らず、置き場のどれかを確かめてもらう。
-    延期していないフェーズで、閉じ直したときにレビューが要らないもの（定義が `review: none` で、
+    延期していないフェーズで、閉じ直したときにレビューが要らないもの（定義が `review: false` で、
     この子も `human_review` を求めていない）は、マーカーが残っていても止める条件に
     入らないので言わない。
     文には子の識別子を入れない（呼び手が前に付ける）。
@@ -778,9 +765,10 @@ def resumed_review(
                 "再開後の作業はそのレビューに含まれていません。"
             )
             return lead + _erase_steps(root, conf, child, None)
-        # `review_kind` は子の要求（`human_review`）を `review/` と `done/` の子からしか数えない。
-        # 再開された子は `doing/` なので、閉じ直したときに要る分（この子の要求）も足して見る。
-        # ここだけで足し、`review_kind` は変えない（ゲートと告知とボードの判定を動かさないため）。
+        # `review_required` は子の要求（`human_review`）を `review/` と `done/` の子からしか
+        # 数えない。再開された子は `doing/` なので、閉じ直したときに要る分（この子の要求）も
+        # 足して見る。ここだけで足し、`review_required` は変えない
+        # （ゲートと告知とボードの判定を動かさないため）。
         if not (ph.review_required or child.review_required):
             return ""
         if approval_marks.MARK_REVIEWED not in ph.marks:
@@ -960,9 +948,9 @@ def plan_finished(root: str, conf: settings.Settings, parent: ticket_model.Ticke
     return seen == set(range(1, last + 1))
 
 
-def review_venues(root: str, conf: settings.Settings, parent_id: str) -> dict[int, str]:
-    """この親のフェーズ番号 → ユーザがどこで見るか（`none` / `mr`）。"""
-    return {p.number: p.review_kind for p in phases_of(root, conf, parent_id)}
+def review_venues(root: str, conf: settings.Settings, parent_id: str) -> dict[int, bool]:
+    """この親のフェーズ番号 → ユーザのレビューが要るか。"""
+    return {p.number: p.review_required for p in phases_of(root, conf, parent_id)}
 
 
 # 全体計画が全部閉じてレビューも済み、フィードバック計画（`feedback:`）がまだ無い局面の呼び名。

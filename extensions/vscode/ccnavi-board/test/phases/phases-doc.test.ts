@@ -15,7 +15,7 @@ phases:
   research:
     kind: work
     title: 調査
-    review: none
+    review: false
     scope: ["wip/research/*"]
     deliverables: ["wip/research/summary.md"]
     when: 既存の振る舞いが分からないとき
@@ -24,7 +24,7 @@ phases:
   design:
     kind: work
     title: 設計
-    review: mr
+    review: true
     scope: ["wip/design/*", "docs/*"]
 
   implement:
@@ -36,13 +36,13 @@ phases:
   acceptance:
     kind: work
     title: 受入テスト作成
-    review: mr
+    review: true
     scope: ["tests/*"]
 
   implement-feedback:
     kind: feedback
     title: 実装フィードバック対応
-    review: mr
+    review: true
     scope: inherit
 `;
 
@@ -52,7 +52,7 @@ function phase(id: string, over: Partial<PhaseForm> = {}): PhaseForm {
     id,
     title: "",
     kind: "work",
-    review: "mr",
+    review: true,
     inherit: true,
     scope: [],
     deliverables: [],
@@ -75,7 +75,7 @@ test("CB-T86 phases.yml を定義ごとに読む。kind と review はなけれ�
   assert.equal(research.origin, 0);
   assert.equal(research.title, "調査");
   assert.equal(research.kind, "work");
-  assert.equal(research.review, "none");
+  assert.equal(research.review, false);
   assert.equal(research.inherit, false);
   assert.deepEqual(research.scope, ["wip/research/*"]);
   assert.deepEqual(research.deliverables, ["wip/research/summary.md"]);
@@ -83,7 +83,7 @@ test("CB-T86 phases.yml を定義ごとに読む。kind と review はなけれ�
   // kind と review を書いていない定義は、実行ファイルの既定（work / mr）で出す
   const implement = phases[2];
   assert.equal(implement.kind, "work");
-  assert.equal(implement.review, "mr");
+  assert.equal(implement.review, true);
   // 画面に渡す形に古い欄は載らない（画面は読まない欄を直せない）
   assert.ok(!("requires" in implement) && !("overlap" in implement) && !("after" in implement), JSON.stringify(implement));
   assert.ok(!("order" in doc.model.form), JSON.stringify(Object.keys(doc.model.form)));
@@ -104,12 +104,12 @@ test("CB-T87 変えていない内容で書き戻すと 1 文字も変わらな�
 test("CB-T88 変えた欄だけが差分になり、コメントと引用符は残る", () => {
   const doc = readPhases(SAMPLE);
   const phases = doc.model.form.phases.map((p) =>
-    p.id === "design" ? { ...p, review: "none" as const, scope: ["wip/design/*"], when: "設計が必要とき" } : p,
+    p.id === "design" ? { ...p, review: false as const, scope: ["wip/design/*"], when: "設計が必要とき" } : p,
   );
   const out = doc.apply({ phases });
   const expected = SAMPLE.replace(
-    '    review: mr\n    scope: ["wip/design/*", "docs/*"]\n',
-    '    review: none\n    scope: ["wip/design/*"]\n    when: 設計が必要とき\n',
+    '    review: true\n    scope: ["wip/design/*", "docs/*"]\n',
+    '    review: false\n    scope: ["wip/design/*"]\n    when: 設計が必要とき\n',
   );
   assert.notEqual(expected, SAMPLE);
   assert.equal(out, expected);
@@ -142,13 +142,13 @@ test("CB-T90 追加する・削除する・空のリストは欄ごと削除す�
       }
       return p;
     })
-    .concat([phase("docs", { title: "文書", review: "mr", inherit: false, scope: ["README.md"], agent: "writer" })]);
+    .concat([phase("docs", { title: "文書", review: true, inherit: false, scope: ["README.md"], agent: "writer" })]);
   const out = doc.apply({ phases });
   assert.ok(!out.includes("  acceptance:"));
   assert.match(out, /\n  implement:\n    title: 実装とテスト\n    scope: inherit\n    requires: \[acceptance\]\n    overlap: \[acceptance\]\n/);
-  assert.match(out, /\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: \["\*\.md", "docs\/\*"\]\n/);
+  assert.match(out, /\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: true\n    scope: \["\*\.md", "docs\/\*"\]\n/);
   // 新しい定義は kind と review を必ず書き、欄は決まった順
-  assert.match(out, /\n  docs:\n    kind: work\n    title: 文書\n    review: mr\n    scope: \["README\.md"\]\n    agent: writer\n$/);
+  assert.match(out, /\n  docs:\n    kind: work\n    title: 文書\n    review: true\n    scope: \["README\.md"\]\n    agent: writer\n$/);
   // 書いたものは読み直せる
   const again = readPhases(out);
   assert.deepEqual(again.model.problems, []);
@@ -164,12 +164,12 @@ test("CB-T91 id が重なれば書き戻さない（実行ファイルは後ろ�
   assert.throws(() => doc.apply({ phases }), /id `research` が 2 つあります/);
 });
 
-test("CB-T92a review: chat は廃止した値で、苦情が出て mr として出る", () => {
+test("CB-T92a review: chat は読めない値で、苦情が出て true として出る", () => {
   const doc = readPhases("version: 1\nphases:\n  quick:\n    kind: work\n    review: chat\n    scope: inherit\n");
-  assert.ok(doc.model.problems.some((p) => p.includes("review `chat` は none・mr のどれでもありません")));
-  assert.equal(doc.model.form.phases[0].review, "mr");
+  assert.ok(doc.model.problems.some((p) => p.includes("review `chat` は true か false ではありません")));
+  assert.equal(doc.model.form.phases[0].review, true);
   const bad = readPhases("version: 1\nphases:\n  q:\n    review: Mr\n    scope: inherit\n");
-  assert.ok(bad.model.problems.some((p) => p.includes("review `Mr` は none・mr のどれでもありません")));
+  assert.ok(bad.model.problems.some((p) => p.includes("review `Mr` は true か false ではありません")));
 });
 
 test("CB-T92 version がなければ苦情を出し、保存で先頭に追加する。読み込めない値は苦情にして既定で出す", () => {
@@ -177,16 +177,16 @@ test("CB-T92 version がなければ苦情を出し、保存で先頭に追加�
   assert.equal(doc.model.version, null);
   assert.ok(doc.model.problems.some((p) => p.startsWith("version がありません")));
   assert.ok(doc.model.problems.some((p) => p.includes("kind `strange`")));
-  assert.ok(doc.model.problems.some((p) => p.includes("review `maybe` は none・mr のどれでもありません")));
+  assert.ok(doc.model.problems.some((p) => p.includes("review `maybe` は true か false ではありません")));
   assert.ok(doc.model.problems.some((p) => p.includes("scope `everything`")));
   // 順序の欄は読まないので、形が崩れていても苦情にしない
   assert.ok(!doc.model.problems.some((p) => p.includes("overlap")), doc.model.problems.join("\n"));
   const a = doc.model.form.phases[0];
   assert.equal(a.kind, "work");
-  assert.equal(a.review, "mr");
+  assert.equal(a.review, true);
   assert.equal(a.inherit, true);
   const out = doc.apply(doc.model.form);
-  assert.match(out, /^version: 1\nphases:\n  a:\n    kind: work\n    review: mr\n    scope: inherit\n    overlap: b\n$/);
+  assert.match(out, /^version: 1\nphases:\n  a:\n    kind: work\n    review: true\n    scope: inherit\n    overlap: b\n$/);
 });
 
 test("CB-T93 phases がない、定義がない、空のファイルは苦情になり、保存で対応表から始める", () => {
@@ -195,12 +195,12 @@ test("CB-T93 phases がない、定義がない、空のファイルは苦情に
   const empty = readPhases("");
   assert.deepEqual(empty.model.form.phases, []);
   const out = empty.apply({ phases: [phase("implement", { title: "実装", inherit: false, scope: ["src/*"] })] });
-  assert.equal(out, 'version: 1\nphases:\n  implement:\n    kind: work\n    title: 実装\n    review: mr\n    scope: ["src/*"]\n');
+  assert.equal(out, 'version: 1\nphases:\n  implement:\n    kind: work\n    title: 実装\n    review: true\n    scope: ["src/*"]\n');
 });
 
 test("CB-T94 画面から来た内容は形だけ確認する。リストに文字以外が混ざれば受け取らない。順序の欄は送られても受け取らない", () => {
   const ok = asPhasesForm({
-    phases: [{ origin: 0, id: "a", title: 1, kind: "work", review: "mr", inherit: true, scope: ["x"], when: "w" }],
+    phases: [{ origin: 0, id: "a", title: 1, kind: "work", review: true, inherit: true, scope: ["x"], when: "w" }],
   });
   assert.ok(ok !== undefined);
   assert.equal(ok.phases[0].title, "1");
@@ -209,15 +209,15 @@ test("CB-T94 画面から来た内容は形だけ確認する。リストに文�
   // 画面は順序の欄を送らない。前の形（order・after・overlap・requires）が混ざっていても、受け取る形には載せない
   const old = asPhasesForm({
     order: "dag",
-    phases: [{ origin: 0, id: "a", kind: "work", review: "mr", inherit: true, after: ["b"], overlap: [1], requires: "c" }],
+    phases: [{ origin: 0, id: "a", kind: "work", review: true, inherit: true, after: ["b"], overlap: [1], requires: "c" }],
   });
   assert.ok(old !== undefined);
   assert.deepEqual(Object.keys(old), ["phases"]);
   assert.ok(!("after" in old.phases[0]) && !("overlap" in old.phases[0]) && !("requires" in old.phases[0]), JSON.stringify(old.phases[0]));
-  assert.equal(asPhasesForm({ phases: [{ id: "a", kind: "work", review: "mr", scope: [1] }] }), undefined);
-  assert.equal(asPhasesForm({ phases: [{ id: "a", kind: "work", review: "mr", deliverables: [1] }] }), undefined);
-  assert.equal(asPhasesForm({ phases: [{ id: "a", kind: "other", review: "mr" }] }), undefined);
-  assert.equal(asPhasesForm({ phases: [{ id: "a", kind: "work", review: "mr", origin: -1 }] }), undefined);
+  assert.equal(asPhasesForm({ phases: [{ id: "a", kind: "work", review: true, scope: [1] }] }), undefined);
+  assert.equal(asPhasesForm({ phases: [{ id: "a", kind: "work", review: true, deliverables: [1] }] }), undefined);
+  assert.equal(asPhasesForm({ phases: [{ id: "a", kind: "other", review: true }] }), undefined);
+  assert.equal(asPhasesForm({ phases: [{ id: "a", kind: "work", review: true, origin: -1 }] }), undefined);
   assert.equal(asPhasesForm({ phases: "a" }), undefined);
   assert.equal(asPhasesForm(null), undefined);
 });
@@ -233,7 +233,7 @@ test("CB-T102 先頭を動かしても空白だけの行は出ず、先頭を削
   const [research, design, ...rest] = doc.model.form.phases;
   const swapped = doc.apply({ phases: [design, research, ...rest] });
   assert.ok(!/\n {2,}\n/.test(swapped), "空白だけの行がありません");
-  assert.match(swapped, /^# フェーズ定義。ユーザが持つ設定で、エージェントは変更しない。\n#\n# id と title はどちらも一意。\nversion: 1\n\nphases:\n  # 触る場所が多いとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: \["wip\/design\/\*", "docs\/\*"\]\n\n  # 分からないときだけ\n  research:\n    kind: work\n/);
+  assert.match(swapped, /^# フェーズ定義。ユーザが持つ設定で、エージェントは変更しない。\n#\n# id と title はどちらも一意。\nversion: 1\n\nphases:\n  # 触る場所が多いとき\n  design:\n    kind: work\n    title: 設計\n    review: true\n    scope: \["wip\/design\/\*", "docs\/\*"\]\n\n  # 分からないときだけ\n  research:\n    kind: work\n/);
   const dropped = doc.apply({ phases: [design, ...rest] });
   assert.match(dropped, /\nphases:\n  # 分からないときだけ\n  # 触る場所が多いとき\n  design:\n/);
   assert.ok(!dropped.includes("  research:"));
@@ -245,13 +245,13 @@ test("CB-T103 同じ元ノードを 2 回送れば書き戻さない。yes / no 
   assert.throws(() => doc.apply({ phases: [research, { ...research, id: "x" }] }), /2 回送られました/);
 
   const renamed = doc.apply({ phases: doc.model.form.phases.map((p) => (p.id === "design" ? { ...p, id: "yes", when: "on" } : p)) });
-  assert.match(renamed, /\n  "yes":\n    kind: work\n    title: 設計\n    review: mr\n    scope: \["wip\/design\/\*", "docs\/\*"\]\n    when: "on"\n/);
+  assert.match(renamed, /\n  "yes":\n    kind: work\n    title: 設計\n    review: true\n    scope: \["wip\/design\/\*", "docs\/\*"\]\n    when: "on"\n/);
   assert.deepEqual(readPhases(renamed).model.form.phases.map((p) => p.id), ["research", "yes", "implement", "acceptance", "implement-feedback"]);
 
   const flow = readPhases("version: 1\nphases: {}\n");
   assert.equal(
     flow.apply({ phases: [phase("a", { title: "A" })] }),
-    "version: 1\nphases:\n  a:\n    kind: work\n    title: A\n    review: mr\n    scope: inherit\n",
+    "version: 1\nphases:\n  a:\n    kind: work\n    title: A\n    review: true\n    scope: inherit\n",
   );
   assert.match(readPhases("- a\n").model.problems[0], /最上位がマップ（キーと値の組の集まり）ではありません/);
   assert.match(readPhases("version: 1\nphases:\n  broken:\n  ok:\n    kind: work\n").model.problems[0], /保存するとこの定義は消えます/);

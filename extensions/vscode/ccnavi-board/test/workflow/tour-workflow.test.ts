@@ -138,10 +138,10 @@ test("CB-T501 見本の open は、実例の open と同じ線・番号・見る
   const { plans: _a, ticket: _b, source_sha: _c, ...restSample } = sample.answers.open.answer;
   const { plans: _d, ticket: _e, source_sha: _f, ...restReal } = real;
   assert.deepEqual(restSample, restReal);
-  // 見る場所は、実例が持つ言葉（none / mr）だけ。タイトルは実行ファイルが定義のタイトルを入れるので、見本は実際の定義のタイトルを使う
+  // レビューの要否は、実例が持つ真偽値だけ。タイトルは実行ファイルが定義のタイトルを入れるので、見本は実際の定義のタイトルを使う
   for (const plan of sample.answers.open.answer.plans) {
     for (const item of plan.items) {
-      assert.ok(["none", "mr"].includes(item.review), `${item.number} の見る場所 ${item.review}`);
+      assert.ok(typeof item.review === "boolean", `${item.number} のレビューの要否 ${item.review}`);
       assert.notEqual(item.title, "");
     }
   }
@@ -341,7 +341,7 @@ test("CB-T507 案内の構成。基本の案内は今のタイトルと順序の
 });
 
 test("CB-T508 見本の書き間違いは読み込みで落ちる（知らないキー・先に書いていない base・計画がない答え・開いたときの答えがありません）", () => {
-  const plan = { items: [{ number: 1, type: "research", title: "調査", review: "none" }], after: {}, ready: [1] };
+  const plan = { items: [{ number: 1, type: "research", title: "調査", review: false }], after: {}, ready: [1] };
   const ok = { ticket: "t", answers: { open: { plan } } };
   assert.ok(parseWorkflowSample(ok).answers.open.answer.writable);
   const bad: Array<[string, unknown, RegExp]> = [
