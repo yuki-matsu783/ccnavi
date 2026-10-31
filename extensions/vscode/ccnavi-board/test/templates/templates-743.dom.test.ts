@@ -29,6 +29,11 @@ test("CB-T1237 CSS: 計画の編集欄の表は、操作の列を右端に固定
   assert.match(css, /\.tpl-edit-items td\.tpl-edit-ops[^{]*\{[^}]*position: sticky; right: 0/);
 });
 
+test("CB-T1242 CSS: 計画の編集欄の表の見出しは、狭い幅でも折れない", () => {
+  const css = fs.readFileSync(path.join(__dirname, "..", "..", "..", "src", "webview", "templates", "Edit.css"), "utf8");
+  assert.match(css, /\.tpl-edit-items th[^{]*\{[^}]*white-space: nowrap/);
+});
+
 async function openList(): Promise<DomPage> {
   const dom = await loadPage(templatesHtml({ kind: "page", page: page() }), undefined, { measure: true });
   await dom.settle();

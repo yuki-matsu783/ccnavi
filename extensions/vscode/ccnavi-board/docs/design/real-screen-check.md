@@ -318,6 +318,7 @@ node "$W/shoot.js" "$UC" board 1280 760 チケット管理      # 最初の 1 �
 | 終わったあと、code-server の子プロセスが残る | `pgrep -f "[c]ode-server/out/node/entry"` では、ファイル監視の子（`--type=fileWatcher`）が見つからない | 親の PID に加えて、`--type=fileWatcher` の子プロセスも止める。一時ファイルは `rm -r` で消す（`rm -rf` と `find -delete` はガードに拒否される） |
 | macOS で `setsid` が無い | macOS には `setsid` が標準で無い | `nohup … &` だけで動く（`disown` も不要だった）。Chromium は、Playwright のブラウザの置き場の `chromium_headless_shell-*/chrome-headless-shell-*/chrome-headless-shell` を `CCNAVI_CHROMIUM`（`CHROME`）に指す |
 | 拡張を入れ直すたびに vsix を作るのが重い | `package.sh` は install と compile を含む | compile 済みの出力（`package.json`、`media/`、`out/extension.js`、`out/webview/`）を、拡張の置き場へコピーするだけでも動いた。コピー元が現在のソースと合っているかは、先に compile して確かめる |
+| 単体の Chromium で webview だけを開いて測りたい（code-server は要らない CSS の確認など） | webview は `acquireVsCodeApi` を前提にしていて、そのままでは動かない | ビルド済みの HTML に `acquireVsCodeApi` の代わり（スタブ）を差し込み、HTML をファイルに書いて `goto` で開く。`setContent` は `file://` と違ってスクリプトが動かない。`page.addInitScript` には関数をそのまま渡さず、`"(" + fn + ")(window)"` の文字列で渡す。テンプレートの編集画面は、`editOpen` の `session` を拾ってから `editOpened` を流し込むと開く。VS Code の通知・テーマの色が絡む点は、これでは確かめられない（本物は code-server） |
 
 code-server 由来のため、評価には入れなかったもの。
 
