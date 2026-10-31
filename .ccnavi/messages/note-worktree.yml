@@ -1,4 +1,5 @@
 # ccnavi-worktree.sh が、親のワークツリーから直接作業へ切り替えたときに出す案内と、切り替えを断るときの案内。
+# 末尾の NOTE_WORKTREE_ACTIVE_AT_START だけは sh でなく SessionStart（hook/events.py → tickets/notice/direct_active.py）が引く。
 # 何が残っているか（条件）は sh が実行ファイル（tree leftover）に聞く。取り下げの手順は
 # .ccnavi/docs/ticket-work.md の「拒否される条件と、切り替える前の取り下げ」と同じ。
 version: 1
@@ -31,3 +32,10 @@ messages:
     values: [mr]
     note: |-
       MR {mr} が残っている。ccnavi には MR を閉じる操作が無く、Draft のまま残すか閉じるかはユーザがホストで決める（エージェントは閉じない）。MR のブランチは変わらず、直接作業の変更はこのワークツリーのブランチに入る
+
+  # SessionStart。作業中の直接作業のワークツリーがあるとき。compact で会話が忘れた続きの作業を、別に切り直さないため。
+  NOTE_WORKTREE_ACTIVE_AT_START:
+    kind: note
+    values: [worktrees]
+    note: |-
+      作業中の直接作業のワークツリーがある: {worktrees}。同じリポジトリで別に切ろうとすると、ccnavi-worktree.sh が確認を求める

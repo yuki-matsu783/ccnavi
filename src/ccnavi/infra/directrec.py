@@ -122,6 +122,30 @@ def records_of(root: str, main: tree.Tree) -> list[Record]:
     return out
 
 
+def active_names(root: str, main: tree.Tree) -> list[str]:
+    """このユーザのチェックアウトの、作業中の直接作業の名前（横で作業する指定の有無は問わない）。
+
+    記録（`ccnavi-direct/<名前>`）があり、作業ワークツリーのディレクトリが残っているもの。
+    `ccnavi-worktree.sh` の C8 と同じ基準で、記録の中身は読まない。compact などで会話が
+    覚えていない続きの作業を知らせ、別に切るときに確かめるために使う。
+    """
+    common = common_dir(main.root)
+    if common is None:
+        return []
+    base = os.path.join(common, DIRECT_DIR)
+    try:
+        names = sorted(os.listdir(base))
+    except OSError:
+        return []
+    return [
+        name
+        for name in names
+        if not name.startswith(".")
+        and os.path.isfile(os.path.join(base, name))
+        and os.path.isdir(tree.worktree_path(root, name))
+    ]
+
+
 def side_by_side_roots(root: str, projects_dir: str = "") -> list[tree.Tree]:
     """有効な記録があるユーザのチェックアウト（ワークスペース自身かプロジェクト）。"""
     mains = [tree.main_tree(root), *tree.projects(projects_dir)]
