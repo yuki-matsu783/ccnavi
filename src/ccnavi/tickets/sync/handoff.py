@@ -4,8 +4,7 @@
 `wip/handoff/<ツリーからの相対パス>` に下書きを置き、ユーザがこの取り込みで元の場所へ書く。
 相対パスの中の `.claude` の階層は、Claude Code 本体が編集を断るので `handoff-.claude` に読み替えて
 置き、取り込むときに戻す（表と規則は `handoff_names`）。
-下書きを作るのは `ccnavi-stage.sh`（元のファイルをコピーし、
-`<下書き>.orig` にコピーした時点の元を残す）か、
+下書きを作るのは `ccnavi-stage.sh`（元のファイルをコピーする）か、
 テンプレートなら `ccnavi --templates --draft`。
 
 ## 取り込み先（許可リスト）
@@ -22,14 +21,13 @@
   両方を断る
 - バイナリ（NUL を含む）と、UTF-8 として読めないもの
 - 種類の表で新規作成を許さない種類の、取り込み先に無いもの
-- コピーした時点の元（`.orig`）と今の取り込み先が違うもの（`conflict`）
 
-選んだ対象に 1 つでも error か `conflict` があれば、何も書かない。
+選んだ対象に 1 つでも error があれば、何も書かない。
 
 ## 照合の値（`--expect`）
 
 対象ごとに (相対パスの NFC・fold、種類、下書きのバイト列の SHA-256、取り込み先のバイト列の SHA-256
-（無ければ `-`）、`.orig` のバイト列の SHA-256（無ければ `-`））を、長さの前置き（`<バイト数>:`）
+（無ければ `-`））を、長さの前置き（`<バイト数>:`）
 つきで並べたものが 1 件の記録。選んだ対象の記録をパスの並び順で連結した SHA-256 が `expect`。
 改行コードは正規化せず、バイト列のまま。
 
@@ -39,7 +37,7 @@
 リンクと取り込み先のハッシュを確かめ直す。複数の対象の途中で失敗したら、書いたものを書く前の
 バイト列（メモリに持つ）へ戻し、戻せなかったものを名指しする。複数ファイルの書き込みは、
 プロセスの途中終了に対して原子的ではない。取り込めたら、下書きの今のバイト列が取り込んだものと
-同じときだけ、下書きと `.orig` を消す。
+同じときだけ、下書きを消す。
 """
 
 from __future__ import annotations
@@ -51,7 +49,6 @@ import json
 import os
 import re
 import shutil
-import stat
 import subprocess
 import unicodedata
 from dataclasses import dataclass, field
@@ -71,8 +68,6 @@ JSON_VERSION = 1
 # 下書きの置き場（ツリーのルートからの相対）。
 HANDOFF_PARTS = (ticket_places.WIP_ROOT, "handoff")
 HANDOFF_REL = "/".join(HANDOFF_PARTS)
-# `ccnavi-stage.sh` がコピーした時点の元を残す名前の後ろ。
-ORIG_SUFFIX = ".orig"
 # 下書きの置き場で読み替える階層名の表（元の階層名 → 下書きでの階層名）。中身は `handoff_names` が
 # `.ccnavi/scripts/ccnavi-handoff-names.txt` から読む。sh（`ccnavi-stage.sh`）と同じファイル。
 HANDOFF_ALIASES = handoff_names.ALIASES
@@ -86,7 +81,6 @@ KIND_DEFENSE = "defense"
 STATE_NEW = "new"
 STATE_CHANGED = "changed"
 STATE_UNCHANGED = "unchanged"
-STATE_CONFLICT = "conflict"
 STATE_REJECTED = "rejected"
 
 # 差分に添える前後の行数。
@@ -264,7 +258,7 @@ def walk(tree_root: str) -> tuple[list[Found], list[tuple[str, str]], str]:
     置き場そのものの問題。
 
     リンクのディレクトリの中へは降りない（降りないので、その中の下書きは取り込まれない）。
-    `.orig`（コピーした時点の元）と、途中を見せない書き方の残した一時ファイルは下書きに数えない。
+    途中を見せない書き方の残した一時ファイルは下書きに数えない。
     `rel` と `key` は、読み替えを戻した取り込み先のパス。
     """
     base = handoff_dir(tree_root)
@@ -279,7 +273,7 @@ def walk(tree_root: str) -> tuple[list[Found], list[tuple[str, str]], str]:
         for name in sorted(files):
             full = os.path.join(parent, name)
             drel = os.path.relpath(full, base).replace(os.sep, "/")
-            if fold_part(name).endswith(ORIG_SUFFIX) or fsio.is_temp_name(name):
+            if fsio.is_temp_name(name):
                 continue
             rel = handoff_names.from_draft(drel)
             key = key_of(rel)
@@ -336,20 +330,17 @@ class Entry:
     key: str
     kind: Kind
     draft: str
-    # 置き場の中の相対パス（置いてある綴りのまま。`.orig` はこの隣）。
+    # 置き場の中の相対パス（置いてある綴りのまま）。
     drel: str = ""
     target: str = ""
     raw: bytes | None = None
     current: bytes | None = None
-    orig: bytes | None = None
-    has_orig: bool = False
     # テンプレートとレイヤーの設定の、レイヤーの名前（common / self / プロジェクト）。
     layer: str = ""
     # レイヤーの設定の種類（settings.KIND_*）。
     config_kind: str = ""
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
-    conflict: bool = False
     diff: str = ""
     selected: bool = False
     # 種類はボードで取り込めるが、中身が防御の記述を動かすので、ターミナルに限る理由
@@ -362,10 +353,6 @@ class Entry:
         return self.kind.board and not self.defense
 
     @property
-    def orig_path(self) -> str:
-        return self.draft + ORIG_SUFFIX
-
-    @property
     def draft_rel(self) -> str:
         """下書きのツリーからの相対パス。置いてある綴りのまま（無ければ表から組む）。"""
         return f"{HANDOFF_REL}/{self.drel}" if self.drel else draft_rel(self.rel)
@@ -374,8 +361,6 @@ class Entry:
     def state(self) -> str:
         if self.errors:
             return STATE_REJECTED
-        if self.conflict:
-            return STATE_CONFLICT
         if self.current is None:
             return STATE_NEW
         if self.current == self.raw:
@@ -391,7 +376,6 @@ class Entry:
                 self.kind.id,
                 _sha(self.raw),
                 _sha(self.current),
-                _sha(self.orig),
             )
         )
 
@@ -428,9 +412,7 @@ class Plan:
 
     @property
     def ok(self) -> bool:
-        return not self.error and all(
-            e.state not in (STATE_REJECTED, STATE_CONFLICT) for e in self.selected
-        )
+        return not self.error and all(e.state != STATE_REJECTED for e in self.selected)
 
 
 def wanted_key(arg: str) -> tuple[str, str]:
@@ -508,7 +490,7 @@ def prepare(conf: settings.Settings, root: str, wanted: list[str] | None = None)
 
 
 def _read(conf: settings.Settings, root: str, entry: Entry) -> None:
-    """下書き・取り込み先・`.orig` を読み、形の上の断る理由を足す。中身の検査は別。
+    """下書き・取り込み先を読み、形の上の断る理由を足す。中身の検査は別。
 
     処理フロー:
     1. パスの要素に `.git` で始まるものがあれば断る。
@@ -516,7 +498,6 @@ def _read(conf: settings.Settings, root: str, entry: Entry) -> None:
     3. `_locate_layer` で下書きのレイヤーを求め、`spelled` で取り込み先を決める。
     4. 取り込み先の途中にリンクがあるか、ツリーの外を指すなら断る。
     5. 取り込み先があれば読む。無いのに種類が新しく作れないものなら断る。
-    6. `.orig` があれば読み、コピーしたあとに取り込み先が変わっていれば `conflict` を立てる。
     """
     parts = entry.key.split("/")
     if any(part.startswith(".git") for part in parts):
@@ -552,16 +533,6 @@ def _read(conf: settings.Settings, root: str, entry: Entry) -> None:
         entry.errors.append(
             f"取り込み先 {entry.rel} が無い。この種類（{entry.kind.id}）は新しく作れない"
         )
-    if os.path.lexists(entry.orig_path):
-        entry.has_orig = True
-        orig, why = flow.read_bytes(entry.orig_path, root)
-        if orig is None:
-            entry.errors.append(f"コピーした時点の元（{ORIG_SUFFIX}）を読めない（{why}）")
-            return
-        entry.orig = orig
-        if entry.current != orig:
-            # コピーしたあとに取り込み先が変わった。取り込むと、その変更を黙って上書きする。
-            entry.conflict = True
 
 
 def _inside(root: str, path: str) -> bool:
@@ -936,15 +907,12 @@ def board_refused(plan: Plan) -> str:
 
 
 def not_ok_reason(plan: Plan) -> str:
-    """選んだ対象に error か conflict があるときの、名指しの文。"""
+    """選んだ対象に error があるときの、名指しの文。"""
     if plan.error:
         return plan.error
-    bad = [e for e in plan.selected if e.state in (STATE_REJECTED, STATE_CONFLICT)]
-    named = "、".join(
-        f"{e.rel}（{e.errors[0] if e.errors else 'コピーしたあとに取り込み先が変わった'}）"
-        for e in bad[:10]
-    )
-    return f"選んだ対象に error か conflict がある: {named}。何も書いていません"
+    bad = [e for e in plan.selected if e.state == STATE_REJECTED]
+    named = "、".join(f"{e.rel}（{e.errors[0]}）" for e in bad[:10])
+    return f"選んだ対象に error がある: {named}。何も書いていません"
 
 
 def apply(plan: Plan, expect: str, via_board: bool = False) -> Applied:
@@ -975,8 +943,8 @@ def apply(plan: Plan, expect: str, via_board: bool = False) -> Applied:
     if expect != plan.expect:
         return Applied(
             False,
-            "--expect が今の対象のハッシュと違う（見せたあとに、下書き・取り込み先・"
-            f".orig のどれかが変わった）。何も書いていません。今のハッシュ: {plan.expect}",
+            "--expect が今の対象のハッシュと違う（見せたあとに、下書きか取り込み先が変わった）。"
+            f"何も書いていません。今のハッシュ: {plan.expect}",
         )
     written: list[Entry] = []
     failure = ""
@@ -1044,13 +1012,11 @@ def _roll_back(written: list[Entry]) -> list[str]:
 
 
 def _clean_draft(root: str, entry: Entry, done: Applied) -> None:
-    """下書きの今のバイト列が取り込んだものと同じときだけ、下書きと `.orig` を消す。
+    """下書きの今のバイト列が取り込んだものと同じときだけ、下書きを消す。
 
     処理フロー:
     1. 下書きを読み直し、取り込んだときの `entry.raw` と同じかを見る。違えば消さずに残す理由を積む。
     2. 下書きを `fsio.unlink` で消し、`removed_drafts` に入れる。
-    3. `.orig` があれば、`lstat` で通常のファイルかを見て、そうなら消す。通常のファイルでなければ
-       （リンクやディレクトリを含む）残す。
     """
     now, why = flow.read_bytes(entry.draft, root)
     if now is None:
@@ -1066,24 +1032,6 @@ def _clean_draft(root: str, entry: Entry, done: Applied) -> None:
         done.kept_drafts.append((entry.draft_rel, f"下書きを消せない（{_line(err)}）"))
         return
     done.removed_drafts.append(entry.draft_rel)
-    orig = entry.orig_path
-    if not os.path.lexists(orig):
-        return
-    try:
-        mode = os.lstat(orig).st_mode
-    except OSError as exc:
-        done.kept_drafts.append((entry.draft_rel + ORIG_SUFFIX, f"読めない（{_line(exc)}）"))
-        return
-    if not stat.S_ISREG(mode):
-        done.kept_drafts.append(
-            (entry.draft_rel + ORIG_SUFFIX, "リンクかふつうのファイルでないので消していない")
-        )
-        return
-    err = fsio.unlink(orig)
-    if err:
-        done.kept_drafts.append((entry.draft_rel + ORIG_SUFFIX, f"消せない（{_line(err)}）"))
-        return
-    done.removed_drafts.append(entry.draft_rel + ORIG_SUFFIX)
 
 
 # ---- ready の止め
