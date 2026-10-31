@@ -116,7 +116,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
 
     def test_ready_from_outside_drops_the_parent_worktree_after_undrafting(self):
         """`ready --parent <親>` を親のワークツリーの外（ワークスペースルート）から打つ。
-        中から打ったときと同じに Draft を外し、最後に親のワークツリーを消す（ブランチは残す）。"""
+        Draft を外し、最後に親のワークツリーを消す（ブランチは残す）。"""
         ready = self.sh(
             "ccnavi-review.sh",
             "ready",

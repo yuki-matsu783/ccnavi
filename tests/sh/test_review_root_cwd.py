@@ -1,4 +1,4 @@
-"""ワークスペースルート（origin は GitHub）から review の confirm・decide・request・ready を打ったときの止まり方。
+"""ワークスペースルート（origin は GitHub）から review の confirm・decide・request を打ったときの止まり方（ready は --parent が要る別の止め方）。
 
 親は cwd のワークツリーから引く。ルートから打つと親が決まらないので、ホストへ繋ぐ前に
 「親のワークツリーの中で打つ」と止める。先にホストへ繋ぐと、親のプロジェクトが GitLab でも、

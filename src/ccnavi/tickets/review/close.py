@@ -465,7 +465,7 @@ def close_early(
     stdout.write(
         f"OK: {parent.ticket} を早めに閉じた。あとは親に、状態の移動をコミットし、"
         f"'ticket finish {parent.ticket}' で閉じて push し、"
-        "'ccnavi-review.sh ready' で Draft を解除させる"
+        f"'{ops.ready_command(root, parent.ticket)}' で Draft を解除させる"
         f"（`{ticket_places.WIP_ROOT}/` の追跡済みのファイルは ready が削除します）\n"
     )
     return 0

@@ -609,7 +609,7 @@ class WriteAndPushHostHarness(WriteAndPushHarness):
         return self.sh(script, *args, cwd=cwd or self.tree, stdin=stdin, **env)
 
     def carried_after_drop(self, rel):
-        """ready が親のワークツリーを消した後。親のブランチ（ワークスペースの側）で見る。"""
+        """ready が親のワークツリーを消したあと。親のブランチ（ワークスペースの側）で確かめる。"""
         self.assertFalse(os.path.exists(self.tree))
         self.assertIn(rel, self.committed(PARENT, self.ws))
         self.assertEqual(self.remote_sha(), self.sha(self.ws, PARENT))

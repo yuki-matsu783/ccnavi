@@ -31,7 +31,7 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 | `decide <N> --preview` | 一覧とダイジェストを見るだけ（`--reviewed N --accept-unresolved --preview`）。書く側は `ccnavi-user-decide.sh <N>`（下の行） |
 | `ccnavi-user-decide.sh <N>` | ユーザが打つ。`ccnavi-review.sh` には無い。sh が取ってくる → `user reviewed N --accept-unresolved` → sh が投稿。途中で失敗した送信は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送る（操作記録は `logs/state/ops/`） |
 | `comment --body-file <本文>` | sh が投稿する。実行ファイルは関わらず、レビューの状態も変えない |
-| `ready` | `review ready`（条件を確かめ、マーカーを置き、閉じた親子のチケットを `logs/archive/` へ退避する。`wip/` の追跡済みのファイルを消す。標準出力は 1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`、続けて消したものがあれば `wip-from <消す前の HEAD>` と `wip <パス>`）→ write-and-push が退避と `wip/` の削除をコミットして push する（write-and-push の外なら、sh が 2 行目のツリーの置き場と `wip/` に未コミットの変更が無いことを確かめ、あれば止める）→ sh が Draft を外し、コメントを投稿する → sh が実行ファイルの `worktree drop <親>` で親のワークツリーを消す（cwd が中なら消さず、外から打つ 1 本を出す）。`--parent <親>` なら親のワークツリーの外から打てる（sh が親のワークツリーへ移って同じ段を回し、消す前に打った場所へ戻る） |
+| `ready` | `review ready`（条件を確かめ、マーカーを置き、閉じた親子のチケットを `logs/archive/` へ退避する。`wip/` の追跡済みのファイルを消す。標準出力は 1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`、続けて消したものがあれば `wip-from <消す前の HEAD>` と `wip <パス>`）→ write-and-push が退避と `wip/` の削除をコミットして push する（write-and-push の外なら、sh が 2 行目のツリーの置き場と `wip/` に未コミットの変更が無いことを確かめ、あれば止める）→ sh が Draft を外し、コメントを投稿する → sh が実行ファイルの `worktree retire <親>` で子と親のワークツリーを消す。`ready` は `--parent <親>` を付けて親のワークツリーの外から打つ形だけ（sh が親のワークツリーへ移って同じ段を回し、消す前に打った場所へ戻る） |
 | `ccnavi-user-close-early.sh --reason <理由> [--no-issue]` | ユーザがターミナルで打つ。`ccnavi-review.sh` には無い。`user close-early` → sh が残りを issue に書き出し、コメントを投稿する |
 | `fetch` / `origin` | 取得した JSON を標準出力へ / origin をどう読んだか |
 
@@ -140,13 +140,13 @@ push 済みであること。満たしていれば `ready.json` とコメント�
 2 行目が `tree <退避したツリーのルート>` で、sh はこの 2 行目のツリーで未コミットを確かめる（sh と実行ファイルの約束）。
 `wip/` から消したものがあれば、続けて `wip-from <消す前の HEAD>` と `wip <パス>`（1 行 1 本）を出し、sh がユーザに見せる。
 write-and-push の書いたパスの一覧の検査は、`review ready` が消した `wip/` の下のファイル（今は無いもの）だけを置き場の外でも通す。
-続いて write-and-push が退避と `wip/` の削除をコミットして push し、sh が Draft を外し、コメントを投稿し、最後に `worktree drop <親>` で
-親のワークツリーを消す（cwd が中にあれば消さず、外から打つ `ccnavi-clean.sh --worktree <親>` を出す。Draft を外す前と、
+続いて write-and-push が退避と `wip/` の削除をコミットして push し、sh が Draft を外し、コメントを投稿し、最後に `worktree retire <親>` で
+子と親のワークツリーを消す（cwd が親の中にあれば、何も消さずに断り、外から打つ形を出す。Draft を外す前と、
 外せなかったときは消さない）。互換の版が食い違っていても止めず、組み立て直しはユーザに頼むと言う。
 親は cwd から引くので、`review-request`・`confirm`・`decide` を統合先のブランチの上（ワークスペースルートなど）で打つと、sh はホストへ繋ぐ前に止まる。cwd を示して「親のワークツリーの中で打ってください」と言い、`次:` に `cd` 付きの打ち直しを出す。ホストは cwd の origin で決まるので、先に繋ぐと親のプロジェクトとは別のホストで止まってしまう。
 `ready` は親のワークツリーの外から `--parent <親>` を付けて打つ形だけ。`--parent` が無ければ、sh はホストへ繋ぐ前に止まり、何も変えず、外から打つ 1 本を `次:` に出す（cwd が親のワークツリーの中なら親の識別子を埋める）。付いていれば、sh は `.claude/worktrees/<親>` へ移ってから origin・ブランチ・親の識別子を
 読み、実行ファイルにもそこを cwd として渡す。最後は打った場所へ戻ってから、親のワークツリーを消す。
-最後の `worktree drop` だけは打った場所へ戻ってから、打った場所を cwd として渡すので、親のワークツリーが消える。GitLab では、Draft を外すときに `squash` も
+最後の `worktree retire` だけは打った場所へ戻ってから、打った場所を cwd として渡すので、親のワークツリーが消える。GitLab では、Draft を外すときに `squash` も
 有効にする。同じ親に 2 度打っても通る。退避を始めた後の打ち直しは、ready のマーカーが今のツリーのもので、`ready.json` のマージリクエストの
 番号が今回と同じときだけ、ワークツリーの側の条件だけを見て残りを移す。マージするのはユーザ。
 

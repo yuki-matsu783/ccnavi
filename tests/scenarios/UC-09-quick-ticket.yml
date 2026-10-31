@@ -38,7 +38,7 @@ steps:
     check:
       - 差分が README.md の末尾 1 行の追加と、ELI5 の HTML（wip/eli5/phase-1.html）だけである
   - prompt: >-
-      レビューが済んだ。`sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1` で確認し、親を finish して push し、`sh .ccnavi/scripts/ccnavi-review.sh ready` で Draft を外して。
+      レビューが済んだ。`sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1` で確認し、親を finish して push し、`sh .ccnavi/scripts/ccnavi-review.sh ready --parent <親の識別子>` で Draft を外して。
     resume: true
 
 expect:

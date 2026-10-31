@@ -2,16 +2,16 @@
 type: adr
 title: ready は親のワークツリーの外から --parent で打つ形に一本化する
 description: ready の打ち方を、親のワークツリーの外から --parent を付ける 1 本に絞る。付けずに打たれたら、ホストへ繋ぐ前に止めて、外から打つコマンドを案内する
-tags: [tickets, review, worktree]
+tags: [ticket, review, worktree]
 keywords: [ready, --parent, 親のワークツリー, 外から, 一本化, Draft 解除, worktree retire]
 ---
-# ADR-0214: ready は親のワークツリーの外から --parent で打つ形に一本化する
+# ADR-0216: ready は親のワークツリーの外から --parent で打つ形に一本化する
 
 状態: 採用
 
 ## 状況
 
-`ccnavi-review.sh ready` は 2 通りの打ち方を許していた。外から `--parent <親>` を付ける形は、sh が親のワークツリーへ移って処理し、最後に元の場所へ戻って親のワークツリーまで片付ける。親のワークツリーの中から `--parent` なしで打つ形は、処理は走るが、cwd が親の中なので最後に親を消せず、外から打つコマンドを案内していた。
+`ccnavi-review.sh ready` は 2 通りの打ち方を許していた。外から `--parent <親>` を付ける形は、sh が親のワークツリーへ移って処理し、最後に元の場所へ戻って親のワークツリーまで片付ける。親のワークツリーの中から `--parent` なしで打つ形は、処理は進むが、cwd が親の中なので最後に親を消せず、外から打つコマンドを案内していた。
 
 ## 決定
 
