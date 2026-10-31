@@ -94,7 +94,7 @@ Claude Code 本体は `.claude` という名前の階層（深さを問わない
 取り込みは `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`。`defense`（と、防御の記述を動かす `rules.yml`）は一覧に出し、ターミナルで取り込むことと打つコマンド（`ccnavi --root <ツリー> user handoff <パス> --yes --expect <ハッシュ>`。引用は POSIX の sh の形で、PowerShell では単引用符の中の `'\''` を `''` に打ち直す）を案内する。
 テンプレート管理の画面は、一覧・検索・表示のほか、ユーザが図で直したテンプレートを拡張が直接保存する（実行ファイルは読むだけの `--templates --check-file` で保存前に検査する。取り込み済みの本文を書くのはこの保存と、ユーザの手作業だけ）。下書きの取り込みは取り込み待ちの画面。ボードの rules・phases・risks の画面は、拡張が直接書くまま。
 
-**表。** `tickets/model/user_only.py` の表が `handoff` の操作と `--handoff` を持つ。
+`tickets/model/user_only.py` の表が `handoff` の操作と `--handoff` を持つ。
 
 #### `--draft` と `ready`
 

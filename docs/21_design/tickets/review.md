@@ -62,7 +62,7 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 6. 終わったら、sh はユーザが打つ `cd '<ツリーのルート>'`・`crit review <相対パス>`・`crit push <番号>` を標準出力に出す。
    ツリーのルートはいつも `'…'` で包み、中の `'` は `'\''` に置き換える。
 
-**`confirm` の段**。sh は、ロック・取り込みの前に `review confirm --check` で断れる条件を通してから、スレッドとレビューを取ってきて、`review confirm` に渡す。`review confirm` は判定し、
+`confirm` の段。sh は、ロック・取り込みの前に `review confirm --check` で断れる条件を通してから、スレッドとレビューを取ってきて、`review confirm` に渡す。`review confirm` は判定し、
 通れば `reviewed` のマーカーを置いて、そのフェーズと引き受けた延期の分の `review/` の子を `done/` へ動かす。
 sh がトークンの持ち主を引けたら `--actor` で渡し、マーカーに `actor` と `via: cli` を残す。引けないときは渡さないので、
 マーカーに `actor` が無い。
@@ -75,7 +75,7 @@ Chrome 拡張も `decide` を行える。拡張が issue・返信・解決をホ
 `done/` へ動いた子のワークツリーを消す（未コミットがあるもの・cwd が中のものは消さずに言う）。
 Chrome 拡張のレビュー済みと `decide` のワークツリーは、親の `finish` の片付けが消す。
 
-**`decide` の段**（`ccnavi-user-decide.sh`）。ユーザがボードの［レビュー完了］かターミナルで打つ。sh は、アカウントの問い合わせ・ロック・取り込みの前に、`ccnavi --entry sh --check user reviewed N --accept-unresolved`（親とフェーズ・依頼の記録・依頼のあとに動いていないこと。選択とダイジェストを渡すときは `--yes` と `--digest` も）で断れる条件を通す。そのあと、スレッドとレビューを取ってきて、実行ファイルを
+`decide` の段（`ccnavi-user-decide.sh`）。ユーザがボードの［レビュー完了］かターミナルで打つ。sh は、アカウントの問い合わせ・ロック・取り込みの前に、`ccnavi --entry sh --check user reviewed N --accept-unresolved`（親とフェーズ・依頼の記録・依頼のあとに動いていないこと。選択とダイジェストを渡すときは `--yes` と `--digest` も）で断れる条件を通す。そのあと、スレッドとレビューを取ってきて、実行ファイルを
 `user reviewed N --accept-unresolved` で呼ぶ。実行ファイルは残っているスレッドを 1 件ずつ見せ、ユーザに対応方針を
 選ばせる。方針は次の 3 つ。
 
