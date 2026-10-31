@@ -43,7 +43,7 @@ from . import stop as ops_stop
 from . import worktrees
 
 # 最後のレビューのあと、Draft を外すまでの手順がユーザの合意の範囲に入ることの言い切り。
-# `confirm` の知らせ（core_review.after_last_review）と親の `finish` の出力が同じ文を使う。
+# `confirm` の知らせ（core_review.next_after_confirm）と親の `finish` の出力が同じ文を使う。
 # ユーザがレビュー済みにした時点で、ここまでは合意済み。外へ出る操作（push・Draft を外す）の前に
 # 確認を取り直すと、同じ流れの中で何度も許可を求めることになる。
 READY_FLOW_AGREED = (
@@ -148,10 +148,13 @@ def start(
         stdout.write(
             "共通レイヤーと工程スキルのプロジェクトへのコピーは、次のユーザの発言で置かれる\n"
         )
-    for line in ops_plan.childless_notice(root, conf, found):
+    childless = ops_plan.childless_notice(root, conf, found)
+    for line in childless:
         stdout.write(line + "\n")
     if found.is_child:
         stdout.write(texts.say(root, "NEXT_OPS_START_CHILD", {"ticket": found.ticket}) + "\n")
+    elif not childless:
+        stdout.write(texts.say(root, "NEXT_OPS_START_PARENT", {}) + "\n")
     if learning.applies(root, conf, found):
         stdout.write(
             "学びの蓄積: 閉じる前に "
@@ -359,7 +362,13 @@ def _close_parent(
 
 
 def cancel(
-    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str, reason: str
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    ticket_id: str,
+    reason: str,
+    advise: bool = True,
 ) -> int:
     """`doing/` → `done/`。取り消しの時刻と理由を書く。理由が要る。
 
@@ -368,6 +377,10 @@ def cancel(
     2. `ops_close.find` で承認済みを引き、未承認（`todo/`）と作業中でないものを止める。
     3. 親が作業中（`ops_close.parent_still_busy`）なら止める。
     4. `cancelled_at` と `cancel_reason` を欄に書き、`_move` で `done/` へ動かす。
+
+    `advise` が偽なら、子の取り消しのあとの `次:` を出さない（close-early が未着手の子を
+    まとめて取り消すとき、`次:` が子の数だけ並ぶため）。取り消した親には言う次が無い
+    （親の閉じ方は取り消しでは決まらない）。
     """
     if not reason.strip():
         stderr.write("ccnavi: 取り消しには --reason <理由> が必要です。\n")
@@ -396,6 +409,7 @@ def cancel(
         ticket_model.DONE,
         fields,
         f"取り消し: {reason.strip()}",
+        advise=advise,
     )
 
 
@@ -471,6 +485,7 @@ def record_risk(
         f"OK: {ticket_id} の {factor_id} を {answer} と記録した"
         f"（{'+' + str(factor.points) if answer == 'yes' else '加点なし'}、HEAD {head[:12]}）\n"
     )
+    stdout.write(texts.say(root, "NEXT_OPS_RECORD_RISK", {"ticket": ticket_id}) + "\n")
     return 0
 
 
@@ -595,6 +610,7 @@ def _move(
     state: str,
     fields: dict[str, str],
     said: str,
+    advise: bool = True,
 ) -> int:
     """`doing/` の承認済みチケットに欄を書き、`review/` か `done/` へ動かす。
 
@@ -635,7 +651,7 @@ def _move(
             )
             + "\n"
         )
-    elif state == ticket_model.DONE and found.is_child and not fields.get("cancelled_at"):
+    elif state == ticket_model.DONE and found.is_child and advise:
         # 次の一手は status が計算する
         stdout.write(texts.say(root, "NEXT_OPS_CHILD_DONE", {"parent": found.parent}) + "\n")
     return 0

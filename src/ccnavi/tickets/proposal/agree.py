@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from typing import TextIO
 
 from ...infra import fsio, settings
-from ...policy import rules
+from ...policy import rules, texts
 from ..approval import checks as approval_checks
 from ..approval import marks as approval_marks
 from ..approval import ops as approval_ops
@@ -236,7 +236,7 @@ class Verdict:
 
 
 def verify_verdict(
-    gathered: Gathered, tickets_rel: str, held: tuple[str, str] | None = None
+    root: str, gathered: Gathered, tickets_rel: str, held: tuple[str, str] | None = None
 ) -> Verdict:
     """`--verify` の答えを組む。判定は `gather` が済ませてあり、ここは言い換えるだけ。
 
@@ -291,9 +291,7 @@ def verify_verdict(
         reason = VERIFY_REJECTED
         tail = (
             f"\n{len(gathered.rejected)} 件が承認の対象にならない。\n"
-            "次: 提案を直してから、同じ --agree --preview --verify を打ち直す。"
-            "通ったら、ccnavi-ticket.sh approval-request で親のブランチへ送り、"
-            "ユーザに承認を依頼する\n"
+            f"{texts.say(root, 'NEXT_VERIFY_REJECTED')}\n"
         )
     else:
         reason = VERIFY_OK
@@ -301,16 +299,8 @@ def verify_verdict(
             workflow.CHILDLESS_MARK in p.detail for c in gathered.batch for p in c.complaints
         )
         # 子の無い親は通るが、書き忘れに気づけるよう、次の一手を子の提案に向ける
-        step = (
-            "次: 子の提案が無い親がある（上の warn）。子の提案を wip/proposals/todo/ に書いてから、"
-            "同じ --agree --preview --verify を打ち直す。親だけを先に承認する進め方なら、"
-            "ccnavi-ticket.sh approval-request <識別子> で送り、子の承認がもう 1 回要ることを"
-            "ユーザに伝える。承認が済むまで実装はしない\n"
-            if childless
-            else "次: ccnavi-ticket.sh approval-request <識別子> で提案を親のブランチへ送ってから、"
-            "ユーザに承認を依頼してよい。承認が済むまで実装はしない\n"
-        )
-        tail = f"\n{len(gathered.batch)} 件が承認の対象に入る。\n{step}"
+        step = texts.say(root, "NEXT_VERIFY_CHILDLESS" if childless else "NEXT_VERIFY_OK")
+        tail = f"\n{len(gathered.batch)} 件が承認の対象に入る。\n{step}\n"
     lines.append(tail)
     return Verdict(reason == VERIFY_OK, reason, "".join(lines))
 
@@ -345,9 +335,13 @@ def _unreadable(gathered: Gathered) -> str:
 
 def _note_line(note: str) -> str:
     """行の下に添える 1 件。改行を含む苦情（ルールの `message` は複数行を書ける）は、
-    2 行目からも同じだけ下げる。下げないと、次の行が新しい段落に見える。"""
+    2 行目からも同じだけ下げる。下げないと、次の行が新しい段落に見える。
+    ただし、行頭が `次: ` の行は下げない。機械が数える行頭の語なので、行頭に置く。"""
     head, *rest = note.splitlines() or [""]
-    return "".join([f"      - {head}\n"] + [f"        {line}\n" for line in rest])
+    return "".join(
+        [f"      - {head}\n"]
+        + [(f"{line}\n" if line.startswith("次: ") else f"        {line}\n") for line in rest]
+    )
 
 
 def _batch_entry(cand: agree_candidates.Candidate) -> dict:

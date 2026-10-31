@@ -20,6 +20,7 @@ from types import SimpleNamespace
 from typing import TextIO
 
 from ...infra import fsio, settings, tree
+from ...policy import texts
 from ..approval import marks as approval_marks
 from ..approval import ops as approval_ops
 from ..approval import store as approval
@@ -78,7 +79,10 @@ def _followup_from_choice(
         f"続きの子チケット {ident} を {conf.approved}/{ticket_model.DOING}/ に起こした"
         f"（フェーズ {ph.number}、範囲は見た子の和、本文に指摘 {len(items)} 件）。"
         "フェーズは再び開かれ、マーカーは消えた。\n"
-        f"次は{_followup_next(root, parent, ident)}\n"
+    )
+    stdout.write(
+        texts.say(root, "NEXT_DECIDE_FOLLOWUP", {"words": _followup_next(root, parent, ident)})
+        + "\n"
     )
     for line in phase.reopen_impact(root, conf, parent.ticket, ph.number):
         stdout.write(line + "\n")

@@ -27,7 +27,7 @@ import os
 from typing import TextIO
 
 from ...infra import fsio, settings, tree
-from ...policy import rules
+from ...policy import rules, texts
 from ..approval import marks as approval_marks
 from ..approval import ops as approval_ops
 from ..approval import store as approval
@@ -165,7 +165,7 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, pare
         fsio.note_input(existing.path)
         stdout.write(
             f"開いている統合の子 {existing.ticket} がある。新しくは作らない。"
-            f"{_next_words(root, existing.ticket)}\n"
+            f"\n{_next_words(root, existing.ticket)}\n"
         )
         return 0
     if ops_close.misplaced_home(stderr, root, conf, found):
@@ -213,11 +213,4 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, pare
 
 
 def _next_words(root: str, ident: str) -> str:
-    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
-    git = settings.script_command(root, "ccnavi-git.sh")
-    return (
-        f"次: '{ticket_sh} start {ident}' で着手し（子のワークツリー "
-        f".claude/worktrees/{ident} は start が作る。作れないときは '{git} worktree add "
-        f'".claude/worktrees/{ident}" -b {ident}\'）、サブエージェントに処理を任せる。'
-        f"終わってコミットされたら '{ticket_sh} finish {ident}'"
-    )
+    return texts.say(root, "NEXT_CONSOLIDATE", {"ident": ident})
