@@ -107,7 +107,7 @@ class Direct:
     blocked: str = ""
     # 取り込み先のブランチ。記録があるときだけ入る（無いときは統合先で数える）。
     base: str = ""
-    # 記録が無い（更新前に切った・手で切った）。integrateは断るので、`--adopt` を案内する。
+    # 記録が無い（手で切った）。integrateは断るので、`--adopt` を案内する。
     no_record: bool = False
     # 取り込みの途中のmarker。"" なし、"v4" 版 4、"unknown" 版を知らない（壊れた記録）。
     marker: str = ""

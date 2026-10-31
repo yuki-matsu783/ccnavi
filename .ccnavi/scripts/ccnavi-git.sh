@@ -1132,7 +1132,7 @@ ig_integrate() {
 		if [ "$ccnavi_tb_state" = yes ]; then
 			reject integrate-no-record "$ig_n の直接作業の記録がありません（ccnavi-direct/${ig_n}）。$ig_n はチケットに結び付く名前です（${ccnavi_tb_why}）。チケットの作業は直接作業に引き取らず、マージリクエストで出します（$TICKET_SH_Q status の次の操作に従う。.ccnavi/docs/worktree-merge.md）。"
 		fi
-		reject integrate-no-record "$ig_n の直接作業の記録がありません（ccnavi-direct/${ig_n}）。更新前に切ったワークツリーや、手で切ったワークツリーは、ユーザの確認を経て $WT_SH_Q $ig_n --adopt --base <取り込み先> で引き取ります。"
+		reject integrate-no-record "$ig_n の直接作業の記録がありません（ccnavi-direct/${ig_n}）。手で切ったワークツリーは、ユーザの確認を経て $WT_SH_Q $ig_n --adopt --base <取り込み先> で引き取ります。"
 	fi
 	d4_common_check
 	d4_git_ge 2 40 ||

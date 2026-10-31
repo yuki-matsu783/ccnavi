@@ -1202,7 +1202,7 @@ class WorktreeShTest(unittest.TestCase):
     # ---- 引き取り（--adopt）
 
     def uncorded_worktree(self, name="topic", commits=2):
-        """記録の無い直接作業のワークツリー（更新前に切った・手で切ったもの）。"""
+        """記録の無い直接作業のワークツリー（手で切ったもの）。"""
         git(self.ws, "worktree", "add", "-q", self.wt(name), "-b", name)
         for index in range(commits):
             write(os.path.join(self.wt(name), f"w{index}.txt"), f"w{index}\n")
