@@ -111,7 +111,7 @@ warn で言う。マーカーを消すかは、レビューをやり直すかど
 呼び名を「レビュー準備中」から「レビュー待ち」へ変えるだけ。9.8）。
 
 ```
-    無し ──終わった ∧ mr で見る──→ pending ──review-request──→ requested ──confirm / user reviewed──→ reviewed
+    無し ──終わった ∧ レビューが要る──→ pending ──review-request──→ requested ──confirm / user reviewed──→ reviewed
      │
      └────終わった ∧ レビュー不要──→ skipped
 
