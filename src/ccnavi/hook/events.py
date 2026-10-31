@@ -58,11 +58,18 @@ from ..tickets.lifecycle import stop_feedback as ops_stop_feedback
 from ..tickets.lifecycle import stop_integrate as ops_stop_integrate
 from ..tickets.lifecycle import stop_request as ops_stop_request
 from ..tickets.model import direct_candidates, ticket_guard
-from ..tickets.notice import learning_notice, overview, pending_integrate, session_rejects
+from ..tickets.notice import (
+    direct_worktrees,
+    learning_notice,
+    overview,
+    pending_integrate,
+    session_rejects,
+)
 from ..tickets.phase import gates as phase
 from ..tickets.sync import promptsync
 from . import (
     ccnavimd,
+    commitnote,
     judge,
     post,
     post_findings,
@@ -1098,9 +1105,15 @@ def decide_at_start(
     # ユーザにも出す。チケット制御は見ない。サブエージェントには出さない。期限は hook の期限と
     # 開始から 2 秒の小さいほうで、索引（docsearch）より先に組んで残りを渡す。
     pending = ""
+    direct = ""
     if not payload.agent_id:
         limit = time.monotonic() + PENDING_SECONDS
         pending = pending_integrate.pending_notice(
+            root, conf, limit if deadline is None else min(deadline, limit)
+        )
+        # 直接作業のワークツリーの一覧（事実だけ）。モデルにだけ出す。期限は同じ作り方で別に取る。
+        limit = time.monotonic() + PENDING_SECONDS
+        direct = direct_worktrees.session_text(
             root, conf, limit if deadline is None else min(deadline, limit)
         )
     # md の frontmatter の索引を差分で新しくし、引き方を案内する（`ccnavi --docs`）。
@@ -1130,6 +1143,8 @@ def decide_at_start(
         texts.append(rejects)
     if pending:
         texts.append(pending)
+    if direct:
+        texts.append(direct)
     # 学びの蓄積の提案の候補が新しく現れたら、ユーザにだけ知らせる（モデルの文脈には入れない）。
     learning = "" if payload.agent_id else learning_notice.notice(conf, root, deadline)
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録。
@@ -1380,6 +1395,8 @@ def _decide_after(
     hint = docsearch.missing_frontmatter(conf, root, payload)
     # 親の提案を手で書いたときの書式の誤りも、書いた時点で 1 度だけ案内する。
     hint = "\n\n".join(p for p in (hint, proposalhint.hint(conf, root, payload)) if p)
+    # 直接作業のコミットが済んだら、レビュー手順の次の一手を、ワークツリーごとに 1 度だけ足す。
+    hint = "\n\n".join(p for p in (hint, commitnote.notice(stderr, conf, root, payload)) if p)
     if not text and not hint:
         return EXIT_OK
 

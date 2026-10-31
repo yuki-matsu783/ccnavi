@@ -426,17 +426,23 @@ def _probe_recorded(
             "操作せず、ユーザに確かめてください"
         )
         return Probe(HIT, found)
-    counted = _run(here.root, ["rev-list", "--count", f"{rec['snap_sha']}..HEAD"], deadline)
-    out = counted.out.strip()
-    if not (counted.ok and out.isdigit()):
+    ahead = ahead_since(here.root, rec["snap_sha"], deadline)
+    if ahead is None:
         return Probe(UNKNOWN)
-    found.ahead = int(out)
+    found.ahead = ahead
     found.origin_ahead = _origin_ahead(owner, base, deadline)
     if found.marker == "unknown":
         return Probe(HIT, found)
     if found.marker or not found.ahead:
         return Probe(CLEAR)
     return Probe(HIT, found)
+
+
+def ahead_since(worktree: str, snap: str, deadline: float | None = None) -> int | None:
+    """記録の起点 S から先頭までのコミットの数。数えられなければ None。"""
+    counted = _run(worktree, ["rev-list", "--count", f"{snap}..HEAD"], deadline)
+    out = counted.out.strip()
+    return int(out) if counted.ok and out.isdigit() else None
 
 
 def _integrable_name(name: str) -> bool:

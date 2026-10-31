@@ -513,7 +513,7 @@ class WorktreeShTest(unittest.TestCase):
         last = result.stdout.rstrip("\n").split("\n")[-1]
         self.assertTrue(last.startswith("次: 編集はこのワークツリーの下で行います"), last)
         self.assertIn(f"Write / Edit に渡すパス: {self.wt('topic')}/…", last)
-        self.assertIn("続けて integrate を打ちます", last)
+        self.assertIn("が済んでから integrate を打ちます", last)
         # 名前の警告よりも後ろ。
         self.assertGreater(result.stdout.rindex("次:"), result.stdout.index("warn:"))
         # 案内の git は、書いたとおりに新しいシェルで打てる。
