@@ -1,7 +1,8 @@
 """直接作業の案内 2 つの単体テスト。
 
-- コミット後の案内（`hook.commitnote`）: メインの commit が成功したとき、直接作業の
-  ワークツリーごとに 1 回だけ、レビュー手順の次の一手を足す。
+- コミット後の案内（`hook.commitnote`）: メインの commit が成功したとき、またはメインの Agent
+  ツールが返ったときに直前のコミットのある直接作業があれば、ワークツリーごとに 1 回だけ、
+  レビュー手順の次の一手を足す。
   サブエージェント・dry-run・チケットに結び付く名前・
   コミットが積まれていない回は黙る
 - SessionStart のワークツリー一覧（`tickets.notice.direct_worktrees`）: 直接作業だけを新しい順に
@@ -138,6 +139,52 @@ class CommitNoteTest(Workspace):
         path = self.worktree("fix-1-a")
         self.assertEqual(self.say(path), "")
         self.assertEqual(self.say(self.root), "")
+
+
+class AgentDoneNoteTest(Workspace):
+    def say(self, *, tool="Agent", agent_id="", session="s1"):
+        payload = hookio.Input(
+            event="PostToolUse",
+            tool_name=tool,
+            tool_input={"prompt": "実装して"},
+            session_id=session,
+            cwd=self.root,
+            agent_id=agent_id,
+        )
+        return commitnote.notice(io.StringIO(), self.conf, self.root, payload)
+
+    def test_says_it_once_after_the_agent_returns(self):
+        path = self.worktree("fix-1-a")
+        self.commit(path)
+        first = self.say()
+        self.assertIn("fix-1-a", first)
+        self.assertTrue(first.count("次:") == 1, first)
+        self.commit(path, "z\n")
+        self.assertEqual(self.say(), "")
+        self.assertEqual(self.say(tool="Task", session="s2").count("次:"), 1)
+
+    def test_once_is_shared_with_the_main_commit(self):
+        path = self.worktree("fix-1-a")
+        self.commit(path)
+        sh = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-git.sh")
+        payload = hookio.Input(
+            event="PostToolUse",
+            tool_name="Bash",
+            tool_input={"command": f"sh {sh} commit -m x"},
+            session_id="s1",
+            cwd=path,
+        )
+        self.assertIn("fix-1-a", commitnote.notice(io.StringIO(), self.conf, self.root, payload))
+        self.assertEqual(self.say(), "")
+
+    def test_silent_for_ticket_bound_and_uncommitted_worktrees(self):
+        self.worktree("fix-1-a")
+        bound = self.worktree("fix-2-b")
+        self.commit(bound)
+        self.ticket("fix-2-b")
+        self.assertEqual(self.say(), "")
+        self.assertEqual(self.say(agent_id="sub1"), "")
+        self.assertEqual(self.say(tool="Read"), "")
 
 
 class DirectWorktreesTest(Workspace):

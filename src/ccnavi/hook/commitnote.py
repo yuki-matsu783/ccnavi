@@ -8,9 +8,14 @@ Stop の促しはターンを伸ばすので、案内の主経路にしない。
 出すのは次をすべて満たすときだけ。判定できないとき（読み切れないコマンド行・git の失敗・期限不足）は
 何も出さない。
 
-- メインのエージェントの Bash（サブエージェントの中ではない）
-- `ccnavi-git.sh commit` を打った場所が、直接作業のワークツリー（`.claude/worktrees/<名前>`。
-  ブランチが名前と同じで、チケットに結び付かない。判定は Stop の促しと同じ `direct_check`）
+- 次のどちらかの契機
+  - メインのエージェントの Bash（サブエージェントの中ではない）が `ccnavi-git.sh commit` を打った
+    （打った場所が対象）
+  - メインの Agent ツール（`Agent`・`Task`）が返った（サブエージェントは、メインが指したのとは別の
+    ワークツリーで動くことがあり、コミットの場所をコマンド行から読めない。そこで、全ワークツリーの
+    うち直前にコミットが積まれたものを対象にする）
+- 対象が、直接作業のワークツリー（`.claude/worktrees/<名前>`。ブランチが名前と同じで、
+  チケットに結び付かない。判定は Stop の促しと同じ `direct_check`）
 - 実際にコミットが積まれた（`--dry-run` の類いではなく、HEAD の履歴の最後が直前の commit）
 
 ワークツリーの名前ごとにセッションで 1 回だけ出す。覚え方は `additionalContextOnce` と同じ
@@ -23,7 +28,7 @@ import re
 import time
 from typing import TextIO
 
-from ..infra import gitcmd, hookio, pathcase, settings, shellread, tree
+from ..infra import gitcmd, hookio, pathcase, settings, shellread, toolnames, tree
 from ..policy import ctxfile, rules, texts
 from ..tickets.lifecycle import stop_integrate as osi
 from . import wrapguard
@@ -42,33 +47,55 @@ _REFLOG_AT = re.compile(r"@\{(\d+)\}")
 
 def notice(stderr: TextIO, conf: settings.Settings, root: str, payload: hookio.Input) -> str:
     """案内の文。出さないときは空。何が起きても実行後チェックを止めない。"""
-    command = str(payload.tool_input.get("command") or "")
-    if payload.agent_id or payload.tool_name != "Bash" or not conf.state:
+    if payload.agent_id or not conf.state:
         return ""
-    if "ccnavi-git.sh" not in command.lower():
+    command = str(payload.tool_input.get("command") or "")
+    is_commit = payload.tool_name == "Bash" and "ccnavi-git.sh" in command.lower()
+    if not is_commit and payload.tool_name not in toolnames.AGENT_TOOLS:
         return ""
     try:
-        return _notice(stderr, conf, root, payload, command)
+        deadline = time.monotonic() + SECONDS
+        if is_commit:
+            found = _commit_names(root, conf, payload, command, deadline)
+        else:
+            found = _agent_names(root, conf, deadline)
+        return _carry(stderr, conf, root, payload, found)
     except Exception:  # noqa: BLE001 - 案内の足しなので、何が起きても実行後チェックを止めない
         return ""
 
 
-def _notice(
-    stderr: TextIO, conf: settings.Settings, root: str, payload: hookio.Input, command: str
-) -> str:
-    """処理フロー:
-    1. コマンド行から `commit` の呼び出しと、走った場所を取り出す。
-    2. 場所ごとに、直接作業のワークツリーで直前にコミットが積まれたかを確かめる（`_direct_name`）。
-    3. 名前ごとに 1 回だけの文脈として、文面を渡す。
-    """
-    deadline = time.monotonic() + SECONDS
-    names: dict[str, str] = {}
+def _commit_names(
+    root: str, conf: settings.Settings, payload: hookio.Input, command: str, deadline: float
+) -> list[str]:
+    """`commit` の呼び出しごとに、走った場所が直前にコミットの積まれた直接作業なら、その名前。"""
+    found: list[str] = []
     for args, place in wrapguard.git_calls(
         payload.cwd, command, shellread.read(command).degraded, "commit"
     ):
         if place is None or _NO_COMMIT.intersection(args):
             continue
-        name = _direct_name(root, conf, place, deadline)
+        here = tree.tree_of(root, place, conf.projects)
+        found.append(_direct_name(root, conf, here, deadline) if here else "")
+    return found
+
+
+def _agent_names(root: str, conf: settings.Settings, deadline: float) -> list[str]:
+    """全ワークツリーのうち、直前にコミットの積まれた直接作業の名前。"""
+    return [
+        _direct_name(root, conf, here, deadline) for here in tree.worktrees(root, conf.projects)
+    ]
+
+
+def _carry(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    found: list[str],
+) -> str:
+    """名前ごとに 1 回だけの文脈として、文面を渡す。コミット後の案内の唯一の組み立て口。"""
+    names: dict[str, str] = {}
+    for name in found:
         if name:
             names.setdefault(pathcase.fold(name), name)
     carriers = [
@@ -81,10 +108,9 @@ def _notice(
     return ctxfile.for_rules(stderr, conf.state, payload, carriers) if carriers else ""
 
 
-def _direct_name(root: str, conf: settings.Settings, place: str, deadline: float) -> str:
-    """`place` が、いま直前にコミットが積まれた直接作業のワークツリーなら、その名前。違えば空。"""
-    here = tree.tree_of(root, place, conf.projects)
-    if here is None or here.is_main:
+def _direct_name(root: str, conf: settings.Settings, here: tree.Tree, deadline: float) -> str:
+    """`here` が、いま直前にコミットが積まれた直接作業のワークツリーなら、その名前。違えば空。"""
+    if here.is_main:
         return ""
     reason, unsure = osi.direct_check(root, conf, here, deadline)
     if reason or unsure or not _just_committed(here.root, deadline):
