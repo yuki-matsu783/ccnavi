@@ -77,4 +77,3 @@ keywords: [単体 clone, ワークスペース内 clone, 根, ルート, 統合�
 - `--lint` のレビュー経路の検査（origin の有無と、gh / glab や curl で届くか）は、根の origin だけを見る。単体 clone ではそのプロジェクトの origin を見る。ワークスペースでは、プロジェクトの origin は見ない
 - `ccnavi-user-push-approved.sh` の `--path` は、根のツリーに対しては `projects/` と `.claude/worktrees/` の下を別のツリーとして除く
 - setup は、実行した先の `.gitignore` に `/.claude/worktrees/` などを足す。`/projects/` は足さず、案内だけを出す
-- 実行ファイルと sh の互換の食い違いを知らせる文面は、配り直しの手順に「このワークスペース」を使う

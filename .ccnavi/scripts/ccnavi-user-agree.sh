@@ -97,9 +97,6 @@ trap 'rm -f "$report" "$written"; exit 130' INT TERM HUP
 # `set --` の右の "$@" は置き換える前の引数（並べた識別子）に展開される。
 # 起こし方（実行ファイルか、ソースと uv か）は ccnavi-common-write-and-push.sh の ccnavi_wap_use_exe が決める。
 if ccnavi_wap_use_exe "$root"; then
-	if [ -n "$ccnavi_wap_bin" ]; then
-		skew=$(ccnavi_compat_skew "$root" "$ccnavi_wap_bin") || printf 'ccnavi-user-agree: %s\n' "$skew" >&2
-	fi
 	set -- ccnavi_wap_exe --record-writes "$written" --entry sh user agree --placed-out "$report" "$@"
 else
 	printf 'ccnavi-user-agree: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2

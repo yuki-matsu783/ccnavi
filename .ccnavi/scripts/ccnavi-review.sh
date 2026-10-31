@@ -767,7 +767,6 @@ ${eli5_how}"
 	# --check は読むだけなので、ロックも取り込みもしない。
 	[ -n "$rr_check" ] || wap_start "$family"
 	# 段 1: 前提。exe が依頼の本文を書き出す。
-	tell_skew
 	prepared=$(ccnavi review prepare "$@") || exit $?
 	file=$(printf '%s\n' "$prepared" | sed -n 1p)
 	# 段 1.5: マージリクエストの確認。無ければ作らずに止める（作るのは ccnavi-start.sh）。
@@ -810,7 +809,6 @@ ${eli5_how}"
 			printf '\n---\n\nELI5（変更をやさしく説明した HTML）はこのマージリクエストの差分の `%s`。手元のチェックアウトのルートで `crit review %s` を開いてソースの行に指摘を付け、`crit push %s` でここに送ってください（送った指摘は行のスレッドになり、未解決の間はレビュー済みにならない。`crit %s` だけだと描画のプレビューになり、そこで付けたピンは送られない）。\n' \
 				"$eli5_rel" "$eli5_rel" "$number" "$eli5_rel"
 		} >"$eli5_posted"
-		tell_skew
 		posted=$(comment_staged request "$request_marker" "$number" "$url" "$eli5_posted") ||
 			{
 				rm -f "$eli5_posted"
@@ -891,7 +889,6 @@ comment)
 		cat "$body"
 	} >"$noted"
 	comment_key="@$body"
-	tell_skew
 	posted=$(comment_staged comment "$comment_key" "$number" "$url" "$noted") ||
 		{
 			rm -f "$noted"
@@ -916,13 +913,6 @@ ready)
 	fetch_all >"$result"
 	# 打ち直しの判断（Draft を外し損ねたか）に、MR がまだ Draft かを結果に足す。
 	"$JQ" --argjson d "${mr_draft:-false}" '.mr.draft = $d' "$result" >"$result.draft" && mv -f "$result.draft" "$result"
-	tell_skew
-	# 互換の版が食い違っていても ready は止めない。実行ファイルは条件の確かめ・退避・wip/ の片付けを、
-	# sh は push・Draft 外し・コメントを受け持ち、契約（標準出力の形）は前の版と変わらないため。
-	# 組み立て直しはエージェントが勝手に回さない決まりなので、誰が何をするかを言う。
-	if [ -n "${skew:-}" ]; then
-		printf 'ccnavi-review: 食い違いがあっても ready は続ける。エージェントは build.py を実行せず、終わったらユーザに実行ファイルの組み立て直し（または配り直し）を頼む。\n' >&2
-	fi
 	ccnavi_wap_capture="$state/review-ready-$$.out"
 	ready_rc=0
 	wap_ccnavi "$branch の Draft を解除するマーカーを置いた" -- review ready --result "$result" || ready_rc=$?

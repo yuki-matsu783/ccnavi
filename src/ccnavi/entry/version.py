@@ -6,7 +6,9 @@
 （JSON の欄の有無など）は `features` で言う。
 
 互換の版（COMPAT）は、実行ファイルと、それを呼ぶ側（`.ccnavi/scripts/` の sh と
-VS Code 拡張）との契約の版。呼ぶ側が頼っているフラグや出力の形を、呼ぶ側を直さないと
+VS Code 拡張）との契約の版。sh と拡張は実行時に比べて断らない（必ず同時に配る前提）。
+`--lint` と配布の組み立てが見る。
+呼ぶ側が頼っているフラグや出力の形を、呼ぶ側を直さないと
 動かない形に変えたときに 1 上げ、sh の `CCNAVI_COMPAT`（ccnavi-common.sh）と拡張の
 `EXTENSION_COMPAT`（extensions/vscode/ccnavi-board/src/core/version.ts）も同じ値に揃える。
 Chrome 拡張は組み立てのときにここの値を埋め込む。
