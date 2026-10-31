@@ -27,14 +27,14 @@ phases:
   quick-work:
     kind: work
     title: 小さい作業
-    review: mr
+    review: true
     scope: inherit
     when: 設計判断や並行作業が要らないとき
 
   research:
     kind: work
     title: 調査
-    review: none
+    review: false
     scope: ["wip/research/*"]
     deliverables: ["wip/research/summary.md"]
     when: 既存の振る舞いや依存が分からないとき。分かっているなら省略する
@@ -42,7 +42,7 @@ phases:
   design:
     kind: work
     title: 設計
-    review: mr
+    review: true
     scope: ["wip/design/*", "docs/*"]
     deliverables: ["wip/design/*.md"]
     when: 変更箇所が 3 か所を超えるか、外から見える振る舞いが変わるとき
@@ -50,26 +50,26 @@ phases:
   acceptance:
     kind: work
     title: 受入テスト作成
-    review: mr
+    review: true
     scope: ["tests/*"]
     when: 振る舞いが変わるとき。実装と並行してよい（実装のステップの `after` にこのステップを書かなければ並行する）
 
   implement:
     kind: work
     title: 実装とテスト
-    review: mr
+    review: true
     scope: ["src/*", "tests/*"]
     when: 振る舞いを変えるとき。受入テスト作成を先に置く（計画に受入テスト作成の項も置く）
 
   design-feedback:
     kind: feedback
     title: 設計フィードバック対応
-    review: mr
+    review: true
     scope: ["wip/design/*", "docs/*"]
 
   implement-feedback:
     kind: feedback
     title: 実装フィードバック対応
-    review: mr
+    review: true
     scope: inherit
     when: フィードバック計画の最後に置き、ほかの対応を受ける

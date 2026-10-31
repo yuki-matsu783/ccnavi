@@ -10,7 +10,7 @@ keywords: [レビュー, 依頼, 確認, mr, ccnavi-review.sh, GraphQL, 403, RES
 
 ### 9.10 レビューの依頼と確認
 
-この節は、見る場所が `mr` のフェーズの話。
+この節は、レビューが要る（`review: true`）フェーズの話。
 
 リモート（GitHub / GitLab）を読み書きするのは `.ccnavi/scripts/ccnavi-review.sh` で、実行ファイルは
 ネットワークに出ない（P11）。実行ファイルが持つのはワークツリーの中で分かる前提検査と、
