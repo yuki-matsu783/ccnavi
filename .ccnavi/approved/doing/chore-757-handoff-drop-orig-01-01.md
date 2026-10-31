@@ -22,6 +22,8 @@ allow:
     glob: "extensions/vscode/ccnavi-board/*"
   - match: Write|Edit
     glob: "extensions/chrome/ccnavi-approval/*"
+started_at: "2026-10-31T11:42:11+0900"
+base_sha: "4e072b78cf65b3365f042fbb27b1e0c591921a8c"
 ---
 親の「範囲」のとおりに、`.orig` と `conflict` の判定をやめる。
 
