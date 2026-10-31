@@ -7,7 +7,7 @@ fetch のときだけ origin の URL を bare リポジトリへ向ける git �
 見るのは次のとおり。
 
 1. ずれが無ければ確認なしで、取り込み先（ユーザのチェックアウトのブランチ）の HEAD から切ること
-2. C4〜C7 のずれがあれば、切らずに終了コード 3 で止まり、報告と確認コードを出すこと。確認コードが
+2. C4〜C8 のずれがあれば、切らずに終了コード 3 で止まり、報告と確認コードを出すこと。確認コードが
    今の状態と合わなければ報告からやり直すこと
 3. 書きかけは --no-wip なら入らず、--copy-wip なら確認した時点のものが S になり、ユーザの
    index とワークツリーは変わらないこと
@@ -785,8 +785,12 @@ class WorktreeShTest(unittest.TestCase):
         dry = self.run_sh("second", "--dry-run")
         self.assertEqual(0, dry.returncode, dry.stdout + dry.stderr)
         self.assertNotIn("書きかけ", dry.stdout)
-        done = self.run_sh("second")
-        self.assertEqual(0, done.returncode, "確認なしで切れる: " + done.stdout + done.stderr)
+        # 先に切った first があるので C8 だけが掛かる。書きかけの確認は出ない。
+        stopped = self.run_sh("second")
+        self.assertEqual(3, stopped.returncode, stopped.stdout + stopped.stderr)
+        self.assertNotIn("書きかけ", stopped.stdout)
+        done = self.run_sh("second", "--accept", self.code_of(stopped))
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertTrue(os.path.isdir(self.wt("second")))
 
     def test_real_wip_still_needs_the_confirmation(self):
