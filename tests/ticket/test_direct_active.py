@@ -24,10 +24,10 @@ def load_tests(loader, tests, pattern):
 
 
 class DirectActiveTest(TicketTest):
-    def record(self, name, version="4", make_dir=True):
+    def record(self, name, make_dir=True):
         path = os.path.join(self.root, ".git", "ccnavi-direct", name)
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        write(path, f"version {version}\nbase_branch main\n")
+        write(path, "version 4\nbase_branch main\n")
         if make_dir:
             os.makedirs(os.path.join(self.root, ".claude", "worktrees", name), exist_ok=True)
 
@@ -52,10 +52,6 @@ class DirectActiveTest(TicketTest):
 
     def test_a_record_without_its_worktree_is_not_active(self):
         self.record("gone", make_dir=False)
-        self.assertEqual(self.notice(), "")
-
-    def test_a_record_of_another_version_is_not_active(self):
-        self.record("old", version="3")
         self.assertEqual(self.notice(), "")
 
     def test_it_is_told_again_after_a_compact(self):

@@ -125,8 +125,9 @@ def records_of(root: str, main: tree.Tree) -> list[Record]:
 def active_names(root: str, main: tree.Tree) -> list[str]:
     """このユーザのチェックアウトの、作業中の直接作業の名前（横で作業する指定の有無は問わない）。
 
-    記録（`ccnavi-direct/<名前>`、版 4）があり、作業ワークツリーのディレクトリが残っているもの。
-    compact などで会話が覚えていない続きの作業を知らせ、別に切るときに確かめるために使う。
+    記録（`ccnavi-direct/<名前>`）があり、作業ワークツリーのディレクトリが残っているもの。
+    `ccnavi-worktree.sh` の C8 と同じ基準で、記録の中身は読まない。compact などで会話が
+    覚えていない続きの作業を知らせ、別に切るときに確かめるために使う。
     """
     common = common_dir(main.root)
     if common is None:
@@ -136,19 +137,13 @@ def active_names(root: str, main: tree.Tree) -> list[str]:
         names = sorted(os.listdir(base))
     except OSError:
         return []
-    out = []
-    for name in names:
-        path = os.path.join(base, name)
-        if name.startswith(".") or not os.path.isfile(path):
-            continue
-        try:
-            with open(path, encoding="utf-8") as f:
-                fields = parse(f.read())
-        except (OSError, ValueError):
-            continue
-        if fields.get("version") == VERSION and os.path.isdir(tree.worktree_path(root, name)):
-            out.append(name)
-    return out
+    return [
+        name
+        for name in names
+        if not name.startswith(".")
+        and os.path.isfile(os.path.join(base, name))
+        and os.path.isdir(tree.worktree_path(root, name))
+    ]
 
 
 def side_by_side_roots(root: str, projects_dir: str = "") -> list[tree.Tree]:
