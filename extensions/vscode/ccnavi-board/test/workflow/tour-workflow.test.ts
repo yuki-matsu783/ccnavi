@@ -129,7 +129,7 @@ test("CB-T500 見本の答えは、実行ファイルの答えの実例（plan-o
   assert.ok(Object.keys(sample.answers).length >= 10, "見本の答えが少ない");
 });
 
-test("CB-T501 見本の open は、実例の open と同じ線・番号・見る場所の並びで、識別子・ハッシュ・タイトル・見る場所の言葉だけが見本のもの", () => {
+test("CB-T501 見本の open は、実例の open と同じ線・番号・レビューの要否の並びで、識別子・ハッシュ・タイトル・レビューの要否の言葉だけが見本のもの", () => {
   const real = planOrderSample("open");
   const mask = (plans: readonly ApprovePlan[]): unknown =>
     plans.map((plan) => ({ ...plan, ticket: "", source_sha: "", items: plan.items.map((item) => ({ ...item, title: "", review: "" })) }));

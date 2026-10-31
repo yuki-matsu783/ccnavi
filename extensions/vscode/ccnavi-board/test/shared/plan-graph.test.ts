@@ -74,7 +74,7 @@ test("CB-T357 終端に届かないステップは実行ファイルの loose �
   assert.deepEqual(plain.edges.filter((edge) => edge.loose), []);
 });
 
-test("CB-T358 点は定義のタイトル・見る場所・延期の引き受け手・固定した番号を実行ファイルの値のまま持つ", () => {
+test("CB-T358 点は定義のタイトル・レビューの要否・延期の引き受け手・固定した番号を実行ファイルの値のまま持つ", () => {
   const base = plan(DIAMOND);
   const graph = planGraphOf({
     ...base,

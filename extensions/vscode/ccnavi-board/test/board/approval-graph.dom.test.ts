@@ -86,15 +86,15 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     assert.equal(dom.one('.plan-graph[data-part="feedback"] .react-flow__node[data-id="start"]').textContent, "全体計画のレビュー後");
     assert.equal(dom.one('.plan-graph[data-part="feedback"] .react-flow__node[data-id="end"]').textContent, "親をクローズする");
 
-    // 点は番号・タイトル・見る場所。延期なら引き受け手、子が承認された番号は固定の印
+    // 点は番号・タイトル・レビューの要否。延期なら引き受け手、子が承認された番号は固定の印
     const n1 = dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n1"] .plan-node');
     assert.match(n1.textContent ?? "", /^1調査/);
-    // 見る場所の言葉は、同じオーバーレイの本文（承認画面）と同じ言葉の短い形
+    // レビューの要否の言葉は、同じオーバーレイの本文（承認画面）と同じ言葉の短い形
     assert.match(n1.textContent ?? "", /レビュー不要/);
     assert.equal(n1.getAttribute("data-locked"), "1");
     assert.match(n1.textContent ?? "", /子が承認済み/);
     const n2 = dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n2"] .plan-node');
-    // 延期したステップは、本文の先行の一覧と同じ言い方で引き受け手を言い、見る場所は出さない（本文も出さない）
+    // 延期したステップは、本文の先行の一覧と同じ言い方で引き受け手を言い、レビューの要否は出さない（本文も出さない）
     assert.match(n2.textContent ?? "", /レビューは 4 と一緒に/);
     assert.doesNotMatch(n2.textContent ?? "", /レビュー必須/);
     assert.match(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n3"] .plan-node').textContent ?? "", /レビュー必須（MR）/);

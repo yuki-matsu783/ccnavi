@@ -334,7 +334,7 @@ def _merging_head(root: str, found: ticket_model.Ticket) -> str:
 def _needs_review(root: str, conf: settings.Settings, found: ticket_model.Ticket) -> bool:
     """この子を閉じたとき、ユーザが見る対象になるか。
 
-    フェーズの「見る場所」を、この子を閉じたものとして数え直す。延期したフェーズの子も
+    フェーズのレビューを、この子を閉じたものとして数え直す。延期したフェーズの子も
     レビュー待ちに置く。見るのは次にレビューがあるフェーズの番だが、ユーザが見るまでは
     見られていない。実績のリスクは `_score_child` が記録した直後なので、ここで数え直すと
     宣言に関わらず上がった分も入る。

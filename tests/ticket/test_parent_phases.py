@@ -215,7 +215,7 @@ class CopyJudgeTest(PhaseHarness):
                 self.assertNotEqual(self.decision(inside), "deny", self.reason(inside))
 
     def test_phases_and_their_titles_and_reviews_come_from_the_copy_after_approval(self):
-        """承認のあとに phases.yml の定義を直しても、フェーズのタイトル・見る場所・止め方と
+        """承認のあとに phases.yml の定義を直しても、フェーズのタイトル・レビューの要否・止め方と
         SubagentStart の案内はコピーのまま。"""
         tree = self.approved_child(review=False)
         write(

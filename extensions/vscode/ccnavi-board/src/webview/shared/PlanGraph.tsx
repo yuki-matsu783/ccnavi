@@ -17,7 +17,7 @@
  * `withLayout`）。計画編集タブは、番号が振り直っても点を動かさないためにこれを使う。開いたときの見え方
  * （全体を枠に収める）は `fitKey` が変わったときだけ合わせ直す（渡さなければ計画が替わるたび）。
  *
- * **`detail` が真なら、ステップを押すと右に詳細の欄を出す**（計画編集タブ）。番号・定義・タイトル・見る場所・延期先・固定・
+ * **`detail` が真なら、ステップを押すと右に詳細の欄を出す**（計画編集タブ）。番号・定義・タイトル・レビューの要否・延期先・固定・
  * 先行と後続・すぐ始まるか・終端に届かないかを、実行ファイルの値のまま読むだけで出す（直すのは線）。欄は畳める
  * （畳んだかは画面が覚える）。
  *
@@ -88,7 +88,7 @@ function deferText(reviewAt: number | null): string {
   return reviewAt === null ? "レビューを受け持つステップがありません" : `レビューは ${reviewAt} と一緒に`;
 }
 
-/** ステップの点。番号・定義のタイトル・見る場所と、延期・固定・終端に届かない印 */
+/** ステップの点。番号・定義のタイトル・レビューの要否と、延期・固定・終端に届かない印 */
 function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
   const { node, editable } = data;
   const title = [
@@ -112,7 +112,7 @@ function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
       <span className="plan-node-number">{node.number}</span>
       <span className="plan-node-title">{node.label}</span>
       <span className="plan-node-tags">
-        {/* 延期したステップは見る場所を出さず、引き受け手を言う（本文も延期したステップに見る場所を書かない） */}
+        {/* 延期したステップはレビューの要否を出さず、引き受け手を言う（本文も延期したステップにレビューの要否を書かない） */}
         {node.deferred ? (
           <span className="tag deferred">{deferText(node.reviewAt)}</span>
         ) : (

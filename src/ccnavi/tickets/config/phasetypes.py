@@ -245,7 +245,7 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
 
     処理フロー:
     1. 表示名（`title`）、種類（`kind`）、レビュー（`review`）を読む。知らない値は断る
-    2. 種類がフィードバック対応で、レビューが無しのものは断る（結果を見る場所は MR になる）
+    2. 種類がフィードバック対応で、レビューが無しのものは断る（レビューは MR で行う）
     3. 範囲（`scope`）を読む。無しと `inherit` は親から継ぐ（None）。
        glob のリストは `_globs` で式にする
     4. 成果物（`deliverables`）は文字列のリストに限る。
@@ -498,7 +498,7 @@ def parent_scope_problems(parent: ticket_model.Ticket) -> list[Problem]:
 # 計画を持つ親は、計画（`plan:` / `feedback:`）が使う定義**だけ**のコピーを frontmatter の
 # `phases:` に持つ。欄は `phases.yml` の定義と同じで、定義の id をキーにしたマップ。承認したときの
 # 定義が親に固定され、承認のあとの判定はコピーを読み、`phases.yml` を読まない（直しても進行中の親の
-# 範囲・見る場所・成果物は変わらない）。コピーが `phases.yml` と同じかを確かめるのは承認
+# 範囲・レビューの要否・成果物は変わらない）。コピーが `phases.yml` と同じかを確かめるのは承認
 # （`agree_candidates.plan_problems`）で、手で動かした承認ではその検査は働かずコピーがそのまま効く
 # （承認を本物とするのは置き場で、置き場へ動かしたユーザが中身を承認したと読む）。
 
@@ -602,7 +602,7 @@ def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
     - 定義の `kind` が置いた計画と合わない（error）
     - `phases:` にあって、どのステップも使わない定義（warn。判定はどのステップからも引かないので、
     範囲・
-      見る場所・成果物は変わらない）
+      レビューの要否・成果物は変わらない）
     """
     found: list[Problem] = []
     name = t.ticket
