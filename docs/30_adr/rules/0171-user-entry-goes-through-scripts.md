@@ -25,7 +25,7 @@ keywords: [user, 入口, 印, entry, ccnavi-user-agree.sh, ccnavi-user-handoff.s
 - 実行ファイルの `user <操作>` は、入口の印 `--entry sh|board` が無いと、見るだけの形も含めて断る（終了コード 2）。断りの文は、その操作の sh を案内する。sh は `--entry sh`、拡張のボードの子プロセスは `--entry board` を付ける。
 - テストと端末の無い実行環境の逃げ道は、端末要求を切る既存の切り替え `CCNAVI_GUARD_TICKET_APPROVAL=disable` に乗せる。切ると印が無くても通る。新しい切り替えは足さない。
 - 印は `WRAPPER_OPTIONS` に入れる。hook の正規表現と読み替えは印を読み飛ばすので、印を付けてもエージェントが打つ `user …` は止まる。
-- `--version --json` の `features` に `entry-marker` を足す。拡張は、これを持たない古い実行ファイルに対して `--entry` を付けて呼ばない。（ADR-0226 で覆した）
+- `--version --json` の `features` に `entry-marker` を足す。拡張は、これを持たない古い実行ファイルに対して `--entry` を付けて呼ばない。
 
 ## 理由
 
