@@ -24,7 +24,7 @@ ADR-0224 は、sh と拡張の互換の版の食い違いの通知を消し、sh
 | `Lock.turns` を必須にし、`turnWarning` の `?? []` を消す | 錠を作る側がすべて応答中のセッションを渡す | 任意のままにする |
 | `core/version.ts` には `EXTENSION_COMPAT` だけを残す | 配布の組み立て（`scripts/ccnavi-package.sh`）と `tests/core/test_version.py` が値を読む | 宣言ごと消す |
 
-実行ファイルの `--version --json` の `flags`・`features` の出力は、Chrome 拡張や診断が読みうるので、この決定では消さない。（その後、`flags`・`features` の出力は消した。）
+実行ファイルの `--version --json` の `flags`・`features` の出力は、Chrome 拡張や診断が読みうるので、この決定では消さない。（その後、`flags`・`features` の出力は ADR-0227 が消した。）
 
 ## 得たもの・失ったもの
 
@@ -37,7 +37,7 @@ ADR-0224 は、sh と拡張の互換の版の食い違いの通知を消し、sh
 
 | ADR | 覆した記述 |
 |---|---|
-| ADR-0224 | 拡張が `flags`・`features` を見て、無い機能の画面を開かない処理を残す |
-| ADR-0222 | 機能の有無を `features` で確かめる処理を残す。`Lock.turns?` を任意のままにする |
-| ADR-0134 | 画面からの新しい操作を使えるかを `flags` と `features` で見分ける |
-| ADR-0171 | `features` の `entry-marker` を、拡張が `--entry` を付けるかの見分けに使う |
+| ADR-0224 | 拡張が `flags`・`features` を見て、無い機能の画面を開かない処理を残す（`flags`・`features` の出力そのものは、後の ADR-0227 が覆して消した） |
+| ADR-0222 | 機能の有無を `features` で確かめる処理を残す。`Lock.turns?` を任意のままにする（`flags`・`features` の出力そのものは、後の ADR-0227 が覆して消した） |
+| ADR-0134 | 画面からの新しい操作を使えるかを `flags` と `features` で見分ける（`flags`・`features` の出力そのものは、後の ADR-0227 が覆して消した） |
+| ADR-0171 | `features` の `entry-marker` を、拡張が `--entry` を付けるかの見分けに使う（`flags`・`features` の出力そのものは、後の ADR-0227 が覆して消した） |

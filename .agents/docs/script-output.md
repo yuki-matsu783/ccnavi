@@ -59,6 +59,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チ
 | `ticket record-risk` | 同上（`NEXT_OPS_RECORD_RISK`） | `finish` を打ち直す |
 | `ticket start`・`finish`・`cancel`・`consolidate` が、書く前に分かる条件で断ったとき（`--check` も同じ） | 同上・`tickets/lifecycle/consolidate.py`（`NEXT_OPS_REFUSED`・`NEXT_OPS_REFUSED__CANCEL`） | 理由の行のあとに 1 行。直して同じ操作を打ち直す（`cancel` は `--reason <理由>` つき） |
 | `review-request`・`decide` が、書く前に分かる条件で断ったとき（`--check` も同じ） | `tickets/review/request.py`・`tickets/review/decide.py`（`NEXT_REVIEW_REQUEST_REFUSED`・`NEXT_DECIDE_REFUSED`） | 理由の行のあとに 1 行。直して同じ操作を打ち直す（`decide` はユーザが打つ） |
+| `review confirm`・`review ready` が、ロック・取り込みの前に分かる条件で断ったとき（`--check` も同じ） | `tickets/core/review.py`・`tickets/review/close.py`（`NEXT_CONFIRM_REFUSED`・`NEXT_READY_REFUSED`） | 理由の行のあとに 1 行。直して同じ操作を打ち直す（`ready` は親のワークツリーの外から `--parent` つき）。`ready --check` は、前の回が退避を始めている打ち直しなら通して本体に任せる |
 | 親の `ticket start` | 同上・`tickets/lifecycle/plan.py`（`NEXT_OPS_START_PARENT`・`NEXT_OPS_START_CHILDLESS`） | `status` で承認済みの子を確かめる。子のないフェーズがあれば、子の提案を書く |
 | `ccnavi-review.sh confirm` | `tickets/core/review.py`（`NEXT_REVIEW_CONFIRMED`・`NEXT_REVIEW_LAST`） | 途中は親の `status`。最後のフェーズは親の `finish`（そのあとの ready は `案内:`） |
 | `approval-request --check` | `tickets/proposal/propose.py`（`NEXT_APPROVAL_REQUEST_CHECKED`） | `approval-request` を打つ |
