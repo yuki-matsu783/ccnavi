@@ -141,7 +141,7 @@ DEPLOY_TEMPLATES_DIR=".ccnavi/config/common/templates"
 # *.yml を全部配る。ccnavi の仕組み側のもので、設定ではないので .ccnavi/config/ の外に置く。
 # 無いと sh と hook の文は短い既定の文に落ちる（止める・止めないは変わらない）。
 DEPLOY_MESSAGES_DIR=".ccnavi/messages"
-# 旧い置き場。自動では消さない（古い実行ファイルが走っている間に消すと、文が既定の文に落ちる）。
+# 古い置き場。自動では消さない（古い実行ファイルが走っている間に消すと、文が既定の文に落ちる）。
 DEPLOY_OLD_MESSAGES_DIR=".ccnavi/config/common/messages"
 # 配布先へ配るスキル。配布元の .claude/skills/ の中で、SKILL.md の frontmatter に `process: true`（共通の工程スキル）
 # か `distribute: true`（配るだけのスキル。ccnavi-config）を持つものだけを配る（.ccnavi/docs/skill-processes.md）。

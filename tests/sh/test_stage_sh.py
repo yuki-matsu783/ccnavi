@@ -262,7 +262,7 @@ class StageShTest(unittest.TestCase):
             ".ccnavi/messages/a.yml",
             ".ccnavi/messages/sub/a.yml",
             "projects/p/.ccnavi/messages/a.yml",
-            ".ccnavi/config/common/messages/deny.yml",  # 旧い置き場。取り込めない
+            ".ccnavi/config/common/messages/deny.yml",  # 古い置き場。取り込めない
             ".ccnavi/config/project/templates/a.yml",
             ".ccnavi/config/project/templates/sub/a.yml",
             ".ccnavi/config/common/templates/x/templates/a.yml",
