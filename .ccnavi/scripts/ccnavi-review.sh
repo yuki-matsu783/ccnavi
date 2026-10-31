@@ -954,5 +954,7 @@ ready)
 	# 親と名前が違うワークツリーや、下書きがあって消されなかった子のワークツリーは、drop では消えない。
 	# 一覧を出すだけで消さない（消すかどうかはユーザが決める）。残りが無ければ何も出ない。
 	ccnavi worktree remaining "$family" || :
+	# 最後の案内: マージはユーザ。マージされたあとの 1 手は note に置く。
+	ccnavi_text "$root" NEXT_READY_DONE
 	;;
 esac

@@ -72,3 +72,10 @@ messages:
     kind: next
     next: |-
       ユーザに承認を頼んで返事を待つ。承認が済むまで実装はしない
+
+  NEXT_READY_DONE:
+    kind: next
+    next: |-
+      ユーザにマージを頼んで返事を待つ。マージ前に統合先へ手を入れない
+    note: |-
+      マージされたら {script:ccnavi-sync.sh} で統合先に同期する
