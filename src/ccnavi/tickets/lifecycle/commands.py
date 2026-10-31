@@ -21,6 +21,7 @@ finish の前にワークツリーを
 
 from __future__ import annotations
 
+import io
 import os
 from dataclasses import replace
 from typing import TextIO
@@ -61,24 +62,22 @@ def ready_command(root: str, parent_id: str) -> str:
     return f"{settings.script_command(root, 'ccnavi-review.sh')} ready --parent {parent_id}"
 
 
-def start(
-    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
-) -> int:
-    """`doing/` の承認済みチケットに、着手の時刻と基準点を書く。
+def _refused(stderr: TextIO, root: str, verb: str, ticket_id: str) -> None:
+    """断った理由（呼び手が書いたあと）に、打ち直す 1 手を `次:` で足す。"""
+    if verb == "cancel":
+        line = texts.say(root, "NEXT_OPS_REFUSED__CANCEL", {"ticket": ticket_id})
+    else:
+        line = texts.say(root, "NEXT_OPS_REFUSED", {"verb": verb, "ticket": ticket_id})
+    stderr.write(line + "\n")
 
-    処理フロー:
-    1. `ops_close.find` で承認済みを引き、`doing/` の未着手であることと、置き場・計画・
-       親の着手・先行チケットを確かめる（`misplaced_home`・`plan_missing`・
-       `parent_not_started`・`predecessors_unmet`）。
-    2. ワークツリーが承認済みの `project` の元リポジトリから切られているかを
-       `tree.is_worktree_of` で確かめる。
-    3. ワークツリーの HEAD を基準点にする。
-    4. `approval_ops.update_fields` で `started_at` と `base_sha` を欄に書く。
-    5. 子ならフローのハッシュを `flow.record_digest` で記録し、次の一手を案内する。
-    """
+
+def _start_found(
+    stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
+) -> ticket_model.Ticket | None:
+    """`start` の、副作用の前に分かる検査。通ったチケット、断ったら None（理由は stderr）。"""
     found = ops_close.find(stderr, root, conf, ticket_id)
     if found is None:
-        return 1
+        return None
     if found.state != ticket_model.DOING:
         stderr.write(
             f"ccnavi: {ticket_id} は承認済みの作業中ではない（いまは {found.state}/）。"
@@ -89,17 +88,51 @@ def start(
             )
             + "\n"
         )
-        return 1
+        return None
     if found.started_at:
         stderr.write(f"ccnavi: {ticket_id} は着手済み（{found.started_at}）\n")
-        return 1
+        return None
     if ops_close.misplaced_home(stderr, root, conf, found):
-        return 1
+        return None
     if ops_plan.plan_missing(stderr, found):
-        return 1
+        return None
     if ops_close.parent_not_started(stderr, root, conf, found):
-        return 1
+        return None
     if ops_close.predecessors_unmet(stderr, root, conf, found):
+        return None
+    return found
+
+
+def start_gate(
+    stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
+) -> ticket_model.Ticket | None:
+    """`start` の事前の検査。断ったときは理由のあとに `次:` を 1 行足す。
+
+    本体（`start`）と `check` が同じものを呼ぶ。
+    """
+    found = _start_found(stderr, root, conf, ticket_id)
+    if found is None:
+        _refused(stderr, root, "start", ticket_id)
+    return found
+
+
+def start(
+    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
+) -> int:
+    """`doing/` の承認済みチケットに、着手の時刻と基準点を書く。
+
+    処理フロー:
+    1. `start_gate` で承認済みを引き、`doing/` の未着手であることと、置き場・計画・
+       親の着手・先行チケットを確かめる（`misplaced_home`・`plan_missing`・
+       `parent_not_started`・`predecessors_unmet`）。ここまでは `check` も同じ関数で通す。
+    2. ワークツリーが承認済みの `project` の元リポジトリから切られているかを
+       `tree.is_worktree_of` で確かめる（子のワークツリーは sh が先に作るので、事前には見ない）。
+    3. ワークツリーの HEAD を基準点にする。
+    4. `approval_ops.update_fields` で `started_at` と `base_sha` を欄に書く。
+    5. 子ならフローのハッシュを `flow.record_digest` で記録し、次の一手を案内する。
+    """
+    found = start_gate(stderr, root, conf, ticket_id)
+    if found is None:
         return 1
     # ワークツリーは承認済みチケットの `project` が指すリポジトリから
     # 切られていること。
@@ -164,40 +197,65 @@ def start(
     return 0
 
 
-def finish(
-    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
-) -> int:
-    """`doing/` → `review/`（レビュー要）か `done/`（不要）。完了の時刻を書く。
+def _finish_found(
+    stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
+) -> ticket_model.Ticket | None:
+    """`finish` の、親への合流の前に分かる検査。通ったチケット、断ったら None。
 
-    処理フロー:
-    1. `ops_close.find` で承認済みを引き、着手済みであることと、置き場・親の状態・成果物を確かめる
-       （`misplaced_home`・`parent_still_busy`・`deliverables_missing`）。
-    2. 学びの記録（`learning.record_missing`・`learning.parent_blocked`）を確かめる。
-    3. 子なら `_score_child` で実績のリスクを数える。判定が揃わなければ閉じない。
-    4. 完了の時刻・親へ入った子の先頭（`_merged_sha`）・行き先（`_needs_review`）を決める。
-       行き先は `review` か `done`。
-    5. `_move` で欄を書いて動かす。成功したら、リスクの行を出し、親なら `_close_parent` を呼ぶ。
+    合流したあとでないと分からない検査（成果物の追跡・親の学びの置き場）は `finish` の本体に残す。
     """
     found = ops_close.find(stderr, root, conf, ticket_id)
     if found is None:
-        return 1
+        return None
     if found.state != ticket_model.DOING:
         stderr.write(f"ccnavi: {ticket_id} は作業中ではない（いまは {found.state}/）\n")
-        return 1
+        return None
     if not found.started_at:
         stderr.write(
             f"ccnavi: {ticket_id} は未着手。先に "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')} start {ticket_id}' "
             "を通してください\n"
         )
-        return 1
+        return None
     if ops_close.misplaced_home(stderr, root, conf, found):
-        return 1
+        return None
     if ops_close.parent_still_busy(stderr, root, conf, found):
+        return None
+    if learning.record_missing(stderr, root, conf, found):
+        return None
+    return found
+
+
+def finish_gate(
+    stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
+) -> ticket_model.Ticket | None:
+    """`finish` の事前の検査。断ったときは理由のあとに `次:` を 1 行足す。"""
+    found = _finish_found(stderr, root, conf, ticket_id)
+    if found is None:
+        _refused(stderr, root, "finish", ticket_id)
+    return found
+
+
+def finish(
+    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
+) -> int:
+    """`doing/` → `review/`（レビュー要）か `done/`（不要）。完了の時刻を書く。
+
+    処理フロー:
+    1. `finish_gate` で承認済みを引き、着手済みであることと、置き場・親の状態・学びの記録を確かめる
+       （`misplaced_home`・`parent_still_busy`・`learning.record_missing`）。ここまでは `check` も
+       同じ関数で通す。
+    2. 成果物（`deliverables_missing`）と親の学びの置き場（`learning.parent_blocked`）を確かめる。
+       子の合流のあとでないと分からないので、事前には見ない。
+    3. 子なら `_score_child` で実績のリスクを数える。判定が揃わなければ閉じない。
+    4. 完了の時刻・親へ入った子の先頭（`_merged_sha`）・行き先（`_needs_review`）を決める。
+       行き先は `review` か `done`。
+    5. `_move` で欄を書いて動かす。成功したら、リスクの行を出し、親なら `_close_parent` を呼ぶ。
+    """
+    found = finish_gate(stderr, root, conf, ticket_id)
+    if found is None:
         return 1
     if ops_close.deliverables_missing(stderr, root, conf, found):
-        return 1
-    if learning.record_missing(stderr, root, conf, found):
         return 1
     # 親は、学び以外の検査をすべて通したあとに、親の今の HEAD で気づきの処理の証跡を照合する。
     if learning.parent_blocked(stderr, root, conf, found):
@@ -342,6 +400,71 @@ def _close_parent(
     stdout.write(template_drafts.close_notice(conf, root, found.ticket))
 
 
+def _cancel_found(
+    stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str, reason: str
+) -> ticket_model.Ticket | None:
+    """`cancel` の検査。通ったチケット、断ったら None。全部、開始前に分かる。"""
+    if not reason.strip():
+        stderr.write("ccnavi: 取り消しには --reason <理由> が必要です。\n")
+        return None
+    found = ops_close.find(stderr, root, conf, ticket_id)
+    if found is None:
+        return None
+    if found.state == ticket_model.TODO:
+        stderr.write(
+            f"ccnavi: {ticket_id} は未承認の提案（todo/）。取り消しの記録は不要なので、"
+            "ファイルを削除すればよい\n"
+        )
+        return None
+    if found.state != ticket_model.DOING:
+        stderr.write(f"ccnavi: {ticket_id} は作業中ではない（いまは {found.state}/）\n")
+        return None
+    if ops_close.parent_still_busy(stderr, root, conf, found):
+        return None
+    return found
+
+
+def cancel_gate(
+    stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str, reason: str
+) -> ticket_model.Ticket | None:
+    """`cancel` の事前の検査。断ったときは理由のあとに `次:` を 1 行足す。"""
+    found = _cancel_found(stderr, root, conf, ticket_id, reason)
+    if found is None:
+        _refused(stderr, root, "cancel", ticket_id)
+    return found
+
+
+def check(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    verb: str,
+    ticket_id: str,
+    reason: str = "",
+) -> int:
+    """`ticket start|finish|cancel <識別子> --check`。副作用の前に分かる検査だけを通す（読むだけ）。
+
+    sh が取り込み・コミット・子のワークツリーの作成の前に呼ぶ。本体と同じ `*_gate` を使う。
+    手元に無いチケットは判断しない（別の PC で承認・着手された分は、取り込みのあとに本体が見る）。
+    """
+    if verb == "cancel" and not reason.strip():
+        return 0 if cancel_gate(stderr, root, conf, ticket_id, reason) else 1
+    if ops_close.find(io.StringIO(), root, conf, ticket_id) is None:
+        stdout.write(f"案内: {ticket_id} は手元で引けない。取り込みのあとに本体が確かめます\n")
+        return 0
+    if verb == "start":
+        ok = start_gate(stderr, root, conf, ticket_id)
+    elif verb == "finish":
+        ok = finish_gate(stderr, root, conf, ticket_id)
+    else:
+        ok = cancel_gate(stderr, root, conf, ticket_id, reason)
+    if ok is None:
+        return 1
+    stdout.write(f"確認: ok（{verb} を打てる状態。何も変えていません）\n")
+    return 0
+
+
 def cancel(
     stdout: TextIO,
     stderr: TextIO,
@@ -354,31 +477,16 @@ def cancel(
     """`doing/` → `done/`。取り消しの時刻と理由を書く。理由が要る。
 
     処理フロー:
-    1. 理由が空なら止める。
-    2. `ops_close.find` で承認済みを引き、未承認（`todo/`）と作業中でないものを止める。
-    3. 親が作業中（`ops_close.parent_still_busy`）なら止める。
-    4. `cancelled_at` と `cancel_reason` を欄に書き、`_move` で `done/` へ動かす。
+    1. `cancel_gate` で、理由が空・未承認（`todo/`）・作業中でない・親が作業中
+       （`ops_close.parent_still_busy`）を止める。`check` も同じ関数で通す。
+    2. `cancelled_at` と `cancel_reason` を欄に書き、`_move` で `done/` へ動かす。
 
     `advise` が偽なら、子の取り消しのあとの `次:` を出さない（close-early が未着手の子を
     まとめて取り消すとき、`次:` が子の数だけ並ぶため）。取り消した親には言う次が無い
     （親の閉じ方は取り消しでは決まらない）。
     """
-    if not reason.strip():
-        stderr.write("ccnavi: 取り消しには --reason <理由> が必要です。\n")
-        return 1
-    found = ops_close.find(stderr, root, conf, ticket_id)
+    found = cancel_gate(stderr, root, conf, ticket_id, reason)
     if found is None:
-        return 1
-    if found.state == ticket_model.TODO:
-        stderr.write(
-            f"ccnavi: {ticket_id} は未承認の提案（todo/）。取り消しの記録は不要なので、"
-            "ファイルを削除すればよい\n"
-        )
-        return 1
-    if found.state != ticket_model.DOING:
-        stderr.write(f"ccnavi: {ticket_id} は作業中ではない（いまは {found.state}/）\n")
-        return 1
-    if ops_close.parent_still_busy(stderr, root, conf, found):
         return 1
     fields = {"cancelled_at": approval_marks.now(), "cancel_reason": reason.strip()}
     return _move(

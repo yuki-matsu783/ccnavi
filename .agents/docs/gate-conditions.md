@@ -75,4 +75,6 @@ ccnavi の開発で、操作を止める条件を足す・直すとき、実装�
 
 - 子が親に合流済みか: `write_and_push_merge.py:plan` と `review/request.py:_unmet`
 
+`start`・`finish`・`cancel`・`consolidate` の書く前の検査は、`lifecycle/commands.py` の `start_gate`・`finish_gate`・`cancel_gate` と `consolidate.py` の `gate` に置き、本体と `--check`（sh が取り込みの前に呼ぶ）が同じ関数を通る。合流のあとでないと分からない検査だけが本体に残る。
+
 親のワークツリーの未コミットの変更と親ブランチの未 push は、`lifecycle/treegate.py`（`check`）に寄せた。操作が見る条件は `WATCHES` に宣言する。git の呼び出しが重複していないことは `tests/core/test_gate_single_source.py`、操作ごとの拒否は `tests/core/test_treegate.py` が守る。置き場の判定は `ticket_places.is_ticket_place` に一本化した。

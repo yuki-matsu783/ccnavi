@@ -45,6 +45,20 @@ messages:
     note: |-
       子のないまま親で進めても、`finish` で「終わっていないフェーズがある」と止まります
 
+  # start・finish・cancel・consolidate が、書く前に分かる条件で断ったあと（理由の行のあとに 1 行）。
+  NEXT_OPS_REFUSED:
+    kind: next
+    values: [verb, ticket]
+    next: |-
+      上の理由を直して、'{script:ccnavi-ticket.sh} {verb} {ticket}' を打ち直す
+
+  # cancel は --reason を添える。
+  NEXT_OPS_REFUSED__CANCEL:
+    kind: next
+    values: [ticket]
+    next: |-
+      上の理由を直して、'{script:ccnavi-ticket.sh} cancel {ticket} --reason <理由>' を打ち直す
+
   # 定性のリスク項目の判定を記録したあと。
   NEXT_OPS_RECORD_RISK:
     kind: next
