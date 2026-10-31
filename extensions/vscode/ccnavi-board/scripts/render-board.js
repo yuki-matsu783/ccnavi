@@ -27,7 +27,7 @@ const ROOT = path.resolve(__dirname, "..");
 
 const EXIT = { OK: 0, FAILED: 1, USAGE: 2, NOT_READY: 3 };
 
-/** 環境が揃っていないときに、出力の末尾へ足す。直し方の書いた文書と、その索引の引き方 */
+/** 環境が揃っていないときに、出力の末尾へ足す。直し方を書いた文書と、その索引の引き方 */
 const NOT_READY_HINT =
   "案内: 前提と直し方は extensions/vscode/ccnavi-board/docs/design/development.md の「前提と依存」（ccnavi --docs --keyword render-board でも引ける）";
 
