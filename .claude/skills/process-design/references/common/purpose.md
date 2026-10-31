@@ -11,3 +11,4 @@ keywords: [process-design, 経過, 動機, パターン]
 | 変更 | 動機のパターン |
 |---|---|
 | `plain-terms.md` を足した | internal-names-in-prose |
+| `prefer-mechanism.md` を足した | なし（ユーザの指示。同じ落とし穴への対処を、文書の注意でなく仕組みで解いた経験から） |

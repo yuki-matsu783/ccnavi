@@ -57,7 +57,7 @@ keywords: [統合先, 取り込み, マージ, マージリクエスト, integra
 
 - ワークツリーのブランチを切ったあとに取り込み先が進んでいたら、ワークツリーの中で`ccnavi-git.sh merge <取り込み先>`を打ってコンフリクトを解消し、それから`integrate`を打つ
 - ワークツリーの中の`ccnavi-git.sh merge`は、`--ff`・`--no-ff`・`--ff-only`・`--squash`の指定がなければ`--no-ff`になり、合流のコミットが残る（範囲の検査が、取り込んだだけのファイルを見分けるのに使う）
-- 統合先のユーザのチェックアウトで`ccnavi-git.sh merge <ブランチ>`は打てない（`--abort` `--continue` `--quit`以外は、どの形でも止まる）。`pull <リモート> <別のブランチ>`と、`fetch`のあとの`merge FETCH_HEAD`も同じく止まる。統合先の更新（引数なしの`pull`、`pull [--ff-only] <リモート> <統合先>`）は打てる。取り込みは`integrate-done`が行い、衝突は作業ワークツリーで解く
+- 統合先のユーザのチェックアウトで`ccnavi-git.sh merge <ブランチ>`は打てない（`--abort` `--continue` `--quit`以外は、どの形でも止まる）。`pull <リモート> <別のブランチ>`と、`fetch`のあとの`merge FETCH_HEAD`も同じく止まる。統合先の更新（引数なしの`pull`、`pull [--ff-only] <リモート> <統合先>`）は打てる。ここで`pull`が衝突したときは、ユーザに`pull`と衝突の解決を頼んで止まる案内が出る（`restore --theirs` / `--ours`で片方に倒さない）。取り込みは`integrate-done`が行い、衝突は作業ワークツリーで解く
 - 保護の種類は2つある。手元の取り込み先を保護対象のツリーとして書き込めないときは、`integrate-done`をユーザがターミナルで打つ（上の節）。リモートの`<統合先>`が保護されていてpushできないのは、ユーザがどう出すかを決める話（`ccnavi-git.sh push`は統合先へは送らない）
 - 上の2つに該当しない作業（例: 統合先にそのままfast-forwardで取り込む）は、ユーザが明示的に頼んだときだけの例外。ユーザがターミナルで行い、エージェントの`ccnavi-git.sh merge`は統合先のユーザのチェックアウトで止まる。`ccnavi-git.sh worktree remove <パス>`と`ccnavi-git.sh branch -d <名前>`で片付けるのは、取り込みが済んでから
 

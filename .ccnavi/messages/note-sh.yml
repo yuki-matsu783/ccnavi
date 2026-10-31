@@ -99,6 +99,13 @@ messages:
     note: |-
       統合先の更新（引数なしの pull と pull [--ff-only] <リモート> {integ:sh}）と、統合先でないブランチ・ワークツリーでの pull は、ここでも実行できます。
 
+  # 統合先のユーザのチェックアウトで pull が衝突して失敗したとき（出力の後ろに足す）。
+  NOTE_GIT_PULL_CONFLICT_ON_TARGET:
+    kind: note
+    values: [integ]
+    note: |-
+      統合先 {integ:sh} のユーザのチェックアウトで pull が衝突しました。ここでは解こうとしないでください。保護対象のファイルは直せず、restore --theirs / --ours で丸ごと片方に倒すと、もう片方の変更が消えます。衝突したファイルと今の状態（merge か rebase の途中か）を報告して、ユーザに pull とコンフリクト解消（または中止）を頼んで止まってください。
+
   # ワークツリーを消せなかったとき（Windows で、cwd がワークツリーの中にあるとき）。
   NOTE_GIT_WORKTREE_REMOVE_CWD:
     kind: note

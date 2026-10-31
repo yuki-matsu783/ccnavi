@@ -2554,6 +2554,11 @@ else
 		[ -z "${2:-}" ] || rm_path_q=$(ccnavi_sh_quote "$2")
 		ccnavi_text "$WS" NOTE_GIT_WORKTREE_REMOVE_CWD "ws=$WS" "self_q=$SELF_Q" "path_q=$rm_path_q"
 	fi
+	# 統合先のユーザのチェックアウトの pull が衝突したとき（未解決の索引がある）だけ、解かずにユーザへ頼む案内を足す。
+	# ワークツリーの中の衝突は、そこで解く普段の作業なので足さない。
+	if [ "$sub" = pull ] && [ -n "$(git ls-files -u 2>/dev/null)" ] && merge_target_is_here; then
+		ccnavi_text "$WS" NOTE_GIT_PULL_CONFLICT_ON_TARGET "integ=$mg_integ"
+	fi
 fi
 
 # 世代で切る。新しい順に並べ、上限より後ろを消す。
