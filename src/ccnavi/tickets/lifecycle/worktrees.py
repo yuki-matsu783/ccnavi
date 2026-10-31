@@ -111,10 +111,10 @@ def retry_command(root: str, name: str) -> str:
     return f"{settings.script_command(root, 'ccnavi-clean.sh')} --worktree {name}"
 
 
-def drop(root: str, name: str, cwd: str) -> Dropped:
-    """`.claude/worktrees/<名前>` を消す。消さないときは理由を持って返す（何も消さない）。
+def _screen(root: str, name: str, cwd: str) -> tuple[Dropped | None, str]:
+    """消してよいかの判定（消さずに読むだけ）。止める理由か ABSENT なら `Dropped`、通れば
+    (None, 持ち主のリポジトリ)。`drop` の関門で、`blocked` も同じものを使う。
 
-    処理フロー:
     1. 名前にパスの区切りや `.`・`..` が無いかを見る。
     2. 無ければ ABSENT。リンクやジャンクションなら REFUSED（リンクの先は消さない）。
        ディレクトリでなければ REFUSED。
@@ -123,26 +123,22 @@ def drop(root: str, name: str, cwd: str) -> Dropped:
     5. `git status --porcelain` で未コミットの変更を見る。あれば DIRTY。`_ignored`
        で無視されたファイルを見る。あれば IGNORED（`git worktree remove` は無視された
        ファイルを断らずに消すので、ここで止める）。
-    6. `_clean_generated` で生成物を消す。
-    7. `git worktree remove` で消す。git が断ったら（ロック・submodule など）、その拒否文で
-       REFUSED。
     """
     path = tree.worktree_path(root, name)
     if not name or name in (".", "..") or any(c in name for c in ("/", "\\", ":")):
-        return Dropped(
-            name, REFUSED, path, "名前にパスは書けない（.claude/worktrees/ の直下の名前）"
-        )
+        refusal = "名前にパスは書けない（.claude/worktrees/ の直下の名前）"
+        return Dropped(name, REFUSED, path, refusal), ""
     if not os.path.lexists(path):
-        return Dropped(name, ABSENT, path)
+        return Dropped(name, ABSENT, path), ""
     if os.path.islink(path) or os.path.isjunction(path):
-        return Dropped(name, REFUSED, path, "リンクなので、リンクの先は削除しません。")
+        return Dropped(name, REFUSED, path, "リンクなので、リンクの先は削除しません。"), ""
     if not os.path.isdir(path):
-        return Dropped(name, REFUSED, path, "ディレクトリでない")
+        return Dropped(name, REFUSED, path, "ディレクトリでない"), ""
     if _inside(cwd, path):
-        return Dropped(name, CWD_INSIDE, path)
+        return Dropped(name, CWD_INSIDE, path), ""
     owner, why = _owner(path)
     if not owner:
-        return Dropped(name, REFUSED, path, why)
+        return Dropped(name, REFUSED, path, why), ""
     done = gitcmd.run(
         path,
         ["status", "--porcelain", "--untracked-files=all"],
@@ -150,19 +146,43 @@ def drop(root: str, name: str, cwd: str) -> Dropped:
         raw_paths=True,
     )
     if not done.ok:
-        return Dropped(
-            name, REFUSED, path, "git の状態を読めない。未コミットの変更を確かめられない"
-        )
+        unread = "git の状態を読めない。未コミットの変更を確かめられない"
+        return Dropped(name, REFUSED, path, unread), ""
     if done.out.strip():
-        return Dropped(name, DIRTY, path)
+        return Dropped(name, DIRTY, path), ""
     ignored, why = _ignored(path)
     if why:
-        return Dropped(name, REFUSED, path, why)
+        return Dropped(name, REFUSED, path, why), ""
     if ignored:
         shown = ignored[:_SHOWN] + (
             [f"…ほか {len(ignored) - _SHOWN} 件"] if len(ignored) > _SHOWN else []
         )
-        return Dropped(name, IGNORED, path, "\n".join(shown))
+        return Dropped(name, IGNORED, path, "\n".join(shown)), ""
+    return None, owner
+
+
+def blocked(root: str, name: str, cwd: str) -> Dropped | None:
+    """`drop` がこのワークツリーを消さない理由。消せる（もともと無いのも含む）なら None。
+
+    何も変えずに読むだけ。消す前に断りたい呼び手（`retire`）が、`drop` と同じ判定を使う。
+    """
+    found, _ = _screen(root, name, cwd)
+    return found if found is not None and not found.removed else None
+
+
+def drop(root: str, name: str, cwd: str) -> Dropped:
+    """`.claude/worktrees/<名前>` を消す。消さないときは理由を持って返す（何も消さない）。
+
+    処理フロー:
+    1. `_screen` で消してよいかを見る。止める理由があれば、それを返す。
+    2. `_clean_generated` で生成物を消す。
+    3. `git worktree remove` で消す。git が断ったら（ロック・submodule など）、その拒否文で
+       REFUSED。
+    """
+    found, owner = _screen(root, name, cwd)
+    if found is not None:
+        return found
+    path = tree.worktree_path(root, name)
     failed = _clean_generated(path)
     if failed:
         return Dropped(name, REFUSED, path, failed)
