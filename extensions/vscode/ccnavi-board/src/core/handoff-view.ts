@@ -16,7 +16,7 @@ import { embedJson, type DataMessage } from "./screen-host.js";
 export type HandoffKind = "template" | "layer-config" | "docs" | "defense" | (string & {});
 
 /** 対象の状態。知らない値も通すが、取り込めるのは `new` と `changed` だけ */
-export type HandoffState = "new" | "changed" | "unchanged" | "conflict" | "rejected" | (string & {});
+export type HandoffState = "new" | "changed" | "unchanged" | "rejected" | (string & {});
 
 /** 対象 1 件 */
 export interface HandoffEntry {
@@ -54,7 +54,7 @@ export interface HandoffList {
   readonly entries: readonly HandoffEntry[];
   /** 選んだ対象の集合のハッシュ。拡張は組み直さず、取り込みたいパスを指した答えのものを使う */
   readonly expect: string;
-  /** 選んだ対象に error・conflict・rejected が無い */
+  /** 選んだ対象に error・rejected が無い */
   readonly ok: boolean;
 }
 

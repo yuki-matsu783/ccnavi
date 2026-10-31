@@ -373,16 +373,6 @@ class StageShTest(unittest.TestCase):
                 self.assertIn(why, result.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.ws, "wip", "handoff", "link")))
 
-    def test_commands_refuse_when_the_original_changed_after_staging(self):
-        self.stage(".ccnavi/config/common/rules.yml")
-        write(self.draft_rules, "version: 2\n")
-        write(self.rules, "version: 3\n")  # 別のセッションかユーザが元を直した
-        result = self.stage("--commands", ".ccnavi/config/common/rules.yml")
-        self.assertEqual(1, result.returncode)
-        self.assertNotIn("mv ", result.stdout)
-        self.assertIn("元のファイルが変わっている", result.stderr)
-        self.assertEqual("version: 3\n", read(self.rules))
-
     def test_unknown_option_and_no_args(self):
         self.assertEqual(2, self.stage("--bogus").returncode)
         self.assertEqual(2, self.stage().returncode)

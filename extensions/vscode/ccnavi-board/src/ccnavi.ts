@@ -944,7 +944,7 @@ export async function runTemplateDraft(root: string, setting: string, parent: st
  * `workspace` は実行ファイルを探すワークスペースのルート、`tree` は見るツリーのルート（`--root` に渡す）。
  * ワークスペースのルートのツリーなら二つは同じ。実行ファイルは `workspace` の側で探す
  * （プロジェクトやワークツリーには `dist/ccnavi/` が無いため）。
- * 見るだけの答えは、対象に error や conflict があっても終了コード 0 で返る。
+ * 見るだけの答えは、対象に error があっても終了コード 0 で返る。
  */
 export async function runHandoff(workspace: string, setting: string, tree: string, paths: readonly string[] = []): Promise<RunResult<HandoffList>> {
   const what = "ccnavi user handoff --json";

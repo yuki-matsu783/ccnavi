@@ -35,7 +35,7 @@ def scripts_dir() -> str:
     global _OVERLAY
     real = os.path.join(ROOT, ".ccnavi", "scripts")
     drafts = os.path.join(ROOT, "wip", "handoff", ".ccnavi", "scripts")
-    if not os.path.isdir(drafts) or not [n for n in os.listdir(drafts) if not n.endswith(".orig")]:
+    if not os.path.isdir(drafts) or not os.listdir(drafts):
         return real
     if _OVERLAY is None:
         _OVERLAY = tempfile.mkdtemp(prefix="ccnavi-scripts-")
@@ -43,6 +43,5 @@ def scripts_dir() -> str:
         for name in os.listdir(real):
             shutil.copy(os.path.join(real, name), _OVERLAY)
         for name in os.listdir(drafts):
-            if not name.endswith(".orig"):
-                shutil.copy(os.path.join(drafts, name), _OVERLAY)
+            shutil.copy(os.path.join(drafts, name), _OVERLAY)
     return _OVERLAY

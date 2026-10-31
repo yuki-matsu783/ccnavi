@@ -158,8 +158,6 @@ export function refusalReason(entry: HandoffEntry): string {
     return "ボードからは取り込めません。ターミナルで取り込みます";
   }
   switch (entry.state) {
-    case "conflict":
-      return "下書きをコピーしたあとで、取り込み先が変わっています（conflict）。下書きをコピーし直してから、もう一度確かめてください";
     case "rejected":
       return "取り込み先として受け付けない対象です（rejected）。errors を直してください";
     case "unchanged":
