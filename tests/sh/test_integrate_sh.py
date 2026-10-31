@@ -1615,8 +1615,8 @@ class MergeOnTargetTest(Fixture):
         self.assertNotIn("$SELF merge --ff-only では", text)
 
 
-class PullOnTargetTest(Fixture):
-    """統合先のユーザのチェックアウトでは、pull でも別のブランチを merge できない。"""
+class PullOnTargetBase(Fixture):
+    """統合先のユーザのチェックアウトの pull を試す共通の準備（origin と、先へ進んだ main）。"""
 
     def setUp(self):
         super().setUp()
@@ -1653,6 +1653,9 @@ class PullOnTargetTest(Fixture):
         self.assertEqual(before, git(self.ws, "rev-parse", "HEAD").strip())
         self.assertFalse(os.path.exists(os.path.join(self.ws, "feat.txt")))
         return r
+
+class PullOnTargetTest(PullOnTargetBase):
+    """統合先のユーザのチェックアウトでは、pull でも別のブランチを merge できない。"""
 
     def test_pulling_another_branch_on_the_target_is_refused(self):
         for args in (
@@ -1743,6 +1746,56 @@ class PullOnTargetTest(Fixture):
 
     def test_fetch_itself_is_not_blocked(self):
         self.assertOk(self.run_git_sh("fetch", "origin", "feat"))
+
+
+class PullConflictNoteTest(PullOnTargetBase):
+    """統合先のユーザのチェックアウトの pull が衝突したときだけ、ユーザへ頼む案内を足す。"""
+
+    NOTE = "ユーザに pull とコンフリクト解消（または中止）を頼んで止まってください"
+
+    def setUp(self):
+        super().setUp()
+        git(self.ws, "config", "pull.rebase", "false")
+        # origin の main が keep.txt の 2 行目を直す。
+        side = os.path.join(self._tmp.name, "side-conflict")
+        git(self.ws, "worktree", "add", "-q", side, "-b", "side-c", "origin/main")
+        write(os.path.join(side, "keep.txt"), "1\nremote\n3\n")
+        git(side, "commit", "-q", "-am", "remote edit")
+        git(side, "push", "-q", "origin", "HEAD:main")
+        git(self.ws, "worktree", "remove", "--force", side)
+        git(self.ws, "branch", "-D", "side-c")
+
+    def commit_local_edit(self, cwd):
+        write(os.path.join(cwd, "keep.txt"), "1\nlocal\n3\n")
+        git(cwd, "commit", "-q", "-am", "local edit")
+
+    def test_conflict_on_the_target_adds_the_note(self):
+        self.commit_local_edit(self.ws)
+        r = self.run_git_sh("pull", "--no-edit")
+        self.assertEqual(1, r.returncode, r.stdout + r.stderr)
+        self.assertIn("CONFLICT", r.stdout)
+        self.assertIn(self.NOTE, r.stdout)
+        self.assertIn("restore --theirs / --ours", r.stdout)
+        # merge の途中なら、merge --abort は統合先のユーザのチェックアウトで通る。
+        self.assertOk(self.run_git_sh("merge", "--abort"))
+        self.assertEqual("1\nlocal\n3\n", read(os.path.join(self.ws, "keep.txt")))
+
+    def test_pull_without_conflict_has_no_note(self):
+        write(os.path.join(self.ws, "mine.txt"), "m\n")
+        git(self.ws, "add", "mine.txt")
+        git(self.ws, "commit", "-q", "-m", "mine")
+        r = self.run_git_sh("pull", "--no-edit")
+        self.assertOk(r)
+        self.assertNotIn(self.NOTE, r.stdout)
+
+    def test_conflict_inside_a_worktree_has_no_note(self):
+        self.commit_local_edit(self.wt)
+        r = self.run_git_sh("pull", "--no-edit", "origin", "main", cwd=self.wt)
+        self.assertEqual(1, r.returncode, r.stdout + r.stderr)
+        self.assertIn("CONFLICT", r.stdout)
+        self.assertNotIn(self.NOTE, r.stdout)
+        r = self.run_git_sh("merge", "--abort", cwd=self.wt)
+        self.assertOk(r)
 
 
 if __name__ == "__main__":
