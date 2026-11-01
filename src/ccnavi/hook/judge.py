@@ -35,6 +35,7 @@ from ..tickets.phase import gates as phase
 from ..tickets.phase import scope as phase_scope
 from . import (
     agentlaunch,
+    askcontext,
     ccnavimd,
     failsafe,
     parentwrite,
@@ -169,6 +170,29 @@ def decide_before(
     # 弾けなかったものだけがワークツリーに届くので、届いた側から見れば
     # 「直前」は判定の前だから。
     guard = guard_setting_files(mode, conf, root, payload, record, selfguard.before)
+
+    # ユーザに確認（ask）を出す呼び出しは、確認の前の発言が背景と結果を言っているかを先に見る。
+    # 対象は `AskUserQuestion` と、下で確認を返す 2 か所（`refuse` の `ask_context`）。
+    ask_context = ask_context_check(root, payload, deadline)
+    if payload.tool_name in toolnames.ASK_USER_TOOLS:
+        text = ask_context()
+        if text:
+            record.code, record.rules = askcontext.CODE, [askcontext.RULE_ID]
+            return refuse(
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                ([guard] if guard else [])
+                + [
+                    reasons.builtin_refusal(
+                        askcontext.CODE, askcontext.RULE_ID, ask_subject(payload), text
+                    )
+                ],
+                conf=conf,
+                root=root,
+                kind=GENERAL,
+            )
 
     if not record.subject:
         record.decision, record.reason = audit.SKIP, audit.REASON_NO_SUBJECT
@@ -475,6 +499,7 @@ def decide_before(
                 conf=conf,
                 root=root,
                 kind=GATE,
+                ask_context=ask_context,
             )
         if stop is not None:
             record.code, record.rules = turngate.CODE, [turngate.rule_id(stop.gate)]
@@ -1096,7 +1121,27 @@ def decide_before(
         root=root,
         kind=final_kind(conf, hit_ids, ticket_reason, capped),
         updated_input=updated,
+        ask_context=ask_context,
     )
+
+
+def ask_context_check(root: str, payload: hookio.Input, deadline: float) -> Callable[[], str]:
+    """確認の前の発言を調べる関数。止める文を返し、揃っているか検査しないときは空を返す。
+
+    検査しないのは、非対話のセッション（確認は自動で拒否になり、答える人がいない）と
+    サブエージェントの呼び出し（会話記録の置き場が別で、実測していない）。
+    """
+    if ccnavimd.unattended() or payload.agent_id:
+        return lambda: ""
+    return lambda: askcontext.stop_text(root, payload.transcript_path, deadline)
+
+
+def ask_subject(payload: hookio.Input) -> str:
+    """`AskUserQuestion` の文面に出す主題。最初の質問の文。"""
+    questions = payload.tool_input.get("questions")
+    first = questions[0] if isinstance(questions, list) and questions else None
+    text = first.get("question") if isinstance(first, dict) else None
+    return audit._redacted(text) if isinstance(text, str) and text else payload.tool_name
 
 
 def _write_pass(stdout: TextIO, text: str, updated: dict | None) -> None:
@@ -1187,8 +1232,12 @@ def refuse(
     *,
     kind: str,
     updated_input: dict | None = None,
+    ask_context: Callable[[], str] | None = None,
 ) -> int:
     """拒否か確認を返す。dry-run なら返す代わりに、返していたはずだと言う。
+
+    ask_context は、確認を返す前に直前の発言を調べる関数（`ask_context_check`）。止める文を
+    返したら、確認を出さずに拒否（`askcontext.CODE`）に替える。
 
     kind は止めている箇所の分類（`modes.GENERAL`・`GATE`・`AUX`）。dry-run で報告だけにするのは
     GENERAL だけで、チケット制御の関門（GATE）と補助の保護（AUX）は dry-run でも止める。
@@ -1210,6 +1259,13 @@ def refuse(
     判定を変えないので、案内を出してよい）。最初の 1 回と、連続が閾値の倍数になった回は、
     文面の末尾に資料を引く案内を足す。
     """
+    if verdict == rules.ASK and ask_context is not None:
+        stop = ask_context()
+        if stop:
+            record.code, record.rules = askcontext.CODE, [askcontext.RULE_ID]
+            shown = audit._redacted(record.subject)
+            parts = [reasons.builtin_refusal(askcontext.CODE, askcontext.RULE_ID, shown, stop)]
+            verdict, kind, context, updated_input = rules.DENY, GENERAL, "", None
     # 空行で区切るのは、1 件ずつが閉じた文であることを見た目でも保つため。
     reason = "\n\n".join(parts)
     decision = audit.DENY if verdict == rules.DENY else audit.ASK

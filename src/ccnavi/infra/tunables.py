@@ -27,6 +27,8 @@ class Tunable(NamedTuple):
 
 # 1 回の hook の判定に張る期限（hook.judge）。
 HOOK_DEADLINE = Tunable("CCNAVI_HOOK_DEADLINE_SECONDS", 3.0)
+# 確認（ask）の前に、直前の発言が会話記録へ書かれるのを待つ時間の上限（hook.askcontext）。
+ASK_CONTEXT_WAIT = Tunable("CCNAVI_ASK_CONTEXT_WAIT_SECONDS", 1.5)
 # SessionStart で、終わっていない integrate の記録を確かめる時間の上限（hook.events）。
 INTEGRATE_PENDING = Tunable("CCNAVI_INTEGRATE_PENDING_SECONDS", 2.0)
 # 実行中のサブエージェントの印を「実行中」と数える長さの上限（hook.subagent）。
