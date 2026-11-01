@@ -30,11 +30,11 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   pushの拒否、親のワークツリーでの`checkout`・`switch`の行き先の確認）と、`integrate`・`integrate-done`の状態操作はshに置く。条件は3つで、
   生の`git`が組み込みで止まっていること、ラッパーが許可リストで読むこと、判定の材料のうちチケットの中身は実行ファイルに聞くこと
   （設計 9.2）。この3つを満たさない判定はshに足さない
-- P13の例外の範囲は、親のブランチの共通のpush関門（`ccnavi_push_gate`。`ccnavi-common-state.sh`）にも広げる。
-  関門を通る経路は、`ccnavi-git.sh`の`push`（送り先がoriginのとき）、write-and-push（`ccnavi-common-write-and-push.sh`の`ccnavi_wap_prepare`）、
+- P13の例外の範囲は、親のブランチの共通のpushゲート（`ccnavi_push_gate`。`ccnavi-common-state.sh`）にも広げる。
+  ゲートを通る経路は、`ccnavi-git.sh`の`push`（送り先がoriginのとき）、write-and-push（`ccnavi-common-write-and-push.sh`の`ccnavi_wap_prepare`）、
   `ccnavi-user-push-approved.sh`の3つで、後ろの2つは素の`git push`を打つ。この2つはラッパーを通らないので「ラッパーが許可リストで読むこと」を
-  満たさないが、同じ関門を共有しないと消えた親のブランチを作り直せてしまうため、関門だけを例外に入れる。関門の材料のうちチケットの中身
-  （着手済み＝承認済みの親チケットの`started_at`・`.requested`・退避の有無）は実行ファイルの`tree parent`に聞き、shは自分で読まない。承認済みというだけでは形跡にしない。関門が`ls-remote`を打つのはshの側
+  満たさないが、同じゲートを共有しないと消えた親のブランチを作り直せてしまうため、ゲートだけを例外に入れる。ゲートの材料のうちチケットの中身
+  （着手済み＝承認済みの親チケットの`started_at`・`.requested`・退避の有無）は実行ファイルの`tree parent`に聞き、shは自分で読まない。承認済みというだけでは形跡にしない。ゲートが`ls-remote`を打つのはshの側
   （ネットワークはshの仕事）。この2経路にほかの判定は足さない
 - shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルのサブコマンド（`tree parent`・`tree bound`・`tree base-bound`・`tree guarded`・`tree leftover`・`tree handoff-pending`・`write-and-push family`・`sync retired`・
   `sync paths`など）に聞き、1行1項目の答えを見る。答えが得られないときにどちらへ倒すかは呼ぶ側が決める

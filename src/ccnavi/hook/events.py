@@ -141,7 +141,7 @@ def decide(
     if payload.event == hookio.PRE_TOOL_USE:
         code = judge.decide_before(stdout, stderr, mode, conf, root, payload, record, deadline)
         if record.decision == audit.DENY and record.enforced:
-            # 実行を止めた呼び出しは走らない。実行前に残した関門の記録（A）を消す。
+            # 実行を止めた呼び出しは走らない。実行前に残したゲートの記録（A）を消す。
             turngate.forget_call(conf.state, payload.session_id, payload.tool_use_id)
         return code
     if payload.event == hookio.POST_TOOL_USE:
@@ -316,7 +316,7 @@ def decide_at_prompt(
     """
     # ユーザの発言とバックグラウンド作業の完了通知は、どちらもターンを始める。
     turn.begin(conf.state, payload.session_id)
-    # ユーザの発言と言い切れるものだけを、ターン分離の関門が読む記録に書く。ターンの印とは別。
+    # ユーザの発言と言い切れるものだけを、ターン分離のゲートが読む記録に書く。ターンの印とは別。
     if hookio.is_user_prompt(payload):
         userprompt.note(conf.state, payload.session_id)
         turngate.drop_broken(conf.state, payload.session_id)
@@ -1240,7 +1240,7 @@ def decide_after_failure(
     中断はユーザが止めたもので、ツールの誤りではないので数えない。数えの失敗や案内を組む失敗で、ツールの結果は変わらない。
     """
     record.decision, record.reason = audit.SKIP, audit.REASON_EVENT_NOT_CHECKED
-    # 失敗した呼び出しは、ターン分離の関門の A に数えない（実行前に残した記録を消す）。
+    # 失敗した呼び出しは、ターン分離のゲートの A に数えない（実行前に残した記録を消す）。
     turngate.forget_call(conf.state, payload.session_id, payload.tool_use_id)
     if payload.is_interrupt and not payload.agent_id:
         # ユーザの中断。Stop は来ないことがあるので、ここでターンの終わりにする。

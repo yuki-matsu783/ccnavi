@@ -1,10 +1,10 @@
-"""ターン分離の関門を、hook の入口から実際の呼び出しの順で確かめる
+"""ターン分離のゲートを、hook の入口から実際の呼び出しの順で確かめる
 （`integrate` → `integrate-done`）。
 
 UserPromptSubmit・PreToolUse・PostToolUseFailure・Stop・SessionStart を続けて呼ぶ。
 
 見るのは次の 9 つ。付き添いのないセッション（`CLAUDE_CODE_SESSION_ATTENDED=0`）を既定にして、
-発言を待つ関門を確かめる。付き添いのあるセッションは `AttendedTest` で確かめる。
+発言を待つゲートを確かめる。付き添いのあるセッションは `AttendedTest` で確かめる。
 
 - 付き添いのあるセッションでは、`integrate-done` は発言を待たず確認（ask）に出る。
   同じコマンドに並べた呼び出しだけは、確認でなく止まる
@@ -16,7 +16,7 @@ UserPromptSubmit・PreToolUse・PostToolUseFailure・Stop・SessionStart を続�
 - サブエージェント、別のセッション、並行した呼び出し、同じコマンドの連結
 - 起動と再開は記録を消す。compact は消さない。dry-run でも止まる
 - 止めた記録（`decisions.jsonl`）の拒否コードと `rules`
-- 壊れた関門の記録は止め、次のユーザの発言で消える（完了通知では消えない）
+- 壊れたゲートの記録は止め、次のユーザの発言で消える（完了通知では消えない）
 """
 
 from __future__ import annotations
@@ -199,7 +199,7 @@ class AttendedTest(TurnGateHookTest):
 
         self.assertTrue(self.asked(self.run_command(DONE)))
 
-    def test_非対話に戻れば発言を待つ関門が働く(self):
+    def test_非対話に戻れば発言を待つゲートが働く(self):
         self.attended = "0"
         self.say()
         self.run_command(INTEGRATE)
@@ -386,7 +386,7 @@ class WhoTest(TurnGateHookTest):
 
         self.assertTrue(self.stopped(self.run_command(DONE, agent_id="sub1", agent_type="x")))
 
-    def test_サブエージェントの_integrate_は別の関門が止める_止めた_A_は数えない(self):
+    def test_サブエージェントの_integrate_は別のゲートが止める_止めた_A_は数えない(self):
         self.say()
         denied = self.run_command(INTEGRATE, agent_id="sub1", agent_type="x")
         self.assertIn("DENY_SUBAGENT_TICKET_OP", denied.stdout)

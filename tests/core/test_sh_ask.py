@@ -248,7 +248,7 @@ class TreeParentTest(Harness):
 
 
 class TreeParentGateFactsTest(Harness):
-    """push の関門が聞く 5 行（approved・requested・archived・started・mr）。"""
+    """push のゲートが聞く 5 行（approved・requested・archived・started・mr）。"""
 
     def facts(self, name="p0001"):
         return self.answer("tree 1", "tree", "parent", self.tree, name)

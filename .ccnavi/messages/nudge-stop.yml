@@ -97,4 +97,4 @@ messages:
       ambiguous: |-
         同じ名前 {name} の親のワークツリーが複数のリポジトリにある。片方の親子のチケットを片付けるか、識別子を変えて、1 つのリポジトリに絞る
       absent: |-
-        親のワークツリーを切り直す（`{script:ccnavi-git.sh} fetch origin {branch}` のあと `{script:ccnavi-git.sh} worktree add .claude/worktrees/{name} {branch}`。ブランチ名の `/` を `-` に置き換えたものがフォルダ名になる）。破棄した親子のチケットなら、親のワークツリーを片付ければよい（push の関門の対象から外れる）
+        親のワークツリーを切り直す（`{script:ccnavi-git.sh} fetch origin {branch}` のあと `{script:ccnavi-git.sh} worktree add .claude/worktrees/{name} {branch}`。ブランチ名の `/` を `-` に置き換えたものがフォルダ名になる）。破棄した親子のチケットなら、親のワークツリーを片付ければよい（push のゲートの対象から外れる）

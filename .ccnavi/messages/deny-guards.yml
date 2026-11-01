@@ -1,4 +1,4 @@
-# 組み込みの関門（hook/wrapguard.py・tickets/flow/graph.py・tickets/model/phase_forms.py）の拒否の文。
+# 組み込みのゲート（hook/wrapguard.py・tickets/flow/graph.py・tickets/model/phase_forms.py）の拒否の文。
 # 条件（いつ止めるか）はコード側にある。ここは何を言うかだけを持つ。
 # 先頭の `[ccnavi] CODE (…)` と `subject:` などの状態の行は、コード側が付ける。
 # 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
@@ -16,7 +16,7 @@ messages:
     next: |-
       変数を置かずに、sh の呼び出しを別のコマンドに分けて打ち直す。置き場が本当に違うなら、ユーザに settings.json の env を直してもらい、返事を待つ。出力の量と待ち時間の変数（{pass_through}）は置ける
     no_bypass: |-
-      変数の置き方や書く位置を変えても、同じ関門に当たります。
+      変数の置き方や書く位置を変えても、同じゲートに当たります。
 
   DENY_CHILD_PUSH__UNREAD:
     kind: deny
@@ -28,7 +28,7 @@ messages:
     next: |-
       `cd` の行き先をそのまま書くか、送るツリーに入ってから `{script:ccnavi-git.sh} push` を打ち直す
     no_bypass: |-
-      行き先の書き方を変えても、読めない形は同じ関門に当たります。
+      行き先の書き方を変えても、読めない形は同じゲートに当たります。
 
   DENY_CHILD_PUSH__CHILD:
     kind: deny
@@ -40,7 +40,7 @@ messages:
     next: |-
       作業を終えたら結果を報告して終わる。push は親が取り込んだあと、親のワークツリーで行う
     no_bypass: |-
-      別の経路や言い換えで送ろうとしても、同じ関門に当たります。
+      別の経路や言い換えで送ろうとしても、同じゲートに当たります。
 
   DENY_WRAPPER_CORE_PATH__HIT:
     kind: deny
@@ -52,7 +52,7 @@ messages:
     next: |-
       変更が必要なら、ユーザに依頼して、何をなぜ変えたいのかを伝え、返事を待つ。衝突を解くときの `{script:ccnavi-git.sh} restore --ours -- <パス>`（--theirs も）と、索引だけを戻す `{script:ccnavi-git.sh} restore --staged <パス>` は通る
     no_bypass: |-
-      言い換えや別の経路でも、同じ関門に当たります。
+      言い換えや別の経路でも、同じゲートに当たります。
     note: |-
       グロブ（* ? [）・: で始まる指定・--pathspec-from-file は、守る場所にヒットするかを決められません。削除する・戻すファイルを 1 つずつ名指しします。
 
@@ -66,7 +66,7 @@ messages:
     next: |-
       ユーザに依頼して、何をなぜ削除したいのかを伝え、返事を待つ
     no_bypass: |-
-      言い換えや別の経路でも、同じ関門に当たります。
+      言い換えや別の経路でも、同じゲートに当たります。
 
   DENY_WRAPPER_CORE_PATH__REVIEW:
     kind: deny
@@ -78,7 +78,7 @@ messages:
     next: |-
       レビュー待ちの提案を外したいなら、ユーザに依頼して、どれをなぜ外したいのかを伝え、返事を待つ
     no_bypass: |-
-      言い換えや別の経路でも、同じ関門に当たります。
+      言い換えや別の経路でも、同じゲートに当たります。
 
   DENY_WRAPPER_CORE_PATH__INDEX:
     kind: deny
@@ -90,7 +90,7 @@ messages:
     next: |-
       戻したいファイルがあるなら `{script:ccnavi-git.sh} restore <パス>` を名指しで打つ。ccnavi 自身を守る場所（hook の登録・設定・保護済みのスクリプト・記録）を戻すなら、ユーザに依頼して、何をなぜ戻したいのかを伝え、返事を待つ
     no_bypass: |-
-      言い換えや別の経路でも、同じ関門に当たります。
+      言い換えや別の経路でも、同じゲートに当たります。
 
   DENY_WRAPPER_CORE_PATH__UNREAD:
     kind: deny
@@ -102,7 +102,7 @@ messages:
     next: |-
       ラッパーはサブコマンドと対象をそのまま書いて、直接呼ぶ（`{script:ccnavi-git.sh} <サブコマンド> <パス>`。値は先に読んでから書く）
     no_bypass: |-
-      書き方を変えても、読み切れない形は同じ関門に当たります。
+      書き方を変えても、読み切れない形は同じゲートに当たります。
 
   DENY_SUBAGENT_PARENT_TREE__GIT:
     kind: deny
@@ -114,7 +114,7 @@ messages:
     next: |-
       子のワークツリー（.claude/worktrees/<子>）で実装してコミットし、結果を報告して終わる。衝突を解くときは、子のワークツリーで親のブランチを merge してコミットする
     no_bypass: |-
-      言い換えや別の経路でも、親のワークツリーへの書き込みは同じ関門に当たります。
+      言い換えや別の経路でも、親のワークツリーへの書き込みは同じゲートに当たります。
 
   DENY_SUBAGENT_PARENT_TREE__GIT_UNREAD:
     kind: deny
@@ -126,7 +126,7 @@ messages:
     next: |-
       子のワークツリーに入って、`cd` の行き先をそのまま書いて打ち直す
     no_bypass: |-
-      書き方を変えても、読めない形は同じ関門に当たります。
+      書き方を変えても、読めない形は同じゲートに当たります。
 
   DENY_SUBAGENT_PARENT_TREE__WRITE:
     kind: deny
@@ -138,7 +138,7 @@ messages:
     next: |-
       子のワークツリー（.claude/worktrees/<子>）で実装してコミットし、結果を報告して終わる。衝突を解くときは、子のワークツリーで親のブランチを merge してコミットする
     no_bypass: |-
-      言い換えや別の経路でも、親のワークツリーへの書き込みは同じ関門に当たります。
+      言い換えや別の経路でも、親のワークツリーへの書き込みは同じゲートに当たります。
 
   DENY_SUBAGENT_PARENT_TREE__WRITE_CODE:
     kind: deny
@@ -150,7 +150,7 @@ messages:
     next: |-
       読むだけなら Read・Grep を使う。書くなら、子のワークツリー（.claude/worktrees/<子>）で実装してコミットし、結果を報告して終わる。衝突を解くときは、子のワークツリーで親のブランチを merge してコミットする
     no_bypass: |-
-      言い換えや別の経路でも、親のワークツリーを指す形は同じ関門に当たります。
+      言い換えや別の経路でも、親のワークツリーを指す形は同じゲートに当たります。
 
   DENY_SUBAGENT_PARENT_TREE__WRITE_UNREAD:
     kind: deny
@@ -162,7 +162,7 @@ messages:
     next: |-
       `cd` の行き先をそのまま書くか、子のワークツリーの中の絶対パスで書いて打ち直す
     no_bypass: |-
-      書き方を変えても、読めない形は同じ関門に当たります。
+      書き方を変えても、読めない形は同じゲートに当たります。
 
   # ---- 着手中の子のフローのロック（tickets/flow/graph.py）
 
@@ -176,7 +176,7 @@ messages:
     next: |-
       手順を直したいなら、{ticket} が終わってから、ユーザに書き換えを頼んで返事を待つ。次の子チケットのフローに書いてもらってもよい
     no_bypass: |-
-      別のパスや言い換えで書いても、同じ関門に当たります。
+      別のパスや言い換えで書いても、同じゲートに当たります。
 
   # ---- ユーザの判断の経路と記録の削除（tickets/model/phase_forms.py）
 
@@ -190,7 +190,7 @@ messages:
     next: |-
       必要な操作は、理由を添えてユーザに依頼して返事を待つ。この文字列を探したいだけなら、シェルの grep ではなく Grep ツールを使う
     no_bypass: |-
-      書き方を変えても、同じ関門に当たります。
+      書き方を変えても、同じゲートに当たります。
 
   DENY_TICKET_APPROVAL_CLI__USER_SCRIPT:
     kind: deny
@@ -202,7 +202,7 @@ messages:
     next: |-
       必要なら、理由を添えてユーザに依頼して返事を待つ。この文字列を探したいだけなら、シェルの grep ではなく Grep ツールを使う
     no_bypass: |-
-      書き方を変えても、同じ関門に当たります。
+      書き方を変えても、同じゲートに当たります。
 
   DENY_TICKET_APPROVAL_CLI__EXPANDED:
     kind: deny
@@ -214,7 +214,7 @@ messages:
     next: |-
       オプションは変数や置換で組み立てず、そのまま書く（値が必要なら先に読み、次の手に書く）。ユーザ専用の操作は、ユーザに依頼して返事を待つ
     no_bypass: |-
-      書き方を変えても、同じ関門に当たります。
+      書き方を変えても、同じゲートに当たります。
 
   DENY_TICKET_APPROVAL_CLI__BOARD:
     kind: deny
@@ -233,7 +233,7 @@ messages:
     next: |-
       必要な操作は、理由を添えてユーザに依頼して返事を待つ。この文字列を探したいだけなら、シェルの grep ではなく Grep ツールを使う
     no_bypass: |-
-      書き方を変えても、同じ関門に当たります。
+      書き方を変えても、同じゲートに当たります。
 
   DENY_TICKET_APPROVAL_CLI__HIDDEN_STDIN:
     kind: deny
@@ -245,7 +245,7 @@ messages:
     next: |-
       入口はコマンド行にそのまま書く。ユーザ専用の操作は、ユーザに依頼して返事を待つ
     no_bypass: |-
-      書き方を変えても、同じ関門に当たります。
+      書き方を変えても、同じゲートに当たります。
 
   DENY_TICKET_APPROVAL_CLI__HIDDEN_FEED:
     kind: deny
@@ -257,7 +257,7 @@ messages:
     next: |-
       引数はコマンド行にそのまま書く。ユーザ専用の操作は、ユーザに依頼して返事を待つ
     no_bypass: |-
-      書き方を変えても、同じ関門に当たります。
+      書き方を変えても、同じゲートに当たります。
 
   DENY_TICKET_APPROVAL_CLI__HIDDEN_ENTRY:
     kind: deny
@@ -279,7 +279,7 @@ messages:
       other: |-
         値は変数や glob で組み立てず、そのまま書く（値が必要なら先に読み、次の手に書く）
     no_bypass: |-
-      書き方を変えても、同じ関門に当たります。
+      書き方を変えても、同じゲートに当たります。
 
   DENY_RECORDS_PRUNE:
     kind: deny
@@ -291,4 +291,4 @@ messages:
     next: |-
       何が消える対象かを見るだけなら `ccnavi --prune --preview` を打つ。削除する必要があれば、理由を添えてユーザに依頼して返事を待つ
     no_bypass: |-
-      言い換えや別の経路でも、同じ関門に当たります。
+      言い換えや別の経路でも、同じゲートに当たります。

@@ -1,6 +1,6 @@
 """`hookio.is_user_prompt`（ユーザの発言と言い切れるか）と、ユーザの発言の記録（`records/userprompt.py`）。
 
-関門の記録（ユーザの発言の時刻）だけがこの判定を使う。ターンの印と、ユーザの手による変更の受け入れは
+ゲートの記録（ユーザの発言の時刻）だけがこの判定を使う。ターンの印と、ユーザの手による変更の受け入れは
 `from_background_task` のままで、ここでは変わらないことも確かめる。
 
 見るのは次の 3 つ。
@@ -103,7 +103,7 @@ class UserPromptFormsTest(unittest.TestCase):
 
     def test_動かしている作業が残っていても発言そのものは数える(self):
         # busy は「次の発言までの変更がユーザの手か」を決める材料で、発言かどうかではない。
-        # 数えないと、予約が残る限りユーザの返事で関門が開かなくなる。
+        # 数えないと、予約が残る限りユーザの返事でゲートが開かなくなる。
         got = prompt_payload("続けてください", background_tasks=[{"id": "b1"}])
         self.assertTrue(hookio.is_user_prompt(got))
 

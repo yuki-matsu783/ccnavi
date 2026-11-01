@@ -1233,7 +1233,8 @@ class ParentWorktreeSwitchTest(GitWrapperTest):
 
 
 class ParentPushGateTest(GitWrapperTest):
-    """親のワークツリーのブランチは、リモートから消えていないことを確かめてから送る（push の関門）。
+    """親のワークツリーのブランチは、リモートから消えていないことを確かめてから送る。
+    （push のゲート）
 
     「一度は送った形跡」は、`refs/remotes/origin/<ブランチ>` と、
     実行ファイルが答える着手済み（承認済みの親チケットの started_at）・依頼のマーカー・
@@ -1323,7 +1324,7 @@ class ParentPushGateTest(GitWrapperTest):
 
     def test_the_origin_url_written_directly_is_still_gated(self):
         # origin の URL が `:` を含まないローカルのパスのとき、
-        # 引数にそのパスを書いても関門を飛ばせない。
+        # 引数にそのパスを書いてもゲートを飛ばせない。
         self.assertEqual(0, self.push().returncode)
         self.delete_on_remote()
         result = run_in(self.tree, "push", "-u", self.bare, "i0001")
@@ -1739,7 +1740,7 @@ class SymlinkedWorkspaceTest(GitWrapperTest):
         self.assertIn("親のワークツリー", result.stderr)
 
     def test_the_push_gate_is_active_through_the_link(self):
-        # 承認済みの親チケットがあるのにリモートにブランチが無い親は、リンク越しでも関門が止める。
+        # 承認済みの親チケットがあるのにリモートにブランチが無い親は、リンク越しでもゲートが止める。
         result = run_in(self.via_link, "push", "-u", "origin", "i0001")
         self.assertEqual(2, result.returncode, result.stdout + result.stderr)
         self.assertIn("リモートに無い", result.stderr)
@@ -1752,7 +1753,7 @@ class SymlinkedWorkspaceTest(GitWrapperTest):
 
 
 class PushRemoteResolutionTest(ParentPushGateTest):
-    """送り先は git と同じ順で解き、origin 以外へ送るときは関門を掛けない。"""
+    """送り先は git と同じ順で解き、origin 以外へ送るときはゲートを掛けない。"""
 
     def test_a_push_remote_other_than_origin_is_not_gated(self):
         self.approve()

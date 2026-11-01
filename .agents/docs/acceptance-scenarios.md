@@ -260,7 +260,7 @@ setup:
 
 1. `git worktree remove --force`（本体のワークツリー以外すべて）→ `git worktree prune`
 2. ccnavi 自身の状態を消す。git の共通ディレクトリ直下の `ccnavi-direct/`（直接作業の記録）・`ccnavi-integrate/`（取り込みの marker）・`ccnavi-integrate-done/`、と `refs/ccnavi/` の下のすべての ref（`refs/ccnavi/direct/<名前>/s` など）。前のシナリオの取り込み待ちを、次の SessionStart の文脈や `ccnavi-worktree.sh` の `adopt-recorded` に持ち越さないようにする
-3. ワークスペースルートの `logs/archive/<対象の名前>/` を消す（前の回の ready が退避した親子。残すと同じ識別子の親が「一度は送った形跡」になり、新しい origin への push の関門が止まる。ほかのプロジェクトの退避は消さない）
+3. ワークスペースルートの `logs/archive/<対象の名前>/` を消す（前の回の ready が退避した親子。残すと同じ識別子の親が「一度は送った形跡」になり、新しい origin への push のゲートが止まる。ほかのプロジェクトの退避は消さない）
 4. `git checkout -f -B main <base>`（ローカルの `main` を `base` に合わせて切り替える）
 5. `main` 以外のローカルブランチを `git branch -D`
 6. タグを `git tag -d`

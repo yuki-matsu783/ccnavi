@@ -14,7 +14,7 @@
 種類ごとの短い既定の文（`fallback`）を返す。判定は呼ぶ側が決めたままで、文だけが落ちる。
 壊れた文面ファイルが防御を消さない。
 
-このモジュールは判定を持たず、ルールの読み込みに依らない（hook の関門が呼ぶ）。
+このモジュールは判定を持たず、ルールの読み込みに依らない（hook のゲートが呼ぶ）。
 """
 
 from __future__ import annotations
@@ -598,7 +598,7 @@ def fallback(text_id: str) -> str:
     head = f"{gone}止めた判定は変わらず、短い既定の文で伝えます。"
     lines = [head, f"{LABELS['next']}{ask}"]
     if kind == DENY:
-        lines.append(f"{LABELS['no_bypass']}言い換えや別の経路でも、同じ関門に当たります。")
+        lines.append(f"{LABELS['no_bypass']}言い換えや別の経路でも、同じゲートに当たります。")
     return "\n".join(lines)
 
 

@@ -846,7 +846,7 @@ def _clear_ccnavi_state(root, top, run):
 
 def _clear_archive(root, top):
     """前の回の ready が logs/archive/<プロジェクト>/ へ退避した親子を消す。
-    残すと、同じ識別子の親が「一度は送った形跡」になり、新しい origin への push の関門が止まる。
+    残すと、同じ識別子の親が「一度は送った形跡」になり、新しい origin への push のゲートが止まる。
     置き場はワークスペースルートの logs/ の下（git の外）で、そのプロジェクトの分だけを消す。
     リンクは辿らず、リンク自体を外す。"""
     path = Path(root) / "logs" / "archive" / Path(top).name

@@ -292,7 +292,7 @@ ccnavi_wap_prepare() {
 		log_info write-and-push で止めた -- "family=$ccnavi_wap_family_id" "reason=parent-tree-gone"
 		return 1
 	fi
-	# 親のブランチがリモートから消えていれば、push で作り直さずに止める（push の関門。3 経路で同じ）。
+	# 親のブランチがリモートから消えていれば、push で作り直さずに止める（push のゲート。3 経路で同じ）。
 	ccnavi_cp_gate=0
 	ccnavi_push_gate "$ccnavi_wap_tree" "$ccnavi_wap_branch" "$ccnavi_wap_family_id" "$ccnavi_wap_root" \
 		"$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)" || ccnavi_cp_gate=$?
@@ -303,9 +303,9 @@ ccnavi_wap_prepare() {
 	fi
 	# 親のブランチが一度も送られていない（ccnavi-start.sh を通さずに手で切った親）。5 の見分けは
 	# origin の参照を基点にするので、参照が無いと差分を読めずに内部のエラーで終わる。先に事実を言って止める。
-	# 送った形跡があるのに参照が無い親は、上の push の関門と ccnavi-sync.sh の判定に任せる。
+	# 送った形跡があるのに参照が無い親は、上の push のゲートと ccnavi-sync.sh の判定に任せる。
 	ccnavi_parent_info "$ccnavi_wap_tree" "$ccnavi_wap_family_id" || :
-	# 実行ファイルが答えない・古くて値が unknown のときは、断定せず従来の関門に任せる
+	# 実行ファイルが答えない・古くて値が unknown のときは、断定せず従来のゲートに任せる
 	if [ "$ccnavi_pi_parent" = yes ] && [ "$ccnavi_pi_approved" != unreadable ] &&
 		[ "$ccnavi_pi_approved" != unknown ] && [ "$ccnavi_pi_requested" != unknown ] &&
 		[ "$ccnavi_pi_archived" != unknown ] && [ "$ccnavi_pi_started" != unknown ] &&

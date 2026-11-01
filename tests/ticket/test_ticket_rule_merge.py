@@ -841,7 +841,7 @@ class Boundaries(Workspace):
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
 
     def test_dry_run_says_what_enable_would_do(self):
-        """ルールが allow の場所でチケットが止める判定（関門）は、dry-run でも止める。"""
+        """ルールが allow の場所でチケットが止める判定（ゲート）は、dry-run でも止める。"""
         self.family()
         self.use_rules(rules_with("allow"))
         result = self.write_hook(self.child, TICKET_OUTSIDE, mode="dry-run")

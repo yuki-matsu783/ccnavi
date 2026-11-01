@@ -1,4 +1,4 @@
-"""関門の条件を調べる git の呼び出しが、`treegate` の 1 か所にあること。
+"""ゲートの条件を調べる git の呼び出しが、`treegate` の 1 か所にあること。
 
 親のワークツリーの未コミットの変更（`status --porcelain --untracked-files=no`）と、
 親のブランチの未 push（`rev-list origin/<ブランチ>..HEAD`）を数える実装を、操作ごとに
@@ -18,7 +18,7 @@ from tests import SRC
 PACKAGE = os.path.join(SRC, "ccnavi")
 TREEGATE = os.path.join("tickets", "lifecycle", "treegate.py")
 
-# (ファイル, 種類) -> 関門の条件でない理由。
+# (ファイル, 種類) -> ゲートの条件でない理由。
 EXCEPTIONS = {
     (
         os.path.join("tickets", "lifecycle", "stop_integrate.py"),
@@ -67,7 +67,7 @@ def _hits() -> set[tuple[str, str]]:
 class GateSingleSourceTest(unittest.TestCase):
     def test_only_treegate_reads_dirty_and_unpushed(self):
         outside = sorted(hit for hit in _hits() if hit[0] != TREEGATE and hit not in EXCEPTIONS)
-        self.assertEqual(outside, [], "関門の条件は treegate に置く")
+        self.assertEqual(outside, [], "ゲートの条件は treegate に置く")
 
     def test_treegate_has_both_reads(self):
         hits = _hits()

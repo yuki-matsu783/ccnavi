@@ -11,7 +11,7 @@ sh はチケットの YAML も JSON も自分で読まない。読むのは実�
   ファイルが在るのに frontmatter を読めなければ `parent unreadable`。
   `ready` の後は手元の退避（`logs/archive/<リポジトリ>/done/`）の親も数える
   （ツリーが `.claude/worktrees/` の下のときだけ）。
-  続けて、push の関門（sh）が「初回の push か、消えた親ブランチの再作成か」を見分ける材料を返す。
+  続けて、push のゲート（sh）が「初回の push か、消えた親ブランチの再作成か」を見分ける材料を返す。
   `approved`（承認済みの親チケットだけを見て、在るか）・`requested`（`.requested` の
   マーカーが在るか）・`archived`（手元の退避に親が在るか）・`started`（承認済みの親チケットの
   `started_at` が空でないか。着手は push してから完了するので、着手済みなら一度は push した）・
@@ -382,7 +382,7 @@ def _holds_parent(conf: settings.Settings, work: tree.Tree) -> str:
 def _approved_parent(conf: settings.Settings, work: tree.Tree) -> tuple[str, str, str]:
     """承認済みの置き場（`doing/`・`done/`）に親チケットが在るかと、その `mr:` 欄、着手済みか。
 
-    提案（`todo/`・`review/`）は数えない。push の関門が見るのは、承認された親だけ。
+    提案（`todo/`・`review/`）は数えない。push のゲートが見るのは、承認された親だけ。
     着手済みは `started_at` が空でないこと（`ticket start` は write-and-push で push
     してから完了するので、
     着手済みなら一度は push した）。親チケットが無い・読めないときは `no`。

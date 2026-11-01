@@ -19,7 +19,7 @@ messages:
     next: |-
       ユーザに渡すものはワークスペースルート直下の wip/handoff/、一時的なもの・コミットしたくないものは同じく直下の scratchpad/ に書く（.ccnavi/docs/scratchpad.md）。リポジトリのファイルを直すときは、{script:ccnavi-worktree.sh} <名前> でワークツリーを切り、その中で編集する
     no_bypass: |-
-      書き込み先の書き方を変えても、同じ場所なら同じ関門に当たります。
+      書き込み先の書き方を変えても、同じ場所なら同じゲートに当たります。
 
   # ---- hook/post_findings.py（承認されたチケットの作業範囲の外。ルール `builtin:ticket-scope` の文）
   RULE_TICKET_SCOPE__BLOCKED:

@@ -281,7 +281,7 @@ class ProposeTest(WriteAndPushHarness):
         self.assertIn("提案以外の未コミットの変更がある", result.stderr)
 
     def test_check_stops_on_unpushed_code_like_the_real_run(self):
-        """未 push のコードは、--check でも本番でも実行ファイルの関門が同じ文で止める。"""
+        """未 push のコードは、--check でも本番でも実行ファイルのゲートが同じ文で止める。"""
         self.put("src/secret.py", "x = 1\n")
         git(self.tree, "add", "--", "src/secret.py")
         git(self.tree, "commit", "-q", "-m", "wip code")
@@ -350,7 +350,7 @@ class ProposeTest(WriteAndPushHarness):
         self.put(f"{self.TODO}/{PARENT}.md", "v2\n")
         self.assertEqual(self.ticket("approval-request", PARENT).returncode, 1)
         routes = [r["route"] for r in self.results()]
-        # 親のブランチの状態で止めた回は、実行ファイルの関門（treegate）が拒否した送る前の失敗。
+        # 親のブランチの状態で止めた回は、実行ファイルのゲート（treegate）が拒否した送る前の失敗。
         self.assertEqual(routes[-1], "failed_before")
         self.assertIn(routes[0], ("sent", "unchanged"))
 

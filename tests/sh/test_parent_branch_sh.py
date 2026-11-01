@@ -20,7 +20,7 @@ ccnavi-ticket.sh・ccnavi-fetch.sh）を外から呼ぶ。実行ファイルは�
 6. 子のワークツリーからは送れない（子のブランチは子の識別子）
 7. HEAD が合わない・`branch:` の欄が残る（エラー）場合の動き。古い取り込み状態が残っていても
    判定に使わない
-8. リモートから消えた親のブランチへは、記録が無くても送れない（push の関門）。一度も送っていない
+8. リモートから消えた親のブランチへは、記録が無くても送れない（push のゲート）。一度も送っていない
    親の最初の push は通す
 """
 
@@ -305,7 +305,7 @@ class ParentBranchShTest(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(self.tree, "src", "login.py")))
         self.assertEqual(git(self.tree, "status", "--porcelain").stdout, "")
 
-        # 3. 最初の push は、リモートにブランチが在るので関門を通る。取り込み状態は作らない
+        # 3. 最初の push は、リモートにブランチが在るのでゲートを通る。取り込み状態は作らない
         pushed = self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
         self.assertNotIn("取り込み状態", pushed.stdout)
         self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
@@ -434,7 +434,7 @@ class ParentBranchShTest(unittest.TestCase):
     # ---- 止める形
 
     def test_a_gone_parent_branch_cannot_be_pushed(self):
-        """リモートから消えた親のブランチへは、記録が無くても送れない（push の関門）。
+        """リモートから消えた親のブランチへは、記録が無くても送れない（push のゲート）。
         ユーザが元の名前で戻せば、また送れる。"""
         self.imported_family()
         self.delete_remote_branch()

@@ -1520,7 +1520,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertIn("limit: phase type 調査 (research): wip/research/*", reason)
 
     def test_dry_run_still_stops_the_write_and_says_which_limit(self):
-        """8. dry-run: 範囲の外の Write は関門なので止まり、`limit: phase type` が出る。"""
+        """8. dry-run: 範囲の外の Write はゲートなので止まり、`limit: phase type` が出る。"""
         tree = self.approved_child(
             child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )

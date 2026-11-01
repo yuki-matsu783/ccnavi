@@ -18,8 +18,8 @@
 # 手順は、ロック（write-and-push の中からの入れ子を許す）→ 途中の操作の確認 → 取り込み（ccnavi-sync.sh）→
 # 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた todo/ の提案と、取り込んで消えた flows/ の下書き）を commit --only → push → 失敗したように見えたら届いたかを ls-remote で確かめる。
 # push が失敗してもコミットは残す（ユーザが打ち直せる）。取り込み済みかは実行ファイル（`write-and-push family`）に聞く。
-# 取り込みの後、push の前に、親のブランチがリモートから消えていないかを push の関門（ccnavi_push_gate）で確かめる。
-# 消えていれば（確かめられないときも）コミットも push もせずに止める。親でないツリーの push の前にも同じ関門を通す。
+# 取り込みの後、push の前に、親のブランチがリモートから消えていないかを push のゲート（ccnavi_push_gate）で確かめる。
+# 消えていれば（確かめられないときも）コミットも push もせずに止める。親でないツリーの push の前にも同じゲートを通す。
 #
 # <親> を並べると、その親子のチケットだけをコミットして push する。取り込み済みでない親子のチケットは
 # コミットしない（今のまま、ユーザがコミットする）。省けば今どおり、置き場に変更のあるツリー全部。
@@ -254,7 +254,7 @@ carry_family() {
 		ccnavi_lock_drop
 		return 1
 	fi
-	# 親のブランチがリモートから消えていれば、push で作り直さずに止める（push の関門。write-and-push・ccnavi-git.sh push と同じ）。
+	# 親のブランチがリモートから消えていれば、push で作り直さずに止める（push のゲート。write-and-push・ccnavi-git.sh push と同じ）。
 	cf_rc=0
 	ccnavi_push_gate "$cf_tree" "$cf_b" "$cf_p" "$root" "$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)" || cf_rc=$?
 	if [ "$cf_rc" -ne 0 ]; then
@@ -497,8 +497,8 @@ $(printf '%s\n' "$drafts" | sed '/^$/d; s/^/:(literal)/')"
 		continue
 	fi
 
-	# 親のワークツリーのブランチは、リモートから消えていないことを確かめてから送る（push の関門）。
-	# 親でないツリー・初回の push は関門が通す。
+	# 親のワークツリーのブランチは、リモートから消えていないことを確かめてから送る（push のゲート）。
+	# 親でないツリー・初回の push はゲートが通す。
 	gate_rc=0
 	ccnavi_push_gate "$tree" "$branch" "$name" "$root" "$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)" || gate_rc=$?
 	if [ "$gate_rc" -ne 0 ]; then
