@@ -594,6 +594,22 @@ class PhaseTest(PhaseHarness):
         state = self.finish_to("i0001-01-01", [("wip/design/plan.md", "d\n")])
         self.assertEqual(state, "review")
 
+    def test_a_feedback_plan_step_cannot_drop_the_review(self):
+        """フィードバック計画のステップの `review: false` は承認の検査が error にする。"""
+        self.propose(
+            "i0001",
+            parent_text(
+                "i0001",
+                ["design"],
+                feedback=[{"type": "implement-feedback", "review": False}],
+                copy=self.phases_text,
+            ),
+        )
+        self.commit_parent()
+        refused = self.approve()
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("`review: false` は書けない", refused.stdout + refused.stderr)
+
     def test_step_flags_reads_true_false_and_refuses_the_rest(self):
         flags = ticket_model.step_flags
         self.assertEqual(flags({"review": False}, "plan[0]"), (False, False, ""))

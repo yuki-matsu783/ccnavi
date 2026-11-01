@@ -128,7 +128,7 @@ feedback:
   `scope: inherit`（範囲は親の範囲そのまま）。子は `phase: 1`。ステップが 1 つなので `after` は要らない（そのステップが終端）
 - 親の提案には、計画が使う定義のコピー `phases:`（ここでは `quick` だけ）も書く。`ccnavi --plan-order <親> --fill-phases` で差し込む
 - `quick` のレビューの要否は定義の `review: true` で決まる。子の `human_review.required: false` ではレビューは外れない
-  （子の宣言は「要る」を言うだけで、要らないとは言えない）。レビューを外したい作業は `review: false` の定義を使うか、計画のステップに `review: false` を書く
+  （フェーズの宣言がある番号では、子の宣言は「要る」を言うだけで、要らないとは言えない。宣言が読めない番号だけ、子の `required: false` が効く）。レビューを外したい作業は `review: false` の定義を使うか、計画のステップに `review: false` を書く
 - 親は計画・依頼だけを受け持つ（合流は子の `finish`）。作業は子が行う（P12 のまま）
 - 親の提案には `feedback: []` も書く（対応が無くても空で出す。無いと親を閉じられない）
 - 流れ: 承認 → 親に着手 → 子に着手 → 子で作業して `finish`（子は `review/`。親のブランチへの合流と push も `finish` が行う） → 親が ELI5 の HTML を

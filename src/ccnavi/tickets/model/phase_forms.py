@@ -20,9 +20,7 @@ from . import user_only
 # 資料を引く `ccnavi-launcher.sh --docs`（読むだけで、次に何をするかを調べる手段）を、
 # コマンドの位置で `sh` から呼ぶ形だけ。名前がどこかに含まれるだけでは通さない。
 # 連結されたコマンドが 1 つでもこの形でなければ止める。
-_EXEMPT_COMMAND = re.compile(
-    rf"^(sh|bash)\s+\S*(?:{user_only.agent_script_forms()}|ccnavi-launcher\.sh\s+--docs)(\s|$)"
-)
+_EXEMPT_COMMAND = re.compile(rf"^(sh|bash)\s+\S*{user_only.hold_exempt_forms()}(\s|$)")
 # 止めたときの文に添える、通る形の案内。案内どおりの 1 本に `cd … &&` や `| tail` を
 # 付けると、連結の全部が上の形でないので止まる。文が「何を打つか」だけを言うと、
 # 付け足した形で打って止まり、案内と拒否が食い違って見える。

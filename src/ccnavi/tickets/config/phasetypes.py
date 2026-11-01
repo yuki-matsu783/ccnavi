@@ -656,6 +656,12 @@ def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
     ):
         for i, item in enumerate(items):
             used.add(item.type)
+            if kind == KIND_FEEDBACK and item.review is False:
+                # 定義の `feedback` に `review: false` を書けないのと同じ。計画のステップでも外せない。
+                error(
+                    f"`{key}[{i}]` に `review: false` は書けない"
+                    "（フィードバック対応の結果をユーザが見ない経路は作らない）"
+                )
             pt = types.get(item.type)
             if pt is None:
                 if item.type not in named:
