@@ -23,7 +23,7 @@
 write-and-push の中では書いたものが push の失敗で戻ることがあるので、write-and-push
 が送り終えてから呼ぶ。
 
-消し方は、生成物（`node_modules` など。`ccnavi-clean.js` と同じ名前）を先に消し、
+消し方は、生成物（`node_modules` など。生成物の名前）を先に消し、
 git が無視しているそれ以外のもの（`.env` など）をワークスペースルートの
 `scratchpad/worktrees/<名前>/` へ退避（同じボリュームの rename。中を走査しない。退避先が
 git に無視されていないときと、同じパスが退避先にあるときは動かさず止める）してから
@@ -67,7 +67,6 @@ from ..phase import gates as phase
 TIMEOUT_SECONDS = 30.0
 
 # どこにあっても生成物と言える名前と、隣に印のファイルがあるときだけ生成物と見る名前。
-# `ccnavi-clean.js` の ALWAYS・BESIDE と揃える。
 ALWAYS = frozenset(
     {
         "node_modules",
@@ -423,7 +422,7 @@ def _ignored(top: str) -> tuple[list[str], str]:
     """git が無視しているもの（生成物を除く）。2 つめは読めなかった理由。
 
     `--directory` で、全体が無視されたディレクトリは 1 行（末尾の `/`）にまとめる。生成物
-    （`ccnavi-clean.js` と同じ名前。`out`・`target` などは隣に印のファイルがあるときだけ）は
+    （生成物の名前。`out`・`target` などは隣に印のファイルがあるときだけ）は
     消してよいので数えない。
     下書きの置き場（`wip/handoff/`）は追跡されるファイルで、gitが無視するものではないので、
     ここには現れない。
@@ -581,21 +580,32 @@ def _plain_file(e: os.DirEntry) -> bool:
         return False
 
 
-def _clean_generated(top: str) -> str:
-    """生成物を消す。消し残しがあれば理由。リンクはリンクそのものだけを消す。"""
-    # 消すものを先に決める（途中で止まって半端に消さない）。生成物の名前でも、追跡されている
-    # もの（コミット済みの out/ など）は消さない。消すと未コミットの削除になり、worktree remove が
-    # 通らない。追跡済みのものは worktree remove が消す。
+def _targets(top: str, check_tracked: bool = True) -> tuple[list[str], str]:
+    """消す生成物（ワークツリーのルートからの相対）。2 つめは読めなかった理由。
+
+    生成物の名前でも、追跡されているもの（コミット済みの out/ など）は消さない。消すと未コミットの
+    削除になり、worktree remove が通らない。追跡済みのものは worktree remove が消す。
+    `check_tracked` が偽なのは、git の登録が残っていないディレクトリ（聞くと上へ登って別の
+    リポジトリを答える）。
+    """
     targets = []
     for rel in generated(top):
-        tracked = gitcmd.run(
-            top, ["ls-files", "-z", "--", f":(literal){rel}"], TIMEOUT_SECONDS, raw_paths=True
-        )
-        if not tracked.ok:
-            return f"{rel} が追跡されているかを読めない。何も削除していません。"
-        if not tracked.out.strip("\0"):
-            targets.append(rel)
-    left = []
+        if check_tracked:
+            tracked = gitcmd.run(
+                top, ["ls-files", "-z", "--", f":(literal){rel}"], TIMEOUT_SECONDS, raw_paths=True
+            )
+            if not tracked.ok:
+                return [], f"{rel} が追跡されているかを読めない。何も削除していません。"
+            if tracked.out.strip("\0"):
+                continue
+        targets.append(rel)
+    return targets, ""
+
+
+def _remove(top: str, targets: list[str]) -> tuple[list[str], list[str]]:
+    """`targets` を消す。(消せたもの, 消せなかったもの（理由つき）)。リンクはリンクだけを消す。"""
+    removed: list[str] = []
+    left: list[str] = []
     for rel in targets:
         full = os.path.join(top, *rel.split("/"))
         try:
@@ -605,16 +615,84 @@ def _clean_generated(top: str) -> str:
                 os.rmdir(full)
             else:
                 shutil.rmtree(_long(full), onexc=_writable_and_retry)
+            removed.append(rel)
         except OSError as exc:
             left.append(f"{rel}（{exc.strerror or exc}）")
-    if left:
-        return (
-            "生成物を削除しきれませんでした（"
-            + "、".join(left)
-            + "）。Windows では、読み込まれている DLL（uv の .venv の .pyd）は削除できません。"
-            "使っているプロセスが終わってから再実行します。"
+    return removed, left
+
+
+def _left_message(left: list[str]) -> str:
+    if not left:
+        return ""
+    return (
+        "生成物を削除しきれませんでした（"
+        + "、".join(left)
+        + "）。Windows では、読み込まれている DLL（uv の .venv の .pyd）は削除できません。"
+        "使っているプロセスが終わってから再実行します。"
+    )
+
+
+def _clean_generated(top: str) -> str:
+    """生成物を消す。消し残しがあれば理由。"""
+    # 消すものを先に決める（途中で止まって半端に消さない）。
+    targets, why = _targets(top)
+    if why:
+        return why
+    return _left_message(_remove(top, targets)[1])
+
+
+def run_clean(stdout: TextIO, stderr: TextIO, root: str, name: str, preview: bool) -> int:
+    """`worktree clean <名前> [--preview]`。生成物だけを消す（ワークツリーは消さない）。
+
+    `git worktree remove` の前に打つ（`ccnavi-clean.sh <名前>`）。未コミットの変更があれば何も
+    消さない（別のセッションが作業している見込みが高い）。git の登録が残っていないディレクトリ
+    （消しきれなかったもの）は、確かめようが無いので確かめずに進める。成功で 0、止めたら 1。
+    """
+    top = tree.worktree_path(root, name)
+    if not name or name in (".", "..") or any(c in name for c in ("/", "\\", ":")):
+        stderr.write("ccnavi-clean: 名前にパスは書けません（.claude/worktrees/ の直下の名前）。\n")
+        return 1
+    if os.path.islink(top) or os.path.isjunction(top) or not os.path.isdir(top):
+        stderr.write(f"ccnavi-clean: {top} がディレクトリでないか、リンクです。\n")
+        return 1
+    registered = os.path.lexists(os.path.join(top, ".git"))
+    if registered:
+        done = gitcmd.run(
+            top, ["status", "--porcelain", "--untracked-files=all"], TIMEOUT_SECONDS, raw_paths=True
         )
-    return ""
+        if done.ok:
+            if done.out.strip():
+                stderr.write(
+                    f"ccnavi-clean: {name} に未コミットの変更があるので、何も消しません。"
+                    "別のセッションが作業している可能性が高いです。\n"
+                )
+                for line in done.out.splitlines()[:10]:
+                    stderr.write(f"{line}\n")
+                return 1
+        else:
+            registered = False
+            stderr.write(
+                f"ccnavi-clean: {name} は git の登録が残っていないので、削除しきれなかった"
+                "ディレクトリとして扱います（未コミットの変更は確かめていません）。\n"
+            )
+    targets, why = _targets(top, registered)
+    if why:
+        stderr.write(f"ccnavi-clean: {why}\n")
+        return 1
+    if not targets:
+        stdout.write(f"削除するものはありません（{top}）\n")
+        return 0
+    if preview:
+        for rel in targets:
+            stdout.write(f"would remove {rel}\n")
+        return 0
+    removed, left = _remove(top, targets)
+    for rel in removed:
+        stdout.write(f"removed {rel}\n")
+    if left:
+        stderr.write(f"ccnavi-clean: {_left_message(left)}\n")
+        return 1
+    return 0
 
 
 def _writable_and_retry(func, path, _exc) -> None:

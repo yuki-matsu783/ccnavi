@@ -121,7 +121,6 @@ class SetupTest(unittest.TestCase):
             "ccnavi-session-start.sh",
             "ccnavi-sync.sh",
             "ccnavi-clean.sh",
-            "ccnavi-clean.js",
             "ccnavi-branches.sh",
             "ccnavi-start.sh",
             "ccnavi-stage.sh",

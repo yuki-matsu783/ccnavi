@@ -360,7 +360,6 @@ class StageShTest(unittest.TestCase):
             ".claude/settings.json",
             ".claude/settings.local.json",
             ".claude/hooks/a/b/c.py",
-            ".ccnavi/scripts/ccnavi-clean.js",
             ".ccnavi/scripts/ccnavi-handoff-names.txt",
             ".ccnavi/scripts/sub/x.sh",
             ".claude/skills/x/SKILL.md",

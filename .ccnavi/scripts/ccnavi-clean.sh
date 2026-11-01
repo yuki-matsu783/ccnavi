@@ -20,9 +20,8 @@
 # `rm -rf` の代わりに任意の場所を消す手段にしないためで、ccnavi の builtin:recursive-delete の
 # 趣旨（消す対象を名指しする）に合わせてある。
 #
-# 消すのは、作り直せば戻る決まった名前のディレクトリだけ。何を消すかと消し方は
-# ccnavi-clean.js にある。node が無ければ何も消さず、node_modules と .venv を消すための
-# 1 本（ユーザが打つ）を出して 1 で返る。
+# 消すのは、作り直せば戻る決まった名前のディレクトリだけ。何を消すかと消し方は実行ファイル
+# （src/ccnavi/tickets/lifecycle/worktrees.py の run_clean）にある。
 #
 # ワークツリーに未コミットの変更があれば、何も消さずに止める。別のセッションが
 # そこで作業している見込みが高い。git に登録の残っていない、消しきれなかったディレクトリ（.git が無い、
@@ -47,7 +46,7 @@ sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>
               cwd がその中なら削除しません。ブランチは残す。このときの <名前> はチケットの識別子
               （.claude/worktrees/<識別子>）だけを受ける。識別子の形でない名前は断る
 
-削除するもの: node_modules / .venv / __pycache__ などのキャッシュと、印のファイル（package.json・Cargo.toml など）の隣の out / dist / .cache / target / build（一覧は ccnavi-clean.js）
+削除するもの: node_modules / .venv / __pycache__ などのキャッシュと、印のファイル（package.json・Cargo.toml など）の隣の out / dist / .cache / target / build（一覧は worktrees.py）
 未コミットの変更があるワークツリーでは、何も削除せずに止まる
 USAGE
 }
@@ -98,89 +97,34 @@ root=$(ccnavi_workspace) || {
 	exit 2
 }
 
-# --worktree: 掃除とワークツリーの削除を実行ファイルに任せる（cwd の確かめ・未コミットの確かめ・
-# 生成物の掃除・worktree remove）。見つからなければソース（ccnavi のリポジトリ）で動かす。
+# 中身は ccnavi の実行ファイル。--worktree は `worktree drop`（cwd の確かめ・未コミットの確かめ・生成物の
+# 掃除・無視ファイルの退避・worktree remove）、ないときは `worktree clean`（未コミットの確かめ・生成物の掃除）。
+# 見つからなければソース（ccnavi のリポジトリ）で動かす。
 if [ -n "$whole" ]; then
 	if [ -n "$dry" ]; then
 		printf 'ccnavi-clean: --worktree と --dry-run は同時に指定できません（削除するものを見るだけなら --dry-run だけで実行します）。\n' >&2
 		exit 2
 	fi
-	here="$(pwd -W 2>/dev/null || pwd)"
-	if bin=$(ccnavi_bin "$root"); then
-		exec "$bin" --root "$root" --cwd "$here" worktree drop "$name"
-	elif [ -f "$root/src/ccnavi/__main__.py" ]; then
-		cd "$root"
-		exec uv run python -m ccnavi --root "$root" --cwd "$here" worktree drop "$name"
-	fi
-	printf 'ccnavi-clean: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
-	exit 2
-fi
-
-target="$root/.claude/worktrees/$name"
-
-# ワークツリーの置き場そのものがリンクなら、消す先が置き場の外にある。たどらない。
-if [ -L "$target" ]; then
-	printf 'ccnavi-clean: %s はリンクです。リンクの先は消しません。\n' "$target" >&2
-	exit 2
-fi
-[ -d "$target" ] || {
-	printf 'ccnavi-clean: %s がありません。\n' "$target" >&2
-	exit 2
-}
-
-# 未コミットの変更。`.git` が無いときは git に聞かない。聞くと上へ登って
-# ワークスペースのリポジトリを答えてしまう。
-if [ -e "$target/.git" ]; then
-	if changes=$(git -C "$target" status --porcelain 2>/dev/null); then
-		if [ -n "$changes" ]; then
-			printf 'ccnavi-clean: %s に未コミットの変更があるので、何も消しません。別のセッションが作業している可能性が高いです。\n' "$name" >&2
-			printf '%s\n' "$changes" | head -n 10 >&2
-			exit 1
-		fi
-	else
-		printf 'ccnavi-clean: %s は git の登録が残っていないので、削除しきれなかったディレクトリとして扱います（未コミットの変更は確かめていません）。\n' "$name" >&2
-	fi
-fi
-
-if command -v node >/dev/null 2>&1; then
-	exec node "$(dirname "$0")/ccnavi-clean.js" "$target" ${dry:+--dry-run}
-fi
-
-# node が無ければ消さない。消えにくい生成物（node_modules・.venv）を探し、ユーザが打つ削除の 1 本を出して止める。
-# エージェントは再帰の削除を打てない（builtin:recursive-delete）。Windows（Git Bash）では、260 文字を超える
-# パスと junction を扱える `rd /s /q "\\?\<パス>"`（junction はたどらずにリンクだけを消す）、ほかは `rm -rf`。
-found=$(find "$target" -name .git -prune -o \( -name node_modules -o -name .venv \) -type d -print -prune 2>/dev/null || :)
-paths=""
-on_windows=""
-old_ifs=$IFS
-IFS='
-'
-set -f
-for path in $found; do
-	# 名前に改行があると行の切れ目を取り違える。ワークツリーの中の決まった名前で終わる行だけを使う。
-	case "$path" in
-	"$target"/node_modules | "$target"/*/node_modules | "$target"/.venv | "$target"/*/.venv) ;;
-	*) continue ;;
-	esac
-	if win=$(cd "$path" && pwd -W 2>/dev/null); then
-		on_windows=1
-		win=$(printf '%s\n' "$win" | sed 's#/#\\#g')
-		paths="$paths \"\\\\?\\$win\""
-	else
-		paths="$paths $(ccnavi_sh_quote "$path")"
-	fi
-done
-set +f
-IFS=$old_ifs
-if [ -z "$paths" ]; then
-	printf '削除するものはありません（%s）\n' "$target"
-	exit 0
-fi
-if [ -n "$on_windows" ]; then
-	cmd="cmd //c 'rd /s /q$paths'"
+	sub=drop
 else
-	cmd="rm -rf$paths"
+	target="$root/.claude/worktrees/$name"
+	# ワークツリーの置き場そのものがリンクなら、消す先が置き場の外にある。たどらない。
+	if [ -L "$target" ]; then
+		printf 'ccnavi-clean: %s はリンクです。リンクの先は消しません。\n' "$target" >&2
+		exit 2
+	fi
+	[ -d "$target" ] || {
+		printf 'ccnavi-clean: %s がありません。\n' "$target" >&2
+		exit 2
+	}
+	sub=clean
 fi
-printf 'ccnavi-clean: node が見つからないので消しません。node を入れて再実行するか、次の 1 本を打つようユーザに頼んで返事を待ってください（エージェントは再帰の削除を打てません）。\n' >&2
-printf '%s\n' "$cmd" >&2
-exit 1
+here="$(pwd -W 2>/dev/null || pwd)"
+if bin=$(ccnavi_bin "$root"); then
+	exec "$bin" --root "$root" --cwd "$here" worktree "$sub" "$name" ${dry:+--preview}
+elif [ -f "$root/src/ccnavi/__main__.py" ]; then
+	cd "$root"
+	exec uv run python -m ccnavi --root "$root" --cwd "$here" worktree "$sub" "$name" ${dry:+--preview}
+fi
+printf 'ccnavi-clean: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
+exit 2
