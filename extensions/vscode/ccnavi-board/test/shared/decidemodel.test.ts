@@ -77,16 +77,16 @@ test("CB-T206b 読み取りの検証: JSON でない・最上位がマップで�
 test("CB-T206c 読み取りの検証: parent・phase・mr.number は、型が違っても頼んだものと違っても読み取れなかったことにする", () => {
   assert.match(errorOf(previewJson({ parent: 1 })), /parent が文字列ではありません/);
   assert.match(errorOf(previewJson({ parent: undefined })), /parent が文字列ではありません/);
-  assert.match(errorOf(previewJson({ parent: "i0002" })), /parent が頼んだもの（i0001）と違います（i0002）/);
+  assert.match(errorOf(previewJson({ parent: "i0002" })), /parent が要求したもの（i0001）と違います（i0002）/);
   assert.match(errorOf(previewJson({ phase: "2" })), /phase が整数ではありません/);
   assert.match(errorOf(previewJson({ phase: 2.5 })), /phase が整数ではありません/);
   assert.match(errorOf(previewJson({ phase: undefined })), /phase が整数ではありません/);
-  assert.match(errorOf(previewJson({ phase: 3 })), /phase が頼んだもの（2）と違います（3）/);
+  assert.match(errorOf(previewJson({ phase: 3 })), /phase が要求したもの（2）と違います（3）/);
   assert.match(errorOf(previewJson({ mr: { number: "7", url: "" } })), /mr\.number が整数ではありません/);
   assert.match(errorOf(previewJson({ mr: { number: 7.5, url: "" } })), /mr\.number が整数ではありません/);
   assert.match(errorOf(previewJson({ mr: null })), /mr\.number が整数ではありません/);
   assert.match(errorOf(previewJson({ mr: { url: "" } })), /mr\.number が整数ではありません/);
-  assert.match(errorOf(previewJson({ mr: { number: 8, url: "" } })), /頼んだ依頼のマージリクエスト（#7）と違います（#8）/);
+  assert.match(errorOf(previewJson({ mr: { number: 8, url: "" } })), /要求した依頼のマージリクエスト（#7）と違います（#8）/);
 });
 
 test("CB-T206d 読み取りの検証: digest は無い・文字列でない・v2. で始まらないとエラー", () => {

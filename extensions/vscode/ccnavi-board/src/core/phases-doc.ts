@@ -57,7 +57,7 @@ export function readPhases(text: string): PhasesDocument {
   if (version === undefined || version === null) {
     problems.push(`version がありません。保存すると version: ${PHASES_VERSION} を先頭に追加します`);
   } else if (version !== PHASES_VERSION) {
-    problems.push(`version ${String(version)} は実行ファイルが読み込めません（読み込むのは ${PHASES_VERSION}）。フェーズは番号だけの挙動になります`);
+    problems.push(`version ${String(version)} は実行ファイルが読み込めません（読み込むのは ${PHASES_VERSION}）。フェーズ定義は使われず、番号だけで扱われます`);
   }
 
   const phases: PhaseForm[] = [];

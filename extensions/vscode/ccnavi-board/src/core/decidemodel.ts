@@ -88,7 +88,7 @@ export interface DecideExpect {
  * - JSON でない、最上位がマップでない、`version` が想定外
  * - `parent` が文字列でない、または頼んだものと違う
  * - `phase` が整数でない、または頼んだものと違う
- * - `mr.number` が整数でない、または頼んだ MR の番号（分かるとき）と違う
+ * - `mr.number` が整数でない、または要求した MR の番号（分かるとき）と違う
  * - `digest` が無い、文字列でない、`v2.` で始まらない
  * - `threads` が無い、または配列でない
  * - スレッドの要素がマップでない、`key` が空・文字列でない・重複している、`body`・`url`・`path` が文字列でない、`line` が整数でない
@@ -108,20 +108,20 @@ export function parseDecidePreview(text: string, expect?: DecideExpect): DecideP
     return fail("parent が文字列ではありません");
   }
   if (expect !== undefined && raw.parent !== expect.parent) {
-    return fail(`parent が頼んだもの（${expect.parent}）と違います（${raw.parent}）`);
+    return fail(`parent が要求したもの（${expect.parent}）と違います（${raw.parent}）`);
   }
   if (!isInt(raw.phase)) {
     return fail("phase が整数ではありません");
   }
   if (expect !== undefined && raw.phase !== expect.phase) {
-    return fail(`phase が頼んだもの（${expect.phase}）と違います（${raw.phase}）`);
+    return fail(`phase が要求したもの（${expect.phase}）と違います（${raw.phase}）`);
   }
   const mr = isRecord(raw.mr) ? raw.mr : undefined;
   if (mr === undefined || !isInt(mr.number)) {
     return fail("mr.number が整数ではありません");
   }
   if (expect !== undefined && expect.mr !== null && mr.number !== expect.mr) {
-    return fail(`mr.number が頼んだ依頼のマージリクエスト（#${expect.mr}）と違います（#${mr.number}）`);
+    return fail(`mr.number が要求した依頼のマージリクエスト（#${expect.mr}）と違います（#${mr.number}）`);
   }
   if (typeof raw.digest !== "string" || !raw.digest.startsWith("v2.")) {
     return fail("digest が無いか、版 2（v2. で始まる文字列）ではありません");
