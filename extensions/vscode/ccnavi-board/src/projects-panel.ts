@@ -587,7 +587,7 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     const unknown = unknownSyncNames(current.mirror, message.names);
     if (unknown.length > 0) {
       // 画面が見せていない名前は、実行ファイルに渡さない。一覧を読み直して、もう一度押してもらう
-      void vscode.window.showWarningMessage(`同期の対象を確かめられませんでした: ${unknown.join("、")}。最新の状態を読み直します`);
+      void vscode.window.showWarningMessage(`同期の対象を確かめられませんでした: ${unknown.join("、")}。最新の状態に更新します`);
       void refreshMirror();
       return;
     }
@@ -634,7 +634,7 @@ function fixIgnore(current: PanelState, page: ProjectsPage): void {
     fail(current, `.gitignoreに保存できません: ${(error as Error).message}`);
     return;
   }
-  info(current, `.gitignoreに /${page.projectsRel}/ を追加しました。コミットは自分でしてください`);
+  info(current, `.gitignoreに「/${page.projectsRel}/」を追加しました。コミットは自分でしてください`);
   void update();
 }
 

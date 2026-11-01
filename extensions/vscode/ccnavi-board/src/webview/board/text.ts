@@ -17,7 +17,7 @@ export const FILTER_LABELS = {
   attention: "ユーザ待ちのみ",
   attentionTitle: "承認・レビューなど、ユーザの操作で進むものだけを出します",
   archived: "アーカイブ済みチケットを表示",
-  archivedTitle: "Draftを解除したとき（ccnavi-review.sh ready）にローカルのlogs/archive/ に移動した、完了・取り消しのチケットを「アーカイブ」の列に表示します。初期状態では表示しません。",
+  archivedTitle: "Draftを解除したとき（ccnavi-review.sh ready）にローカルのlogs/archive/に移動した、完了・取り消しのチケットを「アーカイブ」の列に表示します。初期状態では表示しません。",
 } as const;
 
 /** 列の呼び名。列の順序と同じ1か所（`core/board.ts`の`COLUMNS`）から引く */
@@ -238,7 +238,7 @@ export function predecessorsBadge(card: Card): { readonly text: string; readonly
       text: `先行チケットの条件が未達成（${ids}）`,
       lead: "先行チケットの条件が未達成",
       ids: list,
-      title: `作業を始めています。先行チケットがdone/ にないか取り消されているため、開始条件を満たしていません。ただし、作業とfinishコマンドの実行は制限されません。\n${detail}`,
+      title: `作業を始めています。先行チケットがdone/にないか取り消されているため、開始条件を満たしていません。ただし、作業とfinishコマンドの実行は制限されません。\n${detail}`,
     };
   }
   const what = card.copyStatus === "none" ? "承認・着手は" : "着手は";
@@ -246,6 +246,6 @@ export function predecessorsBadge(card: Card): { readonly text: string; readonly
     text: `先行待ち（${ids}）`,
     lead: "先行待ち",
     ids: list,
-    title: `先行チケットが取り消されずに完了し、done/ に移動するまで、${what}できません\n${detail}`,
+    title: `先行チケットが取り消されずに完了し、done/に移動するまで、${what}できません\n${detail}`,
   };
 }

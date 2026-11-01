@@ -74,7 +74,7 @@ export const KIND_LABELS: Readonly<Record<FactorKind, { readonly label: string; 
   files_over: { label: "変更したファイル数が基準を超えたら加点", placeholder: "10（変更したファイルの数がこれを超えたら加点）" },
   deleted_over: { label: "削除したファイル数が基準を超えたら加点", placeholder: "3（削除したファイルの数がこれを超えたら加点）" },
   glob: { label: "globにヒットするファイルを1つ変更するごとに加点", placeholder: ".github/**（ワークツリーのルートからの相対。ヒットするファイル1つごとにpointsを加点し、maxが上限）" },
-  script: { label: "スクリプトが返した点を加点", placeholder: ".ccnavi/config/common/scripts/xxx.sh（.ccnavi/config/common/scripts/ の下だけ。スクリプトが返した点を加点し、失敗や読み込めない出力ならpointsを加点）" },
+  script: { label: "スクリプトが返した点を加点", placeholder: ".ccnavi/config/common/scripts/xxx.sh（.ccnavi/config/common/scripts/の下だけ。スクリプトが返した点を加点し、失敗や読み込めない出力ならpointsを加点）" },
   judge: { label: "サブエージェントの答えがyesなら加点", placeholder: "テストのない振る舞いの変更を含むか（差分を読んでyes/noで答えられる質問。yesで加点）" },
 };
 

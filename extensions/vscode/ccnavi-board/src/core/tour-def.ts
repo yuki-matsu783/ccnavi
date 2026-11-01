@@ -119,7 +119,7 @@ function parseDiagrams(raw: unknown): { readonly ok: true; readonly value: Recor
   for (const [name, rawDiagram] of Object.entries(map)) {
     const at = `diagrams.${name}`;
     if (!ID.test(name)) {
-      return { ok: false, error: `${at}: 名前は小文字の英字で始まり、英小文字・数字・- だけにする` };
+      return { ok: false, error: `${at}: 名前は小文字の英字で始まり、英小文字・数字・-だけにする` };
     }
     const diagram = object(rawDiagram);
     if (diagram === undefined) {
@@ -154,7 +154,7 @@ function parseDiagrams(raw: unknown): { readonly ok: true; readonly value: Recor
       const to = step.to === undefined ? from : text(step.to);
       const label = text(step.text);
       if (id === undefined || !ID.test(id)) {
-        return { ok: false, error: `${stepAt}.idは小文字の英字で始まり、英小文字・数字・- だけにする` };
+        return { ok: false, error: `${stepAt}.idは小文字の英字で始まり、英小文字・数字・-だけにする` };
       }
       if (seen.has(id)) {
         return { ok: false, error: `${stepAt}.id「${id}」が重複しています` };
@@ -212,7 +212,7 @@ export function parseTour(raw: unknown): TourParsed {
     }
     const id = text(course.id);
     if (id === undefined || !ID.test(id)) {
-      return { ok: false, error: `${at}.idは小文字の英字で始まり、英小文字・数字・- だけにする` };
+      return { ok: false, error: `${at}.idは小文字の英字で始まり、英小文字・数字・-だけにする` };
     }
     if (seen.has(id)) {
       return { ok: false, error: `${at}.id「${id}」が重複しています` };
@@ -246,11 +246,11 @@ export function parseTour(raw: unknown): TourParsed {
         return { ok: false, error: `${stepAt}のtitleとbodyが必要です` };
       }
       if (step.target !== undefined && step.target !== "" && (typeof step.target !== "string" || !TARGET.test(step.target))) {
-        return { ok: false, error: `${stepAt}.targetは小文字の英字で始まり、英小文字・数字・- だけにする（空なら中ほどに出す）` };
+        return { ok: false, error: `${stepAt}.targetは小文字の英字で始まり、英小文字・数字・-だけにする（空なら中ほどに出す）` };
       }
       const image = step.image === undefined ? "" : text(step.image);
       if (image === undefined || (image !== "" && !ID.test(image))) {
-        return { ok: false, error: `${stepAt}.imageは小文字の英字で始まり、英小文字・数字・- だけにする（画像の名前）` };
+        return { ok: false, error: `${stepAt}.imageは小文字の英字で始まり、英小文字・数字・-だけにする（画像の名前）` };
       }
       const alt = step.alt === undefined ? "" : text(step.alt);
       if (alt === undefined || (image !== "" && alt === "") || (image === "" && alt !== "")) {

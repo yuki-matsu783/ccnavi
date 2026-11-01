@@ -802,7 +802,7 @@ async function makeTemplateDraft(current: PanelState, ticket: string): Promise<v
   }
   const open = "取り込み待ちを開く";
   const picked = await vscode.window.showInformationMessage(
-    `テンプレートの下書きを作りました: ${result.value.path}。効力は無く、取り込み待ち画面で差分を読んで取り込むまで使われません。`,
+    `テンプレートの下書きを作りました: ${result.value.path}。まだ効力はなく、取り込み待ち画面で差分を読んで取り込むまで使われません。`,
     open,
   );
   if (picked === open) {

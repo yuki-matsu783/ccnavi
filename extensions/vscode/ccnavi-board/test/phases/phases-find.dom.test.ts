@@ -62,7 +62,7 @@ test("CB-D1243 reviewのfalseに「既定」と書かず、リスト欄のplaceh
     const lists = dom.all<HTMLInputElement>('.phase[data-key="p2"] input.f-scope-globs, .phase[data-key="p2"] input.f-deliverables');
     assert.equal(lists.length, 2);
     for (const input of lists) {
-      assert.match(input.placeholder, /区切りは半角 ,/);
+      assert.match(input.placeholder, /区切りは半角の「,」です/);
     }
   } finally {
     await dom.close();

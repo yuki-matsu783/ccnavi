@@ -42,7 +42,7 @@ sample:
         points: 10
         glob: ".github/**"
         max: 35
-        message: CIやエージェント定義に触った
+        message: CIやエージェントの定義を変更した
       - id: db-script
         points: 10
         script: ".ccnavi/config/common/scripts/risk-db.sh"
@@ -69,7 +69,7 @@ sample:
         points: 35
         glob: ".github/**"
         max: 35
-        message: CIやエージェント定義に触った
+        message: CIやエージェントの定義を変更した
       - id: deletes
         points: 20
         deleted_over: 3
@@ -81,7 +81,7 @@ sample:
       factors:
         - { id: big-diff, source: common, kind: lines_over, value: 300, points: 25, message: 行数が多い }
         - { id: many-files, source: common, kind: files_over, value: 10, points: 15, message: ファイルが多い }
-        - { id: ci, source: common, kind: glob, value: ".github/**", points: 10, message: CIやエージェント定義に触った }
+        - { id: ci, source: common, kind: glob, value: ".github/**", points: 10, message: CIやエージェントの定義を変更した }
         - { id: db-script, source: common, kind: script, value: ".ccnavi/config/common/scripts/risk-db.sh", points: 10, message: DBの変更の大きさ }
         - { id: no-tests, source: common, kind: judge, value: テストのない振る舞いの変更を含むか, points: 20, message: テストが足りない }
         - { id: migrations, source: self, kind: glob, value: "db/migrations/**", points: 15, message: マイグレーションに触った }
@@ -91,7 +91,7 @@ sample:
       factors:
         - { id: big-diff, source: common, kind: lines_over, value: 300, points: 25, message: 行数が多い }
         - { id: many-files, source: common, kind: files_over, value: 10, points: 15, message: ファイルが多い }
-        - { id: ci, source: common, kind: glob, value: ".github/**", points: 10, message: CIやエージェント定義に触った }
+        - { id: ci, source: common, kind: glob, value: ".github/**", points: 10, message: CIやエージェントの定義を変更した }
         - { id: db-script, source: common, kind: script, value: ".ccnavi/config/common/scripts/risk-db.sh", points: 10, message: DBの変更の大きさ }
         - { id: no-tests, source: common, kind: judge, value: テストのない振る舞いの変更を含むか, points: 20, message: テストが足りない }
         - { id: "lib:big-diff", source: lib, kind: lines_over, value: 100, points: 15, message: libは小さな変更でも見る }
@@ -132,7 +132,7 @@ courses:
         focus: diff, c-lines
       - target: factor-value
         title: 触ったパスは、ファイルごとに加点する
-        body: ciは .github/** にヒットするファイル1つにつき10点で、上限は35点です。ci.ymlの1ファイルだけなので10点になります。
+        body: ciは.github/** にヒットするファイル1つにつき10点で、上限は35点です。ci.ymlの1ファイルだけなので10点になります。
         scene: { open: ci }
         diagram: risk-score-high
         focus: c-glob
@@ -187,7 +187,7 @@ courses:
         focus: lock
       - target: save
         title: 通ったら、配点のファイルへ書く
-        body: 開いている設定の場所に書きます。共通の設定は .ccnavi/config/common/risks.ymlです。ワークスペースの設定は .ccnavi/config/project/risks.yml、プロジェクトの設定はprojects/名前/.ccnavi/config/project/risks.ymlです。ファイルのコメントは残ります。
+        body: 開いている設定の場所に書きます。共通の設定は.ccnavi/config/common/risks.ymlです。ワークスペースの設定は.ccnavi/config/project/risks.yml、プロジェクトの設定はprojects/名前/.ccnavi/config/project/risks.ymlです。ファイルのコメントは残ります。
         diagram: risk-save
         focus: write
       - target: levels
@@ -301,7 +301,7 @@ courses:
           open: ci
       - target: factor-value
         title: スクリプトの点を使う（script）
-        body: .ccnavi/config/common/scripts/ の下のスクリプトが返した点を加点します。スクリプトが失敗したときと、出力を読み込めないときは、安全を優先してpointsをそのまま加点します。
+        body: .ccnavi/config/common/scripts/の下のスクリプトが返した点を加点します。スクリプトが失敗したときと、出力を読み込めないときは、安全を優先してpointsをそのまま加点します。
         scene:
           open: db-script
       - target: factor-value

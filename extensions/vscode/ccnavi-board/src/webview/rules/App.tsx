@@ -345,7 +345,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         </p>
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={reload}>
           更新
         </button>
       </>
@@ -435,7 +435,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       return;
     }
     if (!isToolName(tool.trim())) {
-      setStatus({ text: "ツール名は英字で始まり、英数字・_・- だけで入れてください", error: true });
+      setStatus({ text: "ツール名は英字で始まり、英数字・_・-だけで入れてください", error: true });
       return;
     }
     if (subject.trim() === "") {
@@ -484,7 +484,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       {!touring && page !== undefined && modeBanner(page.mode) !== "" && (
         // モードは実行ファイルの答え。enableと、答えが取れないときは帯を出さない
         <div className="banner warn">
-          現在の <code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>。{modeBanner(page.mode)}
+          現在の<code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>。{modeBanner(page.mode)}
         </div>
       )}
       {(touring ? [] : page?.notices ?? []).map((notice, index) => (
@@ -499,7 +499,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       ))}
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。更新してください。
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={reload}>
           更新
         </button>
       </div>
@@ -524,7 +524,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           <button type="button" className="action" data-action="open-rules" disabled={page?.exists === false} onClick={() => post({ type: "openFile", which: "rules" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={reload}>
             更新
           </button>
           <button

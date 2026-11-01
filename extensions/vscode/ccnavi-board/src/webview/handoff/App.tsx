@@ -211,11 +211,11 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
           取り込み待ち <span className="count">{entries.length}</span>
         </h2>
         <p className="hint">
-          wip/handoff/ に置いた下書きを、同じ相対パスへ取り込みます。取り込めるのは、新規か変更ありで、errorが無い対象です。
+          wip/handoff/に置いた下書きを、同じ相対パスへ取り込みます。取り込めるのは、新規か変更ありで、errorが無い対象です。
         </p>
         {entries.length === 0 ? (
           <p className="empty" data-role="empty">
-            取り込み待ちの下書きはありません。保護対象を直すときは、ccnavi-stage.shでwip/handoff/ にコピーして編集します。
+            取り込み待ちの下書きはありません。保護対象を直すときは、ccnavi-stage.shでwip/handoff/にコピーして編集します。
           </p>
         ) : (
           <>

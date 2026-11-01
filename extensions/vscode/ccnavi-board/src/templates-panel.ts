@@ -811,7 +811,7 @@ async function editCheck(current: PanelState, session: number, seq: number, data
   };
   const named = dataOf(data);
   if (named === undefined || !validTemplateName(named.name)) {
-    reply(null, "テンプレートの名前は指定できません（英数字で始め、英数字と . _ - のみ、64字まで）");
+    reply(null, "テンプレートの名前は指定できません（英数字で始め、英数字と「.」「_」「-」のみ、64字まで）");
     return;
   }
   const checked = await checkBytes(current, target, named.name, yamlText(data));

@@ -171,7 +171,7 @@ export function validTemplateName(name: string): boolean {
 export const WINDOWS_RESERVED_NAMES: readonly string[] = ["con", "prn", "aux", "nul", ...[1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap((n) => [`com${n}`, `lpt${n}`])];
 
 /** 新しい名前を断るときに画面へ出す、決まりの説明 */
-export const NEW_TEMPLATE_NAME_RULE = "英数字で始め、英数字と . _ - だけを使い、64字までです。末尾に . は使えません。Windowsの予約名は使えません（con・prn・aux・nul・com1〜9・lpt1〜9。拡張子を付けても同じです）";
+export const NEW_TEMPLATE_NAME_RULE = "英数字で始め、英数字と「.」「_」「-」だけを使い、64字までです。末尾に「.」は使えません。Windowsの予約名は使えません（con・prn・aux・nul・com1〜9・lpt1〜9。拡張子を付けても同じです）";
 
 /**
  * 新しく作るテンプレートの名前に使えるか。`validTemplateName`に加えて、末尾の`.`とWindowsの予約名を断る

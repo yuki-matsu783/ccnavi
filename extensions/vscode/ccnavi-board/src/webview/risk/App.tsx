@@ -197,7 +197,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         </p>
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
+        <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
           更新
         </button>
       </>
@@ -306,7 +306,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <div id="changed" className={changed && !touring ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。更新してください。
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={shownBusy} onClick={reload}>
           更新
         </button>
       </div>
@@ -330,7 +330,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           <button type="button" className="action" data-action="open-risk" disabled={!shownExists} onClick={() => act({ type: "openFile" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={shownBusy} onClick={reload}>
             更新
           </button>
           <button
@@ -447,7 +447,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           <summary>説明</summary>
           <p className="hint">
             子チケットの完了時、その子の差分（base_sha..HEAD）で判定して加点します。1件につき加点条件は1つです。
-            <code>script</code> が失敗したときと出力を読み込めないときは、安全を優先してpointsをそのまま加点します。<code>judge</code> の項目があると、判定が揃うまで子をクローズできません。
+            <code>script</code>が失敗したときと出力を読み込めないときは、安全を優先してpointsをそのまま加点します。<code>judge</code>の項目があると、判定が揃うまで子をクローズできません。
           </p>
         </details>
         <ul className="list" id="factors" data-tour="factors">

@@ -107,7 +107,7 @@ test("CB-D722 マージ待ち（Draftなら付記）・マージ済み・閉じ�
     assert.equal(state("a-open"), "- マージ待ち MRを開く");
     assert.equal(state("b-draft"), "- マージ待ち（Draft） MRを開く");
     assert.equal(state("c-merged"), "- マージ済み 片付ける");
-    assert.match(state("d-closed"), /^- マージせず閉じました。自動では片付けません。破棄した親なら、ユーザがターミナルで sh \/ws\/\.ccnavi\/scripts\/ccnavi-launcher\.sh worktree retire --abandon d-closed を実行して記録を消します/);
+    assert.match(state("d-closed"), /^- マージせず閉じました。自動では片付けません。破棄した親なら、ユーザがターミナルでsh \/ws\/\.ccnavi\/scripts\/ccnavi-launcher\.sh worktree retire --abandon d-closedを実行して記録を消します/);
     assert.equal(state("e-unknown"), "- 確認できません（認証: 認証に失敗した（トークンかghの認証を確かめる））");
     assert.equal(state("f-timeout"), "- 確認できません（タイムアウト: 時間内に終わりませんでした）");
     assert.match(state("g-format"), /^- 確認できません（出力の形が想定外: 出力の形が想定外です/);

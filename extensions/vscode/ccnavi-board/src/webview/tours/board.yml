@@ -376,7 +376,7 @@ courses:
         scene: { parent: sample-c }
       - target: ""
         title: レビューを送る（GitLab）
-        body: 「Submit review」を押すと、「Submit your review」の画面が開きます。「Comment」は、承認を伴わない感想です。「Request changes」は、直してからマージしてほしいときに選びます。変更の依頼が出ている間は、ccnaviでもレビュー済みにできません。解除は、レビュアーの「Approve」で行います。画像のように「Approve」が選べない（灰色になる）ときは、自分のMRを承認できない設定などの場合です。
+        body: 「Submit review」を押すと、「Submit your review」の画面が開きます。「Comment」は、承認を伴わない感想です。「Request changes」は、直してからマージしてほしいときに選びます。変更の依頼が出ている間は、ccnaviでもレビュー済みにできません。解除は、レビュアーの「Approve」で行います。「Approve」が灰色で選べないときは、自分のMRを承認できない設定などの場合です。
         image: gitlab-submit-review
         alt: GitLabの「Submit your review」の画面。「Comment」「Approve」「Request changes」の選択肢と、「Submit review」ボタン、ためた指摘の一覧がある
         scene: { parent: sample-c }
@@ -563,7 +563,7 @@ courses:
     steps:
       - target: card-sample-b
         title: 親のカード
-        body: 親カードは、いまのステージとフェーズ一覧を持ちます。子のカードには「親 … / フェーズ名」と出て、親のフェーズに属します。
+        body: 親カードは、いまのステージとフェーズ一覧を持ちます。子のカードには「親 … /フェーズ名」と出て、親のフェーズに属します。
       - target: phases
         title: フェーズ一覧
         body: 1行が1フェーズです。左の丸が進み具合で、右に状態が一言で出ます（レビュー待ち・レビュー準備中・レビュー済み・レビュー予定・レビュー省略・終了・進行中・これから・要確認）。手で動かした子の確認待ちなどは、行の下に1行で出ます。
@@ -615,7 +615,7 @@ courses:
         body: 取り消したチケットは、完了と同じ置き場に残り、取り消しの列に並びます。バッジは「取り消し」で、理由は詳細に出ます。
       - target: filter-archived
         title: アーカイブを表示する
-        body: 入れると、右端に「アーカイブ」の列が追加されます。親のレビューが済んでDraftを解除したときに、ローカルのlogs/archive/ に移動した、完了・取り消しのチケットです。初期状態では表示せず、集計にも数えません。
+        body: 入れると、右端に「アーカイブ」の列が追加されます。親のレビューが済んでDraftを解除したときに、ローカルのlogs/archive/に移動した、完了・取り消しのチケットです。初期状態では表示せず、集計にも数えません。
         scene: { archived: true }
       - target: column-archived
         title: アーカイブの列

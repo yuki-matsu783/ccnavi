@@ -207,7 +207,7 @@ diagrams:
       - id: reply
         from: ccnavi
         to: 親（メインエージェント）
-        text: レビューを省略し、次のフェーズへ進むよう返す。子はfinishの時点でdone/ に入る
+        text: レビューを省略し、次のフェーズへ進むよう返す。子はfinishの時点でdone/に入る
         value: 'マーカー: skipped'
 
   # 同じく子が終わる。review: trueの例（design）
@@ -246,7 +246,7 @@ diagrams:
         value: ボードの［レビュー完了］、または sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 2
       - id: open
         from: ccnavi
-        text: review/ の子がdone/ へ動き、止めが外れる
+        text: review/の子がdone/へ動き、止めが外れる
         value: 'マーカー: reviewed'
 
   # レビューが要るかは、定義・計画のステップ・引き受けた延期のどれか1つでも要ると言えば要る。定義がfalseでも要る扱いになる例（research）
@@ -400,7 +400,7 @@ courses:
         focus: reply, stop
       - target: phases
         title: 依頼してから、レビュー済みまで
-        body: エージェントがMRにレビューを依頼し、ユーザが指摘を付けます。指摘が片付いたら、ボードの［レビュー完了］かconfirmでレビュー済みにします。review/ の子がdone/ へ動き、止めが外れます。
+        body: エージェントがMRにレビューを依頼し、ユーザが指摘を付けます。指摘が片付いたら、ボードの［レビュー完了］かconfirmでレビュー済みにします。review/の子がdone/へ動き、止めが外れます。
         diagram: phase-end-true
         focus: request, confirm, open
       - target: phase-review
@@ -424,7 +424,7 @@ courses:
         body: 「＋ 定義を追加」を押すと、空の定義が末尾に追加され、行が開いてidの欄にカーソルが移ります。追加した定義の既定は、区分がwork、レビューがtrue、編集可能な範囲がinheritです。保存するまでファイルには反映されません。
       - target: phase-id
         title: idを付ける
-        body: idは定義の名前で、親チケットの計画に並べるときにこの名前で指します。英数字で始め、入力できるのは英数字と . _ - です。ほかの定義と重複すると、保存できません。
+        body: idは定義の名前で、親チケットの計画に並べるときにこの名前で指します。英数字で始め、使えるのは英数字と「.」「_」「-」だけです。ほかの定義と重複すると、保存できません。
         scene:
           add: blank
       - target: phase-title
@@ -549,7 +549,7 @@ courses:
           target: lib
       - target: path
         title: ファイルの場所
-        body: プロジェクトの定義は、プロジェクトの .ccnavi/config/project/phases.ymlにあります。どの設定を開いているかは、ここの場所で見分けます。
+        body: プロジェクトの定義は、プロジェクトの.ccnavi/config/project/phases.ymlにあります。どの設定を開いているかは、ここの場所で見分けます。
         scene:
           target: lib
       - target: phases

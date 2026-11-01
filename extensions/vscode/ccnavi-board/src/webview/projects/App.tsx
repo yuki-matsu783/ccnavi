@@ -155,7 +155,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
           ワークスペース内のプロジェクト <span className="count">{rows.length}</span>
         </h2>
         {rows.length === 0 ? (
-          <p className="empty">プロジェクトがありません。上のボタンでcloneするか、既存のリポジトリをprojects/ の直下に移動してください。</p>
+          <p className="empty">プロジェクトがありません。上のボタンでcloneするか、既存のリポジトリをprojects/の直下に移動してください。</p>
         ) : (
           <ul className="projects">
             {rows.map((row, index) => (
@@ -201,7 +201,7 @@ function Banners({ page, act }: { readonly page: ProjectsPage; readonly act: (me
   if (!page.ignored && !tracked) {
     banners.push(
       <div key="ignore" className="banner warn">
-        <code>.gitignore</code> に <code>/{page.projectsRel}/</code>{" "}
+        <code>.gitignore</code>に<code>/{page.projectsRel}/</code>
         がありません。各プロジェクトは自分のgitリポジトリを持つので、ワークスペースのgitからは除外してください。
         <button type="button" className="action" data-action="fix-ignore" onClick={() => act({ type: "fixIgnore" })}>
           .gitignoreに追加
@@ -242,7 +242,7 @@ function Strays({ strays }: { readonly strays: readonly Stray[] }): JSX.Element 
         プロジェクトとして認識されないgitリポジトリ <span className="count">{strays.length}</span>
       </h2>
       <p className="hint">
-        ワークスペース直下から2階層まで（<code>projects/</code> の中だけ3階層まで）を探して見つかったものです。プロジェクトとして扱うには <code>projects/</code>{" "}
+        ワークスペース直下から2階層まで（<code>projects/</code>の中だけ3階層まで）を探して見つかったものです。プロジェクトとして扱うには<code>projects/</code>
         の直下へ移してください。
       </p>
       <ul className="stray-list">

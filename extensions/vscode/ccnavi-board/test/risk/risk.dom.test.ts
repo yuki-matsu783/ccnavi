@@ -21,10 +21,10 @@ test("CB-D10 既定は畳み、行を押すと開いてstateにidが入る。要
   const dom = await openRisk();
   try {
     assert.equal(dom.all(".factor.open").length, 0);
-    assert.equal(dom.one(`${rowSelector("f1")} .sum .clip`).textContent, "変更した行数（追加＋削除）が 300 行を超えると加点行数が多い");
+    assert.equal(dom.one(`${rowSelector("f1")} .sum .clip`).textContent, "変更した行数（追加＋削除）が300行を超えると加点行数が多い");
     assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, ".github/**にヒットするファイルを1つ変更するごとに加点（上限35点）CIに触った");
     // scriptは「返した点を加点」で、pointsは測れなかったときの保険。judgeはyesで加点
-    assert.equal(dom.one(`${rowSelector("f3")} .sum .clip`).textContent, "スクリプト .ccnavi/config/common/scripts/risk.shが返した点を加点（点を読み取れなかったときは10点）");
+    assert.equal(dom.one(`${rowSelector("f3")} .sum .clip`).textContent, "スクリプト.ccnavi/config/common/scripts/risk.shが返した点を加点（点を読み取れなかったときは10点）");
     assert.equal(dom.one(`${rowSelector("f4")} .sum .clip`).textContent, "質問「テストのない変更を含むか」の答えがyesなら加点");
     dom.click(dom.one(`${rowSelector("f2")} .row-head`));
     await dom.settle();
@@ -49,7 +49,7 @@ test("CB-D11 加点条件を変えると値は持ち越さず、glob以外では
     assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, "（基準未設定）CIに触った");
     dom.type(dom.one(`${rowSelector("f2")} input.f-value`), "10");
     await dom.settle();
-    assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, "変更したファイルが 10 件を超えると加点CIに触った");
+    assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, "変更したファイルが10件を超えると加点CIに触った");
     // 保存に渡る形にも出る。加点条件を変えてもidと理由は持ち越す
     dom.click(dom.one("#save"));
     await dom.settle();

@@ -314,7 +314,7 @@ function Picker({
       return;
     }
     if (!isToolName(name)) {
-      setAddError("英字で始まり、英数字・_・- だけの名前を入れてください");
+      setAddError("英字で始まり、英数字・_・-だけの名前を入れてください");
       return;
     }
     setAddError("");

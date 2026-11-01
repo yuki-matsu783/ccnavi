@@ -462,7 +462,7 @@ courses:
         focus: match, reply
       - target: rule-protect-env
         title: 組み合わせ条件は、値で結果が分かれる
-        body: protect-envは「.env系は止める。ただし .env.exampleと .env.sampleは通す」という1つのルールです。同じルールが、.envは止め、.env.exampleは通します。
+        body: protect-envは「.env系は止める。ただし.env.exampleと.env.sampleは通す」という1つのルールです。同じルールが、.envは止め、.env.exampleは通します。
         scene: { tab: rules, open: protect-env, when: r }
         diagram: rule-when
         focus: match-env, match-example
@@ -510,11 +510,11 @@ courses:
 
   - id: combo-when
     title: 組み合わせ条件を設定する
-    summary: 「.envは止める。ただし .env.exampleは通す」のように、複数の条件をall / any / notで組み合わせる
+    summary: 「.envは止める。ただし.env.exampleは通す」のように、複数の条件をall / any / notで組み合わせる
     steps:
       - target: rule-protect-env
         title: 組み合わせ条件のルール
-        body: globやregexが1つでは表現できない条件は、組み合わせ条件（when）で記述できます。畳んだ行には、条件を1行に縮めた形（all(regex …, not(any(2)))）が出ます。この例は「.env系のファイルにヒットし、かつ .env.example / .env.sampleではない」です。
+        body: globやregexが1つでは表現できない条件は、組み合わせ条件（when）で記述できます。畳んだ行には、条件を1行に縮めた形（all(regex …, not(any(2)))）が出ます。この例は「.env系のファイルにヒットし、かつ.env.example / .env.sampleではない」です。
         scene: { tab: rules }
       - target: rule-protect-env
         title: 図で見る
@@ -522,7 +522,7 @@ courses:
         scene: { tab: rules, open: protect-env, when: r }
       - target: when-graph
         title: 点を選んで直す
-        body: 条件をクリックすると選ばれ、下の編集欄でその条件を変更できます。ここでは .env系に一致させるregexの点を選んでいます。文字を直すと、その場で図と要約に反映されます。
+        body: 条件をクリックすると選ばれ、下の編集欄でその条件を変更できます。ここでは.env系に一致させるregexの点を選んでいます。文字を直すと、その場で図と要約に反映されます。
         scene: { tab: rules, open: protect-env, when: r.0 }
       - target: when-inspector
         title: 子を足す・削除
@@ -563,7 +563,7 @@ courses:
         scene: { tab: rules, open: git-push }
       - target: rule-no-rm-rf-pattern
         title: regexで記述する
-        body: 語の切れ目まで決めたいときはregexを使います。\brm\s+-rf\bは、rmと -rfが語として並ぶときだけにヒットします。種類の欄でglobとregexを替えられます。式の誤りは、保存前の検証で止まります。
+        body: 語の切れ目まで決めたいときはregexを使います。\brm\s+-rf\bは、rmと-rfが語として並ぶときだけにヒットします。種類の欄でglobとregexを替えられます。式の誤りは、保存前の検証で止まります。
         scene: { tab: rules, open: no-rm-rf }
       - target: rule-git-push-message
         title: 止めるときの言葉を入力する
@@ -588,7 +588,7 @@ courses:
         scene: { tab: rules }
       - target: rule-db-migrate-context
         title: コンテキストの追加
-        body: プロンプトを渡したいルールは、行の中の「コンテキストの追加」を開きます。messageが止められた側への言葉なのに対し、ここはツールの実行を許可する際に、エージェントへ伝える注意事項や補足を入力する欄で、どのタイプにも入力できます。渡す間隔（every）と、補足文を記載したファイルのパスを指定する欄もあります。
+        body: プロンプトを渡したいルールは、行の中の「コンテキストの追加」を開きます。messageが止められた側への言葉なのに対し、ここはツールの実行を許可するときに、エージェントへ伝える注意事項や補足を入力する欄です。どのタイプにも入力できます。渡す間隔（every）と、補足文を記載したファイルのパスを指定する欄もあります。
         scene: { tab: rules, open: db-migrate, more: true }
       - target: rule-db-migrate-every
         title: everyで何回に1度かを決める
@@ -629,7 +629,7 @@ courses:
         scene: { tab: judge, checked: true }
       - target: expectation-ng
         title: 食い違いを確認する
-        body: 食い違った行は赤く出ます。この例は、allowを期待した .env.exampleが、どのallowにもヒットせず判定の対象外になっています。期待が正しければallowのルールを追加し、期待が古ければ例を直します。
+        body: 食い違った行は赤く出ます。この例は、allowを期待した.env.exampleが、どのallowにもヒットせず判定の対象外になっています。期待が正しければallowのルールを追加し、期待が古ければ例を直します。
         scene: { tab: judge, checked: true }
       - target: expectations-result
         title: ヒットしたルールも見る
@@ -774,7 +774,7 @@ courses:
     steps:
       - target: save
         title: 保存で何を確認するか
-        body: 保存を押すと、実行ファイルの --lintでルール全体を検証し、通ればファイルに反映します。errorが1件でもあれば、何も保存しません。作業中のチケットがあるとき、読み込んだあとにファイルが外で変わったときも、保存は止まります。
+        body: 保存を押すと、実行ファイルの--lintでルール全体を検証し、通ればファイルに反映します。errorが1件でもあれば、何も保存しません。作業中のチケットがあるとき、読み込んだあとにファイルが外で変わったときも、保存は止まります。
         scene: { tab: rules }
       - target: status
         title: 理由は下に出る

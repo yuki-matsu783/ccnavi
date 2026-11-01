@@ -68,7 +68,7 @@ export interface InspectorProps {
 
 /** 候補の出どころの呼び名 */
 export function sourceLabel(source: string): string {
-  return source === "builtin" ? "組み込み" : source === "project" ? "プロジェクト（.claude/ の下）" : source;
+  return source === "builtin" ? "組み込み" : source === "project" ? "プロジェクト（.claude/の下）" : source;
 }
 
 /** 名前が候補のどれか。無ければundefined */
@@ -142,7 +142,7 @@ export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect,
         <textarea className="f-flow-description" rows={3} value={str(doc.description)} disabled={readOnly} onChange={(event) => onChange(setMeta(doc, { description: event.target.value }), "flow:description")} />
       </label>
       <p className="hint">
-        ノードを押すと、ここに欄が出ます。ノードの右の点から左の点へドラッグすると、線でつながります。線を押すと条件を入力できます。ノードや線にポインタを載せると × が出て、押すと削除できます。
+        ノードを押すと、ここに欄が出ます。ノードの右の点から左の点へドラッグすると、線でつながります。線を押すと条件を入力できます。ノードや線にポインタを載せると×が出て、押すと削除できます。
         {noGrouping
           ? "元に戻すときは、画面上の「元に戻す」を押します。"
           : "Shiftを押しながらノードを選ぶと、「グループ化」で枠にまとめられます。Ctrl+Zで元に戻せます。選んだノードはCtrl+Cでコピー、Ctrl+Vで貼り付け、Ctrl+Dで複製できます。"}

@@ -109,7 +109,7 @@ export function Phase(props: PhaseProps): JSX.Element {
       <div className="row-body">
         <Captioned name="id" yamlKey="id" tour={mark("phase-id")}>
           {text("id", "f-id narrow", "implement")}
-          <p className="hint">英数字で始まり、使えるのは英数字と . _ - です。</p>
+          <p className="hint">英数字で始まり、使えるのは英数字と「.」「_」「-」です。</p>
         </Captioned>
         <Captioned name="タイトル" yamlKey="title" tour={mark("phase-title")}>
           {text("title", "f-title narrow", "実装とテスト")}
@@ -154,11 +154,11 @@ export function Phase(props: PhaseProps): JSX.Element {
               <option value="inherit">inherit（親チケットの編集可能な範囲を引き継ぐ）</option>
               <option value="globs">上限を指定する（globのリスト）</option>
             </select>
-            {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*。ワークツリーのルートからの相対で、子チケットの編集可能な範囲はこの中に収めます。区切りは半角 ,")}
+            {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*。ワークツリーのルートからの相対で、子チケットの編集可能な範囲はこの中に収めます。区切りは半角の「,」です")}
           </div>
         </Captioned>
         <Captioned name="必須成果物" yamlKey="deliverables" tour={mark("phase-deliverables")}>
-          {list("deliverables", "f-deliverables", "wip/design/*.md。クローズする前に存在し、gitに追跡されている必要があります。区切りは半角 ,")}
+          {list("deliverables", "f-deliverables", "wip/design/*.md。クローズする前に存在し、gitに追跡されている必要があります。区切りは半角の「,」です")}
         </Captioned>
         <details
           className="more"

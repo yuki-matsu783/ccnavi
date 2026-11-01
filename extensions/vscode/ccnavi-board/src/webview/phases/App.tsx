@@ -211,7 +211,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         </p>
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
+        <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
           更新
         </button>
       </>
@@ -356,7 +356,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <div id="changed" data-tour="changed" className={shownChanged ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。更新してください。
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={shownBusy} onClick={reload}>
           更新
         </button>
       </div>
@@ -377,7 +377,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           <button type="button" className="action" data-action="open-phases" data-tour="open-file" disabled={shownPage?.exists !== true} onClick={() => act({ type: "openFile" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={shownBusy} onClick={reload}>
             更新
           </button>
           <button
@@ -455,18 +455,18 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         {shownHelp && (
           <div className="help-panel" id="help" data-tour="help-panel">
             <p className="hint">
-              区分が <code>work</code> の定義を親チケットの計画に並べたものが全体計画で、ユーザが合意すると確定します。レビューのあとは、区分が <code>feedback</code> の定義を並べて計画を改訂します。<code>id</code> と <code>title</code> はどちらも一意です。<code>scope</code>{" "}
-              は子チケットの編集可能な範囲の上限（ワークツリーのルートからのglob。<code>inherit</code> なら親の編集可能な範囲そのまま）、<code>deliverables</code> は必須成果物で、閉じる前に存在し、gitに追跡されているべきものです。
-              <code>agent</code>・<code>skill</code>・<code>when</code> はエージェントへの案内にだけ使い、判定には使いません。編集可能な範囲と必須成果物は <code>,</code> で区切ります。
+              区分が<code>work</code>の定義を親チケットの計画に並べたものが全体計画で、ユーザが合意すると確定します。レビューのあとは、区分が<code>feedback</code>の定義を並べて計画を改訂します。<code>id</code>と<code>title</code>はどちらも一意です。<code>scope</code>
+              は子チケットの編集可能な範囲の上限（ワークツリーのルートからのglob。<code>inherit</code>なら親の編集可能な範囲そのまま）、<code>deliverables</code>は必須成果物で、クローズする前に存在し、gitに追跡されているべきものです。
+              <code>agent</code>・<code>skill</code>・<code>when</code>はエージェントへの案内にだけ使い、判定には使いません。編集可能な範囲と必須成果物は<code>,</code>で区切ります。
             </p>
             <details className="help">
               <summary>計画と合意のコマンド・キー</summary>
               <p className="hint">
-                全体計画は親チケットの <code>plan:</code> に、計画の改訂は <code>feedback:</code> に書きます。合意は <code>ccnavi user agree</code> が通ることです。
+                全体計画は親チケットの<code>plan:</code>に、計画の改訂は<code>feedback:</code>に書きます。合意は<code>ccnavi user agree</code>が通ることです。
               </p>
             </details>
             <p className="hint">
-              順序（どのフェーズにどのフェーズが先行するか）はこのファイルには記載しません。親チケットの計画のステップに <code>after</code> で先行を指定します（最後のステップにほかの全部が先行するようにします）。
+              順序（どのフェーズにどのフェーズが先行するか）はこのファイルには記載しません。親チケットの計画のステップに<code>after</code>で先行を指定します（最後のステップにほかの全部が先行するようにします）。
               親チケットは承認のときに使う定義のコピー（<code>phases:</code>）を持つので、あとでここを直しても進行中の親には反映されません。
             </p>
           </div>

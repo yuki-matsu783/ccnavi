@@ -61,7 +61,7 @@ export function emptyNote(exists: boolean): string {
   if (exists) {
     return "定義がありません。定義が空のファイルはccnaviで読み込めません。保存する前に、定義を1つ以上追加してください。";
   }
-  return "フェーズ定義ファイルはまだ作成されていません。未設定のため、エラーではありません。定義を追加して保存すると、ファイルが作られます";
+  return "フェーズ定義ファイルはまだ作成されていません。未設定のため、エラーではありません。定義を追加して保存すると、ファイルが作られます。";
 }
 
 /** 共通の設定の定義と表示名が重なっているときに下部へ出す文 */
@@ -72,8 +72,8 @@ export function commonTitleNote(ids: ReadonlySet<string>): string {
 
 /** 共通の設定にも同じidがある定義に添える文 */
 export function commonIdNote(ids: ReadonlySet<string>): string {
-  return `共通の設定にも同じidがあります（${Array.from(ids).join(", ")}）。中身がすべて同じなら共通の設定の定義が使われ、中身が違えば保存時の検証（--lint）でエラーになります。変えたいときは別のidにしてください`;
+  return `共通の設定にも同じidがあります（${Array.from(ids).join(", ")}）。中身がすべて同じなら共通の設定の定義が使われ、中身が違えば保存時の検証（--lint）でエラーになります。変えたいときは別のidにしてください。`;
 }
 
 /** 共通の設定の定義の欄の見出しにつける説明 */
-export const COMMON_NOTE = "選択中の設定と組み合わせて適用される共通のフェーズ定義です。この画面では編集できません（.ccnavi/config/common/phases.yml）";
+export const COMMON_NOTE = "選択中の設定と組み合わせて適用される共通のフェーズ定義です。この画面では編集できません（.ccnavi/config/common/phases.yml）。";

@@ -79,7 +79,7 @@ test("CB-T228 錠は実行ファイルのflow.lockedをそのまま使う。親�
   // 取り消しの子でファイルが無ければ、実行ファイルはflowをnullで返す。開く先が無い
   const cancelled = flowTargetOf(board, "i0001-02-05");
   assert.equal(cancelled.ok, false);
-  assert.match(cancelled.ok ? "" : cancelled.error, /完了・取り消しの子でファイルがありません/);
+  assert.match(cancelled.ok ? "" : cancelled.error, /完了・取り消しの子チケットには、フローのファイルがありません/);
   // 画面はstarted_atを見て組み直さない。答えがlocked: falseと言えば、着手済みに見えても開く
   const trusted: BoardJson = {
     ...board,

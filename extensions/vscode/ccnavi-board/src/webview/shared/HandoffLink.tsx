@@ -22,7 +22,7 @@ export function HandoffLink(props: {
         data-action="open-handoff"
         data-tour="handoff"
         disabled={disabled || !enabled}
-        title={enabled ? "wip/handoff/ の下書きの取り込みと編集は、取り込み待ちの画面で行います" : entry?.reason ?? ""}
+        title={enabled ? "wip/handoff/の下書きの取り込みと編集は、取り込み待ちの画面で行います" : entry?.reason ?? ""}
         onClick={onOpen}
       >
         取り込み待ちを開く

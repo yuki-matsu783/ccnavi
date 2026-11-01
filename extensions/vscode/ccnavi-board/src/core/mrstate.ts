@@ -126,7 +126,7 @@ export function interpretMrState(ran: Ran, expected: number): MrStateResult {
       }
       const kind = words[1];
       if (!(SH_UNKNOWN_KINDS as readonly string[]).includes(kind)) {
-        return format(`unknownの種類を知りません（${kind}）`);
+        return format(`unknownの種類が想定外です（${kind}）`);
       }
       if (ran.code !== 1) {
         return format(`終了コードが状態と合いません（${ran.code}）`);
@@ -134,7 +134,7 @@ export function interpretMrState(ran: Ran, expected: number): MrStateResult {
       return unknown(kind as ShUnknownKind, words.slice(2).join(" "));
     }
     default:
-      return format(`状態を知りません（${head}）`);
+      return format(`状態が想定外です（${head}）`);
   }
 }
 
@@ -207,7 +207,7 @@ export function parseRetired(ran: Pick<Ran, "code" | "stdout" | "killed">): Reti
       }
       incomplete.push({ parent: words[1], reason: words.slice(2).join(" ") });
     } else {
-      return { ok: false, error: `一覧を取得できません（形式の異常: ${at}を知りません）` };
+      return { ok: false, error: `一覧を取得できません（形式の異常: ${at}が想定外です）` };
     }
   }
   return { ok: true, entries, incomplete };

@@ -15,13 +15,13 @@ export function Hooks({ hooks, files }: HooksProps): JSX.Element {
   return (
     <>
       <p className="hint">
-        対象は <code>.claude/settings.json</code>
+        対象は<code>.claude/settings.json</code>
         {files.settingsLocal && (
           <>
-            {" と "}
+            {"と"}
             <code>.claude/settings.local.json</code>
           </>
-        )}{" "}
+        )}
         のhooksです。ユーザごとの設定（<code>~/.claude/settings.json</code>）は対象外です。
       </p>
       <Table hooks={hooks} files={files} />
@@ -67,7 +67,7 @@ function Table({ hooks, files }: HooksProps): JSX.Element {
         </table>
       </div>
       <p className="hint">
-        「判定を試す」でツールを選ぶと、そのツールで実行されるhookだけをここから絞り込んで出します。matcherの意味はClaude Codeのものです（空か <code>*</code> で全部、それ以外はツール名への正規表現）。
+        「判定を試す」でツールを選ぶと、そのツールで実行されるhookだけをここから絞り込んで出します。matcherの意味はClaude Codeのものです（空か<code>*</code>で全部、それ以外はツール名への正規表現）。
       </p>
     </>
   );

@@ -32,7 +32,7 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
     <details className="sum" id="sum" data-tour="sum" open={tour === undefined ? undefined : tour.open}>
       <summary>統合結果（読み取り専用）</summary>
       <p className="hint">
-        共通の設定に選んだ設定を重ねた、実行ファイルの答えをそのまま並べた結果です。重ねるのは、親の <code>project:</code> が指す設定だけです。保存済みの配点が対象で、編集中の内容は含みません。直すときは、画面上部の「設定」の欄で編集する設定に切り替えます。
+        共通の設定に選んだ設定を重ねた、実行ファイルの答えをそのまま並べた結果です。重ねるのは、親の<code>project:</code>が指す設定だけです。保存済みの配点が対象で、編集中の内容は含みません。直すときは、画面上部の「設定」の欄で編集する設定に切り替えます。
       </p>
       <label className="sum-pick" data-tour="sum-pick">
         統合結果{" "}

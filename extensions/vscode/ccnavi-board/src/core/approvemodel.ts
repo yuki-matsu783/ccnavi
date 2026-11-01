@@ -306,7 +306,7 @@ export function parseApprovePreview(text: string): PreviewParse {
 }
 
 const WRITTEN_MISSING =
-  "実行ファイルの答えに`written`がありません。承認のpushを絞れないので送りません。ccnaviを更新して、承認を打ち直してください";
+  "実行ファイルの出力に`written`がありません。承認のpushの対象を絞れないため、送りません。ccnaviを更新してから、承認を打ち直してください";
 
 /** `--yes`の答え。承認できたか、一覧が変わっていたか、読めなかったか */
 export function parseApproveResult(text: string): ResultParse {

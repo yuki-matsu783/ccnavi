@@ -75,7 +75,7 @@ export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult
     return { ok: false, error: `${ticket}は親チケットです。フローがあるのは子チケットだけです` };
   }
   if (found.flow === null) {
-    return { ok: false, error: `${ticket}のフローの置き場が実行ファイルの出力にありません（完了・取り消しの子でファイルがありません）` };
+    return { ok: false, error: `${ticket}のフローの置き場が実行ファイルの出力にありません（完了・取り消しの子チケットには、フローのファイルがありません）` };
   }
   return {
     ok: true,

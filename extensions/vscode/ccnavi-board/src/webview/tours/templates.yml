@@ -175,7 +175,7 @@ diagrams:
         value: "取り込めた: .ccnavi/config/project/templates/login.yml"
       - id: use
         from: templates/
-        text: これ以後、ticket newの --template loginで引ける
+        text: 以後は、ticket newの--template loginで引ける
 
   # テンプレートで次の親の提案を始める（フィードバック計画は書かない）
   template-propose:
@@ -294,7 +294,7 @@ courses:
         focus: close,notice
       - target: drafts
         title: readyの前に下書きを作る
-        body: readyでクローズすると下書きの材料が退避されて、拾えなくなります。下書きはエージェントが作り、取り込み先と同じ相対パスでwip/handoff/ に書かれます。既定の取り込み先はプロジェクトのレイヤーです（--to commonで共通のレイヤー）。
+        body: readyでクローズすると下書きの材料が退避されて、拾えなくなります。下書きはエージェントが作り、取り込み先と同じ相対パスでwip/handoff/に書かれます。既定の取り込み先はプロジェクトのレイヤーです（--to commonで共通のレイヤー）。
         scene: {}
         diagram: template-draft
         focus: draft,write
@@ -324,7 +324,7 @@ courses:
         focus: look,apply,write
       - target: list
         title: 取り込んだあと
-        body: 取り込んだ下書きは消え、プロジェクトのレイヤーのテンプレートとして一覧に出ます。これ以後、エージェントが --template loginで引けます。
+        body: 取り込んだ下書きは消え、プロジェクトのレイヤーのテンプレートとして一覧に出ます。以後は、エージェントが--template loginで引けます。
         scene: {}
         diagram: template-import
         focus: result,use
@@ -347,7 +347,7 @@ courses:
         focus: found
       - target: template
         title: テンプレートを指して提案を始める
-        body: ccnavi ticket newに --templateと名前を渡すと、親の提案を始められます。破棄されたテンプレートや、errorのあるテンプレート、phases.ymlに無い種類を含むテンプレートでは、何も書かずに止まります。
+        body: ccnavi ticket newに--templateと名前を渡すと、親の提案を始められます。破棄されたテンプレートや、errorのあるテンプレート、phases.ymlに無い種類を含むテンプレートでは、何も書かずに止まります。
         scene: { open: feature }
         diagram: template-propose
         focus: new,read

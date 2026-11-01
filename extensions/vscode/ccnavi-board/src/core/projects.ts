@@ -29,7 +29,7 @@ export interface RemoteInfo {
 
 export type RemoteCheck = { readonly ok: true; readonly remote: RemoteInfo } | { readonly ok: false; readonly error: string };
 
-const FORMS = "指定できる形式はhttps://host/path、ssh://host/path、git@host:pathの3つです。ローカルのパスとfile:// は指定できません";
+const FORMS = "指定できる形式はhttps://host/path、ssh://host/path、git@host:pathの3つです。ローカルのパスとfile://は指定できません";
 
 /**
  * clone元のURLを検査する。通すのはhttps / ssh / scp風の3形だけ。
@@ -70,7 +70,7 @@ export function checkRemote(raw: string): RemoteCheck {
   if (userinfo.includes(":")) {
     return {
       ok: false,
-      error: "URLに資格情報（user:token@）が入っています。ターミナルの履歴と .git/configに平文で残るため指定できません。credential helperかSSHキーを使ってください",
+      error: "URLに資格情報（user:token@）が入っています。ターミナルの履歴と「.git/config」に平文で残るため指定できません。credential helperかSSHキーを使ってください",
     };
   }
   host = host.replace(/:\d+$/, "").toLowerCase();
@@ -107,10 +107,10 @@ export function checkName(raw: string, existing: readonly string[]): NameCheck {
     return { ok: false, error: "名前が空です" };
   }
   if (!NAME_PATTERN.test(name)) {
-    return { ok: false, error: "名前は英数字で始め、英数字と . _ - だけ（ASCII）で付けてください。frontmatterのproject: とフォルダのパスにそのまま使われます" };
+    return { ok: false, error: "名前は英数字で始め、英数字と「.」「_」「-」だけ（ASCII）で付けてください。frontmatterのproject: とフォルダのパスにそのまま使われます" };
   }
   if (/^\.+$/.test(name)) {
-    return { ok: false, error: "名前を . だけにはできません" };
+    return { ok: false, error: "名前を「.」だけにはできません" };
   }
   const lower = name.toLowerCase();
   const clash = existing.find((e) => e !== "" && e.toLowerCase() === lower);
@@ -142,8 +142,8 @@ export const SKIP_DIRS: ReadonlySet<string> = new Set([".git", "node_modules", "
 const DEPTH = 2;
 const DEPTH_IN_PROJECTS = 3;
 
-export const REASON_OUTSIDE = "projects/ の外にあります。プロジェクトとして扱われるのはprojects/ の直下に置いたものだけです";
-export const REASON_TOO_DEEP = "projects/ の直下ではなく、その下の階層にあります。プロジェクトとして扱われるのはprojects/ の直下に置いたものだけです";
+export const REASON_OUTSIDE = "projects/の外にあります。プロジェクトとして扱われるのはprojects/の直下に置いたものだけです";
+export const REASON_TOO_DEEP = "projects/の直下ではなく、その下の階層にあります。プロジェクトとして扱われるのはprojects/の直下に置いたものだけです";
 
 export interface StrayInput {
   /** 置き場のルートからの相対（"/" 区切り）。空なら置き場が無効 */

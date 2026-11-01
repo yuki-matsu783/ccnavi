@@ -126,8 +126,8 @@ function State({ row, touring }: { readonly row: MergeViewRow; readonly touring:
       return (
         <>
           <span>
-            - マージせず閉じました。自動では片付けません。破棄した親なら、ユーザがターミナルで{" "}
-            <code className="merge-command">{row.abandon}</code> を実行して記録を消します
+            - マージせず閉じました。自動では片付けません。破棄した親なら、ユーザがターミナルで
+            <code className="merge-command">{row.abandon}</code>を実行して記録を消します
           </span>
           <MrLink url={row.url} />{" "}
           <button

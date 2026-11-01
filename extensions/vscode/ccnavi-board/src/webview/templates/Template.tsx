@@ -96,7 +96,7 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
           )}
           {detail !== undefined && detailMatches(detail, entry) && (
             <>
-              <h3 className="tpl-text-head">本文（制御文字・書式文字は \uXXXXで表示）</h3>
+              <h3 className="tpl-text-head">本文（制御文字・書式文字は\uXXXXで表示）</h3>
               <pre className="tpl-text" data-role="template-text">
                 {revealControls(detail.text)}
               </pre>
@@ -104,7 +104,7 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
           )}
           {detail !== undefined && !detailMatches(detail, entry) && (
             <p className="hint" data-role="detail-mismatch">
-              この行の本文は読み込めません。実行ファイルは、統合結果で使われる同名の別のレイヤーの本文を返すためです（破棄された行など）。ファイルを直接開いて読んでください: <span className="mono">{entry.path}</span>
+              この行の本文は読み込めません。実行ファイルは、統合結果で使われる同名の別のレイヤーの本文を返すためです（破棄された行など）。ファイルを直接開いて読んでください。対象は次のファイルです。<span className="mono">{entry.path}</span>
             </p>
           )}
           {detailError !== "" && <p className="status failed">{detailError}</p>}

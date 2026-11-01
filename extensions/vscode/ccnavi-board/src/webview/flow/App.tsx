@@ -398,7 +398,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     onKey.current = () => undefined;
     return (
       <>
-        <p className="empty">フロー編集画面を読み込み直せませんでした。原因を直してから「更新」を押してください。</p>
+        <p className="empty">フロー編集画面を読み込めませんでした。原因を直してから「更新」を押してください。</p>
         <pre className="load-error">{data.kind === "error" ? data.error : ""}</pre>
         <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
           更新

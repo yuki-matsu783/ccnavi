@@ -60,15 +60,15 @@ export function describe(factor: FactorForm): readonly Part[] {
   }
   switch (factor.kind) {
     case "lines_over":
-      return [dim("変更した行数（追加＋削除）が "), code(value), dim(" 行を超えると加点"), ...scopeParts(factor)];
+      return [dim("変更した行数（追加＋削除）が"), code(value), dim("行を超えると加点"), ...scopeParts(factor)];
     case "files_over":
-      return [dim("変更したファイルが "), code(value), dim(" 件を超えると加点"), ...scopeParts(factor)];
+      return [dim("変更したファイルが"), code(value), dim("件を超えると加点"), ...scopeParts(factor)];
     case "deleted_over":
-      return [dim("削除したファイルが "), code(value), dim(" 件を超えると加点"), ...scopeParts(factor)];
+      return [dim("削除したファイルが"), code(value), dim("件を超えると加点"), ...scopeParts(factor)];
     case "glob":
       return [code(value), dim(`にヒットするファイルを1つ変更するごとに加点${factor.max === "" ? "" : `（上限${factor.max}点）`}`)];
     case "script":
-      return [dim("スクリプト "), code(value), dim(`が返した点を加点（点を読み取れなかったときは${factor.points === "" ? "points" : `${factor.points}点`}）`)];
+      return [dim("スクリプト"), code(value), dim(`が返した点を加点（点を読み取れなかったときは${factor.points === "" ? "points" : `${factor.points}点`}）`)];
     case "judge":
       return [dim("質問「"), code(value), dim("」の答えがyesなら加点")];
   }

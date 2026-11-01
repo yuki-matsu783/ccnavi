@@ -28,7 +28,7 @@ interface Entry {
 const ENTRIES: readonly Entry[] = [
   {
     label: "プロジェクト管理",
-    description: "projects/ の一覧、clone・fetch・pullの実行",
+    description: "projects/の一覧、clone・fetch・pullの実行",
     command: "ccnaviBoard.openProjects",
     icon: "repo",
     needsTickets: false,

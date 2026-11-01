@@ -408,7 +408,7 @@ test("CB-D133 サブエージェントの種類とスキルの名前は候補か
       dom.all("#flow-agent-candidates option").map((o) => [o.getAttribute("value"), o.getAttribute("label")]),
       [
         ["Plan", "組み込み"],
-        ["reviewer", "プロジェクト（.claude/ の下）"],
+        ["reviewer", "プロジェクト（.claude/の下）"],
       ],
     );
     assert.equal(dom.all("#inspector .candidate-source").length, 0, "空なら何も添えない");
@@ -426,7 +426,7 @@ test("CB-D133 サブエージェントの種類とスキルの名前は候補か
     assert.equal(dom.one<HTMLInputElement>("#inspector input.f-name[list]").getAttribute("list"), "flow-skill-candidates");
     dom.type(dom.one<HTMLInputElement>("#inspector input.f-name[list]"), "commit");
     await dom.settle();
-    assert.equal(dom.one("#inspector .candidate-source").textContent, "プロジェクト（.claude/ の下）");
+    assert.equal(dom.one("#inspector .candidate-source").textContent, "プロジェクト（.claude/の下）");
   } finally {
     await dom.close();
   }

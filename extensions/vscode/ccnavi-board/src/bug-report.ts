@@ -168,7 +168,7 @@ async function startRecording(current: Session): Promise<void> {
   if (recording.exit !== undefined) {
     current.noRecording = "録画を始められなかった";
     current.errors.push(`ffmpeg（録画）: ${recording.stderr.trim()}`);
-    const hint = current.capture === "mac" ? "macOSの「システム設定 > プライバシーとセキュリティ > 画面収録」でVS Codeを許可してから、もう一度始めます。" : "";
+    const hint = current.capture === "mac" ? "macOSの「システム設定」→「プライバシーとセキュリティ」→「画面収録」でVS Codeを許可してから、もう一度始めます。" : "";
     void vscode.window.showWarningMessage(`録画を始められなかったので、録画はしません。スクリーンショットとログは保存します。${hint}`);
     return;
   }
@@ -300,7 +300,7 @@ export async function takeScreenshot(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 300));
     await run(command.file, command.args, 20_000);
     if (!fs.existsSync(file)) {
-      throw new Error("画像ができなかった");
+      throw new Error("画像を作れなかった");
     }
     current.shots += 1;
     vscode.window.setStatusBarMessage(`$(check)スクリーンショット${current.shots}枚目を撮りました`, 3000);
@@ -316,7 +316,7 @@ export async function takeScreenshot(): Promise<void> {
 async function toGif(current: Session, recording: Recording): Promise<Buffer | string> {
   if (!fs.existsSync(recording.file) || fs.statSync(recording.file).size === 0) {
     current.errors.push(`ffmpeg（録画）: ${recording.stderr.trim()}`);
-    return "録画のファイルができなかった";
+    return "録画のファイルを作れなかった";
   }
   const gif = path.join(current.work, "screen.gif");
   try {
@@ -324,7 +324,7 @@ async function toGif(current: Session, recording: Recording): Promise<Buffer | s
     return fs.readFileSync(gif);
   } catch (error) {
     current.errors.push(`ffmpeg（gif）: ${error instanceof Error ? error.message : String(error)}`);
-    return "gifにできなかった";
+    return "gifに変換できなかった";
   }
 }
 
@@ -403,7 +403,7 @@ export async function finishReport(): Promise<void> {
 
   const reveal = "フォルダで表示";
   const picked = await vscode.window.showInformationMessage(
-    `バグ報告を${zipFile}に保存しました。録画とスクリーンショットには画面に映っていたもの（秘密の値も）が、ログにはその間の操作の記録が入るので、渡す前に中身を確かめてください。`,
+    `バグ報告を${zipFile}に保存しました。録画とスクリーンショットには、画面に映っていた内容（秘密の値を含む）が入ります。ログには、その間の操作の記録が入ります。渡す前に中身を確かめてください。`,
     reveal,
   );
   if (picked === reveal) {

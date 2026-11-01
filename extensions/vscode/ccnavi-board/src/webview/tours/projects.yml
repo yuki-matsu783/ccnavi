@@ -56,7 +56,7 @@ diagrams:
         text: .gitが現れたことを監視で知り、変化が300ミリ秒止まったら一覧を読み直す
       - id: card
         from: プロジェクト管理画面
-        text: 一覧にweb-appのカードが出る。cloneが失敗して .gitが出来なければ、カードは出ない
+        text: 一覧にweb-appのカードが出る。cloneが失敗して.gitが出来なければ、カードは出ない
         value: |-
           名前: web-app
           origin: https://example.com/team/web-app.git
@@ -72,7 +72,7 @@ diagrams:
         value: https://alice:TOKEN@example.com/team/web-app.git
       - id: cred-stop
         from: プロジェクト管理画面
-        text: ターミナルへ送らず、赤い一言で止める。履歴と .git/configに平文で残るため
+        text: ターミナルへ送らず、赤い一言で止める。履歴と.git/configに平文で残るため
         value: URL に資格情報（user:token@）が入っています。…credential helper か SSH キーを使ってください
       - id: dup
         from: ユーザ
@@ -107,7 +107,7 @@ diagrams:
       - id: trees
         from: プロジェクト管理画面
         to: ccnavi
-        text: 一覧のもとになる答えをもらう。projects/ の直下で .gitを持つものが、1件1枚のカードになる
+        text: 一覧のもとになる答えをもらう。projects/の直下で.gitを持つものが、1件1枚のカードになる
         value: ccnavi --explain --json
       - id: origin
         from: プロジェクト管理画面
@@ -168,7 +168,7 @@ diagrams:
       - id: warn-say
         from: ccnavi
         to: プロジェクト管理画面
-        text: warnを返す。ワークツリーはワークスペースの .claude/worktrees/ に置く。ここのものは承認の走査の対象外
+        text: warnを返す。ワークツリーはワークスペースの.claude/worktrees/に置く。ここのものは承認の走査の対象外
         value: |-
           warn (projects/web-app)
           プロジェクトの中にワークツリーがある（fix-login）。…
@@ -227,31 +227,31 @@ diagrams:
       - id: in-projects
         from: ワークスペースのフォルダ
         to: プロジェクト管理画面
-        text: projects/ の直下で .gitを持つ。プロジェクトになり、別枠には出ない
+        text: projects/の直下で.gitを持つ。プロジェクトになり、別枠には出ない
         value: projects/web-app/.git
       - id: outside
         from: ワークスペースのフォルダ
         to: プロジェクト管理画面
-        text: projects/ の外にある（ワークスペース直下）。別枠に出る
+        text: projects/の外にある（ワークスペース直下）。別枠に出る
         value: |-
           web-app/.git
           projects/ の外にあります。…
       - id: too-deep
         from: ワークスペースのフォルダ
         to: プロジェクト管理画面
-        text: projects/ の下だが、直下ではなく1段深い。別枠に出る
+        text: projects/の下だが、直下ではなく1段深い。別枠に出る
         value: |-
           projects/team/api/.git
           projects/ の直下ではなく、その下の階層にあります。…
       - id: second
         from: ワークスペースのフォルダ
         to: プロジェクト管理画面
-        text: projects/ の外でも、2段目までなら別枠に出る
+        text: projects/の外でも、2段目までなら別枠に出る
         value: tools/vendor/.git
       - id: too-far
         from: ワークスペースのフォルダ
         to: プロジェクト管理画面
-        text: projects/ の外の3段目は、探さない。別枠に出ない
+        text: projects/の外の3段目は、探さない。別枠に出ない
         value: tools/vendor/lib/.git
       - id: skipped
         from: ワークスペースのフォルダ
@@ -266,10 +266,10 @@ courses:
     steps:
       - target: summary
         title: プロジェクトの置き場
-        body: ワークスペースのprojects/ の直下にあるgitリポジトリが、プロジェクトとして並びます。ここに件数と置き場のフォルダが出ます。
+        body: ワークスペースのprojects/の直下にあるgitリポジトリが、プロジェクトとして並びます。ここに件数と置き場のフォルダが出ます。
       - target: clone
         title: リポジトリをcloneする
-        body: URLを入れてcloneを押すと、projects/ の直下に取り込みます。名前はURLから自動で入り、手で直せます。git cloneは「ccnavi」ターミナルで動くので、認証が必要なときはそこで入力します。
+        body: URLを入れてcloneを押すと、projects/の直下に取り込みます。名前はURLから自動で入り、手で直せます。git cloneは「ccnavi」ターミナルで動くので、認証が必要なときはそこで入力します。
       - target: list
         title: プロジェクトの一覧
         body: プロジェクトごとに、origin・設定のルール・ワークツリー・チケット・検証の結果をカードで見られます。
@@ -297,7 +297,7 @@ courses:
         focus: input
       - target: clone-name
         title: 名前はURLの末尾から入る
-        body: 例ではweb-appが自動で入ります。この名前はprojects/ の下のフォルダ名になり、チケットのprojectの欄やログの名前にもそのまま使われるので、英数字で始め、英数字と . _ - だけにします。変えたいときだけ直します。
+        body: 例ではweb-appが自動で入ります。この名前はprojects/の下のフォルダ名になり、チケットのprojectの欄やログの名前にもそのまま使われるので、英数字で始め、使えるのは英数字と「.」「_」「-」だけにします。変えたいときだけ直します。
         diagram: project-clone
         focus: input
       - target: clone-run
@@ -307,12 +307,12 @@ courses:
         focus: check
       - target: clone-run
         title: 画面はcloneしない。1行を送るだけ
-        body: 画面は、ワークスペースのルートでgit cloneする1行を「ccnavi」ターミナルへ送ります（図の /wsは例）。cloneするのは、そのターミナルのgitです。送ったあとは、一言を出して欄を空にします。
+        body: 画面は、ワークスペースのルートでgit cloneする1行を「ccnavi」ターミナルへ送ります（図の/wsは例）。cloneするのは、そのターミナルのgitです。送ったあとは、一言を出して欄を空にします。
         diagram: project-clone
         focus: send, info
       - target: clone
         title: 認証とcloneはターミナルで
-        body: 認証が要るときは、ターミナルで入力します。URLにuser:token@ を埋め込むと、履歴と .git/configに平文で残るので、画面が止めます。gitがprojects/web-appを作り、中身を取り込みます。
+        body: 認証が要るときは、ターミナルで入力します。URLにuser:token@を埋め込むと、履歴と.git/configに平文で残るので、画面が止めます。gitがprojects/web-appを作り、中身を取り込みます。
         diagram: project-clone
         focus: auth, clone
       - target: list
@@ -322,7 +322,7 @@ courses:
         focus: watch
       - target: project
         title: カードが出る
-        body: web-appのカードが出ます。cloneが失敗して .gitが出来なければ、カードは出ません。ターミナルの出力を確かめます。
+        body: web-appのカードが出ます。cloneが失敗して.gitが出来なければ、カードは出ません。ターミナルの出力を確かめます。
         diagram: project-clone
         focus: card
       - target: clone-run
@@ -332,7 +332,7 @@ courses:
         focus: cred, cred-stop
       - target: clone-run
         title: 止まる例 同じリポジトリ、同じ名前
-        body: 同じリポジトリは、URLの形が違っても（httpsとgit@ など）originとhost/pathで比べて止めます。名前は大文字小文字だけ違っても、同じ名前として止めます。
+        body: 同じリポジトリは、URLの形が違っても（httpsとgit@など）originとhost/pathで比べて止めます。名前は大文字小文字だけ違っても、同じ名前として止めます。
         diagram: project-clone-stop
         focus: dup, dup-stop, name, name-stop
 
@@ -342,7 +342,7 @@ courses:
     steps:
       - target: list
         title: 一覧はccnaviの答えから作る
-        body: 図の値はすべて例です。画面は、projects/ の直下で .gitを持つものをccnaviの答えから受け取り、1件を1枚のカードにします。何がプロジェクトかは、画面が自分では決めません。
+        body: 図の値はすべて例です。画面は、projects/の直下で.gitを持つものをccnaviの答えから受け取り、1件を1枚のカードにします。何がプロジェクトかは、画面が自分では決めません。
         diagram: project-card
         focus: trees
       - target: project
@@ -352,7 +352,7 @@ courses:
         focus: origin
       - target: project
         title: ルール・ワークツリー・チケット
-        body: 設定のルールは、ccnaviが答えた場所にファイルがあるかを見ます。無いのは設定が無いだけで、問題ではありません。ワークツリーとチケットの件数は、ccnaviの答えを数えたものです。
+        body: 設定のルールは、ccnaviが答えた場所にファイルがあるかを見ます。ファイルが無いのは、設定が無いというだけで、問題ではありません。ワークツリーとチケットの件数は、ccnaviの答えを数えたものです。
         diagram: project-card
         focus: rules, counts
       - target: project-check
@@ -367,7 +367,7 @@ courses:
         focus: err-place, err-say, err-card
       - target: project-check
         title: warnの例 と、問題なし
-        body: プロジェクトの中に作ったワークツリーはwarnです。ワークスペースの .claude/worktrees/ に作り直します。名前も置き場所も問題がなければ、指摘は付きません。
+        body: プロジェクトの中に作ったワークツリーはwarnです。ワークスペースの.claude/worktrees/に作り直します。名前も置き場所も問題がなければ、指摘は付きません。
         diagram: project-lint
         focus: warn-place, warn-say, ok
       - target: workspace
@@ -382,25 +382,25 @@ courses:
         focus: call-bash, load-bash
       - target: refresh
         title: 別枠に出るリポジトリ
-        body: .gitを持つのにプロジェクトにならないものは、一覧の下に別枠で出ます。projects/ の外、またはprojects/ の直下より深い場所にあるものです。別枠の変化は監視にかからないので、更新を押します。
+        body: .gitを持つのにプロジェクトにならないものは、一覧の下に別枠で出ます。projects/の外、またはprojects/の直下より深い場所にあるものです。別枠の変化は監視にかからないので、更新を押します。
         diagram: project-stray
 
   - id: add-project
     title: プロジェクトを追加したいとき
-    summary: cloneするか、既存のリポジトリをprojects/ の下へ移して、一覧に出す
+    summary: cloneするか、既存のリポジトリをprojects/の下へ移して、一覧に出す
     steps:
       - target: clone-url
         title: URLを入れる
         body: cloneしたいリポジトリのURLを入れます。httpsでもssh形式でも構いません。
       - target: clone-name
         title: 名前を決める
-        body: projects/ の下に作るフォルダの名前です。URLの末尾から自動で入ります。変えたいときだけ直します。
+        body: projects/の下に作るフォルダの名前です。URLの末尾から自動で入ります。変えたいときだけ直します。
       - target: clone-run
         title: cloneを実行する
         body: 押すと「ccnavi」ターミナルでgit cloneが実行されます。終わると一覧に新しいカードが出ます。
       - target: refresh
         title: 手で移したときは更新
-        body: 既存のリポジトリをprojects/ の直下へ自分で移したときは、更新を押すと一覧に出ます。ワークスペース直下などにあって認識されないリポジトリは、一覧の下に別枠で出ます。
+        body: 既存のリポジトリをprojects/の直下へ自分で移したときは、更新を押すと一覧に出ます。ワークスペース直下などにあって認識されないリポジトリは、一覧の下に別枠で出ます。
       - target: project
         title: 追加できたか確認する
         body: 新しいカードの検証が「問題なし」なら取り込めています。errorやwarnが出たら、理由に従って直します。

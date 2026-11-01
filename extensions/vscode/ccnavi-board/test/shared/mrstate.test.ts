@@ -38,7 +38,7 @@ test("CB-T621 mr-state: unknownは種類ごとに読み、理由（空白を含�
     assert.deepEqual(result, { kind: "unknown", reason: kind, detail: "ホストに届かない（ネットワーク）" });
   }
   // 種類を知らない・終了コードが合わない・理由が無い: 形が想定外
-  assert.match(formatError(state("unknown frobnicate 理由", { code: 1 })), /種類を知りません（frobnicate）/);
+  assert.match(formatError(state("unknown frobnicate 理由", { code: 1 })), /unknownの種類が想定外です（frobnicate）/);
   assert.match(formatError(state("unknown auth 理由", { code: 0 })), /終了コードが状態と合いません（0）/);
   assert.match(formatError(state("unknown auth", { code: 1 })), /unknownの項目の数が違います/);
 });
@@ -52,9 +52,9 @@ test("CB-T622 mr-stateの検証: 1行目・語の数・番号・Draft・終了�
   // 状態の行が無い・多すぎる
   assert.match(formatError(interpretMrState(ran("mr-state 1\n"), 12)), /状態の行がありません/);
   assert.match(formatError(interpretMrState(ran(`mr-state 1\nmerged 12 ${URL}\nmerged 12 ${URL}\n`), 12)), /行が多すぎます/);
-  assert.match(formatError(interpretMrState(ran(`mr-state 1\n\nmerged 12 ${URL}\n`), 12)), /1行目|行が多すぎます|状態を知りません/);
+  assert.match(formatError(interpretMrState(ran(`mr-state 1\n\nmerged 12 ${URL}\n`), 12)), /1行目|行が多すぎます|状態が想定外です/);
   // 状態を知らない
-  assert.match(formatError(state(`pending 12 ${URL}`)), /状態を知りません（pending）/);
+  assert.match(formatError(state(`pending 12 ${URL}`)), /状態が想定外です（pending）/);
   assert.match(formatError(state("")), /状態の行がありません/);
   // 項目の数: openは4、merged / closedは3
   assert.match(formatError(state(`open 12 no`)), /openの項目の数が違います/);
@@ -131,8 +131,8 @@ test("CB-T626 sync retiredの異常は「一覧を取得できません」にす
   assert.match(error({ code: 1, killed: false, stdout: HEAD }), /一覧を取得できません（コマンドが失敗しました。終了コード1）/);
   assert.match(error({ code: 0, killed: true, stdout: HEAD }), /一覧を取得できません（時間内に終わりませんでした）/);
   // 知らない行（黙って破棄しない）
-  assert.match(error({ ...base, stdout: `${HEAD}retired i0001 self 1 b\nmystery i0002\n` }), /3行目を知りません/);
-  assert.match(error({ ...base, stdout: `${HEAD}\nretired i0001 self 1 b\n` }), /2行目を知りません/);
+  assert.match(error({ ...base, stdout: `${HEAD}retired i0001 self 1 b\nmystery i0002\n` }), /3行目が想定外です/);
+  assert.match(error({ ...base, stdout: `${HEAD}\nretired i0001 self 1 b\n` }), /2行目が想定外です/);
   // retiredの行の項目が足りない
   for (const line of ["retired", "retired i0001", "retired i0001 self", "retired i0001 self 12"]) {
     assert.match(error({ ...base, stdout: `${HEAD}${line}\n` }), /retiredの項目が足りません/, line);

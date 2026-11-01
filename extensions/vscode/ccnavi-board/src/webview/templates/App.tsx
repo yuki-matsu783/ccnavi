@@ -253,7 +253,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
           </span>
         </div>
         <div className="controls">
-          <button type="button" className="action" data-action="reload" data-tour="refresh" title="ファイルを読み直します" disabled={shownBusy || editing !== undefined} onClick={refresh}>
+          <button type="button" className="action" data-action="reload" data-tour="refresh" title="ファイルを更新します" disabled={shownBusy || editing !== undefined} onClick={refresh}>
             更新
           </button>
         </div>
@@ -312,7 +312,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                 </p>
               )}
               {shownTemplates.length === 0 ? (
-                <p className="empty">{"テンプレートがありません。共通は .ccnavi/config/common/templates/、プロジェクトは .ccnavi/config/project/templates/ の下に、<名前>.ymlの名前で置きます。"}</p>
+                <p className="empty">{"テンプレートがありません。共通は.ccnavi/config/common/templates/、プロジェクトは.ccnavi/config/project/templates/の下に、<名前>.ymlの名前で置きます。"}</p>
               ) : (
                 <ul className="list">{shownTemplates.map((entry) => templateRow(entry))}</ul>
               )}
@@ -337,7 +337,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
             <HandoffLink entry={page.handoff} disabled={touring} onOpen={() => act({ type: "openHandoff" })} />
           </p>
           {page.data.drafts.length === 0 ? (
-            <p className="empty">{"下書きはありません。親チケットをクローズする前に、ccnavi --templates --draft <親> で作れます。"}</p>
+            <p className="empty">{"下書きはありません。親チケットをクローズする前に、ccnavi --templates --draft <親>で作れます。"}</p>
           ) : (
             <ul className="list">
               {page.data.drafts.map((draft, index) => (
