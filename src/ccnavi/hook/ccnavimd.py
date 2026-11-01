@@ -129,7 +129,7 @@ SUBSTITUTIONS = (
     "stage_sh",  # 保護対象を下書きで直すための sh
     "worktree_sh",  # 直接作業のワークツリーを切る sh
     "handoff",  # ユーザに渡す物の置き場（`wip/handoff`）
-    "scratch",  # 使い捨ての置き場（ワークスペースルート直下の `scratchpad` の絶対パス。無視される）
+    "scratch",  # 一時の置き場（ワークスペースルート直下の `scratchpad` の絶対パス。無視される）
     "projects",  # プロジェクトの置き場（ワークスペースルートからの相対）
     "tickets_dir",  # 提案の置き場
     "approved_dir",  # 承認済みチケットの置き場

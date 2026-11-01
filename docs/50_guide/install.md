@@ -239,7 +239,7 @@ PATH に通すフォルダが PATH に入っていなければ、環境に合っ
 /.ccnavi/bin/darwin-arm64/
 # --docs の索引
 **/ccnavi-index.jsonl
-# 使い捨ての置き場
+# 一時の置き場
 /scratchpad
 # 実行時の記録
 /logs/

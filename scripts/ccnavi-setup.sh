@@ -1197,7 +1197,7 @@ INDEX_IGNORE_LINE="**/ccnavi-index.jsonl"
 # または同等以上の `/scratchpad/`・`scratchpad`・`scratchpad/` があるときは足さない。
 # 末尾に `/` を付けないのは、scratchpad が symlink でもヒットするようにするため（`/scratchpad/` はディレクトリにしかヒットしない）。
 # `!/scratchpad`・`!scratchpad/keep.md` のようにユーザが否定している行（配下の否定を含む）があれば、追跡すると決めているので足さずに伝える。
-SCRATCH_IGNORE_COMMENT="# 使い捨ての置き場"
+SCRATCH_IGNORE_COMMENT="# 一時の置き場"
 SCRATCH_IGNORE_LINE="/scratchpad"
 # ワークスペースルート直下の logs/ は、判定の記録・state・診断ログ（logs/diag/）の置き場。実行時に
 # 書かれる絶対パスとコマンド全文が入るので追跡しない。無視する行が無い配布先では、ターンの終わりの
