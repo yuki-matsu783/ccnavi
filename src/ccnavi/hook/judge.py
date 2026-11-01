@@ -175,7 +175,7 @@ def decide_before(
 
     # ユーザに確認（ask）を出す呼び出しは、確認の前の発言が背景と結果を言っているかを先に見る。
     # 対象は `AskUserQuestion` と、下で確認を返す 2 か所（`refuse` の `ask_context`）。
-    ask_context = ask_context_check(root, payload, deadline)
+    ask_context = ask_context_check(root, payload)
     if payload.tool_name in toolnames.ASK_USER_TOOLS:
         text = ask_context()
         if text:
@@ -1122,7 +1122,7 @@ def decide_before(
     )
 
 
-def ask_context_check(root: str, payload: hookio.Input, deadline: float) -> Callable[[], str]:
+def ask_context_check(root: str, payload: hookio.Input) -> Callable[[], str]:
     """確認の前の発言を調べる関数。止める文を返し、揃っているか検査しないときは空を返す。
 
     検査しないのは、非対話のセッション（確認は自動で拒否になり、答える人がいない）と
@@ -1130,9 +1130,7 @@ def ask_context_check(root: str, payload: hookio.Input, deadline: float) -> Call
     """
     if ccnavimd.unattended() or payload.agent_id:
         return lambda: ""
-    return lambda: askcontext.stop_text(
-        root, payload.transcript_path, payload.tool_use_id, deadline
-    )
+    return lambda: askcontext.stop_text(root, payload.transcript_path, payload.tool_use_id)
 
 
 def ask_context_refusal(record: audit.Record, subject: str, text: str) -> str:

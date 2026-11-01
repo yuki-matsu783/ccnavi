@@ -12,7 +12,8 @@
 - PreToolUse の時点では、直前の発言がまだ書き込まれていないことがある（`claude -p` の実測では
   3 回中 2 回が未書き込みで、0.5 秒以内に現れた）。書き込み済みかは、この呼び出し自身の行
   （`tool_use_id` を持つ tool_use）が記録にあるかで分かる。自分の行があり、見出しが無ければ、
-  待たずに止める。自分の行がまだ無ければ、見出しが現れるまで、期限の手前まで 0.1 秒ごとに読み直す
+  待たずに止める。自分の行がまだ無ければ、見出しが現れるまで、最大 5 秒（`CCNAVI_ASK_CONTEXT_WAIT_SECONDS`）、
+  0.1 秒ごとに読み直す
 - 判定できないときは通す。記録が読めない・パスや `tool_use_id` が無い、待っても自分の行も見出しも
   現れない、のどれか。促しの検査で、保護ではない。止めすぎるより通すほうを選ぶ
 - 見出しの語（`SECTIONS` の別名を含む）があるかだけを見る。中身が適切かどうかは機械では判断しない
@@ -40,8 +41,6 @@ SECTIONS = {
 # 会話記録の末尾から読む長さ。現在のステップの発言はこの中に収まる。
 _TAIL_BYTES = 512 * 1024
 _POLL_SECONDS = 0.1
-# 期限の手前で読み直しを止める余裕（秒）。
-_MARGIN_SECONDS = 0.5
 
 
 def _heading(words: tuple[str, ...]) -> re.Pattern[str]:
@@ -124,9 +123,14 @@ def absent_sections(text: str) -> list[str]:
     return [name for name in SECTIONS if not _PATTERNS[name].search(text)]
 
 
-def wait_until(deadline: float) -> float:
-    """読み直しを続ける限りの時刻（`time.monotonic`）。hook の判定の期限より手前に収める。"""
-    return min(time.monotonic() + tunables.ASK_CONTEXT_WAIT.value(), deadline - _MARGIN_SECONDS)
+def wait_until() -> float:
+    """読み直しを続ける限りの時刻（`time.monotonic`）。
+
+    hook の判定の期限（`CCNAVI_HOOK_DEADLINE_SECONDS`）には縛らない。期限はルール照合を打ち切る
+    ためのもので、この待ちはその前後の短い読み取りだけだから。上限は hook の timeout（settings.json
+    の `timeout`、既定 10 秒）より短くする。
+    """
+    return time.monotonic() + tunables.ASK_CONTEXT_WAIT.value()
 
 
 def missing(path: str, tool_use_id: str, until: float) -> list[str]:
@@ -152,9 +156,9 @@ def missing(path: str, tool_use_id: str, until: float) -> list[str]:
         time.sleep(_POLL_SECONDS)
 
 
-def stop_text(root: str, path: str, tool_use_id: str, deadline: float) -> str:
+def stop_text(root: str, path: str, tool_use_id: str) -> str:
     """止める文。直前の発言に節が揃っているか、判定できなければ空。"""
-    absent = missing(path, tool_use_id, wait_until(deadline))
+    absent = missing(path, tool_use_id, wait_until())
     if not absent:
         return ""
     return texts.say(root, CODE, {"missing": "・".join(f"「{name}」" for name in absent)})

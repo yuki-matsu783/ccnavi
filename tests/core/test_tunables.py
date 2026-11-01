@@ -52,7 +52,7 @@ class DefaultsTest(unittest.TestCase):
             (tunables.SUBAGENT_RUNNING_MAX, 4 * 3600.0),
             (tunables.TURN_STALE, 30 * 60.0),
             (tunables.STOP_REVIEW_TTL, 600.0),
-            (tunables.ASK_CONTEXT_WAIT, 1.5),
+            (tunables.ASK_CONTEXT_WAIT, 5.0),
         ]
         for tunable, default in pairs:
             with self.subTest(env=tunable.env):
