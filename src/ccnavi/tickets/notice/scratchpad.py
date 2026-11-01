@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import math
 import os
+import time
 
 from ...policy import texts
 from ..model import ticket_places
@@ -19,6 +20,8 @@ from ..model import ticket_places
 WARN_MB_ENV = "CCNAVI_SCRATCHPAD_WARN_MB"
 DEFAULT_WARN_MB = 500.0
 _MB = 1024 * 1024
+# 走査にかける時間の上限（秒）。ファイルが多くても SessionStart を遅らせない。
+SCAN_SECONDS = 2.0
 
 
 def warn_mb() -> float:
@@ -36,10 +39,14 @@ def warn_mb() -> float:
 
 
 def scratch_bytes(root: str) -> int:
-    """`scratchpad/` の中の通常ファイルの大きさの合計。無ければ 0。"""
+    """`scratchpad/` の中の通常ファイルの大きさの合計。無ければ 0。
+
+    `SCAN_SECONDS` を過ぎたら、そこまでの合計を返す。
+    """
     total = 0
+    limit = time.monotonic() + SCAN_SECONDS
     stack = [ticket_places.scratch_dir(root)]
-    while stack:
+    while stack and time.monotonic() < limit:
         current = stack.pop()
         try:
             with os.scandir(current) as it:
