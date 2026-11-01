@@ -146,6 +146,8 @@ def decide_before(
     処理フロー:
     1. 判定より先に設定ファイルのバックアップを取る（`guard_setting_files` に `selfguard.before`）。
        その知らせは `guard` に残し、以降の応答に足す。
+    1b. ユーザに確認を出す呼び出し（`AskUserQuestion`）は、直前の発言に「前提・背景」「想定結果」が
+       無ければ止める（`askcontext`）。ルールや関門が返す確認も、返す前に同じ検査を通る（`refuse`）。
     2. 主題（`record.subject`）が無ければ記録して抜ける。
     3. ルールを読み、この呼び出しの行き先のツリーを決める（`ruleload.rules_for`）。
     4. 組み込みの保護をルールに足す（`selfguard_shell`・`ticket_guard`・`phase_forms`）。

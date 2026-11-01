@@ -234,6 +234,15 @@ GitLab の実物で分かったこと。
 | トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流して作れる（`tests/manual/gitlab/make_gitlab_tokens.rb`） | root と reviewer の 2 人分を作る |
 | 起動直後は API の `PUT` が 30 秒を超えることがある | probe は 120 秒で 3 回まで待つ |
 
+### 会話記録への直前の発言の書き込み（Claude Code 2.1.296）
+
+`claude -p` で、「一文を書いてから Bash で `echo hi` を実行する」よう頼み、PreToolUse の hook が会話記録（`transcript_path`）の全行を読んだ。hook の開始時と、0.5 秒ごと最大 8 秒の読み直しで、一文を含むアシスタントの text 行が現れる時刻を記録した。3 回実行した。
+
+- 3 回とも、一文は 0.5 秒以内に会話記録へ書かれた。うち 1 回は hook の開始時点で書き込み済み、2 回は未書き込みだった
+- 読み直しの間隔が 0.5 秒なので、実際の遅れは 0 秒から 0.5 秒のどこか
+- 一文の text 行の後ろに、同じ呼び出しの tool_use 行が続いた
+- 未確認: 対話のセッション、サブエージェントの会話記録、負荷が高いとき、ほかの版
+
 ### 非対話の起動（Claude Code 2.1.310）
 
 `claude -p`（haiku）を、リポジトリの外の空のディレクトリで回して確かめた。SessionStart の hook に環境変数と payload を書き出す設定を `--settings` で渡した。
