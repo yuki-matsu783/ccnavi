@@ -4,7 +4,7 @@
  * ファイルは YAML の 1 文書（`.ccnavi/config/<層>/templates/<名前>.yml`）。形は実行ファイル（`tickets/proposal/plan_templates.py`）が読むもの。
  *
  *     name, description, when?
- *     plan:     [型の名前 | {type, review?, after?}, ...]     全体計画。`after` は計画の中の添字（1 始まり）
+ *     plan:     [型の名前 | {type, review?, deferred?, after?}, ...]     全体計画。`after` は計画の中の添字（1 始まり）
  *     feedback: [同上]                                        フィードバック計画。`after` もこの計画の中の添字
  *     flows:    {全体計画の添字: フローの本文}                  子のフロー（フロー編集画面と同じ形）
  *
@@ -26,9 +26,9 @@ export type PlanPart = "plan" | "feedback";
 /** 計画の 1 ステップ。`after` は計画の中の添字（1 始まり） */
 export interface EditItem {
   readonly type: string;
-  /** ステップの `review: true`（定義が `review: false` でも要る）。既定は false */
-  readonly review: boolean;
-  /** ステップの `deferred: true`（レビューを後ろのステップへ延ばす）。既定は false。`review` と同時には真にならない */
+  /** ステップの `review`。true は要る、false は要らない（どちらも定義より優先）。null は書かない（定義に従う） */
+  readonly review: boolean | null;
+  /** ステップの `deferred: true`（レビューを後ろのステップへ延ばす）。既定は false。`review` を書いたステップとは同時に真にならない */
   readonly deferred: boolean;
   readonly after: readonly number[];
 }
@@ -46,12 +46,15 @@ export interface EditTemplate {
   readonly extra: Readonly<Record<string, unknown>>;
 }
 
-/** ステップのレビューの指定（画面の選択肢）。空は定義のまま、`review` は `review: true`、`deferred` は `deferred: true` */
-export const ITEM_MODES = ["", "review", "deferred"] as const;
+/** ステップのレビューの指定（画面の選択肢）。空は定義のまま、`review` は `review: true`、`no-review` は `review: false`、`deferred` は `deferred: true` */
+export const ITEM_MODES = ["", "review", "no-review", "deferred"] as const;
 export type ItemMode = (typeof ITEM_MODES)[number];
 
 export function modeOf(item: EditItem): ItemMode {
-  return item.review ? "review" : item.deferred ? "deferred" : "";
+  if (item.review !== null) {
+    return item.review ? "review" : "no-review";
+  }
+  return item.deferred ? "deferred" : "";
 }
 
 const KNOWN = new Set(["name", "description", "when", "plan", "feedback", "flows"]);
@@ -70,10 +73,11 @@ function readItems(value: unknown): EditItem[] | undefined {
   const out: EditItem[] = [];
   for (const entry of value) {
     if (typeof entry === "string") {
-      out.push({ type: entry, review: false, deferred: false, after: [] });
+      out.push({ type: entry, review: null, deferred: false, after: [] });
     } else if (isRecord(entry) && typeof entry.type === "string") {
       const after = Array.isArray(entry.after) ? entry.after.filter((n): n is number => typeof n === "number") : [];
-      out.push({ type: entry.type, review: entry.review === true, deferred: entry.deferred === true && entry.review !== true, after: [...new Set(after)].sort((a, b) => a - b) });
+      const review = typeof entry.review === "boolean" ? entry.review : null;
+      out.push({ type: entry.type, review, deferred: entry.deferred === true && review === null, after: [...new Set(after)].sort((a, b) => a - b) });
     } else {
       return undefined;
     }
@@ -119,7 +123,7 @@ export function fromData(raw: unknown): EditTemplate | undefined {
 
 /** 空の名前から始める新しいテンプレート。`type` は最初のステップの型 */
 export function blankTemplate(name: string, type: string): EditTemplate {
-  return { name, description: "", when: "", plan: [{ type, review: false, deferred: false, after: [] }], feedback: [], flows: {}, extra: {} };
+  return { name, description: "", when: "", plan: [{ type, review: null, deferred: false, after: [] }], feedback: [], flows: {}, extra: {} };
 }
 
 /** まだ何も入力していないか。`blank` は `blankTemplate` で作った開いた直後の中身。書き出す形で比べる */
@@ -129,12 +133,12 @@ export function untouched(template: EditTemplate, blank: EditTemplate): boolean 
 
 function itemData(item: EditItem): unknown {
   const type = item.type.trim();
-  if (!item.review && !item.deferred && item.after.length === 0) {
+  if (item.review === null && !item.deferred && item.after.length === 0) {
     return type;
   }
   const out: Record<string, unknown> = { type };
-  if (item.review) {
-    out.review = true;
+  if (item.review !== null) {
+    out.review = item.review;
   }
   if (item.deferred) {
     out.deferred = true;
@@ -216,6 +220,11 @@ function partOf(template: EditTemplate, part: PlanPart): readonly EditItem[] {
 
 // ---- ステップの編集（どれも新しいコピーを返す。できない編集は元のまま返す）
 
+/** 画面の選択肢（`mode`）が書く `review`。`review` は要る、`no-review` は要らない、それ以外は書かない */
+function reviewOf(mode: ItemMode): boolean | null {
+  return mode === "review" ? true : mode === "no-review" ? false : null;
+}
+
 /** ステップの型・レビューの指定（`mode`）を差し替える */
 export function setItem(template: EditTemplate, part: PlanPart, index: number, patch: { readonly type?: string; readonly mode?: ItemMode }): EditTemplate {
   const items = partOf(template, part);
@@ -225,7 +234,7 @@ export function setItem(template: EditTemplate, part: PlanPart, index: number, p
   return withPart(
     template,
     part,
-    items.map((item, i) => (i === index - 1 ? { ...item, ...(patch.type === undefined ? {} : { type: patch.type }), ...(patch.mode === undefined ? {} : { review: patch.mode === "review", deferred: patch.mode === "deferred" }) } : item)),
+    items.map((item, i) => (i === index - 1 ? { ...item, ...(patch.type === undefined ? {} : { type: patch.type }), ...(patch.mode === undefined ? {} : { review: reviewOf(patch.mode), deferred: patch.mode === "deferred" }) } : item)),
   );
 }
 
@@ -233,7 +242,7 @@ export function setItem(template: EditTemplate, part: PlanPart, index: number, p
 export function addItem(template: EditTemplate, part: PlanPart, type: string): EditTemplate {
   const items = partOf(template, part);
   const after = items.length === 0 ? [] : [items.length];
-  return withPart(template, part, [...items, { type, review: false, deferred: false, after }]);
+  return withPart(template, part, [...items, { type, review: null, deferred: false, after }]);
 }
 
 /** ステップを `order`（新しい添字の順に、古い添字を並べたもの。入れない古い添字は落とす）で並べ直す。全体計画ならフローのキーも合わせる */
