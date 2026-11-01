@@ -5,7 +5,7 @@
 - 見出しの判定（`前提・背景`・`想定結果`と別名。本文中の語や別の語は当たらない）
 - `AskUserQuestion` は、直前の発言に 2 つの節が無ければ止まり、揃えば通る
 - 発言は、最後のユーザの行（プロンプトかツールの結果）より後ろだけを見る。サイドチェーンは見ない
-- ccnavi が確認に出す呼び出し（ターン分離の関門の確認）も、節が無ければ確認でなく止まる
+- ccnavi が確認に出す呼び出し（ターン分離の関門の確認・ルールの `ask`）も、節が無ければ確認でなく止まる
 - 会話記録に発言が遅れて書かれても、待てば通る
 - 記録が読めない・パスが無い、非対話、サブエージェントの呼び出しは検査しない
 - dry-run では止めず、返していたはずだと言う
@@ -244,6 +244,35 @@ class GateConfirmTest(AskContextHookTest):
         done = self.run_done()
 
         self.assertIn('"permissionDecision": "ask"', done.stdout)
+        self.assertFalse(self.stopped(done))
+
+
+RULES = os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml")
+
+
+class RuleAskTest(AskContextHookTest):
+    """ルールの `ask`（運用の rules.yml の direct-worktree-confirm）が返す確認。"""
+
+    def run_adopt(self, **kw):
+        shutil.copy(RULES, os.path.join(self.repo, ".ccnavi", "config", "common", "rules.yml"))
+        command = "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh feature-1 --base main"
+        return self.hook(tool="Bash", tool_input={"command": command}, **kw)
+
+    def test_節が無ければ確認でなく止まる(self):
+        self.write(prompt(), assistant("ワークツリーを切ります"))
+
+        done = self.run_adopt()
+
+        self.assertTrue(self.stopped(done))
+        self.assertNotIn('"permissionDecision": "ask"', done.stdout)
+
+    def test_節が揃えば確認に出る(self):
+        self.write(prompt(), assistant(BOTH))
+
+        done = self.run_adopt()
+
+        self.assertIn('"permissionDecision": "ask"', done.stdout)
+        self.assertIn("direct-worktree-confirm", done.stdout)
         self.assertFalse(self.stopped(done))
 
 

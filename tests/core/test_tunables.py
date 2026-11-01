@@ -41,7 +41,7 @@ class TunableValueTest(unittest.TestCase):
 class DefaultsTest(unittest.TestCase):
     def test_env_names_are_distinct(self):
         envs = [t.env for t in vars(tunables).values() if isinstance(t, tunables.Tunable)]
-        self.assertEqual(5, len(envs))
+        self.assertEqual(6, len(envs))
         self.assertEqual(len(envs), len(set(envs)))
 
     def test_users_keep_the_original_defaults(self):
@@ -52,6 +52,7 @@ class DefaultsTest(unittest.TestCase):
             (tunables.SUBAGENT_RUNNING_MAX, 4 * 3600.0),
             (tunables.TURN_STALE, 30 * 60.0),
             (tunables.STOP_REVIEW_TTL, 600.0),
+            (tunables.ASK_CONTEXT_WAIT, 1.5),
         ]
         for tunable, default in pairs:
             with self.subTest(env=tunable.env):
