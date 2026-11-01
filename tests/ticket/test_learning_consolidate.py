@@ -66,7 +66,7 @@ def cons_text(**front):
 
 
 class FlowHarness(PhaseHarness):
-    def setup_family(self, record=RECORD_TEXT):
+    def setup_family(self, record=RECORD_TEXT, child_finish_ok=True):
         write(self.phases, PH)
         scope = ("src/*", "wip/*", "docs/*")
         self.propose("i0001", parent_text("i0001", ["work"], feedback=[], allow=scope, copy=PH))
@@ -82,6 +82,8 @@ class FlowHarness(PhaseHarness):
         git(tree, "add", "-f", "-A")
         git(tree, "commit", "--quiet", "-m", "rec")
         closed = self.ccnavi("ticket", "finish", CHILD, env=EN)
+        if not child_finish_ok:
+            return closed
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         self.merge(CHILD)
         return tree
@@ -138,8 +140,24 @@ class ConsolidateFlowTest(FlowHarness):
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("docs/wiki/inbox/feat-1.md", refused.stderr)
 
+    def test_broken_record_stops_the_child_finish(self):
+        """子の finish も、親の finish と同じ検査で形式の誤りを断る。"""
+        refused = self.setup_family(
+            RECORD_TEXT.replace("learnings: 1", "learnings: 5"), child_finish_ok=False
+        )
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn(RECORD, refused.stderr)
+        self.assertIn("合わない", refused.stderr)
+
     def test_broken_record_stops_both_finish_and_consolidate(self):
-        self.setup_family(RECORD_TEXT.replace("learnings: 1", "learnings: 5"))
+        """合流のあとに記録が壊れたら、親の finish と consolidate が止まる。"""
+        self.setup_family()
+        write(
+            os.path.join(self.parent_tree, *RECORD.split("/")),
+            RECORD_TEXT.replace("learnings: 1", "learnings: 5"),
+        )
+        git(self.parent_tree, "add", "-f", RECORD)
+        self.commit_parent("break")
         for result in (self.parent_finish(), self.consolidate()):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(RECORD, result.stderr)

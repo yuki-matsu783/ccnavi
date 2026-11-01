@@ -70,7 +70,10 @@ PLAN_WAITS = os.path.join(ROOT, "tests", "fixtures", "plan-waits.json")
 def item(kind, mode="", after=()):
     """`mode` は "" / "review"（`review: true`）/ "defer"（`deferred: true`）。"""
     return ticket_model.PlanItem(
-        type=kind, review=mode == "review", deferred=mode == "defer", after=list(after)
+        type=kind,
+        review=True if mode == "review" else None,
+        deferred=mode == "defer",
+        after=list(after),
     )
 
 

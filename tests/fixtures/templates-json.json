@@ -45,7 +45,7 @@
       "index": 1,
       "number": 1,
       "type": "design",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": []
      },
@@ -53,7 +53,7 @@
       "index": 2,
       "number": 2,
       "type": "implement",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": [
        1
@@ -65,7 +65,7 @@
       "index": 1,
       "number": 3,
       "type": "implement-feedback",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": []
      }
@@ -103,7 +103,7 @@
       "index": 1,
       "number": 1,
       "type": "research",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": []
      },
@@ -111,7 +111,7 @@
       "index": 2,
       "number": 2,
       "type": "design",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": [
        1
@@ -140,7 +140,7 @@
       "index": 1,
       "number": 1,
       "type": "design",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": []
      },
@@ -148,7 +148,7 @@
       "index": 2,
       "number": 2,
       "type": "acceptance",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": []
      }
@@ -180,7 +180,7 @@
       "index": 1,
       "number": 1,
       "type": "design",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": []
      },
@@ -188,7 +188,7 @@
       "index": 2,
       "number": 2,
       "type": "implement",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": [
        1
@@ -200,7 +200,7 @@
       "index": 1,
       "number": 3,
       "type": "implement-feedback",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": []
      }
@@ -246,7 +246,7 @@
       "index": 1,
       "number": 1,
       "type": "docs",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": []
      }
@@ -278,7 +278,7 @@
       "index": 1,
       "number": 1,
       "type": "research",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": []
      },
@@ -286,7 +286,7 @@
       "index": 2,
       "number": 2,
       "type": "design",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": [
        1
@@ -359,7 +359,7 @@
         "index": 1,
         "number": 1,
         "type": "design",
-        "review": false,
+        "review": null,
         "deferred": false,
         "after": []
        },
@@ -367,7 +367,7 @@
         "index": 2,
         "number": 2,
         "type": "implement",
-        "review": false,
+        "review": null,
         "deferred": false,
         "after": [
          1
@@ -379,7 +379,7 @@
         "index": 1,
         "number": 3,
         "type": "implement-feedback",
-        "review": false,
+        "review": null,
         "deferred": false,
         "after": []
        }
@@ -417,7 +417,7 @@
         "index": 1,
         "number": 1,
         "type": "research",
-        "review": false,
+        "review": null,
         "deferred": false,
         "after": []
        },
@@ -425,7 +425,7 @@
         "index": 2,
         "number": 2,
         "type": "design",
-        "review": false,
+        "review": null,
         "deferred": false,
         "after": [
          1
@@ -469,7 +469,7 @@
         "index": 1,
         "number": 1,
         "type": "design",
-        "review": false,
+        "review": null,
         "deferred": false,
         "after": []
        },
@@ -477,7 +477,7 @@
         "index": 2,
         "number": 2,
         "type": "acceptance",
-        "review": false,
+        "review": null,
         "deferred": false,
         "after": []
        }
@@ -509,7 +509,7 @@
         "index": 1,
         "number": 1,
         "type": "design",
-        "review": false,
+        "review": null,
         "deferred": false,
         "after": []
        },
@@ -517,7 +517,7 @@
         "index": 2,
         "number": 2,
         "type": "implement",
-        "review": false,
+        "review": null,
         "deferred": false,
         "after": [
          1
@@ -529,7 +529,7 @@
         "index": 1,
         "number": 3,
         "type": "implement-feedback",
-        "review": false,
+        "review": null,
         "deferred": false,
         "after": []
        }
@@ -575,7 +575,7 @@
         "index": 1,
         "number": 1,
         "type": "docs",
-        "review": false,
+        "review": null,
         "deferred": false,
         "after": []
        }
@@ -607,7 +607,7 @@
         "index": 1,
         "number": 1,
         "type": "research",
-        "review": false,
+        "review": null,
         "deferred": false,
         "after": []
        },
@@ -615,7 +615,7 @@
         "index": 2,
         "number": 2,
         "type": "design",
-        "review": false,
+        "review": null,
         "deferred": false,
         "after": [
          1
@@ -662,7 +662,7 @@
         "index": 1,
         "number": 1,
         "type": "research",
-        "review": false,
+        "review": null,
         "deferred": false,
         "after": []
        }
@@ -821,7 +821,7 @@
       "index": 1,
       "number": 1,
       "type": "design",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": []
      },
@@ -829,7 +829,7 @@
       "index": 2,
       "number": 2,
       "type": "implement",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": [
        1
@@ -841,7 +841,7 @@
       "index": 1,
       "number": 3,
       "type": "implement-feedback",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": []
      }
@@ -889,7 +889,7 @@
       "index": 1,
       "number": 1,
       "type": "research",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": []
      },
@@ -897,7 +897,7 @@
       "index": 2,
       "number": 2,
       "type": "design",
-      "review": false,
+      "review": null,
       "deferred": false,
       "after": [
        1
