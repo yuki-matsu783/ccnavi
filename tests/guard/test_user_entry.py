@@ -208,6 +208,17 @@ class EntryMarkTest(unittest.TestCase):
         result = run_ccnavi(["--entry", "sh", "user", "prune", "--entry", "sh"])
         self.assertEqual(result.returncode, EXIT_ERROR, result.stderr)
 
+    def test_the_decide_check_form_keeps_the_mark_next_to_user(self):
+        """decide の sh が打つ事前検査の並び。`--check` は `user reviewed N` の後ろに置く。"""
+        good = ["--entry", "sh", "user", "reviewed", "1", "--check", "--accept-unresolved"]
+        self.assertEqual(user_only.take_entry(good), (good[2:], "sh"))
+        result = run_ccnavi(good)
+        self.assertNotIn("入口と一緒に", result.stderr)
+        bad = ["--entry", "sh", "--check", "user", "reviewed", "1", "--accept-unresolved"]
+        with self.assertRaises(user_only.UserEntryError):
+            user_only.take_entry(bad)
+        self.assertEqual(run_ccnavi(bad).returncode, EXIT_BLOCK)
+
     def test_a_bad_mark_is_an_error(self):
         for argv in (
             ["--entry", "terminal", "user", "agree"],

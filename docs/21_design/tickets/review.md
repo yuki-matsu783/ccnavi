@@ -29,7 +29,7 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 | `review-request --phase <N> --eli5 <HTML> --check` | 読むだけ。ロックも取り込みもせず、`review-request` の前提（ELI5・`review prepare`・MR の確認）を通して、投稿とマーカーの前で `確認: ok` を出して終わる |
 | `confirm --phase <N>` | `review confirm --check`（ロック・取り込みの前に断る）→ sh がスレッドとレビューを取ってくる → `review confirm` |
 | `decide <N> --preview` | 一覧とダイジェストを見るだけ（`--reviewed N --accept-unresolved --preview`）。書く側は `ccnavi-user-decide.sh <N>`（下の行） |
-| `ccnavi-user-decide.sh <N>` | ユーザが打つ。`ccnavi-review.sh` には無い。`user reviewed N --accept-unresolved --check`（ロック・取り込みの前に断る）→ sh が取ってくる → `user reviewed N --accept-unresolved` → sh が投稿。途中で失敗した送信は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送る（操作記録は `logs/state/ops/`） |
+| `ccnavi-user-decide.sh <N>` | ユーザが打つ。`ccnavi-review.sh` には無い。`--entry sh user reviewed N --check --accept-unresolved`（ロック・取り込みの前に断る）→ sh が取ってくる → `user reviewed N --accept-unresolved` → sh が投稿。途中で失敗した送信は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送る（操作記録は `logs/state/ops/`） |
 | `comment --body-file <本文>` | sh が投稿する。実行ファイルは関わらず、レビューの状態も変えない |
 | `ready` | `review ready --check`（ロック・取り込みの前に断る。前の回が退避を始めている打ち直しなら通して本体に任せる。Draft かどうかはホストの結果が要る）→ `review ready`（条件を確かめ、マーカーを置き、閉じた親子のチケットを `logs/archive/` へ退避する。`wip/` の追跡済みのファイルを消す。標準出力は 1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`、続けて消したものがあれば `wip-from <消す前の HEAD>` と `wip <パス>`）→ write-and-push が退避と `wip/` の削除をコミットして push する（write-and-push の外なら、sh が 2 行目のツリーの置き場と `wip/` に未コミットの変更が無いことを確かめ、あれば止める）→ sh が Draft を外し、コメントを投稿する → sh が実行ファイルの `worktree retire <親>` で子と親のワークツリーを消す。`ready` は `--parent <親>` を付けて親のワークツリーの外から打つ形だけ（sh が親のワークツリーへ移って同じ段を回し、消す前に打った場所へ戻る） |
 | `ccnavi-user-close-early.sh --reason <理由> [--no-issue]` | ユーザがターミナルで打つ。`ccnavi-review.sh` には無い。`user close-early` → sh が残りを issue に書き出し、コメントを投稿する |
@@ -75,7 +75,7 @@ Chrome 拡張も `decide` を行える。拡張が issue・返信・解決をホ
 `done/` へ動いた子のワークツリーを消す（未コミットがあるもの・cwd が中のものは消さずに言う）。
 Chrome 拡張のレビュー済みと `decide` のワークツリーは、親の `finish` の片付けが消す。
 
-`decide` の段（`ccnavi-user-decide.sh`）。ユーザがボードの［レビュー完了］かターミナルで打つ。sh は、アカウントの問い合わせ・ロック・取り込みの前に、`ccnavi --entry sh --check user reviewed N --accept-unresolved`（親とフェーズ・依頼の記録・依頼のあとに動いていないこと。選択とダイジェストを渡すときは `--yes` と `--digest` も）で断れる条件を通す。そのあと、スレッドとレビューを取ってきて、実行ファイルを
+`decide` の段（`ccnavi-user-decide.sh`）。ユーザがボードの［レビュー完了］かターミナルで打つ。sh は、アカウントの問い合わせ・ロック・取り込みの前に、`ccnavi --entry sh user reviewed N --check --accept-unresolved`（親とフェーズ・依頼の記録・依頼のあとに動いていないこと。選択とダイジェストを渡すときは `--yes` と `--digest` も）で断れる条件を通す。そのあと、スレッドとレビューを取ってきて、実行ファイルを
 `user reviewed N --accept-unresolved` で呼ぶ。実行ファイルは残っているスレッドを 1 件ずつ見せ、ユーザに対応方針を
 選ばせる。方針は次の 3 つ。
 

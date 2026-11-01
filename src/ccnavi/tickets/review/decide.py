@@ -262,7 +262,7 @@ def check(
     choices_text: str = "",
     digest: str = "",
 ) -> int:
-    """`ccnavi --entry sh --check user reviewed N --accept-unresolved`。
+    """`ccnavi --entry sh user reviewed N --check --accept-unresolved`。
     置く前に分かる前提だけを通す（読むだけ）。
 
     `decide_gate` に加えて、選択とダイジェストを渡されたときはその形も検める
