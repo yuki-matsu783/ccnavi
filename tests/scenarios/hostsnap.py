@@ -11,7 +11,7 @@
 - 取れなかったものは、その場所の `errors` に残す。例外は呼び出し側へ出さない（シナリオを止めない）
 - トークンは記録に出さない。取る項目は選んだものだけにし、知っているトークンの値は伏せる
 
-実行器（runner.py）が `take` を呼び、出力の置き場に `host-<step>.json` を書く。
+実行器（prepare.snapshot_host）が `take` を呼び、出力の置き場に `host-<step>.json` を書く。
 """
 
 import json

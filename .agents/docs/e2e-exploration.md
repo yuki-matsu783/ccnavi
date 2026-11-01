@@ -27,7 +27,7 @@ ccnavi の弱点（止め方の過不足、案内の分かりにくさ、画面�
 
 - 人間役にエージェント役の環境（PATH・トークン）を引き継がせない。人間しかできない操作をエージェントが通ってしまうと、弱点を見逃す
 - 人間役の GitLab 操作は、実行器の `human_api` を正とする。CE では変更要求（`request_changes`）が 404 になるので、変更要求は確かめられない（[acceptance-scenarios.md](acceptance-scenarios.md) の「人間の操作」）
-- `claude -p` の起動は、実行器の `run_step`（`--permission-mode auto`、`--include-hook-events`）を正とする。`real-screen/haiku-step.sh` は権限の形が違う（`acceptEdits`）ので、受入の結果とは比べない
+- `claude -p` の起動は、実行器の `drive.run_step`（`--permission-mode auto`、`--include-hook-events`）を正とする。`real-screen/haiku-step.sh` は権限の形が違う（`acceptEdits`）ので、受入の結果とは比べない
 
 ## 1. 環境を組み立てる
 
@@ -73,7 +73,7 @@ ccnavi 本体のチェックアウトには書かない。一時物は `scratchp
 - セッションごとに上限（`--max-budget-usd`）を付け、`result` の `total_cost_usd` のセッションごとの最大値を足して累計にする
 - 本は受入シナリオと同じ欄で書き（[acceptance-scenarios.md](acceptance-scenarios.md) の「シナリオの形」）、置き場は `scratchpad/<測定名>/patterns/<ID>.yml`。機械で見る欄（判定・`status`・MR と issue の状態・ファイル）と、意味で見る `judge`（迷った・誤った・不要に止められた・止められるべきなのに通った・案内が分かりにくい）に分ける
 - 画面の人間役は `real-screen/` のページオブジェクト（`BoardPage`・`ApprovalDialog`）を使う（`approve.js`・`snapshot.js`）。承認・レビュー完了・取り込みの前後で撮り、ボードの表示と `ccnavi-ticket.sh status` を突き合わせる。取り込みなどは処理中の表示になるので、直後と数秒後の両方を撮る
-- 端末の人間役は `human_run` を使う。足りない sh は実行器の `HUMAN_RUN_SCRIPTS` に足す。出力の `glpat-` の値は伏せる
+- 端末の人間役は `human_run` を使う。足りない sh は実行器の `schema.HUMAN_RUN_SCRIPTS` に足す。出力の `glpat-` の値は伏せる
 
 ### 保護の迂回を直接確かめる（probe）
 

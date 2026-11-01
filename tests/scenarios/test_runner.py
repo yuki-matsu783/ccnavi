@@ -5,6 +5,7 @@
 シナリオを拾わないこと。
 """
 
+import argparse
 import contextlib
 import io
 import json
@@ -22,7 +23,24 @@ import yaml
 from ccnavi.entry import version
 from tests import ROOT, common_sh, fake_gitlab, host_stub
 from tests import __main__ as full_run
-from tests.scenarios import hostenv, hostsnap, runner
+from tests.scenarios import (
+    commands,
+    common,
+    drive,
+    evidence,
+    expect,
+    hostenv,
+    hostsnap,
+    issues,
+    prepare,
+    repo,
+    report,
+    runner,
+    schema,
+    stream,
+    workspace,
+)
+from tests.scenarios.actors import terminal
 
 SCENARIOS = sorted(Path(__file__).parent.glob("UC-*.yml"))
 EXPECT_KEYS = {
@@ -48,46 +66,46 @@ class IssueCommandTest(unittest.TestCase):
 
     def test_gitlab_uses_glab(self):
         self.assertEqual(
-            runner.issue_create_args("gitlab", self.ISSUE),
+            issues.issue_create_args("gitlab", self.ISSUE),
             ["glab", "issue", "create", "--title", "タイトル", "--description", "本文", "--yes"],
         )
-        self.assertEqual(runner.issue_close_args("gitlab", 12), ["glab", "issue", "close", "12"])
+        self.assertEqual(issues.issue_close_args("gitlab", 12), ["glab", "issue", "close", "12"])
 
     def test_github_uses_gh(self):
         self.assertEqual(
-            runner.issue_create_args("github", self.ISSUE),
+            issues.issue_create_args("github", self.ISSUE),
             ["gh", "issue", "create", "--title", "タイトル", "--body", "本文"],
         )
-        self.assertEqual(runner.issue_close_args("github", 12), ["gh", "issue", "close", "12"])
+        self.assertEqual(issues.issue_close_args("github", 12), ["gh", "issue", "close", "12"])
 
     def test_missing_body_is_empty(self):
-        args = runner.issue_create_args("gitlab", {"title": "t"})
+        args = issues.issue_create_args("gitlab", {"title": "t"})
         self.assertEqual(args[args.index("--description") + 1], "")
 
     def test_unreadable_origin_is_an_error(self):
         with self.assertRaises(RuntimeError):
-            runner.issue_create_args("", self.ISSUE)
+            issues.issue_create_args("", self.ISSUE)
         with self.assertRaises(RuntimeError):
-            runner.issue_close_args("", 1)
+            issues.issue_close_args("", 1)
 
     def test_issue_number_from_github_url(self):
-        self.assertEqual(runner.issue_number("https://github.com/o/r/issues/7\n"), 7)
+        self.assertEqual(issues.issue_number("https://github.com/o/r/issues/7\n"), 7)
 
     def test_issue_number_from_gitlab_url(self):
         url = "https://gitlab.example.com/g/p/-/issues/12"
-        self.assertEqual(runner.issue_number(url + "\n"), 12)
+        self.assertEqual(issues.issue_number(url + "\n"), 12)
 
     def test_issue_number_finds_the_url_line(self):
         out = "Creating issue in g/p\n\nhttps://gitlab.example.com/g/p/-/issues/34\nopen it later\n"
-        self.assertEqual(runner.issue_number(out), 34)
+        self.assertEqual(issues.issue_number(out), 34)
 
     def test_issue_number_ignores_other_urls(self):
         out = "https://gl.example.com/g/p/-/issues/12\nsee https://docs.example.com/9\n"
-        self.assertEqual(runner.issue_number(out), 12)
+        self.assertEqual(issues.issue_number(out), 12)
 
     def test_issue_number_rejects_output_without_url(self):
         with self.assertRaises(RuntimeError):
-            runner.issue_number("created 5\n")
+            issues.issue_number("created 5\n")
 
 
 def rec(**kw):
@@ -100,17 +118,17 @@ class CheckDecisionTest(unittest.TestCase):
     def test_pass_when_decision_matches(self):
         rows = [rec(decision="deny", code="DENY_PATH", rules=["workspace-root"], subject="/a/b")]
         cond = {"decision": "deny", "code": "DENY_PATH", "rules_include": ["workspace-root"]}
-        self.assertEqual(runner.check_decision(rows, cond)[0], runner.PASS)
+        self.assertEqual(expect.check_decision(rows, cond)[0], common.PASS)
 
     def test_inconclusive_when_call_never_made(self):
         rows = [rec(tool="Read", decision="handover")]
-        v, _ = runner.check_decision(rows, {"tool": "Edit", "decision": "deny"})
-        self.assertEqual(v, runner.INCONCLUSIVE)
+        v, _ = expect.check_decision(rows, {"tool": "Edit", "decision": "deny"})
+        self.assertEqual(v, common.INCONCLUSIVE)
 
     def test_fail_when_call_made_but_allowed(self):
         rows = [rec(tool="Edit", decision="allow", subject="/x/README.md")]
-        v, why = runner.check_decision(rows, {"tool": "Edit", "decision": "deny"})
-        self.assertEqual(v, runner.FAIL)
+        v, why = expect.check_decision(rows, {"tool": "Edit", "decision": "deny"})
+        self.assertEqual(v, common.FAIL)
         self.assertIn("allow", why)
 
     def test_subject_contains_selects_the_call(self):
@@ -119,21 +137,21 @@ class CheckDecisionTest(unittest.TestCase):
             rec(decision="deny", subject="cat .env", rules=["credentials"]),
         ]
         cond = {"subject_contains": "cat .env", "decision": "deny"}
-        self.assertEqual(runner.check_decision(rows, cond)[0], runner.PASS)
+        self.assertEqual(expect.check_decision(rows, cond)[0], common.PASS)
 
     def test_min_count(self):
         rows = [rec(decision="deny"), rec(decision="deny")]
         self.assertEqual(
-            runner.check_decision(rows, {"decision": "deny", "min_count": 3})[0], runner.FAIL
+            expect.check_decision(rows, {"decision": "deny", "min_count": 3})[0], common.FAIL
         )
         self.assertEqual(
-            runner.check_decision(rows, {"decision": "deny", "min_count": 2})[0], runner.PASS
+            expect.check_decision(rows, {"decision": "deny", "min_count": 2})[0], common.PASS
         )
 
     def test_decision_not(self):
         rows = [rec(decision="handover", subject="ccnavi-git.sh status")]
         cond = {"subject_contains": "ccnavi-git.sh status", "decision_not": "deny"}
-        self.assertEqual(runner.check_decision(rows, cond)[0], runner.PASS)
+        self.assertEqual(expect.check_decision(rows, cond)[0], common.PASS)
 
     def test_hinted_true_and_false(self):
         rows = [
@@ -142,21 +160,21 @@ class CheckDecisionTest(unittest.TestCase):
         ]
         first = {"subject_contains": "cat a"}
         second = {"subject_contains": "cat b"}
-        self.assertEqual(runner.check_decision(rows, {**first, "hinted": True})[0], runner.PASS)
-        self.assertEqual(runner.check_decision(rows, {**first, "hinted": False})[0], runner.FAIL)
-        self.assertEqual(runner.check_decision(rows, {**second, "hinted": False})[0], runner.PASS)
-        self.assertEqual(runner.check_decision(rows, {**second, "hinted": True})[0], runner.FAIL)
+        self.assertEqual(expect.check_decision(rows, {**first, "hinted": True})[0], common.PASS)
+        self.assertEqual(expect.check_decision(rows, {**first, "hinted": False})[0], common.FAIL)
+        self.assertEqual(expect.check_decision(rows, {**second, "hinted": False})[0], common.PASS)
+        self.assertEqual(expect.check_decision(rows, {**second, "hinted": True})[0], common.FAIL)
 
     def test_decisions_none(self):
         rows = [rec(decision="deny", rules=["workspace-root"], tool="Edit")]
         cond = {"tool": "Edit", "decision": "deny", "rules_include": ["workspace-root"]}
-        self.assertEqual(runner.check_decision_none(rows, cond)[0], runner.FAIL)
-        self.assertEqual(runner.check_decision_none([], cond)[0], runner.PASS)
+        self.assertEqual(expect.check_decision_none(rows, cond)[0], common.FAIL)
+        self.assertEqual(expect.check_decision_none([], cond)[0], common.PASS)
 
     def test_decisions_none_subject_is_clipped_with_notice(self):
         rows = [rec(decision="deny", tool="Edit", subject="s" * 300)]
-        v, why = runner.check_decision_none(rows, {"tool": "Edit", "decision": "deny"})
-        self.assertEqual(v, runner.FAIL)
+        v, why = expect.check_decision_none(rows, {"tool": "Edit", "decision": "deny"})
+        self.assertEqual(v, common.FAIL)
         self.assertIn("全 300 文字のうち先頭 200 文字。全量は logs/decisions.jsonl", why)
 
 
@@ -166,11 +184,11 @@ class ReadDecisionsTest(unittest.TestCase):
             p = Path(d) / "decisions.jsonl"
             lines = [rec(session="mine"), rec(session="other"), rec(session="mine2")]
             p.write_text("\n".join(json.dumps(r) for r in lines) + "\nnot json\n", encoding="utf-8")
-            rows = runner.read_decisions(p, ["mine", "mine2"])
+            rows = expect.read_decisions(p, ["mine", "mine2"])
         self.assertEqual([r["session"] for r in rows], ["mine", "mine2"])
 
     def test_missing_log_is_empty(self):
-        self.assertEqual(runner.read_decisions("/no/such/file.jsonl", ["s"]), [])
+        self.assertEqual(expect.read_decisions("/no/such/file.jsonl", ["s"]), [])
 
 
 class ParseStreamTest(unittest.TestCase):
@@ -191,7 +209,7 @@ class ParseStreamTest(unittest.TestCase):
             {"type": "result", "session_id": "abc", "result": "終わり", "total_cost_usd": 0.01},
         ]
         text = "\n".join(json.dumps(e) for e in events) + "\nnoise\n"
-        got = runner.parse_stream(text)
+        got = stream.parse_stream(text)
         self.assertEqual(got["session_ids"], ["abc"])
         self.assertEqual(got["tool_calls"][0]["name"], "Edit")
         self.assertTrue(got["tool_results"][0]["is_error"])
@@ -202,37 +220,37 @@ class ParseStreamTest(unittest.TestCase):
 class EvaluateTest(unittest.TestCase):
     def test_overall_orders_fail_over_inconclusive_over_review(self):
         mk = lambda *vs: [("k", "c", v, "") for v in vs]  # noqa: E731
-        self.assertEqual(runner.overall(mk(runner.PASS, runner.PASS)), runner.PASS)
-        self.assertEqual(runner.overall(mk(runner.PASS, runner.REVIEW)), runner.REVIEW)
+        self.assertEqual(expect.overall(mk(common.PASS, common.PASS)), common.PASS)
+        self.assertEqual(expect.overall(mk(common.PASS, common.REVIEW)), common.REVIEW)
         self.assertEqual(
-            runner.overall(mk(runner.REVIEW, runner.INCONCLUSIVE)), runner.INCONCLUSIVE
+            expect.overall(mk(common.REVIEW, common.INCONCLUSIVE)), common.INCONCLUSIVE
         )
-        self.assertEqual(runner.overall(mk(runner.INCONCLUSIVE, runner.FAIL)), runner.FAIL)
+        self.assertEqual(expect.overall(mk(common.INCONCLUSIVE, common.FAIL)), common.FAIL)
 
     def test_files_unchanged_and_forbidden_and_judge(self):
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / "a.txt").write_text("1", encoding="utf-8")
-            pre = {"a.txt": runner.file_digest(Path(d) / "a.txt")}
-            expect = {
+            pre = {"a.txt": expect.file_digest(Path(d) / "a.txt")}
+            spec = {
                 "files_unchanged": ["a.txt"],
                 "transcript_forbidden": ["secret-value"],
                 "judge": ["迂回しなかった"],
             }
-            got = runner.evaluate(expect, [], "出力に secret-value がある", d, pre)
+            got = expect.evaluate(spec, [], "出力に secret-value がある", d, pre)
             by_kind = {k: v for k, _, v, _ in got}
-            self.assertEqual(by_kind["files_unchanged"], runner.PASS)
-            self.assertEqual(by_kind["transcript_forbidden"], runner.FAIL)
-            self.assertEqual(by_kind["judge"], runner.REVIEW)
+            self.assertEqual(by_kind["files_unchanged"], common.PASS)
+            self.assertEqual(by_kind["transcript_forbidden"], common.FAIL)
+            self.assertEqual(by_kind["judge"], common.REVIEW)
             (Path(d) / "a.txt").write_text("2", encoding="utf-8")
-            got = runner.evaluate({"files_unchanged": ["a.txt"]}, [], "", d, pre)
-            self.assertEqual(got[0][2], runner.FAIL)
+            got = expect.evaluate({"files_unchanged": ["a.txt"]}, [], "", d, pre)
+            self.assertEqual(got[0][2], common.FAIL)
 
     def test_state_command(self):
         with tempfile.TemporaryDirectory() as d:
             ok = {"run": "echo hello", "expect_contains": "hello"}
             ng = {"run": "echo hello", "expect_not_contains": "hello"}
-            self.assertEqual(runner.check_state(ok, d)[0], runner.PASS)
-            self.assertEqual(runner.check_state(ng, d)[0], runner.FAIL)
+            self.assertEqual(expect.check_state(ok, d)[0], common.PASS)
+            self.assertEqual(expect.check_state(ng, d)[0], common.FAIL)
 
 
 class FinishOrderTest(unittest.TestCase):
@@ -241,16 +259,16 @@ class FinishOrderTest(unittest.TestCase):
     REL = "sub/keep.txt"
 
     def run_finish(self, root, out, scn):
-        files, dirs = runner._setup(scn, root)
+        files, dirs = prepare.make_files(scn, root)
         st = {
             "setup_made": files,
             "setup_dirs": dirs,
             "session_ids": [],
             "pre_digests": {},
-            "pre_repo": runner.repo_snapshot(root),
+            "pre_repo": workspace.repo_snapshot(root),
             "cost_usd": 0.0,
         }
-        return runner.finish(scn, out, st, root)
+        return drive.finish(scn, out, st, root)
 
     def scenario(self):
         return {
@@ -268,7 +286,7 @@ class FinishOrderTest(unittest.TestCase):
             code = self.run_finish(root, out, self.scenario())
             self.assertEqual(code, 0)
             report = json.loads((out / "report.json").read_text(encoding="utf-8"))
-            self.assertEqual(report[0]["verdict"], runner.PASS)
+            self.assertEqual(report[0]["verdict"], common.PASS)
 
 
 class ExpectAfterTest(unittest.TestCase):
@@ -284,9 +302,9 @@ class ExpectAfterTest(unittest.TestCase):
 
     def test_evaluate_after_inconclusive_when_call_missing(self):
         with tempfile.TemporaryDirectory() as d:
-            expect = {"decisions": [{"event": "PreToolUse", "tool": "Edit", "decision": "allow"}]}
-            got = runner.evaluate_after(expect, {"session_ids": ["s1"]}, d)
-        self.assertEqual(got[0][2], runner.INCONCLUSIVE)
+            spec = {"decisions": [{"event": "PreToolUse", "tool": "Edit", "decision": "allow"}]}
+            got = expect.evaluate_after(spec, {"session_ids": ["s1"]}, d)
+        self.assertEqual(got[0][2], common.INCONCLUSIVE)
 
     def test_drive_halts_and_skips_later_steps(self):
         with tempfile.TemporaryDirectory() as d:
@@ -303,8 +321,8 @@ class ExpectAfterTest(unittest.TestCase):
                 ]
             )
             st = self.state()
-            with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT) as run:
-                rc = runner.drive(scn, out, st, root)
+            with mock.patch.object(drive, "run_step", return_value=self.STEP_OUT) as run:
+                rc = drive.run_steps(scn, out, st, root)
         self.assertEqual(rc, 11)
         self.assertEqual(st["halt"]["step"], 1)
         self.assertEqual(run.call_count, 1)
@@ -315,8 +333,8 @@ class ExpectAfterTest(unittest.TestCase):
             out.mkdir()
             root.mkdir()
             scn = self.scenario([{"prompt": "a"}, {"prompt": "b"}])
-            with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT) as run:
-                rc = runner.drive(scn, out, self.state(), root)
+            with mock.patch.object(drive, "run_step", return_value=self.STEP_OUT) as run:
+                rc = drive.run_steps(scn, out, self.state(), root)
         self.assertIsNone(rc)
         self.assertEqual(run.call_count, 2)
 
@@ -336,14 +354,14 @@ class ExpectAfterTest(unittest.TestCase):
             )
             st = self.state()
             with (
-                mock.patch.object(runner, "run_step", return_value=self.STEP_OUT) as run,
+                mock.patch.object(drive, "run_step", return_value=self.STEP_OUT) as run,
                 mock.patch.object(
-                    runner,
+                    expect,
                     "check_state",
                     side_effect=subprocess.TimeoutExpired("x", 1),
                 ),
             ):
-                rc = runner.drive(scn, out, st, root)
+                rc = drive.run_steps(scn, out, st, root)
         self.assertEqual(rc, 11)
         self.assertIn("評価で例外", st["halt"]["reasons"][0])
         self.assertEqual(run.call_count, 1)
@@ -366,18 +384,18 @@ class ExpectAfterTest(unittest.TestCase):
             root, out = Path(d) / "root", Path(d) / "out"
             root.mkdir()
             out.mkdir()
-            st["pre_repo"] = runner.repo_snapshot(root)
-            rc = runner.finish(scn, out, st, root)
+            st["pre_repo"] = workspace.repo_snapshot(root)
+            rc = drive.finish(scn, out, st, root)
             report = json.loads((out / "report.json").read_text(encoding="utf-8"))
         self.assertEqual(rc, 2)
         self.assertEqual([r["kind"] for r in report], ["expect_after", "repo", "host", "cost"])
-        self.assertEqual(report[0]["verdict"], runner.INCONCLUSIVE)
+        self.assertEqual(report[0]["verdict"], common.INCONCLUSIVE)
 
     def load_yml(self, text):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "scn.yml"
             path.write_text(text, encoding="utf-8")
-            return runner.load_scenario(path)
+            return schema.load_scenario(path)
 
     def test_load_scenario_rejects_expect_after_on_human_step(self):
         text = (
@@ -414,17 +432,17 @@ class HumanRunTest(unittest.TestCase):
             with (
                 # 1 回目は打つ前、2 回目は打ったあと
                 mock.patch.object(
-                    runner,
-                    "_pending_proposals",
+                    terminal,
+                    "pending_proposals",
                     side_effect=[pending, pending if pending_after is None else pending_after],
                 ),
                 # 打つ前は approved_before（既定は空）、打ったあとは approved
                 mock.patch.object(
-                    runner, "_approved_ids", side_effect=[approved_before or set(), approved]
+                    terminal, "approved_ids", side_effect=[approved_before or set(), approved]
                 ),
-                mock.patch.object(runner, "_run_on_terminal", return_value=(rc, "")) as term,
+                mock.patch.object(terminal, "run_on_terminal", return_value=(rc, "")) as term,
             ):
-                got = runner.drive(scn, out, st, root)
+                got = drive.run_steps(scn, out, st, root)
         return got, st, term
 
     def test_load_scenario_needs_test_repo(self):
@@ -433,18 +451,18 @@ class HumanRunTest(unittest.TestCase):
             path = Path(d) / "scn.yml"
             path.write_text(text, encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "test_repo: true"):
-                runner.load_scenario(path)
+                schema.load_scenario(path)
 
     def test_terminal_is_attached_and_answers_arrive(self):
         script = 'if [ -t 0 ]; then echo tty; fi; read a; echo "got=$a"; exit 3'
-        rc, text = runner._run_on_terminal(["sh", "-c", script], None, None, ["y"], timeout=10)
+        rc, text = terminal.run_on_terminal(["sh", "-c", script], None, None, ["y"], timeout=10)
         self.assertEqual(rc, 3)
         self.assertIn("tty", text)
         self.assertIn("got=y", text)
 
     def test_timeout_stops_the_whole_group(self):
         with self.assertRaises(subprocess.TimeoutExpired):
-            runner._run_on_terminal(["sh", "-c", "sleep 30 & wait"], None, None, [], timeout=1)
+            terminal.run_on_terminal(["sh", "-c", "sleep 30 & wait"], None, None, [], timeout=1)
 
     def test_success_is_judged_by_approved_tickets_not_exit_code(self):
         got, st, term = self.drive([["i1", "test-repo"]], approved=set(), rc=0)
@@ -478,8 +496,8 @@ class HumanRunTest(unittest.TestCase):
 
     def test_scans_run_on_a_workspace_without_tickets(self):
         with tempfile.TemporaryDirectory() as d:
-            self.assertEqual(runner._pending_proposals(d), [])
-            self.assertEqual(runner._approved_ids(d), set())
+            self.assertEqual(terminal.pending_proposals(d), [])
+            self.assertEqual(terminal.approved_ids(d), set())
 
     def test_approved_run_continues_and_is_recorded(self):
         got, st, _ = self.drive([["i1", "test-repo"]], approved={"i1"})
@@ -491,7 +509,7 @@ class HumanRunTest(unittest.TestCase):
 class PreflightTest(unittest.TestCase):
     def test_missing_project_dir_is_reported_not_raised(self):
         with tempfile.TemporaryDirectory() as d:
-            facts = runner.preflight_facts(d)
+            facts = workspace.preflight_facts(d)
         self.assertIn("置き場が無い", facts)
 
 
@@ -507,7 +525,7 @@ class ModeCheckTest(unittest.TestCase):
     def _check(self, settings_env, environ=None):
         root = self._root(settings_env)
         with mock.patch.dict("os.environ", environ or {}, clear=True):
-            return runner.mode_check(root)[0]
+            return workspace.mode_check(root)[0]
 
     def test_enable_in_settings_passes(self):
         self.assertTrue(self._check({"CCNAVI_MODE": "enable"}))
@@ -525,7 +543,7 @@ class ModeCheckTest(unittest.TestCase):
         root = self._root({"CCNAVI_MODE": "enable"})
         (Path(root) / ".claude/settings.json").write_text("{", encoding="utf-8")
         with mock.patch.dict("os.environ", {}, clear=True):
-            self.assertFalse(runner.mode_check(root)[0])
+            self.assertFalse(workspace.mode_check(root)[0])
 
 
 class SetupSafetyTest(unittest.TestCase):
@@ -536,15 +554,15 @@ class SetupSafetyTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             (root / "keep.txt").write_text("元の中身\n", encoding="utf-8")
-            self.assertEqual(runner.setup_clashes(self.scenario("keep.txt"), root), ["keep.txt"])
+            self.assertEqual(prepare.setup_clashes(self.scenario("keep.txt"), root), ["keep.txt"])
 
     def test_cleanup_removes_only_dirs_setup_created(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             (root / "keepdir").mkdir()
-            files, dirs = runner._setup(self.scenario("keepdir/a/b.txt"), root)
+            files, dirs = prepare.make_files(self.scenario("keepdir/a/b.txt"), root)
             self.assertEqual(dirs, ["keepdir/a"])
-            runner._cleanup(files, dirs, root)
+            prepare.remove_files(files, dirs, root)
             self.assertFalse((root / "keepdir/a").exists())
             self.assertTrue((root / "keepdir").is_dir())
 
@@ -555,11 +573,11 @@ class StepFailureTest(unittest.TestCase):
         scn = {"model": "haiku", "budget_usd": 1, "_prompt_steps": 1, "permission_mode": "auto"}
         with (
             tempfile.TemporaryDirectory() as d,
-            mock.patch.object(runner, "_ENTRY", True),
-            mock.patch.object(runner.subprocess, "run", return_value=proc),
+            mock.patch.object(common, "_ENTRY", True),
+            mock.patch.object(subprocess, "run", return_value=proc),
             self.assertRaises(RuntimeError),
         ):
-            runner.run_step(scn, {"prompt": "x"}, Path(d), 1, "s", None, False, Path(d))
+            drive.run_step(scn, {"prompt": "x"}, Path(d), 1, "s", None, False, Path(d))
 
     def test_failed_step_halts_with_run_kind_and_later_steps_do_not_run(self):
         scn = {
@@ -570,9 +588,9 @@ class StepFailureTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d)
             with mock.patch.object(
-                runner, "run_step", side_effect=RuntimeError("起動できない")
+                drive, "run_step", side_effect=RuntimeError("起動できない")
             ) as m:
-                rc = runner.drive(scn, out, st, Path(d))
+                rc = drive.run_steps(scn, out, st, Path(d))
         self.assertEqual(rc, 11)
         self.assertEqual(st["halt"]["kind"], "run")
         self.assertEqual(m.call_count, 1)
@@ -581,7 +599,7 @@ class StepFailureTest(unittest.TestCase):
 class ScenarioSummaryTest(unittest.TestCase):
     def test_summary_shows_title_steps_and_expectations(self):
         path = Path(__file__).parent / "UC-01-direct-edit-denied.yml"
-        text = runner.scenario_summary(runner.load_scenario(path))
+        text = report.scenario_summary(schema.load_scenario(path))
         self.assertIn("UC-01", text)
         self.assertIn("ワークツリーを切らずに", text)
         self.assertIn("DENY_PATH", text)
@@ -601,7 +619,7 @@ class ScenarioSummaryTest(unittest.TestCase):
             "unconfirmed": ["点"],
             "test_repo": True,
         }
-        text = runner.scenario_summary(scn)
+        text = report.scenario_summary(scn)
         self.assertIn("2. 人間の操作: 確認して", text)
         self.assertIn("projects/test-repo にブランチ・コミット・MR", text)
         self.assertIn("「x」が出る", text)
@@ -617,7 +635,7 @@ class StepAnswerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d)
             (out / "step-1.jsonl").write_text(line, encoding="utf-8")
-            text = "\n".join(runner.step_answer_lines(scn, out))
+            text = "\n".join(report.step_answer_lines(scn, out))
         self.assertIn("【入力プロンプト】\n一つ目の質問", text)
         self.assertIn("【最終出力】\n一つ目の答え", text)
         self.assertIn("### step 2（人間の操作）", text)
@@ -626,7 +644,7 @@ class StepAnswerTest(unittest.TestCase):
     def test_missing_step_output_is_marked_not_run(self):
         scn = {"steps": [{"prompt": "a"}]}
         with tempfile.TemporaryDirectory() as d:
-            text = "\n".join(runner.step_answer_lines(scn, Path(d)))
+            text = "\n".join(report.step_answer_lines(scn, Path(d)))
         self.assertIn("【最終出力】\n未実行", text)
 
 
@@ -634,7 +652,7 @@ class ConfirmationTextTest(unittest.TestCase):
     def test_text_has_summary_mode_facts_and_questions(self):
         scn = {"id": "UC-XX", "title": "t", "steps": [{"prompt": "a"}], "test_repo": True}
         with tempfile.TemporaryDirectory() as d:
-            text = runner.confirmation_text(scn, Path(d), "MODE OK")
+            text = report.confirmation_text(scn, Path(d), "MODE OK")
         self.assertIn("UC-XX", text)
         self.assertIn("MODE OK", text)
         self.assertIn("## ワークスペースルート: git status", text)
@@ -648,7 +666,7 @@ class ConfirmationTextTest(unittest.TestCase):
     def test_question_2_only_for_test_repo_scenarios(self):
         scn = {"id": "UC-XX", "title": "t", "steps": [{"prompt": "a"}]}
         with tempfile.TemporaryDirectory() as d:
-            text = runner.confirmation_text(scn, Path(d), "MODE OK")
+            text = report.confirmation_text(scn, Path(d), "MODE OK")
         self.assertNotIn("確認事項 2", text)
 
     def test_preflight_command_does_not_run_claude(self):
@@ -659,8 +677,8 @@ class ConfirmationTextTest(unittest.TestCase):
             str(Path(__file__).parents[2]),
         ]
         with (
-            mock.patch.object(runner, "run_step") as m,
-            mock.patch.object(runner, "preflight_facts", return_value="FACTS"),
+            mock.patch.object(drive, "run_step") as m,
+            mock.patch.object(workspace, "preflight_facts", return_value="FACTS"),
         ):
             rc = runner.main(args)
         self.assertEqual(rc, 3)
@@ -671,24 +689,24 @@ class JudgeTest(unittest.TestCase):
     TABLE = "| 基準 | 判定 | 理由 |\n|---|---|---|\n| a | pass | r1 |\n| b | pass | r2 |\n"
 
     def test_parse_reads_rows_and_skips_header(self):
-        rows = runner.parse_judgment(self.TABLE)
+        rows = expect.parse_judgment(self.TABLE)
         self.assertEqual(rows, [("a", "pass", "r1"), ("b", "pass", "r2")])
 
     def test_parse_rejects_a_verdict_that_is_not_pass_or_fail(self):
         with self.assertRaises(ValueError):
-            runner.parse_judgment("| a | needs-review | r |\n")
+            expect.parse_judgment("| a | needs-review | r |\n")
 
     def test_final_verdict_waits_until_user_accepts(self):
-        mech = [("decisions", {}, runner.PASS, "")]
-        judged = [("a", runner.PASS, "")]
-        self.assertIn("受け入れ待ち", runner.final_verdict(mech, judged, False))
+        mech = [("decisions", {}, common.PASS, "")]
+        judged = [("a", common.PASS, "")]
+        self.assertIn("受け入れ待ち", expect.final_verdict(mech, judged, False))
 
     def test_final_verdict_after_acceptance(self):
-        mech = [("decisions", {}, runner.PASS, "")]
-        self.assertEqual(runner.final_verdict(mech, [("a", runner.PASS, "")], True), runner.PASS)
-        self.assertEqual(runner.final_verdict(mech, [("a", runner.FAIL, "")], True), runner.FAIL)
-        bad = [("decisions", {}, runner.FAIL, "")]
-        self.assertEqual(runner.final_verdict(bad, [("a", runner.PASS, "")], True), runner.FAIL)
+        mech = [("decisions", {}, common.PASS, "")]
+        self.assertEqual(expect.final_verdict(mech, [("a", common.PASS, "")], True), common.PASS)
+        self.assertEqual(expect.final_verdict(mech, [("a", common.FAIL, "")], True), common.FAIL)
+        bad = [("decisions", {}, common.FAIL, "")]
+        self.assertEqual(expect.final_verdict(bad, [("a", common.PASS, "")], True), common.FAIL)
 
     def test_cmd_judge_appends_once_and_records_acceptance(self):
         uc01 = str(Path(__file__).parent / "UC-01-direct-edit-denied.yml")
@@ -704,13 +722,13 @@ class JudgeTest(unittest.TestCase):
             (out / "report.json").write_text(json.dumps(recorded), encoding="utf-8")
             table = Path(d) / "judge.md"
             table.write_text(self.TABLE, encoding="utf-8")
-            ns = runner.argparse.Namespace(out=str(out), file=str(table), accept=True)
-            self.assertEqual(runner.cmd_judge(ns), 0)
+            ns = argparse.Namespace(out=str(out), file=str(table), accept=True)
+            self.assertEqual(commands.cmd_judge(ns), 0)
             text = (out / "report.md").read_text(encoding="utf-8")
-            self.assertIn(runner.JUDGE_HEADING, text)
+            self.assertIn(expect.JUDGE_HEADING, text)
             self.assertIn("ユーザの受け入れ: あり", text)
             self.assertIn("全体（機械判定と意味の判定の合わせ）: pass", text)
-            self.assertEqual(runner.cmd_judge(ns), 1)
+            self.assertEqual(commands.cmd_judge(ns), 1)
 
     def test_acceptance_can_be_recorded_after_the_table_was_added(self):
         uc01 = str(Path(__file__).parent / "UC-01-direct-edit-denied.yml")
@@ -726,17 +744,17 @@ class JudgeTest(unittest.TestCase):
             (out / "report.json").write_text(json.dumps(recorded), encoding="utf-8")
             table = Path(d) / "judge.md"
             table.write_text(self.TABLE, encoding="utf-8")
-            first = runner.argparse.Namespace(out=str(out), file=str(table), accept=False)
-            self.assertEqual(runner.cmd_judge(first), 0)
+            first = argparse.Namespace(out=str(out), file=str(table), accept=False)
+            self.assertEqual(commands.cmd_judge(first), 0)
             text = (out / "report.md").read_text(encoding="utf-8")
             self.assertIn("ユーザの受け入れ: なし", text)
-            later = runner.argparse.Namespace(out=str(out), file=str(table), accept=True)
-            self.assertEqual(runner.cmd_judge(later), 0)
+            later = argparse.Namespace(out=str(out), file=str(table), accept=True)
+            self.assertEqual(commands.cmd_judge(later), 0)
             text = (out / "report.md").read_text(encoding="utf-8")
             self.assertIn("ユーザの受け入れ: あり", text)
             self.assertIn("全体（機械判定と意味の判定の合わせ）: pass", text)
-            self.assertEqual(text.count(runner.JUDGE_HEADING), 1)
-            self.assertEqual(runner.cmd_judge(later), 1)
+            self.assertEqual(text.count(expect.JUDGE_HEADING), 1)
+            self.assertEqual(commands.cmd_judge(later), 1)
 
 
 class AcceptWithoutTableFileTest(unittest.TestCase):
@@ -745,15 +763,15 @@ class AcceptWithoutTableFileTest(unittest.TestCase):
             out = Path(d)
             report = (
                 "# UC-XX\n\n全体: needs-review\n\n"
-                f"{runner.JUDGE_HEADING}\n\n| 基準 | 判定 | 理由 |\n|---|---|---|\n"
+                f"{expect.JUDGE_HEADING}\n\n| 基準 | 判定 | 理由 |\n|---|---|---|\n"
                 "| a | pass | r |\n\nユーザの受け入れ: なし\n"
                 "全体（機械判定と意味の判定の合わせ）: 受け入れ待ち\n"
             )
             (out / "report.md").write_text(report, encoding="utf-8")
             recorded = [{"kind": "decisions", "expect": {}, "verdict": "pass", "why": ""}]
             (out / "report.json").write_text(json.dumps(recorded), encoding="utf-8")
-            ns = runner.argparse.Namespace(out=str(out), file=None, accept=True)
-            self.assertEqual(runner.cmd_judge(ns), 0)
+            ns = argparse.Namespace(out=str(out), file=None, accept=True)
+            self.assertEqual(commands.cmd_judge(ns), 0)
             text = (out / "report.md").read_text(encoding="utf-8")
             self.assertIn("ユーザの受け入れ: あり", text)
             self.assertIn("全体（機械判定と意味の判定の合わせ）: pass", text)
@@ -761,22 +779,22 @@ class AcceptWithoutTableFileTest(unittest.TestCase):
 
 class RepoResultTest(unittest.TestCase):
     def test_same_state_passes(self):
-        self.assertEqual(runner.repo_result("a", "a")[0], runner.PASS)
+        self.assertEqual(expect.repo_result("a", "a")[0], common.PASS)
 
     def test_changed_state_fails(self):
-        self.assertEqual(runner.repo_result("a", "b"), (runner.FAIL, runner.REPO_CHANGED))
+        self.assertEqual(expect.repo_result("a", "b"), (common.FAIL, expect.REPO_CHANGED))
 
     def test_missing_before_state_is_not_passed(self):
-        self.assertEqual(runner.repo_result(None, "a")[0], runner.INCONCLUSIVE)
+        self.assertEqual(expect.repo_result(None, "a")[0], common.INCONCLUSIVE)
 
 
 class PersistTest(unittest.TestCase):
     def test_session_is_kept_only_when_the_next_prompt_resumes(self):
         steps = [{"prompt": "a"}, {"human": True}, {"prompt": "b", "resume": True}, {"prompt": "c"}]
-        self.assertTrue(runner._persist_needed(steps, 0))
-        self.assertTrue(runner._persist_needed(steps, 1))
-        self.assertFalse(runner._persist_needed(steps, 2))
-        self.assertFalse(runner._persist_needed(steps, 3))
+        self.assertTrue(drive._persist_needed(steps, 0))
+        self.assertTrue(drive._persist_needed(steps, 1))
+        self.assertFalse(drive._persist_needed(steps, 2))
+        self.assertFalse(drive._persist_needed(steps, 3))
 
 
 class EntryGateTest(unittest.TestCase):
@@ -785,14 +803,14 @@ class EntryGateTest(unittest.TestCase):
     def test_run_step_refuses_when_imported(self):
         with mock.patch.object(subprocess, "run") as run:
             with self.assertRaises(RuntimeError):
-                runner.run_step({}, {"prompt": "x"}, Path("."), 1, "id", None, False, ".")
+                drive.run_step({}, {"prompt": "x"}, Path("."), 1, "id", None, False, ".")
             run.assert_not_called()
 
     def test_cmd_run_refuses_when_imported(self):
         with mock.patch.object(subprocess, "run") as run:
             args = mock.Mock(scenario="x", confirmed=True, root=".", out=None)
             with self.assertRaises(RuntimeError):
-                runner.cmd_run(args)
+                commands.cmd_run(args)
             run.assert_not_called()
 
 
@@ -817,7 +835,7 @@ class ScenarioFilesTest(unittest.TestCase):
     def test_each_scenario_is_well_formed(self):
         for path in SCENARIOS:
             with self.subTest(scenario=path.name):
-                scn = runner.load_scenario(path)
+                scn = schema.load_scenario(path)
                 self.assertTrue(path.name.startswith(scn["id"]))
                 self.assertIn(scn["status"], {"draft", "verified"})
                 self.assertTrue(scn["steps"])
@@ -834,21 +852,21 @@ class ScenarioFilesTest(unittest.TestCase):
 
 class IssueSetupTest(unittest.TestCase):
     def test_issue_number_from_url(self):
-        self.assertEqual(runner.issue_number("https://github.com/o/r/issues/34\n"), 34)
+        self.assertEqual(issues.issue_number("https://github.com/o/r/issues/34\n"), 34)
 
     def test_issue_number_rejects_non_url(self):
         with self.assertRaises(RuntimeError):
-            runner.issue_number("作成できませんでした")
+            issues.issue_number("作成できませんでした")
 
     def test_fill_issue_replaces_placeholder(self):
         text = "issue #{issue} で `--issue {issue}` を打つ"
-        self.assertEqual(runner.fill_issue(text, 34), "issue #34 で `--issue 34` を打つ")
+        self.assertEqual(issues.fill_issue(text, 34), "issue #34 で `--issue 34` を打つ")
 
     def test_fill_issue_keeps_text_without_number(self):
-        self.assertEqual(runner.fill_issue("issue #{issue}", None), "issue #{issue}")
+        self.assertEqual(issues.fill_issue("issue #{issue}", None), "issue #{issue}")
 
     def test_uc09_creates_issue_per_run(self):
-        scn = runner.load_scenario(Path(__file__).parent / "UC-09-quick-ticket.yml")
+        scn = schema.load_scenario(Path(__file__).parent / "UC-09-quick-ticket.yml")
         issue = scn["setup"]["issue"]
         self.assertEqual(issue["repo"], "projects/test-repo")
         self.assertTrue(issue["close"])
@@ -882,8 +900,8 @@ class EvidenceTest(unittest.TestCase):
         )
         scn = {"id": "UC-99", "title": "t", "expect": {"judge": ["基準A"]}}
         st = {"cost_usd": 0.0}
-        results = results or [("files_unchanged", "README.md", runner.PASS, "変わっていない")]
-        runner.write_report(scn, out, st, results, [], "")
+        results = results or [("files_unchanged", "README.md", common.PASS, "変わっていない")]
+        report.write_report(scn, out, st, results, [], "")
         return (out / "evidence.md").read_text(encoding="utf-8")
 
     def test_deny_reason_is_not_clipped(self):
@@ -943,7 +961,7 @@ class EvidenceTest(unittest.TestCase):
 
     def test_machine_result_table_in_evidence_is_not_clipped(self):
         why = "理由" * 100
-        text = self._write([], results=[("state", "ls", runner.FAIL, why)])
+        text = self._write([], results=[("state", "ls", common.FAIL, why)])
         self.assertIn(why, text)
 
     def test_decision_subject_clipped_with_notice(self):
@@ -954,7 +972,7 @@ class EvidenceTest(unittest.TestCase):
             rows = [
                 {"event": "PreToolUse", "tool": "Bash", "decision": "deny", "subject": "s" * 800}
             ]
-            runner.write_report(scn, out, {"cost_usd": 0.0}, [], rows, "")
+            report.write_report(scn, out, {"cost_usd": 0.0}, [], rows, "")
             text = (out / "evidence.md").read_text(encoding="utf-8")
         self.assertIn("全 800 文字のうち先頭 500 文字。全量は logs/decisions.jsonl", text)
 
@@ -981,7 +999,7 @@ class EvidenceTest(unittest.TestCase):
 
     def test_result_table_cells_do_not_break_rows(self):
         why = "出力に「a」が無い: l1\nl2 | l3"
-        text = self._write([], results=[("state", "ls", runner.FAIL, why)])
+        text = self._write([], results=[("state", "ls", common.FAIL, why)])
         self.assertIn("l1 l2 \\| l3", text)
 
     def test_non_text_block_in_tool_result_is_marked(self):
@@ -1124,7 +1142,7 @@ class EvidenceTest(unittest.TestCase):
                 "expect": {},
                 "steps": [{"prompt": "  ワークツリーは切らない  "}],
             }
-            runner.write_report(scn, out, {"cost_usd": 0.0}, [], [], "")
+            report.write_report(scn, out, {"cost_usd": 0.0}, [], [], "")
             text = (out / "evidence.md").read_text(encoding="utf-8")
         self.assertIn("### 入力プロンプト\nワークツリーは切らない", text)
 
@@ -1147,7 +1165,7 @@ class EvidenceTest(unittest.TestCase):
                     "subject": "a|b",
                 },
             ]
-            runner.write_report(
+            report.write_report(
                 {"id": "UC-99", "title": "t", "expect": {}}, out, {"cost_usd": 0.0}, [], rows, ""
             )
             text = (out / "evidence.md").read_text(encoding="utf-8")
@@ -1158,12 +1176,12 @@ class EvidenceTest(unittest.TestCase):
 
 class ResultsTableTest(unittest.TestCase):
     def test_limit_cuts_cells_and_none_does_not(self):
-        results = [("k", "c" * 300, runner.FAIL, "w" * 300)]
-        cut = "\n".join(runner._results_table(results, 100))
+        results = [("k", "c" * 300, common.FAIL, "w" * 300)]
+        cut = "\n".join(report._results_table(results, 100))
         self.assertIn("c" * 100 + " |", cut)
         self.assertNotIn("c" * 101, cut)
         self.assertNotIn("w" * 101, cut)
-        full = "\n".join(runner._results_table(results))
+        full = "\n".join(report._results_table(results))
         self.assertIn("c" * 300, full)
         self.assertIn("w" * 300, full)
 
@@ -1224,7 +1242,7 @@ def call_line(name, tool_input, call_id="t1", parent=None):
 
 
 def write_all(scn, out, rows):
-    runner.write_report(scn, out, {"cost_usd": 0.0}, [], rows, "")
+    report.write_report(scn, out, {"cost_usd": 0.0}, [], rows, "")
     return {
         name: (out / name).read_text(encoding="utf-8")
         for name in ("report.md", "evidence.md", "messages.md")
@@ -1233,7 +1251,7 @@ def write_all(scn, out, rows):
 
 class ParseStreamIdsTest(unittest.TestCase):
     def test_tool_calls_and_results_keep_ids_and_parent(self):
-        got = runner.parse_stream(fixture_text("subagent-edit-denied.jsonl"))
+        got = stream.parse_stream(fixture_text("subagent-edit-denied.jsonl"))
         by_id = {c["id"]: c for c in got["tool_calls"]}
         agent = next(c for c in got["tool_calls"] if c["name"] == "Agent")
         self.assertIsNone(agent["parent"])
@@ -1244,7 +1262,7 @@ class ParseStreamIdsTest(unittest.TestCase):
             self.assertEqual(r["parent"], by_id[r["tool_use_id"]]["parent"])
 
     def test_existing_fields_are_unchanged(self):
-        got = runner.parse_stream(fixture_text("subagent-edit-denied.jsonl"))
+        got = stream.parse_stream(fixture_text("subagent-edit-denied.jsonl"))
         self.assertEqual(got["session_ids"], ["sess-main"])
         self.assertEqual([c["name"] for c in got["tool_calls"]], ["Agent", "Read", "Edit"])
         edit = got["tool_calls"][2]["input"]
@@ -1260,7 +1278,7 @@ class ParseStreamIdsTest(unittest.TestCase):
             },
             {"type": "user", "message": {"content": [{"type": "tool_result", "content": "x"}]}},
         ]
-        got = runner.parse_stream("\n".join(json.dumps(e) for e in events))
+        got = stream.parse_stream("\n".join(json.dumps(e) for e in events))
         self.assertEqual(
             got["tool_calls"][0], {"name": "Edit", "input": {}, "id": None, "parent": None}
         )
@@ -1275,7 +1293,7 @@ class ContextSectionTest(unittest.TestCase):
         return out
 
     def test_counts_characters_and_clips_the_head_only(self):
-        ctx = "あ" * (runner.CONTEXT_LIMIT + 500)
+        ctx = "あ" * (evidence.CONTEXT_LIMIT + 500)
         out = self._out(
             [
                 hook_line(
@@ -1288,19 +1306,19 @@ class ContextSectionTest(unittest.TestCase):
         files = write_all({"id": "UC-99", "title": "t", "expect": {}}, out, [])
         ev = files["evidence.md"]
         self.assertIn(f"SessionStart [SessionStart:startup] 案内（{len(ctx)} 文字）", ev)
-        self.assertIn("あ" * runner.CONTEXT_LIMIT + "…", ev)
-        self.assertNotIn("あ" * (runner.CONTEXT_LIMIT + 1), ev)
+        self.assertIn("あ" * evidence.CONTEXT_LIMIT + "…", ev)
+        self.assertNotIn("あ" * (evidence.CONTEXT_LIMIT + 1), ev)
         self.assertIn(
-            f"全 {len(ctx)} 文字のうち先頭 {runner.CONTEXT_LIMIT} 文字。全量は context-1.md", ev
+            f"全 {len(ctx)} 文字のうち先頭 {evidence.CONTEXT_LIMIT} 文字。全量は context-1.md", ev
         )
         self.assertIn(ctx, (out / "context-1.md").read_text(encoding="utf-8"))
 
     def test_denial_reason_uses_evidence_limit(self):
-        reason = "拒" * (runner.EVIDENCE_LIMIT + 10)
+        reason = "拒" * (evidence.EVIDENCE_LIMIT + 10)
         out = self._out([deny_line(reason)])
         ev = write_all({"id": "UC-99", "title": "t", "expect": {}}, out, [])["evidence.md"]
         self.assertIn(f"PreToolUse [PreToolUse:Edit] 拒否（{len(reason)} 文字）", ev)
-        self.assertNotIn("拒" * (runner.EVIDENCE_LIMIT + 1), ev.split("### 渡った文脈")[1])
+        self.assertNotIn("拒" * (evidence.EVIDENCE_LIMIT + 1), ev.split("### 渡った文脈")[1])
         self.assertIn(reason, (out / "context-1.md").read_text(encoding="utf-8"))
 
     def test_no_context_means_no_section_and_no_file(self):
@@ -1347,17 +1365,17 @@ class DenialTrendTest(unittest.TestCase):
 
     def test_three_denials_in_a_row_are_flagged(self):
         rows = [rec(decision="deny", code="DENY_PATH", subject=f"f{i}") for i in range(3)]
-        got = runner.repeated_denials(rows, self.SESSIONS)
+        got = evidence.repeated_denials(rows, self.SESSIONS)
         self.assertEqual([(g["step"], g["code"], g["count"]) for g in got], [("1", "DENY_PATH", 3)])
 
     def test_two_denials_are_not_flagged(self):
         rows = [rec(decision="deny", code="DENY_PATH") for _ in range(2)]
-        self.assertEqual(runner.repeated_denials(rows, self.SESSIONS), [])
+        self.assertEqual(evidence.repeated_denials(rows, self.SESSIONS), [])
 
     def test_allow_between_denials_resets_the_count(self):
         seq = ["deny", "deny", "allow", "deny", "deny"]
         rows = [rec(decision=d, code="DENY_PATH") for d in seq]
-        self.assertEqual(runner.repeated_denials(rows, self.SESSIONS), [])
+        self.assertEqual(evidence.repeated_denials(rows, self.SESSIONS), [])
 
     def test_other_rows_between_denials_do_not_reset_but_other_code_does(self):
         rows = [
@@ -1367,13 +1385,13 @@ class DenialTrendTest(unittest.TestCase):
             rec(decision="deny", code="A"),
             rec(decision="deny", code="B"),
         ]
-        got = runner.repeated_denials(rows, self.SESSIONS)
+        got = evidence.repeated_denials(rows, self.SESSIONS)
         self.assertEqual([(g["code"], g["count"]) for g in got], [("A", 3)])
 
     def test_steps_are_counted_apart(self):
         rows = [rec(decision="deny", code="A", session="s1") for _ in range(2)]
         rows += [rec(decision="deny", code="A", session="s2") for _ in range(2)]
-        self.assertEqual(runner.repeated_denials(rows, self.SESSIONS), [])
+        self.assertEqual(evidence.repeated_denials(rows, self.SESSIONS), [])
 
     def _streams(self, calls):
         return {1: {"tool_calls": calls}}
@@ -1386,27 +1404,27 @@ class DenialTrendTest(unittest.TestCase):
         streams = self._streams(
             [self._call("/work/Repo/README.md"), self._call("/work/repo/readme.md", "Write")]
         )
-        got = runner.bypass_suspects(rows, streams, self.SESSIONS)
+        got = evidence.bypass_suspects(rows, streams, self.SESSIONS)
         self.assertEqual([(g["step"], g["denied"], g["calls"]) for g in got], [("1", 1, 2)])
 
     def test_retry_that_was_denied_again_is_not_a_bypass(self):
         rows = [rec(decision="deny", tool="Edit", subject="/work/a.md") for _ in range(2)]
         streams = self._streams([self._call("/work/a.md"), self._call("/work/a.md")])
-        self.assertEqual(runner.bypass_suspects(rows, streams, self.SESSIONS), [])
+        self.assertEqual(evidence.bypass_suspects(rows, streams, self.SESSIONS), [])
 
     def test_other_path_bash_and_cut_subjects_are_not_compared(self):
         streams = self._streams([self._call("/work/b.md")])
         rows = [rec(decision="deny", tool="Edit", subject="/work/a.md")]
-        self.assertEqual(runner.bypass_suspects(rows, streams, self.SESSIONS), [])
+        self.assertEqual(evidence.bypass_suspects(rows, streams, self.SESSIONS), [])
         bash_rows = [rec(decision="deny", tool="Bash", subject="sed -i s/a/b/ /work/b.md")]
-        self.assertEqual(runner.bypass_suspects(bash_rows, streams, self.SESSIONS), [])
+        self.assertEqual(evidence.bypass_suspects(bash_rows, streams, self.SESSIONS), [])
         cut = [rec(decision="deny", tool="Edit", subject="/work/b.md…(+30)")]
-        self.assertEqual(runner.bypass_suspects(cut, streams, self.SESSIONS), [])
+        self.assertEqual(evidence.bypass_suspects(cut, streams, self.SESSIONS), [])
 
     def flagged(self, *lines):
         tmp, out = make_out(["\n".join(lines) + "\n"])
         self.addCleanup(tmp.cleanup)
-        return [text for _, _, text in runner.unguided_denials(runner.step_streams(out))]
+        return [text for _, _, text in evidence.unguided_denials(evidence.step_streams(out))]
 
     def test_denial_without_next_step_is_flagged(self):
         got = self.flagged(
@@ -1433,7 +1451,7 @@ class DenialTrendTest(unittest.TestCase):
             {"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": ""}},
         )
         block = hook_line("Stop", "Stop", {"decision": "block"})
-        self.assertEqual(self.flagged(empty, block), [runner.EMPTY_REASON] * 2)
+        self.assertEqual(self.flagged(empty, block), [evidence.EMPTY_REASON] * 2)
 
     def test_ask_is_not_a_denial(self):
         ask = hook_line(
@@ -1490,7 +1508,7 @@ class DenialTrendTest(unittest.TestCase):
             shutil.copytree(Path(ROOT) / ".ccnavi/messages", Path(d) / ".ccnavi/messages")
             texts += [ptexts.spoken(r) for r in builtin.load_base(d)[0].deny]
         self.assertGreater(len(texts), 10)
-        self.assertEqual([t for t in texts if not runner.has_guide(t)], [])
+        self.assertEqual([t for t in texts if not evidence.has_guide(t)], [])
 
     def test_report_names_the_empty_and_unguided(self):
         deny = deny_line("[ccnavi] DENY_PATH\n編集しません。")
@@ -1523,14 +1541,15 @@ class MessagesTest(unittest.TestCase):
     def test_normalize_order_keeps_commit_ids_intact(self):
         text = "commit 0123abc の 3 件を /home/u/a/b.sh と C:\\w\\x で見る"
         self.assertEqual(
-            runner.normalize_message(text),
+            evidence.normalize_message(text),
             "commit <SHA> の <N> 件を <PATH> と <PATH> で見る",
         )
-        self.assertEqual(runner.normalize_message("12345678"), "<SHA>")
+        self.assertEqual(evidence.normalize_message("12345678"), "<SHA>")
 
     def test_paths_with_japanese_punctuation_around_them(self):
         self.assertEqual(
-            runner.normalize_message("（.ccnavi/docs/a.md「節」）を読む"), "（<PATH>「節」）を読む"
+            evidence.normalize_message("（.ccnavi/docs/a.md「節」）を読む"),
+            "（<PATH>「節」）を読む",
         )
 
     def test_texts_differing_only_in_path_become_one_entry(self):
@@ -1554,7 +1573,7 @@ class MessagesTest(unittest.TestCase):
             ),
             rec(decision="deny", code="DENY_X", rules=[], subject="x"),
         ]
-        msgs = runner.collect_messages(runner.step_streams(out), rows)
+        msgs = evidence.collect_messages(evidence.step_streams(out), rows)
         self.assertEqual([m["count"] for m in msgs], [2, 1])
         self.assertEqual(msgs[0]["src"], ["DENY_PATH / r:workspace-root"])
         self.assertEqual(msgs[1]["src"], ["DENY_X / -"])
@@ -1566,7 +1585,7 @@ class MessagesTest(unittest.TestCase):
     def test_source_is_unknown_when_counts_differ(self):
         out_tmp, out = make_out([deny_line("拒否") + "\n"])
         self.addCleanup(out_tmp.cleanup)
-        msgs = runner.collect_messages(runner.step_streams(out), [])
+        msgs = evidence.collect_messages(evidence.step_streams(out), [])
         self.assertEqual(msgs[0]["src"], [])
 
     def test_session_start_context_is_left_out(self):
@@ -1578,14 +1597,14 @@ class MessagesTest(unittest.TestCase):
         )
         tmp, out = make_out([start + "\n" + guide + "\n"])
         self.addCleanup(tmp.cleanup)
-        msgs = runner.collect_messages(runner.step_streams(out), [])
+        msgs = evidence.collect_messages(evidence.step_streams(out), [])
         self.assertEqual([(m["kind"], m["text"]) for m in msgs], [("案内", "案内文")])
 
     def test_real_stream_fixture_with_its_decisions(self):
         tmp, out = make_out([fixture_text("subagent-edit-denied.jsonl")])
         self.addCleanup(tmp.cleanup)
         rows = fixture_rows("subagent-edit-denied.decisions.jsonl")
-        msgs = runner.collect_messages(runner.step_streams(out), rows)
+        msgs = evidence.collect_messages(evidence.step_streams(out), rows)
         kinds = [(m["kind"], m["events"]) for m in msgs]
         self.assertIn(("拒否", ["PreToolUse"]), kinds)
         self.assertIn(("案内", ["SubagentStart"]), kinds)
@@ -1668,8 +1687,8 @@ class DisposableRepoTest(unittest.TestCase):
     def test_workspace_root_is_refused(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            with self.assertRaises(runner.Refusal) as cm:
-                runner.require_disposable_repo(ws.root, ws.root, allowed=ws.root)
+            with self.assertRaises(common.Refusal) as cm:
+                repo.require_disposable_repo(ws.root, ws.root, allowed=ws.root)
         self.assertIn("ccnavi 本体", str(cm.exception))
 
     def test_dir_inside_root_without_own_repo_is_the_root(self):
@@ -1677,14 +1696,14 @@ class DisposableRepoTest(unittest.TestCase):
             ws = Workspace(d)
             plain = ws.root / "projects" / "plain"
             plain.mkdir()
-            with self.assertRaises(runner.Refusal) as cm:
-                runner.require_disposable_repo(ws.root, plain, allowed=plain)
+            with self.assertRaises(common.Refusal) as cm:
+                repo.require_disposable_repo(ws.root, plain, allowed=plain)
         self.assertIn("ccnavi 本体", str(cm.exception))
 
     def test_default_allowed_is_projects_test_repo(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            top = runner.require_disposable_repo(ws.root, ws.target)
+            top = repo.require_disposable_repo(ws.root, ws.target)
         self.assertEqual(top, str(ws.target.resolve()))
 
     def test_other_repo_than_allowed_is_refused(self):
@@ -1692,15 +1711,15 @@ class DisposableRepoTest(unittest.TestCase):
             ws = Workspace(d)
             other = Path(d) / "other"
             make_repo(other)
-            with self.assertRaises(runner.Refusal) as cm:
-                runner.require_disposable_repo(ws.root, other, allowed=ws.target)
+            with self.assertRaises(common.Refusal) as cm:
+                repo.require_disposable_repo(ws.root, other, allowed=ws.target)
         self.assertIn("許可された", str(cm.exception))
 
     def test_case_differing_spelling_is_the_same_target(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
             shouting = Path(str(ws.target).swapcase())
-            top = runner.require_disposable_repo(ws.root, ws.target, allowed=shouting)
+            top = repo.require_disposable_repo(ws.root, ws.target, allowed=shouting)
         self.assertEqual(top, str(ws.target.resolve()))
 
     def test_symlink_to_the_allowed_repo_is_the_same_target(self):
@@ -1711,7 +1730,7 @@ class DisposableRepoTest(unittest.TestCase):
                 link.symlink_to(ws.target, target_is_directory=True)
             except OSError:
                 self.skipTest("シンボリックリンクを作れない")
-            top = runner.require_disposable_repo(ws.root, link, allowed=ws.target)
+            top = repo.require_disposable_repo(ws.root, link, allowed=ws.target)
         self.assertEqual(top, str(ws.target.resolve()))
 
     def test_same_origin_as_the_body_is_refused(self):
@@ -1721,8 +1740,8 @@ class DisposableRepoTest(unittest.TestCase):
                 origin_root="https://example.com/o/r.git",
                 origin_target="https://EXAMPLE.com/o/r/",
             )
-            with self.assertRaises(runner.Refusal) as cm:
-                runner.require_disposable_repo(ws.root, ws.target)
+            with self.assertRaises(common.Refusal) as cm:
+                repo.require_disposable_repo(ws.root, ws.target)
         self.assertIn("origin", str(cm.exception))
 
     def test_different_origin_is_allowed(self):
@@ -1732,33 +1751,33 @@ class DisposableRepoTest(unittest.TestCase):
                 origin_root="https://example.com/o/r.git",
                 origin_target="https://example.com/o/t.git",
             )
-            runner.require_disposable_repo(ws.root, ws.target)
+            repo.require_disposable_repo(ws.root, ws.target)
 
     def test_missing_origin_on_either_side_compares_the_toplevel_only(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d, origin_target="https://example.com/o/t.git")
-            runner.require_disposable_repo(ws.root, ws.target)
+            repo.require_disposable_repo(ws.root, ws.target)
 
     def test_linked_worktree_of_the_body_is_refused_even_without_origin(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
             shutil.rmtree(ws.target)
             git(ws.root, "worktree", "add", "-q", str(ws.target), "-b", "linked")
-            with self.assertRaises(runner.Refusal) as cm:
-                runner.require_disposable_repo(ws.root, ws.target)
+            with self.assertRaises(common.Refusal) as cm:
+                repo.require_disposable_repo(ws.root, ws.target)
             self.assertIn("同じリポジトリ", str(cm.exception))
 
     def test_not_a_repo_is_refused(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            with self.assertRaises(runner.Refusal):
-                runner.require_disposable_repo(ws.root, Path(d) / "nothing")
+            with self.assertRaises(common.Refusal):
+                repo.require_disposable_repo(ws.root, Path(d) / "nothing")
 
     def test_refusal_text_ends_with_one_next_line(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            with self.assertRaises(runner.Refusal) as cm:
-                runner.require_disposable_repo(ws.root, ws.root)
+            with self.assertRaises(common.Refusal) as cm:
+                repo.require_disposable_repo(ws.root, ws.root)
         lines = str(cm.exception).splitlines()
         self.assertEqual([x for x in lines if x.startswith("次: ")], [lines[-1]])
         self.assertTrue(any(x.startswith("案内: ") for x in lines))
@@ -1770,14 +1789,14 @@ class DisposableRepoTest(unittest.TestCase):
             path = ws.scenario_file({"reset": {"base": ws.base}})
             args = ["run", str(path), "--confirmed", "--root", str(ws.root), "--out", str(ws.out)]
             with (
-                mock.patch.object(runner, "_ENTRY", True),
-                mock.patch.object(runner, "drive") as drive,
+                mock.patch.object(common, "_ENTRY", True),
+                mock.patch.object(drive, "run_steps") as run_steps,
                 mock.patch("builtins.print") as shown,
             ):
                 rc = runner.main(args)
             text = "\n".join(str(c.args[0]) for c in shown.call_args_list if c.args)
         self.assertEqual(rc, 3)
-        drive.assert_not_called()
+        run_steps.assert_not_called()
         self.assertFalse(ws.out.exists())
         self.assertIn("次: ", text)
 
@@ -1800,15 +1819,15 @@ class SetupGitTest(unittest.TestCase):
             ["git", ""],
         ):
             with self.subTest(argv=bad), self.assertRaises(ValueError):
-                runner.check_git_argv(bad)
-        runner.check_git_argv(["git", "switch", "-c", "feat"])
-        runner.check_git_argv(["git", "commit", "-m", "x"])
+                schema.check_git_argv(bad)
+        schema.check_git_argv(["git", "switch", "-c", "feat"])
+        schema.check_git_argv(["git", "commit", "-m", "x"])
 
     def test_git_without_reset_is_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             path = write_scenario(d, {"git": [["git", "status"]]})
             with self.assertRaises(ValueError) as cm:
-                runner.load_scenario(path)
+                schema.load_scenario(path)
         self.assertIn("setup.reset", str(cm.exception))
 
     def test_load_scenario_rejects_a_bad_command(self):
@@ -1816,18 +1835,18 @@ class SetupGitTest(unittest.TestCase):
             ws = Workspace(d)
             path = ws.scenario_file({"git": [["git", "-C", "/", "status"]]})
             with self.assertRaises(ValueError):
-                runner.load_scenario(path)
+                schema.load_scenario(path)
 
     def test_runs_in_the_target_not_the_body_and_logs_it(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            before = runner.repo_snapshot(ws.root)
-            runner.run_setup_git(
+            before = workspace.repo_snapshot(ws.root)
+            repo.run_setup_git(
                 ws.root, ws.target, [["git", "switch", "-q", "-c", "feat"], ["git", "branch", "b2"]]
             )
             self.assertEqual(git(ws.target, "branch", "--show-current"), "feat")
             self.assertIn("b2", git(ws.target, "branch"))
-            self.assertEqual(runner.repo_snapshot(ws.root), before)
+            self.assertEqual(workspace.repo_snapshot(ws.root), before)
             log = (ws.root / "logs" / "diag" / "scenario-runner.log").read_text(encoding="utf-8")
         self.assertIn("git switch -q -c feat", log)
         self.assertIn("rc=0", log)
@@ -1837,15 +1856,15 @@ class SetupGitTest(unittest.TestCase):
             ws = Workspace(d)
             env = {"GIT_DIR": str(ws.root / ".git"), "GIT_WORK_TREE": str(ws.root)}
             with mock.patch.dict(os.environ, env):
-                runner.run_setup_git(ws.root, ws.target, [["git", "branch", "only-in-target"]])
+                repo.run_setup_git(ws.root, ws.target, [["git", "branch", "only-in-target"]])
             self.assertIn("only-in-target", git(ws.target, "branch"))
             self.assertNotIn("only-in-target", git(ws.root, "branch"))
 
     def test_refuses_the_body_as_target(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            with self.assertRaises(runner.Refusal):
-                runner.run_setup_git(ws.root, ws.root, [["git", "branch", "x"]], allowed=ws.root)
+            with self.assertRaises(common.Refusal):
+                repo.run_setup_git(ws.root, ws.root, [["git", "branch", "x"]], allowed=ws.root)
             self.assertNotIn("x", git(ws.root, "branch"))
 
     def test_stops_when_the_body_changed(self):
@@ -1853,10 +1872,10 @@ class SetupGitTest(unittest.TestCase):
             ws = Workspace(d)
             snaps = iter(["a", "b", "b", "b"])
             with (
-                mock.patch.object(runner, "repo_snapshot", side_effect=lambda r: next(snaps)),
-                self.assertRaises(runner.Refusal) as cm,
+                mock.patch.object(workspace, "repo_snapshot", side_effect=lambda r: next(snaps)),
+                self.assertRaises(common.Refusal) as cm,
             ):
-                runner.run_setup_git(
+                repo.run_setup_git(
                     ws.root, ws.target, [["git", "branch", "x"], ["git", "branch", "y"]]
                 )
             self.assertIn("ccnavi 本体", str(cm.exception))
@@ -1865,23 +1884,23 @@ class SetupGitTest(unittest.TestCase):
     def test_failed_command_stops_with_the_command_named(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            with self.assertRaises(runner.Refusal) as cm:
-                runner.run_setup_git(ws.root, ws.target, [["git", "checkout", "nonexistent"]])
+            with self.assertRaises(common.Refusal) as cm:
+                repo.run_setup_git(ws.root, ws.target, [["git", "checkout", "nonexistent"]])
         self.assertIn("git checkout nonexistent", str(cm.exception))
 
 
 class ScenarioFieldsTest(unittest.TestCase):
     def load(self, setup):
         with tempfile.TemporaryDirectory() as d:
-            return runner.load_scenario(write_scenario(d, setup))
+            return schema.load_scenario(write_scenario(d, setup))
 
     def test_dict_form_is_accepted(self):
         base = "a" * 40
         scn = self.load(
             {"files": {"x.md": {"content": "y", "append": True}, "z": "s"}, "reset": {"base": base}}
         )
-        self.assertEqual(runner.file_spec(scn["setup"]["files"]["x.md"]), ("y", True))
-        self.assertEqual(runner.file_spec(scn["setup"]["files"]["z"]), ("s", False))
+        self.assertEqual(schema.file_spec(scn["setup"]["files"]["x.md"]), ("y", True))
+        self.assertEqual(schema.file_spec(scn["setup"]["files"]["z"]), ("s", False))
 
     def test_bad_shapes_are_rejected(self):
         base = {"base": "a" * 40}
@@ -1923,7 +1942,7 @@ class ScenarioFieldsTest(unittest.TestCase):
                 }
             }
             (root / "app-have.txt").write_text("x", encoding="utf-8")
-            self.assertEqual(runner.setup_clashes(scn, root), ["have.txt", "app-missing.txt"])
+            self.assertEqual(prepare.setup_clashes(scn, root), ["have.txt", "app-missing.txt"])
 
     def test_summary_separates_created_and_appended_files(self):
         scn = {
@@ -1939,7 +1958,7 @@ class ScenarioFieldsTest(unittest.TestCase):
                 "reset": {"base": "a" * 40},
             },
         }
-        text = runner.scenario_summary(scn)
+        text = report.scenario_summary(scn)
         self.assertIn("回す前に作り、回したあとに消すファイル: new.txt", text)
         self.assertIn("回す前に追記する、対象にある管理下のファイル", text)
         self.assertIn("projects/test-repo/README.md", text.split("追記する", 1)[1])
@@ -1957,42 +1976,42 @@ class AppendTest(unittest.TestCase):
     def test_appends_to_the_tracked_file_and_cleanup_keeps_it(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            top = runner.require_disposable_repo(ws.root, ws.target)
-            files, dirs = runner._setup(self.scenario(), ws.root, top)
+            top = repo.require_disposable_repo(ws.root, ws.target)
+            files, dirs = prepare.make_files(self.scenario(), ws.root, top)
             self.assertEqual((files, dirs), ([], []))
             self.assertEqual(
                 (ws.target / "README.md").read_text(encoding="utf-8"), "元の中身\n追記\n"
             )
-            runner._cleanup(files, dirs, ws.root)
+            prepare.remove_files(files, dirs, ws.root)
             self.assertTrue((ws.target / "README.md").is_file())
 
     def test_appended_file_is_not_removed_by_finish(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            top = runner.require_disposable_repo(ws.root, ws.target)
-            files, dirs = runner._setup(self.scenario(), ws.root, top)
+            top = repo.require_disposable_repo(ws.root, ws.target)
+            files, dirs = prepare.make_files(self.scenario(), ws.root, top)
             ws.out.mkdir()
             st = {
                 "setup_made": files,
                 "setup_dirs": dirs,
                 "session_ids": [],
                 "pre_digests": {},
-                "pre_repo": runner.repo_snapshot(ws.root),
+                "pre_repo": workspace.repo_snapshot(ws.root),
                 "cost_usd": 0.0,
             }
-            runner.finish({"id": "UC-XX", "title": "t", "expect": {}}, ws.out, st, ws.root)
+            drive.finish({"id": "UC-XX", "title": "t", "expect": {}}, ws.out, st, ws.root)
             self.assertTrue((ws.target / "README.md").is_file())
 
     def refused(self, rel):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            top = runner.require_disposable_repo(ws.root, ws.target)
+            top = repo.require_disposable_repo(ws.root, ws.target)
             (ws.target / "untracked.txt").write_text("u", encoding="utf-8")
             (ws.target / "sub").mkdir()
             (ws.root / "outside.txt").write_text("o", encoding="utf-8")
             before = (ws.target / "README.md").read_text(encoding="utf-8")
-            with self.assertRaises(runner.Refusal):
-                runner._setup(self.scenario(rel), ws.root, top)
+            with self.assertRaises(common.Refusal):
+                prepare.make_files(self.scenario(rel), ws.root, top)
             self.assertEqual((ws.target / "README.md").read_text(encoding="utf-8"), before)
 
     def test_outside_missing_untracked_and_directory_are_refused(self):
@@ -2010,9 +2029,9 @@ class AppendTest(unittest.TestCase):
     def test_absolute_path_is_refused(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            top = runner.require_disposable_repo(ws.root, ws.target)
-            with self.assertRaises(runner.Refusal):
-                runner._setup(self.scenario(str(ws.target / "README.md")), ws.root, top)
+            top = repo.require_disposable_repo(ws.root, ws.target)
+            with self.assertRaises(common.Refusal):
+                prepare.make_files(self.scenario(str(ws.target / "README.md")), ws.root, top)
 
     def test_symlink_that_leaves_the_target_is_refused(self):
         with tempfile.TemporaryDirectory() as d:
@@ -2023,9 +2042,9 @@ class AppendTest(unittest.TestCase):
             except OSError:
                 self.skipTest("シンボリックリンクを作れない")
             git(ws.target, "add", "escape.txt")
-            top = runner.require_disposable_repo(ws.root, ws.target)
-            with self.assertRaises(runner.Refusal) as cm:
-                runner._setup(self.scenario("projects/test-repo/escape.txt"), ws.root, top)
+            top = repo.require_disposable_repo(ws.root, ws.target)
+            with self.assertRaises(common.Refusal) as cm:
+                prepare.make_files(self.scenario("projects/test-repo/escape.txt"), ws.root, top)
             self.assertIn("外", str(cm.exception))
             self.assertEqual((ws.root / "outside.txt").read_text(encoding="utf-8"), "o")
 
@@ -2038,15 +2057,15 @@ class AppendTest(unittest.TestCase):
                 (ws.target / "docs*.md").write_text("u", encoding="utf-8")
             except OSError:
                 self.skipTest("ファイル名に * を使えない")
-            top = runner.require_disposable_repo(ws.root, ws.target)
-            with self.assertRaises(runner.Refusal):
-                runner._setup(self.scenario("projects/test-repo/docs*.md"), ws.root, top)
+            top = repo.require_disposable_repo(ws.root, ws.target)
+            with self.assertRaises(common.Refusal):
+                prepare.make_files(self.scenario("projects/test-repo/docs*.md"), ws.root, top)
 
     def test_append_needs_the_checked_target(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            with self.assertRaises(runner.Refusal):
-                runner._setup(self.scenario(), ws.root)
+            with self.assertRaises(common.Refusal):
+                prepare.make_files(self.scenario(), ws.root)
 
 
 class ResetTest(unittest.TestCase):
@@ -2055,7 +2074,7 @@ class ResetTest(unittest.TestCase):
             ws = Workspace(d)
             ws.dirty()
             t = ws.target
-            runner.reset_repo(ws.root, t, ws.base)
+            repo.reset_repo(ws.root, t, ws.base)
             self.assertEqual(git(t, "rev-parse", "HEAD"), ws.base)
             self.assertEqual(git(t, "rev-parse", "main"), ws.base)
             self.assertEqual(git(t, "branch", "--show-current"), "main")
@@ -2077,17 +2096,17 @@ class ResetTest(unittest.TestCase):
     def ccnavi_state(self, ws, name="work1"):
         """ccnavi が対象の .git に書く記録・marker・ref を作る（ブランチも切る）。"""
         t = ws.target
-        common = t / ".git"
-        (common / "ccnavi-direct").mkdir()
-        (common / "ccnavi-direct" / name).write_text("version 4\n", encoding="utf-8")
-        (common / "ccnavi-integrate" / name).mkdir(parents=True)
-        (common / "ccnavi-integrate" / name / "marker").write_text("m\n", encoding="utf-8")
-        (common / "ccnavi-integrate-done").mkdir()
-        (common / "ccnavi-integrate-done" / name).write_text("done\n", encoding="utf-8")
+        gitdir = t / ".git"
+        (gitdir / "ccnavi-direct").mkdir()
+        (gitdir / "ccnavi-direct" / name).write_text("version 4\n", encoding="utf-8")
+        (gitdir / "ccnavi-integrate" / name).mkdir(parents=True)
+        (gitdir / "ccnavi-integrate" / name / "marker").write_text("m\n", encoding="utf-8")
+        (gitdir / "ccnavi-integrate-done").mkdir()
+        (gitdir / "ccnavi-integrate-done" / name).write_text("done\n", encoding="utf-8")
         git(t, "branch", name)
         git(t, "update-ref", f"refs/ccnavi/direct/{name}/s", ws.base)
         git(t, "update-ref", f"refs/ccnavi/direct/{name}/pending", ws.base)
-        return common
+        return gitdir
 
     def test_archive_of_the_target_is_removed_and_others_are_kept(self):
         with tempfile.TemporaryDirectory() as d:
@@ -2098,24 +2117,24 @@ class ResetTest(unittest.TestCase):
                 p.mkdir(parents=True)
                 (p / "feature-1-x.md").write_text("done\n", encoding="utf-8")
             base = git(ws.target, "rev-parse", "HEAD")
-            runner.reset_repo(ws.root, ws.target, base)
+            repo.reset_repo(ws.root, ws.target, base)
             self.assertFalse((ws.root / "logs" / "archive" / ws.target.name).exists())
             self.assertTrue((other / "feature-1-x.md").exists())
 
     def test_ccnavi_own_records_markers_and_refs_are_removed(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            common = self.ccnavi_state(ws)
+            gitdir = self.ccnavi_state(ws)
             (ws.target / "logs").mkdir()
             (ws.target / "logs" / "keep.log").write_text("判定の記録\n", encoding="utf-8")
             (ws.target / ".gitignore").write_text("logs/\n", encoding="utf-8")
             git(ws.target, "add", ".gitignore")
             git(ws.target, "commit", "-q", "-m", "ignore logs")
             base = git(ws.target, "rev-parse", "HEAD")
-            runner.reset_repo(ws.root, ws.target, base)
-            self.assertFalse((common / "ccnavi-direct").exists())
-            self.assertFalse((common / "ccnavi-integrate").exists())
-            self.assertFalse((common / "ccnavi-integrate-done").exists())
+            repo.reset_repo(ws.root, ws.target, base)
+            self.assertFalse((gitdir / "ccnavi-direct").exists())
+            self.assertFalse((gitdir / "ccnavi-integrate").exists())
+            self.assertFalse((gitdir / "ccnavi-integrate-done").exists())
             self.assertEqual(git(ws.target, "for-each-ref", "refs/ccnavi"), "")
             self.assertEqual(
                 git(ws.target, "for-each-ref", "--format=%(refname:short)", "refs/heads"), "main"
@@ -2134,7 +2153,7 @@ class ResetTest(unittest.TestCase):
             git(ws.target, "worktree", "add", "-q", "--detach", str(gone), ws.base)
             shutil.rmtree(gone)
             self.assertIn("prunable", git(ws.target, "worktree", "list", "--porcelain"))
-            runner.reset_repo(ws.root, ws.target, ws.base)
+            repo.reset_repo(ws.root, ws.target, ws.base)
             self.assertEqual(len(git(ws.target, "worktree", "list").splitlines()), 1)
             self.assertNotIn("prunable", git(ws.target, "worktree", "list", "--porcelain"))
             self.assertFalse(alive.exists())
@@ -2142,26 +2161,26 @@ class ResetTest(unittest.TestCase):
     def test_failed_worktree_removal_keeps_the_records(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            common = self.ccnavi_state(ws)
+            gitdir = self.ccnavi_state(ws)
             locked = ws.root / "logs" / "direct-tmp" / "test-repo" / "work1"
             git(ws.target, "worktree", "add", "-q", "--detach", str(locked), ws.base)
             git(ws.target, "worktree", "lock", str(locked))
-            with self.assertRaises(runner.Refusal):
-                runner.reset_repo(ws.root, ws.target, ws.base)
-            self.assertTrue((common / "ccnavi-direct" / "work1").exists())
+            with self.assertRaises(common.Refusal):
+                repo.reset_repo(ws.root, ws.target, ws.base)
+            self.assertTrue((gitdir / "ccnavi-direct" / "work1").exists())
             refs = git(ws.target, "for-each-ref", "refs/ccnavi")
             self.assertIn("refs/ccnavi/direct/work1/s", refs)
 
     def test_ccnavi_state_of_the_body_is_not_touched(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            common = ws.root / ".git"
-            (common / "ccnavi-direct").mkdir()
-            (common / "ccnavi-direct" / "mine").write_text("x\n", encoding="utf-8")
+            gitdir = ws.root / ".git"
+            (gitdir / "ccnavi-direct").mkdir()
+            (gitdir / "ccnavi-direct" / "mine").write_text("x\n", encoding="utf-8")
             git(ws.root, "update-ref", "refs/ccnavi/direct/mine/s", "HEAD")
-            with self.assertRaises(runner.Refusal):
-                runner.reset_repo(ws.root, ws.root, ws.base, allowed=ws.root)
-            self.assertTrue((common / "ccnavi-direct" / "mine").exists())
+            with self.assertRaises(common.Refusal):
+                repo.reset_repo(ws.root, ws.root, ws.base, allowed=ws.root)
+            self.assertTrue((gitdir / "ccnavi-direct" / "mine").exists())
             self.assertIn("refs/ccnavi/direct/mine/s", git(ws.root, "for-each-ref", "refs/ccnavi"))
 
     def test_main_pointing_elsewhere_is_moved_to_base(self):
@@ -2173,7 +2192,7 @@ class ResetTest(unittest.TestCase):
             git(t, "add", "s.txt")
             git(t, "commit", "-q", "-m", "side")
             git(t, "branch", "-f", "main", "side")
-            runner.reset_repo(ws.root, t, ws.base)
+            repo.reset_repo(ws.root, t, ws.base)
             self.assertEqual(git(t, "rev-parse", "main"), ws.base)
             self.assertEqual(git(t, "branch", "--show-current"), "main")
 
@@ -2181,8 +2200,8 @@ class ResetTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
             ws.dirty()
-            with mock.patch.object(runner, "_target_git", side_effect=runner._target_git) as spy:
-                runner.reset_repo(ws.root, ws.target, ws.base)
+            with mock.patch.object(repo, "target_git", side_effect=repo.target_git) as spy:
+                repo.reset_repo(ws.root, ws.target, ws.base)
             calls = [c.args[2] for c in spy.call_args_list]
             kinds = []
             for c in calls:
@@ -2216,8 +2235,8 @@ class ResetTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
             ws.dirty()
-            with self.assertRaises(runner.Refusal):
-                runner.reset_repo(ws.root, ws.target, "f" * 40)
+            with self.assertRaises(common.Refusal):
+                repo.reset_repo(ws.root, ws.target, "f" * 40)
             self.assertEqual(
                 (ws.target / "README.md").read_text(encoding="utf-8"), "元の中身\n未コミット\n"
             )
@@ -2226,8 +2245,8 @@ class ResetTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
             git(ws.root, "branch", "keep-me")
-            with self.assertRaises(runner.Refusal):
-                runner.reset_repo(ws.root, ws.root, ws.base, allowed=ws.root)
+            with self.assertRaises(common.Refusal):
+                repo.reset_repo(ws.root, ws.root, ws.base, allowed=ws.root)
             self.assertIn("keep-me", git(ws.root, "branch"))
 
 
@@ -2237,11 +2256,11 @@ class PreRunCheckTest(unittest.TestCase):
             ws = Workspace(d)
             ws.dirty()
             scn = {"setup": {"reset": {"base": "0" * 40}}}
-            with self.assertRaises(runner.Refusal) as cm:
-                runner.check_before_run(scn, ws.root, str(ws.target.resolve()))
+            with self.assertRaises(common.Refusal) as cm:
+                prepare.check_before_run(scn, ws.root, str(ws.target.resolve()))
             self.assertIn("次: ", str(cm.exception))
             self.assertEqual(git(ws.target, "branch", "--show-current"), "main")
-            self.assertNotIn(runner.LEFT_NAME, {p.name for p in (ws.target / ".git").iterdir()})
+            self.assertNotIn(repo.LEFT_NAME, {p.name for p in (ws.target / ".git").iterdir()})
 
     def test_unusable_append_target_is_refused_before_the_confirmation(self):
         with tempfile.TemporaryDirectory() as d:
@@ -2253,7 +2272,7 @@ class PreRunCheckTest(unittest.TestCase):
                 }
             )
             (ws.target / "untracked.txt").write_text("u", encoding="utf-8")
-            with mock.patch.object(runner, "_ENTRY", True), mock.patch("builtins.print"):
+            with mock.patch.object(common, "_ENTRY", True), mock.patch("builtins.print"):
                 rc = runner.main(["run", str(path), "--root", str(ws.root)])  # --confirmed なし
             self.assertEqual(rc, 3)
             self.assertFalse(ws.out.exists())
@@ -2272,9 +2291,9 @@ class SetupFailureTest(unittest.TestCase):
                 return real(self, *a, **k)
 
             with mock.patch.object(Path, "write_text", flaky), self.assertRaises(OSError):
-                runner._setup(scn, root)
+                prepare.make_files(scn, root)
             self.assertFalse((root / "a").exists())
-            self.assertEqual(runner.setup_clashes(scn, root), [])
+            self.assertEqual(prepare.setup_clashes(scn, root), [])
 
 
 class CleanupRobustnessTest(unittest.TestCase):
@@ -2283,7 +2302,7 @@ class CleanupRobustnessTest(unittest.TestCase):
             ws = Workspace(d)
             ws.dirty()
             top = str(ws.target.resolve())
-            lock = runner.acquire_target(top, ws.out)
+            lock = repo.acquire_target(top, ws.out)
             st = {
                 "target": {"path": top, "base": ws.base, "lock": lock},
                 "out": str(ws.out),
@@ -2293,10 +2312,10 @@ class CleanupRobustnessTest(unittest.TestCase):
             ws.out.mkdir()
             scn = {"setup": {"issue": {"repo": "projects/test-repo", "close": True}}}
             with (
-                mock.patch.object(runner, "repo_host_kind", side_effect=FileNotFoundError("gh")),
+                mock.patch.object(issues, "repo_host_kind", side_effect=FileNotFoundError("gh")),
                 mock.patch("builtins.print"),
             ):
-                runner._abort(scn, ws.out, st, ws.root)
+                drive.abort(scn, ws.out, st, ws.root)
             self.assertEqual(git(ws.target, "status", "--porcelain"), "")
             self.assertFalse(Path(lock).exists())
 
@@ -2307,9 +2326,9 @@ class CleanupRobustnessTest(unittest.TestCase):
                 {"files": {"projects/test-repo/new.txt": "x\n"}, "reset": {"base": ws.base}}
             )
             with (
-                mock.patch.object(runner, "_ENTRY", True),
+                mock.patch.object(common, "_ENTRY", True),
                 mock.patch.object(
-                    runner, "run_step", return_value={"cost_usd": 0.0, "session_ids": []}
+                    drive, "run_step", return_value={"cost_usd": 0.0, "session_ids": []}
                 ),
                 mock.patch("builtins.print"),
             ):
@@ -2329,20 +2348,55 @@ class CleanupRobustnessTest(unittest.TestCase):
             os.chdir(d)
             self.addCleanup(os.chdir, before)
             with (
-                mock.patch.object(runner, "_ENTRY", True),
+                mock.patch.object(common, "_ENTRY", True),
                 mock.patch.object(
-                    runner, "run_step", return_value={"cost_usd": 0.0, "session_ids": []}
+                    drive, "run_step", return_value={"cost_usd": 0.0, "session_ids": []}
                 ),
                 mock.patch("builtins.print"),
             ):
                 args = ["run", str(path), "--confirmed", "--root", str(ws.root), "--out", "rel"]
                 self.assertEqual(runner.main(args), 10)
-                marker = ws.target / ".git" / runner.LEFT_NAME
+                marker = ws.target / ".git" / repo.LEFT_NAME
                 self.assertEqual(
                     marker.read_text(encoding="utf-8"), str((Path(d) / "rel").resolve())
                 )
                 os.chdir(ws.root)  # 別の cwd からでも、同じ回として続けられる
                 self.assertEqual(runner.main(["restore", str(Path(d) / "rel")]), 0)
+
+    def test_restore_closes_the_issue_the_scenario_asked_to_close(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            steps = [{"prompt": "a"}, {"human": True, "instruction": "打つ"}]
+            path = ws.scenario_file({"reset": {"base": ws.base}}, steps)
+            with (
+                mock.patch.object(common, "_ENTRY", True),
+                mock.patch.object(
+                    drive, "run_step", return_value={"cost_usd": 0.0, "session_ids": []}
+                ),
+                mock.patch("builtins.print"),
+            ):
+                args = [
+                    "run",
+                    str(path),
+                    "--confirmed",
+                    "--root",
+                    str(ws.root),
+                    "--out",
+                    str(ws.out),
+                ]
+                self.assertEqual(runner.main(args), 10)
+                state_path = ws.out / "state.json"
+                st = json.loads(state_path.read_text(encoding="utf-8"))
+                st["issue_no"] = 7
+                state_path.write_text(json.dumps(st), encoding="utf-8")
+                spec = {"repo": "projects/test-repo", "close": True}
+                scn = {"setup": {"issue": spec}}
+                with (
+                    mock.patch.object(schema, "load_scenario", return_value=scn),
+                    mock.patch.object(issues, "close_issue") as close,
+                ):
+                    self.assertEqual(runner.main(["restore", str(ws.out)]), 0)
+            close.assert_called_once_with(spec, 7, st["root"])
 
 
 class LockTest(unittest.TestCase):
@@ -2350,14 +2404,14 @@ class LockTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
             top = str(ws.target.resolve())
-            lock = runner.acquire_target(top, ws.out)
+            lock = repo.acquire_target(top, ws.out)
             self.assertEqual(Path(lock).read_text(encoding="utf-8"), str(os.getpid()))
-            with self.assertRaises(runner.Refusal) as cm:
-                runner.acquire_target(top, ws.out)
+            with self.assertRaises(common.Refusal) as cm:
+                repo.acquire_target(top, ws.out)
             self.assertIn("別の回が使っている", str(cm.exception))
             st = {"target": {"path": top, "base": None}, "out": str(ws.out)}
-            runner.release_target(st, ws.root)
-            runner.acquire_target(top, ws.out)
+            repo.release_target(st, ws.root)
+            repo.acquire_target(top, ws.out)
 
     def test_resuming_matches_the_same_out_in_any_spelling(self):
         with tempfile.TemporaryDirectory() as d:
@@ -2379,26 +2433,26 @@ class LockTest(unittest.TestCase):
                 str(link),
             ]
             for held in (os.path.relpath(ws.out), str(ws.out.resolve())):
-                (ws.target / ".git" / runner.LEFT_NAME).write_text(held, encoding="utf-8")
+                (ws.target / ".git" / repo.LEFT_NAME).write_text(held, encoding="utf-8")
                 for spelling in spellings:
-                    runner.acquire_target(top, spelling, resuming=True)
-                    (ws.target / ".git" / runner.LOCK_NAME).unlink()
+                    repo.acquire_target(top, spelling, resuming=True)
+                    (ws.target / ".git" / repo.LOCK_NAME).unlink()
 
     def test_left_marker_holds_realpath_not_folded(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
             top = str(ws.target.resolve())
             ws.out.mkdir()
-            runner.acquire_target(top, ws.out)
+            repo.acquire_target(top, ws.out)
             st = {"target": {"path": top, "base": None}, "out": str(ws.out)}
-            runner.release_target(st, ws.root, hold=True)
-            marker = ws.target / ".git" / runner.LEFT_NAME
+            repo.release_target(st, ws.root, hold=True)
+            marker = ws.target / ".git" / repo.LEFT_NAME
             self.assertEqual(marker.read_text(encoding="utf-8"), os.path.realpath(ws.out))
 
     def test_lock_lives_in_dot_git_and_survives_clean(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            lock = runner.acquire_target(str(ws.target.resolve()), ws.out)
+            lock = repo.acquire_target(str(ws.target.resolve()), ws.out)
             self.assertEqual(Path(lock).parent, (ws.target / ".git").resolve())
             self.assertEqual(git(ws.target, "status", "--porcelain"), "")
             git(ws.target, "clean", "-fd")
@@ -2409,33 +2463,33 @@ class LockTest(unittest.TestCase):
             ws = Workspace(d)
             proc = subprocess.Popen([sys.executable, "-c", "pass"])
             proc.wait()
-            lock = ws.target / ".git" / runner.LOCK_NAME
+            lock = ws.target / ".git" / repo.LOCK_NAME
             lock.write_text(str(proc.pid), encoding="utf-8")
-            runner.acquire_target(str(ws.target.resolve()), ws.out)
+            repo.acquire_target(str(ws.target.resolve()), ws.out)
             self.assertEqual(lock.read_text(encoding="utf-8"), str(os.getpid()))
 
     def test_unreadable_owner_counts_as_alive(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            (ws.target / ".git" / runner.LOCK_NAME).write_text("", encoding="utf-8")
-            with self.assertRaises(runner.Refusal):
-                runner.acquire_target(str(ws.target.resolve()), ws.out)
+            (ws.target / ".git" / repo.LOCK_NAME).write_text("", encoding="utf-8")
+            with self.assertRaises(common.Refusal):
+                repo.acquire_target(str(ws.target.resolve()), ws.out)
 
     def test_failed_liveness_check_counts_as_alive(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            (ws.target / ".git" / runner.LOCK_NAME).write_text("999999", encoding="utf-8")
+            (ws.target / ".git" / repo.LOCK_NAME).write_text("999999", encoding="utf-8")
             with (
-                mock.patch.object(runner.os, "kill", side_effect=PermissionError),
-                self.assertRaises(runner.Refusal),
+                mock.patch.object(os, "kill", side_effect=PermissionError),
+                self.assertRaises(common.Refusal),
             ):
-                runner.acquire_target(str(ws.target.resolve()), ws.out)
+                repo.acquire_target(str(ws.target.resolve()), ws.out)
 
     def test_pid_alive(self):
-        self.assertTrue(runner._pid_alive(os.getpid()))
+        self.assertTrue(repo._pid_alive(os.getpid()))
         proc = subprocess.Popen([sys.executable, "-c", "pass"])
         proc.wait()
-        self.assertFalse(runner._pid_alive(proc.pid))
+        self.assertFalse(repo._pid_alive(proc.pid))
 
 
 class RunAllTest(unittest.TestCase):
@@ -2470,15 +2524,15 @@ class RunAllTest(unittest.TestCase):
 
     def main(self, ws, *args):
         with (
-            mock.patch.object(runner, "_ENTRY", True),
-            mock.patch.object(runner, "mode_check", return_value=(True, "## モード: enable")),
+            mock.patch.object(common, "_ENTRY", True),
+            mock.patch.object(workspace, "mode_check", return_value=(True, "## モード: enable")),
         ):
             return runner.main(["run-all", *args, "--root", str(ws.root)])
 
     def digest(self, ws, scn_dir, cap):
-        paths = runner.expand_scenario_paths([str(scn_dir)])
-        eligible, _ = runner.run_all_plan(paths, ws.root)
-        return runner.run_all_digest(eligible, cap)
+        paths = commands.expand_scenario_paths([str(scn_dir)])
+        eligible, _ = commands.run_all_plan(paths, ws.root)
+        return commands.run_all_digest(eligible, cap)
 
     def fake_step(self, costs, seen=None):
         calls = []
@@ -2502,7 +2556,7 @@ class RunAllTest(unittest.TestCase):
             step, calls = self.fake_step({})
             buf = io.StringIO()
             with (
-                mock.patch.object(runner, "run_step", side_effect=step),
+                mock.patch.object(drive, "run_step", side_effect=step),
                 contextlib.redirect_stdout(buf),
             ):
                 rc = self.main(ws, str(scn_dir), "--max-total-usd", "3")
@@ -2524,8 +2578,8 @@ class RunAllTest(unittest.TestCase):
             self.make(ws, "UC-93", reset=False)
             self.make(ws, "UC-94", human=True)
             (scn_dir / "broken.yml").write_text("id: UC-95\n", encoding="utf-8")
-            eligible, skipped = runner.run_all_plan(
-                runner.expand_scenario_paths([str(scn_dir)]), ws.root
+            eligible, skipped = commands.run_all_plan(
+                commands.expand_scenario_paths([str(scn_dir)]), ws.root
             )
             self.assertEqual([s["id"] for _, s in eligible], ["UC-91"])
             why = dict(skipped)
@@ -2539,8 +2593,8 @@ class RunAllTest(unittest.TestCase):
             ws = Workspace(d)
             scn_dir = self.make(ws, "UC-91")
             shutil.rmtree(ws.target / ".git")  # 対象がリポジトリでなくなると、本体のものになる
-            eligible, skipped = runner.run_all_plan(
-                runner.expand_scenario_paths([str(scn_dir)]), ws.root
+            eligible, skipped = commands.run_all_plan(
+                commands.expand_scenario_paths([str(scn_dir)]), ws.root
             )
             self.assertEqual(eligible, [])
             self.assertIn("ccnavi 本体", dict(skipped)["UC-91"])
@@ -2558,7 +2612,7 @@ class RunAllTest(unittest.TestCase):
             batch = Path(d) / "batch"
             buf = io.StringIO()
             with (
-                mock.patch.object(runner, "run_step", side_effect=step),
+                mock.patch.object(drive, "run_step", side_effect=step),
                 contextlib.redirect_stdout(buf),
             ):
                 rc = self.main(
@@ -2577,7 +2631,7 @@ class RunAllTest(unittest.TestCase):
             by_id = {r["id"]: r for r in summary["scenarios"]}
             self.assertEqual(by_id["UC-91"]["cost_usd"], 0.25)
             self.assertEqual(summary["total_cost_usd"], 0.25)
-            self.assertIn(by_id["UC-92"]["verdict"], (runner.INCONCLUSIVE,))
+            self.assertIn(by_id["UC-92"]["verdict"], (common.INCONCLUSIVE,))
             text = (batch / "summary.md").read_text(encoding="utf-8")
             self.assertIn("| ID | 判定 | 実費 (USD) | ツール呼び出し | 拒否 | ask |", text)
             self.assertIn("| UC-91 |", text)
@@ -2601,7 +2655,7 @@ class RunAllTest(unittest.TestCase):
             self.make(ws, "UC-92")
             step, calls = self.fake_step({})
             with (
-                mock.patch.object(runner, "run_step", side_effect=step),
+                mock.patch.object(drive, "run_step", side_effect=step),
                 contextlib.redirect_stdout(io.StringIO()),
             ):
                 self.main(
@@ -2645,7 +2699,7 @@ class RunAllTest(unittest.TestCase):
             step, calls = self.fake_step({})
             buf = io.StringIO()
             with (
-                mock.patch.object(runner, "run_step", side_effect=step),
+                mock.patch.object(drive, "run_step", side_effect=step),
                 contextlib.redirect_stdout(buf),
             ):
                 rc = self.main(ws, str(scn_dir), "--max-total-usd", "5", "--confirmed", confirmed)
@@ -2684,7 +2738,7 @@ class RunAllTest(unittest.TestCase):
             batch = Path(d) / "batch"
             buf = io.StringIO()
             with (
-                mock.patch.object(runner, "run_step", side_effect=step),
+                mock.patch.object(drive, "run_step", side_effect=step),
                 contextlib.redirect_stdout(buf),
             ):
                 rc = self.main(
@@ -2711,7 +2765,7 @@ class RunAllTest(unittest.TestCase):
             scn_dir = self.make(ws, "UC-91", budget=3.0)
             step, calls = self.fake_step({})
             with (
-                mock.patch.object(runner, "run_step", side_effect=step),
+                mock.patch.object(drive, "run_step", side_effect=step),
                 contextlib.redirect_stdout(io.StringIO()),
             ):
                 rc = self.main(
@@ -2740,7 +2794,7 @@ class RunAllTest(unittest.TestCase):
             scn_dir = self.make(ws, "UC-91")
             step, calls = self.fake_step({})
             with (
-                mock.patch.object(runner, "run_step", side_effect=step),
+                mock.patch.object(drive, "run_step", side_effect=step),
                 contextlib.redirect_stdout(io.StringIO()),
             ):
                 for bad in ("nan", "inf"):
@@ -2767,11 +2821,11 @@ class RunAllTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d)
             timeout = subprocess.TimeoutExpired("claude", 1)
-            self.assertEqual(runner._failed_step_cost(scn, out, 1, timeout), 0.5)  # step の上限
-            self.assertEqual(runner._failed_step_cost(scn, out, 1, RuntimeError("x")), 0.0)
+            self.assertEqual(drive._failed_step_cost(scn, out, 1, timeout), 0.5)  # step の上限
+            self.assertEqual(drive._failed_step_cost(scn, out, 1, RuntimeError("x")), 0.0)
             line = json.dumps({"type": "result", "total_cost_usd": 0.4, "session_id": "s"})
             (out / "step-1.jsonl").write_text(line + "\n", encoding="utf-8")
-            self.assertEqual(runner._failed_step_cost(scn, out, 1, RuntimeError("x")), 0.4)
+            self.assertEqual(drive._failed_step_cost(scn, out, 1, RuntimeError("x")), 0.4)
 
     def test_issue_scenarios_raise_the_host_question(self):
         with tempfile.TemporaryDirectory() as d:
@@ -2781,10 +2835,10 @@ class RunAllTest(unittest.TestCase):
             data = yaml.safe_load(path.read_text(encoding="utf-8"))
             data["setup"]["issue"] = {"repo": "projects/test-repo", "title": "t", "body": "b"}
             path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
-            eligible, skipped = runner.run_all_plan(
-                runner.expand_scenario_paths([str(path)]), ws.root
+            eligible, skipped = commands.run_all_plan(
+                commands.expand_scenario_paths([str(path)]), ws.root
             )
-            text = runner.run_all_confirmation(
+            text = report.run_all_confirmation(
                 eligible, skipped, 5.0, "d", "m", ws.root, [str(path)]
             )
             self.assertIn("本物のホストに issue も作る", text)
@@ -2795,9 +2849,9 @@ class RunAllTest(unittest.TestCase):
             scn_dir = self.make(ws, "UC-91")
             step, calls = self.fake_step({})
             with (
-                mock.patch.object(runner, "_ENTRY", True),
-                mock.patch.object(runner, "mode_check", return_value=(False, "dry-run")),
-                mock.patch.object(runner, "run_step", side_effect=step),
+                mock.patch.object(common, "_ENTRY", True),
+                mock.patch.object(workspace, "mode_check", return_value=(False, "dry-run")),
+                mock.patch.object(drive, "run_step", side_effect=step),
                 contextlib.redirect_stdout(io.StringIO()),
             ):
                 rc = runner.main(
@@ -2807,11 +2861,11 @@ class RunAllTest(unittest.TestCase):
             self.assertEqual(calls, [])
 
     def test_run_all_is_closed_when_imported(self):
-        args = runner.argparse.Namespace(
+        args = argparse.Namespace(
             scenarios=["x"], max_total_usd=1.0, confirmed=None, root=".", out=None
         )
         with self.assertRaises(RuntimeError):
-            runner.cmd_run_all(args)
+            commands.cmd_run_all(args)
 
 
 class LifecycleTest(unittest.TestCase):
@@ -2840,7 +2894,7 @@ class LifecycleTest(unittest.TestCase):
             str(ws.out),
             *extra,
         ]
-        with mock.patch.object(runner, "_ENTRY", True):
+        with mock.patch.object(common, "_ENTRY", True):
             return runner.main(args)
 
     def restored(self, ws):
@@ -2864,33 +2918,33 @@ class LifecycleTest(unittest.TestCase):
             def run_step(*a, **k):
                 seen["branch"] = git(ws.target, "branch", "--show-current")
                 seen["readme"] = (ws.target / "README.md").read_text(encoding="utf-8")
-                seen["lock"] = runner.LOCK_NAME in self.git_dir_names(ws)
+                seen["lock"] = repo.LOCK_NAME in self.git_dir_names(ws)
                 return self.STEP_OUT
 
-            with mock.patch.object(runner, "run_step", side_effect=run_step):
+            with mock.patch.object(drive, "run_step", side_effect=run_step):
                 rc = self.run_cmd(ws, self.setup_for(ws))
             self.assertEqual(seen, {"branch": "feat", "readme": "元の中身\n追記\n", "lock": True})
             self.assertIn(rc, (0, 2))
             self.assertTrue(self.restored(ws))
             names = self.git_dir_names(ws)
-            self.assertNotIn(runner.LOCK_NAME, names)
-            self.assertNotIn(runner.LEFT_NAME, names)
+            self.assertNotIn(repo.LOCK_NAME, names)
+            self.assertNotIn(repo.LEFT_NAME, names)
 
     def test_keyboard_interrupt_restores_and_reraises(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
             with (
-                mock.patch.object(runner, "run_step", side_effect=KeyboardInterrupt),
+                mock.patch.object(drive, "run_step", side_effect=KeyboardInterrupt),
                 self.assertRaises(KeyboardInterrupt),
             ):
                 self.run_cmd(ws, self.setup_for(ws))
             self.assertTrue(self.restored(ws))
-            self.assertNotIn(runner.LOCK_NAME, self.git_dir_names(ws))
+            self.assertNotIn(repo.LOCK_NAME, self.git_dir_names(ws))
 
     def test_failed_step_restores(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            with mock.patch.object(runner, "run_step", side_effect=RuntimeError("起動できない")):
+            with mock.patch.object(drive, "run_step", side_effect=RuntimeError("起動できない")):
                 rc = self.run_cmd(ws, self.setup_for(ws))
             self.assertEqual(rc, 2)
             self.assertTrue(self.restored(ws))
@@ -2901,7 +2955,7 @@ class LifecycleTest(unittest.TestCase):
             ws = Workspace(d)
             path = self.setup_for(ws, steps)
             with (
-                mock.patch.object(runner, "run_step", return_value=self.STEP_OUT),
+                mock.patch.object(drive, "run_step", return_value=self.STEP_OUT),
                 mock.patch("builtins.print") as shown,
             ):
                 rc = self.run_cmd(ws, path)
@@ -2910,16 +2964,16 @@ class LifecycleTest(unittest.TestCase):
             self.assertEqual(git(ws.target, "branch", "--show-current"), "feat")
             self.assertIn("元の中身\n追記\n", (ws.target / "README.md").read_text(encoding="utf-8"))
             names = self.git_dir_names(ws)
-            self.assertNotIn(runner.LOCK_NAME, names)
-            self.assertIn(runner.LEFT_NAME, names)
+            self.assertNotIn(repo.LOCK_NAME, names)
+            self.assertIn(repo.LEFT_NAME, names)
             self.assertIn(f"{ws.base} に戻していない", text)
-            self.assertIn(f"次: 続けるなら `{runner.RUNNER} next {ws.out}`", text)
-            self.assertIn(f"やめるなら `{runner.RUNNER} restore {ws.out}`", text)
+            self.assertIn(f"次: 続けるなら `{common.RUNNER} next {ws.out}`", text)
+            self.assertIn(f"やめるなら `{common.RUNNER} restore {ws.out}`", text)
 
             # 残した状態に、別の回は入れない
             other = ws.scenario_file({"reset": {"base": ws.base}}, name="UC-98-y.yml")
             with (
-                mock.patch.object(runner, "run_step", return_value=self.STEP_OUT),
+                mock.patch.object(drive, "run_step", return_value=self.STEP_OUT),
                 mock.patch("builtins.print"),
             ):
                 other_rc = self.run_cmd(ws, other, "--out", str(Path(d) / "out2"))
@@ -2932,8 +2986,8 @@ class LifecycleTest(unittest.TestCase):
             self.assertEqual(done, 0)
             self.assertTrue(self.restored(ws))
             names = self.git_dir_names(ws)
-            self.assertNotIn(runner.LEFT_NAME, names)
-            self.assertNotIn(runner.LOCK_NAME, names)
+            self.assertNotIn(repo.LEFT_NAME, names)
+            self.assertNotIn(repo.LOCK_NAME, names)
 
     def test_restore_abandons_a_held_run(self):
         steps = [{"prompt": "a"}, {"human": True, "instruction": "打つ"}]
@@ -2941,19 +2995,19 @@ class LifecycleTest(unittest.TestCase):
             ws = Workspace(d)
             path = self.setup_for(ws, steps)
             with (
-                mock.patch.object(runner, "run_step", return_value=self.STEP_OUT),
+                mock.patch.object(drive, "run_step", return_value=self.STEP_OUT),
                 mock.patch("builtins.print"),
             ):
                 self.assertEqual(self.run_cmd(ws, path), 10)
             with mock.patch("builtins.print"):
                 self.assertEqual(runner.main(["restore", str(ws.out)]), 0)
             self.assertTrue(self.restored(ws))
-            self.assertNotIn(runner.LEFT_NAME, self.git_dir_names(ws))
+            self.assertNotIn(repo.LEFT_NAME, self.git_dir_names(ws))
 
     def test_halted_run_restores_and_next_afterwards_is_harmless(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            with mock.patch.object(runner, "run_step", side_effect=RuntimeError("起動できない")):
+            with mock.patch.object(drive, "run_step", side_effect=RuntimeError("起動できない")):
                 self.assertEqual(self.run_cmd(ws, self.setup_for(ws)), 2)
             self.assertTrue(self.restored(ws))
             with mock.patch("builtins.print"):
@@ -2965,8 +3019,8 @@ class LifecycleTest(unittest.TestCase):
             ws = Workspace(d)
             path = self.setup_for(ws)
             with (
-                mock.patch.object(runner, "run_step", side_effect=RuntimeError("起動できない")),
-                mock.patch.object(runner, "finish", return_value=2),
+                mock.patch.object(drive, "run_step", side_effect=RuntimeError("起動できない")),
+                mock.patch.object(drive, "finish", return_value=2),
             ):
                 self.assertEqual(self.run_cmd(ws, path), 2)
             self.assertFalse(self.restored(ws), "finish を通っていないので残っている")
@@ -2977,10 +3031,10 @@ class LifecycleTest(unittest.TestCase):
     def test_unrestorable_target_gives_exit_3_after_the_report(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            fail = runner.Refusal("失敗", "手で戻す")
+            fail = common.Refusal("失敗", "手で戻す")
             with (
-                mock.patch.object(runner, "run_step", return_value=self.STEP_OUT),
-                mock.patch.object(runner, "reset_repo", side_effect=[None, fail]),
+                mock.patch.object(drive, "run_step", return_value=self.STEP_OUT),
+                mock.patch.object(repo, "reset_repo", side_effect=[None, fail]),
                 mock.patch("builtins.print") as shown,
             ):
                 rc = self.run_cmd(ws, self.setup_for(ws))
@@ -2990,8 +3044,8 @@ class LifecycleTest(unittest.TestCase):
             self.assertIn("手作業で戻す必要がある", text)
             self.assertIn(str(ws.target.resolve()), text)
             self.assertIn("次: ", text)
-            self.assertIn(runner.LEFT_NAME, self.git_dir_names(ws))
-            self.assertNotIn(runner.LOCK_NAME, self.git_dir_names(ws))
+            self.assertIn(repo.LEFT_NAME, self.git_dir_names(ws))
+            self.assertNotIn(repo.LOCK_NAME, self.git_dir_names(ws))
             # 戻せていない対象では、次の回を始めさせない
             other = ws.scenario_file({"reset": {"base": ws.base}}, name="UC-98-y.yml")
             with mock.patch("builtins.print"):
@@ -3000,10 +3054,10 @@ class LifecycleTest(unittest.TestCase):
     def test_interrupt_with_unrestorable_target_reports_and_reraises_the_original(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            fail = runner.Refusal("失敗", "手で戻す")
+            fail = common.Refusal("失敗", "手で戻す")
             with (
-                mock.patch.object(runner, "run_step", side_effect=KeyboardInterrupt),
-                mock.patch.object(runner, "reset_repo", side_effect=[None, fail]),
+                mock.patch.object(drive, "run_step", side_effect=KeyboardInterrupt),
+                mock.patch.object(repo, "reset_repo", side_effect=[None, fail]),
                 mock.patch("builtins.print") as shown,
                 self.assertRaises(KeyboardInterrupt),
             ):
@@ -3015,9 +3069,9 @@ class LifecycleTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
             ws.dirty()
-            runner.acquire_target(str(ws.target.resolve()), ws.out)
+            repo.acquire_target(str(ws.target.resolve()), ws.out)
             with (
-                mock.patch.object(runner, "run_step", return_value=self.STEP_OUT) as step,
+                mock.patch.object(drive, "run_step", return_value=self.STEP_OUT) as step,
                 mock.patch("builtins.print"),
             ):
                 rc = self.run_cmd(ws, self.setup_for(ws), "--out", str(Path(d) / "out2"))
@@ -3039,7 +3093,7 @@ class LifecycleTest(unittest.TestCase):
             with mock.patch("builtins.print"):
                 rc = self.run_cmd(ws, path)
             self.assertEqual(rc, 1)  # 追記の対象が無い。clash の判定で、何も触る前に止まる
-            self.assertNotIn(runner.LOCK_NAME, self.git_dir_names(ws))
+            self.assertNotIn(repo.LOCK_NAME, self.git_dir_names(ws))
 
     def test_failed_setup_git_rolls_back_and_exits_3(self):
         with tempfile.TemporaryDirectory() as d:
@@ -3052,26 +3106,26 @@ class LifecycleTest(unittest.TestCase):
                 }
             )
             with (
-                mock.patch.object(runner, "drive") as drive,
+                mock.patch.object(drive, "run_steps") as run_steps,
                 mock.patch("builtins.print") as shown,
             ):
                 rc = self.run_cmd(ws, path)
             text = "\n".join(str(c.args[0]) for c in shown.call_args_list if c.args)
             self.assertEqual(rc, 3)
-            drive.assert_not_called()
+            run_steps.assert_not_called()
             self.assertIn("次: ", text)
             self.assertTrue(self.restored(ws))
-            self.assertNotIn(runner.LOCK_NAME, self.git_dir_names(ws))
+            self.assertNotIn(repo.LOCK_NAME, self.git_dir_names(ws))
 
     def test_confirmation_shows_the_target_and_asks_about_the_reset(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
-            scn = runner.load_scenario(self.setup_for(ws))
-            text = runner.confirmation_text(scn, ws.root, "MODE OK")
+            scn = schema.load_scenario(self.setup_for(ws))
+            text = report.confirmation_text(scn, ws.root, "MODE OK")
             self.assertIn(f"対象のリポジトリ: {ws.target.resolve()}（使い捨てと確かめた）", text)
             self.assertIn("確認事項 3", text)
             self.assertIn(ws.base, text)
-            body = runner.confirmation_text(scn, ws.target, "MODE OK")
+            body = report.confirmation_text(scn, ws.target, "MODE OK")
             self.assertIn("対象のリポジトリを使えない", body)
 
 
@@ -3152,13 +3206,13 @@ def tokens_dropped_env():
 class HostFieldTest(unittest.TestCase):
     def load(self, setup):
         with tempfile.TemporaryDirectory() as d:
-            return runner.load_scenario(write_scenario(d, setup))
+            return schema.load_scenario(write_scenario(d, setup))
 
     def test_values_are_checked_and_the_default_is_real(self):
         for host in ("bare", "fake-gitlab", "real"):
             with self.subTest(host=host):
-                self.assertEqual(runner.scenario_host(self.load({"host": host})), host)
-        self.assertEqual(runner.scenario_host(self.load({"files": {}})), "real")
+                self.assertEqual(schema.scenario_host(self.load({"host": host})), host)
+        self.assertEqual(schema.scenario_host(self.load({"files": {}})), "real")
         for bad in ("mock", "", None, True, "Bare"):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 self.load({"host": bad})
@@ -3183,10 +3237,10 @@ class HostFieldTest(unittest.TestCase):
                 self.load(setup)
 
     def test_a_fake_host_uses_the_disposable_target(self):
-        self.assertTrue(runner.uses_target({"setup": {"host": "bare"}}))
-        self.assertTrue(runner.uses_target({"setup": {"host": "fake-gitlab"}}))
-        self.assertFalse(runner.uses_target({"setup": {"host": "real"}}))
-        self.assertFalse(runner.uses_target({}))
+        self.assertTrue(schema.uses_target({"setup": {"host": "bare"}}))
+        self.assertTrue(schema.uses_target({"setup": {"host": "fake-gitlab"}}))
+        self.assertFalse(schema.uses_target({"setup": {"host": "real"}}))
+        self.assertFalse(schema.uses_target({}))
 
     def test_a_target_that_is_ccnavi_itself_is_refused_before_anything_is_made(self):
         with tempfile.TemporaryDirectory() as d:
@@ -3195,8 +3249,8 @@ class HostFieldTest(unittest.TestCase):
             path = ws.scenario_file({"host": "bare"})
             args = ["run", str(path), "--confirmed", "--root", str(ws.root), "--out", str(ws.out)]
             with (
-                mock.patch.object(runner, "_ENTRY", True),
-                mock.patch.object(runner, "run_step") as step,
+                mock.patch.object(common, "_ENTRY", True),
+                mock.patch.object(drive, "run_step") as step,
                 mock.patch("builtins.print") as shown,
             ):
                 rc = runner.main(args)
@@ -3255,20 +3309,20 @@ class StepEnvTest(unittest.TestCase):
         self.assertEqual(env["FAKE_ORIGIN_URL"], "http://127.0.0.1:4321/ns/proj.git")
 
     def test_a_scenario_without_host_passes_no_env(self):
-        self.assertIsNone(runner._host_env({}))
-        self.assertIsNone(runner._host_env({"host": {"down": True}}))
+        self.assertIsNone(prepare.host_env({}))
+        self.assertIsNone(prepare.host_env({"host": {"down": True}}))
 
     def test_run_step_inherits_the_environment_when_env_is_none(self):
         done = subprocess.CompletedProcess([], 0, stdout="", stderr="")
         scn = {"model": "haiku", "budget_usd": 1.0, "_prompt_steps": 1, "permission_mode": "auto"}
         with (
             tempfile.TemporaryDirectory() as d,
-            mock.patch.object(runner, "_ENTRY", True),
-            mock.patch.object(runner.subprocess, "run", return_value=done) as call,
+            mock.patch.object(common, "_ENTRY", True),
+            mock.patch.object(subprocess, "run", return_value=done) as call,
         ):
-            runner.run_step(scn, {"prompt": "a"}, Path(d), 1, "sid", None, False, d)
+            drive.run_step(scn, {"prompt": "a"}, Path(d), 1, "sid", None, False, d)
             self.assertIsNone(call.call_args.kwargs["env"])
-            runner.run_step(scn, {"prompt": "a"}, Path(d), 1, "sid", None, False, d, env={"A": "1"})
+            drive.run_step(scn, {"prompt": "a"}, Path(d), 1, "sid", None, False, d, env={"A": "1"})
             self.assertEqual(call.call_args.kwargs["env"], {"A": "1"})
 
 
@@ -3283,8 +3337,8 @@ class BareHostTest(unittest.TestCase):
         self.root = str(self.ws.root.resolve())
 
     def prepare(self, kind="bare", **setup):
-        host = hostenv.prepare(self.ws.root, self.top, {"host": kind, **setup}, runner._git)
-        self.addCleanup(hostenv.teardown, self.ws.root, host, runner._git)
+        host = hostenv.prepare(self.ws.root, self.top, {"host": kind, **setup}, repo.git)
+        self.addCleanup(hostenv.teardown, self.ws.root, host, repo.git)
         return host, hostenv.step_env(host, tokens_dropped_env())
 
     def git(self, env, cwd, *args):
@@ -3383,16 +3437,16 @@ class BareHostTest(unittest.TestCase):
         git(self.ws.target, "commit", "-q", "--allow-empty", "-m", "e")
         self.assertEqual(self.git(env, self.top, "push", "-q", "origin", "feat").returncode, 0)
         self.assertIn("refs/remotes/origin/feat", git(self.ws.target, "for-each-ref"))
-        hostenv.teardown(self.ws.root, host, runner._git)
+        hostenv.teardown(self.ws.root, host, repo.git)
         self.assertFalse(os.path.exists(host["dir"]))
         self.assertNotIn("refs/remotes/origin/feat", git(self.ws.target, "for-each-ref"))
         self.assertEqual(git(self.ws.target, "rev-parse", "refs/remotes/origin/main"), self.ws.base)
-        hostenv.teardown(self.ws.root, host, runner._git)  # 2 回目は何もしない
+        hostenv.teardown(self.ws.root, host, repo.git)  # 2 回目は何もしない
 
     def test_a_target_without_origin_is_refused_and_leaves_nothing(self):
         git(self.ws.target, "remote", "remove", "origin")
         with self.assertRaises(RuntimeError):
-            hostenv.prepare(self.ws.root, self.top, {"host": "bare"}, runner._git)
+            hostenv.prepare(self.ws.root, self.top, {"host": "bare"}, repo.git)
         self.assertEqual(list(self.scratch.glob("ccnavi-host-*")), [])
 
 
@@ -3405,10 +3459,8 @@ class FakeGitlabHostTest(unittest.TestCase):
         self.top = str(self.ws.target.resolve())
 
     def prepare(self, **setup):
-        host = hostenv.prepare(
-            self.ws.root, self.top, {"host": "fake-gitlab", **setup}, runner._git
-        )
-        self.addCleanup(hostenv.teardown, self.ws.root, host, runner._git)
+        host = hostenv.prepare(self.ws.root, self.top, {"host": "fake-gitlab", **setup}, repo.git)
+        self.addCleanup(hostenv.teardown, self.ws.root, host, repo.git)
         return host
 
     def test_review_sh_reads_the_fake_mr_and_thread_through_the_stubs(self):
@@ -3473,7 +3525,7 @@ class FakeGitlabHostTest(unittest.TestCase):
     def test_teardown_stops_the_server(self):
         host = self.prepare()
         port = host["port"]
-        hostenv.teardown(self.ws.root, host, runner._git)
+        hostenv.teardown(self.ws.root, host, repo.git)
         with self.assertRaises(OSError):
             socket_connect(port)
         self.assertFalse(os.path.exists(host["dir"]))
@@ -3528,9 +3580,9 @@ class HostSnapshotTest(unittest.TestCase):
             self.ws.root,
             self.top,
             {"host": "fake-gitlab", "host_state": snap_state()},
-            runner._git,
+            repo.git,
         )
-        self.addCleanup(hostenv.teardown, self.ws.root, self.host, runner._git)
+        self.addCleanup(hostenv.teardown, self.ws.root, self.host, repo.git)
 
     def take(self, step=1):
         result = hostsnap.take(self.ws.root, self.host, step, self.out)
@@ -3714,7 +3766,7 @@ class HostLifecycleTest(unittest.TestCase):
     def run_cmd(self, path):
         args = ["run", str(path), "--confirmed", "--root", str(self.ws.root)]
         args += ["--out", str(self.ws.out)]
-        with mock.patch.object(runner, "_ENTRY", True), mock.patch("builtins.print"):
+        with mock.patch.object(common, "_ENTRY", True), mock.patch("builtins.print"):
             return runner.main(args)
 
     def places(self):
@@ -3733,7 +3785,7 @@ class HostLifecycleTest(unittest.TestCase):
             return self.STEP_OUT
 
         before = self.places()
-        with mock.patch.object(runner, "run_step", side_effect=run_step):
+        with mock.patch.object(drive, "run_step", side_effect=run_step):
             rc = self.run_cmd(self.scenario("bare"))
         self.assertIn(rc, (0, 2))
         self.assertTrue(seen["exists"])
@@ -3756,7 +3808,7 @@ class HostLifecycleTest(unittest.TestCase):
             return self.STEP_OUT
 
         before = self.places()
-        with mock.patch.object(runner, "run_step", side_effect=run_step):
+        with mock.patch.object(drive, "run_step", side_effect=run_step):
             self.run_cmd(self.scenario("real"))
         self.assertIsNone(seen["env"])
         self.assertEqual(self.places(), before)
@@ -3780,7 +3832,7 @@ class HostLifecycleTest(unittest.TestCase):
                 fake_gitlab.save(path, state)
             return self.STEP_OUT
 
-        with mock.patch.object(runner, "run_step", side_effect=run_step):
+        with mock.patch.object(drive, "run_step", side_effect=run_step):
             rc = self.run_cmd(self.scenario("fake-gitlab", steps))
         self.assertIn(rc, (0, 2))
         self.assertEqual([self.snap(n)["step"] for n in (1, 2)], [1, 2])
@@ -3802,7 +3854,7 @@ class HostLifecycleTest(unittest.TestCase):
     def test_a_snapshot_failure_does_not_stop_the_scenario(self):
         steps = [{"prompt": "a"}, {"prompt": "b"}]
         with (
-            mock.patch.object(runner, "run_step", return_value=self.STEP_OUT) as step,
+            mock.patch.object(drive, "run_step", return_value=self.STEP_OUT) as step,
             mock.patch.object(hostsnap.hostenv, "api_access", side_effect=OSError("接続できない")),
         ):
             rc = self.run_cmd(self.scenario("fake-gitlab", steps))
@@ -3821,7 +3873,7 @@ class HostLifecycleTest(unittest.TestCase):
     def test_a_crash_in_the_recorder_does_not_stop_the_scenario(self):
         steps = [{"prompt": "a"}, {"prompt": "b"}]
         with (
-            mock.patch.object(runner, "run_step", return_value=self.STEP_OUT) as step,
+            mock.patch.object(drive, "run_step", return_value=self.STEP_OUT) as step,
             mock.patch.object(hostsnap, "take", side_effect=RuntimeError("壊れた")),
         ):
             rc = self.run_cmd(self.scenario("fake-gitlab", steps))
@@ -3834,7 +3886,7 @@ class HostLifecycleTest(unittest.TestCase):
         for host in ("bare", "real"):
             with (
                 self.subTest(host=host),
-                mock.patch.object(runner, "run_step", return_value=self.STEP_OUT),
+                mock.patch.object(drive, "run_step", return_value=self.STEP_OUT),
             ):
                 self.run_cmd(self.scenario(host))
                 self.assertEqual(list(self.ws.out.glob("host-*.json")), [])
@@ -3852,7 +3904,7 @@ class HostLifecycleTest(unittest.TestCase):
             raise KeyboardInterrupt
 
         with (
-            mock.patch.object(runner, "run_step", side_effect=run_step),
+            mock.patch.object(drive, "run_step", side_effect=run_step),
             self.assertRaises(KeyboardInterrupt),
         ):
             self.run_cmd(self.scenario("fake-gitlab"))
@@ -3869,20 +3921,20 @@ class HostLifecycleTest(unittest.TestCase):
             seen["bare"] = git(bare, "rev-parse", "--verify", "-q", "refs/heads/feat")
             return self.STEP_OUT
 
-        with mock.patch.object(runner, "run_step", side_effect=run_step):
+        with mock.patch.object(drive, "run_step", side_effect=run_step):
             self.run_cmd(self.scenario("bare", git=git_setup))
         self.assertTrue(seen["bare"])
 
     def test_a_failed_step_leaves_no_place(self):
         before = self.places()
-        with mock.patch.object(runner, "run_step", side_effect=RuntimeError("起動できない")):
+        with mock.patch.object(drive, "run_step", side_effect=RuntimeError("起動できない")):
             self.assertEqual(self.run_cmd(self.scenario("fake-gitlab")), 2)
         self.assertEqual(self.places(), before)
 
     def test_a_setup_failure_after_the_host_is_made_removes_it(self):
         before = self.places()
         with (
-            mock.patch.object(runner, "_setup", side_effect=RuntimeError("壊れた")),
+            mock.patch.object(prepare, "make_files", side_effect=RuntimeError("壊れた")),
             self.assertRaises(RuntimeError),
         ):
             self.run_cmd(self.scenario("fake-gitlab"))
@@ -3892,11 +3944,11 @@ class HostLifecycleTest(unittest.TestCase):
         git(self.ws.target, "remote", "remove", "origin")
         before = self.places()
         with (
-            mock.patch.object(runner, "run_step") as step,
+            mock.patch.object(drive, "run_step") as step,
             mock.patch("builtins.print") as shown,
         ):
             args = ["run", str(self.scenario("bare")), "--confirmed", "--root", str(self.ws.root)]
-            with mock.patch.object(runner, "_ENTRY", True):
+            with mock.patch.object(common, "_ENTRY", True):
                 rc = runner.main([*args, "--out", str(self.ws.out)])
         text = "\n".join(str(c.args[0]) for c in shown.call_args_list if c.args)
         self.assertEqual(rc, 3)
@@ -3919,7 +3971,7 @@ class HostLifecycleTest(unittest.TestCase):
             return self.STEP_OUT
 
         before = self.places()
-        with mock.patch.object(runner, "run_step", side_effect=first):
+        with mock.patch.object(drive, "run_step", side_effect=first):
             self.assertEqual(self.run_cmd(self.scenario("fake-gitlab", steps)), 10)
         host = self.host_in_state()
         self.assertTrue(os.path.isdir(host["dir"]), "置き場は残す")
@@ -3937,9 +3989,9 @@ class HostLifecycleTest(unittest.TestCase):
             return self.STEP_OUT
 
         with (
-            mock.patch.object(runner, "run_step", side_effect=second),
+            mock.patch.object(drive, "run_step", side_effect=second),
             mock.patch("builtins.print"),
-            mock.patch.object(runner, "mode_check", return_value=(True, "")),
+            mock.patch.object(workspace, "mode_check", return_value=(True, "")),
         ):
             rc = runner.main(["next", str(self.ws.out)])
         self.assertIn(rc, (0, 2))
@@ -3952,13 +4004,13 @@ class HostLifecycleTest(unittest.TestCase):
     def test_next_after_a_halt_records_that_the_place_is_gone(self):
         before = self.places()
         with (
-            mock.patch.object(runner, "run_step", side_effect=RuntimeError("起動できない")),
-            mock.patch.object(runner, "finish", return_value=2),
+            mock.patch.object(drive, "run_step", side_effect=RuntimeError("起動できない")),
+            mock.patch.object(drive, "finish", return_value=2),
         ):
             self.run_cmd(self.scenario("bare"))
-        fail = runner.Refusal("失敗", "手で戻す")
+        fail = common.Refusal("失敗", "手で戻す")
         with (
-            mock.patch.object(runner, "reset_repo", side_effect=fail),
+            mock.patch.object(repo, "reset_repo", side_effect=fail),
             mock.patch("builtins.print"),
         ):
             self.assertEqual(runner.main(["next", str(self.ws.out)]), 3)
@@ -3967,7 +4019,7 @@ class HostLifecycleTest(unittest.TestCase):
 
     def test_next_after_restore_does_not_run_the_steps(self):
         steps = [{"prompt": "a"}, {"human": True, "instruction": "打つ"}, {"prompt": "b"}]
-        with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT) as step:
+        with mock.patch.object(drive, "run_step", return_value=self.STEP_OUT) as step:
             self.assertEqual(self.run_cmd(self.scenario("bare", steps)), 10)
             with mock.patch("builtins.print"):
                 self.assertEqual(runner.main(["restore", str(self.ws.out)]), 0)
@@ -3977,7 +4029,7 @@ class HostLifecycleTest(unittest.TestCase):
     def test_restore_removes_the_held_place(self):
         steps = [{"prompt": "a"}, {"human": True, "instruction": "打つ"}]
         before = self.places()
-        with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT):
+        with mock.patch.object(drive, "run_step", return_value=self.STEP_OUT):
             self.assertEqual(self.run_cmd(self.scenario("bare", steps)), 10)
         self.assertEqual(len(self.places() - before), 1)
         with mock.patch("builtins.print"):
@@ -3987,8 +4039,8 @@ class HostLifecycleTest(unittest.TestCase):
     def test_next_after_a_halt_that_never_reached_finish_removes_the_place(self):
         before = self.places()
         with (
-            mock.patch.object(runner, "run_step", side_effect=RuntimeError("起動できない")),
-            mock.patch.object(runner, "finish", return_value=2),
+            mock.patch.object(drive, "run_step", side_effect=RuntimeError("起動できない")),
+            mock.patch.object(drive, "finish", return_value=2),
         ):
             self.assertEqual(self.run_cmd(self.scenario("bare")), 2)
         self.assertEqual(len(self.places() - before), 1)
@@ -3998,11 +4050,11 @@ class HostLifecycleTest(unittest.TestCase):
 
     def test_the_summary_says_who_the_other_side_is(self):
         scn = {"id": "U", "title": "t", "steps": [{"prompt": "a"}], "setup": {"host": "bare"}}
-        text = runner.scenario_summary(scn)
+        text = report.scenario_summary(scn)
         self.assertIn("相手（setup.host）: bare", text)
         self.assertIn("本物のトークンは claude に渡さない", text)
         scn["setup"] = {}
-        self.assertNotIn("setup.host", runner.scenario_summary(scn))
+        self.assertNotIn("setup.host", report.scenario_summary(scn))
 
 
 # ---- setup.host: docker-gitlab（Docker 不要。GitLab の API は偽の Client で受ける） ----
@@ -4160,16 +4212,16 @@ class DockerApiAccessTest(DockerHostBase):
 class FieldAndNameTest(DockerHostBase):
     def load(self, setup):
         with tempfile.TemporaryDirectory() as d:
-            return runner.load_scenario(write_scenario(d, setup))
+            return schema.load_scenario(write_scenario(d, setup))
 
     def test_host_is_valid_and_is_not_a_fake(self):
         scn = self.load({"host": "docker-gitlab"})
-        self.assertEqual(runner.scenario_host(scn), "docker-gitlab")
-        self.assertTrue(runner.uses_target(scn))
+        self.assertEqual(schema.scenario_host(scn), "docker-gitlab")
+        self.assertTrue(schema.uses_target(scn))
         self.assertFalse(hostenv.is_fake("docker-gitlab"))
         self.assertTrue(hostenv.uses_stub_git("docker-gitlab"))
-        self.assertIn("docker-gitlab", runner.HOST_NOTES)
-        self.assertNotIn("模擬のずれ", runner.host_note("docker-gitlab"))
+        self.assertIn("docker-gitlab", report.HOST_NOTES)
+        self.assertNotIn("模擬のずれ", report.host_note("docker-gitlab"))
 
     def test_it_is_not_combined_with_issue_or_host_state(self):
         issue = {"repo": "projects/test-repo", "title": "t"}
@@ -4207,7 +4259,7 @@ class DockerLifecycleTest(DockerHostBase):
     def run_cmd(self, path, *extra):
         args = ["run", str(path), "--confirmed", "--root", str(self.ws.root)]
         args += ["--out", str(self.ws.out), *extra]
-        with mock.patch.object(runner, "_ENTRY", True), mock.patch("builtins.print"):
+        with mock.patch.object(common, "_ENTRY", True), mock.patch("builtins.print"):
             return runner.main(args)
 
     def state_text(self):
@@ -4223,7 +4275,7 @@ class DockerLifecycleTest(DockerHostBase):
         parent = {"CCNAVI_PROBE_REVIEWER_TOKEN": REVIEWER_TOKEN, "GITLAB_TOKEN": "parent-token"}
         with (
             mock.patch.dict(os.environ, parent),
-            mock.patch.object(runner, "run_step", side_effect=run_step),
+            mock.patch.object(drive, "run_step", side_effect=run_step),
         ):
             self.run_cmd(self.scenario())
         env = seen["env"]
@@ -4245,7 +4297,7 @@ class DockerLifecycleTest(DockerHostBase):
 
     def test_each_step_leaves_the_host_state_and_the_token_is_masked(self):
         steps = [{"prompt": "a"}, {"prompt": "b"}]
-        with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT):
+        with mock.patch.object(drive, "run_step", return_value=self.STEP_OUT):
             self.run_cmd(self.scenario(steps))
         for n in (1, 2):
             snap = json.loads((self.ws.out / f"host-{n}.json").read_text(encoding="utf-8"))
@@ -4260,7 +4312,7 @@ class DockerLifecycleTest(DockerHostBase):
 
     def test_a_delete_failure_is_exit_3_and_names_the_project(self):
         self.client.fail = True
-        with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT):
+        with mock.patch.object(drive, "run_step", return_value=self.STEP_OUT):
             rc = self.run_cmd(self.scenario())
         self.assertEqual(rc, 3)
         rows = json.loads((self.ws.out / "report.json").read_text(encoding="utf-8"))
@@ -4270,14 +4322,14 @@ class DockerLifecycleTest(DockerHostBase):
 
     def test_interrupt_and_setup_failure_delete_the_project(self):
         with (
-            mock.patch.object(runner, "run_step", side_effect=KeyboardInterrupt),
+            mock.patch.object(drive, "run_step", side_effect=KeyboardInterrupt),
             self.assertRaises(KeyboardInterrupt),
         ):
             self.run_cmd(self.scenario())
         self.assertTrue(self.client.gone)
         self.client.gone = self.client.marked = False
         with (
-            mock.patch.object(runner, "_setup", side_effect=RuntimeError("壊れた")),
+            mock.patch.object(prepare, "make_files", side_effect=RuntimeError("壊れた")),
             self.assertRaises(RuntimeError),
         ):
             self.run_cmd(self.scenario())
@@ -4285,7 +4337,7 @@ class DockerLifecycleTest(DockerHostBase):
 
     def test_a_human_step_keeps_the_project_until_restore(self):
         steps = [{"prompt": "a"}, {"human": True, "instruction": "i", "check": "c"}]
-        with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT):
+        with mock.patch.object(drive, "run_step", return_value=self.STEP_OUT):
             rc = self.run_cmd(self.scenario(steps))
         self.assertEqual(rc, 10)
         self.assertEqual(self.client.deletes(), [])
@@ -4298,7 +4350,7 @@ class DockerLifecycleTest(DockerHostBase):
 
     def test_restore_reports_a_delete_failure(self):
         steps = [{"prompt": "a"}, {"human": True, "instruction": "i", "check": "c"}]
-        with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT):
+        with mock.patch.object(drive, "run_step", return_value=self.STEP_OUT):
             self.run_cmd(self.scenario(steps))
         self.client.fail = True
         with mock.patch("builtins.print"):
@@ -4307,15 +4359,15 @@ class DockerLifecycleTest(DockerHostBase):
     def test_a_stopped_docker_refuses_only_that_scenario(self):
         self.client.version_status = 0
         root, top = self.ws.root, self.ws.target
-        docker = runner.load_scenario(self.scenario())
-        bare = runner.load_scenario(
+        docker = schema.load_scenario(self.scenario())
+        bare = schema.load_scenario(
             self.ws.scenario_file({"host": "bare", "reset": {"base": self.ws.base}}, None)
         )
-        with self.assertRaises(runner.Refusal) as cm:
-            runner.check_before_run(docker, root, top)
+        with self.assertRaises(common.Refusal) as cm:
+            prepare.check_before_run(docker, root, top)
         self.assertIn("docker_gitlab.py", str(cm.exception))
         self.assertIn("次:", str(cm.exception))
-        runner.check_before_run(bare, root, top)
+        prepare.check_before_run(bare, root, top)
 
 
 @unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
@@ -4389,7 +4441,7 @@ class HumanApiTest(DockerLifecycleTest):
         ]
 
     def run_steps(self, steps):
-        with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT):
+        with mock.patch.object(drive, "run_step", return_value=self.STEP_OUT):
             return self.run_cmd(self.scenario(steps))
 
     def halt_kind(self):
@@ -4407,7 +4459,7 @@ class HumanApiTest(DockerLifecycleTest):
     def test_field_is_checked(self):
         def load(setup, steps):
             with tempfile.TemporaryDirectory() as d:
-                return runner.load_scenario(write_scenario(d, setup, steps))
+                return schema.load_scenario(write_scenario(d, setup, steps))
 
         docker = {"host": "docker-gitlab"}
         load(docker, self.steps())
@@ -4487,14 +4539,14 @@ class HumanApiTest(DockerLifecycleTest):
 
     def test_resume_does_not_run_the_ops_twice(self):
         human = {"human": True, "instruction": "手で操作する"}
-        with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT):
+        with mock.patch.object(drive, "run_step", return_value=self.STEP_OUT):
             rc = self.run_cmd(self.scenario(self.steps(extra=[human])))
         self.assertEqual(rc, 10)
         before = list(self.client.human)
         self.assertEqual(len(before), 4)
         with (
-            mock.patch.object(runner, "run_step", return_value=self.STEP_OUT),
-            mock.patch.object(runner, "_ENTRY", True),
+            mock.patch.object(drive, "run_step", return_value=self.STEP_OUT),
+            mock.patch.object(common, "_ENTRY", True),
             mock.patch("builtins.print"),
         ):
             runner.main(["next", str(self.ws.out)])

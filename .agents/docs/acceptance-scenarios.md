@@ -26,7 +26,7 @@ ccnavi の振る舞い（ガードの拒否、チケットの流れ、サブエ�
 
 ## 置き場
 
-シナリオは 1 本 1 ファイルで `tests/scenarios/<ID>-<slug>.yml`（ID は UC の番号を引き継ぐ。例: `UC-01`）、回す道具は `tests/scenarios/runner.py`。シナリオの一覧、機能の層、ユースケースの表は `tests/scenarios/README.md`。
+シナリオは 1 本 1 ファイルで `tests/scenarios/<ID>-<slug>.yml`（ID は UC の番号を引き継ぐ。例: `UC-01`）、回す道具は `tests/scenarios/runner.py`（入口。中身は責務ごとのモジュールに分けてあり、段の一覧は `runner.py` の docstring）。シナリオの一覧、機能の層、ユースケースの表は `tests/scenarios/README.md`。
 
 ## シナリオの形
 
@@ -323,7 +323,7 @@ setup:
 - トークンは記録に出さない。認証の情報を含む応答は全文を残さず、取る項目を選ぶ。そのうえで、`tokens.env` の値と模擬のトークンが文字列に混ざっていたら `***` に置き換える
 - `state.json` の `host_snapshots` に step ごとの結果（`step`・`file`・`ok`・`errors`。ここの `errors` は件数）を残し、`report.md` の「相手（setup.host）」の行のあとに件数と、取れなかった step を出す。判定（`pass` / `fail`）には使わない
 
-**後片付け。** 模擬の停止、一時ディレクトリの削除、回している間に動いた対象の `refs/remotes/origin/*` の巻き戻しは、`setup.reset` の戻しと同じ経路で行う（`finish` の `finally`・`_continue` の `BaseException`・`restore`・失敗の停止）。人間の操作の step（終了コード 10）では、模擬は止め、置き場（bare・代役・模擬の状態）は残す。`next` は、同じ置き場で模擬を、残した状態ファイルのまま起こし直す（初期状態で上書きしない）。ポートは同じものを取り直し、取れなければ OS に決めさせて `案内:` を出す（前の step の記録に古いポートの URL が残りうる）。
+**後片付け。** 模擬の停止、一時ディレクトリの削除、回している間に動いた対象の `refs/remotes/origin/*` の巻き戻しは、`setup.reset` の戻しと同じ経路で行う（`drive.finish` の `finally`・`drive.continue_scenario` の `BaseException`・`restore`・失敗の停止）。人間の操作の step（終了コード 10）では、模擬は止め、置き場（bare・代役・模擬の状態）は残す。`next` は、同じ置き場で模擬を、残した状態ファイルのまま起こし直す（初期状態で上書きしない）。ポートは同じものを取り直し、取れなければ OS に決めさせて `案内:` を出す（前の step の記録に古いポートの URL が残りうる）。
 
 ### 中断・失敗・停止のあと
 
@@ -331,7 +331,7 @@ setup:
 |---|---|---|
 | 最後まで回った（`finish`） | `base` に戻す | 放す |
 | claude の失敗・`expect_after` を満たさない停止・`human_api` と `human_run` の失敗（内部の値 11。`finish` を通る） | `base` に戻す | 放す |
-| `KeyboardInterrupt` など（`_continue` の `BaseException`） | `base` に戻し、元の例外を投げ直す | 放す |
+| `KeyboardInterrupt` など（`drive.continue_scenario` の `BaseException`） | `base` に戻し、元の例外を投げ直す | 放す |
 | 人間の操作の step で止まった（10） | **戻さず残す**（人間が操作したあとの `next` で続くため。`setup.host` は模擬を止め、置き場は残す） | 放す |
 | 対象を取る前の拒否（判定・ロック・残し印・`base` が無い・追記の対象が使えない） | 何もしない（出力の置き場だけ作る） | 取っていない |
 | 対象を取ったあとの setup の失敗 | 作ったものを消し、`base` に戻す | 放す |
@@ -347,7 +347,7 @@ setup:
 
 - 作り方は `O_CREAT|O_EXCL`。中身は PID
 - すでにあれば、その PID が生きているかを見る（POSIX は `os.kill(pid, 0)`。Windows の `os.kill` はプロセスを終わらせるので、`OpenProcess` で見る）。生きている・判定できない（権限など）・中身が PID として読めないときは断り、死んでいれば奪う
-- 取るのは `reset` の前、放すのは `finish` の `finally` と `_continue` の `BaseException`。10 で止めるときは放す（残した状態は残し印が守る）
+- 取るのは `reset` の前、放すのは `drive.finish` の `finally` と `drive.continue_scenario` の `BaseException`。10 で止めるときは放す（残した状態は残し印が守る）
 
 ### 出力
 
@@ -410,9 +410,9 @@ hook の応答の文面（拒否・確認・案内）を、重複を除いて 1 
 
 「全量テストを回して」（`uv run python -m tests`）で、シナリオが回らないようにしてある。
 
-- **拾われる範囲が違う。** 全量は `test_*.py` を持つグループだけを拾う。シナリオの YAML と `runner.py` は拾われない。
+- **拾われる範囲が違う。** 全量は `test_*.py` を持つグループだけを拾う。シナリオの YAML と実行器のモジュール（`runner.py`・`drive.py`・`commands.py` など）は拾われない。
   `tests/scenarios/` で拾われるのは `test_runner.py`（実行器の判定部分の単体テスト）だけで、`claude` を呼ばない
-- **実行器がゲートを持つ。** `claude` を呼ぶ道（`run_step`・`cmd_run`）は、`python -m tests.scenarios.runner` で起動されたときだけ開く。
+- **実行器がゲートを持つ。** `claude` を呼ぶ道（`drive.run_step`・`commands.cmd_run`。ゲートは `common.require_entry`）は、`python -m tests.scenarios.runner` で起動されたときだけ開く。
   ほかのモジュールが import して呼ぶと `RuntimeError` で止まる。後で誰かが、実行器を呼ぶテストを足しても動かない
 - **テストが見張る。** `test_runner.py` が、ゲートが閉じていること、全量が `tests.scenarios.test_runner` しか拾わないこと、
   `tests/scenarios/` に `test_runner.py` 以外の `test_*.py` が無いことを確かめる。シナリオを回す道を `test_` のモジュールに置かない
@@ -467,7 +467,7 @@ steps:
 
 ### 人間役が端末で打つ sh（`human_run`）
 
-`test_repo: true` のシナリオでは、`human: true` の step に `human_run` を書くと、ユーザ専用の sh を runner が人間役として打つ。止まらずに次の step へ進む。打てる sh は runner の表（`HUMAN_RUN_SCRIPTS`）にあるものだけで、今は承認（`agree` → `ccnavi-user-agree.sh`）だけ。
+`test_repo: true` のシナリオでは、`human: true` の step に `human_run` を書くと、ユーザ専用の sh を runner が人間役として打つ。止まらずに次の step へ進む。打てる sh は runner の表（`schema.HUMAN_RUN_SCRIPTS`）にあるものだけで、今は承認（`agree` → `ccnavi-user-agree.sh`）だけ。
 
 ```yaml
 test_repo: true
