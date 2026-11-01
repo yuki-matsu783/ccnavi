@@ -128,6 +128,13 @@ messages:
     what: |-
       [ccnavi] Artifact ツールが失敗しました。HTML はワークスペースルート直下の scratchpad/（{scratch}）に出力してください。そのスクラッチパッドは置き場にしません。書き出した HTML のパスもユーザに伝えてください。
 
+  # scratchpad/ の中身が CCNAVI_SCRATCHPAD_WARN_MB を超えたとき（SessionStart。tickets/notice/scratchpad.py）。
+  NOTICE_SCRATCHPAD_LARGE:
+    kind: notice
+    values: [size, limit, path]
+    what: |-
+      [ccnavi] scratchpad/（{path}）の中身が {size} になり、しきい値 {limit} を超えました。ユーザに、消してよいものを尋ねてください。消すのは、ユーザが了承したものだけにします。
+
   # frontmatter の無い md を書いたとき。`code` は見出しの理由コード、`shown` は md のパス。
   NOTICE_DOCS_FRONTMATTER__NONE:
     kind: notice

@@ -91,10 +91,10 @@ def lands_in_finished_state(rel: str, tickets_rel: str, approved_rel: str) -> bo
 # `wip/` ごと消す。成果物には残らない。
 HANDOFF = "wip/handoff"
 
-# 使い捨ての置き場。ワークスペースルート直下の `scratchpad/`。`.gitignore` で追跡から外し、
+# 一時の置き場。ワークスペースルート直下の `scratchpad/`。`.gitignore` で追跡から外し、
 # 直接作業の途中でユーザに見せる一時的な物を置く。名前は固定。チケットの範囲は適用しない
 # （ワークスペースルートはユーザのチェックアウトで、範囲を持たない）。
-# コミットされず、片付けでも消えない。
+# コミットされず、ccnavi は消さない。
 SCRATCH_ROOT = "scratchpad"
 
 

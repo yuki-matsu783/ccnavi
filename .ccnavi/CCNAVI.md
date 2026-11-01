@@ -30,7 +30,7 @@
   - git は直接呼ばない。止められたら迂回せず、出力の案内に従う。git の操作が要るときはユーザに頼む。
 <!-- ccnavi:endif -->
 - ホスト（issue・MR など）の操作は glab を基本にし、gh は origin が GitHub のときだけ使う。ccnavi のスクリプトがある操作はそちらを優先する。認証で止まったら、ユーザに glab auth login（GitHub なら gh auth login）を頼む。
-- 下書きの置き場は 2 つ。ユーザに渡す物は {{handoff}}/（追跡される。integrate が外し、ready が消す）、一時的な物・コミットしたくない物はワークスペースルート直下の {{scratch}}/（追跡されない。終わったら消す）。セッションのスクラッチパッドには置かない。
+- 下書きの置き場は 2 つ。ユーザに渡す物は {{handoff}}/（追跡される。integrate が外し、ready が消す）、一時的な物・コミットしたくない物はワークスペースルート直下の {{scratch}}/（追跡されない。消さずに残す。大きくなったら ccnavi がユーザへの確認を促す）。セッションのスクラッチパッドには置かない。
 - 書き込みを止められている場所（保護対象など）は、{{stage_sh}} <元のパス> で {{handoff}}/ にコピーして編集する（自分で階層を作らない）。複数あるときは全部コピーしてからターンを終える。対話セッションでは、ユーザに `ccnavi-user-handoff.sh` での取り込みを案内してターンを終える。非対話セッションでは、編集済みの下書きを push し、確認と取り込みをユーザに頼んでターンを終える（手順は .ccnavi/docs/scratchpad.md）。
 <!-- ccnavi:if projects -->
   - {{projects}}/<名前>/ を直すときは、そこへ cd してから作業する（git は cwd のリポジトリに向く）。
@@ -51,7 +51,7 @@
 |---|---|
 | ワークツリーを切る、他セッションの影響を受けた、親の正本・ワークツリーが無い、`mr:` を確かめる、issue・MR を指定して頼まれた | `worktree.md`、`worktree-start.md` |
 | `<統合先>` に取り込む、子の finish で親へ合流する・衝突を解く、MR に出す、ワークツリーや子のブランチを片付ける | `worktree-merge.md`、`worktree-cleanup.md` |
-| 下書き・使い捨てのファイルを置く | `scratchpad.md` |
+| 下書き・一時のファイルを置く | `scratchpad.md` |
 | `projects/` 配下を直す、チケット・マーカー・記録の置き場を確かめる、`rules.yml` の `message` を書く | `projects.md` |
 | 提案を書く、承認・レビュー済みをユーザに頼む、相談が要るか迷う、ccnavi に止められた、サブエージェントに任せる | `decisions.md` |
 | 親の提案・子の提案の書式（frontmatter・`plan`・`after`・`ticket new`・承認済みの親の改版の雛形 `ticket revise`）を確かめる、提案を書いたあとに検査を打つ | `proposal-format.md` |

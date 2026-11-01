@@ -18,7 +18,7 @@ messages:
       plain: |-
         削除するものを 1 つずつ名指しするか、ユーザに削除を頼む
     note: |-
-      scratchpad/ の一時物は、名指しの rm -f と rmdir（空のディレクトリ）で消せます。
+      scratchpad/ の中は、ユーザが消してよいと言ったものだけを名指しして消せます（rm -f と rmdir）。
 
   RULE_GIT_PUSH:
     kind: deny
