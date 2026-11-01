@@ -1,11 +1,11 @@
 /**
- * 計画編集タブ（React）を happy-dom で動かす。`test/helpers/flow.ts` と同じ役割。
+ * 計画編集タブ（React）をhappy-domで動かす。`test/helpers/flow.ts`と同じ役割。
  *
- * 画面はバンドルした 1 本（`out/webview/workflow.js`）で、拡張はそれを `<script nonce>` に流し込む。
- * この入口のパス（`test/helpers/<画面の名前>.ts`）が約束で、`scripts/test-groups.js` はそれを辿る。
+ * 画面はバンドルした1本（`out/webview/workflow.js`）で、拡張はそれを`<script nonce>`に流し込む。
+ * この入口のパス（`test/helpers/<画面の名前>.ts`）が約束で、`scripts/test-groups.js`はそれを辿る。
  *
- * 図を描くので、大きさの偽物（`measure`）を入れて読ませる。入れないと React Flow は点を隠したまま
- * 線を 1 本も描かない（`test/helpers/dom.ts` の頭）。中身は Python 側が書き出した `--plan-order` の
+ * 図を描くので、大きさの偽物（`measure`）を入れて読ませる。入れないとReact Flowは点を隠したまま
+ * 線を1本も描かない（`test/helpers/dom.ts`の頭）。中身はPython側が書き出した`--plan-order`の
  * 答えの実例（`test/helpers/plan-order.ts`）。
  */
 import { renderWorkflowPage, type RenderOptions } from "../../src/core/workflow-render.js";

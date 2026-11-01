@@ -1,10 +1,10 @@
 /**
  * 残った指摘の対応方針を決めるオーバーレイの中身。［レビュー完了］を押すとここに来る。
  *
- * - 未解決が 0 件のとき（正しく読めたときだけ。読めなかったときはここに来ない）: 「フェーズ N に未解決の指摘はありません」と、
+ * - 未解決が0件のとき（正しく読めたときだけ。読めなかったときはここに来ない）: 「フェーズNに未解決の指摘はありません」と、
  *   主ボタン「レビュー済みにする」を出す。
- * - 1 件以上のとき: 指摘を 1 件ずつ並べ、対応方針（対応しない・このフェーズで直す・issue に回す）を選ばせる。
- *   何も選ばなければ、全部を「このフェーズで直す」とする。2 件以上なら、全部を一括で同じ対応方針にする小さな行を出す。
+ * - 1件以上のとき: 指摘を1件ずつ並べ、対応方針（対応しない・このフェーズで直す・issueに回す）を選ばせる。
+ *   何も選ばなければ、全部を「このフェーズで直す」とする。2件以上なら、全部を一括で同じ対応方針にする小さな行を出す。
  *   副ボタン「エージェントに相談するプロンプトをコピー」は、オーバーレイを閉じず、選びかけの対応方針も変えない。
  *
  * 選び直した対応方針だけをここに持つ。見せる指摘、ダイジェスト、置いている最中かどうかは拡張ホストが持つ。
@@ -50,18 +50,18 @@ export function DecideBody({
     <>
       <h2 id="approval-title">
         {count === 0
-          ? `フェーズ ${preview.phase} に未解決の指摘はありません`
-          : `フェーズ ${preview.phase} の指摘 ${count} 件の対応方針`}
+          ? `フェーズ${preview.phase}に未解決の指摘はありません`
+          : `フェーズ${preview.phase}の指摘${count}件の対応方針`}
       </h2>
       {notice ? <p className="approval-note warn">{notice}</p> : null}
       <p className="approval-note">
-        親 {preview.parent} の MR で残っている指摘です。
-        {/* 選ぶものが無いときは、選び方の注意を出さない。0 件なら押すとレビュー済みになるだけ */}
+        親{preview.parent}のMRで残っている指摘です。
+        {/* 選ぶものが無いときは、選び方の注意を出さない。0件なら押すとレビュー済みになるだけ */}
         {count === 0
           ? "このフェーズをレビュー済みにしますか？"
-          : "「このフェーズで直す」を 1 件でも選ぶと、直すための子チケットを作り、フェーズを作業に戻します。"}
+          : "「このフェーズで直す」を1件でも選ぶと、直すための子チケットを作り、フェーズを作業に戻します。"}
       </p>
-      {/* 2 件以上のときだけ、全部を同じ対応方針にする小さな行を出す。個別の選択は上書きされる */}
+      {/* 2件以上のときだけ、全部を同じ対応方針にする小さな行を出す。個別の選択は上書きされる */}
       {count < 2 ? null : (
         <div className="decide-bulk">
           <span>すべて:</span>
@@ -85,11 +85,11 @@ export function DecideBody({
             <li key={t.key} className="decide-thread" data-key={t.key}>
               <div className="decide-where">
                 <span className="approval-id">{t.path ? `${t.path}:${t.line}` : "（場所なし）"}</span>
-                {/* 指摘の URL。http(s) のときだけリンクにする（そうでなければ文字として出すだけ） */}
+                {/* 指摘のURL。http(s)のときだけリンクにする（そうでなければ文字として出すだけ） */}
                 {t.url ? (
                   isHttpUrl(t.url) ? (
                     <a className="decide-url" href={t.url} title={t.url}>
-                      MR で開く
+                      MRで開く
                     </a>
                   ) : (
                     <span className="decide-url">{t.url}</span>
@@ -97,7 +97,7 @@ export function DecideBody({
                 ) : null}
               </div>
               <Body body={t.body} />
-              <div className="decide-choices" role="radiogroup" aria-label={`${t.path || t.key} の対応方針`}>
+              <div className="decide-choices" role="radiogroup" aria-label={`${t.path || t.key}の対応方針`}>
                 {DECIDE_CHOICES.map((c) => (
                   <label key={c} className="decide-choice">
                     <input
@@ -160,7 +160,7 @@ export function DecideBody({
   );
 }
 
-/** 指摘の本文。1 行目を出し、2 行以上あれば `<details>` で全文を開ける */
+/** 指摘の本文。1行目を出し、2行以上あれば`<details>`で全文を開ける */
 function Body({ body }: { readonly body: string }): JSX.Element {
   const lines = body.split("\n");
   const first = (lines.find((l) => l.trim() !== "") ?? "").trim();

@@ -1,39 +1,39 @@
 /**
- * 計画編集タブ（作業・レビュー計画の編集。旧称ワークフロー編集）の Webview パネル。生成・更新・破棄、提案の監視、Webview からの操作の受け付け。
- * VS Code の API に触れるので単体テストの対象外。docs/design/manual-checks.md の手動確認の手順で確かめる。
+ * 計画編集タブ（作業・レビュー計画の編集。旧称ワークフロー編集）のWebviewパネル。生成・更新・破棄、提案の監視、Webviewからの操作の受け付け。
+ * VS CodeのAPIに触れるので単体テストの対象外。docs/design/manual-checks.mdの手動確認の手順で確かめる。
  *
- * 親の提案（承認待ちの置き場 `todo/` にある、計画を持つ親。新規と改版の両方）の計画のステップどうしの先行（線）を
- * 図で引き直す。**タブは親ごとに 1 枚**（同じ親をもう 1 度開けば前面に出す）。作りはフロー編集（`flow-panel.ts`）と
- * 同じで、違いは 3 つ。
+ * 親の提案（承認待ちの置き場`todo/`にある、計画を持つ親。新規と改版の両方）の計画のステップどうしの先行（線）を
+ * 図で引き直す。**タブは親ごとに1枚**（同じ親をもう1度開けば前面に出す）。作りはフロー編集（`flow-panel.ts`）と
+ * 同じで、違いは3つ。
  *
- * 1. 取り込む段が無い。開いたときの提案の中身（`--plan-order <親> --json` の答え）がそのまま初期値
+ * 1. 取り込む段が無い。開いたときの提案の中身（`--plan-order <親> --json`の答え）がそのまま初期値
  * 2. 書くのは実行ファイル（`--plan-order <親> --order <JSON> --expect <ハッシュ> --write`）
  * 3. 保存先はエージェントも書ける提案（親の提案と、番号の変わるステップを指す子の提案）。なので開いたときのハッシュ
- *    （`source_sha`）を `--expect` に渡し、外で変わっていれば実行ファイルが何も書かない
+ *    （`source_sha`）を`--expect`に渡し、外で変わっていれば実行ファイルが何も書かない
  *
- * 画面は React（`src/webview/workflow/`）で、ここが渡すのは「いま何を見せるか」（`WorkflowData`）だけ。
- * 渡し方はフロー編集と同じ `retainedHost`（線の引き直しの途中を持つので、入れ物を入れ直さない）。
+ * 画面はReact（`src/webview/workflow/`）で、ここが渡すのは「いま何を見せるか」（`WorkflowData`）だけ。
+ * 渡し方はフロー編集と同じ`retainedHost`（線の引き直しの途中を持つので、入れ物を入れ直さない）。
  *
  * **判定は実行ファイル。** 線を変えるたびに画面が元の番号での先行（`--order`）を頼み、ここが
- * `--plan-order <親> --json --order <JSON>` の答えをそのまま返す。番号の振り直し・順序の検査・書けるか
+ * `--plan-order <親> --json --order <JSON>`の答えをそのまま返す。番号の振り直し・順序の検査・書けるか
  * （`writable`）・子の付け替えの一覧は答えのまま。画面もここも番号を振り直さない。
  *
- * **外で提案が変わったとき。** 提案の置き場（`core/watch.ts`）を見張り、動いたら `--plan-order <親> --json` を打ち直して
+ * **外で提案が変わったとき。** 提案の置き場（`core/watch.ts`）を見張り、動いたら`--plan-order <親> --json`を打ち直して
  * ハッシュを比べる。違えば画面に「外で変わった」と今の答えを渡し、画面が差分を見せて「取り込む」（読み直す）か
  * 「編集を続ける」（保存はできない）を選ばせる。線の答えのハッシュが開いたときと違うときも同じ。親の提案が承認待ちから
  * 無くなったら（承認・取り下げ・削除。ボードの答えで見分ける）、画面を読むだけにする。
  *
- * **未保存のまま閉じたとき。** フロー編集と同じく、閉じるのは止められない（`onDidDispose` は閉じた後）。未保存の間は
+ * **未保存のまま閉じたとき。** フロー編集と同じく、閉じるのは止められない（`onDidDispose`は閉じた後）。未保存の間は
  * タブのタイトルの頭に「●」を付け、画面が送ってくる線のコピー（`draft`）を覚える。閉じた後に未保存だったら「開き直して戻す」
  * 「破棄する」を聞く。戻すのは、提案のハッシュが閉じた時点から変わっていないときだけ（変わっていれば戻せないと言う）。
  *
  * **ボードの承認との結び付き。** タブの未保存と、最後に保存したときのハッシュ（`source_sha`）を帳面
  * （`core/workflow-tabs.ts`）に書く。ボードは、未保存のタブがある親を含む一覧の承認を打たず、承認の一覧の
- * `source_sha` が保存したときと違えば「保存したあとに提案が変わった」と出す。未保存は、タブが閉じた・破棄した
+ * `source_sha`が保存したときと違えば「保存したあとに提案が変わった」と出す。未保存は、タブが閉じた・破棄した
  * （読み直した・取り込んだ）・保存したときに外れる。
  *
  * 残る隙間（TOCTOU）: 実行ファイルがハッシュを確かめてから書くまでの間にエージェントが提案を書くと、どちらかが
- * 失われうる。間は実行ファイル 1 回の起動の中で、防ぐには提案の置き場に錠が要るので、ここでは狭めるだけにする
+ * 失われうる。間は実行ファイル1回の起動の中で、防ぐには提案の置き場に錠が要るので、ここでは狭めるだけにする
  * （書いたあとの監視で食い違いに気づけば「外で変わった」を出す）。
  */
 import * as crypto from "node:crypto";
@@ -67,7 +67,7 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 /** 他の画面（WATCH_DEBOUNCE_MS = 120）より長い。理由は記録が無く未確認。変える前に、答えを返す実行ファイルの重さを測ること */
 const DEBOUNCE_MS = 200;
-/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js` */
+/** 画面の名前。バンドルのパスは`src/webview/<名前>/main.tsx` → `out/webview/<名前>.js` */
 const SCREEN = "workflow";
 
 /** 未保存のまま閉じた画面から戻す線。提案のハッシュが閉じたときと同じときだけ戻す */
@@ -83,13 +83,13 @@ interface PanelState {
   readonly host: ScreenHost<WorkflowData>;
   watchers: vscode.FileSystemWatcher[];
   timer?: NodeJS.Timeout;
-  /** 開いたとき（読み直したとき）の答え。`source_sha` を保存の `--expect` に使う */
+  /** 開いたとき（読み直したとき）の答え。`source_sha`を保存の`--expect`に使う */
   loaded?: PlanOrderAnswer;
   error?: string;
   dirty: boolean;
   /** 画面が送ってきた、未保存の線のコピー（未保存でなければ無い） */
   draft?: PlanOrder;
-  /** 開き直したときに戻す線。最初の読み込みで確かめて `shownDraft` に移す */
+  /** 開き直したときに戻す線。最初の読み込みで確かめて`shownDraft`に移す */
   restore?: Restore;
   shownDraft?: PlanOrder;
   /** 外で変わったときの今の答え。再表示されたとき・作り直したときに知らせ直す */
@@ -101,7 +101,7 @@ interface PanelState {
   wroteAt: number;
 }
 
-/** 開いているパネル。親の識別子ごとに 1 枚 */
+/** 開いているパネル。親の識別子ごとに1枚 */
 const panels = new Map<string, PanelState>();
 
 function binSetting(): string {
@@ -109,7 +109,7 @@ function binSetting(): string {
 }
 
 /**
- * 親の識別子を受けてタブを開く（コマンド `ccnaviBoard.openWorkflow` と、画面の帳面の `workflow`）。
+ * 親の識別子を受けてタブを開く（コマンド`ccnaviBoard.openWorkflow`と、画面の帳面の`workflow`）。
  * コマンドパレットには出さない（開く親を選ぶ段が無いため）。識別子の形でなければ開かない
  */
 export async function openWorkflow(ticket: unknown): Promise<void> {
@@ -135,7 +135,7 @@ async function openWorkflowPanel(ticket: string, restore: Restore | undefined): 
     open.panel.reveal(open.panel.viewColumn);
     if (restore !== undefined) {
       // 既に開いている画面の編集を何も言わずに差し替えない
-      void vscode.window.showWarningMessage(`${ticket} の計画編集タブは既に開いているため、閉じる前の編集を戻せませんでした。閉じる前の編集は、無題の JSON ファイルとして開きます。`);
+      void vscode.window.showWarningMessage(`${ticket}の計画編集タブは既に開いているため、閉じる前の編集を戻せませんでした。閉じる前の編集は、無題のJSONファイルとして開きます。`);
       void openDraftAsJson(restore.draft);
     }
     return;
@@ -154,7 +154,7 @@ async function openWorkflowPanel(ticket: string, restore: Restore | undefined): 
     // 線の引き直しの途中を持つので、タブを非表示にしても破棄しない
     retainContextWhenHidden: true,
   });
-  showLoading(panel, workflowTitle(ticket), SCREEN, `${ticket} の計画編集`);
+  showLoading(panel, workflowTitle(ticket), SCREEN, `${ticket}の計画編集`);
   const current: PanelState = {
     ticket,
     panel,
@@ -238,7 +238,7 @@ function askRestore(current: PanelState): void {
   const back = "開き直して戻す";
   void vscode.window
     .showWarningMessage(
-      `${current.ticket} の作業・レビュー計画の順序を未保存のまま閉じました。編集を戻しますか？`,
+      `${current.ticket}の作業・レビュー計画の順序を未保存のまま閉じました。編集を戻しますか？`,
       { modal: true, detail: "「破棄する」を選ぶと、閉じる前の編集は残りません。提案が閉じた後に変わっていれば、戻せません。" },
       back,
       "破棄する",
@@ -250,13 +250,13 @@ function askRestore(current: PanelState): void {
     });
 }
 
-/** コピーを名前の無い JSON のエディタで開く（ファイルには書かない） */
+/** コピーを名前の無いJSONのエディタで開く（ファイルには書かない） */
 async function openDraftAsJson(draft: PlanOrder): Promise<void> {
   try {
     const document = await vscode.workspace.openTextDocument({ language: "json", content: `${JSON.stringify(draft, null, 2)}\n` });
     await vscode.window.showTextDocument(document, { preserveFocus: true });
   } catch (error) {
-    void vscode.window.showErrorMessage(`閉じる前の編集を JSON として開けませんでした: ${error instanceof Error ? error.message : String(error)}`);
+    void vscode.window.showErrorMessage(`閉じる前の編集をJSONとして開けませんでした: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -343,7 +343,7 @@ function redraw(current: PanelState): void {
     showError(current, current.error);
     return;
   }
-  current.host.send({ kind: "loading", text: loadingText(`${current.ticket} の計画編集`) });
+  current.host.send({ kind: "loading", text: loadingText(`${current.ticket}の計画編集`) });
 }
 
 function workflowHost(panel: vscode.WebviewPanel, rootPath: string): ScreenHost<WorkflowData> {
@@ -380,14 +380,14 @@ async function reload(current: PanelState): Promise<void> {
   const got = await runPlanOrder(rootPath, binSetting(), current.ticket);
   if (!alive(current) || current.seq !== seq) {
     if (restore !== undefined) {
-      void vscode.window.showWarningMessage(`${current.ticket} の計画編集タブを読み直せなかったので、閉じる前の編集を戻せませんでした。閉じる前の編集は、無題の JSON ファイルとして開きます。`);
+      void vscode.window.showWarningMessage(`${current.ticket}の計画編集タブを読み直せなかったので、閉じる前の編集を戻せませんでした。閉じる前の編集は、無題のJSONファイルとして開きます。`);
       void openDraftAsJson(restore.draft);
     }
     return;
   }
   if (!got.ok) {
     if (restore !== undefined) {
-      void vscode.window.showWarningMessage(`${current.ticket} の提案を読めなかったので、閉じる前の編集を戻せませんでした。閉じる前の編集は、無題の JSON ファイルとして開きます。`);
+      void vscode.window.showWarningMessage(`${current.ticket}の提案を読めなかったので、閉じる前の編集を戻せませんでした。閉じる前の編集は、無題のJSONファイルとして開きます。`);
       void openDraftAsJson(restore.draft);
     }
     showError(current, got.error);
@@ -399,7 +399,7 @@ async function reload(current: PanelState): Promise<void> {
       current.shownDraft = restore.draft;
     } else {
       // 閉じた後に提案が変わった。前の線を戻すと、変わった提案に古い順序を重ねることになる
-      void vscode.window.showWarningMessage(`${current.ticket} の提案は閉じた後に変わったので、閉じる前の編集を戻しませんでした。閉じる前の編集は、無題の JSON ファイルとして開きます。`);
+      void vscode.window.showWarningMessage(`${current.ticket}の提案は閉じた後に変わったので、閉じる前の編集を戻しませんでした。閉じる前の編集は、無題のJSONファイルとして開きます。`);
       void openDraftAsJson(restore.draft);
     }
   }
@@ -435,7 +435,7 @@ async function handleMessage(current: PanelState, message: WorkflowMessage | und
       current.host.ready();
       redraw(current);
       postAppearance(current.host);
-      // 初回だけ吹き出しの案内を頼む。画面は図が出てから始め、閉じたら `tourDone` を返す
+      // 初回だけ吹き出しの案内を頼む。画面は図が出てから始め、閉じたら`tourDone`を返す
       if (!tourSeen(SCREEN)) {
         current.host.post({ type: "tour" } satisfies ToWorkflow);
       }
@@ -445,8 +445,8 @@ async function handleMessage(current: PanelState, message: WorkflowMessage | und
       return;
     case "reload": {
       if (message.dirty) {
-        const choice = await vscode.window.showWarningMessage("未保存の順序があります。破棄して再読み込みしますか？", { modal: true }, "再読み込みする");
-        if (choice !== "再読み込みする") {
+        const choice = await vscode.window.showWarningMessage("未保存の順序があります。破棄して更新しますか？", { modal: true }, "更新する");
+        if (choice !== "更新する") {
           current.host.post({ type: "cancelled" } satisfies ToWorkflow);
           return;
         }
@@ -496,7 +496,7 @@ async function save(current: PanelState, order: PlanOrder, expect: string): Prom
   }
   if (expect !== loaded.source_sha) {
     // 画面が別の読み込みのハッシュを送ってきた（読み直しと行き違った）。書かない
-    fail(current, "提案を再読み込みしたため、この保存は取りやめました。再読み込みした提案で線を引き直してください");
+    fail(current, "提案を更新したため、この保存は取りやめました。更新した提案で線を引き直してください");
     return;
   }
   const log = diaglog.get("ccnavi-board", root(current));
@@ -519,14 +519,14 @@ async function save(current: PanelState, order: PlanOrder, expect: string): Prom
       const moved = result.answer.children.filter((child) => child.ticket !== child.new_ticket).length;
       await reload(current);
       vscode.window.showInformationMessage(
-        `${current.ticket} の計画の順序を提案に反映しました${moved === 0 ? "" : `（子の提案 ${moved} 本の識別子と phase: を付け替えました）`}。` +
+        `${current.ticket}の計画の順序を提案に反映しました${moved === 0 ? "" : `（子の提案${moved}本の識別子とphase: を付け替えました）`}。` +
           "承認の画面はボードから開き直してください。変更した提案はコミットしていません",
       );
       return;
     }
     case "unchanged":
       await reload(current);
-      vscode.window.showInformationMessage(`${current.ticket} の計画は振り直しても変わらないので、反映しませんでした`);
+      vscode.window.showInformationMessage(`${current.ticket}の計画は振り直しても変わらないので、反映しませんでした`);
       return;
     case "changed": {
       current.wroteAt = 0;

@@ -1,35 +1,35 @@
 /**
  * 承認のオーバーレイの遷移。「いまの状態 ＋ 入力 → 次の状態 ＋ やること」だけをここに置く。
  *
- * 承認は取り返しがつかない（承認済みチケットが置かれ、コミットと push がターミナルに送られる）。
+ * 承認は取り返しがつかない（承認済みチケットが置かれ、コミットとpushがターミナルに送られる）。
  * 連打・承認中の再入・古いボードからの承認は現実に起きるので、「この状態ではこれを受けない」を
- * 書き落とさないことが要る。散らばっていると書き落とすので、ガードをこの 1 ファイルに集めた。
+ * 書き落とさないことが要る。散らばっていると書き落とすので、ガードをこの1ファイルに集めた。
  *
- * VS Code の API には触れない。外へ出る仕事（実行ファイルを呼ぶ・ターミナルに送る・クリップボードに
- * 入れる・新しいセッションで開く・ユーザに言う）は `ApprovalEffect` として返すだけで、実際に行うのは
- * 呼ぶ側（`board-panel.ts`）。`core/screen-host.ts` の `Surface` と同じ形で、単体で試せる。
+ * VS CodeのAPIには触れない。外へ出る仕事（実行ファイルを呼ぶ・ターミナルに送る・クリップボードに
+ * 入れる・新しいセッションで開く・ユーザに言う）は`ApprovalEffect`として返すだけで、実際に行うのは
+ * 呼ぶ側（`board-panel.ts`）。`core/screen-host.ts`の`Surface`と同じ形で、単体で試せる。
  *
- * 呼ぶ側の段取りは 3 行で、順を変えない。
+ * 呼ぶ側の段取りは3行で、順を変えない。
  *
- * 1. `approvalStep(いまの状態, 入力)` を呼ぶ
- * 2. 返った `state` を持ち直し、`redraw` が真なら画面へ送り直す
- * 3. 返った `effects` を順に行う（返事が要るもの＝一覧と承認の結果は、返ってきたらまた 1 へ）
+ * 1. `approvalStep(いまの状態, 入力)`を呼ぶ
+ * 2. 返った`state`を持ち直し、`redraw`が真なら画面へ送り直す
+ * 3. 返った`effects`を順に行う（返事が要るもの＝一覧と承認の結果は、返ってきたらまた1へ）
  *
  * 描き直しが先、やることが後。 逆にすると、承認の文を渡すときに画面が古いまま残る。
  *
- * ## 状態（閉じているのを含めて 10）
+ * ## 状態（閉じているのを含めて10）
  *
  * | 状態 | 何をしている |
  * |---|---|
- * | 無し（`overlay` が `undefined`） | 閉じている |
+ * | 無し（`overlay`が`undefined`） | 閉じている |
  * | `loading` | 承認先行の一覧を読んでいる |
  * | `preview` | 一覧と本文を見せた。押されるまで何も置かない |
- * | `approving` | 承認を打っている。ここでは閉じない（Esc も受け付けない。画面の側も同じ） |
+ * | `approving` | 承認を打っている。ここでは閉じない（Escも受け付けない。画面の側も同じ） |
  * | `done` | 承認した。渡す文がある |
  * | `error` | 読めなかった |
  * | `prompt` | 承認以外で渡すプロンプト（残った指摘を決めた結果） |
  * | `decideLoading` | 残った指摘を読んでいる（［レビュー完了］を押した） |
- * | `decidePreview` | 残った指摘（0 件なら「未解決なし」）を見せた。押されるまで何も置かない |
+ * | `decidePreview` | 残った指摘（0件なら「未解決なし」）を見せた。押されるまで何も置かない |
  * | `deciding` | 選んだ行き先を置いている。ここでは閉じない |
  *
  * ## ガード（消すと承認が正しく動かなくなる順）
@@ -38,30 +38,30 @@
  *
  * | ガード | 消すとどうなる |
  * |---|---|
- * | `approving` の間は閉じない | 承認を打っている最中に閉じられ、結果をユーザが見ないまま次へ進む |
- * | 承認を打つのは `preview` のときだけ | 二重に打てる。実行ファイルが承認のときに読み直した中身のダイジェストと照合するので 2 本目は止まるが、止まる前提で連打させない |
+ * | `approving`の間は閉じない | 承認を打っている最中に閉じられ、結果をユーザが見ないまま次へ進む |
+ * | 承認を打つのは`preview`のときだけ | 二重に打てる。実行ファイルが承認のときに読み直した中身のダイジェストと照合するので2本目は止まるが、止まる前提で連打させない |
  * | 承認の途中（`loading`・`preview`・`approving`）は二重に開かない | 見せている一覧が、読み直しの途中の別の一覧になってしまう |
  * | 一覧を受けるのは、それを頼んだ状態のときだけ | 閉じたあとに返ってきた一覧が、勝手にオーバーレイを開く |
- * | 文を渡せるのは `done` と `prompt` のときだけ | 文の無い状態で「コピー」が通る |
- * | `done` の上に［レビュー完了］の読み込みを被せない | 承認のプロンプトが、渡す前に消える |
+ * | 文を渡せるのは`done`と`prompt`のときだけ | 文の無い状態で「コピー」が通る |
+ * | `done`の上に［レビュー完了］の読み込みを被せない | 承認のプロンプトが、渡す前に消える |
  * | 絞り込みで見えている承認待ちが、いまのボードでも承認待ちか | 古いボードの識別子で承認が通る |
- * | `deciding` の間は閉じない | 行き先を置いている最中に閉じられ、続きの子が起きたことをユーザが見ない |
- * | 行き先を置くのは `decidePreview` のときだけ | 二重に置ける。続きの子が 2 本起きる |
- * | 行き先が見せた指摘の全部に 1 つずつ付いているか | 古い画面から届いた選択で、見せていない指摘の扱いが決まる |
+ * | `deciding`の間は閉じない | 行き先を置いている最中に閉じられ、続きの子が起きたことをユーザが見ない |
+ * | 行き先を置くのは`decidePreview`のときだけ | 二重に置ける。続きの子が2本起きる |
+ * | 行き先が見せた指摘の全部に1つずつ付いているか | 古い画面から届いた選択で、見せていない指摘の扱いが決まる |
  * | 残った指摘を読むのは、ユーザのレビュー待ちのフェーズだけ | 依頼していないフェーズで、実行ファイルの前提の誤りをユーザが読むことになる |
  * | 読み取りの結果が頼んだフェーズのものでなければ開かない | 別のフェーズの指摘に、対応方針を選ばせる |
- * | 相談のプロンプトを組むのは、1 件以上の指摘を見せているとき（`decidePreview`）だけ | 閉じたあと・置いている最中・0 件の画面で、指摘の無いプロンプトが出る |
+ * | 相談のプロンプトを組むのは、1件以上の指摘を見せているとき（`decidePreview`）だけ | 閉じたあと・置いている最中・0件の画面で、指摘の無いプロンプトが出る |
  * | 相談のコピーの結果を受けるのは、見せている画面（`decidePreview`）のときだけ | 閉じたあとに返った結果が、別の画面の上に出る |
  * | 一覧を受けるのは、それを頼んだ状態のときだけ（残った指摘も同じ） | 閉じたあとに返ってきた一覧が、勝手にオーバーレイを開く |
  * | 承認と残った指摘は互いの途中に被さらない | 見せている一覧が、別の一覧になってしまう |
- * | 決めた結果のプロンプトの上に、次の「レビュー完了」を被せない（決め直しを出す場合を除く） | 続きの子の識別子と次の 2 手を渡す前に、プロンプトが消える |
+ * | 決めた結果のプロンプトの上に、次の「レビュー完了」を被せない（決め直しを出す場合を除く） | 続きの子の識別子と次の2手を渡す前に、プロンプトが消える |
  * | 計画編集タブに未保存の変更がある親を含む一覧は、承認を打たない | 未保存の順序のまま承認され、直したつもりの順序と違うものが通る |
  * | 承認を打つ直前にも、未保存のタブがある親が打つ識別子に入っていないかを見る（`blockedBeforeApprove`） | 押したあとにタブで線を変えた一覧が、そのまま承認される |
  * | 「計画を編集」でタブを開くのは、一覧を見せているとき（preview）だけ | 承認を打っている最中に閉じられ、結果を受ける場所が消える |
  * | 「計画を編集」で開くのは、一覧の図にある親だけ | 古い画面から届いた識別子で、承認と関係の無いタブが開く |
  *
- * これらは `test/shared/approval-machine.test.ts` が見る。同じファイルの変異テストが、
- * ガードを 1 つ消したらテストが失敗することまで見るので、ガードを足したらそちらにも足す。
+ * これらは`test/shared/approval-machine.test.ts`が見る。同じファイルの変異テストが、
+ * ガードを1つ消したらテストが失敗することまで見るので、ガードを足したらそちらにも足す。
  */
 import type { ApprovalOverlay } from "./board-view.js";
 import { changedSinceSave, HANDOVER_NOTE, partialMessage, unsavedParents, unsavedText, type ApproveOutcome, type ApprovePreview, type PreviewParse } from "./approvemodel.js";
@@ -70,10 +70,10 @@ import type { PhaseChip } from "./board.js";
 import { consultPrompt, PUSH_APPROVED_SCRIPT } from "./commands.js";
 
 /**
- * 承認のオーバーレイの持ち物。`overlay` が画面へ渡るぶんで、残りは拡張ホストの中だけに保持する。
+ * 承認のオーバーレイの持ち物。`overlay`が画面へ渡るぶんで、残りは拡張ホストの中だけに保持する。
  *
  * 画面の中に持たないのは、監視の更新でボードが入れ替わってもオーバーレイが消えないようにするため
- * （`board-view.ts` の `ApprovalOverlay`）。
+ * （`board-view.ts`の`ApprovalOverlay`）。
  */
 export interface ApprovalState {
   /** いま被せているオーバーレイ。無ければ閉じている */
@@ -85,14 +85,14 @@ export interface ApprovalState {
    */
   readonly only: readonly string[];
   /**
-   * 食い違い（`mismatch`）で一覧を読み直している最中。見せている `overlay` は `approving` のままで、
-   * 返ってきた一覧にこの `notice` をつけて `preview` に切り替える。
-   * `dropped` は、絞りが通らなかったので絞りを外して読み直したか（外したあとは、もう外さない）。
+   * 食い違い（`mismatch`）で一覧を読み直している最中。見せている`overlay`は`approving`のままで、
+   * 返ってきた一覧にこの`notice`をつけて`preview`に切り替える。
+   * `dropped`は、絞りが通らなかったので絞りを外して読み直したか（外したあとは、もう外さない）。
    *
-   * 不変条件: これがあるとき `overlay` は必ず `approving`。 置くのは `answered` の食い違いの枝
-   * 1 か所だけで、そこは `overlay` を持ち越す。`approving` の間は閉じられないので、外れるのは
-   * 一覧が返って `preview` か `error` に差し替わるときだけ。型では持っていないので、
-   * `recheck` を置く枝を増やすならここを読み直すこと
+   * 不変条件: これがあるとき`overlay`は必ず`approving`。 置くのは`answered`の食い違いの枝
+   * 1か所だけで、そこは`overlay`を持ち越す。`approving`の間は閉じられないので、外れるのは
+   * 一覧が返って`preview`か`error`に差し替わるときだけ。型では持っていないので、
+   * `recheck`を置く枝を増やすならここを読み直すこと
    */
   readonly recheck?: { readonly notice: string; readonly dropped: boolean };
 }
@@ -103,9 +103,9 @@ export const CLOSED: ApprovalState = { only: [] };
 /** ユーザが押したことと、外から返ってきたこと。どちらも「入力」として同じ関数から入れる */
 export type ApprovalInput =
   /**
-   * 「承認」を押した。`filtered` はボードが絞り込まれているか、`tickets` はそのとき見えている
-   * 承認待ち（カードの「この 1 件を承認」は、そのカードの識別子だけが入る）。
-   * `pending` はいまのボードの承認待ち。送られてきた識別子と突き合わせる
+   * 「承認」を押した。`filtered`はボードが絞り込まれているか、`tickets`はそのとき見えている
+   * 承認待ち（カードの「この1件を承認」は、そのカードの識別子だけが入る）。
+   * `pending`はいまのボードの承認待ち。送られてきた識別子と突き合わせる
    */
   | {
       readonly kind: "approve";
@@ -114,13 +114,13 @@ export type ApprovalInput =
       readonly pending: readonly string[];
     }
   /**
-   * 一覧（`--agree --preview --json`）が返った。`saved` は計画編集タブが最後に保存したときの
+   * 一覧（`--agree --preview --json`）が返った。`saved`は計画編集タブが最後に保存したときの
    * `source_sha`（親ごと。`core/workflow-tabs.ts`）。一覧の計画と比べて、保存したあとに変わった親を覚える
    */
   | { readonly kind: "previewed"; readonly result: PreviewParse; readonly saved: Readonly<Record<string, string>> }
   /**
-   * 「この N 件を承認する」を押した。`unsaved` は**押した時点の**、計画編集タブに未保存の変更がある親
-   * （呼ぶ側が帳面から引いて渡す）。`digest` は押した画面に出ていた一覧のダイジェスト
+   * 「このN件を承認する」を押した。`unsaved`は**押した時点の**、計画編集タブに未保存の変更がある親
+   * （呼ぶ側が帳面から引いて渡す）。`digest`は押した画面に出ていた一覧のダイジェスト
    */
   | {
       readonly kind: "confirm";
@@ -132,15 +132,15 @@ export type ApprovalInput =
   | { readonly kind: "editWorkflow"; readonly ticket: string }
   /**
    * 承認（`user agree --yes`）の結果が返った。食い違い（`mismatch`）もここに入る。
-   * `carrier` は承認の push の sh が置いてあるか（呼ぶ側が見て渡す）
+   * `carrier`は承認のpushのshが置いてあるか（呼ぶ側が見て渡す）
    */
   | { readonly kind: "approved"; readonly outcome: ApproveOutcome; readonly carrier: boolean }
-  /** 「やめる」「閉じる」を押した（画面の Esc も同じ） */
+  /** 「やめる」「閉じる」を押した（画面のEscも同じ） */
   | { readonly kind: "cancel" }
   /** 承認のプロンプト・決めた結果のプロンプトを渡した */
   | { readonly kind: "handOver"; readonly how: "promptCopy" | "promptOpen" | "promptRun" }
   /**
-   * ［レビュー完了］を押した。`tree` と `chip` はボードから引くので、無いことがある（古いボード）
+   * ［レビュー完了］を押した。`tree`と`chip`はボードから引くので、無いことがある（古いボード）
    */
   | {
       readonly kind: "decide";
@@ -151,11 +151,11 @@ export type ApprovalInput =
     }
   /** 残った指摘の一覧（`decide <N> --preview`）が返った */
   | { readonly kind: "decidePreviewed"; readonly result: DecidePreviewParse }
-  /** 「この対応方針を確定」（0 件なら「レビュー済みにする」）を押した */
+  /** 「この対応方針を確定」（0件なら「レビュー済みにする」）を押した */
   | { readonly kind: "decideConfirm"; readonly choices: Readonly<Record<string, string>> }
   /**
-   * 「エージェントに相談するプロンプトをコピー」を押した。`root` は文面に書くワークスペースルート
-   * （呼ぶ側が realpath で解く）。オーバーレイは閉じず、選びかけの対応方針も変えない
+   * 「エージェントに相談するプロンプトをコピー」を押した。`root`は文面に書くワークスペースルート
+   * （呼ぶ側がrealpathで解く）。オーバーレイは閉じず、選びかけの対応方針も変えない
    */
   | { readonly kind: "consult"; readonly root: string }
   /** 相談のプロンプトをクリップボードに入れた結果。入らなかったときは理由 */
@@ -165,9 +165,9 @@ export type ApprovalInput =
 
 /** 外へ出る仕事。行うのは呼ぶ側（`board-panel.ts`） */
 export type ApprovalEffect =
-  /** 承認先行の一覧を読む（`--agree --preview --json`）。返ったら `previewed` で戻す */
+  /** 承認先行の一覧を読む（`--agree --preview --json`）。返ったら`previewed`で戻す */
   | { readonly kind: "loadPreview"; readonly only: readonly string[] }
-  /** 承認を打つ（`user agree --yes … --digest …`）。返ったら `approved` で戻す */
+  /** 承認を打つ（`user agree --yes … --digest …`）。返ったら`approved`で戻す */
   | {
       readonly kind: "approve";
       readonly tickets: readonly string[];
@@ -175,13 +175,13 @@ export type ApprovalEffect =
       readonly only: readonly string[];
     }
   /**
-   * 承認の push の sh をターミナルに送る。`paths` はこの承認で書いた・消したパスで、sh にはこれだけを
-   * コミット・push させる（同じ置き場の承認と無関係な変更を巻き込まない）
+   * 承認のpushのshをターミナルに送る。`paths`はこの承認で書いた・消したパスで、shにはこれだけを
+   * コミット・pushさせる（同じ置き場の承認と無関係な変更を巻き込まない）
    */
   | { readonly kind: "carry"; readonly paths: readonly string[] }
   /**
-   * 残った指摘を読む（`decide <N> --preview`）。返ったら `decidePreviewed` で戻す。
-   * `parent`・`phase`・`mr` は頼んだもの（読み取りの検証が、返ってきた JSON と照らす）
+   * 残った指摘を読む（`decide <N> --preview`）。返ったら`decidePreviewed`で戻す。
+   * `parent`・`phase`・`mr`は頼んだもの（読み取りの検証が、返ってきたJSONと照らす）
    */
   | {
       readonly kind: "loadDecide";
@@ -190,7 +190,7 @@ export type ApprovalEffect =
       readonly phase: number;
       readonly mr: number | null;
     }
-  /** 行き先を置く（`ccnavi-user-decide.sh <N> --choices … --digest …`）。返ったら `decided` で戻す */
+  /** 行き先を置く（`ccnavi-user-decide.sh <N> --choices … --digest …`）。返ったら`decided`で戻す */
   | {
       readonly kind: "decide";
       readonly tree: string;
@@ -198,16 +198,16 @@ export type ApprovalEffect =
       readonly choices: Readonly<Record<string, string>>;
       readonly digest: string;
     }
-  /** プロンプトをクリップボードに入れる。`what` は何のプロンプトかの呼び名（伝える文面に出す） */
+  /** プロンプトをクリップボードに入れる。`what`は何のプロンプトかの呼び名（伝える文面に出す） */
   | { readonly kind: "copy"; readonly prompt: string; readonly what: string }
   /**
-   * 相談のプロンプトをクリップボードに入れる。オーバーレイは閉じない。返ったら `consultCopied` で戻す
+   * 相談のプロンプトをクリップボードに入れる。オーバーレイは閉じない。返ったら`consultCopied`で戻す
    * （できたら短く知らせ、できなければ失敗と言う）
    */
   | { readonly kind: "copyConsult"; readonly prompt: string }
   /** プロンプトを埋めて新しいセッションで開く */
   | { readonly kind: "openSession"; readonly prompt: string }
-  /** プロンプトを `claude -p` でボードのターミナルから実行する（止めるには、ターミナルで Ctrl+C を押す。結果は取り込まない） */
+  /** プロンプトを`claude -p`でボードのターミナルから実行する（止めるには、ターミナルでCtrl+Cを押す。結果は取り込まない） */
   | { readonly kind: "runClaude"; readonly prompt: string }
   /** 親の計画編集タブを開く（`screens().workflow`） */
   | { readonly kind: "openWorkflow"; readonly ticket: string }
@@ -228,7 +228,7 @@ function stay(state: ApprovalState, ...effects: ApprovalEffect[]): ApprovalStep 
   return { state, redraw: false, effects };
 }
 
-/** オーバーレイを差し替える。`redraw` は差し替わったかで決まる（同じものなら描き直さない） */
+/** オーバーレイを差し替える。`redraw`は差し替わったかで決まる（同じものなら描き直さない） */
 function move(state: ApprovalState, next: ApprovalState, ...effects: ApprovalEffect[]): ApprovalStep {
   return { state: next, redraw: next.overlay !== state.overlay, effects };
 }
@@ -276,8 +276,8 @@ function opened(
     if (input.tickets.length === 0) {
       return stay(state, { kind: "warn", text: "絞り込みで見えている承認待ちがありません" });
     }
-    // 1 つでもいまのボードで承認待ちでなければ、ボードが古い。外して送ると「見せた 2 件の
-    // つもりが 1 件」になるので、削らずに止める
+    // 1つでもいまのボードで承認待ちでなければ、ボードが古い。外して送ると「見せた2件の
+    // つもりが1件」になるので、削らずに止める
     const pending = new Set(input.pending);
     if (!input.tickets.every((id) => pending.has(id))) {
       return stay(
@@ -306,7 +306,7 @@ function previewed(state: ApprovalState, result: PreviewParse, saved: Readonly<R
   const recheck = state.recheck;
   if (recheck !== undefined) {
     // 絞りが通らない（その識別子がもう承認待ちに無い、親の改版が承認待ちに入った）ときだけ絞りを
-    // 外し、いま何が承認待ちなのかを全部見せる。外すのは 1 度だけ
+    // 外し、いま何が承認待ちなのかを全部見せる。外すのは1度だけ
     if (!result.ok && state.only.length > 0 && !recheck.dropped) {
       return move(
         state,
@@ -342,8 +342,8 @@ export const SHOWN_STALE =
   "内容が更新されました（押した画面の一覧は最新ではありませんでした）。何も承認していません。最新の内容を表示し直したので、見直してからもう一度承認してください";
 
 /**
- * 「この N 件を承認する」。見せた識別子とダイジェストをそのまま渡す。実行ファイルが一覧と本文の一致を
- * 確かめ、違えば何も置かずに `mismatch` を返す。
+ * 「このN件を承認する」。見せた識別子とダイジェストをそのまま渡す。実行ファイルが一覧と本文の一致を
+ * 確かめ、違えば何も置かずに`mismatch`を返す。
  * 渡すダイジェストは、押した画面に出ていたもの（`digest`）。読み直しで一覧が差し替わった直後、画面が
  * 描き直す前に押されると、手元の一覧（`state`）は画面に出ていない新しい中身になっている。そのときは
  * 打たずに、今の一覧を表示し直す
@@ -354,7 +354,7 @@ function confirmed(
   digest: string,
   unsaved: readonly string[],
 ): ApprovalStep {
-  // 承認を打てるのは、一覧を見せているときだけ。承認中に押し直しても 2 本目は出ない
+  // 承認を打てるのは、一覧を見せているときだけ。承認中に押し直しても2本目は出ない
   if (state.overlay?.kind !== "preview" || tickets.length === 0) {
     return stay(state);
   }
@@ -384,16 +384,16 @@ function confirmed(
 function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolean): ApprovalStep {
   if (outcome.ok) {
     const count = outcome.value.approved.length;
-    // 承認の push の 1 行は、文を渡すのを待たずにターミナルへ出す。承認と同じ時点で出しておく
+    // 承認のpushの1行は、文を渡すのを待たずにターミナルへ出す。承認と同じ時点で出しておく
     const carried = count > 0 && carrier;
     // 承認できたら読み直す。監視（`core/watch.ts`）だけに頼らない。 承認は承認済みチケットを
-    // `.ccnavi/approved/doing/` に書いてから提案を消すので、ふつうはその置き場の監視が拾って
-    // 読み直る。拾えないのは、`files.watcherExclude` でそこを外したとき、監視が利用できない
-    // ファイルシステムのとき（置き場は既定に固定で、監視するパス `core/watch.ts` とずれない）。
-    // 読み直しの途中でもう 1 回頼まれた分は呼ぶ側が 1 回にまとめる（`board-panel.ts` の `again`）ので、
-    // 監視と重なっても画面はちらつかない。1 件も置かれていないなら読み直さない（何も動いていない）。
+    // `.ccnavi/approved/doing/`に書いてから提案を消すので、ふつうはその置き場の監視が拾って
+    // 読み直る。拾えないのは、`files.watcherExclude`でそこを外したとき、監視が利用できない
+    // ファイルシステムのとき（置き場は既定に固定で、監視するパス`core/watch.ts`とずれない）。
+    // 読み直しの途中でもう1回頼まれた分は呼ぶ側が1回にまとめる（`board-panel.ts`の`again`）ので、
+    // 監視と重なっても画面はちらつかない。1件も置かれていないなら読み直さない（何も動いていない）。
     //
-    // 承認の push の sh が無ければ送らずに言う。送って `No such file` を見せるより、何をすればよいかが先に分かる
+    // 承認のpushのshが無ければ送らずに言う。送って`No such file`を見せるより、何をすればよいかが先に分かる
     const effects: ApprovalEffect[] =
       count === 0
         ? []
@@ -403,8 +403,8 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
               : {
                   kind: "warn",
                   text:
-                    `承認済みチケットはまだコミットされていません。${PUSH_APPROVED_SCRIPT} がないので、` +
-                    "導入スクリプト（scripts/ccnavi-setup.sh）で配ってください",
+                    `承認済みチケットはまだコミットされていません。${PUSH_APPROVED_SCRIPT}が配られていないので、` +
+                    "導入スクリプト（scripts/ccnavi-setup.sh）で配布してください",
                 },
             { kind: "refresh" },
           ];
@@ -415,8 +415,8 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
     );
   }
   if ("mismatch" in outcome) {
-    // まず同じ絞りで読み直す。カードの「この 1 件を承認」で全部の一覧に切り替わると、1 件のつもりで
-    // 押し続けて全部を承認しかねない。見せているのは `approving` のままで、返ったら差し替える
+    // まず同じ絞りで読み直す。カードの「この1件を承認」で全部の一覧に切り替わると、1件のつもりで
+    // 押し続けて全部を承認しかねない。見せているのは`approving`のままで、返ったら差し替える
     const sameIds = outcome.mismatch.expected.join(",") === outcome.mismatch.current.join(",");
     const notice = sameIds
       ? "内容が更新されました（表示したあとに提案ファイルが書き換えられました）。何も承認していません。最新の内容を表示し直したので、見直してからもう一度承認してください"
@@ -429,7 +429,7 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
   }
   if ("partial" in outcome) {
     // 途中で止まった。置けたぶんは残っているので、その分だけコミット・pushを送り、何が書けて
-    // 何が書けなかったかをオーバーレイで言う。1 件も置けていなければ何も送らない
+    // 何が書けなかったかをオーバーレイで言う。1件も置けていなければ何も送らない
     const placed = outcome.partial.placed.length > 0;
     return move(
       state,
@@ -446,7 +446,7 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
 }
 
 /**
- * プロンプトを Claude Code に渡す。プロンプトは拡張ホストが持っている分を使う（画面から届いたものは使わない）。
+ * プロンプトをClaude Codeに渡す。プロンプトは拡張ホストが持っている分を使う（画面から届いたものは使わない）。
  * 渡したらオーバーレイを閉じる
  */
 function handedOver(state: ApprovalState, how: "promptCopy" | "promptOpen" | "promptRun"): ApprovalStep {
@@ -484,7 +484,7 @@ function editWorkflow(state: ApprovalState, ticket: string): ApprovalStep {
 }
 
 /**
- * 承認を打つ直前の確かめ（`board-panel.ts` が `approve` のやることを行う前に呼ぶ）。打つ識別子のうち、
+ * 承認を打つ直前の確かめ（`board-panel.ts`が`approve`のやることを行う前に呼ぶ）。打つ識別子のうち、
  * 計画編集タブに未保存の変更がある親（識別子の順）。空でなければ打たない。遷移が「押した時点」で見た
  * あとに未保存になったものを、ここで拾う。子の識別子は親のタブと取り違えない（識別子が違う）
  */
@@ -532,14 +532,14 @@ function decideOpened(
   if (tree === undefined || chip === undefined) {
     return stay(state, {
       kind: "warn",
-      text: `親 ${parent} のワークツリーかフェーズ ${phase} がないので、レビューの指摘を読み込めません`,
+      text: `親${parent}のワークツリーかフェーズ${phase}がないので、レビューの指摘を読み込めません`,
     });
   }
   // 残った指摘を決めるのは、依頼を出してからユーザが見ている間だけ。待ちでなければ依頼の記録が無い
   if (chip.reviewWaiting !== true) {
     return stay(
       state,
-      { kind: "warn", text: `親 ${parent} のフェーズ ${chip.label} はユーザのレビュー待ちではありません。チケット管理画面を更新しました` },
+      { kind: "warn", text: `親${parent}のフェーズ${chip.label}はユーザのレビュー待ちではありません。チケット管理画面を更新しました` },
       { kind: "refresh" },
     );
   }
@@ -558,7 +558,7 @@ function unreadable(reason: string): string {
 /**
  * 残った指摘の読み取りが返った。頼んだとき（`decideLoading`）のままでなければ受けない。
  * 読み取れなかったときは件数を出さず、確定のボタンも出さない（エラーのオーバーレイ）。
- * 検証の本体は `parseDecidePreview`（頼んだ親・フェーズ・MR の番号との照合を含む）で、ここでも頼んだフェーズかを見る
+ * 検証の本体は`parseDecidePreview`（頼んだ親・フェーズ・MRの番号との照合を含む）で、ここでも頼んだフェーズかを見る
  */
 function decidePreviewed(state: ApprovalState, result: DecidePreviewParse): ApprovalStep {
   const overlay = state.overlay;
@@ -582,7 +582,7 @@ function decidePreviewed(state: ApprovalState, result: DecidePreviewParse): Appr
 }
 
 /**
- * 「この対応方針を確定」（0 件なら「レビュー済みにする」）。見せた指摘の全部に行き先が 1 つずつ付いているときだけ送る。
+ * 「この対応方針を確定」（0件なら「レビュー済みにする」）。見せた指摘の全部に行き先が1つずつ付いているときだけ送る。
  * ダイジェストは見せた一覧のもの。実行ファイルが今の指摘と比べ、違えば何も置かない
  */
 function decideConfirmed(state: ApprovalState, choices: Readonly<Record<string, string>>): ApprovalStep {
@@ -603,9 +603,9 @@ function decideConfirmed(state: ApprovalState, choices: Readonly<Record<string, 
 }
 
 /**
- * 「エージェントに相談するプロンプトをコピー」。1 件以上の指摘を見せているとき（`decidePreview`）だけ組む。
- * 置いている最中（`deciding`）と 0 件の画面では組まない。オーバーレイは閉じず、選びかけの対応方針にも触れない
- * （描き直しもしない。結果は `consultCopied` で知らせる）
+ * 「エージェントに相談するプロンプトをコピー」。1件以上の指摘を見せているとき（`decidePreview`）だけ組む。
+ * 置いている最中（`deciding`）と0件の画面では組まない。オーバーレイは閉じず、選びかけの対応方針にも触れない
+ * （描き直しもしない。結果は`consultCopied`で知らせる）
  */
 function consulted(state: ApprovalState, root: string): ApprovalStep {
   const overlay = state.overlay;
@@ -636,7 +636,7 @@ function consultCopied(state: ApprovalState, error: string | undefined): Approva
 /**
  * 置いた結果。承認の結果と同じく「この状態でなければ受けない」を置かない。 置かれたものは
  * 戻らないので、受けずに破棄するとユーザに届かない。
- * 表示は実行ファイルの答えに従う。`reviewed` が真ならレビュー済み。偽で `pending_extra` があれば、
+ * 表示は実行ファイルの答えに従う。`reviewed`が真ならレビュー済み。偽で`pending_extra`があれば、
  * 見せたあとに指摘が追加されたのでレビュー済みにしていない、と言う（続きの子が起きていなければ、決め直しへ戻れる）
  */
 function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
@@ -647,7 +647,7 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
       effects.unshift({ kind: "warn", text: value.warning });
     }
     const extra = value.pending_extra.length;
-    const issued = value.issue_url ? ` issue に回した分: ${value.issue_url}` : "";
+    const issued = value.issue_url ? ` issueに回した分: ${value.issue_url}` : "";
     const handover = ` ${HANDOVER_NOTE}`;
     const overlay = state.overlay;
     const where = overlay?.kind === "deciding" ? { parent: overlay.preview.parent, phase: overlay.preview.phase } : { parent: value.parent, phase: value.phase };
@@ -656,18 +656,18 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
     if (value.followup) {
       title = "対応方針を確定しました";
       note =
-        `直す指摘は、子チケット ${value.followup} に載せました（承認済み）。フェーズ ${value.phase} は作業に戻ります。` +
-        // fix のスレッドはホスト上で未解決のまま残る。keep・issue のときに sh が返信して resolve する仕組みは対象外
-        "直したあとの確認と、MR 上の指摘を解決済みにするのは、あなたです。" +
-        (extra > 0 ? `表示した後に増えた指摘 ${extra} 件は、今回は判断していません。` : "");
+        `直す指摘は、子チケット${value.followup}に載せました（承認済み）。フェーズ${value.phase}は作業に戻ります。` +
+        // fixのスレッドはホスト上で未解決のまま残る。keep・issueのときにshが返信してresolveする仕組みは対象外
+        "直したあとの確認と、MR上の指摘を解決済みにする作業は、ユーザが行います。" +
+        (extra > 0 ? `表示した後に増えた指摘${extra}件は、今回は判断していません。` : "");
     } else if (value.reviewed) {
-      title = `フェーズ ${value.phase} をレビュー済みにしました`;
+      title = `フェーズ${value.phase}をレビュー済みにしました`;
       note = "フェーズはレビュー済みになりました。";
     } else if (extra > 0) {
       title = "指摘が増えたため、レビュー済みにしていません";
-      note = `今回の判断は反映しました。表示した後に増えた指摘 ${extra} 件は未判断です。「指摘を読み直して決め直す」を押してください。`;
+      note = `今回の判断は反映しました。表示した後に増えた指摘${extra}件は未判断です。「指摘を読み直して決め直す」を押してください。`;
     } else {
-      title = `フェーズ ${value.phase} は、まだレビュー済みになっていません`;
+      title = `フェーズ${value.phase}は、まだレビュー済みになっていません`;
       note = "フェーズはレビュー済みになっていません。「更新」を押して、状態を確かめてください。";
     }
     const retry = !value.followup && !value.reviewed && extra > 0;
@@ -702,7 +702,7 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
           phase: preview.phase,
           tree,
           mr: preview.mr.number,
-          notice: "表示した指摘と今の指摘が違います（増えたか、変更されました）。見直してから決めてください",
+          notice: "表示した指摘と今の指摘が違います（増えたか、変わりました）。見直してから決めてください",
         },
         only: state.only,
       },

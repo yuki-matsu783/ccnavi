@@ -2,7 +2,7 @@
  * 画面が覚えておくもの。絞り込み（プロジェクト・親・ユーザ待ちのみ・アーカイブ済みを表示するか）、折りたたんだ列、
  * ドラッグで決めた列の幅、詳細を開いているカード。
  *
- * 置き場は Webview の state で、拡張が HTML を作り直しても（非表示になって作り直されても）残る。
+ * 置き場はWebviewのstateで、拡張がHTMLを作り直しても（非表示になって作り直されても）残る。
  */
 import { getState, setState } from "../vscode.js";
 
@@ -23,7 +23,7 @@ export interface ViewState {
 
 export const EMPTY: ViewState = { project: "*", parent: "*", attention: false, archived: false, folded: [], widths: {}, details: [] };
 
-/** 詳細の開閉を覚えるキー。プロジェクトと識別子の組（どちらも文字列なので JSON にすれば取り違えない） */
+/** 詳細の開閉を覚えるキー。プロジェクトと識別子の組（どちらも文字列なのでJSONにすれば取り違えない） */
 export function detailsKey(card: { readonly project: string; readonly id: string }): string {
   return JSON.stringify([card.project, card.id]);
 }

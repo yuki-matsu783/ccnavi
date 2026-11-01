@@ -1,7 +1,7 @@
 /**
- * 編集欄の計画 1 つ（全体計画かフィードバック計画）。上に線を引ける図、下にステップの表（種類・レビューを選び、並べ替え・削除・追加）。
+ * 編集欄の計画1つ（全体計画かフィードバック計画）。上に線を引ける図、下にステップの表（種類・レビューを選び、並べ替え・削除・追加）。
  *
- * 図に描く中身（番号・始まるステップ・終端に届かないステップ・順序の error）は実行ファイルが読んで返した答え（`plan`）のまま描き、
+ * 図に描く中身（番号・始まるステップ・終端に届かないステップ・順序のerror）は実行ファイルが読んで返した答え（`plan`）のまま描き、
  * ここは判定しない。**図が古い間は（編集した直後で、まだ読ませた答えが戻っていない間）線を引けない**。古い図の番号で線を引くと、
  * 別のステップを指してしまうため。
  */
@@ -30,15 +30,15 @@ const PART_TITLE: Readonly<Record<PlanPart, string>> = { plan: "全体計画", f
 /** ステップのレビューの指定の言葉 */
 const MODE_LABEL: Readonly<Record<ItemMode, string>> = {
   "": "定義のまま",
-  review: "review: true（MR を見る）",
-  "no-review": "review: false（MR を見ない）",
+  review: "review: true（MRを見る）",
+  "no-review": "review: false（MRを見ない）",
   deferred: "deferred: true（後ろのステップへ延ばす）",
 };
 
 export interface PlanEditProps {
   readonly part: PlanPart;
   readonly template: EditTemplate;
-  /** 実行ファイルが返した、この計画の図の中身。まだ無ければ undefined */
+  /** 実行ファイルが返した、この計画の図の中身。まだ無ければundefined */
   readonly plan: ApprovePlan | undefined;
   /** 図の中身が、いまの編集の中身を読ませたものか */
   readonly fresh: boolean;
@@ -46,7 +46,7 @@ export interface PlanEditProps {
   readonly onChange: (next: EditTemplate, typing?: string) => void;
 }
 
-/** この計画で選べる型。全体計画は `work`、フィードバック計画は `feedback`。いま使っている型が定義に無ければそれも挙げる */
+/** この計画で選べる型。全体計画は`work`、フィードバック計画は`feedback`。いま使っている型が定義に無ければそれも挙げる */
 function optionsFor(part: PlanPart, types: readonly PhaseTypeInfo[], current: string): readonly { readonly id: string; readonly label: string }[] {
   const kind = part === "plan" ? "work" : "feedback";
   const options = types.filter((t) => t.kind === kind).map((t) => ({ id: t.id, label: t.title === "" || t.title === t.id ? t.id : `${t.id}（${t.title}）` }));
@@ -71,7 +71,7 @@ export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanE
           className="action small"
           data-action="add-item"
           disabled={first === undefined}
-          title={first === undefined ? "この層で指定できる型（phases.yml の定義）が見つかりません" : undefined}
+          title={first === undefined ? "このレイヤーで指定できる型（phases.ymlの定義）が見つかりません" : undefined}
           onClick={() => first !== undefined && onChange(addItem(template, part, first))}
         >
           {part === "feedback" ? "フィードバック計画を作る" : "ステップを足す"}
@@ -117,7 +117,7 @@ export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanE
                 <td>
                   <select
                     className="f-item-type"
-                    aria-label={`${offset + index} 番の種類`}
+                    aria-label={`${offset + index}番の種類`}
                     value={item.type}
                     onChange={(event) => onChange(setItem(template, part, index, { type: event.target.value }))}
                   >
@@ -131,7 +131,7 @@ export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanE
                 <td>
                   <select
                     className="f-item-review"
-                    aria-label={`${offset + index} 番のレビュー`}
+                    aria-label={`${offset + index}番のレビュー`}
                     value={modeOf(item)}
                     onChange={(event) => onChange(setItem(template, part, index, { mode: event.target.value as ItemMode }))}
                   >
@@ -144,19 +144,19 @@ export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanE
                 </td>
                 <td className="mono">{item.after.length === 0 ? "なし" : item.after.map((n) => offset + n).join(", ")}</td>
                 <td className="tpl-edit-ops">
-                  <button type="button" className="action small" data-action="move-up" aria-label={`${offset + index} 番を前へ`} disabled={!canMove(template, part, index, -1)} onClick={() => onChange(moveItem(template, part, index, -1))}>
+                  <button type="button" className="action small" data-action="move-up" aria-label={`${offset + index}番を前へ`} disabled={!canMove(template, part, index, -1)} onClick={() => onChange(moveItem(template, part, index, -1))}>
                     ↑
                   </button>
-                  <button type="button" className="action small" data-action="move-down" aria-label={`${offset + index} 番を後ろへ`} disabled={!canMove(template, part, index, 1)} onClick={() => onChange(moveItem(template, part, index, 1))}>
+                  <button type="button" className="action small" data-action="move-down" aria-label={`${offset + index}番を後ろへ`} disabled={!canMove(template, part, index, 1)} onClick={() => onChange(moveItem(template, part, index, 1))}>
                     ↓
                   </button>
                   <button
                     type="button"
                     className="action small"
                     data-action="remove-item"
-                    aria-label={`${offset + index} 番を削除`}
+                    aria-label={`${offset + index}番を削除`}
                     disabled={part === "plan" && items.length <= 1}
-                    title={part === "plan" && items.length <= 1 ? "全体計画の最後の 1 ステップは消せません" : undefined}
+                    title={part === "plan" && items.length <= 1 ? "全体計画の最後の1ステップは消せません" : undefined}
                     onClick={() => onChange(removeItem(template, part, index))}
                   >
                     削除

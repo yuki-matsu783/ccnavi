@@ -21,7 +21,7 @@ function place(tree: string, name = "i0001-01-01"): string {
   return path.join(tree, ".ccnavi", "approved", "flows", `${name}.yml`);
 }
 
-/** シンボリックリンクを作れる環境か（Windows は権限が無いと作れない）。作れなければ呼び出し側が skip する。 */
+/** シンボリックリンクを作れる環境か（Windowsは権限が無いと作れない）。作れなければ呼び出し側がskipする。 */
 function canSymlink(): boolean {
   const dir = scratch();
   try {
@@ -37,7 +37,7 @@ function canSymlink(): boolean {
 
 const NEW = { exists: false, mtimeMs: 0 } as const;
 
-test("CB-T231 ない置き場は 1 段ずつ作って入れ替えで書く。一時ファイルは残らない。読むとその中身", () => {
+test("CB-T231 ない置き場は1段ずつ作って入れ替えで書く。一時ファイルは残らない。読むとその中身", () => {
   const tree = scratch();
   const file = place(tree);
   const written = writeFlowFile(tree, file, '{"nodes":[]}\n', NEW);
@@ -51,7 +51,7 @@ test("CB-T231 ない置き場は 1 段ずつ作って入れ替えで書く。一
   const again = writeFlowFile(tree, file, '{"nodes":[1]}\n', { exists: true, mtimeMs: read.mtimeMs });
   assert.deepEqual(again, { ok: true });
   assert.equal(fs.readFileSync(file, "utf8"), '{"nodes":[1]}\n');
-  // 無いファイルは undefined（フローは任意）
+  // 無いファイルはundefined（フローは任意）
   assert.equal(readFlowFile(tree, place(tree, "i0001-01-09")), undefined);
 });
 
@@ -103,7 +103,7 @@ test("CB-T233 読み込んでから外で作られた・変わったファイル
   assert.equal(fs.readFileSync(file, "utf8"), "theirs");
 });
 
-test("CB-T234 線の言葉は、出口が項目の id とちょうど同じか branch-<番号> のときだけ（実行ファイルと同じ読み方）", () => {
+test("CB-T234 線の言葉は、出口が項目のidとちょうど同じかbranch-<番号> のときだけ（実行ファイルと同じ読み方）", () => {
   const base = bareFlow("i0001-01-01", "調査");
   const doc: FlowDoc = {
     ...base,
@@ -149,14 +149,14 @@ test("CB-T236 名前付きパイプは読まずに戻る（開いて待たない
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const made = spawnSync("mkfifo", [file]);
   if (made.status !== 0) {
-    return; // mkfifo がない機械
+    return; // mkfifoがない機械
   }
   assert.throws(() => readFlowFile(tree, file), /ふつうのファイルではない/);
   const written = writeFlowFile(tree, file, "{}", { exists: true, mtimeMs: fs.lstatSync(file).mtimeMs });
   assert.equal(written.ok, false);
 });
 
-test("CB-T237 256KB を超えるフローは読まないし書かない。書けなかったとき一時ファイルは残らない", () => {
+test("CB-T237 256KBを超えるフローは読まないし書かない。書けなかったとき一時ファイルは残らない", () => {
   const tree = scratch();
   const file = place(tree);
   const big = `{"nodes":[],"pad":"${"x".repeat(FLOW_FILE_LIMIT)}"}`;
@@ -166,14 +166,14 @@ test("CB-T237 256KB を超えるフローは読まないし書かない。書け
   assert.deepEqual(fs.readdirSync(path.dirname(file)), []);
   fs.writeFileSync(file, big);
   assert.throws(() => readFlowFile(tree, file), /大きすぎる/);
-  // 入れ替えの直前に外で作られた（2 度目の確かめで止まる）ときも、一時ファイルは消す
+  // 入れ替えの直前に外で作られた（2度目の確かめで止まる）ときも、一時ファイルは消す
   fs.rmSync(file);
   const raced = writeFlowFile(tree, file, "{}", { exists: true, mtimeMs: 1 });
   assert.equal(raced.ok, false);
   assert.deepEqual(fs.readdirSync(path.dirname(file)), []);
 });
 
-test("CB-T238 線の言葉は真偽値を空として読み、整数の値は表記で比べる（実行ファイルの flow_text._text と同じ）", () => {
+test("CB-T238 線の言葉は真偽値を空として読み、整数の値は表記で比べる（実行ファイルのflow_text._textと同じ）", () => {
   const base = bareFlow("i0001-01-01", "調査");
   const doc: FlowDoc = {
     ...base,
@@ -200,7 +200,7 @@ test("CB-T238 線の言葉は真偽値を空として読み、整数の値は表
   assert.deepEqual(labels, ["", "", "ONE", "", "T", "2"]);
 });
 
-test("CB-T245 読んだバイトは UTF-8 として不正なら文字にしない（置き換え文字で埋めない）。BOM は 1 つ外す", () => {
+test("CB-T245 読んだバイトはUTF-8として不正なら文字にしない（置き換え文字で埋めない）。BOMは1つ外す", () => {
   const tree = scratch();
   const file = place(tree);
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -210,11 +210,11 @@ test("CB-T245 読んだバイトは UTF-8 として不正なら文字にしな�
   assert.ok(read !== undefined);
   // 読むのはバイトのまま（実行ファイルにこのバイトを確かめさせる）
   assert.deepEqual(Buffer.from(read.bytes), broken);
-  assert.deepEqual(decodeFlowBytes(read.bytes), { ok: false, error: "UTF-8 として解釈できません" });
-  // 実行ファイル（utf-8-sig）と同じく、先頭の BOM は 1 つだけ外す
+  assert.deepEqual(decodeFlowBytes(read.bytes), { ok: false, error: "UTF-8として解釈できません" });
+  // 実行ファイル（utf-8-sig）と同じく、先頭のBOMは1つだけ外す
   assert.deepEqual(decodeFlowBytes(Buffer.from("\uFEFFnodes: []\n", "utf8")), { ok: true, text: "nodes: []\n" });
   assert.deepEqual(decodeFlowBytes(Buffer.from("\uFEFF\uFEFFx", "utf8")), { ok: true, text: "\uFEFFx" });
-  // 途中で切れた多バイト文字も UTF-8 として読めない
+  // 途中で切れた多バイト文字もUTF-8として読めない
   assert.equal(decodeFlowBytes(Buffer.from("あ", "utf8").subarray(0, 2)).ok, false);
 });
 
@@ -297,7 +297,7 @@ test("CB-T300 確認してから削除するまでの間に書き直された下
   const file = draftPlace(tree);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, "nodes: []\n");
-  // import の名前空間は読むだけなので、本体の node:fs を差し替える（ソースの fs は呼ぶたびに本体を引く）
+  // importの名前空間は読むだけなので、本体のnode:fsを差し替える（ソースのfsは呼ぶたびに本体を引く）
   const real = require("node:fs") as { renameSync: typeof fs.renameSync };
   const original = real.renameSync;
   // 照合のあと、移す直前にエージェントが書き直した、を真似る

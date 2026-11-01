@@ -4,12 +4,12 @@ import { defaultSum, riskSums, rulesSums, sumLabel } from "../../src/core/sums.j
 import { targetOptions } from "../../src/core/targets.js";
 import { sumsBoard } from "../helpers/sums.js";
 
-test("CB-T307 統合結果は実行ファイルの sums[] をそのまま渡す。ワークスペースが先、プロジェクトが後で、拡張は追加し直さない", () => {
+test("CB-T307 統合結果は実行ファイルのsums[]をそのまま渡す。ワークスペースが先、プロジェクトが後で、拡張は追加し直さない", () => {
   const board = sumsBoard();
   const rules = rulesSums(board);
   assert.deepEqual(rules.map((s) => s.name), ["self", "lib"]);
   assert.deepEqual(rules.map((s) => s.layers), [["common", "self"], ["common", "lib"]]);
-  // lib の統合結果は共通のルールと lib のルールの両方を持つ。ask は ask のまま
+  // libの統合結果は共通のルールとlibのルールの両方を持つ。askはaskのまま
   assert.deepEqual(rules[1].deny.map((r) => [r.id, r.source]), [["guard-approved", "common"], ["lib:no-tmp", "lib"]]);
   assert.deepEqual(rules[1].ask.map((r) => r.id), ["lib:deps"]);
   assert.deepEqual(rules[0].deny.map((r) => r.id), ["guard-approved"]);

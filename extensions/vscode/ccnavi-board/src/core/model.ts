@@ -1,23 +1,23 @@
 /**
- * `ccnavi --explain --json` が出す形。実行ファイルと拡張の契約で、拡張はこれ以外を読まない。
- * 形の定義は ccnavi の docs/11_requirements/json-shapes.md「ボードの JSON」。同じ例が test/fixtures/board.json にあり、
- * Python 側のテスト（tests/ticket/test_board.py）が同じ例で形を確かめる。
+ * `ccnavi --explain --json`が出す形。実行ファイルと拡張の契約で、拡張はこれ以外を読まない。
+ * 形の定義はccnaviのdocs/11_requirements/json-shapes.md「ボードのJSON」。同じ例がtest/fixtures/board.jsonにあり、
+ * Python側のテスト（tests/ticket/test_board.py）が同じ例で形を確かめる。
  */
 
 /** 拡張が読める版。実行ファイルが違う版を出したら、解釈せずに版の違いを伝える */
 export const BOARD_VERSION = 1;
 
 /**
- * ボードの列。置き場は 4 つ（`wip/proposals/{todo,review}/`、`.ccnavi/approved/{doing,done}/`）だが、
- * 列は 未着手（`todo/`）/ 作業中（`approved/doing/` と `review/`）/ 完了（`approved/done/`）/ 取り消し
- * （`approved/done/` で `cancelled_at` を持つ）の 4 つ。レビュー待ちは列ではなくカードの属性で分かる。
- * 5 つめのアーカイブは置き場ではなく、手元の退避（`logs/archive/`。`ccnavi-review.sh ready` が閉じた
+ * ボードの列。置き場は4つ（`wip/proposals/{todo,review}/`、`.ccnavi/approved/{doing,done}/`）だが、
+ * 列は 未着手（`todo/`）/ 作業中（`approved/doing/`と`review/`）/ 完了（`approved/done/`）/ 取り消し
+ * （`approved/done/`で`cancelled_at`を持つ）の4つ。レビュー待ちは列ではなくカードの属性で分かる。
+ * 5つめのアーカイブは置き場ではなく、手元の退避（`logs/archive/`。`ccnavi-review.sh ready`が閉じた
  * 親子のチケットを移した先）にあるもの。表示するだけで、既定では隠す
  */
 export type ProposalState = "todo" | "doing" | "done" | "cancelled" | "archived";
 /**
- * 承認済みチケットの今。`archived` は手元の退避（`logs/archive/`）にだけあるもの（JSON の `archived` の欄から組む）。`open` は `.ccnavi/approved/doing/`、`review` は `wip/proposals/review/`（承認済みのまま
- * ユーザのレビューを待つ）、`closed` は `.ccnavi/approved/done/`（取り消しも `cancelled_at` を持ってここ）、`none` は
+ * 承認済みチケットの今。`archived`は手元の退避（`logs/archive/`）にだけあるもの（JSONの`archived`の欄から組む）。`open`は`.ccnavi/approved/doing/`、`review`は`wip/proposals/review/`（承認済みのまま
+ * ユーザのレビューを待つ）、`closed`は`.ccnavi/approved/done/`（取り消しも`cancelled_at`を持ってここ）、`none`は
  * 承認待ちの提案だけ
  */
 export type CopyStatus = "open" | "review" | "closed" | "none" | "archived";
@@ -32,13 +32,13 @@ export interface TreeJson {
 }
 
 export interface ProposalJson {
-  /** 提案の置き場。`todo`（承認待ち）か `review`（レビュー待ち）だけ */
+  /** 提案の置き場。`todo`（承認待ち）か`review`（レビュー待ち）だけ */
   readonly state: "todo" | "review";
   readonly tree: string;
   readonly tree_root: string;
   readonly path: string;
   /**
-   * 親の提案が全体計画（`plan:`）を持つか。`feedback:` だけの親と子は偽（計画編集タブは `plan:` の無い親を開けない）。ボードは計画を読まず、これで親の提案のカードの
+   * 親の提案が全体計画（`plan:`）を持つか。`feedback:`だけの親と子は偽（計画編集タブは`plan:`の無い親を開けない）。ボードは計画を読まず、これで親の提案のカードの
    * 「計画編集」を出し分ける
    */
   readonly has_plan: boolean;
@@ -49,7 +49,7 @@ export interface CopyJson {
   readonly approved_at?: string;
   /**
    * 承認の時刻をどこから引いたか。`commit`（doing/ に足したコミット）・
-   * `uncommitted`（手で置いてまだコミットしていない。approved_at は空）・空（分からない）
+   * `uncommitted`（手で置いてまだコミットしていない。approved_atは空）・空（分からない）
    */
   readonly approved_from?: string;
   readonly path?: string;
@@ -68,14 +68,14 @@ export interface SeenInJson {
 }
 
 /**
- * 子チケットのフロー。親は null。
- * `locked` は判定がいまそのファイルへの書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中・レビュー中）。
- * 拡張はそのまま受け取るだけで、`started_at` などから組み直さない。
+ * 子チケットのフロー。親はnull。
+ * `locked`は判定がいまそのファイルへの書き込みを`DENY_TICKET_FLOW_LOCKED`で止めているか（着手中・レビュー中）。
+ * 拡張はそのまま受け取るだけで、`started_at`などから組み直さない。
  */
 export interface FlowJson {
   /** 読む先の絶対パス（正とする側のツリーの版、無ければ子のワークツリーの版。どちらにも無ければ正とする側のツリーのパス） */
   readonly path: string;
-  /** ツリーのルートからの相対。承認済みの領域の固定の置き場（既定 `.ccnavi/approved/flows/<子>.yml`） */
+  /** ツリーのルートからの相対。承認済みの領域の固定の置き場（既定`.ccnavi/approved/flows/<子>.yml`） */
   readonly rel: string;
   /** ファイルを持つツリーのルート。保存はここからファイルまでの途中にリンクがあれば書かない */
   readonly tree: string;
@@ -84,8 +84,8 @@ export interface FlowJson {
   readonly linked: boolean;
   readonly locked: boolean;
   /**
-   * 錠の種類（`locked` が真のとき）。`doing` は着手中、`review` はレビュー中（実行ファイルの答え）。
-   * 止めていなければ null
+   * 錠の種類（`locked`が真のとき）。`doing`は着手中、`review`はレビュー中（実行ファイルの答え）。
+   * 止めていなければnull
    */
   readonly lock_kind: "doing" | "review" | null;
   /** エージェントが書く下書き。置き場はフローと同じツリーの提案の置き場 */
@@ -94,7 +94,7 @@ export interface FlowJson {
 
 /** 子のフローの下書き。効力は無く、ユーザがフロー編集画面で取り込んだものだけが効く */
 export interface FlowDraftJson {
-  /** 絶対パス（既定 `<ツリー>/wip/proposals/flows/<子>.yml`） */
+  /** 絶対パス（既定`<ツリー>/wip/proposals/flows/<子>.yml`） */
   readonly path: string;
   /** ツリーのルートからの相対 */
   readonly rel: string;
@@ -104,7 +104,7 @@ export interface FlowDraftJson {
 }
 
 /**
- * 満たしていない先行 1 本。承認と着手は、先行が全部 `.ccnavi/approved/done/` に在って取り消しでないことを
+ * 満たしていない先行1本。承認と着手は、先行が全部`.ccnavi/approved/done/`に在って取り消しでないことを
  * 求める。その答えを実行ファイルが出し、拡張はそのまま受け取るだけ（先行の置き場から組み直さない）。
  */
 export interface PredecessorUnmetJson {
@@ -116,8 +116,8 @@ export interface PredecessorUnmetJson {
 }
 
 /**
- * 親のワークツリーのリモートとの差（`ccnavi --explain --json` の `remote`）。最後に取ってきた origin との差で、
- * ネットワークには出ない。`ahead`（未送信）と `behind`（遅れ）は、リモート追跡の ref が無い・読めないと null。
+ * 親のワークツリーのリモートとの差（`ccnavi --explain --json`の`remote`）。最後に取ってきたoriginとの差で、
+ * ネットワークには出ない。`ahead`（未送信）と`behind`（遅れ）は、リモート追跡のrefが無い・読めないとnull。
  */
 export interface RemoteJson {
   readonly branch: string;
@@ -132,24 +132,24 @@ export interface TicketJson {
   readonly title: string;
   readonly project: string;
   readonly issue: number | null;
-  /** 親だけ。親を載せる MR の番号（親チケットの `mr:`）。無ければ null */
+  /** 親だけ。親を載せるMRの番号（親チケットの`mr:`）。無ければnull */
   readonly mr: number | null;
   /** 親だけ。親のブランチ名。子は空 */
   readonly branch: string;
-  /** 親だけ。親のワークツリーがあるときのリモートとの差。子・ワークツリーなしは null */
+  /** 親だけ。親のワークツリーがあるときのリモートとの差。子・ワークツリーなしはnull */
   readonly remote: RemoteJson | null;
   readonly predecessors: readonly string[];
-  /** 満たしていない先行。空なら満たしている（先行が無い・閉じたチケットも空） */
+  /** 満たしていない先行。空なら満たしている（先行が無い・クローズしたチケットも空） */
   readonly predecessors_unmet: readonly PredecessorUnmetJson[];
-  /** 子の `human_review`。`required` が null なら宣言なし（計画のステップとフェーズ定義に従う） */
+  /** 子の`human_review`。`required`がnullなら宣言なし（計画のステップとフェーズ定義に従う） */
   readonly human_review: { readonly required: boolean | null; readonly reason: string };
   readonly proposal: ProposalJson | null;
   /** 完了した計画付きの親から、テンプレートの下書きを作れるか */
   readonly template_draft: boolean;
   /**
    * 空でなければ「読めるが信頼できない」理由（親が引けないなど、範囲をどこで切り詰めるか決まらない）。判定はこのチケットの
-   * ワークツリーへの書き込みを `DENY_TICKET_BLOCKED` で全部止める。`copy.status` は
-   * `open` のままなので、止まっていることはこの欄でしか分からない。
+   * ワークツリーへの書き込みを`DENY_TICKET_BLOCKED`で全部止める。`copy.status`は
+   * `open`のままなので、止まっていることはこの欄でしか分からない。
    */
   readonly blocked: string;
   readonly copy: CopyJson;
@@ -157,13 +157,13 @@ export interface TicketJson {
   readonly started_at: string;
   readonly completed_at: string;
   readonly base_sha: string;
-  /** finish が親のブランチへ合流した子の先頭。合流していなければ空（表示だけ） */
+  /** finishが親のブランチへ合流した子の先頭。合流していなければ空（表示だけ） */
   readonly merged_sha: string;
   readonly cancelled_at: string;
   readonly cancel_reason: string;
   /**
-   * 作業中か（承認済みチケットが `doing/` にあり、着手していて、終わってもいないし取り消されてもいない）。
-   * 実行ファイルが決め、拡張は `started_at` などから組み直さない
+   * 作業中か（承認済みチケットが`doing/`にあり、着手していて、終わってもいないし取り消されてもいない）。
+   * 実行ファイルが決め、拡張は`started_at`などから組み直さない
    */
   readonly in_progress: boolean;
   readonly seen_in: readonly SeenInJson[];
@@ -171,7 +171,7 @@ export interface TicketJson {
   readonly scattered: readonly SeenInJson[];
   readonly risk: Record<string, unknown> | null;
   readonly judge: Record<string, unknown> | null;
-  /** 子のフロー。親は null */
+  /** 子のフロー。親はnull */
   readonly flow: FlowJson | null;
   /** 読み手が気づくべき不備の文。実行ファイルが組み、ボードはそのまま出す */
   readonly issues: readonly string[];
@@ -179,7 +179,7 @@ export interface TicketJson {
   readonly attention: boolean;
 }
 
-/** いまターンの途中にいるセッション。時刻は UNIX 秒 */
+/** いまターンの途中にいるセッション。時刻はUNIX秒 */
 export interface TurnJson {
   readonly session: string;
   /** ターンが始まった時刻 */
@@ -189,7 +189,7 @@ export interface TurnJson {
 }
 
 /**
- * 手元の退避（`logs/archive/`）にある閉じたチケット 1 件。表示のためだけの欄で、実行ファイルは判定に混ぜない。
+ * 手元の退避（`logs/archive/`）にあるクローズしたチケット1件。表示のためだけの欄で、実行ファイルは判定に混ぜない。
  * 置き場（`tickets`）に同じ識別子があるものは、実行ファイルがここに出さない
  */
 export interface ArchivedTicketJson {
@@ -202,7 +202,7 @@ export interface ArchivedTicketJson {
   readonly path: string;
   readonly started_at: string;
   readonly completed_at: string;
-  /** finish が親のブランチへ合流した子の先頭。合流していなければ空か無い（表示だけ） */
+  /** finishが親のブランチへ合流した子の先頭。合流していなければ空か無い（表示だけ） */
   readonly merged_sha?: string;
   readonly cancelled_at: string;
   readonly cancel_reason: string;
@@ -227,7 +227,7 @@ export interface PhaseJson {
   readonly risk: Record<string, unknown> | null;
   readonly risk_escalates: boolean;
   readonly risk_line: string;
-  /** 手で done/ に動かされた子の確認待ち・移動が未共有など。判定が出す 1 行。無ければ空 */
+  /** 手でdone/ に動かされた子の確認待ち・移動が未共有など。判定が出す1行。無ければ空 */
   readonly manual: string;
 }
 
@@ -242,7 +242,7 @@ export interface ParentJson {
   readonly phases: readonly PhaseJson[];
 }
 
-/** 設定ファイル 1 本の場所 */
+/** 設定ファイル1本の場所 */
 export interface LayerFileJson {
   /** 実行ファイルが解いたパス。ファイルが無くても本来の場所を指す */
   readonly path: string;
@@ -251,24 +251,24 @@ export interface LayerFileJson {
 }
 
 /**
- * レイヤー（layer）1 つ（共通・ワークスペース・プロジェクトの設定のどれか）。拡張が使うのはルール・配点・フェーズ定義の
- * ファイルの場所と、読めなかった理由だけなので、それだけを読む。宣言の中身は読まない（統合結果の表示は `sums` から読む）。
+ * レイヤー（layer）1つ（共通・ワークスペース・プロジェクトの設定のどれか）。拡張が使うのはルール・配点・フェーズ定義の
+ * ファイルの場所と、読めなかった理由だけなので、それだけを読む。宣言の中身は読まない（統合結果の表示は`sums`から読む）。
  */
 export interface LayerJson {
   /** `common` / `self` / プロジェクトの名前 */
   readonly name: string;
   readonly rules: LayerFileJson;
-  /** リスクの配点のファイル（`risk` の `path` と `unreadable`） */
+  /** リスクの配点のファイル（`risk`の`path`と`unreadable`） */
   readonly risk: LayerFileJson;
   /**
-   * フェーズ定義のファイル（`phases_file`）。読めなければ `unreadable` に理由が入る（そのファイルの定義は空として扱われる）
+   * フェーズ定義のファイル（`phases_file`）。読めなければ`unreadable`に理由が入る（そのファイルの定義は空として扱われる）
    */
   readonly phasesFile: LayerFileJson;
 }
 
-/** 統合結果に入ったルール 1 件（`sums[].rules` の `deny` / `ask` / `allow` の要素）。実行ファイルが出した値をそのまま持つ */
+/** 統合結果に入ったルール1件（`sums[].rules`の`deny` / `ask` / `allow`の要素）。実行ファイルが出した値をそのまま持つ */
 export interface SumRuleJson {
-  /** レイヤー名付きの id（共通は裸、ほかは `<レイヤー>:<id>`） */
+  /** レイヤー名付きのid（共通は裸、ほかは`<レイヤー>:<id>`） */
   readonly id: string;
   readonly section: string;
   /** どのレイヤーから来たか */
@@ -282,7 +282,7 @@ export interface SumRuleJson {
   readonly message: string;
 }
 
-/** 統合結果に入ったリスクの項目 1 件 */
+/** 統合結果に入ったリスクの項目1件 */
 export interface SumFactorJson {
   readonly id: string;
   readonly source: string;
@@ -293,7 +293,7 @@ export interface SumFactorJson {
   readonly message: string;
 }
 
-/** 統合結果に入ったフェーズ定義 1 件 */
+/** 統合結果に入ったフェーズ定義1件 */
 export interface SumPhaseJson {
   readonly id: string;
   readonly source: string;
@@ -304,9 +304,9 @@ export interface SumPhaseJson {
 }
 
 /**
- * 統合結果（`sums[]`）の 1 件。「共通の設定 + そのレイヤー」の読み取り用の結果で、実行ファイルが判定と同じ関数で組む。
+ * 統合結果（`sums[]`）の1件。「共通の設定 + そのレイヤー」の読み取り用の結果で、実行ファイルが判定と同じ関数で組む。
  * 拡張はこれを足し直さず、そのまま見せる。順は ワークスペース（`self`）→ プロジェクト（名前順）。
- * パスを持たないツール（Bash など）が適用する、全プロジェクトの設定を足した和ではない。
+ * パスを持たないツール（Bashなど）が適用する、全プロジェクトの設定を足した和ではない。
  */
 export interface SumJson {
   /** `self` / プロジェクトの名前 */
@@ -333,8 +333,8 @@ export interface SumJson {
     readonly problems: readonly string[];
   };
   /**
-   * 共通の設定 + そのレイヤーの定義（判定に使う和）。`path` と `unreadable` はそのレイヤーのファイル。
-   * 各定義の `source` が出どころ（`common` かそのレイヤーの名前）
+   * 共通の設定 + そのレイヤーの定義（判定に使う和）。`path`と`unreadable`はそのレイヤーのファイル。
+   * 各定義の`source`が出どころ（`common`かそのレイヤーの名前）
    */
   readonly phases: {
     readonly path: string;
@@ -349,8 +349,8 @@ export interface BoardJson {
   readonly generated_at: string;
   readonly settings: {
     /**
-     * 動作モード。hook がいま使うはずの値を実行ファイルが解決したもの（enable / dry-run / disable）。
-     * 読めない値は enable になっている
+     * 動作モード。hookがいま使うはずの値を実行ファイルが解決したもの（enable / dry-run / disable）。
+     * 読めない値はenableになっている
      */
     readonly mode: string;
     /** チケット制御を使うか。実行ファイルが解決した値（enable / disable） */
@@ -369,7 +369,7 @@ export interface BoardJson {
   readonly pending_approval: readonly string[];
   readonly tickets: readonly TicketJson[];
   readonly parents: readonly ParentJson[];
-  /** 手元の退避にある閉じたチケット（表示用） */
+  /** 手元の退避にあるクローズしたチケット（表示用） */
   readonly archived: readonly ArchivedTicketJson[];
   /**
    * いまターンの途中にいるセッション。ターン中に設定ファイルを直すと、次のツール呼び出しで
@@ -384,23 +384,23 @@ export type ParseResult =
 
 /**
  * 実行ファイルの標準出力を読む。欠けている項目は既定値で埋め、版が違えば読まない。
- * 1 件の欠けで全体を破棄しないのは、参考にした拡張の「1 枚の不備で他を止めない」に倣う。
+ * 1件の欠けで全体を破棄しないのは、参考にした拡張の「1枚の不備で他を止めない」に倣う。
  */
 export function parseBoardJson(text: string): ParseResult {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `JSON として解釈できません: ${(error as Error).message}` };
+    return { ok: false, error: `JSONとして解釈できません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
-    return { ok: false, error: "JSON の最上位がオブジェクトではありません" };
+    return { ok: false, error: "JSONの最上位がオブジェクトではありません" };
   }
   const version = typeof raw.version === "number" ? raw.version : NaN;
   if (version !== BOARD_VERSION) {
     return {
       ok: false,
-      error: `ccnavi --explain --json の版が違います（拡張は ${BOARD_VERSION}、実行ファイルは ${String(raw.version)}）`,
+      error: `ccnavi --explain --jsonの版が違います（拡張は${BOARD_VERSION}、実行ファイルは${String(raw.version)}）`,
     };
   }
   const settings = isRecord(raw.settings) ? raw.settings : {};

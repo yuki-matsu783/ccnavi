@@ -1,4 +1,4 @@
-/** 画面に中身を渡す段取り。どの状態で何が送られるか（拡張ホスト側。VS Code は要らない） */
+/** 画面に中身を渡す段取り。どの状態で何が送られるか（拡張ホスト側。VS Codeは要らない） */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { retainedHost, screenHost, type Surface } from "../../src/core/screen-host.js";
@@ -25,7 +25,7 @@ function surface(visible = true): Spy {
   };
 }
 
-test("CB-T143 1 枚目は入れ物ごと入れる。組み上がる前に渡したものは送らず、入れ直しもしない", () => {
+test("CB-T143 1枚目は入れ物ごと入れる。組み上がる前に渡したものは送らず、入れ直しもしない", () => {
   const spy = surface();
   const host = screenHost<string>(spy, (data) => `<html>${data}</html>`);
   assert.equal(host.send("あ"), "rebuilt");
@@ -61,7 +61,7 @@ test("CB-T145 非表示になったら入れ物ごと入れ直す。再表示さ
   assert.equal(host.send("い"), "rebuilt", "戻った瞬間に新しい中身が出るよう、入れておく");
   assert.deepEqual(spy.pages, ["あ", "い"]);
   assert.deepEqual(spy.posted, []);
-  // 再表示する。VS Code が入れてある HTML から作り直す間は送らない
+  // 再表示する。VS Codeが入れてあるHTMLから作り直す間は送らない
   spy.visible = true;
   assert.equal(host.live, false);
   assert.equal(host.send("う"), "deferred");
@@ -73,10 +73,10 @@ test("CB-T145 非表示になったら入れ物ごと入れ直す。再表示さ
   assert.deepEqual(spy.posted, [{ type: "data", data: "う" }]);
 });
 
-test("CB-T146 1 度きりのメッセージは、届いたときだけ真を返す", () => {
+test("CB-T146 1度きりのメッセージは、届いたときだけ真を返す", () => {
   const spy = surface();
   const host = screenHost<string>(spy, (data) => data);
-  assert.equal(host.post({ type: "filter" }), false, "まだ 1 枚も入れていない");
+  assert.equal(host.post({ type: "filter" }), false, "まだ1枚も入れていない");
   host.send("あ");
   assert.equal(host.post({ type: "filter" }), false, "作り直している最中");
   host.ready();
@@ -89,11 +89,11 @@ test("CB-T146 1 度きりのメッセージは、届いたときだけ真を返�
   assert.deepEqual(spy.posted, [{ type: "filter" }]);
 });
 
-test("CB-T147 非表示になっている画面からの ready は、破棄された画面が残したものとして破棄する", () => {
+test("CB-T147 非表示になっている画面からのreadyは、破棄された画面が残したものとして破棄する", () => {
   const spy = surface();
   const host = screenHost<string>(spy, (data) => data);
   host.send("あ");
-  // 画面が ready を送った直後にユーザがタブを非表示にすると、非表示になったことが先に届くことがある。
+  // 画面がreadyを送った直後にユーザがタブを非表示にすると、非表示になったことが先に届くことがある。
   // これを真に受けると、再表示されたとき「組み上がっている」と誤って送ってしまう
   spy.visible = false;
   host.ready();
@@ -101,8 +101,8 @@ test("CB-T147 非表示になっている画面からの ready は、破棄さ�
   assert.equal(host.live, false);
   assert.equal(host.send("い"), "deferred");
   assert.deepEqual(spy.posted, []);
-  assert.equal(host.post({ type: "filter" }), false, "1 度きりの指示を、失われる先へ送って消さない");
-  // 実際の ready で届くようになる
+  assert.equal(host.post({ type: "filter" }), false, "1度きりの指示を、失われる先へ送って消さない");
+  // 実際のreadyで届くようになる
   host.ready();
   assert.equal(host.send("い"), "posted");
   assert.equal(host.post({ type: "filter" }), true);
@@ -124,7 +124,7 @@ test("CB-T149 非表示になったと教えられたら、そのあいだ何も
   host.send("あ");
   host.ready();
   assert.equal(host.live, true);
-  // 非表示になって再表示されるまでの間、この段取りは 1 度も呼ばれない（実機の onDidChangeViewState がその形）。
+  // 非表示になって再表示されるまでの間、この段取りは1度も呼ばれない（実機のonDidChangeViewStateがその形）。
   // 知らされていなければ、表示の有無を自分で読んでも行って戻ったことに気づけない
   spy.visible = false;
   host.hidden();
@@ -142,7 +142,7 @@ test("CB-T150 教えてもらえなくても、表示の有無が変わってい
   const host = screenHost<string>(spy, (data) => data);
   host.send("あ");
   host.ready();
-  // 非表示になったことが知らされない場合。非表示の間に 1 度でも触れば、そこで気づく
+  // 非表示になったことが知らされない場合。非表示の間に1度でも触れば、そこで気づく
   spy.visible = false;
   assert.equal(host.post({ type: "filter" }), false, "非表示の画面には届かない");
   spy.visible = true;
@@ -153,7 +153,7 @@ test("CB-T150 教えてもらえなくても、表示の有無が変わってい
 
 // ---- 保持する画面（retainContextWhenHidden: true）。非表示になっても画面が破棄されないので段取りが変わる
 
-test("CB-T151 保持する画面は入れ物を 1 度しか入れない。2 枚目からは中身だけ送る", () => {
+test("CB-T151 保持する画面は入れ物を1度しか入れない。2枚目からは中身だけ送る", () => {
   const spy = surface();
   const host = retainedHost<string>(spy, (data) => `<html>${data}</html>`);
   assert.equal(host.send("あ"), "rebuilt");
@@ -174,24 +174,24 @@ test("CB-T152 保持する画面は非表示になっても入れ直さず、非
   const host = retainedHost<string>(spy, (data) => data);
   host.send("あ");
   host.ready();
-  // 非表示にする。VS Code は画面を破棄しないので、送ったものは届く
+  // 非表示にする。VS Codeは画面を破棄しないので、送ったものは届く
   spy.visible = false;
   host.hidden();
   assert.equal(host.live, true);
   assert.equal(host.send("い"), "posted", "入れ直すと、非表示の間に打ちかけていた編集が消える");
   assert.deepEqual(spy.pages, ["あ"]);
   assert.deepEqual(spy.posted, [{ type: "data", data: "い" }]);
-  // 1 度きりのメッセージ（lock・changed）も非表示のまま届く
+  // 1度きりのメッセージ（lock・changed）も非表示のまま届く
   assert.equal(host.post({ type: "lock" }), true);
   spy.visible = true;
   assert.equal(host.send("う"), "posted", "再表示されても作り直されていないので、そのまま送れる");
   assert.deepEqual(spy.pages, ["あ"]);
 });
 
-test("CB-T153 保持する画面でも、1 枚目が組み上がるまでは 1 度きりのメッセージを送らない", () => {
+test("CB-T153 保持する画面でも、1枚目が組み上がるまでは1度きりのメッセージを送らない", () => {
   const spy = surface();
   const host = retainedHost<string>(spy, (data) => data);
-  assert.equal(host.post({ type: "lock" }), false, "まだ 1 枚も入れていない");
+  assert.equal(host.post({ type: "lock" }), false, "まだ1枚も入れていない");
   host.send("あ");
   assert.equal(host.post({ type: "lock" }), false, "読み込んでいる最中。送っても失われる");
   host.ready();
@@ -199,7 +199,7 @@ test("CB-T153 保持する画面でも、1 枚目が組み上がるまでは 1 �
   assert.deepEqual(spy.posted, [{ type: "lock" }]);
 });
 
-test("CB-T154 保持する画面も、入れ物に埋めて渡すものは 1 枚目にだけ使う", () => {
+test("CB-T154 保持する画面も、入れ物に埋めて渡すものは1枚目にだけ使う", () => {
   const spy = surface();
   const host = retainedHost<string>(spy, (data) => `<html>${data}</html>`);
   assert.equal(host.send("素", "埋めた"), "rebuilt");

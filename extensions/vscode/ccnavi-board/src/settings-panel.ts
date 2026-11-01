@@ -1,13 +1,13 @@
 /**
- * 設定を編集する 3 画面（ルール管理・リスク管理・フェーズ管理）のパネルが共通で持つ段取り。
- * VS Code の API に触れるので単体テストの対象外。
+ * 設定を編集する3画面（ルール管理・リスク管理・フェーズ管理）のパネルが共通で持つ段取り。
+ * VS CodeのAPIに触れるので単体テストの対象外。
  *
- * 3 画面は同じ形をしている。対象（共通の設定・ワークスペース・プロジェクト）を 1 枚のタブで切り替える。
- * 編集の途中を持つので `retainContextWhenHidden` は真。ここにまとめたのは、パネルの
+ * 3画面は同じ形をしている。対象（共通の設定・ワークスペース・プロジェクト）を1枚のタブで切り替える。
+ * 編集の途中を持つので`retainContextWhenHidden`は真。ここにまとめたのは、パネルの
  * 受け付け・再表示・破棄、監視の反応の遅らせ方、読み直しと描き直し、対象の切り替え。
  *
  * 画面ごとに違う仕事（何を読む・何を見せる・どのファイルを見張る・保存できるかをどう聞く）は、
- * `settingsPanel` に渡す `SettingsScreen` のコールバックで注入する。**残す仕事は画面ごとに必要で、残し忘れると
+ * `settingsPanel`に渡す`SettingsScreen`のコールバックで注入する。**残す仕事は画面ごとに必要で、残し忘れると
  * 不具合になる**ので、ここには画面ごとの差を持たせず、差は必ず呼ぶ側に置く。
  */
 import * as fs from "node:fs";
@@ -19,54 +19,54 @@ import type { ScreenHost } from "./core/screen-host.js";
 import { OWN_WRITE_GRACE_MS } from "./core/watch.js";
 import { debounce, watchTickets } from "./panel-common.js";
 
-/** 3 画面のパネルが持つ状態。画面ごとに違うのは、画面に渡す形（`D`）・対象（`T`）・読んだ結果（`L`）だけ */
+/** 3画面のパネルが持つ状態。画面ごとに違うのは、画面に渡す形（`D`）・対象（`T`）・読んだ結果（`L`）だけ */
 export interface SettingsState<D, T, L> {
-  /** いま見せている対象。別の対象を開くと入れ替わる（タブは 1 枚） */
+  /** いま見せている対象。別の対象を開くと入れ替わる（タブは1枚） */
   target: T;
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   readonly tmpDir: string;
   readonly host: ScreenHost<D>;
-  /** 編集対象と設定ファイルの監視。対象のパスが変わるので、再読み込みのたびに張り直す */
+  /** 編集対象と設定ファイルの監視。対象のパスが変わるので、更新のたびに張り直す */
   fileWatchers: vscode.FileSystemWatcher[];
   /** チケットの置き場の監視。開いている間ずっと同じ */
   watchers: vscode.FileSystemWatcher[];
   timer?: NodeJS.Timeout;
   lockTimer?: NodeJS.Timeout;
   loaded?: L;
-  /** 読み直せなかった理由。`loaded` と排他で、どちらかは必ず入っている */
+  /** 読み直せなかった理由。`loaded`と排他で、どちらかは必ず入っている */
   error?: string;
   lock: Lock;
   /** 「ファイルの変更を検知しました」を出したまま、まだ読み直していない。再表示されたときに送り直す */
   changedPending: boolean;
   wroteAt: number;
-  /** 画面に未保存の変更があるか（画面が `dirty` で知らせる）。別の対象へ切り替えるときに聞くかを決める */
+  /** 画面に未保存の変更があるか（画面が`dirty`で知らせる）。別の対象へ切り替えるときに聞くかを決める */
   dirty: boolean;
   /**
-   * 読み直しの番号。読むたびに 1 つ進め、読み終えたときに変わっていたら破棄する。
+   * 読み直しの番号。読むたびに1つ進め、読み終えたときに変わっていたら破棄する。
    * 設定ファイルの場所を実行ファイルに聞く間に別の対象へ切り替わると、前の対象の答えが後から届くため
    */
   seq: number;
-  /** 「破棄して切り替える？」を出している間は真。重ねて開かれても 2 枚目の問いを出さない */
+  /** 「破棄して切り替える？」を出している間は真。重ねて開かれても2枚目の問いを出さない */
   asking: boolean;
 }
 
-/** ここから画面へ送る知らせ。画面の契約（`To*`）に入っていなければならない（`accepts` で型が確かめる） */
+/** ここから画面へ送る知らせ。画面の契約（`To*`）に入っていなければならない（`accepts`で型が確かめる） */
 export type SettingsNotice = { readonly type: "lock"; readonly lock: Lock } | { readonly type: "changed" };
 
-/** 画面ごとの仕事。`D` 画面に渡す形、`T` 対象、`L` 読んだ結果、`M` 画面の契約（`To*`） */
+/** 画面ごとの仕事。`D`画面に渡す形、`T`対象、`L`読んだ結果、`M`画面の契約（`To*`） */
 export interface SettingsScreen<D, T, L, M> {
-  /** `true` と書く。ここから送るので、`lock` と `changed` が `M` に入っていないと型が合わなくなる */
+  /** `true`と書く。ここから送るので、`lock`と`changed`が`M`に入っていないと型が合わなくなる */
   readonly accepts: SettingsNotice extends M ? true : never;
   /** このパネルがまだ開いている現役のものか */
   alive(current: SettingsState<D, T, L>): boolean;
-  /** 閉じた。開いているパネルのバッジ（モジュールの `state`）が `current` なら外す */
+  /** 閉じた。開いているパネルのバッジ（モジュールの`state`）が`current`なら外す */
   release(current: SettingsState<D, T, L>): void;
   /** 画面からの操作の受け付け（受け取った値の型の絞り込みも含む） */
   handleMessage(current: SettingsState<D, T, L>, message: unknown): void;
   /** 対象の中身を読む。読めなければ投げる */
   read(root: string, target: T): Promise<L>;
-  /** 読めた中身を渡す（`current.loaded` が入っている） */
+  /** 読めた中身を渡す（`current.loaded`が入っている） */
   show(current: SettingsState<D, T, L>): void;
   /** 読めなかったことを見せる */
   showError(current: SettingsState<D, T, L>, error: string): void;
@@ -81,9 +81,9 @@ export interface SettingsScreen<D, T, L, M> {
   targetLabel(target: T): string;
 }
 
-/** `settingsPanel` が返す、画面のパネルから呼ぶ関数 */
+/** `settingsPanel`が返す、画面のパネルから呼ぶ関数 */
 export interface SettingsPanel<D, T, L> {
-  /** パネルを作った直後に 1 度呼ぶ。受け付け・再表示・破棄と、監視を繋ぐ */
+  /** パネルを作った直後に1度呼ぶ。受け付け・再表示・破棄と、監視を繋ぐ */
   registerPanelHandlers(current: SettingsState<D, T, L>): void;
   /** 設定ファイルが変わったと知らせる（自分の保存は除く） */
   scheduleChanged(current: SettingsState<D, T, L>): void;
@@ -91,7 +91,7 @@ export interface SettingsPanel<D, T, L> {
   scheduleLock(current: SettingsState<D, T, L>): void;
   reload(current: SettingsState<D, T, L>): Promise<void>;
   /**
-   * いまの状態で渡し直す。1 枚目を読み込んでいる間に見送られたもの（`deferred`）は、画面が
+   * いまの状態で渡し直す。1枚目を読み込んでいる間に見送られたもの（`deferred`）は、画面が
    * 組み上がった（`ready`）ところでここから渡る。
    */
   redraw(current: SettingsState<D, T, L>): void;
@@ -99,8 +99,8 @@ export interface SettingsPanel<D, T, L> {
    * 開いているタブの対象を入れ替える。未保存の変更があれば、破棄するかを先に聞く。
    * やめたらタブは前面に出たまま、前の対象と編集が残る。
    *
-   * 読み終えるまでは前の対象の中身を消して「読み込み中」を見せ、操作も受けない（`loaded` を空にする）。
-   * 前の対象の保存が往復の途中なら、画面の `stale` が破棄する。
+   * 読み終えるまでは前の対象の中身を消して「読み込み中」を見せ、操作も受けない（`loaded`を空にする）。
+   * 前の対象の保存が往復の途中なら、画面の`stale`が破棄する。
    */
   switchTarget(current: SettingsState<D, T, L>, target: T): Promise<void>;
 }
@@ -115,11 +115,11 @@ export function settingsPanel<D, T, L, M>(screen: SettingsScreen<D, T, L, M>): S
       screen.handleMessage(current, message);
     });
 
-    // 保持する画面は非表示でも生きていて、`postMessage` は届く。VS Code の文書は、同じ型定義の中で
-    // 記述が食い違っている（`retainContextWhenHidden` の側は「非表示の画面には送れない」と言う）。
+    // 保持する画面は非表示でも生きていて、`postMessage`は届く。VS Codeの文書は、同じ型定義の中で
+    // 記述が食い違っている（`retainContextWhenHidden`の側は「非表示の画面には送れない」と言う）。
     // どちらが正しくても困らないよう、再表示されたところで、いま出すべき知らせを送り直す。
     // 中身（`data`）は送らない。送ると、非表示の間に打っていた編集がここで消える。
-    // 見た目（`appearance`）も同じ扱い。保持しない画面は入れ物から作り直されるので `ready` で渡るが、
+    // 見た目（`appearance`）も同じ扱い。保持しない画面は入れ物から作り直されるので`ready`で渡るが、
     // 保持する画面は作り直されないので、非表示の間の切り替えが届いていなかったらここでしか気づけない。
     panel.onDidChangeViewState(() => {
       if (!panel.visible || !screen.alive(current)) {
@@ -224,7 +224,7 @@ export function settingsPanel<D, T, L, M>(screen: SettingsScreen<D, T, L, M>): S
         "切り替える",
       );
       current.asking = false;
-      // 問いを出している間にパネルを閉じられる。切り替え先が同じになっていることもある（2 度押した）
+      // 問いを出している間にパネルを閉じられる。切り替え先が同じになっていることもある（2度押した）
       if (choice !== "切り替える" || !screen.alive(current) || screen.sameTarget(current.target, target)) {
         return;
       }
@@ -235,7 +235,7 @@ export function settingsPanel<D, T, L, M>(screen: SettingsScreen<D, T, L, M>): S
     current.dirty = false;
     current.changedPending = false;
     current.lock = lockFromError("確認中…");
-    // 前の対象のファイルの監視は外す。切り替え先が読めたら `reload` が張り直す。読めずにエラーのままなら、
+    // 前の対象のファイルの監視は外す。切り替え先が読めたら`reload`が張り直す。読めずにエラーのままなら、
     // 前の対象の変化を「ファイルの変更を検知しました」と拾い続けない
     if (current.timer !== undefined) {
       clearTimeout(current.timer);

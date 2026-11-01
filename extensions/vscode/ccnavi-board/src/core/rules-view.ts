@@ -1,18 +1,18 @@
 /**
- * ルール管理画面の、拡張ホストと Webview の間の契約。
+ * ルール管理画面の、拡張ホストとWebviewの間の契約。
  *
- * 画面は React で組み、拡張ホストは HTML を組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。拡張ホストが渡すのは
- * 「いま何を見せるか」（`RulesData`）だけで、ルールの行も判定の結果も hook の表も画面が作る。
+ * 画面はReactで組み、拡張ホストはHTMLを組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。拡張ホストが渡すのは
+ * 「いま何を見せるか」（`RulesData`）だけで、ルールの行も判定の結果もhookの表も画面が作る。
  * 画面が返すのはユーザが押した操作（`RulesMessage`）だけ。
  *
  * ルールの形（`SECTIONS`・`RuleForm`・`RulesModel`）もここに置く。 読み書き（`rules-doc.ts`）の側に
- * 置いたままだと、画面がそこから `yaml` を辿ることになり、バンドルしたものに YAML の解析器がすべて入る。
- * 同じ理由で、ここには VS Code の API も DOM も node も入れない。
+ * 置いたままだと、画面がそこから`yaml`を辿ることになり、バンドルしたものにYAMLの解析器がすべて入る。
+ * 同じ理由で、ここにはVS CodeのAPIもDOMもnodeも入れない。
  *
- * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
- * 入れ物は 1 度しか入らない（入れ直すと打ちかけの編集が消える）。中身（`data`）が届くのは、画面の編集を破棄してよいとき
- * だけ（ユーザが「再読み込み」を押した、保存が通って中身が入れ替わった）。ファイルが外で変わっただけの
- * ときは `changed` の帯を出し、破棄するかどうかはユーザが決める。
+ * この画面は`retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は`retainedHost`で、
+ * 入れ物は1度しか入らない（入れ直すと打ちかけの編集が消える）。中身（`data`）が届くのは、画面の編集を破棄してよいとき
+ * だけ（ユーザが「更新」を押した、保存が通って中身が入れ替わった）。ファイルが外で変わっただけの
+ * ときは`changed`の帯を出し、破棄するかどうかはユーザが決める。
  */
 import type { HandoffEntry, OpenHandoffMessage } from "./handoff-entry.js";
 import type { AppearanceMessage } from "./appearance.js";
@@ -31,7 +31,7 @@ export const SECTIONS = ["deny", "ask", "allow"] as const;
 export type Section = (typeof SECTIONS)[number];
 export type PatternKind = "glob" | "regex";
 
-/** タイプの言い換え。画面の見出しで `deny` などの表記につける */
+/** タイプの言い換え。画面の見出しで`deny`などの表記につける */
 export const SECTION_LABELS: Readonly<Record<Section, string>> = {
   deny: "拒否する",
   ask: "ユーザに確認する",
@@ -39,8 +39,8 @@ export const SECTION_LABELS: Readonly<Record<Section, string>> = {
 };
 
 /**
- * 判定が対象を取り出せるツール。ccnavi の judge.SUBJECT_FIELDS（diagnose.KNOWN_TOOLS）と同じ順。
- * 名前は Claude Code の権限ルール `ToolName(指定子)` から括弧の中を除いたもの。
+ * 判定が対象を取り出せるツール。ccnaviのjudge.SUBJECT_FIELDS（diagnose.KNOWN_TOOLS）と同じ順。
+ * 名前はClaude Codeの権限ルール`ToolName(指定子)`から括弧の中を除いたもの。
  */
 export const KNOWN_TOOLS = [
   "Bash",
@@ -58,9 +58,9 @@ export const KNOWN_TOOLS = [
 ] as const;
 
 /**
- * ツール名として受け付ける形。英字で始まり、英数字・`_`・`-` だけ（`Bash`、`mcp__server__tool` など）。
- * `match` は名前を `|` で並べたものなので `|` を含めない。ccnavi の `--test` には名前を引数で渡すので、
- * 先頭の `-` も弾く。一覧にない名前は、判定が対象を取り出せないだけで、形が正しければ受け付ける。
+ * ツール名として受け付ける形。英字で始まり、英数字・`_`・`-`だけ（`Bash`、`mcp__server__tool`など）。
+ * `match`は名前を`|`で並べたものなので`|`を含めない。ccnaviの`--test`には名前を引数で渡すので、
+ * 先頭の`-`も弾く。一覧にない名前は、判定が対象を取り出せないだけで、形が正しければ受け付ける。
  */
 const TOOL_NAME = /^[A-Za-z][A-Za-z0-9_-]*$/;
 
@@ -68,7 +68,7 @@ export function isToolName(name: string): boolean {
   return TOOL_NAME.test(name);
 }
 
-/** 画面で編集する 1 件。`origin` は読み込んだときの位置で、新しいルールは null */
+/** 画面で編集する1件。`origin`は読み込んだときの位置で、新しいルールはnull */
 export interface RuleForm {
   readonly origin: { readonly section: Section; readonly index: number } | null;
   readonly id: string;
@@ -78,47 +78,47 @@ export interface RuleForm {
   readonly message: string;
   /** ヒットしたときにモデルへ渡すプロンプト（`additionalContext`）。無ければ空 */
   readonly additionalContext: string;
-  /** 1 つの文脈で最初にヒットしたときだけ渡すプロンプト（`additionalContextOnce`）。無ければ空 */
+  /** 1つの文脈で最初にヒットしたときだけ渡すプロンプト（`additionalContextOnce`）。無ければ空 */
   readonly additionalContextOnce: string;
   /** 文に続けて本文を渡すファイル（`additionalContextFile`）。ルートからの相対パス。無ければ空 */
   readonly additionalContextFile: string;
   /** 最初にヒットしたときだけ本文を渡すファイル（`additionalContextOnceFile`）。無ければ空 */
   readonly additionalContextOnceFile: string;
   /**
-   * 何回に 1 度渡すか（`every`）。ヒットした回数がこの倍数になった回だけ文が渡り、
-   * `additionalContextOnce` はその最初の 1 回（＝ N 回目）に渡る。書いていなければ空。
+   * 何回に1度渡すか（`every`）。ヒットした回数がこの倍数になった回だけ文が渡り、
+   * `additionalContextOnce`はその最初の1回（＝ N回目）に渡る。書いていなければ空。
    *
    * 他の欄と同じく書かれたままの文字で持つ。数（`number | null`）で持つと、空欄が
    * 「刻み無し」なのか「刻みとして読めない値（`0`・`-1`・`x`）だった」のかを区別できず、
    * 刻みを外す操作も、読めない値を画面から直す方法も書けない。読めない値は書いたまま
-   * 書き戻し、報告するのは保存前の `ccnavi --lint`。気づかないうちに画面で直されると、lint が名指し
+   * 書き戻し、報告するのは保存前の`ccnavi --lint`。気づかないうちに画面で直されると、lintが名指し
    * している対象が消えて指摘の出どころが分からなくなる
    */
   readonly every: string;
   /**
-   * 除くもの（`except:`）を `glob: …` / `regex: …` の形にしたもの。見せるだけ。書き戻しは元のノードをそのまま使うので、ここを変えてもファイルは変わらない。
+   * 除くもの（`except:`）を`glob: …` / `regex: …`の形にしたもの。見せるだけ。書き戻しは元のノードをそのまま使うので、ここを変えてもファイルは変わらない。
    * 本体にヒットしても、どれかにヒットすればルールはヒットしない（判定は実行ファイルの仕事）。
    * 書いていなければ省く。
    */
   readonly excepts?: readonly string[];
   /**
-   * `except:` の各パターンを組み合わせ条件のノードにしたもの（`excepts` と同じ並び）。「組み合わせ条件に変換」が
-   * `not: {any: …}` に入れるために持つ。書いていなければ省く
+   * `except:`の各パターンを組み合わせ条件のノードにしたもの（`excepts`と同じ並び）。「組み合わせ条件に変換」が
+   * `not: {any: …}`に入れるために持つ。書いていなければ省く
    */
   readonly exceptNodes?: readonly CondNode[];
   /**
-   * 組み合わせ条件（`when:`）。在れば `kind` と `pattern` は使わない（`glob` / `regex` の代わりに組み合わせ条件で適用する）。
-   * 書き戻しは、組み合わせ条件が読み込んだときと同じなら元のノードに触らない。変えたら組み合わせ条件を書き、`glob` / `regex` を消す。
+   * 組み合わせ条件（`when:`）。在れば`kind`と`pattern`は使わない（`glob` / `regex`の代わりに組み合わせ条件で適用する）。
+   * 書き戻しは、組み合わせ条件が読み込んだときと同じなら元のノードに触らない。変えたら組み合わせ条件を書き、`glob` / `regex`を消す。
    * 書いていなければ省く
    */
   readonly when?: CondNode;
   /**
-   * 「組み合わせ条件に変換」で `except:` を組み合わせ条件の中へ移した。書き戻しで `except:` を消す。
+   * 「組み合わせ条件に変換」で`except:`を組み合わせ条件の中へ移した。書き戻しで`except:`を消す。
    * 画面が明示したときだけ消す（欄が届かなかっただけで消さないため）
    */
   readonly dropExcept?: boolean;
   /**
-   * `glob` と `regex` を両方書いてある（`when:` は無い）。画面はどちらか一方しか持てないので、
+   * `glob`と`regex`を両方書いてある（`when:`は無い）。画面はどちらか一方しか持てないので、
    * 「組み合わせ条件に変換」させない（変換すると片方が黙って消える）。書いていなければ省く
    */
   readonly bothPatterns?: boolean;
@@ -148,8 +148,8 @@ export interface RulesPage {
    */
   readonly exists?: boolean;
   /**
-   * 動作モード。実行ファイルが `--explain --json` の `settings.mode` で答えた、hook がいま使うはずの値
-   * （enable / dry-run / disable。読めない値は enable になっている）。答えが取れなければ空
+   * 動作モード。実行ファイルが`--explain --json`の`settings.mode`で答えた、hookがいま使うはずの値
+   * （enable / dry-run / disable。読めない値はenableになっている）。答えが取れなければ空
    */
   readonly mode: string;
   readonly model: RulesModel;
@@ -176,24 +176,24 @@ export interface RulesPage {
 
 /**
  * 画面に見せる中身。読み直せなかったときはルールの代わりに文面を渡す（`kind: "error"`）。
- * 他の 4 画面と同じ形で、画面はどちらでも 1 枚を描く。
+ * 他の4画面と同じ形で、画面はどちらでも1枚を描く。
  *
- * `loading` は開いているタブの対象を切り替えて、新しい対象を読んでいる間（タブは種類ごとに 1 枚）。
- * `text` は画面に出す一言（「web のルールを読み込み中…」）。読み終えたら `page` か `error` が続けて届く
+ * `loading`は開いているタブの対象を切り替えて、新しい対象を読んでいる間（タブは種類ごとに1枚）。
+ * `text`は画面に出す一言（「webのルールを読み込み中…」）。読み終えたら`page`か`error`が続けて届く
  */
 export type RulesData =
   | { readonly kind: "page"; readonly page: RulesPage }
-  /** `targets` は読めなかった画面から別の対象へ戻るための欄（共通・ワークスペースと、いま開いていた対象）。ボードを読めていないので、ほかのプロジェクトは載せない */
+  /** `targets`は読めなかった画面から別の対象へ戻るための欄（共通・ワークスペースと、いま開いていた対象）。ボードを読めていないので、ほかのプロジェクトは載せない */
   | { readonly kind: "error"; readonly error: string; readonly target?: { readonly kind: string; readonly name: string }; readonly targets?: readonly TargetOption[] }
   | { readonly kind: "loading"; readonly text: string };
 
 /**
- * 拡張ホスト → 画面。中身を包む形は `screen-host.ts` が決める（渡すのはそこ）。
+ * 拡張ホスト → 画面。中身を包む形は`screen-host.ts`が決める（渡すのはそこ）。
  *
- * `judged` と `expectationsChecked` は実行ファイルに聞いた判定の結果、`suggested` は記録から起こした候補、`failed` は操作の結果をその場で言う
- * 一言、`lock` は保存してよいかの取り直し、`changed` はファイルが外で変わったという帯、
- * `picked` はダイアログで選んだファイルのパス。どれも画面の編集には触らない
- * （`picked` は名指しした 1 欄だけを埋める）。
+ * `judged`と`expectationsChecked`は実行ファイルに聞いた判定の結果、`suggested`は記録から起こした候補、`failed`は操作の結果をその場で言う
+ * 一言、`lock`は保存してよいかの取り直し、`changed`はファイルが外で変わったという帯、
+ * `picked`はダイアログで選んだファイルのパス。どれも画面の編集には触らない
+ * （`picked`は名指しした1欄だけを埋める）。
  */
 export type ToRules =
   | DataMessage<RulesData>
@@ -205,17 +205,17 @@ export type ToRules =
   | { readonly type: "notice"; readonly message: string }
   | { readonly type: "lock"; readonly lock: Lock }
   | { readonly type: "changed" }
-  /** 保存が通った（中身 `data` を渡した直後に送る）。検証の warn の本文。画面は上部の帯に出し、次の編集か更新で消す */
+  /** 保存が通った（中身`data`を渡した直後に送る）。検証のwarnの本文。画面は上部の帯に出し、次の編集か更新で消す */
   | { readonly type: "saved"; readonly warns: readonly string[] }
   /** 頼んだ往復が起きなかった（ユーザが「破棄して読み直す？」をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
-  /** 選んだファイルのパス。`key` は画面が渡した行のキーで、拡張ホストはそのまま返す */
+  /** 選んだファイルのパス。`key`は画面が渡した行のキーで、拡張ホストはそのまま返す */
   | { readonly type: "picked"; readonly key: string; readonly field: FileField; readonly path: string }
   /** 初回の吹き出しの案内を出す。画面は指す先が出てから始める（`src/tour.ts`） */
   | { readonly type: "tour" }
   | AppearanceMessage;
 
-/** 画面 → 拡張ホスト。受け側（rules-panel の `asMessage`）が形を確かめてから使う */
+/** 画面 → 拡張ホスト。受け側（rules-panelの`asMessage`）が形を確かめてから使う */
 export type RulesMessage =
   /** 画面が組み上がった。拡張ホストはここで中身を渡し直す */
   | { readonly type: "ready" }
@@ -227,7 +227,7 @@ export type RulesMessage =
   | { readonly type: "dirty"; readonly dirty: boolean }
   | { readonly type: "openFile"; readonly which: "rules" | "expectations" }
   | { readonly type: "save"; readonly sections: Sections }
-  /** 編集中の内容で 1 件だけ判定する。保存は要らない */
+  /** 編集中の内容で1件だけ判定する。保存は要らない */
   | { readonly type: "judge"; readonly sections: Sections; readonly tool: string; readonly subject: string }
   /** 編集中の内容で期待する判定を一括で確かめる */
   | { readonly type: "expectations"; readonly sections: Sections }
@@ -240,43 +240,43 @@ export type RulesMessage =
   | { readonly type: "switchTarget"; readonly kind: string; readonly name: string }
   | OpenHandoffMessage;
 
-/** 最初の中身を埋める `<script type="application/json">` の id。画面はこれを読んで最初の 1 枚を描く */
+/** 最初の中身を埋める`<script type="application/json">`のid。画面はこれを読んで最初の1枚を描く */
 export const DATA_ID = "ccnavi-rules-data";
 
-/** 最初の中身を HTML に埋める形にする。埋め方は `screen-host.ts` が持つ（React の画面で同じ） */
+/** 最初の中身をHTMLに埋める形にする。埋め方は`screen-host.ts`が持つ（Reactの画面で同じ） */
 export function embedData(data: RulesData): string {
   return embedJson(data);
 }
 
 /**
  * 動作モードの帯に出す説明。実行ファイルが答えたモードをそのまま言い換えるだけで、設定ファイルは読まない。
- * enable と空（答えが取れない）は帯を出さないので空を返す
+ * enableと空（答えが取れない）は帯を出さないので空を返す
  */
 export function modeBanner(mode: string): string {
   if (mode === "dry-run") {
-    return "判定と記録をします。deny や ask にヒットしても、一般の保護はツールの実行を止めません。止まるのは、チケットのゲートと補助の保護です";
+    return "判定と記録をします。denyやaskにヒットしても、一般の保護はツールの実行を止めません。止まるのは、チケットのゲートと補助の保護です";
   }
   if (mode === "disable") {
-    return "判定しません。ルールは使われず、deny や ask にヒットする操作も止まりません";
+    return "判定しません。ルールは使われず、denyやaskにヒットする操作も止まりません";
   }
   return "";
 }
 
-/** 編集中の内容を判定に渡すための一時ディレクトリの接頭辞（`rules-panel.ts` の `mkdtemp` と共有する） */
+/** 編集中の内容を判定に渡すための一時ディレクトリの接頭辞（`rules-panel.ts`の`mkdtemp`と共有する） */
 export const TMP_RULES_PREFIX = "ccnavi-rules-";
 
 const TMP_RULES = new RegExp(`(?:[A-Za-z]:)?(?:\\.\\.[\\\\/])*[^\\s:()]*${TMP_RULES_PREFIX}[A-Za-z0-9]{6}[\\\\/]rules\\.yml:`, "g");
 
 /**
  * 判定結果の文字列から、編集中の内容を置いた一時ファイルのパスを消す。
- * 実行ファイルはルール id を「ワークスペースからの相対のファイル:id」で言うので、一時ファイルのルールは
- * `../../../tmp/ccnavi-rules-XXXXXX/rules.yml:<id>`（ドライブが違う Windows では絶対パス）になる。`rules.yml:<id>` に縮める。
+ * 実行ファイルはルールidを「ワークスペースからの相対のファイル:id」で言うので、一時ファイルのルールは
+ * `../../../tmp/ccnavi-rules-XXXXXX/rules.yml:<id>`（ドライブが違うWindowsでは絶対パス）になる。`rules.yml:<id>`に縮める。
  */
 export function tmpName(text: string): string {
   return text.replace(TMP_RULES, "rules.yml:");
 }
 
-/** 判定の rule.id（`rules.yml:<id>`）から、編集中の行の id（`<id>`）だけを取り出す。接頭辞が無ければそのまま返す */
+/** 判定のrule.id（`rules.yml:<id>`）から、編集中の行のid（`<id>`）だけを取り出す。接頭辞が無ければそのまま返す */
 export function bareRuleId(id: string): string {
   return tmpName(id).replace(/^rules\.yml:/, "");
 }

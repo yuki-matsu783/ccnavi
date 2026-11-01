@@ -1,11 +1,11 @@
 /**
- * 定義 1 件の行。折りたたんだときは要約 1 行、開くと欄が出る。
+ * 定義1件の行。折りたたんだときは要約1行、開くと欄が出る。
  *
- * 欄名は日本語で欄の左に出し、YAML のキー名は欄名のツールチップに載せる（`Captioned`）。
- * 出番の少ない 3 欄（補足。agent / skill / when）は見出し 1 行に折りたたみ、値がある定義だけ最初から開く。
+ * 欄名は日本語で欄の左に出し、YAMLのキー名は欄名のツールチップに載せる（`Captioned`）。
+ * 出番の少ない3欄（補足。agent / skill / when）は見出し1行に折りたたみ、値がある定義だけ最初から開く。
  *
  * **ほかの定義との関係の欄（overlap / requires / after）は出さない。** 順序（どのフェーズにどのフェーズが先行するか）は
- * フェーズ定義ではなく親チケットの計画のステップの `after` で決める。
+ * フェーズ定義ではなく親チケットの計画のステップの`after`で決める。
  */
 import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 
@@ -14,18 +14,18 @@ import { moreNote, scopeText, scopeTitle, splitList } from "./text.js";
 import { moveTitle } from "../shared/find.js";
 
 export interface PhaseProps {
-  /** 画面の中だけのキー（`state.ts`）。行を名指しするために `data-key` へ出す */
+  /** 画面の中だけのキー（`state.ts`）。行を名指しするために`data-key`へ出す */
   readonly phaseKey: string;
   readonly phase: PhaseForm;
   readonly find: string;
   readonly hidden: boolean;
   readonly open: boolean;
   /**
-   * 「補足」を開いているか。決めるのは呼ぶ側（行ごとに 1 度だけ値の有無で決め、あとは
+   * 「補足」を開いているか。決めるのは呼ぶ側（行ごとに1度だけ値の有無で決め、あとは
    * ユーザの開閉で動く）。ここで値の有無から決め直すと、最後の値を消した時点で、打っている欄ごと折りたたまれる
    */
   readonly moreOpen: boolean;
-  /** id が他の定義と重なっている。保存は止まる */
+  /** idが他の定義と重なっている。保存は止まる */
   readonly duplicate: boolean;
   /** 欄を触れるか。保存の往復の間は触れない */
   readonly disabled: boolean;
@@ -39,7 +39,7 @@ export interface PhaseProps {
   readonly finding: boolean;
   readonly onMove: (delta: number) => void;
   readonly onRemove: () => void;
-  /** 案内が指す行か。真のとき、行と欄に `data-tour` の印を付ける（印は画面に 1 つだけ。見本の最初の行にだけ付ける） */
+  /** 案内が指す行か。真のとき、行と欄に`data-tour`の印を付ける（印は画面に1つだけ。見本の最初の行にだけ付ける） */
   readonly tour?: boolean;
   /** 案内の見本の行。打っても欄の文字が変わらず、「補足」の開閉も動かない */
   readonly frozen?: boolean;
@@ -91,15 +91,15 @@ export function Phase(props: PhaseProps): JSX.Element {
           {props.open ? "▾" : "▸"}
         </button>
         <span className="sum">
-          <span className={phase.id === "" ? "sum-id dim" : "sum-id"} title={phase.id === "" ? "（id 未設定）" : phase.id}>
-            {phase.id === "" ? "（id 未設定）" : phase.id}
+          <span className={phase.id === "" ? "sum-id dim" : "sum-id"} title={phase.id === "" ? "（id未設定）" : phase.id}>
+            {phase.id === "" ? "（id未設定）" : phase.id}
           </span>
           <span className="clip" title={phase.title}>
             {phase.title}
           </span>
           <span className={`tag ${phase.kind}`}>{phase.kind}</span>
           <span className="dim" title="review">
-            レビュー {String(phase.review)}
+            レビュー{String(phase.review)}
           </span>
           <span className="clip dim mono" title={scopeTitle(phase)}>
             {scopeText(phase)}
@@ -113,7 +113,7 @@ export function Phase(props: PhaseProps): JSX.Element {
         </Captioned>
         <Captioned name="タイトル" yamlKey="title" tour={mark("phase-title")}>
           {text("title", "f-title narrow", "実装とテスト")}
-          <p className="hint">空なら id をそのまま使います。</p>
+          <p className="hint">空ならidをそのまま使います。</p>
         </Captioned>
         <Captioned name="区分" yamlKey="kind" tour={mark("phase-kind")}>
           <select
@@ -151,14 +151,14 @@ export function Phase(props: PhaseProps): JSX.Element {
               disabled={disabled}
               onChange={(event) => props.onChange({ ...phase, inherit: event.target.value === "inherit" })}
             >
-              <option value="inherit">inherit（親チケットの編集可能範囲を引き継ぐ）</option>
-              <option value="globs">上限を指定する（glob のリスト）</option>
+              <option value="inherit">inherit（親チケットの編集可能な範囲を引き継ぐ）</option>
+              <option value="globs">上限を指定する（globのリスト）</option>
             </select>
             {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*。ワークツリーのルートからの相対で、子チケットの編集可能な範囲はこの中に収めます。区切りは半角 ,")}
           </div>
         </Captioned>
         <Captioned name="必須成果物" yamlKey="deliverables" tour={mark("phase-deliverables")}>
-          {list("deliverables", "f-deliverables", "wip/design/*.md。閉じる前に存在し、git に追跡されている必要があります。区切りは半角 ,")}
+          {list("deliverables", "f-deliverables", "wip/design/*.md。閉じる前に存在し、gitに追跡されている必要があります。区切りは半角 ,")}
         </Captioned>
         <details
           className="more"
@@ -185,7 +185,7 @@ export function Phase(props: PhaseProps): JSX.Element {
               {text("agent", "f-agent narrow", "サブエージェント名（案内に出すだけで、割り当てはしません）")}
             </Captioned>
             <Captioned name="最初に呼ぶ工程スキル" yamlKey="skill">
-              {text("skill", "f-skill narrow", "工程スキル名（例 process-research。案内に出すだけで、呼ぶかは子が決めます）")}
+              {text("skill", "f-skill narrow", "工程スキル名（例process-research。案内に出すだけで、呼ぶかは子が決めます）")}
             </Captioned>
             <Captioned name="使う場面" yamlKey="when" tour={mark("phase-when")}>
               {text("when", "f-when", "この定義を計画に入れる場面（エージェントへの案内にだけ使います）")}
@@ -209,13 +209,13 @@ export function Phase(props: PhaseProps): JSX.Element {
 }
 
 /**
- * リストの欄。1 つの欄に `,` 区切りで出し、打つたびにリストへ戻す。
+ * リストの欄。1つの欄に`,`区切りで出し、打つたびにリストへ戻す。
  *
- * 打っている途中の文字は欄が持つ。 リストに直したものをそのまま欄へ戻すと、`a, ` と打った
- * ところで `a` に縮む（区切りの直後が打てない）。
+ * 打っている途中の文字は欄が持つ。 リストに直したものをそのまま欄へ戻すと、`a, `と打った
+ * ところで`a`に縮む（区切りの直後が打てない）。
  *
- * 外から中身が入れ替わったとき（再読み込み・保存）は、行のキーが配り直されてこの部品ごと作り直されるので、
- * 欄は新しい値で始まる。下の `useEffect` はその経路を通らない保険で、キーを保つ書き方に変えたときに
+ * 外から中身が入れ替わったとき（更新・保存）は、行のキーが配り直されてこの部品ごと作り直されるので、
+ * 欄は新しい値で始まる。下の`useEffect`はその経路を通らない保険で、キーを保つ書き方に変えたときに
  * 欄が古いまま残らないように置いてある。
  */
 function ListInput({
@@ -263,11 +263,11 @@ function ListInput({
   );
 }
 
-/** 欄名を左に置く。YAML のキー名は欄名のツールチップに載せる */
+/** 欄名を左に置く。YAMLのキー名は欄名のツールチップに載せる */
 export function Captioned({ name, yamlKey, tour, children }: { readonly name: string; readonly yamlKey?: string; readonly tour?: string; readonly children: ReactNode }): JSX.Element {
   return (
     <div className="field" data-tour={tour}>
-      <span className="cap" title={yamlKey === undefined ? undefined : `YAML のキー: ${yamlKey}`}>
+      <span className="cap" title={yamlKey === undefined ? undefined : `YAMLのキー: ${yamlKey}`}>
         {name}
       </span>
       {children}

@@ -1,18 +1,18 @@
 /**
- * 画面の HTML を happy-dom に読み込み、埋め込んだスクリプトを実際に動かすための土台。
+ * 画面のHTMLをhappy-domに読み込み、埋め込んだスクリプトを実際に動かすための土台。
  *
- * 画面のスクリプトは文字列で HTML に埋めてあり、型検査の対象にならない。イベントの付け忘れや
- * 無い id への参照は、DOM で動かして初めて分かる。ここでは VS Code の Webview が渡す
- * `acquireVsCodeApi` を差し替え、postMessage と state を記録して、テストから読めるようにする。
+ * 画面のスクリプトは文字列でHTMLに埋めてあり、型検査の対象にならない。イベントの付け忘れや
+ * 無いidへの参照は、DOMで動かして初めて分かる。ここではVS CodeのWebviewが渡す
+ * `acquireVsCodeApi`を差し替え、postMessageとstateを記録して、テストから読めるようにする。
  *
- * happy-dom は innerHTML で入れた script を実行しないので、CSP の meta を外したうえで
- * 本文を入れ、JSON でない script だけを順に window.eval で走らせる。
- * happy-dom で動かないものだけ jsdom に回す方針（`test/helpers/jsdom.ts`）。
+ * happy-domはinnerHTMLで入れたscriptを実行しないので、CSPのmetaを外したうえで
+ * 本文を入れ、JSONでないscriptだけを順にwindow.evalで走らせる。
+ * happy-domで動かないものだけjsdomに回す方針（`test/helpers/jsdom.ts`）。
  * いま回しているのは、図の点のドラッグだけ。
  */
 import type { Document, Element, HTMLElement, Window } from "happy-dom" with { "resolution-mode": "import" };
 
-// happy-dom は ESM だけなので、CommonJS のテストからは動的 import で読む。
+// happy-domはESMだけなので、CommonJSのテストからは動的importで読む。
 const happyDom = import("happy-dom");
 
 export interface Posted {
@@ -23,21 +23,21 @@ export interface Posted {
 export interface DomPage {
   readonly window: Window;
   readonly document: Document;
-  /** 画面が vscode.postMessage で送ったもの（古い順） */
+  /** 画面がvscode.postMessageで送ったもの（古い順） */
   readonly posted: Posted[];
-  /** 画面が vscode.setState で最後に書いたもの */
+  /** 画面がvscode.setStateで最後に書いたもの */
   state(): unknown;
   /** 拡張側からのメッセージを画面に届け、処理が終わるまで待つ */
   send(message: unknown): Promise<void>;
-  /** 欄に文字を入れて input イベントを流す（打っている途中。change は流さない） */
+  /** 欄に文字を入れてinputイベントを流す（打っている途中。changeは流さない） */
   type(element: Element, value: string): void;
-  /** 欄の値を確定する（change イベント）。select を選ぶときもこれ */
+  /** 欄の値を確定する（changeイベント）。selectを選ぶときもこれ */
   change(element: Element, value?: string): void;
-  /** 要素を押す（click イベント） */
+  /** 要素を押す（clickイベント） */
   click(element: Element): void;
-  /** キーを押す（keydown を流す）。要素を渡さなければ document に流す（画面ぜんたいで受けるもの）。Ctrl などは `modifiers` */
+  /** キーを押す（keydownを流す）。要素を渡さなければdocumentに流す（画面ぜんたいで受けるもの）。Ctrlなどは`modifiers` */
   key(name: string, element?: Element, modifiers?: { readonly ctrlKey?: boolean; readonly shiftKey?: boolean; readonly metaKey?: boolean }): void;
-  /** セレクタで 1 つ取る。無ければ失敗させる */
+  /** セレクタで1つ取る。無ければ失敗させる */
   one<T extends Element = HTMLElement>(selector: string): T;
   /** セレクタで全部取る */
   all<T extends Element = HTMLElement>(selector: string): T[];
@@ -55,15 +55,15 @@ export interface LoadOptions {
   /**
    * 要素の大きさを測れるようにする（`measure: true`）。図の画面だけが要る。
    *
-   * happy-dom は `ResizeObserver` を形だけ持つが `observe()` が何もせず、`offsetWidth` は 0 を返す。
-   * React Flow は点の大きさを `ResizeObserver` の報せで知り、測れていない点を `visibility: hidden` の
-   * まま置き、線を 1 本も描かない。失敗しないので、細工をしないとテストは「空の絵」を見て通る。
+   * happy-domは`ResizeObserver`を形だけ持つが`observe()`が何もせず、`offsetWidth`は0を返す。
+   * React Flowは点の大きさを`ResizeObserver`の報せで知り、測れていない点を`visibility: hidden`の
+   * まま置き、線を1本も描かない。失敗しないので、細工をしないとテストは「空の絵」を見て通る。
    *
    * ここで偽るのは大きさだけで、置き場所は偽らない（線の経路の正しさはここでは見られない。
-   * 見るのは「点と線がその本数あるか」「押すと何が起きるか」まで）。数字は下の `SIZES`。
+   * 見るのは「点と線がその本数あるか」「押すと何が起きるか」まで）。数字は下の`SIZES`。
    */
   readonly measure?: boolean;
-  /** 画面のスクリプトを流す前に window へ細工する（マウントの最中の動きを見たいとき） */
+  /** 画面のスクリプトを流す前にwindowへ細工する（マウントの最中の動きを見たいとき） */
   readonly prepare?: (window: { readonly HTMLElement: { readonly prototype: object } }) => void;
 }
 
@@ -79,7 +79,7 @@ function sizeOf(element: { matches?: (selector: string) => boolean }): [number, 
     return undefined;
   }
   for (const [selector, width, height] of SIZES) {
-    // `.react-flow__node` は `.react-flow` の下にあるので、細かいほうから見る
+    // `.react-flow__node`は`.react-flow`の下にあるので、細かいほうから見る
     if (element.matches(`${selector}, ${selector} *`)) {
       return [width, height];
     }
@@ -88,8 +88,8 @@ function sizeOf(element: { matches?: (selector: string) => boolean }): [number, 
 }
 
 /**
- * 大きさを測れるようにする。画面のスクリプトを走らせる前に入れる（React Flow は
- * マウントの最中に `ResizeObserver` を張るので、あとから入れても間に合わない）。
+ * 大きさを測れるようにする。画面のスクリプトを走らせる前に入れる（React Flowは
+ * マウントの最中に`ResizeObserver`を張るので、あとから入れても間に合わない）。
  */
 function fakeMeasure(window: Window): void {
   const w = window as unknown as { Element: { prototype: object }; HTMLElement: { prototype: object }; ResizeObserver?: unknown };
@@ -107,7 +107,7 @@ function fakeMeasure(window: Window): void {
     const [width, height] = sizeOf(this) ?? [0, 0];
     return { x: 0, y: 0, top: 0, left: 0, right: width, bottom: height, width, height, toJSON: () => ({}) };
   };
-  // 観測を始めたら 1 度だけ報せる。実際のように大きさが変わることは無いので、繰り返さない
+  // 観測を始めたら1度だけ報せる。実際のように大きさが変わることは無いので、繰り返さない
   w.ResizeObserver = class {
     private readonly callback: (entries: { target: unknown; contentRect: unknown }[]) => void;
     constructor(callback: (entries: { target: unknown; contentRect: unknown }[]) => void) {
@@ -115,7 +115,7 @@ function fakeMeasure(window: Window): void {
     }
     observe(target: { matches?: (selector: string) => boolean }): void {
       const [width, height] = sizeOf(target) ?? [0, 0];
-      // 同期で呼ぶと React のマウントの最中に state を触ることになる。次の順番で呼ぶ
+      // 同期で呼ぶとReactのマウントの最中にstateを触ることになる。次の順番で呼ぶ
       setTimeout(() => this.callback([{ target, contentRect: { x: 0, y: 0, top: 0, left: 0, right: width, bottom: height, width, height } }]), 0);
     }
     unobserve(): void {}
@@ -127,8 +127,8 @@ export async function loadPage(html: string, initialState?: unknown, options: Lo
   const { Window } = await happyDom;
   const window = new Window({ url: "vscode-webview://ccnavi/" });
   const posted: Posted[] = [];
-  // イベントハンドラの中の例外は happy-dom が window の error に流す。気づかれないまま通さず、テストを失敗させる。
-  // 非同期のハンドラ（async や Promise）の例外は window の unhandledrejection に来る。
+  // イベントハンドラの中の例外はhappy-domがwindowのerrorに流す。気づかれないまま通さず、テストを失敗させる。
+  // 非同期のハンドラ（asyncやPromise）の例外はwindowのunhandledrejectionに来る。
   const errors: Error[] = [];
   const toError = (value: unknown, fallback: string): Error => (value instanceof Error ? value : new Error(String(value ?? fallback)));
   window.addEventListener("error", (event) => {
@@ -138,18 +138,18 @@ export async function loadPage(html: string, initialState?: unknown, options: Lo
   window.addEventListener("unhandledrejection", (event) => {
     errors.push(toError((event as unknown as { reason?: unknown }).reason, "unhandledrejection"));
   });
-  // 溜めた例外は 1 度投げたら消す。次の raise が同じ文面を繰り返さず、後片付けの close で
+  // 溜めた例外は1度投げたら消す。次のraiseが同じ文面を繰り返さず、後片付けのcloseで
   // 本来の失敗を上書きしない。
   const raise = (): void => {
     if (errors.length > 0) {
       const taken = errors.splice(0);
-      throw new Error(`画面のスクリプトが例外を投げた（${taken.length} 件）: ${taken[0].message}`, { cause: taken[0] });
+      throw new Error(`画面のスクリプトが例外を投げた（${taken.length}件）: ${taken[0].message}`, { cause: taken[0] });
     }
   };
   /**
-   * 欄に値を入れる。React は制御された欄の `value` を自分の追跡器で差し替えるので、
-   * そのまま代入すると「値は変わっていない」と見なされて onChange が呼ばれない。
-   * 追跡器は要素の側に載るので、大元（プロトタイプ）の setter を通して入れる。
+   * 欄に値を入れる。Reactは制御された欄の`value`を自分の追跡器で差し替えるので、
+   * そのまま代入すると「値は変わっていない」と見なされてonChangeが呼ばれない。
+   * 追跡器は要素の側に載るので、大元（プロトタイプ）のsetterを通して入れる。
    */
   const setValue = (element: Element, value: string): void => {
     const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element) as object, "value");
@@ -161,8 +161,8 @@ export async function loadPage(html: string, initialState?: unknown, options: Lo
   };
   let state: unknown = initialState;
   (window as unknown as { acquireVsCodeApi: () => unknown }).acquireVsCodeApi = () => ({
-    // 画面の中の配列やオブジェクトは happy-dom 側の realm のもので、strict な deepEqual が
-    // 「構造は同じだが参照が違う」と失敗させる。JSON で複製してこちらの realm に移す。
+    // 画面の中のリストやオブジェクトはhappy-dom側のrealmのもので、strictなdeepEqualが
+    // 「構造は同じだが参照が違う」と失敗させる。JSONで複製してこちらのrealmに移す。
     postMessage: (message: Posted) => {
       posted.push(JSON.parse(JSON.stringify(message)) as Posted);
     },
@@ -188,14 +188,14 @@ export async function loadPage(html: string, initialState?: unknown, options: Lo
     }
     (window as unknown as { eval: (code: string) => unknown }).eval(script.textContent ?? "");
   }
-  // 実際の Webview では script のあとに DOMContentLoaded と load が流れる。待って初期化する書き方にも備える
+  // 実際のWebviewではscriptのあとにDOMContentLoadedとloadが流れる。待って初期化する書き方にも備える
   document.dispatchEvent(new window.Event("DOMContentLoaded", { bubbles: true }));
   window.dispatchEvent(new window.Event("load"));
-  // 画面が React のとき、押した直後には描き直されない。React のスケジューラは happy-dom の
-  // VM に MessageChannel が無いと setImmediate / setTimeout を使い、どちらも
-  // `waitUntilComplete` は追わない（happy-dom が数えるのは自分が張ったタイマーと取得だけ）。
-  // 待ちを 1 回で切ると、機械が混んでいるときに「まだ描き直していない DOM」を見て失敗する。
-  // check 相（setImmediate）と timers 相（setTimeout）の両方を何度か空にしてから見る。
+  // 画面がReactのとき、押した直後には描き直されない。Reactのスケジューラはhappy-domの
+  // VMにMessageChannelが無いとsetImmediate / setTimeoutを使い、どちらも
+  // `waitUntilComplete`は追わない（happy-domが数えるのは自分が張ったタイマーと取得だけ）。
+  // 待ちを1回で切ると、機械が混んでいるときに「まだ描き直していないDOM」を見て失敗する。
+  // check相（setImmediate）とtimers相（setTimeout）の両方を何度か空にしてから見る。
   const settle = async (): Promise<void> => {
     for (let round = 0; round < 4; round += 1) {
       await window.happyDOM.waitUntilComplete();

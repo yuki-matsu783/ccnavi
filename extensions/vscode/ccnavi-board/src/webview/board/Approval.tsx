@@ -1,9 +1,9 @@
 /**
  * 承認のオーバーレイ。一覧の識別子の表、承認画面の本文（`<pre>`）、対象外の提案と読めない提案、
- * 「この N 件を承認する」「やめる」。本文は実行ファイルが組んだものをそのまま出し、項目には分けない。
+ * 「このN件を承認する」「やめる」。本文は実行ファイルが組んだものをそのまま出し、項目には分けない。
  *
- * 計画を持つ親が一覧にあれば、本文の上にその計画の図を読むだけで出す（`PlanGraph`。中身は preview の
- * `plans` で、承認する提案そのものの順序）。図は実行ファイルの答えを描くだけ。図は親ごとにまとめ、
+ * 計画を持つ親が一覧にあれば、本文の上にその計画の図を読むだけで出す（`PlanGraph`。中身はpreviewの
+ * `plans`で、承認する提案そのものの順序）。図は実行ファイルの答えを描くだけ。図は親ごとにまとめ、
  * その前に順序を直す計画編集タブへの入口（「計画を編集」）を置く。押すと拡張ホストがオーバーレイを
  * 閉じてからタブを開く（タブで保存すると、この一覧はもう承認できないため）。
  *
@@ -33,7 +33,7 @@ export function Approval({ overlay, unsaved = [] }: { readonly overlay: Approval
       first.focus();
     }
   }, [overlay.kind]);
-  // Esc でやめる。承認している最中と、行き先を置いている最中は閉じない
+  // Escでやめる。承認している最中と、行き先を置いている最中は閉じない
   useEscape(overlay.kind !== "approving" && overlay.kind !== "deciding", ESCAPE_LAYER.overlay, () => post({ type: "approveCancel" }));
 
   return (
@@ -70,8 +70,8 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
     case "done":
       return (
         <>
-          <h2 id="approval-title">{overlay.count} 件を承認しました</h2>
-          {overlay.carried === true ? <p className="approval-note">承認済みチケットをコミット・push するコマンドをターミナルに送信しました。</p> : null}
+          <h2 id="approval-title">{overlay.count}件を承認しました</h2>
+          {overlay.carried === true ? <p className="approval-note">承認済みチケットをコミット・pushするコマンドをターミナルに送信しました。</p> : null}
           <p className="approval-note">{HANDOVER_NOTE}</p>
           <HandOver />
           <details className="approval-more" data-tour="approval-prompt">
@@ -95,7 +95,7 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
     case "decideLoading":
       return (
         <>
-          <p className="approval-note">フェーズ {overlay.phase} のレビューの指摘を読み込み中…</p>
+          <p className="approval-note">フェーズ{overlay.phase}のレビューの指摘を読み込み中…</p>
           <DialogActions className="approval-actions">
             <Cancel label="キャンセル" />
           </DialogActions>
@@ -128,7 +128,7 @@ function Body({
   const blockedText = blocked.length === 0 ? "" : unsavedText(blocked);
   return (
     <>
-      <h2 id="approval-title">{count === 0 ? "承認待ちのチケットなし" : `承認待ちのチケット ${count} 件`}</h2>
+      <h2 id="approval-title">{count === 0 ? "承認待ちのチケットなし" : `承認待ちのチケット${count}件`}</h2>
       {notice ? <p className="approval-note warn">{notice}</p> : null}
       {summary.tickets === "" ? null : (
         <div className="approval-summary" data-approval-summary>
@@ -154,7 +154,7 @@ function Body({
               <tr key={b.ticket}>
                 <td className="approval-id">{b.ticket}</td>
                 <td>{b.title}</td>
-                <td>{b.revision ? "親（改版）" : b.parent === null ? "親" : `親 ${b.parent} / フェーズ ${b.phase ?? "?"}`}</td>
+                <td>{b.revision ? "親（改版）" : b.parent === null ? "親" : `親${b.parent} / フェーズ${b.phase ?? "?"}`}</td>
               </tr>
             ))}
           </tbody>
@@ -180,7 +180,7 @@ function Body({
                     data-action="edit-workflow"
                     data-tour="edit-workflow"
                     data-ticket={ticket}
-                    title={`このオーバーレイを閉じて、${ticket} の計画の順序を直す計画編集タブを開きます。保存すると提案内容が変更されるため、承認画面を開き直してください。`}
+                    title={`このオーバーレイを閉じて、${ticket}の計画の順序を直す計画編集タブを開きます。保存すると提案内容が変更されるため、承認画面を開き直してください。`}
                     onClick={() => post({ type: "editWorkflow", ticket })}
                   >
                     計画を編集
@@ -238,7 +238,7 @@ function Body({
             title={blockedText === "" ? undefined : blockedText}
             onClick={() => post({ type: "approveConfirm", tickets, digest: preview.digest })}
           >
-            {approving ? "承認中…" : `この ${count} 件を承認する`}
+            {approving ? "承認中…" : `この${count}件を承認する`}
           </button>
         )}
         <Cancel label="キャンセル" disabled={approving} />
@@ -256,8 +256,8 @@ const LEGEND: readonly (readonly [string, string])[] = [
   ["ask", "実行時に確認が必要な場所"],
   ["deny", "このチケットでも編集できない場所"],
   ["after", "先に閉じてレビューが済んでいるべきステップ（先行。自分より小さい番号だけ）"],
-  ["scope", "そのフェーズで編集できる範囲（inherit は親の範囲を引き継ぐ）"],
-  ["review", "フェーズが終わったあとの人間のレビュー（false は不要、true はマージリクエストで見る）"],
+  ["scope", "そのフェーズで編集できる範囲（inheritは親の範囲を引き継ぐ）"],
+  ["review", "フェーズが終わったあとの人間のレビュー（falseは不要、trueはMRで見る）"],
 ];
 
 function Legend(): JSX.Element {
@@ -273,7 +273,7 @@ function Legend(): JSX.Element {
   );
 }
 
-/** 計画の図を親ごとにまとめる（全体計画とフィードバック計画は同じ親の 2 つの図）。並びは届いた順 */
+/** 計画の図を親ごとにまとめる（全体計画とフィードバック計画は同じ親の2つの図）。並びは届いた順 */
 function families(plans: readonly ApprovePlan[]): [string, ApprovePlan[]][] {
   const out = new Map<string, ApprovePlan[]>();
   for (const plan of plans) {
@@ -311,8 +311,8 @@ function BodyText({ text }: { readonly text: string }): JSX.Element {
 }
 
 /**
- * 承認のプロンプトと決めた結果のプロンプトは、同じ 2 ボタンで渡す。プロンプトは拡張ホストが持っている分を使う。
- * `retry` があるときは、指摘を読み直して決め直すボタンも出す（表示した後に指摘が追加されたとき）
+ * 承認のプロンプトと決めた結果のプロンプトは、同じ2ボタンで渡す。プロンプトは拡張ホストが持っている分を使う。
+ * `retry`があるときは、指摘を読み直して決め直すボタンも出す（表示した後に指摘が追加されたとき）
  */
 function HandOver({ retry }: { readonly retry?: { readonly parent: string; readonly phase: number } }): JSX.Element {
   return (
@@ -327,7 +327,7 @@ function HandOver({ retry }: { readonly retry?: { readonly parent: string; reado
         type="button"
         className="action"
         data-action="prompt-run"
-        title="ボードのターミナルで claude -p を実行します（auto モード）。押すと確認なしですぐ実行されます。止めるときはターミナルで Ctrl+C"
+        title="ボードのターミナルでclaude -pを実行します（autoモード）。押すと確認なしですぐ実行されます。止めるときはターミナルでCtrl+C"
         onClick={() => post({ type: "promptRun" })}
       >
         ターミナルで実行

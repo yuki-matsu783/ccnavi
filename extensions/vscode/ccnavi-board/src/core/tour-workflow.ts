@@ -1,20 +1,20 @@
 /**
- * 計画編集画面の案内の見本（`webview/tours/workflow.yml` の `sample:`）を、画面が描く形にする。
+ * 計画編集画面の案内の見本（`webview/tours/workflow.yml`の`sample:`）を、画面が描く形にする。
  *
- * 見本は「実行ファイルの答え」（`--plan-order <親> --json` の答え。`planordermodel.ts` の `PlanOrderAnswer`）を、名前を付けて
- * 何本か持つ。手順の `scene.answer` が、その手順で画面が描く答えを名前で選ぶ。画面は答えをそのまま描くので、
+ * 見本は「実行ファイルの答え」（`--plan-order <親> --json`の答え。`planordermodel.ts`の`PlanOrderAnswer`）を、名前を付けて
+ * 何本か持つ。手順の`scene.answer`が、その手順で画面が描く答えを名前で選ぶ。画面は答えをそのまま描くので、
  * 未保存・番号の変わるステップ・保存できない理由・番号の振り直しの確かめは、実際と同じ読み取り（`workflow-view.ts`）から出る。
  *
- * 答えは実行ファイルの JSON と同じ形で書き、欠けた欄は次の決まりで埋めてから `parsePlanOrder` に通す（形がずれれば落ちる）。
+ * 答えは実行ファイルのJSONと同じ形で書き、欠けた欄は次の決まりで埋めてから`parsePlanOrder`に通す（形がずれれば落ちる）。
  *
- *   計画ごと   `ticket`・`part`・`source_sha`・ステップの `from`（番号）・`deferred`・`review_at`・`locked` は省ける。
- *              `proposed`（提案に書いてある先行）は、`base` があればその答えの同じ計画の値、無ければ `after`
- *   base       その答えを引く前の答え（先に定義した答えの名前）。書かなかった計画（plan / feedback）は `base` の計画をそのまま使う。
- *              「案に戻す」・外で変わった差分・点の置き場所の元になる。`base` を書かない答えは、開いたときの答え
- *   答え全体   `problems`・`loose` は計画の値を寄せ集め、`writable` は「断った線・検査の error・子の付け替えの問題・改版の錠が
- *              どれも無い」から決める（実行ファイルの答えと同じ関係。`test/fixtures/plan-order.json` の実例で確かめる）
+ *   計画ごと`ticket`・`part`・`source_sha`・ステップの`from`（番号）・`deferred`・`review_at`・`locked`は省ける。
+ *              `proposed`（提案に書いてある先行）は、`base`があればその答えの同じ計画の値、無ければ`after`
+ *   baseその答えを引く前の答え（先に定義した答えの名前）。書かなかった計画（plan / feedback）は`base`の計画をそのまま使う。
+ *              「案に戻す」・外で変わった差分・点の置き場所の元になる。`base`を書かない答えは、開いたときの答え
+ *   答え全体`problems`・`loose`は計画の値を寄せ集め、`writable`は「断った線・検査のerror・子の付け替えの問題・改版の錠が
+ *              どれも無い」から決める（実行ファイルの答えと同じ関係。`test/fixtures/plan-order.json`の実例で確かめる）
  *
- * DOM にも VS Code の API にも触れない。
+ * DOMにもVS CodeのAPIにも触れない。
  */
 import { parsePlanOrder, type PlanOrderAnswer } from "./planordermodel.js";
 
@@ -30,7 +30,7 @@ export interface WorkflowSample {
   readonly answers: Readonly<Record<string, WorkflowSampleAnswer>>;
 }
 
-/** 見本の計画の欄の名前。実行ファイルの `--order` が受ける 2 つ */
+/** 見本の計画の欄の名前。実行ファイルの`--order`が受ける2つ */
 const PARTS = ["plan", "feedback"] as const;
 
 const ROOT_KEYS = ["ticket", "answers"];
@@ -38,14 +38,14 @@ const ANSWER_KEYS = ["base", "plan", "feedback", "problems", "loose", "refused",
 const PART_KEYS = ["items", "after", "proposed", "current", "loose", "ready", "problems"];
 const ITEM_KEYS = ["number", "from", "type", "title", "review", "deferred", "review_at", "locked"];
 
-/** 見本の `source_sha`。実行ファイルのハッシュではなく、見本だと分かる印 */
+/** 見本の`source_sha`。実行ファイルのハッシュではなく、見本だと分かる印 */
 export const SAMPLE_SHA = "sample";
 
 type Json = Record<string, unknown>;
 
 function object(value: unknown, at: string): Json {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error(`${at} がオブジェクトではない`);
+    throw new Error(`${at}がオブジェクトではない`);
   }
   return value as Json;
 }
@@ -55,7 +55,7 @@ function array(value: unknown, at: string): unknown[] {
     return [];
   }
   if (!Array.isArray(value)) {
-    throw new Error(`${at} がリストではない`);
+    throw new Error(`${at}がリストではない`);
   }
   return value;
 }
@@ -64,7 +64,7 @@ function array(value: unknown, at: string): unknown[] {
 function onlyKeys(map: Json, known: readonly string[], at: string): void {
   const unknown = Object.keys(map).find((key) => !known.includes(key));
   if (unknown !== undefined) {
-    throw new Error(`${at} に未知のキー ${unknown}`);
+    throw new Error(`${at}に未知のキー${unknown}`);
   }
 }
 
@@ -73,10 +73,10 @@ function itemOf(raw: unknown, at: string): Json {
   onlyKeys(item, ITEM_KEYS, at);
   // 実行ファイルの答えの読み取りは、番号の無いステップを黙って落とす。見本では落とさず、書き間違いとして止める
   if (typeof item.number !== "number" || !Number.isInteger(item.number) || item.number < 1) {
-    throw new Error(`${at}.number は 1 以上の整数にする`);
+    throw new Error(`${at}.numberは1以上の整数にする`);
   }
   if (typeof item.type !== "string" || item.type === "") {
-    throw new Error(`${at}.type がありません`);
+    throw new Error(`${at}.typeがありません`);
   }
   return {
     number: item.number,
@@ -110,8 +110,8 @@ function planOf(name: string, part: string, raw: unknown, ticket: string, base: 
 }
 
 /**
- * 見本の答え 1 本を、実行ファイルの JSON と同じ形にする（`parsePlanOrder` に渡す手前）。
- * `known` は先に書いた答え（`base` を引く）。テストが実例の JSON とキーを見比べるために出している
+ * 見本の答え1本を、実行ファイルのJSONと同じ形にする（`parsePlanOrder`に渡す手前）。
+ * `known`は先に書いた答え（`base`を引く）。テストが実例のJSONとキーを見比べるために出している
  */
 export function completeAnswer(name: string, raw: unknown, ticket: string, known: Readonly<Record<string, Json>>): { readonly json: Json; readonly base: string } {
   const at = `sample.answers.${name}`;
@@ -133,7 +133,7 @@ export function completeAnswer(name: string, raw: unknown, ticket: string, known
     }
   }
   if (plans.length === 0) {
-    throw new Error(`${at} に計画（plan / feedback）がありません`);
+    throw new Error(`${at}に計画（plan / feedback）がありません`);
   }
   const problems = given.problems ?? plans.flatMap((plan) => plan.problems as unknown[]);
   const revision = array(given.revision_problems, `${at}.revision_problems`);
@@ -161,7 +161,7 @@ export function parseWorkflowSample(raw: unknown): WorkflowSample {
   onlyKeys(root, ROOT_KEYS, "sample");
   const ticket = typeof root.ticket === "string" && root.ticket !== "" ? root.ticket : "";
   if (ticket === "") {
-    throw new Error("sample.ticket がありません");
+    throw new Error("sample.ticketがありません");
   }
   const given = object(root.answers, "sample.answers");
   const known: Record<string, Json> = {};

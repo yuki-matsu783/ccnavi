@@ -12,7 +12,7 @@ import { openFlow, savedDoc, bareFlow } from "../helpers/flow.js";
 const HASH = "0123456789abcdef".repeat(4);
 const OFFER = { draftPath: ".claude/worktrees/i0001/wip/proposals/flows/i0001-01-01.yml" };
 
-/** 雛形にプロンプトを 1 つ足した下書き */
+/** 雛形にプロンプトを1つ足した下書き */
 function drafted(): FlowDoc {
   const added = addNode(bareFlow("i0001-01-01", "調査"), "prompt", { x: 200, y: 300 });
   return patchData(added.doc, added.id, { prompt: "既存の振る舞いを読む\nそのあと要点をまとめる" });
@@ -82,12 +82,12 @@ test("CB-D140 未保存の変更があれば破棄することを言ってから
     dom.key("Escape");
     await dom.settle();
     assert.equal(dom.all("#proposal-review").length, 0);
-    // 実行ファイルが error を言った下書きは、理由だけで取り込むボタンを出さない
+    // 実行ファイルがerrorを言った下書きは、理由だけで取り込むボタンを出さない
     await dom.send({ type: "lock", lock: { locked: false, reason: "" } });
     dom.click(dom.one('[data-action="open-proposal"]'));
     await dom.settle();
-    await dom.send({ type: "proposal", error: "下書きを取り込めません（x.yml）: ノードの id が重なっている" });
-    assert.match(dom.one("#proposal-error").textContent ?? "", /id が重なっている/);
+    await dom.send({ type: "proposal", error: "下書きを取り込めません（x.yml）: ノードのidが重なっている" });
+    assert.match(dom.one("#proposal-error").textContent ?? "", /idが重なっている/);
     assert.equal(dom.all('[data-action="import-proposal"]').length, 0);
     // 下書きが動いた（消えた）と拡張ホストが知らせれば、帯が消える
     await dom.send({ type: "offer" });
@@ -111,7 +111,7 @@ test("CB-D141 依頼のボタンは言葉が届いたときだけ出し、錠が
     dom.click(button);
     await dom.settle();
     assert.equal(dom.posted.filter((m) => m.type === "request").length, 1);
-    await dom.send({ type: "requestText", prompt: "[ccnavi] ユーザが子チケット i0001-01-01 のフローの作成を頼んだ" });
+    await dom.send({ type: "requestText", prompt: "[ccnavi]ユーザが子チケットi0001-01-01のフローの作成を頼んだ" });
     assert.match(dom.one("#request-text pre").textContent ?? "", /フローの作成を頼んだ/);
     dom.click(dom.one('[data-action="request-copy"]'));
     dom.click(dom.one('[data-action="request-open"]'));
@@ -169,7 +169,7 @@ test("CB-D142 取り込んだあとに元に戻して別の編集をした・取
   }
 });
 
-test("CB-D143 並び順だけ違う下書きはそう言って取り込め、値の種類の違い（\"1.0.0\" と 1）は種類の表示で見える", async () => {
+test("CB-D143 並び順だけ違う下書きはそう言って取り込め、値の種類の違い（\"1.0.0\" と1）は種類の表示で見える", async () => {
   const dom = await openFlow({ offer: OFFER });
   try {
     dom.click(dom.one('[data-action="open-proposal"]'));

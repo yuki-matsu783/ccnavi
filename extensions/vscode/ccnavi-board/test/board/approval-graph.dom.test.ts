@@ -1,9 +1,9 @@
 /**
- * 承認のオーバーレイの計画の図。`--agree --preview --json` の `plans`（承認する提案そのものの順序）を、
+ * 承認のオーバーレイの計画の図。`--agree --preview --json`の`plans`（承認する提案そのものの順序）を、
  * 共有の図の部品（`webview/shared/PlanGraph.tsx`）で読むだけで描く。
  *
- * **大きさの偽物が要る**（`openBoard` の `measure`）。React Flow は点の大きさを測れないと線を 1 本も描かず、
- * テストは空の絵を見て通ってしまう（`test/helpers/dom.ts` の `LoadOptions`）。
+ * **大きさの偽物が要る**（`openBoard`の`measure`）。React Flowは点の大きさを測れないと線を1本も描かず、
+ * テストは空の絵を見て通ってしまう（`test/helpers/dom.ts`の`LoadOptions`）。
  *
  * 図は判定をしない。終端に届かないステップ（`loose`）・すぐ始まるステップ（`ready`）・延期の引き受け手（`review_at`）・
  * 順序の検査の理由（`problems`）は実行ファイルの答えをそのまま出す。
@@ -23,7 +23,7 @@ import { buildBoard } from "../../src/core/board.js";
 const DIAMOND: readonly RawItem[] = ["research", { type: "design", after: [1] }, { type: "acceptance", after: [1] }, { type: "implement", after: [2, 3] }];
 const FEEDBACK: readonly RawItem[] = ["design-feedback", "skill-improve", { type: "implement-feedback", after: [5] }];
 
-/** 全体計画（1〜4。1 は子が承認済み、2 は延期で 4 が引き受ける）と、終端に届かないステップのあるフィードバック計画（5〜7） */
+/** 全体計画（1〜4。1は子が承認済み、2は延期で4が引き受ける）と、終端に届かないステップのあるフィードバック計画（5〜7） */
 function samplePlans(): ApprovePlan[] {
   const [main, feedback] = plansOf(DIAMOND, FEEDBACK, [1]);
   return [
@@ -38,7 +38,7 @@ function samplePlans(): ApprovePlan[] {
       ...feedback,
       loose: [6],
       ready: [5, 6],
-      problems: ["フィードバック計画の最後のステップ（7）に 6 が先行していない。最後のステップへ線を引くか、合流のステップを置く"],
+      problems: ["フィードバック計画の最後のステップ（7）に6が先行していない。最後のステップへ線を引くか、合流のステップを置く"],
     },
   ];
 }
@@ -53,7 +53,7 @@ async function openOverlay(plans: readonly ApprovePlan[]): Promise<DomPage> {
   return dom;
 }
 
-/** その計画の図の中の、線の id（React Flow の `data-id`） */
+/** その計画の図の中の、線のid（React Flowの`data-id`） */
 function edgeIds(dom: DomPage, part: string): string[] {
   return dom
     .all(`.plan-graph[data-part="${part}"] .react-flow__edge`)
@@ -61,7 +61,7 @@ function edgeIds(dom: DomPage, part: string): string[] {
     .sort();
 }
 
-test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図を読むだけで出す。start・end の仮の点、延期の引き受け手、固定した番号、終端に届かないステップ、すぐ始まるステップ、順序の検査の理由は実行ファイルの答えのまま", async () => {
+test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図を読むだけで出す。start・endの仮の点、延期の引き受け手、固定した番号、終端に届かないステップ、すぐ始まるステップ、順序の検査の理由は実行ファイルの答えのまま", async () => {
   const dom = await openOverlay(samplePlans());
   try {
     const graphs = dom.all(".approval .plan-graph");
@@ -71,14 +71,14 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     );
     assert.deepEqual(
       dom.all(".approval .plan-graph h3").map((h) => h.textContent),
-      ["i0001 の全体計画（plan:）", "i0001 のフィードバック計画（feedback:）"],
+      ["i0001の全体計画（plan:）", "i0001のフィードバック計画（feedback:）"],
     );
     // 図は本文（承認画面の文字）より前に出る
     const box = dom.one(".approval");
     const order = Array.from(box.querySelectorAll(".plan-graphs, pre.approval-text")).map((el) => el.className);
     assert.deepEqual(order, ["plan-graphs", "approval-text"]);
 
-    // 点はステップと start・end。線は after と、start・end への仮の線
+    // 点はステップとstart・end。線はafterと、start・endへの仮の線
     assert.equal(dom.all('.plan-graph[data-part="plan"] .react-flow__node').length, 6);
     assert.deepEqual(edgeIds(dom, "plan"), ["after-1-2", "after-1-3", "after-2-4", "after-3-4", "end-4", "start-1"]);
     assert.equal(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="start"]').textContent, "開始");
@@ -95,12 +95,12 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     assert.match(n1.textContent ?? "", /子が承認済み/);
     const n2 = dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n2"] .plan-node');
     // 延期したステップは、本文の先行の一覧と同じ言い方で引き受け手を言い、レビューの要否は出さない（本文も出さない）
-    assert.match(n2.textContent ?? "", /レビューは 4 と一緒に/);
+    assert.match(n2.textContent ?? "", /レビューは4と一緒に/);
     assert.doesNotMatch(n2.textContent ?? "", /レビュー必須/);
     assert.match(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n3"] .plan-node').textContent ?? "", /レビュー必須（MR）/);
     assert.equal(n2.getAttribute("data-locked"), "0");
 
-    // 終端に届かないステップは、実行ファイルが言ったものだけに印。そのステップから end への線も
+    // 終端に届かないステップは、実行ファイルが言ったものだけに印。そのステップからendへの線も
     assert.deepEqual(
       dom.all('.plan-graph[data-part="feedback"] .plan-node[data-loose="1"]').map((node) => node.getAttribute("data-number")),
       ["6"],
@@ -112,12 +112,12 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     // 図の下。すぐ始まるステップ・終端に届かないステップ・順序の検査の理由
     const plain = dom.one('.plan-graph[data-part="plan"] .plan-graph-notes').textContent ?? "";
     assert.match(plain, /すぐ始まる: 1/);
-    assert.match(plain, /延期したレビュー: 2 は 4 と一緒に/);
+    assert.match(plain, /延期したレビュー: 2は4と一緒に/);
     assert.doesNotMatch(plain, /最後のステップの先行になっていない/);
     const notes = dom.one('.plan-graph[data-part="feedback"] .plan-graph-notes').textContent ?? "";
     assert.match(notes, /すぐ始まる: 5, 6/);
     assert.match(notes, /最後のステップの先行になっていない: 6。最後のステップへ線を引くか、合流のステップを置いてください/);
-    assert.match(notes, /フィードバック計画の最後のステップ（7）に 6 が先行していない/);
+    assert.match(notes, /フィードバック計画の最後のステップ（7）に6が先行していない/);
   } finally {
     await dom.close();
   }
@@ -143,7 +143,7 @@ test("CB-D161 図は読むだけ。線を引く取っ手も、点のドラッグ
   }
 });
 
-test("CB-D162 plans がない・空なら図を出さない。見本の preview（実行ファイルの出力）の plans は、そのステップと線のまま描く", async () => {
+test("CB-D162 plansがない・空なら図を出さない。見本のpreview（実行ファイルの出力）のplansは、そのステップと線のまま描く", async () => {
   const none = await openOverlay([]);
   try {
     assert.equal(none.all(".plan-graph, .plan-graphs").length, 0);
@@ -155,7 +155,7 @@ test("CB-D162 plans がない・空なら図を出さない。見本の preview�
   try {
     await dom.settle();
     assert.equal(dom.all(".plan-graph").length, 1);
-    assert.equal(dom.all(".react-flow__attribution").length, 0, "React Flow の帯は出さない");
+    assert.equal(dom.all(".react-flow__attribution").length, 0, "React Flowの帯は出さない");
     assert.deepEqual(
       dom.all('.plan-graph[data-part="plan"] .plan-node').map((node) => node.textContent?.replace(/レビュー.*$/, "")),
       ["1調査", "2設計"],
@@ -166,9 +166,9 @@ test("CB-D162 plans がない・空なら図を出さない。見本の preview�
   }
 });
 
-test("CB-D163 振り直しの見本の表の計画（振り直す前と後）を、plans どおりの線で描く", async () => {
+test("CB-D163 振り直しの見本の表の計画（振り直す前と後）を、plansどおりの線で描く", async () => {
   const cases = reorderCases().filter((c) => c.expect !== undefined && (c.name.includes("逆向き") || c.name.includes("フィードバック計画")));
-  assert.equal(cases.length, 2, "見本の表から使う 2 件が見つからない");
+  assert.equal(cases.length, 2, "見本の表から使う2件が見つからない");
   for (const c of cases) {
     for (const plans of [plansOf(c.plan, c.feedback), plansOf(c.expect?.plan ?? [], c.expect?.feedback)]) {
       const dom = await openOverlay(plans);
@@ -196,7 +196,7 @@ test("CB-D163 振り直しの見本の表の計画（振り直す前と後）を
 test("CB-D164 図のある親ごとに「計画を編集」を出す。押すと親の識別子を送る（閉じてタブを開くのは拡張ホスト）。承認中は出さない", async () => {
   const dom = await openOverlay(samplePlans());
   try {
-    // 親 1 つに全体計画とフィードバック計画の 2 つの図。入口は親ごとに 1 つ、その親の図の前
+    // 親1つに全体計画とフィードバック計画の2つの図。入口は親ごとに1つ、その親の図の前
     const buttons = dom.all('.approval [data-action="edit-workflow"]');
     assert.deepEqual(
       buttons.map((b) => [b.getAttribute("data-ticket"), b.textContent]),
@@ -231,7 +231,7 @@ test("CB-D180 計画編集タブに未保存の変更がある親を含む一覧
     assert.equal(note.textContent, "計画編集タブに保存していない変更があります。変更を保存または破棄するまで、表示中のチケットは承認できません。");
     const confirm = dom.one<HTMLButtonElement>('[data-action="approve-confirm"]');
     assert.equal(confirm.disabled, true);
-    assert.equal(dom.one("#approval-blocked").textContent, "親 i0001 の計画編集タブに未保存の変更があります。保存するか破棄してから承認してください");
+    assert.equal(dom.one("#approval-blocked").textContent, "親i0001の計画編集タブに未保存の変更があります。保存するか破棄してから承認してください");
     assert.equal(confirm.getAttribute("title"), dom.one("#approval-blocked").textContent);
     // 未保存のままでも、タブへの入口は押せる（保存しに行く）
     assert.equal(dom.one<HTMLButtonElement>('[data-action="edit-workflow"]').disabled, false);
@@ -275,11 +275,11 @@ test("CB-D181 タブで保存したあとに提案が変わった親（拡張ホ
   }
 });
 
-/** 見えている図の倍率と、左上の位置（React Flow の viewport の transform） */
+/** 見えている図の倍率と、左上の位置（React Flowのviewportのtransform） */
 function viewportOf(dom: DomPage, part: string): { x: number; y: number; zoom: number } {
   const style = dom.one(`.plan-graph[data-part="${part}"] .react-flow__viewport`).getAttribute("style") ?? "";
   const found = /translate\(\s*(-?[\d.]+)px,\s*(-?[\d.]+)px\)\s*scale\(\s*([\d.]+)\s*\)/.exec(style);
-  assert.ok(found !== null, `viewport の transform が読み込めない: ${style}`);
+  assert.ok(found !== null, `viewportのtransformが読み込めない: ${style}`);
   return { x: Number(found[1]), y: Number(found[2]), zoom: Number(found[3]) };
 }
 
@@ -306,9 +306,9 @@ test("CB-D165 大きな計画でも、開いた最初の図は縮めすぎない
   }
 });
 
-test("CB-T362 ボードの CSS は図の部品の CSS（React Flow と、その色を VS Code のテーマ変数に置き換える規則）を持つ", () => {
+test("CB-T362 ボードのCSSは図の部品のCSS（React Flowと、その色をVS Codeのテーマ変数に置き換える規則）を持つ", () => {
   const style = screenStyle("board");
-  assert.ok(style.includes(".react-flow"), "React Flow の CSS が入っていない");
+  assert.ok(style.includes(".react-flow"), "React FlowのCSSが入っていない");
   assert.match(style, /\.plan-graph \.react-flow \{[^}]*--xy-background-color-default: var\(--vscode-editor-background\)/);
   assert.match(style, /\.plan-node\[data-loose="1"\] \{[^}]*var\(--vscode-editorWarning-foreground\)/);
 });

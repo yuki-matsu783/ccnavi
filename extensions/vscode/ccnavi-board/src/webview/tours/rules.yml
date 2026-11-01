@@ -1,21 +1,21 @@
-# ルール管理画面の案内。`sample:` は案内の間だけ画面に出す見本（実際の設定ではない）。
-# ルールは rules.yml と同じ書き方。判定・期待する判定・候補は実行ファイルの JSON と同じ形（足りない項目は既定値で埋まる）。
-# `scene:` は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。
+# ルール管理画面の案内。`sample:`は案内の間だけ画面に出す見本（実際の設定ではない）。
+# ルールはrules.ymlと同じ書き方。判定・期待する判定・候補は実行ファイルのJSONと同じ形（足りない項目は既定値で埋まる）。
+# `scene:`は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。
 #   tab      rules / judge / hooks
-#   open     開く行の id（, で区切って複数）
-#   when     組み合わせ条件の図で選ぶ点（r は最上位、r.0 は 1 番目の子、r.0.1 はその中の 2 番目）
+#   open開く行のid（, で区切って複数）
+#   when組み合わせ条件の図で選ぶ点（rは最上位、r.0は1番目の子、r.0.1はその中の2番目）
 #   more     「コンテキストの追加」を開く
-#   find     絞り込みの欄に入れる文字
-#   tool / subject / judge   「判定を試す」の欄の値と、出す判定の結果（sample.judges の名前）
-#   checked / suggested      期待する判定の一括確認・記録からの候補の結果を出す
-#   fold     畳むタイプ（, で区切って複数。deny / ask / allow）。見出しを指す手順でだけ使う（畳んだ中は指せない）
-#   sum      「統合結果」の枠を開き、選ぶ統合結果の名前（sample.sums の name）
-#   error    保存前の検証エラーの見本（sample.save_error）を下の欄に出す
-# `target:` の印（画面の data-tour）:
+#   find絞り込みの欄に入れる文字
+#   tool / subject / judge   「判定を試す」の欄の値と、出す判定の結果（sample.judgesの名前）
+#   checked / suggested期待する判定の一括確認・記録からの候補の結果を出す
+#   fold畳むタイプ（, で区切って複数。deny / ask / allow）。見出しを指す手順でだけ使う（畳んだ中は指せない）
+#   sum      「統合結果」の枠を開き、選ぶ統合結果の名前（sample.sumsのname）
+#   error保存前の検証エラーの見本（sample.save_error）を下の欄に出す
+# `target:`の印（画面のdata-tour）:
 #   tabs / rules / find / order-hint / hooks / save / tour / target / status
-#   section-<タイプ> / fold-<タイプ> / count-<タイプ> / add-<タイプ>   タイプの塊 / ▾ / 件数 / 「＋ ルールを追加」（タイプは deny・ask・allow）
-#   rule-<id>   ルールの行。開いた行の中は rule-<id>-<欄>（match / type / pattern / except / message / context / every / text / once / file / once-file / to-when / buttons）
-#   when-graph / when-inspector   組み合わせ条件の図と操作の欄（開いた行）
+#   section-<タイプ> / fold-<タイプ> / count-<タイプ> / add-<タイプ>   タイプの塊 / ▾ / 件数 / 「＋ ルールを追加」（タイプはdeny・ask・allow）
+#   rule-<id>   ルールの行。開いた行の中はrule-<id>-<欄>（match / type / pattern / except / message / context / every / text / once / file / once-file / to-when / buttons）
+#   when-graph / when-inspector組み合わせ条件の図と操作の欄（開いた行）
 #   judge-form / judge-result / expectations / expectations-counts / expectations-result / expectation-ng / open-expectations / suggest / suggest-result / suggest-candidate   「判定を試す」タブ
 #   sum / sum-pick / sum-count / sum-<タイプ>   統合結果の枠 / 選ぶ欄 / 件数 / タイプごとの表
 screen: rules
@@ -26,7 +26,7 @@ sample:
       - id: git-push
         match: Bash
         glob: "*git push*"
-        message: push はユーザが行う。ccnavi-git.sh の入口を使う
+        message: pushはユーザが行う。ccnavi-git.shの入口を使う
       - id: no-rm-rf
         match: Bash
         regex: '\brm\s+-rf\b'
@@ -57,7 +57,7 @@ sample:
         match: Bash
         regex: '\bmigrate\b'
         every: 3
-        additionalContext: 本番に向けた migrate でないかを確認する
+        additionalContext: 本番に向けたmigrateでないかを確認する
     allow:
       - id: read-docs
         match: Read
@@ -88,7 +88,7 @@ sample:
       code: DENY_COMMAND_PATTERN
       rules:
         - { id: git-push, source: file, section: deny, kind: glob, written: "*git push*" }
-      response: "[ccnavi] DENY (rule: git-push)\npush はユーザが行う。ccnavi-git.sh の入口を使う"
+      response: "[ccnavi] DENY (rule: git-push)\npushはユーザが行う。ccnavi-git.shの入口を使う"
     rm-rf:
       tool: Bash
       subject: rm -rf build
@@ -104,7 +104,7 @@ sample:
       code: RULE_ASK
       rules:
         - { id: db-migrate, source: file, section: ask, kind: regex, written: '\bmigrate\b' }
-      response: "[ccnavi] RULE_ASK (rule: db-migrate)\n本番に向けた migrate でないかを確認する"
+      response: "[ccnavi] RULE_ASK (rule: db-migrate)\n本番に向けたmigrateでないかを確認する"
     secrets-key:
       tool: Read
       subject: /ws/secrets/key.pem
@@ -138,9 +138,9 @@ sample:
     mismatches: 1
     expectations:
       - { expected: deny, tool: Read, subject: /ws/.env, why: 環境変数は読ませない, verdict: deny, known: true, ok: true, rules: [{ id: protect-env, source: file, section: deny, kind: when, written: "all(regex …, not(any(2)))" }] }
-      - { expected: deny, tool: Bash, subject: git push origin main, why: push はユーザが行う, verdict: deny, known: true, ok: true, rules: [{ id: git-push, source: file, section: deny, kind: glob, written: "*git push*" }] }
-      - { expected: ask, tool: Bash, subject: python manage.py migrate, why: 本番に向けた migrate は確認する, verdict: ask, known: true, ok: true, rules: [{ id: db-migrate, source: file, section: ask, kind: regex, written: '\bmigrate\b' }] }
-      - { expected: allow, tool: Read, subject: /ws/docs/guide.md, why: docs は読んでよい, verdict: allow, known: true, ok: true, rules: [{ id: read-docs, source: file, section: allow, kind: glob, written: "**/docs/**" }] }
+      - { expected: deny, tool: Bash, subject: git push origin main, why: pushはユーザが行う, verdict: deny, known: true, ok: true, rules: [{ id: git-push, source: file, section: deny, kind: glob, written: "*git push*" }] }
+      - { expected: ask, tool: Bash, subject: python manage.py migrate, why: 本番に向けたmigrateは確認する, verdict: ask, known: true, ok: true, rules: [{ id: db-migrate, source: file, section: ask, kind: regex, written: '\bmigrate\b' }] }
+      - { expected: allow, tool: Read, subject: /ws/docs/guide.md, why: docsは読んでよい, verdict: allow, known: true, ok: true, rules: [{ id: read-docs, source: file, section: allow, kind: glob, written: "**/docs/**" }] }
       - { expected: allow, tool: Read, subject: /ws/.env.example, why: 見本は読んでよい, verdict: "", known: true, ok: false, rules: [] }
   suggested:
     root: /ws
@@ -152,7 +152,7 @@ sample:
         id: suggest-npm-install
         tool: Bash
         count: 6
-        summary: "ルールを追加する候補: Bash の npm install が 6 回、どのルールにもヒットせず権限モードへ渡った"
+        summary: "ルールを追加する候補: Bashのnpm installが6回、どのルールにもヒットせず権限モードへ渡った"
         layer: common
         rules_path: /ws/.ccnavi/config/common/rules.yml
         expectations:
@@ -163,20 +163,20 @@ sample:
         id: git-push
         tool: Bash
         count: 3
-        summary: "message を見直す候補: git-push が同じ呼び出しを繰り返し止めた（3 回）。文面から次の一手が読めていない疑い"
+        summary: "messageを見直す候補: git-pushが同じ呼び出しを繰り返し止めた（3回）。文面から次の一手が読めていない疑い"
         layer: common
         rules_path: /ws/.ccnavi/config/common/rules.yml
         expectations:
           - { tool: Bash, subject: git push origin main, why: 同じ呼び出しを繰り返し止めた形 }
-        yaml: "rules:\n  deny:\n    - id: git-push\n      match: Bash\n      glob: '*git push*'\n      message: push はユーザが行う。ccnavi-git.sh の入口を使う\nexpectations:\n  deny:\n    - tool: Bash\n      subject: git push origin main\n      why: 同じ呼び出しを繰り返し止めた形\n"
-  save_error: "設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください:\nerror: db-migrate: ask に message がある"
+        yaml: "rules:\n  deny:\n    - id: git-push\n      match: Bash\n      glob: '*git push*'\n      message: pushはユーザが行う。ccnavi-git.shの入口を使う\nexpectations:\n  deny:\n    - tool: Bash\n      subject: git push origin main\n      why: 同じ呼び出しを繰り返し止めた形\n"
+  save_error: "設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください:\nerror: db-migrate: askにmessageがある"
   sums:
     - name: self
       layers: [common, self]
       rules:
         path: .ccnavi/config/project/rules.yml
         deny:
-          - { id: git-push, section: deny, source: common, match: Bash, kind: glob, written: "*git push*", pattern: '(?s:(?>.*?git\ push).*)\Z', message: push はユーザが行う。ccnavi-git.sh の入口を使う }
+          - { id: git-push, section: deny, source: common, match: Bash, kind: glob, written: "*git push*", pattern: '(?s:(?>.*?git\ push).*)\Z', message: pushはユーザが行う。ccnavi-git.shの入口を使う }
           - { id: no-rm-rf, section: deny, source: common, match: Bash, kind: regex, written: '\brm\s+-rf\b', pattern: '\brm\s+-rf\b', message: 削除する前にユーザへ確認する }
           - { id: "self:protect-secrets", section: deny, source: self, match: Read|Edit|Write, kind: glob, written: "**/secrets/**", pattern: '(?s:(?>.*?[\\/]secrets[\\/]).*)\Z', message: 秘密の置き場は読まない・書かない。必要ならユーザに頼む }
         ask:
@@ -188,7 +188,7 @@ sample:
       rules:
         path: projects/web/.ccnavi/config/project/rules.yml
         deny:
-          - { id: git-push, section: deny, source: common, match: Bash, kind: glob, written: "*git push*", pattern: '(?s:(?>.*?git\ push).*)\Z', message: push はユーザが行う。ccnavi-git.sh の入口を使う }
+          - { id: git-push, section: deny, source: common, match: Bash, kind: glob, written: "*git push*", pattern: '(?s:(?>.*?git\ push).*)\Z', message: pushはユーザが行う。ccnavi-git.shの入口を使う }
           - { id: no-rm-rf, section: deny, source: common, match: Bash, kind: regex, written: '\brm\s+-rf\b', pattern: '\brm\s+-rf\b', message: 削除する前にユーザへ確認する }
           - { id: "web:no-prod-deploy", section: deny, source: web, match: Bash, kind: glob, written: "*deploy --prod*", pattern: '(?s:(?>.*?deploy\ --prod).*)\Z', message: 本番への配備はユーザが行う }
         ask:
@@ -196,8 +196,8 @@ sample:
         allow:
           - { id: read-docs, section: allow, source: common, match: Read, kind: glob, written: "**/docs/**", pattern: '(?s:(?>.*?[\\/]docs[\\/]).*)\Z', message: "" }
 
-# 案内の手順が引く時系列の図。登場者を左から並べ、矢印を上から下へ時間順に並べる。矢印の `value` は実際に入れる値や出る答えの例（等幅）。
-# 手順の `diagram:` で名前を指し、`focus:` で光らせる矢印（id を , で区切る）を決める。`to` を書かない矢印は、その登場者の中の動き。
+# 案内の手順が引く時系列の図。登場者を左から並べ、矢印を上から下へ時間順に並べる。矢印の`value`は実際に入れる値や出る答えの例（等幅）。
+# 手順の`diagram:`で名前を指し、`focus:`で光らせる矢印（idを , で区切る）を決める。`to`を書かない矢印は、その登場者の中の動き。
 diagrams:
   # ルールを書いて保存し、次のツール呼び出しから効くまで
   rule-save:
@@ -206,7 +206,7 @@ diagrams:
       - id: edit
         from: ユーザ
         to: ルール管理画面
-        text: deny に 1 件書き足す
+        text: denyに1件書き足す
         value: |-
           id: git-push
           match: Bash
@@ -228,7 +228,7 @@ diagrams:
       - id: effect
         from: ccnavi
         to: rules.yml
-        text: 次にツールを使うとき、hook が rules.yml を読み直す
+        text: 次にツールを使うとき、hookがrules.ymlを読み直す
         value: Claude Code の再起動は要らない
 
   # 値がヒットして止まる例（git push）
@@ -238,7 +238,7 @@ diagrams:
       - id: call
         from: Claude Code
         to: ccnavi（hook）
-        text: ツールを使う直前に、hook を起こして内容を渡す
+        text: ツールを使う直前に、hookを起こして内容を渡す
         value: '{"tool_name":"Bash","tool_input":{"command":"git push origin main"}}'
       - id: load
         from: ccnavi（hook）
@@ -246,7 +246,7 @@ diagrams:
         text: ルールを読む（共通の設定に、ワークスペースかプロジェクトの設定を重ねたもの）
       - id: match
         from: ccnavi（hook）
-        text: deny → ask → allow の順に適用する
+        text: deny → ask → allowの順に適用する
         value: |-
           match: Bash ✓
           glob: "*git push*" ✓
@@ -261,7 +261,7 @@ diagrams:
       - id: log
         from: ccnavi（hook）
         to: decisions.jsonl
-        text: 返す前に、判定を 1 行追記する
+        text: 返す前に、判定を1行追記する
         value: 'decision: deny'
       - id: stop
         from: Claude Code
@@ -297,7 +297,7 @@ diagrams:
         value: Read /ws/.env
       - id: match-env
         from: ccnavi（hook）
-        text: protect-env の when（all）を調べる
+        text: protect-envのwhen（all）を調べる
         value: |-
           regex (^|[\\/])\.env(\.|$) ✓
           not(any(glob **/.env.example, glob **/.env.sample)) ✓
@@ -322,11 +322,11 @@ diagrams:
       - id: call
         from: Claude Code
         to: ccnavi（hook）
-        text: 動作モードが dry-run のとき、同じコマンドを使う
+        text: 動作モードがdry-runのとき、同じコマンドを使う
         value: '{"tool_name":"Bash","tool_input":{"command":"git push origin main"}}'
       - id: match
         from: ccnavi（hook）
-        text: 判定は enable と同じで deny にヒットする。記録も同じ形で残す
+        text: 判定はenableと同じでdenyにヒットする。記録も同じ形で残す
         value: 'decision: deny, enforced: false'
       - id: reply
         from: ccnavi（hook）
@@ -335,7 +335,7 @@ diagrams:
         value: '[ccnavi dry-run] enable would have stopped … （additionalContext）'
       - id: run
         from: Claude Code
-        text: コマンドは実行される。enable に切り替えると、前の図のとおり止まる
+        text: コマンドは実行される。enableに切り替えると、前の図のとおり止まる
 
   # 判定を試す: 実際のツールは動かない
   rule-try:
@@ -355,42 +355,42 @@ diagrams:
       - id: answer
         from: ccnavi
         to: ルール管理画面
-        text: hook と同じ経路で判定した答えを返す。コマンドは実行しない
+        text: hookと同じ経路で判定した答えを返す。コマンドは実行しない
         value: |-
           判定: deny
           ヒットしたルール: git-push
           message: push はユーザが行う
       - id: note
         from: ルール管理画面
-        text: 常に enable の答え。記録（decisions.jsonl）は残らず、every の回数も数えない
+        text: 常にenableの答え。記録（decisions.jsonl）は残らず、everyの回数も数えない
 
-  # コンテキストの追加: 3 回に 1 度だけ文が届く
+  # コンテキストの追加: 3回に1度だけ文が届く
   rule-context:
-    actors: [Claude Code, ccnavi（hook）, state ファイル]
+    actors: [Claude Code, ccnavi（hook）, stateファイル]
     steps:
       - id: call-1
         from: Claude Code
         to: ccnavi（hook）
-        text: ルールにヒットするコマンドを使う（1 回目）
+        text: ルールにヒットするコマンドを使う（1回目）
         value: pytest tests/core
       - id: count-1
         from: ccnavi（hook）
-        to: state ファイル
-        text: ヒットした回数を 1 にする。3 の倍数ではないので、プロンプトは渡さない
+        to: stateファイル
+        text: ヒットした回数を1にする。3の倍数ではないので、プロンプトは渡さない
         value: 'every: 3'
       - id: call-3
         from: Claude Code
         to: ccnavi（hook）
-        text: 3 回目に同じルールへヒットする
+        text: 3回目に同じルールへヒットする
         value: pytest tests/ui
       - id: count-3
         from: ccnavi（hook）
-        to: state ファイル
-        text: 回数が 3 になる
+        to: stateファイル
+        text: 回数が3になる
       - id: deliver
         from: ccnavi（hook）
         to: Claude Code
-        text: 3 の倍数なので、additionalContext をモデルに渡す
+        text: 3の倍数なので、additionalContextをモデルに渡す
         value: additionalContext：テストは tests/ に置く
 
 courses:
@@ -399,12 +399,12 @@ courses:
     summary: 画面の見どころを順に回ります
     steps:
       - target: tabs
-        title: 3 つのタブ
-        body: 「ルール」タブでは deny・ask・allow のルールを確認して直せます。「判定を試す」タブでは、編集中のルールで判定を試せます。「hook」タブでは登録内容を確認できます。
+        title: 3つのタブ
+        body: 「ルール」タブではdeny・ask・allowのルールを確認して直せます。「判定を試す」タブでは、編集中のルールで判定を試せます。「hook」タブでは登録内容を確認できます。
         scene: { tab: rules }
       - target: rules
         title: ルール
-        body: deny（止める）・ask（確認する）・allow（通す）のタイプごとに並びます。判定は強い順に deny > ask > allow です。行を押すと欄が開き、「＋ ルールを追加」で追加できます。見出しの ▾ でタイプを畳めます。
+        body: deny（止める）・ask（確認する）・allow（通す）のタイプごとに並びます。判定は強い順にdeny > ask > allowです。行を押すと欄が開き、「＋ ルールを追加」で追加できます。見出しの ▾ でタイプを畳めます。
         scene: { tab: rules, open: git-push }
       - target: find
         title: 絞り込み
@@ -416,7 +416,7 @@ courses:
         scene: { tab: judge, tool: Bash, subject: git push origin main, judge: git-push }
       - target: hooks
         title: hook
-        body: .claude/settings.json に登録された hook の一覧です。直すときは settings.json を開いて編集してください。
+        body: .claude/settings.jsonに登録されたhookの一覧です。直すときはsettings.jsonを開いて編集してください。
         scene: { tab: hooks }
       - target: save
         title: 保存
@@ -433,104 +433,104 @@ courses:
     steps:
       - target: rule-git-push
         title: 例のルール
-        body: 「Bash で git push を含むコマンドは止める」というルールで追います。保存すると、次にツールを使う場面から効きます。
+        body: 「Bashでgit pushを含むコマンドは止める」というルールで追います。保存すると、次にツールを使う場面から効きます。
         scene: { tab: rules, open: git-push }
         diagram: rule-deny
       - target: hooks
-        title: ツールを使う直前に hook が起きる
-        body: Claude Code は、ツールを使う直前に、登録された hook を起こして内容を渡します。hook は、毎回ルールを読み直します。
+        title: ツールを使う直前にhookが起きる
+        body: Claude Codeは、ツールを使う直前に、登録されたhookを起こして内容を渡します。hookは、毎回ルールを読み直します。
         scene: { tab: hooks }
         diagram: rule-deny
         focus: call, load
       - target: hooks
         title: 値がルールにヒットすると、止める
-        body: コマンドが git push origin main なので、match の Bash と、glob の *git push* の両方にヒットします。deny → ask → allow の順に適用し、最初にヒットしたタイプで決まります。止める答えには、message が理由として付きます。
+        body: コマンドがgit push origin mainなので、matchのBashと、globの *git push* の両方にヒットします。deny → ask → allowの順に適用し、最初にヒットしたタイプで決まります。止める答えには、messageが理由として付きます。
         scene: { tab: hooks }
         diagram: rule-deny
         focus: match, reply
       - target: hooks
         title: 記録して、止める
-        body: hook は、答えを返す前に判定を logs/decisions.jsonl に 1 行足します。コマンドは実行されず、message がモデルに届きます。
+        body: hookは、答えを返す前に判定をlogs/decisions.jsonlに1行足します。コマンドは実行されず、messageがモデルに届きます。
         scene: { tab: hooks }
         diagram: rule-deny
         focus: log, stop
       - target: rules
         title: 別の値ならヒットしない
-        body: git status は、*git push* に合いません。どのルールにもヒットしないときは、判定を返しません。これは「許可」ではなく、権限モードに従います。
+        body: git statusは、*git push* に合いません。どのルールにもヒットしないときは、判定を返しません。これは「許可」ではなく、権限モードに従います。
         scene: { tab: rules }
         diagram: rule-pass
         focus: match, reply
       - target: rule-protect-env
         title: 組み合わせ条件は、値で結果が分かれる
-        body: protect-env は「.env 系は止める。ただし .env.example と .env.sample は通す」という 1 つのルールです。同じルールが、.env は止め、.env.example は通します。
+        body: protect-envは「.env系は止める。ただし .env.exampleと .env.sampleは通す」という1つのルールです。同じルールが、.envは止め、.env.exampleは通します。
         scene: { tab: rules, open: protect-env, when: r }
         diagram: rule-when
         focus: match-env, match-example
       - target: hooks
         title: 動作モードで、止まるかどうかが変わる
-        body: CCNAVI_MODE が dry-run のときは、同じ deny にヒットしても止まらず、止めるはずだったという文だけが返ります。「判定を試す」は、常に enable の答えを返すので、実際の動きと食い違うことがあります。
+        body: CCNAVI_MODEがdry-runのときは、同じdenyにヒットしても止まらず、止めるはずだったという文だけが返ります。「判定を試す」は、常にenableの答えを返すので、実際の動きと食い違うことがあります。
         scene: { tab: hooks }
         diagram: rule-mode
         focus: reply, run
 
   - id: how-save-try
     title: 保存してから効くまでと、試すときの違いを知りたいとき
-    summary: 保存で何が検証され、いつから効くか。「判定を試す」と本番の違いと、プロンプトを 3 回に 1 度だけ渡す設定
+    summary: 保存で何が検証され、いつから効くか。「判定を試す」と本番の違いと、プロンプトを3回に1度だけ渡す設定
     steps:
       - target: rules
         title: ルールを書く
-        body: ここでは、deny に git-push のルールを 1 件足します。書いている間は「未保存」の印が付くだけで、ファイルも hook も変わりません。
+        body: ここでは、denyにgit-pushのルールを1件足します。書いている間は「未保存」の印が付くだけで、ファイルもhookも変わりません。
         scene: { tab: rules, open: git-push }
         diagram: rule-save
         focus: edit
       - target: save
         title: 保存すると、まず検証される
-        body: ［保存］を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します。error が 1 件でもあれば、何も保存しません。作業中のチケットがあるときは保存できません。エージェントが応答中なら、確認が出ます。
+        body: ［保存］を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します。errorが1件でもあれば、何も保存しません。作業中のチケットがあるときは保存できません。エージェントが応答中なら、確認が出ます。
         scene: { tab: rules, open: git-push }
         diagram: rule-save
         focus: save, lock
       - target: save
         title: 書き込まれて、次から効く
-        body: 検証を通ると、rules.yml に書き込みます。hook はツールを使うたびにファイルを読み直すので、Claude Code を再起動しなくても、次のツール呼び出しから効きます。ワークツリーで直したルールは、統合するまで効きません。
+        body: 検証を通ると、rules.ymlに書き込みます。hookはツールを使うたびにファイルを読み直すので、Claude Codeを再起動しなくても、次のツール呼び出しから効きます。ワークツリーで直したルールは、統合するまで効きません。
         scene: { tab: rules, open: git-push }
         diagram: rule-save
         focus: write, effect
       - target: judge-form
         title: 保存しないで試す
-        body: 「判定を試す」は、編集中の内容で判定します。保存は要りません。実際のコマンドは動かず、記録も残りません。ここでの答えは常に enable のものです。
+        body: 「判定を試す」は、編集中の内容で判定します。保存は要りません。実際のコマンドは動かず、記録も残りません。ここでの答えは常にenableのものです。
         scene: { tab: judge, tool: Bash, subject: git push origin main, judge: git-push }
         diagram: rule-try
         focus: input, ask, answer, note
       - target: rule-db-migrate
-        title: プロンプトを 3 回に 1 度だけ渡す
-        body: "every: 3 を付けたルールは、ヒットした回数が 3 の倍数になった回にだけ、additionalContext をモデルに渡します。「判定を試す」は回数を数えないので、毎回文が出ます。本番との違いに注意してください。"
+        title: プロンプトを3回に1度だけ渡す
+        body: "every: 3を付けたルールは、ヒットした回数が3の倍数になった回にだけ、additionalContextをモデルに渡します。「判定を試す」は回数を数えないので、毎回文が出ます。本番との違いに注意してください。"
         scene: { tab: rules, open: db-migrate, more: true }
         diagram: rule-context
         focus: count-1, count-3, deliver
 
   - id: combo-when
     title: 組み合わせ条件を設定する
-    summary: 「.env は止める。ただし .env.example は通す」のように、複数の条件を all / any / not で組み合わせる
+    summary: 「.envは止める。ただし .env.exampleは通す」のように、複数の条件をall / any / notで組み合わせる
     steps:
       - target: rule-protect-env
         title: 組み合わせ条件のルール
-        body: glob や regex が 1 つでは表現できない条件は、組み合わせ条件（when）で記述できます。畳んだ行には、条件を 1 行に縮めた形（all(regex …, not(any(2)))）が出ます。この例は「.env 系のファイルにヒットし、かつ .env.example / .env.sample ではない」です。
+        body: globやregexが1つでは表現できない条件は、組み合わせ条件（when）で記述できます。畳んだ行には、条件を1行に縮めた形（all(regex …, not(any(2)))）が出ます。この例は「.env系のファイルにヒットし、かつ .env.example / .env.sampleではない」です。
         scene: { tab: rules }
       - target: rule-protect-env
         title: 図で見る
-        body: 行を開くと、条件が図になります。左端の点が最上位で、右へ枝分かれします。all は「すべての条件に一致」、any は「いずれかの条件に一致」、not は「指定した条件に一致しない」を表します。
+        body: 行を開くと、条件が図になります。左端の点が最上位で、右へ枝分かれします。allは「すべての条件に一致」、anyは「いずれかの条件に一致」、notは「指定した条件に一致しない」を表します。
         scene: { tab: rules, open: protect-env, when: r }
       - target: when-graph
         title: 点を選んで直す
-        body: 条件をクリックすると選ばれ、下の編集欄でその条件を変更できます。ここでは .env 系に一致させる regex の点を選んでいます。文字を直すと、その場で図と要約に反映されます。
+        body: 条件をクリックすると選ばれ、下の編集欄でその条件を変更できます。ここでは .env系に一致させるregexの点を選んでいます。文字を直すと、その場で図と要約に反映されます。
         scene: { tab: rules, open: protect-env, when: r.0 }
       - target: when-inspector
         title: 子を足す・削除
-        body: all / any の点を選ぶと「＋ glob」「＋ regex」「＋ all」「＋ any」「＋ not」で子を足せます。例えば any に「＋ glob」を足せば、通す例外が 1 つ増えます。「この条件を削除」で削除できます。
+        body: all / anyの点を選ぶと「＋ glob」「＋ regex」「＋ all」「＋ any」「＋ not」で子を足せます。例えばanyに「＋ glob」を足せば、通す例外が1つ増えます。「この条件を削除」で削除できます。
         scene: { tab: rules, open: protect-env, when: r.1.0 }
       - target: when-inspector
         title: 包む・種類を替える
-        body: 「all で包む」「any で包む」「not で包む」で、選んだ点を新しい演算子の中へ入れられます。glob と regex、all と any は、種類の欄で入れ替えられます。
+        body: 「allで包む」「anyで包む」「notで包む」で、選んだ点を新しい演算子の中へ入れられます。globとregex、allとanyは、種類の欄で入れ替えられます。
         scene: { tab: rules, open: protect-env, when: r.1 }
       - target: judge-form
         title: 判定で確認する
@@ -538,36 +538,36 @@ courses:
         scene: { tab: judge, tool: Read, subject: /ws/.env, judge: env-read }
       - target: judge-form
         title: 通す例を確認する
-        body: .env.example はどのルールにもヒットせず、判定の対象外（そのまま通る）になります。
+        body: .env.exampleはどのルールにもヒットせず、判定の対象外（そのまま通る）になります。
         scene: { tab: judge, tool: Read, subject: /ws/.env.example, judge: env-example }
       - target: save
         title: 保存
-        body: 保存すると、実行ファイルが検証し、通ればファイルに反映します。空の演算子や、中が空の not のような誤りは、図の下に並んで保存前の検証で止まります。
+        body: 保存すると、実行ファイルが検証し、通ればファイルに反映します。空の演算子や、中が空のnotのような誤りは、図の下に並んで保存前の検証で止まります。
         scene: { tab: rules, open: protect-env }
 
   - id: add-rule
-    title: ルールを新しく追加して、ツールと glob / regex を決めたいとき
-    summary: タイプを選んで行を追加し、ツールとパターンと message を入力して、判定で確認する
+    title: ルールを新しく追加して、ツールとglob / regexを決めたいとき
+    summary: タイプを選んで行を追加し、ツールとパターンとmessageを入力して、判定で確認する
     steps:
       - target: add-deny
         title: 追加するタイプを選ぶ
-        body: ルールは deny（止める）・ask（確認する）・allow（通す）のどれかに追加します。タイプの見出しにある「＋ ルールを追加」を押すと、空の行が開いた状態で末尾に追加され、id の欄にカーソルが移ります。id はルールの名前で、判定の結果や記録にも出ます。タイプはあとから行の中の「タイプ」で替えられます。
+        body: ルールはdeny（止める）・ask（確認する）・allow（通す）のどれかに追加します。タイプの見出しにある「＋ ルールを追加」を押すと、空の行が開いた状態で末尾に追加され、idの欄にカーソルが移ります。idはルールの名前で、判定の結果や記録にも出ます。タイプはあとから行の中の「タイプ」で替えられます。
         scene: { tab: rules }
       - target: rule-git-push-match
         title: ツールを決める
-        body: 「ツール」の欄は押すと選択肢が出ます。Bash・Read・Edit のようにチェックを入れて選ぶと、複数なら Write|Edit の形で 1 つの欄に入ります。候補は判定が対象を取り出せるツールです。一覧にない名前は「新しいツール名」で追加できますが、判定には届かずヒットしません。
+        body: 「ツール」の欄は押すと選択肢が出ます。Bash・Read・Editのようにチェックを入れて選ぶと、複数ならWrite|Editの形で1つの欄に入ります。候補は判定が対象を取り出せるツールです。一覧にない名前は「新しいツール名」で追加できますが、判定には届かずヒットしません。
         scene: { tab: rules, open: git-push }
       - target: rule-git-push-pattern
-        title: glob で記述する
-        body: パターンは種類（glob か regex）と式で決めます。glob は * が「何でも」を表し、*git push* は「git push を含むコマンド」にヒットします。短く記述できますが、legit push のように語の途中にもヒットします。
+        title: globで記述する
+        body: パターンは種類（globかregex）と式で決めます。globは * が「何でも」を表し、*git push* は「git pushを含むコマンド」にヒットします。短く記述できますが、legit pushのように語の途中にもヒットします。
         scene: { tab: rules, open: git-push }
       - target: rule-no-rm-rf-pattern
-        title: regex で記述する
-        body: 語の切れ目まで決めたいときは regex を使います。\brm\s+-rf\b は、rm と -rf が語として並ぶときだけにヒットします。種類の欄で glob と regex を替えられます。式の誤りは、保存前の検証で止まります。
+        title: regexで記述する
+        body: 語の切れ目まで決めたいときはregexを使います。\brm\s+-rf\bは、rmと -rfが語として並ぶときだけにヒットします。種類の欄でglobとregexを替えられます。式の誤りは、保存前の検証で止まります。
         scene: { tab: rules, open: no-rm-rf }
       - target: rule-git-push-message
         title: 止めるときの言葉を入力する
-        body: deny には message を入力します。止められたモデルに届く文なので、なぜ止めたかと、代わりに何をすればよいかを入力します。ask と allow の message は、モデルには届きません（ask はユーザの確認ダイアログに出るだけです）。そのため、入力すると lint が error になります。渡したいプロンプトは「コンテキストの追加」に入力します。
+        body: denyにはmessageを入力します。止められたモデルに届く文なので、なぜ止めたかと、代わりに何をすればよいかを入力します。askとallowのmessageは、モデルには届きません（askはユーザの確認ダイアログに出るだけです）。そのため、入力するとlintがerrorになります。渡したいプロンプトは「コンテキストの追加」に入力します。
         scene: { tab: rules, open: git-push }
       - target: judge-form
         title: 判定で確認する
@@ -579,36 +579,36 @@ courses:
         scene: { tab: rules, open: git-push }
 
   - id: context-every
-    title: 何回に 1 度、どんなプロンプトをモデルに渡すかを決めたいとき
-    summary: every と additionalContext / additionalContextOnce で、渡す回とプロンプトを決める
+    title: 何回に1度、どんなプロンプトをモデルに渡すかを決めたいとき
+    summary: everyとadditionalContext / additionalContextOnceで、渡す回とプロンプトを決める
     steps:
       - target: rule-db-migrate
         title: 畳んだ行で見分ける
-        body: 畳んだ行の右に「3 回ごと」のようなバッジと、コンテキストの追加がある印が出ます。見本では db-migrate が 3 回に 1 度、deps-change が 1 回ごと（ヒットするたび）にプロンプトを渡します。
+        body: 畳んだ行の右に「3回ごと」のようなバッジと、コンテキストの追加がある印が出ます。見本ではdb-migrateが3回に1度、deps-changeが1回ごと（ヒットするたび）にプロンプトを渡します。
         scene: { tab: rules }
       - target: rule-db-migrate-context
         title: コンテキストの追加
-        body: プロンプトを渡したいルールは、行の中の「コンテキストの追加」を開きます。message が止められた側への言葉なのに対し、ここはツールの実行を許可する際に、エージェントへ伝える注意事項や補足を入力する欄で、どのタイプにも入力できます。渡す間隔（every）と、補足文を記載したファイルのパスを指定する欄もあります。
+        body: プロンプトを渡したいルールは、行の中の「コンテキストの追加」を開きます。messageが止められた側への言葉なのに対し、ここはツールの実行を許可する際に、エージェントへ伝える注意事項や補足を入力する欄で、どのタイプにも入力できます。渡す間隔（every）と、補足文を記載したファイルのパスを指定する欄もあります。
         scene: { tab: rules, open: db-migrate, more: true }
       - target: rule-db-migrate-every
-        title: every で何回に 1 度かを決める
-        body: 'every: 3 は、そのルールがヒットした回数が 3 の倍数になった回だけを「渡す回」にします（3・6・9 回目）。空なら毎回です。数えるのはヒットした回数で、セッションの開始（起動・再開・compact の後）で 0 に戻ります。0 や整数でない値は lint の error です。'
+        title: everyで何回に1度かを決める
+        body: 'every: 3は、そのルールがヒットした回数が3の倍数になった回だけを「渡す回」にします（3・6・9回目）。空なら毎回です。数えるのはヒットした回数で、セッションの開始（起動・再開・compactの後）で0に戻ります。0や整数でない値はlintのerrorです。'
         scene: { tab: rules, open: db-migrate, more: true }
       - target: rule-db-migrate-text
         title: 渡す回のたびに届くプロンプト
-        body: additionalContext は、渡す回のたびに届くプロンプトです。短く、次の行動に直結する一言にします。ask のルールでは、ユーザが確認で Yes を押したときだけ届き、No なら届きません。
+        body: additionalContextは、渡す回のたびに届くプロンプトです。短く、次の行動に直結する一言にします。askのルールでは、ユーザが確認でYesを押したときだけ届き、Noなら届きません。
         scene: { tab: rules, open: db-migrate, more: true }
       - target: rule-deps-change-once
-        title: 最初の 1 回だけ届くプロンプト
-        body: additionalContextOnce は、セッションで最初に渡す回にだけ届くプロンプトで、長い背景の説明に向きます。additionalContext と両方入力すると、初回は 2 つを空行で並べて届き、2 回目からは additionalContext だけが届きます。every を指定すると、1 回目ではなく N 回目に届きます。
+        title: 最初の1回だけ届くプロンプト
+        body: additionalContextOnceは、セッションで最初に渡す回にだけ届くプロンプトで、長い背景の説明に向きます。additionalContextと両方入力すると、初回は2つを空行で並べて届き、2回目からはadditionalContextだけが届きます。everyを指定すると、1回目ではなくN回目に届きます。
         scene: { tab: rules, open: deps-change, more: true }
       - target: rule-deps-change-file
         title: 長いプロンプトはファイルで渡す
-        body: プロンプトが長いときは、additionalContextFile（毎回）と additionalContextOnceFile（最初の 1 回）に、補足文を記載したファイルのパスを指定できます。先頭 4000 文字までが届きます。「選択…」でダイアログからも選べます。
+        body: プロンプトが長いときは、additionalContextFile（毎回）とadditionalContextOnceFile（最初の1回）に、補足文を記載したファイルのパスを指定できます。先頭4000文字までが届きます。「選択…」でダイアログからも選べます。
         scene: { tab: rules, open: deps-change, more: true }
       - target: judge-result
         title: 届くプロンプトを判定で確認する
-        body: 「判定を試す」の結果の「返すメッセージ」に、入力したプロンプトが何と一緒に届くかが出ます。every で間引くかどうかは、実際にヒットした回数で決まるので、ここで確認できるのは文の中身と、ヒットするルールです。
+        body: 「判定を試す」の結果の「返すメッセージ」に、入力したプロンプトが何と一緒に届くかが出ます。everyで間引くかどうかは、実際にヒットした回数で決まるので、ここで確認できるのは文の中身と、ヒットするルールです。
         scene: { tab: judge, tool: Bash, subject: python manage.py migrate, judge: db-migrate }
 
   - id: check-expectations
@@ -617,19 +617,19 @@ courses:
     steps:
       - target: expectations
         title: 一括で確認する
-        body: 「期待する判定を一括で確認する」は、期待する判定のファイルに並べた例を、編集中のルールでまとめて判定します。例は、deny なら止まるはず、ask ならユーザに確認が出るはず、allow なら通るはず、という期待です。ルールを直したあとの確認に、1 件ずつ入力する代わりに使います。
+        body: 「期待する判定を一括で確認する」は、期待する判定のファイルに並べた例を、編集中のルールでまとめて判定します。例は、denyなら止まるはず、askならユーザに確認が出るはず、allowなら通るはず、という期待です。ルールを直したあとの確認に、1件ずつ入力する代わりに使います。
         scene: { tab: judge }
       - target: open-expectations
         title: 期待する例を追加する
-        body: 例は「エディタで開く」で期待する判定のファイルを開いて追加します。ルールを 1 件追加したら、その例も 1 行追加しておくと、あとから読む人に何のためのルールかが伝わります。ツールと対象（コマンドやパス）と、理由を入力します。
+        body: 例は「エディタで開く」で期待する判定のファイルを開いて追加します。ルールを1件追加したら、その例も1行追加しておくと、あとから読む人に何のためのルールかが伝わります。ツールと対象（コマンドやパス）と、理由を入力します。
         scene: { tab: judge }
       - target: expectations-counts
         title: 件数で全体を見る
-        body: 結果の上に、タイプごとの一致数（deny 2/2 など）と不一致の件数が並びます。保存していなくても、編集中のルールでの結果です。
+        body: 結果の上に、タイプごとの一致数（deny 2/2など）と不一致の件数が並びます。保存していなくても、編集中のルールでの結果です。
         scene: { tab: judge, checked: true }
       - target: expectation-ng
         title: 食い違いを確認する
-        body: 食い違った行は赤く出ます。この例は、allow を期待した .env.example が、どの allow にもヒットせず判定の対象外になっています。期待が正しければ allow のルールを追加し、期待が古ければ例を直します。
+        body: 食い違った行は赤く出ます。この例は、allowを期待した .env.exampleが、どのallowにもヒットせず判定の対象外になっています。期待が正しければallowのルールを追加し、期待が古ければ例を直します。
         scene: { tab: judge, checked: true }
       - target: expectations-result
         title: ヒットしたルールも見る
@@ -642,23 +642,23 @@ courses:
 
   - id: suggest-rule
     title: 記録から候補を出して、下書きをルールにしたいとき
-    summary: 判定の記録から deny / ask の下書きを作り、ルールに転記して確認する
+    summary: 判定の記録からdeny / askの下書きを作り、ルールに転記して確認する
     steps:
       - target: suggest
         title: 記録から候補を出す
-        body: 「記録から候補を出す」は、判定の記録（logs/decisions.jsonl）を集計して、deny / ask のルールの下書きを作ります。どのルールにもヒットせず権限モードへ渡った呼び出しが同じ形で 5 回以上あると、その形にルールを追加する候補になります。保存済みのルールで確認するので、編集中の内容は使いません。
+        body: 「記録から候補を出す」は、判定の記録（logs/decisions.jsonl）を集計して、deny / askのルールの下書きを作ります。どのルールにもヒットせず権限モードへ渡った呼び出しが同じ形で5回以上あると、その形にルールを追加する候補になります。保存済みのルールで確認するので、編集中の内容は使いません。
         scene: { tab: judge }
       - target: suggest-result
         title: 結果の読み方
-        body: 読んだ記録の本数と行数、候補の数が出ます。「検証を通らず除いたもの」は、lint と期待する判定を通らず出さなかった数です。候補はすべて下書きです。確認して設定に反映するのはユーザです。
+        body: 読んだ記録の本数と行数、候補の数が出ます。「検証を通らず除いたもの」は、lintと期待する判定を通らず出さなかった数です。候補はすべて下書きです。確認して設定に反映するのはユーザです。
         scene: { tab: judge, suggested: true }
       - target: suggest-candidate
-        title: 候補 1 件の中身
-        body: '候補は、種類（ルールを追加する・message を見直す）・タイプ・id と、根拠の一言、下書きの YAML です。下書きは、rules.yml に追加する rules: と、期待する判定のファイルに追加する expectations: の組です。ルールを追加する候補は ask で出ます（記録から通す側は勧めません）。message を見直す候補は、同じ呼び出しを deny が繰り返し止めたときに出ます。'
+        title: 候補1件の中身
+        body: '候補は、種類（ルールを追加する・messageを見直す）・タイプ・idと、根拠の一言、下書きのYAMLです。下書きは、rules.ymlに追加するrules: と、期待する判定のファイルに追加するexpectations: の組です。ルールを追加する候補はaskで出ます（記録から通す側は勧めません）。messageを見直す候補は、同じ呼び出しをdenyが繰り返し止めたときに出ます。'
         scene: { tab: judge, suggested: true }
       - target: add-ask
         title: 下書きをルールに転記する
-        body: 下書きは自動では保存されません。「＋ ルールを追加」で行を追加し、下書きの id・ツール・パターンを転記します。置き先は候補に示されたレイヤーのファイルなので、いま編集している設定と同じかを確認します。ふさわしくなければ追加しなくて構いません。
+        body: 下書きは自動では保存されません。「＋ ルールを追加」で行を追加し、下書きのid・ツール・パターンを転記します。置き先は候補に示されたレイヤーのファイルなので、いま編集している設定と同じかを確認します。ふさわしくなければ追加しなくて構いません。
         scene: { tab: rules }
       - target: judge-form
         title: 転記したら判定で確認する
@@ -666,7 +666,7 @@ courses:
         scene: { tab: judge, tool: Bash, subject: npm install left-pad, judge: npm-install }
       - target: open-expectations
         title: 期待する例も追加する
-        body: '下書きの expectations: は、期待する判定のファイルをエディタで開いて追加します。あとで「期待する判定を一括で確認する」に利用できます。'
+        body: '下書きのexpectations: は、期待する判定のファイルをエディタで開いて追加します。あとで「期待する判定を一括で確認する」に利用できます。'
         scene: { tab: judge, suggested: true }
       - target: save
         title: 保存
@@ -675,11 +675,11 @@ courses:
 
   - id: except-to-when
     title: 除外（except）を組み合わせ条件へ移したいとき
-    summary: 「A だが B は除く」の except を、when の not の中へ変換して、図で編集できるようにする
+    summary: 「AだがBは除く」のexceptを、whenのnotの中へ変換して、図で編集できるようにする
     steps:
       - target: rule-protect-secrets
         title: 除外を持つルール
-        body: except に並べた glob / regex は、「本体にヒットしても、どれかにヒットすればそのルールはヒットしない」という除外です。畳んだ行には「除外 1」と出ます。見本の protect-secrets は、secrets の下は止めるが、README.md だけ除きます。
+        body: exceptに並べたglob / regexは、「本体にヒットしても、どれかにヒットすればそのルールはヒットしない」という除外です。畳んだ行には「除外1」と出ます。見本のprotect-secretsは、secretsの下は止めるが、README.mdだけ除きます。
         scene: { tab: rules }
       - target: rule-protect-secrets-except
         title: 画面では編集しない
@@ -687,15 +687,15 @@ courses:
         scene: { tab: rules, open: protect-secrets }
       - target: rule-protect-secrets-to-when
         title: 組み合わせ条件に変換する
-        body: '「組み合わせ条件に変換」を押すと、パターンと除外が同じ意味の組み合わせ条件になります。除外は not の中の any に移り、保存時に except: は消えます。glob と regex を両方指定している、除外が読み込めないなど、そのまま移せないときはボタンが押せません。理由はボタンの説明に出ます。'
+        body: '「組み合わせ条件に変換」を押すと、パターンと除外が同じ意味の組み合わせ条件になります。除外はnotの中のanyに移り、保存時にexcept: は消えます。globとregexを両方指定している、除外が読み込めないなど、そのまま移せないときはボタンが押せません。理由はボタンの説明に出ます。'
         scene: { tab: rules, open: protect-secrets }
       - target: when-graph
         title: 変換したあとの形
-        body: 変換したあとは、見本の protect-env と同じ形になります。左端の all の下に、本体の条件と、not の中の any（除外）が並びます。図の点を選べば、除外を追加したり削除したりできます。
+        body: 変換したあとは、見本のprotect-envと同じ形になります。左端のallの下に、本体の条件と、notの中のany（除外）が並びます。図の点を選べば、除外を追加したり削除したりできます。
         scene: { tab: rules, open: protect-env, when: r }
       - target: judge-result
         title: 止める例を確認する
-        body: 意味が変わっていないことを判定で確認します。まず止めたい例（secrets の下の key.pem）が、変換後も deny にヒットすることを見ます。
+        body: 意味が変わっていないことを判定で確認します。まず止めたい例（secretsの下のkey.pem）が、変換後もdenyにヒットすることを見ます。
         scene: { tab: judge, tool: Read, subject: /ws/secrets/key.pem, judge: secrets-key }
       - target: judge-form
         title: 除く例を確認する
@@ -703,7 +703,7 @@ courses:
         scene: { tab: judge, tool: Read, subject: /ws/secrets/README.md, judge: secrets-readme }
       - target: save
         title: 保存
-        body: '保存すると、except: の代わりに when: として保存されます。組み合わせ条件から glob / regex 1 つへは戻せないので、保存の前に判定で確認します。'
+        body: '保存すると、except: の代わりにwhen: として保存されます。組み合わせ条件からglob / regex 1つへは戻せないので、保存の前に判定で確認します。'
         scene: { tab: rules, open: protect-secrets }
 
   - id: read-sum
@@ -716,23 +716,23 @@ courses:
         scene: { tab: rules, sum: web }
       - target: sum-pick
         title: 統合結果を選ぶ
-        body: 選ぶ欄で、統合結果（共通 + ワークスペース）と、プロジェクトの統合結果（共通 + プロジェクト（名前））を切り替えます。パスを持たないツール（Bash など）に適用されるのは、全プロジェクトの設定を合算した和ではありません。
+        body: 選ぶ欄で、統合結果（共通 + ワークスペース）と、プロジェクトの統合結果（共通 + プロジェクト（名前））を切り替えます。パスを持たないツール（Bashなど）が適用するのは、この結果ではなく、全プロジェクトの設定を足した和です。
         scene: { tab: rules, sum: web }
       - target: sum-count
         title: 件数と追加されたレイヤー
-        body: 件数の横に、追加されたレイヤーが出ます。見本の web は「共通 + プロジェクト（web）」を重ねたもので、共通の設定のルールに、web のルールが追加されています。
+        body: 件数の横に、追加されたレイヤーが出ます。見本のwebは「共通 + プロジェクト（web）」を重ねたもので、共通の設定のルールに、webのルールが追加されています。
         scene: { tab: rules, sum: web }
       - target: sum-deny
         title: 由来で確認する
-        body: タイプごとの表に、id・ツール・パターン・由来・メッセージが並びます。「由来」は、共通の設定から来たか、そのプロジェクトの設定から来たかです。共通のルールの id はそのまま、ほかは web:no-prod-deploy のようにレイヤー名が付きます。
+        body: タイプごとの表に、id・ツール・パターン・由来・メッセージが並びます。「由来」は、共通の設定から来たか、そのプロジェクトの設定から来たかです。共通のルールのidはそのまま、ほかはweb:no-prod-deployのようにレイヤー名が付きます。
         scene: { tab: rules, sum: web }
       - target: sum-deny
         title: 統合結果を替えて見比べる
-        body: 同じ共通のルール（git-push・no-rm-rf）が、どの統合結果にも入ります。統合結果を切り替えると、レイヤーごとに追加されるルールだけが入れ替わります。見本のワークスペースでは secrets の置き場を止めるルールが追加されます。
+        body: 同じ共通のルール（git-push・no-rm-rf）が、どの統合結果にも入ります。統合結果を切り替えると、レイヤーごとに追加されるルールだけが入れ替わります。見本のワークスペースではsecretsの置き場を止めるルールが追加されます。
         scene: { tab: rules, sum: self }
       - target: target
         title: 編集する設定ファイルを選ぶ
-        body: 統合結果の枠は見せるだけです。追加されたルールを直すときは、実際の画面では上部の「設定」の欄で、直したい 1 本（共通の設定・ワークスペース・プロジェクト）に切り替えて編集します。
+        body: 統合結果の枠は見せるだけです。追加されたルールを直すときは、実際の画面では上部の「設定」の欄で、直したい1本（共通の設定・ワークスペース・プロジェクト）に切り替えて編集します。
         scene: { tab: rules, sum: self }
 
   - id: find-fold-move
@@ -749,11 +749,11 @@ courses:
         scene: { tab: rules, find: git }
       - target: fold-allow
         title: タイプを畳む
-        body: 見出しの ▾ を押すと、そのタイプの行が畳まれます（▸ になります）。deny を見たいときに allow を畳む、のように使います。畳んでもルールは消えず、判定にも関わりません。判定でヒットした行は、畳んであってもその場だけ開いて出ます。
+        body: 見出しの ▾ を押すと、そのタイプの行が畳まれます（▸ になります）。denyを見たいときにallowを畳む、のように使います。畳んでもルールは消えず、判定にも関わりません。判定でヒットした行は、畳んであってもその場だけ開いて出ます。
         scene: { tab: rules, fold: allow }
       - target: order-hint
         title: 判定の強さ
-        body: 判定は強い順に deny > ask > allow です。1 件でも deny にヒットすれば拒否で、弱いタイプは確認しません。行の並びが強さを決めるのではなく、タイプが決めます。
+        body: 判定は強い順にdeny > ask > allowです。1件でもdenyにヒットすれば拒否で、弱いタイプは確認しません。行の並びが強さを決めるのではなく、タイプが決めます。
         scene: { tab: rules }
       - target: rule-no-rm-rf-buttons
         title: 同じタイプの中の順
@@ -761,7 +761,7 @@ courses:
         scene: { tab: rules, open: no-rm-rf }
       - target: rule-no-rm-rf-type
         title: タイプを移す
-        body: 「タイプ」の欄で deny / ask / allow を替えると、行は移した先の末尾に移ります。絞り込み中は動かせないため、先に検索欄を空にします。止めすぎだと分かった deny を ask に下げる、のように使います。ask と allow に message が残ると lint が error にするので、移したら message を additionalContext へ移します。
+        body: 「タイプ」の欄でdeny / ask / allowを替えると、行は移した先の末尾に移ります。絞り込み中は動かせないため、先に検索欄を空にします。止めすぎだと分かったdenyをaskに下げる、のように使います。askとallowにmessageが残るとlintがerrorにするので、移したらmessageをadditionalContextへ移します。
         scene: { tab: rules, open: no-rm-rf }
       - target: save
         title: 保存
@@ -774,23 +774,23 @@ courses:
     steps:
       - target: save
         title: 保存で何を確認するか
-        body: 保存を押すと、実行ファイルの --lint でルール全体を検証し、通ればファイルに反映します。error が 1 件でもあれば、何も保存しません。作業中のチケットがあるとき、読み込んだあとにファイルが外で変わったときも、保存は止まります。
+        body: 保存を押すと、実行ファイルの --lintでルール全体を検証し、通ればファイルに反映します。errorが1件でもあれば、何も保存しません。作業中のチケットがあるとき、読み込んだあとにファイルが外で変わったときも、保存は止まります。
         scene: { tab: rules }
       - target: status
         title: 理由は下に出る
-        body: '止まった理由は画面の下に出ます。「設定の検証（--lint）でエラーが見つかりました」に続けて、lint の報告が 1 行ずつ並び、1 行は「error: ルールの id: 内容」の形です。見本は、ask の db-migrate に message を入力して保存したときの報告です。'
+        body: '止まった理由は画面の下に出ます。「設定の検証（--lint）でエラーが見つかりました」に続けて、lintの報告が1行ずつ並び、1行は「error: ルールのid: 内容」の形です。見本は、askのdb-migrateにmessageを入力して保存したときの報告です。'
         scene: { tab: rules, error: true }
       - target: rule-db-migrate
-        title: id で直す行を探す
-        body: 報告の id（db-migrate）で、直す行を探します。多いときは絞り込みの欄に id を入れます。id が空のルールは、行の見出しに「（id 未設定）」と出ます。
+        title: idで直す行を探す
+        body: 報告のid（db-migrate）で、直す行を探します。多いときは絞り込みの欄にidを入れます。idが空のルールは、行の見出しに「（id未設定）」と出ます。
         scene: { tab: rules, open: db-migrate, error: true }
       - target: rule-db-migrate-context
         title: 内容を直す
-        body: この例の直し方は、ask の message を削除して、モデルに渡したいプロンプトを additionalContext に移すことです。ask の message は、ユーザの確認ダイアログにしか出ないためです。message が残った行を開くと、「message を削除」のボタンも出ます。
+        body: この例の直し方は、askのmessageを削除して、モデルに渡したいプロンプトをadditionalContextに移すことです。askのmessageは、ユーザの確認ダイアログにしか出ないためです。messageが残った行を開くと、「messageを削除」のボタンも出ます。
         scene: { tab: rules, open: db-migrate, more: true, error: true }
       - target: rule-protect-env-pattern
         title: 組み合わせ条件の誤り
-        body: 空の all や any、中が空の not のような組み合わせ条件の誤りは、行の見出しに「組み合わせ条件に誤り」と出て、図の下にも並びます。保存前の検証でも止まります。
+        body: 空のallやany、中が空のnotのような組み合わせ条件の誤りは、行の見出しに「組み合わせ条件に誤り」と出て、図の下にも並びます。保存前の検証でも止まります。
         scene: { tab: rules, open: protect-env, when: r }
       - target: save
         title: 直したら保存し直す

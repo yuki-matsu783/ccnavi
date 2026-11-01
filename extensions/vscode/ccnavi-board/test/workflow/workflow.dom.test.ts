@@ -1,11 +1,11 @@
 /**
- * 計画編集タブ（`src/webview/workflow/`）を happy-dom で動かす。
+ * 計画編集タブ（`src/webview/workflow/`）をhappy-domで動かす。
  *
  * 画面は判定しない。線を変えるたびに、元の番号での直接の先行（`--order`）を拡張ホストに送り（`order`）、
- * 実行ファイルの答え（`answer`）が届いたらその振り直し・`problems`・`loose`・`writable` を図に出す。
+ * 実行ファイルの答え（`answer`）が届いたらその振り直し・`problems`・`loose`・`writable`を図に出す。
  * 番号は画面で振り直さない。断られた線（`refused`）は、線を引く前の形に戻す。
  *
- * **大きさの偽物が要る**（`openWorkflow` の `measure`）。React Flow は点の大きさを測れないと線を 1 本も描かず、
+ * **大きさの偽物が要る**（`openWorkflow`の`measure`）。React Flowは点の大きさを測れないと線を1本も描かず、
  * テストは空の絵を見て通ってしまう。
  */
 import { test } from "node:test";
@@ -15,7 +15,7 @@ import type { DomPage } from "../helpers/dom.js";
 import { planOrderSample } from "../helpers/plan-order.js";
 import { lastPosted, openWorkflow, openWorkflowData } from "../helpers/workflow.js";
 
-/** その計画の図の中の、点の番号（React Flow の data-id が n<番号> のもの） */
+/** その計画の図の中の、点の番号（React Flowのdata-idがn<番号> のもの） */
 function numbers(dom: DomPage, part: string): string[] {
   return dom
     .all(`.plan-graph[data-part="${part}"] .plan-node`)
@@ -26,11 +26,11 @@ function saveButton(dom: DomPage): HTMLButtonElement {
   return dom.one<HTMLButtonElement>("#save");
 }
 
-/** 線の × を押して `order` を送らせ、その頼みの番号を返す */
+/** 線の × を押して`order`を送らせ、その頼みの番号を返す */
 function removeEdge(dom: DomPage, edge: string): { readonly seq: number; readonly order: unknown } {
   dom.click(dom.one(`button[data-action="plan-remove-edge"][data-edge="${edge}"]`));
   const sent = lastPosted(dom, "order");
-  assert.ok(sent !== undefined, "order を送っていない");
+  assert.ok(sent !== undefined, "orderを送っていない");
   return { seq: sent.seq as number, order: sent.order };
 }
 
@@ -56,7 +56,7 @@ test("CB-D166 開くと、計画ごとの図を線を引ける形で出す。提
   }
 });
 
-test("CB-D167 線の × を押すと、元の番号での先行を送って答えを待つ。待つ間は線を変えられない。start と end の仮の線には × がありません", async () => {
+test("CB-D167 線の × を押すと、元の番号での先行を送って答えを待つ。待つ間は線を変えられない。startとendの仮の線には × がありません", async () => {
   const dom = await openWorkflow();
   try {
     const edges = dom.all('button[data-action="plan-remove-edge"]').map((b) => b.getAttribute("data-edge"));
@@ -80,7 +80,7 @@ test("CB-D168 答えが届いたら、実行ファイルが振り直した番号
     const { seq } = removeEdge(dom, "after-1-3");
     await dom.send({ type: "answer", seq, answer: planOrderSample("reverse") });
     assert.deepEqual(numbers(dom, "plan"), ["1:調査", "2:実装とテスト", "3:設計", "4:docs"]);
-    // 元の 3（実装とテスト）は 2 番になったが、置き場所は前の 3 番の場所のまま
+    // 元の3（実装とテスト）は2番になったが、置き場所は前の3番の場所のまま
     assert.equal(dom.one('.react-flow__node[data-id="n2"]').getAttribute("style"), placed);
     assert.ok(!dom.one("#dirty").classList.contains("hidden"));
     assert.deepEqual(lastPosted(dom, "dirty"), { type: "dirty", dirty: true, checking: false });
@@ -110,7 +110,7 @@ test("CB-D169 断られた線（循環など）は引く前の形に戻し、理
     assert.equal(dom.all('.plan-graph[data-editable="1"]').length, 2, "断られたあとも線を変えられる");
     // 確かめられなかった（実行ファイルが落ちた）ときも、引く前の形のまま理由を出す
     const again = removeEdge(dom, "after-1-2");
-    await dom.send({ type: "answer", seq: again.seq, error: "ccnavi --plan-order が失敗しました" });
+    await dom.send({ type: "answer", seq: again.seq, error: "ccnavi --plan-orderが失敗しました" });
     assert.match(dom.one("#status").textContent ?? "", /失敗/);
     assert.equal(dom.all('.plan-graph[data-editable="1"]').length, 2);
   } finally {
@@ -118,7 +118,7 @@ test("CB-D169 断られた線（循環など）は引く前の形に戻し、理
   }
 });
 
-test("CB-D170 順序の検査に error がある答えは保存できない。理由（problems）は図の下に、終端に届かないステップの印は点に、実行ファイルの答えのまま出す", async () => {
+test("CB-D170 順序の検査にerrorがある答えは保存できない。理由（problems）は図の下に、終端に届かないステップの印は点に、実行ファイルの答えのまま出す", async () => {
   const dom = await openWorkflow();
   try {
     const { seq } = removeEdge(dom, "after-3-4");
@@ -132,7 +132,7 @@ test("CB-D170 順序の検査に error がある答えは保存できない。�
   }
 });
 
-test("CB-D171 保存の前に、番号の変わるステップと付け替える子の提案（識別子と phase の前後）を見せ、保存すると開いたときのハッシュを添えて送る", async () => {
+test("CB-D171 保存の前に、番号の変わるステップと付け替える子の提案（識別子とphaseの前後）を見せ、保存すると開いたときのハッシュを添えて送る", async () => {
   const dom = await openWorkflow({ answer: planOrderSample("open", "a".repeat(64)) });
   try {
     const { seq } = removeEdge(dom, "after-1-3");
@@ -155,7 +155,7 @@ test("CB-D171 保存の前に、番号の変わるステップと付け替える
     dom.click(dom.one('[data-action="confirm-save"]'));
     await dom.settle();
     assert.deepEqual(lastPosted(dom, "save"), { type: "save", order: { plan: { "1": [], "2": [1, 3], "3": [1], "4": [2] } }, expect: "a".repeat(64) });
-    assert.equal(saveButton(dom).disabled, true, "保存中にもう 1 度押せる");
+    assert.equal(saveButton(dom).disabled, true, "保存中にもう1度押せる");
     // 書けなかった（拡張ホストが理由を返した）ら、押せる形に戻して理由を出す
     await dom.send({ type: "failed", message: "子の提案を付け替えられない" });
     assert.match(dom.one("#status").textContent ?? "", /付け替えられない/);
@@ -176,8 +176,8 @@ test("CB-D179 子の提案を付け替えられない理由・改版の錠・計
       answer: {
         ...reverse,
         writable: false,
-        child_problems: ["i0001-02-01 の付け替え先 i0001-03-01 が承認済みチケットと重なる"],
-        mismatched: [{ ticket: "i0001-09-01", path: "/ws/x.md", phase: 9, text: "i0001-09-01 の phase: 9 は親の計画（1〜6 番）にありません" }],
+        child_problems: ["i0001-02-01の付け替え先i0001-03-01が承認済みチケットと重なる"],
+        mismatched: [{ ticket: "i0001-09-01", path: "/ws/x.md", phase: 9, text: "i0001-09-01のphase: 9は親の計画（1〜6番）にありません" }],
       },
     });
     const listed = dom.all("#workflow-problems li").map((li) => li.textContent ?? "");
@@ -247,14 +247,14 @@ test("CB-D174 提案が承認待ちから無くなったら（承認・取り下
   }
 });
 
-test("CB-D175 読み込めなければ理由と再読み込み、読み込み中は一言だけ。中身が届けば図を出す", async () => {
-  const dom = await openWorkflowData({ kind: "error", error: "ccnavi --plan-order が失敗しました: 親の提案がありません" });
+test("CB-D175 読み込めなければ理由と更新、読み込み中は一言だけ。中身が届けば図を出す", async () => {
+  const dom = await openWorkflowData({ kind: "error", error: "ccnavi --plan-orderが失敗しました: 親の提案がありません" });
   try {
     assert.match(dom.one(".load-error").textContent ?? "", /親の提案がありません/);
     dom.click(dom.one('[data-action="reload"]'));
     await dom.settle();
     assert.deepEqual(lastPosted(dom, "reload"), { type: "reload", dirty: false });
-    await dom.send({ type: "data", data: { kind: "loading", text: "i0001 の計画編集を読み込み中…" } });
+    await dom.send({ type: "data", data: { kind: "loading", text: "i0001の計画編集を読み込み中…" } });
     assert.match(dom.one("#ccnavi-loading").textContent ?? "", /読み込み中/);
     await dom.send({ type: "data", data: { kind: "page", page: { root: "/ws", ticket: "i0001", answer: planOrderSample("open") } } });
     assert.equal(dom.all(".plan-graph").length, 2);
@@ -315,7 +315,7 @@ async function walkTour(dom: DomPage): Promise<string[]> {
   return titles;
 }
 
-test("CB-D182 拡張ホストが頼んだらタブの案内を出し、最後まで進めると閉じて tourDone を返す。ヘッダ右上の ? からもう一度出せる", async () => {
+test("CB-D182 拡張ホストが頼んだらタブの案内を出し、最後まで進めると閉じてtourDoneを返す。ヘッダ右上の ? からもう一度出せる", async () => {
   const dom = await openWorkflow();
   try {
     assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
@@ -415,7 +415,7 @@ test("CB-D187 ステップを押すと右の欄に詳細を出す。欄は畳め
   }
 });
 
-test("CB-D189 図の拡大ボタンで図だけを全画面にし、閉じる・Esc で戻す", async () => {
+test("CB-D189 図の拡大ボタンで図だけを全画面にし、閉じる・Escで戻す", async () => {
   const dom = await openWorkflow();
   try {
     const canvas = '.plan-graph[data-part="plan"] .plan-graph-canvas';

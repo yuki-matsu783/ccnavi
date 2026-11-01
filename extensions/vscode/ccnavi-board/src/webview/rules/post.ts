@@ -1,8 +1,8 @@
 /**
  * ルール管理画面が拡張ホストへ返す操作。
- * 送れるのは契約（`core/rules-view.ts` の `RulesMessage`）に書いてあるものだけ。
+ * 送れるのは契約（`core/rules-view.ts`の`RulesMessage`）に書いてあるものだけ。
  *
- * 案内の間（`mutePosts`）は、見本の上の操作が実際の設定へ届かないよう、案内を閉じたことを伝える `tourDone` のほかは送らない。
+ * 案内の間（`mutePosts`）は、見本の上の操作が実際の設定へ届かないよう、案内を閉じたことを伝える`tourDone`のほかは送らない。
  */
 import { poster } from "../vscode.js";
 import type { RulesMessage } from "../../core/rules-view.js";

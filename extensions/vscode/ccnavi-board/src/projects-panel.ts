@@ -1,28 +1,28 @@
 /**
- * プロジェクト管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
- * VS Code の API と子プロセスに触れるので単体テストの対象外。docs/design/manual-checks.md の手動確認の手順で確かめる。
+ * プロジェクト管理画面のWebviewパネル。生成・更新・破棄、ファイル監視、Webviewからの操作の受け付け。
+ * VS CodeのAPIと子プロセスに触れるので単体テストの対象外。docs/design/manual-checks.mdの手動確認の手順で確かめる。
  *
- * 画面は React（`src/webview/projects/`）で、ここが渡すのは「いま何を見せるか」（`ProjectsData`）だけ。
- * 渡し方（送る・入れ物ごと・作り直し中で見送る）は `core/screen-host.ts` が決める。この画面は
- * `retainContextWhenHidden` が偽なので、そのままヒットする（打ちかけの clone の欄は Webview の state にある）。
+ * 画面はReact（`src/webview/projects/`）で、ここが渡すのは「いま何を見せるか」（`ProjectsData`）だけ。
+ * 渡し方（送る・入れ物ごと・作り直し中で見送る）は`core/screen-host.ts`が決める。この画面は
+ * `retainContextWhenHidden`が偽なので、そのままヒットする（打ちかけのcloneの欄はWebviewのstateにある）。
  *
- * 一覧は実行ファイルの答え（`--explain --json` の trees と layers、`--lint --json` の苦情）を並べる。
- * 拡張が自分で見るのは、origin（ローカルの git を読み取り専用で起こす）、ワークスペースとプロジェクトの設定のルールファイル・
- * `.gitignore` の本文、プロジェクトになっていない `.git` の探索だけ。
- * そのルールファイルの場所は layers（レイヤー）の答えを使い、`.ccnavi` から自分で組まない（組み方を実行ファイルとずらさない）。
+ * 一覧は実行ファイルの答え（`--explain --json`のtreesとlayers、`--lint --json`の苦情）を並べる。
+ * 拡張が自分で見るのは、origin（ローカルのgitを読み取り専用で起こす）、ワークスペースとプロジェクトの設定のルールファイル・
+ * `.gitignore`の本文、プロジェクトになっていない`.git`の探索だけ。
+ * そのルールファイルの場所はlayers（レイヤー）の答えを使い、`.ccnavi`から自分で組まない（組み方を実行ファイルとずらさない）。
  *
- * clone は統合ターミナルへ送る。認証の対話はそこでユーザが行い、完了は `projects/<名前>/.git`
- * の出現を監視して拾う。拡張が書くのは、ユーザがボタンを押したときの `.gitignore` だけ。
+ * cloneは統合ターミナルへ送る。認証の対話はそこでユーザが行い、完了は`projects/<名前>/.git`
+ * の出現を監視して拾う。拡張が書くのは、ユーザがボタンを押したときの`.gitignore`だけ。
  *
- * 共通レイヤーのミラー（各プロジェクトの `.ccnavi/config/common/`）のずれは、開いた時と 5 分ごと（`MIRROR_INTERVAL_MS`）に
- * 実行ファイルに聞く（`user mirror --json`。読むだけ）。一覧の読み直し（`update`）とは別に回し、結果は `ProjectsData` の `mirror` に載せる。
+ * 共通レイヤーのミラー（各プロジェクトの`.ccnavi/config/common/`）のずれは、開いた時と5分ごと（`MIRROR_INTERVAL_MS`）に
+ * 実行ファイルに聞く（`user mirror --json`。読むだけ）。一覧の読み直し（`update`）とは別に回し、結果は`ProjectsData`の`mirror`に載せる。
  * 処理の流れ:
  *
- * 1. `refreshMirror` が `runMirror` で実行ファイルに聞き、終わったら次の回を予約する。
- *    読み込み中に呼ばれたら、終わった後にもう 1 回だけ回す（`update` と同じ重ならない作り）。パネルを閉じたら予約を消して止める
- * 2. 画面の「ミラーを同期」「すべて同期」で `mirrorSync` が届いたら `runMirrorYes` を呼ぶ。書くのは実行ファイルで、
- *    各プロジェクトのワークツリーへ（コミットはしない）。結果は VS Code の通知で知らせ、すぐ調べ直す
- * 3. 同期している間と、同期の後の調べ直しが終わるまでは、画面のボタンを押せなくする（`busy`）。古い `expect` で押させないため
+ * 1. `refreshMirror`が`runMirror`で実行ファイルに聞き、終わったら次の回を予約する。
+ *    読み込み中に呼ばれたら、終わった後にもう1回だけ回す（`update`と同じ重ならない作り）。パネルを閉じたら予約を消して止める
+ * 2. 画面の「ミラーを同期」「すべて同期」で`mirrorSync`が届いたら`runMirrorYes`を呼ぶ。書くのは実行ファイルで、
+ *    各プロジェクトのワークツリーへ（コミットはしない）。結果はVS Codeの通知で知らせ、すぐ調べ直す
+ * 3. 同期している間と、同期の後の調べ直しが終わるまでは、画面のボタンを押せなくする（`busy`）。古い`expect`で押させないため
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -58,12 +58,12 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 /** 他の画面（WATCH_DEBOUNCE_MS = 120）より長い。理由は記録が無く未確認。変える前に、プロジェクトの一覧を読む重さを測ること */
 const DEBOUNCE_MS = 300;
-/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+/** 画面の名前。バンドルのパスは`src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "projects";
-const TITLE = "ccnavi プロジェクト管理";
+const TITLE = "ccnaviプロジェクト管理";
 /**
  * ミラーのずれを調べ直す間隔。ずれは共通レイヤーを直したときにしか生じず、急ぐものではない。
- * 1 回ごとに実行ファイルを 2 度（`--version --json` と `user mirror --json`）起こすので、短くしすぎない
+ * 1回ごとに実行ファイルを2度（`--version --json`と`user mirror --json`）起こすので、短くしすぎない
  */
 const MIRROR_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -74,7 +74,7 @@ interface PanelState {
   watchers: vscode.FileSystemWatcher[];
   timer?: NodeJS.Timeout;
   page?: ProjectsPage;
-  /** 読み直せなかった理由。`page` と排他で、どちらかは必ず入っている */
+  /** 読み直せなかった理由。`page`と排他で、どちらかは必ず入っている */
   error?: string;
   loading: boolean;
   again: boolean;
@@ -101,7 +101,7 @@ function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
-/** `ccnaviBoard.openProjects` の本体 */
+/** `ccnaviBoard.openProjects`の本体 */
 export async function openProjects(): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
@@ -109,19 +109,19 @@ export async function openProjects(): Promise<void> {
     return;
   }
   if (state !== undefined) {
-    // `reveal` の前に表示されたことにする。`wasVisible` を真にせずに出すと、下の `update()` と
-    // `onDidChangeViewState` の `becameVisible` からの `update()` で、実行ファイルを 2 度起こす
+    // `reveal`の前に表示されたことにする。`wasVisible`を真にせずに出すと、下の`update()`と
+    // `onDidChangeViewState`の`becameVisible`からの`update()`で、実行ファイルを2度起こす
     state.wasVisible = true;
     state.panel.reveal(state.panel.viewColumn);
     void update();
-    // 開いたままのタブで、左パネルの案内から案内を頼まれたとき。組み上がりの `ready` は来ない
+    // 開いたままのタブで、左パネルの案内から案内を頼まれたとき。組み上がりの`ready`は来ない
     if (tourDue(SCREEN)) {
       state.host.post({ type: "tour" } satisfies ToProjects);
     }
     return;
   }
 
-  // 画面と CSS はバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面とCSSはバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
@@ -131,8 +131,8 @@ export async function openProjects(): Promise<void> {
   }
 
   // タブは読む前に作る。実行ファイルの答えを待ってから作ると、押しても何も起きないように見え、
-  // 押し直した分だけタブが増える（`state` を先に設定するので、2 度目の押下は上の `reveal` に入る）。
-  // 読めなかったときもタブは閉じず、中にエラーを出す（`update` の `showError`）
+  // 押し直した分だけタブが増える（`state`を先に設定するので、2度目の押下は上の`reveal`に入る）。
+  // 読めなかったときもタブは閉じず、中にエラーを出す（`update`の`showError`）
   const panel = vscode.window.createWebviewPanel("ccnaviProjects", TITLE, vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
@@ -267,8 +267,8 @@ function registerPanelHandlers(current: PanelState): void {
     const becameVisible = panel.visible && !current.wasVisible;
     current.wasVisible = panel.visible;
     if (!panel.visible) {
-      // `retainContextWhenHidden` は偽なので、非表示になった画面は破棄される。再表示されると
-      // ここで入れてある HTML から作り直され、組み上がったら `ready` が届く
+      // `retainContextWhenHidden`は偽なので、非表示になった画面は破棄される。再表示されると
+      // ここで入れてあるHTMLから作り直され、組み上がったら`ready`が届く
       current.host.hidden();
     }
     if (becameVisible) {
@@ -282,7 +282,7 @@ function registerPanelHandlers(current: PanelState): void {
       clearTimeout(current.timer);
       current.timer = undefined;
     }
-    // ミラーの次の回を止める。読み込み中の回は、終わったところで `state` が変わったのを見て予約しない
+    // ミラーの次の回を止める。読み込み中の回は、終わったところで`state`が変わったのを見て予約しない
     if (current.mirrorTimer !== undefined) {
       clearTimeout(current.mirrorTimer);
       current.mirrorTimer = undefined;
@@ -298,7 +298,7 @@ function registerPanelHandlers(current: PanelState): void {
 }
 
 /**
- * 監視を張る。置き場のパスは実行ファイルの答えから取るので、最初に読めたときに 1 度だけ張る
+ * 監視を張る。置き場のパスは実行ファイルの答えから取るので、最初に読めたときに1度だけ張る
  * （読めないまま開いたタブは、「更新」で読めたところで張る）。
  */
 function watchProjects(current: PanelState, projectsRel: string, selfRulesRel: string): void {
@@ -306,9 +306,9 @@ function watchProjects(current: PanelState, projectsRel: string, selfRulesRel: s
     return;
   }
   const { folder } = current;
-  // clone の完了（`.git` の出現）、ワークスペースとプロジェクトの設定のルールファイルの出入り、origin の変化、ワークツリーの登録、`.gitignore`。
-  // 設定のパス（ccnavi ディレクトリの下の `config/`）はワークスペースの設定のパスから取る。プロジェクトの設定も同じ形。
-  // ワークスペースの設定のパスが取れない（JSON として読めない）なら、設定のルールファイルの監視は張らない。
+  // cloneの完了（`.git`の出現）、ワークスペースとプロジェクトの設定のルールファイルの出入り、originの変化、ワークツリーの登録、`.gitignore`。
+  // 設定のパス（ccnaviディレクトリの下の`config/`）はワークスペースの設定のパスから取る。プロジェクトの設定も同じ形。
+  // ワークスペースの設定のパスが取れない（JSONとして読めない）なら、設定のルールファイルの監視は張らない。
   const rel = projectsRel;
   const layerDir = selfRulesRel === "" ? "" : path.posix.dirname(selfRulesRel);
   const patterns = [
@@ -389,8 +389,8 @@ function showMirror(current: PanelState): void {
 // ---- ミラー
 
 /**
- * ミラーのずれを調べ直し、終わったら次の回を予約する。読み込み中に呼ばれたら、終わった後にもう 1 回だけ回す。
- * 読むだけで、何も書かない（同期は `syncMirror` だけ）。
+ * ミラーのずれを調べ直し、終わったら次の回を予約する。読み込み中に呼ばれたら、終わった後にもう1回だけ回す。
+ * 読むだけで、何も書かない（同期は`syncMirror`だけ）。
  */
 async function refreshMirror(): Promise<void> {
   const current = state;
@@ -436,15 +436,15 @@ async function refreshMirror(): Promise<void> {
   }
 }
 
-/** 実行ファイルに、`user mirror` を持つかとミラーのずれを聞く */
+/** 実行ファイルに、`user mirror`を持つかとミラーのずれを聞く */
 async function readMirror(root: string): Promise<MirrorStatus> {
   const result = await runMirror(root, binSetting());
   return result.ok ? { kind: "ok", list: result.value } : { kind: "failed", error: result.error };
 }
 
 /**
- * ミラーを同期する（`names` が空なら差分のある全プロジェクト）。書くのは実行ファイルで、各プロジェクトのワークツリーへ。
- * 結果は VS Code の通知で知らせ（成功は情報、見せた後に内容が変わっていたら警告、失敗はエラー）、すぐ調べ直す。
+ * ミラーを同期する（`names`が空なら差分のある全プロジェクト）。書くのは実行ファイルで、各プロジェクトのワークツリーへ。
+ * 結果はVS Codeの通知で知らせ（成功は情報、見せた後に内容が変わっていたら警告、失敗はエラー）、すぐ調べ直す。
  */
 async function syncMirror(current: PanelState, names: readonly string[], expect: string): Promise<void> {
   if (current.syncing || current.seenSeq < current.syncSeq) {
@@ -482,7 +482,7 @@ async function syncMirror(current: PanelState, names: readonly string[], expect:
   }
 }
 
-/** 読み直せなかったことを見せる。理由は覚えておく（渡せなかったときに `ready` で渡し直すため） */
+/** 読み直せなかったことを見せる。理由は覚えておく（渡せなかったときに`ready`で渡し直すため） */
 function showError(current: PanelState, error: string): void {
   current.page = undefined;
   current.error = error;
@@ -490,11 +490,11 @@ function showError(current: PanelState, error: string): void {
 }
 
 /**
- * いまの状態で描き直す。`send` が `deferred`（作り直し中）を返して破棄されたものは、
+ * いまの状態で描き直す。`send`が`deferred`（作り直し中）を返して破棄されたものは、
  * 画面が組み上がった（`ready`）ところでここから渡し直す。
  *
- * 読み直せなかったことも渡し直す。 ここで渡さないと、入れてある HTML（古い一覧）が出たまま
- * 失敗がユーザに届かず、`page` が無いので以後のボタンも使えない。
+ * 読み直せなかったことも渡し直す。 ここで渡さないと、入れてあるHTML（古い一覧）が出たまま
+ * 失敗がユーザに届かず、`page`が無いので以後のボタンも使えない。
  */
 function redraw(current: PanelState): void {
   if (current.page !== undefined) {
@@ -507,8 +507,8 @@ function redraw(current: PanelState): void {
 }
 
 /**
- * プロジェクト管理の画面に渡す手段。VS Code のパネルを `screenHost` の形に合わせる。
- * nonce は呼ぶたびに変える（同じ文字列を `webview.html` に入れても VS Code は何もしない）。
+ * プロジェクト管理の画面に渡す手段。VS Codeのパネルを`screenHost`の形に合わせる。
+ * nonceは呼ぶたびに変える（同じ文字列を`webview.html`に入れてもVS Codeは何もしない）。
  */
 function projectsHost(panel: vscode.WebviewPanel): ScreenHost<ProjectsData> {
   return screenHost<ProjectsData>(
@@ -552,14 +552,14 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     return;
   }
   if (message.type === "ready") {
-    // 画面が組み上がった。入れてある HTML は少し古いことがあるので、いまの中身を渡し直す。
+    // 画面が組み上がった。入れてあるHTMLは少し古いことがあるので、いまの中身を渡し直す。
     // 作り直している間に見送った更新（send）も、ここで届く
     current.host.ready();
     redraw(current);
-    // 非表示の間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
-    // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て破棄している
+    // 非表示の間に見た目が変わっていたら、入れてあるHTMLのbodyのクラスは古い。
+    // `followAppearance`がそのとき送ったものは、段取りが「送れない」と見て破棄している
     postAppearance(current.host);
-    // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す
+    // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら`tourDone`を返す
     if (tourDue(SCREEN)) {
       current.host.post({ type: "tour" } satisfies ToProjects);
     }
@@ -609,18 +609,18 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
   }
   const twin = duplicateOf(page.rows, remote.remote.key);
   if (twin !== undefined) {
-    fail(current, `同じリポジトリを ${twin.name} として既に clone しています（origin ${twin.origin}）`);
+    fail(current, `同じリポジトリを${twin.name}として既にcloneしています（origin ${twin.origin}）`);
     return;
   }
   const target = path.join(page.projectsDir, name.name);
   if (fs.existsSync(target) && listDir(target).length > 0) {
-    fail(current, `${page.projectsRel}/${name.name} が既にあり、空ではありません`);
+    fail(current, `${page.projectsRel}/${name.name}が既にあり、空ではありません`);
     return;
   }
   runInTerminal(root, cloneCommand(root, page.projectsDir, remote.remote.url, name.name));
   info(
     current,
-    `git clone を「ccnavi」ターミナルに送りました（${page.projectsRel}/${name.name}）。認証が必要ならターミナルで入力してください。終わると一覧が更新されます`,
+    `git cloneを「ccnavi」ターミナルに送りました（${page.projectsRel}/${name.name}）。認証が必要ならターミナルで入力してください。終わると一覧が更新されます`,
     "cloned",
   );
 }
@@ -631,10 +631,10 @@ function fixIgnore(current: PanelState, page: ProjectsPage): void {
   try {
     fs.writeFileSync(file, gitignoreWithProjects(before, page.projectsRel), "utf8");
   } catch (error) {
-    fail(current, `.gitignore に保存できません: ${(error as Error).message}`);
+    fail(current, `.gitignoreに保存できません: ${(error as Error).message}`);
     return;
   }
-  info(current, `.gitignore に /${page.projectsRel}/ を追加しました。コミットは自分でしてください`);
+  info(current, `.gitignoreに /${page.projectsRel}/ を追加しました。コミットは自分でしてください`);
   void update();
 }
 
@@ -652,7 +652,7 @@ function asMessage(message: unknown): ProjectsMessage | undefined {
     case "clone":
       return typeof m.url === "string" && typeof m.name === "string" ? { type: "clone", url: m.url, name: m.name } : undefined;
     case "mirrorSync":
-      // 名前は空でない文字列だけ。`expect` が空なら、実行ファイルに渡しても一致しないので受けない
+      // 名前は空でない文字列だけ。`expect`が空なら、実行ファイルに渡しても一致しないので受けない
       return Array.isArray(m.names) && m.names.every((n) => typeof n === "string" && n !== "") && typeof m.expect === "string" && m.expect !== ""
         ? { type: "mirrorSync", names: m.names as string[], expect: m.expect }
         : undefined;

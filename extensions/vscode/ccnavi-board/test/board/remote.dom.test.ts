@@ -2,7 +2,7 @@
  * 親カードの出どころ（issue・MR・ブランチ名）とリモートとの差（未送信・遅れ）、
  * 親のブランチ名 -> 識別子の変換。
  *
- * 値は実行ファイルの JSON（`remote`・`mr`・`issue`・`branch`）のとおりで、拡張は計算し直さない。
+ * 値は実行ファイルのJSON（`remote`・`mr`・`issue`・`branch`）のとおりで、拡張は計算し直さない。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -16,7 +16,7 @@ import { fixture } from "../helpers/fixture.js";
 import { openBoard } from "../helpers/board.js";
 import { remoteItems } from "../../src/webview/board/text.js";
 
-/** 見本のボードの親 i0001 に、出どころとリモートとの差を載せる */
+/** 見本のボードの親i0001に、出どころとリモートとの差を載せる */
 function withRemote(remote: RemoteJson | null, over: Partial<TicketJson> = {}): BoardJson {
   const board = fixture();
   return {
@@ -31,14 +31,14 @@ function parentCard(board: Board) {
   return card;
 }
 
-test("CB-T578 親のカードに issue・MR・ブランチ名とリモートとの差が載る。MR は親チケットの mr: から", () => {
+test("CB-T578 親のカードにissue・MR・ブランチ名とリモートとの差が載る。MRは親チケットのmr: から", () => {
   const remote: RemoteJson = { branch: "feature/12-login", ahead: 2, behind: 1 };
   const card = parentCard(buildBoard(withRemote(remote, { issue: 12, mr: 7, branch: "feature/12-login" })));
   assert.equal(card.issueNumber, 12);
   assert.equal(card.parentMr, 7);
   assert.equal(card.branch, "feature/12-login");
   assert.deepEqual(card.remote, remote);
-  // 親チケットに mr: が無ければ MR は出さない
+  // 親チケットにmr: が無ければMRは出さない
   assert.equal(parentCard(buildBoard(withRemote(remote, { mr: null }))).parentMr, null);
   // 子には載せない
   const child = buildBoard(withRemote(remote)).columns.flatMap((c) => c.cards).find((c) => c.id === "i0001-01-01");
@@ -50,10 +50,10 @@ test("CB-T578 親のカードに issue・MR・ブランチ名とリモートと�
 
 test("CB-T579 リモートとの差の言い方。未送信・遅れ。読めない差は不明", () => {
   const board = (remote: RemoteJson | null) => parentCard(buildBoard(withRemote(remote)));
-  assert.deepEqual(remoteItems(board({ branch: "a", ahead: 2, behind: 1 })), ["未送信 2 件", "遅れ 1 件"]);
-  assert.deepEqual(remoteItems(board({ branch: "a", ahead: 0, behind: 0 })), ["未送信 なし", "遅れ なし"]);
-  assert.deepEqual(remoteItems(board({ branch: "a", ahead: null, behind: null })), ["未送信 不明", "遅れ 不明"]);
-  // ワークツリーが無い親（remote が無い）は出さない
+  assert.deepEqual(remoteItems(board({ branch: "a", ahead: 2, behind: 1 })), ["未送信2件", "遅れ1件"]);
+  assert.deepEqual(remoteItems(board({ branch: "a", ahead: 0, behind: 0 })), ["未送信なし", "遅れなし"]);
+  assert.deepEqual(remoteItems(board({ branch: "a", ahead: null, behind: null })), ["未送信不明", "遅れ不明"]);
+  // ワークツリーが無い親（remoteが無い）は出さない
   assert.deepEqual(remoteItems(board(null)), []);
 });
 
@@ -63,8 +63,8 @@ test("CB-D363 親のカードは、未送信を注意の行に短く出し、出
   const page = await openBoard(json);
   try {
     const parent = page.one('li.card[data-id="i0001"]');
-    // 未送信（ahead が 1 以上）は注意の行に。遅れはここには出さない
-    assert.deepEqual(Array.from(parent.querySelectorAll(".notes .badge.unsent")).map((e) => e.textContent), ["未送信 2 件"]);
+    // 未送信（aheadが1以上）は注意の行に。遅れはここには出さない
+    assert.deepEqual(Array.from(parent.querySelectorAll(".notes .badge.unsent")).map((e) => e.textContent), ["未送信2件"]);
     assert.equal(parent.querySelectorAll(".origin").length, 0, "出どころの行は常時は出さない");
     // 詳細は畳んである（開くまで中身を出さない）
     assert.equal(parent.querySelectorAll("details.card-details").length, 1);
@@ -80,14 +80,14 @@ test("CB-D363 親のカードは、未送信を注意の行に短く出し、出
     assert.equal(row("issue"), "#12");
     assert.equal(row("parent-mr"), "!7");
     assert.equal(row("branch"), "feature/12-login");
-    assert.equal(row("remote"), "未送信 2 件遅れ 1 件");
+    assert.equal(row("remote"), "未送信2件遅れ1件");
     // 子のカードには出さない
     const child = opened.one('li.card[data-id="i0001-01-01"]');
     assert.equal(child.querySelectorAll(".notes .badge.unsent").length, 0);
   } finally {
     await opened.close();
   }
-  // 未送信が 0 件なら注意には出ない（普通のことは出さない）
+  // 未送信が0件なら注意には出ない（普通のことは出さない）
   const clean = await openBoard(withRemote({ branch: "a", ahead: 0, behind: 3 }, {}));
   try {
     assert.equal(clean.all(".badge.unsent").length, 0);
@@ -96,7 +96,7 @@ test("CB-D363 親のカードは、未送信を注意の行に短く出し、出
   }
 });
 
-test("CB-T581 ブランチ名の / を - に置き換えた識別子を作る。Python・sh と共通の表（tests/fixtures/branch-to-id.json）で一致する", () => {
+test("CB-T581 ブランチ名の / を - に置き換えた識別子を作る。Python・shと共通の表（tests/fixtures/branch-to-id.json）で一致する", () => {
   const table = path.join(__dirname, "..", "..", "..", "..", "..", "..", "tests", "fixtures", "branch-to-id.json");
   const cases = (JSON.parse(fs.readFileSync(table, "utf8")) as { convert: { branch: string; id: string }[] }).convert;
   assert.ok(cases.length > 0);

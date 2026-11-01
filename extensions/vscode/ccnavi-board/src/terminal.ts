@@ -1,9 +1,9 @@
 /**
- * clone / fetch / pull と、承認のあと承認済みチケットをコミットして push する sh を送る統合ターミナル。
- * 「ccnavi」という名前の 1 本を使い回す。
+ * clone / fetch / pullと、承認のあと承認済みチケットをコミットしてpushするshを送る統合ターミナル。
+ * 「ccnavi」という名前の1本を使い回す。
  * 承認と残った指摘の行き先はここを通らない（ボードのオーバーレイから子プロセスで打つ。ccnavi.ts）。
- * Windows では Git Bash を使う（sh のスクリプトと `cd ... && ...` の形をそのまま通すため）。
- * 子プロセスで sh を走らせるときも同じシェルを使う（`scriptShell`）。
+ * WindowsではGit Bashを使う（shのスクリプトと`cd ... && ...`の形をそのまま通すため）。
+ * 子プロセスでshを走らせるときも同じシェルを使う（`scriptShell`）。
  */
 import * as fs from "node:fs";
 import * as vscode from "vscode";
@@ -37,7 +37,7 @@ export function runInTerminal(root: string, command: string): void {
 }
 
 /**
- * 実行のたびに新しい専用ターミナルを作って 1 行を送る。「ccnavi」ターミナルは承認の push の sh などが
+ * 実行のたびに新しい専用ターミナルを作って1行を送る。「ccnavi」ターミナルは承認のpushのshなどが
  * 使っていて、走っている間に送った行はそのプロセスの標準入力に入ってしまうので、取り合わないよう分ける
  */
 export function runInNewTerminal(root: string, name: string, command: string): void {
@@ -61,8 +61,8 @@ const READY_TIMEOUT_MS = 3000;
 const pending = new WeakMap<vscode.Terminal, string[]>();
 
 /**
- * 作ったばかりのターミナルで、シェル統合が立ち上がってから行を送る。待っている間に runInTerminal が
- * 積んだ行も、送った順に送る。シェル統合の API が無い版では待たずに送る。API があっても統合が働かない
+ * 作ったばかりのターミナルで、シェル統合が立ち上がってから行を送る。待っている間にrunInTerminalが
+ * 積んだ行も、送った順に送る。シェル統合のAPIが無い版では待たずに送る。APIがあっても統合が働かない
  * 環境（設定で無効・対応しないシェルなど）では、上限の時間まで待ってから送る
  */
 function sendWhenReady(terminal: vscode.Terminal, command: string): void {
@@ -99,14 +99,14 @@ function sendWhenReady(terminal: vscode.Terminal, command: string): void {
 }
 
 /**
- * 子プロセスで sh のスクリプトを走らせるシェル。Windows は統合ターミナルと同じ Git Bash、
- * 他の OS は `sh`
+ * 子プロセスでshのスクリプトを走らせるシェル。Windowsは統合ターミナルと同じGit Bash、
+ * 他のOSは`sh`
  */
 export function scriptShell(): string {
   return shellPath() ?? "sh";
 }
 
-/** Windows だけシェルを指定する。他の OS は既定のシェル（sh が利用できる前提） */
+/** Windowsだけシェルを指定する。他のOSは既定のシェル（shが利用できる前提） */
 function shellPath(): string | undefined {
   if (process.platform !== "win32") {
     return undefined;
@@ -120,7 +120,7 @@ function shellPath(): string | undefined {
       return GIT_BASH;
     }
   } catch {
-    // 無ければ PATH の bash に任せる
+    // 無ければPATHのbashに任せる
   }
   return "bash";
 }

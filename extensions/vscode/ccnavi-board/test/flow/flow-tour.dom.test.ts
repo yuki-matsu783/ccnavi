@@ -1,6 +1,6 @@
 /**
- * フロー編集画面の案内。「?」の一覧・案内の間の見本・実際の編集に触れないこと・閉じたら戻ることを、happy-dom で見る。
- * 指す先（`data-tour`）が全手順で画面にあることは、ルール管理の案内（`rules.dom.test.ts` の CB-D193）と同じ形で確かめる。
+ * フロー編集画面の案内。「?」の一覧・案内の間の見本・実際の編集に触れないこと・閉じたら戻ることを、happy-domで見る。
+ * 指す先（`data-tour`）が全手順で画面にあることは、ルール管理の案内（`rules.dom.test.ts`のCB-D193）と同じ形で確かめる。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -24,7 +24,7 @@ async function start(dom: DomPage, course: string): Promise<void> {
   await dom.settle();
 }
 
-/** 案内を最後まで進める。手順ごとに `each` を呼ぶ（手順の画面が整うのを待ってから） */
+/** 案内を最後まで進める。手順ごとに`each`を呼ぶ（手順の画面が整うのを待ってから） */
 async function walk(dom: DomPage, each: (index: number) => void): Promise<void> {
   let index = 0;
   while (dom.all(".tour").length > 0) {
@@ -40,7 +40,7 @@ function nodeIds(dom: DomPage): string[] {
   return dom.all(".react-flow__node").map((node) => node.getAttribute("data-id") ?? "");
 }
 
-test("CB-D260 「?」は案内の一覧を開き、選んだ案内だけが始まる。基本の案内が先頭で、閉じたら tourDone だけを返す", async () => {
+test("CB-D260 「?」は案内の一覧を開き、選んだ案内だけが始まる。基本の案内が先頭で、閉じたらtourDoneだけを返す", async () => {
   const dom = await openFlow();
   try {
     dom.click(dom.one('[data-action="tour"]'));
@@ -66,7 +66,7 @@ test("CB-D260 「?」は案内の一覧を開き、選んだ案内だけが始�
   }
 });
 
-test("CB-D261 基本の案内は、今のタイトルと順序のまま（部品箱・図・欄・保存・案内）で、拡張ホストが送る tour でも始まる", async () => {
+test("CB-D261 基本の案内は、今のタイトルと順序のまま（部品箱・図・欄・保存・案内）で、拡張ホストが送るtourでも始まる", async () => {
   const dom = await openFlow();
   try {
     await dom.send({ type: "tour" });
@@ -88,11 +88,11 @@ test("CB-D262 全部の案内の全部の手順で、指す先が画面にあり
       await start(dom, course.id);
       await walk(dom, (index) => {
         const step = course.steps[index];
-        const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
+        const at = `${course.id}の${index + 1}番目の手順（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
-        assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面にありません`);
+        assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先${step.target}が画面にありません`);
         assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
-        // 実際のフロー（bareFlow の start / end だけ）ではなく、手順の見本を描く
+        // 実際のフロー（bareFlowのstart / endだけ）ではなく、手順の見本を描く
         const scene = sceneOf(sample, step.scene);
         const doc = scene.flow.doc;
         assert.equal(dom.all(".banner.tour-sample").length, 1, at);
@@ -105,7 +105,7 @@ test("CB-D262 全部の案内の全部の手順で、指す先が画面にあり
         }
       });
       assert.equal(dom.all(".tour").length, 0, `${course.id}: 最後の手順で閉じない`);
-      // 閉じたら実際のフローへ戻る。送ったのは tourDone だけ（dirty・draft・check・save・request などを送らない）
+      // 閉じたら実際のフローへ戻る。送ったのはtourDoneだけ（dirty・draft・check・save・requestなどを送らない）
       assert.deepEqual(nodeIds(dom).sort(), ["end", "start"], `${course.id}: 閉じたあと実際のフローに戻らない`);
       assert.equal(dom.all(".banner.tour-sample").length, 0);
       assert.equal(dom.one(".flow-ticket strong").textContent, "i0001-01-01");
@@ -145,7 +145,7 @@ test("CB-D263 案内の間は、押す・キーで編集しても何も動かず
   }
 });
 
-test("CB-D264 実際に編集中の内容は、案内の間は出ず、閉じたあとに残っている（選んだノードも選んだまま）。案内の間に dirty などを送り直さない", async () => {
+test("CB-D264 実際に編集中の内容は、案内の間は出ず、閉じたあとに残っている（選んだノードも選んだまま）。案内の間にdirtyなどを送り直さない", async () => {
   const dom = await openFlow();
   try {
     dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
@@ -157,7 +157,7 @@ test("CB-D264 実際に編集中の内容は、案内の間は出ず、閉じた
     const before = dom.posted.length;
     await start(dom, "intro");
     await dom.settle();
-    // 案内の間は、編集中の内容でなく見本。未保存の印も見本の scene（基本の案内の 1 番目の手順は未保存でない）
+    // 案内の間は、編集中の内容でなく見本。未保存の印も見本のscene（基本の案内の1番目の手順は未保存でない）
     assert.ok(!nodeIds(dom).includes("prompt-1"));
     assert.equal(dom.all("#dirty:not(.hidden)").length, 0);
     dom.click(dom.one('[data-action="tour-skip"]'));
@@ -176,7 +176,7 @@ test("CB-D264 実際に編集中の内容は、案内の間は出ず、閉じた
   }
 });
 
-test("CB-D265 scene が図の選びと欄を替える（複数選択・グループ・線）。グループ化の案内は、選んだ 2 つで「グループ化」が押せる", async () => {
+test("CB-D265 sceneが図の選びと欄を替える（複数選択・グループ・線）。グループ化の案内は、選んだ2つで「グループ化」が押せる", async () => {
   const dom = await openFlow();
   try {
     await start(dom, "bulk");
@@ -195,11 +195,11 @@ test("CB-D265 scene が図の選びと欄を替える（複数選択・グルー
       group.push(!dom.one<HTMLButtonElement>('[data-action="group-nodes"]').disabled);
     });
     assert.equal(picked[0], "fix-small,redesign");
-    assert.equal(group[0], true, "2 つ選んでも「グループ化」が押せない");
+    assert.equal(group[0], true, "2つ選んでも「グループ化」が押せない");
     assert.equal(inspector[2], "node:group", "枠を選んだ欄にならない");
     assert.equal(picked[2], "group-1");
     assert.equal(picked[4], "investigate");
-    assert.equal(group[4], false, "1 つだけなら「グループ化」は押せない");
+    assert.equal(group[4], false, "1つだけなら「グループ化」は押せない");
     // 見本のグループ化のあとは、枠の中にノードが入っている
     assert.ok(inspector.length === 8);
   } finally {
@@ -264,7 +264,7 @@ test("CB-D267 差分の一覧は見本どうしの差分で、変えた中身が
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
-    // 3 番目の手順（変更の一覧）
+    // 3番目の手順（変更の一覧）
     await dom.settle();
     assert.ok(dom.all('#save-review [data-kind="added-nodes"] li').length >= 1);
     assert.ok(dom.all('#save-review [data-kind="changed-nodes"] li').length >= 1);
@@ -314,7 +314,7 @@ test("CB-D268 畳んだ部品箱・右の欄は、案内の間は開いて指す
   }
 });
 
-test("CB-D269 読み込み中に頼まれた案内はフローが出てから始め、別の対象へ切り替わって読み込み中になったら閉じて tourDone を返す", async () => {
+test("CB-D269 読み込み中に頼まれた案内はフローが出てから始め、別の対象へ切り替わって読み込み中になったら閉じてtourDoneを返す", async () => {
   const dom = await openPage({ kind: "loading", text: "フローを読み込み中…" });
   try {
     await dom.send({ type: "tour" });

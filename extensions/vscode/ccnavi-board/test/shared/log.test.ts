@@ -1,7 +1,7 @@
 /**
- * 診断ログ（`src/log.ts`）。行の形・logfmt のエスケープのしかた・レベルの絞り込み・置き場・書けないときに何も出さないこと・
- * リンクをたどらないこと・出どころの名前・0600・URL と scp 形式の資格情報の伏せ方。
- * sh と Python が同じ行を出すことは Python のテスト（tests/sh/test_diaglog_sh.py）が見る。
+ * 診断ログ（`src/log.ts`）。行の形・logfmtのエスケープのしかた・レベルの絞り込み・置き場・書けないときに何も出さないこと・
+ * リンクをたどらないこと・出どころの名前・0600・URLとscp形式の資格情報の伏せ方。
+ * shとPythonが同じ行を出すことはPythonのテスト（tests/sh/test_diaglog_sh.py）が見る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -39,17 +39,17 @@ function withLevel<T>(value: string | undefined, run: () => T): T {
   }
 }
 
-test("CB-T280 診断ログの行は 時刻・5 字のレベル・出どころ[pid]・本文・logfmt の値 の形", () => {
+test("CB-T280 診断ログの行は 時刻・5字のレベル・出どころ[pid]・本文・logfmtの値 の形", () => {
   const root = workspace();
   try {
-    withLevel(undefined, () => get("probe", root).info("push を拒否した", { reason: "unapproved", ticket: "T-12" }));
+    withLevel(undefined, () => get("probe", root).info("pushを拒否した", { reason: "unapproved", ticket: "T-12" }));
     const [line] = lines(root);
     const head = HEAD.exec(line);
     assert.ok(head !== null, line);
     assert.equal(head[1], "INFO ");
     assert.equal(head[2], "probe");
     assert.equal(head[3], String(process.pid));
-    assert.equal(line.slice(head[0].length), "push を拒否した reason=unapproved ticket=T-12");
+    assert.equal(line.slice(head[0].length), "pushを拒否した reason=unapproved ticket=T-12");
     assert.equal(formatLine("T", "ERROR", "n", 1, "m", { a: true, b: null, c: undefined, d: 3 }), "T ERROR n[1] m a=true b= c= d=3");
     assert.match(stamp(new Date()), /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
   } finally {
@@ -57,7 +57,7 @@ test("CB-T280 診断ログの行は 時刻・5 字のレベル・出どころ[pi
   }
 });
 
-test("CB-T281 logfmt の値は空白・タブ・\"・=・改行を含むときだけ囲み、\\ と \" を逃がし、改行を \\n に畳む", () => {
+test("CB-T281 logfmtの値は空白・タブ・\"・=・改行を含むときだけ囲み、\\ と \" を逃がし、改行を \\n に畳む", () => {
   assert.equal(quote("abc"), "abc");
   assert.equal(quote("a\\b"), "a\\b");
   assert.equal(quote(""), "");
@@ -66,10 +66,10 @@ test("CB-T281 logfmt の値は空白・タブ・\"・=・改行を含むとき�
   assert.equal(quote("k=v"), '"k=v"');
   assert.equal(quote('say "hi"\\x'), '"say \\"hi\\"\\\\x"');
   assert.equal(quote("l1\nl2\r\nl3\rl4"), '"l1\\nl2\\nl3\\nl4"');
-  assert.equal(formatLine("T", "INFO", "n", 1, "1 行目\n2 行目", {}), "T INFO  n[1] 1 行目\\n2 行目");
+  assert.equal(formatLine("T", "INFO", "n", 1, "1行目\n2行目", {}), "T INFO  n[1] 1行目\\n2行目");
 });
 
-test("CB-T282 レベルは CCNAVI_LOG_LEVEL で絞る。大文字小文字を問わず、空と読み込めない値は INFO", () => {
+test("CB-T282 レベルはCCNAVI_LOG_LEVELで絞る。大文字小文字を問わず、空と読み込めない値はINFO", () => {
   assert.equal(withLevel(undefined, () => threshold()), "INFO");
   assert.equal(withLevel("debug", () => threshold()), "DEBUG");
   assert.equal(withLevel("loud", () => threshold()), "INFO");
@@ -93,7 +93,7 @@ test("CB-T282 レベルは CCNAVI_LOG_LEVEL で絞る。大文字小文字を問
   }
 });
 
-test("CB-T283 書けないときはエラーにせず破棄し、console にも何も出さない。root が空なら書かない", () => {
+test("CB-T283 書けないときはエラーにせず破棄し、consoleにも何も出さない。rootが空なら書かない", () => {
   const root = workspace();
   const spoken: unknown[] = [];
   const saved = { log: console.log, error: console.error, warn: console.warn };
@@ -101,7 +101,7 @@ test("CB-T283 書けないときはエラーにせず破棄し、console にも�
   console.error = (...args: unknown[]) => spoken.push(args);
   console.warn = (...args: unknown[]) => spoken.push(args);
   try {
-    // logs がファイルなので logs/diag を作れない
+    // logsがファイルなのでlogs/diagを作れない
     fs.writeFileSync(path.join(root, "logs"), "x");
     assert.doesNotThrow(() => get("probe", root).error("書けない", { a: "b" }));
     assert.doesNotThrow(() => get("probe", "").error("置き場がありません"));
@@ -135,13 +135,13 @@ test("CB-T284 logs・logs/diag・書き先のどれかがリンクなら、辿�
     }
     withLevel(undefined, () => get("probe", root).error("x"));
     assert.equal(fs.readFileSync(victim, "utf8"), "{}\n");
-    // logs/diag がリンク
+    // logs/diagがリンク
     fs.rmSync(path.join(root, "logs"), { recursive: true, force: true });
     fs.mkdirSync(path.join(root, "logs"));
     tryLink(outside, diag);
     withLevel(undefined, () => get("probe", root).error("x"));
     assert.deepEqual(fs.readdirSync(outside), []);
-    // logs そのものがリンク
+    // logsそのものがリンク
     fs.rmSync(path.join(root, "logs"), { recursive: true, force: true });
     fs.mkdirSync(path.join(outside, "diag"));
     tryLink(outside, path.join(root, "logs"));
@@ -153,7 +153,7 @@ test("CB-T284 logs・logs/diag・書き先のどれかがリンクなら、辿�
   }
 });
 
-test("CB-T285 出どころの名前が [A-Za-z0-9_-] 以外を含めば書かない。新しいファイルは 0600", () => {
+test("CB-T285 出どころの名前が [A-Za-z0-9_-]以外を含めば書かない。新しいファイルは0600", () => {
   const root = workspace();
   try {
     for (const name of ["../escape", "a.b", "a b", "a/b", ""]) {
@@ -175,7 +175,7 @@ test("CB-T285 出どころの名前が [A-Za-z0-9_-] 以外を含めば書かな
   }
 });
 
-test("CB-T286 URL と scp 形に埋まった資格情報を *** に伏せる（本文と値の両方。sh と Python と同じ読み）", () => {
+test("CB-T286 URLとscp形に埋まった資格情報を *** に伏せる（本文と値の両方。shとPythonと同じ読み）", () => {
   const cases: Array<[string, string]> = [
     ["https://user:tok@host/x y", "https://***@host/x y"],
     ["oauth2:tok@gitlab.example:org/r.git", "***@gitlab.example:org/r.git"],

@@ -1,12 +1,12 @@
 /**
  * 右の欄。選んだノードか線の中身を直す。何も選んでいなければフロー自体の名前と説明。
  *
- * 直すのは `core/flow-doc.ts` の関数で作ったコピーで、触った欄以外は元のまま（知らない欄を消さない）。
- * 画面が欄を持たない種類は、名前だけ直せて、`data` は読むだけ（ファイルと同じ YAML の形で見せる）。
+ * 直すのは`core/flow-doc.ts`の関数で作ったコピーで、触った欄以外は元のまま（知らない欄を消さない）。
+ * 画面が欄を持たない種類は、名前だけ直せて、`data`は読むだけ（ファイルと同じYAMLの形で見せる）。
  * グループは名前だけ直せて、解く（中のノードは残して枠だけ消す）か消す（同じく中のノードは残す）。
  * サブエージェントの種類とスキルの名前は、実行ファイルが挙げた候補（`candidates`）から選べる。打って決めても
  * よく（ユーザ・プラグインのものは候補に無い）、候補のどれか（組み込み・プロジェクト）か、候補に無いかをつける。
- * 欄に打った字は、どの欄かをつけて返す（呼び手が同じ欄への打ち込みを元に戻す 1 件にまとめる）。フォーカスが外れたら `onSeal`。
+ * 欄に打った字は、どの欄かをつけて返す（呼び手が同じ欄への打ち込みを元に戻す1件にまとめる）。フォーカスが外れたら`onSeal`。
  */
 import type { JSX } from "react";
 
@@ -50,8 +50,8 @@ export interface InspectorProps {
   readonly selected: Selection | undefined;
   readonly readOnly: boolean;
   /**
-   * 直したコピーを返す。欄に打った文字は `typing`（どの欄か）をつける。呼び手はそれを手がかりに、
-   * 同じ欄に続けて打ったものを元に戻す 1 件にまとめる
+   * 直したコピーを返す。欄に打った文字は`typing`（どの欄か）をつける。呼び手はそれを手がかりに、
+   * 同じ欄に続けて打ったものを元に戻す1件にまとめる
    */
   readonly onChange: (doc: FlowDoc, typing?: string) => void;
   /** 欄からフォーカスが外れた。打ち込みのまとまりを区切る */
@@ -60,7 +60,7 @@ export interface InspectorProps {
   /** 実行ファイルが挙げた、選べるサブエージェントとスキルの名前。無ければ候補を出さない */
   readonly candidates?: LintFlowCandidates;
   /**
-   * グループ化・コピー・Ctrl+Z を持たない画面（テンプレートの子のフロー編集）。案内文から、その機能の案内を外す。
+   * グループ化・コピー・Ctrl+Zを持たない画面（テンプレートの子のフロー編集）。案内文から、その機能の案内を外す。
    * フロー編集画面は指定しない
    */
   readonly noGrouping?: boolean;
@@ -71,7 +71,7 @@ export function sourceLabel(source: string): string {
   return source === "builtin" ? "組み込み" : source === "project" ? "プロジェクト（.claude/ の下）" : source;
 }
 
-/** 名前が候補のどれか。無ければ undefined */
+/** 名前が候補のどれか。無ければundefined */
 function candidateOf(list: readonly LintFlowCandidate[], name: string): LintFlowCandidate | undefined {
   return list.find((c) => c.name === name);
 }
@@ -145,7 +145,7 @@ export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect,
         ノードを押すと、ここに欄が出ます。ノードの右の点から左の点へドラッグすると、線でつながります。線を押すと条件を入力できます。ノードや線にポインタを載せると × が出て、押すと削除できます。
         {noGrouping
           ? "元に戻すときは、画面上の「元に戻す」を押します。"
-          : "Shift を押しながらノードを選ぶと、「グループ化」で枠にまとめられます。Ctrl+Z で元に戻せます。選んだノードは Ctrl+C でコピー、Ctrl+V で貼り付け、Ctrl+D で複製できます。"}
+          : "Shiftを押しながらノードを選ぶと、「グループ化」で枠にまとめられます。Ctrl+Zで元に戻せます。選んだノードはCtrl+Cでコピー、Ctrl+Vで貼り付け、Ctrl+Dで複製できます。"}
       </p>
     </aside>
   );
@@ -168,7 +168,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
       )}
     </label>
   );
-  /** 候補から選べる欄。`list` は datalist の id。候補が無ければふつうの欄 */
+  /** 候補から選べる欄。`list`はdatalistのid。候補が無ければふつうの欄 */
   const pickable = (key: string, label: string, list: readonly LintFlowCandidate[] | undefined, listId: string, placeholder: string, tour?: string): JSX.Element => {
     const value = dataText(node, key);
     const found = list === undefined ? undefined : candidateOf(list, value);
@@ -219,7 +219,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
       {type === "subAgent" && (
         <>
           {text("description", "何を任せるか")}
-          {pickable("builtInType", "サブエージェントの種類", candidates?.agents, "flow-agent-candidates", "general-purpose / Explore / Plan など", "inspector-agent")}
+          {pickable("builtInType", "サブエージェントの種類", candidates?.agents, "flow-agent-candidates", "general-purpose / Explore / Planなど", "inspector-agent")}
           {text("prompt", "プロンプト", { area: true, tour: "inspector-prompt" })}
         </>
       )}
@@ -266,7 +266,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
       {host !== undefined && <p className="dim small">グループ「{nodeName(host) || host.id}」の中にあります。枠の外へドラッグすると、グループから出ます。</p>}
       {group && (
         <>
-          <p className="hint">図の上の枠です。手順には入りません（線はつなぎません）。中のノードは {members} 個です。枠の中へドラッグしたノードは枠に入り、外へドラッグすると出ます。枠を選ぶと、縁をドラッグして大きさを変えられます。</p>
+          <p className="hint">図の上の枠です。手順には入りません（線はつなぎません）。中のノードは{members}個です。枠の中へドラッグしたノードは枠に入り、外へドラッグすると出ます。枠を選ぶと、縁をドラッグして大きさを変えられます。</p>
           <div className="buttons">
             <button
               type="button"
@@ -309,19 +309,19 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
   );
 }
 
-/** 分岐の出口（`branches`）か選択肢（`options`）。1 件ずつが出口になる */
+/** 分岐の出口（`branches`）か選択肢（`options`）。1件ずつが出口になる */
 function Branches({ doc, node, readOnly, onChange }: { readonly doc: FlowDoc; readonly node: FlowNode; readonly readOnly: boolean; readonly onChange: (doc: FlowDoc, typing?: string) => void }): JSX.Element {
   const key = branchKey(nodeType(node));
   const options = key === "options";
   const items = branchItems(node);
   const second = options ? "description" : "condition";
-  // if / else の出口は真と偽の 2 本で決まっている（増やすなら switch）
-  // 繰り返しの出口は「繰り返す」と「抜ける」の 2 本で決まっていて、名前も直せない
+  // if / elseの出口は真と偽の2本で決まっている（増やすならswitch）
+  // 繰り返しの出口は「繰り返す」と「抜ける」の2本で決まっていて、名前も直せない
   const loop = nodeType(node) === "loop";
   const fixed = nodeType(node) === "ifElse" || loop;
   return (
     <fieldset className="branches" data-tour="inspector-branches">
-      <legend title={`data.${key ?? ""}`}>{options ? "選択肢（1 件ずつが出口）" : "出口"}</legend>
+      <legend title={`data.${key ?? ""}`}>{options ? "選択肢（1件ずつが出口）" : "出口"}</legend>
       {items.map((item, index) => (
         <div key={index} className="branch" data-index={index}>
           <input
@@ -352,7 +352,7 @@ function Branches({ doc, node, readOnly, onChange }: { readonly doc: FlowDoc; re
         className="action small"
         data-action="add-branch"
         disabled={readOnly}
-        onClick={() => onChange(addBranch(doc, node.id, options ? { label: `選択肢 ${items.length + 1}`, description: "" } : { label: `出口 ${items.length + 1}`, condition: "" }))}
+        onClick={() => onChange(addBranch(doc, node.id, options ? { label: `選択肢${items.length + 1}`, description: "" } : { label: `出口${items.length + 1}`, condition: "" }))}
       >
         ＋ {options ? "選択肢" : "出口"}を追加する
       </button>}

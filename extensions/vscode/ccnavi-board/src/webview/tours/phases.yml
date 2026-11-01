@@ -1,32 +1,32 @@
-# フェーズ管理画面の案内。`sample:` は案内の間だけ画面に出す見本（実際の定義ではない）。
-#   path     見本のファイルの場所（画面には「（見本）」を付けて出す）
-#   lock     作業中のチケットがあるときに画面が出す文（scene の locked で見せる）
-#   error    保存の検証が通らなかったときに下へ出る文（scene の error で見せる）
-#   phases   見本の定義。phases.yml と同じ書き方（version と phases）
-#   added    「＋ 定義を追加」で足した定義の見本。phases と同じ書き方で、phases の外に置く（scene の add: filled で末尾に足す）
-#   project  プロジェクトの設定の見本（name・path・lock・phases）。scene の target: lib で切り替える
-# `scene:` は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。
-#   target   開いている設定。self（ワークスペース。既定）か lib（プロジェクト lib の見本）
-#   open     開く定義の id（, で区切って複数）。指す先 phase-* は、開いた最初の定義に付く。開いた定義が無ければ最初の定義に付く
-#   more     補足（agent / when）を開く定義の id（, で区切って複数）
-#   find     絞り込みの欄に入れる文字
-#   add      末尾に足す行。blank（「＋ 定義を追加」を押した直後の空の行）か filled（sample.added を書いた行）。足した行を開き、phase-* はその行に付く
-#   dirty    未保存の印を出し、保存を押せる状態にする
-#   locked   作業中のチケットがある状態（lock の文を出し、保存を止める）
-#   error    保存の検証が通らなかった文（error）を下に出す
-#   changed  ファイルが外で変わった帯を出す
-#   help     ヘルプの説明を開く
-# `target:` の印（画面の data-tour）:
-#   target / path / dirty / open-file / changed / save / lock   設定の切り替え / ファイルの場所 / 未保存の印 / 「エディタで開く」 / 外の変更の帯 / 保存 / 作業中の文
-#   phases / phase-count / add / help / help-panel / find / status   定義の一覧 / 件数 / 「＋ 定義を追加」 / 「ヘルプ」 / ヘルプの説明 / 絞り込みの欄 / 下の状態の文
-#   phase-row / phase-id / phase-title / phase-kind / phase-review / phase-scope / phase-deliverables / phase-more / phase-agent / phase-when   開いた定義の中
+# フェーズ管理画面の案内。`sample:`は案内の間だけ画面に出す見本（実際の定義ではない）。
+#   path見本のファイルの場所（画面には「（見本）」を付けて出す）
+#   lock作業中のチケットがあるときに画面が出す文（sceneのlockedで見せる）
+#   error保存の検証が通らなかったときに下へ出る文（sceneのerrorで見せる）
+#   phases見本の定義。phases.ymlと同じ書き方（versionとphases）
+#   added    「＋ 定義を追加」で足した定義の見本。phasesと同じ書き方で、phasesの外に置く（sceneのadd: filledで末尾に足す）
+#   projectプロジェクトの設定の見本（name・path・lock・phases）。sceneのtarget: libで切り替える
+# `scene:`は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。
+#   target開いている設定。self（ワークスペース。既定）かlib（プロジェクトlibの見本）
+#   open開く定義のid（, で区切って複数）。指す先phase-* は、開いた最初の定義に付く。開いた定義が無ければ最初の定義に付く
+#   more補足（agent / when）を開く定義のid（, で区切って複数）
+#   find絞り込みの欄に入れる文字
+#   add末尾に足す行。blank（「＋ 定義を追加」を押した直後の空の行）かfilled（sample.addedを書いた行）。足した行を開き、phase-* はその行に付く
+#   dirty未保存の印を出し、保存を押せる状態にする
+#   locked作業中のチケットがある状態（lockの文を出し、保存を止める）
+#   error保存の検証が通らなかった文（error）を下に出す
+#   changedファイルが外で変わった帯を出す
+#   helpヘルプの説明を開く
+# `target:`の印（画面のdata-tour）:
+#   target / path / dirty / open-file / changed / save / lock設定の切り替え / ファイルの場所 / 未保存の印 / 「エディタで開く」 / 外の変更の帯 / 保存 / 作業中の文
+#   phases / phase-count / add / help / help-panel / find / status定義の一覧 / 件数 / 「＋ 定義を追加」 / 「ヘルプ」 / ヘルプの説明 / 絞り込みの欄 / 下の状態の文
+#   phase-row / phase-id / phase-title / phase-kind / phase-review / phase-scope / phase-deliverables / phase-more / phase-agent / phase-when開いた定義の中
 #   tour   「?」
 screen: phases
 
 sample:
   path: .ccnavi/config/project/phases.yml
   lock: 作業中のチケットがあります（2026-10-03-search-api）。いま保存すると、進行中の作業の判定が途中で変わるため、作業が終わってから保存してください。
-  error: 定義 design-feedback は feedback なので review は true にしてください（false は指定できません）
+  error: 定義design-feedbackはfeedbackなのでreviewはtrueにしてください（falseは指定できません）
   phases:
     version: 1
     phases:
@@ -43,7 +43,7 @@ sample:
         review: true
         scope: ["wip/design/*", "docs/*"]
         deliverables: ["wip/design/*.md"]
-        when: 変更箇所が 3 か所を超えるか、外から見える振る舞いが変わるとき
+        when: 変更箇所が3か所を超えるか、外から見える振る舞いが変わるとき
       acceptance:
         kind: work
         title: 受入テスト作成
@@ -82,7 +82,7 @@ sample:
   project:
     name: lib
     path: projects/lib/.ccnavi/config/project/phases.yml
-    lock: プロジェクト lib に作業中のチケットがあります（2026-10-05-lib-parser）。いま保存すると、進行中の作業の判定が途中で変わるため、作業が終わってから保存してください。
+    lock: プロジェクトlibに作業中のチケットがあります（2026-10-05-lib-parser）。いま保存すると、進行中の作業の判定が途中で変わるため、作業が終わってから保存してください。
     phases:
       version: 1
       phases:
@@ -94,20 +94,20 @@ sample:
           when: 設計判断が要らないとき
         api-change:
           kind: work
-          title: 公開 API の変更
+          title: 公開APIの変更
           review: true
           scope: ["src/api/*", "tests/*", "docs/api/*"]
           deliverables: ["docs/api/changes.md"]
-          when: 公開 API を変えるとき。利用者への影響を変更履歴に書く
+          when: 公開APIを変えるとき。利用者への影響を変更履歴に書く
         quick-feedback:
           kind: feedback
           title: 小さい作業への指摘対応
           review: true
           scope: inherit
 
-# 案内の手順が引く時系列の図。登場者を左から並べ、矢印を上から下へ時間順に並べる。矢印の `value` は実際に入れる値や出る答えの例（等幅）で、
-# 値は上の `sample:` の定義（research・design など）と同じにする。手順の `diagram:` で名前を指し、`focus:` で光らせる矢印（id を , で区切る）を決める。
-# `to` を書かない矢印は、その登場者の中の動き。
+# 案内の手順が引く時系列の図。登場者を左から並べ、矢印を上から下へ時間順に並べる。矢印の`value`は実際に入れる値や出る答えの例（等幅）で、
+# 値は上の`sample:`の定義（research・designなど）と同じにする。手順の`diagram:`で名前を指し、`focus:`で光らせる矢印（idを , で区切る）を決める。
+# `to`を書かない矢印は、その登場者の中の動き。
 diagrams:
   # 定義を直して保存し、承認で計画に使われるまで
   phase-save:
@@ -116,7 +116,7 @@ diagrams:
       - id: edit
         from: ユーザ
         to: フェーズ管理画面
-        text: research の定義を直す
+        text: researchの定義を直す
         value: |-
           review: false
           scope: ["wip/research/*"]
@@ -137,7 +137,7 @@ diagrams:
       - id: use
         from: ccnavi
         to: phases.yml
-        text: 読むのは、親の提案を承認するとき・--fill-phases・--lint だけ
+        text: 読むのは、親の提案を承認するとき・--fill-phases・--lintだけ
         value: 承認のあとは、親が持つ定義のコピーを読む。ここを直しても進行中の親は変わらない
 
   # 計画のステップからコピーを作り、承認で固定するまで
@@ -147,7 +147,7 @@ diagrams:
       - id: plan
         from: エージェント
         to: 親の提案
-        text: plan に、使う定義を番号のステップとして並べる
+        text: planに、使う定義を番号のステップとして並べる
         value: |-
           plan:
             - research
@@ -162,7 +162,7 @@ diagrams:
       - id: read
         from: ccnavi
         to: phases.yml
-        text: 計画のステップが使う定義だけを読む（共通の設定に、親の project が指す設定を重ねたもの）
+        text: 計画のステップが使う定義だけを読む（共通の設定に、親のprojectが指す設定を重ねたもの）
       - id: write
         from: ccnavi
         to: 親の提案
@@ -180,18 +180,18 @@ diagrams:
         text: 承認すると、計画とコピーが親に固定される
         value: ccnavi user agree <親>
 
-  # 子が終わって、フェーズが終わる。review: false の例（research）
+  # 子が終わって、フェーズが終わる。review: falseの例（research）
   phase-end-false:
     actors: [親（メインエージェント）, ccnavi]
     steps:
       - id: finish
         from: 親（メインエージェント）
         to: ccnavi
-        text: 一つ目のフェーズ（research）の子を閉じる
+        text: 一つ目のフェーズ（research）の子をクローズする
         value: sh .ccnavi/scripts/ccnavi-ticket.sh finish <子>
       - id: deliverables
         from: ccnavi
-        text: 閉じる前に、必須成果物が在って git に追跡されているかを見る
+        text: 閉じる前に、必須成果物が在ってgitに追跡されているかを見る
         value: wip/research/summary.md が無いと、finish は拒む
       - id: ended
         from: ccnavi
@@ -202,22 +202,22 @@ diagrams:
           → フェーズ 1 は終わり
       - id: kind
         from: ccnavi
-        text: レビューの要否を決める。定義は false で、計画のステップに review の true は無く、実績のリスクも HIGH に届いていない
+        text: レビューの要否を決める。定義はfalseで、計画のステップにreviewのtrueは無く、実績のリスクもHIGHに届いていない
         value: 'review: false → 要らない'
       - id: reply
         from: ccnavi
         to: 親（メインエージェント）
-        text: レビューを省略し、次のフェーズへ進むよう返す。子は finish の時点で done/ に入る
+        text: レビューを省略し、次のフェーズへ進むよう返す。子はfinishの時点でdone/ に入る
         value: 'マーカー: skipped'
 
-  # 同じく子が終わる。review: true の例（design）
+  # 同じく子が終わる。review: trueの例（design）
   phase-end-true:
-    actors: [親（メインエージェント）, ccnavi, マージリクエスト, ユーザ]
+    actors: [親（メインエージェント）, ccnavi, MR, ユーザ]
     steps:
       - id: finish
         from: 親（メインエージェント）
         to: ccnavi
-        text: 二つ目のフェーズ（design）の最後の子を閉じる
+        text: 二つ目のフェーズ（design）の最後の子をクローズする
         value: sh .ccnavi/scripts/ccnavi-ticket.sh finish <子>
       - id: ended
         from: ccnavi
@@ -232,54 +232,54 @@ diagrams:
         value: 'マーカー: pending'
       - id: stop
         from: ccnavi
-        text: レビュー済みになるまで、その親の cwd からのサブエージェントの起動と Bash を止める。ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh と、資料を引く ccnavi-launcher.sh --docs だけは通る。Write / Edit も通る
+        text: レビュー済みになるまで、その親のcwdからのサブエージェントの起動とBashを止める。ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.shと、資料を引くccnavi-launcher.sh --docsだけは通る。Write / Editも通る
         value: DENY_PHASE_REVIEW
       - id: request
         from: 親（メインエージェント）
-        to: マージリクエスト
+        to: MR
         text: レビューを依頼する（依頼を出すまでが「レビュー準備中」、出してからが「レビュー待ち」）
         value: sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 2 --body-file … --eli5 …
       - id: confirm
         from: ユーザ
         to: ccnavi
-        text: 指摘が片付いたら、レビュー済みにする。未解決の指摘が残るなら、decide で行き先を選ぶ
+        text: 指摘が片付いたら、レビュー済みにする。未解決の指摘が残るなら、decideで行き先を選ぶ
         value: ボードの［レビュー完了］、または sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 2
       - id: open
         from: ccnavi
-        text: review/ の子が done/ へ動き、止めが外れる
+        text: review/ の子がdone/ へ動き、止めが外れる
         value: 'マーカー: reviewed'
 
-  # レビューが要るかは、定義・計画のステップ・引き受けた延期のどれか 1 つでも要ると言えば要る。定義が false でも要る扱いになる例（research）
+  # レビューが要るかは、定義・計画のステップ・引き受けた延期のどれか1つでも要ると言えば要る。定義がfalseでも要る扱いになる例（research）
   phase-review-up:
     actors: [フェーズ定義, 親の計画, ccnavi]
     steps:
       - id: def
         from: フェーズ定義
         to: ccnavi
-        text: research の定義は、レビューを省略する
+        text: researchの定義は、レビューを省略する
         value: 'review: false'
       - id: plan
         from: 親の計画
         to: ccnavi
-        text: 計画のステップに review の true を書くと、定義が false でも要るにする
+        text: 計画のステップにreviewのtrueを書くと、定義がfalseでも要るにする
         value: '- {type: research, review: true}'
       - id: pick
         from: ccnavi
-        text: 1 つでも要ると言えば要る
+        text: 1つでも要ると言えば要る
         value: false と true → 要る
       - id: risk
         from: ccnavi
-        text: ステップに review の true が無くても、閉じた子の実績のリスクが HIGH 以上なら、要らない判定を要るに上げる
+        text: ステップにreviewのtrueが無くても、クローズした子の実績のリスクがHIGH以上なら、要らない判定を要るに上げる
         value: 'リスク: 58 (HIGH) — 行数が多い → 要る'
 
-  # 順序は計画のステップの after が決める（定義には順序の欄が無い）
+  # 順序は計画のステップのafterが決める（定義には順序の欄が無い）
   phase-order:
     actors: [親の計画, ccnavi, ユーザ]
     steps:
       - id: after
         from: 親の計画
         to: ccnavi
-        text: ステップごとに、先に済ませる番号を after に書く（自分より小さい番号だけ）
+        text: ステップごとに、先に済ませる番号をafterに書く（自分より小さい番号だけ）
         value: |-
           1: research
           2: {type: design, after: [1]}
@@ -287,7 +287,7 @@ diagrams:
           4: {type: implement, after: [3]}
       - id: waits
         from: ccnavi
-        text: after を辿って、各ステップの先行を計算する
+        text: afterを辿って、各ステップの先行を計算する
         value: |-
           3: acceptance — 先行 1, 2
           4: implement — 先行 1, 2, 3
@@ -298,7 +298,7 @@ diagrams:
         value: 三つ目が閉じてレビューが済むまで、承認されない
       - id: fixed
         from: ccnavi
-        text: 先行は親の計画から計算する。承認のあとに phases.yml を直しても変わらない
+        text: 先行は親の計画から計算する。承認のあとにphases.ymlを直しても変わらない
 
 courses:
   - id: intro
@@ -307,7 +307,7 @@ courses:
     steps:
       - target: phases
         title: フェーズ定義
-        body: 工程の型です。作業（work）の定義は親チケットの計画 plan に、フィードバック対応（feedback）の定義はレビューのあとの feedback に並べます。順序（どのフェーズにどのフェーズが先行するか）は、親チケットの計画のステップの after で決めます（この画面には記載しません）。行を押すと欄が開き、「＋ 定義を追加」で増やせます。
+        body: 工程の型です。作業（work）の定義は親チケットの計画planに、フィードバック対応（feedback）の定義はレビューのあとのfeedbackに並べます。順序（どのフェーズにどのフェーズが先行するか）は、親チケットの計画のステップのafterで決めます（この画面には記載しません）。行を押すと欄が開き、「＋ 定義を追加」で増やせます。
       - target: phase-more
         title: 補足
         body: 案内するエージェントと使う場面です。どちらもエージェントへの案内にだけ使い、判定には使いません。計画のどこに置くか（受入テスト作成を先に置く、フィードバック計画の最後に置く、など）も使う場面に入力します。
@@ -330,88 +330,88 @@ courses:
     steps:
       - target: phase-review
         title: 例の定義
-        body: 見本の調査（research）の定義で追います。レビューは false、編集可能な範囲は wip/research/*、必須成果物は wip/research/summary.md です。直している間は「未保存」の印が付くだけで、ファイルは変わりません。
+        body: 見本の調査（research）の定義で追います。レビューはfalse、編集可能な範囲はwip/research/*、必須成果物はwip/research/summary.mdです。直している間は「未保存」の印が付くだけで、ファイルは変わりません。
         scene: { open: research }
         diagram: phase-save
         focus: edit
       - target: save
         title: 保存すると、まず検証される
-        body: ［保存］を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します。error が 1 件でもあれば、何も保存しません。作業中のチケットがあるときは、進行中の作業の判定が途中で変わるため保存できません。エージェントが応答中なら、確認が出ます。
+        body: ［保存］を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します。errorが1件でもあれば、何も保存しません。作業中のチケットがあるときは、進行中の作業の判定が途中で変わるため保存できません。エージェントが応答中なら、確認が出ます。
         scene: { open: research, dirty: true }
         diagram: phase-save
         focus: save, lock
       - target: save
         title: 書き込まれて、承認のときに読まれる
-        body: 検証を通ると、phases.yml に書き込みます。この定義を読むのは、親の提案の承認、--fill-phases、--lint のときだけです。承認のあとは、親が持つコピーを読むので、あとで直しても進行中の親には反映されません。
+        body: 検証を通ると、phases.ymlに書き込みます。この定義を読むのは、親の提案の承認、--fill-phases、--lintのときだけです。承認のあとは、親が持つコピーを読むので、あとで直しても進行中の親には反映されません。
         scene: { open: research, dirty: true }
         diagram: phase-save
         focus: write, use
       - target: phases
         title: 計画に並べる
-        body: 親の提案の plan に、使う定義をステップとして並べます。ステップの番号が、子の phase の番号になります。ステップは名前だけでも、type と after を持つ形でも書けます。
+        body: 親の提案のplanに、使う定義をステップとして並べます。ステップの番号が、子のphaseの番号になります。ステップは名前だけでも、typeとafterを持つ形でも書けます。
         diagram: phase-fill
         focus: plan
       - target: phases
         title: 使う定義だけをコピーする
-        body: "--fill-phases は、計画のステップが使う定義だけを phases.yml から読み、親の提案の phases: にコピーします。ステップが使わない定義はコピーしません。phases.yml を直したあとに、承認待ちの提案を追いつかせるのも同じ操作です。"
+        body: "--fill-phasesは、計画のステップが使う定義だけをphases.ymlから読み、親の提案のphases: にコピーします。ステップが使わない定義はコピーしません。phases.ymlを直したあとに、承認待ちの提案を追いつかせるのも同じ操作です。"
         diagram: phase-fill
         focus: fill, read, write
       - target: phases
         title: 承認で固定される
-        body: 承認（ccnavi user agree）すると、計画とコピーが親に固定され、以後の判定はコピーを読みます。コピーに書いた scope と review も、その時点の値のままです。
+        body: 承認（ccnavi user agree）すると、計画とコピーが親に固定され、以後の判定はコピーを読みます。コピーに書いたscopeとreviewも、その時点の値のままです。
         diagram: phase-fill
         focus: agree
       - target: phases
-        title: 順序は計画の after が決める
-        body: 定義には順序の欄がありません。どのフェーズにどのフェーズが先行するかは、計画のステップの after が決めます。四つ目の implement には、3 → 2 → 1 を辿って 1, 2, 3 が先行します。
+        title: 順序は計画のafterが決める
+        body: 定義には順序の欄がありません。どのフェーズにどのフェーズが先行するかは、計画のステップのafterが決めます。四つ目のimplementには、3 → 2 → 1を辿って1, 2, 3が先行します。
         diagram: phase-order
         focus: after, waits
       - target: phases
         title: 先行は承認で効く
-        body: 四つ目の子は、三つ目が閉じてレビューが済むまで承認されません。先行は計画から計算するので、承認のあとに phases.yml を直しても変わりません。after の書き漏れは並行として通るので、承認の画面の「すぐ始まる」の一覧で確かめます。
+        body: 四つ目の子は、三つ目が閉じてレビューが済むまで承認されません。先行は計画から計算するので、承認のあとにphases.ymlを直しても変わりません。afterの書き漏れは並行として通るので、承認の画面の「すぐ始まる」の一覧で確かめます。
         diagram: phase-order
         focus: gate, fixed
 
   - id: how-phase-ends
-    title: フェーズが終わったあとの動きが、review でどう変わるかを知りたいとき
-    summary: review が false と true のときの違い。定義・計画のステップ・リスクでレビューが要る扱いになる条件
+    title: フェーズが終わったあとの動きが、reviewでどう変わるかを知りたいとき
+    summary: reviewがfalseとtrueのときの違い。定義・計画のステップ・リスクでレビューが要る扱いになる条件
     steps:
       - target: phase-review
-        title: review が false の定義
-        body: 調査（research）は review が false です。最後の子を finish で閉じるとき、必須成果物 wip/research/summary.md が git に追跡されていないと、finish は拒みます。
+        title: reviewがfalseの定義
+        body: 調査（research）はreviewがfalseです。最後の子をfinishで閉じるとき、必須成果物wip/research/summary.mdがgitに追跡されていないと、finishは拒みます。
         scene: { open: research }
         diagram: phase-end-false
         focus: finish, deliverables
       - target: phases
-        title: false は省略して進む
-        body: 同じ phase の子が doing にも todo にも無く、done に 1 枚以上あれば、フェーズは終わりです。レビューが要らないなら、レビューを省略して次のフェーズへ進むよう返します。ユーザの手は入りません。
+        title: falseは省略して進む
+        body: 同じphaseの子がdoingにもtodoにも無く、doneに1枚以上あれば、フェーズは終わりです。レビューが要らないなら、レビューを省略して次のフェーズへ進むよう返します。ユーザの手は入りません。
         diagram: phase-end-false
         focus: ended, kind, reply
       - target: phase-review
-        title: review が true の定義
-        body: 設計（design）は review が true です。最後の子を閉じてフェーズが終わると、レビューが要ります。
+        title: reviewがtrueの定義
+        body: 設計（design）はreviewがtrueです。最後の子をクローズしてフェーズが終わると、レビューが要ります。
         scene: { open: design }
         diagram: phase-end-true
         focus: finish, ended
       - target: phases
-        title: true なら、ユーザを待って止まる
-        body: 返す文は「すべての子が合流済みと確かめ、レビューを頼み、応答を終えてユーザを待て」です。レビュー済みになるまで、その親の cwd からのサブエージェントの起動と Bash が止まります。次のフェーズの計画を書く Write と Edit は通ります。
+        title: trueなら、ユーザを待って止まる
+        body: 返す文は「すべての子が合流済みと確かめ、レビューを頼み、応答を終えてユーザを待て」です。レビュー済みになるまで、その親のcwdからのサブエージェントの起動とBashが止まります。次のフェーズの計画を書くWriteとEditは通ります。
         diagram: phase-end-true
         focus: reply, stop
       - target: phases
         title: 依頼してから、レビュー済みまで
-        body: エージェントがマージリクエストにレビューを依頼し、ユーザが指摘を付けます。指摘が片付いたら、ボードの［レビュー完了］か confirm でレビュー済みにします。review/ の子が done/ へ動き、止めが外れます。
+        body: エージェントがMRにレビューを依頼し、ユーザが指摘を付けます。指摘が片付いたら、ボードの［レビュー完了］かconfirmでレビュー済みにします。review/ の子がdone/ へ動き、止めが外れます。
         diagram: phase-end-true
         focus: request, confirm, open
       - target: phase-review
-        title: 定義が false でも、計画のステップで true にできる
-        body: 定義の review と計画のステップの review のどちらかが true なら、そのフェーズはレビューが要ります。計画のステップに review の true を書くと、research の定義が false のままでも、そのフェーズはレビューが要ります。
+        title: 定義がfalseでも、計画のステップでtrueにできる
+        body: 定義のreviewと計画のステップのreviewのどちらかがtrueなら、そのフェーズはレビューが要ります。計画のステップにreviewのtrueを書くと、researchの定義がfalseのままでも、そのフェーズはレビューが要ります。
         scene: { open: research }
         diagram: phase-review-up
         focus: def, plan, pick
       - target: phases
-        title: リスクが高ければ、false も要るに上がる
-        body: 閉じた子の実績のリスクが HIGH 以上なら、宣言が false でも、レビューが要る扱いになります。点と理由は、閉じたときの出力とレビューの依頼文の先頭に出ます。feedback の定義は、もとから false を書けません。
+        title: リスクが高ければ、falseも要るに上がる
+        body: クローズした子の実績のリスクがHIGH以上なら、宣言がfalseでも、レビューが要る扱いになります。点と理由は、クローズしたときの出力とレビューの依頼文の先頭に出ます。feedbackの定義は、もとからfalseを書けません。
         diagram: phase-review-up
         focus: risk
 
@@ -421,35 +421,35 @@ courses:
     steps:
       - target: add
         title: 定義を追加する
-        body: 「＋ 定義を追加」を押すと、空の定義が末尾に追加され、行が開いて id の欄にカーソルが移ります。追加した定義の既定は、区分が work、レビューが true、編集可能な範囲が inherit です。保存するまでファイルには反映されません。
+        body: 「＋ 定義を追加」を押すと、空の定義が末尾に追加され、行が開いてidの欄にカーソルが移ります。追加した定義の既定は、区分がwork、レビューがtrue、編集可能な範囲がinheritです。保存するまでファイルには反映されません。
       - target: phase-id
-        title: id を付ける
-        body: id は定義の名前で、親チケットの計画に並べるときにこの名前で指します。英数字で始め、入力できるのは英数字と . _ - です。ほかの定義と重複すると、保存できません。
+        title: idを付ける
+        body: idは定義の名前で、親チケットの計画に並べるときにこの名前で指します。英数字で始め、入力できるのは英数字と . _ - です。ほかの定義と重複すると、保存できません。
         scene:
           add: blank
       - target: phase-title
         title: タイトルを付ける
-        body: タイトルです。空なら id をそのまま使います。id と同じく、ほかの定義と重なるものは使えません。
+        body: タイトルです。空ならidをそのまま使います。idと同じく、ほかの定義と重なるものは使えません。
         scene:
           add: blank
       - target: phase-kind
         title: 区分を選ぶ
-        body: 計画に並べる定義は work、レビューのあとに対応するフィードバック計画に並べる定義は feedback です。feedback のレビューは true になります。
+        body: 計画に並べる定義はwork、レビューのあとに対応するフィードバック計画に並べる定義はfeedbackです。feedbackのレビューはtrueになります。
         scene:
           add: blank
       - target: phase-scope
         title: 編集可能な範囲を決める
-        body: この定義で作る子チケットの、編集できる範囲の上限です。ワークツリーのルートからの glob を指定するか、inherit で親の範囲そのままにします。子の範囲が上限に収まるかは、実行ファイルが判定します。
+        body: この定義で作る子チケットの、編集できる範囲の上限です。ワークツリーのルートからのglobを指定するか、inheritで親の範囲そのままにします。子の範囲が上限に収まるかは、実行ファイルが判定します。
         scene:
           add: filled
       - target: phase-deliverables
         title: 必須成果物を決める
-        body: 子を閉じる前に存在し、git に追跡されているべきファイルです。複数あるときは , で区切ります。空なら確かめません。
+        body: 子をクローズする前に存在し、gitに追跡されているべきファイルです。複数あるときは , で区切ります。空なら確かめません。
         scene:
           add: filled
       - target: save
         title: 保存して計画に使う
-        body: 保存すると、検証を通ったあとに phases.yml に反映されます。親チケットの計画のステップにこの id を並べると利用できます。親は承認のときに定義のコピーを保持するので、あとで直しても進行中の親には反映されません。
+        body: 保存すると、検証を通ったあとにphases.ymlに反映されます。親チケットの計画のステップにこのidを並べると利用できます。親は承認のときに定義のコピーを保持するので、あとで直しても進行中の親には反映されません。
         scene:
           add: filled
           dirty: true
@@ -460,18 +460,18 @@ courses:
     steps:
       - target: phase-more
         title: 補足の欄
-        body: 定義の下に「補足」の見出しがあります。案内するエージェント（agent）と使う場面（when）の 2 欄で、値がある定義は最初から開きます。どちらもエージェントへの案内にだけ使い、判定には使いません。
+        body: 定義の下に「補足」の見出しがあります。案内するエージェント（agent）と使う場面（when）の2欄で、値がある定義は最初から開きます。どちらもエージェントへの案内にだけ使い、判定には使いません。
         scene:
           open: acceptance
       - target: phase-agent
         title: 案内するエージェント
-        body: この定義の子を任せたいサブエージェントの名前です。案内に出すだけで、割り当てはしません。見本では受入テスト作成に acceptance-tester を記載しています。
+        body: この定義の子を任せたいサブエージェントの名前です。案内に出すだけで、割り当てはしません。見本では受入テスト作成にacceptance-testerを記載しています。
         scene:
           open: acceptance
           more: acceptance
       - target: phase-when
         title: 使う場面
-        body: この定義を計画に入れる場面と、計画のどこに置くかを入力します。見本では「設計のあと、実装より先に書く」と書き、置き場所を伝えています。順序そのものは、親チケットの計画のステップの after で決めます。
+        body: この定義を計画に入れる場面と、計画のどこに置くかを入力します。見本では「設計のあと、実装より先に書く」と書き、置き場所を伝えています。順序そのものは、親チケットの計画のステップのafterで決めます。
         scene:
           open: acceptance
           more: acceptance
@@ -482,7 +482,7 @@ courses:
           find: 実装より先
       - target: help-panel
         title: 順序は計画に記載する
-        body: 工程の順序は、この画面でも定義でも指定しません。親チケットの計画のステップに after で先行を指定します。使う場面に入力した置き方は、計画を書くエージェントが読む案内です。
+        body: 工程の順序は、この画面でも定義でも指定しません。親チケットの計画のステップにafterで先行を指定します。使う場面に入力した置き方は、計画を書くエージェントが読む案内です。
         scene:
           help: true
       - target: save
@@ -495,40 +495,40 @@ courses:
 
   - id: feedback
     title: フィードバック対応の定義を使い分けたいとき
-    summary: feedback の定義の区分・レビュー・範囲・置き方を決める
+    summary: feedbackの定義の区分・レビュー・範囲・置き方を決める
     steps:
       - target: phases
-        title: work と feedback
-        body: 一覧には work と feedback の定義が並びます。work はレビューを受ける前の計画 plan に、feedback はレビューの指摘に対応する計画 feedback に並べます。計画に並べられるのは、それぞれの区分の定義だけです。
+        title: workとfeedback
+        body: 一覧にはworkとfeedbackの定義が並びます。workはレビューを受ける前の計画planに、feedbackはレビューの指摘に対応する計画feedbackに並べます。計画に並べられるのは、それぞれの区分の定義だけです。
       - target: phase-kind
-        title: 区分は feedback にする
-        body: 区分を feedback にした定義だけが、フィードバック計画に並べられます。指摘の種類（設計か実装か）ごとに、定義を分けておきます。
+        title: 区分はfeedbackにする
+        body: 区分をfeedbackにした定義だけが、フィードバック計画に並べられます。指摘の種類（設計か実装か）ごとに、定義を分けておきます。
         scene:
           open: implement-feedback
       - target: phase-review
-        title: レビューは true のまま
-        body: feedback の定義は、レビューを true にします。false にすると検証が通らず、保存できません。対応した結果も、必ずレビューを受けます。
+        title: レビューはtrueのまま
+        body: feedbackの定義は、レビューをtrueにします。falseにすると検証が通らず、保存できません。対応した結果も、必ずレビューを受けます。
         scene:
           open: implement-feedback
       - target: phase-scope
         title: 指摘の種類で範囲を絞る
-        body: 設計への指摘だけを直す定義は、範囲を wip/design と docs に絞ります。実装への指摘は、範囲を inherit にして親の範囲そのままにすると、指摘が多岐にわたっても収まります。
+        body: 設計への指摘だけを直す定義は、範囲をwip/designとdocsに絞ります。実装への指摘は、範囲をinheritにして親の範囲そのままにすると、指摘が多岐にわたっても収まります。
         scene:
           open: design-feedback
       - target: phase-when
         title: 最後に置いて受ける
-        body: 使う場面に、フィードバック計画のどこに置くかを入力します。見本の実装フィードバック対応は、最後に置いてほかの対応を受けます。独立した対応は、最後の 1 ステップで受けるか、一直線に並べます。
+        body: 使う場面に、フィードバック計画のどこに置くかを入力します。見本の実装フィードバック対応は、最後に置いてほかの対応を受けます。独立した対応は、最後の1ステップで受けるか、一直線に並べます。
         scene:
           open: implement-feedback
           more: implement-feedback
       - target: find
-        title: feedback だけを見る
-        body: 絞り込みの欄に feedback と入れると、id に feedback を含む定義だけが残ります。定義が増えたときに、work と feedback の取り違えを防げます。
+        title: feedbackだけを見る
+        body: 絞り込みの欄にfeedbackと入れると、idにfeedbackを含む定義だけが残ります。定義が増えたときに、workとfeedbackの取り違えを防げます。
         scene:
           find: feedback
       - target: help-panel
         title: 順序は計画に記載する
-        body: フィードバック計画の順序も、定義ではなく feedback のステップの after で決めます。最後のステップにほかのすべてのステップが先行する形にします。
+        body: フィードバック計画の順序も、定義ではなくfeedbackのステップのafterで決めます。最後のステップにほかのすべてのステップが先行する形にします。
         scene:
           help: true
 
@@ -538,23 +538,23 @@ courses:
     steps:
       - target: target
         title: 設定を切り替える
-        body: 開いている設定はワークスペースの設定で、親チケットの project が空のときに使われます。この欄で、共通の設定や、設定のあるプロジェクトの定義に切り替えられます。
+        body: 開いている設定はワークスペースの設定で、親チケットのprojectが空のときに使われます。この欄で、共通の設定や、設定のあるプロジェクトの定義に切り替えられます。
       - target: phases
         title: ワークスペースの定義
         body: 見本のワークスペースには、調査・設計・受入テスト作成・実装とテストなどの作業の定義と、フィードバック対応の定義があります。
       - target: target
         title: プロジェクトを選ぶ
-        body: プロジェクトを選ぶと、このタブの中身がそのプロジェクトの定義に変わります。タブは 1 枚のままです。見本では lib を選んでいます。
+        body: プロジェクトを選ぶと、このタブの中身がそのプロジェクトの定義に変わります。タブは1枚のままです。見本ではlibを選んでいます。
         scene:
           target: lib
       - target: path
         title: ファイルの場所
-        body: プロジェクトの定義は、プロジェクトの .ccnavi/config/project/phases.yml にあります。どの設定を開いているかは、ここの場所で見分けます。
+        body: プロジェクトの定義は、プロジェクトの .ccnavi/config/project/phases.ymlにあります。どの設定を開いているかは、ここの場所で見分けます。
         scene:
           target: lib
       - target: phases
         title: 共通の設定との重ね合わせ
-        body: 使われるのは、共通の設定の定義と、親チケットの project が指す 1 本を重ねたものです。ワークスペースの定義とプロジェクトの定義は合算されません。同じ id で中身が違う定義と、タイトルが重なる定義は、保存の検査で止まります。
+        body: 使われるのは、共通の設定の定義と、親チケットのprojectが指す1本を重ねたものです。ワークスペースの定義とプロジェクトの定義は合算されません。同じidで中身が違う定義と、タイトルが重なる定義は、保存の検査で止まります。
         scene:
           target: lib
       - target: target
@@ -582,12 +582,12 @@ courses:
           dirty: true
       - target: save
         title: 検証してから保存する
-        body: 保存すると、直した内容を一時ファイルに保存して、実行ファイルの検証（lint）を通します。通れば phases.yml に反映します。コメントは、直していない場所ではそのまま残ります。
+        body: 保存すると、直した内容を一時ファイルに保存して、実行ファイルの検証（lint）を通します。通ればphases.ymlに反映します。コメントは、直していない場所ではそのまま残ります。
         scene:
           dirty: true
       - target: status
         title: 通らなかったとき
-        body: 検証が通らなければ、保存せずに下へ理由を出します。検証に通らない例は、識別子に使えない id、重複したタイトル、feedback の定義で review を false にしたことです。同じ id が 2 つあるときは、画面が先に止めます。
+        body: 検証が通らなければ、保存せずに下へ理由を出します。検証に通らない例は、識別子に使えないid、重複したタイトル、feedbackの定義でreviewをfalseにしたことです。同じidが2つあるときは、画面が先に止めます。
         scene:
           dirty: true
           error: true
@@ -604,4 +604,4 @@ courses:
           changed: true
       - target: open-file
         title: エディタで開く
-        body: 画面で直しにくいこと（コメントの追記など）は、エディタでファイルを開いて直します。YAML として読み込めないファイルも、エディタで直します。
+        body: 画面で直しにくいこと（コメントの追記など）は、エディタでファイルを開いて直します。YAMLとして読み込めないファイルも、エディタで直します。

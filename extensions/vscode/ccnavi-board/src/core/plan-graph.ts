@@ -1,5 +1,5 @@
 /**
- * 計画の図の中身。実行ファイルが返す計画 1 つぶん（`plans` の 1 件。`approvemodel.ts` の `ApprovePlan`）から、
+ * 計画の図の中身。実行ファイルが返す計画1つぶん（`plans`の1件。`approvemodel.ts`の`ApprovePlan`）から、
  * 点・線・置き場所を組む純関数。描くのは共有の図の部品（`webview/shared/PlanGraph.tsx`）で、承認のオーバーレイは
  * 読むだけで、計画編集タブは線を引き直して使う。
  *
@@ -7,59 +7,59 @@
  * （`review_at`）、順序の検査の理由（`problems`）は実行ファイルが決めて返し、ここは印を付けるだけ。
  * ここが組むのは、線と点だけで決まる形の扱いに限る。
  *
- * - **start と end の仮の点。** 先行の無いステップへ start から、後続の無いステップから end へ線を引く。どちらも図だけの
- *   もので保存しない（実行ファイルは知らない）。この 2 種類の線は引き直せない（先行を全部消せば start からの
- *   線が出る）。フィードバック計画では start を「全体計画のレビュー後」、end を「親を閉じる」と名付ける
- * - **置き場所。** start からの最長の段数で列に分け、列の中は番号順。線が循環していても（計画編集タブで
+ * - **startとendの仮の点。** 先行の無いステップへstartから、後続の無いステップからendへ線を引く。どちらも図だけの
+ *   もので保存しない（実行ファイルは知らない）。この2種類の線は引き直せない（先行を全部消せばstartからの
+ *   線が出る）。フィードバック計画ではstartを「全体計画のレビュー後」、endを「親をクローズする」と名付ける
+ * - **置き場所。** startからの最長の段数で列に分け、列の中は番号順。線が循環していても（計画編集タブで
  *   引いている途中など）止まらず、循環に戻った線は段数に数えない（循環を言うのは引けない線の検査と実行ファイル）
- * - **引けない線（`canConnect`）。** ステップからステップへだけ引ける。自分へ・start と end に触れる線・固定した番号
+ * - **引けない線（`canConnect`）。** ステップからステップへだけ引ける。自分へ・startとendに触れる線・固定した番号
  *   （子が承認された番号）へ入る線・循環になる線を断る。線と点だけで決まる形の検査で、計画の良し悪しの判定ではない
  *
  * - **置き場所を覚える（`layoutOf` / `withLayout`）。** 計画編集タブで線を変えて番号が振り直っても、
  *   点に表示する番号だけが変わり、置き場所は動かさない。置き場所は振り直す前の番号（`from`）で覚え、「並べ直す」で
  *   組み直す。覚えるのは画面の状態だけで、保存しない
- * - **消せる線（`canDisconnect`）。** ステップどうしの線だけ。start と end の仮の線と、固定した番号へ入る線は消せない
+ * - **消せる線（`canDisconnect`）。** ステップどうしの線だけ。startとendの仮の線と、固定した番号へ入る線は消せない
  *
- * `after` が計画に無い番号を指すものは線にしない（なぜ無いのかを言うのは実行ファイル）。
+ * `after`が計画に無い番号を指すものは線にしない（なぜ無いのかを言うのは実行ファイル）。
  *
- * VS Code の API も DOM も node も読まない（画面のバンドルに入る）。
+ * VS CodeのAPIもDOMもnodeも読まない（画面のバンドルに入る）。
  */
 import type { ApprovePlan } from "./approvemodel.js";
 
-/** 点の種類。`item` は計画のステップ、`start` と `end` は図だけの仮の点 */
+/** 点の種類。`item`は計画のステップ、`start`と`end`は図だけの仮の点 */
 export type PlanNodeKind = "start" | "item" | "end";
 
 export interface PlanGraphNode {
   /** `start`・`end`・`n<番号>` */
   readonly id: string;
   readonly kind: PlanNodeKind;
-  /** ステップの番号。start と end は null */
+  /** ステップの番号。startとendはnull */
   readonly number: number | null;
   /**
-   * 振り直す前の番号（実行ファイルの `from`。いま提案に書いてある番号）。計画編集タブで番号が振り直っても
-   * 同じステップを指すので、置き場所はこれで覚える。start と end は null
+   * 振り直す前の番号（実行ファイルの`from`。いま提案に書いてある番号）。計画編集タブで番号が振り直っても
+   * 同じステップを指すので、置き場所はこれで覚える。startとendはnull
    */
   readonly from: number | null;
-  /** ステップなら定義のタイトル、start と end なら名前 */
+  /** ステップなら定義のタイトル、startとendなら名前 */
   readonly label: string;
-  /** 定義の名前。start と end は空 */
+  /** 定義の名前。startとendは空 */
   readonly type: string;
-  /** レビューが要るか（実行ファイルの値のまま）。定義が読めなければ null。start と end も null */
+  /** レビューが要るか（実行ファイルの値のまま）。定義が読めなければnull。startとendもnull */
   readonly review: boolean | null;
   readonly deferred: boolean;
   /** 延期したレビューを引き受ける番号（実行ファイルの値のまま） */
   readonly reviewAt: number | null;
   /** 固定した番号（子が承認された番号）。入る線を変えられない */
   readonly locked: boolean;
-  /** 終端に届かないステップ（実行ファイルの `loose` に入っている） */
+  /** 終端に届かないステップ（実行ファイルの`loose`に入っている） */
   readonly loose: boolean;
-  /** start からの最長の段数。start が 0 */
+  /** startからの最長の段数。startが0 */
   readonly column: number;
   readonly x: number;
   readonly y: number;
 }
 
-/** 線の種類。`after` はステップどうし（先行側 → 後続側）、`start` と `end` は図だけの仮の線 */
+/** 線の種類。`after`はステップどうし（先行側 → 後続側）、`start`と`end`は図だけの仮の線 */
 export type PlanEdgeKind = "after" | "start" | "end";
 
 export interface PlanGraphEdge {
@@ -68,7 +68,7 @@ export interface PlanGraphEdge {
   readonly source: string;
   readonly target: string;
   readonly kind: PlanEdgeKind;
-  /** 終端に届かないステップから end への線 */
+  /** 終端に届かないステップからendへの線 */
   readonly loose: boolean;
 }
 
@@ -80,8 +80,8 @@ export interface PlanGraph {
 
 /**
  * 開いたときに図を合わせる倍率の下限。全体を枠に収める（fitView）と、ステップの多い計画や狭い枠では文字が
- * 数 px まで縮んで読めない。ここで止め、はみ出す分はパンで見せる（開始の側から見せる）。
- * 0.7 で点の文字（13px）が 9px 前後になり、読める下限に近い。計画編集タブの広い枠では
+ * 数pxまで縮んで読めない。ここで止め、はみ出す分はパンで見せる（開始の側から見せる）。
+ * 0.7で点の文字（13px）が9px前後になり、読める下限に近い。計画編集タブの広い枠では
  * 下限にヒットするのは大きな計画だけなので、同じ値でよい（線を引くには文字が読める大きさが要る）。
  * 拡大・縮小のボタンと「全体を表示」は、この下限より小さくもできる
  */
@@ -89,7 +89,7 @@ export const PLAN_FIT_MIN_ZOOM = 0.7;
 /** 開いたときに図を合わせる倍率の上限。小さな計画を等倍より大きくしない */
 export const PLAN_FIT_MAX_ZOOM = 1;
 
-/** 下限で止まったとき、開始の点を枠の左端から離す余白（px）。`webview/shared/PlanGraph.tsx` の `START_PAD` と同じ */
+/** 下限で止まったとき、開始の点を枠の左端から離す余白（px）。`webview/shared/PlanGraph.tsx`の`START_PAD`と同じ */
 export const FIT_START_PAD = 16;
 
 /** 画面上の点の箱（図の座標。左上の位置と大きさ） */
@@ -106,19 +106,19 @@ export function fitStalled(zoom: number): boolean {
 }
 
 /**
- * 下限で止まったときの見え方。開始の点を枠の左端（`pad` だけ内側）に、縦は開始の中心を枠の中心に置く
- * （分岐で縦に広がっても開始が見える。最小 x の点ではなく、開始の点そのものに合わせる）。
- * `frameHeight` は図の枠の高さ。座標は React Flow の `setViewport` の値（図の座標 × zoom + 平行移動）
+ * 下限で止まったときの見え方。開始の点を枠の左端（`pad`だけ内側）に、縦は開始の中心を枠の中心に置く
+ * （分岐で縦に広がっても開始が見える。最小xの点ではなく、開始の点そのものに合わせる）。
+ * `frameHeight`は図の枠の高さ。座標はReact Flowの`setViewport`の値（図の座標 × zoom + 平行移動）
  */
 export function viewportAtStart(zoom: number, start: FitBox, frameHeight: number, pad: number = FIT_START_PAD): { readonly x: number; readonly y: number; readonly zoom: number } {
   return { x: pad - start.x * zoom, y: frameHeight / 2 - (start.y + start.height / 2) * zoom, zoom };
 }
 
-/** 列の間隔と行の間隔。CSS の `.react-flow__node-planItem` の大きさと合わせる */
+/** 列の間隔と行の間隔。CSSの`.react-flow__node-planItem`の大きさと合わせる */
 export const COLUMN = 210;
 export const ROW = 96;
 
-/** start と end の名前。フィードバック計画は全体計画のレビューのあとに始まり、終われば親を閉じる */
+/** startとendの名前。フィードバック計画は全体計画のレビューのあとに始まり、終われば親をクローズする */
 const ENDS: Readonly<Record<"plan" | "feedback", { readonly start: string; readonly end: string }>> = {
   plan: { start: "開始", end: "終了" },
   feedback: { start: "全体計画のレビュー後", end: "親をクローズする" },
@@ -128,7 +128,7 @@ export function nodeId(number: number): string {
   return `n${number}`;
 }
 
-/** 計画 1 つぶんの図。点は start・ステップ（番号順）・end の順、線はステップごとに start・after・end の順 */
+/** 計画1つぶんの図。点はstart・ステップ（番号順）・endの順、線はステップごとにstart・after・endの順 */
 export function planGraphOf(plan: ApprovePlan): PlanGraph {
   const numbers = plan.items.map((item) => item.number);
   const known = new Set(numbers);
@@ -194,7 +194,7 @@ export function planGraphOf(plan: ApprovePlan): PlanGraph {
   return { part: plan.part, nodes, edges };
 }
 
-/** start からの最長の段数（先行の無いステップが 1）。循環に戻った線は数えない */
+/** startからの最長の段数（先行の無いステップが1）。循環に戻った線は数えない */
 function depthsOf(numbers: readonly number[], before: ReadonlyMap<number, readonly number[]>): Map<number, number> {
   const depth = new Map<number, number>();
   const visiting = new Set<number>();
@@ -218,9 +218,9 @@ function depthsOf(numbers: readonly number[], before: ReadonlyMap<number, readon
 }
 
 /**
- * `source` から `target` へ線を引けるか（`source` が `target` の先行になる）。引けるのはステップからステップへだけで、
- * 自分へ・start と end に触れる線（図が自動で引く）・固定した番号へ入る線・循環になる線（`target` から
- * `source` へ既に辿れる）を断る。React Flow の `isValidConnection` に渡し、引いている最中に断る
+ * `source`から`target`へ線を引けるか（`source`が`target`の先行になる）。引けるのはステップからステップへだけで、
+ * 自分へ・startとendに触れる線（図が自動で引く）・固定した番号へ入る線・循環になる線（`target`から
+ * `source`へ既に辿れる）を断る。React Flowの`isValidConnection`に渡し、引いている最中に断る
  */
 export function canConnect(graph: PlanGraph, source: string, target: string): boolean {
   if (source === target) {
@@ -234,7 +234,7 @@ export function canConnect(graph: PlanGraph, source: string, target: string): bo
   return !reaches(graph, target, source);
 }
 
-/** `from` から線を辿って `to` に着くか（after の線だけ） */
+/** `from`から線を辿って`to`に着くか（afterの線だけ） */
 function reaches(graph: PlanGraph, from: string, to: string): boolean {
   const next = new Map<string, string[]>();
   for (const edge of graph.edges) {
@@ -273,8 +273,8 @@ export function layoutOf(graph: PlanGraph): PlanLayout {
 }
 
 /**
- * 覚えた置き場所にステップを置き直す。覚えていないステップは組んだ場所のまま。start は先頭の列、end は右端のステップの次の列に置く
- * （線を変えて段数が変わっても、end がステップに重ならないように）。覚えた場所が 1 つもヒットしなければ組んだ図のまま
+ * 覚えた置き場所にステップを置き直す。覚えていないステップは組んだ場所のまま。startは先頭の列、endは右端のステップの次の列に置く
+ * （線を変えて段数が変わっても、endがステップに重ならないように）。覚えた場所が1つもヒットしなければ組んだ図のまま
  */
 export function withLayout(graph: PlanGraph, layout: PlanLayout): PlanGraph {
   const placed = (node: PlanGraphNode): PlanGraphNode => {
@@ -296,8 +296,8 @@ export function withLayout(graph: PlanGraph, layout: PlanLayout): PlanGraph {
 }
 
 /**
- * `source` から `target` への線を消せるか（`source` が `target` の先行でなくなる）。消せるのはステップどうしの線（after）だけで、
- * start と end の仮の線（図が引く）と、固定した番号へ入る線は消せない
+ * `source`から`target`への線を消せるか（`source`が`target`の先行でなくなる）。消せるのはステップどうしの線（after）だけで、
+ * startとendの仮の線（図が引く）と、固定した番号へ入る線は消せない
  */
 export function canDisconnect(graph: PlanGraph, source: string, target: string): boolean {
   const to = graph.nodes.find((node) => node.id === target);

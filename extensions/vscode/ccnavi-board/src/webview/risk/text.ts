@@ -2,12 +2,12 @@
  * リスク管理画面に出す言葉。要約の文、欄の名前、絞り込みが適用する文字列。
  *
  * 点は数えない。ここが作るのは「この項目はどうヒットするか」を読める語順に並べた文だけで、
- * 何点になるかは実行ファイルが子を閉じるときに出す。
+ * 何点になるかは実行ファイルが子をクローズするときに出す。
  */
 import { KIND_LABELS, type FactorForm, type FactorKind } from "../../core/risk-view.js";
 import { foldFind } from "../shared/find.js";
 
-/** 要約の文の 1 片。`code` は等幅で出す（値そのもの）、`dim` は薄い地の文 */
+/** 要約の文の1片。`code`は等幅で出す（値そのもの）、`dim`は薄い地の文 */
 export interface Part {
   readonly tone: "dim" | "code";
   readonly text: string;
@@ -25,12 +25,12 @@ export function valueLabel(kind: FactorKind): string {
     return "スクリプト";
   }
   if (kind === "judge") {
-    return "yes/no の質問";
+    return "yes/noの質問";
   }
   return "基準";
 }
 
-/** glob の欄（1 行に 1 つ）を、空行を除いた一覧にする */
+/** globの欄（1行に1つ）を、空行を除いた一覧にする */
 function globList(text: string): string[] {
   return text
     .split("\n")
@@ -56,7 +56,7 @@ function scopeParts(factor: FactorForm): readonly Part[] {
 export function describe(factor: FactorForm): readonly Part[] {
   const value = factor.value;
   if (value === "") {
-    return [dim(`（${valueLabel(factor.kind)} 未設定）`)];
+    return [dim(`（${valueLabel(factor.kind)}未設定）`)];
   }
   switch (factor.kind) {
     case "lines_over":
@@ -66,22 +66,22 @@ export function describe(factor: FactorForm): readonly Part[] {
     case "deleted_over":
       return [dim("削除したファイルが "), code(value), dim(" 件を超えると加点"), ...scopeParts(factor)];
     case "glob":
-      return [code(value), dim(` に該当するファイルを 1 つ変更するごとに加点${factor.max === "" ? "" : `（上限 ${factor.max} 点）`}`)];
+      return [code(value), dim(`にヒットするファイルを1つ変更するごとに加点${factor.max === "" ? "" : `（上限${factor.max}点）`}`)];
     case "script":
-      return [dim("スクリプト "), code(value), dim(` が返した点を加点（点を読み取れなかったときは ${factor.points === "" ? "points" : `${factor.points} 点`}）`)];
+      return [dim("スクリプト "), code(value), dim(`が返した点を加点（点を読み取れなかったときは${factor.points === "" ? "points" : `${factor.points}点`}）`)];
     case "judge":
-      return [dim("質問「"), code(value), dim("」の答えが yes なら加点")];
+      return [dim("質問「"), code(value), dim("」の答えがyesなら加点")];
   }
 }
 
-/** 要約の左の id。未設定なら薄く言う */
+/** 要約の左のid。未設定なら薄く言う */
 export function summaryId(factor: FactorForm): string {
-  return factor.id === "" ? "（id 未設定）" : factor.id;
+  return factor.id === "" ? "（id未設定）" : factor.id;
 }
 
 /** 要約の点。未設定なら「（未設定）」と言う */
 export function summaryPoints(factor: FactorForm): string {
-  return factor.points === "" ? "（未設定）" : `${factor.points} 点`;
+  return factor.points === "" ? "（未設定）" : `${factor.points}点`;
 }
 
 /** 加点条件と値をツールチップに出す文 */
@@ -91,8 +91,8 @@ export function kindTitle(factor: FactorForm): string {
 
 /**
  * 絞り込みが適用する文字列。画面に出ている語（加点条件のラベルと要約の文）でも、キーの表記
- * （`lines_over` など）でもヒットする。 要約に出る文をそのまま含めるので、加点条件を変えれば
- * ヒットする語も変わる。ただし空の欄の代わりに出す断り（「（id 未設定）」「（未設定）」「（基準 未設定）」など）は
+ * （`lines_over`など）でもヒットする。 要約に出る文をそのまま含めるので、加点条件を変えれば
+ * ヒットする語も変わる。ただし空の欄の代わりに出す断り（「（id未設定）」「（未設定）」「（基準 未設定）」など）は
  * 書いてある値ではないので含めない。「未設定」で探しても、空の欄がある項目にはヒットしない。
  */
 export function findText(factor: FactorForm): string {
@@ -102,10 +102,10 @@ export function findText(factor: FactorForm): string {
   return foldFind(`${factor.id} ${factor.kind} ${KIND_LABELS[factor.kind].label} ${summary}`);
 }
 
-/** 項目の数。絞り込んでいるときは「一致 / 全体（開いたまま N）」 */
+/** 項目の数。絞り込んでいるときは「一致 / 全体（開いたままN）」 */
 export function countText(total: number, query: string, shown: number, kept: number): string {
   if (query === "") {
     return String(total);
   }
-  return `${shown} / ${total}${kept > 0 ? `（絞り込み外で開いている項目: ${kept} 件）` : ""}`;
+  return `${shown} / ${total}${kept > 0 ? `（絞り込み外で開いている項目: ${kept}件）` : ""}`;
 }

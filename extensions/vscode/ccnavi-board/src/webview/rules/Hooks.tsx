@@ -1,5 +1,5 @@
 /**
- * 「hook」のタブ。`.claude/settings.json`（と `settings.local.json`）に登録された hook を並べる。
+ * 「hook」のタブ。`.claude/settings.json`（と`settings.local.json`）に登録されたhookを並べる。
  * ユーザごとの設定（`~/.claude/settings.json`）は拡張ホストが読まない。
  */
 import type { JSX } from "react";
@@ -22,7 +22,7 @@ export function Hooks({ hooks, files }: HooksProps): JSX.Element {
             <code>.claude/settings.local.json</code>
           </>
         )}{" "}
-        の hooks です。ユーザごとの設定（<code>~/.claude/settings.json</code>）は対象外です。
+        のhooksです。ユーザごとの設定（<code>~/.claude/settings.json</code>）は対象外です。
       </p>
       <Table hooks={hooks} files={files} />
     </>
@@ -31,10 +31,10 @@ export function Hooks({ hooks, files }: HooksProps): JSX.Element {
 
 function Table({ hooks, files }: HooksProps): JSX.Element {
   if (!files.settings) {
-    return <p className="empty">.claude/settings.json がありません</p>;
+    return <p className="empty">.claude/settings.jsonがありません</p>;
   }
   if (hooks.length === 0) {
-    return <p className="empty">hooks が 1 つも登録されていません</p>;
+    return <p className="empty">hooksが1つも登録されていません</p>;
   }
   return (
     <>
@@ -67,7 +67,7 @@ function Table({ hooks, files }: HooksProps): JSX.Element {
         </table>
       </div>
       <p className="hint">
-        「判定を試す」でツールを選ぶと、そのツールで実行される hook だけをここから絞り込んで出します。matcher の意味は Claude Code のものです（空か <code>*</code> で全部、それ以外はツール名への正規表現）。
+        「判定を試す」でツールを選ぶと、そのツールで実行されるhookだけをここから絞り込んで出します。matcherの意味はClaude Codeのものです（空か <code>*</code> で全部、それ以外はツール名への正規表現）。
       </p>
     </>
   );

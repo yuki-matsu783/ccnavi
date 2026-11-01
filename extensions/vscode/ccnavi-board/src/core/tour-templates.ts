@@ -1,13 +1,13 @@
 /**
- * テンプレート管理画面の案内の見本（`webview/tours/templates.yml` の `sample:`）を、画面が描く形にする。
+ * テンプレート管理画面の案内の見本（`webview/tours/templates.yml`の`sample:`）を、画面が描く形にする。
  *
- * 見本は実行ファイルの JSON（`--templates --json`）より小さい書き方で YAML に書き、ここで `TemplatesPage`（画面が描く形）にする。
+ * 見本は実行ファイルのJSON（`--templates --json`）より小さい書き方でYAMLに書き、ここで`TemplatesPage`（画面が描く形）にする。
  * 案内の間に描くだけ。有効か・破棄した理由・取り込めるかは見本に書いた値をそのまま使う。
  */
 import type { DraftEntry, FlowSummary, PlanItem, ProblemSeverity, Sum, SumRow, TemplateEntry, TemplateProblem, TemplatesPage } from "./templates-view.js";
 
 export interface TemplatesSample {
-  /** 見本の画面（対象はワークスペース、見せる層は self） */
+  /** 見本の画面（対象はワークスペース、見せるレイヤーはself） */
   readonly page: TemplatesPage;
   /** テンプレートの名前 → 本文（「本文を見る」の見本） */
   readonly texts: Readonly<Record<string, string>>;
@@ -15,7 +15,7 @@ export interface TemplatesSample {
 
 function object(value: unknown, at: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error(`${at} がオブジェクトではない`);
+    throw new Error(`${at}がオブジェクトではない`);
   }
   return value as Record<string, unknown>;
 }
@@ -25,12 +25,12 @@ function list(value: unknown, at: string): unknown[] {
     return [];
   }
   if (!Array.isArray(value)) {
-    throw new Error(`${at} がリストではない`);
+    throw new Error(`${at}がリストではない`);
   }
   return value;
 }
 
-/** 欄の文字。無いか null なら空 */
+/** 欄の文字。無いかnullなら空 */
 function str(value: unknown): string {
   return typeof value === "string" ? value : value === undefined || value === null ? "" : String(value);
 }
@@ -49,7 +49,7 @@ function problemsOf(value: unknown, at: string): TemplateProblem[] {
   });
 }
 
-/** 計画の 1 ステップ。`index` は並びの添字、`number` は添字 + 1 */
+/** 計画の1ステップ。`index`は並びの添字、`number`は添字 + 1 */
 function planOf(value: unknown, at: string): PlanItem[] {
   return list(value, at).map((item, index) => {
     const map = object(item, `${at}[${index}]`);

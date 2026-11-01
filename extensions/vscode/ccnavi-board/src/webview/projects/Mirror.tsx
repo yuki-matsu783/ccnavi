@@ -2,7 +2,7 @@
  * 共通レイヤーのミラーの表示。カードの「ミラー」の欄（状態・ずれの中身・「ミラーを同期」）、上部の「すべて同期」と最終確認の時刻、
  * 確認できないときの帯。
  *
- * 見せる中身は拡張ホストが渡す（`ProjectsData` の `mirror`）。ボタンを押せるかと文言は `core/mirrormodel.ts` が決め、
+ * 見せる中身は拡張ホストが渡す（`ProjectsData`の`mirror`）。ボタンを押せるかと文言は`core/mirrormodel.ts`が決め、
  * ここは並べるだけ。同期するのは拡張ホスト（実行ファイル）で、画面は押されたことを送るだけ。
  */
 import type { JSX } from "react";
@@ -61,7 +61,7 @@ function MirrorState({ mirror, project }: { readonly mirror: MirrorData; readonl
   );
 }
 
-/** ずれの中身。既定は畳んでおき、開くと 1 ファイルずつ種類とパスが出る */
+/** ずれの中身。既定は畳んでおき、開くと1ファイルずつ種類とパスが出る */
 function Changes({ project }: { readonly project: MirrorProject }): JSX.Element {
   return (
     <details className="mirror-changes">
@@ -77,7 +77,7 @@ function Changes({ project }: { readonly project: MirrorProject }): JSX.Element 
   );
 }
 
-/** 上部の「すべて同期（N 件）」 */
+/** 上部の「すべて同期（N件）」 */
 export function SyncAllButton({ mirror, act }: { readonly mirror: MirrorData; readonly act: Act }): JSX.Element {
   const button = syncAllButton(mirror.status, mirror.busy);
   const expect = mirror.status.kind === "ok" ? mirror.status.list.expect : "";
@@ -91,7 +91,7 @@ export function SyncAllButton({ mirror, act }: { readonly mirror: MirrorData; re
       onClick={() => act({ type: "mirrorSync", names: [], expect })}
     >
       <span className="spin" aria-hidden="true" />
-      すべて同期（{button.count} 件）
+      すべて同期（{button.count}件）
     </button>
   );
 }
@@ -101,7 +101,7 @@ export function CheckedAt({ mirror }: { readonly mirror: MirrorData }): JSX.Elem
   if (mirror.checkedAt === "") {
     return null;
   }
-  return <span className="mirror-checked dim">ミラーの最終確認 {mirror.checkedAt}</span>;
+  return <span className="mirror-checked dim">ミラーの最終確認{mirror.checkedAt}</span>;
 }
 
 /** ミラーを確認できないとき・コピーするものが無いときの帯 */

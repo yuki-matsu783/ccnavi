@@ -1,6 +1,6 @@
 /**
- * テンプレートの子のフロー 1 本の編集。フロー編集画面の図（`flow/Canvas.tsx`）と右の欄（`flow/Inspector.tsx`）をそのまま使い、
- * 部品箱でノードを足す。中身は `core/flow-doc.ts` の関数で作り直す（コピーを返す）。
+ * テンプレートの子のフロー1本の編集。フロー編集画面の図（`flow/Canvas.tsx`）と右の欄（`flow/Inspector.tsx`）をそのまま使い、
+ * 部品箱でノードを足す。中身は`core/flow-doc.ts`の関数で作り直す（コピーを返す）。
  *
  * 画面が持つのは編集中のコピーだけ。形が正しいかは実行ファイルが読んで言う（編集欄の苦情に出る）。ここは判定しない。
  * 元に戻す・コピー・グループ化・ミニマップは持たない（フロー編集画面の機能。テンプレートの編集全体の元に戻すで戻る）。
@@ -25,7 +25,7 @@ import { Inspector } from "../flow/Inspector.js";
 
 export interface FlowEditProps {
   readonly doc: FlowDoc;
-  /** コピーを作り直したとき。欄に打った文字は `typing`（どの欄か）が付く */
+  /** コピーを作り直したとき。欄に打った文字は`typing`（どの欄か）が付く */
   readonly onChange: (doc: FlowDoc, typing?: string) => void;
 }
 

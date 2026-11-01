@@ -5,7 +5,7 @@
  * （編集中の配点、開いている行、絞り込み、直前の操作の一言）だけ。点は数えず、ファイルも書かない。
  *
  * 中身（`data`）が届いたら、編集中の配点はその中身で置き換える。 届くのは編集を破棄してよい
- * ときだけ（ユーザが「再読み込み」を押した、保存や作成が通った）で、ファイルが外で変わっただけのときは
+ * ときだけ（ユーザが「更新」を押した、保存や作成が通った）で、ファイルが外で変わっただけのときは
  * 帯（`changed`）が出るだけ。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
@@ -48,7 +48,7 @@ const SAMPLE_DRAFT = sampleDraft(SAMPLE.page);
 const SAMPLE_MISSING_DRAFT = sampleDraft(SAMPLE.missing);
 const NO_SCENE: Scene = {};
 
-/** 手順の `scene` の文字列を `,` で割る */
+/** 手順の`scene`の文字列を`,`で割る */
 function sceneList(value: Scene[string] | undefined): readonly string[] {
   return typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : [];
 }
@@ -76,7 +76,7 @@ function editingOf(data: RiskData, nextKey: () => string): Editing {
 }
 
 export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
-  // キーは 1 枚の画面の中で数え上げる。描き直しで配り直さない
+  // キーは1枚の画面の中で数え上げる。描き直しで配り直さない
   const nextKey = useRef(keyer()).current;
   const [data, setData] = useState<RiskData>(initial);
   const [editing, setEditing] = useState<Editing>(() => editingOf(initial, nextKey));
@@ -87,16 +87,16 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   const [lock, setLock] = useState<Lock>(() => pageOf(initial)?.lock ?? NO_LOCK);
   /** ファイルが外で変わった。破棄して読み直すかはユーザが決める */
   const [changed, setChanged] = useState(false);
-  /** 保存が通ったときの検証の warn の本文。帯に出し、次の編集か更新（中身の入れ替え）で消す */
+  /** 保存が通ったときの検証のwarnの本文。帯に出し、次の編集か更新（中身の入れ替え）で消す */
   const [saveWarns, setSaveWarns] = useState<readonly string[]>([]);
   const [find, setFind] = useState("");
-  /** 足した直後の行。id の欄に焦点を移したら忘れる */
+  /** 足した直後の行。idの欄に焦点を移したら忘れる */
   const [focusKey, setFocusKey] = useState<string | undefined>(undefined);
 
   const { draft, open } = editing;
   const page = pageOf(data);
   /**
-   * 案内の間は見本を描き、手順ごとの様子（開く項目・絞り込み・統合結果など）は `scene` に入れる。実際の編集中の配点や開いた行は動かさないので、
+   * 案内の間は見本を描き、手順ごとの様子（開く項目・絞り込み・統合結果など）は`scene`に入れる。実際の編集中の配点や開いた行は動かさないので、
    * 閉じたあとに戻すものは無い
    */
   const [scene, setScene] = useState<Scene>(NO_SCENE);
@@ -108,7 +108,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
     },
   });
   const requestTour = tour.request;
-  /** 拡張ホストへの送信。案内の間は実際の操作を送らない（`tourDone` と最初の `ready` は直に送る） */
+  /** 拡張ホストへの送信。案内の間は実際の操作を送らない（`tourDone`と最初の`ready`は直に送る） */
   const act = (message: RiskMessage): void => {
     if (!tour.touring) {
       post(message);
@@ -116,7 +116,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   };
 
   /**
-   * 未保存の変更の有無が変わったら拡張ホストに伝える。同じ種類のタブは 1 枚で、別の対象を開くと
+   * 未保存の変更の有無が変わったら拡張ホストに伝える。同じ種類のタブは1枚で、別の対象を開くと
    * このタブの中身が入れ替わるので、拡張ホストはこれを見て「破棄して切り替える？」を聞く。
    * 送るのは変わったときだけ（最初の「変更なし」は拡張ホストも同じ前提で始まるので送らない）
    */
@@ -157,7 +157,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
     }
   }, () => post({ type: "ready" }));
 
-  // 足した行の id へ焦点を移す。折りたたんだままでは何を足したか分からないので、行は開いて出してある
+  // 足した行のidへ焦点を移す。折りたたんだままでは何を足したか分からないので、行は開いて出してある
   useEffect(() => {
     if (focusKey === undefined) {
       return;
@@ -170,7 +170,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   /**
    * 読み直しを頼む。押した時点で欄を止める。 拡張ホストは実行ファイルに聞いてから中身を返す
    * ことがあり（設定ファイルの場所を解く）、その間に打った内容は、届いた中身で気づかないうちに消えるため。
-   * ユーザが「破棄して読み直す？」をやめたときは `cancelled` が返り、欄が戻る。
+   * ユーザが「破棄して読み直す？」をやめたときは`cancelled`が返り、欄が戻る。
    */
   const reload = (): void => {
     if (tour.touring) {
@@ -259,7 +259,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
 
   const courses = coursesOf(TOUR, setScene);
 
-  // 案内の間は、今の配点ではなく見本を描く。画面の state（編集中の配点・開いた行・絞り込み・状態の一言）は触らない
+  // 案内の間は、今の配点ではなく見本を描く。画面のstate（編集中の配点・開いた行・絞り込み・状態の一言）は触らない
   const touring = tour.touring;
   const sampleMissing = scene.missing === true;
   const shownPage: RiskPage | undefined = touring ? (sampleMissing ? SAMPLE.missing : SAMPLE.page) : page;
@@ -287,7 +287,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   });
   const shown = rows.filter((row) => !row.hidden).length;
   const kept = rows.filter((row) => row.hidden && isShownOpen(row)).length;
-  /** 案内が指す項目（開いている最初の行）。中の部品の `data-tour` はこの行にだけ付く */
+  /** 案内が指す項目（開いている最初の行）。中の部品の`data-tour`はこの行にだけ付く */
   const tourRowKey = touring ? rows.find((row) => !row.hidden && isShownOpen(row))?.key : undefined;
   const sceneSum = touring && typeof scene.sum === "string" && scene.sum !== "" ? scene.sum : undefined;
 
@@ -367,7 +367,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       )}
       {shownPage !== undefined && shownReadOnly && (
         <div className="banner missing" data-tour="missing">
-          <span>{shownPage.riskPath} がありません。実行ファイルは組み込みの配点で数えています（画面の値はその組み込みの配点です）。配点を直すには、まずファイルを作ってください。</span>
+          <span>{shownPage.riskPath}がありません。実行ファイルは組み込みの配点で数えています（画面の値はその組み込みの配点です）。配点を直すには、まずファイルを作ってください。</span>
           <button
             type="button"
             className="action primary"
@@ -392,11 +392,11 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         <details className="help">
           <summary>説明</summary>
           <p className="hint">
-            子チケットを閉じるとき、下の「項目」で該当した点を合計して、その変更のリスクの点を出します。
-            合計点がしきい値以上になると、リスクレベルが LOW → MEDIUM → HIGH → CRITICAL の順に上がっていきます。
-            <strong>HIGH 以上になったフェーズは、レビューが終わるまで先へ進めません。</strong>
+            子チケットをクローズするとき、下の「項目」でヒットした点を合計して、その変更のリスクの点を出します。
+            合計点がしきい値以上になると、リスクレベルがLOW → MEDIUM → HIGH → CRITICALの順に上がっていきます。
+            <strong>HIGH以上になったフェーズは、レビューが終わるまで先へ進めません。</strong>
             チケット作成時に「レビュー不要」と宣言していても、ユーザのレビューが必要になります。
-            値は MEDIUM ≤ HIGH ≤ CRITICAL となるように入れてください。空欄にしたリスクレベルは、組み込みの値（
+            値はMEDIUM ≤ HIGH ≤ CRITICALとなるように入れてください。空欄にしたリスクレベルは、組み込みの値（
             {LEVEL_NAMES.map((name) => `${name} ${BUILTIN_LEVELS[name]}`).join(" / ")}）を使います。
           </p>
         </details>
@@ -408,8 +408,8 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
                 className="f-level"
                 spellCheck={false}
                 inputMode="numeric"
-                title={`${name.toUpperCase()} 以上になる点`}
-                placeholder={`既定 ${BUILTIN_LEVELS[name]}`}
+                title={`${name.toUpperCase()}以上になる点`}
+                placeholder={`既定${BUILTIN_LEVELS[name]}`}
                 value={shownDraft.levels[name]}
                 disabled={shownBusy || shownReadOnly}
                 onChange={(event) => editDraft({ ...draft, levels: { ...draft.levels, [name]: event.target.value } as Readonly<Record<LevelName, string>> })}
@@ -446,8 +446,8 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         <details className="help">
           <summary>説明</summary>
           <p className="hint">
-            子チケットの完了時、その子の差分（base_sha..HEAD）で判定して加点します。1 件につき加点条件は 1 つです。
-            <code>script</code> が失敗したときと出力を読み込めないときは、安全を優先して points をそのまま加点します。<code>judge</code> の項目があると、判定が揃うまで子を閉じられません。
+            子チケットの完了時、その子の差分（base_sha..HEAD）で判定して加点します。1件につき加点条件は1つです。
+            <code>script</code> が失敗したときと出力を読み込めないときは、安全を優先してpointsをそのまま加点します。<code>judge</code> の項目があると、判定が揃うまで子をクローズできません。
           </p>
         </details>
         <ul className="list" id="factors" data-tour="factors">
@@ -471,7 +471,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
             />
           ))}
           {rows.length > 0 && shown + kept === 0 && <li className="empty">絞り込みにヒットする項目がありません。語を変えるか、絞り込み欄を空にしてください</li>}
-          {shownDraft.rows.length === 0 && <li className="empty">項目がありません。加点する項目がなければ、どの子も LOW のまま閉じられます</li>}
+          {shownDraft.rows.length === 0 && <li className="empty">項目がありません。加点する項目がなければ、どの子もLOWのまま閉じられます</li>}
         </ul>
       </section>
       {shownPage?.sums !== undefined && (

@@ -12,7 +12,7 @@ import { loadPage, type DomPage } from "../helpers/dom.js";
 import { page, templatesCheckFixtureText, templatesHtml } from "../helpers/templates.js";
 import type { HTMLButtonElement } from "happy-dom" with { "resolution-mode": "import" };
 
-test("CB-T1236 新しい名前は、Windows の予約名（拡張子付きも）と末尾の . を断る。読み込み側の検査は変えない", () => {
+test("CB-T1236 新しい名前は、Windowsの予約名（拡張子付きも）と末尾の . を断る。読み込み側の検査は変えない", () => {
   for (const ok of ["feature", "a", "console", "com10", "lpt0", "v1.2_x", "con-x", "A".repeat(64)]) {
     assert.ok(validNewTemplateName(ok), ok);
   }
@@ -40,7 +40,7 @@ async function openList(): Promise<DomPage> {
   return dom;
 }
 
-test("CB-D1244 新しい名前が con や a. のときは作るを押せず、理由を title に出す", async () => {
+test("CB-D1244 新しい名前がconやa. のときは作るを押せず、理由をtitleに出す", async () => {
   const dom = await openList();
   try {
     for (const bad of ["con", "NUL.txt", "a."]) {
@@ -48,7 +48,7 @@ test("CB-D1244 新しい名前が con や a. のときは作るを押せず、�
       await dom.settle();
       const make = dom.one<HTMLButtonElement>('button[data-action="new-template"]');
       assert.equal(make.disabled, true, bad);
-      assert.match(make.title, /Windows の予約名/);
+      assert.match(make.title, /Windowsの予約名/);
     }
     dom.type(dom.one(".f-new-name"), "my-flow");
     await dom.settle();
@@ -58,7 +58,7 @@ test("CB-D1244 新しい名前が con や a. のときは作るを押せず、�
   }
 });
 
-test("CB-D1245 子のフロー編集の右の欄は、グループ化・Ctrl+C/V/D・Ctrl+Z の案内を出さない", async () => {
+test("CB-D1245 子のフロー編集の右の欄は、グループ化・Ctrl+C/V/D・Ctrl+Zの案内を出さない", async () => {
   const dom = await openList();
   try {
     const parsed = parseTemplateCheck(templatesCheckFixtureText());

@@ -1,9 +1,9 @@
 /**
- * 画面が書き出す本文（`serializeFlow`）を、実行ファイルの読み手（PyYAML。`src/ccnavi/tickets/flow/graph.py` の `parse`）で実際に読み戻す。
- * 読み戻した中身（`flow.as_json`。`--lint --json --flow` の `flow.data` と同じ形）が画面の中身と同じかを
- * `flow-match.ts` の見比べで確かめる。乱数の入力（固定の種）でも確かめる。
+ * 画面が書き出す本文（`serializeFlow`）を、実行ファイルの読み手（PyYAML。`src/ccnavi/tickets/flow/graph.py`の`parse`）で実際に読み戻す。
+ * 読み戻した中身（`flow.as_json`。`--lint --json --flow`の`flow.data`と同じ形）が画面の中身と同じかを
+ * `flow-match.ts`の見比べで確かめる。乱数の入力（固定の種）でも確かめる。
  *
- * 実行ファイルの読み手を起こすのは、リポジトリのルートで `uv run python`（無ければ `python3`）。どちらも起こせない
+ * 実行ファイルの読み手を起こすのは、リポジトリのルートで`uv run python`（無ければ`python3`）。どちらも起こせない
  * 環境では飛ばす（理由を出す）。
  */
 import { test } from "node:test";
@@ -14,9 +14,9 @@ import * as path from "node:path";
 import { flowMismatch } from "../../src/core/flow-match.js";
 import { parseFlowValue, serializeFlow, type FlowDoc } from "../../src/core/flow-doc.js";
 
-/** リポジトリのルート（`out/test/flow/` から 6 段上） */
+/** リポジトリのルート（`out/test/flow/`から6段上） */
 const REPO_ROOT = path.join(__dirname, "..", "..", "..", "..", "..", "..");
-/** ccnavi パッケージを置いたディレクトリ（src レイアウト） */
+/** ccnaviパッケージを置いたディレクトリ（srcレイアウト） */
 const PACKAGE_ROOT = path.join(REPO_ROOT, "src");
 
 const SCRIPT = `
@@ -62,7 +62,7 @@ function pyyaml(): Reader {
         },
       };
     }
-    said.push(`${command}: ${probe.error?.message ?? probe.stderr.split("\n").filter(Boolean).pop() ?? `終了 ${probe.status}`}`);
+    said.push(`${command}: ${probe.error?.message ?? probe.stderr.split("\n").filter(Boolean).pop() ?? `終了${probe.status}`}`);
   }
   return { ok: false, why: `実行ファイルの読み手（PyYAML）を起こせないので飛ばす（${said.join(" / ")}）` };
 }
@@ -78,7 +78,7 @@ function node(id: string, data: Record<string, unknown>): { readonly id: string;
   return { id, type: "prompt", name: id, position: { x: 80, y: 160 }, data };
 }
 
-test("CB-T248 PyYAML が裸や `|` では読み込めない・別の文字に読む文字列を、書き出しが読める形で書く", { skip: reader.ok ? false : reader.why }, () => {
+test("CB-T248 PyYAMLが裸や`|`では読み込めない・別の文字に読む文字列を、書き出しが読める形で書く", { skip: reader.ok ? false : reader.why }, () => {
   const values = [
     "a\tb",
     "\tlead",
@@ -105,7 +105,7 @@ test("CB-T248 PyYAML が裸や `|` では読み込めない・別の文字に読
     "x\udc00",
     "😀 ﻿",
     "  - 箇条\n  - 書き",
-    "1 行目\n  字下げ\n戻る",
+    "1行目\n  字下げ\n戻る",
     "yes",
     "0755",
     "1:30",
@@ -122,7 +122,7 @@ test("CB-T248 PyYAML が裸や `|` では読み込めない・別の文字に読
     assert.equal(read.why, "", `${JSON.stringify(values[i])}: ${read.why}\n${serializeFlow(docs[i] as unknown as FlowDoc)}`);
     assert.equal(flowMismatch(docs[i], read.data), undefined, `${JSON.stringify(values[i])}\n${serializeFlow(docs[i] as unknown as FlowDoc)}`);
   });
-  // 1 行の文字列のタブは裸で書かない（JSON のときからの退行）
+  // 1行の文字列のタブは裸で書かない（JSONのときからの退行）
   assert.match(serializeFlow({ nodes: [node("a", { prompt: "a\tb" })] }), /prompt: "a\\tb"/);
   assert.match(serializeFlow({ nodes: [node("a", { prompt: "a\u0085b" })] }), /prompt: "a\\Nb"/);
 });
@@ -203,7 +203,7 @@ function record(rand: () => number, depth: number): Record<string, unknown> {
   return out;
 }
 
-test("CB-T249 乱数の中身（固定の種、400 本）を書き出して PyYAML で読み戻すと、どれも同じ中身になる", { skip: reader.ok ? false : reader.why }, () => {
+test("CB-T249 乱数の中身（固定の種、400本）を書き出してPyYAMLで読み戻すと、どれも同じ中身になる", { skip: reader.ok ? false : reader.why }, () => {
   const rand = random(20260926);
   const docs: Record<string, unknown>[] = [];
   for (let i = 0; i < 400; i += 1) {
@@ -227,15 +227,15 @@ test("CB-T249 乱数の中身（固定の種、400 本）を書き出して PyYA
     // 画面の読み手でも同じ中身に読める（書いたものを画面が開き直せる）
     const again = parseFlowValue(shown);
     assert.ok(again.ok, `${i}`);
-    assert.equal(flowMismatch(again.value, read.data), undefined, `${i} を画面で再読み込みすると食い違う\n${shown}`);
+    assert.equal(flowMismatch(again.value, read.data), undefined, `${i}を画面で更新すると食い違う\n${shown}`);
   });
 });
 
-test("CB-T250 画面の読み（YAML 1.2）と PyYAML の読みが違う表記は、開くときの見比べで食い違いになる。引用符で囲めば揃う", { skip: reader.ok ? false : reader.why }, () => {
+test("CB-T250 画面の読み（YAML 1.2）とPyYAMLの読みが違う表記は、開くときの見比べで食い違いになる。引用符で囲めば揃う", { skip: reader.ok ? false : reader.why }, () => {
   assert.ok(reader.ok);
   const spelled = ["0755", "yes", "on", "1:30", "0o17", "1e3", "1_000", "1.", "2026-01-01", "!!float 1", "!!binary aGk=", ".inf", "123456789012345678901", "{1: a}"];
   const texts = spelled.map((v) => `nodes:\n  - id: a\n    data:\n      v: ${v}\n`);
-  // 別名を使わないマージキー。PyYAML は中身を取り込み、画面の読み手は取り込まない
+  // 別名を使わないマージキー。PyYAMLは中身を取り込み、画面の読み手は取り込まない
   texts.push("nodes: [{<<: {id: a}}]\n");
   const quoted = spelled.map((v) => `nodes:\n  - id: a\n    data:\n      v: "${v}"\n`);
   const reads = reader.read([...texts, ...quoted].map((t) => Buffer.from(t, "utf8")));
@@ -246,10 +246,10 @@ test("CB-T250 画面の読み（YAML 1.2）と PyYAML の読みが違う表記�
     const found = flowMismatch(screen.value, reads[i].data);
     assert.notEqual(found, undefined, t);
   });
-  // 場所はノードの id と欄のパスで言う
+  // 場所はノードのidと欄のパスで言う
   const first = parseFlowValue(texts[0]);
   assert.ok(first.ok);
-  assert.deepEqual(flowMismatch(first.value, reads[0].data), { where: 'ノード "a" の data.v', screen: "整数 755", executable: "整数 493" });
+  assert.deepEqual(flowMismatch(first.value, reads[0].data), { where: 'ノード"a"のdata.v', screen: "整数755", executable: "整数493" });
   quoted.forEach((t, i) => {
     const screen = parseFlowValue(t);
     assert.ok(screen.ok, t);

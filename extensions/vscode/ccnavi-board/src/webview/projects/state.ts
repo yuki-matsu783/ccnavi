@@ -1,14 +1,14 @@
 /**
- * 画面が覚えておくもの。clone の欄に打ちかけた URL と名前、名前をユーザが触ったか。
+ * 画面が覚えておくもの。cloneの欄に打ちかけたURLと名前、名前をユーザが触ったか。
  *
- * 置き場は Webview の state で、拡張が HTML を作り直しても（非表示になって作り直されても）残る。
+ * 置き場はWebviewのstateで、拡張がHTMLを作り直しても（非表示になって作り直されても）残る。
  */
 import { getState, setState } from "../vscode.js";
 
 export interface CloneState {
   readonly url: string;
   readonly name: string;
-  /** 名前をユーザが打った。真なら URL から自動で埋め直さない */
+  /** 名前をユーザが打った。真ならURLから自動で埋め直さない */
   readonly nameTouched: boolean;
 }
 
@@ -28,7 +28,7 @@ export function saveClone(state: CloneState): void {
   setState({ url: state.url, name: state.name, nameTouched: state.nameTouched });
 }
 
-/** URL の末尾から採る、`projects/<名前>` の既定の名前。拡張ホスト側の検査（checkName）はこの後 */
+/** URLの末尾から採る、`projects/<名前>`の既定の名前。拡張ホスト側の検査（checkName）はこの後 */
 export function guessName(text: string): string {
   const trimmed = text.trim().replace(/\/+$/, "").replace(/\.git$/i, "");
   return trimmed.split(/[/:]/).pop() ?? "";

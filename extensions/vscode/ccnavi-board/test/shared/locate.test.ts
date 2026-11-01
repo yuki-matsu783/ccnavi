@@ -38,14 +38,14 @@ test("CB-T20 設定 → settings.json → 既定 → ソースの順に探す", 
   assert.equal(locate(input([])), undefined);
 });
 
-test("CB-T21 .exe はパスに付いていなくても試す", () => {
+test("CB-T21 .exeはパスに付いていなくても試す", () => {
   assert.deepEqual(
     locate(input(["/ws/dist/ccnavi/ccnavi.exe"])),
     { kind: "exe", path: "/ws/dist/ccnavi/ccnavi.exe" },
   );
 });
 
-test("CB-T160 E1 振り分けの sh を指していれば、../bin/ のこの機械向けの実体を起動する", () => {
+test("CB-T160 E1振り分けのshを指していれば、../bin/ のこの機械向けの実体を起動する", () => {
   assert.deepEqual(
     locate(
       input(
@@ -59,7 +59,7 @@ test("CB-T160 E1 振り分けの sh を指していれば、../bin/ のこの機
     ),
     { kind: "exe", path: "/ws/.ccnavi/bin/linux-x86_64/ccnavi" },
   );
-  // Windows は .exe を探す。
+  // Windowsは .exeを探す。
   assert.deepEqual(
     locate(
       input(
@@ -73,7 +73,7 @@ test("CB-T160 E1 振り分けの sh を指していれば、../bin/ のこの機
     ),
     { kind: "exe", path: "/ws/.ccnavi/bin/windows-x86_64/ccnavi.exe" },
   );
-  // arm64 の macOS は、自分向けが無ければ x86_64 を使う。
+  // arm64のmacOSは、自分向けが無ければx86_64を使う。
   assert.deepEqual(
     locate(
       input(["/ws/.ccnavi/bin/darwin-x86_64/ccnavi"], {
@@ -94,8 +94,8 @@ test("CB-T160 E1 振り分けの sh を指していれば、../bin/ のこの機
   );
 });
 
-test("CB-T161 E2 振り分けの sh そのものは返さない。実体がなければ次の候補へ進む", () => {
-  // Windows では sh を直接起動できない。
+test("CB-T161 E2振り分けのshそのものは返さない。実体がなければ次の候補へ進む", () => {
+  // Windowsではshを直接起動できない。
   const sh = "/ws/.ccnavi/scripts/ccnavi-launcher.sh";
   assert.equal(locate(input([sh], { settingsEnvBin: ".ccnavi/scripts/ccnavi-launcher.sh" })), undefined);
   assert.equal(locate(input([sh, `${sh}.exe`])), undefined);
@@ -104,7 +104,7 @@ test("CB-T161 E2 振り分けの sh そのものは返さない。実体がな�
     locate(input([sh, "/ws/dist/ccnavi/ccnavi"], { settingsEnvBin: ".ccnavi/scripts/ccnavi-launcher.sh" })),
     { kind: "exe", path: "/ws/dist/ccnavi/ccnavi" },
   );
-  // sh の隣（.ccnavi/scripts/<os>-<arch>/）は配る場所ではないので探さない。
+  // shの隣（.ccnavi/scripts/<os>-<arch>/）は配る場所ではないので探さない。
   assert.equal(
     locate(input([sh, "/ws/.ccnavi/scripts/linux-x86_64/ccnavi"], { settingsEnvBin: ".ccnavi/scripts/ccnavi-launcher.sh" })),
     undefined,
@@ -116,7 +116,7 @@ test("CB-T161 E2 振り分けの sh そのものは返さない。実体がな�
   );
 });
 
-test("CB-T119 E3 名前が ccnavi-launcher.sh でないパスはそのパスそのものを探し、隣は見ない", () => {
+test("CB-T119 E3名前がccnavi-launcher.shでないパスはそのパスそのものを探し、隣は見ない", () => {
   assert.deepEqual(
     locate(
       input(["/ws/tools/scripts/ccnavi", "/ws/tools/scripts/linux-x86_64/ccnavi"], { settingsEnvBin: "tools/scripts/ccnavi" }),
@@ -129,7 +129,7 @@ test("CB-T119 E3 名前が ccnavi-launcher.sh でないパスはそのパスそ�
   );
 });
 
-test("CB-T24 機械の語は src/ccnavi/infra/platformtag.py と揃える", () => {
+test("CB-T24 機械の語はsrc/ccnavi/infra/platformtag.pyと揃える", () => {
   assert.equal(hostTarget("win32", "x64"), "windows-x86_64");
   assert.equal(hostTarget("darwin", "arm64"), "darwin-arm64");
   assert.equal(hostTarget("linux", "x64"), "linux-x86_64");
@@ -137,7 +137,7 @@ test("CB-T24 機械の語は src/ccnavi/infra/platformtag.py と揃える", () =
   assert.deepEqual(runnableTargets("linux-arm64"), ["linux-arm64"]);
 });
 
-test("CB-T22 settings.json の env.CCNAVI_ENTRY_PATH を読む", () => {
+test("CB-T22 settings.jsonのenv.CCNAVI_ENTRY_PATHを読む", () => {
   assert.equal(binFromSettingsJson(JSON.stringify({ env: { CCNAVI_ENTRY_PATH: "dist/x" } })), "dist/x");
   assert.equal(binFromSettingsJson(JSON.stringify({ env: { CCNAVI_ENTRY_PATH: "" } })), undefined);
   assert.equal(binFromSettingsJson(JSON.stringify({ env: {} })), undefined);
@@ -145,7 +145,7 @@ test("CB-T22 settings.json の env.CCNAVI_ENTRY_PATH を読む", () => {
   assert.equal(binFromSettingsJson("[]"), undefined);
 });
 
-test("CB-T1153 PATH の ccnavi は最後に見る。絶対パスの項目だけで、ソースが先", () => {
+test("CB-T1153 PATHのccnaviは最後に見る。絶対パスの項目だけで、ソースが先", () => {
   const pathDirs = ["", "rel", "/usr/local/bin", "/opt/bin"];
   assert.deepEqual(locate(input(["/opt/bin/ccnavi"], { pathDirs })), {
     kind: "exe",
@@ -155,9 +155,9 @@ test("CB-T1153 PATH の ccnavi は最後に見る。絶対パスの項目だけ�
     kind: "exe",
     path: "/usr/local/bin/ccnavi",
   });
-  // 相対と空の項目は飛ばす（"rel/ccnavi" は "/ws" の外の cwd で変わる）。
+  // 相対と空の項目は飛ばす（"rel/ccnavi" は "/ws" の外のcwdで変わる）。
   assert.equal(locate(input(["rel/ccnavi", "/ccnavi"], { pathDirs })), undefined);
-  // ソースが先。bin/ の実体も PATH より先。
+  // ソースが先。bin/ の実体もPATHより先。
   assert.deepEqual(locate(input(["/opt/bin/ccnavi", "/ws/src/ccnavi/__main__.py"], { pathDirs })), {
     kind: "uv",
     root: "/ws",
@@ -166,11 +166,11 @@ test("CB-T1153 PATH の ccnavi は最後に見る。絶対パスの項目だけ�
     locate(input(["/opt/bin/ccnavi", "/ws/.ccnavi/bin/linux-x86_64/ccnavi"], { pathDirs })),
     { kind: "exe", path: "/ws/.ccnavi/bin/linux-x86_64/ccnavi" },
   );
-  // pathDirs を渡さなければ PATH は見ない。
+  // pathDirsを渡さなければPATHは見ない。
   assert.equal(locate(input(["/opt/bin/ccnavi"])), undefined);
 });
 
-test("CB-T1154 PATH の ccnavi が振り分けの sh と同じファイルなら飛ばして次へ進む", () => {
+test("CB-T1154 PATHのccnaviが振り分けのshと同じファイルなら飛ばして次へ進む", () => {
   const pathDirs = ["/linked", "/real"];
   const sameFile = (a: string, b: string) =>
     a === "/linked/ccnavi" && b === "/ws/.ccnavi/scripts/ccnavi-launcher.sh";

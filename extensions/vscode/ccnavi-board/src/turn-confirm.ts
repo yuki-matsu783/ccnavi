@@ -11,7 +11,7 @@ export async function confirmDuringTurn(lock: Lock): Promise<boolean> {
   return confirmTurns(lock.turns);
 }
 
-/** `confirmDuringTurn` の、セッションの一覧を直に渡す形（保存の錠を持たない画面が使う） */
+/** `confirmDuringTurn`の、セッションの一覧を直に渡す形（保存の錠を持たない画面が使う） */
 export async function confirmTurns(sessions: readonly string[]): Promise<boolean> {
   const warning = turnWarning({ locked: false, reason: "", doing: [], turns: sessions });
   if (warning === "") {

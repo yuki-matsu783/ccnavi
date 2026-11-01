@@ -1,13 +1,13 @@
 /*
- * Claude の配色。VS Code のテーマ変数を body のクラスの下で上書きする。切り替えは画面の側
- * （`src/webview/appearance.ts` が body のクラスを切り替える）で、ここはその見た目。
+ * Claudeの配色。VS Codeのテーマ変数をbodyのクラスの下で上書きする。切り替えは画面の側
+ * （`src/webview/appearance.ts`がbodyのクラスを切り替える）で、ここはその見た目。
  *
- * 意味の色（error / warning / charts の緑と黄）は、地の色に合わせてライトとダークの両方で置き換える。
+ * 意味の色（error / warning / chartsの緑と黄）は、地の色に合わせてライトとダークの両方で置き換える。
  * ライトのテーマからダークを選んだとき（またはその逆）にテーマの意味の色が地と合わなくなるため。
  * 青系の強調（charts-blue / editorInfo / focusBorder / textLink）だけ橙に寄せる。文字に使う色（前景・説明・意味の色・リンク）は
- * 地（editor / editorWidget / list-hover のどれ）に対しても 4.5:1 以上、焦点の枠は 3:1 以上。ボタンの地の橙は文字ではない。
- * ハイコントラストのテーマ（body に vscode-high-contrast* が付く）では適用しない。純黒・純白の地と焦点の色を
- * 置き換えると、HC が意図した見え方にならないため。
+ * 地（editor / editorWidget / list-hoverのどれ）に対しても4.5:1以上、焦点の枠は3:1以上。ボタンの地の橙は文字ではない。
+ * ハイコントラストのテーマ（bodyにvscode-high-contrast* が付く）では適用しない。純黒・純白の地と焦点の色を
+ * 置き換えると、HCが意図した見え方にならないため。
  */
 body.ccnavi-claude-dark:not(.vscode-high-contrast):not(.vscode-high-contrast-light) {
   --vscode-editor-background: #262624; --vscode-editor-foreground: #E8E6DF; --vscode-foreground: #E8E6DF; --vscode-descriptionForeground: #A8A69E;

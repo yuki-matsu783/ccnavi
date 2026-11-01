@@ -1,8 +1,8 @@
 /**
- * `ccnavi --suggest --json`（候補の JSON）が出す形。実行ファイルと拡張の契約で、形の定義は
- * ccnavi の docs/11_requirements/json-shapes.md「候補の JSON」。
+ * `ccnavi --suggest --json`（候補のJSON）が出す形。実行ファイルと拡張の契約で、形の定義は
+ * ccnaviのdocs/11_requirements/json-shapes.md「候補のJSON」。
  *
- * 候補は実行ファイルが記録から起こし、`--lint` と `--test-expectations` と同じ検査を通したものだけ。
+ * 候補は実行ファイルが記録から起こし、`--lint`と`--test-expectations`と同じ検査を通したものだけ。
  * 拡張はそれを並べるだけで、候補を自分で起こさず、ルールにも足さない（置くのはユーザ）。
  */
 
@@ -16,9 +16,9 @@ export interface SuggestExpectationJson {
 }
 
 export interface SuggestCandidateJson {
-  /** `rule`（ルールを足す）か `message`（文面を見直す） */
+  /** `rule`（ルールを足す）か`message`（文面を見直す） */
   readonly kind: string;
-  /** `ask` か `deny`。`allow` は出ない */
+  /** `ask`か`deny`。`allow`は出ない */
   readonly section: string;
   readonly id: string;
   readonly tool: string;
@@ -27,7 +27,7 @@ export interface SuggestCandidateJson {
   readonly layer: string;
   readonly rules_path: string;
   readonly expectations: readonly SuggestExpectationJson[];
-  /** 文字で出すときと同じ下書き（`rules:` と `expectations:` の組） */
+  /** 文字で出すときと同じ下書き（`rules:`と`expectations:`の組） */
   readonly yaml: string;
 }
 
@@ -48,15 +48,15 @@ export function parseSuggestJson(text: string): Parsed<SuggestJson> {
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `候補の JSON として解釈できません: ${(error as Error).message}` };
+    return { ok: false, error: `候補のJSONとして解釈できません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
-    return { ok: false, error: "候補の JSON の最上位がオブジェクトではありません" };
+    return { ok: false, error: "候補のJSONの最上位がオブジェクトではありません" };
   }
   if (raw.version !== SUGGEST_VERSION) {
     return {
       ok: false,
-      error: `候補の JSON の版が違います（拡張は ${SUGGEST_VERSION}、実行ファイルは ${String(raw.version)}）。拡張か実行ファイルを揃えてください`,
+      error: `候補のJSONの版が違います（拡張は${SUGGEST_VERSION}、実行ファイルは${String(raw.version)}）。拡張か実行ファイルを揃えてください`,
     };
   }
   return {
@@ -67,7 +67,7 @@ export function parseSuggestJson(text: string): Parsed<SuggestJson> {
       rules_path: str(raw.rules_path),
       logs: list(raw.logs).filter((p): p is string => typeof p === "string"),
       records: num(raw.records),
-      // 出るのは deny と ask だけの約束。違う表記が来ても、通す側の候補は並べない
+      // 出るのはdenyとaskだけの約束。違う表記が来ても、通す側の候補は並べない
       candidates: list(raw.candidates)
         .filter(isRecord)
         .filter((c) => c.section === "deny" || c.section === "ask")

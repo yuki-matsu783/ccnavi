@@ -1,6 +1,6 @@
 /**
- * `--plan-order <親> --json` の答え（実行ファイルとの契約。`src/core/planordermodel.ts`）の読み取り。
- * 見本は Python 側が書き出した実例（`test/fixtures/plan-order.json`）。画面は判定せず、答えを読むだけ。
+ * `--plan-order <親> --json`の答え（実行ファイルとの契約。`src/core/planordermodel.ts`）の読み取り。
+ * 見本はPython側が書き出した実例（`test/fixtures/plan-order.json`）。画面は判定せず、答えを読むだけ。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -24,10 +24,10 @@ test("CB-T366 開いたときの答えを読む。計画ごとの図の中身（
   assert.equal(answer.writable, true);
   assert.deepEqual(answer.children, []);
   assert.deepEqual(answer.refused, []);
-  assert.equal(answer.written, undefined, "読むだけの答えに written はありません");
+  assert.equal(answer.written, undefined, "読むだけの答えにwrittenはありません");
 });
 
-test("CB-T367 振り直した答えの子の付け替え（旧識別子 → 新識別子、phase の旧 → 新）と、断った線・書けない理由・書いたかを読む", () => {
+test("CB-T367 振り直した答えの子の付け替え（旧識別子 → 新識別子、phaseの旧 → 新）と、断った線・書けない理由・書いたかを読む", () => {
   const reverse = planOrderSample("reverse");
   assert.deepEqual(
     reverse.children.map((child) => [child.ticket, child.new_ticket, child.phase, child.new_phase]),
@@ -59,8 +59,8 @@ test("CB-T367 振り直した答えの子の付け替え（旧識別子 → 新�
   assert.deepEqual(revision.plans[0].current, { "2": [1], "3": [1], "4": [2, 3] });
 });
 
-test("CB-T368 読み込めない答えは理由を返す（JSON でない・版が違う・最上位がオブジェクトでない）。欄の型が崩れていれば空として読む", () => {
-  const notJson = parsePlanOrder("ccnavi: i0099 の親の提案が承認待ちの置き場にありません");
+test("CB-T368 読み込めない答えは理由を返す（JSONでない・版が違う・最上位がオブジェクトでない）。欄の型が崩れていれば空として読む", () => {
+  const notJson = parsePlanOrder("ccnavi: i0099の親の提案が承認待ちの置き場にありません");
   assert.equal(notJson.ok, false);
   assert.match(notJson.ok ? "" : notJson.error, /JSON/);
   const version = parsePlanOrder(JSON.stringify({ ...JSON.parse(planOrderText("open")), version: 2 }));

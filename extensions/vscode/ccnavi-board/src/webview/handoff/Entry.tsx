@@ -1,7 +1,7 @@
 /**
- * 対象 1 件。見出しに選択の欄・パス・種類・状態のバッジを出し、取り込めない理由（錠を含む）を直下に出す。
- * 開くと差分・指摘（errors / warnings）を出す。`board` が偽の対象（`defense`）には、ターミナルで取り込む案内を出す。
- * 取り込めるか・取り込めない理由は実行ファイルの答えを読んだ `handoffmodel.ts` の判断のまま使う。
+ * 対象1件。見出しに選択の欄・パス・種類・状態のバッジを出し、取り込めない理由（錠を含む）を直下に出す。
+ * 開くと差分・指摘（errors / warnings）を出す。`board`が偽の対象（`defense`）には、ターミナルで取り込む案内を出す。
+ * 取り込めるか・取り込めない理由は実行ファイルの答えを読んだ`handoffmodel.ts`の判断のまま使う。
  */
 import type { JSX } from "react";
 
@@ -10,7 +10,7 @@ import { blockReason } from "../../core/handoffmodel.js";
 import type { Lock } from "../../core/lock.js";
 import { DEFENSE_NOTE, kindLabel, stateLabel, stateTone } from "./text.js";
 
-/** ターミナルで打つコマンドの案内の状態。まだ頼んでいなければ undefined */
+/** ターミナルで打つコマンドの案内の状態。まだ頼んでいなければundefined */
 export interface TerminalState {
   readonly command: string;
   readonly error: string;
@@ -55,7 +55,7 @@ export function Entry({ entry, lock, selected, open, disabled, terminal, onToggl
           type="checkbox"
           className="entry-pick"
           data-action="select"
-          aria-label={`${entry.path} を取り込む対象に選ぶ`}
+          aria-label={`${entry.path}を取り込む対象に選ぶ`}
           checked={selected}
           disabled={!importable || disabled}
           title={importable ? undefined : reason}
@@ -113,8 +113,8 @@ export function Entry({ entry, lock, selected, open, disabled, terminal, onToggl
 }
 
 /**
- * `board` が偽の対象の案内。ボードからは取り込まない。ターミナルで打つコマンドを出す
- * （`expect` はそのパスだけを指して見るだけをもう一度呼んで取る。拡張が組み直さない）。
+ * `board`が偽の対象の案内。ボードからは取り込まない。ターミナルで打つコマンドを出す
+ * （`expect`はそのパスだけを指して見るだけをもう一度呼んで取る。拡張が組み直さない）。
  */
 function TerminalGuide({
   entry,

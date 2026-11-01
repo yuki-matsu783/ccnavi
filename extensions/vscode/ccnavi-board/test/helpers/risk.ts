@@ -1,12 +1,12 @@
 /**
- * リスク管理画面（React）を happy-dom で動かす。`test/helpers/projects.ts` と同じ役割。
+ * リスク管理画面（React）をhappy-domで動かす。`test/helpers/projects.ts`と同じ役割。
  *
- * 画面はバンドルした 1 本（`out/webview/risk.js`）で、拡張はそれを `<script nonce>` に流し込む。
- * ここでも同じ 1 本を流し込むので、テストが見るのは配るものと同じ画面になる。
- * バンドルするのは `pnpm test` の中の `scripts/bundle-webview.js`。この入口のパス（`test/helpers/<画面の名前>.ts`）が
- * 約束で、`scripts/test-groups.js` はそれを辿って「この画面を読むグループ」を決める。
+ * 画面はバンドルした1本（`out/webview/risk.js`）で、拡張はそれを`<script nonce>`に流し込む。
+ * ここでも同じ1本を流し込むので、テストが見るのは配るものと同じ画面になる。
+ * バンドルするのは`pnpm test`の中の`scripts/bundle-webview.js`。この入口のパス（`test/helpers/<画面の名前>.ts`）が
+ * 約束で、`scripts/test-groups.js`はそれを辿って「この画面を読むグループ」を決める。
  *
- * React は押した直後には描き直さない。操作のあとは `await page.settle()` を挟んでから見る。
+ * Reactは押した直後には描き直さない。操作のあとは`await page.settle()`を挟んでから見る。
  */
 import { readRisk } from "../../src/core/risk-doc.js";
 import { renderRiskPage, type RenderOptions } from "../../src/core/risk-render.js";
@@ -16,12 +16,12 @@ import { loadPage, type DomPage } from "./dom.js";
 
 export const NONCE = "TEST-NONCE-123";
 
-/** 画面の HTML。CSS や nonce のように、文字列のまま見たいものはこれを見る */
+/** 画面のHTML。CSSやnonceのように、文字列のまま見たいものはこれを見る */
 export function riskHtml(data: RiskData, options: Partial<RenderOptions> = {}): string {
   return renderRiskPage(data, { nonce: NONCE, script: screenScript("risk"), style: screenStyle("risk"), ...options });
 }
 
-/** 見本の配点。4 つの加点条件が 1 件ずつ */
+/** 見本の配点。4つの加点条件が1件ずつ */
 export const RISK = `version: 1
 factors:
   - id: big-diff
@@ -32,7 +32,7 @@ factors:
     points: 35
     glob: ".github/**"
     max: 35
-    message: "CI に触った"
+    message: "CIに触った"
   - id: sh
     points: 10
     script: ".ccnavi/config/common/scripts/risk.sh"
@@ -53,7 +53,7 @@ export function page(overrides: Partial<RiskPage> = {}): RiskPage {
   };
 }
 
-/** HTML を happy-dom に読ませ、React がマウントし終わるまで待つ */
+/** HTMLをhappy-domに読ませ、Reactがマウントし終わるまで待つ */
 export async function openPage(data: RiskData, initialState?: unknown): Promise<DomPage> {
   const dom = await loadPage(riskHtml(data), initialState);
   await dom.settle();
@@ -65,7 +65,7 @@ export async function openRisk(overrides: Partial<RiskPage> = {}, initialState?:
   return openPage({ kind: "page", page: page(overrides) }, initialState);
 }
 
-/** 項目 1 行の中の要素。`li.factor[data-key=…]` の下だけを見る */
+/** 項目1行の中の要素。`li.factor[data-key=…]`の下だけを見る */
 export function rowSelector(key: string): string {
   return `.factor[data-key="${key}"]`;
 }

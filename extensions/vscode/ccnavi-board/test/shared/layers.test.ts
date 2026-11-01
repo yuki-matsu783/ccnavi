@@ -12,7 +12,7 @@ function board(layers: readonly LayerJson[]): BoardJson {
   return { ...fixture(), layers };
 }
 
-test("CB-T111 レイヤーは layers[] から名前で引き、予約名のプロジェクトは大文字小文字を問わずレイヤーを引かない", () => {
+test("CB-T111 レイヤーはlayers[]から名前で引き、予約名のプロジェクトは大文字小文字を問わずレイヤーを引かない", () => {
   const b = board([
     layer("common", "/ws/.ccnavi/config/common/rules.yml"),
     layer("self", "/ws/.ccnavi/config/project/rules.yml"),
@@ -21,7 +21,7 @@ test("CB-T111 レイヤーは layers[] から名前で引き、予約名のプ�
   assert.equal(commonLayer(b)?.rules.path, "/ws/.ccnavi/config/common/rules.yml");
   assert.equal(selfLayer(b)?.rules.path, "/ws/.ccnavi/config/project/rules.yml");
   assert.equal(projectLayer(b, "lib")?.rules.path, "/ws/projects/lib/.ccnavi/config/project/rules.yml");
-  // projects/self は自身のレイヤーを、projects/Common は共通レイヤーを引いてはいけない
+  // projects/selfは自身のレイヤーを、projects/Commonは共通レイヤーを引いてはいけない
   for (const reserved of ["self", "Self", "common", "COMMON"]) {
     assert.equal(projectLayer(b, reserved), undefined, reserved);
   }

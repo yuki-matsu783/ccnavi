@@ -1,16 +1,16 @@
 /**
- * 残った指摘を決める JSON の形（実行ファイルとの契約）と読み取り。docs/11_requirements/json-shapes.md「残った指摘の JSON」。
+ * 残った指摘を決めるJSONの形（実行ファイルとの契約）と読み取り。docs/11_requirements/json-shapes.md「残った指摘のJSON」。
  *
- * `ccnavi-review.sh decide <N> --preview` が残った指摘とダイジェストを見せ、
- * `ccnavi-user-decide.sh <N> --choices <JSON> --digest <ダイジェスト>` がユーザの選んだ行き先を置く。
+ * `ccnavi-review.sh decide <N> --preview`が残った指摘とダイジェストを見せ、
+ * `ccnavi-user-decide.sh <N> --choices <JSON> --digest <ダイジェスト>`がユーザの選んだ行き先を置く。
  * 拡張は見せられた指摘をそのまま並べ、選んだ行き先をキーごとに返すだけ
- * （マージリクエストを読むのは sh、判断するのは実行ファイル）。
+ * （MRを読むのはsh、判断するのは実行ファイル）。
  */
 
-/** 版 2: ダイジェストは指摘ごとの版（見せたあとに追加された指摘は止めない）。版 1 の JSON は読まない */
+/** 版2: ダイジェストは指摘ごとの版（見せたあとに追加された指摘は止めない）。版1のJSONは読まない */
 export const DECIDE_VERSION = 2;
 
-/** 行き先。対応しない（受け入れて進む）・このフェーズで直す（続きの子）・issue に回す */
+/** 行き先。対応しない（受け入れて進む）・このフェーズで直す（続きの子）・issueに回す */
 export type DecideChoice = "keep" | "fix" | "issue";
 
 export const DECIDE_CHOICES: readonly DecideChoice[] = ["keep", "fix", "issue"];
@@ -18,11 +18,11 @@ export const DECIDE_CHOICES: readonly DecideChoice[] = ["keep", "fix", "issue"];
 export const DECIDE_LABELS: Readonly<Record<DecideChoice, string>> = {
   keep: "対応しない",
   fix: "このフェーズで直す",
-  issue: "issue に回す",
+  issue: "issueに回す",
 };
 
 export interface DecideThread {
-  /** 選択を結ぶキー（URL か、無ければスレッドの id） */
+  /** 選択を結ぶキー（URLか、無ければスレッドのid） */
   readonly key: string;
   readonly url: string;
   readonly path: string;
@@ -40,7 +40,7 @@ export interface DecidePreview {
   readonly phase: number;
   readonly mr: { readonly number: number; readonly url: string };
   readonly threads: readonly DecideThread[];
-  /** 見せた指摘のダイジェスト（不透明な文字列）。選択を置くときに `--digest` で返す */
+  /** 見せた指摘のダイジェスト（不透明な文字列）。選択を置くときに`--digest`で返す */
   readonly digest: string;
 }
 
@@ -53,9 +53,9 @@ export interface DecideResult {
   readonly pending_extra: readonly string[];
   /** 起こした続きの子の識別子。起こしていなければ空 */
   readonly followup: string;
-  /** Claude Code に渡す文 */
+  /** Claude Codeに渡す文 */
   readonly prompt: string;
-  /** issue に回した分で作った issue の URL。無ければ空 */
+  /** issueに回した分で作ったissueのURL。無ければ空 */
   readonly issue_url: string;
   /** 置いたあとの投稿（issue・コメント）で起きたこと。置いたことは戻らない */
   readonly warning: string;
@@ -72,7 +72,7 @@ export type DecideOutcome =
   | { readonly ok: false; readonly error: string };
 
 /**
- * 読み取りの検証が照らす、頼んだもの。`mr` はフェーズ行の依頼が持つ MR の番号（分かるときだけ。分からなければ null で、番号の食い違いは見ない）
+ * 読み取りの検証が照らす、頼んだもの。`mr`はフェーズ行の依頼が持つMRの番号（分かるときだけ。分からなければnullで、番号の食い違いは見ない）
  */
 export interface DecideExpect {
   readonly parent: string;
@@ -81,21 +81,21 @@ export interface DecideExpect {
 }
 
 /**
- * `ccnavi-review.sh decide <N> --preview` の標準出力を読む。**厳しく読む**。次のどれかなら、件数を出さずに
- * 「指摘を読み取れなかった」として扱う（呼び手は確定のボタンを出さない）。「未解決は 0 件」と読み間違えると、
+ * `ccnavi-review.sh decide <N> --preview`の標準出力を読む。**厳しく読む**。次のどれかなら、件数を出さずに
+ * 「指摘を読み取れなかった」として扱う（呼び手は確定のボタンを出さない）。「未解決は0件」と読み間違えると、
  * 指摘が残っているフェーズを「レビュー済みにする」と見せてしまうため。
  *
- * - JSON でない、最上位がマップでない、`version` が想定外
- * - `parent` が文字列でない、または頼んだものと違う
- * - `phase` が整数でない、または頼んだものと違う
- * - `mr.number` が整数でない、または要求した MR の番号（分かるとき）と違う
- * - `digest` が無い、文字列でない、`v2.` で始まらない
- * - `threads` が無い、または配列でない
- * - スレッドの要素がマップでない、`key` が空・文字列でない・重複している、`body`・`url`・`path` が文字列でない、`line` が整数でない
+ * - JSONでない、最上位がマップでない、`version`が想定外
+ * - `parent`が文字列でない、または頼んだものと違う
+ * - `phase`が整数でない、または頼んだものと違う
+ * - `mr.number`が整数でない、または要求したMRの番号（分かるとき）と違う
+ * - `digest`が無い、文字列でない、`v2.`で始まらない
+ * - `threads`が無い、またはリストでない
+ * - スレッドの要素がマップでない、`key`が空・文字列でない・重複している、`body`・`url`・`path`が文字列でない、`line`が整数でない
  *   （不正な要素は破棄せずに、全体をエラーにする）
  *
- * URL が http(s) でないことはエラーにしない（画面がリンクにしないだけ）。
- * `expect` を渡さなければ、頼んだものとの照合だけを省く（型の検査はする）
+ * URLがhttp(s)でないことはエラーにしない（画面がリンクにしないだけ）。
+ * `expect`を渡さなければ、頼んだものとの照合だけを省く（型の検査はする）
  */
 export function parseDecidePreview(text: string, expect?: DecideExpect): DecidePreviewParse {
   const top = parseTop(text);
@@ -105,29 +105,29 @@ export function parseDecidePreview(text: string, expect?: DecideExpect): DecideP
   const raw = top.raw;
   const fail = (reason: string): DecidePreviewParse => ({ ok: false, error: reason });
   if (typeof raw.parent !== "string") {
-    return fail("parent が文字列ではありません");
+    return fail("parentが文字列ではありません");
   }
   if (expect !== undefined && raw.parent !== expect.parent) {
-    return fail(`parent が要求したもの（${expect.parent}）と違います（${raw.parent}）`);
+    return fail(`parentが要求したもの（${expect.parent}）と違います（${raw.parent}）`);
   }
   if (!isInt(raw.phase)) {
-    return fail("phase が整数ではありません");
+    return fail("phaseが整数ではありません");
   }
   if (expect !== undefined && raw.phase !== expect.phase) {
-    return fail(`phase が要求したもの（${expect.phase}）と違います（${raw.phase}）`);
+    return fail(`phaseが要求したもの（${expect.phase}）と違います（${raw.phase}）`);
   }
   const mr = isRecord(raw.mr) ? raw.mr : undefined;
   if (mr === undefined || !isInt(mr.number)) {
-    return fail("mr.number が整数ではありません");
+    return fail("mr.numberが整数ではありません");
   }
   if (expect !== undefined && expect.mr !== null && mr.number !== expect.mr) {
-    return fail(`mr.number が要求した依頼のマージリクエスト（#${expect.mr}）と違います（#${mr.number}）`);
+    return fail(`mr.numberが要求した依頼のMR（#${expect.mr}）と違います（#${mr.number}）`);
   }
   if (typeof raw.digest !== "string" || !raw.digest.startsWith("v2.")) {
-    return fail("digest が無いか、版 2（v2. で始まる文字列）ではありません");
+    return fail("digestが無いか、版2（v2. で始まる文字列）ではありません");
   }
   if (!Array.isArray(raw.threads)) {
-    return fail("threads が配列ではありません");
+    return fail("threadsがリストではありません");
   }
   const threads: DecideThread[] = [];
   const seen = new Set<string>();
@@ -137,7 +137,7 @@ export function parseDecidePreview(text: string, expect?: DecideExpect): DecideP
       return fail(read);
     }
     if (seen.has(read.key)) {
-      return fail(`threads[${i}] の key が重複しています（${read.key}）`);
+      return fail(`threads[${i}]のkeyが重複しています（${read.key}）`);
     }
     seen.add(read.key);
     threads.push(read);
@@ -156,8 +156,8 @@ export function parseDecidePreview(text: string, expect?: DecideExpect): DecideP
 }
 
 /**
- * 選択を置いた答え。sh は実行ファイルの答えに issue の URL と投稿の警告を足して返す。
- * 失敗の答え（`mismatch`）は終了コードが 0 でなくても JSON で来るので、呼び手は先にこれを読む
+ * 選択を置いた答え。shは実行ファイルの答えにissueのURLと投稿の警告を足して返す。
+ * 失敗の答え（`mismatch`）は終了コードが0でなくてもJSONで来るので、呼び手は先にこれを読む
  */
 export function parseDecideResult(text: string): DecideOutcome {
   const top = parseTop(text);
@@ -169,7 +169,7 @@ export function parseDecideResult(text: string): DecideOutcome {
     return { ok: false, mismatch: true };
   }
   if (raw.ok !== true) {
-    return { ok: false, error: "反映できたか分かりません（出力の ok が true ではありません）" };
+    return { ok: false, error: "反映できたか分かりません（出力のokがtrueではありません）" };
   }
   return {
     ok: true,
@@ -187,7 +187,7 @@ export function parseDecideResult(text: string): DecideOutcome {
 }
 
 /**
- * 選んだ行き先が、見せた指摘の全部に 1 つずつ付いているか。付いていなければ理由を返す。
+ * 選んだ行き先が、見せた指摘の全部に1つずつ付いているか。付いていなければ理由を返す。
  * 押せるかどうかを画面が決め、送る前に遷移の側でも同じものを見る（古い画面から届いた選択を通さない）
  */
 export function choicesProblem(
@@ -217,37 +217,37 @@ function parseTop(text: string): Top {
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `JSON として解釈できません: ${(error as Error).message}` };
+    return { ok: false, error: `JSONとして解釈できません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
-    return { ok: false, error: "JSON の最上位がオブジェクトではありません" };
+    return { ok: false, error: "JSONの最上位がオブジェクトではありません" };
   }
   const version = typeof raw.version === "number" ? raw.version : NaN;
   if (version !== DECIDE_VERSION) {
     return {
       ok: false,
-      error: `未解決の指摘の JSON の版が違います（拡張は ${DECIDE_VERSION}、実行ファイルは ${String(raw.version)}）`,
+      error: `未解決の指摘のJSONの版が違います（拡張は${DECIDE_VERSION}、実行ファイルは${String(raw.version)}）`,
     };
   }
   return { ok: true, raw, version };
 }
 
-/** スレッド 1 件を読む。読めなければ、何番目がなぜ不正かの文を返す */
+/** スレッド1件を読む。読めなければ、何番目がなぜ不正かの文を返す */
 function thread(item: unknown, index: number): DecideThread | string {
   const at = `threads[${index}]`;
   if (!isRecord(item)) {
-    return `${at} がマップではありません`;
+    return `${at}がマップではありません`;
   }
   if (typeof item.key !== "string" || item.key === "") {
-    return `${at} の key が空か、文字列ではありません`;
+    return `${at}のkeyが空か、文字列ではありません`;
   }
   for (const name of ["body", "url", "path"] as const) {
     if (typeof item[name] !== "string") {
-      return `${at} の ${name} が文字列ではありません`;
+      return `${at}の${name}が文字列ではありません`;
     }
   }
   if (!isInt(item.line)) {
-    return `${at} の line が整数ではありません`;
+    return `${at}のlineが整数ではありません`;
   }
   const last: Record<string, unknown> = isRecord(item.last_comment) ? item.last_comment : {};
   return {

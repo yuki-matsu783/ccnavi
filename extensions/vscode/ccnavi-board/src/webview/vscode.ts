@@ -1,9 +1,9 @@
 /**
- * Webview が持つ VS Code の窓口。`acquireVsCodeApi` は 1 つの Webview で 1 度しか呼べないので、
- * ここで 1 度だけ呼んで配る。
+ * Webviewが持つVS Codeの窓口。`acquireVsCodeApi`は1つのWebviewで1度しか呼べないので、
+ * ここで1度だけ呼んで配る。
  *
- * どの画面の部品からも読むので、特定の画面の契約（`BoardMessage` など）には依存しない。
- * 送る関数は画面ごとに `poster<その画面のメッセージ>()` で型を付けて作る（`board/post.ts`）。
+ * どの画面の部品からも読むので、特定の画面の契約（`BoardMessage`など）には依存しない。
+ * 送る関数は画面ごとに`poster<その画面のメッセージ>()`で型を付けて作る（`board/post.ts`）。
  */
 
 export interface VsCodeApi {
@@ -12,7 +12,7 @@ export interface VsCodeApi {
   setState(state: unknown): void;
 }
 
-/** 画面が拡張ホストへ返すもの。何であれ `type` で見分ける */
+/** 画面が拡張ホストへ返すもの。何であれ`type`で見分ける */
 export interface ScreenMessage {
   readonly type: string;
 }
@@ -23,16 +23,16 @@ const api = acquireVsCodeApi();
 
 /**
  * 画面の契約で型を付けた送る関数を作る。画面は自分の契約に無いものを送れない
- * （`post({ type: "打ち間違い" })` は型で止まる）。
+ * （`post({ type: "打ち間違い" })`は型で止まる）。
  *
- * 既定を `never` にしてあるので、型を渡し忘れた `poster()` は何も送れない（呼ぶ側で型が合わない）。
- * 既定を `ScreenMessage` にすると「`type` さえあれば何でも通る」送る関数が気づかないうちに出来てしまう。
+ * 既定を`never`にしてあるので、型を渡し忘れた`poster()`は何も送れない（呼ぶ側で型が合わない）。
+ * 既定を`ScreenMessage`にすると「`type`さえあれば何でも通る」送る関数が気づかないうちに出来てしまう。
  */
 export function poster<M extends ScreenMessage = never>(): (message: M) => void {
   return (message) => api.postMessage(message);
 }
 
-/** 画面が覚えておくもの（ボードなら絞り込み・折りたたんだ列・列の幅）。HTML を作り直しても残る */
+/** 画面が覚えておくもの（ボードなら絞り込み・折りたたんだ列・列の幅）。HTMLを作り直しても残る */
 export function getState(): unknown {
   return api.getState();
 }
@@ -41,7 +41,7 @@ export function setState(state: unknown): void {
   api.setState(state);
 }
 
-/** 覚えているものの 1 つのキーを読む。読めなければ undefined（覚えられなくても画面は動く） */
+/** 覚えているものの1つのキーを読む。読めなければundefined（覚えられなくても画面は動く） */
 export function readState(key: string): unknown {
   try {
     return ((getState() ?? {}) as Record<string, unknown>)[key];
@@ -50,7 +50,7 @@ export function readState(key: string): unknown {
   }
 }
 
-/** 覚えているものの 1 つのキーだけを書く（ほかのキーは残す）。書けなくても画面は動く */
+/** 覚えているものの1つのキーだけを書く（ほかのキーは残す）。書けなくても画面は動く */
 export function mergeState(key: string, value: unknown): void {
   try {
     setState({ ...((getState() ?? {}) as Record<string, unknown>), [key]: value });

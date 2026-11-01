@@ -1,6 +1,6 @@
 /**
- * Webview パネルの生成・更新・破棄と、ファイル監視、Webview からの操作の受け付け。
- * VS Code の API に触れるので単体テストの対象外。docs/design/manual-checks.md の手動確認の手順で確かめる。
+ * Webviewパネルの生成・更新・破棄と、ファイル監視、Webviewからの操作の受け付け。
+ * VS CodeのAPIに触れるので単体テストの対象外。docs/design/manual-checks.mdの手動確認の手順で確かめる。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -48,9 +48,9 @@ import { noteTicketControl, requireTickets } from "./ticket-control.js";
 import * as diaglog from "./log.js";
 import { assertNever, assertRetained, debounce, watchTickets } from "./panel-common.js";
 
-/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+/** 画面の名前。バンドルのパスは`src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "board";
-const TITLE = "ccnavi チケット管理";
+const TITLE = "ccnaviチケット管理";
 
 interface PanelState {
   readonly panel: vscode.WebviewPanel;
@@ -63,21 +63,21 @@ interface PanelState {
   /** 読み直せなかったときの文面。描き直しでオーバーレイだけを載せ替えるために覚えておく */
   error?: string;
   launcher?: Launcher;
-  /** 読み直しの最中か。最中にもう 1 回頼まれたら、終わってからもう 1 回だけ走らせる */
+  /** 読み直しの最中か。最中にもう1回頼まれたら、終わってからもう1回だけ走らせる */
   loading: boolean;
   again: boolean;
   wasVisible: boolean;
-  /** 次に描いたときに選ぶ絞り込み。1 度使ったら消す（以後は Webview の state が覚える） */
+  /** 次に描いたときに選ぶ絞り込み。1度使ったら消す（以後はWebviewのstateが覚える） */
   filter?: string;
   /**
    * 承認のオーバーレイ。あれば描くたびにボードの上に被せる（監視の更新で消えない）。
-   * 遷移の規則は `core/approval-machine.ts` が持ち、ここは持ち直すだけ
+   * 遷移の規則は`core/approval-machine.ts`が持ち、ここは持ち直すだけ
    */
   approval: ApprovalState;
   /**
    * 前の読み直しから動いたカード。画面ではなくここが持つ。画面は非表示になると破棄され、
-   * 再表示されると作り直されるので（`retainContextWhenHidden` は偽）、そちらに持たせると
-   * 承認の文を渡してボードに戻った時点で動いた表示が消える。決めるのは `core/board-moved.ts`
+   * 再表示されると作り直されるので（`retainContextWhenHidden`は偽）、そちらに持たせると
+   * 承認の文を渡してボードに戻った時点で動いた表示が消える。決めるのは`core/board-moved.ts`
    */
   moved: MovedState;
   /**
@@ -96,7 +96,7 @@ function binSetting(): string {
 }
 
 /**
- * 承認した子のワークツリーを作る（計画の `create` の子だけ）。作れなかったものは、名前と手で打つ
+ * 承認した子のワークツリーを作る（計画の`create`の子だけ）。作れなかったものは、名前と手で打つ
  * コマンドを付けて知らせる。親のワークツリーが無い子は計画に入らないので、ここでは作らない。
  */
 async function createChildWorktrees(root: string, worktrees: readonly ApproveWorktree[]): Promise<void> {
@@ -116,8 +116,8 @@ async function createChildWorktrees(root: string, worktrees: readonly ApproveWor
 }
 
 /**
- * `ccnaviBoard.open` の本体。`project` を渡すと、開いたボードの絞り込みをそのプロジェクトにする
- * （`""` はワークスペース（プロジェクト外）、`"*"` は全部）。いまは呼び出し元が無い（プロジェクト管理画面の入口を外した）。
+ * `ccnaviBoard.open`の本体。`project`を渡すと、開いたボードの絞り込みをそのプロジェクトにする
+ * （`""`はワークスペース（プロジェクト外）、`"*"`は全部）。いまは呼び出し元が無い（プロジェクト管理画面の入口を外した）。
  */
 export async function openBoard(project?: string): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
@@ -133,14 +133,14 @@ export async function openBoard(project?: string): Promise<void> {
     state.panel.reveal(state.panel.viewColumn);
     state.filter = project;
     void update();
-    // 開いたままのタブで、左パネルの案内から案内を頼まれたとき。組み上がりの `ready` は来ない
+    // 開いたままのタブで、左パネルの案内から案内を頼まれたとき。組み上がりの`ready`は来ない
     if (tourDue(SCREEN)) {
       state.host.post({ type: "tour" } satisfies ToBoard);
     }
     return;
   }
 
-  // 画面と CSS はバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面とCSSはバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
@@ -150,8 +150,8 @@ export async function openBoard(project?: string): Promise<void> {
   }
 
   // タブは読む前に作る。実行ファイルの答えを待ってから作ると、押しても何も起きないように見え、
-  // 押し直した分だけタブが増える（`state` を先に設定するので、2 度目の押下は下の `reveal` に入る）。
-  // 読めなかったときもタブは閉じず、中にエラーを出す（`update` の `showError`）
+  // 押し直した分だけタブが増える（`state`を先に設定するので、2度目の押下は下の`reveal`に入る）。
+  // 読めなかったときもタブは閉じず、中にエラーを出す（`update`の`showError`）
   const panel = vscode.window.createWebviewPanel("ccnaviBoard", TITLE, vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
@@ -179,7 +179,7 @@ export async function openBoard(project?: string): Promise<void> {
   void update();
 }
 
-/** `ccnaviBoard.refresh` の本体 */
+/** `ccnaviBoard.refresh`の本体 */
 export function refreshBoard(): void {
   if (state === undefined) {
     vscode.window.showInformationMessage("チケット管理画面が開かれていません");
@@ -199,8 +199,8 @@ function registerPanelHandlers(current: PanelState): void {
     const becameVisible = panel.visible && !current.wasVisible;
     current.wasVisible = panel.visible;
     if (!panel.visible) {
-      // `retainContextWhenHidden` は偽なので、非表示になった画面は破棄される。再表示されると
-      // ここで入れてある HTML から作り直され、組み上がったら `ready` が届く
+      // `retainContextWhenHidden`は偽なので、非表示になった画面は破棄される。再表示されると
+      // ここで入れてあるHTMLから作り直され、組み上がったら`ready`が届く
       current.host.hidden();
     }
     if (becameVisible) {
@@ -246,7 +246,7 @@ function scheduleUpdate(): void {
   });
 }
 
-/** 実行ファイルを走らせ直して Webview の内容を差し替える */
+/** 実行ファイルを走らせ直してWebviewの内容を差し替える */
 async function update(): Promise<void> {
   const current = state;
   if (current === undefined) {
@@ -277,7 +277,7 @@ async function update(): Promise<void> {
     }
     const board = buildBoard(result.board);
     current.board = board;
-    // 承認待ちの親の提案に無い親の、計画編集タブの保存のハッシュを忘れる。ターミナルや Chrome 拡張で承認した・
+    // 承認待ちの親の提案に無い親の、計画編集タブの保存のハッシュを忘れる。ターミナルやChrome拡張で承認した・
     // 取り下げた親を、あとで出す改版の提案と比べない（ボードから承認したときは承認の結果でも忘れる）
     forgetSaved(staleSaved(workflowTabs().saved, todoParentsOf(board)));
     show(current, board);
@@ -291,10 +291,10 @@ async function update(): Promise<void> {
 }
 
 /**
- * ボードを見せる。中身を渡すのは `send`。
+ * ボードを見せる。中身を渡すのは`send`。
  *
  * 読めたボードはここを必ず通るので、動いたカードもここで数え直す。同じボードを渡し直すだけの
- * 描き直し（オーバーレイの出し入れ）でも通るが、列が動いていなければ `movedStep` が前の動いた表示を
+ * 描き直し（オーバーレイの出し入れ）でも通るが、列が動いていなければ`movedStep`が前の動いた表示を
  * そのまま返すので、承認の文を閉じた拍子に動いた表示が消えることはない。
  */
 function show(current: PanelState, board: Board): void {
@@ -319,7 +319,7 @@ function showError(current: PanelState, error: string): void {
 
 /**
  * いま見せるものを画面に渡す。どう渡るか（送る・入れ物ごと・作り直し中で持ち越し）は
- * `screenHost` が決めて返す。ここが持つのは「1 度きりの絞り込みをいつ消すか」だけ。
+ * `screenHost`が決めて返す。ここが持つのは「1度きりの絞り込みをいつ消すか」だけ。
  */
 function send(current: PanelState, data: BoardData): void {
   const filter = current.filter;
@@ -330,7 +330,7 @@ function send(current: PanelState, data: BoardData): void {
     return;
   }
   if (delivery === "deferred") {
-    // 作り直している最中。組み上がったら `ready` が届くので、そこで渡し直す（絞り込みも持ち越す）
+    // 作り直している最中。組み上がったら`ready`が届くので、そこで渡し直す（絞り込みも持ち越す）
     return;
   }
   // 届いたときだけ消す。届かないまま消すと「このプロジェクトで絞って開く」が二度と渡らない
@@ -345,8 +345,8 @@ function withFilter(data: BoardData, filter: string | undefined): BoardData {
 }
 
 /**
- * ボードの画面に渡す手段。VS Code のパネルを `screenHost` の形に合わせる。
- * nonce は呼ぶたびに変える（同じ文字列を `webview.html` に入れても VS Code は何もしない）。
+ * ボードの画面に渡す手段。VS Codeのパネルを`screenHost`の形に合わせる。
+ * nonceは呼ぶたびに変える（同じ文字列を`webview.html`に入れてもVS Codeは何もしない）。
  */
 function boardHost(panel: vscode.WebviewPanel): ScreenHost<BoardData> {
   return screenHost<BoardData>(
@@ -379,15 +379,15 @@ function handleMessage(message: BoardMessage | undefined): void {
   const root = current.folder.uri.fsPath;
   switch (message.type) {
     case "ready":
-      // 画面が組み上がった。入れてある HTML は少し古いことがあるので、いまの中身を渡し直す。
+      // 画面が組み上がった。入れてあるHTMLは少し古いことがあるので、いまの中身を渡し直す。
       // 作り直している間に見送った更新（send）も、絞り込みも、ここで届く
       current.host.ready();
       redraw(current);
-      // 非表示の間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
-      // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て破棄している
+      // 非表示の間に見た目が変わっていたら、入れてあるHTMLのbodyのクラスは古い。
+      // `followAppearance`がそのとき送ったものは、段取りが「送れない」と見て破棄している
       postAppearance(current.host);
-      // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
-      // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
+      // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら`tourDone`を返す。
+      // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう1度出る
       if (tourDue(SCREEN)) {
         current.host.post({ type: "tour" } satisfies ToBoard);
       }
@@ -403,7 +403,7 @@ function handleMessage(message: BoardMessage | undefined): void {
       return;
     case "approve":
       // 絞り込んでいなければ承認待ち全部。絞り込んでいれば見えている分だけを承認の対象にする。
-      // カードの「この 1 件を承認」は、そのカードの識別子だけを絞りとして送ってくる。
+      // カードの「この1件を承認」は、そのカードの識別子だけを絞りとして送ってくる。
       // 突き合わせる相手（いまのボードの承認待ち）をつけて渡し、決めるのは遷移の側
       dispatch(current, {
         kind: "approve",
@@ -430,8 +430,8 @@ function handleMessage(message: BoardMessage | undefined): void {
       dispatch(current, { kind: "handOver", how: message.type });
       return;
     case "decide":
-      // ［レビュー完了］。残った指摘を読むオーバーレイを開く。sh が指摘を取ってきて、0 件ならレビュー済みにする画面、
-      // 1 件以上ならユーザが指摘ごとに選ぶ画面になる。
+      // ［レビュー完了］。残った指摘を読むオーバーレイを開く。shが指摘を取ってきて、0件ならレビュー済みにする画面、
+      // 1件以上ならユーザが指摘ごとに選ぶ画面になる。
       // ボードから引くもの（親のワークツリー・フェーズ）をつけて渡し、開いてよいかは遷移の側が決める
       dispatch(current, {
         kind: "decide",
@@ -455,7 +455,7 @@ function handleMessage(message: BoardMessage | undefined): void {
       void copyAbandon(current, message.parent);
       return;
     case "decideConsult":
-      // 相談のプロンプトを組むのは遷移の側。文面に書くワークスペースルートは、実行ファイルの案内と同じ realpath で渡す
+      // 相談のプロンプトを組むのは遷移の側。文面に書くワークスペースルートは、実行ファイルの案内と同じrealpathで渡す
       dispatch(current, { kind: "consult", root: realRoot(root) });
       return;
     case "flow":
@@ -466,13 +466,13 @@ function handleMessage(message: BoardMessage | undefined): void {
       return;
     case "workflow":
       // 画面が言った識別子をそのまま信頼せず、いまのボードで入口を出しているカード（計画を持つ承認待ちの親の
-      // 提案）だけを開く。開くのはコマンド ccnaviBoard.openWorkflow と同じ入口
+      // 提案）だけを開く。開くのはコマンドccnaviBoard.openWorkflowと同じ入口
       if (current.board !== undefined && workflowCardOf(current.board, message.ticket) !== undefined) {
         void vscode.commands.executeCommand("ccnaviBoard.openWorkflow", message.ticket);
       }
       return;
     case "editWorkflow":
-      // 閉じてよいか・一覧の図にある親かは遷移が決める。開くのは遷移が返す openWorkflow
+      // 閉じてよいか・一覧の図にある親かは遷移が決める。開くのは遷移が返すopenWorkflow
       dispatch(current, { kind: "editWorkflow", ticket: message.ticket });
       return;
     case "templateDraft":
@@ -482,7 +482,7 @@ function handleMessage(message: BoardMessage | undefined): void {
       }
       return;
     default:
-      // `BoardMessage` に操作を足したのに、ここに処理を書いていなければ型が合わなくなる。
+      // `BoardMessage`に操作を足したのに、ここに処理を書いていなければ型が合わなくなる。
       // 画面のボタンだけ足して受け側を書き忘れるのを防ぐ
       assertNever(message);
       return;
@@ -490,8 +490,8 @@ function handleMessage(message: BoardMessage | undefined): void {
 }
 
 /**
- * 文面に書くワークスペースルート。実行ファイルの案内（`settings.script_command`）は realpath で解いたパスを出すので、
- * 同じパスにする（macOS の /tmp → /private/tmp など）。解けなければ渡されたパスのまま
+ * 文面に書くワークスペースルート。実行ファイルの案内（`settings.script_command`）はrealpathで解いたパスを出すので、
+ * 同じパスにする（macOSの /tmp → /private/tmpなど）。解けなければ渡されたパスのまま
  */
 function realRoot(root: string): string {
   try {
@@ -516,10 +516,10 @@ function redraw(current: PanelState): void {
 }
 
 /**
- * 承認のオーバーレイに 1 つ入力を入れる。遷移の規則はここに書かない
- * （`core/approval-machine.ts`。VS Code に触れないので単体で試せる）。
+ * 承認のオーバーレイに1つ入力を入れる。遷移の規則はここに書かない
+ * （`core/approval-machine.ts`。VS Codeに触れないので単体で試せる）。
  *
- * ここがするのは 3 つだけ。返った状態を持ち直す、描き直す、やることを行う。順を変えない。
+ * ここがするのは3つだけ。返った状態を持ち直す、描き直す、やることを行う。順を変えない。
  * 描き直しが先で、やることが後（逆にすると、文を渡すときに画面が古いまま残る）。
  */
 function dispatch(current: PanelState, input: ApprovalInput): void {
@@ -534,8 +534,8 @@ function dispatch(current: PanelState, input: ApprovalInput): void {
 }
 
 /**
- * マージ状況の確認に 1 つ入力を入れる。遷移の規則は `core/merge.ts` にある（VS Code に触れないので単体で試せる）。
- * ここがするのは 3 つだけ。返った状態を持ち直す、描き直す、やることを行う。描き直しが先で、やることが後。
+ * マージ状況の確認に1つ入力を入れる。遷移の規則は`core/merge.ts`にある（VS Codeに触れないので単体で試せる）。
+ * ここがするのは3つだけ。返った状態を持ち直す、描き直す、やることを行う。描き直しが先で、やることが後。
  */
 function dispatchMerge(current: PanelState, input: MergeInput): void {
   const step = mergeStep(current.merge, input);
@@ -548,7 +548,7 @@ function dispatchMerge(current: PanelState, input: MergeInput): void {
   }
 }
 
-/** 同時に走らせる `mr-state` の数。ホストの API を叩くので、親が多くても一度に押し寄せない */
+/** 同時に走らせる`mr-state`の数。ホストのAPIを叩くので、親が多くても一度に押し寄せない */
 const MR_STATE_SLOTS = 4;
 let mrStateRunning = 0;
 const mrStateQueue: (() => void)[] = [];
@@ -573,7 +573,7 @@ function nowText(): string {
   return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
 }
 
-/** マージ状況の確認が遷移から頼まれた仕事を行う。返事が要るものは、パネルがまだ同じなら `dispatchMerge` で戻す */
+/** マージ状況の確認が遷移から頼まれた仕事を行う。返事が要るものは、パネルがまだ同じなら`dispatchMerge`で戻す */
 async function runMergeEffect(current: PanelState, effect: MergeEffect): Promise<void> {
   const root = current.folder.uri.fsPath;
   switch (effect.kind) {
@@ -585,7 +585,7 @@ async function runMergeEffect(current: PanelState, effect: MergeEffect): Promise
       return;
     }
     case "loadState": {
-      // 1 回ごとに期限を付け（`runMrState`）、失敗はその親だけに留める。cwd は片付けの記録が指すリポジトリ
+      // 1回ごとに期限を付け（`runMrState`）、失敗はその親だけに留める。cwdは片付けの記録が指すリポジトリ
       const cwd = repoDirOf(root, current.board?.projectsDir ?? "", effect.repo);
       const result = await withMrStateSlot(() => runMrState(root, scriptShell(), cwd, effect.mr));
       if (state === current) {
@@ -625,7 +625,7 @@ async function runMergeEffect(current: PanelState, effect: MergeEffect): Promise
 }
 
 /**
- * マージせずに閉じた親の、記録を消すコマンドをコピーする。ボードからは送らない（ユーザがターミナルで実行する）。
+ * マージせずにクローズした親の、記録を消すコマンドをコピーする。ボードからは送らない（ユーザがターミナルで実行する）。
  * 画面が言った親をそのまま信頼せず、いまの結果で「マージせず閉じた」と確認できている親だけを扱う
  */
 async function copyAbandon(current: PanelState, parent: string): Promise<void> {
@@ -639,7 +639,7 @@ async function copyAbandon(current: PanelState, parent: string): Promise<void> {
 
 /**
  * 遷移が返した「やること」を行う。外へ出るのはここだけ（実行ファイル・ターミナル・クリップボード・
- * 新しいセッション・通知）。返事が要るもの（一覧と承認の結果）は、返ってきたらまた `dispatch` に入れる。
+ * 新しいセッション・通知）。返事が要るもの（一覧と承認の結果）は、返ってきたらまた`dispatch`に入れる。
  *
  * 返事を入れる前に、パネルがまだ同じかを見る。 開き直された後のパネルに、前のパネルの
  * 承認の結果を入れない。
@@ -656,7 +656,7 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
       return;
     }
     case "approve": {
-      // 打つ直前にもう 1 度、計画編集タブに未保存の変更がある親を含まないかを見る（遷移が見たあとに
+      // 打つ直前にもう1度、計画編集タブに未保存の変更がある親を含まないかを見る（遷移が見たあとに
       // 未保存になっていれば打たない）。一覧の親の識別子と、帳面の親の識別子を突き合わせる
       const blocked = blockedBeforeApprove(effect.tickets, workflowTabs().unsaved);
       if (blocked.length > 0) {
@@ -667,7 +667,7 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
       // 見せたダイジェスト（提案の識別子の一覧と各提案ファイルのバイト列全体）も渡す。識別子が同じでも、
       // 見せたあとに提案ファイルの中身（本文・改行・BOM）が変われば承認せず、最新を表示し直す
       const outcome = await runApproveYes(root, binSetting(), effect.tickets, effect.digest, effect.only);
-      // 承認済みチケットを置くのは取り返しがつかないので、受け付けたことと結果を 1 行残す
+      // 承認済みチケットを置くのは取り返しがつかないので、受け付けたことと結果を1行残す
       diaglog.get("ccnavi-board", root).info("承認を打った", {
         result: outcome.ok ? "approved" : "mismatch" in outcome ? "mismatch" : "error",
         requested: effect.tickets.length,
@@ -680,12 +680,12 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
         void createChildWorktrees(root, outcome.value.worktrees);
       }
       if (state === current) {
-        // 承認の push の sh があるかは、承認が返ったこの時点で見る
+        // 承認のpushのshがあるかは、承認が返ったこの時点で見る
         dispatch(current, { kind: "approved", outcome, carrier: isFile(path.join(root, PUSH_APPROVED_SCRIPT)) });
       }
       return;
     }
-    // 承認の実行ファイルは承認済みチケットを置くだけで、コミットして push するのはこの sh
+    // 承認の実行ファイルは承認済みチケットを置くだけで、コミットしてpushするのはこのsh
     case "carry":
       runInTerminal(root, pushApprovedCommand(root, [], effect.paths));
       return;
@@ -726,7 +726,7 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
         effect.choices,
         effect.digest,
       );
-      // 行き先を置くのは取り返しがつかない（続きの子が起きる）ので、受け付けたことと結果を 1 行残す
+      // 行き先を置くのは取り返しがつかない（続きの子が起きる）ので、受け付けたことと結果を1行残す
       diaglog.get("ccnavi-board", root).info("残った指摘の対応方針を置いた", {
         result: outcome.ok ? "decided" : "mismatch" in outcome ? "mismatch" : "error",
         phase: effect.phase,
@@ -747,7 +747,7 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
       void update();
       return;
     default:
-      // `ApprovalEffect` に足したのに、ここに書いていなければ型が合わなくなる
+      // `ApprovalEffect`に足したのに、ここに書いていなければ型が合わなくなる
       assertNever(effect);
       return;
   }
@@ -773,11 +773,11 @@ function openTicket(current: PanelState, filePath: string): void {
 }
 
 /**
- * チケットは Markdown なので、素のテキストではなくプレビューで見せる。
- * プレビューは組み込みの Markdown 拡張のもので、無いファイルを渡しても失敗を返さない前提で書いている
- * （ここからは確かめられないので、docs/design/manual-checks.md の手動確認で見る）。だから先に在るかを確かめ、無ければ
+ * チケットはMarkdownなので、素のテキストではなくプレビューで見せる。
+ * プレビューは組み込みのMarkdown拡張のもので、無いファイルを渡しても失敗を返さない前提で書いている
+ * （ここからは確かめられないので、docs/design/manual-checks.mdの手動確認で見る）。だから先に在るかを確かめ、無ければ
  * 呼び手に失敗を返す（通知して、ボードを読み直す）。確かめてから描くまでに消えた場合は拾えない。
- * プレビューのコマンドが無い環境（組み込みの Markdown 拡張が無効）では、これまでどおりエディタで開く。
+ * プレビューのコマンドが無い環境（組み込みのMarkdown拡張が無効）では、これまでどおりエディタで開く。
  */
 async function showTicketPreview(filePath: string): Promise<void> {
   const uri = vscode.Uri.file(filePath);
@@ -811,8 +811,8 @@ async function makeTemplateDraft(current: PanelState, ticket: string): Promise<v
 }
 
 /**
- * 形を確かめる操作の一覧。`BoardMessage` に足したのにここへ足していなければ、型が合わなくなる。
- * `handleMessage` の網羅検査（`never`）は処理の書き忘れしか止めないので、入口の側でも同じことをする。
+ * 形を確かめる操作の一覧。`BoardMessage`に足したのにここへ足していなければ、型が合わなくなる。
+ * `handleMessage`の網羅検査（`never`）は処理の書き忘れしか止めないので、入口の側でも同じことをする。
  * 足し忘れると、画面のボタンは押せるのに、届いたものが何も出さずに破棄される。
  */
 const KNOWN: Readonly<Record<BoardMessage["type"], true>> = {

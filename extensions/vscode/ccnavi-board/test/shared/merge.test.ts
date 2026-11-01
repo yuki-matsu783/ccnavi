@@ -1,5 +1,5 @@
 /**
- * 「MR の状況を確認」の遷移（`src/core/merge.ts`）。確認の二重起動・遅れて返った答え・一部だけの失敗・
+ * 「MRの状況を確認」の遷移（`src/core/merge.ts`）。確認の二重起動・遅れて返った答え・一部だけの失敗・
  * 片付けの再入と送信の失敗。外へ出る仕事は効果として返るだけなので、単体で全部試せる。
  */
 import { test } from "node:test";
@@ -25,7 +25,7 @@ const merged = (n: number): MrStateResult => ({ kind: "merged", number: n, url: 
 const open = (n: number, draft = false): MrStateResult => ({ kind: "open", number: n, draft, url: `https://example.com/pull/${n}` });
 const closed = (n: number): MrStateResult => ({ kind: "closed", number: n, url: `https://example.com/pull/${n}` });
 
-/** 2 親（i1 は self の MR 11、i2 は web の MR 12）を確認し終えた状態を作る */
+/** 2親（i1はselfのMR 11、i2はwebのMR 12）を確認し終えた状態を作る */
 function checked(results: Record<string, MrStateResult>): MergeState {
   const started = step(MERGE_IDLE, { kind: "check" });
   const token = started.state.token;
@@ -60,7 +60,7 @@ test("CB-T630 確認を押すと一覧を読みに行く。確認中の「確認
   assert.deepEqual(next.effects, [{ kind: "loadList", token: 2 }]);
 });
 
-test("CB-T631 一覧が読めたら対象ごとに状況を聞く（MR の番号があるものだけ）。0 件でも、incomplete だけでも確認は終わる", () => {
+test("CB-T631 一覧が読めたら対象ごとに状況を聞く（MRの番号があるものだけ）。0件でも、incompleteだけでも確認は終わる", () => {
   const started = step(MERGE_IDLE, { kind: "check" }).state;
   const listedStep = step(started, {
     kind: "listed",
@@ -75,38 +75,38 @@ test("CB-T631 一覧が読めたら対象ごとに状況を聞く（MR の番号
     ),
   });
   assert.deepEqual(listedStep.effects, [{ kind: "loadState", token: 1, parent: "i1", repo: "self", mr: 11 }]);
-  assert.equal(listedStep.state.checking, true, "i1 の答えを待つ");
-  // 番号の無い親と incomplete は、聞かずに確認できないものとして出る（その親だけに留める）
+  assert.equal(listedStep.state.checking, true, "i1の答えを待つ");
+  // 番号の無い親とincompleteは、聞かずに確認できないものとして出る（その親だけに留める）
   const rows = listedStep.state.list.kind === "rows" ? listedStep.state.list.rows : [];
   assert.equal(rows[1].result?.kind === "unknown" ? rows[1].result.reason : "", "no-number");
   assert.equal(rows[2].result?.kind, "incomplete");
-  // 0 件: 確認は終わり、帯は「ありません」を言える（一覧を取れた）
+  // 0件: 確認は終わり、帯は「ありません」を言える（一覧を取れた）
   const empty = step(started, { kind: "listed", token: 1, at: AT, result: listed([]) });
   assert.equal(empty.state.checking, false);
   assert.equal(empty.state.checkedAt, AT);
   assert.deepEqual(mergeView(empty.state, abandon), { checking: false, checkedAt: AT, error: "", rows: [] });
-  // incomplete だけ: 聞くものが無いので、すぐ終わる。「ありません」ではなく確認できない行を出す
-  const only = step(started, { kind: "listed", token: 1, at: AT, result: listed([], [{ parent: "i9", reason: "mr が無い" }]) });
+  // incompleteだけ: 聞くものが無いので、すぐ終わる。「ありません」ではなく確認できない行を出す
+  const only = step(started, { kind: "listed", token: 1, at: AT, result: listed([], [{ parent: "i9", reason: "mrが無い" }]) });
   assert.equal(only.state.checking, false);
   assert.deepEqual(only.effects, []);
   const view = mergeView(only.state, abandon);
   assert.equal(view?.rows.length, 1);
   assert.equal(view?.rows[0].state, "incomplete");
-  assert.equal(view?.rows[0].detail, "mr が無い");
+  assert.equal(view?.rows[0].detail, "mrが無い");
 });
 
 test("CB-T632 一覧の形式の異常は「ありません」とは言わず、エラーとして出す", () => {
   const started = step(MERGE_IDLE, { kind: "check" }).state;
-  const failed = step(started, { kind: "listed", token: 1, at: AT, result: { ok: false, error: "一覧を取得できません（形式の異常: 頭の行が retired 1 ではありません）" } });
+  const failed = step(started, { kind: "listed", token: 1, at: AT, result: { ok: false, error: "一覧を取得できません（形式の異常: 頭の行がretired 1ではありません）" } });
   assert.equal(failed.state.checking, false);
   assert.deepEqual(failed.effects, []);
   const view = mergeView(failed.state, abandon);
-  assert.equal(view?.error, "一覧を取得できません（形式の異常: 頭の行が retired 1 ではありません）");
+  assert.equal(view?.error, "一覧を取得できません（形式の異常: 頭の行がretired 1ではありません）");
   assert.deepEqual(view?.rows, []);
   assert.equal(view?.checkedAt, AT);
 });
 
-test("CB-T633 一部だけ失敗してもほかは続け、全部そろったら終える。期限切れ・sh の失敗もその親だけの結果", () => {
+test("CB-T633 一部だけ失敗してもほかは続け、全部そろったら終える。期限切れ・shの失敗もその親だけの結果", () => {
   const started = step(MERGE_IDLE, { kind: "check" }).state;
   let state = step(started, {
     kind: "listed",
@@ -122,7 +122,7 @@ test("CB-T633 一部だけ失敗してもほかは続け、全部そろったら
   assert.equal(state.checking, true, "ほかの親の答えを待つ");
   state = step(state, { kind: "stated", token: 1, parent: "i1", at: AT, result: merged(11) }).state;
   assert.equal(state.checking, true);
-  state = step(state, { kind: "stated", token: 1, parent: "i3", at: "終わった時刻", result: { kind: "unknown", reason: "failed", detail: "sh が終了コード 127 で終わりました" } }).state;
+  state = step(state, { kind: "stated", token: 1, parent: "i3", at: "終わった時刻", result: { kind: "unknown", reason: "failed", detail: "shが終了コード127で終わりました" } }).state;
   assert.equal(state.checking, false);
   assert.equal(state.checkedAt, "終わった時刻");
   const view = mergeView(state, abandon);
@@ -130,7 +130,7 @@ test("CB-T633 一部だけ失敗してもほかは続け、全部そろったら
 });
 
 test("CB-T634 頼んだ世代でない答えは受けない（閉じたボードや前の確認へ遅れて返った結果を破棄する）", () => {
-  const started = step(MERGE_IDLE, { kind: "check" }).state; // 世代 1
+  const started = step(MERGE_IDLE, { kind: "check" }).state; // 世代1
   const loaded = step(started, { kind: "listed", token: 1, at: AT, result: listed([{ parent: "i1", repo: "self", mr: 11, branch: "" }]) }).state;
   // 別の世代・別の親・確認していないとき
   for (const input of [
@@ -144,7 +144,7 @@ test("CB-T634 頼んだ世代でない答えは受けない（閉じたボード
   }
   assert.equal(step(MERGE_IDLE, { kind: "stated", token: 1, parent: "i1", result: merged(11), at: AT }).state, MERGE_IDLE);
   assert.equal(step(MERGE_IDLE, { kind: "listed", token: 1, result: listed([]), at: AT }).state, MERGE_IDLE);
-  // 答えた親には答えを 2 度入れない（先の答えを上書きしない）
+  // 答えた親には答えを2度入れない（先の答えを上書きしない）
   const answered = step(loaded, { kind: "stated", token: 1, parent: "i1", result: merged(11), at: AT }).state;
   const dup = step(answered, { kind: "stated", token: 1, parent: "i1", result: closed(11), at: AT });
   assert.equal(dup.state, answered);
@@ -155,11 +155,11 @@ test("CB-T634 頼んだ世代でない答えは受けない（閉じたボード
   assert.equal(step(second, { kind: "stated", token: 1, parent: "i1", result: closed(11), at: AT }).state, second);
 });
 
-test("CB-T635 mergeView: 一度も確認していなければ帯を出さない。確認中は行ごとに「確認中」。closed のときだけ記録を消すコマンドを持つ", () => {
+test("CB-T635 mergeView: 一度も確認していなければ帯を出さない。確認中は行ごとに「確認中」。closedのときだけ記録を消すコマンドを持つ", () => {
   assert.equal(mergeView(MERGE_IDLE, abandon), undefined);
   const state = checked({ i1: closed(11) });
   const view = mergeView(state, abandon);
-  assert.equal(view?.checking, true, "i2 の答えがまだ");
+  assert.equal(view?.checking, true, "i2の答えがまだ");
   assert.deepEqual(view?.rows.map((r) => [r.parent, r.state, r.project, r.mr]), [["i1", "closed", "", 11], ["i2", "checking", "web", 12]]);
   assert.equal(view?.rows[0].abandon, abandon("i1"));
   assert.equal(view?.rows[1].abandon, "");
@@ -189,7 +189,7 @@ test("CB-T636 片付け: マージ済みと確認できた親だけ。確認の�
   assert.deepEqual(cancelled.state.confirming, []);
   assert.deepEqual(cancelled.effects, []);
   assert.deepEqual(kinds(step(cancelled.state, { kind: "retire", parent: "i1" }).effects), ["confirmRetire"]);
-  // 「実行する」: 送る。送り終わるまで confirming に残る（その間も再入させない）
+  // 「実行する」: 送る。送り終わるまでconfirmingに残る（その間も再入させない）
   const accepted = step(asked.state, { kind: "retireAnswered", parent: "i1", accepted: true });
   assert.deepEqual(accepted.effects, [{ kind: "sendRetire", parent: "i1" }]);
   assert.deepEqual(accepted.state.confirming, ["i1"]);
@@ -224,7 +224,7 @@ test("CB-T637 送信の結果: 成功すると、その行を「送信した」�
   const retry = step(step(step(ng.state, { kind: "retire", parent: "i1" }).state, { kind: "retireAnswered", parent: "i1", accepted: true }).state, { kind: "retireSent", parent: "i1", error: undefined });
   assert.equal(mergeView(retry.state, abandon)?.rows[0].sendError, "");
   assert.deepEqual(retry.state.sent, ["i1"]);
-  // 次に「MR の状況を確認」を押すまで押せない（確認を始めると、送った印は消える）
+  // 次に「MRの状況を確認」を押すまで押せない（確認を始めると、送った印は消える）
   assert.deepEqual(retry.state.sent, ["i1"]);
   const recheck = step({ ...retry.state, checking: false }, { kind: "check" });
   assert.deepEqual(recheck.state.sent, []);

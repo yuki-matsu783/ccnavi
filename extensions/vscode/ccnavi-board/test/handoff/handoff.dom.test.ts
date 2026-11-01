@@ -1,7 +1,7 @@
 /**
- * 取り込み待ち画面（React）を happy-dom で動かす。対象の一覧（種類・状態・errors・warnings・差分）、
- * 取り込めない理由、選択と取り込みの確認、錠、defense のターミナルの案内、取り込みの結果、無効・エラー・読み込み中を見る。
- * 見本は `test/helpers/handoff.ts`（種類と状態を 1 本ずつ並べた一覧）。
+ * 取り込み待ち画面（React）をhappy-domで動かす。対象の一覧（種類・状態・errors・warnings・差分）、
+ * 取り込めない理由、選択と取り込みの確認、錠、defenseのターミナルの案内、取り込みの結果、無効・エラー・読み込み中を見る。
+ * 見本は`test/helpers/handoff.ts`（種類と状態を1本ずつ並べた一覧）。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -30,7 +30,7 @@ async function check(dom: DomPage, path: string): Promise<void> {
   await dom.settle();
 }
 
-test("CB-D366 一覧は対象ごとに 1 行。パス・種類・状態のバッジと、errors / warnings の件数、要約の件数を出す", async () => {
+test("CB-D366 一覧は対象ごとに1行。パス・種類・状態のバッジと、errors / warningsの件数、要約の件数を出す", async () => {
   const dom = await openHandoff();
   try {
     assert.deepEqual(
@@ -44,8 +44,8 @@ test("CB-D366 一覧は対象ごとに 1 行。パス・種類・状態のバッ
     assert.equal(text(dom.one(`${row(".ccnavi/docs/same.md")} [data-role="state"]`)), "変更なし");
     assert.match(text(dom.one(row(".ccnavi/docs/broken.md"))), /error 1/);
     assert.match(text(dom.one(row(DOCS))), /warn 1/);
-    // 要約: 対象 6 件、取り込める 3 件（template・layer-config の changed・docs）、選択 0 件、対象外 2 件
-    assert.equal(text(dom.one("#counts")), "対象 6 件・取り込める 3 件・選択 0 件・対象外 2 件");
+    // 要約: 対象6件、取り込める3件（template・layer-configのchanged・docs）、選択0件、対象外2件
+    assert.equal(text(dom.one("#counts")), "対象6件・取り込める3件・選択0件・対象外2件");
     const ignored = text(dom.one("#ignored-paths"));
     assert.match(ignored, /repro\.sh: 取り込める種類の表に無い/);
     assert.match(ignored, /linked: リンクのディレクトリ/);
@@ -54,8 +54,8 @@ test("CB-D366 一覧は対象ごとに 1 行。パス・種類・状態のバッ
   }
 });
 
-test("CB-D367 見出しを押すと開き、差分と errors / warnings を出す。差分が空なら無いと言う", async () => {
-  const dom = await openHandoff({ list: list([entry(), entry({ path: ".ccnavi/docs/guide.md", kind: "docs", warnings: ["見出しが無い"], errors: ["UTF-8 ではない"], diff: "", entry_sha: "c".repeat(16) })]) });
+test("CB-D367 見出しを押すと開き、差分とerrors / warningsを出す。差分が空なら無いと言う", async () => {
+  const dom = await openHandoff({ list: list([entry(), entry({ path: ".ccnavi/docs/guide.md", kind: "docs", warnings: ["見出しが無い"], errors: ["UTF-8ではない"], diff: "", entry_sha: "c".repeat(16) })]) });
   try {
     assert.equal(dom.all('[data-role="diff"]').length, 0, "閉じている間は差分を出さない");
     dom.click(dom.one(`${row(TEMPLATE)} .row-head`));
@@ -64,7 +64,7 @@ test("CB-D367 見出しを押すと開き、差分と errors / warnings を出�
     dom.click(dom.one(`${row(DOCS)} .row-head`));
     await dom.settle();
     assert.equal(text(dom.one(`${row(DOCS)} [data-role="no-diff"]`)), "差分はありません。");
-    assert.match(text(dom.one(`${row(DOCS)} .sev-error`)), /\[error\] UTF-8 ではない/);
+    assert.match(text(dom.one(`${row(DOCS)} .sev-error`)), /\[error\] UTF-8ではない/);
     assert.match(text(dom.one(`${row(DOCS)} .sev-warn`)), /\[warn\] 見出しが無い/);
   } finally {
     await dom.close();
@@ -75,16 +75,16 @@ test("CB-D368 取り込めない対象は選べず、理由を出す。error・u
   const dom = await openHandoff();
   try {
     for (const path of [TEMPLATE, RULES, DOCS]) {
-      assert.equal(pick(dom, path).disabled, false, `${path} は選べる`);
-      assert.equal(dom.all(`${row(path)} [data-role="reason"]`).length, 0, `${path} に理由は出ない`);
+      assert.equal(pick(dom, path).disabled, false, `${path}は選べる`);
+      assert.equal(dom.all(`${row(path)} [data-role="reason"]`).length, 0, `${path}に理由は出ない`);
     }
     const reasons: [string, RegExp][] = [
-      [".ccnavi/docs/broken.md", /取り込めません: 検査で error があります/],
+      [".ccnavi/docs/broken.md", /取り込めません: 検査でerrorがあります/],
       [".ccnavi/docs/same.md", /取り込めません: 取り込み先と同じ内容/],
       [HOOK, /取り込めません: ボードからは取り込めません。ターミナルで取り込みます/],
     ];
     for (const [path, pattern] of reasons) {
-      assert.equal(pick(dom, path).disabled, true, `${path} は選べない`);
+      assert.equal(pick(dom, path).disabled, true, `${path}は選べない`);
       assert.match(text(dom.one(`${row(path)} [data-role="reason"]`)), pattern);
     }
     assert.match(text(dom.one(row(HOOK))), /ターミナルで取り込む/);
@@ -93,14 +93,14 @@ test("CB-D368 取り込めない対象は選べず、理由を出す。error・u
   }
 });
 
-test("CB-D369 選んで「取り込む…」を押すと確認の帯が出て、「この内容で取り込む」で import をパスの配列つきで送る。やめれば何も送らない", async () => {
+test("CB-D369 選んで「取り込む…」を押すと確認の帯が出て、「この内容で取り込む」でimportをパスのリストつきで送る。やめれば何も送らない", async () => {
   const dom = await openHandoff();
   try {
     const open = dom.one<HTMLButtonElement>('[data-action="import"]');
     assert.equal(open.disabled, true, "何も選んでいない間は押せない");
     await check(dom, TEMPLATE);
     await check(dom, DOCS);
-    assert.equal(text(dom.one("#counts")), "対象 6 件・取り込める 3 件・選択 2 件・対象外 2 件");
+    assert.equal(text(dom.one("#counts")), "対象6件・取り込める3件・選択2件・対象外2件");
     dom.click(open);
     await dom.settle();
     assert.deepEqual(
@@ -124,7 +124,7 @@ test("CB-D369 選んで「取り込む…」を押すと確認の帯が出て、
   }
 });
 
-test("CB-D370 取り込める対象をすべて選ぶ／選択を外す。選ぶのは取り込める 3 件だけで、error・unchanged・defense は入らない", async () => {
+test("CB-D370 取り込める対象をすべて選ぶ／選択を外す。選ぶのは取り込める3件だけで、error・unchanged・defenseは入らない", async () => {
   const dom = await openHandoff();
   try {
     dom.click(dom.one('[data-action="select-all"]'));
@@ -141,7 +141,7 @@ test("CB-D370 取り込める対象をすべて選ぶ／選択を外す。選ぶ
   }
 });
 
-test("CB-D371 作業中の錠が掛かると template と layer-config は選べなくなり、選んでいたものも外れる。docs は選べるまま。帯に理由を出す", async () => {
+test("CB-D371 作業中の錠が掛かるとtemplateとlayer-configは選べなくなり、選んでいたものも外れる。docsは選べるまま。帯に理由を出す", async () => {
   const dom = await openHandoff();
   try {
     assert.ok(dom.one("#lock").classList.contains("hidden"));
@@ -154,7 +154,7 @@ test("CB-D371 作業中の錠が掛かると template と layer-config は選べ
     assert.equal(pick(dom, TEMPLATE).checked, false, "止まった種類の選択は外れる");
     assert.match(text(dom.one(`${row(TEMPLATE)} [data-role="reason"]`)), /作業中のチケットがあります（T1）/);
     assert.equal(pick(dom, RULES).disabled, true);
-    assert.equal(pick(dom, DOCS).disabled, false, "docs には掛けない");
+    assert.equal(pick(dom, DOCS).disabled, false, "docsには掛けない");
     assert.equal(pick(dom, DOCS).checked, true);
     assert.equal(dom.all(`${row(DOCS)} [data-role="reason"]`).length, 0);
     // 錠が外れたら選べる（帯も消える）
@@ -166,14 +166,14 @@ test("CB-D371 作業中の錠が掛かると template と layer-config は選べ
   }
 });
 
-test("CB-D372 錠が掛かった状態で開いても、template と layer-config は選べない。取り込める対象が template と layer-config だけでなければ帯は出さない", async () => {
+test("CB-D372 錠が掛かった状態で開いても、templateとlayer-configは選べない。取り込める対象がtemplateとlayer-configだけでなければ帯は出さない", async () => {
   const locked = await openHandoff({ lock: LOCKED });
   try {
     assert.equal(pick(locked, TEMPLATE).disabled, true);
     assert.equal(pick(locked, RULES).disabled, true);
     assert.equal(pick(locked, DOCS).disabled, false);
     assert.ok(!locked.one("#lock").classList.contains("hidden"));
-    assert.equal(text(locked.one("#counts")), "対象 6 件・取り込める 1 件・選択 0 件・対象外 2 件");
+    assert.equal(text(locked.one("#counts")), "対象6件・取り込める1件・選択0件・対象外2件");
   } finally {
     await locked.close();
   }
@@ -185,7 +185,7 @@ test("CB-D372 錠が掛かった状態で開いても、template と layer-confi
   }
 });
 
-test("CB-D373 defense はターミナルの案内を出す。「ターミナルのコマンドを出す」で terminal を送り、返ったコマンドを出してコピーできる", async () => {
+test("CB-D373 defenseはターミナルの案内を出す。「ターミナルのコマンドを出す」でterminalを送り、返ったコマンドを出してコピーできる", async () => {
   const dom = await openHandoff();
   try {
     assert.equal(dom.all('[data-role="terminal-guide"]').length, 0, "閉じている間は出さない");
@@ -212,8 +212,8 @@ test("CB-D373 defense はターミナルの案内を出す。「ターミナル�
   try {
     failed.click(failed.one(`${row(HOOK)} .row-head`));
     await failed.settle();
-    await failed.send({ type: "terminal", path: HOOK, command: "", error: "検査で error があります" });
-    assert.equal(text(failed.one('[data-role="terminal-error"]')), "検査で error があります");
+    await failed.send({ type: "terminal", path: HOOK, command: "", error: "検査でerrorがあります" });
+    assert.equal(text(failed.one('[data-role="terminal-error"]')), "検査でerrorがあります");
     assert.equal(failed.all('[data-action="copy-terminal"]').length, 0);
   } finally {
     await failed.close();
@@ -251,7 +251,7 @@ test("CB-D375 取り込みの結果を出す。取り込めた対象・消した
     });
     assert.equal(dom.all('[data-role="confirm"]').length, 0);
     assert.equal(dom.one<HTMLButtonElement>('[data-action="reload"]').disabled, false);
-    assert.match(text(dom.one('[data-role="result"] h3')), /取り込みました（1 件）。下書きを 1 件削除しました。下書きを 1 件残しました/);
+    assert.match(text(dom.one('[data-role="result"] h3')), /取り込みました（1件）。下書きを1件削除しました。下書きを1件残しました/);
     assert.deepEqual(dom.all('[data-role="applied"] li').map((li) => text(li)), [`${DOCS}（docs）`]);
     assert.deepEqual(dom.all('[data-role="removed-drafts"] li').map((li) => text(li)), ["wip/handoff/.ccnavi/docs/guide.md"]);
     assert.match(text(dom.one('[data-role="kept-drafts"] li')), /other\.md\s+取り込み後に下書きが編集されていた/);
@@ -264,15 +264,15 @@ test("CB-D376 取り込めなかった結果は理由を出す。選択は残る
   const dom = await openHandoff();
   try {
     await check(dom, DOCS);
-    await dom.send({ type: "imported", paths: [DOCS], result: { ok: false, error: "--expect が合いません" } });
-    assert.equal(text(dom.one('[data-role="result-error"]')), "--expect が合いません");
+    await dom.send({ type: "imported", paths: [DOCS], result: { ok: false, error: "--expectが合いません" } });
+    assert.equal(text(dom.one('[data-role="result-error"]')), "--expectが合いません");
     assert.equal(pick(dom, DOCS).checked, true);
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D377 読み直すと、同じ entry_sha で取り込める対象だけ選択が残り、変わった対象・消えた対象の選択は外れる。ターミナルの案内も破棄する", async () => {
+test("CB-D377 読み直すと、同じentry_shaで取り込める対象だけ選択が残り、変わった対象・消えた対象の選択は外れる。ターミナルの案内も破棄する", async () => {
   const dom = await openHandoff();
   try {
     await check(dom, TEMPLATE);
@@ -285,13 +285,13 @@ test("CB-D377 読み直すと、同じ entry_sha で取り込める対象だけ�
     assert.equal(dom.all(row(TEMPLATE)).length, 0);
     assert.equal(pick(dom, RULES).checked, false, "中身が変わった対象は選び直す");
     assert.equal(pick(dom, DOCS).checked, true, "同じ中身の対象は選んだまま");
-    assert.match(text(dom.one("#counts")), /選択 1 件/);
+    assert.match(text(dom.one("#counts")), /選択1件/);
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D378 更新はそのまま refresh を送り、ツリーの切り替えは switchTree を送る。取り込み待ちが無ければ空と言う", async () => {
+test("CB-D378 更新はそのままrefreshを送り、ツリーの切り替えはswitchTreeを送る。取り込み待ちが無ければ空と言う", async () => {
   const dom = await openHandoff();
   try {
     dom.click(dom.one('button[data-action="reload"]'));
@@ -315,7 +315,7 @@ test("CB-D378 更新はそのまま refresh を送り、ツリーの切り替え
   }
 });
 
-test("CB-D380 読み込みのエラーは文面とツリーの欄、読み込み中は読み込みの文を出す。見た目は body のクラスだけを変える", async () => {
+test("CB-D380 読み込みのエラーは文面とツリーの欄、読み込み中は読み込みの文を出す。見た目はbodyのクラスだけを変える", async () => {
   const dom = await openHandoff();
   try {
     await dom.send({ type: "data", data: { kind: "error", error: "実行ファイルが返らない", tree: "main:", trees: page().trees } });
@@ -332,7 +332,7 @@ test("CB-D380 読み込みのエラーは文面とツリーの欄、読み込み
   }
 });
 
-test("CB-D381 画面が組み上がったら ready を送る。画面は取り込みの判定を持たず、取り込み以外のメッセージを勝手に送らない", async () => {
+test("CB-D381 画面が組み上がったらreadyを送る。画面は取り込みの判定を持たず、取り込み以外のメッセージを勝手に送らない", async () => {
   const dom = await openHandoff();
   try {
     assert.deepEqual(dom.posted.map((m) => m.type), ["ready"]);

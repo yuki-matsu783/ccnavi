@@ -1,10 +1,10 @@
 /*
- * フェーズ定義 1 件の行（`Phase.tsx`）。行の見出しの列と、区分のバッジ。
- * 行・開閉・欄名の骨組みは設定 3 画面で同じ `@ccnavi/shared/styles/list.css`（extensions/shared）が持つ。
+ * フェーズ定義1件の行（`Phase.tsx`）。行の見出しの列と、区分のバッジ。
+ * 行・開閉・欄名の骨組みは設定3画面で同じ`@ccnavi/shared/styles/list.css`（extensions/shared）が持つ。
  */
-/* 1 行 = 開閉、id、title、kind、review、scope */
+/* 1行 = 開閉、id、title、kind、review、scope */
 .phase .row-head { grid-template-columns: 18px minmax(110px, 160px) minmax(90px, 160px) max-content max-content minmax(0, 1fr); }
-/* 狭いときは 3 段。1 段目 = 開閉、id、kind、review。2 段目 = title。3 段目 = scope */
+/* 狭いときは3段。1段目 = 開閉、id、kind、review。2段目 = title。3段目 = scope */
 @media (max-width: 520px) {
   .phase .row-head { grid-template-columns: 18px minmax(0, 1fr) max-content max-content; }
   .phase .sum > .clip:not(.mono) { grid-row: 2; grid-column: 2 / -1; }

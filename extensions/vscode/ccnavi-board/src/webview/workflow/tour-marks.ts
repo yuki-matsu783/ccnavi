@@ -1,18 +1,18 @@
 /**
  * 案内が指す先の印（`data-tour`）を、共通の図の部品（`shared/PlanGraph.tsx`）の中の点・線・詳細の欄などに付ける。
  *
- * 図の部品は承認のオーバーレイとも共有していて、そこに案内の印を持ち込まない。そこで、案内の間だけ画面が実際の DOM を
- * 見て、図の中の要素に印を付ける。点と線は React Flow が描くので、描き足されるたびに付け直す（`MutationObserver`）。
- * 印の値は小文字の英字で始まる英小文字・数字・- だけ（`parseTour` の検査）。
+ * 図の部品は承認のオーバーレイとも共有していて、そこに案内の印を持ち込まない。そこで、案内の間だけ画面が実際のDOMを
+ * 見て、図の中の要素に印を付ける。点と線はReact Flowが描くので、描き足されるたびに付け直す（`MutationObserver`）。
+ * 印の値は小文字の英字で始まる英小文字・数字・- だけ（`parseTour`の検査）。
  *
  *   graph-<計画>  計画ごとの図（plan / feedback）      detail-<計画>  詳細の欄
- *   notes-<計画>  図の下の一言                          zoom-<計画>    拡大縮小のボタン
- *   node-<番号>   ステップの点（振り直したあとの番号）         edge-<先行>-<番号>  線        cut-<先行>-<番号>  線の ×
+ *   notes-<計画>  図の下の一言zoom-<計画>    拡大縮小のボタン
+ *   node-<番号>   ステップの点（振り直したあとの番号）         edge-<先行>-<番号>  線cut-<先行>-<番号>  線の ×
  *
- * 線は React Flow が点を測ってから描くので、案内が指す先を測る刻みには、まだ線が無いことがある。印を新しく付けたら、案内に
- * 測り直させる（案内は画面の大きさが変わったときに測り直すので、`resize` を流す）。
+ * 線はReact Flowが点を測ってから描くので、案内が指す先を測る刻みには、まだ線が無いことがある。印を新しく付けたら、案内に
+ * 測り直させる（案内は画面の大きさが変わったときに測り直すので、`resize`を流す）。
  *
- * 手順が `pick` でステップを選ぶときは、その点を押して詳細の欄を出す（見本の図の中の押す操作で、拡張ホストへは何も送らない）。
+ * 手順が`pick`でステップを選ぶときは、その点を押して詳細の欄を出す（見本の図の中の押す操作で、拡張ホストへは何も送らない）。
  */
 import { useEffect, type RefObject } from "react";
 
@@ -54,8 +54,8 @@ export function markGraphs(root: ParentNode): number {
 }
 
 /**
- * 案内の間（`enabled`）、`ref` の領域に印を付け続ける。`pick` があれば、その番号の点を 1 度だけ押す。
- * `generation` が変わったら（見本の図が作り直された）、押し直す
+ * 案内の間（`enabled`）、`ref`の領域に印を付け続ける。`pick`があれば、その番号の点を1度だけ押す。
+ * `generation`が変わったら（見本の図が作り直された）、押し直す
  */
 export function useGraphMarks(ref: RefObject<HTMLElement | null>, enabled: boolean, pick: number | undefined, generation: string): void {
   useEffect(() => {

@@ -15,7 +15,7 @@ const sample = parseTemplatesSample(def.sample);
 const NEW_COURSES = ["how-drafts-flow", "how-templates-used"];
 const DIAGRAMS = ["template-draft", "template-import", "template-propose", "template-propose-feedback"];
 
-/** 見本の層の置き場（`sample.path`） */
+/** 見本のレイヤーの置き場（`sample.path`） */
 const PLACE = (def.sample as { path: string }).path;
 
 /** 図の中の値をすべて、改行でつないだ 1 本の文字列にする */
@@ -90,7 +90,7 @@ test("CB-T1202 図の中の値は、見本の下書き・テンプレート・�
 
   const draft = valuesOf("template-draft");
   assert.ok(draft.includes(`ccnavi --templates --draft ${login.name}`), "下書きを作る命令に見本の下書きの名前");
-  assert.ok(draft.includes(`wip/handoff/${target}`), "下書きの置き場は、見本の層の置き場と同じ相対パス");
+  assert.ok(draft.includes(`wip/handoff/${target}`), "下書きの置き場は、見本のレイヤーの置き場と同じ相対パス");
   assert.ok(draft.includes(`description: ${login.description}`), "直したあとの説明は、見本の下書きの説明");
 
   const imported = valuesOf("template-import");
@@ -101,7 +101,7 @@ test("CB-T1202 図の中の値は、見本の下書き・テンプレート・�
   assert.ok(propose.includes(`${feature.name}  [self]  ${feature.description}`), "一覧の答えに、見本のテンプレートの名前・説明");
   assert.ok(propose.includes(`いつ: ${feature.when}`), "一覧の答えに、見本の使う場面");
   assert.ok(propose.includes(`--template ${feature.name}`));
-  assert.ok(propose.includes(`${PLACE}${feature.name}.yml`), "引く先は、見本の層の置き場の feature.yml");
+  assert.ok(propose.includes(`${PLACE}${feature.name}.yml`), "引く先は、見本のレイヤーの置き場の feature.yml");
   assert.ok(propose.includes(`plan（${feature.plan.length} ステップ）: ${planText()}`), "提案の計画は見本の plan と同じ並び");
   assert.ok(propose.includes(`フィードバック計画（${feature.feedback.length} ステップ）`), "見本の feedback のステップ数");
   assert.ok(!/ccnavi ticket new [^\n]*--with-feedback/.test(propose), "フィードバックなしの図の命令に --with-feedback を付けない");

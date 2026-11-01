@@ -1,5 +1,5 @@
 /**
- * ルール管理画面（React）を happy-dom で動かす。描くものも、押したときの動きもここで見る。
+ * ルール管理画面（React）をhappy-domで動かす。描くものも、押したときの動きもここで見る。
  *
  * 判定は実行ファイルの仕事なので、その結果（`judged` / `expectationsChecked`）は拡張ホストから届いたものとして送る。
  */
@@ -27,7 +27,7 @@ function hit(section: string, id: string, kind = "glob"): RuleHitJson {
   return { section, id, kind, written: "*", pattern: ".*", source: "file" };
 }
 
-/** 実行ファイルが返した判定。拡張ホストが `judged` で渡す形 */
+/** 実行ファイルが返した判定。拡張ホストが`judged`で渡す形 */
 function judged(rules: readonly RuleHitJson[]): { type: string; result: TestJson; hooks: [] } {
   const result: TestJson = {
     version: 1,
@@ -63,7 +63,7 @@ test("CB-D1227 判定結果は一時パスを出さず、項目名は日本語�
   }
 });
 
-test("CB-D01 既定は全部畳む。行の見出しを押すと開き、開いた行の id が state に入る。もう一度押すと畳む", async () => {
+test("CB-D01 既定は全部畳む。行の見出しを押すと開き、開いた行のidがstateに入る。もう一度押すと畳む", async () => {
   const dom = await openRules();
   try {
     assert.equal(dom.all(".rule").length, 3);
@@ -83,7 +83,7 @@ test("CB-D01 既定は全部畳む。行の見出しを押すと開き、開い�
   }
 });
 
-test("CB-D08 id を打っている途中は state を書き直さず、確定（change）したときに新しい id で state に残す", async () => {
+test("CB-D08 idを打っている途中はstateを書き直さず、確定（change）したときに新しいidでstateに残す", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
@@ -91,7 +91,7 @@ test("CB-D08 id を打っている途中は state を書き直さず、確定（
     assert.deepEqual((dom.state() as { open: string[] }).open, ["git-push"]);
     dom.type(dom.one(`${rowSelector("git-push")} input.f-id`), "git-pu");
     await dom.settle();
-    assert.deepEqual((dom.state() as { open: string[] }).open, ["git-push"], "打っている途中は前の id のまま");
+    assert.deepEqual((dom.state() as { open: string[] }).open, ["git-push"], "打っている途中は前のidのまま");
     dom.type(dom.one(`${rowSelector("git-pu")} input.f-id`), "git-push-2");
     await dom.settle();
     dom.change(dom.one(`${rowSelector("git-push-2")} input.f-id`));
@@ -103,7 +103,7 @@ test("CB-D08 id を打っている途中は state を書き直さず、確定（
   }
 });
 
-test("CB-D09 土台は画面のスクリプトの例外を握りつぶさない。非同期の例外も拾い、1 度投げたら削除", async () => {
+test("CB-D09 土台は画面のスクリプトの例外を握りつぶさない。非同期の例外も拾い、1度投げたら削除", async () => {
   const dom = await openRules();
   try {
     dom.one("#find").addEventListener("input", () => {
@@ -145,7 +145,7 @@ test("CB-D0a 絞り込み中にタイプを畳んでも矢印は開いた向き�
   }
 });
 
-test("CB-D0b 見た目のメッセージで body のクラスが書き換わり、開いている行と入力は消えない", async () => {
+test("CB-D0b 見た目のメッセージでbodyのクラスが書き換わり、開いている行と入力は消えない", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
@@ -165,7 +165,7 @@ test("CB-D0b 見た目のメッセージで body のクラスが書き換わり�
   }
 });
 
-test("CB-D02 state に残した id の行は、再読み込みしたあとも開いている", async () => {
+test("CB-D02 stateに残したidの行は、更新したあとも開いている", async () => {
   const dom = await openRules({}, { open: ["deps"], tab: "rules" });
   try {
     assert.ok(dom.one(rowSelector("deps")).classList.contains("open"));
@@ -209,10 +209,10 @@ test("CB-D04 絞り込みは一致しない行を隠し、開いている行は�
     await dom.settle();
     const hidden = dom.all(".rule").map((rule) => `${rule.getAttribute("data-id")}:${rule.classList.contains("hidden-by-find")}`);
     assert.deepEqual(hidden, ["git-push:true", "no-rm:false", "deps:true"]);
-    // 開いている deps は hidden-by-find でも表示は消えない（CSS の :not(.open)）
+    // 開いているdepsはhidden-by-findでも表示は消えない（CSSの :not(.open)）
     assert.ok(dom.one("#tab-rules").classList.contains("finding"));
     assert.equal(dom.one('[data-count="deny"]').textContent, "1 / 2");
-    assert.equal(dom.one('[data-count="ask"]').textContent, "0 / 1（絞り込み外で開いている項目: 1 件）");
+    assert.equal(dom.one('[data-count="ask"]').textContent, "0 / 1（絞り込み外で開いている項目: 1件）");
     assert.equal(dom.one('.rule-section[data-section="deny"] h2 > .twist').textContent, "▾");
     // 空に戻すと元どおり
     dom.type(dom.one("#find"), "");
@@ -225,7 +225,7 @@ test("CB-D04 絞り込みは一致しない行を隠し、開いている行は�
   }
 });
 
-test("CB-D346 一覧にない新しいツール名を追加欄に打つと、選んだ状態で match に入る。形の違う名前は足さず理由を出す", async () => {
+test("CB-D346 一覧にない新しいツール名を追加欄に打つと、選んだ状態でmatchに入る。形の違う名前は足さず理由を出す", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one(`${rowSelector("no-rm")} .row-head`));
@@ -244,7 +244,7 @@ test("CB-D346 一覧にない新しいツール名を追加欄に打つと、選
     await dom.settle();
     assert.equal(dom.all(`${adder} .add-error`).length, 0, "直した名前は通る");
     const matched = dom.one<HTMLInputElement>(`${rowSelector("no-rm")} input.f-match`).value.split("|");
-    assert.ok(matched.includes("mcp__github__get_me"), "match に入る");
+    assert.ok(matched.includes("mcp__github__get_me"), "matchに入る");
     const box = dom.one<HTMLInputElement>(`${rowSelector("no-rm")} .picker input[value="mcp__github__get_me"]`);
     assert.equal(box.checked, true, "選択肢に並び、選んだ状態になる");
     assert.ok(!dom.one<HTMLButtonElement>("#save").disabled, "編集したので保存できる");
@@ -276,7 +276,7 @@ test("CB-D05 ツールの選択肢で選ぶと、欄と行の要約が同じ操�
   }
 });
 
-test("CB-D1232 実行ファイルが返す id に一時ファイル名が付いていても、ヒットした行を開いて強調する", async () => {
+test("CB-D1232 実行ファイルが返すidに一時ファイル名が付いていても、ヒットした行を開いて強調する", async () => {
   const dom = await openRules();
   try {
     await dom.send(judged([hit("deny", "../../tmp/ccnavi-rules-AbC123/rules.yml:git-push")]));
@@ -287,7 +287,7 @@ test("CB-D1232 実行ファイルが返す id に一時ファイル名が付い�
   }
 });
 
-test("CB-D06 判定でヒットした行はその場で開くが state には入らず、次の判定で畳まれる", async () => {
+test("CB-D06 判定でヒットした行はその場で開くがstateには入らず、次の判定で畳まれる", async () => {
   const dom = await openRules();
   try {
     await dom.send(judged([hit("deny", "git-push")]));
@@ -299,13 +299,13 @@ test("CB-D06 判定でヒットした行はその場で開くが state には入
     await dom.send(judged([hit("deny", "no-rm")]));
     assert.ok(!dom.one(rowSelector("git-push")).classList.contains("open"));
     assert.ok(dom.one(rowSelector("no-rm")).classList.contains("open"));
-    // 絞り込み中に 2 件ヒットしても、両方開き、件数は一致した行だけを数える
+    // 絞り込み中に2件ヒットしても、両方開き、件数は一致した行だけを数える
     dom.type(dom.one("#find"), "pyproject");
     await dom.settle();
     await dom.send(judged([hit("deny", "git-push"), hit("deny", "no-rm")]));
     assert.ok(dom.one(rowSelector("git-push")).classList.contains("open"));
     assert.ok(dom.one(rowSelector("no-rm")).classList.contains("open"));
-    assert.equal(dom.one('[data-count="deny"]').textContent, "0 / 2（絞り込み外で開いている項目: 2 件）");
+    assert.equal(dom.one('[data-count="deny"]').textContent, "0 / 2（絞り込み外で開いている項目: 2件）");
     assert.equal(dom.one('[data-count="ask"]').textContent, "1 / 1");
     // 折りたたんだタイプの中のルールがヒットすれば、タイプが開いて矢印もそれに合う
     dom.type(dom.one("#find"), "");
@@ -317,10 +317,10 @@ test("CB-D06 判定でヒットした行はその場で開くが state には入
     assert.ok(!dom.one('.rule-section[data-section="ask"]').classList.contains("folded"));
     assert.equal(dom.one('.rule-section[data-section="ask"] h2 > .twist').textContent, "▾");
     assert.ok(dom.one(rowSelector("deps")).classList.contains("open"));
-    // ヒットしたルールの表と、返すメッセージ・hook の見出しも出る
-    assert.deepEqual(dom.all("#judge-result h3").map((head) => head.textContent), ["ヒットしたルール", "返すメッセージ", "このツールで実行される hook"]);
+    // ヒットしたルールの表と、返すメッセージ・hookの見出しも出る
+    assert.deepEqual(dom.all("#judge-result h3").map((head) => head.textContent), ["ヒットしたルール", "返すメッセージ", "このツールで実行されるhook"]);
     assert.equal(dom.all("#judge-result table tbody tr").length, 1);
-    assert.match(dom.one("#judge-result").textContent ?? "", /実行される hook はありません/);
+    assert.match(dom.one("#judge-result").textContent ?? "", /実行されるhookはありません/);
   } finally {
     await dom.close();
   }
@@ -330,7 +330,7 @@ test("CB-D0c 刻みは畳んだ行のバッジに出る。欄に打てばバッ�
   const dom = await openRules();
   try {
     // 読んだ刻みは折りたたんだままでも見える。刻みが無い行はバッジを出さない（枠だけ置く）
-    assert.equal(dom.one(`${rowSelector("no-rm")} .sum .sum-every`).textContent, "4 回ごと");
+    assert.equal(dom.one(`${rowSelector("no-rm")} .sum .sum-every`).textContent, "4回ごと");
     assert.equal(dom.one(`${rowSelector("git-push")} .sum .sum-every`).textContent, "");
     // 刻みだけを直す。欄は「コンテキストの追加」の中にあり、刻みがあれば最初から開いている
     assert.ok(!dom.one(`${rowSelector("git-push")} details.more`).hasAttribute("open"));
@@ -339,7 +339,7 @@ test("CB-D0c 刻みは畳んだ行のバッジに出る。欄に打てばバッ�
     assert.equal(dom.one<HTMLInputElement>(`${rowSelector("git-push")} input.f-every`).value, "");
     dom.type(dom.one(`${rowSelector("git-push")} input.f-every`), "3");
     await dom.settle();
-    assert.equal(dom.one(`${rowSelector("git-push")} .sum .sum-every`).textContent, "3 回ごと");
+    assert.equal(dom.one(`${rowSelector("git-push")} .sum .sum-every`).textContent, "3回ごと");
     // 読めない値も打てる。画面は直さず、そのまま送る（止めるのは保存前の --lint）
     dom.type(dom.one(`${rowSelector("no-rm")} input.f-every`), "x");
     await dom.settle();
@@ -351,7 +351,7 @@ test("CB-D0c 刻みは畳んだ行のバッジに出る。欄に打てばバッ�
   }
 });
 
-test("CB-D124 「記録から候補を出す」は suggest を送り、届いた候補を下書きのまま判定タブに並べる", async () => {
+test("CB-D124 「記録から候補を出す」はsuggestを送り、届いた候補を下書きのまま判定タブに並べる", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one('button[data-action="suggest"]'));
@@ -377,7 +377,7 @@ test("CB-D124 「記録から候補を出す」は suggest を送り、届いた
     assert.ok(dom.one("#tab-judge").classList.contains("active"));
     assert.ok(!(dom.one('button[data-action="suggest"]') as unknown as HTMLButtonElement).disabled);
     assert.equal(dom.all("#suggest-result .candidate").length, 1);
-    assert.match(dom.one("#suggest-result").textContent ?? "", /除いたもの 2 件/);
+    assert.match(dom.one("#suggest-result").textContent ?? "", /除いたもの2件/);
     assert.match(dom.one('#suggest-result .candidate[data-id="suggest-npm-install"] pre').textContent ?? "", /^# ルールを追加する候補/);
     // 候補はルールに足さない（下書きを見せるだけ）
     assert.equal(dom.all('.rule[data-id="suggest-npm-install"]').length, 0);
@@ -386,7 +386,7 @@ test("CB-D124 「記録から候補を出す」は suggest を送り、届いた
   }
 });
 
-test("CB-D07 追加したルールは開いて焦点が id に来る。タイプを移すと移った先でも開いたまま。保存は今の順序を送る", async () => {
+test("CB-D07 追加したルールは開いて焦点がidに来る。タイプを移すと移った先でも開いたまま。保存は今の順序を送る", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one('button[data-action="add"][data-section="allow"]'));
@@ -410,7 +410,7 @@ test("CB-D07 追加したルールは開いて焦点が id に来る。タイプ
   }
 });
 
-test("CB-D69 additionalContextFile で選んだパスは、拡張ホストが名指しした行の欄にだけ入る", async () => {
+test("CB-D69 additionalContextFileで選んだパスは、拡張ホストが名指しした行の欄にだけ入る", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
@@ -429,7 +429,7 @@ test("CB-D69 additionalContextFile で選んだパスは、拡張ホストが名
   }
 });
 
-test("CB-D70 再読み込みは押した時点でボタンを止め、やめたら戻る。中身が届けば編集は破棄して入れ替わる", async () => {
+test("CB-D70 更新は押した時点でボタンを止め、やめたら戻る。中身が届けば編集は破棄して入れ替わる", async () => {
   const dom = await openRules();
   try {
     dom.type(dom.one(`${rowSelector("git-push")} input.f-id`), "打ちかけ");
@@ -461,15 +461,15 @@ test("CB-D71 ファイルが外で変わったら帯を出す。錠と操作の�
     await dom.send({ type: "lock", lock: { locked: true, reason: "作業中のチケットがある（i0001-02-02）", doing: ["i0001-02-02"], turns: [] } });
     assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02-02）");
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled, "錠が掛かっていれば保存は押せない");
-    await dom.send({ type: "failed", message: "--lint が error を報告した" });
-    assert.equal(dom.one("#status").textContent, "--lint が error を報告した");
+    await dom.send({ type: "failed", message: "--lintがerrorを報告した" });
+    assert.equal(dom.one("#status").textContent, "--lintがerrorを報告した");
     assert.ok(dom.one("#status").closest(".foot")?.classList.contains("error"));
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D1223 notice は赤にせずに一言を出す（期待する判定のファイルが無いときの案内）", async () => {
+test("CB-D1223 noticeは赤にせずに一言を出す（期待する判定のファイルが無いときの案内）", async () => {
   const dom = await openRules();
   try {
     await dom.send({ type: "notice", message: "期待する判定のファイルがまだありません: x.yml。" });
@@ -482,7 +482,7 @@ test("CB-D1223 notice は赤にせずに一言を出す（期待する判定の�
   }
 });
 
-test("CB-D72 再読み込みできなかった画面から中身が届いたあとも、id の確定で開いた行を state に残す", async () => {
+test("CB-D72 更新できなかった画面から中身が届いたあとも、idの確定で開いた行をstateに残す", async () => {
   const dom = await openPage({ kind: "error", error: "ルールファイルを読み込めない" });
   try {
     assert.match(dom.one(".load-error").textContent ?? "", /ルールファイルを読み込めない/);
@@ -490,7 +490,7 @@ test("CB-D72 再読み込みできなかった画面から中身が届いたあ�
     await dom.settle();
     assert.deepEqual(dom.posted.filter((message) => message.type === "reload").map((message) => message.dirty), [false]);
     assert.ok(dom.one<HTMLButtonElement>('button[data-action="reload"]').disabled, "押した時点で止める");
-    // 中身が届いて一覧が出る。state に残す側（id の確定）は、ここで張られていないと二度と張られない
+    // 中身が届いて一覧が出る。stateに残す側（idの確定）は、ここで張られていないと二度と張られない
     await dom.send({ type: "data", data: { kind: "page", page: page() } });
     dom.click(dom.one(`${rowSelector("deps")} .row-head`));
     await dom.settle();
@@ -504,7 +504,7 @@ test("CB-D72 再読み込みできなかった画面から中身が届いたあ�
   }
 });
 
-test("CB-T50 実行ファイルが答えたモードで帯を出す。dry-run と disable は止めないことを言い、enable と答えがないときは言わない", async () => {
+test("CB-T50 実行ファイルが答えたモードで帯を出す。dry-runとdisableは止めないことを言い、enableと答えがないときは言わない", async () => {
   const banners = async (mode: string): Promise<string[]> => {
     const dom = await openRules({ mode });
     try {
@@ -518,7 +518,7 @@ test("CB-T50 実行ファイルが答えたモードで帯を出す。dry-run �
   assert.match(dryRun, /判定と記録をします/);
   const disable = (await banners("disable")).join("\n");
   assert.match(disable, /CCNAVI_MODE.*disable/);
-  // disable は判定しない。dry-run と同じ「判定と記録」の文面にしない
+  // disableは判定しない。dry-runと同じ「判定と記録」の文面にしない
   assert.match(disable, /判定しません/);
   assert.doesNotMatch(disable, /記録/);
   assert.deepEqual(await banners(""), []);
@@ -550,10 +550,10 @@ test("CB-T51 保存できない理由と読み込みの苦情を出す", async (
   }
 });
 
-test("CB-T52 settings.json がなければ hook の表にそう書く", async () => {
+test("CB-T52 settings.jsonがなければhookの表にそう書く", async () => {
   const dom = await openRules({ hooks: [], hookFiles: { settings: false, settingsLocal: false } });
   try {
-    assert.match(dom.one("#tab-hooks").textContent ?? "", /settings\.json がありません/);
+    assert.match(dom.one("#tab-hooks").textContent ?? "", /settings\.jsonがありません/);
     assert.equal(dom.all("#tab-hooks table").length, 0);
   } finally {
     await dom.close();
@@ -572,8 +572,8 @@ test("CB-T69 タイプごとに畳むボタンを出す", async () => {
   }
 });
 
-test("CB-T71 match の候補と判定の試し打ちは、権限ルールの名前（括弧の中を除いたもの）で並ぶ", async () => {
-  // 判定が対象を取り出せるツールだけ。WebSearch は取り出せないので載せない。
+test("CB-T71 matchの候補と判定の試し打ちは、権限ルールの名前（括弧の中を除いたもの）で並ぶ", async () => {
+  // 判定が対象を取り出せるツールだけ。WebSearchは取り出せないので載せない。
   assert.deepEqual([...KNOWN_TOOLS], [
     "Bash", "PowerShell", "Read", "Grep", "Glob", "Edit", "Write", "NotebookEdit", "Skill", "Agent", "Task", "WebFetch",
   ]);
@@ -603,18 +603,18 @@ test("CB-T112 ルール管理画面は注意を上部に出し、なければ出
   }
 });
 
-test("CB-T120 一覧は 1 件 1 行で既定は畳み、絞り込み欄を持ち、開いた行を id で state に残す", async () => {
+test("CB-T120 一覧は1件1行で既定は畳み、絞り込み欄を持ち、開いた行をidでstateに残す", async () => {
   const dom = await openRules();
   try {
     assert.equal(dom.all("#find").length, 1);
     assert.equal(dom.all('[data-list="deny"] .rule').length, 2);
     assert.equal(dom.all(".rule > .row-head").length, 3);
-    assert.equal(dom.all(".rule > .row-body").length, 3, "本体は畳んでいても DOM にある（見せるかは CSS）");
+    assert.equal(dom.all(".rule > .row-body").length, 3, "本体は畳んでいてもDOMにある（見せるかはCSS）");
     assert.equal(dom.all(".rule.open").length, 0);
     dom.click(dom.one(`${rowSelector("deps")} .row-head`));
     await dom.settle();
     assert.deepEqual((dom.state() as { open: string[] }).open, ["deps"]);
-    // id が空の行は開いていても state に残せない（次に開き直す手がかりが無い）
+    // idが空の行は開いていてもstateに残せない（次に開き直す手がかりが無い）
     dom.click(dom.one('button[data-action="add"][data-section="deny"]'));
     await dom.settle();
     const added = dom.all('[data-list="deny"] .rule').slice(-1)[0];
@@ -629,18 +629,18 @@ test("CB-T120 一覧は 1 件 1 行で既定は畳み、絞り込み欄を持ち
   }
 });
 
-test("CB-T124 欄名は日本語で、YAML のキー名は欄名の title に載せる", async () => {
+test("CB-T124 欄名は日本語で、YAMLのキー名は欄名のtitleに載せる", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
     await dom.settle();
     const caps = new Map(dom.all(`${rowSelector("git-push")} .field > .cap`).map((cap) => [cap.textContent ?? "", cap.getAttribute("title")]));
-    assert.equal(caps.get("ツール"), "YAML のキー: match");
-    assert.equal(caps.get("メッセージ"), "YAML のキー: message");
-    assert.equal(caps.get("additionalContext"), "YAML のキー: additionalContext");
-    assert.equal(caps.get("additionalContextOnceFile"), "YAML のキー: additionalContextOnceFile");
-    assert.equal(caps.get("every"), "YAML のキー: every");
-    assert.equal(dom.one("#subject").closest("label")?.getAttribute("title"), "--test の subject");
+    assert.equal(caps.get("ツール"), "YAMLのキー: match");
+    assert.equal(caps.get("メッセージ"), "YAMLのキー: message");
+    assert.equal(caps.get("additionalContext"), "YAMLのキー: additionalContext");
+    assert.equal(caps.get("additionalContextOnceFile"), "YAMLのキー: additionalContextOnceFile");
+    assert.equal(caps.get("every"), "YAMLのキー: every");
+    assert.equal(dom.one("#subject").closest("label")?.getAttribute("title"), "--testのsubject");
   } finally {
     await dom.close();
   }
@@ -658,10 +658,10 @@ test("CB-D83 未保存の変更の有無は変わったときだけ拡張ホス�
     await dom.settle();
     dom.type(dom.one(`${rowSelector("打ちかけ")} input.f-id`), "打ちかけ2");
     await dom.settle();
-    assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), [{ type: "dirty", dirty: true }], "打ち続けても 1 度だけ");
+    assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), [{ type: "dirty", dirty: true }], "打ち続けても1度だけ");
     // 別の対象へ切り替わった。前の対象の編集は破棄して、読み込み中を出す
-    await dom.send({ type: "data", data: { kind: "loading", text: "web のルールを読み込み中…" } });
-    assert.equal(dom.one("#ccnavi-loading").textContent, "web のルールを読み込み中…");
+    await dom.send({ type: "data", data: { kind: "loading", text: "webのルールを読み込み中…" } });
+    assert.equal(dom.one("#ccnavi-loading").textContent, "webのルールを読み込み中…");
     assert.equal(dom.all(".rule").length, 0);
     assert.deepEqual(
       dom.posted.filter((message) => message.type === "dirty").map((message) => message.dirty),
@@ -678,11 +678,11 @@ test("CB-D83 未保存の変更の有無は変わったときだけ拡張ホス�
   }
 });
 
-test("CB-D101 ルール管理の基本の案内は見本の上でタブを切り替えて中を指し、実際のタブは動かさない。途中の切り替えは state に書かない", async () => {
+test("CB-D101 ルール管理の基本の案内は見本の上でタブを切り替えて中を指し、実際のタブは動かさない。途中の切り替えはstateに書かない", async () => {
   const dom = await openRules({}, { tab: "hooks" });
   try {
     assert.ok(dom.one("#tab-hooks").classList.contains("active"));
-    // 案内の入口は ? 1 文字で、ヘッダ（ツールバー）の最後の子。位置は Tour.css が 6 画面とも右上に揃える
+    // 案内の入口は ? 1文字で、ヘッダ（ツールバー）の最後の子。位置はTour.cssが6画面とも右上に揃える
     assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
     await dom.send({ type: "tour" });
     await dom.settle();
@@ -694,8 +694,8 @@ test("CB-D101 ルール管理の基本の案内は見本の上でタブを切り
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
-    assert.deepEqual(titles, ["3 つのタブ", "ルール", "絞り込み", "判定を試す", "hook", "保存", "案内"]);
-    // 案内は見本の上のタブを動かす。最後の 2 手順は「ルール」のタブで保存と案内の入口を指す
+    assert.deepEqual(titles, ["3つのタブ", "ルール", "絞り込み", "判定を試す", "hook", "保存", "案内"]);
+    // 案内は見本の上のタブを動かす。最後の2手順は「ルール」のタブで保存と案内の入口を指す
     assert.deepEqual(tabs, ["tab-rules", "tab-rules", "tab-rules", "tab-judge", "tab-hooks", "tab-rules", "tab-rules"]);
     assert.ok(dom.one("#tab-hooks").classList.contains("active"), "実際のタブが動いた");
     assert.equal((dom.state() as { tab?: string }).tab, "hooks");
@@ -705,7 +705,7 @@ test("CB-D101 ルール管理の基本の案内は見本の上でタブを切り
   }
 });
 
-test("CB-D192 「?」は案内の一覧を開き、選んだ案内だけが始まる。基本の案内が先頭で、閉じたら tourDone を返す", async () => {
+test("CB-D192 「?」は案内の一覧を開き、選んだ案内だけが始まる。基本の案内が先頭で、閉じたらtourDoneを返す", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one('[data-action="tour"]'));
@@ -740,13 +740,13 @@ test("CB-D193 使い方ごとの案内は、全部の手順で指す先が画面
       await dom.settle();
       for (const [index, step] of course.steps.entries()) {
         await dom.settle();
-        const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
+        const at = `${course.id}の${index + 1}段目（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
         if (step.target !== "") {
-          assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面にありません`);
+          assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先${step.target}が画面にありません`);
           assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
         }
-        // 実際のルール（git-push の日本語メッセージの見本とは別の id）は出さず、見本の id が並ぶ
+        // 実際のルール（git-pushの日本語メッセージの見本とは別のid）は出さず、見本のidが並ぶ
         const ids = dom.all(".rule").map((row) => row.getAttribute("data-id"));
         assert.ok(ids.includes("protect-env"), at);
         assert.ok(!ids.includes("deps"), `${at}: 実際のルールが出ている`);
@@ -764,7 +764,7 @@ test("CB-D193 使い方ごとの案内は、全部の手順で指す先が画面
   }
 });
 
-test("CB-D194 組み合わせ条件の案内は、見本の行を開いて図を出し、手順の scene が選ぶ点を替える", async () => {
+test("CB-D194 組み合わせ条件の案内は、見本の行を開いて図を出し、手順のsceneが選ぶ点を替える", async () => {
   const dom = await openRules({}, undefined, { measure: true });
   try {
     dom.click(dom.one('[data-action="tour"]'));
@@ -782,7 +782,7 @@ test("CB-D194 組み合わせ条件の案内は、見本の行を開いて図を
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
-    // 行を開く前（1 番目の手順）は閉じていて、開いてからは図の点を手順ごとに替える
+    // 行を開く前（1番目の手順）は閉じていて、開いてからは図の点を手順ごとに替える
     assert.equal(open[0], "0");
     assert.equal(open[1], "1");
     assert.deepEqual(picked.slice(2, 5), ["r.0", "r.1.0", "r.1"]);
@@ -792,7 +792,7 @@ test("CB-D194 組み合わせ条件の案内は、見本の行を開いて図を
   }
 });
 
-test("CB-D195 畳んだタイプがあっても、案内は見本の行を畳まずに指す。メニューから始めた案内を閉じると焦点は「?」へ戻る。メニューは Esc で閉じて「?」へ戻る", async () => {
+test("CB-D195 畳んだタイプがあっても、案内は見本の行を畳まずに指す。メニューから始めた案内を閉じると焦点は「?」へ戻る。メニューはEscで閉じて「?」へ戻る", async () => {
   const dom = await openRules({}, undefined, { measure: true });
   try {
     dom.click(dom.one('[data-action="fold-section"][data-section="deny"]'));
@@ -819,7 +819,7 @@ test("CB-D195 畳んだタイプがあっても、案内は見本の行を畳ま
   }
 });
 
-test("CB-D106 読み込み中に頼まれた案内はルールが出てから始め、別の対象へ切り替わって読み込み中になったら閉じて tourDone を返す", async () => {
+test("CB-D106 読み込み中に頼まれた案内はルールが出てから始め、別の対象へ切り替わって読み込み中になったら閉じてtourDoneを返す", async () => {
   const dom = await openPage({ kind: "loading", text: "ルールを読み込み中…" });
   try {
     await dom.send({ type: "tour" });
@@ -827,7 +827,7 @@ test("CB-D106 読み込み中に頼まれた案内はルールが出てから始
     assert.equal(dom.all(".tour").length, 0, "指す先がない読み込み中には出さない");
     await dom.send({ type: "data", data: { kind: "page", page: page() } });
     await dom.settle();
-    assert.equal(dom.one("#tour-title").textContent, "3 つのタブ");
+    assert.equal(dom.one("#tour-title").textContent, "3つのタブ");
     await dom.send({ type: "data", data: { kind: "loading", text: "ルールを読み込み中…" } });
     await dom.settle();
     assert.equal(dom.all(".tour").length, 0);
@@ -840,18 +840,18 @@ test("CB-D106 読み込み中に頼まれた案内はルールが出てから始
   }
 });
 
-test("CB-D150 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が 1 つだけでも出す", async () => {
+test("CB-D150 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が1つだけでも出す", async () => {
   const targets = [
     { kind: "workspace", name: "", label: "共通の設定" },
     { kind: "self", name: "", label: "ワークスペース" },
-    { kind: "project", name: "app:x", label: "プロジェクト app:x" },
+    { kind: "project", name: "app:x", label: "プロジェクトapp:x" },
   ];
   const dom = await openRules({ target: { kind: "workspace", name: "" }, targets });
   try {
     const select = dom.one<HTMLSelectElement>("select#target");
     assert.deepEqual(
       [...select.options].map((o) => o.textContent),
-      ["共通の設定", "ワークスペース", "プロジェクト app:x"],
+      ["共通の設定", "ワークスペース", "プロジェクトapp:x"],
     );
     assert.equal(select.value, "workspace:");
     dom.change(select, "project:app:x");
@@ -877,7 +877,7 @@ test("CB-D152 読み込みに失敗した画面にも設定の切り替えの欄
     targets: [
       { kind: "workspace", name: "", label: "共通の設定" },
       { kind: "self", name: "", label: "ワークスペース" },
-      { kind: "project", name: "app", label: "プロジェクト app" },
+      { kind: "project", name: "app", label: "プロジェクトapp" },
     ],
   });
   try {
@@ -892,7 +892,7 @@ test("CB-D152 読み込みに失敗した画面にも設定の切り替えの欄
 });
 
 
-test("CB-T310 統合結果は読み取り専用の表で出し、編集する 1 本の欄とは別にする。選んだ統合結果の共通のルールと設定のルールが由来付きで並ぶ", async () => {
+test("CB-T310 統合結果は読み取り専用の表で出し、編集する1本の欄とは別にする。選んだ統合結果の共通のルールと設定のルールが由来付きで並ぶ", async () => {
   const sums = rulesSums(sumsBoard());
   const dom = await openRules({ target: { kind: "project", name: "lib" }, sums });
   try {
@@ -900,19 +900,19 @@ test("CB-T310 統合結果は読み取り専用の表で出し、編集する 1 
     const select = dom.one<HTMLSelectElement>("select#sum-select");
     assert.equal(select.value, "lib");
     assert.deepEqual([...select.options].map((o) => o.textContent), ["共通 + ワークスペース", "共通 + プロジェクト（lib）"]);
-    assert.match(dom.one("#sum .hint").textContent, /パスを持たないツール（Bash など）に効くのは、全プロジェクトの設定を合わせたものではありません/);
+    assert.match(dom.one("#sum .hint").textContent, /パスを持たないツール（Bashなど）が適用するのは、この結果ではなく、全プロジェクトの設定を足した和です/);
     const rows = (section: string) => dom.all(`#sum .sum-section[data-section="${section}"] tbody tr`).map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
     assert.deepEqual(rows("deny").map((r) => [r[0], r[1], r[3]]), [["guard-approved", "Write|Edit", "共通"], ["lib:no-tmp", "Write", "プロジェクト（lib）"]]);
     assert.deepEqual(rows("ask").map((r) => r[0]), ["lib:deps"]);
     assert.equal(dom.all('#sum .sum-section[data-section="allow"] tbody tr').length, 0);
-    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "3 件（共通 + プロジェクト（lib））");
+    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "3件（共通 + プロジェクト（lib））");
     // 統合結果を切り替えても、拡張ホストへは何も送らない（見せるだけ。判定も合成もしない）
     dom.change(select, "self");
     await dom.settle();
     assert.deepEqual(rows("deny").map((r) => r[0]), ["guard-approved"]);
     assert.equal(dom.all("#sum button").length, 0, "統合結果に操作はありません");
     assert.deepEqual(dom.posted.filter((m) => m.type !== "ready"), []);
-    // 編集する 1 本のルールの一覧は統合結果と混ざらない
+    // 編集する1本のルールの一覧は統合結果と混ざらない
     assert.equal(dom.all("#tab-rules .rule").length, 3);
   } finally {
     await dom.close();
@@ -920,13 +920,13 @@ test("CB-T310 統合結果は読み取り専用の表で出し、編集する 1 
 });
 
 test("CB-T311 共通の設定を開いているときはワークスペースの統合結果が最初に出る。統合結果がなければ（ボードを読み込めない）欄ごと出さない。読み込めない設定は空として扱っていると言う", async () => {
-  const sums = rulesSums(sumsBoard()).map((s) => (s.name === "lib" ? { ...s, unreadable: "YAML として読み込めない", deny: [], ask: [] } : s));
+  const sums = rulesSums(sumsBoard()).map((s) => (s.name === "lib" ? { ...s, unreadable: "YAMLとして読み込めない", deny: [], ask: [] } : s));
   const dom = await openRules({ target: { kind: "workspace", name: "" }, sums });
   try {
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "self");
     dom.change(dom.one("select#sum-select"), "lib");
     await dom.settle();
-    assert.match(dom.one("#sum .banner.warn").textContent, /読み込めず、その設定を空として扱っています.*YAML として読み込めない/);
+    assert.match(dom.one("#sum .banner.warn").textContent, /読み込めず、その設定を空として扱っています.*YAMLとして読み込めない/);
   } finally {
     await dom.close();
   }
@@ -958,7 +958,7 @@ test("CB-T312 ルールのファイルがないのは正常で、不備の帯は
   }
 });
 
-test("CB-D98 except は畳んだ行に件数、開いた行に中身を見せる", async () => {
+test("CB-D98 exceptは畳んだ行に件数、開いた行に中身を見せる", async () => {
   const text = `version: 1
 deny:
   - id: workspace-root
@@ -967,12 +967,12 @@ deny:
     except:
       - regex: '^{root}[\\\\/]wip[\\\\/]handoff(?:[\\\\/]|$)'
       - glob: '{root}/.claude/worktrees/*'
-    message: main では編集しない
+    message: mainでは編集しない
 `;
   const dom = await openRules({ model: readRules(text).model });
   try {
     const row = rowSelector("workspace-root");
-    assert.equal(dom.one(`${row} .sum-except`).textContent, "除外 2");
+    assert.equal(dom.one(`${row} .sum-except`).textContent, "除外2");
     dom.click(dom.one(`${row} .row-head`));
     await dom.settle();
     const shown = dom.all(`${row} .f-except code`).map((el) => el.textContent);
@@ -993,7 +993,7 @@ deny:
             any:
               - regex: '^{root}[\\\\/]wip'
               - glob: '{root}/.claude/worktrees/**'
-    message: main では編集しない
+    message: mainでは編集しない
   - id: except-rule
     match: Write
     regex: '^{root}[\\\\/]src'
@@ -1002,7 +1002,7 @@ deny:
     message: 生成物以外は直さない
 `;
 
-/** 中が空の any を持つ組み合わせ条件（誤りの見本） */
+/** 中が空のanyを持つ組み合わせ条件（誤りの見本） */
 const BROKEN_WHEN = `version: 1
 deny:
   - id: workspace-root
@@ -1012,7 +1012,7 @@ deny:
         - regex: '^{root}[\\\\/]'
         - not:
             any: []
-    message: main では編集しない
+    message: mainでは編集しない
 `;
 
 /** 組み合わせ条件の点を押して選ぶ */
@@ -1048,10 +1048,10 @@ test("CB-D155 組み合わせ条件のルールは、畳んだ行に組み合わ
   const bad = await openRules({ model: readRules(BROKEN_WHEN).model }, undefined, { measure: true });
   try {
     const row = rowSelector("workspace-root");
-    assert.equal(bad.one(`${row} .sum-when-error`).textContent, "組み合わせ条件に誤り 1");
+    assert.equal(bad.one(`${row} .sum-when-error`).textContent, "組み合わせ条件に誤り1");
     bad.click(bad.one(`${row} .row-head`));
     await bad.settle();
-    assert.deepEqual(bad.all(`${row} .cond-problems li`).map((li) => li.textContent), ["any の中が空です（1 個以上）"]);
+    assert.deepEqual(bad.all(`${row} .cond-problems li`).map((li) => li.textContent), ["anyの中が空です（1個以上）"]);
     assert.ok(bad.one(`${row} .cond-node[data-key="r.1.0"]`).classList.contains("broken"));
     // 誤りを押すとその点が選ばれ、子を足せば誤りが入れ替わる
     bad.click(bad.one(`${row} .cond-problems button`));
@@ -1059,14 +1059,14 @@ test("CB-D155 組み合わせ条件のルールは、畳んだ行に組み合わ
     assert.equal(bad.one(`${row} .cond-inspector`).getAttribute("data-key"), "r.1.0");
     bad.click(bad.one(`${row} .cond-inspector button[data-add="glob"]`));
     await bad.settle();
-    assert.deepEqual(bad.all(`${row} .cond-problems li`).map((li) => li.textContent), ["glob が空です"]);
+    assert.deepEqual(bad.all(`${row} .cond-problems li`).map((li) => li.textContent), ["globが空です"]);
     assert.equal(bad.one(`${row} .cond-inspector`).getAttribute("data-key"), "r.1.0.0", "追加した子が選ばれる");
   } finally {
     await bad.close();
   }
 });
 
-test("CB-D156 図で組み合わせ条件を直して保存する（個別条件の文字・glob ⇄ regex・all ⇄ any・子の追加・not で包む・削除）", async () => {
+test("CB-D156 図で組み合わせ条件を直して保存する（個別条件の文字・glob ⇄ regex・all ⇄ any・子の追加・notで包む・削除）", async () => {
   const dom = await openRules({ model: readRules(WHEN_RULES).model }, undefined, { measure: true });
   try {
     const row = rowSelector("workspace-root");
@@ -1079,7 +1079,7 @@ test("CB-D156 図で組み合わせ条件を直して保存する（個別条件
     dom.change(dom.one(`${row} .cond-inspector select.f-cond-op`), "regex");
     await dom.settle();
     assert.equal(dom.one(`${row} .cond-node[data-key="r.1.0.1"]`).getAttribute("data-op"), "regex");
-    // any → all にして、子（glob）を足して文字を入れる
+    // any → allにして、子（glob）を足して文字を入れる
     await pickCond(dom, "workspace-root", "r.1.0");
     dom.change(dom.one(`${row} .cond-inspector select.f-cond-op`), "all");
     await dom.settle();
@@ -1087,7 +1087,7 @@ test("CB-D156 図で組み合わせ条件を直して保存する（個別条件
     await dom.settle();
     dom.type(dom.one(`${row} .cond-inspector .f-cond-pattern`), "*.md");
     await dom.settle();
-    // 本体を not で包む
+    // 本体をnotで包む
     await pickCond(dom, "workspace-root", "r.0");
     dom.click(dom.one(`${row} .cond-inspector [data-op-action="wrap"]`));
     await dom.settle();
@@ -1122,7 +1122,7 @@ test("CB-D156 図で組み合わせ条件を直して保存する（個別条件
   }
 });
 
-test("CB-D157 glob / regex と除外のルールは「組み合わせ条件に変換」で組み合わせ条件になり、除外は組み合わせ条件の中へ移る。判定を試すも組み合わせ条件のまま送る", async () => {
+test("CB-D157 glob / regexと除外のルールは「組み合わせ条件に変換」で組み合わせ条件になり、除外は組み合わせ条件の中へ移る。判定を試すも組み合わせ条件のまま送る", async () => {
   const dom = await openRules({ model: readRules(WHEN_RULES).model }, undefined, { measure: true });
   try {
     const row = rowSelector("except-rule");
@@ -1157,7 +1157,7 @@ test("CB-D157 glob / regex と除外のルールは「組み合わせ条件に�
         { op: "not", child: { op: "any", children: [{ op: "glob", pattern: "{root}/src/gen/**" }] } },
       ],
     });
-    // 書き戻すと except が消え、when が入る（拡張ホストは送られた形をそのまま書く）
+    // 書き戻すとexceptが消え、whenが入る（拡張ホストは送られた形をそのまま書く）
     const text = readRules(WHEN_RULES).apply(judge.sections as Sections);
     assert.ok(!text.includes("except:"), text);
     assert.deepEqual(readRules(text).model.sections.deny[1].when, sent.when);
@@ -1166,7 +1166,7 @@ test("CB-D157 glob / regex と除外のルールは「組み合わせ条件に�
   }
 });
 
-test("CB-D158 except が組み合わせ条件へそのまま移せない形なら、「組み合わせ条件に変換」を押せず、理由をボタンの説明に出す", async () => {
+test("CB-D158 exceptが組み合わせ条件へそのまま移せない形なら、「組み合わせ条件に変換」を押せず、理由をボタンの説明に出す", async () => {
   const text = `version: 1
 deny:
   - id: bad-except
@@ -1189,9 +1189,9 @@ deny:
   const dom = await openRules({ model: readRules(text).model }, undefined, { measure: true });
   try {
     for (const [id, why] of [
-      ["bad-except", "except の 1 件目が読み込めません（except の値はリストです）"],
-      ["group-except", "except の 1 件目が glob / regex 1 つのマップではありません"],
-      ["both-patterns", "glob と regex を両方指定しています"],
+      ["bad-except", "exceptの1件目が読み込めません（exceptの値はリストで指定します）"],
+      ["group-except", "exceptの1件目がglob / regex 1つのマップではありません"],
+      ["both-patterns", "globとregexを両方指定しています"],
     ]) {
       const row = rowSelector(id);
       dom.click(dom.one(`${row} .row-head`));
@@ -1214,7 +1214,7 @@ deny:
   }
 });
 
-test("CB-D159 最上位のノードが個別条件の組み合わせ条件は、all / any で包んで子を追加できる。最上位のノードの削除ボタンは包む道を案内する", async () => {
+test("CB-D159 最上位のノードが個別条件の組み合わせ条件は、all / anyで包んで子を追加できる。最上位のノードの削除ボタンは包む道を案内する", async () => {
   const text = `version: 1
 deny:
   - id: leaf-root
@@ -1230,7 +1230,7 @@ deny:
     await dom.settle();
     const remove = dom.one<HTMLButtonElement>(`${row} .cond-inspector [data-op-action="remove"]`);
     assert.equal(remove.disabled, true);
-    assert.match(remove.title, /all \/ any \/ not で包んで/);
+    assert.match(remove.title, /all \/ any \/ notで包んで/);
     assert.equal(dom.all(`${row} .cond-inspector button[data-add]`).length, 0, "個別条件には子を追加できない");
     dom.click(dom.one(`${row} .cond-inspector [data-op-action="wrap-any"]`));
     await dom.settle();
@@ -1241,7 +1241,7 @@ deny:
     await dom.settle();
     dom.type(dom.one(`${row} .cond-inspector .f-cond-pattern`), "*.key");
     await dom.settle();
-    // 子を all で包むこともできる
+    // 子をallで包むこともできる
     await pickCond(dom, "leaf-root", "r.0");
     dom.click(dom.one(`${row} .cond-inspector [data-op-action="wrap-all"]`));
     await dom.settle();
@@ -1260,7 +1260,7 @@ deny:
   }
 });
 
-/** 案内が今いる手順（0 始まり）。`startCourse` で 0 に戻し、`toStep` で進めたり戻したりする */
+/** 案内が今いる手順（0始まり）。`startCourse`で0に戻し、`toStep`で進めたり戻したりする */
 const position = new WeakMap<DomPage, number>();
 
 /** 「?」の一覧から使い方ごとの案内を始める */
@@ -1272,7 +1272,7 @@ async function startCourse(dom: DomPage, id: string): Promise<void> {
   position.set(dom, 0);
 }
 
-/** 案内の n 番目の手順（0 始まり）へ移る。吹き出しのタイトルが、定義の手順のタイトルと同じであることも見る */
+/** 案内のn番目の手順（0始まり）へ移る。吹き出しのタイトルが、定義の手順のタイトルと同じであることも見る */
 async function toStep(dom: DomPage, id: string, index: number): Promise<void> {
   const steps = loadTour("rules").courses.find((course) => course.id === id)!.steps;
   let at = position.get(dom) ?? 0;
@@ -1306,7 +1306,7 @@ test("CB-D300 ユースケースの一覧は、基本の案内の後ろに、追
   }
 });
 
-test("CB-D301 案内の間の統合結果は見本を出し、手順の scene が枠を開いて統合結果を替える。閉じたあとは実際の統合結果に戻り、案内で選んだものを持ち越さない", async () => {
+test("CB-D301 案内の間の統合結果は見本を出し、手順のsceneが枠を開いて統合結果を替える。閉じたあとは実際の統合結果に戻り、案内で選んだものを持ち越さない", async () => {
   const sums = rulesSums(sumsBoard());
   const dom = await openRules({ target: { kind: "project", name: "lib" }, sums }, undefined, { measure: true });
   try {
@@ -1320,7 +1320,7 @@ test("CB-D301 案内の間の統合結果は見本を出し、手順の scene �
       dom.all('#sum .sum-section[data-section="deny"] tbody tr').map((tr) => tr.querySelector("td")?.textContent),
       ["git-push", "no-rm-rf", "web:no-prod-deploy"],
     );
-    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "5 件（共通 + プロジェクト（web））");
+    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "5件（共通 + プロジェクト（web））");
     await toStep(dom, "read-sum", 4);
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "self");
     assert.ok(dom.all('#sum .sum-section[data-section="deny"] tbody tr').some((tr) => tr.querySelector("td")?.textContent === "self:protect-secrets"));
@@ -1328,14 +1328,14 @@ test("CB-D301 案内の間の統合結果は見本を出し、手順の scene �
     await dom.settle();
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "lib", "閉じたあと案内で選んだ統合結果が残る");
     assert.equal(dom.one<HTMLDetailsElement>("#sum").open, false);
-    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "3 件（共通 + プロジェクト（lib））");
+    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "3件（共通 + プロジェクト（lib））");
     assert.deepEqual(dom.posted.filter((message) => message.type !== "ready" && message.type !== "tourDone"), []);
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D302 絞り込みと畳みの案内は、scene の find で件数を「一致 / 全体」にし、fold で名指しのタイプだけを畳む。閉じたら元に戻る", async () => {
+test("CB-D302 絞り込みと畳みの案内は、sceneのfindで件数を「一致 / 全体」にし、foldで名指しのタイプだけを畳む。閉じたら元に戻る", async () => {
   const dom = await openRules({}, undefined, { measure: true });
   try {
     await startCourse(dom, "find-fold-move");
@@ -1366,7 +1366,7 @@ test("CB-D303 保存前の検証エラーの案内は、その手順にだけ見
     assert.equal(dom.one("#status").textContent, "");
     await toStep(dom, "save-error", 1);
     assert.match(dom.one("#status").textContent ?? "", /設定の検証（--lint）でエラーが見つかりました/);
-    assert.match(dom.one("#status").textContent ?? "", /error: db-migrate: ask に message がある/);
+    assert.match(dom.one("#status").textContent ?? "", /error: db-migrate: askにmessageがある/);
     assert.ok(dom.one("footer").classList.contains("error"));
     await toStep(dom, "save-error", 2);
     assert.match(dom.one("#status").textContent ?? "", /error: db-migrate/, "検証エラーを読む段の続きで消えた");
@@ -1389,7 +1389,7 @@ test("CB-D304 一括確認と候補の案内は、その手順から結果を出
     await toStep(dom, "check-expectations", 2);
     assert.equal(dom.one(".pane.active").id, "tab-judge");
     assert.match(dom.one('[data-tour="expectations-counts"]').textContent ?? "", /allow 1\/2/);
-    assert.match(dom.one('[data-tour="expectations-counts"]').textContent ?? "", /不一致 1 件/);
+    assert.match(dom.one('[data-tour="expectations-counts"]').textContent ?? "", /不一致1件/);
     assert.equal(dom.all('[data-tour="expectation-ng"]').length, 1);
     assert.match(dom.one('[data-tour="expectation-ng"]').textContent ?? "", /\.env\.example/);
     dom.click(dom.one('[data-action="tour-skip"]'));
@@ -1411,13 +1411,13 @@ test("CB-D304 一括確認と候補の案内は、その手順から結果を出
   }
 });
 
-test("CB-D305 ルールの欄の案内は、scene の open と more で行と「コンテキストの追加」を開き、判定の結果は scene の judge で見本を出す", async () => {
+test("CB-D305 ルールの欄の案内は、sceneのopenとmoreで行と「コンテキストの追加」を開き、判定の結果はsceneのjudgeで見本を出す", async () => {
   const dom = await openRules({}, undefined, { measure: true });
   try {
     await startCourse(dom, "context-every");
     await toStep(dom, "context-every", 0);
     assert.equal(dom.all(".rule.open").length, 0);
-    assert.match(dom.one('[data-id="db-migrate"] .sum-every').textContent ?? "", /3 回ごと/);
+    assert.match(dom.one('[data-id="db-migrate"] .sum-every').textContent ?? "", /3回ごと/);
     await toStep(dom, "context-every", 1);
     assert.deepEqual(dom.all(".rule.open").map((row) => row.getAttribute("data-id")), ["db-migrate"]);
     assert.equal(dom.one<HTMLDetailsElement>('[data-id="db-migrate"] details.more').open, true);
@@ -1428,7 +1428,7 @@ test("CB-D305 ルールの欄の案内は、scene の open と more で行と「
     assert.equal(dom.all('[data-tour="rule-deps-change-once"]').length, 1);
     await toStep(dom, "context-every", 6);
     assert.equal(dom.one(".pane.active").id, "tab-judge");
-    assert.match(dom.one("#judge-result .response").textContent ?? "", /migrate でないかを確認する/);
+    assert.match(dom.one("#judge-result .response").textContent ?? "", /migrateでないかを確認する/);
     dom.click(dom.one('[data-action="tour-skip"]'));
     await dom.settle();
     assert.equal(dom.all("#judge-result").length, 0, "案内の判定が残った");
@@ -1468,7 +1468,7 @@ test("CB-D306 案内の間は、ルールを追加する・変換するなどの
   }
 });
 
-test("CB-D320 案内の間は、案内の外の操作（開く・選ぶ・再読み込みする・判定・タブ・畳み・追加）が拡張ホストへも実際の state へも届かない", async () => {
+test("CB-D320 案内の間は、案内の外の操作（開く・選ぶ・更新する・判定・タブ・畳み・追加）が拡張ホストへも実際のstateへも届かない", async () => {
   const dom = await openRules();
   try {
     await dom.send({ type: "tour" });
@@ -1502,11 +1502,11 @@ test("CB-D320 案内の間は、案内の外の操作（開く・選ぶ・再読
   }
 });
 
-test("CB-D391 見出しに「取り込み待ちを開く」があり、押すと openHandoff を送る。実行ファイルが handoff を持たなければ無効で、理由を出す", async () => {
+test("CB-D391 見出しに「取り込み待ちを開く」があり、押すとopenHandoffを送る。実行ファイルがhandoffを持たなければ無効で、理由を出す", async () => {
   await checkHandoffLink((handoff) => openRules({ handoff }));
 });
 
-test("CB-D742 図のある手順は、本文の下に時系列の図を出し、focus の矢印だけを光らせてほかを薄くする。値は等幅で出る", async () => {
+test("CB-D742 図のある手順は、本文の下に時系列の図を出し、focusの矢印だけを光らせてほかを薄くする。値は等幅で出る", async () => {
   const def = loadTour("rules");
   const course = def.courses.find((c) => c.id === "how-it-works")!;
   const dom = await openRules({}, undefined, { measure: true });
@@ -1519,11 +1519,11 @@ test("CB-D742 図のある手順は、本文の下に時系列の図を出し、
       await dom.settle();
       const diagram = dom.one(".tour-bubble .tour-diagram");
       const spec = def.diagrams[step.diagram];
-      assert.equal(diagram.getAttribute("data-diagram"), step.diagram, `${index + 1} 番目`);
+      assert.equal(diagram.getAttribute("data-diagram"), step.diagram, `${index + 1}番目`);
       assert.equal(dom.all(".tour-bubble .tour-diagram-step").length, spec.steps.length);
       assert.equal(dom.all(".tour-bubble .tour-diagram-actor").length, spec.actors.length);
       const lit = dom.all(".tour-bubble .tour-diagram-step.focus").map((el) => el.getAttribute("data-step"));
-      assert.deepEqual(lit, spec.steps.map((entry) => entry.id).filter((id) => step.focus.includes(id)), `${index + 1} 番目の光る矢印`);
+      assert.deepEqual(lit, spec.steps.map((entry) => entry.id).filter((id) => step.focus.includes(id)), `${index + 1}番目の光る矢印`);
       assert.equal(dom.all(".tour-bubble .tour-diagram-step.dim").length, step.focus.length === 0 ? 0 : spec.steps.length - lit.length);
       assert.equal(dom.all(".tour-bubble code.tour-diagram-value").length, spec.steps.filter((entry) => entry.value !== "").length);
       if (index < course.steps.length - 1) {

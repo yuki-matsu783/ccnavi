@@ -153,7 +153,7 @@ test("CB-T1180 リスクの図の中の値（差分・加点・合計・レベ�
 
   // 境目は「以上」
   for (const [id, points] of [["p19", 19], ["p20", 20], ["p39", 39], ["p40", 40], ["p70", 70]] as const) {
-    assert.ok(textOf("risk-level", id).includes(`${points} 点`), id);
+    assert.ok(textOf("risk-level", id).includes(`${points}点`), id);
     assert.ok(valueOf("risk-level", id).includes(`→ ${levelOf(points, SAMPLE_LEVELS)}`), `${points} 点は ${levelOf(points, SAMPLE_LEVELS)}`);
   }
   assert.equal(valueOf("risk-level", "read"), levelsText(SAMPLE_LEVELS));

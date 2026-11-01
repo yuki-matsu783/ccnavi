@@ -1,5 +1,5 @@
 /**
- * 子のフローの読み書き（`core/flow-doc.ts`）。YAML の読み書き、知らない欄と知らない種類を失わないこと、雛形、
+ * 子のフローの読み書き（`core/flow-doc.ts`）。YAMLの読み書き、知らない欄と知らない種類を失わないこと、雛形、
  * 編集の関数、入れ子の段の数え方を見る。
  */
 import { test } from "node:test";
@@ -48,19 +48,19 @@ function sample(): FlowDoc {
   return read.doc;
 }
 
-/** 書き出した本文をもう 1 度読んだ中身（読み手は拡張の外の YAML の読み方で） */
+/** 書き出した本文をもう1度読んだ中身（読み手は拡張の外のYAMLの読み方で） */
 function roundTrip(doc: FlowDoc): unknown {
   return parse(serializeFlow(doc));
 }
 
-test("CB-T218 YAML を読んで書くだけなら、知らない欄も知らない種類も元のまま出る", () => {
+test("CB-T218 YAMLを読んで書くだけなら、知らない欄も知らない種類も元のまま出る", () => {
   // 手で書いた形（コメント・流れ形式・BOM）も読める
   assert.deepEqual(sample(), sampleData());
   const bom = parseFlow(`\uFEFF${SAMPLE}`);
   assert.ok(bom.ok);
   assert.deepEqual(bom.doc, sampleData());
   assert.deepEqual(roundTrip(sample()), sampleData());
-  // 書き出しはブロック形式の 2 字下げで、末尾に改行。別名（& / *）は使わない
+  // 書き出しはブロック形式の2字下げで、末尾に改行。別名（& / *）は使わない
   const text = serializeFlow(sample());
   assert.ok(text.endsWith("\n"));
   assert.match(text, /^id: wf-1\nname: 調べて聞く\n/);
@@ -70,19 +70,19 @@ test("CB-T218 YAML を読んで書くだけなら、知らない欄も知らな�
 });
 
 test("CB-T253 書き出しはユーザが読める形で、実行ファイル（YAML 1.1）が別の型に読む表記は引用符で囲む", () => {
-  // 同じ中身を 2 か所で持っても別名にしない（実行ファイルは別名を読まない）
+  // 同じ中身を2か所で持っても別名にしない（実行ファイルは別名を読まない）
   const shared = { x: 1, y: 2 };
   const doc: FlowDoc = {
     nodes: [
-      { id: "a", type: "prompt", name: "yes", position: shared, data: { prompt: "1 行目\n2 行目\n", mode: "0755", on: "2026-01-01", empty: "" } },
+      { id: "a", type: "prompt", name: "yes", position: shared, data: { prompt: "1行目\n2行目\n", mode: "0755", on: "2026-01-01", empty: "" } },
       { id: "b", type: "prompt", name: "no", position: shared, data: { prompt: "続き" } },
     ],
   };
   const text = serializeFlow(doc);
   assert.doesNotMatch(text, /[&*]\w/);
   // 複数行の文は | の形
-  assert.match(text, /prompt: \|\n {8}1 行目\n {8}2 行目\n/);
-  // YAML 1.1 で真偽値・八進・日付に読まれる表記は引用符で囲む（キーも）
+  assert.match(text, /prompt: \|\n {8}1行目\n {8}2行目\n/);
+  // YAML 1.1で真偽値・八進・日付に読まれる表記は引用符で囲む（キーも）
   assert.match(text, /name: "yes"/);
   assert.match(text, /name: "no"/);
   assert.match(text, /mode: "0755"/);
@@ -93,20 +93,20 @@ test("CB-T253 書き出しはユーザが読める形で、実行ファイル（
   assert.deepEqual(read.doc, doc);
 });
 
-test("CB-T240 読みはルール管理の画面と同じ yaml の既定で、YAML 1.1 の読み方は真似しない（型の答えは実行ファイル）", () => {
+test("CB-T240 読みはルール管理の画面と同じyamlの既定で、YAML 1.1の読み方は真似しない（型の答えは実行ファイル）", () => {
   const read = parseFlow("nodes:\n  - {id: a, type: askUserQuestion, position: {x: 1, y: 2}, data: {multiSelect: yes, off: n, when: 2026-01-01}}\n");
   assert.ok(read.ok, read.ok ? "" : read.error);
-  // `yes` `off` は文字のまま（真偽値に差し替えない）。`y` `n` も文字。日付も文字
+  // `yes` `off`は文字のまま（真偽値に差し替えない）。`y` `n`も文字。日付も文字
   assert.deepEqual(read.doc.nodes[0].position, { x: 1, y: 2 });
   assert.deepEqual(read.doc.nodes[0].data, { multiSelect: "yes", off: "n", when: "2026-01-01" });
-  // 書き出しは実行ファイル（YAML 1.1）が文字以外に読む表記を囲む（書式の側の制約）。y は囲まない
+  // 書き出しは実行ファイル（YAML 1.1）が文字以外に読む表記を囲む（書式の側の制約）。yは囲まない
   const text = serializeFlow(read.doc);
   assert.match(text, /multiSelect: "yes"/);
   assert.match(text, /"off": n/);
   assert.match(serializeFlow(templateFlow("x", "")), /\n {6}y: 160\n/);
 });
 
-test("CB-T401 雛形のノードは重ならない（間隔がノードの幅 190 より広い）", () => {
+test("CB-T401 雛形のノードは重ならない（間隔がノードの幅190より広い）", () => {
   const xs = templateFlow("x", "").nodes.map((node) => (node.position as { x: number }).x);
   for (let i = 1; i < xs.length; i++) {
     assert.ok(xs[i] - xs[i - 1] > 190 + 40, "ノードの間に線が見える隙間がある");
@@ -140,7 +140,7 @@ test("CB-T219 編集は触ったところだけを差し替え、ほかの欄（
   assert.equal("condition" in cleared.connections[0], false);
 });
 
-test("CB-T220 雛形は 開始 → チケットを読む → 終了 の 3 ノードと線 2 本で、そのまま再読み込みできて注意が出ない", () => {
+test("CB-T220 雛形は 開始 → チケットを読む → 終了 の3ノードと線2本で、そのまま更新できて注意が出ない", () => {
   const doc = templateFlow("i0001-01-01", "調査");
   assert.deepEqual(
     doc.nodes.map((node) => node.type),
@@ -165,11 +165,11 @@ test("CB-T220 雛形は 開始 → チケットを読む → 終了 の 3 ノー
   assert.equal(templateFlow("i0002-01-01", "").name, "i0002-01-01");
 });
 
-test("CB-T221 画面が断るのは描けないときだけ。正しいか（id の重なり・線の形・別名）は決めず、例外を外に出さない", () => {
+test("CB-T221 画面が断るのは描けないときだけ。正しいか（idの重なり・線の形・別名）は決めず、例外を外に出さない", () => {
   const refused: [string, RegExp][] = [
-    ["nodes: [", /画面の YAML パーサーで読み込めないため、図にできません/],
-    ["a: 1\na: 2\n", /画面の YAML パーサーで読み込めないため、図にできません/],
-    ["nodes: []\n---\nnodes: []\n", /画面の YAML パーサーで読み込めないため、図にできません/],
+    ["nodes: [", /画面のYAMLパーサーで読み込めないため、図にできません/],
+    ["a: 1\na: 2\n", /画面のYAMLパーサーで読み込めないため、図にできません/],
+    ["nodes: []\n---\nnodes: []\n", /画面のYAMLパーサーで読み込めないため、図にできません/],
     ["", /描けません/],
     ["- 1\n", /描けません/],
     ["name: x\n", /描けません/],
@@ -185,7 +185,7 @@ test("CB-T221 画面が断るのは描けないときだけ。正しいか（id 
   for (const text of ["nodes:\n  - {id: a}\n  - {id: a}\n", "nodes: []\nconnections: {}\n", "nodes: []\nconnections: [1]\n", "x: &a [1]\nnodes: [{id: a, data: *a}]\n"]) {
     assert.ok(parseFlow(text).ok, text);
   }
-  // 別名を重ねて膨らませる形（billion laughs）は、yaml の読み手が辿る数の上限で断る（失敗しない）
+  // 別名を重ねて膨らませる形（billion laughs）は、yamlの読み手が辿る数の上限で断る（失敗しない）
   const lines = ["a0: &a0 [x, x, x, x, x, x, x, x, x, x]"];
   for (let i = 1; i < 12; i += 1) {
     lines.push(`a${i}: &a${i} [${Array.from({ length: 10 }, () => `*a${i - 1}`).join(", ")}]`);
@@ -193,7 +193,7 @@ test("CB-T221 画面が断るのは描けないときだけ。正しいか（id 
   lines.push("nodes: [{id: a, data: {v: *a11}}]");
   const bomb = parseFlow(lines.join("\n"));
   assert.equal(bomb.ok, false);
-  // connections が無いフローも読める。描くときに空として扱う
+  // connectionsが無いフローも読める。描くときに空として扱う
   const bare = parseFlow("nodes:\n  - {id: a, type: prompt}\n");
   assert.ok(bare.ok);
   assert.deepEqual(connectionsOf(bare.doc), []);
@@ -206,7 +206,7 @@ test("CB-T222 ノードを削除すると線も消え、出口を削除すると
     connectionsOf(doc).map((c) => c.id),
     ["c1", "c3"],
   );
-  // 選択肢 A（branch-0）を消すと、B へ出ていた線は branch-0 に詰まる
+  // 選択肢A（branch-0）を消すと、Bへ出ていた線はbranch-0に詰まる
   const trimmed = removeBranch(sample(), "ask-1", 0);
   assert.deepEqual(
     connectionsOf(trimmed).map((c) => [c.id, c.fromPort]),
@@ -218,7 +218,7 @@ test("CB-T222 ノードを削除すると線も消え、出口を削除すると
   );
   const ask = trimmed.nodes[1].data as Record<string, unknown>;
   assert.deepEqual(ask.options, [{ label: "B", description: "" }]);
-  // 足すと後ろに付く。1 件だけ直すと他は元のまま
+  // 足すと後ろに付く。1件だけ直すと他は元のまま
   const grown = patchBranch(addBranch(trimmed, "ask-1", { label: "C", description: "" }), "ask-1", 0, { description: "いまのまま" });
   assert.deepEqual((grown.nodes[1].data as Record<string, unknown>).options, [
     { label: "B", description: "いまのまま" },
@@ -231,24 +231,24 @@ test("CB-T222 ノードを削除すると線も消え、出口を削除すると
   const linked = connect(sample(), "start-1", "output", "end-1", "input");
   assert.deepEqual(connectionsOf(linked)[4], { id: "c-start-1-end-1", from: "start-1", to: "end-1", fromPort: "output", toPort: "input" });
   assert.equal(connectionsOf(removeConnectionAt(linked, 4)).length, 4);
-  // connections が無かったフローには欄ができる
+  // connectionsが無かったフローには欄ができる
   const bare = parseFlow("nodes:\n  - {id: a, type: start}\n  - {id: b, type: end}\n");
   assert.ok(bare.ok);
   assert.equal(connectionsOf(connect(bare.doc, "a", "output", "b", "input")).length, 1);
-  // 足したノードは使われていない id と既定の中身を持つ
+  // 足したノードは使われていないidと既定の中身を持つ
   const added = addNode(bareFlow("x", ""), "askUserQuestion", { x: 1, y: 2 });
   assert.equal(added.id, "askUserQuestion-1");
   assert.deepEqual(added.doc.nodes[2].position, { x: 1, y: 2 });
   assert.deepEqual(added.doc.nodes[2].data, { questionText: "", multiSelect: false, options: [{ label: "はい", description: "" }, { label: "いいえ", description: "" }] });
 });
 
-/** サブフローを重ねたフロー。`depth` はメインの流れから数えた subAgentFlow の重なり */
+/** サブフローを重ねたフロー。`depth`はメインの流れから数えたsubAgentFlowの重なり */
 function nested(depth: number, cyclic = false): FlowDoc {
   const flows = [];
   for (let i = 1; i <= depth; i += 1) {
     const last = i === depth;
     const inner = last && !cyclic ? { id: `sa-${i}`, type: "subAgent", name: "深掘り", data: {} } : { id: `sf-node-${i}`, type: "subAgentFlow", name: "次", data: { subAgentFlowId: last ? "sf-1" : `sf-${i + 1}` } };
-    flows.push({ id: `sf-${i}`, name: `サブフロー ${i}`, nodes: [inner], connections: [] });
+    flows.push({ id: `sf-${i}`, name: `サブフロー${i}`, nodes: [inner], connections: [] });
   }
   return {
     nodes: [
@@ -260,26 +260,26 @@ function nested(depth: number, cyclic = false): FlowDoc {
   };
 }
 
-test("CB-T223 入れ子の段は subAgent と subAgentFlow で 1 段ずつ数え、子の下 2 段を超えたときだけ言う", () => {
+test("CB-T223 入れ子の段はsubAgentとsubAgentFlowで1段ずつ数え、子の下2段を超えたときだけ言う", () => {
   const single = patchData(addNode(bareFlow("x", ""), "subAgent", { x: 0, y: 0 }).doc, "subAgent-1", {});
   assert.deepEqual(nesting(single), { depth: 1, cyclic: false });
   assert.deepEqual(flowNotices(single), []);
-  // サブフロー（1 段）の中の subAgent（2 段）。子の下 2 段で、まだ上限の中
+  // サブフロー（1段）の中のsubAgent（2段）。子の下2段で、まだ上限の中
   assert.equal(nesting(nested(1)).depth, 2);
   assert.ok(!flowNotices(nested(1)).some((n) => n.includes("段重なっています")));
-  // もう 1 段重ねると 3 段。既定の上限（メインの下 3 段、子は 1 段目）を超える
+  // もう1段重ねると3段。既定の上限（メインの下3段、子は1段目）を超える
   assert.equal(nesting(nested(2)).depth, 3);
   const warned = flowNotices(nested(2)).find((n) => n.includes("段重なっています"));
   assert.ok(warned !== undefined);
-  assert.match(warned, /子の下に 3 段重なっています/);
-  assert.match(warned, /メインの下 3 段/);
+  assert.match(warned, /子の下に3段重なっています/);
+  assert.match(warned, /メインの下3段/);
   assert.match(warned, /そのノードで止まってメインへ戻ります/);
   // 巡るサブフローは数えきれないと言う
   const loop = nested(2, true);
   assert.equal(nesting(loop).cyclic, true);
-  assert.ok(flowNotices(loop).some((n) => n.includes("サブフローの呼び出しが循環しています（subAgentFlowId が輪になっています）")));
+  assert.ok(flowNotices(loop).some((n) => n.includes("サブフローの呼び出しが循環しています（subAgentFlowIdが輪になっています）")));
   // サブフローの中身は描かないことも言う
-  assert.ok(flowNotices(nested(1)).some((n) => n.includes("サブフロー（subAgentFlows）が 1 本")));
+  assert.ok(flowNotices(nested(1)).some((n) => n.includes("サブフロー（subAgentFlows）が1本")));
 });
 
 test("CB-T224 出入口は種類の既定に、読んだ線が使う表記を追加する。線の言葉は条件か出口の名前", () => {
@@ -292,7 +292,7 @@ test("CB-T224 出入口は種類の既定に、読んだ線が使う表記を追
       { id: "branch-1", label: "B" },
     ],
   });
-  // 複数選択の問いは出口が 1 本
+  // 複数選択の問いは出口が1本
   const multi = patchData(doc, "ask-1", { multiSelect: true });
   assert.deepEqual(
     portsOf(multi.nodes[1], []).outputs.map((p) => p.id),
@@ -319,7 +319,7 @@ test("CB-T224 出入口は種類の既定に、読んだ線が使う表記を追
   assert.equal(connectionLabel(setConditionAt(doc, 1, "急ぐとき"), connectionsOf(setConditionAt(doc, 1, "急ぐとき"))[1]), "急ぐとき");
 });
 
-/** 3 つのノードと線 2 本。a と b をグループにまとめる見本に使う */
+/** 3つのノードと線2本。aとbをグループにまとめる見本に使う */
 function three(): FlowDoc {
   return {
     id: "wf",
@@ -348,7 +348,7 @@ test("CB-T254 グループ化は選んだノードを外枠＋余白の枠で囲
   assert.equal(id, "group-1");
   // 枠は囲んだノードのうち最も前（a）の位置に入る
   assert.deepEqual(doc.nodes.map((n) => n.id), ["group-1", "a", "b", "c"]);
-  // 外枠は a(100,100) から b(400+190, 200+90)。余白 24、名前の帯 28
+  // 外枠はa(100,100)からb(400+190, 200+90)。余白24、名前の帯28
   assert.deepEqual(byId(doc, "group-1"), { id: "group-1", type: "group", name: "グループ", position: { x: 76, y: 48 }, data: {}, style: { width: 538, height: 266 } });
   assert.deepEqual(byId(doc, "a").position, { x: 24, y: 52 });
   assert.equal(byId(doc, "a").parentId, "group-1");
@@ -364,7 +364,7 @@ test("CB-T254 グループ化は選んだノードを外枠＋余白の枠で囲
   // グループへは線を繋がない
   assert.equal(connect(doc, "c", "output", "group-1", "input"), doc);
   assert.equal(connect(doc, "group-1", "output", "c", "input"), doc);
-  // グループ自身は囲まない。囲めるものが無ければ undefined
+  // グループ自身は囲まない。囲めるものが無ければundefined
   assert.equal(groupNodes(doc, ["group-1"]), undefined);
   assert.equal(groupNodes(doc, []), undefined);
   // 別のグループのノードは新しいグループへ移る（元の枠は残す）
@@ -374,7 +374,7 @@ test("CB-T254 グループ化は選んだノードを外枠＋余白の枠で囲
   assert.equal(byId(again.doc, "a").parentId, "group-1");
   assert.deepEqual(absolutePosition(again.doc, "b"), { x: 400, y: 200 });
   assert.deepEqual(again.doc.nodes.map((n) => n.id), ["group-1", "a", "group-2", "b", "c"]);
-  // 指す先の無い parentId が指す id は使わない（そのノードが気づかないうちに新しいグループに入ることはない）
+  // 指す先の無いparentIdが指すidは使わない（そのノードが気づかないうちに新しいグループに入ることはない）
   const stray: FlowDoc = { nodes: [{ id: "x", type: "prompt", name: "X", position: { x: 700, y: 500 }, parentId: "group-1" }, ...three().nodes] };
   const fresh = groupNodes(stray, ["a", "b"]);
   assert.ok(fresh !== undefined);
@@ -403,14 +403,14 @@ test("CB-T256 ノードを放すと、真ん中が枠の中ならそのグルー
   const grouped = groupNodes(three(), ["a"]);
   assert.ok(grouped !== undefined);
   const doc = grouped.doc;
-  // 枠は (76, 48) から 238 x 166
+  // 枠は(76, 48)から238 x 166
   assert.deepEqual(byId(doc, "group-1").style, { width: 238, height: 166 });
-  // c（後ろに並ぶ）を枠の中へ放す。枠からの位置で入り、枠が c より前にあるのでそのまま
+  // c（後ろに並ぶ）を枠の中へ放す。枠からの位置で入り、枠がcより前にあるのでそのまま
   const joined = placeNode(doc, "c", { x: 90, y: 110 });
   assert.equal(byId(joined, "c").parentId, "group-1");
   assert.deepEqual(byId(joined, "c").position, { x: 14, y: 62 });
   assert.deepEqual(joined.nodes.map((n) => n.id), ["group-1", "a", "b", "c"]);
-  // 枠の外へ放すと出る（parentId が消え、位置は図の上の位置）
+  // 枠の外へ放すと出る（parentIdが消え、位置は図の上の位置）
   const left = placeNode(joined, "c", { x: 900, y: 500 });
   assert.equal("parentId" in byId(left, "c"), false);
   assert.deepEqual(byId(left, "c").position, { x: 900, y: 500 });
@@ -433,17 +433,17 @@ test("CB-T256 ノードを放すと、真ん中が枠の中ならそのグルー
   assert.equal(byId(into, "a").parentId, "g");
   assert.deepEqual(byId(into, "a").position, { x: 50, y: 50 });
   assert.deepEqual(into.nodes.map((n) => n.id), ["g", "a", "b", "c"]);
-  // 指す先の無い parentId は反映しない（位置は図の上の位置として読み、書き換えない）
+  // 指す先の無いparentIdは反映しない（位置は図の上の位置として読み、書き換えない）
   const stray: FlowDoc = { nodes: [{ id: "x", type: "prompt", name: "X", position: { x: 5, y: 5 }, parentId: "missing" }] };
   assert.equal(groupOf(stray, byId(stray, "x")), undefined);
   assert.deepEqual(absolutePosition(stray, "x"), { x: 5, y: 5 });
   assert.equal(byId(placeNode(stray, "x", { x: 50, y: 5 }), "x").parentId, "missing");
 });
 
-test("CB-T257 まとめて動かしたときは React Flow の位置（枠からの位置）で読み、グループを先に置く", () => {
+test("CB-T257 まとめて動かしたときはReact Flowの位置（枠からの位置）で読み、グループを先に置く", () => {
   const grouped = groupNodes(three(), ["a"]);
   assert.ok(grouped !== undefined);
-  // 枠と c を一緒に動かす。c は枠の新しい位置の中に収まるので入る
+  // 枠とcを一緒に動かす。cは枠の新しい位置の中に収まるので入る
   const next = placeNodes(grouped.doc, [
     { id: "c", position: { x: 300, y: 300 } },
     { id: "group-1", position: { x: 276, y: 248 } },
@@ -466,7 +466,7 @@ test("CB-T258 グループの大きさを変える。左や上の辺を動かし
   const wider = resizeGroup(doc, "group-1", { width: 500, height: 300 });
   assert.deepEqual(byId(wider, "group-1").style, { width: 500, height: 300 });
   assert.deepEqual(byId(wider, "group-1").position, { x: 76, y: 48 });
-  // 左上を (56, 38) へ広げる。中の a は枠からの位置が 20, 10 だけ増え、図の上では動かない
+  // 左上を(56, 38)へ広げる。中のaは枠からの位置が20, 10だけ増え、図の上では動かない
   const grown = resizeGroup(doc, "group-1", { width: 258, height: 176 }, { x: 56, y: 38 });
   assert.deepEqual(byId(grown, "group-1").position, { x: 56, y: 38 });
   assert.deepEqual(byId(grown, "a").position, { x: 44, y: 62 });
@@ -491,7 +491,7 @@ function loopFlow(): FlowDoc {
   };
 }
 
-test("CB-T322 繰り返し（loop）は部品箱の 8 番目で、追加すると出口 2 つ（繰り返す / 抜ける）と上限 3 の既定で作る", () => {
+test("CB-T322 繰り返し（loop）は部品箱の8番目で、追加すると出口2つ（繰り返す / 抜ける）と上限3の既定で作る", () => {
   assert.deepEqual([...PALETTE], ["start", "end", "prompt", "subAgent", "askUserQuestion", "ifElse", "switch", "loop", "skill"]);
   const added = addNode(bareFlow("i0001-01-01", "調査"), "loop", { x: 1, y: 2 });
   assert.equal(added.id, "loop-1");
@@ -514,7 +514,7 @@ test("CB-T322 繰り返し（loop）は部品箱の 8 番目で、追加する�
   assert.deepEqual(portsOf(node, []).inputs, [{ id: "input", label: "" }]);
 });
 
-test("CB-T323 繰り返しの線の言葉は出口の項目の id（body / done）か branch-<番号> でヒットし、項目の label が出る。欄を直しても出口は変わらない", () => {
+test("CB-T323 繰り返しの線の言葉は出口の項目のid（body / done）かbranch-<番号> でヒットし、項目のlabelが出る。欄を直しても出口は変わらない", () => {
   const doc = loopFlow();
   assert.deepEqual(connectionsOf(doc).map((c) => connectionLabel(doc, c)), ["", "抜ける", "繰り返す"]);
   const body = connect(doc, "loop-1", "body", "end", "input");
@@ -524,7 +524,7 @@ test("CB-T323 繰り返しの線の言葉は出口の項目の id（body / done�
   assert.deepEqual(node?.data, { label: "", condition: "テストが落ちる", maxIterations: 5, branches: [{ id: "body", label: "繰り返す" }, { id: "done", label: "抜ける" }] });
 });
 
-test("CB-T324 書き出して再読み込みしても maxIterations は数のまま（文字列にならない）。出口の id も残る", () => {
+test("CB-T324 書き出して更新してもmaxIterationsは数のまま（文字列にならない）。出口のidも残る", () => {
   const doc = patchData(loopFlow(), "loop-1", { condition: "テストが落ちる", maxIterations: 7 });
   const text = serializeFlow(doc);
   assert.match(text, /maxIterations: 7\n/);
@@ -553,7 +553,7 @@ test("CB-T325 繰り返しを複製・貼り付けしても出口の項目（bod
   assert.deepEqual(portsOf(pasted.doc.nodes.find((n) => n.id === pasted.ids[0]) as FlowNode, []).outputs.map((p) => p.label), ["繰り返す", "抜ける"]);
 });
 
-test("CB-T326 項目の id（body / done）で書いた線は、branch-<番号> の出口と別に並べず、その id を出口にする。両方で書けば id の出口が追加される", () => {
+test("CB-T326 項目のid（body / done）で書いた線は、branch-<番号> の出口と別に並べず、そのidを出口にする。両方で書けばidの出口が追加される", () => {
   const doc = loopFlow();
   const node = doc.nodes.find((n) => n.id === "loop-1") as FlowNode;
   const byId = [
@@ -564,7 +564,7 @@ test("CB-T326 項目の id（body / done）で書いた線は、branch-<番号> 
     { id: "body", label: "繰り返す" },
     { id: "done", label: "抜ける" },
   ]);
-  // `branch-<番号>` で書いた線だけなら従来どおり。
+  // `branch-<番号>`で書いた線だけなら従来どおり。
   const byIndex = byId.map((c, i) => ({ ...c, fromPort: `branch-${1 - i}` }));
   assert.deepEqual(portsOf(node, byIndex).outputs.map((p) => p.id), ["branch-0", "branch-1"]);
   // 片方ずつ別の表記なら、それぞれの出口になる。

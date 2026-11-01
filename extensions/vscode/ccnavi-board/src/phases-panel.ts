@@ -1,33 +1,33 @@
 /**
- * フェーズ管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
- * VS Code の API に触れるので単体テストの対象外。docs/design/manual-checks.md の手動確認の手順で確かめる。
+ * フェーズ管理画面のWebviewパネル。生成・更新・破棄、ファイル監視、Webviewからの操作の受け付け。
+ * VS CodeのAPIに触れるので単体テストの対象外。docs/design/manual-checks.mdの手動確認の手順で確かめる。
  *
- * 画面は React（`src/webview/phases/`）で、ここが渡すのは「いま何を見せるか」（`PhasesData`）だけ。
- * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
- * `retainContextWhenHidden` が真で、入れ物（HTML）は 1 度しか入らない。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
+ * 画面はReact（`src/webview/phases/`）で、ここが渡すのは「いま何を見せるか」（`PhasesData`）だけ。
+ * 渡し方は`core/screen-host.ts`の`retainedHost`が決める。この画面は編集の途中を持つので
+ * `retainContextWhenHidden`が真で、入れ物（HTML）は1度しか入らない。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
  * 中身を渡すのは、画面の編集を破棄してよいときだけ（ユーザが「更新」を押した、保存が通った）。
  *
- * 対象は 3 種。共通の設定の定義（`.ccnavi/config/common/phases.yml`。場所は固定）、ワークスペースの設定の定義
- * （既定 `.ccnavi/config/project/phases.yml`）、プロジェクト 1 つの設定の定義（既定 `projects/<名前>/.ccnavi/config/project/phases.yml`）。
- * 判定に使われるのは、共通の設定と、親チケットの `project:` が指す設定の和。共通の設定を開いたときは、編集する定義がそのまま
+ * 対象は3種。共通の設定の定義（`.ccnavi/config/common/phases.yml`。場所は固定）、ワークスペースの設定の定義
+ * （既定`.ccnavi/config/project/phases.yml`）、プロジェクト1つの設定の定義（既定`projects/<名前>/.ccnavi/config/project/phases.yml`）。
+ * 判定に使われるのは、共通の設定と、親チケットの`project:`が指す設定の和。共通の設定を開いたときは、編集する定義がそのまま
  * 共通の定義になるので、読み取り専用の欄（実行ファイルの統合結果のうち出どころが共通のもの）は出さない。
- * タブは 1 枚だけで、別の対象を開くとそのタブの中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
- * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json` の `layers[].phases_file`）を使い、拡張は組まない。
+ * タブは1枚だけで、別の対象を開くとそのタブの中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
+ * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json`の`layers[].phases_file`）を使い、拡張は組まない。
  *
  * 検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、`--lint --project-phases-file <名前>=<パス>`
- * （ワークスペースの設定は名前が `self`）、共通の設定は `--phases <パス>` で渡す。実行ファイルは共通の設定と足した形で確かめる（同じ id で中身が違う、
+ * （ワークスペースの設定は名前が`self`）、共通の設定は`--phases <パス>`で渡す。実行ファイルは共通の設定と足した形で確かめる（同じidで中身が違う、
  * 表示名の重なり、定義の形）。
  * 保存は、検証（`--lint`）を通り、作業中のチケットが無く、ファイルが外で変わっていないときだけ行う。
  * 作業中のチケットは、共通の設定とワークスペースの設定ならどのツリーでも、プロジェクトの設定ならそのプロジェクトの分だけを見る
  * （定義は承認・着手・閉じるときに読まれるので、走っている最中に変えない）。
  * ファイルが無いのは「設定が無い」正常な状態で、帯は出さない。欄は触れ、検証を通った最初の保存でファイルを作る（雛形は置かない）。
- * 定義の無いファイル（`phases: {}`）は実行ファイルが error にするので、先に書き出さない。
+ * 定義の無いファイル（`phases: {}`）は実行ファイルがerrorにするので、先に書き出さない。
  * 組み込みの既定は無い（実行ファイルも持たない。既定を組み込むと、意図せずレビューの要否が決まる）。
- * 共通の設定の `phases.yml` を実行ファイルが読めないときは、共通の定義が空として扱われ、`--lint` が error で言う。画面は開き、その
- * error を上部の帯で出す。共通の設定を開いているときは、その定義を直して検証の通る形で保存できる（直さなければ、ほかの対象の `--lint` も error のまま）。
+ * 共通の設定の`phases.yml`を実行ファイルが読めないときは、共通の定義が空として扱われ、`--lint`がerrorで言う。画面は開き、その
+ * errorを上部の帯で出す。共通の設定を開いているときは、その定義を直して検証の通る形で保存できる（直さなければ、ほかの対象の`--lint`もerrorのまま）。
  *
- * チケット制御が disable のワークスペースでは、対象がどれでも開かない。定義は親チケットの計画と
- * 子の範囲にしか読まれないので、disable の間は何も動かさない。入口（サイドパネル・コマンドパレット）も同じキーで隠れる。
+ * チケット制御がdisableのワークスペースでは、対象がどれでも開かない。定義は親チケットの計画と
+ * 子の範囲にしか読まれないので、disableの間は何も動かさない。入口（サイドパネル・コマンドパレット）も同じキーで隠れる。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -60,32 +60,32 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 import { confirmDuringTurn } from "./turn-confirm.js";
 
 const DEFAULT_PHASES = ".ccnavi/config/project/phases.yml";
-/** 共通の設定の定義の場所。ルール管理・リスク管理と同じく固定で、env では動かせない */
+/** 共通の設定の定義の場所。ルール管理・リスク管理と同じく固定で、envでは動かせない */
 const DEFAULT_COMMON_PHASES = ".ccnavi/config/common/phases.yml";
-/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+/** 画面の名前。バンドルのパスは`src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "phases";
-const TITLE = "ccnavi フェーズ管理";
+const TITLE = "ccnaviフェーズ管理";
 
 /** ワークスペースかプロジェクトの設定のファイルを最初の保存で作るときに、先頭へ置く説明 */
 const LAYER_HEADER = [
-  "# このレイヤーのフェーズ定義。親チケットの project: がこのレイヤーを指すときに、共通レイヤーの定義に追加して使われる。",
-  "# 共通レイヤーと同じ id で中身が違う定義や、title が重なる定義は --lint が error にし、このファイルのその定義だけが使われない。",
+  "# このレイヤーのフェーズ定義。親チケットのproject: がこのレイヤーを指すときに、共通レイヤーの定義に追加して使われる。",
+  "# 共通レイヤーと同じidで中身が違う定義や、titleが重なる定義は --lintがerrorにし、このファイルのその定義だけが使われない。",
   "",
 ].join("\n");
 /** 共通の設定のファイルを最初の保存で作るときに、先頭へ置く説明 */
 const COMMON_HEADER = [
-  "# フェーズ定義（共通レイヤー）。判定は、このファイルと親チケットの project: が指すレイヤーの phases.yml の統合結果で使う。",
-  "# 同じ id で中身が違う定義や、title が重なる定義は --lint が error にする。",
+  "# フェーズ定義（共通レイヤー）。判定は、このファイルと親チケットのproject: が指すレイヤーのphases.ymlの統合結果で使う。",
+  "# 同じidで中身が違う定義や、titleが重なる定義は --lintがerrorにする。",
   "",
 ].join("\n");
 
 interface Loaded {
-  /** 読んだ対象。往復の間に切り替わったかを `stale` が見る */
+  /** 読んだ対象。往復の間に切り替わったかを`stale`が見る */
   readonly target: PhasesTarget;
   /** ファイルの本文。無ければ空 */
   readonly text: string;
   readonly exists: boolean;
-  /** 無いときは 0 */
+  /** 無いときは0 */
   readonly mtimeMs: number;
   readonly doc: PhasesDocument;
   readonly phasesPath: string;
@@ -95,7 +95,7 @@ interface Loaded {
   readonly notices: readonly string[];
   /** 取り込み待ち画面を開けるか */
   readonly handoff: HandoffEntry;
-  /** 上部に error の帯で出す文。共通の設定の phases.yml を読めない、など */
+  /** 上部にerrorの帯で出す文。共通の設定のphases.ymlを読めない、など */
   readonly errors: readonly string[];
   /** 共通の設定の定義（読み取り専用）。実行ファイルの統合結果のうち出どころが共通のもの */
   readonly common: readonly CommonPhase[];
@@ -105,19 +105,19 @@ interface Loaded {
 
 type PanelState = SettingsState<PhasesData, PhasesTarget, Loaded>;
 
-/** 開いているパネル。種類ごとに 1 枚 */
+/** 開いているパネル。種類ごとに1枚 */
 let state: PanelState | undefined;
 
 function sameTarget(a: PhasesTarget, b: PhasesTarget): boolean {
   return a.kind === b.kind && (a.kind !== "project" || (b.kind === "project" && a.name === b.name));
 }
 
-/** 保存を止めるチケットを絞るプロジェクト。共通の設定とワークスペースの設定は絞らない（どのツリーの doing でも止める） */
+/** 保存を止めるチケットを絞るプロジェクト。共通の設定とワークスペースの設定は絞らない（どのツリーのdoingでも止める） */
 function projectOf(target: PhasesTarget): string | undefined {
   return target.kind === "project" ? target.name : undefined;
 }
 
-/** 確認の文で使う対象の名前。「設定」欄の表示（core/targets.ts の label）と揃える */
+/** 確認の文で使う対象の名前。「設定」欄の表示（core/targets.tsのlabel）と揃える */
 function targetLabelOf(target: PhasesTarget): string {
   switch (target.kind) {
     case "workspace":
@@ -125,7 +125,7 @@ function targetLabelOf(target: PhasesTarget): string {
     case "self":
       return "ワークスペース";
     case "project":
-      return `プロジェクト ${target.name}`;
+      return `プロジェクト${target.name}`;
   }
 }
 
@@ -137,7 +137,7 @@ function whatOf(target: PhasesTarget): string {
     case "self":
       return "ワークスペースの設定のフェーズ";
     case "project":
-      return `${target.name} のフェーズ`;
+      return `${target.name}のフェーズ`;
   }
 }
 
@@ -145,7 +145,7 @@ function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
-/** `ccnaviBoard.openPhases` の本体。引数なしはワークスペースの設定の定義 */
+/** `ccnaviBoard.openPhases`の本体。引数なしはワークスペースの設定の定義 */
 export async function openPhases(target: PhasesTarget = { kind: "self" }): Promise<void> {
   if (!requireTickets("フェーズ管理画面")) {
     return;
@@ -163,7 +163,7 @@ export async function openPhases(target: PhasesTarget = { kind: "self" }): Promi
     return;
   }
 
-  // 画面と CSS はバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面とCSSはバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
@@ -173,8 +173,8 @@ export async function openPhases(target: PhasesTarget = { kind: "self" }): Promi
   }
 
   // タブは読む前に作る。設定ファイルの場所を実行ファイルに聞く間に、押しても何も起きないように見えるのを避けるため。
-  // `state` を先に設定するので、読んでいる間に押し直しても上の `reveal` に入る。
-  // 読めなかったときもタブは閉じず、中にエラーを出す（`reload` の `showError`）
+  // `state`を先に設定するので、読んでいる間に押し直しても上の`reveal`に入る。
+  // 読めなかったときもタブは閉じず、中にエラーを出す（`reload`の`showError`）
   const panel = vscode.window.createWebviewPanel("ccnaviPhases", TITLE, vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
@@ -207,7 +207,7 @@ export async function openPhases(target: PhasesTarget = { kind: "self" }): Promi
 async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   const notices: string[] = [];
   const errors: string[] = [];
-  // 設定ファイルの場所は実行ファイルに聞く。`.ccnavi` から自分で組むと、組み方が食い違ったときに
+  // 設定ファイルの場所は実行ファイルに聞く。`.ccnavi`から自分で組むと、組み方が食い違ったときに
   // この画面で保存した定義が承認と着手に反映されなくなる。答えは元リポジトリの版。
   const board = await loadBoard(root, binSetting());
   if (!board.ok) {
@@ -217,7 +217,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   let phasesPath: string;
   let phasesRel: string;
   if (target.kind === "workspace") {
-    // 共通の設定の場所は `.ccnavi/config/common/` 固定。env（`--phases` を渡す設定など）では動かせない（リスク管理と同じ）。
+    // 共通の設定の場所は`.ccnavi/config/common/`固定。env（`--phases`を渡す設定など）では動かせない（リスク管理と同じ）。
     phasesRel = DEFAULT_COMMON_PHASES;
     phasesPath = resolveIn(root, phasesRel);
   } else {
@@ -225,8 +225,8 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     if (layer === undefined || layer.phasesFile.path === "") {
       throw new Error(
         target.kind === "self"
-          ? "ccnavi の出力にワークスペースの設定がありません"
-          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下にないか、名前が予約名の common か self です）`,
+          ? "ccnaviの出力にワークスペースの設定がありません"
+          : `プロジェクト${target.name}は設定の対象になっていません（プロジェクトのフォルダの直下にないか、名前が予約名のcommonかselfです）`,
       );
     }
     phasesPath = resolveIn(root, layer.phasesFile.path);
@@ -235,10 +235,10 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
       notices.push(`実行ファイルはこのファイルを読み込めず、この設定の定義を空として扱っています: ${layer.phasesFile.unreadable}`);
     }
   }
-  // 共通の設定の phases.yml を実行ファイルが読めなければ、共通の定義は空として扱われ、--lint が error で言う。画面は開いたまま帯で知らせる。
+  // 共通の設定のphases.ymlを実行ファイルが読めなければ、共通の定義は空として扱われ、--lintがerrorで言う。画面は開いたまま帯で知らせる。
   const commonFile = commonLayer(board.board);
   if (commonFile !== undefined && commonFile.phasesFile.unreadable !== "") {
-    errors.push(`共通の設定の phases.yml を読み込めません（${commonFile.phasesFile.path}）。共通の定義は空として扱われています: ${commonFile.phasesFile.unreadable}`);
+    errors.push(`共通の設定のphases.ymlを読み込めません（${commonFile.phasesFile.path}）。共通の定義は空として扱われています: ${commonFile.phasesFile.unreadable}`);
   }
   // 判定に使われる和は実行ファイルが組む（`sums[]`）。出どころが共通の定義だけを読み取り専用で見せ、拡張は足し直さない。
   // 共通の設定を開いているときは、編集する定義がそのまま共通の定義なので、読み取り専用の欄は出さない。
@@ -262,7 +262,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     mtimeMs = 0;
     exists = false;
   }
-  // 無いときの苦情（version が無い、phases が無い）は画面に出さない。
+  // 無いときの苦情（versionが無い、phasesが無い）は画面に出さない。
   const parsed = readPhases(text);
   const doc = exists ? parsed : { apply: parsed.apply, model: { ...parsed.model, problems: [] } };
   return { target, text, exists, mtimeMs, doc, phasesPath, phasesRel, notices, errors, common, targets, handoff: HANDOFF_ENTRY };
@@ -274,7 +274,7 @@ function resolveIn(root: string, filePath: string): string {
 
 /**
  * 定義のファイルと設定ファイルが変わったら「ファイルの変更を検知しました」と伝える。自分の保存は除く。
- * 対象のパスは設定で変わるので、再読み込みのたびに張り直す。絶対パスはワークスペース相対の glob に
+ * 対象のパスは設定で変わるので、更新のたびに張り直す。絶対パスはワークスペース相対のglobに
  * ならないので、そのディレクトリを起点にする。
  */
 function watchFiles(current: PanelState): void {
@@ -307,7 +307,7 @@ function alive(current: PanelState): boolean {
   return state === current;
 }
 
-/** この画面の仕事を、3 画面で共通の段取り（`settings-panel.ts`）に渡す */
+/** この画面の仕事を、3画面で共通の段取り（`settings-panel.ts`）に渡す */
 const { registerPanelHandlers, scheduleChanged, reload, redraw, switchTarget } = settingsPanel<PhasesData, PhasesTarget, Loaded, ToPhases>({
   accepts: true,
   alive,
@@ -329,8 +329,8 @@ const { registerPanelHandlers, scheduleChanged, reload, redraw, switchTarget } =
 
 /**
  * 保存できるかを実行ファイルに聞く。確かめられなければ閉じる側。
- * 共通の設定とワークスペースの設定の定義はどのツリーの doing でも止める（プロジェクト外のチケットだけに影響するが、絞らずに止める側にする）。
- * プロジェクトの設定は、そのプロジェクトのチケットにしか足されないので、そのプロジェクトの doing だけを見る。
+ * 共通の設定とワークスペースの設定の定義はどのツリーのdoingでも止める（プロジェクト外のチケットだけに影響するが、絞らずに止める側にする）。
+ * プロジェクトの設定は、そのプロジェクトのチケットにしか足されないので、そのプロジェクトのdoingだけを見る。
  */
 async function refreshLock(current: PanelState): Promise<Lock> {
   const result = await loadBoard(current.folder.uri.fsPath, binSetting());
@@ -372,7 +372,7 @@ function show(current: PanelState): void {
   });
 }
 
-/** 読み直せなかったことを見せる。理由は覚えておく（渡せなかったときに `ready` で渡し直すため） */
+/** 読み直せなかったことを見せる。理由は覚えておく（渡せなかったときに`ready`で渡し直すため） */
 function showError(current: PanelState, error: string): void {
   current.loaded = undefined;
   current.error = error;
@@ -380,15 +380,15 @@ function showError(current: PanelState, error: string): void {
   current.host.send({ kind: "error", error, target, targets: targetOptions(undefined, "workspace", target) });
 }
 
-/** 開いている対象の欄の値（`targets.ts` の `kind` と `name`） */
+/** 開いている対象の欄の値（`targets.ts`の`kind`と`name`） */
 function currentKey(target: PhasesTarget): { kind: string; name: string } {
   return { kind: target.kind, name: target.kind === "project" ? target.name : "" };
 }
 
 /**
- * フェーズ管理の画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。
- * 入れ物は 1 度しか入らないので、表示の有無は渡さない（保持する画面は非表示でも生きている）。
- * パネルの `retainContextWhenHidden` を偽に変えると、送った先が破棄されていても気づけなくなる。
+ * フェーズ管理の画面に渡す手段。VS Codeのパネルを`retainedHost`の形に合わせる。
+ * 入れ物は1度しか入らないので、表示の有無は渡さない（保持する画面は非表示でも生きている）。
+ * パネルの`retainContextWhenHidden`を偽に変えると、送った先が破棄されていても気づけなくなる。
  * 型では止まらないので、ここで見て言う。
  */
 function phasesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<PhasesData> {
@@ -415,7 +415,7 @@ function phasesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<Phases
 /**
  * 保存を始めたときに読んでいたものが、往復の間に入れ替わっていないか。
  *
- * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間にユーザが「更新」を押せば、
+ * 保存は実行ファイルへ2度出る（`--lint`と錠の取り直し）。その間にユーザが「更新」を押せば、
  * 画面の編集は破棄され、新しい中身が出ている。そこへ古い編集を書くと、破棄したはずのものが
  * ファイルに入る。 読み直されていたら、この保存はもう無かったことにする。
  */
@@ -431,7 +431,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   return true;
 }
 
-/** 操作の結果の一言。1 枚目を読み込んでいる間だけ届かずに破棄される（非表示になっていても届く） */
+/** 操作の結果の一言。1枚目を読み込んでいる間だけ届かずに破棄される（非表示になっていても届く） */
 function fail(current: PanelState, message: string): void {
   current.host.post({ type: "failed", message } satisfies ToPhases);
 }
@@ -447,14 +447,14 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
   if (message.type === "ready") {
     // 組み上がったばかりの画面は必ず「変更なし」で始まる（作り直された画面は前の編集を持たない）
     current.dirty = false;
-    // 画面が組み上がった。1 枚目を読み込んでいる間に見送った中身は、ここで渡る。
-    // 見送るものが無くても渡し直す（同じ中身がもう 1 度届く）。VS Code が画面を作り直す経路
-    // （`Developer: Reload Webviews`）では、入れてある HTML の中身が古いことがあるため
+    // 画面が組み上がった。1枚目を読み込んでいる間に見送った中身は、ここで渡る。
+    // 見送るものが無くても渡し直す（同じ中身がもう1度届く）。VS Codeが画面を作り直す経路
+    // （`Developer: Reload Webviews`）では、入れてあるHTMLの中身が古いことがあるため
     current.host.ready();
     redraw(current);
     postAppearance(current.host);
-    // 初回だけ吹き出しの案内を頼む。画面は定義の中身が出てから始め、閉じたら `tourDone` を返す。
-    // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
+    // 初回だけ吹き出しの案内を頼む。画面は定義の中身が出てから始め、閉じたら`tourDone`を返す。
+    // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう1度出る
     if (!tourSeen(SCREEN)) {
       current.host.post({ type: "tour" } satisfies ToPhases);
     }
@@ -465,7 +465,7 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
     return;
   }
   // 読み直せていない画面では、定義にヒットする操作はどれも行き先が無い（「更新」は
-  // 押せるが、その経路は `reload` が読み直しからやり直す）
+  // 押せるが、その経路は`reload`が読み直しからやり直す）
   if (current.loaded === undefined && message.type !== "reload") {
     return;
   }
@@ -522,7 +522,7 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
   }
 }
 
-/** 保存の前の検証に渡す差し替え。共通の設定は `--phases`、ほかは名前を付けて `--project-phases-file` */
+/** 保存の前の検証に渡す差し替え。共通の設定は`--phases`、ほかは名前を付けて`--project-phases-file` */
 function headerOf(target: PhasesTarget): string {
   return target.kind === "workspace" ? COMMON_HEADER : LAYER_HEADER;
 }
@@ -556,8 +556,8 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     return;
   }
 
-  // 1. 検証。error が 1 件でもあれば保存しない。承認済みの計画がこの定義で読めるかもここで分かる。
-  //    実行ファイルは共通の設定と足した形で確かめる（同じ id で中身が違う、表示名の重なり）。
+  // 1. 検証。errorが1件でもあれば保存しない。承認済みの計画がこの定義で読めるかもここで分かる。
+  //    実行ファイルは共通の設定と足した形で確かめる（同じidで中身が違う、表示名の重なり）。
   const lint = await runLint(root, binSetting(), overrideFor(current.target, tmp));
   if (!alive(current)) {
     return;
@@ -627,12 +627,12 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     return;
   }
   await reload(current);
-  // warn の本文は画面上部の帯に出す（通知は件数だけ）。中身（data）を渡したあとに送る
+  // warnの本文は画面上部の帯に出す（通知は件数だけ）。中身（data）を渡したあとに送る
   const warns = warnLinesOf(lint.value.report, tmp, loaded.phasesRel);
   if (warns.length > 0 && alive(current)) {
     current.host.post({ type: "saved", warns } satisfies ToPhases);
   }
-  vscode.window.showInformationMessage(`${loaded.phasesRel} に保存しました（${lintSummary(lint.value.report)}）`);
+  vscode.window.showInformationMessage(`${loaded.phasesRel}に保存しました（${lintSummary(lint.value.report)}）`);
 }
 
 function asMessage(message: unknown): PhasesMessage | undefined {

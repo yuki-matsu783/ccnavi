@@ -1,5 +1,5 @@
 /**
- * ルール管理画面の絞り込み・並べ替え・保存後の warn・期待確認の根拠（#743）を happy-dom で見る。
+ * ルール管理画面の絞り込み・並べ替え・保存後のwarn・期待確認の根拠（#743）をhappy-domで見る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -11,14 +11,14 @@ function hit(section: string, id: string, source: "file" | "outside"): RuleHitJs
   return { section, id, kind: "glob", written: "*", pattern: ".*", source };
 }
 
-test("CB-D1236 絞り込みが 3 タイプとも 0 件のときだけ案内を出す。全角英数字は半角と同じに探せる", async () => {
+test("CB-D1236 絞り込みが3タイプとも0件のときだけ案内を出す。全角英数字は半角と同じに探せる", async () => {
   const dom = await openRules();
   try {
     assert.equal(dom.all("#tab-rules > p.empty").length, 0);
     dom.type(dom.one("#find"), "存在しない文字列-zzz");
     await dom.settle();
     assert.match(dom.one("#tab-rules > p.empty").textContent ?? "", /絞り込みに一致するルールがありません/);
-    // 1 件でも一致すれば出ない（全角の「ＧＩＴ」は git-push に一致する）
+    // 1件でも一致すれば出ない（全角の「ＧＩＴ」はgit-pushに一致する）
     dom.type(dom.one("#find"), "ＧＩＴ ＰＵＳＨ");
     await dom.settle();
     assert.equal(dom.all("#tab-rules > p.empty").length, 0);
@@ -29,7 +29,7 @@ test("CB-D1236 絞り込みが 3 タイプとも 0 件のときだけ案内を�
   }
 });
 
-test("CB-D1237 絞り込み中は上下ボタンを止め、title に理由を出す。空に戻せば戻る", async () => {
+test("CB-D1237 絞り込み中は上下ボタンを止め、titleに理由を出す。空に戻せば戻る", async () => {
   const dom = await openRules();
   try {
     const down = (): HTMLButtonElement => dom.all<HTMLButtonElement>('.rule[data-id="git-push"] button[data-action], .rule[data-id="git-push"] .buttons button').find((b) => b.textContent === "↓") as HTMLButtonElement;
@@ -87,7 +87,7 @@ test("CB-D1238 期待確認の「ヒットしたルール」に、ルールフ�
   }
 });
 
-test("CB-D1239 保存後の warn の本文を上部の帯に出し、次の編集で消す", async () => {
+test("CB-D1239 保存後のwarnの本文を上部の帯に出し、次の編集で消す", async () => {
   const dom = await openRules();
   try {
     assert.equal(dom.all('[data-banner="save-warn"]').length, 0);

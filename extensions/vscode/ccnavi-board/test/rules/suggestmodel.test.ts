@@ -10,7 +10,7 @@ function read(name: string): string {
   return fs.readFileSync(path.join(FIXTURES, name), "utf8");
 }
 
-test("CB-T266 --suggest --json のフィクスチャ（実行ファイルの出力）を読める", () => {
+test("CB-T266 --suggest --jsonのフィクスチャ（実行ファイルの出力）を読める", () => {
   const parsed = parseSuggestJson(read("suggest.json"));
   assert.equal(parsed.ok, true);
   if (!parsed.ok) {
@@ -30,7 +30,7 @@ test("CB-T266 --suggest --json のフィクスチャ（実行ファイルの出�
   assert.equal(s.candidates[1].expectations[0].subject, "git push origin main");
 });
 
-test("CB-T267 版が違う・JSON でないときは理由を返し、allow の候補は並べない", () => {
+test("CB-T267 版が違う・JSONでないときは理由を返し、allowの候補は並べない", () => {
   const other = read("suggest.json").replace(`"version": ${SUGGEST_VERSION}`, `"version": ${SUGGEST_VERSION + 1}`);
   const parsed = parseSuggestJson(other);
   assert.equal(parsed.ok, false);

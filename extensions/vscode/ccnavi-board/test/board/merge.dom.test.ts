@@ -1,5 +1,5 @@
 /**
- * マージ状況の帯と、ツールバーの「MR の状況を確認」（React の画面を happy-dom で動かす）。
+ * マージ状況の帯と、ツールバーの「MRの状況を確認」（Reactの画面をhappy-domで動かす）。
  * 中身（`MergeView`）は拡張ホストが持つ。ここは渡されたものを正しく出し、押した操作を正しく返すかを見る。
  */
 import { test } from "node:test";
@@ -32,11 +32,11 @@ function text(page: DomPage, selector: string): string {
   return page.one(selector).textContent.replace(/\s+/g, " ").trim();
 }
 
-test("CB-D720 「MR の状況を確認」はツールバーに通常の色で置く。押すと mergeCheck を送り、確認中は「確認中…」で押せず、二重に送らない", async () => {
+test("CB-D720 「MRの状況を確認」はツールバーに通常の色で置く。押すとmergeCheckを送り、確認中は「確認中…」で押せず、二重に送らない", async () => {
   const page = await openBoard(json());
   try {
     const button = page.one<HTMLButtonElement>('.controls button[data-action="merge-check"]');
-    assert.equal(button.textContent.trim(), "MR の状況を確認");
+    assert.equal(button.textContent.trim(), "MRの状況を確認");
     assert.ok(button.classList.contains("action") && !button.classList.contains("primary"));
     assert.equal(page.all(".merge-band").length, 0, "一度も確認していなければ帯を出さない");
     page.click(button);
@@ -60,25 +60,25 @@ test("CB-D720 「MR の状況を確認」はツールバーに通常の色で置
     await page.send({ type: "data", data: { kind: "board", board: buildBoard(json()), merge: view([row("i1")]) } });
     const idle = page.one<HTMLButtonElement>('button[data-action="merge-check"]');
     assert.equal(idle.disabled, false);
-    assert.equal(idle.textContent.trim(), "MR の状況を確認");
+    assert.equal(idle.textContent.trim(), "MRの状況を確認");
   } finally {
     await page.close();
   }
 });
 
-test("CB-D721 帯の行: 親・タイトル・MR !N ・状態。タイトルはボードのアーカイブの同じ親（プロジェクトと ID が一致）から取り、無ければ ID だけ", async () => {
+test("CB-D721 帯の行: 親・タイトル・MR !N・状態。タイトルはボードのアーカイブの同じ親（プロジェクトとIDが一致）から取り、無ければIDだけ", async () => {
   const rows = [row("i1"), row("i2", { project: "web", mr: 6 }), row("i2", { project: "", mr: 7 }), row("nowhere", { mr: null })];
-  // 同じ ID が 2 行あると key が重なるので、別の ID でプロジェクトの取り違えを確かめる
+  // 同じIDが2行あるとkeyが重なるので、別のIDでプロジェクトの取り違えを確かめる
   const page = await openBoard(json(), { merge: view([row("i1"), row("i2", { project: "web", mr: 6 }), row("nowhere", { mr: null })]) });
   try {
     const line = (parent: string): string => text(page, `.merge-row[data-parent="${parent}"] .merge-who`);
     assert.equal(line("i1"), "i1 古い親 MR !5");
     assert.equal(line("i2"), "i2 別のプロジェクトの親 MR !6");
-    assert.equal(line("nowhere"), "nowhere", "タイトルが無ければ ID だけ（MR の番号も無ければ出さない）");
+    assert.equal(line("nowhere"), "nowhere", "タイトルが無ければIDだけ（MRの番号も無ければ出さない）");
   } finally {
     await page.close();
   }
-  // プロジェクトが違えば別の親: web の i2 のタイトルを、ワークスペースの i2 に付けない
+  // プロジェクトが違えば別の親: webのi2のタイトルを、ワークスペースのi2に付けない
   const other = await openBoard(json(), { merge: view([row("i2", { project: "" })]) });
   try {
     assert.equal(text(other, '.merge-row[data-parent="i2"] .merge-who'), "i2 MR !5");
@@ -88,34 +88,34 @@ test("CB-D721 帯の行: 親・タイトル・MR !N ・状態。タイトルは�
   void rows;
 });
 
-test("CB-D722 マージ待ち（Draft なら付記）・マージ済み・閉じた・確認できない・記録が不完全・確認中の行の言葉", async () => {
+test("CB-D722 マージ待ち（Draftなら付記）・マージ済み・閉じた・確認できない・記録が不完全・確認中の行の言葉", async () => {
   const merge = view([
     row("a-open", { state: "open", draft: false }),
     row("b-draft", { state: "open", draft: true }),
     row("c-merged", { state: "merged" }),
     row("d-closed", { state: "closed", abandon: "sh /ws/.ccnavi/scripts/ccnavi-launcher.sh worktree retire --abandon d-closed" }),
-    row("e-unknown", { state: "unknown", url: "", reason: "auth", detail: "認証に失敗した（トークンか gh の認証を確かめる）" }),
+    row("e-unknown", { state: "unknown", url: "", reason: "auth", detail: "認証に失敗した（トークンかghの認証を確かめる）" }),
     row("f-timeout", { state: "unknown", url: "", reason: "timeout", detail: "時間内に終わりませんでした" }),
-    row("g-format", { state: "unknown", url: "", reason: "format", detail: "出力の形が想定外です（要求した MR（#5）と番号が違います（6））" }),
-    row("h-failed", { state: "unknown", url: "", reason: "failed", detail: "sh が終了コード 127 で終わりました" }),
+    row("g-format", { state: "unknown", url: "", reason: "format", detail: "出力の形が想定外です（要求したMR（#5）と番号が違います（6））" }),
+    row("h-failed", { state: "unknown", url: "", reason: "failed", detail: "shが終了コード127で終わりました" }),
     row("i-incomplete", { state: "incomplete", url: "", mr: null, detail: "記録を読めない（壊れている）" }),
     row("j-wait", { state: "checking", url: "" }),
   ]);
   const page = await openBoard(json(), { merge });
   try {
     const state = (parent: string): string => text(page, `.merge-row[data-parent="${parent}"] .merge-state`);
-    assert.equal(state("a-open"), "- マージ待ち MR を開く");
-    assert.equal(state("b-draft"), "- マージ待ち（Draft） MR を開く");
+    assert.equal(state("a-open"), "- マージ待ち MRを開く");
+    assert.equal(state("b-draft"), "- マージ待ち（Draft） MRを開く");
     assert.equal(state("c-merged"), "- マージ済み 片付ける");
     assert.match(state("d-closed"), /^- マージせず閉じました。自動では片付けません。破棄した親なら、ユーザがターミナルで sh \/ws\/\.ccnavi\/scripts\/ccnavi-launcher\.sh worktree retire --abandon d-closed を実行して記録を消します/);
-    assert.equal(state("e-unknown"), "- 確認できません（認証: 認証に失敗した（トークンか gh の認証を確かめる））");
-    assert.equal(state("f-timeout"), "- 確認できません（期限切れ: 時間内に終わりませんでした）");
+    assert.equal(state("e-unknown"), "- 確認できません（認証: 認証に失敗した（トークンかghの認証を確かめる））");
+    assert.equal(state("f-timeout"), "- 確認できません（タイムアウト: 時間内に終わりませんでした）");
     assert.match(state("g-format"), /^- 確認できません（出力の形が想定外: 出力の形が想定外です/);
-    assert.equal(state("h-failed"), "- 確認できません（実行できません: sh が終了コード 127 で終わりました）");
+    assert.equal(state("h-failed"), "- 確認できません（実行できません: shが終了コード127で終わりました）");
     assert.equal(state("i-incomplete"), "- 確認できません（記録が不完全: 記録を読めない（壊れている））");
     assert.equal(state("j-wait"), "確認中…");
     // 確認した時刻
-    assert.equal(text(page, '[data-merge="checked-at"]'), "確認した時刻 2026-10-01 10:00:00");
+    assert.equal(text(page, '[data-merge="checked-at"]'), "確認した時刻2026-10-01 10:00:00");
     // マージ済み以外に［片付ける］は出ない
     assert.deepEqual(page.all('button[data-action="merge-retire"]').map((b) => b.getAttribute("data-parent")), ["c-merged"]);
   } finally {
@@ -123,7 +123,7 @@ test("CB-D722 マージ待ち（Draft なら付記）・マージ済み・閉じ
   }
 });
 
-test("CB-D723 帯のボタンとリンクは card-button（［片付ける］だけが主）。URL が http(s) のときだけ［MR を開く］をリンクにし、状態は出す", async () => {
+test("CB-D723 帯のボタンとリンクはcard-button（［片付ける］だけが主）。URLがhttp(s)のときだけ［MRを開く］をリンクにし、状態は出す", async () => {
   const merge = view([
     row("a", { state: "open", url: "https://example.com/pull/5" }),
     row("b", { state: "open", url: "javascript:alert(1)" }),
@@ -134,7 +134,7 @@ test("CB-D723 帯のボタンとリンクは card-button（［片付ける］だ
   const page = await openBoard(json(), { merge });
   try {
     const links = page.all(".merge-band a");
-    assert.deepEqual(links.map((a) => a.getAttribute("href")), ["https://example.com/pull/5"], "javascript: などを href にしない");
+    assert.deepEqual(links.map((a) => a.getAttribute("href")), ["https://example.com/pull/5"], "javascript: などをhrefにしない");
     for (const a of links) {
       assert.ok(a.classList.contains("card-button"));
     }
@@ -152,7 +152,7 @@ test("CB-D723 帯のボタンとリンクは card-button（［片付ける］だ
   }
 });
 
-test("CB-D724 ［片付ける］は mergeRetire を送る。ダイアログ中（busy）は押せず、送ったら「送信しました」にして押せなくする。送れなかったら理由を出して押し直せる", async () => {
+test("CB-D724 ［片付ける］はmergeRetireを送る。ダイアログ中（busy）は押せず、送ったら「送信しました」にして押せなくする。送れなかったら理由を出して押し直せる", async () => {
   const page = await openBoard(json(), { merge: view([row("c-merged")]) });
   try {
     page.click(page.one('button[data-action="merge-retire"]'));
@@ -188,7 +188,7 @@ test("CB-D724 ［片付ける］は mergeRetire を送る。ダイアログ中�
   }
 });
 
-test("CB-D725 マージせず閉じた親は、記録を消すコマンドのコピーのボタンだけ（片付けるボタンも、ボードから送る操作も出さない）", async () => {
+test("CB-D725 マージせずクローズした親は、記録を消すコマンドのコピーのボタンだけ（片付けるボタンも、ボードから送る操作も出さない）", async () => {
   const page = await openBoard(json(), { merge: view([row("d", { state: "closed", abandon: "sh /ws/x.sh worktree retire --abandon d" })]) });
   try {
     assert.equal(page.all('button[data-action="merge-retire"]').length, 0);
@@ -204,11 +204,11 @@ test("CB-D725 マージせず閉じた親は、記録を消すコマンドのコ
   }
 });
 
-test("CB-D726 一覧を取れなかったときは「一覧を取得できません」をエラーに出し、「ありません」とは言わない。正しく取れて 0 件のときだけ「マージ待ちの親はありません」", async () => {
-  const error = await openBoard(json(), { merge: view([], { error: "一覧を取得できません（形式の異常: 頭の行が retired 1 ではありません）" }) });
+test("CB-D726 一覧を取れなかったときは「一覧を取得できません」をエラーに出し、「ありません」とは言わない。正しく取れて0件のときだけ「マージ待ちの親はありません」", async () => {
+  const error = await openBoard(json(), { merge: view([], { error: "一覧を取得できません（形式の異常: 頭の行がretired 1ではありません）" }) });
   try {
     const alert = error.one('[data-merge="list-error"]');
-    assert.equal(alert.textContent, "一覧を取得できません（形式の異常: 頭の行が retired 1 ではありません）");
+    assert.equal(alert.textContent, "一覧を取得できません（形式の異常: 頭の行がretired 1ではありません）");
     assert.equal(alert.getAttribute("role"), "alert");
     assert.equal(error.all('[data-merge="empty"]').length, 0);
     assert.ok(!error.document.body.textContent.includes("マージ待ちの親はありません"));
@@ -222,11 +222,11 @@ test("CB-D726 一覧を取れなかったときは「一覧を取得できませ
   } finally {
     await none.close();
   }
-  // incomplete だけ: 「ありません」ではなく確認できない行
-  const only = await openBoard(json(), { merge: view([row("x", { state: "incomplete", mr: null, url: "", detail: "mr が無い" })]) });
+  // incompleteだけ: 「ありません」ではなく確認できない行
+  const only = await openBoard(json(), { merge: view([row("x", { state: "incomplete", mr: null, url: "", detail: "mrが無い" })]) });
   try {
     assert.equal(only.all('[data-merge="empty"]').length, 0);
-    assert.match(text(only, '.merge-row[data-parent="x"] .merge-state'), /確認できません（記録が不完全: mr が無い）/);
+    assert.match(text(only, '.merge-row[data-parent="x"] .merge-state'), /確認できません（記録が不完全: mrが無い）/);
   } finally {
     await only.close();
   }
@@ -237,7 +237,7 @@ test("CB-D727 結果は拡張ホストが持つので、画面が作り直され
   const page = await openBoard(json(), { merge });
   try {
     assert.equal(page.all('.merge-row[data-parent="c-merged"]').length, 1);
-    // 画面を作り直す（ready を受けた拡張ホストが同じ merge を渡し直す）
+    // 画面を作り直す（readyを受けた拡張ホストが同じmergeを渡し直す）
     await page.send({ type: "data", data: { kind: "board", board: buildBoard(json()), merge } });
     assert.equal(page.all('.merge-row[data-parent="c-merged"]').length, 1);
     // 結果が無いデータ（ボードを開き直したあと）では、帯は出ない
@@ -246,12 +246,12 @@ test("CB-D727 結果は拡張ホストが持つので、画面が作り直され
   } finally {
     await page.close();
   }
-  // 1 枚目の HTML に埋まった中身からも描く
+  // 1枚目のHTMLに埋まった中身からも描く
   const html = boardPage({ kind: "board", board: buildBoard(json()), merge });
   assert.ok(html.includes("c-merged"));
 });
 
-test("CB-D728 帯の見た目の規則: 狭い画面で折り返し、ボタンは card-button の寸法", () => {
+test("CB-D728 帯の見た目の規則: 狭い画面で折り返し、ボタンはcard-buttonの寸法", () => {
   const css = flatStyle(boardPage({ kind: "board", board: buildBoard(json()), merge: view([row("a")]) }));
   assert.match(css, /\.merge-row \{[^}]*flex-wrap: wrap;/);
   assert.match(css, /\.merge-state \{[^}]*overflow-wrap: anywhere;/);

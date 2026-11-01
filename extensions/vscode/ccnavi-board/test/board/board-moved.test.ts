@@ -1,6 +1,6 @@
 /**
  * 前の読み直しから、どのカードが列を変えたか（`src/core/board-moved.ts`）。
- * 渡された分を画面が出すところは board.dom.test.ts（CB-D82）。
+ * 渡された分を画面が出すところはboard.dom.test.ts（CB-D82）。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -11,8 +11,8 @@ import { fixture } from "../helpers/fixture.js";
 
 test("CB-T192 列が変わったカードと新規起票のカードだけを出す。消えたカードは出さない", () => {
   // 見本のボードの置き場所。列は組み立て（board.ts）が決めたものをそのまま読む。
-  // `assert.deepEqual` は `asserts actual is T` なので、変数に適用すると以後の型が literal に狭まる。
-  // 戻り値に直に適用して、`before` は `Placement` のままにする
+  // `assert.deepEqual`は`asserts actual is T`なので、変数に適用すると以後の型がliteralに狭まる。
+  // 戻り値に直に適用して、`before`は`Placement`のままにする
   const board = buildBoard(fixture());
   const before = placementOf(board);
   assert.deepEqual(placementOf(board), {
@@ -26,13 +26,13 @@ test("CB-T192 列が変わったカードと新規起票のカードだけを出
 
   // 承認は 未着手 → 作業中。着手も完了も同じ形で出る
   const after: Placement = { ...before, "i0001-02-03": "doing", "i0001-02-02": "done" };
-  // 順序は `after` の並び順。`placementOf` が作ったものなら列の順（未着手 → 作業中 → …）
+  // 順序は`after`の並び順。`placementOf`が作ったものなら列の順（未着手 → 作業中 → …）
   assert.deepEqual(movedCards(before, after), [
     { id: "i0001-02-03", from: "todo", to: "doing" },
     { id: "i0001-02-02", from: "doing", to: "done" },
   ]);
 
-  // 新しく現れたカードは from を持たない。消えたカードは動いた表示を付ける先が無いので出さない
+  // 新しく現れたカードはfromを持たない。消えたカードは動いた表示を付ける先が無いので出さない
   const { "i0001-02-05": _gone, ...rest } = before;
   const added: Placement = { ...rest, i0002: "todo" };
   assert.deepEqual(movedCards(before, added), [{ id: "i0002", to: "todo" }]);
@@ -48,11 +48,11 @@ test("CB-T192b 置き場所が同じかを見る（同じなら動いた表示�
   const { "i0001-02-05": _gone, ...fewer } = before;
   assert.equal(samePlacement(before, fewer), false, "減っても違う");
   assert.equal(samePlacement(fewer, before), false, "増えても違う");
-  // 件数が同じで中身が違う（1 枚消えて 1 枚増えた）のも違う。数だけで同じと見なさない
+  // 件数が同じで中身が違う（1枚消えて1枚増えた）のも違う。数だけで同じと見なさない
   assert.equal(samePlacement(before, { ...fewer, i0002: "done" }), false);
 });
 
-/** 見本のボードの `ticket` を、指定の列に置いた 1 枚 */
+/** 見本のボードの`ticket`を、指定の列に置いた1枚 */
 function moveTo(board: ReturnType<typeof buildBoard>, ticket: string, to: string): ReturnType<typeof buildBoard> {
   return {
     ...board,
@@ -60,7 +60,7 @@ function moveTo(board: ReturnType<typeof buildBoard>, ticket: string, to: string
       const cards = column.cards.filter((card) => card.id !== ticket);
       const moving = board.columns.flatMap((c) => c.cards).find((card) => card.id === ticket);
       if (moving === undefined) {
-        throw new Error(`見本に ${ticket} がありません`);
+        throw new Error(`見本に${ticket}がありません`);
       }
       const own = column.state === to ? [...cards, moving] : cards;
       return { ...column, cards: own, count: own.length };
@@ -68,7 +68,7 @@ function moveTo(board: ReturnType<typeof buildBoard>, ticket: string, to: string
   };
 }
 
-/** 見本のボードから `ticket` を 1 枚除いた形 */
+/** 見本のボードから`ticket`を1枚除いた形 */
 function without(board: ReturnType<typeof buildBoard>, ticket: string): ReturnType<typeof buildBoard> {
   return {
     ...board,
@@ -79,10 +79,10 @@ function without(board: ReturnType<typeof buildBoard>, ticket: string): ReturnTy
   };
 }
 
-test("CB-T192c 1 枚目は動いた表示を付けず、列が動かない再読み込みでは前の動いた表示を持ち越す", () => {
+test("CB-T192c 1枚目は動いた表示を付けず、列が動かない更新では前の動いた表示を持ち越す", () => {
   const board = buildBoard(fixture());
 
-  // 1 枚目。比べる相手が無いので、何にも動いた表示を付けない（開いた直後に全部が光ると意味が無い）
+  // 1枚目。比べる相手が無いので、何にも動いた表示を付けない（開いた直後に全部が光ると意味が無い）
   const first = movedStep(NOTHING_MOVED, board);
   assert.deepEqual(first.moved, []);
   assert.notEqual(first.placement, undefined);
@@ -106,12 +106,12 @@ test("CB-T192c 1 枚目は動いた表示を付けず、列が動かない再読
   ]);
 });
 
-test("CB-T192d カードが消えただけの再読み込みも「変わった」と数える（戻ってきたら新規起票と言える）", () => {
+test("CB-T192d カードが消えただけの更新も「変わった」と数える（戻ってきたら新規起票と言える）", () => {
   const board = buildBoard(fixture());
   const first = movedStep(NOTHING_MOVED, board);
 
-  // 消えたカードには動いた表示を付けられないので `moved` は空。それでも置き場所は更新する。
-  // ここを「動いた分が 0 件なら据え置き」にすると、戻ってきたカードが「新規起票」にならない
+  // 消えたカードには動いた表示を付けられないので`moved`は空。それでも置き場所は更新する。
+  // ここを「動いた分が0件なら据え置き」にすると、戻ってきたカードが「新規起票」にならない
   const gone = movedStep(first, without(board, "i0001-02-03"));
   assert.deepEqual(gone.moved, []);
   assert.notEqual(gone, first, "置き場所が変わったので、同じ状態は返さない");

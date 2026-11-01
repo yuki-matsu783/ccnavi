@@ -1,6 +1,6 @@
 /**
- * プロジェクト管理画面の案内（`src/webview/tours/projects.yml`）を happy-dom で動かす。見本は使わず、今の画面を指す。
- * 案内の間は clone・更新・.gitignore の操作を拡張ホストへ送らない。
+ * プロジェクト管理画面の案内（`src/webview/tours/projects.yml`）をhappy-domで動かす。見本は使わず、今の画面を指す。
+ * 案内の間はclone・更新・.gitignoreの操作を拡張ホストへ送らない。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -18,7 +18,7 @@ async function startCourse(dom: DomPage, id: string): Promise<void> {
   await dom.settle();
 }
 
-test("CB-D321 プロジェクト管理画面に「?」があり、初回の案内の依頼で基本の案内が始まる。閉じたら tourDone を返す", async () => {
+test("CB-D321 プロジェクト管理画面に「?」があり、初回の案内の依頼で基本の案内が始まる。閉じたらtourDoneを返す", async () => {
   const dom = await openProjects([row()]);
   try {
     assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
@@ -34,16 +34,16 @@ test("CB-D321 プロジェクト管理画面に「?」があり、初回の案�
   }
 });
 
-test("CB-D322 全案内の全手順で、指す先が画面に 1 つあり、吹き出しが中ほどに出ない。案内の間は操作を送らない", async () => {
+test("CB-D322 全案内の全手順で、指す先が画面に1つあり、吹き出しが中ほどに出ない。案内の間は操作を送らない", async () => {
   for (const course of def.courses) {
     const dom = await openProjects([row(), row({ name: "app", rel: "projects/app" })], { ignored: false });
     try {
       await startCourse(dom, course.id);
       for (const [index, step] of course.steps.entries()) {
         await dom.settle();
-        const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
+        const at = `${course.id}の${index + 1}番目の手順（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
-        assert.equal(dom.all(`[data-tour="${step.target}"]`).length, 1, `${at}: 指す先 ${step.target} が画面に 1 つではない`);
+        assert.equal(dom.all(`[data-tour="${step.target}"]`).length, 1, `${at}: 指す先${step.target}が画面に1つではない`);
         assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
         dom.click(dom.one('[data-action="tour-next"]'));
       }
@@ -55,7 +55,7 @@ test("CB-D322 全案内の全手順で、指す先が画面に 1 つあり、吹
   }
 });
 
-test("CB-D323 案内の間に clone・更新・.gitignore を押しても、拡張ホストへ送らない", async () => {
+test("CB-D323 案内の間にclone・更新・.gitignoreを押しても、拡張ホストへ送らない", async () => {
   const dom = await openProjects([row()], { ignored: false });
   try {
     dom.click(dom.one('[data-action="tour"]'));

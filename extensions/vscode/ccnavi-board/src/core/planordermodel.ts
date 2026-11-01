@@ -1,17 +1,17 @@
 /**
- * `--plan-order <親> --json [--order <JSON>]` と、保存の `--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`
- * の答え（実行ファイルとの契約）と読み取り。形はリポジトリの設計（`docs/21_design/tickets/approval.md` の
- * 計画の順序の振り直しの表）と、Python 側が書き出す実例 `test/fixtures/plan-order.json`。
+ * `--plan-order <親> --json [--order <JSON>]`と、保存の`--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`
+ * の答え（実行ファイルとの契約）と読み取り。形はリポジトリの設計（`docs/21_design/tickets/approval.md`の
+ * 計画の順序の振り直しの表）と、Python側が書き出す実例`test/fixtures/plan-order.json`。
  *
  * 計画編集タブ（`workflow-panel.ts`）が読む。**番号の振り直し・順序の検査・書けるか（`writable`）は
- * 実行ファイルが答え、拡張は読むだけ**。計画ごとの図の中身（`plans`）は承認の preview と同じ関数で作られるので、
- * 読み方も `approvemodel.ts` の `readPlans` を使う。
+ * 実行ファイルが答え、拡張は読むだけ**。計画ごとの図の中身（`plans`）は承認のpreviewと同じ関数で作られるので、
+ * 読み方も`approvemodel.ts`の`readPlans`を使う。
  *
- * VS Code の API も DOM も node も読まない。
+ * VS CodeのAPIもDOMもnodeも読まない。
  */
 import { readPlans, type ApprovePlan } from "./approvemodel.js";
 
-/** 答えの版（実行ファイルの `plan_order.VERSION`）。欄を足すだけなら上がらない */
+/** 答えの版（実行ファイルの`plan_order.VERSION`）。欄を足すだけなら上がらない */
 export const PLAN_ORDER_VERSION = 1;
 
 /**
@@ -20,14 +20,14 @@ export const PLAN_ORDER_VERSION = 1;
  */
 export type PlanOrder = Readonly<Record<string, Readonly<Record<string, readonly number[]>>>>;
 
-/** 振り直せない線（`cycle` 循環・`locked` 子が承認された番号へ入る線を変えた・`unpackable` 詰められない） */
+/** 振り直せない線（`cycle`循環・`locked`子が承認された番号へ入る線を変えた・`unpackable`詰められない） */
 export interface PlanOrderRefusal {
   readonly kind: string;
   readonly number: number;
   readonly text: string;
 }
 
-/** 付け替える `todo/` の子の提案 1 本（旧 → 新） */
+/** 付け替える`todo/`の子の提案1本（旧 → 新） */
 export interface PlanOrderChild {
   readonly ticket: string;
   readonly new_ticket: string;
@@ -39,7 +39,7 @@ export interface PlanOrderChild {
   readonly new_predecessors: readonly string[];
 }
 
-/** `phase:` が親の計画の番号に無い `todo/` の子の提案。知らせるだけで、書き戻しは止めない */
+/** `phase:`が親の計画の番号に無い`todo/`の子の提案。知らせるだけで、書き戻しは止めない */
 export interface PlanOrderMismatch {
   readonly ticket: string;
   readonly path: string;
@@ -50,10 +50,10 @@ export interface PlanOrderMismatch {
 export interface PlanOrderAnswer {
   readonly version: number;
   readonly ticket: string;
-  /** 親の提案と子の提案をまとめたハッシュ。保存の `--expect` に返す */
+  /** 親の提案と子の提案をまとめたハッシュ。保存の`--expect`に返す */
   readonly source_sha: string;
   readonly plans: readonly ApprovePlan[];
-  /** 振り直した計画の順序の検査の error（両方の計画） */
+  /** 振り直した計画の順序の検査のerror（両方の計画） */
   readonly problems: readonly string[];
   readonly loose: readonly number[];
   /** 断った線。断ったときは振り直さず、提案のままの答えが入っている */
@@ -66,7 +66,7 @@ export interface PlanOrderAnswer {
   readonly mismatched: readonly PlanOrderMismatch[];
   /** 書き戻せるか（実行ファイルが決める） */
   readonly writable: boolean;
-  /** `--write` のときだけ。書いたか */
+  /** `--write`のときだけ。書いたか */
   readonly written?: boolean;
 }
 
@@ -77,13 +77,13 @@ export function parsePlanOrder(text: string): PlanOrderParse {
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `JSON として解釈できません: ${(error as Error).message}` };
+    return { ok: false, error: `JSONとして解釈できません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
-    return { ok: false, error: "JSON の最上位がオブジェクトではありません" };
+    return { ok: false, error: "JSONの最上位がオブジェクトではありません" };
   }
   if (raw.version !== PLAN_ORDER_VERSION) {
-    return { ok: false, error: `--plan-order の答えの版が違います（拡張は ${PLAN_ORDER_VERSION}、実行ファイルは ${String(raw.version)}）` };
+    return { ok: false, error: `--plan-orderの答えの版が違います（拡張は${PLAN_ORDER_VERSION}、実行ファイルは${String(raw.version)}）` };
   }
   return {
     ok: true,
@@ -122,9 +122,9 @@ export function parsePlanOrder(text: string): PlanOrderParse {
 }
 
 /**
- * 保存（`--write --json`）の答えを、パネルが読む形にしたもの。`changed` は開いたときのハッシュ（`--expect`）が
- * 今の中身と違った（外で変わった。何も書いていない）。`refused` は書かなかった（順序の検査・改版の錠・子の付け替え
- * など。理由は実行ファイルの標準エラー）。`unchanged` は振り直しても変わらず、書くものが無かった
+ * 保存（`--write --json`）の答えを、パネルが読む形にしたもの。`changed`は開いたときのハッシュ（`--expect`）が
+ * 今の中身と違った（外で変わった。何も書いていない）。`refused`は書かなかった（順序の検査・改版の錠・子の付け替え
+ * など。理由は実行ファイルの標準エラー）。`unchanged`は振り直しても変わらず、書くものが無かった
  */
 export type PlanOrderWrite =
   | { readonly kind: "written"; readonly answer: PlanOrderAnswer }

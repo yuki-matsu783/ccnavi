@@ -1,26 +1,26 @@
 /**
- * フローの図。点がノード、線が `connections`。見た目は cc-wf-studio に似せてあるが、コードは
- * 使っていない（あちらは AGPL。ここは React Flow の部品を組んだだけ）。
+ * フローの図。点がノード、線が`connections`。見た目はcc-wf-studioに似せてあるが、コードは
+ * 使っていない（あちらはAGPL。ここはReact Flowの部品を組んだだけ）。
  *
- * 図が持つのは描き方だけで、フローの中身は持たない。動かす・繋ぐ・選ぶは `onMove` などで
- * 呼び手（`App.tsx`）に返し、呼び手が `core/flow-doc.ts` の関数でコピーを作り直して戻す。
+ * 図が持つのは描き方だけで、フローの中身は持たない。動かす・繋ぐ・選ぶは`onMove`などで
+ * 呼び手（`App.tsx`）に返し、呼び手が`core/flow-doc.ts`の関数でコピーを作り直して戻す。
  *
- * 点の位置は React Flow の手元（`nodes`）で動かし、放したときだけコピーに書く。 ドラッグの間に
+ * 点の位置はReact Flowの手元（`nodes`）で動かし、放したときだけコピーに書く。 ドラッグの間に
  * コピーを作り直すと、放すまでに何十回も「未保存」にし直すことになる。コピーが替わったら手元を
  * 作り直すが、測った大きさ（`measured`）は引き継ぐ（引き継がないと点が一瞬消える）。
  *
- * グループ（`type: "group"`）は React Flow の親子で描く。中のノードに `parentId` を付け、位置は
- * グループからの位置のまま渡す。グループは点の配列の前に置き、ほかの点より奥に描く。
+ * グループ（`type: "group"`）はReact Flowの親子で描く。中のノードに`parentId`を付け、位置は
+ * グループからの位置のまま渡す。グループは点のリストの前に置き、ほかの点より奥に描く。
  * ドラッグを放したときに、どのグループに入るか・出るかはコピーの側（`placeNodes`）が決める。
  *
  * ノードと線には × のボタンを付ける（ノードは右上、線は真ん中。載せた・選んだときだけ見える）。
  * 押すと呼び手に返すだけで、消すのはコピーの側。読むだけのときは出さない。
- * Shift を押しながら押す・ドラッグして囲むと、いくつも選べる。選んだノードの id は `onPick` で返す（グループ化・コピー・複製に使う）。
+ * Shiftを押しながら押す・ドラッグして囲むと、いくつも選べる。選んだノードのidは`onPick`で返す（グループ化・コピー・複製に使う）。
  *
- * 線を引いている最中に、引けない先（開始へ入る・終了から出る・グループ・自分）は `canConnect` で断る
- * （放しても線はできない）。右下のミニマップは `minimap` が真のときだけ出す。
+ * 線を引いている最中に、引けない先（開始へ入る・終了から出る・グループ・自分）は`canConnect`で断る
+ * （放しても線はできない）。右下のミニマップは`minimap`が真のときだけ出す。
  *
- * 見た目は `Canvas.css`。
+ * 見た目は`Canvas.css`。
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type JSX, type MouseEvent as ReactMouseEvent } from "react";
 import {
@@ -81,7 +81,7 @@ import { maximizeClass, MaximizeButton, RefitOnChange, useMaximize } from "../sh
 import { badgeOf, summaryOf, type Badge } from "./text.js";
 import { FLOW_ARIA_LABELS } from "../shared/flow-aria.js";
 
-/** いま選んでいるもの。線はリストの位置で指す（id が無い線もある） */
+/** いま選んでいるもの。線はリストの位置で指す（idが無い線もある） */
 export type Selection = { readonly kind: "node"; readonly id: string } | { readonly kind: "edge"; readonly index: number };
 
 interface StepData extends Record<string, unknown> {
@@ -117,8 +117,8 @@ interface EdgeData extends Record<string, unknown> {
 type FlowEdge = Edge<EdgeData, "flow">;
 
 /**
- * 点と線の部品から呼び手へ返す手段。部品は React Flow が描くので、props では渡せない。
- * `data` に関数を入れるとコピーが替わるたびに点を作り直すことになるので、context で渡す
+ * 点と線の部品から呼び手へ返す手段。部品はReact Flowが描くので、propsでは渡せない。
+ * `data`に関数を入れるとコピーが替わるたびに点を作り直すことになるので、contextで渡す
  */
 interface CanvasActions {
   readonly removeNode: (id: string) => void;
@@ -129,7 +129,7 @@ interface CanvasActions {
 const NO_ACTIONS: CanvasActions = { removeNode: () => undefined, removeEdge: () => undefined, resizeGroup: () => undefined };
 const Actions = createContext<CanvasActions>(NO_ACTIONS);
 
-/** × のボタン。押しても選ばない（押した点・線を選ぶ前に止める）。`nodrag` `nopan` でドラッグも始めない */
+/** × のボタン。押しても選ばない（押した点・線を選ぶ前に止める）。`nodrag` `nopan`でドラッグも始めない */
 function RemoveButton({ action, label, onRemove }: { readonly action: string; readonly label: string; readonly onRemove: () => void }): JSX.Element {
   const stop = (event: ReactMouseEvent): void => event.stopPropagation();
   return (
@@ -152,7 +152,7 @@ function RemoveButton({ action, label, onRemove }: { readonly action: string; re
   );
 }
 
-/** 種類を CSS の表記にする（知らない種類は 1 つにまとめる） */
+/** 種類をCSSの表記にする（知らない種類は1つにまとめる） */
 function cssType(type: string, known: boolean): string {
   return known ? type : "other";
 }
@@ -241,7 +241,7 @@ function useHover(): readonly [boolean, { readonly onMouseEnter: () => void; rea
   return [hover, handlers];
 }
 
-/** 線。矢印と言葉は React Flow の既定の線と同じに描き、真ん中に × のボタンを置く */
+/** 線。矢印と言葉はReact Flowの既定の線と同じに描き、真ん中に × のボタンを置く */
 function FlowEdgeView({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, style, label, selected, data, interactionWidth }: EdgeProps<FlowEdge>): JSX.Element {
   const actions = useContext(Actions);
   const [hover, handlers] = useHover();
@@ -265,11 +265,11 @@ function FlowEdgeView({ sourceX, sourceY, targetX, targetY, sourcePosition, targ
   );
 }
 
-// 描くたびに作り直すと React Flow が「点の種類が変わった」と言って組み直す。1 度だけ作る
+// 描くたびに作り直すとReact Flowが「点の種類が変わった」と言って組み直す。1度だけ作る
 const NODE_TYPES: NodeTypes = { step: StepView, flowGroup: GroupView };
 const EDGE_TYPES: EdgeTypes = { flow: FlowEdgeView };
 
-/** グループを奥に描く。選んでも（React Flow は選んだ点を 1000 だけ手前に上げる）ほかのノードより奥に留める */
+/** グループを奥に描く。選んでも（React Flowは選んだ点を1000だけ手前に上げる）ほかのノードより奥に留める */
 const GROUP_Z = -2000;
 
 function stepsOf(doc: FlowDoc, readOnly: boolean, marks: boolean): FlowNodeView[] {
@@ -308,7 +308,7 @@ function stepsOf(doc: FlowDoc, readOnly: boolean, marks: boolean): FlowNodeView[
       },
     };
   });
-  // 親（グループ）を子より前に並べる（React Flow は前から読んで親を探す）
+  // 親（グループ）を子より前に並べる（React Flowは前から読んで親を探す）
   return [...views.filter((view) => view.type === "flowGroup"), ...views.filter((view) => view.type !== "flowGroup")];
 }
 
@@ -342,28 +342,28 @@ export interface CanvasProps {
   readonly readOnly: boolean;
   readonly selected: Selection | undefined;
   readonly onSelect: (selection: Selection | undefined) => void;
-  /** 図で選んでいるノードの id が変わった（Shift で選び足したものも含む） */
+  /** 図で選んでいるノードのidが変わった（Shiftで選び足したものも含む） */
   readonly onPick: (ids: readonly string[]) => void;
   /**
    * 図の外で選んだノード（部品箱で足したもの・貼り付けたものなど）。これが替わったときだけ、そのノードを選び直す
    * （空なら選択を全部外す。中身を読み直したとき）。
-   * 図で押したノードは React Flow が選ぶ（Shift での選び足し・外しもそのまま）ので、ここには来ない
+   * 図で押したノードはReact Flowが選ぶ（Shiftでの選び足し・外しもそのまま）ので、ここには来ない
    */
   readonly focus?: { readonly ids: readonly string[] } | undefined;
   /** 右下にミニマップを出すか */
   readonly minimap?: boolean;
   /**
-   * ノードと線に案内の印（`data-tour="node-<id>"` / `edge-<線の id>`）を付ける。案内の間だけ真にする（ふだんは付けない）。
-   * 真の間は、図が組み上がって収まったあとに `resize` を流し、案内が指す先の位置を測り直させる
+   * ノードと線に案内の印（`data-tour="node-<id>"` / `edge-<線のid>`）を付ける。案内の間だけ真にする（ふだんは付けない）。
+   * 真の間は、図が組み上がって収まったあとに`resize`を流し、案内が指す先の位置を測り直させる
    */
   readonly marks?: boolean;
   /**
    * 開いた直後に、文字が読める倍率（`PLAN_FIT_MIN_ZOOM`）より縮めず、下限で止まったら開始の点が見える位置から始める。
-   * 既定は偽（全体を枠に収める `fitView`。ツアーの見本と読むだけの図はこちら）。合わせるのは開いた直後の 1 回だけで、
+   * 既定は偽（全体を枠に収める`fitView`。ツアーの見本と読むだけの図はこちら）。合わせるのは開いた直後の1回だけで、
    * 点が増えても自動では合わせ直さない（見ている位置を動かさない）。「全体を表示」は、今までどおり全体を出す
    */
   readonly readableFit?: boolean;
-  /** ドラッグを放した点。位置は React Flow の決まり（グループの中のノードはグループからの位置） */
+  /** ドラッグを放した点。位置はReact Flowの決まり（グループの中のノードはグループからの位置） */
   readonly onMove: (moves: readonly { readonly id: string; readonly position: FlowPoint }[]) => void;
   readonly onConnect: (from: string, fromPort: string, to: string, toPort: string) => void;
   readonly onRemoveNode: (id: string) => void;
@@ -398,7 +398,7 @@ function minimapColor(node: FlowNodeView): string {
 
 /**
  * 案内の間の図。図は組み上がってから全体を収める（`fitView`）ので、案内が最初に測った位置は動く。
- * 収まったころに `resize` を流すと、案内は指す先を測り直す（`Tour.tsx` が `resize` で測り直す）
+ * 収まったころに`resize`を流すと、案内は指す先を測り直す（`Tour.tsx`が`resize`で測り直す）
  */
 function TourSettle(): null {
   const ready = useNodesInitialized();
@@ -413,10 +413,10 @@ function TourSettle(): null {
 }
 
 /**
- * `readableFit` のときの開いた直後の見え方（`webview/shared/PlanGraph.tsx` の `FitOnOpen` と同じ方式）。
- * 点がすべて測れたら 1 回だけ、下限の倍率までで全体を収める。下限で止まって収まらないときは、種類が start の点を
- * 左端に寄せる。`fitView` の属性は使わない（下限で止めたあとに寄せる段を挟めないため）。
- * `useNodesInitialized` は使わない（点の読み込みが終わったことを返さない図では、実際の Chromium で偽のままになる）
+ * `readableFit`のときの開いた直後の見え方（`webview/shared/PlanGraph.tsx`の`FitOnOpen`と同じ方式）。
+ * 点がすべて測れたら1回だけ、下限の倍率までで全体を収める。下限で止まって収まらないときは、種類がstartの点を
+ * 左端に寄せる。`fitView`の属性は使わない（下限で止めたあとに寄せる段を挟めないため）。
+ * `useNodesInitialized`は使わない（点の読み込みが終わったことを返さない図では、実際のChromiumで偽のままになる）
  */
 function ReadableFit(): null {
   const done = useRef(false);
@@ -450,9 +450,9 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, marks 
   const [nodes, setNodes] = useState<FlowNodeView[]>(() => base.map((node) => (focus?.ids.includes(node.id) ? { ...node, selected: true } : node)));
   const [maximized, toggleMaximize, maxBox] = useMaximize();
 
-  // コピーが替わったら手元を作り直す。測った大きさと、選んでいるか（Shift で選び足したものも）は引き継ぐ。
-  // 呼び手が図の外から選んだノード（`focus`。部品箱で足したもの）は、それが替わったときだけ、それ 1 つを選ぶ。
-  // 図で押したノードは React Flow が選んでいる（Shift で外したものも）ので、ここでは選び直さない
+  // コピーが替わったら手元を作り直す。測った大きさと、選んでいるか（Shiftで選び足したものも）は引き継ぐ。
+  // 呼び手が図の外から選んだノード（`focus`。部品箱で足したもの）は、それが替わったときだけ、それ1つを選ぶ。
+  // 図で押したノードはReact Flowが選んでいる（Shiftで外したものも）ので、ここでは選び直さない
   const focused = useRef(focus);
   useEffect(() => {
     const fresh = focused.current !== focus;
@@ -468,7 +468,7 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, marks 
   }, [base, focus]);
 
   const onNodesChange = useCallback((changes: NodeChange<FlowNodeView>[]) => {
-    // 消す・足すはコピーの側でしかしない（Delete キーも受けない）。ここで受けるのは大きさ・位置・選択
+    // 消す・足すはコピーの側でしかしない（Deleteキーも受けない）。ここで受けるのは大きさ・位置・選択
     setNodes((now) => applyNodeChanges(changes.filter((change) => change.type !== "remove" && change.type !== "add"), now));
   }, []);
 
@@ -482,7 +482,7 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, marks 
     [readOnly, onConnect],
   );
 
-  // 引いている最中に断る（開始へ入る・終了から出る線など）。コピーの側の `connect` も同じ規則で断る
+  // 引いている最中に断る（開始へ入る・終了から出る線など）。コピーの側の`connect`も同じ規則で断る
   const isValidConnection = useCallback((connection: Connection | FlowEdge) => !readOnly && canConnect(doc, connection.source, connection.target), [doc, readOnly]);
 
   const handleSelection = useCallback(({ nodes: chosenNodes }: OnSelectionChangeParams) => onPick(chosenNodes.map((node) => node.id)), [onPick]);
@@ -523,10 +523,10 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, marks 
           ariaLabelConfig={FLOW_ARIA_LABELS}
           minZoom={0.2}
           maxZoom={1.8}
-          // Shift を押しながら押すと選び足し、Shift を押しながら何も無いところからドラッグして囲むと、囲んだものを選ぶ
+          // Shiftを押しながら押すと選び足し、Shiftを押しながら何も無いところからドラッグして囲むと、囲んだものを選ぶ
           selectionKeyCode="Shift"
           multiSelectionKeyCode={["Shift", "Meta", "Control"]}
-          // 消すのは × のボタンと右の欄のボタンだけ。Delete キーで消えると、読むだけのときにも消えたように見える
+          // 消すのは × のボタンと右の欄のボタンだけ。Deleteキーで消えると、読むだけのときにも消えたように見える
           deleteKeyCode={null}
         >
           <Background />

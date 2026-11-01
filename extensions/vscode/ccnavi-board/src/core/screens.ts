@@ -1,58 +1,58 @@
 /**
- * 画面の入口の帳面。どの画面をどう開くかを 1 か所に集める。
+ * 画面の入口の帳面。どの画面をどう開くかを1か所に集める。
  *
- * 画面どうしは互いを import しない。プロジェクト管理画面から「チケット管理を開く」ような
+ * 画面どうしは互いをimportしない。プロジェクト管理画面から「チケット管理を開く」ような
  * 導線は、相手のパネルの関数を直に呼ばず、ここに登録された入口へ要求を出す。相手の
  * パネルがどう作られていて、いま開いているかどうかは、要求する側に見せない。
  *
- * 登録するのは `extension.ts`（組み立ての場）だけ。登録前に開こうとしたら、それは
+ * 登録するのは`extension.ts`（組み立ての場）だけ。登録前に開こうとしたら、それは
  * 組み立ての誤りなので例外で止める（ユーザの操作では起こらない）。
  */
 
-/** ルール管理画面が直すルールファイル。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定 */
+/** ルール管理画面が直すルールファイル。共通の設定、ワークスペースの設定、プロジェクト1つの設定 */
 export type RulesTarget =
   | { readonly kind: "workspace" }
   | { readonly kind: "self" }
   | { readonly kind: "project"; readonly name: string };
 
-/** リスク管理画面が直す配点のファイル。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定 */
+/** リスク管理画面が直す配点のファイル。共通の設定、ワークスペースの設定、プロジェクト1つの設定 */
 export type RiskTarget = RulesTarget;
 
-/** フェーズ管理画面が直す定義のファイル。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定（ルール管理・リスク管理と同じ 3 種） */
+/** フェーズ管理画面が直す定義のファイル。共通の設定、ワークスペースの設定、プロジェクト1つの設定（ルール管理・リスク管理と同じ3種） */
 export type PhasesTarget = RulesTarget;
 
-/** テンプレート管理画面が開く対象。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定（ルール管理・リスク管理・フェーズ管理と同じ 3 種） */
+/** テンプレート管理画面が開く対象。共通の設定、ワークスペースの設定、プロジェクト1つの設定（ルール管理・リスク管理・フェーズ管理と同じ3種） */
 export type TemplatesTarget = RulesTarget;
 
-/** 画面の入口（サイドパネルに並ぶ 6 つと、ボードから開くフロー編集・計画編集）。引数は開く側が解く（空の表記や未登録のプロジェクトの扱いは各パネルの持ち物） */
+/** 画面の入口（サイドパネルに並ぶ6つと、ボードから開くフロー編集・計画編集）。引数は開く側が解く（空の表記や未登録のプロジェクトの扱いは各パネルの持ち物） */
 export interface Screens {
-  /** ボード。`project` は開いたときの絞り込み（`""` はワークスペース（プロジェクト外）、`"*"` は全部、未指定は前回のまま） */
+  /** ボード。`project`は開いたときの絞り込み（`""`はワークスペース（プロジェクト外）、`"*"`は全部、未指定は前回のまま） */
   readonly board: (project?: string) => Promise<void>;
   readonly rules: (target: RulesTarget) => Promise<void>;
   readonly risk: (target: RiskTarget) => Promise<void>;
   readonly phases: (target: PhasesTarget) => Promise<void>;
   readonly templates: (target: TemplatesTarget) => Promise<void>;
   /**
-   * 取り込み待ち画面（`wip/handoff/` の下書きを取り込む）。`tree` は見るツリーのキー（`main:` はワークスペース、
-   * `project:<名前>`、`worktree:<名前>`）。未指定はワークスペース。タブは 1 枚で、別のツリーを開けば中身を入れ替える
+   * 取り込み待ち画面（`wip/handoff/`の下書きを取り込む）。`tree`は見るツリーのキー（`main:`はワークスペース、
+   * `project:<名前>`、`worktree:<名前>`）。未指定はワークスペース。タブは1枚で、別のツリーを開けば中身を入れ替える
    */
   readonly handoff: (tree?: string) => Promise<void>;
   readonly projects: () => Promise<void>;
   /**
-   * 子チケット 1 枚のフロー編集画面。ボードのカードの「フロー」からだけ開く。
-   * タブは子ごとに 1 枚で、同じ子をもう 1 度開けば前面に出す
+   * 子チケット1枚のフロー編集画面。ボードのカードの「フロー」からだけ開く。
+   * タブは子ごとに1枚で、同じ子をもう1度開けば前面に出す
    */
   readonly flow: (ticket: string) => Promise<void>;
   /**
-   * 親の提案 1 枚の計画編集タブ（計画のステップどうしの先行を図で引き直す）。対象は承認待ち（`todo/`）の
-   * 計画を持つ親。タブは親ごとに 1 枚で、同じ親をもう 1 度開けば前面に出す
+   * 親の提案1枚の計画編集タブ（計画のステップどうしの先行を図で引き直す）。対象は承認待ち（`todo/`）の
+   * 計画を持つ親。タブは親ごとに1枚で、同じ親をもう1度開けば前面に出す
    */
   readonly workflow: (ticket: string) => Promise<void>;
 }
 
 let registered: Screens | undefined;
 
-/** 組み立てのときに 1 度だけ呼ぶ。テストでは差し替えのために何度でも呼べる */
+/** 組み立てのときに1度だけ呼ぶ。テストでは差し替えのために何度でも呼べる */
 export function registerScreens(value: Screens): void {
   registered = value;
 }
@@ -62,10 +62,10 @@ export function forgetScreens(): void {
   registered = undefined;
 }
 
-/** 画面を開く。`screens().rules({ kind: "self" })` のように使う */
+/** 画面を開く。`screens().rules({ kind: "self" })`のように使う */
 export function screens(): Screens {
   if (registered === undefined) {
-    throw new Error("画面の入口が登録されていません（extension.ts の registerScreens を通っていません）");
+    throw new Error("画面の入口が登録されていません（extension.tsのregisterScreensを通っていません）");
   }
   return registered;
 }

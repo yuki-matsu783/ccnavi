@@ -1,6 +1,6 @@
 /**
  * フェーズ管理画面の入れ物（HTML）。中身は画面（React）が作るので、ここで見るのは
- * 保護（CSP）・埋め込む中身・バンドルした画面の流し込みだけ。描くものは phases.dom.test.ts。
+ * 保護（CSP）・埋め込む中身・バンドルした画面の流し込みだけ。描くものはphases.dom.test.ts。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -12,7 +12,7 @@ function shell(rendered: string): string {
   return rendered.split(screenScript("phases")).join("（バンドルした画面）");
 }
 
-test("CB-T95 フェーズ管理画面は外部資源を持たず、定義を JSON で埋め込む", () => {
+test("CB-T95 フェーズ管理画面は外部資源を持たず、定義をJSONで埋め込む", () => {
   const rendered = phasesHtml({ kind: "page", page: page() }, { nonce: "n0nce" });
   assert.match(rendered, /<meta http-equiv="Content-Security-Policy" content="default-src 'none';/);
   assert.match(rendered, /style-src 'nonce-n0nce'; script-src 'nonce-n0nce'/);
@@ -28,22 +28,22 @@ test("CB-T95 フェーズ管理画面は外部資源を持たず、定義を JSO
   assert.equal(data.page.exists, true);
 });
 
-test("CB-T121 バンドルした画面を nonce 付きの script に流し込み、資源としては読ませない", () => {
+test("CB-T121 バンドルした画面をnonce付きのscriptに流し込み、資源としては読ませない", () => {
   const rendered = phasesHtml({ kind: "page", page: page() });
   assert.ok(rendered.includes(`<script nonce="${NONCE}">\n${screenScript("phases")}\n</script>`));
   assert.match(rendered, /<div id="root"><p class="empty" id="ccnavi-loading">フェーズを読み込み中…<\/p><\/div>/);
   assert.doesNotMatch(shell(rendered), /<script[^>]*\ssrc=/);
 });
 
-test("CB-T156 再読み込みできなかったときは定義の代わりに理由を渡す", () => {
+test("CB-T156 更新できなかったときは定義の代わりに理由を渡す", () => {
   const rendered = phasesHtml({ kind: "error", error: "定義のファイルを読み込めない" });
   assert.match(rendered, /"kind":"error"/);
   assert.match(rendered, /定義のファイルを読み込めない/);
 });
 
-test("CB-T353 フェーズ管理画面は図を持たない。バンドルした画面にも CSS にも React Flow が入っていない", () => {
-  // 図を外したので、React Flow の部品（点・線の class）も、その CSS（`@xyflow/react` の style.css）も入らない。
-  // 入っていれば、どこかで図の部品を読み込み直している（バンドルが約 180KB 重くなる）
-  assert.ok(!screenScript("phases").includes("react-flow__"), "phases.js に React Flow が入っている");
-  assert.ok(!screenStyle("phases").includes(".react-flow"), "phases.css に React Flow の CSS が入っている");
+test("CB-T353 フェーズ管理画面は図を持たない。バンドルした画面にもCSSにもReact Flowが入っていない", () => {
+  // 図を外したので、React Flowの部品（点・線のclass）も、そのCSS（`@xyflow/react`のstyle.css）も入らない。
+  // 入っていれば、どこかで図の部品を読み込み直している（バンドルが約180KB重くなる）
+  assert.ok(!screenScript("phases").includes("react-flow__"), "phases.jsにReact Flowが入っている");
+  assert.ok(!screenStyle("phases").includes(".react-flow"), "phases.cssにReact FlowのCSSが入っている");
 });

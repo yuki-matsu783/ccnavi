@@ -1,17 +1,17 @@
 /**
- * ルール管理画面の 1 枚の HTML を組み立てる。中身（帯・タブ・ルールの行・判定の結果・hook の表）を
- * 作るのは Webview 側の React（`src/webview/rules/`）で、ここが作るのはその入れ物だけ。
+ * ルール管理画面の1枚のHTMLを組み立てる。中身（帯・タブ・ルールの行・判定の結果・hookの表）を
+ * 作るのはWebview側のReact（`src/webview/rules/`）で、ここが作るのはその入れ物だけ。
  *
- * 外部資源に依存しない 1 枚にする方針は変えていない。バンドルした画面のスクリプトは
- * `<script nonce>` に文字列として流し込み、ファイルとしては読ませない（`localResourceRoots` は空のまま）。
- * 最初に見せる中身は `<script type="application/json">` に埋める。
+ * 外部資源に依存しない1枚にする方針は変えていない。バンドルした画面のスクリプトは
+ * `<script nonce>`に文字列として流し込み、ファイルとしては読ませない（`localResourceRoots`は空のまま）。
+ * 最初に見せる中身は`<script type="application/json">`に埋める。
  *
- * この入れ物は 1 度しか入らない（`retainedHost`）。画面は編集の途中を持つので、
- * 入れ直すと打ちかけの内容が消える。2 枚目からは拡張ホストが `postMessage` で渡す（rules-panel）。
+ * この入れ物は1度しか入らない（`retainedHost`）。画面は編集の途中を持つので、
+ * 入れ直すと打ちかけの内容が消える。2枚目からは拡張ホストが`postMessage`で渡す（rules-panel）。
  *
- * CSS も画面の側の持ち物で、部品と同じ置き場にある（`src/webview/rules/*.css`。6 画面共通のぶんは
- * `extensions/shared/styles/` と配色の `src/webview/styles/appearance.css`）。それをバンドルした 1 本（`out/webview/rules.css`）を、ここが `<style nonce>` に
- * 流し込む。挿すのがここなのは、Webview の CSP が nonce を持つ `<style>` しか通さず、nonce を作るのが
+ * CSSも画面の側の持ち物で、部品と同じ置き場にある（`src/webview/rules/*.css`。6画面共通のぶんは
+ * `extensions/shared/styles/`と配色の`src/webview/styles/appearance.css`）。それをバンドルした1本（`out/webview/rules.css`）を、ここが`<style nonce>`に
+ * 流し込む。挿すのがここなのは、WebviewのCSPがnonceを持つ`<style>`しか通さず、nonceを作るのが
  * 入れ物を組む側だから。
  */
 import { type Appearance, bodyTag } from "./appearance.js";
@@ -20,15 +20,15 @@ import { DATA_ID, embedData, type RulesData } from "./rules-view.js";
 
 export interface RenderOptions {
   readonly nonce: string;
-  /** バンドルした画面のスクリプト（`out/webview/rules.js` の中身）。拡張は起動時に 1 度読む */
+  /** バンドルした画面のスクリプト（`out/webview/rules.js`の中身）。拡張は起動時に1度読む */
   readonly script: string;
-  /** バンドルした画面の CSS（`out/webview/rules.css` の中身）。拡張は起動時に 1 度読む */
+  /** バンドルした画面のCSS（`out/webview/rules.css`の中身）。拡張は起動時に1度読む */
   readonly style: string;
-  /** 見た目。無ければ VS Code のテーマに従う */
+  /** 見た目。無ければVS Codeのテーマに従う */
   readonly appearance?: Appearance;
 }
 
-/** 入れ物の HTML。`data` はそのまま画面の最初の 1 枚になる */
+/** 入れ物のHTML。`data`はそのまま画面の最初の1枚になる */
 export function renderRulesPage(data: RulesData, options: RenderOptions): string {
   const { nonce } = options;
   return `<!DOCTYPE html>
@@ -37,7 +37,7 @@ export function renderRulesPage(data: RulesData, options: RenderOptions): string
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ccnavi ルール管理</title>
+<title>ccnaviルール管理</title>
 <style nonce="${nonce}">
 ${options.style}
 </style>

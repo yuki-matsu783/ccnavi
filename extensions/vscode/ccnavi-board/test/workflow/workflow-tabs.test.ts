@@ -1,7 +1,7 @@
 /**
  * 計画編集タブの帳面（`src/core/workflow-tabs.ts`）。タブ（`workflow-panel.ts`）が書き、ボード
  * （`board-panel.ts`）が読む。ボードの承認は、未保存のタブがある親を含む一覧を打たず、タブが最後に保存したときの
- * `source_sha` と承認の一覧の `source_sha` を比べて「保存したあとに提案が変わった」を出す。
+ * `source_sha`と承認の一覧の`source_sha`を比べて「保存したあとに提案が変わった」を出す。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -54,7 +54,7 @@ test("CB-T381 未保存の親と保存したときのハッシュを持ち、変
   resetWorkflowTabs();
 });
 
-test("CB-T390 ボードを再読み込みしたとき、承認待ちの親の提案にない親の保存のハッシュを忘れる（ターミナルや Chrome 拡張で承認した・取り下げた親）", () => {
+test("CB-T390 ボードを更新したとき、承認待ちの親の提案にない親の保存のハッシュを忘れる（ターミナルやChrome拡張で承認した・取り下げた親）", () => {
   const saved = { i0001: "s1", i0002: "s2", i0003: "s3" };
   assert.deepEqual(staleSaved(saved, ["i0002", "i0009"]), ["i0001", "i0003"]);
   assert.deepEqual(staleSaved(saved, ["i0001", "i0002", "i0003"]), []);

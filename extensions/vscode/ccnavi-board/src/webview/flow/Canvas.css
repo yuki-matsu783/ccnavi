@@ -1,6 +1,6 @@
 /*
- * フローの図（`Canvas.tsx`）。React Flow の色の変数
- * （`--xy-*`）を VS Code のテーマ変数に置き換える。`!important` は要らない。
+ * フローの図（`Canvas.tsx`）。React Flowの色の変数
+ * （`--xy-*`）をVS Codeのテーマ変数に置き換える。`!important`は要らない。
  */
 .flow-graph {
   height: 70vh;
@@ -90,7 +90,7 @@
 .react-flow__node .flow-remove { position: absolute; top: -9px; right: -9px; z-index: var(--z-inline); visibility: hidden; }
 .react-flow__node:hover .flow-remove, .react-flow__node.selected .flow-remove, .react-flow__node .flow-remove:focus-visible { visibility: visible; }
 .flow-edge-tools { position: absolute; pointer-events: all; }
-/* グループ。点線の枠と名前だけ。ほかのノードより奥に描く（`Canvas.tsx` の zIndex） */
+/* グループ。点線の枠と名前だけ。ほかのノードより奥に描く（`Canvas.tsx`のzIndex） */
 .flow-graph .react-flow__node-flowGroup { font-size: var(--vscode-font-size); }
 .flow-group {
   width: 100%; height: 100%; box-sizing: border-box;

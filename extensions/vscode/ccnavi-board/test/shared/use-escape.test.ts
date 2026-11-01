@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import { JSDOM } from "jsdom";
 import { ESCAPE_LAYER, useEscape } from "../../src/webview/useEscape.js";
 
-/** 面を 1 枚。`active` の間だけ Esc を受け、受けたら名前を記録する */
+/** 面を1枚。`active`の間だけEscを受け、受けたら名前を記録する */
 function Face({ name, layer, active, log }: { name: string; layer: number; active: boolean; log: string[] }): JSX.Element | null {
   useEscape(active, layer, () => log.push(name));
   return null;
@@ -30,7 +30,7 @@ async function withDom(run: (press: () => void) => Promise<void>): Promise<void>
   }
 }
 
-test("CB-T582 Esc は重なった面のうち最も手前の 1 枚だけが受け、手前が閉じると次の面が受ける", async () => {
+test("CB-T582 Escは重なった面のうち最も手前の1枚だけが受け、手前が閉じると次の面が受ける", async () => {
   await withDom(async (press) => {
     const log: string[] = [];
     const root = createRoot(document.getElementById("root") as HTMLElement);
@@ -54,7 +54,7 @@ test("CB-T582 Esc は重なった面のうち最も手前の 1 枚だけが受�
   });
 });
 
-test("CB-T583 変換中の Esc は面を閉じない", async () => {
+test("CB-T583 変換中のEscは面を閉じない", async () => {
   await withDom(async () => {
     const log: string[] = [];
     const root = createRoot(document.getElementById("root") as HTMLElement);

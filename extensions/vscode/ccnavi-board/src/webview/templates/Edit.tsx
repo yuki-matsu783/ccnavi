@@ -3,7 +3,7 @@
  *
  * 編集中の中身（`EditTemplate`）はこの欄が持つ。直すたびに（少し待って）実行ファイルに読ませ（`editCheck`）、返ってきた
  * 苦情と図の中身をそのまま描く。読めるか・計画の順序・フローの形は実行ファイルの答えで、ここは判定しない。
- * 保存（`editSave`）は拡張ホストが、読ませ直して error が無く、読み返した中身が書こうとした中身と同じで、開いたときから
+ * 保存（`editSave`）は拡張ホストが、読ませ直してerrorが無く、読み返した中身が書こうとした中身と同じで、開いたときから
  * ファイルが外で変わっていないときだけ書く。断られたら理由を出して、編集は続けられる。
  *
  * 作業中のチケットがある間は編集はできるが保存できない（錠は拡張ホストが取り直して知らせる。`editLock`）。
@@ -38,7 +38,7 @@ interface Status {
   readonly error: boolean;
 }
 
-/** 全体計画の最初のステップにする型。`implement` があればそれ、無ければ作業の型の最初 */
+/** 全体計画の最初のステップにする型。`implement`があればそれ、無ければ作業の型の最初 */
 function firstType(check: TemplateCheck): string {
   const work = check.types.filter((t) => t.kind === "work");
   return (work.find((t) => t.id === "implement") ?? work[0])?.id ?? "implement";
@@ -61,7 +61,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
       return undefined;
     }
     return opened.created ? blankTemplate(read.name, firstType(opened.check)) : read;
-    // 開いたときの中身だけから作る（以降の編集は state が持つ）
+    // 開いたときの中身だけから作る（以降の編集はstateが持つ）
   }, []);
   const [tpl, setTpl] = useState<EditTemplate | undefined>(start);
   const [history, setHistory] = useState<FlowHistory<EditTemplate>>(() => emptyHistory<EditTemplate>());
@@ -75,7 +75,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   const [created, setCreated] = useState(opened.created);
   const [baseSha, setBaseSha] = useState(opened.sha);
   const [savedKey, setSavedKey] = useState(() => (opened.created ? "" : keyOf(start ?? blankTemplate(opened.name, "implement"))));
-  /** 作った直後の空の雛形に error の苦情を出さないための印。一度触ったら、空に戻しても出す */
+  /** 作った直後の空の雛形にerrorの苦情を出さないための印。一度触ったら、空に戻しても出す */
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status | undefined>(undefined);
@@ -153,7 +153,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   if (tpl === undefined) {
     return (
       <section className="tpl-edit" data-role="edit">
-        <p className="status failed">読み込んだ中身を編集の形に直せませんでした。ファイルを直接直してください。</p>
+        <p className="status failed">読み込んだ中身を編集用の形に変換できませんでした。ファイルを直接編集してください。</p>
         <button type="button" className="action" data-action="close-edit" onClick={finish}>
           閉じる
         </button>

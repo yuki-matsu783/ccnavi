@@ -23,7 +23,7 @@ import { MergeBand } from "./MergeBand.js";
 import { detailsKey, EMPTY, loadState, saveState, type ViewState } from "./state.js";
 import { FILTER_LABELS } from "./text.js";
 
-/** 列の最小の幅（px）。ドラッグでもこれより狭くしない。CSS の min-width と同じ値 */
+/** 列の最小の幅（px）。ドラッグでもこれより狭くしない。CSSのmin-widthと同じ値 */
 const MIN_WIDTH = 220;
 
 /**
@@ -33,7 +33,7 @@ const MIN_WIDTH = 220;
 const TOUR = tourOf(boardTour);
 const NO_SCENE: Scene = {};
 
-/** 手順の `scene` の文字列を `,` で割る */
+/** 手順の`scene`の文字列を`,`で割る */
 function sceneList(value: Scene[string] | undefined): readonly string[] {
   return typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : [];
 }
@@ -60,11 +60,11 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   // 次の中身を渡したとき。読み直しが失敗しても中身は届く（エラーの画面になる）ので、ここで戻す経路は要らない。
   // 実行ファイルが返らない場合は期限（ccnavi.ts）で打ち切る。
   const [refreshing, setRefreshing] = useState(false);
-  // 「MR の状況を確認」を押した直後から、拡張ホストの答え（確認中）が届くまで押せなくする
+  // 「MRの状況を確認」を押した直後から、拡張ホストの答え（確認中）が届くまで押せなくする
   const [mergePending, setMergePending] = useState(false);
 
   const board = data.kind === "board" ? data.board : undefined;
-  // 受け取る側（メッセージ）はいまのボードを知らないので、描くたびに ref へ入れておく
+  // 受け取る側（メッセージ）はいまのボードを知らないので、描くたびにrefへ入れておく
   const boardRef = useRef<Board | undefined>(board);
   boardRef.current = board;
   // 初回の案内はボードが出てから始める。承認のオーバーレイが出ている間は、その下を指しても見えないので待つ
@@ -82,7 +82,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   });
   const requestTour = tour.request;
   const touring = tour.touring;
-  // 案内の間は、見本の上の操作を拡張ホストへ送らない（`tourDone` だけ返す）。描いたあとに切り替える
+  // 案内の間は、見本の上の操作を拡張ホストへ送らない（`tourDone`だけ返す）。描いたあとに切り替える
   useLayoutEffect(() => {
     mutePosts(touring);
     return () => mutePosts(false);
@@ -90,14 +90,14 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   const courses = coursesOf(TOUR, setScene, TOUR_IMAGES);
   /**
    * 案内の間は、実際のチケットではなく見本のボードを描く（`tour-board.ts`）。見本は描くだけで、
-   * 絞り込みの state や承認の件数の元にはしない
+   * 絞り込みのstateや承認の件数の元にはしない
    */
   const sample = useMemo(
     () => (touring && board !== undefined ? parseBoardSample(TOUR.sample, board.root, board.generatedAt) : undefined),
     [touring, board?.root, board?.generatedAt],
   );
   const shown = sample?.board ?? board;
-  /** 案内の間に画面の state を動かさない（見本の上の押す・入れるは何も起こさない） */
+  /** 案内の間に画面のstateを動かさない（見本の上の押す・入れるは何も起こさない） */
   const change = (next: (now: ViewState) => ViewState): void => {
     if (!touring) {
       setView(next);
@@ -113,7 +113,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   };
   useHostMessages<ToBoard>((message) => {
     if (message.type === "data" && message.data !== undefined) {
-      // 中身だけ。開いた直後の絞り込みは 1 枚目の HTML に埋まっていて、2 枚目以降は filter のメッセージで届く
+      // 中身だけ。開いた直後の絞り込みは1枚目のHTMLに埋まっていて、2枚目以降はfilterのメッセージで届く
       setData(message.data);
       setRefreshing(false);
       setMergePending(false);
@@ -137,7 +137,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   const filtering = project !== EMPTY.project || parent !== EMPTY.parent || attention;
   // 「アーカイブ済みチケットを表示」を入れたら、右端に足されるアーカイブの列まで横へ送る。
   // ユーザが入れたときだけ動かす（覚えていた値で開き直したときには動かさない）。
-  // 送るのはボードの横だけ。列の scrollIntoView だと、列の高さに合わせて文書の縦まで動いてしまう
+  // 送るのはボードの横だけ。列のscrollIntoViewだと、列の高さに合わせて文書の縦まで動いてしまう
   const revealArchived = useRef(false);
   useEffect(() => {
     if (!archived || !revealArchived.current) {
@@ -150,13 +150,13 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     }
   }, [archived]);
 
-  // 絞り込み中かどうかは body に出す。カードの表示・非表示は CSS（.card.hidden）が受け持つ
+  // 絞り込み中かどうかはbodyに出す。カードの表示・非表示はCSS（.card.hidden）が受け持つ
   useEffect(() => {
     document.body.classList.toggle("filtering", filtering);
   }, [filtering]);
 
   // 詳細を開いているカード。覚えるのは実際のボードのカードだけ（消えたカードの分は破棄する）。
-  // 読み直せなかった画面（board が無い）では、覚えていた分を触らない
+  // 読み直せなかった画面（boardが無い）では、覚えていた分を触らない
   const cardKeys = board === undefined ? undefined : new Set(board.columns.flatMap((column) => column.cards.map(detailsKey)));
   const details = cardKeys === undefined ? view.details : view.details.filter((key) => cardKeys.has(key));
 
@@ -174,14 +174,14 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     saveState({ project, parent, attention, archived, folded: view.folded, widths: view.widths, details });
   }, [board === undefined, project, parent, attention, archived, view.folded, view.widths, details.join("\u0000")]);
 
-  // 案内の間は見本の上の様子を描く。絞り込み・畳んだ列・幅は `scene` が決め、実際の `view` は使わない（動かさない）
+  // 案内の間は見本の上の様子を描く。絞り込み・畳んだ列・幅は`scene`が決め、実際の`view`は使わない（動かさない）
   const shownProject = touring ? (typeof scene.project === "string" ? scene.project : EMPTY.project) : project;
   const shownParent = touring ? (typeof scene.parent === "string" ? scene.parent : EMPTY.parent) : parent;
   const shownAttention = touring ? scene.attention === true : attention;
   const shownArchived = touring ? scene.archived === true : archived;
   const shownFolded = touring ? sceneList(scene.fold) : view.folded;
   const shownWidths: Readonly<Record<string, number>> = touring ? {} : view.widths;
-  // 案内の間に詳細を開いて見せるカードは、手順の `scene.details`（識別子を , で区切る）が決める。実際の開閉（`view.details`）には書かない
+  // 案内の間に詳細を開いて見せるカードは、手順の`scene.details`（識別子を , で区切る）が決める。実際の開閉（`view.details`）には書かない
   const shownDetails: readonly string[] = touring ? sceneList(scene.details) : details;
   const detailsOpenOf = (card: Card): boolean => (touring ? shownDetails.includes(card.id) : shownDetails.includes(detailsKey(card)));
   const toggleDetails = (card: Card, open: boolean): void => {
@@ -193,7 +193,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   };
   const shownParents = shown === undefined ? [] : shownArchived ? [...shown.parents, ...shown.archivedParents] : shown.parents;
   // マージ状況の帯。実際の結果は拡張ホストが持ち（ボードが開いている間だけ）、ここは出すだけ。案内の間は見本の結果を、
-  // 手順の `scene.merge` が指すときだけ出す（実際の結果は見せない・書き換えない）
+  // 手順の`scene.merge`が指すときだけ出す（実際の結果は見せない・書き換えない）
   const mergeShown = touring ? (scene.merge === true ? sample?.merge : undefined) : data.kind === "board" ? data.merge : undefined;
   const overlay =
     touring && sample !== undefined
@@ -212,8 +212,8 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     (shownParent !== EMPTY.parent && card.family !== shownParent) ||
     (shownAttention && !card.attention);
 
-  // 「承認待ち N 件を承認」は、押したときに承認の対象になるもの（絞り込みで見えている承認待ち）の数にする。
-  // 「絞り込み無し」は空の配列ではなく filtered で言う。空を「全部」に読ませると、0 件のつもりが全部承認になってしまう。
+  // 「承認待ちN件を承認」は、押したときに承認の対象になるもの（絞り込みで見えている承認待ち）の数にする。
+  // 「絞り込み無し」は空のリストではなくfilteredで言う。空を「全部」に読ませると、0件のつもりが全部承認になってしまう。
   const visiblePending =
     shown?.columns.flatMap((column) => column.cards.filter((card) => card.pendingApproval && !hiddenOf(card)).map((card) => card.id)) ?? [];
 
@@ -221,7 +221,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     <>
       {shown === undefined ? (
         <>
-          <p className="board-empty">チケット管理画面を読み込めませんでした。原因を直してから「ccnavi ボード: チケット管理を更新」を実行してください。</p>
+          <p className="board-empty">チケット管理画面を読み込めませんでした。原因を直してから「ccnaviボード: チケット管理を更新」を実行してください。</p>
           <pre className="load-error">{data.kind === "error" ? data.error : ""}</pre>
         </>
       ) : (
@@ -229,10 +229,10 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
           {sample !== undefined ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
           <ScreenHeader courses={courses} onPick={tour.start}>
             <div className="summary" data-tour="summary">
-              {shown.pendingApproval.length > 0 ? <span className="pending warn">承認待ち {shown.pendingApproval.length} 件</span> : null}
-              {shown.issueCount > 0 ? <span className="issues warn">不備 {shown.issueCount} 件</span> : null}
+              {shown.pendingApproval.length > 0 ? <span className="pending warn">承認待ち{shown.pendingApproval.length}件</span> : null}
+              {shown.issueCount > 0 ? <span className="issues warn">不備{shown.issueCount}件</span> : null}
               <span className="counts">
-                残り {shown.remainingCount} / 全 {shown.totalCount}
+                残り{shown.remainingCount} / 全{shown.totalCount}
               </span>
             </div>
             <div className="controls">
@@ -301,7 +301,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 data-tour="merge-check"
                 disabled={mergeShown?.checking === true || mergePending}
                 aria-busy={mergeShown?.checking === true || mergePending ? "true" : undefined}
-                title="片付けの記録を持つ親のマージリクエストが、マージ済みかを確かめます（読むだけで、何も変えません）"
+                title="片付けの記録を持つ親のMRが、マージ済みかを確かめます（読むだけで、何も変えません）"
                 onClick={() => {
                   if (touring) {
                     return;
@@ -311,7 +311,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 }}
               >
                 <span className="spin" aria-hidden="true" />
-                <span className="label">{mergeShown?.checking === true || mergePending ? "確認中…" : "MR の状況を確認"}</span>
+                <span className="label">{mergeShown?.checking === true || mergePending ? "確認中…" : "MRの状況を確認"}</span>
               </button>
               <button
                 type="button"
@@ -325,7 +325,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                   }
                 }}
               >
-                承認待ち {visiblePending.length} 件を承認
+                承認待ち{visiblePending.length}件を承認
               </button>
             </div>
           </ScreenHeader>
@@ -340,7 +340,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
           {/* 退避のチケットを表示しているときは、アーカイブの列に並ぶので「チケットなし」は出さない */}
           {shown.totalCount === 0 && !(shownArchived && shown.archivedCount > 0) ? <p className="board-empty">チケットなし</p> : null}
           <div className="board" data-tour="board">
-            {/* アーカイブの列は「アーカイブ済みチケットを表示」が ON のときだけ出す（OFF ならカードは全部隠れる） */}
+            {/* アーカイブの列は「アーカイブ済みチケットを表示」がONのときだけ出す（OFFならカードは全部隠れる） */}
             {shown.columns.filter((column) => shownArchived || column.state !== "archived").map((column) => (
               <Column
                 key={column.state}
@@ -383,13 +383,13 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
 function Footer({ board }: { readonly board: Board }): JSX.Element {
   return (
     <footer className="foot">
-      最終更新 {board.generatedAt} / {board.root}
+      最終更新{board.generatedAt} / {board.root}
     </footer>
   );
 }
 
 /**
- * 1 つの列。見出しを押すと折りたたみ、右端の取っ手をドラッグすると幅が px で固定される
+ * 1つの列。見出しを押すと折りたたみ、右端の取っ手をドラッグすると幅がpxで固定される
  * （ダブルクリックで元の伸び縮みに戻る）。件数は絞り込みで見えているカードの数。
  * 上部の集計（残り・全・不備・承認待ち）は絞り込みに関係なくボード全体の数のまま。
  */
@@ -416,8 +416,8 @@ function Column({
 }): JSX.Element {
   const section = useRef<HTMLElement>(null);
   const visible = column.cards.filter((card) => !hiddenOf(card)).length;
-  // ドラッグの最中に列が消えたら（読み直せずエラーの画面に替わる）`pointerup` を受ける相手が居なくなり、
-  // 後片付けが走らない。body に付けたクラスを残すと、カーソルが変わったまま文字も選べなくなる
+  // ドラッグの最中に列が消えたら（読み直せずエラーの画面に替わる）`pointerup`を受ける相手が居なくなり、
+  // 後片付けが走らない。bodyに付けたクラスを残すと、カーソルが変わったまま文字も選べなくなる
   useEffect(() => () => document.body.classList.remove("resizing"), []);
   const classes = ["column"];
   if (width !== undefined) {
@@ -428,8 +428,8 @@ function Column({
   }
 
   /**
-   * ドラッグしている間の幅は DOM に直に書く。動かすたびに React へ流すと、指を動かすあいだ中
-   * ボード全体を描き直すことになる。離したときに覚える（そこで React の持ち物に戻る）。
+   * ドラッグしている間の幅はDOMに直に書く。動かすたびにReactへ流すと、指を動かすあいだ中
+   * ボード全体を描き直すことになる。離したときに覚える（そこでReactの持ち物に戻る）。
    */
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>): void => {
     if (event.button !== 0 || section.current === null) {
@@ -439,11 +439,11 @@ function Column({
     const handle = event.currentTarget;
     const element = section.current;
     const startX = event.clientX;
-    // 画面を拡大している（body の zoom）と、矩形とポインタの座標は見た目の px、`style.width` は CSS の px になる。その比で換算する
+    // 画面を拡大している（bodyのzoom）と、矩形とポインタの座標は見た目のpx、`style.width`はCSSのpxになる。その比で換算する
     const scale = Number.parseFloat(document.body.style.zoom) || 1;
     const startWidth = element.getBoundingClientRect().width / scale;
     let last = Math.max(MIN_WIDTH, Math.round(startWidth));
-    // 動かさずに押して離しただけなら、幅は決めない。押しただけで px に固定されると、
+    // 動かさずに押して離しただけなら、幅は決めない。押しただけでpxに固定されると、
     // その列は窓の幅に追従しなくなる
     let dragged = false;
     element.classList.add("resizing");

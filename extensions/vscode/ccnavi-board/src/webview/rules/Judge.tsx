@@ -1,5 +1,5 @@
 /**
- * 「判定を試す」の結果。1 件の判定（`judged`）と、期待する判定の一括確認（`expectationsChecked`）、記録から起こした
+ * 「判定を試す」の結果。1件の判定（`judged`）と、期待する判定の一括確認（`expectationsChecked`）、記録から起こした
  * ルールの候補（`suggested`）。
  *
  * ここで出すのは、実行ファイル（`--test --json` / `--test-expectations --json` /
@@ -65,10 +65,10 @@ function Hits({ rules }: { readonly rules: readonly RuleHitJson[] }): JSX.Elemen
   );
 }
 
-/** そのツールで実行される hook。判定の結果と一緒に出す（拡張ホストが絞ってから渡す） */
+/** そのツールで実行されるhook。判定の結果と一緒に出す（拡張ホストが絞ってから渡す） */
 function RunningHooks({ hooks }: { readonly hooks: readonly HookEntry[] }): JSX.Element {
   if (hooks.length === 0) {
-    return <p className="empty">実行される hook はありません</p>;
+    return <p className="empty">実行されるhookはありません</p>;
   }
   return (
     <div className="table-scroll">
@@ -130,10 +130,10 @@ export function JudgeResult({ judged }: { readonly judged: Judged }): JSX.Elemen
         </>
       ) : (
         <p>
-          <Verdict verdict="" /> {result.tool} は判定の対象を取り出せないツールです。ルールを作成してもヒットせず、呼び出しはそのまま通ります
+          <Verdict verdict="" /> {result.tool}は判定の対象を取り出せないツールです。ルールを作成してもヒットせず、呼び出しはそのまま通ります
         </p>
       )}
-      <h3>このツールで実行される hook</h3>
+      <h3>このツールで実行されるhook</h3>
       <RunningHooks hooks={judged.hooks} />
     </div>
   );
@@ -151,8 +151,8 @@ export function ExpectationsResult({ result }: { readonly result: ExpectationsJs
             </span>
           );
         })}
-        <span className={result.mismatches > 0 ? "ng" : ""}>不一致 {result.mismatches} 件</span>
-        <span>判定の対象外 {result.skipped} 件</span>
+        <span className={result.mismatches > 0 ? "ng" : ""}>不一致{result.mismatches}件</span>
+        <span>判定の対象外{result.skipped}件</span>
       </div>
       <div className="table-scroll">
         <table>
@@ -201,15 +201,15 @@ export function ExpectationsResult({ result }: { readonly result: ExpectationsJs
 /** 候補の種類の言い換え */
 const SUGGEST_KINDS: Readonly<Record<string, string>> = {
   rule: "ルールを追加する",
-  message: "message を見直す",
+  message: "messageを見直す",
 };
 
 export function SuggestResult({ result }: { readonly result: SuggestJson }): JSX.Element {
   return (
     <div id="suggest-result" className="result" data-tour="suggest-result">
       <p>
-        記録 {result.logs.length} 本・{result.records} 行から、候補 {result.candidates.length} 件
-        （検証を通らず除いたもの {result.dropped} 件）。候補はすべて下書きです。確認して設定に反映するのはユーザです。
+        記録{result.logs.length}本・{result.records}行から、候補{result.candidates.length}件
+        （検証を通らず除いたもの{result.dropped}件）。候補はすべて下書きです。確認して設定に反映するのはユーザです。
       </p>
       {result.candidates.length === 0 ? (
         <p className="empty">候補はありません</p>

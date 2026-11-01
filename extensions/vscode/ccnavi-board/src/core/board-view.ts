@@ -1,11 +1,11 @@
 /**
- * ボード画面の、拡張ホストと Webview の間の契約。
+ * ボード画面の、拡張ホストとWebviewの間の契約。
  *
- * 画面は React で組み、拡張ホストは HTML を組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。
- * 拡張ホストが渡すのは「いま何を見せるか」（`BoardData`）だけで、列やカードの DOM は画面が作る。
+ * 画面はReactで組み、拡張ホストはHTMLを組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。
+ * 拡張ホストが渡すのは「いま何を見せるか」（`BoardData`）だけで、列やカードのDOMは画面が作る。
  * 画面が返すのはユーザが押した操作（`BoardMessage`）だけ。
  *
- * この形を保つために、ここには VS Code の API も DOM も入れない。両側から import されるので、
+ * この形を保つために、ここにはVS CodeのAPIもDOMも入れない。両側からimportされるので、
  * 片方だけが持てるものを置くとバンドルできなくなる。
  */
 import type { ApprovePreview } from "./approvemodel.js";
@@ -23,20 +23,20 @@ import { embedJson, type DataMessage } from "./screen-host.js";
 export type ApprovalOverlay =
   | { readonly kind: "loading" }
   /**
-   * `changedSinceSave` は、計画編集タブで保存したあとに提案が変わった親（一覧を開いた時点で拡張ホストが比べた）。
+   * `changedSinceSave`は、計画編集タブで保存したあとに提案が変わった親（一覧を開いた時点で拡張ホストが比べた）。
    * 図の上に注意を出すだけで、承認は止めない
    */
   | { readonly kind: "preview"; readonly preview: ApprovePreview; readonly notice?: string; readonly changedSinceSave?: readonly string[] }
   | { readonly kind: "approving"; readonly preview: ApprovePreview }
   | { readonly kind: "error"; readonly error: string }
   /**
-   * 承認できた。Claude Code に渡す文と、コピー / 新しいセッションで開く / ターミナルで実行 を出す。
-   * `carried` は承認済みチケットをコミットして push する sh をターミナルに送ることにしたか（その sh が置いてあるか）。
+   * 承認できた。Claude Codeに渡す文と、コピー / 新しいセッションで開く / ターミナルで実行 を出す。
+   * `carried`は承認済みチケットをコミットしてpushするshをターミナルに送ることにしたか（そのshが置いてあるか）。
    * 送るのは拡張ホストで、送れたかまでは見ていない。真のときだけ、そう言う
    */
   | { readonly kind: "done"; readonly count: number; readonly prompt: string; readonly carried?: boolean }
   /**
-   * 承認以外で Claude Code に渡すプロンプト（残った指摘を決めた結果）。承認したときと同じ 2 ボタンで渡す
+   * 承認以外でClaude Codeに渡すプロンプト（残った指摘を決めた結果）。承認したときと同じ2ボタンで渡す
    */
   | {
       readonly kind: "prompt";
@@ -52,15 +52,15 @@ export type ApprovalOverlay =
       readonly keep?: boolean;
       /**
        * 決め直しへ戻れる。表示した後に指摘が追加されて、レビュー済みにしていないとき（実行ファイルの答えの
-       * `reviewed` が偽で `pending_extra` がある）。押すと残った指摘を読み直す。続きの子が起きたときは付けない
+       * `reviewed`が偽で`pending_extra`がある）。押すと残った指摘を読み直す。続きの子が起きたときは付けない
        * （そのプロンプトは取り返せない）
        */
       readonly retry?: { readonly parent: string; readonly phase: number };
     }
   /**
    * 残った指摘を読み込んでいる（`ccnavi-review.sh decide <N> --preview`）。「レビュー完了」を押すとここに入る。
-   * `tree` は親のワークツリーで、sh をそこで走らせる。`mr` はフェーズ行の依頼が持つ MR の番号（分かるときだけ。
-   * 読み取りの検証が、読んだ番号とこれを照らす）。`notice` は見せ直す理由（見せた指摘と今の指摘が違った）
+   * `tree`は親のワークツリーで、shをそこで走らせる。`mr`はフェーズ行の依頼が持つMRの番号（分かるときだけ。
+   * 読み取りの検証が、読んだ番号とこれを照らす）。`notice`は見せ直す理由（見せた指摘と今の指摘が違った）
    */
   | {
       readonly kind: "decideLoading";
@@ -71,8 +71,8 @@ export type ApprovalOverlay =
       readonly notice?: string;
     }
   /**
-   * 残った指摘を見せた。0 件なら「未解決の指摘はありません」と［レビュー済みにする］、1 件以上なら行き先を指摘ごとに選ぶ。
-   * 押されるまで何も置かない。`consult` は「エージェントに相談するプロンプトをコピー」の結果（コピーできた・できなかった）
+   * 残った指摘を見せた。0件なら「未解決の指摘はありません」と［レビュー済みにする］、1件以上なら行き先を指摘ごとに選ぶ。
+   * 押されるまで何も置かない。`consult`は「エージェントに相談するプロンプトをコピー」の結果（コピーできた・できなかった）
    */
   | {
       readonly kind: "decidePreview";
@@ -111,8 +111,8 @@ export type BoardData =
       readonly merge?: MergeView;
       /**
        * 開いた直後に選ぶプロジェクトの絞り込み（いまは呼び出し元が無い）。
-       * 入るのは 1 枚目の HTML に埋めるときだけで、`ToBoard` の `data` では渡さない
-       * （画面が組み上がった後は `filter` のメッセージで渡す）
+       * 入るのは1枚目のHTMLに埋めるときだけで、`ToBoard`の`data`では渡さない
+       * （画面が組み上がった後は`filter`のメッセージで渡す）
        */
       readonly filter?: string;
     }
@@ -124,7 +124,7 @@ export type BoardData =
       readonly filter?: string;
     };
 
-/** 拡張ホスト → 画面。中身を包む形は `screen-host.ts` が決める（渡すのはそこ） */
+/** 拡張ホスト → 画面。中身を包む形は`screen-host.ts`が決める（渡すのはそこ） */
 export type ToBoard =
   | DataMessage<BoardData>
   /** 開くときにプロジェクトを指定されたとき（いまは呼び出し元が無い） */
@@ -133,7 +133,7 @@ export type ToBoard =
   | { readonly type: "tour" }
   | AppearanceMessage;
 
-/** 画面 → 拡張ホスト。受け側（board-panel の `asMessage`）が形を確かめてから使う */
+/** 画面 → 拡張ホスト。受け側（board-panelの`asMessage`）が形を確かめてから使う */
 export type BoardMessage =
   /** 画面が組み上がった。非表示になって作り直された画面が、いまの中身をもらい直すために送る */
   | { readonly type: "ready" }
@@ -144,11 +144,11 @@ export type BoardMessage =
   | { readonly type: "approveCancel" }
   | { readonly type: "promptCopy" }
   | { readonly type: "promptOpen" }
-  /** 承認のプロンプトを、ボードのターミナルで `claude -p` として実行する。オーバーレイは閉じる */
+  /** 承認のプロンプトを、ボードのターミナルで`claude -p`として実行する。オーバーレイは閉じる */
   | { readonly type: "promptRun" }
-  /** ［レビュー完了］を押した。残った指摘を読む流れに入る（0 件ならレビュー済みにする画面、1 件以上なら対応方針の画面） */
+  /** ［レビュー完了］を押した。残った指摘を読む流れに入る（0件ならレビュー済みにする画面、1件以上なら対応方針の画面） */
   | { readonly type: "decide"; readonly parent: string; readonly phase: number }
-  /** 残った指摘の行き先を決めた（0 件なら「レビュー済みにする」）。キーは指摘の `key`、値は `keep` / `fix` / `issue` */
+  /** 残った指摘の行き先を決めた（0件なら「レビュー済みにする」）。キーは指摘の`key`、値は`keep` / `fix` / `issue` */
   | { readonly type: "decideConfirm"; readonly choices: Readonly<Record<string, string>> }
   /** 対応方針の画面の「エージェントに相談するプロンプトをコピー」を押した。オーバーレイは閉じない */
   | { readonly type: "decideConsult" }
@@ -159,12 +159,12 @@ export type BoardMessage =
   | { readonly type: "flow"; readonly ticket: string }
   /**
    * 親の提案のカードの「計画編集」を押した。拡張ホストはいまのボードでそのカードが入口を出していることを
-   * 確かめてから、その親の計画編集タブを開く（`ccnaviBoard.openWorkflow` と同じ入口）
+   * 確かめてから、その親の計画編集タブを開く（`ccnaviBoard.openWorkflow`と同じ入口）
    */
   | { readonly type: "workflow"; readonly ticket: string }
   /**
    * 完了した親のカードの「テンプレートの下書きを作る」を押した。拡張ホストはいまのボードでそのカードが入口を出していることを
-   * 確かめてから、`ccnavi --templates --draft` を呼ぶ
+   * 確かめてから、`ccnavi --templates --draft`を呼ぶ
    */
   | { readonly type: "templateDraft"; readonly ticket: string }
   /**
@@ -172,23 +172,23 @@ export type BoardMessage =
    * 計画編集タブを開く（一覧の図にある親だけ。決めるのは承認の遷移）
    */
   | { readonly type: "editWorkflow"; readonly ticket: string }
-  /** 「MR の状況を確認」を押した。確認中なら拡張ホストが受けない（二重に走らせない） */
+  /** 「MRの状況を確認」を押した。確認中なら拡張ホストが受けない（二重に走らせない） */
   | { readonly type: "mergeCheck" }
   /**
    * マージ済みの親の［片付ける］を押した。拡張ホストが確認のダイアログを出し、「実行する」なら
-   * `cd … && sh …/ccnavi-sync.sh <親>` をボードのターミナルへ送る（MR がマージ済みかの確かめ直しと片付けは sync が決める）
+   * `cd … && sh …/ccnavi-sync.sh <親>`をボードのターミナルへ送る（MRがマージ済みかの確かめ直しと片付けはsyncが決める）
    */
   | { readonly type: "mergeRetire"; readonly parent: string }
-  /** マージせずに閉じた親の、記録を消すコマンドのコピーを押した。コピーするだけで、ボードからは送らない */
+  /** マージせずにクローズした親の、記録を消すコマンドのコピーを押した。コピーするだけで、ボードからは送らない */
   | { readonly type: "mergeCopyAbandon"; readonly parent: string }
   /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */
   | { readonly type: "tourDone" };
 
 
-/** 最初の中身を埋める `<script type="application/json">` の id。画面はこれを読んで最初の 1 枚を描く */
+/** 最初の中身を埋める`<script type="application/json">`のid。画面はこれを読んで最初の1枚を描く */
 export const DATA_ID = "ccnavi-board-data";
 
-/** 最初の中身を HTML に埋める形にする。埋め方は `screen-host.ts` が持つ（React の画面で同じ） */
+/** 最初の中身をHTMLに埋める形にする。埋め方は`screen-host.ts`が持つ（Reactの画面で同じ） */
 export function embedData(data: BoardData): string {
   return embedJson(data);
 }

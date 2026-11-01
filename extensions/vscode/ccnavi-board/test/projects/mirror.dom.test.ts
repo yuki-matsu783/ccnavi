@@ -1,5 +1,5 @@
 /**
- * プロジェクト管理画面（React）のミラーの表示を happy-dom で動かす。カードの状態とずれの中身、「ミラーを同期」と
+ * プロジェクト管理画面（React）のミラーの表示をhappy-domで動かす。カードの状態とずれの中身、「ミラーを同期」と
  * 「すべて同期」が送るもの、押せないとき（同期中・コピーするものが無い）、最終確認の時刻、案内の間は送らないこと。
  */
 import { test } from "node:test";
@@ -60,7 +60,7 @@ test("CB-D734 カードにミラーの状態が出る。ずれの中身は畳ん
   try {
     const state = (name: string): string => text(dom.one(`${cardSelector(name)} .mirror-state`));
     assert.equal(state("app"), "同期済み");
-    assert.equal(state("web"), "ずれ 3 件");
+    assert.equal(state("web"), "ずれ3件");
     assert.equal(state("x"), "確認できません 書き込めません");
     const details = dom.one(`${cardSelector("web")} details.mirror-changes`);
     assert.equal(details.hasAttribute("open"), false);
@@ -69,13 +69,13 @@ test("CB-D734 カードにミラーの状態が出る。ずれの中身は畳ん
       ["更新 .ccnavi/config/common/rules.yml", "追加 .ccnavi/config/common/templates/a.yml", "削除 .ccnavi/config/common/old.yml"],
     );
     assert.equal(dom.all(`${cardSelector("app")} details.mirror-changes`).length, 0);
-    assert.equal(text(dom.one(".summary .mirror-checked")), "ミラーの最終確認 14:05");
+    assert.equal(text(dom.one(".summary .mirror-checked")), "ミラーの最終確認14:05");
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D735 「ミラーを同期」はずれのある行だけ押せて、その名前と行の expect を送る。「すべて同期」は件数を出し、名前を空にして全体の expect を送る", async () => {
+test("CB-D735 「ミラーを同期」はずれのある行だけ押せて、その名前と行のexpectを送る。「すべて同期」は件数を出し、名前を空にして全体のexpectを送る", async () => {
   const dom = await open(mirror());
   try {
     const button = (name: string): HTMLButtonElement => dom.one<HTMLButtonElement>(`${cardSelector(name)} button[data-action="mirror-sync"]`);
@@ -84,7 +84,7 @@ test("CB-D735 「ミラーを同期」はずれのある行だけ押せて、そ
     assert.equal(button("web").disabled, false);
     assert.equal(text(button("web")), "ミラーを同期");
     const all = dom.one<HTMLButtonElement>('button[data-action="mirror-sync-all"]');
-    assert.equal(text(all), "すべて同期（1 件）");
+    assert.equal(text(all), "すべて同期（1件）");
     assert.equal(all.disabled, false);
     dom.click(button("web"));
     await dom.settle();
@@ -99,7 +99,7 @@ test("CB-D735 「ミラーを同期」はずれのある行だけ押せて、そ
   }
 });
 
-test("CB-D736 同期中はどのボタンも押せない。終われば（busy が偽の中身が届けば）戻る", async () => {
+test("CB-D736 同期中はどのボタンも押せない。終われば（busyが偽の中身が届けば）戻る", async () => {
   const dom = await open(mirror(undefined, true));
   try {
     const disabled = (): boolean[] => dom.all<HTMLButtonElement>('button[data-action^="mirror-sync"]').map((b) => b.disabled);
@@ -114,7 +114,7 @@ test("CB-D736 同期中はどのボタンも押せない。終われば（busy �
 
 test("CB-D737 確認できない・コピーするものが無いときは帯に理由を出し、ボタンは押せない", async () => {
   const cases: [MirrorStatus, RegExp][] = [
-    [{ kind: "failed", error: "60 秒で中断しました" }, /確認できませんでした。60 秒で中断しました/],
+    [{ kind: "failed", error: "60秒で中断しました" }, /確認できませんでした。60秒で中断しました/],
     [{ kind: "ok", list: list({ ok: false, error: "共通レイヤーを読み込めません" }) }, /確認できませんでした。共通レイヤーを読み込めません/],
     [{ kind: "ok", list: list({ common_empty: true }) }, /コピーするものがありません/],
   ];
@@ -131,7 +131,7 @@ test("CB-D737 確認できない・コピーするものが無いときは帯に
   }
 });
 
-test("CB-D738 ミラーをまだ確認していない中身（mirror が無い）では、ミラーの欄もボタンも出さない。確認している間は「確認しています」", async () => {
+test("CB-D738 ミラーをまだ確認していない中身（mirrorが無い）では、ミラーの欄もボタンも出さない。確認している間は「確認しています」", async () => {
   const none = await openPage({ kind: "page", page: page(ROWS) });
   try {
     assert.equal(none.all(".mirror-field").length, 0);

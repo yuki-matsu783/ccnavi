@@ -1,9 +1,9 @@
 /**
- * プロジェクト管理画面（React）を happy-dom で動かす。clone と .gitignore のボタンの送り先、
- * カードに出るレイヤーの置き場と苦情、チケット制御が disable のときの件数の欄。
+ * プロジェクト管理画面（React）をhappy-domで動かす。cloneと .gitignoreのボタンの送り先、
+ * カードに出るレイヤーの置き場と苦情、チケット制御がdisableのときの件数の欄。
  *
- * 移す前は拡張ホストが組んだ HTML の文字列を正規表現で見ていた（CB-T113 / CB-T123 / CB-T133）。
- * 確かめている中身はそのままで、見る先を DOM に移してある。
+ * 移す前は拡張ホストが組んだHTMLの文字列を正規表現で見ていた（CB-T113 / CB-T123 / CB-T133）。
+ * 確かめている中身はそのままで、見る先をDOMに移してある。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -15,7 +15,7 @@ function text(element: { textContent: string | null } | null | undefined): strin
   return (element?.textContent ?? "").trim();
 }
 
-test("CB-D31 .gitignore の帯のボタンと clone は、それぞれの型で送る。clone は欄の URL と名前を送り、名前は URL から埋まる", async () => {
+test("CB-D31 .gitignoreの帯のボタンとcloneは、それぞれの型で送る。cloneは欄のURLと名前を送り、名前はURLから埋まる", async () => {
   const dom = await openProjects([row()], { ignored: false });
   try {
     dom.click(dom.one('button[data-action="fix-ignore"]'));
@@ -30,17 +30,17 @@ test("CB-D31 .gitignore の帯のボタンと clone は、それぞれの型で�
       { type: "fixIgnore" },
       { type: "clone", url: "https://gitlab.example.com/g/tool.git", name: "tool" },
     ]);
-    // 打ちかけは Webview の state に残す。作り直されても残る
+    // 打ちかけはWebviewのstateに残す。作り直されても残る
     assert.deepEqual(dom.state(), { url: "https://gitlab.example.com/g/tool.git", name: "tool", nameTouched: false });
-    await dom.send({ type: "cloned", message: "clone を送った" });
+    await dom.send({ type: "cloned", message: "cloneを送った" });
     assert.equal(dom.one<HTMLInputElement>("#url").value, "");
-    assert.equal(text(dom.one("#status")), "clone を送った");
+    assert.equal(text(dom.one("#status")), "cloneを送った");
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D32 中身は postMessage で入れ替わり、再読み込みできなければ文面を出す。見た目は body のクラスだけ変える", async () => {
+test("CB-D32 中身はpostMessageで入れ替わり、更新できなければ文面を出す。見た目はbodyのクラスだけ変える", async () => {
   const dom = await openProjects();
   try {
     await dom.send({ type: "data", data: { kind: "page", page: page([row({ name: "app", rel: "projects/app" })]) } });
@@ -65,17 +65,17 @@ test("CB-D34 失敗の一言は次の一覧が届いたら消える。案内は�
   try {
     const status = () => text(dom.one("#status"));
     const failed = () => dom.one("#status").className.includes("failed");
-    await dom.send({ type: "failed", message: "プロジェクト lib が一覧にありません。更新してから押し直す" });
+    await dom.send({ type: "failed", message: "プロジェクトlibが一覧にありません。更新してから押し直す" });
     assert.match(status(), /一覧にありません/);
     assert.ok(failed());
     // 一覧が新しくなったら、それを見て言った失敗はもう今のことではない
     await dom.send({ type: "data", data: { kind: "page", page: page([row()]) } });
     assert.equal(status(), "");
     assert.ok(!failed());
-    // 案内は残す。clone は .git の出現で必ず読み直しが走るので、ここで消すと一瞬で消える
-    await dom.send({ type: "cloned", message: "clone をターミナルに送った" });
+    // 案内は残す。cloneは .gitの出現で必ず読み直しが走るので、ここで消すと一瞬で消える
+    await dom.send({ type: "cloned", message: "cloneをターミナルに送った" });
     await dom.send({ type: "data", data: { kind: "page", page: page([row(), row({ name: "app", rel: "projects/app" })]) } });
-    assert.equal(status(), "clone をターミナルに送った");
+    assert.equal(status(), "cloneをターミナルに送った");
   } finally {
     await dom.close();
   }
@@ -109,12 +109,12 @@ test("CB-T113 カードはレイヤーの置き場を出す。自身のレイヤ
   }
 });
 
-test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだけ出す", async () => {
+test("CB-T123 プロジェクト管理は同じ事象の注意を1か所にだけ出す", async () => {
   const dom = await openProjects(
     [
       row({
         problems: [
-          problem("warn", ".claude/settings.json を読み込めない: 壊れている"),
+          problem("warn", ".claude/settings.jsonを読み込めない: 壊れている"),
           problem("error", "文面がありません", "(projects/lib) x"),
         ],
       }),
@@ -122,42 +122,42 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
     {
       ignored: false,
       dirProblems: [
-        problem("warn", "projects/ がワークスペースの git で無視されていない", "(projects)"),
+        problem("warn", "projects/ がワークスペースのgitで無視されていない", "(projects)"),
         problem("warn", "別の指摘", "(projects)"),
       ],
     },
   );
   try {
     const banners = dom.all(".banner").map((b) => text(b));
-    // .gitignore の帯（直すボタン付き）があるので、lint の「無視されていない」は重ねない。別の指摘は出る
+    // .gitignoreの帯（直すボタン付き）があるので、lintの「無視されていない」は重ねない。別の指摘は出る
     assert.equal(dom.all('button[data-action="fix-ignore"]').length, 1);
     assert.ok(!banners.some((b) => /無視されていない/.test(b)), banners.join(" / "));
     assert.ok(banners.some((b) => b === "warn: 別の指摘"), banners.join(" / "));
-    // ".claude/settings.json を読めない" のような warn と error は、lint の指摘のまま出る
+    // ".claude/settings.jsonを読めない" のようなwarnとerrorは、lintの指摘のまま出る
     const lint = dom.all(`${cardSelector("lib")} ul.lint li`).map((li) => text(li));
-    assert.ok(lint.some((l) => l === "warn: .claude/settings.json を読み込めない: 壊れている"), lint.join(" / "));
+    assert.ok(lint.some((l) => l === "warn: .claude/settings.jsonを読み込めない: 壊れている"), lint.join(" / "));
     assert.ok(lint.some((l) => l === "error: 文面がありません"), lint.join(" / "));
   } finally {
     await dom.close();
   }
 
-  // .gitignore が済んでいれば lint の指摘はそのまま出る
-  const fine = await openProjects([row()], { dirProblems: [problem("warn", "projects/ がワークスペースの git で無視されていない", "(projects)")] });
+  // .gitignoreが済んでいればlintの指摘はそのまま出る
+  const fine = await openProjects([row()], { dirProblems: [problem("warn", "projects/ がワークスペースのgitで無視されていない", "(projects)")] });
   try {
-    assert.ok(fine.all(".banner").some((b) => text(b) === "warn: projects/ がワークスペースの git で無視されていない"));
+    assert.ok(fine.all(".banner").some((b) => text(b) === "warn: projects/ がワークスペースのgitで無視されていない"));
   } finally {
     await fine.close();
   }
 });
 
-// `projects/` がワークスペースの git の索引に載っているときの苦情（src/ccnavi/entry/lint.py の `_in_index`）。
-// 先頭の句は 2 つで共通で、載せ忘れは直後に「（入れ子のリポジトリとして」が続く（設計 §4.2）
+// `projects/`がワークスペースのgitの索引に載っているときの苦情（src/ccnavi/entry/lint.pyの`_in_index`）。
+// 先頭の句は2つで共通で、載せ忘れは直後に「（入れ子のリポジトリとして」が続く（設計 §4.2）
 const COLLISION =
-  "`projects/` はワークスペースの git が追跡している（例: `projects/foo/main.py`）。ccnavi はワークスペース直下の `projects/` をプロジェクトの置き場として使い、名前は変えられない。直すには、ワークスペースの `projects/` を別の名前に移す（例: `git mv projects apps`）";
+  "`projects/`はワークスペースのgitが追跡している（例: `projects/foo/main.py`）。ccnaviはワークスペース直下の`projects/`をプロジェクトの置き場として使い、名前は変えられない。直すには、ワークスペースの`projects/`を別の名前に移す（例: `git mv projects apps`）";
 const ADDED_BY_MISTAKE =
-  "`projects/` はワークスペースの git が追跡している（入れ子のリポジトリとして: `projects/lib`）。直すには、ワークスペースで `git rm -r --cached projects` を打ち、`.gitignore` に `/projects/` を追加して、コミットする";
+  "`projects/`はワークスペースのgitが追跡している（入れ子のリポジトリとして: `projects/lib`）。直すには、ワークスペースで`git rm -r --cached projects`を打ち、`.gitignore`に`/projects/`を追加して、コミットする";
 
-/** 置き場の苦情の帯・`.gitignore` の帯とボタンを見る */
+/** 置き場の苦情の帯・`.gitignore`の帯とボタンを見る */
 async function trackedBanners(detail: string, ignored: boolean): Promise<{ banners: string[]; fixButtons: number }> {
   const dom = await openProjects([row()], { ignored, dirProblems: [problem("warn", detail, "(projects)"), problem("warn", "別の指摘", "(projects)")] });
   try {
@@ -167,7 +167,7 @@ async function trackedBanners(detail: string, ignored: boolean): Promise<{ banne
   }
 }
 
-test("CB-D148 A10 置き場がワークスペースのソースとぶつかっていたら、苦情の帯だけを出し、.gitignore のボタンと「無視されていない」の帯を出さない", async () => {
+test("CB-D148 A10置き場がワークスペースのソースとぶつかっていたら、苦情の帯だけを出し、.gitignoreのボタンと「無視されていない」の帯を出さない", async () => {
   const { banners, fixButtons } = await trackedBanners(COLLISION, false);
   assert.equal(fixButtons, 0);
   assert.ok(banners.includes(`warn: ${COLLISION}`), banners.join(" / "));
@@ -177,7 +177,7 @@ test("CB-D148 A10 置き場がワークスペースのソースとぶつかっ�
   assert.ok(banners.includes("warn: 別の指摘"), banners.join(" / "));
 });
 
-test("CB-D149 A10b 載せ忘れ（入れ子のリポジトリが索引に載った）でも同じ。.gitignore に /projects/ が既にあっても苦情の帯は出たまま", async () => {
+test("CB-D149 A10b載せ忘れ（入れ子のリポジトリが索引に載った）でも同じ。.gitignoreに /projects/ が既にあっても苦情の帯は出たまま", async () => {
   for (const ignored of [false, true]) {
     const { banners, fixButtons } = await trackedBanners(ADDED_BY_MISTAKE, ignored);
     assert.equal(fixButtons, 0, `ignored=${ignored}`);
@@ -187,10 +187,10 @@ test("CB-D149 A10b 載せ忘れ（入れ子のリポジトリが索引に載っ�
   }
 });
 
-test("CB-T133 チケット制御が disable なら、チケットの件数の欄を出さない", async () => {
+test("CB-T133 チケット制御がdisableなら、チケットの件数の欄を出さない", async () => {
   const enabled = await openProjects([row({ tickets: 3 })]);
   try {
-    assert.match(text(enabled.one(cardSelector("lib"))), /チケット\s*3 件/);
+    assert.match(text(enabled.one(cardSelector("lib"))), /チケット\s*3件/);
   } finally {
     await enabled.close();
   }
@@ -203,10 +203,10 @@ test("CB-T133 チケット制御が disable なら、チケットの件数の欄
   }
 });
 
-test("CB-D1230 フッターの最終更新は ISO 形式の秒とタイムゾーンを落とし、ワークスペースのパスは付けない", async () => {
+test("CB-D1230 フッターの最終更新はISO形式の秒とタイムゾーンを落とし、ワークスペースのパスは付けない", async () => {
   const dom = await openProjects([row()], { generatedAt: "2026-10-29T09:00:00+0900" });
   try {
-    assert.equal(text(dom.one("footer.foot")), "最終更新 2026-10-29 09:00");
+    assert.equal(text(dom.one("footer.foot")), "最終更新2026-10-29 09:00");
   } finally {
     await dom.close();
   }

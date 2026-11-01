@@ -1,5 +1,5 @@
 /**
- * フェーズ管理画面の案内（`src/webview/tours/phases.yml`）を happy-dom で動かす。案内の間は見本を描き、実際の定義・編集中の内容・
+ * フェーズ管理画面の案内（`src/webview/tours/phases.yml`）をhappy-domで動かす。案内の間は見本を描き、実際の定義・編集中の内容・
  * 拡張ホストへの送信には触れない。
  */
 import { test } from "node:test";
@@ -13,7 +13,7 @@ import type { HTMLButtonElement, HTMLElement, HTMLInputElement, HTMLSelectElemen
 
 const def = loadTour("phases");
 
-/** 実際の定義。見本の id と重ならない id だけで書き、案内の間に出ていたら実際の定義を描いていると分かるようにする */
+/** 実際の定義。見本のidと重ならないidだけで書き、案内の間に出ていたら実際の定義を描いていると分かるようにする */
 const REAL_TEXT = `version: 1
 phases:
   real-a:
@@ -33,7 +33,7 @@ const SAMPLE_IDS = ["research", "design", "acceptance", "implement", "design-fee
 const LIB_IDS = ["quick", "api-change", "quick-feedback"];
 
 async function openReal(): Promise<DomPage> {
-  return openPhases({ model: readPhases(REAL_TEXT).model, target: { kind: "self", name: "" }, targets: [{ kind: "self", name: "", label: "ワークスペース" }, { kind: "project", name: "lib", label: "プロジェクト lib" }] });
+  return openPhases({ model: readPhases(REAL_TEXT).model, target: { kind: "self", name: "" }, targets: [{ kind: "self", name: "", label: "ワークスペース" }, { kind: "project", name: "lib", label: "プロジェクトlib" }] });
 }
 
 /** 開いた「?」の一覧から案内を選んで始める */
@@ -49,7 +49,7 @@ async function next(dom: DomPage): Promise<void> {
   await dom.settle();
 }
 
-/** 案内を始めて、n 番目の手順（0 始まり）まで進める */
+/** 案内を始めて、n番目の手順（0始まり）まで進める */
 async function goto(dom: DomPage, id: string, index: number): Promise<void> {
   await startCourse(dom, id);
   for (let i = 0; i < index; i += 1) {
@@ -57,7 +57,7 @@ async function goto(dom: DomPage, id: string, index: number): Promise<void> {
   }
 }
 
-/** 画面に出ている定義の id（絞り込みで隠れたものも含む。足した空の行は空文字） */
+/** 画面に出ている定義のid（絞り込みで隠れたものも含む。足した空の行は空文字） */
 function ids(dom: DomPage): string[] {
   return dom.all<HTMLElement>(".phase .sum-id").map((el) => (el.classList.contains("dim") ? "" : (el.textContent ?? "")));
 }
@@ -67,12 +67,12 @@ function keys(dom: DomPage): string[] {
   return dom.all(".phase").map((el) => el.dataset.key ?? "");
 }
 
-/** 案内が拡張ホストへ送ったもの（`ready` は組み上がり、`tourDone` は案内を閉じた印なので除く）。空であること */
+/** 案内が拡張ホストへ送ったもの（`ready`は組み上がり、`tourDone`は案内を閉じた印なので除く）。空であること */
 function extraPosts(dom: DomPage): unknown[] {
   return dom.posted.filter((message) => message.type !== "ready" && message.type !== "tourDone");
 }
 
-test("CB-D240 「?」は案内の一覧を開き、選んだ案内だけが始まる。基本の案内が先頭で、閉じたら tourDone を返す", async () => {
+test("CB-D240 「?」は案内の一覧を開き、選んだ案内だけが始まる。基本の案内が先頭で、閉じたらtourDoneを返す", async () => {
   const dom = await openReal();
   try {
     dom.click(dom.one('[data-action="tour"]'));
@@ -96,7 +96,7 @@ test("CB-D240 「?」は案内の一覧を開き、選んだ案内だけが始�
   }
 });
 
-test("CB-D241 全ユースケースの全手順で、指す先が画面に 1 つあり、吹き出しが中ほどに出ない。見本だけを描き、閉じたら実際の定義に戻る", async () => {
+test("CB-D241 全ユースケースの全手順で、指す先が画面に1つあり、吹き出しが中ほどに出ない。見本だけを描き、閉じたら実際の定義に戻る", async () => {
   for (const course of def.courses) {
     const dom = await openReal();
     try {
@@ -104,13 +104,13 @@ test("CB-D241 全ユースケースの全手順で、指す先が画面に 1 つ
       await startCourse(dom, course.id);
       for (const [index, step] of course.steps.entries()) {
         await dom.settle();
-        const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
+        const at = `${course.id}の${index + 1}番目の手順（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
-        assert.equal(dom.all(`[data-tour="${step.target}"]`).length, 1, `${at}: 指す先 ${step.target} が画面に 1 つではない`);
+        assert.equal(dom.all(`[data-tour="${step.target}"]`).length, 1, `${at}: 指す先${step.target}が画面に1つではない`);
         assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
         const shown = ids(dom);
         for (const real of REAL_IDS) {
-          assert.ok(!shown.includes(real), `${at}: 実際の定義 ${real} が出ている`);
+          assert.ok(!shown.includes(real), `${at}: 実際の定義${real}が出ている`);
         }
         assert.ok(keys(dom).every((key) => !/^p\d+$/.test(key)), `${at}: 実際の行のキーが出ている`);
         assert.ok(shown.includes(step.scene.target === "lib" ? "quick" : "research"), `${at}: 見本の定義が出ていない`);
@@ -197,14 +197,14 @@ test("CB-D242 案内の間は、画面の編集・ボタン・設定の切り替
   }
 });
 
-test("CB-D243 手順の scene が画面の様子を替える（開く定義・補足・絞り込み・追加した行）。scene は次の手順へ引き継がない", async () => {
+test("CB-D243 手順のsceneが画面の様子を替える（開く定義・補足・絞り込み・追加した行）。sceneは次の手順へ引き継がない", async () => {
   // 開く定義と補足。phase-* の印は開いた最初の定義にだけ付く
   let dom = await openReal();
   try {
     await goto(dom, "guide-agent", 0);
     assert.equal(dom.all(".phase.open").length, 1);
     assert.equal(dom.one(".phase.open .sum-id").textContent, "acceptance");
-    assert.ok(!dom.one(".phase.open details.more").hasAttribute("open"), "補足を開く scene がない手順では畳む");
+    assert.ok(!dom.one(".phase.open details.more").hasAttribute("open"), "補足を開くsceneがない手順では畳む");
     await next(dom);
     assert.ok(dom.one(".phase.open details.more").hasAttribute("open"));
     assert.equal(dom.one<HTMLInputElement>('[data-tour="phase-agent"] input').value, "acceptance-tester");
@@ -261,7 +261,7 @@ test("CB-D243 手順の scene が画面の様子を替える（開く定義・�
     await next(dom);
     assert.equal(dom.one<HTMLButtonElement>("#save").disabled, false);
     await next(dom);
-    assert.match(dom.one("#status").textContent ?? "", /design-feedback は feedback なので review は true/);
+    assert.match(dom.one("#status").textContent ?? "", /design-feedbackはfeedbackなのでreviewはtrue/);
     assert.ok(dom.one(".foot").classList.contains("error"));
     await next(dom);
     assert.equal(dom.one("#status").textContent, "", "手順をまたいで検証の文が残った");
@@ -282,16 +282,16 @@ test("CB-D243 手順の scene が画面の様子を替える（開く定義・�
 test("CB-D244 設定の切り替えの案内は、見本のプロジェクトの定義を描く。実際の対象は動かず、閉じたら実際の設定に戻る", async () => {
   const dom = await openPage({
     kind: "page",
-    page: page({ model: readPhases(REAL_TEXT).model, phasesPath: "real/phases.yml", target: { kind: "project", name: "web" }, targets: [{ kind: "self", name: "", label: "ワークスペース" }, { kind: "project", name: "web", label: "プロジェクト web" }] }),
+    page: page({ model: readPhases(REAL_TEXT).model, phasesPath: "real/phases.yml", target: { kind: "project", name: "web" }, targets: [{ kind: "self", name: "", label: "ワークスペース" }, { kind: "project", name: "web", label: "プロジェクトweb" }] }),
   });
   try {
     assert.equal(dom.one<HTMLSelectElement>("select#target").value, "project:web");
     await goto(dom, "project", 0);
-    // 1 番目の手順はワークスペースの見本。欄の選択肢は見本のもの
+    // 1番目の手順はワークスペースの見本。欄の選択肢は見本のもの
     assert.equal(dom.one<HTMLSelectElement>("select#target").value, "self:");
     assert.deepEqual(
       dom.all<HTMLElement>("select#target option").map((option) => option.textContent),
-      ["ワークスペース", "プロジェクト lib"],
+      ["ワークスペース", "プロジェクトlib"],
     );
     assert.deepEqual(ids(dom), SAMPLE_IDS);
     assert.equal(dom.one(".path").textContent, "（見本）.ccnavi/config/project/phases.yml");
@@ -305,7 +305,7 @@ test("CB-D244 設定の切り替えの案内は、見本のプロジェクトの
     await next(dom);
     assert.equal(dom.all("#dirty:not(.hidden)").length, 1);
     await next(dom);
-    assert.match(dom.one("#lock").textContent ?? "", /プロジェクト lib に作業中のチケット/);
+    assert.match(dom.one("#lock").textContent ?? "", /プロジェクトlibに作業中のチケット/);
     assert.equal(dom.one<HTMLButtonElement>("#save").disabled, true);
     assert.deepEqual(extraPosts(dom), []);
     await next(dom);
@@ -319,7 +319,7 @@ test("CB-D244 設定の切り替えの案内は、見本のプロジェクトの
   }
 });
 
-test("CB-D245 案内の最中に読み込み中やエラーへ替わったら、案内を閉じて tourDone を返す。中身が戻っても案内は出直さない", async () => {
+test("CB-D245 案内の最中に読み込み中やエラーへ替わったら、案内を閉じてtourDoneを返す。中身が戻っても案内は出直さない", async () => {
   for (const next of [
     { kind: "loading", text: "読み込み中…" },
     { kind: "error", error: "読み込めません" },
@@ -363,7 +363,7 @@ test("CB-D246 実際に編集中の定義と未保存の印は、案内の間も
     assert.equal(dom.all("#dirty:not(.hidden)").length, 1);
     assert.equal(dom.all("#help").length, 1);
     assert.equal(dom.one<HTMLButtonElement>("#save").disabled, false);
-    // `dirty` は実際の編集で変わったときの 1 度だけ。案内は送らない
+    // `dirty`は実際の編集で変わったときの1度だけ。案内は送らない
     assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), [{ type: "dirty", dirty: true }]);
   } finally {
     await dom.close();

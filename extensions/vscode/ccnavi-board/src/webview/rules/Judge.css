@@ -1,6 +1,6 @@
 /*
- * 判定の結果（`Judge.tsx`）。1 回ぶんの結果の枠と、サンプルを一括で判定したときの数。
- * 表そのものの見た目は `App.css`（hook の一覧と共有する）。
+ * 判定の結果（`Judge.tsx`）。1回ぶんの結果の枠と、サンプルを一括で判定したときの数。
+ * 表そのものの見た目は`App.css`（hookの一覧と共有する）。
  */
 .result { border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-lg); padding: 8px 10px; margin-bottom: 12px; }
 .verdict { font-weight: 700; padding: 0 8px; border-radius: var(--radius-pill); border: 1px solid currentColor; }

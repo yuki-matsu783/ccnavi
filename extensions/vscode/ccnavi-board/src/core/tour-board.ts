@@ -1,12 +1,12 @@
 /**
- * ボード画面の案内の見本（`webview/tours/board.yml` の `sample:`）を、画面が描く形にする。
+ * ボード画面の案内の見本（`webview/tours/board.yml`の`sample:`）を、画面が描く形にする。
  *
  * ボードは実行ファイルの出力（`ccnavi --explain --json`）と同じ形で見本に書き、実際の読み取り（`parseBoardJson`）と
  * 組み立て（`buildBoard`）を通す。カードの形をここで組むと、カードの欄が増えたときに見本だけが古くなる。
- * 承認の一覧と残った指摘も、実行ファイルの JSON と同じ形で書き、`approvemodel.ts` / `decidemodel.ts` の読み取りを通す。
+ * 承認の一覧と残った指摘も、実行ファイルのJSONと同じ形で書き、`approvemodel.ts` / `decidemodel.ts`の読み取りを通す。
  * いずれも案内の間に描くだけで、拡張ホストへは何も送らない。
  *
- * `root` と `generatedAt` は、いまのボードのものをそのまま使う（脚注が見本のために変わらないように）。
+ * `root`と`generatedAt`は、いまのボードのものをそのまま使う（脚注が見本のために変わらないように）。
  */
 import { parseApprovePreview } from "./approvemodel.js";
 import { buildBoard, COLUMNS, type Board } from "./board.js";
@@ -16,7 +16,7 @@ import { DECIDE_VERSION, parseDecidePreview } from "./decidemodel.js";
 import type { MergeRowState, MergeView, MergeViewRow } from "./merge.js";
 import { BOARD_VERSION, parseBoardJson, type ProposalState } from "./model.js";
 
-/** 手順の `scene.overlay` が指せるオーバーレイ */
+/** 手順の`scene.overlay`が指せるオーバーレイ */
 export const OVERLAY_NAMES = ["approval", "done", "decide"] as const;
 export type OverlayName = (typeof OVERLAY_NAMES)[number];
 
@@ -24,22 +24,22 @@ export interface BoardSample {
   readonly board: Board;
   /** 前の更新から列が変わったカード（動いた表示） */
   readonly moved: readonly Moved[];
-  /** マージ状況の帯の見本（手順の `scene.merge` が真のときだけ出す）。実際の確認の結果ではない */
+  /** マージ状況の帯の見本（手順の`scene.merge`が真のときだけ出す）。実際の確認の結果ではない */
   readonly merge: MergeView | undefined;
-  /** `scene.overlay` の名前で引く承認のオーバーレイ */
+  /** `scene.overlay`の名前で引く承認のオーバーレイ */
   readonly overlays: Readonly<Record<OverlayName, ApprovalOverlay>>;
 }
 
 function object(value: unknown, at: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error(`${at} がオブジェクトではない`);
+    throw new Error(`${at}がオブジェクトではない`);
   }
   return value as Record<string, unknown>;
 }
 
 function str(value: unknown, at: string): string {
   if (typeof value !== "string") {
-    throw new Error(`${at} が文字列ではない`);
+    throw new Error(`${at}が文字列ではない`);
   }
   return value;
 }
@@ -47,12 +47,12 @@ function str(value: unknown, at: string): string {
 function column(value: unknown, at: string): ProposalState {
   const state = COLUMNS.find((c) => c.state === value)?.state;
   if (state === undefined) {
-    throw new Error(`${at} は列の名前（${COLUMNS.map((c) => c.state).join(" / ")}）にする`);
+    throw new Error(`${at}は列の名前（${COLUMNS.map((c) => c.state).join(" / ")}）にする`);
   }
   return state;
 }
 
-/** 実行ファイルの JSON の読み取りは版を見るので、見本にも版を付けて通す */
+/** 実行ファイルのJSONの読み取りは版を見るので、見本にも版を付けて通す */
 function viaParser<T>(parse: (text: string) => { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: string }, raw: unknown, at: string, version = 1): T {
   const parsed = parse(JSON.stringify({ version, ...object(raw, at) }));
   if (!parsed.ok) {
@@ -91,7 +91,7 @@ export function parseBoardSample(raw: unknown, root: string, generatedAt: string
 
 const MERGE_STATES: readonly MergeRowState[] = ["checking", "open", "merged", "closed", "unknown", "incomplete"];
 
-/** マージ状況の帯の見本。実際の `MergeView`（拡張ホストが画面へ渡す形）と同じ欄で書き、足りない欄は既定で埋める */
+/** マージ状況の帯の見本。実際の`MergeView`（拡張ホストが画面へ渡す形）と同じ欄で書き、足りない欄は既定で埋める */
 function mergeSample(raw: unknown): MergeView {
   const at = "sample.merge";
   const merge = object(raw, at);
@@ -100,7 +100,7 @@ function mergeSample(raw: unknown): MergeView {
     const row = object(item, where);
     const state = MERGE_STATES.find((s) => s === row.state);
     if (state === undefined) {
-      throw new Error(`${where}.state は ${MERGE_STATES.join(" / ")} のどれかにする`);
+      throw new Error(`${where}.stateは${MERGE_STATES.join(" / ")}のどれかにする`);
     }
     const text = (name: string): string => (row[name] === undefined ? "" : str(row[name], `${where}.${name}`));
     return {

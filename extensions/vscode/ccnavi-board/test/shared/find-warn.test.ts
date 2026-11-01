@@ -1,5 +1,5 @@
 /**
- * 絞り込みの比べ方（`webview/shared/find.ts`）と、保存後に出す warn の行の取り出し（`core/lintmodel.ts`）。
+ * 絞り込みの比べ方（`webview/shared/find.ts`）と、保存後に出すwarnの行の取り出し（`core/lintmodel.ts`）。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -13,12 +13,12 @@ import type { RuleForm } from "../../src/core/rules-view.js";
 import type { PhaseForm } from "../../src/core/phases-view.js";
 import type { FactorForm } from "../../src/core/risk-view.js";
 
-// 各画面の `state.ts` は VS Code の API を読み込むので、テストでは同じ形の値を直に書く
+// 各画面の`state.ts`はVS CodeのAPIを読み込むので、テストでは同じ形の値を直に書く
 const emptyRule = (): RuleForm => ({ origin: null, id: "", match: "", kind: "glob", pattern: "", message: "", additionalContext: "", additionalContextOnce: "", additionalContextFile: "", additionalContextOnceFile: "", every: "" });
 const emptyPhase = (): PhaseForm => ({ origin: null, id: "", title: "", kind: "work", review: true, inherit: true, scope: [], deliverables: [], agent: "", skill: "", when: "" });
 const emptyFactor = (): FactorForm => ({ origin: null, id: "", points: "", kind: "lines_over", value: "", max: "", include: "", exclude: "", message: "" });
 
-test("CB-T1238 絞り込みは NFKC で正規化して小文字にする。全角英数字・半角カナも同じに探せる", () => {
+test("CB-T1238 絞り込みはNFKCで正規化して小文字にする。全角英数字・半角カナも同じに探せる", () => {
   assert.equal(foldFind("ＡＢＣ-ｇｉｔ"), "abc-git");
   assert.equal(foldFind("ﾃｽﾄ"), "テスト");
   assert.ok(ruleFind({ ...emptyRule(), id: "Git-Push" }).includes(foldFind("ＧＩＴ")));
@@ -26,29 +26,29 @@ test("CB-T1238 絞り込みは NFKC で正規化して小文字にする。全�
   assert.ok(riskFind({ ...emptyFactor(), id: "Big-Change" }).includes(foldFind("ＢＩＧ")));
 });
 
-test("CB-T1239 絞り込み中の上下ボタンの title は理由を言う。そうでなければ向きだけ", () => {
+test("CB-T1239 絞り込み中の上下ボタンのtitleは理由を言う。そうでなければ向きだけ", () => {
   assert.equal(moveTitle("上へ", false), "上へ");
   assert.equal(moveTitle("下へ", false), "下へ");
   assert.match(moveTitle("上へ", true), /絞り込み中は並べ替えできません/);
 });
 
-test("CB-T1240 --lint の報告から warn の行だけを取り出し、一時ファイルのパスを対象のパスに直す", () => {
+test("CB-T1240 --lintの報告からwarnの行だけを取り出し、一時ファイルのパスを対象のパスに直す", () => {
   const report = [
     "ccnavi: 設定を検証する",
     "  ルール: /tmp/x/rules.yml",
-    "warn: no-rm: /tmp/x/rules.yml の説明が空",
+    "warn: no-rm: /tmp/x/rules.ymlの説明が空",
     "info: deps: 補足",
     "warn: (file): 重なっています",
-    "error 0 件、warn 2 件、info 1 件",
+    "error 0件、warn 2件、info 1件",
   ].join("\n");
   assert.deepEqual(warnLinesOf(report, "/tmp/x/rules.yml", ".ccnavi/config/common/rules.yml"), [
-    "warn: no-rm: .ccnavi/config/common/rules.yml の説明が空",
+    "warn: no-rm: .ccnavi/config/common/rules.ymlの説明が空",
     "warn: (file): 重なっています",
   ]);
-  assert.deepEqual(warnLinesOf("error 0 件、warn 0 件、info 0 件", "/tmp/x", "y"), []);
+  assert.deepEqual(warnLinesOf("error 0件、warn 0件、info 0件", "/tmp/x", "y"), []);
 });
 
-test("CB-T1241 warn の帯は先頭 MAX_WARN_LINES 件までで、超えた分は「ほか N 件」の 1 行にする。以下ならそのまま", () => {
+test("CB-T1241 warnの帯は先頭MAX_WARN_LINES件までで、超えた分は「ほかN件」の1行にする。以下ならそのまま", () => {
   const warns = (n: number) => Array.from({ length: n }, (_, i) => `warn: w${i}: 本文`).join("\n");
   const atLimit = warnLinesOf(warns(MAX_WARN_LINES), "/tmp/x", "y");
   assert.equal(atLimit.length, MAX_WARN_LINES);
@@ -56,5 +56,5 @@ test("CB-T1241 warn の帯は先頭 MAX_WARN_LINES 件までで、超えた分�
   const over = warnLinesOf(warns(MAX_WARN_LINES + 3), "/tmp/x", "y");
   assert.equal(over.length, MAX_WARN_LINES + 1);
   assert.equal(over[0], "warn: w0: 本文");
-  assert.equal(over[MAX_WARN_LINES], "ほか 3 件。`ccnavi --lint` で全部見られます");
+  assert.equal(over[MAX_WARN_LINES], "ほか3件。`ccnavi --lint`で全部見られます");
 });

@@ -1,16 +1,16 @@
 /**
- * ルール管理とリスク管理が見せる「統合結果」（共通の設定 + 1 つの設定）の読み取り用の表示と、フェーズ管理が見せる共通の設定の定義を、
- * ボードの JSON（`sums[]`）から取り出す。
+ * ルール管理とリスク管理が見せる「統合結果」（共通の設定 + 1つの設定）の読み取り用の表示と、フェーズ管理が見せる共通の設定の定義を、
+ * ボードのJSON（`sums[]`）から取り出す。
  *
  * 統合結果は実行ファイルが判定と同じ関数で組んで出す。ここは形を整えて渡すだけ。ワークスペースの統合結果は「共通の設定 + ワークスペースの設定」、プロジェクトの統合結果は
- * 「共通の設定 + そのプロジェクトの設定」で、パスを持たないツール（Bash など）が適用する、全プロジェクトの設定を足した和ではない。
+ * 「共通の設定 + そのプロジェクトの設定」で、パスを持たないツール（Bashなど）が適用する、全プロジェクトの設定を足した和ではない。
  *
- * ここは vscode にも DOM にも触れない。拡張ホストと画面の両方から読まれる。
+ * ここはvscodeにもDOMにも触れない。拡張ホストと画面の両方から読まれる。
  */
 import type { BoardJson, SumFactorJson, SumJson, SumRuleJson } from "./model.js";
 import type { CommonPhase } from "./phases-view.js";
 
-/** ルール管理が見せる統合結果 1 件 */
+/** ルール管理が見せる統合結果1件 */
 export interface RulesSum {
   /** `self` / プロジェクトの名前 */
   readonly name: string;
@@ -28,7 +28,7 @@ export interface RulesSum {
   readonly allow: readonly SumRuleJson[];
 }
 
-/** リスク管理が見せる統合結果 1 件 */
+/** リスク管理が見せる統合結果1件 */
 export interface RiskSum {
   readonly name: string;
   readonly label: string;
@@ -46,12 +46,12 @@ export function sumLabel(name: string): string {
   return name === "self" ? "共通 + ワークスペース" : `共通 + プロジェクト（${name}）`;
 }
 
-/** 層の名前（`common` / `self` / プロジェクト名）を画面の言い方にする */
+/** レイヤーの名前（`common` / `self` / プロジェクト名）を画面の言い方にする */
 export function layerLabel(name: string): string {
   return name === "common" ? "共通" : name === "self" ? "ワークスペース" : `プロジェクト（${name}）`;
 }
 
-/** 統合結果の層を「共通 + ワークスペース」の形に並べる */
+/** 統合結果のレイヤーを「共通 + ワークスペース」の形に並べる */
 export function layersText(layers: readonly string[]): string {
   return layers.map(layerLabel).join(" + ");
 }
@@ -91,7 +91,7 @@ export function defaultSum(sums: readonly { readonly name: string }[], target: {
   return sums.find((s) => s.name === want)?.name ?? sums[0]?.name ?? "";
 }
 
-/** 出どころが共通の設定であることを言う `source` の値 */
+/** 出どころが共通の設定であることを言う`source`の値 */
 const COMMON_SOURCE = "common";
 
 /**

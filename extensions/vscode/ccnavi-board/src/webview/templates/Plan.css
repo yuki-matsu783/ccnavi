@@ -1,5 +1,5 @@
 /*
- * 計画の表（`Plan.tsx`）。狭い幅で表がはみ出すときは外側の div を横に送る。
+ * 計画の表（`Plan.tsx`）。狭い幅で表がはみ出すときは外側のdivを横に送る。
  */
 .tpl-plan-wrap { overflow-x: auto; margin: 0 0 10px; }
 .tpl-plan { border-collapse: collapse; min-width: 100%; font-size: var(--font-md); }

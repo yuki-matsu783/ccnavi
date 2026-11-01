@@ -1,5 +1,5 @@
 /*
- * 下書き 1 件（`Draft.tsx`）。見出しの作りは `Template.css` と同じで、本体は縦に並べる。
+ * 下書き1件（`Draft.tsx`）。見出しの作りは`Template.css`と同じで、本体は縦に並べる。
  */
 .row.draft > .row-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-2) var(--gap-4); }
 .row.draft > .row-head:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }

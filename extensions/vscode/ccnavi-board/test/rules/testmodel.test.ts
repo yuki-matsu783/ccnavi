@@ -10,7 +10,7 @@ function read(name: string): string {
   return fs.readFileSync(path.join(FIXTURES, name), "utf8");
 }
 
-test("CB-T37 --test --json のフィクスチャ（実行ファイルの出力）を読める", () => {
+test("CB-T37 --test --jsonのフィクスチャ（実行ファイルの出力）を読める", () => {
   const parsed = parseTestJson(read("test.json"));
   assert.equal(parsed.ok, true);
   if (!parsed.ok) {
@@ -30,7 +30,7 @@ test("CB-T37 --test --json のフィクスチャ（実行ファイルの出力�
   assert.match(t.response, /push/);
 });
 
-test("CB-T38 --test-expectations --json のフィクスチャを読める", () => {
+test("CB-T38 --test-expectations --jsonのフィクスチャを読める", () => {
   const parsed = parseExpectationsJson(read("expectations.json"));
   assert.equal(parsed.ok, true);
   if (!parsed.ok) {
@@ -48,7 +48,7 @@ test("CB-T38 --test-expectations --json のフィクスチャを読める", () =
   assert.equal(skipped.ok, true);
 });
 
-test("CB-T39 版が違う・JSON でない・オブジェクトでないときは理由を返す", () => {
+test("CB-T39 版が違う・JSONでない・オブジェクトでないときは理由を返す", () => {
   const other = read("test.json").replace(`"version": ${TEST_VERSION}`, `"version": ${TEST_VERSION + 1}`);
   const parsed = parseTestJson(other);
   assert.equal(parsed.ok, false);
@@ -71,10 +71,10 @@ test("CB-T40 欠けた項目は既定値で埋め、全体を破棄しない", (
   }
 });
 
-test("CB-T396 ヒットしたルールの source は file だけを file と読み、ほかは outside に倒す", () => {
+test("CB-T396 ヒットしたルールのsourceはfileだけをfileと読み、ほかはoutsideに倒す", () => {
   const rules = [
     { id: "a", source: "file" },
-    { id: "builtin:ticket-state", source: "outside", section: "deny", kind: "regex", written: "x…（全 999 字）" },
+    { id: "builtin:ticket-state", source: "outside", section: "deny", kind: "regex", written: "x…（全999字）" },
     { id: "b", source: "builtin" },
     { id: "c" },
   ];

@@ -1,5 +1,5 @@
 /*
- * カード 1 枚（`Card.tsx`）。見出し（タイトル・ID・状態のバッジ）・位置・MR・ユーザ待ち・注意・親のフェーズ一覧・補助の操作・詳細。
+ * カード1枚（`Card.tsx`）。見出し（タイトル・ID・状態のバッジ）・位置・MR・ユーザ待ち・注意・親のフェーズ一覧・補助の操作・詳細。
  */
 .card {
   position: relative;
@@ -11,7 +11,7 @@
   outline: 1px solid var(--vscode-focusBorder);
   background: var(--vscode-list-hoverBackground);
 }
-/* HC のホバーの点線。疑似要素に描き、上の outline（実線。焦点の輪でもある）には触らない。他のテーマでは透明 */
+/* HCのホバーの点線。疑似要素に描き、上のoutline（実線。焦点の輪でもある）には触らない。他のテーマでは透明 */
 .card:hover::after { content: ""; position: absolute; inset: 0; border-radius: var(--radius-lg); pointer-events: none; border: 1px dashed var(--vscode-contrastActiveBorder, transparent); }
 .card.has-issue { border-left: 3px solid var(--vscode-editorWarning-foreground); }
 .card.pending { border-left: 3px solid var(--vscode-charts-blue); }
@@ -21,7 +21,7 @@
    **時間では消さない。** 承認の直後は渡す文のオーバーレイがボードを覆っていて、動く瞬間そのものを
    ユーザが見られないので、次に何かが動くまで動いた表示を残す（`core/board-moved.ts`）。
    左の縁は不備・承認待ち・レビュー待ちが使っているので、こちらは輪（box-shadow）で出して上書きしない。
-   HC のテーマでは輪を contrast の色に振り替える（他のテーマでは緑のまま）。
+   HCのテーマでは輪をcontrastの色に振り替える（他のテーマでは緑のまま）。
    色だけに頼らず、どこからどこへ動いたかは帯（`.moved-mark`）の文で言う */
 .card.moved { box-shadow: 0 0 0 1px var(--vscode-contrastActiveBorder, var(--vscode-charts-green)); animation: ccnavi-moved 1.1s ease-out 2; }
 @keyframes ccnavi-moved {
@@ -32,8 +32,8 @@
 @media (prefers-reduced-motion: reduce) { .card.moved { animation: none; } }
 .moved-mark { margin-top: 4px; font-size: var(--font-xs); font-weight: 600; color: var(--vscode-charts-green); }
 .card.hidden { display: none; }
-/* 見出し。タイトルを主にし、ID は補助にする。DOM の並びは ID・タイトル・バッジのまま、order でタイトルを先頭に出す。
-   バッジは右端に 1 つ（狭くて収まらなければ次の行の右端へ回る） */
+/* 見出し。タイトルを主にし、IDは補助にする。DOMの並びはID・タイトル・バッジのまま、orderでタイトルを先頭に出す。
+   バッジは右端に1つ（狭くて収まらなければ次の行の右端へ回る） */
 .card-head { display: flex; gap: var(--gap-1) var(--gap-3); align-items: baseline; flex-wrap: wrap; }
 .num { font-weight: 600; font-variant-numeric: tabular-nums; }
 .title { flex: 1 1 8em; min-width: 0; overflow-wrap: anywhere; }
@@ -44,12 +44,12 @@
 }
 .card-head .title { order: 0; font-weight: 600; }
 .card-head .status { order: 2; }
-/* タイトルが空のカードは ID が唯一の識別なので、省略せず折り返し、目立つ見た目にする */
+/* タイトルが空のカードはIDが唯一の識別なので、省略せず折り返し、目立つ見た目にする */
 .card-head:has(.title:empty) .num {
   order: 0; flex: 1 1 8em; font-size: inherit; font-weight: 600; color: inherit;
   white-space: normal; overflow: visible; overflow-wrap: anywhere;
 }
-/* 状態のバッジ。色だけに頼らず、言葉を必ず出す。文字と枠の色は文字用の色（`App.css` の `--board-*-text`）で、地に対して 4.5:1 以上。
+/* 状態のバッジ。色だけに頼らず、言葉を必ず出す。文字と枠の色は文字用の色（`App.css`の`--board-*-text`）で、地に対して4.5:1以上。
    ユーザ待ち（承認待ち・レビュー待ち）は塗り、確認が要るもの（要確認）は警告の色、それ以外は枠だけ */
 .status {
   margin-left: auto; flex: 0 0 auto; white-space: nowrap;
@@ -64,9 +64,9 @@
 /* 「親 <長い名前> / フェーズ名」はカードより長くなる。折り返して、はみ出さないようにする */
 .where, .stage { margin-top: 2px; min-width: 0; max-width: 100%; font-size: var(--font-sm); color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
 .card-mr { margin-top: 2px; font-size: var(--font-sm); color: var(--vscode-descriptionForeground); }
-/* バッジはユーザが動く必要がある状態だけ。属性は枠無しの薄い文字で 1 行に並べる。
-   角の丸みは 1 行のときに丸く見える分だけにする（999px だと 2 行に折れたときに縁が楕円に崩れる）。
-   文字と枠の色はどちらも文字用の色（`App.css` の `--board-*-text`）で、地に対して 4.5:1 以上 */
+/* バッジはユーザが動く必要がある状態だけ。属性は枠無しの薄い文字で1行に並べる。
+   角の丸みは1行のときに丸く見える分だけにする（999pxだと2行に折れたときに縁が楕円に崩れる）。
+   文字と枠の色はどちらも文字用の色（`App.css`の`--board-*-text`）で、地に対して4.5:1以上 */
 .badges { display: flex; flex-wrap: wrap; gap: var(--gap-2); margin-top: 6px; }
 .badge {
   font-size: var(--font-xs); padding: 0 6px; border-radius: var(--radius-chip);
@@ -80,13 +80,13 @@
 .badge.preds { color: var(--board-warn-text); }
 .badge-id { white-space: nowrap; }
 .badge.worktree.none, .badge.issue, .badge.unsent { color: var(--board-warn-text); }
-/* 親のフェーズ一覧。1 フェーズ 1 行。左の丸がフェーズで、右が状態。依頼へのリンクとボタンは 2 段目（.phase-actions）。
+/* 親のフェーズ一覧。1フェーズ1行。左の丸がフェーズで、右が状態。依頼へのリンクとボタンは2段目（.phase-actions）。
    状態は全文（状態・マーカー・レビューの要否・リスクの点と理由）だけを出し、狭ければ折り返す。
-   右の列を auto にすると状態の 1 行分の幅が行を占め、フェーズ名の列が 0 になって省略記号ごと
-   消えるので、状態の列は 55% で止める。状態は項目（.phase-item）ごとに折り返さない塊にし、
-   折り返すのは項目の間だけにする（1 項目が列より長いときだけ項目の中で折る）。
-   丸は 1 行目の高さの真ん中に置く。行が 2 段以上になっても縦の真ん中へずれない。
-   フェーズ一覧が 300px 以下（4 列並べたときのカード）では、名前と状態を縦 2 段にして名前に幅を渡す */
+   右の列をautoにすると状態の1行分の幅が行を占め、フェーズ名の列が0になって省略記号ごと
+   消えるので、状態の列は55% で止める。状態は項目（.phase-item）ごとに折り返さない塊にし、
+   折り返すのは項目の間だけにする（1項目が列より長いときだけ項目の中で折る）。
+   丸は1行目の高さの真ん中に置く。行が2段以上になっても縦の真ん中へずれない。
+   フェーズ一覧が300px以下（4列並べたときのカード）では、名前と状態を縦2段にして名前に幅を渡す */
 .phases { list-style: none; margin: 8px 0 0; padding: 6px 0 0; border-top: 1px solid var(--vscode-panel-border); font-size: var(--font-sm); display: flex; flex-direction: column; gap: var(--gap-2); container-type: inline-size; }
 .phase { display: grid; grid-template-columns: 12px minmax(0, 1fr) fit-content(55%); gap: var(--gap-1) var(--gap-3); align-items: baseline; color: var(--vscode-descriptionForeground); }
 .phase-dot { box-sizing: border-box; width: 10px; height: 10px; border-radius: var(--radius-round); border: 1.5px solid var(--vscode-descriptionForeground); align-self: start; margin-top: calc((1lh - 10px) / 2); }
@@ -104,10 +104,10 @@
 .phase-active .phase-status { color: var(--board-info-text); }
 .phase.review-hold .phase-label, .phase.review-hold .phase-status { color: var(--board-error-text); }
 .phase.phase-check .phase-status { color: var(--board-warn-text); font-weight: 600; }
-/* 手で動かした子の確認待ち・移動が未共有など、ユーザが対応する注意。状態の下に 1 行 */
+/* 手で動かした子の確認待ち・移動が未共有など、ユーザが対応する注意。状態の下に1行 */
 .phase-manual { grid-column: 2 / -1; min-width: 0; color: var(--board-warn-text); overflow-wrap: anywhere; }
 
-/* ユーザ待ち。ユーザができることがあるときだけ出る。主ボタンは 1 つ。見出しは小さく、本文とボタンを縦に並べる */
+/* ユーザ待ち。ユーザができることがあるときだけ出る。主ボタンは1つ。見出しは小さく、本文とボタンを縦に並べる */
 .turn {
   margin-top: 8px; padding: 6px 8px; border-radius: var(--radius-md);
   background: var(--vscode-list-inactiveSelectionBackground, transparent);
@@ -117,10 +117,10 @@
 .turn-text { margin: 2px 0 0; font-size: var(--font-md); overflow-wrap: anywhere; }
 .turn-buttons { display: flex; flex-wrap: wrap; gap: var(--gap-2) var(--gap-3); margin-top: 6px; min-width: 0; }
 
-/* 操作ボタン（承認・MR を開く・レビュー完了・フロー・計画編集・テンプレートの下書き）。
-   共通の `button.action` は使わない。文字サイズ・高さ・余白は絶対値で決め、親（カード・フェーズ一覧・列）の文字サイズを引き継がない
-   （フェーズ一覧は小さい文字なので、`font: inherit` だとそこのボタンだけ小さくなる）。
-   狭い列では幅に収まらない言葉をボタンの中で折り返す。操作の MR リンク（`a.card-button`）も同じ寸法。
+/* 操作ボタン（承認・MRを開く・レビュー完了・フロー・計画編集・テンプレートの下書き）。
+   共通の`button.action`は使わない。文字サイズ・高さ・余白は絶対値で決め、親（カード・フェーズ一覧・列）の文字サイズを引き継がない
+   （フェーズ一覧は小さい文字なので、`font: inherit`だとそこのボタンだけ小さくなる）。
+   狭い列では幅に収まらない言葉をボタンの中で折り返す。操作のMRリンク（`a.card-button`）も同じ寸法。
    詳細の中のリンクは普通のリンクのままで、これを付けない */
 .card-button {
   box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;
@@ -138,7 +138,7 @@ a.card-button, a.card-button:hover, a.card-button:focus, a.card-button:active { 
 .card-button.primary, a.card-button.primary, a.card-button.primary:hover { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: transparent; }
 .card-button.primary:hover { background: var(--vscode-button-hoverBackground); }
 .card-button:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; border-color: transparent; }
-/* フェーズ行のボタン。行の 2 段目に左寄せで並べる */
+/* フェーズ行のボタン。行の2段目に左寄せで並べる */
 .phase-actions { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: var(--gap-2) var(--gap-3); align-items: center; min-width: 0; margin-top: 2px; }
 /* 補助の操作（フロー・計画編集・テンプレートの下書き）。通常の色 */
 .card-actions { display: flex; flex-wrap: wrap; gap: var(--gap-2) var(--gap-3); margin-top: 8px; min-width: 0; }

@@ -1,7 +1,7 @@
 /**
- * 「MR の状況を確認」の遷移と、画面に渡す形。「いまの状態 ＋ 入力 → 次の状態 ＋ やること」だけをここに置く。
- * VS Code の API には触れない（外へ出る仕事は `MergeEffect` として返すだけで、行うのは `board-panel.ts`）。
- * `approval-machine.ts` と同じ段取り: 返った状態を持ち直し、描き直し、やることを順に行う。
+ * 「MRの状況を確認」の遷移と、画面に渡す形。「いまの状態 ＋ 入力 → 次の状態 ＋ やること」だけをここに置く。
+ * VS CodeのAPIには触れない（外へ出る仕事は`MergeEffect`として返すだけで、行うのは`board-panel.ts`）。
+ * `approval-machine.ts`と同じ段取り: 返った状態を持ち直し、描き直し、やることを順に行う。
  *
  * 結果は、ボードが開いている間だけ拡張ホストが持つ（パネルの状態）。タブを隠して画面が作り直されても残り、
  * ボードを閉じて開き直すと消える。**頼んだ状態でなければ受けない**: 確認ごとに世代（`token`）を振り、
@@ -15,21 +15,21 @@
  * | 一覧と状態を受けるのは、頼んだ世代の確認中だけ | 前の確認の遅れた答えや、閉じたあとの答えが画面に出る |
  * | 状態が分かった親が全部そろったら確認を終える | 確認中のまま戻らない |
  * | 「片付ける」はマージ済みと確認できた親だけ | マージ待ち・閉じた・確認できない親の片付けが起きる |
- * | 同じ親の「片付ける」は、ダイアログを開いている間と送っている間は再入させない | 確認が二重に出て、コマンドが 2 回送られる |
+ * | 同じ親の「片付ける」は、ダイアログを開いている間と送っている間は再入させない | 確認が二重に出て、コマンドが2回送られる |
  * | 送ったあとは、次の確認まで押せない | 同じコマンドを何度も送る |
  * | 送れなかったときは「送信しました」と言わず、理由を出して押し直せる | 送れていないのに済んだと読まれる |
  */
 import type { IncompleteEntry, MrStateResult, RetiredEntry, RetiredParse } from "./mrstate.js";
 import { projectOfRepo } from "./mrstate.js";
 
-/** 画面の 1 行の確認結果 */
+/** 画面の1行の確認結果 */
 export type RowResult = MrStateResult | { readonly kind: "incomplete"; readonly reason: string };
 
 export interface MergeRow {
   readonly parent: string;
-  /** ボードの `project`（ワークスペースは空） */
+  /** ボードの`project`（ワークスペースは空） */
   readonly project: string;
-  /** `self` かプロジェクトの名前 */
+  /** `self`かプロジェクトの名前 */
   readonly repo: string;
   readonly mr: number | null;
   /** 確認の結果。まだなら無い（確認中） */
@@ -62,27 +62,27 @@ export interface MergeState {
 export const MERGE_IDLE: MergeState = { checking: false, token: 0, checkedAt: "", list: { kind: "none" }, sent: [], confirming: [], sendErrors: {} };
 
 export type MergeInput =
-  /** 「MR の状況を確認」を押した */
+  /** 「MRの状況を確認」を押した */
   | { readonly kind: "check" }
   /** 一覧（`sync retired`）が返った */
   | { readonly kind: "listed"; readonly token: number; readonly result: RetiredParse; readonly at: string }
-  /** 1 件の `mr-state` が返った（失敗・期限切れもここに入る。その親だけに留める） */
+  /** 1件の`mr-state`が返った（失敗・期限切れもここに入る。その親だけに留める） */
   | { readonly kind: "stated"; readonly token: number; readonly parent: string; readonly result: MrStateResult; readonly at: string }
   /** 「片付ける」を押した */
   | { readonly kind: "retire"; readonly parent: string }
-  /** 確認のダイアログに答えた（`accepted` は「実行する」を選んだか） */
+  /** 確認のダイアログに答えた（`accepted`は「実行する」を選んだか） */
   | { readonly kind: "retireAnswered"; readonly parent: string; readonly accepted: boolean }
   /** 片付けのコマンドをターミナルへ送った結果（送れなかったときは理由）。送った＝実行の成功ではない */
   | { readonly kind: "retireSent"; readonly parent: string; readonly error: string | undefined };
 
 export type MergeEffect =
-  /** 片付けの記録を持つ親の一覧を読む（`ccnavi sync retired`）。返ったら `listed` で戻す */
+  /** 片付けの記録を持つ親の一覧を読む（`ccnavi sync retired`）。返ったら`listed`で戻す */
   | { readonly kind: "loadList"; readonly token: number }
-  /** 1 件の MR の状況を聞く（そのリポジトリを cwd にして `ccnavi-review.sh mr-state <番号>`）。返ったら `stated` で戻す */
+  /** 1件のMRの状況を聞く（そのリポジトリをcwdにして`ccnavi-review.sh mr-state <番号>`）。返ったら`stated`で戻す */
   | { readonly kind: "loadState"; readonly token: number; readonly parent: string; readonly repo: string; readonly mr: number }
-  /** 片付けの確認のダイアログを出す。答えは `retireAnswered` で戻す */
+  /** 片付けの確認のダイアログを出す。答えは`retireAnswered`で戻す */
   | { readonly kind: "confirmRetire"; readonly parent: string }
-  /** 片付けのコマンドをターミナルへ送る。結果は `retireSent` で戻す */
+  /** 片付けのコマンドをターミナルへ送る。結果は`retireSent`で戻す */
   | { readonly kind: "sendRetire"; readonly parent: string }
   /** ユーザに言う（警告） */
   | { readonly kind: "warn"; readonly text: string };
@@ -157,9 +157,9 @@ function listed(state: MergeState, input: { readonly token: number; readonly res
 
 function rowOf(e: RetiredEntry): MergeRow {
   const base = { parent: e.parent, project: projectOfRepo(e.repo), repo: e.repo, mr: e.mr };
-  // 記録に MR の番号が無い（読めない）親は聞きようが無い。確認できないものとして、その親だけに留める
+  // 記録にMRの番号が無い（読めない）親は聞きようが無い。確認できないものとして、その親だけに留める
   return e.mr === null
-    ? { ...base, result: { kind: "unknown", reason: "no-number", detail: "片付けの記録に MR の番号がありません" } }
+    ? { ...base, result: { kind: "unknown", reason: "no-number", detail: "片付けの記録にMRの番号がありません" } }
     : base;
 }
 
@@ -203,7 +203,7 @@ function retireAsked(state: MergeState, parent: string): MergeStep {
   const row = rowOfParent(state, parent);
   // マージ済みと確認できた親だけ。画面が古いボードのまま押した場合もここで止める
   if (row === undefined || row.result?.kind !== "merged") {
-    return stay(state, { kind: "warn", text: `親 ${parent} は、マージ済みと確認できていません。もう一度「MR の状況を確認」を押してください` });
+    return stay(state, { kind: "warn", text: `親${parent}は、マージ済みと確認できていません。もう一度「MRの状況を確認」を押してください` });
   }
   // ダイアログを開いている間・送っている間・送ったあとは再入させない
   if (state.confirming.includes(parent) || state.sent.includes(parent)) {
@@ -219,7 +219,7 @@ function retireAnswered(state: MergeState, parent: string, accepted: boolean): M
   if (!accepted) {
     return move({ ...state, confirming: state.confirming.filter((p) => p !== parent) });
   }
-  // 送り終わるまで confirming に残す（その間の再入を止める）
+  // 送り終わるまでconfirmingに残す（その間の再入を止める）
   return stay(state, { kind: "sendRetire", parent });
 }
 
@@ -244,13 +244,13 @@ export interface MergeViewRow {
   readonly project: string;
   readonly mr: number | null;
   readonly state: MergeRowState;
-  /** open のとき Draft か */
+  /** openのときDraftか */
   readonly draft: boolean;
-  /** open / merged / closed のとき、MR の URL（画面は http(s) のときだけリンクにする） */
+  /** open / merged / closedのとき、MRのURL（画面はhttp(s)のときだけリンクにする） */
   readonly url: string;
-  /** unknown のとき、種類（`UnknownKind`）。incomplete のときは空 */
+  /** unknownのとき、種類（`UnknownKind`）。incompleteのときは空 */
   readonly reason: string;
-  /** unknown / incomplete のとき、理由 */
+  /** unknown / incompleteのとき、理由 */
   readonly detail: string;
   /** 片付けのコマンドを送った（次の確認まで押せない） */
   readonly sent: boolean;
@@ -259,7 +259,7 @@ export interface MergeViewRow {
   /** 送れなかった理由。空なら無い */
   readonly sendError: string;
   /**
-   * closed のとき、破棄した親の記録を消すコマンド（`sh <ルート>/.ccnavi/scripts/ccnavi-launcher.sh worktree retire --abandon <親>`）。
+   * closedのとき、破棄した親の記録を消すコマンド（`sh <ルート>/.ccnavi/scripts/ccnavi-launcher.sh worktree retire --abandon <親>`）。
    * 見せるだけで、ボードからは送らない（コピーのボタンも拡張ホストが同じ関数で組み直したものをコピーする）
    */
   readonly abandon: string;
@@ -276,8 +276,8 @@ export interface MergeView {
 }
 
 /**
- * 画面に渡す形にする。まだ一度も確認していなければ undefined（帯を出さない）。
- * `abandonOf` は破棄した親の記録を消すコマンドの組み方（`commands.ts` の `abandonCommand`。node を読む部品はここに入れない）
+ * 画面に渡す形にする。まだ一度も確認していなければundefined（帯を出さない）。
+ * `abandonOf`は破棄した親の記録を消すコマンドの組み方（`commands.ts`の`abandonCommand`。nodeを読む部品はここに入れない）
  */
 export function mergeView(state: MergeState, abandonOf: (parent: string) => string): MergeView | undefined {
   if (!state.checking && state.checkedAt === "" && state.list.kind === "none") {

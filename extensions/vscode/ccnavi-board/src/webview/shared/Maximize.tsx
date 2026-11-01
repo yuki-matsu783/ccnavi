@@ -1,18 +1,18 @@
 /**
- * 図を画面いっぱいに出す部品。図の枠に `maximizeClass(maximized)` と `ref` を付け、枠の中に `MaximizeButton` を置く。
+ * 図を画面いっぱいに出す部品。図の枠に`maximizeClass(maximized)`と`ref`を付け、枠の中に`MaximizeButton`を置く。
  * 出している間は枠が画面全体を覆い（`Maximize.css`）、ほかの表示は隠れる。
  *
- * - **ほかの表示は触れない。** 枠から `body` までの道すじの兄弟に `inert` を付け、Tab でも読み上げでも入れなくする
- *   （戻すときに外す）。`body` には `data-graph-max` を付け、画面のキー操作（元に戻す・貼り付けなど）が見えない文書を
+ * - **ほかの表示は触れない。** 枠から`body`までの道すじの兄弟に`inert`を付け、Tabでも読み上げでも入れなくする
+ *   （戻すときに外す）。`body`には`data-graph-max`を付け、画面のキー操作（元に戻す・貼り付けなど）が見えない文書を
  *   直さないよう、画面側が見て止められるようにする。出すとフォーカスをボタンへ移し、戻すとボタンへ戻す。
- * - **Esc は図が先に受ける。** `useEscape` の層（`ESCAPE_LAYER.maximize`）で受けるので、背後の承認オーバーレイなどは Esc では閉じない（より手前の案内の吹き出しが出ていれば、そちらが先に受ける）。
- * - 大きさが変わると React Flow は全体を映し直さないので、`RefitOnChange` を図の中に置く。
+ * - **Escは図が先に受ける。** `useEscape`のレイヤー（`ESCAPE_LAYER.maximize`）で受けるので、背後の承認オーバーレイなどはEscでは閉じない（より手前の案内の吹き出しが出ていれば、そちらが先に受ける）。
+ * - 大きさが変わるとReact Flowは全体を映し直さないので、`RefitOnChange`を図の中に置く。
  */
 import { useEffect, useRef, useState, type JSX, type RefObject } from "react";
 import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
 import { useReactFlow, useStore, type Viewport } from "@xyflow/react";
 
-/** 出している間 `body` に付ける属性 */
+/** 出している間`body`に付ける属性 */
 export const GRAPH_MAX_ATTR = "data-graph-max";
 
 /** 全画面を出している間か（画面のキー操作が止めるのに使う） */
@@ -20,7 +20,7 @@ export function graphMaximized(): boolean {
   return document.body.hasAttribute(GRAPH_MAX_ATTR);
 }
 
-/** 出しているかと、切り替えと、図の枠につける ref */
+/** 出しているかと、切り替えと、図の枠につけるref */
 export function useMaximize(): readonly [boolean, () => void, RefObject<HTMLDivElement | null>] {
   const [maximized, setMaximized] = useState(false);
   const box = useRef<HTMLDivElement | null>(null);
@@ -71,8 +71,8 @@ export function MaximizeButton({ maximized, onToggle }: { readonly maximized: bo
       className="action small graph-max-button nodrag nopan"
       data-action="toggle-maximize"
       aria-pressed={maximized}
-      aria-label={maximized ? "全画面を閉じる" : "図を全画面で表示"}
-      title={maximized ? "全画面を閉じる（Esc）" : "図を全画面で表示"}
+      aria-label={maximized ? "全画面表示を閉じる" : "図を全画面で表示"}
+      title={maximized ? "全画面表示を閉じる（Esc）" : "図を全画面で表示"}
       onClick={onToggle}
     >
       {maximized ? "✕ 閉じる" : "⛶ 拡大"}
@@ -81,9 +81,9 @@ export function MaximizeButton({ maximized, onToggle }: { readonly maximized: bo
 }
 
 /**
- * 全画面の出し入れで枠の大きさが変わったら映し直す（React Flow の中に置く）。出すときは全体を映し、戻すときは出す前の
- * 見え方（拡大・位置）に戻す。React Flow が新しい大きさを測り終えた（`width` `height` が替わった）ときに合わせる。
- * 大きさが替わらなかったとき用に、遅れて 1 度だけ合わせる。
+ * 全画面の出し入れで枠の大きさが変わったら映し直す（React Flowの中に置く）。出すときは全体を映し、戻すときは出す前の
+ * 見え方（拡大・位置）に戻す。React Flowが新しい大きさを測り終えた（`width` `height`が替わった）ときに合わせる。
+ * 大きさが替わらなかったとき用に、遅れて1度だけ合わせる。
  */
 export function RefitOnChange({ value }: { readonly value: boolean }): null {
   const flow = useReactFlow();

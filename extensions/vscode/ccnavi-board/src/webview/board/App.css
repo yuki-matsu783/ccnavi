@@ -1,13 +1,13 @@
 /*
  * ボード画面の骨組み（`App.tsx`）。ツールバーの絞り込み、列、列の幅の取っ手、畳んだ列、カードの入れ物。
- * カード 1 枚は `Card.css`、承認のオーバーレイは `Approval.css` が持つ。
+ * カード1枚は`Card.css`、承認のオーバーレイは`Approval.css`が持つ。
  */
 /* 意味の色を文字に使うときの色。テーマの警告・情報（charts-blue）・誤りは、地によっては文字として
-   4.5:1 に届かない（Light Modern の警告 #BF8803 はカードの地 #F8F8F8 に 2.9:1）。前景色に寄せて混ぜ、
-   色味を残したまま濃くする。割合は Light Modern・Dark Modern・Claude のライトとダークで、カードの地と
-   ホバーの地のどちらにも 4.5:1 以上になる値（警告 55% で Light Modern 4.85:1、情報 60% で 5.10:1、
-   誤り 70% で Dark Modern 4.86:1）。枠や縁や丸に使う色はテーマの色のまま。
-   body に置くのは、Claude の配色（`appearance.css`）が body で変数を上書きするため */
+   4.5:1に届かない（Light Modernの警告 #BF8803はカードの地 #F8F8F8に2.9:1）。前景色に寄せて混ぜ、
+   色味を残したまま濃くする。割合はLight Modern・Dark Modern・Claudeのライトとダークで、カードの地と
+   ホバーの地のどちらにも4.5:1以上になる値（警告55% でLight Modern 4.85:1、情報60% で5.10:1、
+   誤り70% でDark Modern 4.86:1）。枠や縁や丸に使う色はテーマの色のまま。
+   bodyに置くのは、Claudeの配色（`appearance.css`）がbodyで変数を上書きするため */
 body {
   --board-warn-text: color-mix(in srgb, var(--vscode-editorWarning-foreground) 55%, var(--vscode-foreground));
   --board-yellow-text: color-mix(in srgb, var(--vscode-charts-yellow) 55%, var(--vscode-foreground));
@@ -17,19 +17,19 @@ body {
 .toolbar { padding-bottom: 12px; }
 .summary .counts { color: var(--vscode-descriptionForeground); }
 .summary .issues.warn { color: var(--board-warn-text); }
-/* select は既定で一番長い選択肢の幅に広がり、親のタイトルが長いとページごと横に流れる。幅は --w-field で止め、
+/* selectは既定で一番長い選択肢の幅に広がり、親のタイトルが長いとページごと横に流れる。幅は --w-fieldで止め、
    それより狭い画面では絞り込みの入れ物ごと縮める。はみ出す選択肢は省略記号で切る（開いた一覧には全文が出る）。
-   max-width を % で書くと、入れ物の幅を決める段で適用されず（循環する % は無いものとして扱われる）、入れ物が広がる */
+   max-widthを % で書くと、入れ物の幅を決める段で適用されず（循環する % は無いものとして扱われる）、入れ物が広がる */
 .toolbar .controls { min-width: 0; max-width: 100%; }
 .filter { display: flex; gap: var(--gap-3); align-items: center; color: var(--vscode-descriptionForeground); min-width: 0; max-width: 100%; }
 .filter select { flex: 0 1 auto; min-width: 0; max-width: var(--w-field); text-overflow: ellipsis; }
 .filter.attention { gap: var(--gap-2); cursor: pointer; }
 .filter.attention input { margin: 0; cursor: pointer; }
 .board-empty { padding: 4px; color: var(--vscode-descriptionForeground); }
-/* 列は空きに合わせて伸び縮みする。4 列が 220px ずつ収まらない幅（940px 以下）では、横スクロールをやめて列を縦に積む。
-   右端の取っ手をドラッグした列は幅が px で固定され（.sized）、ダブルクリックで元の伸び縮みに戻る。
-   畳んだ列は見出し 1 行ぶんの幅に縮む。縦書きにはしない。
-   取っ手は列の右の隙間にはみ出して置くが、最後の列だけは内側に置く（外に出すとボードが常に数 px 横に流れる） */
+/* 列は空きに合わせて伸び縮みする。4列が220pxずつ収まらない幅（940px以下）では、横スクロールをやめて列を縦に積む。
+   右端の取っ手をドラッグした列は幅がpxで固定され（.sized）、ダブルクリックで元の伸び縮みに戻る。
+   畳んだ列は見出し1行ぶんの幅に縮む。縦書きにはしない。
+   取っ手は列の右の隙間にはみ出して置くが、最後の列だけは内側に置く（外に出すとボードが常に数px横に流れる） */
 .board { display: flex; gap: var(--gap-5); align-items: flex-start; overflow-x: auto; }
 .column {
   position: relative;
@@ -39,7 +39,7 @@ body {
 .column.sized { flex: 0 0 auto; }
 .resizer { position: absolute; top: 0; bottom: 0; right: -7px; width: 12px; cursor: col-resize; z-index: var(--z-inline); }
 .column:last-child .resizer { right: 0; }
-/* 4 列 × 220px + 隙間 + 余白が収まらない幅（約 940px 以下）では、横スクロールをやめて列を縦に積む */
+/* 4列 × 220px + 隙間 + 余白が収まらない幅（約940px以下）では、横スクロールをやめて列を縦に積む */
 @media (max-width: 940px) {
   .board { flex-direction: column; align-items: stretch; }
   .column { min-width: 0; }
@@ -69,7 +69,7 @@ button.fold:focus-visible { outline: 1px solid var(--vscode-focusBorder); outlin
 .column.folded .fold-mark {
   border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 6px solid currentColor; border-right: 0;
 }
-/* ドラッグで固定した px 幅（インラインの style）より畳んだ状態を優先する。広げたときは固定幅に戻る */
+/* ドラッグで固定したpx幅（インラインのstyle）より畳んだ状態を優先する。広げたときは固定幅に戻る */
 .column.folded { flex: 0 0 auto; min-width: 0; width: auto !important; }
 .column.folded h2 { margin: 0; white-space: nowrap; }
 .column.folded .cards, .column.folded .empty, .column.folded .resizer { display: none; }

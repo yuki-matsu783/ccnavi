@@ -1,12 +1,12 @@
 /**
- * 統合結果（`--explain --json` の `sums[]`）の見本。実行ファイルの出力の形（tests/config/test_config_absent.py が見る形）で、
- * ワークスペースの統合結果（共通 + 自身）とプロジェクト lib の統合結果（共通 + lib）を持つ。
+ * 統合結果（`--explain --json`の`sums[]`）の見本。実行ファイルの出力の形（tests/config/test_config_absent.pyが見る形）で、
+ * ワークスペースの統合結果（共通 + 自身）とプロジェクトlibの統合結果（共通 + lib）を持つ。
  */
 import { parseBoardJson, type BoardJson } from "../../src/core/model.js";
 import { fixture } from "./fixture.js";
 
 const RULE_COMMON = { id: "guard-approved", section: "deny", source: "common", match: "Write|Edit", kind: "glob", written: ".ccnavi/approved/**", pattern: "^\\.ccnavi/approved/.*$", message: "承認済みは書かない" };
-const RULE_LIB = { id: "lib:no-tmp", section: "deny", source: "lib", match: "Write", kind: "regex", written: "tmp/.*", pattern: "tmp/.*", message: "tmp には書かない" };
+const RULE_LIB = { id: "lib:no-tmp", section: "deny", source: "lib", match: "Write", kind: "regex", written: "tmp/.*", pattern: "tmp/.*", message: "tmpには書かない" };
 const RULE_ASK = { id: "lib:deps", section: "ask", source: "lib", match: "Edit", kind: "glob", written: "pyproject.toml", pattern: "^pyproject\\.toml$", message: "" };
 
 function sum(name: string, rules: unknown[], extra: Record<string, unknown> = {}): Record<string, unknown> {
@@ -32,7 +32,7 @@ function sum(name: string, rules: unknown[], extra: Record<string, unknown> = {}
   };
 }
 
-/** `sums` を持つボード。ワークスペースの統合結果と lib の統合結果の 2 件 */
+/** `sums`を持つボード。ワークスペースの統合結果とlibの統合結果の2件 */
 export function sumsBoard(): BoardJson {
   const parsed = parseBoardJson(JSON.stringify({ ...JSON.parse(JSON.stringify(fixture())), sums: [sum("self", [RULE_COMMON]), sum("lib", [RULE_COMMON, RULE_LIB, RULE_ASK])] }));
   if (!parsed.ok) {

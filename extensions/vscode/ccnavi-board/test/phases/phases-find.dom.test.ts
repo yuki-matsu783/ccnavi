@@ -1,5 +1,5 @@
 /**
- * フェーズ管理画面の絞り込み・並べ替え・保存後の warn・文言（#743）を happy-dom で見る。
+ * フェーズ管理画面の絞り込み・並べ替え・保存後のwarn・文言（#743）をhappy-domで見る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -7,7 +7,7 @@ import { REVIEW_OPTIONS } from "../../src/core/phases-view.js";
 import { openPhases, page } from "../helpers/phases.js";
 import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
 
-test("CB-D1240 全角英数字でも絞り込める（NFKC で正規化して比べる）", async () => {
+test("CB-D1240 全角英数字でも絞り込める（NFKCで正規化して比べる）", async () => {
   const dom = await openPhases();
   try {
     dom.type(dom.one("#find"), "ＤＥＳＩＧＮ");
@@ -19,7 +19,7 @@ test("CB-D1240 全角英数字でも絞り込める（NFKC で正規化して比
   }
 });
 
-test("CB-D1241 絞り込み中は上下ボタンを止め、title に理由を出す", async () => {
+test("CB-D1241 絞り込み中は上下ボタンを止め、titleに理由を出す", async () => {
   const dom = await openPhases();
   try {
     const buttons = (): HTMLButtonElement[] => dom.all<HTMLButtonElement>(".phase .buttons button").filter((b) => b.textContent === "↑" || b.textContent === "↓");
@@ -36,7 +36,7 @@ test("CB-D1241 絞り込み中は上下ボタンを止め、title に理由を�
   }
 });
 
-test("CB-D1242 保存後の warn の本文を上部の帯に出し、次の編集で消す", async () => {
+test("CB-D1242 保存後のwarnの本文を上部の帯に出し、次の編集で消す", async () => {
   const dom = await openPhases();
   try {
     await dom.send({ type: "saved", warns: ["warn: design: 重なっています"] });
@@ -52,7 +52,7 @@ test("CB-D1242 保存後の warn の本文を上部の帯に出し、次の編�
   }
 });
 
-test("CB-D1243 review の false に「既定」と書かず、リスト欄の placeholder で区切りは半角 , と言う", async () => {
+test("CB-D1243 reviewのfalseに「既定」と書かず、リスト欄のplaceholderで区切りは半角 , と言う", async () => {
   const falseOption = REVIEW_OPTIONS.find((option) => option.value === "false");
   assert.ok(falseOption !== undefined && !falseOption.label.includes("既定"), falseOption?.label);
   const dom = await openPhases();

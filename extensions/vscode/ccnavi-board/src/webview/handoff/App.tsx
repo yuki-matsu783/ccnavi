@@ -3,8 +3,8 @@
  *
  * 見せる中身は拡張ホストが渡す（`HandoffData`）。画面が自分で持つのは、ユーザが触って決めるもの
  * （選んだ対象、開いている行、確認の帯、直近の結果、ターミナルの案内）だけ。種類・状態・検査・差分・ハッシュは実行ファイルの答えを読むだけで、
- * 取り込めるか・取り込めない理由は `core/handoffmodel.ts` の判断をそのまま使う。
- * 取り込む手順（見るだけをもう一度呼んで `expect` を取る、錠を取り直す）は拡張ホストが持つ（`core/handoff-import.ts`）。
+ * 取り込めるか・取り込めない理由は`core/handoffmodel.ts`の判断をそのまま使う。
+ * 取り込む手順（見るだけをもう一度呼んで`expect`を取る、錠を取り直す）は拡張ホストが持つ（`core/handoff-import.ts`）。
  */
 import { useRef, useState, type JSX } from "react";
 
@@ -32,7 +32,7 @@ function pageOf(data: HandoffData): HandoffPage | undefined {
 export function App({ initial }: { readonly initial: HandoffData }): JSX.Element {
   const [data, setData] = useState<HandoffData>(initial);
   const [lock, setLock] = useState<Lock>(() => pageOf(initial)?.lock ?? NO_LOCK);
-  /** 選んだ対象。パス → 選んだときの `entry_sha`（読み直したあとも同じ中身のものだけ残す） */
+  /** 選んだ対象。パス → 選んだときの`entry_sha`（読み直したあとも同じ中身のものだけ残す） */
   const [selected, setSelected] = useState<ReadonlyMap<string, string>>(() => new Map());
   /** 開いている行のパス */
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
@@ -44,7 +44,7 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
   const [outcome, setOutcome] = useState<HandoffOutcome | undefined>(undefined);
   /** ターミナルで打つコマンドの案内（パス → 答え）。読み直すと古くなるので破棄する */
   const [terminals, setTerminals] = useState<Readonly<Record<string, TerminalState>>>({});
-  /** 届いたメッセージの中で「いまの一覧」を見るための ref（setState の更新関数の中から読むため） */
+  /** 届いたメッセージの中で「いまの一覧」を見るためのref（setStateの更新関数の中から読むため） */
   const pageOfRef = useRef<HandoffPage | undefined>(pageOf(data));
   pageOfRef.current = pageOf(data);
 
@@ -182,7 +182,7 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
           </span>
         </div>
         <div className="controls">
-          <button type="button" className="action" data-action="reload" title="ファイルを再読み込みします" disabled={busy} onClick={refresh}>
+          <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={refresh}>
             更新
           </button>
         </div>
@@ -191,11 +191,11 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
         {lockedPresent ? `テンプレートと設定の取り込みは止めています: ${lock.reason}` : ""}
       </p>
       <p className="count" id="counts">
-        <span>対象 {entries.length} 件</span>・<span>取り込める {selectable.length} 件</span>・<span>選択 {chosen.length} 件</span>・<span>対象外 {page.list.ignored} 件</span>
+        <span>対象{entries.length}件</span>・<span>取り込める{selectable.length}件</span>・<span>選択{chosen.length}件</span>・<span>対象外{page.list.ignored}件</span>
       </p>
       {page.list.ignored_paths.length > 0 && (
         <details id="ignored-paths">
-          <summary>対象外の名前と理由（{page.list.ignored_paths.length} 件）</summary>
+          <summary>対象外の名前と理由（{page.list.ignored_paths.length}件）</summary>
           <ul>
             {page.list.ignored_paths.map((item) => (
               <li key={item.path}>
@@ -211,11 +211,11 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
           取り込み待ち <span className="count">{entries.length}</span>
         </h2>
         <p className="hint">
-          wip/handoff/ に置いた下書きを、同じ相対パスへ取り込みます。取り込めるのは、新規か変更ありで、error が無い対象です。
+          wip/handoff/ に置いた下書きを、同じ相対パスへ取り込みます。取り込めるのは、新規か変更ありで、errorが無い対象です。
         </p>
         {entries.length === 0 ? (
           <p className="empty" data-role="empty">
-            取り込み待ちの下書きはありません。保護対象を直すときは、ccnavi-stage.sh で wip/handoff/ にコピーして編集します。
+            取り込み待ちの下書きはありません。保護対象を直すときは、ccnavi-stage.shでwip/handoff/ にコピーして編集します。
           </p>
         ) : (
           <>
@@ -232,7 +232,7 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
             </div>
             {confirming && (
               <div className="confirm" data-role="confirm" role="alertdialog" aria-label="取り込みの確認">
-                <p>次の {chosen.length} 件を取り込みます。取り込み先のファイルは、差分のとおりに置き換わります。</p>
+                <p>次の{chosen.length}件を取り込みます。取り込み先のファイルは、差分のとおりに置き換わります。</p>
                 <ul>
                   {chosen.map((path) => (
                     <li key={path}>{path}</li>
@@ -272,7 +272,7 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
   );
 }
 
-/** 見るツリーを切り替える欄。選んだ値は `onSwitch` で拡張ホストへ送るだけで、欄の値は `tree` に従う（制御された `<select>`） */
+/** 見るツリーを切り替える欄。選んだ値は`onSwitch`で拡張ホストへ送るだけで、欄の値は`tree`に従う（制御された`<select>`） */
 function TreeSelect({
   tree,
   trees,

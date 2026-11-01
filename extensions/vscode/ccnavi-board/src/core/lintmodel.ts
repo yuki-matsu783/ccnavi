@@ -1,10 +1,10 @@
 /**
- * `ccnavi --lint --json`（lint の JSON）が出す形。実行ファイルと拡張の契約で、拡張はこれ以外を読まない。
- * 形の定義は ccnavi の docs/11_requirements/json-shapes.md「lint の JSON」。
+ * `ccnavi --lint --json`（lintのJSON）が出す形。実行ファイルと拡張の契約で、拡張はこれ以外を読まない。
+ * 形の定義はccnaviのdocs/11_requirements/json-shapes.md「lintのJSON」。
  *
- * 読み手はプロジェクト管理画面。プロジェクトごとの苦情（`projects/` が無視されていない、
+ * 読み手はプロジェクト管理画面。プロジェクトごとの苦情（`projects/`が無視されていない、
  * プロジェクトの中にワークツリーがある）を拾って並べる。判定と同じ深刻度で届くので、
- * 拡張は自分で `.gitignore` やルールの中身を解釈し直さない。
+ * 拡張は自分で`.gitignore`やルールの中身を解釈し直さない。
  */
 
 /** 拡張が読める版。実行ファイルが違う版を出したら、解釈せずに版の違いを伝える */
@@ -14,7 +14,7 @@ export type Severity = "error" | "warn";
 
 export interface LintProblem {
   readonly severity: Severity;
-  /** ユーザ向けの文面で `error:` の後ろに出る場所。`(projects/lib) rule-id` など。ファイル全体への苦情なら空 */
+  /** ユーザ向けの文面で`error:`の後ろに出る場所。`(projects/lib) rule-id`など。ファイル全体への苦情なら空 */
   readonly where: string;
   readonly detail: string;
 }
@@ -30,8 +30,8 @@ export interface LintJson {
   readonly errors: number;
   readonly warns: number;
   /**
-   * `--flow <パス>` を渡したときだけ在る。実行ファイルが読んだフローの中身（`data`。読めなければ null。
-   * JSON にそのまま載らない値は `{"$ccnavi": ...}` のマーカー）。無ければ、実行ファイルがフローを見たか分からない
+   * `--flow <パス>`を渡したときだけ在る。実行ファイルが読んだフローの中身（`data`。読めなければnull。
+   * JSONにそのまま載らない値は`{"$ccnavi": ...}`のマーカー）。無ければ、実行ファイルがフローを見たか分からない
    */
   readonly flow?: LintFlow;
 }
@@ -39,13 +39,13 @@ export interface LintJson {
 export interface LintFlow {
   readonly path: string;
   readonly data: unknown;
-  /** `SubagentStart` で担当に渡る手順の行（`flow_render.render`）。読めなければ null */
+  /** `SubagentStart`で担当に渡る手順の行（`flow_render.render`）。読めなければnull */
   readonly rendered: readonly string[] | null;
   /** フローで選べるサブエージェントとスキルの名前（`flow.catalog`） */
   readonly candidates: LintFlowCandidates;
 }
 
-/** 候補 1 件。`source` は `builtin`（組み込み）か `project`（ワークスペースの `.claude/` の下） */
+/** 候補1件。`source`は`builtin`（組み込み）か`project`（ワークスペースの`.claude/`の下） */
 export interface LintFlowCandidate {
   readonly name: string;
   readonly source: string;
@@ -79,16 +79,16 @@ export function parseLintJson(text: string): ParsedLint {
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `JSON として解釈できません: ${(error as Error).message}` };
+    return { ok: false, error: `JSONとして解釈できません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
-    return { ok: false, error: "JSON の最上位がオブジェクトではありません" };
+    return { ok: false, error: "JSONの最上位がオブジェクトではありません" };
   }
   const version = typeof raw.version === "number" ? raw.version : NaN;
   if (version !== LINT_VERSION) {
     return {
       ok: false,
-      error: `lint の JSON の版が違います（拡張は ${LINT_VERSION}、実行ファイルは ${String(raw.version)}）`,
+      error: `lintのJSONの版が違います（拡張は${LINT_VERSION}、実行ファイルは${String(raw.version)}）`,
     };
   }
   const problems = list(raw.problems).filter(isRecord).map(problem);
@@ -119,10 +119,10 @@ function problem(raw: Record<string, unknown>): LintProblem {
 }
 
 /**
- * `--lint` の報告（文面）から warn の行だけを取り出す。行は `warn: <場所>: <中身>`。
+ * `--lint`の報告（文面）からwarnの行だけを取り出す。行は`warn: <場所>: <中身>`。
  * 保存が通ったあとに画面の帯へ出す。一時ファイルのパスは対象のファイルのパスに直す。
- * 帯が長くならないよう、先頭 `MAX_WARN_LINES` 件までにし、残りは「ほか N 件」の 1 行にまとめる。
- * 保存したファイルの warn だけに絞る印は、報告の行に無い（場所はルール id や `(risk)` など
+ * 帯が長くならないよう、先頭`MAX_WARN_LINES`件までにし、残りは「ほかN件」の1行にまとめる。
+ * 保存したファイルのwarnだけに絞る印は、報告の行に無い（場所はルールidや`(risk)`など
  * まちまち）ので、絞らない。
  */
 export const MAX_WARN_LINES = 5;
@@ -137,21 +137,21 @@ export function warnLinesOf(report: string, tmp: string, shown: string): string[
   }
   return [
     ...all.slice(0, MAX_WARN_LINES),
-    `ほか ${all.length - MAX_WARN_LINES} 件。\`ccnavi --lint\` で全部見られます`,
+    `ほか${all.length - MAX_WARN_LINES}件。\`ccnavi --lint\`で全部見られます`,
   ];
 }
 
-/** そのプロジェクトについての苦情。`where` が `(projects/<名前>)` で始まるもの */
+/** そのプロジェクトについての苦情。`where`が`(projects/<名前>)`で始まるもの */
 export function problemsOfProject(lint: LintJson, name: string): LintProblem[] {
   const prefix = `(projects/${name})`;
   return lint.problems.filter((p) => p.where === prefix || p.where.startsWith(`${prefix} `));
 }
 
-/** `--lint --flow <パス>` の苦情の場所（実行ファイルの `lint.FLOW_WHERE`） */
+/** `--lint --flow <パス>`の苦情の場所（実行ファイルの`lint.FLOW_WHERE`） */
 export const FLOW_WHERE = "(flow)";
 
 /**
- * 渡したフローについての苦情。`where` が `(flow)` のもの。フロー編集画面はこれだけを読む
+ * 渡したフローについての苦情。`where`が`(flow)`のもの。フロー編集画面はこれだけを読む
  * （ほかの設定の苦情でフローの保存を止めない）。読めるか・形が正しいかの答えは実行ファイルが出し、
  * 拡張は並べるだけ
  */
@@ -159,7 +159,7 @@ export function problemsOfFlow(lint: LintJson): LintProblem[] {
   return lint.problems.filter((p) => p.where === FLOW_WHERE);
 }
 
-/** 置き場そのものについての苦情。`where` が `(projects)` */
+/** 置き場そのものについての苦情。`where`が`(projects)` */
 export function problemsOfProjectsDir(lint: LintJson): LintProblem[] {
   return lint.problems.filter((p) => p.where === "(projects)");
 }

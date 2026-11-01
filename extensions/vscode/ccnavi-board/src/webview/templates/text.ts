@@ -5,7 +5,7 @@ import { shownLayerOf } from "../../core/templatesmodel.js";
 import type { PlanItem, ProblemSeverity, FlowSummary, TemplateLayer, TemplateProblem } from "../../core/templates-view.js";
 import { layerLabel as coreLayerLabel } from "../../core/sums.js";
 
-/** 深刻度の言葉。表示は `[error]` の形にする（`Problems.tsx`） */
+/** 深刻度の言葉。表示は`[error]`の形にする（`Problems.tsx`） */
 export function severityLabel(severity: ProblemSeverity): string {
   return severity;
 }
@@ -29,18 +29,18 @@ export function treeLabel(tree: string): string {
   return tree === "" ? "ワークスペース" : tree;
 }
 
-/** 層の言葉。共通・ワークスペース（self）・プロジェクト（名前）。言い方は `core/sums.ts` と同じ */
+/** レイヤーの言葉。共通・ワークスペース（self）・プロジェクト（名前）。言い方は`core/sums.ts`と同じ */
 export const layerLabel = coreLayerLabel;
 
-/** 対象が見せる層。実行ファイルが返していなければ undefined */
+/** 対象が見せるレイヤー。実行ファイルが返していなければundefined */
 export function layerFor(target: { readonly kind: string; readonly name: string }, layers: readonly TemplateLayer[]): TemplateLayer | undefined {
   const name = shownLayerOf(target);
   return layers.find((layer) => layer.name === name);
 }
 
-/** フローの要約の 1 行 */
+/** フローの要約の1行 */
 export function flowText(flow: FlowSummary): string {
-  return `${flow.name}（ノード ${flow.nodes}・接続 ${flow.connections}）`;
+  return `${flow.name}（ノード${flow.nodes}・接続${flow.connections}）`;
 }
 
 /** 先行ステップの番号の並び。空なら「なし」 */
@@ -56,7 +56,7 @@ export function afterNumbers(item: PlanItem, items: readonly PlanItem[]): number
   return item.after.map((at) => items.find((other) => other.index === at)?.number ?? at);
 }
 
-/** 本文の問題が、下書きの TODO（書きかけ）を指しているか */
+/** 本文の問題が、下書きのTODO（書きかけ）を指しているか */
 export function isTodo(problem: TemplateProblem): boolean {
   return problem.detail.includes("TODO");
 }

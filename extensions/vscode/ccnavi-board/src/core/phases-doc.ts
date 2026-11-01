@@ -1,18 +1,18 @@
 /**
  * フェーズ定義（phases.yml）の読み書き。コメントを残したまま書き戻す。
  *
- * phases.yml は先頭に使い方の説明、定義の前に理由のコメントを持つ。risk-doc と同じく
- * `yaml` の Document を保ち、変えるところだけを差し替える。定義の入れ替えや改名は
- * 元のノード（対応表の 1 組）をそのまま別のリストへ移す。
+ * phases.ymlは先頭に使い方の説明、定義の前に理由のコメントを持つ。risk-docと同じく
+ * `yaml`のDocumentを保ち、変えるところだけを差し替える。定義の入れ替えや改名は
+ * 元のノード（対応表の1組）をそのまま別のリストへ移す。
  *
  * ここは定義の意味（どの子がどこまで書けるか、レビューが要るか）には触れない。判定は
- * 実行ファイル（tickets/config/phasetypes.py）の仕事で、書式の検証も `--lint --phases <一時ファイル>` に聞く。
- * 画面の欄は文字のまま持ち、リストの欄（scope / deliverables）は文字の配列で持つ。
+ * 実行ファイル（tickets/config/phasetypes.py）の仕事で、書式の検証も`--lint --phases <一時ファイル>`に聞く。
+ * 画面の欄は文字のまま持ち、リストの欄（scope / deliverables）は文字のリストで持つ。
  *
- * 順序は親チケットの計画のステップの `after` で決めるので、定義は順序の欄を持たない。
+ * 順序は親チケットの計画のステップの`after`で決めるので、定義は順序の欄を持たない。
  *
  * 組み込みの既定は持たない（実行ファイルも持たない。既定を組み込むと、意図せずレビューの
- * 要否が決まる）。雛形も持たない（共通レイヤーに雛形を置くと、レイヤーの同じ id と中身が食い違い、そのレイヤーが
+ * 要否が決まる）。雛形も持たない（共通レイヤーに雛形を置くと、レイヤーの同じidと中身が食い違い、そのレイヤーが
  * 空として扱われる）。
  */
 import { isMap, isNode, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document, type Pair } from "yaml";
@@ -21,8 +21,8 @@ import { PHASE_KINDS, type PhaseForm, type PhaseKind, type PhasesForm, type Phas
 import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
- * 定義の形（`PHASE_KINDS`・`PhaseForm`・`PhasesForm` など）は画面との契約（`phases-view.ts`）にある。
- * ここに置くと、画面がそこから `yaml` を辿ってバンドルしたものに解析器がすべて入る。
+ * 定義の形（`PHASE_KINDS`・`PhaseForm`・`PhasesForm`など）は画面との契約（`phases-view.ts`）にある。
+ * ここに置くと、画面がそこから`yaml`を辿ってバンドルしたものに解析器がすべて入る。
  */
 
 /** 実行ファイルが読む版（phasetypes.VERSION） */
@@ -40,7 +40,7 @@ const KEY_ORDER = ["kind", "title", "review", "scope", "deliverables", "agent", 
 
 export interface PhasesDocument {
   readonly model: PhasesModel;
-  /** 編集した内容で書き戻す。元のノードを使い回してコメントを残す。id が重なれば投げる */
+  /** 編集した内容で書き戻す。元のノードを使い回してコメントを残す。idが重なれば投げる */
   readonly apply: (form: PhasesForm) => string;
 }
 
@@ -48,35 +48,35 @@ export function readPhases(text: string): PhasesDocument {
   const doc = parseDocument(text, { keepSourceTokens: false });
   const problems: string[] = [];
   for (const e of doc.errors) {
-    problems.push(`YAML として解釈できません: ${e.message}`);
+    problems.push(`YAMLとして解釈できません: ${e.message}`);
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
     problems.push("最上位がマップ（キーと値の組の集まり）ではありません。実行ファイルは読み込めません。保存すると中身を破棄して空のマップから始めます");
   }
   const version = doc.get("version");
   if (version === undefined || version === null) {
-    problems.push(`version がありません。保存すると version: ${PHASES_VERSION} を先頭に追加します`);
+    problems.push(`versionがありません。保存するとversion: ${PHASES_VERSION}を先頭に追加します`);
   } else if (version !== PHASES_VERSION) {
-    problems.push(`version ${String(version)} は実行ファイルが読み込めません（読み込むのは ${PHASES_VERSION}）。フェーズ定義は使われず、番号だけで扱われます`);
+    problems.push(`version ${String(version)}は実行ファイルが読み込めません（読み込むのは${PHASES_VERSION}）。フェーズ定義は使われず、番号だけで扱われます`);
   }
 
   const phases: PhaseForm[] = [];
   const raw = doc.get("phases", true);
   if (raw === undefined || raw === null) {
-    problems.push("phases がありません。実行ファイルは「`phases` がないか空か、マップではない」と報告します。定義を 1 つ以上追加して保存してください");
+    problems.push("phasesがありません。実行ファイルは「`phases`がないか空か、マップではない」と報告します。定義を1つ以上追加して保存してください");
   } else if (!isMap(raw)) {
-    problems.push("phases がマップ（キーと値の組の集まり）ではありません。定義は画面に出しません。保存すると中身を破棄して空のマップから始めます");
+    problems.push("phasesがマップ（キーと値の組の集まり）ではありません。定義は画面に出しません。保存すると中身を破棄して空のマップから始めます");
   } else {
     raw.items.forEach((pair, index) => {
       const id = keyText(pair);
       if (!isMap(pair.value)) {
-        problems.push(`定義 ${id || `（${index + 1} 件目）`} の中身がマップ（キーと値の組の集まり）ではありません。画面に出さず、保存するとこの定義は消えます（実行ファイルも読み込めません）`);
+        problems.push(`定義${id || `（${index + 1}件目）`}の中身がマップ（キーと値の組の集まり）ではありません。画面に出さず、保存するとこの定義は消えます（実行ファイルも読み込めません）`);
         return;
       }
       phases.push(formOf(index, id, pair.value, problems));
     });
     if (phases.length === 0 && problems.length === 0) {
-      problems.push("定義が 1 つもありません。実行ファイルは「`phases` がないか空か、マップではない」と報告します");
+      problems.push("定義が1つもありません。実行ファイルは「`phases`がないか空か、マップではない」と報告します");
     }
   }
 
@@ -87,7 +87,7 @@ export function readPhases(text: string): PhasesDocument {
       problems,
     },
     // 書き出すたびに読み直す。元のノードに値を書き込むので、同じ文書を使い回すと
-    // 2 回目の `origin` が 1 回目の並び替えの後を指してしまう。
+    // 2回目の`origin`が1回目の並び替えの後を指してしまう。
     apply: (edited) => applyTo(parseDocument(text), edited),
   };
 }
@@ -104,12 +104,12 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
   const kindText = scalarText(map, "kind") || "work";
   const kind: PhaseKind = (PHASE_KINDS as readonly string[]).includes(kindText) ? (kindText as PhaseKind) : "work";
   if (kind !== kindText) {
-    problems.push(`定義 ${id} の kind \`${kindText}\` は ${PHASE_KINDS.join("・")} のどれでもありません。画面は work として出し、保存すると work になります`);
+    problems.push(`定義${id}のkind \`${kindText}\`は${PHASE_KINDS.join("・")}のどれでもありません。画面はworkとして出し、保存するとworkになります`);
   }
   const rawReview = map.get("review");
   const review = typeof rawReview === "boolean" ? rawReview : true;
   if (rawReview !== undefined && rawReview !== null && typeof rawReview !== "boolean") {
-    problems.push(`定義 ${id} の review \`${String(rawReview)}\` は true か false ではありません。画面は true として出し、保存すると true になります（\`none\` や \`mr\` などの文字列も true で書きます。false にしたいときは書き直してください）`);
+    problems.push(`定義${id}のreview \`${String(rawReview)}\`はtrueかfalseではありません。画面はtrueとして出し、保存するとtrueになります（\`none\`や \`mr\`などの文字列もtrueで書きます。falseにしたいときは書き直してください）`);
   }
 
   const rawScope = map.get("scope", true);
@@ -119,14 +119,14 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
     inherit = true;
   } else if (rawScope instanceof Scalar) {
     if (rawScope.value !== INHERIT && rawScope.value !== null) {
-      problems.push(`定義 ${id} の scope \`${String(rawScope.value)}\` は glob のリストか inherit ではありません。画面は inherit として出します`);
+      problems.push(`定義${id}のscope \`${String(rawScope.value)}\`はglobのリストかinheritではありません。画面はinheritとして出します`);
     }
     inherit = true;
   } else if (isSeq(rawScope)) {
     inherit = false;
     scope = seqTexts(rawScope);
   } else {
-    problems.push(`定義 ${id} の scope がリストでも inherit でもありません。画面は inherit として出します`);
+    problems.push(`定義${id}のscopeがリストでもinheritでもありません。画面はinheritとして出します`);
   }
 
   const lists = {} as Record<ListKey, string[]>;
@@ -137,7 +137,7 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
     } else if (isSeq(raw)) {
       lists[key] = seqTexts(raw);
     } else {
-      problems.push(`定義 ${id} の ${key} がリスト（配列）ではありません。画面は空として出し、保存すると欄が消えます`);
+      problems.push(`定義${id}の${key}がリストではありません。画面は空として出し、保存すると欄が消えます`);
       lists[key] = [];
     }
   }
@@ -183,14 +183,14 @@ function applyTo(doc: Document, edited: PhasesForm): string {
   for (const form of edited.phases) {
     const id = form.id.trim();
     if (seen.has(id)) {
-      // 同じキーを 2 つ書くと、実行ファイル（yaml.safe_load）は後ろで何も出さずに上書きし、定義が 1 つ消える。
-      throw new Error(`id \`${id}\` が 2 つあります。同じ id の定義は 1 つにしてください`);
+      // 同じキーを2つ書くと、実行ファイル（yaml.safe_load）は後ろで何も出さずに上書きし、定義が1つ消える。
+      throw new Error(`id \`${id}\`が2つあります。同じidの定義は1つにしてください`);
     }
     seen.add(id);
     if (form.origin !== null) {
       if (seenOrigins.has(form.origin)) {
-        // 同じ元ノードを 2 か所に置くと、後から書いた欄が両方に出て、キーも重なる。
-        throw new Error(`${form.origin + 1} 件目の定義が 2 回送られました。更新してから編集し直してください`);
+        // 同じ元ノードを2か所に置くと、後から書いた欄が両方に出て、キーも重なる。
+        throw new Error(`${form.origin + 1}件目の定義が2回送られました。更新してから編集し直してください`);
       }
       seenOrigins.add(form.origin);
     }
@@ -202,15 +202,15 @@ function applyTo(doc: Document, edited: PhasesForm): string {
     doc.contents = top;
   }
 
-  // version。無ければ先頭に足す。違う版はそのまま（lint が言う）。
+  // version。無ければ先頭に足す。違う版はそのまま（lintが言う）。
   if (!top.has("version")) {
     top.items.unshift(doc.createPair("version", PHASES_VERSION));
   }
 
-  // ファイルの頭の order は読まない欄で、あればそのまま残る。
+  // ファイルの頭のorderは読まない欄で、あればそのまま残る。
 
   // phases。元の組を先に全部拾っておき、編集したリストへ移す。
-  // `origin` は読み込んだときの生の位置。中身が対応表でない組は画面に載らず、保存で消える（苦情で言ってある）。
+  // `origin`は読み込んだときの生の位置。中身が対応表でない組は画面に載らず、保存で消える（苦情で言ってある）。
   const existing = top.get("phases", true);
   const originals: Pair[] = isMap(existing) ? existing.items.slice() : [];
   const adopted = isMap(existing) ? adoptLeadingComment(existing, originals[0]) : undefined;
@@ -219,7 +219,7 @@ function applyTo(doc: Document, edited: PhasesForm): string {
     const original = form.origin === null ? undefined : originals[form.origin];
     const pair = original !== undefined && isMap(original.value) ? original : doc.createPair(id, new YAMLMap());
     // 改名は組のキーの値だけを替える。キーの前のコメントはキーに付いているので一緒に動く。
-    // 実行ファイル（PyYAML）が別の型に読む語（yes / no / on / off など）は囲む。
+    // 実行ファイル（PyYAML）が別の型に読む語（yes / no / on / offなど）は囲む。
     let key: Scalar;
     if (pair.key instanceof Scalar) {
       key = pair.key;
@@ -245,8 +245,8 @@ function applyTo(doc: Document, edited: PhasesForm): string {
     // 対応表の前後のコメントは対応表のノードに付いているので、対応表は残して中身だけ替える。
     existing.items = pairs;
   } else {
-    // 無い、対応表でない、`{}` の 1 行書き（flow）は、ブロックの対応表に置き換える。
-    // flow のまま中身を入れると全部が 1 行になり、以後の差分もコメントの置き場も行単位で扱えなくなる。
+    // 無い、対応表でない、`{}`の1行書き（flow）は、ブロックの対応表に置き換える。
+    // flowのまま中身を入れると全部が1行になり、以後の差分もコメントの置き場も行単位で扱えなくなる。
     const map = new YAMLMap();
     map.items = pairs;
     top.set("phases", map);
@@ -274,7 +274,7 @@ function adoptLeadingComment(map: YAMLMap, first: Pair | undefined): Pair | unde
 
 /**
  * 定義の前の空行は、定義ではなく「対応表の何番目か」に付いていたものとして揃える。
- * 先頭に来た定義と一緒に空行も移ると `phases:` の直後に空白だけの行が出るため。
+ * 先頭に来た定義と一緒に空行も移ると`phases:`の直後に空白だけの行が出るため。
  */
 function keepSpacing(before: readonly Pair[], after: readonly Pair[]): void {
   const slots = before.map((p) => isNode(p.key) && p.key.spaceBefore === true);
@@ -286,9 +286,9 @@ function keepSpacing(before: readonly Pair[], after: readonly Pair[]): void {
   });
 }
 
-/** 欄を順に書く。変わっていない欄は触らず、元の書き方（引用符）を残す。新しい定義は kind と review を必ず書く */
+/** 欄を順に書く。変わっていない欄は触らず、元の書き方（引用符）を残す。新しい定義はkindとreviewを必ず書く */
 function writePhase(doc: Document, node: YAMLMap, form: PhaseForm, isNew: boolean): void {
-  // kind と review は実行ファイルに既定がある（work / true）。元から欄が無くて既定のままなら足さない。
+  // kindとreviewは実行ファイルに既定がある（work / true）。元から欄が無くて既定のままなら足さない。
   if (isNew || node.has("kind") || form.kind !== "work") {
     setValue(doc, node, "kind", form.kind, Scalar.PLAIN);
   }
@@ -297,7 +297,7 @@ function writePhase(doc: Document, node: YAMLMap, form: PhaseForm, isNew: boolea
     setValue(doc, node, "review", form.review, Scalar.PLAIN);
   }
 
-  // scope。inherit は値として書く（欄が無いのも inherit だが、意図が読めるように残す）。
+  // scope。inheritは値として書く（欄が無いのもinheritだが、意図が読めるように残す）。
   if (form.inherit) {
     const current = node.get("scope", true);
     if (current instanceof Scalar) {
@@ -313,11 +313,11 @@ function writePhase(doc: Document, node: YAMLMap, form: PhaseForm, isNew: boolea
       insertAfter(doc, node, "scope", scalar, before("scope", node));
     }
   } else {
-    // glob は二重引用符で囲む。`*` で始まる値を裸で書くと YAML が別名として読む。
+    // globは二重引用符で囲む。`*`で始まる値を裸で書くとYAMLが別名として読む。
     setList(doc, node, "scope", form.scope, Scalar.QUOTE_DOUBLE, true);
   }
 
-  // deliverables は glob なので引用符付き。読まない欄（after / overlap / requires）には手を付けない。
+  // deliverablesはglobなので引用符付き。読まない欄（after / overlap / requires）には手を付けない。
   setList(doc, node, "deliverables", form.deliverables, Scalar.QUOTE_DOUBLE, false);
 
   setOrDelete(doc, node, "agent", form.agent.trim(), Scalar.PLAIN);
@@ -326,9 +326,9 @@ function writePhase(doc: Document, node: YAMLMap, form: PhaseForm, isNew: boolea
 }
 
 /**
- * リストの欄を書く。空なら欄ごと消す（`keepEmpty` が真なら `[]` で残す。scope の `[]` は
- * 「何も書けない」の意味で、消すと inherit に変わってしまう）。
- * 変わっていなければ触らない。変わっていれば flow（1 行）のリストで書き直す。
+ * リストの欄を書く。空なら欄ごと消す（`keepEmpty`が真なら`[]`で残す。scopeの`[]`は
+ * 「何も書けない」の意味で、消すとinheritに変わってしまう）。
+ * 変わっていなければ触らない。変わっていればflow（1行）のリストで書き直す。
  */
 function setList(
   doc: Document,
@@ -402,7 +402,7 @@ function setValue(doc: Document, node: YAMLMap, key: string, value: string | boo
   insertAfter(doc, node, key, scalar, before(key, node));
 }
 
-/** `key` を足すとき、その直前に置くべき欄（KEY_ORDER で前にあって、いま在るもの） */
+/** `key`を足すとき、その直前に置くべき欄（KEY_ORDERで前にあって、いま在るもの） */
 function before(key: string, node: YAMLMap): string | undefined {
   const at = (KEY_ORDER as readonly string[]).indexOf(key);
   for (let i = at - 1; i >= 0; i -= 1) {
@@ -484,7 +484,7 @@ function asPhase(raw: unknown): PhaseForm | undefined {
   };
 }
 
-/** リストの欄は文字の配列で持つ。無ければ空。文字以外が混ざっていれば形が違う */
+/** リストの欄は文字のリストで持つ。無ければ空。文字以外が混ざっていれば形が違う */
 function texts(value: unknown): string[] | undefined {
   if (value === undefined || value === null) {
     return [];
@@ -495,7 +495,7 @@ function texts(value: unknown): string[] | undefined {
   return value as string[];
 }
 
-/** 欄は文字で持つ。数で来ても文字にする（JSON を経ても同じ形にするため） */
+/** 欄は文字で持つ。数で来ても文字にする（JSONを経ても同じ形にするため） */
 function text(value: unknown): string {
   if (typeof value === "string") {
     return value;

@@ -1,13 +1,13 @@
 /**
- * ルール 1 件の行。折りたたんだときは要約 1 行、開くと欄が出る。
+ * ルール1件の行。折りたたんだときは要約1行、開くと欄が出る。
  *
- * 欄名は日本語で欄の左に出し、YAML のキー名は欄名のツールチップに載せる（`Captioned`）。
- * ツールの欄（`match`）は押すと選択肢が出る。`message` は deny だけの欄で、ask と allow に
+ * 欄名は日本語で欄の左に出し、YAMLのキー名は欄名のツールチップに載せる（`Captioned`）。
+ * ツールの欄（`match`）は押すと選択肢が出る。`message`はdenyだけの欄で、askとallowに
  * 残っていれば「どこにも届かない」と言って消すボタンだけ出す。
  *
  * 組み合わせ条件（`when:`）を持つルールは、パターンの欄の代わりに組み合わせ条件の図（`When.tsx`）を出し、畳んだ行には
- * 組み合わせ条件を 1 行に縮めたもの（`all(regex …, not(any(2)))`）を出す。glob / regex 1 つのルールは
- * 「組み合わせ条件に変換」で同じ意味の組み合わせ条件にできる（除くものは `not: {any: …}` に入れ、`except:` は消す）。
+ * 組み合わせ条件を1行に縮めたもの（`all(regex …, not(any(2)))`）を出す。glob / regex 1つのルールは
+ * 「組み合わせ条件に変換」で同じ意味の組み合わせ条件にできる（除くものは`not: {any: …}`に入れ、`except:`は消す）。
  */
 import { useState, type JSX, type ReactNode } from "react";
 
@@ -17,23 +17,23 @@ import { contextSummary, hasContext, staleMessage, summaryId, summaryMatch, summ
 import { When } from "./When.js";
 import { moveTitle } from "../shared/find.js";
 
-/** 1 行の欄（input）で受ける値 */
+/** 1行の欄（input）で受ける値 */
 type TextKey = "id" | "match" | "pattern" | "every" | "additionalContextFile" | "additionalContextOnceFile";
 /** 文の欄（textarea）で受ける値。ブロック（`>-`）で書かれることがあるので折り返せる欄にする */
 type AreaKey = "message" | "additionalContext" | "additionalContextOnce";
 
 export interface RuleProps {
-  /** 画面の中だけのキー（`state.ts`）。行を名指しするために `data-key` へ出す */
+  /** 画面の中だけのキー（`state.ts`）。行を名指しするために`data-key`へ出す */
   readonly ruleKey: string;
   readonly section: Section;
   readonly rule: RuleForm;
-  /** 絞り込みが適用する文字列（`data-find`）。ヒットしなければ `hidden` */
+  /** 絞り込みが適用する文字列（`data-find`）。ヒットしなければ`hidden` */
   readonly find: string;
   readonly hidden: boolean;
   readonly open: boolean;
   /** 直前の判定でヒットした行。折りたたんだままでも分かるように縁を付ける */
   readonly hit: boolean;
-  /** ツールの選択肢が開いているか。開くのは画面ぜんたいで 1 つだけ */
+  /** ツールの選択肢が開いているか。開くのは画面ぜんたいで1つだけ */
   readonly pickerOpen: boolean;
   readonly onToggle: () => void;
   readonly onChange: (next: RuleForm) => void;
@@ -56,9 +56,9 @@ export interface RuleProps {
 
 export function Rule(props: RuleProps): JSX.Element {
   const { rule, section } = props;
-  // glob と regex の併記や、except が組み合わせ条件へそのまま移せない形なら、「組み合わせ条件に変換」を押させずに理由を出す
+  // globとregexの併記や、exceptが組み合わせ条件へそのまま移せない形なら、「組み合わせ条件に変換」を押させずに理由を出す
   const blocker = toWhenBlocker(rule);
-  /** 案内が指す先（`data-tour`）。id 未設定の行には付けない（行ごとに名前を分けるので、別の行の欄を指さない） */
+  /** 案内が指す先（`data-tour`）。id未設定の行には付けない（行ごとに名前を分けるので、別の行の欄を指さない） */
   const tour = (name: string): string | undefined => (rule.id === "" ? undefined : `rule-${rule.id}-${name}`);
 
   const text = (name: TextKey, className: string, placeholder: string): JSX.Element => (
@@ -74,7 +74,7 @@ export function Rule(props: RuleProps): JSX.Element {
   const area = (name: AreaKey, className: string, placeholder: string): JSX.Element => (
     <textarea className={className} placeholder={placeholder} value={rule[name]} onChange={(event) => props.onChange({ ...rule, [name]: event.target.value })} />
   );
-  /** 手で書くほかに、VS Code のダイアログでも選べる欄。選んだ結果は拡張ホストが `picked` で返す */
+  /** 手で書くほかに、VS Codeのダイアログでも選べる欄。選んだ結果は拡張ホストが`picked`で返す */
   const file = (name: FileField, label: string, className: string, placeholder: string): JSX.Element => (
     <Captioned name={label} yamlKey={name} tour={tour(name === "additionalContextFile" ? "file" : "once-file")}>
       <div className="with-button">
@@ -113,7 +113,7 @@ export function Rule(props: RuleProps): JSX.Element {
           {props.open ? "▾" : "▸"}
         </button>
         <span className="sum">
-          {/* id は長いと列の幅で切れるので、全体は title で見せる */}
+          {/* idは長いと列の幅で切れるので、全体はtitleで見せる */}
           <span className={rule.id === "" ? "sum-id dim" : "sum-id"} title={summaryId(rule)}>
             {summaryId(rule)}
           </span>
@@ -124,17 +124,17 @@ export function Rule(props: RuleProps): JSX.Element {
             {rule.when !== undefined ? (
               <>
                 <code className="sum-when">{condSummary(rule.when)}</code>
-                {condProblems(rule.when).length > 0 && <span className="sum-note sum-when-error">組み合わせ条件に誤り {condProblems(rule.when).length}</span>}
+                {condProblems(rule.when).length > 0 && <span className="sum-note sum-when-error">組み合わせ条件に誤り{condProblems(rule.when).length}</span>}
               </>
             ) : rule.pattern === "" ? (
-              <span className="dim">（{rule.kind} 未設定）</span>
+              <span className="dim">（{rule.kind}未設定）</span>
             ) : (
               <code>{rule.pattern}</code>
             )}
             {summaryNote(section, rule) !== "" && <span className="sum-note">{summaryNote(section, rule)}</span>}
             {rule.excepts !== undefined && rule.excepts.length > 0 && (
               <span className="sum-note sum-except" title={`except: ${rule.excepts.join(" / ")}`}>
-                除外 {rule.excepts.length}
+                除外{rule.excepts.length}
               </span>
             )}
           </span>
@@ -143,7 +143,7 @@ export function Rule(props: RuleProps): JSX.Element {
             <span className="sum-every" />
           ) : (
             <span className="tag sum-every" title={`every: ${rule.every}`}>
-              {rule.every} 回ごと
+              {rule.every}回ごと
             </span>
           )}
           <span className={hasContext(rule) ? "sum-flag on" : "sum-flag"} title={hasContext(rule) ? "コンテキストの追加あり" : ""} />
@@ -169,7 +169,7 @@ export function Rule(props: RuleProps): JSX.Element {
         </Captioned>
         {rule.when !== undefined ? (
           <Captioned name="組み合わせ条件" yamlKey="when" tour={tour("pattern")}>
-            {/* 開いた行にだけ図を置く（畳んだ行の分まで React Flow を立ち上げない） */}
+            {/* 開いた行にだけ図を置く（畳んだ行の分までReact Flowを立ち上げない） */}
             {props.open ? <When tree={rule.when} pick={props.pickNode} onChange={(when) => props.onChange({ ...rule, when })} /> : <span />}
           </Captioned>
         ) : (
@@ -186,7 +186,7 @@ export function Rule(props: RuleProps): JSX.Element {
                 data-action="to-when"
                 data-tour={tour("to-when")}
                 disabled={blocker !== undefined}
-                title={blocker ?? "このパターン（と除外）を、同じ意味の組み合わせ条件（when）に変換します。除外は not の中へ移ります"}
+                title={blocker ?? "このパターン（と除外）を、同じ意味の組み合わせ条件（when）に変換します。除外はnotの中へ移ります"}
                 onClick={() => props.onChange(toWhen(rule))}
               >
                 組み合わせ条件に変換
@@ -205,7 +205,7 @@ export function Rule(props: RuleProps): JSX.Element {
               ))}
               <span className="dim">
                 {rule.when !== undefined ? "組み合わせ条件" : "パターン"}にヒットした操作でも、除外にヒットしたものは対象から外れます。画面では編集できません。ルールファイルで直すか、
-                {rule.when !== undefined ? "組み合わせ条件の not に移してください" : "「組み合わせ条件に変換」で組み合わせ条件の中へ移してください"}
+                {rule.when !== undefined ? "組み合わせ条件のnotに移してください" : "「組み合わせ条件に変換」で組み合わせ条件の中へ移してください"}
               </span>
             </div>
           </Captioned>
@@ -220,20 +220,20 @@ export function Rule(props: RuleProps): JSX.Element {
               {staleMessage(section)}
               <code>{rule.message}</code>
               <button type="button" className="action small" onClick={() => props.onChange({ ...rule, message: "" })}>
-                message を削除
+                messageを削除
               </button>
             </p>
           )
         )}
-        {/* コンテキストの 4 欄は出番が少ないので見出し 1 行に折りたたむ。値があるルールだけ最初から開く */}
+        {/* コンテキストの4欄は出番が少ないので見出し1行に折りたたむ。値があるルールだけ最初から開く */}
         <details className="more" data-tour={tour("context")} open={props.moreOpen} onToggle={(event) => props.onToggleMore(event.currentTarget.open)}>
           <summary>
             <b>コンテキストの追加</b>
             {contextSummary(rule)}
           </summary>
           <div className="sub">
-            {/* 刻みはプロンプトの前。ここから下の 4 欄が「何回に 1 度届くか」を決める欄なので、先に置く。
-                type は text（number ではない）。数でない値を空にしてしまうと、読み込めない値を
+            {/* 刻みはプロンプトの前。ここから下の4欄が「何回に1度届くか」を決める欄なので、先に置く。
+                typeはtext（numberではない）。数でない値を空にしてしまうと、読み込めない値を
                 見せて直させるという欄の目的が消える */}
             <Captioned name="every" yamlKey="every" tour={tour("every")}>
               {text("every", "f-every", "5（空なら毎回渡します）")}
@@ -241,11 +241,11 @@ export function Rule(props: RuleProps): JSX.Element {
             <Captioned name="additionalContext" yamlKey="additionalContext" tour={tour("text")}>
               {area("additionalContext", "f-context", "ヒットしたときにモデルへ渡すプロンプト")}
             </Captioned>
-            {file("additionalContextFile", "additionalContextFile", "f-context-file", "ヒットしたときにモデルへ渡すファイル（先頭 4000 文字まで）")}
+            {file("additionalContextFile", "additionalContextFile", "f-context-file", "ヒットしたときにモデルへ渡すファイル（先頭4000文字まで）")}
             <Captioned name="additionalContextOnce" yamlKey="additionalContextOnce" tour={tour("once")}>
               {area("additionalContextOnce", "f-once", "セッションで最初にヒットしたときだけモデルへ渡すプロンプト")}
             </Captioned>
-            {file("additionalContextOnceFile", "additionalContextOnceFile", "f-once-file", "セッションで最初にヒットしたときだけモデルへ渡すファイル（先頭 4000 文字まで）")}
+            {file("additionalContextOnceFile", "additionalContextOnceFile", "f-once-file", "セッションで最初にヒットしたときだけモデルへ渡すファイル（先頭4000文字まで）")}
           </div>
         </details>
         <span className="buttons" data-tour={tour("buttons")}>
@@ -265,8 +265,8 @@ export function Rule(props: RuleProps): JSX.Element {
 }
 
 /**
- * glob / regex 1 つのルールを、同じ意味の組み合わせ条件にする。除くもの（`except:`）は組み合わせ条件の中へ移し、
- * 書き戻しで `except:` を消す（`dropExcept`）。組み合わせ条件から glob / regex 1 つへは戻さない
+ * glob / regex 1つのルールを、同じ意味の組み合わせ条件にする。除くもの（`except:`）は組み合わせ条件の中へ移し、
+ * 書き戻しで`except:`を消す（`dropExcept`）。組み合わせ条件からglob / regex 1つへは戻さない
  */
 function toWhen(rule: RuleForm): RuleForm {
   const { excepts, exceptNodes, ...rest } = rule;
@@ -280,12 +280,12 @@ function toWhen(rule: RuleForm): RuleForm {
 }
 
 /**
- * ツールの選択肢。`match` はツール名を `|` で並べたもので、判定は名前をそのまま突き合わせるので
+ * ツールの選択肢。`match`はツール名を`|`で並べたもので、判定は名前をそのまま突き合わせるので
  * 打ち間違えると気づかないうちにヒットしなくなる。書かせずに選ばせる。ファイルに書いてある知らない名前
- * （MCP のツールなど）も、消さずにそのまま選択肢にして出す（開いただけで消えたように見えないように）。
+ * （MCPのツールなど）も、消さずにそのまま選択肢にして出す（開いただけで消えたように見えないように）。
  *
- * 一覧にない新しいツールは、欄に名前を打って足す。形は `isToolName` で確かめる。一覧にない名前は、
- * ccnavi がそのツールの対象を取り出せないため、判定には届かずヒットしない（`lint` が warn で言う）。
+ * 一覧にない新しいツールは、欄に名前を打って足す。形は`isToolName`で確かめる。一覧にない名前は、
+ * ccnaviがそのツールの対象を取り出せないため、判定には届かずヒットしない（`lint`がwarnで言う）。
  */
 function Picker({
   rule,
@@ -363,11 +363,11 @@ function Picker({
   );
 }
 
-/** 欄名を左に置く。YAML のキー名は欄名のツールチップに載せる。`tour` は案内が指す先の名前 */
+/** 欄名を左に置く。YAMLのキー名は欄名のツールチップに載せる。`tour`は案内が指す先の名前 */
 function Captioned({ name, yamlKey, tour, children }: { readonly name: string; readonly yamlKey?: string; readonly tour?: string; readonly children: ReactNode }): JSX.Element {
   return (
     <div className="field" data-tour={tour}>
-      <span className="cap" title={yamlKey === undefined ? undefined : `YAML のキー: ${yamlKey}`}>
+      <span className="cap" title={yamlKey === undefined ? undefined : `YAMLのキー: ${yamlKey}`}>
         {name}
       </span>
       {children}

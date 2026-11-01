@@ -1,7 +1,7 @@
 /**
- * `ccnavi --test --json` と `--test-expectations --json`（試験の JSON）が出す形。
- * 実行ファイルと拡張の契約で、拡張はこれ以外を読まない。形の定義は ccnavi の docs/11_requirements/json-shapes.md「試験の JSON」。
- * 同じ例が test/fixtures/test.json と expectations.json にあり、Python 側のテスト
+ * `ccnavi --test --json`と`--test-expectations --json`（試験のJSON）が出す形。
+ * 実行ファイルと拡張の契約で、拡張はこれ以外を読まない。形の定義はccnaviのdocs/11_requirements/json-shapes.md「試験のJSON」。
+ * 同じ例がtest/fixtures/test.jsonとexpectations.jsonにあり、Python側のテスト
  * （tests/core/test_test_json.py）が同じ例で形を確かめる。
  */
 
@@ -10,7 +10,7 @@ export const TEST_VERSION = 1;
 
 export interface RuleHitJson {
   readonly id: string;
-  /** `file` はルールファイルから読んだルール。`outside` はチケットの範囲・組み込みの保護・退避した既定のように外から来た根拠で、式は短く切ってある */
+  /** `file`はルールファイルから読んだルール。`outside`はチケットの範囲・組み込みの保護・退避した既定のように外から来た根拠で、式は短く切ってある */
   readonly source: "file" | "outside";
   readonly section: string;
   readonly kind: string;
@@ -139,15 +139,15 @@ function readObject(text: string): Parsed<Record<string, unknown>> {
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `試験の JSON として解釈できません: ${(error as Error).message}` };
+    return { ok: false, error: `試験のJSONとして解釈できません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
-    return { ok: false, error: "試験の JSON の最上位がオブジェクトではありません" };
+    return { ok: false, error: "試験のJSONの最上位がオブジェクトではありません" };
   }
   if (raw.version !== TEST_VERSION) {
     return {
       ok: false,
-      error: `試験の JSON の版が違います（拡張は ${TEST_VERSION}、実行ファイルは ${String(raw.version)}）。拡張か実行ファイルを揃えてください`,
+      error: `試験のJSONの版が違います（拡張は${TEST_VERSION}、実行ファイルは${String(raw.version)}）。拡張か実行ファイルを揃えてください`,
     };
   }
   return { ok: true, value: raw };
@@ -158,7 +158,7 @@ function hits(value: unknown): RuleHitJson[] {
     .filter(isRecord)
     .map((h) => ({
       id: str(h.id),
-      // 知らない値は `outside` に倒す。ルールファイルの外の根拠（組み込みの保護など）を
+      // 知らない値は`outside`に倒す。ルールファイルの外の根拠（組み込みの保護など）を
       // ルールファイルのルールとして見せると、ユーザは無いルールを探しに行く。
       source: h.source === "file" ? "file" : "outside",
       section: str(h.section),
