@@ -9,7 +9,8 @@
 2. 最後のレビューを `confirm` したら、親の finish から ready までの流れを言う
 3. `worktree tidy <親> --phase <N>` は done/ に動いた子のワークツリーを消し、ブランチは残す。
    取り消しで閉じた子のワークツリーも消す（ワークツリーがあるのは作業中の子だけ）
-4. `worktree drop <名前>` は生成物を消してから `git worktree remove` する。cwd が中にある・
+4. `worktree drop <名前>` は生成物を消し、git が無視しているそれ以外のものを
+   `scratchpad/worktrees/<名前>/` へ退避してから `git worktree remove` する。cwd が中にある・
    未コミットの変更がある・git のワークツリーでないときは何も消さずに言う
 """
 
@@ -274,9 +275,14 @@ class DropTest(PhaseHarness):
         self.assertEqual(absent.returncode, 0)
         self.assertIn("ありません", absent.stdout)
 
-    def test_keeps_the_worktree_with_ignored_files_other_than_build_outputs(self):
-        """git が無視している .env などは worktree remove が黙って消すので、名指しして止める。
-        生成物（node_modules など）は数えない。"""
+    def ignore_scratchpad(self):
+        """退避先（ワークスペースルートの scratchpad/）を git に無視させる。"""
+        write(os.path.join(self.root, ".gitignore"), "/scratchpad\n")
+
+    def test_moves_ignored_files_to_the_scratchpad_before_removing(self):
+        """git が無視している .env などは worktree remove が黙って消すので、消さずに
+        scratchpad/worktrees/<名前>/ へ退避する。生成物（node_modules など）は消す。"""
+        self.ignore_scratchpad()
         tree = self.worktree("i0002", "main")
         write(os.path.join(tree, ".gitignore"), ".env\nnode_modules/\n")
         git(tree, "add", "-A")
@@ -284,32 +290,74 @@ class DropTest(PhaseHarness):
         write(os.path.join(tree, "node_modules", "x", "index.js"), "")
         write(os.path.join(tree, ".env"), "TOKEN=x\n")
         dropped = self.drop("i0002")
-        self.assertEqual(dropped.returncode, 1, dropped.stdout + dropped.stderr)
-        self.assertIn(
-            "git が無視しているファイルがあるので、何も削除しませんでした。", dropped.stdout
-        )
+        self.assertEqual(dropped.returncode, 0, dropped.stdout + dropped.stderr)
+        self.assertIn("scratchpad/worktrees/i0002 へ退避しました", dropped.stdout)
         self.assertIn(".env", dropped.stdout)
         self.assertNotIn("node_modules", dropped.stdout)
-        self.assertIn("退避", dropped.stdout)
-        self.assertTrue(os.path.exists(os.path.join(tree, ".env")))
-        self.assertTrue(os.path.exists(os.path.join(tree, "node_modules", "x", "index.js")))
-        # .env を退避して打ち直せば消える
-        os.remove(os.path.join(tree, ".env"))
-        again = self.drop("i0002")
-        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertFalse(os.path.exists(tree))
+        stash = os.path.join(self.root, "scratchpad", "worktrees", "i0002")
+        with open(os.path.join(stash, ".env"), encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "TOKEN=x\n")
+        self.assertFalse(os.path.exists(os.path.join(stash, "node_modules")))
 
-    def test_a_scratchpad_dir_is_counted_like_any_ignored_file(self):
-        """直下の scratchpad/ も、無視されていれば数えて止める（特別扱いは廃止した）。"""
+    def test_moves_cargo_target_and_out_beside_cargo_toml(self):
+        """Cargo.toml の隣の target/ は生成物として消す。印の無い out/ は退避する。"""
+        self.ignore_scratchpad()
+        tree = self.worktree("i0002", "main")
+        write(os.path.join(tree, ".gitignore"), "target/\nout/\n")
+        write(os.path.join(tree, "data-schema", "Cargo.toml"), "[package]\n")
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "-m", "rust")
+        write(os.path.join(tree, "data-schema", "target", "debug", "x"), "")
+        write(os.path.join(tree, "data-schema", "out", "key_experiment.md"), "記録\n")
+        dropped = self.drop("i0002")
+        self.assertEqual(dropped.returncode, 0, dropped.stdout + dropped.stderr)
+        stash = os.path.join(self.root, "scratchpad", "worktrees", "i0002", "data-schema")
+        self.assertTrue(os.path.isfile(os.path.join(stash, "out", "key_experiment.md")))
+        self.assertFalse(os.path.exists(os.path.join(stash, "target")))
+
+    def test_a_scratchpad_dir_in_the_worktree_is_moved_like_any_ignored_file(self):
+        """ワークツリー直下の scratchpad/ も、無視されていれば退避する（特別扱いは無い）。"""
+        self.ignore_scratchpad()
         tree = self.worktree("i0002", "main")
         write(os.path.join(tree, ".gitignore"), "scratchpad/\n")
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "ignore")
         write(os.path.join(tree, "scratchpad", "memo.md"), "メモ\n")
-        stopped = self.drop("i0002")
-        self.assertEqual(stopped.returncode, 1, stopped.stdout + stopped.stderr)
-        self.assertIn("scratchpad/", stopped.stdout)
-        self.assertTrue(os.path.exists(os.path.join(tree, "scratchpad", "memo.md")))
+        dropped = self.drop("i0002")
+        self.assertEqual(dropped.returncode, 0, dropped.stdout + dropped.stderr)
+        kept = os.path.join(self.root, "scratchpad", "worktrees", "i0002", "scratchpad", "memo.md")
+        self.assertTrue(os.path.isfile(kept))
+
+    def test_keeps_everything_when_the_stash_dir_is_not_ignored(self):
+        """退避先が git に無視されていないと .env がコミットされうるので、何も動かさずに止める。"""
+        tree = self.worktree("i0002", "main")
+        write(os.path.join(tree, ".gitignore"), ".env\n")
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "-m", "ignore")
+        write(os.path.join(tree, ".env"), "TOKEN=x\n")
+        dropped = self.drop("i0002")
+        self.assertEqual(dropped.returncode, 1, dropped.stdout + dropped.stderr)
+        self.assertIn("/scratchpad", dropped.stdout)
+        self.assertTrue(os.path.isfile(os.path.join(tree, ".env")))
+        self.assertFalse(os.path.exists(os.path.join(self.root, "scratchpad")))
+
+    def test_does_not_overwrite_an_existing_stash(self):
+        """退避先に同じパスがあれば上書きせず止める（前の退避を失わない）。"""
+        self.ignore_scratchpad()
+        tree = self.worktree("i0002", "main")
+        write(os.path.join(tree, ".gitignore"), ".env\n")
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "-m", "ignore")
+        write(os.path.join(tree, ".env"), "NEW\n")
+        old = os.path.join(self.root, "scratchpad", "worktrees", "i0002", ".env")
+        write(old, "OLD\n")
+        dropped = self.drop("i0002")
+        self.assertEqual(dropped.returncode, 1, dropped.stdout + dropped.stderr)
+        self.assertIn("退避できませんでした", dropped.stdout)
+        with open(old, encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "OLD\n")
+        self.assertTrue(os.path.isfile(os.path.join(tree, ".env")))
 
     def test_tracked_build_output_names_are_not_cleaned(self):
         """生成物の名前でも追跡されているもの（package.json の隣のコミット済みの out/ など）は
@@ -340,7 +388,8 @@ class DropTest(PhaseHarness):
         self.assertTrue(os.path.exists(os.path.join(tree, ".gitignore")))
         self.assertIn("i0002", git(self.root, "worktree", "list"))
 
-    def test_many_ignored_files_are_cut_short(self):
+    def test_many_moved_files_are_cut_short(self):
+        self.ignore_scratchpad()
         tree = self.worktree("i0002", "main")
         write(os.path.join(tree, ".gitignore"), "*.log\n")
         git(tree, "add", "-A")
@@ -348,7 +397,7 @@ class DropTest(PhaseHarness):
         for i in range(15):
             write(os.path.join(tree, f"a{i:02d}.log"), "")
         dropped = self.drop("i0002")
-        self.assertEqual(dropped.returncode, 1)
+        self.assertEqual(dropped.returncode, 0, dropped.stdout + dropped.stderr)
         self.assertIn("…ほか 5 件", dropped.stdout)
 
     def test_keeps_the_worktree_when_the_cwd_is_inside(self):

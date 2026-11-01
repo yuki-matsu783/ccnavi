@@ -453,5 +453,25 @@ class CleanWithoutNodeTest(CleanBase, unittest.TestCase):
         self.assertNotIn("other", result.stderr.strip().splitlines()[-1])
 
 
+class GeneratedListsMatchTest(unittest.TestCase):
+    """ccnavi-clean.js の一覧と、実行ファイル側（worktrees.py）の一覧が同じであること。"""
+
+    def test_js_lists_equal_the_python_lists(self):
+        import re
+
+        from ccnavi.tickets.lifecycle import worktrees
+
+        with open(os.path.join(SH_DIR, "ccnavi-clean.js"), encoding="utf-8") as handle:
+            source = handle.read()
+        always = re.search(r"const ALWAYS = new Set\(\[(.*?)\]\);", source, re.S).group(1)
+        self.assertEqual(set(re.findall(r'"([^"]+)"', always)), set(worktrees.ALWAYS))
+        beside = re.search(r"const BESIDE = new Map\(\[(.*?)\]\);", source, re.S).group(1)
+        found = {
+            name: tuple(re.findall(r'"([^"]+)"', marks))
+            for name, marks in re.findall(r'\["([^"]+)", \[(.*?)\]\]', beside)
+        }
+        self.assertEqual(found, dict(worktrees.BESIDE))
+
+
 if __name__ == "__main__":
     unittest.main()

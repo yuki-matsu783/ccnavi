@@ -14,9 +14,30 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 // どこにあっても生成物と言える名前
-const ALWAYS = new Set(["node_modules", ".venv", "__pycache__", ".pytest_cache", ".ruff_cache"]);
-// ありふれた名前なので、隣に package.json があるときだけ生成物と見る
-const BESIDE_PACKAGE_JSON = new Set(["out", "dist", ".cache"]);
+// 一覧は src/ccnavi/tickets/lifecycle/worktrees.py の ALWAYS・BESIDE と同じ（tests/sh/test_clean_sh.py が突き合わせる）
+const ALWAYS = new Set([
+	"node_modules",
+	".venv",
+	"__pycache__",
+	".pytest_cache",
+	".ruff_cache",
+	".mypy_cache",
+	".tox",
+	".nox",
+	".next",
+	".nuxt",
+	".turbo",
+	".parcel-cache",
+	".gradle",
+]);
+// ありふれた名前なので、隣に印のファイルがあるときだけ生成物と見る
+const BESIDE = new Map([
+	["out", ["package.json"]],
+	["dist", ["package.json"]],
+	[".cache", ["package.json"]],
+	["target", ["Cargo.toml", "pom.xml"]],
+	["build", ["build.gradle", "build.gradle.kts"]],
+]);
 // 中へ降りない。git の管理領域
 const SKIP = new Set([".git"]);
 
@@ -47,10 +68,10 @@ function findTargets(top) {
 		} catch {
 			continue; // 読めないディレクトリは飛ばす（消す対象を増やさない方を選ぶ）
 		}
-		const hasPackageJson = entries.some((e) => e.isFile() && e.name === "package.json");
+		const plain = new Set(entries.filter((e) => e.isFile()).map((e) => e.name));
 		for (const e of entries) {
 			const full = path.join(dir, e.name);
-			if (ALWAYS.has(e.name) || (hasPackageJson && BESIDE_PACKAGE_JSON.has(e.name))) {
+			if (ALWAYS.has(e.name) || (BESIDE.get(e.name) || []).some((mark) => plain.has(mark))) {
 				// リンクなら rmSync はリンクだけを消す。先は残る
 				if (e.isDirectory() || e.isSymbolicLink()) {
 					found.push(full);

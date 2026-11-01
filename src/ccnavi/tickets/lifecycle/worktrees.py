@@ -23,9 +23,13 @@
 write-and-push の中では書いたものが push の失敗で戻ることがあるので、write-and-push
 が送り終えてから呼ぶ。
 
-消し方は、生成物（`node_modules` など。`ccnavi-clean.js` と同じ名前）を先に消してから
+消し方は、生成物（`node_modules` など。`ccnavi-clean.js` と同じ名前）を先に消し、
+git が無視しているそれ以外のもの（`.env` など）をワークスペースルートの
+`scratchpad/worktrees/<名前>/` へ退避（同じボリュームの rename。中を走査しない。退避先が
+git に無視されていないときと、同じパスが退避先にあるときは動かさず止める）してから
 `git worktree remove`（`--force` なし）。Windows で深い `node_modules` が `worktree remove` を
-途中で止めるのを防ぐ。親を閉じたときのブランチは
+途中で止めるのを防ぐ。退避したものは ccnavi が消さない（要らなければユーザが消す）。
+親を閉じたときのブランチは
 `tickets/lifecycle/retire.py` が片付ける（条件を確かめてから消す）。
 
 消さないとき（何も消さずに理由を言う）:
@@ -34,11 +38,11 @@ write-and-push の中では書いたものが push の失敗で戻ることが�
   外へ出てから打つ 1 本（`ccnavi-clean.sh --worktree <名前>`）を出す
 - 未コミットの変更（未追跡を含む）がある。別のセッションが作業している見込みがあるので、
   `git status` で確かめてもらう
-- git が無視しているファイル（生成物を除く。.env など）がある。
-  `worktree remove` はそれごと消して戻せないので、名指しする
 - git のワークツリーとして登録されていない、リンクである、など。任意の場所を消す手段にしない
+- 無視されたファイルを退避できない（使用中・退避先が別のボリュームなど）。理由を伝える。
+  退避の途中で止まったときは、退避済みのものが退避先に残る
 - `git worktree remove` が断る（ロック・submodule など）。git の拒否文をそのまま伝える。
-  生成物はその前に消えているが、作り直せるので失うものは無い
+  生成物はその前に消えているが、作り直せるので失うものは無い。退避したものは退避先に残る
 
 ネットワークには出ない。git はローカルの操作（`status`・`rev-parse`・`worktree remove`）だけ。
 """
@@ -62,10 +66,32 @@ from ..phase import gates as phase
 
 TIMEOUT_SECONDS = 30.0
 
-# どこにあっても生成物と言える名前と、隣に package.json があるときだけ生成物と見る名前。
-# `ccnavi-clean.js` の ALWAYS・BESIDE_PACKAGE_JSON と揃える。
-ALWAYS = frozenset({"node_modules", ".venv", "__pycache__", ".pytest_cache", ".ruff_cache"})
-BESIDE_PACKAGE_JSON = frozenset({"out", "dist", ".cache"})
+# どこにあっても生成物と言える名前と、隣に印のファイルがあるときだけ生成物と見る名前。
+# `ccnavi-clean.js` の ALWAYS・BESIDE と揃える。
+ALWAYS = frozenset(
+    {
+        "node_modules",
+        ".venv",
+        "__pycache__",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".mypy_cache",
+        ".tox",
+        ".nox",
+        ".next",
+        ".nuxt",
+        ".turbo",
+        ".parcel-cache",
+        ".gradle",
+    }
+)
+BESIDE = {
+    "out": ("package.json",),
+    "dist": ("package.json",),
+    ".cache": ("package.json",),
+    "target": ("Cargo.toml", "pom.xml"),
+    "build": ("build.gradle", "build.gradle.kts"),
+}
 
 # drop の結果。
 REMOVED = "removed"
@@ -73,11 +99,7 @@ ABSENT = "absent"
 CWD_INSIDE = "cwd"
 DIRTY = "dirty"
 REFUSED = "refused"
-# git に無視されたファイル（生成物を除く）がある。`git worktree remove` は無視されたファイルごと
-# 消すので、.env などを知らないうちに消さないよう止める。
-IGNORED = "ignored"
-
-# 無視されたファイルを名指しする行の上限。
+# 退避したファイルを名指しする行の上限。
 _SHOWN = 10
 
 
@@ -123,9 +145,8 @@ def _screen(root: str, name: str, cwd: str) -> tuple[Dropped | None, str]:
        ディレクトリでなければ REFUSED。
     3. cwd がその中なら CWD_INSIDE。
     4. `_owner` で持ち主のリポジトリを求める。
-    5. `git status --porcelain` で未コミットの変更を見る。あれば DIRTY。`_ignored`
-       で無視されたファイルを見る。あれば IGNORED（`git worktree remove` は無視された
-       ファイルを断らずに消すので、ここで止める）。
+    5. `git status --porcelain` で未コミットの変更を見る。あれば DIRTY。無視された
+       ファイルは止める理由にしない（`drop` が退避する）。
     """
     path = tree.worktree_path(root, name)
     if not name or name in (".", "..") or any(c in name for c in ("/", "\\", ":")):
@@ -153,14 +174,6 @@ def _screen(root: str, name: str, cwd: str) -> tuple[Dropped | None, str]:
         return Dropped(name, REFUSED, path, unread), ""
     if done.out.strip():
         return Dropped(name, DIRTY, path), ""
-    ignored, why = _ignored(path)
-    if why:
-        return Dropped(name, REFUSED, path, why), ""
-    if ignored:
-        shown = ignored[:_SHOWN] + (
-            [f"…ほか {len(ignored) - _SHOWN} 件"] if len(ignored) > _SHOWN else []
-        )
-        return Dropped(name, IGNORED, path, "\n".join(shown)), ""
     return None, owner
 
 
@@ -179,7 +192,8 @@ def drop(root: str, name: str, cwd: str) -> Dropped:
     処理フロー:
     1. `_screen` で消してよいかを見る。止める理由があれば、それを返す。
     2. `_clean_generated` で生成物を消す。
-    3. `git worktree remove` で消す。git が断ったら（ロック・submodule など）、その拒否文で
+    3. `_stash_ignored` で、git が無視しているそれ以外のものを退避する。
+    4. `git worktree remove` で消す。git が断ったら（ロック・submodule など）、その拒否文で
        REFUSED。
     """
     found, owner = _screen(root, name, cwd)
@@ -189,6 +203,9 @@ def drop(root: str, name: str, cwd: str) -> Dropped:
     failed = _clean_generated(path)
     if failed:
         return Dropped(name, REFUSED, path, failed)
+    note, stuck = _stash_ignored(root, name, path)
+    if stuck:
+        return Dropped(name, REFUSED, path, stuck)
     done = gitcmd.run(owner, ["worktree", "remove", path], TIMEOUT_SECONDS)
     if not done.ok:
         said = (done.err or done.failure or "").strip().splitlines()
@@ -196,9 +213,10 @@ def drop(root: str, name: str, cwd: str) -> Dropped:
             name,
             REFUSED,
             path,
-            f"git worktree remove が失敗した（{said[0] if said else '理由不明'}）",
+            f"git worktree remove が失敗した（{said[0] if said else '理由不明'}）"
+            + (f"\n{note}" if note else ""),
         )
-    return Dropped(name, REMOVED, path)
+    return Dropped(name, REMOVED, path, note)
 
 
 def report(stdout: TextIO, root: str, d: Dropped, after: str = "。ブランチは残してある") -> None:
@@ -208,6 +226,8 @@ def report(stdout: TextIO, root: str, d: Dropped, after: str = "。ブランチ�
     """
     if d.status == REMOVED:
         stdout.write(f"ワークツリー {d.name} を削除しました（{d.path}{after}）\n")
+        if d.detail:
+            stdout.write(f"{d.detail}\n")
     elif d.status == ABSENT:
         stdout.write(f"ワークツリー {d.name} はありません（削除するものがありません）\n")
     elif d.status == CWD_INSIDE:
@@ -228,18 +248,6 @@ def report(stdout: TextIO, root: str, d: Dropped, after: str = "。ブランチ�
             f"ワークツリー {d.name} に未コミットの変更があるので、何も削除しませんでした。"
             "別のセッションが作業している見込みがあるので、"
             f"ユーザに git -C {shlex.quote(d.path)} status で確かめてもらう\n"
-        )
-    elif d.status == IGNORED:
-        stdout.write(
-            f"ワークツリー {d.name} に git が無視しているファイルがあるので、"
-            "何も削除しませんでした。"
-            "（worktree remove は無視されたファイルごと削除し、履歴から戻せない）:\n"
-        )
-        for line in d.detail.splitlines():
-            stdout.write(f"  {line}\n")
-        stdout.write(
-            "  残したいならワークツリーの外へ退避し、不要なら手で削除してから、"
-            f"'{retry_command(root, d.name)}' で再実行します。\n"
         )
     else:
         stdout.write(f"ワークツリー {d.name} を削除しなかった: {d.detail}\n")
@@ -333,7 +341,7 @@ class Left:
 def _leftover_facts(path: str) -> tuple[list[str], list[str]]:
     """残ったワークツリーが抱えているもの（理由と、確かめること）。何も読めなければ空。
 
-    `drop` が DIRTY・IGNORED で止める条件と同じ。消さずに読むだけ。
+    `drop` が DIRTY で止める条件と同じ。消さずに読むだけ。
     """
     why: list[str] = []
     check: list[str] = []
@@ -347,10 +355,6 @@ def _leftover_facts(path: str) -> tuple[list[str], list[str]]:
         check.append(
             f"`git -C {shlex.quote(path)} status` で中身を見て、必要なものはコミットするか退避する"
         )
-    ignored, _ = _ignored(path)
-    if ignored:
-        why.append("git が無視しているファイル（.env など）がある")
-        check.append("無視されたファイルを見て、必要なものは退避する")
     return why, check
 
 
@@ -359,7 +363,7 @@ def remaining(root: str, conf: settings.Settings, family: str, cwd: str = "") ->
 
     - 名前が親の識別子と違うが、その親の提案か承認済みチケットを持つワークツリー
       （親の作業を別の名前のワークツリーで進めた場合。`drop <親>` は名前で消すので拾えない）
-    - 閉じた子のワークツリーで、未保存の下書きや無視されたファイルがあって `drop` が消さなかったもの
+    - 閉じた子のワークツリーで、未保存の下書きがあって `drop` が消さなかったもの
     """
     family = family_for(root, conf, family)
     open_all, _ = approval.scan_all(conf, root)
@@ -419,7 +423,7 @@ def _ignored(top: str) -> tuple[list[str], str]:
     """git が無視しているもの（生成物を除く）。2 つめは読めなかった理由。
 
     `--directory` で、全体が無視されたディレクトリは 1 行（末尾の `/`）にまとめる。生成物
-    （`ccnavi-clean.js` と同じ名前。`out`・`dist`・`.cache` は package.json の隣だけ）は
+    （`ccnavi-clean.js` と同じ名前。`out`・`target` などは隣に印のファイルがあるときだけ）は
     消してよいので数えない。
     下書きの置き場（`wip/handoff/`）は追跡されるファイルで、gitが無視するものではないので、
     ここには現れない。
@@ -435,14 +439,58 @@ def _ignored(top: str) -> tuple[list[str], str]:
     return [p for p in done.out.split("\0") if p and not _is_generated(top, p)], ""
 
 
+def _stash_ignored(root: str, name: str, top: str) -> tuple[str, str]:
+    """生成物でない無視されたもの（`.env` など）を、`<ルート>/scratchpad/worktrees/<名前>/` へ移す。
+
+    (退避したことを言う文, 止まった理由)。何も無ければ ("", "")。移すのは最上位の項目ごとの
+    rename で、中身を走査しない（同じボリュームなら一瞬。深い node_modules でも 260 文字の
+    制限に掛からない）。退避先に同じパスが既にあれば上書きせず止める。退避先が git に無視されて
+    いなければ（.env がコミットされうる）、何も動かさず止める。移せなければ、推測や再試行を
+    せず、理由と退避済みのものを言って止める。
+    """
+    ignored, why = _ignored(top)
+    if why:
+        return "", why
+    if not ignored:
+        return "", ""
+    dest = os.path.join(root, "scratchpad", "worktrees", name)
+    shown_dest = f"scratchpad/worktrees/{name}"
+    checked = gitcmd.run(root, ["check-ignore", "-q", "--", shown_dest], TIMEOUT_SECONDS)
+    if not checked.ok:
+        return "", (
+            f"退避先 {shown_dest} が git に無視されていないので、無視されたファイルを退避しません。"
+            "ワークスペースルートの .gitignore に `/scratchpad` を足してから再実行します。"
+        )
+    moved: list[str] = []
+    for rel in ignored:
+        parts = [p for p in rel.rstrip("/").split("/") if p]
+        target = os.path.join(dest, *parts)
+        try:
+            if os.path.lexists(_long(target)):
+                raise FileExistsError(0, "退避先に同じパスがある", target)
+            os.makedirs(_long(os.path.dirname(target)), exist_ok=True)
+            os.replace(_long(os.path.join(top, *parts)), _long(target))
+        except OSError as exc:
+            done = f"（退避済み: {', '.join(moved)}）" if moved else ""
+            return "", (
+                f"無視されたファイル {rel} を {shown_dest} へ退避できませんでした"
+                f"（{exc.strerror or exc}）{done}。原因を直してから再実行します。"
+            )
+        moved.append(rel)
+    shown = moved[:_SHOWN] + ([f"…ほか {len(moved) - _SHOWN} 件"] if len(moved) > _SHOWN else [])
+    lines = [f"git が無視しているファイルを {shown_dest} へ退避しました（不要ならユーザが消す）:"]
+    lines += [f"  {line}" for line in shown]
+    return "\n".join(lines), ""
+
+
 def _is_generated(top: str, rel: str) -> bool:
     """ワークツリーのルートからの相対 `rel` が、生成物（とその中）か。"""
     parts = [p for p in rel.rstrip("/").split("/") if p]
     for i, part in enumerate(parts):
         if part in ALWAYS:
             return True
-        if part in BESIDE_PACKAGE_JSON and os.path.isfile(
-            os.path.join(top, *parts[:i], "package.json")
+        if part in BESIDE and any(
+            os.path.isfile(os.path.join(top, *parts[:i], mark)) for mark in BESIDE[part]
         ):
             return True
     return False
@@ -511,11 +559,11 @@ def generated(top: str) -> list[str]:
                 entries = list(it)
         except OSError:
             continue
-        has_package = any(e.name == "package.json" and _plain_file(e) for e in entries)
+        plain = {e.name for e in entries if _plain_file(e)}
         for e in entries:
             full = os.path.join(here, e.name)
             linked = e.is_symlink() or os.path.isjunction(full)
-            if e.name in ALWAYS or (has_package and e.name in BESIDE_PACKAGE_JSON):
+            if e.name in ALWAYS or any(mark in plain for mark in BESIDE.get(e.name, ())):
                 if linked or e.is_dir(follow_symlinks=False):
                     found.append(os.path.relpath(full, top).replace(os.sep, "/"))
                 continue

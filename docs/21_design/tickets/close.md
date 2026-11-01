@@ -31,12 +31,12 @@ keywords: [閉じる, Draft, feedback, confirm, decide]
 たまっていた過去の親）の `done/` の親子のチケット・`phases/<親>/`・`flows/` のフローを、
 ワークスペースの `logs/archive/<リポジトリ>/` へ移す（同じ構成で。`logs/` は git が追跡しないので削除になる）。
 write-and-push がその削除をコミットして push してから Draft を外し、最後に片付ける（`ccnavi worktree retire`。実行ファイルが
-条件を確かめて消す。親のワークツリーが消せない（cwd が中・未コミット・git が無視しているファイル）ときは、子に触る前に何も消さずに断る）。閉じた子のワークツリーは、完了でも取り消しでも、レビュー待ちだったものも全部消し
+条件を確かめて消す。親のワークツリーが消せない（cwd が中・未コミット）ときは、子に触る前に何も消さずに断る）。閉じた子のワークツリーは、完了でも取り消しでも、レビュー待ちだったものも全部消し
 （`confirm`・`finish`・`cancel` のあとにも、その時点で閉じた子を消す）、子の手元のブランチは、合流した子なら先頭が
 `merged_sha` と同じでその先頭が push 済みの親の祖先のときに消す。取り消した子のブランチは、一覧をユーザに見せて確認が取れてから
 （`ccnavi-user-clean-branch.sh <子> --confirmed`）消す。続けて親のワークツリーを消す
 （子に触る前に消せるかを確かめ、cwd がその中なら断る。外から打ち直す `ccnavi-launcher.sh worktree retire <親>` を出す）。
-子のワークツリーも、未コミットの変更や git が無視しているファイルがあれば、理由を出して残す。閉じた子の一覧は、`ready` が子のチケットを退避へ移す前に状態の置き場の `retire/<親>.json` に書く。
+子のワークツリーも、未コミットの変更があれば、理由を出して残す。閉じた子の一覧は、`ready` が子のチケットを退避へ移す前に状態の置き場の `retire/<親>.json` に書く。
 `ready` の打ち直しは、MR がまだ Draft であることと親のブランチのツリーの様子で決める。
 
 **退避の細部。** 退避の対象は、`done/` の親と子のチケット、`phases/<親>/` の下（マーカー・子の記録・`ready.json`・`closed.json`）、`flows/` の子のフロー。
@@ -63,7 +63,7 @@ write-and-push がその削除をコミットして push してから Draft を�
 `done/`・`phases/`・`flows/` の下にあり、消えた中身が退避したコピーと同じもの。`logs/archive/` は記録と state の置き場の守り（`builtin:guard-records` と、シェルの側の `builtin:guard-setting-files`）が書き込みを止める。
 
 **片付けの細部。** 片付けた内容は 1 行ずつ出る。消さなかったものは、理由と手で消すコマンド（`git -C <リポジトリ> branch -D <ブランチ>`）が出る。
-ワークツリーの消し方は、生成物（`node_modules`・`.venv` など）を消してから `git worktree remove`（`--force` なし）。git が無視しているファイル（`.env` など）があるワークツリーは名指しする
+ワークツリーの消し方は、生成物（`node_modules`・`.venv` など）を消してから `git worktree remove`（`--force` なし）。git が無視しているそれ以外のファイル（`.env` など）は、消さずにワークスペースルートの `scratchpad/worktrees/<名前>/` へ rename で退避してから消す（退避先が git に無視されていないとき、退避先に同じパスがあるとき、移せないときは、何も動かさず理由を言って止める。退避したものは ccnavi が消さない）
 （`worktree remove` はそれごと消して戻せない）。数えないのは生成物だけで、下書きの置き場 `wip/handoff/` は追跡されるので、ここには現れない。
 片付けの入口（`ccnavi worktree retire`・`ccnavi worktree branch`・`ccnavi sync tidy`・`ccnavi-user-clean-branch.sh`）は、メインのエージェントもサブエージェントも直には打てない。
 `ccnavi-review.sh ready` と `ccnavi-sync.sh` が中で呼ぶか、ユーザが `!` を付けて打つ。消す前に、記録の子がチケットの `parent:` でもその親の子かを確かめ直す。

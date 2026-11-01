@@ -495,7 +495,6 @@ def _parent_refusal(root: str, family: str, refused: worktrees.Dropped) -> str:
     case = {
         worktrees.CWD_INSIDE: "cwd",
         worktrees.DIRTY: "dirty",
-        worktrees.IGNORED: "ignored",
     }.get(refused.status, "other")
     command = f"{settings.script_command(root, 'ccnavi-launcher.sh')} worktree retire {family}"
     return texts.say(
