@@ -61,7 +61,7 @@ test("CB-T622 mr-state の検証: 1 行目・語の数・番号・Draft・終了
   assert.match(formatError(state(`open 12 no ${URL} extra`)), /open の項目の数が違います/);
   assert.match(formatError(state(`merged 12`)), /merged の項目の数が違います/);
   assert.match(formatError(state(`closed 12 ${URL} extra`)), /closed の項目の数が違います/);
-  // 番号: 頼んだ MR と同じでなければ、別の MR の答え
+  // 番号: 要求した MR と同じでなければ、別の MR の答え
   assert.match(formatError(state(`merged 13 ${URL}`)), /要求した MR（#12）と番号が違います（13）/);
   assert.match(formatError(state(`open 13 no ${URL}`)), /要求した MR（#12）と番号が違います（13）/);
   for (const bad of ["abc", "0", "012", "1e1", "-1", "12.0", "0x0c", "１２"]) {

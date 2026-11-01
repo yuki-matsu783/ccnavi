@@ -362,7 +362,7 @@ export async function runDecidePreview(
   if (ran.code !== 0) {
     return { ok: false, error: `ccnavi-review.sh decide --preview が失敗しました: ${ran.stderr.trim()}` };
   }
-  // 頼んだ親・フェーズ・MR の番号と照らして厳しく読む。読めなければ呼び手は件数を出さない
+  // 要求した親・フェーズ・MR の番号と照らして厳しく読む。読めなければ呼び手は件数を出さない
   const parsed = parseDecidePreview(ran.stdout, expect);
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
 }

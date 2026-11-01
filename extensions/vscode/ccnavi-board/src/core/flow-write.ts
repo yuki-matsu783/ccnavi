@@ -303,7 +303,7 @@ export function removeDraftFile(tree: string, file: string, hash: string): Draft
     return { ok: true, removed: false };
   }
   if (crypto.createHash("sha256").update(read.bytes).digest("hex") !== hash) {
-    return { ok: false, error: "下書きは、取り込んだあとに書き直されているため削除しません。新しい案は「提案あり」から確認してください" };
+    return { ok: false, error: "下書きは、取り込んだあとに書き直されているため削除できません。新しい案は「提案あり」から確認してください" };
   }
   const linked = linkedSegment(tree, file);
   if (linked !== undefined) {
@@ -329,7 +329,7 @@ export function removeDraftFile(tree: string, file: string, hash: string): Draft
     again = "";
   }
   if (again !== hash) {
-    return { ok: false, error: putBack(aside, file, "下書きは、取り込んだあとに書き直されているため削除しません。新しい案は「提案あり」から確認してください") };
+    return { ok: false, error: putBack(aside, file, "下書きは、取り込んだあとに書き直されているため削除できません。新しい案は「提案あり」から確認してください") };
   }
   try {
     fs.unlinkSync(aside);
