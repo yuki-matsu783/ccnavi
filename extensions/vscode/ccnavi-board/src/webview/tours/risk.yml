@@ -42,7 +42,7 @@ sample:
         points: 10
         glob: ".github/**"
         max: 35
-        message: CIやエージェントの定義を変更した
+        message: CI やエージェント定義に触った
       - id: db-script
         points: 10
         script: ".ccnavi/config/common/scripts/risk-db.sh"
@@ -69,7 +69,7 @@ sample:
         points: 35
         glob: ".github/**"
         max: 35
-        message: CIやエージェントの定義を変更した
+        message: CI やエージェント定義に触った
       - id: deletes
         points: 20
         deleted_over: 3
@@ -81,7 +81,7 @@ sample:
       factors:
         - { id: big-diff, source: common, kind: lines_over, value: 300, points: 25, message: 行数が多い }
         - { id: many-files, source: common, kind: files_over, value: 10, points: 15, message: ファイルが多い }
-        - { id: ci, source: common, kind: glob, value: ".github/**", points: 10, message: CIやエージェントの定義を変更した }
+        - { id: ci, source: common, kind: glob, value: ".github/**", points: 10, message: CI やエージェント定義に触った }
         - { id: db-script, source: common, kind: script, value: ".ccnavi/config/common/scripts/risk-db.sh", points: 10, message: DBの変更の大きさ }
         - { id: no-tests, source: common, kind: judge, value: テストのない振る舞いの変更を含むか, points: 20, message: テストが足りない }
         - { id: migrations, source: self, kind: glob, value: "db/migrations/**", points: 15, message: マイグレーションに触った }
@@ -91,7 +91,7 @@ sample:
       factors:
         - { id: big-diff, source: common, kind: lines_over, value: 300, points: 25, message: 行数が多い }
         - { id: many-files, source: common, kind: files_over, value: 10, points: 15, message: ファイルが多い }
-        - { id: ci, source: common, kind: glob, value: ".github/**", points: 10, message: CIやエージェントの定義を変更した }
+        - { id: ci, source: common, kind: glob, value: ".github/**", points: 10, message: CI やエージェント定義に触った }
         - { id: db-script, source: common, kind: script, value: ".ccnavi/config/common/scripts/risk-db.sh", points: 10, message: DBの変更の大きさ }
         - { id: no-tests, source: common, kind: judge, value: テストのない振る舞いの変更を含むか, points: 20, message: テストが足りない }
         - { id: "lib:big-diff", source: lib, kind: lines_over, value: 100, points: 15, message: libは小さな変更でも見る }

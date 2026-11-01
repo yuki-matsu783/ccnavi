@@ -2,7 +2,7 @@
 
 ccnaviのチケットが、どのワークツリーでどこまで進んでいるかをカンバンで見られます。
 
-この拡張は、チケットの状態を見て、承認などの人の操作を受ける入口です。判定は実行ファイルが行い、作業中のエージェントのセッションへプロンプトを送り込む手段は持ちません（ccnaviのREADME「複数人・別PC・別セッションで進める」）。
+この拡張は、チケットの状態を見て、承認などの人の操作を受ける入口です。判定は実行ファイルが行い、作業中のエージェントのセッションへプロンプトを送り込む手段は持ちません（ccnaviのREADME「複数人・別 PC・別セッションで進める」）。
 
 この拡張が何をするか（画面ごとのふるまい）は[docs/requirements.md](docs/requirements.md)、作り（構成・画面の段取り・テストのID）は[docs/design.md](docs/design.md)に書いてあります。このREADMEには、必要なもの・組み立てと導入だけを書きます。拡張開発ホストでの動かし方と手動確認の手順は[docs/design/manual-checks.md](docs/design/manual-checks.md)にあります。
 
@@ -59,7 +59,7 @@ pnpm run package   # scripts/package.sh: install → compile → vsce package
 code --install-extension dist/ccnavi-board-<version>.vsix --force   # --forceは入れ替えのとき
 ```
 
-入れたあと、開いているウィンドウは更新（`Developer: Reload Window`）すると新しい版になる。
+入れたあと、開いているウィンドウは再読み込み（`Developer: Reload Window`）すると新しい版になる。
 
 入れたときの`[DEP0169] DeprecationWarning: url.parse() ...`は`code`コマンド自身の警告で、拡張とは関係ない。`successfully installed`が出ていれば入っている。
 

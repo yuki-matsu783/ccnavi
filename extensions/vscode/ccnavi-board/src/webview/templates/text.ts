@@ -40,7 +40,7 @@ export function layerFor(target: { readonly kind: string; readonly name: string 
 
 /** フローの要約の1行 */
 export function flowText(flow: FlowSummary): string {
-  return `${flow.name}（ノード${flow.nodes}・接続${flow.connections}）`;
+  return `${flow.name}（ノード${flow.nodes}・線${flow.connections}）`;
 }
 
 /** 先行ステップの番号の並び。空なら「なし」 */

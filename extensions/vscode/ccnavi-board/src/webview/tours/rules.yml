@@ -169,7 +169,7 @@ sample:
         expectations:
           - { tool: Bash, subject: git push origin main, why: 同じ呼び出しを繰り返し止めた形 }
         yaml: "rules:\n  deny:\n    - id: git-push\n      match: Bash\n      glob: '*git push*'\n      message: pushはユーザが行う。ccnavi-git.shの入口を使う\nexpectations:\n  deny:\n    - tool: Bash\n      subject: git push origin main\n      why: 同じ呼び出しを繰り返し止めた形\n"
-  save_error: "設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください:\nerror: db-migrate: askにmessageがある"
+  save_error: "設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください:\nerror: db-migrate: ask に message がある"
   sums:
     - name: self
       layers: [common, self]

@@ -10,12 +10,12 @@ keywords: [要件, REQ-EXT, 拡張, VS Code, Chrome, 互換, COMPAT, CCNAVI_COMP
 
 ### 2.13 拡張との取り決め — REQ-EXT
 
-ccnavi を読む拡張は 2 つある。VS Code 拡張「ccnavi ボード」は実行ファイルと sh を
+ccnavi を読む拡張は 2 つある。VS Code 拡張「ccnaviボード」は実行ファイルと sh を
 子プロセスで起動し、JSON を読み、ワークスペースのファイルを直接読み書きする。Chrome 拡張「ccnavi 承認ボード」
 は、ccnavi を同梱してブラウザ上で動かし、公開の入口を直接呼ぶ。
 
 この節には、ccnavi が拡張に約束することだけを書く。拡張が画面でどうふるまうかは、各拡張の要件書
-（ccnavi ボードの要件の REQ-VSC、ccnavi 承認ボードの要件の REQ-CHR）にある。
+（ccnaviボードの要件の REQ-VSC、ccnavi 承認ボードの要件の REQ-CHR）にある。
 JSON の欄の細かい形は、この要件書の「JSON の形」（json-shapes.md）の各 JSON の節にある。
 
 ### 2.13.1 共通
