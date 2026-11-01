@@ -25,7 +25,7 @@ import tempfile
 import unittest
 
 from ccnavi.hook import turngate
-from ccnavi.hook.turngate import BUILTIN, Cond, Gate
+from ccnavi.hook.turngate import BUILTIN, INTEGRATE_GATE, Cond, Gate
 from ccnavi.records import userprompt
 from tests import put_messages
 
@@ -467,10 +467,10 @@ class BuiltinFormsTest(TurnGateTestCase):
     GIT = "sh /w/.ccnavi/scripts/ccnavi-git.sh"
 
     def first(self, tail):
-        return turngate.hits(BUILTIN[0].first, "first", [f"{self.GIT} {tail}"])
+        return turngate.hits(INTEGRATE_GATE.first, "first", [f"{self.GIT} {tail}"])
 
     def second(self, tail):
-        return turngate.hits(BUILTIN[0].second, "second", [f"{self.GIT} {tail}"])
+        return turngate.hits(INTEGRATE_GATE.second, "second", [f"{self.GIT} {tail}"])
 
     def test_integrate_は名前を_A_のキーにする(self):
         self.assertEqual(self.first("integrate foo"), [("foo", "foo")])
@@ -510,13 +510,13 @@ class BuiltinFormsTest(TurnGateTestCase):
                 self.assertEqual(self.first(tail), [])
                 self.assertEqual(self.second(tail), [])
         self.assertEqual(
-            turngate.hits(BUILTIN[0].second, "second", ["sh other.sh integrate-done foo"]), []
+            turngate.hits(INTEGRATE_GATE.second, "second", ["sh other.sh integrate-done foo"]), []
         )
 
     def test_引用の中の文字列は反応しない(self):
         # shellread は引用の中の空白を目印に置き換える。echo の引数は別のコマンドの語。
         quoted = "echo ccnavi-git.sh\x01integrate\x01foo"
-        self.assertEqual(turngate.hits(BUILTIN[0].first, "first", [quoted]), [])
+        self.assertEqual(turngate.hits(INTEGRATE_GATE.first, "first", [quoted]), [])
 
     def test_名前に空白を使った_A_と_B_は組む(self):
         turngate.note(BUILTIN, [f"{self.GIT} integrate Foo"], self.state, SESSION, "c1", now=1.0)

@@ -62,7 +62,7 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 6. 終わったら、sh はユーザが打つ `cd '<ツリーのルート>'`・`crit review <相対パス>`・`crit push <番号>` を標準出力に出す。
    ツリーのルートはいつも `'…'` で包み、中の `'` は `'\''` に置き換える。
 
-`confirm` の段。sh は、ロック・取り込みの前に `review confirm --check` で断れる条件を通してから、スレッドとレビューを取ってきて、`review confirm` に渡す。`review confirm` は判定し、
+`confirm` の段（依頼のあとにユーザの発言をはさむまでの拒否は[事前判定の 6.7](../pre-check.md)）。sh は、ロック・取り込みの前に `review confirm --check` で断れる条件を通してから、スレッドとレビューを取ってきて、`review confirm` に渡す。`review confirm` は判定し、
 通れば `reviewed` のマーカーを置いて、そのフェーズと引き受けた延期の分の `review/` の子を `done/` へ動かす。
 sh がトークンの持ち主を引けたら `--actor` で渡し、マーカーに `actor` と `via: cli` を残す。引けないときは渡さないので、
 マーカーに `actor` が無い。
