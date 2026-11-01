@@ -295,7 +295,7 @@ function readPlanItems(value: unknown): PlanItem[] {
       index: num(p.index),
       number: num(p.number),
       type: str(p.type),
-      review: p.review === true,
+      review: typeof p.review === "boolean" ? p.review : null,
       deferred: p.deferred === true,
       after: numbers(p.after),
     }));

@@ -37,6 +37,7 @@ phases:
     scope: ["wip/research/*"]
     deliverables: ["wip/research/summary.md"]
     agent: explorer
+    skill: process-research
     when: 既存の振る舞いが分からないとき
   design:
     kind: work
@@ -77,7 +78,7 @@ def plan_item_lines(items, start=1) -> list[str]:
     `start` はその計画の最初の番号（フィードバック計画は続き）。
 
     ステップは定義の名前、`(名前, "review" か "defer")`、
-    `{"type": …, "review": True, "deferred": True, "after": […]}` のどれか。
+    `{"type": …, "review": True か False, "deferred": True, "after": […]}` のどれか。
     `after` を書かないステップは、すぐ前のステップが先行する（一直線）。最初のステップは先行なし。
     並行にしたい見本はマップで `after` を明記する（`[]` なら先行なし）。
     """
@@ -85,17 +86,17 @@ def plan_item_lines(items, start=1) -> list[str]:
     for i, item in enumerate(items):
         if isinstance(item, dict):
             kind, after = item["type"], item.get("after")
-            review, deferred = item.get("review", False), item.get("deferred", False)
+            review, deferred = item.get("review"), item.get("deferred", False)
         elif isinstance(item, tuple):
             kind, after = item[0], None
-            review, deferred = item[1] == "review", item[1] == "defer"
+            review, deferred = (True if item[1] == "review" else None), item[1] == "defer"
         else:
-            kind, after, review, deferred = item, None, False, False
+            kind, after, review, deferred = item, None, None, False
         if after is None:
             after = [start + i - 1] if i > 0 else []
         fields = [f"type: {kind}"]
-        if review:
-            fields.append("review: true")
+        if review is not None:
+            fields.append(f"review: {'true' if review else 'false'}")
         if deferred:
             fields.append("deferred: true")
         if after:
@@ -140,15 +141,21 @@ def _parent_text(name, plan, feedback, allow, issue):
 
 
 def child_text(name, parent, phase, allow, review=True):
+    """子の提案の本文。`review` が None なら `human_review` を書かない（宣言なし）。"""
     lines = [
         "---",
         "version: 1",
         f"ticket: {name}",
         f"parent: {parent}",
         f"phase: {phase}",
-        "human_review:",
-        f"  required: {'true' if review else 'false'}",
-        "  reason: t",
+    ]
+    if review is not None:
+        lines += [
+            "human_review:",
+            f"  required: {'true' if review else 'false'}",
+            "  reason: t",
+        ]
+    lines += [
         f"title: 子 {name}",
         "rationale: r",
         "allow:",

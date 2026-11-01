@@ -507,7 +507,7 @@ def _read_review(ticket: ticket_model.Ticket, front: dict, problems: list[Proble
             Problem(SEVERITY_ERROR, name, "`human_review` は {required:, reason:} で書く")
         )
         return True
-    if not ticket.review_required and not ticket.review_reason:
+    if ticket.review_required is False and not ticket.review_reason:
         problems.append(
             Problem(
                 SEVERITY_WARN,

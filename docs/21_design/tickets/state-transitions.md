@@ -36,7 +36,7 @@ keywords: [状態遷移, 置き場, マーカー, doing, review, done]
 | `todo` → `doing`（手で） | ユーザが hook の外で動かす | 無し。動かせること自体が条件（その置き場にエージェントは書けない）。承認の検査は判定が適用する | ― |
 | `todo`（改版）→ 消える | `ccnavi-user-agree.sh`（ユーザ） | 同じ識別子が `doing/` にあり、計画・`phases:`・範囲のどれかが違う。`doing/` の側の計画・コピー・範囲を差し替える | `plan` / `feedback`（ステップの `after` ごと）・`phases:`・`allow` / `ask` / `deny` |
 | `doing` のまま | `ccnavi-ticket.sh start` | 着手の欄が空。`.claude/worktrees/<識別子>/` がワークツリーとして在り、元リポジトリが承認済みチケットの `project` と合い。子なら親が `doing/` に在って着手済みで、先行が全部 `done/` に在って取り消しでない | `started_at`、`base_sha`（そのワークツリーの HEAD） |
-| `doing` → `review` | `ccnavi-ticket.sh finish` | 着手済み。子で、閉じた時点のフェーズがレビュー要（延期を含む。9.8）。フェーズ定義の成果物が在り、定性のリスク判定が揃っている（9.9） | `completed_at` |
+| `doing` → `review` | `ccnavi-ticket.sh finish` | 着手済み。子で、閉じた時点のフェーズがレビュー要（延期を含む。9.8）。フェーズ定義の成果物が在り、定性のリスク判定が揃っている（9.9）。成果物が `wip/` の下なら、`ready` が `wip/` ごと消すので main に残らない旨を案内する（止めない）。学びの記録は形式（`learnings` と節の数）も検査する | `completed_at` |
 | `doing` → `done` | `ccnavi-ticket.sh finish` | 着手済み。子ならフェーズがレビュー不要。親なら開いている子が無く、レビューで止まっておらず、計画があればフィードバック計画が承認済みで全フェーズが終わっている（早めに閉じていれば子だけ） | `completed_at` |
 | `doing` → `done`（取り消し） | `ccnavi-ticket.sh cancel --reason`、`ccnavi-user-close-early.sh`（未着手の子） | 理由が空でない。親なら開いている子が無い | `cancelled_at`、`cancel_reason` |
 | `review` → `done` | `ccnavi-review.sh confirm`、`ccnavi-user-decide.sh`、Chrome 拡張のレビュー済み、`ccnavi-user-close-early.sh` | そのフェーズ（延期を引き受けた分を含む）のレビューが済んだ（9.10） | ― |

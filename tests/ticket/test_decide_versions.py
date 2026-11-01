@@ -209,6 +209,8 @@ class PostTextTest(unittest.TestCase):
     def test_the_note_lists_each_destination_and_the_followup(self):
         text = review_decide.post_text(self.record(), "note")
         self.assertTrue(text.startswith(review_host.MARKER_DECIDE))
+        # 投稿者はエージェントと同じアカウントなので、ユーザの判断であることと経路を本文に書く。
+        self.assertIn("ユーザの判断（経路: ", text.splitlines()[1])
         self.assertIn("issue に回す:\n- u1", text)
         self.assertIn("対応しない（受け入れて進む）:\n- u2", text)
         self.assertIn("続きの子チケット `i0001-02-03`", text)

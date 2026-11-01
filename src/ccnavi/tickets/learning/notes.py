@@ -336,22 +336,42 @@ def applies(root: str, conf: settings.Settings, found: ticket_model.Ticket) -> b
     )
 
 
-def record_missing(
+def record_blocked(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
+    """子の `finish` の学びの検査。止めたなら理由を出して True。
+
+    子の HEAD にある記録が、在って空でなく、親の `finish` と同じ読み取りの検査
+    （`learning_records.parse`）と整合の検査（`consistency_problem`）を通ること。
+    親で初めて断ると、閉じた子へ戻って直す手間が出る。
+    """
     if not applies(root, conf, found):
         return False
     child_tree = tree.worktree_path(root, found.ticket)
     rel = record_rel(found.ticket)
     text = head_text(child_tree, rel)
-    if text is not None and text.strip():
+    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
+    if text is None or not text.strip():
+        stderr.write(
+            f"ccnavi: {found.ticket} の気づきの記録（{rel}）が、子のブランチの HEAD に無いか、"
+            "空か、リンクになっている（コミットが必要です）。"
+            f"'{ticket_sh} learn' を実行して記録を書き、"
+            "git add と git commit をしてから閉じてください"
+            "（気づきが無ければ learnings: none のままでよい）\n"
+        )
+        return True
+    record, why = learning_records.parse(rel, found.ticket, text)
+    if record is None:
+        stderr.write(f"ccnavi: 気づきの記録 {rel} を読み取れない: {why}\n")
+    else:
+        why = learning_records.consistency_problem(record)
+        if why:
+            stderr.write(f"ccnavi: 気づきの記録 {rel} が整合の検査にヒットする: {why}\n")
+    if record is not None and not why:
         return False
     stderr.write(
-        f"ccnavi: {found.ticket} の気づきの記録（{rel}）が、子のブランチの HEAD に無いか、"
-        "空か、リンクになっている（コミットが必要です）。"
-        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} learn' を実行して記録を書き、"
-        "git add と git commit をしてから閉じてください"
-        "（気づきが無ければ learnings: none のままでよい）\n"
+        "  記録を直してコミットしてから閉じてください"
+        "（`learnings:` は `none` か件数の数値、気づきは `## ` 見出しの節に書く）\n"
     )
     return True
 

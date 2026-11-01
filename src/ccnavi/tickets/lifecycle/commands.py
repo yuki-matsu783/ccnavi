@@ -36,7 +36,7 @@ from ..flow import graph as flow
 from ..learning import notes as learning
 from ..model import ticket_model, ticket_places
 from ..phase import gates as phase
-from ..sync import template_drafts
+from ..sync import skillsync, template_drafts
 from . import close as ops_close
 from . import plan as ops_plan
 from . import stop as ops_stop
@@ -184,6 +184,10 @@ def start(
         stdout.write(line + "\n")
     if found.is_child:
         stdout.write(texts.say(root, "NEXT_OPS_START_CHILD", {"ticket": found.ticket}) + "\n")
+        pt = ops_close.phase_type(root, conf, found)
+        skill = skillsync.installed(root, pt.skill) if pt is not None else ""
+        if skill:
+            stdout.write(texts.say(root, "NOTE_OPS_START_SKILL", {"skill": skill}) + "\n")
     elif not childless:
         stdout.write(texts.say(root, "NEXT_OPS_START_PARENT", {}) + "\n")
     if learning.applies(root, conf, found):
@@ -220,7 +224,7 @@ def _finish_found(
         return None
     if ops_close.parent_still_busy(stderr, root, conf, found):
         return None
-    if learning.record_missing(stderr, root, conf, found):
+    if learning.record_blocked(stderr, root, conf, found):
         return None
     return found
 
@@ -242,14 +246,15 @@ def finish(
 
     処理フロー:
     1. `finish_gate` で承認済みを引き、着手済みであることと、置き場・親の状態・学びの記録を確かめる
-       （`misplaced_home`・`parent_still_busy`・`learning.record_missing`）。ここまでは `check` も
+       （`misplaced_home`・`parent_still_busy`・`learning.record_blocked`）。ここまでは `check` も
        同じ関数で通す。
     2. 成果物（`deliverables_missing`）と親の学びの置き場（`learning.parent_blocked`）を確かめる。
        子の合流のあとでないと分からないので、事前には見ない。
     3. 子なら `_score_child` で実績のリスクを数える。判定が揃わなければ閉じない。
     4. 完了の時刻・親へ入った子の先頭（`_merged_sha`）・行き先（`_needs_review`）を決める。
        行き先は `review` か `done`。
-    5. `_move` で欄を書いて動かす。成功したら、リスクの行を出し、親なら `_close_parent` を呼ぶ。
+    5. `_move` で欄を書いて動かす。成功したら、リスクの行を出し、成果物が `wip/` の下にあれば
+       消える旨の案内を足し（止めない）、親なら `_close_parent` を呼ぶ。
     """
     found = finish_gate(stderr, root, conf, ticket_id)
     if found is None:
@@ -277,6 +282,11 @@ def finish(
     if code == 0 and scored:
         for line in scored:
             stdout.write(line + "\n")
+    in_wip = ops_close.deliverables_in_wip(root, conf, found) if code == 0 else []
+    if in_wip:
+        stdout.write(
+            texts.say(root, "NOTE_OPS_FINISH_WIP_DELIVERABLES", {"paths": "、".join(in_wip)}) + "\n"
+        )
     if code == 0 and not found.is_child:
         _close_parent(stdout, stderr, root, conf, found)
     return code
@@ -349,7 +359,7 @@ def _needs_review(root: str, conf: settings.Settings, found: ticket_model.Ticket
             continue
         ph.states[found.ticket] = ticket_model.DONE
         return ph.deferred or ph.review_required
-    return found.review_required
+    return found.review_required is not False
 
 
 def _close_parent(

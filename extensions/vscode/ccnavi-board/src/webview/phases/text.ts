@@ -6,9 +6,9 @@
 import type { PhaseForm } from "../../core/phases-view.js";
 import { foldFind } from "../shared/find.js";
 
-/** 補足（agent / when）に何か入っているか */
+/** 補足（agent / skill / when）に何か入っているか */
 export function hasMore(phase: PhaseForm): boolean {
-  return phase.agent !== "" || phase.when !== "";
+  return phase.agent !== "" || phase.skill !== "" || phase.when !== "";
 }
 
 /** 「補足」の見出しにつける一言 */

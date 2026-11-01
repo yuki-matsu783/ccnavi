@@ -35,6 +35,7 @@ Write は止まる。組み込みの既定は持たない。
         scope: ["wip/research/*"]   # 子の範囲の上限。inherit なら親の範囲
         deliverables: ["wip/research/summary.md"]
         agent: explorer       # 案内にだけ使う
+        skill: process-research   # 案内にだけ使う。子が最初に Skill で呼ぶ工程スキルの名前
         when: 既存の振る舞いが分からないとき   # 案内にだけ使う
 
 ## 承認のあとは親のコピーを読む
@@ -103,6 +104,8 @@ class PhaseType:
     scope_globs: list[str] = field(default_factory=list)
     deliverables: list[str] = field(default_factory=list)
     agent: str = ""
+    # 子が最初に呼ぶ工程スキル（`.claude/skills/<名前>/`）の名前。案内にだけ使う。
+    skill: str = ""
     when: str = ""
     learning: str = LEARNING_ON
     # source はこの定義が書いてあるレイヤーの名前（`common` / `self` / プロジェクト名）。
@@ -127,6 +130,7 @@ class PhaseType:
             None if self.scope is None else tuple(self.scope_globs),
             tuple(self.deliverables),
             self.agent,
+            self.skill,
             self.when,
             self.learning,
         )
@@ -250,7 +254,7 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
        glob のリストは `_globs` で式にする
     4. 成果物（`deliverables`）は文字列のリストに限る。
        `..` や絶対パスは、ワークツリーの外を指すので断る
-    5. 担当（`agent`）と条件（`when`）は文字列として読む
+    5. 担当（`agent`）・工程スキル（`skill`）・条件（`when`）は文字列として読む
     6. 学習（`learning`）は真偽値か既知の文字列に限る
     """
     problems: list[Problem] = []
@@ -325,6 +329,7 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
             )
             return None, problems
     pt.agent = str(body.get("agent") or "").strip()
+    pt.skill = str(body.get("skill") or "").strip()
     pt.when = str(body.get("when") or "").strip()
     # 学習の設定。真偽値か既知の文字列に限る。
     raw_learning = body.get("learning")
@@ -505,7 +510,17 @@ def parent_scope_problems(parent: ticket_model.Ticket) -> list[Problem]:
 COPY_KEY = ticket_mod.PHASES_KEY
 
 # コピーの欄の名前。`PhaseType.key()` の並びと同じ（`id` を除く）。
-_KEY_FIELDS = ("title", "kind", "review", "scope", "deliverables", "agent", "when", "learning")
+_KEY_FIELDS = (
+    "title",
+    "kind",
+    "review",
+    "scope",
+    "deliverables",
+    "agent",
+    "skill",
+    "when",
+    "learning",
+)
 
 
 def read_copy(raw) -> tuple[PhaseTypes, list[Problem]]:
@@ -585,6 +600,8 @@ def as_copy(pt: PhaseType) -> dict:
         out["deliverables"] = list(pt.deliverables)
     if pt.agent:
         out["agent"] = pt.agent
+    if pt.skill:
+        out["skill"] = pt.skill
     if pt.when:
         out["when"] = pt.when
     if pt.learning != LEARNING_ON:
@@ -639,6 +656,12 @@ def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
     ):
         for i, item in enumerate(items):
             used.add(item.type)
+            if kind == KIND_FEEDBACK and item.review is False:
+                # 定義の `feedback` に `review: false` を書けないのと同じ。計画のステップでも外せない。
+                error(
+                    f"`{key}[{i}]` に `review: false` は書けない"
+                    "（フィードバック対応の結果をユーザが見ない経路は作らない）"
+                )
             pt = types.get(item.type)
             if pt is None:
                 if item.type not in named:

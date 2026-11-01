@@ -36,7 +36,7 @@ export const LIST_KEYS = ["deliverables"] as const;
 export type ListKey = (typeof LIST_KEYS)[number];
 
 /** 定義の中の欄を書く順。無い欄はこの順の直前の欄の後ろに入る */
-const KEY_ORDER = ["kind", "title", "review", "scope", "deliverables", "agent", "when"] as const;
+const KEY_ORDER = ["kind", "title", "review", "scope", "deliverables", "agent", "skill", "when"] as const;
 
 export interface PhasesDocument {
   readonly model: PhasesModel;
@@ -152,6 +152,7 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
     scope,
     deliverables: lists.deliverables,
     agent: scalarText(map, "agent"),
+    skill: scalarText(map, "skill"),
     when: scalarText(map, "when"),
   };
 }
@@ -320,6 +321,7 @@ function writePhase(doc: Document, node: YAMLMap, form: PhaseForm, isNew: boolea
   setList(doc, node, "deliverables", form.deliverables, Scalar.QUOTE_DOUBLE, false);
 
   setOrDelete(doc, node, "agent", form.agent.trim(), Scalar.PLAIN);
+  setOrDelete(doc, node, "skill", form.skill.trim(), Scalar.PLAIN);
   setOrDelete(doc, node, "when", form.when.trim(), Scalar.PLAIN);
 }
 
@@ -477,6 +479,7 @@ function asPhase(raw: unknown): PhaseForm | undefined {
     scope: lists[0] as string[],
     deliverables: lists[1] as string[],
     agent: text(r.agent),
+    skill: text(r.skill),
     when: text(r.when),
   };
 }
