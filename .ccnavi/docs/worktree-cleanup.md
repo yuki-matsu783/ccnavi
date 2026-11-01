@@ -30,16 +30,23 @@ keywords: [片付け, ワークツリー, worktree remove, ccnavi-clean.sh, 分�
       エージェントは一覧と、出てきたコマンドをそのままユーザに見せて頼む。`--confirmed`なしでは消えない
   - 消し方は生成物の掃除（`ccnavi-clean.sh`と同じもの）のあと`worktree remove`（`--force`なし）。ワークツリーを消してもブランチは消えない
     （ブランチは上の条件か、下の「MRがマージされたあと」で片付ける）
-  - 親のワークツリーが消せない（下の3つ。cwdが中・未コミット・gitが無視しているファイル）とき、`ccnavi worktree retire`は
+  - 親のワークツリーが消せない（下の2つ。cwdが中・未コミット）とき、`ccnavi worktree retire`は
     子に触る前に、何も消さずに断る（子のワークツリーもブランチも残る）。直して`retire`を打ち直す。`ready`の最後の片付けも同じ
   - cwdが消す対象の中にあると消さず、「cwdが中にあるので消さなかった」と、外に出てから打つ1本
     （`sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-clean.sh --worktree <名前>`）が出る。`worktree drop`を親のワークツリーの中から
     直接打ったときはこの形になる（`worktree retire`は子に触る前に最初に断る。上）。`ready`は外から`--parent`を付けて打つので、この形にはならない。ExitWorktreeか`cd`でワークスペースルートに出てから、出た1本をそのまま打つ
   - 未コミットの変更があるワークツリーは、何も消さずに止まる（中身は`git -C <パス> status`で見る）。別のセッションの作業かもしれないので、ユーザに確かめる
-  - gitが無視しているファイル（`.env`など）があるワークツリーも、何も消さずに名指しされる。`worktree remove`はそれごと消し、
-    履歴から戻せないため。残したいならワークツリーの外へ退避し、要らないならユーザに確かめて消してから打ち直す。
-    数えないのは、生成物（`ccnavi-clean.sh`が消すもの）だけ。下書きの置き場は`wip/handoff/`（追跡される。
-    [scratchpad.md](scratchpad.md)）で、gitが無視するファイルではない。未コミットの下書きは「未コミットの変更」として止まる
+  - gitが無視しているファイル（`.env`など）は、`worktree remove`が黙って消して履歴から戻せないので、消さずに
+    ワークスペースルートの`scratchpad/worktrees/<名前>/`へ退避してから消す（元の相対パスを保つ。最上位の項目ごとのrenameで、
+    中を走査しない。何を退避したかは出力に出る）。退避したものはccnaviが消さないので、要らなければユーザが消す
+    - 動かさずに止まる場合は3つ。退避先がgitに無視されていない（`.env`がコミットされうる。ルートの`.gitignore`に`/scratchpad`を足す）、
+      退避先に同じパスがある（上書きしない）、移せない（使用中・別ボリュームなど。理由が出る。退避済みのものは退避先に残る）
+    - 生成物（`ccnavi-clean.sh`が消すもの。一覧は`src/ccnavi/tickets/lifecycle/worktrees.py`の`ALWAYS`・`BESIDE`）は退避せずに消す。一覧は作り直せるキャッシュだけで、`node_modules`・`.venv`・`__pycache__`・
+      `.mypy_cache`・`.tox`・`.next`などと、隣に印のファイルがあるときだけの`out`・`dist`・`.cache`（`package.json`）、
+      `target`（`Cargo.toml`・`pom.xml`）、`build`（`build.gradle`）。追跡されているものは消さない。手で置いたデータは、
+      この名前の下に置かない
+    - 下書きの置き場は`wip/handoff/`（追跡される。[scratchpad.md](scratchpad.md)）で、gitが無視するファイルではない。
+      未コミットの下書きは「未コミットの変更」として止まる
   - `git worktree remove`が断る（ロック・submoduleなど）ワークツリーは残り、gitの拒否文が出る。生成物は先に消えているが、作り直せる
 
 ## MRがマージされたあと
@@ -52,8 +59,8 @@ keywords: [片付け, ワークツリー, worktree remove, ccnavi-clean.sh, 分�
 - MRをマージせずに閉じた（放棄した）親の記録は、ユーザが`ccnavi worktree retire --abandon <親の識別子>`で消す（エージェントは打てない）。
   放棄した親のワークツリーを片付ければ、`ccnavi-sync.sh`の対象から外れる
 - 片付けの実行はshが中で行う。エージェントが実行ファイルを直に打つと止められる。
-- マージ済みと分かったら、手元の親を片付ける。消すのは、親のワークツリー（未コミットの変更や、gitが無視している
-  ファイルがあれば残す）、親の手元のブランチ（親の識別子のブランチで、手元の先頭がpush済みの先頭（手元の`origin/<ブランチ>`）と
+- マージ済みと分かったら、手元の親を片付ける。消すのは、親のワークツリー（未コミットの変更があれば残す。gitが無視している
+  ファイルは退避してから消す）、親の手元のブランチ（親の識別子のブランチで、手元の先頭がpush済みの先頭（手元の`origin/<ブランチ>`）と
   マージされたMRの先頭の両方に含まれるときだけ。`origin/<ブランチ>`が手元に無ければ消さない）、
   その親の片付けの記録。残った子のブランチも、MRの先頭を基準に上と同じ条件で消す
 - 片付けた内容は1行ずつ出る。消さなかったものは、理由と手で消すコマンド（`git -C <リポジトリ> branch -D <ブランチ>`）が出る。
@@ -64,7 +71,7 @@ keywords: [片付け, ワークツリー, worktree remove, ccnavi-clean.sh, 分�
 
 - 自分で`worktree remove`を打つとき（`<統合先>`に直接取り込んだワークツリーなど）は、その前に`ccnavi-clean.sh <名前>`で
   node_modules・.venvなどの生成物を消す。Windowsで削除が途中で止まるのを防ぐためである。未コミットの変更があるワークツリーでは、
-  `ccnavi-clean.sh`は何も消さずに止まる。node が無いときも何も消さず、ユーザが打つ削除の1本を出して止まる（エージェントは打たず、ユーザに頼む）。`ccnavi-clean.sh --worktree <名前>`は掃除と`worktree remove`を1本で行う
+  `ccnavi-clean.sh`は何も消さずに止まる。`ccnavi-clean.sh --worktree <名前>`は掃除と`worktree remove`を1本で行う
 - 片付けの1本（`ccnavi-clean.sh --worktree`）や`ccnavi-git.sh rm -r wip`がClaude Codeの自動モードの分類器に止められたら、迂回しない。
   ユーザに許可を頼む。続けて許すなら、ユーザがホームの`~/.claude/settings.json`の`permissions.allow`に、操作ごとに絞った許可
   （例 `Bash(sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-clean.sh --worktree *)`）を足す。分類器はプロジェクトの

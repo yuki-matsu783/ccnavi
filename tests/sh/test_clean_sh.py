@@ -3,8 +3,8 @@
 確かめるのは 3 つ。決まった名前の生成物だけが消えること。`.claude/worktrees/` の直下の
 名前以外は受け付けないこと。未コミットの変更があるワークツリーでは何も消さないこと。
 
-消すのは node（ccnavi-clean.js）。node が無いときは何も消さず、ユーザが打つ削除の 1 本を出して
-止めることを確かめる。node が無い状態は、sh に渡す PATH から node のあるディレクトリを外して作る。
+消すのは ccnavi の実行ファイル（`worktree clean`・`worktree drop`）。
+実行ファイルの代わりに、このツリーのソースを起こす（CCNAVI_ENTRY_PATH）。
 
 読み返すのは終了コード・出力と、ファイルシステムに残ったものだけ。
 
@@ -24,19 +24,14 @@ import unittest
 from tests import ROOT, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")
-NODE = shutil.which("node")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 SCRIPTS = (
     "ccnavi-clean.sh",
-    "ccnavi-clean.js",
     # 残った子のブランチを消す入口
     "ccnavi-user-clean-branch.sh",
     *common_sh(SH_DIR),
 )
-# ccnavi-clean.sh と共通部（ccnavi-common*.sh）が呼ぶ外部コマンド。
-# node を外した PATH でも見えるように残す。
-TOOLS = ("basename", "cat", "dirname", "find", "git", "head", "sed", "tr")
 # Windows は chmod で消せなくならず、root は権限を無視して消す。
 CANNOT_LOCK = os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0)
 
@@ -75,39 +70,8 @@ def link_dir(target, link):
         return False
 
 
-def path_without_node(shim):
-    """PATH から node のあるディレクトリを外す。リンクが張れなければ None。
-
-    node と同じディレクトリに sh の使う道具があることがある（Linux の /usr/bin）。
-    丸ごと外すと find や git まで消えるので、TOOLS だけを shim にリンクして、外した場所に置く。
-    """
-    dirs = []
-    for d in os.environ.get("PATH", "").split(os.pathsep):
-        if not d:
-            continue
-        if not shutil.which("node", path=d):
-            dirs.append(d)
-            continue
-        for tool in TOOLS:
-            found = shutil.which(tool, path=d)
-            if not found:
-                continue
-            dest = os.path.join(shim, os.path.basename(found))
-            if os.path.lexists(dest):
-                continue  # 先に外した場所のものが採られる。PATH の順序と同じ
-            try:
-                os.symlink(found, dest)
-            except OSError:
-                return None
-        if shim not in dirs:
-            dirs.append(shim)
-    return os.pathsep.join(dirs)
-
-
 class CleanBase:
-    """使い捨てのワークスペース。strip_node が真なら PATH から node を外す。"""
-
-    strip_node = False
+    """使い捨てのワークスペース。実行ファイルは、このツリーのソースを起こす shim。"""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -120,21 +84,17 @@ class CleanBase:
             shutil.copy(os.path.join(SH_DIR, name), scripts)
         self.worktrees = os.path.join(self.ws, ".claude", "worktrees")
         os.makedirs(self.worktrees)
-        self.path = None
-        if self.strip_node:
-            shim = os.path.join(self._tmp.name, "bin")
-            os.makedirs(shim)
-            self.path = path_without_node(shim)
-            if self.path is None:
-                self.skipTest("node を外した PATH が作れない（リンクが張れない）")
-            if shutil.which("node", path=self.path):
-                self.skipTest("PATH から node を外しきれない")
+        self.bin = os.path.join(self._tmp.name, "bin", "ccnavi")
+        write(
+            self.bin,
+            f"#!/bin/sh\nPYTHONPATH='{ROOT}/src' exec '{sys.executable}' -m ccnavi \"$@\"\n",
+        )
+        os.chmod(self.bin, 0o755)
 
     def run_clean(self, *args, cwd=None):
         env = dict(os.environ)
         env.pop("CCNAVI_WORKSPACE", None)  # 実際のワークスペースを指させない
-        if self.path is not None:
-            env["PATH"] = self.path
+        env["CCNAVI_ENTRY_PATH"] = self.bin
         script = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-clean.sh").replace(os.sep, "/")
         return subprocess.run(
             [SHELL, script, *args],
@@ -167,8 +127,9 @@ class CleanBase:
         return top
 
 
-class CleanCases(CleanBase):
-    """node で消す側の検査。"""
+@unittest.skipUnless(SHELL, "sh が要る")
+class CleanCases(CleanBase, unittest.TestCase):
+    """生成物だけを消す側（`ccnavi-clean.sh <名前>`）の検査。"""
 
     def test_removes_only_generated_directories(self):
         top = self.make_shell("shell")
@@ -258,8 +219,8 @@ class CleanCases(CleanBase):
         self.addCleanup(os.chmod, locked, 0o755)
         result = self.run_clean("shell")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("削除できなかった: node_modules", result.stderr)
-        self.assertIn("消し残しがあります", result.stderr)
+        self.assertIn("node_modules", result.stderr)
+        self.assertIn("削除しきれませんでした", result.stderr)
         self.assertFalse(os.path.exists(os.path.join(top, ".venv")))  # 他は消す
 
     @unittest.skipUnless(GIT, "git が要る")
@@ -284,6 +245,44 @@ class CleanCases(CleanBase):
         result = self.run_clean("wt")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(os.path.exists(os.path.join(top, "node_modules")))
+
+
+@unittest.skipUnless(SHELL and GIT, "sh と git が要る")
+class CleanGitStateTest(CleanBase, unittest.TestCase):
+    """`.git` があるときの確かめ。読めない・指す先が消えている、の扱いを分ける。"""
+
+    def test_a_gitfile_pointing_nowhere_is_treated_as_a_leftover(self):
+        top = self.make_shell("shell")
+        write(os.path.join(top, ".git"), "gitdir: /nonexistent/gitdir\n")
+        result = self.run_clean("shell")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("git の登録が残っていない", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(top, "node_modules")))
+
+    def test_an_unreadable_git_state_stops_without_removing_anything(self):
+        top = self.make_shell("shell")
+        os.makedirs(os.path.join(top, ".git"))  # 中身の無い .git。git status は失敗する
+        before = files_under(top)
+        result = self.run_clean("shell")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("git の状態を読めない", result.stderr)
+        self.assertEqual(files_under(top), before)
+
+    def test_a_missing_executable_is_an_environment_error(self):
+        self.make_shell("shell")
+        env = {**os.environ, "CCNAVI_ENTRY_PATH": os.path.join(self._tmp.name, "none")}
+        env.pop("CCNAVI_WORKSPACE", None)
+        script = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-clean.sh")
+        result = subprocess.run(
+            [SHELL, script, "shell"],
+            cwd=self.ws,
+            env={**env, "PATH": "/usr/bin:/bin"},
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("実行ファイルが見つかりません", result.stderr)
 
 
 @unittest.skipUnless(SHELL and GIT, "sh と git が要る")
@@ -405,52 +404,6 @@ class WorktreeOptionTest(unittest.TestCase):
             ["git", "branch", "--list", "wt"], cwd=self.ws, capture_output=True, text=True
         )
         self.assertEqual(branches.stdout.strip().lstrip("+ ").strip(), "wt")
-
-
-@unittest.skipUnless(SHELL and NODE, "sh と node が要る")
-class CleanWithNodeTest(CleanCases, unittest.TestCase):
-    pass
-
-
-@unittest.skipUnless(SHELL, "sh が要る")
-class CleanWithoutNodeTest(CleanBase, unittest.TestCase):
-    """node が無ければ何も消さず、ユーザが打つ削除の 1 本を出して 1 で止まる。"""
-
-    strip_node = True
-
-    def test_prints_the_command_for_the_user_and_removes_nothing(self):
-        top = self.make_shell("shell")
-        before = files_under(top)
-        for args in (("shell",), ("shell", "--dry-run")):
-            with self.subTest(args=args):
-                result = self.run_clean(*args)
-                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-                self.assertIn("ユーザに頼んで", result.stderr)
-                command = result.stderr.strip().splitlines()[-1]
-                if os.name == "nt":
-                    self.assertTrue(command.startswith("cmd //c 'rd /s /q "), command)
-                else:
-                    self.assertTrue(command.startswith("rm -rf "), command)
-                    listed = ("node_modules", "ext/node_modules", "ext/out-x/node_modules", ".venv")
-                    for rel in listed:
-                        self.assertIn(f"'{top}/{rel}'", command)
-                self.assertEqual(files_under(top), before)
-
-    def test_nothing_to_remove(self):
-        write(os.path.join(self.worktrees, "empty", "a.txt"))
-        result = self.run_clean("empty")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("削除するものはありません", result.stdout)
-
-    @unittest.skipIf(os.name == "nt", "Windows は名前に改行を入れられない")
-    def test_skips_lines_outside_the_worktree(self):
-        # 行で読むと `../other/node_modules` が現れる名前。隣のワークツリーを名指ししない。
-        write(os.path.join(self.worktrees, "other", "node_modules", "keep.js"))
-        top = self.make_shell("shell")
-        write(os.path.join(top, "a\n..", "other", "node_modules", "x.js"))
-        result = self.run_clean("shell")
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertNotIn("other", result.stderr.strip().splitlines()[-1])
 
 
 if __name__ == "__main__":

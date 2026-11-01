@@ -1,5 +1,5 @@
 # `ccnavi worktree retire <親>` が、子に触る前に断るときの文。親のワークツリーを消せない理由（cwd が中・
-# 未コミット・無視されたファイル・そのほか）で分ける。判定は lifecycle/worktrees.py の blocked が持つ。
+# 未コミット・そのほか）で分ける。判定は lifecycle/worktrees.py の blocked が持つ。
 version: 1
 messages:
   DENY_RETIRE_PARENT:
@@ -10,8 +10,6 @@ messages:
         親 {parent} のワークツリーの中から片付けを打ったので、何も削除しなかった（子のワークツリーも残してある）
       dirty: |-
         親 {parent} のワークツリー（{path}）に未コミットの変更があるので、何も削除しなかった（子のワークツリーも残してある）
-      ignored: |-
-        親 {parent} のワークツリー（{path}）に git が無視しているファイルがあるので、何も削除しなかった（子のワークツリーも残してある）: {detail}
       other: |-
         親 {parent} のワークツリー（{path}）を削除できないので、何も削除しなかった（子のワークツリーも残してある）: {detail}
     why: |-
@@ -21,8 +19,6 @@ messages:
         親のワークツリーの外（ワークスペースルートなど）に出てから、'{retire}' を打ち直す
       dirty: |-
         コミットするか退避してから、'{retire}' を打ち直す（別のセッションが作業中かもしれないなら、ユーザに git status で確かめてもらう）
-      ignored: |-
-        残したいファイルは親のワークツリーの外へ退避し、不要なら手で削除してから、'{retire}' を打ち直す
       other: |-
         理由を直すか、直せなければ状態をユーザに伝えてから、'{retire}' を打ち直す
     no_bypass: |-

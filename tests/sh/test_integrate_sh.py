@@ -27,7 +27,7 @@ from tests import ROOT, common_sh, put_messages
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
-SCRIPTS = ("ccnavi-git.sh", "ccnavi-clean.sh", "ccnavi-clean.js", *common_sh(SH_DIR))
+SCRIPTS = ("ccnavi-git.sh", "ccnavi-clean.sh", *common_sh(SH_DIR))
 
 
 def write(path, text=""):

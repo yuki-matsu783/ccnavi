@@ -133,7 +133,6 @@ DEPLOY_SCRIPTS = (
     "ccnavi-session-start.sh",
     "ccnavi-sync.sh",
     "ccnavi-clean.sh",
-    "ccnavi-clean.js",
     # 依頼文の issue・MR の指定に応じて hook が案内する sh
     "ccnavi-branches.sh",
     "ccnavi-start.sh",
@@ -175,8 +174,7 @@ NO_TEMPLATES_FILES = [
         f".ccnavi/scripts/{name}"
         for name in (
             "ccnavi-branches.sh",
-            "ccnavi-clean.js",
-            "ccnavi-clean.sh",
+                    "ccnavi-clean.sh",
             "ccnavi-common-host.sh",
             "ccnavi-common-lock.sh",
             "ccnavi-common-log.sh",
@@ -271,7 +269,6 @@ ccnavi を登録した hook:
   .ccnavi/scripts/ccnavi-session-start.sh
   .ccnavi/scripts/ccnavi-sync.sh
   .ccnavi/scripts/ccnavi-clean.sh
-  .ccnavi/scripts/ccnavi-clean.js
   .ccnavi/scripts/ccnavi-branches.sh
   .ccnavi/scripts/ccnavi-start.sh
   .ccnavi/scripts/ccnavi-stage.sh

@@ -108,18 +108,19 @@ class RetireAfterReadyTest(RetireHarness):
         self.assertIn("チェックアウトしている", done.stdout)
         self.assertIn(CHILD, self.branches())
 
-    def test_ignored_files_keep_the_worktree_and_say_why(self):
+    def test_ignored_files_are_moved_out_of_the_worktree_before_it_is_removed(self):
         self.closed_and_pushed()
+        write(os.path.join(self.root, ".gitignore"), "/scratchpad\n")
         exclude = git(self.child_tree, "rev-parse", "--git-path", "info/exclude").strip()
         exclude = exclude if os.path.isabs(exclude) else os.path.join(self.child_tree, exclude)
         write(exclude, ".env\n")
         write(os.path.join(self.child_tree, ".env"), "SECRET=1\n")
         done = self.retire()
-        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-        self.assertIn("git が無視しているファイル", done.stdout)
-        self.assertIn(".env", done.stdout)
-        self.assertTrue(os.path.isfile(os.path.join(self.child_tree, ".env")))
-        self.assertIn(CHILD, self.branches())
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("git が無視しているファイルを", done.stdout)
+        self.assertFalse(os.path.exists(self.child_tree))
+        kept = os.path.join(self.root, "scratchpad", "worktrees", CHILD, ".env")
+        self.assertTrue(os.path.isfile(kept))
 
     def test_a_parent_that_cannot_be_removed_is_refused_before_any_child_is_touched(self):
         self.closed_and_pushed()

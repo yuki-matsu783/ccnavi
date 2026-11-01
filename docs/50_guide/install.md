@@ -215,7 +215,7 @@ PATH に通すフォルダが PATH に入っていなければ、環境に合っ
 | `dist/ccnavi/`（中身ごと） | `.ccnavi/bin/<os>-<arch>/` |
 | `.ccnavi/config/common/` の `rules.yml`・`risks.yml`・`phases.yml` | 同じパス |
 | `.ccnavi/config/common/templates/` の計画テンプレート | 同じパス |
-| `.ccnavi/scripts/` の sh（`ccnavi-*.sh`）と `ccnavi-clean.js` | 同じパス。振り分けの sh には実行ビットを付ける |
+| `.ccnavi/scripts/` の sh（`ccnavi-*.sh`） | 同じパス。振り分けの sh には実行ビットを付ける |
 | `.ccnavi/CCNAVI.md` | 同じパス |
 | `.ccnavi/docs/`（エージェント向けの使い方の文書） | 同じパス |
 | `.ccnavi/messages/`（拒否と案内の文面） | 同じパス |

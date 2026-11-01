@@ -170,8 +170,8 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # projects/ の clone 済みリポジトリ一覧の ccnavi-dirs.sh を順に呼ぶ。ccnavi-sync.sh はユーザが実行する
 # 取り込み（分かれた親ブランチの merge、消えた親ブランチの確認、片付けの記録の読み出し）。
 # ccnavi-git.sh の拒否の文面が ccnavi-sync.sh を案内するので、配らないと案内どおりに実行しても動かない。
-# ccnavi-clean.sh と ccnavi-clean.js は、ワークツリーを片付ける前に生成物を消すもの。Windows では
-# node_modules などが残ると worktree remove が途中で止まる。js が本体で、sh は node を探して js を渡す（node が無ければ消さず、ユーザが打つ削除の 1 本を出す）。
+# ccnavi-clean.sh は、ワークツリーを片付ける前に生成物を消すもの。Windows では
+# node_modules などが残ると worktree remove が途中で止まる。本体は実行ファイル（worktree clean / drop）で、sh はそれを呼ぶ。
 # ccnavi-branches.sh は issue・MR に紐づくブランチを探す sh。UserPromptSubmit の hook が依頼文の
 # issue・MR の指定を見つけるとこの表記を案内するので、配らないと案内どおりに実行しても動かない。
 # ccnavi-start.sh は issue・MR の指定を受けた着手の入口で、hook がこの表記を案内する。中で ccnavi-branches.sh を呼ぶ。
@@ -184,7 +184,7 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
 # git で追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順番も最後にする。途中で失敗したときに、
 # hook が起動する sh だけがあって、代わりに通る sh が無い状態を作らないため。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-write-and-push.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common-review.sh ccnavi-common.sh ccnavi-user-lib-review.sh ccnavi-user-push-approved.sh ccnavi-user-agree.sh ccnavi-user-decide.sh ccnavi-user-close-early.sh ccnavi-user-clean-branch.sh ccnavi-user-handoff.sh ccnavi-user-mirror.sh ccnavi-user-prune.sh ccnavi-fetch.sh ccnavi-dirs.sh ccnavi-session-start.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-start.sh ccnavi-stage.sh ccnavi-handoff-names.txt ccnavi-worktree.sh ccnavi-idle.sh ccnavi-launcher.sh"
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-write-and-push.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common-review.sh ccnavi-common.sh ccnavi-user-lib-review.sh ccnavi-user-push-approved.sh ccnavi-user-agree.sh ccnavi-user-decide.sh ccnavi-user-close-early.sh ccnavi-user-clean-branch.sh ccnavi-user-handoff.sh ccnavi-user-mirror.sh ccnavi-user-prune.sh ccnavi-fetch.sh ccnavi-dirs.sh ccnavi-session-start.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-branches.sh ccnavi-start.sh ccnavi-stage.sh ccnavi-handoff-names.txt ccnavi-worktree.sh ccnavi-idle.sh ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
 mode="$DEFAULT_MODE"
 # 明示されたかどうかを別の変数で持つ。--force で置き換えてよいのは、ユーザがこの実行で
@@ -2145,7 +2145,7 @@ for name in $DEPLOY_SCRIPTS; do
 		ccnavi-sync.sh)
 			why="ユーザが実行する取り込みと、親のブランチが消えたかの確認"
 			;;
-		ccnavi-clean.sh | ccnavi-clean.js)
+		ccnavi-clean.sh)
 			why="ワークツリーを片付ける前に生成物を消す"
 			;;
 		ccnavi-stage.sh)

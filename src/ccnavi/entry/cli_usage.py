@@ -486,7 +486,7 @@ _SCRIPTS = """\
          ユーザが確認した後に、ユーザが ! を付けて
          ccnavi-user-clean-branch.sh <name> --confirmed を打って削除します。
          ccnavi-review.sh ready が中で呼びます。エージェントからは打てません。
-         未コミットの変更や、git が無視しているファイルがあるワークツリーは理由を出して残します）
+         未コミットの変更があるワークツリーは理由を出して残します。git が無視しているファイルは scratchpad/worktrees/<名前>/ へ退避します）
     ccnavi worktree branch <name> [confirmed]
         （retire が記録した子のブランチだけを、条件を確かめ直して削除します。記録の子が
          チケットの parent: でもその親の子であることを確かめます。取り消した子は confirmed が

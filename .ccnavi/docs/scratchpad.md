@@ -43,6 +43,20 @@ keywords: [scratchpad, handoff, user handoff, 取り込み, 保護対象, wip/ha
 - マージリクエストのレビュー依頼には「`wip/handoff/`配下はユーザに渡すコピーで、レビューの対象外」と書かれる。レビューでは読まなくてよい
 - ワークスペースルートの`wip/handoff/`へは、`workspace-root`のルールの例外として書き込める。ワークツリーを切らなくても書ける（ルートでの編集全体が止まるわけではない）
 
+## gitが無視する出力の置き場
+
+ビルドの出力（`target/`・`dist/`）やテストの出力など、gitが無視する出力は、ワークツリーの中ではなく
+ワークスペースルートの`scratchpad/worktrees/<ワークツリー名>/`に出す。ワークツリーを消すと、その出力も
+ワークツリーと一緒に片付けの対象になるため、置き場を1か所にまとめる。
+
+- 出力先は、各ツールの設定で指定する（Rustは`CARGO_TARGET_DIR`、Pythonのキャッシュは`PYTHONPYCACHEPREFIX`など）。
+  `.cargo/config.toml`の相対パスは、ワークツリーごとに位置がずれるので使わない
+- ワークツリーの中に書かれたgit無視のファイルは、片付けのときに同じ`scratchpad/worktrees/<名前>/`へ
+  ccnaviが退避する（[worktree-cleanup.md](worktree-cleanup.md)）。退避したものはccnaviが消さないので、要らなければ消す。退避したものも`scratchpad/`の中身なので、下の「容量の知らせ」の数に入る
+- `node_modules`は多くのツールが`package.json`の隣に置くことを前提とするので移さない。`node_modules`・`.venv`などの
+  キャッシュは、片付けのときに消す。環境そのものは、ワークツリーごとに作る
+  （uvとpnpmは、共有のキャッシュからハードリンクで作るので軽い）
+
 ## セッションのスクラッチパッドには置かない
 
 Artifactツールが失敗したとき、ccnaviはHTMLの出力先としてこの`scratchpad/`を知らせる。

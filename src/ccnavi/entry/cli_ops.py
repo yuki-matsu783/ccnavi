@@ -331,11 +331,11 @@ def _worktree(
     words: list[str],
     cwd: str,
 ) -> int:
-    """`worktree drop <名前>` と `worktree tidy <親> [--phase <N>]`
+    """`worktree drop <名前>`・`worktree clean <名前>` と `worktree tidy <親> [--phase <N>]`
     （tickets/lifecycle/worktrees.py）。
 
-    sh が状態を書く操作の後に呼ぶ。名前は識別子の形だけを受ける（パスを渡して任意の場所を
-    消させない）。
+    sh が状態を書く操作の後に呼ぶ。名前は、`clean` 以外は識別子の形だけを受ける
+    （パスを渡して任意の場所を消させない。`clean` は `run_clean` が置き場の直下の名前かを見る）。
 
     処理フロー:
     1. `--abandon` があれば、`retire.run_abandon` で放棄した親の片付けの記録を消す。
@@ -397,9 +397,14 @@ def _worktree(
             return EXIT_ERROR
         code = retire.run_branch(stdout, stderr, root, conf, words[2], len(words) == 4)
         return EXIT_OK if code == 0 else EXIT_ERROR
+    if verb == "clean" and len(words) == 3:
+        # 生成物だけを消す（ccnavi-clean.sh <名前>）。名前の形は sh と `run_clean` が見る。
+        done = worktrees.run_clean(stdout, stderr, root, words[2], args.preview)
+        return EXIT_OK if done == 0 else EXIT_ERROR
     if verb not in ("drop", "tidy", "remaining", "retire") or len(words) != 3:
         stderr.write(
-            "ccnavi: worktree drop <名前> か worktree tidy <親> [--phase <N>]"
+            "ccnavi: worktree drop <名前> か worktree clean <名前> [--preview]"
+            " か worktree tidy <親> [--phase <N>]"
             " か worktree remaining <親> か worktree retire <親>"
             " か worktree retire --abandon <親>"
             " か worktree branch <名前> [confirmed]"
