@@ -11,7 +11,7 @@ keywords: [文面, 文面ファイル, messages, ccnavi text, 識別子, 差し�
 
 ## 状況
 
-エージェントとユーザが読む文は、4 か所に散らばっていた。ルールの `message` と `additionalContext`（条件と同じファイルにインライン）、組み込みの拒否（`hook/reasons.py` と各関門のモジュール）、Stop の促し（`standing.py` など）、sh の `printf '次: …'`（`ccnavi-start.sh` に 20 数か所）。条件の分岐と文が同じ関数の中にあるので、文を直すたびにコードを開く。文の型（何が起きたか・なぜ・次の一手・迂回しない）を機械で点検する置き場も無かった。値の差し込みは、Python は `{root}` と `{script:..}`、sh は `printf` の `%s` と `ccnavi_sh_quote` と、流儀が割れていた。
+エージェントとユーザが読む文は、4 か所に散らばっていた。ルールの `message` と `additionalContext`（条件と同じファイルにインライン）、組み込みの拒否（`hook/reasons.py` と各ゲートのモジュール）、Stop の促し（`standing.py` など）、sh の `printf '次: …'`（`ccnavi-start.sh` に 20 数か所）。条件の分岐と文が同じ関数の中にあるので、文を直すたびにコードを開く。文の型（何が起きたか・なぜ・次の一手・迂回しない）を機械で点検する置き場も無かった。値の差し込みは、Python は `{root}` と `{script:..}`、sh は `printf` の `%s` と `ccnavi_sh_quote` と、流儀が割れていた。
 
 一部は独立済みだった。`additionalContextFile` は案内の本文を md から読める（ワークスペース内、4000 字で切る）。拒否と sh の出力には、同じ仕組みが無い。
 

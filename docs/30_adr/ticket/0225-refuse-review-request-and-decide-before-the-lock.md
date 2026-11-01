@@ -3,7 +3,7 @@ type: adr
 title: review-request と decide は、ワークツリーの中で分かる前提をロック・取り込みの前に断る
 description: review-request の prepare の前提と decide の依頼の記録・動きの検査を、ロック・取り込み・コミットの前に読むだけの口（--check）で通す。ホストの API が要る条件は対象外にする
 tags: [ticket, review, gate-conditions, script-output]
-keywords: [関門, 最初に断る, 事前の検査, --check, review-request, prepare, decide, 取り込み, ロック, 依頼の記録, 依頼のあとに動いた]
+keywords: [ゲート, 最初に断る, 事前の検査, --check, review-request, prepare, decide, 取り込み, ロック, 依頼の記録, 依頼のあとに動いた]
 ---
 # ADR-0225: review-request と decide は、ワークツリーの中で分かる前提をロック・取り込みの前に断る
 
