@@ -1130,7 +1130,9 @@ def ask_context_check(root: str, payload: hookio.Input, deadline: float) -> Call
     """
     if ccnavimd.unattended() or payload.agent_id:
         return lambda: ""
-    return lambda: askcontext.stop_text(root, payload.transcript_path, deadline)
+    return lambda: askcontext.stop_text(
+        root, payload.transcript_path, payload.tool_use_id, deadline
+    )
 
 
 def ask_context_refusal(record: audit.Record, subject: str, text: str) -> str:

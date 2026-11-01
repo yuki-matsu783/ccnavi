@@ -7,7 +7,8 @@
 - 発言は、最後のユーザの発言より後ろだけを見る。ツールの結果の行は区切りにしない。サイドチェーンは見ない
 - ccnavi が確認に出す呼び出し（ターン分離の関門の確認・ルールの `ask`）も、節が無ければ確認でなく止まる
 - 会話記録に発言が遅れて書かれても、待てば通る
-- 記録が読めない・パスが無い、非対話、サブエージェントの呼び出しは検査しない
+- 判定できないとき（記録が読めない・パスや tool_use_id が無い、自分の行も見出しも現れない）、非対話、
+  サブエージェントの呼び出しは検査しない。自分の行があって見出しが無ければ、待たずに止める
 - dry-run では止めず、返していたはずだと言う
 """
 
@@ -36,6 +37,12 @@ def assistant(text, **extra):
 
 def prompt(text="お願いします"):
     return {"type": "user", "message": {"content": text}}
+
+
+def call(tool_use_id="toolu_test"):
+    """この呼び出し自身の tool_use の行。あれば、直前の発言は書き込み済み。"""
+    block = {"type": "tool_use", "id": tool_use_id, "name": "X", "input": {}}
+    return {"type": "assistant", "message": {"content": [block]}}
 
 
 def tool_result():
@@ -86,20 +93,19 @@ class AskContextHookTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.repo, ignore_errors=True)
         os.makedirs(os.path.join(self.repo, ".ccnavi", "config", "common"))
         self.transcript = os.path.join(self.repo, "transcript.jsonl")
-        self.calls = 0
 
-    def write(self, *rows):
+    def write(self, *rows, called=True):
+        """会話記録を書く。called なら、末尾にこの呼び出し自身の行を足す。"""
         with open(self.transcript, "w", encoding="utf-8") as handle:
-            for row in rows:
+            for row in (*rows, *([call()] if called else [])):
                 handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
     def hook(self, tool="AskUserQuestion", mode="enable", transcript=True, **body):
-        self.calls += 1
         payload = {
             "hook_event_name": "PreToolUse",
             "session_id": "s1",
             "tool_name": tool,
-            "tool_use_id": f"toolu_{self.calls}",
+            "tool_use_id": "toolu_test",
             "tool_input": {"questions": [{"question": "消してよいですか", "options": []}]},
         }
         if transcript:
@@ -191,13 +197,28 @@ class AskUserQuestionTest(AskContextHookTest):
         self.assertEqual(record["rules"], [askcontext.RULE_ID])
         self.assertEqual(record["decision"], "deny")
 
+    def test_自分の行がまだ無く_待っても見出しも現れなければ通す(self):
+        self.write(prompt(), assistant("消してよいですか？"), called=False)
+
+        self.assertFalse(self.stopped(self.hook()))
+
+    def test_自分の行があって見出しが無ければ_待たずに止める(self):
+        self.write(prompt(), assistant("消してよいですか？"))
+        started = time.monotonic()
+
+        done = self.hook(**{"tool_input": {"questions": [{"question": "消してよいですか"}]}})
+
+        self.assertTrue(self.stopped(done))
+        self.assertLess(time.monotonic() - started, 5)
+
     def test_発言が遅れて書かれても待てば通る(self):
-        self.write(prompt())
+        self.write(prompt(), called=False)
 
         def late():
             time.sleep(0.15)
             with open(self.transcript, "a", encoding="utf-8") as handle:
-                handle.write(json.dumps(assistant(BOTH), ensure_ascii=False) + "\n")
+                for row in (assistant(BOTH), call()):
+                    handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
         thread = threading.Thread(target=late)
         thread.start()
@@ -227,6 +248,11 @@ class NotCheckedTest(AskContextHookTest):
         self.write(prompt(), assistant("消してよいですか？"))
 
         self.assertFalse(self.stopped(self.hook(agent_id="a1")))
+
+    def test_tool_use_id_が無ければ検査しない(self):
+        self.write(prompt(), assistant("消してよいですか？"))
+
+        self.assertFalse(self.stopped(self.hook(tool_use_id="")))
 
     def test_ほかのツールは検査しない(self):
         self.write(prompt(), assistant("調べます"))
