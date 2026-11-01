@@ -191,7 +191,7 @@ Write / Edit の対象が `.claude/worktrees/<名前>/` の中なら、その名
 | 先へ進める者 | `ccnavi-review.sh confirm` / `ccnavi-user-decide.sh`、Chrome 拡張のレビュー済み | — |
 | `review/` の子 | レビュー済みで `.ccnavi/approved/done/` へ動く | `finish` の時点で `done/` へ |
 
-止めている間は、その親でのサブエージェントの起動と Bash が止まる（`DENY_PHASE_REVIEW`）。ただし`ccnavi-ticket.sh` `ccnavi-review.sh` `ccnavi-git.sh`と、資料を引く`ccnavi-launcher.sh --docs`は通す。ファイルの書き込みは通すので、次のフェーズの計画はレビュー前に進められる。
+止めている間は、その親でのサブエージェントの起動と Bash が止まる（`DENY_PHASE_REVIEW`）。ただし`ccnavi-ticket.sh` `ccnavi-review.sh` `ccnavi-git.sh`と、資料を引く`ccnavi-launcher.sh --docs`は通す。前に`cd`、後ろに`| head`・`| tail`を付けた形も通す。ファイルの書き込みは通すので、次のフェーズの計画はレビュー前に進められる。
 止めている間は、依頼を出すまでが「レビュー準備中」（次に動くのはエージェント）、出してからが「レビュー待ち」（次に動くのはユーザ）。
 レビュー待ちで止めるのは親ごとなので、どれかの枝がレビューを待つ間は別の枝にも子を起こせない。
 

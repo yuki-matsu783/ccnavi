@@ -22,7 +22,8 @@
 #
 # 語は src/ccnavi/infra/platformtag.py と scripts/ccnavi-setup.sh の host_target と揃える。
 #
-# bin/ に無ければ PATH の ccnavi を探す（下の ccnavi_launcher_path）。
+# bin/ に無ければ、ワークツリーなら本体のルートの launcher に渡し（ccnavi_launcher_main）、
+# それでも無ければ PATH の ccnavi を探す（下の ccnavi_launcher_path）。
 # どちらにも見つからなければ 127 で終わる。実行ファイルそのものが無いときにシェルが返すのと
 # 同じ値で、hook からは「起動できなかった」として扱われる。
 
