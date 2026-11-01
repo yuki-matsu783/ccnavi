@@ -388,9 +388,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         </div>
       )}
       <section className="block">
-        <h2>
-          リスクレベルの境目の点
-        </h2>
+        <h2>リスクレベルの境目の点</h2>
         <details className="help">
           <summary>説明</summary>
           <p className="hint">

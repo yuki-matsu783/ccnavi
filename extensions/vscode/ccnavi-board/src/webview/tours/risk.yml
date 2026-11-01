@@ -372,7 +372,7 @@ courses:
           missing: true
       - target: levels
         title: 画面の値は組み込みの配点
-        body: 画面に出ているのは組み込みの配点で、欄は読み取り専用です（MEDIUM 20 / HIGH 40 / CRITICAL 70 と、組み込みの 4 項目）。配点を直すには、まずファイルを作ります。
+        body: 画面に出ているのは組み込みの配点で、欄は読み取り専用です（MEDIUM 20 / HIGH 40 / CRITICAL 70 と、big-diff・many-files・ci・deletes の 4 項目）。配点を直すには、まずファイルを作ります。
         scene:
           missing: true
       - target: create

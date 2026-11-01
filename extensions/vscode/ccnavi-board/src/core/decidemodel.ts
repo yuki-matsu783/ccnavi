@@ -108,20 +108,20 @@ export function parseDecidePreview(text: string, expect?: DecideExpect): DecideP
     return fail("parent が文字列ではありません");
   }
   if (expect !== undefined && raw.parent !== expect.parent) {
-    return fail(`parent が頼んだもの（${expect.parent}）と違います（${raw.parent}）`);
+    return fail(`parent が要求したもの（${expect.parent}）と違います（${raw.parent}）`);
   }
   if (!isInt(raw.phase)) {
     return fail("phase が整数ではありません");
   }
   if (expect !== undefined && raw.phase !== expect.phase) {
-    return fail(`phase が頼んだもの（${expect.phase}）と違います（${raw.phase}）`);
+    return fail(`phase が要求したもの（${expect.phase}）と違います（${raw.phase}）`);
   }
   const mr = isRecord(raw.mr) ? raw.mr : undefined;
   if (mr === undefined || !isInt(mr.number)) {
     return fail("mr.number が整数ではありません");
   }
   if (expect !== undefined && expect.mr !== null && mr.number !== expect.mr) {
-    return fail(`mr.number が頼んだ依頼のマージリクエスト（#${expect.mr}）と違います（#${mr.number}）`);
+    return fail(`mr.number が要求した依頼のマージリクエスト（#${expect.mr}）と違います（#${mr.number}）`);
   }
   if (typeof raw.digest !== "string" || !raw.digest.startsWith("v2.")) {
     return fail("digest が無いか、版 2（v2. で始まる文字列）ではありません");

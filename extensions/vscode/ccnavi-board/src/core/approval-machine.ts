@@ -571,7 +571,7 @@ function decidePreviewed(state: ApprovalState, result: DecidePreviewParse): Appr
   // 頼んだフェーズの一覧か。別のフェーズの答えで開かない
   if (result.value.parent !== overlay.parent || result.value.phase !== overlay.phase) {
     return move(state, {
-      overlay: { kind: "error", error: unreadable("頼んだフェーズと違う一覧が返りました。チケット管理画面を更新してから、もう一度レビュー完了を押してください") },
+      overlay: { kind: "error", error: unreadable("要求したフェーズと違う一覧が返りました。チケット管理画面を更新してから、もう一度レビュー完了を押してください") },
       only: state.only,
     });
   }
