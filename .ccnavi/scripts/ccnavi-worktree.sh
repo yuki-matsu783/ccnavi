@@ -456,7 +456,7 @@ if [ -n "$adopt" ]; then
 	exit 0
 fi
 
-# ---- 状態を調べる（C4〜C8）。
+# ---- 状態を調べる（C4〜C7）。
 top_branch=$(git -C "$top" symbolic-ref --quiet --short HEAD 2>/dev/null || :)
 c4=no
 [ "$top_branch" = "$target" ] || c4=yes
@@ -495,6 +495,17 @@ common_dir=$(ccnavi_phys "$common_dir")
 ref_pending="refs/ccnavi/direct/$name/pending"
 ref_s="refs/ccnavi/direct/$name/s"
 
+# 別の名前で、記録（ccnavi-direct/<名前>）があり、作業ワークツリーも残っている直接作業（空白区切りの名前）。
+# 並行作業は普通にあるので止めない。compact で会話が忘れた続きを別に切り直さないよう、切った後に案内するだけ。
+others=""
+for o_rec in "$common_dir"/ccnavi-direct/*; do
+	[ -f "$o_rec" ] || continue
+	o_name=${o_rec##*/}
+	[ "$o_name" != "$name" ] && [ -d "$root/.claude/worktrees/$o_name" ] || continue
+	others="$others $o_name"
+done
+others=${others# }
+
 # 直接作業の名前の形は実行ファイルに聞く。取れなければ案内は出さない。
 # 名前が形に合わないことは、切る前に（--dry-run でも）言う。
 print_name_note() {
@@ -511,6 +522,7 @@ if [ -n "$dry" ]; then
 	[ "$c4" = no ] || printf '状態: cwd のブランチ（%s）が取り込み先と違う。実行するには --base %s が要る\n' "${top_branch:-ブランチの外}" "$target"
 	[ "$c5" = no ] || printf '状態: 取り込み先がデフォルトブランチ（%s）でない。実行するには --accept が要る\n' "$integ"
 	[ "$c7" = no ] || printf '状態: 書きかけ 変更 %s・新規 %s（staged %s）。実行するには --accept と、--copy-wip か --no-wip が要る\n' "$wip_changed" "$wip_new" "$wip_staged"
+	[ -z "$others" ] || printf '案内: 作業中の直接作業のワークツリーが他にある（%s）。切ったあとに知らせる\n' "$others"
 	printf 'ブランチ: %s（起点 %s）\n' "$name" "$(git -C "$main_tree" rev-parse --short "$head_sha")"
 	printf 'ワークツリー: %s\n' "$dest"
 	print_name_note
@@ -781,5 +793,6 @@ if [ "$(printf '%s\n' "$lo_out" | head -n 1)" = "tree 1" ] && [ "$(lo_get leftov
 	[ "$(lo_get proposal)" != yes ] || ccnavi_text "$root" NOTE_WORKTREE_LEFTOVER_PROPOSAL "parent=$lo_name"
 	[ "$(lo_get mr)" = - ] || ccnavi_text "$root" NOTE_WORKTREE_LEFTOVER_MR "mr=#$(lo_get mr)"
 fi
+[ -z "$others" ] || ccnavi_text "$root" NOTE_WORKTREE_OTHER_ACTIVE "others=$others"
 print_next
 log_info 完了 -- "name=$name" "target=$target" "snap=$s_sha" "wip=$s_wip" "side=$side_word"

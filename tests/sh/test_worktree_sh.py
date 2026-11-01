@@ -233,6 +233,21 @@ class WorktreeShTest(unittest.TestCase):
 
     # ---- ずれが無いとき
 
+    def test_a_second_direct_worktree_is_cut_and_names_the_first_afterwards(self):
+        first = self.run_sh("first")
+        self.assertEqual(0, first.returncode, first.stderr + first.stdout)
+        self.assertNotIn("他にある", first.stdout)
+        second = self.run_sh("second")
+        self.assertEqual(0, second.returncode, second.stderr + second.stdout)
+        self.assertTrue(os.path.isdir(self.wt("second")))
+        self.assertIn("作業中の直接作業のワークツリーが他にある: first", second.stdout)
+
+    def test_a_removed_first_worktree_is_not_named(self):
+        self.assertEqual(0, self.run_sh("first").returncode)
+        shutil.rmtree(self.wt("first"))
+        result = self.run_sh("second")
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+
     def test_cuts_from_the_base_head_without_asking_when_nothing_is_off(self):
         result = self.run_sh("topic")
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
