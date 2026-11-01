@@ -112,6 +112,7 @@ class SessionStartWiringTest(unittest.TestCase):
             "hook_event_name": "SessionStart",
             "session_id": "s1",
             "cwd": self.root,
+            "source": "startup",
             **extra,
         }
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
@@ -139,6 +140,11 @@ class SessionStartWiringTest(unittest.TestCase):
     def test_no_notice_below_limit(self):
         _put(self.root, "small.bin", 100)
         self.assertNotIn("しきい値", self._context("1"))
+
+    def test_only_startup_notifies(self):
+        _put(self.root, "big.bin", 2 * MB)
+        for source in ("resume", "compact", "clear"):
+            self.assertNotIn("しきい値", self._context("1", source=source), source)
 
     def test_subagent_gets_no_notice(self):
         _put(self.root, "big.bin", 2 * MB)

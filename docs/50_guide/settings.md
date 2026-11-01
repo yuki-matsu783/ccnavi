@@ -188,7 +188,7 @@ ccnavi の動作に依存する決まりと考え方なので、ワークスペ�
 | `CCNAVI_LEARNING` | 学びの蓄積を使うか。`enable` / `disable`、既定 `enable`。子チケットを閉じるときに気づきの記録（`wip/handoff/learnings/<子>.md`）を求め、親を閉じるときに気づきの処理の証跡を確かめる（[記録](records.md)の「学びの蓄積」） |
 | `CCNAVI_LEARNING_SOURCES` | パターンの観測元の数が何以上なら提案に足りるか。既定 3 |
 | `CCNAVI_LEARNING_NOTICE_COUNT` | 提案の候補が何件溜まったら SessionStart で知らせるか。既定 5 |
-| `CCNAVI_SCRATCHPAD_WARN_MB` | ワークスペースルート直下の `scratchpad/` の中身がこの大きさ（MB）を超えたとき、SessionStart で消してよいものをユーザに尋ねる文を渡す。既定は `500`。`0` なら知らせない。読めない値と負の値は既定に戻る。`logs/` は数えない |
+| `CCNAVI_SCRATCHPAD_WARN_MB` | ワークスペースルート直下の `scratchpad/` の中身がこの大きさ（MB）を超えたとき、セッションの起動（SessionStart の `startup`）で消してよいものをユーザに尋ねる文を渡す（再開・compact・clear では出さない）。既定は `500`。`0` なら知らせない。読めない値と負の値は既定に戻る |
 | `CCNAVI_HANDOFF_SUGGEST_TOKENS` | 会話の大きさ（トークン数）がこの値以上のとき、次のセッションへの引き継ぎを促す（下の「大きな会話を放置したとき」）。既定は `400000`。`0` なら促さない。読めない値は既定に戻る |
 | `CCNAVI_HOOK_DEADLINE_SECONDS` | hook の判定 1 回に張る期限（秒）。既定は `3`。呼び出し側が長く走った hook を打ち切る前に、自前の判定を出し終えるための値。読めない値と 0 以下は既定に戻る |
 | `CCNAVI_ASK_CONTEXT_WAIT_SECONDS` | ユーザに確認する前の発言が会話記録に書かれるのを待つ時間の上限（秒）。既定は `2.5`。判定の期限（`CCNAVI_HOOK_DEADLINE_SECONDS`）には縛られないが、hook の `timeout`（settings.json。既定 10 秒）より短くする。読めない値と 0 以下は既定に戻る |
