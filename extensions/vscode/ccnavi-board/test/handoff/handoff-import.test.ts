@@ -186,7 +186,7 @@ test("CB-T1132 ターミナルの案内は、そのパスだけを指して見�
 
 test("CB-T1133 ターミナルの案内を出さない場合。ボードから取り込める対象・error・一覧にない・見せたあとの変更・見るだけの失敗", async () => {
   const r = rig();
-  assert.match((await terminalGuide(r.deps, shown, DOCS)).error, /ボードから取り込めます/);
+  assert.match((await terminalGuide(r.deps, shown, DOCS)).error, /ボードから取り込むため/);
   assert.match((await terminalGuide(r.deps, shown, "none")).error, /一覧にない対象です/);
   const errorHook = list([entry({ path: HOOK, kind: "defense", board: false, errors: ["CRLF"] })]);
   assert.match((await terminalGuide(r.deps, errorHook, HOOK)).error, /error/);

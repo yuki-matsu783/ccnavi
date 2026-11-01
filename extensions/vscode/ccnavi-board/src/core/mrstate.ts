@@ -60,7 +60,7 @@ function parseNumber(word: string): number | undefined {
  *
  * - 1 行目が `mr-state 1`、2 行目の最初の語が既知の状態、ほかの行が無い
  * - 項目の数が状態ごとに決めた数（open は 4、merged / closed は 3、unknown は 3 以上）
- * - 番号が頼んだ MR の番号と同じ
+ * - 要求した MR の番号と同じ
  * - Draft が `yes` / `no`
  * - 終了コードが状態と合う（状態が分かれば 0、`unknown` は 1）
  *
@@ -96,7 +96,7 @@ export function interpretMrState(ran: Ran, expected: number): MrStateResult {
       }
       const number = parseNumber(words[1]);
       if (number === undefined || number !== expected) {
-        return format(`番号が頼んだ MR（#${expected}）と違います（${words[1]}）`);
+        return format(`要求した MR（#${expected}）と番号が違います（${words[1]}）`);
       }
       if (words[2] !== "yes" && words[2] !== "no") {
         return format(`Draft が yes / no ではありません（${words[2]}）`);
@@ -113,7 +113,7 @@ export function interpretMrState(ran: Ran, expected: number): MrStateResult {
       }
       const number = parseNumber(words[1]);
       if (number === undefined || number !== expected) {
-        return format(`番号が頼んだ MR（#${expected}）と違います（${words[1]}）`);
+        return format(`要求した MR（#${expected}）と番号が違います（${words[1]}）`);
       }
       if (ran.code !== 0) {
         return format(`終了コードが状態と合いません（${ran.code}）`);

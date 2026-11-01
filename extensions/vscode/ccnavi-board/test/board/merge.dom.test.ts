@@ -96,7 +96,7 @@ test("CB-D722 マージ待ち（Draft なら付記）・マージ済み・閉じ
     row("d-closed", { state: "closed", abandon: "sh /ws/.ccnavi/scripts/ccnavi-launcher.sh worktree retire --abandon d-closed" }),
     row("e-unknown", { state: "unknown", url: "", reason: "auth", detail: "認証に失敗した（トークンか gh の認証を確かめる）" }),
     row("f-timeout", { state: "unknown", url: "", reason: "timeout", detail: "時間内に終わりませんでした" }),
-    row("g-format", { state: "unknown", url: "", reason: "format", detail: "出力の形が想定外です（番号が頼んだ MR（#5）と違います（6））" }),
+    row("g-format", { state: "unknown", url: "", reason: "format", detail: "出力の形が想定外です（要求した MR（#5）と番号が違います（6））" }),
     row("h-failed", { state: "unknown", url: "", reason: "failed", detail: "sh が終了コード 127 で終わりました" }),
     row("i-incomplete", { state: "incomplete", url: "", mr: null, detail: "記録を読めない（壊れている）" }),
     row("j-wait", { state: "checking", url: "" }),

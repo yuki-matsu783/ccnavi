@@ -543,7 +543,7 @@ async function attempt(run: () => Promise<void>, fail: (error: string) => void):
   try {
     await run();
   } catch (error) {
-    fail(`編集の処理で失敗しました: ${error instanceof Error ? error.message : String(error)}`);
+    fail(`編集の処理に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 

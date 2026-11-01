@@ -297,7 +297,7 @@ export function removeDraftFile(tree: string, file: string, hash: string): Draft
     // ツリーの外・リンク・ハードリンク・ふつうのファイルでないものは、ここで断られる
     read = readFlowFile(tree, file);
   } catch (error) {
-    return { ok: false, error: `下書きは削除しません: ${(error as Error).message}` };
+    return { ok: false, error: `下書きを削除できません: ${(error as Error).message}` };
   }
   if (read === undefined) {
     return { ok: true, removed: false };
@@ -307,7 +307,7 @@ export function removeDraftFile(tree: string, file: string, hash: string): Draft
   }
   const linked = linkedSegment(tree, file);
   if (linked !== undefined) {
-    return { ok: false, error: `下書きは削除しません: ${linked} がシンボリックリンクです` };
+    return { ok: false, error: `下書きを削除できません: ${linked} がシンボリックリンクです` };
   }
   // 確かめてから消すまでの間に書き直されると、新しい案を消してしまう。先に同じディレクトリの別の名前へ移し
   // （ほかの書き手はもう触れない）、移したものを確かめ直してから消す。違えば元の名前へ戻す

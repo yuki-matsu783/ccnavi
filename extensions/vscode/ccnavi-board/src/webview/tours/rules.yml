@@ -243,7 +243,7 @@ diagrams:
       - id: load
         from: ccnavi（hook）
         to: rules.yml
-        text: ルールを読む（共通・ワークスペース・プロジェクトの設定を重ねたもの）
+        text: ルールを読む（共通の設定に、ワークスペースかプロジェクトの設定を重ねたもの）
       - id: match
         from: ccnavi（hook）
         text: deny → ask → allow の順に適用する
@@ -567,7 +567,7 @@ courses:
         scene: { tab: rules, open: no-rm-rf }
       - target: rule-git-push-message
         title: 止めるときの言葉を入力する
-        body: deny には message を入力します。止められたモデルに届く文なので、なぜ止めたかと、代わりに何をすればよいかを入力します。ask と allow に message を入力すると、どこにも届かない（ask はユーザの確認ダイアログにしか出ない）ので lint が error にします。渡したいプロンプトは「コンテキストの追加」に入力します。
+        body: deny には message を入力します。止められたモデルに届く文なので、なぜ止めたかと、代わりに何をすればよいかを入力します。ask と allow の message は、モデルには届きません（ask はユーザの確認ダイアログに出るだけです）。そのため、入力すると lint が error になります。渡したいプロンプトは「コンテキストの追加」に入力します。
         scene: { tab: rules, open: git-push }
       - target: judge-form
         title: 判定で確認する

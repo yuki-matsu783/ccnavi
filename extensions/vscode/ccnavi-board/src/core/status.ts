@@ -146,7 +146,7 @@ function fieldsOf(card: StatusCard): string {
     `置き場: ${card.copyStatus}`,
     `承認待ち: ${card.pendingApproval ? "はい" : "いいえ"}`,
     `着手: ${card.startedAt === "" ? "なし" : card.startedAt}`,
-    card.isParent ? "" : `フェーズ: ${card.phaseStatus === "" ? "引けない" : card.phaseStatus}`,
+    card.isParent ? "" : `フェーズ: ${card.phaseStatus === "" ? "取得できない" : card.phaseStatus}`,
   ]
     .filter((line) => line !== "")
     .join("\n");

@@ -126,7 +126,7 @@ export async function terminalGuide(
     return { command: "", error: `一覧にない対象です: ${path}` };
   }
   if (entry.board) {
-    return { command: "", error: "この対象はボードから取り込めます（ターミナルのコマンドは出しません）" };
+    return { command: "", error: "この対象はボードから取り込むため、ターミナルのコマンドはありません" };
   }
   const state = entry.state;
   if (state !== "new" && state !== "changed") {
