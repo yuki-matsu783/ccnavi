@@ -80,7 +80,7 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 **`ccnavi-git.sh` の中の判定は P13 の例外。** git の入口は `ccnavi-git.sh` 1 本に寄せてあり（生の
 `git` は組み込みでいつも止まる）、その中で次の可否を sh が一次に判定する。チケットに結び付くブランチの `integrate` を断る
 （`integrate-ticket`）、統合先への push を断る、親のワークツリーのブランチが
-リモートから消えていれば push を断る（push の関門。下）、親のワークツリーでの
+リモートから消えていれば push を断る（push のゲート。下）、親のワークツリーでの
 `checkout`・`switch` の行き先を、今のブランチと、変換した名前がフォルダ名になるブランチに限る（`worktree add` も変換した名前の
 形だけ）。`integrate` / `integrate-done` の状態操作（取り込みの記録・一時ワークツリー・取り込み先への `merge --ff-only --no-overwrite-ignore`・取り込んだブランチの
 `update-ref -d`）も sh が持つ。例外に入るのは、生の操作が組み込みで止まり、ラッパーが許可リストで読み、判定の材料のうち
@@ -89,17 +89,17 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 止める側の検査は止める向きに（`integrate` は断り、checkout は親のワークツリーとして狭める。ただし親のワークツリーからの切り替えの拒否は、聞けないときや `stage` が無いときも通す）、ツリーを動かす側
 （`ccnavi-fetch.sh` の早送り、`ccnavi-sync.sh` の取り込み）は動かさない向きに倒す。
 
-push の関門（`ccnavi_push_gate`、`ccnavi-common-state.sh`）も同じ例外に入る。範囲は `ccnavi-git.sh` の中に限らず、
+push のゲート（`ccnavi_push_gate`、`ccnavi-common-state.sh`）も同じ例外に入る。範囲は `ccnavi-git.sh` の中に限らず、
 write-and-push（`ccnavi_wap_prepare`）と `ccnavi-user-push-approved.sh` の push の前も含める。この 3 経路はどれも素の push を打つので、
 ここを通さないと、消えた親のブランチを作り直してしまう。対象は親のワークツリーのブランチだけ（通常のブランチと子の push には掛けない）。
 形跡（`refs/remotes/origin/<B>`、または着手済み（承認済みの親チケットの `started_at`）・`.requested`・退避）があれば `ls-remote`（60 秒。`CCNAVI_WRITE_AND_PUSH_TIMEOUT` で変えられる）でリモートにあるかを聞き、
 無ければ拒否、失敗・時間切れは確かめられない（拒否側）。形跡が無く、着手も依頼も退避も無ければ初回の push として通す。
 承認済みというだけでは形跡にしない（承認して最初に打つ push を通す。着手は write-and-push で push してから完了するので、着手済みなら一度は push している）。
-実行ファイルが無い、または古くて `started` の行を返さないときは、参照の形跡だけで決める。`ccnavi-start.sh` の push も `ccnavi-git.sh push` を通るので掛かる。`merged`（ホストへの照会）は関門では呼ばない。
+実行ファイルが無い、または古くて `started` の行を返さないときは、参照の形跡だけで決める。`ccnavi-start.sh` の push も `ccnavi-git.sh push` を通るので掛かる。`merged`（ホストへの照会）はゲートでは呼ばない。
 迂回は、ユーザがターミナルで `git push origin <B>` を一度打つこと。破棄した親は、親のワークツリーを片付ければ対象から外れる。
 `branch.<B>.remote` は形跡に使わない（`origin/main` から切っただけの未 push の親でも設定されるため）。`ccnavi-git.sh push` は、引数のリモートが origin と同じ URL なら origin とみなす。
 write-and-push は、取り込みがマージ済みの親のワークツリーを片付けた後にツリーが無ければ、何も書かずに止める。診断は `sh .ccnavi/scripts/ccnavi-sync.sh <P>`。
-関門の結果は次のとおり。
+ゲートの結果は次のとおり。
 
 | 状況 | 結果 |
 |---|---|
@@ -117,7 +117,7 @@ HEAD とフォルダ名の一致・途中の操作を示すファイルだけで
 - 親のワークツリーが無い、HEAD のブランチ名を変換したものがフォルダ名と合わない: **決まらない**。その親子のチケットの承認・状態の操作
   （着手・終了・取り消し・記録・レビューのマーカー）・実行前チェックを止め、準備のしかた（`ccnavi-start.sh --mr <番号>`）を出す。
   ボードにはその親子のチケットが出ない
-- 親のブランチがリモートから消えたことは、push の関門が止め、`ccnavi-sync.sh` が診断する（上）。
+- 親のブランチがリモートから消えたことは、push のゲートが止め、`ccnavi-sync.sh` が診断する（上）。
   オフラインの hook では消失が分からない
 - 閉じた親子のチケット: 閉じたかの根拠は MR がマージ済みかだけで、`ccnavi-sync.sh` がホストに聞いて、親の片付けまで行う（9.11）。
   閉じた別の親子の子を先行に持つチケットは、`predecessors` を満たす置き場が

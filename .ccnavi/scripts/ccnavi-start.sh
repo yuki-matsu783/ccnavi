@@ -1680,7 +1680,7 @@ if [ "$total" -eq 0 ]; then
 	id_check "$new_branch" "--prefix・--slug を見直して再実行してください。" 2
 	clash_check "$new_branch" strict
 	merged_check "$new_branch"
-	# マージ済みの MR の関門（終了コード 1）が先。そのあとで、閉じた issue かを見る
+	# マージ済みの MR のゲート（終了コード 1）が先。そのあとで、閉じた issue かを見る
 	issue_state_gate
 	new_title=$(make_title "$slug")
 	new_wt="$root/.claude/worktrees/$new_branch"

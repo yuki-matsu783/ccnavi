@@ -1,4 +1,4 @@
-"""ターン分離の関門（`hook/turngate.py`）の部品。
+"""ターン分離のゲート（`hook/turngate.py`）の部品。
 
 宣言の表を直接渡して確かめる。組み込みの 1 件（`integrate` → `integrate-done`）のほかに、
 `integrate` と関係の無い架空の組を使い、部品が特定の組に依存していないことを見る。
@@ -344,7 +344,7 @@ messages:
       no_user_turn: "{first_name} を打ったあと、発言が無いまま {second_name} を打とうとしました{where}。"
     why: コピーの中身をユーザが見るためです。
     next: ユーザに見せて返事を待ち、あとで {second_name} {key} を打ち直す
-    no_bypass: 分けても同じ関門に当たります。
+    no_bypass: 分けても同じゲートに当たります。
 """  # noqa: E501
 
 

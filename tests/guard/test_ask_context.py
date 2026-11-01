@@ -5,7 +5,7 @@
 - 見出しの判定（`前提・背景`・`想定結果`と別名。本文中の語や別の語は当たらない）
 - `AskUserQuestion` は、直前の発言に 2 つの節が無ければ止まり、揃えば通る
 - 発言は、最後のユーザの発言より後ろだけを見る。ツールの結果の行は区切りにしない。サイドチェーンは見ない
-- ccnavi が確認に出す呼び出し（ターン分離の関門の確認・ルールの `ask`）も、節が無ければ確認でなく止まる
+- ccnavi が確認に出す呼び出し（ターン分離のゲートの確認・ルールの `ask`）も、節が無ければ確認でなく止まる
 - 会話記録に発言が遅れて書かれても、待てば通る
 - 判定できないとき（記録が読めない・パスや tool_use_id が無い、自分の行も見出しも現れない）、非対話、
   サブエージェントの呼び出しは検査しない。自分の行があって見出しが無ければ、待たずに止める
@@ -273,7 +273,7 @@ class UnattendedTest(AskContextHookTest):
 
 
 class GateConfirmTest(AskContextHookTest):
-    """ccnavi が確認に出す呼び出し（ターン分離の関門の確認）。"""
+    """ccnavi が確認に出す呼び出し（ターン分離のゲートの確認）。"""
 
     def run_done(self, **kw):
         return self.hook(tool="Bash", tool_input={"command": DONE}, **kw)
@@ -286,7 +286,7 @@ class GateConfirmTest(AskContextHookTest):
         self.assertTrue(self.stopped(done))
         self.assertNotIn('"permissionDecision": "ask"', done.stdout)
 
-    def test_dry_run_でも関門の確認は止めたまま(self):
+    def test_dry_run_でもゲートの確認は止めたまま(self):
         self.write(prompt(), assistant("取り込みます"))
 
         done = self.hook(tool="Bash", tool_input={"command": DONE}, mode="dry-run")

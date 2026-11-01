@@ -260,7 +260,7 @@ setup:
 
 1. `git worktree remove --force`（本体のワークツリー以外すべて）→ `git worktree prune`
 2. ccnavi 自身の状態を消す。git の共通ディレクトリ直下の `ccnavi-direct/`（直接作業の記録）・`ccnavi-integrate/`（取り込みの marker）・`ccnavi-integrate-done/`、と `refs/ccnavi/` の下のすべての ref（`refs/ccnavi/direct/<名前>/s` など）。前のシナリオの取り込み待ちを、次の SessionStart の文脈や `ccnavi-worktree.sh` の `adopt-recorded` に持ち越さないようにする
-3. ワークスペースルートの `logs/archive/<対象の名前>/` を消す（前の回の ready が退避した親子。残すと同じ識別子の親が「一度は送った形跡」になり、新しい origin への push の関門が止まる。ほかのプロジェクトの退避は消さない）
+3. ワークスペースルートの `logs/archive/<対象の名前>/` を消す（前の回の ready が退避した親子。残すと同じ識別子の親が「一度は送った形跡」になり、新しい origin への push のゲートが止まる。ほかのプロジェクトの退避は消さない）
 4. `git checkout -f -B main <base>`（ローカルの `main` を `base` に合わせて切り替える）
 5. `main` 以外のローカルブランチを `git branch -D`
 6. タグを `git tag -d`
@@ -412,9 +412,9 @@ hook の応答の文面（拒否・確認・案内）を、重複を除いて 1 
 
 - **拾われる範囲が違う。** 全量は `test_*.py` を持つグループだけを拾う。シナリオの YAML と `runner.py` は拾われない。
   `tests/scenarios/` で拾われるのは `test_runner.py`（実行器の判定部分の単体テスト）だけで、`claude` を呼ばない
-- **実行器が門を持つ。** `claude` を呼ぶ道（`run_step`・`cmd_run`）は、`python -m tests.scenarios.runner` で起動されたときだけ開く。
+- **実行器がゲートを持つ。** `claude` を呼ぶ道（`run_step`・`cmd_run`）は、`python -m tests.scenarios.runner` で起動されたときだけ開く。
   ほかのモジュールが import して呼ぶと `RuntimeError` で止まる。後で誰かが、実行器を呼ぶテストを足しても動かない
-- **テストが見張る。** `test_runner.py` が、門が閉じていること、全量が `tests.scenarios.test_runner` しか拾わないこと、
+- **テストが見張る。** `test_runner.py` が、ゲートが閉じていること、全量が `tests.scenarios.test_runner` しか拾わないこと、
   `tests/scenarios/` に `test_runner.py` 以外の `test_*.py` が無いことを確かめる。シナリオを回す道を `test_` のモジュールに置かない
 
 ## 人間の操作

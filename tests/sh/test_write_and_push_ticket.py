@@ -320,7 +320,7 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         """push の応答も ls-remote も失敗したが届いていた。
 
         戻して取り込み直すと自分のコミットが戻るので、書き直さずに成功で終える。
-        push の関門の ls-remote（push の前）は数えない。push のあとの 1 回目だけ失敗させる。
+        push のゲートの ls-remote（push の前）は数えない。push のあとの 1 回目だけ失敗させる。
         """
         count = os.path.join(self._base, "ls-count")
         write(count, "0\n")
@@ -541,7 +541,7 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
 
     def test_a_parent_gone_from_the_remote_is_refused_by_the_push_gate(self):
         """取り込みが通っても（代役が 0 で終わる）、リモートに無い親のブランチは作り直さない。
-        write-and-push の push の前の関門が止める。"""
+        write-and-push の push の前のゲートが止める。"""
         write(os.path.join(self.scripts, "ccnavi-sync.sh"), "#!/bin/sh\nexit 0\n")
         git(self.ws, "--git-dir", self.remote, "update-ref", "-d", f"refs/heads/{PARENT}")
         result = self.ticket("start", PARENT)

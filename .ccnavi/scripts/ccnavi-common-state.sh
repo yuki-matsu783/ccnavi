@@ -1,6 +1,6 @@
 # ccnavi-common-state.sh  ccnavi-common.sh が読む部品。単体では読まない（読み方は ccnavi-common.sh の冒頭）。
 #
-# state の置き場とロック、統合先の名前、親ブランチの push の関門、タイムアウト監視つきの git。
+# state の置き場とロック、統合先の名前、親ブランチの push のゲート、タイムアウト監視つきの git。
 
 # ---- state の置き場とロック
 #
@@ -302,7 +302,7 @@ ccnavi_parent_info() {
 # だけの未 push の親でも設定されるため）か、実行ファイルが答える .requested・退避・着手済み（started_at）
 # （fetch.prune で参照が消えても残る）。承認済みというだけでは形跡にしない（直接作業で提案を書き、同名のワークツリーを
 # 切って承認し、最初の push を打つ流れが、初回の push として通らなくなる）。着手（ticket start）は write-and-push で push して
-# から完了するので、started_at があれば一度は push している。push の関門（ccnavi_push_gate）と ccnavi-sync.sh の
+# から完了するので、started_at があれば一度は push している。push のゲート（ccnavi_push_gate）と ccnavi-sync.sh の
 # 「消えた親」の判定が同じ述語を使う。
 ccnavi_parent_trace() {
 	if git -C "$1" show-ref --verify --quiet "refs/remotes/origin/$2" 2>/dev/null; then
@@ -311,7 +311,7 @@ ccnavi_parent_trace() {
 	[ "$ccnavi_pi_requested" = yes ] || [ "$ccnavi_pi_archived" = yes ] || [ "$ccnavi_pi_started" = yes ]
 }
 
-# 親のブランチの push の関門。0 通す、1 拒否、2 確かめられない（拒否側）。
+# 親のブランチの push のゲート。0 通す、1 拒否、2 確かめられない（拒否側）。
 #   ccnavi_push_gate <ツリー> <ブランチ> <識別子> <ワークスペースルート> [<秒>]
 # 理由は変数 ccnavi_pg_why に入る（拒否と確かめられないとき）。
 #

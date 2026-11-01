@@ -88,7 +88,7 @@ PASS, FAIL, INCONCLUSIVE, REVIEW = "pass", "fail", "inconclusive", "needs-review
 
 # claude を呼ぶ道は、`python -m tests.scenarios.runner` で起動されたときだけ開く。
 # ほかのモジュール（全量テストに入るテストを含む）が import して呼んでも、ここで止まる。
-# 全量テストに入らないのは「test_ で始まるモジュールが無いから」だけでなく、この門でも守る。
+# 全量テストに入らないのは「test_ で始まるモジュールが無いから」だけでなく、このゲートでも守る。
 _ENTRY = False
 
 
@@ -846,7 +846,7 @@ def _clear_ccnavi_state(root, top, run):
 
 def _clear_archive(root, top):
     """前の回の ready が logs/archive/<プロジェクト>/ へ退避した親子を消す。
-    残すと、同じ識別子の親が「一度は送った形跡」になり、新しい origin への push の関門が止まる。
+    残すと、同じ識別子の親が「一度は送った形跡」になり、新しい origin への push のゲートが止まる。
     置き場はワークスペースルートの logs/ の下（git の外）で、そのプロジェクトの分だけを消す。
     リンクは辿らず、リンク自体を外す。"""
     path = Path(root) / "logs" / "archive" / Path(top).name

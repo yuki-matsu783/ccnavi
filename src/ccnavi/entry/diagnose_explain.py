@@ -182,17 +182,17 @@ def _explain_modes(stdout: TextIO, conf: settings.Settings) -> None:
     """dry-run で止めるものと止めないもの、判定に達せなかったときの扱い。
 
     止める箇所の分類（`modes.GENERAL`・`GATE`・`AUX`）と、ツールごとの扱い（`modes.fail_closed`）は
-    判定と同じ定数・関数から組む。チケット制御が無効なら、関門と補助の保護も効かない。
+    判定と同じ定数・関数から組む。チケット制御が無効なら、ゲートと補助の保護も効かない。
     """
     stdout.write("\n■ dry-run のときに止めるもの\n")
     stdout.write(
         "  一般の保護（ルールの deny・ask）: dry-run は止めずに報告だけにする\n"
-        "  チケットの関門（状態の操作、承認済みの置き場、範囲、レビュー待ち）と、その抜け道を"
+        "  チケットのゲート（状態の操作、承認済みの置き場、範囲、レビュー待ち）と、その抜け道を"
         "ふさぐ補助の保護（生の git、環境変数の指定など）: dry-run でも止める\n"
     )
     if not conf.tickets_enabled:
         stdout.write(
-            f"  {settings.TICKET_CONTROL_ENV}=disable なので、関門と補助の保護も効いていない\n"
+            f"  {settings.TICKET_CONTROL_ENV}=disable なので、ゲートと補助の保護も効いていない\n"
         )
     stdout.write("\n■ 判定に達せなかったとき（内部の例外・期限切れ・payload が読めない）\n")
     labels = {

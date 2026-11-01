@@ -74,7 +74,7 @@ PERMISSION_NO_JUDGE = ("dontAsk", "bypassPermissions")
 # 同じ変数に入るので、ルールファイルには現れない表記にしてある。
 HANDOVER = "(handover)"
 
-# dry-run でも効く止め（関門と補助）の拒否文に添える 1 行。
+# dry-run でも効く止め（ゲートと補助）の拒否文に添える 1 行。
 DRY_RUN_HOLDS_NOTE = (
     "[ccnavi] CCNAVI_MODE is dry-run, but this stop still applies: ticket gates and the "
     "protections that keep them from being bypassed are enforced in every mode except disable."
@@ -147,7 +147,7 @@ def decide_before(
     1. 判定より先に設定ファイルのバックアップを取る（`guard_setting_files` に `selfguard.before`）。
        その知らせは `guard` に残し、以降の応答に足す。
     1b. ユーザに確認を出す呼び出し（`AskUserQuestion`）は、直前の発言に「前提・背景」「想定結果」が
-       無ければ止める（`askcontext`）。ルールや関門が返す確認も、返す前に同じ検査を通る（`refuse`）。
+       無ければ止める（`askcontext`）。ルールやゲートが返す確認も、返す前に同じ検査を通る（`refuse`）。
     2. 主題（`record.subject`）が無ければ記録して抜ける。
     3. ルールを読み、この呼び出しの行き先のツリーを決める（`ruleload.rules_for`）。
     4. 組み込みの保護をルールに足す（`selfguard_shell`・`ticket_guard`・`phase_forms`）。
@@ -155,7 +155,7 @@ def decide_before(
     6. 組み込みの止めを、順に適用する。ヒットすれば `refuse` で返す。順に、環境変数の指定
        （`wrapguard.check_env`）・自己防衛のパス（`wrapguard.check_core_paths`）・記録の削除
        （`phase_forms.prune_form`）・ユーザの判断の経路（`phase_forms`）・子の push
-       （`wrapguard.check_child_push`）・ユーザの発言をまたぐ関門（`turngate`）・サブエージェントの禁止（`phase_forms.forbidden`）・
+       （`wrapguard.check_child_push`）・ユーザの発言をまたぐゲート（`turngate`）・サブエージェントの禁止（`phase_forms.forbidden`）・
        親のワークツリーへの書き込み（`wrapguard.check_parent_tree_git`・`parentwrite.check`）・
        レビュー待ちの止め（`phase.held_phase`）・サブエージェントの起動（`agentlaunch.decide`）・
        プロジェクトの食い違い（`project_mismatch`）・着手中の子のロック（`flow_lock`）。
@@ -238,7 +238,7 @@ def decide_before(
     rule_set.deny.append(ticket_guard.raw_git_rule(root))
     if conf.tickets_enabled:
         rule_set.deny.extend(ticket_guard.guard_rules(conf.tickets, root))
-        # 承認済みの置き場と操作記録の置き場。関門なので dry-run でも
+        # 承認済みの置き場と操作記録の置き場。ゲートなので dry-run でも
         # `CCNAVI_GUARD_CORE_FILES` の値でも外れない。
         rule_set.deny.extend(ticket_guard.gate_rules(conf.approved, root))
         # ユーザの判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
@@ -455,13 +455,13 @@ def decide_before(
                 kind=GATE,
             )
 
-    # ユーザの発言をまたぐ関門。「A を打ったら、ユーザの発言が 1 回はさまるまで B を打てない」
+    # ユーザの発言をまたぐゲート。「A を打ったら、ユーザの発言が 1 回はさまるまで B を打てない」
     # （`turngate.BUILTIN`）。ルールより先に見る。ルールが allow と書いていても、ユーザの返事を
     # 待つ手順は外さない。B は止め、通した A は記録する（記録は拒否・失敗で消す。`events.decide`、
     # `decide_after_failure`）。サブエージェントの呼び出しも、同じセッションの記録で見る。
     # 付き添いのあるセッションでは、`ask_if_attended` の宣言は発言を待たず、B を確認に出す
     # （同じコマンドに A と B を並べた呼び出しだけは止める）。サブエージェントの呼び出しは対話でも
-    # 発言を待つ関門のままにする。確認で先に返すと、後段のサブエージェントの禁止に届かないため。
+    # 発言を待つゲートのままにする。確認で先に返すと、後段のサブエージェントの禁止に届かないため。
     if payload.tool_name in toolnames.SHELL_TOOLS:
         gate_texts = [subject, *(layer for runner, layer, _ in inner if runner != shellread.MOVED)]
         waited, asked = turngate.split_by_attendance(
@@ -1158,8 +1158,8 @@ def _write_pass(stdout: TextIO, text: str, updated: dict | None) -> None:
     hookio.write_pre_tool_use(stdout, context=text, updated_input=updated)
 
 
-# 一般の保護とは別に、dry-run でも止める関門のルール。チケット制御が有効なときだけ足されるので、
-# ヒットしたならそのまま関門として数える。
+# 一般の保護とは別に、dry-run でも止めるゲートのルール。チケット制御が有効なときだけ足されるので、
+# ヒットしたならそのままゲートとして数える。
 GATE_RULE_IDS = (
     ticket_guard.STATE_RULE_ID,
     ticket_guard.STATE_SHELL_RULE_ID,
@@ -1174,12 +1174,12 @@ GATE_RULE_IDS = (
 def final_kind(conf: settings.Settings, ids: set[str], ticket_reason: str, capped: bool) -> str:
     """ルールとチケットの判定を拒否にした回の分類。dry-run でも止めるかを決める。
 
-    ids はヒットしたルールの id（土台を落とす前の組）。関門（GATE）が優先、次が補助（AUX）、
-    それ以外は一般。チケット制御が無効なら関門は足されていない。生の git はそのときでも止めるが、
+    ids はヒットしたルールの id（土台を落とす前の組）。ゲート（GATE）が優先、次が補助（AUX）、
+    それ以外は一般。チケット制御が無効ならゲートは足されていない。生の git はそのときでも止めるが、
     一般の保護として扱う。
 
-    `>` の数の上限で上げた拒否は、シェルから書き込む形の保護（関門の置き場を守る 2 本を含む）を
-    生の文字列に適用していない代わりの拒否。関門の穴にならないよう、チケット制御が有効なら関門にする。
+    `>` の数の上限で上げた拒否は、シェルから書き込む形の保護（ゲートの置き場を守る 2 本を含む）を
+    生の文字列に適用していない代わりの拒否。ゲートの穴にならないよう、チケット制御が有効ならゲートにする。
     """
     if capped:
         return GATE if conf.tickets_enabled else GENERAL
@@ -1244,7 +1244,7 @@ def refuse(
     そのまま残す。
 
     kind は止めている箇所の分類（`modes.GENERAL`・`GATE`・`AUX`）。dry-run で報告だけにするのは
-    GENERAL だけで、チケット制御の関門（GATE）と補助の保護（AUX）は dry-run でも止める。
+    GENERAL だけで、チケット制御のゲート（GATE）と補助の保護（AUX）は dry-run でも止める。
     拒否の文面には「dry-run でもこの止めは効く」と 1 行添える。
 
     context はルールの `additionalContext`。判定と一緒にモデルへ渡す文で、
@@ -1267,7 +1267,7 @@ def refuse(
         stop = ask_context()
         if stop:
             # 確認の本文は残す。書く内容（なぜ確認が要るか）の手がかりになる。止める強さ（kind）は
-            # 確認のときのまま。ターン分離の関門の確認は、dry-run でも止める。
+            # 確認のときのまま。ターン分離のゲートの確認は、dry-run でも止める。
             shown = audit._redacted(record.subject)
             parts = [ask_context_refusal(record, shown, stop), *parts]
             verdict = rules.DENY

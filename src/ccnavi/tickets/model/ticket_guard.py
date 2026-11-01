@@ -171,7 +171,7 @@ def approved_write_rule(approved_rel: str, root: str) -> rules.Rule:
     """承認済みの置き場を名前で書くツールから守る 1 本（`builtin:ticket-approved`）。
 
     実行後の保護範囲（`events.watched_for`）に足す。シェル版は足さない。実行後はワークツリーの
-    変更を見るため。実行前の関門（`gate_rules`）と同じ式・同じ文面。
+    変更を見るため。実行前のゲート（`gate_rules`）と同じ式・同じ文面。
     """
     return _dir_rules(
         APPROVED_RULE_ID,

@@ -2369,7 +2369,7 @@ push)
 			;;
 		esac
 	done
-	# リモートから消えた親のブランチへは送らない（push の関門。write-and-push・ccnavi-user-push-approved.sh と同じ）。
+	# リモートから消えた親のブランチへは送らない（push のゲート。write-and-push・ccnavi-user-push-approved.sh と同じ）。
 	# 普通の push で作り直すと、消えた理由（改名・消し間違い・破棄した親子のチケット）を確かめないまま親子のチケットが
 	# 動き出す。送り先が origin のときだけ見る。送り先は git と同じ順で解く: 引数のリモート →
 	# branch.<b>.pushRemote → remote.pushDefault → branch.<b>.remote → origin。
@@ -2380,7 +2380,7 @@ push)
 			git config --get "branch.$push_branch.remote" 2>/dev/null || echo origin)
 	fi
 	# 設定済みのリモート名でない引数（`:` を含まない URL やローカルのパス）は、origin と同じ URL なら origin とみなす。
-	# origin の URL が `:` を含まないローカルのパスのとき、`push <そのパス>` で関門を飛ばせてしまうため。
+	# origin の URL が `:` を含まないローカルのパスのとき、`push <そのパス>` でゲートを飛ばせてしまうため。
 	if [ "$push_dest" != origin ]; then
 		push_dest_url=$(git config --get "remote.$push_dest.url" 2>/dev/null || printf '%s' "$push_dest")
 		push_origin_url=$(git config --get remote.origin.url 2>/dev/null || :)

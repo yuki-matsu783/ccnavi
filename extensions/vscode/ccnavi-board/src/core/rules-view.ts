@@ -254,7 +254,7 @@ export function embedData(data: RulesData): string {
  */
 export function modeBanner(mode: string): string {
   if (mode === "dry-run") {
-    return "判定と記録をします。deny や ask にヒットしても、一般の保護はツールの実行を止めません。止まるのは、チケットの関門と補助の保護です";
+    return "判定と記録をします。deny や ask にヒットしても、一般の保護はツールの実行を止めません。止まるのは、チケットのゲートと補助の保護です";
   }
   if (mode === "disable") {
     return "判定しません。ルールは使われず、deny や ask にヒットする操作も止まりません";

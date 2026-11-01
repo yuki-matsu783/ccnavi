@@ -3,7 +3,7 @@ type: adr
 title: 開始前に分かる条件で止まる操作は、何も変えずに最初に断る
 description: 途中まで進んでから案内を出して中断していた操作を、開始前に分かる条件（cwd・ファイル・git の状態・引数の形・ローカルの記録）で最初に断る形に統一する
 tags: [gate-conditions, script-output]
-keywords: [関門, 最初に断る, 半端, 中断, retire, close-early, stage, ワークツリー, 打ち直し]
+keywords: [ゲート, 最初に断る, 半端, 中断, retire, close-early, stage, ワークツリー, 打ち直し]
 ---
 # ADR-0217: 開始前に分かる条件で止まる操作は、何も変えずに最初に断る
 

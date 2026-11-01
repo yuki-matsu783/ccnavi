@@ -3,7 +3,7 @@ type: adr
 title: start・finish・cancel・consolidate は、書く前に分かる検査を取り込みの前に通して断る
 description: チケット作業の子の start・finish・cancel と consolidate の検査を、ロック・取り込み・コミット・子のワークツリーの作成の前に読むだけの口（--check）で通す。合流のあとでないと分からない検査は本体に残す
 tags: [ticket, gate-conditions, script-output]
-keywords: [関門, 最初に断る, 事前の検査, --check, start, finish, cancel, consolidate, 取り込み, 子のワークツリー, 先行, 学びの記録]
+keywords: [ゲート, 最初に断る, 事前の検査, --check, start, finish, cancel, consolidate, 取り込み, 子のワークツリー, 先行, 学びの記録]
 ---
 # ADR-0221: start・finish・cancel・consolidate は、書く前に分かる検査を取り込みの前に通して断る
 

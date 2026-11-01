@@ -14,7 +14,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 |---|---|
 | `DENY_COMMAND_PATTERN` | Bash の実行される部分がルールにヒットした。読み切れない形でも、ヒットしたルールが全部、中で実行されるコマンドでヒットしたときはこれ（6.3.1） |
 | `DENY_PATH` | ファイルのパスがヒットした |
-| `RULE_ASK` | ルールの `ask` にヒットした。付き添いのあるセッションで、ターン分離の関門の B を確認に出した回も同じコードになる。`rules` は `builtin:turn-gate:<宣言 id>` |
+| `RULE_ASK` | ルールの `ask` にヒットした。付き添いのあるセッションで、ターン分離のゲートの B を確認に出した回も同じコードになる。`rules` は `builtin:turn-gate:<宣言 id>` |
 | `UNDECLARED` | どのルールも言及しない。権限モードに委ねた、または確認できる者が居ないので断った |
 | `PARSE_UNCERTAIN` | コマンドを読み切れず生の文字列に適用し、どこにもヒットしなかった |
 | `DENY_SHELL_WORKSPACE_ROOT` | Bash の書き込み先（`>`・`tee`・`sed -i`・`rm`・`mv`・`cp` など）を、`cd` で移った先をたどって絶対パスに解くと、ルールファイルの `workspace-root` にヒットした。ワークスペースルート直下には書かず、`wip/handoff/`・`scratchpad/`・ワークツリーの中に書くよう案内して止める。ガード自身の保護など、ほかの `deny` にヒットした呼び出しはその文面で止まる。変数・置換・`~`・`{}` で組んだ書き込み先と、インタプリタに渡したコードの中は見ず、実行後チェックが戻す |
@@ -32,10 +32,10 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `DENY_TICKET_APPROVAL_CLI` | 実行ファイルの `user` の入口か `ccnavi-user-*.sh` を打った。実行役のコマンド越しに打った形を含む。ターミナル要求を切る変数とフラグをコマンド行に書いた形も。ターミナルを求めない入口に、止める操作（`user agree` などと `--yes`・`ccnavi-user-decide.sh`・`worktree retire --abandon`・`decide --choices`・`--guard-ticket-approval`）を組み立てうる読み切れない引数（変数・置換・glob・`xargs`）を渡した形と、標準入力から読むシェルに入口の名前を含む文字列を流す形も（9.5、9.18） |
 | `DENY_PHASE_REVIEW` | フェーズのレビューで止まっている（レビュー準備中・レビュー待ち） |
 | `DENY_AGENT_ISOLATION` | `Agent`・`Task` に `isolation` のキーがある（値によらない）。作業場所は ccnavi が決め、isolation のワークツリー（`.claude/worktrees/agent-<id>`）にはチケットの範囲に該当しない。補助で、チケット制御が無効でも dry-run でも止める。`CCNAVI_MODE=disable` だけ通す（9.12） |
-| `DENY_AGENT_NO_CHILD` | 親のワークツリーから、担当の子を指さずに編集する種類のサブエージェントを起動した。作業中の子の識別子を最大 5 件並べる。関門。読み取り専用の種類は止めない（9.12） |
-| `DENY_AGENT_MULTI_TARGET` | プロンプトが違うワークツリーを 2 つ以上指している（「触れない」と書いた子も数える）。関門。チケット制御が無効のときも、パスが 2 つ以上なら止める（補助。9.12） |
-| `DENY_AGENT_PARENT_TREE` | プロンプトが親のワークツリーだけを指している。関門（9.12） |
-| `DENY_AGENT_CHILD_UNAVAILABLE` | 指した子が担当にできない（閉じた・レビュー待ち・blocked・未着手・ワークツリーが無い・プロジェクトの食い違い）。未着手とワークツリーが無い場合だけ `start` の打ち方を示す。関門（9.12） |
+| `DENY_AGENT_NO_CHILD` | 親のワークツリーから、担当の子を指さずに編集する種類のサブエージェントを起動した。作業中の子の識別子を最大 5 件並べる。ゲート。読み取り専用の種類は止めない（9.12） |
+| `DENY_AGENT_MULTI_TARGET` | プロンプトが違うワークツリーを 2 つ以上指している（「触れない」と書いた子も数える）。ゲート。チケット制御が無効のときも、パスが 2 つ以上なら止める（補助。9.12） |
+| `DENY_AGENT_PARENT_TREE` | プロンプトが親のワークツリーだけを指している。ゲート（9.12） |
+| `DENY_AGENT_CHILD_UNAVAILABLE` | 指した子が担当にできない（閉じた・レビュー待ち・blocked・未着手・ワークツリーが無い・プロジェクトの食い違い）。未着手とワークツリーが無い場合だけ `start` の打ち方を示す。ゲート（9.12） |
 | `DENY_AGENT_TARGET_INVALID` | プロンプトのワークツリーのパスが使えない（このワークスペースの外・`..`・シンボリックリンク・登録が無い・名前が無い）。補助（9.12） |
 | `DENY_AGENT_CWD_CONFLICT` | `tool_input` の cwd が、プロンプトで決まった担当先と違う。補助（9.12） |
 | `NUDGE_TICKET_FEEDBACK` | メインエージェントの `Stop` で、cwd のツリーが承認済みで着手済みの親子に結び付き、親が blocked でなく、親の局面が「フィードバック計画待ち」。同じ状態（親・HEAD・改版を提案済みか）では 1 回だけ止めて、改版を書いて `approval-request` で送りユーザに承認を頼むよう促す。実行中のサブエージェントが居る間は出ない（9.12）。記録の `decision` は `nudge` |
@@ -46,8 +46,8 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `NUDGE_STOP_RULE` | メインエージェントの `Stop` で、`match: Stop` の `allow` のルールが渡す回になった（`every` の刻み）。止めて、ルールの文を渡す。`finish` の促しと重なった回は出ない（6.6）。記録の `decision` は `nudge` |
 | `DENY_SUBAGENT_TICKET_OP` | サブエージェントが、役割の表（`user_only.SUBAGENT_ROLES`）で許されていない操作（チケットの状態・レビュー・push・開始や片付けの sh）を打とうとした |
 | `DENY_SUBAGENT_PARENT_TREE` | サブエージェントが、親のワークツリーへの merge・commit・書き込みをしようとした。子のワークツリーでのコミットと、衝突を解くための親のブランチの merge は通す。親のワークツリーかは、そのワークツリー自身のチケットで決める（9.12） |
-| `DENY_NEEDS_USER_TURN` | ターン分離の関門。A（`ccnavi-git.sh integrate <名前>`）を打ったあと、ユーザの発言をはさまずに B（`ccnavi-git.sh integrate-done <名前>`）を打った。同じコマンドに A と B を連結した形、記録を読み書きできない場合も。ルールより先に止め、`dry-run` でも止める。付き添いのあるセッションでは、連結した形以外の B は止めずに確認（`RULE_ASK`）に出す。どの宣言かは記録の `rules` と文面が言う（6.7） |
-| `DENY_ASK_NEEDS_CONTEXT` | ユーザに確認（ask）を出す直前の発言に、見出し「前提・背景」「想定結果」（別名は「背景」「前提」「選んだ時の結果」）の片方か両方が無い。対象は `judge.refuse` が返す確認すべて（ルールの `ask`・チケットの `ask`・ターン分離の関門の確認・どのルールも言及しない呼び出しの確認）と `AskUserQuestion`。`ExitPlanMode` と、Claude Code 自身の権限の確認は対象外。最後のユーザの発言（ツールの結果の行は区切りにしない）より後ろの、サイドチェーンでないアシスタントの text を、会話記録（`transcript_path`）の末尾から読む。PreToolUse の時点では直前の発言がまだ書かれていないことがある。書き込み済みかは、この呼び出し自身の tool_use の行（`tool_use_id`）が記録にあるかで分かる。自分の行があって見出しが無ければ、待たずに止める。自分の行がまだ無ければ、見出しが現れるまで最大 `CCNAVI_ASK_CONTEXT_WAIT_SECONDS`（既定 2.5 秒。判定の期限には縛らず、hook の `timeout` に収める）読み直す。判定できないときは通す（記録が読めない・パスや `tool_use_id` が無い、待っても自分の行も見出しも現れない）。非対話・サブエージェントの呼び出しも検査しない。`dry-run` では、確認のときと同じ強さで扱う（関門の確認は止める）。見るのは見出しの語だけで、中身は見ない |
+| `DENY_NEEDS_USER_TURN` | ターン分離のゲート。A（`ccnavi-git.sh integrate <名前>`）を打ったあと、ユーザの発言をはさまずに B（`ccnavi-git.sh integrate-done <名前>`）を打った。同じコマンドに A と B を連結した形、記録を読み書きできない場合も。ルールより先に止め、`dry-run` でも止める。付き添いのあるセッションでは、連結した形以外の B は止めずに確認（`RULE_ASK`）に出す。どの宣言かは記録の `rules` と文面が言う（6.7） |
+| `DENY_ASK_NEEDS_CONTEXT` | ユーザに確認（ask）を出す直前の発言に、見出し「前提・背景」「想定結果」（別名は「背景」「前提」「選んだ時の結果」）の片方か両方が無い。対象は `judge.refuse` が返す確認すべて（ルールの `ask`・チケットの `ask`・ターン分離のゲートの確認・どのルールも言及しない呼び出しの確認）と `AskUserQuestion`。`ExitPlanMode` と、Claude Code 自身の権限の確認は対象外。最後のユーザの発言（ツールの結果の行は区切りにしない）より後ろの、サイドチェーンでないアシスタントの text を、会話記録（`transcript_path`）の末尾から読む。PreToolUse の時点では直前の発言がまだ書かれていないことがある。書き込み済みかは、この呼び出し自身の tool_use の行（`tool_use_id`）が記録にあるかで分かる。自分の行があって見出しが無ければ、待たずに止める。自分の行がまだ無ければ、見出しが現れるまで最大 `CCNAVI_ASK_CONTEXT_WAIT_SECONDS`（既定 2.5 秒。判定の期限には縛らず、hook の `timeout` に収める）読み直す。判定できないときは通す（記録が読めない・パスや `tool_use_id` が無い、待っても自分の行も見出しも現れない）。非対話・サブエージェントの呼び出しも検査しない。`dry-run` では、確認のときと同じ強さで扱う（ゲートの確認は止める）。見るのは見出しの語だけで、中身は見ない |
 | `DENY_CHILD_PUSH` | 子チケットのワークツリーから `ccnavi-git.sh push` を打った。`cd` の行き先が読めない push を含む（9.10） |
 | `DENY_SCRIPT_ENV_OVERRIDE` | 保護済みの sh を、sh の検査の材料を変える環境変数と同じコマンド行で呼んだ。補助の保護で、`CCNAVI_GUARD_CORE_FILES` では切れず、`dry-run` でも止める（8.2） |
 | `DENY_WRAPPER_CORE_PATH` | `ccnavi-git.sh` の `rm`・`restore --source`・`checkout <ref> <パス>` で、自己防衛の対象か承認済みチケットの置き場かレビュー待ちの置き場（`wip/proposals/review/`。置き場に何かがある間はその親も）を消す・別のコミットの中身に戻そうとした。対象を読み切れない形（変数・置換・居場所の読めない `cd` / `pushd` の後の相対パス）、サブコマンドが文字どおりの語でない形、標準入力から読むシェルに流す文字列の中の呼び出し、走査が読み切れず名前の直後に文字どおりのサブコマンドが無い形と、索引の中身に戻す `checkout -- <パス>` も（8.2） |
@@ -83,8 +83,8 @@ JSON も、同じコードをキー `code` に持つ（通れば `null`。`stopp
 | 名前 | 理由コード |
 |---|---|
 | `builtin:ticket-state` / `builtin:ticket-state-shell` | 状態の置き場への直接の作成・移動（`wip/proposals/review/` など） |
-| `builtin:ticket-approved` / `builtin:ticket-approved-shell` | 承認済みの置き場（`.ccnavi/approved/` の下すべて）への書き込み。関門で、`dry-run` でも `CCNAVI_GUARD_CORE_FILES` の値でも効く。文面は承認の経路・`status`・`finish`・`approval-request` を案内する。名前で書くツール用の 1 本は、実行後の保護範囲にも足す（チケット制御が有効な間。`ticket_guard.approved_write_rule`） |
-| `builtin:ticket-ops` / `builtin:ticket-ops-shell` | 操作記録の置き場（`logs/state/ops/`）への書き込み。関門で、`dry-run` でも `CCNAVI_GUARD_CORE_FILES` の値でも効く |
+| `builtin:ticket-approved` / `builtin:ticket-approved-shell` | 承認済みの置き場（`.ccnavi/approved/` の下すべて）への書き込み。ゲートで、`dry-run` でも `CCNAVI_GUARD_CORE_FILES` の値でも効く。文面は承認の経路・`status`・`finish`・`approval-request` を案内する。名前で書くツール用の 1 本は、実行後の保護範囲にも足す（チケット制御が有効な間。`ticket_guard.approved_write_rule`） |
+| `builtin:ticket-ops` / `builtin:ticket-ops-shell` | 操作記録の置き場（`logs/state/ops/`）への書き込み。ゲートで、`dry-run` でも `CCNAVI_GUARD_CORE_FILES` の値でも効く |
 | `builtin:guard-hooks` / `builtin:guard-settings` / `builtin:guard-scripts` / `builtin:guard-ccnavi-config` | 名前で書くツール（`Write` `Edit` `NotebookEdit`）から自己防衛の対象への書き込み。対象と例外は自己防衛の「止める側」の表にある |
 | `builtin:credentials` | 認証情報の場所（`.env*`、`.dev.vars`、`.netrc`、`.npmrc`、`.pypirc`、`.aws/`、`.ssh/`、`*.pem` / `*.key`（後ろに別の拡張子が続く形も）、`secrets/`、`credentials/`、`credentials.json`、`id_rsa`、`id_ed25519`）への `Bash` `Read` `Write` `Edit` `NotebookEdit`。常に効く土台で、設定で切れない。見本の `.env.example` も止める。`Grep` `Glob` `PowerShell` は対象外 |
 | `builtin:guard-raw-git` | 生の `git`。補助（チケット制御が有効なら `dry-run` でも止める） |
@@ -116,7 +116,7 @@ JSON も、同じコードをキー `code` に持つ（通れば `null`。`stopp
 | 欄 | 中身 |
 |---|---|
 | `decision` | `allow` `ask` `deny` `handover` `skip`（促した回は `nudge`）。`handover` は権限モードに委ねた回 |
-| `enforced` | 実際に適用したか。`dry-run` は、一般の保護では `false`、関門と補助の保護で止めた回は `true` |
+| `enforced` | 実際に適用したか。`dry-run` は、一般の保護では `false`、ゲートと補助の保護で止めた回は `true` |
 | `code` | 判定の根拠の種別。一覧は付録 A。よく出るのは `DENY_COMMAND_PATTERN`、`DENY_PATH`、`RULE_ASK`、`UNDECLARED`、`PARSE_UNCERTAIN`、`DENY_TICKET_SCOPE`。実行後チェックの行は `POST_VIOLATION` などで、件が混ざった回は強いほう 1 つ |
 | `rules` | ヒットしたルールの名前（ルールファイル由来は `<相対パス>:<id>`、組み込みは id）。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`builtin:ticket-scope`、`builtin:phase-review` など。判定ごとに分かれる。一覧は付録 A） |
 | `reason` | `skip` の理由（上の一覧）。`stop-review-judge` は `allow`・`deny` の行にも、`stop-review-worker` は `deny` の行に付く。`worktree-unreadable` は `detail` に理由 |

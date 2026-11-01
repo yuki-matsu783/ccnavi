@@ -135,7 +135,7 @@ class Workspace(unittest.TestCase):
             f"*\" --version \"*) printf 'compat: {version.COMPAT}\\n'; exit 0 ;;\n"
             '*" write-and-push family "*) printf \'write-and-push 1\\nfamily i0001\\ntarget '
             "no\\n'; exit 0 ;;\n"
-            # 親か・承認済みか（push の関門が聞く）。STUB_PARENT があるときだけ答える。
+            # 親か・承認済みか（push のゲートが聞く）。STUB_PARENT があるときだけ答える。
             # STUB_PARENT=old は、新しい行（approved など）を知らない古い実行ファイル。
             '*" tree parent "*)\n'
             '  [ -n "${STUB_PARENT:-}" ] || exit 0\n'
@@ -435,13 +435,13 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.dirty(tree, APPROVED), "")
         self.assertIn("i0001", result.stderr)
 
-    # ---- 親のブランチの push の関門（ccnavi_push_gate）。
+    # ---- 親のブランチの push のゲート（ccnavi_push_gate）。
     # 実行ファイルの代役が `tree parent` に答える（STUB_PARENT）。答えなければ参照だけで決める。
 
     def sent_parent(self, name="i0001", started="yes", **extra):
         """送ったことのある親のワークツリー。ホストがブランチを消した（参照だけが残る）形にする。
 
-        返すのは、ツリーと、関門に聞かれる実行ファイルの答えを入れた環境。
+        返すのは、ツリーと、ゲートに聞かれる実行ファイルの答えを入れた環境。
         承認済みの親チケットは置いてある（STUB_APPROVED=yes）。着手済み（STUB_STARTED）が形跡になる。
         """
         tree = self.worktree(name)

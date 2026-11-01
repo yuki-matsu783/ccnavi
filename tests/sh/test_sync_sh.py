@@ -623,7 +623,7 @@ class SyncTest(SyncHarness):
         done = self.sync(PARENT)
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertIn("決められない", done.stdout)
-        self.assertIn("push の関門", done.stdout)
+        self.assertIn("push のゲート", done.stdout)
         self.assertIn("戻し方 1", done.stdout)
         self.assertIn(f"git push origin {PARENT}", done.stdout)
         self.assertIn("戻し方 2", done.stdout)
