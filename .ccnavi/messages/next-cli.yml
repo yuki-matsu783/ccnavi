@@ -143,7 +143,7 @@ messages:
     kind: note
     note: |-
       処理の行は、気づきの節に 1 行だけ書く。形は '- 処理: 反映 <パターン名>' か '- 処理: 対象外 <理由>'（例: '- 処理: 反映 retry-backoff'、'- 処理: 対象外 この回限りの事情'）。後ろに注釈は付けない（後ろ全部がパターン名や理由と読まれる）
-      反映するパターンの sources には、観測元のチケット ID（記録のファイル名から .md を除いたもの）を書く。受信箱のファイル名は書かない。詳しくは .ccnavi/docs/learning-propose.md
+      反映するパターンの sources には、観測元のチケット ID（記録のファイル名から .md を除いたもの）を書く。受信箱のファイル名は書かない。受信箱の項目は節ではないので処理の行は要らない（判定して消す）。詳しくは .ccnavi/docs/learning-propose.md
 
   NEXT_LEARN_SCAFFOLD_COMMIT:
     kind: next
