@@ -151,7 +151,7 @@ test("CB-T605 子のバッジ: copyStatusがreviewのときは自分のフェー
   assert.equal(label(cards.get("c3")), "レビュー予定");
   for (const id of ["c4", "c6"]) {
     assert.equal(label(cards.get(id)), "要確認", id);
-    assert.equal(cards.get(id)!.status.title, "レビュー待ちの置き場にあるが、フェーズの状態と合いません", id);
+    assert.equal(cards.get(id)!.status.title, "レビュー待ちの置き場にありますが、フェーズの状態と合いません", id);
     assert.deepEqual(cards.get(id)!.actions, [], `${id}: 要確認の子にはレビューの操作を出さない`);
   }
   // 操作はバッジが「レビュー待ち」の子だけ。MRのURLは断片を除いたMR自体

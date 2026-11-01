@@ -64,7 +64,7 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
         項目{sum.factors.length}件（{layersText(sum.layers)}）
       </p>
       {sum.factors.length === 0 ? (
-        <p className="empty">項目がありません。加点する項目がなければ、どの子もLOWのまま閉じられます</p>
+        <p className="empty">項目がありません。加点する項目がなければ、どの子もLOWのままクローズできます</p>
       ) : (
         <div className="table-scroll" data-tour="sum-table">
           <table className="sum-table">

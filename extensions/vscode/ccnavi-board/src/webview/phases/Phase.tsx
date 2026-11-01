@@ -158,7 +158,7 @@ export function Phase(props: PhaseProps): JSX.Element {
           </div>
         </Captioned>
         <Captioned name="必須成果物" yamlKey="deliverables" tour={mark("phase-deliverables")}>
-          {list("deliverables", "f-deliverables", "wip/design/*.md。閉じる前に存在し、gitに追跡されている必要があります。区切りは半角 ,")}
+          {list("deliverables", "f-deliverables", "wip/design/*.md。クローズする前に存在し、gitに追跡されている必要があります。区切りは半角 ,")}
         </Captioned>
         <details
           className="more"

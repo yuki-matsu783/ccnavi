@@ -191,7 +191,7 @@ diagrams:
         value: sh .ccnavi/scripts/ccnavi-ticket.sh finish <子>
       - id: deliverables
         from: ccnavi
-        text: 閉じる前に、必須成果物が在ってgitに追跡されているかを見る
+        text: クローズする前に、必須成果物があってgitに追跡されているかを見る
         value: wip/research/summary.md が無いと、finish は拒む
       - id: ended
         from: ccnavi
@@ -295,7 +295,7 @@ diagrams:
         from: ユーザ
         to: ccnavi
         text: 四つ目の子を承認しようとする
-        value: 三つ目が閉じてレビューが済むまで、承認されない
+        value: 三つ目がクローズされてレビューが済むまで、承認されない
       - id: fixed
         from: ccnavi
         text: 先行は親の計画から計算する。承認のあとにphases.ymlを直しても変わらない
@@ -368,7 +368,7 @@ courses:
         focus: after, waits
       - target: phases
         title: 先行は承認で効く
-        body: 四つ目の子は、三つ目が閉じてレビューが済むまで承認されません。先行は計画から計算するので、承認のあとにphases.ymlを直しても変わりません。afterの書き漏れは並行として通るので、承認の画面の「すぐ始まる」の一覧で確かめます。
+        body: 四つ目の子は、三つ目がクローズされてレビューが済むまで承認されません。先行は計画から計算するので、承認のあとにphases.ymlを直しても変わりません。afterの書き漏れは並行として通るので、承認の画面の「すぐ始まる」の一覧で確かめます。
         diagram: phase-order
         focus: gate, fixed
 
@@ -378,7 +378,7 @@ courses:
     steps:
       - target: phase-review
         title: reviewがfalseの定義
-        body: 調査（research）はreviewがfalseです。最後の子をfinishで閉じるとき、必須成果物wip/research/summary.mdがgitに追跡されていないと、finishは拒みます。
+        body: 調査（research）はreviewがfalseです。最後の子をfinishでクローズするとき、必須成果物wip/research/summary.mdがgitに追跡されていないと、finishは拒みます。
         scene: { open: research }
         diagram: phase-end-false
         focus: finish, deliverables

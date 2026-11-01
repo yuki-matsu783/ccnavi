@@ -229,7 +229,7 @@ diagrams:
         from: ccnavi
         to: rules.yml
         text: 次にツールを使うとき、hookがrules.ymlを読み直す
-        value: Claude Code の再起動は要らない
+        value: Claude Codeの再起動は要らない
 
   # 値がヒットして止まる例（git push）
   rule-deny:

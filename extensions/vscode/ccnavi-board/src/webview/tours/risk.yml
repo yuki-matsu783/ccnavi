@@ -121,7 +121,7 @@ courses:
     steps:
       - target: factors
         title: 例の差分を、項目ごとに適用する
-        body: 子チケットをticket finishで閉じると、ccnaviが配点を読み、子の仕事の始まりから先頭までの差分を数えて点を付けます。ここでは見本の配点で、4ファイルを変えた子を追います。
+        body: 子チケットをticket finishでクローズすると、ccnaviが配点を読み、子の仕事の始まりから先頭までの差分を数えて点を付けます。ここでは見本の配点で、4ファイルを変えた子を追います。
         diagram: risk-score-high
         focus: finish, load, diff
       - target: factor-include
@@ -143,8 +143,8 @@ courses:
         diagram: risk-score-high
         focus: c-skip
       - target: factor-value
-        title: 読んで判断させる項目は、答えが揃うまで閉じられない
-        body: no-testsはjudgeなので、ccnaviは問いを書き出して閉じるのを止めます。サブエージェントが差分を読んでyesかnoで答え、親がその答えを記録してから、閉じ直します。yesなので20点です。
+        title: 読んで判断させる項目は、答えが揃うまでクローズできない
+        body: no-testsはjudgeなので、ccnaviは問いを書き出してクローズを止めます。サブエージェントが差分を読んでyesかnoで答え、親がその答えを記録してから、閉じ直します。yesなので20点です。
         scene: { open: no-tests }
         diagram: risk-score-high
         focus: judge, record
@@ -395,7 +395,7 @@ diagrams:
       - id: finish
         from: エージェント
         to: ccnavi
-        text: 子をticket finishで閉じる
+        text: 子をticket finishでクローズする
       - id: load
         from: ccnavi
         to: risks.yml
@@ -430,12 +430,12 @@ diagrams:
       - id: judge
         from: ccnavi
         to: エージェント
-        text: 判定の項目（no-tests）の答えが無いので、閉じずに問いを渡す
+        text: 判定の項目（no-tests）の答えが無いので、クローズせずに問いを渡す
         value: 'no-tests: テストのない振る舞いの変更を含むか'
       - id: record
         from: エージェント
         to: ccnavi
-        text: サブエージェントの答えを記録し、閉じ直す
+        text: サブエージェントの答えを記録し、クローズし直す
         value: ccnavi-ticket.sh record-risk 子 no-tests yes --reason …
       - id: sum
         from: ccnavi
@@ -456,7 +456,7 @@ diagrams:
       - id: finish
         from: エージェント
         to: ccnavi
-        text: 子をticket finishで閉じる
+        text: 子をticket finishでクローズする
       - id: load
         from: ccnavi
         to: risks.yml
@@ -566,7 +566,7 @@ diagrams:
         from: ccnavi
         to: risks.yml
         text: 次に子をクローズする（ticket finish）とき、配点を読み直す
-        value: Claude Code の再起動は要らない
+        value: Claude Codeの再起動は要らない
 
   # 共通の設定にlibの設定を足した配点で、同じ差分を数える
   risk-sum-lib:

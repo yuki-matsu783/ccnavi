@@ -395,7 +395,7 @@ function TemplateDraftButton({ id }: { readonly id: string }): JSX.Element {
       className="card-button"
       data-action="template-draft"
       data-ticket={id}
-      title="この親の計画とフローから、テンプレートの下書きを作ります。下書きに効力はなく、取り込み待ち画面で取り込むまで使われません。親をreadyで閉じる前に作ってください"
+      title="この親の計画とフローから、テンプレートの下書きを作ります。下書きに効力はなく、取り込み待ち画面で取り込むまで使われません。親をreadyでクローズする前に作ってください"
       onClick={() => post({ type: "templateDraft", ticket: id })}
     >
       テンプレートの下書きを作る

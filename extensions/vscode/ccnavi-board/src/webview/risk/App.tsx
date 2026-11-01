@@ -471,7 +471,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
             />
           ))}
           {rows.length > 0 && shown + kept === 0 && <li className="empty">絞り込みにヒットする項目がありません。語を変えるか、絞り込み欄を空にしてください</li>}
-          {shownDraft.rows.length === 0 && <li className="empty">項目がありません。加点する項目がなければ、どの子もLOWのまま閉じられます</li>}
+          {shownDraft.rows.length === 0 && <li className="empty">項目がありません。加点する項目がなければ、どの子もLOWのままクローズできます</li>}
         </ul>
       </section>
       {shownPage?.sums !== undefined && (
