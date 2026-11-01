@@ -39,7 +39,7 @@ messages:
       finish: |-
         作業が済んでいる子には {finish_cmds_q} を実行する。まだ作業が残っているなら、確認を取らずに続ける。子が全部閉じて（合流は finish が済ませる）、すべての子が合流済みと確かめたら、ELI5、レビューの依頼（review-request）へ進む
       confirm: |-
-        `{script:ccnavi-review.sh} confirm --phase {phase}` を実行して確定する。未解決の指摘は、移動の前に付いたものだけが版つきで受け入れられ、移動の後に付いたものが残っていれば止まるので、その分は decide をユーザに頼む
+        `{script:ccnavi-review.sh} confirm --phase {phase}` を実行して確定する（このセッションで review-request を打ったあとにユーザの発言が無ければ、hook が止める。その場合はユーザの発言を待つ）。未解決の指摘は、移動の前に付いたものだけが版つきで受け入れられ、移動の後に付いたものが残っていれば止まるので、その分は decide をユーザに頼む
       merge: |-
         合流は子の finish が行う。`{script:ccnavi-ticket.sh} status {parent}` で子の状態を確かめ、合流の記録が無い理由（origin が無い親、置き場を手で動かした子など）をユーザに伝える。合流済みと確かめられたら、ELI5 の HTML を wip/eli5/phase-{phase}.html に書いてコミットして push し、`{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文> --eli5 wip/eli5/phase-{phase}.html` で依頼する
       late_fix: |-

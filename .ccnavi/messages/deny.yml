@@ -46,7 +46,7 @@ messages:
       risk: |-
         フェーズは終わっていて、実績のリスクが高い（{risk_line}）ので、宣言に関わらずレビューが要ります。
     next: |-
-      子が合流済み（finish 済み）であることを確かめ、ELI5 の HTML を wip/eli5/phase-{phase}.html に書いてコミットして push し、`{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文> --eli5 wip/eli5/phase-{phase}.html` でレビューを頼み、{turn_defined}を終えてユーザを待つ。ユーザがレビューを終えたら `{script:ccnavi-review.sh} confirm --phase {phase}` で確かめる。次のフェーズの計画（wip/proposals/todo/ への提案）はレビュー前に進めてよい
+      子が合流済み（finish 済み）であることを確かめ、ELI5 の HTML を wip/eli5/phase-{phase}.html に書いてコミットして push し、`{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文> --eli5 wip/eli5/phase-{phase}.html` でレビューを頼み、{turn_defined}を終えてユーザを待つ。ユーザがレビューを終えたと伝えたら `{script:ccnavi-review.sh} confirm --phase {phase}` で確かめる。次のフェーズの計画（wip/proposals/todo/ への提案）はレビュー前に進めてよい
     no_bypass: |-
       子の作業や別の経路で先へ進めても、レビュー済みのマーカーが置かれるまで同じゲートに当たります。依頼を出して待ちます。
 
@@ -67,6 +67,24 @@ messages:
         integrate の出力の差分と変わるファイルをユーザに見せ、返事を待ってターンを終える。ユーザの返事のあとで {script:ccnavi-git.sh} integrate-done {key} -m '<メッセージ>' を打ち直す
     no_bypass: |-
       別のセッションやサブエージェントから打っても、同じゲートに当たります。非対話ではコマンドを分けても、ユーザの発言を待つ必要があります。対話では連結を分けると、ユーザの確認に出ます。
+
+  DENY_NEEDS_USER_TURN__REVIEW_CONFIRM:
+    kind: deny
+    values: [first_name, second_name, where, key]
+    what:
+      same_command: |-
+        {first_name} と {second_name} を 1 つのコマンドにまとめて打とうとしました{where}。
+      no_user_turn: |-
+        {first_name} を打ったあと、ユーザの発言が 1 回も無いまま {second_name} を打とうとしました{where}。
+    why: |-
+      confirm が見るのは未解決のスレッドの有無だけなので、レビューを頼んだ直後に打つと、ユーザが何も見ていなくても通り、子が done/ へ動いてしまうためです。ユーザがレビューを終えたと伝えるまで確定できません。バックグラウンド作業の完了通知や、Stop の促しで同じターンを続けた分は、ユーザの発言に数えません。ゲートが見るのは、ユーザの発言が 1 回あったかどうかだけで、発言の中身は見ません。
+    next:
+      same_command: |-
+        {first_name} だけを先に打ち、ターンを終えてユーザのレビューを待つ。ユーザがレビューが済んだと伝えてから、{script:ccnavi-review.sh} confirm --phase {key} を打つ
+      no_user_turn: |-
+        ターンを終えてユーザのレビューを待つ。ユーザがレビューが済んだと伝えてから、{script:ccnavi-review.sh} confirm --phase {key} を打ち直す
+    no_bypass: |-
+      別のセッションやサブエージェントから打っても、コマンドを分けても、同じゲートに当たります。ユーザの発言を待ちます。
 
   DENY_NEEDS_USER_TURN__STATE:
     kind: deny

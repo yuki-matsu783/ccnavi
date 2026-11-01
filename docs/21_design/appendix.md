@@ -46,7 +46,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `NUDGE_STOP_RULE` | メインエージェントの `Stop` で、`match: Stop` の `allow` のルールが渡す回になった（`every` の刻み）。止めて、ルールの文を渡す。`finish` の促しと重なった回は出ない（6.6）。記録の `decision` は `nudge` |
 | `DENY_SUBAGENT_TICKET_OP` | サブエージェントが、役割の表（`user_only.SUBAGENT_ROLES`）で許されていない操作（チケットの状態・レビュー・push・開始や片付けの sh）を打とうとした |
 | `DENY_SUBAGENT_PARENT_TREE` | サブエージェントが、親のワークツリーへの merge・commit・書き込みをしようとした。子のワークツリーでのコミットと、衝突を解くための親のブランチの merge は通す。親のワークツリーかは、そのワークツリー自身のチケットで決める（9.12） |
-| `DENY_NEEDS_USER_TURN` | ターン分離のゲート。A（`ccnavi-git.sh integrate <名前>`）を打ったあと、ユーザの発言をはさまずに B（`ccnavi-git.sh integrate-done <名前>`）を打った。同じコマンドに A と B を連結した形、記録を読み書きできない場合も。ルールより先に止め、`dry-run` でも止める。付き添いのあるセッションでは、連結した形以外の B は止めずに確認（`RULE_ASK`）に出す。どの宣言かは記録の `rules` と文面が言う（6.7） |
+| `DENY_NEEDS_USER_TURN` | ターン分離のゲート。A（`ccnavi-git.sh integrate <名前>`）を打ったあと、ユーザの発言をはさまずに B（`ccnavi-git.sh integrate-done <名前>`）を打った。レビューの組（A は `ccnavi-review.sh review-request --phase <N>`、B は `ccnavi-review.sh confirm --phase <N>`）も同じで、こちらは対話でも確認に出さず止める。同じコマンドに A と B を連結した形、記録を読み書きできない場合も。ルールより先に止め、`dry-run` でも止める。付き添いのあるセッションでは、連結した形以外の B は止めずに確認（`RULE_ASK`）に出す。どの宣言かは記録の `rules` と文面が言う（6.7） |
 | `DENY_ASK_NEEDS_CONTEXT` | ユーザに確認（ask）を出す直前の発言に、見出し「前提・背景」「想定結果」（別名は「背景」「前提」「選んだ時の結果」）の片方か両方が無い。対象は `judge.refuse` が返す確認すべて（ルールの `ask`・チケットの `ask`・ターン分離のゲートの確認・どのルールも言及しない呼び出しの確認）と `AskUserQuestion`。`ExitPlanMode` と、Claude Code 自身の権限の確認は対象外。最後のユーザの発言（ツールの結果の行は区切りにしない）より後ろの、サイドチェーンでないアシスタントの text を、会話記録（`transcript_path`）の末尾から読む。PreToolUse の時点では直前の発言がまだ書かれていないことがある。書き込み済みかは、この呼び出し自身の tool_use の行（`tool_use_id`）が記録にあるかで分かる。自分の行があって見出しが無ければ、待たずに止める。自分の行がまだ無ければ、見出しが現れるまで最大 `CCNAVI_ASK_CONTEXT_WAIT_SECONDS`（既定 2.5 秒。判定の期限には縛らず、hook の `timeout` に収める）読み直す。判定できないときは通す（記録が読めない・パスや `tool_use_id` が無い、待っても自分の行も見出しも現れない）。非対話・サブエージェントの呼び出しも検査しない。`dry-run` では、確認のときと同じ強さで扱う（ゲートの確認は止める）。見るのは見出しの語だけで、中身は見ない |
 | `DENY_CHILD_PUSH` | 子チケットのワークツリーから `ccnavi-git.sh push` を打った。`cd` の行き先が読めない push を含む（9.10） |
 | `DENY_SCRIPT_ENV_OVERRIDE` | 保護済みの sh を、sh の検査の材料を変える環境変数と同じコマンド行で呼んだ。補助の保護で、`CCNAVI_GUARD_CORE_FILES` では切れず、`dry-run` でも止める（8.2） |
@@ -96,7 +96,7 @@ JSON も、同じコードをキー `code` に持つ（通れば `null`。`stopp
 | `builtin:agent-isolation` / `builtin:agent-no-child` / `builtin:agent-multi-target` / `builtin:agent-parent-tree` / `builtin:agent-child-unavailable` / `builtin:agent-target-invalid` / `builtin:agent-cwd-conflict` | `DENY_AGENT_ISOLATION` / `DENY_AGENT_NO_CHILD` / `DENY_AGENT_MULTI_TARGET` / `DENY_AGENT_PARENT_TREE` / `DENY_AGENT_CHILD_UNAVAILABLE` / `DENY_AGENT_TARGET_INVALID` / `DENY_AGENT_CWD_CONFLICT`（`hook.agentlaunch`） |
 | `builtin:subagent-ticket-op` | `DENY_SUBAGENT_TICKET_OP` |
 | `builtin:ask-context` | `DENY_ASK_NEEDS_CONTEXT`（`hook.askcontext`） |
-| `builtin:turn-gate:<宣言 id>` | `DENY_NEEDS_USER_TURN`。宣言ごとに名前を分ける（組み込みは `integrate-user-turn`。6.7） |
+| `builtin:turn-gate:<宣言 id>` | `DENY_NEEDS_USER_TURN`。宣言ごとに名前を分ける（組み込みは `integrate-user-turn`・`review-confirm-user-turn`。6.7） |
 | `builtin:redirect-limit` | `DENY_REDIRECT_LIMIT` |
 | `<ルールファイルのパス>:workspace-root` | `DENY_SHELL_WORKSPACE_ROOT`（Bash の書き込み先にヒットしたとき。Write / Edit にヒットしたときは `DENY_PATH`） |
 

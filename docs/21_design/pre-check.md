@@ -460,7 +460,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 
 ### 6.7 ターン分離のゲート
 
-「A を打ったら、ユーザの発言が 1 回はさまるまで B を打てない」を止める。汎用の部品（`hook/turngate.py`）で、宣言（`Gate`）の表を渡して判定する。組み込みの表は 1 件で、A が `ccnavi-git.sh integrate <名前>`（`--abort` は除く）、B が `ccnavi-git.sh integrate-done <名前> …`、キーが `<名前>`。`PreToolUse` の組み込みの止めの 1 つで、子の push の止めのあと、サブエージェントの禁止の前にある。ルールが `allow` と書いていても外れない。
+「A を打ったら、ユーザの発言が 1 回はさまるまで B を打てない」を止める。汎用の部品（`hook/turngate.py`）で、宣言（`Gate`）の表を渡して判定する。組み込みの表は 2 件。1 件目は、A が `ccnavi-git.sh integrate <名前>`（`--abort` は除く）、B が `ccnavi-git.sh integrate-done <名前> …`、キーが `<名前>`。2 件目（`review-confirm-user-turn`）は、A が `ccnavi-review.sh review-request --phase <N>`、B が `ccnavi-review.sh confirm --phase <N>`、キーが `--phase`（`--phase=<N>` も）。`confirm` は未解決のスレッドの有無しか見ないので、依頼の直後に同じターンで打てばユーザのレビューを飛ばせる。それを止めるため、`ask_if_attended` は立てず、対話でも「レビューが済んだ」というユーザの発言を待つ。`--check` は A にも B にもならず、`decide`・`ready` など他の副命令も対象外。B が `--phase` を読めない形（略記など）でもキーなしとして、どのフェーズの A とも結ぶ。記録はセッションごとなので、別のセッション・`--resume` では働かない。ユーザが自分の端末で打つ `confirm` は hook を通らず止まらない。予約した実行の `prompt` はユーザの発言と見分けられない。`PreToolUse` の組み込みの止めの 1 つで、子の push の止めのあと、サブエージェントの禁止の前にある。ルールが `allow` と書いていても外れない。
 
 付き添いのあるセッション（`ccnavimd.unattended` が偽）では、宣言の `ask_if_attended` が立っている組は、発言を待つゲートを働かせず、B を確認（ask）に返す（`turngate.split_by_attendance`・`turngate.asks`）。組み込みの 1 件は立っている。同じコマンドに A と B が並ぶ形だけは、どちらのセッションでも止める（`turngate.check` の `same_command_only`）。確認を返すときは、A の記録を残さず、B の側で記録を読まない。確認の判定はルールより先で、`dry-run` でも出す（ゲートの分類）。付き添いのないセッションは、確認に答える人が居ないので、以下で述べる発言を待つゲートが働く。
 

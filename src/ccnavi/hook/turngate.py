@@ -187,7 +187,33 @@ INTEGRATE_GATE = Gate(
     ask_message="NOTICE_ASK_USER_CONFIRM__INTEGRATE",
 )
 
-BUILTIN: tuple[Gate, ...] = (INTEGRATE_GATE,)
+# 2 件目。レビューを頼んだ（`review-request`）直後に、同じターンで確定（`confirm`）して、ユーザの
+# レビューを飛ばせないようにする。`confirm` は依頼済みの未解決スレッドの有無しか見ないので、
+# 人が何も見ていなくても通る。付き添いのあるセッションでも確認には出さず、「レビューが済んだ」という
+# ユーザの発言を待つ（`ask_if_attended` は立てない）。
+# キーは `--phase <N>`（`--phase=<N>` も）。A はキーを必須にして、B は任意にする。B が `--phase` を
+# 読めない形（略記・並べ替えなど）でも、キーなし（WILDCARD）としてどの A とも結ぶので、外せない。
+# `--check`（打つだけで何も変えない確認）は A にも B にもならない。`review-request` 以外の副命令
+# （decide・ready など）は、副命令の名前が合わないので対象外。
+_PHASE = r"--phase(?:=|\s+)(?P<key>[^-\s\x00\x01][^\s\x00\x01]*)"
+_CHECK = r"(?:^|\s)--check(?:\s|$)"
+REVIEW_CONFIRM_GATE = Gate(
+    id="review-confirm-user-turn",
+    first=Cond(
+        regex=rf"ccnavi-review\.sh\s+review-request(?:\s|$)(?:[^\s\x00\x01]+\s+)*?{_PHASE}",
+        but=(_CHECK,),
+    ),
+    second=Cond(
+        regex=rf"ccnavi-review\.sh\s+confirm(?:\s|$)(?:(?:[^\s\x00\x01]+\s+)*?{_PHASE}|)",
+        but=(_CHECK,),
+    ),
+    first_name="ccnavi-review.sh review-request",
+    second_name="ccnavi-review.sh confirm",
+    message="DENY_NEEDS_USER_TURN__REVIEW_CONFIRM",
+    key_name="<N>",
+)
+
+BUILTIN: tuple[Gate, ...] = (INTEGRATE_GATE, REVIEW_CONFIRM_GATE)
 
 
 @functools.cache

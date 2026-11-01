@@ -1,9 +1,9 @@
 """ターン分離のゲート（`hook/turngate.py`）の部品。
 
-宣言の表を直接渡して確かめる。組み込みの 1 件（`integrate` → `integrate-done`）のほかに、
+宣言の表を直接渡して確かめる。組み込みの `integrate` → `integrate-done` のほかに、
 `integrate` と関係の無い架空の組を使い、部品が特定の組に依存していないことを見る。
 
-見るのは次の 6 つ。
+見るのは次の 7 つ。
 
 - 付き添いのあるセッションでは、`ask_if_attended` の宣言だけが確認（ask）に出る側へ分かれる
 
@@ -11,6 +11,8 @@
 - キーが違う組、A の記録が無い B は対象外
 - 条件の書き方（regex・glob・but・キーの解けない書き方）と、宣言の検査
 - 組み込みの宣言が、`integrate` と `integrate-done` の実際の引数の形を読むこと
+- 組み込みの `review-confirm-user-turn` が、`review-request` と `confirm` の引数の形
+  （`--phase` の位置・等号・`--check`・ほかの副命令）を読むこと
 - 記録が壊れている・読めない・書けないときは閉じる側に倒れ、文面が次の一手を言うこと
 """
 
@@ -525,6 +527,107 @@ class BuiltinFormsTest(TurnGateTestCase):
         self.assertEqual(got.key, "foo")
 
 
+class ReviewConfirmFormsTest(TurnGateTestCase):
+    """組み込みの `review-confirm-user-turn` が、`review-request` と `confirm` の引数の形を読む。"""
+
+    REVIEW = "sh .ccnavi/scripts/ccnavi-review.sh"
+    RR = "review-request --body-file req.md --eli5 wip/eli5/phase-1.html"
+    GATE = turngate.REVIEW_CONFIRM_GATE
+
+    def first(self, tail):
+        return turngate.hits(self.GATE.first, "first", [f"{self.REVIEW} {tail}"])
+
+    def second(self, tail):
+        return turngate.hits(self.GATE.second, "second", [f"{self.REVIEW} {tail}"])
+
+    def test_review_request_は_phase_をキーにする_引数の順序や等号に関わらない(self):
+        for tail in (
+            f"{self.RR} --phase 2",
+            "review-request --phase 2 --body-file req.md --eli5 x.html",
+            f"{self.RR} --phase=2",
+            "review-request --phase=2",
+        ):
+            with self.subTest(tail=tail):
+                self.assertEqual(self.first(tail), [("2", "2")])
+
+    def test_confirm_は_phase_をキーにする_引数の順序や等号に関わらない(self):
+        for tail in (
+            "confirm --phase 2",
+            "confirm --phase=2",
+            "confirm --phase 2 --result r.json",
+            "confirm --result r.json --phase 2",
+            "confirm --result r.json --phase=2",
+        ):
+            with self.subTest(tail=tail):
+                self.assertEqual(self.second(tail), [("2", "2")])
+
+    def test_confirm_は_phase_が読めない形でもキーなしとして_B_になる(self):
+        for tail in ("confirm", "confirm --phase", "confirm --phase $N", "confirm --pha 2"):
+            with self.subTest(tail=tail):
+                got = self.second(tail)
+                self.assertEqual(len(got), 1)
+                self.assertEqual(got[0][0], turngate.WILDCARD)
+
+    def test_check_は_A_にも_B_にもならない(self):
+        self.assertEqual(self.first(f"{self.RR} --phase 2 --check"), [])
+        self.assertEqual(self.first(f"{self.RR} --check --phase 2"), [])
+        self.assertEqual(self.second("confirm --phase 2 --check"), [])
+        self.assertEqual(self.second("confirm --check --phase 2"), [])
+
+    def test_ほかの副命令は_A_にも_B_にもならない(self):
+        for sub in ("decide", "ready", "comment", "fetch", "origin", "merged", "mr-state"):
+            with self.subTest(sub=sub):
+                self.assertEqual(self.first(f"{sub} --phase 2"), [])
+                self.assertEqual(self.second(f"{sub} --phase 2"), [])
+
+    def test_phase_の無い_review_request_は_A_にならない(self):
+        self.assertEqual(self.first("review-request --body-file req.md"), [])
+
+    def test_別のスクリプトは対象外(self):
+        got = turngate.hits(self.GATE.second, "second", ["sh other.sh confirm --phase 1"])
+
+        self.assertEqual(got, [])
+
+    def test_キーが違うフェーズは結ばない(self):
+        turngate.note(BUILTIN, [f"{self.REVIEW} {self.RR} --phase 1"], self.state, SESSION, "c1")
+
+        other = turngate.check(BUILTIN, [f"{self.REVIEW} confirm --phase 2"], self.state, SESSION)
+        same = turngate.check(BUILTIN, [f"{self.REVIEW} confirm --phase 1"], self.state, SESSION)
+
+        self.assertIsNone(other)
+        self.assertEqual(same.gate.id, "review-confirm-user-turn")
+        self.assertEqual(same.key, "1")
+
+    def test_phase_が読めない_confirm_はどのフェーズの_A_とも結ぶ(self):
+        turngate.note(BUILTIN, [f"{self.REVIEW} {self.RR} --phase 1"], self.state, SESSION, "c1")
+
+        got = turngate.check(BUILTIN, [f"{self.REVIEW} confirm"], self.state, SESSION)
+
+        self.assertEqual(got.reason, turngate.NO_USER_TURN)
+
+    def test_同じコマンドに並べると止まる(self):
+        both = f"{self.REVIEW} {self.RR} --phase 1 && {self.REVIEW} confirm --phase 1"
+
+        got = turngate.check(BUILTIN, [both], self.state, SESSION)
+
+        self.assertEqual(got.reason, turngate.SAME_COMMAND)
+
+    def test_文面は文面ファイルから引ける(self):
+        root = tempfile.mkdtemp(prefix="ccnavi-turngate-root-")
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        put_messages(root)
+        turngate.note(BUILTIN, [f"{self.REVIEW} {self.RR} --phase 3"], self.state, SESSION, "c1")
+        stop = turngate.check(BUILTIN, [f"{self.REVIEW} confirm --phase 3"], self.state, SESSION)
+
+        lines = turngate.message(stop, root).split("\n")
+
+        self.assertEqual(len(lines), 4)
+        self.assertIn("ccnavi-review.sh review-request を打ったあと", lines[0])
+        self.assertIn("キー 3", lines[0])
+        self.assertIn("confirm --phase 3", lines[2])
+        self.assertIn("ユーザのレビュー", lines[2])
+
+
 class AskIfAttendedTest(TurnGateTestCase):
     GIT = "sh .ccnavi/scripts/ccnavi-git.sh"
 
@@ -534,11 +637,11 @@ class AskIfAttendedTest(TurnGateTestCase):
         self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
         put_messages(self.root)
 
-    def test_付き添いがあれば_integrate_は確認の側に分かれる(self):
+    def test_付き添いがあれば_integrate_は確認の側に分かれ_レビューの確定は発言を待つ側に残る(self):
         waited, asked = turngate.split_by_attendance(BUILTIN, True)
 
-        self.assertEqual(waited, ())
-        self.assertEqual(asked, BUILTIN)
+        self.assertEqual(waited, (turngate.REVIEW_CONFIRM_GATE,))
+        self.assertEqual(asked, (turngate.INTEGRATE_GATE,))
 
     def test_付き添いがなければ発言を待つ側に残る(self):
         waited, asked = turngate.split_by_attendance(BUILTIN, False)
@@ -558,6 +661,13 @@ class AskIfAttendedTest(TurnGateTestCase):
         self.assertEqual(got.gate.id, "integrate-user-turn")
         self.assertEqual(got.key, "foo")
         self.assertEqual(got.reason, turngate.ASK)
+
+    def test_asks_はレビューの確定を確認に出さない(self):
+        review = "sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1"
+
+        asked = turngate.split_by_attendance(BUILTIN, True)[1]
+
+        self.assertIsNone(turngate.asks(asked, [review]))
 
     def test_asks_は_A_や関係の無いコマンドにヒットしない(self):
         self.assertIsNone(turngate.asks(BUILTIN, [f"{self.GIT} integrate foo"]))
