@@ -55,7 +55,7 @@ phases:
   build:
     kind: work
     title: 設計
-    review: none
+    review: false
     scope: ["src/*"]
 """
 
@@ -69,7 +69,7 @@ phases:
   design:
     kind: work
     title: 設計（自身）
-    review: none
+    review: false
     scope: ["wip/*"]
 """
 
@@ -81,12 +81,12 @@ phases:
   design:
     kind: work
     title: 設計
-    review: mr
+    review: true
     scope: ["wip/design/*"]
   build:
     kind: work
     title: ビルド
-    review: none
+    review: false
     scope: ["src/*"]
     after: [design]
 """
@@ -98,7 +98,7 @@ phases:
   work:
     kind: work
     title: 作業
-    review: none
+    review: false
     scope: inherit
 """
 
@@ -185,7 +185,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         write_layer(
             self.lib,
             phases=LIB_PHASES_TITLE_OVERLAP
-            + "  other:\n    kind: work\n    title: 設計\n    review: none\n",
+            + "  other:\n    kind: work\n    title: 設計\n    review: false\n",
         )
 
         errors = self.phase_problems("error", "lib")
@@ -278,7 +278,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         write_layer(
             self.ws,
             phases=OWN_PHASES_DESIGN
-            + "  docs:\n    kind: work\n    title: 文書\n    review: none\n"
+            + "  docs:\n    kind: work\n    title: 文書\n    review: false\n"
             + '    scope: ["docs/*"]\n',
         )
 
@@ -314,7 +314,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         write_layer(
             self.lib,
             phases=LIB_PHASES_TITLE_OVERLAP
-            + "  release:\n    kind: work\n    title: リリース\n    review: mr\n"
+            + "  release:\n    kind: work\n    title: リリース\n    review: true\n"
             + '    scope: ["CHANGELOG.md"]\n',
         )
 
@@ -744,7 +744,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertEqual(record["untested"].get("source"), "lib", record)
 
     def test_the_mark_that_rests_on_a_type_names_its_layer(self):
-        """定義を根拠に置くマーカー（`review: none` の skipped）には、その定義のレイヤー。"""
+        """定義を根拠に置くマーカー（`review: false` の skipped）には、その定義のレイヤー。"""
         tree = self.one_child()
         self.commit(tree, "src/a.py", "1\n")
         closed = self.ccnavi("ticket", "finish", "i0001-01-01")
@@ -786,7 +786,7 @@ class LayerPlaceFlagsAreDiagnosisOnlyTest(RiskUnionTest):
     この形はエージェントが Bash で打てる。
 
     土台の子は共通レイヤーの `big-diff`（25）と lib の `schema`（30）で 55 点、
-    lib の critical は 50 なので CRITICAL。`review: mr` のフェーズなので
+    lib の critical は 50 なので CRITICAL。`review: true` のフェーズなので
     レビュー待ちへ動く。lib のレイヤーが消えると 25 点の MEDIUM になり、
     レビューを飛ばして閉じられる。
     """

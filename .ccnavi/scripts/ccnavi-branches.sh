@@ -98,7 +98,6 @@ trap 'rm -f "$result" "$host_err" "$host_err.status" "$host_err.body"' EXIT
 
 # ---- 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 if bin=$(ccnavi_bin "$root"); then
-	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-branches: %s\n' "$skew" >&2
 	ccnavi() { "$bin" --root "$root" --cwd "$here" "$@"; }
 elif [ -f "$root/src/ccnavi/__main__.py" ]; then
 	ccnavi() { (cd "$root" && uv run python -m ccnavi --root "$root" --cwd "$here" "$@"); }

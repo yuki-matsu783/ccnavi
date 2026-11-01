@@ -18,7 +18,7 @@ function tmpDir(): string {
   return dir;
 }
 
-/** 答えに `flow` を載せない（`--flow` を知らない古い実行ファイル） */
+/** 答えに `flow` を載せない */
 const ABSENT = Symbol("absent");
 
 /** 実行ファイルの `--lint --json --flow` の答え（偽物） */
@@ -58,7 +58,7 @@ test("CB-T242 本文を一時ファイルに書いて実行ファイルに渡し
       };
     });
     // 通れば、実行ファイルが読んだ中身と、(flow) の warn を返す（ほかの設定の苦情は載せない）
-    assert.deepEqual(verdict, { ok: true, data: { nodes: [] }, checks: { warns: ["言うだけの苦情"] } });
+    assert.deepEqual(verdict, { ok: true, data: { nodes: [] }, checks: { warns: ["言うだけの苦情"], rendered: null, candidates: { agents: [], skills: [] } } });
     assert.equal(asked.length, 1);
     assert.equal(path.dirname(asked[0]), dir);
     assert.ok(path.basename(asked[0]).startsWith(FLOW_TEMP_PREFIX));
@@ -132,8 +132,8 @@ test("CB-T246 一時ファイルは呼ぶたびに別の名前で書き、終わ
     await new Promise((resolve) => setImmediate(resolve));
     release();
     assert.deepEqual(await Promise.all([first, second]), [
-      { ok: true, data: { nodes: [] }, checks: { warns: [] } },
-      { ok: true, data: { nodes: [] }, checks: { warns: [] } },
+      { ok: true, data: { nodes: [] }, checks: { warns: [], rendered: null, candidates: { agents: [], skills: [] } } },
+      { ok: true, data: { nodes: [] }, checks: { warns: [], rendered: null, candidates: { agents: [], skills: [] } } },
     ]);
     assert.notEqual(seen.get("nodes: [{id: a}]\n"), seen.get("nodes: [{id: b}]\n"));
     assert.deepEqual(fs.readdirSync(dir), []);
@@ -162,7 +162,7 @@ test("CB-T247 答えに読んだ中身（flow）がなければ通さない（�
       assert.match(verdict.ok ? "" : verdict.error, /flow）を返しません/);
     }
     // lint の JSON の読み手は flow を持ち越す。無ければ欄ごと無い
-    assert.deepEqual(answer([], { path: "/p", data: { a: 1 } }).flow, { path: "/p", data: { a: 1 } });
+    assert.deepEqual(answer([], { path: "/p", data: { a: 1 }, rendered: null, candidates: { agents: [], skills: [] } }).flow, { path: "/p", data: { a: 1 }, rendered: null, candidates: { agents: [], skills: [] } });
     assert.equal(answer([], ABSENT).flow, undefined);
     // 渡る手順（rendered）と候補（candidates）も持ち越す。形の違う項目は除く
     const extras = answer([], {
@@ -199,13 +199,10 @@ test("CB-T278 通ったときは (flow) の warn を対象のファイルのパ�
     assert.ok(verdict.ok);
     assert.deepEqual(verdict.checks, { warns: [`${SHOWN}: start がない（どこから始めるかが決まらない）`], rendered: ["1. [prompt] 書く"], candidates });
     assert.ok(!verdict.checks.warns[0].includes(tmp));
-    // 並べられなければ null のまま。古い実行ファイル（欄が無い）なら欄ごと無い
+    // 並べられなければ null のまま
     const unreadable = await lintFlowText("nodes: []\n", dir, SHOWN, async (file) => ({ ok: true, value: answer([], { path: file, data: { nodes: [] }, rendered: null }) }));
     assert.ok(unreadable.ok);
     assert.equal(unreadable.checks.rendered, null);
-    const old = await lintFlowText("nodes: []\n", dir, SHOWN, async (file) => ({ ok: true, value: answer([], { path: file, data: { nodes: [] } }) }));
-    assert.ok(old.ok);
-    assert.deepEqual(old.checks, { warns: [] });
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

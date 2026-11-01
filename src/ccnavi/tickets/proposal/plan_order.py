@@ -13,7 +13,7 @@ VS Code の計画編集タブは、図で引いた線を「元の番号（いま
 - 子が承認された番号（固定した番号）は動かさず、空いた番号に承認されていない
   ステップを詰める。詰めるステップが無ければ「詰められない」と断る。固定した番号へ入る線（固定したステップの先行）は変えられない
 - 循環になる線は断る。断ったときは振り直さず、提案のままの答えを返す（タブは線を引く前に戻す）
-- `after` は振り直した番号に付け替える。`review: defer` はステップに付いたまま動く。
+- `after` は振り直した番号に付け替える。`deferred: true` はステップに付いたまま動く。
   延期の引き受け手は保存せず、振り直した計画から計算し直す
 - 全体計画とフィードバック計画は別に振り直す。フィードバック計画の番号は全体計画の続きで、
   フィードバック計画のステップにはフィードバック計画のステップだけが先行できる
@@ -604,11 +604,7 @@ def plans(ans: Answer) -> list[dict]:
         entry_items = []
         for n, item in zip(numbers, items, strict=True):
             pt = types.get(item.type)
-            review = (
-                ticket_model.PLAN_REVIEW_MR
-                if item.review == ticket_model.PLAN_REVIEW_MR
-                else (pt.review if pt is not None else "")
-            )
+            review = True if item.review else (pt.review if pt is not None else None)
             entry_items.append(
                 {
                     "number": n,
@@ -884,7 +880,7 @@ def _changed_elsewhere(old: str, new: str, revised: ticket_model.Ticket) -> str:
         return "組んだ全文がチケットとして読めないので反映しません"
 
     def shape(items):
-        return [(i.type, i.review, list(i.after)) for i in items or []]
+        return [(i.type, i.review, i.deferred, list(i.after)) for i in items or []]
 
     if shape(ticket.plan) != shape(revised.plan) or shape(ticket.feedback) != shape(
         revised.feedback

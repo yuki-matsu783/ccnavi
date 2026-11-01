@@ -101,6 +101,7 @@ def absolute(
             plan_templates.Item(
                 type=item.type,
                 review=item.review,
+                deferred=item.deferred,
                 after=[n + offset for n in item.after],
             )
             for item in items

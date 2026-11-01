@@ -140,14 +140,14 @@ class LockMovedTest(unittest.TestCase):
         current = parsed(
             [
                 "research",
-                {"type": "design", "review": "defer"},
+                {"type": "design", "deferred": True},
                 {"type": "implement", "after": [1, 2]},
             ]
         )
         # 振り直しで 1 と 2 が入れ替わった。引き受け手は同じ 3。
         revised = parsed(
             [
-                {"type": "design", "review": "defer"},
+                {"type": "design", "deferred": True},
                 "research",
                 {"type": "implement", "after": [1, 2]},
             ]
@@ -230,8 +230,8 @@ class PlanOrderJsonTest(PlanOrderHarness):
             [(1, 1, "research"), (2, 2, "design"), (3, 3, "implement")],
         )
         self.assertEqual(plan["items"][0]["title"], "調査")
-        self.assertEqual(plan["items"][0]["review"], "none")
-        self.assertEqual(plan["items"][1]["review"], "mr")
+        self.assertIs(plan["items"][0]["review"], False)
+        self.assertIs(plan["items"][1]["review"], True)
         self.assertFalse(plan["items"][1]["deferred"])
         self.assertFalse(plan["items"][1]["locked"])
         self.assertEqual(plan["after"], {"2": [1], "3": [2]})
@@ -247,7 +247,7 @@ class PlanOrderJsonTest(PlanOrderHarness):
             "i0001",
             [
                 "research",
-                {"type": "design", "review": "defer", "after": [1]},
+                {"type": "design", "deferred": True, "after": [1]},
                 {"type": "implement", "after": [2]},
             ],
         )

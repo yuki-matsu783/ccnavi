@@ -652,7 +652,6 @@ def _phase_record(ph: phase.Phase, manual: str = "") -> dict:
         "states": dict(ph.states),
         "marks": ph.marks,
         "review_required": ph.review_required,
-        "review_kind": ph.review_kind,
         "gate_closed": ph.gate_closed,
         "review_waiting": ph.review_waiting,
         "deferred": ph.deferred,

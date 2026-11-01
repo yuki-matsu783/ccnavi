@@ -54,8 +54,9 @@ messages:
     kind: next
     values: [id, title_q, scope_q, tail_q]
     next: |-
-      ワークツリーの中で {script:ccnavi-launcher.sh} ticket new {id} --title {title_q} --plan quick-work --scope {scope_q} {tail_q} で提案を作る。作れたら、承認をユーザに頼んで返事を待つ
+      ワークツリーの中で {script:ccnavi-launcher.sh} ticket new {id} --title {title_q} --plan quick-work --scope {scope_q} {tail_q} で提案を作る
     note: |-
+      作れたら、承認をユーザに頼んで返事を待つ
       設計判断が要らない作業は、範囲が複数のディレクトリや文書・設定にまたがっても quick-work。大きい作業は --plan を design,implement のように変える（型と範囲は .ccnavi/config/common/phases.yml）。提案は手で書かず、承認が通らないなど詰まったら、直接実装に切り替えず、ユーザに報告して止まる
 
   NEXT_START_LIST_OPEN__GITHUB:

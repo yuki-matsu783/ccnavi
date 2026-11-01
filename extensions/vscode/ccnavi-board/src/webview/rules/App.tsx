@@ -68,7 +68,7 @@ function sceneList(value: Scene[string] | undefined): readonly string[] {
 }
 
 /** 中身が読めなかったときの錠。画面は保存させない（押せる形で出して異常終了させない） */
-const NO_LOCK: Lock = { locked: true, reason: "", doing: [] };
+const NO_LOCK: Lock = { locked: true, reason: "", doing: [], turns: [] };
 
 /** 直前の操作の一言。生きている画面にしか届かないので持ち越さない */
 interface Status {
@@ -469,7 +469,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const shownDirty = touring ? false : dirty;
   // 保存前の検証エラーの見本（`sample.save_error`）。実際の直前の操作の一言は、案内の間は出さない
   const shownStatus: Status | undefined = touring ? (scene.error === true && SAMPLE.saveError !== "" ? { text: SAMPLE.saveError, error: true } : undefined) : status;
-  const shownLock: Lock = touring ? { locked: false, reason: "", doing: [] } : lock;
+  const shownLock: Lock = touring ? { locked: false, reason: "", doing: [], turns: [] } : lock;
   const shownTool = touring ? (typeof scene.tool === "string" ? scene.tool : KNOWN_TOOLS[0]) : tool;
   const shownSubject = touring ? (typeof scene.subject === "string" ? scene.subject : "") : subject;
   const isShownOpen = (row: { readonly key: string; readonly rule: RuleForm }): boolean => (touring ? sceneOpen.has(row.rule.id) : isOpen(row.key));

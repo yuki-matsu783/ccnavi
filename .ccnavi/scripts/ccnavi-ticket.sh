@@ -50,7 +50,7 @@
 # start・finish・approval-request・consolidate は、ロックの前に事前確認（ホストの API と git のリモートが使える状態か）を打つ。
 #   直接作業では確かめない。標準出力には何も足さず、ok でない項目だけを標準エラーに出す（ticket_preflight）。
 #
-# 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）の
+# 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの）の
 # start・finish・cancel・approval-request・consolidate は write-and-push で回す。Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため、次を 1 操作にする。
 # ロック → 途中の操作の確認 → hook のマーカーを先にコミット →
 # 取り込み（ccnavi-sync.sh）→ 未送信の確かめ → 書く → 書いたパスだけ commit --only → push。push が
@@ -77,9 +77,9 @@ usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-ticket.sh status [<親>]
 sh .ccnavi/scripts/ccnavi-ticket.sh next-id [<先頭の語> <slug>]
-sh .ccnavi/scripts/ccnavi-ticket.sh <start|finish|cancel|approval-request> <識別子> [--reason <理由>]
-  （approval-request は --check を付けると、送る前の検査だけをして何も送らない）
-sh .ccnavi/scripts/ccnavi-ticket.sh consolidate <親>
+sh .ccnavi/scripts/ccnavi-ticket.sh <start|finish|cancel|approval-request> <識別子> [--reason <理由>] [--check]
+  （--check を付けると、書く前の検査だけをして何も変えない。approval-request は何も送らない）
+sh .ccnavi/scripts/ccnavi-ticket.sh consolidate <親> [--check]
 sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>
 sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] [--signal <信号>]
 （親の提案の雛形はこのスクリプトに無い: ccnavi ticket new <識別子> --title <タイトル> --plan <型,…> --issue <値> --mr <番号>）
@@ -191,11 +191,13 @@ ticket_id() {
 # 道は、中が申し送り（CCNAVI_PROPOSE_NOTE の route=）に書く。書かれていなければ、終了コードで決める。
 # --check は確かめるだけで何も送らない。結果ファイルも書かない（送ったかどうかの記録に混ぜない）。
 po_check=""
-if [ "$1" = approval-request ]; then
+case "$1" in
+start | finish | cancel | approval-request | consolidate)
 	for po_arg in "$@"; do
 		[ "$po_arg" != --check ] || po_check=yes
 	done
-fi
+	;;
+esac
 if [ "$1" = approval-request ] && [ -z "${CCNAVI_PROPOSE_INNER:-}" ] && [ -z "$po_check" ]; then
 	po_id=$(ticket_id "$@")
 	po_dir="$root/logs/state/stopops-result"
@@ -221,11 +223,7 @@ if [ "$1" = approval-request ] && [ -z "${CCNAVI_PROPOSE_INNER:-}" ] && [ -z "$p
 fi
 
 # 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
-if ccnavi_wap_use_exe "$root"; then
-	if [ -n "$ccnavi_wap_bin" ]; then
-		skew=$(ccnavi_compat_skew "$root" "$ccnavi_wap_bin") || printf 'ccnavi-ticket: %s\n' "$skew" >&2
-	fi
-else
+if ! ccnavi_wap_use_exe "$root"; then
 	printf 'ccnavi-ticket: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2
 fi
@@ -367,13 +365,17 @@ start | finish | cancel | approval-request | consolidate)
 		esac
 		# 取り消しは事前確認しない（ホストに届かない・権限が足りないときでも、取り消せるようにする）
 		[ "$1" = cancel ] || ticket_preflight || exit 1
-		# approval-request --check は、ロックも取り込みもせず、送る前の検査だけを実行ファイルで行う。
+		# --check は、ロックも取り込みもせず、書く前の検査だけを実行ファイルで行う。
 		if [ -n "$po_check" ]; then
 			ccnavi_wap_end
 			trap - EXIT INT TERM HUP
 			ccnavi_wap_exe ticket "$@" || exit $?
 			exit 0
 		fi
+		# 書く前に分かる条件は、ロック・取り込み・コミット・子のワークツリーの作成より前に、何も変えずに断る。
+		# 検査は実行ファイルの本体と同じ関数（読むだけ）。通ったときの標準出力は捨てる。`--check` は位置引数の前に置く。
+		# approval-request も同じ型で、承認の画面と同じ検査（approval_request_gate）を先に通す。
+		ccnavi_wap_exe --check ticket "$@" >/dev/null || exit $?
 		ccnavi_wap_begin || {
 			ticket_unsent_parent_next "$1"
 			exit 1

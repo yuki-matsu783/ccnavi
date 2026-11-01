@@ -14,7 +14,7 @@ from ..tickets.approval import checks as approval_checks
 from ..tickets.approval import marks as approval_marks
 from ..tickets.approval import store as approval
 from ..tickets.approval import times as approval_times
-from ..tickets.config import phasetypes, risk, workflow
+from ..tickets.config import risk, workflow
 from ..tickets.model import ticket as ticket_mod
 from ..tickets.model import ticket_model
 from ..tickets.notice import session_rejects
@@ -89,7 +89,7 @@ def _explain_phases(
                 ", ".join(diagnose_shared.written(e) for e in pt.scope) if pt.scope else "inherit"
             )
             head = f"  {pt.id:<16}{_pad(layer_label(name), _LAYER_COL)}{pt.kind:<8}{pt.title:<16}"
-            stdout.write(f"{head}{pt.review:<8}{scope}\n")
+            stdout.write(f"{head}{str(pt.review).lower():<8}{scope}\n")
 
 
 def _explain_risk(
@@ -343,9 +343,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
             else:
                 state = "進行中"
             hold = ph.review_label if ph.gate_closed else "止めていない"
-            review = {
-                phasetypes.REVIEW_MR: " / レビューはマージリクエストで",
-            }.get(ph.review_kind, "")
+            review = " / レビューはマージリクエストで" if ph.review_required else ""
             if ph.deferred:
                 review = f" / レビューは {ph.review_at} と一緒に"
             elif ph.covers:

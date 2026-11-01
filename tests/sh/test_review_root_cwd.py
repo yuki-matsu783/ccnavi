@@ -1,4 +1,4 @@
-"""ワークスペースルート（origin は GitHub）から review の confirm・decide・request・ready を打ったときの止まり方。
+"""ワークスペースルート（origin は GitHub）から review の confirm・decide・request を打ったときの止まり方（ready は --parent が要る別の止め方）。
 
 親は cwd のワークツリーから引く。ルートから打つと親が決まらないので、ホストへ繋ぐ前に
 「親のワークツリーの中で打つ」と止める。先にホストへ繋ぐと、親のプロジェクトが GitLab でも、
@@ -90,7 +90,6 @@ class RootCwdTest(unittest.TestCase):
                 "--eli5",
                 "e.html",
             ],
-            "ready": ["ready"],
         }
         for name, args in cases.items():
             with self.subTest(sub=name):
@@ -118,6 +117,31 @@ class RootCwdTest(unittest.TestCase):
                 self.assertNotIn("の中で打ってください", done.stderr)
                 # 中なら先へ進み、ホストへ繋ぐところで止まる
                 self.assertIn("利用できず", done.stderr)
+
+    def test_ready_without_parent_stops_before_the_host_and_says_how_to_type_it_outside(self):
+        done = self.run_review("ready")
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertNotIn("利用できず", done.stderr)
+        self.assertIn("--parent", done.stderr)
+        nexts = [x for x in done.stderr.splitlines() if x.startswith("次: ")]
+        self.assertEqual(len(nexts), 1, done.stderr)
+        self.assertIn("ready --parent <親の識別子>", nexts[0])
+        self.assertIn("案内: ", done.stderr)
+
+    def test_ready_without_parent_inside_a_parent_worktree_fills_in_the_parent(self):
+        subprocess.run(
+            ["git", "worktree", "add", "-q", "-b", "p-1", ".claude/worktrees/p-1"],
+            cwd=self.dir,
+            check=True,
+        )
+        tree = os.path.join(self.dir, ".claude", "worktrees", "p-1")
+        done = self.run_review("ready", cwd=tree)
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertNotIn("利用できず", done.stderr)
+        nexts = [x for x in done.stderr.splitlines() if x.startswith("次: ")]
+        self.assertEqual(len(nexts), 1, done.stderr)
+        self.assertIn("ready --parent p-1", nexts[0])
+        self.assertTrue(os.path.isdir(tree))
 
     def test_ready_with_parent_is_not_stopped_by_the_check(self):
         done = self.run_review("ready", "--parent", "p-1")

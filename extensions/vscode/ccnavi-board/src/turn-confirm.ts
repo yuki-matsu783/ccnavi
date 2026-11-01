@@ -8,7 +8,7 @@ import { turnWarning, type Lock } from "./core/lock.js";
  * として戻すことがある。保存は止めず、押した時点で知らせて選ばせる。
  */
 export async function confirmDuringTurn(lock: Lock): Promise<boolean> {
-  return confirmTurns(lock.turns ?? []);
+  return confirmTurns(lock.turns);
 }
 
 /** `confirmDuringTurn` の、セッションの一覧を直に渡す形（保存の錠を持たない画面が使う） */
@@ -28,5 +28,5 @@ export async function confirmTurns(sessions: readonly string[]): Promise<boolean
  */
 export async function confirmIfTurn(root: string, setting: string): Promise<boolean> {
   const board = await loadBoard(root, setting);
-  return confirmTurns(board.ok ? (board.board.turns ?? []).map((t) => t.session) : []);
+  return confirmTurns(board.ok ? (board.board.turns).map((t) => t.session) : []);
 }

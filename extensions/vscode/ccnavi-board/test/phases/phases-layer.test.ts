@@ -55,7 +55,7 @@ test("CB-T116 ないファイル（空の本文）に定義を追加して書き
         id: "notes",
         title: "メモ",
         kind: "work",
-        review: "none",
+        review: false,
         inherit: true,
         scope: [],
         deliverables: [],
@@ -73,8 +73,8 @@ test("CB-T116 ないファイル（空の本文）に定義を追加して書き
   assert.deepEqual(again.model.form.phases.map((p) => [p.id, p.title, p.inherit]), [["notes", "メモ", true]]);
 });
 
-const COMMON_PLAN = { id: "plan", title: "調査", kind: "work", review: "mr", scope: ["wip/plan/*"] };
-const COMMON_IMPL = { id: "implement", title: "実装とテスト", kind: "work", review: "mr", scope: ["src/*", "tests/*"] };
+const COMMON_PLAN = { id: "plan", title: "調査", kind: "work", review: true, scope: ["wip/plan/*"] };
+const COMMON_IMPL = { id: "implement", title: "実装とテスト", kind: "work", review: true, scope: ["src/*", "tests/*"] };
 
 test("CB-T527 共通の設定の定義は、統合結果（sums[].phases.types）のうち出どころが common のものだけを取る。統合結果がなければ空", () => {
   const sum = {
@@ -85,7 +85,7 @@ test("CB-T527 共通の設定の定義は、統合結果（sums[].phases.types�
       unreadable: "",
       types: [
         { ...COMMON_IMPL, source: "common" },
-        { id: "docs", source: "self", kind: "work", title: "文書", review: "mr", scope: ["docs/*"] },
+        { id: "docs", source: "self", kind: "work", title: "文書", review: true, scope: ["docs/*"] },
       ],
     },
   } as unknown as SumJson;
@@ -139,7 +139,7 @@ test("CB-T529 共通の設定の別の id と表示名が重なる定義は、id
 });
 
 test("CB-T530 id が空の行（打っている途中）は、共通の設定の定義と表示名が重なっても重なりの印を付けない。id を打てば止める", async () => {
-  const dom = await openPhases({ common: [{ id: "plan", title: "計画", kind: "work", review: "mr", scope: ["wip/plan/*"] }] });
+  const dom = await openPhases({ common: [{ id: "plan", title: "計画", kind: "work", review: true, scope: ["wip/plan/*"] }] });
   try {
     dom.click(dom.one('button[data-action="add"]'));
     await dom.settle();

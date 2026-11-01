@@ -16,7 +16,6 @@ function preview(threads = 2): DecidePreview {
     parent: "i0001",
     phase: 2,
     mr: { number: 7, url: "https://example.com/mr/7" },
-    can_issue: true,
     threads: Array.from({ length: threads }, (_, i) => ({
       key: `u${i + 1}`,
       url: i === 0 ? "https://example.com/mr/7#n1" : "javascript:alert(1)",

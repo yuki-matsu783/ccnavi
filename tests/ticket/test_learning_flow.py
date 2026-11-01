@@ -22,7 +22,7 @@ EN = {"CCNAVI_LEARNING": "enable"}
 DIS = {"CCNAVI_LEARNING": "disable"}
 PH = (
     "version: 1\nphases:\n  work:\n    kind: work\n    title: 作業\n"
-    "    review: none\n    scope: inherit\n{extra}"
+    "    review: false\n    scope: inherit\n{extra}"
 )
 RECORD = "wip/handoff/learnings/i0001-01-01.md"
 RECORD_TEXT = "---\nticket: i0001-01-01\nparent: i0001\nlearnings: none\n---\n\n"

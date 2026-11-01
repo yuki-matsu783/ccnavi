@@ -17,7 +17,7 @@ phases:
   real-a:
     kind: work
     title: 実物A
-    review: mr
+    review: true
     scope: inherit
 `;
 

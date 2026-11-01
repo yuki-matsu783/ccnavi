@@ -57,7 +57,8 @@ function planOf(value: unknown, at: string): PlanItem[] {
       index,
       number: index + 1,
       type: str(map.type),
-      review: str(map.review),
+      review: map.review === true,
+      deferred: map.deferred === true,
       after: list(map.after, `${at}[${index}].after`).map((n) => num(n)),
     };
   });

@@ -42,7 +42,7 @@ FEATURE = textwrap.dedent(
         when: 新しい機能を足すとき
         plan:
           - research
-          - {type: design, review: defer, after: [1]}
+          - {type: design, deferred: true, after: [1]}
           - {type: implement, after: [2]}
         feedback:
           - implement-feedback
@@ -129,7 +129,7 @@ class ProposalTest(Use):
             front["plan"],
             [
                 "research",
-                {"type": "design", "review": "defer", "after": [1]},
+                {"type": "design", "deferred": True, "after": [1]},
                 {"type": "implement", "after": [2]},
             ],
         )
@@ -446,7 +446,7 @@ class RoundTripTest(Use):
 
     PLAN = [
         {"type": "research", "after": []},
-        {"type": "design", "review": "defer", "after": [1]},
+        {"type": "design", "deferred": True, "after": [1]},
         {"type": "implement", "after": [1, 2]},
     ]
     FEEDBACK = [
@@ -456,14 +456,14 @@ class RoundTripTest(Use):
     # defer・複数の after・同じ型の繰り返し、フィードバック計画の after が複数（5, 6 の続き）。
     RICH_PLAN = [
         {"type": "research", "after": []},
-        {"type": "design", "review": "defer", "after": [1]},
+        {"type": "design", "deferred": True, "after": [1]},
         {"type": "design", "after": [1]},
         {"type": "implement", "after": [2, 3]},
     ]
     RICH_FEEDBACK = [
         {"type": "implement-feedback", "after": []},
         {"type": "implement-feedback", "after": [5]},
-        {"type": "implement-feedback", "review": "defer", "after": [5, 6]},
+        {"type": "implement-feedback", "deferred": True, "after": [5, 6]},
         {"type": "implement-feedback", "after": [5, 7]},
     ]
 

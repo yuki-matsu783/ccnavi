@@ -699,9 +699,9 @@ def _parsed(
     検証（`--verify`）は 0 か `modes.EXIT_ANSWER_NO` を返し、承認が途中で止まったときは
     `modes.EXIT_PARTIAL` をそのまま返す。
     """
-    # 版だけを出す。フラグは上の定義から引くので、足したものはそのまま並ぶ。
+    # 版だけを出す。受け付けるオプションの一覧は出さない（ADR-0226）。
     if args.version:
-        return version.report(stdout, parser, args.json)
+        return version.report(stdout, args.json)
     if not cli_args._one_wrapper_flag_each(stderr, args):
         return EXIT_ERROR
     if cli_templates.asked(args):
@@ -1089,7 +1089,11 @@ def _parsed(
         # オーバーレイで押した `--yes` はターミナルを求めない。
         # `--yes` を守るのは、見せた指摘のダイジェストの一致と、
         # シェルから打つ形を止める組み込みの deny。
-        board = args.reviewed is not None and args.accept_unresolved and (args.preview or args.yes)
+        board = (
+            args.reviewed is not None
+            and args.accept_unresolved
+            and (args.preview or args.yes or args.check)
+        )
         if (
             args.reviewed is not None
             and not board

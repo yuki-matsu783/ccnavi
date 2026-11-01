@@ -142,10 +142,11 @@ class CommentStagedTest(unittest.TestCase):
             self.assertIn("stage=issue -->", f.read())
         self.assertIn("issue sent https://h/o/r/issues/5", self.ops_log())
 
-    def test_without_a_record_it_posts_like_before(self):
+    def test_without_a_record_it_stops_without_posting(self):
         done = self.run_staged(NO_RECORD="1")
-        self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual(self.posted(), "本文\n")
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("操作記録を作れなかった", done.stderr)
+        self.assertIsNone(self.posted())
 
     def test_already_sent_is_not_posted_again(self):
         done = self.run_staged(ST="sent")

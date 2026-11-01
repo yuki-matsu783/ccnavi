@@ -96,7 +96,7 @@ const COMMON_SOURCE = "common";
 
 /**
  * フェーズ管理が見せる、共通の設定の定義（読み取り専用）。統合結果（`sums[].phases.types`）のうち出どころが共通のもの。
- * 統合結果が無い（古い実行ファイル・その設定が対象でない）なら空。
+ * 統合結果が無い（その設定が対象でない）なら空。
  */
 export function commonPhases(sum: SumJson | undefined): readonly CommonPhase[] {
   return (sum?.phases.types ?? [])

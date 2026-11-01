@@ -513,7 +513,7 @@ class WorktreeShTest(unittest.TestCase):
         last = result.stdout.rstrip("\n").split("\n")[-1]
         self.assertTrue(last.startswith("次: 編集はこのワークツリーの下で行います"), last)
         self.assertIn(f"Write / Edit に渡すパス: {self.wt('topic')}/…", last)
-        self.assertIn("続けて integrate を打ちます", last)
+        self.assertIn("が済んでから integrate を打ちます", last)
         # 名前の警告よりも後ろ。
         self.assertGreater(result.stdout.rindex("次:"), result.stdout.index("warn:"))
         # 案内の git は、書いたとおりに新しいシェルで打てる。
@@ -1202,7 +1202,7 @@ class WorktreeShTest(unittest.TestCase):
     # ---- 引き取り（--adopt）
 
     def uncorded_worktree(self, name="topic", commits=2):
-        """記録の無い直接作業のワークツリー（更新前に切った・手で切ったもの）。"""
+        """記録の無い直接作業のワークツリー（手で切ったもの）。"""
         git(self.ws, "worktree", "add", "-q", self.wt(name), "-b", name)
         for index in range(commits):
             write(os.path.join(self.wt(name), f"w{index}.txt"), f"w{index}\n")

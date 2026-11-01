@@ -21,7 +21,7 @@ state を内部で外す。拡張と `scripts/check_rules.py` は念のため `-
 | `--explain [--json]` | タイプごとのルール、プロジェクトの一覧とルールの可否、権限モードの扱い（権限モード × 読めたか読み切れないかの結末を、判定と同じ `judge.undeclared_verdict` で組む）、チケット制御の値、元のプロジェクトが無いワークツリー（節「■ 元のプロジェクトが無いワークツリー」。該当があるときだけ。11.3）、「dry-run のときに止めるもの」と「判定に達せなかったとき」（内部の例外・期限切れ・payload が読めない。ツールごとの扱い）、承認済みチケットの一覧、親の局面、フェーズごとの状態・マーカー・止まっているか・リスク、上位の設定に却下された要求（節「■ 上位の設定に却下された要求」。全件を 1 件 1 行で、該当があるときだけ。REQ-SES-02） | 0 |
 | `--lint [--json]` | 判定を行わず、防御を無効化しうる記述を error と warn に分けて報告。ルール・フェーズ定義・配点・settings.json の登録・チケット・プロジェクトを見る | error があれば 1 |
 | `--suggest [--json]` | 記録（`decisions.jsonl` と、同じ置き場で回した `decisions.*.jsonl`）から、ルールの候補を `rules.yml` と `rule-expectations.yml` の形の下書きで出す。どのルールも言及せず 5 回以上渡った形は `ask` のルールの候補（形は Bash なら先頭のコマンドとサブコマンド、パスのツールならディレクトリの下、WebFetch ならホストの下）、同じ呼び出しを `CCNAVI_DENY_REPEAT` 回以上止めた `deny` は `message` を見直す候補。出すのは `deny` と `ask` だけ。候補ごとに `rules:` 1 タイプぶんと `expectations:`（記録の呼び出しを 3 件まで、ルートは `/repo`）1 タイプぶんを YAML の文書 1 つで並べる。候補ごとに `--lint` と同じ読みと `--test-expectations` と同じ判定で確かめ、通ったものだけを出す（ルールを足す候補は共通レイヤーのコピーに足した一時ファイルで試す）。通らなかった形（いまのルールでは別の判定になる形、ルールファイルの外から来た根拠の拒否）は数だけを出す。読み切れなかった呼び出し（`degraded`）と、上限で切れた `subject` は数えない | 常に 0 |
-| `--version [--json]` | 版・組み立ての元のコミット（`build.py` が埋める。ソースでは `unknown`）・互換の版・受け付けるフラグ（引数の定義から引く）・読む書式の版。設定もワークスペースも読まない（docs/11_requirements/json-shapes.md「版の JSON」） | 0 |
+| `--version [--json]` | 版・組み立ての元のコミット（`build.py` が埋める。ソースでは `unknown`）・互換の版・読む書式の版。設定もワークスペースも読まない（docs/11_requirements/json-shapes.md「版の JSON」） | 0 |
 | `--lint [--json] --flow <パス>` | 上に加えて、子のフロー 1 本（9.3.1）を `SubagentStart` と同じ読み手・同じ検査で読み、読めなければ場所 `(flow)` の error で言う。読めたフローの構造と名前の怪しいところは warn。`--json` なら読めた中身を `flow.data`、渡る手順の行を `flow.rendered` に載せ（読めなければどちらも `null`）、選べる名前を `flow.candidates` に載せる。パスは起動した場所からの相対でよい | error があれば 1 |
 | `--docs [絞り込み] [--sort …] [-r] [--limit N] [--format table\|path\|detail\|json\|jsonl\|count]` | ワークスペースと、プロジェクトの置き場の直下の各プロジェクト（別の git）の md（それぞれの `git ls-files --cached --others --exclude-standard`、ccnavi ディレクトリの下は除く。ただし `.ccnavi/docs/` は載せる）を、頭の frontmatter の索引で横断して引く（`docsearch`）。パスはワークスペースルートから。md が直下にあるディレクトリごとの `ccnavi-index.jsonl` を差分で新しくしてから引く。書くのは git がそこの `ccnavi-index.jsonl` を無視しているときだけで、どのディレクトリでも無視していないツリーは、書く前にそのツリーの `.gitignore` に `**/ccnavi-index.jsonl` を 1 行だけ足して（ワークスペースもプロジェクトも同じ。足したことは標準エラーと SessionStart の案内で名指しする。未コミットの差分が残る）確かめ直す。`!` で否定する行がある（ユーザが追跡している）・足せない・足しても無視されないツリーだけが対象外になり、名指しされる。ccnavi の形でない `ccnavi-index.jsonl` はそのまま残し、実体がツリーの外に出るディレクトリは対象外にする。一時ファイルは `.git/` の中に作る（`.git` が別のファイルシステムなら、そのディレクトリの下の git に無視される `.ccnavi-tmp-*/ccnavi-index.jsonl`）。git への問い合わせの失敗は対象外と分けて言う。形は 10.1「`--docs` の索引」 | 引ければ 0（0 件でも）。使い方の誤りは 1 |
 
@@ -42,10 +42,8 @@ state を内部で外す。拡張と `scripts/check_rules.py` は念のため `-
 write-and-push の書いたパスの一覧（`--record-writes`）も、診断の外では `--state` を見ずに既定の state の置き場だけを一覧から外す。
 
 **互換の版**（`src/ccnavi/entry/version.py` の `COMPAT`）は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh の `CCNAVI_COMPAT`、拡張の
-`EXTENSION_COMPAT`）の契約の版で、3 か所に同じ値を書く。sh は実行ファイルを起動する前に、拡張は起動のときに `--version` を読んで
-比べ、`--lint` は sh の値と比べる（`(version)` の warn）。食い違えば、どれも直し方（ccnavi のリポジトリなら組み立て直し、配布先なら
-配り直し、拡張が古ければ入れ直し）を名指しする。新しいフラグを使う前は、渡してみて argparse のエラーで見分けるのでは
-なく `flags` を見る。sh は `--version` の答えから互換の版を読めなければ「不明」として食い違いに数える。拡張は版を聞けなかったとき、起動では何も言わず、フラグを使う前に理由を出して先へ進まない。レイヤーは頭の `version:` が書式の版を示す。
+`EXTENSION_COMPAT`）の契約の版で、3 か所に同じ値を書く。sh と拡張は実行時に実行ファイルの版を比べず、食い違いを断らない（sh と実行ファイルは
+必ず同時に配る前提）。`--lint` だけが sh の値と比べる（`(version)` の warn）。拡張もフラグや機能の有無を事前に確かめない（版のずれは断らず、実行ファイルの断りの文面に任せる。`--version --json` は `flags`・`features` を返さない）。レイヤーは頭の `version:` が書式の版を示す。
 読めない版は読む側が error にする。
 
 `--flow <パス>` も診断でだけ有効で、読むのは `--lint` だけ。`--test` / `--test-expectations` / `--explain` に渡すと
@@ -86,7 +84,7 @@ hook の判定の経路（`load`）はこの重ねを使わず、プロセスに
 設定を画面で直す 3 つ（ルール管理・リスク管理・フェーズ管理）は、編集中の内容を一時ファイルに書いて
 `--rules` / `--risk` / `--phases`（ワークスペースとプロジェクトの設定のレイヤーは `--project-rules-file` / `--project-risk-file` / `--project-phases-file`）で渡し、`--lint` が error を返さないときだけ保存する。フロー編集画面も
 本文を一時ファイルに書いて `--lint --json --flow` に渡し、`(flow)` の error が無く、`flow.data` が画面の中身と
-同じときだけ開く・保存する（`--version` の `flags` に `--flow` が無いか、版を確かめられないときは開かない）。
+同じときだけ開く・保存する。
 
 リスク管理・フェーズ管理・テンプレート管理は、`CCNAVI_TICKET_CONTROL` が `disable` のワークスペースでは開かない（適用されない
 設定だから）。入口はすべて隠す（サイドパネル・コマンドパレット、フェーズ管理はプロジェクト管理画面の
@@ -118,7 +116,7 @@ error がある間は配点もフェーズ定義も保存できない。
   本体のモジュールを動かすときは `ext.py` の行だけを直す。拡張は同じ版の本体と一緒に同梱するので、別の版の本体と拡張は組み合わさらない。
   互換の版は、拡張が統合先のデータや出力の形を読み違えるような変更のときに上げ、呼び出しの名前だけを変えるときは上げない
 - 互換の版の書き方: 実行ファイル側は `entry/version.py` の行頭から始まる 1 行 `COMPAT = <整数>` で、Chrome 拡張の組み立てが正規表現で読む。
-  VS Code 拡張側は `EXTENSION_COMPAT`。3 か所（実行ファイル・sh の `CCNAVI_COMPAT`・拡張）の突き合わせは `tests/sh/test_compat_skew.py` が見る
+  VS Code 拡張側は `EXTENSION_COMPAT`。3 か所（実行ファイル・sh の `CCNAVI_COMPAT`・拡張）の突き合わせは `tests/core/test_version.py` が見る
 
 ### 10.1 `--docs` の索引
 

@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import unittest
 
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
@@ -397,3 +398,15 @@ class ApproveVerifyTest(PhaseHarness):
         other = os.path.join(self.parent_tree, "src", "keep.py")
         result = self.hook("PreToolUse", "Write", self.parent_tree, file_path=other)
         self.assertNotIn("--agree --preview --verify", context(result))
+
+
+class FollowLinesTest(unittest.TestCase):
+    """次の手が複数あっても `次:` は 1 行（最初の手）。後の手は `案内:` に回る。"""
+
+    def test_only_the_first_step_is_next(self):
+        from ccnavi.tickets.core import approve
+
+        got = approve._follow(["一手目", "二手目", "三手目"])
+        self.assertEqual(["次: 一手目", "案内: 二手目", "案内: 三手目"], got)
+        ready = approve.Readiness("r", ["ccnavi: 理由"], got)
+        self.assertEqual(1, ready.text().count("次: "))

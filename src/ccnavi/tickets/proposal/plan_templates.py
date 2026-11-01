@@ -125,7 +125,7 @@ LAYER_COMMON = settings.LAYER_COMMON
 LAYER_SELF = settings.LAYER_SELF
 
 # ステップの欄。
-ITEM_FIELDS = ("type", "review", "after")
+ITEM_FIELDS = ("type", "review", "deferred", "after")
 
 # 取り込まれない理由（`Entry.dropped`）。
 DROP_INVALID = "invalid"
@@ -141,15 +141,18 @@ class Item:
     """計画の 1 ステップ。`after` はその計画の中の添字（1 始まり）。"""
 
     type: str
-    review: str = ""
+    review: bool = False
+    deferred: bool = False
     after: list[int] = field(default_factory=list)
 
     def as_data(self):
-        if not self.review and not self.after:
+        if not self.review and not self.deferred and not self.after:
             return self.type
         out: dict = {"type": self.type}
         if self.review:
-            out["review"] = self.review
+            out["review"] = True
+        if self.deferred:
+            out["deferred"] = True
         if self.after:
             out["after"] = list(self.after)
         return out
@@ -461,7 +464,7 @@ def _items(raw, key: str, problems: list[Problem], stem: str, required: bool) ->
             items.append(Item(type=entry.strip()))
             continue
         if not isinstance(entry, dict):
-            error(f"{where} は定義の名前か {{type, review, after}} で書く")
+            error(f"{where} は定義の名前か {{type, review, deferred, after}} で書く")
             continue
         # 知らない欄は警告にして、読まない。
         for unknown in entry:
@@ -473,9 +476,9 @@ def _items(raw, key: str, problems: list[Problem], stem: str, required: bool) ->
         if not isinstance(kind, str) or not kind.strip():
             error(f"{where} に `type` がありません。")
             continue
-        review = entry.get("review")
-        if review is not None and not isinstance(review, str):
-            error(f"{where} の `review` は文字列で書く")
+        review, deferred, why = ticket_model.step_flags(entry, where)
+        if why:
+            error(why)
             continue
         # 添字は整数のリストに限る。重複は警告にして、昇順・重複なしに整える。
         after = entry.get("after")
@@ -492,7 +495,7 @@ def _items(raw, key: str, problems: list[Problem], stem: str, required: bool) ->
                 problems.append(
                     Problem(SEVERITY_WARN, stem, f"{where} の `after` に同じ添字を 2 度挙げている")
                 )
-        items.append(Item(type=kind.strip(), review=(review or "").strip(), after=numbers))
+        items.append(Item(type=kind.strip(), review=review, deferred=deferred, after=numbers))
     return items
 
 
@@ -593,12 +596,6 @@ def check(
                         f"`{key}[{i}]` の `after` の {value} は読めない"
                         f"（{key} の中の添字で、自分（{i}）より小さい 1 以上の数だけを指せる）",
                     )
-            if item.review and item.review not in ticket_model.PLAN_REVIEWS:
-                say(
-                    SEVERITY_ERROR,
-                    f"`{key}[{i}]` の `review` は {' か '.join(ticket_model.PLAN_REVIEWS)}。"
-                    "弱める向き（none）は書けない",
-                )
     if not any(p.severity == SEVERITY_ERROR for p in found):
         found.extend(_plan_problems(template, types))
     found.extend(_flow_problems(template, candidates))
@@ -610,11 +607,13 @@ def _composed(template: Template, ptypes: dict) -> str:
     planned = len(template.plan)
 
     def raw(item: Item, offset: int):
-        if not item.review and not item.after:
+        if not item.review and not item.deferred and not item.after:
             return item.type
         out: dict = {"type": item.type}
         if item.review:
-            out["review"] = item.review
+            out["review"] = True
+        if item.deferred:
+            out["deferred"] = True
         if item.after:
             out["after"] = [n + offset for n in item.after]
         return out
@@ -664,7 +663,7 @@ def _plan_config(
                 ptypes[item.type] = phasetypes.as_copy(real)
                 continue
             pt = phasetypes.PhaseType(
-                id=item.type, title=f"(定義なし) {item.type}", kind=kind, review="mr"
+                id=item.type, title=f"(定義なし) {item.type}", kind=kind, review=True
             )
             placeholders[item.type] = pt
             ptypes[item.type] = phasetypes.as_copy(pt)
@@ -758,11 +757,7 @@ def graph(
         rows = []
         for n, item in zip(numbers, items, strict=True):
             pt = config.get(item.type)
-            review = (
-                ticket_model.PLAN_REVIEW_MR
-                if item.review == ticket_model.PLAN_REVIEW_MR
-                else (pt.review if pt is not None else "")
-            )
+            review = True if item.review else (pt.review if pt is not None else None)
             rows.append(
                 {
                     "number": n,
@@ -770,7 +765,7 @@ def graph(
                     "type": item.type,
                     "title": pt.title if pt is not None and pt.title else item.type,
                     "review": review,
-                    "deferred": item.review == ticket_model.PLAN_REVIEW_DEFER,
+                    "deferred": item.deferred,
                     "review_at": wf.review_at.get(n) if wf is not None else None,
                     "locked": False,
                 }
@@ -812,10 +807,6 @@ def _order_errors(template: Template) -> list[Problem]:
                             f"（{key} の中の添字で、自分（{i}）より小さい 1 以上の数だけを指せる）",
                         )
                     )
-            if item.review and item.review not in ticket_model.PLAN_REVIEWS:
-                found.append(
-                    Problem(SEVERITY_ERROR, template.name, f"`{key}[{i}]` の `review` は読めない")
-                )
     return found
 
 
@@ -1100,6 +1091,7 @@ def _item_json(items: list[Item], first: int) -> list[dict]:
             "number": first + i - 1,
             "type": item.type,
             "review": item.review,
+            "deferred": item.deferred,
             "after": list(item.after),
         }
         for i, item in enumerate(items, start=1)

@@ -12,7 +12,7 @@ ccnavi のチケットが、どのワークツリーでどこまで進んでい�
 |---|---|
 | VS Code | 1.90 以上 |
 | ccnavi の実行ファイル | 探す順は、設定 `ccnaviBoard.binPath` → `.claude/settings.json`（`settings.local.json` が優先）の `CCNAVI_ENTRY_PATH` → `dist/ccnavi/ccnavi[.exe]` → `.ccnavi/scripts/ccnavi-launcher.sh` → ソースがあれば `uv run python -m ccnavi` → PATH の `ccnavi`（絶対パスの項目だけ）。振り分けの sh（名前が `ccnavi-launcher.sh`）を指していれば、sh を通さず `../bin/<os>-<arch>/` にあるこの OS と CPU 向けの実行ファイルを使い、無ければ次の候補へ進む（Windows では sh を直接起動できないため、sh そのものは使わない）。それ以外のパスは、そのまま実行ファイルとして使う |
-| 実行ファイルの版 | 起動のときに 1 度 `--version --json` を聞き、互換の版（`compat`）が拡張の `EXTENSION_COMPAT` と違うときに通知を出す。版を聞けなかったとき（実行ファイルが `--version --json` に失敗する・答えが読めない）は、起動では何も言わない。画面ごとに、使うフラグを確かめられない理由を出して先へ進まない。通知では、どちらが古いかと直し方（ccnavi のリポジトリなら `build.py` で組み立て直し、配布先なら `scripts/ccnavi-setup.sh --force` で配り直し、拡張が古ければ入れ直し）を示す。画面は止めない（[版の JSON](../../../docs/11_requirements/json-shapes.md#版の-json)） |
+| 実行ファイルの版 | 拡張と実行ファイルは同時に配る前提で、起動のときに互換の版を比べて知らせることはしない。使うフラグや機能の有無も事前に確かめず、版のずれは実行ファイルの断りをそのまま見せる（[版の JSON](../../../docs/11_requirements/json-shapes.md#版の-json)） |
 | bash | clone / fetch / pull を送るターミナル。承認と未解決の指摘の対応方針はこのターミナルを通らない（子プロセスで打つ。sh はこのシェルで走らせる）。Windows は Git Bash（`C:\Program Files\Git\bin\bash.exe`、無ければ PATH の `bash`） |
 | git | PATH にあること。プロジェクト管理画面が origin を読み、ターミナルで clone を打つ |
 | ffmpeg | 任意。バグ報告の録画にだけ使う（無ければ録画せず、スクリーンショットとログだけを zip にする）。Windows は PATH から呼べること、WSL は Windows 側の PATH に `ffmpeg.exe` があること、macOS は PATH か Homebrew の置き場にあること。入れ方は `winget install ffmpeg`・`brew install ffmpeg` など。入れたあとは VS Code を再起動する（起動中の VS Code は新しい PATH を読まない） |

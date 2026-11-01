@@ -36,7 +36,7 @@ import { COMMON_NOTE, commonIdNote, commonTitleNote, countText, duplicateNote, e
 import { commonClashes, draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
 
 /** 中身が読めなかったときの錠。画面は保存させない */
-const NO_LOCK: Lock = { locked: true, reason: "", doing: [] };
+const NO_LOCK: Lock = { locked: true, reason: "", doing: [], turns: [] };
 
 const EMPTY_DRAFT: Draft = { rows: [] };
 
@@ -301,8 +301,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const sampleLocked = touring && scene.locked === true;
   const shownLock: Lock = touring
     ? sampleLocked
-      ? { locked: true, reason: sampleLib ? TEXTS.locks.lib : TEXTS.locks.self, doing: [sampleLib ? "2026-10-05-lib-parser" : "2026-10-03-search-api"] }
-      : { locked: false, reason: "", doing: [] }
+      ? { locked: true, reason: sampleLib ? TEXTS.locks.lib : TEXTS.locks.self, doing: [sampleLib ? "2026-10-05-lib-parser" : "2026-10-03-search-api"], turns: [] }
+      : { locked: false, reason: "", doing: [], turns: [] }
     : lock;
   const sceneOpen = sceneList(scene.open);
   const sceneMore = sceneList(scene.more);
@@ -529,7 +529,7 @@ function CommonList(props: { readonly common: readonly CommonPhase[] }): JSX.Ele
       <ul className="list">
         {props.common.map((phase) => (
           <li key={phase.id} className="common-phase" data-id={phase.id} data-source="common">
-            <code>{phase.id}</code> {phase.title} <span>（区分 {phase.kind} / レビュー {phase.review} / 編集可能な範囲 {phase.scope.join(", ")}）</span>
+            <code>{phase.id}</code> {phase.title} <span>（区分 {phase.kind} / レビュー {String(phase.review)} / 編集可能な範囲 {phase.scope.join(", ")}）</span>
           </li>
         ))}
       </ul>

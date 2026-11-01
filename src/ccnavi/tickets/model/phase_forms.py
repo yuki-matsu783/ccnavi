@@ -353,9 +353,10 @@ _EXE_DIAGNOSES = frozenset(
         "-h",
     }
 )
-# 実行ファイルが受けるオプション（`ccnavi --version --json` の flags と、短い形の `-h` `-r`）。
+# 実行ファイルが受けるオプション（短い形の `-h` `-r` を含む）。
 # ここに無いオプション（`--list` など）は実行ファイルが使い方の誤りとして断り、何も動かさない。
-# オプションを足したらここにも足す（tests/ticket/test_ticket.py が flags と比べる）。
+# オプションを足したらここにも足す（tests/ticket/test_ticket.py の
+# test_executable_options_list_matches_the_parser が parser と比べる）。
 EXE_OPTIONS = frozenset(
     {
         "--abandon", "--accept-check", "--accept-done", "--accept-plan",

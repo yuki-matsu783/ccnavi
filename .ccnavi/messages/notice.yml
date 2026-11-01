@@ -166,3 +166,29 @@ messages:
       取り込み先はユーザが使っている場所で、取り込むと、ユーザがエディタで開いている内容と食い違うことがあるためです。この確認は、ユーザが了承したという操作です。差分を読んだかどうかは、ccnavi には確かめられません。
     next: |-
       確認の前に、integrate の出力にある差分と変わるファイルを、文章でユーザに見せておく。許可されたら確定し、断られたら取り込まず、やめるなら {script:ccnavi-git.sh} integrate --abort {key} を打つ
+
+  # ---- hook/commitnote.py（直接作業のコミットのあとの案内。メインのエージェントの commit が成功したとき、またはメインの Agent ツールが返ったとき（サブエージェントのコミットを拾う）、ワークツリーごとに 1 回）
+  NOTICE_DIRECT_COMMIT:
+    kind: notice
+    values: [name]
+    what: |-
+      ワークツリー .claude/worktrees/{name}（チケットに結び付かない直接作業）にコミットしました。
+    next: |-
+      コミットがほかにも続くなら全部済んでから、取り込み先が進んでいれば先に取り込み（direct-flow.md の手順 4）、haiku のサブエージェントで差分の敵対的レビュー（単純化・共通化の余地も見る）、続けて別の haiku でフラットな評価（過剰な作り込みも見る）を行う。取り入れる指摘は新しいコミットで直してから integrate を打つ。レビュー済みなら、そのまま integrate を打つ（手順は .ccnavi/docs/direct-flow.md）
+
+  # ---- tickets/notice/direct_worktrees.py（SessionStart の直接作業のワークツリーの一覧。1 本ごとの行はコードが組む）
+  NOTICE_DIRECT_WORKTREES_HEAD:
+    kind: notice
+    what: |-
+      [ccnavi] このPCの直接作業のワークツリーは次のとおりです（チケットに結び付かないもの。新しい順）。
+
+  NOTICE_DIRECT_WORKTREES_MORE:
+    kind: notice
+    values: [rest, total, shown]
+    what: |-
+      ほかに {rest} 本（全 {total} 本のうち、新しい順に {shown} 本だけ載せた）
+
+  NOTICE_DIRECT_WORKTREES_TAIL:
+    kind: notice
+    what: |-
+      他のセッションの作業の可能性があります。続きとして操作する前にユーザに確かめてください。

@@ -29,7 +29,7 @@ import { foldFind } from "../shared/find.js";
 import { draftOf, emptyFactor, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
 
 /** 中身が読めなかったときの錠。画面は保存させない（押せる形で出して異常終了させない） */
-const NO_LOCK: Lock = { locked: true, reason: "", doing: [] };
+const NO_LOCK: Lock = { locked: true, reason: "", doing: [], turns: [] };
 
 const EMPTY_DRAFT: Draft = { levels: { medium: "", high: "", critical: "" }, rows: [] };
 
@@ -275,7 +275,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       : { ...sampleBase, levels: { ...sampleBase.levels, [blank]: "" } as Readonly<Record<LevelName, string>> };
   const shownDirty = touring ? false : dirty;
   const shownBusy = touring ? false : busy;
-  const shownLock: Lock = touring ? { locked: false, reason: "", doing: [] } : lock;
+  const shownLock: Lock = touring ? { locked: false, reason: "", doing: [], turns: [] } : lock;
   const sceneOpen = new Set(sceneList(scene.open));
   const isShownOpen = (row: { readonly key: string; readonly factor: FactorForm }): boolean => (touring ? sceneOpen.has(row.factor.id) : open.has(row.key));
   const shownFind = touring ? (typeof scene.find === "string" ? scene.find : "") : find;

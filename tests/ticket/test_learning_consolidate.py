@@ -27,7 +27,7 @@ from tests.ticketsample import child_text, parent_text
 EN = {"CCNAVI_LEARNING": "enable"}
 PH = (
     "version: 1\nphases:\n  work:\n    kind: work\n    title: 作業\n"
-    "    review: none\n    scope: inherit\n"
+    "    review: false\n    scope: inherit\n"
 )
 CHILD = "i0001-01-01"
 CONS = "i0001-00-01"

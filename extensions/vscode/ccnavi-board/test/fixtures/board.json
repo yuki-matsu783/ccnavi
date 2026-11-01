@@ -89,7 +89,7 @@
      "source": "self",
      "kind": "work",
      "title": "調査",
-     "review": "none",
+     "review": false,
      "scope": [
       "wip/research/*"
      ]
@@ -99,7 +99,7 @@
      "source": "self",
      "kind": "work",
      "title": "設計",
-     "review": "mr",
+     "review": true,
      "scope": [
       "wip/design/*"
      ]
@@ -109,7 +109,7 @@
      "source": "self",
      "kind": "work",
      "title": "受入テスト作成",
-     "review": "mr",
+     "review": true,
      "scope": [
       "tests/*"
      ]
@@ -119,7 +119,7 @@
      "source": "self",
      "kind": "work",
      "title": "実装とテスト",
-     "review": "mr",
+     "review": true,
      "scope": [
       "src/*",
       "tests/*"
@@ -130,7 +130,7 @@
      "source": "self",
      "kind": "feedback",
      "title": "実装フィードバック対応",
-     "review": "mr",
+     "review": true,
      "scope": [
       "inherit"
      ]
@@ -140,7 +140,7 @@
      "source": "self",
      "kind": "work",
      "title": "片付け",
-     "review": "mr",
+     "review": true,
      "scope": [
       "src/*"
      ]
@@ -150,7 +150,7 @@
      "source": "self",
      "kind": "feedback",
      "title": "片付けフィードバック対応",
-     "review": "mr",
+     "review": true,
      "scope": [
       "inherit"
      ]
@@ -245,7 +245,7 @@
       "source": "self",
       "kind": "work",
       "title": "調査",
-      "review": "none",
+      "review": false,
       "scope": [
        "wip/research/*"
       ]
@@ -255,7 +255,7 @@
       "source": "self",
       "kind": "work",
       "title": "設計",
-      "review": "mr",
+      "review": true,
       "scope": [
        "wip/design/*"
       ]
@@ -265,7 +265,7 @@
       "source": "self",
       "kind": "work",
       "title": "受入テスト作成",
-      "review": "mr",
+      "review": true,
       "scope": [
        "tests/*"
       ]
@@ -275,7 +275,7 @@
       "source": "self",
       "kind": "work",
       "title": "実装とテスト",
-      "review": "mr",
+      "review": true,
       "scope": [
        "src/*",
        "tests/*"
@@ -286,7 +286,7 @@
       "source": "self",
       "kind": "feedback",
       "title": "実装フィードバック対応",
-      "review": "mr",
+      "review": true,
       "scope": [
        "inherit"
       ]
@@ -296,7 +296,7 @@
       "source": "self",
       "kind": "work",
       "title": "片付け",
-      "review": "mr",
+      "review": true,
       "scope": [
        "src/*"
       ]
@@ -306,7 +306,7 @@
       "source": "self",
       "kind": "feedback",
       "title": "片付けフィードバック対応",
-      "review": "mr",
+      "review": true,
       "scope": [
        "inherit"
       ]
@@ -728,7 +728,6 @@
      },
      "marks": {},
      "review_required": false,
-     "review_kind": "none",
      "gate_closed": false,
      "review_waiting": false,
      "deferred": false,
@@ -766,7 +765,6 @@
      },
      "marks": {},
      "review_required": true,
-     "review_kind": "mr",
      "gate_closed": false,
      "review_waiting": false,
      "deferred": false,

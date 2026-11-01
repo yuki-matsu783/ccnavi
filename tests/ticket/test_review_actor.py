@@ -151,7 +151,8 @@ class MovedSinceTest(ActorHarness):
         root = self.root.replace(os.sep, "/")
         same = [p.replace(os.sep, "/").replace(f"{root}/memfs/", "") for p in chrome["problems"]]
         said = [line.replace(os.sep, "/").replace(f"{root}/", "") for line in said]
-        # 手元と Chrome は同じ文面
+        # 手元は理由のあとに `次:` を 1 行足す。それ以外は Chrome と同じ文面
+        self.assertTrue(said.pop().startswith("次: "))
         self.assertEqual([p.replace(f"{root}/", "") for p in same], said)
         self.assertIn("依頼の後に親の HEAD が動いている", chrome["problems"][0])
         self.assertIsNone(chrome["changes"])
@@ -299,7 +300,7 @@ class ReviewRuleTest(ActorHarness):
         again = self.confirm_as(fixture, "--actor", "someone")
         self.assertEqual(again.returncode, 1)
         self.assertEqual(
-            again.stderr.splitlines(),
+            again.stderr.splitlines()[:1],
             ["ccnavi: [CORE_CONFIRM_ALREADY_REVIEWED] フェーズ 1 はレビュー済み"],
         )
         self.assertEqual(read_json(self.mark_path()), before)

@@ -9,7 +9,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import unittest
 
@@ -50,18 +49,9 @@ class TableTest(unittest.TestCase):
 
     def test_handoff_is_a_board_verb(self):
         self.assertIn("handoff", user_only.WORD_GROUPS["user-board-verb"])
-        flags = set(json.loads(run_ccnavi(["--version", "--json"]).stdout)["flags"])
-        self.assertIn("--handoff", flags)
 
-    def test_version_says_handoff(self):
-        features = json.loads(run_ccnavi(["--version", "--json"]).stdout)["features"]
-        self.assertIn("handoff", features)
-
-    def test_mirror_is_a_board_verb_and_the_version_says_so(self):
+    def test_mirror_is_a_board_verb(self):
         self.assertIn("mirror", user_only.WORD_GROUPS["user-board-verb"])
-        version = json.loads(run_ccnavi(["--version", "--json"]).stdout)
-        self.assertIn("--mirror", set(version["flags"]))
-        self.assertIn("mirror", version["features"])
 
 
 class RewriteTest(unittest.TestCase):
@@ -267,11 +257,6 @@ class EntryMarkTest(unittest.TestCase):
         result = run_ccnavi(["user", "prune", "--preview"], env=env)
         self.assertNotIn("直に打つ入口ではありません", result.stderr)
         self.assertEqual(result.returncode, 0, result.stderr)
-
-    def test_the_version_says_the_mark(self):
-        self.assertIn(
-            "entry-marker", json.loads(run_ccnavi(["--version", "--json"]).stdout)["features"]
-        )
 
 
 class HookTest(HookCase):

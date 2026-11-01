@@ -31,14 +31,6 @@ test("CB-T36 ボードが読めなければ閉じる側にする", () => {
   assert.equal(lock.reason, "保存できるか確認できません: 実行ファイルがありません");
 });
 
-test("CB-T391 作業中かを答えない古い実行ファイルの答えでは、確認できないので保存できない", () => {
-  const board = fixture();
-  const tickets = board.tickets.map((t) => ({ ...t, in_progress: null }));
-  const lock = lockFromBoard({ ...board, tickets });
-  assert.equal(lock.locked, true);
-  assert.match(lock.reason, /作業中かどうかを答えません/);
-});
-
 test("CB-T392 プロジェクトを渡したときは、そのプロジェクトのチケットの答えだけを見る", () => {
   const board = fixture();
   const tickets = board.tickets.map((t) => ({ ...t, project: t.ticket === "i0001-02-02" ? "lib" : "" }));
@@ -60,12 +52,10 @@ test("CB-T586 ターン中のセッションがあれば、保存は止めずに
   assert.match(turnWarning(lock), /応答の途中.*a, b/);
 });
 
-test("CB-T587 ターン中のセッションが無ければ警告は出ない。欄を出さない古い実行ファイルでも同じ", () => {
+test("CB-T587 ターン中のセッションが無ければ警告は出ない", () => {
   const board = fixture();
   const tickets = board.tickets.map((t) => ({ ...t, in_progress: false }));
   assert.equal(turnWarning(lockFromBoard({ ...board, tickets, turns: [] })), "");
-  const { turns: _omitted, ...old } = board;
-  assert.equal(turnWarning(lockFromBoard({ ...old, tickets })), "");
   assert.equal(turnWarning(lockFromError("読めない")), "");
 });
 
@@ -94,5 +84,5 @@ test("CB-T1222 作業中の理由は「整合性」を使わず、チケット�
   assert.match(locked.reason, /i0001-02-02/);
   assert.equal(lockClass(locked), "lock info");
   assert.equal(lockClass(lockFromError("読めない")), "lock");
-  assert.equal(lockClass({ locked: false, reason: "", doing: [] }), "lock hidden");
+  assert.equal(lockClass({ locked: false, reason: "", doing: [], turns: [] }), "lock hidden");
 });

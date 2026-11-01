@@ -21,7 +21,7 @@ keywords: [フェーズ, フェーズ定義, phases.yml, plan, after, 先行関�
 |---|---|---|
 | `kind` | `work` は全体計画に、`feedback` はフィードバック計画にしか置けない。既定 `work` | 承認 |
 | `title` | ユーザ向けの名前。id と title はどちらも一意。重なれば `--lint` が error | 承認、案内 |
-| `review` | `none` / `mr`（既定）。そのフェーズの終わりにユーザがどこで見るか。既定であって上限ではない。`feedback` のフェーズ定義に `none` は書けない | HITL ポイント |
+| `review` | `true`（既定）/ `false`。そのフェーズの終わりにユーザのレビュー（マージリクエスト）が要るか。既定であって上限ではない。`feedback` のフェーズ定義に `false` は書けない。`true` と `false` 以外は読み込みで error | HITL ポイント |
 | `scope` | このフェーズ定義の子が宣言できる範囲の上限（glob のリスト。20 件まで）。省略か `inherit` なら親の範囲。子 ⊆ フェーズ定義 ⊆ 親。大文字小文字はどの機械でも区別しない（チケットの範囲と同じ規則。9.3）。超えても承認は止めず、承認画面に「チケットで編集対象としているが、書き込めない場所」として出す（9.4）。判定は子の範囲をこの上限でも切り詰める（9.5） | 承認（警告）、判定 |
 | `deliverables` | フェーズを閉じる前に、親か子のワークツリーに在って追跡されているべきファイル（glob。20 件まで）。中身は見ない | `ticket finish` |
 | `learning` | `on`（既定）/ `off`。`off` の定義の子は、学びの蓄積（9.16）の着手の案内と子を閉じる検査を受けない。YAML の引用符なしの `on` / `off` も読める | `ticket start`、`ticket finish` |
@@ -57,7 +57,7 @@ keywords: [フェーズ, フェーズ定義, phases.yml, plan, after, 先行関�
 効くと読み手に思わせる）。
 
 親の計画は `plan`（全体計画。作業フェーズ定義のリスト）と `feedback`（フィードバック計画。
-フィードバック対応フェーズ定義のリスト）。ステップは名前だけか `{type, review, after}`。
+フィードバック対応フェーズ定義のリスト）。ステップは名前だけか `{type, review, deferred, after}`。
 
 ```yaml
 plan:
@@ -65,7 +65,7 @@ plan:
   - {type: design, after: [1]}                # 2
   - {type: acceptance, after: [2]}            # 3
   - {type: implement, after: [2]}             # 4。3 と並行
-  - {type: implement, after: [3, 4], review: defer}   # 5。同じ定義の 2 回目も番号で指す
+  - {type: implement, after: [3, 4], deferred: true}   # 5。同じ定義の 2 回目も番号で指す
   - {type: docs, after: [5]}                  # 6。終端（ほかの全部が推移的に先行する）
 feedback:
   - design-feedback                           # 7。先行なし（全体計画は済んでいる）
@@ -80,11 +80,11 @@ feedback:
 `after` の形の誤り（リストでない、整数でない、`true`、範囲の外、自分以上の番号、フィードバック計画から全体計画を
 指す）はチケットを読む段では落とさず、誤った線は待ちから外す。承認と `--lint` が error で言い、判定は親を止める（下）。
 
-`review` に書けるのは `mr`（フェーズ定義の `review` が `none` でも要る）と `defer`（延期。後ろでこのステップを先行に持つ
-フェーズのレビューに含める）だけ。引き受けるのは、延期したステップより後ろで、その番号を先行に持つステップのうち、**延期していない**
-番号のいちばん小さいもの（延期した子孫は飛ばして辿る）。引き受け手のフェーズ定義が `review: none` なら承認が error を
+ステップの `review` に書けるのは `true`（フェーズ定義の `review` が `false` でも要る）だけ、`deferred` に書けるのも `true`（延期。後ろでこのステップを先行に持つ
+フェーズのレビューに含める）だけ。弱める向き（`false`）は書けず、2 つは同時に書けない（延期したステップは自分では見ない）。引き受けるのは、延期したステップより後ろで、その番号を先行に持つステップのうち、**延期していない**
+番号のいちばん小さいもの（延期した子孫は飛ばして辿る）。引き受け手のフェーズ定義が `review: false` なら承認が error を
 出す。引き受け手が居なければ、承認が error を出す。延期の引き受け手を読む側（`review_at` を使う箇所）は、みな計画から
-計算した先行関係を読む。最後のステップは `defer` にできず、フェーズ定義の `review` が `none` のステップも延期できない。番号は全体計画が
+計算した先行関係を読む。最後のステップは延期できず、フェーズ定義の `review` が `false` のステップも延期できない。番号は全体計画が
 1 から、フィードバック計画がその続き。`feedback` が無いのは「まだ計画していない」、`[]` は「見たうえで対応なし」。
 
 **延期は省略ではない。** 延期したフェーズでは止まらず、次にレビューがあるフェーズの依頼が
@@ -123,11 +123,11 @@ feedback:
 
 **小さい作業。** 子を作らない親は無い。小さい作業も、親 1 本と子 1 本を同時に提案して、1 回の承認（`ccnavi user agree <親> <子>`）で通す。
 
-- 親は `plan: [quick]` の 1 ステップだけを持つ。`quick` は小さい作業向けのフェーズ定義で、`review: mr`（マージリクエストでユーザが見る）、
+- 親は `plan: [quick]` の 1 ステップだけを持つ。`quick` は小さい作業向けのフェーズ定義で、`review: true`（マージリクエストでユーザが見る）、
   `scope: inherit`（範囲は親の範囲そのまま）。子は `phase: 1`。ステップが 1 つなので `after` は要らない（そのステップが終端）
 - 親の提案には、計画が使う定義のコピー `phases:`（ここでは `quick` だけ）も書く。`ccnavi --plan-order <親> --fill-phases` で差し込む
-- `quick` の見る場所は定義の `review: mr` で決まる。子の `human_review.required: false` ではレビューは外れない
-  （子の宣言は「要る」を言うだけで、見る場所は定義が決める）。レビューを外したい作業は `review: none` の定義を使う
+- `quick` のレビューの要否は定義の `review: true` で決まる。子の `human_review.required: false` ではレビューは外れない
+  （子の宣言は「要る」を言うだけで、要らないとは言えない）。レビューを外したい作業は `review: false` の定義を使う
 - 親は計画・依頼だけを受け持つ（合流は子の `finish`）。作業は子が行う（P12 のまま）
 - 親の提案には `feedback: []` も書く（対応が無くても空で出す。無いと親を閉じられない）
 - 流れ: 承認 → 親に着手 → 子に着手 → 子で作業して `finish`（子は `review/`。親のブランチへの合流と push も `finish` が行う） → 親が ELI5 の HTML を
@@ -139,7 +139,7 @@ feedback:
 動かしたので `after` も承認したと読む。代わりに、`user agree` の検査を通っていない計画が壊れていても判定が進まないように、
 **判定の側で、承認済みチケットだけを読んで済む検査を適用する**（`after` の形・終端・最後のステップの延期・延期の引き受け手）。
 定義は親に固定したコピーから読むので、コピーの検査（計画を持つのに `phases:` が無い、ステップが `phases:` に無い定義名を使う、
-コピーの定義の形、`kind` が置いた計画と合う、引き受け手にレビューがある＝コピーの `review` とステップの `review: mr`）も判定の側で
+コピーの定義の形、`kind` が置いた計画と合う、引き受け手にレビューがある＝コピーの `review` とステップの `review: true`）も判定の側で
 適用する。子に書いた `phases:` も同じに止める。
 誤りがあれば親を止め（範囲を適用しない）、子も同じ理由で止める（子の承認・着手・書き込み。子の承認の順序の検査も、
 壊れた待ちで順序を数えずに落とす）。止めるのは承認済みチケットそのものの形の誤りで、承認のあとに外の何かが動いて
@@ -181,7 +181,7 @@ VS Code の計画編集タブでは並びの逆向きの線も引けるので、
 
 - 先行が全部前に並んだステップのうち、元の番号がいちばん小さいものから順に番号を振る（同じ段のステップは元の番号順を保つ）。
   線を変えても並びが崩れなければ番号は変わらない
-- `after` の指す先は振り直した番号に付け替える。`review: defer` はステップに付いたまま動く。延期の引き受け手は保存せず、
+- `after` の指す先は振り直した番号に付け替える。`deferred: true` はステップに付いたまま動く。延期の引き受け手は保存せず、
   振り直した計画から計算し直す
 - 全体計画とフィードバック計画は別に振り直す（フィードバック計画の番号は全体計画の続きのまま）
 - 子が承認された番号（固定した番号）は動かさず、空いた番号に承認されていないステップを詰める。固定した番号へ入る線
@@ -217,16 +217,16 @@ phases:                      # 親だけ。plan: / feedback: が使う定義の�
   research:
     kind: work
     title: 調査
-    review: none
+    review: false
     scope: ["wip/research/*"]
     deliverables: ["wip/research/summary.md"]
-  design: {kind: work, title: 設計, review: mr, scope: ["wip/design/*"]}
+  design: {kind: work, title: 設計, review: true, scope: ["wip/design/*"]}
 plan:
   - research
   - {type: design, after: [1]}
 ```
 
-承認したときの定義が親に固定され、**承認のあとの判定・フェーズのタイトルと見る場所・成果物の確かめ・子の範囲の上限はコピーを
+承認したときの定義が親に固定され、**承認のあとの判定・フェーズのタイトルとレビューの要否・成果物の確かめ・子の範囲の上限はコピーを
 読む。** 承認のあとに `phases.yml` を直しても、進行中の親とその子には届かない（範囲を狭めても
 効かない）。子の承認の定義（範囲の上限の警告）と順序の検査も、親が承認済みならそのコピー、同じ承認で通る提案ならその
 提案のコピーから引く。`allow:` は変えない（親の `allow` / `ask` / `deny`、子の範囲、`scope: inherit` は今のまま。子の範囲は
@@ -242,7 +242,7 @@ plan:
 | コピーの定義の名前が `phases.yml` に無い | error |
 | 定義の形（`kind` と置いた計画、`review` の値、`scope` の glob、件数の上限） | error |
 | `phases.yml` にあってコピーに無い定義 | 何も言わない（この親では使わないだけ） |
-| コピーにあって、どのステップも使わない定義 | warn（判定はどのステップからも引かないので、範囲・見る場所・成果物は変わらない。error にすると、ステップを消した・並べ直したあとの消し忘れで承認が止まる） |
+| コピーにあって、どのステップも使わない定義 | warn（判定はどのステップからも引かないので、範囲・レビューの要否・成果物は変わらない。error にすると、ステップを消した・並べ直したあとの消し忘れで承認が止まる） |
 
 コピーが違うと落とすときの文面は `ccnavi --plan-order <親> --fill-phases` を出す。承認画面（ターミナルと VS Code）は定義を
 3 つに分けて出す。**この親に固定する定義**（タイトル・`review`・`scope`・`deliverables` と使う番号）、**使われていない定義**
@@ -268,7 +268,7 @@ error で、足すのも外すのも自由。同じ定義を固定した番号�
 **手で動かした承認では、コピーはそのまま効く。** `user agree` を通さずに承認済みの置き場へ動かした親では、コピーが
 `phases.yml` と同じかの検査が働かず、エージェントが書いたコピーがそのまま効く。承認を本物とするのは置き場で（9.2）、
 置き場へ動かしたユーザが中身を承認したと読む（計画の `after` を信じるのと同じ向き）。理由は弱い。手で動かすユーザが
-コピーを `phases.yml` と見比べるとは限らず、`review: none` や広い `scope` を気づかずに通しうる。`--lint` が食い違いを warn で言う
+コピーを `phases.yml` と見比べるとは限らず、`review: false` や広い `scope` を気づかずに通しうる。`--lint` が食い違いを warn で言う
 （「進行中の親には効かない。反映するには、子の無い番号の定義なら `--fill-phases` を打った改版を出す。計画が同じでも
 改版になる。子が承認された番号の定義ならユーザが承認済みチケットを直す」）。
 
@@ -287,7 +287,7 @@ phases:
   research:
     kind: work            # work は全体計画に、feedback はフィードバック計画にだけ置ける
     title: 調査           # id と title はどちらも一意
-    review: none          # none | mr。既定であって上限ではない
+    review: false          # true | false。既定（true）であって上限ではない
     scope: ["wip/research/*"]          # 子の範囲の上限（20 件まで）。省略か inherit なら親の範囲
     deliverables: ["wip/research/summary.md"]   # 閉じる前に在って追跡されているべきもの（20 件まで）
     agent: explorer       # .claude/agents/<名前>.md。案内。判定には使わない
@@ -295,18 +295,18 @@ phases:
   implement:
     kind: work
     title: 実装とテスト
-    review: mr
+    review: true
     scope: ["src/*", "tests/*"]
     when: 振る舞いを変えるとき。受入テスト作成を先に置く
   acceptance:
     kind: work
     title: 受入テスト作成
-    review: mr
+    review: true
     scope: ["tests/*"]
   implement-feedback:
     kind: feedback
     title: 実装フィードバック対応
-    review: mr                         # feedback に none は書けない
+    review: true                         # feedback に false は書けない
     scope: inherit
     when: フィードバック計画の最後に置き、ほかの対応を受ける
 ```
@@ -318,12 +318,12 @@ phases:
 ticket: i0001
 issue: 1
 phases:                                # 計画が使う定義のコピー。ccnavi --plan-order i0001 --fill-phases で差し込む
-  research: {kind: work, title: 調査, review: none, scope: ["wip/research/*"], deliverables: ["wip/research/summary.md"]}
-  acceptance: {kind: work, title: 受入テスト作成, review: mr, scope: ["tests/*"]}
-  implement: {kind: work, title: 実装とテスト, review: mr, scope: ["src/*", "tests/*"]}
+  research: {kind: work, title: 調査, review: false, scope: ["wip/research/*"], deliverables: ["wip/research/summary.md"]}
+  acceptance: {kind: work, title: 受入テスト作成, review: true, scope: ["tests/*"]}
+  implement: {kind: work, title: 実装とテスト, review: true, scope: ["src/*", "tests/*"]}
 plan:                                  # 全体計画。user agree が通ることが合意
   - research                           # 1。先行なし
-  - {type: acceptance, after: [1], review: defer}   # 2。レビューを後ろと一緒に見る（延期。省略ではない）
+  - {type: acceptance, after: [1], deferred: true}   # 2。レビューを後ろと一緒に見る（延期。省略ではない）
   - {type: implement, after: [1, 2]}   # 3。終端（ほかの全部が先行する）
 feedback:                              # フィードバック計画。レビューのあと改版で足す。空でも出す
   - implement-feedback                 # 4。after はフィードバック計画の番号だけを指せる

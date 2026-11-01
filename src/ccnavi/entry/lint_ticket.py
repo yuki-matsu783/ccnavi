@@ -250,7 +250,7 @@ def _operation_problems(
     - 未完了の操作記録は warn（読めない記録は error）。decide は `--resume`、ほかは打ち直して続ける
     - 受け入れ台帳（`phases/<親>/accepted.json`）が読めなければ warn（空として扱うので、
       受け入れ済みの指摘が未解決に戻る）
-    - `finished_to` を持たない review/ の子は info（この変更より前に閉じた子は、手で動かしても
+    - `finished_to` を持たない review/ の子は info（`finish` を通らずに閉じた子は、手で動かしても
       確定できない。confirm か decide で確かめる）
     - 承認済みの置き場の保護と設定ファイルの自己防衛が両方切れている組み合わせは warn
     """
@@ -287,7 +287,7 @@ def _operation_problems(
                 Problem(
                     SEVERITY_INFO,
                     "(ticket)",
-                    f"{child.ticket}: review/ の子に `finished_to` が無い（この変更より前に"
+                    f"{child.ticket}: review/ の子に `finished_to` が無い（`finish` を通らずに"
                     "閉じた子）。手で done/ に動かしても確定できないので、confirm か decide を使う",
                 )
             )

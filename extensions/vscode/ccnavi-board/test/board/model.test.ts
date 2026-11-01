@@ -69,7 +69,7 @@ test("CB-T110 layers[] からルールファイルの置き場を読み、欠け
   ]);
 });
 
-test("CB-T318 sums[] を読む。ワークスペースの統合結果（共通 + 自身）が先で、欠けた欄は空で補い、古い実行ファイル（sums がありません）では空", () => {
+test("CB-T318 sums[] を読む。ワークスペースの統合結果（共通 + 自身）が先で、欠けた欄は空で補い、sums がなければ空", () => {
   const board = fixture();
   assert.deepEqual(board.sums.map((s) => s.name), ["self"]);
   const self = board.sums[0];
@@ -127,7 +127,7 @@ test("CB-T4 欠けた項目は既定値で埋め、全体を破棄しない", ()
   }
 });
 
-test("CB-T140 blocked は欄がなければ空。古い実行ファイルの出力でも失敗しない", () => {
+test("CB-T140 blocked は欄がなければ空。失敗しない", () => {
   // 欄が無いのは、この欄より前の実行ファイルの出力。空なら止まっていないと読む。
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
@@ -157,7 +157,7 @@ test("CB-T262 predecessors_unmet は実行ファイルの答えをそのまま�
   assert.deepEqual(parsed.board.tickets[1].predecessors_unmet, []);
 });
 
-test("CB-T303 archived は実行ファイルの退避の欄をコピーする。欄がなければ空、オブジェクトでない行は除き、欠けた欄は既定値で埋める", () => {
+test("CB-T303 archived は実行ファイルの退避の欄をコピーする。オブジェクトでない行は除き、欠けた欄は既定値で埋める", () => {
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const parsed = parseBoardJson(
     JSON.stringify({
@@ -172,22 +172,15 @@ test("CB-T303 archived は実行ファイルの退避の欄をコピーする。
   if (!parsed.ok) {
     return;
   }
-  assert.equal(parsed.board.archived?.length, 1);
-  const old = parsed.board.archived![0];
+  assert.equal(parsed.board.archived.length, 1);
+  const old = parsed.board.archived[0];
   assert.equal(old.ticket, "old");
   assert.equal(old.parent, "");
   assert.equal(old.phase, null);
   assert.equal(old.path, "/ws/logs/archive/self/done/old.md");
-  // この欄を出さない古い実行ファイル
-  const { archived: _dropped, ...older } = base;
-  const parsedOlder = parseBoardJson(JSON.stringify(older));
-  assert.equal(parsedOlder.ok, true);
-  if (parsedOlder.ok) {
-    assert.deepEqual(parsedOlder.board.archived, []);
-  }
 });
 
-test("CB-T385 提案の has_plan（計画を持つか）を読む。ない・真偽でない値は偽（古い実行ファイルの答え）", () => {
+test("CB-T385 提案の has_plan（計画を持つか）を読む。ない・真偽でない値は偽", () => {
   const parsed = parseBoardJson(
     JSON.stringify({
       version: BOARD_VERSION,
@@ -208,7 +201,7 @@ test("CB-T385 提案の has_plan（計画を持つか）を読む。ない・真
   }
 });
 
-test("CB-T570 チケットの template_draft（完了した計画付きの親から下書きを作れるか）を読む。ない・真偽でない値は偽（古い実行ファイルの答え）", () => {
+test("CB-T570 チケットの template_draft（完了した計画付きの親から下書きを作れるか）を読む。ない・真偽でない値は偽", () => {
   const parsed = parseBoardJson(
     JSON.stringify({
       version: BOARD_VERSION,

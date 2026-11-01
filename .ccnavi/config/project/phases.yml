@@ -20,21 +20,21 @@ phases:
   implement-ccnavi:
     kind: work
     title: 実装とテスト（ccnavi 自身）
-    review: mr
+    review: true
     scope: ["src/*", "tests/*", "build.py", "pyproject.toml", "scripts/*", ".ccnavi/*", "extensions/*"]
     when: 振る舞いを変えるとき。受入テスト作成を先に置く（計画に受入テスト作成の項も置く）
 
   staging:
     kind: work
     title: ユーザがコピーする版の作成
-    review: mr
+    review: true
     scope: ["wip/design/*", "tests/*"]
     when: 保護済みファイル（.ccnavi/scripts/、.claude/hooks/、rules.yml）を修正するとき。エージェントはそこに書けないので、完成品を wip/design/scripts/ に全文で配置し、ユーザがコピーする。受入テスト作成を先に置く（計画に受入テスト作成の項も置く）
 
   docs:
     kind: work
     title: 文書
-    review: mr
+    review: true
     scope: ["README.md", "docs/*", "extensions/vscode/ccnavi-board/docs/*", "extensions/chrome/ccnavi-approval/docs/*", "CLAUDE.md", "AGENTS.md", ".agents/docs/*", ".claude/skills/*"]
 
   # 作業の振り返りで出たスキルの候補を、ワークスペースの .claude/skills/ に配置する。
@@ -44,6 +44,6 @@ phases:
   skill-improve:
     kind: feedback
     title: スキル改善
-    review: mr
+    review: true
     scope: [".claude/skills/*", "docs/wiki/*"]
     when: 振り返りでスキルの候補が出たとき（.ccnavi/docs/skill-review.md）。候補が無ければ置かない

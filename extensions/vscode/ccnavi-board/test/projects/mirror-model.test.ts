@@ -121,7 +121,7 @@ test("CB-T1159 実行ファイルの出力の読み方: 読める答えは終了
   const list = mirrorListOf({ code: 0, stdout: LIST_TEXT, stderr: "" });
   assert.ok(list.ok);
   assert.equal(list.value.projects.length, 3);
-  // 古い実行ファイルは argparse の苦情を標準エラーに出して 2 で終わる
+  // 実行ファイルが argparse の苦情を標準エラーに出して 2 で終わる場合
   const usage = mirrorListOf({ code: 2, stdout: "", stderr: "usage: ccnavi user ...\nccnavi user: error: invalid choice: 'mirror'" });
   assert.ok(!usage.ok);
   assert.equal(usage.error, "ccnavi user mirror --json が失敗しました: usage: ccnavi user ...");
@@ -156,15 +156,12 @@ test("CB-T1161 「すべて同期」の対象は differs のプロジェクト�
   assert.equal(syncAllButton(ok(noExpect), false).enabled, false);
 });
 
-test("CB-T1162 ボタンを押せないとき: 同期中、確認する前、古い実行ファイル、確認できない、コピーするものが無い。理由を返す", () => {
+test("CB-T1162 ボタンを押せないとき: 同期中、確認する前、確認できない、コピーするものが無い。理由を返す", () => {
   const list = listOf();
   assert.deepEqual(projectSyncButton(ok(list), false, "web"), { enabled: true, reason: "" });
   assert.match(projectSyncButton(ok(list), true, "web").reason, /同期しています/);
   assert.equal(syncAllButton(ok(list), true).enabled, false);
   assert.match(projectSyncButton({ kind: "waiting" }, false, "web").reason, /確認しています/);
-  const old: MirrorStatus = { kind: "unsupported", reason: "実行ファイル（ccnavi 0.1.0）が mirror の機能に対応していません（古い版です）" };
-  assert.deepEqual(projectSyncButton(old, false, "web"), { enabled: false, reason: old.reason });
-  assert.deepEqual(syncAllButton(old, false), { enabled: false, reason: old.reason, count: 0 });
   assert.match(projectSyncButton({ kind: "failed", error: "期限切れ" }, false, "web").reason, /確認できませんでした/);
   const empty = listOf(LIST_TEXT.replace('"common_empty":false', '"common_empty":true'));
   assert.match(projectSyncButton(ok(empty), false, "web").reason, /コピーするものがありません/);

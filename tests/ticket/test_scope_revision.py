@@ -232,6 +232,8 @@ class ScopeRevisionFlowTest(PhaseHarness):
         )
         cancelled = self.ccnavi("ticket", "cancel", "i0001-01-01", "--reason", "範囲を広げる")
         self.assertEqual(0, cancelled.returncode, cancelled.stdout + cancelled.stderr)
+        # 子を個別に取り消したときは、次の一手（親の status）を言う
+        self.assertIn("次: ", cancelled.stdout)
         self.commit_parent("cancel")
         result = self.revise(self.WIDER)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)

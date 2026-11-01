@@ -489,7 +489,7 @@ class ManualSettleGapsTest(PhaseHarness):
         )
         copy = os.path.join(self.approved, "doing", "i0001.md")
         self.edit(
-            copy, lambda t: t.replace("  - research\n", "  - {type: research, review: mr}\n", 1)
+            copy, lambda t: t.replace("  - research\n", "  - {type: research, review: true}\n", 1)
         )
         ph = next(p for p in phase.phases_of(self.root, self.conf(), "i0001") if p.number == 1)
         self.assertTrue(ph.review_required)

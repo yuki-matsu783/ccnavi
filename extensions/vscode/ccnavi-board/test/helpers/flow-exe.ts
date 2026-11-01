@@ -21,7 +21,7 @@ export interface ExeRead {
   readonly data: unknown;
   /** `(flow)` の苦情。一時ファイルのパスは `shown` に直してある */
   readonly problems: readonly { readonly severity: string; readonly detail: string }[];
-  readonly rendered: readonly string[] | null | undefined;
+  readonly rendered: readonly string[] | null;
 }
 
 export type ExeRunner = { readonly ok: true; readonly read: (doc: FlowDoc, shown: string) => ExeRead } | { readonly ok: false; readonly reason: string };
@@ -64,7 +64,7 @@ function runner(): ExeRunner {
         const ran = run(file);
         const out = JSON.parse(ran.stdout) as {
           problems: { severity: string; where: string; detail: string }[];
-          flow: { data: unknown; rendered?: string[] | null };
+          flow: { data: unknown; rendered: string[] | null };
         };
         return {
           data: out.flow.data,

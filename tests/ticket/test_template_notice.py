@@ -5,7 +5,6 @@
 1. 計画を持つ親が閉じると、`ready` の前に `ccnavi --templates --draft <親>` を打つ案内が 1 行出る
 2. 出さない: その親の識別子の下書きが在る、同じ計画の形のテンプレートが取り込み済み、
    子の `finish`、`ready` 済み（材料が退避されて拾えない。`close_notice` が空を返す）
-2b. マージリクエストを作らない親（全フェーズが MR で見ない）には、`ready` に触れない文面を出す
 3. 案内は出力に足すだけ。終了コードも、閉じる判定も変えない
 4. 案内のとおりに打てば下書きができ、下書きができたあとは案内を出さない
 """
@@ -19,9 +18,8 @@ from ccnavi.tickets.sync import template_drafts
 from tests import ROOT
 from tests.inproc import run_ccnavi
 from tests.ticket.test_archive import ReadyHarness
-from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import write
-from tests.ticketsample import child_text, parent_text
+from tests.ticketsample import child_text
 
 MARK = "テンプレートにするなら"
 TEMPLATE_SAME = "name: same\ndescription: 設計だけ\nwhen: 設計をするとき\nplan: [design]\n"
@@ -149,52 +147,3 @@ class CloseNoticeTest(ReadyHarness):
 
     def test_an_unknown_parent_says_nothing(self):
         self.assertEqual(template_drafts.close_notice(self.conf(), self.root, "nothing"), "")
-
-
-class NoMrCloseNoticeTest(PhaseHarness):
-    """全フェーズが MR で見ない親（`research` だけ）を閉じる。"""
-
-    def close_without_mr(self, before_close=None):
-        self.propose("i0001", parent_text("i0001", ["research"], copy=self.phases_text))
-        self.commit_parent()
-        self.assertEqual(self.approve().returncode, 0)
-        self.propose(
-            "i0001-01-01",
-            child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], review=False),
-        )
-        self.commit_parent("approval-request child")
-        self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01-01", [("wip/research/summary.md", "s\n")])
-        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
-        self.commit_parent("close 01")
-        self.merge("i0001-01-01")
-        self.propose("i0001", parent_text("i0001", ["research"], feedback=[]))
-        self.assertEqual(self.approve().returncode, 0)
-        if before_close:
-            before_close()
-        closed = self.ccnavi("ticket", "finish", "i0001")
-        self.assertEqual(closed.returncode, 0, closed.stderr)
-        return closed
-
-    def test_a_parent_without_mr_gets_a_notice_that_never_mentions_ready(self):
-        closed = self.close_without_mr()
-        self.assertIn("Draft を解除する手順はありません", closed.stdout)
-        lines = notice_lines(closed)
-        self.assertEqual(len(lines), 1, closed.stdout)
-        self.assertIn("ccnavi --templates --draft i0001", lines[0])
-        self.assertIn("取り込む前に", lines[0])
-        self.assertNotIn("ready", lines[0])
-        self.assertGreater(closed.stdout.index(MARK), closed.stdout.index("Draft を解除"))
-        self.assertTrue(closed.stdout.endswith("\n"))
-
-    def test_the_notice_of_a_parent_without_mr_goes_quiet_after_the_draft(self):
-        def draft():
-            write(
-                os.path.join(
-                    self.parent_tree,
-                    "wip/handoff/.ccnavi/config/project/templates/i0001.yml".replace("/", os.sep),
-                ),
-                "name: i0001\nplan: [research]\n",
-            )
-
-        self.assertEqual(notice_lines(self.close_without_mr(draft)), [])

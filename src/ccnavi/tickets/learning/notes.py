@@ -16,6 +16,7 @@ import shlex
 from typing import TextIO
 
 from ...infra import fsio, gitcmd, pathsafe, settings, toolnames, tree
+from ...policy import texts
 from ...records import audit, redact
 from ..approval import checks as approval_checks
 from ..approval import marks as approval_marks
@@ -174,8 +175,11 @@ def _count_entries(text: str) -> str:
 
 def append_entry(text: str, entry: str, ident: str = "", parent: str = "") -> str:
     text = text.lstrip("﻿").replace("\r\n", "\n")
-    if not _has_usable_frontmatter(text):
-        text = scaffold_text(ident, parent) + text.lstrip("\n")
+    if not text.strip():
+        text = scaffold_text(ident, parent)
+    elif not _has_usable_frontmatter(text):
+        # 手で書いた記録だけがここに来る。雛形を推測して先頭に付けず、止めて直し方を言う
+        raise ValueError("先頭に learnings: を持つ frontmatter がありません")
     if not text.endswith("\n"):
         text += "\n"
     if not text.endswith("\n\n"):
@@ -508,12 +512,9 @@ def run(
         if msg:
             stderr.write(f"ccnavi: 書けない（{msg}）\n")
             return 1
-        stdout.write(
-            f"記録: {record_rel(ident)}"
-            "（気づきを書いて git add と git commit をする。"
-            "無ければ learnings: none のまま）\n"
-        )
-        stdout.write(f"要約: {digest_rel(ident)}（git add と git commit をする）\n")
+        stdout.write(f"記録: {record_rel(ident)}\n")
+        stdout.write(f"要約: {digest_rel(ident)}\n")
+        stdout.write(texts.say(root, "NEXT_LEARN_SCAFFOLD_COMMIT", {}) + "\n")
         return 0
 
     # --note があるときは、本文を組んで記録か受信箱へ書く
@@ -543,11 +544,20 @@ def run(
         except (OSError, ValueError) as e:
             stderr.write(f"ccnavi: 書けない（{e}）\n")
             return 1
-        msg = fsio.write_text_atomic(rec_path, append_entry(text, entry, ident, parent))
+        try:
+            new_text = append_entry(text, entry, ident, parent)
+        except ValueError as e:
+            stderr.write(
+                f"ccnavi: 気づきの記録 {record_rel(ident)} を読み取れません（{e}）。"
+                "直すか、消してから打ち直してください\n"
+            )
+            return 1
+        msg = fsio.write_text_atomic(rec_path, new_text)
         if msg:
             stderr.write(f"ccnavi: 書けない（{msg}）\n")
             return 1
         stdout.write(f"追記した: {record_rel(ident)}\n")
+        stdout.write(texts.say(root, "NEXT_LEARN_NOTE_COMMIT", {}) + "\n")
         return 0
 
     # 結び付かないときは受信箱に、名前が重ならない新しいファイルを書く

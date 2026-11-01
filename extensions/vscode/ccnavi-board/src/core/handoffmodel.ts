@@ -71,14 +71,13 @@ export function parseHandoffList(text: string): HandoffListParse {
       entry_sha: str(item.entry_sha),
     });
   }
-  const ignoredPaths = ignoredPathsOf(raw.ignored_paths);
   return {
     ok: true,
     value: {
       version: HANDOFF_VERSION,
       tree: str(raw.tree),
       ignored: num(raw.ignored),
-      ...(ignoredPaths === undefined ? {} : { ignored_paths: ignoredPaths }),
+      ignored_paths: ignoredPathsOf(raw.ignored_paths),
       entries,
       expect: raw.expect,
       ok: raw.ok,
@@ -86,19 +85,12 @@ export function parseHandoffList(text: string): HandoffListParse {
   };
 }
 
-/** 対象外の名前と理由。欄が無い（古い実行ファイル）・配列でない・欠けた欄があるときは、無いものとして扱い、件数だけ出す */
-function ignoredPathsOf(value: unknown): HandoffIgnored[] | undefined {
-  if (!Array.isArray(value)) {
-    return undefined;
-  }
-  const out: HandoffIgnored[] = [];
-  for (const item of value) {
-    if (!isRecord(item) || typeof item.path !== "string" || item.path === "" || typeof item.why !== "string") {
-      return undefined;
-    }
-    out.push({ path: item.path, why: item.why });
-  }
-  return out;
+/** 対象外の名前と理由 */
+function ignoredPathsOf(value: unknown): HandoffIgnored[] {
+  return list(value)
+    .filter(isRecord)
+    .map((item) => ({ path: str(item.path), why: str(item.why) }))
+    .filter((item) => item.path !== "");
 }
 
 /**

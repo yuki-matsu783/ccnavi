@@ -64,7 +64,7 @@ test("CB-D1245 子のフロー編集の右の欄は、グループ化・Ctrl+C/V
     const parsed = parseTemplateCheck(templatesCheckFixtureText());
     assert.ok(parsed.ok);
     const check = parsed.value;
-    const opened: EditOpened = { name: "feature", layer: "self", created: false, sha: "sha", data: check.data, check, lock: { locked: false, reason: "", doing: [] } };
+    const opened: EditOpened = { name: "feature", layer: "self", created: false, sha: "sha", data: check.data, check, lock: { locked: false, reason: "", doing: [], turns: [] } };
     const row = 'li.template[data-name="feature"][data-layer="self"]';
     if (dom.all(`${row}.open`).length === 0) {
       dom.click(dom.one(`${row} .row-head`));

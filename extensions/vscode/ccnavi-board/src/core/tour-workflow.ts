@@ -83,7 +83,7 @@ function itemOf(raw: unknown, at: string): Json {
     from: item.from ?? item.number,
     type: item.type,
     title: item.title ?? "",
-    review: item.review ?? "",
+    review: item.review ?? null,
     deferred: item.deferred ?? false,
     review_at: item.review_at ?? null,
     locked: item.locked ?? false,

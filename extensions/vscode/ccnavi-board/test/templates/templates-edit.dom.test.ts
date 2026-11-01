@@ -22,7 +22,7 @@ function fixtureCheck(): TemplateCheck {
 }
 
 function openedOf(check: TemplateCheck, extra: Partial<EditOpened> = {}): EditOpened {
-  return { name: "feature", layer: "self", created: false, sha: "sha-opened", data: check.data, check, lock: { locked: false, reason: "", doing: [] }, ...extra };
+  return { name: "feature", layer: "self", created: false, sha: "sha-opened", data: check.data, check, lock: { locked: false, reason: "", doing: [], turns: [] }, ...extra };
 }
 
 /** 見本の画面（図の大きさを測れる細工つき）。self の層の feature の行を開いた状態 */
@@ -284,7 +284,7 @@ test("CB-D388 新しいテンプレートは名前を入れて作る。使えな
     assert.equal(asked?.name, "my-flow");
     const check = fixtureCheck();
     const skeleton = { name: "my-flow", description: "", plan: ["implement"] };
-    await dom.send({ type: "editOpened", session: asked?.session, opened: { name: "my-flow", layer: "self", created: true, sha: "", data: skeleton, check: { ...check, name: "my-flow" }, lock: { locked: false, reason: "", doing: [] } }, error: "" });
+    await dom.send({ type: "editOpened", session: asked?.session, opened: { name: "my-flow", layer: "self", created: true, sha: "", data: skeleton, check: { ...check, name: "my-flow" }, lock: { locked: false, reason: "", doing: [], turns: [] } }, error: "" });
     await dom.settle();
     assert.match(text(dom.one('[data-role="edit"] h2')), /my-flow/);
     assert.match(text(dom.one('[data-role="edit"] h2')), /新規/);
@@ -308,7 +308,7 @@ test("CB-D1224 作った直後は error の苦情を隠し（warn は出す）�
     const check = fixtureCheck();
     const problems = [{ severity: "error", detail: "description がありません" }, { severity: "warn", detail: "when がありません" }];
     const skeleton = { name: "my-flow2", description: "", plan: ["implement"] };
-    await dom.send({ type: "editOpened", session: asked?.session, opened: { name: "my-flow2", layer: "self", created: true, sha: "", data: skeleton, check: { ...check, name: "my-flow2", problems }, lock: { locked: false, reason: "", doing: [] } }, error: "" });
+    await dom.send({ type: "editOpened", session: asked?.session, opened: { name: "my-flow2", layer: "self", created: true, sha: "", data: skeleton, check: { ...check, name: "my-flow2", problems }, lock: { locked: false, reason: "", doing: [], turns: [] } }, error: "" });
     await dom.settle();
     assert.equal(dom.all(".tpl-problems .sev-error").length, 0, "未入力の間は error を出さない");
     assert.equal(dom.all(".tpl-problems .sev-warn").length, 1);
@@ -363,14 +363,14 @@ test("CB-D389 ステップのフローは最初から図を開いていて、部
 test("CB-D390 作業中のチケットがある間は編集はできるが保存できない。錠は開いたときの答えと、あとから届く editLock で替わり、錠が解けると保存できる", async () => {
   const dom = await openList();
   try {
-    const locked = { locked: true, reason: "作業中のチケットがあります（i0001-1）。いま保存すると、進行中の作業の判定が途中で変わるため、作業が終わってから保存してください。", doing: ["i0001-1"] };
+    const locked = { locked: true, reason: "作業中のチケットがあります（i0001-1）。いま保存すると、進行中の作業の判定が途中で変わるため、作業が終わってから保存してください。", doing: ["i0001-1"], turns: [] };
     const { session } = await startEdit(dom, openedOf(fixtureCheck(), { lock: locked }));
     assert.match(text(dom.one('[data-role="edit-lock"]')), /作業中のチケットがあります/);
     dom.type(dom.one(".f-description"), "錠の間も直せる");
     await dom.settle();
     assert.equal(dom.all('[data-role="dirty"]').length, 1);
     assert.equal(dom.one<HTMLButtonElement>('button[data-action="save-edit"]').disabled, true, "錠が掛かっている間は保存を押せない");
-    await dom.send({ type: "editLock", session, lock: { locked: false, reason: "", doing: [] } });
+    await dom.send({ type: "editLock", session, lock: { locked: false, reason: "", doing: [], turns: [] } });
     await dom.settle();
     assert.equal(dom.all('[data-role="edit-lock"]').length, 0);
     assert.equal(dom.one<HTMLButtonElement>('button[data-action="save-edit"]').disabled, false);

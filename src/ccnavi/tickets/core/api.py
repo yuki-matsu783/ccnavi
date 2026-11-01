@@ -46,6 +46,7 @@ approval_refusal_code = core_approve.refusal_code
 
 confirm = core_review.confirm
 confirm_local = core_review.confirm_local
+check_confirm = core_review.check_confirm
 reviewable = core_review.reviewable
 requested_head = core_review.requested_head
 moved_on_host = core_review.moved_on_host

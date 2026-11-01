@@ -15,7 +15,7 @@ const TEMPLATE = ".ccnavi/config/project/templates/login.yml";
 const RULES = ".ccnavi/config/project/rules.yml";
 const DOCS = ".ccnavi/docs/guide.md";
 const HOOK = ".claude/hooks/guard.sh";
-const LOCKED = { locked: true, reason: "作業中のチケットがあります（T1）", doing: ["T1"] };
+const LOCKED = { locked: true, reason: "作業中のチケットがあります（T1）", doing: ["T1"], turns: [] };
 
 /** 要素の文字。前後の空白は除く */
 function text(element: { textContent: string | null } | null | undefined): string {
@@ -49,16 +49,6 @@ test("CB-D366 一覧は対象ごとに 1 行。パス・種類・状態のバッ
     const ignored = text(dom.one("#ignored-paths"));
     assert.match(ignored, /repro\.sh: 取り込める種類の表に無い/);
     assert.match(ignored, /linked: リンクのディレクトリ/);
-  } finally {
-    await dom.close();
-  }
-});
-
-test("CB-D1229 古い実行ファイル（ignored_paths が無い）は、件数だけで折りたたみを出さない", async () => {
-  const dom = await openHandoff({ list: list(undefined, { ignored_paths: undefined }) });
-  try {
-    assert.match(text(dom.one("#counts")), /対象外 2 件/);
-    assert.equal(dom.all("#ignored-paths").length, 0);
   } finally {
     await dom.close();
   }
@@ -322,23 +312,6 @@ test("CB-D378 更新はそのまま refresh を送り、ツリーの切り替え
     assert.equal(empty.all('[data-action="select-all"], [data-action="import"]').length, 0);
   } finally {
     await empty.close();
-  }
-});
-
-test("CB-D379 実行ファイルが handoff を持たない版のとき、画面を無効にして古い版であることを言う。一覧は出さない", async () => {
-  const reason = "実行ファイル（0.1.0 abc）が handoff の機能に対応していません（古い版です）。「取り込み待ち画面」は使えないので進めません。build.py を実行して組み立て直してください";
-  const dom = await openPage({ kind: "disabled", reason });
-  try {
-    assert.match(text(dom.one("#handoff-disabled")), /利用できません/);
-    assert.equal(text(dom.one('[data-role="disabled-reason"]')), reason);
-    assert.match(text(dom.one('[data-role="disabled-reason"]')), /古い版です/);
-    assert.match(text(dom.one('[data-role="disabled-reason"]')), /組み立て直してください/);
-    assert.equal(dom.all("li.entry, input[data-action='select']").length, 0);
-    dom.click(dom.one('button[data-action="reload"]'));
-    await dom.settle();
-    assert.deepEqual(dom.posted.filter((m) => m.type === "refresh"), [{ type: "refresh" }]);
-  } finally {
-    await dom.close();
   }
 });
 

@@ -51,8 +51,8 @@
 .plan-node-title { font-weight: 600; overflow-wrap: anywhere; }
 .plan-node-tags { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--gap-1) var(--gap-3); font-size: var(--font-xs); color: var(--vscode-descriptionForeground); }
 .plan-node-tags .tag { border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-sm); padding: 0 3px; }
-/* 見る場所が none のステップは、縁を細くして「ユーザが見ない」を示す */
-.plan-node:has(.tag[data-review="none"]) { border-left-color: var(--vscode-descriptionForeground); border-left-style: dashed; }
+/* review が false のステップは、縁を細くして「ユーザが見ない」を示す */
+.plan-node:has(.tag[data-review="false"]) { border-left-color: var(--vscode-descriptionForeground); border-left-style: dashed; }
 /* 終端に届かないステップ（実行ファイルの loose）。縁を注意の色にする。文字は普通の色のまま */
 .plan-node[data-loose="1"] { border-color: var(--vscode-editorWarning-foreground); border-left-color: var(--vscode-editorWarning-foreground); }
 /* 子が承認された番号（固定した番号）。薄くして、動かせないことを示す */

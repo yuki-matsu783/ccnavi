@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>直接作業とチケット作業の流れ</title>
+<style>
+/* 構成: 左に直接作業、右にチケット作業。どのつなぎ目にも、前の作業の完了時に出る「次:」を添える */
+:root {
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --fg: #16212b;
+  --muted: #566573;
+  --line: #d2dae1;
+  --ticket: #1b6aa5;
+  --direct: #2b7a55;
+  --font-body: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", "Meiryo", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1920; --surface: #15232c; --fg: #e5ecf1; --muted: #9aaab6; --line: #2a3a46;
+    --ticket: #63b5ea; --direct: #66c795;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1920; --surface: #15232c; --fg: #e5ecf1; --muted: #9aaab6; --line: #2a3a46;
+  --ticket: #63b5ea; --direct: #66c795;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.75;
+  padding: 32px max(16px, env(safe-area-inset-right, 0px)) 56px max(16px, env(safe-area-inset-left, 0px));
+}
+main { max-width: 980px; margin: 0 auto; }
+h1 { font-size: clamp(1.6rem, 4.5vw, 2.2rem); line-height: 1.35; margin: 0 0 12px; text-wrap: balance; }
+p { margin: 0 0 12px; max-width: 42em; }
+.lead { color: var(--muted); }
+.tag { font-size: .78rem; letter-spacing: .08em; color: var(--muted); margin: 0 0 6px; }
+.mono { font-family: var(--font-mono); font-size: .88em; }
+
+.rails { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 24px; align-items: start; }
+.rail { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 18px 8px; min-width: 0; }
+.rail h2 { font-size: 1.1rem; margin: 0 0 4px; }
+.rail.direct h2 { color: var(--direct); }
+.rail.ticket h2 { color: var(--ticket); }
+.rail .sub { color: var(--muted); font-size: .88rem; margin: 0 0 14px; }
+ol.flow { list-style: none; margin: 0; padding: 0; }
+.step { display: grid; grid-template-columns: 22px 1fr; column-gap: 12px; }
+.node { display: flex; justify-content: center; }
+.node::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 3px solid currentColor; background: var(--surface); margin-top: 7px; }
+.direct .node, .direct .line { color: var(--direct); }
+.ticket .node, .ticket .line { color: var(--ticket); }
+.name { padding: 2px 0; min-width: 0; overflow-wrap: anywhere; }
+.name .mono { display: block; color: var(--muted); font-size: .8rem; line-height: 1.5; }
+.link { display: grid; grid-template-columns: 22px 1fr; column-gap: 12px; }
+.line { display: flex; justify-content: center; }
+.line::before { content: ""; border-left: 3px solid currentColor; min-height: 46px; }
+.what { font-size: .88rem; color: var(--muted); padding: 6px 0 8px; min-width: 0; overflow-wrap: anywhere; }
+.what b { font-family: var(--font-mono); font-weight: 600; color: var(--fg); }
+.note { margin-top: 20px; font-size: .88rem; color: var(--muted); }
+
+@media (max-width: 760px) {
+  .rails { grid-template-columns: 1fr; }
+  body { font-size: 15.5px; padding-top: 24px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <p class="tag">IDEA / 図</p>
+  <h1>直接作業とチケット作業の流れ</h1>
+  <p class="lead">ccnavi には、性格の違う 2 つの作業の流れがあります。どちらも、前の作業が終わった時点で、次の作業だけを案内します。線の横の「次:」が、その案内です。</p>
+
+  <div class="rails">
+    <section class="rail direct" aria-label="直接作業の流れ">
+      <h2>直接作業</h2>
+      <p class="sub">承認なし。調査や小さな修正をその場で進め、統合先へ取り込む</p>
+      <ol class="flow">
+        <li>
+          <div class="step"><span class="node"></span><div class="name">ワークツリーを切る<span class="mono">ccnavi-worktree.sh</span></div></div>
+          <div class="link"><span class="line"></span><div class="what"><b>次:</b> ワークツリーの中で編集する</div></div>
+        </li>
+        <li>
+          <div class="step"><span class="node"></span><div class="name">編集する</div></div>
+          <div class="link"><span class="line"></span><div class="what"><b>次:</b> 区切りがついたらコミットする</div></div>
+        </li>
+        <li>
+          <div class="step"><span class="node"></span><div class="name">コミットする<span class="mono">ccnavi-git.sh commit</span></div></div>
+          <div class="link"><span class="line"></span><div class="what"><b>次:</b> AI のレビューを頼む。まず敵対的レビュー、続けて別の AI によるフラットな評価</div></div>
+        </li>
+        <li>
+          <div class="step"><span class="node"></span><div class="name">2 段のレビューを受ける</div></div>
+          <div class="link"><span class="line"></span><div class="what"><b>次:</b> 指摘を取り込んで修正し、integrate を打つ</div></div>
+        </li>
+        <li>
+          <div class="step"><span class="node"></span><div class="name">取り込みを準備する<span class="mono">integrate</span></div></div>
+          <div class="link"><span class="line"></span><div class="what"><b>次:</b> 差分をユーザに報告する</div></div>
+        </li>
+        <li>
+          <div class="step"><span class="node"></span><div class="name">ユーザの了承で確定する<span class="mono">integrate-done</span></div></div>
+          <div class="link"><span class="line"></span><div class="what"><b>次:</b> push はユーザに頼む</div></div>
+        </li>
+        <li>
+          <div class="step"><span class="node"></span><div class="name">ユーザが git push する</div></div>
+        </li>
+      </ol>
+    </section>
+
+    <section class="rail ticket" aria-label="チケット作業の流れ">
+      <h2>チケット作業</h2>
+      <p class="sub">issue とマージリクエストのセット。計画を承認してから、子ごとに進める</p>
+      <ol class="flow">
+        <li>
+          <div class="step"><span class="node"></span><div class="name">提案を書く<span class="mono">ticket new</span></div></div>
+          <div class="link"><span class="line"></span><div class="what"><b>次:</b> 空欄を埋めて、approval-request で送る</div></div>
+        </li>
+        <li>
+          <div class="step"><span class="node"></span><div class="name">提案を送る<span class="mono">approval-request</span></div></div>
+          <div class="link"><span class="line"></span><div class="what"><b>次:</b> ユーザに承認を頼む</div></div>
+        </li>
+        <li>
+          <div class="step"><span class="node"></span><div class="name">ユーザが承認する</div></div>
+          <div class="link"><span class="line"></span><div class="what"><b>次:</b> 親を start する</div></div>
+        </li>
+        <li>
+          <div class="step"><span class="node"></span><div class="name">親を始める<span class="mono">ticket start</span></div></div>
+          <div class="link"><span class="line"></span><div class="what"><b>次:</b> 子を start する</div></div>
+        </li>
+        <li>
+          <div class="step"><span class="node"></span><div class="name">子を始め、実装を任せる<span class="mono">ticket start &lt;子&gt;</span></div></div>
+          <div class="link"><span class="line"></span><div class="what"><b>次:</b> 実装が終わったら、子を finish する</div></div>
+        </li>
+        <li>
+          <div class="step"><span class="node"></span><div class="name">子を閉じる<span class="mono">ticket finish</span></div></div>
+          <div class="link"><span class="line"></span><div class="what"><b>次:</b> レビューを依頼する。不要なら親の status を見る</div></div>
+        </li>
+        <li>
+          <div class="step"><span class="node"></span><div class="name">レビューを確定する<span class="mono">confirm / decide</span></div></div>
+          <div class="link"><span class="line"></span><div class="what"><b>次:</b> 親の status で、次の子か親の finish かを確かめる</div></div>
+        </li>
+        <li>
+          <div class="step"><span class="node"></span><div class="name">親を閉じる<span class="mono">finish → ready</span></div></div>
+          <div class="link"><span class="line"></span><div class="what"><b>次:</b> マージリクエストのマージはユーザに頼む</div></div>
+        </li>
+        <li>
+          <div class="step"><span class="node"></span><div class="name">ユーザがマージする</div></div>
+          <div class="link"><span class="line"></span><div class="what"><b>次:</b> ccnavi-sync.sh で同期する</div></div>
+        </li>
+        <li>
+          <div class="step"><span class="node"></span><div class="name">同期する<span class="mono">ccnavi-sync.sh</span></div></div>
+        </li>
+      </ol>
+    </section>
+  </div>
+
+  <p class="note">「次:」の文言は、流れを説明するための例です。実際の出力は、操作ごとの文面ファイルで決まります。</p>
+</main>
+</body>
+</html>

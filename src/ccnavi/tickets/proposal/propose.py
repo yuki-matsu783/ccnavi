@@ -36,6 +36,7 @@ from collections.abc import Callable
 from typing import TextIO
 
 from ...infra import fsio, pathcase, settings
+from ...policy import texts
 from ..approval import checks as approval_checks
 from ..approval import store as approval
 from ..approval import write_and_push
@@ -188,6 +189,7 @@ def run(
             return 1
     if check:
         stdout.write("確認: ok（approval-request を打てる状態。提案は送っていません）\n")
+        stdout.write(texts.say(root, "NEXT_APPROVAL_REQUEST_CHECKED", {"parent": parent}) + "\n")
         return 0
     for path in paths:
         fsio.note_input(path)

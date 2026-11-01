@@ -42,7 +42,7 @@ import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { rulesSums, type RulesSum } from "./core/sums.js";
 import { showLoading } from "./loading.js";
 import type { HandoffEntry } from "./core/handoff-entry.js";
-import { openHandoffFrom, readHandoffEntry } from "./handoff-entry.js";
+import { HANDOFF_ENTRY, openHandoffFrom } from "./handoff-entry.js";
 import type { RulesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
 import { lintSummary } from "./core/lint-summary.js";
@@ -244,11 +244,9 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     ...(localText === undefined ? [] : parseHooks(localText, "settings-local")),
   ];
   const expectationsRel = expectationsSetting();
-  // 取り込み待ち画面を開けるかは、設定の読み込みとは別に確かめる（古い実行ファイルでは入口だけを無効にする）
-  const handoff = await readHandoffEntry(root, binSetting());
   return {
     target,
-    handoff,
+    handoff: HANDOFF_ENTRY,
     exists,
     mtimeMs,
     // 無いファイルは、書式の版だけを持つ空のルールとして読む（版が無いファイルは実行ファイルが読めないので、保存で作るときに先頭へ置く）

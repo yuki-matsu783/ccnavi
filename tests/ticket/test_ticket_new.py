@@ -284,7 +284,7 @@ class TicketNewScopeTest(TicketNewTestBase):
     def setUp(self):
         super().setUp()
         quick_work = (
-            "\n  quick-work:\n    kind: work\n    title: 小さい作業\n    review: mr\n"
+            "\n  quick-work:\n    kind: work\n    title: 小さい作業\n    review: true\n"
             "    scope: inherit\n"
         )
         with open(config_path(self.root, "phases"), "w", encoding="utf-8", newline="\n") as f:

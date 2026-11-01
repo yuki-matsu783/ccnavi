@@ -228,10 +228,10 @@ class MakeTest(Drafts):
         self.assertEqual([p for p in found if p.severity == SEVERITY_ERROR], [])
 
     def test_review_is_kept(self):
-        plan = [{"type": "design", "review": "defer"}, "implement"]
+        plan = [{"type": "design", "deferred": True}, "implement"]
         self.done_parent(plan)
         self.assertEqual(self.draft().returncode, 0)
-        self.assertEqual([i.review for i in self.drafted().plan], ["defer", ""])
+        self.assertEqual([i.deferred for i in self.drafted().plan], [True, False])
 
     def test_flows_come_from_the_first_child_that_has_one(self):
         self.done_parent(
