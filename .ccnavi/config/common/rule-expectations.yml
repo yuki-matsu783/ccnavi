@@ -133,6 +133,12 @@ deny:
     subject: "gh api -X PUT repos/o/r/pulls/3/merge"
     why: API を直に叩くマージ（no-direct-merge）
   - tool: Bash
+    subject: "glab mr -R g/p merge 1"
+    why: mr と merge の間に -R が入っても止める（no-direct-merge）
+  - tool: Bash
+    subject: "gh pr review 3 -a"
+    why: --approve の短い形も止める（no-direct-merge）
+  - tool: Bash
     subject: "gh pr review 3 --approve"
     why: gh の承認（no-direct-merge）
   - tool: Bash

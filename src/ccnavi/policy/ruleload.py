@@ -181,7 +181,7 @@ def unreadable(conf: settings.Settings, root: str) -> list[str]:
     """ルールのファイルがあるのに読めないレイヤーの名前。無いレイヤーは数えない。
 
     読めないレイヤーは空として扱われ、そのレイヤーの deny は黙って効かなくなる。
-    判定のたびには言わず（`add_layers`）、セッションの開始で 1 度だけ言うために使う。
+    判定のたびには言わず（`add_layers`）、セッションの開始のたびに言うために使う。
     """
     broken = []
     for layer in layers(conf, root):

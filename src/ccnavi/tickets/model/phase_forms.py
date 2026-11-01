@@ -22,15 +22,17 @@ from . import user_only
 # 連結されたコマンドが 1 つでもこの形（または下の付き添い）でなければ止める。
 _EXEMPT_COMMAND = re.compile(rf"^(sh|bash)\s+\S*{user_only.hold_exempt_forms()}(\s|$)")
 # 上の形に付き添ってよい、読むだけの付き添いのコマンド。`cd <ツリー> && …` と `… | head`・`… | tail`。
-# 上の形が 1 本も無ければ付き添いだけでは通さない。リダイレクトを含む形は通さない。
-_EXEMPT_COMPANION = re.compile(r"^(?:cd|head|tail)(?:\s[^<>]*)?$")
+# 上の形が 1 本も無ければ付き添いだけでは通さない。head・tail は行数の指定だけで、ファイル名・
+# `-f`・リダイレクト（`2>&1` を含む）は付けられない。cd は引数 1 個。
+_EXEMPT_COMPANION = re.compile(r"^(?:head|tail)(?:\s+-n?\s*\d+)?$|^cd\s+\S+$")
 # 止めたときの文に添える、通る形の案内。案内どおりの 1 本に `cd … &&` や `| tail` を
 # 付けると、連結の全部が上の形でないので止まる。文が「何を打つか」だけを言うと、
 # 付け足した形で打って止まり、案内と拒否が食い違って見える。
 EXEMPT_NOTE = (
     "止めている間に通るのは、ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh と "
     "ccnavi-launcher.sh --docs を sh で実行する形だけです。"
-    "前に cd、後ろに | head・| tail を付けてもよく、ほかのコマンドを足すと止まります。"
+    "前に cd、後ろに | head -n 3 のような行数だけの head・tail を付けてもよく、"
+    "ファイル名・リダイレクト（2>&1 など）・ほかのコマンドを足すと止まります。"
 )
 
 # ユーザとモデルに見せる文で「ターン」を初めて使うところに置く表記。LLM の用語で、

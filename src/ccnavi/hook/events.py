@@ -39,7 +39,6 @@ from ..policy import (
     selfguard_targets,
     texts,
 )
-from ..policy import texts as policy_texts  # decide_at_start の局所変数 texts と名前が重なるため
 from ..records import (
     audit,
     busy,
@@ -1092,10 +1091,10 @@ def decide_at_start(
     pruned = _prune_at_start(stderr, conf, root, payload.session_id)
     record.detail = "; ".join(part for part in (record.detail, pruned) if part)
     record.decision, record.enforced = audit.ALLOW, True
-    texts = []
+    blocks = []
     if outcomes:
         record.guarded = [f"{o.target.key}:{o.action}" for o in outcomes]
-        texts.append(selfguard.report(outcomes))
+        blocks.append(selfguard.report(outcomes))
     # 承認済みチケットの要求のうち、上位（ルールの deny・親の範囲・フェーズ定義の上限）に
     # 却下されて効かないもの（REQ-SES-02）。モデルにもユーザにも出す。サブエージェントには
     # 出さない。索引（docsearch）より先に組むのは、こちらが短い予算で済み、索引に期限の
@@ -1136,44 +1135,44 @@ def decide_at_start(
             mode,
         )
         if guide:
-            texts.append(guide)
+            blocks.append(guide)
         # このPCで作業中の親を 1 行ずつ（親・ブランチ・MR・次の子・未送信）。
         # 読めなくても開始は止めない。
         parents = _parents_at_start(stderr, conf, root)
         if parents:
-            texts.append(parents)
+            blocks.append(parents)
     # 読めないレイヤーのルールは空として扱われ、そのレイヤーの deny が黙って効かなくなる。
-    # 判定のたびには言わないので、開始で 1 度だけ、モデルにもユーザにも出す。
+    # 判定のたびには言わないので、開始のたびに、モデルにもユーザにも出す。
     broken = [] if payload.agent_id else ruleload.unreadable(conf, root)
     if broken:
-        said = policy_texts.say(root, "NOTICE_LAYER_UNREADABLE", {"layers": "、".join(broken)})
+        said = texts.say(root, "NOTICE_LAYER_UNREADABLE", {"layers": "、".join(broken)})
         rejects = "\n\n".join(p for p in (rejects, said) if p)
     if rejects:
-        texts.append(rejects)
+        blocks.append(rejects)
     if pending:
-        texts.append(pending)
+        blocks.append(pending)
     if direct:
-        texts.append(direct)
+        blocks.append(direct)
     # scratchpad/ が大きいときに、消してよいものを尋ねる文。起動（startup）のときだけ出す
     # （再開・compact・clear のたびに同じ質問を繰り返さない）。サブエージェントには出さない。
     if payload.source == "startup" and not payload.agent_id:
         limit = time.monotonic() + PENDING_SECONDS
         large = scratchpad.session_text(root, limit if deadline is None else min(deadline, limit))
         if large:
-            texts.append(large)
+            blocks.append(large)
     # 学びの蓄積の提案の候補が新しく現れたら、ユーザにだけ知らせる（モデルの文脈には入れない）。
     learning = "" if payload.agent_id else learning_notice.notice(conf, root, deadline)
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録。
     skills = projskills.notice(stderr, conf, root, payload, at_start=True)
     if skills:
-        texts.append(skills)
+        blocks.append(skills)
     if docs:
-        texts.append(docs)
-    if texts or learning:
+        blocks.append(docs)
+    if blocks or learning:
         hookio.write_context(
             stdout,
             hookio.SESSION_START,
-            "\n\n".join(texts),
+            "\n\n".join(blocks),
             system="\n\n".join(p for p in (rejects, pending, learning) if p),
         )
     return EXIT_OK

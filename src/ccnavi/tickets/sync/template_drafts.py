@@ -33,6 +33,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 from dataclasses import dataclass, field
 
 from ...infra import fsio, pathsafe, settings, tree
@@ -552,5 +553,5 @@ def close_notice(conf: settings.Settings, root: str, parent: str) -> str:
         f"`ccnavi --templates --draft {parent}` で下書きを作る"
         "（ready で閉じると下書きの材料は退避されて拾えない）。"
         "下書きはユーザが `ccnavi-user-handoff.sh --root "
-        f"{found.tree_root}` で取り込むか、削除してから ready\n"
+        f"{shlex.quote(found.tree_root)}` で取り込むか、削除してから ready\n"
     )

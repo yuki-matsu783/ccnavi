@@ -95,7 +95,7 @@ deny:
   # Developer 止まりにすること（.ccnavi/docs/ticket-flow.md）。
   - id: no-direct-merge
     match: Bash
-    regex: '(^|\x00)(?:[^\s\x00\\/]*+[\\/])*+(glab|gh)(\.exe)?\s[^\x00]*(\b(mr|pr)\s+(merge|approve)\b|\bpr\s+review\s[^\x00]*--approve\b|\bapi\s[^\x00]*/(merge|approve|merge_when_pipeline_succeeds)([^\w/-]|$))'
+    regex: '(^|\x00)(?:[^\s\x00\\/]*+[\\/])*+(glab|gh)(\.exe)?\s[^\x00]*(\b(mr|pr)\s+(?:(?:-R|--repo)\s+\S+\s+)?(merge|approve)\b|\bpr\s+review\s[^\x00]*(--approve\b|\s-a\b)|\bapi\s[^\x00]*/(merge|approve|merge_when_pipeline_succeeds)([^\w/-]|$))'
     message: >-
       MR / PR のマージと承認は、ユーザが行う操作です。トークンで直接行わないでください。
       レビューを頼む手順（ccnavi-review.sh の review-request）を通し、ユーザの承認とマージを待ってください。
