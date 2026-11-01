@@ -114,7 +114,7 @@ learnings: 2
 子の `ticket finish` は、学びの蓄積が有効な親の子について、`wip/handoff/learnings/<子>.md` が子のブランチの HEAD にコミットされた通常のファイル（モードが `100644` か `100755` の blob。ディレクトリとシンボリックリンクは不可）で、空でなく、親の `finish` と同じ読み取りの検査と節の整合の検査を通ることを確かめる
 （子の閉じる操作の検査のうち、成果物を見る `lifecycle.close.deliverables_missing` の隣に置く。フェーズ定義の `deliverables` とは別に持つ）。満たさなければ閉じるのを拒み、置き場と `ticket learn` を示す。
 この検査はフェーズ定義の `deliverables` に載せず、閉じる操作に固定で持つ。
-`deliverables` と同じく、在って追跡されていることを見たうえで、親の `finish` が見る形式（`learnings` の値と節の数）も同じ関数で見る。
+`deliverables` と同じく、ファイルが在って追跡されているかを確かめたうえで、親の `finish` が見る形式（`learnings` の値と節の数）も同じ関数で確かめる。
 
 子の着手の出力に 1 行を足す（REQ-LRN-03）。「閉じる前に `ticket learn` を打ち、`wip/handoff/learnings/<子>.md` に気づきを書く（無ければ `learnings: none`）」。
 この 1 行と検査は、子の起動の経路（`claude -p` のメインエージェントでも、サブエージェントでも）によらず働く。
