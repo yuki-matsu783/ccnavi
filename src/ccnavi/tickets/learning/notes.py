@@ -398,6 +398,7 @@ def parent_blocked(
             f"その子を処理して閉じたあと、"
             f"'{ticket_sh} finish {found.ticket}' を打ち直してください\n"
         )
+        stderr.write(texts.say(root, "NOTE_LEARN_PROCESS_FORM", {}) + "\n")
         return True
     return False
 

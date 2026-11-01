@@ -138,6 +138,13 @@ messages:
     next: |-
       気づきの記録をステージしてコミットする（しないと finish が止まる）
 
+  # 親の finish が「判定されていない気づき」で止めるとき、統合の子の本文を読めない担当にも書式が届くように添える。
+  NOTE_LEARN_PROCESS_FORM:
+    kind: note
+    note: |-
+      処理の行は、気づきの節に 1 行だけ書く。形は '- 処理: 反映 <パターン名>' か '- 処理: 対象外 <理由>'（例: '- 処理: 反映 retry-backoff'、'- 処理: 対象外 この回限りの事情'）。後ろに注釈は付けない（後ろ全部がパターン名や理由と読まれる）
+      反映するパターンの sources には、観測元のチケット ID（記録のファイル名から .md を除いたもの）を書く。受信箱のファイル名は書かない。詳しくは .ccnavi/docs/learning-propose.md
+
   NEXT_LEARN_SCAFFOLD_COMMIT:
     kind: next
     next: |-
@@ -287,6 +294,7 @@ messages:
       '{script:ccnavi-ticket.sh} start {ident}' で着手する
     note: |-
       着手したら、サブエージェントに処理を任せる。終わってコミットされたら '{script:ccnavi-ticket.sh} finish {ident}' を打つ
+      処理の行は節に 1 行だけ、注釈なしで書く: '- 処理: 反映 <パターン名>' か '- 処理: 対象外 <理由>'。sources には観測元のチケット ID を書く（.ccnavi/docs/learning-propose.md）
       子のワークツリー .claude/worktrees/{ident} は start が作る。作れないときは '{script:ccnavi-git.sh} worktree add ".claude/worktrees/{ident}" -b {ident}'
 
   # ---- entry/cli_templates.py（テンプレートの下書きを書いたあと）
