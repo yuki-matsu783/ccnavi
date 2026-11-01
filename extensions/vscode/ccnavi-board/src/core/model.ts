@@ -141,7 +141,8 @@ export interface TicketJson {
   readonly predecessors: readonly string[];
   /** 満たしていない先行。空なら満たしている（先行が無い・閉じたチケットも空） */
   readonly predecessors_unmet: readonly PredecessorUnmetJson[];
-  readonly human_review: { readonly required: boolean; readonly reason: string };
+  /** 子の `human_review`。`required` が null なら宣言なし（計画のステップとフェーズ定義に従う） */
+  readonly human_review: { readonly required: boolean | null; readonly reason: string };
   readonly proposal: ProposalJson | null;
   /** 完了した計画付きの親から、テンプレートの下書きを作れるか */
   readonly template_draft: boolean;
@@ -519,7 +520,7 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     predecessors_unmet: list(raw.predecessors_unmet)
       .filter(isRecord)
       .map((p) => ({ ticket: str(p.ticket), state: str(p.state), label: str(p.label) })),
-    human_review: { required: raw !== undefined && review.required === true, reason: str(review.reason) },
+    human_review: { required: typeof review.required === "boolean" ? review.required : null, reason: str(review.reason) },
     proposal: isRecord(raw.proposal) ? proposal(raw.proposal) : null,
     blocked: str(raw.blocked),
     copy: {

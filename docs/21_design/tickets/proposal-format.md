@@ -21,7 +21,7 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
 | `mr` | 親 | 必須。仕事を載せる MR の番号（下の `mr` の項） |
 | `project` | 全部 | 置き場と同じ名前。省ける。決めるのは置き場（11） |
 | `parent` `phase` `predecessors` | 子 | 同じ親の同じ `phase` が 1 つのまとまり。0 以上の整数で、計画があれば 1 から。`predecessors` は先に閉じているべき子 |
-| `human_review` | 子 | `required`（既定 `true`）と `reason` |
+| `human_review` | 子 | `required` と `reason`。省くと宣言なしで、計画のステップとフェーズ定義に従う |
 | `phases` `plan` `feedback` | 親 | フェーズ定義のコピーと、全体計画・フィードバック計画（9.7） |
 | `title` `rationale` | 全部 | タイトルと理由 |
 | `allow` `ask` `deny` | 全部 | 書ける範囲 |
@@ -58,7 +58,8 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
   `..` `~` `$` と絶対パスは書けない。項は 20 件まで、
   `allow` か `ask` が 1 件は要る。表記は書いたまま持ち、大文字小文字を無視するのは適用するときだけ
 - `human_review` は子ごと。フェーズの子に 1 枚でも `required: true` があれば、そのフェーズの終わりで
-  レビューが済むまで止まる。省くのに理由が無ければ warn
+  レビューが済むまで止まる。省くと宣言なしで、計画のステップの `review` とフェーズ定義に従う。
+  `required: false` と書くのに理由が無ければ warn
 - 短縮形の `issue: "#12"` と `human_review: true`・`false` は、提案では error（`--agree` と `--lint` が
   `issue: 12`・`{required:, reason:}` の形を言う）。承認済みチケットは書き直せないので、読み取りは受ける
 - `predecessors` は子だけ。承認と `ticket start` が、各チケットが `done/` に在って取り消しでないことを求める

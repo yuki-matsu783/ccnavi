@@ -308,8 +308,8 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         head = f"{t.ticket}（{t.title}、承認 {when}、{place}、{bound}）"
         if t.is_child:
             unmet = approval_checks.unmet_predecessors(t, preds)
-            need = "要" if t.review_required else "不要"
-            head += f" 親 {t.parent} フェーズ {t.phase} レビュー{need}"
+            need = {True: "要", False: "不要", None: "宣言なし"}[t.review_required]
+            head += f" 親 {t.parent} フェーズ {t.phase} 子の宣言のレビュー{need}"
             if unmet:
                 head += " 先行を満たしていない: " + ", ".join(
                     f"{p.ticket}（{p.label}）" for p in unmet

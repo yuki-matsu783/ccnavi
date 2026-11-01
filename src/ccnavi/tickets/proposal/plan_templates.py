@@ -141,16 +141,16 @@ class Item:
     """計画の 1 ステップ。`after` はその計画の中の添字（1 始まり）。"""
 
     type: str
-    review: bool = False
+    review: bool | None = None
     deferred: bool = False
     after: list[int] = field(default_factory=list)
 
     def as_data(self):
-        if not self.review and not self.deferred and not self.after:
+        if self.review is None and not self.deferred and not self.after:
             return self.type
         out: dict = {"type": self.type}
-        if self.review:
-            out["review"] = True
+        if self.review is not None:
+            out["review"] = self.review
         if self.deferred:
             out["deferred"] = True
         if self.after:
@@ -607,11 +607,11 @@ def _composed(template: Template, ptypes: dict) -> str:
     planned = len(template.plan)
 
     def raw(item: Item, offset: int):
-        if not item.review and not item.deferred and not item.after:
+        if item.review is None and not item.deferred and not item.after:
             return item.type
         out: dict = {"type": item.type}
-        if item.review:
-            out["review"] = True
+        if item.review is not None:
+            out["review"] = item.review
         if item.deferred:
             out["deferred"] = True
         if item.after:
@@ -757,7 +757,7 @@ def graph(
         rows = []
         for n, item in zip(numbers, items, strict=True):
             pt = config.get(item.type)
-            review = True if item.review else (pt.review if pt is not None else None)
+            review = ticket_model.chosen_review(item.review, pt.review if pt is not None else None)
             rows.append(
                 {
                     "number": n,

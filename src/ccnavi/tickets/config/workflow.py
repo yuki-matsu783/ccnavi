@@ -237,7 +237,7 @@ def problems(
                 continue
             target_item = numbered[target]
             tpt = (types or {}).get(target_item.type)
-            if tpt is not None and not tpt.review and not target_item.review:
+            if tpt is not None and not ticket_model.chosen_review(target_item.review, tpt.review):
                 error(f"`{key}[{i}]` を延期した先の `{target_item.type}` にレビューがありません。")
     return found
 

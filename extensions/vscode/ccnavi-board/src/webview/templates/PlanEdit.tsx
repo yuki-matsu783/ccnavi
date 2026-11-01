@@ -31,6 +31,7 @@ const PART_TITLE: Readonly<Record<PlanPart, string>> = { plan: "全体計画", f
 const MODE_LABEL: Readonly<Record<ItemMode, string>> = {
   "": "定義のまま",
   review: "review: true（MR を見る）",
+  "no-review": "review: false（MR を見ない）",
   deferred: "deferred: true（後ろのステップへ延ばす）",
 };
 

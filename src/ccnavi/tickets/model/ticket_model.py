@@ -111,23 +111,32 @@ class Entry:
         return self.glob[:cut]
 
 
-def step_flags(entry: dict, where: str) -> tuple[bool, bool, str]:
+def step_flags(entry: dict, where: str) -> tuple[bool | None, bool, str]:
     """計画のステップの `review` と `deferred` を読む。(review, deferred, 誤りの文)。
 
-    `review: true` は、定義が `review: false` でも要る（強める）。`deferred: true` は、次に
-    レビューがあるフェーズと一緒に見る（延期）。どちらも `true` だけを書け、弱める向き
-    （`review: false`）は書けない。2 つは同時に書けない（延期は自分では見ない）。
+    `review` は、このステップの終わりにユーザのレビューが要るか（`true`）要らないか（`false`）を、
+    フェーズ定義の `review` より優先して決める。書かなければ None で、定義に従う。
+    `deferred: true` は、次にレビューがあるフェーズと一緒に見る（延期）。
+    2 つは同時に書けない（延期は自分では見ない）。
     ステップの形を読む入口（ticket.py と plan_templates.py）は、この関数だけを通る。
     """
-    flags = []
-    for key in ("review", "deferred"):
-        value = entry.get(key)
-        if value is not None and value is not True:
-            return False, False, f"{where} の `{key}` は true だけ書ける（弱める向きは書けない）"
-        flags.append(value is True)
-    if all(flags):
-        return False, False, f"{where} に `review: true` と `deferred: true` は同時に書けない"
-    return flags[0], flags[1], ""
+    review = entry.get("review")
+    if review is not None and not isinstance(review, bool):
+        return None, False, f"{where} の `review` は true か false"
+    deferred = entry.get("deferred")
+    if deferred is not None and deferred is not True:
+        return None, False, f"{where} の `deferred` は true だけ書ける"
+    if review is not None and deferred is True:
+        return None, False, f"{where} に `review` と `deferred: true` は同時に書けない"
+    return review, deferred is True, ""
+
+
+def chosen_review(item_review: bool | None, type_review: bool | None) -> bool | None:
+    """ステップの終わりにレビューが要るか。ステップの指定（チケットの記載）が定義より優先する。
+
+    どちらも言わなければ None（言っている者が居ない）。
+    """
+    return item_review if item_review is not None else type_review
 
 
 @dataclass
@@ -144,18 +153,19 @@ class PlanItem:
     """
 
     type: str
-    review: bool = False
+    # None はフェーズ定義に従う。true / false は定義より優先する。
+    review: bool | None = None
     deferred: bool = False
     after: list[int] = field(default_factory=list)
     after_errors: list[tuple[object, str]] = field(default_factory=list)
     after_repeated: list[int] = field(default_factory=list)
 
     def as_raw(self):
-        if not self.review and not self.deferred and not self.after:
+        if self.review is None and not self.deferred and not self.after:
             return self.type
         raw: dict = {"type": self.type}
-        if self.review:
-            raw["review"] = True
+        if self.review is not None:
+            raw["review"] = self.review
         if self.deferred:
             raw["deferred"] = True
         if self.after:
@@ -249,7 +259,8 @@ class Ticket:
     # 提案は承認の候補を組むときと `phase.phases_of`）。state 層のここからは compose 層を
     # 読み込まないので、型は書かない。
     phase_types: dict | None = None
-    review_required: bool = True
+    # 子が `human_review` で言った、人間レビューの要否。None は宣言なし（フェーズ定義に従う）。
+    review_required: bool | None = None
     review_reason: str = ""
     title: str = ""
     rationale: str = ""

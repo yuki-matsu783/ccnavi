@@ -91,7 +91,8 @@ export interface Card {
   readonly openPath: string;
   readonly copyStatus: CopyStatus;
   readonly approvedAt: string;
-  readonly reviewRequired: boolean;
+  /** 子の宣言。null は宣言なし */
+  readonly reviewRequired: boolean | null;
   readonly reviewReason: string;
   readonly worktreeExists: boolean;
   readonly worktreePath: string;
@@ -363,7 +364,7 @@ function toArchivedCard(a: ArchivedTicketJson): Card {
     openPath: a.path,
     copyStatus: "archived",
     approvedAt: "",
-    reviewRequired: false,
+    reviewRequired: null,
     reviewReason: "",
     worktreeExists: false,
     worktreePath: "",

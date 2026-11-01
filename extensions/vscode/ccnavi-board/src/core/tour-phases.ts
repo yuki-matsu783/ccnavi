@@ -48,6 +48,7 @@ function phaseOf(origin: number | null, id: string, raw: unknown): PhaseForm {
     scope: inherit ? [] : list(map.scope),
     deliverables: list(map.deliverables),
     agent: str(map.agent),
+    skill: str(map.skill),
     when: str(map.when),
   };
 }

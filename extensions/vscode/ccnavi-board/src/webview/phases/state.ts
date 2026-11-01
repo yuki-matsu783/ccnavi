@@ -44,7 +44,7 @@ export function formOf(draft: Draft): PhasesForm {
  * レビューは true（足した定義が気づかないうちにレビュー無しにならないように）。
  */
 export function emptyPhase(): PhaseForm {
-  return { origin: null, id: "", title: "", kind: "work", review: true, inherit: true, scope: [], deliverables: [], agent: "", when: "" };
+  return { origin: null, id: "", title: "", kind: "work", review: true, inherit: true, scope: [], deliverables: [], agent: "", skill: "", when: "" };
 }
 
 /**

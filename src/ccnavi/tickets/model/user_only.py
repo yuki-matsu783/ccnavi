@@ -355,6 +355,18 @@ def board_combos() -> tuple[tuple[re.Pattern[str], ...], ...]:
     )
 
 
+# 止めている間（レビュー準備中・待ち）も通す、起動の sh（`ccnavi-launcher.sh`）のオプション。
+# 読むだけで、次に何をするかを調べる手段。エージェントに許す副命令（`SUBAGENT_ROLES`）の一部で、
+# ここに足すと `phase_forms.exempt` が通す。
+HOLD_EXEMPT_LAUNCHER_FLAGS: tuple[str, ...] = ("--docs",)
+
+
+def hold_exempt_forms() -> str:
+    """止めている間も通す `ccnavi-…sh` の部分。エージェントの 3 本と、起動の sh の資料の引き。"""
+    launcher = "|".join(re.escape(flag) for flag in HOLD_EXEMPT_LAUNCHER_FLAGS)
+    return rf"(?:{agent_script_forms()}|ccnavi-launcher\.sh\s+(?:{launcher}))"
+
+
 def agent_script_forms() -> str:
     """`sh <…>/ccnavi-(ticket|review|git).sh` の `ccnavi-…sh` の部分。"""
     return r"ccnavi-(?:" + "|".join(AGENT_SCRIPTS) + r")\.sh"

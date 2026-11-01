@@ -22,6 +22,7 @@ phases:
     title: 実装とテスト（ccnavi 自身）
     review: true
     scope: ["src/*", "tests/*", "build.py", "pyproject.toml", "scripts/*", ".ccnavi/*", "extensions/*"]
+    skill: process-implement
     when: 振る舞いを変えるとき。受入テスト作成を先に置く（計画に受入テスト作成の項も置く）
 
   staging:

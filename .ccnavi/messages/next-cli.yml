@@ -12,6 +12,20 @@ messages:
     next: |-
       サブエージェントに、子のワークツリー（.claude/worktrees/{ticket}）での実装を任せる。終わってコミットされたら '{script:ccnavi-ticket.sh} finish {ticket}' を打つ
 
+  # 子の着手のあと。フェーズ定義の `skill` が指す工程スキルがこの機械にあるとき。
+  NOTE_OPS_START_SKILL:
+    kind: note
+    values: [skill]
+    note: |-
+      サブエージェントへの指示に「最初に Skill ツールで {skill} を呼ぶ」を入れる（この工程の標準の考え方と、このリポジトリで育てた決まりが入っている）
+
+  # 子の finish が通ったあと。成果物の置き場が wip/ のとき（止めない）。
+  NOTE_OPS_FINISH_WIP_DELIVERABLES:
+    kind: note
+    values: [paths]
+    note: |-
+      成果物 {paths} は wip/ の下にあり、親の ready が wip/ ごと消すので、マージされても main に残らない（履歴からは戻せる）。結論を main に残すなら、範囲が許す場所（docs/ など）に書き写すか、レビュー依頼の本文・MR の説明に書く
+
   # 親を閉じたあと。
   NEXT_OPS_CLOSE_MR:
     kind: next

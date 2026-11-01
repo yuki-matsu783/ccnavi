@@ -314,7 +314,7 @@ class LearningMoreTest(LearningBase):
             check=True,
             capture_output=True,
         )
-        self.assertTrue(learning.record_missing(io.StringIO(), self.ws, conf, found))
+        self.assertTrue(learning.record_blocked(io.StringIO(), self.ws, conf, found))
 
     def test_command_word_table(self) -> None:
         cases = {

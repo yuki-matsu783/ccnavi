@@ -604,7 +604,7 @@ def plans(ans: Answer) -> list[dict]:
         entry_items = []
         for n, item in zip(numbers, items, strict=True):
             pt = types.get(item.type)
-            review = True if item.review else (pt.review if pt is not None else None)
+            review = ticket_model.chosen_review(item.review, pt.review if pt is not None else None)
             entry_items.append(
                 {
                     "number": n,

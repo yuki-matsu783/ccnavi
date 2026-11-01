@@ -116,7 +116,8 @@ test("CB-T4 欠けた項目は既定値で埋め、全体を破棄しない", ()
     assert.equal(t.proposal, null);
     assert.equal(parsed.board.tickets[1].copy.status, "review");
     assert.equal(parsed.board.tickets[1].proposal, null);
-    assert.equal(t.human_review.required, false);
+    // 子が human_review を書いていなければ宣言なし（null）。要らないとは言っていない
+    assert.equal(t.human_review.required, null);
     assert.deepEqual(t.seen_in, []);
     const p = parsed.board.parents[0].phases[0];
     assert.equal(p.state, "planned");

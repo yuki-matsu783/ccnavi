@@ -61,6 +61,11 @@ def processes(root: str) -> list[str]:
     return found
 
 
+def installed(root: str, name: str) -> str:
+    """フェーズ定義の `skill` が指す工程スキルの名前。この機械に無ければ空（案内に出さない）。"""
+    return name if name and name in processes(root) else ""
+
+
 def _process_flag(raw: bytes) -> bool:
     text = raw[:HEAD_LIMIT].decode("utf-8", errors="replace")
     lines = text.splitlines()

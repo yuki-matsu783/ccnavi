@@ -14,6 +14,7 @@ import {
   connectItems,
   disconnectItems,
   fromData,
+  modeOf,
   locate,
   moveItem,
   removeFlow,
@@ -40,14 +41,14 @@ function sample(): EditTemplate {
     description: "説明",
     when: "",
     plan: [
-      { type: "design", review: false, deferred: false, after: [] },
+      { type: "design", review: null, deferred: false, after: [] },
       { type: "implement", review: true, deferred: false, after: [1] },
-      { type: "docs", review: false, deferred: false, after: [1] },
-      { type: "acceptance", review: false, deferred: false, after: [2, 3] },
+      { type: "docs", review: null, deferred: false, after: [1] },
+      { type: "acceptance", review: null, deferred: false, after: [2, 3] },
     ],
     feedback: [
-      { type: "implement-feedback", review: false, deferred: false, after: [] },
-      { type: "docs-feedback", review: false, deferred: false, after: [1] },
+      { type: "implement-feedback", review: null, deferred: false, after: [] },
+      { type: "docs-feedback", review: null, deferred: false, after: [1] },
     ],
     flows: { "2": FLOW("f2"), "4": FLOW("f4") },
     extra: { note: "知らない欄" },
@@ -66,7 +67,7 @@ test("CB-T1139 実行ファイルが読み返した中身を編集のコピー�
   assert.ok(read !== undefined);
   assert.equal(read.name, "feature");
   assert.equal(read.plan.length, 2);
-  assert.deepEqual(read.plan[1], { type: "implement", review: false, deferred: false, after: [1] });
+  assert.deepEqual(read.plan[1], { type: "implement", review: null, deferred: false, after: [1] });
   assert.equal(read.feedback.length, 1);
   assert.deepEqual(Object.keys(read.flows), ["2"]);
   assert.ok(sameData(toData(read), data));
@@ -78,7 +79,7 @@ test("CB-T1140 書き出した YAML を読み直すと書こうとした中身�
   const t = sample();
   const read = parse(serializeTemplate(t)) as Record<string, unknown>;
   assert.ok(sameData(toData(t), read));
-  const bare = toData({ ...t, plan: [{ type: "design", review: false, deferred: false, after: [] }], feedback: [], flows: {}, extra: {}, when: "" });
+  const bare = toData({ ...t, plan: [{ type: "design", review: null, deferred: false, after: [] }], feedback: [], flows: {}, extra: {}, when: "" });
   assert.deepEqual(bare, { name: "t", description: "説明", plan: ["design"] });
   assert.deepEqual(Object.keys(toData(t)), ["name", "description", "plan", "feedback", "flows", "note"]);
 });
@@ -101,7 +102,7 @@ test("CB-T1142 ステップを消すと、後ろのステップの添字・先�
     ],
   );
   // 途中のステップを消しても、後ろのステップは前のステップが先行のまま残る（並行して始まるステップに変わらない）
-  const chain: EditTemplate = { ...sample(), plan: [{ type: "a", review: false, deferred: false, after: [] }, { type: "b", review: false, deferred: false, after: [1] }, { type: "c", review: false, deferred: false, after: [2] }], flows: {} };
+  const chain: EditTemplate = { ...sample(), plan: [{ type: "a", review: null, deferred: false, after: [] }, { type: "b", review: null, deferred: false, after: [1] }, { type: "c", review: null, deferred: false, after: [2] }], flows: {} };
   assert.deepEqual(removeItem(chain, "plan", 2).plan.map((i) => [i.type, [...i.after]]), [["a", []], ["c", [1]]]);
   // 2 番のフローはステップと一緒に消え、4 番のフローは 3 番になる（4 番は 2 が先行だったので、2 の先行の 1 を引き継ぐ。先行は 1 と 3）
   assert.deepEqual(Object.keys(next.flows), ["3"]);
@@ -157,11 +158,11 @@ test("CB-T1145 並べ直せない循環の線は引かない。先行の添字�
   const t = sample();
   // 受入（4）が設計（1）の先行になると、4 には 2・3 を通って 1 が先行するので循環する
   assert.equal(connectItems(t, 4, 1), t);
-  const broken: EditTemplate = { ...t, plan: [{ type: "a", review: false, deferred: false, after: [2] }, { type: "b", review: false, deferred: false, after: [] }], flows: {} };
+  const broken: EditTemplate = { ...t, plan: [{ type: "a", review: null, deferred: false, after: [2] }, { type: "b", review: null, deferred: false, after: [] }], flows: {} };
   const fixed = renumber(broken, "plan");
   assert.deepEqual(fixed?.plan.map((i) => i.type), ["b", "a"]);
   assert.deepEqual(fixed?.plan[1].after, [1]);
-  const cycle: EditTemplate = { ...t, plan: [{ type: "a", review: false, deferred: false, after: [2] }, { type: "b", review: false, deferred: false, after: [1] }], flows: {} };
+  const cycle: EditTemplate = { ...t, plan: [{ type: "a", review: null, deferred: false, after: [2] }, { type: "b", review: null, deferred: false, after: [1] }], flows: {} };
   assert.equal(renumber(cycle, "plan"), undefined);
   assert.equal(renumber(t, "plan"), t);
 });
@@ -169,9 +170,16 @@ test("CB-T1145 並べ直せない循環の線は引かない。先行の添字�
 test("CB-T1146 ステップの足し方・型とレビューの差し替え・説明の差し替え・フローの置き外し", () => {
   const t = sample();
   const added = addItem(t, "plan", "staging");
-  assert.deepEqual(added.plan[4], { type: "staging", review: false, deferred: false, after: [4] });
-  assert.deepEqual(addItem(blankTemplate("n", "implement"), "feedback", "x").feedback, [{ type: "x", review: false, deferred: false, after: [] }]);
-  assert.deepEqual(setItem(t, "plan", 1, { type: "research", mode: "deferred" }).plan[0], { type: "research", review: false, deferred: true, after: [] });
+  assert.deepEqual(added.plan[4], { type: "staging", review: null, deferred: false, after: [4] });
+  assert.deepEqual(addItem(blankTemplate("n", "implement"), "feedback", "x").feedback, [{ type: "x", review: null, deferred: false, after: [] }]);
+  assert.deepEqual(setItem(t, "plan", 1, { type: "research", mode: "deferred" }).plan[0], { type: "research", review: null, deferred: true, after: [] });
+  // `review: false`（レビューを外す）も書ける。読み返して書き出すと同じ中身に戻り、選択肢の値も往復する
+  const off = setItem(t, "plan", 1, { mode: "no-review" });
+  assert.deepEqual(off.plan[0], { type: "design", review: false, deferred: false, after: [] });
+  assert.equal(modeOf(off.plan[0]), "no-review");
+  assert.deepEqual((toData(off) as { plan: unknown[] }).plan[0], { type: "design", review: false });
+  assert.deepEqual(fromData(toData(off))?.plan[0], off.plan[0]);
+  assert.equal(setItem(off, "plan", 1, { mode: "" }).plan[0].review, null);
   assert.equal(setItem(t, "plan", 9, { type: "x" }), t);
   assert.equal(setMeta(t, { description: "新" }).description, "新");
   assert.equal(setFlow(t, 9, FLOW("x")), t);

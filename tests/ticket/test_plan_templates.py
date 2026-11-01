@@ -415,9 +415,14 @@ class CheckTest(Harness):
         row = self.check(template("t", plan))
         self.assertTrue(any("延期できない" in d for d in self.problems(row, "error")))
 
-    def test_a_review_that_loosens_is_an_error(self):
+    def test_a_review_false_is_allowed_and_overrides_the_definition(self):
         row = self.check(template("t", "  - {type: design, review: false}\n"))
-        self.assertTrue(any("弱める向き" in d for d in self.problems(row, "error")))
+        self.assertEqual(self.problems(row, "error"), [])
+
+    def test_a_review_with_deferred_is_an_error(self):
+        plan = "  - {type: design, review: false, deferred: true}\n  - {type: implement}\n"
+        row = self.check(template("t", plan))
+        self.assertTrue(any("同時に書けない" in d for d in self.problems(row, "error")))
 
     def test_an_unknown_type_is_only_a_warning(self):
         row = self.check(template("t", "  - docs\n"))

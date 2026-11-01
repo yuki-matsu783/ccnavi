@@ -2,7 +2,7 @@
  * 定義 1 件の行。折りたたんだときは要約 1 行、開くと欄が出る。
  *
  * 欄名は日本語で欄の左に出し、YAML のキー名は欄名のツールチップに載せる（`Captioned`）。
- * 出番の少ない 2 欄（補足。agent / when）は見出し 1 行に折りたたみ、値がある定義だけ最初から開く。
+ * 出番の少ない 3 欄（補足。agent / skill / when）は見出し 1 行に折りたたみ、値がある定義だけ最初から開く。
  *
  * **ほかの定義との関係の欄（overlap / requires / after）は出さない。** 順序（どのフェーズにどのフェーズが先行するか）は
  * フェーズ定義ではなく親チケットの計画のステップの `after` で決める。
@@ -45,7 +45,7 @@ export interface PhaseProps {
   readonly frozen?: boolean;
 }
 
-type TextKey = "id" | "title" | "agent" | "when";
+type TextKey = "id" | "title" | "agent" | "skill" | "when";
 type ListKey = "scope" | "deliverables";
 
 export function Phase(props: PhaseProps): JSX.Element {
@@ -183,6 +183,9 @@ export function Phase(props: PhaseProps): JSX.Element {
           <div className="sub">
             <Captioned name="案内するエージェント" yamlKey="agent" tour={mark("phase-agent")}>
               {text("agent", "f-agent narrow", "サブエージェント名（案内に出すだけで、割り当てはしません）")}
+            </Captioned>
+            <Captioned name="最初に呼ぶ工程スキル" yamlKey="skill">
+              {text("skill", "f-skill narrow", "工程スキル名（例 process-research。案内に出すだけで、呼ぶかは子が決めます）")}
             </Captioned>
             <Captioned name="使う場面" yamlKey="when" tour={mark("phase-when")}>
               {text("when", "f-when", "この定義を計画に入れる場面（エージェントへの案内にだけ使います）")}

@@ -30,7 +30,8 @@ export interface PlanItem {
   readonly index: number;
   readonly number: number;
   readonly type: string;
-  readonly review: boolean;
+  /** ステップの `review`。null は書いていない（定義に従う） */
+  readonly review: boolean | null;
   readonly deferred: boolean;
   readonly after: readonly number[];
 }

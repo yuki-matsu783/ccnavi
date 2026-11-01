@@ -60,6 +60,7 @@ test("CB-T116 ないファイル（空の本文）に定義を追加して書き
         scope: [],
         deliverables: [],
         agent: "",
+        skill: "",
         when: "",
       },
     ],
