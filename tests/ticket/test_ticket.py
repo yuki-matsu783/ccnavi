@@ -1116,6 +1116,14 @@ class TicketTest(unittest.TestCase):
             command="sh .ccnavi/scripts/ccnavi-git.sh status",
         )
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(exempt))
+        # 止めている間も、資料を引く `--docs` は通る（次に何をするかを調べる手段）。
+        docs = f"{settings.script_command(self.root, 'ccnavi-launcher.sh')} --docs --keyword review"
+        passed = self.hook("PreToolUse", "Bash", self.parent_tree, command=docs)
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(passed), self.reason(passed))
+        # 連結や、`--docs` 以外のオプションは止まる。
+        for command in (f"cd . && {docs}", f"{docs.split(' --docs')[0]} --lint"):
+            held = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
+            self.assertIn("DENY_PHASE_REVIEW", self.reason(held), command)
         # 次のフェーズの計画は通る。
         plan = self.hook(
             "PreToolUse",

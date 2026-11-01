@@ -18,7 +18,7 @@ from ..approval import marks as approval_marks
 from ..approval import ops as approval_ops
 from ..approval import store as approval
 from ..config import phasetypes
-from ..model import standing, ticket_model
+from ..model import standing, ticket_model, ticket_places
 from ..model import ticket as ticket_mod
 from ..phase import gates as phase
 
@@ -342,6 +342,37 @@ def close_problems(
     return problems
 
 
+def phase_type(
+    root: str, conf: settings.Settings, found: ticket_model.Ticket
+) -> phasetypes.PhaseType | None:
+    """子のフェーズの定義（成果物・工程スキルの案内が読む）。子でない・計画が無い・定義が無いなら None。
+
+    定義は親に固定したコピー（`phases:`）から読む。`phases.yml` は読まない（承認のあとに
+    直しても、進行中のフェーズの成果物は変わらない）。
+    """
+    if not found.is_child or found.phase is None:
+        return None
+    copies, _ = approval.scan(conf, root)
+    parent = approval_checks.by_id(copies).get(found.parent)
+    if parent is None or not parent.has_plan:
+        return None
+    item = parent.item_at(found.phase)
+    return phasetypes.types_of(parent).get(item.type) if item is not None else None
+
+
+def deliverables_in_wip(
+    root: str, conf: settings.Settings, found: ticket_model.Ticket
+) -> list[str]:
+    """定義の成果物のうち、`wip/` の下に置くもの。`ready` が `wip/` ごと消すので、MR に残らない。
+
+    止めない。調査のように範囲が `wip/` だけのフェーズは、結論の置き場がここしか無いことがある。
+    """
+    pt = phase_type(root, conf, found)
+    if pt is None:
+        return []
+    return [g for g in pt.deliverables if ticket_places.in_wip(g)]
+
+
 def deliverables_missing(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
@@ -357,16 +388,7 @@ def deliverables_missing(
     4. 成果物のうち、親と子のワークツリーのどちらにも追跡されていないものを集める。
     5. あれば名前を言って止める（True）。
     """
-    if not found.is_child or found.phase is None:
-        return False
-    copies, _ = approval.scan(conf, root)
-    parent = approval_checks.by_id(copies).get(found.parent)
-    if parent is None or not parent.has_plan:
-        return False
-    item = parent.item_at(found.phase)
-    # 成果物は親に固定したコピー（`phases:`）の定義から読む。`phases.yml` は読まない（承認のあとに
-    # 直しても、進行中のフェーズの成果物は変わらない）。
-    pt = phasetypes.types_of(parent).get(item.type) if item is not None else None
+    pt = phase_type(root, conf, found)
     if pt is None or not pt.deliverables:
         return False
     # 同じフェーズに、まだ開いている別の子があれば、成果物はその子が出すかもしれない。

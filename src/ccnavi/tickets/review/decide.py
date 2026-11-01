@@ -1081,12 +1081,27 @@ def _part_path(issue_path: str, n: int) -> str:
     return f"{stem}.part{n}{ext}"
 
 
+def _decided_by() -> str:
+    """コメントに書く、判断した人と経路の行。アカウントが引けなければ経路だけ。"""
+    account, route = _decide_actor()
+    route = route or via.via()
+    detail = f"経路: {route}" + (f"、アカウント: {account}" if account else "")
+    return f"ユーザの判断（{detail}）"
+
+
 def decide_comment_text(
     d: Decision, picked: dict[str, list[review_host.Thread]], followup: str
 ) -> str:
-    """MR に書き込む、決めた内容のコメントの本文。issue の表記は、作ったあとに書き足す。"""
+    """MR に書き込む、決めた内容のコメントの本文。issue の表記は、作ったあとに書き足す。
+
+    投稿者はエージェントと同じアカウントになるので、ユーザの判断であることと、操作の経路
+    （`terminal`・`board`・`chrome`）とアカウントを本文に書く。後からホストの記録だけで、
+    誰が判断したかを読めるようにするため。
+    """
+    by = _decided_by()
     lines = [
         review_host.MARKER_DECIDE,
+        by,
         f"フェーズ {d.ph.number} の未解決（Unresolved）指摘の対応方針:",
     ]
     if picked[CHOICE_KEEP]:
@@ -1113,7 +1128,7 @@ def decide_comment_text(
             text = f"フェーズ {d.ph.number} は今回の判断なし。追加分 {len(extra)} 件は判断待ち。"
         else:
             text = f"フェーズ {d.ph.number} で未解決（Unresolved）の指摘なし。レビュー済みにした。"
-        lines = [review_host.MARKER_DECIDE, text]
+        lines = [review_host.MARKER_DECIDE, by, text]
     return "\n".join(lines) + "\n"
 
 

@@ -23,6 +23,7 @@ import shutil
 import tempfile
 import unittest
 
+from ccnavi.tickets.model import ticket_model
 from tests import can_case_sensitive, common_path, config_path, userform, write_and_push_flag
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import ROOT, git, read_json, write
@@ -545,7 +546,90 @@ class PhaseTest(PhaseHarness):
         write(os.path.join(tree, "wip", "research", "summary.md"), "x\n")
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "summary")
-        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
+        closed = self.close_child("i0001-01-01")
+        self.assertEqual(closed.returncode, 0)
+        # 成果物が wip/ の下にあるときは、ready で消えることを止めずに言う。
+        self.assertIn("wip/research/summary.md は wip/ の下にあり", closed.stdout)
+
+    def finish_to(self, name, files):
+        """子を着手して閉じ、置き場（review か done）を返す。"""
+        self.run_child(name, files)
+        closed = self.close_child(name)
+        self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
+        if os.path.exists(os.path.join(self.approved, "done", f"{name}.md")):
+            return "done"
+        review = os.path.join(self.parent_tree, "wip", "proposals", "review", f"{name}.md")
+        return "review" if os.path.exists(review) else ""
+
+    def test_a_child_without_human_review_follows_the_phase_definition(self):
+        """子が `human_review` を書かなければ宣言なしで、定義の `review: false` に従う。"""
+        self.family(plan=["research", "design"])
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], review=None)
+        )
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        state = self.finish_to("i0001-01-01", [("wip/research/summary.md", "x\n")])
+        self.assertEqual(state, "done")
+
+    def test_plan_step_review_false_overrides_a_definition_that_needs_review(self):
+        """計画のステップの `review: false` は、定義の `review: true` より優先する。"""
+        self.family(plan=[{"type": "design", "review": False}])
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"], review=None)
+        )
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        state = self.finish_to("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(state, "done")
+
+    def test_an_explicit_required_true_still_raises_the_phase(self):
+        """子の `required: true` は、計画の `review: false` でも「要る」へ上げる。"""
+        self.family(plan=[{"type": "design", "review": False}])
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"], review=True)
+        )
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        state = self.finish_to("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(state, "review")
+
+    def test_step_flags_reads_true_false_and_refuses_the_rest(self):
+        flags = ticket_model.step_flags
+        self.assertEqual(flags({"review": False}, "plan[0]"), (False, False, ""))
+        self.assertEqual(flags({"review": True}, "plan[0]"), (True, False, ""))
+        self.assertEqual(flags({}, "plan[0]"), (None, False, ""))
+        self.assertEqual(flags({"deferred": True}, "plan[0]"), (None, True, ""))
+        for bad in ({"review": "no"}, {"review": False, "deferred": True}, {"deferred": False}):
+            self.assertTrue(flags(bad, "plan[0]")[2], bad)
+
+    def start_research_child(self, with_skill):
+        self.family(plan=["research", "design"])
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], review=False)
+        )
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.start_parent()
+        self.worktree("i0001-01-01", "i0001")
+        if with_skill:
+            skill = os.path.join(self.root, ".claude", "skills", "process-research")
+            write(
+                os.path.join(skill, "SKILL.md"), "---\nname: process-research\nprocess: true\n---\n"
+            )
+        started = self.ccnavi("ticket", "start", "i0001-01-01")
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        return started
+
+    def test_start_names_the_process_skill_of_the_phase(self):
+        """定義の `skill` が指す工程スキルがあれば、着手の出力が名前で言う。"""
+        started = self.start_research_child(with_skill=True)
+        self.assertIn("最初に Skill ツールで process-research を呼ぶ", started.stdout)
+
+    def test_start_does_not_name_a_process_skill_that_is_not_installed(self):
+        """この機械に無い工程スキルは、案内に出さない。"""
+        started = self.start_research_child(with_skill=False)
+        self.assertNotIn("process-research", started.stdout)
 
     def test_deliverable_tracked_but_deleted_from_the_worktree_is_missing(self):
         """追跡済みでもワークツリーから消えていれば、成果物は無いものとして閉じない。

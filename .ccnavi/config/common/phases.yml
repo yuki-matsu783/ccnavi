@@ -28,6 +28,7 @@ phases:
     kind: work
     title: 小さい作業
     review: true
+    skill: process-implement
     scope: inherit
     when: 設計判断や並行作業が要らないとき
 
@@ -35,6 +36,7 @@ phases:
     kind: work
     title: 調査
     review: false
+    skill: process-research
     scope: ["wip/research/*"]
     deliverables: ["wip/research/summary.md"]
     when: 既存の振る舞いや依存が分からないとき。分かっているなら省略する
@@ -43,6 +45,7 @@ phases:
     kind: work
     title: 設計
     review: true
+    skill: process-design
     scope: ["wip/design/*", "docs/*"]
     deliverables: ["wip/design/*.md"]
     when: 変更箇所が 3 か所を超えるか、外から見える振る舞いが変わるとき
@@ -51,6 +54,7 @@ phases:
     kind: work
     title: 受入テスト作成
     review: true
+    skill: process-test
     scope: ["tests/*"]
     when: 振る舞いが変わるとき。実装と並行してよい（実装のステップの `after` にこのステップを書かなければ並行する）
 
@@ -58,6 +62,7 @@ phases:
     kind: work
     title: 実装とテスト
     review: true
+    skill: process-implement
     scope: ["src/*", "tests/*"]
     when: 振る舞いを変えるとき。受入テスト作成を先に置く（計画に受入テスト作成の項も置く）
 
@@ -65,11 +70,13 @@ phases:
     kind: feedback
     title: 設計フィードバック対応
     review: true
+    skill: process-design
     scope: ["wip/design/*", "docs/*"]
 
   implement-feedback:
     kind: feedback
     title: 実装フィードバック対応
     review: true
+    skill: process-implement
     scope: inherit
     when: フィードバック計画の最後に置き、ほかの対応を受ける

@@ -18,6 +18,7 @@ from ..tickets.flow import graph as flow
 from ..tickets.model import ticket as ticket_mod
 from ..tickets.model import ticket_model
 from ..tickets.phase import gates as phase
+from ..tickets.sync import skillsync
 
 # 担当の案内に必ず足す 3 行。サブエージェントの Bash は cd がコマンドをまたいで続かず、
 # 担当外のワークツリーと、push・チケットの状態の操作は触らせない（メインが行う）。
@@ -96,6 +97,9 @@ def child_block(
         label = f"{t.phase}: {pt.title}"
         if pt.agent:
             hint = f" 定義の案内: エージェント {pt.agent}"
+        skill = skillsync.installed(root, pt.skill)
+        if skill:
+            hint += f" 最初に Skill ツールで {skill} を呼ぶ"
     block = Block()
     block.lines.append(
         f"  {t.ticket}（親 {t.parent}、フェーズ {label}）: {where} [{state}]"

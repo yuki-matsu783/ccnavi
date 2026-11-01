@@ -85,7 +85,8 @@ ask:                       # 無くてよい。allow か ask のどちらかが 
 ```
 
 - `allow` / `ask` の `glob` は、ワイルドカードが無ければ前置として扱う（`app` は `app/` 以下全部）。`..` `~` `$` と絶対パスは書けない。項は 20 件まで。書いていない場所は範囲外
-- `human_review: {required: true, reason: …}` は子ごとの欄。省くと既定（`required: true`）。`required: false` にするときは `reason` に理由を書く
+- `human_review: {required: true, reason: …}` は子ごとの欄。省くと宣言なしで、フェーズのレビューの要否は計画のステップの `review` とフェーズ定義（型）に従う。`required: true` は「要る」を足すだけで、要らないことは言えない。`required: false` にするときは `reason` に理由を書く
+- 計画のステップに `review: true`（要る）か `review: false`（要らない）を書くと、型の `review` より優先する（例 `{type: research, review: false}`）。レビューの要否をチケットで決めたいときは、ここに書く
 - `started_at` `completed_at` `base_sha` などの欄はスクリプトが書く。提案には書かない
 - `branch:` は書けない（使えない欄としてエラーになる）。本文は自由で、MR の下書きの本文に使われる
 

@@ -159,44 +159,47 @@ class Phase:
 
     @property
     def declared_review(self) -> bool | None:
-        """このフェーズ定義と計画のステップが言う「レビューが要るか」。宣言が無ければ None。
+        """このフェーズの計画のステップと定義が言う「レビューが要るか」。宣言が無ければ None。
 
-        計画のステップは「要る」にだけ強められる（`review: true`）ので、ステップが要ると言えば
-        定義より優先する。定義の無い番号（計画が無い、定義のファイルが無い、その名前の
-        定義が読めない）は、言っている者が居ないので None。
+        チケットに書いた計画のステップ（`review: true / false`）が、定義（型）より優先する。
+        どちらも言わない番号（計画が無い、定義のファイルが無い、その名前の定義が読めない）は、
+        言っている者が居ないので None。
         """
-        if self.item is not None and self.item.review:
-            return True
-        if self.type is not None:
-            return self.type.review
-        return None
+        return ticket_model.chosen_review(
+            self.item.review if self.item is not None else None,
+            self.type.review if self.type is not None else None,
+        )
 
     @property
     def review_required(self) -> bool:
         """このフェーズの終わりにユーザのレビューが要るか。
 
-        要るかを言えるのは、定義と計画のステップと、引き受けた延期だけ。そのうち 1 つでも
-        要ると言えば要る。子の宣言（`human_review.required`）と実績のリスクは「要る」とだけ
-        言うので、宣言が「要らない」だったフェーズを要るへ上げる。どちらも止める向きにしか働かない。
+        要るかを言えるのは、計画のステップ（チケットの記載。定義より優先する）と定義と、
+        引き受けた延期だけ。そのうち 1 つでも要ると言えば要る。子の宣言（`human_review.required:
+        true`）と実績のリスクは「要る」とだけ言うので、宣言が「要らない」だったフェーズを
+        要るへ上げる。どちらも止める向きにしか働かない。子が何も書かなければ宣言なしで、
+        フェーズの宣言に従う。
 
-        要るかを言う根拠が 1 つも無ければ（計画が無い、定義が読めない）、子が「ユーザが見る」と
-        言うか実績が高ければ要る。要らない側に倒すと、定義のファイルが読めないときにレビューが消える。
-        延期を引き受けている番号は、覆っている分の宣言が読めなくても要るを受け取る
-        （`_covered_review`）ので、この扱いにはならない。
+        要るかを言う根拠が 1 つも無ければ（計画が無い、定義が読めない）、子が「要らない」と
+        明示しない限り要り、実績が高ければ要る。要らない側に倒すと、定義のファイルが読めないときに
+        レビューが消える。延期を引き受けている番号は、覆っている分の宣言が読めなくても
+        要るを受け取る（`_covered_review`）ので、この扱いにはならない。
 
         延期したフェーズは自分では要らず、次に見るフェーズが引き受ける。
         """
         if self.deferred:
             return False
-        from_children = any(
-            t.review_required
+        closed = [
+            t
             for t in self.tickets
             if self.states.get(t.ticket) in (ticket_model.REVIEW, ticket_model.DONE)
-        )
+        ]
         # 実績のリスクは、宣言を要るの側にだけ上書きする（tickets/config/risk.py）。
-        needed = from_children or self.risk_escalates
+        needed = any(t.review_required is True for t in closed) or self.risk_escalates
         declared = [d for d in [self.declared_review, *self.covered_reviews] if d is not None]
-        return any(declared) or needed
+        if declared:
+            return any(declared) or needed
+        return needed or any(t.review_required is not False for t in closed)
 
     @property
     def gate_closed(self) -> bool:

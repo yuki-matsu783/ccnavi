@@ -16,16 +16,20 @@ from . import user_only
 # 何がユーザ専用かは `user_only` の表が正本。この module はその表から正規表現とオプションの一覧を
 # 組み立て、コマンド行に適用する。操作を足す・外すときは表の行を直し、ここの正規表現は直さない。
 
-# 止めている間でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
+# 止めている間でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本と、
+# 資料を引く `ccnavi-launcher.sh --docs`（読むだけで、次に何をするかを調べる手段）を、
 # コマンドの位置で `sh` から呼ぶ形だけ。名前がどこかに含まれるだけでは通さない。
 # 連結されたコマンドが 1 つでもこの形でなければ止める。
-_EXEMPT_COMMAND = re.compile(rf"^(sh|bash)\s+\S*{user_only.agent_script_forms()}(\s|$)")
+_EXEMPT_COMMAND = re.compile(
+    rf"^(sh|bash)\s+\S*(?:{user_only.agent_script_forms()}|ccnavi-launcher\.sh\s+--docs)(\s|$)"
+)
 # 止めたときの文に添える、通る形の案内。案内どおりの 1 本に `cd … &&` や `| tail` を
 # 付けると、連結の全部が上の形でないので止まる。文が「何を打つか」だけを言うと、
 # 付け足した形で打って止まり、案内と拒否が食い違って見える。
 EXEMPT_NOTE = (
-    "止めている間に通るのは、ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh を "
-    "sh で単独で実行する形だけです。cd や | tail などを前後に付けると、そのコマンドも止まります。"
+    "止めている間に通るのは、ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh と "
+    "ccnavi-launcher.sh --docs を sh で単独で実行する形だけです。"
+    "cd や | tail などを前後に付けると、そのコマンドも止まります。"
 )
 
 # ユーザとモデルに見せる文で「ターン」を初めて使うところに置く表記。LLM の用語で、

@@ -14,6 +14,13 @@ from ..model import ticket_model
 from . import agree_candidates, agree_digest
 
 
+def _declared_review(required: bool | None) -> str:
+    """子の `human_review` の読み。書かなければ、計画のステップとフェーズ定義に従う。"""
+    if required is None:
+        return "宣言なし（計画のステップとフェーズ定義に従う）"
+    return "要" if required else "不要（子の宣言。計画かフェーズ定義が要ると言えば要る）"
+
+
 def approved_text(
     tickets: list[ticket_model.Ticket],
     revisions: set[str],
@@ -221,8 +228,8 @@ def screen(
             )
             lines += [f"    {p.detail}" for p in cand.overflow]
         if t.is_child:
-            state = "要" if t.review_required else "不要"
-            lines.append(f"■ 人間レビュー: {state}")
+            state = _declared_review(t.review_required)
+            lines.append(f"■ 人間レビュー（子の宣言）: {state}")
             if t.review_reason:
                 lines.append(f"    理由: {t.review_reason}")
             if t.predecessors:
@@ -274,8 +281,8 @@ def _plan_lines(items: list[ticket_model.PlanItem], start: int, types: dict | No
         review = ""
         if item.deferred:
             review = "次のフェーズとまとめてレビュー"
-        elif item.review:
-            review = "レビュー必須：計画で追加指定"
+        elif item.review is not None:
+            review = "レビュー必須：計画で指定" if item.review else "レビュー不要：計画で指定"
         elif pt is not None:
             review = "レビュー必須: マージリクエスト" if pt.review else "レビュー不要"
         lines.append(f"    {n}. {title} / {item.type}" + (f"  {review}" if review else ""))
