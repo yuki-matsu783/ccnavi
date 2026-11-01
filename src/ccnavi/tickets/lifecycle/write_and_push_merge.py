@@ -249,7 +249,7 @@ def _tree_problem(
             [
                 "サブエージェントにコミットさせるか、不要な変更を取り除いてから finish をやり直す。"
                 "追跡外で、自分のコマンドが作ったと分かる生成物（lock・キャッシュ・仮想環境など）は"
-                "rm してよい（ルールの dependencies は Write/Edit が対象で、rm は掛からない）。"
+                "rm してよい（ルールの dependencies は Write/Edit が対象で、rm にはルールが掛からない）。"
                 "出所が分からないものは消さず、ユーザに確かめる。"
                 "追跡済みのファイルの変更は rm せず、不要なら ccnavi-git.sh restore で戻す"
             ],

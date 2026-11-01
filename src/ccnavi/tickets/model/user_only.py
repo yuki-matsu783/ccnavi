@@ -388,7 +388,7 @@ SUBAGENT_ROLES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ("fetch", "origin", "merged", "--help", r"decide\s+\S+\s+--preview"),
     ),
     ("ccnavi-git", "deny", ("push", "worktree", "integrate", "integrate-done")),
-    # 起動の sh は、資料・検査・試験・説明・一覧（学び・ルールの候補。書き込まない）・ヘルプだけ許す。中身は実行ファイルの全副命令に届くため。
+    # 起動の sh は、資料・検査・試験・説明・学びとルールの候補の一覧（書き込まない）・ヘルプだけ許す。中身は実行ファイルの全副命令に届くため。
     (
         "ccnavi-launcher",
         "allow",

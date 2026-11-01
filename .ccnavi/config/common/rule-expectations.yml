@@ -122,7 +122,7 @@ deny:
     why: トークンで未レビューの MR を直接マージする形（no-direct-merge）
   - tool: Bash
     subject: "cd /repo && gh pr merge 3 --squash"
-    why: 連結の後ろでも、コマンドの位置なら止める（no-direct-merge）
+    why: 連結の後ろでも、コマンドの位置にあれば止める（no-direct-merge）
   - tool: Bash
     subject: "glab -R group/proj mr approve 10"
     why: サブコマンドの前にオプションが付いても止める（no-direct-merge）
