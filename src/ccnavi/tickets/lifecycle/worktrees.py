@@ -56,12 +56,12 @@ import stat
 from dataclasses import dataclass
 from typing import TextIO
 
-from ...infra import gitcmd, pathcase, settings, tree
+from ...infra import gitcmd, pathcase, pathsafe, settings, tree
 from ...policy import texts
 from ..approval import checks as approval_checks
 from ..approval import store as approval
 from ..model import ticket as ticket_mod
-from ..model import ticket_ids, ticket_model
+from ..model import ticket_ids, ticket_model, ticket_places
 from ..phase import gates as phase
 
 TIMEOUT_SECONDS = 30.0
@@ -133,6 +133,11 @@ def retry_command(root: str, name: str) -> str:
     return f"{settings.script_command(root, 'ccnavi-clean.sh')} --worktree {name}"
 
 
+def _bad_name(name: str) -> bool:
+    """`.claude/worktrees/` の直下の名前として使えない（空・`.`・`..`・パスの区切り）か。"""
+    return not name or name in (".", "..") or any(c in name for c in ("/", "\\", ":"))
+
+
 def _screen(root: str, name: str, cwd: str) -> tuple[Dropped | None, str]:
     """消してよいかを判定する（消さずに読むだけ）。
 
@@ -148,12 +153,12 @@ def _screen(root: str, name: str, cwd: str) -> tuple[Dropped | None, str]:
        ファイルは止める理由にしない（`drop` が退避する）。
     """
     path = tree.worktree_path(root, name)
-    if not name or name in (".", "..") or any(c in name for c in ("/", "\\", ":")):
+    if _bad_name(name):
         refusal = "名前にパスは書けない（.claude/worktrees/ の直下の名前）"
         return Dropped(name, REFUSED, path, refusal), ""
     if not os.path.lexists(path):
         return Dropped(name, ABSENT, path), ""
-    if os.path.islink(path) or os.path.isjunction(path):
+    if pathsafe.is_link(path):
         return Dropped(name, REFUSED, path, "リンクなので、リンクの先は削除しません。"), ""
     if not os.path.isdir(path):
         return Dropped(name, REFUSED, path, "ディレクトリでない"), ""
@@ -452,9 +457,14 @@ def _stash_ignored(root: str, name: str, top: str) -> tuple[str, str]:
         return "", why
     if not ignored:
         return "", ""
-    dest = os.path.join(root, "scratchpad", "worktrees", name)
-    shown_dest = f"scratchpad/worktrees/{name}"
-    checked = gitcmd.run(root, ["check-ignore", "-q", "--", shown_dest], TIMEOUT_SECONDS)
+    dest = os.path.join(root, ticket_places.SCRATCH_ROOT, "worktrees", name)
+    shown_dest = f"{ticket_places.SCRATCH_ROOT}/worktrees/{name}"
+    checked = gitcmd.run(
+        root,
+        ["check-ignore", "-q", "--", shown_dest],
+        TIMEOUT_SECONDS,
+        plain_pathspecs=True,
+    )
     if not checked.ok:
         return "", (
             f"退避先 {shown_dest} が git に無視されていないので、無視されたファイルを退避しません。"
@@ -641,40 +651,68 @@ def _clean_generated(top: str) -> str:
     return _left_message(_remove(top, targets)[1])
 
 
+def _unregistered(top: str) -> bool:
+    """git の登録が残っていない（消しきれなかった）ディレクトリか。
+
+    `.git` が無い、または `.git` のファイルが指す先（`gitdir:`）が消えている。聞くと git は上へ
+    登って別のリポジトリを答えるので、この形のときだけ git に聞かずに進める。ほかの `git status` の
+    失敗は登録なしと見ずに止める。
+    """
+    git = os.path.join(top, ".git")
+    if not os.path.lexists(git):
+        return True
+    if not os.path.isfile(git):
+        return False
+    try:
+        with open(git, encoding="utf-8") as handle:
+            first = handle.readline().strip()
+    except (OSError, UnicodeDecodeError):
+        return False
+    if not first.startswith("gitdir:"):
+        return False
+    target = first[len("gitdir:") :].strip()
+    return not os.path.isdir(target if os.path.isabs(target) else os.path.join(top, target))
+
+
 def run_clean(stdout: TextIO, stderr: TextIO, root: str, name: str, preview: bool) -> int:
     """`worktree clean <名前> [--preview]`。生成物だけを消す（ワークツリーは消さない）。
 
     `git worktree remove` の前に打つ（`ccnavi-clean.sh <名前>`）。未コミットの変更があれば何も
     消さない（別のセッションが作業している見込みが高い）。git の登録が残っていないディレクトリ
-    （消しきれなかったもの）は、確かめようが無いので確かめずに進める。成功で 0、止めたら 1。
+    （消しきれなかったもの。`_unregistered`）は、確かめようが無いので確かめずに進める。git の状態を
+    読めないときは、登録なしと見ずに止める。成功で 0、止めたら 1。
     """
     top = tree.worktree_path(root, name)
-    if not name or name in (".", "..") or any(c in name for c in ("/", "\\", ":")):
+    if _bad_name(name):
         stderr.write("ccnavi-clean: 名前にパスは書けません（.claude/worktrees/ の直下の名前）。\n")
         return 1
-    if os.path.islink(top) or os.path.isjunction(top) or not os.path.isdir(top):
+    if pathsafe.is_link(top) or not os.path.isdir(top):
         stderr.write(f"ccnavi-clean: {top} がディレクトリでないか、リンクです。\n")
         return 1
-    registered = os.path.lexists(os.path.join(top, ".git"))
+    registered = not _unregistered(top)
     if registered:
         done = gitcmd.run(
             top, ["status", "--porcelain", "--untracked-files=all"], TIMEOUT_SECONDS, raw_paths=True
         )
-        if done.ok:
-            if done.out.strip():
-                stderr.write(
-                    f"ccnavi-clean: {name} に未コミットの変更があるので、何も消しません。"
-                    "別のセッションが作業している可能性が高いです。\n"
-                )
-                for line in done.out.splitlines()[:10]:
-                    stderr.write(f"{line}\n")
-                return 1
-        else:
-            registered = False
+        if not done.ok:
             stderr.write(
-                f"ccnavi-clean: {name} は git の登録が残っていないので、削除しきれなかった"
-                "ディレクトリとして扱います（未コミットの変更は確かめていません）。\n"
+                f"ccnavi-clean: {name} の git の状態を読めないので、何も消しません"
+                "（未コミットの変更を確かめられない）。\n"
             )
+            return 1
+        if done.out.strip():
+            stderr.write(
+                f"ccnavi-clean: {name} に未コミットの変更があるので、何も消しません。"
+                "別のセッションが作業している可能性が高いです。\n"
+            )
+            for line in done.out.splitlines()[:10]:
+                stderr.write(f"{line}\n")
+            return 1
+    else:
+        stderr.write(
+            f"ccnavi-clean: {name} は git の登録が残っていないので、削除しきれなかった"
+            "ディレクトリとして扱います（未コミットの変更は確かめていません）。\n"
+        )
     targets, why = _targets(top, registered)
     if why:
         stderr.write(f"ccnavi-clean: {why}\n")

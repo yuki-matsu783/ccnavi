@@ -1,5 +1,6 @@
 #!/bin/sh
-# ccnavi-clean ワークツリー 1 本の生成物を消す。`git worktree remove` の前に打つ。
+# ccnavi-clean ワークツリー 1 本の生成物を消す（--worktree は、無視されたファイルの退避とワークツリーの削除まで行う）。
+# `git worktree remove` の前に打つ。
 #
 #   sh .ccnavi/scripts/ccnavi-clean.sh <名前>
 #   sh .ccnavi/scripts/ccnavi-clean.sh <名前> --dry-run

@@ -334,8 +334,8 @@ def _worktree(
     """`worktree drop <名前>`・`worktree clean <名前>` と `worktree tidy <親> [--phase <N>]`
     （tickets/lifecycle/worktrees.py）。
 
-    sh が状態を書く操作の後に呼ぶ。名前は識別子の形だけを受ける（パスを渡して任意の場所を
-    消させない）。
+    sh が状態を書く操作の後に呼ぶ。名前は、`clean` 以外は識別子の形だけを受ける
+    （パスを渡して任意の場所を消させない。`clean` は `run_clean` が置き場の直下の名前かを見る）。
 
     処理フロー:
     1. `--abandon` があれば、`retire.run_abandon` で放棄した親の片付けの記録を消す。

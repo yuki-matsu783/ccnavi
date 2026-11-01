@@ -32,8 +32,6 @@ SCRIPTS = (
     "ccnavi-user-clean-branch.sh",
     *common_sh(SH_DIR),
 )
-# ccnavi-clean.sh と共通部（ccnavi-common*.sh）が呼ぶ外部コマンド。
-# node を外した PATH でも見えるように残す。
 # Windows は chmod で消せなくならず、root は権限を無視して消す。
 CANNOT_LOCK = os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0)
 
@@ -247,6 +245,44 @@ class CleanCases(CleanBase, unittest.TestCase):
         result = self.run_clean("wt")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(os.path.exists(os.path.join(top, "node_modules")))
+
+
+@unittest.skipUnless(SHELL and GIT, "sh と git が要る")
+class CleanGitStateTest(CleanBase, unittest.TestCase):
+    """`.git` があるときの確かめ。読めない・指す先が消えている、の扱いを分ける。"""
+
+    def test_a_gitfile_pointing_nowhere_is_treated_as_a_leftover(self):
+        top = self.make_shell("shell")
+        write(os.path.join(top, ".git"), "gitdir: /nonexistent/gitdir\n")
+        result = self.run_clean("shell")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("git の登録が残っていない", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(top, "node_modules")))
+
+    def test_an_unreadable_git_state_stops_without_removing_anything(self):
+        top = self.make_shell("shell")
+        os.makedirs(os.path.join(top, ".git"))  # 中身の無い .git。git status は失敗する
+        before = files_under(top)
+        result = self.run_clean("shell")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("git の状態を読めない", result.stderr)
+        self.assertEqual(files_under(top), before)
+
+    def test_a_missing_executable_is_an_environment_error(self):
+        self.make_shell("shell")
+        env = {**os.environ, "CCNAVI_ENTRY_PATH": os.path.join(self._tmp.name, "none")}
+        env.pop("CCNAVI_WORKSPACE", None)
+        script = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-clean.sh")
+        result = subprocess.run(
+            [SHELL, script, "shell"],
+            cwd=self.ws,
+            env={**env, "PATH": "/usr/bin:/bin"},
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("実行ファイルが見つかりません", result.stderr)
 
 
 @unittest.skipUnless(SHELL and GIT, "sh と git が要る")

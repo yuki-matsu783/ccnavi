@@ -12,8 +12,7 @@
 （識別子・合流したか取り消したか・合流した先頭の sha）を状態の置き場の `retire/<親>.json` に
 書く（`note`）。片付けはそれを読む。
 
-- 先に、親のワークツリーを消せるか（cwd が中でない・未コミットや、git が無視しているファイル
-  （`.env` など）が無い）を確かめる。消せなければ、子にも触らずに断る（`worktrees.blocked`）
+- 先に、親のワークツリーを消せるか（cwd が中でない・未コミットが無い）を確かめる。消せなければ、子にも触らずに断る（`worktrees.blocked`）
 - 子のワークツリーをすべて消す（`worktrees.drop` と同じ条件）
 - 子のブランチ（手元）を消す。条件は子の種類で分ける
   - 合流した子: ブランチの先頭が合流した sha（`merged_sha`）と同じで、その sha が push 済みの
@@ -515,8 +514,8 @@ def run_retire(
 ) -> int:
     """`worktree retire <親>`。子のワークツリーとブランチ、親のワークツリーを片付ける。
 
-    Draft を外した後に呼ぶ。親のワークツリーを消せない（cwd が中・未コミット・無視されたファイル
-    など）ときは、子に触る前に何も消さずに断る（`worktrees.blocked`。`drop` と同じ判定）。
+    Draft を外した後に呼ぶ。親のワークツリーを消せない（cwd が中・未コミットなど）ときは、
+    子に触る前に何も消さずに断る（`worktrees.blocked`。`drop` と同じ判定）。
     消さなかったものがあれば 1。
     """
     family = worktrees.family_for(root, conf, family)
@@ -728,7 +727,7 @@ def run_merged(
     parent_path = tree.worktree_path(root, family)
     on_disk = os.path.lexists(parent_path)
     # ワークツリーが在るなら、その HEAD が記録のブランチか確かめる。`worktrees.drop` が見るのは
-    # 未コミットと ignored だけ。HEAD が push 済みか・MR に含まれるかはここで確かめる。
+    # 未コミットだけ。HEAD が push 済みか・MR に含まれるかはここで確かめる。
     blocker = _parent_head_blocker(parent_path, branch, bool(tip)) if on_disk else ""
     if not blocker and tip:
         blocker = _merged_blocker(repo, branch, tip, head_sha)

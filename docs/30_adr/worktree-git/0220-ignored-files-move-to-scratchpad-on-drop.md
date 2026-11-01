@@ -24,7 +24,7 @@ keywords: [片付け, 無視, 退避, scratchpad, worktree drop, 生成物, targ
 | 生成物でない無視ファイルは、止める理由にしない。`drop` が `<ルート>/scratchpad/worktrees/<名前>/<元の相対パス>` へ、最上位の項目ごとの rename で退避してから `git worktree remove` する | データは失われず、止まって人手を待つ状態が無くなる。rename は中を走査しないので、同じボリュームなら一瞬で、深い `node_modules` の 260 文字の制限にも掛からない |
 | 退避先が git に無視されていない・退避先に同じパスがある・移せない、のどれかなら、何も動かさず（途中で止まったときは退避済みを言って）理由を出して止める | `.env` のコミットと、前の退避の上書きを防ぐ。まれな異常は推測や修復をせず、状態と直し方を言って止める |
 | 退避したものは ccnavi が消さない | 戻せない削除はユーザの判断にする。`scratchpad/` の既存の扱いと同じ |
-| 生成物は退避せず、一覧で消す。`__pycache__`・`.mypy_cache`・`.tox`・`.next` などは名前だけ、`out`・`dist`・`.cache`・`target`・`build` は隣に印のファイルがあるときだけ。追跡されているものは消さない。`ccnavi-clean.js` と `worktrees.py` の一覧は同じにし、テストで突き合わせる | 作り直せる大きなキャッシュは、退避すると scratchpad に溜まる。一覧は重複するが、JS は Windows の深いパスのために残す |
+| 生成物は退避せず、一覧で消す。`__pycache__`・`.mypy_cache`・`.tox`・`.next` などは名前だけ、`out`・`dist`・`.cache`・`target`・`build` は隣に印のファイルがあるときだけ。追跡されているものは消さない。一覧は `worktrees.py` だけが持ち、`ccnavi-clean.sh` は実行ファイル（`worktree clean`・`worktree drop`）を呼ぶ。Node の `ccnavi-clean.js` は廃止した | 作り直せる大きなキャッシュは、退避すると scratchpad に溜まる。一覧を2か所に持つと食い違うので1か所にする。Windows の深いパスは、Python の `shutil.rmtree` と長いパスの接頭辞で扱う |
 | gitが無視する出力は、はじめから `scratchpad/worktrees/<名前>/` に出す、と文書に書く。強制はしない | 出力先を1か所にまとめる。守られなくても退避が受ける |
 
 ## 結果
