@@ -1,5 +1,5 @@
 /**
- * リスク管理画面の案内（`src/webview/tours/risk.yml`）を happy-dom で動かす。案内の間は見本を描き、実際の配点・編集中の内容・
+ * リスク管理画面の案内（`src/webview/tours/risk.yml`）をhappy-domで動かす。案内の間は見本を描き、実際の配点・編集中の内容・
  * 拡張ホストへの送信には触れない。
  */
 import { test } from "node:test";
@@ -14,7 +14,7 @@ import type { HTMLButtonElement, HTMLInputElement, HTMLSelectElement } from "hap
 
 const def = loadTour("risk");
 
-/** 実際の配点（`test/helpers/risk.ts`）にだけある項目の id。案内の間に出ていたら、実際の配点を描いている */
+/** 実際の配点（`test/helpers/risk.ts`）にだけある項目のid。案内の間に出ていたら、実際の配点を描いている */
 const REAL_ONLY = ["sh", "q"];
 const REAL_IDS = ["big-diff", "ci", "sh", "q"];
 
@@ -26,7 +26,7 @@ async function startCourse(dom: DomPage, id: string): Promise<void> {
   await dom.settle();
 }
 
-/** 画面に出ている項目の id（絞り込みで隠れたものも含む） */
+/** 画面に出ている項目のid（絞り込みで隠れたものも含む） */
 function factorIds(dom: DomPage): string[] {
   return dom.all(".factor .sum-id").map((el) => el.textContent ?? "");
 }
@@ -36,7 +36,7 @@ async function next(dom: DomPage): Promise<void> {
   await dom.settle();
 }
 
-/** 案内を始めて、n 番目の手順（0 始まり）まで進める */
+/** 案内を始めて、n番目の手順（0始まり）まで進める */
 async function goto(dom: DomPage, id: string, index: number): Promise<void> {
   await startCourse(dom, id);
   for (let i = 0; i < index; i += 1) {
@@ -44,14 +44,14 @@ async function goto(dom: DomPage, id: string, index: number): Promise<void> {
   }
 }
 
-/** 案内が拡張ホストへ送ったもの（`ready` は組み上がり、`tourDone` は案内を閉じた印なので除く）。空であること */
+/** 案内が拡張ホストへ送ったもの（`ready`は組み上がり、`tourDone`は案内を閉じた印なので除く）。空であること */
 function extraPosts(dom: DomPage): unknown[] {
   return dom.posted.filter((message) => message.type !== "ready" && message.type !== "tourDone");
 }
 
 const levelsOf = (dom: DomPage): string[] => dom.all<HTMLInputElement>("input.f-level").map((el) => el.value);
 
-test("CB-D220 「?」は案内の一覧を開き、選んだ案内だけが始まる。基本の案内が先頭で、閉じたら tourDone を返す", async () => {
+test("CB-D220 「?」は案内の一覧を開き、選んだ案内だけが始まる。基本の案内が先頭で、閉じたらtourDoneを返す", async () => {
   const dom = await openRisk();
   try {
     dom.click(dom.one('[data-action="tour"]'));
@@ -84,17 +84,17 @@ test("CB-D221 全ユースケースの全手順で、指す先が画面にあり
       await startCourse(dom, course.id);
       for (const [index, step] of course.steps.entries()) {
         await dom.settle();
-        const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
+        const at = `${course.id}の${index + 1}番目の手順（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
         if (step.target !== "") {
-          assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面にありません`);
+          assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先${step.target}が画面にありません`);
           assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
-          // 同じ印が 2 か所にあると、先頭の 1 つを測って別の行を指してしまう
-          assert.equal(dom.all(`[data-tour="${step.target}"]`).length, 1, `${at}: 指す先 ${step.target} が複数ある`);
+          // 同じ印が2か所にあると、先頭の1つを測って別の行を指してしまう
+          assert.equal(dom.all(`[data-tour="${step.target}"]`).length, 1, `${at}: 指す先${step.target}が複数ある`);
         }
         const ids = factorIds(dom);
         for (const real of REAL_ONLY) {
-          assert.ok(!ids.includes(real), `${at}: 実際の項目 ${real} が出ている`);
+          assert.ok(!ids.includes(real), `${at}: 実際の項目${real}が出ている`);
         }
         assert.ok(ids.includes(step.scene.missing === true ? "deletes" : "no-tests"), `${at}: 見本の項目が出ていない`);
         assert.equal(dom.all(".banner.tour-sample").length, 1, at);
@@ -153,7 +153,7 @@ test("CB-D222 案内の間は、画面の編集・ボタン・拡張ホストへ
   }
 });
 
-test("CB-D223 手順の scene が画面の様子を替える（境目を空にする・開く項目・絞り込み）。scene は次の手順へ引き継がない", async () => {
+test("CB-D223 手順のsceneが画面の様子を替える（境目を空にする・開く項目・絞り込み）。sceneは次の手順へ引き継がない", async () => {
   const sums = riskSums(sumsBoard());
 
   // 境目を空にして、組み込みの値を薄く出す
@@ -161,7 +161,7 @@ test("CB-D223 手順の scene が画面の様子を替える（境目を空に�
   try {
     await goto(dom, "levels", 3);
     assert.deepEqual(levelsOf(dom), ["20", "40", ""]);
-    assert.equal(dom.all<HTMLInputElement>("input.f-level")[2].placeholder, "既定 70");
+    assert.equal(dom.all<HTMLInputElement>("input.f-level")[2].placeholder, "既定70");
     await next(dom);
     assert.deepEqual(levelsOf(dom), ["20", "40", "70"], "手順をまたいで空が残った");
   } finally {
@@ -181,7 +181,7 @@ test("CB-D223 手順の scene が画面の様子を替える（境目を空に�
     await next(dom);
     assert.equal(dom.one(".factor.open .sum-id").textContent, "ci");
     assert.equal(dom.all(".factor.open input.f-max").length, 1);
-    assert.equal(dom.all('[data-tour="factor-include"]').length, 0, "glob に対象パスの欄はありません");
+    assert.equal(dom.all('[data-tour="factor-include"]').length, 0, "globに対象パスの欄はありません");
   } finally {
     await dom.close();
   }

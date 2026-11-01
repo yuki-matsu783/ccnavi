@@ -60,7 +60,7 @@ test("CB-T06 カードに承認済みチケット・ワークツリー・マー�
   assert.match(review.openPath, /wip\/proposals\/review\/i0001-02-04\.md$/);
   assert.equal(review.cancelledAt, "");
 
-  // 取り消しは approved/done/ に cancelled_at を持って入る。提案の側には無く、列は取り消し
+  // 取り消しはapproved/done/ にcancelled_atを持って入る。提案の側には無く、列は取り消し
   const cancelled = cards.get("i0001-02-05")!;
   assert.equal(cancelled.column, "cancelled");
   assert.equal(cancelled.proposalState, null);
@@ -103,18 +103,18 @@ test("CB-T07 提案がなければ承認済みチケットの置き場が列。�
   assert.equal(buildBoard(json).issueCount, 1);
 });
 
-test("CB-T08 不備は実行ファイルの issues をそのまま持ち、ボードは追加しも削りもしない", () => {
+test("CB-T08 不備は実行ファイルのissuesをそのまま持ち、ボードは追加しも削りもしない", () => {
   const base = fixture();
   // 親の無い子でも、実行ファイルが言わなければボードは不備を作らない
   const stray: TicketJson = { ...base.tickets[1], ticket: "i0002-01-01", parent: "i0002" };
   assert.deepEqual(cardsOf(buildBoard({ ...base, tickets: [...base.tickets, stray] })).get("i0002-01-01")!.issues, []);
-  const said: TicketJson = { ...stray, issues: ["親 i0002 が見つかりません"] };
+  const said: TicketJson = { ...stray, issues: ["親i0002が見つかりません"] };
   const board = buildBoard({ ...base, tickets: [...base.tickets, said] });
-  assert.deepEqual(cardsOf(board).get("i0002-01-01")!.issues, ["親 i0002 が見つかりません"]);
+  assert.deepEqual(cardsOf(board).get("i0002-01-01")!.issues, ["親i0002が見つかりません"]);
   assert.equal(board.issueCount, 1);
 });
 
-test("CB-T09 依頼済みで止まったフェーズに decide、早めに閉じた親にはバッジだけ", () => {
+test("CB-T09 依頼済みで止まったフェーズにdecide、早めにクローズした親にはバッジだけ", () => {
   const base = fixture();
   const parent: ParentJson = {
     ...base.parents[0],
@@ -138,13 +138,13 @@ test("CB-T09 依頼済みで止まったフェーズに decide、早めに閉じ
   assert.deepEqual(card.actions, []);
   assert.equal(card.wrapped, true);
   assert.deepEqual(card.phases[0].actions, []);
-  // レビュー待ちの行には、レビュー完了の操作が付く（依頼のマーカーに URL が無ければ MR のリンクは出さない）
+  // レビュー待ちの行には、レビュー完了の操作が付く（依頼のマーカーにURLが無ければMRのリンクは出さない）
   assert.deepEqual(card.phases[1].actions, [{ kind: "review", parent: "i0001", phase: 2, mrUrl: "" }]);
   assert.equal(card.phases[1].status, "レビュー待ち");
-  // ユーザのレビュー待ちは JSON の review_waiting をそのまま使う。依頼していないフェーズ 1 は閉じていても待ちではない
+  // ユーザのレビュー待ちはJSONのreview_waitingをそのまま使う。依頼していないフェーズ1は閉じていても待ちではない
   assert.equal(card.phases[0].reviewWaiting, false);
   assert.equal(card.phases[1].reviewWaiting, true);
-  // 子のカードには自分のフェーズの、止まっているかとレビュー待ちが反映される。親は false
+  // 子のカードには自分のフェーズの、止まっているかとレビュー待ちが反映される。親はfalse
   assert.equal(cards.get("i0001-02-02")!.gateClosed, true);
   assert.equal(cards.get("i0001-02-02")!.reviewWaiting, true);
   assert.equal(cards.get("i0001-01-01")!.reviewWaiting, false);
@@ -169,7 +169,7 @@ test("CB-T09b レビューが済んで止まらなくなったフェーズは、
   };
   const cards = cardsOf(buildBoard({ ...base, parents: [parent] }));
   const card = cards.get("i0001")!;
-  // マーカーは残り、待ちだけが false になる。マーカーを削って「直す」形は取らない（フェーズ行は「レビュー済み」と言う）
+  // マーカーは残り、待ちだけがfalseになる。マーカーを削って「直す」形は取らない（フェーズ行は「レビュー済み」と言う）
   assert.equal(card.phases[0].status, "レビュー済み");
   assert.equal(card.phases[0].reviewWaiting, false);
   assert.deepEqual(card.phases[0].actions, []);
@@ -186,7 +186,7 @@ test("CB-T09c 親カードは、自分の番号のフェーズがレビュー待
         : p,
     ),
   };
-  // 親のチケットに phase が入っていても（判定は入れないが）、親は子の項目を反映しない
+  // 親のチケットにphaseが入っていても（判定は入れないが）、親は子の項目を反映しない
   const tickets = base.tickets.map((t) => (t.ticket === "i0001" ? { ...t, phase: 1 } : t));
   const cards = cardsOf(buildBoard({ ...base, tickets, parents: [parent] }));
   const card = cards.get("i0001")!;
@@ -265,7 +265,7 @@ test("CB-T117 散在は実行ファイルの答えをそのまま載せ、ほか
   assert.equal(card.seenIn.length, 2);
 });
 
-/** フェーズ 2 を「依頼済みで止まったまま（ユーザのレビュー待ち）」にし、依頼のマーカーにマージリクエストを持たせる */
+/** フェーズ2を「依頼済みで止まったまま（ユーザのレビュー待ち）」にし、依頼のマーカーにMRを持たせる */
 function waitingWithMr(url: string): BoardJson {
   const base = fixture();
   const parent: ParentJson = {
@@ -286,11 +286,11 @@ function waitingWithMr(url: string): BoardJson {
   return { ...base, parents: [parent] };
 }
 
-test("CB-T131 レビュー待ちのフェーズ行にレビュー完了が付き、依頼のマーカーのマージリクエストがフェーズ行・親カード・そのフェーズの子に載る", () => {
+test("CB-T131 レビュー待ちのフェーズ行にレビュー完了が付き、依頼のマーカーのMRがフェーズ行・親カード・そのフェーズの子に載る", () => {
   const cards = cardsOf(buildBoard(waitingWithMr("https://example.com/o/r/pull/18#issuecomment-5")));
   const card = cards.get("i0001")!;
   assert.deepEqual(card.phases[1].actions, [{ kind: "review", parent: "i0001", phase: 2, mrUrl: "https://example.com/o/r/pull/18" }]);
-  // フェーズ行は依頼の投稿を指す。親カードと、そのフェーズの子のカードは、断片を除いてマージリクエスト自体を指す
+  // フェーズ行は依頼の投稿を指す。親カードと、そのフェーズの子のカードは、断片を除いてMR自体を指す
   assert.equal(card.phases[1].mrUrl, "https://example.com/o/r/pull/18#issuecomment-5");
   assert.equal(card.phases[1].mrNumber, 18);
   assert.equal(card.phases[0].mrUrl, "");
@@ -300,12 +300,12 @@ test("CB-T131 レビュー待ちのフェーズ行にレビュー完了が付き
   assert.equal(cards.get("i0001-02-02")!.mrUrl, "https://example.com/o/r/pull/18");
   assert.equal(cards.get("i0001-02-02")!.mrNumber, 18);
   assert.equal(cards.get("i0001-01-01")!.mrUrl, "", "依頼していないフェーズの子には持たせない");
-  // 引く関数。承認と残った指摘を決めるボタンが使う parentTreeOf と同じ場所を見る
+  // 引く関数。承認と残った指摘を決めるボタンが使うparentTreeOfと同じ場所を見る
   assert.equal(parentCardOf(buildBoard(waitingWithMr("u")), "i0001")?.id, "i0001");
   assert.equal(parentCardOf(buildBoard(waitingWithMr("u")), "i0001-02-02"), undefined);
   assert.equal(phaseChipOf(buildBoard(waitingWithMr("u")), "i0001", 2)?.mrUrl, "u");
   assert.equal(phaseChipOf(buildBoard(waitingWithMr("u")), "i0001", 9), undefined);
-  // 依頼のマーカーが無くレビュー済みだけ残った形（close-early が置く）では、リンクも番号も出さない（url が無い）。連絡のボタンは待ちでなければ出ない
+  // 依頼のマーカーが無くレビュー済みだけ残った形（close-earlyが置く）では、リンクも番号も出さない（urlが無い）。連絡のボタンは待ちでなければ出ない
   const base = fixture();
   const reviewedOnly: ParentJson = {
     ...base.parents[0],
@@ -319,14 +319,14 @@ test("CB-T131 レビュー待ちのフェーズ行にレビュー完了が付き
   assert.deepEqual(quiet.phases[1].actions, []);
 });
 
-test("CB-T132 要対応は実行ファイルの attention をそのまま持ち、条件をボードで組み直さない", () => {
+test("CB-T132 要対応は実行ファイルのattentionをそのまま持ち、条件をボードで組み直さない", () => {
   // 見本: 実行ファイルは承認待ちでワークツリーの無い子だけを要対応と言っている
   const cards = cardsOf(buildBoard(fixture()));
   assert.deepEqual(
     [...cards.values()].filter((card) => card.attention).map((card) => card.id),
     ["i0001-02-03"],
   );
-  // 承認待ち・ワークツリーが見つからない・HIGH のリスク・止まったフェーズがあっても、実行ファイルが偽と判定すれば偽のまま
+  // 承認待ち・ワークツリーが見つからない・HIGHのリスク・止まったフェーズがあっても、実行ファイルが偽と判定すれば偽のまま
   const base = fixture();
   const loud: TicketJson = {
     ...base.tickets[2],
@@ -347,11 +347,11 @@ test("CB-T132 要対応は実行ファイルの attention をそのまま持ち�
 });
 
 test("CB-T138 止まっているチケットは、理由と実行ファイルが組んだ不備・要対応をそのまま持つ", () => {
-  // 判定はこのチケットのワークツリーへの書き込みを全部止めるが、`copy.status` は `open` の
+  // 判定はこのチケットのワークツリーへの書き込みを全部止めるが、`copy.status`は`open`の
   // ままなので、列からも承認済みのバッジからも分からない。
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-02-02")!;
-  const blocked = "親 i0001 の承認済みチケットが作業中にない（未承認か、閉じている）";
+  const blocked = "親i0001の承認済みチケットが作業中にない（未承認か、閉じている）";
   const stopped: TicketJson = { ...child, blocked, issues: [`書き込みが止まっています: ${blocked}`], attention: true };
   const parent = base.tickets.find((t) => t.ticket === "i0001")!;
   const card = cardsOf(buildBoard({ ...base, tickets: [parent, stopped] })).get("i0001-02-02")!;
@@ -376,7 +376,7 @@ test("CB-T139 止まっていないチケットは今までどおり、不備も
 });
 
 test("CB-T263 先行待ちはカードへそのまま渡り、列と要対応は変えない", () => {
-  // 判定（先行が done/ に在って取り消しでないか）は実行ファイルが出す。ボードは先行の置き場から組み直さない。
+  // 判定（先行がdone/ に在って取り消しでないか）は実行ファイルが出す。ボードは先行の置き場から組み直さない。
   const base = fixture();
   const unmet = [{ ticket: "i0001-02-02", state: "doing", label: "作業中（doing/）" }];
   const before = cardsOf(buildBoard(base)).get("i0001-02-03")!;
@@ -393,7 +393,7 @@ function archivedJson(ticket: string, parent = ""): ArchivedTicketJson {
     ticket,
     parent,
     phase: parent === "" ? null : 1,
-    title: `退避した ${ticket}`,
+    title: `退避した${ticket}`,
     project: "",
     path: `/ws/logs/archive/self/done/${ticket}.md`,
     started_at: "",
@@ -418,7 +418,7 @@ test("CB-T301 退避のチケットはアーカイブの列に並び、操作も
   assert.equal(board.totalCount, buildBoard(base).totalCount);
   assert.equal(board.remainingCount, buildBoard(base).remainingCount);
   assert.ok(!board.parents.some((p) => p.id === "old"));
-  // 退避したファイルは開ける（カードの openPath がそのパス）
+  // 退避したファイルは開ける（カードのopenPathがそのパス）
   assert.ok(isKnownPath(board, "/ws/logs/archive/self/done/old.md"));
   assert.ok(!isKnownPath(buildBoard(base), "/ws/logs/archive/self/done/old.md"));
 });

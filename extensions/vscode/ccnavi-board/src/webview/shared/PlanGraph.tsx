@@ -1,27 +1,27 @@
 /**
  * 計画の図の部品。承認のオーバーレイ（読むだけ）と計画編集タブ（線を引き直す）が共有する。
- * 中身は実行ファイルが返す計画 1 つぶん（`plans` の 1 件）で、点・線・置き場所は `core/plan-graph.ts` が組む。
- * 見た目と React Flow の扱いはフロー編集画面の図（`flow/Canvas.tsx`）に揃えてある。
+ * 中身は実行ファイルが返す計画1つぶん（`plans`の1件）で、点・線・置き場所は`core/plan-graph.ts`が組む。
+ * 見た目とReact Flowの扱いはフロー編集画面の図（`flow/Canvas.tsx`）に揃えてある。
  *
  * 終端に届かないステップ（`loose`）・すぐ始まるステップ（`ready`）・延期の引き受け手（`review_at`）・
  * 順序の検査の理由（`problems`）は実行ファイルの答えをそのまま描く。図の下の一言も、その値を並べるだけ。
  *
- * **`editable` が偽なら読むだけ。** 線を引けず、点も線も選べず、点を動かせない（`Canvas.tsx` の読むだけの扱いと
- * 同じ）。拡大・縮小と全体表示はできる。`editable` が真なら、ステップからステップへ線を引ける（計画編集タブ）。
- * 引いている最中に、引けない線（自分へ・start と end に触れる・固定した番号へ入る・循環になる）を
- * `canConnect` で断る（放しても線はできない）。引けた線は `onConnect` で呼び手に返すだけで、図は描き直さない
- * （呼び手が計画を作り直して渡し直す。番号の振り直しの正は実行ファイル）。`onDisconnect` を渡せば、消せる線
+ * **`editable`が偽なら読むだけ。** 線を引けず、点も線も選べず、点を動かせない（`Canvas.tsx`の読むだけの扱いと
+ * 同じ）。拡大・縮小と全体表示はできる。`editable`が真なら、ステップからステップへ線を引ける（計画編集タブ）。
+ * 引いている最中に、引けない線（自分へ・startとendに触れる・固定した番号へ入る・循環になる）を
+ * `canConnect`で断る（放しても線はできない）。引けた線は`onConnect`で呼び手に返すだけで、図は描き直さない
+ * （呼び手が計画を作り直して渡し直す。番号の振り直しの正は実行ファイル）。`onDisconnect`を渡せば、消せる線
  * （ステップどうしの線で、固定した番号へ入らないもの。`canDisconnect`）の真ん中に × を出し、押したら呼び手に返す。
  *
- * **置き場所。** `layout` を渡せば、ステップをその場所に置く（振り直す前の番号 `from` で覚えた場所。`core/plan-graph.ts` の
+ * **置き場所。** `layout`を渡せば、ステップをその場所に置く（振り直す前の番号`from`で覚えた場所。`core/plan-graph.ts`の
  * `withLayout`）。計画編集タブは、番号が振り直っても点を動かさないためにこれを使う。開いたときの見え方
- * （全体を枠に収める）は `fitKey` が変わったときだけ合わせ直す（渡さなければ計画が替わるたび）。
+ * （全体を枠に収める）は`fitKey`が変わったときだけ合わせ直す（渡さなければ計画が替わるたび）。
  *
- * `detail` が真なら、ステップを押すと右に詳細の欄を出す（計画編集タブ）。番号・定義・タイトル・レビューの要否・延期先・固定・
+ * `detail`が真なら、ステップを押すと右に詳細の欄を出す（計画編集タブ）。番号・定義・タイトル・レビューの要否・延期先・固定・
  * 先行と後続・すぐ始まるか・終端に届かないかを、実行ファイルの値のまま読むだけで出す（直すのは線）。欄は畳める
  * （畳んだかは画面が覚える）。
  *
- * 見た目は `PlanGraph.css`。React Flow の CSS は `--xy-*` の変数で出来ているので、そこを `--vscode-*` で上書きする。
+ * 見た目は`PlanGraph.css`。React FlowのCSSは`--xy-*`の変数で出来ているので、そこを`--vscode-*`で上書きする。
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type JSX, type MouseEvent as ReactMouseEvent } from "react";
 import {
@@ -73,7 +73,7 @@ type PlanNode = ItemNode | EndNode;
 
 /**
  * レビューの要否の言葉。同じオーバーレイの本文（承認画面。`agree_screen.py`）の「レビュー不要」
- * 「レビュー必須: マージリクエスト」を、点の幅に収まる短さにしたもの。
+ * 「レビュー必須: MR」を、点の幅に収まる短さにしたもの。
  * 定義が読めない（null）なら「?」
  */
 function reviewText(review: boolean | null): string {
@@ -83,9 +83,9 @@ function reviewText(review: boolean | null): string {
   return review ? "レビュー必須（MR）" : "レビュー不要";
 }
 
-/** 延期したステップの言葉。本文の先行の一覧（「レビューは 4 と一緒に」）と同じ言い方 */
+/** 延期したステップの言葉。本文の先行の一覧（「レビューは4と一緒に」）と同じ言い方 */
 function deferText(reviewAt: number | null): string {
-  return reviewAt === null ? "レビューを受け持つステップがありません" : `レビューは ${reviewAt} と一緒に`;
+  return reviewAt === null ? "レビューを受け持つステップがありません" : `レビューは${reviewAt}と一緒に`;
 }
 
 /** ステップの点。番号・定義のタイトル・レビューの要否と、延期・固定・終端に届かない印 */
@@ -128,9 +128,9 @@ function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
 }
 
 /**
- * start と end の仮の点。名前だけ。線は図が引くので、取っ手から線は引けない。
- * end は、終端に届かないステップからの線を下の取っ手で受ける。左の取っ手で受けると、最後のステップからの線と
- * end の手前で重なり、どちらが注意の線か見分けられない
+ * startとendの仮の点。名前だけ。線は図が引くので、取っ手から線は引けない。
+ * endは、終端に届かないステップからの線を下の取っ手で受ける。左の取っ手で受けると、最後のステップからの線と
+ * endの手前で重なり、どちらが注意の線か見分けられない
  */
 function EndView({ data }: NodeProps<EndNode>): JSX.Element {
   const { node } = data;
@@ -144,11 +144,11 @@ function EndView({ data }: NodeProps<EndNode>): JSX.Element {
   );
 }
 
-/** end の取っ手。ふつうの線は左、終端に届かないステップからの線は下 */
+/** endの取っ手。ふつうの線は左、終端に届かないステップからの線は下 */
 const END_IN = "in";
 const END_LOOSE = "loose";
 
-/** 消せる線の × を押したときに呼ぶもの。線の id を渡す。図の部品ごとに 1 つ */
+/** 消せる線の × を押したときに呼ぶもの。線のidを渡す。図の部品ごとに1つ */
 const RemoveEdge = createContext<(id: string) => void>(() => undefined);
 
 /**
@@ -186,7 +186,7 @@ function RemovableEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition,
   );
 }
 
-// 描くたびに作り直すと React Flow が「点の種類が変わった」と言って組み直す。1 度だけ作る
+// 描くたびに作り直すとReact Flowが「点の種類が変わった」と言って組み直す。1度だけ作る
 const NODE_TYPES: NodeTypes = { planItem: ItemView, planEnd: EndView };
 const EDGE_TYPES: EdgeTypes = { planRemovable: RemovableEdge };
 
@@ -210,7 +210,7 @@ function edgesOf(graph: Graph, removable: boolean): Edge[] {
       ...(removable && canDisconnect(graph, edge.source, edge.target) ? { type: "planRemovable" } : {}),
       className: ["plan-edge", `plan-${edge.kind}`, edge.loose ? "loose" : ""].filter((name) => name !== "").join(" "),
       markerEnd: { type: MarkerType.ArrowClosed, color },
-      // start と end への線は図が引くもので、消せない
+      // startとendへの線は図が引くもので、消せない
       deletable: false,
     };
   });
@@ -220,15 +220,15 @@ function edgesOf(graph: Graph, removable: boolean): Edge[] {
 const START_PAD = 16;
 
 /**
- * 開いたときの見え方。点の大きさが測れたら、全体を枠に収める（`PLAN_FIT_MIN_ZOOM` より縮めず、
- * `PLAN_FIT_MAX_ZOOM` より拡げない）。下限で止まって収まらないときは、開始（左端の列）が見えるように
+ * 開いたときの見え方。点の大きさが測れたら、全体を枠に収める（`PLAN_FIT_MIN_ZOOM`より縮めず、
+ * `PLAN_FIT_MAX_ZOOM`より拡げない）。下限で止まって収まらないときは、開始（左端の列）が見えるように
  * 左へ寄せる（真ん中に合わせると、開始も終了も枠の外になる）。計画が替わったら合わせ直す。
- * React Flow の `fitView` の属性は使わない（下限で止めたあとに寄せる段を挟めないため）
+ * React Flowの`fitView`の属性は使わない（下限で止めたあとに寄せる段を挟めないため）
  */
 /**
- * 点がすべて測れたか。React Flow の `useNodesInitialized` は使わない。あれは呼び手が渡した点（`nodes`）に
- * 測った大きさが書き戻されて初めて真になり、点を読むだけで返さない（`onNodesChange` を持たない）この図では、
- * 実際の Chromium でいつまでも偽のまま（全体を枠に収める段が走らない）。React Flow が測って持つ内側の点を見る
+ * 点がすべて測れたか。React Flowの`useNodesInitialized`は使わない。あれは呼び手が渡した点（`nodes`）に
+ * 測った大きさが書き戻されて初めて真になり、点を読むだけで返さない（`onNodesChange`を持たない）この図では、
+ * 実際のChromiumでいつまでも偽のまま（全体を枠に収める段が走らない）。React Flowが測って持つ内側の点を見る
  */
 function useMeasured(): boolean {
   return useStore((s) => s.nodeLookup.size > 0 && [...s.nodeLookup.values()].every((node) => (node.measured?.width ?? 0) > 0 && (node.measured?.height ?? 0) > 0));
@@ -256,12 +256,12 @@ function FitOnOpen({ fitKey }: { readonly fitKey: unknown }): null {
 
 /** 計画の見出し */
 function headingOf(plan: ApprovePlan): string {
-  return `${plan.ticket} の${plan.part === "feedback" ? "フィードバック計画（feedback:）" : "全体計画（plan:）"}`;
+  return `${plan.ticket}の${plan.part === "feedback" ? "フィードバック計画（feedback:）" : "全体計画（plan:）"}`;
 }
 
 /** 図の下の一言。実行ファイルの値を並べるだけ */
 function Notes({ plan }: { readonly plan: ApprovePlan }): JSX.Element | null {
-  const deferred = plan.items.filter((item) => item.deferred).map((item) => (item.review_at === null ? `${item.number} はレビューを受け持つステップがありません` : `${item.number} は ${item.review_at} と一緒に`));
+  const deferred = plan.items.filter((item) => item.deferred).map((item) => (item.review_at === null ? `${item.number}はレビューを受け持つステップがありません` : `${item.number}は${item.review_at}と一緒に`));
   const lines: { readonly text: string; readonly warn: boolean }[] = [];
   if (plan.ready.length > 0) {
     lines.push({ text: `すぐ始まる: ${plan.ready.join(", ")}`, warn: false });
@@ -290,12 +290,12 @@ function Notes({ plan }: { readonly plan: ApprovePlan }): JSX.Element | null {
   );
 }
 
-/** 線が引けたときに呼び手へ返すもの。`from` が `to` の先行になる（番号） */
+/** 線が引けたときに呼び手へ返すもの。`from`が`to`の先行になる（番号） */
 export type PlanConnect = (from: number, to: number) => void;
 
 /**
- * 詳細の欄を畳んだか。図が何枚あっても（全体計画とフィードバック計画）同じ値を見せるため、画面で 1 つだけ持ち、
- * HTML を作り直しても残るよう `getState` にも書く
+ * 詳細の欄を畳んだか。図が何枚あっても（全体計画とフィードバック計画）同じ値を見せるため、画面で1つだけ持ち、
+ * HTMLを作り直しても残るよう`getState`にも書く
  */
 const FOLD_KEY = "planDetailFolded";
 let detailFoldedNow: boolean | undefined;
@@ -366,9 +366,9 @@ export interface PlanGraphProps {
   readonly detail?: boolean;
   readonly editable?: boolean;
   readonly onConnect?: PlanConnect;
-  /** 線を消したときに呼ぶ。`from` が `to` の先行でなくなる（番号）。渡したときだけ × を出す */
+  /** 線を消したときに呼ぶ。`from`が`to`の先行でなくなる（番号）。渡したときだけ × を出す */
   readonly onDisconnect?: PlanConnect;
-  /** ステップの置き場所（振り直す前の番号で覚えたもの）。無ければ `planGraphOf` が組んだ場所 */
+  /** ステップの置き場所（振り直す前の番号で覚えたもの）。無ければ`planGraphOf`が組んだ場所 */
   readonly layout?: PlanLayout;
   /** 開いたときの見え方を合わせ直す合図。変わったときだけ全体を枠に収める。無ければ計画が替わるたび */
   readonly fitKey?: unknown;
@@ -426,7 +426,7 @@ export function PlanGraph({ plan, detail = false, editable = false, onConnect, o
           nodesFocusable={false}
           edgesFocusable={false}
           elementsSelectable={false}
-          // 押せるのは onNodeClick があるときだけ（無いと点は pointer-events: none で描かれる）
+          // 押せるのはonNodeClickがあるときだけ（無いと点はpointer-events: noneで描かれる）
           onNodeClick={
             detail
               ? (event, node) => {

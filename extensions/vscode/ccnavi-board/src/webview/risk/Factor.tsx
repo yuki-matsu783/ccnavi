@@ -1,8 +1,8 @@
 /**
- * 項目 1 件の行。折りたたんだときは要約 1 行、開くと欄が出る。
+ * 項目1件の行。折りたたんだときは要約1行、開くと欄が出る。
  *
- * 欄名は日本語で欄の左に出し、YAML のキー名は欄名のツールチップに載せる（`Captioned`）。
- * 値の欄は加点条件で名前も placeholder も変わり、上限（`max`）は glob のときだけ出る。
+ * 欄名は日本語で欄の左に出し、YAMLのキー名は欄名のツールチップに載せる（`Captioned`）。
+ * 値の欄は加点条件で名前もplaceholderも変わり、上限（`max`）はglobのときだけ出る。
  */
 import type { JSX, ReactNode } from "react";
 
@@ -17,16 +17,16 @@ const KINDS_KEYS = KINDS.join(" / ");
 const NUMERIC: readonly FactorKind[] = ["lines_over", "files_over", "deleted_over"];
 
 export interface FactorProps {
-  /** 画面の中だけのキー（`state.ts`）。行を名指しするために `data-key` へ出す */
+  /** 画面の中だけのキー（`state.ts`）。行を名指しするために`data-key`へ出す */
   readonly factorKey: string;
   readonly factor: FactorForm;
-  /** 絞り込みが適用する文字列（`data-find`）。ヒットしなければ `hidden` */
+  /** 絞り込みが適用する文字列（`data-find`）。ヒットしなければ`hidden` */
   readonly find: string;
   readonly hidden: boolean;
   readonly open: boolean;
   /** 欄を触れるか。保存の往復の間と、ファイルが無い間は触れない */
   readonly disabled: boolean;
-  /** 案内が指す行。中の部品に `data-tour` の印を付ける（行ごとに付けると、畳んだ行を指してしまう） */
+  /** 案内が指す行。中の部品に`data-tour`の印を付ける（行ごとに付けると、畳んだ行を指してしまう） */
   readonly tour?: boolean;
   readonly onToggle: () => void;
   readonly onChange: (next: FactorForm) => void;
@@ -112,8 +112,8 @@ export function Factor(props: FactorProps): JSX.Element {
             disabled={disabled}
             onChange={(event) => {
               const kind = event.target.value as FactorKind;
-              // 値は加点条件ごとに意味が違うので持ち越さない。max は glob だけの欄
-              // include / exclude は数える加点条件（lines_over など）だけの欄
+              // 値は加点条件ごとに意味が違うので持ち越さない。maxはglobだけの欄
+              // include / excludeは数える加点条件（lines_overなど）だけの欄
               const counting = NUMERIC.includes(kind);
               props.onChange({
                 ...factor,
@@ -136,7 +136,7 @@ export function Factor(props: FactorProps): JSX.Element {
           {factor.kind === "glob" ? (
             <div className="inline">
               {text("value", "f-value", KIND_LABELS[factor.kind].placeholder)}
-              <span className="cap" title="YAML のキー: max">
+              <span className="cap" title="YAMLのキー: max">
                 上限
               </span>
               {text("max", "f-max num", "上限。空なら上限なしです")}
@@ -148,15 +148,15 @@ export function Factor(props: FactorProps): JSX.Element {
         {NUMERIC.includes(factor.kind) && (
           <>
             <Captioned name="対象パス" yamlKey="include" {...mark("factor-include")}>
-              {globs("include", "src/**（glob を 1 行に 1 つ。指定すると、該当するパスだけを数えます。空なら全パスです）")}
+              {globs("include", "src/**（globを1行に1つ。指定すると、ヒットするパスだけを数えます。空なら全パスです）")}
             </Captioned>
             <Captioned name="除外パス" yamlKey="exclude" {...mark("factor-exclude")}>
-              {globs("exclude", "*.lock（glob を 1 行に 1 つ。該当するパスは数えません。対象パスに該当していても除外します）")}
+              {globs("exclude", "*.lock（globを1行に1つ。ヒットするパスは数えません。対象パスにヒットしていても除外します）")}
             </Captioned>
           </>
         )}
         <Captioned name="理由" yamlKey="message" {...mark("factor-message")}>
-          {text("message", "f-message", "レビュー依頼文と、子を閉じたときの出力に出る加点の理由。空なら id を使います")}
+          {text("message", "f-message", "レビュー依頼文と、子をクローズしたときの出力に出る加点の理由。空ならidを使います")}
         </Captioned>
         <span className="buttons" {...mark("factor-buttons")}>
           <button type="button" className="action small" title={moveTitle("上へ", props.finding)} disabled={disabled || props.first || props.finding} onClick={() => props.onMove(-1)}>
@@ -174,7 +174,7 @@ export function Factor(props: FactorProps): JSX.Element {
   );
 }
 
-/** 欄名を左に置く。YAML のキー名は欄名のツールチップに載せる */
+/** 欄名を左に置く。YAMLのキー名は欄名のツールチップに載せる */
 export function Captioned({
   name,
   yamlKey,
@@ -189,7 +189,7 @@ export function Captioned({
 }): JSX.Element {
   return (
     <div className="field" data-tour={tour}>
-      <span className="cap" title={yamlKey === undefined ? undefined : `YAML のキー: ${yamlKey}`}>
+      <span className="cap" title={yamlKey === undefined ? undefined : `YAMLのキー: ${yamlKey}`}>
         {name}
       </span>
       {children}

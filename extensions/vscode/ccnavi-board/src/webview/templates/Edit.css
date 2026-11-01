@@ -1,5 +1,5 @@
 /*
- * テンプレートの編集欄（`Edit.tsx`・`PlanEdit.tsx`・`FlowEdit.tsx`）。図（計画の図・フローの図）の見た目は、それぞれの部品の CSS
+ * テンプレートの編集欄（`Edit.tsx`・`PlanEdit.tsx`・`FlowEdit.tsx`）。図（計画の図・フローの図）の見た目は、それぞれの部品のCSS
  * （`../shared/PlanGraph.css`・`../flow/Canvas.css`・`../flow/Inspector.css`・`../flow/App.css`）にある。
  */
 .tpl-edit-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--gap-3) var(--gap-5); margin-bottom: 8px; }

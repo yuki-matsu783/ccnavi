@@ -1,11 +1,11 @@
 /**
- * ボード画面（React）を happy-dom で動かす。
+ * ボード画面（React）をhappy-domで動かす。
  *
- * 画面はバンドルした 1 本（`out/webview/board.js`）で、拡張はそれを `<script nonce>` に流し込む。
- * ここでも同じ 1 本を流し込むので、テストが見るのは配るものと同じ画面になる。
- * バンドルするのは `pnpm test` の中の `scripts/bundle-webview.js`。
+ * 画面はバンドルした1本（`out/webview/board.js`）で、拡張はそれを`<script nonce>`に流し込む。
+ * ここでも同じ1本を流し込むので、テストが見るのは配るものと同じ画面になる。
+ * バンドルするのは`pnpm test`の中の`scripts/bundle-webview.js`。
  *
- * React は押した直後には描き直さない。操作のあとは `await page.settle()` を挟んでから見る。
+ * Reactは押した直後には描き直さない。操作のあとは`await page.settle()`を挟んでから見る。
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -22,12 +22,12 @@ import { fixture } from "./fixture.js";
 
 export const NONCE = "TEST-NONCE-123";
 
-/** 画面の HTML。CSS や nonce のように、文字列のまま見たいものはこれを見る */
+/** 画面のHTML。CSSやnonceのように、文字列のまま見たいものはこれを見る */
 export function boardPage(data: BoardData, options: Partial<RenderOptions> = {}): string {
   return renderBoardPage(data, { nonce: NONCE, script: screenScript("board"), style: screenStyle("board"), ...options });
 }
 
-/** HTML を happy-dom に読ませ、React がマウントし終わるまで待つ */
+/** HTMLをhappy-domに読ませ、Reactがマウントし終わるまで待つ */
 export async function openPage(data: BoardData, initialState?: unknown, options: LoadOptions = {}): Promise<DomPage> {
   const page = await loadPage(boardPage(data), initialState, options);
   await page.settle();
@@ -42,7 +42,7 @@ export async function openBoard(
     readonly filter?: string;
     readonly state?: unknown;
     readonly prepare?: LoadOptions["prepare"];
-    /** 図（承認のオーバーレイの計画の図）を描かせるときは真。大きさを測れるようにする（`dom.ts` の `measure`） */
+    /** 図（承認のオーバーレイの計画の図）を描かせるときは真。大きさを測れるようにする（`dom.ts`の`measure`） */
     readonly measure?: boolean;
     /** 計画編集タブに未保存の変更がある親（拡張ホストが渡す） */
     readonly unsaved?: readonly string[];
@@ -57,7 +57,7 @@ export async function openBoard(
   );
 }
 
-/** 承認画面の見本（`--agree --preview --json` の出力そのもの）。Python 側の tests/ticket/test_approve_json.py が書き出す */
+/** 承認画面の見本（`--agree --preview --json`の出力そのもの）。Python側のtests/ticket/test_approve_json.pyが書き出す */
 export function approvePreview(): ApprovePreview {
   const text = fs.readFileSync(path.join(__dirname, "..", "..", "..", "test", "fixtures", "approve-preview.json"), "utf8");
   const parsed = parseApprovePreview(text);

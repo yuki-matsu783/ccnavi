@@ -1,9 +1,9 @@
 ---
-title: ccnavi ボードの構成
+title: ccnaviボードの構成
 type: design
-description: VS Code 拡張 ccnavi ボードのファイルの置き場と役目、テストの ID の決まり
+description: VS Code拡張ccnaviボードのファイルの置き場と役目、テストのIDの決まり
 tags: [design-doc, extension, testing]
-keywords: [設計, 構成, ファイル, src, core, webview, test, fixtures, テストの ID, CB-T, CB-D]
+keywords: [設計, 構成, ファイル, src, core, webview, test, fixtures, テストのID, CB-T, CB-D]
 ---
 
 # 構成
@@ -283,12 +283,12 @@ scripts/
   render-board.js     VS Code なしで Chromium にボードの画面を描く開発用ツール（lib/vscode-stub.js は acquireVsCodeApi のスタブ。使い方は development.md）
 ```
 
-**テストの ID。** 名前の頭に付ける `CB-T…` / `CB-D…` は「失敗したテストを名指しする」ためのもので、手動確認の表（[manual-checks.md](manual-checks.md)）やチケットの記録から参照する。
+**テストのID。** 名前の頭に付ける`CB-T…` / `CB-D…`は「失敗したテストを名指しする」ためのもので、手動確認の表（[manual-checks.md](manual-checks.md)）やチケットの記録から参照する。
 
 | 何 | 決まり |
 |---|---|
-| どちらを使うか | `CB-D` は happy-dom で動かすもの（`*.dom.test.ts`）、`CB-T` はそれ以外 |
-| 番号の採り方 | **最後尾の次を採る。** グループごとの順序や空き番号に差し込まない。画面ごとに別のファイルで採ると、同じ番号を 2 つ付けやすい |
-| 枝番 | `CB-T19b` は、既にある ID に後から足した確認。番号は同じでよく、枝番まで込みで一意にする |
-| 確かめ方 | `test/shared/test-ids.test.ts`（CB-T163 / CB-T164）が、重複と「ID の無いテスト」を見つける。手で数えるなら `grep -rhoE 'test\("CB-[TD][0-9]+[a-z]*' test --include=*.ts \| sed 's/test("//' \| sort \| uniq -d`（枝番まで数える） |
-| 振り直すとき | 後から付けたほうを最後尾の次へ動かす。参照（手動確認の表・`.ccnavi/approved/` の記録）も追う |
+| どちらを使うか | `CB-D`はhappy-domで動かすもの（`*.dom.test.ts`）、`CB-T`はそれ以外 |
+| 番号の採り方 | **最後尾の次を採る。** グループごとの順序や空き番号に差し込まない。画面ごとに別のファイルで採ると、同じ番号を2つ付けやすい |
+| 枝番 | `CB-T19b`は、既にあるIDに後から足した確認。番号は同じでよく、枝番まで込みで一意にする |
+| 確かめ方 | `test/shared/test-ids.test.ts`（CB-T163 / CB-T164）が、重複と「IDの無いテスト」を見つける。手で数えるなら`grep -rhoE 'test\("CB-[TD][0-9]+[a-z]*' test --include=*.ts \| sed 's/test("//' \| sort \| uniq -d`（枝番まで数える） |
+| 振り直すとき | 後から付けたほうを最後尾の次へ動かす。参照（手動確認の表・`.ccnavi/approved/`の記録）も追う |

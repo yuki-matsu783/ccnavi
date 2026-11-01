@@ -1,6 +1,6 @@
 /**
- * 保存後の通知に出す、検証（`--lint`）の要約行。実行ファイルの答え（`error N 件、warn N 件、info N 件`）の
- * 英語の深刻度を日本語に言い換える。リスク・ルール・フェーズの 3 画面で同じ言い方にそろえる。
+ * 保存後の通知に出す、検証（`--lint`）の要約行。実行ファイルの答え（`error N件、warn N件、info N件`）の
+ * 英語の深刻度を日本語に言い換える。リスク・ルール・フェーズの3画面で同じ言い方にそろえる。
  */
 export function lintSummary(report: string): string {
   const tail = report.split("\n").filter((l) => l.trim() !== "").pop() ?? "";

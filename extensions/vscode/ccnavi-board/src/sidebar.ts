@@ -1,14 +1,14 @@
 /**
- * アクティビティバーの ccnavi から開くサイドパネル。並ぶのは画面の入口 6 つで（取り込み待ちは並べない。ルール管理・リスク管理・フェーズ管理・テンプレート管理の各画面から開く）、どれも Webview パネルを開く。
+ * アクティビティバーのccnaviから開くサイドパネル。並ぶのは画面の入口6つで（取り込み待ちは並べない。ルール管理・リスク管理・フェーズ管理・テンプレート管理の各画面から開く）、どれもWebviewパネルを開く。
  * 「チケット管理」「リスク管理」「フェーズ管理」「テンプレート管理」は、チケット制御（CCNAVI_TICKET_CONTROL）が
- * disable のワークスペースでは出さない。配点は子チケットを閉じるときに、フェーズ定義は親の
- * 計画と子の範囲にしか読まれないので、disable の間はどちらも何も動かさない。使われない設定の
+ * disableのワークスペースでは出さない。配点は子チケットをクローズするときに、フェーズ定義は親の
+ * 計画と子の範囲にしか読まれないので、disableの間はどちらも何も動かさない。使われない設定の
  * 入口を残すと、直したのに反映されていない、という読み違いの元になる。
  *
- * 見た目の切り替えとバグ報告は一覧に混ぜず、パネルのタイトルバーのアイコン（配色・虫）に置く（`package.json` の `view/title`）。
- * 押すと画面が開く行と、押すと設定が変わる行が 1 列に並ぶと、押す前に何が起きるか読めない。
+ * 見た目の切り替えとバグ報告は一覧に混ぜず、パネルのタイトルバーのアイコン（配色・虫）に置く（`package.json`の`view/title`）。
+ * 押すと画面が開く行と、押すと設定が変わる行が1列に並ぶと、押す前に何が起きるか読めない。
  * 今どれを選んでいるかは、行の代わりにビューの見出しの横（`view.description`）に出す。
- * VS Code の API に触れるので単体テストの対象外。
+ * VS CodeのAPIに触れるので単体テストの対象外。
  */
 import * as vscode from "vscode";
 
@@ -28,14 +28,14 @@ interface Entry {
 const ENTRIES: readonly Entry[] = [
   {
     label: "プロジェクト管理",
-    description: "projects/ の一覧、clone・fetch・pull の実行",
+    description: "projects/の一覧、clone・fetch・pullの実行",
     command: "ccnaviBoard.openProjects",
     icon: "repo",
     needsTickets: false,
   },
   {
     label: "ルール管理",
-    description: "ルールの編集と保存、判定を試す、hook の確認",
+    description: "ルールの編集と保存、判定を試す、hookの確認",
     command: "ccnaviBoard.openRules",
     icon: "shield",
     needsTickets: false,
@@ -95,7 +95,7 @@ class EntryProvider implements vscode.TreeDataProvider<Entry> {
 
 export function registerSidebar(context: vscode.ExtensionContext): void {
   const provider = new EntryProvider();
-  // 見出しの横に今の見た目を出すので、provider を登録するだけでなくビューを持つ
+  // 見出しの横に今の見た目を出すので、providerを登録するだけでなくビューを持つ
   const view = vscode.window.createTreeView("ccnaviBoard.entries", { treeDataProvider: provider });
   view.description = APPEARANCE_LABELS[readAppearance()];
   context.subscriptions.push(view);

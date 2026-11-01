@@ -1,45 +1,45 @@
 /**
- * フロー編集画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
- * VS Code の API に触れるので単体テストの対象外。docs/design/manual-checks.md の手動確認の手順で確かめる。
+ * フロー編集画面のWebviewパネル。生成・更新・破棄、ファイル監視、Webviewからの操作の受け付け。
+ * VS CodeのAPIに触れるので単体テストの対象外。docs/design/manual-checks.mdの手動確認の手順で確かめる。
  *
- * 子チケット 1 枚のフローを図で直す。開くのはボードのカードの「フロー」だけで、
- * タブは子ごとに 1 枚（同じ子をもう 1 度開けば前面に出す）。
+ * 子チケット1枚のフローを図で直す。開くのはボードのカードの「フロー」だけで、
+ * タブは子ごとに1枚（同じ子をもう1度開けば前面に出す）。
  *
- * 画面は React（`src/webview/flow/`）で、ここが渡すのは「いま何を見せるか」（`FlowData`）だけ。
- * 渡し方はフェーズ管理と同じ `retainedHost`（編集の途中を持つので、入れ物を入れ直さない）。
+ * 画面はReact（`src/webview/flow/`）で、ここが渡すのは「いま何を見せるか」（`FlowData`）だけ。
+ * 渡し方はフェーズ管理と同じ`retainedHost`（編集の途中を持つので、入れ物を入れ直さない）。
  *
- * 置き場と錠は実行ファイルに聞く（`--explain --json` の `tickets[].flow`）。拡張は置き場を組まず、
- * 着手中かを `started_at` から組み直さない。拡張が組み直すと、判定と 2 か所で答えが分かれうるため。フローが正しいか（読めるか・形）も実行ファイルに聞く。
- * 開くときは読んだ本文を、保存の前は書き出す本文を一時ファイルに書いて `--lint --json --flow` に掛け
- * （`core/flow-lint.ts`）、error があれば理由を出して開かない・保存しない。開くときは、画面の読みと実行ファイルが
+ * 置き場と錠は実行ファイルに聞く（`--explain --json`の`tickets[].flow`）。拡張は置き場を組まず、
+ * 着手中かを`started_at`から組み直さない。拡張が組み直すと、判定と2か所で答えが分かれうるため。フローが正しいか（読めるか・形）も実行ファイルに聞く。
+ * 開くときは読んだ本文を、保存の前は書き出す本文を一時ファイルに書いて`--lint --json --flow`に掛け
+ * （`core/flow-lint.ts`）、errorがあれば理由を出して開かない・保存しない。開くときは、画面の読みと実行ファイルが
  * 読んだ中身を見比べ、食い違えば場所と両者の値を出して開かない（`core/flow-match.ts`）。保存は次を全部満たすときだけ書く。
  *
- * 1. 実行ファイルの `--lint --flow` が書き出す本文に error を言わず、その本文を読んだ中身（`flow.data`）が
- *    画面が書こうとした中身と同じ（`core/flow-match.ts`。PyYAML で意味が変わる本文を書かない）
- * 2. 押した時点で実行ファイルに聞き直し、`locked` が偽（着手中でない）
+ * 1. 実行ファイルの`--lint --flow`が書き出す本文にerrorを言わず、その本文を読んだ中身（`flow.data`）が
+ *    画面が書こうとした中身と同じ（`core/flow-match.ts`。PyYAMLで意味が変わる本文を書かない）
+ * 2. 押した時点で実行ファイルに聞き直し、`locked`が偽（着手中でない）
  * 3. 置き場が読んだときと同じ（往復の間にチケットが動いて置き場が替わっていない）
  * 4. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）
  * 5. ツリーのルートからファイルまでの途中にシンボリックリンクが無い
  *
  * 書き込みは一時ファイルの入れ替えで、リンクを辿らない（`core/flow-write.ts`）。置き場は承認済みの領域
- * （既定 `.ccnavi/approved/flows/<子>.yml`）で、エージェントは判定に止められて書けない。
+ * （既定`.ccnavi/approved/flows/<子>.yml`）で、エージェントは判定に止められて書けない。
  *
- * 残る隙間（TOCTOU）: 1 で聞き直してから書くまでの間に子が着手されると、着手の直後に書き込みが入りうる。
- * 着手はユーザか親のエージェントが `ccnavi-ticket.sh start` を打つ操作で、聞き直しから書き込みまでは同じ保存の
- * 1 回の中（実行ファイルを 1 度起こすぶん）。防ぐには実行ファイルの側に錠の置き場が要るので、ここでは狭めるだけにする。
+ * 残る隙間（TOCTOU）: 1で聞き直してから書くまでの間に子が着手されると、着手の直後に書き込みが入りうる。
+ * 着手はユーザか親のエージェントが`ccnavi-ticket.sh start`を打つ操作で、聞き直しから書き込みまでは同じ保存の
+ * 1回の中（実行ファイルを1度起こすぶん）。防ぐには実行ファイルの側に錠の置き場が要るので、ここでは狭めるだけにする。
  *
- * 未保存のまま閉じたとき。 VS Code の Webview パネルには、閉じるのを止める手段（保存・破棄・取り消しを聞いてから
- * 閉じる）が無い（`onDidDispose` は閉じた後に呼ばれる）。代わりに、未保存の間はタブのタイトルの頭に「●」を付け、
+ * 未保存のまま閉じたとき。 VS CodeのWebviewパネルには、閉じるのを止める手段（保存・破棄・取り消しを聞いてから
+ * 閉じる）が無い（`onDidDispose`は閉じた後に呼ばれる）。代わりに、未保存の間はタブのタイトルの頭に「●」を付け、
  * 画面が送ってくる編集中のコピー（`draft`）を覚えておく。閉じた後に未保存だったら、「開き直して戻す」
- * 「YAML で開く」「破棄する」を聞く。開き直すときは、閉じた時点から置き場・有無・更新時刻・中身のハッシュが
- * 変わっていなければコピーを未保存のまま戻し、変わっていれば戻さずにコピーを名前の無い YAML のエディタで開く
- * （上書きしない）。同じ子の画面が既に開いていれば、その編集は差し替えず、戻せなかったと言って YAML で開く。
+ * 「YAMLで開く」「破棄する」を聞く。開き直すときは、閉じた時点から置き場・有無・更新時刻・中身のハッシュが
+ * 変わっていなければコピーを未保存のまま戻し、変わっていれば戻さずにコピーを名前の無いYAMLのエディタで開く
+ * （上書きしない）。同じ子の画面が既に開いていれば、その編集は差し替えず、戻せなかったと言ってYAMLで開く。
  *
  * エージェントの下書き。 置き場は実行ファイルに聞く（`tickets[].flow.draft`）。下書きが在り、中身が
- * いまのフローと違えば（`sameFlowIgnoringLayout` が偽）「提案あり」を出す。開くと下書きを読んだバイトのまま `--lint --json --flow` に
- * 掛け、error なら取り込めないと言う。通れば画面が文の前後まで見せる差分を出し、「取り込む」で編集中の内容に入れる
+ * いまのフローと違えば（`sameFlowIgnoringLayout`が偽）「提案あり」を出す。開くと下書きを読んだバイトのまま`--lint --json --flow`に
+ * 掛け、errorなら取り込めないと言う。通れば画面が文の前後まで見せる差分を出し、「取り込む」で編集中の内容に入れる
  * （書かない。保存はいつもの経路）。保存が成功したら、下書きの中身が取り込んだときのハッシュと同じときだけ消し
- * （`core/flow-write.ts` の `removeDraftFile`）、保存のあとの知らせに名前を出す。依頼のボタン（着手の前だけ）は
+ * （`core/flow-write.ts`の`removeDraftFile`）、保存のあとの知らせに名前を出す。依頼のボタン（着手の前だけ）は
  * 依頼の文を組み、ボードと同じ「コピー / 新しいセッションで開く」（`prompt-handover.ts`）で渡す。
  */
 import * as crypto from "node:crypto";
@@ -83,15 +83,15 @@ import { markTourSeen, tourSeen } from "./tour.js";
 import { confirmIfTurn } from "./turn-confirm.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
-/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js` */
+/** 画面の名前。バンドルのパスは`src/webview/<名前>/main.tsx` → `out/webview/<名前>.js` */
 const SCREEN = "flow";
 
 interface Loaded {
   readonly target: FlowTarget;
   readonly exists: boolean;
-  /** 無いときは 0 */
+  /** 無いときは0 */
   readonly mtimeMs: number;
-  /** 読んだバイトのハッシュ（sha256 の 16 進）。無いときは空 */
+  /** 読んだバイトのハッシュ（sha256の16進）。無いときは空 */
   readonly hash: string;
   readonly doc: FlowDoc;
   /** 画面に見せるパス（ワークスペースルートからの相対。外なら絶対） */
@@ -123,7 +123,7 @@ interface PanelState {
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   readonly host: ScreenHost<FlowData>;
-  /** 編集中の本文を `--lint --flow` に渡す一時ファイルの置き場。画面を閉じたら消す */
+  /** 編集中の本文を`--lint --flow`に渡す一時ファイルの置き場。画面を閉じたら消す */
   readonly tmpDir: string;
   fileWatchers: vscode.FileSystemWatcher[];
   watchers: vscode.FileSystemWatcher[];
@@ -137,12 +137,12 @@ interface PanelState {
   dirty: boolean;
   /** 画面が送ってきた、未保存のコピー（未保存でなければ無い） */
   draft?: FlowDoc;
-  /** 開き直したときに戻すコピー。最初の読み込みで確かめて `shownDraft` に移す */
+  /** 開き直したときに戻すコピー。最初の読み込みで確かめて`shownDraft`に移す */
   restore?: Restore;
   /** 画面に渡している、戻したコピー（次に読み直すまで） */
   shownDraft?: FlowDoc;
   seq: number;
-  /** 画面に渡した下書きのハッシュ。保存のときに届いた `imported` がこの中にあるときだけ、下書きを消しに行く */
+  /** 画面に渡した下書きのハッシュ。保存のときに届いた`imported`がこの中にあるときだけ、下書きを消しに行く */
   offered: Set<string>;
   /** 画面に見せている依頼の文（コピー / 新しいセッションで開く はこれを渡す） */
   requestPrompt?: string;
@@ -151,7 +151,7 @@ interface PanelState {
   beforeStart?: boolean;
 }
 
-/** 開いているパネル。子の識別子ごとに 1 枚 */
+/** 開いているパネル。子の識別子ごとに1枚 */
 const panels = new Map<string, PanelState>();
 
 function binSetting(): string {
@@ -159,7 +159,7 @@ function binSetting(): string {
 }
 
 function titleOf(ticket: string, dirty = false): string {
-  return `${dirty ? "● " : ""}ccnavi フロー: ${ticket}`;
+  return `${dirty ? "● " : ""}ccnaviフロー: ${ticket}`;
 }
 
 /** 保存の前に差分を確かめるか（設定。既定は確かめる） */
@@ -201,8 +201,8 @@ async function openFlowPanel(ticket: string, restore: Restore | undefined): Prom
   if (open !== undefined) {
     open.panel.reveal(open.panel.viewColumn);
     if (restore !== undefined) {
-      // 既に開いている画面の編集を何も言わずに差し替えない。戻せなかったと言い、コピーは YAML で見せる
-      void vscode.window.showWarningMessage(`${ticket} のフローは既に開いているため、閉じる前の編集を戻せませんでした。閉じる前の編集は、無題の YAML ファイルとして開きます。`);
+      // 既に開いている画面の編集を何も言わずに差し替えない。戻せなかったと言い、コピーはYAMLで見せる
+      void vscode.window.showWarningMessage(`${ticket}のフローは既に開いているため、閉じる前の編集を戻せませんでした。閉じる前の編集は、無題のYAMLファイルとして開きます。`);
       void openDraftAsYaml(restore.draft);
     }
     return;
@@ -221,7 +221,7 @@ async function openFlowPanel(ticket: string, restore: Restore | undefined): Prom
     // 編集の途中を持つので、タブを非表示にしても破棄しない
     retainContextWhenHidden: true,
   });
-  showLoading(panel, titleOf(ticket), SCREEN, `${ticket} のフロー`);
+  showLoading(panel, titleOf(ticket), SCREEN, `${ticket}のフロー`);
   const current: PanelState = {
     ticket,
     panel,
@@ -269,7 +269,7 @@ async function lookUp(root: string, ticket: string): Promise<FlowTarget> {
   return found.target;
 }
 
-/** 本文を実行ファイルに確かめさせる。error があれば理由を返す（`core/flow-lint.ts`） */
+/** 本文を実行ファイルに確かめさせる。errorがあれば理由を返す（`core/flow-lint.ts`） */
 function lintText(root: string, tmpDir: string, text: string | Uint8Array, shown: string) {
   return lintFlowText(text, tmpDir, shown, (file) => runFlowLint(root, binSetting(), file));
 }
@@ -291,8 +291,8 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
     return { target, exists: false, mtimeMs: 0, hash: "", doc, shown, offer: readOffer(root, target, doc) };
   }
   const { bytes, mtimeMs } = read;
-  const refuse = (why: string): Error => new Error(`フローのファイルを開きません（${shown}）: ${why}。エディタで直してから再読み込みしてください`);
-  // 正しいかは実行ファイルに聞く（SubagentStart と同じ読み）。読んだバイトのまま渡す（UTF-8 として不正かどうかも
+  const refuse = (why: string): Error => new Error(`フローのファイルを開きません（${shown}）: ${why}。エディタで直してから更新してください`);
+  // 正しいかは実行ファイルに聞く（SubagentStartと同じ読み）。読んだバイトのまま渡す（UTF-8として不正かどうかも
   // 実行ファイルが言う）。読めないフローを画面で直すと、読めなかった部分を省いて書くことになる。エディタで直させる
   const verdict = await lintText(root, tmpDir, bytes, shown);
   if (!verdict.ok) {
@@ -307,21 +307,21 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
     throw refuse(value.error);
   }
   // 画面の読み（YAML 1.2）が実行ファイルの読み（PyYAML）と同じときだけ開く。違えば、画面で保存しただけで
-  // 値の意味が変わる（`0755` `yes` `1:30` マージキー など）。意味の答えは実行ファイルが持つ（core/flow-match.ts）
+  // 値の意味が変わる（`0755` `yes` `1:30`マージキー など）。意味の答えは実行ファイルが持つ（core/flow-match.ts）
   const mismatch = flowMismatch(value.value, verdict.data);
   if (mismatch !== undefined) {
-    throw new Error(`フローのファイルを開きません（${shown}）: ${openMismatchText(mismatch)}。直したら再読み込みしてください`);
+    throw new Error(`フローのファイルを開きません（${shown}）: ${openMismatchText(mismatch)}。直したら更新してください`);
   }
   const doc = asFlowDoc(value.value);
   if (doc === undefined) {
-    throw refuse("ノードのリスト（id が文字列のノード）を取り出せないため、図を描けません");
+    throw refuse("ノードのリスト（idが文字列のノード）を取り出せないため、図を描けません");
   }
   return { target, exists: true, mtimeMs, hash: hashOf(bytes), doc, shown, checks: verdict.checks, offer: readOffer(root, target, doc) };
 }
 
 /**
  * 「提案あり」を出すか。下書きが在り、中身がいまのフロー（`current`）と違えば出す。読めない（リンク・ハードリンク・
- * 大きすぎる・YAML として読めない）ときも出し、開いたときに理由を言う。ここでは実行ファイルに掛けない（開いたときに掛ける）
+ * 大きすぎる・YAMLとして読めない）ときも出し、開いたときに理由を言う。ここでは実行ファイルに掛けない（開いたときに掛ける）
  */
 function readOffer(root: string, target: FlowTarget, current: FlowDoc): FlowOffer | undefined {
   const draft = target.flow.draft;
@@ -409,7 +409,7 @@ function registerPanelHandlers(current: PanelState): void {
     try {
       fs.rmSync(current.tmpDir, { recursive: true, force: true });
     } catch {
-      // 消せなければ OS の一時ディレクトリに残る（承認済みの領域には書いていない）
+      // 消せなければOSの一時ディレクトリに残る（承認済みの領域には書いていない）
     }
     if (alive(current)) {
       panels.delete(current.ticket);
@@ -431,9 +431,9 @@ function askRestore(current: PanelState): void {
   }
   const restore: Restore = { draft, path: loaded.target.flow.path, exists: loaded.exists, mtimeMs: loaded.mtimeMs, hash: loaded.hash };
   const back = "開き直して戻す";
-  const asYaml = "YAML で開く";
+  const asYaml = "YAMLで開く";
   void vscode.window
-    .showWarningMessage(`${current.ticket} のフローを未保存のまま閉じました。編集を戻しますか？`, { modal: true, detail: "「破棄する」を選ぶと、閉じる前の編集は残りません。" }, back, asYaml, "破棄する")
+    .showWarningMessage(`${current.ticket}のフローを未保存のまま閉じました。編集を戻しますか？`, { modal: true, detail: "「破棄する」を選ぶと、閉じる前の編集は残りません。" }, back, asYaml, "破棄する")
     .then((choice) => {
       if (choice === back) {
         void openFlowPanel(current.ticket, restore);
@@ -443,7 +443,7 @@ function askRestore(current: PanelState): void {
     });
 }
 
-/** コピーを名前の無い YAML のエディタで開く（ファイルには書かない） */
+/** コピーを名前の無いYAMLのエディタで開く（ファイルには書かない） */
 async function openDraftAsYaml(draft: FlowDoc): Promise<void> {
   const document = await vscode.workspace.openTextDocument({ language: "yaml", content: serializeFlow(draft) });
   await vscode.window.showTextDocument(document);
@@ -587,7 +587,7 @@ function redraw(current: PanelState): void {
     showError(current, current.error);
     return;
   }
-  current.host.send({ kind: "loading", text: loadingText(`${current.ticket} のフロー`) });
+  current.host.send({ kind: "loading", text: loadingText(`${current.ticket}のフロー`) });
 }
 
 function flowHost(panel: vscode.WebviewPanel, root: string): ScreenHost<FlowData> {
@@ -639,8 +639,8 @@ async function reload(current: PanelState): Promise<void> {
     if (same) {
       current.shownDraft = restore.draft;
     } else {
-      // 閉じた後にファイルが変わった。コピーを戻すと、変わった中身を気づかないうちに上書きしうる。コピーは YAML で見せる
-      void vscode.window.showWarningMessage(`${current.ticket} のフローは閉じた後に変わったので、編集を戻しませんでした。閉じる前の編集は、無題の YAML ファイルとして開きます。`);
+      // 閉じた後にファイルが変わった。コピーを戻すと、変わった中身を気づかないうちに上書きしうる。コピーはYAMLで見せる
+      void vscode.window.showWarningMessage(`${current.ticket}のフローは閉じた後に変わったので、編集を戻しませんでした。閉じる前の編集は、無題のYAMLファイルとして開きます。`);
       void openDraftAsYaml(restore.draft);
     }
   }
@@ -657,7 +657,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   if (current.loaded === loaded) {
     return false;
   }
-  fail(current, "フローを再読み込みしたため、この保存は取りやめました。再読み込みしたフローで編集し直してください");
+  fail(current, "フローを更新したため、この保存は取りやめました。更新したフローで編集し直してください");
   return true;
 }
 
@@ -695,8 +695,8 @@ async function handleMessage(current: PanelState, message: FlowMessage | undefin
       return;
     case "reload": {
       if (message.dirty) {
-        const choice = await vscode.window.showWarningMessage("未保存の変更があります。破棄して再読み込みしますか？", { modal: true }, "再読み込みする");
-        if (choice !== "再読み込みする") {
+        const choice = await vscode.window.showWarningMessage("未保存の変更があります。破棄して更新しますか？", { modal: true }, "更新する");
+        if (choice !== "更新する") {
           current.host.post({ type: "cancelled" } satisfies ToFlow);
           return;
         }
@@ -761,8 +761,8 @@ async function check(current: PanelState, seq: number, doc: FlowDoc): Promise<vo
 }
 
 /**
- * 「提案あり」を開く。下書きを読んだバイトのまま実行ファイルに確かめさせ（`--lint --json --flow`。SubagentStart と同じ読み）、
- * error なら取り込めないと言う。通れば画面の読みと実行ファイルの読みを見比べ（開くときと同じ）、中身とハッシュを返す
+ * 「提案あり」を開く。下書きを読んだバイトのまま実行ファイルに確かめさせ（`--lint --json --flow`。SubagentStartと同じ読み）、
+ * errorなら取り込めないと言う。通れば画面の読みと実行ファイルの読みを見比べ（開くときと同じ）、中身とハッシュを返す
  */
 async function openProposal(current: PanelState): Promise<void> {
   const loaded = current.loaded;
@@ -813,7 +813,7 @@ async function openProposal(current: PanelState): Promise<void> {
   }
   const doc = asFlowDoc(value.value);
   if (doc === undefined) {
-    refuse("ノードのリスト（id が文字列のノード）を取り出せないため、図を描けません");
+    refuse("ノードのリスト（idが文字列のノード）を取り出せないため、図を描けません");
     return;
   }
   const hash = hashOf(bytes);
@@ -861,9 +861,9 @@ function removeImported(current: PanelState, target: FlowTarget, imported: strin
   const shown = shownPath(current.folder.uri.fsPath, draft.path);
   const removed = removeDraftFile(target.flow.tree, draft.path, imported);
   if (!removed.ok) {
-    return `取り込んだ下書き ${shown} は削除していません（${removed.error}）。`;
+    return `取り込んだ下書き${shown}は削除していません（${removed.error}）。`;
   }
-  return removed.removed ? `取り込んだ下書き ${shown} を削除しました（削除もコミットに入ります）。` : "";
+  return removed.removed ? `取り込んだ下書き${shown}を削除しました（削除もコミットに入ります）。` : "";
 }
 
 async function save(current: PanelState, doc: FlowDoc, imported?: string): Promise<void> {
@@ -871,7 +871,7 @@ async function save(current: PanelState, doc: FlowDoc, imported?: string): Promi
   if (loaded === undefined) {
     return;
   }
-  // 1. 書き出す本文が正しいかを実行ファイルに聞く（SubagentStart と同じ読み）。error なら書かない
+  // 1. 書き出す本文が正しいかを実行ファイルに聞く（SubagentStartと同じ読み）。errorなら書かない
   const text = serializeFlow(doc);
   const verdict = await lintText(current.folder.uri.fsPath, current.tmpDir, text, loaded.shown);
   if (!alive(current) || stale(current, loaded)) {
@@ -907,11 +907,11 @@ async function save(current: PanelState, doc: FlowDoc, imported?: string): Promi
   // 3. 置き場が同じ。往復の間にチケットが動くと、読む先（正とする側のツリー）が替わることがある
   const filePath = loaded.target.flow.path;
   if (target.flow.path !== filePath) {
-    fail(current, `フローの置き場が変わりました（${loaded.shown} → ${shownPath(current.folder.uri.fsPath, target.flow.path)}）。再読み込みしてから編集し直してください`);
+    fail(current, `フローの置き場が変わりました（${loaded.shown} → ${shownPath(current.folder.uri.fsPath, target.flow.path)}）。更新してから編集し直してください`);
     return;
   }
   // 4. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）。5. リンクを辿らない。
-  // 6. 一時ファイルに書いて入れ替える（途中で異常終了しても半端なファイルを残さない）。4〜6 は flow-write.ts
+  // 6. 一時ファイルに書いて入れ替える（途中で異常終了しても半端なファイルを残さない）。4〜6はflow-write.ts
   current.wroteAt = Date.now();
   const written = writeFlowFile(target.flow.tree, filePath, text, { exists: loaded.exists, mtimeMs: loaded.mtimeMs });
   if (!written.ok) {
@@ -922,7 +922,7 @@ async function save(current: PanelState, doc: FlowDoc, imported?: string): Promi
   // 取り込んだ下書きは、保存が成功したこの時点で消す（取り込んだときと同じ中身のときだけ）
   const drafted = removeImported(current, target, imported);
   await reload(current);
-  // 取り込み済みの親子のチケット（write-and-push の対象）だけ、承認の push を送る。フローはユーザが保存したものなので write-and-push ではコミットせず、
+  // 取り込み済みの親子のチケット（write-and-pushの対象）だけ、承認のpushを送る。フローはユーザが保存したものなのでwrite-and-pushではコミットせず、
   // ユーザの操作の最後に送る。ターミナルは対話中のことがあるので、勝手に打ち込まず、ユーザがボタンを押したときだけ送る。
   // それ以外の親子のチケットは今どおりユーザがコミットする。
   const root = current.folder.uri.fsPath;
@@ -932,13 +932,13 @@ async function save(current: PanelState, doc: FlowDoc, imported?: string): Promi
     (await runWriteAndPushTarget(root, binSetting(), target.parent)) === "yes";
   if (!carrier) {
     vscode.window.showInformationMessage(
-      `${loaded.shown} に保存しました。${drafted}コミットは、承認済みチケットと同じくユーザが行います（sh ${PUSH_APPROVED_SCRIPT}）`,
+      `${loaded.shown}に保存しました。${drafted}コミットは、承認済みチケットと同じくユーザが行います（sh ${PUSH_APPROVED_SCRIPT}）`,
     );
     return;
   }
   const send = "ターミナルで送る";
   const picked = await vscode.window.showInformationMessage(
-    `${loaded.shown} に保存しました。${drafted}親 ${target.parent} とその子は取り込み済みのため、コミットと push は、「${send}」を押すと ${PUSH_APPROVED_SCRIPT} ${target.parent} で送れます`,
+    `${loaded.shown}に保存しました。${drafted}親${target.parent}とその子は取り込み済みのため、コミットとpushは、「${send}」を押すと${PUSH_APPROVED_SCRIPT} ${target.parent}で送れます`,
     send,
   );
   if (picked === send) {
@@ -946,7 +946,7 @@ async function save(current: PanelState, doc: FlowDoc, imported?: string): Promi
   }
 }
 
-/** 普通のファイルが在るか（承認の push の sh が配られているか） */
+/** 普通のファイルが在るか（承認のpushのshが配られているか） */
 function isFile(filePath: string): boolean {
   try {
     return fs.statSync(filePath).isFile();

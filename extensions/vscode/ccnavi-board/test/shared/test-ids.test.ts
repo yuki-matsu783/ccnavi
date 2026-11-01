@@ -1,11 +1,11 @@
 /**
- * テストの名前に付ける ID（`CB-T…` / `CB-D…`）の決まりを、テストで確かめる。
+ * テストの名前に付けるID（`CB-T…` / `CB-D…`）の決まりを、テストで確かめる。
  *
- * ID は「失敗したテストを名指しする」ためのもので、手動確認の表（docs/design/manual-checks.md）やチケットの記録から参照する。
- * 同じ番号が 2 つあると、どちらの主題か読めない。画面ごとに別のファイルで
+ * IDは「失敗したテストを名指しする」ためのもので、手動確認の表（docs/design/manual-checks.md）やチケットの記録から参照する。
+ * 同じ番号が2つあると、どちらの主題か読めない。画面ごとに別のファイルで
  * 採番すると起きるので、人の注意ではなくここで止める。
  *
- * 枝番（`CB-T19b`）は、既にある ID に後から足した確認。番号そのものは同じでよく、
+ * 枝番（`CB-T19b`）は、既にあるIDに後から足した確認。番号そのものは同じでよく、
  * 枝番まで込みで一意であればよい。
  */
 import { test } from "node:test";
@@ -15,7 +15,7 @@ import * as path from "node:path";
 
 const TEST_DIR = path.join(__dirname, "..", "..", "..", "test");
 
-/** `test("CB-T12 …"` の ID（枝番まで）と、書いてある場所 */
+/** `test("CB-T12 …"`のID（枝番まで）と、書いてある場所 */
 const DEFINITION = /^\s*test\(\s*"(CB-[TD][0-9]+[a-z]*)\s/;
 
 interface Named {
@@ -49,9 +49,9 @@ function names(): Named[] {
   return found;
 }
 
-test("CB-T163 テストの ID は重複しない。追加するときは最後尾の次を採る", () => {
+test("CB-T163 テストのIDは重複しない。追加するときは最後尾の次を採る", () => {
   const found = names();
-  assert.ok(found.length > 100, `テストを数えられていない（${found.length} 件）。置き場のパスが変わった？`);
+  assert.ok(found.length > 100, `テストを数えられていない（${found.length}件）。置き場のパスが変わった？`);
   const seen = new Map<string, string[]>();
   for (const { id, where } of found) {
     seen.set(id, [...(seen.get(id) ?? []), where]);
@@ -60,11 +60,11 @@ test("CB-T163 テストの ID は重複しない。追加するときは最後�
   assert.deepEqual(
     duplicated.map(([id, wheres]) => `${id}: ${wheres.join(" / ")}`),
     [],
-    "同じ ID が 2 つある。後から付けたほうを最後尾の次へ振り直す（docs/design/structure.md の「テストの ID」）",
+    "同じIDが2つある。後から付けたほうを最後尾の次へ振り直す（docs/design/structure.mdの「テストのID」）",
   );
 });
 
-test("CB-T164 テストの名前は ID から始まる（名指しできない名前を作らない）", () => {
+test("CB-T164 テストの名前はIDから始まる（名指しできない名前を作らない）", () => {
   const files = walk(TEST_DIR);
   const headless: string[] = [];
   for (const file of files) {
@@ -77,5 +77,5 @@ test("CB-T164 テストの名前は ID から始まる（名指しできない�
         }
       });
   }
-  assert.deepEqual(headless, [], "ID のないテストがある。`test(\"CB-T<番号> …\"` の形にする");
+  assert.deepEqual(headless, [], "IDのないテストがある。`test(\"CB-T<番号> …\"`の形にする");
 });

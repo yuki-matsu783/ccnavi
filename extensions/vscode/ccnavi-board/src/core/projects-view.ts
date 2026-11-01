@@ -1,11 +1,11 @@
 /**
- * プロジェクト管理画面の、拡張ホストと Webview の間の契約。
+ * プロジェクト管理画面の、拡張ホストとWebviewの間の契約。
  *
- * 画面は React で組み、拡張ホストは HTML を組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。拡張ホストが渡すのは
- * 「いま何を見せるか」（`ProjectsData`）だけで、カードとメニューの DOM は画面が作る。
+ * 画面はReactで組み、拡張ホストはHTMLを組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。拡張ホストが渡すのは
+ * 「いま何を見せるか」（`ProjectsData`）だけで、カードとメニューのDOMは画面が作る。
  * 画面が返すのはユーザが押した操作（`ProjectsMessage`）だけ。
  *
- * この形を保つために、ここには VS Code の API も DOM も入れない。両側から import されるので、
+ * この形を保つために、ここにはVS CodeのAPIもDOMも入れない。両側からimportされるので、
  * 片方だけが持てるものを置くとバンドルできなくなる。
  */
 import type { AppearanceMessage } from "./appearance.js";
@@ -15,8 +15,8 @@ import { embedJson, type DataMessage } from "./screen-host.js";
 
 // ---- 画面に見せる形
 //
-// 組み立てるのは `projects.ts` の `buildProjectsPage`。形をここに置くのは、Webview 側が
-// `projects.ts`（`commands.ts` 経由で `node:path` を読む）を辿らずに済むようにするため。
+// 組み立てるのは`projects.ts`の`buildProjectsPage`。形をここに置くのは、Webview側が
+// `projects.ts`（`commands.ts`経由で`node:path`を読む）を辿らずに済むようにするため。
 
 export interface Stray {
   /** ワークスペースルートからの相対、"/" 区切り */
@@ -36,7 +36,7 @@ export interface ProjectRow {
   readonly originKey: string;
   readonly worktrees: readonly string[];
   readonly tickets: number;
-  /** 作業中（ボードの作業中の列と同じ。`.ccnavi/approved/doing/` にあるものと、レビュー待ち `wip/proposals/review/`） */
+  /** 作業中（ボードの作業中の列と同じ。`.ccnavi/approved/doing/`にあるものと、レビュー待ち`wip/proposals/review/`） */
   readonly doing: number;
   readonly problems: readonly LintProblem[];
 }
@@ -46,8 +46,8 @@ export interface ProjectsPage {
   readonly generatedAt: string;
   readonly ticketsEnabled: boolean;
   /**
-   * 置き場（絶対）。実行ファイルの答え（`board.settings.projects`）で、既定の `<root>/projects` に固定。
-   * 空になるのは診断のフラグ `--projects ""` を渡したときだけで、拡張はフラグを渡さない
+   * 置き場（絶対）。実行ファイルの答え（`board.settings.projects`）で、既定の`<root>/projects`に固定。
+   * 空になるのは診断のフラグ`--projects ""`を渡したときだけで、拡張はフラグを渡さない
    */
   readonly projectsDir: string;
   readonly projectsRel: string;
@@ -65,8 +65,8 @@ export interface ProjectsPage {
 }
 
 /**
- * 共通レイヤーのミラーの状態（`user mirror --json` の結果）。一覧（`ProjectsPage`）とは別に、拡張ホストが 5 分ごとに調べ直す。
- * 状態の形とボタンの判断は `mirrormodel.ts` が持つ。
+ * 共通レイヤーのミラーの状態（`user mirror --json`の結果）。一覧（`ProjectsPage`）とは別に、拡張ホストが5分ごとに調べ直す。
+ * 状態の形とボタンの判断は`mirrormodel.ts`が持つ。
  */
 export interface MirrorData {
   readonly status: MirrorStatus;
@@ -80,7 +80,7 @@ export interface MirrorData {
 
 /**
  * 画面に見せる中身。読み直せなかったときは一覧の代わりに文面を渡す（`kind: "error"`）。
- * ボードと同じ形で、画面はどちらでも 1 枚を描く。`mirror` が無ければ、まだミラーを調べていない
+ * ボードと同じ形で、画面はどちらでも1枚を描く。`mirror`が無ければ、まだミラーを調べていない
  * （画面はミラーの欄もボタンも出さない）。
  */
 export type ProjectsData =
@@ -88,11 +88,11 @@ export type ProjectsData =
   | { readonly kind: "error"; readonly error: string };
 
 /**
- * 拡張ホスト → 画面。中身を包む形は `screen-host.ts` が決める（渡すのはそこ）。
+ * 拡張ホスト → 画面。中身を包む形は`screen-host.ts`が決める（渡すのはそこ）。
  *
- * `failed` / `info` / `cloned` は clone の欄の下に出す一言で、画面が覚える。生きている画面にしか
+ * `failed` / `info` / `cloned`はcloneの欄の下に出す一言で、画面が覚える。生きている画面にしか
  * 届かない（非表示になっていれば失われる）が、操作の結果をその場で言うだけのものなので持ち越さない。
- * `cloned` のときだけ、画面は打ち込んだ URL と名前を消す。
+ * `cloned`のときだけ、画面は打ち込んだURLと名前を消す。
  */
 export type ToProjects =
   | DataMessage<ProjectsData>
@@ -103,7 +103,7 @@ export type ToProjects =
   | { readonly type: "tour" }
   | AppearanceMessage;
 
-/** 画面 → 拡張ホスト。受け側（projects-panel の `asMessage`）が形を確かめてから使う */
+/** 画面 → 拡張ホスト。受け側（projects-panelの`asMessage`）が形を確かめてから使う */
 export type ProjectsMessage =
   /** 画面が組み上がった。非表示になって作り直された画面が、いまの中身をもらい直すために送る */
   | { readonly type: "ready" }
@@ -111,24 +111,24 @@ export type ProjectsMessage =
   | { readonly type: "fixIgnore" }
   | { readonly type: "clone"; readonly url: string; readonly name: string }
   /**
-   * ミラーを同期する。`names` が空なら差分のある全プロジェクト（「すべて同期」）、1 つならそのプロジェクトだけ（「ミラーを同期」）。
-   * `expect` は画面が見せていた結果の値（全体なら結果の `expect`、単独ならそのプロジェクトの `expect`）。
+   * ミラーを同期する。`names`が空なら差分のある全プロジェクト（「すべて同期」）、1つならそのプロジェクトだけ（「ミラーを同期」）。
+   * `expect`は画面が見せていた結果の値（全体なら結果の`expect`、単独ならそのプロジェクトの`expect`）。
    * 見せた後に内容が変わっていれば、実行ファイルは何も書かない
    */
   | { readonly type: "mirrorSync"; readonly names: readonly string[]; readonly expect: string }
   /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */
   | { readonly type: "tourDone" };
 
-/** clone の欄の下に出す一言。`failed` は失敗を示す */
+/** cloneの欄の下に出す一言。`failed`は失敗を示す */
 export interface CloneStatus {
   readonly kind: "info" | "failed";
   readonly message: string;
 }
 
-/** 最初の中身を埋める `<script type="application/json">` の id。画面はこれを読んで最初の 1 枚を描く */
+/** 最初の中身を埋める`<script type="application/json">`のid。画面はこれを読んで最初の1枚を描く */
 export const DATA_ID = "ccnavi-projects-data";
 
-/** 最初の中身を HTML に埋める形にする。埋め方は `screen-host.ts` が持つ（React の画面で同じ） */
+/** 最初の中身をHTMLに埋める形にする。埋め方は`screen-host.ts`が持つ（Reactの画面で同じ） */
 export function embedData(data: ProjectsData): string {
   return embedJson(data);
 }

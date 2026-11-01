@@ -168,7 +168,7 @@ test("CB-T158 途中で止まった承認を読む（置いたぶんを拾い、
     JSON.stringify({ version: APPROVE_VERSION, partial: { placed: [], written: [], ticket: "i0001", reason: "書けない", lines: [] } }),
   );
   assert.ok(!none.ok && "partial" in none && none.partial.placed.length === 0);
-  // `written` が無い答えは、絞れないので読まずに止める（空配列は書いたものが無い正常な形）
+  // `written` が無い答えは、絞れないので読まずに止める（空リストは書いたものが無い正常な形）
   const lacking = parseApproveResult(
     JSON.stringify({ version: APPROVE_VERSION, partial: { placed: ["i0001"], ticket: "i0001", reason: "書けない", lines: [] } }),
   );
@@ -186,10 +186,10 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
     reason: "書けない (…)",
     lines: ["  i0001 のフェーズ 1 のマーカーを削除した"],
   });
-  assert.ok(stopped.includes("i0001-01-01 で止まりました"));
-  assert.ok(stopped.includes("書けた承認済みチケット（1 件）: .ccnavi/approved/doing/i0001.md"), "書けたパスを言う");
+  assert.ok(stopped.includes("i0001-01-01で止まりました"));
+  assert.ok(stopped.includes("書けた承認済みチケット（1件）: .ccnavi/approved/doing/i0001.md"), "書けたパスを言う");
   assert.ok(stopped.includes("書き込めませんでした: i0001-01-01"), "書けなかった提案を名指しする");
-  assert.ok(stopped.includes("コミット・push するコマンドは送信していません"), "送れていなければ未送信と言う");
+  assert.ok(stopped.includes("コミット・pushするコマンドは送信していません"), "送れていなければ未送信と言う");
   const sent = partialMessage({
     placed: ["i0001"],
     paths: [".ccnavi/approved/doing/i0001.md"],
@@ -198,7 +198,7 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
     reason: "書けない",
     lines: [],
   }, true);
-  assert.ok(sent.includes("書けたぶんだけをコミット・push するコマンドをターミナルに送信しました"), sent);
+  assert.ok(sent.includes("書けたぶんだけをコミット・pushするコマンドをターミナルに送信しました"), sent);
   assert.ok(stopped.includes("マーカーを削除した"), "ターミナルに出ていた行も渡す");
 
   // 1 件も置かれなかったときは「一部だけ置かれた」と言わない
@@ -215,17 +215,17 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
     reason: "マーカーを置けない: 書けない",
     lines: [],
   });
-  assert.ok(after.includes("i0001 の後始末で止まりました"));
-  assert.ok(!after.includes("i0001 で止まりました"));
+  assert.ok(after.includes("i0001の後始末で止まりました"));
+  assert.ok(!after.includes("i0001で止まりました"));
 
-  // 「が」と識別子の間は空白 1 つ。止まった識別子が分からない（空）ときは空白を重ねない
-  assert.ok(stopped.startsWith("ccnavi user agree --yes が i0001-01-01 で止まりました: 書けない (…)。"), stopped);
-  assert.ok(after.startsWith("ccnavi user agree --yes が i0001 の後始末で止まりました: "), after);
+  // 「が」と識別子の間に空白を入れない。止まった識別子が分からない（空）ときも「が」の直後に「止まりました」が続く
+  assert.ok(stopped.startsWith("ccnavi user agree --yesがi0001-01-01で止まりました: 書けない (…)。"), stopped);
+  assert.ok(after.startsWith("ccnavi user agree --yesがi0001の後始末で止まりました: "), after);
   const unknown = partialMessage({ placed: [], paths: [], written: [], ticket: "", reason: "書けない", lines: [] });
-  assert.ok(unknown.startsWith("ccnavi user agree --yes が止まりました: 書けない。"), unknown);
-  // 継ぎ目だけを見る。識別子があれば「が」のあとに空白ちょうど 1 つ、無ければ「が」の直後に「止まりました」
-  assert.match(stopped, /--yes が [^\s]/, stopped);
-  assert.match(unknown, /--yes が止まりました/, unknown);
+  assert.ok(unknown.startsWith("ccnavi user agree --yesが止まりました: 書けない。"), unknown);
+  // 継ぎ目だけを見る。識別子があっても無くても、「が」のあとに空白は入らない
+  assert.match(stopped, /--yesがi0001-01-01で止まりました/, stopped);
+  assert.match(unknown, /--yesが止まりました/, unknown);
 });
 
 test("CB-T398 承認した子のワークツリーの計画を読む（欠けた欄は空として読む）", () => {
@@ -265,9 +265,9 @@ test("CB-T399 作れなかった子のワークツリーは、名前と手で打
   );
   assert.equal(
     text,
-    "子チケット i0001-01-01 のワークツリー .claude/worktrees/i0001-01-01 を作成できませんでした（fatal: already exists）。" +
+    "子チケットi0001-01-01のワークツリー.claude/worktrees/i0001-01-01を作成できませんでした（fatal: already exists）。" +
       "手で作るなら: sh '/ws/.ccnavi/scripts/ccnavi-git.sh' worktree add .claude/worktrees/i0001-01-01 -b i0001-01-01 i0001。" +
-      "ブランチ i0001-01-01 が既にあるなら: sh '/ws/.ccnavi/scripts/ccnavi-git.sh' worktree add .claude/worktrees/i0001-01-01 i0001-01-01",
+      "ブランチi0001-01-01が既にあるなら: sh '/ws/.ccnavi/scripts/ccnavi-git.sh' worktree add .claude/worktrees/i0001-01-01 i0001-01-01",
   );
   assert.equal(childWorktreeFailureText([], "sh x"), "");
 });
@@ -289,11 +289,11 @@ test("CB-T1220 承認の要約は batch と plans から作る（件数・part �
   const plan = base.plans[0];
   const two = { ...base, plans: [plan, { ...plan, part: "feedback", items: [plan.items[0]] }] };
   assert.deepEqual(summarize(two), {
-    tickets: "承認するチケット 3 件（親 1 件・子 2 件）",
-    plans: ["i0001 の全体計画 2 ステップ（調査・設計）", "i0001 のフィードバック計画 1 ステップ（調査）"],
+    tickets: "承認するチケット3件（親1件・子2件）",
+    plans: ["i0001の全体計画2ステップ（調査・設計）", "i0001のフィードバック計画1ステップ（調査）"],
   });
   const revised = { ...base, batch: base.batch.map((b) => (b.parent === null ? { ...b, revision: true } : b)) };
-  assert.match(summarize(revised).tickets, /改版 1 件/);
+  assert.match(summarize(revised).tickets, /改版1件/);
   assert.match(summarize(revised).plans[0], /^i0001（改版）の全体計画/);
   assert.deepEqual(summarize({ ...base, plans: [] }).plans, []);
   assert.equal(summarize({ ...base, batch: [], plans: [] }).tickets, "");

@@ -1,9 +1,9 @@
 /**
  * ボード画面が拡張ホストへ返す操作。
- * 送れるのは契約（`core/board-view.ts` の `BoardMessage`）に書いてあるものだけ。
+ * 送れるのは契約（`core/board-view.ts`の`BoardMessage`）に書いてあるものだけ。
  *
  * 案内の間（`mutePosts`）は、見本のカードやオーバーレイの操作が実際のチケットへ届かないよう、
- * 案内を閉じたことを伝える `tourDone` のほかは送らない。
+ * 案内を閉じたことを伝える`tourDone`のほかは送らない。
  */
 import { poster } from "../vscode.js";
 import type { BoardMessage } from "../../core/board-view.js";

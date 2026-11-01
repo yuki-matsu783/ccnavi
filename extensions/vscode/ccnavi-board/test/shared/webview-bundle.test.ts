@@ -1,14 +1,14 @@
 /**
- * バンドルした画面（React）と、その CSS が、外へ出る手段を持っていないこと。
+ * バンドルした画面（React）と、そのCSSが、外へ出る手段を持っていないこと。
  *
- * 入れ物の HTML は CSP（`default-src 'none'`）で守られていて、各画面のテストが「外の資源を
- * 指す表記が無い」ことを見る。バンドルしたものはその検査から外してある（React の本番ビルドが
- * 自分の説明ページの URL を文字列で持っているため）。外した代わりに、ここで「本当に外へ出る
+ * 入れ物のHTMLはCSP（`default-src 'none'`）で守られていて、各画面のテストが「外の資源を
+ * 指す表記が無い」ことを見る。バンドルしたものはその検査から外してある（Reactの本番ビルドが
+ * 自分の説明ページのURLを文字列で持っているため）。外した代わりに、ここで「本当に外へ出る
  * 呼び出し」だけを名前で見る。拡張の画面は実行ファイルの答えを見せるだけで、自分で外を見に
  * 行かない（.agents/docs/exe-boundary.md）。
  *
- * CSS も同じで、バンドルした 1 本が `<style nonce>` に入る。CSS から外へ出る手段は
- * `url()` と `@import`（バンドルに入らなかったもの）なので、そこを見る。
+ * CSSも同じで、バンドルした1本が`<style nonce>`に入る。CSSから外へ出る手段は
+ * `url()`と`@import`（バンドルに入らなかったもの）なので、そこを見る。
  *
  * 見つかったら、その画面が何を読もうとしているかを確かめる。バンドルしたものは機械が書くので、
  * 目で読んで気づくことは期待できない。
@@ -26,48 +26,48 @@ test("CB-T157 バンドルした画面は、外へ出る呼び出しを持たな
   for (const name of names) {
     const script = screenScript(name);
     for (const pattern of OUTSIDE) {
-      assert.doesNotMatch(script, pattern, `${name} の画面が ${String(pattern)} を持っている`);
+      assert.doesNotMatch(script, pattern, `${name}の画面が${String(pattern)}を持っている`);
     }
   }
 });
 
-test("CB-T167 バンドルした CSS は、外の資源を読まない（url() と残った @import がありません）", () => {
+test("CB-T167 バンドルしたCSSは、外の資源を読まない（url()と残った @importがありません）", () => {
   for (const name of screenNames()) {
     const style = screenStyle(name);
-    // 画像やフォントを読む手段。VS Code のテーマ変数（var(--vscode-*)）だけで組む方針
-    assert.doesNotMatch(style, /url\s*\(/, `${name} の CSS が url() を持っている`);
-    // バンドルに入らなかった @import は、配ったあとに外へ読みに行く（CSP が止めるが、見た目は抜ける）
-    assert.doesNotMatch(style, /@import/, `${name} の CSS にバンドルされなかった @import が残っている`);
-    assert.doesNotMatch(style, /https?:\/\//, `${name} の CSS が外を指す表記を持っている`);
+    // 画像やフォントを読む手段。VS Codeのテーマ変数（var(--vscode-*)）だけで組む方針
+    assert.doesNotMatch(style, /url\s*\(/, `${name}のCSSがurl()を持っている`);
+    // バンドルに入らなかった @importは、配ったあとに外へ読みに行く（CSPが止めるが、見た目は抜ける）
+    assert.doesNotMatch(style, /@import/, `${name}のCSSにバンドルされなかった @importが残っている`);
+    assert.doesNotMatch(style, /https?:\/\//, `${name}のCSSが外を指す表記を持っている`);
   }
 });
 
 /**
- * バンドルした画面が、CSP に止められるやり方でスタイルを適用していないこと。
+ * バンドルした画面が、CSPに止められるやり方でスタイルを適用していないこと。
  *
- * 画面の CSP は `style-src 'nonce-…'` だけで `'unsafe-inline'` が無い。この下では
- * `style` 属性（`setAttribute("style", …)` を含む）は気づかないうちに無効になる。例外は投げず、
+ * 画面のCSPは`style-src 'nonce-…'`だけで`'unsafe-inline'`が無い。この下では
+ * `style`属性（`setAttribute("style", …)`を含む）は気づかないうちに無効になる。例外は投げず、
  * コンソールに出るだけなので、配ってから「幅が反映されない」「図が動かない」で気づくことになる。
- * 通るのは CSSOM（`el.style.x = …` / `setProperty`）のほうで、React の style プロップも
- * React Flow の viewport の transform もそちらを通る（Chromium で実際に確かめた）。
+ * 通るのはCSSOM（`el.style.x = …` / `setProperty`）のほうで、Reactのstyleプロップも
+ * React Flowのviewportのtransformもそちらを通る（Chromiumで実際に確かめた）。
  *
  * これは外から来た部品の版が上がったときに気づくための検査で、いまの版がそうだという
  * 確認ではない。増えたら、その部品が何をしているかを見てから通す。
  *
- * 見るのは `style` 属性を付けるやり方だけ。`el.style.cssText = …` は通る（Chromium で実際に確かめた。
- * CSSOM なので属性の禁止にヒットしない）ので、ここでは見ない。`dangerouslySetInnerHTML` も見ない。
- * react-dom が属性の対応表に表記を持っているだけで、6 画面ともヒットしてしまう。
+ * 見るのは`style`属性を付けるやり方だけ。`el.style.cssText = …`は通る（Chromiumで実際に確かめた。
+ * CSSOMなので属性の禁止にヒットしない）ので、ここでは見ない。`dangerouslySetInnerHTML`も見ない。
+ * react-domが属性の対応表に表記を持っているだけで、6画面ともヒットしてしまう。
  *
  * 属性名を実行時に組み立てる書き方（`el.setAttribute(name, value)`）は、表記では見つけられない。
  * 名前で見るだけの検査で、そこまでは防げない。
  */
 const CSP_BLOCKED = [/setAttribute\(\s*["']style["']/];
 
-test("CB-T190 バンドルした画面は、CSP に止められるやり方でスタイルを適用しない", () => {
+test("CB-T190 バンドルした画面は、CSPに止められるやり方でスタイルを適用しない", () => {
   for (const name of screenNames()) {
     const script = screenScript(name);
     for (const pattern of CSP_BLOCKED) {
-      assert.doesNotMatch(script, pattern, `${name} の画面が ${String(pattern)} を使っている（style-src に 'unsafe-inline' がないので黙って効かない）`);
+      assert.doesNotMatch(script, pattern, `${name}の画面が${String(pattern)}を使っている（style-srcに 'unsafe-inline' がないので黙って効かない）`);
     }
   }
 });

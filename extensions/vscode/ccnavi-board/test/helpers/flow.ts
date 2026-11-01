@@ -1,11 +1,11 @@
 /**
- * フロー編集画面（React）を happy-dom で動かす。`test/helpers/phases.ts` と同じ役割。
+ * フロー編集画面（React）をhappy-domで動かす。`test/helpers/phases.ts`と同じ役割。
  *
- * 画面はバンドルした 1 本（`out/webview/flow.js`）で、拡張はそれを `<script nonce>` に流し込む。
- * この入口のパス（`test/helpers/<画面の名前>.ts`）が約束で、`scripts/test-groups.js` はそれを辿る。
+ * 画面はバンドルした1本（`out/webview/flow.js`）で、拡張はそれを`<script nonce>`に流し込む。
+ * この入口のパス（`test/helpers/<画面の名前>.ts`）が約束で、`scripts/test-groups.js`はそれを辿る。
  *
- * 図を描くので、大きさの偽物（`measure`）を入れて読ませる。入れないと React Flow は点を隠したまま
- * 線を 1 本も描かない（`test/helpers/dom.ts` の頭）。
+ * 図を描くので、大きさの偽物（`measure`）を入れて読ませる。入れないとReact Flowは点を隠したまま
+ * 線を1本も描かない（`test/helpers/dom.ts`の頭）。
  */
 import { INPUT_PORT, OUTPUT_PORT, templateFlow, type FlowDoc } from "../../src/core/flow-doc.js";
 import { renderFlowPage, type RenderOptions } from "../../src/core/flow-render.js";
@@ -17,7 +17,7 @@ export const NONCE = "TEST-NONCE-123";
 
 /**
  * 開始 → 終了 だけの土台。編集の操作を調べるテストが、雛形の中身（チケットを読むノード）に
- * 頼らず数えられるようにする。雛形そのものを調べるテストだけ `templateFlow` を使う。
+ * 頼らず数えられるようにする。雛形そのものを調べるテストだけ`templateFlow`を使う。
  */
 export function bareFlow(ticket: string, title: string): FlowDoc {
   const base = templateFlow(ticket, title);
@@ -69,7 +69,7 @@ export function savedDoc(dom: DomPage): FlowDoc {
   return saves[saves.length - 1].doc as FlowDoc;
 }
 
-/** 見本の中身。画面が知らない欄・知らない種類（mcp）・サブフローを持つ。`SAMPLE` を読むとこれになる */
+/** 見本の中身。画面が知らない欄・知らない種類（mcp）・サブフローを持つ。`SAMPLE`を読むとこれになる */
 export function sampleData(): Record<string, unknown> {
   return {
     id: "wf-1",
@@ -100,7 +100,7 @@ export function sampleData(): Record<string, unknown> {
   };
 }
 
-/** ユーザが手で書いた形の見本の本文（YAML。コメント・流れ形式・引用符が混じる）。読むと `sampleData()` になる */
+/** ユーザが手で書いた形の見本の本文（YAML。コメント・流れ形式・引用符が混じる）。読むと`sampleData()`になる */
 export const SAMPLE = `# 調べてからユーザに聞くフロー
 id: wf-1
 name: 調べて聞く

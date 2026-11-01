@@ -4,11 +4,11 @@
  * 見せる中身は拡張ホストが渡す（`WorkflowData`）。画面が持つのは、いま見せている実行ファイルの答え（`answer`）・
  * 答えを待っているか・点の置き場所・直前の一言・外で変わった知らせだけ。
  *
- * **画面は判定しない。番号も振り直さない。** 線を足す・消すと、元の番号での直接の先行（`--order` の形。
- * `core/workflow-view.ts` の `editedOrder`）を組んで拡張ホストに頼み（`order`）、答え（`answer`）が届いたら
+ * **画面は判定しない。番号も振り直さない。** 線を足す・消すと、元の番号での直接の先行（`--order`の形。
+ * `core/workflow-view.ts`の`editedOrder`）を組んで拡張ホストに頼み（`order`）、答え（`answer`）が届いたら
  * その答えを描く。答えを待つ間は線を変えさせない（頼みと答えがずれないように）。断られた線（`refused`）と、
  * 確かめられなかったときは、線を引く前の答えのまま理由を出す。引けない線（循環・子が承認された番号へ入る線）は、
- * 図の部品が引いている最中に断る（`core/plan-graph.ts` の `canConnect`）。
+ * 図の部品が引いている最中に断る（`core/plan-graph.ts`の`canConnect`）。
  *
  * **未保存は答えから決める**（`isDirty`）。案に戻すは、往復せずに開いたときの答えへ戻す。未保存の間は、
  * 線のコピーを拡張ホストに覚えさせる（未保存のまま閉じられたときに戻すため）。
@@ -16,9 +16,9 @@
  * **置き場所は動かさない。** 番号が振り直っても点に表示する番号だけが変わる。置き場所は振り直す前の番号で覚え
  * （`layoutOf`）、「並べ直す」で今の線から組み直す。
  *
- * **案内**（`Tour.tsx`）は図が出てから始める。案内の間は今の計画ではなく、案内用の見本（`tours/workflow.yml` の `sample:`。実行ファイルの
- * 答えの形）を描く。見本は名前を付けた答えの束で、手順の `scene` が描く答えを選ぶ。画面の state（実際の答え・未保存の線・置き場所・
- * 保存の確かめ）と拡張ホストへの送信（線の頼み・保存・再読み込み）には触れない。案内の間は、線も保存も効かない。
+ * **案内**（`Tour.tsx`）は図が出てから始める。案内の間は今の計画ではなく、案内用の見本（`tours/workflow.yml`の`sample:`。実行ファイルの
+ * 答えの形）を描く。見本は名前を付けた答えの束で、手順の`scene`が描く答えを選ぶ。画面のstate（実際の答え・未保存の線・置き場所・
+ * 保存の確かめ）と拡張ホストへの送信（線の頼み・保存・更新）には触れない。案内の間は、線も保存も効かない。
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 
@@ -82,12 +82,12 @@ const TOUR = tourOf(workflowTour);
 const SAMPLE = parseWorkflowSample(TOUR.sample);
 const NO_SCENE: Scene = {};
 
-/** 見本の答えごとの点の置き場所。`base`（その答えを引く前の答え）の置き場所のままにする（実際の画面と同じ）。`tidy` は今の線から組み直した置き場所 */
+/** 見本の答えごとの点の置き場所。`base`（その答えを引く前の答え）の置き場所のままにする（実際の画面と同じ）。`tidy`は今の線から組み直した置き場所 */
 const SAMPLE_LAYOUTS: Readonly<Record<string, { readonly kept: Readonly<Record<string, PlanLayout>>; readonly tidy: Readonly<Record<string, PlanLayout>> }>> = Object.fromEntries(
   Object.entries(SAMPLE.answers).map(([name, sample]) => [name, { kept: layoutsOf(SAMPLE.answers[sample.base].answer), tidy: layoutsOf(sample.answer) }]),
 );
 
-/** 手順の `scene` が選ぶ答えの名前。無い・知らない名前は、開いたときの答え */
+/** 手順の`scene`が選ぶ答えの名前。無い・知らない名前は、開いたときの答え */
 function sampleName(value: Scene[string] | undefined, fallback = "open"): string {
   return typeof value === "string" && value in SAMPLE.answers ? value : fallback;
 }
@@ -111,7 +111,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   const [review, setReview] = useState(false);
   const seq = useRef(0);
   /**
-   * 案内の間は見本の答えを描き、手順ごとの様子（描く答え・開く確かめ・選ぶステップなど）は `scene` に入れる。
+   * 案内の間は見本の答えを描き、手順ごとの様子（描く答え・開く確かめ・選ぶステップなど）は`scene`に入れる。
    * 実際の答え・未保存の線・置き場所・確かめは動かさないので、閉じたあとに戻すものは無い
    */
   const [scene, setScene] = useState<Scene>(NO_SCENE);
@@ -200,7 +200,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
     if (draft !== undefined) {
       ask(draft);
     }
-    // 最初の 1 回だけ（`ask` は変わらない）。中身が入れ替わったときの頼み直しは、"data" の受信側が行う
+    // 最初の1回だけ（`ask`は変わらない）。中身が入れ替わったときの頼み直しは、"data" の受信側が行う
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -246,10 +246,10 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   if (data.kind === "error" || answer === undefined) {
     return (
       <>
-        <p className="empty">計画編集タブを読み込めませんでした。原因を直してから「再読み込み」を押してください。</p>
+        <p className="empty">計画編集タブを読み込めませんでした。原因を直してから「更新」を押してください。</p>
         <pre className="load-error">{data.kind === "error" ? data.error : ""}</pre>
         <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
-          再読み込み
+          更新
         </button>
       </>
     );
@@ -286,7 +286,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
     ...shownAnswer.mismatched.map((m) => ({ text: m.text, kind: "mismatched" })),
   ];
 
-  // 案内の間は、画面の state にも拡張ホストにも何も頼まない（押せるように見える部品も、ここで止める）
+  // 案内の間は、画面のstateにも拡張ホストにも何も頼まない（押せるように見える部品も、ここで止める）
   const edit = (part: string, add: boolean) => (from: number, to: number): void => {
     if (touring || !editable) {
       return;
@@ -434,7 +434,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
             案に戻す
           </button>
           <button type="button" className="action" data-action="reload" data-tour="reload" disabled={shownBusy} onClick={reload}>
-            再読み込み
+            更新
           </button>
           <button
             type="button"
@@ -456,7 +456,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
       </ScreenHeader>
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <p className="dim small">
-        ステップの右の点から別のステップの左の点へドラッグすると、線の先のステップに、元のステップが先行します（逆向きでも引けます）。線の真ん中の × で先行を外せます。線を変えるたびに ccnavi が番号を振り直します。循環になる線と、子が承認された番号へ入る線は引けません。
+        ステップの右の点から別のステップの左の点へドラッグすると、線の先のステップの先行に、元のステップが加わります（逆向きでも引けます）。線の真ん中の × で先行を外せます。線を変えるたびにccnaviが番号を振り直します。循環になる線と、子が承認された番号へ入る線は引けません。
       </p>
       {moved.length > 0 && (
         <p id="workflow-renumbered" className="small" data-tour="renumbered">

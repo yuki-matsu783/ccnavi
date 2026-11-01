@@ -1,10 +1,10 @@
 /**
- * プロジェクト管理画面の判断。ワークスペース内のプロジェクト（`projects/` の直下で `.git` を持つもの）を一覧し、clone の入力を検査し、ターミナルへ送るコマンド行を組む。
+ * プロジェクト管理画面の判断。ワークスペース内のプロジェクト（`projects/`の直下で`.git`を持つもの）を一覧し、cloneの入力を検査し、ターミナルへ送るコマンド行を組む。
  *
- * ここは vscode にも子プロセスにも触れない。ファイルの有無や git の答えは呼び手が渡す。
- * 何がプロジェクトかは実行ファイルの答え（`--explain --json` の trees、`--lint --json` の苦情）に
+ * ここはvscodeにも子プロセスにも触れない。ファイルの有無やgitの答えは呼び手が渡す。
+ * 何がプロジェクトかは実行ファイルの答え（`--explain --json`のtrees、`--lint --json`の苦情）に
  * 従う。拡張が自分で決めるのは、入力の形の検査と、
- * プロジェクトになっていない `.git` の探し方だけ。
+ * プロジェクトになっていない`.git`の探し方だけ。
  */
 import { shellQuote, toPosixPath } from "./commands.js";
 import { problemsOfProject, problemsOfProjectsDir, type LintJson } from "./lintmodel.js";
@@ -12,37 +12,37 @@ import type { BoardJson } from "./model.js";
 import type { ProjectRow, ProjectsPage, Stray } from "./projects-view.js";
 
 // 画面に渡す形（`ProjectRow` / `ProjectsPage` / `Stray`）は契約の側（`projects-view.ts`）が持つ。
-// Webview は Node の API を持たないので、そこから `commands.ts` を辿らせないため。
+// WebviewはNodeのAPIを持たないので、そこから`commands.ts`を辿らせないため。
 // 呼び手はここから読めるままにしておく。
 export type { ProjectRow, ProjectsPage, Stray };
 
-// ---- clone の入力
+// ---- cloneの入力
 
 export interface RemoteInfo {
-  /** 打たれたままの URL（前後の空白だけ除く） */
+  /** 打たれたままのURL（前後の空白だけ除く） */
   readonly url: string;
-  /** 同じリポジトリかを比べるキー。scheme・ユーザ・ポート・末尾の `.git` と `/` を除き、小文字にした `host/path` */
+  /** 同じリポジトリかを比べるキー。scheme・ユーザ・ポート・末尾の`.git`と`/`を除き、小文字にした`host/path` */
   readonly key: string;
-  /** URL の末尾から採った、`projects/<名前>` の既定の名前 */
+  /** URLの末尾から採った、`projects/<名前>`の既定の名前 */
   readonly name: string;
 }
 
 export type RemoteCheck = { readonly ok: true; readonly remote: RemoteInfo } | { readonly ok: false; readonly error: string };
 
-const FORMS = "指定できる形式は https://host/path、ssh://host/path、git@host:path の 3 つです。ローカルのパスと file:// は指定できません";
+const FORMS = "指定できる形式はhttps://host/path、ssh://host/path、git@host:pathの3つです。ローカルのパスとfile://は指定できません";
 
 /**
- * clone 元の URL を検査する。通すのは https / ssh / scp 風の 3 形だけ。
- * 資格情報（`user:token@`）が入っていれば通さない。ターミナルへ送った 1 行は履歴に残り、
- * `.git/config` にも平文で入るので、伏せても意味が無い。
+ * clone元のURLを検査する。通すのはhttps / ssh / scp風の3形だけ。
+ * 資格情報（`user:token@`）が入っていれば通さない。ターミナルへ送った1行は履歴に残り、
+ * `.git/config`にも平文で入るので、伏せても意味が無い。
  */
 export function checkRemote(raw: string): RemoteCheck {
   const url = raw.trim();
   if (url === "") {
-    return { ok: false, error: "URL が空です" };
+    return { ok: false, error: "URLが空です" };
   }
   if (/\s/.test(url)) {
-    return { ok: false, error: "URL に空白が入っています" };
+    return { ok: false, error: "URLに空白が入っています" };
   }
   let userinfo = "";
   let host: string;
@@ -58,7 +58,7 @@ export function checkRemote(raw: string): RemoteCheck {
     if (/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) {
       return { ok: false, error: FORMS };
     }
-    // scp 風。`git@host:path`。`C:\path` のような Windows のパスは host が 1 文字になるので弾く。
+    // scp風。`git@host:path`。`C:\path`のようなWindowsのパスはhostが1文字になるので弾く。
     const scp = /^(?:([^@/:\\]+)@)?([^@/:\\]{2,}):([^\\]+)$/.exec(url);
     if (scp === null) {
       return { ok: false, error: FORMS };
@@ -70,36 +70,36 @@ export function checkRemote(raw: string): RemoteCheck {
   if (userinfo.includes(":")) {
     return {
       ok: false,
-      error: "URL に資格情報（user:token@）が入っています。ターミナルの履歴と .git/config に平文で残るため指定できません。credential helper か SSH キーを使ってください",
+      error: "URLに資格情報（user:token@）が入っています。ターミナルの履歴と「.git/config」に平文で残るため指定できません。credential helperかSSHキーを使ってください",
     };
   }
   host = host.replace(/:\d+$/, "").toLowerCase();
   if (host === "") {
-    return { ok: false, error: "URL にホスト名がありません" };
+    return { ok: false, error: "URLにホスト名がありません" };
   }
   const cleaned = repoPath.replace(/^\/+/, "").replace(/\/+$/, "").replace(/\.git$/i, "");
   if (cleaned === "") {
-    return { ok: false, error: "URL にリポジトリのパスがありません" };
+    return { ok: false, error: "URLにリポジトリのパスがありません" };
   }
   const name = cleaned.split("/").pop() ?? "";
   return { ok: true, remote: { url, key: `${host}/${cleaned.toLowerCase()}`, name } };
 }
 
-/** origin の URL から比べるキーを出す。読めない表記（ローカルパスなど）なら空 */
+/** originのURLから比べるキーを出す。読めない表記（ローカルパスなど）なら空 */
 export function remoteKeyOf(url: string): string {
   const checked = checkRemote(url);
   return checked.ok ? checked.remote.key : "";
 }
 
-/** `projects/<名前>` に使える表記。英数字で始まり、英数字と `. _ -` だけ */
+/** `projects/<名前>`に使える表記。英数字で始まり、英数字と`. _ -`だけ */
 export const NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 export type NameCheck = { readonly ok: true; readonly name: string } | { readonly ok: false; readonly error: string };
 
 /**
- * 名前を検査する。名前はツリーの名前、`wip/<名前>/proposals/`、`logs/<名前>/`、frontmatter の
- * `project:` にそのまま使われるので ASCII に絞る。既存のツリー名（プロジェクト・ワークツリー）と
- * 大文字小文字だけ違う名前も衝突扱い（Windows では同じディレクトリになる）。
+ * 名前を検査する。名前はツリーの名前、`wip/<名前>/proposals/`、`logs/<名前>/`、frontmatterの
+ * `project:`にそのまま使われるのでASCIIに絞る。既存のツリー名（プロジェクト・ワークツリー）と
+ * 大文字小文字だけ違う名前も衝突扱い（Windowsでは同じディレクトリになる）。
  */
 export function checkName(raw: string, existing: readonly string[]): NameCheck {
   const name = raw.trim();
@@ -107,22 +107,22 @@ export function checkName(raw: string, existing: readonly string[]): NameCheck {
     return { ok: false, error: "名前が空です" };
   }
   if (!NAME_PATTERN.test(name)) {
-    return { ok: false, error: "名前は英数字で始め、英数字と . _ - だけ（ASCII）で付けてください。frontmatter の project: とフォルダのパスにそのまま使われます" };
+    return { ok: false, error: "名前は英数字で始め、英数字と「.」「_」「-」だけ（ASCII）で付けてください。frontmatterのproject: とフォルダのパスにそのまま使われます" };
   }
   if (/^\.+$/.test(name)) {
-    return { ok: false, error: "名前を . だけにはできません" };
+    return { ok: false, error: "名前を「.」だけにはできません" };
   }
   const lower = name.toLowerCase();
   const clash = existing.find((e) => e !== "" && e.toLowerCase() === lower);
   if (clash !== undefined) {
-    return { ok: false, error: `${clash} という名前のプロジェクトかワークツリーが既にあります` };
+    return { ok: false, error: `${clash}という名前のプロジェクトかワークツリーが既にあります` };
   }
   return { ok: true, name };
 }
 
 // ---- ターミナルへ送るコマンド行
 
-/** `git clone -- <url> <置き場>/<名前>` をワークスペースルートで。生の git をユーザが打つ形 */
+/** `git clone -- <url> <置き場>/<名前>`をワークスペースルートで。生のgitをユーザが打つ形 */
 export function cloneCommand(root: string, projectsDir: string, url: string, name: string): string {
   const target = `${toPosixPath(projectsDir)}/${name}`;
   return `cd ${shellQuote(toPosixPath(root))} && git clone -- ${shellQuote(url)} ${shellQuote(target)}`;
@@ -135,27 +135,27 @@ export interface DirEntry {
   readonly isDir: boolean;
 }
 
-/** 歩かないディレクトリ。ワークツリーは trees に既にあり、依存の置き場は深くて遅い */
+/** 歩かないディレクトリ。ワークツリーはtreesに既にあり、依存の置き場は深くて遅い */
 export const SKIP_DIRS: ReadonlySet<string> = new Set([".git", "node_modules", ".venv", ".claude"]);
 
-/** 置き場の中は 1 段深く歩き、2 段目に置かれた clone を「置き場の 2 段目以下」として拾う */
+/** 置き場の中は1段深く歩き、2段目に置かれたcloneを「置き場の2段目以下」として拾う */
 const DEPTH = 2;
 const DEPTH_IN_PROJECTS = 3;
 
-export const REASON_OUTSIDE = "projects/ の外にあります。プロジェクトとして扱われるのは projects/ の直下に置いたものだけです";
-export const REASON_TOO_DEEP = "projects/ の直下ではなく、その下の階層にあります。プロジェクトとして扱われるのは projects/ の直下に置いたものだけです";
+export const REASON_OUTSIDE = "projects/の外にあります。プロジェクトとして扱われるのはprojects/の直下に置いたものだけです";
+export const REASON_TOO_DEEP = "projects/の直下ではなく、その下の階層にあります。プロジェクトとして扱われるのはprojects/の直下に置いたものだけです";
 
 export interface StrayInput {
   /** 置き場のルートからの相対（"/" 区切り）。空なら置き場が無効 */
   readonly projectsRel: string;
   /** ルートからの相対（空はルート自身）を受けて、そこにあるものを返す。読めなければ空 */
   readonly list: (rel: string) => readonly DirEntry[];
-  /** trees にあるルート相対パス。既にプロジェクトかワークツリーなので拾わない */
+  /** treesにあるルート相対パス。既にプロジェクトかワークツリーなので拾わない */
   readonly knownRels: ReadonlySet<string>;
 }
 
 /**
- * ワークスペース直下を深さ 2 まで歩き、`.git` を持つのにプロジェクトになっていないディレクトリを拾う。
+ * ワークスペース直下を深さ2まで歩き、`.git`を持つのにプロジェクトになっていないディレクトリを拾う。
  * 見つけたところで降りるのをやめる。表示だけで、操作は付けない。
  */
 export function findStrayGitDirs(input: StrayInput): Stray[] {
@@ -188,7 +188,7 @@ export function findStrayGitDirs(input: StrayInput): Stray[] {
 
 // ---- .gitignore
 
-/** `.gitignore` の本文に置き場が書かれているか。`/projects/`、`projects/`、`/projects`、`projects` のどれか */
+/** `.gitignore`の本文に置き場が書かれているか。`/projects/`、`projects/`、`/projects`、`projects`のどれか */
 export function gitignoreHasProjects(text: string | undefined, projectsRel: string): boolean {
   if (text === undefined || projectsRel === "") {
     return false;
@@ -197,13 +197,13 @@ export function gitignoreHasProjects(text: string | undefined, projectsRel: stri
   return text.split(/\r?\n/).some((line) => accepted.has(line.trim()));
 }
 
-/** `.gitignore` に置き場の行を足した本文。既にあればそのまま */
+/** `.gitignore`に置き場の行を足した本文。既にあればそのまま */
 export function gitignoreWithProjects(text: string | undefined, projectsRel: string): string {
   if (gitignoreHasProjects(text, projectsRel)) {
     return text ?? "";
   }
   const head = text === undefined || text === "" ? "" : text.endsWith("\n") ? `${text}\n` : `${text}\n\n`;
-  return `${head}# ccnavi のプロジェクト置き場。各プロジェクトは自分の git を持つ。\n/${projectsRel}/\n`;
+  return `${head}# ccnaviのプロジェクト置き場。各プロジェクトは自分のgitを持つ。\n/${projectsRel}/\n`;
 }
 
 // ---- 画面の中身
@@ -212,12 +212,12 @@ export interface PageInput {
   readonly board: BoardJson;
   readonly lint: LintJson | undefined;
   readonly lintError: string;
-  /** プロジェクト名 → origin の URL（読めなければ空） */
+  /** プロジェクト名 → originのURL（読めなければ空） */
   readonly origins: Readonly<Record<string, string>>;
   readonly strays: readonly Stray[];
   readonly projectsRel: string;
   readonly ignored: boolean;
-  /** プロジェクト名 → プロジェクトの設定のルールファイルのルート相対（`layers[]` の path から）。プロジェクトの設定として数えられていなければ無い */
+  /** プロジェクト名 → プロジェクトの設定のルールファイルのルート相対（`layers[]`のpathから）。プロジェクトの設定として数えられていなければ無い */
   readonly rulesRels: Readonly<Record<string, string>>;
   readonly rulesExists: Readonly<Record<string, boolean>>;
   readonly selfRulesRel: string;
@@ -264,7 +264,7 @@ export function buildProjectsPage(input: PageInput): ProjectsPage {
   };
 }
 
-/** 同じリポジトリを既に clone しているプロジェクト。無ければ undefined */
+/** 同じリポジトリを既にcloneしているプロジェクト。無ければundefined */
 export function duplicateOf(rows: readonly ProjectRow[], key: string): ProjectRow | undefined {
   if (key === "") {
     return undefined;

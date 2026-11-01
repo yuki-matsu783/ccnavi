@@ -1,22 +1,22 @@
 /**
  * 計画編集タブの帳面。タブ（`workflow-panel.ts`）が書き、ボード（`board-panel.ts`）が読む。
  *
- * 画面どうしは互いを import しない（`screens.ts`）ので、ボードの承認がタブの様子を知る道はここだけにする。
- * 持つのは 2 つ。
+ * 画面どうしは互いをimportしない（`screens.ts`）ので、ボードの承認がタブの様子を知る道はここだけにする。
+ * 持つのは2つ。
  *
- * - **未保存のタブがある親。** その親を含む一覧は承認を打たない（`approval-machine.ts` のガード）。未保存の順序の
+ * - **未保存のタブがある親。** その親を含む一覧は承認を打たない（`approval-machine.ts`のガード）。未保存の順序の
  *   まま承認して、直したつもりの順序と違うものが通らないように。タブが閉じた・破棄した・保存したら外す
- * - **タブが最後に保存したときの `source_sha`**（親と子の提案をまとめたハッシュ）。承認の一覧を開くときに、一覧の
- *   計画の `source_sha` と比べ、違えば「保存したあとに提案が変わった」と出す。エージェントが `after` を書き戻して
+ * - **タブが最後に保存したときの`source_sha`**（親と子の提案をまとめたハッシュ）。承認の一覧を開くときに、一覧の
+ *   計画の`source_sha`と比べ、違えば「保存したあとに提案が変わった」と出す。エージェントが`after`を書き戻して
  *   ユーザが保存した順序を黙って戻しても、ユーザが気づけるように。承認して承認待ちから無くなった親は忘れる
  *
- * 拡張ホストの中だけの持ち物で、残さない（VS Code を閉じれば消える）。VS Code の API には触れない。
+ * 拡張ホストの中だけの持ち物で、残さない（VS Codeを閉じれば消える）。VS CodeのAPIには触れない。
  */
 
 export interface WorkflowTabs {
   /** 未保存のタブがある親（識別子の順） */
   readonly unsaved: readonly string[];
-  /** 親 → タブが最後に保存したときの `source_sha` */
+  /** 親 → タブが最後に保存したときの`source_sha` */
   readonly saved: Readonly<Record<string, string>>;
 }
 
@@ -43,7 +43,7 @@ export function markUnsaved(ticket: string, dirty: boolean): void {
   changed();
 }
 
-/** タブが提案を書き換えた。`sha` は書いたあとに読み直したハッシュ */
+/** タブが提案を書き換えた。`sha`は書いたあとに読み直したハッシュ */
 export function rememberSaved(ticket: string, sha: string): void {
   if (saved.get(ticket) === sha) {
     return;

@@ -1,7 +1,7 @@
 /**
- * テンプレート管理画面の編集欄（React）を happy-dom で動かす。編集の開始と答え、直したときの読ませる依頼（editCheck）、
+ * テンプレート管理画面の編集欄（React）をhappy-domで動かす。編集の開始と答え、直したときの読ませる依頼（editCheck）、
  * 計画の表の操作（ステップを足す・消す・動かす）、保存（editSave）と保存の答え、未保存のまま閉じる確認、始められなかったときの理由、
- * 新しいテンプレートを作る入口を見る。読めるか・計画の図の中身は実行ファイルの答え（見本 `tests/fixtures/templates-check-json.json`）のまま。
+ * 新しいテンプレートを作る入口を見る。読めるか・計画の図の中身は実行ファイルの答え（見本`tests/fixtures/templates-check-json.json`）のまま。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -12,7 +12,7 @@ import { loadPage, type DomPage } from "../helpers/dom.js";
 import { page, templatesCheckFixtureText, templatesHtml } from "../helpers/templates.js";
 import type { HTMLButtonElement, HTMLInputElement, HTMLSelectElement, HTMLTextAreaElement } from "happy-dom" with { "resolution-mode": "import" };
 
-/** 直してから読ませるまでの待ちを越える（`Edit.tsx` の CHECK_DELAY_MS は 300） */
+/** 直してから読ませるまでの待ちを越える（`Edit.tsx`のCHECK_DELAY_MSは300） */
 const WAIT_CHECK_MS = 450;
 
 function fixtureCheck(): TemplateCheck {
@@ -25,7 +25,7 @@ function openedOf(check: TemplateCheck, extra: Partial<EditOpened> = {}): EditOp
   return { name: "feature", layer: "self", created: false, sha: "sha-opened", data: check.data, check, lock: { locked: false, reason: "", doing: [], turns: [] }, ...extra };
 }
 
-/** 見本の画面（図の大きさを測れる細工つき）。self の層の feature の行を開いた状態 */
+/** 見本の画面（図の大きさを測れる細工つき）。selfのレイヤーのfeatureの行を開いた状態 */
 async function openList(): Promise<DomPage> {
   const dom = await loadPage(templatesHtml({ kind: "page", page: page() }), undefined, { measure: true });
   await dom.settle();
@@ -58,18 +58,18 @@ async function checkAsked(dom: DomPage): Promise<Record<string, unknown>> {
   await new Promise((resolve) => setTimeout(resolve, WAIT_CHECK_MS));
   await dom.settle();
   const asked = dom.posted.filter((m) => m.type === "editCheck");
-  assert.ok(asked.length > 0, "editCheck を送っていない");
+  assert.ok(asked.length > 0, "editCheckを送っていない");
   return asked[asked.length - 1];
 }
 
 const text = (element: { textContent: string | null } | null | undefined): string => (element?.textContent ?? "").trim();
 
-test("CB-D382 編集を押すと editOpen を送り、答えが届くまで読み込み中を出す。答えが届くと一覧の代わりに編集欄を出し、説明・使う場面・計画の表・フローの欄が見本どおりに入る", async () => {
+test("CB-D382 編集を押すとeditOpenを送り、答えが届くまで読み込み中を出す。答えが届くと一覧の代わりに編集欄を出し、説明・使う場面・計画の表・フローの欄が見本どおりに入る", async () => {
   const dom = await openList();
   try {
     dom.click(dom.one('li.template[data-name="feature"][data-layer="self"] button[data-action="edit-template"]'));
     await dom.settle();
-    assert.match(text(dom.one("#edit-loading")), /feature を読み込み中/);
+    assert.match(text(dom.one("#edit-loading")), /featureを読み込み中/);
     const session = dom.posted.find((m) => m.type === "editOpen")?.session as number;
     await dom.send({ type: "editOpened", session, opened: openedOf(fixtureCheck()), error: "" });
     await dom.settle();
@@ -85,7 +85,7 @@ test("CB-D382 編集を押すと editOpen を送り、答えが届くまで読�
       ["3"],
       "フィードバック計画の番号は全体計画の続き",
     );
-    assert.equal(dom.all('section.tpl-edit-plan[data-part="plan"] .react-flow__node').length, 4, "start と end と 2 ステップ");
+    assert.equal(dom.all('section.tpl-edit-plan[data-part="plan"] .react-flow__node').length, 4, "startとendと2ステップ");
     assert.equal(dom.all('section[data-role="flows"] li.row').length, 2);
     assert.match(text(dom.one('section[data-role="flows"] li[data-index="2"]')), /フロー: 実装の手順/);
     assert.equal(dom.all('[data-role="dirty"]').length, 0);
@@ -97,7 +97,7 @@ test("CB-D382 編集を押すと editOpen を送り、答えが届くまで読�
   }
 });
 
-test("CB-D383 説明を直すと「未保存」が出て、少し待つと直した中身を editCheck で読ませる。答えが届くまでは古い図に線を引けない", async () => {
+test("CB-D383 説明を直すと「未保存」が出て、少し待つと直した中身をeditCheckで読ませる。答えが届くまでは古い図に線を引けない", async () => {
   const dom = await openList();
   try {
     const { session } = await startEdit(dom);
@@ -120,12 +120,12 @@ test("CB-D383 説明を直すと「未保存」が出て、少し待つと直し
   }
 });
 
-test("CB-D384 計画の表でステップを足す・動かす・消す。足したステップには前の末尾のステップが先行し、全体計画の最後の 1 ステップは消せない。番号は全体計画の続きで振る", async () => {
+test("CB-D384 計画の表でステップを足す・動かす・消す。足したステップには前の末尾のステップが先行し、全体計画の最後の1ステップは消せない。番号は全体計画の続きで振る", async () => {
   const dom = await openList();
   try {
     await startEdit(dom);
     const rows = (part: string) => dom.all(`section.tpl-edit-plan[data-part="${part}"] tbody tr`);
-    // 足す: 全体計画に docs を末尾に足すと 3 ステップになり、先行ステップは 2
+    // 足す: 全体計画にdocsを末尾に足すと3ステップになり、先行ステップは2
     dom.change(dom.one<HTMLSelectElement>('section.tpl-edit-plan[data-part="plan"] select.f-add-type'), "docs");
     await dom.settle();
     dom.click(dom.one('section.tpl-edit-plan[data-part="plan"] button[data-action="add-item"]'));
@@ -133,19 +133,19 @@ test("CB-D384 計画の表でステップを足す・動かす・消す。足し
     assert.equal(rows("plan").length, 3);
     assert.equal(text(rows("plan")[2].querySelectorAll("td")[3]), "2");
     assert.equal(rows("feedback")[0].querySelector("td.mono")?.textContent, "4", "フィードバック計画の番号が続きになる");
-    // 動かす: 1 は 2 の先行なので前にも後ろにも動かせない。足した 3 は 2 の後続なので前へ動かせない
+    // 動かす: 1は2の先行なので前にも後ろにも動かせない。足した3は2の後続なので前へ動かせない
     assert.equal(rows("plan")[0].querySelector<HTMLButtonElement>('button[data-action="move-up"]')?.disabled, true);
     assert.equal(rows("plan")[2].querySelector<HTMLButtonElement>('button[data-action="move-up"]')?.disabled, true);
-    // 消す: 3 番を消すと 2 ステップに戻る
+    // 消す: 3番を消すと2ステップに戻る
     dom.click(rows("plan")[2].querySelector<HTMLButtonElement>('button[data-action="remove-item"]') as HTMLButtonElement);
     await dom.settle();
     assert.equal(rows("plan").length, 2);
-    // 2 番を消すと 1 ステップだけになり、最後の 1 ステップは消せない
+    // 2番を消すと1ステップだけになり、最後の1ステップは消せない
     dom.click(rows("plan")[1].querySelector<HTMLButtonElement>('button[data-action="remove-item"]') as HTMLButtonElement);
     await dom.settle();
     assert.equal(rows("plan").length, 1);
     assert.equal(rows("plan")[0].querySelector<HTMLButtonElement>('button[data-action="remove-item"]')?.disabled, true);
-    // 消した 2 番のフローはステップと一緒になくなる
+    // 消した2番のフローはステップと一緒になくなる
     assert.equal(dom.all('section[data-role="flows"] li.row').length, 1);
     assert.match(text(dom.one('section[data-role="flows"] li[data-index="1"]')), /フローなし/);
     // フィードバック計画のステップは全部消せて、「作る」入口に戻る
@@ -162,7 +162,7 @@ test("CB-D384 計画の表でステップを足す・動かす・消す。足し
   }
 });
 
-test("CB-D385 保存は editSave に開いたときのハッシュと書き出す中身を載せて送る。断られたら理由を出して編集を続けられ、書けたら未保存が消える", async () => {
+test("CB-D385 保存はeditSaveに開いたときのハッシュと書き出す中身を載せて送る。断られたら理由を出して編集を続けられ、書けたら未保存が消える", async () => {
   const dom = await openList();
   try {
     const { session } = await startEdit(dom);
@@ -231,7 +231,7 @@ test("CB-D386 未保存のまま閉じようとすると破棄してよいかを
   }
 });
 
-test("CB-D387 編集を始められなかったときは、理由を一覧の上に出す。読み取り専用の層では編集と作るの入口を出さない", async () => {
+test("CB-D387 編集を始められなかったときは、理由を一覧の上に出す。読み取り専用のレイヤーでは編集と作るの入口を出さない", async () => {
   const dom = await openList();
   try {
     dom.click(dom.one('li.template[data-name="feature"][data-layer="self"] button[data-action="edit-template"]'));
@@ -297,7 +297,7 @@ test("CB-D388 新しいテンプレートは名前を入れて作る。使えな
   }
 });
 
-test("CB-D1224 作った直後は error の苦情を隠し（warn は出す）、触ったあとは出る", async () => {
+test("CB-D1224 作った直後はerrorの苦情を隠し（warnは出す）、触ったあとは出る", async () => {
   const dom = await openList();
   try {
     dom.type(dom.one(".f-new-name"), "my-flow2");
@@ -306,11 +306,11 @@ test("CB-D1224 作った直後は error の苦情を隠し（warn は出す）�
     await dom.settle();
     const asked = dom.posted.find((m) => m.type === "editNew");
     const check = fixtureCheck();
-    const problems = [{ severity: "error", detail: "description がありません" }, { severity: "warn", detail: "when がありません" }];
+    const problems = [{ severity: "error", detail: "descriptionがありません" }, { severity: "warn", detail: "whenがありません" }];
     const skeleton = { name: "my-flow2", description: "", plan: ["implement"] };
     await dom.send({ type: "editOpened", session: asked?.session, opened: { name: "my-flow2", layer: "self", created: true, sha: "", data: skeleton, check: { ...check, name: "my-flow2", problems }, lock: { locked: false, reason: "", doing: [], turns: [] } }, error: "" });
     await dom.settle();
-    assert.equal(dom.all(".tpl-problems .sev-error").length, 0, "未入力の間は error を出さない");
+    assert.equal(dom.all(".tpl-problems .sev-error").length, 0, "未入力の間はerrorを出さない");
     assert.equal(dom.all(".tpl-problems .sev-warn").length, 1);
     dom.type(dom.one(".f-description"), "x");
     dom.type(dom.one(".f-description"), "");
@@ -326,7 +326,7 @@ test("CB-D389 ステップのフローは最初から図を開いていて、部
   try {
     await startEdit(dom);
     const item = (index: number) => `section[data-role="flows"] li[data-index="${index}"]`;
-    // 2 番にはフローがある。最初から図と右の欄が出ている。畳むと消え、開き直すと戻る
+    // 2番にはフローがある。最初から図と右の欄が出ている。畳むと消え、開き直すと戻る
     assert.equal(dom.all(`${item(2)} .tpl-flow-edit`).length, 1);
     dom.click(dom.one(`${item(2)} button[data-action="toggle-flow"]`));
     await dom.settle();
@@ -344,7 +344,7 @@ test("CB-D389 ステップのフローは最初から図を開いていて、部
     const asked = await checkAsked(dom);
     const flows = (asked.data as { flows: Record<string, { nodes: unknown[] }> }).flows;
     assert.equal(flows["2"].nodes.length, nodes + 1);
-    // 1 番にはフローが無い。足すと雛形が置かれて図が開く
+    // 1番にはフローが無い。足すと雛形が置かれて図が開く
     assert.match(text(dom.one(item(1))), /フローなし/);
     dom.click(dom.one(`${item(1)} button[data-action="add-flow"]`));
     await dom.settle();
@@ -360,7 +360,7 @@ test("CB-D389 ステップのフローは最初から図を開いていて、部
   }
 });
 
-test("CB-D390 作業中のチケットがある間は編集はできるが保存できない。錠は開いたときの答えと、あとから届く editLock で替わり、錠が解けると保存できる", async () => {
+test("CB-D390 作業中のチケットがある間は編集はできるが保存できない。錠は開いたときの答えと、あとから届くeditLockで替わり、錠が解けると保存できる", async () => {
   const dom = await openList();
   try {
     const locked = { locked: true, reason: "作業中のチケットがあります（i0001-1）。いま保存すると、進行中の作業の判定が途中で変わるため、作業が終わってから保存してください。", doing: ["i0001-1"], turns: [] };
@@ -389,7 +389,7 @@ test("CB-D739 一覧の行は最初から開き、図の中身を求める（pre
     const row = 'li.template[data-name="feature"][data-layer="self"]';
     assert.equal(dom.all(`${row}.open`).length, 1, "最初から開いている");
     const asked = dom.posted.filter((m) => m.type === "preview" && m.name === "feature");
-    assert.equal(asked.length, 1, "1 行につき 1 度だけ求める");
+    assert.equal(asked.length, 1, "1行につき1度だけ求める");
     assert.equal(asked[0].layer, "self");
     // 答えが届くまでは表で出す（読み込み中の表示）
     assert.equal(dom.all(`${row} table.tpl-plan`).length > 0, true);

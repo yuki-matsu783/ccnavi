@@ -1,18 +1,18 @@
 /**
  * ルール管理画面が編集中に持つもの。ルールのコピー（`Draft`）と、開いている行・開いているタブ。
  *
- * 契約の `Sections` はタイプごとの配列だけを持つが、画面は行ごとに動かないキーが要る
- * （足す・消す・タイプを移す・並べ替えの間、React が同じ行を同じ行として描き直せるように）。
- * id はユーザが打つもので、空にも重複にもなるのでキーには使えない。キーは画面の中だけのもので、
+ * 契約の`Sections`はタイプごとのリストだけを持つが、画面は行ごとに動かないキーが要る
+ * （足す・消す・タイプを移す・並べ替えの間、Reactが同じ行を同じ行として描き直せるように）。
+ * idはユーザが打つもので、空にも重複にもなるのでキーには使えない。キーは画面の中だけのもので、
  * 拡張ホストへ渡すのは、ファイルを選ぶとき（`pickFile` → `picked`）に行を名指しするときだけ。
  *
- * 残す先は Webview の state（`{ open: [id, …], tab }`）。
- * 残すのは id で、キーは画面を作り直すと変わるため。id が空の行は残せない。
+ * 残す先はWebviewのstate（`{ open: [id, …], tab }`）。
+ * 残すのはidで、キーは画面を作り直すと変わるため。idが空の行は残せない。
  */
 import { SECTIONS, type RuleForm, type Section, type Sections } from "../../core/rules-view.js";
 import { getState, setState } from "../vscode.js";
 
-/** 行 1 つ。`key` は画面の中だけのキー */
+/** 行1つ。`key`は画面の中だけのキー */
 export interface Row {
   readonly key: string;
   readonly rule: RuleForm;
@@ -22,7 +22,7 @@ export type Draft = Readonly<Record<Section, readonly Row[]>>;
 
 export const EMPTY_DRAFT: Draft = { deny: [], ask: [], allow: [] };
 
-/** キーを配る。1 枚の画面の中で数え上げる（`r1`、`r2`、…） */
+/** キーを配る。1枚の画面の中で数え上げる（`r1`、`r2`、…） */
 export function keyer(): () => string {
   let seq = 0;
   return () => {
@@ -77,14 +77,14 @@ export function findRow(draft: Draft, key: string): { readonly section: Section;
   return undefined;
 }
 
-/** state に残してある「開いていた行の id」。型が違うものは空として扱う */
+/** stateに残してある「開いていた行のid」。型が違うものは空として扱う */
 export function loadOpen(): ReadonlySet<string> {
   const saved = (getState() ?? {}) as { open?: unknown };
   const ids = Array.isArray(saved.open) ? saved.open.filter((id): id is string => typeof id === "string") : [];
   return new Set(ids);
 }
 
-/** state に残してあるタブ。知らない値は既定（ルール） */
+/** stateに残してあるタブ。知らない値は既定（ルール） */
 export function loadTab(): TabName {
   const saved = (getState() ?? {}) as { tab?: unknown };
   return saved.tab === "judge" || saved.tab === "hooks" ? saved.tab : "rules";
@@ -93,7 +93,7 @@ export function loadTab(): TabName {
 export const TABS = ["rules", "judge", "hooks"] as const;
 export type TabName = (typeof TABS)[number];
 
-/** 開いている行を state に残す。id が空の行は残さない（次に開き直す手がかりが無い） */
+/** 開いている行をstateに残す。idが空の行は残さない（次に開き直す手がかりが無い） */
 export function saveOpen(draft: Draft, open: ReadonlySet<string>): void {
   const ids: string[] = [];
   for (const section of SECTIONS) {
@@ -106,12 +106,12 @@ export function saveOpen(draft: Draft, open: ReadonlySet<string>): void {
   setState({ ...((getState() ?? {}) as object), open: ids });
 }
 
-/** 開いているタブを state に残す。開いた行の記録は消さない（同じ state に足す） */
+/** 開いているタブをstateに残す。開いた行の記録は消さない（同じstateに足す） */
 export function saveTab(tab: TabName): void {
   setState({ ...((getState() ?? {}) as object), tab });
 }
 
-/** state に残してある id から、いまの行のキーに直す。画面を作り直したあとに開き直すため */
+/** stateに残してあるidから、いまの行のキーに直す。画面を作り直したあとに開き直すため */
 export function openedFromIds(draft: Draft, ids: ReadonlySet<string>): ReadonlySet<string> {
   const keys = new Set<string>();
   for (const section of SECTIONS) {

@@ -1,24 +1,24 @@
 ---
-title: 実画面（code-server の VS Code）で日本語ユーザ目線を確かめる
+title: 実画面（code-serverのVS Code）で日本語ユーザ目線を確かめる
 type: design
-description: ccnavi の最新ソースを検証用コピーへ setup で反映し、拡張を入れた code-server の VS Code を Chromium で撮って、日本語ユーザにとって分かりづらい点を洗い出す手順。準備、詰まりどころの表、画面と操作ごとの撮り方、評価の観点、未確認のこと
+description: ccnaviの最新ソースを検証用コピーへsetupで反映し、拡張を入れたcode-serverのVS CodeをChromiumで撮って、日本語ユーザにとって分かりづらい点を洗い出す手順。準備、詰まりどころの表、画面と操作ごとの撮り方、評価の観点、未確認のこと
 tags: [design-doc, extension, testing]
 keywords: [実画面, code-server, 日本語, ユーザ目線, 画面確認, Chromium, playwright-core, 検証用コピー, ccnavi-setup.sh, vsix, 案内ツアー, 詰まりどころ, スクリーンショット, 評価の観点]
 ---
 
-# 実画面（code-server の VS Code）で日本語ユーザ目線を確かめる
+# 実画面（code-serverのVS Code）で日本語ユーザ目線を確かめる
 
 [設計の入口に戻る](../design.md)
 
-ボードの画面だけなら [render-board.js](development.md#画面を-vs-code-なしで描くrender-boardjs) で描ける。ここでは、その先を確かめる。
-本物の VS Code（左の一覧、タブ、通知、ターミナルを含む）に拡張を入れ、ccnavi を入れたリポジトリを開いて、操作しながら撮る。
+ボードの画面だけなら [render-board.js](development.md#画面を-vs-code-なしで描くrender-boardjs)で描ける。ここでは、その先を確かめる。
+本物のVS Code（左の一覧、タブ、通知、ターミナルを含む）に拡張を入れ、ccnaviを入れたリポジトリを開いて、操作しながら撮る。
 目的は、日本語で読む利用者にとって分かりづらい画面や使いづらい画面を見つけることにある。
 
-動かした環境は Linux（クラウドのコンテナ、root）で、外へ出られるのは npm のレジストリだけだった。
-VS Code 本体の配布元、GitHub のリリース、Open VSX は 403 で、`code` や `@vscode/test-electron` は使えない。
-そのため VS Code は npm の `code-server`（ブラウザで開く VS Code）で代える。手順は Linux で動かした。macOS や Git Bash では、`setsid`・`disown`・`python3` を読み替える（未確認）。
+動かした環境はLinux（クラウドのコンテナ、root）で、外へ出られるのはnpmのレジストリだけだった。
+VS Code本体の配布元、GitHubのリリース、Open VSXは403で、`code`や`@vscode/test-electron`は使えない。
+そのためVS Codeはnpmの`code-server`（ブラウザで開くVS Code）で代える。手順はLinuxで動かした。macOSやGit Bashでは、`setsid`・`disown`・`python3`を読み替える（未確認）。
 
-`code-server` と `playwright` が環境に入っていれば（`command -v code-server`、`playwright --version`）、それを使う。無ければ [1.0](#10-道具があるか確かめる) で入れる。入っていれば、1.5 の code-server の取得は要らない。
+`code-server`と`playwright`が環境に入っていれば（`command -v code-server`、`playwright --version`）、それを使う。無ければ [1.0](#10-道具があるか確かめる)で入れる。入っていれば、1.5のcode-serverの取得は要らない。
 
 ## 1. 前提と準備
 
@@ -26,13 +26,13 @@ VS Code 本体の配布元、GitHub のリリース、Open VSX は 403 で、`co
 
 | もの | 用途 | 確かめ方 |
 |---|---|---|
-| Node.js 22.13.1 以上と npm | 拡張の組み立て、code-server | `node -v` |
+| Node.js 22.13.1以上とnpm | 拡張の組み立て、code-server | `node -v` |
 | pnpm 10 | 拡張の組み立て | `pnpm -v`（壊れていたら詰まりどころの表） |
-| uv と Python 3.12 以上 | ccnavi の組み立て、チケットの見本を作る | `uv --version` |
-| Playwright の Chromium | 撮影 | Playwright のブラウザの置き場（環境変数 `PLAYWRIGHT_BROWSERS_PATH`。無ければ Linux は `~/.cache/ms-playwright`、macOS は `~/Library/Caches/ms-playwright`、Windows は `%LOCALAPPDATA%\ms-playwright`）の `chromium*`。クラウドのコンテナでは `/opt/pw-browsers/` のこともある |
+| uvとPython 3.12以上 | ccnaviの組み立て、チケットの見本を作る | `uv --version` |
+| PlaywrightのChromium | 撮影 | Playwrightのブラウザの置き場（環境変数`PLAYWRIGHT_BROWSERS_PATH`。無ければLinuxは`~/.cache/ms-playwright`、macOSは`~/Library/Caches/ms-playwright`、Windowsは`%LOCALAPPDATA%\ms-playwright`）の`chromium*`。クラウドのコンテナでは`/opt/pw-browsers/`のこともある |
 | git | 検証用コピーのワークツリー | `git --version` |
 
-### 1.0 道具があるか確かめる
+### 1.0道具があるか確かめる
 
 先に、環境にあるかを確かめる。あれば、そのまま使う（入れ直さない）。
 
@@ -42,7 +42,7 @@ command -v playwright && playwright --version        # 無ければ入れる（�
 ls -d "${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"/chromium* 2>/dev/null   # macOS は ~/Library/Caches/ms-playwright
 ```
 
-無いものは、入れる前に、グローバルに入れるかローカルに入れるかをユーザに確かめる（入れてよいことは [real-screen-verification.md](../../../../../.agents/docs/real-screen-verification.md) にある。入れ方の選びはユーザが決める）。
+無いものは、入れる前に、グローバルに入れるかローカルに入れるかをユーザに確かめる（入れてよいことは [real-screen-verification.md](../../../../../.agents/docs/real-screen-verification.md)にある。入れ方の選びはユーザが決める）。
 
 ```sh
 # グローバル（今後の確認でも使い回せる）
@@ -52,11 +52,11 @@ mkdir -p "$W/cs" && cd "$W/cs" && pnpm add code-server@4.144.0 playwright@1.64.1
 playwright install chromium                         # Chromium が無いとき（ローカルなら pnpm exec playwright install chromium）
 ```
 
-- `pnpm add -g` が「global bin directory が無い」で止まったときは、`pnpm setup` が要る。`pnpm setup` はシェルの設定ファイル（`~/.zshrc` など）を書き換えるので、エージェントは打たず、ユーザに頼む。環境変数 `PNPM_HOME` を渡して入れる方法もあるが、PATH には載らないので、実行ファイルはフルパスで呼ぶ
-- 動かした版は、code-server 4.144.0（VS Code 1.144.0）と playwright 1.64.1。版を上げたときは、1.5 の起動が通るかを確かめ直す
-- pnpm が「code-server と argon2 のビルド用スクリプトを飛ばした」と警告することがある。`code-server --version` は動く。画面を立ち上げて、パスワード関連で問題が出たときだけ `pnpm approve-builds -g` を使う（未確認）
-- Playwright が探す Chromium の版（例: 1194）と、入っている版（例: 1200）が食い違うことがある。撮影のスクリプトでは、実行ファイルを `executablePath`（`CHROME`）で明示する
-- グローバルの `playwright` は、CLI（ブラウザの取得）用。撮影のスクリプトは、拡張の `node_modules/` の `playwright-core` を使う（1.4）
+- `pnpm add -g`が「global bin directoryが無い」で止まったときは、`pnpm setup`が要る。`pnpm setup`はシェルの設定ファイル（`~/.zshrc`など）を書き換えるので、エージェントは打たず、ユーザに頼む。環境変数`PNPM_HOME`を渡して入れる方法もあるが、PATHには載らないので、実行ファイルはフルパスで呼ぶ
+- 動かした版は、code-server 4.144.0（VS Code 1.144.0）とplaywright 1.64.1。版を上げたときは、1.5の起動が通るかを確かめ直す
+- pnpmが「code-serverとargon2のビルド用スクリプトを飛ばした」と警告することがある。`code-server --version`は動く。画面を立ち上げて、パスワード関連で問題が出たときだけ`pnpm approve-builds -g`を使う（未確認）
+- Playwrightが探すChromiumの版（例: 1194）と、入っている版（例: 1200）が食い違うことがある。撮影のスクリプトでは、実行ファイルを`executablePath`（`CHROME`）で明示する
+- グローバルの`playwright`は、CLI（ブラウザの取得）用。撮影のスクリプトは、拡張の`node_modules/`の`playwright-core`を使う（1.4）
 
 以降で使う変数。値は自分の環境に合わせて直す。
 
@@ -70,17 +70,17 @@ CHROME=$(ls -d /opt/pw-browsers/chromium-*/chrome-linux*/chrome | head -1)   # 1
 mkdir -p "$W/shots"
 ```
 
-### 1.1 ccnavi を組み立てる
+### 1.1 ccnaviを組み立てる
 
 ```sh
 cd "$CCNAVI" && uv run --with pyinstaller python build.py
 ```
 
-約 10 秒で終わる。`dist/ccnavi/` ができ、ccnavi 自身の `.ccnavi/bin/<os>-<arch>/` にもコピーされる（どちらも git 管理外）。`ccnavi-setup.sh` は、`dist/` を配布元にする。
+約10秒で終わる。`dist/ccnavi/`ができ、ccnavi自身の`.ccnavi/bin/<os>-<arch>/`にもコピーされる（どちらもgit管理外）。`ccnavi-setup.sh`は、`dist/`を配布元にする。
 
-### 1.2 検証用コピーを作って setup で反映する
+### 1.2検証用コピーを作ってsetupで反映する
 
-撮影では承認など書き込みを伴う操作をするため、test-repo 本体ではなくコピーで行う。
+撮影では承認など書き込みを伴う操作をするため、test-repo本体ではなくコピーで行う。
 
 ```sh
 rm -rf "$UC" && cp -a "$TESTREPO" "$UC"
@@ -88,17 +88,17 @@ cd "$UC" && git remote remove origin        # 承認の操作が push するの�
 sh "$CCNAVI/scripts/ccnavi-setup.sh" "$UC" --mode enable --force
 ```
 
-コピーなので `--force` を付けてよい。`--force` は、配布先にある配布物（設定 3 本の `rules.yml`・`risks.yml`・共通の `phases.yml`、`.ccnavi/` の文書・スクリプト・テンプレート、スキル、`settings.json` の env）を、配布元の内容で置き換える。
-test-repo 本体に反映するときは `--force` を付けない（付けると検証用の設定が消える）。付けて置き換えてしまったら、`git diff --stat -- .ccnavi .claude` で差分を見て、残したいものだけ `git checkout -- <ファイル>` で戻す。
+コピーなので`--force`を付けてよい。`--force`は、配布先にある配布物（設定3本の`rules.yml`・`risks.yml`・共通の`phases.yml`、`.ccnavi/`の文書・スクリプト・テンプレート、スキル、`settings.json`のenv）を、配布元の内容で置き換える。
+test-repo本体に反映するときは`--force`を付けない（付けると検証用の設定が消える）。付けて置き換えてしまったら、`git diff --stat -- .ccnavi .claude`で差分を見て、残したいものだけ`git checkout -- <ファイル>`で戻す。
 
-### 1.3 チケットを並べる（親 2・子 4）
+### 1.3チケットを並べる（親2・子4）
 
-何も無いリポジトリではボードが空で、確かめられる画面が少ない。ccnavi のテストが使う見本の組み立て（`tests/ticketsample.py`）で、次の状態を作る。
+何も無いリポジトリではボードが空で、確かめられる画面が少ない。ccnaviのテストが使う見本の組み立て（`tests/ticketsample.py`）で、次の状態を作る。
 
-- 親 A: 承認済み。調査の子は完了、設計の子は作業中（ワークツリーあり）、実装の子は承認待ち
-- 親 B: 承認待ち（子 1 件も承認待ち）
+- 親A: 承認済み。調査の子は完了、設計の子は作業中（ワークツリーあり）、実装の子は承認待ち
+- 親B: 承認待ち（子1件も承認待ち）
 
-次を `$W/seed.py` に保存して実行する。
+次を`$W/seed.py`に保存して実行する。
 
 ```python
 # seed.py: python3 seed.py <検証用コピー> <ccnavi のリポジトリ>
@@ -176,9 +176,9 @@ python3 "$W/seed.py" "$UC" "$CCNAVI"
 sh "$UC/.ccnavi/scripts/ccnavi-launcher.sh" --lint | tail -3    # error 0 件になること（warn は出てよい）
 ```
 
-コピー元（`$TESTREPO`）にコミット済みの内容から親のワークツリーを切るので、コピー元の未コミットの変更は反映されない。やり直すときは 1.2 から（同じ名前のブランチが残ると止まる）。
+コピー元（`$TESTREPO`）にコミット済みの内容から親のワークツリーを切るので、コピー元の未コミットの変更は反映されない。やり直すときは1.2から（同じ名前のブランチが残ると止まる）。
 
-`--lint` が error になるときは、親のワークツリー（`.claude/worktrees/<親>`）が無いか、子の `allow` が親の範囲を超えている。
+`--lint`がerrorになるときは、親のワークツリー（`.claude/worktrees/<親>`）が無いか、子の`allow`が親の範囲を超えている。
 
 下書きの取り込み（取り込み待ち画面）を撮るときだけ、下書きも作る。
 
@@ -188,7 +188,7 @@ sed -i 's/medium: 20/medium: 15/' wip/handoff/.ccnavi/config/common/risks.yml
 printf '\n追記: 新しい手順\n' >> wip/handoff/.ccnavi/docs/worktree.md
 ```
 
-手で `wip/handoff/` に置いたファイルは、階層名の読み替え（`handoff-.claude` など）が合わないと「対象外」に数えられる。必ず `ccnavi-stage.sh` で作る。
+手で`wip/handoff/`に置いたファイルは、階層名の読み替え（`handoff-.claude`など）が合わないと「対象外」に数えられる。必ず`ccnavi-stage.sh`で作る。
 
 何も無い状態（編集の確認用）は、チケットを並べない別のコピーで作る。
 
@@ -201,17 +201,17 @@ sh "$CCNAVI/scripts/ccnavi-setup.sh" "$ED" --mode enable --force
 
 チケットが作業中だと、ルール・リスク・フェーズは保存できないため、編集の操作は、チケットを並べないコピーで撮る。
 
-### 1.4 拡張の vsix を作る
+### 1.4拡張のvsixを作る
 
 ```sh
 cd "$BOARD" && sh scripts/package.sh | tail -2     # $CCNAVI/dist/ccnavi-board-<version>.vsix
 ```
 
-`package.sh` が `pnpm install --frozen-lockfile` と `pnpm run compile` を含む。この `node_modules/` に `playwright-core` も入るので、撮影の道具もこれを使う。
+`package.sh`が`pnpm install --frozen-lockfile`と`pnpm run compile`を含む。この`node_modules/`に`playwright-core`も入るので、撮影の道具もこれを使う。
 
-### 1.5 code-server を入れて起動する
+### 1.5 code-serverを入れて起動する
 
-1.0 で `code-server` が環境にあれば、次の取得（`npm install`）は飛ばしてよい。起動は、`node node_modules/code-server/out/node/entry.js` の代わりに、環境の `code-server` を同じ引数で呼ぶ（未確認。通ったら、ここを直す）。
+1.0で`code-server`が環境にあれば、次の取得（`npm install`）は飛ばしてよい。起動は、`node node_modules/code-server/out/node/entry.js`の代わりに、環境の`code-server`を同じ引数で呼ぶ（未確認。通ったら、ここを直す）。
 
 ```sh
 mkdir -p "$W/cs" && cd "$W/cs"
@@ -219,9 +219,9 @@ npm install code-server --ignore-scripts --no-audit --no-fund
 (cd node_modules/code-server/lib/vscode && npm install --omit=dev --ignore-scripts --no-audit --no-fund)
 ```
 
-`--ignore-scripts` を外すと、ネイティブモジュール（`kerberos`）の node-gyp が失敗して入らない（詰まりどころの表）。
+`--ignore-scripts`を外すと、ネイティブモジュール（`kerberos`）のnode-gypが失敗して入らない（詰まりどころの表）。
 
-拡張は `--install-extension` が失敗するので、vsix を展開して拡張の置き場へ置く。
+拡張は`--install-extension`が失敗するので、vsixを展開して拡張の置き場へ置く。
 
 ```sh
 VER=$(node -p "require('$BOARD/package.json').version")
@@ -232,7 +232,7 @@ cp -r "$W/x/extension" "$W/ext/local.ccnavi-board-$VER"
 echo '{"workbench.startupEditor":"none","security.workspace.trust.enabled":false,"telemetry.telemetryLevel":"off","update.mode":"none","extensions.autoCheckUpdates":false,"workbench.tips.enabled":false}' > "$W/ud/User/settings.json"
 ```
 
-テーマは設定に書かない（書かないと明るい配色で撮れた）。起動する。`setsid` と `< /dev/null` を付けないと、呼び出したシェルが終わったときに落ちる。
+テーマは設定に書かない（書かないと明るい配色で撮れた）。起動する。`setsid`と`< /dev/null`を付けないと、呼び出したシェルが終わったときに落ちる。
 
 ```sh
 cd "$W/cs" && setsid nohup node node_modules/code-server/out/node/entry.js \
@@ -241,14 +241,14 @@ cd "$W/cs" && setsid nohup node node_modules/code-server/out/node/entry.js \
 curl -s http://127.0.0.1:8080/healthz      # {"status":...} が返る
 ```
 
-別のフォルダを開くには、サーバーは動かしたままにして URL の `?folder=<絶対パス>` を変える。
-止めるときは `pgrep -f "[c]ode-server/out/node/entry"` で PID を見て `kill <PID>` する。`[c]` と書くのは、`pgrep -f`・`pkill -f` が自分のコマンドラインにも当たってシェルごと落ちるのを避けるため。
+別のフォルダを開くには、サーバーは動かしたままにしてURLの`?folder=<絶対パス>`を変える。
+止めるときは`pgrep -f "[c]ode-server/out/node/entry"`でPIDを見て`kill <PID>`する。`[c]`と書くのは、`pgrep -f`・`pkill -f`が自分のコマンドラインにも当たってシェルごと落ちるのを避けるため。
 
-### 1.6 撮影の道具
+### 1.6撮影の道具
 
-操作して撮る道具は、リポジトリの [`scripts/real-screen/`](../../scripts/real-screen/README.md)（ページオブジェクトの形）にある。以下の `shoot.js` は最小の例で、新しい操作は `scripts/real-screen/` に足す。
+操作して撮る道具は、リポジトリの [`scripts/real-screen/`](../../scripts/real-screen/README.md)（ページオブジェクトの形）にある。以下の`shoot.js`は最小の例で、新しい操作は`scripts/real-screen/`に足す。
 
-次を `$W/shoot.js` に保存する。左の「画面」一覧から画面を開き、案内ツアーを閉じて、撮る。
+次を`$W/shoot.js`に保存する。左の「画面」一覧から画面を開き、案内ツアーを閉じて、撮る。
 
 ```js
 // shoot.js: node shoot.js <フォルダ> <出力名の接頭辞> <幅> <高さ> <画面の名前>...
@@ -290,7 +290,7 @@ async function skipTour(page) {  // 案内ツアーは × の 1 回で全部閉�
 })();
 ```
 
-操作を伴う撮影は、この雛形を写し、画面を開いたあとに `webview(page)` で得たフレームを操作する（3 章）。
+操作を伴う撮影は、この雛形を写し、画面を開いたあとに`webview(page)`で得たフレームを操作する（3章）。
 
 ```sh
 export BOARD CHROME W
@@ -301,39 +301,39 @@ node "$W/shoot.js" "$UC" board 1280 760 チケット管理      # 最初の 1 �
 
 | 症状 | 原因 | 対処 |
 |---|---|---|
-| `pnpm -v` が `Cannot find module '…/corepack/v1/pnpm/12.15.0/bin/pnpm.cjs'` で落ちる | `/opt/node22/bin/pnpm` が corepack の shim で、指す先の pnpm（12.15.0）がキャッシュに無く、ネットワーク制限で取れない | `npm i -g pnpm@10`。入れたあと `hash -r; pnpm -v` が 10.x を返す |
-| `ccnavi-setup.sh --force` のあと、test-repo の `rules.yml`・`risks.yml` が配布元の既定に変わっていた | `--force` は配布先にあるものを置き換える。test-repo の検証用の設定も対象 | 作業は検証用コピーで行う（1.2）。本体は `--force` なしで反映する。上書きしたら差分を見て、必要なものを `git checkout -- <ファイル>` で戻す |
-| 検証用コピーで承認の操作をしたら、コピーの `origin`（test-repo の実物）に親のブランチが push された | 承認のあとにボードが送るコミット・push の sh が、コピーの `origin` へ push する | コピーを作った直後に `git remote remove origin`（1.2）。本体へ push してしまったときは、そのブランチを削除する（ユーザに確かめてから） |
-| 最初に開いた画面が「案内のための見本」で、実際のチケットが出ない | 初回起動（その画面の案内をまだ閉じていない）は、案内ツアーが見本のデータで始まる | 案内の × を 1 回押す（`[data-action="tour-skip"]`）。閉じたあとに実データへ替わる。撮るたびに閉じる処理を入れる（`shoot.js` の `skipTour`）。表示が出ない画面もあるので、あれば閉じる、の形にする |
-| `npm install code-server` が `sh ./postinstall.sh` で失敗する（root では `--unsafe-perm` を要求される） | postinstall がネイティブモジュールをビルドする。`--unsafe-perm` を付けても `kerberos` の node-gyp が失敗する | `--ignore-scripts` で入れる。ネイティブモジュールが無くても、画面の確認には足りた |
-| code-server に繋ぐと 500 で `Cannot find package '@microsoft/1ds-core-js'` | `--ignore-scripts` では、`lib/vscode/` の依存が入らない | `(cd node_modules/code-server/lib/vscode && npm install --omit=dev --ignore-scripts)`（1.5） |
-| `--install-extension <vsix>` が `Got error from Code` で失敗する | 原因は調べていない（ネイティブモジュールを入れていない影響の可能性） | vsix を `python3 -m zipfile -e` で展開し、`extension/` を `--extensions-dir` の下に `local.ccnavi-board-<版>` で置く（1.5）。左の一覧に ccnavi が出る |
-| `pkill -f code-server/out/node/entry.js` を、その文字列を含む呼び出しの中で打ったら、シェルごと落ちた（終了コード 144） | `pkill -f` が、自分のコマンドラインにも含まれる文字列に当たった | 止めるのと起動は別の呼び出しにし、`pgrep -f "[c]ode-server/out/node/entry"` で PID を見て `kill` する。起動は `setsid nohup … < /dev/null & disown` |
-| Playwright が `strict mode violation`（同じ placeholder の入力欄が 16 個）や `element is not visible` で落ちる | ルールなどの一覧は、行ごとに隠れた入力欄を持つ。新しく足した行は値が空 | `input[placeholder="git-push"][value=""]` や `textarea.f-message:visible` のように、空の値・見えているものに絞る |
-| 画面を開いた直後に撮ると、中身が空や古い | webview は拡張が中身を渡すまで読み込み中 | 開いてから 5 秒待つ。ボードは `ccnavi --explain --json` を呼ぶので、遅いときは増やす |
-| VS Code の表示が英語のまま（`locale: ja` を設定しても変わらない） | 日本語言語パックを入れていない（Open VSX に出られない） | 未確認の宿題（5 章）。拡張の文言は日本語で出るので、ccnavi の画面の確認には影響しない |
-| 保存したあと、画面上部の警告の帯が撮れない | 保存すると、画面は編集した行の高さのままで、上部の帯が画面の外にある | webview の中のスクロールする要素を、すべて `scrollTop = 0` にしてから撮る |
-| 「編集中は外から別の対象を開いても切り替えない」通知が出ない | コマンド（`ccnaviBoard.openTemplates`）とサイドパネルは、対象がワークスペース自身（`self`）。画面が `self` を開いていると、対象が同じで切り替えが起きない | テンプレート画面の設定を「共通の設定」か「プロジェクト」にして、新しいテンプレートの編集欄を開き、サイドパネルの「テンプレート管理」を押す。画面内の設定の選択欄は、編集中は押せない |
-| 警告の帯が、保存したファイルと関係のない warn で長くなる | 帯は、保存時点の検査全体の warn を並べる。検証用ワークスペースに git の origin が無いと、「統合先と違う」系が 10 件前後出る | 検証用ワークスペースを git のリポジトリにして origin を付ける（`git remote remove origin` で外すのは承認の確認用だけ）か、無関係な warn が出ることを承知で確認する |
-| 終わったあと、code-server の子プロセスが残る | `pgrep -f "[c]ode-server/out/node/entry"` では、ファイル監視の子（`--type=fileWatcher`）が見つからない | 親の PID に加えて、`--type=fileWatcher` の子プロセスも止める。一時ファイルは `rm -r` で消す（`rm -rf` と `find -delete` はガードに拒否される） |
-| macOS で `setsid` が無い | macOS には `setsid` が標準で無い | `nohup … &` だけで動く（`disown` も不要だった）。Chromium は、Playwright のブラウザの置き場の `chromium_headless_shell-*/chrome-headless-shell-*/chrome-headless-shell` を `CCNAVI_CHROMIUM`（`CHROME`）に指す |
-| 拡張を入れ直すたびに vsix を作るのが重い | `package.sh` は install と compile を含む | compile 済みの出力（`package.json`、`media/`、`out/extension.js`、`out/webview/`）を、拡張の置き場へコピーするだけでも動いた。コピー元が現在のソースと合っているかは、先に compile して確かめる |
-| 単体の Chromium で webview だけを開いて測りたい（code-server は要らない CSS の確認など） | webview は `acquireVsCodeApi` を前提にしていて、そのままでは動かない | ビルド済みの HTML に `acquireVsCodeApi` の代わり（スタブ）を差し込み、HTML をファイルに書いて `goto` で開く。`setContent` は `file://` と違ってスクリプトが動かない。`page.addInitScript` には関数をそのまま渡さず、`"(" + fn + ")(window)"` の文字列で渡す。テンプレートの編集画面は、`editOpen` の `session` を拾ってから `editOpened` を流し込むと開く。VS Code の通知・テーマの色が絡む点は、これでは確かめられない（本物は code-server） |
+| `pnpm -v`が`Cannot find module '…/corepack/v1/pnpm/12.15.0/bin/pnpm.cjs'`で落ちる | `/opt/node22/bin/pnpm`がcorepackのshimで、指す先のpnpm（12.15.0）がキャッシュに無く、ネットワーク制限で取れない | `npm i -g pnpm@10`。入れたあと`hash -r; pnpm -v`が10.xを返す |
+| `ccnavi-setup.sh --force`のあと、test-repoの`rules.yml`・`risks.yml`が配布元の既定に変わっていた | `--force`は配布先にあるものを置き換える。test-repoの検証用の設定も対象 | 作業は検証用コピーで行う（1.2）。本体は`--force`なしで反映する。上書きしたら差分を見て、必要なものを`git checkout -- <ファイル>`で戻す |
+| 検証用コピーで承認の操作をしたら、コピーの`origin`（test-repoの実物）に親のブランチがpushされた | 承認のあとにボードが送るコミット・pushのshが、コピーの`origin`へpushする | コピーを作った直後に`git remote remove origin`（1.2）。本体へpushしてしまったときは、そのブランチを削除する（ユーザに確かめてから） |
+| 最初に開いた画面が「案内のための見本」で、実際のチケットが出ない | 初回起動（その画面の案内をまだ閉じていない）は、案内ツアーが見本のデータで始まる | 案内の × を1回押す（`[data-action="tour-skip"]`）。閉じたあとに実データへ替わる。撮るたびに閉じる処理を入れる（`shoot.js`の`skipTour`）。表示が出ない画面もあるので、あれば閉じる、の形にする |
+| `npm install code-server`が`sh ./postinstall.sh`で失敗する（rootでは`--unsafe-perm`を要求される） | postinstallがネイティブモジュールをビルドする。`--unsafe-perm`を付けても`kerberos`のnode-gypが失敗する | `--ignore-scripts`で入れる。ネイティブモジュールが無くても、画面の確認には足りた |
+| code-serverに繋ぐと500で`Cannot find package '@microsoft/1ds-core-js'` | `--ignore-scripts`では、`lib/vscode/`の依存が入らない | `(cd node_modules/code-server/lib/vscode && npm install --omit=dev --ignore-scripts)`（1.5） |
+| `--install-extension <vsix>`が`Got error from Code`で失敗する | 原因は調べていない（ネイティブモジュールを入れていない影響の可能性） | vsixを`python3 -m zipfile -e`で展開し、`extension/`を`--extensions-dir`の下に`local.ccnavi-board-<版>`で置く（1.5）。左の一覧にccnaviが出る |
+| `pkill -f code-server/out/node/entry.js`を、その文字列を含む呼び出しの中で打ったら、シェルごと落ちた（終了コード144） | `pkill -f`が、自分のコマンドラインにも含まれる文字列に当たった | 止めるのと起動は別の呼び出しにし、`pgrep -f "[c]ode-server/out/node/entry"`でPIDを見て`kill`する。起動は`setsid nohup … < /dev/null & disown` |
+| Playwrightが`strict mode violation`（同じplaceholderの入力欄が16個）や`element is not visible`で落ちる | ルールなどの一覧は、行ごとに隠れた入力欄を持つ。新しく足した行は値が空 | `input[placeholder="git-push"][value=""]`や`textarea.f-message:visible`のように、空の値・見えているものに絞る |
+| 画面を開いた直後に撮ると、中身が空や古い | webviewは拡張が中身を渡すまで読み込み中 | 開いてから5秒待つ。ボードは`ccnavi --explain --json`を呼ぶので、遅いときは増やす |
+| VS Codeの表示が英語のまま（`locale: ja`を設定しても変わらない） | 日本語言語パックを入れていない（Open VSXに出られない） | 未確認の宿題（5章）。拡張の文言は日本語で出るので、ccnaviの画面の確認には影響しない |
+| 保存したあと、画面上部の警告の帯が撮れない | 保存すると、画面は編集した行の高さのままで、上部の帯が画面の外にある | webviewの中のスクロールする要素を、すべて`scrollTop = 0`にしてから撮る |
+| 「編集中は外から別の対象を開いても切り替えない」通知が出ない | コマンド（`ccnaviBoard.openTemplates`）とサイドパネルは、対象がワークスペース自身（`self`）。画面が`self`を開いていると、対象が同じで切り替えが起きない | テンプレート画面の設定を「共通の設定」か「プロジェクト」にして、新しいテンプレートの編集欄を開き、サイドパネルの「テンプレート管理」を押す。画面内の設定の選択欄は、編集中は押せない |
+| 警告の帯が、保存したファイルと関係のないwarnで長くなる | 帯は、保存時点の検査全体のwarnを並べる。検証用ワークスペースにgitのoriginが無いと、「統合先と違う」系が10件前後出る | 検証用ワークスペースをgitのリポジトリにしてoriginを付ける（`git remote remove origin`で外すのは承認の確認用だけ）か、無関係なwarnが出ることを承知で確認する |
+| 終わったあと、code-serverの子プロセスが残る | `pgrep -f "[c]ode-server/out/node/entry"`では、ファイル監視の子（`--type=fileWatcher`）が見つからない | 親のPIDに加えて、`--type=fileWatcher`の子プロセスも止める。一時ファイルは`rm -r`で消す（`rm -rf`と`find -delete`はガードに拒否される） |
+| macOSで`setsid`が無い | macOSには`setsid`が標準で無い | `nohup … &`だけで動く（`disown`も不要だった）。Chromiumは、Playwrightのブラウザの置き場の`chromium_headless_shell-*/chrome-headless-shell-*/chrome-headless-shell`を`CCNAVI_CHROMIUM`（`CHROME`）に指す |
+| 拡張を入れ直すたびにvsixを作るのが重い | `package.sh`はinstallとcompileを含む | compile済みの出力（`package.json`、`media/`、`out/extension.js`、`out/webview/`）を、拡張の置き場へコピーするだけでも動いた。コピー元が現在のソースと合っているかは、先にcompileして確かめる |
+| 単体のChromiumでwebviewだけを開いて測りたい（code-serverは要らないCSSの確認など） | webviewは`acquireVsCodeApi`を前提にしていて、そのままでは動かない | ビルド済みのHTMLに`acquireVsCodeApi`の代わり（スタブ）を差し込み、HTMLをファイルに書いて`goto`で開く。`setContent`は`file://`と違ってスクリプトが動かない。`page.addInitScript`には関数をそのまま渡さず、`"(" + fn + ")(window)"`の文字列で渡す。テンプレートの編集画面は、`editOpen`の`session`を拾ってから`editOpened`を流し込むと開く。VS Codeの通知・テーマの色が絡む点は、これでは確かめられない（本物はcode-server） |
 
-code-server 由来のため、評価には入れなかったもの。
+code-server由来のため、評価には入れなかったもの。
 
-- ターミナルの表示の崩れ（承認のあとにターミナルへ送る長いコマンドの折り返しで、文字が重なる）。実機の VS Code での再現は未確認
-- 等幅フォントでバックスラッシュが「¥」に見えること（正規表現が `¥b` や `¥s` に見える）。この環境のフォントの選び方による可能性があり、実機（Windows の日本語フォント）では未確認
-- 起動時に開く code-server の「Walkthrough」のタブ。拡張とは関係ない（`shoot.js` で閉じようとしても残る。撮れた画像では無視する）
-- 画面の右上の「チャット」は code-server の機能。`Ctrl+Alt+B` で閉じる
+- ターミナルの表示の崩れ（承認のあとにターミナルへ送る長いコマンドの折り返しで、文字が重なる）。実機のVS Codeでの再現は未確認
+- 等幅フォントでバックスラッシュが「¥」に見えること（正規表現が`¥b`や`¥s`に見える）。この環境のフォントの選び方による可能性があり、実機（Windowsの日本語フォント）では未確認
+- 起動時に開くcode-serverの「Walkthrough」のタブ。拡張とは関係ない（`shoot.js`で閉じようとしても残る。撮れた画像では無視する）
+- 画面の右上の「チャット」はcode-serverの機能。`Ctrl+Alt+B`で閉じる
 
 ## 3. 画面ごとの撮り方
 
-画像の名前は `<状況>-<番号>-<画面か操作>.png`。撮る幅は 1280×760（日本語の Windows で拡大率 125〜150% のときに近い）を基本にし、狭い幅は 900 を使う。
+画像の名前は`<状況>-<番号>-<画面か操作>.png`。撮る幅は1280×760（日本語のWindowsで拡大率125〜150% のときに近い）を基本にし、狭い幅は900を使う。
 
 ### 画面
 
-左の ccnavi の一覧から開く。`shoot.js` に名前を並べると、順に開いて撮る。
+左のccnaviの一覧から開く。`shoot.js`に名前を並べると、順に開いて撮る。
 
 ```sh
 node "$W/shoot.js" "$UC" uc 1280 760 チケット管理 ルール管理 リスク管理 フェーズ管理 テンプレート管理 プロジェクト管理
@@ -342,44 +342,44 @@ node "$W/shoot.js" "$UC" uc 1280 760 チケット管理 ルール管理 リス�
 | 画面 | 行き方 | 撮る状態 |
 |---|---|---|
 | チケット管理 | 一覧から | チケットを並べた状態（1.3）。列、カード、上部の件数と絞り込み |
-| ルール管理 | 一覧から | 作業中のチケットがある状態と、無い状態（編集できるか）の 2 つ。「ルール」「判定を試す」「hook」の 3 つのタブ |
+| ルール管理 | 一覧から | 作業中のチケットがある状態と、無い状態（編集できるか）の2つ。「ルール」「判定を試す」「hook」の3つのタブ |
 | リスク管理 | 一覧から | 同上 |
 | フェーズ管理 | 一覧から | 同上。共通の定義の一覧 |
 | テンプレート管理 | 一覧から | 空の状態 |
-| プロジェクト管理 | 一覧から | 空の状態（`projects/` が無い警告を含む） |
-| 取り込み待ち | ルール・リスク・フェーズ・テンプレートの各管理画面の「取り込み待ちを開く」（一覧には無い） | 下書きがある状態と、無い状態（1.3 の下書き） |
+| プロジェクト管理 | 一覧から | 空の状態（`projects/`が無い警告を含む） |
+| 取り込み待ち | ルール・リスク・フェーズ・テンプレートの各管理画面の「取り込み待ちを開く」（一覧には無い） | 下書きがある状態と、無い状態（1.3の下書き） |
 | 計画編集 | チケット管理の、承認待ちの親のカードの計画を編集するボタン | 計画の図 |
 | フロー編集 | チケット管理のカードのフローのボタン | 図と右のペイン。図の文字が既定の倍率で読めるか |
 
 ### 操作
 
-画面を開いて案内を閉じたあと、フレームを操作して撮る。ボタンの文言は変わることがあるため、`getByRole('button', { name: /…/ })` の正規表現は画面を見て合わせる。
+画面を開いて案内を閉じたあと、フレームを操作して撮る。ボタンの文言は変わることがあるため、`getByRole('button', { name: /…/ })`の正規表現は画面を見て合わせる。
 
 | 操作 | 状態の作り方 | 撮るもの |
 |---|---|---|
-| 承認 | チケット管理で、承認待ちを承認するボタン（上部）を押す | 開いた直後（上端までスクロール）、途中、承認する前。承認したあとの結果（検証用コピーで、`origin` を外してあること）。画面の下のターミナルも入れる |
+| 承認 | チケット管理で、承認待ちを承認するボタン（上部）を押す | 開いた直後（上端までスクロール）、途中、承認する前。承認したあとの結果（検証用コピーで、`origin`を外してあること）。画面の下のターミナルも入れる |
 | カードの詳細 | カードの「詳細」を開く | 展開した状態 |
 | ルールの追加・保存・判定 | 作業中のチケットが無いコピーで、ルール管理の「ルールを追加」。id・ツール・パターン・メッセージを入れて保存。「判定を試す」タブでツールと対象を入れて判定。期待する判定の一括確認と、記録から候補を出す | 追加フォーム、保存後の通知、判定の結果、一括確認のエラー |
 | リスクの項目の追加 | 同上、リスク管理の「項目を追加」 | 追加フォーム |
 | フェーズの定義の追加とヘルプ | 同上、フェーズ管理の「定義を追加」「ヘルプ」 | 追加フォーム、ヘルプを開いた状態 |
 | テンプレートを作る | テンプレート管理で名前を入れて作る | 作った直後（検証のエラーが出るか） |
-| 不正な clone URL | プロジェクト管理で、URL 欄に URL ではない文字列を入れて clone | 欄の下のエラー、名前欄の自動入力 |
+| 不正なclone URL | プロジェクト管理で、URL欄にURLではない文字列を入れてclone | 欄の下のエラー、名前欄の自動入力 |
 | 下書きの取り込み | 取り込み待ちで、すべて選ぶ→選んだ対象を取り込む | 確認の枠。ターミナルでしか取り込めない対象の表示 |
-| 幅 900px | `shoot.js` の幅を 900 にして、チケット管理とルール管理 | 列の切れ、ボタンの折り返し |
+| 幅900px | `shoot.js`の幅を900にして、チケット管理とルール管理 | 列の切れ、ボタンの折り返し |
 
-操作の撮影は、`shoot.js` の `for` を、その操作の手順に置き換えた別のファイルにする。1 画面 1 操作ずつ、操作の前後で `page.screenshot` を呼ぶ。
+操作の撮影は、`shoot.js`の`for`を、その操作の手順に置き換えた別のファイルにする。1画面1操作ずつ、操作の前後で`page.screenshot`を呼ぶ。
 
 ## 4. 評価の観点
 
 日本語で読む利用者にとって分かりづらいか、使いづらいかを、次の物差しで見る。
 
-- 実装の語がそのまま出る（`allow`・`deny`・`after`・`plan:`・`feedback:`・コマンドや `sh` の長文）。意味を知らない人が読めるか
+- 実装の語がそのまま出る（`allow`・`deny`・`after`・`plan:`・`feedback:`・コマンドや`sh`の長文）。意味を知らない人が読めるか
 - 英語の例外文や、`Errno`・スタックのような内部の文言が出る
 - 一時パスや環境固有のパスが出る（`../../../tmp/…`）
 - 初見で何をするものか分からないバッジ、ボタン、見出し。同じものに別の名前を付けていないか
 - 日本語の中に英語だけの見出し・項目名・値が混ざる（判定の結果の項目名など）
-- 識別子（長い ID）がタイトルより目立つ。ID が単語の途中で折り返される
-- 幅で切れる・折れる（4 列目が見えない、プレースホルダーが途中で切れる、ボタンが 2 段になる）
+- 識別子（長いID）がタイトルより目立つ。IDが単語の途中で折り返される
+- 幅で切れる・折れる（4列目が見えない、プレースホルダーが途中で切れる、ボタンが2段になる）
 - 何もしていないのにエラーの見た目が出る。赤い帯が、通常の案内に使われている
 - 操作したのに結果が見えない・画面の外に出る（長い画面の最下部に出るエラー）
 - 件数や状態の数え方の理由が画面から分からない（件数だけで、どれがなぜかが出ない）
@@ -393,21 +393,21 @@ node "$W/shoot.js" "$UC" uc 1280 760 チケット管理 ルール管理 リス�
 cd "$BOARD" && grep -rn "<画面の文言の一部>" src docs | head
 ```
 
-文言は `src/core/*.ts`（拡張ホストが組む文）、`src/webview/**/text.ts`・`*.tsx`（画面）、`src/webview/tours/*.yml`（案内）にある。
-ccnavi 本体が返す文言（エラーの文、判定の結果）は `$CCNAVI/src/ccnavi/` にある。文言の出どころが拡張か実行ファイルかで、直す場所が変わる。
+文言は`src/core/*.ts`（拡張ホストが組む文）、`src/webview/**/text.ts`・`*.tsx`（画面）、`src/webview/tours/*.yml`（案内）にある。
+ccnavi本体が返す文言（エラーの文、判定の結果）は`$CCNAVI/src/ccnavi/`にある。文言の出どころが拡張か実行ファイルかで、直す場所が変わる。
 指摘には、画像の名前、画面と操作、ソースの場所（`ファイル:行`）、日本語の読み手がどこで迷うかを書く。
 
 ## 5. 今回確認できなかったこと（次回の宿題）
 
 | 項目 | できなかった理由 | 試す案 |
 |---|---|---|
-| VS Code 本体の日本語表示 | 日本語言語パックを入れられなかった（Open VSX に出られない） | ネットワークの制限が無い環境で `ms-ceintl.vscode-language-pack-ja` を `--install-extension` する。入れてから `locale` を `ja` にして撮り直す。その環境で、メニューや通知が日本語のとき、拡張の英語混じりの表記がどう見えるかも見る |
-| ライトテーマ・見た目の切り替え（◐ ボタン） | 設定に `Default Dark Modern` を書いた撮影は暗く、あとから `Default Light Modern` に書き換えても暗いままだった（原因は未調査）。設定に何も書かない 1.5 の手順では、明るい配色で撮れた。◐ ボタンは押していない | ユーザー設定の `workbench.colorTheme` で明るい・暗いを明示し、ブラウザ側の保存（`--user-data-dir` を作り直す）も消してから再読み込みし、左上の ◐（見た目を切り替えるコマンド）で `claude-light`・`claude-dark`・`vscode` を順に撮る。ハイコントラストも見る |
+| VS Code本体の日本語表示 | 日本語言語パックを入れられなかった（Open VSXに出られない） | ネットワークの制限が無い環境で`ms-ceintl.vscode-language-pack-ja`を`--install-extension`する。入れてから`locale`を`ja`にして撮り直す。その環境で、メニューや通知が日本語のとき、拡張の英語混じりの表記がどう見えるかも見る |
+| ライトテーマ・見た目の切り替え（◐ ボタン） | 設定に`Default Dark Modern`を書いた撮影は暗く、あとから`Default Light Modern`に書き換えても暗いままだった（原因は未調査）。設定に何も書かない1.5の手順では、明るい配色で撮れた。◐ ボタンは押していない | ユーザー設定の`workbench.colorTheme`で明るい・暗いを明示し、ブラウザ側の保存（`--user-data-dir`を作り直す）も消してから更新し、左上の ◐（見た目を切り替えるコマンド）で`claude-light`・`claude-dark`・`vscode`を順に撮る。ハイコントラストも見る |
 | 取り込み待ちの差分の展開 | 行の ▶ を押す操作が開かなかった（セレクタの特定に失敗した） | 開発者ツールで行の要素を調べてから押す。差分の見出し、追加行・削除行の色、長いファイルの扱いを撮る |
-| レビュー待ちチケットの「レビュー完了」操作 | レビュー待ちの子（`wip/proposals/review/` に置かれた状態）を作っていない | `ccnavi-ticket.sh finish` で子を閉じる流れ（[manual-checks.md](manual-checks.md) の 5・5b）で状態を作る。指摘の対応方針を選ぶ画面と、指摘が無いときの画面を撮る |
-| 実機の等幅フォント・ターミナル | code-server のため | 実機の VS Code で同じ画面を開き、「¥」とターミナルの崩れが出るか確かめる |
+| レビュー待ちチケットの「レビュー完了」操作 | レビュー待ちの子（`wip/proposals/review/`に置かれた状態）を作っていない | `ccnavi-ticket.sh finish`で子を閉じる流れ（[manual-checks.md](manual-checks.md)の5・5b）で状態を作る。指摘の対応方針を選ぶ画面と、指摘が無いときの画面を撮る |
+| 実機の等幅フォント・ターミナル | code-serverのため | 実機のVS Codeで同じ画面を開き、「¥」とターミナルの崩れが出るか確かめる |
 
 ## 6. 画像の置き場
 
-リポジトリに画像を入れない。置き場は `$W/shots/` のような一時ディレクトリ（リポジトリの外）にする。
-PR に付けるのは、指摘の根拠になる数枚だけにする。画像の名前（`<状況>-<番号>-<画面か操作>.png`）は、指摘の本文から指す。
+リポジトリに画像を入れない。置き場は`$W/shots/`のような一時ディレクトリ（リポジトリの外）にする。
+PRに付けるのは、指摘の根拠になる数枚だけにする。画像の名前（`<状況>-<番号>-<画面か操作>.png`）は、指摘の本文から指す。

@@ -1,9 +1,9 @@
 /**
- * ボード画面が何を描くか。React の画面を happy-dom で動かし、出来上がった DOM を見る。
- * 操作の続き（折りたたむ・絞り込み・承認の送り先）は board.dom.test.ts。
+ * ボード画面が何を描くか。Reactの画面をhappy-domで動かし、出来上がったDOMを見る。
+ * 操作の続き（折りたたむ・絞り込み・承認の送り先）はboard.dom.test.ts。
  *
- * CSS はバンドルした 1 本が `<style nonce>` に入っているので、規則そのものを見たいところは
- * `flatStyle()`（1 行にまとめた CSS）を見る。
+ * CSSはバンドルした1本が`<style nonce>`に入っているので、規則そのものを見たいところは
+ * `flatStyle()`（1行にまとめたCSS）を見る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -16,12 +16,12 @@ import { flatStyle } from "../helpers/bundle.js";
 import type { DomPage } from "../helpers/dom.js";
 import type { HTMLButtonElement } from "happy-dom" with { "resolution-mode": "import" };
 
-/** 見本のボードの HTML。nonce を文字列で見るときに使う */
+/** 見本のボードのHTML。nonceを文字列で見るときに使う */
 function html(): string {
   return boardPage({ kind: "board", board: buildBoard(fixture()) });
 }
 
-/** 見本のボードの CSS（1 行にまとめたもの）。規則そのものを見るときに使う */
+/** 見本のボードのCSS（1行にまとめたもの）。規則そのものを見るときに使う */
 function css(): string {
   return flatStyle(html());
 }
@@ -40,11 +40,11 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
   try {
     assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "preview");
     // 定義の範囲を超える子（i0001-01-02）は承認を止めないので一覧に載り、超過は本文の見出しに出る。
-    assert.equal(text(page, "#approval-title"), "承認待ちのチケット 3 件");
+    assert.equal(text(page, "#approval-title"), "承認待ちのチケット3件");
     assert.deepEqual(texts(page, ".approval-batch td.approval-id"), ["i0001", "i0001-01-01", "i0001-01-02"]);
     const confirm = page.one('button[data-action="approve-confirm"]');
     assert.equal(confirm.getAttribute("data-tickets"), "i0001,i0001-01-01,i0001-01-02");
-    assert.equal(confirm.textContent, "この 3 件を承認する");
+    assert.equal(confirm.textContent, "この3件を承認する");
     // 見せた識別子をそのまま送る（属性に持たせるだけでなく、押したときの中身も見る）
     page.click(confirm);
     await page.settle();
@@ -66,7 +66,7 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
     assert.ok(!text(page, ".approval-rejected").includes("error:"));
     assert.equal(text(page, ".approval-rejected").split("i0001-05-05").length, 2);
     assert.equal(page.all(".approval-problems").length, 0);
-    // 承認の操作の列は共通の Dialog 部品の列に含まれる
+    // 承認の操作の列は共通のDialog部品の列に含まれる
     assert.ok(page.all(".approval .overlay-actions.approval-actions").length > 0);
   } finally {
     await page.close();
@@ -74,7 +74,7 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
   // 狭い幅でも表は枠に収め（識別子だけは折らない）、ボタンの行は折り返す
   assert.match(css(), /\.approval-batch th, \.approval-batch td \{[^}]*overflow-wrap: anywhere; \}/);
   assert.match(css(), /\.approval-id \{[^}]*white-space: nowrap; \}/);
-  // 操作の列は共通の Dialog 部品（Dialog.css）が持つ。承認のボタンもその列に含まれる
+  // 操作の列は共通のDialog部品（Dialog.css）が持つ。承認のボタンもその列に含まれる
   assert.match(css(), /\.overlay-actions \{ display: flex; flex-wrap: wrap;/);
   // 本文に何が書かれていても、文字として出すだけ。
   const spiked = await openBoard(fixture(), { approval: { kind: "preview", preview: { ...preview, text: "<script>alert(1)</script>" } } });
@@ -100,31 +100,31 @@ function decidePreview(): DecidePreview {
   };
 }
 
-test("CB-T205 残った指摘は既定で全部「このフェーズで直す」。1 件ずつ・一括で選び直せる。選んだ対応方針をキーごとに送る", async () => {
+test("CB-T205 残った指摘は既定で全部「このフェーズで直す」。1件ずつ・一括で選び直せる。選んだ対応方針をキーごとに送る", async () => {
   const page = await openBoard(fixture(), {
     approval: { kind: "decidePreview", preview: decidePreview(), tree: "/w/.claude/worktrees/i0001" },
   });
   try {
     assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "decidePreview");
-    assert.equal(text(page, "#approval-title"), "フェーズ 2 の指摘 2 件の対応方針");
-    assert.ok(texts(page, ".approval-note").join(" ").includes("「このフェーズで直す」を 1 件でも選ぶと"));
-    // 本文は 1 行目を出し、2 行以上あれば <details> で全文。HTML は文字として出す
+    assert.equal(text(page, "#approval-title"), "フェーズ2の指摘2件の対応方針");
+    assert.ok(texts(page, ".approval-note").join(" ").includes("「このフェーズで直す」を1件でも選ぶと"));
+    // 本文は1行目を出し、2行以上あれば <details> で全文。HTMLは文字として出す
     assert.deepEqual(texts(page, ".decide-first"), ["命名を直す", "<b>テスト</b>"]);
     assert.equal(page.all('li[data-key="u1"] details.decide-more').length, 1);
-    assert.equal(page.all('li[data-key="u2"] details.decide-more').length, 0, "1 行だけの本文には「全文」を出さない");
+    assert.equal(page.all('li[data-key="u2"] details.decide-more').length, 0, "1行だけの本文には「全文」を出さない");
     assert.equal(text(page, 'li[data-key="u1"] .decide-full'), "命名を直す\n詳しく");
     assert.equal(page.all(".decide-body b").length, 0);
-    // 指摘の URL は http(s) のときだけリンクにする（そうでなければ文字として出すだけ）
+    // 指摘のURLはhttp(s)のときだけリンクにする（そうでなければ文字として出すだけ）
     assert.equal(page.all("a.decide-url").length, 0);
-    // 対応方針の選択肢は同じ寸法の切り替え。ラジオの意味（同じ name のグループ）とキーボード操作はそのまま
+    // 対応方針の選択肢は同じ寸法の切り替え。ラジオの意味（同じnameのグループ）とキーボード操作はそのまま
     const group = page.one('li[data-key="u1"] [role="radiogroup"]');
     assert.equal(group.querySelectorAll("label.decide-choice").length, 3);
     assert.equal(new Set(page.all('li[data-key="u1"] input[type="radio"]').map((r) => r.getAttribute("name"))).size, 1);
-    // 相談のプロンプトのコピー（1 件以上のときだけ）。押してもオーバーレイは閉じず、選びかけも変えない
+    // 相談のプロンプトのコピー（1件以上のときだけ）。押してもオーバーレイは閉じず、選びかけも変えない
     const consult = page.one<HTMLButtonElement>('button[data-action="decide-consult"]');
     assert.equal(consult.textContent, "エージェントに相談するプロンプトをコピー");
     assert.equal(consult.disabled, false);
-    // issue に回す行き先は、局面（フィードバック計画の承認の有無）に関わらず出す
+    // issueに回す行き先は、局面（フィードバック計画の承認の有無）に関わらず出す
     assert.equal(page.all('input[data-choice="issue"]').length, 2);
     assert.ok(!texts(page, ".approval-note").join(" ").includes("フィードバック計画"));
     assert.equal(page.all('input[data-choice="keep"]').length, 2);
@@ -174,17 +174,17 @@ test("CB-T205 残った指摘は既定で全部「このフェーズで直す」
   } finally {
     await deciding.close();
   }
-  // 未解決が 0 件なら、選び方の注意（「このフェーズで直す」を選ぶと…）は出さない
+  // 未解決が0件なら、選び方の注意（「このフェーズで直す」を選ぶと…）は出さない
   const none = await openBoard(fixture(), {
     approval: { kind: "decidePreview", preview: { ...decidePreview(), threads: [] }, tree: "/w" },
   });
   try {
-    assert.equal(text(none, "#approval-title"), "フェーズ 2 に未解決の指摘はありません");
-    assert.equal(none.all('button[data-action="decide-consult"]').length, 0, "指摘が 0 件なら相談のボタンは出さない");
+    assert.equal(text(none, "#approval-title"), "フェーズ2に未解決の指摘はありません");
+    assert.equal(none.all('button[data-action="decide-consult"]').length, 0, "指摘が0件なら相談のボタンは出さない");
     assert.ok(none.one('button[data-action="decide-confirm"]').classList.contains("primary"));
     const notes = texts(none, ".approval-note").join(" ");
     assert.ok(!notes.includes("このフェーズで直す"), notes);
-    assert.ok(!notes.includes("issue に回せる"), notes);
+    assert.ok(!notes.includes("issueに回せる"), notes);
     assert.equal(none.one<HTMLButtonElement>('button[data-action="decide-confirm"]').textContent, "レビュー済みにする");
   } finally {
     await none.close();
@@ -202,12 +202,12 @@ test("CB-D73 説明の付く見出しは次の行をツールチップに畳み�
     assert.ok(!labels.includes("■ エージェントが記載した理由"), labels.join(" / "));
     const scope = heads.find((head) => head.textContent === "■ このチケットで編集可能な範囲");
     assert.match(scope?.getAttribute("title") ?? "", /allow は確認なしで編集できる場所/);
-    // 折りたたんだ説明は目には出さないが、読み上げに渡すので DOM には残る。
+    // 折りたたんだ説明は目には出さないが、読み上げに渡すのでDOMには残る。
     const hints = texts(page, ".approval-hint").join(" ");
     assert.ok(hints.includes("allow は確認なしで編集できる場所"), hints);
     // 要約は表の上、凡例は本文の外に出る。本文の語は置き換えない
-    assert.match(text(page, "[data-approval-summary]"), /^承認するチケット 3 件/);
-    assert.match(text(page, "[data-approval-summary-plan]"), /全体計画 2 ステップ（調査・設計）/);
+    assert.match(text(page, "[data-approval-summary]"), /^承認するチケット3件/);
+    assert.match(text(page, "[data-approval-summary-plan]"), /全体計画2ステップ（調査・設計）/);
     const legend = text(page, "[data-approval-legend]");
     for (const word of ["allow", "ask", "deny", "after", "scope", "review"]) {
       assert.ok(legend.includes(word), legend);
@@ -258,21 +258,21 @@ test("CB-T108 承認の対象が空なら承認ボタンを出さず、承認中
 });
 
 test("CB-T108b 承認したら同じオーバーレイに文とコピー・新しいセッションで開く・ターミナルで実行・閉じるを出す", async () => {
-  const page = await openBoard(fixture(), { approval: { kind: "done", count: 1, prompt: "i0001-02-03 を承認した <b>" } });
+  const page = await openBoard(fixture(), { approval: { kind: "done", count: 1, prompt: "i0001-02-03を承認した <b>" } });
   try {
     assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "done");
-    assert.equal(text(page, "#approval-title"), "1 件を承認しました");
+    assert.equal(text(page, "#approval-title"), "1件を承認しました");
     // 文は文字として出す。<b> がタグにならない
-    assert.equal(text(page, "pre.approval-text"), "i0001-02-03 を承認した <b>");
+    assert.equal(text(page, "pre.approval-text"), "i0001-02-03を承認した <b>");
     assert.equal(page.all("pre.approval-text b").length, 0);
-    // 案内は折りたたんで最初は閉じておく。コピーは上に並べ、画面に 1 個だけ置く
+    // 案内は折りたたんで最初は閉じておく。コピーは上に並べ、画面に1個だけ置く
     const more = page.one("details.approval-more");
     assert.equal(more.hasAttribute("open"), false);
     assert.equal(text(page, "details.approval-more > summary"), "次に打つコマンドを含む案内");
     assert.ok(more.contains(page.one("pre.approval-text")));
     assert.equal(page.all('button[data-action="prompt-copy"]').length, 1);
     assert.equal(page.all('details.approval-more button[data-action="prompt-copy"]').length, 0);
-    // 文は Webview から送らせない。拡張が持っている文を使うので、押したことだけを伝える
+    // 文はWebviewから送らせない。拡張が持っている文を使うので、押したことだけを伝える
     page.click(page.one('button[data-action="prompt-copy"]'));
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "promptCopy" });
@@ -283,14 +283,14 @@ test("CB-T108b 承認したら同じオーバーレイに文とコピー・新�
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "promptRun" });
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
-    // 承認の push の sh をターミナルに送ったときだけ、そう言う。
+    // 承認のpushのshをターミナルに送ったときだけ、そう言う。
     assert.ok(!texts(page, ".approval-note").some((note) => note.includes("ターミナルに送りました")));
   } finally {
     await page.close();
   }
-  const carried = await openBoard(fixture(), { approval: { kind: "done", count: 1, prompt: "i0001-02-03 を承認した", carried: true } });
+  const carried = await openBoard(fixture(), { approval: { kind: "done", count: 1, prompt: "i0001-02-03を承認した", carried: true } });
   try {
-    assert.ok(texts(carried, ".approval-note").includes("承認済みチケットをコミット・push するコマンドをターミナルに送信しました。"));
+    assert.ok(texts(carried, ".approval-note").includes("承認済みチケットをコミット・pushするコマンドをターミナルに送信しました。"));
   } finally {
     await carried.close();
   }
@@ -325,24 +325,24 @@ test("CB-T109 オーバーレイを渡さなければ出ない", async () => {
   }
 });
 
-test("CB-T12 4 列と件数と承認ボタンを出す", async () => {
+test("CB-T12 4列と件数と承認ボタンを出す", async () => {
   const page = await openBoard();
   try {
     assert.deepEqual(texts(page, ".column button.fold .label"), ["未着手", "作業中", "完了", "取り消し"]);
     assert.equal(page.all(".column").length, 4);
-    assert.equal(text(page, ".summary .counts"), "残り 4 / 全 6");
-    assert.equal(text(page, ".summary .pending"), "承認待ち 1 件");
-    // 色が付くのは warn を持つものだけ（.summary .warn）
+    assert.equal(text(page, ".summary .counts"), "残り4 / 全6");
+    assert.equal(text(page, ".summary .pending"), "承認待ち1件");
+    // 色が付くのはwarnを持つものだけ（.summary .warn）
     assert.ok(page.one(".summary .pending").classList.contains("warn"));
-    // 0 件のものは見出しに出さない
+    // 0件のものは見出しに出さない
     assert.equal(page.all(".summary .issues").length, 0);
     const approve = page.one<HTMLButtonElement>('.controls button[data-action="approve"]');
-    assert.equal(approve.textContent, "承認待ち 1 件を承認");
+    assert.equal(approve.textContent, "承認待ち1件を承認");
     assert.equal(approve.disabled, false);
   } finally {
     await page.close();
   }
-  // nonce は style と script の両方に付く（CSP が nonce だけを通す）
+  // nonceはstyleとscriptの両方に付く（CSPがnonceだけを通す）
   assert.ok(html().includes(`<style nonce="${NONCE}">`));
   assert.ok(html().includes(`<script nonce="${NONCE}">`));
 });
@@ -374,14 +374,14 @@ test("CB-T12c 列の件数は見えているカードの数。畳んだ列は固
   } finally {
     await page.close();
   }
-  // ドラッグで付けたインラインの width より折りたたんだ状態を優先する
+  // ドラッグで付けたインラインのwidthより折りたたんだ状態を優先する
   assert.match(css(), /\.column\.folded \{[^}]*width: auto !important/);
   // 最後の列の取っ手は内側に置き、ボードを常に横へ流さない
   assert.match(css(), /\.column:last-child \.resizer \{ right: 0; \}/);
-  // 絞り込みの select は最長の選択肢の幅に広がらず、ページを横に流さない
+  // 絞り込みのselectは最長の選択肢の幅に広がらず、ページを横に流さない
   assert.match(css(), /\.filter select \{ flex: 0 1 auto; min-width: 0; max-width: var\(--w-field\);/);
   // 操作ボタン（card-button）は、親（カード・フェーズ一覧）の文字サイズを引き継がず、文字サイズ・高さ・余白を明示する。
-  // 共通の button.action は使わない
+  // 共通のbutton.actionは使わない
   assert.match(css(), /\.card-button \{[^}]*min-height: 26px;[^}]*font-size: var\(--vscode-font-size, 13px\);/);
   assert.doesNotMatch(css(), /\.card-button \{[^}]*font: inherit/);
 });
@@ -389,18 +389,18 @@ test("CB-T12c 列の件数は見えているカードの数。畳んだ列は固
 test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、その識別子を送る。上部の集計は絞らない", async () => {
   const page = await openBoard();
   try {
-    assert.equal(text(page, ".summary .pending"), "承認待ち 1 件");
-    assert.equal(text(page, ".summary .counts"), "残り 4 / 全 6");
+    assert.equal(text(page, ".summary .pending"), "承認待ち1件");
+    assert.equal(text(page, ".summary .counts"), "残り4 / 全6");
     page.click(page.one('.controls button[data-action="approve"]'));
     await page.settle();
-    // 識別子と「絞り込み中か」を別々に送る。空の配列を「全部」に読ませない
+    // 識別子と「絞り込み中か」を別々に送る。空のリストを「全部」に読ませない
     assert.deepEqual(page.posted.at(-1), { type: "approve", tickets: ["i0001-02-03"], filtered: false });
     // 絞り込んでも上部の集計はボード全体の数のまま（変わるのはボタンの数だけ）
     page.click(page.one("#attention-filter"));
     await page.settle();
-    assert.equal(text(page, ".summary .pending"), "承認待ち 1 件");
-    assert.equal(text(page, ".summary .counts"), "残り 4 / 全 6");
-    assert.equal(page.one<HTMLButtonElement>('.controls button[data-action="approve"]').textContent, "承認待ち 1 件を承認");
+    assert.equal(text(page, ".summary .pending"), "承認待ち1件");
+    assert.equal(text(page, ".summary .counts"), "残り4 / 全6");
+    assert.equal(page.one<HTMLButtonElement>('.controls button[data-action="approve"]').textContent, "承認待ち1件を承認");
   } finally {
     await page.close();
   }
@@ -423,7 +423,7 @@ test("CB-T13b 親の絞り込みを出し、カードにどの親子のチケッ
   }
 });
 
-test("CB-T14 0 件のときは空の表示と無効な承認ボタン", async () => {
+test("CB-T14 0件のときは空の表示と無効な承認ボタン", async () => {
   const page = await openBoard({ ...fixture(), tickets: [], parents: [], pending_approval: [] });
   try {
     assert.equal(text(page, ".board-empty"), "チケットなし");
@@ -435,9 +435,9 @@ test("CB-T14 0 件のときは空の表示と無効な承認ボタン", async ()
 });
 
 test("CB-T15 問題とプロジェクトの絞り込みを出す", async () => {
-  const page = await openBoard({ ...fixture(), problems: ["承認済みチケット x を読み込めない"], projects: ["lib", "app"] });
+  const page = await openBoard({ ...fixture(), problems: ["承認済みチケットxを読み込めない"], projects: ["lib", "app"] });
   try {
-    assert.deepEqual(texts(page, ".problems li"), ["承認済みチケット x を読み込めない"]);
+    assert.deepEqual(texts(page, ".problems li"), ["承認済みチケットxを読み込めない"]);
     assert.deepEqual(texts(page, "#project-filter option"), ["すべて", "ワークスペース（プロジェクト外）", "lib", "app"]);
   } finally {
     await page.close();
@@ -457,7 +457,7 @@ test("CB-T16 本文の文字列で表示が崩れない", async () => {
   const page = await openBoard({ ...base, tickets: [evil, ...base.tickets.slice(1)] });
   try {
     assert.equal(text(page, `.card[data-id="${evil.ticket}"] .title`), `<script>alert("x")</script>`);
-    // 画面の中に script は 1 本（バンドルした画面）だけ。中身から増えない
+    // 画面の中にscriptは1本（バンドルした画面）だけ。中身から増えない
     assert.equal(page.all(".card script").length, 0);
   } finally {
     await page.close();
@@ -466,13 +466,13 @@ test("CB-T16 本文の文字列で表示が崩れない", async () => {
 
 test("CB-T131o 決めた結果のプロンプトのオーバーレイは、タイトル・注意・プロンプトと、承認と同じコピー・新しいセッションで開く・閉じる", async () => {
   const page = await openBoard(fixture(), {
-    approval: { kind: "prompt", title: "フェーズ 2 をレビュー済みにしました", note: "注意 <i>", prompt: "[ccnavi] レビューを終えた <b>" },
+    approval: { kind: "prompt", title: "フェーズ2をレビュー済みにしました", note: "注意 <i>", prompt: "[ccnavi]レビューを終えた <b>" },
   });
   try {
     assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "prompt");
-    assert.equal(text(page, "#approval-title"), "フェーズ 2 をレビュー済みにしました");
+    assert.equal(text(page, "#approval-title"), "フェーズ2をレビュー済みにしました");
     assert.equal(text(page, ".approval-note"), "注意 <i>");
-    assert.equal(text(page, "pre.approval-text"), "[ccnavi] レビューを終えた <b>");
+    assert.equal(text(page, "pre.approval-text"), "[ccnavi]レビューを終えた <b>");
     assert.equal(page.all('button[data-action="prompt-copy"]').length, 1);
     assert.equal(page.all('button[data-action="prompt-open"]').length, 1);
     assert.equal(page.all('button[data-action="prompt-run"]').length, 1);
@@ -504,11 +504,11 @@ test("CB-T132r 「ユーザ待ちのみ」の絞り込みを出し、カード�
   }
 });
 
-test("CB-T162 再読み込みできなかった画面にも承認のオーバーレイが載り、閉じる手立てが付いてくる", async () => {
-  const plain = await openPage({ kind: "error", error: "ccnavi --explain --json が失敗した: 60 秒で返らないので打ち切った" });
+test("CB-T162 更新できなかった画面にも承認のオーバーレイが載り、閉じる手立てが付いてくる", async () => {
+  const plain = await openPage({ kind: "error", error: "ccnavi --explain --jsonが失敗した: 60秒で返らないので打ち切った" });
   try {
     assert.ok(text(plain, ".board-empty").includes("チケット管理画面を読み込めませんでした"));
-    assert.ok(text(plain, "pre.load-error").includes("60 秒で返らないので打ち切った"));
+    assert.ok(text(plain, "pre.load-error").includes("60秒で返らないので打ち切った"));
     assert.equal(plain.all(".approval-backdrop").length, 0, "オーバーレイがなければ被せない");
     // ボードの部品は出さない
     assert.equal(plain.all(".column").length, 0);
@@ -518,11 +518,11 @@ test("CB-T162 再読み込みできなかった画面にも承認のオーバー
   const withApproval = await openPage({
     kind: "error",
     error: "読み込めない",
-    approval: { kind: "done", count: 2, prompt: "i0001-02-03 を承認した" },
+    approval: { kind: "done", count: 2, prompt: "i0001-02-03を承認した" },
   });
   try {
-    assert.equal(text(withApproval, "#approval-title"), "2 件を承認しました");
-    assert.equal(text(withApproval, "pre.approval-text"), "i0001-02-03 を承認した");
+    assert.equal(text(withApproval, "#approval-title"), "2件を承認しました");
+    assert.equal(text(withApproval, "pre.approval-text"), "i0001-02-03を承認した");
     // ボタンが有効（画面の骨組みが載っている）
     withApproval.click(withApproval.one('button[data-action="prompt-copy"]'));
     await withApproval.settle();
@@ -541,7 +541,7 @@ test("CB-T162 再読み込みできなかった画面にも承認のオーバー
   }
 });
 
-test("CB-T142 見た目の切り替えは body のクラスだけを変更する。中身は作り直さない", async () => {
+test("CB-T142 見た目の切り替えはbodyのクラスだけを変更する。中身は作り直さない", async () => {
   const page = await openBoard();
   try {
     assert.equal(page.document.body.className, "");
@@ -559,7 +559,7 @@ test("CB-T142 見た目の切り替えは body のクラスだけを変更する
   }
 });
 
-test("CB-T264 先行を満たしていないカードに「先行待ち（先行の識別子）」のバッジ。どの先行が何の状態かは tooltip に実行ファイルの言葉で出す", async () => {
+test("CB-T264 先行を満たしていないカードに「先行待ち（先行の識別子）」のバッジ。どの先行が何の状態かはtooltipに実行ファイルの言葉で出す", async () => {
   const base = fixture();
   const unmet = [
     { ticket: "i0001-02-02", state: "doing", label: "作業中（doing/）" },
@@ -568,7 +568,7 @@ test("CB-T264 先行を満たしていないカードに「先行待ち（先行
   const page = await openBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-02-03" ? { ...t, predecessors_unmet: unmet } : t)) });
   try {
     assert.equal(text(page, '.card[data-id="i0001-02-03"] .badge.preds'), "先行待ち（i0001-02-02, i0001-01-09）");
-    // 識別子は 1 つずつ折り返さない塊（`i0001-` と `02` に割れない）
+    // 識別子は1つずつ折り返さない塊（`i0001-`と`02`に割れない）
     assert.deepEqual(texts(page, '.card[data-id="i0001-02-03"] .badge.preds .badge-id'), ["i0001-02-02", "i0001-01-09"]);
     assert.match(css(), /\.badge-id \{ white-space: nowrap; \}/);
     assert.doesNotMatch(css(), /\.badge \{[^}]*border-radius: 999px/);
@@ -612,7 +612,7 @@ test("CB-T265 先行のバッジの言葉はカードの今で分ける。承認
     assert.doesNotMatch(title("i0001-02-02"), /承認/);
     assert.equal(text(page, '.card[data-id="i0001-02-04"] .badge.preds'), "先行チケットの条件が未達成（i0001-01-09）");
     assert.match(title("i0001-02-04"), /作業を始めています/);
-    assert.match(title("i0001-02-04"), /作業と finish コマンドの実行は制限されません/);
+    assert.match(title("i0001-02-04"), /作業とfinishコマンドの実行は制限されません/);
   } finally {
     await page.close();
   }

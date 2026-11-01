@@ -1,12 +1,12 @@
 /**
- * プロジェクト管理画面（React）を happy-dom で動かす。`test/helpers/board.ts` と同じ役割。
+ * プロジェクト管理画面（React）をhappy-domで動かす。`test/helpers/board.ts`と同じ役割。
  *
- * 画面はバンドルした 1 本（`out/webview/projects.js`）で、拡張はそれを `<script nonce>` に流し込む。
- * ここでも同じ 1 本を流し込むので、テストが見るのは配るものと同じ画面になる。
- * バンドルするのは `pnpm test` の中の `scripts/bundle-webview.js`。この入口のパス（`test/helpers/<画面の名前>.ts`）が
- * 約束で、`scripts/test-groups.js` はそれを辿って「この画面を読むグループ」を決める。
+ * 画面はバンドルした1本（`out/webview/projects.js`）で、拡張はそれを`<script nonce>`に流し込む。
+ * ここでも同じ1本を流し込むので、テストが見るのは配るものと同じ画面になる。
+ * バンドルするのは`pnpm test`の中の`scripts/bundle-webview.js`。この入口のパス（`test/helpers/<画面の名前>.ts`）が
+ * 約束で、`scripts/test-groups.js`はそれを辿って「この画面を読むグループ」を決める。
  *
- * React は押した直後には描き直さない。操作のあとは `await page.settle()` を挟んでから見る。
+ * Reactは押した直後には描き直さない。操作のあとは`await page.settle()`を挟んでから見る。
  */
 import type { LintProblem } from "../../src/core/lintmodel.js";
 import type { ProjectRow, ProjectsData, ProjectsPage } from "../../src/core/projects-view.js";
@@ -16,12 +16,12 @@ import { loadPage, type DomPage } from "./dom.js";
 
 export const NONCE = "TEST-NONCE-123";
 
-/** 画面の HTML。CSS や nonce のように、文字列のまま見たいものはこれを見る */
+/** 画面のHTML。CSSやnonceのように、文字列のまま見たいものはこれを見る */
 export function projectsHtml(data: ProjectsData, options: Partial<RenderOptions> = {}): string {
   return renderProjectsPage(data, { nonce: NONCE, script: screenScript("projects"), style: screenStyle("projects"), ...options });
 }
 
-/** 見本の 1 行。差し替えたいところだけ渡す */
+/** 見本の1行。差し替えたいところだけ渡す */
 export function row(overrides: Partial<ProjectRow> = {}): ProjectRow {
   return {
     name: "lib",
@@ -60,7 +60,7 @@ export function page(rows: readonly ProjectRow[], overrides: Partial<ProjectsPag
   };
 }
 
-/** HTML を happy-dom に読ませ、React がマウントし終わるまで待つ */
+/** HTMLをhappy-domに読ませ、Reactがマウントし終わるまで待つ */
 export async function openPage(data: ProjectsData, initialState?: unknown): Promise<DomPage> {
   const dom = await loadPage(projectsHtml(data), initialState);
   await dom.settle();
@@ -76,7 +76,7 @@ export async function openProjects(
   return openPage({ kind: "page", page: page(rows, overrides) }, initialState);
 }
 
-/** カード 1 枚の中の要素。`li.project[data-name=…]` の下だけを見る */
+/** カード1枚の中の要素。`li.project[data-name=…]`の下だけを見る */
 export function cardSelector(name: string): string {
   return `li.project[data-name="${name}"]`;
 }

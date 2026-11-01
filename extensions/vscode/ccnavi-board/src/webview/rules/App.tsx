@@ -1,5 +1,5 @@
 /**
- * ルール管理画面の本体。ルールの一覧・判定を試す・hook の 3 タブ。
+ * ルール管理画面の本体。ルールの一覧・判定を試す・hookの3タブ。
  *
  * 見せる中身は拡張ホストが渡す（`RulesData`）。画面が持つのは、ユーザが触って決めるもの
  * （編集中のルール、開いている行、折りたたんだタイプ、絞り込み、開いているタブ、直前の操作の一言）だけ。
@@ -7,7 +7,7 @@
  * 実行ファイルが返した結果を出すだけ。
  *
  * 中身（`data`）が届いたら、編集中のルールはその中身で置き換える。 届くのは編集を破棄してよい
- * ときだけ（ユーザが「再読み込み」を押した、保存が通った）で、ファイルが外で変わっただけのときは
+ * ときだけ（ユーザが「更新」を押した、保存が通った）で、ファイルが外で変わっただけのときは
  * 帯（`changed`）が出るだけ。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
@@ -62,7 +62,7 @@ const SAMPLE_DRAFT: Draft = draftOf(SAMPLE.sections, ((): (() => string) => {
 })());
 const NO_SCENE: Scene = {};
 
-/** 手順の `scene` の文字列を `,` で割る */
+/** 手順の`scene`の文字列を`,`で割る */
 function sceneList(value: Scene[string] | undefined): readonly string[] {
   return typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : [];
 }
@@ -78,7 +78,7 @@ interface Status {
 
 interface Editing {
   readonly draft: Draft;
-  /** ユーザが開いた行のキー。state に入るのはこちらだけ */
+  /** ユーザが開いた行のキー。stateに入るのはこちらだけ */
   readonly open: ReadonlySet<string>;
 }
 
@@ -93,28 +93,28 @@ function editingOf(data: RulesData, nextKey: () => string): Editing {
 }
 
 export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
-  // キーは 1 枚の画面の中で数え上げる。描き直しで配り直さない
+  // キーは1枚の画面の中で数え上げる。描き直しで配り直さない
   const nextKey = useRef(keyer()).current;
   const [data, setData] = useState<RulesData>(initial);
   const [editing, setEditing] = useState<Editing>(() => editingOf(initial, nextKey));
   /**
-   * 判定でヒットしてその場だけ開いた行。state には入れない（判定を繰り返しても、ユーザが決めた
+   * 判定でヒットしてその場だけ開いた行。stateには入れない（判定を繰り返しても、ユーザが決めた
    * 既定の折りたたみが変わらない）。次の判定で入れ替わる。
    */
   const [transient, setTransient] = useState<ReadonlySet<string>>(new Set());
-  /** 直前の判定でヒットしたルールの id。折りたたんだままでも分かるように縁を付ける */
+  /** 直前の判定でヒットしたルールのid。折りたたんだままでも分かるように縁を付ける */
   const [hits, setHits] = useState<ReadonlySet<string>>(new Set());
   /** 「コンテキストの追加」の開閉。最初は値の有無で決め、以後はユーザの操作をキーで覚える */
   const [moreOpen, setMoreOpen] = useState<ReadonlyMap<string, boolean>>(new Map());
   const [folded, setFolded] = useState<ReadonlySet<Section>>(new Set());
   const [dirty, setDirty] = useState(false);
-  /** 実行ファイルへの往復の間。判定・期待する判定の確認・再読み込み・保存のボタンを止める */
+  /** 実行ファイルへの往復の間。判定・期待する判定の確認・更新・保存のボタンを止める */
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status | undefined>(undefined);
   const [lock, setLock] = useState<Lock>(() => pageOf(initial)?.lock ?? NO_LOCK);
   /** ファイルが外で変わった。破棄して読み直すかはユーザが決める */
   const [changed, setChanged] = useState(false);
-  /** 保存が通ったときの検証の warn の本文。帯に出し、次の編集か更新（中身の入れ替え）で消す */
+  /** 保存が通ったときの検証のwarnの本文。帯に出し、次の編集か更新（中身の入れ替え）で消す */
   const [saveWarns, setSaveWarns] = useState<readonly string[]>([]);
   const [find, setFind] = useState("");
   const [tab, setTab] = useState<TabName>(() => loadTab());
@@ -123,16 +123,16 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const [suggested, setSuggested] = useState<SuggestJson | undefined>(undefined);
   const [tool, setTool] = useState<string>(KNOWN_TOOLS[0]);
   const [subject, setSubject] = useState("");
-  /** 選択肢が開いている行。開くのは画面ぜんたいで 1 つだけ */
+  /** 選択肢が開いている行。開くのは画面ぜんたいで1つだけ */
   const [pickerKey, setPickerKey] = useState<string | undefined>(undefined);
-  /** 足した直後の行。id の欄に焦点を移したら忘れる */
+  /** 足した直後の行。idの欄に焦点を移したら忘れる */
   const [focusKey, setFocusKey] = useState<string | undefined>(undefined);
 
   const { draft, open } = editing;
   const page = pageOf(data);
 
   /**
-   * 案内の間は見本を描き、手順ごとの様子（開く行・タブ・選ぶ点など）は `scene` に入れる。実際のタブや開いた行は動かさないので、
+   * 案内の間は見本を描き、手順ごとの様子（開く行・タブ・選ぶ点など）は`scene`に入れる。実際のタブや開いた行は動かさないので、
    * 閉じたあとに戻すものは無い
    */
   const [scene, setScene] = useState<Scene>(NO_SCENE);
@@ -144,7 +144,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     },
   });
   const requestTour = tour.request;
-  // 案内の間は、見本の上の操作を拡張ホストへ送らない（`tourDone` だけ返す）。描いたあとに切り替える
+  // 案内の間は、見本の上の操作を拡張ホストへ送らない（`tourDone`だけ返す）。描いたあとに切り替える
   const touringNow = tour.touring;
   useLayoutEffect(() => {
     mutePosts(touringNow);
@@ -152,7 +152,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   }, [touringNow]);
 
   /**
-   * 未保存の変更の有無が変わったら拡張ホストに伝える。同じ種類のタブは 1 枚で、別の対象を開くと
+   * 未保存の変更の有無が変わったら拡張ホストに伝える。同じ種類のタブは1枚で、別の対象を開くと
    * このタブの中身が入れ替わるので、拡張ホストはこれを見て「破棄して切り替える？」を聞く。
    * 送るのは変わったときだけ（最初の「変更なし」は拡張ホストも同じ前提で始まるので送らない）
    */
@@ -165,19 +165,19 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   }, [dirty]);
 
   /**
-   * id を打っている途中は state を書き直さない（打ちかけの id が state に入る）。書くのは欄を
-   * 確定した（native の `change`）ときだけ。React の `onChange` は打つたびに呼ばれるので、
-   * ここは素の DOM のイベントで受ける。いまの編集は描き直しのたびに `latest` へ入れる
-   * （`useLayoutEffect` は描き直しと同じ順番で走るので、確定が届いた時点では今の編集が入っている）。
+   * idを打っている途中はstateを書き直さない（打ちかけのidがstateに入る）。書くのは欄を
+   * 確定した（nativeの`change`）ときだけ。Reactの`onChange`は打つたびに呼ばれるので、
+   * ここは素のDOMのイベントで受ける。いまの編集は描き直しのたびに`latest`へ入れる
+   * （`useLayoutEffect`は描き直しと同じ順番で走るので、確定が届いた時点では今の編集が入っている）。
    */
   const latest = useRef<Editing>(editing);
   useLayoutEffect(() => {
     latest.current = editing;
   });
   /**
-   * 受け取る側は一覧そのものに張る。`useEffect` で 1 度だけ張ると、読み直せなかった画面
+   * 受け取る側は一覧そのものに張る。`useEffect`で1度だけ張ると、読み直せなかった画面
    * （`kind: "error"`）から始まったときは一覧がまだ無く、あとで中身が届いても張られない。
-   * ref のコールバックなら、一覧が出た時点で張り、消えた時点で外れる。
+   * refのコールバックなら、一覧が出た時点で張り、消えた時点で外れる。
    */
   const list = useCallback((element: HTMLElement | null): (() => void) | undefined => {
     if (element === null) {
@@ -253,7 +253,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     }
   }, () => post({ type: "ready" }));
 
-  // 選択肢は、その欄と選択肢の外を押したとき、または Esc で閉じる
+  // 選択肢は、その欄と選択肢の外を押したとき、またはEscで閉じる
   useEffect(() => {
     const onDown = (event: Event): void => {
       const target = event.target as HTMLElement | null;
@@ -268,7 +268,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 
   /**
    * 判定でヒットした行を、折りたたんであってもその場だけ開く。見えないところで光っても分からないので、
-   * タイプの折りたたみも外す。state には入れないので、次の判定で元の折りたたみに戻る。
+   * タイプの折りたたみも外す。stateには入れないので、次の判定で元の折りたたみに戻る。
    */
   const unfoldHits = (ids: readonly string[]): void => {
     const wanted = new Set(ids);
@@ -287,7 +287,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     setFolded((now) => new Set([...now].filter((section) => !unfold.has(section))));
   };
 
-  // 足した行の id へ焦点を移す。移したら忘れる（同じ行を描き直すたびに焦点を奪わない）
+  // 足した行のidへ焦点を移す。移したら忘れる（同じ行を描き直すたびに焦点を奪わない）
   useEffect(() => {
     if (focusKey === undefined) {
       return;
@@ -318,7 +318,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   /**
    * 読み直しを頼む。押した時点でボタンを止める。 拡張ホストは実行ファイルに聞いてから中身を
    * 返すことがあり（設定ファイルの場所を解く）、その間に押し直せると往復が重なる。ユーザが
-   * 「破棄して読み直す？」をやめたときは `cancelled` が返り、ボタンが戻る。
+   * 「破棄して読み直す？」をやめたときは`cancelled`が返り、ボタンが戻る。
    */
   const reload = (): void => {
     if (tour.touring) {
@@ -345,7 +345,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         </p>
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={reload}>
           更新
         </button>
       </>
@@ -435,7 +435,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       return;
     }
     if (!isToolName(tool.trim())) {
-      setStatus({ text: "ツール名は英字で始まり、英数字・_・- だけで入れてください", error: true });
+      setStatus({ text: "ツール名は英字で始まり、英数字・_・-だけで入れてください", error: true });
       return;
     }
     if (subject.trim() === "") {
@@ -449,12 +449,12 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 
   const courses = coursesOf(TOUR, setScene);
 
-  // 案内の間は、今の設定ではなく見本を描く。画面の state（編集中のルール・開いた行・タブ・判定の結果）は触らない
+  // 案内の間は、今の設定ではなく見本を描く。画面のstate（編集中のルール・開いた行・タブ・判定の結果）は触らない
   const touring = tour.touring;
   const sceneOpen = new Set(sceneList(scene.open));
   const shownTab: TabName = touring ? (scene.tab === "judge" || scene.tab === "hooks" ? scene.tab : "rules") : tab;
   const shownDraft = touring ? SAMPLE_DRAFT : draft;
-  // 畳んだタイプの中は指しても見えない（0×0 の枠を強調することになる）。案内の間は、手順の `fold` が名指ししたタイプだけを畳む（見出しを指す手順でだけ使う）
+  // 畳んだタイプの中は指しても見えない（0×0の枠を強調することになる）。案内の間は、手順の`fold`が名指ししたタイプだけを畳む（見出しを指す手順でだけ使う）
   const shownFolded: ReadonlySet<Section> = touring ? new Set(SECTIONS.filter((section) => sceneList(scene.fold).includes(section))) : folded;
   const shownFind = touring ? (typeof scene.find === "string" ? scene.find : "") : find;
   const sceneJudge = typeof scene.judge === "string" ? SAMPLE.judges[scene.judge] : undefined;
@@ -475,16 +475,16 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const isShownOpen = (row: { readonly key: string; readonly rule: RuleForm }): boolean => (touring ? sceneOpen.has(row.rule.id) : isOpen(row.key));
 
   const query = foldFind(shownFind.trim());
-  // 3 タイプとも、絞り込みに一致する行も、開いたまま見えている行も無いときだけ案内を出す
+  // 3タイプとも、絞り込みに一致する行も、開いたまま見えている行も無いときだけ案内を出す
   const allRows = SECTIONS.flatMap((section) => shownDraft[section]);
   const nothingFound = query !== "" && allRows.length > 0 && allRows.every((row) => !findText(row.rule).includes(query) && !isShownOpen(row));
 
   return (
     <>
       {!touring && page !== undefined && modeBanner(page.mode) !== "" && (
-        // モードは実行ファイルの答え。enable と、答えが取れないときは帯を出さない
+        // モードは実行ファイルの答え。enableと、答えが取れないときは帯を出さない
         <div className="banner warn">
-          現在の <code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>。{modeBanner(page.mode)}
+          現在の<code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>。{modeBanner(page.mode)}
         </div>
       )}
       {(touring ? [] : page?.notices ?? []).map((notice, index) => (
@@ -499,7 +499,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       ))}
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。更新してください。
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={reload}>
           更新
         </button>
       </div>
@@ -524,7 +524,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           <button type="button" className="action" data-action="open-rules" disabled={page?.exists === false} onClick={() => post({ type: "openFile", which: "rules" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={reload}>
             更新
           </button>
           <button
@@ -570,7 +570,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       <section id="tab-rules" data-tour="rules" className={`pane${shownTab === "rules" ? " active" : ""}${query === "" ? "" : " finding"}`} ref={list}>
         <div className="find">
           <input id="find" data-tour="find" type="search" placeholder="id・ツール・パターン・メッセージ・プロンプトで絞り込む" spellCheck={false} value={shownFind} onChange={(event) => (tour.touring ? undefined : setFind(event.target.value))} />
-          <span className="hint" data-tour="order-hint">判定は強い順に deny &gt; ask &gt; allow</span>
+          <span className="hint" data-tour="order-hint">判定は強い順にdeny &gt; ask &gt; allow</span>
         </div>
         {nothingFound && <p className="empty">絞り込みに一致するルールがありません。検索語を変えるか、検索欄を空にしてください</p>}
         {SECTIONS.map((section) => {
@@ -650,7 +650,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       </section>
       <section id="tab-judge" className={shownTab === "judge" ? "pane active" : "pane"}>
         <p className="hint">
-          dry-run モードの場合でも、ここは enable モードのときの判定を返します。
+          dry-runモードの場合でも、ここはenableモードのときの判定を返します。
         </p>
         <div className="judge-form" data-tour="judge-form">
           <label>
@@ -670,12 +670,12 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
               ))}
             </datalist>
           </label>
-          <label className="grow" title="--test の subject">
+          <label className="grow" title="--testのsubject">
             対象{" "}
             <input
               id="subject"
               type="text"
-              placeholder="Bash / PowerShell ならコマンド、Read / Grep / Glob / Edit / Write なら絶対パス、Skill ならスキル名、Agent なら見出し、WebFetch なら URL"
+              placeholder="Bash / PowerShellならコマンド、Read / Grep / Glob / Edit / Writeなら絶対パス、Skillならスキル名、Agentなら見出し、WebFetchならURL"
               spellCheck={false}
               value={shownSubject}
               onChange={(event) => setSubject(event.target.value)}
@@ -718,7 +718,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             className="action"
             data-action="suggest"
             disabled={busy}
-            title="ccnavi --suggest --json を実行し、保存済みのルールと判定の記録から deny / ask の下書きを起こします"
+            title="ccnavi --suggest --jsonを実行し、保存済みのルールと判定の記録からdeny / askの下書きを起こします"
             onClick={() => {
               setBusy(true);
               setStatus({ text: "記録から候補を起こしています…", error: false });

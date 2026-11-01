@@ -1,17 +1,17 @@
 /**
- * 取り込み待ち画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
- * VS Code の API に触れるので単体テストの対象外。docs/design/manual-checks.md の手動確認の手順で確かめる。
+ * 取り込み待ち画面のWebviewパネル。生成・更新・破棄、ファイル監視、Webviewからの操作の受け付け。
+ * VS CodeのAPIに触れるので単体テストの対象外。docs/design/manual-checks.mdの手動確認の手順で確かめる。
  *
- * `wip/handoff/<相対パス>` に置いた下書きを、同じツリーの元のパス（`.claude` の階層は `handoff-.claude` に読み替えて置かれ、取り込みで戻る）へ取り込む画面。見るツリーは 1 本で、
- * 実行ファイルに `--root` で渡す（ワークスペース、プロジェクト、ワークツリーのどれか）。
- * 一覧は `ccnavi user handoff --json`（見るだけ）の答えをそのまま渡し、取り込みは実行ファイルが書く。拡張はファイルを書かない。
- * 取り込む手順（見るだけをもう一度呼んで `expect` を取る、錠を取り直す）は `core/handoff-import.ts` に分けてあり、
+ * `wip/handoff/<相対パス>`に置いた下書きを、同じツリーの元のパス（`.claude`の階層は`handoff-.claude`に読み替えて置かれ、取り込みで戻る）へ取り込む画面。見るツリーは1本で、
+ * 実行ファイルに`--root`で渡す（ワークスペース、プロジェクト、ワークツリーのどれか）。
+ * 一覧は`ccnavi user handoff --json`（見るだけ）の答えをそのまま渡し、取り込みは実行ファイルが書く。拡張はファイルを書かない。
+ * 取り込む手順（見るだけをもう一度呼んで`expect`を取る、錠を取り直す）は`core/handoff-import.ts`に分けてあり、
  * ここはそれに実行ファイルの呼び出しを渡すだけ。
  *
- * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は選んだ対象や開いた行を持つので
- * `retainContextWhenHidden` が真で、入れ物（HTML）は 1 度しか入らない。
+ * 渡し方は`core/screen-host.ts`の`retainedHost`が決める。この画面は選んだ対象や開いた行を持つので
+ * `retainContextWhenHidden`が真で、入れ物（HTML）は1度しか入らない。
  *
- * チケット制御が disable でも開ける（作業中の錠は、チケットが無ければ掛からない）。
+ * チケット制御がdisableでも開ける（作業中の錠は、チケットが無ければ掛からない）。
  */
 import * as crypto from "node:crypto";
 import * as vscode from "vscode";
@@ -32,15 +32,15 @@ import { assertRetained, debounce, watchGlobs, watchTickets } from "./panel-comm
 import { confirmIfTurn } from "./turn-confirm.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
-/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+/** 画面の名前。バンドルのパスは`src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "handoff";
-const TITLE = "ccnavi 取り込み待ち";
+const TITLE = "ccnavi取り込み待ち";
 
 type Loaded =
   | {
       readonly kind: "page";
       readonly key: string;
-      /** 見るツリー。ボードの `trees` に無いワークスペースのルートは、`main` として組む */
+      /** 見るツリー。ボードの`trees`に無いワークスペースのルートは、`main`として組む */
       readonly tree: TreeJson;
       readonly list: HandoffList;
       readonly trees: readonly HandoffTreeOption[];
@@ -48,7 +48,7 @@ type Loaded =
     };
 
 interface PanelState {
-  /** いま見ているツリーのキー。別のツリーを開くと入れ替わる（タブは 1 枚） */
+  /** いま見ているツリーのキー。別のツリーを開くと入れ替わる（タブは1枚） */
   key: string;
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
@@ -60,7 +60,7 @@ interface PanelState {
   timer?: NodeJS.Timeout;
   lockTimer?: NodeJS.Timeout;
   loaded?: Loaded;
-  /** 読み直せなかった理由。`loaded` と排他で、どちらかは必ず入っている */
+  /** 読み直せなかった理由。`loaded`と排他で、どちらかは必ず入っている */
   error?: string;
   /** 取り込みの実行ファイルを走らせている間は真。この間の監視の反応は外で変わったものとして扱わない */
   writing: boolean;
@@ -72,14 +72,14 @@ interface PanelState {
   lockSeq: number;
 }
 
-/** 開いているパネル。種類ごとに 1 枚 */
+/** 開いているパネル。種類ごとに1枚 */
 let state: PanelState | undefined;
 
 function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
-/** `ccnaviBoard.openHandoff` の本体。引数なしはワークスペース */
+/** `ccnaviBoard.openHandoff`の本体。引数なしはワークスペース */
 export async function openHandoff(key: string = MAIN_TREE_KEY): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
@@ -94,7 +94,7 @@ export async function openHandoff(key: string = MAIN_TREE_KEY): Promise<void> {
     return;
   }
 
-  // 画面と CSS はバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面とCSSはバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
@@ -104,7 +104,7 @@ export async function openHandoff(key: string = MAIN_TREE_KEY): Promise<void> {
   }
 
   // タブは読む前に作る（押しても何も起きないように見えて、押し直されるのを避けるため）。
-  // 読めなかったときもタブは閉じず、中にエラーを出す（`reload` の `showError`）
+  // 読めなかったときもタブは閉じず、中にエラーを出す（`reload`の`showError`）
   const panel = vscode.window.createWebviewPanel("ccnaviHandoff", TITLE, vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
@@ -144,7 +144,7 @@ async function switchTree(current: PanelState, key: string): Promise<void> {
   await reload(current);
 }
 
-/** ボードの `main` が `trees` に無いとき（ボードが読めたのに無いことは通常ない）の、ワークスペースのツリー */
+/** ボードの`main`が`trees`に無いとき（ボードが読めたのに無いことは通常ない）の、ワークスペースのツリー */
 function mainTree(root: string): TreeJson {
   return { name: "", root, project: "", kind: "main" };
 }
@@ -156,7 +156,7 @@ async function readPage(workspace: string, key: string): Promise<Loaded> {
   }
   const trees = treeOptions(board.board);
   const found = findTree(board.board, key);
-  // ワークスペースは、ボードの `main` の root（実パス）ではなく、開いているフォルダを渡す。他は実行ファイルが答えた root
+  // ワークスペースは、ボードの`main`のroot（実パス）ではなく、開いているフォルダを渡す。他は実行ファイルが答えたroot
   const tree: TreeJson | undefined = key === MAIN_TREE_KEY ? { ...(found ?? mainTree(workspace)), root: workspace } : found;
   if (tree === undefined) {
     throw new Error(`ツリーが見つかりません: ${keyLabel(key)}`);
@@ -175,7 +175,7 @@ function registerPanelHandlers(current: PanelState): void {
     void handleMessage(current, asMessage(message));
   });
 
-  // 保持する画面は非表示でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
+  // 保持する画面は非表示でも生きている（`postMessage`は届く）が、VS Codeの文書は同じ型定義の中で
   // 記述が一致していない。どちらが正しくても困らないよう、再表示されたところで、いま出すべき知らせを送り直す。
   // 中身（`data`）は送らない。送ると、非表示の間に選んでいた内容がここで消える。
   panel.onDidChangeViewState(() => {
@@ -300,14 +300,14 @@ function show(current: PanelState): void {
   });
 }
 
-/** 読み直せなかったことを見せる。理由は覚えておく（渡せなかったときに `ready` で渡し直すため） */
+/** 読み直せなかったことを見せる。理由は覚えておく（渡せなかったときに`ready`で渡し直すため） */
 function showError(current: PanelState, error: string): void {
   current.loaded = undefined;
   current.error = error;
   current.host.send({ kind: "error", error, tree: current.key, trees: treeOptions(undefined) });
 }
 
-/** いまの状態で渡し直す。1 枚目を読み込んでいる間に見送られたものは、画面が組み上がった（`ready`）ところでここから渡る */
+/** いまの状態で渡し直す。1枚目を読み込んでいる間に見送られたものは、画面が組み上がった（`ready`）ところでここから渡る */
 function redraw(current: PanelState): void {
   if (current.loaded !== undefined) {
     show(current);
@@ -320,7 +320,7 @@ function redraw(current: PanelState): void {
   current.host.send({ kind: "loading", text: loadingText(keyLabel(current.key)) });
 }
 
-/** 取り込み待ちの画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。パネルの前提が崩れていれば診断ログに残す */
+/** 取り込み待ちの画面に渡す手段。VS Codeのパネルを`retainedHost`の形に合わせる。パネルの前提が崩れていれば診断ログに残す */
 function handoffHost(panel: vscode.WebviewPanel, root: string): ScreenHost<HandoffData> {
   assertRetained(panel, root, "handoff");
   return retainedHost<HandoffData>(
@@ -381,8 +381,8 @@ async function handleMessage(current: PanelState, message: HandoffMessage | unde
     return;
   }
   if (message.type === "ready") {
-    // 画面が組み上がった。1 枚目を読み込んでいる間に見送った中身は、ここで渡る。
-    // 見送るものが無くても渡し直す（同じ中身がもう 1 度届く）
+    // 画面が組み上がった。1枚目を読み込んでいる間に見送った中身は、ここで渡る。
+    // 見送るものが無くても渡し直す（同じ中身がもう1度届く）
     current.host.ready();
     redraw(current);
     postAppearance(current.host);
@@ -426,16 +426,16 @@ async function handleMessage(current: PanelState, message: HandoffMessage | unde
 }
 
 /**
- * 取り込みの実行。手順は `importSelected` が持つ（呼ぶ前にはじくこと、見るだけをもう一度呼んで `expect` を取ること、錠）。
+ * 取り込みの実行。手順は`importSelected`が持つ（呼ぶ前にはじくこと、見るだけをもう一度呼んで`expect`を取ること、錠）。
  * 実行ファイルを呼んだなら、成否によらず読み直す（書けたかが分からない失敗があるため）。結果は読み直したあとに送る
- * （`data` を渡すと画面の確認の帯が閉じるので、結果の知らせはその後ろに置く）。
+ * （`data`を渡すと画面の確認の帯が閉じるので、結果の知らせはその後ろに置く）。
  */
 async function importPaths(current: PanelState, loaded: Loaded | undefined, paths: readonly string[]): Promise<void> {
   const answer = (result: { readonly ok: false; readonly error: string }): void => {
     current.host.post({ type: "imported", paths, result } satisfies ToHandoff);
   };
   if (loaded?.kind !== "page") {
-    answer({ ok: false, error: "画面を再読み込みしてください" });
+    answer({ ok: false, error: "画面を更新してください" });
     return;
   }
   // ターン中に書くと、次のツール呼び出しの実行後チェックが戻しうる。押した時点で知らせる。

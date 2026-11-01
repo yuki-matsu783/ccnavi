@@ -1,19 +1,19 @@
 /**
  * 読み込んだフローと編集中のフローの見比べ。「未保存」の判定と、保存の前に見せる差分の一覧に使う。
  *
- * - `sameFlow` は中身が同じか（キーの順序は見ない）。元に戻して読み込んだときと同じ中身になれば、未保存を消す
- * - `diffFlows` は足した・消した・変えたノードと線。ノードは `id` で、線は両端と出入口
- *   （`from` `fromPort` `to` `toPort`）で突き合わせる（ユーザが書いた線は `id` が無いことも重なることもある）。
- *   同じ両端と出入口の線が何本もあれば、配列の順に突き合わせる
- * - `sameFlowIgnoringLayout` は位置とグループ化（`position` `style` `parentId`・`type: group` のノード。サブフローの中も）を除いて見比べる。
- *   「提案あり」の判定に使う。`textDiff` も同じ除き方をする
- * - `textDiff` は同じ突き合わせで、変わった欄の名前だけでなく値の前後（文はそのまま）まで並べる。エージェントの
+ * - `sameFlow`は中身が同じか（キーの順序は見ない）。元に戻して読み込んだときと同じ中身になれば、未保存を消す
+ * - `diffFlows`は足した・消した・変えたノードと線。ノードは`id`で、線は両端と出入口
+ *   （`from` `fromPort` `to` `toPort`）で突き合わせる（ユーザが書いた線は`id`が無いことも重なることもある）。
+ *   同じ両端と出入口の線が何本もあれば、リストの順に突き合わせる
+ * - `sameFlowIgnoringLayout`は位置とグループ化（`position` `style` `parentId`・`type: group`のノード。サブフローの中も）を除いて見比べる。
+ *   「提案あり」の判定に使う。`textDiff`も同じ除き方をする
+ * - `textDiff`は同じ突き合わせで、変わった欄の名前だけでなく値の前後（文はそのまま）まで並べる。エージェントの
  *   下書きを取り込む前に見せる。フローの文は担当のサブエージェントへの案内文になるので、ユーザが
  *   中身を読めるように、足したもの・消したものは全部の欄を、変えたものは変わった欄の前と後を出す
  *
  * 良し悪しは言わない。 保存を止めるかは拡張ホストと実行ファイルが決める。
  *
- * ここには VS Code の API も DOM も node も入れない。
+ * ここにはVS CodeのAPIもDOMもnodeも入れない。
  */
 import {
   connectionFrom,
@@ -33,7 +33,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** 値が同じか。マップはキーの順序を見ない。配列は順も見る */
+/** 値が同じか。マップはキーの順序を見ない。リストは順も見る */
 export function sameValue(a: unknown, b: unknown): boolean {
   if (a === b) {
     return true;
@@ -92,20 +92,20 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
 
 export interface NodeChange {
   readonly id: string;
-  /** 見せる名前（`名前（id）` の形。名前が無ければ id だけ） */
+  /** 見せる名前（`名前（id）`の形。名前が無ければidだけ） */
   readonly label: string;
   /** 変わった欄の呼び名（変えたノードだけ） */
   readonly fields: readonly string[];
 }
 
 export interface ConnectionChange {
-  /** `開始 → 終了（branch-0）` の形 */
+  /** `開始 → 終了（branch-0）`の形 */
   readonly label: string;
   readonly fields: readonly string[];
 }
 
 export interface FlowDiff {
-  /** フロー自体の欄（名前・説明など、`nodes` と `connections` 以外）で変わったもの */
+  /** フロー自体の欄（名前・説明など、`nodes`と`connections`以外）で変わったもの */
   readonly meta: readonly string[];
   readonly addedNodes: readonly NodeChange[];
   readonly removedNodes: readonly NodeChange[];
@@ -186,7 +186,7 @@ function pair(before: FlowDoc, after: FlowDoc): Paired {
   }
   const removedNodes = before.nodes.filter((node) => !afterNodes.has(node.id));
 
-  // 線は両端と出入口で突き合わせる。同じものが何本もあれば配列の順に
+  // 線は両端と出入口で突き合わせる。同じものが何本もあればリストの順に
   const pool = new Map<string, FlowConnection[]>();
   for (const c of connectionsOf(before)) {
     const key = connectionKey(c);
@@ -208,7 +208,7 @@ function pair(before: FlowDoc, after: FlowDoc): Paired {
   return { addedNodes, removedNodes, changedNodes, addedConnections, removedConnections, changedConnections };
 }
 
-/** `before`（読み込んだ時点）から `after`（いま）への差分 */
+/** `before`（読み込んだ時点）から`after`（いま）への差分 */
 export function diffFlows(before: FlowDoc, after: FlowDoc): FlowDiff {
   const paired = pair(before, after);
   const node = (n: FlowNode): NodeChange => ({ id: n.id, label: nodeLabel(n), fields: [] });
@@ -225,12 +225,12 @@ export function diffFlows(before: FlowDoc, after: FlowDoc): FlowDiff {
 
 // ---- 値の前後まで見せる差分（下書きの取り込み）
 
-/** 値の種類（画面が前後に付ける）。`1` と `"1"`、`true` と `"true"`、`null` と `"null"` を見分けるため */
-export type ValueKind = "文字列" | "数" | "真偽" | "null" | "マップ" | "配列" | "その他";
+/** 値の種類（画面が前後に付ける）。`1`と`"1"`、`true`と`"true"`、`null`と`"null"`を見分けるため */
+export type ValueKind = "文字列" | "数" | "真偽" | "null" | "マップ" | "リスト" | "その他";
 
-/** 欄 1 つの前後。足した欄は `before` が無く、消した欄は `after` が無い */
+/** 欄1つの前後。足した欄は`before`が無く、消した欄は`after`が無い */
 export interface FieldText {
-  /** 欄の表記（`中身.prompt`・`中身.options[0].label` の形。頭の欄は呼び名にし、記号や英字以外を含むキーは `["…"]` で囲む） */
+  /** 欄の表記（`中身.prompt`・`中身.options[0].label`の形。頭の欄は呼び名にし、記号や英字以外を含むキーは`["…"]`で囲む） */
   readonly field: string;
   readonly before?: string;
   readonly beforeKind?: ValueKind;
@@ -239,9 +239,9 @@ export interface FieldText {
 }
 
 export interface TextChange {
-  /** 何が変わったか（`added-node` など。`FlowDiff` の欄の名前に揃える） */
+  /** 何が変わったか（`added-node`など。`FlowDiff`の欄の名前に揃える） */
   readonly kind: "meta" | "added-node" | "removed-node" | "changed-node" | "added-connection" | "removed-connection" | "changed-connection";
-  /** ノードは `名前（id） 種類`、線は `開始 → 終了（branch-0）`、フロー自体は空 */
+  /** ノードは`名前（id） 種類`、線は`開始 → 終了（branch-0）`、フロー自体は空 */
   readonly label: string;
   readonly texts: readonly FieldText[];
 }
@@ -250,7 +250,7 @@ export interface TextDiff {
   readonly changes: readonly TextChange[];
   /**
    * 欄ごとの前後に分けて見せられなかった理由（欄の表記が重なる・違うのに違う欄が見つからない）。あれば画面は取り込ませない。
-   * 見せられなかったものは、生の JSON の前後を `texts` に入れてある
+   * 見せられなかったものは、生のJSONの前後を`texts`に入れてある
    */
   readonly problem?: string;
 }
@@ -269,12 +269,12 @@ function kindOf(value: unknown): ValueKind {
     return "null";
   }
   if (Array.isArray(value)) {
-    return "配列";
+    return "リスト";
   }
   return isRecord(value) ? "マップ" : "その他";
 }
 
-/** 値を見せる文。文字列はそのまま（改行も残す）、ほかは JSON の表記。種類は `kindOf` で別に付ける */
+/** 値を見せる文。文字列はそのまま（改行も残す）、ほかはJSONの表記。種類は`kindOf`で別に付ける */
 function shown(value: unknown): string {
   if (typeof value === "string") {
     return value;
@@ -286,10 +286,10 @@ function shown(value: unknown): string {
   }
 }
 
-/** 英字・数字・`_` `-` だけのキーは `.キー` で、ほかは `["キー"]` で書く（`.` や `[` を含むキーで表記が重ならないように） */
+/** 英字・数字・`_` `-`だけのキーは`.キー`で、ほかは`["キー"]`で書く（`.`や`[`を含むキーで表記が重ならないように） */
 const PLAIN_KEY = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 
-/** 頭の欄の表記。呼び名の在る欄は呼び名、英字のキーはそのまま、ほかは `["キー"]`（呼び名と重ならない） */
+/** 頭の欄の表記。呼び名の在る欄は呼び名、英字のキーはそのまま、ほかは`["キー"]`（呼び名と重ならない） */
 function headLabel(key: string): string {
   if (Object.prototype.hasOwnProperty.call(FIELD_LABELS, key)) {
     return FIELD_LABELS[key];
@@ -297,13 +297,13 @@ function headLabel(key: string): string {
   return PLAIN_KEY.test(key) ? key : `[${JSON.stringify(key)}]`;
 }
 
-/** 葉 1 つ。突き合わせは `path`（キーと番号の配列の JSON。型ごと持つので重ならない）で、`field` は見せるだけ */
+/** 葉1つ。突き合わせは`path`（キーと番号のリストのJSON。型ごと持つので重ならない）で、`field`は見せるだけ */
 interface Leaf {
   readonly field: string;
   readonly value: unknown;
 }
 
-/** 値を葉まで開く。マップと配列は中へ下りる。空のマップ・配列は葉として扱う */
+/** 値を葉まで開く。マップとリストは中へ下りる。空のマップ・リストは葉として扱う */
 function leaves(value: unknown, path: readonly (string | number)[], field: string, out: Map<string, Leaf>): void {
   if (isRecord(value) && Object.keys(value).length > 0) {
     for (const [key, inner] of Object.entries(value)) {
@@ -330,7 +330,7 @@ function leavesOf(value: Readonly<Record<string, unknown>>, skip: ReadonlySet<st
   return out;
 }
 
-/** 2 つの値の、違う葉の前後。片方にしか無い葉は、もう片方を空にする。見せる表記が重なれば `ambiguous` */
+/** 2つの値の、違う葉の前後。片方にしか無い葉は、もう片方を空にする。見せる表記が重なれば`ambiguous` */
 function fieldTexts(
   a: Readonly<Record<string, unknown>> | undefined,
   b: Readonly<Record<string, unknown>> | undefined,
@@ -363,11 +363,11 @@ function fieldTexts(
   return { texts, ambiguous };
 }
 
-/** 欄ごとに分けられなかったときの、生の JSON の前後 */
+/** 欄ごとに分けられなかったときの、生のJSONの前後 */
 function rawTexts(a: unknown, b: unknown): FieldText[] {
   return [
     {
-      field: "（全体の JSON）",
+      field: "（全体のJSON）",
       ...(a === undefined ? {} : { before: shown(a), beforeKind: kindOf(a) }),
       ...(b === undefined ? {} : { after: shown(b), afterKind: kindOf(b) }),
     },
@@ -375,8 +375,8 @@ function rawTexts(a: unknown, b: unknown): FieldText[] {
 }
 
 /**
- * `before`（いまのフロー）から `after`（下書き）への差分を、値の前後まで。欄の表記が重なるか、違うのに違う欄が
- * 見つからないものは、生の JSON の前後を入れて `problem` で言う（画面は取り込ませない）
+ * `before`（いまのフロー）から`after`（下書き）への差分を、値の前後まで。欄の表記が重なるか、違うのに違う欄が
+ * 見つからないものは、生のJSONの前後を入れて`problem`で言う（画面は取り込ませない）
  */
 export function textDiff(rawBefore: FlowDoc, rawAfter: FlowDoc): TextDiff {
   const before = withoutLayout(rawBefore);
@@ -387,7 +387,7 @@ export function textDiff(rawBefore: FlowDoc, rawAfter: FlowDoc): TextDiff {
   const add = (kind: TextChange["kind"], label: string, a: Readonly<Record<string, unknown>> | undefined, b: Readonly<Record<string, unknown>> | undefined, skip: ReadonlySet<string>): void => {
     const made = fieldTexts(a, b, skip);
     if (made.ambiguous) {
-      problem = "欄の名前が重複していて見分けられないもの（`.` や `[` を含むキーなど）があるため、欄ごとの前後に分けられません";
+      problem = "欄の名前が重複していて見分けられないもの（`.`や`[`を含むキーなど）があるため、欄ごとに変更前と変更後を分けられません";
       changes.push({ kind, label, texts: rawTexts(a, b) });
     } else if (made.texts.length === 0 && a !== undefined && b !== undefined && !sameValue(a, b)) {
       problem = "中身が違うのに、違う欄を見つけられません";

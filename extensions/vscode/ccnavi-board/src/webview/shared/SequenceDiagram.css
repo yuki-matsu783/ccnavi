@@ -1,6 +1,6 @@
 /*
- * 時系列の図（`SequenceDiagram.tsx`）。登場者の列を grid で並べ、矢印は 1 本ずつ行にする。
- * 縦の時間軸は、箱の背景に列の中央ごとに引く（インラインの `background-image`）。色は VS Code のテーマ変数だけで組む。
+ * 時系列の図（`SequenceDiagram.tsx`）。登場者の列をgridで並べ、矢印は1本ずつ行にする。
+ * 縦の時間軸は、箱の背景に列の中央ごとに引く（インラインの`background-image`）。色はVS Codeのテーマ変数だけで組む。
  */
 .tour-diagram {
   --tour-diagram-line: var(--vscode-panel-border, rgba(128, 128, 128, .4));
@@ -42,7 +42,7 @@
 
 .tour-diagram-text { overflow-wrap: anywhere; }
 
-/* 実際の値。矢印の文の下に、等幅で 1 つの塊として出す */
+/* 実際の値。矢印の文の下に、等幅で1つの塊として出す */
 .tour-diagram-value {
   display: block;
   margin: var(--gap-1) 0 0;

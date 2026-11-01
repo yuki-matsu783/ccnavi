@@ -1,9 +1,9 @@
 /**
- * リスク管理画面の案内の見本（`webview/tours/risk.yml` の `sample:`）を、画面が描く形にする。
+ * リスク管理画面の案内の見本（`webview/tours/risk.yml`の`sample:`）を、画面が描く形にする。
  *
- * 配点は `risks.yml` と同じ書き方（`levels:` と `factors:`。加点条件は `lines_over:` などのキー）で見本に書き、ここで
- * `RiskPage`（画面が描く形）にする。統合結果は実行ファイルの JSON と同じ形で書く。いずれも案内の間に描くだけで、保存にも判定にも使わない。
- * `risk-doc.ts` は YAML の解析器を持つので画面から読めない。同じ読み方をここで小さく持ち、そろっていることはテストが見る。
+ * 配点は`risks.yml`と同じ書き方（`levels:`と`factors:`。加点条件は`lines_over:`などのキー）で見本に書き、ここで
+ * `RiskPage`（画面が描く形）にする。統合結果は実行ファイルのJSONと同じ形で書く。いずれも案内の間に描くだけで、保存にも判定にも使わない。
+ * `risk-doc.ts`はYAMLの解析器を持つので画面から読めない。同じ読み方をここで小さく持ち、そろっていることはテストが見る。
  */
 import { KINDS, LEVEL_NAMES, type FactorForm, type FactorKind, type LevelName, type RiskForm, type RiskPage } from "./risk-view.js";
 import { sumLabel, type RiskSum } from "./sums.js";
@@ -17,17 +17,17 @@ export interface RiskSample {
 
 function object(value: unknown, at: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error(`${at} がオブジェクトではない`);
+    throw new Error(`${at}がオブジェクトではない`);
   }
   return value as Record<string, unknown>;
 }
 
-/** 欄の文字。無いか null なら空（`risk-doc.ts` の `scalarText` と同じ） */
+/** 欄の文字。無いかnullなら空（`risk-doc.ts`の`scalarText`と同じ） */
 function str(value: unknown): string {
   return typeof value === "string" ? value : value === undefined || value === null ? "" : String(value);
 }
 
-/** include / exclude は glob のリスト。欄には 1 行に 1 つで出す（リストでない書き方は 1 つの値として出す） */
+/** include / excludeはglobのリスト。欄には1行に1つで出す（リストでない書き方は1つの値として出す） */
 function globsText(value: unknown): string {
   return Array.isArray(value) ? value.map((item) => str(item)).join("\n") : str(value);
 }
@@ -48,7 +48,7 @@ function factorOf(raw: unknown, index: number): FactorForm {
   };
 }
 
-/** `risks.yml` の書き方の配点（`levels` と `factors`）を、画面の `RiskForm` にする */
+/** `risks.yml`の書き方の配点（`levels`と`factors`）を、画面の`RiskForm`にする */
 export function riskFormOf(raw: unknown, at = "risks"): RiskForm {
   const root = object(raw, at);
   const levels = { medium: "", high: "", critical: "" } as Record<LevelName, string>;
@@ -60,7 +60,7 @@ export function riskFormOf(raw: unknown, at = "risks"): RiskForm {
   }
   const list = root.factors ?? [];
   if (!Array.isArray(list)) {
-    throw new Error(`${at}.factors はリスト`);
+    throw new Error(`${at}.factorsはリスト`);
   }
   return { levels, factors: list.map((item, index) => factorOf(item, index)) };
 }
@@ -87,7 +87,7 @@ function sumOf(raw: unknown, index: number): RiskSum {
         id: str(f.id),
         source: str(f.source),
         kind: str(f.kind),
-        // 数でも文字列でも文字にして持つ（実行ファイルの JSON と同じ）
+        // 数でも文字列でも文字にして持つ（実行ファイルのJSONと同じ）
         value: str(f.value),
         points: typeof f.points === "number" ? f.points : null,
         message: str(f.message),

@@ -1,28 +1,28 @@
 /**
- * happy-dom で動かないものを走らせる別の手段（`dom.ts` の方針）。回すのは図の点のドラッグ
+ * happy-domで動かないものを走らせる別の手段（`dom.ts`の方針）。回すのは図の点のドラッグ
  * （`onNodeDragStop`）だけ。いまこれを使うテストは無い（使っていたフェーズ管理画面の図を外した）。
  *
- * happy-dom では、d3-drag が張る待ちが終わらずテストが固まる（実際に確かめた。90 秒で打ち切り）。
- * jsdom では同じ操作がそのまま通る。逆に jsdom は起動が重いので、ここへ来るのは happy-dom で
- * 走らないものだけにする。普段の画面のテストは `dom.ts` のまま。
+ * happy-domでは、d3-dragが張る待ちが終わらずテストが固まる（実際に確かめた。90秒で打ち切り）。
+ * jsdomでは同じ操作がそのまま通る。逆にjsdomは起動が重いので、ここへ来るのはhappy-domで
+ * 走らないものだけにする。普段の画面のテストは`dom.ts`のまま。
  *
- * jsdom にも無いものが 2 つあるので、ここで埋める。
+ * jsdomにも無いものが2つあるので、ここで埋める。
  *
- * - `ResizeObserver`（`dom.ts` の `measure` と同じ理由。点の大きさが測れないと線が 1 本も出ない）
- * - `DOMMatrixReadOnly`（React Flow が点の transform を読むのに使う。無いと例外で止まる）
+ * - `ResizeObserver`（`dom.ts`の`measure`と同じ理由。点の大きさが測れないと線が1本も出ない）
+ * - `DOMMatrixReadOnly`（React Flowが点のtransformを読むのに使う。無いと例外で止まる）
  *
  * どちらも大きさと行列を偽るだけで、実際の配置はしない。だから、ここで見てよいのは
- * 「動かしたら state に入るか」までで、動いた先の座標そのものは見ない（図の倍率で決まる）。
+ * 「動かしたらstateに入るか」までで、動いた先の座標そのものは見ない（図の倍率で決まる）。
  */
 import type { JSDOM as JSDOMType } from "jsdom" with { "resolution-mode": "import" };
 
-// jsdom は CommonJS なので、そのまま require で読む（happy-dom と違って動的 import は要らない）
+// jsdomはCommonJSなので、そのままrequireで読む（happy-domと違って動的importは要らない）
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { JSDOM } = require("jsdom") as { JSDOM: typeof JSDOMType };
 
 const CSP = /<meta http-equiv="Content-Security-Policy"[^>]*>/;
 
-/** 偽る大きさ。`dom.ts` の `SIZES` と同じ数字にしてある */
+/** 偽る大きさ。`dom.ts`の`SIZES`と同じ数字にしてある */
 const SIZES: readonly [string, number, number][] = [
   [".react-flow__node", 170, 60],
   [".react-flow", 800, 480],
@@ -30,17 +30,17 @@ const SIZES: readonly [string, number, number][] = [
 ];
 
 export interface JsdomPage {
-  /** 画面が vscode.setState で最後に書いたもの */
+  /** 画面がvscode.setStateで最後に書いたもの */
   state(): unknown;
-  /** 画面が vscode.postMessage で送ったもの（古い順） */
+  /** 画面がvscode.postMessageで送ったもの（古い順） */
   readonly posted: { readonly type: string }[];
-  /** セレクタで 1 つ取る。無ければ失敗させる */
+  /** セレクタで1つ取る。無ければ失敗させる */
   one(selector: string): Element;
   /** セレクタで全部取る */
   all(selector: string): Element[];
   /**
-   * 要素をドラッグする（`dx`・`dy` は画面の px）。d3-drag は mousedown を要素で、
-   * mousemove と mouseup を window で受けるので、そのとおりに流す。
+   * 要素をドラッグする（`dx`・`dy`は画面のpx）。d3-dragはmousedownを要素で、
+   * mousemoveとmouseupをwindowで受けるので、そのとおりに流す。
    * 動いた先の座標は約束しない（図の倍率で決まる）
    */
   drag(element: Element, dx: number, dy: number): Promise<void>;
@@ -90,7 +90,7 @@ export async function loadPageJsdom(html: string, initialState?: unknown): Promi
         const [width, height] = sizeOf(this);
         return { x: 0, y: 0, top: 0, left: 0, right: width, bottom: height, width, height, toJSON: () => ({}) };
       };
-      // 点の transform を読むのに使う。行列の表記だけ読めればよい
+      // 点のtransformを読むのに使う。行列の表記だけ読めればよい
       w.DOMMatrixReadOnly = class {
         readonly m11: number;
         readonly m12: number;
@@ -130,7 +130,7 @@ export async function loadPageJsdom(html: string, initialState?: unknown): Promi
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
   };
-  // React がマウントし、点が測られて線が出るまで待つ
+  // Reactがマウントし、点が測られて線が出るまで待つ
   await new Promise((resolve) => setTimeout(resolve, 400));
   const mouse = (type: string, x: number, y: number): Event => new window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, view: dom.window });
   return {
@@ -148,7 +148,7 @@ export async function loadPageJsdom(html: string, initialState?: unknown): Promi
     },
     async drag(element, dx, dy) {
       element.dispatchEvent(mouse("mousedown", 10, 10));
-      // d3-drag は動きを確かめてからドラッグを始める。1 回では「押しただけ」になることがあるので 2 回流す
+      // d3-dragは動きを確かめてからドラッグを始める。1回では「押しただけ」になることがあるので2回流す
       window.dispatchEvent(mouse("mousemove", 10 + Math.round(dx / 2), 10 + Math.round(dy / 2)));
       window.dispatchEvent(mouse("mousemove", 10 + dx, 10 + dy));
       window.dispatchEvent(mouse("mouseup", 10 + dx, 10 + dy));

@@ -155,7 +155,7 @@ ccnavi --lint --json --project-risk-file lib=/tmp/risks.yml
 ccnavi --explain --json
 ```
 
-`--explain` のうちチケットに関わる部分を JSON で出す。読み手は VS Code の拡張「ccnavi ボード」。拡張はこれを並べるだけで、提案やマーカーを
+`--explain` のうちチケットに関わる部分を JSON で出す。読み手は VS Code の拡張「ccnaviボード」。拡張はこれを並べるだけで、提案やマーカーを
 自分では読まない。`version` が拡張の知っている版（いま 1）と違えば、拡張は読まずに版の違いを伝える。
 
 | キー | 何 |

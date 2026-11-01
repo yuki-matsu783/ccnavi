@@ -1,6 +1,6 @@
 /**
  * リスク管理画面の入れ物（HTML）。中身は画面（React）が作るので、ここで見るのは
- * 保護（CSP）・埋め込む中身・バンドルした画面の流し込みだけ。描くものは risk.dom.test.ts。
+ * 保護（CSP）・埋め込む中身・バンドルした画面の流し込みだけ。描くものはrisk.dom.test.ts。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -25,7 +25,7 @@ function shell(rendered: string): string {
   return rendered.split(screenScript("risk")).join("（バンドルした画面）");
 }
 
-test("CB-T80 リスク管理画面は外部資源を読まず、nonce で自分のスタイルとスクリプトだけを許す", () => {
+test("CB-T80 リスク管理画面は外部資源を読まず、nonceで自分のスタイルとスクリプトだけを許す", () => {
   const rendered = html();
   assert.match(rendered, /default-src 'none'/);
   assert.match(rendered, /style-src 'nonce-N0NCE'; script-src 'nonce-N0NCE'/);
@@ -33,10 +33,10 @@ test("CB-T80 リスク管理画面は外部資源を読まず、nonce で自分�
   assert.doesNotMatch(shell(rendered), /https?:\/\//);
   assert.doesNotMatch(shell(rendered), /<(?:script|img|iframe)[^>]*\ssrc=|<link\s/);
   assert.match(rendered, /<script type="application\/json" id="ccnavi-risk-data">/);
-  assert.match(rendered, /<title>ccnavi リスク管理<\/title>/);
+  assert.match(rendered, /<title>ccnaviリスク管理<\/title>/);
 });
 
-test("CB-T81 埋め込む中身は JSON で、文面の < は実体にして script を閉じさせない", () => {
+test("CB-T81 埋め込む中身はJSONで、文面の < は実体にしてscriptを閉じさせない", () => {
   const rendered = html();
   assert.match(rendered, /\\u003cb>CI\\u003c\/b>/);
   assert.doesNotMatch(rendered, /<b>CI<\/b>/);
@@ -45,16 +45,16 @@ test("CB-T81 埋め込む中身は JSON で、文面の < は実体にして scr
   assert.match(rendered, /"exists":true/);
 });
 
-// 画面のスクリプトはバンドルした 1 本を流し込む（ファイルとしては読ませない）。
-// 中身の型は tsconfig.webview.json が見るので、ここで見るのは入れ方だけ。
-test("CB-T85 バンドルした画面を nonce 付きの script に流し込み、資源としては読ませない", () => {
+// 画面のスクリプトはバンドルした1本を流し込む（ファイルとしては読ませない）。
+// 中身の型はtsconfig.webview.jsonが見るので、ここで見るのは入れ方だけ。
+test("CB-T85 バンドルした画面をnonce付きのscriptに流し込み、資源としては読ませない", () => {
   const rendered = riskHtml({ kind: "page", page: page() });
   assert.ok(rendered.includes(`<script nonce="${NONCE}">\n${screenScript("risk")}\n</script>`));
   assert.match(rendered, /<div id="root"><p class="empty" id="ccnavi-loading">リスクを読み込み中…<\/p><\/div>/);
   assert.doesNotMatch(shell(rendered), /<script[^>]*\ssrc=/);
 });
 
-test("CB-T155 再読み込みできなかったときは一覧の代わりに理由を渡す", () => {
+test("CB-T155 更新できなかったときは一覧の代わりに理由を渡す", () => {
   const rendered = riskHtml({ kind: "error", error: "配点のファイルを読み込めない" });
   assert.match(rendered, /"kind":"error"/);
   assert.match(rendered, /配点のファイルを読み込めない/);

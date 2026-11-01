@@ -1,15 +1,15 @@
 /**
- * マージ状況の帯。ツールバーの「MR の状況を確認」の結果を、ボードの上に 1 親 1 行で出す。
+ * マージ状況の帯。ツールバーの「MRの状況を確認」の結果を、ボードの上に1親1行で出す。
  *
  * 見せる中身は拡張ホストが持つ（`MergeView`。ボードが開いている間だけ）。ここは渡されたものを出すだけで、判定しない。
  * 行は次のとおり（タイトルは、ボードのアーカイブにある同じ親から取る。無ければ識別子だけ）。
  *
- * - マージ待ち: `<親> <タイトル> MR !N - マージ待ち（Draft なら付記）` ［MR を開く］
- * - マージ済み: ［片付ける］（確認のダイアログのあと、sync のコマンドを送る。送ったら、次の確認まで押せない）
+ * - マージ待ち: `<親> <タイトル> MR !N - マージ待ち（Draftなら付記）` ［MRを開く］
+ * - マージ済み: ［片付ける］（確認のダイアログのあと、syncのコマンドを送る。送ったら、次の確認まで押せない）
  * - マージせず閉じた: 自動では片付けない。破棄した親なら、ユーザがターミナルで記録を消すコマンド（コピーのボタンだけ。ボードからは送らない）
  * - 確認できない（種類と理由）／記録が不完全
  *
- * ボタンとリンクは `card-button`（操作の MR リンクも同じ寸法）。リンクは http(s) のときだけ。
+ * ボタンとリンクは`card-button`（操作のMRリンクも同じ寸法）。リンクはhttp(s)のときだけ。
  */
 import type { JSX } from "react";
 
@@ -18,17 +18,17 @@ import type { MergeView, MergeViewRow } from "../../core/merge.js";
 import { post } from "./post.js";
 import { isHttpUrl } from "./text.js";
 
-/** 確認できなかった理由の種類の呼び名。画面の言葉（sh の種類の文字列はそのまま出さない） */
+/** 確認できなかった理由の種類の呼び名。画面の言葉（shの種類の文字列はそのまま出さない） */
 const REASON_LABELS: Readonly<Record<string, string>> = {
   "no-tool": "ツールが無い",
   auth: "認証",
   network: "ネットワーク",
-  api: "ホストの API",
+  api: "ホストのAPI",
   "not-found": "見つかりません",
-  timeout: "期限切れ",
+  timeout: "タイムアウト",
   format: "出力の形が想定外",
   failed: "実行できません",
-  "no-number": "MR の番号が無い",
+  "no-number": "MRの番号が無い",
 };
 
 export function MergeBand({ merge, board, touring }: { readonly merge: MergeView; readonly board: Board; readonly touring: boolean }): JSX.Element {
@@ -56,7 +56,7 @@ export function MergeBand({ merge, board, touring }: { readonly merge: MergeView
       )}
       {merge.checkedAt !== "" ? (
         <p className="merge-time" data-merge="checked-at">
-          確認した時刻 {merge.checkedAt}
+          確認した時刻{merge.checkedAt}
         </p>
       ) : null}
     </section>
@@ -105,7 +105,7 @@ function State({ row, touring }: { readonly row: MergeViewRow; readonly touring:
               data-tour="merge-retire"
               data-parent={row.parent}
               disabled={row.busy}
-              title="ccnavi-sync.sh をターミナルで実行します（確認のダイアログが出ます）"
+              title="ccnavi-sync.shをターミナルで実行します（確認のダイアログが出ます）"
               onClick={() => {
                 if (!touring) {
                   post({ type: "mergeRetire", parent: row.parent });
@@ -126,8 +126,8 @@ function State({ row, touring }: { readonly row: MergeViewRow; readonly touring:
       return (
         <>
           <span>
-            - マージせず閉じました。自動では片付けません。破棄した親なら、ユーザがターミナルで{" "}
-            <code className="merge-command">{row.abandon}</code> を実行して記録を消します
+            - マージせず閉じました。自動では片付けません。破棄した親なら、ユーザがターミナルで
+            <code className="merge-command">{row.abandon}</code>を実行して記録を消します
           </span>
           <MrLink url={row.url} />{" "}
           <button
@@ -157,11 +157,11 @@ function State({ row, touring }: { readonly row: MergeViewRow; readonly touring:
   }
 }
 
-/** 操作の MR リンク。URL が http(s) のときだけ（それ以外は状態だけを出し、リンクにしない） */
+/** 操作のMRリンク。URLがhttp(s)のときだけ（それ以外は状態だけを出し、リンクにしない） */
 function MrLink({ url }: { readonly url: string }): JSX.Element | null {
   return isHttpUrl(url) ? (
-    <a className="card-button" data-action="open-mr" href={url} title="マージリクエストを開きます">
-      MR を開く
+    <a className="card-button" data-action="open-mr" href={url} title="MRを開きます">
+      MRを開く
     </a>
   ) : null;
 }

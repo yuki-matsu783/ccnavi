@@ -1,4 +1,4 @@
-/** フェーズ管理画面（React）を happy-dom で動かす。描くものも、押したときの動きもここで見る。 */
+/** フェーズ管理画面（React）をhappy-domで動かす。描くものも、押したときの動きもここで見る。 */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readPhases } from "../../src/core/phases-doc.js";
@@ -15,7 +15,7 @@ function savedForm(dom: DomPage): PhasesForm {
   return saves[saves.length - 1].form as PhasesForm;
 }
 
-test("CB-D20 既定は畳み、行を押すと開いて state に id が入る。補足は値がある定義だけ開く", async () => {
+test("CB-D20 既定は畳み、行を押すと開いてstateにidが入る。補足は値がある定義だけ開く", async () => {
   const dom = await openPhases();
   try {
     assert.equal(dom.all(".phase").length, 5);
@@ -24,7 +24,7 @@ test("CB-D20 既定は畳み、行を押すと開いて state に id が入る�
     await dom.settle();
     assert.ok(dom.one(rowSelector("p2")).classList.contains("open"));
     assert.deepEqual((dom.state() as { open: string[] }).open, ["design"]);
-    // 見本の design は when を持つので開く。implement は agent も when も無いので閉じる
+    // 見本のdesignはwhenを持つので開く。implementはagentもwhenも無いので閉じる
     assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"));
     assert.ok(!dom.one(`${rowSelector("p4")} details.more`).hasAttribute("open"));
   } finally {
@@ -32,7 +32,7 @@ test("CB-D20 既定は畳み、行を押すと開いて state に id が入る�
   }
 });
 
-test("CB-D21 編集可能な範囲を inherit に変えると glob の欄が消え、行は開いたまま。id が重なると保存できない", async () => {
+test("CB-D21 編集可能な範囲をinheritに変えるとglobの欄が消え、行は開いたまま。idが重なると保存できない", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p2")} .row-head`));
@@ -46,7 +46,7 @@ test("CB-D21 編集可能な範囲を inherit に変えると glob の欄が消�
     dom.type(dom.one(`${rowSelector("p2")} input.f-id`), "research");
     await dom.settle();
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled);
-    assert.match(dom.one("#status").textContent ?? "", /id が重なっています（research）/);
+    assert.match(dom.one("#status").textContent ?? "", /idが重なっています（research）/);
     assert.ok(dom.one<HTMLInputElement>(`${rowSelector("p2")} input.f-id`).classList.contains("duplicate"));
     // 直せば保存できるようになり、文面も消える
     dom.type(dom.one(`${rowSelector("p2")} input.f-id`), "design2");
@@ -58,15 +58,15 @@ test("CB-D21 編集可能な範囲を inherit に変えると glob の欄が消�
   }
 });
 
-test("CB-D22 絞り込みは title と scope にもヒットし、開いている行は隠さず、一致した行だけを数える。追加した定義は開いて焦点が id に来る", async () => {
+test("CB-D22 絞り込みはtitleとscopeにもヒットし、開いている行は隠さず、一致した行だけを数える。追加した定義は開いて焦点がidに来る", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p1")} .row-head`));
     await dom.settle();
     dom.type(dom.one("#find"), "設計");
     await dom.settle();
-    // design はタイトルで、acceptance は when（「設計と並行してよく」）でヒットする
-    assert.equal(dom.one("#phase-count").textContent, "2 / 5（絞り込み外で開いている項目: 1 件）", "開いている research は一致しないので数えず、開いたままの数として添える");
+    // designはタイトルで、acceptanceはwhen（「設計と並行してよく」）でヒットする
+    assert.equal(dom.one("#phase-count").textContent, "2 / 5（絞り込み外で開いている項目: 1件）", "開いているresearchは一致しないので数えず、開いたままの数として添える");
     assert.ok(dom.one(rowSelector("p1")).classList.contains("hidden-by-find"));
     assert.ok(dom.one(rowSelector("p1")).classList.contains("open"));
     assert.ok(!dom.one(rowSelector("p2")).classList.contains("hidden-by-find"));
@@ -105,7 +105,7 @@ test("CB-D23 保存の往復の間は欄を止めるが、行の開閉のボタ�
   }
 });
 
-test("CB-T125 件の欄名は日本語で、YAML のキー名は欄名の title に載せる", async () => {
+test("CB-T125 件の欄名は日本語で、YAMLのキー名は欄名のtitleに載せる", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p1")} .row-head`));
@@ -117,7 +117,7 @@ test("CB-T125 件の欄名は日本語で、YAML のキー名は欄名の title 
     );
     assert.deepEqual(
       caps.map((cap) => cap.getAttribute("title")),
-      ["id", "title", "kind", "review", "scope", "deliverables", "agent", "skill", "when"].map((key) => `YAML のキー: ${key}`),
+      ["id", "title", "kind", "review", "scope", "deliverables", "agent", "skill", "when"].map((key) => `YAMLのキー: ${key}`),
     );
   } finally {
     await dom.close();
@@ -173,7 +173,7 @@ test("CB-D61 ファイルが外で変わったら帯を出し、届いた中身�
     await dom.send({ type: "changed" });
     assert.ok(!dom.one("#changed").classList.contains("hidden"));
     assert.equal(dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).value, "調べる", "帯が出ても編集は消さない");
-    // 再読み込みが通ったら、その中身で描き直す
+    // 更新が通ったら、その中身で描き直す
     await dom.send({ type: "data", data: { kind: "page", page: page({ phasesPath: ".ccnavi/config/project/phases.yml" }) } });
     assert.ok(dom.one("#changed").classList.contains("hidden"));
     assert.ok(dom.one("#dirty").classList.contains("hidden"));
@@ -184,7 +184,7 @@ test("CB-D61 ファイルが外で変わったら帯を出し、届いた中身�
   }
 });
 
-test("CB-D62 再読み込みできなかったら理由を出し、定義は出さない", async () => {
+test("CB-D62 更新できなかったら理由を出し、定義は出さない", async () => {
   const dom = await openPage({ kind: "error", error: "定義のファイルを読み込めない: EACCES" });
   try {
     assert.match(dom.one(".empty").textContent, /フェーズ管理画面を読み込めませんでした/);
@@ -201,8 +201,8 @@ test("CB-D63 定義がないファイルは、保存する前に追加すると�
     lock: { locked: true, reason: "作業中のチケットがある（i0001-02-02）", doing: ["i0001-02-02"], turns: [] },
   });
   try {
-    assert.match(dom.one("#phases .empty").textContent, /定義がありません。定義が空のファイルは ccnavi で読み込めません/);
-    assert.match(dom.one(".problems").textContent, /phases がマップ（キーと値の組の集まり）ではありません/);
+    assert.match(dom.one("#phases .empty").textContent, /定義がありません。定義が空のファイルはccnaviで読み込めません/);
+    assert.match(dom.one(".problems").textContent, /phasesがマップ（キーと値の組の集まり）ではありません/);
     assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02-02）");
     assert.ok(dom.one("#lock").classList.contains("info"), "作業中は情報色");
     assert.ok(!dom.one("#lock").classList.contains("hidden"));
@@ -216,7 +216,7 @@ test("CB-D67 補足は、最後の値を削除しても畳まれない（打っ�
   try {
     dom.click(dom.one(`${rowSelector("p1")} .row-head`));
     await dom.settle();
-    // 見本の research は when だけを持つので開いている
+    // 見本のresearchはwhenだけを持つので開いている
     assert.ok(dom.one(`${rowSelector("p1")} details.more`).hasAttribute("open"));
     dom.type(dom.one(`${rowSelector("p1")} input.f-when`), "");
     await dom.settle();
@@ -227,7 +227,7 @@ test("CB-D67 補足は、最後の値を削除しても畳まれない（打っ�
   }
 });
 
-test("CB-D68 往復の間は帯の再読み込みも止め、再読み込みを押した時点で欄を止める", async () => {
+test("CB-D68 往復の間は帯の更新も止め、更新を押した時点で欄を止める", async () => {
   const dom = await openPhases();
   try {
     await dom.send({ type: "changed" });
@@ -238,7 +238,7 @@ test("CB-D68 往復の間は帯の再読み込みも止め、再読み込みを�
     dom.click(dom.one("#save"));
     await dom.settle();
     for (const button of dom.all<HTMLButtonElement>('button[data-action="reload"]')) {
-      assert.ok(button.disabled, "保存の往復の間はどの再読み込みも押せない");
+      assert.ok(button.disabled, "保存の往復の間はどの更新も押せない");
     }
     await dom.send({ type: "failed", message: "lint error" });
     dom.click(dom.one('#changed button[data-action="reload"]'));
@@ -263,9 +263,9 @@ test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホス�
     await dom.settle();
     dom.type(dom.one(`${rowSelector("p1")} input.f-title`), "調べる2");
     await dom.settle();
-    assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), [{ type: "dirty", dirty: true }], "打ち続けても 1 度だけ");
-    await dom.send({ type: "data", data: { kind: "loading", text: "web のフェーズを読み込み中…" } });
-    assert.equal(dom.one("#ccnavi-loading").textContent, "web のフェーズを読み込み中…");
+    assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), [{ type: "dirty", dirty: true }], "打ち続けても1度だけ");
+    await dom.send({ type: "data", data: { kind: "loading", text: "webのフェーズを読み込み中…" } });
+    assert.equal(dom.one("#ccnavi-loading").textContent, "webのフェーズを読み込み中…");
     assert.equal(dom.all(rowSelector("p1")).length, 0);
     assert.deepEqual(
       dom.posted.filter((message) => message.type === "dirty").map((message) => message.dirty),
@@ -281,7 +281,7 @@ test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホス�
   }
 });
 
-test("CB-D85 関係の欄（overlap・requires・after）と、その id を選ぶ複数選択は、work の定義にも feedback の定義にも出ない。保存に順序の欄は載らない", async () => {
+test("CB-D85 関係の欄（overlap・requires・after）と、そのidを選ぶ複数選択は、workの定義にもfeedbackの定義にも出ない。保存に順序の欄は載らない", async () => {
   const dom = await openPhases();
   try {
     for (const key of ["p1", "p2", "p3", "p4", "p5"]) {
@@ -305,7 +305,7 @@ test("CB-D85 関係の欄（overlap・requires・after）と、その id を選�
   }
 });
 
-test("CB-D86 図・一覧と図の切り替え・全体計画の先行関係の選択は出ない。state に前の図の表示や点の位置が残っていても一覧で開き、定義を追加できば追加した行が見える", async () => {
+test("CB-D86 図・一覧と図の切り替え・全体計画の先行関係の選択は出ない。stateに前の図の表示や点の位置が残っていても一覧で開き、定義を追加できば追加した行が見える", async () => {
   const dom = await openPhases({}, { view: "graph", spots: { design: { x: 40, y: 80 } } });
   try {
     assert.equal(dom.all("#phase-graph, .react-flow, .graph, .graph-legend, .graph-note").length, 0, "図が残っている");
@@ -323,15 +323,15 @@ test("CB-D86 図・一覧と図の切り替え・全体計画の先行関係の�
   }
 });
 
-test("CB-D90 拡張ホストが頼んだら基本の案内を出し、最後まで進めると閉じて tourDone を返す。案内の間は見本を描き、閉じたら実際の定義に戻る。図・関係の欄・先行関係の手順はありません", async () => {
+test("CB-D90 拡張ホストが頼んだら基本の案内を出し、最後まで進めると閉じてtourDoneを返す。案内の間は見本を描き、閉じたら実際の定義に戻る。図・関係の欄・先行関係の手順はありません", async () => {
   const dom = await openPhases();
   try {
     assert.equal(dom.all(".tour").length, 0, "頼まれるまでは出さない");
     await dom.send({ type: "tour" });
     await dom.settle();
     assert.equal(dom.one("#tour-title").textContent, "フェーズ定義");
-    // 1 番目の手順で、順序は親チケットの計画で決めることを言う
-    assert.match(dom.one(".tour-bubble").textContent ?? "", /順序（どのフェーズにどのフェーズが先行するか）は、親チケットの計画のステップの after で決めます/);
+    // 1番目の手順で、順序は親チケットの計画で決めることを言う
+    assert.match(dom.one(".tour-bubble").textContent ?? "", /順序（どのフェーズにどのフェーズが先行するか）は、親チケットの計画のステップのafterで決めます/);
     const titles = [dom.one("#tour-title").textContent];
     for (let i = 0; i < 4; i += 1) {
       dom.click(dom.one('[data-action="tour-next"]'));
@@ -360,7 +360,7 @@ test("CB-D90 拡張ホストが頼んだら基本の案内を出し、最後ま�
   }
 });
 
-test("CB-D93 案内の間は Tab が吹き出しのボタンの中だけを巡り、焦点は「次へ」から始まる。閉じたら絞り込みも戻る", async () => {
+test("CB-D93 案内の間はTabが吹き出しのボタンの中だけを巡り、焦点は「次へ」から始まる。閉じたら絞り込みも戻る", async () => {
   const dom = await openPhases();
   try {
     dom.type(dom.one("#find"), "設計");
@@ -369,11 +369,11 @@ test("CB-D93 案内の間は Tab が吹き出しのボタンの中だけを巡�
     await dom.settle();
     dom.click(dom.one('[data-action="tour-next"]'));
     await dom.settle();
-    // 2 番目の手順：×・戻る・次へ
+    // 2番目の手順：×・戻る・次へ
     assert.equal(dom.document.activeElement, dom.one('[data-action="tour-next"]'));
     dom.key("Tab");
     await dom.settle();
-    assert.equal(dom.document.activeElement, dom.one('[data-action="tour-skip"]'), "Tab が吹き出しの外へ出た");
+    assert.equal(dom.document.activeElement, dom.one('[data-action="tour-skip"]'), "Tabが吹き出しの外へ出た");
     dom.document.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }));
     await dom.settle();
     assert.equal(dom.document.activeElement, dom.one('[data-action="tour-next"]'));
@@ -387,7 +387,7 @@ test("CB-D93 案内の間は Tab が吹き出しのボタンの中だけを巡�
   }
 });
 
-test("CB-D91 案内は Esc か × でやめられ、やめても tourDone を返す。読み込み中に頼まれたら中身が出てから始める", async () => {
+test("CB-D91 案内はEscか × でやめられ、やめてもtourDoneを返す。読み込み中に頼まれたら中身が出てから始める", async () => {
   const dom = await openPage({ kind: "loading", text: "フェーズ定義を読み込み中…" });
   try {
     await dom.send({ type: "tour" });
@@ -437,11 +437,11 @@ test("CB-D92 細かい説明はヘルプを押したときだけ出す。ヘッ�
   const dom = await openPhases();
   try {
     assert.equal(dom.all("#help").length, 0, "ヘルプを押すまで説明は出さない");
-    // 案内の入口は ? 1 文字で、ヘッダ（ツールバー）の最後の子。位置は Tour.css が全画面とも右上に揃える
+    // 案内の入口は ? 1文字で、ヘッダ（ツールバー）の最後の子。位置はTour.cssが全画面とも右上に揃える
     assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
     dom.click(dom.one('[data-action="help"]'));
     await dom.settle();
-    assert.match(dom.one("#help").textContent ?? "", /順序（どのフェーズにどのフェーズが先行するか）はこのファイルには記載しません。親チケットの計画のステップに after で先行を指定します/);
+    assert.match(dom.one("#help").textContent ?? "", /順序（どのフェーズにどのフェーズが先行するか）はこのファイルには記載しません。親チケットの計画のステップにafterで先行を指定します/);
     dom.click(dom.one('[data-action="tour"]'));
     await dom.settle();
     dom.click(dom.one('[data-action="tour-course"][data-course="intro"]'));
@@ -452,25 +452,25 @@ test("CB-D92 細かい説明はヘルプを押したときだけ出す。ヘッ�
     await dom.settle();
     assert.equal(dom.all(".tour").length, 0);
     assert.equal(dom.all("#help").length, 1, "閉じたら開いていたヘルプに戻る");
-    // ? から始めた案内も、やめたら tourDone を返す
+    // ? から始めた案内も、やめたらtourDoneを返す
     assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 1);
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D151 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が 1 つだけでも出す", async () => {
+test("CB-D151 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が1つだけでも出す", async () => {
   const targets = [
     { kind: "self", name: "", label: "ワークスペース" },
-    { kind: "project", name: "app:x", label: "プロジェクト app:x" },
-    { kind: "project", name: "lib", label: "プロジェクト lib" },
+    { kind: "project", name: "app:x", label: "プロジェクトapp:x" },
+    { kind: "project", name: "lib", label: "プロジェクトlib" },
   ];
   const dom = await openPhases({ target: { kind: "self", name: "" }, targets });
   try {
     const select = dom.one<HTMLSelectElement>("select#target");
     assert.deepEqual(
       [...select.options].map((o) => o.textContent),
-      ["ワークスペース", "プロジェクト app:x", "プロジェクト lib"],
+      ["ワークスペース", "プロジェクトapp:x", "プロジェクトlib"],
     );
     assert.equal(select.value, "self:");
     dom.change(select, "project:app:x");
@@ -495,7 +495,7 @@ test("CB-D153 読み込みに失敗した画面にも設定の切り替えの欄
     target: { kind: "project", name: "app" },
     targets: [
       { kind: "self", name: "", label: "ワークスペース" },
-      { kind: "project", name: "app", label: "プロジェクト app" },
+      { kind: "project", name: "app", label: "プロジェクトapp" },
     ],
   });
   try {
@@ -509,6 +509,6 @@ test("CB-D153 読み込みに失敗した画面にも設定の切り替えの欄
   }
 });
 
-test("CB-D392 見出しに「取り込み待ちを開く」があり、押すと openHandoff を送る。実行ファイルが handoff を持たなければ無効で、理由を出す", async () => {
+test("CB-D392 見出しに「取り込み待ちを開く」があり、押すとopenHandoffを送る。実行ファイルがhandoffを持たなければ無効で、理由を出す", async () => {
   await checkHandoffLink((handoff) => openPhases({ handoff }));
 });

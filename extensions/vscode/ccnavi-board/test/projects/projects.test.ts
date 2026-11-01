@@ -17,7 +17,7 @@ import {
 import { parseLintJson } from "../../src/core/lintmodel.js";
 import { fixture } from "../helpers/fixture.js";
 
-test("CB-T60 URL は https / ssh / scp 風の 3 形を通し、同じリポジトリは同じキーになる", () => {
+test("CB-T60 URLはhttps / ssh / scp風の3形を通し、同じリポジトリは同じキーになる", () => {
   const https = checkRemote("https://GitLab.example.com/group/Repo.git");
   const ssh = checkRemote("ssh://git@gitlab.example.com:2222/group/repo");
   const scp = checkRemote("git@gitlab.example.com:group/repo.git");
@@ -30,7 +30,7 @@ test("CB-T60 URL は https / ssh / scp 風の 3 形を通し、同じリポジ�
   assert.equal(remoteKeyOf("git@github.com:org/lib.git"), "github.com/org/lib");
 });
 
-test("CB-T61 ローカルパス・file・資格情報入りの URL は通さない", () => {
+test("CB-T61 ローカルパス・file・資格情報入りのURLは通さない", () => {
   for (const bad of ["", "   ", "/repo/x", "C:\\repo\\x", "file:///repo/x", "http://host/x", "git://host/x", "https://host", "a b"]) {
     const checked = checkRemote(bad);
     assert.equal(checked.ok, false, bad);
@@ -38,12 +38,12 @@ test("CB-T61 ローカルパス・file・資格情報入りの URL は通さな�
   const creds = checkRemote("https://user:glpat-x@gitlab.example.com/g/p.git");
   assert.ok(!creds.ok);
   assert.match(creds.error, /資格情報/);
-  // ssh の git@ はユーザ名であって資格情報ではない
+  // sshのgit@ はユーザ名であって資格情報ではない
   assert.ok(checkRemote("ssh://git@host.example/g/p").ok);
   assert.equal(remoteKeyOf("/local/path"), "");
 });
 
-test("CB-T62 名前は ASCII に絞り、既存のプロジェクトかワークツリーの名前と大文字小文字違いでも衝突する", () => {
+test("CB-T62 名前はASCIIに絞り、既存のプロジェクトかワークツリーの名前と大文字小文字違いでも衝突する", () => {
   assert.deepEqual(checkName(" lib ", []), { ok: true, name: "lib" });
   assert.ok(checkName("my.repo_1-x", []).ok);
   for (const bad of ["", ".hidden", "ライブラリ", "a/b", "a b", "-x"]) {
@@ -57,14 +57,14 @@ test("CB-T62 名前は ASCII に絞り、既存のプロジェクトかワーク
   assert.ok(!worktree.ok);
 });
 
-test("CB-T63 clone はターミナル向けの 1 行になる", () => {
+test("CB-T63 cloneはターミナル向けの1行になる", () => {
   assert.equal(
     cloneCommand("C:\\ws", "C:\\ws\\projects", "git@host:g/p.git", "p"),
     "cd 'C:/ws' && git clone -- 'git@host:g/p.git' 'C:/ws/projects/p'",
   );
 });
 
-test("CB-T64 プロジェクトになっていない .git を深さ 2 まで探し、置き場の中は 1 段深く見る", () => {
+test("CB-T64 プロジェクトになっていない .gitを深さ2まで探し、置き場の中は1段深く見る", () => {
   const tree: Record<string, readonly DirEntry[]> = {
     "": [
       dir("projects"), dir("参考"), dir("tools"), dir("node_modules"), dir(".claude"), dir("src"), file("README.md"),
@@ -96,7 +96,7 @@ test("CB-T64 プロジェクトになっていない .git を深さ 2 まで探�
   ]);
 });
 
-test("CB-T65 .gitignore の置き場の行を見つけ、なければ追加する", () => {
+test("CB-T65 .gitignoreの置き場の行を見つけ、なければ追加する", () => {
   assert.equal(gitignoreHasProjects("/dist/\n/projects/\n", "projects"), true);
   assert.equal(gitignoreHasProjects("projects\n", "projects"), true);
   assert.equal(gitignoreHasProjects("/projects/lib/\n", "projects"), false);
@@ -107,7 +107,7 @@ test("CB-T65 .gitignore の置き場の行を見つけ、なければ追加す�
   assert.match(gitignoreWithProjects(undefined, "projects"), /^# .*\n\/projects\/\n$/);
 });
 
-test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引ける", () => {
+test("CB-T67 lintのJSONを読み、プロジェクトごとの苦情を引ける", () => {
   const parsed = parseLintJson(
     JSON.stringify({
       version: 1,
@@ -117,7 +117,7 @@ test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引�
       ticket_control: "enable",
       projects: ["app", "lib"],
       problems: [
-        { severity: "warn", where: "(projects)", detail: "projects/ がワークスペースの git で無視されていない" },
+        { severity: "warn", where: "(projects)", detail: "projects/ がワークスペースのgitで無視されていない" },
         { severity: "warn", where: "(projects/lib)", detail: ".claude/ がある" },
         { severity: "error", where: "(projects/app) no-message", detail: "文面がありません" },
         { severity: "warn", where: "(projects/application)", detail: "別のプロジェクト" },
@@ -171,7 +171,7 @@ test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引�
   assert.equal(duplicateOf(page.rows, ""), undefined);
 });
 
-test("CB-T68 lint の JSON の版が違えば読まない", () => {
+test("CB-T68 lintのJSONの版が違えば読まない", () => {
   const parsed = parseLintJson(JSON.stringify({ version: 2, problems: [] }));
   assert.ok(!parsed.ok);
   assert.match(parsed.error, /版が違います/);

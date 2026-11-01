@@ -3,7 +3,7 @@
  * 知らない値はそのまま出す（実行ファイルが種類や状態を足しても、画面が黙って読み違えない）。
  */
 
-/** 種類の言葉。`kind` の値も併記して、実行ファイルの答えと突き合わせられるようにする */
+/** 種類の言葉。`kind`の値も併記して、実行ファイルの答えと突き合わせられるようにする */
 export function kindLabel(kind: string): string {
   switch (kind) {
     case "template":
@@ -13,7 +13,7 @@ export function kindLabel(kind: string): string {
     case "docs":
       return "docs";
     case "defense":
-      return "防御（hook など・ターミナルのみ）";
+      return "防御（hookなど・ターミナルのみ）";
     default:
       return kind === "" ? "（種類なし）" : kind;
   }
@@ -21,7 +21,7 @@ export function kindLabel(kind: string): string {
 
 /** 防御の説明。何が防御か、なぜターミナルのみか（`docs/requirements/handoff.md`） */
 export const DEFENSE_NOTE =
-  "防御は、エージェントを止める仕組み（hook やラッパースクリプトなど）のファイルです。ボードから取り込むと防御を外せてしまうため、ユーザのターミナルで打って取り込みます。";
+  "防御は、エージェントを止める仕組み（hookやラッパースクリプトなど）のファイルです。ボードから取り込むと防御を外せてしまうため、ユーザのターミナルで打って取り込みます。";
 
 /** 状態の言葉 */
 export function stateLabel(state: string): string {
@@ -39,7 +39,7 @@ export function stateLabel(state: string): string {
   }
 }
 
-/** 状態のバッジの色。取り込める状態は ok、取り込めない状態は bad、変更なしは色なし */
+/** 状態のバッジの色。取り込める状態はok、取り込めない状態はbad、変更なしは色なし */
 export function stateTone(state: string): "ok" | "bad" | "" {
   if (state === "new" || state === "changed") {
     return "ok";

@@ -1,10 +1,10 @@
 /*
- * 配点 1 件の行（`Factor.tsx`）。行の見出しの列と、点の桁揃え。
- * 行・開閉・欄名の骨組みは設定 3 画面で同じ `@ccnavi/shared/styles/list.css`（extensions/shared）が持つ。
+ * 配点1件の行（`Factor.tsx`）。行の見出しの列と、点の桁揃え。
+ * 行・開閉・欄名の骨組みは設定3画面で同じ`@ccnavi/shared/styles/list.css`（extensions/shared）が持つ。
  */
-/* 1 行 = 開閉、id、points、加点条件と値と理由 */
+/* 1行 = 開閉、id、points、加点条件と値と理由 */
 .factor .row-head { grid-template-columns: 18px minmax(110px, 160px) 60px minmax(0, 1fr); }
-/* 狭いときは 2 段。1 段目 = 開閉、id、points。2 段目 = 加点条件と値と理由 */
+/* 狭いときは2段。1段目 = 開閉、id、points。2段目 = 加点条件と値と理由 */
 @media (max-width: 520px) {
   .factor .row-head { grid-template-columns: 18px minmax(0, 1fr) 60px; }
   .factor .sum > .clip { grid-row: 2; grid-column: 2 / -1; }

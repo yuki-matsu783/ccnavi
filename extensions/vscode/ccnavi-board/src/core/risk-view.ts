@@ -1,21 +1,21 @@
 /**
- * リスク管理画面の、拡張ホストと Webview の間の契約。
+ * リスク管理画面の、拡張ホストとWebviewの間の契約。
  *
- * 画面は React で組み、拡張ホストは HTML を組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。拡張ホストが渡すのは
+ * 画面はReactで組み、拡張ホストはHTMLを組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。拡張ホストが渡すのは
  * 「いま何を見せるか」（`RiskData`）だけで、境目の点の欄も項目の行も画面が作る。画面が返すのは
- * ユーザが押した操作（`RiskMessage`）だけで、点も数えず、ファイルも書かない。点を数えるのは実行ファイルだけにして、答えを 2 か所に持たない。
+ * ユーザが押した操作（`RiskMessage`）だけで、点も数えず、ファイルも書かない。点を数えるのは実行ファイルだけにして、答えを2か所に持たない。
  *
- * 配点の形（`KINDS`・`FactorForm` など）もここに置く。 読み書き（`risk-doc.ts`）の側に
- * 置いたままだと、画面がそこから `yaml` を辿ることになり、バンドルしたものに YAML の解析器がすべて入る。
- * 同じ理由で、ここには VS Code の API も DOM も node も入れない。
+ * 配点の形（`KINDS`・`FactorForm`など）もここに置く。 読み書き（`risk-doc.ts`）の側に
+ * 置いたままだと、画面がそこから`yaml`を辿ることになり、バンドルしたものにYAMLの解析器がすべて入る。
+ * 同じ理由で、ここにはVS CodeのAPIもDOMもnodeも入れない。
  *
- * 編集する 1 本は、共通の設定・ワークスペースの設定・プロジェクトの設定のどれか（画面上部の「設定」の欄で切り替える。
- * タブは 1 枚）。それとは別に、読み取り専用の統合結果（`RiskPage.sums`）を持つ。
+ * 編集する1本は、共通の設定・ワークスペースの設定・プロジェクトの設定のどれか（画面上部の「設定」の欄で切り替える。
+ * タブは1枚）。それとは別に、読み取り専用の統合結果（`RiskPage.sums`）を持つ。
  *
- * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
- * 入れ物は 1 度しか入らない（入れ直すと打ちかけの編集が消える）。中身（`data`）が届くのは、画面の編集を破棄してよいとき
+ * この画面は`retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は`retainedHost`で、
+ * 入れ物は1度しか入らない（入れ直すと打ちかけの編集が消える）。中身（`data`）が届くのは、画面の編集を破棄してよいとき
  * だけ（ユーザが「更新」を押した、保存や作成が通って中身が入れ替わった）。ファイルが外で
- * 変わっただけのときは `changed` の帯を出し、破棄するかどうかはユーザが決める。
+ * 変わっただけのときは`changed`の帯を出し、破棄するかどうかはユーザが決める。
  */
 import type { HandoffEntry, OpenHandoffMessage } from "./handoff-entry.js";
 import type { AppearanceMessage } from "./appearance.js";
@@ -26,31 +26,31 @@ import type { TargetOption } from "./targets.js";
 
 // ---- 配点の形（画面と読み書きで分け合う）
 
-/** 加点条件。1 件につき 1 つ。ccnavi の risk.KINDS と同じ順 */
+/** 加点条件。1件につき1つ。ccnaviのrisk.KINDSと同じ順 */
 export const KINDS = ["lines_over", "files_over", "deleted_over", "glob", "script", "judge"] as const;
 export type FactorKind = (typeof KINDS)[number];
 
-/** リスクレベルの名前は固定。境目の点だけ動かす。LOW は境目の点を持たない */
+/** リスクレベルの名前は固定。境目の点だけ動かす。LOWは境目の点を持たない */
 export const LEVEL_NAMES = ["medium", "high", "critical"] as const;
 export type LevelName = (typeof LEVEL_NAMES)[number];
 
-/** 組み込みの配点（risk.builtin と同じ値）。ファイルが無いときに画面が見せ、作るときに書き出す */
+/** 組み込みの配点（risk.builtinと同じ値）。ファイルが無いときに画面が見せ、作るときに書き出す */
 export const BUILTIN_LEVELS: Readonly<Record<LevelName, number>> = { medium: 20, high: 40, critical: 70 };
 
-/** 画面で編集する項目 1 件。`origin` は読み込んだときの位置で、新しい項目は null */
+/** 画面で編集する項目1件。`origin`は読み込んだときの位置で、新しい項目はnull */
 export interface FactorForm {
   readonly origin: number | null;
   readonly id: string;
-  /** 加点。整数のはずだが欄の文字のまま持つ。整数でなければそのまま書いて lint が言う */
+  /** 加点。整数のはずだが欄の文字のまま持つ。整数でなければそのまま書いてlintが言う */
   readonly points: string;
   readonly kind: FactorKind;
-  /** 加点条件の値。lines_over 等なら基準、glob ならパターン、script ならパス、judge なら問い */
+  /** 加点条件の値。lines_over等なら基準、globならパターン、scriptならパス、judgeなら問い */
   readonly value: string;
-  /** glob の上限。空なら青天井（欄を書かない） */
+  /** globの上限。空なら青天井（欄を書かない） */
   readonly max: string;
-  /** lines_over / files_over / deleted_over が数えるパス（glob を 1 行に 1 つ）。空なら全パス（欄を書かない） */
+  /** lines_over / files_over / deleted_overが数えるパス（globを1行に1つ）。空なら全パス（欄を書かない） */
   readonly include: string;
-  /** 同じく数えないパス。include にヒットしていても外す。空なら外さない（欄を書かない） */
+  /** 同じく数えないパス。includeにヒットしていても外す。空なら外さない（欄を書かない） */
   readonly exclude: string;
   readonly message: string;
 }
@@ -68,14 +68,14 @@ export interface RiskModel {
   readonly problems: readonly string[];
 }
 
-/** 加点条件の説明。select のラベルと、値の欄の placeholder */
+/** 加点条件の説明。selectのラベルと、値の欄のplaceholder */
 export const KIND_LABELS: Readonly<Record<FactorKind, { readonly label: string; readonly placeholder: string }>> = {
   lines_over: { label: "変更した行数が基準を超えたら加点", placeholder: "300（追加と削除の合計がこれを超えたら加点）" },
   files_over: { label: "変更したファイル数が基準を超えたら加点", placeholder: "10（変更したファイルの数がこれを超えたら加点）" },
   deleted_over: { label: "削除したファイル数が基準を超えたら加点", placeholder: "3（削除したファイルの数がこれを超えたら加点）" },
-  glob: { label: "glob に該当するファイルを 1 つ変更するごとに加点", placeholder: ".github/**（ワークツリーのルートからの相対。該当するファイル 1 つごとに points を加点し、max が上限）" },
-  script: { label: "スクリプトが返した点を加点", placeholder: ".ccnavi/config/common/scripts/xxx.sh（.ccnavi/config/common/scripts/ の下だけ。スクリプトが返した点を加点し、失敗や読み込めない出力なら points を加点）" },
-  judge: { label: "サブエージェントの答えが yes なら加点", placeholder: "テストのない振る舞いの変更を含むか（差分を読んで yes/no で答えられる質問。yes で加点）" },
+  glob: { label: "globにヒットするファイルを1つ変更するごとに加点", placeholder: ".github/**（ワークツリーのルートからの相対。ヒットするファイル1つごとにpointsを加点し、maxが上限）" },
+  script: { label: "スクリプトが返した点を加点", placeholder: ".ccnavi/config/common/scripts/xxx.sh（.ccnavi/config/common/scripts/の下だけ。スクリプトが返した点を加点し、失敗や読み込めない出力ならpointsを加点）" },
+  judge: { label: "サブエージェントの答えがyesなら加点", placeholder: "テストのない振る舞いの変更を含むか（差分を読んでyes/noで答えられる質問。yesで加点）" },
 };
 
 // ---- 画面に見せる形
@@ -113,19 +113,19 @@ export interface RiskPage {
 
 /**
  * 画面に見せる中身。読み直せなかったときは配点の代わりに文面を渡す（`kind: "error"`）。
- * ボード・プロジェクト管理と同じ形で、画面はどちらでも 1 枚を描く。
+ * ボード・プロジェクト管理と同じ形で、画面はどちらでも1枚を描く。
  */
 export type RiskData =
   | { readonly kind: "page"; readonly page: RiskPage }
-  /** `targets` は読めなかった画面から別の対象へ戻るための欄（共通・ワークスペースと、いま開いていた対象）。ボードを読めていないので、ほかのプロジェクトは載せない */
+  /** `targets`は読めなかった画面から別の対象へ戻るための欄（共通・ワークスペースと、いま開いていた対象）。ボードを読めていないので、ほかのプロジェクトは載せない */
   | { readonly kind: "error"; readonly error: string; readonly target?: { readonly kind: string; readonly name: string }; readonly targets?: readonly TargetOption[] }
-  /** 開いているタブの対象を切り替えて、新しい対象を読んでいる間（タブは 1 枚）。`text` は画面に出す一言 */
+  /** 開いているタブの対象を切り替えて、新しい対象を読んでいる間（タブは1枚）。`text`は画面に出す一言 */
   | { readonly kind: "loading"; readonly text: string };
 
 /**
- * 拡張ホスト → 画面。中身を包む形は `screen-host.ts` が決める（渡すのはそこ）。
+ * 拡張ホスト → 画面。中身を包む形は`screen-host.ts`が決める（渡すのはそこ）。
  *
- * `failed` は操作の結果をその場で言う一言、`lock` は保存してよいかの取り直し、`changed` は
+ * `failed`は操作の結果をその場で言う一言、`lock`は保存してよいかの取り直し、`changed`は
  * ファイルが外で変わったという帯。どれも画面の編集には触らない。
  */
 export type ToRisk =
@@ -133,7 +133,7 @@ export type ToRisk =
   | { readonly type: "failed"; readonly message: string }
   | { readonly type: "lock"; readonly lock: Lock }
   | { readonly type: "changed" }
-  /** 保存が通った（中身 `data` を渡した直後に送る）。検証の warn の本文。画面は上部の帯に出し、次の編集か更新で消す */
+  /** 保存が通った（中身`data`を渡した直後に送る）。検証のwarnの本文。画面は上部の帯に出し、次の編集か更新で消す */
   | { readonly type: "saved"; readonly warns: readonly string[] }
   /** 頼んだ往復が起きなかった（ユーザが「破棄して読み直す？」をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
@@ -141,7 +141,7 @@ export type ToRisk =
   | { readonly type: "tour" }
   | AppearanceMessage;
 
-/** 画面 → 拡張ホスト。受け側（risk-panel の `asMessage`）が形を確かめてから使う */
+/** 画面 → 拡張ホスト。受け側（risk-panelの`asMessage`）が形を確かめてから使う */
 export type RiskMessage =
   /** 画面が組み上がった。拡張ホストはここで中身を渡し直す */
   | { readonly type: "ready" }
@@ -157,10 +157,10 @@ export type RiskMessage =
   | { readonly type: "switchTarget"; readonly kind: string; readonly name: string }
   | OpenHandoffMessage;
 
-/** 最初の中身を埋める `<script type="application/json">` の id。画面はこれを読んで最初の 1 枚を描く */
+/** 最初の中身を埋める`<script type="application/json">`のid。画面はこれを読んで最初の1枚を描く */
 export const DATA_ID = "ccnavi-risk-data";
 
-/** 最初の中身を HTML に埋める形にする。埋め方は `screen-host.ts` が持つ（React の画面で同じ） */
+/** 最初の中身をHTMLに埋める形にする。埋め方は`screen-host.ts`が持つ（Reactの画面で同じ） */
 export function embedData(data: RiskData): string {
   return embedJson(data);
 }

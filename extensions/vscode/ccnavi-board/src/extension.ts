@@ -19,7 +19,7 @@ import { openWorkflow } from "./workflow-panel.js";
 export function activate(context: vscode.ExtensionContext): void {
   // 画面ごとの初回の案内を見たかどうかの置き場（`globalState`）
   initTours(context);
-  // 画面の入口はここに集める。画面どうしは互いを import せず、ここで登録した一覧を通して互いを開く。
+  // 画面の入口はここに集める。画面どうしは互いをimportせず、ここで登録した一覧を通して互いを開く。
   registerScreens({
     board: openBoard,
     rules: openRules,
@@ -50,10 +50,10 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("ccnaviBoard.tourBasics", runBasicTours),
     vscode.commands.registerCommand("ccnaviBoard.tourProjects", () => runScreenTour("projects")),
     vscode.commands.registerCommand("ccnaviBoard.tourBoard", () => runScreenTour("board")),
-    // 親の識別子を引数で受けて開く（キーバインドの args や、ほかの拡張の executeCommand から）。開く親を選ぶ段が
-    // 無いので、コマンドパレットには出さない（package.json の menus.commandPalette で when: false）
+    // 親の識別子を引数で受けて開く（キーバインドのargsや、ほかの拡張のexecuteCommandから）。開く親を選ぶ段が
+    // 無いので、コマンドパレットには出さない（package.jsonのmenus.commandPaletteでwhen: false）
     vscode.commands.registerCommand("ccnaviBoard.openWorkflow", (ticket: unknown) => void screens().workflow(String(ticket ?? ""))),
-    // バグ報告。撮る・終えるは報告の間だけコマンドパレットに出す（package.json の when）
+    // バグ報告。撮る・終えるは報告の間だけコマンドパレットに出す（package.jsonのwhen）
     vscode.commands.registerCommand("ccnaviBoard.bugReport", () => void startReport()),
     vscode.commands.registerCommand("ccnaviBoard.bugReportScreenshot", () => void takeScreenshot()),
     vscode.commands.registerCommand("ccnaviBoard.bugReportFinish", () => void finishReport()),
@@ -64,5 +64,5 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 export function deactivate(): void {
-  // 後始末は context.subscriptions とパネルの onDidDispose が担う
+  // 後始末はcontext.subscriptionsとパネルのonDidDisposeが担う
 }

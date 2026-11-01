@@ -1,29 +1,29 @@
 /**
- * テンプレート管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
- * VS Code の API に触れるので単体テストの対象外。docs/design/manual-checks.md の手動確認の手順で確かめる。
+ * テンプレート管理画面のWebviewパネル。生成・更新・破棄、ファイル監視、Webviewからの操作の受け付け。
+ * VS CodeのAPIに触れるので単体テストの対象外。docs/design/manual-checks.mdの手動確認の手順で確かめる。
  *
- * 画面は React（`src/webview/templates/`）で、ここが渡すのは「いま何を見せるか」（`TemplatesData`）だけ。
- * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は開いた行を持つので
- * `retainContextWhenHidden` が真で、入れ物（HTML）は 1 度しか入らない。入れ直すと画面が作り直され、開いた行が閉じるため。
+ * 画面はReact（`src/webview/templates/`）で、ここが渡すのは「いま何を見せるか」（`TemplatesData`）だけ。
+ * 渡し方は`core/screen-host.ts`の`retainedHost`が決める。この画面は開いた行を持つので
+ * `retainContextWhenHidden`が真で、入れ物（HTML）は1度しか入らない。入れ直すと画面が作り直され、開いた行が閉じるため。
  * 中身を渡すのは、ユーザが「更新」を押したときと、ファイルが外で変わったのを読み直したときだけ。
  *
- * 対象は 3 種。共通の設定のテンプレート（`.ccnavi/config/common/templates/`）、ワークスペースの設定のテンプレート、
- * プロジェクト 1 つの設定のテンプレート。画面は一覧・検索・表示と、開いている対象の層のテンプレートの編集（計画のステップと線・子のフロー）。
- * 読んだ中身（一覧・層ごとの中身・統合結果の索引・下書き）は `ccnavi --templates --json` の答えをそのまま渡す。
+ * 対象は3種。共通の設定のテンプレート（`.ccnavi/config/common/templates/`）、ワークスペースの設定のテンプレート、
+ * プロジェクト1つの設定のテンプレート。画面は一覧・検索・表示と、開いている対象のレイヤーのテンプレートの編集（計画のステップと線・子のフロー）。
+ * 読んだ中身（一覧・レイヤーごとの中身・統合結果の索引・下書き）は`ccnavi --templates --json`の答えをそのまま渡す。
  *
  * **編集。** 編集中の中身は画面が持つ。拡張ホストが受け持つのは、実行ファイルでの検査（`--templates --check-file`）と保存だけ。
- * 読めるか・計画の順序・フローの形・図に描く中身は、実行ファイルの答えのまま。保存は、(1) 書き出す本文を実行ファイルで検査して error が無い、
- * (2) 実行ファイルが読み返した中身が、画面が書こうとした中身と同じ（食い違えば書かない）、(3) 開いたときからファイルが外で変わっていない
- * （ハッシュが同じ。新規はまだ無い）、(4) リンクを辿らず一時ファイルの入れ替えで書く（`core/flow-write.ts`）、を満たしたときだけ書く。
- * 編集できるのは、開いている対象の層で、実行ファイルが書ける（`writable`）と答えた層のテンプレートだけ。
+ * 読めるか・計画の順序・フローの形・図に描く中身は、実行ファイルの答えのまま。保存は、(1)書き出す本文を実行ファイルで検査してerrorが無い、
+ * (2)実行ファイルが読み返した中身が、画面が書こうとした中身と同じ（食い違えば書かない）、(3)開いたときからファイルが外で変わっていない
+ * （ハッシュが同じ。新規はまだ無い）、(4)リンクを辿らず一時ファイルの入れ替えで書く（`core/flow-write.ts`）、を満たしたときだけ書く。
+ * 編集できるのは、開いている対象のレイヤーで、実行ファイルが書ける（`writable`）と答えたレイヤーのテンプレートだけ。
  * **作業中の錠。** 作業中のチケットがある間は、編集はできるが保存できない（取り込み待ち画面がテンプレートの取り込みを止めるのと同じ決まり。
  * 共通の設定とワークスペースはどのツリーの作業中でも、プロジェクトはそのプロジェクトの作業中だけ。確かめられなければ止める）。
  * 錠は編集を始めたときと、チケットが動いたときと、保存を押した時点で取り直す。実行ファイルには錠を足さない。
  * 改名・移動・削除は持たない（ユーザがファイルを直接操作する）。
- * 下書き（`wip/handoff/` の `template`）の取り込みと編集は「取り込み待ち」の画面が受け持つ。ここからはそちらを開く入口だけを持つ。
- * タブは 1 枚だけで、別の対象を開くとそのタブの中身を入れ替える。
+ * 下書き（`wip/handoff/`の`template`）の取り込みと編集は「取り込み待ち」の画面が受け持つ。ここからはそちらを開く入口だけを持つ。
+ * タブは1枚だけで、別の対象を開くとそのタブの中身を入れ替える。
  *
- * チケット制御が disable のワークスペースでは開かない。入口（サイドパネル・コマンドパレット）も同じキーで隠れる。
+ * チケット制御がdisableのワークスペースでは開かない。入口（サイドパネル・コマンドパレット）も同じキーで隠れる。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -53,54 +53,54 @@ import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 import { confirmDuringTurn } from "./turn-confirm.js";
 
-/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+/** 画面の名前。バンドルのパスは`src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "templates";
-const TITLE = "ccnavi テンプレート管理";
+const TITLE = "ccnaviテンプレート管理";
 
-/** 1 枚の画面の「どの対象か」を画面の欄の値にコピーするための、対象の一覧の既定（共通の設定の欄の kind） */
+/** 1枚の画面の「どの対象か」を画面の欄の値にコピーするための、対象の一覧の既定（共通の設定の欄のkind） */
 const COMMON_KIND = "workspace";
 
 interface Loaded {
   /** 読んだ対象。往復の間に切り替わったかを見る */
   readonly target: TemplatesTarget;
-  /** `ccnavi --templates --json` の答え */
+  /** `ccnavi --templates --json`の答え */
   readonly data: TemplatesJson;
   /** 切り替えられる対象（共通の設定・ワークスペース・設定のあるプロジェクト） */
   readonly targets: readonly TargetOption[];
-  /** 取り込み待ち画面を開けるか。実行ファイルが `handoff` の機能を持たなければ理由 */
+  /** 取り込み待ち画面を開けるか。実行ファイルが`handoff`の機能を持たなければ理由 */
   readonly handoff: HandoffEntry;
   /** 上部に出す注意。今は空のまま渡す（画面の欄を残すため） */
   readonly notices: readonly string[];
 }
 
 interface PanelState {
-  /** いま見せている対象。別の対象を開くと入れ替わる（タブは 1 枚） */
+  /** いま見せている対象。別の対象を開くと入れ替わる（タブは1枚） */
   target: TemplatesTarget;
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   readonly host: ScreenHost<TemplatesData>;
-  /** テンプレートの置き場と設定ファイルの監視。対象の層が変わるので、再読み込みのたびに張り直す */
+  /** テンプレートの置き場と設定ファイルの監視。対象のレイヤーが変わるので、更新のたびに張り直す */
   fileWatchers: vscode.FileSystemWatcher[];
   timer?: NodeJS.Timeout;
   loaded?: Loaded;
-  /** 読み直せなかった理由。`loaded` と排他で、どちらかは必ず入っている */
+  /** 読み直せなかった理由。`loaded`と排他で、どちらかは必ず入っている */
   error?: string;
   /** 編集中の本文を実行ファイルに読ませるための一時の置き場。最初に読ませるときに作り、閉じるときに消す */
   tmpDir?: string;
-  /** 編集欄を開いている番号。閉じていれば undefined。開いている間だけ、チケットが動いたら錠を取り直して知らせる */
+  /** 編集欄を開いている番号。閉じていればundefined。開いている間だけ、チケットが動いたら錠を取り直して知らせる */
   editing?: number;
   /** 作業中の錠の監視（チケットの置き場）と、取り直しの待ち・番号 */
   lockWatchers: vscode.FileSystemWatcher[];
   lockTimer?: NodeJS.Timeout;
   lockSeq: number;
   /**
-   * 読み直しの番号。読むたびに 1 つ進め、読み終えたときに変わっていたら破棄する。
+   * 読み直しの番号。読むたびに1つ進め、読み終えたときに変わっていたら破棄する。
    * 実行ファイルに聞く間に別の対象へ切り替わると、前の対象の答えが後から届くため
    */
   seq: number;
 }
 
-/** 開いているパネル。種類ごとに 1 枚 */
+/** 開いているパネル。種類ごとに1枚 */
 let state: PanelState | undefined;
 
 function sameTarget(a: TemplatesTarget, b: TemplatesTarget): boolean {
@@ -115,7 +115,7 @@ function whatOf(target: TemplatesTarget): string {
     case "self":
       return "ワークスペース";
     case "project":
-      return `プロジェクト ${target.name}`;
+      return `プロジェクト${target.name}`;
   }
 }
 
@@ -123,7 +123,7 @@ function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
-/** `ccnaviBoard.openTemplates` の本体。引数なしはワークスペースの設定のテンプレート */
+/** `ccnaviBoard.openTemplates`の本体。引数なしはワークスペースの設定のテンプレート */
 export async function openTemplates(target: TemplatesTarget = { kind: "self" }): Promise<void> {
   if (!requireTickets("テンプレート管理画面")) {
     return;
@@ -146,7 +146,7 @@ export async function openTemplates(target: TemplatesTarget = { kind: "self" }):
     return;
   }
 
-  // 画面と CSS はバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面とCSSはバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
@@ -156,8 +156,8 @@ export async function openTemplates(target: TemplatesTarget = { kind: "self" }):
   }
 
   // タブは読む前に作る。実行ファイルに聞く間に、押しても何も起きないように見えるのを避けるため。
-  // `state` を先に設定するので、読んでいる間に押し直しても上の `reveal` に入る。
-  // 読めなかったときもタブは閉じず、中にエラーを出す（`reload` の `showError`）
+  // `state`を先に設定するので、読んでいる間に押し直しても上の`reveal`に入る。
+  // 読めなかったときもタブは閉じず、中にエラーを出す（`reload`の`showError`）
   const panel = vscode.window.createWebviewPanel("ccnaviTemplates", TITLE, vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
@@ -184,13 +184,13 @@ export async function openTemplates(target: TemplatesTarget = { kind: "self" }):
 
 /**
  * 開いているタブの対象を入れ替える。読み終えるまでは前の対象の中身を消して「読み込み中」を見せ、操作も受けない
- * （`loaded` を空にする）。
+ * （`loaded`を空にする）。
  */
 async function switchTarget(current: PanelState, target: TemplatesTarget): Promise<void> {
   current.target = target;
   current.loaded = undefined;
   current.error = undefined;
-  // 前の対象のファイルの監視は外す。切り替え先が読めたら `reload` が張り直す。読めずにエラーのままなら、
+  // 前の対象のファイルの監視は外す。切り替え先が読めたら`reload`が張り直す。読めずにエラーのままなら、
   // 前の対象の変化を拾い続けない
   if (current.timer !== undefined) {
     clearTimeout(current.timer);
@@ -205,7 +205,7 @@ async function switchTarget(current: PanelState, target: TemplatesTarget): Promi
 }
 
 async function readPage(root: string, target: TemplatesTarget): Promise<Loaded> {
-  // 一覧の中身（層・統合結果・下書き）は実行ファイルの答えをそのまま使う。層の場所も拡張は組まない。
+  // 一覧の中身（レイヤー・統合結果・下書き）は実行ファイルの答えをそのまま使う。レイヤーの場所も拡張は組まない。
   const board = await loadBoard(root, binSetting());
   if (!board.ok) {
     throw new Error(`ボードを実行ファイルから取得できません: ${board.error}`);
@@ -226,8 +226,8 @@ function registerPanelHandlers(current: PanelState): void {
     void handleMessage(current, asMessage(message));
   });
 
-  // 保持する画面は非表示でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
-  // 記述が一致していない（`retainContextWhenHidden` の側は「非表示の画面には送れない」と言う）。
+  // 保持する画面は非表示でも生きている（`postMessage`は届く）が、VS Codeの文書は同じ型定義の中で
+  // 記述が一致していない（`retainContextWhenHidden`の側は「非表示の画面には送れない」と言う）。
   // どちらが正しくても困らないよう、再表示されたところで、いま出すべき知らせを送り直す。
   // 中身（`data`）は送らない。送ると、非表示の間に開いていた行がここで閉じる。
   panel.onDidChangeViewState(() => {
@@ -267,7 +267,7 @@ function registerPanelHandlers(current: PanelState): void {
 
 /**
  * テンプレートの置き場と下書きの置き場（`wip/handoff/`）、設定ファイルが変わったら、読み直す。
- * 層の場所は読んだ答えから決まるので、再読み込みのたびに張り直す。
+ * レイヤーの場所は読んだ答えから決まるので、更新のたびに張り直す。
  */
 function watchFiles(current: PanelState): void {
   for (const watcher of current.fileWatchers) {
@@ -327,7 +327,7 @@ function show(current: PanelState): void {
   });
 }
 
-/** 読み直せなかったことを見せる。理由は覚えておく（渡せなかったときに `ready` で渡し直すため） */
+/** 読み直せなかったことを見せる。理由は覚えておく（渡せなかったときに`ready`で渡し直すため） */
 function showError(current: PanelState, error: string): void {
   current.loaded = undefined;
   current.error = error;
@@ -335,13 +335,13 @@ function showError(current: PanelState, error: string): void {
   current.host.send({ kind: "error", error, target, targets: targetOptions(undefined, COMMON_KIND, target) });
 }
 
-/** 開いている対象の欄の値（`targets.ts` の `kind` と `name`） */
+/** 開いている対象の欄の値（`targets.ts`の`kind`と`name`） */
 function currentKey(target: TemplatesTarget): { kind: string; name: string } {
   return { kind: target.kind, name: target.kind === "project" ? target.name : "" };
 }
 
 /**
- * いまの状態で渡し直す。1 枚目を読み込んでいる間に見送られたものは、画面が
+ * いまの状態で渡し直す。1枚目を読み込んでいる間に見送られたものは、画面が
  * 組み上がった（`ready`）ところでここから渡る。
  */
 function redraw(current: PanelState): void {
@@ -358,9 +358,9 @@ function redraw(current: PanelState): void {
 }
 
 /**
- * テンプレート管理の画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。
- * 入れ物は 1 度しか入らないので、表示の有無は渡さない（保持する画面は非表示でも生きている）。
- * パネルの `retainContextWhenHidden` を偽に変えると、送った先が破棄されていても気づけなくなる。
+ * テンプレート管理の画面に渡す手段。VS Codeのパネルを`retainedHost`の形に合わせる。
+ * 入れ物は1度しか入らないので、表示の有無は渡さない（保持する画面は非表示でも生きている）。
+ * パネルの`retainContextWhenHidden`を偽に変えると、送った先が破棄されていても気づけなくなる。
  * 型では止まらないので、ここで見て言う。
  */
 function templatesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<TemplatesData> {
@@ -410,13 +410,13 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
     return;
   }
   if (message.type === "ready") {
-    // 画面が組み上がった。1 枚目を読み込んでいる間に見送った中身は、ここで渡る。
-    // 見送るものが無くても渡し直す（同じ中身がもう 1 度届く）。VS Code が画面を作り直す経路
-    // （`Developer: Reload Webviews`）では、入れてある HTML の中身が古いことがあるため
+    // 画面が組み上がった。1枚目を読み込んでいる間に見送った中身は、ここで渡る。
+    // 見送るものが無くても渡し直す（同じ中身がもう1度届く）。VS Codeが画面を作り直す経路
+    // （`Developer: Reload Webviews`）では、入れてあるHTMLの中身が古いことがあるため
     current.host.ready();
     redraw(current);
     postAppearance(current.host);
-    // 初回だけ吹き出しの案内を頼む。画面は中身が出てから始め、閉じたら `tourDone` を返す
+    // 初回だけ吹き出しの案内を頼む。画面は中身が出てから始め、閉じたら`tourDone`を返す
     if (!tourSeen(SCREEN)) {
       current.host.post({ type: "tour" } satisfies ToTemplates);
     }
@@ -427,7 +427,7 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
     return;
   }
   // 読み直せていない画面では、中身にヒットする操作はどれも行き先が無い（「更新」は押せるが、
-  // その経路は `reload` が読み直しからやり直す）
+  // その経路は`reload`が読み直しからやり直す）
   if (current.loaded === undefined && message.type !== "refresh") {
     return;
   }
@@ -452,7 +452,7 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
       return;
     }
     case "showTemplate": {
-      // 1 件の本文は実行ファイルに読ませる。待つ間に別の対象へ切り替わっても、画面が名前と層で突き合わせる
+      // 1件の本文は実行ファイルに読ませる。待つ間に別の対象へ切り替わっても、画面が名前とレイヤーで突き合わせる
       const result = await runTemplateShow(current.folder.uri.fsPath, binSetting(), message.name, templatesLayerOf(currentKey(current.target)));
       if (!alive(current)) {
         return;
@@ -547,7 +547,7 @@ async function attempt(run: () => Promise<void>, fail: (error: string) => void):
   }
 }
 
-/** 編集のコピーを読ませるテンプレートの形。画面が送ってくる `data` は、名前を持つマッピングでなければ受けない */
+/** 編集のコピーを読ませるテンプレートの形。画面が送ってくる`data`は、名前を持つマッピングでなければ受けない */
 function dataOf(data: unknown): { readonly name: string } | undefined {
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
     return undefined;
@@ -593,7 +593,7 @@ function postOpened(current: PanelState, session: number, opened: Extract<ToTemp
   current.host.post({ type: "editOpened", session, opened, error } satisfies ToTemplates);
 }
 
-/** 編集してよい層。開いている対象の層で、実行ファイルが書けると答えたものだけ。理由は画面にそのまま出す */
+/** 編集してよいレイヤー。開いている対象のレイヤーで、実行ファイルが書けると答えたものだけ。理由は画面にそのまま出す */
 function editableLayer(current: PanelState, layerName: string): { readonly ok: true; readonly layer: TemplateLayer } | { readonly ok: false; readonly error: string } {
   const data = current.loaded?.data;
   if (data === undefined) {
@@ -601,22 +601,22 @@ function editableLayer(current: PanelState, layerName: string): { readonly ok: t
   }
   const shown = shownLayerOf(currentKey(current.target));
   if (layerName !== shown) {
-    return { ok: false, error: "開いている対象の層のテンプレートだけ編集できます。対象を切り替えてください" };
+    return { ok: false, error: "開いている対象のレイヤーのテンプレートだけ編集できます。対象を切り替えてください" };
   }
   const layer = data.layers.find((l) => l.name === shown);
   if (layer === undefined) {
     return { ok: false, error: "この設定のテンプレートの置き場を、実行ファイルが返していません" };
   }
   if (layer.unreadable !== "") {
-    return { ok: false, error: `この層の置き場を読めないため、編集できません: ${layer.unreadable}` };
+    return { ok: false, error: `このレイヤーの置き場を読めないため、編集できません: ${layer.unreadable}` };
   }
   if (!layer.writable) {
-    return { ok: false, error: "この層は読み取り専用です。実行ファイルが書き込めないと判定したため、置き場の権限を確かめてください" };
+    return { ok: false, error: "このレイヤーは読み取り専用です。実行ファイルが書き込めないと判定したため、置き場の権限を確かめてください" };
   }
   return { ok: true, layer };
 }
 
-/** 層の置き場のテンプレートのファイル。名前は形を確かめてから使う（ファイル名になるため） */
+/** レイヤーの置き場のテンプレートのファイル。名前は形を確かめてから使う（ファイル名になるため） */
 function templateFile(root: string, layer: TemplateLayer, name: string): string | undefined {
   if (!validTemplateName(name)) {
     return undefined;
@@ -627,7 +627,7 @@ function templateFile(root: string, layer: TemplateLayer, name: string): string 
   return rel === `${name}.yml` ? file : undefined;
 }
 
-/** 一時の置き場に `<名前>.yml` として書き、実行ファイルに読ませる。ファイル名が名前の期待値になる */
+/** 一時の置き場に`<名前>.yml`として書き、実行ファイルに読ませる。ファイル名が名前の期待値になる */
 async function checkBytes(
   current: PanelState,
   target: TemplatesTarget,
@@ -659,8 +659,8 @@ function sha256(bytes: string | Uint8Array): string {
 }
 
 /**
- * 読ませている間に、対象が別に切り替わった（またはパネルが閉じた）か。切り替わっていたら `reply` で理由を返して真を返す。
- * 層・錠・検査に使う対象は入口で控えたものに揃っているので、途中で変わった答えは使わない（別の層の錠で通さない）
+ * 読ませている間に、対象が別に切り替わった（またはパネルが閉じた）か。切り替わっていたら`reply`で理由を返して真を返す。
+ * レイヤー・錠・検査に使う対象は入口で控えたものに揃っているので、途中で変わった答えは使わない（別のレイヤーの錠で通さない）
  */
 function abandoned(current: PanelState, target: TemplatesTarget, reply: (error: string) => void): boolean {
   if (!alive(current)) {
@@ -674,8 +674,8 @@ function abandoned(current: PanelState, target: TemplatesTarget, reply: (error: 
 }
 
 /**
- * 一覧の 1 行を図で見せるため、そのファイルを実行ファイルに読ませて答えを返す。読むだけで、錠も編集の番号も取らない。
- * 層は開いている対象のどの層でもよい（読み取り専用の層も図は見られる）
+ * 一覧の1行を図で見せるため、そのファイルを実行ファイルに読ませて答えを返す。読むだけで、錠も編集の番号も取らない。
+ * レイヤーは開いている対象のどのレイヤーでもよい（読み取り専用のレイヤーも図は見られる）
  */
 async function preview(current: PanelState, name: string, layerName: string): Promise<void> {
   const target = current.target;
@@ -685,12 +685,12 @@ async function preview(current: PanelState, name: string, layerName: string): Pr
   const layer = current.loaded?.data.layers.find((l) => l.name === layerName);
   const file = layer === undefined ? undefined : templateFile(current.folder.uri.fsPath, layer, name);
   if (layer === undefined || file === undefined) {
-    reply(null, `テンプレート ${name} の置き場が分かりません`);
+    reply(null, `テンプレート${name}の置き場が分かりません`);
     return;
   }
   const read = readFlowFile(current.folder.uri.fsPath, file);
   if (read === undefined) {
-    reply(null, `${name}.yml がありません。更新してください`);
+    reply(null, `${name}.ymlがありません。更新してください`);
     return;
   }
   const decoded = decodeFlowBytes(read.bytes);
@@ -714,7 +714,7 @@ async function editOpen(current: PanelState, session: number, name: string, laye
   const where = editableLayer(current, layerName);
   const file = where.ok ? templateFile(current.folder.uri.fsPath, where.layer, name) : undefined;
   if (!where.ok || file === undefined) {
-    postOpened(current, session, null, where.ok ? `テンプレートの名前 ${name} は指定できません` : where.error);
+    postOpened(current, session, null, where.ok ? `テンプレートの名前${name}は指定できません` : where.error);
     return;
   }
   let read: ReturnType<typeof readFlowFile>;
@@ -725,7 +725,7 @@ async function editOpen(current: PanelState, session: number, name: string, laye
     return;
   }
   if (read === undefined) {
-    postOpened(current, session, null, `${name}.yml がありません。更新してから開き直してください`);
+    postOpened(current, session, null, `${name}.ymlがありません。更新してから開き直してください`);
     return;
   }
   const decoded = decodeFlowBytes(read.bytes);
@@ -767,26 +767,26 @@ async function editNew(current: PanelState, session: number, name: string): Prom
   }
   const file = validNewTemplateName(name) ? templateFile(current.folder.uri.fsPath, where.layer, name) : undefined;
   if (file === undefined) {
-    postOpened(current, session, null, `テンプレートの名前 ${name} は指定できません。${NEW_TEMPLATE_NAME_RULE}`);
+    postOpened(current, session, null, `テンプレートの名前${name}は指定できません。${NEW_TEMPLATE_NAME_RULE}`);
     return;
   }
-  // 大文字小文字だけが違う名前は同じものとして扱う（別の機械で 2 本が 1 本に重なるため）。共通の層にある名前も、
+  // 大文字小文字だけが違う名前は同じものとして扱う（別の機械で2本が1本に重なるため）。共通のレイヤーにある名前も、
   // 同名で中身が違うと統合結果で破棄されるので作らない
   const taken = current.loaded === undefined ? undefined : templateNameTaken(current.loaded.data.layers, layerName, name);
   if (taken !== undefined) {
-    postOpened(current, session, null, `名前 ${name} は、${taken.layer === "common" ? "共通" : "この層"}の ${taken.name} と同じです（大文字小文字は区別しません）。別の名前にしてください`);
+    postOpened(current, session, null, `名前${name}は、${taken.layer === "common" ? "共通" : "このレイヤー"}の${taken.name}と同じです（大文字小文字は区別しません）。別の名前にしてください`);
     return;
   }
   try {
     if (readFlowFile(current.folder.uri.fsPath, file) !== undefined) {
-      postOpened(current, session, null, `${name}.yml は既にあります。一覧から開いて編集してください`);
+      postOpened(current, session, null, `${name}.ymlは既にあります。一覧から開いて編集してください`);
       return;
     }
   } catch (error) {
     postOpened(current, session, null, (error as Error).message);
     return;
   }
-  // 型の選択肢を知るために、仮の 1 ステップで読ませる。画面はこの答えの `types` から最初のステップの型を決める
+  // 型の選択肢を知るために、仮の1ステップで読ませる。画面はこの答えの`types`から最初のステップの型を決める
   const data = { name, description: "", plan: ["implement"] };
   const checked = await checkBytes(current, target, name, yamlText(data));
   if (abandoned(current, target, (e) => postOpened(current, session, null, e))) {
@@ -811,7 +811,7 @@ async function editCheck(current: PanelState, session: number, seq: number, data
   };
   const named = dataOf(data);
   if (named === undefined || !validTemplateName(named.name)) {
-    reply(null, "テンプレートの名前が指定できません（英数字で始め、英数字と . _ - のみ、64 字まで）");
+    reply(null, "テンプレートの名前は指定できません（英数字で始め、英数字と「.」「_」「-」のみ、64字まで）");
     return;
   }
   const checked = await checkBytes(current, target, named.name, yamlText(data));
@@ -860,7 +860,7 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
     reply("", "保存しません: テンプレートの名前が不正か、中身の名前と食い違っています");
     return;
   }
-  // 1. 書き出す本文を実行ファイルに読ませる。error が 1 件でもあれば書かない
+  // 1. 書き出す本文を実行ファイルに読ませる。errorが1件でもあれば書かない
   const text = yamlText(data);
   const checked = await checkBytes(current, target, name, text);
   if (abandoned(current, target, (e) => reply("", e))) {
@@ -877,7 +877,7 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
   }
   // 2. 実行ファイルが読み返した中身が、画面が書こうとした中身と同じときだけ書く
   if (!sameData(data, checked.check.data)) {
-    reply("", "保存しません: 実行ファイルが読み返した中身が、画面の中身と食い違いました（YAML の読み方の違い）。食い違う欄を直してから、保存し直してください");
+    reply("", "保存しません: 実行ファイルが読み返した中身が、画面の中身と食い違いました（YAMLの読み方の違い）。食い違う欄を直してから、保存し直してください");
     return;
   }
   // 錠は、読ませている間に着手されたチケットを見逃さないよう、読んで書く直前（同期の区間の手前）にもう一度取り直す
@@ -899,7 +899,7 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
     return;
   }
   if (expect === "" ? read !== undefined : read === undefined || sha256(read.bytes) !== expect) {
-    reply("", expect === "" ? `${name}.yml は、開いたあとに画面の外で作られています。更新してからやり直してください（上書きしません）` : `${name}.yml は、開いたあとに画面の外で変わっています。この編集は上書きしません。更新して開き直してください`);
+    reply("", expect === "" ? `${name}.ymlは、開いたあとに画面の外で作られています。更新してからやり直してください（上書きしません）` : `${name}.ymlは、開いたあとに画面の外で変わっています。この編集は上書きしません。更新して開き直してください`);
     return;
   }
   // 4. リンクを辿らず、一時ファイルの入れ替えで書く

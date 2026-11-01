@@ -1,15 +1,15 @@
 /*
- * ルール 1 件の行（`Rule.tsx`）。行の見出しの列、ツールを選ぶ一覧、参照が切れた知らせ。
- * 行・開閉・欄名の骨組みは設定 3 画面で同じ `@ccnavi/shared/styles/list.css`（extensions/shared）が持つ。
+ * ルール1件の行（`Rule.tsx`）。行の見出しの列、ツールを選ぶ一覧、参照が切れた知らせ。
+ * 行・開閉・欄名の骨組みは設定3画面で同じ`@ccnavi/shared/styles/list.css`（extensions/shared）が持つ。
  */
-/* 1 行 = 開閉、id、match、パターンとメッセージ、every、コンテキストの有無 */
+/* 1行 = 開閉、id、match、パターンとメッセージ、every、コンテキストの有無 */
 .rule .row-head { grid-template-columns: 18px minmax(110px, 170px) minmax(90px, 190px) minmax(0, 1fr) max-content 14px; }
-/* 狭いときは 2 段。1 段目 = 開閉、id、match、every、コンテキスト。2 段目 = パターンとメッセージ */
+/* 狭いときは2段。1段目 = 開閉、id、match、every、コンテキスト。2段目 = パターンとメッセージ */
 @media (max-width: 520px) {
   .rule .row-head { grid-template-columns: 18px minmax(0, 1fr) minmax(0, 1fr) max-content 14px; }
   .rule .sum > .clip:not(.mono) { grid-row: 2; grid-column: 2 / -1; }
 }
-/* 刻みのバッジ。刻みが無い行でも空の枠を置く（置かないと右端の●が 1 列ずれる） */
+/* 刻みのバッジ。刻みが無い行でも空の枠を置く（置かないと右端の●が1列ずれる） */
 .sum .sum-every { color: var(--vscode-descriptionForeground); white-space: nowrap; }
 .field > input.f-every { max-width: 110px; }
 .rule.hit .row-head { box-shadow: inset 3px 0 0 var(--vscode-focusBorder); }
@@ -36,6 +36,6 @@ select.f-section { max-width: 120px; }
 .rule .stale { grid-column: 1 / -1; margin: 0; font-size: var(--font-md); color: var(--error-text); overflow-wrap: anywhere; }
 .rule .stale code { margin: 0 6px; }
 .rule .pattern { font-family: var(--vscode-editor-font-family); }
-/* 組み合わせ条件を 1 行に縮めたもの。誤りがあれば件数を添える（色だけに頼らず文で言う） */
+/* 組み合わせ条件を1行に縮めたもの。誤りがあれば件数を添える（色だけに頼らず文で言う） */
 .sum .sum-when { font-family: var(--vscode-editor-font-family); }
 .sum .sum-when-error { color: var(--error-text); }

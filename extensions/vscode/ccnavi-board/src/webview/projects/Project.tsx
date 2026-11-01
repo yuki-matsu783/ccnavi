@@ -1,8 +1,8 @@
 /**
- * プロジェクト 1 件のカード。
+ * プロジェクト1件のカード。
  *
- * 一覧を表ではなくカードにしているのは、表だと列が 7 本になり、幅が足りないと検証やチケットの列が
- * 1 文字ずつ縦に並んでしまうため。カードの中の項目は幅に合わせて 1〜3 段に組み替わる（CSS の grid）。
+ * 一覧を表ではなくカードにしているのは、表だと列が7本になり、幅が足りないと検証やチケットの列が
+ * 1文字ずつ縦に並んでしまうため。カードの中の項目は幅に合わせて1〜3段に組み替わる（CSSのgrid）。
  */
 import type { JSX } from "react";
 
@@ -24,7 +24,7 @@ export interface ProjectProps {
 export function Project({ row, ticketsEnabled, tour = false, mirror, act }: ProjectProps): JSX.Element {
   const problems = row.problems;
   const flags = [
-    row.doing > 0 ? { key: "doing", className: "badge doing", text: `作業中 ${row.doing}` } : undefined,
+    row.doing > 0 ? { key: "doing", className: "badge doing", text: `作業中${row.doing}` } : undefined,
     problems.some((p) => p.severity === "error") ? { key: "error", className: "badge error", text: "error" } : undefined,
     problems.some((p) => p.severity === "warn") ? { key: "warn", className: "badge warn", text: "warn" } : undefined,
   ].filter((f) => f !== undefined);
@@ -69,7 +69,7 @@ export function Project({ row, ticketsEnabled, tour = false, mirror, act }: Proj
               <span className="dim">なし</span>
             ) : (
               <>
-                {row.worktrees.length} 件 <span className="small dim">{row.worktrees.join(", ")}</span>
+                {row.worktrees.length}件 <span className="small dim">{row.worktrees.join(", ")}</span>
               </>
             )}
           </dd>
@@ -78,7 +78,7 @@ export function Project({ row, ticketsEnabled, tour = false, mirror, act }: Proj
           <div className="field">
             <dt>チケット</dt>
             <dd>
-              {row.tickets} 件{row.doing > 0 && <span className="dim">、作業中 {row.doing} 件</span>}
+              {row.tickets}件{row.doing > 0 && <span className="dim">、作業中{row.doing}件</span>}
             </dd>
           </div>
         )}
@@ -102,7 +102,7 @@ export function Project({ row, ticketsEnabled, tour = false, mirror, act }: Proj
 /** プロジェクトの設定のルールファイル。プロジェクトの設定として数えられていない（予約名）なら、置く先も出さない */
 function Rules({ row }: { readonly row: ProjectRow }): JSX.Element {
   if (row.rulesRel === "") {
-    return <span className="dim">設定の対象になっていません（検証の error を確認してください）</span>;
+    return <span className="dim">設定の対象になっていません（検証のerrorを確認してください）</span>;
   }
   if (row.rulesExists) {
     return (

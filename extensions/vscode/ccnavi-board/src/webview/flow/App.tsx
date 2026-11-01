@@ -9,24 +9,24 @@
  * 保存を押したときも、拡張ホストが実行ファイルに聞き直してから書く。
  *
  * 中身（`data`）が届いたら、編集中のフローはその中身で置き換える。 届くのは編集を破棄してよいとき
- * だけ（再読み込み・保存が通った）。履歴もそこで空にする。
+ * だけ（更新・保存が通った）。履歴もそこで空にする。
  *
- * コピーを替えるのは `edit()` だけ。 直す前のコピーを履歴（`core/flow-history.ts`）に積んでから替える。
- * 「未保存」は、読み込んだ中身（`base`）と見比べて決める（`core/flow-diff.ts` の `sameFlow`）ので、
+ * コピーを替えるのは`edit()`だけ。 直す前のコピーを履歴（`core/flow-history.ts`）に積んでから替える。
+ * 「未保存」は、読み込んだ中身（`base`）と見比べて決める（`core/flow-diff.ts`の`sameFlow`）ので、
  * 元に戻して読み込んだときと同じ中身になれば消える。
  *
  * 実行ファイルが言ったこと（`FlowChecks`）は画面で作らない。 開くときの答えは中身と一緒に届き、編集したら
  * 止まってから（`CHECK_MS`）拡張ホストに確かめ直しを頼む（`check` → `checked`。書きはしない）。答えの
- * warn は画面の注意と並べて出し、渡る手順は右の列のプレビュー、候補の名前は右の欄の選択肢に使う。
+ * warnは画面の注意と並べて出し、渡る手順は右の列のプレビュー、候補の名前は右の欄の選択肢に使う。
  *
  * エージェントの下書き。 拡張ホストが「提案あり」（`offer`）を渡したら帯を出す。開くと拡張ホストが
  * 実行ファイルに確かめさせた中身が届き（`proposal`）、文の前後まで見せる差分（`Proposal.tsx`）から「取り込む」で
- * 編集中の内容に入れる（`edit()` を通すので元に戻せる）。保存のときに取り込んだ下書きのハッシュを添え、拡張ホストは
+ * 編集中の内容に入れる（`edit()`を通すので元に戻せる）。保存のときに取り込んだ下書きのハッシュを添え、拡張ホストは
  * 保存が通ったあと、同じ中身の下書きだけを消す。依頼のボタン（`review-request`）は着手の前だけ拡張ホストが言葉を渡す。
  *
  * 案内（`tours/flow.yml`）。 案内の間は、実際のフローではなく案内用の見本（`core/tour-flow.ts`）を描く。見本の上の様子
- * （どの見本か・選ぶノード・未保存か・差分や下書きを出すか）は手順ごとの `scene` が決め、画面の state には入れない。
- * 実際の編集内容・履歴・選択・保存・下書きには触れず、案内の間は編集・保存・拡張ホストへの送信（`post.ts` の `muteForTour`）が動かない。
+ * （どの見本か・選ぶノード・未保存か・差分や下書きを出すか）は手順ごとの`scene`が決め、画面のstateには入れない。
+ * 実際の編集内容・履歴・選択・保存・下書きには触れず、案内の間は編集・保存・拡張ホストへの送信（`post.ts`の`muteForTour`）が動かない。
  * 閉じたら実際の表示に戻る。
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
@@ -87,7 +87,7 @@ function pageOf(data: FlowData): FlowPage | undefined {
   return data.kind === "page" ? data.page : undefined;
 }
 
-/** 画面が覚えておくもの（HTML を作り直しても残る）。ミニマップを出すか、左右の欄を畳んだか */
+/** 画面が覚えておくもの（HTMLを作り直しても残る）。ミニマップを出すか、左右の欄を畳んだか */
 function minimapShown(): boolean {
   return readState("minimap") !== false;
 }
@@ -108,13 +108,13 @@ function rememberSideFolded(side: Side, folded: boolean): void {
   mergeState("folded", { ...now, [side]: folded });
 }
 
-/** 配列が同じか（選んだノードの id を毎回作り直さないため） */
+/** リストが同じか（選んだノードのidを毎回作り直さないため） */
 function sameIds(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((id, i) => id === b[i]);
 }
 
 /**
- * いまの時刻（履歴のまとめに使う）。テストは `window.ccnaviClock` に関数を置いて時計を固定する
+ * いまの時刻（履歴のまとめに使う）。テストは`window.ccnaviClock`に関数を置いて時計を固定する
  * （実時間に頼ると、遅い機械で打ち込みのまとまりが切れる）
  */
 function now(): number {
@@ -122,7 +122,7 @@ function now(): number {
   return typeof clock === "function" ? Number((clock as () => number)()) : Date.now();
 }
 
-/** キーを押した先が欄の中か（欄の中の Ctrl+Z や Ctrl+C は欄に任せる） */
+/** キーを押した先が欄の中か（欄の中のCtrl+ZやCtrl+Cは欄に任せる） */
 function inField(target: EventTarget | null): boolean {
   const element = target as { tagName?: unknown; isContentEditable?: unknown } | null;
   if (element === null || typeof element.tagName !== "string") {
@@ -182,8 +182,8 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   // コピーしたノード（画面の中に保持する）と、同じものを何回貼り付けたか（貼り付けるたびに少しずつずらす）
   const clip = useRef<{ readonly clip: FlowClip; pasted: number } | undefined>(undefined);
   const [hasClip, setHasClip] = useState(false);
-  // 実行ファイルが言ったこと。`checkedDoc` は出している答えが指すコピー、`pendingDoc` は頼んで答えを待っているコピー、
-  // `checkSeq` は最後に頼んだ確認の番号。コピーが替わるたびに番号を進め、待っていた答えは破棄する
+  // 実行ファイルが言ったこと。`checkedDoc`は出している答えが指すコピー、`pendingDoc`は頼んで答えを待っているコピー、
+  // `checkSeq`は最後に頼んだ確認の番号。コピーが替わるたびに番号を進め、待っていた答えは破棄する
   // （答えを待つ間に直すと、古いコピーの答えを今の答えと取り違えるため）
   const [checks, setChecks] = useState<FlowChecks | undefined>(() => pageOf(initial)?.checks);
   const [checking, setChecking] = useState(false);
@@ -191,7 +191,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const checkedDoc = useRef<FlowDoc | undefined>(pageOf(initial)?.checks === undefined ? undefined : pageOf(initial)?.doc);
   const pendingDoc = useRef<FlowDoc | undefined>(undefined);
   const checkSeq = useRef(0);
-  // 外で変わった知らせを受けているか。拡張ホストはタブを再表示するたびに送り直すので、最初の 1 回だけ履歴を空にする
+  // 外で変わった知らせを受けているか。拡張ホストはタブを再表示するたびに送り直すので、最初の1回だけ履歴を空にする
   const changedSeen = useRef(false);
   // エージェントの下書き。依頼のボタンの言葉、「提案あり」、開いた下書き、依頼の文、取り込んだ下書きのハッシュ
   const [request, setRequest] = useState<string | undefined>(() => pageOf(initial)?.request);
@@ -336,11 +336,11 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     return () => clearTimeout(timer);
   }, [doc, dirty, tour.touring]);
 
-  // 図で選んでいるノードが変わった。毎回同じ関数を渡す（React Flow は onSelectionChange が替わるたびに
+  // 図で選んでいるノードが変わった。毎回同じ関数を渡す（React FlowはonSelectionChangeが替わるたびに
   // その時の選択で呼び直すので、描くたびに作り直すと、押した直後の古い選択で呼ばれる）
   const pick = useCallback((ids: readonly string[]): void => {
     setPicked((now) => (sameIds(now, ids) ? now : ids));
-    // Shift を押しながら選んでいたノードを押すと、React Flow はそれを選択から外す。右の欄がそのノードの
+    // Shiftを押しながら選んでいたノードを押すと、React Flowはそれを選択から外す。右の欄がそのノードの
     // ままにならないよう、選択に残ったノードの最後（残っていなければ何も無い）に替える
     setSelected((now) => (now?.kind !== "node" || ids.includes(now.id) ? now : ids.length === 0 ? undefined : { kind: "node", id: ids[ids.length - 1] }));
   }, []);
@@ -375,10 +375,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     }
   }, [doc]);
 
-  // 画面の注意と、実行ファイルの warn。実行ファイルの答えがあれば、同じことを言う画面の注意は出さない
+  // 画面の注意と、実行ファイルのwarn。実行ファイルの答えがあれば、同じことを言う画面の注意は出さない
   const notices = useMemo(() => (doc === undefined ? [] : flowNotices(doc, { exe: checks !== undefined })), [doc, checks]);
 
-  // キー入力を受け取る側は 1 度だけ張り、中身は描くたびに最新へ差し替える
+  // キー入力を受け取る側は1度だけ張り、中身は描くたびに最新へ差し替える
   const onKey = useRef<(event: KeyboardEvent) => void>(() => undefined);
   useEffect(() => {
     const listener = (event: KeyboardEvent): void => onKey.current(event);
@@ -398,10 +398,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     onKey.current = () => undefined;
     return (
       <>
-        <p className="empty">フロー編集画面を読み込み直せませんでした。原因を直してから「再読み込み」を押してください。</p>
+        <p className="empty">フロー編集画面を読み込めませんでした。原因を直してから「更新」を押してください。</p>
         <pre className="load-error">{data.kind === "error" ? data.error : ""}</pre>
         <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
-          再読み込み
+          更新
         </button>
       </>
     );
@@ -410,8 +410,8 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const readOnly = lock.locked || busy;
 
   /**
-   * コピーを替える唯一の入り口。直す前のコピーを履歴に積む。`typing` は欄に打った文字のときの欄の名前で、
-   * 同じ欄に続けて打ったものは 1 件にまとめる
+   * コピーを替える唯一の入り口。直す前のコピーを履歴に積む。`typing`は欄に打った文字のときの欄の名前で、
+   * 同じ欄に続けて打ったものは1件にまとめる
    */
   const edit = (next: FlowDoc, typing?: string): void => {
     if (tour.touring || lock.locked || next === doc) {
@@ -422,7 +422,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setDoc(next);
   };
 
-  /** 戻した・やり直したコピーに無いものを選んでいたら外す（線は配列の位置で指すので、線の選択は外す） */
+  /** 戻した・やり直したコピーに無いものを選んでいたら外す（線はリストの位置で指すので、線の選択は外す） */
   const travel = (moved: { readonly history: FlowHistory; readonly doc: FlowDoc } | undefined): void => {
     if (moved === undefined || readOnly || tour.touring) {
       return;
@@ -455,13 +455,13 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setFocus({ ids: [added.id] });
   };
 
-  /** 消したものを選んでいたら、選ぶのをやめる（線は配列の位置で指すので、線を消したら線の選択は外す） */
+  /** 消したものを選んでいたら、選ぶのをやめる（線はリストの位置で指すので、線を消したら線の選択は外す） */
   const removeNodeAt = (id: string): void => {
     if (tour.touring) {
       return;
     }
     edit(removeNode(doc, id));
-    // ノードと一緒に線も消えて配列の位置がずれるので、線の選択も外す
+    // ノードと一緒に線も消えてリストの位置がずれるので、線の選択も外す
     if ((selected?.kind === "node" && selected.id === id) || selected?.kind === "edge") {
       setSelected(undefined);
     }
@@ -476,7 +476,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     }
   };
 
-  // グループ化できるのは、グループでないノードを 2 つ以上選んでいるとき
+  // グループ化できるのは、グループでないノードを2つ以上選んでいるとき
   const groupable = picked.filter((id) => doc.nodes.some((node) => node.id === id && !isGroup(node)));
   const group = (): void => {
     if (tour.touring) {
@@ -512,7 +512,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     }
     clip.current = { clip: copied, pasted: 0 };
     setHasClip(true);
-    setStatus({ text: `ノードを ${copied.nodes.length} 個、線を ${copied.connections.length} 本コピーしました。Ctrl+V で貼り付けられます`, error: false });
+    setStatus({ text: `ノードを${copied.nodes.length}個、線を${copied.connections.length}本コピーしました。Ctrl+Vで貼り付けられます`, error: false });
   };
 
   const paste = (): void => {
@@ -524,7 +524,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     const pasted = pasteNodes(doc, held.clip, { x: PASTE_OFFSET.x * held.pasted, y: PASTE_OFFSET.y * held.pasted });
     edit(pasted.doc);
     choose(pasted.ids);
-    setStatus({ text: `ノードを ${pasted.ids.length} 個貼り付けました`, error: false });
+    setStatus({ text: `ノードを${pasted.ids.length}個貼り付けました`, error: false });
   };
 
   const duplicate = (): void => {
@@ -538,7 +538,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     }
     edit(made.doc);
     choose(made.ids);
-    setStatus({ text: `ノードを ${made.ids.length} 個複製しました`, error: false });
+    setStatus({ text: `ノードを${made.ids.length}個複製しました`, error: false });
   };
 
   const toggleMinimap = (): void => {
@@ -605,7 +605,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   };
 
   onKey.current = (event: KeyboardEvent): void => {
-    // 案内の間は、案内が受ける（Esc・矢印・Tab）。背後の編集（Ctrl+Z など）は動かさない
+    // 案内の間は、案内が受ける（Esc・矢印・Tab）。背後の編集（Ctrl+Zなど）は動かさない
     if (tour.touring) {
       return;
     }
@@ -613,8 +613,8 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     if (graphMaximized()) {
       return;
     }
-    // 提案・依頼文・保存前の確認の Esc は、この keydown が受ける（Ctrl+Z などと同じ分岐に並ぶため `useEscape` へ移していない）。
-    // `useEscape` は window の捕捉段階で止めるので、全画面表示の図や案内の吹き出しが手前に出ている間は、ここへ届かない
+    // 提案・依頼文・保存前の確認のEscは、このkeydownが受ける（Ctrl+Zなどと同じ分岐に並ぶため`useEscape`へ移していない）。
+    // `useEscape`はwindowの捕捉段階で止めるので、全画面表示の図や案内の吹き出しが手前に出ている間は、ここへ届かない
     if (proposal !== undefined || requestText !== undefined) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -686,9 +686,9 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         </div>
       )}
       <div id="changed" data-tour="changed" className={shownChanged ? "banner warn" : "banner warn hidden"}>
-        ファイルの変更を検知しました。再読み込みしてください。
+        ファイルの変更を検知しました。更新してください。
         <button type="button" className="action" data-action="reload" disabled={shownBusy} onClick={reload}>
-          再読み込み
+          更新
         </button>
       </div>
       {shownOffer !== undefined && (
@@ -737,7 +737,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
             data-action="group-nodes"
             data-tour="group"
             disabled={shownReadOnly || groupableCount < 2}
-            title="Shift を押しながらノードを 2 つ以上選ぶと、枠（グループ）にまとめられます。枠は図の上の囲みで、手順は変わりません"
+            title="Shiftを押しながらノードを2つ以上選ぶと、枠（グループ）にまとめられます。枠は図の上の囲みで、手順は変わりません"
             onClick={group}
           >
             グループ化
@@ -762,7 +762,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
             エディタで開く
           </button>
           <button type="button" className="action" data-action="reload" disabled={shownBusy} onClick={reload}>
-            再読み込み
+            更新
           </button>
           <button type="button" className="action primary" id="save" data-action="save" data-tour="save" disabled={shownLock.locked || shownBusy || (!shownDirty && shownPage.exists)} onClick={save}>
             保存
@@ -777,7 +777,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
             </li>
           ))}
           {(shownChecks?.warns ?? []).map((warn, index) => (
-            <li key={`exe-${index}`} data-source="exe" title="ccnavi --lint --flow の warn です（保存は止めません）">
+            <li key={`exe-${index}`} data-source="exe" title="ccnavi --lint --flowのwarnです（保存は止めません）">
               {warn}
             </li>
           ))}
@@ -811,7 +811,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           readableFit={!touring}
           onPick={touring ? NOOP : pick}
           onMove={(moves) => {
-            // 押しただけ（動かしていない）なら未保存にしない（placeNodes が同じものを返す）
+            // 押しただけ（動かしていない）なら未保存にしない（placeNodesが同じものを返す）
             const next = placeNodes(doc, moves);
             if (next !== doc) {
               edit(next);
@@ -821,7 +821,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           onRemoveNode={removeNodeAt}
           onRemoveEdge={removeEdgeAt}
           onResizeGroup={(id, size, position) => {
-            // 縁を押しただけ（大きさが変わっていない）なら未保存にしない（resizeGroup が同じものを返す）
+            // 縁を押しただけ（大きさが変わっていない）なら未保存にしない（resizeGroupが同じものを返す）
             const next = resizeGroup(doc, id, size, position);
             if (next !== doc) {
               edit(next);

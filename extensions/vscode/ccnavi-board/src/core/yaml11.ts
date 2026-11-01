@@ -1,14 +1,14 @@
 /**
- * 拡張が書く YAML（`yaml` ライブラリ、YAML 1.2）を、実行ファイル（PyYAML、YAML 1.1）が別の型に
+ * 拡張が書くYAML（`yaml`ライブラリ、YAML 1.2）を、実行ファイル（PyYAML、YAML 1.1）が別の型に
  * 読んでしまう語を見分ける。
  *
- * `yaml` は 1.2 の規則でしか引用符を足さないので、`yes` `on` `1:30` `0755` のような値を裸で書くと
- * PyYAML は真偽値・六十進・八進として読み、`message` が `True` になったり id が `True` になったりする。
- * `--lint` はそれを止めない（読めた値が正しい型なら苦情が無い）。ここにヒットする文字は
+ * `yaml`は1.2の規則でしか引用符を足さないので、`yes` `on` `1:30` `0755`のような値を裸で書くと
+ * PyYAMLは真偽値・六十進・八進として読み、`message`が`True`になったりidが`True`になったりする。
+ * `--lint`はそれを止めない（読めた値が正しい型なら苦情が無い）。ここにヒットする文字は
  * 引用符で囲んで書く。ヒットしない文字を囲まないのは、変えていない行の見た目を保つため。
  *
- * 規則は PyYAML の resolver.py の実装（bool / null / int / float / timestamp / merge / value）。
- * 1.2 でも型になる語（`true` `null` `123` `1.5` `.inf`）は `yaml` が自分で囲むが、重ねて囲んでも害は無い。
+ * 規則はPyYAMLのresolver.pyの実装（bool / null / int / float / timestamp / merge / value）。
+ * 1.2でも型になる語（`true` `null` `123` `1.5` `.inf`）は`yaml`が自分で囲むが、重ねて囲んでも害は無い。
  */
 const PATTERNS: readonly RegExp[] = [
   /^(y|Y|yes|Yes|YES|n|N|no|No|NO|true|True|TRUE|false|False|FALSE|on|On|ON|off|Off|OFF)$/,
@@ -18,8 +18,8 @@ const PATTERNS: readonly RegExp[] = [
   /^[-+]?(0|[1-9][0-9_]*)$/,
   /^[-+]?0x[0-9a-fA-F_]+$/,
   /^[-+]?[1-9][0-9_]*(:[0-5]?[0-9])+$/,
-  // float は PyYAML 6 の正規表現どおり。整数部の無い形（`.5`）は符号を取らず、点の直後に数字が要る。
-  // `.` `+.` `._` `.E+1` `+.5` は文字列に読まれる
+  // floatはPyYAML 6の正規表現どおり。整数部の無い形（`.5`）は符号を取らず、点の直後に数字が要る。
+  // `.` `+.` `._` `.E+1` `+.5`は文字列に読まれる
   /^[-+]?[0-9][0-9_]*\.[0-9_]*([eE][-+][0-9]+)?$/,
   /^\.[0-9][0-9_]*([eE][-+][0-9]+)?$/,
   /^[-+]?[0-9][0-9_]*(:[0-5]?[0-9])+\.[0-9_]*$/,
@@ -31,7 +31,7 @@ const PATTERNS: readonly RegExp[] = [
   /^<<$/,
 ];
 
-/** PyYAML（YAML 1.1）が文字列以外に読む表記なら真。空文字は真（`null` に読まれる） */
+/** PyYAML（YAML 1.1）が文字列以外に読む表記なら真。空文字は真（`null`に読まれる） */
 export function yaml11Ambiguous(text: string): boolean {
   if (text === "") {
     return true;

@@ -1,18 +1,18 @@
 /**
- * 計画の番号の振り直しの見本の表（リポジトリの `tests/fixtures/plan-reorder.json`）を読む。
+ * 計画の番号の振り直しの見本の表（リポジトリの`tests/fixtures/plan-reorder.json`）を読む。
  * 表は実行ファイルのテスト（`tests/ticket/test_plan_order.py`）と共有していて、**ここでは書き換えない**。
  *
  * 拡張はまだ番号を振り直さない（振り直しの正は実行ファイル）。ここで使うのは、表の計画（振り直す前の
- * `plan` と、振り直したあとの `expect.plan`）を、実行ファイルが承認の preview に載せる `plans` の形に
- * 並べ直すことだけ。番号は計画の並びのまま（全体計画が 1 から、フィードバック計画はその続き）で、
- * `after` も書いてあるとおりにコピーする。図がその `plans` どおりに点と線を描くかを見るのに使う。
+ * `plan`と、振り直したあとの`expect.plan`）を、実行ファイルが承認のpreviewに載せる`plans`の形に
+ * 並べ直すことだけ。番号は計画の並びのまま（全体計画が1から、フィードバック計画はその続き）で、
+ * `after`も書いてあるとおりにコピーする。図がその`plans`どおりに点と線を描くかを見るのに使う。
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
 
 import type { ApprovePlan, ApprovePlanItem } from "../../src/core/approvemodel.js";
 
-/** 表の計画のステップ。名前だけか、`type`・`review`・`after` を持つマップ */
+/** 表の計画のステップ。名前だけか、`type`・`review`・`after`を持つマップ */
 export type RawItem = string | { readonly type: string; readonly review?: boolean; readonly deferred?: boolean; readonly after?: readonly number[] };
 
 export interface ReorderCase {
@@ -24,7 +24,7 @@ export interface ReorderCase {
   readonly expect?: { readonly plan: readonly RawItem[]; readonly feedback?: readonly RawItem[]; readonly from: readonly number[] };
 }
 
-/** このファイルは `out/test/helpers/` から走る。6 つ上がリポジトリのルート */
+/** このファイルは`out/test/helpers/`から走る。6つ上がリポジトリのルート */
 export const PLAN_REORDER = path.join(__dirname, "..", "..", "..", "..", "..", "..", "tests", "fixtures", "plan-reorder.json");
 
 export function reorderCases(): readonly ReorderCase[] {
@@ -40,7 +40,7 @@ function afterOf(item: RawItem): readonly number[] {
   return typeof item === "string" ? [] : (item.after ?? []);
 }
 
-/** 表の計画を `plans` の形に並べる。`fixed` の番号は固定した番号（子が承認された番号）として印を付ける */
+/** 表の計画を`plans`の形に並べる。`fixed`の番号は固定した番号（子が承認された番号）として印を付ける */
 export function plansOf(plan: readonly RawItem[], feedback: readonly RawItem[] | undefined, fixed: readonly number[] = []): ApprovePlan[] {
   const out: ApprovePlan[] = [];
   let first = 1;

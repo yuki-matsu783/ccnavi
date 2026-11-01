@@ -1,11 +1,11 @@
 /**
  * 取り込み待ち画面へ進む入口の、各画面（ルール管理・リスク管理・フェーズ管理・テンプレート管理）に共通の契約。
  * 取り込み待ちはサイドパネルには並べず、設定を見ている画面からここを通って開く。
- * 画面ごとに作るのは、ページの `handoff` 欄とメッセージ `openHandoff` を契約に足すところまで。
+ * 画面ごとに作るのは、ページの`handoff`欄とメッセージ`openHandoff`を契約に足すところまで。
  */
 import { MAIN_TREE_KEY } from "./handoffmodel.js";
 
-/** 取り込み待ち画面を開けるか。案内の間などで開けないときは `enabled` が偽で、理由を `reason` に入れる */
+/** 取り込み待ち画面を開けるか。案内の間などで開けないときは`enabled`が偽で、理由を`reason`に入れる */
 export interface HandoffEntry {
   readonly enabled: boolean;
   readonly reason: string;

@@ -1,6 +1,6 @@
 /**
- * ルール管理の案内の見本（`tours/rules.yml` の `sample:`）の検査。見本のルールは rules.yml と同じ書き方で、
- * 画面は `tour-rules.ts` の小さな読み取りで `RuleForm` にする。実際の読み取り（`readRules`）と同じ結果になることを見る。
+ * ルール管理の案内の見本（`tours/rules.yml`の`sample:`）の検査。見本のルールはrules.ymlと同じ書き方で、
+ * 画面は`tour-rules.ts`の小さな読み取りで`RuleForm`にする。実際の読み取り（`readRules`）と同じ結果になることを見る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -15,7 +15,7 @@ import { loadTour } from "../helpers/tour.js";
 
 const sample = parseRulesSample(loadTour("rules").sample);
 
-test("CB-T404 ルールの見本は、実際の読み取り（readRules）と同じ RuleForm になる", () => {
+test("CB-T404 ルールの見本は、実際の読み取り（readRules）と同じRuleFormになる", () => {
   const raw = (loadTour("rules").sample as { rules: unknown }).rules;
   const real = readRules(stringify({ version: 1, ...(raw as object) })).model;
   assert.deepEqual(real.problems, []);
@@ -32,7 +32,7 @@ test("CB-T405 ルールの見本には、組み合わせ条件を持つ行があ
   assert.equal(condSummary(env.when!), "all(regex (^|[\\\\/])\\.env(\\.|$), not(any(2)))");
 });
 
-test("CB-T406 判定・期待する判定・候補の見本は、実行ファイルの JSON の読み取りを通る", () => {
+test("CB-T406 判定・期待する判定・候補の見本は、実行ファイルのJSONの読み取りを通る", () => {
   assert.ok(Object.keys(sample.judges).length >= 2);
   assert.equal(sample.judges["env-read"].verdict, "deny");
   assert.equal(sample.judges["env-example"].verdict, "");
@@ -40,29 +40,29 @@ test("CB-T406 判定・期待する判定・候補の見本は、実行ファイ
   assert.ok(sample.suggested !== undefined && sample.suggested.candidates.length >= 1);
 });
 
-test("CB-T407 ルールの案内の scene は、見本にあるタブ・行の id・判定の名前だけを指す（綴り違いが既定へ黙って戻らない）", () => {
+test("CB-T407 ルールの案内のsceneは、見本にあるタブ・行のid・判定の名前だけを指す（綴り違いが既定へ黙って戻らない）", () => {
   const ids = new Set([...sample.sections.deny, ...sample.sections.ask, ...sample.sections.allow].map((rule) => rule.id));
   for (const course of loadTour("rules").courses) {
     for (const [index, step] of course.steps.entries()) {
-      const at = `${course.id} の ${index + 1} 番目の手順`;
+      const at = `${course.id}の${index + 1}番目の手順`;
       const scene = step.scene;
       assert.ok(scene.tab === undefined || ["rules", "judge", "hooks"].includes(String(scene.tab)), `${at}: tab`);
       for (const id of String(scene.open ?? "").split(",").filter((item) => item.trim() !== "")) {
-        assert.ok(ids.has(id.trim()), `${at}: open の ${id} が見本にありません`);
+        assert.ok(ids.has(id.trim()), `${at}: openの${id}が見本にありません`);
       }
-      assert.ok(scene.judge === undefined || String(scene.judge) in sample.judges, `${at}: judge の ${String(scene.judge)} が見本にありません`);
+      assert.ok(scene.judge === undefined || String(scene.judge) in sample.judges, `${at}: judgeの${String(scene.judge)}が見本にありません`);
       for (const section of String(scene.fold ?? "").split(",").filter((item) => item.trim() !== "")) {
-        assert.ok(["deny", "ask", "allow"].includes(section.trim()), `${at}: fold の ${section} がタイプではない`);
+        assert.ok(["deny", "ask", "allow"].includes(section.trim()), `${at}: foldの${section}がタイプではない`);
       }
-      assert.ok(scene.sum === undefined || sample.sums.some((sum) => sum.name === scene.sum), `${at}: sum の ${String(scene.sum)} が見本にありません`);
-      assert.ok(scene.error === undefined || (scene.error === true && sample.saveError !== ""), `${at}: error は true で、見本に save_error が必要です`);
+      assert.ok(scene.sum === undefined || sample.sums.some((sum) => sum.name === scene.sum), `${at}: sumの${String(scene.sum)}が見本にありません`);
+      assert.ok(scene.error === undefined || (scene.error === true && sample.saveError !== ""), `${at}: errorはtrueで、見本にsave_errorが必要です`);
       for (const key of ["checked", "suggested", "more"]) {
-        assert.ok(scene[key] === undefined || scene[key] === true, `${at}: ${key} は true だけ`);
+        assert.ok(scene[key] === undefined || scene[key] === true, `${at}: ${key}はtrueだけ`);
       }
       assert.ok(scene.when === undefined || /^r(\.\d+)*$/.test(String(scene.when)), `${at}: when`);
       const known = ["tab", "open", "when", "more", "find", "tool", "subject", "judge", "checked", "suggested", "fold", "sum", "error"];
       for (const key of Object.keys(scene)) {
-        assert.ok(known.includes(key), `${at}: scene のキー ${key} を画面は読まない`);
+        assert.ok(known.includes(key), `${at}: sceneのキー${key}を画面は読まない`);
       }
     }
   }
@@ -93,19 +93,19 @@ function knownTarget(target: string, ids: ReadonlySet<string>): boolean {
   return ids.has(rule[1]) || FIELDS.some((field) => rule[1].endsWith(`-${field}`) && ids.has(rule[1].slice(0, -field.length - 1)));
 }
 
-test("CB-T520 ルールの案内は、使い方ごとの案内が 4〜9 手順で、指す先が知っている印（見本の行 id と欄を含む）だけ", () => {
+test("CB-T520 ルールの案内は、使い方ごとの案内が4〜9手順で、指す先が知っている印（見本の行idと欄を含む）だけ", () => {
   const ids = new Set([...sample.sections.deny, ...sample.sections.ask, ...sample.sections.allow].map((rule) => rule.id));
   const courses = loadTour("rules").courses;
   assert.ok(courses.length >= 9, "ユースケースが足りない");
   for (const course of courses.slice(1)) {
-    assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 手順`);
+    assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length}手順`);
     for (const [index, step] of course.steps.entries()) {
-      assert.ok(knownTarget(step.target, ids), `${course.id} の ${index + 1} 番目の手順: 指す先 ${step.target} を画面は付けない`);
+      assert.ok(knownTarget(step.target, ids), `${course.id}の${index + 1}番目の手順: 指す先${step.target}を画面は付けない`);
     }
   }
 });
 
-test("CB-T521 統合結果の見本は、実際のボードの JSON の読み取りと同じ RulesSum になり、共通の設定と別のレイヤーの由来を持つ", () => {
+test("CB-T521 統合結果の見本は、実際のボードのJSONの読み取りと同じRulesSumになり、共通の設定と別のレイヤーの由来を持つ", () => {
   const raw = (loadTour("rules").sample as { sums: unknown }).sums;
   const parsed = parseBoardJson(JSON.stringify({ version: BOARD_VERSION, sums: raw }));
   assert.ok(parsed.ok);
@@ -116,7 +116,7 @@ test("CB-T521 統合結果の見本は、実際のボードの JSON の読み取
     assert.ok(rules.some((rule) => rule.source === "common"), sum.name);
     const own = rules.filter((rule) => rule.source !== "common");
     assert.ok(own.length >= 1, sum.name);
-    // 共通以外の id にはレイヤー名が付く
+    // 共通以外のidにはレイヤー名が付く
     for (const rule of own) {
       assert.ok(rule.id.startsWith(`${rule.source}:`), `${sum.name}: ${rule.id}`);
     }
@@ -124,14 +124,14 @@ test("CB-T521 統合結果の見本は、実際のボードの JSON の読み取
   }
 });
 
-test("CB-T522 除外を持つ見本の行は、組み合わせ条件へそのまま移せ、移すと all(本体, not(any(除外))) になる", () => {
+test("CB-T522 除外を持つ見本の行は、組み合わせ条件へそのまま移せ、移すとall(本体, not(any(除外)))になる", () => {
   const rule = sample.sections.deny.find((item) => item.id === "protect-secrets")!;
   assert.equal(rule.excepts?.length, 1);
   assert.equal(toWhenBlocker(rule), undefined);
   assert.equal(condSummary(treeOfPattern(rule.kind, rule.pattern, rule.exceptNodes ?? [])), "all(glob **/secrets/**, not(any(1)))");
 });
 
-test("CB-T523 一括確認の見本は、行の ok と件数・不一致の数が合い、食い違う行が 1 件ある", () => {
+test("CB-T523 一括確認の見本は、行のokと件数・不一致の数が合い、食い違う行が1件ある", () => {
   const checked = sample.checked!;
   for (const section of SECTION_NAMES) {
     const rows = checked.expectations.filter((row) => row.expected === section);
@@ -142,7 +142,7 @@ test("CB-T523 一括確認の見本は、行の ok と件数・不一致の数�
 });
 
 test("CB-T524 判定の見本は、ヒットしたルールが見本の行（か候補の下書き）にあり、タイプが判定と同じ。一括確認の行も同じ", () => {
-  // 候補の下書きをコピーしたあとの判定（suggest-rule の案内）もあるので、候補の id も数える
+  // 候補の下書きをコピーしたあとの判定（suggest-ruleの案内）もあるので、候補のidも数える
   const byId = new Map<string, string>([...sample.sections.deny, ...sample.sections.ask, ...sample.sections.allow].map((rule) => [rule.id, rule.origin!.section]));
   for (const candidate of sample.suggested!.candidates) {
     byId.set(candidate.id, candidate.section);
@@ -160,7 +160,7 @@ test("CB-T524 判定の見本は、ヒットしたルールが見本の行（か
   }
 });
 
-test("CB-T525 候補の見本は、下書きの YAML が候補の id・タイプ・ツールと同じルールを持ち、期待する例の組を持つ", () => {
+test("CB-T525 候補の見本は、下書きのYAMLが候補のid・タイプ・ツールと同じルールを持ち、期待する例の組を持つ", () => {
   const candidates = sample.suggested!.candidates;
   assert.ok(candidates.length >= 2);
   assert.ok(candidates.some((c) => c.kind === "rule") && candidates.some((c) => c.kind === "message"));
@@ -172,7 +172,7 @@ test("CB-T525 候補の見本は、下書きの YAML が候補の id・タイプ
   }
 });
 
-test("CB-T526 保存前の検証エラーの見本は、lint の報告の形（設定の検証（--lint）でエラーが見つかりました…、続けて「error: id: 内容」）で、見本の行の id を名指しする", () => {
+test("CB-T526 保存前の検証エラーの見本は、lintの報告の形（設定の検証（--lint）でエラーが見つかりました…、続けて「error: id: 内容」）で、見本の行のidを名指しする", () => {
   const lines = sample.saveError.split("\n");
   assert.match(lines[0], /^設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください:$/);
   const ids = new Set([...sample.sections.deny, ...sample.sections.ask, ...sample.sections.allow].map((rule) => rule.id));

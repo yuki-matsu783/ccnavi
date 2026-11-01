@@ -1,13 +1,13 @@
 /**
- * 画面の見た目。既定は VS Code のテーマ変数に従う（`vscode`）。ユーザが選べば、6 画面の地・枠・文字を
- * Claude の配色（ライト / ダーク）に置き換える。置き換えは body のクラスで切り替え、CSS は
- * `--vscode-*` の変数を上書きするだけなので、各画面の部品はテーマ変数を読むまま変わらない。
+ * 画面の見た目。既定はVS Codeのテーマ変数に従う（`vscode`）。ユーザが選べば、6画面の地・枠・文字を
+ * Claudeの配色（ライト / ダーク）に置き換える。置き換えはbodyのクラスで切り替え、CSSは
+ * `--vscode-*`の変数を上書きするだけなので、各画面の部品はテーマ変数を読むまま変わらない。
  *
- * ハイコントラストのテーマでは `--vscode-contrastBorder` などが定義されていて、それを使う枠や点線は
- * Claude の配色を選んでもそのまま反映される。
+ * ハイコントラストのテーマでは`--vscode-contrastBorder`などが定義されていて、それを使う枠や点線は
+ * Claudeの配色を選んでもそのまま反映される。
  *
- * 配色そのもの（変数の上書き）は画面の側の `src/webview/styles/appearance.css` にあり、ここが持つのは
- * 設定の値（配色と拡大率）・body に付けるクラス・送るメッセージの形だけ。切り替えるのは `src/webview/appearance.ts`。
+ * 配色そのもの（変数の上書き）は画面の側の`src/webview/styles/appearance.css`にあり、ここが持つのは
+ * 設定の値（配色と拡大率）・bodyに付けるクラス・送るメッセージの形だけ。切り替えるのは`src/webview/appearance.ts`。
  */
 
 export const APPEARANCES = ["vscode", "claude-light", "claude-dark"] as const;
@@ -16,9 +16,9 @@ export type Appearance = (typeof APPEARANCES)[number];
 export const DEFAULT_APPEARANCE: Appearance = "vscode";
 
 export const APPEARANCE_LABELS: Readonly<Record<Appearance, string>> = {
-  vscode: "VS Code のテーマに従う",
-  "claude-light": "Claude ライト",
-  "claude-dark": "Claude ダーク",
+  vscode: "VS Codeのテーマに従う",
+  "claude-light": "Claudeライト",
+  "claude-dark": "Claudeダーク",
 };
 
 export const DEFAULT_ZOOM = 1;
@@ -38,12 +38,12 @@ export function parseAppearance(value: unknown): Appearance {
   return typeof value === "string" && (APPEARANCES as readonly string[]).includes(value) ? (value as Appearance) : DEFAULT_APPEARANCE;
 }
 
-/** body に付けるクラス。`vscode` なら無し */
+/** bodyに付けるクラス。`vscode`なら無し */
 export function appearanceClass(appearance: Appearance): string {
   return appearance === "vscode" ? "" : `ccnavi-${appearance}`;
 }
 
-/** 各画面の `<body>`。クラスが要るときだけ付ける（テストが `<body>` の文字列を見るので、無いときは素のまま） */
+/** 各画面の`<body>`。クラスが要るときだけ付ける（テストが`<body>`の文字列を見るので、無いときは素のまま） */
 export function bodyTag(appearance: Appearance | undefined): string {
   const cls = appearanceClass(appearance ?? DEFAULT_APPEARANCE);
   return cls === "" ? "<body>" : `<body class="${cls}">`;
@@ -58,8 +58,8 @@ export interface AppearanceMessage {
 }
 
 /**
- * 見た目の送り先。画面に中身を渡す段取り（`ScreenHost`）の `post` だけを使う形。
- * `ScreenHost<D>` はそのまま渡せる（`post` は `unknown` を取り、`boolean` を返す）。
+ * 見た目の送り先。画面に中身を渡す段取り（`ScreenHost`）の`post`だけを使う形。
+ * `ScreenHost<D>`はそのまま渡せる（`post`は`unknown`を取り、`boolean`を返す）。
  */
 export interface AppearanceSink {
   /** 生きている画面にだけ届く。届いたら真、失われるので送らなかったら偽 */
@@ -70,10 +70,10 @@ export interface AppearanceSink {
  * 見た目を画面へ送る。段取りを通すので、組み上がっていない画面と破棄された画面には送らない
  * （偽が返る）。届かなかったぶんを後で送り直す必要は無い。どちらの経路でも、後からいまの値が渡るため。
  *
- * - 入れ物ごと入れ直す経路（`rebuilt`）では、組む側が `appearance` を HTML に埋める（`bodyTag`）
+ * - 入れ物ごと入れ直す経路（`rebuilt`）では、組む側が`appearance`をHTMLに埋める（`bodyTag`）
  * - 画面が組み上がった（`ready`）ところで、呼ぶ側が送り直す
  *
- * 直に `webview.postMessage` を呼ぶと、この 2 つのどちらも通らない画面へ送ることになり、
+ * 直に`webview.postMessage`を呼ぶと、この2つのどちらも通らない画面へ送ることになり、
  * 送ったつもりでも届いていないことを段取りの側で把握できなくなる。
  */
 export function sendAppearance(sink: AppearanceSink, value: Appearance, zoom: number = DEFAULT_ZOOM): boolean {

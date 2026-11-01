@@ -1,6 +1,6 @@
 /**
- * エージェントの下書きを取り込む前に見せる差分（`core/flow-diff.ts` の `textDiff`）と、エージェントへの
- * 依頼の文。どちらもボードの承認のオーバーレイと同じ背景の上の本体（見た目は `SaveReview.css` と `Proposal.css`）。
+ * エージェントの下書きを取り込む前に見せる差分（`core/flow-diff.ts`の`textDiff`）と、エージェントへの
+ * 依頼の文。どちらもボードの承認のオーバーレイと同じ背景の上の本体（見た目は`SaveReview.css`と`Proposal.css`）。
  *
  * 差分は文の前後まで見せる。 フローの文は担当のサブエージェントへの案内文になり、プロンプトインジェクションの
  * 経路になる。歯止めはユーザがここで読むことなので、変わった欄の名前だけでなく、値の前と後を並べる。
@@ -21,9 +21,9 @@ const KIND_TITLES: Readonly<Record<TextChange["kind"], string>> = {
   "added-node": "追加するノード",
   "removed-node": "削除するノード",
   "changed-node": "変更するノード",
-  "added-connection": "追加する接続",
-  "removed-connection": "削除する接続",
-  "changed-connection": "変更する接続",
+  "added-connection": "追加する線",
+  "removed-connection": "削除する線",
+  "changed-connection": "変更する線",
 };
 
 /** 開いた下書きの様子。読み込み中・取り込めない・取り込める */
@@ -32,7 +32,7 @@ export type ProposalView =
   | { readonly kind: "error"; readonly error: string }
   | { readonly kind: "ready"; readonly proposal: FlowProposal };
 
-/** 値の種類の表示（`1` と `"1"` を見分ける） */
+/** 値の種類の表示（`1`と`"1"`を見分ける） */
 function Kind({ kind }: { readonly kind: ValueKind | undefined }): JSX.Element | null {
   return kind === undefined ? null : <span className="proposal-value-kind">{kind}</span>;
 }
@@ -89,7 +89,7 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
   return (
     <Dialog titleId="proposal-review-title" backdropClass="review-backdrop" cardClass="review proposal" id="proposal-review" tour="proposal">
       <h2 id="proposal-review-title">エージェントの提案を確認する</h2>
-      {view.kind === "loading" && <p className="dim">下書きを ccnavi で確認しています…</p>}
+      {view.kind === "loading" && <p className="dim">下書きをccnaviで確認しています…</p>}
       {view.kind === "error" && (
         <p className="proposal-error" id="proposal-error">
           {view.error}
@@ -98,12 +98,12 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
       {view.kind === "ready" && (
         <>
           <p className="dim small">
-            下書き {view.proposal.draftPath} と、いまのフローとの違いです。フローの文は担当のサブエージェントへの案内になります。
+            下書き{view.proposal.draftPath}と、いまのフローとの違いです。フローの文は担当のサブエージェントへの案内になります。
             外部のツールを使わせる指示などが紛れていないか、文を読んでから取り込んでください。
           </p>
           {diff?.problem !== undefined && (
             <p className="proposal-error" id="proposal-problem">
-              取り込めません: {diff.problem}。下の全体の JSON を確認し、エディタで直すか、エージェントに下書きの作り直しを依頼してください。
+              取り込めません: {diff.problem}。下の全体のJSONを確認し、エディタで直すか、エージェントに下書きの作り直しを依頼してください。
             </p>
           )}
           {changes.length === 0 && <p id="proposal-order-only">並び順だけが違います（ノードと線の中身は同じです）。</p>}
@@ -134,7 +134,7 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
   );
 }
 
-/** エージェントへの依頼の文。承認の文と同じ 2 ボタンで渡す。文は拡張ホストが持っている分を使う */
+/** エージェントへの依頼の文。承認の文と同じ2ボタンで渡す。文は拡張ホストが持っている分を使う */
 export function RequestText({ prompt, onClose }: { readonly prompt: string; readonly onClose: () => void }): JSX.Element {
   const copy = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -144,7 +144,7 @@ export function RequestText({ prompt, onClose }: { readonly prompt: string; read
     <Dialog titleId="request-text-title" backdropClass="review-backdrop" cardClass="review" id="request-text" tour="request-text">
       <h2 id="request-text-title">エージェントへの依頼文</h2>
       <p className="dim small">
-        コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。エージェントは下書きのみを作成します。
+        コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分でEnterを押してください。エージェントは下書きのみを作成します。
         取り込むかどうかは、この画面で差分を確認して判断してください。
       </p>
       <pre className="request-prompt">{prompt}</pre>

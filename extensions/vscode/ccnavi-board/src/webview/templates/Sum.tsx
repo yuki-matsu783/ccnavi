@@ -3,7 +3,7 @@
  * プロジェクトの統合結果（共通の設定 + そのプロジェクトの設定）を、実行ファイルが出した索引のまま並べる。
  *
  * ここは見せるだけ。使われるか・破棄した理由は実行ファイルの答えのままで、拡張は判定も合成もしない。
- * 1 件の中身（計画・フロー・本文）は上の一覧（開いている対象の層）で開く。
+ * 1件の中身（計画・フロー・本文）は上の一覧（開いている対象のレイヤー）で開く。
  */
 import { useState, type JSX } from "react";
 
@@ -48,7 +48,7 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
         </select>
       </label>
       <p className="count" data-count="sum" data-tour="sum-count">
-        使われるのは {used} 件（{layersText(sum.layers)}）
+        使われるのは{used}件（{layersText(sum.layers)}）
       </p>
       {sum.templates.length === 0 ? (
         <p className="empty">テンプレートがありません</p>

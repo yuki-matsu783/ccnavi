@@ -1,10 +1,10 @@
 /**
- * 保存の前に見せる差分の一覧（`core/flow-diff.ts` の `diffFlows`）。未保存なのに差分が空なら、順序だけが変わった
- * （`sameFlow` は配列の順を見る）と言う。読み込んだ時点から、足した・消した・変えた
- * ノードと線を並べ、「保存する」で拡張ホストへ保存を頼む。「やめる」か Esc で閉じる（編集はそのまま）。
+ * 保存の前に見せる差分の一覧（`core/flow-diff.ts`の`diffFlows`）。未保存なのに差分が空なら、順序だけが変わった
+ * （`sameFlow`はリストの順を見る）と言う。読み込んだ時点から、足した・消した・変えた
+ * ノードと線を並べ、「保存する」で拡張ホストへ保存を頼む。「やめる」かEscで閉じる（編集はそのまま）。
  *
- * 「次から確かめずに保存する」にチェックを付けて保存すると、設定 `ccnaviBoard.flowSaveReview` を外す（呼び手が送る）。
- * 見た目は `SaveReview.css`。
+ * 「次から確かめずに保存する」にチェックを付けて保存すると、設定`ccnaviBoard.flowSaveReview`を外す（呼び手が送る）。
+ * 見た目は`SaveReview.css`。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
 
@@ -34,7 +34,7 @@ function Items({ title, kind, items }: { readonly title: string; readonly kind: 
 
 export interface SaveReviewProps {
   readonly diff: FlowDiff;
-  /** 保存する。`skipNext` が真なら、次から確かめない */
+  /** 保存する。`skipNext`が真なら、次から確かめない */
   readonly onConfirm: (skipNext: boolean) => void;
   readonly onCancel: () => void;
 }
@@ -63,12 +63,12 @@ export function SaveReview({ diff, onConfirm, onCancel }: SaveReviewProps): JSX.
       <Items title="追加したノード" kind="added-nodes" items={diff.addedNodes} />
       <Items title="削除したノード" kind="removed-nodes" items={diff.removedNodes} />
       <Items title="変更したノード" kind="changed-nodes" items={diff.changedNodes} />
-      <Items title="追加した接続" kind="added-connections" items={diff.addedConnections} />
-      <Items title="削除した接続" kind="removed-connections" items={diff.removedConnections} />
-      <Items title="変更した接続" kind="changed-connections" items={diff.changedConnections} />
+      <Items title="追加した線" kind="added-connections" items={diff.addedConnections} />
+      <Items title="削除した線" kind="removed-connections" items={diff.removedConnections} />
+      <Items title="変更した線" kind="changed-connections" items={diff.changedConnections} />
       <label className="review-skip" data-tour="review-skip">
         <input type="checkbox" className="f-review-skip" checked={skip} onChange={(event) => setSkip(event.target.checked)} />
-        次回から保存前の確認を省略（設定 ccnaviBoard.flowSaveReview で再び有効にできます）
+        次回から保存前の確認を省略（設定ccnaviBoard.flowSaveReviewで再び有効にできます）
       </label>
       <DialogActions className="review-actions">
         <button type="button" className="action" data-action="cancel-save" onClick={onCancel}>

@@ -3,7 +3,7 @@
  *
  * 見せる中身は拡張ホストが渡す（`TemplatesData`）。画面が自分で持つのは、ユーザが触って決めるもの
  * （開いている行、本文の取り出しの結果）だけ。有効か・破棄した理由は実行ファイルの答えを読むだけ。
- * 下書きは読むだけで、取り込みは「取り込み待ち」の画面が受け持つ（ここにあるのは入口だけ）。テンプレートの編集は `Edit.tsx`。
+ * 下書きは読むだけで、取り込みは「取り込み待ち」の画面が受け持つ（ここにあるのは入口だけ）。テンプレートの編集は`Edit.tsx`。
  * 案内の間は見本（`core/tour-templates.ts`）を描き、実際の中身・開閉には触れない。
  */
 import { useRef, useState, type JSX } from "react";
@@ -31,18 +31,18 @@ const TOUR = tourOf(templatesTour);
 const SAMPLE = parseTemplatesSample(TOUR.sample);
 const NO_SCENE: Scene = {};
 
-/** 手順の `scene` の文字列を `,` で割る */
+/** 手順の`scene`の文字列を`,`で割る */
 function sceneList(value: Scene[string] | undefined): readonly string[] {
   return typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : [];
 }
 
-/** 1 件の本文の答え。`error` があれば本文は無い */
+/** 1件の本文の答え。`error`があれば本文は無い */
 interface Detail {
   readonly detail?: TemplateDetail;
   readonly error: string;
 }
 
-/** 編集の状態。始めるのを頼んでから答えが来るまでは `opened` が無い */
+/** 編集の状態。始めるのを頼んでから答えが来るまでは`opened`が無い */
 interface Editing {
   readonly session: number;
   readonly name: string;
@@ -56,9 +56,9 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
   const [foldedTemplates, setFoldedTemplates] = useState<ReadonlySet<string>>(() => new Set());
   /** 開いている下書きの名前 */
   const [openDrafts, setOpenDrafts] = useState<ReadonlySet<string>>(() => new Set());
-  /** 本文の答え（キーは `layer/name`） */
+  /** 本文の答え（キーは`layer/name`） */
   const [details, setDetails] = useState<Readonly<Record<string, Detail>>>({});
-  /** 図の中身の答え（キーは `layer/name`）。読めなければ `error` */
+  /** 図の中身の答え（キーは`layer/name`）。読めなければ`error` */
   const [previews, setPreviews] = useState<Readonly<Record<string, { readonly check?: TemplateCheck; readonly error: string }>>>({});
   /** 図の中身を頼んだ行（頼み直さないため）。読み直したら空にする */
   const asked = useRef<Set<string>>(new Set());
@@ -80,7 +80,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
     },
   });
   const requestTour = tour.request;
-  /** 拡張ホストへの送信。案内の間は実際の操作を送らない（`tourDone` と `ready` は直に送る） */
+  /** 拡張ホストへの送信。案内の間は実際の操作を送らない（`tourDone`と`ready`は直に送る） */
   const act = (message: TemplatesMessage): void => {
     if (!tour.touring) {
       post(message);
@@ -151,7 +151,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
   const layer = layerFor(page.target, page.data.layers);
   const shownTemplates: readonly TemplateEntry[] = layer?.templates ?? [];
   const count = shownTemplates.length;
-  /** 案内が指すテンプレート（いま見えている一覧の最初の 1 件）。`data-tour` はこの 1 件にだけ付く */
+  /** 案内が指すテンプレート（いま見えている一覧の最初の1件）。`data-tour`はこの1件にだけ付く */
   const first: TemplateEntry | undefined = shownTemplates[0];
   const firstKey = first === undefined ? undefined : `${first.layer}/${first.name}`;
 
@@ -170,7 +170,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
     });
   };
 
-  /** 図の中身を頼む（1 行につき 1 度。読み直すまで頼み直さない） */
+  /** 図の中身を頼む（1行につき1度。読み直すまで頼み直さない） */
   const askPreview = (entry: TemplateEntry): void => {
     const key = `${entry.layer}/${entry.name}`;
     if (tour.touring || asked.current.has(key)) {
@@ -253,7 +253,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
           </span>
         </div>
         <div className="controls">
-          <button type="button" className="action" data-action="reload" data-tour="refresh" title="ファイルを読み直します" disabled={shownBusy || editing !== undefined} onClick={refresh}>
+          <button type="button" className="action" data-action="reload" data-tour="refresh" title="ファイルを更新します" disabled={shownBusy || editing !== undefined} onClick={refresh}>
             更新
           </button>
         </div>
@@ -261,7 +261,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
       {editing !== undefined && !touring ? (
         editing.opened === undefined ? (
           <p className="empty" id="edit-loading" data-role="edit-loading">
-            {`テンプレート ${editing.name} を読み込み中…`}
+            {`テンプレート${editing.name}を読み込み中…`}
           </p>
         ) : (
           <Edit key={editing.session} session={editing.session} opened={editing.opened} onClose={() => setEditing(undefined)} />
@@ -269,7 +269,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
       ) : (
         <>
         <p className="count" id="counts" data-tour="summary">
-          <span>エラー {page.data.errors} 件</span>・<span>警告 {page.data.warns} 件</span>・<span>情報 {page.data.infos} 件</span>
+          <span>エラー{page.data.errors}件</span>・<span>警告{page.data.warns}件</span>・<span>情報{page.data.infos}件</span>
         </p>
         <section className="templates" data-tour="list">
           <h2>
@@ -298,7 +298,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                     className="action small"
                     data-action="new-template"
                     disabled={!validNewTemplateName(newName) || templateNameTaken(page.data.layers, layer.name, newName) !== undefined}
-                    title={newName === "" || validNewTemplateName(newName) ? "この層に新しいテンプレートを作ります。保存するまでファイルは作りません" : NEW_TEMPLATE_NAME_RULE}
+                    title={newName === "" || validNewTemplateName(newName) ? "このレイヤーに新しいテンプレートを作ります。保存するまでファイルは作りません" : NEW_TEMPLATE_NAME_RULE}
                     onClick={() => startEdit({ type: "editNew", name: newName })}
                   >
                     作る
@@ -312,7 +312,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                 </p>
               )}
               {shownTemplates.length === 0 ? (
-                <p className="empty">{"テンプレートがありません。共通は .ccnavi/config/common/templates/、プロジェクトは .ccnavi/config/project/templates/ の下に、<名前>.yml の名前で置きます。"}</p>
+                <p className="empty">{"テンプレートがありません。共通は.ccnavi/config/common/templates/、プロジェクトは.ccnavi/config/project/templates/の下に、<名前>.ymlの名前で置きます。"}</p>
               ) : (
                 <ul className="list">{shownTemplates.map((entry) => templateRow(entry))}</ul>
               )}
@@ -337,7 +337,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
             <HandoffLink entry={page.handoff} disabled={touring} onOpen={() => act({ type: "openHandoff" })} />
           </p>
           {page.data.drafts.length === 0 ? (
-            <p className="empty">{"下書きはありません。親チケットを閉じる前に、ccnavi --templates --draft <親> で作れます。"}</p>
+            <p className="empty">{"下書きはありません。親チケットをクローズする前に、ccnavi --templates --draft <親>で作れます。"}</p>
           ) : (
             <ul className="list">
               {page.data.drafts.map((draft, index) => (

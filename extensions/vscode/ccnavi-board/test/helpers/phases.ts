@@ -1,11 +1,11 @@
 /**
- * フェーズ管理画面（React）を happy-dom で動かす。`test/helpers/risk.ts` と同じ役割。
+ * フェーズ管理画面（React）をhappy-domで動かす。`test/helpers/risk.ts`と同じ役割。
  *
- * 画面はバンドルした 1 本（`out/webview/phases.js`）で、拡張はそれを `<script nonce>` に流し込む。
- * ここでも同じ 1 本を流し込むので、テストが見るのは配るものと同じ画面になる。
- * この入口のパス（`test/helpers/<画面の名前>.ts`）が約束で、`scripts/test-groups.js` はそれを辿る。
+ * 画面はバンドルした1本（`out/webview/phases.js`）で、拡張はそれを`<script nonce>`に流し込む。
+ * ここでも同じ1本を流し込むので、テストが見るのは配るものと同じ画面になる。
+ * この入口のパス（`test/helpers/<画面の名前>.ts`）が約束で、`scripts/test-groups.js`はそれを辿る。
  *
- * React は押した直後には描き直さない。操作のあとは `await page.settle()` を挟んでから見る。
+ * Reactは押した直後には描き直さない。操作のあとは`await page.settle()`を挟んでから見る。
  */
 import { readPhases } from "../../src/core/phases-doc.js";
 import { renderPhasesPage, type RenderOptions } from "../../src/core/phases-render.js";
@@ -16,28 +16,28 @@ import { loadPage, type DomPage, type LoadOptions } from "./dom.js";
 export const NONCE = "TEST-NONCE-123";
 
 /**
- * 見本の定義（5 件。docs/21_design/tickets/phases.md「フェーズ定義と計画」の例）。画面のテストの多くがこれを開く。
- * 拡張がファイルを作るときの雛形だったが、共通レイヤーに雛形を置くとレイヤーの同じ id と中身が食い違うので、
+ * 見本の定義（5件。docs/21_design/tickets/phases.md「フェーズ定義と計画」の例）。画面のテストの多くがこれを開く。
+ * 拡張がファイルを作るときの雛形だったが、共通レイヤーに雛形を置くとレイヤーの同じidと中身が食い違うので、
  * 画面から作る方法ごと無くし、テストの見本としてだけ残す。
  *
- * 順序の欄（ファイルの頭の `order`、定義の `after`・`overlap`・`requires`）は書かない。実行ファイルは
- * もう読まず、順序は親チケットの計画のステップの `after` で決める。古い欄が残ったファイルの扱いは
- * `phases-doc.test.ts` が別の見本で見る。feedback の定義の `when` には、フィードバック計画の最後に置いて
+ * 順序の欄（ファイルの頭の`order`、定義の`after`・`overlap`・`requires`）は書かない。実行ファイルは
+ * もう読まず、順序は親チケットの計画のステップの`after`で決める。古い欄が残ったファイルの扱いは
+ * `phases-doc.test.ts`が別の見本で見る。feedbackの定義の`when`には、フィードバック計画の最後に置いて
  * ほかの対応を受ける（合流する）ことを書く。
  */
 export const SAMPLE_PHASES_TEXT = `# フェーズ定義。ユーザが持つ設定で、エージェントは変更しない。
 #
-# 親チケットの \`plan:\` に、ここで定義したものの名前を並べる。それが全体計画で、
-# \`ccnavi user agree\` が通ることが合意になる。レビューを受けたあとは \`feedback:\` に
-# \`kind: feedback\` の定義を並べて改版を出す（対応が無くても \`[]\` で出す）。
+# 親チケットの \`plan:\`に、ここで定義したものの名前を並べる。それが全体計画で、
+# \`ccnavi user agree\`が通ることが合意になる。レビューを受けたあとは \`feedback:\`に
+# \`kind: feedback\`の定義を並べて改版を出す（対応が無くても \`[]\`で出す）。
 #
-# 順序（どのフェーズにどのフェーズが先行するか）はここには書かない。計画のステップに \`after\` で先行を書き、
+# 順序（どのフェーズにどのフェーズが先行するか）はここには書かない。計画のステップに \`after\`で先行を書き、
 # 最後のステップにほかの全部が先行するようにする。
 #
-# \`id\`（キー）と \`title\` はどちらも一意。重なれば --lint が error で止める。
+# \`id\`（キー）と \`title\`はどちらも一意。重なれば --lintがerrorで止める。
 # このファイルがなければ、フェーズは番号だけの挙動に戻る。
 #
-# 下は雛形。scope のパスはこのプロジェクトの置き場に合わせて直す。
+# 下は雛形。scopeのパスはこのプロジェクトの置き場に合わせて直す。
 version: 1
 
 phases:
@@ -55,7 +55,7 @@ phases:
     review: true
     scope: ["wip/design/*", "docs/*"]
     deliverables: ["wip/design/*.md"]
-    when: 触る場所が 3 か所を超えるか、外から見える振る舞いが変わるとき
+    when: 触る場所が3か所を超えるか、外から見える振る舞いが変わるとき
 
   acceptance:
     kind: work
@@ -78,12 +78,12 @@ phases:
     when: フィードバック計画の最後に置き、ほかの対応を受ける
 `;
 
-/** 画面の HTML。CSS や nonce のように、文字列のまま見たいものはこれを見る */
+/** 画面のHTML。CSSやnonceのように、文字列のまま見たいものはこれを見る */
 export function phasesHtml(data: PhasesData, options: Partial<RenderOptions> = {}): string {
   return renderPhasesPage(data, { nonce: NONCE, script: screenScript("phases"), style: screenStyle("phases"), ...options });
 }
 
-/** 見本の中身（`SAMPLE_PHASES_TEXT` の 5 件）。差し替えたいところだけ渡す */
+/** 見本の中身（`SAMPLE_PHASES_TEXT`の5件）。差し替えたいところだけ渡す */
 export function page(overrides: Partial<PhasesPage> = {}): PhasesPage {
   return {
     root: "/ws",
@@ -95,7 +95,7 @@ export function page(overrides: Partial<PhasesPage> = {}): PhasesPage {
   };
 }
 
-/** HTML を happy-dom に読ませ、React がマウントし終わるまで待つ */
+/** HTMLをhappy-domに読ませ、Reactがマウントし終わるまで待つ */
 export async function openPage(data: PhasesData, initialState?: unknown, options: LoadOptions = {}): Promise<DomPage> {
   const dom = await loadPage(phasesHtml(data), initialState, options);
   await dom.settle();
@@ -107,7 +107,7 @@ export async function openPhases(overrides: Partial<PhasesPage> = {}, initialSta
   return openPage({ kind: "page", page: page(overrides) }, initialState);
 }
 
-/** 定義 1 行の中の要素。`li.phase[data-key=…]` の下だけを見る */
+/** 定義1行の中の要素。`li.phase[data-key=…]`の下だけを見る */
 export function rowSelector(key: string): string {
   return `.phase[data-key="${key}"]`;
 }

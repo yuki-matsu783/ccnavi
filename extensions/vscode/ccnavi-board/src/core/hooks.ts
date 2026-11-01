@@ -1,13 +1,13 @@
 /**
- * `.claude/settings.json` と `.claude/settings.local.json` の hooks を読み、
- * 「このツール名でどの hook が走るか」を答える。
+ * `.claude/settings.json`と`.claude/settings.local.json`のhooksを読み、
+ * 「このツール名でどのhookが走るか」を答える。
  *
  * 読むだけで書かない。ユーザごとの設定（~/.claude/settings.json）は見ない。
  * ワークスペースの外を読む手段にしないため。ユーザごとの設定が載らないことは画面に書く。
  *
- * matcher の意味は Claude Code のもので、ccnavi の判定ではない。空か `*` なら全部、
- * それ以外はツール名に対する正規表現（`Write|Edit` のように書ける）。正規表現として
- * 読めなければ文字列そのものと比べる。ここは hook の登録を見せる場所。
+ * matcherの意味はClaude Codeのもので、ccnaviの判定ではない。空か`*`なら全部、
+ * それ以外はツール名に対する正規表現（`Write|Edit`のように書ける）。正規表現として
+ * 読めなければ文字列そのものと比べる。ここはhookの登録を見せる場所。
  */
 
 export type HookSource = "settings" | "settings-local";
@@ -20,7 +20,7 @@ export interface HookEntry {
   readonly timeout: number | null;
 }
 
-/** ツール名を持つイベント。これ以外は matcher に関係なく常に走る */
+/** ツール名を持つイベント。これ以外はmatcherに関係なく常に走る */
 export const TOOL_EVENTS = ["PreToolUse", "PostToolUse", "PostToolUseFailure"] as const;
 
 export function parseHooks(text: string, source: HookSource): HookEntry[] {
@@ -61,7 +61,7 @@ export function parseHooks(text: string, source: HookSource): HookEntry[] {
   return entries;
 }
 
-/** matcher がこのツール名にヒットするか */
+/** matcherがこのツール名にヒットするか */
 export function matcherHits(matcher: string, tool: string): boolean {
   const trimmed = matcher.trim();
   if (trimmed === "" || trimmed === "*") {
@@ -74,7 +74,7 @@ export function matcherHits(matcher: string, tool: string): boolean {
   }
 }
 
-/** このツール名で走る hook。ツール名を持つイベントは matcher で絞り、それ以外は常に含める */
+/** このツール名で走るhook。ツール名を持つイベントはmatcherで絞り、それ以外は常に含める */
 export function hooksFor(entries: readonly HookEntry[], tool: string): HookEntry[] {
   return entries.filter((e) =>
     (TOOL_EVENTS as readonly string[]).includes(e.event) ? matcherHits(e.matcher, tool) : true,

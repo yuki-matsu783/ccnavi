@@ -7,17 +7,17 @@ import { fixture } from "../helpers/fixture.js";
 test("CB-T34 実行ファイルが作業中と答えたチケットがあれば保存できない", () => {
   const lock = lockFromBoard(fixture());
   assert.equal(lock.locked, true);
-  // 作業中かは実行ファイルの答え（in_progress）だけで決まる。レビュー待ち・閉じた子・取り消した子は偽で来る
+  // 作業中かは実行ファイルの答え（in_progress）だけで決まる。レビュー待ち・クローズした子・取り消した子は偽で来る
   assert.deepEqual(lock.doing, ["i0001-02-02"]);
   assert.match(lock.reason, /i0001-02-02/);
 });
 
-test("CB-T35 作業中がなければ保存できる。started_at があっても実行ファイルが偽と答えれば数えない", () => {
+test("CB-T35 作業中がなければ保存できる。started_atがあっても実行ファイルが偽と答えれば数えない", () => {
   const board = fixture();
   const tickets = board.tickets.map((t) =>
     t.ticket === "i0001-02-02" ? { ...t, in_progress: false } : t,
   );
-  // 拡張が started_at から組み直していないことを見るため、着手の時刻は残したままにする
+  // 拡張がstarted_atから組み直していないことを見るため、着手の時刻は残したままにする
   assert.notEqual(tickets.find((t) => t.ticket === "i0001-02-02")?.started_at, "");
   const lock = lockFromBoard({ ...board, tickets });
   assert.equal(lock.locked, false);
@@ -35,7 +35,7 @@ test("CB-T392 プロジェクトを渡したときは、そのプロジェクト
   const board = fixture();
   const tickets = board.tickets.map((t) => ({ ...t, project: t.ticket === "i0001-02-02" ? "lib" : "" }));
   assert.equal(lockFromBoard({ ...board, tickets }, "lib").locked, true);
-  assert.match(lockFromBoard({ ...board, tickets }, "lib").reason, /^プロジェクト lib に作業中のチケットがあります（i0001-02-02）。いま保存すると/);
+  assert.match(lockFromBoard({ ...board, tickets }, "lib").reason, /^プロジェクトlibに作業中のチケットがあります（i0001-02-02）。いま保存すると/);
   assert.equal(lockFromBoard({ ...board, tickets }, "other").locked, false);
 });
 
@@ -66,7 +66,7 @@ test("CB-T588 作業中のチケットで止めるときも、ターン中の印
   assert.deepEqual(lock.turns, ["a"]);
 });
 
-test("CB-T589 ボードの JSON の turns を読む。形の違う行は欠けた値で埋める", () => {
+test("CB-T589 ボードのJSONのturnsを読む。形の違う行は欠けた値で埋める", () => {
   const raw = JSON.parse(JSON.stringify({ ...fixture(), turns: [{ session: "a", since: 10, seen: 20 }, { session: "b" }, "x"] }));
   const parsed = parseBoardJson(JSON.stringify(raw));
   assert.equal(parsed.ok, true);
@@ -78,7 +78,7 @@ test("CB-T589 ボードの JSON の turns を読む。形の違う行は欠け�
   }
 });
 
-test("CB-T1222 作業中の理由は「整合性」を使わず、チケットの ID を含む。帯は作業中だけ情報色、読めないときは赤のまま", () => {
+test("CB-T1222 作業中の理由は「整合性」を使わず、チケットのIDを含む。帯は作業中だけ情報色、読めないときは赤のまま", () => {
   const locked = lockFromBoard(fixture());
   assert.doesNotMatch(locked.reason, /整合性/);
   assert.match(locked.reason, /i0001-02-02/);

@@ -1,8 +1,8 @@
 /**
- * フロー編集画面（React）を happy-dom で動かす。図・目印・錠・保存・注意を見る。
+ * フロー編集画面（React）をhappy-domで動かす。図・目印・錠・保存・注意を見る。
  *
- * 図は大きさの偽物（`openPage` が渡す `measure`）で描かせる。見るのは「点と線がその数あるか」
- * 「押すと何が起きるか」まで。線の経路とドラッグは docs/design/manual-checks.md の手動確認に回す。
+ * 図は大きさの偽物（`openPage`が渡す`measure`）で描かせる。見るのは「点と線がその数あるか」
+ * 「押すと何が起きるか」まで。線の経路とドラッグはdocs/design/manual-checks.mdの手動確認に回す。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -18,13 +18,13 @@ function sample(): FlowDoc {
   return read.doc;
 }
 
-/** 線（SVG の要素）を押す。SVG の要素は click() を持たないので、click のイベントを流す */
+/** 線（SVGの要素）を押す。SVGの要素はclick()を持たないので、clickのイベントを流す */
 function clickSvg(dom: DomPage, element: unknown): void {
   const Mouse = (dom.window as unknown as { MouseEvent: new (type: string, init: unknown) => unknown }).MouseEvent;
   (element as { dispatchEvent: (event: unknown) => boolean }).dispatchEvent(new Mouse("click", { bubbles: true }));
 }
 
-/** 目印のある 2 種類（問いとサブエージェント）を足した雛形 */
+/** 目印のある2種類（問いとサブエージェント）を足した雛形 */
 function marked(): FlowDoc {
   let doc = bareFlow("i0001-01-01", "調査");
   doc = addNode(doc, "askUserQuestion", { x: 200, y: 300 }).doc;
@@ -52,7 +52,7 @@ test("CB-D107 図はノードと線を描き、問いには「メインに戻る
       Array.from(ask.querySelectorAll(".flow-port")).map((port) => port.getAttribute("data-port")),
       ["branch-0", "branch-1"],
     );
-    // 部品箱は 9 種類
+    // 部品箱は9種類
     assert.deepEqual(
       dom.all('[data-action="add-node"]').map((button) => button.getAttribute("data-type")),
       ["start", "end", "prompt", "subAgent", "askUserQuestion", "ifElse", "switch", "loop", "skill"],
@@ -108,7 +108,7 @@ test("CB-D109 錠が掛かっていれば読むだけ。理由の帯を出し、
     assert.ok(dom.one<HTMLButtonElement>('[data-action="remove-node"]').disabled);
     // 何も押していないので、保存は送っていない
     assert.equal(dom.posted.filter((m) => m.type === "save").length, 0);
-    // 実行ファイルの答えが変わった（finish した）と拡張ホストが知らせる。欄が戻る
+    // 実行ファイルの答えが変わった（finishした）と拡張ホストが知らせる。欄が戻る
     await dom.send({ type: "lock", lock: { locked: false, reason: "" } });
     assert.equal(dom.all("#lock").length, 0);
     assert.ok(!dom.one<HTMLInputElement>("#inspector input.f-description").disabled);
@@ -138,7 +138,7 @@ test("CB-D110 部品箱で追加して欄で直して保存すると、知らな
     await dom.settle();
     assert.equal(dom.all(".react-flow__node").length, 5);
     assert.equal(dom.one("#inspector").getAttribute("data-type"), "prompt");
-    dom.type(dom.one<HTMLTextAreaElement>("#inspector textarea.f-prompt"), "資料を読んで要点を 3 つ挙げる");
+    dom.type(dom.one<HTMLTextAreaElement>("#inspector textarea.f-prompt"), "資料を読んで要点を3つ挙げる");
     await dom.settle();
     // 問いの選択肢の名前も直す
     dom.click(dom.one('.react-flow__node[data-id="ask-1"]'));
@@ -161,7 +161,7 @@ test("CB-D110 部品箱で追加して欄で直して保存すると、知らな
     ]);
     assert.equal((nodes[1].data as Record<string, unknown>).extra, 1);
     assert.deepEqual(nodes[1].style, { width: 220 });
-    assert.deepEqual(nodes[4], { id: "prompt-1", type: "prompt", name: "プロンプト", position: nodes[4].position, data: { prompt: "資料を読んで要点を 3 つ挙げる" } });
+    assert.deepEqual(nodes[4], { id: "prompt-1", type: "prompt", name: "プロンプト", position: nodes[4].position, data: { prompt: "資料を読んで要点を3つ挙げる" } });
     assert.deepEqual(saved.connections, original.connections);
     // 画面が送るのはフローだけで、未保存かは別に知らせる
     assert.ok(dom.posted.some((m) => m.type === "dirty" && m.dirty === true));
@@ -170,7 +170,7 @@ test("CB-D110 部品箱で追加して欄で直して保存すると、知らな
   }
 });
 
-test("CB-D111 入れ子が子の下 2 段を超えるときだけ注意を出す。サブフローの中身は描かないことも言う", async () => {
+test("CB-D111 入れ子が子の下2段を超えるときだけ注意を出す。サブフローの中身は描かないことも言う", async () => {
   const quiet = await openFlow({ doc: marked() });
   try {
     assert.equal(quiet.all("#flow-notices").length, 0);
@@ -191,8 +191,8 @@ test("CB-D111 入れ子が子の下 2 段を超えるときだけ注意を出す
   const dom = await openFlow({ doc: deep });
   try {
     const notices = dom.all("#flow-notices li").map((li) => li.textContent ?? "");
-    assert.ok(notices.some((n) => /子の下に 3 段重なっています/.test(n)), notices.join("\n"));
-    assert.ok(notices.some((n) => /サブフロー（subAgentFlows）が 2 本/.test(n)));
+    assert.ok(notices.some((n) => /子の下に3段重なっています/.test(n)), notices.join("\n"));
+    assert.ok(notices.some((n) => /サブフロー（subAgentFlows）が2本/.test(n)));
     // サブフローのノードにも入れ子の目印
     assert.equal(dom.one('.react-flow__node[data-id="outer"]').querySelector(".flow-badge.nest")?.textContent, "入れ子（上限なら戻る）");
     // 注意は保存を止めない（判定ではない）
@@ -225,7 +225,7 @@ test("CB-D112 外のファイルを取り込むボタンはありません。中
 test("CB-D117 ノードと線の × で削除できる。押しても選ばない。削除したものを選んでいたら欄はフローに戻る。読むだけなら × は出ない", async () => {
   const dom = await openFlow({ doc: marked() });
   try {
-    // × はどのノードにもある（載せた・選んだときだけ見せるのは CSS）。線の × は載せる・選ぶまで出さない
+    // × はどのノードにもある（載せた・選んだときだけ見せるのはCSS）。線の × は載せる・選ぶまで出さない
     assert.equal(dom.all('[data-action="canvas-remove-node"]').length, 4);
     assert.equal(dom.all('[data-action="canvas-remove-edge"]').length, 0);
     const button = dom.one('.react-flow__node[data-id="askUserQuestion-1"] [data-action="canvas-remove-node"]');
@@ -292,12 +292,12 @@ test("CB-D118 グループは枠で描き、欄で名前を直して解ける。
     assert.equal(group.querySelectorAll(".react-flow__handle").length, 0, "グループは出入口を持たない");
     // 「欄を持たない種類」の注意は出さない
     assert.equal(dom.all("#flow-notices").length, 0);
-    // 選ぶのが 1 つだけならグループ化は押せない
+    // 選ぶのが1つだけならグループ化は押せない
     assert.ok(dom.one<HTMLButtonElement>('[data-action="group-nodes"]').disabled);
     dom.click(group);
     await dom.settle();
     assert.equal(dom.one("#inspector").getAttribute("data-type"), "group");
-    assert.match(dom.one("#inspector").textContent ?? "", /中のノードは 1 個/);
+    assert.match(dom.one("#inspector").textContent ?? "", /中のノードは1個/);
     dom.type(dom.one<HTMLInputElement>("#inspector input.f-name"), "準備");
     await dom.settle();
     assert.equal(dom.one('.react-flow__node[data-id="g"] .flow-group-label').textContent, "準備");
@@ -316,14 +316,14 @@ test("CB-D118 グループは枠で描き、欄で名前を直して解ける。
   }
 });
 
-test("CB-D119 Shift を押しながらノードを 2 つ選ぶと「グループ化」が押せ、押すと枠で囲んで枠を選ぶ", async () => {
+test("CB-D119 Shiftを押しながらノードを2つ選ぶと「グループ化」が押せ、押すと枠で囲んで枠を選ぶ", async () => {
   const dom = await openFlow({ doc: marked() });
   try {
     const group = (): HTMLButtonElement => dom.one<HTMLButtonElement>('[data-action="group-nodes"]');
     assert.ok(group().disabled);
     dom.click(dom.one('.react-flow__node[data-id="start"]'));
     await dom.settle();
-    assert.ok(group().disabled, "1 つだけではまとめない");
+    assert.ok(group().disabled, "1つだけではまとめない");
     dom.key("Shift");
     await dom.settle();
     dom.click(dom.one('.react-flow__node[data-id="end"]'));
@@ -333,7 +333,7 @@ test("CB-D119 Shift を押しながらノードを 2 つ選ぶと「グループ
     await dom.settle();
     assert.equal(dom.all(".react-flow__node").length, 5);
     assert.equal(dom.one("#inspector").getAttribute("data-type"), "group");
-    assert.match(dom.one("#inspector").textContent ?? "", /中のノードは 2 個/);
+    assert.match(dom.one("#inspector").textContent ?? "", /中のノードは2個/);
     dom.click(dom.one("#save"));
     await dom.settle();
     const saved = savedDoc(dom);
@@ -349,12 +349,12 @@ test("CB-D119 Shift を押しながらノードを 2 つ選ぶと「グループ
   }
 });
 
-/** 選ばれている点の id（図の上で） */
+/** 選ばれている点のid（図の上で） */
 function pickedIds(dom: DomPage): (string | null)[] {
   return dom.all(".react-flow__node.selected").map((node) => node.getAttribute("data-id"));
 }
 
-test("CB-D120 Shift を押しながら選んでいるノードを押すと、そのノードだけ選びから外れ、ほかは残る。右の欄は残ったノードに移る", async () => {
+test("CB-D120 Shiftを押しながら選んでいるノードを押すと、そのノードだけ選びから外れ、ほかは残る。右の欄は残ったノードに移る", async () => {
   let doc = bareFlow("i0001-01-01", "調査");
   doc = addNode(doc, "prompt", { x: 400, y: 80 }).doc;
   const dom = await openFlow({ doc });
@@ -369,7 +369,7 @@ test("CB-D120 Shift を押しながら選んでいるノードを押すと、そ
     dom.click(node("prompt-1"));
     await dom.settle();
     assert.deepEqual(pickedIds(dom).sort(), ["end", "prompt-1", "start"]);
-    // 真ん中の 1 つを外す
+    // 真ん中の1つを外す
     dom.click(node("end"));
     await dom.settle();
     assert.deepEqual(pickedIds(dom).sort(), ["prompt-1", "start"]);
@@ -386,7 +386,7 @@ test("CB-D120 Shift を押しながら選んでいるノードを押すと、そ
     await dom.settle();
     assert.deepEqual(pickedIds(dom), []);
     assert.equal(dom.one("#inspector").getAttribute("data-selected"), "flow");
-    // 部品箱で足したノードは、それ 1 つだけを選ぶ
+    // 部品箱で足したノードは、それ1つだけを選ぶ
     dom.click(node("start"));
     await dom.settle();
     dom.click(node("end"));
@@ -400,7 +400,7 @@ test("CB-D120 Shift を押しながら選んでいるノードを押すと、そ
   }
 });
 
-/** グループ 1 つ（中に開始）と終了のフロー */
+/** グループ1つ（中に開始）と終了のフロー */
 function grouped(): FlowDoc {
   return {
     ...bareFlow("i0001-01-01", "調査"),
@@ -449,7 +449,7 @@ test("CB-D122 読むだけのときは、グループの縁を出さず、「グ
     assert.equal(dom.all(".react-flow__resize-control").length, 0);
     assert.ok(dom.one<HTMLButtonElement>('#inspector [data-action="ungroup"]').disabled);
     assert.ok(dom.one<HTMLButtonElement>('#inspector [data-action="remove-node"]').disabled);
-    // 2 つ選んでもグループ化は押せない
+    // 2つ選んでもグループ化は押せない
     dom.click(dom.one('.react-flow__node[data-id="start"]'));
     await dom.settle();
     dom.key("Shift");
@@ -512,7 +512,7 @@ test("CB-D190 図の拡大ボタンで図だけを全画面にし、もう一度
   }
 });
 
-test("CB-D191 図を全画面にしている間は、背後を inert にして Esc を背後へ渡さず、キー操作で文書を直さない", async () => {
+test("CB-D191 図を全画面にしている間は、背後をinertにしてEscを背後へ渡さず、キー操作で文書を直さない", async () => {
   const dom = await openFlow({ doc: marked() });
   try {
     let behind = 0;
@@ -520,13 +520,13 @@ test("CB-D191 図を全画面にしている間は、背後を inert にして E
     dom.click(dom.one('#flow-graph button[data-action="toggle-maximize"]'));
     await dom.settle();
     assert.ok(dom.document.body.hasAttribute("data-graph-max"));
-    assert.ok(dom.all("[inert]").length > 0, "背後に inert を付ける");
-    assert.equal(dom.one("#flow-graph").closest("[inert]"), null, "図そのものは inert にしない");
+    assert.ok(dom.all("[inert]").length > 0, "背後にinertを付ける");
+    assert.equal(dom.one("#flow-graph").closest("[inert]"), null, "図そのものはinertにしない");
     dom.key("Escape");
     await dom.settle();
-    assert.equal(behind, 0, "Esc は図が受けて背後へ渡さない");
+    assert.equal(behind, 0, "Escは図が受けて背後へ渡さない");
     assert.equal(dom.document.body.hasAttribute("data-graph-max"), false);
-    assert.equal(dom.all("[inert]").length, 0, "戻したら inert を外す");
+    assert.equal(dom.all("[inert]").length, 0, "戻したらinertを外す");
   } finally {
     await dom.close();
   }

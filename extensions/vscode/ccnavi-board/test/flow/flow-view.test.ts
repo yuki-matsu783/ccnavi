@@ -1,5 +1,5 @@
 /**
- * フロー編集画面の契約（`core/flow-view.ts`）と、ボードの JSON の `flow` の欄の読み方。
+ * フロー編集画面の契約（`core/flow-view.ts`）と、ボードのJSONの`flow`の欄の読み方。
  * 画面から届くメッセージの形の確かめ、錠を実行ファイルの答えから取り込むこと、カードのボタンの言葉を見る。
  */
 import { test } from "node:test";
@@ -25,7 +25,7 @@ test("CB-T225 画面から届くメッセージは形を確認し、崩れたも
   assert.equal(asFlowMessage({ type: "save" }), undefined);
   assert.equal(asFlowMessage({ type: "save", doc: { name: "x" } }), undefined);
   assert.equal(asFlowMessage({ type: "save", doc: { nodes: [{ type: "start" }] } }), undefined);
-  // 描ける形なら受ける。id の重なりのような正しさは、保存の前に実行ファイル（--lint --flow）が言う
+  // 描ける形なら受ける。idの重なりのような正しさは、保存の前に実行ファイル（--lint --flow）が言う
   const twin = { nodes: [{ id: "a" }, { id: "a" }] };
   assert.deepEqual(asFlowMessage({ type: "save", doc: twin }), { type: "save", doc: twin });
   // 知らない操作・オブジェクトでないもの
@@ -58,9 +58,9 @@ test("CB-T227 カードのボタンの言葉は、在るか・錠の種類（実
   assert.equal(flowButtonLabel({ ...base, exists: false, locked: true, lock_kind: "doing" }), "フロー: 閲覧（着手中）");
 });
 
-test("CB-T228 錠は実行ファイルの flow.locked をそのまま使う。親・ない子・欄のない子は引けない", () => {
+test("CB-T228 錠は実行ファイルのflow.lockedをそのまま使う。親・ない子・欄のない子は引けない", () => {
   const board = fixture();
-  // 見本の i0001-02-02 は着手中（DENY_TICKET_FLOW_LOCKED で止まる）、i0001-01-01 は閉じていてファイルが在る
+  // 見本のi0001-02-02は着手中（DENY_TICKET_FLOW_LOCKEDで止まる）、i0001-01-01は閉じていてファイルが在る
   const locked = flowTargetOf(board, "i0001-02-02");
   assert.ok(locked.ok);
   assert.equal(locked.target.lock.locked, true);
@@ -76,11 +76,11 @@ test("CB-T228 錠は実行ファイルの flow.locked をそのまま使う。�
   assert.match(parent.ok ? "" : parent.error, /親チケット/);
   const missing = flowTargetOf(board, "i9999-01-01");
   assert.equal(missing.ok, false);
-  // 取り消しの子でファイルが無ければ、実行ファイルは flow を null で返す。開く先が無い
+  // 取り消しの子でファイルが無ければ、実行ファイルはflowをnullで返す。開く先が無い
   const cancelled = flowTargetOf(board, "i0001-02-05");
   assert.equal(cancelled.ok, false);
-  assert.match(cancelled.ok ? "" : cancelled.error, /完了・取り消しの子でファイルがありません/);
-  // 画面は started_at を見て組み直さない。答えが locked: false と言えば、着手済みに見えても開く
+  assert.match(cancelled.ok ? "" : cancelled.error, /完了・取り消しの子チケットには、フローのファイルがありません/);
+  // 画面はstarted_atを見て組み直さない。答えがlocked: falseと言えば、着手済みに見えても開く
   const trusted: BoardJson = {
     ...board,
     tickets: board.tickets.map((t) => (t.ticket === "i0001-02-02" && t.flow !== null ? { ...t, flow: { ...t.flow, locked: false } } : t)),
@@ -92,7 +92,7 @@ test("CB-T228 錠は実行ファイルの flow.locked をそのまま使う。�
   assert.equal(lockFromFailure("返らない").locked, true);
 });
 
-test("CB-T229 ボードの JSON の flow は子だけが持つ", () => {
+test("CB-T229 ボードのJSONのflowは子だけが持つ", () => {
   const board = fixture();
   assert.equal(board.tickets.find((t) => t.ticket === "i0001")?.flow, null);
   const child = board.tickets.find((t) => t.ticket === "i0001-01-01")?.flow;
@@ -110,7 +110,7 @@ test("CB-T229 ボードの JSON の flow は子だけが持つ", () => {
   assert.equal(flowCardOf(built, "i0001-02-05"), undefined);
 });
 
-test("CB-T534 錠の種類（lock_kind）はボードの JSON から読む。doing・review はそのまま、知らない値は null", () => {
+test("CB-T534 錠の種類（lock_kind）はボードのJSONから読む。doing・reviewはそのまま、知らない値はnull", () => {
   const raw = JSON.parse(fixtureText()) as { tickets: { ticket: string; flow: Record<string, unknown> | null }[] };
   const flowOf = (ticket: string): Record<string, unknown> => {
     const flow = raw.tickets.find((t) => t.ticket === ticket)?.flow;
@@ -140,7 +140,7 @@ test("CB-T557 置き場かその途中がリンクなら、着手前でも読む
   assert.match(linked.target.lock.reason, /シンボリックリンク/);
 });
 
-test("CB-T293 下書きの置き場は実行ファイルの flow.draft のコピー", () => {
+test("CB-T293 下書きの置き場は実行ファイルのflow.draftのコピー", () => {
   const board = fixture();
   const child = board.tickets.find((t) => t.ticket === "i0001-02-03")?.flow;
   assert.ok(child !== null && child !== undefined);
@@ -158,7 +158,7 @@ test("CB-T294 依頼のボタンは着手の前で錠がないときだけ。フ
   assert.equal(requestLabel({ ...open, flowExists: true }), "エージェントにフローの直しを頼む");
   assert.equal(requestLabel({ ...open, draftExists: true }), "エージェントにフローを頼み直す");
   assert.equal(requestLabel({ ...open, flowExists: true, draftExists: true }), "エージェントにフローを頼み直す");
-  // 着手中・閉じた子（着手の前でない）・錠の確認中やリンク（錠が掛かっている）には出さない
+  // 着手中・クローズした子（着手の前でない）・錠の確認中やリンク（錠が掛かっている）には出さない
   assert.equal(requestLabel({ ...open, beforeStart: false }), undefined);
   assert.equal(requestLabel({ ...open, locked: true }), undefined);
 });
@@ -173,9 +173,9 @@ test("CB-T295 依頼の文は子・保存先・いまのフロー・確認方法
     lintCommand: "sh /ws/.ccnavi/scripts/ccnavi-launcher.sh --lint --flow /ws/.claude/worktrees/i0001/wip/proposals/flows/i0001-02-03.yml",
   };
   const made = flowRequestPrompt(base);
-  assert.match(made, /子チケット i0001-02-03（設計） のフローの作成を頼んだ（親 i0001）/);
+  assert.match(made, /子チケットi0001-02-03（設計）のフローの作成を頼んだ（親i0001）/);
   assert.match(made, /下書きの保存先: \/ws\/\.claude\/worktrees\/i0001\/wip\/proposals\/flows\/i0001-02-03\.yml/);
-  assert.match(made, /ccnavi-launcher\.sh --lint --flow \/ws\/.*i0001-02-03\.yml` で確認し、error が無くなってから/);
+  assert.match(made, /ccnavi-launcher\.sh --lint --flow \/ws\/.*i0001-02-03\.yml`で確認し、errorが無くなってから/);
   assert.match(made, /\.ccnavi\/approved\/flows\/）には保存しない/);
   assert.doesNotMatch(made, /いまのフロー/);
   assert.doesNotMatch(made, /前の下書き/);

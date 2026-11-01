@@ -1,6 +1,6 @@
 /**
- * 取り込み待ち画面へ進む入口の、拡張ホスト側の共通部分（契約は `core/handoff-entry.ts`）。
- * VS Code の API には触れないが、実行ファイルを呼ぶので単体テストの対象外。
+ * 取り込み待ち画面へ進む入口の、拡張ホスト側の共通部分（契約は`core/handoff-entry.ts`）。
+ * VS CodeのAPIには触れないが、実行ファイルを呼ぶので単体テストの対象外。
  */
 import { handoffTreeKey, type HandoffEntry } from "./core/handoff-entry.js";
 import { screens } from "./core/screens.js";

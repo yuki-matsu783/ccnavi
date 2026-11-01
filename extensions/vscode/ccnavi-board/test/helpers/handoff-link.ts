@@ -1,6 +1,6 @@
 /**
  * 「取り込み待ちを開く」（`src/webview/shared/HandoffLink.tsx`）の確かめ。ルール管理・リスク管理・フェーズ管理が同じ部品を置くので、
- * 確かめる中身も 1 つにして、画面ごとの `open` だけを差し替える。
+ * 確かめる中身も1つにして、画面ごとの`open`だけを差し替える。
  */
 import assert from "node:assert/strict";
 import type { HandoffEntry } from "../../src/core/handoff-entry.js";

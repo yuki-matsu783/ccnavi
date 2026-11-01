@@ -1,24 +1,24 @@
 /**
- * ルール管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
- * VS Code の API に触れるので単体テストの対象外。docs/design/manual-checks.md の手動確認の手順で確かめる。
+ * ルール管理画面のWebviewパネル。生成・更新・破棄、ファイル監視、Webviewからの操作の受け付け。
+ * VS CodeのAPIに触れるので単体テストの対象外。docs/design/manual-checks.mdの手動確認の手順で確かめる。
  *
- * 画面は React（`src/webview/rules/`）で、ここが渡すのは「いま何を見せるか」（`RulesData`）だけ。
- * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
- * `retainContextWhenHidden` が真で、入れ物（HTML）は 1 度しか入らない。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
+ * 画面はReact（`src/webview/rules/`）で、ここが渡すのは「いま何を見せるか」（`RulesData`）だけ。
+ * 渡し方は`core/screen-host.ts`の`retainedHost`が決める。この画面は編集の途中を持つので
+ * `retainContextWhenHidden`が真で、入れ物（HTML）は1度しか入らない。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
  * 中身を渡すのは、画面の編集を破棄してよいときだけ（ユーザが「更新」を押した、保存が通った）。
- * ファイルが外で変わっただけのときは `changed` を送り、破棄するかどうかはユーザが決める。
+ * ファイルが外で変わっただけのときは`changed`を送り、破棄するかどうかはユーザが決める。
  *
- * 対象は 3 種。共通の設定のルール（`.ccnavi/config/common/rules.yml`）、
- * ワークスペースの設定のルール（既定 `.ccnavi/config/project/rules.yml`）、プロジェクト 1 つの設定のルール
- * （既定 `projects/<名前>/.ccnavi/config/project/rules.yml`）。タブは 1 枚だけで、別の対象を開くとそのタブの
+ * 対象は3種。共通の設定のルール（`.ccnavi/config/common/rules.yml`）、
+ * ワークスペースの設定のルール（既定`.ccnavi/config/project/rules.yml`）、プロジェクト1つの設定のルール
+ * （既定`projects/<名前>/.ccnavi/config/project/rules.yml`）。タブは1枚だけで、別の対象を開くとそのタブの
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
- * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json` の `layers[]`）を使い、拡張は組まない。
+ * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json`の`layers[]`）を使い、拡張は組まない。
  * ファイルが無いのは「設定が無い」正常な状態で、空として出す（保存でファイルを作る）。
- * 編集する 1 本とは別に、読み取り専用の統合結果（共通の設定 + ワークスペース、共通の設定 + 各プロジェクト。`sums[]`）を出す。
+ * 編集する1本とは別に、読み取り専用の統合結果（共通の設定 + ワークスペース、共通の設定 + 各プロジェクト。`sums[]`）を出す。
  * 統合結果は実行ファイルが出した結果をそのまま見せる。
  *
- * 判定・検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、共通の設定なら `--rules`、
- * ワークスペースかプロジェクトの設定なら `--project-rules-file <名前>=<パス>`（ワークスペースの設定は名前が `self`）で渡す。保存は、検証（`--lint`）を通り、
+ * 判定・検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、共通の設定なら`--rules`、
+ * ワークスペースかプロジェクトの設定なら`--project-rules-file <名前>=<パス>`（ワークスペースの設定は名前が`self`）で渡す。保存は、検証（`--lint`）を通り、
  * 作業中のチケットが無く（プロジェクトならそのプロジェクトの）、ファイルが外で変わっていない
  * ときだけ行う。
  */
@@ -54,20 +54,20 @@ import { confirmDuringTurn } from "./turn-confirm.js";
 
 const DEFAULT_RULES = ".ccnavi/config/common/rules.yml";
 const DEFAULT_EXPECTATIONS =".ccnavi/config/common/rule-expectations.yml";
-/** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+/** 画面の名前。バンドルのパスは`src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "rules";
-const TITLE = "ccnavi ルール管理";
+const TITLE = "ccnaviルール管理";
 
 interface Loaded {
-  /** 読んだ対象。往復の間に切り替わったかを `stale` が見る */
+  /** 読んだ対象。往復の間に切り替わったかを`stale`が見る */
   readonly target: RulesTarget;
   /** ファイルが在るか。無ければ空として出し、保存で作る */
   readonly exists: boolean;
-  /** 無いときは 0 */
+  /** 無いときは0 */
   readonly mtimeMs: number;
   readonly doc: RulesDocument;
   readonly rulesPath: string;
-  /** ワークスペースルートからの相対で見せるパス。プロジェクトなら `projects/<名前>/.ccnavi/config/project/rules.yml` */
+  /** ワークスペースルートからの相対で見せるパス。プロジェクトなら`projects/<名前>/.ccnavi/config/project/rules.yml` */
   readonly rulesRel: string;
   /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
@@ -75,7 +75,7 @@ interface Loaded {
   readonly handoff: HandoffEntry;
   /** 切り替えられる対象（共通・ワークスペース・設定のあるプロジェクト） */
   readonly targets: readonly TargetOption[];
-  /** 読み取り専用の統合結果（実行ファイルの `sums[]`） */
+  /** 読み取り専用の統合結果（実行ファイルの`sums[]`） */
   readonly sums: readonly RulesSum[];
   readonly hooks: readonly HookEntry[];
   readonly hookFiles: { readonly settings: boolean; readonly settingsLocal: boolean };
@@ -86,19 +86,19 @@ interface Loaded {
 
 type PanelState = SettingsState<RulesData, RulesTarget, Loaded>;
 
-/** 開いているパネル。種類ごとに 1 枚 */
+/** 開いているパネル。種類ごとに1枚 */
 let state: PanelState | undefined;
 
 function sameTarget(a: RulesTarget, b: RulesTarget): boolean {
   return a.kind === b.kind && (a.kind !== "project" || (b.kind === "project" && a.name === b.name));
 }
 
-/** 保存を止めるチケットを絞るプロジェクト。共通の設定とワークスペースの設定は絞らない（どちらも全ツリーの Bash に影響する） */
+/** 保存を止めるチケットを絞るプロジェクト。共通の設定とワークスペースの設定は絞らない（どちらも全ツリーのBashに影響する） */
 function projectOf(target: RulesTarget): string | undefined {
   return target.kind === "project" ? target.name : undefined;
 }
 
-/** 確認の文で使う対象の名前。「設定」欄の表示（core/targets.ts の label）と揃える */
+/** 確認の文で使う対象の名前。「設定」欄の表示（core/targets.tsのlabel）と揃える */
 function targetLabelOf(target: RulesTarget): string {
   switch (target.kind) {
     case "workspace":
@@ -106,7 +106,7 @@ function targetLabelOf(target: RulesTarget): string {
     case "self":
       return "ワークスペース";
     case "project":
-      return `プロジェクト ${target.name}`;
+      return `プロジェクト${target.name}`;
   }
 }
 
@@ -118,7 +118,7 @@ function whatOf(target: RulesTarget): string {
     case "self":
       return "ワークスペースの設定のルール";
     case "project":
-      return `${target.name} のルール`;
+      return `${target.name}のルール`;
   }
 }
 
@@ -130,7 +130,7 @@ function expectationsSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("expectationsPath", DEFAULT_EXPECTATIONS);
 }
 
-/** `ccnaviBoard.openRules` の本体。引数なしは共通の設定のルール */
+/** `ccnaviBoard.openRules`の本体。引数なしは共通の設定のルール */
 export async function openRules(target: RulesTarget = { kind: "workspace" }): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
@@ -145,7 +145,7 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     return;
   }
 
-  // 画面と CSS はバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面とCSSはバンドルしたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
@@ -155,8 +155,8 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
   }
 
   // タブは読む前に作る。設定ファイルの場所を実行ファイルに聞く間に、押しても何も起きないように見えるのを避けるため。
-  // `state` を先に設定するので、読んでいる間に押し直しても上の `reveal` に入る。
-  // 読めなかったときもタブは閉じず、中にエラーを出す（`reload` の `showError`）
+  // `state`を先に設定するので、読んでいる間に押し直しても上の`reveal`に入る。
+  // 読めなかったときもタブは閉じず、中にエラーを出す（`reload`の`showError`）
   const panel = vscode.window.createWebviewPanel("ccnaviRules", TITLE, vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
@@ -199,11 +199,11 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   }
   const targets = targetOptions(board.ok ? board.board : undefined, "workspace", { kind: target.kind, name: target.kind === "project" ? target.name : "" });
   if (target.kind === "workspace") {
-    // 共通の設定の場所は `.ccnavi/config/common/` 固定。env（`CCNAVI_RULES` など）では動かせないので、設定ファイルは読まない。
+    // 共通の設定の場所は`.ccnavi/config/common/`固定。env（`CCNAVI_RULES`など）では動かせないので、設定ファイルは読まない。
     rulesRel = DEFAULT_RULES;
     rulesPath = resolveIn(root, rulesRel);
   } else {
-    // 設定ファイルの場所は実行ファイルに聞く。`.ccnavi` から自分で組むと、組み方が実行ファイルと
+    // 設定ファイルの場所は実行ファイルに聞く。`.ccnavi`から自分で組むと、組み方が実行ファイルと
     // 食い違ったときに、この画面で保存したルールが判定に使われなくなる。答えは元リポジトリの版で、
     // ワークツリーの中の版は指さない。
     if (!board.ok) {
@@ -213,14 +213,14 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     if (layer === undefined || layer.rules.path === "") {
       throw new Error(
         target.kind === "self"
-          ? "ccnavi の出力にワークスペースの設定がありません"
-          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下にないか、名前が予約名の common か self です）`,
+          ? "ccnaviの出力にワークスペースの設定がありません"
+          : `プロジェクト${target.name}は設定の対象になっていません（プロジェクトのフォルダの直下にないか、名前が予約名のcommonかselfです）`,
       );
     }
     rulesPath = resolveIn(root, layer.rules.path);
     rulesRel = path.relative(root, rulesPath).split(path.sep).join("/");
     if (layer.rules.unreadable !== "") {
-      notices.push(`実行ファイルはこのファイルを読み込めず、この設定を空として扱っています（このファイルのルールは 1 件も判定に使われていません）: ${layer.rules.unreadable}`);
+      notices.push(`実行ファイルはこのファイルを読み込めず、この設定を空として扱っています（このファイルのルールは1件も判定に使われていません）: ${layer.rules.unreadable}`);
     }
   }
   let text: string;
@@ -258,7 +258,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     sums: rulesSums(board.ok ? board.board : undefined),
     hooks,
     hookFiles: { settings: settingsText !== undefined, settingsLocal: localText !== undefined },
-    // 動作モードは実行ファイルに聞く。設定ファイルの env から自分で読むと、settings.local.json・環境・
+    // 動作モードは実行ファイルに聞く。設定ファイルのenvから自分で読むと、settings.local.json・環境・
     // 読めない値の扱いが判定と食い違う
     mode: board.ok ? board.board.settings.mode : "",
     expectationsPath: resolveIn(root, expectationsRel),
@@ -280,7 +280,7 @@ function resolveIn(root: string, filePath: string): string {
 
 /**
  * ルールファイルと設定ファイルが変わったら「ファイルの変更を検知しました」と伝える。自分の保存は除く。
- * 対象のパスは設定ファイルの場所で変わるので、再読み込みのたびに張り直す。
+ * 対象のパスは設定ファイルの場所で変わるので、更新のたびに張り直す。
  */
 function watchFiles(current: PanelState): void {
   for (const watcher of current.fileWatchers) {
@@ -299,7 +299,7 @@ function alive(current: PanelState): boolean {
   return state === current;
 }
 
-/** この画面の仕事を、3 画面で共通の段取り（`settings-panel.ts`）に渡す */
+/** この画面の仕事を、3画面で共通の段取り（`settings-panel.ts`）に渡す */
 const { registerPanelHandlers, scheduleChanged, reload, redraw, switchTarget } = settingsPanel<RulesData, RulesTarget, Loaded, ToRules>({
   accepts: true,
   alive,
@@ -321,7 +321,7 @@ const { registerPanelHandlers, scheduleChanged, reload, redraw, switchTarget } =
 
 /**
  * 保存できるかを実行ファイルに聞く。確かめられなければ閉じる側。
- * 共通の設定とワークスペースの設定のルールはどのツリーの doing でも止め、プロジェクトのルールはそのプロジェクトの doing だけ見る。
+ * 共通の設定とワークスペースの設定のルールはどのツリーのdoingでも止め、プロジェクトのルールはそのプロジェクトのdoingだけ見る。
  */
 async function refreshLock(current: PanelState): Promise<Lock> {
   const result = await loadBoard(current.folder.uri.fsPath, binSetting());
@@ -366,7 +366,7 @@ function show(current: PanelState): void {
   });
 }
 
-/** 読み直せなかったことを見せる。理由は覚えておく（渡せなかったときに `ready` で渡し直すため） */
+/** 読み直せなかったことを見せる。理由は覚えておく（渡せなかったときに`ready`で渡し直すため） */
 function showError(current: PanelState, error: string): void {
   current.loaded = undefined;
   current.error = error;
@@ -374,15 +374,15 @@ function showError(current: PanelState, error: string): void {
   current.host.send({ kind: "error", error, target, targets: targetOptions(undefined, "workspace", target) });
 }
 
-/** 開いている対象の欄の値（`targets.ts` の `kind` と `name`） */
+/** 開いている対象の欄の値（`targets.ts`の`kind`と`name`） */
 function currentKey(target: RulesTarget): { kind: string; name: string } {
   return { kind: target.kind, name: target.kind === "project" ? target.name : "" };
 }
 
 /**
- * ルール管理の画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。
- * 入れ物は 1 度しか入らないので、表示の有無は渡さない（保持する画面は非表示でも生きている）。
- * パネルの `retainContextWhenHidden` を偽に変えると、送った先が破棄されていても気づけなくなる。
+ * ルール管理の画面に渡す手段。VS Codeのパネルを`retainedHost`の形に合わせる。
+ * 入れ物は1度しか入らないので、表示の有無は渡さない（保持する画面は非表示でも生きている）。
+ * パネルの`retainContextWhenHidden`を偽に変えると、送った先が破棄されていても気づけなくなる。
  * 型では止まらないので、ここで見て言う。
  */
 function rulesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<RulesData> {
@@ -407,9 +407,9 @@ function rulesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<RulesDa
 }
 
 /**
- * 頼まれたときに読んでいたものが、往復の間に入れ替わっていないか。`what` は破棄するもの。
+ * 頼まれたときに読んでいたものが、往復の間に入れ替わっていないか。`what`は破棄するもの。
  *
- * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間にユーザが「更新」を押せば、
+ * 保存は実行ファイルへ2度出る（`--lint`と錠の取り直し）。その間にユーザが「更新」を押せば、
  * 画面の編集は破棄され、新しい中身が出ている。そこへ古い編集を書くと、破棄したはずのものが
  * ファイルに入る。 判定と期待する判定の確認はファイルに触らないが、破棄した編集で出した答えを
  * 「いまのルールの判定」として見せることになるので、同じく無かったことにする。
@@ -426,7 +426,7 @@ function stale(current: PanelState, loaded: Loaded, what: string): boolean {
   return true;
 }
 
-/** 操作の結果の一言。1 枚目を読み込んでいる間だけ届かずに破棄される（非表示になっていても届く） */
+/** 操作の結果の一言。1枚目を読み込んでいる間だけ届かずに破棄される（非表示になっていても届く） */
 function fail(current: PanelState, message: string): void {
   current.host.post({ type: "failed", message } satisfies ToRules);
 }
@@ -464,14 +464,14 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
   if (message.type === "ready") {
     // 組み上がったばかりの画面は必ず「変更なし」で始まる（作り直された画面は前の編集を持たない）
     current.dirty = false;
-    // 画面が組み上がった。1 枚目を読み込んでいる間に見送った中身は、ここで渡る。
-    // 見送るものが無くても渡し直す（同じ中身がもう 1 度届く）。VS Code が画面を作り直す経路
-    // （`Developer: Reload Webviews`）では、入れてある HTML の中身が古いことがあるため
+    // 画面が組み上がった。1枚目を読み込んでいる間に見送った中身は、ここで渡る。
+    // 見送るものが無くても渡し直す（同じ中身がもう1度届く）。VS Codeが画面を作り直す経路
+    // （`Developer: Reload Webviews`）では、入れてあるHTMLの中身が古いことがあるため
     current.host.ready();
     redraw(current);
     postAppearance(current.host);
-    // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
-    // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
+    // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら`tourDone`を返す。
+    // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう1度出る
     if (!tourSeen(SCREEN)) {
       current.host.post({ type: "tour" } satisfies ToRules);
     }
@@ -482,7 +482,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
     return;
   }
   // 読み直せていない画面では、ルールにヒットする操作はどれも行き先が無い（「更新」は
-  // 押せるが、その経路は `reload` が読み直しからやり直す）
+  // 押せるが、その経路は`reload`が読み直しからやり直す）
   if (current.loaded === undefined && message.type !== "reload") {
     return;
   }
@@ -538,7 +538,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
     }
     case "pickFile": {
       // 選んだファイルはワークスペースルートからの相対で欄に入れる。外を選んだら入れない。
-      // 実行ファイルが読むのはルートの中だけで、lint も外を指すパスを error にする。
+      // 実行ファイルが読むのはルートの中だけで、lintも外を指すパスをerrorにする。
       const picked = await vscode.window.showOpenDialog({
         defaultUri: current.folder.uri,
         canSelectFiles: true,
@@ -657,7 +657,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     return;
   }
 
-  // 1. 検証。error が 1 件でもあれば保存しない。
+  // 1. 検証。errorが1件でもあれば保存しない。
   const lint = await runLint(root, binSetting(), overrideFor(current.target, tmp));
   if (!alive(current) || stale(current, loaded, "この保存")) {
     return;
@@ -668,7 +668,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
   }
   if (!lint.value.ok) {
     // 指摘は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
-    fail(current, `設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください:\n${lint.value.report.split(tmp).join(loaded.rulesRel)}`);
+    fail(current, `設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください。\n${lint.value.report.split(tmp).join(loaded.rulesRel)}`);
     return;
   }
 
@@ -722,12 +722,12 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     return;
   }
   await reload(current);
-  // warn の本文は画面上部の帯に出す（通知は件数だけ）。中身（data）を渡したあとに送る
+  // warnの本文は画面上部の帯に出す（通知は件数だけ）。中身（data）を渡したあとに送る
   const warns = warnLinesOf(lint.value.report, tmp, loaded.rulesRel);
   if (warns.length > 0 && alive(current)) {
     current.host.post({ type: "saved", warns } satisfies ToRules);
   }
-  vscode.window.showInformationMessage(`${loaded.rulesRel} に保存しました（${lintSummary(lint.value.report)}）`);
+  vscode.window.showInformationMessage(`${loaded.rulesRel}に保存しました（${lintSummary(lint.value.report)}）`);
 }
 
 function asMessage(message: unknown): RulesMessage | undefined {

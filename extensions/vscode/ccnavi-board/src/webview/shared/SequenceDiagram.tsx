@@ -2,9 +2,9 @@
  * 時系列の図（案内の中で「誰が誰に何をするか」を見せる）。登場者を左から並べ、矢印を上から下へ時間順に並べる。
  * 矢印には、実際に入れる値や出る結果を等幅で添えられる（`value`）。値を変えると結果が変わる例は、図を分けて並べる。
  *
- * 絵は DOM と CSS だけで描く（画像にしない）ので、VS Code のテーマに従い、文字を直すのは YAML だけで済む。
- * `focus` に入れた矢印は光らせ、ほかは薄く出す（空なら全部を同じ濃さで出す）。
- * 矢印の向きは `from` から `to`。同じ登場者なら、その列の覚え書き（自分の中の動き）として箱で出す。
+ * 絵はDOMとCSSだけで描く（画像にしない）ので、VS Codeのテーマに従い、文字を直すのはYAMLだけで済む。
+ * `focus`に入れた矢印は光らせ、ほかは薄く出す（空なら全部を同じ濃さで出す）。
+ * 矢印の向きは`from`から`to`。同じ登場者なら、その列の覚え書き（自分の中の動き）として箱で出す。
  */
 import type { CSSProperties, JSX } from "react";
 
@@ -30,7 +30,7 @@ export function SequenceDiagram({ name, diagram, focus }: { readonly name: strin
         const classes = `tour-diagram-step${lit ? "" : " dim"}${focus.includes(step.id) ? " focus" : ""}`;
         const row = index + 2;
         if (from === to) {
-          // 自分の中の動き。右端の列では左へ 1 列広げる（箱がはみ出さないように）
+          // 自分の中の動き。右端の列では左へ1列広げる（箱がはみ出さないように）
           const start = Math.min(from, count - 2);
           return (
             <div key={step.id} className={`${classes} note`} data-step={step.id} style={{ gridColumn: `${start + 1} / span 2`, gridRow: row }}>

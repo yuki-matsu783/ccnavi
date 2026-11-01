@@ -1,5 +1,5 @@
 /*
- * 承認のオーバーレイ（`Approval.tsx`）。背景と本体の作りは `shared/Dialog.css`。ここは幅と中身。
+ * 承認のオーバーレイ（`Approval.tsx`）。背景と本体の作りは`shared/Dialog.css`。ここは幅と中身。
  */
 .approval { --overlay-w: 920px; }
 .approval-batch { border-collapse: collapse; width: 100%; font-size: var(--font-md); margin-bottom: 8px; }
@@ -35,7 +35,7 @@
 .plan-family + .plan-family { margin-top: 12px; }
 .plan-family-actions { display: flex; justify-content: flex-end; margin: 4px 0; }
 
-/* 残った指摘の行き先（`Decide.tsx`）。指摘 1 件ずつに場所・要旨・行き先の選択を並べる */
+/* 残った指摘の行き先（`Decide.tsx`）。指摘1件ずつに場所・要旨・行き先の選択を並べる */
 /* 一括の行。文字だけの小さなボタンで、一覧の邪魔をしない */
 .decide-bulk { display: flex; align-items: center; gap: var(--gap-4); justify-content: flex-end; margin: 0 0 4px; font-size: var(--font-md); color: var(--vscode-descriptionForeground); }
 .decide-bulk-button { background: none; border: none; padding: 2px 4px; font: inherit; color: var(--vscode-textLink-foreground); cursor: pointer; }
@@ -50,8 +50,8 @@ a.decide-url:hover, a.decide-url:focus-visible { text-decoration: underline; col
 .decide-body { margin: 2px 0 4px; overflow-wrap: anywhere; }
 .decide-full { margin: 4px 0 0; padding: 6px 8px; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--vscode-editor-font-family); font-size: var(--font-md); background: var(--vscode-textCodeBlock-background); border-radius: var(--radius-md); }
 .decide-more > summary { cursor: pointer; width: fit-content; color: var(--vscode-descriptionForeground); font-size: var(--font-md); }
-/* 対応方針の選択肢。3 つが同じ寸法の切り替えになる。ラジオ自体は見えなくするが、フォーカスと矢印キーの操作は
-   ラジオのまま（display: none にしない）。選んだものは塗り、フォーカスは輪で示す */
+/* 対応方針の選択肢。3つが同じ寸法の切り替えになる。ラジオ自体は見えなくするが、フォーカスと矢印キーの操作は
+   ラジオのまま（display: noneにしない）。選んだものは塗り、フォーカスは輪で示す */
 .decide-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); font-size: var(--font-md); max-width: 36em; }
 .decide-choice {
   position: relative; display: flex; align-items: center; justify-content: center; text-align: center;

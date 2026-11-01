@@ -1,9 +1,9 @@
 /**
  * テンプレート管理画面が読む実行ファイルの答えの読み取り（`--templates --json`・`--templates --show <名前> --json`）。
- * 形の契約は `templates-view.ts`、見本は `tests/fixtures/templates-json.json`。
+ * 形の契約は`templates-view.ts`、見本は`tests/fixtures/templates-json.json`。
  *
- * 読むだけ（有効か・破棄した理由は実行ファイルが決めて答える）。読み方は `planordermodel.ts` と
- * `lintmodel.ts` に揃える。答えの版が違えば解釈せず、版の違いを伝える。VS Code の API も DOM も node も読まない。
+ * 読むだけ（有効か・破棄した理由は実行ファイルが決めて答える）。読み方は`planordermodel.ts`と
+ * `lintmodel.ts`に揃える。答えの版が違えば解釈せず、版の違いを伝える。VS CodeのAPIもDOMもnodeも読まない。
  */
 import { readPlans } from "./approvemodel.js";
 import type {
@@ -23,13 +23,13 @@ import type {
   TemplatesJson,
 } from "./templates-view.js";
 
-/** 答えの版。欄を足すだけなら上がらない（`planordermodel.ts` の PLAN_ORDER_VERSION と同じ決まり） */
+/** 答えの版。欄を足すだけなら上がらない（`planordermodel.ts`のPLAN_ORDER_VERSIONと同じ決まり） */
 export const TEMPLATES_VERSION = 1;
 
 export type TemplatesParse = { readonly ok: true; readonly value: TemplatesJson } | { readonly ok: false; readonly error: string };
 export type TemplateShowParse = { readonly ok: true; readonly value: TemplateDetail } | { readonly ok: false; readonly error: string };
 
-/** `--templates --json` の答えを読む。版が違う・欄が足りないときは文面を返す */
+/** `--templates --json`の答えを読む。版が違う・欄が足りないときは文面を返す */
 export function parseTemplates(text: string): TemplatesParse {
   const parsed = parseRecord(text);
   if (!parsed.ok) {
@@ -41,12 +41,12 @@ export function parseTemplates(text: string): TemplatesParse {
   }
   for (const key of ["templates", "layers", "sums", "drafts"] as const) {
     if (!Array.isArray(raw[key])) {
-      return { ok: false, error: `テンプレートの JSON の ${key} 欄が配列ではありません` };
+      return { ok: false, error: `テンプレートのJSONの${key}欄がリストではありません` };
     }
   }
   for (const key of ["errors", "warns", "infos"] as const) {
     if (typeof raw[key] !== "number") {
-      return { ok: false, error: `テンプレートの JSON の ${key} 欄が数ではありません` };
+      return { ok: false, error: `テンプレートのJSONの${key}欄が数ではありません` };
     }
   }
   return {
@@ -67,7 +67,7 @@ export function parseTemplates(text: string): TemplatesParse {
   };
 }
 
-/** `--templates --show <名前> --json` の答えを読む。失敗の答え（`{ok:false,error}`）は error をそのまま返す */
+/** `--templates --show <名前> --json`の答えを読む。失敗の答え（`{ok:false,error}`）はerrorをそのまま返す */
 export function parseTemplateShow(text: string): TemplateShowParse {
   const parsed = parseRecord(text);
   if (!parsed.ok) {
@@ -82,7 +82,7 @@ export function parseTemplateShow(text: string): TemplateShowParse {
   }
   const template = raw.template;
   if (!isRecord(template)) {
-    return { ok: false, error: "テンプレートの答えに template 欄がありません" };
+    return { ok: false, error: "テンプレートの答えにtemplate欄がありません" };
   }
   const body = template.text;
   if (typeof body !== "string") {
@@ -93,7 +93,7 @@ export function parseTemplateShow(text: string): TemplateShowParse {
 
 export type TemplateCheckParse = { readonly ok: true; readonly value: TemplateCheck } | { readonly ok: false; readonly error: string };
 
-/** `--templates --check-file <パス> --json` の答えを読む。失敗の答え（`{ok:false,error}`）は error をそのまま返す */
+/** `--templates --check-file <パス> --json`の答えを読む。失敗の答え（`{ok:false,error}`）はerrorをそのまま返す */
 export function parseTemplateCheck(text: string): TemplateCheckParse {
   const parsed = parseRecord(text);
   if (!parsed.ok) {
@@ -108,13 +108,13 @@ export function parseTemplateCheck(text: string): TemplateCheckParse {
   }
   for (const key of ["problems", "plans", "types"] as const) {
     if (!Array.isArray(raw[key])) {
-      return { ok: false, error: `テンプレートの検査の JSON の ${key} 欄が配列ではありません` };
+      return { ok: false, error: `テンプレートの検査のJSONの${key}欄がリストではありません` };
     }
   }
   const valid = bool(raw.valid);
   // 読めたと言うのに中身が無い答えは、見比べる相手が無いので受けない
   if (valid && !isRecord(raw.data)) {
-    return { ok: false, error: "テンプレートの検査の JSON の data 欄がありません。ccnavi が古い可能性があります。実行ファイルを更新してください" };
+    return { ok: false, error: "テンプレートの検査のJSONのdata欄がありません。ccnaviが古い可能性があります。実行ファイルを更新してください" };
   }
   return {
     ok: true,
@@ -135,8 +135,8 @@ export function parseTemplateCheck(text: string): TemplateCheckParse {
 }
 
 /**
- * 読み違えを誘う文字を `\uXXXX` に直して見せる。制御文字（Cc）と書式文字（Cf）・行と段落の区切り（Zl・Zp）が対象で、
- * 改行とタブは残す。BMP の外の文字は `\UXXXXXXXX`。実行ファイルの `plan_templates.reveal` と同じ形。
+ * 読み違えを誘う文字を`\uXXXX`に直して見せる。制御文字（Cc）と書式文字（Cf）・行と段落の区切り（Zl・Zp）が対象で、
+ * 改行とタブは残す。BMPの外の文字は`\UXXXXXXXX`。実行ファイルの`plan_templates.reveal`と同じ形。
  */
 export function revealControls(text: string): string {
   let out = "";
@@ -146,12 +146,12 @@ export function revealControls(text: string): string {
   return out;
 }
 
-/** 本文を読むときの層。`project` の対象は層の名前（その層）、それ以外は共通との統合結果の self */
+/** 本文を読むときのレイヤー。`project`の対象はレイヤーの名前（そのレイヤー）、それ以外は共通との統合結果のself */
 export function templatesLayerOf(target: { readonly kind: string; readonly name: string }): string {
   return target.kind === "project" ? target.name : "self";
 }
 
-/** 対象が見せる層の名前。共通の設定は common、ワークスペースは self、プロジェクトはその名前（編集できるのはこの層のテンプレートだけ） */
+/** 対象が見せるレイヤーの名前。共通の設定はcommon、ワークスペースはself、プロジェクトはその名前（編集できるのはこのレイヤーのテンプレートだけ） */
 export function shownLayerOf(target: { readonly kind: string; readonly name: string }): string {
   if (target.kind === "workspace") {
     return "common";
@@ -159,23 +159,23 @@ export function shownLayerOf(target: { readonly kind: string; readonly name: str
   return target.kind === "project" ? target.name : "self";
 }
 
-/** テンプレートの名前に使える形（実行ファイルの `NAME_RE` と上限と同じ。ファイル名になるので、読ませる前にここでも断る） */
+/** テンプレートの名前に使える形（実行ファイルの`NAME_RE`と上限と同じ。ファイル名になるので、読ませる前にここでも断る） */
 export function validTemplateName(name: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name) && name.length <= 64;
 }
 
 /**
- * Windows でファイル名にできない予約名の一覧。拡張子が付いても同じ名前になる。比べるためではなく、新しい名前を断るために使う。
- * 実行ファイルの `plan_templates.WINDOWS_RESERVED` と同じ
+ * Windowsでファイル名にできない予約名の一覧。拡張子が付いても同じ名前になる。比べるためではなく、新しい名前を断るために使う。
+ * 実行ファイルの`plan_templates.WINDOWS_RESERVED`と同じ
  */
 export const WINDOWS_RESERVED_NAMES: readonly string[] = ["con", "prn", "aux", "nul", ...[1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap((n) => [`com${n}`, `lpt${n}`])];
 
 /** 新しい名前を断るときに画面へ出す、決まりの説明 */
-export const NEW_TEMPLATE_NAME_RULE = "英数字で始め、英数字と . _ - だけを使い、64 字までです。末尾に . は使えません。Windows の予約名は使えません（con・prn・aux・nul・com1〜9・lpt1〜9。拡張子を付けても同じです）";
+export const NEW_TEMPLATE_NAME_RULE = "英数字で始め、英数字と「.」「_」「-」だけを使い、64字までです。末尾に「.」は使えません。Windowsの予約名は使えません（con・prn・aux・nul・com1〜9・lpt1〜9。拡張子を付けても同じです）";
 
 /**
- * 新しく作るテンプレートの名前に使えるか。`validTemplateName` に加えて、末尾の `.` と Windows の予約名を断る
- * （実行ファイルの `plan_templates.new_name_problem` と同じ決まり）。すでに置いてあるファイルの読み込みには使わない
+ * 新しく作るテンプレートの名前に使えるか。`validTemplateName`に加えて、末尾の`.`とWindowsの予約名を断る
+ * （実行ファイルの`plan_templates.new_name_problem`と同じ決まり）。すでに置いてあるファイルの読み込みには使わない
  */
 export function validNewTemplateName(name: string): boolean {
   if (!validTemplateName(name) || name.endsWith(".")) {
@@ -185,8 +185,8 @@ export function validNewTemplateName(name: string): boolean {
 }
 
 /**
- * 新しいテンプレートの名前が、共通の層か `layer` の層の既存の名前と重なるか。大文字小文字は区別しない（別の機械で 2 本が 1 本に重なる）。
- * 重なる既存の 1 件を返す。無ければ undefined
+ * 新しいテンプレートの名前が、共通のレイヤーか`layer`のレイヤーの既存の名前と重なるか。大文字小文字は区別しない（別の機械で2本が1本に重なる）。
+ * 重なる既存の1件を返す。無ければundefined
  */
 export function templateNameTaken(layers: readonly TemplateLayer[], layer: string, name: string): { readonly layer: string; readonly name: string } | undefined {
   const folded = name.toLowerCase();
@@ -202,7 +202,7 @@ export function templateNameTaken(layers: readonly TemplateLayer[], layer: strin
   return undefined;
 }
 
-/** 書き方が読み違いを誘う文字（`revealControls` が直す対象）。改行とタブは含めない */
+/** 書き方が読み違いを誘う文字（`revealControls`が直す対象）。改行とタブは含めない */
 const HIDDEN = /^[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]$/u;
 
 function escapeChar(ch: string): string {
@@ -313,29 +313,29 @@ function readFlows(value: unknown): FlowSummary[] {
     }));
 }
 
-/** 破棄した理由。無いか null なら null */
+/** 破棄した理由。無いかnullならnull */
 function readDropped(value: unknown): Dropped | null {
   return isRecord(value) ? { reason: str(value.reason), detail: str(value.detail) } : null;
 }
 
 // ---- 共通の部品
 
-/** JSON として読み、最上位がオブジェクトのものを返す。読めなければ文面 */
+/** JSONとして読み、最上位がオブジェクトのものを返す。読めなければ文面 */
 function parseRecord(text: string): { readonly ok: true; readonly value: Record<string, unknown> } | { readonly ok: false; readonly error: string } {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `JSON として解釈できません: ${(error as Error).message}` };
+    return { ok: false, error: `JSONとして解釈できません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
-    return { ok: false, error: "JSON の最上位がオブジェクトではありません" };
+    return { ok: false, error: "JSONの最上位がオブジェクトではありません" };
   }
   return { ok: true, value: raw };
 }
 
 function versionMismatch(version: unknown): string {
-  return `テンプレートの JSON の形が違います（拡張は ${TEMPLATES_VERSION}、実行ファイルは ${String(version)}）`;
+  return `テンプレートのJSONの版が違います（拡張は${TEMPLATES_VERSION}、実行ファイルは${String(version)}）`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

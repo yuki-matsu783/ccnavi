@@ -1,6 +1,6 @@
 /**
- * 案内の定義（`src/webview/tours/<画面>.yml`）をテストから読む。画面はバンドルに入った JSON を読むが、テストは YAML を直に読み、
- * 同じ形の検査（`parseTour`）を通す。このファイルは `out/test/helpers/` から走るので、`src/` は 3 つ上。
+ * 案内の定義（`src/webview/tours/<画面>.yml`）をテストから読む。画面はバンドルに入ったJSONを読むが、テストはYAMLを直に読み、
+ * 同じ形の検査（`parseTour`）を通す。このファイルは`out/test/helpers/`から走るので、`src/`は3つ上。
  */
 import * as fs from "node:fs";
 import * as path from "node:path";

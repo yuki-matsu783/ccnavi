@@ -19,7 +19,7 @@ const SETTINGS = JSON.stringify({
   },
 });
 
-test("CB-T30 hooks をイベント・matcher・コマンドの平らなリストで読む", () => {
+test("CB-T30 hooksをイベント・matcher・コマンドの平らなリストで読む", () => {
   const entries = parseHooks(SETTINGS, "settings");
   assert.deepEqual(
     entries.map((e) => [e.event, e.matcher, e.command, e.timeout]),
@@ -35,7 +35,7 @@ test("CB-T30 hooks をイベント・matcher・コマンドの平らなリスト
   assert.deepEqual(parseHooks("{}", "settings-local"), []);
 });
 
-test("CB-T31 matcher は空か * で全部、それ以外はツール名への正規表現", () => {
+test("CB-T31 matcherは空か * で全部、それ以外はツール名への正規表現", () => {
   assert.equal(matcherHits("", "Bash"), true);
   assert.equal(matcherHits("*", "Bash"), true);
   assert.equal(matcherHits("Write|Edit", "Edit"), true);
@@ -47,7 +47,7 @@ test("CB-T31 matcher は空か * で全部、それ以外はツール名への�
   assert.equal(matcherHits("(", "Bash"), false);
 });
 
-test("CB-T32 ツール名で走る hook を絞る。ツール名のないイベントは常に走る", () => {
+test("CB-T32 ツール名で走るhookを絞る。ツール名のないイベントは常に走る", () => {
   const entries = parseHooks(SETTINGS, "settings");
   assert.deepEqual(
     hooksFor(entries, "Bash").map((e) => `${e.event}:${e.command}`),

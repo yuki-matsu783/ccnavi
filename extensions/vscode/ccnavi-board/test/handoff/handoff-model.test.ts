@@ -36,7 +36,7 @@ import { entry, list, sampleEntries } from "../helpers/handoff.js";
 const OPEN: Lock = { locked: false, reason: "", doing: [], turns: [] };
 const LOCKED: Lock = { locked: true, reason: "作業中のチケットがあります（T1）", doing: ["T1"], turns: [] };
 
-/** 見るだけの答えの JSON（実行ファイルの標準出力と同じ文字列） */
+/** 見るだけの答えのJSON（実行ファイルの標準出力と同じ文字列） */
 function listText(overrides: Record<string, unknown> = {}): string {
   return JSON.stringify({
     version: 1,
@@ -50,7 +50,7 @@ function listText(overrides: Record<string, unknown> = {}): string {
         board: true,
         selected: true,
         errors: [],
-        warnings: ["description に TODO が残っている"],
+        warnings: ["descriptionにTODOが残っている"],
         diff: "+name: login\n",
         entry_sha: "ab12cd34ab12cd34",
       },
@@ -61,7 +61,7 @@ function listText(overrides: Record<string, unknown> = {}): string {
   });
 }
 
-test("CB-T1104 見るだけの答えを読む。対象の欄・対象外の件数・expect・ok を型どおりに持つ", () => {
+test("CB-T1104 見るだけの答えを読む。対象の欄・対象外の件数・expect・okを型どおりに持つ", () => {
   const parsed = parseHandoffList(listText());
   assert.ok(parsed.ok);
   const value = parsed.value;
@@ -78,29 +78,29 @@ test("CB-T1104 見るだけの答えを読む。対象の欄・対象外の件�
       board: true,
       selected: true,
       errors: [],
-      warnings: ["description に TODO が残っている"],
+      warnings: ["descriptionにTODOが残っている"],
       diff: "+name: login\n",
       entry_sha: "ab12cd34ab12cd34",
     },
   ]);
 });
 
-test("CB-T1105 見るだけの答えが読めないとき、文面で失敗する（版違い・欄の型違い・path の無い対象・JSON でない）", () => {
+test("CB-T1105 見るだけの答えが読めないとき、文面で失敗する（版違い・欄の型違い・pathの無い対象・JSONでない）", () => {
   assert.deepEqual(parseHandoffList(listText({ version: 2 })), {
     ok: false,
-    error: `取り込み待ちの JSON の形が違います（拡張は ${HANDOFF_VERSION}、実行ファイルは 2）`,
+    error: `取り込み待ちのJSONの版が違います（拡張は${HANDOFF_VERSION}、実行ファイルは2）`,
   });
   assert.equal(parseHandoffList(listText({ entries: "x" })).ok, false);
   assert.equal(parseHandoffList(listText({ expect: 1 })).ok, false);
   assert.equal(parseHandoffList(listText({ ok: "yes" })).ok, false);
   assert.equal(parseHandoffList(listText({ entries: [{ kind: "docs" }] })).ok, false);
-  assert.equal(parseHandoffList("これは JSON ではない").ok, false);
-  assert.deepEqual(parseHandoffList("[1]"), { ok: false, error: "JSON の最上位がオブジェクトではありません" });
-  // entries を持たない失敗の答えは、error をそのまま返す
+  assert.equal(parseHandoffList("これはJSONではない").ok, false);
+  assert.deepEqual(parseHandoffList("[1]"), { ok: false, error: "JSONの最上位がオブジェクトではありません" });
+  // entriesを持たない失敗の答えは、errorをそのまま返す
   assert.deepEqual(parseHandoffList('{"version":1,"ok":false,"error":"ツリーを解けない"}'), { ok: false, error: "ツリーを解けない" });
 });
 
-test("CB-T1106 知らない種類・状態の対象も読む。欄が足りなければ空で補い、board は真のときだけ真", () => {
+test("CB-T1106 知らない種類・状態の対象も読む。欄が足りなければ空で補い、boardは真のときだけ真", () => {
   const parsed = parseHandoffList(listText({ entries: [{ path: "x.md", kind: "future", state: "later" }] }));
   assert.ok(parsed.ok);
   assert.deepEqual(parsed.value.entries[0], {
@@ -116,7 +116,7 @@ test("CB-T1106 知らない種類・状態の対象も読む。欄が足りな�
   });
 });
 
-test("CB-T1107 取り込みの答えを読む。applied・removed_drafts（文字列でも {path} でも）・kept_drafts", () => {
+test("CB-T1107 取り込みの答えを読む。applied・removed_drafts（文字列でも {path}でも）・kept_drafts", () => {
   const text = JSON.stringify({
     version: 1,
     ok: true,
@@ -132,28 +132,28 @@ test("CB-T1107 取り込みの答えを読む。applied・removed_drafts（文�
     removedDrafts: ["wip/handoff/a.yml", "wip/handoff/b.md"],
     keptDrafts: [{ path: "wip/handoff/c.md", reason: "取り込み後に下書きが編集されていた" }],
   });
-  // 空の配列（成功したが何も消さず、何も残さなかった）
+  // 空のリスト（成功したが何も消さず、何も残さなかった）
   const empty = parseHandoffResult(JSON.stringify({ version: 1, ok: true, applied: [], removed_drafts: [], kept_drafts: [] }));
   assert.ok(empty.ok);
   assert.deepEqual(empty.value, { ok: true, applied: [], removedDrafts: [], keptDrafts: [] });
 });
 
-test("CB-T1108 取り込みの失敗の答え（ok が偽・error）は、失敗の結果として読む。読めない答えは読み取りの失敗にする", () => {
-  assert.deepEqual(parseHandoffResult('{"version":1,"ok":false,"error":"--expect が合わない"}'), {
+test("CB-T1108 取り込みの失敗の答え（okが偽・error）は、失敗の結果として読む。読めない答えは読み取りの失敗にする", () => {
+  assert.deepEqual(parseHandoffResult('{"version":1,"ok":false,"error":"--expectが合わない"}'), {
     ok: true,
-    value: { ok: false, error: "--expect が合わない" },
+    value: { ok: false, error: "--expectが合わない" },
   });
   assert.deepEqual(parseHandoffResult('{"version":1,"ok":false}'), {
     ok: true,
     value: { ok: false, error: "取り込めませんでした（理由は返りませんでした）" },
   });
   assert.equal(parseHandoffResult('{"version":2,"ok":true,"applied":[]}').ok, false);
-  assert.equal(parseHandoffResult('{"version":1,"ok":true}').ok, false, "applied が無い成功は読めない");
+  assert.equal(parseHandoffResult('{"version":1,"ok":true}').ok, false, "appliedが無い成功は読めない");
   assert.equal(parseHandoffResult('{"version":1}').ok, false);
   assert.equal(parseHandoffResult("{").ok, false);
 });
 
-test("CB-T1109 取り込めるのは board が真・状態が new か changed・error 無しの対象だけ", () => {
+test("CB-T1109 取り込めるのはboardが真・状態がnewかchanged・error無しの対象だけ", () => {
   assert.equal(isImportable(entry()), true);
   assert.equal(isImportable(entry({ state: "changed" })), true);
   assert.equal(isImportable(entry({ state: "unchanged" })), false);
@@ -161,7 +161,7 @@ test("CB-T1109 取り込めるのは board が真・状態が new か changed・
   assert.equal(isImportable(entry({ state: "later" })), false, "知らない状態は取り込めると決めない");
   assert.equal(isImportable(entry({ errors: ["x"] })), false);
   assert.equal(isImportable(entry({ board: false, kind: "defense" })), false);
-  // warnings だけなら取り込める
+  // warningsだけなら取り込める
   assert.equal(isImportable(entry({ warnings: ["TODO"] })), true);
 });
 
@@ -176,7 +176,7 @@ test("CB-T1110 取り込めない対象には理由を言う。ターミナル�
   assert.match(refusalReason(entry({ board: false, state: "rejected" })), /ターミナルで取り込みます/);
 });
 
-test("CB-T1111 作業中の錠は template と layer-config にだけ掛かる。docs と defense には掛けない", () => {
+test("CB-T1111 作業中の錠はtemplateとlayer-configにだけ掛かる。docsとdefenseには掛けない", () => {
   assert.deepEqual([...LOCKED_KINDS], ["template", "layer-config"]);
   assert.equal(lockReason("template", LOCKED), LOCKED.reason);
   assert.equal(lockReason("layer-config", LOCKED), LOCKED.reason);
@@ -190,13 +190,13 @@ test("CB-T1111 作業中の錠は template と layer-config にだけ掛かる�
   assert.match(blockReason(entry({ state: "rejected" }), LOCKED), /rejected/);
 });
 
-test("CB-T1112 選べる対象は、取り込めて錠が止めないもの。錠が掛かると template と layer-config が外れ、docs は残る", () => {
+test("CB-T1112 選べる対象は、取り込めて錠が止めないもの。錠が掛かるとtemplateとlayer-configが外れ、docsは残る", () => {
   const entries = sampleEntries();
   assert.deepEqual(selectablePaths(entries, OPEN), [".ccnavi/config/project/templates/login.yml", ".ccnavi/config/project/rules.yml", ".ccnavi/docs/guide.md"]);
   assert.deepEqual(selectablePaths(entries, LOCKED), [".ccnavi/docs/guide.md"]);
 });
 
-test("CB-T1113 読み直したあとの選択は、同じパスで entry_sha が同じ、いまも取り込める対象だけ残す", () => {
+test("CB-T1113 読み直したあとの選択は、同じパスでentry_shaが同じ、いまも取り込める対象だけ残す", () => {
   const before = new Map([
     [".ccnavi/config/project/templates/login.yml", "a".repeat(16)],
     [".ccnavi/config/project/rules.yml", "b".repeat(16)],
@@ -209,18 +209,18 @@ test("CB-T1113 読み直したあとの選択は、同じパスで entry_sha が
     entry({ path: ".ccnavi/docs/guide.md", kind: "docs", state: "rejected", entry_sha: "c".repeat(16) }),
   ];
   const kept = reconcileSelection(before, entries, OPEN);
-  assert.deepEqual([...kept.keys()], [".ccnavi/config/project/templates/login.yml"], "sha が変わった・rejected になった・消えた対象は外す");
-  // 錠が掛かれば template も外れる
+  assert.deepEqual([...kept.keys()], [".ccnavi/config/project/templates/login.yml"], "shaが変わった・rejectedになった・消えた対象は外す");
+  // 錠が掛かればtemplateも外れる
   assert.equal(reconcileSelection(before, entries, LOCKED).size, 0);
 });
 
-test("CB-T1114 端末で打つコマンドは sh .ccnavi/scripts/ccnavi-user-handoff.sh <パス> --yes --expect <ハッシュ>。空白や記号のあるパスは単引用符で囲む", () => {
+test("CB-T1114 端末で打つコマンドはsh .ccnavi/scripts/ccnavi-user-handoff.sh <パス> --yes --expect <ハッシュ>。空白や記号のあるパスは単引用符で囲む", () => {
   assert.equal(terminalCommand(".claude/hooks/guard.sh", "ab".repeat(32)), `sh .ccnavi/scripts/ccnavi-user-handoff.sh .claude/hooks/guard.sh --yes --expect ${"ab".repeat(32)}`);
   assert.equal(terminalCommand(".claude/hooks/my guard.sh", "h"), "sh .ccnavi/scripts/ccnavi-user-handoff.sh '.claude/hooks/my guard.sh' --yes --expect h");
   assert.equal(terminalCommand(".claude/it's.sh", "h"), "sh .ccnavi/scripts/ccnavi-user-handoff.sh '.claude/it'\\''s.sh' --yes --expect h");
 });
 
-test("CB-T1138 端末のコマンドは --root で下書きのあるツリーを指す。入口の sh は、ワークスペースルートを渡せば絶対パスで書く。空白・単引用符のあるツリーは POSIX の形で囲む", () => {
+test("CB-T1138 端末のコマンドは --rootで下書きのあるツリーを指す。入口のshは、ワークスペースルートを渡せば絶対パスで書く。空白・単引用符のあるツリーはPOSIXの形で囲む", () => {
   assert.equal(terminalCommand(".claude/hooks/guard.sh", "h", "/ws/.claude/worktrees/a"), "sh .ccnavi/scripts/ccnavi-user-handoff.sh --root /ws/.claude/worktrees/a .claude/hooks/guard.sh --yes --expect h");
   assert.equal(terminalCommand("x.sh", "h", "C:\\Users\\me\\ws"), "sh .ccnavi/scripts/ccnavi-user-handoff.sh --root 'C:\\Users\\me\\ws' x.sh --yes --expect h");
   assert.equal(terminalCommand("x.sh", "h", "/w's"), "sh .ccnavi/scripts/ccnavi-user-handoff.sh --root '/w'\\''s' x.sh --yes --expect h");
@@ -237,31 +237,31 @@ test("CB-T1138 端末のコマンドは --root で下書きのあるツリーを
   assert.ok(!isTerminalCommand("ccnavi user handoff x --yes --expect h"), "実行ファイルを直に打つ形は、断られるので写さない");
 });
 
-test("CB-T1115 パスは大文字小文字と NFC/NFD の違いを無視して比べる", () => {
+test("CB-T1115 パスは大文字小文字とNFC/NFDの違いを無視して比べる", () => {
   assert.equal(samePath(".CCNAVI/Docs/A.md", ".ccnavi/docs/a.md"), true);
   assert.equal(samePath("が.md", "が.md"), true);
   assert.equal(samePath("a.md", "b.md"), false);
   assert.equal(foldPath("Ａ.md"), "Ａ.md".normalize("NFC").toLowerCase());
 });
 
-test("CB-T1116 結果の 1 行。取り込んだ件数・消した下書き・残した下書き。失敗は理由を添える", () => {
-  assert.equal(resultSummary({ ok: true, applied: [{ path: "a", kind: "docs" }], removedDrafts: [], keptDrafts: [] }), "取り込みました（1 件）");
+test("CB-T1116 結果の1行。取り込んだ件数・消した下書き・残した下書き。失敗は理由を添える", () => {
+  assert.equal(resultSummary({ ok: true, applied: [{ path: "a", kind: "docs" }], removedDrafts: [], keptDrafts: [] }), "取り込みました（1件）");
   assert.equal(
     resultSummary({ ok: true, applied: [{ path: "a", kind: "docs" }, { path: "b", kind: "docs" }], removedDrafts: ["x"], keptDrafts: [{ path: "y", reason: "z" }] }),
-    "取り込みました（2 件）。下書きを 1 件削除しました。下書きを 1 件残しました",
+    "取り込みました（2件）。下書きを1件削除しました。下書きを1件残しました",
   );
   assert.equal(resultSummary({ ok: false, error: "合わない" }), "取り込めませんでした: 合わない");
 });
 
-test("CB-T1117 見るツリーの選択肢は、ワークスペース・プロジェクト・ワークツリーの順。key から名前を戻せる", () => {
+test("CB-T1117 見るツリーの選択肢は、ワークスペース・プロジェクト・ワークツリーの順。keyから名前を戻せる", () => {
   const board = fixture();
   const options = treeOptions(board);
   assert.equal(options[0].key, "main:");
   assert.equal(options[0].label, "ワークスペース");
-  assert.ok(options.slice(1).every((o) => o.key.startsWith("worktree:") && o.label.startsWith("ワークツリー ")));
+  assert.ok(options.slice(1).every((o) => o.key.startsWith("worktree:") && o.label.startsWith("ワークツリー")));
   assert.deepEqual(treeOptions(undefined), [{ key: "main:", label: "ワークスペース" }]);
-  assert.equal(keyLabel("project:lib"), "プロジェクト lib");
-  assert.equal(keyLabel("worktree:i0001"), "ワークツリー i0001");
+  assert.equal(keyLabel("project:lib"), "プロジェクトlib");
+  assert.equal(keyLabel("worktree:i0001"), "ワークツリーi0001");
   assert.equal(keyLabel("main:"), "ワークスペース");
   const tree = findTree(board, treeKey({ kind: "worktree", name: "i0001" }));
   assert.equal(tree?.name, "i0001");
@@ -288,7 +288,7 @@ test("CB-T1119 一覧の見本は、種類と状態を網羅している（画�
   assert.deepEqual([...new Set(entries.map((e) => e.state))].sort(), ["changed", "new", "unchanged"]);
 });
 
-test("CB-T1228 ignored_paths は対象外の名前と理由を読む", () => {
+test("CB-T1228 ignored_pathsは対象外の名前と理由を読む", () => {
   const parsed = parseHandoffList(listText({ ignored_paths: [{ path: "a.sh", why: "not-allowed" }] }));
   assert.ok(parsed.ok);
   assert.deepEqual(parsed.ok ? parsed.value.ignored_paths : undefined, [{ path: "a.sh", why: "not-allowed" }]);

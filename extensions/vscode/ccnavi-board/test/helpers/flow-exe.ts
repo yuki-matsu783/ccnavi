@@ -1,10 +1,10 @@
 /**
  * 実行ファイル（`ccnavi --lint --json --flow <パス>`）にフローを読ませる。案内の見本が、実際の読み取りと
- * 実行ファイルの答え（`(flow)` の warn・担当に渡る手順）と同じかを見るテストが使う。
+ * 実行ファイルの答え（`(flow)`のwarn・担当に渡る手順）と同じかを見るテストが使う。
  *
- * 起こすのはリポジトリのルートで `uv run python -m ccnavi`（無ければ `python3 -m ccnavi`）。どちらも起こせない環境では
- * `reason` に理由を入れ、呼ぶテストは飛ばす。1 つのファイルの中では起こした結果を使い回す（起動に時間がかかる）。
- * このファイルは `out/test/helpers/` から走るので、リポジトリのルートは 6 段上。
+ * 起こすのはリポジトリのルートで`uv run python -m ccnavi`（無ければ`python3 -m ccnavi`）。どちらも起こせない環境では
+ * `reason`に理由を入れ、呼ぶテストは飛ばす。1つのファイルの中では起こした結果を使い回す（起動に時間がかかる）。
+ * このファイルは`out/test/helpers/`から走るので、リポジトリのルートは6段上。
  */
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
@@ -19,7 +19,7 @@ const PACKAGE_ROOT = path.join(REPO_ROOT, "src");
 export interface ExeRead {
   /** 実行ファイルが読んだ中身（`flow.data`） */
   readonly data: unknown;
-  /** `(flow)` の苦情。一時ファイルのパスは `shown` に直してある */
+  /** `(flow)`の苦情。一時ファイルのパスは`shown`に直してある */
   readonly problems: readonly { readonly severity: string; readonly detail: string }[];
   readonly rendered: readonly string[] | null;
 }
@@ -51,7 +51,7 @@ function runner(): ExeRunner {
       parsed = undefined;
     }
     if (parsed?.flow === undefined) {
-      said.push(`${command}: ${probe.error?.message ?? probe.stderr.split("\n").filter(Boolean).pop() ?? `終了 ${String(probe.status)}`}`);
+      said.push(`${command}: ${probe.error?.message ?? probe.stderr.split("\n").filter(Boolean).pop() ?? `終了${String(probe.status)}`}`);
       continue;
     }
     let count = 0;

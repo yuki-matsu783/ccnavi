@@ -1,9 +1,9 @@
 /**
  * 開発用の画面確認ツール（`scripts/render-board.js`）の、ブラウザを使わない部分。
- * 引数の解釈、`--out` が `--repo` の下のときの拒否、`--appearance` と `--width` の検証、失敗の条件と終了コード、
- * VS Code の窓口のスタブ。Chromium で描くところは `render-board.e2e.ts`。
+ * 引数の解釈、`--out`が`--repo`の下のときの拒否、`--appearance`と`--width`の検証、失敗の条件と終了コード、
+ * VS Codeの窓口のスタブ。Chromiumで描くところは`render-board.e2e.ts`。
  *
- * ツールは CommonJS の素の JS（型が無い）なので、`require` で読んで必要な形だけ型を付ける。
+ * ツールはCommonJSの素のJS（型が無い）なので、`require`で読んで必要な形だけ型を付ける。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -66,7 +66,7 @@ function rejected(...argv: string[]): string {
   return result.ok ? "" : result.error;
 }
 
-test("CB-T1213 引数は --repo か --fixture のどちらか一方と --out が要り、既定の見た目は claude-light・幅は 1400", () => {
+test("CB-T1213 引数は --repoか --fixtureのどちらか一方と --outが要り、既定の見た目はclaude-light・幅は1400", () => {
   assert.deepEqual(parsed("--repo", "r", "--out", "o"), { repo: "r", fixture: undefined, out: "o", appearance: "claude-light", width: 1400 });
   assert.equal(parsed("--fixture", "f.json", "--out", "o").fixture, "f.json");
   assert.match(rejected("--out", "o"), /どちらか一方/);
@@ -79,7 +79,7 @@ test("CB-T1213 引数は --repo か --fixture のどちらか一方と --out が
   assert.match(rejected("--repo", "r", "--repo", "r2", "--out", "o"), /2 度/);
 });
 
-test("CB-T1214 --width は 320〜3000 の整数だけ。--appearance は拡張が持つ表（APPEARANCES）で確かめる", () => {
+test("CB-T1214 --widthは320〜3000の整数だけ。--appearanceは拡張が持つ表（APPEARANCES）で確かめる", () => {
   assert.equal(parsed("--repo", "r", "--out", "o", "--width", "320").width, 320);
   assert.equal(parsed("--repo", "r", "--out", "o", "--width", "3000").width, 3000);
   for (const bad of ["319", "3001", "1400.5", "-1", "abc", "1e3", "0x10"]) {
@@ -94,7 +94,7 @@ test("CB-T1214 --width は 320〜3000 の整数だけ。--appearance は拡張�
   assert.ok((bad.error ?? "").includes(APPEARANCES.join("|")));
 });
 
-test("CB-T1215 --out が --repo と同じか下のときは拒否し、兄弟（名前の前置だけ同じ）・外は通す。大文字小文字と区切りは区別しない", () => {
+test("CB-T1215 --outが --repoと同じか下のときは拒否し、兄弟（名前の前置だけ同じ）・外は通す。大文字小文字と区切りは区別しない", () => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "render-board-"));
   try {
     const repo = path.join(base, "Repo");
@@ -118,7 +118,7 @@ test("CB-T1215 --out が --repo と同じか下のときは拒否し、兄弟（
   }
 });
 
-test("CB-T1216 失敗の条件はページエラー・コンソールの error・CSP 違反。favicon の失敗と error 以外は数えない。終了コードは 0/1/2/3", () => {
+test("CB-T1216 失敗の条件はページエラー・コンソールのerror・CSP違反。faviconの失敗とerror以外は数えない。終了コードは0/1/2/3", () => {
   const entries: Entry[] = [
     { kind: "console", type: "log", text: "ok" },
     { kind: "console", type: "warning", text: "warn" },
@@ -136,7 +136,7 @@ test("CB-T1216 失敗の条件はページエラー・コンソールの error�
   assert.equal(tool.logLine({ kind: "posted", text: "{}" }), "[posted] {}");
 });
 
-test("CB-T1217 VS Code の窓口のスタブは、送ったものを window.__posted に積み、状態を覚え、2 度目の取得は本物と同じく投げ、CSP 違反を積む", () => {
+test("CB-T1217 VS Codeの窓口のスタブは、送ったものをwindow.__postedに積み、状態を覚え、2度目の取得は本物と同じく投げ、CSP違反を積む", () => {
   const listeners: Record<string, (event: { violatedDirective: string; blockedURI: string }) => void> = {};
   const win: FakeWindow = {
     document: {
@@ -159,7 +159,7 @@ test("CB-T1217 VS Code の窓口のスタブは、送ったものを window.__po
   assert.deepEqual(win.__csp, ["script-src: inline"]);
 });
 
-test("CB-T1218 使い方の誤りは終了コード 2: 引数なし・両方指定・--repo が無い・--out が --repo の下・--out がファイル", () => {
+test("CB-T1218 使い方の誤りは終了コード2: 引数なし・両方指定・--repoが無い・--outが --repoの下・--outがファイル", () => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "render-board-"));
   try {
     const repo = path.join(base, "repo");
@@ -173,7 +173,7 @@ test("CB-T1218 使い方の誤りは終了コード 2: 引数なし・両方指�
     assert.match(inside.stderr, /--out が --repo の下/);
     assert.ok(!fs.existsSync(path.join(repo, "out")), "リポジトリの下に何も作らない");
     fs.writeFileSync(path.join(base, "file"), "");
-    assert.equal(run("--repo", repo, "--out", path.join(base, "file")).status, 2, "--out がファイル");
+    assert.equal(run("--repo", repo, "--out", path.join(base, "file")).status, 2, "--outがファイル");
     assert.equal(run("--repo", repo, "--out", path.join(base, "out"), "--appearance", "nope").status, 2);
     assert.equal(run("--repo", repo, "--out", path.join(base, "out"), "--width", "10").status, 2);
   } finally {

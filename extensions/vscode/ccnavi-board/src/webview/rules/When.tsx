@@ -1,13 +1,13 @@
 /**
  * 組み合わせ条件（`when:`）を図で見せて直す欄。ルールの行を開いたときに、パターンの欄の代わりに出る。
  *
- * 図は React Flow で、最上位のノードを左に置いて右へ伸ばす（置き場所は `layoutCond` が組み合わせ条件の形だけで決める）。
+ * 図はReact Flowで、最上位のノードを左に置いて右へ伸ばす（置き場所は`layoutCond`が組み合わせ条件の形だけで決める）。
  * 点を押すと選ばれ、下の操作の欄がその点に効く。操作は、子を足す・消す・種別を替える（all ⇄ any、
- * glob ⇄ regex）・個別条件の文字を直す・all / any / not で包む・not を外す。直すたびに組み合わせ条件ぜんたいを `onChange` で返し、
- * 書き戻し（`rules-doc.ts`）が `when:` の YAML に直す。保存と保存前の `--lint` は他の欄と同じ流れ。
+ * glob ⇄ regex）・個別条件の文字を直す・all / any / notで包む・notを外す。直すたびに組み合わせ条件ぜんたいを`onChange`で返し、
+ * 書き戻し（`rules-doc.ts`）が`when:`のYAMLに直す。保存と保存前の`--lint`は他の欄と同じ流れ。
  *
- * 誤り（空の演算子、中が空の not、空の個別条件、読めなかったノード、深さとノード数の上限）は図の下に並べ、
- * 押すとその点を選ぶ。止めるのは保存前の `--lint` で、ここは見せるだけ。
+ * 誤り（空の演算子、中が空のnot、空の個別条件、読めなかったノード、深さとノード数の上限）は図の下に並べ、
+ * 押すとその点を選ぶ。止めるのは保存前の`--lint`で、ここは見せるだけ。
  */
 import { useEffect, useMemo, useState, type JSX } from "react";
 import { Background, Controls, Handle, Position, ReactFlow, type Edge, type Node, type NodeProps, type NodeTypes } from "@xyflow/react";
@@ -48,7 +48,7 @@ const OP_TITLES: Readonly<Record<string, string>> = {
   all: "all: 中のすべてにヒットすればヒットします",
   any: "any: 中のどれかにヒットすればヒットします",
   not: "not: 中にヒットしなければヒットします",
-  glob: "glob: 対象をこの glob で照合します",
+  glob: "glob: 対象をこのglobで照合します",
   regex: "regex: 対象をこの正規表現で照合します",
   invalid: "読み込めない条件",
   empty: "空。押して中に入れるものを選びます",
@@ -83,7 +83,7 @@ export interface WhenProps {
   readonly pick?: string;
 }
 
-/** 選んだ点の親（`empty` の点は親の not に効かせる）と、その点そのもの */
+/** 選んだ点の親（`empty`の点は親のnotに効かせる）と、その点そのもの */
 function targetOf(tree: CondNode, key: string): { readonly path: CondPath; readonly node: CondNode | null } | undefined {
   const path = pathOfKey(key);
   if (path === undefined) {
@@ -93,7 +93,7 @@ function targetOf(tree: CondNode, key: string): { readonly path: CondPath; reado
   if (node !== undefined) {
     return { path, node };
   }
-  // 中が空の not の穴（親の not の 0 番）
+  // 中が空のnotの穴（親のnotの0番）
   const parent = path.length === 0 ? undefined : nodeAt(tree, path.slice(0, -1));
   if (parent?.op === "not" && parent.child === null && path[path.length - 1] === 0) {
     return { path, node: null };
@@ -149,7 +149,7 @@ export function When({ tree, onChange, pick }: WhenProps): JSX.Element {
           nodesDraggable={false}
           edgesFocusable={false}
           elementsSelectable={false}
-          // 押せるのは onNodeClick があるときだけ。無いと React Flow は点を pointer-events: none で描き、押しても届かない
+          // 押せるのはonNodeClickがあるときだけ。無いとReact Flowは点をpointer-events: noneで描き、押しても届かない
           onNodeClick={(_event, node) => setPicked(node.id)}
           fitView
           fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
@@ -214,7 +214,7 @@ function Inspector({
   );
 
   if (node === null) {
-    // 中が空の not の穴
+    // 中が空のnotの穴
     const parent = path.slice(0, -1);
     return <div className="cond-inspector" data-tour="when-inspector" data-key={pathKey(path)}>{adders(parent, 0)}</div>;
   }
@@ -252,7 +252,7 @@ function Inspector({
           {node.child === null && adders(path, 0)}
           {node.child !== null && (
             <button type="button" className="action small" data-op-action="unwrap" onClick={() => edit(unwrapNot(tree, path), path)}>
-              not を解除
+              notを解除
             </button>
           )}
         </span>
@@ -263,26 +263,26 @@ function Inspector({
             {node.reason}: <code>{node.text}</code>
           </span>
           <button type="button" className="action small" data-op-action="replace" onClick={() => edit(replaceAt(tree, path, leaf("glob")), path)}>
-            glob に置き換える
+            globに置き換える
           </button>
         </span>
       )}
       <span className="buttons">
-        <button type="button" className="action small" data-op-action="wrap-all" title="この条件を all で包みます。隣に子を足して組み合わせにできます" onClick={() => edit(wrapGroup(tree, path, "all"), path)}>
-          all で包む
+        <button type="button" className="action small" data-op-action="wrap-all" title="この条件をallで包みます。隣に子を足して組み合わせにできます" onClick={() => edit(wrapGroup(tree, path, "all"), path)}>
+          allで包む
         </button>
-        <button type="button" className="action small" data-op-action="wrap-any" title="この条件を any で包みます。隣に子を足して組み合わせにできます" onClick={() => edit(wrapGroup(tree, path, "any"), path)}>
-          any で包む
+        <button type="button" className="action small" data-op-action="wrap-any" title="この条件をanyで包みます。隣に子を足して組み合わせにできます" onClick={() => edit(wrapGroup(tree, path, "any"), path)}>
+          anyで包む
         </button>
         <button type="button" className="action small" data-op-action="wrap" onClick={() => edit(wrapNot(tree, path), path)}>
-          not で包む
+          notで包む
         </button>
         <button
           type="button"
           className="action small"
           data-op-action="remove"
           disabled={isRoot}
-          title={isRoot ? "最上位の条件は削除できません（all / any / not で包んでから中を直すか、個別条件なら文字を直してください）" : "この条件を削除"}
+          title={isRoot ? "最上位の条件は削除できません（all / any / notで包んでから中を直すか、個別条件なら文字を直してください）" : "この条件を削除"}
           onClick={() => edit(removeAt(tree, path), path.slice(0, -1))}
         >
           この条件を削除

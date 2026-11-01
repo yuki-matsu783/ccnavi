@@ -1,6 +1,6 @@
 /**
  * ボードのカードの「テンプレートの下書きを作る」ボタン。出すのは、完了した計画付きの親のカードだけ。
- * 出すかは実行ファイルの `template_draft` で決まり、画面は計画を読まない。押すと拡張ホストへ親の識別子を
+ * 出すかは実行ファイルの`template_draft`で決まり、画面は計画を読まない。押すと拡張ホストへ親の識別子を
  * 返すだけ（拡張ホストはいまのボードで確かめてから下書きを作る）。
  */
 import { test } from "node:test";
@@ -10,8 +10,8 @@ import { openBoard } from "../helpers/board.js";
 import { fixture } from "../helpers/fixture.js";
 
 /**
- * 見本に完了した親を足す。i0004 は完了した計画付きの親（`template_draft` が真）、i0005 は完了した親だが
- * 真でない（下書きを作れない）。子 i0001-02-03 には真を付けても出ない（親だけ）
+ * 見本に完了した親を足す。i0004は完了した計画付きの親（`template_draft`が真）、i0005は完了した親だが
+ * 真でない（下書きを作れない）。子i0001-02-03には真を付けても出ない（親だけ）
  */
 function withDone(): BoardJson {
   const board = fixture();
@@ -21,7 +21,7 @@ function withDone(): BoardJson {
     ticket,
     parent: "",
     phase: null,
-    title: `完了 ${ticket}`,
+    title: `完了${ticket}`,
     flow: null,
     proposal: null,
     copy: { status: "closed" },

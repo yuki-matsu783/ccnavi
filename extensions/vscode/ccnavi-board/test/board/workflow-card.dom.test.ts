@@ -1,6 +1,6 @@
 /**
  * ボードのカードの「計画編集」ボタン（計画編集タブの入口）。出すのは、計画を持つ承認待ち（`todo/`）の
- * 親の提案だけ。計画を持つかは実行ファイルが提案の `has_plan` で言い、画面は計画を読まない。押すと拡張ホストへ
+ * 親の提案だけ。計画を持つかは実行ファイルが提案の`has_plan`で言い、画面は計画を読まない。押すと拡張ホストへ
  * 親の識別子を返すだけ（拡張ホストはいまのボードで確かめてからタブを開く）。
  */
 import { test } from "node:test";
@@ -11,8 +11,8 @@ import { openBoard } from "../helpers/board.js";
 import { fixture } from "../helpers/fixture.js";
 
 /**
- * 見本に親の提案を足す。i0002 は計画を持つ新規の親、i0003 は計画を持たない新規の親、i0001 は承認済みの親の改版
- * （計画を持つ）を `todo/` に置いた形。子 i0001-02-03 は承認待ちの子
+ * 見本に親の提案を足す。i0002は計画を持つ新規の親、i0003は計画を持たない新規の親、i0001は承認済みの親の改版
+ * （計画を持つ）を`todo/`に置いた形。子i0001-02-03は承認待ちの子
  */
 function withParents(revision = true): BoardJson {
   const board = fixture();
@@ -23,7 +23,7 @@ function withParents(revision = true): BoardJson {
     ticket,
     parent: "",
     phase: null,
-    title: `親 ${ticket}`,
+    title: `親${ticket}`,
     flow: null,
     proposal: proposal(ticket, hasPlan),
     copy: { status: "none" },
@@ -49,7 +49,7 @@ function cardOf(json: BoardJson, id: string): Card {
   throw new Error(`カードがない: ${id}`);
 }
 
-test("CB-D185 カードの workflow は、計画を持つ承認待ちの親の提案（新規も改版も）だけ真。承認済みだけの親・計画のない親・子・has_plan が欠けた壊れた JSON は偽", () => {
+test("CB-D185 カードのworkflowは、計画を持つ承認待ちの親の提案（新規も改版も）だけ真。承認済みだけの親・計画のない親・子・has_planが欠けた壊れたJSONは偽", () => {
   const json = withParents();
   assert.equal(cardOf(json, "i0002").workflow, true);
   assert.equal(cardOf(json, "i0001").workflow, true, "改版の提案");
@@ -60,7 +60,7 @@ test("CB-D185 カードの workflow は、計画を持つ承認待ちの親の�
   const review = withParents();
   const reviewed = { ...review, tickets: review.tickets.map((t) => (t.ticket === "i0002" && t.proposal !== null ? { ...t, proposal: { ...t.proposal, state: "review" as const } } : t)) };
   assert.equal(cardOf(reviewed, "i0002").workflow, false);
-  // 欄が欠けた壊れた JSON への備え（型は必須）。計画があると決めつけて出さない
+  // 欄が欠けた壊れたJSONへの備え（型は必須）。計画があると決めつけて出さない
   const old = withParents();
   const stripped = {
     ...old,

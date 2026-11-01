@@ -1,5 +1,5 @@
 /**
- * 一覧の 1 行を開いたときに最初に見せる図。計画（全体計画・フィードバック計画）の図と、子のフローの図を読むだけで出す。
+ * 一覧の1行を開いたときに最初に見せる図。計画（全体計画・フィードバック計画）の図と、子のフローの図を読むだけで出す。
  * 中身は実行ファイルに読ませた答え（`TemplateCheck`）のまま描き、ここは判定しない。直すのは「図を編集」で開く編集欄（`Edit.tsx`）。
  */
 import type { JSX } from "react";
@@ -25,7 +25,7 @@ export function Diagrams({ check }: { readonly check: TemplateCheck }): JSX.Elem
       ))}
       {flows.map(([index, doc]) => (
         <div key={index} className="tpl-diagram" data-role="flow-diagram" data-index={index}>
-          <h3>{`子のフロー（${index} 番${typeof doc.name === "string" && doc.name !== "" ? `: ${doc.name}` : ""}）`}</h3>
+          <h3>{`子のフロー（${index}番${typeof doc.name === "string" && doc.name !== "" ? `: ${doc.name}` : ""}）`}</h3>
           <div className="flow-body tpl-flow-view" data-palette-folded="1" data-side-folded="1">
             <Canvas
               doc={doc as FlowDoc}

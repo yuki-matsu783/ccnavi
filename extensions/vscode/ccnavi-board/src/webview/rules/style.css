@@ -1,13 +1,13 @@
 /*
- * ルール管理画面の CSS。**画面（React）と同じ置き場にあり、部品 1 つに CSS 1 本**（`Rule.tsx` なら
- * `Rule.css`）。ここはそれらをバンドルする入口で、`@import` を並べるだけ。部品を足したら、同じ名前の CSS を足して
- * ここに 1 行足す（`Hooks.tsx` のように自前の CSS が要らない部品には、CSS を置かない）。
+ * ルール管理画面のCSS。**画面（React）と同じ置き場にあり、部品1つにCSS 1本**（`Rule.tsx`なら
+ * `Rule.css`）。ここはそれらをバンドルする入口で、`@import`を並べるだけ。部品を足したら、同じ名前のCSSを足して
+ * ここに1行足す（`Hooks.tsx`のように自前のCSSが要らない部品には、CSSを置かない）。
  *
- * バンドルするのは `scripts/bundle-webview.js`（出口は `out/webview/rules.css`）。拡張ホストはそれを読んで
- * `<style nonce>` に流し込む（`src/core/rules-render.ts`）。
+ * バンドルするのは`scripts/bundle-webview.js`（出口は`out/webview/rules.css`）。拡張ホストはそれを読んで
+ * `<style nonce>`に流し込む（`src/core/rules-render.ts`）。
  *
- * **先頭の 1 行だけが外のパス**（`@xyflow/react`。組み合わせ条件の図 `When.tsx` が要る CSS で、node_modules から来る）。
- * 色は `--xy-*` の変数で出来ていて、`When.css` が `--vscode-*` に置き換える。先に読ませるのはそのため。
+ * **先頭の1行だけが外のパス**（`@xyflow/react`。組み合わせ条件の図`When.tsx`が要るCSSで、node_modulesから来る）。
+ * 色は`--xy-*`の変数で出来ていて、`When.css`が`--vscode-*`に置き換える。先に読ませるのはそのため。
  */
 @import "@xyflow/react/dist/style.css";
 @import "../shared/Maximize.css";

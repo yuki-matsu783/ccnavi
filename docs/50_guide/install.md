@@ -278,7 +278,7 @@ VS Code の他の設定は残し、`false` と書いてあれば変えずに並�
 何を足せばよいかだけを出し、`.claude/settings.json` は書く。自分で書きたいときや
 VS Code を使わないときは `--no-vscode` を付ける。
 
-チケットの状態を見る VS Code の拡張「ccnavi ボード」の使い方は[拡張の使い方](extensions.md)にある。
+チケットの状態を見る VS Code の拡張「ccnaviボード」の使い方は[拡張の使い方](extensions.md)にある。
 
 ## 次に読むもの
 

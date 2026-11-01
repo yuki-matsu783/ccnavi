@@ -1,5 +1,5 @@
 /*
- * マージ状況の帯（`MergeBand.tsx`）。ツールバーの下、列の上。1 親 1 行。ボタンとリンクは `card-button`（`Card.css`）。
+ * マージ状況の帯（`MergeBand.tsx`）。ツールバーの下、列の上。1親1行。ボタンとリンクは`card-button`（`Card.css`）。
  * 狭い画面では行の中で折り返す。
  */
 .merge-band {

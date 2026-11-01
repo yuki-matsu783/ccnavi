@@ -1,6 +1,6 @@
 /**
  * フローの本文を実行ファイルに確かめさせる流れ（`core/flow-lint.ts`）と、その答えの読み方（`core/lintmodel.ts`）。
- * 実行ファイルの答えは、プロジェクト管理画面のテストと同じく lint の JSON を組んで渡す偽物。
+ * 実行ファイルの答えは、プロジェクト管理画面のテストと同じくlintのJSONを組んで渡す偽物。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -18,10 +18,10 @@ function tmpDir(): string {
   return dir;
 }
 
-/** 答えに `flow` を載せない */
+/** 答えに`flow`を載せない */
 const ABSENT = Symbol("absent");
 
-/** 実行ファイルの `--lint --json --flow` の答え（偽物） */
+/** 実行ファイルの`--lint --json --flow`の答え（偽物） */
 function answer(problems: readonly { severity: string; where: string; detail: string }[], flow: unknown = { path: "/tmp/x.yml", data: { nodes: [] } }): LintJson {
   const parsed = parseLintJson(
     JSON.stringify({
@@ -41,7 +41,7 @@ function answer(problems: readonly { severity: string; where: string; detail: st
   return parsed.value;
 }
 
-test("CB-T242 本文を一時ファイルに書いて実行ファイルに渡し、(flow) の error がなければ通す。ほかの設定の苦情では止めない", async () => {
+test("CB-T242 本文を一時ファイルに書いて実行ファイルに渡し、(flow)のerrorがなければ通す。ほかの設定の苦情では止めない", async () => {
   const dir = tmpDir();
   try {
     const asked: string[] = [];
@@ -57,7 +57,7 @@ test("CB-T242 本文を一時ファイルに書いて実行ファイルに渡し
         ]),
       };
     });
-    // 通れば、実行ファイルが読んだ中身と、(flow) の warn を返す（ほかの設定の苦情は載せない）
+    // 通れば、実行ファイルが読んだ中身と、(flow)のwarnを返す（ほかの設定の苦情は載せない）
     assert.deepEqual(verdict, { ok: true, data: { nodes: [] }, checks: { warns: ["言うだけの苦情"], rendered: null, candidates: { agents: [], skills: [] } } });
     assert.equal(asked.length, 1);
     assert.equal(path.dirname(asked[0]), dir);
@@ -69,22 +69,22 @@ test("CB-T242 本文を一時ファイルに書いて実行ファイルに渡し
   }
 });
 
-test("CB-T243 (flow) の error があれば、実行ファイルの理由を対象のファイルのパスに直して断る。走らせられなければ断る", async () => {
+test("CB-T243 (flow)のerrorがあれば、実行ファイルの理由を対象のファイルのパスに直して断る。走らせられなければ断る", async () => {
   const dir = tmpDir();
   try {
     let tmp = "";
     const refused = await lintFlowText("nodes:\n  - {id: a}\n  - {id: a}\n", dir, SHOWN, async (file) => {
       tmp = file;
-      return { ok: true, value: answer([{ severity: "error", where: FLOW_WHERE, detail: `${file}: ノードの id が重なっている（a）` }], { path: file, data: null }) };
+      return { ok: true, value: answer([{ severity: "error", where: FLOW_WHERE, detail: `${file}: ノードのidが重なっている（a）` }], { path: file, data: null }) };
     });
     assert.equal(refused.ok, false);
     const error = refused.ok ? "" : refused.error;
-    assert.match(error, /ノードの id が重なっている（a）/);
+    assert.match(error, /ノードのidが重なっている（a）/);
     assert.ok(error.includes(SHOWN), error);
     assert.ok(!error.includes(tmp), error);
-    // 実行ファイルを走らせられない（古くて --flow を知らない、など）なら、その理由で断る（開かない・保存しない側）
-    const failed = await lintFlowText("nodes: []\n", dir, SHOWN, async () => ({ ok: false, error: "実行ファイルが --flow を知らない（古い）" }));
-    assert.deepEqual(failed, { ok: false, error: "実行ファイルが --flow を知らない（古い）" });
+    // 実行ファイルを走らせられない（古くて --flowを知らない、など）なら、その理由で断る（開かない・保存しない側）
+    const failed = await lintFlowText("nodes: []\n", dir, SHOWN, async () => ({ ok: false, error: "実行ファイルが --flowを知らない（古い）" }));
+    assert.deepEqual(failed, { ok: false, error: "実行ファイルが --flowを知らない（古い）" });
     // 一時ファイルを書けなければ、実行ファイルを起こさずに断る
     const missing = path.join(dir, "gone");
     let called = false;
@@ -99,7 +99,7 @@ test("CB-T243 (flow) の error があれば、実行ファイルの理由を対�
   }
 });
 
-test("CB-T244 lint の JSON から (flow) の苦情だけを引く", () => {
+test("CB-T244 lintのJSONから(flow)の苦情だけを引く", () => {
   const lint = answer([
     { severity: "error", where: "(flow)", detail: "a" },
     { severity: "error", where: "(flow) x", detail: "b" },
@@ -123,7 +123,7 @@ test("CB-T246 一時ファイルは呼ぶたびに別の名前で書き、終わ
       lintFlowText(text, dir, SHOWN, async (file): Promise<FlowLintRun> => {
         seen.set(text, file);
         await gate;
-        // 待っている間にもう 1 本が書かれても、自分の本文のまま
+        // 待っている間にもう1本が書かれても、自分の本文のまま
         assert.equal(fs.readFileSync(file, "utf8"), text);
         return { ok: true, value: answer([]) };
       });
@@ -161,17 +161,17 @@ test("CB-T247 答えに読んだ中身（flow）がなければ通さない（�
       assert.equal(verdict.ok, false, String(flow === ABSENT ? "absent" : JSON.stringify(flow)));
       assert.match(verdict.ok ? "" : verdict.error, /flow）を返しません/);
     }
-    // lint の JSON の読み手は flow を持ち越す。無ければ欄ごと無い
+    // lintのJSONの読み手はflowを持ち越す。無ければ欄ごと無い
     assert.deepEqual(answer([], { path: "/p", data: { a: 1 }, rendered: null, candidates: { agents: [], skills: [] } }).flow, { path: "/p", data: { a: 1 }, rendered: null, candidates: { agents: [], skills: [] } });
     assert.equal(answer([], ABSENT).flow, undefined);
     // 渡る手順（rendered）と候補（candidates）も持ち越す。形の違う項目は除く
     const extras = answer([], {
       path: "/p",
       data: {},
-      rendered: ["1. [start] 開始", 2],
+      rendered: ["1. [start]開始", 2],
       candidates: { agents: [{ name: "Plan", source: "builtin" }, { name: "" }, 3], skills: "x" },
     }).flow;
-    assert.deepEqual(extras?.rendered, ["1. [start] 開始"]);
+    assert.deepEqual(extras?.rendered, ["1. [start]開始"]);
     assert.deepEqual(extras?.candidates, { agents: [{ name: "Plan", source: "builtin" }], skills: [] });
     assert.equal(answer([], { path: "/p", data: {}, rendered: null }).flow?.rendered, null);
   } finally {
@@ -179,7 +179,7 @@ test("CB-T247 答えに読んだ中身（flow）がなければ通さない（�
   }
 });
 
-test("CB-T278 通ったときは (flow) の warn を対象のファイルのパスに直し、渡る手順（rendered）と候補（candidates）を添えて返す", async () => {
+test("CB-T278 通ったときは(flow)のwarnを対象のファイルのパスに直し、渡る手順（rendered）と候補（candidates）を添えて返す", async () => {
   const dir = tmpDir();
   try {
     let tmp = "";
@@ -188,18 +188,18 @@ test("CB-T278 通ったときは (flow) の warn を対象のファイルのパ�
       tmp = file;
       return {
         ok: true,
-        value: answer([{ severity: "warn", where: FLOW_WHERE, detail: `${file}: start がない（どこから始めるかが決まらない）` }], {
+        value: answer([{ severity: "warn", where: FLOW_WHERE, detail: `${file}: startがない（どこから始めるかが決まらない）` }], {
           path: file,
           data: { nodes: [] },
-          rendered: ["1. [prompt] 書く"],
+          rendered: ["1. [prompt]書く"],
           candidates,
         }),
       };
     });
     assert.ok(verdict.ok);
-    assert.deepEqual(verdict.checks, { warns: [`${SHOWN}: start がない（どこから始めるかが決まらない）`], rendered: ["1. [prompt] 書く"], candidates });
+    assert.deepEqual(verdict.checks, { warns: [`${SHOWN}: startがない（どこから始めるかが決まらない）`], rendered: ["1. [prompt]書く"], candidates });
     assert.ok(!verdict.checks.warns[0].includes(tmp));
-    // 並べられなければ null のまま
+    // 並べられなければnullのまま
     const unreadable = await lintFlowText("nodes: []\n", dir, SHOWN, async (file) => ({ ok: true, value: answer([], { path: file, data: { nodes: [] }, rendered: null }) }));
     assert.ok(unreadable.ok);
     assert.equal(unreadable.checks.rendered, null);

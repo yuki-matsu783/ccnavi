@@ -1,6 +1,6 @@
 /**
- * 保存（「この順序に決める」）の前の確かめ。番号の変わるステップと、一緒に付け替える `todo/` の子の提案
- * （旧識別子 → 新識別子、`phase:` の旧 → 新、`predecessors` の直し）を見せる。並べるのは実行ファイルの答え
+ * 保存（「この順序に決める」）の前の確かめ。番号の変わるステップと、一緒に付け替える`todo/`の子の提案
+ * （旧識別子 → 新識別子、`phase:`の旧 → 新、`predecessors`の直し）を見せる。並べるのは実行ファイルの答え
  * （`children`・`mismatched`）と、答えの番号と元の番号の違い（`renumbered`）だけで、画面は決めない。
  */
 import { useEffect, useRef, type JSX } from "react";
@@ -9,7 +9,7 @@ import type { PlanOrderAnswer, PlanOrderChild } from "../../core/planordermodel.
 import { Dialog, DialogActions } from "../shared/Dialog.js";
 import { renumbered } from "../../core/workflow-view.js";
 
-/** 子 1 本の付け替えの 1 行。「i0001-02-01 → i0001-03-01（phase: 2 → 3）」。`predecessors` を直すなら添える */
+/** 子1本の付け替えの1行。「i0001-02-01 → i0001-03-01（phase: 2 → 3）」。`predecessors`を直すなら添える */
 function childText(child: PlanOrderChild): string {
   const parts: string[] = [];
   if (child.phase !== child.new_phase) {
@@ -42,7 +42,7 @@ export function Review({ ticket, answer, onConfirm, onCancel, focus = true }: Re
   return (
     <Dialog titleId="save-review-title" backdropClass="workflow-review-backdrop" cardClass="workflow-review" id="save-review">
       <h2 id="save-review-title">この順序に決める</h2>
-      <p className="dim small">ccnavi が {ticket} の提案の計画（plan: / feedback:）と、番号の変わるステップを指す子の提案を変更します。承認はしません。</p>
+      <p className="dim small">ccnaviが{ticket}の提案の計画（plan: / feedback:）と、番号の変わるステップを指す子の提案を変更します。承認はしません。</p>
       <div data-tour="review-numbers">
         <h3>番号が変わるステップ（{moved.length}）</h3>
         {moved.length === 0 ? (

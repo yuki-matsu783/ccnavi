@@ -1,31 +1,31 @@
 /**
  * ルール管理画面に出す言葉。行の要約、絞り込みが適用する文字列、件数の出し方。
  *
- * ヒットする・ヒットしないは実行ファイルの `--test` が言う。ここが作るのは
+ * ヒットする・ヒットしないは実行ファイルの`--test`が言う。ここが作るのは
  * 「このルールは何を止めるか」を折りたたんだままでも読める形に縮めた文だけ。
  */
 import type { RuleForm, Section } from "../../core/rules-view.js";
 import { condPatterns } from "../../core/rules-when.js";
 import { foldFind } from "../shared/find.js";
 
-/** 1 行に縮める。空白をまとめて、長ければ後ろを省く */
+/** 1行に縮める。空白をまとめて、長ければ後ろを省く */
 function excerpt(text: string, max: number): string {
   const one = text.replace(/\s+/g, " ").trim();
   return one.length > max ? `${one.slice(0, max)}…` : one;
 }
 
-/** 要約の左の id。未設定なら薄く言う */
+/** 要約の左のid。未設定なら薄く言う */
 export function summaryId(rule: RuleForm): string {
-  return rule.id === "" ? "（id 未設定）" : rule.id;
+  return rule.id === "" ? "（id未設定）" : rule.id;
 }
 
-/** 要約のツール。空は「どのツールにもヒットしない」（実行ファイルは match の無いルールを error にする） */
+/** 要約のツール。空は「どのツールにもヒットしない」（実行ファイルはmatchの無いルールをerrorにする） */
 export function summaryMatch(rule: RuleForm): string {
-  return rule.match === "" ? "（match 未設定）" : rule.match;
+  return rule.match === "" ? "（match未設定）" : rule.match;
 }
 
 /**
- * 要約につける文。deny は拒否の文面、ask と allow はプロンプト（message はどこにも届かないため）。
+ * 要約につける文。denyは拒否の文面、askとallowはプロンプト（messageはどこにも届かないため）。
  */
 export function summaryNote(section: Section, rule: RuleForm): string {
   const shown = section === "deny" ? rule.message : rule.additionalContext || rule.additionalContextOnce;
@@ -33,7 +33,7 @@ export function summaryNote(section: Section, rule: RuleForm): string {
 }
 
 /**
- * 刻み（`every`）とコンテキストの 4 欄のどれかがあるか。刻みだけを持つルールでも
+ * 刻み（`every`）とコンテキストの4欄のどれかがあるか。刻みだけを持つルールでも
  * 「コンテキストの追加」が開いて出るように、刻みも数える。
  */
 export function hasContext(rule: RuleForm): boolean {
@@ -53,10 +53,10 @@ export function contextSummary(rule: RuleForm): string {
     : "（未設定）ルールにヒットしたときにモデルへ渡すプロンプト・ファイルと、その頻度（every）を設定します。";
 }
 
-/** ask と allow に message が残っているときに出す断り。lint が error にする */
+/** askとallowにmessageが残っているときに出す断り。lintがerrorにする */
 export function staleMessage(section: Section): string {
   const where = section === "ask" ? "ユーザの確認ダイアログにしか出ない" : "どこにも届かない";
-  return `${section} の message は${where}ため、設定の検証（lint）でエラーになります。モデルに渡すプロンプトは additionalContext に移してください: `;
+  return `${section}のmessageは${where}ため、設定の検証（lint）でエラーになります。モデルに渡すプロンプトはadditionalContextに移してください。残っている文面は次のとおりです。`;
 }
 
 /**
@@ -76,10 +76,10 @@ export function countText(query: string, shown: number, total: number, kept: num
   if (query === "") {
     return String(total);
   }
-  return `${shown} / ${total}${kept > 0 ? `（絞り込み外で開いている項目: ${kept} 件）` : ""}`;
+  return `${shown} / ${total}${kept > 0 ? `（絞り込み外で開いている項目: ${kept}件）` : ""}`;
 }
 
-/** 判定結果の項目名。日本語を主に、英語（実行ファイルの JSON の名前）を括弧に添える */
+/** 判定結果の項目名。日本語を主に、英語（実行ファイルのJSONの名前）を括弧に添える */
 export const JUDGE_LABELS = {
   tool: "ツール（tool）",
   subject: "対象（subject）",

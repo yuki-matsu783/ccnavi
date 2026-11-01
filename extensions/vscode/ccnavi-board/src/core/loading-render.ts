@@ -1,42 +1,42 @@
 /**
- * 中身を読み込んでいる間だけ見せる 1 枚の HTML。6 画面が共通で使う。
+ * 中身を読み込んでいる間だけ見せる1枚のHTML。6画面が共通で使う。
  *
  * 画面を開くと、中身を読む前にタブを作ってこれを入れる。実行ファイルへの問い合わせ（ボード・
  * プロジェクト管理・設定ファイルの場所）は数秒かかることがあり、読み終えてからタブを作ると、押しても
- * 何も起きないように見えて押し直され、同じ種類のタブが 2 枚開く原因にもなっていた。
+ * 何も起きないように見えて押し直され、同じ種類のタブが2枚開く原因にもなっていた。
  *
- * これは段取り（`screen-host.ts`）を通さない。 パネルが `webview.html` に直に入れる。段取りから見ると
- * 入れ物はまだ 1 枚も入っていないので、読み終えて最初に渡す中身は必ず入れ物ごと
- * （`rebuilt`）になり、この 1 枚と入れ替わる。スクリプトは持たず、`ready` も送らない。
+ * これは段取り（`screen-host.ts`）を通さない。 パネルが`webview.html`に直に入れる。段取りから見ると
+ * 入れ物はまだ1枚も入っていないので、読み終えて最初に渡す中身は必ず入れ物ごと
+ * （`rebuilt`）になり、この1枚と入れ替わる。スクリプトは持たず、`ready`も送らない。
  *
- * CSS はその画面のバンドル（`out/webview/<名前>.css`）をそのまま流し込む。地の色と見た目の切り替え
- * （body のクラス）が、読み終えた後の画面と同じになる。
+ * CSSはその画面のバンドル（`out/webview/<名前>.css`）をそのまま流し込む。地の色と見た目の切り替え
+ * （bodyのクラス）が、読み終えた後の画面と同じになる。
  */
 import { type Appearance, bodyTag } from "./appearance.js";
 
 export interface LoadingOptions {
   readonly nonce: string;
-  /** その画面のバンドルした CSS */
+  /** その画面のバンドルしたCSS */
   readonly style: string;
-  /** 見た目。無ければ VS Code のテーマに従う */
+  /** 見た目。無ければVS Codeのテーマに従う */
   readonly appearance?: Appearance;
 }
 
-/** 読み込み中の一言。`what` は読むもの（「チケット」「web のルール」）。6 画面と切り替え中の表示で表記を揃える */
+/** 読み込み中の一言。`what`は読むもの（「チケット」「webのルール」）。6画面と切り替え中の表示で表記を揃える */
 export function loadingText(what: string): string {
   return `${what}を読み込み中…`;
 }
 
 /**
- * 読み込み中の一言を段落にしたもの（HTML としてエスケープする）。この 1 枚の本文のほか、各画面の入れ物の
- * `<div id="root">` にも入れる。入れ物を入れてからバンドルした画面が組み上がるまでの間、白いままにしないため。
- * 組み上がると React が中身を入れ替えるので、残らない
+ * 読み込み中の一言を段落にしたもの（HTMLとしてエスケープする）。この1枚の本文のほか、各画面の入れ物の
+ * `<div id="root">`にも入れる。入れ物を入れてからバンドルした画面が組み上がるまでの間、白いままにしないため。
+ * 組み上がるとReactが中身を入れ替えるので、残らない
  */
 export function loadingMarkup(what: string): string {
   return `<p class="empty" id="ccnavi-loading">${escapeHtml(loadingText(what))}</p>`;
 }
 
-/** 読み込み中の 1 枚。`title` は `<title>` に、`what` は本文の一言に出す（どちらも HTML としてエスケープする） */
+/** 読み込み中の1枚。`title`は`<title>`に、`what`は本文の一言に出す（どちらもHTMLとしてエスケープする） */
 export function renderLoadingPage(title: string, what: string, options: LoadingOptions): string {
   const { nonce } = options;
   return `<!DOCTYPE html>

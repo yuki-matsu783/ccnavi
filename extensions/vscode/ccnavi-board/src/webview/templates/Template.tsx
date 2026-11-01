@@ -1,5 +1,5 @@
 /**
- * テンプレート 1 件。見出しに名前・層・状態のバッジ・説明を出し、最初から開いていて、計画とフローの図・本文の取り出しを出す（畳める）。
+ * テンプレート1件。見出しに名前・レイヤー・状態のバッジ・説明を出し、最初から開いていて、計画とフローの図・本文の取り出しを出す（畳める）。
  * 判定（有効・無効・使われない・破棄した理由・読めない）は実行ファイルの答えのまま出す。
  */
 import { useEffect, type JSX } from "react";
@@ -16,16 +16,16 @@ export interface TemplateProps {
   readonly entry: TemplateEntry;
   readonly open: boolean;
   readonly onToggle: () => void;
-  /** 本文の答え。まだ読んでいなければ undefined */
+  /** 本文の答え。まだ読んでいなければundefined */
   readonly detail: TemplateDetail | undefined;
   /** 本文を読めなかったときの理由。無ければ空 */
   readonly detailError: string;
   readonly onShow: () => void;
-  /** 案内が指す先にする（一覧の最初の 1 件だけ） */
+  /** 案内が指す先にする（一覧の最初の1件だけ） */
   readonly tour: boolean;
-  /** 編集を始める。渡さなければ「図を編集」は出さない（読み取り専用の層・読めない行・案内の間） */
+  /** 編集を始める。渡さなければ「図を編集」は出さない（読み取り専用のレイヤー・読めない行・案内の間） */
   readonly onEdit?: () => void;
-  /** 図の中身（実行ファイルに読ませた答え）。まだ読んでいなければ undefined。読めなかったときは `previewError` に理由 */
+  /** 図の中身（実行ファイルに読ませた答え）。まだ読んでいなければundefined。読めなかったときは`previewError`に理由 */
   readonly preview?: TemplateCheck | undefined;
   readonly previewError?: string;
   /** 開いたとき、図の中身を求める。渡さなければ求めない（案内の間） */
@@ -96,7 +96,7 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
           )}
           {detail !== undefined && detailMatches(detail, entry) && (
             <>
-              <h3 className="tpl-text-head">本文（制御文字・書式文字は \uXXXX で表示）</h3>
+              <h3 className="tpl-text-head">本文（制御文字・書式文字は\uXXXXで表示）</h3>
               <pre className="tpl-text" data-role="template-text">
                 {revealControls(detail.text)}
               </pre>
@@ -104,7 +104,7 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
           )}
           {detail !== undefined && !detailMatches(detail, entry) && (
             <p className="hint" data-role="detail-mismatch">
-              この行の本文は読み込めません。実行ファイルは、統合結果で使われる同名の別の層の本文を返すためです（破棄された行など）。ファイルを直接開いて読んでください: <span className="mono">{entry.path}</span>
+              この行の本文は読み込めません。実行ファイルは、統合結果で使われる同名の別のレイヤーの本文を返すためです（破棄された行など）。ファイルを直接開いて読んでください。対象は次のファイルです。<span className="mono">{entry.path}</span>
             </p>
           )}
           {detailError !== "" && <p className="status failed">{detailError}</p>}
@@ -115,8 +115,8 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
 }
 
 /**
- * 届いた本文が、この行のものか。実行ファイルは層ごとでなく統合結果で 1 件を返すので、破棄された行を開くと
- * 別の層の本文が来ることがある。層と sha（読めない行は sha が空なので層だけ）で突き合わせる
+ * 届いた本文が、この行のものか。実行ファイルはレイヤーごとでなく統合結果で1件を返すので、破棄された行を開くと
+ * 別のレイヤーの本文が来ることがある。レイヤーとsha（読めない行はshaが空なのでレイヤーだけ）で突き合わせる
  */
 function detailMatches(detail: TemplateDetail, entry: TemplateEntry): boolean {
   return detail.layer === entry.layer && (entry.sha === "" || detail.sha === entry.sha);
@@ -143,7 +143,7 @@ function StateTags({ entry }: { readonly entry: TemplateEntry }): JSX.Element {
   );
 }
 
-/** フローの要約。フローが無くて `has_flows` が偽なら、無いと言う */
+/** フローの要約。フローが無くて`has_flows`が偽なら、無いと言う */
 export function Flows({ flows, hasFlows }: { readonly flows: readonly FlowSummary[]; readonly hasFlows: boolean }): JSX.Element | null {
   if (flows.length > 0) {
     return (

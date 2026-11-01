@@ -1,16 +1,16 @@
 /**
- * バグ報告。サイドパネルの「バグ報告」で始め、ステータスバーの「終了」で zip にまとめる。
+ * バグ報告。サイドパネルの「バグ報告」で始め、ステータスバーの「終了」でzipにまとめる。
  *
- * 始めると「バグ発生時の挙動を再現してください」を出し、ffmpeg が見つかれば画面全体の録画を始める。
+ * 始めると「バグ発生時の挙動を再現してください」を出し、ffmpegが見つかれば画面全体の録画を始める。
  * 途中はステータスバーの「スクリーンショット」のボタンか、ボードのビューのタイトルのカメラのボタン（通知の
- * 「スクリーンショット」も同じ）で何枚でも撮れる（ffmpeg は使わない）。通知は時間が経つと隠れるが、この 2 つは
+ * 「スクリーンショット」も同じ）で何枚でも撮れる（ffmpegは使わない）。通知は時間が経つと隠れるが、この2つは
  * 報告の間ずっと出ている。
- * 終了すると、録画を gif にし、始めてから `logs/diag/*.log` に足された行、スクリーンショット、
- * 説明（report.txt）を `logs/bug-report/bug-report-<時刻>.zip` にまとめる。
- * ffmpeg が無い・録画を始められないときは、録画だけをやめて残りはそのまま作る。
+ * 終了すると、録画をgifにし、始めてから`logs/diag/*.log`に足された行、スクリーンショット、
+ * 説明（report.txt）を`logs/bug-report/bug-report-<時刻>.zip`にまとめる。
+ * ffmpegが無い・録画を始められないときは、録画だけをやめて残りはそのまま作る。
  *
- * 何を起動するかは core/bug-report.ts が組む。ここは子プロセスと VS Code の表示だけを持つ。
- * VS Code の API に触れるので単体テストの対象外。
+ * 何を起動するかはcore/bug-report.tsが組む。ここは子プロセスとVS Codeの表示だけを持つ。
+ * VS CodeのAPIに触れるので単体テストの対象外。
  */
 import { type ChildProcess, execFile, spawn } from "node:child_process";
 import * as fs from "node:fs";
@@ -37,9 +37,9 @@ import {
 } from "./core/bug-report.js";
 import * as diaglog from "./log.js";
 
-/** 録画が始まったとみなすまで待つ時間。これより前に ffmpeg が終われば、始められなかったとみなす */
+/** 録画が始まったとみなすまで待つ時間。これより前にffmpegが終われば、始められなかったとみなす */
 const START_GRACE_MS = 1500;
-/** `q` を送ってから ffmpeg が書き終えるのを待つ時間。過ぎたら止める */
+/** `q`を送ってからffmpegが書き終えるのを待つ時間。過ぎたら止める */
 const STOP_WAIT_MS = 10_000;
 /** 子プロセスのエラーの出力は末尾だけ残す */
 const ERROR_TAIL = 2000;
@@ -60,9 +60,9 @@ interface Session {
   readonly started: Date;
   readonly marks: LogMarks;
   recording: Recording | undefined;
-  /** 録画を始める処理。終えるときはこれを待ってから録画を止める（始める途中の ffmpeg を取り残さない） */
+  /** 録画を始める処理。終えるときはこれを待ってから録画を止める（始める途中のffmpegを取り残さない） */
   starting: Promise<void>;
-  /** 拡張が止まった。始める途中で立っていれば、起こした ffmpeg をその場で止める */
+  /** 拡張が止まった。始める途中で立っていれば、起こしたffmpegをその場で止める */
   disposed: boolean;
   /** 録画しなかった・できなかった理由 */
   noRecording: string;
@@ -104,7 +104,7 @@ function run(file: string, args: readonly string[], timeout: number): Promise<st
   });
 }
 
-/** 子プロセスに渡すパス。WSL から Windows の道具を呼ぶときは、Windows の形（`\\wsl.localhost\…`）に直す */
+/** 子プロセスに渡すパス。WSLからWindowsの道具を呼ぶときは、Windowsの形（`\\wsl.localhost\…`）に直す */
 async function toolPath(capture: Capture, file: string): Promise<string> {
   if (capture !== "wsl") {
     return file;
@@ -127,14 +127,14 @@ async function findFfmpeg(capture: Capture): Promise<string | undefined> {
 
 async function startRecording(current: Session): Promise<void> {
   if (current.capture === "none") {
-    current.noRecording = "この OS では録画しない（Windows・macOS・WSL だけ）";
+    current.noRecording = "このOSでは録画しない（Windows・macOS・WSLだけ）";
     return;
   }
   const ffmpeg = await findFfmpeg(current.capture);
   if (ffmpeg === undefined) {
-    current.noRecording = "ffmpeg が見つからない";
+    current.noRecording = "ffmpegが見つからない";
     void vscode.window.showWarningMessage(
-      "ffmpeg が見つからないので、録画はしません。スクリーンショットとログは保存します。録画するには ffmpeg を入れるか、設定 ccnaviBoard.ffmpegPath に場所を書きます。",
+      "ffmpegが見つからないので、録画はしません。スクリーンショットとログは保存します。録画するにはffmpegを入れるか、設定ccnaviBoard.ffmpegPathに場所を書きます。",
     );
     return;
   }
@@ -147,7 +147,7 @@ async function startRecording(current: Session): Promise<void> {
     stdio: ["pipe", "ignore", "pipe"],
     windowsHide: true,
   });
-  // 止める直前に ffmpeg が落ちていると `q` の書き込みが EPIPE になる。拾わないと拡張ホストの例外になる
+  // 止める直前にffmpegが落ちていると`q`の書き込みがEPIPEになる。拾わないと拡張ホストの例外になる
   child.stdin?.on("error", () => undefined);
   const recording: Recording = { ffmpeg, child, file, exit: undefined, stderr: "" };
   child.stderr?.on("data", (chunk: Buffer) => {
@@ -168,14 +168,14 @@ async function startRecording(current: Session): Promise<void> {
   if (recording.exit !== undefined) {
     current.noRecording = "録画を始められなかった";
     current.errors.push(`ffmpeg（録画）: ${recording.stderr.trim()}`);
-    const hint = current.capture === "mac" ? "macOS の「システム設定 > プライバシーとセキュリティ > 画面収録」で VS Code を許可してから、もう一度始めます。" : "";
+    const hint = current.capture === "mac" ? "macOSの「システム設定」→「プライバシーとセキュリティ」→「画面収録」でVS Codeを許可してから、もう一度始めます。" : "";
     void vscode.window.showWarningMessage(`録画を始められなかったので、録画はしません。スクリーンショットとログは保存します。${hint}`);
     return;
   }
   current.recording = recording;
 }
 
-/** 待たずに止める（拡張を止めるとき）。WSL では kill が Windows 側に届かないことがあるので、先に `q` も送る */
+/** 待たずに止める（拡張を止めるとき）。WSLではkillがWindows側に届かないことがあるので、先に`q`も送る */
 function halt(recording: Recording): void {
   recording.child.stdin?.write("q");
   recording.child.stdin?.end();
@@ -261,8 +261,8 @@ export async function startReport(): Promise<void> {
     seq: 0,
     errors: [],
     items: [
-      statusItem("$(record) 再現中: 終了", "ccnaviBoard.bugReportFinish", "バグ報告を終えて zip にまとめる", 1001),
-      statusItem("$(device-camera) スクリーンショット", "ccnaviBoard.bugReportScreenshot", "バグ報告: スクリーンショットを撮る", 1000),
+      statusItem("$(record)再現中: 終了", "ccnaviBoard.bugReportFinish", "バグ報告を終えてzipにまとめる", 1001),
+      statusItem("$(device-camera)スクリーンショット", "ccnaviBoard.bugReportScreenshot", "バグ報告: スクリーンショットを撮る", 1000),
     ],
   };
   current.items[0].backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
@@ -293,30 +293,30 @@ export async function takeScreenshot(): Promise<void> {
   try {
     const command = screenshotCommand(current.capture, await toolPath(current.capture, file));
     if (command === undefined) {
-      void vscode.window.showWarningMessage("この OS ではスクリーンショットを撮りません（Windows・macOS・WSL だけ）。");
+      void vscode.window.showWarningMessage("このOSではスクリーンショットを撮りません（Windows・macOS・WSLだけ）。");
       return;
     }
     // 押したボタンの通知が消えるのを待ってから撮る
     await new Promise((resolve) => setTimeout(resolve, 300));
     await run(command.file, command.args, 20_000);
     if (!fs.existsSync(file)) {
-      throw new Error("画像ができなかった");
+      throw new Error("画像を作れなかった");
     }
     current.shots += 1;
-    vscode.window.setStatusBarMessage(`$(check) スクリーンショット ${current.shots} 枚目を撮りました`, 3000);
+    vscode.window.setStatusBarMessage(`$(check)スクリーンショット${current.shots}枚目を撮りました`, 3000);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     current.errors.push(`スクリーンショット: ${message}`);
-    const hint = current.capture === "mac" ? "（macOS では、「画面収録」で VS Code の許可が必要です）" : "";
+    const hint = current.capture === "mac" ? "（macOSでは、「画面収録」でVS Codeの許可が必要です）" : "";
     void vscode.window.showWarningMessage(`スクリーンショットを撮れませんでした${hint}: ${message}`);
   }
 }
 
-/** 録画を gif にする。できなければ理由を返す */
+/** 録画をgifにする。できなければ理由を返す */
 async function toGif(current: Session, recording: Recording): Promise<Buffer | string> {
   if (!fs.existsSync(recording.file) || fs.statSync(recording.file).size === 0) {
     current.errors.push(`ffmpeg（録画）: ${recording.stderr.trim()}`);
-    return "録画のファイルができなかった";
+    return "録画のファイルを作れなかった";
   }
   const gif = path.join(current.work, "screen.gif");
   try {
@@ -324,7 +324,7 @@ async function toGif(current: Session, recording: Recording): Promise<Buffer | s
     return fs.readFileSync(gif);
   } catch (error) {
     current.errors.push(`ffmpeg（gif）: ${error instanceof Error ? error.message : String(error)}`);
-    return "gif にできなかった";
+    return "gifに変換できなかった";
   }
 }
 
@@ -350,12 +350,12 @@ export async function finishReport(): Promise<void> {
         let recordingNote = current.noRecording;
         if (current.recording !== undefined) {
           if (current.recording.exit !== undefined) {
-            const why = current.recording.exit === 0 ? `上限の ${RECORD_MAX_SECONDS} 秒で止まった` : `終える前に止まった（終了コード ${String(current.recording.exit)}）`;
+            const why = current.recording.exit === 0 ? `上限の${RECORD_MAX_SECONDS}秒で止まった` : `終える前に止まった（終了コード${String(current.recording.exit)}）`;
             current.errors.push(`ffmpeg（録画）: ${why} ${current.recording.stderr.trim()}`.trim());
           }
           progress.report({ message: "録画を止めています" });
           await stopRecording(current.recording);
-          progress.report({ message: "録画を gif にしています" });
+          progress.report({ message: "録画をgifにしています" });
           const gif = await toGif(current, current.recording);
           if (typeof gif === "string") {
             recordingNote = gif;
@@ -395,7 +395,7 @@ export async function finishReport(): Promise<void> {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    void vscode.window.showErrorMessage(`バグ報告の zip を書けませんでした: ${message}`);
+    void vscode.window.showErrorMessage(`バグ報告のzipを書けませんでした: ${message}`);
     return;
   } finally {
     removeWork(current.work);
@@ -403,7 +403,7 @@ export async function finishReport(): Promise<void> {
 
   const reveal = "フォルダで表示";
   const picked = await vscode.window.showInformationMessage(
-    `バグ報告を ${zipFile} に保存しました。録画とスクリーンショットには画面に映っていたもの（秘密の値も）が、ログにはその間の操作の記録が入るので、渡す前に中身を確かめてください。`,
+    `バグ報告を${zipFile}に保存しました。録画とスクリーンショットには、画面に映っていた内容（秘密の値を含む）が入ります。ログには、その間の操作の記録が入ります。渡す前に中身を確かめてください。`,
     reveal,
   );
   if (picked === reveal) {
@@ -411,7 +411,7 @@ export async function finishReport(): Promise<void> {
   }
 }
 
-/** 拡張を止めるときに録画が残っていれば止める（gif と zip は作らない） */
+/** 拡張を止めるときに録画が残っていれば止める（gifとzipは作らない） */
 export function disposeReport(): void {
   const current = session;
   session = undefined;
@@ -426,11 +426,11 @@ export function disposeReport(): void {
   removeWork(current.work);
 }
 
-/** 作業フォルダを消す。Windows で ffmpeg がまだ開いているなどで消せなければ残す（例外にしない） */
+/** 作業フォルダを消す。Windowsでffmpegがまだ開いているなどで消せなければ残す（例外にしない） */
 function removeWork(work: string): void {
   try {
     fs.rmSync(work, { recursive: true, force: true });
   } catch {
-    // 一時フォルダなので OS に任せる
+    // 一時フォルダなのでOSに任せる
   }
 }

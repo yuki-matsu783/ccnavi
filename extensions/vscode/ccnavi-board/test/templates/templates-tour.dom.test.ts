@@ -1,5 +1,5 @@
 /**
- * テンプレート管理画面の案内（`src/webview/tours/templates.yml`）を happy-dom で動かす。案内の間は見本を描き、実際の中身には触れない。
+ * テンプレート管理画面の案内（`src/webview/tours/templates.yml`）をhappy-domで動かす。案内の間は見本を描き、実際の中身には触れない。
  * 案内の間は更新・切り替え・本文の依頼を拡張ホストへ送らない。
  */
 import { test } from "node:test";
@@ -12,7 +12,7 @@ import type { HTMLButtonElement, HTMLSelectElement } from "happy-dom" with { "re
 
 const def = loadTour("templates");
 
-/** 開く前に図の中身を求めた行の数（見本の一覧の self の層の 4 件）。案内の間に増えない */
+/** 開く前に図の中身を求めた行の数（見本の一覧のselfのレイヤーの4件）。案内の間に増えない */
 const ASKED_BEFORE_TOUR = 4;
 
 /** 図の中身の依頼は、案内に入る前に送った分だけ。数が増えていれば、案内の間に送ったことになる */
@@ -32,7 +32,7 @@ async function next(dom: DomPage): Promise<void> {
   await dom.settle();
 }
 
-/** 案内を始めて、n 番目の手順（0 始まり）まで進める */
+/** 案内を始めて、n番目の手順（0始まり）まで進める */
 async function goto(dom: DomPage, id: string, index: number): Promise<void> {
   await startCourse(dom, id);
   for (let i = 0; i < index; i += 1) {
@@ -42,7 +42,7 @@ async function goto(dom: DomPage, id: string, index: number): Promise<void> {
 
 const names = (dom: DomPage): (string | null)[] => dom.all("li.template").map((li) => li.getAttribute("data-name"));
 
-test("CB-D332 テンプレート管理画面に「?」があり、初回の依頼で基本の案内が始まる。閉じたら tourDone を返す", async () => {
+test("CB-D332 テンプレート管理画面に「?」があり、初回の依頼で基本の案内が始まる。閉じたらtourDoneを返す", async () => {
   const dom = await openTemplates();
   try {
     assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
@@ -61,16 +61,16 @@ test("CB-D332 テンプレート管理画面に「?」があり、初回の依�
   }
 });
 
-test("CB-D333 全案内の全手順で、指す先が画面に 1 つあり、吹き出しが中ほどに出ない。案内の間は操作を送らない", async () => {
+test("CB-D333 全案内の全手順で、指す先が画面に1つあり、吹き出しが中ほどに出ない。案内の間は操作を送らない", async () => {
   for (const course of def.courses) {
     const dom = await openTemplates();
     try {
       await startCourse(dom, course.id);
       for (const [index, step] of course.steps.entries()) {
         await dom.settle();
-        const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
+        const at = `${course.id}の${index + 1}番目の手順（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
-        assert.equal(dom.all(`[data-tour="${step.target}"]`).length, 1, `${at}: 指す先 ${step.target} が画面に 1 つではない`);
+        assert.equal(dom.all(`[data-tour="${step.target}"]`).length, 1, `${at}: 指す先${step.target}が画面に1つではない`);
         assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
         assert.equal(dom.all(".banner.tour-sample").length, 1, at);
         dom.click(dom.one('[data-action="tour-next"]'));
@@ -128,15 +128,15 @@ test("CB-D359 案内の間は見本を描き、実際のテンプレートは出
   }
 });
 
-test("CB-D360 手順の scene が画面の様子を替える（テンプレートを開く・本文・統合結果の枠）。scene は次の手順へ引き継がない", async () => {
+test("CB-D360 手順のsceneが画面の様子を替える（テンプレートを開く・本文・統合結果の枠）。sceneは次の手順へ引き継がない", async () => {
   const dom = await openTemplates();
   try {
-    // intro の 4 番目の手順（0 始まりで 3）: 見本の feature を開き、本文を出す
+    // introの4番目の手順（0始まりで3）: 見本のfeatureを開き、本文を出す
     await goto(dom, "intro", 3);
     assert.equal(dom.all("li.template.open").length, 1);
     assert.match(dom.one("pre.tpl-text").textContent ?? "", /name: feature/);
     assert.equal(dom.all("details#sum[open]").length, 0);
-    // 5 番目の手順: 統合結果の枠を開く。開いたテンプレートは閉じる
+    // 5番目の手順: 統合結果の枠を開く。開いたテンプレートは閉じる
     await next(dom);
     assert.equal(dom.all("details#sum[open]").length, 1);
     assert.equal(dom.all("li.template.open").length, 0, "手順をまたいで開いたままになった");
@@ -160,7 +160,7 @@ test("CB-D361 統合結果の案内は、見本の統合結果を選び、閉じ
   }
   const dom = await openTemplates();
   try {
-    // 下書きの案内の 3 番目の手順（0 始まりで 2）は「取り込み待ちを開く」を指す。案内の間は押せず、何も送らない
+    // 下書きの案内の3番目の手順（0始まりで2）は「取り込み待ちを開く」を指す。案内の間は押せず、何も送らない
     await goto(dom, "read-drafts", 2);
     assert.equal(dom.one("#tour-title").textContent, "取り込み待ちの画面へ");
     assert.equal(dom.one<HTMLButtonElement>(`[data-tour="handoff"]`).disabled, true);

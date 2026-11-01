@@ -1,13 +1,13 @@
 /**
  * リスクの配点（risks.yml）の読み書き。コメントを残したまま書き戻す。
  *
- * risks.yml は先頭に使い方の説明、項目の前後に理由や例のコメントを持つ。素直に読んで
- * dump し直すとそれが全部消えるので、rules-doc と同じく `yaml` の Document を保ち、
+ * risks.ymlは先頭に使い方の説明、項目の前後に理由や例のコメントを持つ。素直に読んで
+ * dumpし直すとそれが全部消えるので、rules-docと同じく`yaml`のDocumentを保ち、
  * 変えるところだけを差し替える。項目の入れ替えは元のノードをそのまま別のリストへ移す。
  *
  * ここは配点の意味（何点になるか）には触れない。数えるのは実行ファイル（tickets/config/risk.py）の仕事で、
- * 書式の検証も `--lint --risk <一時ファイル>` に聞く。画面の欄は文字のまま持ち、整数で
- * なければそのまま書いて lint に言わせる。
+ * 書式の検証も`--lint --risk <一時ファイル>`に聞く。画面の欄は文字のまま持ち、整数で
+ * なければそのまま書いてlintに言わせる。
  */
 import { isMap, isNode, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document } from "yaml";
 
@@ -15,8 +15,8 @@ import { KINDS, LEVEL_NAMES, type FactorForm, type FactorKind, type LevelName, t
 import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
- * 配点の形（`KINDS`・`FactorForm`・`RiskForm` など）は画面との契約（`risk-view.ts`）にある。
- * ここに置くと、画面がそこから `yaml` を辿ってバンドルしたものに解析器がすべて入る。
+ * 配点の形（`KINDS`・`FactorForm`・`RiskForm`など）は画面との契約（`risk-view.ts`）にある。
+ * ここに置くと、画面がそこから`yaml`を辿ってバンドルしたものに解析器がすべて入る。
  */
 
 /** 実行ファイルが読む版（risk.VERSION） */
@@ -25,21 +25,21 @@ export const RISK_VERSION = 1;
 export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子をクローズするときに、その子の差分（base_sha..HEAD）で数える。
 #
 # 計画のときに「軽い」と思った作業が大きな変更になっていたら、宣言に関わらずレビューが
-# 要る扱いにするためのもの。リスクレベルの名前は LOW / MEDIUM / HIGH / CRITICAL で固定。
-# HIGH 以上はレビューが済むまでフェーズを止める。境目の点は levels で動かす。
+# 要る扱いにするためのもの。リスクレベルの名前はLOW / MEDIUM / HIGH / CRITICALで固定。
+# HIGH以上はレビューが済むまでフェーズを止める。境目の点はlevelsで動かす。
 #
-# 項目は 3 系統。1 件につき加点条件を 1 つだけ書く。
-#   定量（組み込み）: lines_over / files_over / deleted_over / glob（ヒットするごとに加点。max で上限）
-#                    lines_over / files_over / deleted_over は include / exclude（glob のリスト）で数えるパスを絞れる。
-#                    無指定なら差分全体。include があればヒットしたパスだけ、exclude にヒットしたパスは数えない
-#   定量（スクリプト）: script: <.ccnavi/config/common/scripts/ の下>。cwd は子のワークツリー、
-#                      CCNAVI_BASE_SHA / CCNAVI_HEAD / CCNAVI_TICKET / CCNAVI_PARENT を受け取り、
-#                      標準出力に整数か {"points": N, "message": "..."} を出す。失敗は重い側（points を加点）
+# 項目は3系統。1件につき加点条件を1つだけ書く。
+#   定量（組み込み）: lines_over / files_over / deleted_over / glob（ヒットするごとに加点。maxで上限）
+#                    lines_over / files_over / deleted_overはinclude / exclude（globのリスト）で数えるパスを絞れる。
+#                    無指定なら差分全体。includeがあればヒットしたパスだけ、excludeにヒットしたパスは数えない
+#   定量（スクリプト）: script: <.ccnavi/config/common/scripts/ の下>。cwdは子のワークツリー、
+#                      CCNAVI_BASE_SHA / CCNAVI_HEAD / CCNAVI_TICKET / CCNAVI_PARENTを受け取り、
+#                      標準出力に整数か {"points": N, "message": "..."}を出す。失敗は重い側（pointsを加点）
 #   定性（サブエージェント）: judge: <問い>。親がサブエージェントに判断させ、
 #                      'sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>' で記録する。
-#                      判定が揃うまで子は閉じられない。子の HEAD が動けば取り直し
+#                      判定が揃うまで子はクローズできない。子のHEADが動けば取り直し
 #
-# このファイルがなければ組み込み（big-diff・many-files・ci・deletes と同じ値）。不正なら組み込みを使い、--lint が指摘する。
+# このファイルがなければ組み込み（big-diff・many-files・ci・deletesと同じ値）。不正なら組み込みを使い、--lintが指摘する。
 version: 1
 levels:
   medium: 20
@@ -75,23 +75,23 @@ export function readRisk(text: string): RiskDocument {
   const doc = parseDocument(text, { keepSourceTokens: false });
   const problems: string[] = [];
   for (const e of doc.errors) {
-    problems.push(`YAML として解釈できません: ${e.message}`);
+    problems.push(`YAMLとして解釈できません: ${e.message}`);
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
     problems.push("最上位がマップ（キーと値の組の集まり）ではありません。実行ファイルは組み込みの配点を使います。保存すると中身を破棄して空のマップから始めます");
   }
   const version = doc.get("version");
   if (version === undefined || version === null) {
-    problems.push(`version がありません。保存すると version: ${RISK_VERSION} を先頭に追加します`);
+    problems.push(`versionがありません。保存するとversion: ${RISK_VERSION}を先頭に追加します`);
   } else if (version !== RISK_VERSION) {
-    problems.push(`version ${String(version)} は実行ファイルが読み込めません（読み込むのは ${RISK_VERSION}）。組み込みの配点を使います`);
+    problems.push(`version ${String(version)}は実行ファイルが読み込めません（読み込むのは${RISK_VERSION}）。組み込みの配点を使います`);
   }
 
   const levels = { medium: "", high: "", critical: "" } as Record<LevelName, string>;
   const rawLevels = doc.get("levels", true);
   if (rawLevels !== undefined && rawLevels !== null) {
     if (!isMap(rawLevels)) {
-      problems.push("levels がマップ（キーと値の組の集まり）ではありません。境目の点は組み込みの値として表示します");
+      problems.push("levelsがマップ（キーと値の組の集まり）ではありません。境目の点は組み込みの値として表示します");
     } else {
       for (const name of LEVEL_NAMES) {
         levels[name] = scalarText(rawLevels, name);
@@ -103,17 +103,17 @@ export function readRisk(text: string): RiskDocument {
   const rawFactors = doc.get("factors", true);
   if (rawFactors !== undefined && rawFactors !== null) {
     if (!isSeq(rawFactors)) {
-      problems.push("factors がリスト（配列）ではありません。項目は画面に出しません");
+      problems.push("factorsがリストではありません。項目は画面に出しません");
     } else {
       rawFactors.items.forEach((item, index) => {
         if (!isMap(item)) {
-          problems.push(`factors の ${index + 1} 件目がマップ（キーと値の組の集まり）ではありません。画面に出さず、保存するとこの項目は消えます（実行ファイルも読み込めません）`);
+          problems.push(`factorsの${index + 1}件目がマップ（キーと値の組の集まり）ではありません。画面に出さず、保存するとこの項目は消えます（実行ファイルも読み込めません）`);
           return;
         }
         const present = KINDS.filter((k) => item.has(k));
         if (present.length > 1) {
           problems.push(
-            `factors の ${index + 1} 件目に加点条件が ${present.length} 個あります（${present.join(", ")}）。画面は ${present[0]} だけを出し、保存すると他は消えます`,
+            `factorsの${index + 1}件目に加点条件が${present.length}個あります（${present.join(", ")}）。画面は${present[0]}だけを出し、保存すると他は消えます`,
           );
         }
         factors.push(formOf(index, item, present[0] ?? "lines_over"));
@@ -128,7 +128,7 @@ export function readRisk(text: string): RiskDocument {
       problems,
     },
     // 書き出すたびに読み直す。元のノードに値を書き込むので、同じ文書を使い回すと
-    // 2 回目の `origin` が 1 回目の並び替えの後を指してしまう。
+    // 2回目の`origin`が1回目の並び替えの後を指してしまう。
     apply: (edited) => applyTo(parseDocument(text), edited),
   };
 }
@@ -147,7 +147,7 @@ function formOf(index: number, map: YAMLMap, kind: FactorKind): FactorForm {
   };
 }
 
-/** include / exclude は glob のリスト。欄には 1 行に 1 つで出す（リストでない書き方は 1 つの値として出す） */
+/** include / excludeはglobのリスト。欄には1行に1つで出す（リストでない書き方は1つの値として出す） */
 function globsText(map: YAMLMap, key: string): string {
   const value = map.get(key, true);
   if (isSeq(value)) {
@@ -171,7 +171,7 @@ function applyTo(doc: Document, edited: RiskForm): string {
     doc.contents = top;
   }
 
-  // version。無ければ先頭に足す。違う版はそのまま（lint が言う）。
+  // version。無ければ先頭に足す。違う版はそのまま（lintが言う）。
   if (!top.has("version")) {
     top.items.unshift(doc.createPair("version", RISK_VERSION));
   }
@@ -199,15 +199,15 @@ function applyTo(doc: Document, edited: RiskForm): string {
   }
 
   // factors。元のノードを先に全部拾っておき、編集したリストへ移す。
-  // `origin` は読み込んだときの生の位置なので、対応表でない項目の分も位置を空けて持つ
-  // （詰めると、その後ろの項目が 1 つずれた元ノードに書き込まれる）。
+  // `origin`は読み込んだときの生の位置なので、対応表でない項目の分も位置を空けて持つ
+  // （詰めると、その後ろの項目が1つずれた元ノードに書き込まれる）。
   const existing = top.get("factors", true);
   const originals: (YAMLMap | undefined)[] = isSeq(existing) ? existing.items.map((n) => (isMap(n) ? n : undefined)) : [];
   const seen = new Set<number>();
   for (const form of edited.factors) {
     if (form.origin !== null && seen.has(form.origin)) {
-      // 同じ元ノードを 2 か所に置くと、後から書いた欄が両方に出る。
-      throw new Error(`${form.origin + 1} 件目の項目が 2 回送られました。更新してから編集し直してください`);
+      // 同じ元ノードを2か所に置くと、後から書いた欄が両方に出る。
+      throw new Error(`${form.origin + 1}件目の項目が2回送られました。更新してから編集し直してください`);
     }
     if (form.origin !== null) {
       seen.add(form.origin);
@@ -256,7 +256,7 @@ function adoptLeadingComment(seq: YAMLSeq, first: YAMLMap | undefined): YAMLMap 
 
 /**
  * 項目の前の空行は、項目ではなく「リストの何番目か」に付いていたものとして揃える。
- * 先頭に来た項目と一緒に空行も移ると `factors:` の直後に空白だけの行が出るため。
+ * 先頭に来た項目と一緒に空行も移ると`factors:`の直後に空白だけの行が出るため。
  */
 function keepSpacing(before: readonly unknown[], after: readonly YAMLMap[]): void {
   const slots = before.map((n) => isNode(n) && n.spaceBefore === true);
@@ -270,7 +270,7 @@ function keepSpacing(before: readonly unknown[], after: readonly YAMLMap[]): voi
 function writeFactor(doc: Document, node: YAMLMap, form: FactorForm): void {
   setValue(doc, node, "id", form.id, Scalar.PLAIN);
   setValue(doc, node, "points", numberish(form.points), Scalar.PLAIN, "id");
-  // 加点条件は 1 つ。他の加点条件の欄が残っていれば消す（残すと lint が「1 つを書く」と止める）。
+  // 加点条件は1つ。他の加点条件の欄が残っていれば消す（残すとlintが「1つを書く」と止める）。
   for (const other of KINDS) {
     if (other !== form.kind && node.has(other)) {
       node.delete(other);
@@ -279,16 +279,16 @@ function writeFactor(doc: Document, node: YAMLMap, form: FactorForm): void {
   if (form.kind === "lines_over" || form.kind === "files_over" || form.kind === "deleted_over") {
     setValue(doc, node, form.kind, numberish(form.value), Scalar.PLAIN, "points");
   } else if (form.kind === "glob") {
-    // glob は引用符で囲む。`*` で始まる値を裸で書くと YAML が別名として読む。
+    // globは引用符で囲む。`*`で始まる値を裸で書くとYAMLが別名として読む。
     setValue(doc, node, form.kind, form.value, Scalar.QUOTE_DOUBLE, "points");
   } else {
     setValue(doc, node, form.kind, form.value, Scalar.PLAIN, "points");
   }
-  // include / exclude は数える項目（lines_over など）だけ。空なら欄ごと消す（全パスが対象）。
+  // include / excludeは数える項目（lines_overなど）だけ。空なら欄ごと消す（全パスが対象）。
   const counting = form.kind === "lines_over" || form.kind === "files_over" || form.kind === "deleted_over";
   writeGlobs(doc, node, "include", counting ? form.include : "");
   writeGlobs(doc, node, "exclude", counting ? form.exclude : "");
-  // max は glob の上限。glob 以外の加点条件では意味が無く、画面にも出ないので消す。空なら欄ごと消す（青天井）。
+  // maxはglobの上限。glob以外の加点条件では意味が無く、画面にも出ないので消す。空なら欄ごと消す（青天井）。
   if (form.max === "" || form.kind !== "glob") {
     if (node.has("max")) {
       node.delete("max");
@@ -296,7 +296,7 @@ function writeFactor(doc: Document, node: YAMLMap, form: FactorForm): void {
   } else {
     setValue(doc, node, "max", numberish(form.max), Scalar.PLAIN, form.kind);
   }
-  // message は空なら欄ごと消す（実行ファイルは id を文面に使う）。
+  // messageは空なら欄ごと消す（実行ファイルはidを文面に使う）。
   if (form.message === "") {
     if (node.has("message")) {
       node.delete("message");
@@ -306,7 +306,7 @@ function writeFactor(doc: Document, node: YAMLMap, form: FactorForm): void {
   }
 }
 
-/** glob のリストを書く。行ごとに 1 つ、空行は破棄する。変わっていなければ触らない（元の書き方を残す） */
+/** globのリストを書く。行ごとに1つ、空行は破棄する。変わっていなければ触らない（元の書き方を残す） */
 function writeGlobs(doc: Document, node: YAMLMap, key: string, text: string): void {
   const globs = text
     .split("\n")
@@ -325,7 +325,7 @@ function writeGlobs(doc: Document, node: YAMLMap, key: string, text: string): vo
   const seq = new YAMLSeq();
   seq.flow = true;
   for (const glob of globs) {
-    // glob は引用符で囲む。`*` で始まる値を裸で書くと YAML が別名として読む。
+    // globは引用符で囲む。`*`で始まる値を裸で書くとYAMLが別名として読む。
     const scalar = doc.createNode(glob) as Scalar;
     scalar.type = Scalar.QUOTE_DOUBLE;
     seq.items.push(scalar);
@@ -337,7 +337,7 @@ function writeGlobs(doc: Document, node: YAMLMap, key: string, text: string): vo
   }
 }
 
-/** 整数に読める文字は数として書き、それ以外は文字のまま書く（lint が「整数ではない」と言う） */
+/** 整数に読める文字は数として書き、それ以外は文字のまま書く（lintが「整数ではない」と言う） */
 function numberish(text: string): number | string {
   const trimmed = text.trim();
   return /^-?\d+$/.test(trimmed) ? Number(trimmed) : text;
@@ -431,7 +431,7 @@ function asFactor(raw: unknown): FactorForm | undefined {
   };
 }
 
-/** 欄は文字で持つ。数で来ても文字にする（JSON を経ても同じ形にするため） */
+/** 欄は文字で持つ。数で来ても文字にする（JSONを経ても同じ形にするため） */
 function text(value: unknown): string {
   if (typeof value === "string") {
     return value;

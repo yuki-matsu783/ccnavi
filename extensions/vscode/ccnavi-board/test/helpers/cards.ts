@@ -1,6 +1,6 @@
 /**
  * カードの組み立てを、見本（`test/fixtures/board.json`）に頼らず、欄を一つずつ指定して試すための部品。
- * 実行ファイルの JSON と同じ形の 1 件（`TicketJson` / `PhaseJson` / `ParentJson`）を、既定の欄で埋めて作る。
+ * 実行ファイルのJSONと同じ形の1件（`TicketJson` / `PhaseJson` / `ParentJson`）を、既定の欄で埋めて作る。
  * 見本の殻（設定・レイヤー・統合結果）だけは見本を借りる。
  */
 import type { BoardJson, ParentJson, PhaseJson, TicketJson } from "../../src/core/model.js";
@@ -12,7 +12,7 @@ export function ticketJson(ticket: string, over: Partial<TicketJson> = {}): Tick
     ticket,
     parent: "",
     phase: null,
-    title: `タイトル ${ticket}`,
+    title: `タイトル${ticket}`,
     project: "",
     issue: null,
     mr: null,

@@ -60,7 +60,7 @@ test("CB-D114 「フロー」を押すと識別子だけを拡張ホストへ返
 });
 
 test("CB-D116 完了・取り消しの子でフローのファイルがなければ、カードに「フロー」ボタンを出さない（作成させない）", async () => {
-  // 実行ファイルは、閉じた子でファイルが無ければ flow を null で返す
+  // 実行ファイルは、クローズした子でファイルが無ければflowをnullで返す
   const board = fixture();
   const dom = await openBoard({ ...board, tickets: board.tickets.map((t) => (t.ticket === "i0001-01-01" ? { ...t, flow: null } : t)) });
   try {

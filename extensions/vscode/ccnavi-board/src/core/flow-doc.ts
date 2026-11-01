@@ -1,7 +1,7 @@
 /**
  * 子チケットのフローの読み書き。フロー編集画面と拡張ホストが分け合う。
  *
- * ファイルは YAML の 1 文書（既定 `.ccnavi/approved/flows/<子>.yml`）。形は実行ファイル（`src/ccnavi/tickets/flow/graph.py`）が読むもの。
+ * ファイルはYAMLの1文書（既定`.ccnavi/approved/flows/<子>.yml`）。形は実行ファイル（`src/ccnavi/tickets/flow/graph.py`）が読むもの。
  *
  *     id, name, description?, version
  *     nodes:          [node, ...]
@@ -12,38 +12,38 @@
  *     connection = {id, from, to, fromPort, toPort, condition?}
  *
  * グループ（`type: "group"`）は図の上の囲みで、手順ではない。出入口を持たず、線は繋がない。
- * 中のノードは `parentId` にグループの id を持ち、`position` はグループの左上からの位置
- * （React Flow の決まり）。グループは中のノードより前に並べる（React Flow は親を先に読む）。
+ * 中のノードは`parentId`にグループのidを持ち、`position`はグループの左上からの位置
+ * （React Flowの決まり）。グループは中のノードより前に並べる（React Flowは親を先に読む）。
  * グループの中にグループは置かない。
  *
  * 知らない欄も知らない種類も消さない。 読んだ中身をそのまま持ち、編集はそのコピーの
- * 触ったところだけを差し替える（`phases-doc.ts` が YAML の知らない欄を残すのと同じ考え）。
- * 欠けた欄（`position` や `data`）も、読むときに既定で補うだけで、触るまで書き足さない。
+ * 触ったところだけを差し替える（`phases-doc.ts`がYAMLの知らない欄を残すのと同じ考え）。
+ * 欠けた欄（`position`や`data`）も、読むときに既定で補うだけで、触るまで書き足さない。
  * 書き出しは中身から組み直す（コメントや書き方は残らない。ユーザが保存したときだけ書く）。
  *
- * 読めるか・形が正しいかは実行ファイルが `--lint --flow` で言い（`flow-lint.ts`）、
- * 着手中に書けるかは実行ファイルが `flow.locked` で言う。
+ * 読めるか・形が正しいかは実行ファイルが`--lint --flow`で言い（`flow-lint.ts`）、
+ * 着手中に書けるかは実行ファイルが`flow.locked`で言う。
  * 入れ子の段の数（`nesting`）は案内で、止めるのは実行ファイルでも画面でもなく、上限にヒットした
- * サブエージェントに Agent ツールが渡らないこと（そのノードで止まってメインへ戻る）。
+ * サブエージェントにAgentツールが渡らないこと（そのノードで止まってメインへ戻る）。
  *
- * ここには VS Code の API も node も DOM も入れない。画面（React）がバンドルして読むため。
+ * ここにはVS CodeのAPIもnodeもDOMも入れない。画面（React）がバンドルして読むため。
  */
 import { Document, parseDocument, Scalar, visit } from "yaml";
 
 import { yaml11Ambiguous } from "./yaml11.js";
 
-/** ノード 1 つ。読んだまま。欄は `nodeType` などの読む関数で読む */
+/** ノード1つ。読んだまま。欄は`nodeType`などの読む関数で読む */
 export interface FlowNode {
   readonly id: string;
   readonly [key: string]: unknown;
 }
 
-/** 線 1 本。読んだまま */
+/** 線1本。読んだまま */
 export interface FlowConnection {
   readonly [key: string]: unknown;
 }
 
-/** フロー 1 本。`nodes` だけは必ずリスト。ほかの欄は読んだまま */
+/** フロー1本。`nodes`だけは必ずリスト。ほかの欄は読んだまま */
 export interface FlowDoc {
   readonly nodes: readonly FlowNode[];
   readonly [key: string]: unknown;
@@ -81,12 +81,12 @@ export const TYPE_LABELS: Readonly<Record<string, string>> = {
   group: "グループ",
 };
 
-/** 画面が欄を持つ種類。これ以外は種類の名前と `name` だけで見せ、`data` は読むだけにする */
+/** 画面が欄を持つ種類。これ以外は種類の名前と`name`だけで見せ、`data`は読むだけにする */
 export function isEditableType(type: string): type is PaletteType {
   return (PALETTE as readonly string[]).includes(type);
 }
 
-/** 分岐の出口を持つ種類。出口は `data` のリスト（`branches` か `options`）の 1 件ずつ */
+/** 分岐の出口を持つ種類。出口は`data`のリスト（`branches`か`options`）の1件ずつ */
 export function branchKey(type: string): "branches" | "options" | undefined {
   if (type === "ifElse" || type === "switch" || type === "loop" || type === "branch") {
     return "branches";
@@ -97,20 +97,20 @@ export function branchKey(type: string): "branches" | "options" | undefined {
   return undefined;
 }
 
-/** 出入口の表記。`input` / `output` / `branch-<番号>`（実行ファイルの案内 `flow_render._port_label` も同じ表記で読む） */
+/** 出入口の表記。`input` / `output` / `branch-<番号>`（実行ファイルの案内`flow_render._port_label`も同じ表記で読む） */
 export const INPUT_PORT = "input";
 export const OUTPUT_PORT = "output";
 export function branchPort(index: number): string {
   return `branch-${index}`;
 }
 
-// ---- 入れ子の上限（付録 C）
+// ---- 入れ子の上限（付録C）
 
 /** 入れ子の起動の既定の上限（`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`）。メインの下の段の数 */
 export const SPAWN_LIMIT = 3;
-/** 子チケットの担当のサブエージェントの段（メインの下 1 段目） */
+/** 子チケットの担当のサブエージェントの段（メインの下1段目） */
 export const CHILD_LAYER = 1;
-/** 子のフローの中で重ねてよい段の数。子の下 2 段まで */
+/** 子のフローの中で重ねてよい段の数。子の下2段まで */
 export const NEST_ALLOWED = SPAWN_LIMIT - CHILD_LAYER;
 
 // ---- 読む関数（欠けた欄は既定で読む。書き足さない）
@@ -171,7 +171,7 @@ export function dataText(node: FlowNode, key: string): string {
   return str(nodeData(node)[key]);
 }
 
-/** 分岐の出口のリスト（`branches` / `options`）。1 件は `{label, condition?, description?, ...}` */
+/** 分岐の出口のリスト（`branches` / `options`）。1件は`{label, condition?, description?, ...}` */
 export function branchItems(node: FlowNode): readonly Readonly<Record<string, unknown>>[] {
   const key = branchKey(nodeType(node));
   if (key === undefined) {
@@ -184,12 +184,12 @@ export function branchItems(node: FlowNode): readonly Readonly<Record<string, un
 // ---- 読む・書く
 
 /**
- * YAML の本文を、画面が描くために読む。正しいかは決めない。 読めるか（大きさ・YAML として読めるか・別名）と
- * 形（`nodes` が無い、`id` が無い・重なる など）の答えは実行ファイル（`--lint --flow`、`flow-lint.ts`）が出し、
- * 画面はそれを通ったものだけを開く。読み手はルール管理の画面（`rules-doc.ts`）と同じ `yaml` の既定。
+ * YAMLの本文を、画面が描くために読む。正しいかは決めない。 読めるか（大きさ・YAMLとして読めるか・別名）と
+ * 形（`nodes`が無い、`id`が無い・重なる など）の答えは実行ファイル（`--lint --flow`、`flow-lint.ts`）が出し、
+ * 画面はそれを通ったものだけを開く。読み手はルール管理の画面（`rules-doc.ts`）と同じ`yaml`の既定。
  *
  * ここが断るのは、画面が描けないときだけ。拡張の読み手が読めない（実行ファイルとは読み手が違うので、
- * 実行ファイルが読めても `yaml` が断ることがある。重なったキーなど）か、ノードのリスト（`id` が文字列の
+ * 実行ファイルが読めても`yaml`が断ることがある。重なったキーなど）か、ノードのリスト（`id`が文字列の
  * マッピング）が取れないとき。例外は外に出さない。
  */
 export function parseFlow(text: string): FlowRead {
@@ -198,24 +198,24 @@ export function parseFlow(text: string): FlowRead {
     return read;
   }
   const doc = asFlowDoc(read.value);
-  return doc === undefined ? { ok: false, error: "ノードのリスト（id が文字列のノード）を取り出せないため、図を描けません" } : { ok: true, doc };
+  return doc === undefined ? { ok: false, error: "ノードのリスト（idが文字列のノード）を取り出せないため、図を描けません" } : { ok: true, doc };
 }
 
 /**
- * YAML の本文を `yaml` の既定で読んだ中身（形は確かめない）。実行ファイルが読んだ中身と見比べるのに使う
+ * YAMLの本文を`yaml`の既定で読んだ中身（形は確かめない）。実行ファイルが読んだ中身と見比べるのに使う
  * （`flow-match.ts`。描けるかより先に見比べるので、マージキーのような読みの違いも「食い違い」として言える）。
- * 先頭の BOM は 1 つ外す（実行ファイルの `utf-8-sig` と同じ）。例外は外に出さない。
+ * 先頭のBOMは1つ外す（実行ファイルの`utf-8-sig`と同じ）。例外は外に出さない。
  */
 export function parseFlowValue(text: string): { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: string } {
   try {
     const doc = parseDocument(text.replace(/^\uFEFF/, ""));
     const problem = doc.errors[0];
     if (problem !== undefined) {
-      return { ok: false, error: `画面の YAML パーサーで読み込めないため、図にできません（${firstLine(problem.message)}）` };
+      return { ok: false, error: `画面のYAMLパーサーで読み込めないため、図にできません（${firstLine(problem.message)}）` };
     }
     return { ok: true, value: doc.toJS() };
   } catch (error) {
-    return { ok: false, error: `画面の YAML パーサーで読み込めないため、図にできません（${firstLine(error instanceof Error ? error.message : String(error))}）` };
+    return { ok: false, error: `画面のYAMLパーサーで読み込めないため、図にできません（${firstLine(error instanceof Error ? error.message : String(error))}）` };
   }
 }
 
@@ -224,7 +224,7 @@ function firstLine(text: string): string {
 }
 
 /**
- * 描ける形か。最上位がマッピングで、`nodes` が「文字列の `id` を持つマッピング」のリスト。
+ * 描ける形か。最上位がマッピングで、`nodes`が「文字列の`id`を持つマッピング」のリスト。
  * 画面から届いた保存の中身もここで受ける（形が不正なら書かない。正しいかは保存の前に実行ファイルが言う）。
  */
 export function asFlowDoc(raw: unknown): FlowDoc | undefined {
@@ -238,11 +238,11 @@ export function asFlowDoc(raw: unknown): FlowDoc | undefined {
 }
 
 /**
- * 書き出す本文。字下げ 2 のブロック形式で、長い行を折らない。複数行の文は `|` の形で書く。
- * 同じ中身が 2 度出ても別名（`&` / `*`）にしない（実行ファイルは別名を読まない）。
- * 実行ファイル（PyYAML、YAML 1.1）が文字以外に読む表記（`yes` `0755` `2026-01-01` など）と、
- * 裸や `|` では PyYAML が読めない・別の文字に読む文字列（`needsDoubleQuotes`）は二重引用符で囲む。
- * `y` `n` は PyYAML が文字として読むので囲まない（`position` の `y` をそのまま書く）。
+ * 書き出す本文。字下げ2のブロック形式で、長い行を折らない。複数行の文は`|`の形で書く。
+ * 同じ中身が2度出ても別名（`&` / `*`）にしない（実行ファイルは別名を読まない）。
+ * 実行ファイル（PyYAML、YAML 1.1）が文字以外に読む表記（`yes` `0755` `2026-01-01`など）と、
+ * 裸や`|`ではPyYAMLが読めない・別の文字に読む文字列（`needsDoubleQuotes`）は二重引用符で囲む。
+ * `y` `n`はPyYAMLが文字として読むので囲まない（`position`の`y`をそのまま書く）。
  *
  * 書いたものが実行ファイルに同じ中身で読まれるかは、保存の前に実行ファイルに読ませて見比べる
  * （`flow-match.ts`）。ここの囲み方はその見比べで止まらずに書くためのもの。
@@ -251,7 +251,7 @@ export function serializeFlow(doc: FlowDoc): string {
   return yamlText(doc);
 }
 
-/** 値を書き出しと同じ形の YAML にする。画面が欄を持たない種類の `data` を見せるのにも使う */
+/** 値を書き出しと同じ形のYAMLにする。画面が欄を持たない種類の`data`を見せるのにも使う */
 export function yamlText(value: unknown): string {
   const out = new Document(value, { aliasDuplicateObjects: false });
   visit(out, {
@@ -264,27 +264,27 @@ export function yamlText(value: unknown): string {
       }
     },
   });
-  // 二重引用符の中は JSON と同じ書き方にする（`yaml` の折り返しや独自のエスケープを使わない。PyYAML は JSON の
-  // エスケープを全部読む）。そのうえで JSON が裸のまま残す文字を、PyYAML が読めるエスケープに直す
+  // 二重引用符の中はJSONと同じ書き方にする（`yaml`の折り返しや独自のエスケープを使わない。PyYAMLはJSONの
+  // エスケープを全部読む）。そのうえでJSONが裸のまま残す文字を、PyYAMLが読めるエスケープに直す
   return escapeForPyYaml(out.toString({ lineWidth: 0, doubleQuotedAsJSON: true }));
 }
 
 /**
- * PyYAML が本文に裸では置けない文字（読み手が断る）。C0 の制御文字（タブ・改行・復帰を除く）、DEL、
- * C1 の制御文字（U+0085 を除く）、U+FFFE・U+FFFF、対になっていないサロゲート
+ * PyYAMLが本文に裸では置けない文字（読み手が断る）。C0の制御文字（タブ・改行・復帰を除く）、DEL、
+ * C1の制御文字（U+0085を除く）、U+FFFE・U+FFFF、対になっていないサロゲート
  */
 const PYYAML_UNPRINTABLE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
-/** PyYAML（YAML 1.1）が改行として読む文字（二重引用符の中でも空白に置き換えられる）と、文書の頭で読み飛ばす BOM */
+/** PyYAML（YAML 1.1）が改行として読む文字（二重引用符の中でも空白に置き換えられる）と、文書の頭で読み飛ばすBOM */
 const PYYAML_BREAKS = /[\u0085\u2028\u2029\uFEFF]/;
 
 /**
- * 裸でも `|` でも正しく書けない文字列。二重引用符（とエスケープ）で書く。
+ * 裸でも`|`でも正しく書けない文字列。二重引用符（とエスケープ）で書く。
  *
- * - タブ・復帰・U+0085・U+2028・U+2029・U+FEFF・PyYAML が裸では読めない文字を含む（`a\tb` を裸で書くと PyYAML が
- *   読めない。U+0085 などは PyYAML が改行として読む。本文の頭の U+FEFF は BOM として読み飛ばされる）
- * - 複数行で、1 行目の頭が空白（1 行目が空白だけの `|+` は PyYAML が中身を取り違える。字下げの指示に頼らない）か、
- *   どこかの行の末尾が空白（空白だけの行を含む。行末の空白の扱いを読み手に任せない）。2 行目から先の頭の空白は
- *   `|` のままで読める
+ * - タブ・復帰・U+0085・U+2028・U+2029・U+FEFF・PyYAMLが裸では読めない文字を含む（`a\tb`を裸で書くとPyYAMLが
+ *   読めない。U+0085などはPyYAMLが改行として読む。本文の頭のU+FEFFはBOMとして読み飛ばされる）
+ * - 複数行で、1行目の頭が空白（1行目が空白だけの`|+`はPyYAMLが中身を取り違える。字下げの指示に頼らない）か、
+ *   どこかの行の末尾が空白（空白だけの行を含む。行末の空白の扱いを読み手に任せない）。2行目から先の頭の空白は
+ *   `|`のままで読める
  */
 export function needsDoubleQuotes(text: string): boolean {
   if (/[\t\r]/.test(text) || PYYAML_BREAKS.test(text) || PYYAML_UNPRINTABLE.test(text)) {
@@ -299,7 +299,7 @@ export function needsDoubleQuotes(text: string): boolean {
 const BREAK_ESCAPES: Readonly<Record<string, string>> = { "\u0085": "\\N", "\u2028": "\\L", "\u2029": "\\P" };
 
 /**
- * JSON の書き方が裸のまま残す文字を、PyYAML の二重引用符のエスケープに直す。こうした文字を含む文字列は
+ * JSONの書き方が裸のまま残す文字を、PyYAMLの二重引用符のエスケープに直す。こうした文字を含む文字列は
  * どれも二重引用符で書いてある（`needsDoubleQuotes`）ので、本文に裸で出るのは二重引用符の中だけ
  */
 function escapeForPyYaml(text: string): string {
@@ -346,7 +346,7 @@ export function templateFlow(ticket: string, title: string): FlowDoc {
 
 // ---- 編集（どれも新しいコピーを返す。触ったところ以外は元のまま）
 
-/** 新しいノードの `data`。画面が欄を持つものだけ */
+/** 新しいノードの`data`。画面が欄を持つものだけ */
 export function defaultData(type: PaletteType): Record<string, unknown> {
   switch (type) {
     case "start":
@@ -378,7 +378,7 @@ export function defaultData(type: PaletteType): Record<string, unknown> {
       return {
         evaluationTarget: "",
         branches: [
-          { label: "ケース 1", condition: "" },
+          { label: "ケース1", condition: "" },
           { label: "既定", condition: "default" },
         ],
       };
@@ -398,8 +398,8 @@ export function defaultData(type: PaletteType): Record<string, unknown> {
 }
 
 /**
- * 使われていない id。`<種類>-<番号>`。どこかのノードの `parentId` が指している id も使っているとみなす
- * （指す先の無い `parentId` を持つノードが、新しく作ったグループに気づかないうちに入らないように）
+ * 使われていないid。`<種類>-<番号>`。どこかのノードの`parentId`が指しているidも使っているとみなす
+ * （指す先の無い`parentId`を持つノードが、新しく作ったグループに気づかないうちに入らないように）
  */
 export function freshNodeId(doc: FlowDoc, type: string): string {
   const used = new Set(doc.nodes.map((node) => node.id));
@@ -441,7 +441,7 @@ export function renameNode(doc: FlowDoc, id: string, name: string): FlowDoc {
   return mapNode(doc, id, (node) => ({ ...node, name }));
 }
 
-/** `data` の欄を差し替える。渡さなかった欄は元のまま */
+/** `data`の欄を差し替える。渡さなかった欄は元のまま */
 export function patchData(doc: FlowDoc, id: string, patch: Readonly<Record<string, unknown>>): FlowDoc {
   return mapNode(doc, id, (node) => ({ ...node, data: { ...nodeData(node), ...patch } }));
 }
@@ -471,7 +471,7 @@ export function nextSpot(doc: FlowDoc): { x: number; y: number } {
 
 /**
  * ノードを消す。そのノードに出入りする線も消す。
- * グループを消すときは、中のノードは消さずに外へ出す（`ungroup` と同じ。位置は図の上で動かない）。
+ * グループを消すときは、中のノードは消さずに外へ出す（`ungroup`と同じ。位置は図の上で動かない）。
  */
 export function removeNode(doc: FlowDoc, id: string): FlowDoc {
   const released = releaseMembers(doc, id);
@@ -483,7 +483,7 @@ export function removeNode(doc: FlowDoc, id: string): FlowDoc {
 }
 
 /**
- * `from` から `to` へ線を引けるか。図で引いている最中（React Flow の `isValidConnection`）と `connect` が同じ規則で読む。
+ * `from`から`to`へ線を引けるか。図で引いている最中（React Flowの`isValidConnection`）と`connect`が同じ規則で読む。
  *
  * - 自分へ戻る線は引かない
  * - グループは囲みで手順ではない。線は繋がない
@@ -504,7 +504,7 @@ export function canConnect(doc: FlowDoc, from: string, to: string): boolean {
 
 /**
  * 線を足す。引けない線（`canConnect`）と、同じ出口から同じ入口への線が既にあるときは足さない。
- * `connections` が無かったフローには、ここで初めて欄ができる。
+ * `connections`が無かったフローには、ここで初めて欄ができる。
  */
 export function connect(doc: FlowDoc, from: string, fromPort: string, to: string, toPort: string): FlowDoc {
   if (!canConnect(doc, from, to)) {
@@ -519,7 +519,7 @@ export function connect(doc: FlowDoc, from: string, fromPort: string, to: string
 }
 
 /**
- * 線を消す。線は配列の位置で指す（ユーザが書いたフローの線は id が無いことも重なることもある）。
+ * 線を消す。線はリストの位置で指す（ユーザが書いたフローの線はidが無いことも重なることもある）。
  */
 export function removeConnectionAt(doc: FlowDoc, index: number): FlowDoc {
   return { ...doc, connections: connectionsOf(doc).filter((_, i) => i !== index) };
@@ -546,7 +546,7 @@ export function setMeta(doc: FlowDoc, patch: { readonly name?: string; readonly 
 }
 
 /**
- * 分岐の出口を 1 件足す。
+ * 分岐の出口を1件足す。
  */
 export function addBranch(doc: FlowDoc, id: string, item: Readonly<Record<string, unknown>>): FlowDoc {
   return mapNode(doc, id, (node) => {
@@ -558,7 +558,7 @@ export function addBranch(doc: FlowDoc, id: string, item: Readonly<Record<string
   });
 }
 
-/** 分岐の出口の 1 件の欄を差し替える */
+/** 分岐の出口の1件の欄を差し替える */
 export function patchBranch(doc: FlowDoc, id: string, index: number, patch: Readonly<Record<string, unknown>>): FlowDoc {
   return mapNode(doc, id, (node) => {
     const key = branchKey(nodeType(node));
@@ -571,8 +571,8 @@ export function patchBranch(doc: FlowDoc, id: string, index: number, patch: Read
 }
 
 /**
- * 分岐の出口を 1 件消す。その出口から出る線は消し、後ろの出口（`branch-<番号>`）の線は番号を 1 つ詰める。
- * 詰めないと、残った線が 1 つずれた出口に付き替わる。
+ * 分岐の出口を1件消す。その出口から出る線は消し、後ろの出口（`branch-<番号>`）の線は番号を1つ詰める。
+ * 詰めないと、残った線が1つずれた出口に付き替わる。
  */
 export function removeBranch(doc: FlowDoc, id: string, index: number): FlowDoc {
   const next = mapNode(doc, id, (node) => {
@@ -608,7 +608,7 @@ export function removeBranch(doc: FlowDoc, id: string, index: number): FlowDoc {
 // ---- グループ（図の上の囲み。手順ではない）
 
 export const GROUP_TYPE = "group";
-/** 大きさの分からないノードの見積もり。図のノードの幅（`Canvas.css` の `.react-flow__node-step`）とふつうの高さ */
+/** 大きさの分からないノードの見積もり。図のノードの幅（`Canvas.css`の`.react-flow__node-step`）とふつうの高さ */
 export const NODE_SIZE: FlowSize = { width: 190, height: 90 };
 /** 大きさを書いていないグループの大きさ */
 export const GROUP_SIZE: FlowSize = { width: 320, height: 200 };
@@ -631,7 +631,7 @@ function positiveNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
-/** ノードの大きさ。`style` の `width` / `height` があればそれ、無ければ見積もり */
+/** ノードの大きさ。`style`の`width` / `height`があればそれ、無ければ見積もり */
 export function nodeSize(node: FlowNode): FlowSize {
   const style = isRecord(node.style) ? node.style : {};
   const fallback = isGroup(node) ? GROUP_SIZE : NODE_SIZE;
@@ -639,8 +639,8 @@ export function nodeSize(node: FlowNode): FlowSize {
 }
 
 /**
- * ノードが入っているグループ。`parentId` が在るグループを指しているときだけ。グループ自身は
- * どこにも入らない（グループの中にグループは置かない）。指す先が無い・グループでない `parentId` は
+ * ノードが入っているグループ。`parentId`が在るグループを指しているときだけ。グループ自身は
+ * どこにも入らない（グループの中にグループは置かない）。指す先が無い・グループでない`parentId`は
  * 読むだけで反映しない（図でも親にしない。書き換えもしない）
  */
 export function groupOf(doc: FlowDoc, node: FlowNode): FlowNode | undefined {
@@ -693,7 +693,7 @@ function releaseMembers(doc: FlowDoc, groupId: string): FlowDoc {
   };
 }
 
-/** `id` のノードを `before` のノードの直前へ移す（親は子より前に並べる） */
+/** `id`のノードを`before`のノードの直前へ移す（親は子より前に並べる） */
 function moveBefore(nodes: readonly FlowNode[], id: string, before: string): FlowNode[] {
   const moving = nodes.find((n) => n.id === id);
   const rest = nodes.filter((n) => n.id !== id);
@@ -706,10 +706,10 @@ function moveBefore(nodes: readonly FlowNode[], id: string, before: string): Flo
 
 /**
  * 選んだノードを新しいグループで囲む。グループの大きさは、囲むノードの外枠に余白を足したもの
- * （大きさの分からないノードは `NODE_SIZE` で見積もる）。
+ * （大きさの分からないノードは`NODE_SIZE`で見積もる）。
  *
  * グループ自身は囲まない（入れ子にしない）。別のグループに入っているノードは、そのグループから
- * 抜けて新しいグループに移る（元のグループは空でも残す）。囲めるノードが 1 つも無ければ undefined。
+ * 抜けて新しいグループに移る（元のグループは空でも残す）。囲めるノードが1つも無ければundefined。
  * 新しいグループは、囲んだノードのうち最も前のものの位置に並べる（親を子より前に置くため）。
  */
 export function groupNodes(doc: FlowDoc, ids: readonly string[]): { readonly doc: FlowDoc; readonly id: string } | undefined {
@@ -767,7 +767,7 @@ export function ungroup(doc: FlowDoc, groupId: string): FlowDoc {
 /**
  * グループの大きさを変える。左や上の辺を動かしたときは位置（`position`、図の上の位置）も渡す。
  * そのときは中のノードの位置（グループからの位置）をずれた分だけ戻し、図の上では動かさない
- * （React Flow も縮めている間、中のノードをその場に留める）。
+ * （React Flowも縮めている間、中のノードをその場に留める）。
  */
 export function resizeGroup(doc: FlowDoc, id: string, size: FlowSize, position?: FlowPoint): FlowDoc {
   const group = doc.nodes.find((n) => n.id === id);
@@ -801,7 +801,7 @@ export function resizeGroup(doc: FlowDoc, id: string, size: FlowSize, position?:
 }
 
 /**
- * ノードを図の上の位置 `absolute` に置く（ドラッグを放したとき）。
+ * ノードを図の上の位置`absolute`に置く（ドラッグを放したとき）。
  *
  * - グループはそのまま動く（中のノードは位置がグループからなので、一緒に動く）
  * - ほかのノードは、真ん中がグループの枠の中に収まればそのグループに入り、どの枠にも収まらなければ
@@ -851,7 +851,7 @@ export function placeNode(doc: FlowDoc, id: string, absolute: FlowPoint): FlowDo
 }
 
 /**
- * ドラッグで動いた点をまとめて置く。位置は React Flow の決まり（グループの中のノードはグループからの位置）で、
+ * ドラッグで動いた点をまとめて置く。位置はReact Flowの決まり（グループの中のノードはグループからの位置）で、
  * コピーの今のグループに対して読む。グループを先に置き、そのあとほかのノードを置く（一緒に動いた
  * グループの新しい位置から読むため）。何も変わらなければ同じものを返す。
  */
@@ -874,12 +874,12 @@ export function placeNodes(doc: FlowDoc, moves: readonly { readonly id: string; 
 // ---- コピー・貼り付け・複製
 
 /**
- * コピーしたノードと線（画面の中に保持する）。元のフローから切り離した深いコピーで、貼るたびに id を振り直す。
+ * コピーしたノードと線（画面の中に保持する）。元のフローから切り離した深いコピーで、貼るたびにidを振り直す。
  *
- * - `nodes` は元の配列の順（グループは中のノードより前）。`parentId` は元の id のまま持つ
- * - `absolute` はコピーした時点の図の上の位置。貼る先に元のグループが無いとき（消した・別のグループの中身だけ
+ * - `nodes`は元のリストの順（グループは中のノードより前）。`parentId`は元のidのまま持つ
+ * - `absolute`はコピーした時点の図の上の位置。貼る先に元のグループが無いとき（消した・別のグループの中身だけ
  *   コピーした）は、この位置で外に置く
- * - `connections` はコピーしたノード同士の線だけ（片方しかコピーしていない線は含めない）
+ * - `connections`はコピーしたノード同士の線だけ（片方しかコピーしていない線は含めない）
  */
 export interface FlowClip {
   readonly nodes: readonly FlowNode[];
@@ -890,7 +890,7 @@ export interface FlowClip {
 /** 貼るたびにずらす量。元のノードにちょうど重ならないように */
 export const PASTE_OFFSET: FlowPoint = { x: 40, y: 40 };
 
-/** コピーしない種類。開始は 1 つだけにしておく（2 つあると案内は両方から辿る。`flowNotices` の注意） */
+/** コピーしない種類。開始は1つだけにしておく（2つあると案内は両方から辿る。`flowNotices`の注意） */
 export function isCopyable(node: FlowNode): boolean {
   return nodeType(node) !== "start";
 }
@@ -901,7 +901,7 @@ function deepCopy<T>(value: T): T {
 
 /**
  * 選んだノードをコピーする。コピーできないノード（開始）は外す。グループを選んだら中のノードも一緒にコピーする
- * （枠だけコピーすると空の枠になる）。コピーするものが無ければ undefined。
+ * （枠だけコピーすると空の枠になる）。コピーするものが無ければundefined。
  */
 export function copyNodes(doc: FlowDoc, ids: readonly string[]): FlowClip | undefined {
   const wanted = new Set(ids);
@@ -930,14 +930,14 @@ export function copyNodes(doc: FlowDoc, ids: readonly string[]): FlowClip | unde
 }
 
 /**
- * コピーしたものを貼る。ノードの id は `freshNodeId`、線の id は `freshConnectionId` で振り直し、線の両端と
- * `parentId` を新しい id に書き換える。出口の表記（`branch-<番号>`）と `data` はそのまま（分岐の出口のリストも
+ * コピーしたものを貼る。ノードのidは`freshNodeId`、線のidは`freshConnectionId`で振り直し、線の両端と
+ * `parentId`を新しいidに書き換える。出口の表記（`branch-<番号>`）と`data`はそのまま（分岐の出口のリストも
  * 一緒にコピーしているので、同じ出口に付く）。
  *
- * 置き場所は、グループの外のノードは `offset` だけずらす。グループの中のノードは、
+ * 置き場所は、グループの外のノードは`offset`だけずらす。グループの中のノードは、
  * - グループも一緒に貼るなら、新しいグループの中で元と同じ相対位置
- * - グループは貼らず、元のグループが貼る先にまだあるなら、同じグループの中で `offset` だけずらす
- * - 元のグループが貼る先に無ければ、コピーした時点の図の上の位置から `offset` だけずらして外に置く
+ * - グループは貼らず、元のグループが貼る先にまだあるなら、同じグループの中で`offset`だけずらす
+ * - 元のグループが貼る先に無ければ、コピーした時点の図の上の位置から`offset`だけずらして外に置く
  *
  * 貼ったノードは後ろに足す。グループは中のノードより前に並ぶ（コピーしたときの順のまま）。
  */
@@ -982,7 +982,7 @@ export function pasteNodes(doc: FlowDoc, clip: FlowClip, offset: FlowPoint = PAS
   return { doc: next, ids: placed.map((node) => node.id) };
 }
 
-/** 選んだノードをその場で複製する（コピーして `offset` だけずらして貼る）。コピーできるものが無ければ undefined */
+/** 選んだノードをその場で複製する（コピーして`offset`だけずらして貼る）。コピーできるものが無ければundefined */
 export function duplicateNodes(doc: FlowDoc, ids: readonly string[], offset: FlowPoint = PASTE_OFFSET): { readonly doc: FlowDoc; readonly ids: readonly string[] } | undefined {
   const clip = copyNodes(doc, ids);
   return clip === undefined ? undefined : pasteNodes(doc, clip, offset);
@@ -992,7 +992,7 @@ export function duplicateNodes(doc: FlowDoc, ids: readonly string[], offset: Flo
 
 export interface PortInfo {
   readonly id: string;
-  /** 出口の名前（分岐の `label`）。1 本しかない出口は空 */
+  /** 出口の名前（分岐の`label`）。1本しかない出口は空 */
   readonly label: string;
 }
 
@@ -1018,8 +1018,8 @@ export function portsOf(node: FlowNode, connections: readonly FlowConnection[]):
   if (type === "end") {
     // 出口なし
   } else if (key !== undefined && !multi) {
-    // 線が項目の `id`（`body` / `done` など）で出口を指しているなら、その `id` を出口にする（`branch-<番号>` と
-    // 別の出口が並ぶのを避ける。実行ファイルの出口の読み方と同じく、項目の `id` でも `branch-<番号>` でもヒットする）
+    // 線が項目の`id`（`body` / `done`など）で出口を指しているなら、その`id`を出口にする（`branch-<番号>`と
+    // 別の出口が並ぶのを避ける。実行ファイルの出口の読み方と同じく、項目の`id`でも`branch-<番号>`でもヒットする）
     const used = new Set(connections.filter((c) => connectionFrom(c) === node.id).map((c) => connectionFromPort(c)));
     branchItems(node).forEach((item, index) => {
       const id = labelText(item.id);
@@ -1040,10 +1040,10 @@ export function portsOf(node: FlowNode, connections: readonly FlowConnection[]):
   return { inputs, outputs };
 }
 
-/** 線につける言葉。`condition` があればそれ、無ければ出口の名前（実行ファイルの案内と同じ読み方） */
+/** 線につける言葉。`condition`があればそれ、無ければ出口の名前（実行ファイルの案内と同じ読み方） */
 /**
- * 線の言葉に使う値の表記。実行ファイルの `flow_text._text` と同じ読み方にする。真偽値は空、数は整数ならその表記
- * （`1.0` は `1`）、文字列はそのまま、ほかは空
+ * 線の言葉に使う値の表記。実行ファイルの`flow_text._text`と同じ読み方にする。真偽値は空、数は整数ならその表記
+ * （`1.0`は`1`）、文字列はそのまま、ほかは空
  */
 function labelText(value: unknown): string {
   if (typeof value === "string") {
@@ -1064,8 +1064,8 @@ export function connectionLabel(doc: FlowDoc, c: FlowConnection): string {
   if (from === undefined) {
     return "";
   }
-  // 出口が項目の id とちょうど同じか、`branch-<番号>` の番号が項目の位置。部分一致や末尾の数字だけでは適用しない
-  // （実行ファイルの案内 `flow_render._port_label` と同じ読み方。出口・id・言葉の値も `flow_text._text` と同じく、
+  // 出口が項目のidとちょうど同じか、`branch-<番号>`の番号が項目の位置。部分一致や末尾の数字だけでは適用しない
+  // （実行ファイルの案内`flow_render._port_label`と同じ読み方。出口・id・言葉の値も`flow_text._text`と同じく、
   // 真偽値は空として読む）
   const port = labelText(c.fromPort);
   if (port === "") {
@@ -1087,7 +1087,7 @@ export function connectionLabel(doc: FlowDoc, c: FlowConnection): string {
 // ---- 入れ子の段と注意
 
 export interface Nesting {
-  /** 子の下に重なる段の数の最大。subAgent / subAgentFlow が 1 段 */
+  /** 子の下に重なる段の数の最大。subAgent / subAgentFlowが1段 */
   readonly depth: number;
   /** サブフローが自分を（間接にでも）呼んでいる */
   readonly cyclic: boolean;
@@ -1108,8 +1108,8 @@ function subFlows(doc: FlowDoc): ReadonlyMap<string, readonly FlowNode[]> {
 }
 
 /**
- * 子の下に何段の入れ子が重なるか。`subAgent` は 1 段。`subAgentFlow` は 1 段で、そのサブフローの中の
- * ノードがさらに重なる。子は メインの下 1 段目なので、既定の上限（メインの下 3 段）なら子の下は 2 段まで。
+ * 子の下に何段の入れ子が重なるか。`subAgent`は1段。`subAgentFlow`は1段で、そのサブフローの中の
+ * ノードがさらに重なる。子は メインの下1段目なので、既定の上限（メインの下3段）なら子の下は2段まで。
  */
 export function nesting(doc: FlowDoc): Nesting {
   const flows = subFlows(doc);
@@ -1138,22 +1138,22 @@ export function nesting(doc: FlowDoc): Nesting {
 }
 
 /**
- * 図の上に出す注意。該当するときだけ出す。 良し悪しは決めない（保存は止めない）。
+ * 図の上に出す注意。ヒットするときだけ出す。 良し悪しは決めない（保存は止めない）。
  *
- * 実行ファイル（`--lint --flow`）の warn と並べて出す。`exe` を真にすると、実行ファイルが同じことを言うもの
- * （開始が無い。実行ファイルは「start が無い」と言う）は出さず、実行ファイルの答えにそろえる（二重に出さない）。
+ * 実行ファイル（`--lint --flow`）のwarnと並べて出す。`exe`を真にすると、実行ファイルが同じことを言うもの
+ * （開始が無い。実行ファイルは「startが無い」と言う）は出さず、実行ファイルの答えにそろえる（二重に出さない）。
  */
 export function flowNotices(doc: FlowDoc, options: { readonly exe?: boolean } = {}): readonly string[] {
   const out: string[] = [];
   const { depth, cyclic } = nesting(doc);
   if (depth > NEST_ALLOWED) {
     out.push(
-      `入れ子のサブエージェントが、子の下に ${depth} 段重なっています。既定の上限はメインの下 ${SPAWN_LIMIT} 段で、子（1 段目）の下は ${NEST_ALLOWED} 段までです。` +
-        "上限に達した段では Agent ツールを利用できず、そのノードで止まってメインへ戻ります",
+      `入れ子のサブエージェントが、子の下に${depth}段重なっています。既定の上限はメインの下${SPAWN_LIMIT}段で、子（1段目）の下は${NEST_ALLOWED}段までです。` +
+        "上限に達した段ではAgentツールを利用できず、そのノードで止まってメインへ戻ります",
     );
   }
   if (cyclic) {
-    out.push("サブフローの呼び出しが循環しています（subAgentFlowId が輪になっています）。段の数を数えられません");
+    out.push("サブフローの呼び出しが循環しています（subAgentFlowIdが輪になっています）。段の数を数えられません");
   }
   const starts = doc.nodes.filter((node) => nodeType(node) === "start").length;
   if (starts === 0) {
@@ -1161,7 +1161,7 @@ export function flowNotices(doc: FlowDoc, options: { readonly exe?: boolean } = 
       out.push("開始（start）のノードがありません。担当のサブエージェントは先頭のノードから読みます");
     }
   } else if (starts > 1) {
-    out.push(`開始（start）のノードが ${starts} つあります。案内は、どの開始からもたどって並べます`);
+    out.push(`開始（start）のノードが${starts}つあります。案内は、どの開始からもたどって並べます`);
   }
   const unknown = [...new Set(doc.nodes.map(nodeType).filter((type) => !isEditableType(type) && type !== GROUP_TYPE))];
   if (unknown.length > 0) {
@@ -1169,7 +1169,7 @@ export function flowNotices(doc: FlowDoc, options: { readonly exe?: boolean } = 
   }
   const flows = subFlows(doc).size;
   if (flows > 0) {
-    out.push(`サブフロー（subAgentFlows）が ${flows} 本あります。この画面では中身を描きません。保存してもそのまま残ります`);
+    out.push(`サブフロー（subAgentFlows）が${flows}本あります。この画面では中身を描きません。保存してもそのまま残ります`);
   }
   return out;
 }

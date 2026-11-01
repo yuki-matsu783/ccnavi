@@ -1,9 +1,9 @@
 /**
- * 1 枚のカード。上から 見出し（タイトル・ID・状態のバッジ。DOM は ID・タイトル・バッジの順で、タイトルを先頭に出すのは CSS の order）・位置・MR（あれば）・ユーザ待ち・注意・フェーズ行（親だけ）・補助の操作・詳細（畳む）。
+ * 1枚のカード。上から 見出し（タイトル・ID・状態のバッジ。DOMはID・タイトル・バッジの順で、タイトルを先頭に出すのはCSSのorder）・位置・MR（あれば）・ユーザ待ち・注意・フェーズ行（親だけ）・補助の操作・詳細（畳む）。
  * 何を出すかは組み立て（core/board.ts）と状態のバッジ（core/status.ts）が決めた値のとおりで、ここで判定し直さない。
  *
  * バッジは「状況」、「ユーザ待ち」は「ユーザができること」。別の規則で決めるので、同時に出てよい
- * （「要確認」のバッジと［承認］など）。ボタンは `card-button`（共通の `button.action` は使わない。寸法は `Card.css`）。
+ * （「要確認」のバッジと［承認］など）。ボタンは`card-button`（共通の`button.action`は使わない。寸法は`Card.css`）。
  */
 import type { JSX } from "react";
 
@@ -18,9 +18,9 @@ import { detailRows, isHttpUrl, movedLabel, mrText, notesOf, predecessorsBadge, 
 type ReviewAction = Extract<Action, { readonly kind: "review" }>;
 
 /**
- * `moved` は、前の読み直しからこのカードが動いたこと（`core/board-moved.ts`）。動いていなければ
+ * `moved`は、前の読み直しからこのカードが動いたこと（`core/board-moved.ts`）。動いていなければ
  * 渡らない。何が動いたかを決めるのは画面（`App.tsx`）で、ここは受け取った分に動いた表示を出すだけ。
- * `detailsOpen` は詳細を開いているか。覚えるのは画面（`state.ts`）で、ここは出すだけ。
+ * `detailsOpen`は詳細を開いているか。覚えるのは画面（`state.ts`）で、ここは出すだけ。
  */
 export function CardItem({
   card,
@@ -60,7 +60,7 @@ export function CardItem({
       post({ type: "open", filePath: card.openPath });
     }
   };
-  const where = card.isParent ? card.stage : `親 ${card.parent} / ${card.phaseLabel === "" ? `フェーズ ${card.phase ?? "?"}` : card.phaseLabel}`;
+  const where = card.isParent ? card.stage : `親${card.parent} / ${card.phaseLabel === "" ? `フェーズ${card.phase ?? "?"}` : card.phaseLabel}`;
   const auxiliary = card.flow !== null || card.workflow || card.templateDraft;
   return (
     <li
@@ -75,7 +75,7 @@ export function CardItem({
       data-moved={moved === undefined ? undefined : `${moved.from ?? "none"}-${moved.to}`}
       tabIndex={0}
       onClick={(event) => {
-        // ID をドラッグして文字を選んだあとの click は、共通の親（カード）まで届く。文字を選択中は開かない（Enter では見ない）
+        // IDをドラッグして文字を選んだあとのclickは、共通の親（カード）まで届く。文字を選択中は開かない（Enterでは見ない）
         if ((window.getSelection?.()?.toString() ?? "") === "") {
           open(event.target);
         }
@@ -117,7 +117,7 @@ export function CardItem({
 /** カードの上で押しても提案を開かない場所。ボタン・リンク・詳細（開閉と開いた本文） */
 const NOT_OPENING = "button, a, details";
 
-/** マージリクエスト（`MR #番号`）。詳細を開かなくても見えるよう、位置の下に出す。URL が http(s) のときだけリンクにする */
+/** MR（`MR #番号`）。詳細を開かなくても見えるよう、位置の下に出す。URLがhttp(s)のときだけリンクにする */
 function MrLink({ card }: { readonly card: Card }): JSX.Element | null {
   if (card.mrUrl === "" && card.mrNumber === null) {
     return null;
@@ -136,7 +136,7 @@ function MrLink({ card }: { readonly card: Card }): JSX.Element | null {
   );
 }
 
-/** 状態のバッジ。見出しの右端に 1 つ。言葉は必ず出す（色だけに頼らない）。理由があればツールチップ */
+/** 状態のバッジ。見出しの右端に1つ。言葉は必ず出す（色だけに頼らない）。理由があればツールチップ */
 function StatusMark({ status }: { readonly status: Status }): JSX.Element {
   return (
     <span className={`status status-${status.tone}`} data-tour="status" title={status.title === "" ? undefined : status.title}>
@@ -146,9 +146,9 @@ function StatusMark({ status }: { readonly status: Status }): JSX.Element {
 }
 
 /**
- * ユーザ待ち。ユーザができることがあるときだけ出す。主ボタン（primary）は 1 つ。
- * 親は承認待ちのときだけ（レビューの操作は各フェーズ行に置く）。子は承認 → レビュー完了の順で 1 つだけ。
- * 承認は `pendingApproval` だけを条件にする。バッジが「要確認」でも出す
+ * ユーザ待ち。ユーザができることがあるときだけ出す。主ボタン（primary）は1つ。
+ * 親は承認待ちのときだけ（レビューの操作は各フェーズ行に置く）。子は承認 → レビュー完了の順で1つだけ。
+ * 承認は`pendingApproval`だけを条件にする。バッジが「要確認」でも出す
  */
 function Turn({ card }: { readonly card: Card }): JSX.Element | null {
   const approve = card.actions.some((a) => a.kind === "approve");
@@ -169,7 +169,7 @@ function Turn({ card }: { readonly card: Card }): JSX.Element | null {
       ) : null}
       {!approve && review !== undefined ? (
         <>
-          <p className="turn-text">マージリクエストでレビューしてください</p>
+          <p className="turn-text">MRでレビューしてください</p>
           <div className="turn-buttons">
             <ReviewButtons action={review} />
           </div>
@@ -219,10 +219,10 @@ function Badge({ note }: { readonly note: Note }): JSX.Element {
 }
 
 /**
- * 親カードのフェーズ一覧。1 フェーズ 1 行で、左の丸がフェーズ、右が状態の一言（`core/status.ts` の `phaseStatusOf`）。
- * ユーザが対応する注意（`manual`）は 1 行で出す。レビュー待ちの行には、行の中に［MR を開く］［レビュー完了］を置く
- * （複数のフェーズが同時にレビュー待ちなら、それぞれの行に置く。主ボタンは行ごとに 1 つ）。
- * 状態の列に入れると、55% で止めた列の中でボタンが縦に積まれて行が高くなるため、ボタンは行の 2 段目に左寄せで並べる
+ * 親カードのフェーズ一覧。1フェーズ1行で、左の丸がフェーズ、右が状態の一言（`core/status.ts`の`phaseStatusOf`）。
+ * ユーザが対応する注意（`manual`）は1行で出す。レビュー待ちの行には、行の中に［MRを開く］［レビュー完了］を置く
+ * （複数のフェーズが同時にレビュー待ちなら、それぞれの行に置く。主ボタンは行ごとに1つ）。
+ * 状態の列に入れると、55% で止めた列の中でボタンが縦に積まれて行が高くなるため、ボタンは行の2段目に左寄せで並べる
  */
 function Phases({ phases }: { readonly phases: readonly PhaseChip[] }): JSX.Element {
   return (
@@ -252,7 +252,7 @@ function Phases({ phases }: { readonly phases: readonly PhaseChip[] }): JSX.Elem
 
 /**
  * 詳細。畳んでおき、開きたいときだけ見る。開閉は画面が覚える（カードごと。更新や列の移動でも閉じない）ので、
- * ここは渡された状態を出し、押されたら知らせるだけ。ブラウザの既定の開閉は止める（状態を 2 か所に持たない）。
+ * ここは渡された状態を出し、押されたら知らせるだけ。ブラウザの既定の開閉は止める（状態を2か所に持たない）。
  * ここのリンクは普通のリンクのまま（ボタンの寸法にしない）
  */
 function Details({ card, open, onToggle }: { readonly card: Card; readonly open: boolean; readonly onToggle: (open: boolean) => void }): JSX.Element | null {
@@ -301,15 +301,15 @@ function DetailItem({ row }: { readonly row: DetailRow }): JSX.Element {
 }
 
 /**
- * ［MR を開く］（リンク）と［レビュー完了］（主ボタン）。リンクは URL が http(s) のときだけ（`javascript:` などは出さない）。
+ * ［MRを開く］（リンク）と［レビュー完了］（主ボタン）。リンクはURLがhttp(s)のときだけ（`javascript:`などは出さない）。
  * ［レビュー完了］は、残った指摘を読む流れに入るだけで、まだ何も置かない
  */
 function ReviewButtons({ action }: { readonly action: ReviewAction }): JSX.Element {
   return (
     <>
       {isHttpUrl(action.mrUrl) ? (
-        <a className="card-button" data-action="open-mr" data-tour="mr" href={action.mrUrl} title="マージリクエストを開きます。指摘はそこにコメントで書きます">
-          MR を開く
+        <a className="card-button" data-action="open-mr" data-tour="mr" href={action.mrUrl} title="MRを開きます。指摘はそこにコメントで書きます">
+          MRを開く
         </a>
       ) : null}
       <button
@@ -395,7 +395,7 @@ function TemplateDraftButton({ id }: { readonly id: string }): JSX.Element {
       className="card-button"
       data-action="template-draft"
       data-ticket={id}
-      title="この親の計画とフローから、テンプレートの下書きを作ります。下書きに効力はなく、取り込み待ち画面で取り込むまで使われません。親を ready で閉じる前に作ってください"
+      title="この親の計画とフローから、テンプレートの下書きを作ります。下書きに効力はなく、取り込み待ち画面で取り込むまで使われません。親をreadyでクローズする前に作ってください"
       onClick={() => post({ type: "templateDraft", ticket: id })}
     >
       テンプレートの下書きを作る

@@ -18,7 +18,7 @@ import {
   screenshotCommand,
 } from "../../src/core/bug-report.js";
 
-/** zip を中央ディレクトリから読み戻して（名前 → 中身）、書いた形を外の道具に頼らず確かめる */
+/** zipを中央ディレクトリから読み戻して（名前 → 中身）、書いた形を外の道具に頼らず確かめる */
 function readZip(zip: Buffer): Map<string, { data: Buffer; method: number }> {
   const end = zip.length - 22;
   assert.equal(zip.readUInt32LE(end), 0x06054b50, "終わりの印が無い");
@@ -27,7 +27,7 @@ function readZip(zip: Buffer): Map<string, { data: Buffer; method: number }> {
   const out = new Map<string, { data: Buffer; method: number }>();
   for (let i = 0; i < count; i++) {
     assert.equal(zip.readUInt32LE(at), 0x02014b50);
-    assert.equal(zip.readUInt16LE(at + 8) & 0x0800, 0x0800, "名前が UTF-8 の印が無い");
+    assert.equal(zip.readUInt16LE(at + 8) & 0x0800, 0x0800, "名前がUTF-8の印が無い");
     const method = zip.readUInt16LE(at + 10);
     const crc = zip.readUInt32LE(at + 16);
     const size = zip.readUInt32LE(at + 20);
@@ -38,14 +38,14 @@ function readZip(zip: Buffer): Map<string, { data: Buffer; method: number }> {
     const start = local + 30 + zip.readUInt16LE(local + 26) + zip.readUInt16LE(local + 28);
     const body = zip.subarray(start, start + size);
     const data = method === 8 ? zlib.inflateRawSync(body) : Buffer.from(body);
-    assert.equal(crc32(data), crc, `${name} の CRC が合わない`);
+    assert.equal(crc32(data), crc, `${name}のCRCが合わない`);
     out.set(name, { data, method });
     at += 46 + nameLength;
   }
   return out;
 }
 
-test("CB-T1229 バグ報告の画面の取り方は Windows・macOS・WSL の 3 つで、ほかの Linux では録画もスクリーンショットもしない", () => {
+test("CB-T1229 バグ報告の画面の取り方はWindows・macOS・WSLの3つで、ほかのLinuxでは録画もスクリーンショットもしない", () => {
   assert.equal(captureKind("win32", {}, ""), "windows");
   assert.equal(captureKind("darwin", {}, ""), "mac");
   assert.equal(captureKind("linux", { WSL_DISTRO_NAME: "Ubuntu" }, ""), "wsl");
@@ -55,14 +55,14 @@ test("CB-T1229 バグ報告の画面の取り方は Windows・macOS・WSL の 3 
   assert.deepEqual(ffmpegCandidates("none", ""), []);
 });
 
-test("CB-T1230 ffmpeg は設定があればそれだけを使い、無ければ OS ごとの名前を探す（WSL は Windows 側の ffmpeg.exe、macOS は Homebrew の置き場も）", () => {
+test("CB-T1230 ffmpegは設定があればそれだけを使い、無ければOSごとの名前を探す（WSLはWindows側のffmpeg.exe、macOSはHomebrewの置き場も）", () => {
   assert.deepEqual(ffmpegCandidates("mac", "  /opt/ffmpeg  "), ["/opt/ffmpeg"]);
   assert.deepEqual(ffmpegCandidates("windows", ""), ["ffmpeg"]);
   assert.deepEqual(ffmpegCandidates("wsl", ""), ["ffmpeg.exe"]);
   assert.deepEqual(ffmpegCandidates("mac", ""), ["ffmpeg", "/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"]);
 });
 
-test("CB-T1231 録画は画面全体を mkv に録り（Windows と WSL は gdigrab、macOS は avfoundation）、gif はパレットを作ってから塗る", () => {
+test("CB-T1231 録画は画面全体をmkvに録り（WindowsとWSLはgdigrab、macOSはavfoundation）、gifはパレットを作ってから塗る", () => {
   const windows = recordArgs("windows", "C:\\t\\screen.mkv");
   assert.deepEqual(windows.slice(windows.indexOf("-f"), windows.indexOf("-f") + 2), ["-f", "gdigrab"]);
   assert.equal(windows[windows.indexOf("-i") + 1], "desktop");
@@ -73,7 +73,7 @@ test("CB-T1231 録画は画面全体を mkv に録り（Windows と WSL は gdig
   const mac = recordArgs("mac", "/t/screen.mkv");
   assert.equal(mac[mac.indexOf("-f") + 1], "avfoundation");
   assert.equal(mac[mac.indexOf("-i") + 1], "Capture screen 0:none");
-  // 縦横を偶数にそろえる（yuv420p で落ちないため）
+  // 縦横を偶数にそろえる（yuv420pで落ちないため）
   assert.match(windows[windows.indexOf("-vf") + 1], /trunc\(min\(1920,iw\)\/2\)\*2':-2/);
   const gif = gifArgs("in.mkv", "out.gif");
   assert.equal(gif[gif.indexOf("-i") + 1], "in.mkv");
@@ -81,7 +81,7 @@ test("CB-T1231 録画は画面全体を mkv に録り（Windows と WSL は gdig
   assert.match(gif[gif.indexOf("-vf") + 1], /palettegen.*paletteuse/);
 });
 
-test("CB-T1232 スクリーンショットは ffmpeg を使わず、macOS は screencapture、Windows と WSL は PowerShell で撮る。パスの引用符がスクリプトの中で崩れない", () => {
+test("CB-T1232 スクリーンショットはffmpegを使わず、macOSはscreencapture、WindowsとWSLはPowerShellで撮る。パスの引用符がスクリプトの中で崩れない", () => {
   assert.deepEqual(screenshotCommand("mac", "/t/s 1.png"), { file: "screencapture", args: ["-x", "-t", "png", "/t/s 1.png"] });
   const windows = screenshotCommand("windows", "C:\\Users\\o'neil\\s.png");
   assert.ok(windows !== undefined);
@@ -118,8 +118,8 @@ test("CB-T1233 ログは始めたときの大きさを控え、終わりには�
   }
 });
 
-test("CB-T1234 zip は読み戻せて、名前は UTF-8、gif と png はそのまま、テキストは縮めて入れる", () => {
-  const text = Buffer.from("2026-10-29T10:00:00+09:00 INFO  ccnavi-board[1] バグ報告を始めた\n".repeat(50), "utf8");
+test("CB-T1234 zipは読み戻せて、名前はUTF-8、gifとpngはそのまま、テキストは縮めて入れる", () => {
+  const text = Buffer.from("2026-10-29T10:00:00+09:00 INFO  ccnavi-board[1]バグ報告を始めた\n".repeat(50), "utf8");
   const gif = Buffer.from("GIF89a fake");
   const zip = buildZip(
     [
@@ -137,11 +137,11 @@ test("CB-T1234 zip は読み戻せて、名前は UTF-8、gif と png はその�
   assert.equal(entries.get("screen.gif")?.method, 0);
   assert.deepEqual(entries.get("screen.gif")?.data, gif);
   assert.equal(entries.get("report.txt")?.data.toString("utf8"), "説明\n");
-  // 既知の値（"123456789" の CRC-32）
+  // 既知の値（"123456789" のCRC-32）
   assert.equal(crc32(Buffer.from("123456789")), 0xcbf43926);
 });
 
-test("CB-T1235 報告の説明には録画の結果・枚数・ログ・エラーが並び、zip の名前は始めた時刻から付ける", () => {
+test("CB-T1235 報告の説明には録画の結果・枚数・ログ・エラーが並び、zipの名前は始めた時刻から付ける", () => {
   const text = reportText({
     started: new Date("2026-10-29T01:00:00Z"),
     finished: new Date("2026-10-29T01:05:00Z"),
@@ -149,13 +149,13 @@ test("CB-T1235 報告の説明には録画の結果・枚数・ログ・エラ�
     extensionVersion: "0.12.0",
     platform: "linux 5.15",
     capture: "wsl",
-    recording: "ffmpeg が見つからない",
+    recording: "ffmpegが見つからない",
     screenshots: 2,
     logs: [],
     errors: ["スクリーンショット: 失敗"],
   });
-  assert.match(text, /録画: ffmpeg が見つからない/);
-  assert.match(text, /スクリーンショット: 2 枚/);
+  assert.match(text, /録画: ffmpegが見つからない/);
+  assert.match(text, /スクリーンショット: 2枚/);
   assert.match(text, /ログ: この間に書かれた行は無い/);
   assert.match(text, /エラー:\n- スクリーンショット: 失敗\n$/);
   assert.equal(reportStamp(new Date(2026, 9, 29, 15, 30, 12)), "20261029-153012");

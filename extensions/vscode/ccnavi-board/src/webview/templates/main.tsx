@@ -1,6 +1,6 @@
 /**
- * テンプレート管理画面の入口。最初の中身は HTML に埋まっている（`<script type="application/json">`）。
- * 2 枚目からは拡張ホストが postMessage で渡し、React が要るところだけ描き直す。
+ * テンプレート管理画面の入口。最初の中身はHTMLに埋まっている（`<script type="application/json">`）。
+ * 2枚目からは拡張ホストがpostMessageで渡し、Reactが要るところだけ描き直す。
  */
 import { createRoot } from "react-dom/client";
 

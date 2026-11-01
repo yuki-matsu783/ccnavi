@@ -1,17 +1,17 @@
 /**
  * リスク管理画面が編集中に持つもの。配点のコピー（`Draft`）と、開いている項目。
  *
- * 契約の `RiskForm` は配列だけを持つが、画面は行ごとに動かないキーが要る（足す・消す・
- * 並べ替えの間、React が同じ行を同じ行として描き直せるように）。id はユーザが打つもので、
+ * 契約の`RiskForm`はリストだけを持つが、画面は行ごとに動かないキーが要る（足す・消す・
+ * 並べ替えの間、Reactが同じ行を同じ行として描き直せるように）。idはユーザが打つもので、
  * 空にも重複にもなるのでキーには使えない。キーは画面の中だけのもので、拡張ホストへは渡さない。
  *
- * 開いている項目は Webview の state（`{ open: [id, …] }`）に残す。残すのは id で、
- * キーは画面を作り直すと変わるため。id が空の行は残せない。
+ * 開いている項目はWebviewのstate（`{ open: [id, …] }`）に残す。残すのはidで、
+ * キーは画面を作り直すと変わるため。idが空の行は残せない。
  */
 import type { FactorForm, LevelName, RiskForm } from "../../core/risk-view.js";
 import { getState, setState } from "../vscode.js";
 
-/** 行 1 つ。`key` は画面の中だけのキーで、拡張ホストへは渡さない */
+/** 行1つ。`key`は画面の中だけのキーで、拡張ホストへは渡さない */
 export interface Row {
   readonly key: string;
   readonly factor: FactorForm;
@@ -22,7 +22,7 @@ export interface Draft {
   readonly rows: readonly Row[];
 }
 
-/** キーを配る。1 枚の画面の中で数え上げる（`f1`、`f2`、…） */
+/** キーを配る。1枚の画面の中で数え上げる（`f1`、`f2`、…） */
 export function keyer(): () => string {
   let seq = 0;
   return () => {
@@ -41,25 +41,25 @@ export function formOf(draft: Draft): RiskForm {
   return { levels: draft.levels, factors: draft.rows.map((row) => row.factor) };
 }
 
-/** 新しい項目。加点条件の既定は `lines_over` */
+/** 新しい項目。加点条件の既定は`lines_over` */
 export function emptyFactor(): FactorForm {
   return { origin: null, id: "", points: "", kind: "lines_over", value: "", max: "", include: "", exclude: "", message: "" };
 }
 
-/** state に残してある「開いていた項目の id」。型が違うものは空として扱う */
+/** stateに残してある「開いていた項目のid」。型が違うものは空として扱う */
 export function loadOpen(): ReadonlySet<string> {
   const saved = (getState() ?? {}) as { open?: unknown };
   const ids = Array.isArray(saved.open) ? saved.open.filter((id): id is string => typeof id === "string") : [];
   return new Set(ids);
 }
 
-/** 開いている項目を state に残す。id が空の行は残さない（次に開き直す手がかりが無い） */
+/** 開いている項目をstateに残す。idが空の行は残さない（次に開き直す手がかりが無い） */
 export function saveOpen(draft: Draft, open: ReadonlySet<string>): void {
   const ids = draft.rows.filter((row) => open.has(row.key) && row.factor.id !== "").map((row) => row.factor.id);
   setState({ ...((getState() ?? {}) as object), open: ids });
 }
 
-/** state に残してある id から、いまの行のキーに直す。画面を作り直したあとに開き直すため */
+/** stateに残してあるidから、いまの行のキーに直す。画面を作り直したあとに開き直すため */
 export function openedFromIds(draft: Draft, ids: ReadonlySet<string>): ReadonlySet<string> {
   return new Set(draft.rows.filter((row) => row.factor.id !== "" && ids.has(row.factor.id)).map((row) => row.key));
 }

@@ -1,25 +1,25 @@
 /**
- * バグ報告（サイドパネルの「バグ報告」）の、VS Code に触れない部分。
+ * バグ報告（サイドパネルの「バグ報告」）の、VS Codeに触れない部分。
  *
- * - どの OS の取り方を使うか（Windows・macOS・WSL。ほかは録画とスクリーンショットをしない）
- * - ffmpeg に渡す引数（録画と gif への変換）と、スクリーンショットを撮るコマンド
+ * - どのOSの取り方を使うか（Windows・macOS・WSL。ほかは録画とスクリーンショットをしない）
+ * - ffmpegに渡す引数（録画とgifへの変換）と、スクリーンショットを撮るコマンド
  * - 診断ログ（`logs/diag/*.log`）のうち、報告を始めてから足された行の切り出し
- * - zip の組み立て（依存を増やさないため、ここで書く）
+ * - zipの組み立て（依存を増やさないため、ここで書く）
  *
- * ffmpeg は利用者に入れてもらう。見つからなければ録画だけをやめ、スクリーンショットとログの zip は作る。
- * 子プロセスを起動するのは src/bug-report.ts で、ここはコマンドと引数を組むだけ。
+ * ffmpegは利用者に入れてもらう。見つからなければ録画だけをやめ、スクリーンショットとログのzipは作る。
+ * 子プロセスを起動するのはsrc/bug-report.tsで、ここはコマンドと引数を組むだけ。
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as zlib from "node:zlib";
 
-/** 画面の取り方の種類。`none` は録画もスクリーンショットもしない（ログだけ） */
+/** 画面の取り方の種類。`none`は録画もスクリーンショットもしない（ログだけ） */
 export type Capture = "windows" | "mac" | "wsl" | "none";
 
 /**
- * 拡張ホストが動いている OS から取り方を決める。
- * WSL では拡張ホストが Linux 側で動くので、Windows の ffmpeg.exe と powershell.exe を相互運用で呼ぶ。
- * `procVersion` は `/proc/version` の中身（読めなければ空）。
+ * 拡張ホストが動いているOSから取り方を決める。
+ * WSLでは拡張ホストがLinux側で動くので、Windowsのffmpeg.exeとpowershell.exeを相互運用で呼ぶ。
+ * `procVersion`は`/proc/version`の中身（読めなければ空）。
  */
 export function captureKind(platform: string, env: NodeJS.ProcessEnv, procVersion: string): Capture {
   if (platform === "win32") {
@@ -34,19 +34,19 @@ export function captureKind(platform: string, env: NodeJS.ProcessEnv, procVersio
   return "none";
 }
 
-/** 録画の fps。gif は大きくなりやすいので低めに置く */
+/** 録画のfps。gifは大きくなりやすいので低めに置く */
 export const RECORD_FPS = 10;
 /** 録画の長さの上限（秒）。終了を忘れたときや拡張ホストが落ちたときに、録り続けないため */
 export const RECORD_MAX_SECONDS = 600;
 /** 録画の幅の上限（px）。これより広い画面は縮めて録る */
 export const RECORD_MAX_WIDTH = 1920;
-/** gif の fps と幅の上限 */
+/** gifのfpsと幅の上限 */
 export const GIF_FPS = 8;
 export const GIF_MAX_WIDTH = 1280;
 
 /**
- * ffmpeg を探す候補。設定 `ccnaviBoard.ffmpegPath` があればそれだけを使う。
- * macOS では、Dock から起動した VS Code の PATH に Homebrew が入っていないことがあるので、置き場を候補に足す。
+ * ffmpegを探す候補。設定`ccnaviBoard.ffmpegPath`があればそれだけを使う。
+ * macOSでは、Dockから起動したVS CodeのPATHにHomebrewが入っていないことがあるので、置き場を候補に足す。
  */
 export function ffmpegCandidates(kind: Capture, configured: string): string[] {
   if (configured.trim() !== "") {
@@ -64,7 +64,7 @@ export function ffmpegCandidates(kind: Capture, configured: string): string[] {
   }
 }
 
-/** 画面全体を録る入力の引数。`none` では録らない */
+/** 画面全体を録る入力の引数。`none`では録らない */
 function inputArgs(kind: Capture): string[] {
   switch (kind) {
     case "windows":
@@ -78,8 +78,8 @@ function inputArgs(kind: Capture): string[] {
 }
 
 /**
- * 録画の引数。止めるときは標準入力に `q` を送る。
- * 途中で切れても読めるよう mkv に書き、縦横は偶数にそろえる（yuv420p の条件）。`output` は ffmpeg から見たパス。
+ * 録画の引数。止めるときは標準入力に`q`を送る。
+ * 途中で切れても読めるようmkvに書き、縦横は偶数にそろえる（yuv420pの条件）。`output`はffmpegから見たパス。
  */
 export function recordArgs(kind: Capture, output: string): string[] {
   return [
@@ -102,7 +102,7 @@ export function recordArgs(kind: Capture, output: string): string[] {
   ];
 }
 
-/** 録画を gif にする引数。色は先に作ったパレットで塗る（既定の 256 色より文字が読める） */
+/** 録画をgifにする引数。色は先に作ったパレットで塗る（既定の256色より文字が読める） */
 export function gifArgs(input: string, output: string): string[] {
   return [
     "-hide_banner",
@@ -124,8 +124,8 @@ export interface Command {
 }
 
 /**
- * Windows の画面全体（複数の画面をまたぐ仮想画面）を png に撮る PowerShell。
- * 拡大率が 100% 以外の機械で一部だけが撮れないよう、先に DPI を認識させる。
+ * Windowsの画面全体（複数の画面をまたぐ仮想画面）をpngに撮るPowerShell。
+ * 拡大率が100% 以外の機械で一部だけが撮れないよう、先にDPIを認識させる。
  */
 function powershellScript(output: string): string {
   const quoted = `'${output.replace(/'/g, "''")}'`;
@@ -144,9 +144,9 @@ function powershellScript(output: string): string {
 }
 
 /**
- * スクリーンショットを撮るコマンド。ffmpeg は使わず、OS に元からある道具で撮る。
- * `output` はそのコマンドから見たパス（WSL なら Windows の形に直してから渡す）。
- * スクリプトは -EncodedCommand（UTF-16LE の base64）で渡し、パスの引用符の扱いに左右されないようにする。
+ * スクリーンショットを撮るコマンド。ffmpegは使わず、OSに元からある道具で撮る。
+ * `output`はそのコマンドから見たパス（WSLならWindowsの形に直してから渡す）。
+ * スクリプトは -EncodedCommand（UTF-16LEのbase64）で渡し、パスの引用符の扱いに左右されないようにする。
  */
 export function screenshotCommand(kind: Capture, output: string): Command | undefined {
   switch (kind) {
@@ -226,7 +226,7 @@ export function reportStamp(when: Date): string {
   return `${when.getFullYear()}${two(when.getMonth() + 1)}${two(when.getDate())}-${two(when.getHours())}${two(when.getMinutes())}${two(when.getSeconds())}`;
 }
 
-/** zip に入れる 1 件。`name` は `/` 区切り */
+/** zipに入れる1件。`name`は`/`区切り */
 export interface ZipEntry {
   readonly name: string;
   readonly data: Buffer;
@@ -252,7 +252,7 @@ export function crc32(data: Buffer): number {
   return (c ^ 0xffffffff) >>> 0;
 }
 
-/** zip の日付と時刻（DOS の形。現地時刻） */
+/** zipの日付と時刻（DOSの形。現地時刻） */
 function dosTime(when: Date): { time: number; date: number } {
   return {
     time: (when.getHours() << 11) | (when.getMinutes() << 5) | Math.floor(when.getSeconds() / 2),
@@ -260,12 +260,12 @@ function dosTime(when: Date): { time: number; date: number } {
   };
 }
 
-/** 縮めても効果が無い形式（gif・png は既に圧縮されている）。そのまま入れる */
+/** 縮めても効果が無い形式（gif・pngは既に圧縮されている）。そのまま入れる */
 const STORED = /\.(gif|png|jpe?g|zip|mkv|mp4)$/i;
 
 /**
- * zip を組む。名前は UTF-8（汎用フラグの bit 11）。gif・png はそのまま、ほかは deflate で縮める。
- * 1 件 4 GiB を超えるものは扱わない（ZIP64 は書かない）。
+ * zipを組む。名前はUTF-8（汎用フラグのbit 11）。gif・pngはそのまま、ほかはdeflateで縮める。
+ * 1件4 GiBを超えるものは扱わない（ZIP64は書かない）。
  */
 export function buildZip(entries: readonly ZipEntry[], when: Date): Buffer {
   const { time, date } = dosTime(when);
@@ -328,17 +328,17 @@ export interface ReportInfo {
   readonly extensionVersion: string;
   readonly platform: string;
   readonly capture: Capture;
-  /** 録画の結果。gif を入れたか、入れなかった理由 */
+  /** 録画の結果。gifを入れたか、入れなかった理由 */
   readonly recording: string;
   readonly screenshots: number;
   readonly logs: readonly string[];
-  /** ffmpeg やスクリーンショットのコマンドが出したエラー（そのまま） */
+  /** ffmpegやスクリーンショットのコマンドが出したエラー（そのまま） */
   readonly errors: readonly string[];
 }
 
 export function reportText(info: ReportInfo): string {
   const lines = [
-    "ccnavi ボードのバグ報告",
+    "ccnaviボードのバグ報告",
     "",
     `開始: ${info.started.toISOString()}`,
     `終了: ${info.finished.toISOString()}`,
@@ -346,7 +346,7 @@ export function reportText(info: ReportInfo): string {
     `拡張: ${info.extensionVersion}`,
     `OS: ${info.platform}（画面の取り方: ${info.capture}）`,
     `録画: ${info.recording}`,
-    `スクリーンショット: ${info.screenshots} 枚`,
+    `スクリーンショット: ${info.screenshots}枚`,
     `ログ: ${info.logs.length === 0 ? "この間に書かれた行は無い" : info.logs.join(", ")}`,
   ];
   if (info.errors.length > 0) {

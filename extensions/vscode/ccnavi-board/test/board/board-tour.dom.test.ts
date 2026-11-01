@@ -1,7 +1,7 @@
 /**
  * ボード画面の案内（`tours/board.yml`）。案内の間は今のチケットではなく見本（`core/tour-board.ts`）を描き、
- * 見本の上の操作は画面の state にも拡張ホストにも届かない。使い方ごとの案内は、全部の手順で指す先が画面にある。
- * 図の部品が大きさを測れるよう、承認の一覧を出す画面は `measure: true` で開く。
+ * 見本の上の操作は画面のstateにも拡張ホストにも届かない。使い方ごとの案内は、全部の手順で指す先が画面にある。
+ * 図の部品が大きさを測れるよう、承認の一覧を出す画面は`measure: true`で開く。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -27,10 +27,10 @@ function cardIds(dom: DomPage): string[] {
   return dom.all(".card").map((el) => el.getAttribute("data-id") ?? "").sort();
 }
 
-/** ふだん（実際のボード）の画面。fixture の `i0001` が親 */
+/** ふだん（実際のボード）の画面。fixtureの`i0001`が親 */
 const REAL_IDS = ["i0001", "i0001-01-01", "i0001-02-02", "i0001-02-03", "i0001-02-04", "i0001-02-05"].sort();
 
-test("CB-D200 「?」は案内の一覧を開き、基本の案内が先頭で、使い方ごとの案内を選ぶと、その 1 本だけが始まる", async () => {
+test("CB-D200 「?」は案内の一覧を開き、基本の案内が先頭で、使い方ごとの案内を選ぶと、その1本だけが始まる", async () => {
   const dom = await openBoard();
   try {
     dom.click(dom.one('[data-action="tour"]'));
@@ -58,29 +58,29 @@ test("CB-D201 全部の案内の全部の手順で、指す先が画面にあり
       const posted = dom.posted.length;
       for (const [index, step] of course.steps.entries()) {
         await dom.settle();
-        const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
+        const at = `${course.id}の${index + 1}番目の手順（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
         if (step.target === "") {
           // 画面の外の見た目を画像で見せる手順だけが、指す先を持たず中ほどに出る
           assert.ok(step.image !== "", `${at}: 指す先も画像もない`);
           assert.equal(dom.all(".tour-bubble.center").length, 1, `${at}: 画像の手順が中ほどに出ていない`);
         } else {
-          assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面にありません`);
+          assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先${step.target}が画面にありません`);
           assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
         }
-        // 実際のチケットではなく見本。実際のカードは 1 枚も出ない
+        // 実際のチケットではなく見本。実際のカードは1枚も出ない
         assert.ok(cardIds(dom).length > 0 && cardIds(dom).every((id) => id.startsWith("sample-")), `${at}: 実際のカードが出ている`);
         assert.equal(dom.all(".banner.tour-sample").length, 1, at);
-        // 手順の scene が言うオーバーレイだけが出る
+        // 手順のsceneが言うオーバーレイだけが出る
         const overlay = step.scene.overlay === undefined ? 0 : 1;
-        assert.equal(dom.all(".approval-backdrop").length, overlay, `${at}: オーバーレイの出入りが scene と違う`);
+        assert.equal(dom.all(".approval-backdrop").length, overlay, `${at}: オーバーレイの出入りがsceneと違う`);
         dom.click(dom.one('[data-action="tour-next"]'));
         await dom.settle();
       }
       assert.equal(dom.all(".tour").length, 0, `${course.id}: 最後の手順で閉じない`);
       assert.deepEqual(cardIds(dom), REAL_IDS, `${course.id}: 閉じたあと実際のボードに戻らない`);
       assert.equal(dom.all(".approval-backdrop").length, 0);
-      assert.deepEqual(dom.posted.slice(posted), [{ type: "tourDone" }], `${course.id}: tourDone のほかに送った`);
+      assert.deepEqual(dom.posted.slice(posted), [{ type: "tourDone" }], `${course.id}: tourDoneのほかに送った`);
     } finally {
       await dom.close();
     }
@@ -95,8 +95,8 @@ test("CB-D202 案内の間は、実際のチケットではなく見本のカー
     assert.equal(dom.all(".banner.tour-sample").length, 1);
     assert.ok(cardIds(dom).length > 0 && cardIds(dom).every((id) => id.startsWith("sample-")), `実際のカードが出ている: ${cardIds(dom).join(",")}`);
     // 見本の集計
-    assert.equal(dom.one(".summary .pending").textContent, "承認待ち 3 件");
-    assert.equal(dom.one(".summary .counts").textContent?.replace(/\s+/g, " "), "残り 8 / 全 10");
+    assert.equal(dom.one(".summary .pending").textContent, "承認待ち3件");
+    assert.equal(dom.one(".summary .counts").textContent?.replace(/\s+/g, " "), "残り8 / 全10");
     dom.click(dom.one('[data-action="tour-skip"]'));
     await dom.settle();
     assert.equal(dom.all(".banner.tour-sample").length, 0);
@@ -107,32 +107,32 @@ test("CB-D202 案内の間は、実際のチケットではなく見本のカー
   }
 });
 
-test("CB-D203 案内の間の見本の絞り込み・畳みは見本の上だけに効き、実際の絞り込み・畳んだ列・state には触れない", async () => {
+test("CB-D203 案内の間の見本の絞り込み・畳みは見本の上だけに効き、実際の絞り込み・畳んだ列・stateには触れない", async () => {
   const saved = { project: "*", parent: "*", attention: false, archived: false, folded: ["cancelled"], widths: {}, details: [] };
   const dom = await openBoard(fixture(), { state: saved });
   try {
     const before = JSON.stringify(dom.state());
     const doneFolded = (): boolean => dom.one('.column[data-state="done"]').classList.contains("folded");
     assert.equal(doneFolded(), false);
-    // プロジェクトで絞る案内: 見本の欄が web になり、プロジェクト外のカードが隠れる
+    // プロジェクトで絞る案内: 見本の欄がwebになり、プロジェクト外のカードが隠れる
     await start(dom, "filter");
     assert.equal(dom.one<HTMLSelectElement>("#project-filter").value, "web");
     assert.ok(dom.all(".card.hidden").length > 0 && dom.all(".card:not(.hidden)").length > 0);
     assert.equal(dom.one('.card[data-id="sample-a"]').classList.contains("hidden"), true);
     assert.equal(dom.one('.card[data-id="sample-b"]').classList.contains("hidden"), false);
-    // 4 番目の手順: 承認のボタンは、見えている承認待ち（web の 1 件）だけが対象
+    // 4番目の手順: 承認のボタンは、見えている承認待ち（webの1件）だけが対象
     for (let i = 0; i < 3; i += 1) {
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
-    assert.equal(dom.one('[data-action="approve"]').textContent?.trim(), "承認待ち 1 件を承認");
+    assert.equal(dom.one('[data-action="approve"]').textContent?.trim(), "承認待ち1件を承認");
     assert.equal(dom.one<HTMLButtonElement>('[data-action="approve"]').disabled, false);
     dom.key("Escape");
     await dom.settle();
-    // 閉じたら実際の絞り込みと畳みに戻り、state は動いていない（実際のボードにはプロジェクトが無く、欄も出ない）
+    // 閉じたら実際の絞り込みと畳みに戻り、stateは動いていない（実際のボードにはプロジェクトが無く、欄も出ない）
     assert.equal(dom.all("#project-filter").length, 0);
     assert.equal(dom.one('.column[data-state="cancelled"]').classList.contains("folded"), true);
-    assert.equal(JSON.stringify(dom.state()), before, "案内が覚えている state を変更した");
+    assert.equal(JSON.stringify(dom.state()), before, "案内が覚えているstateを変更した");
 
     // 列を畳む案内: 見本の完了の列が畳まれ、実際の畳み（取り消し）は見本に持ち込まない
     await start(dom, "progress");
@@ -152,7 +152,7 @@ test("CB-D203 案内の間の見本の絞り込み・畳みは見本の上だけ
   }
 });
 
-test("CB-D204 案内の間は見本のボタンを押しても拡張ホストへ何も送らず、見本のオーバーレイの操作も届かない。送るのは tourDone だけ", async () => {
+test("CB-D204 案内の間は見本のボタンを押しても拡張ホストへ何も送らず、見本のオーバーレイの操作も届かない。送るのはtourDoneだけ", async () => {
   const dom = await openBoard(fixture(), { measure: true });
   try {
     await start(dom, "approve");
@@ -173,7 +173,7 @@ test("CB-D204 案内の間は見本のボタンを押しても拡張ホストへ
     await click('[data-action="review-done"]');
     await click('[data-action="merge-check"]');
     await click('.card-details summary');
-    // 見本の承認の一覧（4 手順進める）
+    // 見本の承認の一覧（4手順進める）
     for (let i = 0; i < 4; i += 1) {
       await click('[data-action="tour-next"]');
     }
@@ -185,7 +185,7 @@ test("CB-D204 案内の間は見本のボタンを押しても拡張ホストへ
     await dom.settle();
     assert.deepEqual(dom.posted.slice(posted), [{ type: "tourDone" }], "案内の間に拡張ホストへ余計な送信があった");
     // 見本の上で詳細を開閉しても、実際の状態（覚えている詳細の開閉）を書き換えない
-    assert.equal(JSON.stringify(dom.state()), stateBefore, "案内の間の操作が覚えている state を書き換えた");
+    assert.equal(JSON.stringify(dom.state()), stateBefore, "案内の間の操作が覚えているstateを書き換えた");
     assert.equal(dom.all(".tour").length, 0);
     // 閉じたら実際の操作は届く
     dom.click(dom.one('[data-action="approve"]'));
@@ -235,7 +235,7 @@ test("CB-D206 案内の間に実際の承認のオーバーレイが出たら案
   }
 });
 
-test("CB-D741 画像のある手順は、本文の下に data: の画像を出し、吹き出しを中ほどに広く出す。画像のない手順は出さない", async () => {
+test("CB-D741 画像のある手順は、本文の下にdata: の画像を出し、吹き出しを中ほどに広く出す。画像のない手順は出さない", async () => {
   const course = def.courses.find((c) => c.id === "to-merge")!;
   const dom = await openBoard(fixture(), { measure: true });
   try {
@@ -244,9 +244,9 @@ test("CB-D741 画像のある手順は、本文の下に data: の画像を出�
       await dom.settle();
       const images = dom.all(".tour-bubble img.tour-image");
       if (step.image === "") {
-        assert.equal(images.length, 0, `${index + 1} 番目（${step.title}）に画像が出ている`);
+        assert.equal(images.length, 0, `${index + 1}番目（${step.title}）に画像が出ている`);
       } else {
-        assert.equal(images.length, 1, `${index + 1} 番目（${step.title}）に画像がない`);
+        assert.equal(images.length, 1, `${index + 1}番目（${step.title}）に画像がない`);
         assert.match(images[0].getAttribute("src") ?? "", /^data:image\/png;base64,/);
         assert.equal(images[0].getAttribute("alt"), step.alt);
         assert.ok(dom.one(".tour-bubble").className.includes("center"), `${step.title}: 画像の手順が中ほどに出ていない`);

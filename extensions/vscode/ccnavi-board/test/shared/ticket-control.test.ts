@@ -8,15 +8,15 @@ function withValue(value: string) {
   return { ...board, settings: { ...board.settings, ticket_control: value } };
 }
 
-test("CB-T55 実行ファイルが enable と答えれば enable", () => {
+test("CB-T55 実行ファイルがenableと答えればenable", () => {
   assert.equal(ticketControlOf(withValue("enable")), "enable");
 });
 
-test("CB-T56 実行ファイルが disable と答えたときだけ disable", () => {
+test("CB-T56 実行ファイルがdisableと答えたときだけdisable", () => {
   assert.equal(ticketControlOf(withValue("disable")), "disable");
 });
 
-test("CB-T57 ボードが読み込めない・答えが空なら enable（入口を消さない）", () => {
+test("CB-T57 ボードが読み込めない・答えが空ならenable（入口を消さない）", () => {
   assert.equal(ticketControlOf(undefined), "enable");
   assert.equal(ticketControlOf(withValue("")), "enable");
 });

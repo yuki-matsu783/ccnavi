@@ -1,5 +1,5 @@
 /*
- * プロジェクト 1 件のカード（`Project.tsx`）。見出しとバッジ、項目の格子、行末のボタンの帯、
+ * プロジェクト1件のカード（`Project.tsx`）。見出しとバッジ、項目の格子、行末のボタンの帯、
  * 設定の検証の一覧。
  */
 .project {
@@ -11,7 +11,7 @@
 .project-head .name { font-weight: 600; font-size: var(--font-title); overflow-wrap: anywhere; }
 .project-head .rel { overflow-wrap: anywhere; }
 .project-head .flags { display: flex; flex-wrap: wrap; gap: var(--gap-2); margin-left: auto; }
-/* 項目は 1 つ 240px を目安に、幅に合わせて段数が変わる。検証は長くなるので常に 1 段まるごと使う */
+/* 項目は1つ240pxを目安に、幅に合わせて段数が変わる。検証は長くなるので常に1段まるごと使う */
 .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--gap-3) var(--gap-6); margin: 0; }
 .field { min-width: 0; }
 .field.wide { grid-column: 1 / -1; }

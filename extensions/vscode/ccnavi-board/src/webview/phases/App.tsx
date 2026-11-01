@@ -5,17 +5,17 @@
  * （編集中の定義、開いている行、絞り込み、直前の操作の一言）だけ。定義の意味は判定しない。
  *
  * 中身（`data`）が届いたら、編集中の定義はその中身で置き換える。 届くのは編集を破棄してよい
- * ときだけ（ユーザが「再読み込み」を押した、保存や作成が通った）で、ファイルが外で変わっただけのときは
+ * ときだけ（ユーザが「更新」を押した、保存や作成が通った）で、ファイルが外で変わっただけのときは
  * 帯（`changed`）が出るだけ。
  *
- * id の重なりだけは画面で止める。 同じ id が 2 つあると実行ファイルは後ろで何も出さずに上書きする。
- * 共通の設定の定義と表示名が重なる定義も止める（重なると、この設定の定義が 1 つも使われない）。
- * 止めるのはこの 2 つだけで、書式の検証と、共通の設定と同じ id の中身の比べは保存のときに実行ファイル（`--lint`）へ渡す。
+ * idの重なりだけは画面で止める。 同じidが2つあると実行ファイルは後ろで何も出さずに上書きする。
+ * 共通の設定の定義と表示名が重なる定義も止める（重なると、この設定の定義が1つも使われない）。
+ * 止めるのはこの2つだけで、書式の検証と、共通の設定と同じidの中身の比べは保存のときに実行ファイル（`--lint`）へ渡す。
  *
  * 共通の設定の定義は、開いている設定の定義に足されて判定に使われる。出どころが分かるように別の欄に
  * 読み取り専用で並べる（`PhasesPage.common`。実行ファイルの統合結果のうち出どころが共通のもの）。
  *
- * 順序（どのフェーズにどのフェーズが先行するか）はフェーズ定義ではなく親チケットの計画のステップの `after` で決める。
+ * 順序（どのフェーズにどのフェーズが先行するか）はフェーズ定義ではなく親チケットの計画のステップの`after`で決める。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
 
@@ -54,12 +54,12 @@ function sampleDraft(page: PhasesPage, prefix: string): Draft {
 }
 const SAMPLE_DRAFT = sampleDraft(SAMPLE.page, "s");
 const PROJECT_DRAFT = sampleDraft(SAMPLE.project, "t");
-/** 「＋ 定義を追加」で足した行の見本（`add: blank` は空の行、`add: filled` は書いた行） */
+/** 「＋ 定義を追加」で足した行の見本（`add: blank`は空の行、`add: filled`は書いた行） */
 const ADDED_KEY = "s-add";
 const ADDED_BLANK = emptyPhase();
 const NO_SCENE: Scene = {};
 
-/** 手順の `scene` の文字列を `,` で割る */
+/** 手順の`scene`の文字列を`,`で割る */
 function sceneList(value: Scene[string] | undefined): ReadonlySet<string> {
   return new Set(typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : []);
 }
@@ -74,7 +74,7 @@ interface Editing {
   /** 開いている行のキー */
   readonly open: ReadonlySet<string>;
   /**
-   * 「補足」を開いているか。行ごとに 1 度だけ値の有無で決め、あとはユーザの開閉で動く。
+   * 「補足」を開いているか。行ごとに1度だけ値の有無で決め、あとはユーザの開閉で動く。
    * 描くたびに値の有無で決め直すと、最後の値を消した時点で、打っている欄ごと折りたたまれる
    */
   readonly more: ReadonlyMap<string, boolean>;
@@ -101,7 +101,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const [status, setStatus] = useState<Status | undefined>(undefined);
   const [lock, setLock] = useState<Lock>(() => pageOf(initial)?.lock ?? NO_LOCK);
   const [changed, setChanged] = useState(false);
-  /** 保存が通ったときの検証の warn の本文。帯に出し、次の編集か更新（中身の入れ替え）で消す */
+  /** 保存が通ったときの検証のwarnの本文。帯に出し、次の編集か更新（中身の入れ替え）で消す */
   const [saveWarns, setSaveWarns] = useState<readonly string[]>([]);
   const [find, setFind] = useState("");
   const [focusKey, setFocusKey] = useState<string | undefined>(undefined);
@@ -110,7 +110,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const { draft, open, more } = editing;
   const page = pageOf(data);
   /**
-   * 案内の間は見本を描き、手順ごとの様子（開く定義・絞り込み・設定の切り替えなど）は `scene` に入れる。実際の編集中の定義や開いた行は
+   * 案内の間は見本を描き、手順ごとの様子（開く定義・絞り込み・設定の切り替えなど）は`scene`に入れる。実際の編集中の定義や開いた行は
    * 動かさないので、閉じたあとに戻すものは無い。
    */
   const [scene, setScene] = useState<Scene>(NO_SCENE);
@@ -122,7 +122,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     },
   });
   const requestTour = tour.request;
-  /** 拡張ホストへの送信。案内の間は実際の操作を送らない（`tourDone` と最初の `ready` は直に送る） */
+  /** 拡張ホストへの送信。案内の間は実際の操作を送らない（`tourDone`と最初の`ready`は直に送る） */
   const act = (message: PhasesMessage): void => {
     if (!tour.touring) {
       post(message);
@@ -158,7 +158,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     }
   }, () => post({ type: "ready" }));
 
-  // 足した行の id へ焦点を移す。折りたたんだままでは何を足したか分からないので、行は開いて出してある
+  // 足した行のidへ焦点を移す。折りたたんだままでは何を足したか分からないので、行は開いて出してある
   useEffect(() => {
     if (focusKey === undefined) {
       return;
@@ -171,10 +171,10 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   /**
    * 読み直しを頼む。押した時点で欄を止める。 拡張ホストは実行ファイルに聞いてから中身を返す
    * ことがあり（設定ファイルの場所を解く）、その間に打った内容は、届いた中身で気づかないうちに消えるため。
-   * ユーザが「破棄して読み直す？」をやめたときは `cancelled` が返り、欄が戻る。
+   * ユーザが「破棄して読み直す？」をやめたときは`cancelled`が返り、欄が戻る。
    */
   /**
-   * 未保存の変更の有無が変わったら拡張ホストに伝える。同じ種類のタブは 1 枚で、別の対象を開くと
+   * 未保存の変更の有無が変わったら拡張ホストに伝える。同じ種類のタブは1枚で、別の対象を開くと
    * このタブの中身が入れ替わるので、拡張ホストはこれを見て「破棄して切り替える？」を聞く。
    * 送るのは変わったときだけ（最初の「変更なし」は拡張ホストも同じ前提で始まるので送らない）
    */
@@ -211,7 +211,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         </p>
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
+        <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
           更新
         </button>
       </>
@@ -225,7 +225,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     setEditing((now) => ({ ...now, draft: next, open: open ?? now.open }));
     setDirty(true);
     setSaveWarns([]);
-    // id が重なっている間はその文面だけを出す。直前の失敗の文面は今のことではない
+    // idが重なっている間はその文面だけを出す。直前の失敗の文面は今のことではない
     if (duplicates(next).size > 0) {
       setStatus(undefined);
     }
@@ -275,7 +275,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 
   const courses = coursesOf(TOUR, setScene);
 
-  /** 定義を足す。絞り込みは外す（id が空の行は絞り込みにヒットせず隠れる） */
+  /** 定義を足す。絞り込みは外す（idが空の行は絞り込みにヒットせず隠れる） */
   const add = (): void => {
     if (tour.touring) {
       return;
@@ -288,7 +288,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     setFocusKey(row.key);
   };
 
-  // 案内の間は、今の定義ではなく見本を描く。画面の state（編集中の定義・開いた行・絞り込み・状態の一言）は触らない
+  // 案内の間は、今の定義ではなく見本を描く。画面のstate（編集中の定義・開いた行・絞り込み・状態の一言）は触らない
   const touring = tour.touring;
   const sampleLib = scene.target === "lib";
   const shownPage: PhasesPage | undefined = touring ? (sampleLib ? SAMPLE.project : SAMPLE.page) : page;
@@ -322,7 +322,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   });
   const shown = rows.filter((row) => !row.hidden).length;
   const kept = rows.filter((row) => row.hidden && isShownOpen(row)).length;
-  /** 案内が指す定義（足した行、無ければ開いている最初の行、それも無ければ最初の行）。中の部品の `data-tour` はこの行にだけ付く */
+  /** 案内が指す定義（足した行、無ければ開いている最初の行、それも無ければ最初の行）。中の部品の`data-tour`はこの行にだけ付く */
   const tourRowKey = touring
     ? (addedRow?.key ?? rows.find((row) => !row.hidden && isShownOpen(row))?.key ?? rows.find((row) => !row.hidden)?.key)
     : undefined;
@@ -356,7 +356,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <div id="changed" data-tour="changed" className={shownChanged ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。更新してください。
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={shownBusy} onClick={reload}>
           更新
         </button>
       </div>
@@ -377,7 +377,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           <button type="button" className="action" data-action="open-phases" data-tour="open-file" disabled={shownPage?.exists !== true} onClick={() => act({ type: "openFile" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={shownBusy} onClick={reload}>
             更新
           </button>
           <button
@@ -442,7 +442,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           <input
             id="find"
             type="search"
-            placeholder="id・title・scope・when で絞り込む"
+            placeholder="id・title・scope・whenで絞り込む"
             spellCheck={false}
             value={shownFind}
             onChange={(event) => {
@@ -455,18 +455,18 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         {shownHelp && (
           <div className="help-panel" id="help" data-tour="help-panel">
             <p className="hint">
-              区分が <code>work</code> の定義を親チケットの計画に並べたものが全体計画で、ユーザが合意すると確定します。レビューのあとは、区分が <code>feedback</code> の定義を並べて計画を改訂します。<code>id</code> と <code>title</code> はどちらも一意です。<code>scope</code>{" "}
-              は子チケットの編集可能な範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の編集可能な範囲そのまま）、<code>deliverables</code> は必須成果物で、閉じる前に存在し、git に追跡されているべきものです。
-              <code>agent</code>・<code>skill</code>・<code>when</code> はエージェントへの案内にだけ使い、判定には使いません。編集可能な範囲と必須成果物は <code>,</code> で区切ります。
+              区分が<code>work</code>の定義を親チケットの計画に並べたものが全体計画で、ユーザが合意すると確定します。レビューのあとは、区分が<code>feedback</code>の定義を並べて計画を改訂します。<code>id</code>と<code>title</code>はどちらも一意です。<code>scope</code>
+              は子チケットの編集可能な範囲の上限（ワークツリーのルートからのglob。<code>inherit</code>なら親の編集可能な範囲そのまま）、<code>deliverables</code>は必須成果物で、クローズする前に存在し、gitに追跡されているべきものです。
+              <code>agent</code>・<code>skill</code>・<code>when</code>はエージェントへの案内にだけ使い、判定には使いません。編集可能な範囲と必須成果物は<code>,</code>で区切ります。
             </p>
             <details className="help">
               <summary>計画と合意のコマンド・キー</summary>
               <p className="hint">
-                全体計画は親チケットの <code>plan:</code> に、計画の改訂は <code>feedback:</code> に書きます。合意は <code>ccnavi user agree</code> が通ることです。
+                全体計画は親チケットの<code>plan:</code>に、計画の改訂は<code>feedback:</code>に書きます。合意は<code>ccnavi user agree</code>が通ることです。
               </p>
             </details>
             <p className="hint">
-              順序（どのフェーズにどのフェーズが先行するか）はこのファイルには記載しません。親チケットの計画のステップに <code>after</code> で先行を指定します（最後のステップにほかの全部が先行するようにします）。
+              順序（どのフェーズにどのフェーズが先行するか）はこのファイルには記載しません。親チケットの計画のステップに<code>after</code>で先行を指定します（最後のステップにほかの全部が先行するようにします）。
               親チケットは承認のときに使う定義のコピー（<code>phases:</code>）を持つので、あとでここを直しても進行中の親には反映されません。
             </p>
           </div>
@@ -529,7 +529,7 @@ function CommonList(props: { readonly common: readonly CommonPhase[] }): JSX.Ele
       <ul className="list">
         {props.common.map((phase) => (
           <li key={phase.id} className="common-phase" data-id={phase.id} data-source="common">
-            <code>{phase.id}</code> {phase.title} <span>（区分 {phase.kind} / レビュー {String(phase.review)} / 編集可能な範囲 {phase.scope.join(", ")}）</span>
+            <code>{phase.id}</code> {phase.title} <span>（区分{phase.kind} / レビュー{String(phase.review)} / 編集可能な範囲{phase.scope.join(", ")}）</span>
           </li>
         ))}
       </ul>

@@ -1,8 +1,8 @@
 /**
- * ボード画面の操作。React の画面を happy-dom で動かし、列の折りたたみ・絞り込み・承認の送り先を見る。
- * 何を描くかは render.dom.test.ts。
+ * ボード画面の操作。Reactの画面をhappy-domで動かし、列の折りたたみ・絞り込み・承認の送り先を見る。
+ * 何を描くかはrender.dom.test.ts。
  *
- * React は押した直後には描き直さない。操作のあとは `await page.settle()` を挟んでから見る。
+ * Reactは押した直後には描き直さない。操作のあとは`await page.settle()`を挟んでから見る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -14,7 +14,7 @@ import { approvePreview, openBoard, openPage } from "../helpers/board.js";
 import type { Element, Event, HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
 import type { DomPage } from "../helpers/dom.js";
 
-test("CB-D40 列の見出しを押すと畳み、state に列名が入る。再読み込みしても畳んだまま", async () => {
+test("CB-D40 列の見出しを押すと畳み、stateに列名が入る。更新しても畳んだまま", async () => {
   const page = await openBoard();
   try {
     page.click(page.one('button.fold[data-fold="done"]'));
@@ -35,18 +35,18 @@ test("CB-D40 列の見出しを押すと畳み、state に列名が入る。再�
 
 test("CB-D41 親で絞り込むと他の親子のチケットのカードが隠れ、列の件数と承認ボタンは見えている数になる。承認は見えている承認待ちだけを送る", async () => {
   const base = fixture();
-  // 先頭は親 i0001。同じ形でもう 1 つ親（承認待ち）を足す
+  // 先頭は親i0001。同じ形でもう1つ親（承認待ち）を足す
   const other = { ...base.tickets[0], ticket: "i0002", title: "別の親", pending_approval: true };
   const json = { ...base, tickets: [...base.tickets, other], pending_approval: [...base.pending_approval, "i0002"] };
   const page = await openBoard(json);
   try {
-    assert.equal(page.one<HTMLButtonElement>('.controls button[data-action="approve"]').textContent, "承認待ち 2 件を承認");
+    assert.equal(page.one<HTMLButtonElement>('.controls button[data-action="approve"]').textContent, "承認待ち2件を承認");
     page.change(page.one("#parent-filter"), "i0001");
     await page.settle();
     assert.ok(page.document.body.classList.contains("filtering"));
     assert.ok(page.one('.card[data-id="i0002"]').classList.contains("hidden"));
     assert.ok(!page.one('.card[data-id="i0001"]').classList.contains("hidden"));
-    assert.equal(page.one<HTMLButtonElement>('.controls button[data-action="approve"]').textContent, "承認待ち 1 件を承認");
+    assert.equal(page.one<HTMLButtonElement>('.controls button[data-action="approve"]').textContent, "承認待ち1件を承認");
     assert.equal((page.state() as { parent: string }).parent, "i0001");
     page.click(page.one('.controls button[data-action="approve"]'));
     await page.settle();
@@ -64,10 +64,10 @@ test("CB-D41 親で絞り込むと他の親子のチケットのカードが隠�
 });
 
 test("CB-D46 書き込みが止まっているカードは「ユーザ待ちのみ」でも残る", async () => {
-  // 信頼できない理由（`blocked`）は、実行ファイルが不備として積み `attention` を真にする。素の版では
-  // i0001-02-02 は隠れる（CB-D42）ので、実行ファイルがそう言ったときだけ残ることが確かめられる。
+  // 信頼できない理由（`blocked`）は、実行ファイルが不備として積み`attention`を真にする。素の版では
+  // i0001-02-02は隠れる（CB-D42）ので、実行ファイルがそう言ったときだけ残ることが確かめられる。
   const base = fixture();
-  const blocked = "親 i0001 の承認済みチケットが作業中にない（未承認か、閉じている）";
+  const blocked = "親i0001の承認済みチケットが作業中にない（未承認か、閉じている）";
   const stopped = base.tickets.map((t) =>
     t.ticket === "i0001-02-02" ? { ...t, blocked, issues: [`書き込みが止まっています: ${blocked}`], attention: true } : t,
   );
@@ -82,7 +82,7 @@ test("CB-D46 書き込みが止まっているカードは「ユーザ待ちの�
   }
 });
 
-test("CB-D42 「ユーザ待ちのみ」でユーザが動く必要のないカードが隠れ、列の件数が減り、state に残る。承認は見えている承認待ちだけ", async () => {
+test("CB-D42 「ユーザ待ちのみ」でユーザが動く必要のないカードが隠れ、列の件数が減り、stateに残る。承認は見えている承認待ちだけ", async () => {
   const page = await openBoard();
   try {
     const box = page.one<HTMLInputElement>("#attention-filter");
@@ -136,12 +136,12 @@ test("CB-D44 「更新」を押すと非活性になり、回り記号と「更�
     assert.ok(button.classList.contains("busy"), "回り記号が出る");
     assert.equal(button.getAttribute("aria-busy"), "true");
     assert.equal(button.querySelector(".label")?.textContent, "更新中…");
-    // 非活性の間はもう 1 度押しても送らない
+    // 非活性の間はもう1度押しても送らない
     const sent = page.posted.length;
     page.click(button);
     await page.settle();
     assert.equal(page.posted.length, sent);
-    // 拡張が読み直しを終えて次の中身を渡したら、活性に戻る（HTML は作り直さない）
+    // 拡張が読み直しを終えて次の中身を渡したら、活性に戻る（HTMLは作り直さない）
     await page.send({ type: "data", data: { kind: "board", board: buildBoard(fixture()) } });
     assert.equal(button.disabled, false);
     assert.ok(!button.classList.contains("busy"));
@@ -151,7 +151,7 @@ test("CB-D44 「更新」を押すと非活性になり、回り記号と「更�
   }
 });
 
-test("CB-D45 再読み込みできなかった画面でも、承認のオーバーレイのボタンが効く。覚えていた絞り込みは上書きしない", async () => {
+test("CB-D45 更新できなかった画面でも、承認のオーバーレイのボタンが効く。覚えていた絞り込みは上書きしない", async () => {
   const saved = { project: "alpha", parent: "i0001", attention: true, folded: ["done"], widths: {} };
   const page = await openPage({ kind: "error", error: "読み込めない", approval: { kind: "done", count: 1, prompt: "文" } }, saved);
   try {
@@ -179,8 +179,8 @@ test("CB-D47 非表示から再表示されて作り直された画面は、い�
 
 test("CB-D48 プロジェクトの絞り込みは拡張ホストからの指定でも効き、覚える。候補になければ今の絞りを外さない", async () => {
   const base = fixture();
-  // lib のカードを 1 枚足す。絞ったときに他が隠れることを見る
-  const mine = { ...base.tickets[0], ticket: "i0002", title: "lib の親", project: "lib" };
+  // libのカードを1枚足す。絞ったときに他が隠れることを見る
+  const mine = { ...base.tickets[0], ticket: "i0002", title: "libの親", project: "lib" };
   const json = { ...base, projects: ["lib", "app"], tickets: [...base.tickets, mine] };
   const page = await openBoard(json, { filter: "lib" });
   try {
@@ -221,7 +221,7 @@ test("CB-D48 プロジェクトの絞り込みは拡張ホストからの指定�
   }
 });
 
-test("CB-D49 承認のオーバーレイは Esc で閉じる。承認している最中は閉じない", async () => {
+test("CB-D49 承認のオーバーレイはEscで閉じる。承認している最中は閉じない", async () => {
   const page = await openBoard(fixture(), { approval: { kind: "done", count: 1, prompt: "文" } });
   try {
     page.key("Escape");
@@ -235,7 +235,7 @@ test("CB-D49 承認のオーバーレイは Esc で閉じる。承認してい�
   } finally {
     await page.close();
   }
-  // 承認している最中は取り返しがつかないので、Esc を受けない
+  // 承認している最中は取り返しがつかないので、Escを受けない
   const approving = await openBoard(fixture(), {
     approval: { kind: "approving", preview: approvePreview() },
   });
@@ -247,7 +247,7 @@ test("CB-D49 承認のオーバーレイは Esc で閉じる。承認してい�
   } finally {
     await approving.close();
   }
-  // オーバーレイが無ければ、Esc は何も起こさない
+  // オーバーレイが無ければ、Escは何も起こさない
   const plain = await openBoard();
   try {
     const sent = plain.posted.length;
@@ -259,7 +259,7 @@ test("CB-D49 承認のオーバーレイは Esc で閉じる。承認してい�
   }
 });
 
-test("CB-D50 カードは Enter でも開く。ボタンやリンクの上では開かない", async () => {
+test("CB-D50 カードはEnterでも開く。ボタンやリンクの上では開かない", async () => {
   const page = await openBoard();
   try {
     page.key("Enter", page.one('.card[data-id="i0001-01-01"]'));
@@ -301,7 +301,7 @@ test("CB-D51 列の幅は取っ手のドラッグで決まって覚え、押し�
     await page.settle();
     assert.ok(!column().classList.contains("sized"));
     assert.deepEqual((page.state() as { widths?: Record<string, number> }).widths ?? {}, {});
-    // ドラッグしたら px で固定し、覚える
+    // ドラッグしたらpxで固定し、覚える
     drag(page, handle, 320);
     await page.settle();
     assert.ok(column().classList.contains("sized"));
@@ -335,8 +335,8 @@ test("CB-D52 ドラッグの途中で列が消えても、掴んだままのク�
     page.one('.resizer[data-resize="done"]').dispatchEvent(new window.PointerEvent("pointerdown", { bubbles: true, button: 0, clientX: 0, pointerId: 1 }));
     await page.settle();
     assert.ok(page.document.body.classList.contains("resizing"));
-    // 読み直せずエラーの画面に替わると列ごと消え、pointerup を受ける要素が無くなる。
-    // クラスが残ると、カーソルが col-resize のまま文字も選べなくなる
+    // 読み直せずエラーの画面に替わると列ごと消え、pointerupを受ける要素が無くなる。
+    // クラスが残ると、カーソルがcol-resizeのまま文字も選べなくなる
     await page.send({ type: "data", data: { kind: "error", error: "読み込めない" } });
     assert.equal(page.all(".column").length, 0);
     assert.ok(!page.document.body.classList.contains("resizing"));
@@ -345,7 +345,7 @@ test("CB-D52 ドラッグの途中で列が消えても、掴んだままのク�
   }
 });
 
-/** 前の読み直しから動いたカード。数えるのは拡張ホストで、画面には `moved` として渡る */
+/** 前の読み直しから動いたカード。数えるのは拡張ホストで、画面には`moved`として渡る */
 function data(moved?: readonly Moved[]): BoardData {
   return { kind: "board", board: buildBoard(fixture()), moved };
 }
@@ -409,17 +409,17 @@ async function walkTour(dom: DomPage): Promise<string[]> {
   return titles;
 }
 
-test("CB-D95 拡張ホストが頼んだらボードの案内を出し、最後まで進めると閉じて tourDone を返す。「？ 案内」からもう一度出せる", async () => {
+test("CB-D95 拡張ホストが頼んだらボードの案内を出し、最後まで進めると閉じてtourDoneを返す。「？ 案内」からもう一度出せる", async () => {
   const dom = await openBoard();
   try {
-    // 案内の入口は ? 1 文字で、ヘッダ（ツールバー）の最後の子。位置は Tour.css が 6 画面とも右上に揃える
+    // 案内の入口は ? 1文字で、ヘッダ（ツールバー）の最後の子。位置はTour.cssが6画面とも右上に揃える
     assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
     assert.equal(dom.all(".tour").length, 0, "頼まれるまでは出さない");
     await dom.send({ type: "tour" });
     await dom.settle();
     // チケットがあるボードでも、案内の間は見本を描く
     assert.equal(dom.all(".tour-sample").length, 1);
-    assert.deepEqual(await walkTour(dom), ["集計", "絞り込み", "列", "状態のバッジ", "ユーザ待ち", "詳細", "承認", "更新", "MR の状況を確認", "案内"]);
+    assert.deepEqual(await walkTour(dom), ["集計", "絞り込み", "列", "状態のバッジ", "ユーザ待ち", "詳細", "承認", "更新", "MRの状況を確認", "案内"]);
     assert.equal(dom.all(".tour").length, 0);
     assert.equal(dom.all(".tour-sample").length, 0);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
@@ -439,7 +439,7 @@ test("CB-D95 拡張ホストが頼んだらボードの案内を出し、最後�
   }
 });
 
-test("CB-D96 チケットが 1 枚もないボードでは、案内の間だけ見本のカードを出し、閉じたら削除する。見本は承認に送らない", async () => {
+test("CB-D96 チケットが1枚もないボードでは、案内の間だけ見本のカードを出し、閉じたら削除する。見本は承認に送らない", async () => {
   const empty = { ...fixture(), tickets: [], parents: [], pending_approval: [] };
   const dom = await openBoard(empty);
   try {
@@ -528,13 +528,13 @@ test("CB-D104 案内を閉じたら、焦点を案内の前の場所（「？ �
     assert.equal(dom.document.activeElement, dom.one('[data-action="tour-next"]'));
     dom.key("Escape");
     await dom.settle();
-    assert.equal(dom.document.activeElement, button, "焦点が body に移った");
+    assert.equal(dom.document.activeElement, button, "焦点がbodyに移った");
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D105 案内の最中にボードが再読み込みできなくなったら案内を閉じて tourDone を返し、ボードが戻っても出直さない", async () => {
+test("CB-D105 案内の最中にボードが更新できなくなったら案内を閉じてtourDoneを返し、ボードが戻っても出直さない", async () => {
   const json = fixture();
   const dom = await openBoard(json);
   try {
@@ -554,7 +554,7 @@ test("CB-D105 案内の最中にボードが再読み込みできなくなった
   }
 });
 
-test("CB-D144 「アーカイブ済みチケットを表示」は既定で外れていて、入れるとアーカイブの列と退避のカードが出る。state に残る", async () => {
+test("CB-D144 「アーカイブ済みチケットを表示」は既定で外れていて、入れるとアーカイブの列と退避のカードが出る。stateに残る", async () => {
   const archived = {
     ticket: "old",
     parent: "",
@@ -568,7 +568,7 @@ test("CB-D144 「アーカイブ済みチケットを表示」は既定で外れ
     cancel_reason: "",
   };
   const json = { ...fixture(), archived: [archived] };
-  // ボードの横幅を偽る（happy-dom は測らない）。送ったかは scrollLeft で見る
+  // ボードの横幅を偽る（happy-domは測らない）。送ったかはscrollLeftで見る
   const wide = (window: { readonly HTMLElement: { readonly prototype: object } }): void => {
     Object.defineProperty(window.HTMLElement.prototype, "scrollWidth", { configurable: true, get: () => 1000 });
   };

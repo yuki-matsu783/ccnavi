@@ -16,10 +16,10 @@ import type { ToTemplates } from "../../src/core/templates-view.js";
 import type { AppearanceMessage } from "../../src/core/appearance.js";
 import { WEBVIEW_SRC } from "../helpers/bundle.js";
 
-/** Claude の配色そのもの。画面の側の CSS にある（拡張が持つのは body のクラスだけ） */
+/** Claudeの配色そのもの。画面の側のCSSにある（拡張が持つのはbodyのクラスだけ） */
 const APPEARANCE_STYLE = fs.readFileSync(path.join(WEBVIEW_SRC, "styles", "appearance.css"), "utf8");
 
-/** WCAG の相対輝度によるコントラスト比 */
+/** WCAGの相対輝度によるコントラスト比 */
 function contrast(a: string, b: string): number {
   const lum = (hex: string): number => {
     const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
@@ -29,7 +29,7 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-test("CB-T128 見た目の設定は 3 つの値だけを受け、知らない値と型違いは既定（VS Code のテーマ）にする", () => {
+test("CB-T128 見た目の設定は3つの値だけを受け、知らない値と型違いは既定（VS Codeのテーマ）にする", () => {
   assert.equal(parseAppearance("claude-light"), "claude-light");
   assert.equal(parseAppearance("claude-dark"), "claude-dark");
   assert.equal(parseAppearance("vscode"), "vscode");
@@ -38,12 +38,12 @@ test("CB-T128 見た目の設定は 3 つの値だけを受け、知らない値
   assert.equal(parseAppearance(3), "vscode");
 });
 
-test("CB-T129 body のクラスは Claude の配色のときだけ付き、CSS はそのクラスの下でテーマ変数を上書きする", () => {
+test("CB-T129 bodyのクラスはClaudeの配色のときだけ付き、CSSはそのクラスの下でテーマ変数を上書きする", () => {
   assert.equal(bodyTag(undefined), "<body>");
   assert.equal(bodyTag("vscode"), "<body>");
   assert.equal(bodyTag("claude-light"), '<body class="ccnavi-claude-light">');
   assert.equal(appearanceClass("claude-dark"), "ccnavi-claude-dark");
-  // HC では適用しない書き方
+  // HCでは適用しない書き方
   assert.match(APPEARANCE_STYLE, /body\.ccnavi-claude-dark:not\(\.vscode-high-contrast\):not\(\.vscode-high-contrast-light\) \{\s*--vscode-editor-background: #262624;/);
   assert.match(APPEARANCE_STYLE, /body\.ccnavi-claude-light:not\(\.vscode-high-contrast\):not\(\.vscode-high-contrast-light\) \{\s*--vscode-editor-background: #FAF9F5;/);
   // 意味の色は両方で地に合わせて置き換える（ライトのテーマからダークを選んでも読める）
@@ -53,19 +53,19 @@ test("CB-T129 body のクラスは Claude の配色のときだけ付き、CSS �
       assert.match(part, new RegExp(`--vscode-${name}: #[0-9A-Fa-f]{6}`), name);
     }
   }
-  // 部品の色を直接書かない（テーマ変数の上書きだけ）。placeholder は使う CSS が無いので上書きしない
+  // 部品の色を直接書かない（テーマ変数の上書きだけ）。placeholderは使うCSSが無いので上書きしない
   assert.doesNotMatch(APPEARANCE_STYLE, /\.summary|\.badge|\.card|placeholderForeground/);
-  // 文字の色は地に対して 4.5:1 以上
+  // 文字の色は地に対して4.5:1以上
   const pairs: [string, string][] = [["#E8E6DF", "#262624"], ["#A8A69E", "#30302E"], ["#1F1E1D", "#D97757"], ["#E0B75A", "#262624"], ["#F2707A", "#262624"], ["#7BC275", "#262624"], ["#141413", "#FAF9F5"], ["#6B6A64", "#F0EEE6"], ["#ffffff", "#B0532F"], ["#7F5500", "#F0EEE6"], ["#B3261E", "#F0EEE6"], ["#366D24", "#F0EEE6"]];
   for (const [fg, bg] of pairs) {
     assert.ok(contrast(fg, bg) >= 4.5, `${fg} on ${bg} = ${contrast(fg, bg).toFixed(2)}`);
   }
 });
 
-/** Chrome 拡張の画面が読む配色（`extensions/shared/styles/browser-theme.css`）。appearance.css のコピー */
+/** Chrome拡張の画面が読む配色（`extensions/shared/styles/browser-theme.css`）。appearance.cssのコピー */
 const BROWSER_THEME = fs.readFileSync(path.join(WEBVIEW_SRC, "..", "..", "..", "..", "shared", "styles", "browser-theme.css"), "utf8");
 
-/** CSS の `--vscode-*` の宣言を、名前 -> 値で取る（コメントは除き、値は大文字小文字と空白の差を無視する） */
+/** CSSの`--vscode-*`の宣言を、名前 -> 値で取る（コメントは除き、値は大文字小文字と空白の差を無視する） */
 function themeVariables(css: string): Map<string, string> {
   const found = new Map<string, string>();
   for (const match of css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/(--vscode-[\w-]+)\s*:\s*([^;}]+)[;}]/g)) {
@@ -79,41 +79,41 @@ function themeDiff(expected: Map<string, string>, actual: Map<string, string>, a
   const diffs: string[] = [];
   for (const [name, value] of expected) {
     if (!actual.has(name)) {
-      diffs.push(`${name} が browser-theme.css にありません`);
+      diffs.push(`${name}がbrowser-theme.cssにありません`);
     } else if (actual.get(name) !== value) {
-      diffs.push(`${name}: appearance.css は ${value}、browser-theme.css は ${actual.get(name)}`);
+      diffs.push(`${name}: appearance.cssは${value}、browser-theme.cssは${actual.get(name)}`);
     }
   }
   for (const name of actual.keys()) {
     if (!expected.has(name) && !allowedExtra.has(name)) {
-      diffs.push(`${name} が appearance.css にありません`);
+      diffs.push(`${name}がappearance.cssにありません`);
     }
   }
   return diffs;
 }
 
-test("CB-T393 browser-theme.css（Chrome 拡張）の配色は appearance.css の Claude の配色と、ライト・ダークとも同じ名前・同じ値", () => {
-  // browser-theme.css だけが持ってよいのは字体の 3 変数（VS Code の Webview では VS Code が渡す値）
+test("CB-T393 browser-theme.css（Chrome拡張）の配色はappearance.cssのClaudeの配色と、ライト・ダークとも同じ名前・同じ値", () => {
+  // browser-theme.cssだけが持ってよいのは字体の3変数（VS CodeのWebviewではVS Codeが渡す値）
   const fontVariables = new Set(["--vscode-font-family", "--vscode-font-size", "--vscode-editor-font-family"]);
   const [beforeDark, afterDark] = BROWSER_THEME.split("@media (prefers-color-scheme: dark)");
-  assert.notEqual(afterDark, undefined, "browser-theme.css にダークの @media がありません");
+  assert.notEqual(afterDark, undefined, "browser-theme.cssにダークの @mediaがありません");
   const light = themeVariables(beforeDark);
   const dark = themeVariables(afterDark);
   const [darkPart, lightPart] = APPEARANCE_STYLE.split("body.ccnavi-claude-light");
   const expectedDark = themeVariables(darkPart);
   const expectedLight = themeVariables(lightPart);
   // 比べる元が空だと、何も比べないまま通る
-  assert.ok(expectedLight.size >= 30 && expectedDark.size >= 30, `appearance.css の変数が少ない: light=${expectedLight.size} dark=${expectedDark.size}`);
+  assert.ok(expectedLight.size >= 30 && expectedDark.size >= 30, `appearance.cssの変数が少ない: light=${expectedLight.size} dark=${expectedDark.size}`);
   assert.deepEqual(themeDiff(expectedLight, light, fontVariables), [], "ライト");
-  // ダークは字体を持たない（ライトの :root だけが持つ）。持つなら appearance.css に無いものとして落とす
+  // ダークは字体を持たない（ライトの :rootだけが持つ）。持つならappearance.cssに無いものとして落とす
   assert.deepEqual(themeDiff(expectedDark, dark, new Set()), [], "ダーク");
   for (const name of fontVariables) {
-    assert.ok(light.has(name), `${name} が browser-theme.css のライトにありません`);
-    assert.ok(!expectedLight.has(name) && !expectedDark.has(name), `${name} は appearance.css に置かない`);
+    assert.ok(light.has(name), `${name}がbrowser-theme.cssのライトにありません`);
+    assert.ok(!expectedLight.has(name) && !expectedDark.has(name), `${name}はappearance.cssに置かない`);
   }
 });
 
-/** 段取りの下に置く Webview の代わり。何が送られたかだけを見る */
+/** 段取りの下に置くWebviewの代わり。何が送られたかだけを見る */
 function surface(visible = true): Surface & { visible: boolean; readonly pages: string[]; readonly posted: unknown[] } {
   const pages: string[] = [];
   const posted: unknown[] = [];
@@ -134,7 +134,7 @@ test("CB-T182 見た目は画面に中身を渡す段取りを通る。組み上
   const spy = surface();
   const host = screenHost<string>(spy, (data) => data);
 
-  // 1 枚も入れていない。入れ物を入れる経路はまだ通っていないので送り先が無い
+  // 1枚も入れていない。入れ物を入れる経路はまだ通っていないので送り先が無い
   assert.equal(sendAppearance(host, "claude-dark"), false);
   assert.deepEqual(spy.posted, []);
 
@@ -156,7 +156,7 @@ test("CB-T182 見た目は画面に中身を渡す段取りを通る。組み上
   assert.deepEqual(spy.posted, [{ type: "appearance", value: "claude-dark" }]);
 });
 
-test("CB-T182b 保持する画面は非表示でも送る。1 枚目を読み込んでいる間だけ送れない", () => {
+test("CB-T182b 保持する画面は非表示でも送る。1枚目を読み込んでいる間だけ送れない", () => {
   const spy = surface();
   const host = retainedHost<string>(spy, (data) => data);
 
@@ -167,7 +167,7 @@ test("CB-T182b 保持する画面は非表示でも送る。1 枚目を読み込
   assert.equal(sendAppearance(host, "claude-light"), true);
 
   // 保持する画面は非表示になっても破棄されない。表示の有無を見ないので送れる
-  // （届くかどうかは VS Code 次第なので、再表示されたところで呼ぶ側が送り直す）
+  // （届くかどうかはVS Code次第なので、再表示されたところで呼ぶ側が送り直す）
   host.hidden();
   assert.equal(sendAppearance(host, "vscode"), true);
   assert.deepEqual(spy.posted, [
@@ -180,15 +180,15 @@ test("CB-T182b 保持する画面は非表示でも送る。1 枚目を読み込
 /**
  * 見た目の配線を、ソースを読んで見張る（CB-T157 と同じ手）。
  *
- * 退行そのもの（`followAppearance` が `webview.postMessage` を直に呼ぶ、送り直しを省く）は
- * `src/appearance.ts` と 8 つのパネルで起きるが、そこは `vscode` を import するので単体では
- * 動かせない。上の 2 本（CB-T182 / CB-T182b）が見ているのは段取りの側で、配線を戻してもテストは通ったまま。
+ * 退行そのもの（`followAppearance`が`webview.postMessage`を直に呼ぶ、送り直しを省く）は
+ * `src/appearance.ts`と8つのパネルで起きるが、そこは`vscode`をimportするので単体では
+ * 動かせない。上の2本（CB-T182 / CB-T182b）が見ているのは段取りの側で、配線を戻してもテストは通ったまま。
  * 名前で見るだけなので表記を変えて呼ぶ方法までは防げないが、うっかり外すことは防げる。
  */
 const EXT_SRC = path.join(WEBVIEW_SRC, "..");
 
 /**
- * コードだけを返す。コメントを外すのが肝で、外さないと「`webview.postMessage` は呼ばない」と
+ * コードだけを返す。コメントを外すのが肝で、外さないと「`webview.postMessage`は呼ばない」と
  * 書いた説明そのものが「呼んでいる」としてヒットする。
  */
 function source(name: string): string {
@@ -202,44 +202,44 @@ function source(name: string): string {
 const REBUILT_PANELS = ["board-panel.ts", "projects-panel.ts"];
 const RETAINED_PANELS = ["rules-panel.ts", "risk-panel.ts", "phases-panel.ts", "templates-panel.ts", "flow-panel.ts", "workflow-panel.ts", "handoff-panel.ts"];
 
-test("CB-T183 見た目は段取りを通る。直に postMessage を呼ぶ道と、自前の送り直しを持たない", () => {
+test("CB-T183 見た目は段取りを通る。直にpostMessageを呼ぶ道と、自前の送り直しを持たない", () => {
   const follow = source("appearance.ts");
   assert.doesNotMatch(follow, /webview\s*\.\s*postMessage/, "見た目が段取り（ScreenHost）を迂回している");
-  assert.doesNotMatch(follow, /onDidChangeViewState/, "再表示されたときの送り直しを 2 か所で持っている");
+  assert.doesNotMatch(follow, /onDidChangeViewState/, "再表示されたときの送り直しを2か所で持っている");
   assert.match(follow, /export function followAppearance\(panel: vscode\.WebviewPanel, host: AppearanceSink\)/);
 });
 
-test("CB-T183b 9 画面とも段取りに繋ぎ、組み上がったところで送り直す", () => {
+test("CB-T183b 9画面とも段取りに繋ぎ、組み上がったところで送り直す", () => {
   for (const name of [...REBUILT_PANELS, ...RETAINED_PANELS]) {
     const text = source(name);
-    assert.match(text, /followAppearance\(panel, current\.host\)/, `${name} が段取りに繋いでいない`);
-    // `ready` を受けたところ。入れてある HTML の body のクラスは古いことがある
-    assert.match(text, /current\.host\.ready\(\);[\s\S]{0,600}?postAppearance\(current\.host\)/, `${name} の ready で送り直していない`);
+    assert.match(text, /followAppearance\(panel, current\.host\)/, `${name}が段取りに繋いでいない`);
+    // `ready`を受けたところ。入れてあるHTMLのbodyのクラスは古いことがある
+    assert.match(text, /current\.host\.ready\(\);[\s\S]{0,600}?postAppearance\(current\.host\)/, `${name}のreadyで送り直していない`);
   }
 });
 
-test("CB-T183c 保持する画面は、再表示されたところでも送り直す（作り直されないので ready が来ない）", () => {
+test("CB-T183c 保持する画面は、再表示されたところでも送り直す（作り直されないのでreadyが来ない）", () => {
   for (const name of RETAINED_PANELS) {
     const raw = source(name);
-    // ルール・リスク・フェーズの再表示の処理は、3 画面が共通で使う段取り（settings-panel.ts）にある
+    // ルール・リスク・フェーズの再表示の処理は、3画面が共通で使う段取り（settings-panel.ts）にある
     const text = /settingsPanel</.test(raw) ? source("settings-panel.ts") : raw;
     const found = /panel\.onDidChangeViewState\(\(\) => \{([\s\S]*?)\n\s*\}\);/.exec(text);
-    assert.ok(found !== null, `${name} に再表示されたときの送り直しがありません`);
-    assert.match(found[1], /postAppearance\(current\.host\)/, `${name} が再表示されても見た目を送り直していない`);
+    assert.ok(found !== null, `${name}に再表示されたときの送り直しがありません`);
+    assert.match(found[1], /postAppearance\(current\.host\)/, `${name}が再表示されても見た目を送り直していない`);
   }
   for (const name of REBUILT_PANELS) {
     // 保持しない画面は作り直されるので、ここで送ると「破棄された画面へ送る」になる
-    assert.doesNotMatch(source(name), /onDidChangeViewState\([\s\S]{0,400}?postAppearance/, `${name} は ready で足りる`);
+    assert.doesNotMatch(source(name), /onDidChangeViewState\([\s\S]{0,400}?postAppearance/, `${name}はreadyで足りる`);
   }
 });
 
 /**
- * 見た目のメッセージが、9 画面すべての契約（`To*`）に入っていること。tsc が確かめる。
+ * 見た目のメッセージが、9画面すべての契約（`To*`）に入っていること。tscが確かめる。
  *
- * 古いコードは呼び出しのたびに `{ type: "appearance", value } satisfies ToBoard` と書いていて、
- * その画面の契約に入っていることをコンパイラが確かめていた。`postAppearance(host)` にそろえたときに
- * その検査が消えた（`ScreenHost<D>.post` は `unknown` を取るので、契約から外しても通ってしまう）。
- * ここで 1 か所にまとめて確かめ直す。画面を足す人は、この配列に 1 行足せば同じ検査が有効になる。
+ * 古いコードは呼び出しのたびに`{ type: "appearance", value } satisfies ToBoard`と書いていて、
+ * その画面の契約に入っていることをコンパイラが確かめていた。`postAppearance(host)`にそろえたときに
+ * その検査が消えた（`ScreenHost<D>.post`は`unknown`を取るので、契約から外しても通ってしまう）。
+ * ここで1か所にまとめて確かめ直す。画面を足す人は、このリストに1行足せば同じ検査が有効になる。
  */
 const APPEARANCE: AppearanceMessage = { type: "appearance", value: "claude-dark" };
 const IN_EVERY_CONTRACT: readonly [ToBoard, ToProjects, ToRisk, ToRules, ToPhases, ToTemplates, ToFlow, ToWorkflow, ToHandoff] = [
@@ -254,14 +254,14 @@ const IN_EVERY_CONTRACT: readonly [ToBoard, ToProjects, ToRisk, ToRules, ToPhase
   APPEARANCE,
 ];
 
-test("CB-T184 見た目のメッセージは 9 画面すべての契約に入っている（外すとコンパイルが通らない）", () => {
+test("CB-T184 見た目のメッセージは9画面すべての契約に入っている（外すとコンパイルが通らない）", () => {
   assert.equal(IN_EVERY_CONTRACT.length, 9);
   for (const message of IN_EVERY_CONTRACT) {
     assert.deepEqual(message, { type: "appearance", value: "claude-dark" });
   }
 });
 
-test("CB-T1243 拡大率の設定は 0.8〜2 に収め、数でない値は等倍にする。等倍以外のときだけメッセージに乗る", () => {
+test("CB-T1243 拡大率の設定は0.8〜2に収め、数でない値は等倍にする。等倍以外のときだけメッセージに乗る", () => {
   assert.equal(parseZoom(1.5), 1.5);
   assert.equal(parseZoom(5), 2);
   assert.equal(parseZoom(0.1), 0.8);

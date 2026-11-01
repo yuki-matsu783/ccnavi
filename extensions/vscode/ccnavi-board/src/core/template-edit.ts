@@ -1,34 +1,34 @@
 /**
  * テンプレートの編集の手元のコピー。テンプレート管理画面の編集欄と拡張ホストが分け合う。
  *
- * ファイルは YAML の 1 文書（`.ccnavi/config/<層>/templates/<名前>.yml`）。形は実行ファイル（`tickets/proposal/plan_templates.py`）が読むもの。
+ * ファイルはYAMLの1文書（`.ccnavi/config/<レイヤー>/templates/<名前>.yml`）。形は実行ファイル（`tickets/proposal/plan_templates.py`）が読むもの。
  *
  *     name, description, when?
- *     plan:     [型の名前 | {type, review?, deferred?, after?}, ...]     全体計画。`after` は計画の中の添字（1 始まり）
- *     feedback: [同上]                                        フィードバック計画。`after` もこの計画の中の添字
- *     flows:    {全体計画の添字: フローの本文}                  子のフロー（フロー編集画面と同じ形）
+ *     plan:     [型の名前 | {type, review?, deferred?, after?}, ...]全体計画。`after`は計画の中の添字（1始まり）
+ *     feedback: [同上]フィードバック計画。`after`もこの計画の中の添字
+ *     flows:    {全体計画の添字: フローの本文}子のフロー（フロー編集画面と同じ形）
  *
- * 画面が持つのは、実行ファイルが読んで返した中身（`--templates --check-file` の `data`）のコピー。編集はそのコピーを作り直すだけで、
- * ステップの `after` は「その計画の中の添字」のまま持つ。**番号の付け直しを伴う編集（ステップの削除・並べ替え・線を引く）は、先行が必ず
- * 自分より小さい添字になるように、ここで添字を振り直す**（実行ファイルの `after` の決まり。守らなければ error になる）。
+ * 画面が持つのは、実行ファイルが読んで返した中身（`--templates --check-file`の`data`）のコピー。編集はそのコピーを作り直すだけで、
+ * ステップの`after`は「その計画の中の添字」のまま持つ。**番号の付け直しを伴う編集（ステップの削除・並べ替え・線を引く）は、先行が必ず
+ * 自分より小さい添字になるように、ここで添字を振り直す**（実行ファイルの`after`の決まり。守らなければerrorになる）。
  *
  * 書き出しは中身から組み直す（コメントや書き方は残らない）。書いたものが実行ファイルに同じ中身で読まれるかは、保存の前に
  * 実行ファイルに読ませて見比べる（`sameData`）。読めるか・計画とフローの形が正しいかは実行ファイルが言い、画面は判定しない。
  *
- * ここには VS Code の API も node も DOM も入れない。画面（React）がバンドルして読むため。
+ * ここにはVS CodeのAPIもnodeもDOMも入れない。画面（React）がバンドルして読むため。
  */
 import type { FlowDoc } from "./flow-doc.js";
 import { yamlText } from "./flow-doc.js";
 
-/** 計画の 2 つ。全体計画（`plan`）とフィードバック計画（`feedback`） */
+/** 計画の2つ。全体計画（`plan`）とフィードバック計画（`feedback`） */
 export type PlanPart = "plan" | "feedback";
 
-/** 計画の 1 ステップ。`after` は計画の中の添字（1 始まり） */
+/** 計画の1ステップ。`after`は計画の中の添字（1始まり） */
 export interface EditItem {
   readonly type: string;
-  /** ステップの `review`。true は要る、false は要らない（どちらも定義より優先）。null は書かない（定義に従う） */
+  /** ステップの`review`。trueは要る、falseは要らない（どちらも定義より優先）。nullは書かない（定義に従う） */
   readonly review: boolean | null;
-  /** ステップの `deferred: true`（レビューを後ろのステップへ延ばす）。既定は false。`review` を書いたステップとは同時に真にならない */
+  /** ステップの`deferred: true`（レビューを後ろのステップへ延ばす）。既定はfalse。`review`を書いたステップとは同時に真にならない */
   readonly deferred: boolean;
   readonly after: readonly number[];
 }
@@ -46,7 +46,7 @@ export interface EditTemplate {
   readonly extra: Readonly<Record<string, unknown>>;
 }
 
-/** ステップのレビューの指定（画面の選択肢）。空は定義のまま、`review` は `review: true`、`no-review` は `review: false`、`deferred` は `deferred: true` */
+/** ステップのレビューの指定（画面の選択肢）。空は定義のまま、`review`は`review: true`、`no-review`は`review: false`、`deferred`は`deferred: true` */
 export const ITEM_MODES = ["", "review", "no-review", "deferred"] as const;
 export type ItemMode = (typeof ITEM_MODES)[number];
 
@@ -85,7 +85,7 @@ function readItems(value: unknown): EditItem[] | undefined {
   return out;
 }
 
-/** 実行ファイルが読んで返した中身（`data`）から編集のコピーを作る。形が違えば undefined（編集を始めない） */
+/** 実行ファイルが読んで返した中身（`data`）から編集のコピーを作る。形が違えばundefined（編集を始めない） */
 export function fromData(raw: unknown): EditTemplate | undefined {
   if (!isRecord(raw) || typeof raw.name !== "string") {
     return undefined;
@@ -121,12 +121,12 @@ export function fromData(raw: unknown): EditTemplate | undefined {
   };
 }
 
-/** 空の名前から始める新しいテンプレート。`type` は最初のステップの型 */
+/** 空の名前から始める新しいテンプレート。`type`は最初のステップの型 */
 export function blankTemplate(name: string, type: string): EditTemplate {
   return { name, description: "", when: "", plan: [{ type, review: null, deferred: false, after: [] }], feedback: [], flows: {}, extra: {} };
 }
 
-/** まだ何も入力していないか。`blank` は `blankTemplate` で作った開いた直後の中身。書き出す形で比べる */
+/** まだ何も入力していないか。`blank`は`blankTemplate`で作った開いた直後の中身。書き出す形で比べる */
 export function untouched(template: EditTemplate, blank: EditTemplate): boolean {
   return JSON.stringify(toData(template)) === JSON.stringify(toData(blank));
 }
@@ -150,7 +150,7 @@ function itemData(item: EditItem): unknown {
 }
 
 /**
- * 書き出す中身（実行ファイルの `Template.as_data()` と同じ形・同じ順）。文字は実行ファイルが読むときと同じに前後の空白を取る。
+ * 書き出す中身（実行ファイルの`Template.as_data()`と同じ形・同じ順）。文字は実行ファイルが読むときと同じに前後の空白を取る。
  * フィードバック計画とフローは、空なら欄ごと省く
  */
 export function toData(template: EditTemplate): Record<string, unknown> {
@@ -176,12 +176,12 @@ export function toData(template: EditTemplate): Record<string, unknown> {
   return out;
 }
 
-/** YAML の文面。保存のときだけ使う */
+/** YAMLの文面。保存のときだけ使う */
 export function serializeTemplate(template: EditTemplate): string {
   return yamlText(toData(template));
 }
 
-/** キーを並べ直した JSON。中身の比べ合いに使う（キーの順は無視する） */
+/** キーを並べ直したJSON。中身の比べ合いに使う（キーの順は無視する） */
 function canonical(value: unknown): string {
   return JSON.stringify(value, (_key, v: unknown) => {
     if (isRecord(v)) {
@@ -198,7 +198,7 @@ export function sameData(intended: unknown, read: unknown): boolean {
 
 // ---- 番号（図のステップの番号は、フィードバック計画が全体計画の続き）
 
-/** 図の番号 → 計画と添字（1 始まり）。範囲外は undefined */
+/** 図の番号 → 計画と添字（1始まり）。範囲外はundefined */
 export function locate(template: EditTemplate, number: number): { readonly part: PlanPart; readonly index: number } | undefined {
   const planned = template.plan.length;
   if (number >= 1 && number <= planned) {
@@ -220,7 +220,7 @@ function partOf(template: EditTemplate, part: PlanPart): readonly EditItem[] {
 
 // ---- ステップの編集（どれも新しいコピーを返す。できない編集は元のまま返す）
 
-/** 画面の選択肢（`mode`）が書く `review`。`review` は要る、`no-review` は要らない、それ以外は書かない */
+/** 画面の選択肢（`mode`）が書く`review`。`review`は要る、`no-review`は要らない、それ以外は書かない */
 function reviewOf(mode: ItemMode): boolean | null {
   return mode === "review" ? true : mode === "no-review" ? false : null;
 }
@@ -245,7 +245,7 @@ export function addItem(template: EditTemplate, part: PlanPart, type: string): E
   return withPart(template, part, [...items, { type, review: null, deferred: false, after }]);
 }
 
-/** ステップを `order`（新しい添字の順に、古い添字を並べたもの。入れない古い添字は落とす）で並べ直す。全体計画ならフローのキーも合わせる */
+/** ステップを`order`（新しい添字の順に、古い添字を並べたもの。入れない古い添字は落とす）で並べ直す。全体計画ならフローのキーも合わせる */
 function remap(template: EditTemplate, part: PlanPart, order: readonly number[]): EditTemplate {
   // order[新しい添字-1] = 古い添字
   const items = partOf(template, part);
@@ -269,7 +269,7 @@ function remap(template: EditTemplate, part: PlanPart, order: readonly number[])
 }
 
 /**
- * ステップを消す。全体計画の最後の 1 ステップは消せない（計画が空になる）。消すステップが先行だったステップは、消すステップの先行を引き継ぐ
+ * ステップを消す。全体計画の最後の1ステップは消せない（計画が空になる）。消すステップが先行だったステップは、消すステップの先行を引き継ぐ
  * （途中のステップを消しても、後ろのステップが前のステップと並行して始まるステップに変わらない）。後ろのステップの添字と、フローのキーを振り直す
  */
 export function removeItem(template: EditTemplate, part: PlanPart, index: number): EditTemplate {
@@ -290,7 +290,7 @@ function ordered(items: readonly EditItem[]): boolean {
   return items.every((item, i) => item.after.every((n) => n >= 1 && n < i + 1));
 }
 
-/** ステップを 1 つ前（`delta` = -1）か後ろ（+1）へ動かせるか。先行か後続を越える動きはできない */
+/** ステップを1つ前（`delta` = -1）か後ろ（+1）へ動かせるか。先行か後続を越える動きはできない */
 export function canMove(template: EditTemplate, part: PlanPart, index: number, delta: -1 | 1): boolean {
   const items = partOf(template, part);
   const to = index + delta;
@@ -316,7 +316,7 @@ export function moveItem(template: EditTemplate, part: PlanPart, index: number, 
 
 /**
  * 先行が自分より小さい添字になるように、ステップを並べ直す（元の順をなるべく保つ並べ替え）。すでに満たしていれば元のまま。
- * 先行が循環していて並べられなければ undefined
+ * 先行が循環していて並べられなければundefined
  */
 export function renumber(template: EditTemplate, part: PlanPart): EditTemplate | undefined {
   const items = partOf(template, part);
@@ -336,7 +336,7 @@ export function renumber(template: EditTemplate, part: PlanPart): EditTemplate |
   return remap(template, part, placed);
 }
 
-/** 図の番号 `from` が `to` の先行になる線を引く。同じ計画の中だけ。引いたあと、先行が小さい添字になるよう並べ直す */
+/** 図の番号`from`が`to`の先行になる線を引く。同じ計画の中だけ。引いたあと、先行が小さい添字になるよう並べ直す */
 export function connectItems(template: EditTemplate, from: number, to: number): EditTemplate {
   const a = locate(template, from);
   const b = locate(template, to);
@@ -355,7 +355,7 @@ export function connectItems(template: EditTemplate, from: number, to: number): 
   return renumber(next, a.part) ?? template;
 }
 
-/** 図の番号 `from` が `to` の先行である線を消す */
+/** 図の番号`from`が`to`の先行である線を消す */
 export function disconnectItems(template: EditTemplate, from: number, to: number): EditTemplate {
   const a = locate(template, from);
   const b = locate(template, to);
@@ -379,7 +379,7 @@ export function setMeta(template: EditTemplate, patch: { readonly name?: string;
   return { ...template, ...patch };
 }
 
-/** 全体計画の `index` 番のステップにフローを置く（置き換える） */
+/** 全体計画の`index`番のステップにフローを置く（置き換える） */
 export function setFlow(template: EditTemplate, index: number, doc: FlowDoc): EditTemplate {
   if (index < 1 || index > template.plan.length) {
     return template;
@@ -387,7 +387,7 @@ export function setFlow(template: EditTemplate, index: number, doc: FlowDoc): Ed
   return { ...template, flows: { ...template.flows, [String(index)]: doc } };
 }
 
-/** 全体計画の `index` 番のステップのフローを外す */
+/** 全体計画の`index`番のステップのフローを外す */
 export function removeFlow(template: EditTemplate, index: number): EditTemplate {
   const key = String(index);
   if (!(key in template.flows)) {
