@@ -86,6 +86,20 @@ deny:
       ヒアドキュメントで書いたファイルは、Write / Edit に掛かる権限の宣言も、
       編集後に走る検査も、どちらも通りません。
 
+  # MR / PR のマージと承認は人間の操作。レビューを頼む手順を通さずにトークンで直接行う形を止める。
+  # `create`・`view`・`list` などは止めない（チケットの作業は `glab mr create` / `gh pr create` で MR を作る）。
+  # コマンドの位置で見るので、`grep "glab mr merge"` やコミットメッセージの文字列にはヒットしない。
+  # `api` の形は、末尾が merge / approve / merge_when_pipeline_succeeds のパスだけ
+  # （`/merge_requests` の読み取りにはヒットしない）。
+  # python や curl を経由する形はここでは止まらない。確実に防ぐのは、エージェント用トークンの権限を
+  # Developer 止まりにすること（.ccnavi/docs/ticket-flow.md）。
+  - id: no-direct-merge
+    match: Bash
+    regex: '(^|\x00)(?:[^\s\x00\\/]*+[\\/])*+(glab|gh)(\.exe)?\s[^\x00]*(\b(mr|pr)\s+(merge|approve)\b|\bpr\s+review\s[^\x00]*--approve\b|\bapi\s[^\x00]*/(merge|approve|merge_when_pipeline_succeeds)([^\w/-]|$))'
+    message: >-
+      MR / PR のマージと承認は、ユーザが行う操作です。トークンで直接行わないでください。
+      レビューを頼む手順（ccnavi-review.sh の review-request）を通し、ユーザの承認とマージを待ってください。
+
 ask:
   # 直接作業の取り込み先・状態の了承・横で作業する指定・引き取りは、ユーザの確認ダイアログに出す。
   # ダイアログのコマンドに、取り込み先のブランチ名と選んだ指定が見える。

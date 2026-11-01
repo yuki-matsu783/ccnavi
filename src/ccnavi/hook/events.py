@@ -39,6 +39,7 @@ from ..policy import (
     selfguard_targets,
     texts,
 )
+from ..policy import texts as policy_texts  # decide_at_start の局所変数 texts と名前が重なるため
 from ..records import (
     audit,
     busy,
@@ -1141,6 +1142,12 @@ def decide_at_start(
         parents = _parents_at_start(stderr, conf, root)
         if parents:
             texts.append(parents)
+    # 読めないレイヤーのルールは空として扱われ、そのレイヤーの deny が黙って効かなくなる。
+    # 判定のたびには言わないので、開始で 1 度だけ、モデルにもユーザにも出す。
+    broken = [] if payload.agent_id else ruleload.unreadable(conf, root)
+    if broken:
+        said = policy_texts.say(root, "NOTICE_LAYER_UNREADABLE", {"layers": "、".join(broken)})
+        rejects = "\n\n".join(p for p in (rejects, said) if p)
     if rejects:
         texts.append(rejects)
     if pending:

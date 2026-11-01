@@ -44,17 +44,19 @@ factors:
   #
   # 例: 重要なパスの加点。差分が小さくても、1 つヒットするだけで HIGH（levels.high）に届く点にする。
   # 使うときにコメントを外し、glob はこのリポジトリの置き場に合わせて直す。
+  # パスはリポジトリのルートからの相対で、glob は全体にヒットする。`*/billing/*` はルート直下の
+  # `billing/x.py` にヒットしない。最上位にも深い場所にも当てるなら `*billing/*` と書く。
   # - id: auth-paths
   #   points: 40
-  #   glob: "*/auth/*"
+  #   glob: "*auth/*"
   #   message: 認可に関わるパス
   # - id: billing-paths
   #   points: 40
-  #   glob: "*/billing/*"
+  #   glob: "*billing/*"
   #   message: 課金に関わるパス
   # - id: db-migrations
   #   points: 40
-  #   glob: "*/migrations/*"
+  #   glob: "*migrations/*"
   #   message: DB 移行
   # - id: ci-config
   #   points: 40
@@ -62,5 +64,5 @@ factors:
   #   message: CI 設定
   # - id: public-api
   #   points: 40
-  #   glob: "*/api/public/*"
+  #   glob: "*api/public/*"
   #   message: 公開 API

@@ -653,8 +653,8 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
         problems.append(
             f"`{handoff.HANDOFF_REL}/` に取り込んでいない保護対象の下書きが {len(waiting)} 件ある"
             f"（{shown}）。ready は `{wip}/` を削除するので中止しました。ユーザに"
-            "`ccnavi-user-handoff.sh` で取り込んでもらうか、要らない下書きを削除してから"
-            "再実行してください"
+            f"`ccnavi-user-handoff.sh --root {tree_root}` で取り込んでもらうか、"
+            "要らない下書きを削除してから再実行してください"
         )
     problems += [r.line for r in treegate.check(treegate.READY, tree_root, conf)]
     return problems

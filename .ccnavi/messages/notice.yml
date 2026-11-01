@@ -12,6 +12,13 @@ messages:
     what: |-
       [ccnavi] the rule file at {path} could not be read, so ccnavi is judging with its built-in defaults. The project's own rules are not in force right now. Neither the shell nor the Write or Edit tool can write to that file while the defaults are in force. Put a draft at wip/handoff/.ccnavi/config/common/rules.yml and ask the user to import it with 'ccnavi-user-handoff.sh' (or to fix the file by hand).
 
+  # セッションの開始で 1 度だけ。読めないレイヤーは空として扱われ、そのレイヤーの deny が黙って効かなくなる。
+  NOTICE_LAYER_UNREADABLE:
+    kind: notice
+    values: [layers]
+    what: |-
+      [ccnavi] レイヤー {layers} のルールのファイルを読めません。そのレイヤーの deny は効いていません。`ccnavi --lint` で原因を確かめ、ユーザに直してもらってください（下書きは wip/handoff/ に置き、ユーザが `ccnavi-user-handoff.sh` で取り込みます）。
+
   # どのルールも言及しなかった呼び出し。結末（ask／deny）と、読み切れたか、組み込みの既定に退避したかで分ける。
   # 危険だと判定したわけではない。判定できないので権限モードに委ねている。
   NOTICE_UNDECLARED__ASK:
