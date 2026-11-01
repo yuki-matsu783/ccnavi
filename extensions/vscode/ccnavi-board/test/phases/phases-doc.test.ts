@@ -57,6 +57,7 @@ function phase(id: string, over: Partial<PhaseForm> = {}): PhaseForm {
     scope: [],
     deliverables: [],
     agent: "",
+    skill: "",
     when: "",
     ...over,
   };
@@ -142,13 +143,13 @@ test("CB-T90 追加する・削除する・空のリストは欄ごと削除す�
       }
       return p;
     })
-    .concat([phase("docs", { title: "文書", review: true, inherit: false, scope: ["README.md"], agent: "writer" })]);
+    .concat([phase("docs", { title: "文書", review: true, inherit: false, scope: ["README.md"], agent: "writer", skill: "process-design" })]);
   const out = doc.apply({ phases });
   assert.ok(!out.includes("  acceptance:"));
   assert.match(out, /\n  implement:\n    title: 実装とテスト\n    scope: inherit\n    requires: \[acceptance\]\n    overlap: \[acceptance\]\n/);
   assert.match(out, /\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: true\n    scope: \["\*\.md", "docs\/\*"\]\n/);
   // 新しい定義は kind と review を必ず書き、欄は決まった順
-  assert.match(out, /\n  docs:\n    kind: work\n    title: 文書\n    review: true\n    scope: \["README\.md"\]\n    agent: writer\n$/);
+  assert.match(out, /\n  docs:\n    kind: work\n    title: 文書\n    review: true\n    scope: \["README\.md"\]\n    agent: writer\n    skill: process-design\n$/);
   // 書いたものは読み直せる
   const again = readPhases(out);
   assert.deepEqual(again.model.problems, []);

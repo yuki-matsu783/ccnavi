@@ -629,7 +629,7 @@ diagrams:
         text: すべての子が合流済みと確かめ、レビューを頼み、応答を終えてユーザを待つよう返す
       - id: block
         from: ccnavi
-        text: レビューが済むまで、親のワークツリーでのサブエージェントの起動と Bash を止める。通すのは ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh だけ
+        text: レビューが済むまで、親のワークツリーでのサブエージェントの起動と Bash を止める。通すのは ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh と ccnavi-launcher.sh --docs だけ
       - id: request
         from: エージェント
         to: ユーザ

@@ -25,7 +25,7 @@ keywords: [フェーズ, フェーズ定義, phases.yml, plan, after, 先行関�
 | `scope` | このフェーズ定義の子が宣言できる範囲の上限（glob のリスト。20 件まで）。省略か `inherit` なら親の範囲。子 ⊆ フェーズ定義 ⊆ 親。大文字小文字はどの機械でも区別しない（チケットの範囲と同じ規則。9.3）。超えても承認は止めず、承認画面に「チケットで編集対象としているが、書き込めない場所」として出す（9.4）。判定は子の範囲をこの上限でも切り詰める（9.5） | 承認（警告）、判定 |
 | `deliverables` | フェーズを閉じる前に、親か子のワークツリーに在って追跡されているべきファイル（glob。20 件まで）。中身は見ない | `ticket finish` |
 | `learning` | `on`（既定）/ `off`。`off` の定義の子は、学びの蓄積（9.16）の着手の案内と子を閉じる検査を受けない。YAML の引用符なしの `on` / `off` も読める | `ticket start`、`ticket finish` |
-| `agent` / `when` | 案内。`agent` は `SubagentStart`、`when` は次のフェーズを促す文に出す | 案内 |
+| `agent` / `skill` / `when` | 案内。`agent` は `SubagentStart`、`skill`（工程スキル名。この機械に無ければ出さない）は子の `ticket start` の出力と、子へ渡す案内（`SubagentStart`・起動前のプロンプト）に「最初に Skill で呼ぶ」として出す、`when` は次のフェーズを促す文に出す | 案内 |
 
 「使われる場所」で読むのは、承認のあとはどれも親に固定したコピー（`phases:`）の定義。`scope` と `deliverables` の
 件数の上限（20 件。チケットの範囲と同じ）は、定義を親にコピーするので親の大きさを縛るためのもので、超えた `phases.yml` は
@@ -292,6 +292,7 @@ phases:
     scope: ["wip/research/*"]          # 子の範囲の上限（20 件まで）。省略か inherit なら親の範囲
     deliverables: ["wip/research/summary.md"]   # 閉じる前に在って追跡されているべきもの（20 件まで）
     agent: explorer       # .claude/agents/<名前>.md。案内。判定には使わない
+    skill: process-research   # 子が最初に呼ぶ工程スキル。案内。判定には使わない
     when: 既存の振る舞いが分からないとき          # 案内。判定には使わない
   implement:
     kind: work

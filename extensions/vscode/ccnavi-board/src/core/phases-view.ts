@@ -43,6 +43,8 @@ export interface PhaseForm {
   readonly deliverables: readonly string[];
   /** 案内にだけ使う。空なら欄を書かない */
   readonly agent: string;
+  /** 子が最初に呼ぶ工程スキルの名前（案内にだけ使う） */
+  readonly skill: string;
   readonly when: string;
 }
 

@@ -232,7 +232,7 @@ diagrams:
         value: 'マーカー: pending'
       - id: stop
         from: ccnavi
-        text: レビュー済みになるまで、その親の cwd からのサブエージェントの起動と Bash を止める。ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh だけは通る。Write / Edit も通る
+        text: レビュー済みになるまで、その親の cwd からのサブエージェントの起動と Bash を止める。ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh と、資料を引く ccnavi-launcher.sh --docs だけは通る。Write / Edit も通る
         value: DENY_PHASE_REVIEW
       - id: request
         from: 親（メインエージェント）

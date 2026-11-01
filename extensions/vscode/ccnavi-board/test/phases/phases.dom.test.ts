@@ -113,11 +113,11 @@ test("CB-T125 件の欄名は日本語で、YAML のキー名は欄名の title 
     const caps = dom.all(`${rowSelector("p1")} .row-body .field > .cap`);
     assert.deepEqual(
       caps.map((cap) => cap.textContent),
-      ["id", "タイトル", "区分", "レビュー", "編集可能な範囲", "必須成果物", "案内するエージェント", "使う場面"],
+      ["id", "タイトル", "区分", "レビュー", "編集可能な範囲", "必須成果物", "案内するエージェント", "最初に呼ぶ工程スキル", "使う場面"],
     );
     assert.deepEqual(
       caps.map((cap) => cap.getAttribute("title")),
-      ["id", "title", "kind", "review", "scope", "deliverables", "agent", "when"].map((key) => `YAML のキー: ${key}`),
+      ["id", "title", "kind", "review", "scope", "deliverables", "agent", "skill", "when"].map((key) => `YAML のキー: ${key}`),
     );
   } finally {
     await dom.close();

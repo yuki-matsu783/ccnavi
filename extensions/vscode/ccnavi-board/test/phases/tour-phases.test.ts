@@ -192,6 +192,6 @@ test("CB-T467 見本の形が壊れていれば、読み取りが名指しして
   assert.throws(() => parsePhasesSample({ ...base, project: undefined }), /sample\.project/);
   // 区分と既定のレビューは、実際の読み取りと同じ既定（work / mr / inherit）に落ちる
   const one = parsePhasesSample({ ...base, phases: { version: 1, phases: { x: { kind: "nonsense" } } } });
-  assert.deepEqual(one.page.model.form.phases[0], { origin: 0, id: "x", title: "", kind: "work", review: true, inherit: true, scope: [], deliverables: [], agent: "", when: "" });
+  assert.deepEqual(one.page.model.form.phases[0], { origin: 0, id: "x", title: "", kind: "work", review: true, inherit: true, scope: [], deliverables: [], agent: "", skill: "", when: "" });
   assert.deepEqual(readPhases(stringify({ version: 1, phases: { x: { kind: "nonsense" } } })).model.form.phases[0], one.page.model.form.phases[0]);
 });

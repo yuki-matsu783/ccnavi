@@ -109,7 +109,7 @@ export function detailRows(card: Card): DetailRow[] {
     add({
       key: "review",
       label: "人間レビュー",
-      values: [`${card.reviewRequired ? "必須" : "不要"}${card.reviewReason === "" ? "" : `（${card.reviewReason}）`}`],
+      values: [`${card.reviewRequired === null ? "宣言なし" : card.reviewRequired ? "必須" : "不要"}${card.reviewReason === "" ? "" : `（${card.reviewReason}）`}`],
     });
   }
   add({ key: "risk", label: "リスク", values: card.riskLevel === "" ? [] : [riskText(card)] });

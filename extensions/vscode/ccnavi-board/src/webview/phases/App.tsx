@@ -457,7 +457,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             <p className="hint">
               区分が <code>work</code> の定義を親チケットの計画に並べたものが全体計画で、ユーザが合意すると確定します。レビューのあとは、区分が <code>feedback</code> の定義を並べて計画を改訂します。<code>id</code> と <code>title</code> はどちらも一意です。<code>scope</code>{" "}
               は子チケットの編集可能な範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の編集可能な範囲そのまま）、<code>deliverables</code> は必須成果物で、閉じる前に存在し、git に追跡されているべきものです。
-              <code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には使いません。編集可能な範囲と必須成果物は <code>,</code> で区切ります。
+              <code>agent</code>・<code>skill</code>・<code>when</code> はエージェントへの案内にだけ使い、判定には使いません。編集可能な範囲と必須成果物は <code>,</code> で区切ります。
             </p>
             <details className="help">
               <summary>計画と合意のコマンド・キー</summary>
