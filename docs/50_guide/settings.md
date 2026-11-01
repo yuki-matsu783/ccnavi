@@ -190,6 +190,7 @@ ccnavi の動作に依存する決まりと考え方なので、ワークスペ�
 | `CCNAVI_LEARNING_NOTICE_COUNT` | 提案の候補が何件溜まったら SessionStart で知らせるか。既定 5 |
 | `CCNAVI_HANDOFF_SUGGEST_TOKENS` | 会話の大きさ（トークン数）がこの値以上のとき、次のセッションへの引き継ぎを促す（下の「大きな会話を放置したとき」）。既定は `400000`。`0` なら促さない。読めない値は既定に戻る |
 | `CCNAVI_HOOK_DEADLINE_SECONDS` | hook の判定 1 回に張る期限（秒）。既定は `3`。呼び出し側が長く走った hook を打ち切る前に、自前の判定を出し終えるための値。読めない値と 0 以下は既定に戻る |
+| `CCNAVI_ASK_CONTEXT_WAIT_SECONDS` | ユーザに確認する前の発言が会話記録に書かれるのを待つ時間の上限（秒）。既定は `2.5`。判定の期限（`CCNAVI_HOOK_DEADLINE_SECONDS`）には縛られないが、hook の `timeout`（settings.json。既定 10 秒）より短くする。読めない値と 0 以下は既定に戻る |
 | `CCNAVI_INTEGRATE_PENDING_SECONDS` | セッション開始で、終わっていない `integrate` の記録を確かめる時間の上限（秒）。既定は `2`。読めない値と 0 以下は既定に戻る |
 | `CCNAVI_SUBAGENT_RUNNING_MAX_SECONDS` | サブエージェントの印を「実行中」と数える長さの上限（秒）。既定は `14400`（4 時間）。短すぎると、長く走るサブエージェントを待つ間に誤って止める。読めない値と 0 以下は既定に戻る |
 | `CCNAVI_TURN_STALE_SECONDS` | ターンの印が更新されないまま古いと数える長さ（秒）。既定は `1800`（30 分）。短くすると、長いツール呼び出しの最中に警告が消える。読めない値と 0 以下は既定に戻る |

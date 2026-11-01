@@ -15,6 +15,8 @@ WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 WRITTEN_FILE_TOOLS = ("Write", "Edit", "MultiEdit")
 # サブエージェントの起動ツール。Claude Code の版によって Agent か Task で来る。
 AGENT_TOOLS = ("Agent", "Task")
+# ユーザに質問するツール。サブエージェントには渡らない。
+ASK_USER_TOOLS = ("AskUserQuestion",)
 # サブエージェントが親へ報告を返すためのツール。判定に達せなかったときも止めない
 # （止めると、体が報告を返せずに終われない）。
 REPORT_TOOLS = ("SubagentHandback", "StructuredOutput")

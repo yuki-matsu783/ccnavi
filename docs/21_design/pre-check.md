@@ -33,6 +33,7 @@ Bash なら実行される部分に絞る（6.3）── 何も残らない → 
   │  ワークツリーの元リポジトリと承認済みチケットの project が違う → deny（DENY_TICKET_PROJECT_MISMATCH）
   │
 deny → ask → allow の順にルールを適用する（5.2）── deny にヒットした → deny（6.4）
+  │  ask を返す前に、直前の発言に「前提・背景」「想定結果」の見出しが無ければ deny（DENY_ASK_NEEDS_CONTEXT）に替える（対話のみ）
   │  deny と ask は中で実行されるコマンドにも適用する。allow は適用しない
   │
 Bash の書き込み先がワークスペースルート直下 → deny（DENY_SHELL_WORKSPACE_ROOT）
@@ -332,7 +333,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 `allow` を足せとは言わない。直し方は同じ応答の退避の文が言うので、それを指すだけにする。読めない回の断りは
 「どのルールも言及していない」と言い、ヒットしたルールを指す「this rule」は使わない。
 
-理由コードは `UNDECLARED`。ルールの `ask` にヒットした呼び出し（`RULE_ASK`）は権限モードによらず確認に出す。判断できる相手が居る
+理由コードは `UNDECLARED`。ルールの `ask` にヒットした呼び出し（`RULE_ASK`）は権限モードによらず確認に出す（対話のセッションでは、確認の前の発言に「前提・背景」「想定結果」の見出しが無いと `DENY_ASK_NEEDS_CONTEXT` で止める）。判断できる相手が居る
 4 つのモードでは確認を上乗せしない。確認できる者が居ないモードで通さないのは、ask が「誰も答えないまま通る」に
 変わってしまうため。縮退した呼び出しは委ねない（6.3）。`CCNAVI_GUARD_UNWATCHED=disable` でも委ねない。
 生の文字列の `>` が上限を超えて組み込みの保護を適用しなかった回は、この表に依らず、どのモードでも止める（`DENY_REDIRECT_LIMIT`）。上限を掛けるのは、外す保護（ガード自身の設定とチケットの置き場を守る組み込み）がそのツールにヒットするときだけ。既定の組み込みだけでチケット制御が無効なら、外す保護は Bash にしかヒットしないので、PowerShell には掛けない。
@@ -481,7 +482,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 
 **止めた文。** `DENY_NEEDS_USER_TURN`（組み込みの名前は `builtin:turn-gate:<宣言 id>`）。何が起きたか・なぜ・次の一手（`次:` の 1 行で、値を埋める）・迂回しないの 4 行。拒否コードは宣言ごとに分けず、どの宣言かは名前と文面が言う。
 
-**確認の文。** 付き添いのあるセッションで B を確認に返すとき、記録の `code` は `RULE_ASK`、`rules` は `builtin:turn-gate:<宣言 id>`。文は宣言の `ask_message` が指す通知（`NOTICE_ASK_USER_CONFIRM__<宣言>`）で、何を確認するか・なぜ・次の一手（確認の前に差分をユーザに見せる）を言う。
+**確認の文。** 確認の前に、直前の発言に「前提・背景」「想定結果」の見出しが無ければ、確認を出さずに `DENY_ASK_NEEDS_CONTEXT`（`rules` は `builtin:ask-context`）に替える。揃っていれば、付き添いのあるセッションで B を確認に返すとき、記録の `code` は `RULE_ASK`、`rules` は `builtin:turn-gate:<宣言 id>`。文は宣言の `ask_message` が指す通知（`NOTICE_ASK_USER_CONFIRM__<宣言>`）で、何を確認するか・なぜ・次の一手（確認の前に差分をユーザに見せる）を言う。
 
 **ユーザの発言の数え方。** 数えるのは、ユーザの発言と言い切れるものだけ。
 
