@@ -26,7 +26,7 @@ export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子を�
 #
 # 計画のときに「軽い」と思った作業が大きな変更になっていたら、宣言に関わらずレビューが
 # 要る扱いにするためのもの。リスクレベルの名前はLOW / MEDIUM / HIGH / CRITICALで固定。
-# HIGH以上はレビューが済むまでフェーズを止める。境目の点はlevelsで動かす。
+# HIGH以上はレビューが済むまでフェーズを止める。閾値はlevelsで動かす。
 #
 # 項目は3系統。1件につき加点条件を1つだけ書く。
 #   定量（組み込み）: lines_over / files_over / deleted_over / glob（ヒットするごとに加点。maxで上限）
@@ -91,7 +91,7 @@ export function readRisk(text: string): RiskDocument {
   const rawLevels = doc.get("levels", true);
   if (rawLevels !== undefined && rawLevels !== null) {
     if (!isMap(rawLevels)) {
-      problems.push("levelsがマップ（キーと値の組の集まり）ではありません。境目の点は組み込みの値として表示します");
+      problems.push("levelsがマップ（キーと値の組の集まり）ではありません。閾値は組み込みの値として表示します");
     } else {
       for (const name of LEVEL_NAMES) {
         levels[name] = scalarText(rawLevels, name);

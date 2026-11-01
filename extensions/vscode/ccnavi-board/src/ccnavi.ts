@@ -316,7 +316,7 @@ export async function runApproveYes(
       error:
         `${cutOff("ccnavi user agree --yes", APPROVE_TIMEOUT_MS)}。` +
         "一部だけ承認済みになっている可能性があります。承認済みチケットをコミット・pushするコマンドはターミナルに送信していません" +
-        "（送るのは承認できたときだけです）。チケット管理画面を更新して、何が承認されたかを確認してください",
+        "（コマンドを送るのは承認できたときだけです）。チケット管理画面を更新して、何が承認されたかを確認してください",
     };
   }
   const parsed = parseApproveResult(ran.stdout);

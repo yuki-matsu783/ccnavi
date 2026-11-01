@@ -261,7 +261,7 @@ diagrams:
       - id: plan
         from: 親の計画
         to: ccnavi
-        text: 計画のステップにreviewのtrueを書くと、定義がfalseでも要るにする
+        text: 計画のステップにreviewのtrueを書くと、定義がfalseでも要る扱いにする
         value: '- {type: research, review: true}'
       - id: pick
         from: ccnavi
@@ -269,7 +269,7 @@ diagrams:
         value: false と true → 要る
       - id: risk
         from: ccnavi
-        text: ステップにreviewのtrueが無くても、クローズした子の実績のリスクがHIGH以上なら、要らない判定を要るに上げる
+        text: ステップにreviewのtrueが無くても、クローズした子の実績のリスクがHIGH以上なら、要らない判定を、要る扱いに上げる
         value: 'リスク: 58 (HIGH) — 行数が多い → 要る'
 
   # 順序は計画のステップのafterが決める（定義には順序の欄が無い）
@@ -342,13 +342,13 @@ courses:
         focus: save, lock
       - target: save
         title: 書き込まれて、承認のときに読まれる
-        body: 検証を通ると、phases.ymlに書き込みます。この定義を読むのは、親の提案の承認、--fill-phases、--lintのときだけです。承認のあとは、親が持つコピーを読むので、あとで直しても進行中の親には反映されません。
+        body: 検証を通ると、phases.ymlに書き込みます。この定義を読むのは、親チケットの提案の承認、--fill-phases、--lintのときだけです。承認のあとは、親が持つコピーを読むので、あとで直しても進行中の親には反映されません。
         scene: { open: research, dirty: true }
         diagram: phase-save
         focus: write, use
       - target: phases
         title: 計画に並べる
-        body: 親の提案のplanに、使う定義をステップとして並べます。ステップの番号が、子のphaseの番号になります。ステップは名前だけでも、typeとafterを持つ形でも書けます。
+        body: 親の提案のplanに、使う定義をステップとして並べます。ステップの番号が、子チケットのphaseの番号になります。ステップは名前だけでも、typeとafterを持つ形でも書けます。
         diagram: phase-fill
         focus: plan
       - target: phases
@@ -378,7 +378,7 @@ courses:
     steps:
       - target: phase-review
         title: reviewがfalseの定義
-        body: 調査（research）はreviewがfalseです。最後の子をfinishでクローズするとき、必須成果物wip/research/summary.mdがgitに追跡されていないと、finishは拒みます。
+        body: 調査（research）はreviewがfalseです。最後の子チケットをfinishでクローズするとき、必須成果物wip/research/summary.mdがgitに追跡されていないと、finishは拒みます。
         scene: { open: research }
         diagram: phase-end-false
         focus: finish, deliverables
@@ -395,7 +395,7 @@ courses:
         focus: finish, ended
       - target: phases
         title: trueなら、ユーザを待って止まる
-        body: 返す文は「すべての子が合流済みと確かめ、レビューを頼み、応答を終えてユーザを待て」です。レビュー済みになるまで、その親のcwdからのサブエージェントの起動とBashが止まります。次のフェーズの計画を書くWriteとEditは通ります。
+        body: 返す文は「すべての子が合流済みと確かめ、レビューを頼み、応答を終えてユーザを待て」です。レビュー済みになるまで、その親チケットのcwdからのサブエージェントの起動とBashが止まります。次のフェーズの計画を書くWriteとEditは通ります。
         diagram: phase-end-true
         focus: reply, stop
       - target: phases
@@ -465,7 +465,7 @@ courses:
           open: acceptance
       - target: phase-agent
         title: 案内するエージェント
-        body: この定義の子を任せたいサブエージェントの名前です。案内に出すだけで、割り当てはしません。見本では受入テスト作成にacceptance-testerを記載しています。
+        body: この定義の子チケットを任せたいサブエージェントの名前です。案内に出すだけで、割り当てはしません。見本では受入テスト作成にacceptance-testerを記載しています。
         scene:
           open: acceptance
           more: acceptance
@@ -512,7 +512,7 @@ courses:
           open: implement-feedback
       - target: phase-scope
         title: 指摘の種類で範囲を絞る
-        body: 設計への指摘だけを直す定義は、範囲をwip/designとdocsに絞ります。実装への指摘は、範囲をinheritにして親の範囲そのままにすると、指摘が多岐にわたっても収まります。
+        body: 設計への指摘だけを直す定義は、範囲をwip/designとdocsに絞ります。実装への指摘は、範囲をinheritにして親チケットの範囲そのままにすると、指摘が多岐にわたっても収まります。
         scene:
           open: design-feedback
       - target: phase-when
@@ -582,7 +582,7 @@ courses:
           dirty: true
       - target: save
         title: 検証してから保存する
-        body: 保存すると、直した内容を一時ファイルに保存して、実行ファイルの検証（lint）を通します。通ればphases.ymlに反映します。コメントは、直していない場所ではそのまま残ります。
+        body: 保存すると、直した内容を一時ファイルに書いて、実行ファイルの検証（lint）を通します。通ればphases.ymlに反映します。コメントは、直していない場所ではそのまま残ります。
         scene:
           dirty: true
       - target: status

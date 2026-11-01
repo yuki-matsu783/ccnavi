@@ -32,7 +32,7 @@ export function Preview({ checks, checking, error }: PreviewProps): JSX.Element 
     <details className="flow-preview" id="flow-preview" data-tour="preview" open>
       <summary title="SubagentStartで担当のサブエージェントに渡る手順です。実行ファイル（ccnavi --lint --flow）が並べたものです">担当に渡る手順</summary>
       <p className="dim small" id="flow-preview-lead">
-        子チケットを担当するサブエージェントに渡る手順です。編集するとここに反映されます
+        子チケットを担当するサブエージェントに渡る手順です。編集するとここに反映されます。
       </p>
       {/* 結果がまだ無い（確認していない）ときは、前の答えが無いので確認中の文は出さない。今の状態はbodyの「まだ確認していません」が示す */}
       {checking && checks !== undefined && (

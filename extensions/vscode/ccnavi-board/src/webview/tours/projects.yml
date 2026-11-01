@@ -56,7 +56,7 @@ diagrams:
         text: .gitが現れたことを監視で知り、変化が300ミリ秒止まったら一覧を読み直す
       - id: card
         from: プロジェクト管理画面
-        text: 一覧にweb-appのカードが出る。cloneが失敗して.gitが出来なければ、カードは出ない
+        text: 一覧にweb-appのカードが出る。cloneが失敗して.gitができなければ、カードは出ない
         value: |-
           名前: web-app
           origin: https://example.com/team/web-app.git
@@ -256,7 +256,7 @@ diagrams:
       - id: skipped
         from: ワークスペースのフォルダ
         to: プロジェクト管理画面
-        text: node_modules・.venv・.claude・.gitの中は歩かない
+        text: node_modules・.venv・.claude・.gitの中は調べない
         value: node_modules/foo/.git
 
 courses:
@@ -278,7 +278,7 @@ courses:
         body: プロジェクトの設定を検証した結果です。問題があるカードは、見出しにerrorやwarnのバッジが出ます。
       - target: workspace
         title: ワークスペース（プロジェクト外）
-        body: プロジェクトの外、ワークスペース自体のワークツリーと、ワークスペースの設定のルールの有無です。
+        body: プロジェクトの外、ワークスペース自身のワークツリーと、ワークスペースの設定のルールの有無です。
       - target: refresh
         title: 更新
         body: 一覧を更新します。cloneや移動をターミナルで済ませたあとに押します。
@@ -316,13 +316,13 @@ courses:
         diagram: project-clone
         focus: auth, clone
       - target: list
-        title: .gitが出来ると、一覧が読み直される
+        title: .gitができると、一覧が読み直される
         body: projects/web-app/.gitが現れたことを画面が監視で知り、変化が300ミリ秒止まったら一覧を読み直します。手で移したときなど、監視にかからないときは更新を押します。
         diagram: project-clone
         focus: watch
       - target: project
         title: カードが出る
-        body: web-appのカードが出ます。cloneが失敗して.gitが出来なければ、カードは出ません。ターミナルの出力を確かめます。
+        body: web-appのカードが出ます。cloneが失敗して.gitができなければ、カードは出ません。ターミナルの出力を確かめます。
         diagram: project-clone
         focus: card
       - target: clone-run

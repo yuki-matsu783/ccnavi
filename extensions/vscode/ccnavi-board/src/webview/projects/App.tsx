@@ -242,7 +242,7 @@ function Strays({ strays }: { readonly strays: readonly Stray[] }): JSX.Element 
         プロジェクトとして認識されないgitリポジトリ <span className="count">{strays.length}</span>
       </h2>
       <p className="hint">
-        ワークスペース直下から2階層まで（<code>projects/</code>の中だけ3階層まで）を探して見つかったものです。プロジェクトとして扱うには<code>projects/</code>
+        ワークスペース直下から2階層まで（<code>projects/</code>の中だけ3階層まで）を探した結果見つかったものです。プロジェクトとして扱うには<code>projects/</code>
         の直下へ移してください。
       </p>
       <ul className="stray-list">

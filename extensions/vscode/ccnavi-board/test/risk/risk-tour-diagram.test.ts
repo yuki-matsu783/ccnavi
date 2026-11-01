@@ -1,5 +1,5 @@
 /**
- * リスク管理の案内の時系列の図（`tours/risk.yml` の `diagrams:`）の検査。図の中の値（差分・点・合計・レベル・境目の点）が、
+ * リスク管理の案内の時系列の図（`tours/risk.yml` の `diagrams:`）の検査。図の中の値（差分・点・合計・レベル・閾値）が、
  * 見本の配点（`sample:`）をそのとおりに適用した結果と一致していること、新しい 2 本の案内の形を見る。
  * 点を数えるのは実行ファイルで、ここでは `tickets/config/risk.py` の `evaluate` と同じ数え方を小さく書き直して、図の数字と突き合わせる。
  */
@@ -112,7 +112,7 @@ function levelsText(levels: { medium: number; high: number; critical: number }):
   return `levels: {medium: ${levels.medium}, high: ${levels.high}, critical: ${levels.critical}}`;
 }
 
-test("CB-T1180 リスクの図の中の値（差分・加点・合計・レベル・境目）は、見本の配点を適用した結果と一致する", () => {
+test("CB-T1180 リスクの図の中の値（差分・加点・合計・レベル・閾値）は、見本の配点を適用した結果と一致する", () => {
   const rules = commonRules();
 
   // 4 ファイルの子: big-diff（src/** から src/generated/** を外す）と ci がヒットし、judge が yes で HIGH
@@ -151,7 +151,7 @@ test("CB-T1180 リスクの図の中の値（差分・加点・合計・レベ�
   assert.ok(valueOf("risk-score-low", "sum").includes("0 < 20 → LOW"));
   assert.equal(valueOf("risk-score-low", "load"), levelsText(SAMPLE_LEVELS));
 
-  // 境目は「以上」
+  // 閾値は「以上」
   for (const [id, points] of [["p19", 19], ["p20", 20], ["p39", 39], ["p40", 40], ["p70", 70]] as const) {
     assert.ok(textOf("risk-level", id).includes(`${points}点`), id);
     assert.ok(valueOf("risk-level", id).includes(`→ ${levelOf(points, SAMPLE_LEVELS)}`), `${points} 点は ${levelOf(points, SAMPLE_LEVELS)}`);
@@ -169,7 +169,7 @@ test("CB-T1180 リスクの図の中の値（差分・加点・合計・レベ�
   assert.equal(valueOf("risk-save", "edit"), levelsText(raised));
 });
 
-test("CB-T1181 共通の設定に lib の設定を足した図は、統合結果の見本（境目は小さいほう、項目は連結）の数え方と一致する", () => {
+test("CB-T1181 共通の設定に lib の設定を足した図は、統合結果の見本（閾値は小さいほう、項目は連結）の数え方と一致する", () => {
   const lib = (sample.page.sums ?? []).find((entry) => entry.name === "lib")!;
   const levels = { medium: lib.levels.medium!, high: lib.levels.high!, critical: lib.levels.critical! };
   const common = commonRules();
@@ -182,7 +182,7 @@ test("CB-T1181 共通の設定に lib の設定を足した図は、統合結果
   assert.deepEqual(hits, { "lib:big-diff": 15, "public-api": 20 });
   const total = Object.values(hits).reduce((sum, points) => sum + points, 0);
   assert.equal(levelOf(total, levels), "HIGH");
-  assert.ok(total < Number(form.levels.high), "共通の HIGH なら届かない合計の例（小さいほうの境目が効く）");
+  assert.ok(total < Number(form.levels.high), "共通の HIGH なら届かない合計の例（小さいほうの閾値が効く）");
 
   assert.equal(valueOf("risk-sum-lib", "common"), `${levelsText(SAMPLE_LEVELS)}\n項目: ${[...common.keys()].join(", ")}`);
   assert.equal(valueOf("risk-sum-lib", "layer"), `${levelsText(levels)}\n項目: ${[...added.keys()].join(", ")}`);
@@ -201,8 +201,8 @@ test("CB-T1181 共通の設定に lib の設定を足した図は、統合結果
   assert.equal(valueOf("risk-sum-lib", "level"), `${hits["lib:big-diff"]} + ${hits["public-api"]} = ${total}\n${total} ≥ ${levels.high} → HIGH`);
 });
 
-/** 図の中の `levels: {…}` は、見本の配点・統合結果の境目、または案内が「直した例」として示す HIGH 50 だけ */
-test("CB-T1182 図に出る levels の値は、見本の配点・統合結果の境目か、直した例（HIGH 50）だけ。直した例は保存の図に限る", () => {
+/** 図の中の `levels: {…}` は、見本の配点・統合結果の閾値、または案内が「直した例」として示す HIGH 50 だけ */
+test("CB-T1182 図に出る levels の値は、見本の配点・統合結果の閾値か、直した例（HIGH 50）だけ。直した例は保存の図に限る", () => {
   const allowed = new Set([levelsText(SAMPLE_LEVELS)]);
   for (const sum of sample.page.sums ?? []) {
     allowed.add(levelsText({ medium: sum.levels.medium!, high: sum.levels.high!, critical: sum.levels.critical! }));
@@ -213,9 +213,9 @@ test("CB-T1182 図に出る levels の値は、見本の配点・統合結果の
     for (const step of diagram.steps) {
       for (const match of step.value.match(/levels: \{[^}]*\}/g) ?? []) {
         if (match === edited) {
-          assert.ok(editedOnly.has(name), `${name}/${step.id}: 直した例の境目が保存の図の外にある`);
+          assert.ok(editedOnly.has(name), `${name}/${step.id}: 直した例の閾値が保存の図の外にある`);
         } else {
-          assert.ok(allowed.has(match), `${name}/${step.id}: ${match} は見本の境目にない`);
+          assert.ok(allowed.has(match), `${name}/${step.id}: ${match} は見本の閾値にない`);
         }
       }
     }

@@ -125,9 +125,9 @@ test("CB-T626 sync retiredの異常は「一覧を取得できません」にす
     return parsed.ok ? "" : parsed.error;
   };
   const base = { code: 0, killed: false };
-  assert.match(error({ ...base, stdout: "" }), /一覧を取得できません（形式の異常: 頭の行がretired 1ではありません）/);
-  assert.match(error({ ...base, stdout: "retired 2\n" }), /頭の行がretired 1ではありません/);
-  assert.match(error({ ...base, stdout: "usage: ccnavi ...\n" }), /頭の行がretired 1ではありません/);
+  assert.match(error({ ...base, stdout: "" }), /一覧を取得できません（形式の異常: 先頭の行がretired 1ではありません）/);
+  assert.match(error({ ...base, stdout: "retired 2\n" }), /先頭の行がretired 1ではありません/);
+  assert.match(error({ ...base, stdout: "usage: ccnavi ...\n" }), /先頭の行がretired 1ではありません/);
   assert.match(error({ code: 1, killed: false, stdout: HEAD }), /一覧を取得できません（コマンドが失敗しました。終了コード1）/);
   assert.match(error({ code: 0, killed: true, stdout: HEAD }), /一覧を取得できません（時間内に終わりませんでした）/);
   // 知らない行（黙って破棄しない）

@@ -53,7 +53,7 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
         </ul>
       )}
       <p className="sum-levels" id="sum-levels" data-tour="sum-levels">
-        リスクレベルの境目の点:{" "}
+        リスクレベルの閾値:{" "}
         {LEVEL_NAMES.map((name) => (
           <span key={name} className="sum-level">
             {name.toUpperCase()} <strong>{sum.levels[name] ?? "-"}</strong>

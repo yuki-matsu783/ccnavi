@@ -686,7 +686,7 @@ courses:
         scene: {doc: branch-loop, select: fix-loop}
       - target: preview
         title: 渡る手順で確認する
-        body: 条件と最大回数が、手順の行に並びます。回数が1以上の整数でないときは、そう表示されます。
+        body: 条件と最大回数が、手順の行に並びます。回数が1以上の整数でないときは、その旨が表示されます。
         scene: {doc: branch-loop}
 
   - id: subagent
@@ -699,7 +699,7 @@ courses:
         scene: {doc: main}
       - target: inspector-agent
         title: 何を任せるか・種類を決める
-        body: 「何を任せるか」を1行で入力し、「サブエージェントの種類」を決めます。種類はccnaviが挙げた候補（組み込みと、プロジェクトの.claude/の下のもの）から選べます。入力して決めてもかまいません。候補にない名前は、そう表示されます。
+        body: 「何を任せるか」を1行で入力し、「サブエージェントの種類」を決めます。種類はccnaviが挙げた候補（組み込みと、プロジェクトの.claude/の下のもの）から選べます。入力して決めてもかまいません。候補にない名前には「候補にありません」と表示されます。
         scene: {doc: main, select: investigate}
       - target: inspector-prompt
         title: プロンプトを入力する
@@ -769,7 +769,7 @@ courses:
         scene: {doc: broken}
       - target: inspector-agent
         title: 候補にない名前
-        body: サブエージェントの種類が、ccnaviの挙げた候補にないと、欄の下にそう出ます。綴りの違いなら直します。ユーザやプラグインのものなら、そのままでかまいません。
+        body: サブエージェントの種類が、ccnaviの挙げた候補にないと、欄の下に「候補にありません」と出ます。綴りの違いなら直します。ユーザやプラグインのものなら、そのままでかまいません。
         scene: {doc: broken, select: investigate}
       - target: preview
         title: 担当に渡る手順を確認する
@@ -790,7 +790,7 @@ courses:
         scene: {doc: main-edited, dirty: true, history: true}
       - target: save
         title: 保存を押す
-        body: 保存を押すと、保存する前に、変更の一覧を見せます。保存の直前に、子チケットが着手中でないかをccnaviに再確認します。
+        body: 保存を押すと、まず変更の一覧を表示します。保存の直前に、子チケットが着手中でないかをccnaviに再確認します。
         scene: {doc: main-edited, dirty: true, history: true}
       - target: review
         title: 変更の一覧
@@ -819,7 +819,7 @@ courses:
         scene: {doc: main}
       - target: request-text
         title: 依頼文を渡す
-        body: この文は、コピーして進行中のセッションに貼るか、新しいセッションで開いて渡します。どの子のフローを、どこに保存して、何を確認してから渡すかが書かれています。効力のあるフローには保存させません。
+        body: この文は、コピーして進行中のセッションに貼るか、新しいセッションで開いて渡します。どの子チケットのフローを、どこに保存して、何を確認してから渡すかが書かれています。効力のあるフローには保存しないよう書かれています。
         scene: {doc: main, requestText: true}
       - target: offer
         title: 提案あり

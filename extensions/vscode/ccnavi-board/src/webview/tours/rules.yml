@@ -238,7 +238,7 @@ diagrams:
       - id: call
         from: Claude Code
         to: ccnavi（hook）
-        text: ツールを使う直前に、hookを起こして内容を渡す
+        text: ツールを使う直前に、hookを起動して内容を渡す
         value: '{"tool_name":"Bash","tool_input":{"command":"git push origin main"}}'
       - id: load
         from: ccnavi（hook）
@@ -437,8 +437,8 @@ courses:
         scene: { tab: rules, open: git-push }
         diagram: rule-deny
       - target: hooks
-        title: ツールを使う直前にhookが起きる
-        body: Claude Codeは、ツールを使う直前に、登録されたhookを起こして内容を渡します。hookは、毎回ルールを読み直します。
+        title: ツールを使う直前にhookが動く
+        body: Claude Codeは、ツールを使う直前に、登録されたhookを起動して内容を渡します。hookは、毎回ルールを読み直します。
         scene: { tab: hooks }
         diagram: rule-deny
         focus: call, load
@@ -526,7 +526,7 @@ courses:
         scene: { tab: rules, open: protect-env, when: r.0 }
       - target: when-inspector
         title: 子を足す・削除
-        body: all / anyの点を選ぶと「＋ glob」「＋ regex」「＋ all」「＋ any」「＋ not」で子を足せます。例えばanyに「＋ glob」を足せば、通す例外が1つ増えます。「この条件を削除」で削除できます。
+        body: all / anyの点を選ぶと「＋ glob」「＋ regex」「＋ all」「＋ any」「＋ not」で子チケットを足せます。例えばanyに「＋ glob」を足せば、通す例外が1つ増えます。「この条件を削除」で削除できます。
         scene: { tab: rules, open: protect-env, when: r.1.0 }
       - target: when-inspector
         title: 包む・種類を替える
@@ -666,7 +666,7 @@ courses:
         scene: { tab: judge, tool: Bash, subject: npm install left-pad, judge: npm-install }
       - target: open-expectations
         title: 期待する例も追加する
-        body: '下書きのexpectations: は、期待する判定のファイルをエディタで開いて追加します。あとで「期待する判定を一括で確認する」に利用できます。'
+        body: '下書きのexpectations: は、期待する判定のファイルをエディタで開いて追加します。あとで「期待する判定を一括で確認する」で使えます。'
         scene: { tab: judge, suggested: true }
       - target: save
         title: 保存

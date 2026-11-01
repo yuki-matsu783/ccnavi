@@ -6,15 +6,15 @@
 # `scene:`は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。
 #   open開く項目のid（, で区切って複数。指す先factor-* は、開いた最初の項目に付く）
 #   find絞り込みの欄に入れる文字
-#   blank欄を空にして見せる境目（medium / high / critical）。空の欄には組み込みの値を薄く出す
+#   blank欄を空にして見せる閾値（medium / high / critical）。空の欄には組み込みの値を薄く出す
 #   missing配点のファイルが無い状態（組み込みの配点を読み取り専用で見せ、「作る」を出す）
 #   sum      「統合結果」の枠を開き、選ぶ統合結果の名前（sample.sumsのname）
 # `target:`の印（画面のdata-tour）:
-#   levels / level-high境目の点の欄全体 / HIGHの欄
+#   levels / level-high閾値の欄全体 / HIGHの欄
 #   factors / factor-count / find / add項目の一覧 / 項目の件数 / 絞り込みの欄 / 「＋ 項目を追加」
 #   factor-row / factor-id / factor-points / factor-kind / factor-value / factor-include / factor-exclude / factor-message / factor-buttons開いた項目の中
 #   save / missing / create保存 / ファイルが無いときの帯 / 「作る」ボタン
-#   sum / sum-pick / sum-levels / sum-table統合結果の枠 / 選ぶ欄 / 境目の点 / 項目の表
+#   sum / sum-pick / sum-levels / sum-table統合結果の枠 / 選ぶ欄 / 閾値 / 項目の表
 #   tour   「?」
 screen: risk
 
@@ -100,10 +100,10 @@ sample:
 courses:
   - id: intro
     title: 基本の案内
-    summary: 画面の見方。境目の点・項目・保存
+    summary: 画面の見方。閾値・項目・保存
     steps:
       - target: levels
-        title: リスクレベルの境目の点
+        title: リスクレベルの閾値
         body: 子チケットのリスクの点がこの値以上になると、リスクレベルが上がります（LOW → MEDIUM → HIGH → CRITICAL）。HIGH以上になると、レビューが終わるまでフェーズは先へ進めません。空欄なら組み込みの値を使います。
       - target: factors
         title: 項目
@@ -144,18 +144,18 @@ courses:
         focus: c-skip
       - target: factor-value
         title: 読んで判断させる項目は、答えが揃うまでクローズできない
-        body: no-testsはjudgeなので、ccnaviは問いを書き出してクローズを止めます。サブエージェントが差分を読んでyesかnoで答え、親がその答えを記録してから、閉じ直します。yesなので20点です。
+        body: no-testsはjudgeなので、ccnaviは問いを書き出してクローズを止めます。サブエージェントが差分を読んでyesかnoで答え、親チケットがその答えを記録してから、クローズし直します。yesなので20点です。
         scene: { open: no-tests }
         diagram: risk-score-high
         focus: judge, record
       - target: levels
-        title: 合計を境目の点と比べる
+        title: 合計を閾値と比べる
         body: 25 + 10 + 20 = 55点です。HIGHの40以上でCRITICALの70未満なのでHIGHになります。結果はphases/親/子.risk.jsonに残り、クローズしたときの出力にも出ます。
         diagram: risk-score-high
         focus: sum, write
       - target: levels
-        title: 境目ちょうどは、上のレベル
-        body: 境目の点は「以上」で判定します。19点はLOW、20点でMEDIUM、39点はMEDIUM、40点でHIGH、70点でCRITICALです。
+        title: 閾値ちょうどは、上のレベル
+        body: 閾値は「以上」で判定します。19点はLOW、20点でMEDIUM、39点はMEDIUM、40点でHIGH、70点でCRITICALです。
         diagram: risk-level
       - target: level-high
         title: 小さな変更はLOW
@@ -164,7 +164,7 @@ courses:
         focus: diff, c-all, sum
       - target: save
         title: 配点を変えるとき
-        body: 境目の点や項目の点を変えて保存すると、次にクローズする子から新しい配点で数えます。保存からの流れは「保存してから効くまでを知りたいとき」の案内で見られます。
+        body: 閾値や項目の点を変えて保存すると、次にクローズする子から新しい配点で数えます。保存からの流れは「保存してから効くまでを知りたいとき」の案内で見られます。
 
   - id: how-save-effect
     title: 保存してから効くまでを知りたいとき
@@ -172,12 +172,12 @@ courses:
     steps:
       - target: levels
         title: 値を直す
-        body: ここでは、HIGHの境目を40から50に直します。書いている間は「未保存」の印が付くだけで、ファイルも、子をクローズするときの数え方も変わりません。
+        body: ここでは、HIGHの閾値を40から50に直します。書いている間は「未保存」の印が付くだけで、ファイルも、子チケットをクローズするときの数え方も変わりません。
         diagram: risk-save
         focus: edit
       - target: save
         title: 保存すると、まず検証される
-        body: 保存を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します（--lint）。errorが1件でもあれば何も保存せず、理由を下に出します。点が整数でないときや、境目の点の並びが逆のときも、ここで止まります。
+        body: 保存を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します（--lint）。errorが1件でもあれば何も保存せず、理由を下に出します。点が整数でないときや、閾値の並びが逆のときも、ここで止まります。
         diagram: risk-save
         focus: save
       - target: save
@@ -196,12 +196,12 @@ courses:
         diagram: risk-save
         focus: effect
       - target: level-high
-        title: 同じ40点でも、境目が変わると結果が変わる
-        body: HIGHの境目が40点のとき、40点の子はHIGHです。境目を50に直したあとにクローズする40点の子はMEDIUMで、実績ではユーザのレビューが要る扱いになりません。ただし、計画でreviewをtrueと宣言していれば、そのままtrueです。
+        title: 同じ40点でも、閾値が変わると結果が変わる
+        body: HIGHの閾値が40点のとき、40点の子はHIGHです。閾値を50に直したあとにクローズする40点の子はMEDIUMで、実績では、ユーザのレビューが要る扱いにはなりません。ただし、計画でreviewをtrueと宣言していれば、そのままtrueです。
         diagram: risk-level-edit
       - target: sum
         title: 実際に使うのは、共通の設定との重ね合わせ
-        body: 子をクローズするときの配点は、共通の設定と、親のprojectが指す設定を重ねたものです。ここではlibの設定を共通の設定に足します。境目の点は小さいほうを使い、項目は両方を連結します。
+        body: 子をクローズするときの配点は、共通の設定と、親チケットのprojectが指す設定を重ねたものです。ここではlibの設定を共通の設定に足します。閾値は小さいほうを使い、項目は両方を連結します。
         scene: { sum: lib }
         diagram: risk-sum-lib
         focus: common, layer, merge
@@ -219,17 +219,17 @@ courses:
 
   - id: levels
     title: レビューを必須にする基準を調整したいとき
-    summary: 境目の点を変えて、どの子でレビューを必須にするかを決める
+    summary: 閾値を変えて、どの子でレビューを必須にするかを決める
     steps:
       - target: levels
-        title: 境目の点で決まること
-        body: 子チケットをクローズするとき、項目にヒットした点を足し合わせます。合計がしきい値以上になると、リスクレベルが上がります（LOW → MEDIUM → HIGH → CRITICAL）。LOWには境目がありません。
+        title: 閾値で決まること
+        body: 子チケットをクローズするとき、項目にヒットした点を足し合わせます。合計が閾値以上になると、リスクレベルが上がります（LOW → MEDIUM → HIGH → CRITICAL）。LOWには閾値がありません。
       - target: level-high
         title: 止めるのはHIGHから
         body: HIGH以上になったフェーズは、レビューが終わるまで先へ進めません。計画のときに「レビュー不要」と宣言していても同じです。レビューを求める基準を厳しくするならHIGHを下げ、緩めるなら上げます。
       - target: factors
         title: 項目の点と見比べる
-        body: 見本ではbig-diffが25点、many-filesが15点で、2つヒットすると40点になりHIGHに届きます。境目を動かすときは、項目の点のどの組み合わせが何点になるかを見比べて決めます。
+        body: 見本ではbig-diffが25点、many-filesが15点で、2つヒットすると40点になりHIGHに届きます。閾値を動かすときは、項目の点のどの組み合わせが何点になるかを見比べて決めます。
       - target: levels
         title: 並び順と空欄
         body: 値はMEDIUM ≤ HIGH ≤ CRITICALの順に入れます。欄を空にすると、そのリスクレベルは組み込みの値を使います。見本ではCRITICALを空にして、組み込みの70を薄く表示しています。
@@ -248,12 +248,12 @@ courses:
         body: 「＋ 項目を追加」を押すと、空の項目が末尾に追加され、欄が開いてidの欄にカーソルが移ります。1件につき加点条件は1つです。
       - target: factor-id
         title: idを付ける
-        body: idは項目の名前です。子をクローズしたときの出力や、judgeの記録（record-risk）がこの名前で項目を指すので、内容が分かる短い名前にします。
+        body: idは項目の名前です。子チケットをクローズしたときの出力や、judgeの記録（record-risk）がこの名前で項目を指すので、内容が分かる短い名前にします。
         scene:
           open: big-diff
       - target: factor-points
         title: 点を決める
-        body: ヒットしたときに加える点です。整数で入れます。点の合計が境目の点以上になるとリスクレベルが上がるので、上の境目と見比べて決めます。scriptだけは、点を読み取れなかったときに加える点になります。
+        body: ヒットしたときに加える点です。整数で入れます。点の合計が閾値以上になるとリスクレベルが上がるので、上の閾値と見比べて決めます。scriptだけは、点を読み取れなかったときに加える点になります。
         scene:
           open: big-diff
       - target: factor-kind
@@ -306,7 +306,7 @@ courses:
           open: db-script
       - target: factor-value
         title: 読んで判断させる（judge）
-        body: 差分を読んでyesかnoで答えられる質問を入力します。サブエージェントが判断し、yesなら加点します。判定が揃うまで、子はクローズできません。
+        body: 差分を読んでyesかnoで答えられる質問を入力します。サブエージェントが判断し、yesなら加点します。判定が揃うまで、子チケットはクローズできません。
         scene:
           open: no-tests
 
@@ -339,7 +339,7 @@ courses:
     steps:
       - target: sum
         title: 統合結果の枠
-        body: 子チケットをクローズするときの配点は、共通の設定に、親のprojectが指す設定を重ねたものです。この枠は、実行ファイルの答えをそのまま読み取り専用で表示します。
+        body: 子チケットをクローズするときの配点は、共通の設定に、親チケットのprojectが指す設定を重ねたものです。この枠は、実行ファイルの答えをそのまま読み取り専用で表示します。
         scene:
           sum: self
       - target: sum-pick
@@ -348,8 +348,8 @@ courses:
         scene:
           sum: lib
       - target: sum-levels
-        title: 境目の点は小さいほう
-        body: 境目の点は、記載されたキーごとに小さいほうを採用します。見本ではlibがHIGHを30と設定しているので、共通の40より小さい30になります。どちらも設定していないキーは組み込みの値です。
+        title: 閾値は小さいほう
+        body: 閾値は、記載されたキーごとに小さいほうを採用します。見本ではlibがHIGHを30と設定しているので、共通の40より小さい30になります。どちらも設定していないキーは組み込みの値です。
         scene:
           sum: lib
       - target: sum-table
@@ -377,16 +377,16 @@ courses:
           missing: true
       - target: create
         title: ファイルを作る
-        body: 「組み込みの配点でファイルを作る」を押すと、組み込みと同じ値のファイルを、いま開いている設定の場所に作成します。値が同じなので数え方は変わりません。既にファイルがあれば上書きしません。コミットは自分で行います。
+        body: 「組み込みの配点でファイルを作る」を押すと、組み込みと同じ値のファイルを、いま開いている設定の場所に作成します。値が同じなので数え方は変わりません。すでにファイルがあれば上書きしません。コミットは自分で行います。
         scene:
           missing: true
       - target: levels
         title: 作ったあとに直す
-        body: ファイルができると欄が使えるようになり、境目の点と項目を直せます。直し方は「レビューを必須にする基準を調整したいとき」などの案内で見られます。
+        body: ファイルができると欄が使えるようになり、閾値と項目を直せます。直し方は「レビューを必須にする基準を調整したいとき」などの案内で見られます。
 
 # 案内の手順が引く時系列の図。登場者を左から並べ、矢印を上から下へ時間順に並べる。矢印の`value`は実際の値や出る答えの例（等幅）。
 # 手順の`diagram:`で名前を指し、`focus:`で光らせる矢印（idを , で区切る）を決める。`to`を書かない矢印は、その登場者の中の動き。
-# 配点は`sample.risks`と同じ値（境目20 / 40 / 70。big-diff 25、ci 10上限35、no-tests 20など）。値を変えて結果が変わる例は図を分ける。
+# 配点は`sample.risks`と同じ値（閾値20 / 40 / 70。big-diff 25、ci 10上限35、no-tests 20など）。値を変えて結果が変わる例は図を分ける。
 diagrams:
   # 見本の配点で、4ファイルを変えた子をクローズしてHIGHになるまで
   risk-score-high:
@@ -439,7 +439,7 @@ diagrams:
         value: ccnavi-ticket.sh record-risk 子 no-tests yes --reason …
       - id: sum
         from: ccnavi
-        text: 加点を足して、境目の点と比べる
+        text: 加点を足して、閾値と比べる
         value: |-
           25 + 10 + 20 = 55
           55 ≥ 40 かつ 55 < 70 → HIGH
@@ -477,19 +477,19 @@ diagrams:
           no-tests: no → 0
       - id: sum
         from: ccnavi
-        text: 合計を境目の点と比べる
+        text: 合計を閾値と比べる
         value: |-
           0 < 20 → LOW
           リスク: 0 (LOW)
 
-  # 合計点とレベルの境目（以上で判定する）
+  # 合計点とレベルの閾値（以上で判定する）
   risk-level:
     actors: [ccnavi, risks.yml]
     steps:
       - id: read
         from: ccnavi
         to: risks.yml
-        text: 境目の点を読む
+        text: 閾値を読む
         value: 'levels: {medium: 20, high: 40, critical: 70}'
       - id: p19
         from: ccnavi
@@ -512,7 +512,7 @@ diagrams:
         text: 合計が70点
         value: 70 ≥ 70 → CRITICAL
 
-  # HIGHの境目を40から50に直すと、40点の子の結果が変わる
+  # HIGHの閾値を40から50に直すと、40点の子の結果が変わる
   risk-level-edit:
     actors: [ccnavi, risks.yml]
     steps:
@@ -535,7 +535,7 @@ diagrams:
         text: 同じ40点の別の子
         value: |-
           40 < 50 かつ 40 ≥ 20 → MEDIUM
-          実績ではユーザのレビューが要る扱いにならない
+          実績では、ユーザのレビューが要る扱いにはならない
       - id: kept
         from: ccnavi
         text: すでにクローズした子の記録（risk.json）は書き直さない
@@ -547,7 +547,7 @@ diagrams:
       - id: edit
         from: ユーザ
         to: リスク管理画面
-        text: HIGHの境目を40から50に直す
+        text: HIGHの閾値を40から50に直す
         value: 'levels: {medium: 20, high: 50, critical: 70}'
       - id: save
         from: リスク管理画面
@@ -588,7 +588,7 @@ diagrams:
           項目: lib:big-diff, public-api
       - id: merge
         from: ccnavi
-        text: 境目の点は小さいほう、項目は連結する
+        text: 閾値は小さいほう、項目は連結する
         value: |-
           medium 20 / high 30 / critical 70
           項目 5 + 2 = 7 件
@@ -606,7 +606,7 @@ diagrams:
           no-tests: no → 0
       - id: level
         from: ccnavi
-        text: 合計を境目の点と比べる
+        text: 合計を閾値と比べる
         value: |-
           15 + 20 = 35
           35 ≥ 30 → HIGH
@@ -621,7 +621,7 @@ diagrams:
         value: 'phases/親/子.risk.json  points: 55, level: HIGH'
       - id: raise
         from: ccnavi
-        text: HIGH以上なので、宣言がfalseでも、レビューを要する扱いに引き上げる。フェーズの点は子の最大値
+        text: HIGH以上なので、宣言がfalseでも、レビューが要る扱いに引き上げる。フェーズの点は子の最大値
         value: 'review: false → 要る'
       - id: ask
         from: ccnavi

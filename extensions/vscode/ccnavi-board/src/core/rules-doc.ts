@@ -153,7 +153,7 @@ export function condOfYaml(value: unknown, depth = 1): CondNode {
       }
       return { op: "not", child: condOfYaml(inner, depth + 1) };
     default:
-      return invalid(value, `知らないキー${key}です（glob / regex / all / any / not）`);
+      return invalid(value, `${key}は知らないキーです（glob / regex / all / any / not）`);
   }
 }
 

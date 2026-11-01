@@ -571,7 +571,7 @@ function decidePreviewed(state: ApprovalState, result: DecidePreviewParse): Appr
   // 頼んだフェーズの一覧か。別のフェーズの答えで開かない
   if (result.value.parent !== overlay.parent || result.value.phase !== overlay.phase) {
     return move(state, {
-      overlay: { kind: "error", error: unreadable("要求したフェーズと違う一覧が返りました。チケット管理画面を更新してから、もう一度レビュー完了を押してください") },
+      overlay: { kind: "error", error: unreadable("要求したフェーズと違う一覧が返りました。チケット管理画面を更新してから、もう一度「レビュー完了」を押してください") },
       only: state.only,
     });
   }
@@ -709,6 +709,6 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
       { kind: "loadDecide", tree, parent: preview.parent, phase: preview.phase, mr: preview.mr.number },
     );
   }
-  const error = "mismatch" in outcome ? "表示した指摘と今の指摘が違います。チケット管理画面を更新したので、もう一度レビュー完了を押して決め直してください" : outcome.error;
+  const error = "mismatch" in outcome ? "表示した指摘と今の指摘が違います。チケット管理画面を更新したので、もう一度「レビュー完了」を押して決め直してください" : outcome.error;
   return move(state, { overlay: { kind: "error", error }, only: state.only }, { kind: "refresh" });
 }

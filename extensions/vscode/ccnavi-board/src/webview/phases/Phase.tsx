@@ -185,7 +185,7 @@ export function Phase(props: PhaseProps): JSX.Element {
               {text("agent", "f-agent narrow", "サブエージェント名（案内に出すだけで、割り当てはしません）")}
             </Captioned>
             <Captioned name="最初に呼ぶ工程スキル" yamlKey="skill">
-              {text("skill", "f-skill narrow", "工程スキル名（例process-research。案内に出すだけで、呼ぶかは子が決めます）")}
+              {text("skill", "f-skill narrow", "工程スキル名（例: process-research。案内に出すだけで、呼ぶかは子が決めます）")}
             </Captioned>
             <Captioned name="使う場面" yamlKey="when" tour={mark("phase-when")}>
               {text("when", "f-when", "この定義を計画に入れる場面（エージェントへの案内にだけ使います）")}

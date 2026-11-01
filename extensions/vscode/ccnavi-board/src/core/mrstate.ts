@@ -188,7 +188,7 @@ export function parseRetired(ran: Pick<Ran, "code" | "stdout" | "killed">): Reti
     lines.pop();
   }
   if (lines[0] !== RETIRED_HEAD) {
-    return { ok: false, error: "一覧を取得できません（形式の異常: 頭の行がretired 1ではありません）" };
+    return { ok: false, error: "一覧を取得できません（形式の異常: 先頭の行がretired 1ではありません）" };
   }
   const entries: RetiredEntry[] = [];
   const incomplete: IncompleteEntry[] = [];
