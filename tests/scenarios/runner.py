@@ -88,7 +88,7 @@ PASS, FAIL, INCONCLUSIVE, REVIEW = "pass", "fail", "inconclusive", "needs-review
 
 # claude を呼ぶ道は、`python -m tests.scenarios.runner` で起動されたときだけ開く。
 # ほかのモジュール（全量テストに入るテストを含む）が import して呼んでも、ここで止まる。
-# 全量テストに入らないのは「test_ で始まるモジュールが無いから」だけでなく、この門でも守る。
+# 全量テストに入らないのは「test_ で始まるモジュールが無いから」だけでなく、このゲートでも守る。
 _ENTRY = False
 
 
