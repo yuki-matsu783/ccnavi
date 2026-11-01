@@ -1,9 +1,9 @@
 """ターン分離のゲートを、hook の入口から実際の呼び出しの順で確かめる
-（`integrate` → `integrate-done`）。
+（`integrate` → `integrate-done`、`review-request` → `confirm`）。
 
 UserPromptSubmit・PreToolUse・PostToolUseFailure・Stop・SessionStart を続けて呼ぶ。
 
-見るのは次の 9 つ。付き添いのないセッション（`CLAUDE_CODE_SESSION_ATTENDED=0`）を既定にして、
+見るのは次の 10 つ。付き添いのないセッション（`CLAUDE_CODE_SESSION_ATTENDED=0`）を既定にして、
 発言を待つゲートを確かめる。付き添いのあるセッションは `AttendedTest` で確かめる。
 
 - 付き添いのあるセッションでは、`integrate-done` は発言を待たず確認（ask）に出る。
@@ -15,6 +15,8 @@ UserPromptSubmit・PreToolUse・PostToolUseFailure・Stop・SessionStart を続�
 - キーが違う名前、`--abort`、`integrate` の失敗・拒否は対象外
 - サブエージェント、別のセッション、並行した呼び出し、同じコマンドの連結
 - 起動と再開は記録を消す。compact は消さない。dry-run でも止まる
+- `review-request` → `confirm`（`ReviewConfirmTest`）。対話でも確認でなく止める。
+  `--check`・他の副命令・別フェーズ・別セッション・失敗した依頼は対象外
 - 止めた記録（`decisions.jsonl`）の拒否コードと `rules`
 - 壊れたゲートの記録は止め、次のユーザの発言で消える（完了通知では消えない）
 """
@@ -34,6 +36,9 @@ from tests.inproc import run_ccnavi
 GIT = "sh .ccnavi/scripts/ccnavi-git.sh"
 INTEGRATE = f"{GIT} integrate foo"
 DONE = f"{GIT} integrate-done foo -m 'msg x'"
+REVIEW = "sh .ccnavi/scripts/ccnavi-review.sh"
+REQUEST = f"{REVIEW} review-request --phase 1 --body-file req.md --eli5 wip/eli5/phase-1.html"
+CONFIRM = f"{REVIEW} confirm --phase 1"
 NOTICE = "<task-notification>\n<status>completed</status>\n</task-notification>"
 
 
@@ -485,6 +490,138 @@ class SessionTest(TurnGateHookTest):
         done = self.run_command(DONE)
 
         self.assertNotIn("internal-error", done.stderr)
+
+
+class ReviewConfirmTest(TurnGateHookTest):
+    """`review-request` → `confirm`。依頼の直後にユーザの発言なしで確定できない（W14）。"""
+
+    def test_依頼と同じ発言の中の_confirm_は止まる(self):
+        self.say()
+        self.assertFalse(self.stopped(self.run_command(REQUEST)))
+
+        done = self.run_command(CONFIRM)
+
+        self.assertTrue(self.stopped(done))
+        self.assertIn('"permissionDecision": "deny"', done.stdout)
+        self.assertIn("builtin:turn-gate:review-confirm-user-turn", done.stdout)
+        self.assertIn("ユーザのレビュー", done.stdout)
+
+    def test_ユーザの発言を_1_回はさむと通る(self):
+        self.say()
+        self.run_command(REQUEST)
+        self.hook("Stop")
+
+        self.say("レビューが済みました")
+
+        self.assertFalse(self.stopped(self.run_command(CONFIRM)))
+        self.assertEqual(self.entries(), [])
+
+    def test_付き添いのあるセッションでも確認に出さず止める(self):
+        self.attended = "1"
+        self.say()
+        self.run_command(REQUEST)
+
+        done = self.run_command(CONFIRM)
+
+        self.assertTrue(self.stopped(done))
+        self.assertIn('"permissionDecision": "deny"', done.stdout)
+
+    def test_付き添いのあるセッションでも発言をはさめば通る(self):
+        self.attended = "1"
+        self.say()
+        self.run_command(REQUEST)
+        self.say("レビューが済みました")
+
+        done = self.run_command(CONFIRM)
+
+        self.assertFalse(self.stopped(done))
+        self.assertNotIn("builtin:turn-gate", done.stdout)
+
+    def test_confirm_を打つ前に依頼が無ければ対象外(self):
+        self.say()
+
+        self.assertFalse(self.stopped(self.run_command(CONFIRM)))
+
+    def test_同じコマンドに連結しても止まる(self):
+        self.say()
+
+        self.assertTrue(self.stopped(self.run_command(f"{REQUEST} && {CONFIRM}")))
+
+    def test_check_と他の副命令は対象外(self):
+        self.say()
+        self.assertFalse(self.stopped(self.run_command(f"{REQUEST} --check")))
+        self.assertEqual(self.entries(), [])
+        self.run_command(REQUEST)
+
+        self.assertFalse(self.stopped(self.run_command(f"{CONFIRM} --check")))
+        for sub in ("decide 1", "ready", "fetch", "mr-state"):
+            with self.subTest(sub=sub):
+                self.assertFalse(self.stopped(self.run_command(f"{REVIEW} {sub}")))
+
+    def test_完了通知は発言に数えない(self):
+        self.say()
+        self.run_command(REQUEST)
+        self.say(NOTICE)
+
+        self.assertTrue(self.stopped(self.run_command(CONFIRM)))
+
+    def test_Stop_の促しで同じターンを続けても開かない(self):
+        self.say()
+        self.run_command(REQUEST)
+        self.hook("Stop")
+
+        self.assertTrue(self.stopped(self.run_command(CONFIRM)))
+
+    def test_別のセッションでは働かない(self):
+        self.say(session="s1")
+        self.run_command(REQUEST, session="s1")
+        self.say(session="s2")
+
+        self.assertFalse(self.stopped(self.run_command(CONFIRM, session="s2")))
+
+    def test_再開で記録が消え_confirm_は通る(self):
+        self.say()
+        self.run_command(REQUEST)
+
+        self.hook("SessionStart", source="resume")
+
+        self.assertFalse(self.stopped(self.run_command(CONFIRM)))
+
+    def test_失敗した依頼は数えない(self):
+        self.say()
+        self.run_command(REQUEST, tool_use_id="toolu_a")
+        self.hook("PostToolUseFailure", tool_use_id="toolu_a", error="rejected")
+
+        self.assertEqual(self.entries(), [])
+        self.assertFalse(self.stopped(self.run_command(CONFIRM)))
+
+    def test_サブエージェントの_confirm_も止まる(self):
+        self.say()
+        self.run_command(REQUEST)
+
+        done = self.run_command(CONFIRM, agent_id="sub1", agent_type="x")
+
+        self.assertTrue(self.stopped(done))
+
+    def test_integrate_の組とは別の宣言で数える(self):
+        self.say()
+        self.run_command(REQUEST)
+        self.run_command(INTEGRATE)
+        self.say("どちらも見ました")
+
+        self.assertFalse(self.stopped(self.run_command(DONE)))
+        self.assertFalse(self.stopped(self.run_command(CONFIRM)))
+
+    def test_止めた記録は拒否コードと宣言を残す(self):
+        self.say()
+        self.run_command(REQUEST)
+        self.run_command(CONFIRM)
+
+        denied = [d for d in self.decisions() if d.get("decision") == "deny"]
+
+        self.assertEqual(len(denied), 1)
+        self.assertEqual(denied[0]["code"], "DENY_NEEDS_USER_TURN")
+        self.assertEqual(denied[0]["rules"], ["builtin:turn-gate:review-confirm-user-turn"])
 
 
 if __name__ == "__main__":

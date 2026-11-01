@@ -108,6 +108,11 @@ class ConsolidateFlowTest(FlowHarness):
         self.assertIn("落とし穴", refused.stderr)
         self.assertIn(RECORD, refused.stderr)
         self.assertIn("consolidate", refused.stderr)
+        # 書式の例（反映・対象外の両方）と、注釈なし・sources はチケット ID であることが出る
+        self.assertIn("- 処理: 反映 <パターン名>", refused.stderr)
+        self.assertIn("- 処理: 対象外 <理由>", refused.stderr)
+        self.assertIn("注釈は付けない", refused.stderr)
+        self.assertIn("チケット ID", refused.stderr)
 
     def test_all_none_passes_without_consolidation(self):
         self.setup_family(RECORD_TEXT.replace("learnings: 1", "learnings: none").replace(ENTRY, ""))
@@ -145,6 +150,7 @@ class ConsolidateFlowTest(FlowHarness):
         made = self.consolidate()
         self.assertEqual(made.returncode, 0, made.stdout + made.stderr)
         self.assertIn(CONS, made.stdout)
+        self.assertIn("- 処理: 反映 <パターン名>", made.stdout)
         self.assertEqual(self.cons_files(), [CONS + ".md"])
         with open(self.doing(CONS), encoding="utf-8") as f:
             text = f.read()

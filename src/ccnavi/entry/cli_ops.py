@@ -459,7 +459,7 @@ def _write_and_push_bypass(
     ユーザの判断の操作（`--close-early`）と、
     書かない形（`--preview`・`--choose-out`・`--accept-plan`・`review prepare`・
     `ticket start|finish|cancel|approval-request|consolidate --check`・
-    `--check user reviewed N --accept-unresolved`）は見ない。
+    `user reviewed N --check --accept-unresolved`）は見ない。
     """
     words = list(args.command)
     if args.record_tree or (args.check and words[:2] in _CHECKABLE):

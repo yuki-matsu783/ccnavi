@@ -506,7 +506,7 @@ class ReviewDecideShTest(unittest.TestCase):
                 self.assertEqual(stopped.returncode, 1, stopped.stderr)
                 self.assertEqual(self.calls(), [])
                 self.assertEqual(len(self.all_calls()), 1)
-                self.assertIn(" --check user reviewed 1 --accept-unresolved", self.all_calls()[0])
+                self.assertIn(" user reviewed 1 --check --accept-unresolved", self.all_calls()[0])
                 self.assertEqual(GitLab.posted, [])
                 self.assertEqual(GitLab.fetches, 0)
                 self.assertEqual(self.leftovers(), [])

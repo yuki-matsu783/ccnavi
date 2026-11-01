@@ -9,7 +9,7 @@
 
 宣言 1 件（`Gate`）が 1 組を表す。持つのは、id、A の条件、B の条件、A と B を同じ対象に結び付ける
 キー（任意）、文面の素材。宣言の表を渡して判定する関数（`check`・`note`）なので、組を足すには
-宣言を 1 件足す。特定の組には依存しない（tests/guard/test_turngate.py が、`integrate` と関係の無い
+宣言を 1 件足す。特定の組には依存しない（tests/core/test_turngate.py が、`integrate` と関係の無い
 別の組で確かめる）。
 
 - 条件（`Cond`）は `glob` か `regex` のどちらか 1 つ。読み方はルールと同じ
@@ -164,7 +164,7 @@ def rule_id(gate: Gate) -> str:
     return RULE_PREFIX + gate.id
 
 
-# 最初の利用は 1 件。差分をユーザに見せて返事を待つ手順書の約束を、機械にする。
+# 差分をユーザに見せて返事を待つ手順書の約束を、機械にする。
 # キーは `<名前>`。`integrate-done` は `-m <メッセージ>` を名前の前後どちらにも置ける
 # （`ig_done_args`）ので、メッセージの引数を読み飛ばしてから名前を取る。
 # `--abort` は先頭が `-` なので
@@ -187,7 +187,26 @@ INTEGRATE_GATE = Gate(
     ask_message="NOTICE_ASK_USER_CONFIRM__INTEGRATE",
 )
 
-BUILTIN: tuple[Gate, ...] = (INTEGRATE_GATE,)
+# 2 件目。レビューを頼んだ（`review-request`）直後に、同じターンで確定（`confirm`）して、ユーザの
+# レビューを飛ばせないようにする。`confirm` は依頼済みの未解決スレッドの有無しか見ないので、
+# 人が何も見ていなくても通る。付き添いのあるセッションでも確認には出さず、「レビューを終えた」という
+# ユーザの発言を待つ（`ask_if_attended` は立てない）。
+# キーは付けない。`--phase` の書き方（`--phase=2`・`01`・重複）を読まずに済み、どのフェーズの
+# 依頼のあとでも、ユーザの発言を待つ。待っている間に別の依頼は受けない決まりなので、これで困らない。
+# `--check`（打つだけで何も変えない確認）は A にも B にもならない。`review-request` 以外の副命令
+# （decide・ready など）は、副命令の名前が合わないので対象外。
+_CHECK = r"(?:^|\s)--check(?:\s|$)"
+REVIEW_CONFIRM_GATE = Gate(
+    id="review-confirm-user-turn",
+    first=Cond(regex=r"ccnavi-review\.sh\s+review-request(?:\s|$)", but=(_CHECK,)),
+    second=Cond(regex=r"ccnavi-review\.sh\s+confirm(?:\s|$)", but=(_CHECK,)),
+    first_name="ccnavi-review.sh review-request",
+    second_name="ccnavi-review.sh confirm",
+    message="DENY_NEEDS_USER_TURN__REVIEW_CONFIRM",
+    key_name="<N>",
+)
+
+BUILTIN: tuple[Gate, ...] = (INTEGRATE_GATE, REVIEW_CONFIRM_GATE)
 
 
 @functools.cache
@@ -470,7 +489,7 @@ def message(stop: Stop, root: str) -> str:
     """止めた文。何が起きたか・なぜ・次の一手・迂回しない、の順に 1 行ずつ。
 
     文は文面ファイルが持つ。宣言の文面（`Gate.message`）は止めた理由が「同じコマンド」か「発言が無い」
-    のとき、記録を読み書きできないときは `DENY_NEEDS_USER_TURN__STATE`。
+    のときに使い、記録を読み書きできないときは `DENY_NEEDS_USER_TURN__STATE` を使う。
     """
     gate = stop.gate
     key = stop.key

@@ -215,11 +215,11 @@ review_wap
 
 # ホストの API・ロック・取り込みより前に、ワークツリーの中で分かる前提（親とフェーズ・依頼の記録・
 # 依頼のあとに動いていないこと・選択とダイジェストの形）を、何も変えずに断る。
-# 検査は本体と同じ関数（読むだけ）。`--check` は位置引数の前に置く。
+# 検査は本体と同じ関数（読むだけ）。`--check` は `user reviewed N` の後ろに置く（`--entry` は `user` の直前に置くので、間に挟めない）。
 if [ -n "$choices" ]; then
-	ccnavi --entry sh --check user reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" >/dev/null || exit $?
+	ccnavi --entry sh user reviewed "$n" --check --accept-unresolved --yes "$choices" --digest "$digest" >/dev/null || exit $?
 else
-	ccnavi --entry sh --check user reviewed "$n" --accept-unresolved >/dev/null || exit $?
+	ccnavi --entry sh user reviewed "$n" --check --accept-unresolved >/dev/null || exit $?
 fi
 
 # マーカーに残すアカウント。confirm と同じくトークンの持ち主をホストに聞き、

@@ -1,9 +1,9 @@
 """ターン分離のゲート（`hook/turngate.py`）の部品。
 
-宣言の表を直接渡して確かめる。組み込みの 1 件（`integrate` → `integrate-done`）のほかに、
+宣言の表を直接渡して確かめる。組み込みの `integrate` → `integrate-done` のほかに、
 `integrate` と関係の無い架空の組を使い、部品が特定の組に依存していないことを見る。
 
-見るのは次の 6 つ。
+見るのは次の 7 つ。
 
 - 付き添いのあるセッションでは、`ask_if_attended` の宣言だけが確認（ask）に出る側へ分かれる
 
@@ -11,6 +11,8 @@
 - キーが違う組、A の記録が無い B は対象外
 - 条件の書き方（regex・glob・but・キーの解けない書き方）と、宣言の検査
 - 組み込みの宣言が、`integrate` と `integrate-done` の実際の引数の形を読むこと
+- 組み込みの `review-confirm-user-turn` が、`review-request` と `confirm` の引数の形
+  （`--check`・ほかの副命令。キーは付けない）を読むこと
 - 記録が壊れている・読めない・書けないときは閉じる側に倒れ、文面が次の一手を言うこと
 """
 
@@ -23,7 +25,7 @@ import tempfile
 import unittest
 
 from ccnavi.hook import turngate
-from ccnavi.hook.turngate import BUILTIN, Cond, Gate
+from ccnavi.hook.turngate import BUILTIN, INTEGRATE_GATE, Cond, Gate
 from ccnavi.records import userprompt
 from tests import put_messages
 
@@ -465,10 +467,10 @@ class BuiltinFormsTest(TurnGateTestCase):
     GIT = "sh /w/.ccnavi/scripts/ccnavi-git.sh"
 
     def first(self, tail):
-        return turngate.hits(BUILTIN[0].first, "first", [f"{self.GIT} {tail}"])
+        return turngate.hits(INTEGRATE_GATE.first, "first", [f"{self.GIT} {tail}"])
 
     def second(self, tail):
-        return turngate.hits(BUILTIN[0].second, "second", [f"{self.GIT} {tail}"])
+        return turngate.hits(INTEGRATE_GATE.second, "second", [f"{self.GIT} {tail}"])
 
     def test_integrate_は名前を_A_のキーにする(self):
         self.assertEqual(self.first("integrate foo"), [("foo", "foo")])
@@ -508,13 +510,13 @@ class BuiltinFormsTest(TurnGateTestCase):
                 self.assertEqual(self.first(tail), [])
                 self.assertEqual(self.second(tail), [])
         self.assertEqual(
-            turngate.hits(BUILTIN[0].second, "second", ["sh other.sh integrate-done foo"]), []
+            turngate.hits(INTEGRATE_GATE.second, "second", ["sh other.sh integrate-done foo"]), []
         )
 
     def test_引用の中の文字列は反応しない(self):
         # shellread は引用の中の空白を目印に置き換える。echo の引数は別のコマンドの語。
         quoted = "echo ccnavi-git.sh\x01integrate\x01foo"
-        self.assertEqual(turngate.hits(BUILTIN[0].first, "first", [quoted]), [])
+        self.assertEqual(turngate.hits(INTEGRATE_GATE.first, "first", [quoted]), [])
 
     def test_名前に空白を使った_A_と_B_は組む(self):
         turngate.note(BUILTIN, [f"{self.GIT} integrate Foo"], self.state, SESSION, "c1", now=1.0)
@@ -523,6 +525,66 @@ class BuiltinFormsTest(TurnGateTestCase):
 
         self.assertEqual(got.gate.id, "integrate-user-turn")
         self.assertEqual(got.key, "foo")
+
+
+class ReviewConfirmFormsTest(TurnGateTestCase):
+    """組み込みの `review-confirm-user-turn` が、`review-request` と `confirm` の引数の形を読む。"""
+
+    REVIEW = "sh .ccnavi/scripts/ccnavi-review.sh"
+    RR = "review-request --body-file req.md --eli5 wip/eli5/phase-1.html"
+    GATE = turngate.REVIEW_CONFIRM_GATE
+
+    def first(self, tail):
+        return turngate.hits(self.GATE.first, "first", [f"{self.REVIEW} {tail}"])
+
+    def second(self, tail):
+        return turngate.hits(self.GATE.second, "second", [f"{self.REVIEW} {tail}"])
+
+    def test_check_は_A_にも_B_にもならない(self):
+        self.assertEqual(self.first(f"{self.RR} --phase 2 --check"), [])
+        self.assertEqual(self.first(f"{self.RR} --check --phase 2"), [])
+        self.assertEqual(self.second("confirm --phase 2 --check"), [])
+        self.assertEqual(self.second("confirm --check --phase 2"), [])
+
+    def test_ほかの副命令は_A_にも_B_にもならない(self):
+        for sub in ("decide", "ready", "comment", "fetch", "origin", "merged", "mr-state"):
+            with self.subTest(sub=sub):
+                self.assertEqual(self.first(f"{sub} --phase 2"), [])
+                self.assertEqual(self.second(f"{sub} --phase 2"), [])
+
+    def test_別のスクリプトは対象外(self):
+        got = turngate.hits(self.GATE.second, "second", ["sh other.sh confirm --phase 1"])
+
+        self.assertEqual(got, [])
+
+    def test_phase_の書き方や番号に関わらず_依頼のあとの確定は止まる(self):
+        turngate.note(BUILTIN, [f"{self.REVIEW} {self.RR} --phase 1"], self.state, SESSION, "c1")
+
+        for tail in ("confirm --phase 1", "confirm --phase=2", "confirm --phase 01", "confirm"):
+            with self.subTest(tail=tail):
+                got = turngate.check(BUILTIN, [f"{self.REVIEW} {tail}"], self.state, SESSION)
+                self.assertEqual(got.reason, turngate.NO_USER_TURN)
+
+    def test_同じコマンドに並べると止まる(self):
+        both = f"{self.REVIEW} {self.RR} --phase 1 && {self.REVIEW} confirm --phase 1"
+
+        got = turngate.check(BUILTIN, [both], self.state, SESSION)
+
+        self.assertEqual(got.reason, turngate.SAME_COMMAND)
+
+    def test_文面は文面ファイルから引ける(self):
+        root = tempfile.mkdtemp(prefix="ccnavi-turngate-root-")
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        put_messages(root)
+        turngate.note(BUILTIN, [f"{self.REVIEW} {self.RR} --phase 3"], self.state, SESSION, "c1")
+        stop = turngate.check(BUILTIN, [f"{self.REVIEW} confirm --phase 3"], self.state, SESSION)
+
+        lines = turngate.message(stop, root).split("\n")
+
+        self.assertEqual(len(lines), 4)
+        self.assertIn("ccnavi-review.sh review-request を打ったあと", lines[0])
+        self.assertIn("confirm --phase <N>", lines[2])
+        self.assertIn("ユーザのレビュー", lines[2])
 
 
 class AskIfAttendedTest(TurnGateTestCase):
@@ -534,11 +596,11 @@ class AskIfAttendedTest(TurnGateTestCase):
         self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
         put_messages(self.root)
 
-    def test_付き添いがあれば_integrate_は確認の側に分かれる(self):
+    def test_付き添いがあれば_integrate_は確認の側に分かれ_レビューの確定は発言を待つ側に残る(self):
         waited, asked = turngate.split_by_attendance(BUILTIN, True)
 
-        self.assertEqual(waited, ())
-        self.assertEqual(asked, BUILTIN)
+        self.assertEqual(waited, (turngate.REVIEW_CONFIRM_GATE,))
+        self.assertEqual(asked, (turngate.INTEGRATE_GATE,))
 
     def test_付き添いがなければ発言を待つ側に残る(self):
         waited, asked = turngate.split_by_attendance(BUILTIN, False)
@@ -558,6 +620,13 @@ class AskIfAttendedTest(TurnGateTestCase):
         self.assertEqual(got.gate.id, "integrate-user-turn")
         self.assertEqual(got.key, "foo")
         self.assertEqual(got.reason, turngate.ASK)
+
+    def test_asks_はレビューの確定を確認に出さない(self):
+        review = "sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1"
+
+        asked = turngate.split_by_attendance(BUILTIN, True)[1]
+
+        self.assertIsNone(turngate.asks(asked, [review]))
 
     def test_asks_は_A_や関係の無いコマンドにヒットしない(self):
         self.assertIsNone(turngate.asks(BUILTIN, [f"{self.GIT} integrate foo"]))
