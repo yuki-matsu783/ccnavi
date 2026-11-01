@@ -191,22 +191,15 @@ INTEGRATE_GATE = Gate(
 # レビューを飛ばせないようにする。`confirm` は依頼済みの未解決スレッドの有無しか見ないので、
 # 人が何も見ていなくても通る。付き添いのあるセッションでも確認には出さず、「レビューを終えた」という
 # ユーザの発言を待つ（`ask_if_attended` は立てない）。
-# キーは `--phase <N>`（`--phase=<N>` も）。A はキーを必須にして、B は任意にする。B が `--phase` を
-# 読めない形（略記・並べ替えなど）でも、キーなし（WILDCARD）としてどの A とも結ぶので、外せない。
+# キーは付けない。`--phase` の書き方（`--phase=2`・`01`・重複）を読まずに済み、どのフェーズの
+# 依頼のあとでも、ユーザの発言を待つ。待っている間に別の依頼は受けない決まりなので、これで困らない。
 # `--check`（打つだけで何も変えない確認）は A にも B にもならない。`review-request` 以外の副命令
 # （decide・ready など）は、副命令の名前が合わないので対象外。
-_PHASE = r"--phase(?:=|\s+)(?P<key>[^-\s\x00\x01][^\s\x00\x01]*)"
 _CHECK = r"(?:^|\s)--check(?:\s|$)"
 REVIEW_CONFIRM_GATE = Gate(
     id="review-confirm-user-turn",
-    first=Cond(
-        regex=rf"ccnavi-review\.sh\s+review-request(?:\s|$)(?:[^\s\x00\x01]+\s+)*?{_PHASE}",
-        but=(_CHECK,),
-    ),
-    second=Cond(
-        regex=rf"ccnavi-review\.sh\s+confirm(?:\s|$)(?:(?:[^\s\x00\x01]+\s+)*?{_PHASE}|)",
-        but=(_CHECK,),
-    ),
+    first=Cond(regex=r"ccnavi-review\.sh\s+review-request(?:\s|$)", but=(_CHECK,)),
+    second=Cond(regex=r"ccnavi-review\.sh\s+confirm(?:\s|$)", but=(_CHECK,)),
     first_name="ccnavi-review.sh review-request",
     second_name="ccnavi-review.sh confirm",
     message="DENY_NEEDS_USER_TURN__REVIEW_CONFIRM",

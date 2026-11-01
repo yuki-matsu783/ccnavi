@@ -3,7 +3,7 @@ type: guide
 title: 止め方の型と選び方
 description: エージェントを止める・ユーザの返事を求める仕組みの型（拒否・確認・確認コード・ユーザ専用の入口・発言をまたぐゲート・促し・案内）の表、選び方、拒否の文面の型、拒否同士が行き止まりを作らない点検、ターン分離のゲートの宣言の足し方
 tags: [exe-boundary, sh-scripts]
-keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ専用の入口, ターン分離, 発言をまたぐゲート, 促し, nudge, 案内, 行き止まり, DENY_ASK_NEEDS_CONTEXT, 前提・背景, 想定結果, AskUserQuestion, DENY_NEEDS_USER_TURN, review-request, confirm, --phase, 非対話, ask_hint, 宣言]
+keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ専用の入口, ターン分離, 発言をまたぐゲート, 促し, nudge, 案内, 行き止まり, DENY_ASK_NEEDS_CONTEXT, 前提・背景, 想定結果, AskUserQuestion, DENY_NEEDS_USER_TURN, review-request, confirm, 非対話, ask_hint, 宣言]
 ---
 
 # 止め方の型と選び方

@@ -547,26 +547,6 @@ class ReviewConfirmTest(TurnGateHookTest):
 
         self.assertTrue(self.stopped(self.run_command(f"{REQUEST} && {CONFIRM}")))
 
-    def test_phase_の書き方が違っても結ぶ(self):
-        self.say()
-        self.run_command(REQUEST)
-
-        self.assertTrue(self.stopped(self.run_command(f"{REVIEW} confirm --phase=1")))
-
-    def test_phase_が読めない_confirm_も止める(self):
-        self.say()
-        self.run_command(REQUEST)
-
-        self.assertTrue(self.stopped(self.run_command(f"{REVIEW} confirm --pha 1")))
-        self.assertTrue(self.stopped(self.run_command(f"{REVIEW} confirm --phase $N")))
-
-    def test_キーが違うフェーズは結ばない(self):
-        self.say()
-        self.run_command(REQUEST)
-
-        self.assertFalse(self.stopped(self.run_command(f"{REVIEW} confirm --phase 2")))
-        self.assertTrue(self.stopped(self.run_command(CONFIRM)))
-
     def test_check_と他の副命令は対象外(self):
         self.say()
         self.assertFalse(self.stopped(self.run_command(f"{REQUEST} --check")))

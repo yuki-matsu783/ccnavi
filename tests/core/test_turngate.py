@@ -12,7 +12,7 @@
 - 条件の書き方（regex・glob・but・キーの解けない書き方）と、宣言の検査
 - 組み込みの宣言が、`integrate` と `integrate-done` の実際の引数の形を読むこと
 - 組み込みの `review-confirm-user-turn` が、`review-request` と `confirm` の引数の形
-  （`--phase` の位置・等号・`--check`・ほかの副命令）を読むこと
+  （`--check`・ほかの副命令。キーは付けない）を読むこと
 - 記録が壊れている・読めない・書けないときは閉じる側に倒れ、文面が次の一手を言うこと
 """
 
@@ -540,34 +540,6 @@ class ReviewConfirmFormsTest(TurnGateTestCase):
     def second(self, tail):
         return turngate.hits(self.GATE.second, "second", [f"{self.REVIEW} {tail}"])
 
-    def test_review_request_は_phase_をキーにする_引数の順序や等号に関わらない(self):
-        for tail in (
-            f"{self.RR} --phase 2",
-            "review-request --phase 2 --body-file req.md --eli5 x.html",
-            f"{self.RR} --phase=2",
-            "review-request --phase=2",
-        ):
-            with self.subTest(tail=tail):
-                self.assertEqual(self.first(tail), [("2", "2")])
-
-    def test_confirm_は_phase_をキーにする_引数の順序や等号に関わらない(self):
-        for tail in (
-            "confirm --phase 2",
-            "confirm --phase=2",
-            "confirm --phase 2 --result r.json",
-            "confirm --result r.json --phase 2",
-            "confirm --result r.json --phase=2",
-        ):
-            with self.subTest(tail=tail):
-                self.assertEqual(self.second(tail), [("2", "2")])
-
-    def test_confirm_は_phase_が読めない形でもキーなしとして_B_になる(self):
-        for tail in ("confirm", "confirm --phase", "confirm --phase $N", "confirm --pha 2"):
-            with self.subTest(tail=tail):
-                got = self.second(tail)
-                self.assertEqual(len(got), 1)
-                self.assertEqual(got[0][0], turngate.WILDCARD)
-
     def test_check_は_A_にも_B_にもならない(self):
         self.assertEqual(self.first(f"{self.RR} --phase 2 --check"), [])
         self.assertEqual(self.first(f"{self.RR} --check --phase 2"), [])
@@ -580,30 +552,18 @@ class ReviewConfirmFormsTest(TurnGateTestCase):
                 self.assertEqual(self.first(f"{sub} --phase 2"), [])
                 self.assertEqual(self.second(f"{sub} --phase 2"), [])
 
-    def test_phase_の無い_review_request_は_A_にならない(self):
-        self.assertEqual(self.first("review-request --body-file req.md"), [])
-
     def test_別のスクリプトは対象外(self):
         got = turngate.hits(self.GATE.second, "second", ["sh other.sh confirm --phase 1"])
 
         self.assertEqual(got, [])
 
-    def test_キーが違うフェーズは結ばない(self):
+    def test_phase_の書き方や番号に関わらず_依頼のあとの確定は止まる(self):
         turngate.note(BUILTIN, [f"{self.REVIEW} {self.RR} --phase 1"], self.state, SESSION, "c1")
 
-        other = turngate.check(BUILTIN, [f"{self.REVIEW} confirm --phase 2"], self.state, SESSION)
-        same = turngate.check(BUILTIN, [f"{self.REVIEW} confirm --phase 1"], self.state, SESSION)
-
-        self.assertIsNone(other)
-        self.assertEqual(same.gate.id, "review-confirm-user-turn")
-        self.assertEqual(same.key, "1")
-
-    def test_phase_が読めない_confirm_はどのフェーズの_A_とも結ぶ(self):
-        turngate.note(BUILTIN, [f"{self.REVIEW} {self.RR} --phase 1"], self.state, SESSION, "c1")
-
-        got = turngate.check(BUILTIN, [f"{self.REVIEW} confirm"], self.state, SESSION)
-
-        self.assertEqual(got.reason, turngate.NO_USER_TURN)
+        for tail in ("confirm --phase 1", "confirm --phase=2", "confirm --phase 01", "confirm"):
+            with self.subTest(tail=tail):
+                got = turngate.check(BUILTIN, [f"{self.REVIEW} {tail}"], self.state, SESSION)
+                self.assertEqual(got.reason, turngate.NO_USER_TURN)
 
     def test_同じコマンドに並べると止まる(self):
         both = f"{self.REVIEW} {self.RR} --phase 1 && {self.REVIEW} confirm --phase 1"
@@ -623,8 +583,7 @@ class ReviewConfirmFormsTest(TurnGateTestCase):
 
         self.assertEqual(len(lines), 4)
         self.assertIn("ccnavi-review.sh review-request を打ったあと", lines[0])
-        self.assertIn("キー 3", lines[0])
-        self.assertIn("confirm --phase 3", lines[2])
+        self.assertIn("confirm --phase <N>", lines[2])
         self.assertIn("ユーザのレビュー", lines[2])
 
 
