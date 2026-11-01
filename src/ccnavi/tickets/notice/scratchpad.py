@@ -20,8 +20,6 @@ from ..model import ticket_places
 WARN_MB_ENV = "CCNAVI_SCRATCHPAD_WARN_MB"
 DEFAULT_WARN_MB = 500.0
 _MB = 1024 * 1024
-# 走査にかける時間の上限（秒）。ファイルが多くても SessionStart を遅らせない。
-SCAN_SECONDS = 2.0
 
 
 def warn_mb() -> float:
@@ -38,21 +36,21 @@ def warn_mb() -> float:
     return value
 
 
-def scratch_bytes(root: str) -> int:
+def scratch_bytes(root: str, until: float | None = None) -> int:
     """`scratchpad/` の中の通常ファイルの大きさの合計。無ければ 0。
 
-    `SCAN_SECONDS` を過ぎたら、そこまでの合計を返す。
+    `until`（`time.monotonic()` の時刻）を過ぎたら、そこまでの合計を返す。
+    シンボリックリンクと junction は辿らず、数えない。
     """
     total = 0
-    limit = time.monotonic() + SCAN_SECONDS
     stack = [ticket_places.scratch_dir(root)]
-    while stack and time.monotonic() < limit:
+    while stack and (until is None or time.monotonic() < until):
         current = stack.pop()
         try:
             with os.scandir(current) as it:
                 for entry in it:
                     try:
-                        if entry.is_symlink():
+                        if entry.is_symlink() or entry.is_junction():
                             continue
                         if entry.is_dir(follow_symlinks=False):
                             stack.append(entry.path)
@@ -65,13 +63,15 @@ def scratch_bytes(root: str) -> int:
     return total
 
 
-def session_text(root: str) -> str:
-    """しきい値を超えたときの文。超えない・止めている・失敗したときは空。"""
+def session_text(root: str, until: float | None = None) -> str:
+    """しきい値を超えたときの文。超えない・止めている・失敗したときは空。
+
+    `until` は走査を打ち切る時刻（`time.monotonic()`）。"""
     try:
         limit = warn_mb()
         if limit <= 0:
             return ""
-        size = scratch_bytes(root)
+        size = scratch_bytes(root, until)
         if size <= limit * _MB:
             return ""
         values = {

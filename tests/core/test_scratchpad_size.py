@@ -47,6 +47,11 @@ class SizeTest(unittest.TestCase):
         self.assertEqual(scratchpad.scratch_bytes(self.root), 100)
 
 
+    def test_scan_stops_at_the_limit(self):
+        _put(self.root, "a.bin", 100)
+        self.assertEqual(scratchpad.scratch_bytes(self.root, 0.0), 0)
+
+
 class WarnMbTest(unittest.TestCase):
     def _with(self, value):
         env = {} if value is None else {scratchpad.WARN_MB_ENV: value}

@@ -1149,7 +1149,8 @@ def decide_at_start(
         texts.append(direct)
     # scratchpad/ が大きいときに、消してよいものを尋ねる文。サブエージェントには出さない。
     if not payload.agent_id:
-        large = scratchpad.session_text(root)
+        limit = time.monotonic() + PENDING_SECONDS
+        large = scratchpad.session_text(root, limit if deadline is None else min(deadline, limit))
         if large:
             texts.append(large)
     # 学びの蓄積の提案の候補が新しく現れたら、ユーザにだけ知らせる（モデルの文脈には入れない）。
