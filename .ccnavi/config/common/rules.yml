@@ -24,7 +24,7 @@ version: 1
 deny:
   # チェックアウトしたブランチでは編集しない。`wip/handoff/`・`scratchpad/`・`.claude/worktrees/` だけが編集可能。
   # `wip/handoff/` は追跡して push する、ユーザに渡す物の置き場（統合時に wip/ ごと消す）。
-  # `scratchpad/` は `.gitignore` で追跡から外す使い捨ての置き場（直接作業で一時的に見せる物）。
+  # `scratchpad/` は `.gitignore` で追跡から外す一時の置き場（直接作業で一時的に見せる物）。
   # `{root}` はワークスペースルートの実パスに置き換わる。ルート直下を全部止め、3 つの置き場を
   # except で除く。置き場の名前そのもの（`wip/handoff`・`scratchpad`）も除くのは、ディレクトリを指すだけの
   # 呼び出しを止めないため。
@@ -42,12 +42,12 @@ deny:
       名前は <先頭の語>-<番号>-<slug>（.ccnavi/docs/worktree.md「直接作業のワークツリーの名前」）。
       統合先へ直接 merge しないでください。取り込みはターンの終わりに出る integrate の案内に従います。
       案内が出ないときは .ccnavi/docs/worktree-merge.md「直接作業のワークツリーを取り込む」を読んでください。
-      ワークスペースルートの wip/handoff/（ユーザに渡す物）と scratchpad/（使い捨て）へは書き込めます。
+      ワークスペースルートの wip/handoff/（ユーザに渡す物）と scratchpad/（一時の置き場）へは書き込めます。
       プロジェクト（projects/<名前>/）の中を直すときは、cd projects/<プロジェクト名> && {script:ccnavi-worktree.sh} <名前> を実行します
       （行き先は同じ {root}/.claude/worktrees/<名前>）。
 
   # セッションが示すスクラッチパッド（/tmp/claude-*/ の下の scratchpad）は置き場にしない。
-  # 使い捨てはワークスペースルート直下の scratchpad/、ユーザに渡す物は wip/handoff/ に置く
+  # 一時の物はワークスペースルート直下の scratchpad/、ユーザに渡す物は wip/handoff/ に置く
   # （.ccnavi/docs/scratchpad.md）。シェルのリダイレクトなどによる書き込みは止めない。
   - id: session-scratchpad
     match: Write|Edit|NotebookEdit

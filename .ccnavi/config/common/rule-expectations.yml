@@ -20,7 +20,7 @@
 deny:
   - tool: Write
     subject: "/tmp/claude-0/-repo/0a1b2c/scratchpad/a.md"
-    why: セッションのスクラッチパッドは置き場にしない。使い捨ては scratchpad/、ユーザに渡す物は wip/handoff/ に置く（session-scratchpad）
+    why: セッションのスクラッチパッドは置き場にしない。一時の物は scratchpad/、ユーザに渡す物は wip/handoff/ に置く（session-scratchpad）
   - tool: Edit
     subject: "/tmp/claude-0/-repo/0a1b2c/scratchpad/sub/b.md"
     why: 下の階層も同じ。スクラッチパッドの中ならどこでも止める（session-scratchpad）
@@ -66,7 +66,7 @@ deny:
     why: workspace-root の except が除くのは scratchpad/ だけ。名前の続く別のディレクトリは除かない
   - tool: Write
     subject: "/repo/wip/scratchpad/a.md"
-    why: 使い捨ての置き場はワークスペースルート直下の scratchpad/ だけ。wip/ の下の同名は除かない
+    why: 一時の置き場はワークスペースルート直下の scratchpad/ だけ。wip/ の下の同名は除かない
   - tool: Write
     subject: "/repo/.claude/worktreesx/a.md"
     why: .claude/worktrees/ と名前の続く別のディレクトリも除かない
@@ -330,7 +330,7 @@ ask:
   - tool: Write
     subject: "/repo/scratchpad/a.md"
     why: >-
-      workspace-root の except で除く、使い捨ての置き場。止めないが allow にも無いので、
+      workspace-root の except で除く、一時の置き場。止めないが allow にも無いので、
       権限モードに渡る（ターミナルからの試験では ask）
   - tool: Write
     subject: "/repo/.claude/worktrees/x/pyproject.toml"

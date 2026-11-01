@@ -31,7 +31,7 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 | 作業・レビュー計画のテンプレート（効力のあるもの。計画と子のフローの一式） | 共通は`.ccnavi/config/common/templates/<名前>.yml`、プロジェクトは`.ccnavi/config/project/templates/<名前>.yml`。取り込むのはユーザ（[templates.md](templates.md)） |
 | テンプレートの下書き（エージェントが書く。効力は無い） | 反映する先と同じ相対パスで`wip/handoff/`の下（`wip/handoff/.ccnavi/config/project/templates/<名前>.yml`など）。プロジェクト向けは`projects/<名前>/wip/handoff/…`。取り込むのはユーザ（`ccnavi-user-handoff.sh`） |
 | ユーザに渡す物（保護対象を直したコピーなど） | ワークスペースのワークツリーの`wip/handoff/`（追跡する。直接作業では`integrate`が取り込み結果から外す） |
-| 使い捨てのファイル・コミットしたくないもの | ワークスペースルート直下の`scratchpad/`（`.gitignore`で追跡から外す。[scratchpad.md](scratchpad.md)）。セッションのスクラッチパッドには置かない。プロジェクトの`projects/<名前>/`には`wip/`の規約が無いので、プロジェクトの作業中の置き物もワークスペース側に置く |
+| 一時のファイル・コミットしたくないもの | ワークスペースルート直下の`scratchpad/`（`.gitignore`で追跡から外す。[scratchpad.md](scratchpad.md)）。セッションのスクラッチパッドには置かない。プロジェクトの`projects/<名前>/`には`wip/`の規約が無いので、プロジェクトの作業中の置き物もワークスペース側に置く |
 | ワークスペースのルール | 共通レイヤーの`.ccnavi/config/common/rules.yml`。リスクの配点とフェーズ定義（`phases.yml`）も同じ場所。レイアウトに依存するフェーズ定義は自身のレイヤーの`.ccnavi/config/project/phases.yml` |
 | プロジェクトの設定 | `projects/<名前>/.ccnavi/config/project/`（`rules.yml`・`phases.yml`・`risks.yml`）。ここはプロジェクト専用で、着手では上書きされない。親チケットに着手したあと、ユーザの発言のたびに、共通レイヤーは親のワークツリーのプロジェクトの`.ccnavi/config/common/`にミラーされる（ずれは`ccnavi-user-mirror.sh`で見て、揃えるのはユーザ。`skills/`の工程スキルも同じ入口で揃う）。フェーズ定義は共通レイヤーと`config/project/`の和 |
 

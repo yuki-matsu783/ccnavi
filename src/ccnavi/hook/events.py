@@ -63,6 +63,7 @@ from ..tickets.notice import (
     learning_notice,
     overview,
     pending_integrate,
+    scratchpad,
     session_rejects,
 )
 from ..tickets.phase import gates as phase
@@ -1146,6 +1147,13 @@ def decide_at_start(
         texts.append(pending)
     if direct:
         texts.append(direct)
+    # scratchpad/ が大きいときに、消してよいものを尋ねる文。起動（startup）のときだけ出す
+    # （再開・compact・clear のたびに同じ質問を繰り返さない）。サブエージェントには出さない。
+    if payload.source == "startup" and not payload.agent_id:
+        limit = time.monotonic() + PENDING_SECONDS
+        large = scratchpad.session_text(root, limit if deadline is None else min(deadline, limit))
+        if large:
+            texts.append(large)
     # 学びの蓄積の提案の候補が新しく現れたら、ユーザにだけ知らせる（モデルの文脈には入れない）。
     learning = "" if payload.agent_id else learning_notice.notice(conf, root, deadline)
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録。

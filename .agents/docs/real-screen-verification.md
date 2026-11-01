@@ -21,4 +21,4 @@ keywords: [実機確認, 実画面, 画面確認, Playwright, playwright-core, c
 - 単体の Chromium で webview だけを開く方法（`render-board.js`、ビルド済みの HTML を `acquireVsCodeApi` の代わりを入れて開く方法）は、CSS の効き方などの部分的な確認に使う。VS Code の通知・コマンド・テーマの色変数が絡む点は、code-server の画面で確かめる
 - 確かめた方法（code-server の画面、単体の Chromium、自動テスト、コード読みのどれか）を、項目ごとに報告へ書く。確かめられなかった点と理由は分けて書き、単体の Chromium やコード読みの結果を「実機で確認済み」と書かない
 - 不具合を見つけたら、再現手順と場所を書く。実機確認の中では直さない
-- 起動した code-server などのプロセスは、終わったら止める。一時ファイルは `scratchpad/` に置き、終わったら消す
+- 起動した code-server などのプロセスは、終わったら止める。一時ファイルは `scratchpad/` に置き、消さずに残す。大きくなって消したいときは、ユーザに尋ねてから消す

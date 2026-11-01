@@ -1,21 +1,21 @@
 ---
 type: guide
 title: 置き場の使い分け（wip/handoff/ と scratchpad/）
-description: ユーザに渡す物の置き場（wip/handoff/）と、使い捨ての置き場（ワークスペースルート直下の scratchpad/）の使い分け
+description: ユーザに渡す物の置き場（wip/handoff/）と、一時の置き場（ワークスペースルート直下の scratchpad/）の使い分け
 tags: [state, records]
-keywords: [scratchpad, handoff, user handoff, 取り込み, 保護対象, wip/handoff, スクラッチパッド, 下書き, 使い捨て, 一時ファイル, 引き渡し, ワークツリー, セッション, integrate, gitignore]
+keywords: [scratchpad, handoff, user handoff, 取り込み, 保護対象, wip/handoff, スクラッチパッド, 下書き, 一時の置き場, 一時ファイル, 引き渡し, ワークツリー, セッション, integrate, gitignore]
 ---
 
 # 置き場の使い分け
 
-置き場は2つある。`wip/handoff/`は、直接作業では`integrate`が取り込み結果から外し、チケット作業では`ready`が片付ける。`scratchpad/`はccnaviが消さないので、終わったら自分で消す（例外: `ccnavi-review.sh review-request`は、`--body-file`が`scratchpad/`の中の依頼文のとき、成功したあとに消す。レビュー待ちの間は`rm`を打てないため）。
+置き場は2つある。`wip/handoff/`は、直接作業では`integrate`が取り込み結果から外し、チケット作業では`ready`が片付ける。`scratchpad/`はccnaviが消さず、終わっても残す。大きくなったらユーザが了承したものだけ消す（例外: `ccnavi-review.sh review-request`は、`--body-file`が`scratchpad/`の中の依頼文のとき、成功したあとに消す。レビュー待ちの間は`rm`を打てないため）。
 
 | | `wip/handoff/` | `scratchpad/` |
 |---|---|---|
 | 置くもの | チケット作業で、保護対象を直したコピー、MRと一緒にユーザへ見せる物 | 直接作業で一時的にユーザへ見せる物、コミットしたくない物（機密、巨大な出力）、再現用スクリプト、コマンド出力 |
 | 場所 | ワークツリーの中ならそのワークツリーの`wip/handoff/`。ワークツリーが無ければワークスペースルート直下の`wip/handoff/` | ユーザのチェックアウトのワークスペースルート直下の`scratchpad/`。ワークツリーの中からも、同じこの1か所に置く |
 | git | 追跡されてpushされる | `.gitignore`で追跡から外す。pushされない |
-| 片付け | `ccnavi-git.sh integrate`が取り込み結果から外す。チケットのワークツリーでは`ready`が`wip/`ごと消す | ccnaviは消さない（`review-request`が成功したあとの`--body-file`の依頼文だけ例外）。作業が終わったら自分で消す |
+| 片付け | `ccnavi-git.sh integrate`が取り込み結果から外す。チケットのワークツリーでは`ready`が`wip/`ごと消す | ccnaviは消さない（`review-request`が成功したあとの`--body-file`の依頼文だけ例外）。残す。大きくなったらユーザに尋ねて、了承されたものだけ消す |
 
 置いたファイルを渡すときは、パスも必ず伝える。ファイル名は他のセッションの置き物と重ならないようにする（どちらもユーザのチェックアウトのルートを他セッションと共有する）。
 
@@ -28,6 +28,10 @@ keywords: [scratchpad, handoff, user handoff, 取り込み, 保護対象, wip/ha
 - ユーザのチェックアウトなので、チケットの範囲はヒットしない。`workspace-root`のルールの例外として、ワークツリーを切らなくても書ける（ルートでの編集全体が止まるわけではない）
 - `wip/scratchpad/`や`scratchpadX/`のように名前が違う場所は置き場ではなく、ルート直下なら止められる
 - ルールの判定は大文字と小文字を区別しない一方、`.gitignore`の`/scratchpad`は区別する（Linuxなど）。`Scratchpad/`のような別の綴りは書き込めてしまうが追跡から外れないので、必ず小文字の`scratchpad/`を使う
+
+## 容量の知らせ
+
+`scratchpad/`の中身の合計（通常ファイルの大きさの和。シンボリックリンクは辿らず数えない）が`CCNAVI_SCRATCHPAD_WARN_MB`（既定500。0で知らせない）を超えると、セッションの起動時（再開・compact・clearでは出ない）の文脈に知らせが出る。出たら、ユーザに消してよいものを尋ねる。消すのはユーザが了承したものだけにし、ファイル名を指定して`rm -f`か`rmdir`で消す。
 
 ## `wip/handoff/`の扱い
 
@@ -43,7 +47,7 @@ keywords: [scratchpad, handoff, user handoff, 取り込み, 保護対象, wip/ha
 
 Artifactツールが失敗したとき、ccnaviはHTMLの出力先としてこの`scratchpad/`を知らせる。
 
-Claude Codeのセッションが示すスクラッチパッド（Environment欄の`.../scratchpad`、`/tmp/claude-*`の下）は、置き場ではない。使い捨ては`scratchpad/`、ユーザに渡す物は`wip/handoff/`に置く。セッションのスクラッチパッドへの書き込みは、ccnaviがこの2つへ案内して止める。
+Claude Codeのセッションが示すスクラッチパッド（Environment欄の`.../scratchpad`、`/tmp/claude-*`の下）は、置き場ではない。一時の物は`scratchpad/`、ユーザに渡す物は`wip/handoff/`に置く。セッションのスクラッチパッドへの書き込みは、ccnaviがこの2つへ案内して止める。
 
 ## 書き込みを止められている場所を直したいとき
 

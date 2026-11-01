@@ -338,6 +338,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.lifecycle.stop_feedback",
                 "tickets.notice.pending_integrate",
                 "tickets.notice.direct_worktrees",
+                "tickets.notice.scratchpad",
                 "hook.commitnote",
                 "hook.post",
                 "hook.post_findings",

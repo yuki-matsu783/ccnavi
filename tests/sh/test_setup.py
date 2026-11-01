@@ -293,9 +293,9 @@ BIN_COMMENT = "# 実行ファイル"
 # （docs/21_design/diagnostics.md の 10.1「ドキュメントの索引」）。
 INDEX_LINE = "**/ccnavi-index.jsonl"
 INDEX_COMMENT = "# --docs の索引"
-# 使い捨ての置き場（ワークスペースルート直下の scratchpad/）を追跡から外す 1 行。
+# 一時の置き場（ワークスペースルート直下の scratchpad/）を追跡から外す 1 行。
 SCRATCH_LINE = "/scratchpad"
-SCRATCH_COMMENT = "# 使い捨ての置き場"
+SCRATCH_COMMENT = "# 一時の置き場"
 # 実行時の記録（ワークスペースルート直下の logs/）を追跡から外す 1 行。
 LOGS_LINE = "/logs/"
 LOGS_COMMENT = "# 実行時の記録"
@@ -2836,7 +2836,7 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
             "node_modules/\n\n"
             "# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）\n"
             f"/.ccnavi/bin/{THIS_MACHINE}/\n\n"
-            "# ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）\n/scratchpad\n"
+            "# ccnavi の一時の置き場（scripts/ccnavi-setup.sh）\n/scratchpad\n"
         )
         self.write_gitignore(old)
         self.run_setup("--deploy", self.make_source())
