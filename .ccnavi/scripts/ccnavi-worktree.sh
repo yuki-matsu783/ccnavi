@@ -19,9 +19,7 @@
 #   C5 取り込み先が統合先（origin/HEAD）でない
 #   C6 origin/<取り込み先> より遅れている・進んでいる・分岐している・originに無い・リモート未確認
 #   C7 ユーザのチェックアウトに書きかけ（追跡済みの変更・新規ファイル）がある（--copy-wipか --no-wipが要る）
-#   C8 同じリポジトリに、別の名前の直接作業のワークツリーが既にある（compact などで覚えていない続きの作業を、
-#      別に切り直さないため。続きなら切らずにそのワークツリーで編集する）
-#   C5〜C8 のどれかにヒットするときは --accept <確認コード> も要る。確認コードは今の状態から決まるので、
+#   C5〜C7 のどれかにヒットするときは --accept <確認コード> も要る。確認コードは今の状態から決まるので、
 #   状態が動けば報告からやり直しになる。
 # ヒットしないときは確認なしでS = 取り込み先のHEADから切る。--side-by-sideだけはaskルールがユーザの確認を取る。
 #
@@ -76,7 +74,7 @@ sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--base <ブランチ>] [--accept
   --base <ブランチ>
                   確認した取り込み先（ユーザのチェックアウトが開いているブランチ）
   --accept <確認コード>
-                  報告したずれ（取り込み先・origin との関係・書きかけ・別の直接作業のワークツリー）を、ユーザが了承して進める
+                  報告したずれ（取り込み先・origin との関係・書きかけ）を、ユーザが了承して進める
   --copy-wip / --no-wip
                   書きかけをコピーして切るか、コピーせず HEAD から切るか（書きかけがあるときはどちらかが要る）
   --side-by-side  このワークツリーが残っている間、ユーザのチェックアウトで見つかった変更を自動で戻さず報告にする
@@ -458,7 +456,7 @@ if [ -n "$adopt" ]; then
 	exit 0
 fi
 
-# ---- 状態を調べる（C4〜C8）。
+# ---- 状態を調べる（C4〜C7）。
 top_branch=$(git -C "$top" symbolic-ref --quiet --short HEAD 2>/dev/null || :)
 c4=no
 [ "$top_branch" = "$target" ] || c4=yes
@@ -497,7 +495,8 @@ common_dir=$(ccnavi_phys "$common_dir")
 ref_pending="refs/ccnavi/direct/$name/pending"
 ref_s="refs/ccnavi/direct/$name/s"
 
-# C8: 別の名前で、記録（ccnavi-direct/<名前>）があり、作業ワークツリーも残っている直接作業。空白区切りの名前。
+# 別の名前で、記録（ccnavi-direct/<名前>）があり、作業ワークツリーも残っている直接作業（空白区切りの名前）。
+# 並行作業は普通にあるので止めない。compact で会話が忘れた続きを別に切り直さないよう、切った後に案内するだけ。
 others=""
 for o_rec in "$common_dir"/ccnavi-direct/*; do
 	[ -f "$o_rec" ] || continue
@@ -506,8 +505,6 @@ for o_rec in "$common_dir"/ccnavi-direct/*; do
 	others="$others $o_name"
 done
 others=${others# }
-c8=no
-[ -z "$others" ] || c8=yes
 
 # 直接作業の名前の形は実行ファイルに聞く。取れなければ案内は出さない。
 # 名前が形に合わないことは、切る前に（--dry-run でも）言う。
@@ -525,7 +522,7 @@ if [ -n "$dry" ]; then
 	[ "$c4" = no ] || printf '状態: cwd のブランチ（%s）が取り込み先と違う。実行するには --base %s が要る\n' "${top_branch:-ブランチの外}" "$target"
 	[ "$c5" = no ] || printf '状態: 取り込み先がデフォルトブランチ（%s）でない。実行するには --accept が要る\n' "$integ"
 	[ "$c7" = no ] || printf '状態: 書きかけ 変更 %s・新規 %s（staged %s）。実行するには --accept と、--copy-wip か --no-wip が要る\n' "$wip_changed" "$wip_new" "$wip_staged"
-	[ "$c8" = no ] || printf '状態: 直接作業のワークツリーが既にある（%s）。続きなら切らずにそこで編集する。切るには --accept が要る\n' "$others"
+	[ -z "$others" ] || printf '案内: 作業中の直接作業のワークツリーが他にある（%s）。切ったあとに知らせる\n' "$others"
 	printf 'ブランチ: %s（起点 %s）\n' "$name" "$(git -C "$main_tree" rev-parse --short "$head_sha")"
 	printf 'ワークツリー: %s\n' "$dest"
 	print_name_note
@@ -608,16 +605,16 @@ if [ "$c7" = yes ]; then
 	cand=$(make_candidate) ||
 		fail snapshot-failed "書きかけのスナップショットを作れませんでした（${main_tree}）。ユーザに確かめてください。"
 fi
-code_input="repo=$common_dir|name=$name|target=$target|head=$head_sha|origin=${origin_sha:-$remote_state}|rs=$remote_state|default=$integ|cwd=${top_branch:--}|cand=${cand:--}|others=${others:--}"
+code_input="repo=$common_dir|name=$name|target=$target|head=$head_sha|origin=${origin_sha:-$remote_state}|rs=$remote_state|default=$integ|cwd=${top_branch:--}|cand=${cand:--}"
 code=$(printf '%s' "$code_input" | git hash-object --stdin | cut -c1-8)
 need_accept=no
-{ [ "$c5" = yes ] || [ "$c6" = yes ] || [ "$c7" = yes ] || [ "$c8" = yes ]; } && need_accept=yes
+{ [ "$c5" = yes ] || [ "$c6" = yes ] || [ "$c7" = yes ]; } && need_accept=yes
 
 # 確認が要るときの報告。切らずに終了コード 3 で止まる。
 report_and_stop() {
 	rs_why="$1"
 	[ -z "$cand" ] || git update-ref "$ref_pending" "$cand" 2>/dev/null || :
-	log_info 確認が要る -- "name=$name" "target=$target" "c4=$c4" "c5=$c5" "c6=$c6" "c7=$c7" "c8=$c8" "why=$rs_why"
+	log_info 確認が要る -- "name=$name" "target=$target" "c4=$c4" "c5=$c5" "c6=$c6" "c7=$c7" "why=$rs_why"
 	printf '確認が要る: ワークツリーはまだ切っていない。\n'
 	[ "$rs_why" = "code" ] && ccnavi_text "$root" NOTE_WORKTREE_CODE_STALE
 	printf '状態:\n'
@@ -632,9 +629,7 @@ report_and_stop() {
 	esac
 	[ "$c5" = no ] || printf '  取り込み先がデフォルトブランチ（%s）でない\n' "$integ"
 	[ "$c7" = no ] || printf '  書きかけ: 変更 %s・新規 %s（staged %s。コピーする場合、staged かどうかは区別されない）\n' "$wip_changed" "$wip_new" "$wip_staged"
-	[ "$c8" = no ] || printf '  直接作業のワークツリーが既にある: %s（%s/.claude/worktrees/ の下）\n' "$others" "$root"
 	[ "$wip_staged" -eq 0 ] || [ "$c7" = yes ] || printf '  staged %s（情報）\n' "$wip_staged"
-	[ "$c8" = no ] || printf '勧め: この作業の続きなら、新しく切らず上のワークツリーで編集する（compact などで覚えていないだけかもしれない）。別の作業として切るのはユーザの了承を得てから\n'
 	rs_main_q=$(ccnavi_sh_quote "$main_tree")
 	rs_target_q=$(ccnavi_sh_quote "$target")
 	case "$remote_state" in
@@ -662,8 +657,6 @@ report_and_stop() {
 	unverified) rs_risks="${rs_risks}  - リモートの最新を確かめないまま作業する。あとで合わせ直しが要りうる
 " ;;
 	esac
-	[ "$c8" = no ] || rs_risks="${rs_risks}  - 切ると、上のワークツリーの作業と別々に取り込むことになる。同じ作業を二重に進めたり、片方が取り込まれずに残ったりする
-"
 	[ "$c5" = no ] || rs_risks="${rs_risks}  - 最後は ${target} に 1 コミットで載る。${integ} に届くのは ${target} の MR がマージされたとき
 "
 	[ "$c4" = no ] || rs_risks="${rs_risks}  - cwd のブランチ（${top_branch:-ブランチの外}）ではなく、ユーザのチェックアウトの ${target} へ取り込む
@@ -800,5 +793,6 @@ if [ "$(printf '%s\n' "$lo_out" | head -n 1)" = "tree 1" ] && [ "$(lo_get leftov
 	[ "$(lo_get proposal)" != yes ] || ccnavi_text "$root" NOTE_WORKTREE_LEFTOVER_PROPOSAL "parent=$lo_name"
 	[ "$(lo_get mr)" = - ] || ccnavi_text "$root" NOTE_WORKTREE_LEFTOVER_MR "mr=#$(lo_get mr)"
 fi
+[ -z "$others" ] || ccnavi_text "$root" NOTE_WORKTREE_OTHER_ACTIVE "others=$others"
 print_next
 log_info 完了 -- "name=$name" "target=$target" "snap=$s_sha" "wip=$s_wip" "side=$side_word"

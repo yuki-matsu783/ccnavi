@@ -38,4 +38,11 @@ messages:
     kind: note
     values: [worktrees]
     note: |-
-      作業中の直接作業のワークツリーがある: {worktrees}。同じリポジトリで別に切ろうとすると、ccnavi-worktree.sh が確認を求める
+      作業中の直接作業のワークツリーがある: {worktrees}
+
+  # ccnavi-worktree.sh が切ったあとに出す。並行作業は止めず、続きを別に切り直していないかの気づきだけ渡す。
+  NOTE_WORKTREE_OTHER_ACTIVE:
+    kind: note
+    values: [others]
+    note: |-
+      作業中の直接作業のワークツリーが他にある: {others}。切ったのが、そのどれかの続きの作業だったなら、切り直さずそちらで編集する（今のワークツリーは不要になる）。並行して別の作業を進めるなら、そのままでよい
