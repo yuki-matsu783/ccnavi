@@ -339,6 +339,33 @@ class ShNotesTest(unittest.TestCase):
             self.assertIn(ident, called)
 
 
+class NextTextsShapeTest(unittest.TestCase):
+    """`kind: next` の文は、組み立てると `次:` の行がちょうど 1 行で、残りは `案内:` の行になる。
+
+    1 回の出力に `次:` は 1 行・1 行 1 手（script-output.md）。2 手目以降は `note` 欄に置く。
+    """
+
+    def test_every_next_text_renders_one_next_line_and_notes_only(self):
+        catalog = texts.load(ROOT)
+        ids = [i for i, e in catalog.entries.items() if e.kind == texts.NEXT]
+        self.assertGreaterEqual(len(ids), 50)
+        for ident in ids:
+            with self.subTest(ident=ident):
+                entry = catalog.entries[ident]
+                values = {name: "v" for name in entry.values}
+                variants = {
+                    name: next(iter(field))
+                    for name, field in entry.fields.items()
+                    if isinstance(field, dict)
+                }
+                said = texts.say(ROOT, ident, values, variants)
+                self.assertNotIn("引けませんでした", said)
+                self.assertNotIn("{", said)
+                self.assertEqual(1, len(texts.lines_of(said)), said)
+                for line in said.splitlines():
+                    self.assertTrue(line.startswith((texts.LABELS["next"], texts.NOTE_LABEL)), line)
+
+
 class SharedRulesWordingTest(unittest.TestCase):
     """同梱の rules.yml の文面。ユーザとエージェントに見える文に ADR 番号を書かない。
 

@@ -210,12 +210,10 @@ export interface SyncButton {
 }
 
 /**
- * ミラーを確認した結果（`projects-view.ts` の `MirrorData` が持つ）。`waiting` はまだ確認していない、`unsupported` は実行ファイルが
- * `user mirror` を持たない、`failed` は確認できなかった（実行ファイルが無い・期限切れ・結果が読めない）
+ * ミラーを確認した結果（`projects-view.ts` の `MirrorData` が持つ）。`waiting` はまだ確認していない、`failed` は確認できなかった（実行ファイルが無い・期限切れ・結果が読めない）
  */
 export type MirrorStatus =
   | { readonly kind: "waiting" }
-  | { readonly kind: "unsupported"; readonly reason: string }
   | { readonly kind: "failed"; readonly error: string }
   | { readonly kind: "ok"; readonly list: MirrorList };
 
@@ -227,8 +225,6 @@ function commonBlock(status: MirrorStatus, busy: boolean): string {
   switch (status.kind) {
     case "waiting":
       return "ミラーを確認しています";
-    case "unsupported":
-      return status.reason;
     case "failed":
       return "ミラーを確認できませんでした。「更新」で確認し直してください";
     case "ok":

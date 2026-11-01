@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import TextIO
 
 from ...infra import settings
+from ...policy import texts
 from ..approval import store as approval
 from ..model import ticket_ids, ticket_model
 from ..phase import gates as phase
@@ -63,11 +64,7 @@ def childless_notice(root: str, conf: settings.Settings, found: ticket_model.Tic
         return []
     labels = ", ".join(label for _, label in missing)
     example = ticket_ids.child_id(found.ticket, missing[0][0], 1)
-    propose = settings.script_command(root, "ccnavi-ticket.sh")
     return [
         f"子のない（子の提案もありません）フェーズがある: {labels}",
-        f"次: 子の提案（例: '{example}'）を wip/proposals/todo/ に書き、"
-        f"'{propose} approval-request {found.ticket}' で送って、承認をユーザに頼む"
-        "（子の着手は親が着手済みであることが条件。親と別の承認になる）",
-        "子のないまま親で進めても、`finish` で「終わっていないフェーズがある」と止まります",
+        texts.say(root, "NEXT_OPS_START_CHILDLESS", {"example": example, "parent": found.ticket}),
     ]

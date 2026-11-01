@@ -30,7 +30,8 @@ export interface PlanItem {
   readonly index: number;
   readonly number: number;
   readonly type: string;
-  readonly review: string;
+  readonly review: boolean;
+  readonly deferred: boolean;
   readonly after: readonly number[];
 }
 
@@ -151,7 +152,7 @@ export interface PhaseTypeInfo {
   readonly id: string;
   readonly title: string;
   readonly kind: string;
-  readonly review: string;
+  readonly review: boolean;
 }
 
 /**

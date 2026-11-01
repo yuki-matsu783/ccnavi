@@ -19,13 +19,13 @@ phases:
   real-a:
     kind: work
     title: 実物A
-    review: mr
+    review: true
     scope: inherit
     when: 実物だけの使う場面
   real-b:
     kind: feedback
     title: 実物B
-    review: mr
+    review: true
     scope: inherit
 `;
 const REAL_IDS = ["real-a", "real-b"];
@@ -261,7 +261,7 @@ test("CB-D243 手順の scene が画面の様子を替える（開く定義・�
     await next(dom);
     assert.equal(dom.one<HTMLButtonElement>("#save").disabled, false);
     await next(dom);
-    assert.match(dom.one("#status").textContent ?? "", /design-feedback は feedback なので review は mr/);
+    assert.match(dom.one("#status").textContent ?? "", /design-feedback は feedback なので review は true/);
     assert.ok(dom.one(".foot").classList.contains("error"));
     await next(dom);
     assert.equal(dom.one("#status").textContent, "", "手順をまたいで検証の文が残った");

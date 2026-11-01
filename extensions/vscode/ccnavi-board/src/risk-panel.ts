@@ -45,7 +45,7 @@ import { renderRiskPage } from "./core/risk-render.js";
 import type { RiskData, RiskForm, RiskMessage, ToRisk } from "./core/risk-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import type { HandoffEntry } from "./core/handoff-entry.js";
-import { openHandoffFrom, readHandoffEntry } from "./handoff-entry.js";
+import { HANDOFF_ENTRY, openHandoffFrom } from "./handoff-entry.js";
 import type { RiskTarget } from "./core/screens.js";
 import { riskSums, type RiskSum } from "./core/sums.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
@@ -257,9 +257,7 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
   // 無いときの苦情（version が無い、など）は画面に出さない。無いことは不備ではない。
   const parsed = readRisk(text);
   const doc = exists || builtin ? parsed : { apply: parsed.apply, model: { ...parsed.model, problems: [] } };
-  // 取り込み待ち画面を開けるかは、設定の読み込みとは別に確かめる（古い実行ファイルでは入口だけを無効にする）
-  const handoff = await readHandoffEntry(root, binSetting());
-  return { target, text, exists, builtin, mtimeMs, doc, riskPath, riskRel, notices, targets, sums, handoff };
+  return { target, text, exists, builtin, mtimeMs, doc, riskPath, riskRel, notices, targets, sums, handoff: HANDOFF_ENTRY };
 }
 
 function resolveIn(root: string, filePath: string): string {

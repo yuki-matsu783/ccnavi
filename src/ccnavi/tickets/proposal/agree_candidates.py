@@ -36,7 +36,7 @@ class Candidate:
     current: ticket_model.Ticket | None = None
     # このチケットに使うフェーズ定義。親のコピー（`phases:`）を読んだもの。
     # 親ならその提案のコピー、
-    # 子なら親（承認済みか、同じ承認で通る提案）のコピー。承認画面はこれでタイトルと見る場所を出す。
+    # 子なら親（承認済みか、同じ承認で通る提案）のコピー。承認画面はこれでタイトルとレビューの要否を出す。
     types: dict | None = None
     # 承認したときの `phases.yml`（共通レイヤー + 親の `project:` が指すレイヤーの和）。コピーが
     # これと同じかを確かめ、承認画面に「この親では使わない定義」を出すのに使う。
@@ -433,7 +433,7 @@ def plan_problems(
     for key, items in (("plan", t.plan), ("feedback", t.feedback or [])):
         for i, item in enumerate(items):
             pt = types.get(item.type)
-            if pt is not None and item.deferred and pt.review == phasetypes.REVIEW_NONE:
+            if pt is not None and item.deferred and not pt.review:
                 problems.append(
                     rules.Problem(
                         rules.SEVERITY_ERROR,
@@ -457,7 +457,7 @@ def copy_config_problems(
 
     読んだ形で比べる（`phasetypes.same`）。`phases.yml` にあってコピーに無い定義は何も言わない
     （この親では使わないだけ）。`held` に入っている定義（改版で、子が承認された番号が使う定義）は
-    `phases.yml` ではなく承認済みチケットのコピーの値と比べる。進んでいるフェーズの範囲・見る場所・
+    `phases.yml` ではなく承認済みチケットのコピーの値と比べる。進んでいるフェーズの範囲・レビューの要否・
     成果物を改版で変えないため。
 
     `approved` なら承認済みチケットの食い違いとして warn で言う（`--lint`）。進行中の親には
@@ -629,13 +629,7 @@ def revision_problems(
     # 比べるのは定義・`review`・推移的な先行の並び（`after` だけの違いも違いとして拾う）。
     if approval.plan_signature(revised, "feedback") != approval.plan_signature(current, "feedback"):
         if current.feedback is not None:
-            # 残りの切り出し先は進め方で違う。マージリクエストがあれば issue に切り出せるが、
-            # マージリクエストを持たない親はホストに何も無いので、新しい親チケットの提案にする。
-            elsewhere = (
-                "残りは新しい親チケットの提案として wip/proposals/todo/ に書いてください"
-                if phase.without_mr(root, conf, current.ticket)
-                else "残りは別 issue に回してください（ccnavi-user-decide.sh）"
-            )
+            elsewhere = "残りは別 issue に回してください（ccnavi-user-decide.sh）"
             problems.append(
                 rules.Problem(
                     rules.SEVERITY_ERROR,
@@ -751,7 +745,11 @@ def lock_problems(
         before, after = held_items.get(n), new_items.get(n)
         if before is None:
             continue
-        if after is None or (after.type, after.review) != (before.type, before.review):
+        if after is None or (after.type, after.review, after.deferred) != (
+            before.type,
+            before.review,
+            before.deferred,
+        ):
             shown = f"{after.type}" if after is not None else "無い"
             error(
                 f"{n} 番目（{before.type}）は子が承認されているので、"
@@ -769,7 +767,11 @@ def lock_problems(
             if m in fixed:
                 continue
             was, now = held_items.get(m), new_items.get(m)
-            if now is None or was is None or (now.type, now.review) != (was.type, was.review):
+            if (
+                now is None
+                or was is None
+                or (now.type, now.review, now.deferred) != (was.type, was.review, was.deferred)
+            ):
                 error(
                     f"{n} 番目に子の無い {m} 番目が先行しているので、{m} 番目のステップ"
                     f"（{was.type if was is not None else '?'}）を入れ替えられない"

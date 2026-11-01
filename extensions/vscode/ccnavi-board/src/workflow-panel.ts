@@ -40,7 +40,7 @@ import * as crypto from "node:crypto";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { checkPlanOrder, loadBoard, runPlanOrder, runPlanOrderWrite } from "./ccnavi.js";
+import { loadBoard, runPlanOrder, runPlanOrderWrite } from "./ccnavi.js";
 import { loadingText } from "./core/loading-render.js";
 import type { PlanOrder, PlanOrderAnswer } from "./core/planordermodel.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
@@ -377,8 +377,7 @@ async function reload(current: PanelState): Promise<void> {
   current.changed = undefined;
   current.gone = undefined;
   const rootPath = root(current);
-  const refused = await checkPlanOrder(rootPath, binSetting());
-  const got = refused === undefined ? await runPlanOrder(rootPath, binSetting(), current.ticket) : ({ ok: false, error: refused } as const);
+  const got = await runPlanOrder(rootPath, binSetting(), current.ticket);
   if (!alive(current) || current.seq !== seq) {
     if (restore !== undefined) {
       void vscode.window.showWarningMessage(`${current.ticket} の計画編集タブを読み直せなかったので、閉じる前の編集を戻せませんでした。閉じる前の編集は、無題の JSON ファイルとして開きます。`);

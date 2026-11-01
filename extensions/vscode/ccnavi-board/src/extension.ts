@@ -14,7 +14,6 @@ import { openTemplates } from "./templates-panel.js";
 import { registerSidebar } from "./sidebar.js";
 import { watchTicketControl } from "./ticket-control.js";
 import { initTours, openSidebarTour, openSidebarTourOnNewVersion, runBasicTours, runScreenTour } from "./tour.js";
-import { warnVersionSkew } from "./version-check.js";
 import { openWorkflow } from "./workflow-panel.js";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -35,8 +34,6 @@ export function activate(context: vscode.ExtensionContext): void {
   // サイドパネルより先に読む。入口の順序がこの値で決まる。
   watchTicketControl(context);
   registerSidebar(context);
-  // 実行ファイルと拡張の互換の版が食い違っていれば知らせる。待たない（起動を遅らせない）
-  void warnVersionSkew();
   context.subscriptions.push(
     vscode.commands.registerCommand("ccnaviBoard.open", () => void screens().board()),
     vscode.commands.registerCommand("ccnaviBoard.refresh", refreshBoard),

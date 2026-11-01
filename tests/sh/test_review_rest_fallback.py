@@ -39,7 +39,7 @@ SCRIPTS = ("ccnavi-review.sh", "ccnavi-user-decide.sh", "ccnavi-user-lib-review.
 EXE = """#!/bin/sh
 case " $* " in
 *" --version --json "*)
-  printf '{{"compat": {compat}, "flags": ["--accept-unresolved", "--actor", "--via"]}}\\n'
+  printf '{{"compat": {compat}}}\\n'
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;

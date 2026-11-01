@@ -176,7 +176,7 @@ export type ApprovalEffect =
     }
   /**
    * 承認の push の sh をターミナルに送る。`paths` はこの承認で書いた・消したパスで、sh にはこれだけを
-   * コミット・push させる（同じ置き場の承認と無関係な変更を巻き込まない）。空なら古い実行ファイルで、絞らずに送る
+   * コミット・push させる（同じ置き場の承認と無関係な変更を巻き込まない）
    */
   | { readonly kind: "carry"; readonly paths: readonly string[] }
   /**

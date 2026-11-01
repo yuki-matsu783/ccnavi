@@ -121,6 +121,30 @@ class RetireAfterReadyTest(RetireHarness):
         self.assertTrue(os.path.isfile(os.path.join(self.child_tree, ".env")))
         self.assertIn(CHILD, self.branches())
 
+    def test_a_parent_that_cannot_be_removed_is_refused_before_any_child_is_touched(self):
+        self.closed_and_pushed()
+        write(os.path.join(self.parent_tree, "memo.txt"), "書きかけ\n")
+        done = self.retire()
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("何も削除しなかった", done.stderr)
+        self.assertIn("次: ", done.stderr)
+        self.assertNotIn("削除しました", done.stdout)
+        self.assertTrue(os.path.isdir(self.child_tree))
+        self.assertTrue(os.path.isdir(self.parent_tree))
+        self.assertIn(CHILD, self.branches())
+
+    def test_a_cwd_inside_the_parent_is_refused_before_any_child_is_touched(self):
+        self.closed_and_pushed()
+        done = self.ccnavi("--cwd", self.parent_tree, "worktree", "retire", "i0001")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("中から片付けを打った", done.stderr)
+        self.assertTrue(os.path.isdir(self.child_tree))
+        self.assertTrue(os.path.isdir(self.parent_tree))
+        # 外から打ち直せば通る
+        again = self.retire()
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertFalse(os.path.exists(self.child_tree))
+
 
 class CancelledChildTest(RetireHarness):
     """取り消した子のブランチは、確認なしでは消さない。"""

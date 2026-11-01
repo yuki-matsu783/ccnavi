@@ -399,25 +399,25 @@ class CheckTest(Harness):
         self.assertTrue(self.problems(self.check(bad), "error"))
 
     def test_a_deferral_without_a_taker_is_an_error(self):
-        row = self.check(template("t", "  - {type: design, review: defer}\n  - implement\n"))
+        row = self.check(template("t", "  - {type: design, deferred: true}\n  - implement\n"))
         self.assertTrue(any("延期を引き受ける" in d for d in self.problems(row, "error")))
 
     def test_a_deferral_to_a_phase_without_review_is_a_warning(self):
         text = template(
-            "t", "  - {type: design, review: defer}\n  - {type: research, after: [1]}\n"
+            "t", "  - {type: design, deferred: true}\n  - {type: research, after: [1]}\n"
         )
         row = self.check(text)
         self.assertEqual(self.problems(row, "error"), [])
         self.assertTrue(any("レビューがありません" in d for d in self.problems(row, "warn")))
 
     def test_the_last_item_cannot_be_deferred(self):
-        plan = "  - design\n  - {type: implement, after: [1], review: defer}\n"
+        plan = "  - design\n  - {type: implement, after: [1], deferred: true}\n"
         row = self.check(template("t", plan))
         self.assertTrue(any("延期できない" in d for d in self.problems(row, "error")))
 
     def test_a_review_that_loosens_is_an_error(self):
-        row = self.check(template("t", "  - {type: design, review: none}\n"))
-        self.assertTrue(any("none" in d for d in self.problems(row, "error")))
+        row = self.check(template("t", "  - {type: design, review: false}\n"))
+        self.assertTrue(any("弱める向き" in d for d in self.problems(row, "error")))
 
     def test_an_unknown_type_is_only_a_warning(self):
         row = self.check(template("t", "  - docs\n"))
@@ -750,7 +750,7 @@ class CheckFileTest(Harness):
     def test_a_plan_only_template_has_one_graph(self):
         got = self.check(RESEARCH, "research")
         self.assertEqual([p["part"] for p in got["plans"]], ["plan"])
-        self.assertEqual(got["plans"][0]["items"][0]["review"], "none")
+        self.assertFalse(got["plans"][0]["items"][0]["review"])
 
     def test_unreadable_yaml_is_invalid(self):
         got = self.check("name: [\n")
@@ -811,10 +811,6 @@ class CheckFileTest(Harness):
         alone = self.ccnavi("--check-file", path)
         self.assertNotEqual(alone.returncode, 0)
         self.assertIn("--templates と一緒に使う", alone.stderr)
-
-    def test_the_flag_is_listed_in_the_version(self):
-        out = self.ccnavi("--version", "--json")
-        self.assertIn("--check-file", json.loads(out.stdout)["flags"])
 
     def test_the_answer_matches_the_fixture(self):
         got = self.check(FEATURE)

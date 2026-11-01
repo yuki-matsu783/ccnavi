@@ -23,7 +23,7 @@ ccnavi --lint --log "" --state ""
 | 出どころ | error（防御が消える・全部止まる） | warn（判定は動くが意図とずれる） |
 |---|---|---|
 | `(rules)` / ルール id | 読めない、版が違う、`deny` が空、文面・match・glob を欠く、glob と regex の両方、`except` の形（空・要素が glob / regex の 1 つでない・知らないキー）、`when` の形（glob / regex と並べた・知らないキー・キーが 1 つでないノード・空のリスト・型違い・8 段 / 64 個の上限超え）、`ask` `allow` に `message`、組めない正規表現、`additionalContextFile` が上に出る | `allow` が空、id 無し・重複、適用する対象の無いツール、広い allow に文、指すファイルが無い・長い、何にでもヒットする単体の `deny`（`glob: "*"` ちょうどは除く）、何にでもヒットする `except`、Bash / PowerShell の deny / ask の `except`、何にでもヒットする・何にもヒットしない `when` のノード、Bash / PowerShell の deny / ask の `when` の `not` |
-| `(phases)` | 読めない、版が違う、`phases` が無い、kind / review の値、feedback が none、id / title の重複、scope が外に出る、scope / deliverables が 20 件を超える、config の定義が共通レイヤーと同じ id で中身が違う・title が重なる | ―（順序の欄は読まず、警告も出さない） |
+| `(phases)` | 読めない、版が違う、`phases` が無い、kind / review の値、feedback が `review: false`、id / title の重複、scope が外に出る、scope / deliverables が 20 件を超える、config の定義が共通レイヤーと同じ id で中身が違う・title が重なる | ―（順序の欄は読まず、警告も出さない） |
 | `(risk)` | 読めない、版が違う、levels の順、id の重複・形、points が負、加点条件が 0 か 2 つ、script の置き場が外、glob が組めない | 知らないリスクレベル名 |
 | `(ticket)` `(project)` `(mode)` | 承認済みチケットの置き場が守られていない、計画を持つ親に定義のコピー（phases:）が無いか壊れている | dry-run、登録の欠け、ワークツリーとチケットの食い違い |
 
@@ -71,7 +71,7 @@ ccnavi --explain --log "" --state ""
 
 - 開いている親の `plan:` / `feedback:` が指すフェーズ定義が、全部 phases.yml（共通レイヤーと親の `project:` のレイヤーの和）に在るか。無ければ
   その親は次のフェーズを承認できない
-- `review: none` のフェーズ定義が、本当にユーザが見なくてよい成果か。`when` に「飛ばしてよい条件」まで
+- `review: false` のフェーズ定義が、本当にユーザが見なくてよい成果か。`when` に「飛ばしてよい条件」まで
   書いてあるか
 - `scope` の広さ。子 ⊆ フェーズ定義 ⊆ 親なので、フェーズ定義の scope が親より広くても効かない。逆に狭すぎると
   子が書けない（子の超過は warn で、承認は止まらない）。rules.yml の deny と重なる場所は deny が勝つ
@@ -103,7 +103,7 @@ AskUserQuestion。聞くのは「この設定をどうするか」で、「こ�
   同じ場所が繰り返すなら allow に足す先、毎回違うなら allow の粒度が細かすぎる。どちらかを添えて聞く
 - 広すぎる allow・deny（`*` 単独、語の切れ目の無い glob、コマンド名を挟まない regex）
 - regex を使っているルール。glob で書けない理由を確かめる
-- ユーザが見なくてよいフェーズ定義（`review: none`）と、境目の点に届かない配点の組み合わせ
+- ユーザが見なくてよいフェーズ定義（`review: false`）と、境目の点に届かない配点の組み合わせ
 - 承認済みの親の計画が指すフェーズ定義を変える提案（親の計画が読めなくなる）
 
 ## 報告

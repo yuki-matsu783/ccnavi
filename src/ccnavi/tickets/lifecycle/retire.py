@@ -12,8 +12,9 @@
 （識別子・合流したか取り消したか・合流した先頭の sha）を状態の置き場の `retire/<親>.json` に
 書く（`note`）。片付けはそれを読む。
 
-- 子のワークツリーをすべて消す（`worktrees.drop` と同じ条件。未コミットの変更や、git が
-  無視しているファイル（`.env` など）があれば消さずに理由を言う）
+- 先に、親のワークツリーを消せるか（cwd が中でない・未コミットや、git が無視しているファイル
+  （`.env` など）が無い）を確かめる。消せなければ、子にも触らずに断る（`worktrees.blocked`）
+- 子のワークツリーをすべて消す（`worktrees.drop` と同じ条件）
 - 子のブランチ（手元）を消す。条件は子の種類で分ける
   - 合流した子: ブランチの先頭が合流した sha（`merged_sha`）と同じで、その sha が push 済みの
     親の先頭（`refs/remotes/origin/<親のブランチ>`）の祖先であること
@@ -49,6 +50,7 @@ from dataclasses import dataclass
 from typing import TextIO
 
 from ...infra import fsio, gitcmd, pathcase, settings, tree
+from ...policy import texts
 from ..approval import store as approval
 from ..model import archive, ticket_ids
 from . import worktrees
@@ -488,12 +490,35 @@ def _parent_of(root: str, conf: settings.Settings, project: str, ident: str) -> 
     return (copy.parent or "") if copy is not None else ""
 
 
+def _parent_refusal(root: str, family: str, refused: worktrees.Dropped) -> str:
+    """親のワークツリーを消せないので、子に触る前に断る文。"""
+    case = {
+        worktrees.CWD_INSIDE: "cwd",
+        worktrees.DIRTY: "dirty",
+        worktrees.IGNORED: "ignored",
+    }.get(refused.status, "other")
+    command = f"{settings.script_command(root, 'ccnavi-launcher.sh')} worktree retire {family}"
+    return texts.say(
+        root,
+        "DENY_RETIRE_PARENT",
+        {
+            "parent": family,
+            "path": refused.path,
+            "detail": refused.detail.replace("\n", "、"),
+            "retire": command,
+        },
+        {"what": case, "next": case},
+    )
+
+
 def run_retire(
     stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, family: str, cwd: str
 ) -> int:
     """`worktree retire <親>`。子のワークツリーとブランチ、親のワークツリーを片付ける。
 
-    Draft を外した後に呼ぶ。消さなかったものがあれば 1。
+    Draft を外した後に呼ぶ。親のワークツリーを消せない（cwd が中・未コミット・無視されたファイル
+    など）ときは、子に触る前に何も消さずに断る（`worktrees.blocked`。`drop` と同じ判定）。
+    消さなかったものがあれば 1。
     """
     family = worktrees.family_for(root, conf, family)
     held, broken = _held_record(record_path(conf, family)) if conf.state else ({}, "")
@@ -502,6 +527,10 @@ def run_retire(
             f"ccnavi: 親 {family} の片付けの記録を読めない（{broken}）。"
             "子の一覧が分からないので、何も消さない。直すか消してから打ち直す\n"
         )
+        return 1
+    refused = worktrees.blocked(root, family, cwd)
+    if refused is not None:
+        stderr.write(_parent_refusal(root, family, refused) + "\n")
         return 1
     children = {c.ticket: c for c in _children_from(held)}
     for c in _closed_children(root, conf, family):

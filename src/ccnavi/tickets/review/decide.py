@@ -20,10 +20,11 @@ from types import SimpleNamespace
 from typing import TextIO
 
 from ...infra import fsio, settings, tree
+from ...policy import texts
 from ..approval import marks as approval_marks
 from ..approval import ops as approval_ops
 from ..approval import store as approval
-from ..model import oplog, review_host, standing, ticket_model, via
+from ..model import oplog, review_host, ticket_model, via
 from ..phase import gates as phase
 from . import request as review
 
@@ -78,7 +79,9 @@ def _followup_from_choice(
         f"続きの子チケット {ident} を {conf.approved}/{ticket_model.DOING}/ に起こした"
         f"（フェーズ {ph.number}、範囲は見た子の和、本文に指摘 {len(items)} 件）。"
         "フェーズは再び開かれ、マーカーは消えた。\n"
-        f"次は{_followup_next(root, parent, ident)}\n"
+    )
+    stdout.write(
+        texts.say(root, "NEXT_DECIDE_FOLLOWUP", {"words": _followup_next(root, ident)}) + "\n"
     )
     for line in phase.reopen_impact(root, conf, parent.ticket, ph.number):
         stdout.write(line + "\n")
@@ -94,19 +97,10 @@ def _status_line(root: str, parent: ticket_model.Ticket) -> str:
     )
 
 
-def _followup_next(root: str, parent: ticket_model.Ticket, ident: str) -> str:
-    """続きの子を起こしたあと、エージェントが打つ 2 手。"""
-    git_sh = settings.script_command(root, "ccnavi-git.sh")
+def _followup_next(root: str, ident: str) -> str:
+    """続きの子を起こしたあと、エージェントが打つ 1 手。ワークツリーは start が切る。"""
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
-    if tree.has_origin(root):
-        # origin があれば、start がワークツリーを切る。手で切る手順は添えない。
-        return f"エージェントが '{ticket_sh} start {ident}' で着手する"
-    base = standing.head_branch(tree.worktree_path(root, parent.ticket), parent.ticket)
-    return (
-        f"エージェントが '{git_sh} worktree add .claude/worktrees/{ident} -b {ident} "
-        f"{base or '<親のブランチ>'}' でワークツリーを切り、'{ticket_sh} start {ident}' で"
-        "着手する"
-    )
+    return f"エージェントが '{ticket_sh} start {ident}' で着手する"
 
 
 @dataclass
@@ -117,15 +111,12 @@ class Decision:
     ph: phase.Phase
     result: review_host.Result
     unresolved: list[review_host.Thread]
-    # issue に回せるか。いつでも真（JSON の欄は互換のために残す）。回せる範囲は、decide が
-    # 求める前提（依頼の記録・HEAD が動いていない・変更要求が無い）を満たした範囲に限る。
-    can_issue: bool
     # 見せたあとに追加された未解決の指摘。今回の判断の対象ではなく、未対応として残す。
     extra: list[review_host.Thread] = field(default_factory=list)
 
 
 def _base_digest(d: Decision) -> str:
-    """指摘の一覧以外の、見せた材料（親・フェーズ・MR・issue に回せるか）のダイジェスト。
+    """指摘の一覧以外の、見せた材料（親・フェーズ・MR）のダイジェスト。
 
     部分ごとの SHA-256 を件数と一緒に並べ、その全体の SHA-256。
     区切りでつなぐと、本文に区切りを書いてつなぎ目をずらせる。
@@ -136,7 +127,6 @@ def _base_digest(d: Decision) -> str:
         str(d.ph.number),
         str(d.result.mr.number),
         d.result.mr.url,
-        str(d.can_issue),
     ]
     lines = [str(len(parts))] + [hashlib.sha256(p.encode("utf-8")).hexdigest() for p in parts]
     return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
@@ -191,6 +181,103 @@ def changed_since_shown(d: Decision, base: str, versions: dict[str, str]) -> lis
     return out
 
 
+def decide_gate(
+    stderr: TextIO, root: str, conf: settings.Settings, cwd: str, phase_no: int
+) -> tuple[ticket_model.Ticket, phase.Phase, dict] | None:
+    """decide の、ホストに聞かずに分かる前提の検査。通れば (親, フェーズ, 依頼のマーカー)。
+
+    親とフェーズがあること、依頼の記録があること、依頼のあとに見せたものが動いていないこと。
+    本体（`_decision`）と `check` が同じものを通る。断ったときは理由のあとに `次:` を 1 行足す。
+    ホストの状態（変更要求・未解決の指摘・ダイジェスト）は見ない。それは sh が取ってくる。
+    """
+    found = review._parent_phase(stderr, root, conf, cwd, phase_no)
+    if found is None:
+        _refused(stderr, root, phase_no)
+        return None
+    parent, ph = found
+    requested_mark = ph.marks.get(approval_marks.MARK_REQUESTED)
+    if requested_mark is None:
+        stderr.write("ccnavi: 依頼の記録がありません。先に review-request してください\n")
+        _refused(stderr, root, phase_no)
+        return None
+    tree_root = tree.worktree_path(root, parent.ticket)
+    moved = review._moved_detail(tree_root, conf, requested_mark, bool(parent.project))
+    if moved.text:
+        stderr.write(f"ccnavi: {moved.text}。{review._redo_request(root, phase_no)}\n")
+        for line in review.moved_explanation(moved):
+            stderr.write(f"{line}\n")
+        _refused(stderr, root, phase_no)
+        return None
+    return parent, ph, requested_mark
+
+
+def _refused(stderr: TextIO, root: str, phase_no: int) -> None:
+    """断った理由のあとに、打ち直す 1 手を `次:` で足す。"""
+    stderr.write(texts.say(root, "NEXT_DECIDE_REFUSED", {"phase": str(phase_no)}) + "\n")
+
+
+def _parse_choices(
+    stderr: TextIO, root: str, phase_no: int, choices_text: str, digest: str
+) -> tuple[tuple[str, dict[str, str]], dict] | None:
+    """`--yes` の選択とダイジェストの形を検める。通れば (ダイジェストの中身, 選択)。何も置かない。
+
+    断ったときは理由のあとに `次:` を 1 行足す（`decide_gate` と同じ `_refused`）。
+    """
+    parsed = _parse_choices_raw(stderr, choices_text, digest)
+    if parsed is None:
+        _refused(stderr, root, phase_no)
+    return parsed
+
+
+def _parse_choices_raw(
+    stderr: TextIO, choices_text: str, digest: str
+) -> tuple[tuple[str, dict[str, str]], dict] | None:
+    if not digest.strip():
+        stderr.write("ccnavi: --yes には --digest（見せた指摘のダイジェスト）が必要です。\n")
+        return None
+    want = parse_digest(digest.strip())
+    if want is None:
+        stderr.write("ccnavi: --digest を読めない。指摘を見せ直してください。何も置いていない\n")
+        return None
+    try:
+        raw = json.loads(choices_text)
+    except ValueError:
+        stderr.write("ccnavi: --yes の選択を JSON として読めない\n")
+        return None
+    if not isinstance(raw, dict) or not all(
+        isinstance(k, str) and v in CHOICES for k, v in raw.items()
+    ):
+        stderr.write(f"ccnavi: --yes の選択は {{キー: {' / '.join(CHOICES)}}} の形で渡す\n")
+        return None
+    return want, raw
+
+
+def check(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    cwd: str,
+    phase_no: int,
+    choices_text: str = "",
+    digest: str = "",
+) -> int:
+    """`ccnavi --entry sh --check user reviewed N --accept-unresolved`。
+    置く前に分かる前提だけを通す（読むだけ）。
+
+    `decide_gate` に加えて、選択とダイジェストを渡されたときはその形も検める
+    （`decide_yes` と同じ `_parse_choices`）。sh が取り込み・ロックの前に呼ぶ。
+    """
+    if decide_gate(stderr, root, conf, cwd, phase_no) is None:
+        return 1
+    if (choices_text or digest) and _parse_choices(
+        stderr, root, phase_no, choices_text, digest
+    ) is None:
+        return 1
+    stdout.write("確認: ok（decide を打てる状態。何も変えていません）\n")
+    return 0
+
+
 def _decision(
     stderr: TextIO,
     root: str,
@@ -206,21 +293,10 @@ def _decision(
     解決済みになっているが、見せた指摘の一部として数え直す（見せたときと同じ並びでダイジェストを
     組み直し、見せたあとに指摘が増えたり変わったりしていないことを確かめるため）。
     """
-    found = review._parent_phase(stderr, root, conf, cwd, phase_no)
-    if found is None:
+    gated = decide_gate(stderr, root, conf, cwd, phase_no)
+    if gated is None:
         return None
-    parent, ph = found
-    requested_mark = ph.marks.get(approval_marks.MARK_REQUESTED)
-    if requested_mark is None:
-        stderr.write("ccnavi: 依頼の記録がありません。先に review-request してください\n")
-        return None
-    tree_root = tree.worktree_path(root, parent.ticket)
-    moved = review._moved_detail(tree_root, conf, requested_mark, bool(parent.project))
-    if moved.text:
-        stderr.write(f"ccnavi: {moved.text}。{review._redo_request(root, phase_no)}\n")
-        for line in review.moved_explanation(moved):
-            stderr.write(f"{line}\n")
-        return None
+    parent, ph, requested_mark = gated
     result = review._matching(stderr, result_path, requested_mark)
     if result is None:
         return None
@@ -244,7 +320,7 @@ def _decision(
         )
     }
     unresolved = [t for t in result.threads if id(t) in open_now or (t.id and t.id in carry)]
-    return Decision(parent, ph, result, unresolved, True)
+    return Decision(parent, ph, result, unresolved)
 
 
 def decision_json(d: Decision) -> dict:
@@ -255,7 +331,6 @@ def decision_json(d: Decision) -> dict:
         "parent": d.parent.ticket,
         "phase": d.ph.number,
         "mr": {"number": d.result.mr.number, "url": d.result.mr.url},
-        "can_issue": d.can_issue,
         "threads": [
             {
                 "key": review.thread_key(t),
@@ -444,26 +519,10 @@ def decide_yes(
     結果は JSON で返す。違えば置かずに `mismatch` を返す（返信・解決を済ませた分は操作記録に残す）。
     """
     # 入力の形を検める。ここで断るときは、まだ何も置いていない。
-    if not digest.strip():
-        stderr.write("ccnavi: --yes には --digest（見せた指摘のダイジェスト）が必要です。\n")
+    parsed = _parse_choices(stderr, root, phase_no, choices_text, digest)
+    if parsed is None:
         return 1
-    want = parse_digest(digest.strip())
-    if want is None:
-        stderr.write(
-            "ccnavi: --digest を読めない（古い版のボードが渡した値かもしれない）。"
-            "拡張を更新して、指摘を見せ直してください。何も置いていない\n"
-        )
-        return 1
-    try:
-        raw = json.loads(choices_text)
-    except ValueError:
-        stderr.write("ccnavi: --yes の選択を JSON として読めない\n")
-        return 1
-    if not isinstance(raw, dict) or not all(
-        isinstance(k, str) and v in CHOICES for k, v in raw.items()
-    ):
-        stderr.write(f"ccnavi: --yes の選択は {{キー: {' / '.join(CHOICES)}}} の形で渡す\n")
-        return 1
+    want, raw = parsed
     # 計画の段（--accept-done）なら、sh が取り直した結果と計画を読む。
     planned = None
     if plan_done:
@@ -649,7 +708,7 @@ def _begin_op(
             request_head=str(mark.get("head") or ""),
             shown=shown,
             choices=choices,
-            plan={"digest": shown_digest, "can_issue": d.can_issue},
+            plan={"digest": shown_digest},
             stages=stages,
         )
         oplog.discard_untouched(conf.state, oplog.KIND_DECIDE, d.parent.ticket, d.ph.number, op_id)
@@ -1165,7 +1224,7 @@ def _decided_prompt(
         )  # 要約。全文は子の本文
         return (
             f"{head}\n直す指摘は続きの子チケット {followup} に載せ、承認済みにしてある。"
-            f"{_followup_next(root, d.parent, followup)}。指摘:\n{items}\n"
+            f"{_followup_next(root, followup)}。指摘:\n{items}\n"
             "状態の操作（start・finish）はメインが打つ。実装はサブエージェントに任せてよい。\n"
             # fix のスレッドはホスト上で未解決のまま残る。keep・issue のときに sh が返信して
             # resolve する仕組みは、この文の対象外

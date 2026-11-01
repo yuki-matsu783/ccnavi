@@ -110,7 +110,7 @@ phases:
   design:
     kind: work
     title: 設計
-    review: mr
+    review: true
     scope: ["wip/design/*"]
 """
 
@@ -120,7 +120,7 @@ phases:
   docs:
     kind: work
     title: 文書
-    review: none
+    review: false
     scope: ["docs/*"]
 """
 
@@ -130,17 +130,17 @@ phases:
   design:
     kind: work
     title: 設計
-    review: mr
+    review: true
     scope: ["wip/design/*"]
   build:
     kind: work
     title: ビルド
-    review: none
+    review: false
     scope: ["src/*"]
   release:
     kind: work
     title: リリース
-    review: mr
+    review: true
     scope: ["src/*"]
 """
 

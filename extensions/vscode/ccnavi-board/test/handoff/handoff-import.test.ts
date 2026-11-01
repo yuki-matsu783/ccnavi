@@ -10,8 +10,8 @@ import type { HandoffEntry, HandoffList, HandoffResult } from "../../src/core/ha
 import type { Lock } from "../../src/core/lock.js";
 import { entry, list, sampleEntries } from "../helpers/handoff.js";
 
-const OPEN: Lock = { locked: false, reason: "", doing: [] };
-const LOCKED: Lock = { locked: true, reason: "作業中のチケットがあります（T1）", doing: ["T1"] };
+const OPEN: Lock = { locked: false, reason: "", doing: [], turns: [] };
+const LOCKED: Lock = { locked: true, reason: "作業中のチケットがあります（T1）", doing: ["T1"], turns: [] };
 
 const TEMPLATE = ".ccnavi/config/project/templates/login.yml";
 const RULES = ".ccnavi/config/project/rules.yml";

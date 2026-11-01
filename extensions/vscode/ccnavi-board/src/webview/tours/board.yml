@@ -217,9 +217,9 @@ sample:
           part: plan
           source_sha: sample
           items:
-            - { number: 1, type: research, title: 調査, review: none }
-            - { number: 2, type: design, title: 設計, review: mr }
-            - { number: 3, type: implement, title: 実装とテスト, review: mr }
+            - { number: 1, type: research, title: 調査, review: false }
+            - { number: 2, type: design, title: 設計, review: true }
+            - { number: 3, type: implement, title: 実装とテスト, review: true }
           after: { "2": [1], "3": [2] }
           proposed: { "2": [1], "3": [2] }
           ready: [1]
@@ -236,7 +236,6 @@ sample:
       parent: sample-c
       phase: 1
       mr: { number: 12, url: "https://example.com/sample/pulls/12" }
-      can_issue: true
       digest: "v2.eyJiIjoiYSIsInQiOnt9fQ"
       threads:
         - { key: thread-1, url: "https://example.com/sample/pulls/12#discussion_r1", path: src/log.ts, line: 42, body: "レベルの名前を定数にまとめてほしい\n同じ文字列が 3 か所にある" }

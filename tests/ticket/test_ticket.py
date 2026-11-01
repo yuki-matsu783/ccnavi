@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import hashlib
 import io
@@ -1578,8 +1579,7 @@ class TicketTest(unittest.TestCase):
         data = json.loads(shown.stdout)
         self.assertEqual([t["key"] for t in data["threads"]], ["u1", "u2"])
         self.assertEqual(data["parent"], "i0001")
-        # フィードバック計画が無くても、issue に回せる（欄は互換のために残る）
-        self.assertTrue(data["can_issue"])
+        self.assertNotIn("can_issue", data)
         self.assertRegex(data["digest"], r"^v2\.[A-Za-z0-9_-]+$")
         phases = os.path.join(self.approved, "phases", "i0001")
         self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))
@@ -2747,9 +2747,21 @@ class TicketTest(unittest.TestCase):
 
     def test_executable_options_list_matches_the_parser(self):
         """入口の止めが知っている実行ファイルのオプションは、実行ファイルが受けるオプションと同じ。"""
-        out = io.StringIO()
-        cli.run(io.StringIO(), out, io.StringIO(), ["--version", "--json"])
-        flags = set(json.loads(out.getvalue())["flags"]) | {"-h", "-r"}
+        seen = []
+        real = argparse.ArgumentParser.parse_args
+
+        def spy(parser, *args, **kwargs):
+            seen.append(parser)
+            return real(parser, *args, **kwargs)
+
+        with mock.patch.object(argparse.ArgumentParser, "parse_args", spy):
+            cli.run(io.StringIO(), io.StringIO(), io.StringIO(), ["--version"])
+        flags = {
+            option
+            for action in seen[0]._actions
+            for option in action.option_strings
+            if option.startswith("--")
+        } | {"-h", "-r"}
         self.assertEqual(flags, set(phase_forms.EXE_OPTIONS))
 
     def test_turning_off_the_terminal_requirement_is_denied(self):
@@ -3449,6 +3461,73 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(prepared.returncode, 0, prepared.stderr)
         self.assertEqual(len(prepared.stdout.splitlines()), 1, prepared.stdout)
         self.assertEqual([n for n in os.listdir(self.state) if n.startswith("review-mr-")], [])
+
+    def test_prepare_check_refuses_like_prepare_and_writes_nothing(self):
+        """`prepare --check` は本体と同じ前提で断り、何も書かない（フェーズが終わっていない）。"""
+        self.family()
+        body = write(os.path.join(self.root, "body.md"), "見てほしい点\n")
+        args = ("--cwd", self.parent_tree, "--phase", "1", "--body-file", body)
+        before = sorted(os.listdir(self.state)) if os.path.isdir(self.state) else []
+        checked = self.ccnavi("--check", *args, "review", "prepare")
+        real = self.ccnavi(*args, "review", "prepare")
+        self.assertEqual(checked.returncode, 1, checked.stdout + checked.stderr)
+        self.assertEqual(real.returncode, 1, real.stdout + real.stderr)
+        self.assertEqual(checked.stderr, real.stderr)
+        self.assertIn("フェーズが終わっていない", checked.stderr)
+        self.assertEqual(len([ln for ln in checked.stderr.splitlines() if "次:" in ln]), 1)
+        after = sorted(os.listdir(self.state)) if os.path.isdir(self.state) else []
+        self.assertEqual(before, after)
+
+    def test_prepare_check_passes_without_writing_the_body(self):
+        self.family()
+        self.close_phase()
+        self.remote()
+        body = write(os.path.join(self.root, "body.md"), "見てほしい点\n")
+        checked = self.ccnavi(
+            "--check", "--cwd", self.parent_tree, "--phase", "1", "--body-file", body,
+            "review", "prepare",
+        )  # fmt: skip
+        self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+        self.assertIn("何も変えていません", checked.stdout)
+        self.assertFalse(os.path.isdir(self.state) and os.listdir(self.state))
+
+    def test_decide_check_refuses_without_a_request_and_writes_nothing(self):
+        """依頼の記録が無ければ、`--check` は本体（`--preview`）と同じ理由で断る。"""
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        base = ("--cwd", self.parent_tree, "user", "reviewed", "1", "--accept-unresolved")
+        head = git(self.parent_tree, "rev-parse", "HEAD")
+        checked = self.ccnavi(*base, "--check")
+        shown = self.ccnavi(*base, "--preview", "--json", "--result", fixture)
+        self.assertEqual(checked.returncode, 1, checked.stdout + checked.stderr)
+        self.assertEqual(shown.returncode, 1, shown.stdout + shown.stderr)
+        self.assertEqual(checked.stderr, shown.stderr)
+        self.assertIn("依頼の記録がありません", checked.stderr)
+        self.assertEqual(len([ln for ln in checked.stderr.splitlines() if "次:" in ln]), 1)
+        self.assertEqual(git(self.parent_tree, "rev-parse", "HEAD"), head)
+        self.assertEqual(git(self.parent_tree, "status", "--porcelain"), "")
+
+    def test_decide_check_passes_after_a_request_and_checks_the_choices_shape(self):
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        base = (
+            "--cwd",
+            self.parent_tree,
+            "user",
+            "reviewed",
+            "1",
+            "--accept-unresolved",
+            "--check",
+        )
+        ok = self.ccnavi(*base)
+        self.assertEqual(ok.returncode, 0, ok.stdout + ok.stderr)
+        self.assertIn("何も変えていません", ok.stdout)
+        bad = self.ccnavi(*base, "--yes", "not-json", "--digest", "d0")
+        self.assertEqual(bad.returncode, 1, bad.stdout + bad.stderr)
+        self.assertEqual(len([ln for ln in bad.stderr.splitlines() if "次:" in ln]), 1)
 
     def confirm(self, fixture, phase="1"):
         return self.ccnavi(

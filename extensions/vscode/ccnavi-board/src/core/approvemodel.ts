@@ -28,7 +28,7 @@ export interface ApproveRejected {
 
 /**
  * 計画の図のステップ 1 つ（`plans[].items[]`）。値は実行ファイルが組んだもの。図は印を付けて描くだけで、
- * 見る場所・延期の引き受け手・固定したかを自分で決めない
+ * レビューの要否・延期の引き受け手・固定したかを自分で決めない
  */
 export interface ApprovePlanItem {
   /** 番号（承認の preview では提案に書いてある番号のまま） */
@@ -39,9 +39,9 @@ export interface ApprovePlanItem {
   readonly type: string;
   /** 定義のタイトル（親の `phases:` から） */
   readonly title: string;
-  /** 見る場所（`none` / `mr`。ステップの `review: mr` は `mr`） */
-  readonly review: string;
-  /** ステップの `review: defer`（レビューを後ろのステップへ延ばす） */
+  /** レビューが要るか（ステップの `review: true` は true）。定義が読めなければ null */
+  readonly review: boolean | null;
+  /** ステップの `deferred: true`（レビューを後ろのステップへ延ばす） */
   readonly deferred: boolean;
   /** 延期したレビューを引き受ける番号。延期していなければ null */
   readonly review_at: number | null;
@@ -156,7 +156,7 @@ export interface ApproveResult {
   readonly copies: readonly string[];
   /**
    * この承認で書いた・消したパス（ワークスペースルートからの相対、`/` 区切り）。承認の push の sh に
-   * `--path` で渡し、これだけをコミット・push させる。古い実行ファイルは返さない（空）
+   * `--path` で渡し、これだけをコミット・push させる。書いたものが無ければ空配列
    */
   readonly written: readonly string[];
   /** ターミナルなら標準出力に出ていた行 */
@@ -305,6 +305,9 @@ export function parseApprovePreview(text: string): PreviewParse {
   };
 }
 
+const WRITTEN_MISSING =
+  "実行ファイルの答えに `written` がありません。承認の push を絞れないので送りません。ccnavi を更新して、承認を打ち直してください";
+
 /** `--yes` の答え。承認できたか、一覧が変わっていたか、読めなかったか */
 export function parseApproveResult(text: string): ResultParse {
   const top = parseTop(text);
@@ -325,6 +328,9 @@ export function parseApproveResult(text: string): ResultParse {
   }
   // 途中で止まった。置いたものは戻らないので、mismatch と同じく成功にはしない。
   if (isRecord(raw.partial)) {
+    if (!Array.isArray(raw.partial.written)) {
+      return { ok: false, error: WRITTEN_MISSING };
+    }
     return {
       ok: false,
       partial: {
@@ -336,6 +342,10 @@ export function parseApproveResult(text: string): ResultParse {
         lines: list(raw.partial.lines).map(str),
       },
     };
+  }
+  // `written` が無いと、承認の push が絞れず広く送ってしまう。推測せず止める
+  if (!Array.isArray(raw.written)) {
+    return { ok: false, error: WRITTEN_MISSING };
   }
   return {
     ok: true,
@@ -435,7 +445,7 @@ function plan(raw: Record<string, unknown>): ApprovePlan {
         from: isNumber(item.from) ? item.from : (item.number as number),
         type: str(item.type),
         title: str(item.title),
-        review: str(item.review),
+        review: typeof item.review === "boolean" ? item.review : null,
         deferred: item.deferred === true,
         review_at: isNumber(item.review_at) ? item.review_at : null,
         locked: item.locked === true,

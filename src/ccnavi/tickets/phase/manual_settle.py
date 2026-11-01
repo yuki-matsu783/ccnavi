@@ -14,7 +14,8 @@ ccnavi が子を動かす経路（confirm・decide・close-early・chrome）は�
 - 子が 1 つだけ動いたとき: 子 X はレビュー完了、フェーズは未完了（PARTIAL）
 - 移動が未コミット・未 push: 確定しない（UNSHARED）。エージェントは代わりに push しない
 - 依頼のマーカーが無い: 確認待ち（NO_REQUEST）。review-request を案内する
-- `finished_to` を持たない子（この変更より前に閉じた子）: 手動とはみなさない（ROUTE_UNKNOWN）
+- `finished_to` を持たない子（finish を通らず手で動かした子など）: 手動とはみなさない
+  （ROUTE_UNKNOWN）
 """
 
 from __future__ import annotations

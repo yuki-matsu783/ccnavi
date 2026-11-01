@@ -226,9 +226,10 @@ class PendingIntegrateTest(TicketTest):
         git(self.root, "update-ref", "refs/ccnavi/direct/w1/s", self.head())
         self.assertEqual(self.notice(), "")
 
-    def test_an_unused_pending_candidate_is_listed(self):
+    def test_a_pending_candidate_is_not_listed(self):
+        """`pending` はワークツリーを切る前の確認待ちの印で、取り込みの跡ではない。"""
         git(self.root, "update-ref", "refs/ccnavi/direct/p1/pending", self.head())
-        self.assertIn("使われなかった書きかけの候補", self.notice())
+        self.assertEqual(self.notice(), "")
 
     def test_many_records_are_told_as_one_line_of_names(self):
         """5 件以上は名前を全件 1 行に並べる。1 件ごとに増えるのは名前と区切りだけ。"""

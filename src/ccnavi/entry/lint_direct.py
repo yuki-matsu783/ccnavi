@@ -19,7 +19,6 @@ import os
 from ..infra import directrec, gitcmd, pathcase, settings, tree
 from ..policy.rules import SEVERITY_INFO, SEVERITY_WARN, Problem
 from ..tickets.lifecycle import stop_integrate as osi
-from ..tickets.model import direct_candidates
 from ..tickets.notice import pending_integrate
 
 _NEED = ("base_branch", "snap_sha", "common_dir", "main_tree")
@@ -118,7 +117,7 @@ def _records(
 
 
 def _markers(root: str, main: tree.Tree, common: str, label: str) -> list[Problem]:
-    base = os.path.join(common, osi._RECORD_DIR)
+    base = os.path.join(common, osi.RECORD_DIR)
     try:
         names = sorted(n for n in os.listdir(base) if not n.startswith("."))
     except OSError:
@@ -186,7 +185,7 @@ def _unrecorded(
 ) -> list[Problem]:
     """記録の無い直接作業のワークツリー（info）。
 
-    更新前に切ったものと、手の `worktree add` で切ったもの。
+    手の `worktree add` で切ったもの。
     """
     base = os.path.join(root, tree.WORKTREES_DIR)
     try:
@@ -201,12 +200,10 @@ def _unrecorded(
         mine = directrec.common_dir(work)
         if mine is None or pathcase.fold(mine) != pathcase.fold(common):
             continue
-        if not direct_candidates.integrable_name(name) or tree.branch_of(work) != name:
-            continue
         if os.path.isfile(os.path.join(common, directrec.DIRECT_DIR, name)):
             continue
         here = tree.Tree(name, work, project=main.project, kind=tree.KIND_WORKTREE)
-        if osi.bound_reason(root, conf, here):
+        if any(osi.direct_check(root, conf, here)):
             continue
         problems.append(
             Problem(

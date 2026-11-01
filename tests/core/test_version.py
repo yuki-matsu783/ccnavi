@@ -1,22 +1,23 @@
 """`ccnavi --version [--json]` と、互換の版を宣言する側（組み立て・sh）の検査。
 
-見るのは 3 つ。
+見るのは 4 つ。
 
 1. `--version` が版・組み立ての元のコミット・受け付けるフラグ・互換の版・書式の版を言い、
    設定もワークスペースも読まずに 0 で終わること
 2. フラグは引数の定義から引くので、定義に足したフラグがそのまま並ぶこと
 3. 組み立ての元のコミットは build.py が埋めた部品から読み、無ければ `unknown` と言うこと
 
-sh の互換の版との食い違いは tests/core/test_lint_compat.py（`--lint`）と
-tests/sh/test_compat_skew.py（sh）が見る。
+4. 互換の版が、実行ファイル・sh・VS Code 拡張で同じ値であること
+
+実行時に版の食い違いを断る処理は無い（sh と実行ファイルは同時に配る前提）。
+sh の互換の版の `--lint` での確かめは tests/core/test_lint_compat.py が見る。
 """
 
 from __future__ import annotations
 
-import argparse
-import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -47,7 +48,7 @@ def write(path: str, text: str) -> str:
 
 
 class VersionFlagTest(unittest.TestCase):
-    def test_v10_json_says_the_version_the_commit_the_flags_and_the_compat(self):
+    def test_v10_json_says_the_version_the_commit_and_the_compat(self):
         """V10"""
         result = ccnavi("--version", "--json")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -58,9 +59,8 @@ class VersionFlagTest(unittest.TestCase):
         self.assertEqual(body["commit"], version.UNKNOWN)
         self.assertIs(body["built"], False)
         self.assertEqual(body["compat"], version.COMPAT)
-        self.assertEqual(body["flags"], sorted(body["flags"]))
-        for flag in ("--version", "--json", "--lint", "--flow", "--explain", "--root"):
-            self.assertIn(flag, body["flags"])
+        self.assertNotIn("flags", body)
+        self.assertNotIn("features", body)
         self.assertEqual(
             set(body["formats"]), {"rules", "phases", "risks", "ticket"}, body["formats"]
         )
@@ -72,7 +72,6 @@ class VersionFlagTest(unittest.TestCase):
         self.assertTrue(result.stdout.startswith(f"ccnavi {version.VERSION}\n"), result.stdout)
         self.assertRegex(result.stdout, rf"(?m)^compat: {version.COMPAT}$")
         self.assertRegex(result.stdout, r"(?m)^commit: unknown$")
-        self.assertRegex(result.stdout, r"(?m)^flags: .*--version")
 
     def test_v12_it_reads_no_settings_and_no_workspace(self):
         """V12 読めない設定のワークスペースでも、在らないルートでも答える。"""
@@ -84,22 +83,28 @@ class VersionFlagTest(unittest.TestCase):
         missing = ccnavi("--version", "--json", root=os.path.join(ROOT, "no-such-dir"))
         self.assertEqual(missing.returncode, 0, missing.stderr)
 
-    def test_v13_flags_come_from_the_argument_definition(self):
-        """V13 定義に足したフラグは、何も書き足さずに並ぶ。短い表記と位置引数は並べない。"""
-        parser = argparse.ArgumentParser(add_help=False)
-        parser.add_argument("--zeta", action="store_true")
-        parser.add_argument("-a", "--alpha", default="")
-        parser.add_argument("words", nargs="*")
-        self.assertEqual(version.flags(parser), ["--alpha", "--zeta"])
-        out = io.StringIO()
-        self.assertEqual(version.report(out, parser, as_json=True), 0)
-        self.assertEqual(json.loads(out.getvalue())["flags"], ["--alpha", "--zeta"])
-
     def test_v14_the_version_agrees_with_pyproject(self):
         """V14"""
         with open(os.path.join(ROOT, "pyproject.toml"), "rb") as f:
             declared = tomllib.load(f)["project"]["version"]
         self.assertEqual(version.VERSION, declared)
+
+
+class CompatDeclaredTest(unittest.TestCase):
+    def test_v6_the_exe_the_sh_and_the_extension_declare_the_same_compat(self):
+        """V6"""
+        sh = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-common.sh")
+        ts = os.path.join(ROOT, "extensions", "vscode", "ccnavi-board", "src", "core", "version.ts")
+        found = []
+        for path, pattern in (
+            (sh, r"^CCNAVI_COMPAT=([0-9]+)$"),
+            (ts, r"^export const EXTENSION_COMPAT = ([0-9]+);$"),
+        ):
+            with open(path, encoding="utf-8") as f:
+                match = re.search(pattern, f.read(), re.MULTILINE)
+            self.assertIsNotNone(match, path)
+            found.append(int(match.group(1)))
+        self.assertEqual(found, [version.COMPAT, version.COMPAT])
 
 
 class BuildInfoTest(unittest.TestCase):

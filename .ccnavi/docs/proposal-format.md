@@ -64,8 +64,8 @@ issue: 50                  # 必須。この MR が閉じる issue（別のリ�
 mr: 12                     # 必須。仕事を載せる MR の番号（同じリポジトリ）
 title: 設定画面の分割
 phases:                    # 計画が使う型の定義のコピー。--fill-phases が作る（下の節）
-  research: {kind: work, title: 調査, review: none, scope: ["wip/research/*"]}
-  implement: {kind: work, title: 実装, review: mr, scope: ["app/*", "test/*"]}
+  research: {kind: work, title: 調査, review: false, scope: ["wip/research/*"]}
+  implement: {kind: work, title: 実装, review: true, scope: ["app/*", "test/*"]}
 plan:
   - research               # 1。先行なし
   - {type: implement, after: [1]}  # 2。1 が済んでから

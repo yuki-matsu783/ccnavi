@@ -52,7 +52,7 @@ export function page(overrides: Partial<RulesPage> = {}): RulesPage {
     hooks: parseHooks(JSON.stringify({ hooks: {} }), "settings"),
     hookFiles: { settings: true, settingsLocal: false },
     expectationsPath: ".ccnavi/config/common/rule-expectations.yml",
-    lock: { locked: false, reason: "", doing: [] },
+    lock: { locked: false, reason: "", doing: [], turns: [] },
     ...overrides,
   };
 }

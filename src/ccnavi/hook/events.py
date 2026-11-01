@@ -57,9 +57,9 @@ from ..tickets.lifecycle import stop as ops_stop
 from ..tickets.lifecycle import stop_feedback as ops_stop_feedback
 from ..tickets.lifecycle import stop_integrate as ops_stop_integrate
 from ..tickets.lifecycle import stop_request as ops_stop_request
-from ..tickets.model import direct_candidates, ticket_guard
+from ..tickets.model import direct_candidates, ticket_guard, ticket_places
 from ..tickets.notice import (
-    direct_active,
+    direct_worktrees,
     learning_notice,
     overview,
     pending_integrate,
@@ -69,6 +69,7 @@ from ..tickets.phase import gates as phase
 from ..tickets.sync import promptsync
 from . import (
     ccnavimd,
+    commitnote,
     judge,
     post,
     post_findings,
@@ -1104,9 +1105,16 @@ def decide_at_start(
     # ユーザにも出す。チケット制御は見ない。サブエージェントには出さない。期限は hook の期限と
     # 開始から 2 秒の小さいほうで、索引（docsearch）より先に組んで残りを渡す。
     pending = ""
+    direct = ""
     if not payload.agent_id:
         limit = time.monotonic() + PENDING_SECONDS
         pending = pending_integrate.pending_notice(
+            root, conf, limit if deadline is None else min(deadline, limit)
+        )
+        # 直接作業のワークツリーの一覧（事実だけ）。モデルにだけ出す。
+        # 期限は、ほかの知らせと同じ作り方で別に取る。
+        limit = time.monotonic() + PENDING_SECONDS
+        direct = direct_worktrees.session_text(
             root, conf, limit if deadline is None else min(deadline, limit)
         )
     # md の frontmatter の索引を差分で新しくし、引き方を案内する（`ccnavi --docs`）。
@@ -1134,12 +1142,10 @@ def decide_at_start(
             texts.append(parents)
     if rejects:
         texts.append(rejects)
-    if not payload.agent_id:
-        active = direct_active.notice(conf, root)
-        if active:
-            texts.append(active)
     if pending:
         texts.append(pending)
+    if direct:
+        texts.append(direct)
     # 学びの蓄積の提案の候補が新しく現れたら、ユーザにだけ知らせる（モデルの文脈には入れない）。
     learning = "" if payload.agent_id else learning_notice.notice(conf, root, deadline)
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録。
@@ -1240,7 +1246,7 @@ def decide_after_failure(
         # ユーザの中断。Stop は来ないことがあるので、ここでターンの終わりにする。
         # 下の照合は中断までに書かれたぶんを戻すので、印を先に消してよい（消す前でも結果は同じ）。
         turn.end(conf.state, payload.session_id)
-    texts = [judge.guard_setting_files(mode, conf, root, payload, record, selfguard.after)]
+    parts = [judge.guard_setting_files(mode, conf, root, payload, record, selfguard.after)]
     raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
     text, _ = post.check(
         stderr,
@@ -1255,10 +1261,14 @@ def decide_after_failure(
         places=(conf.tickets, conf.approved),
         root=root,
     )
-    texts.append(text)
+    parts.append(text)
+    if payload.tool_name == "Artifact" and not payload.is_interrupt:
+        # Artifact はファイルを渡して publish する。失敗の理由を問わず、HTML の置き場を知らせる。
+        scratch = ticket_places.scratch_dir(root)
+        parts.append(texts.say(root, "NOTICE_ARTIFACT_FAILED", {"scratch": scratch}))
     if not payload.is_interrupt:
-        texts.append(judge.fail_streak_hint(conf, root, payload.session_id, payload.agent_id))
-    said = "\n\n".join(p for p in texts if p)
+        parts.append(judge.fail_streak_hint(conf, root, payload.session_id, payload.agent_id))
+    said = "\n\n".join(p for p in parts if p)
     if said:
         hookio.write_context(stdout, hookio.POST_TOOL_USE_FAILURE, said)
     return EXIT_OK
@@ -1384,6 +1394,8 @@ def _decide_after(
     hint = docsearch.missing_frontmatter(conf, root, payload)
     # 親の提案を手で書いたときの書式の誤りも、書いた時点で 1 度だけ案内する。
     hint = "\n\n".join(p for p in (hint, proposalhint.hint(conf, root, payload)) if p)
+    # 直接作業のコミットが済んだら、レビュー手順の次の一手を、ワークツリーごとに 1 度だけ足す。
+    hint = "\n\n".join(p for p in (hint, commitnote.notice(stderr, conf, root, payload)) if p)
     if not text and not hint:
         return EXIT_OK
 

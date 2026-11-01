@@ -3085,7 +3085,7 @@ FAKE_PROJECT = "ns/proj"
 EXE_STUB = """#!/bin/sh
 case " $* " in
 *" --version --json "*)
-  printf '{{"compat": {compat}, "flags": ["--accept-unresolved", "--actor", "--via"]}}\\n'
+  printf '{{"compat": {compat}}}\\n'
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 esac

@@ -328,6 +328,7 @@ test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、
   const checks: FlowChecks = {
     warns: [`${SHOWN}: start がない（どこから始めるかが決まらない）`],
     rendered: ["1. [prompt] プロンプト", "2. [end] 終了"],
+    candidates: { agents: [], skills: [] },
   };
   const doc = removeNode(three(), "start");
   const dom = await openFlow({ doc, checks });
@@ -349,11 +350,11 @@ test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、
     assert.equal(asked.length, 1);
     assert.equal(asked[0].doc.nodes.length, 3);
     // 古い番号の答えは破棄する
-    await dom.send({ type: "checked", seq: asked[0].seq - 1, checks: { warns: ["古い"], rendered: [] } });
+    await dom.send({ type: "checked", seq: asked[0].seq - 1, checks: { warns: ["古い"], rendered: [], candidates: { agents: [], skills: [] } } });
     assert.equal(dom.all("#flow-preview-checking").length, 1);
     assert.doesNotMatch(dom.one("#flow-notices").textContent ?? "", /古い/);
     // 答えが届く。並べられなければその理由を言う
-    await dom.send({ type: "checked", seq: asked[0].seq, checks: { warns: [`${SHOWN}: start がない（どこから始めるかが決まらない）`, `${SHOWN}: start から届かないノードがある: スキル`], rendered: null } });
+    await dom.send({ type: "checked", seq: asked[0].seq, checks: { warns: [`${SHOWN}: start がない（どこから始めるかが決まらない）`, `${SHOWN}: start から届かないノードがある: スキル`], rendered: null, candidates: { agents: [], skills: [] } } });
     assert.equal(dom.all("#flow-preview-checking").length, 0);
     assert.equal(dom.all('#flow-notices li[data-source="exe"]').length, 2);
     assert.equal(dom.all("#flow-preview pre.flow-rendered").length, 0);
@@ -371,15 +372,14 @@ test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、
   }
 });
 
-test("CB-D132 答えのないフロー（まだないファイル）は開いてすぐ確認を頼む。古い実行ファイル（rendered がありません）ならそう言う", async () => {
+test("CB-D132 答えのないフロー（まだないファイル）は開いてすぐ確認を頼む", async () => {
   const dom = await openFlow({ exists: false });
   try {
     assert.match(dom.one("#flow-preview").textContent ?? "", /まだ実行ファイルで確認していません/);
     await waitCheck(dom);
     const asked = checksAsked(dom);
     assert.equal(asked.length, 1);
-    await dom.send({ type: "checked", seq: asked[0].seq, checks: { warns: [] } });
-    assert.match(dom.one("#flow-preview").textContent ?? "", /実行ファイルが古いため、担当に渡る手順を表示できません/);
+    await dom.send({ type: "checked", seq: asked[0].seq, checks: { warns: [], rendered: [], candidates: { agents: [], skills: [] } } });
     // 答えが届いても、開始が 2 つあることは画面が言う（実行ファイルは言わない）
     dom.click(dom.one('[data-action="add-node"][data-type="start"]'));
     await dom.settle();
@@ -441,7 +441,7 @@ test("CB-D133 サブエージェントの種類とスキルの名前は候補か
 });
 
 test("CB-D134 確認を頼んで答えを待つ間に直したら、届いた古い答えは使わず確認中のまま、最後に確認が済んだ結果を出す", async () => {
-  const dom = await openFlow({ doc: three(), checks: { warns: [], rendered: ["1. 最初"] } });
+  const dom = await openFlow({ doc: three(), checks: { warns: [], rendered: ["1. 最初"], candidates: { agents: [], skills: [] } } });
   try {
     dom.click(dom.one('[data-action="add-node"][data-type="skill"]'));
     await dom.settle();
@@ -451,7 +451,7 @@ test("CB-D134 確認を頼んで答えを待つ間に直したら、届いた古
     // 答えを待つ間に、もう 1 つ直す
     dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
     await dom.settle();
-    await dom.send({ type: "checked", seq: first[0].seq, checks: { warns: ["古いコピーの答え"], rendered: ["1. 古い"] } });
+    await dom.send({ type: "checked", seq: first[0].seq, checks: { warns: ["古いコピーの答え"], rendered: ["1. 古い"], candidates: { agents: [], skills: [] } } });
     assert.equal(dom.all("#flow-preview-checking").length, 1, "古い答えで確認が終わったことにしない");
     assert.equal(dom.one("#flow-preview pre.flow-rendered").textContent, "1. 最初");
     assert.doesNotMatch(dom.one("body").textContent ?? "", /古いコピーの答え/);
@@ -481,7 +481,7 @@ test("CB-T1223 右ペインは見出しの下に説明を出し、確認中は�
     await none.close();
   }
   // 結果あり: 確認中は、最後に確認が済んだ結果を残したまま表示する。確認が済めば消える
-  const some = await openFlow({ doc: three(), checks: { warns: [], rendered: ["1. 最初"] } });
+  const some = await openFlow({ doc: three(), checks: { warns: [], rendered: ["1. 最初"], candidates: { agents: [], skills: [] } } });
   try {
     assert.equal(some.all("#flow-preview-checking").length, 0);
     some.click(some.one('[data-action="add-node"][data-type="skill"]'));

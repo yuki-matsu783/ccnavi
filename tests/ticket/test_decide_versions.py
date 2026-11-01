@@ -28,13 +28,12 @@ def thread(key="u1", body="x", **kw):
     )
 
 
-def decision(threads, host="github", can_issue=True):
+def decision(threads, host="github", phase=1):
     return review_decide.Decision(
         parent=SimpleNamespace(ticket="i0001"),
-        ph=SimpleNamespace(number=1),
+        ph=SimpleNamespace(number=phase),
         result=SimpleNamespace(mr=SimpleNamespace(number=7, url="https://h/pr/7"), host=host),
         unresolved=list(threads),
-        can_issue=can_issue,
     )
 
 
@@ -96,7 +95,7 @@ class DigestTest(unittest.TestCase):
         self.assertIn("target", review_decide.changed_since_shown(other, base, versions))
         self.assertIn(
             "target",
-            review_decide.changed_since_shown(decision([a], can_issue=False), base, versions),
+            review_decide.changed_since_shown(decision([a], phase=2), base, versions),
         )
 
     def test_the_board_json_carries_versions_and_the_last_comment(self):

@@ -198,7 +198,7 @@ test("CB-D62 再読み込みできなかったら理由を出し、定義は出�
 test("CB-D63 定義がないファイルは、保存する前に追加すると言う。苦情と錠はそのまま出す", async () => {
   const dom = await openPhases({
     model: readPhases("version: 1\nphases: nope\n").model,
-    lock: { locked: true, reason: "作業中のチケットがある（i0001-02-02）", doing: ["i0001-02-02"] },
+    lock: { locked: true, reason: "作業中のチケットがある（i0001-02-02）", doing: ["i0001-02-02"], turns: [] },
   });
   try {
     assert.match(dom.one("#phases .empty").textContent, /定義がありません。定義が空のファイルは ccnavi で読み込めません/);

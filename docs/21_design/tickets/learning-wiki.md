@@ -156,6 +156,8 @@ learnings: 2
 
 どちらも統合では直せないので、親の `finish` も `consolidate` も止め、ファイルとヒットした条件を名指しして記録を直すよう案内する。訂正や追加は新しい節を足す形に限り、処理済みの節の本文は書き換えない。
 
+`ticket learn --note` の追記も同じ扱いで、frontmatter の無い空でない記録には、雛形を推して前置せず、読み取れない記録として止めて直し方を言う（空の記録は雛形から始める）。
+
 処理すべきものは、親の HEAD で次を列挙する（`learning.records.pending`）。親の `finish` と `consolidate` が同じ結果を使う。
 
 - 処理の行が無い節（`learnings: none` でない記録）

@@ -198,7 +198,7 @@ class StageShTest(unittest.TestCase):
                 f"--commands {self.rules} {self.hook} を打つ"
                 "（取り込みの手順が出る）"
             ),
-            nexts[0],
+            result.stdout,
         )
         # 下書きが既にあるだけでも、次の一手は消えない
         again = self.stage(".ccnavi/config/common/rules.yml")
@@ -226,6 +226,13 @@ class StageShTest(unittest.TestCase):
                 self.assertEqual(2, result.returncode)
                 self.assertIn(why, result.stderr)
         self.assertFalse(os.path.exists(self.draft_rules))
+
+    def test_a_bad_argument_after_a_good_one_writes_no_draft_at_all(self):
+        result = self.stage(".ccnavi/config/common/rules.yml", ".ccnavi/config/common/nothing.yml")
+        self.assertEqual(2, result.returncode)
+        self.assertIn("実在するファイルではありません", result.stderr)
+        self.assertFalse(os.path.exists(self.draft_rules))
+        self.assertFalse(os.path.exists(self.draft_rules + ".orig"))
 
     def test_refuses_quote_in_name(self):
         write(os.path.join(self.ws, "it's.md"), "x")

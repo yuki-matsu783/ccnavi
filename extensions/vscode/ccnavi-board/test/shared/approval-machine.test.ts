@@ -67,7 +67,7 @@ function planOf(ticket: string, sha: string, part = "plan"): ApprovePlan {
     ticket,
     part,
     source_sha: sha,
-    items: [{ number: 1, from: 1, type: "research", title: "調査", review: "none", deferred: false, review_at: null, locked: false }],
+    items: [{ number: 1, from: 1, type: "research", title: "調査", review: false, deferred: false, review_at: null, locked: false }],
     after: {},
     proposed: {},
     current: null,
@@ -105,13 +105,12 @@ function mismatchOf(expected: readonly string[], current: readonly string[]): Ap
 
 const TREE = "/w/.claude/worktrees/i0001";
 
-function decidePreviewOf(keys: readonly string[] = ["u1", "u2"], digest = "v2.eyJiIjoiYSIsInQiOnt9fQ", canIssue = false): DecidePreview {
+function decidePreviewOf(keys: readonly string[] = ["u1", "u2"], digest = "v2.eyJiIjoiYSIsInQiOnt9fQ"): DecidePreview {
   return {
     version: 2,
     parent: "i0001",
     phase: 1,
     mr: { number: 7, url: "https://example.com/mr/7" },
-    can_issue: canIssue,
     threads: keys.map((key) => ({
       key,
       url: key,
@@ -558,7 +557,7 @@ const GUARDS: readonly Guard[] = [
   {
     what: "読み取れなかった指摘は、件数を出さずにエラーにする（0 件と読み間違えて「レビュー済みにする」を見せない）",
     find: '    return move(state, { overlay: { kind: "error", error: unreadable(result.error) }, only: state.only });',
-    into: '    return move(state, { overlay: { kind: "decidePreview", preview: { version: 2, parent: overlay.parent, phase: overlay.phase, mr: { number: 0, url: "" }, can_issue: true, threads: [], digest: "v2.x" }, tree: overlay.tree }, only: state.only });',
+    into: '    return move(state, { overlay: { kind: "decidePreview", preview: { version: 2, parent: overlay.parent, phase: overlay.phase, mr: { number: 0, url: "" }, threads: [], digest: "v2.x" }, tree: overlay.tree }, only: state.only });',
     check(step) {
       const loading = toDecideLoading(step);
       const failed = step(loading, { kind: "decidePreviewed", result: { ok: false, error: "threads が配列ではありません" } });

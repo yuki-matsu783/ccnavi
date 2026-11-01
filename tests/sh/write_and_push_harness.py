@@ -28,8 +28,7 @@ ccnavi-user-push-approved.sh・ccnavi-user-decide.sh・ccnavi-user-close-early.s
    ユーザの判断（c）と知らない変更（d）は止める
 9. ユーザの判断の入口（ccnavi-user-close-early.sh など）は、取り込み済みの親子のチケットなら
    承認の push を自動で呼ぶ
-10. origin の無いリポジトリ・
-    マージリクエストで見るフェーズが無い親子のチケットは今のまま変えない。
+10. origin の無いリポジトリは今のまま変えない。
 11. 承認の push（ccnavi-user-push-approved.sh <親>）は取り込んでから送り、失敗してもコミットを残す
 12. Chrome のレビュー済み: 同じ状態から Chrome の入口が出す書くものと、write-and-push の confirm が
     書いて送ったものが、経路・時刻のほかは同じ
@@ -599,7 +598,7 @@ class WriteAndPushHostHarness(WriteAndPushHarness):
             HOST_HALF.format(root=ROOT, python=sys.executable),
         )
 
-    def review(self, *args, stdin="", script="ccnavi-review.sh", **extra):
+    def review(self, *args, stdin="", script="ccnavi-review.sh", cwd=None, **extra):
         env = {
             "PATH": self.path,
             "GITLAB_TOKEN": "t0k",
@@ -607,7 +606,13 @@ class WriteAndPushHostHarness(WriteAndPushHarness):
             "HALF_TREE": self.tree,
         }
         env.update(extra)
-        return self.sh(script, *args, cwd=self.tree, stdin=stdin, **env)
+        return self.sh(script, *args, cwd=cwd or self.tree, stdin=stdin, **env)
+
+    def carried_after_drop(self, rel):
+        """ready が親のワークツリーを消したあと。親のブランチ（ワークスペースの側）で確かめる。"""
+        self.assertFalse(os.path.exists(self.tree))
+        self.assertIn(rel, self.committed(PARENT, self.ws))
+        self.assertEqual(self.remote_sha(), self.sha(self.ws, PARENT))
 
     def carried(self, rel):
         self.assertIn(rel, self.committed())

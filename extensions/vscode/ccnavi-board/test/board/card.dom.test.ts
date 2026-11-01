@@ -204,7 +204,7 @@ test("CB-D705 操作のまとまりごとに主ボタンは 1 つ以下。操作
     boardOf(
       [
         ticketJson("rev", { proposal: { state: "todo", tree: "rev", tree_root: "/r", path: "/r/p.md", has_plan: true }, mr: 3, branch: "b", template_draft: true }),
-        proposalJson("kid", { parent: "rev", phase: 1, flow: { path: "/f.yml", rel: "f.yml", tree: "/t", exists: false, linked: false, locked: false, draft: null } }),
+        proposalJson("kid", { parent: "rev", phase: 1, flow: { path: "/f.yml", rel: "f.yml", tree: "/t", exists: false, linked: false, locked: false, lock_kind: null, draft: null } }),
         reviewJson("wait", { parent: "rev", phase: 2 }),
       ],
       [parentJson("rev", [waitingPhase(1, 11), waitingPhase(2, 12)])],

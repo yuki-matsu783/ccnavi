@@ -18,7 +18,7 @@ export async function checkHandoffLink(open: (handoff: HandoffEntry) => Promise<
   } finally {
     await dom.close();
   }
-  const reason = "実行ファイルが古い版です。組み立て直してください";
+  const reason = "取り込みの案内の間は開けません";
   const old = await open({ enabled: false, reason });
   try {
     const button = old.one<HTMLButtonElement>('[data-action="open-handoff"]');

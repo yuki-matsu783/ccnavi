@@ -49,7 +49,7 @@ function cardOf(json: BoardJson, id: string): Card {
   throw new Error(`カードがない: ${id}`);
 }
 
-test("CB-D185 カードの workflow は、計画を持つ承認待ちの親の提案（新規も改版も）だけ真。承認済みだけの親・計画のない親・子・古い実行ファイル（has_plan がありません）は偽", () => {
+test("CB-D185 カードの workflow は、計画を持つ承認待ちの親の提案（新規も改版も）だけ真。承認済みだけの親・計画のない親・子・has_plan が欠けた壊れた JSON は偽", () => {
   const json = withParents();
   assert.equal(cardOf(json, "i0002").workflow, true);
   assert.equal(cardOf(json, "i0001").workflow, true, "改版の提案");
@@ -60,7 +60,7 @@ test("CB-D185 カードの workflow は、計画を持つ承認待ちの親の�
   const review = withParents();
   const reviewed = { ...review, tickets: review.tickets.map((t) => (t.ticket === "i0002" && t.proposal !== null ? { ...t, proposal: { ...t.proposal, state: "review" as const } } : t)) };
   assert.equal(cardOf(reviewed, "i0002").workflow, false);
-  // 欄の無い答え（古い実行ファイル）は出さない
+  // 欄が欠けた壊れた JSON への備え（型は必須）。計画があると決めつけて出さない
   const old = withParents();
   const stripped = {
     ...old,

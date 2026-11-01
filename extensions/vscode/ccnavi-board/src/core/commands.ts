@@ -305,7 +305,7 @@ export function claudeRunCommand(promptFile: string): string {
 
 /**
  * `ccnavi write-and-push family <親>` の答えから `target`（`yes` / `no` / `stop`）を読む。頭の `write-and-push 1` が無ければ
- * 空文字（古い実行ファイル）。行末の CR は除く
+ * 空文字。行末の CR は除く
  */
 export function writeAndPushTargetOf(stdout: string): string {
   const lines = stdout.split("\n").map((line) => line.replace(/\r$/, ""));

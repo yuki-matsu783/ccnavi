@@ -33,7 +33,7 @@ phases:
   research:
     kind: work
     title: 調査
-    review: none
+    review: false
     scope: ["wip/research/*"]
     deliverables: ["wip/research/summary.md"]
     agent: explorer
@@ -41,32 +41,32 @@ phases:
   design:
     kind: work
     title: 設計
-    review: mr
+    review: true
     scope: ["wip/design/*"]
   acceptance:
     kind: work
     title: 受入テスト作成
-    review: mr
+    review: true
     scope: ["tests/*"]
   implement:
     kind: work
     title: 実装とテスト
-    review: mr
+    review: true
     scope: ["src/*", "tests/*"]
   implement-feedback:
     kind: feedback
     title: 実装フィードバック対応
-    review: mr
+    review: true
     scope: inherit
   chores:
     kind: work
     title: 片付け
-    review: mr
+    review: true
     scope: ["src/*"]
   chores-feedback:
     kind: feedback
     title: 片付けフィードバック対応
-    review: mr
+    review: true
     scope: inherit
 """
 
@@ -76,24 +76,28 @@ def plan_item_lines(items, start=1) -> list[str]:
 
     `start` はその計画の最初の番号（フィードバック計画は続き）。
 
-    ステップは定義の名前、`(名前, review)`、`{"type": …, "review": …, "after": […]}` のどれか。
+    ステップは定義の名前、`(名前, "review" か "defer")`、
+    `{"type": …, "review": True, "deferred": True, "after": […]}` のどれか。
     `after` を書かないステップは、すぐ前のステップが先行する（一直線）。最初のステップは先行なし。
     並行にしたい見本はマップで `after` を明記する（`[]` なら先行なし）。
     """
     lines = []
     for i, item in enumerate(items):
         if isinstance(item, dict):
-            kind, review = item["type"], item.get("review", "")
-            after = item.get("after")
+            kind, after = item["type"], item.get("after")
+            review, deferred = item.get("review", False), item.get("deferred", False)
         elif isinstance(item, tuple):
-            kind, review, after = item[0], item[1], None
+            kind, after = item[0], None
+            review, deferred = item[1] == "review", item[1] == "defer"
         else:
-            kind, review, after = item, "", None
+            kind, after, review, deferred = item, None, False, False
         if after is None:
             after = [start + i - 1] if i > 0 else []
         fields = [f"type: {kind}"]
         if review:
-            fields.append(f"review: {review}")
+            fields.append("review: true")
+        if deferred:
+            fields.append("deferred: true")
         if after:
             fields.append(f"after: [{', '.join(str(n) for n in after)}]")
         lines.append(f"  - {kind}" if len(fields) == 1 else f"  - {{{', '.join(fields)}}}")
@@ -177,12 +181,12 @@ phases:
   work:
     kind: work
     title: 作業
-    review: none
+    review: false
     scope: inherit
   work-mr:
     kind: work
     title: MR作業
-    review: mr
+    review: true
     scope: inherit
 """
 

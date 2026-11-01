@@ -107,8 +107,6 @@ resume_prepare() {
 	# review_host（JQ を決める）の前に動くので、jq は自分で探す。
 	rp_jq=$(command -v jq || :)
 	[ -n "$rp_jq" ] || fail no-jq "jq が見つかりません。" 2
-	# 互換のずれは、最初の `ops` が失敗する前に親で言う（`$( )` の中に消さない）
-	tell_skew
 	if [ -z "$resume_op" ]; then
 		rp_list=$(ccnavi ops pending 2>/dev/null | grep ' decide ' | sed 's/ .*//' || :)
 		rp_count=$(printf '%s\n' "$rp_list" | grep -c . || :)
@@ -195,37 +193,8 @@ accept_before_place() {
 # 下書きは残す（打ち直せば投稿できる）。下書きの名前は exe と揃える（親の識別子。ブランチ名と違うことがある）。
 
 post_decision() {
-	if [ -n "$op_id" ]; then
-		# 取れなければ post_warning に言う（置いたあとなので決めたことは戻さない）
-		post_decision_staged || :
-		return 0
-	fi
-	issue_url=""
-	post_warning=""
-	number=$("$JQ" '.mr.number' "$result")
-	url=$("$JQ" -r '.mr.url' "$result")
-	issue_draft="$state/review-issue-$family-$1.md"
-	noted="$state/review-decide-$family-$1.md"
-	if [ -f "$issue_draft" ]; then
-		issue=$(create_issue "$issue_draft" || :)
-		if [ -n "$issue" ]; then
-			issue_url=$(printf '%s' "$issue" | "$JQ" -r '.url')
-			issue_no=$(printf '%s' "$issue" | "$JQ" -r '.number')
-			[ -f "$noted" ] && printf '\nissue に回した分: #%s %s\n' "$issue_no" "$issue_url" >>"$noted"
-			rm -f "$issue_draft"
-		else
-			post_warning="issue を作れなかった。下書きは $issue_draft にある"
-		fi
-	fi
-	if [ -f "$noted" ]; then
-		# comment は api と jq のパイプで、終了コードは jq のもの。投稿の失敗は URL が空で見分ける
-		posted=$(comment "$number" "$url" "$noted" || :)
-		if [ -n "$(printf '%s' "$posted" | "$JQ" -r '.url // empty' 2>/dev/null)" ]; then
-			rm -f "$noted"
-		else
-			post_warning="${post_warning:+${post_warning}。}マージリクエストにコメントを残せなかった。下書きは $noted にある"
-		fi
-	fi
+	# 取れなければ post_warning で知らせる（置いたあとなので、決めたことは戻さない）
+	post_decision_staged || :
 }
 
 # --resume の終わりに言うこと。
@@ -243,6 +212,15 @@ trap 'review_exit=$?; ccnavi_wap_end; op_lock_release; accept_cleanup "$review_e
 trap 'ccnavi_wap_end; exit 130' INT TERM HUP
 
 review_wap
+
+# ホストの API・ロック・取り込みより前に、ワークツリーの中で分かる前提（親とフェーズ・依頼の記録・
+# 依頼のあとに動いていないこと・選択とダイジェストの形）を、何も変えずに断る。
+# 検査は本体と同じ関数（読むだけ）。`--check` は位置引数の前に置く。
+if [ -n "$choices" ]; then
+	ccnavi --entry sh --check user reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" >/dev/null || exit $?
+else
+	ccnavi --entry sh --check user reviewed "$n" --accept-unresolved >/dev/null || exit $?
+fi
 
 # マーカーに残すアカウント。confirm と同じくトークンの持ち主をホストに聞き、
 # ロックを取る前に引く。引けなければ渡さず、マーカーにアカウントを入れない。
@@ -274,7 +252,6 @@ fi
 fetch_all >"$result"
 if [ -n "$choices" ]; then
 	# 失敗の答え（見せた指摘と今の指摘が違う、など）も JSON で返すので、先に出してから終わる。
-	tell_skew
 	# 適用まで済んでいる判断の続きは、投稿の段階だけを進める。
 	if [ -n "$resume_op" ] && [ "$(ccnavi ops show "$resume_op" | "$JQ" -r '.applied.local // empty')" = true ]; then
 		op_id="$resume_op"

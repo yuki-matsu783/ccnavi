@@ -12,7 +12,7 @@
 ## 点が何をするか
 
 リスクレベルの名前は 4 つで固定（LOW / MEDIUM / HIGH / CRITICAL）。境目の点は `levels` で動かす。
-`HIGH` 以上なら、定義が `review: none` でも子が `required: false` でも、そのフェーズは
+`HIGH` 以上なら、定義が `review: false` でも子が `required: false` でも、そのフェーズは
 人間レビューが要る扱いになり、レビューが済むまで止まる。実績で宣言を厳しい側にだけ上書きする。
 
 ## 項目は 3 系統

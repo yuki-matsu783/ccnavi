@@ -9,7 +9,7 @@
  */
 import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 
-import { KIND_LABELS, PHASE_KINDS, REVIEWS, REVIEW_LABELS, type PhaseForm, type PhaseKind, type Review } from "../../core/phases-view.js";
+import { KIND_LABELS, PHASE_KINDS, REVIEW_OPTIONS, type PhaseForm, type PhaseKind } from "../../core/phases-view.js";
 import { moreNote, scopeText, scopeTitle, splitList } from "./text.js";
 import { moveTitle } from "../shared/find.js";
 
@@ -99,7 +99,7 @@ export function Phase(props: PhaseProps): JSX.Element {
           </span>
           <span className={`tag ${phase.kind}`}>{phase.kind}</span>
           <span className="dim" title="review">
-            レビュー {phase.review}
+            レビュー {String(phase.review)}
           </span>
           <span className="clip dim mono" title={scopeTitle(phase)}>
             {scopeText(phase)}
@@ -132,13 +132,13 @@ export function Phase(props: PhaseProps): JSX.Element {
         <Captioned name="レビュー" yamlKey="review" tour={mark("phase-review")}>
           <select
             className="f-review"
-            value={phase.review}
+            value={String(phase.review)}
             disabled={disabled}
-            onChange={(event) => props.onChange({ ...phase, review: event.target.value as Review })}
+            onChange={(event) => props.onChange({ ...phase, review: event.target.value === "true" })}
           >
-            {REVIEWS.map((review) => (
-              <option key={review} value={review}>
-                {REVIEW_LABELS[review]}
+            {REVIEW_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </select>

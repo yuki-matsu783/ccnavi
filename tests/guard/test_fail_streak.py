@@ -13,6 +13,7 @@ import tempfile
 import unittest
 
 from ccnavi.records import failstreak
+from ccnavi.tickets.model import ticket_places
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -130,6 +131,31 @@ class FailStreakTest(unittest.TestCase):
         self.assertEqual(["", ""], said[3:5])
         self.assertIn("6 回続いて", said[5])
         self.assertEqual("", said[6])
+
+    def test_artifact_failure_names_the_workspace_scratchpad(self):
+        payload = {
+            "hook_event_name": "PostToolUseFailure",
+            "tool_name": "Artifact",
+            "tool_input": {"file_path": "/tmp/x.html"},
+            "error": "failed",
+            "is_interrupt": False,
+        }
+        said = self._context(self._run(payload))
+        self.assertIn("Artifact ツールが失敗しました", said)
+        self.assertIn(ticket_places.scratch_dir(self.ws), said)
+
+    def test_artifact_interrupt_says_nothing_about_scratchpad(self):
+        payload = {
+            "hook_event_name": "PostToolUseFailure",
+            "tool_name": "Artifact",
+            "tool_input": {"file_path": "/tmp/x.html"},
+            "error": "interrupted",
+            "is_interrupt": True,
+        }
+        self.assertNotIn("scratchpad", self._context(self._run(payload)))
+
+    def test_other_tool_failure_does_not_mention_artifact(self):
+        self.assertNotIn("Artifact", self._context(self._fail()))
 
     def test_note_event_name_is_the_failure_event(self):
         out = json.loads(self._fail().stdout)["hookSpecificOutput"]

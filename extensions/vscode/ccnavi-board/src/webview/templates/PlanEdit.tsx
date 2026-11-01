@@ -13,7 +13,9 @@ import {
   canMove,
   connectItems,
   disconnectItems,
-  ITEM_REVIEWS,
+  ITEM_MODES,
+  modeOf,
+  type ItemMode,
   moveItem,
   removeItem,
   setItem,
@@ -25,11 +27,11 @@ import { PlanGraph } from "../shared/PlanGraph.js";
 
 const PART_TITLE: Readonly<Record<PlanPart, string>> = { plan: "全体計画", feedback: "フィードバック計画" };
 
-/** ステップの `review` の言葉 */
-const REVIEW_LABEL: Readonly<Record<string, string>> = {
+/** ステップのレビューの指定の言葉 */
+const MODE_LABEL: Readonly<Record<ItemMode, string>> = {
   "": "定義のまま",
-  mr: "mr（MR を見る）",
-  defer: "defer（後ろのステップへ延ばす）",
+  review: "review: true（MR を見る）",
+  deferred: "deferred: true（後ろのステップへ延ばす）",
 };
 
 export interface PlanEditProps {
@@ -129,15 +131,14 @@ export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanE
                   <select
                     className="f-item-review"
                     aria-label={`${offset + index} 番のレビュー`}
-                    value={item.review}
-                    onChange={(event) => onChange(setItem(template, part, index, { review: event.target.value }))}
+                    value={modeOf(item)}
+                    onChange={(event) => onChange(setItem(template, part, index, { mode: event.target.value as ItemMode }))}
                   >
-                    {ITEM_REVIEWS.map((r) => (
-                      <option key={r} value={r}>
-                        {REVIEW_LABEL[r]}
+                    {ITEM_MODES.map((mode) => (
+                      <option key={mode} value={mode}>
+                        {MODE_LABEL[mode]}
                       </option>
                     ))}
-                    {!ITEM_REVIEWS.some((r) => r === item.review) && <option value={item.review}>{item.review}（未知）</option>}
                   </select>
                 </td>
                 <td className="mono">{item.after.length === 0 ? "なし" : item.after.map((n) => offset + n).join(", ")}</td>

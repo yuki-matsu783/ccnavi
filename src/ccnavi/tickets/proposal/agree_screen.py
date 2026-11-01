@@ -274,12 +274,10 @@ def _plan_lines(items: list[ticket_model.PlanItem], start: int, types: dict | No
         review = ""
         if item.deferred:
             review = "次のフェーズとまとめてレビュー"
-        elif item.review == ticket_model.PLAN_REVIEW_MR:
+        elif item.review:
             review = "レビュー必須：計画で追加指定"
         elif pt is not None:
-            review = {
-                phasetypes.REVIEW_MR: "レビュー必須: マージリクエスト",
-            }.get(pt.review, "レビュー不要")
+            review = "レビュー必須: マージリクエスト" if pt.review else "レビュー不要"
         lines.append(f"    {n}. {title} / {item.type}" + (f"  {review}" if review else ""))
     return lines
 
@@ -323,7 +321,7 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
                 if pt.inherits_scope
                 else ", ".join(pt.scope_globs)
             )
-            parts = [f"review: {pt.review}", f"scope: {scope}"]
+            parts = [f"review: {str(pt.review).lower()}", f"scope: {scope}"]
             if pt.deliverables:
                 parts.append(f"deliverables: {', '.join(pt.deliverables)}")
             if pt.learning == phasetypes.LEARNING_OFF:

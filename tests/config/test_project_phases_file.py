@@ -27,7 +27,7 @@ from tests.config.test_config_union import (
 LIB_TITLE_OVERLAP = LIB_PHASES.replace("title: ビルド", "title: 設計")
 
 # 同じ 1 本の定義と id も表示名も重ならない定義。`phases:` の続きに繋げる。
-NOTES_TYPE = "  notes:\n    kind: work\n    title: メモ\n    review: none\n    scope: inherit\n"
+NOTES_TYPE = "  notes:\n    kind: work\n    title: メモ\n    review: false\n    scope: inherit\n"
 
 # 定義の無いレイヤー。実行ファイルは読めないとして error にする（拡張はこの形を書き出さない）。
 EMPTY_LAYER = "version: 1\nphases: {}\n"
@@ -51,7 +51,8 @@ class ProjectPhasesFileTest(ConfigUnionHarness):
         own = read(layer_path(self.ws, "phases"))
         edited = write(
             os.path.join(self.ws, "tmp", "self-phases.yml"),
-            own + "  clash:\n    kind: work\n    title: 文書\n    review: mr\n    scope: inherit\n",
+            own
+            + "  clash:\n    kind: work\n    title: 文書\n    review: true\n    scope: inherit\n",
         )
         errors = self.phase_errors("(self)", "--project-phases-file", f"self={edited}")
         self.assertTrue(errors, "自身のレイヤーの差し替えが検証に届かない")

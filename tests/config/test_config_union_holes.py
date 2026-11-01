@@ -97,7 +97,7 @@ phases:
   "lib:build":
     kind: work
     title: ビルド（コロン）
-    review: none
+    review: false
     scope: ["src/*"]
 """
 
@@ -158,7 +158,7 @@ phases:
   reserved:
     kind: work
     title: 予約名のレイヤー
-    review: none
+    review: false
     scope: ["src/*"]
 """
 

@@ -25,6 +25,7 @@ from typing import TextIO
 
 from ..infra import settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
+from ..policy import texts
 from ..tickets.approval import store as approval
 from ..tickets.model import ticket_model
 from ..tickets.proposal import plan_order, plan_phases
@@ -66,6 +67,7 @@ def fill_phases(
             "承認済みチケットからコピーしました。"
         )
     stdout.write(line + "\n")
+    stdout.write(texts.say(root, "NEXT_PLAN_VERIFY", {}) + "\n")
     return EXIT_OK
 
 
@@ -135,6 +137,7 @@ def reorder(
         stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
     elif saved.written:
         stdout.write(f"{name} の計画の順序を書き換えました（source_sha: {sha}）\n")
+        stdout.write(texts.say(root, "NEXT_PLAN_VERIFY", {}) + "\n")
     elif saved.ok:
         stdout.write(f"{name} の計画の順序に変更はありません。ファイルは更新しません。\n")
     return EXIT_OK if saved.ok else EXIT_ERROR

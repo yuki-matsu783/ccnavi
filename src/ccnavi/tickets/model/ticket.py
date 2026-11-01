@@ -116,26 +116,21 @@ def _plan(
             continue
         if isinstance(entry, dict):
             kind = _text(entry.get("type")).strip()
-            review = _text(entry.get("review")).strip()
             if not kind:
                 problems.append(Problem(SEVERITY_ERROR, name, f"{where} に `type` がありません。"))
                 return None, problems
-            if review and review not in ticket_model.PLAN_REVIEWS:
-                problems.append(
-                    Problem(
-                        SEVERITY_ERROR,
-                        name,
-                        f"{where} の `review` は {' か '.join(ticket_model.PLAN_REVIEWS)}。"
-                        "弱める向き（none）は書けない",
-                    )
-                )
+            review, deferred, why = ticket_model.step_flags(entry, where)
+            if why:
+                problems.append(Problem(SEVERITY_ERROR, name, why))
                 return None, problems
-            item = ticket_model.PlanItem(type=kind, review=review)
+            item = ticket_model.PlanItem(type=kind, review=review, deferred=deferred)
             _after(item, entry.get("after"), start, start + i)
             items.append(item)
             continue
         problems.append(
-            Problem(SEVERITY_ERROR, name, f"{where} は定義の名前か {{type, review, after}}")
+            Problem(
+                SEVERITY_ERROR, name, f"{where} は定義の名前か {{type, review, deferred, after}}"
+            )
         )
         return None, problems
     return items, problems

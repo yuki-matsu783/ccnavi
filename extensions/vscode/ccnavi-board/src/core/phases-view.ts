@@ -26,10 +26,6 @@ import type { TargetOption } from "./targets.js";
 export const PHASE_KINDS = ["work", "feedback"] as const;
 export type PhaseKind = (typeof PHASE_KINDS)[number];
 
-/** レビューの並び。phasetypes.REVIEWS と同じ順 */
-export const REVIEWS = ["none", "mr"] as const;
-export type Review = (typeof REVIEWS)[number];
-
 /** 画面で編集する定義 1 件。`origin` は読み込んだときの位置で、新しい定義は null */
 export interface PhaseForm {
   readonly origin: number | null;
@@ -38,7 +34,8 @@ export interface PhaseForm {
   /** 表示名。空なら欄を書かない（実行ファイルは id を使う） */
   readonly title: string;
   readonly kind: PhaseKind;
-  readonly review: Review;
+  /** そのフェーズの終わりにユーザのレビューが要るか（`review: true|false`） */
+  readonly review: boolean;
   /** 真なら `scope: inherit`（親の範囲そのまま）。偽なら `scope` の glob のリスト */
   readonly inherit: boolean;
   /** 子の範囲の上限。inherit なら使わない */
@@ -61,7 +58,7 @@ export interface CommonPhase {
   readonly id: string;
   readonly title: string;
   readonly kind: string;
-  readonly review: string;
+  readonly review: boolean;
   /** `inherit` の 1 語なら親の範囲そのまま */
   readonly scope: readonly string[];
 }
@@ -76,14 +73,14 @@ export interface PhasesModel {
 /** 区分の説明。select のラベル */
 export const KIND_LABELS: Readonly<Record<PhaseKind, string>> = {
   work: "work（全体計画 plan: に並べる定義）",
-  feedback: "feedback（フィードバック計画 feedback: に並べる定義。レビューは mr 固定）",
+  feedback: "feedback（フィードバック計画 feedback: に並べる定義。レビューは true 固定）",
 };
 
-/** レビューの説明。select のラベル。追加した定義の既定は mr で、none は既定ではない */
-export const REVIEW_LABELS: Readonly<Record<Review, string>> = {
-  none: "none（レビューを求めない。ただし実績のリスクが HIGH 以上ならレビューが必要です）",
-  mr: "mr（マージリクエストのレビューを受ける）",
-};
+/** レビューの説明。select のラベル（`value` は select の値）。追加した定義の既定は true で、false は既定ではない */
+export const REVIEW_OPTIONS: readonly { readonly value: "true" | "false"; readonly label: string }[] = [
+  { value: "false", label: "false（レビューを求めない。ただし実績のリスクが HIGH 以上ならレビューが必要です）" },
+  { value: "true", label: "true（マージリクエストのレビューを受ける）" },
+];
 
 // ---- 画面に見せる形
 

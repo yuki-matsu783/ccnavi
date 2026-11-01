@@ -48,7 +48,7 @@ import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { commonPhases } from "./core/sums.js";
 import { showLoading } from "./loading.js";
 import type { HandoffEntry } from "./core/handoff-entry.js";
-import { openHandoffFrom, readHandoffEntry } from "./handoff-entry.js";
+import { HANDOFF_ENTRY, openHandoffFrom } from "./handoff-entry.js";
 import type { PhasesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
 import { lintSummary } from "./core/lint-summary.js";
@@ -265,9 +265,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   // 無いときの苦情（version が無い、phases が無い）は画面に出さない。
   const parsed = readPhases(text);
   const doc = exists ? parsed : { apply: parsed.apply, model: { ...parsed.model, problems: [] } };
-  // 取り込み待ち画面を開けるかは、設定の読み込みとは別に確かめる（古い実行ファイルでは入口だけを無効にする）
-  const handoff = await readHandoffEntry(root, binSetting());
-  return { target, text, exists, mtimeMs, doc, phasesPath, phasesRel, notices, errors, common, targets, handoff };
+  return { target, text, exists, mtimeMs, doc, phasesPath, phasesRel, notices, errors, common, targets, handoff: HANDOFF_ENTRY };
 }
 
 function resolveIn(root: string, filePath: string): string {

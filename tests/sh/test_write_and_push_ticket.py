@@ -69,7 +69,7 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
     # ---- 8. hook の書きかけ（b）は先にコミットする。ユーザの判断（c）と知らない変更（d）は止める
 
     def test_hook_marks_are_committed_before_the_take_in(self):
-        pending = self.mark(1, "pending", {"review": "mr", "at": "2026-09-29T00:00:00+0900"})
+        pending = self.mark(1, "pending", {"review": True, "at": "2026-09-29T00:00:00+0900"})
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(
@@ -161,7 +161,7 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         self.assertFalse(os.path.exists(self.lock_dir()))
 
     def test_a_diverged_parent_is_merged_before_writing(self):
-        self.mark(1, "pending", {"review": "mr", "at": "t"})
+        self.mark(1, "pending", {"review": True, "at": "t"})
         self.remote_commit("src/remote.py", "y = 2\n")
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -172,10 +172,10 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
 
     def test_a_conflicting_take_in_writes_nothing(self):
         pending = f"{APPROVED}/phases/{PARENT}/1.pending"
-        self.mark(1, "pending", {"review": "mr", "at": "l"})
+        self.mark(1, "pending", {"review": True, "at": "l"})
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "hook")
-        self.remote_commit(pending, json.dumps({"review": "mr", "at": "r"}))
+        self.remote_commit(pending, json.dumps({"review": True, "at": "r"}))
         head = self.sha(self.tree, "HEAD")
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
@@ -188,7 +188,7 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
     def test_a_hook_writing_between_sorting_and_taking_in_stops_and_a_rerun_passes(self):
         """3 と 4 の間に hook が書いて取り込みが重なったら、やり直さずに止める。再実行は通る。"""
         rel = f"{APPROVED}/phases/{PARENT}/2.pending"
-        body = json.dumps({"review": "mr", "at": "t"})
+        body = json.dumps({"review": True, "at": "t"})
         self.remote_commit(rel, body)
         once = os.path.join(self._base, "once")
         shim = os.path.join(self._base, "hookshim")
@@ -384,6 +384,75 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+
+    # ---- 書く前に分かる条件は、何も変えずに最初に断る
+
+    def assert_nothing_changed(self, before, pending):
+        """断ったあと、親のブランチ・リモート・ロック・hook のマーカーが動いていない。"""
+        self.assertEqual(self.sha(self.tree, "HEAD"), before)
+        self.assertEqual(self.remote_sha(), before)
+        self.assertIn(pending, self.dirty())
+        self.assertFalse(os.path.exists(self.lock_dir()))
+
+    def next_lines(self, result):
+        return [ln for ln in result.stderr.splitlines() if ln.startswith("次: ")]
+
+    def test_start_refused_up_front_leaves_no_child_worktree_or_commit(self):
+        # 親に着手していない子の start は断られる。hook のマーカーを (b) でコミットしない。
+        pending = self.mark(1, "pending", {"review": True, "at": "2026-09-29T00:00:00+0900"})
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("start", CHILD)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("未着手", result.stderr)
+        lines = self.next_lines(result)
+        self.assertEqual(len(lines), 1, result.stderr)
+        self.assertIn(f"ccnavi-ticket.sh start {CHILD}", lines[0])
+        self.assertFalse(os.path.exists(os.path.join(self.ws, ".claude", "worktrees", CHILD)))
+        self.assertEqual(git(self.ws, "branch", "--list", CHILD).stdout.strip(), "")
+        self.assert_nothing_changed(before, pending)
+
+    def test_cancel_without_a_reason_is_refused_before_the_take_in_and_commit(self):
+        pending = self.mark(1, "pending", {"review": True, "at": "2026-09-29T00:00:00+0900"})
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("cancel", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("--reason", result.stderr)
+        lines = self.next_lines(result)
+        self.assertEqual(len(lines), 1, result.stderr)
+        self.assertIn(f"ccnavi-ticket.sh cancel {PARENT} --reason", lines[0])
+        self.assert_nothing_changed(before, pending)
+
+    def test_finish_of_an_unstarted_child_is_refused_before_the_merge(self):
+        self.assertEqual(self.ticket("start", PARENT).returncode, 0)
+        tree = self.child_tree()
+        pending = self.mark(1, "pending", {"review": True, "at": "2026-09-29T00:00:00+0900"})
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("finish", CHILD)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("未着手", result.stderr)
+        self.assertEqual(len(self.next_lines(result)), 1, result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.tree, ".git", "MERGE_HEAD")))
+        self.assertEqual(self.sha(tree, "HEAD"), before)
+        self.assert_nothing_changed(before, pending)
+
+    def test_check_flag_runs_only_the_gate(self):
+        before = self.sha(self.tree, "HEAD")
+        ok = self.ticket("start", PARENT, "--check")
+        self.assertEqual(ok.returncode, 0, ok.stdout + ok.stderr)
+        self.assertIn("何も変えていません", ok.stdout)
+        self.assertEqual(self.sha(self.tree, "HEAD"), before)
+        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
+
+    def test_check_flag_refuses_an_id_in_two_places_without_a_child_worktree(self):
+        done = self.copy(CHILD, "done")
+        os.makedirs(os.path.dirname(done), exist_ok=True)
+        write(done, self.read(self.copy(CHILD)))
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("start", CHILD, "--check")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("複数の場所", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.ws, ".claude", "worktrees", CHILD)))
+        self.assertEqual(self.sha(self.tree, "HEAD"), before)
 
     # ---- write-and-push を飛ばさせない
 

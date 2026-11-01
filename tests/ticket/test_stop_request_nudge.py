@@ -480,7 +480,7 @@ class RequestNudgeTest(base.StopNudgeTest):
 
 
 class PlannedRequestNudgeTest(PhaseHarness):
-    """計画を持つ親。フェーズの見る場所（延期）と、実際のレビューの状態を作って確かめる。"""
+    """計画を持つ親。フェーズのレビューの要否（延期）と、実際のレビューの状態を作って確かめる。"""
 
     def stop(self, cwd, session="s1"):
         payload = {

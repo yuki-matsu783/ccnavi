@@ -225,7 +225,7 @@ class IntegrateTest(Fixture):
             self.assertIn(f"  {path}", r.stdout)
         self.assertNotIn("  other.txt", r.stdout)
         self.assertIn("保存していない編集", r.stdout)
-        self.assertIn("integrate-done wt -m", r.stdout)
+        self.assertRegex(r.stdout, r"(?m)^案内: .*integrate-done wt -m")
         self.assertEqual(1, [ln[:2] for ln in r.stdout.splitlines()].count("次:"))
         tmp = self.tmp_wt()
         self.assertEqual("1\n2\nthree\n", read(os.path.join(tmp, "keep.txt")))
@@ -1653,6 +1653,7 @@ class PullOnTargetBase(Fixture):
         self.assertEqual(before, git(self.ws, "rev-parse", "HEAD").strip())
         self.assertFalse(os.path.exists(os.path.join(self.ws, "feat.txt")))
         return r
+
 
 class PullOnTargetTest(PullOnTargetBase):
     """統合先のユーザのチェックアウトでは、pull でも別のブランチを merge できない。"""

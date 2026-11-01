@@ -17,33 +17,28 @@ export interface Lock {
   /**
    * いまターンの途中にいるセッション。ターン中の保存は、保存できても、次のツール呼び出しの
    * 実行後チェックに戻されることがある。保存を止める理由ではなく、保存の前に確かめる印。
-   * 古い実行ファイルの答えではない
    */
-  readonly turns?: readonly string[];
+  readonly turns: readonly string[];
 }
 
 /** 応答中の保存の前に見せる文。応答中のセッションが無ければ空 */
 export function turnWarning(lock: Lock): string {
-  const turns = lock.turns ?? [];
-  if (turns.length === 0) {
+  if (lock.turns.length === 0) {
     return "";
   }
-  return `エージェントが応答の途中です（セッション ${turns.join(", ")}）。いま保存すると、次のツール呼び出しで元に戻されることがあります。応答が終わってから保存すると確実です。`;
+  return `エージェントが応答の途中です（セッション ${lock.turns.join(", ")}）。いま保存すると、次のツール呼び出しで元に戻されることがあります。応答が終わってから保存すると確実です。`;
 }
 
 /**
  * 共通の設定とワークスペースの設定のルール（`project` を渡さない）は、どのツリーの doing でも保存を止める（Bash の和に影響するため）。
  * プロジェクトのルール（`project` を渡す）は、そのプロジェクトの doing だけを見る。
  * 作業中かは実行ファイルが答える（チケットの `in_progress`）。承認しただけで着手していないもの・レビュー待ち・閉じたものは
- * 実行ファイルが作業中に数えない。この欄を出さない古い実行ファイルの答えでは確かめられないので、保存できない扱いにする。
+ * 実行ファイルが作業中に数えない。
  */
 export function lockFromBoard(board: BoardJson, project?: string): Lock {
   const mine = board.tickets.filter((t) => project === undefined || t.project === project);
-  if (mine.some((t) => t.in_progress === null)) {
-    return lockFromError("実行ファイルが作業中かどうかを答えません。実行ファイルを更新してください");
-  }
   const doing = mine.filter((t) => t.in_progress === true).map((t) => t.ticket);
-  const turns = (board.turns ?? []).map((t) => t.session);
+  const turns = board.turns.map((t) => t.session);
   if (doing.length === 0) {
     return { locked: false, reason: "", doing, turns };
   }
@@ -73,5 +68,6 @@ export function lockFromError(error: string): Lock {
     locked: true,
     reason: `保存できるか確認できません: ${error}`,
     doing: [],
+    turns: [],
   };
 }

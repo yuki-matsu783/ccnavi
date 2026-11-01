@@ -15,7 +15,7 @@ messages:
     what: |-
       ワークツリー .claude/worktrees/{name} はチケットに結び付かない直接作業で、{left}があり、取り込みの記録（ccnavi-direct）がありません。
     why: |-
-      記録の無いワークツリー（更新前に切った・手で切った）は、integrate が断ります。
+      記録の無いワークツリー（手で切った）は、integrate が断ります。
     next: |-
       ユーザに取り込み先を確かめてから、`cd {integ_tree:path} && {script:ccnavi-worktree.sh} {name} --adopt --base {base:sh}` で引き取る。出力の範囲と差分をユーザに見せ、了承を得て確認コードを付けて打ち直す
 
@@ -25,7 +25,7 @@ messages:
     what: |-
       ワークツリー .claude/worktrees/{name} はチケットに結び付かない直接作業で、{left}があり、integrate {name} をまだ打っていません。
     next: |-
-      作業が終わったなら `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate {name}` を実行して止める。取り込み結果は一時ワークツリーに用意され、ユーザのチェックアウトは変わらない
+      作業が終わり、レビュー（haiku のサブエージェントの敵対的レビュー、別の haiku のフラットな評価、指摘の取り込み。手順は .ccnavi/docs/direct-flow.md）が済んでいるなら、`cd {integ_tree:path} && {script:ccnavi-git.sh} integrate {name}` を実行して止める。レビューがまだなら先に済ませる。取り込み結果は一時ワークツリーに用意され、ユーザのチェックアウトは変わらない
     note: |-
       hook は integrate を実行しません。
       integrate のあとの報告と、確定（`cd {integ_tree:path} && {script:ccnavi-git.sh} integrate-done {name} -m '<メッセージ>'`）の進め方は、integrate を打ったときの追加の文脈に従います。やめるなら `cd {integ_tree:path} && {script:ccnavi-git.sh} integrate --abort {name}`。

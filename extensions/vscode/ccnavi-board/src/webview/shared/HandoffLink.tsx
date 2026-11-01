@@ -1,6 +1,6 @@
 /**
  * 取り込み待ち画面へ進むボタン。ルール管理・リスク管理・フェーズ管理・テンプレート管理が同じものを置く
- * （契約は `core/handoff-entry.ts`）。開けない理由（古い実行ファイル）は、ボタンの title と横の注記に出す。
+ * （契約は `core/handoff-entry.ts`）。開けない理由（案内の間など）は、ボタンの title と横の注記に出す。
  */
 import type { JSX } from "react";
 import type { HandoffEntry } from "../../core/handoff-entry.js";

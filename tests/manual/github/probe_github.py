@@ -996,7 +996,7 @@ def main() -> int:
     closed = sh(TICKET_SH, parent_tree, "finish", "i0001")
     record("親の done", closed.returncode == 0, (closed.stdout + closed.stderr).strip()[:200])
     commit_all(parent_tree, "状態の移動")
-    ready = sh(REVIEW_SH, parent_tree, "ready")
+    ready = sh(REVIEW_SH, ROOT, "ready", "--parent", "i0001")
     say("ready:\n" + redact(ready.stdout + ready.stderr))
     record(
         "ready が通る（wip/ の追跡済みのファイルも消える）",

@@ -1051,7 +1051,7 @@ def _op_decide(req: dict, root: str) -> dict:
         }
 
     - `preview`: 手元の `--reviewed N --accept-unresolved --preview --json` と同じ形（ボードの
-      `DecidePreview`）。`{version: 2, parent, phase, mr: {number, url}, can_issue, threads: [{key,
+      `DecidePreview`）。`{version: 2, parent, phase, mr: {number, url}, threads: [{key,
       url, path, line, body, version, last_comment: {id, at, author}}], digest}`。`digest` は
       `v2.` で始まる不透明な文字列で、apply の `shown_digest` に返す。preview の `changes` は null
     - `host_plan`:

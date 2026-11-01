@@ -39,10 +39,10 @@ export interface LintJson {
 export interface LintFlow {
   readonly path: string;
   readonly data: unknown;
-  /** `SubagentStart` で担当に渡る手順の行（`flow_render.render`）。読めなければ null。古い実行ファイルなら無い */
-  readonly rendered?: readonly string[] | null;
-  /** フローで選べるサブエージェントとスキルの名前（`flow.catalog`）。古い実行ファイルなら無い */
-  readonly candidates?: LintFlowCandidates;
+  /** `SubagentStart` で担当に渡る手順の行（`flow_render.render`）。読めなければ null */
+  readonly rendered: readonly string[] | null;
+  /** フローで選べるサブエージェントとスキルの名前（`flow.catalog`） */
+  readonly candidates: LintFlowCandidates;
 }
 
 /** 候補 1 件。`source` は `builtin`（組み込み）か `project`（ワークスペースの `.claude/` の下） */
@@ -57,8 +57,8 @@ export interface LintFlowCandidates {
 }
 
 function flowOf(raw: Record<string, unknown>): LintFlow {
-  const rendered = Array.isArray(raw.rendered) ? raw.rendered.filter((l): l is string => typeof l === "string") : raw.rendered === null ? null : undefined;
-  const cands = isRecord(raw.candidates) ? raw.candidates : undefined;
+  const rendered = Array.isArray(raw.rendered) ? raw.rendered.filter((l): l is string => typeof l === "string") : null;
+  const cands = isRecord(raw.candidates) ? raw.candidates : {};
   const pick = (value: unknown): LintFlowCandidate[] =>
     list(value)
       .filter(isRecord)
@@ -67,8 +67,8 @@ function flowOf(raw: Record<string, unknown>): LintFlow {
   return {
     path: str(raw.path),
     data: raw.data,
-    ...(rendered === undefined ? {} : { rendered }),
-    ...(cands === undefined ? {} : { candidates: { agents: pick(cands.agents), skills: pick(cands.skills) } }),
+    rendered,
+    candidates: { agents: pick(cands.agents), skills: pick(cands.skills) },
   };
 }
 

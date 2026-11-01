@@ -39,8 +39,6 @@ export interface DecidePreview {
   readonly parent: string;
   readonly phase: number;
   readonly mr: { readonly number: number; readonly url: string };
-  /** issue に回せるか。常に true（JSON の欄は互換のために残す。選ぶ・選ばないの判定には使わない） */
-  readonly can_issue: boolean;
   readonly threads: readonly DecideThread[];
   /** 見せた指摘のダイジェスト（不透明な文字列）。選択を置くときに `--digest` で返す */
   readonly digest: string;
@@ -151,7 +149,6 @@ export function parseDecidePreview(text: string, expect?: DecideExpect): DecideP
       parent: raw.parent,
       phase: raw.phase,
       mr: { number: mr.number, url: str(mr.url) },
-      can_issue: raw.can_issue === true,
       threads,
       digest: raw.digest,
     },
