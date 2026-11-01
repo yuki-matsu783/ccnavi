@@ -4,7 +4,7 @@
 
 - 見出しの判定（`前提・背景`・`想定結果`と別名。本文中の語や別の語は当たらない）
 - `AskUserQuestion` は、直前の発言に 2 つの節が無ければ止まり、揃えば通る
-- 発言は、最後のユーザの行（プロンプトかツールの結果）より後ろだけを見る。サイドチェーンは見ない
+- 発言は、最後のユーザの発言より後ろだけを見る。ツールの結果の行は区切りにしない。サイドチェーンは見ない
 - ccnavi が確認に出す呼び出し（ターン分離の関門の確認・ルールの `ask`）も、節が無ければ確認でなく止まる
 - 会話記録に発言が遅れて書かれても、待てば通る
 - 記録が読めない・パスが無い、非対話、サブエージェントの呼び出しは検査しない
@@ -44,7 +44,17 @@ def tool_result():
 
 class HeadingTest(unittest.TestCase):
     def test_見出しの書き方は何通りかに当たる(self):
-        for text in ("## 背景", "**背景**", "【前提・背景】", "前提:", "- 背景：理由", "  背景"):
+        for text in (
+            "## 背景",
+            "**背景**",
+            "【前提・背景】",
+            "前提:",
+            "- 背景：理由",
+            "  背景",
+            "### 1. 前提・背景",
+            "　背景",
+            "## 背景\r",
+        ):
             with self.subTest(text=text):
                 self.assertNotIn("前提・背景", askcontext.absent_sections(text + "\n想定結果:"))
 
@@ -143,10 +153,22 @@ class AskUserQuestionTest(AskContextHookTest):
 
         self.assertFalse(self.stopped(self.hook()))
 
-    def test_ツールの結果より前の発言は数えない(self):
+    def test_見出しを書いたあとに別のツールを呼んでも_同じ発言の中なら数える(self):
         self.write(prompt(), assistant(BOTH), tool_result(), assistant("消してよいですか？"))
 
+        self.assertFalse(self.stopped(self.hook()))
+
+    def test_ツールの結果をはさんでも_ユーザの発言より前の発言は数えない(self):
+        self.write(
+            assistant(BOTH), prompt("どうぞ"), tool_result(), assistant("消してよいですか？")
+        )
+
         self.assertTrue(self.stopped(self.hook()))
+
+    def test_発言の中に_U_2028_があっても行を割らない(self):
+        self.write(prompt(), assistant(BOTH.replace("消す", "消す\u2028")))
+
+        self.assertFalse(self.stopped(self.hook()))
 
     def test_ユーザの発言より前の発言は数えない(self):
         self.write(assistant(BOTH), prompt("どうぞ"))
@@ -238,6 +260,14 @@ class GateConfirmTest(AskContextHookTest):
         self.assertTrue(self.stopped(done))
         self.assertNotIn('"permissionDecision": "ask"', done.stdout)
 
+    def test_dry_run_でも関門の確認は止めたまま(self):
+        self.write(prompt(), assistant("取り込みます"))
+
+        done = self.hook(tool="Bash", tool_input={"command": DONE}, mode="dry-run")
+
+        self.assertTrue(self.stopped(done))
+        self.assertIn("builtin:turn-gate:integrate-user-turn", done.stdout)
+
     def test_節が揃えば確認に出る(self):
         self.write(prompt(), assistant(BOTH))
 
@@ -265,6 +295,13 @@ class RuleAskTest(AskContextHookTest):
 
         self.assertTrue(self.stopped(done))
         self.assertNotIn('"permissionDecision": "ask"', done.stdout)
+        # 確認の本文と、確認を要求したルールの名前は残る。
+        self.assertIn("direct-worktree-confirm", done.stdout)
+        with open(os.path.join(self.repo, "logs", "decisions.jsonl"), encoding="utf-8") as f:
+            record = [json.loads(line) for line in f if line.strip()][-1]
+        self.assertEqual(record["code"], askcontext.CODE)
+        self.assertIn(askcontext.RULE_ID, record["rules"])
+        self.assertIn("direct-worktree-confirm", " ".join(record["rules"]))
 
     def test_節が揃えば確認に出る(self):
         self.write(prompt(), assistant(BOTH))

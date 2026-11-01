@@ -179,18 +179,13 @@ def decide_before(
     if payload.tool_name in toolnames.ASK_USER_TOOLS:
         text = ask_context()
         if text:
-            record.code, record.rules = askcontext.CODE, [askcontext.RULE_ID]
             return refuse(
                 stdout,
                 mode,
                 record,
                 rules.DENY,
                 ([guard] if guard else [])
-                + [
-                    reasons.builtin_refusal(
-                        askcontext.CODE, askcontext.RULE_ID, ask_subject(payload), text
-                    )
-                ],
+                + [ask_context_refusal(record, ask_subject(payload), text)],
                 conf=conf,
                 root=root,
                 kind=GENERAL,
@@ -1138,6 +1133,12 @@ def ask_context_check(root: str, payload: hookio.Input, deadline: float) -> Call
     return lambda: askcontext.stop_text(root, payload.transcript_path, deadline)
 
 
+def ask_context_refusal(record: audit.Record, subject: str, text: str) -> str:
+    """直前の発言の検査で止めた文。記録の `code` を替え、`rules` には元のルールを残して足す。"""
+    record.code, record.rules = askcontext.CODE, [*record.rules, askcontext.RULE_ID]
+    return reasons.builtin_refusal(askcontext.CODE, askcontext.RULE_ID, subject, text)
+
+
 def ask_subject(payload: hookio.Input) -> str:
     """`AskUserQuestion` の文面に出す主題。最初の質問の文。"""
     questions = payload.tool_input.get("questions")
@@ -1239,7 +1240,8 @@ def refuse(
     """拒否か確認を返す。dry-run なら返す代わりに、返していたはずだと言う。
 
     ask_context は、確認を返す前に直前の発言を調べる関数（`ask_context_check`）。止める文を
-    返したら、確認を出さずに拒否（`askcontext.CODE`）に替える。
+    返したら、確認を出さずに拒否（`askcontext.CODE`）に替える。確認の本文と、止める強さ（`kind`）は
+    そのまま残す。
 
     kind は止めている箇所の分類（`modes.GENERAL`・`GATE`・`AUX`）。dry-run で報告だけにするのは
     GENERAL だけで、チケット制御の関門（GATE）と補助の保護（AUX）は dry-run でも止める。
@@ -1264,10 +1266,11 @@ def refuse(
     if verdict == rules.ASK and ask_context is not None:
         stop = ask_context()
         if stop:
-            record.code, record.rules = askcontext.CODE, [askcontext.RULE_ID]
+            # 確認の本文は残す。書く内容（なぜ確認が要るか）の手がかりになる。止める強さ（kind）は
+            # 確認のときのまま。ターン分離の関門の確認は、dry-run でも止める。
             shown = audit._redacted(record.subject)
-            parts = [reasons.builtin_refusal(askcontext.CODE, askcontext.RULE_ID, shown, stop)]
-            verdict, kind, context, updated_input = rules.DENY, GENERAL, "", None
+            parts = [ask_context_refusal(record, shown, stop), *parts]
+            verdict = rules.DENY
     # 空行で区切るのは、1 件ずつが閉じた文であることを見た目でも保つため。
     reason = "\n\n".join(parts)
     decision = audit.DENY if verdict == rules.DENY else audit.ASK

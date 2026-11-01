@@ -2,12 +2,15 @@
 
 確認の画面に出るのはコマンドや質問だけで、なぜその操作が要るのか、許可と拒否で何が起きるのかは
 出ない。ユーザが判断できるように、確認の前の発言で言わせる。対象は、ccnavi が確認に出す呼び出し
-（ルールの `ask`・ターン分離の関門の確認）と `AskUserQuestion`。
+（ルールの `ask`・チケットの `ask`・ターン分離の関門の確認・どのルールも言及しない呼び出しの確認。
+`judge.refuse` が返す確認すべて）と `AskUserQuestion`。`ExitPlanMode` と、Claude Code 自身の権限の確認
+（ccnavi が返さないもの）は対象外。
 
-- 見るのは会話記録（`transcript_path`）の末尾。最後のユーザの行（プロンプトかツールの結果）より
-  後ろの、サイドチェーンでないアシスタントの text を集め、2 つの節の見出しがあるかを調べる
-- PreToolUse の時点では、直前の発言がまだ書き込まれていないことがある（実測は 3 回中 2 回、
-  0.5 秒以内に現れた）。節が揃うまで、期限の手前まで 0.1 秒ごとに読み直す
+- 見るのは会話記録（`transcript_path`）の末尾。最後のユーザの発言（ツールの結果ではない行）より
+  後ろの、サイドチェーンでないアシスタントの text を集め、2 つの節の見出しがあるかを調べる。
+  見出しを書いたあとに別のツールを呼んでも、同じ発言の中なら数える
+- PreToolUse の時点では、直前の発言がまだ書き込まれていないことがある（`claude -p` の実測では
+  3 回中 2 回が未書き込みで、0.5 秒以内に現れた）。節が揃うまで、期限の手前まで 0.1 秒ごとに読み直す
 - 記録が読めない・パスが無いときは検査しない。促しの検査で、保護ではない
 - 見出しの語（`SECTIONS` の別名を含む）があるかだけを見る。中身が適切かどうかは機械では判断しない
 """
@@ -24,7 +27,6 @@ from ..policy import texts
 
 CODE = "DENY_ASK_NEEDS_CONTEXT"
 RULE_ID = "builtin:ask-context"
-MESSAGE_ID = "DENY_ASK_NEEDS_CONTEXT"
 
 # 直前の発言に要る節。キーは文面（deny.yml）が言う名前で、値はその節として数える見出しの言い方。
 SECTIONS = {
@@ -40,10 +42,13 @@ _MARGIN_SECONDS = 0.5
 
 
 def _heading(words: tuple[str, ...]) -> re.Pattern[str]:
-    """行頭の見出し。`## 背景`・`**背景**`・`【背景】`・`背景:` が当たり、`背景を説明すると…` は外れる。"""
+    """行頭の見出し。`## 背景`・`### 1. 背景`・`**背景**`・`【背景】`・`背景:` が当たり、`背景を説明すると…` は外れる。"""
     alternatives = "|".join(re.escape(word) for word in sorted(words, key=len, reverse=True))
     return re.compile(
-        r"^[ \t#>*\-・【\[]*(?:" + alternatives + r")[*】\]]*(?:[:：]|[ \t]*$)", re.MULTILINE
+        r"^[ \t　#>*\-・【\[]*(?:\d+[.)．][ \t　]*)?(?:"
+        + alternatives
+        + r")[*】\]]*(?:[:：]|[ \t\r　]*$)",
+        re.MULTILINE,
     )
 
 
@@ -57,16 +62,26 @@ def _tail_lines(path: str) -> list[str]:
         start = max(0, size - _TAIL_BYTES)
         handle.seek(start)
         data = handle.read()
-    lines = data.decode("utf-8", errors="replace").splitlines()
+    # 行の区切りは改行だけ。`splitlines` は U+2028 などでも割り、JSON の行を壊す。
+    lines = data.decode("utf-8", errors="replace").split("\n")
     # 途中から読んだときの先頭の行は切れているので捨てる。
     return lines[1:] if start else lines
 
 
-def step_text(path: str) -> str:
-    """最後のユーザの行より後ろの、アシスタントの text を連ねたもの。
+def _is_tool_result(row: dict) -> bool:
+    message = row.get("message")
+    content = message.get("content") if isinstance(message, dict) else None
+    return isinstance(content, list) and any(
+        isinstance(block, dict) and block.get("type") == "tool_result" for block in content
+    )
 
-    ユーザの行は、ユーザのプロンプトとツールの結果の両方。ツールを呼ぶたびに区切るので、
-    確認ごとにその直前の発言を見る。サイドチェーン（サブエージェント）とメタの行は読み飛ばす。
+
+def step_text(path: str) -> str:
+    """最後のユーザの発言より後ろの、アシスタントの text を連ねたもの。
+
+    区切るのはユーザの発言（プロンプト）だけ。ツールの結果の行は区切らない。見出しを書いた発言の
+    あとに別のツールを呼んで確認を出しても、同じ発言の中の見出しを数えるため。
+    サイドチェーン（サブエージェント）とメタの行は読み飛ばす。
     """
     found: list[str] = []
     for line in reversed(_tail_lines(path)):
@@ -78,6 +93,8 @@ def step_text(path: str) -> str:
             continue
         kind = row.get("type")
         if kind == "user":
+            if _is_tool_result(row):
+                continue
             break
         if kind != "assistant":
             continue
@@ -122,4 +139,4 @@ def stop_text(root: str, path: str, deadline: float) -> str:
     absent = missing(path, wait_until(deadline))
     if not absent:
         return ""
-    return texts.say(root, MESSAGE_ID, {"missing": "・".join(f"「{name}」" for name in absent)})
+    return texts.say(root, CODE, {"missing": "・".join(f"「{name}」" for name in absent)})
