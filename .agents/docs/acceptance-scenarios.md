@@ -412,9 +412,9 @@ hook の応答の文面（拒否・確認・案内）を、重複を除いて 1 
 
 - **拾われる範囲が違う。** 全量は `test_*.py` を持つグループだけを拾う。シナリオの YAML と `runner.py` は拾われない。
   `tests/scenarios/` で拾われるのは `test_runner.py`（実行器の判定部分の単体テスト）だけで、`claude` を呼ばない
-- **実行器が門を持つ。** `claude` を呼ぶ道（`run_step`・`cmd_run`）は、`python -m tests.scenarios.runner` で起動されたときだけ開く。
+- **実行器がゲートを持つ。** `claude` を呼ぶ道（`run_step`・`cmd_run`）は、`python -m tests.scenarios.runner` で起動されたときだけ開く。
   ほかのモジュールが import して呼ぶと `RuntimeError` で止まる。後で誰かが、実行器を呼ぶテストを足しても動かない
-- **テストが見張る。** `test_runner.py` が、門が閉じていること、全量が `tests.scenarios.test_runner` しか拾わないこと、
+- **テストが見張る。** `test_runner.py` が、ゲートが閉じていること、全量が `tests.scenarios.test_runner` しか拾わないこと、
   `tests/scenarios/` に `test_runner.py` 以外の `test_*.py` が無いことを確かめる。シナリオを回す道を `test_` のモジュールに置かない
 
 ## 人間の操作
