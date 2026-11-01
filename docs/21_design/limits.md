@@ -90,7 +90,7 @@ ccnavi が Claude Code から読む、または頼っている挙動のうち、
 |---|---|
 | 環境変数 `CLAUDE_CODE_SESSION_ATTENDED` が `0` なら付き添いなし | セッション開始の作業の決まりの条件 `non_interactive`（REQ-SES-07・REQ-SES-08） |
 | 環境変数 `CLAUDE_CODE_SESSION_ATTENDED` が `0` なら、確認（ask）に答えられない（自動で拒否になる） | ask の理由に、確認が要ることと次の行動を足します（`reasons.ask_hint`）。`ccnavi-worktree.sh` の引き取りの案内にも足します（`unattended_line`） |
-| 会話記録（`transcript_path`）への直前のアシスタントの発言は、PreToolUse の hook が呼ばれた時点で書き込み済みとは限らない。実測では 0.5 秒以内に書かれた | 確認の前の発言の検査（`hook.askcontext`）。節が揃うまで短く読み直す（付録 C） |
+| 会話記録（`transcript_path`）への直前のアシスタントの発言は、PreToolUse の hook が呼ばれた時点で書き込み済みとは限らない。非対話（`claude -p`）の実測では、0.5 秒以内に書かれた。対話のセッションは未計測 | 確認の前の発言の検査（`hook.askcontext`）。節が揃うまで短く読み直す（付録 C） |
 | 非対話（`claude -p`）は、バックグラウンドの Bash とバックグラウンドのサブエージェントの完了を、待ち上限（既定は連続 10 分の idle。`CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` で変えられ、0 で上限なし）の範囲で待つ。`CLAUDE_CODE_BG_TASKS_REPORT_RUNNING=0` の環境では、バックグラウンドのサブエージェントはターン終了で消える | 非対話のとき、サブエージェントをフォアグラウンドで起動して完了を待つ案内（消える環境でも安全な形）|
 
 - 判定は、`0` と確かめられたときだけ非対話とする。未設定・`1`・読めない値は対話として扱う
