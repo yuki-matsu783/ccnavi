@@ -26,7 +26,7 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 | sh の呼び方 | 実行ファイルの段 |
 |---|---|
 | `review-request --phase <N> --body-file <文>`（成功後、`--body-file` が workspace 直下の `scratchpad/` の中なら sh が消す。外のファイルは消さない。消せなければ警告のみで終了コードは変えない） | `review prepare --check`（ロック・取り込みの前に断る）→ ロックと取り込み → `review prepare` → sh が親ブランチの open のマージリクエストを探し（無ければ作らずに止める。元ブランチが HEAD と一致し、マージ先が統合先であることも確かめる）、依頼を投稿 → `review requested` |
-| `review-request --phase <N> --body-file <文> --check` | 読むだけ。ロックも取り込みもせず、`review-request` の前提（`review prepare`・MR の確認）を通して、投稿とマーカーの前で `確認: ok` を出して終わる |
+| `review-request --phase <N> --body-file <文> --check` | 読むだけ。ロックも取り込みもせず、`review-request` の前提（`review prepare`・MR の確認）を確かめ、投稿とマーカーの前に `確認: ok` を出して終わる |
 | `confirm --phase <N>` | `review confirm --check`（ロック・取り込みの前に断る）→ sh がスレッドとレビューを取ってくる → `review confirm` |
 | `decide <N> --preview` | 一覧とダイジェストを見るだけ（`--reviewed N --accept-unresolved --preview`）。書く側は `ccnavi-user-decide.sh <N>`（下の行） |
 | `ccnavi-user-decide.sh <N>` | ユーザが打つ。`ccnavi-review.sh` には無い。`--entry sh user reviewed N --check --accept-unresolved`（ロック・取り込みの前に断る）→ sh が取ってくる → `user reviewed N --accept-unresolved` → sh が投稿。途中で失敗した送信は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送る（操作記録は `logs/state/ops/`） |

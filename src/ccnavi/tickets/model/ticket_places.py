@@ -120,8 +120,8 @@ def is_handoff_place(rel: str) -> bool:
     `wip/handoffX/` や、`scratchpad` という名前のファイルは置き場ではない。
 
     `\\` は `/` に直さない。呼び手のパスは `tree.relative`（`os.sep` を `/` に直したもの）か
-    git が出したパスで、どちらも区切りは `/`。直すと Linux / macOS で
-    `wip\\handoff\\x.py` という名前のファイル 1 個が置き場に見えてしまう。
+    git が出したパスで、どちらも区切りは `/`。直すと Linux / macOS では
+    `wip\\handoff\\x.py` という名前の 1 ファイルが置き場の中と判定されてしまう。
     """
     return rel.casefold().startswith(HANDOFF + "/")
 
