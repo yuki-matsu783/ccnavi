@@ -67,7 +67,7 @@ keywords: [設計, 画面, approval-machine, 状態のバッジ, ユーザ待ち
 
 ## レビュー完了の流れ
 
-［レビュー完了］（バッジが「レビュー待ち」の子のカード）は、`approval-machine.ts`の`decide`に入る。`loadDecide`の効果が`ccnavi-review.sh decide <N> --preview`を読み、`parseDecidePreview`が**厳しく検証する**。頼んだ親・フェーズ・MRの番号（フェーズ行の依頼が持つもの。分かるとき）と照らし、不正な要素は破棄せずに全体をエラーにする。読み取れなければ「指摘を読み取れませんでした（理由）」で確定のボタンを出さない。正しく読めて0件なら「フェーズNに未解決の指摘はありません」と［レビュー済みにする］、1件以上なら対応方針の画面（`Decide.tsx`）。確定後の表示は実行ファイルの答え（`reviewed`・`pending_extra`・`followup`）に従い、続きの子が起きていないのに追加された指摘があれば、決め直しへ戻れる（`retry`）。
+［レビュー完了］（バッジが「レビュー待ち」の子のカード）は、`approval-machine.ts`の`decide`に入る。`loadDecide`の効果が`ccnavi-review.sh decide <N> --preview`を読み、`parseDecidePreview`が**厳しく検証する**。頼んだ親・フェーズ・MRの番号（フェーズの依頼が持つもの。分かるとき）と照らし、不正な要素は破棄せずに全体をエラーにする。読み取れなければ「指摘を読み取れませんでした（理由）」で確定のボタンを出さない。正しく読めて0件なら「フェーズNに未解決の指摘はありません」と［レビュー済みにする］、1件以上なら対応方針の画面（`Decide.tsx`）。確定後の表示は実行ファイルの答え（`reviewed`・`pending_extra`・`followup`）に従い、続きの子が起きていないのに追加された指摘があれば、決め直しへ戻れる（`retry`）。
 
 副ボタン「エージェントに相談するプロンプトをコピー」は、遷移が`copyConsult`の効果を返し、`board-panel.ts`がクリップボードに入れて結果（`consultCopied`）を戻す。オーバーレイは閉じず、選びかけの対応方針はReactの状態（ダイジェストが同じ間は保たれる）に残る。確定中（`deciding`）と0件の画面では組まない。プロンプトは`commands.ts`の`consultPrompt`が組み、許すのは`decide <N> --preview`を単体で実行することだけ。
 
