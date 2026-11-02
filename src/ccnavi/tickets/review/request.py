@@ -67,8 +67,7 @@ TIMEOUT_SECONDS = 15.0
 
 # state の置き場に書く、投稿待ちの本文の名前。sh がこれを投稿する。
 REQUEST_FILE = "review-request-{parent}-{phase}.md"
-# まだマージリクエストが無いときに、sh がこれで作る。
-# 依頼の本文とマージリクエストの下書きの末尾に必ず書く一文。下書きの置き場
+# 依頼の本文の末尾に必ず書く一文。下書きの置き場
 # （ticket_places.HANDOFF）の変更を、レビュアーが読む対象に数えないため。
 HANDOFF_NOTE = (
     f"{ticket_places.HANDOFF}/ 配下はユーザに渡すコピーで、レビューの対象外。integrate で消える。"

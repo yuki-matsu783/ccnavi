@@ -21,11 +21,10 @@
 # だけで、マージリクエストの中身はここが取ってきて JSON で渡す（--result）。ホストを読む関数と write-and-push の支度は
 # ccnavi-common-review.sh にあり、ユーザ専用のレビューの sh と共有する。
 #
-#   review-request: `ccnavi review prepare` が前提を確かめ、依頼の本文とマージリクエストの
-#            下書きを書き出す → ここが（無ければ）マージリクエストを下書きで作り、依頼を投稿する
-#            → `ccnavi review requested` がマーカーを置く
-#            ユーザはレビューをマージリクエストで行うので、マージリクエストが無いことで止めない。タイトルから Draft を
-#            外してマージするのはユーザに任せる。
+#   review-request: `ccnavi review prepare` が前提を確かめ、依頼の本文を書き出す → ここが依頼を
+#            マージリクエストに投稿する → `ccnavi review requested` がマーカーを置く
+#            マージリクエストは作らない（ccnavi-start.sh が作る）。親のブランチに open のマージリクエストが無ければ、
+#            依頼を作らずに止める。タイトルから Draft を外してマージするのはユーザに任せる。
 #   confirm: ここがスレッドとレビューを取ってくる → `ccnavi review confirm` が判定してマーカーを置き、
 #            レビュー待ち（wip/proposals/review/）の子を .ccnavi/approved/done/ へ動かす。
 #            トークンの持ち主（GitHub は login、GitLab は username）を引けたら --actor で渡し、マーカーに残す。
@@ -73,7 +72,7 @@ usage() {
 sh .ccnavi/scripts/ccnavi-review.sh <review-request|confirm|comment|decide|ready|fetch|origin|merged|mr-state> [--phase <N>] [--body-file <path>]
 
   review-request --phase <N> --body-file <依頼文>
-                                                  前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く。--body-file が
+                                                  前提を確かめ、依頼をマージリクエストに投稿してマーカーを置く（マージリクエストが無ければ止まる）。--body-file が
                                                   ワークスペースルート直下の scratchpad/ の中のファイルなら、成功のあとに
                                                   review-request 自身が消す（待ち中は rm を打てないため。それ以外の場所のファイルは
                                                   消さない。消せなければ警告だけで、終了コードは変えない）
