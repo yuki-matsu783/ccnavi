@@ -394,7 +394,7 @@ class GuardScriptTest(_Workspace):
         self.assertTrue(
             result.stderr.startswith(
                 "ccnavi-review: https://u:SECRET@h は指定できません。"
-                "指定できるのは request / confirm / comment / decide / ready / "
+                "指定できるのは review-request / confirm / comment / decide / ready / "
                 "fetch / origin / merged"
             ),
             result.stderr,
