@@ -106,7 +106,7 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
   親と子のチケットの承認・状態の操作・実行前の判定も止まる
 - 子の成果は、メインが打つ子の`finish`が親のブランチへ合流してpushする（[worktree-merge.md](worktree-merge.md)）。
   サブエージェントは子のワークツリーで実装して手元でコミットするだけで、親のワークツリーにはmerge・commit・書き込みをしない（止められる）
-- 親のワークツリーへのWrite / Edit / NotebookEditは、メインセッションも置き場（`wip/proposals/`・`wip/handoff/`・`wip/eli5/`・承認済みの置き場）の外では止まる。
+- 親のワークツリーへのWrite / Edit / NotebookEditは、メインセッションも置き場（`wip/proposals/`・`wip/handoff/`・承認済みの置き場）の外では止まる。
   親の範囲の中でも同じで、範囲を広げても通らない。親自身の作業（`plan: [quick-work]` など）も、子チケットを起こして子のワークツリーで行う。
   子のワークツリーでのコミットと、衝突を解くために子のワークツリーで親のブランチをmergeすることはできる
 - 承認の前に親のワークツリーへ入った変更は、承認の後に戻すのも子の`finish`も止まる。片付け方は[ticket-work.md](ticket-work.md)の「正本と親のワークツリー」

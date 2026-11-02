@@ -78,7 +78,7 @@ messages:
     kind: next
     values: [phase]
     next: |-
-      上の理由を直して、'{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文> --eli5 <HTML>' を打ち直す
+      上の理由を直して、'{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文>' を打ち直す
 
   # confirm が、取り込みの前に分かる前提で断ったあと（理由の行のあとに 1 行）。
   NEXT_CONFIRM_REFUSED:

@@ -174,7 +174,7 @@ NO_TEMPLATES_FILES = [
         f".ccnavi/scripts/{name}"
         for name in (
             "ccnavi-branches.sh",
-                    "ccnavi-clean.sh",
+            "ccnavi-clean.sh",
             "ccnavi-common-host.sh",
             "ccnavi-common-lock.sh",
             "ccnavi-common-log.sh",

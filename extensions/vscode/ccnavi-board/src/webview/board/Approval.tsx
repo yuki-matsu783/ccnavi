@@ -31,7 +31,7 @@ export function Approval({ overlay, unsaved = [] }: { readonly overlay: Approval
     const first = box.current?.querySelector<HTMLButtonElement>('button[data-action="prompt-copy"]')
       ?? box.current?.querySelector<HTMLButtonElement>('button[data-action="approve-cancel"]');
     if (first && !first.disabled) {
-      first.focus();
+      first.focus({ preventScroll: true });
     }
   }, [overlay.kind]);
   // Escでやめる。承認している最中と、行き先を置いている最中は閉じない

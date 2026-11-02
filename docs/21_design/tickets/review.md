@@ -25,8 +25,8 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 
 | sh の呼び方 | 実行ファイルの段 |
 |---|---|
-| `review-request --phase <N> --body-file <文> --eli5 <HTML>`（成功後、`--body-file` が workspace 直下の `scratchpad/` の中なら sh が消す。外のファイルは消さない。消せなければ警告のみで終了コードは変えない） | sh が `--eli5` を確かめる → `review prepare --check`（ロック・取り込みの前に断る）→ ロックと取り込み → `review prepare` → sh が親ブランチの open のマージリクエストを探し（無ければ作らずに止める。元ブランチが HEAD と一致し、マージ先が統合先であることも確かめる）、依頼を投稿 → `review requested` |
-| `review-request --phase <N> --eli5 <HTML> --check` | 読むだけ。ロックも取り込みもせず、`review-request` の前提（ELI5・`review prepare`・MR の確認）を通して、投稿とマーカーの前で `確認: ok` を出して終わる |
+| `review-request --phase <N> --body-file <文>`（成功後、`--body-file` が workspace 直下の `scratchpad/` の中なら sh が消す。外のファイルは消さない。消せなければ警告のみで終了コードは変えない） | `review prepare --check`（ロック・取り込みの前に断る）→ ロックと取り込み → `review prepare` → sh が親ブランチの open のマージリクエストを探し（無ければ作らずに止める。元ブランチが HEAD と一致し、マージ先が統合先であることも確かめる）、依頼を投稿 → `review requested` |
+| `review-request --phase <N> --body-file <文> --check` | 読むだけ。ロックも取り込みもせず、`review-request` の前提（`review prepare`・MR の確認）を確かめ、投稿とマーカーの前に `確認: ok` を出して終わる |
 | `confirm --phase <N>` | `review confirm --check`（ロック・取り込みの前に断る）→ sh がスレッドとレビューを取ってくる → `review confirm` |
 | `decide <N> --preview` | 一覧とダイジェストを見るだけ（`--reviewed N --accept-unresolved --preview`）。書く側は `ccnavi-user-decide.sh <N>`（下の行） |
 | `ccnavi-user-decide.sh <N>` | ユーザが打つ。`ccnavi-review.sh` には無い。`--entry sh user reviewed N --check --accept-unresolved`（ロック・取り込みの前に断る）→ sh が取ってくる → `user reviewed N --accept-unresolved` → sh が投稿。途中で失敗した送信は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送る（操作記録は `logs/state/ops/`） |
@@ -37,30 +37,15 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 
 **`review-request` の段**。次の順に進む。
 
-1. sh が `--eli5` を確かめる。確かめるのはロックを取る前。`--eli5` が無い、値が無い、
-   拡張子が `.html` / `.htm` でない、のどれかなら終了コード 2 で止まる。次にヒットするものがあれば、ヒットしたものを
-   全部挙げて終了コード 1 で止まる。
-   - ファイルが無い、または中身が空白だけ
-   - 打った場所のワークツリーの外にある
-   - ツリーのルートからの相対パスが `wip/eli5/` で始まらない
-   - 名前に英数字と `. _ / -` 以外の字がある
-   - HEAD に無い、または HEAD でのモードが 100644 でない（シンボリックリンク・実行ビット付き）
-   - 手元の中身が HEAD と違う
-
-   `--eli5` は実行ファイルには渡さない。
-2. `ccnavi --check review prepare` が前提（フェーズの終了・合流・未コミット・push・依頼済み・依頼文）を、ロックも取り込みもせずに確かめる。通らなければここで断る。通れば sh がロックを取り、取り込む。
-3. `review prepare` が、取り込みのあとの状態で前提をもう一度確かめ、依頼の本文とマージリクエストの下書きを state の置き場に書き出す。
-   どちらの末尾にも固定の一文「`wip/handoff/` 配下はユーザに渡すコピーで、レビューの対象外。integrate で消える。」を足す
+1. `ccnavi --check review prepare` が前提（フェーズの終了・合流・未コミット・push・依頼済み・依頼文）を、ロックも取り込みもせずに確かめる。通らなければここで断る。通れば sh がロックを取り、取り込む。
+2. `review prepare` が、取り込みのあとの状態で前提をもう一度確かめ、依頼の本文を state の置き場に書き出す。
+   本文の末尾に固定の一文「`wip/handoff/` 配下はユーザに渡すコピーで、レビューの対象外。integrate で消える。」を足す
    （`review.HANDOFF_NOTE`）。レビュアーは `wip/handoff/` の下の変更を読まなくてよい。
-4. sh が依頼を投稿する。マージリクエストが無ければ、先に下書きで作る。投稿する本文の末尾には
-   「ELI5 は差分の `<相対パス>`。ルートで `crit review <相対パス>` を開いてソースの行に指摘を付け、`crit push <番号>` で送る」
-   という 1 行を足す。
-5. `review requested` が HEAD が動いていないことを確かめ、`{head, mr, url, host, since}` をマーカーに置く。続けて、親の
+3. sh が依頼を投稿する。親のブランチに open のマージリクエストが無ければ、作らずに止める（マージリクエストは `ccnavi-start.sh` が作る）。
+4. `review requested` が HEAD が動いていないことを確かめ、`{head, mr, url, host, since}` をマーカーに置く。続けて、親の
    承認済みチケットの `mr:` が空なら、この MR の番号を書き足す（`approval.ops.note_mr`。書いたパスは write-and-push のコミットに入る）。
    同じ番号が既にあれば何もせず、違う値があれば上書きせず「`mr:` に別の値が既にある」と警告する（依頼は通る）。
    実行後チェックはこの書き足しだけを ccnavi の書き込みと見なす（post-check.md の `mr:` の例外）。
-6. 終わったら、sh はユーザが打つ `cd '<ツリーのルート>'`・`crit review <相対パス>`・`crit push <番号>` を標準出力に出す。
-   ツリーのルートはいつも `'…'` で包み、中の `'` は `'\''` に置き換える。
 
 `confirm` の段（依頼のあとにユーザの発言をはさむまでの拒否は[事前判定の 6.7](../pre-check.md)）。sh は、ロック・取り込みの前に `review confirm --check` で断れる条件を通してから、スレッドとレビューを取ってきて、`review confirm` に渡す。`review confirm` は判定し、
 通れば `reviewed` のマーカーを置いて、そのフェーズと引き受けた延期の分の `review/` の子を `done/` へ動かす。
@@ -128,8 +113,7 @@ sh はスレッドごとに最後のコメントの id・時刻・作成者も�
 sh がトークンの持ち主を引けたら `--actor=<名前> --via=<terminal|board>` で渡し、`reviewed` のマーカーに
 `actor` と `via` を残す。引けないときは `--actor` を渡さず、マーカーに `actor` を残さない。`--via` は無条件に渡す。実行ファイルは、`--yes` の無い呼び方では `--via board` を受け付けない。
 
-**`comment` の段**。crit の指摘は、ユーザが `crit push` で送る
-（下の「ELI5 と crit」）。
+**`comment` の段**。ユーザの指摘は、マージリクエストの差分に付くスレッドで、ccnavi は関わらない。
 
 **`ready` の段**。親が閉じたあとに打つ。`review ready` は次の 3 つを確かめる。親を閉じられる条件を満たしていること。
 親の承認済みチケットが `done/` にあること（閉じる前に Draft を外してマージされると、親が `done/` に無いまま親のブランチが消えるため）。`wip/` に未追跡のファイルが無く、未コミットの変更が無く、
@@ -169,42 +153,18 @@ write-and-push の書いたパスの一覧の検査は、`review ready` が消�
 ワークツリーに追跡されている未コミットの変更が無い、親ブランチの HEAD が push 済み、
 まだ依頼していない（依頼の後に親の HEAD が動き、まだレビュー済みでなければ出し直せる。依頼文を
 投稿し直し、マーカーの `head` と `since` を今のものに書き換える。レビュー済みのフェーズは、依頼の記録が
-無くても（`close-early` が置いた形）拒む）。1 つでも欠けたら全件を列挙して拒み、何もしない。その前に sh が ELI5 の HTML を確かめる（下の「ELI5 と crit」）。マージリクエストのタイトル・本文・
+無くても（`close-early` が置いた形）拒む）。1 つでも欠けたら全件を列挙して拒み、何もしない。マージリクエストのタイトル・本文・
 `Closes #<課題>` は親チケットの `title` / `rationale` / 本文 / `issue` からコピーする。
 
-**ELI5 と crit**。`review-request` には、変更をやさしく説明した HTML を `--eli5` で必ず添える。HTML は
-マージリクエストの差分に載せ、ユーザは手元のターミナルで外部の CLI `crit` で開いて、指摘を `crit push` でマージリクエストの行のスレッドとして送る。
-手順は次のとおり。
-
-1. エージェントは依頼の前に ELI5 の HTML を書き、親のワークツリーの `wip/eli5/` の下（既定の名前は `wip/eli5/phase-<N>.html`。
-   名前は英数字と `. _ / -` だけ。依頼文とユーザが打つ行にそのまま入るため）に普通のファイル（シンボリックリンクや実行ビットは付けない）として置いて
-   コミットし、push する。相対パスは `--body-file` と同じく打った場所から。`wip/eli5/` の下はチケットの範囲を適用しないので
-   （9.5）、親チケットの範囲に書き足さなくてよい
-2. 中身の目安: 変更の目的・何が変わるか・リスクを専門用語なしで書く。1 枚で完結させ、外部の読み込み（CSS・JS・画像・フォントの URL）を
-   使わない。スタイルは `<style>` に入れる
-3. `review-request --phase <N> --body-file <依頼文> --eli5 wip/eli5/phase-<N>.html` を打つ。投稿が済むと
-   `ELI5 を見る: ユーザがターミナルで cd <ルート> してから crit review <相対パス> を打ち、… crit push <番号> で …` が出るので、その行をユーザに渡して
-   ターンを終える。sh は crit を起動しない（crit は閉じるまで戻らない）
-4. ユーザはツリーのルート（か、同じブランチのチェックアウトのルート）で `crit review <相対パス>` を開き、HTML のソースの行に指摘を付けて、
-   `crit push <番号>` で送る。`crit <相対パス>` だけだと描画のプレビューになり、そこで付けたピンは `crit push` で送られない（crit v0.21.0 で確認）。crit push は GitHub では `gh`、GitLab では `glab` を使い、マージリクエストの差分にあるファイルの行にだけ送れる。
-   手元のチェックアウトがマージリクエストの先頭より古いと、crit が送る行の番号が
-   ずれる。`crit review` を開く前に、手元をマージリクエストの先頭に合わせる
-5. 送られた指摘はユーザのスレッドで、本文が目印で始まらないので、`confirm` は未解決として数えて止め、`decide` は 1 件ずつ行き先を選ばせる
-   （`review_host._unresolved`。依頼者と同じアカウントが送っても数える）。`crit push --event request-changes` は変更要求のレビューに
-   なり、`decide` でも通せない
-6. 依頼の後に `wip/eli5/` の下だけを変えたコミットは「ユーザが見るものが動いた」に数えない。直したら push するだけで、
-   `confirm` は止まらず、`review-request` の打ち直しも要らない（打つと「依頼済み」で止まる）。**代わりに、直した ELI5 をユーザが見直す保証は無い。**
-   直す前の行に付いたスレッドは未解決のまま残るので、ユーザが resolve する（か `decide` で決める）。ELI5 とほかのファイルを一緒に変えた
-   コミットは動いたと数え、打ち直しを求める
-7. `wip/` は `ready` の前に丸ごと消してコミットする（`ready` の前提）。ELI5 もここで消え、squash した成果物には残らない。`ready` の前提は大文字小文字を区別せず（`WIP/` も）、名前が `wip\` で始まる 1 ファイルも残りとして止める
+**ユーザの指摘**。ユーザはマージリクエストの差分にスレッドで指摘を付ける。本文が目印で始まらないので、`confirm` は未解決として数えて止め、`decide` は 1 件ずつ行き先を選ばせる
+（`review_host._unresolved`。依頼者と同じアカウントが付けても数える）。変更要求のレビューは `decide` でも通せない。
+`wip/` は `ready` の前に丸ごと消してコミットする（`ready` の前提）。`ready` の前提は大文字小文字を区別せず（`WIP/` も）、名前が `wip\` で始まる 1 ファイルも残りとして止める。
 
 **`confirm`** は `requested` が無ければ拒む。依頼のマーカーにあるホストとマージリクエストの番号が承認済みチケットと
 一致しなければ拒む。依頼時の HEAD と今の HEAD が同じで push 済みであることを求める。ただし
 ccnavi 自身の置き場（`.ccnavi/approved/` と `wip/proposals/`）だけを変えたコミットは、
 動いたとも未 push とも数えない（マーカーやチケットの移動で依頼が止まらないように）。出し直し（`review-request`）の
-「依頼済み」の判定と、`review-request` の push の前提（`_unmet`）も同じ基準で見る。ELI5 の置き場（`wip/eli5/`）だけを変えた
-コミットも、動いたとは数えない（`review._unseen_by_review`。Chrome のレビュー済みも同じ `moved_since` を通る）。
-ただし push は求める（未 push の ELI5 はマージリクエストの差分に無く、crit push で送れない）。`ready` の前提
+「依頼済み」の判定と、`review-request` の push の前提（`_unmet`）も同じ基準で見る。Chrome のレビュー済みも同じ `moved_since` を通る。`ready` の前提
 （`_merge_problems`）だけは、置き場も含めて完全に push させる。
 マーカーの `head` は、`^[0-9a-f]{7,64}$` でなければ差分の相手にせず、記録が無いマーカーと同じく
 「動いた」として扱い、出し直させる。数えるのは

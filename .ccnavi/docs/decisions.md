@@ -81,7 +81,7 @@ keywords: [提案, 相談, メリット, デメリット, サブエージェン�
   居場所は `cd` と `env -C`・`sudo -D` の行き先で追い、`GIT_DIR`・`GIT_WORK_TREE` などの git の置き場の変数は置けない。
   書き込みは Write / Edit と、Bash のリダイレクト・`tee`・`sed -i`・`cp`/`mv` の行き先を見る。`python -c` などのコードは読み切れないので、
   親のワークツリーのパスと書き込みを疑う語が並べば止める（スクリプトのファイルを実行する形や、変数で組んだ行き先は見ない）。
-  下書き・提案・ELI5 の置き場（`wip/proposals/`・`wip/handoff/`・`wip/eli5/`）は書ける
+  下書き・提案の置き場（`wip/proposals/`・`wip/handoff/`）は書ける
 - 親を閉じたあとの片付け（子と親のワークツリー、子と親の手元のブランチ、片付けの記録）は ccnavi が行う。ブランチは、成果が失われないことを
   条件で確かめられたものだけを消す。エージェントは`git branch -D`を使えない。片付けの入口（`ccnavi sync tidy`・`ccnavi worktree retire`・
   `ccnavi worktree branch`・`ccnavi-user-clean-branch.sh`）は、メインもサブエージェントも直には打てない（sh が中で呼ぶ）。取り消した子のブランチは、

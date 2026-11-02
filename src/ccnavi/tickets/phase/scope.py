@@ -193,15 +193,15 @@ def _outside(
     outside = []
     for rel in sorted(paths):
         # git の `-z` の表記をそのまま使う。git はどの OS でも区切りを `/` で返すので、
-        # `\` を `/` に直す必要は無い。直すと Linux / macOS で `wip\eli5\x.py` や `src\x.py` という
-        # 名前のファイル 1 個が、置き場の中や範囲の中のパスと判定され、範囲外として報告されない
-        # （実行前チェックも直さない）。
+        # `\` を `/` に直す必要は無い。直すと Linux / macOS で `wip\handoff\x.py` や
+        # `src\x.py` という名前のファイル 1 個が、置き場の中や範囲の中のパスと判定され、
+        # 範囲外として報告されない（実行前チェックも直さない）。
         if ticket_places.is_ticket_place(rel, conf.tickets, conf.approved):
             places.append(rel)
             continue
-        # 下書きの置き場（`wip/handoff/`）と ELI5 の置き場は追跡されるので、ここでも外す
+        # 下書きの置き場（`wip/handoff/`）は追跡されるので、ここでも外す
         # （実行前チェックと揃える）。下書きは `integrate` が外し、`ready` が `wip/` ごと消す。
-        if ticket_places.is_handoff_place(rel) or ticket_places.is_eli5_place(rel):
+        if ticket_places.is_handoff_place(rel):
             continue
         found = scope_verdict(child, parent, pt, rel)
         if found.outside:

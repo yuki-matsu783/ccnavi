@@ -1,7 +1,7 @@
 #!/bin/sh
 # ccnavi-review レビューの依頼と確認。親（メインエージェント）だけが呼ぶ。
 #
-#   sh .ccnavi/scripts/ccnavi-review.sh review-request --phase <N> --body-file <依頼文> --eli5 <HTML>
+#   sh .ccnavi/scripts/ccnavi-review.sh review-request --phase <N> --body-file <依頼文>
 #   sh .ccnavi/scripts/ccnavi-review.sh confirm --phase <N>
 #   sh .ccnavi/scripts/ccnavi-review.sh comment --body-file <本文>
 #   sh .ccnavi/scripts/ccnavi-review.sh decide  <N> --preview （残った指摘の一覧を JSON で見るだけ。ボードも読む）
@@ -21,19 +21,10 @@
 # だけで、マージリクエストの中身はここが取ってきて JSON で渡す（--result）。ホストを読む関数と write-and-push の支度は
 # ccnavi-common-review.sh にあり、ユーザ専用のレビューの sh と共有する。
 #
-#   review-request: `ccnavi review prepare` が前提を確かめ、依頼の本文とマージリクエストの
-#            下書きを書き出す → ここが（無ければ）マージリクエストを下書きで作り、依頼を投稿する
-#            → `ccnavi review requested` がマーカーを置く
-#            ユーザはレビューをマージリクエストで行うので、マージリクエストが無いことで止めない。タイトルから Draft を
-#            外してマージするのはユーザに任せる。
-#            --eli5 <HTML> は必須（付け忘れを後回しにさせない）。変更をやさしく説明した 1 枚の HTML で、
-#            このワークツリーの wip/eli5/ の下（既定の名前は wip/eli5/phase-<N>.html）にコミットしておく。
-#            HEAD に入って push されていれば、マージリクエストの差分に載る。ここは拡張子・在ること・
-#            中身があること・wip/eli5/ の下にあること・名前の字・HEAD で普通のファイル（100644）として
-#            HEAD と同じ中身でコミット済みであることを確かめ、
-#            実行ファイルには渡さない。投稿が済んだら、ユーザが打つ
-#            `crit review <パス>` と `crit push <番号>` を標準出力に出す。crit push で送られた指摘は
-#            マージリクエストの行のスレッドになり、confirm が未解決として数え、ccnavi-user-decide.sh で選べる。
+#   review-request: `ccnavi review prepare` が前提を確かめ、依頼の本文を書き出す → ここが依頼を
+#            マージリクエストに投稿する → `ccnavi review requested` がマーカーを置く
+#            マージリクエストは作らない（ccnavi-start.sh が作る）。親のブランチに open のマージリクエストが無ければ、
+#            依頼を作らずに止める。タイトルから Draft を外してマージするのはユーザに任せる。
 #   confirm: ここがスレッドとレビューを取ってくる → `ccnavi review confirm` が判定してマーカーを置き、
 #            レビュー待ち（wip/proposals/review/）の子を .ccnavi/approved/done/ へ動かす。
 #            トークンの持ち主（GitHub は login、GitLab は username）を引けたら --actor で渡し、マーカーに残す。
@@ -78,19 +69,14 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-review.sh <review-request|confirm|comment|decide|ready|fetch|origin|merged|mr-state> [--phase <N>] [--body-file <path>] [--eli5 <html>]
+sh .ccnavi/scripts/ccnavi-review.sh <review-request|confirm|comment|decide|ready|fetch|origin|merged|mr-state> [--phase <N>] [--body-file <path>]
 
-  review-request --phase <N> --body-file <依頼文> --eli5 <HTML>
-                                                  前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く。
-                                                  --eli5 は必須。変更の目的・何が変わるか・リスクを専門用語なしで書いた
-                                                  1 枚の HTML（.html / .htm）。このワークツリーの wip/eli5/ の下（既定の名前は
-                                                  wip/eli5/phase-<N>.html）に置いてコミットし、push しておく（マージリクエストの
-                                                  差分に載せる）。相対パスは実行した場所から。投稿が済むと、ユーザが実行する
-                                                  crit review <パス> と crit push <番号> を出す。--body-file が
+  review-request --phase <N> --body-file <依頼文>
+                                                  前提を確かめ、依頼をマージリクエストに投稿してマーカーを置く（マージリクエストが無ければ止まる）。--body-file が
                                                   ワークスペースルート直下の scratchpad/ の中のファイルなら、成功のあとに
                                                   review-request 自身が消す（待ち中は rm を打てないため。それ以外の場所のファイルは
                                                   消さない。消せなければ警告だけで、終了コードは変えない）
-                                                  --check を付けると、同じ前提（ELI5・フェーズの終了・合流・push・MR）を
+                                                  --check を付けると、同じ前提（フェーズの終了・合流・push・MR）を
                                                   確かめるだけで、投稿もマーカーも置かない。0 なら前提は通っている（取り込みとロックは確かめない）
   confirm      --phase <N>                        未解決（Unresolved）のスレッドが 1 つも無ければマーカーを置く（未解決のスレッドは依頼の時刻に関わらずすべて数える。手で done/ に動かして共有した子は、移動の前の指摘を台帳 accepted.json に版つきで受け入れて確定する）
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに書き出す
@@ -435,7 +421,7 @@ need_parent_tree() {
 	done
 	fail not-in-parent-tree "$sub は親のワークツリー（$root/.claude/worktrees/<親の識別子>）の中で打ってください。いまの cwd（${here}）は統合先のブランチ（${branch}）の上で、親を決められません。
 次: cd $(ccnavi_sh_quote "$root/.claude/worktrees/<親の識別子>") && sh $(ccnavi_sh_quote "$script_dir/ccnavi-review.sh") ${sub}${np_args}
-案内: 親の識別子は 'sh $script_dir/ccnavi-ticket.sh status' か 'sh $script_dir/ccnavi-git.sh worktree list' で確かめる。--body-file・--eli5 などの相対パスは cd で指す先が変わるので、絶対パスで打ち直す。" 2
+案内: 親の識別子は 'sh $script_dir/ccnavi-ticket.sh status' か 'sh $script_dir/ccnavi-git.sh worktree list' で確かめる。--body-file などの相対パスは cd で指す先が変わるので、絶対パスで打ち直す。" 2
 }
 
 # ---- 親を cwd から引くサブコマンドは、ホストへ繋ぐ前に cwd を確かめる。
@@ -542,8 +528,7 @@ review_begin "$args_n"
 # 抜けるときに exe に渡した JSON を消し、終わりの 1 行を診断ログに残す。終了コードは変えない。
 # rm が失敗しても（JSON の置き場の名前がディレクトリ・権限など）、`set -e` がその失敗の値で抜けて
 # 元の終了コードを上書きしないよう、失敗を無視してから元の値で抜け直す。
-eli5_posted=""
-trap 'review_exit=$?; ccnavi_wap_end; rm -f "$result" "$result.re" ${eli5_posted:+"$eli5_posted"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
+trap 'review_exit=$?; ccnavi_wap_end; rm -f "$result" "$result.re" 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
 trap 'ccnavi_wap_end; exit 130' INT TERM HUP
 
 review_wap
@@ -664,109 +649,19 @@ confirm)
 	esac
 	;;
 review-request)
-	# 段 -1: ELI5 の HTML。--eli5 を抜き出し、残りを実行ファイルへ渡す（実行ファイルは
-	# --eli5 を知らない）。ロックを取る前に確かめ、欠けていれば何も書かずに止める。
-	eli5=""
+	# --check を抜き出し、残りを実行ファイルへ渡す（--check は下で位置引数の前に付ける）。
 	rr_check=""
-	eli5_n=$#
-	eli5_i=0
-	while [ "$eli5_i" -lt "$eli5_n" ]; do
-		eli5_a="$1"
+	rr_n=$#
+	rr_i=0
+	while [ "$rr_i" -lt "$rr_n" ]; do
+		rr_a="$1"
 		shift
-		eli5_i=$((eli5_i + 1))
-		case "$eli5_a" in
+		rr_i=$((rr_i + 1))
+		case "$rr_a" in
 		--check) rr_check=yes ;;
-		--eli5)
-			eli5=""
-			if [ "$eli5_i" -lt "$eli5_n" ]; then
-				eli5="$1"
-				shift
-				eli5_i=$((eli5_i + 1))
-			fi
-			;;
-		--eli5=*)
-			eli5="${eli5_a#--eli5=}"
-			;;
-		*) set -- "$@" "$eli5_a" ;;
+		*) set -- "$@" "$rr_a" ;;
 		esac
 	done
-	# 置き場は wip/eli5/ の下で、wip/ のほかの場所は ELI5 にさせない。マージリクエストの差分に載せ、
-	# ユーザが crit push で行に指摘を送れるようにする。wip/ は ready の前に丸ごと消すので、squash した成果物には残らない。
-	eli5_how="依頼の前に、変更の目的・何が変わるか・リスクを専門用語なしで書いた 1 枚の HTML（外部の読み込み無し）を、このワークツリーの wip/eli5/ の下（既定の名前は wip/eli5/phase-<N>.html。名前は英数字と . _ / - だけ）に普通のファイルとして書いてコミットし、push してから --eli5 <パス> で渡してください。"
-	[ -n "$eli5" ] || fail explainer-missing "review-request には --eli5 <HTML> が必要です。${eli5_how}" 2
-	case "$eli5" in
-	*.[Hh][Tt][Mm][Ll] | *.[Hh][Tt][Mm]) ;;
-	*) fail explainer-not-html "--eli5 には拡張子が .html か .htm のファイルを渡してください ($eli5)。${eli5_how}" 2 ;;
-	esac
-	# 相対パスは --body-file と同じく、スクリプトを打った場所（実行ファイルに渡す --cwd）から。
-	case "$eli5" in
-	/* | [A-Za-z]:[\\/]*) eli5_path="$eli5" ;;
-	*) eli5_path="$here/$eli5" ;;
-	esac
-	# 欠けているものは全部を挙げてから止める（実行ファイルの前提の検査と同じ流儀）。ロックの前で、何も書かない。
-	eli5_unmet=""
-	eli5_rel=""
-	eli5_top=""
-	eli5_prefix=""
-	if [ ! -f "$eli5_path" ]; then
-		eli5_unmet="${eli5_unmet}
-  - ファイルがありません。"
-	elif ! grep -q '[^[:space:]]' "$eli5_path" 2>/dev/null; then
-		eli5_unmet="${eli5_unmet}
-  - 中身が空"
-	fi
-	# どのリポジトリのどこにあるかは、ファイルのあるディレクトリで git に聞く。打った場所のリポジトリ
-	# （依頼を出すブランチ）と同じ根でなければ、マージリクエストの差分には載らない。
-	eli5_here_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
-	eli5_dir=$(dirname "$eli5_path")
-	if [ -d "$eli5_dir" ]; then
-		eli5_top=$(cd "$eli5_dir" && git rev-parse --show-toplevel 2>/dev/null) || eli5_top=""
-		eli5_prefix=$(cd "$eli5_dir" && git rev-parse --show-prefix 2>/dev/null) || eli5_prefix=""
-	fi
-	if [ -z "$eli5_top" ] || [ "$eli5_top" != "$eli5_here_top" ]; then
-		eli5_unmet="${eli5_unmet}
-  - このワークツリーの外にある（マージリクエストの差分に載らない）"
-	else
-		eli5_rel="${eli5_prefix}${eli5_path##*/}"
-		# 名前に使える字を絞る。相対パスは依頼文とユーザが打つ crit の行にそのまま入るので、
-		# `'`・`$`・バッククォート・空白・改行・日本語などを通すと、打ったユーザのシェルで別のコマンドになる
-		# 文字列を置ける。C ロケールで、許す字を消して末尾の目印（:）だけが残るかで見る（改行も 1 字として残る）。
-		eli5_rest=$(printf '%s:' "$eli5_rel" | LC_ALL=C tr -d 'A-Za-z0-9._/-')
-		eli5_safe=yes
-		if [ "$eli5_rest" != : ]; then
-			eli5_safe=""
-			eli5_unmet="${eli5_unmet}
-  - 名前に使えない字がある（英数字と . _ / - だけにする）"
-		fi
-		case "$eli5_rel" in
-		wip/eli5/*) ;;
-		*)
-			eli5_safe=""
-			eli5_unmet="${eli5_unmet}
-  - wip/eli5/ の下にありません。"
-			;;
-		esac
-		# HEAD に入っていて、普通のファイル（モード 100644。リンク・実行ビット付き・submodule は止める）で、
-		# 手元の中身が HEAD と同じこと。push 済みかは実行ファイルの前提が見る。
-		# ファイルが無いときは「無い」だけを言う（HEAD に無いのは言うまでもない）。
-		if [ -n "$eli5_safe" ] && [ -f "$eli5_path" ]; then
-			eli5_mode=$(git -C "$eli5_top" ls-tree HEAD -- "$eli5_rel" 2>/dev/null | cut -d ' ' -f 1)
-			if [ -z "$eli5_mode" ]; then
-				eli5_unmet="${eli5_unmet}
-  - HEAD にありません（未追跡か、まだコミットしていない）"
-			elif [ "$eli5_mode" != 100644 ]; then
-				eli5_unmet="${eli5_unmet}
-  - HEAD で普通のファイルでない（モード ${eli5_mode}。シンボリックリンクや実行ビット付きは使わない）"
-			elif ! git -C "$eli5_top" diff --quiet HEAD -- "$eli5_rel" 2>/dev/null; then
-				eli5_unmet="${eli5_unmet}
-  - HEAD から変わっている（未コミットの変更がある）"
-			fi
-		fi
-	fi
-	[ -z "$eli5_unmet" ] ||
-		fail explainer-unmet "ELI5 の HTML ($eli5) が依頼の前提を満たさない:${eli5_unmet}
-${eli5_how}"
-	log_debug ELI5 を確かめた -- "eli5=set"
 	# 段 0: ワークツリーの中で分かる前提（フェーズの終了・合流・未コミット・push・依頼済みなど）は、
 	# ロック・取り込みより前に、何も変えずに断る。検査は段 1 の prepare と同じ関数（読むだけ）。
 	# `--check` は位置引数の前に置く。
@@ -812,20 +707,8 @@ ${eli5_how}"
 		ccnavi ops mark-sent request "${branch:-}" "$number" "$request_marker" comment \
 			"$(printf '%s' "$posted" | "$JQ" -r '.url' | tr -d '\r')" >/dev/null 2>&1 || :
 	else
-		# 本文の末尾に、ELI5 の HTML の在りかと crit での見方を 1 行足す。HTML の中身は
-		# 載せない（マージリクエストの差分にある）。目印は 1 行目なので、足しても二重投稿の見分けは変わらない。
-		eli5_posted="$state/review-request-eli5-$$.md"
-		{
-			cat "$file"
-			printf '\n---\n\nELI5（変更をやさしく説明した HTML）はこのマージリクエストの差分の `%s`。手元のチェックアウトのルートで `crit review %s` を開いてソースの行に指摘を付け、`crit push %s` でここに送ってください（送った指摘は行のスレッドになり、未解決の間はレビュー済みにならない。`crit %s` だけだと描画のプレビューになり、そこで付けたピンは送られない）。\n' \
-				"$eli5_rel" "$eli5_rel" "$number" "$eli5_rel"
-		} >"$eli5_posted"
-		posted=$(comment_staged request "$request_marker" "$number" "$url" "$eli5_posted") ||
-			{
-				rm -f "$eli5_posted"
-				fail request-post-failed "依頼を投稿できたか確定できなかった（上の案内を見る）。マーカーは置いていない。確かめてから、同じコマンドを打ち直す。"
-			}
-		rm -f "$eli5_posted"
+		posted=$(comment_staged request "$request_marker" "$number" "$url" "$file") ||
+			fail request-post-failed "依頼を投稿できたか確定できなかった（上の案内を見る）。マーカーは置いていない。確かめてから、同じコマンドを打ち直す。"
 	fi
 	"$JQ" -n --arg host "$kind" --argjson mr "$mr" --argjson posted "$posted" \
 		'{host: $host, mr: $mr} + $posted' >"$result"
@@ -863,20 +746,6 @@ ${eli5_how}"
 			;;
 		esac
 	fi
-	# 段 4: crit の案内。crit はユーザの手元で打つ道具。
-	# crit push は crit の作業場所（打った場所）からの相対で行を送るので、ワークツリーのルートで打たせる。
-	# crit・gh・glab が PATH に無くても止めない。案内だけ出す。
-	# ツリーの絶対パスはユーザの置き場なので字を絞れない。いつも '…' で包み、中の ' は '\'' に置き換える
-	# （打ったユーザのシェルで 1 語のまま、展開されない）。相対パスは上で字を絞ってあるので包まない。
-	eli5_shown="'$(printf '%s' "$eli5_top" | sed "s/'/'\\\\''/g")'"
-	eli5_rel_shown="$eli5_rel"
-	printf 'ELI5 を見る: ユーザがターミナルで cd %s してから crit review %s を実行し、ソースの行に付けた指摘を crit push %s でマージリクエストに送る（描画は crit %s で見られるが、そこで付けたピンは送られない）\n' \
-		"$eli5_shown" "$eli5_rel_shown" "$number" "$eli5_rel_shown"
-	command -v crit >/dev/null 2>&1 ||
-		printf '（この環境の PATH に crit はありません。ユーザの手元のターミナルで実行します）\n'
-	if [ "$kind" = github ]; then eli5_forge=gh; else eli5_forge=glab; fi
-	command -v "$eli5_forge" >/dev/null 2>&1 ||
-		printf '（この環境の PATH に %s はありません。crit push はユーザの手元で認証済みの %s を使う）\n' "$eli5_forge" "$eli5_forge"
 	;;
 comment)
 	body=""

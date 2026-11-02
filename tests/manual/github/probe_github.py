@@ -625,14 +625,10 @@ def main() -> int:
     blocked, detail = agent_gate(parent_tree)
     record("レビュー待ちが Agent を止める", blocked, detail)
 
-    # 依頼には ELI5 の HTML が要る。wip/eli5/ の下に置いてコミットする
-    # （ready の前に wip/ ごと消える）
-    ELI5 = "wip/eli5/phase-1.html"
-    write(
-        os.path.join(parent_tree, ELI5),
-        "<!doctype html><meta charset=utf-8><title>eli5</title><p>src/a と src/b を足した。</p>\n",
-    )
-    commit_all(parent_tree, "eli5")
+    # ready が wip/ の追跡済みのファイルを消すことを確かめるため、メモを置いてコミットする
+    WIP_NOTE = "wip/note.md"
+    write(os.path.join(parent_tree, WIP_NOTE), "src/a と src/b を足した。\n")
+    commit_all(parent_tree, "wip note")
 
     body = write(os.path.join(OUT, "request-1.md"), "見てほしい点\n\n- src/a と src/b を足した\n")
     early = sh(
@@ -643,8 +639,6 @@ def main() -> int:
         "1",
         "--body-file",
         body,
-        "--eli5",
-        ELI5,
     )
     record(
         "push 前の request は前提で止まる",
@@ -682,8 +676,6 @@ def main() -> int:
         "1",
         "--body-file",
         body,
-        "--eli5",
-        ELI5,
     )
     say("request:\n" + redact(requested.stdout + requested.stderr))
     record("request が通る（PR を作って投稿してマーカー）", requested.returncode == 0)
@@ -718,8 +710,6 @@ def main() -> int:
         "1",
         "--body-file",
         body,
-        "--eli5",
-        ELI5,
     )
     record(
         "2 度目の request は依頼済みで止まる", again.returncode != 0 and "依頼済み" in again.stderr
@@ -836,7 +826,7 @@ def main() -> int:
         say("自分の PR には変更要求も approve も出せないので、その段は走らない（docstring 参照）")
 
     # 差分の外へのレビューは 422 で拒まれ、レビューごと作られない
-    # （crit push が差分外の行に付けた指摘の行き先）
+    # （差分外の行に付けた指摘の行き先）
     _, before = api(
         "GET", f"/repos/{REPO}/pulls/{num}/reviews?per_page=100", tag="reviews-before-422"
     )
@@ -1000,7 +990,7 @@ def main() -> int:
     say("ready:\n" + redact(ready.stdout + ready.stderr))
     record(
         "ready が通る（wip/ の追跡済みのファイルも消える）",
-        ready.returncode == 0 and "wip/eli5/phase-1.html" in ready.stdout,
+        ready.returncode == 0 and WIP_NOTE in ready.stdout,
     )
     pr = pr_of("i0001")
     record(

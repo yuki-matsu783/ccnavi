@@ -93,15 +93,10 @@ limit: parent i0001: src/*, tests/*
 外すのは `wip/handoff/` の下だけで、`wip/` のほかの場所・`wip/handoffX/`・`docs/wip/handoff/`・
 同じ名前のファイルは外さない。大文字小文字は区別する。置き場の名前は固定。
 
-ELI5 の HTML の置き場（ワークツリーのルートからの相対で `wip/eli5/` の下）も、範囲の外として扱わない（`ticket_places.is_eli5_place`）。レビューの依頼に必ず添える材料で（9.10）、親の範囲に毎回書かせると書き忘れた親が依頼の手前で止まるため。
-下書きの置き場と同じく追跡される置き場なので、実行前チェック（`ticket_places.is_unscoped`）に加えて、実行後チェック
-（`post_findings.ScopeGuard.finding`）とサブエージェント終了時チェック（`phase.scope.scope_findings`）でも外す。親のツリーでも子のツリーでも同じ。
-外すのは `wip/eli5/` の下だけで、`wip/` のほかの場所・`wip/eli5x/`・`docs/wip/eli5/`・同じ名前のファイルは外さない。
-大文字小文字は区別せず、`\` は `/` に直さずに見る（`wip\eli5\x.py` という名前の 1 ファイルは置き場ではない）。
 `tree.relative` が `os.sep` を `/` に直すので、Windows の区切りはこれで足りる。チケットの置き場（`ticket_places._under`）と
-下書きの置き場（`ticket_places.is_handoff_place`）も、同じく `\` を直さずに見る。名前は設定で動かさない。
+下書きの置き場（`ticket_places.is_handoff_place`）は、`\` を `/` に直さずに見る。名前は設定で動かさない。
 `wip/` は `ready` の前に丸ごと消すので、ここに置いたものは squash した成果物に残らない。`ready` の前提は大文字小文字を区別せず、
-名前が `wip\` で始まる 1 ファイルも `wip/` の残りとして止める（区別しない FS で `WIP/eli5/` を先に作った形を拾う）。
+名前が `wip\` で始まる 1 ファイルも `wip/` の残りとして止める（区別しない FS で `WIP/handoff/` を先に作った形を拾う）。
 **この除外は、チケットの `deny` と、チケットが信頼できないときの全面停止（`LIMIT_BLOCKED`）より先に適用される**（`is_unscoped` が
 範囲の判定より前にある。順を変えるとチケットの置き場と `wip/handoff/` の扱いにも及ぶので、この弱さは受け入れている）。
 

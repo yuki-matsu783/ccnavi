@@ -343,7 +343,13 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
             </ul>
           ) : null}
           {/* 退避のチケットを表示しているときは、アーカイブの列に並ぶので「チケットなし」は出さない */}
-          {shown.totalCount === 0 && !(shownArchived && shown.archivedCount > 0) && (mergeShown?.rows.length ?? 0) === 0 ? <p className="board-empty">チケットなし</p> : null}
+          {shown.totalCount === 0 && !(shownArchived && shown.archivedCount > 0) && (mergeShown?.rows.length ?? 0) === 0 ? (
+            <>
+              <p className="board-empty">チケットなし</p>
+              {/* finish済みでマージ待ちの親は、MRの状況を確認するまでボードに出ない。空のボードと区別できるよう一言添える */}
+              {mergeShown === undefined && !touring ? <p className="merge-note" data-merge="hint">マージ待ちの親は、［MRの状況を確認］で調べると出ます</p> : null}
+            </>
+          ) : null}
           <div className="board" data-tour="board">
             {/* アーカイブの列は「アーカイブ済みチケットを表示」がONのときだけ出す（OFFならカードは全部隠れる） */}
             {shown.columns.filter((column) => shownArchived || column.state !== "archived").map((column) => (

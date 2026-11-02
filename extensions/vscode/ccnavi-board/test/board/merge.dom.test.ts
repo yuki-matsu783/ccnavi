@@ -103,6 +103,21 @@ test("CB-D720a 帯にマージ待ちの行があるときは、チケットが0�
   }
 });
 
+test("CB-D720b 空のボードで、まだ確認していないときだけ「MRの状況を確認で調べる」案内を出す", async () => {
+  const unchecked = await openBoard(boardOf([], []));
+  try {
+    assert.equal(unchecked.all('[data-merge="hint"]').length, 1);
+  } finally {
+    await unchecked.close();
+  }
+  const checked = await openBoard(boardOf([], []), { merge: view([]) });
+  try {
+    assert.equal(checked.all('[data-merge="hint"]').length, 0);
+  } finally {
+    await checked.close();
+  }
+});
+
 test("CB-D722 マージ待ち（Draftなら付記）・マージ済み・閉じた・確認できない・記録が不完全・確認中の行の言葉", async () => {
   const merge = view([
     row("a-open", { state: "open", draft: false }),
