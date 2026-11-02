@@ -15,6 +15,7 @@ import unittest
 from ccnavi.infra import pathcase
 from tests import ROOT
 from tests.sh.write_and_push_harness import (
+    ACCEPT_PLAN_CASE,
     APPROVED,
     CHILD,
     ELI5,
@@ -334,13 +335,10 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             f"  [ -d '{self.lock_dir()}' ] && echo LOCKED-WHILE-CHOOSING >&2\n"
             '  printf \'{"choices": {"u1": "keep"}, "digest": "d0"}\' >"$out"\n'
             "  exit 0 ;;\n"
-            # 受け入れる指摘の計画を立てる --yes は write-and-push の外で走り、何も置かない。
-            # 受け入れる指摘は無いという計画を返す（実物は依頼の記録を読むので、ここでは使わない）
-            '*" --accept-plan "*)\n'
-            '  prev=""; for a in "$@"; do\n'
-            '    [ "$prev" = --accept-plan ] && plan="$a"; prev="$a"; done\n'
-            '  printf \'{"threads": []}\' >"$plan"\n'
-            '  printf \'{"version":1,"ok":true}\\n\'; exit 0 ;;\n'
+            # 事前の検査（--check）は通す。受け入れる指摘の計画（--accept-plan）は、
+            # 操作記録を作る代役（hosthalf）に任せる
+            '*" --check "*) exit 0 ;;\n'
+            f'*" --accept-plan "*) exec \'{self.half}\' "$@" ;;\n'
             '*" --yes "*)\n'
             '  prev=""; for a in "$@"; do\n'
             '    [ "$prev" = --record-writes ] && list="$a"\n'
@@ -349,6 +347,10 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             '  mkdir -p "$tree/.ccnavi/approved/phases/i0001"\n'
             "  printf '{}' >\"$tree/.ccnavi/approved/phases/i0001/1.reviewed\"\n"
             "  printf '.ccnavi/approved/phases/i0001/1.reviewed\\n' >\"$list\"\n"
+            '  prev=""; for a in "$@"; do\n'
+            '    [ "$prev" = --accept-done ] && dp="$a"; [ "$prev" = --root ] && r="$a"; prev="$a"; done\n'
+            '  op=$(sed -n \'s/.*"op": "\\([0-9a-f]*\\)".*/\\1/p\' "$dp")\n'
+            f"  [ -z \"$op\" ] || PYTHONPATH='{ROOT}/src' '{sys.executable}' -m ccnavi --root \"$r\" ops applied \"$op\" local true\n"
             '  printf \'{"version":1,"ok":true}\\n\'; exit 0 ;;\n'
             "esac\n"
             f"exec '{self.half}' \"$@\"\n",
@@ -416,7 +418,7 @@ class WriteAndPushReviewTest(WriteAndPushHarness):
         self.path = shim + os.pathsep + os.environ.get("PATH", "")
         self.half = executable(
             os.path.join(self._base, "bin", "half"),
-            HALF.format(root=ROOT, python=sys.executable),
+            HALF.format(root=ROOT, python=sys.executable, plan_case=ACCEPT_PLAN_CASE),
         )
 
     def decide(self, *args):

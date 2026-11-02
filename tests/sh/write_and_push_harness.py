@@ -391,21 +391,37 @@ class PhaseOne:
         self.assertEqual(finished.returncode, 0, finished.stdout + finished.stderr)
 
 
+# `--accept-plan` の代役。実行ファイルと同じく、本物の操作記録を作って、その操作ID を計画に書く。
+# `{{root}}`・`{{python}}` は `.format` で埋める（HALF・HOST_HALF）。
+ACCEPT_PLAN_CASE = """*" --accept-plan "*)
+  plan=""; root=""; prev=""
+  for a in "$@"; do
+    [ "$prev" = --accept-plan ] && plan="$a"
+    [ "$prev" = --root ] && root="$a"
+    prev="$a"; done
+  PYTHONPATH='{root}/src' '{python}' -c 'import json, sys
+from ccnavi.tickets.model import oplog
+root, plan = sys.argv[1:3]
+op = oplog.begin(root + "/logs/state", "decide", repo={{"host": "test", "mr_url": "u/mr"}},
+                 parent="i0001", phase=1, mr=1, shown=[], choices={{}}, plan={{"digest": ""}},
+                 stages=[("reply", "reply"), ("note", "comment")])
+with open(plan, "w", encoding="utf-8") as f:
+    json.dump({{"version": 1, "digest": "", "op": op, "threads": []}}, f)' "$root" "$plan"
+  exit 0 ;;
+"""
+ACCEPT_PLAN_CASE = ACCEPT_PLAN_CASE.format(root=ROOT, python=sys.executable)
+
 # 実行ファイルの半分の代役。残った指摘の行き先（`user reviewed ... --yes`）だけを代わりに書き
 # （親のワークツリーにレビュー済みマーカーを置き、書いたパスの一覧を出し、
 # 答えの JSON と下書きを書く）、
 # 残り（`write-and-push family`・`write-and-push sort`・`sync paths` など）は実際のものに渡す。
 HALF = """#!/bin/sh
 case " $* " in
-*" --accept-plan "*)
-  plan=""; prev=""
-  for a in "$@"; do [ "$prev" = --accept-plan ] && plan="$a"; prev="$a"; done
-  printf '{{"version":1,"digest":"","threads":[]}}\\n' >"$plan"
-  exit 0 ;;
-*" user reviewed "*" --yes "*)
-  list=""; tree=""; root=""
+{plan_case}*" user reviewed "*" --yes "*)
+  list=""; tree=""; root=""; done_plan=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
+    --accept-done) done_plan="$2"; shift 2 ;;
     --record-writes) list="$2"; shift 2 ;;
     --record-tree) tree="$2"; shift 2 ;;
     --root) root="$2"; shift 2 ;;
@@ -417,6 +433,8 @@ case " $* " in
   printf '{{"mr": 1, "accepted": ["u1"], "at": "t"}}' >"$tree/$rel"
   [ -z "$list" ] || printf '%s\\n' "$rel" >"$list"
   mkdir -p "$root/logs/state"
+  op=$(sed -n 's/.*"op": "\\([0-9a-f]*\\)".*/\\1/p' "$done_plan" 2>/dev/null)
+  [ -z "$op" ] || PYTHONPATH='{root}/src' '{python}' -m ccnavi --root "$root" ops applied "$op" local true
   printf '<!-- ccnavi:decide -->\\n決めた\\n' >"$root/logs/state/review-decide-i0001-1.md"
   printf '{{"version":1,"ok":true,"reviewed":true,"followup":""}}\\n'
   exit 0 ;;
@@ -473,20 +491,24 @@ put() {{
 }}
 m=.ccnavi/approved/phases/i0001
 case " $* " in
+*" ops "*) PYTHONPATH='{root}/src' exec '{python}' -m ccnavi "$@" ;;
 *" review prepare "*)
   mkdir -p "$root/logs/state"
   printf '<!-- ccnavi:request i0001:1 key=k1 -->\\n見てほしい\\n' >"$root/logs/state/req.md"
   printf 'タイトル\\n\\n本文\\n' >"$root/logs/state/mr.md"
   printf '%s\\n%s\\n' "$root/logs/state/req.md" "$root/logs/state/mr.md"
   exit 0 ;;
-*" review requested "*)
+{plan_case}*" review requested "*)
   if [ -n "${{HALF_FAIL:-}}" ] && [ ! -e "$HALF_FAIL" ]; then
     : >"$HALF_FAIL"; : >"$list"; exit 1
   fi
   : >"$list"; put "$m/1.requested" '{{"mr": 1, "at": "t"}}'; exit 0 ;;
 *" review confirm "*)
+  [ -n "$list" ] || exit 0
   : >"$list"; put "$m/1.reviewed" '{{"mr": 1, "accepted": [], "at": "t"}}'; exit 0 ;;
-*" review ready "*) : >"$list"; put "$m/ready.json" '{{"mr": 1, "at": "t"}}'; exit 0 ;;
+*" review ready "*)
+  [ -n "$list" ] || exit 0
+  : >"$list"; put "$m/ready.json" '{{"mr": 1, "at": "t"}}'; exit 0 ;;
 *" user close-early "*" --accept-plan "*)
   plan=""; prev=""
   for a in "$@"; do [ "$prev" = --accept-plan ] && plan="$a"; prev="$a"; done
@@ -502,7 +524,7 @@ skip=""; first=""
 for a in "$@"; do
   if [ -n "$skip" ]; then skip=""; continue; fi
   case "$a" in
-  --root | --cwd | --record-writes | --record-tree) skip=1 ;;
+  --root | --cwd | --record-writes | --record-tree | --entry) skip=1 ;;
   --root=* | --cwd=* | --record-writes=* | --record-tree=*) ;;
   *) first="$a"; break ;;
   esac
@@ -595,7 +617,7 @@ class WriteAndPushHostHarness(WriteAndPushHarness):
         self.path = shim + os.pathsep + os.environ.get("PATH", "")
         self.half = executable(
             os.path.join(self._base, "bin", "hosthalf"),
-            HOST_HALF.format(root=ROOT, python=sys.executable),
+            HOST_HALF.format(root=ROOT, python=sys.executable, plan_case=ACCEPT_PLAN_CASE),
         )
 
     def review(self, *args, stdin="", script="ccnavi-review.sh", cwd=None, **extra):
