@@ -54,7 +54,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 
 | 登録 | 呼ぶもの | すること |
 |---|---|---|
-| `Stop`（同期、上限 10 秒） | `ccnavi-idle.sh notice` → `ccnavi idle notice` | 会話の大きさが促す大きさ以上なら、事情と勧めをユーザに説明する `systemMessage` を、1 セッションに 1 回だけ返す（`<state>/idle/<セッション>.notice` が済みの印）。状態が `fired` なら、大きさを見ずに、引き継ぎを書かせたことの報告を書かせるたびに 1 回返す（状態ファイルの `told` が済みの印。`check` が消す） |
+| `Stop`（同期、上限 10 秒） | `ccnavi-idle.sh notice` → `ccnavi idle notice` | 会話の大きさが促す大きさ以上なら、事情と勧めをユーザに説明する `systemMessage` を、1 セッションに 1 回だけ返す（`<state>/idle/<セッション>.notice` が済みの印）。状態が `fired` なら、大きさを見ずに、引き継ぎを書かせたことの報告を、書かせるたびに 1 回返す（状態ファイルの `told` が済みの印。`check` が消す） |
 | `Stop`（`asyncRewake`、上限 3600 秒） | `ccnavi-idle.sh start` → `ccnavi idle start` | 促す大きさ以上なら状態を `waiting`（ランダムな印つき）にして待ち時間を返し、sh が `sleep` する。起きたら `ccnavi idle check` に聞き、`fire` なら続く行を標準エラーに出して終了コード 2 で終わる（asyncRewake がセッションを起こし、標準エラーが指示になる） |
 | `UserPromptSubmit`（同期、上限 10 秒） | `ccnavi-idle.sh reset` → `ccnavi idle reset` | 状態を `active` に戻す。起こすときの指示（目印 `[idle-handoff]`）とバックグラウンド作業の完了通知では戻さない |
 
