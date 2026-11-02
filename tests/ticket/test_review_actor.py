@@ -280,7 +280,7 @@ class ReviewRuleTest(ActorHarness):
         ユーザが依頼者と同じアカウントで crit push しても、指摘はレビュー済みを止める。
         """
         crit = review_host.Thread(
-            id="d1", body="ここは X ではなく Y では", author="bot", path="wip/eli5/phase-1.html"
+            id="d1", body="ここは X ではなく Y では", author="bot", path="wip/design/phase-1.html"
         )
         for host in ("github", "gitlab"):
             self.assertEqual(review_host._unresolved([crit], host, "bot"), [crit], host)

@@ -24,7 +24,7 @@ Write / Edit は書き込み先のパスで、`ccnavi-git.sh` は居場所で止
 生成物（`npm install` など）は見ない。走査が読み切れないコマンド行（`sh -c '…'` の入れ子など）は、
 文字列に親のワークツリーのパスと書き込みを疑う語が並べば止める。
 
-下書きの置き場（`wip/proposals/`・`wip/handoff/`・`wip/eli5/`）と承認済みの置き場は、Write と同じく
+下書きの置き場（`wip/proposals/`・`wip/handoff/`）と承認済みの置き場は、Write と同じく
 対象にしない（置き場ごとの保護が別に掛かっている）。
 """
 
@@ -452,7 +452,7 @@ def _check_target(
 
 
 def _unscoped(conf: settings.Settings, root: str, name: str, path: str) -> bool:
-    """下書き・提案・ELI5・承認済みの置き場か（Write と同じく、置き場ごとの保護に任せる）。"""
+    """下書き・提案・承認済みの置き場か（Write と同じく、置き場ごとの保護に任せる）。"""
     rest = tree.parts_under(os.path.join(root, tree.WORKTREES_DIR, name), path)
     if not rest:
         return False

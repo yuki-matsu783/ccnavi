@@ -525,10 +525,9 @@ def announce(
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました"
                 f"（{LABEL_PREPARING}）。{who}"
-                "子が合流済み（finish 済み）であることを確かめ、ELI5 の HTML を "
-                f"wip/eli5/phase-{n}.html に書いてコミットして push し、"
+                "子が合流済み（finish 済み）であることを確かめ、"
                 f"'{settings.script_command(root, 'ccnavi-review.sh')} review-request --phase {n} "
-                f"--body-file <依頼文> --eli5 wip/eli5/phase-{n}.html' "
+                f"--body-file <依頼文>' "
                 f"でレビュー{covers}を頼み、{phase_forms.TURN_DEFINED}を終えてユーザを待ってください。"
                 f"{hold_note}"
             )
@@ -654,7 +653,7 @@ def review_next(
     """レビュー待ち（`review/`）の子について、ユーザに回るまでに誰が何をするかの 1 文。
 
     `finish` の出力と `status` の「次の一手」が使う。子を `review/` に置いただけでは、ユーザには
-    回らない。親が合流・ELI5・`review-request` を済ませて初めて「レビュー待ち」になる（それまでは
+    回らない。親が合流・`review-request` を済ませて初めて「レビュー待ち」になる（それまでは
     「レビュー準備中」）。依頼の前に「ユーザのレビューを待つ」と言うと、依頼を打ち忘れる。
 
     言い分けるのは次のとおり。見るのは子のフェーズのレビューを引き受けるフェーズ（延期なら
@@ -686,16 +685,13 @@ def review_next(
             "ユーザの操作（confirm / decide、Chrome 拡張のレビュー済み）で "
             f"{conf.approved}/{ticket_model.DONE}/ へ動く"
         )
-    request = (
-        f"'{review_sh} review-request --phase {n} --body-file <依頼文> "
-        f"--eli5 wip/eli5/phase-{n}.html'"
-    )
+    request = f"'{review_sh} review-request --phase {n} --body-file <依頼文>'"
     requested = owner.marks.get(approval_marks.MARK_REQUESTED)
     if requested is not None:
         if _later(child.completed_at, str(requested.get("at") or "")):
             return (
                 f"{lead}フェーズ {owner.label} は依頼済みだが、この子は前回の依頼より後に閉じた。"
-                "依頼し直すまで、この子の分はユーザに回らない。親が合流・ELI5 を済ませて push し、"
+                "依頼し直すまで、この子の分はユーザに回らない。親が合流を済ませて push し、"
                 f"{request} で依頼し直す"
             ) + _AFTER_REQUEST.format(done=f"{conf.approved}/{ticket_model.DONE}/")
         return (
@@ -706,12 +702,11 @@ def review_next(
         left = "このフェーズ" if owner is ph else f"フェーズ {owner.label}"
         text = (
             f"{lead}まだ{LABEL_PREPARING}。{left}にはまだ閉じていない子がある。全部閉じてから、"
-            f"親が合流・ELI5・{request} を済ませるまで、ユーザには回らない"
+            f"親が合流・{request} を済ませるまで、ユーザには回らない"
         )
     else:
         text = (
-            f"{lead}まだ{LABEL_PREPARING}。親が合流・ELI5・{request} を済ませるまで、"
-            "ユーザには回らない"
+            f"{lead}まだ{LABEL_PREPARING}。親が合流・{request} を済ませるまで、ユーザには回らない"
         )
     return text + _AFTER_REQUEST.format(done=f"{conf.approved}/{ticket_model.DONE}/")
 

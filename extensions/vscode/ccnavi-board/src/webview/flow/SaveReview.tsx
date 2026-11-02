@@ -43,7 +43,7 @@ export function SaveReview({ diff, onConfirm, onCancel }: SaveReviewProps): JSX.
   const [skip, setSkip] = useState(false);
   const confirm = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    confirm.current?.focus();
+    confirm.current?.focus({ preventScroll: true });
   }, []);
   return (
     <Dialog titleId="save-review-title" backdropClass="review-backdrop" cardClass="review" id="save-review" tour="review">

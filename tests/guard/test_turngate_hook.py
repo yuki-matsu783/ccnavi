@@ -37,7 +37,7 @@ GIT = "sh .ccnavi/scripts/ccnavi-git.sh"
 INTEGRATE = f"{GIT} integrate foo"
 DONE = f"{GIT} integrate-done foo -m 'msg x'"
 REVIEW = "sh .ccnavi/scripts/ccnavi-review.sh"
-REQUEST = f"{REVIEW} review-request --phase 1 --body-file req.md --eli5 wip/eli5/phase-1.html"
+REQUEST = f"{REVIEW} review-request --phase 1 --body-file req.md"
 CONFIRM = f"{REVIEW} confirm --phase 1"
 NOTICE = "<task-notification>\n<status>completed</status>\n</task-notification>"
 

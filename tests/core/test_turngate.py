@@ -531,7 +531,7 @@ class ReviewConfirmFormsTest(TurnGateTestCase):
     """組み込みの `review-confirm-user-turn` が、`review-request` と `confirm` の引数の形を読む。"""
 
     REVIEW = "sh .ccnavi/scripts/ccnavi-review.sh"
-    RR = "review-request --body-file req.md --eli5 wip/eli5/phase-1.html"
+    RR = "review-request --body-file req.md"
     GATE = turngate.REVIEW_CONFIRM_GATE
 
     def first(self, tail):

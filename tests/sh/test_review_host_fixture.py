@@ -29,25 +29,11 @@ import unittest
 
 from ccnavi.entry import version
 from ccnavi.tickets.model import review_host
-from tests import ROOT, can_pass_argument, can_symlink, common_sh
+from tests import ROOT, can_pass_argument, common_sh
 from tests.sh import github_host, gitlab_host
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 NEEDED = all(shutil.which(tool) for tool in ("git", "jq"))
-
-
-def argument_keeps_quote() -> bool:
-    """引数の `'` が、そのまま sh に届くか。実際に渡して確かめる。"""
-    if SHELL is None:
-        return True
-    probe = "a'$(id)'.html"
-    done = subprocess.run(
-        [SHELL, "-c", 'printf %s "$1"', "probe", probe],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return done.stdout == probe
 
 
 def skip_if_too_big_for_argument(test: unittest.TestCase, scene_dir: str) -> None:
@@ -103,9 +89,6 @@ exit 0
 
 # マージリクエストを作ったときのホストの返事（GitLab の形）。
 CREATED = '{"iid": 9, "web_url": "https://gitlab.com/acme/widgets/-/merge_requests/9"}'
-
-# ELI5 の HTML の既定の置き場。ワークツリーの wip/ の下にコミットし、マージリクエストの差分に載せる
-ELI5 = "wip/eli5/phase-1.html"
 
 
 def write(path, text):
@@ -659,20 +642,10 @@ class GitLabHostFixtureTest(unittest.TestCase):
         os.chmod(stub, 0o755)
         return stub
 
-    def eli5(self, rel=ELI5, text="<!doctype html><p>やさしい説明</p>\n", commit=True):
-        """ELI5 の HTML をワークツリーに書く。commit なら追跡してコミットする。"""
-        path = write(os.path.join(self.ws, *rel.split("/")), text)
-        if commit:
-            git = ["git", "-C", self.ws, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
-            subprocess.run([*git, "add", "--", rel], check=True)
-            subprocess.run([*git, "commit", "-q", "-m", f"add {rel}"], check=True)
-        return path.replace(os.sep, "/")
-
     def test_request_records_the_account_that_posted(self):
         """依頼の記録に投稿したアカウント（ノートの author）が入り、打ち直しても 1 度だけ。"""
         out = os.path.join(self._tmp.name, "out")
         stub = self.request_stub(out)
-        html = self.eli5()
         state = os.path.join(self._tmp.name, "notes.json")
         extra = {"CCNAVI_ENTRY_PATH": stub, "FAKE_GITLAB_STATE": state}
         for _ in range(2):
@@ -683,8 +656,6 @@ class GitLabHostFixtureTest(unittest.TestCase):
                 "1",
                 "--body-file",
                 "x",
-                "--eli5",
-                html,
                 **extra,
             )
             self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
@@ -696,7 +667,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         with open(state, encoding="utf-8") as f:
             self.assertEqual(len(json.load(f)), 1)
 
-    def request_on(self, branch="", cwd=None, html=None, **extra):
+    def request_on(self, branch="", cwd=None, **extra):
         """request を打つ。branch を渡すとそのブランチへ移ってから（場面の MR は i0001 だけ）。
 
         マージリクエストを作る要求（POST .../merge_requests）が出たら、この試験の curl が
@@ -704,7 +675,6 @@ class GitLabHostFixtureTest(unittest.TestCase):
         """
         out = os.path.join(self._tmp.name, "out")
         stub = self.request_stub(out)
-        html = html or self.eli5()
         if branch:
             subprocess.run(["git", "-C", self.ws, "checkout", "-q", "-b", branch], check=True)
         sent = os.path.join(self._tmp.name, "created.json")
@@ -723,7 +693,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         path = os.pathsep.join([catcher, self.bin, os.environ.get("PATH", "")])
         done = self.review(
             "resolved",
-            *("review-request", "--phase", "1", "--body-file", "x", "--eli5", html),
+            *("review-request", "--phase", "1", "--body-file", "x"),
             CCNAVI_ENTRY_PATH=stub,
             PATH=path,
             FAKE_GITLAB_STATE=os.path.join(self._tmp.name, "notes.json"),
@@ -790,168 +760,36 @@ class GitLabHostFixtureTest(unittest.TestCase):
             check=True,
         )
         self.set_origin_head(project, "trunk")
-        rel = ELI5
-        html = write(os.path.join(project, *rel.split("/")), "<!doctype html><p>説明</p>\n")
-        git = ["git", "-C", project, "-c", "user.name=t", "-c", "user.email=t@e.invalid"]
-        subprocess.run([*git, "add", "--", rel], check=True)
-        subprocess.run([*git, "commit", "-q", "-m", "add eli5"], check=True)
-        done, sent = self.request_on(cwd=project, html=html.replace(os.sep, "/"))
+        done, sent = self.request_on(cwd=project)
         self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("マージ先（main）が統合先（trunk）ではない", done.stderr)
         self.assertFalse(os.path.exists(sent))
 
-    def test_request_stops_without_an_eli5_html(self):
-        """--eli5 の誤りは 2、置き場とコミットの欠けは全部を挙げて 1 で止める。
-
-        実行ファイルもホストも触らない。wip/eli5/ の外の
-        wip/ も、名前に `'`・`$`・空白・日本語を含むものも、リンクや実行ビット付きも止まる。
-        """
+    def test_request_posts_the_request_body_as_is(self):
+        """依頼の本文は、依頼文に目印が付いたものだけ（案内や追記を足さない）。"""
         out = os.path.join(self._tmp.name, "out")
         stub = self.request_stub(out)
-        state = os.path.join(self._tmp.name, "notes.json")
-        extra = {"CCNAVI_ENTRY_PATH": stub, "FAKE_GITLAB_STATE": state}
-        blank = self.eli5("wip/eli5/blank.html", " \n\t\n")
-        notes = self.eli5("wip/eli5/eli5.md", "# やさしい説明\n")
-        docs = self.eli5("docs/eli5.html")
-        blank_docs = self.eli5("docs/blank.html", "\n")
-        design = self.eli5("wip/design/x.html")
-        dirty = self.eli5("wip/eli5/phase-2.html")
-        write(dirty, "<p>書き換えた</p>\n")
-        outside = write(os.path.join(self._tmp.name, "elsewhere", "eli5.html"), "<p>x</p>\n")
-        outside = outside.replace(os.sep, "/")
-        quote = self.eli5("wip/eli5/a'$(id)'.html")
-        dollar = self.eli5("wip/eli5/a$HOME.html")
-        space = self.eli5("wip/eli5/a b.html")
-        japanese = self.eli5("wip/eli5/説明.html")
-        self.eli5("wip/eli5/target.html")
-        link = os.path.join(self.ws, "wip", "eli5", "link.html")
-        linked = can_symlink()
-        if linked:
-            os.symlink("target.html", link)
-        executable = self.eli5("wip/eli5/run.html", commit=False)
-        os.chmod(executable, 0o755)
-        git = ["git", "-C", self.ws, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
-        subprocess.run(
-            [
-                *git,
-                "-c",
-                "core.fileMode=true",
-                "add",
-                "--",
-                *(["wip/eli5/link.html"] if linked else []),
-                "wip/eli5/run.html",
-            ],
-            check=True,
-        )
-        subprocess.run([*git, "commit", "-q", "-m", "link and exec"], check=True)
-        untracked = self.eli5("wip/eli5/untracked.html", commit=False)
-        bad_name = ["名前に使えない字がある"]
-        cases = {
-            "無い": ([], 2, []),
-            "値が無い": (["--eli5"], 2, []),
-            "拡張子が違う": (["--eli5", notes], 2, []),
-            "ファイルが無い": (["--eli5", "wip/eli5/missing.html"], 1, ["ファイルがありません"]),
-            "空": (["--eli5", blank], 1, ["中身が空"]),
-            "wip/ の外": (["--eli5", docs], 1, ["wip/eli5/ の下にありません"]),
-            "空で wip/ の外": (
-                ["--eli5", blank_docs],
-                1,
-                ["中身が空", "wip/eli5/ の下にありません"],
-            ),
-            "wip/eli5/ の外の wip/": (["--eli5", design], 1, ["wip/eli5/ の下にありません"]),
-            "未追跡": (["--eli5", untracked], 1, ["HEAD にありません"]),
-            "未コミット": (["--eli5", dirty], 1, ["HEAD から変わっている"]),
-            "ワークツリーの外": (["--eli5", outside], 1, ["このワークツリーの外"]),
-            "名前に '": (["--eli5", quote], 1, bad_name),
-            "名前に $": (["--eli5", dollar], 1, bad_name),
-            "名前に空白": (["--eli5", space], 1, bad_name),
-            "名前に日本語": (["--eli5", japanese], 1, bad_name),
-            "実行ビット付き": (["--eli5", executable], 1, ["普通のファイルでない（モード 100755"]),
-        }
-        if not os.stat(executable).st_mode & 0o111:
-            # 実行ビットを持てないファイルシステム（NTFS）では、モード 100755 のファイルを作れない。
-            del cases["実行ビット付き"]
-        if not argument_keeps_quote():
-            # 引数の `'` が sh に届く前に外れる環境では、名前に `'` を持つファイルを名指しできない。
-            del cases["名前に '"]
-        if linked:
-            cases["シンボリックリンク"] = (
-                ["--eli5", link],
-                1,
-                ["普通のファイルでない（モード 120000"],
-            )
-        for name, (flag, code, said) in cases.items():
-            with self.subTest(name):
-                done = self.review(
-                    "resolved", "review-request", "--phase", "1", "--body-file", "x", *flag, **extra
-                )
-                self.assertEqual(done.returncode, code, done.stdout + done.stderr)
-                self.assertIn("--eli5", done.stderr)
-                self.assertIn("HTML", done.stderr)
-                self.assertIn("wip/eli5/phase-<N>.html", done.stderr)
-                listed = [line for line in done.stderr.splitlines() if line.startswith("  - ")]
-                self.assertEqual(len(listed), len(said), done.stderr)
-                for words in said:
-                    self.assertIn(words, done.stderr)
-                self.assertFalse(os.path.exists(os.path.join(out, "body.md")))
-                self.assertFalse(os.path.exists(state))
-
-    def test_request_points_to_crit_push_and_keeps_eli5_from_the_exe(self):
-        """投稿が済んだら、ユーザが打つ crit review <相対> と crit push <番号> を出す。
-
-        相対は打った場所から解く。--eli5 は実行ファイルには渡さない。crit・glab が PATH に
-        無くても止めない。
-        """
-        out = os.path.join(self._tmp.name, "out")
-        stub = self.request_stub(out)
-        self.eli5()
         state = os.path.join(self._tmp.name, "notes.json")
         done = self.review(
             "resolved",
-            "review-request",
-            "--phase",
-            "1",
-            "--body-file",
-            "x",
-            f"--eli5={ELI5}",
+            *("review-request", "--phase", "1", "--body-file", "x"),
             CCNAVI_ENTRY_PATH=stub,
             FAKE_GITLAB_STATE=state,
         )
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        with open(os.path.join(out, "result.json"), encoding="utf-8") as f:
-            number = json.load(f)["mr"]["number"]
-        said = [line for line in done.stdout.splitlines() if line.startswith("ELI5 を見る: ")]
-        self.assertEqual(len(said), 1, done.stdout)
-        # ツリーの絶対パスはいつも '…' で包む（中の ' は '\'' に。ユーザの置き場なので字は絞れない）
-        self.assertIn("cd '", said[0])
-        top = said[0].split("cd ", 1)[1].split(" ", 1)[0].strip("'")
-        self.assertTrue(os.path.isabs(top), top)
-        self.assertTrue(os.path.samefile(top, self.ws), top)
-        self.assertIn(f"crit review {ELI5} ", said[0])
-        self.assertIn(f"crit push {number} ", said[0])
-        if shutil.which("crit") is None:
-            self.assertIn("PATH に crit はありません", done.stdout)
-        with open(os.path.join(out, "args.txt"), encoding="utf-8") as f:
-            passed = f.read()
-        self.assertNotIn("eli5", passed)
-        # 依頼の本文には在りかと送り方を 1 行載せ、HTML の中身は載せない
         with open(state, encoding="utf-8") as f:
             body = json.load(f)[0]["body"]
         self.assertTrue(body.startswith("<!-- ccnavi:request i0001:1 key=k -->"), body)
-        self.assertIn(f"差分の `{ELI5}`", body)
-        self.assertIn(f"`crit review {ELI5}`", body)
-        self.assertIn(f"`crit push {number}`", body)
-        self.assertNotIn("やさしい説明", body)
+        self.assertNotIn("crit", body)
+        self.assertNotIn("crit", done.stdout)
 
     def request_with_body(self, body, **extra):
         """--body-file に body（ws からの相対か絶対）を渡して request を打つ。"""
         out = os.path.join(self._tmp.name, "out")
         stub = self.request_stub(out)
-        if not os.path.exists(os.path.join(self.ws, *ELI5.split("/"))):
-            self.eli5()
         return self.review(
             "resolved",
-            *("review-request", "--phase", "1", "--body-file", body, f"--eli5={ELI5}"),
+            *("review-request", "--phase", "1", "--body-file", body),
             CCNAVI_ENTRY_PATH=stub,
             FAKE_GITLAB_STATE=os.path.join(self._tmp.name, "notes.json"),
             **extra,
@@ -1004,41 +842,6 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertTrue(os.path.exists(body))
         self.assertIn("消せなかった", done.stderr)
-
-    def test_the_tree_path_is_quoted_for_the_shell(self):
-        """ツリーの絶対パスに `'`・`$`・空白があっても、案内の cd は 1 語のまま。"""
-        moved = os.path.join(self._tmp.name, "w s'$(touch pwned)")
-        shutil.move(self.ws, moved)
-        self.ws = moved
-        out = os.path.join(self._tmp.name, "out")
-        stub = self.request_stub(out)
-        self.eli5()
-        state = os.path.join(self._tmp.name, "notes.json")
-        done = self.review(
-            "resolved",
-            "review-request",
-            "--phase",
-            "1",
-            "--body-file",
-            "x",
-            f"--eli5={ELI5}",
-            CCNAVI_ENTRY_PATH=stub,
-            FAKE_GITLAB_STATE=state,
-        )
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        said = [line for line in done.stdout.splitlines() if line.startswith("ELI5 を見る: ")]
-        self.assertEqual(len(said), 1, done.stdout)
-        word = said[0].split("cd ", 1)[1].split(" してから ", 1)[0]
-        # 打ったユーザのシェルがその 1 語を読んだ結果が、元の絶対パスと同じで、何も実行されない
-        echoed = subprocess.run(
-            [SHELL, "-c", f"printf '%s' {word}"],
-            cwd=self._tmp.name,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
-        self.assertTrue(os.path.samefile(echoed.stdout, moved), echoed.stdout)
-        self.assertFalse(os.path.exists(os.path.join(self._tmp.name, "pwned")))
 
     def test_confirm_and_decide_pass_the_token_owner(self):
         done = self.review("resolved", "confirm", "--phase", "1")

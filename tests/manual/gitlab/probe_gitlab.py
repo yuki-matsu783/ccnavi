@@ -280,18 +280,6 @@ def write(path: str, text: str) -> str:
     return path
 
 
-EXPLAINER = "wip/eli5/phase-1.html"
-
-
-def write_explainer(tree: str) -> str:
-    # request は --eli5 の HTML を要る。外部の読み込みは無し（ccnavi-review の規則）
-    return write(
-        os.path.join(tree, "wip", "eli5", "phase-1.html"),
-        '<!doctype html><meta charset="utf-8"><title>実測</title>'
-        "<p>挨拶を足す変更の確認。危険は無い（実測用）。</p>\n",
-    )
-
-
 def ticket_text(
     name, *, parent="", phase=None, allow=(), review=True, title="作業", issue=None, mr=1
 ):
@@ -509,7 +497,6 @@ def run_probe() -> None:
         review=False,
         title="b を書く",
     )
-    write_explainer(parent_tree)
     commit_all(parent_tree, "tickets")
     # 子の start は、親のブランチがリモートにあることを前提とする（ccnavi-start 経由の親）
     pushed_parent = sh(GIT_SH, parent_tree, "push", "-u", "origin", "i0001")
@@ -613,8 +600,6 @@ def run_probe() -> None:
         "1",
         "--body-file",
         body,
-        "--eli5",
-        EXPLAINER,
     )
     record(
         "push 前の request は前提で止まる",
@@ -648,8 +633,6 @@ def run_probe() -> None:
         "1",
         "--body-file",
         body,
-        "--eli5",
-        EXPLAINER,
     )
     say("request:\n" + redact(requested.stdout + requested.stderr))
     record("request が通る（MR を作って投稿してマーカー）", requested.returncode == 0)
@@ -678,8 +661,6 @@ def run_probe() -> None:
         "1",
         "--body-file",
         body,
-        "--eli5",
-        EXPLAINER,
     )
     record(
         "2 度目の request は依頼済みで止まる", again.returncode != 0 and "依頼済み" in again.stderr
@@ -820,7 +801,7 @@ def run_probe() -> None:
     record("ready の note が MR にある", has_marker(notes_of(pid, iid), "<!-- ccnavi:ready -->"))
     top = CLIENT.tree(ROOT_TOKEN, pid, "i0001")
     record("ready のあと GitLab の i0001 に wip/ が無い", bool(top) and "wip" not in top, str(top))
-    # logs/archive/ は git の外（ワークスペースの下）。git 上は削除される（ticket-flow.md の 13）
+    # logs/archive/ は git の外（ワークスペースの下）。git 上は削除される（ticket-flow.md の 12）
     archive = os.path.join(ROOT, "logs", "archive")
     archived = [
         os.path.relpath(os.path.join(d, f), archive)
@@ -934,7 +915,6 @@ def decide_section(pid: int, reviewer_id: int) -> None:
         review=True,
         title="d を書く",
     )
-    write_explainer(tree)
     commit_all(tree, "tickets")
     record("i0003 の push", sh(GIT_SH, tree, "push", "-u", "origin", "i0003").returncode == 0)
     for _ in range(10):
@@ -970,9 +950,7 @@ def decide_section(pid: int, reviewer_id: int) -> None:
         sh(GIT_SH, tree, "push", "-u", "origin", "i0003").returncode == 0,
     )
     body = write(os.path.join(OUT, "request-3.md"), "見てほしい点\n\n- src/d を足した\n")
-    requested = sh(
-        REVIEW_SH, tree, "review-request", "--phase", "1", "--body-file", body, "--eli5", EXPLAINER
-    )
+    requested = sh(REVIEW_SH, tree, "review-request", "--phase", "1", "--body-file", body)
     record("i0003 の request が通る", requested.returncode == 0, redact(requested.stderr)[-200:])
     status, disc = CLIENT.create_discussion(
         REVIEWER_TOKEN,

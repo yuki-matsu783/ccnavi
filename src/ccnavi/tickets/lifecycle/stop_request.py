@@ -1,7 +1,7 @@
 """Stop で、レビューの依頼まで進めずに終えようとしたときの促し。
 
 チケット作業の決まった道（子の `finish`（親ブランチへ合流して push）→ すべての子が合流済みかの確認
-→ ELI5 → `ccnavi-review.sh review-request`）の
+→ `ccnavi-review.sh review-request`）の
 途中で、エージェントが「進めてよいですか」と確認して終えてしまうのを、1 回だけ止めて次の一手を返す。
 `ops_stop.unfinished_at_stop` は `finish` の打ち忘れ専用なので、ここは別の判定にしてある。
 
@@ -58,13 +58,12 @@ CODE_REQUEST_NUDGE = "NUDGE_TICKET_REQUEST"
 STEP_FINISH = "finish"
 STEP_MERGE = "merge"
 STEP_LATE_FIX = "late-fix"
-STEP_ELI5 = "eli5"
 STEP_REQUEST = "request"
 # ユーザが子を手で done/ に動かした。親が confirm を打てば確定する。
 STEP_CONFIRM = "confirm"
 
 # 文面ファイルが場合分けで持つ段階（これ以外は依頼の段階として言う）。
-_STEPS = (STEP_FINISH, STEP_MERGE, STEP_LATE_FIX, STEP_ELI5, STEP_REQUEST, STEP_CONFIRM)
+_STEPS = (STEP_FINISH, STEP_MERGE, STEP_LATE_FIX, STEP_REQUEST, STEP_CONFIRM)
 
 # 記録のキーの頭。`finish` の促しのキー（チケットの識別子）と分ける。
 _KEY_HEAD = "request:"
@@ -153,7 +152,7 @@ def pending_at_stop(
 
 
 def _next_step(root: str, worktree: str, ph: phase.Phase) -> tuple[str, list[str]]:
-    """依頼の前の道のどこにいるか。合流済みでない子があれば確認、無ければ ELI5、あれば依頼。
+    """依頼の前の道のどこにいるか。合流済みでない子があれば確認、無ければ依頼。
 
     合流するのは子の `finish` で、ここは「すべての子が合流済みか」を確かめるだけ。合流済みは、
     finish が書いた `merged_sha`（合流した子の先頭）が親の HEAD の祖先であること。
@@ -182,8 +181,6 @@ def _next_step(root: str, worktree: str, ph: phase.Phase) -> tuple[str, list[str
         return STEP_MERGE, unmerged
     if late:
         return STEP_LATE_FIX, late
-    if not os.path.isfile(os.path.join(worktree, "wip", "eli5", f"phase-{ph.number}.html")):
-        return STEP_ELI5, []
     return STEP_REQUEST, []
 
 
@@ -214,7 +211,7 @@ def request_nudge(root: str, found: Pending) -> str:
 
     処理フロー:
     1. `found.step` で、いまの段階を分ける（子の finish・confirm・合流の確認・合流後の修正・
-       ELI5・依頼）。文は段階ごとに文面ファイルが持つ（`NUDGE_TICKET_REQUEST`）。
+       依頼）。文は段階ごとに文面ファイルが持つ（`NUDGE_TICKET_REQUEST`）。
     2. 子の finish だけは、子ごとのコマンドを並べた値を組んで渡す。
     3. 許可は要らないことと、この案内が同じ状態では 1 回だけであることは、文面ファイルが添える。
     """

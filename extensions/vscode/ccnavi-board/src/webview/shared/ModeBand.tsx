@@ -12,7 +12,10 @@ export function ModeBand({ mode }: { readonly mode: string }): JSX.Element | nul
   }
   return (
     <div className="banner warn mode-band">
-      現在の<code>CCNAVI_MODE</code>: <strong>{mode}</strong>。{text}
+      {/* .bannerはflexなので、文字列を直接の子に並べると別の行に割れる。1文は1つのspanに入れる */}
+      <span>
+        現在の<code>CCNAVI_MODE</code>: <strong>{mode}</strong>。{text}
+      </span>
     </div>
   );
 }

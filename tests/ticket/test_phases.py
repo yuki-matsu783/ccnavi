@@ -1138,7 +1138,7 @@ class PhaseTest(PhaseHarness):
         if not can_case_sensitive():
             self.skipTest("大文字小文字を区別しないファイルシステムでは大文字違いを並べられない")
         fixture = self.closed_family()
-        odd = ["WIP/eli5/a.html", "wip\\eli5\\b.html"]
+        odd = ["WIP/design/a.html", "wip\\design\\b.html"]
         for rel in odd:
             write(os.path.join(self.parent_tree, *rel.split("/")), "<p>x</p>\n")
             git(self.parent_tree, "add", "--", rel)
@@ -1163,7 +1163,7 @@ class PhaseTest(PhaseHarness):
         os.remove(os.path.join(base, "src", "gone.py"))
         cases = {
             os.path.join(base, "wip", "gone.md"): True,
-            os.path.join(base, "WIP", "eli5", "gone.html"): True,
+            os.path.join(base, "WIP", "design", "gone.html"): True,
             os.path.join(base, "wip", "kept.md"): False,
             os.path.join(base, "src", "gone.py"): False,
             os.path.join(base, "wipx", "gone.md"): False,

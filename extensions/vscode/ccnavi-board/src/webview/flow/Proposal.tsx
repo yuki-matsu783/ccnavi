@@ -80,7 +80,7 @@ export interface ProposalReviewProps {
 export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: ProposalReviewProps): JSX.Element {
   const cancel = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    cancel.current?.focus();
+    cancel.current?.focus({ preventScroll: true });
   }, []);
   const diff = view.kind === "ready" ? textDiff(base, view.proposal.doc) : undefined;
   const changes = diff?.changes ?? [];
@@ -138,7 +138,7 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
 export function RequestText({ prompt, onClose }: { readonly prompt: string; readonly onClose: () => void }): JSX.Element {
   const copy = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    copy.current?.focus();
+    copy.current?.focus({ preventScroll: true });
   }, []);
   return (
     <Dialog titleId="request-text-title" backdropClass="review-backdrop" cardClass="review" id="request-text" tour="request-text">
