@@ -65,7 +65,7 @@ JSON の欄名は `gate_closed`。これは判定とボードの契約で、こ�
 
 止めるかどうかは cwd のワークツリーで親を引いて決める。止めている間、その親の cwd からの `Agent`（サブエージェントの
 起動）と `Bash` / `PowerShell` を `DENY_PHASE_REVIEW` で止める。通すのは `Bash` で、連結の全部が
-`sh|bash …ccnavi-(ticket|review|git).sh` か `sh|bash …ccnavi-launcher.sh --docs`（資料を引く読み取り）の形で読み切れたときだけ。読み切れないコマンドに例外は
+`sh|bash …ccnavi-(ticket|review|git).sh` か `sh|bash …ccnavi-launcher.sh --docs`（資料を引く読み取り）の形で読み切れたときだけ。その形が 1 本以上あれば、読むだけの付き添い（前の `cd <ツリー> &&`、後ろの行数だけの `| head`・`| tail`。引数は `cd` が 1 個、head・tail が行数だけで、ファイル名とリダイレクトは付けられない）も通す。読み切れないコマンドに例外は
 与えない。`PowerShell` に例外は無く、止めている間は必ず止まる。`Write` / `Edit` は通す。次のフェーズの計画はレビュー前に進めてよい。別の親は別に
 止め、ワークスペースルート直下や無関係のツリーからの呼び出しは止めない。
 

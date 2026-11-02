@@ -1120,8 +1120,10 @@ class TicketTest(unittest.TestCase):
         docs = f"{settings.script_command(self.root, 'ccnavi-launcher.sh')} --docs --keyword review"
         passed = self.hook("PreToolUse", "Bash", self.parent_tree, command=docs)
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(passed), self.reason(passed))
-        # 連結や、`--docs` 以外のオプションは止まる。
-        for command in (f"cd . && {docs}", f"{docs.split(' --docs')[0]} --lint"):
+        # 前の `cd` は通る。`--docs` 以外のオプションや、ほかのコマンドとの連結は止まる。
+        passed = self.hook("PreToolUse", "Bash", self.parent_tree, command=f"cd . && {docs}")
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(passed), self.reason(passed))
+        for command in (f"ls && {docs}", f"{docs.split(' --docs')[0]} --lint"):
             held = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
             self.assertIn("DENY_PHASE_REVIEW", self.reason(held), command)
         # 次のフェーズの計画は通る。
@@ -1167,8 +1169,8 @@ class TicketTest(unittest.TestCase):
     def test_gate_says_the_exempt_form_is_bare(self):
         """止めたときと終わりの知らせは、案内の 1 本を単独で打つことまで言うこと。
 
-        案内どおりの 1 本でも、`cd … &&` や `| tail` を付けると止まる。それを言わないと、
-        案内に従ったつもりで止まり、案内と拒否が食い違って見える。
+        案内どおりの 1 本に付けてよいのは `cd … &&` と `| head`・`| tail` だけで、ほかを足すと止まる。
+        それを言わないと、案内に従ったつもりで止まり、案内と拒否が食い違って見える。
         """
         self.family()
         self.close_phase()
@@ -1183,8 +1185,18 @@ class TicketTest(unittest.TestCase):
             self.parent_tree,
             command=f"cd {self.parent_tree} && {guided} | tail -3",
         )
-        self.assertIn("DENY_PHASE_REVIEW", self.reason(decorated))
-        self.assertIn(phase_forms.EXEMPT_NOTE, self.reason(decorated))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(decorated), self.reason(decorated))
+        other = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command=f"cd {self.parent_tree} && ls && {guided}",
+        )
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(other))
+        self.assertIn(phase_forms.EXEMPT_NOTE, self.reason(other))
+        # 付き添いだけでは通さない。
+        self.assertFalse(phase_forms.exempt("cd /tmp\x00tail -3", ""))
+        self.assertFalse(phase_forms.exempt(f"{guided}\x00tail > out", ""))
 
         # サブエージェントの起動にはシェルのパスの話をしない。
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")

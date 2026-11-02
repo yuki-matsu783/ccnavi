@@ -22,7 +22,8 @@
 #
 # 語は src/ccnavi/infra/platformtag.py と scripts/ccnavi-setup.sh の host_target と揃える。
 #
-# bin/ に無ければ PATH の ccnavi を探す（下の ccnavi_launcher_path）。
+# bin/ に無ければ、ワークツリーなら本体のルートの launcher に渡し（ccnavi_launcher_main）、
+# それでも無ければ PATH の ccnavi を探す（下の ccnavi_launcher_path）。
 # どちらにも見つからなければ 127 で終わる。実行ファイルそのものが無いときにシェルが返すのと
 # 同じ値で、hook からは「起動できなかった」として扱われる。
 
@@ -61,6 +62,20 @@ for target in $targets; do
 		fi
 	done
 done
+
+# ワークツリーの中の launcher には bin/ が無い（bin/ は追跡せず、本体のルートにだけ置く）。
+# ここで見つからないときは、git の共通ディレクトリ（`<本体のルート>/.git`）から本体のルートを決めて、
+# そこの launcher に渡す。共通ディレクトリが `.git` で終わらない（bare など）ときは何もしない。
+# 本体のルートの launcher も同じ道を通るが、自分と同じファイルは飛ばすので戻らない。
+ccnavi_launcher_main() {
+	common=$(git -C "$here" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+	main=${common%/.git}
+	[ "$main" != "$common" ] || return 1
+	[ -f "$main/.ccnavi/scripts/ccnavi-launcher.sh" ] || return 1
+	[ "$main/.ccnavi/scripts/ccnavi-launcher.sh" -ef "$0" ] && return 1
+	exec sh "$main/.ccnavi/scripts/ccnavi-launcher.sh" "$@"
+}
+ccnavi_launcher_main "$@"
 
 # bin/ に無いときだけ、PATH の ccnavi を使う。bin/ が先なので、配布先の挙動は変わらない。
 # 見るのは絶対パスの項目だけ。空の項目と相対の項目（`.` や `~/bin`）は cwd や展開の有無で

@@ -177,6 +177,23 @@ def layers(conf: settings.Settings, root: str) -> list[Layer]:
     return found
 
 
+def unreadable(conf: settings.Settings, root: str) -> list[str]:
+    """ルールのファイルがあるのに読めないレイヤーの名前。無いレイヤーは数えない。
+
+    読めないレイヤーは空として扱われ、そのレイヤーの deny は黙って効かなくなる。
+    判定のたびには言わず（`add_layers`）、セッションの開始のたびに言うために使う。
+    """
+    broken = []
+    for layer in layers(conf, root):
+        if not os.path.exists(layer.path):
+            continue
+        try:
+            rules.load(layer.path, root)
+        except (OSError, ValueError):
+            broken.append(layer.name)
+    return broken
+
+
 def layer_for(conf: settings.Settings, root: str, target: tree.Tree | None) -> list[Layer]:
     """このツリーに足すレイヤー。書き込み系は行き先の 1 つだけ。
 
