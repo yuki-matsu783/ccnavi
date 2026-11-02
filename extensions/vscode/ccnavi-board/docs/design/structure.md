@@ -39,7 +39,7 @@ src/
     planordermodel.ts --plan-order <親> --json の答えの形（実行ファイルとの契約）と読み取り。plans は承認の preview と同じ読み方。保存の答えをパネルが読む形（書いた・変わらない・外で変わった・書かなかった）
     testmodel.ts      試験の JSON の形（--test --json / --test-expectations --json）と読み取り
     suggestmodel.ts   候補の JSON の形（--suggest --json）と読み取り。allow の候補は並べない
-    lintmodel.ts      lint の JSON の形（--lint --json）と読み取り、プロジェクトごとの苦情とフローの苦情（(flow)）の抜き出し、保存の拒否（errorLinesOf）と帯の行の件数の切り詰め（truncateLines）
+    lintmodel.ts      lint の JSON の形（--lint --json）と読み取り、プロジェクトごとの苦情とフローの苦情（先頭が`(flow)`のもの）の抜き出し、保存の拒否（errorLinesOf）と帯の行の件数の切り詰め（truncateLines）
     board.ts          列とカードへの組み立て、操作の有無（親の提案のカードの「計画編集」は提案の has_plan から）。状態のバッジとフェーズ行の一言を JSON の欄から付ける。マージ状況の帯のタイトルを引く archivedTitleOf
     status.ts         カードの状態のバッジ（statusOf）とフェーズ行の状態の一言（phaseStatusOf）。上から最初にヒットしたものを採る純粋な関数で、JSON の判定済みの欄を表示の言葉に置き換えるだけ
     mrstate.ts        マージ状況の確認が読む 2 つの答え（ccnavi-review.sh mr-state <番号>、ccnavi sync retired）の厳しい検証と、リポジトリのディレクトリの引き方
@@ -91,7 +91,7 @@ src/
     tour-templates.ts テンプレート管理の案内の見本（tours/templates.yml の sample:）を、小さい書き方から TemplatesPage（自身の層のテンプレート・下書き・統合結果）と本文の見本にする小さな読み取り。判定はせず、見本に書いた値をそのまま使う
     tour-phases.ts    フェーズ管理の案内の見本（tours/phases.yml の sample:）を、phases.yml と同じ書き方から PhasesPage にする小さな読み取り。yaml を持たず、readPhases と同じ結果になることをテストが見る
     yaml11.ts         実行ファイル（PyYAML、YAML 1.1）が文字列以外に読む語の見分け。risk-doc と phases-doc が引用符を足す判断に使う
-    yaml-read.ts      rules・phases・risks の文書が共通で使う読み込みの止め（YAMLの構文エラー・最上位がマップでない）。止めたものはエラー画面に出す
+    yaml-read.ts      rules・phases・risks の文書が共通で使う、読み込みを止める問題の検出（YAMLの構文エラー・最上位がマップでない）。見つけたものはエラー画面に出す
     load-failure.ts   設定を読めなかった失敗（LoadFailure）。読めなかったファイルのパスを持ち、エラー画面の［エディタで開く］に使う
     mode-banner.ts    動作モード（dry-run・disable）の帯の文。ルール管理とチケット管理の画面が共通で使う（enable と空は出さない）
     workspace-folder.ts 画面の対象にするフォルダの案内の文（フォルダが無いとき・複数のとき。対象は最初のフォルダ）

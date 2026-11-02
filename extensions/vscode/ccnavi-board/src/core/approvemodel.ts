@@ -265,7 +265,7 @@ export function partialMessage(partial: ApprovePartial, carried = false): string
   const written = paths.length === 0 ? placed.join(", ") : paths.join(", ");
   const failed = ticket === "" || placed.includes(ticket) ? "" : `書き込めませんでした: ${ticket}。`;
   const sent = carried
-    ? "書けたぶんだけをコミット・pushするコマンドをターミナルで実行しました。結果はターミナルで確認してください（pushできていなければ未実行です）"
+    ? "書けたぶんだけをコミット・pushするコマンドをターミナルで実行しました。結果はターミナルで確認してください。pushできていなければ未実行です"
     : "承認済みチケットをコミット・pushするコマンドは実行していません（push用のスクリプトがありません）。未実行です";
   const what =
     placed.length === 0

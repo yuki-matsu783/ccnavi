@@ -155,7 +155,7 @@ def screen(
     4. 範囲の下に、チケットが宣言したが書き込めない場所（`cand.overflow`）を出す
     5. 子は人間レビューと先行、親は計画・フェーズ間の先行（`_plan_lines`・
        `_workflow_lines`）・コピーの定義（`_copy_lines`）を出す
-    6. issue・理由・出どころ（`_origin_line`）を出し、判定に使われない記述（警告）を末尾に置く
+    6. issue・理由・出どころ（`_origin_line`）を出し、判定に使われない記述は警告として末尾に置く
     """
     lines = [f"チケットの承認リクエスト: {len(batch)} 件"]
     for cand in batch:

@@ -25,7 +25,7 @@ export interface RejectedGroup {
 const MAX_GROUP_TICKETS = 3;
 
 /**
- * 子50件に同じ長文の理由が並ぶと画面が伸びるので、理由の並びが全文一致する提案を1つにまとめる。
+ * 子50件に同じ長文の理由が並ぶと画面が伸びるので、理由の文が全文一致する提案を1つにまとめる。
  * 並びは先頭`MAX_WARN_LINES`組までで、超えた分は呼ぶ側が`truncateLines`の1行で足す。
  */
 export function foldRejected(rejected: readonly ApproveRejected[]): { groups: RejectedGroup[]; more: number } {

@@ -120,7 +120,7 @@ function problem(raw: Record<string, unknown>): LintProblem {
 
 /**
  * 行の並びを先頭`max`件までにし、超えた分は「ほかN件」の1行にまとめる。帯・保存拒否・承認ダイアログで
- * 同じ長さの決まりを使う。同じ文（行全体の文字列一致）は先に1つへ畳む。
+ * 同じ件数の上限を使う。同じ文（行全体の文字列一致）は先に1つへ畳む。
  */
 export const MAX_WARN_LINES = 5;
 
