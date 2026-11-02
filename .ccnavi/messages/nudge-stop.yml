@@ -43,7 +43,7 @@ messages:
       late_fix: |-
         このままでは依頼できない。修正を活かすなら、同じフェーズに子を足してユーザの承認を受け、その子で直す。破棄するなら、そのことをユーザに伝えて判断を仰ぐ
       request: |-
-        未コミットの変更があれば先にコミットして push してから（`review-request` は HEAD の普通のファイルを前提にする）、`{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文>` で依頼する
+        未コミットの変更があれば先にコミットして push してから、`{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文>` で依頼する
     note: |-
       {user_stop_note}
       この案内は同じ状態では 1 回だけで、作業が進むまで次に終えるときは止めません。

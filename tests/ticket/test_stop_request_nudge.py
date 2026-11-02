@@ -145,7 +145,7 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.assertIn("同じフェーズに子を足して", reason)
 
     def test_the_request_step_reminds_to_commit_and_push_first(self):
-        """未コミットの変更があるかもしれない。`request` は HEAD の普通のファイルが前提。"""
+        """未コミットの変更があるかもしれない。"""
         self.family(plan=["work-mr"])
         self.close_children(work=False)
         write(os.path.join(self.parent_tree, "src", "wip.py"), "x = 1\n")
