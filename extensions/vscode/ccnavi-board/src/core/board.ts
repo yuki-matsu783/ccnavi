@@ -456,7 +456,7 @@ function columnOf(t: TicketJson): ProposalState {
 
 /**
  * フェーズ行。状態の一言はJSONの欄から`phaseStatusOf`が決める。操作は持たない（レビュー完了は子のカードに置く）。
- * 待ちかどうかは判定が`gate_closed`と`review_waiting`で言う。ここでマーカーから組み直さない。
+ * 待ちかどうかは、判定の`gate_closed`と`review_waiting`が示す。ここではマーカーから組み直さない。
  */
 function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
   const status = phaseStatusOf(p, parent.phases);
