@@ -11,6 +11,7 @@
  * 帯（`changed`）が出るだけ。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
+import { LoadError } from "../shared/LoadError.js";
 
 import { lockClass, type Lock } from "../../core/lock.js";
 import { isToolName, KNOWN_TOOLS, SECTIONS, SECTION_LABELS, bareRuleId, tmpName, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
@@ -340,16 +341,16 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 
   if (data.kind === "error") {
     return (
-      <>
-        <p className="empty">
-          ルール管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に変わります。
-        </p>
+      <LoadError
+        heading="ルール管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に変わります。"
+        error={data.error}
+        file={data.file}
+        busy={busy}
+        onReload={reload}
+        onOpen={() => post({ type: "openFile", which: "rules" })}
+      >
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
-        <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={reload}>
-          更新
-        </button>
-      </>
+      </LoadError>
     );
   }
 

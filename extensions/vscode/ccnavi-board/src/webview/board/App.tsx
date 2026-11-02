@@ -6,6 +6,7 @@
  * 決めるもの（絞り込み・折りたたんだ列・列の幅・「更新」を押したか）だけ。判定はしない。
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX } from "react";
+import { LoadError } from "../shared/LoadError.js";
 
 import type { Board, BoardColumn, Card } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
@@ -222,10 +223,11 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   return (
     <>
       {shown === undefined ? (
-        <>
-          <p className="board-empty">チケット管理画面を読み込めませんでした。原因を直してから「ccnaviボード: チケット管理を更新」を実行してください。</p>
-          <pre className="load-error">{data.kind === "error" ? data.error : ""}</pre>
-        </>
+        <LoadError
+          heading="チケット管理画面を読み込めませんでした。原因を直してから「更新」を押してください。"
+          error={data.kind === "error" ? data.error : ""}
+          onReload={() => post({ type: "refresh" })}
+        />
       ) : (
         <>
           {sample !== undefined ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}

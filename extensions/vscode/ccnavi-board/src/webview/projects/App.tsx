@@ -6,6 +6,7 @@
  * （cloneの欄、直前の操作の一言）だけ。cloneもミラーの同期も書き込みも画面はしない。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
+import { LoadError } from "../shared/LoadError.js";
 
 import type { CloneStatus, ProjectsData, ProjectsPage, Stray, ToProjects } from "../../core/projects-view.js";
 import { tourOf } from "../../core/tour-def.js";
@@ -74,10 +75,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
 
   if (data.kind === "error") {
     return (
-      <>
-        <p className="empty">プロジェクトの一覧を読み込めませんでした。原因を直してから「ccnaviボード: プロジェクト管理を開く」を実行し直してください。</p>
-        <pre className="load-error">{data.error}</pre>
-      </>
+      <LoadError heading="プロジェクトの一覧を読み込めませんでした。原因を直してから「更新」を押してください。" error={data.error} onReload={() => act({ type: "refresh" })} />
     );
   }
 

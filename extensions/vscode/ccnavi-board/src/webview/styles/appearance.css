@@ -33,3 +33,7 @@ body.ccnavi-claude-light:not(.vscode-high-contrast):not(.vscode-high-contrast-li
   --vscode-textCodeBlock-background: #F0EEE6; --vscode-charts-blue: #9A4728; --vscode-editorInfo-foreground: #9A4728;
   --vscode-editorWarning-foreground: #7F5500; --vscode-editorError-foreground: #B3261E; --vscode-charts-green: #366D24; --vscode-charts-yellow: #7F5500;
 }
+
+/* 読み込めなかった画面の共通部品（webview/shared/LoadError.tsx） */
+.load-error { white-space: pre-wrap; overflow-wrap: anywhere; }
+.load-error-actions { display: flex; flex-wrap: wrap; gap: 8px; }

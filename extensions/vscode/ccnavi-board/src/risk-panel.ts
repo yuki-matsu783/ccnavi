@@ -49,9 +49,10 @@ import { HANDOFF_ENTRY, openHandoffFrom } from "./handoff-entry.js";
 import type { RiskTarget } from "./core/screens.js";
 import { riskSums, type RiskSum } from "./core/sums.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
+import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-failure.js";
 import { lintSummary } from "./core/lint-summary.js";
 import { showLoading } from "./loading.js";
-import { assertRetained, watchPattern } from "./panel-common.js";
+import { assertRetained, openInEditor, watchPattern } from "./panel-common.js";
 import { settingsPanel, type SettingsState } from "./settings-panel.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
@@ -229,7 +230,7 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
       other = resolveIn(root, DEFAULT_RISK);
     }
     if (layer.risk.unreadable !== "") {
-      notices.push(`実行ファイルはこのファイルを読み込めず、この設定を空として扱っています（このファイルの配点は1件も数えられていません）: ${layer.risk.unreadable}`);
+      throw unreadableFailure({ path: riskPath, rel: riskRel }, layer.risk.unreadable);
     }
   }
   let text: string;
@@ -256,7 +257,10 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
   }
   // 無いときの苦情（versionが無い、など）は画面に出さない。無いことは不備ではない。
   const parsed = readRisk(text);
-  const doc = exists || builtin ? parsed : { apply: parsed.apply, model: { ...parsed.model, problems: [] } };
+  if (parsed.blocking.length > 0 && (exists || builtin)) {
+    throw blockedFailure({ path: riskPath, rel: riskRel }, parsed.blocking);
+  }
+  const doc = exists || builtin ? parsed : { ...parsed, model: { ...parsed.model, problems: [] } };
   return { target, text, exists, builtin, mtimeMs, doc, riskPath, riskRel, notices, targets, sums, handoff: HANDOFF_ENTRY };
 }
 
@@ -364,11 +368,11 @@ function show(current: PanelState): void {
 }
 
 /** 読み直せなかったことを見せる。理由は覚えておく（渡せなかったときに`ready`で渡し直すため） */
-function showError(current: PanelState, error: string): void {
+function showError(current: PanelState, error: string, file?: ErrorFile): void {
   current.loaded = undefined;
   current.error = error;
   const target = currentKey(current.target);
-  current.host.send({ kind: "error", error, target, targets: targetOptions(undefined, "workspace", target) });
+  current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, "workspace", target) });
 }
 
 /**
@@ -494,14 +498,10 @@ async function handleMessage(current: PanelState, message: RiskMessage | undefin
       return;
     }
     case "openFile": {
-      if (current.loaded === undefined) {
-        return;
+      const target = current.loaded?.riskPath ?? current.errorFile?.path;
+      if (target !== undefined) {
+        openInEditor(target);
       }
-      const target = current.loaded.riskPath;
-      void vscode.workspace.openTextDocument(target).then(
-        (document) => vscode.window.showTextDocument(document),
-        () => vscode.window.showInformationMessage(`ファイルを開けませんでした: ${target}`),
-      );
       return;
     }
     case "create": {

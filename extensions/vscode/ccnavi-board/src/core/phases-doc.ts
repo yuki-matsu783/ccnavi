@@ -18,6 +18,7 @@
 import { isMap, isNode, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document, type Pair } from "yaml";
 
 import { PHASE_KINDS, type PhaseForm, type PhaseKind, type PhasesForm, type PhasesModel } from "./phases-view.js";
+import { blockingProblems } from "./yaml-read.js";
 import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
@@ -40,6 +41,8 @@ const KEY_ORDER = ["kind", "title", "review", "scope", "deliverables", "agent", 
 
 export interface PhasesDocument {
   readonly model: PhasesModel;
+  /** 読み込みを止める問題（構文エラー・最上位がマップでない）。空でなければ画面はフォームを出さない */
+  readonly blocking: readonly string[];
   /** 編集した内容で書き戻す。元のノードを使い回してコメントを残す。idが重なれば投げる */
   readonly apply: (form: PhasesForm) => string;
 }
@@ -47,12 +50,6 @@ export interface PhasesDocument {
 export function readPhases(text: string): PhasesDocument {
   const doc = parseDocument(text, { keepSourceTokens: false });
   const problems: string[] = [];
-  for (const e of doc.errors) {
-    problems.push(`YAMLとして解釈できません: ${e.message}`);
-  }
-  if (doc.contents !== null && !isMap(doc.contents)) {
-    problems.push("最上位がマップ（キーと値の組の集まり）ではありません。実行ファイルは読み込めません。保存すると中身を破棄して空のマップから始めます");
-  }
   const version = doc.get("version");
   if (version === undefined || version === null) {
     problems.push(`versionがありません。保存するとversion: ${PHASES_VERSION}を先頭に追加します`);
@@ -81,6 +78,7 @@ export function readPhases(text: string): PhasesDocument {
   }
 
   return {
+    blocking: blockingProblems(doc),
     model: {
       version: typeof version === "number" ? version : null,
       form: { phases },
@@ -196,7 +194,7 @@ function applyTo(doc: Document, edited: PhasesForm): string {
     }
   }
 
-  // 空か、最上位が対応表でないファイルは、中身を破棄して対応表から始める（読み込みの苦情で言ってある）。
+  // 空のファイルは対応表から始める。最上位が対応表でないファイルは読み込みで止めるので、ここには来ない。
   const top: YAMLMap = isMap(doc.contents) ? doc.contents : new YAMLMap();
   if (doc.contents !== top) {
     doc.contents = top;

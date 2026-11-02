@@ -21,6 +21,7 @@
  * 保存の確かめ）と拡張ホストへの送信（線の頼み・保存・更新）には触れない。案内の間は、線も保存も効かない。
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
+import { LoadError } from "../shared/LoadError.js";
 
 import { layoutOf, planGraphOf, type PlanLayout } from "../../core/plan-graph.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
@@ -245,13 +246,12 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   }
   if (data.kind === "error" || answer === undefined) {
     return (
-      <>
-        <p className="empty">計画編集タブを読み込めませんでした。原因を直してから「更新」を押してください。</p>
-        <pre className="load-error">{data.kind === "error" ? data.error : ""}</pre>
-        <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
-          更新
-        </button>
-      </>
+      <LoadError
+        heading="計画編集タブを読み込めませんでした。原因を直してから「更新」を押してください。"
+        error={data.kind === "error" ? data.error : ""}
+        busy={busy}
+        onReload={() => post({ type: "reload", dirty: false })}
+      />
     );
   }
   const page = data.page;

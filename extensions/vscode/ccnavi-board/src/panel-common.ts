@@ -64,3 +64,11 @@ export function debounce<K extends string>(owner: { [P in K]?: NodeJS.Timeout },
 export function assertNever(value: never): void {
   void value;
 }
+
+/** ファイルをエディタで開く。開けなければ知らせる（rules・risk・phases・flowの［エディタで開く］が共通で使う） */
+export function openInEditor(target: string): void {
+  void vscode.workspace.openTextDocument(target).then(
+    (document) => vscode.window.showTextDocument(document),
+    () => vscode.window.showInformationMessage(`ファイルを開けませんでした: ${target}`),
+  );
+}

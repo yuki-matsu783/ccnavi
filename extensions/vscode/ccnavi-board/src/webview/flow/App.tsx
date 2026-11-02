@@ -30,6 +30,7 @@
  * 閉じたら実際の表示に戻る。
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
+import { LoadError } from "../shared/LoadError.js";
 
 import { diffFlows, sameFlow, type FlowDiff } from "../../core/flow-diff.js";
 import {
@@ -397,13 +398,12 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   if (data.kind === "error" || doc === undefined || base === undefined) {
     onKey.current = () => undefined;
     return (
-      <>
-        <p className="empty">フロー編集画面を読み込めませんでした。原因を直してから「更新」を押してください。</p>
-        <pre className="load-error">{data.kind === "error" ? data.error : ""}</pre>
-        <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
-          更新
-        </button>
-      </>
+      <LoadError
+        heading="フロー編集画面を読み込めませんでした。原因を直してから「更新」を押してください。"
+        error={data.kind === "error" ? data.error : ""}
+        busy={busy}
+        onReload={() => post({ type: "reload", dirty: false })}
+      />
     );
   }
   const page = data.page;

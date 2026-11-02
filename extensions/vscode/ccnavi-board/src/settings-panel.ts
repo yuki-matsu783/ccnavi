@@ -14,6 +14,7 @@ import * as fs from "node:fs";
 import * as vscode from "vscode";
 
 import { postAppearance } from "./appearance.js";
+import { LoadFailure, type ErrorFile } from "./core/load-failure.js";
 import { lockFromError, type Lock } from "./core/lock.js";
 import type { ScreenHost } from "./core/screen-host.js";
 import { OWN_WRITE_GRACE_MS } from "./core/watch.js";
@@ -36,6 +37,8 @@ export interface SettingsState<D, T, L> {
   loaded?: L;
   /** 読み直せなかった理由。`loaded`と排他で、どちらかは必ず入っている */
   error?: string;
+  /** 読めなかったファイル（分かるとき）。エラー画面の［エディタで開く］が使う。`error`と一緒に入る */
+  errorFile?: ErrorFile;
   lock: Lock;
   /** 「ファイルの変更を検知しました」を出したまま、まだ読み直していない。再表示されたときに送り直す */
   changedPending: boolean;
@@ -69,7 +72,7 @@ export interface SettingsScreen<D, T, L, M> {
   /** 読めた中身を渡す（`current.loaded`が入っている） */
   show(current: SettingsState<D, T, L>): void;
   /** 読めなかったことを見せる */
-  showError(current: SettingsState<D, T, L>, error: string): void;
+  showError(current: SettingsState<D, T, L>, error: string, file?: ErrorFile): void;
   /** 編集対象と設定ファイルの監視を張り直す */
   watchFiles(current: SettingsState<D, T, L>): void;
   /** 保存できるかを取り直して画面へ知らせる */
@@ -184,7 +187,9 @@ export function settingsPanel<D, T, L, M>(screen: SettingsScreen<D, T, L, M>): S
       loaded = await screen.read(current.folder.uri.fsPath, current.target);
     } catch (error) {
       if (screen.alive(current) && current.seq === seq) {
-        screen.showError(current, (error as Error).message);
+        const file = error instanceof LoadFailure ? error.file : undefined;
+        current.errorFile = file;
+        screen.showError(current, (error as Error).message, file);
       }
       return;
     }
@@ -193,6 +198,7 @@ export function settingsPanel<D, T, L, M>(screen: SettingsScreen<D, T, L, M>): S
       return;
     }
     current.loaded = loaded;
+    current.errorFile = undefined;
     screen.show(current);
     screen.watchFiles(current);
     void screen.refreshLock(current);

@@ -507,7 +507,7 @@ test("CB-T132r 「ユーザ待ちのみ」の絞り込みを出し、カード�
 test("CB-T162 更新できなかった画面にも承認のオーバーレイが載り、閉じる手立てが付いてくる", async () => {
   const plain = await openPage({ kind: "error", error: "ccnavi --explain --jsonが失敗した: 60秒で返らないので打ち切った" });
   try {
-    assert.ok(text(plain, ".board-empty").includes("チケット管理画面を読み込めませんでした"));
+    assert.ok(text(plain, "p.empty").includes("チケット管理画面を読み込めませんでした"));
     assert.ok(text(plain, "pre.load-error").includes("60秒で返らないので打ち切った"));
     assert.equal(plain.all(".approval-backdrop").length, 0, "オーバーレイがなければ被せない");
     // ボードの部品は出さない

@@ -126,10 +126,10 @@ test("CB-T82 ファイルがなければ組み込みだと言って作るボタ�
 });
 
 test("CB-T84 保存できない理由と読み込みの苦情を出し、錠は届いたところで掛かる", async () => {
-  const dom = await openRisk({ model: readRisk("version: 1\nfactors: nope\n").model });
+  const dom = await openRisk({ model: readRisk("version: 2\n").model });
   try {
     assert.ok(dom.one("#lock").classList.contains("hidden"));
-    assert.match(dom.one(".problems").textContent, /factorsがリストではありません/);
+    assert.match(dom.one(".problems").textContent, /version 2/);
     // 作業中のチケットが現れたら、保存は押せなくなる（編集の途中はそのまま）
     dom.type(dom.one("#find"), "");
     await dom.send({ type: "lock", lock: { locked: true, reason: "作業中のチケットがある（i0001-02-02）", doing: ["i0001-02-02"] } });
@@ -500,6 +500,21 @@ test("CB-D1231 先頭の行の「↑」と末尾の行の「↓」は押せな�
     dom.type(dom.one("#find"), "存在しない文字列-zzz");
     await dom.settle();
     assert.match(dom.one(".empty").textContent, /絞り込みにヒットする項目がありません/);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D1247 読めない設定はフォームを出さず、ファイル名と理由と［エディタで開く］［更新］を出す", async () => {
+  const dom = await openPage({ kind: "error", error: "このファイルを読み込めません。\nYAMLの構文エラー（3行目）: x", file: ".ccnavi/config/common/risk.yml", target: { kind: "workspace", name: "" }, targets: [] });
+  try {
+    assert.equal(dom.all("#save").length, 0);
+    assert.match(dom.one(".load-error-file").textContent, /\.ccnavi\/config\/common\/risk\.yml/);
+    assert.match(dom.one(".load-error").textContent, /3行目/);
+    dom.click(dom.one('button[data-action="open-file"]'));
+    assert.deepEqual(dom.posted.at(-1), { type: "openFile" });
+    dom.click(dom.one('button[data-action="reload"]'));
+    assert.deepEqual(dom.posted.at(-1), { type: "reload", dirty: false });
   } finally {
     await dom.close();
   }

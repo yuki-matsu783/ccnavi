@@ -7,6 +7,7 @@
  * 案内の間は見本（`core/tour-templates.ts`）を描き、実際の中身・開閉には触れない。
  */
 import { useRef, useState, type JSX } from "react";
+import { LoadError } from "../shared/LoadError.js";
 
 import { defaultSum } from "../../core/sums.js";
 import { NEW_TEMPLATE_NAME_RULE, templateNameTaken, validNewTemplateName } from "../../core/templatesmodel.js";
@@ -128,14 +129,9 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
 
   if (data.kind === "error") {
     return (
-      <>
-        <p className="empty">テンプレート管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に変わります。</p>
+      <LoadError heading="テンプレート管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に変わります。" error={data.error} onReload={() => post({ type: "refresh" })}>
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
-        <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" onClick={() => post({ type: "refresh" })}>
-          更新
-        </button>
-      </>
+      </LoadError>
     );
   }
 

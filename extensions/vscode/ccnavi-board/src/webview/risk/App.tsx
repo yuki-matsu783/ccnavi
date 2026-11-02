@@ -9,6 +9,7 @@
  * 帯（`changed`）が出るだけ。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
+import { LoadError } from "../shared/LoadError.js";
 
 import { lockClass, type Lock } from "../../core/lock.js";
 import { BUILTIN_LEVELS, LEVEL_NAMES, type FactorForm, type LevelName, type RiskData, type RiskMessage, type RiskPage, type ToRisk } from "../../core/risk-view.js";
@@ -191,16 +192,16 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
 
   if (data.kind === "error") {
     return (
-      <>
-        <p className="empty">
-          リスク管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に変わります。
-        </p>
+      <LoadError
+        heading="リスク管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に変わります。"
+        error={data.error}
+        file={data.file}
+        busy={busy}
+        onReload={() => post({ type: "reload", dirty: false })}
+        onOpen={() => post({ type: "openFile" })}
+      >
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
-        <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
-          更新
-        </button>
-      </>
+      </LoadError>
     );
   }
 

@@ -51,8 +51,9 @@ import type { HandoffEntry } from "./core/handoff-entry.js";
 import { HANDOFF_ENTRY, openHandoffFrom } from "./handoff-entry.js";
 import type { PhasesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
+import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-failure.js";
 import { lintSummary } from "./core/lint-summary.js";
-import { assertRetained, watchPattern } from "./panel-common.js";
+import { assertRetained, openInEditor, watchPattern } from "./panel-common.js";
 import { settingsPanel, type SettingsState } from "./settings-panel.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
@@ -232,7 +233,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     phasesPath = resolveIn(root, layer.phasesFile.path);
     phasesRel = path.relative(root, phasesPath).split(path.sep).join("/");
     if (layer.phasesFile.unreadable !== "") {
-      notices.push(`実行ファイルはこのファイルを読み込めず、この設定の定義を空として扱っています: ${layer.phasesFile.unreadable}`);
+      throw unreadableFailure({ path: phasesPath, rel: phasesRel }, layer.phasesFile.unreadable);
     }
   }
   // 共通の設定のphases.ymlを実行ファイルが読めなければ、共通の定義は空として扱われ、--lintがerrorで言う。画面は開いたまま帯で知らせる。
@@ -264,7 +265,10 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   }
   // 無いときの苦情（versionが無い、phasesが無い）は画面に出さない。
   const parsed = readPhases(text);
-  const doc = exists ? parsed : { apply: parsed.apply, model: { ...parsed.model, problems: [] } };
+  if (parsed.blocking.length > 0 && exists) {
+    throw blockedFailure({ path: phasesPath, rel: phasesRel }, parsed.blocking);
+  }
+  const doc = exists ? parsed : { ...parsed, model: { ...parsed.model, problems: [] } };
   return { target, text, exists, mtimeMs, doc, phasesPath, phasesRel, notices, errors, common, targets, handoff: HANDOFF_ENTRY };
 }
 
@@ -373,11 +377,11 @@ function show(current: PanelState): void {
 }
 
 /** 読み直せなかったことを見せる。理由は覚えておく（渡せなかったときに`ready`で渡し直すため） */
-function showError(current: PanelState, error: string): void {
+function showError(current: PanelState, error: string, file?: ErrorFile): void {
   current.loaded = undefined;
   current.error = error;
   const target = currentKey(current.target);
-  current.host.send({ kind: "error", error, target, targets: targetOptions(undefined, "workspace", target) });
+  current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, "workspace", target) });
 }
 
 /** 開いている対象の欄の値（`targets.ts`の`kind`と`name`） */
@@ -487,14 +491,10 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
       return;
     }
     case "openFile": {
-      if (current.loaded === undefined) {
-        return;
+      const target = current.loaded?.phasesPath ?? current.errorFile?.path;
+      if (target !== undefined) {
+        openInEditor(target);
       }
-      const target = current.loaded.phasesPath;
-      void vscode.workspace.openTextDocument(target).then(
-        (document) => vscode.window.showTextDocument(document),
-        () => vscode.window.showInformationMessage(`ファイルを開けませんでした: ${target}`),
-      );
       return;
     }
     case "openHandoff": {
