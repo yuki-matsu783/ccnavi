@@ -570,7 +570,7 @@ test("CB-T264 先行を満たしていないカードに「先行待ち（先行
     assert.equal(text(page, '.card[data-id="i0001-02-03"] .badge.preds'), "先行待ち（i0001-02-02, i0001-01-09）");
     // 識別子は1つずつ折り返さない塊（`i0001-`と`02`に割れない）
     assert.deepEqual(texts(page, '.card[data-id="i0001-02-03"] .badge.preds .badge-id'), ["i0001-02-02", "i0001-01-09"]);
-    assert.match(css(), /\.badge-id \{ white-space: nowrap; \}/);
+    assert.match(css(), /\.badge-id \{ display: inline-block; max-width: 100%; overflow-wrap: anywhere; \}/);
     assert.doesNotMatch(css(), /\.badge \{[^}]*border-radius: 999px/);
     const title = page.one('.card[data-id="i0001-02-03"] .badge.preds').getAttribute("title") ?? "";
     assert.match(title, /承認・着手はできません/);
