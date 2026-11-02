@@ -11,6 +11,7 @@ import { useRef, useState, type JSX } from "react";
 import type { HandoffData, HandoffMessage, HandoffOutcome, HandoffPage, ToHandoff } from "../../core/handoff-view.js";
 import { LOCKED_KINDS, blockReason, reconcileSelection, selectablePaths } from "../../core/handoffmodel.js";
 import { lockClass, type Lock } from "../../core/lock.js";
+import { LoadError } from "../shared/LoadError.js";
 import { useHostMessages } from "../useHostMessages.js";
 import { Entry, type TerminalState } from "./Entry.js";
 import { post } from "./post.js";
@@ -102,16 +103,11 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
 
   if (data.kind === "error") {
     return (
-      <>
-        <p className="empty">取り込み待ち画面を読み込めませんでした。原因を直してから「更新」を押してください。</p>
+      <LoadError heading="取り込み待ち画面を読み込めませんでした。原因を直してから「更新」を押してください。" error={data.error} onReload={() => act({ type: "refresh" })}>
         {data.trees !== undefined && data.tree !== undefined && (
           <TreeSelect tree={data.tree} trees={data.trees} disabled={false} onSwitch={(key) => act({ type: "switchTree", key })} />
         )}
-        <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" onClick={() => act({ type: "refresh" })}>
-          更新
-        </button>
-      </>
+      </LoadError>
     );
   }
 
