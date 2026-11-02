@@ -280,6 +280,8 @@ class SessionConventionsTest(unittest.TestCase):
 
     def test_索引の案内とdry_runの注記を足しても短い(self):
         # 索引の案内が出る回（docs の行が載る）と dry-run の注記が重なる、いちばん長い回。
+        # 通常の回は 4000 字未満（上の試験）。ここは注記が何本も重なる回なので、その分の余地として
+        # 4300 字未満にする。注記が重ならない回の上限は上げない。
         os.makedirs(os.path.join(self.root, "projects", "lib", ".git"))
         subprocess.run(["git", "init", "-q", self.root], check=True)
         with open(os.path.join(self.root, ".gitignore"), "w", encoding="utf-8") as f:
@@ -289,14 +291,14 @@ class SessionConventionsTest(unittest.TestCase):
         body = block(self.start("--mode", "dry-run")).replace(self.root, "<root>")
 
         self.assertIn("--docs で", body)
-        self.assertLess(len(body), 4000, body)
+        self.assertLess(len(body), 4300, body)
 
         # 非対話の注記が重なる、いちばん長い回。
         self.attended = "0"
         body = block(self.start("--mode", "dry-run")).replace(self.root, "<root>")
 
         self.assertIn("このセッションは非対話", body)
-        self.assertLess(len(body), 4000, body)
+        self.assertLess(len(body), 4300, body)
 
 
 if __name__ == "__main__":

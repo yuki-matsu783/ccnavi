@@ -467,6 +467,9 @@ _SCRIPTS = """\
         （ビルド成果物を削除し、.claude/worktrees/<name> に対して --force なしで
          `git worktree remove` を実行します。ブランチは残します。--cwd がその中にある場合、
          または未コミットの変更がある場合は何もせず、その旨を表示します）
+    ccnavi worktree clean <name> [--preview] [--cwd <dir>]
+        （ビルド成果物だけを削除します。ワークツリーは削除しません。未コミットの変更が
+         ある場合は何も削除しません。--preview は削除するものを表示するだけです）
     ccnavi worktree tidy <parent> [--phase N] [--cwd <dir>]
         （クローズ済み（完了または取り消し）の子のワークツリーを削除します。--phase N を
          指定した場合はそのフェーズのみが対象です。doing/ にある子のワークツリーだけは残ります。
