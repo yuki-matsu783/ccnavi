@@ -40,7 +40,7 @@ from tests.scenarios import (
     stream,
     workspace,
 )
-from tests.scenarios.actors import terminal
+from tests.scenarios.actors import terminal, ui
 
 SCENARIOS = sorted(Path(__file__).parent.glob("UC-*.yml"))
 EXPECT_KEYS = {
@@ -826,6 +826,41 @@ class FullRunDoesNotPickScenariosTest(unittest.TestCase):
             p.name for p in Path(__file__).parent.glob("test_*.py") if p.name != "test_runner.py"
         ]
         self.assertEqual(extra, [], "シナリオを回す道を test_ のモジュールに置かない")
+
+
+class UiActorTest(unittest.TestCase):
+    """actors/ui.py の足場。Playwright が無い環境でも import でき、run は止めて 11 を返す。"""
+
+    def test_op_text_hides_input(self):
+        op = {"op": "fill", "selector": "#q", "text": "secret"}
+        self.assertEqual(ui.op_text(op), "fill（#q）")
+
+    def test_run_halts_without_playwright(self):
+        st = {}
+        step = {"human_ui": [{"op": "goto", "url": "http://localhost"}]}
+        with (
+            tempfile.TemporaryDirectory() as d,
+            mock.patch.object(ui, "load_playwright", return_value=None),
+        ):
+            rc = ui.run(Path(d), st, 0, step, Path(d))
+        self.assertEqual(rc, 11)
+        self.assertEqual(st["halt"]["kind"], "human_ui")
+        self.assertEqual(st["next_step"], 1)
+
+    def test_run_halts_when_browser_cannot_launch(self):
+        pw = mock.MagicMock()
+        pw.sync_playwright.return_value.__enter__.return_value.chromium.launch.side_effect = (
+            RuntimeError("no browser")
+        )
+        st = {}
+        step = {"human_ui": [{"op": "goto", "url": "http://localhost"}]}
+        with (
+            tempfile.TemporaryDirectory() as d,
+            mock.patch.object(ui, "load_playwright", return_value=pw),
+        ):
+            rc = ui.run(Path(d), st, 0, step, Path(d))
+        self.assertEqual(rc, 11)
+        self.assertIn("no browser", st["halt"]["reasons"][0])
 
 
 class ScenarioFilesTest(unittest.TestCase):
