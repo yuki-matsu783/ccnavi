@@ -254,6 +254,9 @@ test("CB-T103 同じ元ノードを2回送れば書き戻さない。yes / noの
     flow.apply({ phases: [phase("a", { title: "A" })] }),
     "version: 1\nphases:\n  a:\n    kind: work\n    title: A\n    review: true\n    scope: inherit\n",
   );
-  assert.match(readPhases("- a\n").model.problems[0], /最上位がマップ（キーと値の組の集まり）ではありません/);
-  assert.match(readPhases("version: 1\nphases:\n  broken:\n  ok:\n    kind: work\n").model.problems[0], /保存するとこの定義は消えます/);
+  assert.match(readPhases("- a\n").blocking[0], /最上位がマップ（キーと値の組の集まり）ではありません/);
+  const broken = readPhases("version: 1\nphases:\n  broken:\n  ok:\n    kind: work\n");
+  assert.match(broken.blocking[0], /定義brokenの中身がマップ（キーと値の組の集まり）ではありません/);
+  assert.deepEqual(broken.model.problems, []);
+  assert.match(readPhases("version: 1\nphases: nope\n").blocking[0], /^phasesがマップ（キーと値の組の集まり）ではありません$/);
 });

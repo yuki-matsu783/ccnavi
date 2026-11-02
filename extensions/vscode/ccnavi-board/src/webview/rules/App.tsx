@@ -11,9 +11,11 @@
  * 帯（`changed`）が出るだけ。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
+import { LoadError } from "../shared/LoadError.js";
 
 import { lockClass, type Lock } from "../../core/lock.js";
-import { isToolName, KNOWN_TOOLS, SECTIONS, SECTION_LABELS, bareRuleId, modeBanner, tmpName, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
+import { isToolName, KNOWN_TOOLS, SECTIONS, SECTION_LABELS, bareRuleId, tmpName, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
+import { ModeBand } from "../shared/ModeBand.js";
 import type { SuggestJson } from "../../core/suggestmodel.js";
 import type { ExpectationsJson } from "../../core/testmodel.js";
 import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
@@ -339,16 +341,16 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 
   if (data.kind === "error") {
     return (
-      <>
-        <p className="empty">
-          ルール管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に変わります。
-        </p>
+      <LoadError
+        heading="ルール管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に変わります。"
+        error={data.error}
+        file={data.file}
+        busy={busy}
+        onReload={reload}
+        onOpen={() => post({ type: "openFile", which: "rules" })}
+      >
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
-        <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={reload}>
-          更新
-        </button>
-      </>
+      </LoadError>
     );
   }
 
@@ -481,12 +483,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 
   return (
     <>
-      {!touring && page !== undefined && modeBanner(page.mode) !== "" && (
-        // モードは実行ファイルの答え。enableと、答えが取れないときは帯を出さない
-        <div className="banner warn">
-          現在の<code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>。{modeBanner(page.mode)}
-        </div>
-      )}
+      {!touring && page !== undefined && <ModeBand mode={page.mode} />}
       {(touring ? [] : page?.notices ?? []).map((notice, index) => (
         <div className="banner warn" key={index}>
           {notice}

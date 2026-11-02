@@ -6,6 +6,7 @@
  */
 import * as vscode from "vscode";
 
+import { multiFolderText, noFolderText } from "./core/workspace-folder.js";
 import { WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
 import * as diaglog from "./log.js";
 
@@ -63,4 +64,35 @@ export function debounce<K extends string>(owner: { [P in K]?: NodeJS.Timeout },
  */
 export function assertNever(value: never): void {
   void value;
+}
+
+/** ファイルをエディタで開く。開けなければ知らせる（rules・risk・phases・flowの［エディタで開く］が共通で使う） */
+export function openInEditor(target: string): void {
+  void vscode.workspace.openTextDocument(target).then(
+    (document) => vscode.window.showTextDocument(document),
+    () => vscode.window.showInformationMessage(`ファイルを開けませんでした: ${target}`),
+  );
+}
+
+/**
+ * 画面の対象にするフォルダ（最初の1つ）。1つも無ければ案内して`undefined`を返す。複数あれば、最初のフォルダだけが
+ * 対象になることを知らせる。複数のフォルダへの対応はしない。
+ * 画面を開く入口が使う。開く前の判定だけに使うときは、案内を出さない`firstWorkspaceFolder`を使う。
+ */
+export function workspaceFolder(what: string): vscode.WorkspaceFolder | undefined {
+  const folders = vscode.workspace.workspaceFolders;
+  const first = folders?.[0];
+  if (first === undefined) {
+    void vscode.window.showInformationMessage(noFolderText(what));
+    return undefined;
+  }
+  if (folders !== undefined && folders.length > 1) {
+    void vscode.window.showInformationMessage(multiFolderText(first.name));
+  }
+  return first;
+}
+
+/** 最初のフォルダ。案内は出さない（起動時の監視や、開けるかどうかの判定に使う） */
+export function firstWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
+  return vscode.workspace.workspaceFolders?.[0];
 }

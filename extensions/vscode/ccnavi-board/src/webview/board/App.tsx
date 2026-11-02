@@ -6,6 +6,7 @@
  * 決めるもの（絞り込み・折りたたんだ列・列の幅・「更新」を押したか）だけ。判定はしない。
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX } from "react";
+import { LoadError } from "../shared/LoadError.js";
 
 import type { Board, BoardColumn, Card } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
@@ -19,7 +20,8 @@ import boardTour from "../tours/board.yml";
 import { mutePosts, post } from "./post.js";
 import { Approval } from "./Approval.js";
 import { CardItem } from "./Card.js";
-import { formatGeneratedAt } from "../shared/format.js";
+import { lastUpdatedText } from "../shared/format.js";
+import { ModeBand } from "../shared/ModeBand.js";
 import { MergeBand } from "./MergeBand.js";
 import { detailsKey, EMPTY, loadState, saveState, type ViewState } from "./state.js";
 import { FILTER_LABELS } from "./text.js";
@@ -221,13 +223,15 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   return (
     <>
       {shown === undefined ? (
-        <>
-          <p className="board-empty">チケット管理画面を読み込めませんでした。原因を直してから「ccnaviボード: チケット管理を更新」を実行してください。</p>
-          <pre className="load-error">{data.kind === "error" ? data.error : ""}</pre>
-        </>
+        <LoadError
+          heading="チケット管理画面を読み込めませんでした。原因を直してから「更新」を押してください。"
+          error={data.kind === "error" ? data.error : ""}
+          onReload={() => post({ type: "refresh" })}
+        />
       ) : (
         <>
           {sample !== undefined ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
+          {touring ? null : <ModeBand mode={shown.mode} />}
           <ScreenHeader courses={courses} onPick={tour.start}>
             <div className="summary" data-tour="summary">
               {shown.pendingApproval.length > 0 ? <span className="pending warn">承認待ち{shown.pendingApproval.length}件</span> : null}
@@ -384,7 +388,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
 function Footer({ board }: { readonly board: Board }): JSX.Element {
   return (
     <footer className="foot">
-      最終更新{formatGeneratedAt(board.generatedAt)} / {board.root}
+      {lastUpdatedText(board.generatedAt)} / {board.root}
     </footer>
   );
 }

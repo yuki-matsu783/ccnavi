@@ -12,6 +12,7 @@ import { isMap, isNode, isScalar, isSeq, Pair, parseDocument, Scalar, YAMLMap, Y
 
 import { SECTIONS, type PatternKind, type RuleForm, type RulesModel, type Section, type Sections } from "./rules-view.js";
 import { asCond, sameCond, type CondNode } from "./rules-when.js";
+import { blockingProblems } from "./yaml-read.js";
 import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
@@ -24,6 +25,8 @@ const BLOCK_KEYS = ["message", "additionalContext", "additionalContextOnce"] as 
 
 export interface RulesDocument {
   readonly model: RulesModel;
+  /** 読み込みを止める問題（構文エラー・最上位がマップでない・タイプの型違い）。空でなければ画面はフォームを出さない */
+  readonly blocking: readonly string[];
   /** 編集したリストで書き戻す。元のノードを使い回してコメントを残す */
   readonly apply: (sections: Sections) => string;
 }
@@ -31,9 +34,7 @@ export interface RulesDocument {
 export function readRules(text: string): RulesDocument {
   const doc = parseDocument(text, { keepSourceTokens: false });
   const problems: string[] = [];
-  for (const e of doc.errors) {
-    problems.push(`YAMLとして解釈できません: ${e.message}`);
-  }
+  const blocking = blockingProblems(doc);
   const sections = {} as Record<Section, RuleForm[]>;
   for (const section of SECTIONS) {
     sections[section] = [];
@@ -42,12 +43,12 @@ export function readRules(text: string): RulesDocument {
       continue;
     }
     if (!isSeq(seq)) {
-      problems.push(`タイプ${section}がリストではありません。このタイプは画面に出しません`);
+      blocking.push(`タイプ${section}がリストではありません`);
       continue;
     }
     seq.items.forEach((item, index) => {
       if (!isMap(item)) {
-        problems.push(`タイプ${section}の${index + 1}件目がマップ（キーと値の組の集まり）ではありません。画面に出しません`);
+        blocking.push(`タイプ${section}の${index + 1}件目がマップ（キーと値の組の集まり）ではありません`);
         return;
       }
       const form = formOf(section, index, item);
@@ -61,6 +62,7 @@ export function readRules(text: string): RulesDocument {
   }
   const version = doc.get("version");
   return {
+    blocking,
     model: {
       version: typeof version === "number" ? version : null,
       sections,

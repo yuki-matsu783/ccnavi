@@ -6,6 +6,8 @@
 /* 狭い幅ではタイトルや場所の長い語を折り、表を枠の幅に収める（伸びると右の「場所」の列が隠れる）。識別子だけは折らない */
 .approval-batch th, .approval-batch td { text-align: left; padding: 2px 8px 2px 0; border-bottom: 1px solid var(--vscode-panel-border); vertical-align: top; overflow-wrap: anywhere; }
 .approval-id { font-family: var(--vscode-editor-font-family); white-space: nowrap; }
+/* 対象外の一覧の識別子は表の外のspan。幅を超える長い識別子だけ枠の幅で折り返す */
+.approval-rejected .approval-id { display: inline-block; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .approval-text {
   position: relative;
   margin: 0; padding: 8px; max-height: 50vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;

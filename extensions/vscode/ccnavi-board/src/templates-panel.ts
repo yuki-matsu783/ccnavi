@@ -47,7 +47,7 @@ import { NEW_TEMPLATE_NAME_RULE, shownLayerOf, templateNameTaken, templatesLayer
 import { renderTemplatesPage } from "./core/templates-render.js";
 import type { TemplateCheck, TemplateLayer, TemplatesData, TemplatesJson, TemplatesMessage, ToTemplates } from "./core/templates-view.js";
 import { showLoading } from "./loading.js";
-import { assertRetained, debounce, watchPattern, watchTickets } from "./panel-common.js";
+import { assertRetained, debounce, watchPattern, watchTickets, workspaceFolder } from "./panel-common.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -128,9 +128,8 @@ export async function openTemplates(target: TemplatesTarget = { kind: "self" }):
   if (!requireTickets("テンプレート管理画面")) {
     return;
   }
-  const folder = vscode.workspace.workspaceFolders?.[0];
+  const folder = workspaceFolder("テンプレート管理画面");
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、テンプレート管理画面を表示できません");
     return;
   }
   if (state !== undefined) {

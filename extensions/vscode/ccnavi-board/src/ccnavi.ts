@@ -138,7 +138,7 @@ function cutOff(what: string, ms: number): string {
 }
 
 const NOT_FOUND =
-  "ccnaviの実行ファイルが見つかりません。エージェントに「ccnavi を入れて」と頼むか、設定（ccnaviBoard.binPath）で指定してください。";
+  "ccnaviの実行ファイルが見つかりません。エージェントに「ccnavi を入れて」と頼むか、設定（ccnaviBoard.binPath）で指定してください。ワークツリーを開いている場合は、実行ファイルがそこに無いので、本体のチェックアウトのルートを開いてください。";
 
 /** 見るのはルールだけ。チケット制御とstateの置き場は外し、記録も残さない */
 const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] as const;
@@ -315,8 +315,8 @@ export async function runApproveYes(
       ok: false,
       error:
         `${cutOff("ccnavi user agree --yes", APPROVE_TIMEOUT_MS)}。` +
-        "一部だけ承認済みになっている可能性があります。承認済みチケットをコミット・pushするコマンドはターミナルに送信していません" +
-        "（コマンドを送るのは承認できたときだけです）。チケット管理画面を更新して、何が承認されたかを確認してください",
+        "一部だけ承認済みになっている可能性があります。承認済みチケットをコミット・pushするコマンドは、承認できたときだけターミナルで実行します。今回は実行していません。" +
+        "チケット管理画面を更新して、何が承認されたかを確認してください",
     };
   }
   const parsed = parseApproveResult(ran.stdout);

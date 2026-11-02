@@ -198,6 +198,8 @@ export interface Board {
   /** アーカイブのカードの数 */
   readonly archivedCount: number;
   readonly generatedAt: string;
+  /** 動作モード（`CCNAVI_MODE`）。実行ファイルの答えのまま */
+  readonly mode: string;
   readonly root: string;
   /** プロジェクトの置き場（設定の`projects`）。マージ状況の確認が、プロジェクトのリポジトリをcwdにするのに使う */
   readonly projectsDir: string;
@@ -233,6 +235,7 @@ export function buildBoard(json: BoardJson): Board {
     issueCount: live.filter((card) => card.issues.length > 0).length,
     archivedCount: archived.length,
     generatedAt: json.generated_at,
+    mode: json.settings.mode,
     root: json.root,
     projectsDir: json.settings.projects,
   };

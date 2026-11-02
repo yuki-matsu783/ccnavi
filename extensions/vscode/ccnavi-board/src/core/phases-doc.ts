@@ -18,6 +18,7 @@
 import { isMap, isNode, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document, type Pair } from "yaml";
 
 import { PHASE_KINDS, type PhaseForm, type PhaseKind, type PhasesForm, type PhasesModel } from "./phases-view.js";
+import { blockingProblems } from "./yaml-read.js";
 import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
@@ -40,6 +41,8 @@ const KEY_ORDER = ["kind", "title", "review", "scope", "deliverables", "agent", 
 
 export interface PhasesDocument {
   readonly model: PhasesModel;
+  /** 読み込みを止める問題（構文エラー・最上位がマップでない・phasesとその定義の型違い）。空でなければ画面はフォームを出さない */
+  readonly blocking: readonly string[];
   /** 編集した内容で書き戻す。元のノードを使い回してコメントを残す。idが重なれば投げる */
   readonly apply: (form: PhasesForm) => string;
 }
@@ -47,12 +50,7 @@ export interface PhasesDocument {
 export function readPhases(text: string): PhasesDocument {
   const doc = parseDocument(text, { keepSourceTokens: false });
   const problems: string[] = [];
-  for (const e of doc.errors) {
-    problems.push(`YAMLとして解釈できません: ${e.message}`);
-  }
-  if (doc.contents !== null && !isMap(doc.contents)) {
-    problems.push("最上位がマップ（キーと値の組の集まり）ではありません。実行ファイルは読み込めません。保存すると中身を破棄して空のマップから始めます");
-  }
+  const blocking = blockingProblems(doc);
   const version = doc.get("version");
   if (version === undefined || version === null) {
     problems.push(`versionがありません。保存するとversion: ${PHASES_VERSION}を先頭に追加します`);
@@ -65,12 +63,12 @@ export function readPhases(text: string): PhasesDocument {
   if (raw === undefined || raw === null) {
     problems.push("phasesがありません。実行ファイルは「`phases`がないか空か、マップではない」と報告します。定義を1つ以上追加して保存してください");
   } else if (!isMap(raw)) {
-    problems.push("phasesがマップ（キーと値の組の集まり）ではありません。定義は画面に出しません。保存すると中身を破棄して空のマップから始めます");
+    blocking.push("phasesがマップ（キーと値の組の集まり）ではありません");
   } else {
     raw.items.forEach((pair, index) => {
       const id = keyText(pair);
       if (!isMap(pair.value)) {
-        problems.push(`定義${id || `（${index + 1}件目）`}の中身がマップ（キーと値の組の集まり）ではありません。画面に出さず、保存するとこの定義は消えます（実行ファイルも読み込めません）`);
+        blocking.push(`定義${id || `（${index + 1}件目）`}の中身がマップ（キーと値の組の集まり）ではありません`);
         return;
       }
       phases.push(formOf(index, id, pair.value, problems));
@@ -81,6 +79,7 @@ export function readPhases(text: string): PhasesDocument {
   }
 
   return {
+    blocking,
     model: {
       version: typeof version === "number" ? version : null,
       form: { phases },
@@ -196,7 +195,7 @@ function applyTo(doc: Document, edited: PhasesForm): string {
     }
   }
 
-  // 空か、最上位が対応表でないファイルは、中身を破棄して対応表から始める（読み込みの苦情で言ってある）。
+  // 空のファイルは対応表から始める。最上位が対応表でないファイルは読み込みで止めるので、ここには来ない。
   const top: YAMLMap = isMap(doc.contents) ? doc.contents : new YAMLMap();
   if (doc.contents !== top) {
     doc.contents = top;
@@ -210,14 +209,14 @@ function applyTo(doc: Document, edited: PhasesForm): string {
   // ファイルの頭のorderは読まない欄で、あればそのまま残る。
 
   // phases。元の組を先に全部拾っておき、編集したリストへ移す。
-  // `origin`は読み込んだときの生の位置。中身が対応表でない組は画面に載らず、保存で消える（苦情で言ってある）。
+  // `origin`は読み込んだときの生の位置。中身が対応表でない組は読み込みで止めるので、ここの組はどれも対応表。
   const existing = top.get("phases", true);
   const originals: Pair[] = isMap(existing) ? existing.items.slice() : [];
   const adopted = isMap(existing) ? adoptLeadingComment(existing, originals[0]) : undefined;
   const pairs = edited.phases.map((form) => {
     const id = form.id.trim();
     const original = form.origin === null ? undefined : originals[form.origin];
-    const pair = original !== undefined && isMap(original.value) ? original : doc.createPair(id, new YAMLMap());
+    const pair = original ?? doc.createPair(id, new YAMLMap());
     // 改名は組のキーの値だけを替える。キーの前のコメントはキーに付いているので一緒に動く。
     // 実行ファイル（PyYAML）が別の型に読む語（yes / no / on / offなど）は囲む。
     let key: Scalar;
@@ -245,7 +244,7 @@ function applyTo(doc: Document, edited: PhasesForm): string {
     // 対応表の前後のコメントは対応表のノードに付いているので、対応表は残して中身だけ替える。
     existing.items = pairs;
   } else {
-    // 無い、対応表でない、`{}`の1行書き（flow）は、ブロックの対応表に置き換える。
+    // 無い、`{}`の1行書き（flow）は、ブロックの対応表に置き換える。
     // flowのまま中身を入れると全部が1行になり、以後の差分もコメントの置き場も行単位で扱えなくなる。
     const map = new YAMLMap();
     map.items = pairs;

@@ -28,7 +28,7 @@ import type { TreeJson } from "./core/model.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { OWN_WRITE_GRACE_MS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
-import { assertRetained, debounce, watchGlobs, watchTickets } from "./panel-common.js";
+import { assertRetained, debounce, watchGlobs, watchTickets, workspaceFolder } from "./panel-common.js";
 import { confirmIfTurn } from "./turn-confirm.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
@@ -81,9 +81,8 @@ function binSetting(): string {
 
 /** `ccnaviBoard.openHandoff`の本体。引数なしはワークスペース */
 export async function openHandoff(key: string = MAIN_TREE_KEY): Promise<void> {
-  const folder = vscode.workspace.workspaceFolders?.[0];
+  const folder = workspaceFolder("取り込み待ち画面");
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、取り込み待ち画面を表示できません");
     return;
   }
   if (state !== undefined) {

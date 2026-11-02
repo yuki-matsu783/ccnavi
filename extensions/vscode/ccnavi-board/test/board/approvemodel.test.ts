@@ -189,7 +189,7 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
   assert.ok(stopped.includes("i0001-01-01で止まりました"));
   assert.ok(stopped.includes("書けた承認済みチケット（1件）: .ccnavi/approved/doing/i0001.md"), "書けたパスを言う");
   assert.ok(stopped.includes("書き込めませんでした: i0001-01-01"), "書けなかった提案を名指しする");
-  assert.ok(stopped.includes("コミット・pushするコマンドは送信していません"), "送れていなければ未送信と言う");
+  assert.ok(stopped.includes("コミット・pushするコマンドは実行していません"), "送れていなければ未実行と言う");
   const sent = partialMessage({
     placed: ["i0001"],
     paths: [".ccnavi/approved/doing/i0001.md"],
@@ -198,7 +198,7 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
     reason: "書けない",
     lines: [],
   }, true);
-  assert.ok(sent.includes("書けたぶんだけをコミット・pushするコマンドをターミナルに送信しました"), sent);
+  assert.ok(sent.includes("書けたぶんだけをコミット・pushするコマンドをターミナルに送りました"), sent);
   assert.ok(stopped.includes("マーカーを削除した"), "ターミナルに出ていた行も渡す");
 
   // 1 件も置かれなかったときは「一部だけ置かれた」と言わない

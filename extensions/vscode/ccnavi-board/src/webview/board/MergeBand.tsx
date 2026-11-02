@@ -95,7 +95,7 @@ function State({ row, touring }: { readonly row: MergeViewRow; readonly touring:
           <span>マージ済み</span>{" "}
           {row.sent ? (
             <span className="merge-sent" role="status">
-              片付けのコマンドを送信しました。結果はターミナルで確認してください
+              片付けのコマンドをターミナルに送りました。結果はターミナルで確認してください
             </span>
           ) : (
             <button
@@ -117,7 +117,7 @@ function State({ row, touring }: { readonly row: MergeViewRow; readonly touring:
           )}
           {row.sendError !== "" ? (
             <span className="merge-error" role="alert" data-merge="send-error">
-              送信できませんでした: {row.sendError}
+              送れませんでした: {row.sendError}
             </span>
           ) : null}
         </>

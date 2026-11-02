@@ -8,7 +8,7 @@ import * as vscode from "vscode";
 
 import { loadBoard } from "./ccnavi.js";
 import { TICKET_CONTROL_ENV, ticketControlOf, type TicketControl } from "./core/ticket-control.js";
-import { watchGlobs } from "./panel-common.js";
+import { firstWorkspaceFolder, watchGlobs } from "./panel-common.js";
 
 /** package.jsonの`when`と揃える */
 export const CONTEXT_KEY = "ccnaviBoard.ticketControl";
@@ -70,7 +70,7 @@ async function refresh(root: string): Promise<void> {
 
 /** 起動時に1度聞き、設定ファイルの変化で聞き直す */
 export function watchTicketControl(context: vscode.ExtensionContext): void {
-  const folder = vscode.workspace.workspaceFolders?.[0];
+  const folder = firstWorkspaceFolder();
   // 最初は既定のenableをVS Code側に知らせておき、答えが来たら差し替える。起動を待たせない
   void vscode.commands.executeCommand("setContext", CONTEXT_KEY, current);
   if (folder === undefined) {

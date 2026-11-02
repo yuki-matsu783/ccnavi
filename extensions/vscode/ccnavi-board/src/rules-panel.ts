@@ -33,7 +33,7 @@ import { loadBoard, runExpectations, runLint, runSuggest, runTest, type RulesOve
 import { hooksFor, parseHooks, type HookEntry } from "./core/hooks.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
 import { loadingText } from "./core/loading-render.js";
-import { warnLinesOf } from "./core/lintmodel.js";
+import { errorLinesOf, warnLinesOf } from "./core/lintmodel.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asSections, readRules, type RulesDocument } from "./core/rules-doc.js";
 import { renderRulesPage } from "./core/rules-render.js";
@@ -45,8 +45,9 @@ import type { HandoffEntry } from "./core/handoff-entry.js";
 import { HANDOFF_ENTRY, openHandoffFrom } from "./handoff-entry.js";
 import type { RulesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
+import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-failure.js";
 import { lintSummary } from "./core/lint-summary.js";
-import { assertRetained, watchGlobs } from "./panel-common.js";
+import { assertRetained, openInEditor, watchGlobs, workspaceFolder } from "./panel-common.js";
 import { settingsPanel, type SettingsState } from "./settings-panel.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -132,9 +133,8 @@ function expectationsSetting(): string {
 
 /** `ccnaviBoard.openRules`の本体。引数なしは共通の設定のルール */
 export async function openRules(target: RulesTarget = { kind: "workspace" }): Promise<void> {
-  const folder = vscode.workspace.workspaceFolders?.[0];
+  const folder = workspaceFolder("ルール管理画面");
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、ルール管理画面を表示できません");
     return;
   }
   if (state !== undefined) {
@@ -220,7 +220,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     rulesPath = resolveIn(root, layer.rules.path);
     rulesRel = path.relative(root, rulesPath).split(path.sep).join("/");
     if (layer.rules.unreadable !== "") {
-      notices.push(`実行ファイルはこのファイルを読み込めず、この設定を空として扱っています（このファイルのルールは1件も判定に使われていません）: ${layer.rules.unreadable}`);
+      throw unreadableFailure({ path: rulesPath, rel: rulesRel }, layer.rules.unreadable);
     }
   }
   let text: string;
@@ -239,6 +239,10 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     mtimeMs = 0;
     exists = false;
   }
+  const doc = readRules(exists ? text : "version: 1\n");
+  if (doc.blocking.length > 0) {
+    throw blockedFailure({ path: rulesPath, rel: rulesRel }, doc.blocking);
+  }
   const hooks = [
     ...(settingsText === undefined ? [] : parseHooks(settingsText, "settings")),
     ...(localText === undefined ? [] : parseHooks(localText, "settings-local")),
@@ -250,7 +254,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     exists,
     mtimeMs,
     // 無いファイルは、書式の版だけを持つ空のルールとして読む（版が無いファイルは実行ファイルが読めないので、保存で作るときに先頭へ置く）
-    doc: readRules(exists ? text : "version: 1\n"),
+    doc,
     rulesPath,
     rulesRel,
     notices,
@@ -367,11 +371,11 @@ function show(current: PanelState): void {
 }
 
 /** 読み直せなかったことを見せる。理由は覚えておく（渡せなかったときに`ready`で渡し直すため） */
-function showError(current: PanelState, error: string): void {
+function showError(current: PanelState, error: string, file?: ErrorFile): void {
   current.loaded = undefined;
   current.error = error;
   const target = currentKey(current.target);
-  current.host.send({ kind: "error", error, target, targets: targetOptions(undefined, "workspace", target) });
+  current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, "workspace", target) });
 }
 
 /** 開いている対象の欄の値（`targets.ts`の`kind`と`name`） */
@@ -526,14 +530,11 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       return;
     }
     case "openFile": {
-      if (current.loaded === undefined) {
-        return;
+      const loaded = current.loaded;
+      const target = loaded === undefined ? current.errorFile?.path : message.which === "rules" ? loaded.rulesPath : loaded.expectationsPath;
+      if (target !== undefined) {
+        openInEditor(target);
       }
-      const target = message.which === "rules" ? current.loaded.rulesPath : current.loaded.expectationsPath;
-      void vscode.workspace.openTextDocument(target).then(
-        (document) => vscode.window.showTextDocument(document),
-        () => vscode.window.showInformationMessage(`ファイルを開けませんでした: ${target}`),
-      );
       return;
     }
     case "pickFile": {
@@ -668,7 +669,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
   }
   if (!lint.value.ok) {
     // 指摘は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
-    fail(current, `設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください。\n${lint.value.report.split(tmp).join(loaded.rulesRel)}`);
+    fail(current, `設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください。\n${errorLinesOf(lint.value.report, tmp, loaded.rulesRel).join("\n")}`);
     return;
   }
 

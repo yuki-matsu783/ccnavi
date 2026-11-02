@@ -197,12 +197,12 @@ test("CB-D62 更新できなかったら理由を出し、定義は出さない"
 
 test("CB-D63 定義がないファイルは、保存する前に追加すると言う。苦情と錠はそのまま出す", async () => {
   const dom = await openPhases({
-    model: readPhases("version: 1\nphases: nope\n").model,
+    model: readPhases("version: 1\n").model,
     lock: { locked: true, reason: "作業中のチケットがある（i0001-02-02）", doing: ["i0001-02-02"], turns: [] },
   });
   try {
     assert.match(dom.one("#phases .empty").textContent, /定義がありません。定義が空のファイルはccnaviで読み込めません/);
-    assert.match(dom.one(".problems").textContent, /phasesがマップ（キーと値の組の集まり）ではありません/);
+    assert.match(dom.one(".problems").textContent, /phasesがありません/);
     assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02-02）");
     assert.ok(dom.one("#lock").classList.contains("info"), "作業中は情報色");
     assert.ok(!dom.one("#lock").classList.contains("hidden"));
@@ -511,4 +511,19 @@ test("CB-D153 読み込みに失敗した画面にも設定の切り替えの欄
 
 test("CB-D392 見出しに「取り込み待ちを開く」があり、押すとopenHandoffを送る。実行ファイルがhandoffを持たなければ無効で、理由を出す", async () => {
   await checkHandoffLink((handoff) => openPhases({ handoff }));
+});
+
+test("CB-D1249 読めない設定はフォームを出さず、ファイル名と理由と［エディタで開く］［更新］を出す", async () => {
+  const dom = await openPage({ kind: "error", error: "このファイルを読み込めません。\nYAMLの構文エラー（3行目）: x", file: ".ccnavi/config/common/phases.yml", target: { kind: "workspace", name: "" }, targets: [] });
+  try {
+    assert.equal(dom.all("#save").length, 0);
+    assert.match(dom.one(".load-error-file").textContent, /\.ccnavi\/config\/common\/phases\.yml/);
+    assert.match(dom.one(".load-error").textContent, /3行目/);
+    dom.click(dom.one('button[data-action="open-file"]'));
+    assert.deepEqual(dom.posted.at(-1), { type: "openFile" });
+    dom.click(dom.one('button[data-action="reload"]'));
+    assert.deepEqual(dom.posted.at(-1), { type: "reload", dirty: false });
+  } finally {
+    await dom.close();
+  }
 });

@@ -196,6 +196,12 @@ export function statusOf(card: StatusCard): Status {
 /** 「レビュー準備中」のツールチップ。ユーザの番ではない */
 const PREPARING_TITLE = "エージェントがレビュー依頼を出す番です";
 
+/** 「開始前」のツールチップ。ユーザが次に頼むこと */
+const NOT_STARTED_TITLE = "承認済みで、まだ着手していません。Claude Codeに着手を頼むと、エージェントがワークツリーを作って作業を始めます";
+
+/** 「作業中」のツールチップ。エージェントの番 */
+const WORKING_TITLE = "エージェントが作業中です。ユーザの操作は要りません。終わるとエージェントがレビュー依頼を出します";
+
 /** 着手前の開いたチケット。ワークツリーは着手で作るので、無くて普通 */
 export function isNotStarted(card: StatusCard): boolean {
   return card.copyStatus === "open" && card.startedAt === "";
@@ -212,7 +218,7 @@ function parentStatus(card: StatusCard): Status {
     return { label: "レビュー準備中", title: PREPARING_TITLE, tone: "wait" };
   }
   if (card.copyStatus === "open") {
-    return card.startedAt === "" ? { label: "開始前", title: "", tone: "wait" } : { label: "作業中", title: "", tone: "work" };
+    return card.startedAt === "" ? { label: "開始前", title: NOT_STARTED_TITLE, tone: "wait" } : { label: "作業中", title: WORKING_TITLE, tone: "work" };
   }
   return check(fieldsOf(card));
 }
@@ -237,7 +243,7 @@ function childStatus(card: StatusCard): Status {
     if (card.reviewWaiting || card.gateClosed) {
       return check("作業中なのに、フェーズがレビューで止まっています");
     }
-    return card.startedAt === "" ? { label: "開始前", title: "", tone: "wait" } : { label: "作業中", title: "", tone: "work" };
+    return card.startedAt === "" ? { label: "開始前", title: NOT_STARTED_TITLE, tone: "wait" } : { label: "作業中", title: WORKING_TITLE, tone: "work" };
   }
   return check(fieldsOf(card));
 }

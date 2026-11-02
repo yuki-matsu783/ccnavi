@@ -50,7 +50,7 @@ import { showLoading } from "./loading.js";
 import type { MirrorData, ProjectsData, ProjectsMessage, ToProjects } from "./core/projects-view.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { readOrigin } from "./git.js";
-import { assertRetained, debounce, watchGlobs } from "./panel-common.js";
+import { assertRetained, debounce, watchGlobs, workspaceFolder } from "./panel-common.js";
 import { runInTerminal } from "./terminal.js";
 import { markTourSeen, tourDue, tourPanelClosed } from "./tour.js";
 import { confirmIfTurn } from "./turn-confirm.js";
@@ -103,9 +103,8 @@ function binSetting(): string {
 
 /** `ccnaviBoard.openProjects`の本体 */
 export async function openProjects(): Promise<void> {
-  const folder = vscode.workspace.workspaceFolders?.[0];
+  const folder = workspaceFolder("プロジェクト管理画面");
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、プロジェクト管理画面を表示できません");
     return;
   }
   if (state !== undefined) {

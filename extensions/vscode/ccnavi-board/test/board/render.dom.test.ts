@@ -290,7 +290,7 @@ test("CB-T108b 承認したら同じオーバーレイに文とコピー・新�
   }
   const carried = await openBoard(fixture(), { approval: { kind: "done", count: 1, prompt: "i0001-02-03を承認した", carried: true } });
   try {
-    assert.ok(texts(carried, ".approval-note").includes("承認済みチケットをコミット・pushするコマンドをターミナルに送信しました。"));
+    assert.ok(texts(carried, ".approval-note").includes("承認済みチケットをコミット・pushするコマンドをターミナルに送りました。結果はターミナルで確認してください。"));
   } finally {
     await carried.close();
   }
@@ -507,7 +507,7 @@ test("CB-T132r 「ユーザ待ちのみ」の絞り込みを出し、カード�
 test("CB-T162 更新できなかった画面にも承認のオーバーレイが載り、閉じる手立てが付いてくる", async () => {
   const plain = await openPage({ kind: "error", error: "ccnavi --explain --jsonが失敗した: 60秒で返らないので打ち切った" });
   try {
-    assert.ok(text(plain, ".board-empty").includes("チケット管理画面を読み込めませんでした"));
+    assert.ok(text(plain, "p.empty").includes("チケット管理画面を読み込めませんでした"));
     assert.ok(text(plain, "pre.load-error").includes("60秒で返らないので打ち切った"));
     assert.equal(plain.all(".approval-backdrop").length, 0, "オーバーレイがなければ被せない");
     // ボードの部品は出さない
@@ -570,7 +570,7 @@ test("CB-T264 先行を満たしていないカードに「先行待ち（先行
     assert.equal(text(page, '.card[data-id="i0001-02-03"] .badge.preds'), "先行待ち（i0001-02-02, i0001-01-09）");
     // 識別子は1つずつ折り返さない塊（`i0001-`と`02`に割れない）
     assert.deepEqual(texts(page, '.card[data-id="i0001-02-03"] .badge.preds .badge-id'), ["i0001-02-02", "i0001-01-09"]);
-    assert.match(css(), /\.badge-id \{ white-space: nowrap; \}/);
+    assert.match(css(), /\.badge-id \{ display: inline-block; max-width: 100%; overflow-wrap: anywhere; \}/);
     assert.doesNotMatch(css(), /\.badge \{[^}]*border-radius: 999px/);
     const title = page.one('.card[data-id="i0001-02-03"] .badge.preds').getAttribute("title") ?? "";
     assert.match(title, /承認・着手はできません/);

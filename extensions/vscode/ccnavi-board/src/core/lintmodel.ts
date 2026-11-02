@@ -119,26 +119,54 @@ function problem(raw: Record<string, unknown>): LintProblem {
 }
 
 /**
+ * 行の並びを先頭`max`件までにし、超えた分は「ほかN件」の1行にまとめる。帯・保存拒否・承認ダイアログで
+ * 同じ件数の上限を使う。同じ文（行全体の文字列一致）は先に1つへ畳む。
+ */
+export const MAX_WARN_LINES = 5;
+
+/** `--lint`の報告を切り詰めたときの「ほかN件」に続ける案内。報告の元が`--lint`のときだけ渡す */
+export const LINT_MORE_HINT = "。`ccnavi --lint`で全部見られます";
+
+/**
+ * `hint`は「ほかN件」の後ろに続ける案内（なければ空文字）。全部を見る手段は呼ぶ側の出どころで違う
+ * （`--lint`の報告なら`LINT_MORE_HINT`、承認画面の理由には案内なし）。
+ */
+export function truncateLines(lines: readonly string[], hint: string, max: number = MAX_WARN_LINES): string[] {
+  const all = [...new Set(lines)];
+  if (all.length <= max) {
+    return all;
+  }
+  return [...all.slice(0, max), `ほか${all.length - max}件${hint}`];
+}
+
+/** 報告から`prefix`で始まる行を取り出し、一時ファイルのパスを対象のパスに直す。切り詰めは直したあとに行う */
+function linesOf(report: string, prefix: string, tmp: string, shown: string): string[] {
+  return report
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith(prefix))
+    .map((line) => line.split(tmp).join(shown));
+}
+
+/**
  * `--lint`の報告（文面）からwarnの行だけを取り出す。行は`warn: <場所>: <中身>`。
  * 保存が通ったあとに画面の帯へ出す。一時ファイルのパスは対象のファイルのパスに直す。
  * 帯が長くならないよう、先頭`MAX_WARN_LINES`件までにし、残りは「ほかN件」の1行にまとめる。
  * 保存したファイルのwarnだけに絞る印は、報告の行に無い（場所はルールidや`(risk)`など
  * まちまち）ので、絞らない。
  */
-export const MAX_WARN_LINES = 5;
-
 export function warnLinesOf(report: string, tmp: string, shown: string): string[] {
-  const all = report
-    .split(/\r?\n/)
-    .filter((line) => line.startsWith("warn: "))
-    .map((line) => line.split(tmp).join(shown));
-  if (all.length <= MAX_WARN_LINES) {
-    return all;
-  }
-  return [
-    ...all.slice(0, MAX_WARN_LINES),
-    `ほか${all.length - MAX_WARN_LINES}件。\`ccnavi --lint\`で全部見られます`,
-  ];
+  return truncateLines(linesOf(report, "warn: ", tmp, shown), LINT_MORE_HINT);
+}
+
+/**
+ * `--lint`の報告からerrorの行だけを取り出す（保存の拒否に出す）。行頭は日本語（`エラー: `）にする。
+ * 対象のファイル（`shown`）に触れる行を先頭に出し、先頭`MAX_WARN_LINES`件までにする。
+ * 無関係なチケット由来の指摘が何十件あっても、保存を止めた本当の原因が埋もれない。
+ */
+export function errorLinesOf(report: string, tmp: string, shown: string): string[] {
+  const all = linesOf(report, "error: ", tmp, shown).map((line) => `エラー: ${line.slice("error: ".length)}`);
+  const own = all.filter((line) => line.includes(shown));
+  return truncateLines([...own, ...all.filter((line) => !line.includes(shown))], LINT_MORE_HINT);
 }
 
 /** そのプロジェクトについての苦情。`where`が`(projects/<名前>)`で始まるもの */

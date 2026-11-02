@@ -130,10 +130,12 @@ test("CB-T78 versionがなければ苦情にして、保存で先頭に追加す
   assert.match(missing.apply(missing.model.form), /^version: 1\nlevels:\n  high: 40\n$/);
 
   const broken = readRisk("version: 1\nlevels: nope\nfactors:\n  - id: a\n    points: 1\n    lines_over: 1\n    glob: '*'\n  - not-a-map\n");
-  assert.equal(broken.model.problems.length, 3);
-  assert.match(broken.model.problems[0], /levels/);
-  assert.match(broken.model.problems[1], /加点条件が2個/);
-  assert.match(broken.model.problems[2], /2件目/);
+  // 型違い（levels・項目）は読み込みを止める。帯に出すのは、保存で直せる加点条件の重なりだけ
+  assert.equal(broken.model.problems.length, 1);
+  assert.match(broken.model.problems[0], /加点条件が2個/);
+  assert.equal(broken.blocking.length, 2);
+  assert.match(broken.blocking[0], /levels/);
+  assert.match(broken.blocking[1], /2件目/);
   // 加点条件が2つある項目は最初の1つで出し、保存すると他は消える
   assert.equal(broken.model.form.factors.length, 1);
   assert.equal(broken.model.form.factors[0].kind, "lines_over");
@@ -163,14 +165,12 @@ test("CB-T79 画面から来た内容は形を確認してから受け取る", (
   assert.equal(asRiskForm({ levels: {}, factors: [{ origin: "0", kind: "glob" }] }), undefined);
 });
 
-test("CB-T97 対応表でない項目が前にあっても、後ろの項目は自分の元ノードに書き戻す", () => {
-  const text = "version: 1\nfactors:\n  - ごみ\n  # aの理由\n  - id: a\n    points: 1\n    lines_over: 1\n  # bの理由\n  - id: b\n    points: 2\n    files_over: 2\n";
-  const doc = readRisk(text);
-  assert.deepEqual(doc.model.form.factors.map((f) => [f.origin, f.id]), [[1, "a"], [2, "b"]]);
-  assert.match(doc.model.problems[0], /保存するとこの項目は消えます/);
-  // 何も変えずに保存: 読めない項目だけが消え、aとbはそれぞれのコメントごと残る
-  const out = doc.apply(doc.model.form);
-  assert.equal(out, "version: 1\nfactors:\n  # aの理由\n  - id: a\n    points: 1\n    lines_over: 1\n  # bの理由\n  - id: b\n    points: 2\n    files_over: 2\n");
+test("CB-T97 対応表でない項目は読み込みを止め、型違いのlevels・factorsも同じ。未知のキーは止めない", () => {
+  assert.match(readRisk("version: 1\nfactors:\n  - ごみ\n  - id: a\n    points: 1\n    lines_over: 1\n").blocking[0], /factorsの1件目がマップ/);
+  assert.match(readRisk("version: 1\nfactors: nope\n").blocking[0], /factorsがリストではありません/);
+  assert.match(readRisk("version: 1\nlevels: 5\n").blocking[0], /levelsがマップ/);
+  // 未知のキーは仕様どおり無視する（読み込みは止めない）
+  assert.deepEqual(readRisk('version: 1\nthresholds: "high"\nitems: 5\n').blocking, []);
 });
 
 test("CB-T98 先頭の項目を削除してもリストの見出しのコメントは残り、先頭に来た項目は空行を連れてこない", () => {
@@ -188,8 +188,8 @@ test("CB-T99 同じ元ノードを2回送れば書き戻さない。glob以外�
   assert.throws(() => doc.apply({ levels: f.levels, factors: [f.factors[0], { ...f.factors[0], id: "x" }] }), /2回送られました/);
   const withMax = readRisk("version: 1\nfactors:\n  - id: a\n    points: 1\n    lines_over: 5\n    max: 3\n");
   assert.equal(withMax.apply(withMax.model.form), "version: 1\nfactors:\n  - id: a\n    points: 1\n    lines_over: 5\n");
-  assert.match(readRisk("hello\n").model.problems[0], /最上位がマップ（キーと値の組の集まり）ではありません/);
-  assert.match(readRisk("- a\n").model.problems[0], /最上位がマップ（キーと値の組の集まり）ではありません/);
+  assert.match(readRisk("hello\n").blocking[0], /最上位がマップ（キーと値の組の集まり）ではありません/);
+  assert.match(readRisk("- a\n").blocking[0], /最上位がマップ（キーと値の組の集まり）ではありません/);
 });
 
 test("CB-T100 PyYAMLが別の型に読む語は引用符で囲み、それ以外は裸のまま", () => {

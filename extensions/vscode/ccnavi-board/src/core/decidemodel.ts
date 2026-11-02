@@ -53,7 +53,7 @@ export interface DecideResult {
   readonly pending_extra: readonly string[];
   /** 起こした続きの子の識別子。起こしていなければ空 */
   readonly followup: string;
-  /** Claude Codeに渡す文 */
+  /** Claude Codeへの依頼文 */
   readonly prompt: string;
   /** issueに回した分で作ったissueのURL。無ければ空 */
   readonly issue_url: string;

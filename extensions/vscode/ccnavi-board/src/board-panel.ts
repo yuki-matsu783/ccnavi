@@ -46,7 +46,7 @@ import { markTourSeen, tourDue, tourPanelClosed } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 import { noteTicketControl, requireTickets } from "./ticket-control.js";
 import * as diaglog from "./log.js";
-import { assertNever, assertRetained, debounce, watchTickets } from "./panel-common.js";
+import { assertNever, assertRetained, debounce, watchTickets, workspaceFolder } from "./panel-common.js";
 
 /** 画面の名前。バンドルのパスは`src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "board";
@@ -120,9 +120,8 @@ async function createChildWorktrees(root: string, worktrees: readonly ApproveWor
  * （`""`はワークスペース（プロジェクト外）、`"*"`は全部）。いまは呼び出し元が無い（プロジェクト管理画面の入口を外した）。
  */
 export async function openBoard(project?: string): Promise<void> {
-  const folder = vscode.workspace.workspaceFolders?.[0];
+  const folder = workspaceFolder("チケット管理画面");
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、チケット管理画面を表示できません");
     return;
   }
   if (!requireTickets("チケット管理画面")) {

@@ -124,11 +124,11 @@ test("CB-T45 新しいルールは引用符付きのglobと折り返しのmessag
   assert.deepEqual(again.allow, []);
 });
 
-test("CB-T46 不正なタイプは苦情にして、他のタイプは出す", () => {
-  const { model } = readRules("version: 1\ndeny: nope\nallow:\n  - id: a\n    match: Read\n    glob: '*'\n    message: m\n");
-  assert.equal(model.problems.length, 1);
-  assert.match(model.problems[0], /deny/);
-  assert.equal(model.sections.allow.length, 1);
+test("CB-T46 リストでないタイプは読み込みを止める理由にする（他のタイプが読めても画面は出さない）", () => {
+  const { model, blocking } = readRules("version: 1\ndeny: nope\nallow:\n  - id: a\n    match: Read\n    glob: '*'\n    message: m\n");
+  assert.equal(blocking.length, 1);
+  assert.match(blocking[0], /deny/);
+  assert.deepEqual(model.problems, []);
 });
 
 test("CB-T47 画面から来たリストは形を確認してから受け取る", () => {
@@ -341,4 +341,13 @@ test("CB-T332 exceptは書き戻しで消えない（欄を変えても、タイ
   assert.ok(sent);
   assert.equal(doc.apply(sent), EXCEPT_TEXT);
   assert.deepEqual(sent.deny[0].excepts, s.deny[0].excepts);
+});
+
+test("CB-T1260 タイプがリストでない・項目がマップでないファイルは、問題ではなく読み込みを止める理由にする", () => {
+  const notSeq = readRules("version: 1\ndeny: nope\n");
+  assert.deepEqual(notSeq.blocking, ["タイプdenyがリストではありません"]);
+  assert.deepEqual(notSeq.model.problems, []);
+  const notMap = readRules("version: 1\nask:\n  - just-text\n");
+  assert.deepEqual(notMap.blocking, ["タイプaskの1件目がマップ（キーと値の組の集まり）ではありません"]);
+  assert.deepEqual(notMap.model.problems, []);
 });

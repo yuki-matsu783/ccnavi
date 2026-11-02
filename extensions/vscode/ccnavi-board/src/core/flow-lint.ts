@@ -22,7 +22,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import type { FlowChecks } from "./flow-view.js";
-import { problemsOfFlow, type LintJson } from "./lintmodel.js";
+import { LINT_MORE_HINT, problemsOfFlow, truncateLines, type LintJson } from "./lintmodel.js";
 
 /** 実行ファイルを走らせた結果（`ccnavi.ts`の`RunResult<LintJson>`と同じ形） */
 export type FlowLintRun = { readonly ok: true; readonly value: LintJson } | { readonly ok: false; readonly error: string };
@@ -71,7 +71,7 @@ export async function lintFlowText(
     const problems = problemsOfFlow(ran.value);
     const errors = problems.filter((p) => p.severity === "error");
     if (errors.length > 0) {
-      const said = errors.map((p) => rename(p.detail)).join("\n");
+      const said = truncateLines(errors.map((p) => rename(p.detail)), LINT_MORE_HINT).join("\n");
       return { ok: false, error: `実行ファイル（--lint --flow）が、フローを読み込めないと返しました: ${said}` };
     }
     const flow = ran.value.flow;

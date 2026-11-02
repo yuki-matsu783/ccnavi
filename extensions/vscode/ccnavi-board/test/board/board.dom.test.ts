@@ -675,3 +675,30 @@ test("CB-D146 アーカイブの表示を入れると、親の絞り込みに退
     await on.close();
   }
 });
+
+test("CB-D1246 チケット管理にもモード帯を出す。dry-runとdisableで出て、enableでは出ない", async () => {
+  const bandOf = async (mode: string): Promise<string> => {
+    const base = fixture();
+    const page = await openBoard({ ...base, settings: { ...base.settings, mode } });
+    try {
+      return page.all(".mode-band").map((e) => e.textContent ?? "").join("\n");
+    } finally {
+      await page.close();
+    }
+  };
+  assert.match(await bandOf("dry-run"), /CCNAVI_MODE.*dry-run.*判定と記録をします/);
+  assert.match(await bandOf("disable"), /CCNAVI_MODE.*disable.*判定しません/);
+  assert.equal(await bandOf("enable"), "");
+});
+
+test("CB-D1248 ボードが読めないときも、理由と［更新］を出す（押すとrefreshを送る）", async () => {
+  const dom = await openPage({ kind: "error", error: "実行ファイルが見つかりません" });
+  try {
+    assert.match(dom.one(".load-error").textContent, /実行ファイルが見つかりません/);
+    assert.equal(dom.all('button[data-action="open-file"]').length, 0);
+    dom.click(dom.one('button[data-action="reload"]'));
+    assert.deepEqual(dom.posted.at(-1), { type: "refresh" });
+  } finally {
+    await dom.close();
+  }
+});

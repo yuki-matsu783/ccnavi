@@ -592,7 +592,7 @@ def revision_problems(
                 rules.SEVERITY_ERROR,
                 revised.ticket,
                 "改版で変えられるのは plan・feedback・phases・範囲だけ。"
-                "タイトルか課題番号が承認済みチケットと違う",
+                "タイトルかissue番号が承認済みチケットと違う",
             )
         )
     # `mr:` は承認のあとに ccnavi が書き足すことがある（`review-request`）。改版の提案は

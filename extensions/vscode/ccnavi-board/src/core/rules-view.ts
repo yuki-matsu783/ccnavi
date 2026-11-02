@@ -184,7 +184,7 @@ export interface RulesPage {
 export type RulesData =
   | { readonly kind: "page"; readonly page: RulesPage }
   /** `targets`は読めなかった画面から別の対象へ戻るための欄（共通・ワークスペースと、いま開いていた対象）。ボードを読めていないので、ほかのプロジェクトは載せない */
-  | { readonly kind: "error"; readonly error: string; readonly target?: { readonly kind: string; readonly name: string }; readonly targets?: readonly TargetOption[] }
+  | { readonly kind: "error"; readonly error: string; readonly file?: string; readonly target?: { readonly kind: string; readonly name: string }; readonly targets?: readonly TargetOption[] }
   | { readonly kind: "loading"; readonly text: string };
 
 /**
@@ -246,20 +246,6 @@ export const DATA_ID = "ccnavi-rules-data";
 /** 最初の中身をHTMLに埋める形にする。埋め方は`screen-host.ts`が持つ（Reactの画面で同じ） */
 export function embedData(data: RulesData): string {
   return embedJson(data);
-}
-
-/**
- * 動作モードの帯に出す説明。実行ファイルが答えたモードをそのまま言い換えるだけで、設定ファイルは読まない。
- * enableと空（答えが取れない）は帯を出さないので空を返す
- */
-export function modeBanner(mode: string): string {
-  if (mode === "dry-run") {
-    return "判定と記録をします。denyやaskにヒットしても、一般の保護はツールの実行を止めません。止まるのは、チケットのゲートと補助の保護です";
-  }
-  if (mode === "disable") {
-    return "判定しません。ルールは使われず、denyやaskにヒットする操作も止まりません";
-  }
-  return "";
 }
 
 /** 編集中の内容を判定に渡すための一時ディレクトリの接頭辞（`rules-panel.ts`の`mkdtemp`と共有する） */

@@ -118,7 +118,7 @@ export interface RiskPage {
 export type RiskData =
   | { readonly kind: "page"; readonly page: RiskPage }
   /** `targets`は読めなかった画面から別の対象へ戻るための欄（共通・ワークスペースと、いま開いていた対象）。ボードを読めていないので、ほかのプロジェクトは載せない */
-  | { readonly kind: "error"; readonly error: string; readonly target?: { readonly kind: string; readonly name: string }; readonly targets?: readonly TargetOption[] }
+  | { readonly kind: "error"; readonly error: string; readonly file?: string; readonly target?: { readonly kind: string; readonly name: string }; readonly targets?: readonly TargetOption[] }
   /** 開いているタブの対象を切り替えて、新しい対象を読んでいる間（タブは1枚）。`text`は画面に出す一言 */
   | { readonly kind: "loading"; readonly text: string };
 

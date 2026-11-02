@@ -75,7 +75,7 @@ import { loadingText } from "./core/loading-render.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { OWN_WRITE_GRACE_MS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
-import { assertNever, assertRetained, debounce, watchPattern, watchTickets } from "./panel-common.js";
+import { assertNever, assertRetained, debounce, openInEditor, watchPattern, watchTickets, workspaceFolder } from "./panel-common.js";
 import { copyPrompt, openPromptInSession } from "./prompt-handover.js";
 import { runInTerminal } from "./terminal.js";
 import { requireTickets } from "./ticket-control.js";
@@ -192,9 +192,8 @@ async function openFlowPanel(ticket: string, restore: Restore | undefined): Prom
   if (!requireTickets("フロー編集画面")) {
     return;
   }
-  const folder = vscode.workspace.workspaceFolders?.[0];
+  const folder = workspaceFolder("フロー編集画面");
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、フロー編集画面を表示できません");
     return;
   }
   const open = panels.get(ticket);
@@ -710,10 +709,7 @@ async function handleMessage(current: PanelState, message: FlowMessage | undefin
         return;
       }
       const target = loaded.target.flow.path;
-      void vscode.workspace.openTextDocument(target).then(
-        (document) => vscode.window.showTextDocument(document),
-        () => vscode.window.showInformationMessage(`ファイルを開けませんでした: ${target}`),
-      );
+      openInEditor(target);
       return;
     }
     case "save":

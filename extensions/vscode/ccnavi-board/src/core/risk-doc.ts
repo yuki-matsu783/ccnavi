@@ -12,6 +12,7 @@
 import { isMap, isNode, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document } from "yaml";
 
 import { KINDS, LEVEL_NAMES, type FactorForm, type FactorKind, type LevelName, type RiskForm, type RiskModel } from "./risk-view.js";
+import { blockingProblems } from "./yaml-read.js";
 import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
@@ -67,6 +68,8 @@ factors:
 
 export interface RiskDocument {
   readonly model: RiskModel;
+  /** 読み込みを止める問題（構文エラー・最上位がマップでない・levels/factorsとその項目の型違い）。空でなければ画面はフォームを出さない */
+  readonly blocking: readonly string[];
   /** 編集した内容で書き戻す。元のノードを使い回してコメントを残す */
   readonly apply: (form: RiskForm) => string;
 }
@@ -74,12 +77,7 @@ export interface RiskDocument {
 export function readRisk(text: string): RiskDocument {
   const doc = parseDocument(text, { keepSourceTokens: false });
   const problems: string[] = [];
-  for (const e of doc.errors) {
-    problems.push(`YAMLとして解釈できません: ${e.message}`);
-  }
-  if (doc.contents !== null && !isMap(doc.contents)) {
-    problems.push("最上位がマップ（キーと値の組の集まり）ではありません。実行ファイルは組み込みの配点を使います。保存すると中身を破棄して空のマップから始めます");
-  }
+  const blocking = blockingProblems(doc);
   const version = doc.get("version");
   if (version === undefined || version === null) {
     problems.push(`versionがありません。保存するとversion: ${RISK_VERSION}を先頭に追加します`);
@@ -91,7 +89,7 @@ export function readRisk(text: string): RiskDocument {
   const rawLevels = doc.get("levels", true);
   if (rawLevels !== undefined && rawLevels !== null) {
     if (!isMap(rawLevels)) {
-      problems.push("levelsがマップ（キーと値の組の集まり）ではありません。閾値は組み込みの値として表示します");
+      blocking.push("levelsがマップ（キーと値の組の集まり）ではありません");
     } else {
       for (const name of LEVEL_NAMES) {
         levels[name] = scalarText(rawLevels, name);
@@ -103,11 +101,11 @@ export function readRisk(text: string): RiskDocument {
   const rawFactors = doc.get("factors", true);
   if (rawFactors !== undefined && rawFactors !== null) {
     if (!isSeq(rawFactors)) {
-      problems.push("factorsがリストではありません。項目は画面に出しません");
+      blocking.push("factorsがリストではありません");
     } else {
       rawFactors.items.forEach((item, index) => {
         if (!isMap(item)) {
-          problems.push(`factorsの${index + 1}件目がマップ（キーと値の組の集まり）ではありません。画面に出さず、保存するとこの項目は消えます（実行ファイルも読み込めません）`);
+          blocking.push(`factorsの${index + 1}件目がマップ（キーと値の組の集まり）ではありません`);
           return;
         }
         const present = KINDS.filter((k) => item.has(k));
@@ -122,6 +120,7 @@ export function readRisk(text: string): RiskDocument {
   }
 
   return {
+    blocking,
     model: {
       version: typeof version === "number" ? version : null,
       form: { levels, factors },
@@ -165,7 +164,7 @@ function scalarText(map: YAMLMap, key: string): string {
 }
 
 function applyTo(doc: Document, edited: RiskForm): string {
-  // 空か、最上位が対応表でないファイルは、中身を破棄して対応表から始める（読み込みの苦情で言ってある）。
+  // 空のファイルは対応表から始める。最上位が対応表でないファイルは読み込みで止めるので、ここには来ない。
   const top: YAMLMap = isMap(doc.contents) ? doc.contents : new YAMLMap();
   if (doc.contents !== top) {
     doc.contents = top;

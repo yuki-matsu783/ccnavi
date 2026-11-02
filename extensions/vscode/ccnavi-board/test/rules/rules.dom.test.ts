@@ -542,7 +542,7 @@ test("CB-T51 保存できない理由と読み込みの苦情を出す", async (
   } finally {
     await open.close();
   }
-  const broken = await openRules({ model: readRules("version: 1\ndeny: nope\n").model });
+  const broken = await openRules({ model: readRules("version: 1\ndeny:\n  - id: a\n    match: Read\n    glob: x\n    regex: y\n    message: m\n").model });
   try {
     assert.equal(broken.all(".problems li").length, 1);
   } finally {

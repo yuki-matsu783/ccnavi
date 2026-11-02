@@ -6,6 +6,7 @@
  * （cloneの欄、直前の操作の一言）だけ。cloneもミラーの同期も書き込みも画面はしない。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
+import { LoadError } from "../shared/LoadError.js";
 
 import type { CloneStatus, ProjectsData, ProjectsPage, Stray, ToProjects } from "../../core/projects-view.js";
 import { tourOf } from "../../core/tour-def.js";
@@ -16,7 +17,7 @@ import { CheckedAt, MirrorBanners, SyncAllButton } from "./Mirror.js";
 import { Project } from "./Project.js";
 import { post } from "./post.js";
 import { EMPTY, guessName, loadClone, saveClone, type CloneState } from "./state.js";
-import { formatGeneratedAt } from "../shared/format.js";
+import { lastUpdatedText } from "../shared/format.js";
 import { isTrackedProjectsDir } from "./text.js";
 
 /** 案内（`tours/projects.yml`）。見本は使わず、画面は今の中身のまま指す */
@@ -74,10 +75,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
 
   if (data.kind === "error") {
     return (
-      <>
-        <p className="empty">プロジェクトの一覧を読み込めませんでした。原因を直してから「ccnaviボード: プロジェクト管理を開く」を実行し直してください。</p>
-        <pre className="load-error">{data.error}</pre>
-      </>
+      <LoadError heading="プロジェクトの一覧を読み込めませんでした。原因を直してから「更新」を押してください。" error={data.error} onReload={() => act({ type: "refresh" })} />
     );
   }
 
@@ -176,7 +174,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
       </section>
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
       <footer className="foot">
-        最終更新{formatGeneratedAt(page.generatedAt)}
+        {lastUpdatedText(page.generatedAt)}
       </footer>
     </>
   );

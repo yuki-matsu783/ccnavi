@@ -36,6 +36,7 @@ import {
   type ZipEntry,
 } from "./core/bug-report.js";
 import * as diaglog from "./log.js";
+import { firstWorkspaceFolder } from "./panel-common.js";
 
 /** 録画が始まったとみなすまで待つ時間。これより前にffmpegが終われば、始められなかったとみなす */
 const START_GRACE_MS = 1500;
@@ -76,7 +77,7 @@ interface Session {
 let session: Session | undefined;
 
 function workspaceRoot(): string {
-  return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
+  return firstWorkspaceFolder()?.uri.fsPath ?? "";
 }
 
 function procVersion(): string {
