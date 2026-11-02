@@ -71,7 +71,7 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     );
     assert.deepEqual(
       dom.all(".approval .plan-graph h3").map((h) => h.textContent),
-      ["i0001の全体計画（plan:）", "i0001のフィードバック計画（feedback:）"],
+      ["i0001の全体計画", "i0001のフィードバック計画"],
     );
     // 図は本文（承認画面の文字）より前に出る
     const box = dom.one(".approval");

@@ -83,7 +83,7 @@
       },
       {
         "command": "ccnaviBoard.tourBasics",
-        "title": "ccnaviボード: 基本の案内を続けて見る（プロジェクト管理 → チケット管理。チケット制御が無効ならプロジェクト管理だけ）"
+        "title": "ccnaviボード: 基本の案内を続けて見る"
       },
       {
         "command": "ccnaviBoard.tourProjects",

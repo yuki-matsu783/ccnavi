@@ -55,7 +55,7 @@ export function DecideBody({
       </h2>
       {notice ? <p className="approval-note warn">{notice}</p> : null}
       <p className="approval-note">
-        親{preview.parent}のMRで残っている指摘です。
+        {count === 0 ? "" : `親${preview.parent}のMRで残っている指摘です。`}
         {/* 選ぶものが無いときは、選び方の注意を出さない。0件なら押すとレビュー済みになるだけ */}
         {count === 0
           ? "このフェーズをレビュー済みにしますか？"

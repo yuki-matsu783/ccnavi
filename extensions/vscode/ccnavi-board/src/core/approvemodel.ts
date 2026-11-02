@@ -116,7 +116,7 @@ export function summarize(preview: ApprovePreview): ApproveSummary {
     // 番号順に並べるだけにする。計画は先行関係で並列のステップもあるため、矢印では書かない
     const names = [...plan.items].sort((a, b) => a.number - b.number).map((item) => item.title || item.type);
     const label = PART_LABELS[plan.part] ?? plan.part;
-    return `${plan.ticket}${revised.has(plan.ticket) ? "（改版）" : ""}の${label}${names.length}ステップ（${names.join("・")}）`;
+    return `${plan.ticket}${revised.has(plan.ticket) ? "（改版）" : ""}の${label}${names.length}ステップ${names.length === 0 ? "" : `（${names.join("・")}）`}`;
   });
   return { tickets: `承認するチケット${batch.length}件（${kinds.join("・")}）`, plans };
 }
@@ -471,5 +471,5 @@ function str(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-/** 承認や対応方針の確定のあと、Claude Codeに文を渡す方法の案内（コピー / 新しいセッション）。「ターミナルで実行」の注意はそのボタンのツールチップに置く */
-export const HANDOVER_NOTE = "Claude Codeに渡す文を用意しました。「コピー」して貼るか、「新しいセッションで開く」を押してください。送るときは、自分でEnterを押します。";
+/** 承認や対応方針の確定のあと、Claude Codeに文を渡す方法の案内（コピー / 新しいセッション）。「ターミナルで実行」の注意は、この文とそのボタンのツールチップの両方に置く */
+export const HANDOVER_NOTE = "Claude Codeに渡す文を用意しました。「コピー」して貼るか、「新しいセッションで開く」を押してください。送るときは、自分でEnterを押します。「ターミナルで実行」は、確認なしですぐ非対話で1回だけ実行します。";

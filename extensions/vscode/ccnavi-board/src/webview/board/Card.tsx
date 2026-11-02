@@ -117,7 +117,7 @@ export function CardItem({
 /** カードの上で押しても提案を開かない場所。ボタン・リンク・詳細（開閉と開いた本文） */
 const NOT_OPENING = "button, a, details";
 
-/** MR（`MR #番号`）。詳細を開かなくても見えるよう、位置の下に出す。URLがhttp(s)のときだけリンクにする */
+/** MR（`MR !番号`）。詳細を開かなくても見えるよう、位置の下に出す。URLがhttp(s)のときだけリンクにする */
 function MrLink({ card }: { readonly card: Card }): JSX.Element | null {
   if (card.mrUrl === "" && card.mrNumber === null) {
     return null;

@@ -322,7 +322,7 @@ test("CB-D707 注意の行は例外のときだけ短い言葉で出す（不備
 
 test("CB-D707a 承認待ち（ワークツリー未作成）は警告色にせず、作業中でワークツリーが無いものだけ警告色の「見つからない」", async () => {
   const gone = { exists: false, path: "/ws/.claude/worktrees/x", project: "" };
-  const json = boardOf([proposalJson("wait", { worktree: gone }), ticketJson("busy", { worktree: gone })], []);
+  const json = boardOf([proposalJson("wait", { worktree: gone }), ticketJson("busy", { worktree: gone }), ticketJson("fresh", { worktree: gone, started_at: "" })], []);
   const page = await openBoard(json);
   try {
     const badge = (id: string): { text: string; warn: boolean } => {
@@ -331,6 +331,8 @@ test("CB-D707a 承認待ち（ワークツリー未作成）は警告色にせ�
     };
     assert.deepEqual(badge("wait"), { text: "ワークツリー未作成", warn: false });
     assert.deepEqual(badge("busy"), { text: "ワークツリーが見つからない", warn: true });
+    // 開始前の子（着手するとワークツリーを作る）も異常ではない
+    assert.deepEqual(badge("fresh"), { text: "ワークツリー未作成", warn: false });
   } finally {
     await page.close();
   }
@@ -374,7 +376,7 @@ test("CB-D709 詳細は畳んである。MRは詳細に無く位置の下にあ�
     const link = page.one(`${parent} .card-mr a`);
     assert.equal(link.getAttribute("href"), "https://example.com/o/r/pull/18");
     assert.ok(link.classList.contains("detail-link") && !link.classList.contains("card-button"));
-    assert.match(link.textContent, /^MR #\d+$/);
+    assert.match(link.textContent, /^MR !\d+$/);
     // 子のリスクは詳細に（JSONの水準と点）
     page.click(page.one(`${card(page, "busy-02-01")} details > summary`));
     await page.settle();

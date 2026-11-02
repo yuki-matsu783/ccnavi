@@ -34,7 +34,7 @@ export function movedLabel(moved: Moved): string {
 
 /**
  * カードの注意の行。例外のときだけ短い言葉で出す（理由の全文は詳細）。
- * 不備・書き込み停止・先行待ち・リスクHIGH以上・複数の場所にある・ワークツリー未作成（承認待ち）・ワークツリーが見つからない（作業中・レビュー中）・未送信。
+ * 不備・書き込み停止・先行待ち・リスクHIGH以上・複数の場所にある・ワークツリー未作成（承認待ち・開始前の子）・ワークツリーが見つからない（作業中・レビュー中）・未送信。
  * ユーザが動く必要がある状態だけで、普通のことは出さない。先行待ちは識別子の途中で折り返さないよう、`PredecessorNote`で別に出す
  */
 export interface Note {
@@ -54,7 +54,8 @@ export function notesOf(card: Card): Note[] {
   }
   if (!card.worktreeExists && card.copyStatus !== "closed" && card.copyStatus !== "archived") {
     // 承認待ち（none）はまだ作っていないだけ。作業中・レビュー中に無いのは異常（warnの見た目）
-    const pending = card.copyStatus === "none";
+    // 承認待ち（none）と、開始前（startedAtが空）の子はまだ作っていないだけ
+    const pending = card.copyStatus === "none" || (card.copyStatus === "open" && card.startedAt === "");
     notes.push({ key: "worktree", text: pending ? "ワークツリー未作成" : "ワークツリーが見つからない", kind: pending ? "worktree" : "worktree none" });
   }
   if (isHighRisk(card.riskLevel)) {
@@ -169,7 +170,7 @@ export function worktreeName(path: string): string {
 
 /** MRのリンクの文字。番号が読めなければ「MR」だけ */
 export function mrText(number: number | null): string {
-  return number === null ? "MR" : `MR #${number}`;
+  return number === null ? "MR" : `MR !${number}`;
 }
 
 /** 依頼のマーカーが持つURLは中身を確かめずにそのまま取り込んであるので、http(s)のときだけリンクにする */
