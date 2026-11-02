@@ -508,11 +508,6 @@ case " $* " in
 *" review ready "*)
   [ -n "$list" ] || exit 0
   : >"$list"; put "$m/ready.json" '{{"mr": 1, "at": "t"}}'; exit 0 ;;
-*" user close-early "*" --accept-plan "*)
-  plan=""; prev=""
-  for a in "$@"; do [ "$prev" = --accept-plan ] && plan="$a"; prev="$a"; done
-  printf '{{"version":1,"digest":"","threads":[]}}\\n' >"$plan"
-  exit 0 ;;
 *" user close-early "*" --accept-check "*) exit 0 ;;
 *" user close-early "*) put "$m/2.skipped" '{{"by": "close-early", "at": "t"}}'; exit 0 ;;
 esac

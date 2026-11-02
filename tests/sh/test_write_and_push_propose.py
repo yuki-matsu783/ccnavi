@@ -148,8 +148,8 @@ class ProposeTest(WriteAndPushHarness):
         before = self.sha(tree, "HEAD")
         result = self.sh("ccnavi-ticket.sh", "start", "i0003", cwd=tree, **self.host_env({}))
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        # 書く前に分かる検査（承認済みの作業中か）が、取り込みの前に断る。承認の push で
-        # 親は必ず送られるので、`start` が未 push の親に届く道は無い。
+        # 書く前に分かる検査（承認済みの作業中か）が、取り込みの前に断る。未 push の親の
+        # 説明は、`approval-request` の試験（test_a_parent_never_pushed…）で確かめる。
         self.assertIn("i0003 は承認済みの作業中ではない", result.stderr)
         self.assertNotIn("bad revision", result.stderr)
         self.assertEqual(self.sha(tree, "HEAD"), before)
