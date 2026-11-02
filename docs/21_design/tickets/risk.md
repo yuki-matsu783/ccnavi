@@ -18,13 +18,13 @@ keywords: [リスク, risks.yml, risk.json, 差分, HIGH, 配点]
 
 配点は `risks.yml`（共通レイヤーと、親の `project:` が指す config のレイヤーの和。どちらも無くてよい。11.4.2）。両方に無ければ組み込みの 4 項目（共通だけ無く config が在るときは、共通を空として config の項目だけを数え、組み込みの 4 項目は使わない）、不正なら
 組み込みを使い、そのことを `--lint` と閉じたときの出力が言う。リスクレベルの名前は `LOW` / `MEDIUM` / `HIGH` /
-`CRITICAL` で固定し、境目の点（既定 20 / 40 / 70）だけを動かせる。境目の点は「以上」で判定する。
+`CRITICAL` で固定し、閾値（既定 20 / 40 / 70）だけを動かせる。閾値は「以上」で判定する。
 
 配点は `.ccnavi/config/common/risks.yml`（組み込みの deny が守る。エージェントは書き換えない）。書き方の例は次のとおり。
 
 ```yaml
 version: 1
-levels: {medium: 20, high: 40, critical: 70}     # リスクレベルの名前は固定、境目の点だけ動かす
+levels: {medium: 20, high: 40, critical: 70}     # リスクレベルの名前は固定、閾値だけ動かす
 factors:
   - {id: big-diff,   points: 25, lines_over: 300,   message: 行数が多い}
   - {id: many-files, points: 15, files_over: 10,    message: ファイルが多い}
