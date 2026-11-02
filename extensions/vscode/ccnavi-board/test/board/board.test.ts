@@ -137,9 +137,8 @@ test("CB-T09 依頼済みで止まったフェーズにdecide、早めにクロ�
   const card = cards.get("i0001")!;
   assert.deepEqual(card.actions, []);
   assert.equal(card.wrapped, true);
-  assert.deepEqual(card.phases[0].actions, []);
-  // レビュー待ちの行には、レビュー完了の操作が付く（依頼のマーカーにURLが無ければMRのリンクは出さない）
-  assert.deepEqual(card.phases[1].actions, [{ kind: "review", parent: "i0001", phase: 2, mrUrl: "" }]);
+  // レビュー待ちの行も操作は持たない（レビュー完了は子のカードに付く）
+  assert.equal("actions" in card.phases[1], false);
   assert.equal(card.phases[1].status, "レビュー待ち");
   // ユーザのレビュー待ちはJSONのreview_waitingをそのまま使う。依頼していないフェーズ1は閉じていても待ちではない
   assert.equal(card.phases[0].reviewWaiting, false);
@@ -172,7 +171,6 @@ test("CB-T09b レビューが済んで止まらなくなったフェーズは、
   // マーカーは残り、待ちだけがfalseになる。マーカーを削って「直す」形は取らない（フェーズ行は「レビュー済み」と言う）
   assert.equal(card.phases[0].status, "レビュー済み");
   assert.equal(card.phases[0].reviewWaiting, false);
-  assert.deepEqual(card.phases[0].actions, []);
   assert.equal(cards.get("i0001-01-01")!.reviewWaiting, false);
 });
 
@@ -286,10 +284,11 @@ function waitingWithMr(url: string): BoardJson {
   return { ...base, parents: [parent] };
 }
 
-test("CB-T131 レビュー待ちのフェーズ行にレビュー完了が付き、依頼のマーカーのMRがフェーズ行・親カード・そのフェーズの子に載る", () => {
+test("CB-T131 レビュー待ちのフェーズの子にレビュー完了が付き、依頼のマーカーのMRがフェーズ行・親カード・そのフェーズの子に載る", () => {
   const cards = cardsOf(buildBoard(waitingWithMr("https://example.com/o/r/pull/18#issuecomment-5")));
   const card = cards.get("i0001")!;
-  assert.deepEqual(card.phases[1].actions, [{ kind: "review", parent: "i0001", phase: 2, mrUrl: "https://example.com/o/r/pull/18" }]);
+  assert.equal("actions" in card.phases[1], false);
+  assert.deepEqual(cards.get("i0001-02-02")!.actions, [{ kind: "review", parent: "i0001", phase: 2, mrUrl: "https://example.com/o/r/pull/18" }]);
   // フェーズ行は依頼の投稿を指す。親カードと、そのフェーズの子のカードは、断片を除いてMR自体を指す
   assert.equal(card.phases[1].mrUrl, "https://example.com/o/r/pull/18#issuecomment-5");
   assert.equal(card.phases[1].mrNumber, 18);
@@ -315,8 +314,6 @@ test("CB-T131 レビュー待ちのフェーズ行にレビュー完了が付き
   assert.equal(quiet.phases[0].mrNumber, null);
   assert.equal(quiet.phases[0].mrUrl, "");
   assert.equal(quiet.mrUrl, "");
-  assert.deepEqual(quiet.phases[0].actions, []);
-  assert.deepEqual(quiet.phases[1].actions, []);
 });
 
 test("CB-T132 要対応は実行ファイルのattentionをそのまま持ち、条件をボードで組み直さない", () => {

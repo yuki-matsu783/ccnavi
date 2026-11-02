@@ -45,7 +45,7 @@ export const COLUMNS: readonly ColumnDef[] = [
 export type Action =
   | { readonly kind: "approve" }
   /**
-   * レビュー完了。バッジ（`status`）やフェーズ行の状態の一言が「レビュー待ち」のときだけ付く。
+   * レビュー完了。子のカードのバッジ（`status`）が「レビュー待ち」のときだけ付く。
    * 押すと残った指摘を読み、0件なら「レビュー済みにする」、1件以上なら対応方針の画面になる
    */
   | { readonly kind: "review"; readonly parent: string; readonly phase: number; readonly mrUrl: string };
@@ -71,7 +71,6 @@ export interface PhaseChip {
   readonly mrUrl: string;
   /** 依頼のマーカーが持つMRの番号。無ければnull */
   readonly mrNumber: number | null;
-  readonly actions: readonly Action[];
 }
 
 export interface Card {
@@ -334,7 +333,7 @@ function toCard(
 /**
  * 状態のバッジと、ユーザ待ちの操作を付ける。操作はバッジと別の規則で決める。
  * 承認は`pendingApproval`だけを条件にする（バッジが「要確認」でも出す）。レビュー完了はバッジが「レビュー待ち」の子だけ
- * （承認待ちの子には出さない）。親のレビュー完了は各フェーズ行が持つ
+ * （承認待ちの子には出さない）。親には付けない（親のフェーズ行にはレビューの操作を置かない）
  */
 function withStatus(base: Omit<Card, "status" | "actions">): Card {
   const status = statusOf(base);
@@ -456,16 +455,12 @@ function columnOf(t: TicketJson): ProposalState {
 }
 
 /**
- * フェーズ行。状態の一言はJSONの欄から`phaseStatusOf`が決める。レビュー完了の操作は、一言が「レビュー待ち」の行だけに付く
- * （待ちかどうかは判定が`gate_closed`と`review_waiting`で言う。ここでマーカーから組み直さない）。
+ * フェーズ行。状態の一言はJSONの欄から`phaseStatusOf`が決める。操作は持たない（レビュー完了は子のカードに置く）。
+ * 待ちかどうかは判定が`gate_closed`と`review_waiting`で言う。ここでマーカーから組み直さない。
  */
 function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
   const status = phaseStatusOf(p, parent.phases);
   const request = requestOf(p);
-  const actions: Action[] = [];
-  if (status === "レビュー待ち") {
-    actions.push({ kind: "review", parent: parent.ticket, phase: p.number, mrUrl: mrPage(request.url) });
-  }
   return {
     parent: parent.ticket,
     number: p.number,
@@ -481,7 +476,6 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
     tickets: p.tickets,
     mrUrl: request.url,
     mrNumber: request.number,
-    actions,
   };
 }
 

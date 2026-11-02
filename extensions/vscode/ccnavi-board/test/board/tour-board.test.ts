@@ -81,9 +81,9 @@ test("CB-T422 見本には、使い方ごとの案内が見せる状態が揃っ
   assert.equal(card("sample-a").copyStatus, "none");
   assert.equal(card("sample-a").status.label, "承認待ち");
   assert.equal(card("sample-b-03-01").status.label, "承認待ち");
-  // レビュー待ち: 親のフェーズ行に［MRを開く］［レビュー完了］、子のカードはユーザ待ちに同じ操作。バッジはどちらも「レビュー待ち」
+  // レビュー待ち: フェーズ行に操作は無く、子のカードのユーザ待ちに［MRを開く］［レビュー完了］。バッジはどちらも「レビュー待ち」
   const chip = card("sample-c").phases[0];
-  assert.ok(chip.reviewWaiting && chip.gateClosed && chip.status === "レビュー待ち" && chip.actions.some((a) => a.kind === "review"));
+  assert.ok(chip.reviewWaiting && chip.gateClosed && chip.status === "レビュー待ち" && !("actions" in chip));
   assert.equal(card("sample-c").mrNumber, 12);
   assert.ok(card("sample-c").mrUrl.startsWith("https://") && !card("sample-c").mrUrl.includes("#"));
   assert.equal(card("sample-c").status.label, "レビュー待ち");
@@ -203,7 +203,7 @@ const FIXED_TARGETS = new Set([
   "summary", "filter-project", "filter-parent", "filter-attention", "filter-archived", "refresh", "merge-check", "approve", "tour", "board",
   "merge-band", "merge-retire", "merge-abandon",
   "status", "turn", "details", "notes", "badge-blocked", "badge-preds", "badge-worktree", "badge-risk", "badge-seen", "badge-issue", "badge-unsent",
-  "approve-one", "review-done", "mr", "phases", "phase-review", "moved", "flow-create", "flow-edit", "flow-locked", "workflow-button",
+  "approve-one", "review-done", "mr", "phases", "moved", "flow-create", "flow-edit", "flow-locked", "workflow-button",
   "approval-batch", "approval-plan", "approve-confirm", "approval-prompt", "approval-handover", "edit-workflow", "decide-threads", "decide-consult", "decide-confirm",
 ]);
 

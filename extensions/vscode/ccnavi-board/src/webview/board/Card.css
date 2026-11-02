@@ -81,8 +81,7 @@
 .badge.preds { color: var(--board-warn-text); }
 .badge-id { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
 .badge.worktree.none, .badge.issue, .badge.unsent { color: var(--board-warn-text); }
-/* 親のフェーズ一覧。1フェーズ1行。左の丸がフェーズで、右が状態。依頼へのリンクとボタンは2段目（.phase-actions）。
-   状態は全文（状態・マーカー・レビューの要否・リスクの点と理由）だけを出し、狭ければ折り返す。
+/* 親のフェーズ一覧。1フェーズ1行。左の丸がフェーズで、右が状態。   状態は全文（状態・マーカー・レビューの要否・リスクの点と理由）だけを出し、狭ければ折り返す。
    右の列をautoにすると状態の1行分の幅が行を占め、フェーズ名の列が0になって省略記号ごと
    消えるので、状態の列は55% で止める。状態は項目（.phase-item）ごとに折り返さない塊にし、
    折り返すのは項目の間だけにする（1項目が列より長いときだけ項目の中で折る）。
@@ -139,8 +138,6 @@ a.card-button, a.card-button:hover, a.card-button:focus, a.card-button:active { 
 .card-button.primary, a.card-button.primary, a.card-button.primary:hover { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: transparent; }
 .card-button.primary:hover { background: var(--vscode-button-hoverBackground); }
 .card-button:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; border-color: transparent; }
-/* フェーズ行のボタン。行の2段目に左寄せで並べる */
-.phase-actions { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: var(--gap-2) var(--gap-3); align-items: center; min-width: 0; margin-top: 2px; }
 /* 補助の操作（フロー・計画編集・テンプレートの下書き）。通常の色 */
 .card-actions { display: flex; flex-wrap: wrap; gap: var(--gap-2) var(--gap-3); margin-top: 8px; min-width: 0; }
 

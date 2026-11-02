@@ -147,7 +147,7 @@ function StatusMark({ status }: { readonly status: Status }): JSX.Element {
 
 /**
  * ユーザ待ち。ユーザができることがあるときだけ出す。主ボタン（primary）は1つ。
- * 親は承認待ちのときだけ（レビューの操作は各フェーズ行に置く）。子は承認 → レビュー完了の順で1つだけ。
+ * 親は承認待ちのときだけ（レビューの操作は子のカードだけに置く）。子は承認 → レビュー完了の順で1つだけ。
  * 承認は`pendingApproval`だけを条件にする。バッジが「要確認」でも出す
  */
 function Turn({ card }: { readonly card: Card }): JSX.Element | null {
@@ -220,15 +220,12 @@ function Badge({ note }: { readonly note: Note }): JSX.Element {
 
 /**
  * 親カードのフェーズ一覧。1フェーズ1行で、左の丸がフェーズ、右が状態の一言（`core/status.ts`の`phaseStatusOf`）。
- * ユーザが対応する注意（`manual`）は1行で出す。レビュー待ちの行には、行の中に［MRを開く］［レビュー完了］を置く
- * （複数のフェーズが同時にレビュー待ちなら、それぞれの行に置く。主ボタンは行ごとに1つ）。
- * 状態の列に入れると、55% で止めた列の中でボタンが縦に積まれて行が高くなるため、ボタンは行の2段目に左寄せで並べる
+ * ユーザが対応する注意（`manual`）は1行で出す。行にボタンは置かない（［MRを開く］［レビュー完了］は子のカードの「ユーザ待ち」だけ）
  */
 function Phases({ phases }: { readonly phases: readonly PhaseChip[] }): JSX.Element {
   return (
     <ul className="phases" data-tour="phases">
       {phases.map((p) => {
-        const review = p.actions.find((a): a is ReviewAction => a.kind === "review");
         return (
           <li key={p.number} className={`phase phase-${p.state}${p.status === "レビュー待ち" || p.status === "レビュー準備中" ? " review-hold" : ""}${p.status === "要確認" ? " phase-check" : ""}`} data-phase={p.number} data-status={p.status}>
             <span className="phase-dot" aria-hidden="true" />
@@ -238,11 +235,6 @@ function Phases({ phases }: { readonly phases: readonly PhaseChip[] }): JSX.Elem
             </span>
             <span className="phase-status">{p.status}</span>
             {p.manual !== "" ? <span className="phase-manual">{p.manual}</span> : null}
-            {review !== undefined ? (
-              <span className="phase-actions" data-tour="phase-review">
-                <ReviewButtons action={review} />
-              </span>
-            ) : null}
           </li>
         );
       })}

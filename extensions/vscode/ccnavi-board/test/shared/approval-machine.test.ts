@@ -139,7 +139,6 @@ function chipOf(overrides: Partial<PhaseChip> = {}): PhaseChip {
     tickets: [],
     mrUrl: "",
     mrNumber: null,
-    actions: [],
     ...overrides,
   };
 }
