@@ -210,7 +210,7 @@ export function settingsPanel<D, T, L, M>(screen: SettingsScreen<D, T, L, M>): S
       return;
     }
     if (current.error !== undefined) {
-      screen.showError(current, current.error);
+      screen.showError(current, current.error, current.errorFile);
       return;
     }
     // 切り替え先を読んでいる最中

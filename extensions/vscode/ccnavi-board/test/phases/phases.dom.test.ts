@@ -197,12 +197,12 @@ test("CB-D62 更新できなかったら理由を出し、定義は出さない"
 
 test("CB-D63 定義がないファイルは、保存する前に追加すると言う。苦情と錠はそのまま出す", async () => {
   const dom = await openPhases({
-    model: readPhases("version: 1\nphases: nope\n").model,
+    model: readPhases("version: 1\n").model,
     lock: { locked: true, reason: "作業中のチケットがある（i0001-02-02）", doing: ["i0001-02-02"], turns: [] },
   });
   try {
     assert.match(dom.one("#phases .empty").textContent, /定義がありません。定義が空のファイルはccnaviで読み込めません/);
-    assert.match(dom.one(".problems").textContent, /phasesがマップ（キーと値の組の集まり）ではありません/);
+    assert.match(dom.one(".problems").textContent, /phasesがありません/);
     assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02-02）");
     assert.ok(dom.one("#lock").classList.contains("info"), "作業中は情報色");
     assert.ok(!dom.one("#lock").classList.contains("hidden"));
