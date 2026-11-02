@@ -296,6 +296,17 @@ class NoticeTest(Fixture):
         self.assertIn("scratchpad/", first)
         self.assertIsNone(second)
 
+    def test_書かせた後の知らせは会話の大きさを読めなくても出る(self):
+        self.fire()
+
+        self.assertTrue(idlehandoff.notice(self.state, SESSION, None, 400_000))
+
+    def test_ユーザが打った後は書かせた後の知らせを出さない(self):
+        self.fire()
+        idlehandoff.reset(self.state, SESSION, "続けます")
+
+        self.assertIsNone(idlehandoff.notice(self.state, SESSION, self.big, 400_000))
+
     def test_次に書かせたときも書かせたことを知らせる(self):
         self.fire()
         idlehandoff.notice(self.state, SESSION, self.big, 400_000)

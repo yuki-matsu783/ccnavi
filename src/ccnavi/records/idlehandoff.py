@@ -71,7 +71,8 @@ ccnavi: 会話が大きくなっています（約 {size} トークン）。
 
 
 _DONE = """\
-ccnavi: {wait_minutes} 分放置されたため、Claude が引き継ぎプロンプトを scratchpad/ に書きました。
+ccnavi: {wait_minutes} 分放置されたため、Claude に引き継ぎプロンプトの作成を頼みました。
+scratchpad/ に handoff-*.md があるか確かめてください。書くものが無いときは作られません。
 同じセッションで再開すると、会話全文の再計算で料金が大きく増えます。新しいセッションでの再開を推奨します。
 """
 
