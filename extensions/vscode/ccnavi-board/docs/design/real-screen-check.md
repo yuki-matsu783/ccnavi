@@ -78,6 +78,12 @@ cd "$CCNAVI" && uv run --with pyinstaller python build.py
 
 約10秒で終わる。`dist/ccnavi/`ができ、ccnavi自身の`.ccnavi/bin/<os>-<arch>/`にもコピーされる（どちらもgit管理外）。`ccnavi-setup.sh`は、`dist/`を配布元にする。
 
+最新のmainを、検証用の別クローンで組み立てることもできる。ccnaviのワークツリーや`.ccnavi/bin/`、`dist/`を変えずに済む。
+
+- mainのtrackedファイルを、別のディレクトリ（`ccnavi-src`など）へコピーする（コピーの方法は未確認）
+- そのコピーで、`extensions/vscode/ccnavi-board`の`sh scripts/package.sh`（vsix）と、コピーのルートの`uv run --with pyinstaller python build.py`（実行ファイル）を打つ。成果物はコピーの`dist/`に出る。検証用リポジトリへは、そのコピーの`scripts/ccnavi-setup.sh`で入れる
+- 以降の`$CCNAVI`・`$BOARD`は、そのコピーを指す
+
 ### 1.2検証用コピーを作ってsetupで反映する
 
 撮影では承認など書き込みを伴う操作をするため、test-repo本体ではなくコピーで行う。
@@ -241,7 +247,8 @@ cd "$W/cs" && setsid nohup node node_modules/code-server/out/node/entry.js \
 curl -s http://127.0.0.1:8080/healthz      # {"status":...} が返る
 ```
 
-別のフォルダを開くには、サーバーは動かしたままにしてURLの`?folder=<絶対パス>`を変える。
+別のフォルダを開くには、サーバーは動かしたままにしてURLの`?folder=<絶対パス>`を変える。`?folder=`は任意のパスを開くので、1つのcode-serverで複数のリポジトリを切り替えられる。
+複数のルートを並べた`.code-workspace`は、`?workspace=<.code-workspaceのパス>`で開く（マルチルートの確認用。値が絶対パスでよいかは未確認）。ボードが見るのは1つ目のルートだけなので、2つ目以降のルートは画面に出ない。
 止めるときは`pgrep -f "[c]ode-server/out/node/entry"`でPIDを見て`kill <PID>`する。`[c]`と書くのは、`pgrep -f`・`pkill -f`が自分のコマンドラインにも当たってシェルごと落ちるのを避けるため。
 
 ### 1.6撮影の道具
@@ -275,7 +282,7 @@ async function skipTour(page) {  // 案内ツアーは × の 1 回で全部閉�
   await page.goto(`http://127.0.0.1:8080/?folder=${folder}`);
   await page.waitForSelector(".monaco-workbench", { timeout: 60000 });
   await page.waitForTimeout(6000);
-  await page.keyboard.press("Control+Alt+b");                         // 右のチャットを閉じる
+  await page.mouse.click(1260, 52);  // 右のチャットの × を押す。幅1280×760の位置（別の幅では画面で確かめる。詰まりどころの表も見る）
   await page.keyboard.press("Control+k"); await page.keyboard.press("w");  // 開いているタブを閉じる
   await page.locator('.activitybar a[aria-label*="ccnavi"]').first().click();
   await page.waitForTimeout(2500);
@@ -297,6 +304,29 @@ export BOARD CHROME W
 node "$W/shoot.js" "$UC" board 1280 760 チケット管理      # 最初の 1 枚
 ```
 
+### 1.7 日本語の言語パックを入れる
+
+日本語のVS Codeで撮るときの手順。`--install-extension`と`--locale ja`だけでは、表示は英語のままになる（CLIで入れると`languagepacks.json`が作られないため）。
+
+1. Open VSXから`MS-CEINTL.vscode-language-pack-ja`のvsixを取る。Open VSXの版はVS Code本体より遅れる（code-server 4.144.0のVS Code 1.144に対して1.131.0だった）。そのため、チャット欄の「Agent」「Models」などが英語のまま残る
+2. 拡張を入れる: `code-server --user-data-dir "$W/ud" --extensions-dir "$W/ext" --install-extension <vsix>`
+3. `$W/ud/User/locale.json`に`{"locale":"ja"}`を書く
+4. 次の`mklp.js`で`$W/ud/languagepacks.json`を作る。引数は、`--user-data-dir`と、手順2で`--extensions-dir`の下にできた言語パックのディレクトリ
+5. `--locale ja`を付けてcode-serverを起動する
+
+```js
+// mklp.js: node mklp.js <user-data-dir> <言語パックの拡張のディレクトリ>
+const fs = require("node:fs"), path = require("node:path"), crypto = require("node:crypto");
+const [ud, ext] = process.argv.slice(2);
+const p = JSON.parse(fs.readFileSync(path.join(ext, "package.json"), "utf8"));
+const loc = p.contributes.localizations[0];
+const tr = {};
+for (const t of loc.translations) tr[t.id] = path.join(ext, t.path);
+const exts = [{ extensionIdentifier: { id: "ms-ceintl.vscode-language-pack-ja" }, version: p.version }];
+const hash = crypto.createHash("md5").update(JSON.stringify(exts)).digest("hex");
+fs.writeFileSync(path.join(ud, "languagepacks.json"), JSON.stringify({ ja: { hash, extensions: exts, translations: tr, label: "日本語" } }));
+```
+
 ## 2. 詰まりどころ
 
 | 症状 | 原因 | 対処 |
@@ -307,14 +337,20 @@ node "$W/shoot.js" "$UC" board 1280 760 チケット管理      # 最初の 1 �
 | 最初に開いた画面が「案内のための見本」で、実際のチケットが出ない | 初回起動（その画面の案内をまだ閉じていない）は、案内ツアーが見本のデータで始まる。ツアーは globalState に記録されるので、`--user-data-dir`を作り直すと毎回初回になる | 案内の × を1回押す（`[data-action="tour-skip"]`）。閉じたあとに実データへ替わる。撮るたびに閉じる処理を入れる（`shoot.js`の`skipTour`）。表示が出ない画面もあるので、あるときだけ閉じる形にする |
 | `npm install code-server`が`sh ./postinstall.sh`で失敗する（rootでは`--unsafe-perm`を要求される） | postinstallがネイティブモジュールをビルドする。`--unsafe-perm`を付けても`kerberos`のnode-gypが失敗する | `--ignore-scripts`で入れる。ネイティブモジュールが無くても、画面の確認には足りた |
 | code-serverに繋ぐと500で`Cannot find package '@microsoft/1ds-core-js'` | `--ignore-scripts`では、`lib/vscode/`の依存が入らない | `(cd node_modules/code-server/lib/vscode && npm install --omit=dev --ignore-scripts)`（1.5） |
-| `--install-extension <vsix>`が`Got error from Code`で失敗する | 原因は調べていない（ネイティブモジュールを入れていない影響の可能性） | vsixを`python3 -m zipfile -e`で展開し、`extension/`を`--extensions-dir`の下に`local.ccnavi-board-<版>`で置く（1.5）。左の一覧にccnaviが出る |
+| `--install-extension <vsix>`が`Got error from Code`で失敗する | 原因は調べていない（ネイティブモジュールを入れていない影響の可能性）。言語パックは同じCLIで入った（1.7） | vsixを`python3 -m zipfile -e`で展開し、`extension/`を`--extensions-dir`の下に`local.ccnavi-board-<版>`で置く（1.5）。左の一覧にccnaviが出る |
 | `pkill -f code-server/out/node/entry.js`を、その文字列を含む呼び出しの中で打ったら、シェルごと落ちた（終了コード144） | `pkill -f`が、自分のコマンドラインにも含まれる文字列に当たった | 止めるのと起動は別の呼び出しにし、`pgrep -f "[c]ode-server/out/node/entry"`でPIDを見て`kill`する。起動は`setsid nohup … < /dev/null & disown` |
 | Playwrightが`strict mode violation`（同じplaceholderの入力欄が16個）や`element is not visible`で落ちる | ルールなどの一覧は、行ごとに隠れた入力欄を持つ。新しく足した行は値が空 | `input[placeholder="git-push"][value=""]`や`textarea.f-message:visible`のように、空の値・見えているものに絞る |
 | 画面を開いた直後に撮ると、中身が空や古い | webviewは拡張が中身を渡すまで読み込み中 | 開いてから5秒待つ。ボードは`ccnavi --explain --json`を呼ぶので、遅いときは増やす |
-| VS Codeの表示が英語のまま（`locale: ja`を設定しても変わらない） | 日本語言語パックを入れていない（Open VSXに出られない） | 未確認の宿題（5章）。拡張の文言は日本語で出るので、ccnaviの画面の確認には影響しない |
+| VS Codeの表示が英語のまま（`locale: ja`を設定しても変わらない） | 日本語言語パックを入れていない（Open VSXに出られない）、または入れたが`languagepacks.json`が無い | Open VSXに出られる環境では1.7。出られない環境は未確認の宿題（5章）。拡張の文言は日本語で出るので、ccnaviの画面の確認には影響しない |
 | 保存したあと、画面上部の警告の帯が撮れない | 保存すると、画面は編集した行の高さのままで、上部の帯が画面の外にある | webviewの中のスクロールする要素を、すべて`scrollTop = 0`にしてから撮る |
 | 「編集中は外から別の対象を開いても切り替えない」通知が出ない | コマンド（`ccnaviBoard.openTemplates`）とサイドパネルは、対象がワークスペース自身（`self`）。画面が`self`を開いていると、対象が同じで切り替えが起きない | テンプレート画面の設定を「共通の設定」か「プロジェクト」にして、新しいテンプレートの編集欄を開き、サイドパネルの「テンプレート管理」を押す。画面内の設定の選択欄は、編集中は押せない |
 | 警告の帯が、保存したファイルと関係のないwarnで長くなる | 帯は、保存時点の検査全体のwarnを並べる。検証用ワークスペースにgitのoriginが無いと、「統合先と違う」系が10件前後出る | 検証用ワークスペースをgitのリポジトリにしてoriginを付ける（`git remote remove origin`で外すのは承認の確認用だけ）か、無関係なwarnが出ることを承知で確認する |
+| 右のチャット欄が`Ctrl+Alt+B`で閉じない | 欄の仕組みは未確認（`Ctrl+Alt+B`で閉じなかっただけ） | 欄の右上の×を押す（幅1280×760で、おおよそx=1260、y=52）。案内ツアーは、新しいChromiumで開くたびに出る |
+| `webview()`が、画面を替えたあとも前の画面のフレームを返す、または後ろのタブを拾う | `webview()`は、フレームを後ろから探す。webviewのタブが複数残っていると、後ろのタブの中身に当たる | 画面ごとに1つのセッション（ブラウザを開き直す）にするか、画面を替える前に、開いているタブを閉じる（`Ctrl+k` `w`） |
+| モードごとの画面を確かめたいのに、code-serverを起動するときの環境変数を替えても変わらない | 環境変数で起動し直しても効かなかった。`.claude/settings.json`のenvを直すと切り替わった（優先の仕組みは未確認） | 検証用コピー（`cp -a`したもの。ccnavi本体の設定ではない）の`.claude/settings.json`のenvを直し、そのコピーを開く。モードごとにコピーを分ける |
+| 壊れた設定（検証用）を、`.ccnavi/config/project/`に作ろうとして止められる | `.ccnavi/config/project/`は、どのリポジトリの下でも保護対象（guard-project-home）に当たる。dry-runのときは通った（enableでの扱いは未確認） | 保護の外の経路で書けるかを、ユーザに確かめる。止められた操作の書き方を変えて試さない |
+| マルチルートの2つ目以降のルートが、ボードに出ない | ボードは1つ目のルートだけを見る。案内も出ない（T1） | 見られるのは1つ目だけと知って確かめる（回避策は未確認） |
+| ［ターミナルで実行］を押したら、数分間`claude`が動き続けた | 承認後の結果の枠の［ターミナルで実行］は、新しい端末でモデル指定なしの非対話`claude -p --permission-mode auto < prompt.txt`を起動する。確認なしで1回走る。着手まで進んだ回と、実装まで進んだ回があった | 押す前に、検証用コピーであること、`origin`を外したことを確かめる。終わったら（または不要になったら）、そのプロセスを`kill`で止める。費用は計測していない |
 | 終わったあと、code-serverの子プロセスが残る | `pgrep -f "[c]ode-server/out/node/entry"`では、ファイル監視の子（`--type=fileWatcher`）が見つからない | 親のPIDに加えて、`--type=fileWatcher`の子プロセスも止める。一時ファイルは`rm -r`で消す（`rm -rf`と`find -delete`はガードに拒否される） |
 | macOSで`setsid`が無い | macOSには`setsid`が標準で無い | `nohup … &`だけで動く（`disown`も不要だった）。Chromiumは、Playwrightのブラウザの置き場の`chromium_headless_shell-*/chrome-headless-shell-*/chrome-headless-shell`を`CCNAVI_CHROMIUM`（`CHROME`）に指す |
 | 拡張を入れ直すたびにvsixを作るのが重い | `package.sh`はinstallとcompileを含む | compile済みの出力（`package.json`、`media/`、`out/extension.js`、`out/webview/`）を、拡張の置き場へコピーするだけでも動いた。コピー元が現在のソースと合っているかは、先にcompileして確かめる |
@@ -325,7 +361,7 @@ code-server由来のため、評価には入れなかったもの。
 - ターミナルの表示の崩れ（承認のあとにターミナルへ送る長いコマンドの折り返しで、文字が重なる）。実機のVS Codeでの再現は未確認
 - 等幅フォントでバックスラッシュが「¥」に見えること（正規表現が`¥b`や`¥s`に見える）。この環境のフォントの選び方による可能性があり、実機（Windowsの日本語フォント）では未確認
 - 起動時に開くcode-serverの「Walkthrough」のタブ。拡張とは関係ない（`shoot.js`で閉じようとしても残る。撮れた画像では無視する）
-- 画面の右上の「チャット」はcode-serverの機能。`Ctrl+Alt+B`で閉じる
+- 画面の右上の「チャット」はcode-serverの機能。×で閉じる（`Ctrl+Alt+B`では閉じない）
 
 ## 3. 画面ごとの撮り方
 
@@ -401,7 +437,7 @@ ccnavi本体が返す文言（エラーの文、判定の結果）は`$CCNAVI/sr
 
 | 項目 | できなかった理由 | 試す案 |
 |---|---|---|
-| VS Code本体の日本語表示 | 日本語言語パックを入れられなかった（Open VSXに出られない） | ネットワークの制限が無い環境で`ms-ceintl.vscode-language-pack-ja`を`--install-extension`する。入れてから`locale`を`ja`にして撮り直す。その環境で、メニューや通知が日本語のとき、拡張の英語混じりの表記がどう見えるかも見る |
+| VS Code本体の日本語表示 | 日本語言語パックを入れられなかった（Open VSXに出られない） | ネットワークの制限が無い環境で、1.7の手順で言語パックを入れて撮り直す。その環境で、メニューや通知が日本語のとき、拡張の英語混じりの表記がどう見えるかも見る |
 | ライトテーマ・見た目の切り替え（◐ ボタン） | 設定に`Default Dark Modern`を書いた撮影は暗く、あとから`Default Light Modern`に書き換えても暗いままだった（原因は未調査）。設定に何も書かない1.5の手順では、明るい配色で撮れた。◐ ボタンは押していない | ユーザー設定の`workbench.colorTheme`で明るい・暗いを明示し、ブラウザ側の保存（`--user-data-dir`を作り直す）も消してから更新し、左上の ◐（見た目を切り替えるコマンド）で`claude-light`・`claude-dark`・`vscode`を順に撮る。ハイコントラストも見る |
 | 取り込み待ちの差分の展開 | 行の ▶ を押す操作が開かなかった（セレクタの特定に失敗した） | 開発者ツールで行の要素を調べてから押す。差分の見出し、追加行・削除行の色、長いファイルの扱いを撮る |
 | レビュー待ちチケットの「レビュー完了」操作 | レビュー待ちの子（`wip/proposals/review/`に置かれた状態）を作っていない | `ccnavi-ticket.sh finish`で子を閉じる流れ（[manual-checks.md](manual-checks.md)の5・5b）で状態を作る。指摘の対応方針を選ぶ画面と、指摘が無いときの画面を撮る |
