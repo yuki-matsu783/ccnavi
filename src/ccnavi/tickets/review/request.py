@@ -67,8 +67,7 @@ TIMEOUT_SECONDS = 15.0
 
 # state の置き場に書く、投稿待ちの本文の名前。sh がこれを投稿する。
 REQUEST_FILE = "review-request-{parent}-{phase}.md"
-# まだマージリクエストが無いときに、sh がこれで作る。
-# 依頼の本文とマージリクエストの下書きの末尾に必ず書く一文。下書きの置き場
+# 依頼の本文の末尾に必ず書く一文。下書きの置き場
 # （ticket_places.HANDOFF）の変更を、レビュアーが読む対象に数えないため。
 HANDOFF_NOTE = (
     f"{ticket_places.HANDOFF}/ 配下はユーザに渡すコピーで、レビューの対象外。integrate で消える。"
@@ -543,17 +542,10 @@ def thread_version(t: review_host.Thread) -> str:
 def _unseen_by_review(conf: settings.Settings, path: str) -> bool:
     """依頼の後に変わっても「ユーザが見るものが動いた」に数えない場所か。
 
-    ccnavi 自身の置き場と、ELI5 の HTML の置き場（`wip/eli5/`）。ELI5 は依頼に添える
-    説明で、成果物ではない（`ready` の前に消える）。直すたびに依頼し直させると、指摘を受けて
-    説明を直すたびに依頼のコメントが増え、レビュー済みにしにくくなる。代わりに、
-    直した ELI5 をユーザが見直す保証は無くなる。
-
-    未コミットと push の検査（`treegate`）はこれを使わない。
-    ELI5 の未コミットは sh が依頼のときに止め、push していない ELI5 はマージリクエストの差分に無い
-    （crit push が届かない）。
+    ccnavi 自身の置き場。未コミットと push の検査（`treegate`）はこれを使わない。
     """
     # git の `-z` の表記をそのまま見る（`\` を `/` に直さない。`treegate.diff_paths` と同じ理由）。
-    return treegate.in_place(conf, path) or path.startswith(ticket_places.ELI5 + "/")
+    return treegate.in_place(conf, path)
 
 
 # 依頼のマーカーに記録された HEAD。git の revision として使う前に、この形であることを求める。
@@ -572,7 +564,7 @@ def is_sha(value: str) -> bool:
 
 
 def _seen_changes(tree_root: str, conf: settings.Settings, ref: str) -> tuple[list[str], str]:
-    """`ref..HEAD` の差分のうち、ユーザが見るもの（置き場と ELI5 の外）のパス。
+    """`ref..HEAD` の差分のうち、ユーザが見るもの（置き場の外）のパス。
     2 つめは読めなかった理由。"""
     paths, failed = treegate.diff_paths(tree_root, ref)
     return [p for p in paths if not _unseen_by_review(conf, p)], failed
@@ -581,10 +573,10 @@ def _seen_changes(tree_root: str, conf: settings.Settings, ref: str) -> tuple[li
 def wip_tracked(tree_root: str) -> list[str] | None:
     """途中の作業の置き場（`wip`）の下で追跡されているファイル（git の表記）。読めなければ None。
 
-    大文字小文字を区別せずに見る。区別しない FS で `WIP/eli5/` を先に作ると、範囲の判定
-    （`tree.relative` は書いたパスを返す）は `wip/eli5/` として通すのに、
+    大文字小文字を区別せずに見る。区別しない FS で `WIP/handoff/` を先に作ると、範囲の判定
+    （`tree.relative` は書いたパスを返す）は `wip/handoff/` として通すのに、
     git には `WIP/...` で入る。
-    区別して見ると、それが既定のブランチまで残る。名前に `\\` を含む 1 ファイル（`wip\\eli5\\x`。
+    区別して見ると、それが既定のブランチまで残る。名前に `\\` を含む 1 ファイル（`wip\\handoff\\x`。
     Linux / macOS では作れる）も `wip` の下と見なす。pathspec の `:(icase)` に
     頼らず全部を `-z` で読んで絞るのは、`\\` の名前を pathspec で拾えないのと、
     git の版に依らないため。
@@ -1041,7 +1033,7 @@ def moved_detail(
     # sha でない値は差分の相手にしない。読めない（依頼時のコミットが消えているなど）も同じ。
     if not is_sha(recorded) or changed is None:
         return Moved(moved, KIND_MOVED)
-    # ccnavi 自身の置き場と ELI5 の置き場だけの変更は、ユーザが見るものを動かさない。
+    # ccnavi 自身の置き場だけの変更は、ユーザが見るものを動かさない。
     seen = [path for path in changed if not _unseen_by_review(conf, path)]
     if not seen:
         return Moved()
@@ -1109,8 +1101,7 @@ def _redo_request(root: str, phase_no: int) -> str:
     """HEAD が動いたときの案内。push 済みの今の HEAD で依頼を出し直す。"""
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     return (
-        f"push してから '{review_sh} review-request --phase {phase_no} --body-file <依頼文> "
-        f"--eli5 wip/eli5/phase-{phase_no}.html' で"
+        f"push してから '{review_sh} review-request --phase {phase_no} --body-file <依頼文>' で"
         "依頼を出し直してください"
     )
 

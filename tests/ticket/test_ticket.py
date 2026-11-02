@@ -1096,8 +1096,7 @@ class TicketTest(unittest.TestCase):
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertIn("フェーズ 1（MR作業） が終わりました", self.reason(said))
         self.assertIn("request", self.reason(said))
-        # ELI5 の置き場を名指しする
-        self.assertIn("--eli5 wip/eli5/phase-1.html", self.reason(said))
+        self.assertIn("review-request --phase 1 --body-file <依頼文>", self.reason(said))
 
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
@@ -1605,135 +1604,18 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))
         self.assertFalse(os.path.exists(os.path.join(phases, "accepted.json")))
 
-    def test_a_crit_push_thread_on_the_eli5_blocks_and_leaves_with_wip(self):
-        """ELI5 の HTML を wip/ にコミットし、ユーザが crit push で行に指摘を送った形。
-
-        crit push はマージリクエストの行のスレッド（GitHub はレビューのコメント、GitLab は差分の
-        discussion）を立てる。目印で始まらないユーザの投稿なので、confirm は未解決として数えて止め、
-        decide はその 1 件を選べる。wip/ が追跡されている間は ready の前提（_merge_problems）が
-        満たされず、wip/ を消してコミットすると外れる。squash した成果物に HTML は残らない。
-        """
-        self.family()
-        self.close_phase()
-        fixture = self.remote()
-        eli5 = "wip/eli5/phase-1.html"
-        write(
-            os.path.join(self.parent_tree, *eli5.split("/")),
-            "<!doctype html>\n<p>やさしい説明</p>\n",
-        )
-        git(self.parent_tree, "add", "--", eli5)
-        git(self.parent_tree, "commit", "--quiet", "-m", "docs: ELI5")
-        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        self.assertEqual(self.request(fixture).returncode, 0)
-        data = read_json(fixture)
-        # crit push の 1 件をなぞった形（sh の fetch が組むスレッド。path と line は HTML のソース）
-        data["threads"] = [
-            {
-                "id": "crit-1",
-                "resolved": False,
-                "url": "https://example/mr/7#discussion_crit-1",
-                "path": eli5,
-                "line": 2,
-                "body": "ここは X ではなく Y では",
-                "author": "201",
-            }
-        ]
-        write(fixture, json.dumps(data))
-        check = self.ccnavi(
-            "--cwd", self.parent_tree, "--phase", "1", "review", "confirm", "--result", fixture
-        )
-        self.assertNotEqual(check.returncode, 0)
-        self.assertIn("未解決", check.stderr)
-        self.assertIn(eli5, check.stderr)
-        shown = self.decide(fixture, "--preview", "--json")
-        self.assertEqual(shown.returncode, 0, shown.stderr)
-        keys = [t["key"] for t in json.loads(shown.stdout)["threads"]]
-        self.assertEqual(keys, ["https://example/mr/7#discussion_crit-1"])
-        # ready の前提: wip/ の追跡済みのファイルは ready が消すので止めない。未追跡のものは
-        # 戻せないので名指しして止める
-        conf, _ = settings.load(self.root)
-        problems = review._merge_problems(self.parent_tree, conf, self.root)
-        self.assertFalse(any("wip/" in p for p in problems), problems)
-        self.assertIn(eli5, review.wip_tracked(self.parent_tree))
-        draft = os.path.join(self.parent_tree, "wip", "eli5", "draft.html")
-        write(draft, "<p>下書き</p>\n")
-        problems = review._merge_problems(self.parent_tree, conf, self.root)
-        self.assertTrue(any("未追跡のファイルが 1 件" in p for p in problems), problems)
-        self.assertTrue(any("wip/eli5/draft.html" in p for p in problems), problems)
-        os.remove(draft)
-        # ready の片付けは追跡済みのものだけを消し、消す前の HEAD を返す（履歴から戻せる）
-        head = git(self.parent_tree, "rev-parse", "HEAD").strip()
-        removed, before, failed = review.remove_wip(self.parent_tree)
-        self.assertEqual(failed, "")
-        self.assertEqual(before, head)
-        self.assertIn(eli5, removed)
-        self.assertFalse(os.path.exists(os.path.join(self.parent_tree, *eli5.split("/"))))
-        self.assertEqual(git(self.parent_tree, "show", f"{head}:{eli5}").count("やさしい説明"), 1)
-
-    def test_an_eli5_only_commit_does_not_move_the_request(self):
-        """依頼の後に `wip/eli5/` の下だけを変えたコミットは、HEAD が動いたと数えない。
-
-        confirm は止まらず、request の打ち直しも要らない（依頼済みと答える）。ただし push は求める
-        （差分に無い ELI5 には crit push が届かない）。ELI5 とほかのファイルを一緒に変えたコミットは
-        今までどおり数え、confirm が止まって打ち直しを求める。
-        """
-        self.family()
-        self.close_phase()
-        fixture = self.remote()
-        eli5 = os.path.join(self.parent_tree, "wip", "eli5", "phase-1.html")
-        write(eli5, "<p>やさしい説明</p>\n")
-        git(self.parent_tree, "add", "--", "wip/eli5/phase-1.html")
-        git(self.parent_tree, "commit", "--quiet", "-m", "docs: ELI5")
-        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        self.assertEqual(self.request(fixture).returncode, 0)
-
-        def confirm():
-            return self.ccnavi(
-                "--cwd", self.parent_tree, "--phase", "1", "review", "confirm", "--result", fixture
-            )
-
-        def edit(rel, text, message):
-            write(os.path.join(self.parent_tree, *rel.split("/")), text)
-            git(self.parent_tree, "add", "--", rel)
-            git(self.parent_tree, "commit", "--quiet", "-m", message)
-
-        # ELI5 だけを直したコミット。push していなければまだ止める
-        edit("wip/eli5/phase-1.html", "<p>直した説明</p>\n", "docs: ELI5 を直す")
-        unpushed = confirm()
-        self.assertNotEqual(unpushed.returncode, 0)
-        self.assertIn("push されていない", unpushed.stderr)
-        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        again = self.request(fixture)
-        self.assertNotEqual(again.returncode, 0)
-        self.assertIn("依頼済み", again.stderr)
-        # ELI5 とほかのファイルを一緒に変えたコミットは動いたと数える
-        write(os.path.join(self.parent_tree, "src", "a", "fix.py"), "x = 1\n")
-        git(self.parent_tree, "add", "--", "src/a/fix.py")
-        edit("wip/eli5/phase-1.html", "<p>もう一度直した</p>\n", "fix: 直しと ELI5")
-        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        moved = confirm()
-        self.assertNotEqual(moved.returncode, 0)
-        self.assertIn("依頼の後に親の HEAD が動いている", moved.stderr)
-        redo = self.request(fixture)
-        self.assertEqual(redo.returncode, 0, redo.stderr)
-        # 出し直したあとに ELI5 だけを直しても、confirm は止まらない
-        edit("wip/eli5/phase-1.html", "<p>三度目</p>\n", "docs: ELI5 をもう一度直す")
-        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        done = confirm()
-        self.assertEqual(done.returncode, 0, done.stderr)
-
     def test_remove_wip_does_not_follow_a_linked_directory_out_of_the_tree(self):
-        """追跡済みの wip/eli5/x.html の途中のディレクトリがリンク（無視されている）に置き換わって
+        """追跡済みの wip/design/x.html の途中のディレクトリがリンク（無視されている）に置き換わって
         いても、リンクの先（ツリーの外）のファイルは消さない。名指しして止める。"""
-        rel = "wip/eli5/x.html"
+        rel = "wip/design/x.html"
         write(os.path.join(self.parent_tree, *rel.split("/")), "<p>x</p>\n")
         git(self.parent_tree, "add", "--", rel)
-        git(self.parent_tree, "commit", "--quiet", "-m", "eli5")
+        git(self.parent_tree, "commit", "--quiet", "-m", "wip")
         outside = os.path.join(self.root, "outside")
         write(os.path.join(outside, "x.html"), "大事\n")
-        shutil.rmtree(os.path.join(self.parent_tree, "wip", "eli5"))
+        shutil.rmtree(os.path.join(self.parent_tree, "wip", "design"))
         try:
-            os.symlink(outside, os.path.join(self.parent_tree, "wip", "eli5"))
+            os.symlink(outside, os.path.join(self.parent_tree, "wip", "design"))
         except OSError:
             self.skipTest("リンクが作れない")
         # ready の前提の時点で止まる（退避より前）
@@ -1748,9 +1630,9 @@ class TicketTest(unittest.TestCase):
 
     @unittest.skipIf(os.name == "nt", "大文字違いの並存と名前の \\ は Windows では作れない")
     def test_ready_catches_wip_in_any_case_and_a_backslashed_name(self):
-        """ready は `WIP/eli5/…` と `wip\\eli5\\…`（名前に `\\` を含む 1 ファイル）も片付ける。
+        """ready は `WIP/design/…` と `wip\\design\\…`（名前に `\\` を含む 1 ファイル）も片付ける。
 
-        大文字小文字を区別しない FS では範囲の除外が `WIP/eli5/` を通しうるので、ready の側で
+        大文字小文字を区別しない FS では範囲の除外が `WIP/design/` を通しうるので、ready の側で
         区別せずに拾う。
         """
         self.family()
@@ -1763,7 +1645,7 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(
             any("wip/" in p for p in review._merge_problems(self.parent_tree, conf, self.root))
         )
-        for rel in ("WIP/eli5/phase-1.html", "wip\\eli5\\phase-1.html"):
+        for rel in ("WIP/design/phase-1.html", "wip\\design\\phase-1.html"):
             with self.subTest(path=rel):
                 write(os.path.join(self.parent_tree, *rel.split("/")), "<p>x</p>\n")
                 git(self.parent_tree, "add", "--", rel)
@@ -1776,22 +1658,6 @@ class TicketTest(unittest.TestCase):
                 git(self.parent_tree, "add", "-A")
                 git(self.parent_tree, "commit", "--quiet", "-m", f"rm {rel}")
                 git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-
-    def test_eli5_lookalikes_still_move_the_request(self):
-        """`wip/eli5x/` や `wip/` のほかの場所は、今までどおり動いたと数える。"""
-        conf, _ = settings.load(self.root)
-        mark = {"head": "a" * 40}
-        for path, moves in (
-            ("wip/eli5/phase-1.html", False),
-            ("wip/eli5/old/phase-1.html", False),
-            ("wip/eli5x/phase-1.html", True),
-            ("wip/design/plan.md", True),
-            ("wip\\eli5\\phase-1.html", True),
-            ("src/a/x.py", True),
-        ):
-            with self.subTest(path=path):
-                said = review.moved_since(conf, mark, "b" * 40, [path])
-                self.assertEqual(bool(said), moves, said)
 
     def test_decide_yes_places_each_choice(self):
         """指摘ごとの行き先。対応しない分は受け入れ、直す分は続きの子に載せ、フェーズは開き直る。"""
@@ -2595,7 +2461,7 @@ class TicketTest(unittest.TestCase):
             f"sh {sync} feature-1-x",
             f"sh {review} decide 1",
             f"sh {review} decide 1 --preview --json",
-            f'sh {review} request 1 --eli5 "$F"',
+            f'sh {review} request 1 --body-file "$F"',
             "grep -n -- '--abandon' src/ccnavi/tickets/lifecycle/retire.py",
             "echo ccnavi worktree $V --abandon",
             "ccnavi worktree drop P1",

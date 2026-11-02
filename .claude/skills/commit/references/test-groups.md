@@ -56,7 +56,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | `.claude/hooks/check-adr.sh` | `core`（`test_check_adr_hook`） |
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
 | `tests/ticketsample.py` | `ticket` `sh` |
-| `tests/host_stub.py`・`tests/fake_gitlab.py`・`tests/scenarios/hostenv.py`・`tests/scenarios/runner.py` と、その下請けの `tests/scenarios/` のモジュール（`drive.py`・`repo.py`・`actors/` など） | `scenarios` `sh` `contract`（どちらのグループも、この 2 つの代役と模擬を import して使う） |
+| `tests/host_stub.py`・`tests/fake_gitlab.py`・`tests/scenarios/hostenv.py`・`tests/scenarios/runner.py` と、その下請けの `tests/scenarios/` のモジュール（`drive.py`・`repo.py`・`actors/` など） | `scenarios` `sh` `contract` `core`（`sh` `contract` は、この 2 つの代役と模擬を import して使う。`core` の `test_scenario_layers` は、`tests/scenarios/` の import の向きを読む） |
 | `tests/manual/gitlab/gitlab_api.py` | `scenarios` `core`（受入シナリオの相手の準備と状態の読み取りに使う。`core` の `test_gitlab_manual_tools` も使う） |
 | `tests/fixtures/` | `guard` `ticket` |
 | `extensions/vscode/` | `ticket`（`core` の `test_test_json` と `guard` の `test_suggest` も `test/fixtures/` を読む） |

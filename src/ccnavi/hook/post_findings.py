@@ -77,7 +77,7 @@ class ScopeGuard:
         処理フロー:
         1. 変更のパスのツリーを求め（`tree.tree_of`）、主のツリーを外す。
            担当（`tree.lookup`）のないものも外す。
-        2. チケットの置き場・下書きの置き場・ELI5 の置き場は外す（`ticket_places`）。
+        2. チケットの置き場・下書きの置き場は外す（`ticket_places`）。
         3. 親と型の定義から範囲の判定を取る（`phase_scope.type_for`・`phase_scope.scope_verdict`）。
            範囲の中なら None を返す。
         4. 外の理由（チケットの不備・フェーズの型・親の範囲・範囲の外）ごとに文面を組み、
@@ -92,9 +92,9 @@ class ScopeGuard:
         rel = tree.relative(t, full)
         if ticket_places.is_ticket_place(rel, self.tickets, self.approved):
             return None
-        # 下書きの置き場（`wip/handoff/`）と ELI5 の置き場は追跡されるので、ここでも外す
+        # 下書きの置き場（`wip/handoff/`）は追跡されるので、ここでも外す
         # （実行前チェックと揃える）。
-        if ticket_places.is_handoff_place(rel) or ticket_places.is_eli5_place(rel):
+        if ticket_places.is_handoff_place(rel):
             return None
         parent = self.copies.get(ticket.parent) if ticket.is_child else None
         # 定義は親に固定したコピー（`phases:`）から引く。`phases.yml` は開かない。

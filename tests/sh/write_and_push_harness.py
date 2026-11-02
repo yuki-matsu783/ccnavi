@@ -101,9 +101,8 @@ exec '{git}' "$@"
 """
 
 
-# ELI5 の HTML の置き場。親のワークツリーの wip/ の下にコミットして push し、
-# マージリクエストの差分に載せる
-ELI5 = "wip/eli5/phase-1.html"
+# ready が消す wip/ の追跡済みのファイル（親のワークツリーにコミットして push する）
+WIP_NOTE = "wip/note.md"
 
 
 def write(path, text=""):
@@ -336,16 +335,16 @@ class WriteAndPushHarness(unittest.TestCase):
         out = git(tree or self.tree, "show", "--name-only", "--format=", rev).stdout
         return sorted(line for line in out.splitlines() if line)
 
-    def eli5(self):
-        """ELI5 の HTML を親のワークツリーの wip/ の下に書き、コミットして push する。
+    def wip_note(self):
+        """wip/ の下の追跡済みのファイルを親のワークツリーに書き、コミットして push する。
 
-        マージリクエストの差分に載せる置き場。返すのはツリーのルートからの相対。
+        返すのはツリーのルートからの相対。
         """
-        write(os.path.join(self.tree, *ELI5.split("/")), "<p>やさしい説明</p>\n")
-        git(self.tree, "add", "--", ELI5)
-        git(self.tree, "commit", "-q", "-m", "docs: ELI5")
+        write(os.path.join(self.tree, *WIP_NOTE.split("/")), "メモ\n")
+        git(self.tree, "add", "--", WIP_NOTE)
+        git(self.tree, "commit", "-q", "-m", "docs: wip note")
         git(self.tree, "push", "-q", "origin", PARENT)
-        return ELI5
+        return WIP_NOTE
 
     def subjects(self, n=5, tree=None):
         out = git(tree or self.tree, "log", f"-{n}", "--format=%s").stdout

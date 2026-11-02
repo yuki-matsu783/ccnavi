@@ -6,7 +6,7 @@ tags: [worktree, cleanup]
 keywords: [片付け, 無視, 退避, scratchpad, worktree drop, 生成物, target, Cargo, IGNORED, ccnavi-clean]
 ---
 
-# ADR-0230: 片付けでは、git が無視しているファイルを止める理由にせず、scratchpad へ退避する
+# ADR-0231: 片付けでは、git が無視しているファイルを止める理由にせず、scratchpad へ退避する
 
 状態: 採用
 

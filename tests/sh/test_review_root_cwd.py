@@ -87,8 +87,6 @@ class RootCwdTest(unittest.TestCase):
                 "1",
                 "--body-file",
                 "b.md",
-                "--eli5",
-                "e.html",
             ],
         }
         for name, args in cases.items():

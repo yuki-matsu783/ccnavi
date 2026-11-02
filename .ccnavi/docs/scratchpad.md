@@ -36,7 +36,7 @@ keywords: [scratchpad, handoff, user handoff, 取り込み, 保護対象, wip/ha
 ## `wip/handoff/`の扱い
 
 - 追跡されてpushされる。履歴に残るので、レビューで見せられる
-- 直接作業では、`ccnavi-git.sh integrate`が`wip/handoff/`の下の下書きを取り込み結果から外す。`wip/`のそれ以外（`wip/proposals/`・`wip/eli5/`など）は巻き込まない。元の無い下書き（新規のメモ）は取り込みを止めず、`integrate`の出力の「取り込まない下書き」に挙がり、作業ブランチを片付けると一緒に消える（[worktree-merge.md](worktree-merge.md)）
+- 直接作業では、`ccnavi-git.sh integrate`が`wip/handoff/`の下の下書きを取り込み結果から外す。`wip/`のそれ以外（`wip/proposals/`など）は巻き込まない。元の無い下書き（新規のメモ）は取り込みを止めず、`integrate`の出力の「取り込まない下書き」に挙がり、作業ブランチを片付けると一緒に消える（[worktree-merge.md](worktree-merge.md)）
 - チケットのワークツリーでは、`ready`が`wip/`ごと消す
 - チケットが結び付いたワークツリーでも、`wip/handoff/`にはそのまま書き込める。実行前チェック・実行後チェック・サブエージェント終了時チェックのどれも、`wip/handoff/`への書き込みをチケットの範囲と照らし合わせないので、範囲に`wip/handoff/*`を足す必要は無い
 - 照らし合わせの対象から外れるのは、ツリーのルート直下の`wip/handoff/`の下だけで、大文字と小文字は区別しない。`wip/handoffX/`・`docs/wip/handoff/`・`scratchpad/`や、`wip/handoff`という名前のファイルは普通の作業対象と同じように判定され、チケットの範囲の外なら止められる
