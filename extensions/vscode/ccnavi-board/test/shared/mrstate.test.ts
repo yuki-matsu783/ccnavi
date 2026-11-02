@@ -82,7 +82,7 @@ test("CB-T623 mr-state: URLがhttp(s)でなくても状態は出す（リンク�
   // 期限で打ち切った: 拡張の側だけの種類timeout（出力が途中まで読めてもtimeoutが先）
   const timeout = interpretMrState(ran(`mr-state 1\nmerged 12 ${URL}\n`, { killed: true, code: -1 }), 12);
   assert.deepEqual(timeout, { kind: "unknown", reason: "timeout", detail: "時間内に終わりませんでした" });
-  // シェルが無い・shが落ちた（想定外の終了コードで、頭の行が無い）
+  // シェルが無い・shが落ちた（想定外の終了コードで、先頭の行が無い）
   const failed = interpretMrState(ran("", { code: 127, stderr: "sh: not found" }), 12);
   assert.equal(failed.kind === "unknown" ? failed.reason : "", "failed");
   assert.match(failed.kind === "unknown" ? failed.detail : "", /終了コード127で終わりました: sh: not found/);
@@ -125,9 +125,9 @@ test("CB-T626 sync retiredの異常は「一覧を取得できません」にす
     return parsed.ok ? "" : parsed.error;
   };
   const base = { code: 0, killed: false };
-  assert.match(error({ ...base, stdout: "" }), /一覧を取得できません（形式の異常: 頭の行がretired 1ではありません）/);
-  assert.match(error({ ...base, stdout: "retired 2\n" }), /頭の行がretired 1ではありません/);
-  assert.match(error({ ...base, stdout: "usage: ccnavi ...\n" }), /頭の行がretired 1ではありません/);
+  assert.match(error({ ...base, stdout: "" }), /一覧を取得できません（形式の異常: 先頭の行がretired 1ではありません）/);
+  assert.match(error({ ...base, stdout: "retired 2\n" }), /先頭の行がretired 1ではありません/);
+  assert.match(error({ ...base, stdout: "usage: ccnavi ...\n" }), /先頭の行がretired 1ではありません/);
   assert.match(error({ code: 1, killed: false, stdout: HEAD }), /一覧を取得できません（コマンドが失敗しました。終了コード1）/);
   assert.match(error({ code: 0, killed: true, stdout: HEAD }), /一覧を取得できません（時間内に終わりませんでした）/);
   // 知らない行（黙って破棄しない）

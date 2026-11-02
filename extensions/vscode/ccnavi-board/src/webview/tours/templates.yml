@@ -135,7 +135,7 @@ diagrams:
       - id: fix
         from: エージェント
         to: wip/handoff/
-        text: 固有名を一般化し、効かなかった手順を削り、TODOを消す
+        text: 固有名を一般化し、試して失敗した手順を削り、TODOを消す
         value: "description: ログイン画面を追加する親の計画"
       - id: hold
         from: wip/handoff/
@@ -156,7 +156,7 @@ diagrams:
       - id: look
         from: 取り込み待ち画面
         to: ccnavi
-        text: そのパスだけを指して、見るだけでもう一度読み、ハッシュ（expect）を受け取る
+        text: そのパスだけを指して、書き込まずにもう一度読み、ハッシュ（expect）を受け取る
         value: ccnavi user handoff .ccnavi/config/project/templates/login.yml --json
       - id: apply
         from: 取り込み待ち画面
@@ -260,7 +260,7 @@ courses:
         scene: {}
       - target: template
         title: 1件を開く
-        body: 行は最初から開いていて、通常は計画の図と子のフローの図が出ます（この案内の見本では表で見せます）。見出しを押すと畳めます。「本文を見る」を押すと本文も読めます。本文では、見えない文字を \uXXXXの形で出します。
+        body: 行は最初から開いていて、通常は計画の図と子チケットのフローの図が出ます（この案内の見本では表で見せます）。見出しを押すと畳めます。「本文を見る」を押すと本文も読めます。本文では、見えない文字を \uXXXXの形で出します。
         scene:
           open: feature
           body: true
@@ -288,7 +288,7 @@ courses:
     steps:
       - target: drafts
         title: 親をクローズすると案内が出る
-        body: 計画を持つ親をクローズすると、ccnaviがクローズした出力の最後に、テンプレートにする案内を1行出します。出るのは、同じ識別子の下書きがまだ無く、同じ計画の形のテンプレートも取り込まれていないときだけです。
+        body: 計画を持つ親チケットをクローズすると、ccnaviがクローズした出力の最後に、テンプレートにする案内を1行出します。出るのは、同じ識別子の下書きがまだ無く、同じ計画の形のテンプレートも取り込まれていないときだけです。
         scene: {}
         diagram: template-draft
         focus: close,notice
@@ -335,7 +335,7 @@ courses:
     steps:
       - target: list
         title: 利用できるテンプレートを探す
-        body: エージェントはccnavi --templatesで、共通の設定に自分のレイヤーを重ねたものを引きます。この画面の一覧と統合結果と同じ答えです。名前・説明・使う場面で絞れます。
+        body: エージェントはccnavi --templatesで、共通の設定に自分のレイヤーを重ねたものを引きます。この画面の一覧と統合結果と同じ内容です。名前・説明・使う場面で絞れます。
         scene: {}
         diagram: template-propose
         focus: list,found
@@ -347,19 +347,19 @@ courses:
         focus: found
       - target: template
         title: テンプレートを指して提案を始める
-        body: ccnavi ticket newに--templateと名前を渡すと、親の提案を始められます。破棄されたテンプレートや、errorのあるテンプレート、phases.ymlに無い種類を含むテンプレートでは、何も書かずに止まります。
+        body: ccnavi ticket newに--templateと名前を渡すと、親チケットの提案を始められます。破棄されたテンプレートや、errorのあるテンプレート、phases.ymlに無い種類を含むテンプレートでは、何も書かずに止まります。
         scene: { open: feature }
         diagram: template-propose
         focus: new,read
       - target: template
         title: 計画と子のフローの下書きが書かれる
-        body: 全体計画（plan）はテンプレートからコピーし、先行ステップの番号は提案の番号に付け直されます。子のフローは下書きとして書かれ、ユーザがフロー編集画面で取り込むまで効きません。
+        body: 全体計画（plan）はテンプレートからコピーし、先行ステップの番号は提案の番号に付け直されます。子チケットのフローは下書きとして書かれ、ユーザがフロー編集画面で取り込むまで効きません。
         scene: { open: feature }
         diagram: template-propose
         focus: write
       - target: template
         title: フィードバック計画は書かれない
-        body: フィードバック計画は、全体計画の最後のレビューを見てから、改版で1回だけ足す決まりです。--with-feedbackを付けなければ書かず、あることだけを知らせます。提案は通常の承認を通ります。
+        body: フィードバック計画は、全体計画の最後のレビューのあとに、改版で1回だけ足す決まりです。--with-feedbackを付けなければ書かず、あることだけを知らせます。提案は通常の承認を通ります。
         scene: { open: feature }
         diagram: template-propose
         focus: skip,approve
@@ -406,7 +406,7 @@ courses:
     steps:
       - target: drafts
         title: 下書きとは
-        body: 親チケットの中で作成された、まだ効力のないテンプレートです。ここで検査の指摘と計画を読めます。
+        body: 親チケットの中で作成された、まだ効力の無いテンプレートです。ここで検査の指摘と計画を読めます。
         scene:
           draft: login
       - target: draft

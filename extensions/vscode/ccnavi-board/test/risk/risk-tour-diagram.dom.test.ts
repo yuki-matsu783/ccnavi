@@ -59,12 +59,12 @@ test("CB-D751 「保存してから効くまで」の案内の図のある手順
   await checkCourseDiagrams("how-save-effect");
 });
 
-test("CB-D752 図の矢印の値は、見本の配点の数字を等幅で出す（HIGH の例は 55 点と、境目の 40 / 70）", async () => {
+test("CB-D752 図の矢印の値は、見本の配点の数字を等幅で出す（HIGH の例は 55 点と、閾値の 40 / 70）", async () => {
   const course = def.courses.find((c) => c.id === "how-score")!;
   const dom = await openRisk();
   try {
     await startCourse(dom, "how-score");
-    const at = course.steps.findIndex((step) => step.title === "合計を境目の点と比べる");
+    const at = course.steps.findIndex((step) => step.title === "合計を閾値と比べる");
     assert.ok(at > 0);
     for (let i = 0; i < at; i += 1) {
       dom.click(dom.one('[data-action="tour-next"]'));

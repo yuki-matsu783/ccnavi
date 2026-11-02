@@ -95,7 +95,7 @@ def _explain_phases(
 def _explain_risk(
     stdout: TextIO, conf: settings.Settings, root: str, views: list[ruleload.LayerView]
 ) -> None:
-    """レイヤーごとのリスクの配点。境目の点は共通レイヤーのものを出す。"""
+    """レイヤーごとのリスクの配点。閾値は共通レイヤーのものを出す。"""
     tables = [
         (
             v.name,
@@ -106,7 +106,7 @@ def _explain_risk(
         for v in views
     ]
     common, _ = risk.load(conf.risk)
-    # 共通レイヤーの境目の点。
+    # 共通レイヤーの閾値。
     # レイヤーの `levels` はキーごとに小さいほうを採るので、実際に使われる値は
     # チケットのレイヤーで決まる。ここに出すのは共通レイヤーの側の既定。
     effective = risk.effective_levels(common.levels)

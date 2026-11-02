@@ -143,11 +143,11 @@ src/
     projects/state.ts 画面が覚えるもの（clone の欄）の読み書き
     projects/text.ts  カードに出す言葉（プロジェクトの設定の場所、重ねない苦情）
     risk/style.css    リスク管理画面の CSS の入口
-    risk/App.css      App.tsx の CSS（境目の点の枠）
+    risk/App.css      App.tsx の CSS（閾値の枠）
     risk/Factor.css   Factor.tsx の CSS（配点 1 件の行）
     risk/post.ts      リスク管理の送り口。契約に無いものは型で止まる
     risk/main.tsx     リスク管理画面の入口。埋め込みの JSON を読んでマウントする
-    risk/App.tsx      帯・ツールバー・リスクレベルの基準点・項目の一覧と、拡張ホストからのメッセージの受け
+    risk/App.tsx      帯・ツールバー・リスクレベルの閾値・項目の一覧と、拡張ホストからのメッセージの受け
     risk/Factor.tsx   項目 1 件の行（要約と、開いたときの欄）
     risk/state.ts     編集中の配点（行ごとのキー）と、開いている行（id で保持する）の読み書き
     risk/text.ts      要約の文・欄の名前・絞り込みが適用する文字列

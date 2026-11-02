@@ -122,7 +122,7 @@ test("CB-D722 マージ待ち（Draftなら付記）・マージ済み・閉じ�
     assert.equal(state("a-open"), "マージ待ち MRを開く");
     assert.equal(state("b-draft"), "マージ待ち（Draft） MRを開く");
     assert.equal(state("c-merged"), "マージ済み 片付ける");
-    assert.match(state("d-closed"), /^マージせず閉じました。自動では片付けません。破棄した親なら、ユーザがターミナルでsh \/ws\/\.ccnavi\/scripts\/ccnavi-launcher\.sh worktree retire --abandon d-closedを実行して記録を消します/);
+    assert.match(state("d-closed"), /^マージせず閉じました。自動では片付けません。破棄した親の記録は、ターミナルでsh \/ws\/\.ccnavi\/scripts\/ccnavi-launcher\.sh worktree retire --abandon d-closedを実行すると消えます/);
     assert.equal(state("e-unknown"), "確認できません（認証: 認証に失敗した（トークンかghの認証を確かめる））");
     assert.equal(state("f-timeout"), "確認できません（タイムアウト: 時間内に終わりませんでした）");
     assert.match(state("g-format"), /^確認できません（出力の形が想定外: 出力の形が想定外です/);
@@ -130,7 +130,7 @@ test("CB-D722 マージ待ち（Draftなら付記）・マージ済み・閉じ�
     assert.equal(state("i-incomplete"), "確認できません（記録が不完全: 記録を読めない（壊れている））");
     assert.equal(state("j-wait"), "確認中…");
     // 確認した時刻
-    assert.equal(text(page, '[data-merge="checked-at"]'), "確認した時刻2026-10-01 10:00:00");
+    assert.equal(text(page, '[data-merge="checked-at"]'), "確認した時刻: 2026-10-01 10:00:00");
     // マージ済み以外に［片付ける］は出ない
     assert.deepEqual(page.all('button[data-action="merge-retire"]').map((b) => b.getAttribute("data-parent")), ["c-merged"]);
   } finally {
@@ -220,10 +220,10 @@ test("CB-D725 マージせずクローズした親は、記録を消すコマン
 });
 
 test("CB-D726 一覧を取れなかったときは「一覧を取得できません」をエラーに出し、「ありません」とは言わない。正しく取れて0件のときだけ「マージ待ちの親はありません」", async () => {
-  const error = await openBoard(json(), { merge: view([], { error: "一覧を取得できません（形式の異常: 頭の行がretired 1ではありません）" }) });
+  const error = await openBoard(json(), { merge: view([], { error: "一覧を取得できません（形式の異常: 先頭の行がretired 1ではありません）" }) });
   try {
     const alert = error.one('[data-merge="list-error"]');
-    assert.equal(alert.textContent, "一覧を取得できません（形式の異常: 頭の行がretired 1ではありません）");
+    assert.equal(alert.textContent, "一覧を取得できません（形式の異常: 先頭の行がretired 1ではありません）");
     assert.equal(alert.getAttribute("role"), "alert");
     assert.equal(error.all('[data-merge="empty"]').length, 0);
     assert.ok(!error.document.body.textContent.includes("マージ待ちの親はありません"));

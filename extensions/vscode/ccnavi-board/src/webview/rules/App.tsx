@@ -435,7 +435,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       return;
     }
     if (!isToolName(tool.trim())) {
-      setStatus({ text: "ツール名は英字で始まり、英数字・_・-だけで入れてください", error: true });
+      setStatus({ text: "ツール名は英字で始まり、英数字・_・-だけを使ってください", error: true });
       return;
     }
     if (subject.trim() === "") {
@@ -572,7 +572,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           <input id="find" data-tour="find" type="search" placeholder="id・ツール・パターン・メッセージ・プロンプトで絞り込む" spellCheck={false} value={shownFind} onChange={(event) => (tour.touring ? undefined : setFind(event.target.value))} />
           <span className="hint" data-tour="order-hint">判定は強い順にdeny &gt; ask &gt; allow</span>
         </div>
-        {nothingFound && <p className="empty">絞り込みに一致するルールがありません。検索語を変えるか、検索欄を空にしてください</p>}
+        {nothingFound && <p className="empty">絞り込みにヒットするルールがありません。語を変えるか、絞り込み欄を空にしてください</p>}
         {SECTIONS.map((section) => {
           const rows = shownDraft[section].map((row) => {
             const text = findText(row.rule);
@@ -718,10 +718,10 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             className="action"
             data-action="suggest"
             disabled={busy}
-            title="ccnavi --suggest --jsonを実行し、保存済みのルールと判定の記録からdeny / askの下書きを起こします"
+            title="ccnavi --suggest --jsonを実行し、保存済みのルールと判定の記録からdeny / askの下書きを作ります"
             onClick={() => {
               setBusy(true);
-              setStatus({ text: "記録から候補を起こしています…", error: false });
+              setStatus({ text: "記録から候補を作っています…", error: false });
               post({ type: "suggest" });
             }}
           >

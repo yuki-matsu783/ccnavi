@@ -56,7 +56,7 @@ export function MergeBand({ merge, board, touring }: { readonly merge: MergeView
       )}
       {merge.checkedAt !== "" ? (
         <p className="merge-time" data-merge="checked-at">
-          確認した時刻{merge.checkedAt}
+          確認した時刻: {merge.checkedAt}
         </p>
       ) : null}
     </section>
@@ -126,8 +126,8 @@ function State({ row, touring }: { readonly row: MergeViewRow; readonly touring:
       return (
         <>
           <span>
-            マージせず閉じました。自動では片付けません。破棄した親なら、ユーザがターミナルで
-            <code className="merge-command">{row.abandon}</code>を実行して記録を消します
+            マージせず閉じました。自動では片付けません。破棄した親の記録は、ターミナルで
+            <code className="merge-command">{row.abandon}</code>を実行すると消えます
           </span>
           <MrLink url={row.url} />{" "}
           <button
