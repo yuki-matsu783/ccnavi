@@ -35,7 +35,7 @@ export function Review({ ticket, answer, onConfirm, onCancel, focus = true }: Re
   const confirm = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (focus) {
-      confirm.current?.focus();
+      confirm.current?.focus({ preventScroll: true });
     }
   }, [focus]);
   const moved = renumbered(answer);
