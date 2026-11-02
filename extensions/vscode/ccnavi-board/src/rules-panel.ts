@@ -47,7 +47,7 @@ import type { RulesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
 import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-failure.js";
 import { lintSummary } from "./core/lint-summary.js";
-import { assertRetained, openInEditor, watchGlobs } from "./panel-common.js";
+import { assertRetained, openInEditor, watchGlobs, workspaceFolder } from "./panel-common.js";
 import { settingsPanel, type SettingsState } from "./settings-panel.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -133,9 +133,8 @@ function expectationsSetting(): string {
 
 /** `ccnaviBoard.openRules`の本体。引数なしは共通の設定のルール */
 export async function openRules(target: RulesTarget = { kind: "workspace" }): Promise<void> {
-  const folder = vscode.workspace.workspaceFolders?.[0];
+  const folder = workspaceFolder("ルール管理画面");
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、ルール管理画面を表示できません");
     return;
   }
   if (state !== undefined) {

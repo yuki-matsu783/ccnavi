@@ -16,6 +16,7 @@ import * as vscode from "vscode";
 import { screens } from "./core/screens.js";
 import { basicTourScreens, SIDEBAR_WALKTHROUGH } from "./core/tour-sidebar.js";
 import { ticketControl } from "./ticket-control.js";
+import { firstWorkspaceFolder } from "./panel-common.js";
 
 let memento: vscode.Memento | undefined;
 /** 見たかどうかに関わらず、次に開いたときに案内を出す画面 */
@@ -70,7 +71,7 @@ export function forceTour(screen: string): void {
 
 /** 基本の案内を動かせる画面を、開けるときだけ開く。ワークスペースが無い・チケット制御が無効のとき開く入口は何も開かないので、先に見てfalseを返す */
 async function openScreen(screen: string): Promise<boolean> {
-  if (vscode.workspace.workspaceFolders?.[0] === undefined) {
+  if (firstWorkspaceFolder() === undefined) {
     return false;
   }
   const open = screens();
@@ -134,7 +135,7 @@ export function openSidebarTourOnNewVersion(context: vscode.ExtensionContext): v
   if (version === "" || context.globalState.get<string>(VERSION_KEY) === version) {
     return;
   }
-  if (vscode.workspace.workspaceFolders?.[0] === undefined) {
+  if (firstWorkspaceFolder() === undefined) {
     return;
   }
   void context.globalState.update(VERSION_KEY, version);

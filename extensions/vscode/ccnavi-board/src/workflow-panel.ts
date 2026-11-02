@@ -60,7 +60,7 @@ import {
 } from "./core/workflow-view.js";
 import { showLoading } from "./loading.js";
 import * as diaglog from "./log.js";
-import { assertNever, assertRetained, debounce, watchTickets } from "./panel-common.js";
+import { assertNever, assertRetained, debounce, watchTickets, workspaceFolder } from "./panel-common.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -125,9 +125,8 @@ async function openWorkflowPanel(ticket: string, restore: Restore | undefined): 
   if (!requireTickets("計画編集タブ")) {
     return;
   }
-  const folder = vscode.workspace.workspaceFolders?.[0];
+  const folder = workspaceFolder("計画編集タブ");
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、計画編集タブを表示できません");
     return;
   }
   const open = panels.get(ticket);

@@ -118,7 +118,7 @@ MRは詳細に畳まず、位置の下に「MR #番号」（番号が読めな�
 - それとは別に、承認の側からも読み直す（`approval-machine.ts`の`refresh`）。承認済みチケットの置き場は
   固定で、`core/watch.ts`の監視するパスとずれない。この読み直しは`files.watcherExclude`で置き場を外したときも動く。
   重なった読み直しは1回にまとめられる（`board-panel.ts`の`again`）
-- 対象はワークスペースの最初のフォルダだけ。`projects/`配下のプロジェクト向けチケットも
+- 対象はワークスペースの最初のフォルダだけ。フォルダが複数開かれているときは、画面を開くたびに「最初のフォルダ <名前> だけを対象にします」と知らせる（`panel-common.ts`の`workspaceFolder`）。複数のフォルダへの対応は無い。`projects/`配下のプロジェクト向けチケットも
   同じボードに出る（詳細の「プロジェクト」）
 - レビューのスレッドの現状は、［レビュー完了］を押したとき（`decide <N> --preview`）と、「MRの状況を確認」を押したとき（`mr-state`）だけshが取りに行く。監視による自動の読み直しでは取りに行かない
 - 動作モード（`--explain --json`の`settings.mode`）が`dry-run`か`disable`のときは、ルール管理と同じモード帯（`webview/shared/ModeBand.tsx`、文は`core/mode-banner.ts`）を画面の上に出す。`enable`と空では出さない

@@ -52,7 +52,7 @@ import { targetOptions, type TargetOption } from "./core/targets.js";
 import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-failure.js";
 import { lintSummary } from "./core/lint-summary.js";
 import { showLoading } from "./loading.js";
-import { assertRetained, openInEditor, watchPattern } from "./panel-common.js";
+import { assertRetained, openInEditor, watchPattern, workspaceFolder } from "./panel-common.js";
 import { settingsPanel, type SettingsState } from "./settings-panel.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
@@ -140,9 +140,8 @@ export async function openRisk(target: RiskTarget = { kind: "workspace" }): Prom
   if (!requireTickets("リスク管理画面")) {
     return;
   }
-  const folder = vscode.workspace.workspaceFolders?.[0];
+  const folder = workspaceFolder("リスク管理画面");
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、リスク管理画面を表示できません");
     return;
   }
   if (state !== undefined) {
