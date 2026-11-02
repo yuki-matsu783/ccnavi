@@ -75,7 +75,7 @@ import { loadingText } from "./core/loading-render.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { OWN_WRITE_GRACE_MS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
-import { assertNever, assertRetained, debounce, watchPattern, watchTickets } from "./panel-common.js";
+import { assertNever, assertRetained, debounce, openInEditor, watchPattern, watchTickets } from "./panel-common.js";
 import { copyPrompt, openPromptInSession } from "./prompt-handover.js";
 import { runInTerminal } from "./terminal.js";
 import { requireTickets } from "./ticket-control.js";
@@ -710,10 +710,7 @@ async function handleMessage(current: PanelState, message: FlowMessage | undefin
         return;
       }
       const target = loaded.target.flow.path;
-      void vscode.workspace.openTextDocument(target).then(
-        (document) => vscode.window.showTextDocument(document),
-        () => vscode.window.showInformationMessage(`ファイルを開けませんでした: ${target}`),
-      );
+      openInEditor(target);
       return;
     }
     case "save":
