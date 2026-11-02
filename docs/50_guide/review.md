@@ -1,9 +1,9 @@
 ---
 title: レビューの依頼と確認
 type: guide
-description: 親チケットのレビューの依頼から、ELI5 と crit での指摘、レビュー済みにする場所、残った指摘への対応方針（decide）、変更要求の見方、必要な道具と認証まで
+description: 親チケットのレビューの依頼から、MR の差分への指摘、レビュー済みにする場所、残った指摘への対応方針（decide）、変更要求の見方、必要な道具と認証まで
 tags: [user-guide, ticket, review]
-keywords: [レビュー, request, confirm, decide, comment, ELI5, crit, crit review, crit push, 変更要求, Request changes, gh, glab, GITHUB_TOKEN, GITLAB_TOKEN, jq, ccnavi-review.sh, ccnavi-user-decide.sh, 対応しない, issue に回す]
+keywords: [レビュー, request, confirm, decide, comment, 変更要求, Request changes, gh, glab, GITHUB_TOKEN, GITLAB_TOKEN, jq, ccnavi-review.sh, ccnavi-user-decide.sh, 対応しない, issue に回す]
 ---
 
 # レビューの依頼と確認
@@ -16,34 +16,15 @@ keywords: [レビュー, request, confirm, decide, comment, ELI5, crit, crit rev
 エージェントが `ccnavi-review.sh` の `review-request`・`confirm`・`comment` を打つ。
 
 - `review-request` は、フェーズが終わっていて、すべての子が親に合流済みで、未コミットが無く、push 済みであることを確かめる。1 つでも欠けたら全件を列挙して何もしない。通れば、親のブランチの open の MR に依頼コメントを投稿する。MR は作らない（作るのは `ccnavi-start.sh`）
-- `review-request` に `--check` を付けると、同じ前提（ELI5・フェーズの終了・合流・未コミット・push・MR）を確かめるだけで、投稿もマーカーも置かない。終了コードが 0 なら前提は通っている
+- `review-request` に `--check` を付けると、同じ前提（フェーズの終了・合流・未コミット・push・MR）を確かめるだけで、投稿もマーカーも置かない。終了コードが 0 なら前提は通っている
 - 依頼後に親の HEAD が動いたら、レビュー済みになる前なら `review-request` を打ち直せる
 - `confirm` は、依頼したときから変わっていなくて push 済みであることを求め、今残っている未解決のスレッドを数える。未解決も変更要求も無ければレビュー済みになり、そのフェーズの `review/` の子が `done/` へ動く。残るなら一覧を返す。依頼のあと、ユーザがレビューを終えたと伝える発言が 1 回あるまで、同じセッションの `confirm` は hook が止める（別のセッションでは働かない）
 - `comment` は、このセッションで受けた承認や判断を MR のコメントにコピーする
 
-## ELI5 を見て、crit で指摘を付ける
+## MR の差分に指摘を付ける
 
-`review-request` には ELI5 の HTML が付く。変更の目的・何が変わるか・リスクを専門用語なしで書いた 1 枚の HTML で、マージリクエストの差分に載る。
-依頼の投稿が済むと、エージェントは次の形の案内を出す。
-
-```
-ELI5 を見る: ユーザがターミナルで cd <ルート> してから crit review <相対パス> を打ち、… crit push <番号> で …
-```
-
-ユーザはその手順を手元のターミナルで打つ。
-
-1. `crit review <相対パス>` で HTML のソースの行に指摘を付ける
-2. `crit push <番号>` でマージリクエストの行のスレッドとして送る
-
-- GitHub は `gh`、GitLab は `glab` が要る。crit・gh・glab が無い環境でも、依頼そのものは通る
-- GitLab での `crit push` は未確認である
-- `crit <相対パス>` だけだと描画のプレビューになり、そこで付けたピンは送られない
-- 手元のチェックアウトがマージリクエストの先頭より古いと行の番号がずれるので、先に合わせる。差分の外の行がホストに拒まれるかは未確認である
-- 送った指摘はユーザのスレッドなので、`confirm` が未解決として数えて止め、`decide` で 1 件ずつ行き先を選べる
-
-依頼の後に ELI5 の HTML だけを直したときは、打ち直しが要らない。push すれば `confirm` は止まらない。
-直す前の行に付けたスレッドは残るので、ユーザが resolve する。ほかのファイルと一緒に直したときは、`review-request` の打ち直しが要る。
-`wip/` は `ready` の前に丸ごと消すので、squash した成果物に HTML は残らない。
+依頼の投稿が済むと、ユーザはマージリクエストの差分を見て、行にスレッドで指摘を付ける。付けた指摘はユーザのスレッドなので、`confirm` が未解決として数えて止め、`decide` で 1 件ずつ行き先を選べる。
+`wip/` は `ready` の前に丸ごと消すので、squash した成果物に `wip/` の下のファイルは残らない。
 
 ## レビュー済みにする場所
 
