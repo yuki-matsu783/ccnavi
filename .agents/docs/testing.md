@@ -3,7 +3,7 @@ type: guide
 title: ccnaviのPythonのテストを回す
 description: ccnaviのPythonのテストを回すときの決まり。全件を1本で回さず、変えたモジュールから絞って広げる。時間の実測と、出力が出ないときの扱い
 tags: [process-test]
-keywords: [テスト, 全件, discover, グループ, モジュール, python -m tests, 時間切れ, 同時実行, 実測, 重い]
+keywords: [テスト, 代役, STUB, 操作記録, 全件, discover, グループ, モジュール, python -m tests, 時間切れ, 同時実行, 実測, 重い]
 ---
 
 # ccnaviのPythonのテストを回す
@@ -49,6 +49,18 @@ uv run python -m tests --plan          # 何をどの順で回すかだけ出す
 `tests/fake_gitlab.py`（GitLab の模擬）、`tests/sh/gitlab_host.py` とその見本（`extensions/chrome/ccnavi-approval/test/fixtures/host/gitlab/`）の応答を変えたら、`contract`（`uv run python -m tests tests/contract`。約 15 秒）を必ず回す。本物から録った応答の形と比べる試験で、模擬が本物とずれると落ちる。落ちたら本物に合わせて模擬を直す。仕様と録り直しは [gitlab-contract.md](gitlab-contract.md)。
 
 `tests/contract/shape.py` と、`tests/contract/gitlab/` の `normalize-cases.json`・`requests.json`・`recorded.json` を直したら、`extensions/chrome/ccnavi-approval` の `pnpm test` も回す（TS の比較器が同じ表を読む）。Chrome 拡張の `MockGitLab` を直したときも `pnpm test` を回す。拡張だけの要求（`used_by` が `["chrome"]`）は `python -m tests tests/contract` では `fake_gitlab.py` に送らず、`pnpm test` でだけ `MockGitLab` と比べる。`python -m tests tests/contract` は TS を回さないので、食い違いは `pnpm test` を回すまで見つからない。
+
+## sh の試験の実行ファイルの代役
+
+sh を回す試験は、実行ファイルの代わりに小さな sh（代役、`STUB`）を `CCNAVI_ENTRY_PATH` に置く。sh は実行ファイルの答えに依存するので、sh に新しい要求が足されたら、代役も追従させる。追従が漏れると、代役が黙って空の答えを返し、sh が「操作記録を作れなかった」などで止まる。
+
+- `ops …` は本物の `ccnavi ops`（`python -m ccnavi`）へ渡す。sh は操作記録（`ops begin`・`show`・`stage-set`・`reconcile`・`applied`）を必須で使う
+- 受け入れ計画（`--accept-plan` の JSON）は `op`（操作ID）を持つ。代役が書く計画には、本物の `oplog.begin` で作った op を入れる
+- 事前検査（`--check`）は、取り込みより先に sh が呼ぶ。代役の `--check` が副作用（コミットを積むなど）を持たないようにする
+- 文面ファイルを引く文を見る試験の使い捨てのワークスペースには、`tests.put_messages(root)` で文面を置く
+- 子プロセスで `git merge`・`git commit` を呼ぶときは、`-c user.email=… -c user.name=…` を付ける。付けないと、識別子の無い環境で衝突とは別の理由で失敗する
+
+見本は `tests/sh/decide_support.py`（`STUB`・`BEGIN`）。
 
 ## 待つとき
 
