@@ -76,7 +76,7 @@ class IssueRefTest(unittest.TestCase):
             found = agree_candidates.revision_problems(
                 "/nonexistent-ccnavi-root", conf, revised, current, None
             )
-        self.assertTrue(any("課題番号" in p.detail for p in found), found)
+        self.assertTrue(any("issue番号" in p.detail for p in found), found)
 
 
 class ShorthandTest(unittest.TestCase):
