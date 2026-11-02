@@ -9,7 +9,8 @@
 
 2 つの働きがある。どちらも、会話の大きさが「基準 + 閾値」以上のときだけ動く。
 
-- 知らせ（`notice`）: ターンの終わりに、ユーザへ 1 セッション 1 回だけ事情と勧めを出す。
+- 知らせ（`notice`）: ターンの終わりに、ユーザへ事情と勧めを出す。会話が育ったときの予告を
+  1 セッション 1 回、引き継ぎを書かせた後の報告を書かせるたびに 1 回。
 - 待機（`start` → `check`）: ターンの終わりから待ち時間（キャッシュの保持時間の少し手前）が
   過ぎても、ユーザが何も打たなければ、モデルを起こして
   引き継ぎプロンプトを `scratchpad/` に書かせる。
@@ -66,6 +67,12 @@ ccnavi: 会話が大きくなっています（約 {size} トークン）。
 - このセッションが放置されない限り、引き継ぎプロンプトは作成されません。
 
 この通知を止めるには環境変数 CCNAVI_HANDOFF_SUGGEST_TOKENS を 0 にします。
+"""
+
+
+_DONE = """\
+ccnavi: {wait_minutes} 分放置されたため、Claude が引き継ぎプロンプトを scratchpad/ に記載しました。
+同じセッションで再開すると、会話全文の再計算で料金が大きく増えます。新しいセッションでの再開を推奨します。
 """
 
 
@@ -312,8 +319,9 @@ def check(state: str, session: str, token: str, wait: int, limit: int = 0) -> st
         usage = usage_of(str(data["transcript"]))
         if usage is None or not due(data, usage.tokens, limit):
             return None
-    new = dict(data, state=FIRED, base=_int(data.get("due")))
+    new = dict(data, state=FIRED, base=_int(data.get("due")), wait=wait)
     new.pop("token", None)
+    new.pop("told", None)
     if not _write(state, session, new):
         return None
     return _WAKE.format(marker=MARKER, minutes=max(wait // 60, 1))
@@ -338,11 +346,22 @@ def reset(state: str, session: str, prompt: str, background: bool = False) -> No
 def notice(
     state: str, session: str, usage: Usage | None, limit: int, wait_override: str = ""
 ) -> str | None:
-    """ユーザへの知らせ。出すなら文面を返し、知らせ済みの印を置く。1 セッションに 1 回。"""
-    if usage is None or not session_ok(session):
+    """ユーザへの知らせ。出すなら文面を返し、知らせ済みの印を置く。
+
+    引き継ぎを書かせた後（状態が `fired`）は、書かせたことを 1 回だけ知らせる。印は状態ファイルの
+    `told`。次に書かせるとき（`check`）に消える。それ以外は、会話が大きく育ったときの予告を
+    1 セッションに 1 回。
+    """
+    if not session_ok(session):
         return None
     data = _read(state, session)
-    if not due(data, usage.tokens, limit):
+    if data.get("state") == FIRED:
+        if data.get("told"):
+            return None
+        if not _write(state, session, dict(data, told=True)):
+            return None
+        return _DONE.format(wait_minutes=max(_int(data.get("wait")) // 60, 1))
+    if usage is None or not due(data, usage.tokens, limit):
         return None
     mark = _path(state, session, ".notice")
     if os.path.exists(mark):

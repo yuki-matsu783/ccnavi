@@ -282,6 +282,30 @@ class NoticeTest(Fixture):
 
         self.assertIsNone(idlehandoff.notice(self.state, SESSION, small, 400_000))
 
+    def fire(self):
+        plan = idlehandoff.start(self.state, SESSION, self.big, 400_000)
+        return idlehandoff.check(self.state, SESSION, plan.token, 3300)
+
+    def test_引き継ぎを書かせた後は書かせたことを1回だけ知らせる(self):
+        self.fire()
+
+        first = idlehandoff.notice(self.state, SESSION, self.big, 400_000)
+        second = idlehandoff.notice(self.state, SESSION, self.big, 400_000)
+
+        self.assertIn("55 分放置されたため", first)
+        self.assertIn("scratchpad/", first)
+        self.assertIsNone(second)
+
+    def test_次に書かせたときも書かせたことを知らせる(self):
+        self.fire()
+        idlehandoff.notice(self.state, SESSION, self.big, 400_000)
+        idlehandoff.reset(self.state, SESSION, "続けます")
+        grown = idlehandoff.Usage(tokens=1_000_000, ttl=3600)
+        plan = idlehandoff.start(self.state, SESSION, grown, 400_000)
+        idlehandoff.check(self.state, SESSION, plan.token, 3300)
+
+        self.assertTrue(idlehandoff.notice(self.state, SESSION, grown, 400_000))
+
 
 class CliTest(Fixture):
     def setUp(self):
