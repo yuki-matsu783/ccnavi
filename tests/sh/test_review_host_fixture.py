@@ -841,7 +841,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
                 self.assertIn("消した", done.stdout)
                 shutil.rmtree(os.path.join(self._tmp.name, "out"), ignore_errors=True)
                 os.remove(os.path.join(self._tmp.name, "notes.json"))
-                # 本物の操作記録は送信済みを覚えている。次の回で投稿を省かないよう消す
+                # 本物の操作記録は送信済みを覚えている。次の回で投稿が省かれないよう、ここで消す
                 shutil.rmtree(os.path.join(self.ws, "logs", "state"), ignore_errors=True)
 
     def test_request_keeps_a_body_file_outside_scratchpad(self):
@@ -863,7 +863,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
                 self.assertNotIn("消した", done.stdout)
                 shutil.rmtree(os.path.join(self._tmp.name, "out"), ignore_errors=True)
                 os.remove(os.path.join(self._tmp.name, "notes.json"))
-                # 本物の操作記録は送信済みを覚えている。次の回で投稿を省かないよう消す
+                # 本物の操作記録は送信済みを覚えている。次の回で投稿が省かれないよう、ここで消す
                 shutil.rmtree(os.path.join(self.ws, "logs", "state"), ignore_errors=True)
         for path in (outside, near, likeness, escaped):
             self.assertTrue(os.path.exists(path), path)

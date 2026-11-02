@@ -57,7 +57,7 @@ sh を回す試験は、実行ファイルの代わりに小さな sh（代役�
 - `ops …` は本物の `ccnavi ops`（`python -m ccnavi`）へ渡す。sh は操作記録（`ops begin`・`show`・`stage-set`・`reconcile`・`applied`）を必須で使う
 - 受け入れ計画（`--accept-plan` の JSON）は `op`（操作ID）を持つ。代役が書く計画には、本物の `oplog.begin` で作った op を入れる
 - 事前検査（`--check`）は、取り込みより先に sh が呼ぶ。代役の `--check` が副作用（コミットを積むなど）を持たないようにする
-- 文面ファイルを引く文を見る試験の使い捨てのワークスペースには、`tests.put_messages(root)` で文面を置く
+- 文面ファイルを読む処理を試すための使い捨てのワークスペースには、`tests.put_messages(root)` で文面を置く
 - 子プロセスで `git merge`・`git commit` を呼ぶときは、`-c user.email=… -c user.name=…` を付ける。付けないと、識別子の無い環境で衝突とは別の理由で失敗する
 
 見本は `tests/sh/decide_support.py`（`STUB`・`BEGIN`）。
