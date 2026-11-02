@@ -21,7 +21,8 @@ import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
 import { PlanGraph } from "../shared/PlanGraph.js";
 import { DecideBody } from "./Decide.js";
 import { post } from "./post.js";
-import { approvalBody, rejectedReason } from "./text.js";
+import { approvalBody, foldRejected } from "./text.js";
+import { truncateLines } from "../../core/lintmodel.js";
 
 export function Approval({ overlay, unsaved = [] }: { readonly overlay: ApprovalOverlay; readonly unsaved?: readonly string[] }): JSX.Element {
   const box = useRef<HTMLElement>(null);
@@ -122,6 +123,7 @@ function Body({
   readonly changed: readonly string[];
 }): JSX.Element {
   const count = preview.batch.length;
+  const rejectedGroups = foldRejected(preview.rejected);
   const tickets = preview.batch.map((b) => b.ticket);
   const summary = summarize(preview);
   const blocked = unsavedParents(preview, unsaved);
@@ -200,14 +202,20 @@ function Body({
         <>
           <h3>承認対象外の提案</h3>
           <ul className="approval-rejected">
-            {preview.rejected.map((r) => (
-              <li key={r.ticket}>
-                <span className="approval-id">{r.ticket}</span>
-                {r.problems.map((p, i) => (
-                  <div key={i}>{rejectedReason(r.ticket, p)}</div>
+            {rejectedGroups.groups.map((g) => (
+              <li key={g.tickets.join(",")}>
+                {g.tickets.map((t) => (
+                  <span className="approval-id" key={t}>
+                    {t}
+                  </span>
+                ))}
+                {g.more > 0 ? <span>ほか{g.more}件</span> : null}
+                {g.reasons.map((reason, i) => (
+                  <div key={i}>{reason}</div>
                 ))}
               </li>
             ))}
+            {rejectedGroups.more > 0 ? <li>ほか{rejectedGroups.more}組の理由があります</li> : null}
           </ul>
         </>
       ) : null}
@@ -215,7 +223,7 @@ function Body({
         <>
           <h3>読み込めなかった提案・承認済みチケット</h3>
           <ul className="approval-problems">
-            {preview.problems.map((p, i) => (
+            {truncateLines(preview.problems).map((p, i) => (
               <li key={i}>{p}</li>
             ))}
           </ul>

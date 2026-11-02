@@ -33,7 +33,7 @@ import { loadBoard, runExpectations, runLint, runSuggest, runTest, type RulesOve
 import { hooksFor, parseHooks, type HookEntry } from "./core/hooks.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
 import { loadingText } from "./core/loading-render.js";
-import { warnLinesOf } from "./core/lintmodel.js";
+import { errorLinesOf, warnLinesOf } from "./core/lintmodel.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asSections, readRules, type RulesDocument } from "./core/rules-doc.js";
 import { renderRulesPage } from "./core/rules-render.js";
@@ -668,7 +668,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
   }
   if (!lint.value.ok) {
     // 指摘は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
-    fail(current, `設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください。\n${lint.value.report.split(tmp).join(loaded.rulesRel)}`);
+    fail(current, `設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください。\n${errorLinesOf(lint.value.report, tmp, loaded.rulesRel).join("\n")}`);
     return;
   }
 

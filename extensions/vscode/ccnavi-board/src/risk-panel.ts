@@ -38,7 +38,7 @@ import { followAppearance, postAppearance, readAppearance } from "./appearance.j
 import { loadBoard, runLint, type LintOverride } from "./ccnavi.js";
 import { LAYER_SELF, projectLayer, selfLayer } from "./core/layers.js";
 import { loadingText } from "./core/loading-render.js";
-import { warnLinesOf } from "./core/lintmodel.js";
+import { errorLinesOf, warnLinesOf } from "./core/lintmodel.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asRiskForm, BUILTIN_RISK_TEXT, readRisk, type RiskDocument } from "./core/risk-doc.js";
 import { renderRiskPage } from "./core/risk-render.js";
@@ -593,7 +593,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
   }
   if (!lint.value.ok) {
     // 苦情は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
-    fail(current, `設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください。\n${lint.value.report.split(tmp).join(loaded.riskRel)}`);
+    fail(current, `設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください。\n${errorLinesOf(lint.value.report, tmp, loaded.riskRel).join("\n")}`);
     return;
   }
 

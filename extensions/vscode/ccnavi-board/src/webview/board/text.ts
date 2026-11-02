@@ -6,11 +6,43 @@
 import { COLUMNS, type Card, type PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
 import { isNotStarted } from "../../core/status.js";
+import { MAX_WARN_LINES, truncateLines } from "../../core/lintmodel.js";
+import type { ApproveRejected } from "../../core/approvemodel.js";
 
 /** 承認対象外の提案の理由。実行ファイルの行頭の「error: 」「warn: 」と、見出しに出している識別子を外し、理由だけを残す */
 export function rejectedReason(ticket: string, problem: string): string {
   const body = problem.replace(/^(error|warn): /, "");
   return body.startsWith(`${ticket}: `) ? body.slice(ticket.length + 2) : body;
+}
+
+/** 承認対象外の提案を、理由が同じものごとに畳んだ1行。`tickets`は先頭から最大3件、残りは`more` */
+export interface RejectedGroup {
+  readonly tickets: readonly string[];
+  readonly more: number;
+  readonly reasons: readonly string[];
+}
+
+const MAX_GROUP_TICKETS = 3;
+
+/**
+ * 子50件に同じ長文の理由が並ぶと画面が伸びるので、理由の並びが全文一致する提案を1つにまとめる。
+ * 並びは先頭`MAX_WARN_LINES`組までで、超えた分は呼ぶ側が`truncateLines`の1行で足す。
+ */
+export function foldRejected(rejected: readonly ApproveRejected[]): { groups: RejectedGroup[]; more: number } {
+  const byReasons = new Map<string, { tickets: string[]; reasons: string[] }>();
+  for (const r of rejected) {
+    const reasons = truncateLines(r.problems.map((p) => rejectedReason(r.ticket, p)));
+    const key = JSON.stringify(reasons);
+    const group = byReasons.get(key) ?? { tickets: [], reasons };
+    group.tickets.push(r.ticket);
+    byReasons.set(key, group);
+  }
+  const all = [...byReasons.values()].map((g) => ({
+    tickets: g.tickets.slice(0, MAX_GROUP_TICKETS),
+    more: Math.max(0, g.tickets.length - MAX_GROUP_TICKETS),
+    reasons: g.reasons,
+  }));
+  return { groups: all.slice(0, MAX_WARN_LINES), more: Math.max(0, all.length - MAX_WARN_LINES) };
 }
 
 /** ツールバーの絞り込みのチェックボックスの言葉 */
