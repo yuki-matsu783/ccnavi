@@ -225,19 +225,17 @@ function Badge({ note }: { readonly note: Note }): JSX.Element {
 function Phases({ phases }: { readonly phases: readonly PhaseChip[] }): JSX.Element {
   return (
     <ul className="phases" data-tour="phases">
-      {phases.map((p) => {
-        return (
-          <li key={p.number} className={`phase phase-${p.state}${p.status === "レビュー待ち" || p.status === "レビュー準備中" ? " review-hold" : ""}${p.status === "要確認" ? " phase-check" : ""}`} data-phase={p.number} data-status={p.status}>
-            <span className="phase-dot" aria-hidden="true" />
-            <span className="phase-name">
-              <span className="phase-label">{p.label}</span>
-              {p.tickets.length > 0 ? <span className="phase-tickets">{p.tickets.join(", ")}</span> : null}
-            </span>
-            <span className="phase-status">{p.status}</span>
-            {p.manual !== "" ? <span className="phase-manual">{p.manual}</span> : null}
-          </li>
-        );
-      })}
+      {phases.map((p) => (
+        <li key={p.number} className={`phase phase-${p.state}${p.status === "レビュー待ち" || p.status === "レビュー準備中" ? " review-hold" : ""}${p.status === "要確認" ? " phase-check" : ""}`} data-phase={p.number} data-status={p.status}>
+          <span className="phase-dot" aria-hidden="true" />
+          <span className="phase-name">
+            <span className="phase-label">{p.label}</span>
+            {p.tickets.length > 0 ? <span className="phase-tickets">{p.tickets.join(", ")}</span> : null}
+          </span>
+          <span className="phase-status">{p.status}</span>
+          {p.manual !== "" ? <span className="phase-manual">{p.manual}</span> : null}
+        </li>
+      ))}
     </ul>
   );
 }

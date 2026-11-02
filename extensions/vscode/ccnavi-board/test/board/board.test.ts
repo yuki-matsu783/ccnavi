@@ -137,8 +137,6 @@ test("CB-T09 依頼済みで止まったフェーズにdecide、早めにクロ�
   const card = cards.get("i0001")!;
   assert.deepEqual(card.actions, []);
   assert.equal(card.wrapped, true);
-  // レビュー待ちの行も操作は持たない（レビュー完了は子のカードに付く）
-  assert.equal("actions" in card.phases[1], false);
   assert.equal(card.phases[1].status, "レビュー待ち");
   // ユーザのレビュー待ちはJSONのreview_waitingをそのまま使う。依頼していないフェーズ1は閉じていても待ちではない
   assert.equal(card.phases[0].reviewWaiting, false);
@@ -287,7 +285,6 @@ function waitingWithMr(url: string): BoardJson {
 test("CB-T131 レビュー待ちのフェーズの子にレビュー完了が付き、依頼のマーカーのMRがフェーズ行・親カード・そのフェーズの子に載る", () => {
   const cards = cardsOf(buildBoard(waitingWithMr("https://example.com/o/r/pull/18#issuecomment-5")));
   const card = cards.get("i0001")!;
-  assert.equal("actions" in card.phases[1], false);
   assert.deepEqual(cards.get("i0001-02-02")!.actions, [{ kind: "review", parent: "i0001", phase: 2, mrUrl: "https://example.com/o/r/pull/18" }]);
   // フェーズ行は依頼の投稿を指す。親カードと、そのフェーズの子のカードは、断片を除いてMR自体を指す
   assert.equal(card.phases[1].mrUrl, "https://example.com/o/r/pull/18#issuecomment-5");

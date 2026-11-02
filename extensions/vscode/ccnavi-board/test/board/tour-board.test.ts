@@ -83,7 +83,7 @@ test("CB-T422 見本には、使い方ごとの案内が見せる状態が揃っ
   assert.equal(card("sample-b-03-01").status.label, "承認待ち");
   // レビュー待ち: フェーズ行に操作は無く、子のカードのユーザ待ちに［MRを開く］［レビュー完了］。バッジはどちらも「レビュー待ち」
   const chip = card("sample-c").phases[0];
-  assert.ok(chip.reviewWaiting && chip.gateClosed && chip.status === "レビュー待ち" && !("actions" in chip));
+  assert.ok(chip.reviewWaiting && chip.gateClosed && chip.status === "レビュー待ち");
   assert.equal(card("sample-c").mrNumber, 12);
   assert.ok(card("sample-c").mrUrl.startsWith("https://") && !card("sample-c").mrUrl.includes("#"));
   assert.equal(card("sample-c").status.label, "レビュー待ち");

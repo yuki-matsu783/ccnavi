@@ -81,7 +81,8 @@
 .badge.preds { color: var(--board-warn-text); }
 .badge-id { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
 .badge.worktree.none, .badge.issue, .badge.unsent { color: var(--board-warn-text); }
-/* 親のフェーズ一覧。1フェーズ1行。左の丸がフェーズで、右が状態。   状態は省略せず全文（状態・マーカー・レビューの要否・リスクの点と理由）を出し、狭ければ折り返す。
+/* 親のフェーズ一覧。1フェーズ1行。左の丸がフェーズで、右が状態。
+   状態は省略せず全文（状態・マーカー・レビューの要否・リスクの点と理由）を出し、狭ければ折り返す。
    右の列をautoにすると状態の1行分の幅が行を占め、フェーズ名の列が0になって省略記号ごと
    消えるので、状態の列は55% で止める。状態は項目（.phase-item）ごとに折り返さない塊にし、
    折り返すのは項目の間だけにする（1項目が列より長いときだけ項目の中で折る）。

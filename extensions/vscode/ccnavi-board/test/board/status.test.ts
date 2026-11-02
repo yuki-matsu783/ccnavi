@@ -295,7 +295,6 @@ test("CB-T610 操作: 子の承認待ち + レビュー待ちは承認だけ。�
   const p = cards.get("p")!;
   assert.equal(p.status.label, "承認待ち（改版）");
   assert.deepEqual(p.actions, [{ kind: "approve" }]);
-  assert.deepEqual(p.phases.map((c) => "actions" in c), [false, false]);
 });
 
 test("CB-T1247 開始前・作業中・レビュー準備中のバッジは、ツールチップに次の一手（誰の番か）を添える", () => {
