@@ -198,7 +198,7 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
     reason: "書けない",
     lines: [],
   }, true);
-  assert.ok(sent.includes("書けたぶんだけをコミット・pushするコマンドをターミナルで実行しました"), sent);
+  assert.ok(sent.includes("書けたぶんだけをコミット・pushするコマンドをターミナルに送りました"), sent);
   assert.ok(stopped.includes("マーカーを削除した"), "ターミナルに出ていた行も渡す");
 
   // 1 件も置かれなかったときは「一部だけ置かれた」と言わない
