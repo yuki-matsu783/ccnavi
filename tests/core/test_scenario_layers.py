@@ -21,16 +21,16 @@ import ast
 import unittest
 from pathlib import Path
 
-from tests.scenarios import runner
-
 DIR = Path(__file__).parents[1] / "scenarios"
 PREFIX = "tests.scenarios"
+# runner を import すると、グループをまたぐ import になる（tests/core/test_layout.py）。ファイルから読む。
+RUNNER = DIR / "runner.py"
 
 
 def tiers():
     """runner.py の docstring の段の表 → {モジュール名（ドット区切り）: 段の番号}。
     `actors/` は actors の中の全モジュール、「この入口」は runner。"""
-    text = " ".join(runner.__doc__.split())
+    text = " ".join(ast.get_docstring(ast.parse(RUNNER.read_text(encoding="utf-8"))).split())
     start = text.index("0 common")
     table = text[start:].rstrip("。.")
     found = {}
