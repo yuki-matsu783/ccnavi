@@ -282,6 +282,41 @@ class NoticeTest(Fixture):
 
         self.assertIsNone(idlehandoff.notice(self.state, SESSION, small, 400_000))
 
+    def fire(self):
+        plan = idlehandoff.start(self.state, SESSION, self.big, 400_000)
+        return idlehandoff.check(self.state, SESSION, plan.token, 3300)
+
+    def test_引き継ぎを書かせた後は書かせたことを1回だけ知らせる(self):
+        self.fire()
+
+        first = idlehandoff.notice(self.state, SESSION, self.big, 400_000)
+        second = idlehandoff.notice(self.state, SESSION, self.big, 400_000)
+
+        self.assertIn("55 分放置されたため", first)
+        self.assertIn("scratchpad/", first)
+        self.assertIsNone(second)
+
+    def test_書かせた後の知らせは会話の大きさを読めなくても出る(self):
+        self.fire()
+
+        self.assertTrue(idlehandoff.notice(self.state, SESSION, None, 400_000))
+
+    def test_ユーザが打った後は書かせた後の知らせを出さない(self):
+        self.fire()
+        idlehandoff.reset(self.state, SESSION, "続けます")
+
+        self.assertIsNone(idlehandoff.notice(self.state, SESSION, self.big, 400_000))
+
+    def test_次に書かせたときも書かせたことを知らせる(self):
+        self.fire()
+        idlehandoff.notice(self.state, SESSION, self.big, 400_000)
+        idlehandoff.reset(self.state, SESSION, "続けます")
+        grown = idlehandoff.Usage(tokens=1_000_000, ttl=3600)
+        plan = idlehandoff.start(self.state, SESSION, grown, 400_000)
+        idlehandoff.check(self.state, SESSION, plan.token, 3300)
+
+        self.assertTrue(idlehandoff.notice(self.state, SESSION, grown, 400_000))
+
 
 class CliTest(Fixture):
     def setUp(self):
@@ -358,6 +393,18 @@ class CliTest(Fixture):
         second = self.idle("notice", self.payload())
 
         self.assertIn("systemMessage", json.loads(first.stdout))
+        self.assertEqual(second.stdout, "")
+
+    def test_書かせた後のnoticeは報告を1回だけ出す(self):
+        started = dict(
+            line.split(" ", 1) for line in self.idle("start", self.payload()).stdout.splitlines()
+        )
+        self.idle("check", "", None, SESSION, started["token"], "7")
+
+        first = self.idle("notice", self.payload())
+        second = self.idle("notice", self.payload())
+
+        self.assertIn("放置されたため", json.loads(first.stdout)["systemMessage"])
         self.assertEqual(second.stdout, "")
 
     def test_payloadが無くても止まらない(self):

@@ -1,6 +1,7 @@
 """`ccnavi idle start|check|notice|reset`。放置したセッションの引き継ぎ促しの入口。
 
-    ccnavi idle notice                      Stop（同期）。ユーザへの知らせを 1 セッション 1 回出す
+    ccnavi idle notice                      Stop（同期）。ユーザへの知らせを出す（予告は 1 セッション 1 回、
+                                            書かせた後の報告は書かせるたびに 1 回）
     ccnavi idle start                       Stop（`ccnavi-idle.sh` 経由）。待機の指示を返す
     ccnavi idle check <セッション> <印> <待ち秒>   待機のあと。起こすべきか、起こすときの指示を返す
     ccnavi idle reset                       UserPromptSubmit。ユーザが打ったら待機をやめる
