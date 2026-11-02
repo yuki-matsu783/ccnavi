@@ -384,6 +384,18 @@ class CliTest(Fixture):
         self.assertIn("systemMessage", json.loads(first.stdout))
         self.assertEqual(second.stdout, "")
 
+    def test_書かせた後のnoticeは報告を1回だけ出す(self):
+        started = dict(
+            line.split(" ", 1) for line in self.idle("start", self.payload()).stdout.splitlines()
+        )
+        self.idle("check", "", None, SESSION, started["token"], "7")
+
+        first = self.idle("notice", self.payload())
+        second = self.idle("notice", self.payload())
+
+        self.assertIn("放置されたため", json.loads(first.stdout)["systemMessage"])
+        self.assertEqual(second.stdout, "")
+
     def test_payloadが無くても止まらない(self):
         for verb in ("notice", "start", "reset"):
             with self.subTest(verb=verb):
