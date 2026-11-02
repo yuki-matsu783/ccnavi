@@ -675,3 +675,18 @@ test("CB-D146 アーカイブの表示を入れると、親の絞り込みに退
     await on.close();
   }
 });
+
+test("CB-D1246 チケット管理にもモード帯を出す。dry-runとdisableで出て、enableでは出ない", async () => {
+  const bandOf = async (mode: string): Promise<string> => {
+    const base = fixture();
+    const page = await openBoard({ ...base, settings: { ...base.settings, mode } });
+    try {
+      return page.all(".mode-band").map((e) => e.textContent ?? "").join("\n");
+    } finally {
+      await page.close();
+    }
+  };
+  assert.match(await bandOf("dry-run"), /CCNAVI_MODE.*dry-run.*判定と記録をします/);
+  assert.match(await bandOf("disable"), /CCNAVI_MODE.*disable.*判定しません/);
+  assert.equal(await bandOf("enable"), "");
+});

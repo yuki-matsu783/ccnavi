@@ -20,6 +20,7 @@ import { mutePosts, post } from "./post.js";
 import { Approval } from "./Approval.js";
 import { CardItem } from "./Card.js";
 import { formatGeneratedAt } from "../shared/format.js";
+import { ModeBand } from "../shared/ModeBand.js";
 import { MergeBand } from "./MergeBand.js";
 import { detailsKey, EMPTY, loadState, saveState, type ViewState } from "./state.js";
 import { FILTER_LABELS } from "./text.js";
@@ -228,6 +229,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
       ) : (
         <>
           {sample !== undefined ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
+          {touring ? null : <ModeBand mode={shown.mode} />}
           <ScreenHeader courses={courses} onPick={tour.start}>
             <div className="summary" data-tour="summary">
               {shown.pendingApproval.length > 0 ? <span className="pending warn">承認待ち{shown.pendingApproval.length}件</span> : null}
