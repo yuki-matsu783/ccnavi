@@ -138,7 +138,7 @@ function cutOff(what: string, ms: number): string {
 }
 
 const NOT_FOUND =
-  "ccnaviの実行ファイルが見つかりません。エージェントに「ccnavi を入れて」と頼むか、設定（ccnaviBoard.binPath）で指定してください。";
+  "ccnaviの実行ファイルが見つかりません。エージェントに「ccnavi を入れて」と頼むか、設定（ccnaviBoard.binPath）で指定してください。ワークツリーを開いている場合は、実行ファイルがそこに無いので、本体のチェックアウトのルートを開いてください。";
 
 /** 見るのはルールだけ。チケット制御とstateの置き場は外し、記録も残さない */
 const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] as const;
