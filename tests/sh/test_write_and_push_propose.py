@@ -138,7 +138,7 @@ class ProposeTest(WriteAndPushHarness):
         self.assertEqual(self.remote_sha("i0002"), "")
         self.assertFalse(os.path.exists(os.path.join(self.state, "locks", "self", "i0002")))
 
-    def test_start_on_a_parent_never_pushed_stops_with_the_options(self):
+    def test_start_on_a_parent_never_pushed_stops_at_the_precheck(self):
         tree = os.path.join(self.ws, ".claude", "worktrees", "i0003")
         git(self.ws, "worktree", "add", "-q", tree, "-b", "i0003", "main")
         write(
@@ -148,12 +148,13 @@ class ProposeTest(WriteAndPushHarness):
         before = self.sha(tree, "HEAD")
         result = self.sh("ccnavi-ticket.sh", "start", "i0003", cwd=tree, **self.host_env({}))
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("親のブランチ i0003 はリモートにありません", result.stderr)
-        self.assertIn("次の手: ユーザに状況を伝えて", result.stderr)
+        # 書く前に分かる検査（承認済みの作業中か）が、取り込みの前に断る。承認の push で
+        # 親は必ず送られるので、`start` が未 push の親に届く道は無い。
+        self.assertIn("i0003 は承認済みの作業中ではない", result.stderr)
         self.assertNotIn("bad revision", result.stderr)
         self.assertEqual(self.sha(tree, "HEAD"), before)
 
-    def test_other_operations_on_a_parent_never_pushed_say_only_the_fact(self):
+    def test_finish_on_a_parent_never_pushed_stops_at_the_precheck(self):
         tree = os.path.join(self.ws, ".claude", "worktrees", "i0004")
         git(self.ws, "worktree", "add", "-q", tree, "-b", "i0004", "main")
         write(
@@ -162,7 +163,8 @@ class ProposeTest(WriteAndPushHarness):
         )
         result = self.sh("ccnavi-ticket.sh", "finish", "i0004", cwd=tree, **self.host_env({}))
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("親のブランチ i0004 はリモートにありません", result.stderr)
+        # 書く前に分かる検査（作業中か）が、取り込みの前に断る。未 push の親の説明は出さない。
+        self.assertIn("i0004 は作業中ではない", result.stderr)
         self.assertNotIn("次の手: ユーザに状況を伝えて", result.stderr)
 
     def test_other_families_and_template_drafts_stay_out(self):
