@@ -808,7 +808,7 @@ class StandaloneCloneTest(ConfigUnionHarness):
         self.assert_denied(denied, "self:raw-psql")
 
     def test_the_risk_is_the_common_layer_plus_the_own_layer(self):
-        """配点も共通 + 自身のレイヤーの和。境目の点は小さいほう。"""
+        """配点も共通 + 自身のレイヤーの和。閾値は小さいほう。"""
         conf, _ = settings.load(self.lib)
 
         definition, problems = risk.layer_definition(conf, self.lib, "")

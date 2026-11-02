@@ -325,7 +325,7 @@ export interface SumJson {
     readonly allow: readonly SumRuleJson[];
   };
   readonly risk: {
-    /** リスクレベルの境目の点（実際に使う値） */
+    /** リスクレベルの閾値（実際に使う値） */
     readonly levels: Readonly<Record<"medium" | "high" | "critical", number | null>>;
     readonly factors: readonly SumFactorJson[];
     /** 内容が不正で空に戻したときの理由。空なら無い */

@@ -2,7 +2,7 @@
  * リスク管理画面の、拡張ホストとWebviewの間の契約。
  *
  * 画面はReactで組み、拡張ホストはHTMLを組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。拡張ホストが渡すのは
- * 「いま何を見せるか」（`RiskData`）だけで、境目の点の欄も項目の行も画面が作る。画面が返すのは
+ * 「いま何を見せるか」（`RiskData`）だけで、閾値の欄も項目の行も画面が作る。画面が返すのは
  * ユーザが押した操作（`RiskMessage`）だけで、点も数えず、ファイルも書かない。点を数えるのは実行ファイルだけにして、答えを2か所に持たない。
  *
  * 配点の形（`KINDS`・`FactorForm`など）もここに置く。 読み書き（`risk-doc.ts`）の側に
@@ -30,7 +30,7 @@ import type { TargetOption } from "./targets.js";
 export const KINDS = ["lines_over", "files_over", "deleted_over", "glob", "script", "judge"] as const;
 export type FactorKind = (typeof KINDS)[number];
 
-/** リスクレベルの名前は固定。境目の点だけ動かす。LOWは境目の点を持たない */
+/** リスクレベルの名前は固定。閾値だけ動かす。LOWは閾値を持たない */
 export const LEVEL_NAMES = ["medium", "high", "critical"] as const;
 export type LevelName = (typeof LEVEL_NAMES)[number];
 
@@ -56,7 +56,7 @@ export interface FactorForm {
 }
 
 export interface RiskForm {
-  /** 境目の点。空ならそのリスクレベルは組み込みの値（欄を書かない） */
+  /** 閾値。空ならそのリスクレベルは組み込みの値（欄を書かない） */
   readonly levels: Readonly<Record<LevelName, string>>;
   readonly factors: readonly FactorForm[];
 }

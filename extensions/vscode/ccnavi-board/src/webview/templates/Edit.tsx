@@ -266,7 +266,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
       <PlanEdit part="feedback" template={tpl} plan={planOf("feedback")} fresh={fresh} types={checked.check.types} onChange={updatePlan} />
       <section className="tpl-edit-flows" data-role="flows">
         <h3>子のフロー</h3>
-        <p className="hint">全体計画のステップごとに、子のフローを持てます。テンプレートを使うと、子のフローの下書きにこの文がコピーされます。</p>
+        <p className="hint">全体計画のステップごとに、子のフローを持てます。テンプレートを使うと、ここで書いた子のフローが子の下書きにコピーされます。</p>
         <ul className="list">
           {tpl.plan.map((item, i) => {
             const index = i + 1;

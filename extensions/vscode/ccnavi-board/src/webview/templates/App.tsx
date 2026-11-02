@@ -312,7 +312,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                 </p>
               )}
               {shownTemplates.length === 0 ? (
-                <p className="empty">{"テンプレートがありません。共通は.ccnavi/config/common/templates/、プロジェクトは.ccnavi/config/project/templates/の下に、<名前>.ymlの名前で置きます。"}</p>
+                <p className="empty">{"テンプレートがありません。共通は.ccnavi/config/common/templates/、プロジェクトは.ccnavi/config/project/templates/の下に、ファイル名を<名前>.ymlにして置きます。"}</p>
               ) : (
                 <ul className="list">{shownTemplates.map((entry) => templateRow(entry))}</ul>
               )}

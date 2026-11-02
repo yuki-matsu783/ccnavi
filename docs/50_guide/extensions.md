@@ -61,7 +61,7 @@ VS Code からワークツリーを見えるようにする設定は[導入と�
 
 ### リスク管理画面
 
-実績で測るリスクの配点（`.ccnavi/config/common/risks.yml`、ワークスペースとプロジェクトの `.ccnavi/config/project/risks.yml`）の境目の点と項目を画面で直せる。
+実績で測るリスクの配点（`.ccnavi/config/common/risks.yml`、ワークスペースとプロジェクトの `.ccnavi/config/project/risks.yml`）の閾値と項目を画面で直せる。
 
 - 編集する 1 本は切り替えられ、共通+ワークスペース、共通+プロジェクトの統合結果は読み取りで見られる
 - 保存の前に、共通の設定と合わせて検証する

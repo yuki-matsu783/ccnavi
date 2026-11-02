@@ -87,7 +87,7 @@ export function SyncAllButton({ mirror, act }: { readonly mirror: MirrorData; re
       className={`action${mirror.busy ? " busy" : ""}`}
       data-action="mirror-sync-all"
       disabled={!button.enabled}
-      title={button.enabled ? "ずれのある全プロジェクトに、共通レイヤーの内容をコピーします。書くのは各プロジェクトのワークツリーで、コミットはしません" : button.reason}
+      title={button.enabled ? "ずれのある全プロジェクトに、共通レイヤーの内容をコピーします。書き込み先は各プロジェクトのワークツリーで、コミットはしません" : button.reason}
       onClick={() => act({ type: "mirrorSync", names: [], expect })}
     >
       <span className="spin" aria-hidden="true" />

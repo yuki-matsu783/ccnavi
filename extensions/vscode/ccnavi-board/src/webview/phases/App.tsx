@@ -462,7 +462,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             <details className="help">
               <summary>計画と合意のコマンド・キー</summary>
               <p className="hint">
-                全体計画は親チケットの<code>plan:</code>に、計画の改訂は<code>feedback:</code>に書きます。合意は<code>ccnavi user agree</code>が通ることです。
+                全体計画は親チケットの<code>plan:</code>に、計画の改訂は<code>feedback:</code>に書きます。合意は<code>ccnavi user agree</code>が通ったときに成立します。
               </p>
             </details>
             <p className="hint">
