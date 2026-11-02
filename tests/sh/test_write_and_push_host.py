@@ -17,12 +17,12 @@ from tests import ROOT
 from tests.sh.write_and_push_harness import (
     APPROVED,
     CHILD,
-    ELI5,
     GIT,
     HALF,
     PARENT,
     SHELL,
     URL_GIT,
+    WIP_NOTE,
     Host,
     WriteAndPushHarness,
     WriteAndPushHostHarness,
@@ -39,17 +39,10 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
 
     def test_request_confirm_and_ready_are_carried(self):
         body = write(os.path.join(self._base, "body.md"), "見てほしい\n")
-        self.eli5()
-        requested = self.review(
-            "review-request", "--phase", "1", "--body-file", body, "--eli5", ELI5
-        )
+        requested = self.review("review-request", "--phase", "1", "--body-file", body)
         self.assertEqual(requested.returncode, 0, requested.stdout + requested.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/1.requested")
         self.assertEqual(len(Host.notes), 1)
-        # 依頼文は ELI5 の在りか（差分の中の相対パス）と crit push の送り先を言う。
-        # 指摘はユーザが crit push で行のスレッドとして送る
-        self.assertIn(f"`crit review {ELI5}`", Host.notes[0]["body"])
-        self.assertIn("`crit push 1`", Host.notes[0]["body"])
         log = os.path.join(self._base, "tidy.log")
         logger = executable(
             os.path.join(self._base, "bin", "logger"),
@@ -224,7 +217,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         """ready が消した wip/ の追跡済みのファイルは、write-and-push
         が退避と一緒にコミットして push する。
         消したものと、戻せる版（消す前の HEAD）を出す。"""
-        self.eli5()
+        self.wip_note()
         head = self.sha(self.tree, "HEAD")
         mover = executable(
             os.path.join(self._base, "bin", "mover"),
@@ -236,12 +229,12 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             '    [ "$prev" = --record-tree ] && tree="$a"\n'
             '    [ "$prev" = --root ] && root="$a"\n'
             '    prev="$a"; done\n'
-            f'  rm "$tree/{ELI5}"\n'
-            f"  printf '{ELI5}\\n' >\"$list\"\n"
+            f'  rm "$tree/{WIP_NOTE}"\n'
+            f"  printf '{WIP_NOTE}\\n' >\"$list\"\n"
             '  mkdir -p "$root/logs/state"; : >"$root/logs/state/note.md"\n'
             "  printf '%s\\n' \"$root/logs/state/note.md\"\n"
             "  printf 'tree %s\\n' \"$tree\"\n"
-            f"  printf 'wip-from {head}\\nwip {ELI5}\\n'\n"
+            f"  printf 'wip-from {head}\\nwip {WIP_NOTE}\\n'\n"
             "  exit 0 ;;\n"
             "esac\n"
             f"exec '{self.half}' \"$@\"\n",
@@ -250,9 +243,9 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.assertIn("wip/ の追跡済みのファイルを削除しました（1 件", ready.stdout)
         self.assertIn(head[:12], ready.stdout)
-        self.assertIn(f"  {ELI5}", ready.stdout)
-        self.carried_after_drop(ELI5)
-        self.assertEqual(git(self.ws, "ls-tree", PARENT, "--", ELI5).stdout, "")
+        self.assertIn(f"  {WIP_NOTE}", ready.stdout)
+        self.carried_after_drop(WIP_NOTE)
+        self.assertEqual(git(self.ws, "ls-tree", PARENT, "--", WIP_NOTE).stdout, "")
 
     def test_the_real_ready_moves_the_rest_again_after_a_failed_push(self):
         """実際の実行ファイルの ready（退避を始めた後の打ち直し）を write-and-push の中で通す。
@@ -308,15 +301,10 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         """投稿の後に失敗した依頼を打ち直しても、同じ目印の依頼は投稿し直さない。"""
         body = write(os.path.join(self._base, "body.md"), "見てほしい\n")
         once = os.path.join(self._base, "failed-once")
-        html = self.eli5()
-        first = self.review(
-            "review-request", "--phase", "1", "--body-file", body, "--eli5", html, HALF_FAIL=once
-        )
+        first = self.review("review-request", "--phase", "1", "--body-file", body, HALF_FAIL=once)
         self.assertNotEqual(first.returncode, 0, first.stdout + first.stderr)
         self.assertEqual(len(Host.notes), 1)
-        again = self.review(
-            "review-request", "--phase", "1", "--body-file", body, "--eli5", html, HALF_FAIL=once
-        )
+        again = self.review("review-request", "--phase", "1", "--body-file", body, HALF_FAIL=once)
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertIn("投稿済み", again.stdout)
         self.assertEqual(len(Host.notes), 1)

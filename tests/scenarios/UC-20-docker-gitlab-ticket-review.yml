@@ -38,9 +38,8 @@ steps:
       - 承認画面に、親の範囲（README.md）と、リスクの見立て（LOW）が出ている
       - 承認のあとに「pushしました」と出ている
   - prompt: >-
-      承認した。子に着手して README.md の末尾に「UC-20」と 1 行追記し、子を finish して親に合流し、
-      ELI5 の HTML を wip/eli5/phase-1.html に書いてコミットして push し、
-      `sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 1 --body-file <依頼文> --eli5 wip/eli5/phase-1.html` でレビューを依頼するところまで進めて。
+      承認した。子に着手して README.md の末尾に「UC-20」と 1 行追記し、子を finish して親に合流し、push して、
+      `sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 1 --body-file <依頼文>` でレビューを依頼するところまで進めて。
     resume: true
   - human: true
     human_api:

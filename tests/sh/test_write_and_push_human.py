@@ -248,10 +248,7 @@ class WriteAndPushChromeConfirmTest(PhaseOne, WriteAndPushHarness):
 
     def request(self):
         body = write(os.path.join(self._base, "body.md"), "見てほしい\n")
-        html = self.eli5()
-        requested = self.review(
-            "review-request", "--phase", "1", "--body-file", body, "--eli5", html
-        )
+        requested = self.review("review-request", "--phase", "1", "--body-file", body)
         self.assertEqual(requested.returncode, 0, requested.stdout + requested.stderr)
         self.assertIn(self.requested, self.committed())
         return body
