@@ -411,7 +411,7 @@ const RETIRED_TIMEOUT_MS = 30_000;
 export async function runSyncRetired(root: string, setting: string): Promise<RetiredParse> {
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
-    return { ok: false, error: `一覧を取得できません（${NOT_FOUND}）` };
+    return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, syncRetiredArgs(), RETIRED_TIMEOUT_MS);
   return parseRetired(ran);

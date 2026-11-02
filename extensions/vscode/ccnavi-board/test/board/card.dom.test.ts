@@ -376,7 +376,7 @@ test("CB-D709 詳細は畳んである。MRは詳細に無く位置の下にあ�
     const link = page.one(`${parent} .card-mr a`);
     assert.equal(link.getAttribute("href"), "https://example.com/o/r/pull/18");
     assert.ok(link.classList.contains("detail-link") && !link.classList.contains("card-button"));
-    assert.match(link.textContent, /^MR !\d+$/);
+    assert.match(link.textContent, /^MR #\d+$/);
     // 子のリスクは詳細に（JSONの水準と点）
     page.click(page.one(`${card(page, "busy-02-01")} details > summary`));
     await page.settle();

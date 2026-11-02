@@ -5,6 +5,7 @@
  */
 import { COLUMNS, type Card, type PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
+import { isNotStarted } from "../../core/status.js";
 
 /** 承認対象外の提案の理由。実行ファイルの行頭の「error: 」「warn: 」と、見出しに出している識別子を外し、理由だけを残す */
 export function rejectedReason(ticket: string, problem: string): string {
@@ -53,9 +54,8 @@ export function notesOf(card: Card): Note[] {
     notes.push({ key: "blocked", text: "書き込み停止中", kind: "blocked" });
   }
   if (!card.worktreeExists && card.copyStatus !== "closed" && card.copyStatus !== "archived") {
-    // 承認待ち（none）はまだ作っていないだけ。作業中・レビュー中に無いのは異常（warnの見た目）
-    // 承認待ち（none）と、開始前（startedAtが空）の子はまだ作っていないだけ
-    const pending = card.copyStatus === "none" || (card.copyStatus === "open" && card.startedAt === "");
+    // 承認待ち（none）と開始前はまだ作っていないだけ。作業中・レビュー中に無いのは異常（warnの見た目）
+    const pending = card.copyStatus === "none" || isNotStarted(card);
     notes.push({ key: "worktree", text: pending ? "ワークツリー未作成" : "ワークツリーが見つからない", kind: pending ? "worktree" : "worktree none" });
   }
   if (isHighRisk(card.riskLevel)) {
@@ -170,7 +170,7 @@ export function worktreeName(path: string): string {
 
 /** MRのリンクの文字。番号が読めなければ「MR」だけ */
 export function mrText(number: number | null): string {
-  return number === null ? "MR" : `MR !${number}`;
+  return number === null ? "MR" : `MR #${number}`;
 }
 
 /** 依頼のマーカーが持つURLは中身を確かめずにそのまま取り込んであるので、http(s)のときだけリンクにする */

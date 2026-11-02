@@ -88,6 +88,21 @@ test("CB-D721 帯の行: 親・タイトル・MR !N・状態。タイトルは�
   void rows;
 });
 
+test("CB-D720a 帯にマージ待ちの行があるときは、チケットが0件でも「チケットなし」を出さない", async () => {
+  const empty = await openBoard(boardOf([], []), { merge: view([]) });
+  try {
+    assert.equal(empty.all("p.board-empty").length, 1);
+  } finally {
+    await empty.close();
+  }
+  const waiting = await openBoard(boardOf([], []), { merge: view([row("i1")]) });
+  try {
+    assert.equal(waiting.all("p.board-empty").length, 0);
+  } finally {
+    await waiting.close();
+  }
+});
+
 test("CB-D722 マージ待ち（Draftなら付記）・マージ済み・閉じた・確認できない・記録が不完全・確認中の行の言葉", async () => {
   const merge = view([
     row("a-open", { state: "open", draft: false }),
