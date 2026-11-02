@@ -167,7 +167,7 @@ test("CB-D723 帯のボタンとリンクはcard-button（［片付ける］だ�
   }
 });
 
-test("CB-D724 ［片付ける］はmergeRetireを送る。ダイアログ中（busy）は押せず、送ったら「送信しました」にして押せなくする。送れなかったら理由を出して押し直せる", async () => {
+test("CB-D724 ［片付ける］はmergeRetireを送る。ダイアログ中（busy）は押せず、送ったら「実行しました」にして押せなくする。送れなかったら理由を出して押し直せる", async () => {
   const page = await openBoard(json(), { merge: view([row("c-merged")]) });
   try {
     page.click(page.one('button[data-action="merge-retire"]'));
@@ -183,21 +183,21 @@ test("CB-D724 ［片付ける］はmergeRetireを送る。ダイアログ中（b
   } finally {
     await busy.close();
   }
-  // 送ったあと: 「片付けのコマンドを送信しました。結果はターミナルで確認してください」。ボタンは出さない
+  // 送ったあと: 「片付けのコマンドをターミナルで実行しました。結果はターミナルで確認してください」。ボタンは出さない
   const sent = await openBoard(json(), { merge: view([row("c-merged", { sent: true })]) });
   try {
-    assert.equal(text(sent, ".merge-sent"), "片付けのコマンドを送信しました。結果はターミナルで確認してください");
+    assert.equal(text(sent, ".merge-sent"), "片付けのコマンドをターミナルで実行しました。結果はターミナルで確認してください");
     assert.equal(sent.all('button[data-action="merge-retire"]').length, 0);
   } finally {
     await sent.close();
   }
-  // 送れなかった: 「送信しました」とは言わず、理由を出し、押し直せる
+  // 送れなかった: 「実行しました」とは言わず、理由を出し、押し直せる
   const failed = await openBoard(json(), { merge: view([row("c-merged", { sendError: "ターミナルに送れませんでした" })]) });
   try {
     assert.equal(failed.all(".merge-sent").length, 0);
-    assert.equal(text(failed, '[data-merge="send-error"]'), "送信できませんでした: ターミナルに送れませんでした");
+    assert.equal(text(failed, '[data-merge="send-error"]'), "実行できませんでした: ターミナルに送れませんでした");
     assert.equal(failed.one<HTMLButtonElement>('button[data-action="merge-retire"]').disabled, false);
-    assert.ok(!failed.document.body.textContent.includes("送信しました"));
+    assert.ok(!failed.document.body.textContent.includes("実行しました"));
   } finally {
     await failed.close();
   }

@@ -17,7 +17,7 @@ import { CheckedAt, MirrorBanners, SyncAllButton } from "./Mirror.js";
 import { Project } from "./Project.js";
 import { post } from "./post.js";
 import { EMPTY, guessName, loadClone, saveClone, type CloneState } from "./state.js";
-import { formatGeneratedAt } from "../shared/format.js";
+import { lastUpdatedText } from "../shared/format.js";
 import { isTrackedProjectsDir } from "./text.js";
 
 /** 案内（`tours/projects.yml`）。見本は使わず、画面は今の中身のまま指す */
@@ -174,7 +174,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
       </section>
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
       <footer className="foot">
-        最終更新{formatGeneratedAt(page.generatedAt)}
+        {lastUpdatedText(page.generatedAt)}
       </footer>
     </>
   );

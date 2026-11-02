@@ -212,7 +212,7 @@ export function isHttpUrl(url: string): boolean {
 
 /**
  * 承認画面の本文で、見出しの次の1行に説明が付く見出し。実行ファイルが置く文面と同じ表記
- * （`src/ccnavi/tickets/proposal/agree_screen.py`の`screen`）。番号が付く「課題」だけ前方一致で見る。
+ * （`src/ccnavi/tickets/proposal/agree_screen.py`の`screen`）。番号が付く「issue」だけ前方一致で見る。
  *
  * まとめるのはこのリストに載っている見出しの次の行だけ。 知らない見出しなら何もしない。
  * 向こうの文面が変わったときに、本文の中身が気づかないうちに隠れるより、まとめられないほうが軽いため
@@ -226,7 +226,7 @@ const EXPLAINED_HEADS = new Set([
   "■ 判定に効かない記述",
 ]);
 
-const EXPLAINED_HEAD_PREFIXES = ["■ 課題: #", "■ 先行: "];
+const EXPLAINED_HEAD_PREFIXES = ["■ issue: #", "■ 先行: "];
 
 /** 承認画面の本文の1行と、その行にまとめた説明 */
 export interface BodyLine {

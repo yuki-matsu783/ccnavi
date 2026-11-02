@@ -812,10 +812,10 @@ test("CB-T176b 親だけ書けて子が止まった承認は、書けた分の�
   assert.ok(text.includes("書き込めませんでした: i0001-01-01"), "書けなかった子を言う");
   assert.deepEqual(kinds(carried.effects), ["carry", "refresh"], "書けた分は送る");
 
-  // pushのshが無ければ送れない。未送信と言う
+  // pushのshが無ければ送れない。未実行と言う
   const missing = approvalStep(approving, { kind: "approved", outcome: { ok: false, partial }, carrier: false });
   assert.deepEqual(kinds(missing.effects), ["refresh"]);
-  assert.ok((missing.state.overlay?.kind === "error" ? missing.state.overlay.error : "").includes("未送信"));
+  assert.ok((missing.state.overlay?.kind === "error" ? missing.state.overlay.error : "").includes("未実行"));
 
   // 1件も書けていなければ送らない
   const none = approvalStep(approving, {

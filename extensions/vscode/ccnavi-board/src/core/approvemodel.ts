@@ -164,7 +164,7 @@ export interface ApproveResult {
   /** 承認した子のワークツリーの計画。`state`が`create`のものを拡張が承認の後に作る（`ccnavi-git.sh worktree add`） */
   readonly worktrees: readonly ApproveWorktree[];
   /**
-   * Claude Codeに渡す文（承認された識別子と後工程の進め方）。hookは承認を知らせないので、
+   * Claude Codeへの依頼文（承認された識別子と後工程の進め方）。hookは承認を知らせないので、
    * 拡張がこの文を渡す
    */
   readonly prompt: string;
@@ -265,8 +265,8 @@ export function partialMessage(partial: ApprovePartial, carried = false): string
   const written = paths.length === 0 ? placed.join(", ") : paths.join(", ");
   const failed = ticket === "" || placed.includes(ticket) ? "" : `書き込めませんでした: ${ticket}。`;
   const sent = carried
-    ? "書けたぶんだけをコミット・pushするコマンドをターミナルに送信しました。結果はターミナルで確認してください（pushできていなければ未送信です）"
-    : "承認済みチケットをコミット・pushするコマンドは送信していません（push用のスクリプトがありません）。未送信です";
+    ? "書けたぶんだけをコミット・pushするコマンドをターミナルで実行しました。結果はターミナルで確認してください（pushできていなければ未実行です）"
+    : "承認済みチケットをコミット・pushするコマンドは実行していません（push用のスクリプトがありません）。未実行です";
   const what =
     placed.length === 0
       ? "承認済みになったチケットはありません"
@@ -472,4 +472,4 @@ function str(value: unknown): string {
 }
 
 /** 承認や対応方針の確定のあと、Claude Codeに文を渡す方法の案内（コピー / 新しいセッション）。「ターミナルで実行」の注意は、この文とそのボタンのツールチップの両方に置く */
-export const HANDOVER_NOTE = "Claude Codeに渡す文を用意しました。「コピー」して貼るか、「新しいセッションで開く」を押してください。送るときは、自分でEnterを押します。「ターミナルで実行」は、確認なしですぐ非対話で1回だけ実行します。";
+export const HANDOVER_NOTE = "Claude Codeへの依頼文を用意しました。「コピー」して貼るか、「新しいセッションで開く」を押してください。送るときは、自分でEnterを押します。「ターミナルで実行」は、確認なしですぐ非対話で1回だけ実行します。";

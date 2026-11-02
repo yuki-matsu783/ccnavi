@@ -20,7 +20,7 @@ import boardTour from "../tours/board.yml";
 import { mutePosts, post } from "./post.js";
 import { Approval } from "./Approval.js";
 import { CardItem } from "./Card.js";
-import { formatGeneratedAt } from "../shared/format.js";
+import { lastUpdatedText } from "../shared/format.js";
 import { ModeBand } from "../shared/ModeBand.js";
 import { MergeBand } from "./MergeBand.js";
 import { detailsKey, EMPTY, loadState, saveState, type ViewState } from "./state.js";
@@ -388,7 +388,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
 function Footer({ board }: { readonly board: Board }): JSX.Element {
   return (
     <footer className="foot">
-      最終更新{formatGeneratedAt(board.generatedAt)} / {board.root}
+      {lastUpdatedText(board.generatedAt)} / {board.root}
     </footer>
   );
 }

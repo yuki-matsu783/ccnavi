@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 
 import { buildBoard, type Card } from "../../src/core/board.js";
 import type { ArchivedTicketJson, BoardJson, PhaseJson } from "../../src/core/model.js";
-import { phaseStatusOf } from "../../src/core/status.js";
+import { phaseStatusOf, statusOf, type StatusCard } from "../../src/core/status.js";
 import { boardOf, closedJson, parentJson, phaseJson, proposalJson, reviewJson, ticketJson, waitingPhase } from "../helpers/cards.js";
 
 function cardsOf(json: BoardJson): Map<string, Card> {
@@ -298,4 +298,14 @@ test("CB-T610 操作: 子の承認待ち + レビュー待ちは承認だけ。�
   assert.deepEqual(p.phases.map((c) => c.actions.map((a) => a.kind)), [["review"], ["review"]]);
   assert.deepEqual(p.phases.map((c) => (c.actions[0] as { phase: number }).phase), [1, 2]);
   assert.deepEqual(p.phases.map((c) => (c.actions[0] as { mrUrl: string }).mrUrl), ["https://example.com/o/r/pull/11", "https://example.com/o/r/pull/22"]);
+});
+
+test("CB-T1247 開始前・作業中・レビュー準備中のバッジは、ツールチップに次の一手（誰の番か）を添える", () => {
+  const open: StatusCard = {
+    isParent: true, column: "doing", copyStatus: "open", blocked: "", scattered: [], pendingApproval: false, cancelledAt: "",
+    startedAt: "", revision: false, wrapped: false, gateClosed: false, reviewWaiting: false, phaseStatus: "", phases: [],
+  };
+  assert.match(statusOf(open).title, /Claude Codeに着手を頼む/);
+  assert.match(statusOf({ ...open, startedAt: "2026-01-01" }).title, /エージェントが作業中.*ユーザの操作は要りません/);
+  assert.match(statusOf({ ...open, phases: [{ status: "レビュー準備中" }] }).title, /エージェントがレビュー依頼を出す番/);
 });

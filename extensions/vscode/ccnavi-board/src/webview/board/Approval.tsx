@@ -72,7 +72,7 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
       return (
         <>
           <h2 id="approval-title">{overlay.count}件を承認しました</h2>
-          {overlay.carried === true ? <p className="approval-note">承認済みチケットをコミット・pushするコマンドをターミナルに送信しました。</p> : null}
+          {overlay.carried === true ? <p className="approval-note">承認済みチケットをコミット・pushするコマンドをターミナルで実行しました。</p> : null}
           <p className="approval-note">{HANDOVER_NOTE}</p>
           <HandOver />
           <details className="approval-more" data-tour="approval-prompt">
@@ -266,6 +266,7 @@ const LEGEND: readonly (readonly [string, string])[] = [
   ["after", "先にクローズし、レビューも済んでいるべきステップ（先行。自分より小さい番号だけ）"],
   ["scope", "そのフェーズで編集できる範囲（inheritは親の範囲を引き継ぐ）"],
   ["review", "フェーズが終わったあとの人間のレビュー（falseは不要、trueはMRで見る）"],
+  ["phases:", "この親に固定するフェーズ定義（承認のあとの判定はこれを読む）"],
 ];
 
 function Legend(): JSX.Element {

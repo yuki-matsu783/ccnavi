@@ -155,7 +155,7 @@ def screen(
     4. 範囲の下に、チケットが宣言したが書き込めない場所（`cand.overflow`）を出す
     5. 子は人間レビューと先行、親は計画・フェーズ間の先行（`_plan_lines`・
        `_workflow_lines`）・コピーの定義（`_copy_lines`）を出す
-    6. 課題・理由・出どころ（`_origin_line`）を出し、判定に使われない記述（警告）を末尾に置く
+    6. issue・理由・出どころ（`_origin_line`）を出し、判定に使われない記述（警告）を末尾に置く
     """
     lines = [f"チケットの承認リクエスト: {len(batch)} 件"]
     for cand in batch:
@@ -252,10 +252,10 @@ def screen(
             lines += _workflow_lines(t, workflow.compute(t))
             lines += _copy_lines(t, cand_types, cand.config)
         if not t.is_child and t.issue is not None:
-            lines.append(f"■ 課題: {ticket_mod.issue_label(t)}")
+            lines.append(f"■ issue: {ticket_mod.issue_label(t)}")
             lines.append(
                 "    この親のマージリクエストの本文に Closes として記載する番号。"
-                "マージされると、このIssueもクローズされます。"
+                "マージされると、このissueもクローズされます。"
             )
         if t.rationale.strip():
             lines.append("■ エージェントが記載した理由")
