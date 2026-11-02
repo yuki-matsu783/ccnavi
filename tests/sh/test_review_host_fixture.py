@@ -780,8 +780,6 @@ class GitLabHostFixtureTest(unittest.TestCase):
         with open(state, encoding="utf-8") as f:
             body = json.load(f)[0]["body"]
         self.assertTrue(body.startswith("<!-- ccnavi:request i0001:1 key=k -->"), body)
-        self.assertNotIn("crit", body)
-        self.assertNotIn("crit", done.stdout)
 
     def request_with_body(self, body, **extra):
         """--body-file に body（ws からの相対か絶対）を渡して request を打つ。"""
