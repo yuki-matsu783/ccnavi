@@ -199,7 +199,8 @@ class WriteAndPushMergeMoreTest(WriteAndPushMergeHarness):
         wrap = executable(
             os.path.join(self._base, "bin", "wrap"),
             "#!/bin/sh\n"
-            'case " $* " in *" ticket finish "*)\n'
+            # 書く前の検査（--check）では積まない。計画（write-and-push merge）のあと、書く呼び出しで積む。
+            'case " $* " in *" --check "*) ;; *" ticket finish "*)\n'
             f"  cd '{tree}' && echo late > wip/design/late.md && '{GIT}' add -A &&"
             f" '{GIT}' commit -q -m late ;;\n"
             "esac\n"
