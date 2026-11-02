@@ -9,7 +9,7 @@
  * 正直に言い、行を黙って破棄しない。
  */
 
-/** `mr-state`の1行目。頭の行の版 */
+/** `mr-state`の1行目。先頭の行の版 */
 export const MR_STATE_HEAD = "mr-state 1";
 
 /** shが返す`unknown`の種類 */
@@ -21,7 +21,7 @@ export type ShUnknownKind = (typeof SH_UNKNOWN_KINDS)[number];
  * shの`unknown`の種類には入れない。
  *
  * - `timeout`: 期限切れ（拡張が1回ごとに付ける期限で打ち切った）
- * - `format`: 出力の形が想定外（頭の行・語の数・番号・Draft・終了コードの食い違いなど）
+ * - `format`: 出力の形が想定外（先頭の行・語の数・番号・Draft・終了コードの食い違いなど）
  * - `failed`: 実行できなかった、またはshが想定外の終了コードで終わった
  * - `no-number`: 片付けの記録にMRの番号が無い（番号が読めない）
  */
@@ -168,11 +168,11 @@ export type RetiredParse =
   | { readonly ok: true; readonly entries: readonly RetiredEntry[]; readonly incomplete: readonly IncompleteEntry[] }
   | { readonly ok: false; readonly error: string };
 
-/** `sync retired`の頭の行 */
+/** `sync retired`の先頭の行 */
 export const RETIRED_HEAD = "retired 1";
 
 /**
- * `ccnavi sync retired`の答えを読む。頭の行が`retired 1`でない・コマンドが失敗した（`code`が0でない）・
+ * `ccnavi sync retired`の答えを読む。先頭の行が`retired 1`でない・コマンドが失敗した（`code`が0でない）・
  * 知らない行がある・`retired`の行の項目が足りない、のどれかなら「一覧を取得できません」（`ok: false`）にする。
  * 「ありません」とは言わず、行を黙って破棄しない
  */

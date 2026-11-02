@@ -718,10 +718,10 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             className="action"
             data-action="suggest"
             disabled={busy}
-            title="ccnavi --suggest --jsonを実行し、保存済みのルールと判定の記録からdeny / askの下書きを起こします"
+            title="ccnavi --suggest --jsonを実行し、保存済みのルールと判定の記録からdeny / askの下書きを作ります"
             onClick={() => {
               setBusy(true);
-              setStatus({ text: "記録から候補を起こしています…", error: false });
+              setStatus({ text: "記録から候補を作っています…", error: false });
               post({ type: "suggest" });
             }}
           >
