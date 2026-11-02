@@ -88,6 +88,21 @@ test("CB-D721 帯の行: 親・タイトル・MR !N・状態。タイトルは�
   void rows;
 });
 
+test("CB-D720a 帯にマージ待ちの行があるときは、チケットが0件でも「チケットなし」を出さない", async () => {
+  const empty = await openBoard(boardOf([], []), { merge: view([]) });
+  try {
+    assert.equal(empty.all("p.board-empty").length, 1);
+  } finally {
+    await empty.close();
+  }
+  const waiting = await openBoard(boardOf([], []), { merge: view([row("i1")]) });
+  try {
+    assert.equal(waiting.all("p.board-empty").length, 0);
+  } finally {
+    await waiting.close();
+  }
+});
+
 test("CB-D722 マージ待ち（Draftなら付記）・マージ済み・閉じた・確認できない・記録が不完全・確認中の行の言葉", async () => {
   const merge = view([
     row("a-open", { state: "open", draft: false }),
@@ -104,15 +119,15 @@ test("CB-D722 マージ待ち（Draftなら付記）・マージ済み・閉じ�
   const page = await openBoard(json(), { merge });
   try {
     const state = (parent: string): string => text(page, `.merge-row[data-parent="${parent}"] .merge-state`);
-    assert.equal(state("a-open"), "- マージ待ち MRを開く");
-    assert.equal(state("b-draft"), "- マージ待ち（Draft） MRを開く");
-    assert.equal(state("c-merged"), "- マージ済み 片付ける");
-    assert.match(state("d-closed"), /^- マージせず閉じました。自動では片付けません。破棄した親の記録は、ターミナルでsh \/ws\/\.ccnavi\/scripts\/ccnavi-launcher\.sh worktree retire --abandon d-closedを実行すると消えます/);
-    assert.equal(state("e-unknown"), "- 確認できません（認証: 認証に失敗した（トークンかghの認証を確かめる））");
-    assert.equal(state("f-timeout"), "- 確認できません（タイムアウト: 時間内に終わりませんでした）");
-    assert.match(state("g-format"), /^- 確認できません（出力の形が想定外: 出力の形が想定外です/);
-    assert.equal(state("h-failed"), "- 確認できません（実行できません: shが終了コード127で終わりました）");
-    assert.equal(state("i-incomplete"), "- 確認できません（記録が不完全: 記録を読めない（壊れている））");
+    assert.equal(state("a-open"), "マージ待ち MRを開く");
+    assert.equal(state("b-draft"), "マージ待ち（Draft） MRを開く");
+    assert.equal(state("c-merged"), "マージ済み 片付ける");
+    assert.match(state("d-closed"), /^マージせず閉じました。自動では片付けません。破棄した親の記録は、ターミナルでsh \/ws\/\.ccnavi\/scripts\/ccnavi-launcher\.sh worktree retire --abandon d-closedを実行すると消えます/);
+    assert.equal(state("e-unknown"), "確認できません（認証: 認証に失敗した（トークンかghの認証を確かめる））");
+    assert.equal(state("f-timeout"), "確認できません（タイムアウト: 時間内に終わりませんでした）");
+    assert.match(state("g-format"), /^確認できません（出力の形が想定外: 出力の形が想定外です/);
+    assert.equal(state("h-failed"), "確認できません（実行できません: shが終了コード127で終わりました）");
+    assert.equal(state("i-incomplete"), "確認できません（記録が不完全: 記録を読めない（壊れている））");
     assert.equal(state("j-wait"), "確認中…");
     // 確認した時刻
     assert.equal(text(page, '[data-merge="checked-at"]'), "確認した時刻: 2026-10-01 10:00:00");
@@ -139,8 +154,8 @@ test("CB-D723 帯のボタンとリンクはcard-button（［片付ける］だ�
       assert.ok(a.classList.contains("card-button"));
     }
     // 状態は出す（リンクにしないだけ）
-    assert.match(text(page, '.merge-row[data-parent="b"] .merge-state'), /^- マージ待ち$/);
-    assert.match(text(page, '.merge-row[data-parent="c"] .merge-state'), /^- マージ済み 片付ける$/);
+    assert.match(text(page, '.merge-row[data-parent="b"] .merge-state'), /^マージ待ち$/);
+    assert.match(text(page, '.merge-row[data-parent="c"] .merge-state'), /^マージ済み 片付ける$/);
     for (const b of page.all(".merge-band button")) {
       assert.ok(b.classList.contains("card-button"), b.getAttribute("data-action") ?? "");
       assert.ok(!b.classList.contains("action"));

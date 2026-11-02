@@ -650,7 +650,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       </section>
       <section id="tab-judge" className={shownTab === "judge" ? "pane active" : "pane"}>
         <p className="hint">
-          dry-runモードの場合でも、ここはenableモードのときの判定を返します。
+          いまのモードがdry-run（記録だけ）でも、ここではenable（実際に止める）のときの判定を返します。
         </p>
         <div className="judge-form" data-tour="judge-form">
           <label>

@@ -4,7 +4,7 @@
  * 見せる中身は拡張ホストが持つ（`MergeView`。ボードが開いている間だけ）。ここは渡されたものを出すだけで、判定しない。
  * 行は次のとおり（タイトルは、ボードのアーカイブにある同じ親から取る。無ければ識別子だけ）。
  *
- * - マージ待ち: `<親> <タイトル> MR !N - マージ待ち（Draftなら付記）` ［MRを開く］
+ * - マージ待ち: `<親> <タイトル> MR !N マージ待ち（Draftなら付記）` ［MRを開く］
  * - マージ済み: ［片付ける］（確認のダイアログのあと、syncのコマンドを送る。送ったら、次の確認まで押せない）
  * - マージせず閉じた: 自動では片付けない。破棄した親なら、ユーザがターミナルで記録を消すコマンド（コピーのボタンだけ。ボードからは送らない）
  * - 確認できない（種類と理由）／記録が不完全
@@ -86,13 +86,13 @@ function State({ row, touring }: { readonly row: MergeViewRow; readonly touring:
     case "open":
       return (
         <>
-          <span>- マージ待ち{row.draft ? "（Draft）" : ""}</span> <MrLink url={row.url} />
+          <span>マージ待ち{row.draft ? "（Draft）" : ""}</span> <MrLink url={row.url} />
         </>
       );
     case "merged":
       return (
         <>
-          <span>- マージ済み</span>{" "}
+          <span>マージ済み</span>{" "}
           {row.sent ? (
             <span className="merge-sent" role="status">
               片付けのコマンドを送信しました。結果はターミナルで確認してください
@@ -126,7 +126,7 @@ function State({ row, touring }: { readonly row: MergeViewRow; readonly touring:
       return (
         <>
           <span>
-            - マージせず閉じました。自動では片付けません。破棄した親の記録は、ターミナルで
+            マージせず閉じました。自動では片付けません。破棄した親の記録は、ターミナルで
             <code className="merge-command">{row.abandon}</code>を実行すると消えます
           </span>
           <MrLink url={row.url} />{" "}
@@ -149,11 +149,11 @@ function State({ row, touring }: { readonly row: MergeViewRow; readonly touring:
     case "unknown":
       return (
         <span className="merge-unknown" data-reason={row.reason}>
-          - 確認できません（{REASON_LABELS[row.reason] ?? row.reason}: {row.detail}）
+          確認できません（{REASON_LABELS[row.reason] ?? row.reason}: {row.detail}）
         </span>
       );
     case "incomplete":
-      return <span className="merge-unknown">- 確認できません（記録が不完全: {row.detail}）</span>;
+      return <span className="merge-unknown">確認できません（記録が不完全: {row.detail}）</span>;
   }
 }
 

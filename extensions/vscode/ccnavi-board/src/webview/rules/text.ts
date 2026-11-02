@@ -50,7 +50,7 @@ export function hasContext(rule: RuleForm): boolean {
 export function contextSummary(rule: RuleForm): string {
   return hasContext(rule)
     ? "（設定あり）"
-    : "（未設定）ルールにヒットしたときにモデルへ渡すプロンプト・ファイルと、その頻度（every）を設定します。";
+    : "（未設定）ルールに当てはまったときにモデルへ渡すプロンプト・ファイルと、その頻度（every）を設定します。";
 }
 
 /** askとallowにmessageが残っているときに出す断り。lintがerrorにする */

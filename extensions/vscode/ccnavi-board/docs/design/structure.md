@@ -141,7 +141,7 @@ src/
     projects/App.tsx  ツールバー（更新）・帯・clone の欄・一覧・認識されない git・ワークスペース（プロジェクト外）と、拡張ホストからのメッセージの受け
     projects/Project.tsx カード 1 枚（名前・バッジ・項目・検証）
     projects/state.ts 画面が覚えるもの（clone の欄）の読み書き
-    projects/text.ts  カードに出す言葉（プロジェクトの設定の場所、重ねない苦情）と、フッタの最終更新の時刻の形（`formatGeneratedAt`）
+    projects/text.ts  カードに出す言葉（プロジェクトの設定の場所、重ねない苦情）
     risk/style.css    リスク管理画面の CSS の入口
     risk/App.css      App.tsx の CSS（閾値の枠）
     risk/Factor.css   Factor.tsx の CSS（配点 1 件の行）
@@ -272,7 +272,7 @@ test/
   workflow/           計画編集（planordermodel, workflow-view, ボードと結ぶ帳面の workflow-tabs と、画面を動かす workflow.dom）
   devtools/           開発用の画面確認ツール（scripts/render-board.js）。引数・--out の拒否・失敗の条件・スタブの単体テストと、Chromium で PNG が出ることを確かめる render-board.e2e.ts（node --test には渡さず test-groups.js が別に起こす）
   bugreport/          バグ報告（bug-report。ffmpeg と OS の道具は起動せず、組んだ引数・ログの切り出し・zip の読み戻しを見る）
-  shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens, style, appearance, screen-host, approval-machine, plan-graph, decidemodel, mrstate, merge, read-only（読み取りから書き込みを呼ばない）)
+  shared/             画面をまたぐもの（format（最終更新の時刻の形）, locate, commands, lock, layers, yaml11, ticket-control, screens, style, appearance, screen-host, approval-machine, plan-graph, decidemodel, mrstate, merge, read-only（読み取りから書き込みを呼ばない）)
   */*.test.ts         組み立てと HTML の文字列を見る単体テスト CB-T01〜
   */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。画面はどれも React なので、描くものも動かして見る（render.dom, projects.dom, risk.dom, phases.dom, rules.dom, flow.dom, templates.dom, templates-edit.dom, handoff.dom）
   shared/test-ids.test.ts  ID の決まり（重複しない・名前は ID から始まる）を、テストで守る

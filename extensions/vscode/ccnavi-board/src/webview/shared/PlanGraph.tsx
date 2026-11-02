@@ -256,7 +256,7 @@ function FitOnOpen({ fitKey }: { readonly fitKey: unknown }): null {
 
 /** 計画の見出し */
 function headingOf(plan: ApprovePlan): string {
-  return `${plan.ticket}の${plan.part === "feedback" ? "フィードバック計画（feedback:）" : "全体計画（plan:）"}`;
+  return `${plan.ticket}の${plan.part === "feedback" ? "フィードバック計画" : "全体計画"}`;
 }
 
 /** 図の下の一言。実行ファイルの値を並べるだけ */

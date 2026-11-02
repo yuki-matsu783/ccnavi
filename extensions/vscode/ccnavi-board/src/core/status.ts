@@ -193,6 +193,14 @@ export function statusOf(card: StatusCard): Status {
   return childStatus(card);
 }
 
+/** 「レビュー準備中」のツールチップ。ユーザの番ではない */
+const PREPARING_TITLE = "エージェントがレビュー依頼を出す番です";
+
+/** 着手前の開いたチケット。ワークツリーは着手で作るので、無くて普通 */
+export function isNotStarted(card: StatusCard): boolean {
+  return card.copyStatus === "open" && card.startedAt === "";
+}
+
 function parentStatus(card: StatusCard): Status {
   if (closed(card)) {
     return { label: card.wrapped ? "完了（早めに終了）" : "完了", title: "", tone: "done" };
@@ -201,7 +209,7 @@ function parentStatus(card: StatusCard): Status {
     return { label: "レビュー待ち", title: "", tone: "turn" };
   }
   if (card.phases.some((p) => p.status === "レビュー準備中")) {
-    return { label: "レビュー準備中", title: "", tone: "wait" };
+    return { label: "レビュー準備中", title: PREPARING_TITLE, tone: "wait" };
   }
   if (card.copyStatus === "open") {
     return card.startedAt === "" ? { label: "開始前", title: "", tone: "wait" } : { label: "作業中", title: "", tone: "work" };
@@ -218,7 +226,7 @@ function childStatus(card: StatusCard): Status {
       case "レビュー待ち":
         return { label: "レビュー待ち", title: "", tone: "turn" };
       case "レビュー準備中":
-        return { label: "レビュー準備中", title: "", tone: "wait" };
+        return { label: "レビュー準備中", title: PREPARING_TITLE, tone: "wait" };
       case "レビュー予定":
         return { label: "レビュー予定", title: "", tone: "wait" };
       default:

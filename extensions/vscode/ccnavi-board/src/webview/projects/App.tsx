@@ -16,7 +16,8 @@ import { CheckedAt, MirrorBanners, SyncAllButton } from "./Mirror.js";
 import { Project } from "./Project.js";
 import { post } from "./post.js";
 import { EMPTY, guessName, loadClone, saveClone, type CloneState } from "./state.js";
-import { formatGeneratedAt, isTrackedProjectsDir } from "./text.js";
+import { formatGeneratedAt } from "../shared/format.js";
+import { isTrackedProjectsDir } from "./text.js";
 
 /** 案内（`tours/projects.yml`）。見本は使わず、画面は今の中身のまま指す */
 const TOUR = tourOf(projectsTour);

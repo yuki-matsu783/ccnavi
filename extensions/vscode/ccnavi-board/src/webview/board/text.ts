@@ -5,6 +5,7 @@
  */
 import { COLUMNS, type Card, type PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
+import { isNotStarted } from "../../core/status.js";
 
 /** 承認対象外の提案の理由。実行ファイルの行頭の「error: 」「warn: 」と、見出しに出している識別子を外し、理由だけを残す */
 export function rejectedReason(ticket: string, problem: string): string {
@@ -34,7 +35,7 @@ export function movedLabel(moved: Moved): string {
 
 /**
  * カードの注意の行。例外のときだけ短い言葉で出す（理由の全文は詳細）。
- * 不備・書き込み停止・先行待ち・リスクHIGH以上・複数の場所にある・ワークツリー未作成（承認待ち）・ワークツリーが見つからない（作業中・レビュー中）・未送信。
+ * 不備・書き込み停止・先行待ち・リスクHIGH以上・複数の場所にある・ワークツリー未作成（承認待ち・開始前の子）・ワークツリーが見つからない（作業中・レビュー中）・未送信。
  * ユーザが動く必要がある状態だけで、普通のことは出さない。先行待ちは識別子の途中で折り返さないよう、`PredecessorNote`で別に出す
  */
 export interface Note {
@@ -53,8 +54,8 @@ export function notesOf(card: Card): Note[] {
     notes.push({ key: "blocked", text: "書き込み停止中", kind: "blocked" });
   }
   if (!card.worktreeExists && card.copyStatus !== "closed" && card.copyStatus !== "archived") {
-    // 承認待ち（none）はまだ作っていないだけ。作業中・レビュー中に無いのは異常（warnの見た目）
-    const pending = card.copyStatus === "none";
+    // 承認待ち（none）と開始前はまだ作っていないだけ。作業中・レビュー中に無いのは異常（warnの見た目）
+    const pending = card.copyStatus === "none" || isNotStarted(card);
     notes.push({ key: "worktree", text: pending ? "ワークツリー未作成" : "ワークツリーが見つからない", kind: pending ? "worktree" : "worktree none" });
   }
   if (isHighRisk(card.riskLevel)) {

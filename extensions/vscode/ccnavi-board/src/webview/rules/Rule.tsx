@@ -239,13 +239,13 @@ export function Rule(props: RuleProps): JSX.Element {
               {text("every", "f-every", "5（空なら毎回渡します）")}
             </Captioned>
             <Captioned name="additionalContext" yamlKey="additionalContext" tour={tour("text")}>
-              {area("additionalContext", "f-context", "ヒットしたときにモデルへ渡すプロンプト")}
+              {area("additionalContext", "f-context", "当てはまったときにモデルへ渡すプロンプト")}
             </Captioned>
-            {file("additionalContextFile", "additionalContextFile", "f-context-file", "ヒットしたときにモデルへ渡すファイル（先頭4000文字まで）")}
+            {file("additionalContextFile", "additionalContextFile", "f-context-file", "当てはまったときにモデルへ渡すファイル（先頭4000文字まで）")}
             <Captioned name="additionalContextOnce" yamlKey="additionalContextOnce" tour={tour("once")}>
-              {area("additionalContextOnce", "f-once", "セッションで最初にヒットしたときだけモデルへ渡すプロンプト")}
+              {area("additionalContextOnce", "f-once", "セッションで最初に当てはまったときだけモデルへ渡すプロンプト")}
             </Captioned>
-            {file("additionalContextOnceFile", "additionalContextOnceFile", "f-once-file", "セッションで最初にヒットしたときだけモデルへ渡すファイル（先頭4000文字まで）")}
+            {file("additionalContextOnceFile", "additionalContextOnceFile", "f-once-file", "セッションで最初に当てはまったときだけモデルへ渡すファイル（先頭4000文字まで）")}
           </div>
         </details>
         <span className="buttons" data-tour={tour("buttons")}>

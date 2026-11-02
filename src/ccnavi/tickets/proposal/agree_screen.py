@@ -207,8 +207,8 @@ def screen(
             # チケットの範囲はルールの allow より強い。承認するユーザは「ルールで
             # 開けてあるから範囲の外でも書ける」と読み違えやすいので、承認の前に言う。
             lines.append(
-                "    ルールの allow で許可されていても、このチケットの範囲外では編集できません。"
-                "ルールの deny はこの範囲の中でも止まる"
+                "    ルールで許可（allow）されていても、このチケットの範囲外では編集できません。"
+                "ルールで禁止（deny）にした場所は、この範囲の中でも止まります"
             )
         for name in rules.SECTIONS:
             paths = t.paths(name)
@@ -242,7 +242,7 @@ def screen(
         elif t.has_plan:
             lines.append("■ 全体計画")
             lines.append(
-                "    承認すると、この順序で進めることに合意したことになる。"
+                "    承認すると、この順序で進めることに合意したことになります。"
                 "先行フェーズの終了と必要なレビューの完了を確認するまで、このフェーズの子チケットは承認できません。"
             )
             lines += _plan_lines(t.plan, 1, cand_types)
@@ -266,7 +266,7 @@ def screen(
             lines.append("■ 判定に使われない記述")
             lines.append(
                 "    提案に記載があっても、判定はこれを読みません。"
-                "承認しても、編集できる場所は変わらない"
+                "承認しても、編集できる場所は変わりません"
             )
             lines += [f"    {p.detail}" for p in warnings]
     return "\n".join(lines)
@@ -317,7 +317,7 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
     if used:
         lines.append("■ この親に固定するフェーズ定義（phases:。承認のあとの判定はこれを読む）")
         lines.append(
-            "    承認したときの phases.yml と同じ中身を親にコピーして固定する。"
+            "    承認したときの phases.yml と同じ中身を親にコピーして固定します。"
             "承認後に phases.yml を変更しても、この親チケットの編集可能範囲・"
             "確認対象・成果物は変わりません。"
         )
@@ -363,11 +363,12 @@ def _scope_diff_lines(current: ticket_model.Ticket, revised: ticket_model.Ticket
     return [
         "■ 範囲の差分（改版で親に固定する範囲）",
         "    allow は確認なしで編集できる場所、ask は実行時に確認が必要な場所、"
-        "deny はこのチケットでも編集できない場所。承認すると、古い範囲は上書きされる",
+        "deny はこのチケットでも編集できない場所。承認すると、古い範囲は上書きされます",
         *lines,
-        "    作業中の子は居ない（居れば改版は通らない）。新しい範囲の子は、新しい子として提案する。"
-        "狭めた場合、完了済み・レビュー待ちの子の範囲が親の外に出ることがあるが、"
-        "書き込みは親の範囲で切り詰められる",
+        "    作業中の子はいません（いれば改版は通りません）。"
+        "新しい範囲の子は、新しい子として提案します。"
+        "狭めた場合、完了済み・レビュー待ちの子の範囲が親の外に出ることがありますが、"
+        "書き込みは親の範囲で切り詰められます",
     ]
 
 
@@ -432,7 +433,7 @@ def _plan_diff_lines(
         lines.append("■ フィードバック計画")
         start = len(revised.plan) + 1
         lines += _plan_lines(revised.feedback or [], start, types) or [
-            "    対応なし。見たうえで対応しない、という記録になる"
+            "    対応なし。見たうえで対応しない、という記録になります"
         ]
     return lines
 
