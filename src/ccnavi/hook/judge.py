@@ -574,7 +574,7 @@ def decide_before(
         elif payload.tool_name in toolnames.WRITE_TOOLS:
             # 書き込み先のパスが `.claude/worktrees/<名前>` の中で、その名前が親のチケットか
             # （ワークツリーが git に登録されているかは問わない。sh の検査と同じ広さ）。
-            # 提案・下書き・ELI5 の置き場（`wip/proposals/` `wip/handoff/` `wip/eli5/` と承認済みの
+            # 提案・下書きの置き場（`wip/proposals/` `wip/handoff/` と承認済みの
             # 領域）は対象にしない。サブエージェントがフローの下書きなどをここへ書く経路で、
             # 置き場ごとの保護（ルールの deny とチケットの保護）が別に掛かっている。
             name = wrapguard.worktree_name(root, record.subject)

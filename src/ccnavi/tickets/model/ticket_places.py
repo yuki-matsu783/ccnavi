@@ -1,4 +1,4 @@
-"""範囲を適用しない置き場。チケットの置き場・下書きの置き場・ELI5 の置き場と、状態の置き場の
+"""範囲を適用しない置き場。チケットの置き場・下書きの置き場と、状態の置き場の
 出入りの見分け。
 
 パスの文字列だけを見て、ファイルも git も読まない。ticket から分けた。ticket を読まない。
@@ -119,42 +119,17 @@ def is_handoff_place(rel: str) -> bool:
     名前の大文字小文字は区別しない（`WIP/Handoff/` も同じ置き場。`ready` の片付けも同じ見方）。
     `wip/handoffX/` や、`scratchpad` という名前のファイルは置き場ではない。
 
-    `\\` は `/` に直さない（`is_eli5_place` と同じ理由。`wip\\handoff\\x.py` は置き場ではない）。
+    `\\` は `/` に直さない。呼び手のパスは `tree.relative`（`os.sep` を `/` に直したもの）か
+    git が出したパスで、どちらも区切りは `/`。直すと Linux / macOS で
+    `wip\\handoff\\x.py` という名前のファイル 1 個が置き場に見えてしまう。
     """
     return rel.casefold().startswith(HANDOFF + "/")
 
-
-# ELI5 の HTML の置き場。依頼につける、変更をやさしく説明した HTML を置く。マージリクエストの
-# 差分に載るよう `wip/` の下にコミットする。
-# 名前は固定。設定で動かさない（動かせると、その値をソースの置き場に向けるだけで範囲を迂回できる）。
-ELI5 = "wip/eli5"
 
 # 途中の作業の置き場。調査や設計の下書きを置く場所で、マージの前に全体を消す。
 # 既定のブランチに残す場所はマージリクエストと issue。パスは設定から導かず固定する。
 # 読むのは review（片付けの検査）と ops（早めに閉じたあとの案内）。
 WIP_ROOT = "wip"
-
-
-def is_eli5_place(rel: str) -> bool:
-    """ツリーのルートからの相対パスが、ELI5 の HTML の置き場（`wip/eli5/`）の下にあるか。
-
-    チケットの範囲を適用しない。ELI5 はレビューの依頼に必ずつける材料で、親の範囲に
-    毎回 `wip/eli5/*` を書かせると、書き忘れた親は依頼の手前で止まる。ここは `wip/` の下なので
-    `ready` の前にまとめて消え、squash した成果物には残らない。範囲を外すのはこの 1 段だけで、
-    `wip/` のほかの場所（`wip/design/` など）と、紛らわしい名前（`wip/eli5x/`）は外さない。
-
-    `scratchpad/` と違って git が追跡する置き場なので、実行後チェック
-    （`post_findings.ScopeGuard.finding`）とサブエージェント終了時チェック（`phase_scope.scope_findings`）も、ここを明示的に外す。外さないと、
-    実行前に通った書き込みがコミットのあとで範囲の外として報告される。
-
-    名前の大文字小文字は区別しない（`WIP/ELI5/` も同じ置き場。`ready` の片付けも同じ見方）。
-
-    `\\` は `/` に直さない。呼び手のパスは `tree.relative`（`os.sep` を `/` に直したもの）か
-    git が出したパスで、どちらも区切りは `/`。直すと Linux / macOS で `wip\\eli5\\evil.py` という
-    名前のファイル 1 個が置き場に
-    見え、範囲の判定から外れ、しかも `ready` の片付け（`git ls-files -- wip`）の対象にもならない。
-    """
-    return rel.casefold().startswith(ELI5 + "/")
 
 
 def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
@@ -164,11 +139,7 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     実行後チェックは内容で決め（`post_findings._script_writes`）、サブエージェント終了時チェックは
     置き場そのものを外す（`phase_scope.scope_findings`）。
 
-    下書きの置き場（`is_handoff_place`）と ELI5 の置き場（`is_eli5_place`）は、
-    追跡される置き場なので、実行後チェックとサブエージェント終了時チェックも同じく外す。
+    下書きの置き場（`is_handoff_place`）は、追跡される置き場なので、
+    実行後チェックとサブエージェント終了時チェックも同じく外す。
     """
-    return (
-        is_ticket_place(rel, tickets_rel, approved_rel)
-        or is_handoff_place(rel)
-        or is_eli5_place(rel)
-    )
+    return is_ticket_place(rel, tickets_rel, approved_rel) or is_handoff_place(rel)

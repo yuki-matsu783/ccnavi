@@ -109,7 +109,7 @@ class RequestNudgeTest(base.StopNudgeTest):
 
     # ---- 子が全部閉じた。依頼まで 1 手ずつ
 
-    def test_closed_children_are_asked_to_merge_then_eli5_then_request(self):
+    def test_closed_children_are_asked_to_merge_then_request(self):
         self.family(plan=["work-mr"])
         self.close_children()
         review_sh = settings.script_command(self.root, "ccnavi-review.sh")
@@ -123,45 +123,32 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.assertNotIn(f"`{git_sh} merge", reason)
         self.assertNotIn("i0001-01-02 が", reason)
         self.assert_not_asked(self.stop(self.parent_tree))
-        # 合流の記録が揃うと次の一手は ELI5。
+        # 合流の記録が揃うと次の一手は依頼。
         git(self.parent_tree, "merge", "--quiet", "--no-edit", "i0001-01-01")
         record_merge(self.parent_tree, "i0001-01-01")
         reason = self.asked(self.stop(self.parent_tree))
-        self.assertIn("wip/eli5/phase-1.html", reason)
+        self.assertIn(f"`{review_sh} review-request --phase 1 --body-file <依頼文>`", reason)
         self.assertNotIn(f"`{git_sh} merge", reason)
         self.assert_not_asked(self.stop(self.parent_tree))
-        # ELI5 を置くと、次の一手は依頼。
-        write(os.path.join(self.parent_tree, "wip", "eli5", "phase-1.html"), "<p>x</p>\n")
-        git(self.parent_tree, "add", "-A")
-        git(self.parent_tree, "commit", "--quiet", "-m", "eli5")
-        reason = self.asked(self.stop(self.parent_tree))
-        self.assertIn(
-            f"`{review_sh} review-request --phase 1 --body-file <依頼文> "
-            "--eli5 wip/eli5/phase-1.html`",
-            reason,
-        )
-        self.assertNotIn("ELI5 の HTML を", reason)
-        self.assert_not_asked(self.stop(self.parent_tree))
 
-    def test_a_fix_stacked_on_the_child_after_finish_is_asked_before_eli5(self):
+    def test_a_fix_stacked_on_the_child_after_finish_is_asked_before_request(self):
         """finish の後に子のブランチへ積んだコミットは親に無い。依頼の前提と同じく、それを言う。"""
         self.family(plan=["work-mr"])
         self.close_children()
         git(self.parent_tree, "merge", "--quiet", "--no-edit", "i0001-01-01")
         record_merge(self.parent_tree, "i0001-01-01")
-        self.assertIn("wip/eli5/phase-1.html", self.asked(self.stop(self.parent_tree)))
+        self.assertIn("review-request --phase 1", self.asked(self.stop(self.parent_tree)))
         # レビュー待ちの子のワークツリーで、合流の後に修正を積む。
         self.commit_work(self.child_tree(), rel="src/a/late.py")
         reason = self.asked(self.stop(self.parent_tree))
         self.assertIn("子 i0001-01-01 の手元のブランチに、合流されていない修正があります", reason)
         self.assertIn("同じフェーズに子を足して", reason)
-        self.assertNotIn("ELI5 の HTML を", reason)
 
     def test_the_request_step_reminds_to_commit_and_push_first(self):
-        """ELI5 が在っても未コミットかもしれない。`request` は HEAD の普通のファイルが前提。"""
+        """未コミットの変更があるかもしれない。`request` は HEAD の普通のファイルが前提。"""
         self.family(plan=["work-mr"])
         self.close_children(work=False)
-        write(os.path.join(self.parent_tree, "wip", "eli5", "phase-1.html"), "<p>x</p>\n")
+        write(os.path.join(self.parent_tree, "src", "wip.py"), "x = 1\n")
         reason = self.asked(self.stop(self.parent_tree))
         self.assertIn("review-request --phase 1", reason)
         self.assertIn("未コミットの変更があれば先にコミットして push", reason)
@@ -520,8 +507,6 @@ class PlannedRequestNudgeTest(PhaseHarness):
     def test_a_real_change_request_keeps_the_requested_mark_and_is_not_asked(self):
         """依頼したあと、レビュアーが変更要求を付けた。`confirm` は通らず、`requested` が残る。"""
         self.close_first_child(["design", "implement"], ["wip/design/*"], "wip/design/p.md")
-        write(os.path.join(self.parent_tree, "wip", "eli5", "phase-1.html"), "<p>x</p>\n")
-        self.commit_parent("eli5")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
         mark = os.path.join(self.approved, "phases", "i0001", "1.requested")

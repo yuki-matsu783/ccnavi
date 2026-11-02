@@ -76,7 +76,7 @@ CODE_TICKET_PROJECT = "DENY_TICKET_PROJECT_MISMATCH"
 # どこにも書けない。
 CODE_TICKET_BLOCKED = "DENY_TICKET_BLOCKED"
 
-# 親のワークツリーに、置き場（下書き・提案・ELI5・承認済み）以外を書こうとした。親の範囲の
+# 親のワークツリーに、置き場（下書き・提案・承認済み）以外を書こうとした。親の範囲の
 # 外に書いたのではなく、親は作業の場ではないことが根拠なので、CODE_TICKET_SCOPE とは分ける。
 # 次の一手も違う。範囲を広げても通らず、子のチケットを起こしてそのワークツリーで作業する。
 CODE_TICKET_PARENT = "DENY_TICKET_PARENT"

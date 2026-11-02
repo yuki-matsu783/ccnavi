@@ -536,7 +536,6 @@ class SubagentParentTreeTest(unittest.TestCase):
             f"cd {parent} && grep -rn a src >/dev/null",
             f"echo note > {parent}/wip/handoff/n.md",
             f"cp /tmp/f.yml {parent}/wip/proposals/flows/x.yml",
-            f"echo x > {parent}/wip/eli5/n.md",
             f"python3 -c \"print(open('{x}').read())\"",
             "python3 -c \"open('out.txt','w').write('x')\"",
             f"diff {x} src/x.py > /tmp/d.txt",
