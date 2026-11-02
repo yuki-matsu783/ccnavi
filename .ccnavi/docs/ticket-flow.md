@@ -102,7 +102,7 @@ sequenceDiagram
 | 7 | | 成果物 | `wip/eli5/phase-N.html` が親のブランチに載る。依頼の前に、HEAD にコミット済みで、ワークツリーと中身が同じかを検査される |
 | 8 | エージェント（親） | 手順 | すべての子が合流済みと確かめ、レビューを依頼する。MR が open の状態で既にあること（`review-request` は MR を作らない） |
 | 8 | | コマンド | `ccnavi-review.sh review-request --phase N --body-file <依頼文> --eli5 <html>`（投稿せずに確かめるだけなら `--check`） |
-| 8 | | 依頼文の後始末 | 依頼文は `review-request` の入力で、依頼したあとは要らない。レビュー待ちの間は `ccnavi-*.sh` を単独で打つ以外のシェルが止まり `rm` を打てないので、`--body-file` がワークスペースルート直下の `scratchpad/` の中のファイルなら、`review-request` が成功したあとに `review-request` 自身が消す（出力に `案内: 依頼文 … を消した`）。ワークスペースの外や `scratchpad/` 以外のファイルは消さない。消せなければ標準エラーに警告だけ出し、終了コードは変えない |
+| 8 | | 依頼文の後始末 | 依頼文は `review-request` の入力で、依頼したあとは要らない。レビュー待ちの間は `ccnavi-*.sh`（前の `cd`、後ろの `| head`・`| tail` は付けてよい）を打つ以外のシェルが止まり `rm` を打てないので、`--body-file` がワークスペースルート直下の `scratchpad/` の中のファイルなら、`review-request` が成功したあとに `review-request` 自身が消す（出力に `案内: 依頼文 … を消した`）。ワークスペースの外や `scratchpad/` 以外のファイルは消さない。消せなければ標準エラーに警告だけ出し、終了コードは変えない |
 | 8 | | 成果物 | MR に依頼のコメントが 1 件投稿される（MR の説明欄は変えない。同じ目印のコメントがあれば投稿し直さない）。`.ccnavi/approved/phases/<親>/<N>.requested`（`head`・`mr`・`url`・`host`・`since`・`poster`・`at`）が置かれ、コミット・push される。ここからがユーザのレビュー待ち。止まる条件: ELI5 が未コミット・空・`wip/eli5/` の外、子が `merged_sha` を持たないか親の先頭の祖先でない、子のブランチに未合流の修正がある、親に未コミットの tracked 変更がある、親のブランチが未 push、既に依頼済み、open の MR が無い |
 | 9 | ユーザ | 手順 | ELI5 と MR の差分を見て、指摘を付ける |
 | 9 | | コマンド | `crit review <パス>`、`crit push <MR 番号>` |
@@ -141,6 +141,7 @@ sequenceDiagram
 - 3 の `start` が通らないときは、実装に進まず、直接実装にも切り替えず、出力をユーザに報告して止まる
 - 非対話セッションで子が詰まったり、ユーザの確認が要ったりしたときは、止まる前に、メインが子を `cancel` するか、`finish` して続きの子を `approval-request` で送るかを決めてリモートへ反映する（手順は [ticket-work.md](ticket-work.md)）
 - ターンの終わりの促し（子の `finish`・合流・ELI5・`review-request` の抜けと、サブエージェントが範囲外の変更を残したまま、または範囲を確かめられないまま終わったこと、手で動かして共有した子の `confirm` を止める。全体計画のレビューが済んでフィードバック計画が決まらないときも、改版を書いて `approval-request` で送るよう促す）は、親が着手済み（`started_at` あり）でないと効かない。未着手の親で作業すると、`finish` も `review-request` も打たないままターンを終えられる。同じ HEAD では 1 回だけ止め、サブエージェントが実行中の間は止めない
+- MR / PR のマージと承認は、エージェントが打たない。`glab mr merge`・`gh pr merge` などはルール `no-direct-merge` が止めるが、python や curl 経由、`gh api …/reviews` や GraphQL の直接呼び出しは止まらない。確実に防ぐには、エージェント用トークンの権限をホスト側で Developer 止まりにし、統合先を保護ブランチにする
 - 承認済みかどうかや置き場は、ファイルを読んで推測せず `ccnavi-ticket.sh status` で確かめる
 - 子の `finish` から `review-request` までは、決まった手順の続きなので、ユーザの許可を待たずに進める。本当にユーザの判断が要る問いだけを、最後に書いて終える
 - `review-request` を打つまでは、レビューを依頼したと報告しない。ユーザのレビュー待ちになるのは、`requested` のマーカーが置かれてから

@@ -118,6 +118,30 @@ deny:
     subject: "cat <<'EOF' > notes.md"
     why: ヒアドキュメントは検査を通らない経路になる
   - tool: Bash
+    subject: "glab mr merge 10 --yes"
+    why: トークンで未レビューの MR を直接マージする形（no-direct-merge）
+  - tool: Bash
+    subject: "cd /repo && gh pr merge 3 --squash"
+    why: 連結の後ろでも、コマンドの位置にあれば止める（no-direct-merge）
+  - tool: Bash
+    subject: "glab -R group/proj mr approve 10"
+    why: サブコマンドの前にオプションが付いても止める（no-direct-merge）
+  - tool: Bash
+    subject: "glab api -X POST projects/1/merge_requests/10/approve"
+    why: API を直に叩く承認（no-direct-merge）
+  - tool: Bash
+    subject: "gh api -X PUT repos/o/r/pulls/3/merge"
+    why: API を直に叩くマージ（no-direct-merge）
+  - tool: Bash
+    subject: "glab mr -R g/p merge 1"
+    why: mr と merge の間に -R が入っても止める（no-direct-merge）
+  - tool: Bash
+    subject: "gh pr review 3 -a"
+    why: --approve の短い形も止める（no-direct-merge）
+  - tool: Bash
+    subject: "gh pr review 3 --approve"
+    why: gh の承認（no-direct-merge）
+  - tool: Bash
     subject: "cat /repo/.env"
     why: 認証情報。settings.json はシェル経由を止められない
   - tool: Bash
@@ -255,6 +279,12 @@ deny:
     why: 同上。コマンド列の途中でも止まる
 
 ask:
+  - tool: Bash
+    subject: "glab mr create --title x"
+    why: MR を作る操作は止めない（no-direct-merge は merge と approve だけ）。どのルールも言及せず権限モードへ渡る
+  - tool: Bash
+    subject: "glab api projects/1/merge_requests/10"
+    why: MR の読み取りの API は止めない。末尾が merge / approve のパスだけが対象で、どのルールも言及せず権限モードへ渡る
   - tool: Skill
     subject: "data-process-wipe"
     why: 名前の途中の process- には process-skill-call が当たらない（名前が process- で始まるものだけ）
@@ -523,6 +553,9 @@ allow:
     why: >-
       探すだけの find。prefer-glob が適用して通し、Glob ツールのほうを一度だけ勧める。
       -exec が付いた形は shellread が読み切れないと言うので、ここには来ない
+  - tool: Bash
+    subject: "grep -rn glab mr merge /repo/docs"
+    why: 検索の引数に出ただけの文字列はコマンドの位置でないので、no-direct-merge にヒットせず、prefer-read-grep が通す
   - tool: Bash
     subject: "grep -rn TODO /repo/ccnavi"
     why: >-

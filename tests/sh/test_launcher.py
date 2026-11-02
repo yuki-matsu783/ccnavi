@@ -290,6 +290,34 @@ class LauncherTest(unittest.TestCase):
                     result.stdout.startswith("bin/linux-x86_64/ccnavi|x|"), result.stdout
                 )
 
+    def test_worktree_without_bin_starts_the_build_in_the_main_root(self):
+        """ワークツリーの中の launcher には bin/ が無い。git の共通ディレクトリから本体のルートの bin/ を使う。"""
+        git = shutil.which("git")
+        if not git:
+            self.skipTest("git が無い")
+        self.pretend("Linux x86_64")
+        self.build("linux-x86_64")
+        env = {**os.environ, "GIT_AUTHOR_NAME": "a", "GIT_AUTHOR_EMAIL": "a@b"}
+        env.update(GIT_COMMITTER_NAME="a", GIT_COMMITTER_EMAIL="a@b")
+        for args in (
+            ["init", "-q"],
+            ["add", ".ccnavi/scripts"],
+            ["commit", "-q", "-m", "i"],
+            ["worktree", "add", "-q", os.path.join(self.dir, "wt")],
+        ):
+            subprocess.run([git, "-C", self.dir, *args], check=True, env=env, capture_output=True)
+        wt_launcher = os.path.join(self.dir, "wt", ".ccnavi", "scripts", "ccnavi-launcher.sh")
+        self.assertFalse(os.path.isdir(os.path.join(self.dir, "wt", ".ccnavi", "bin")))
+        result = self.run_launcher("x", argv=[SHELL, wt_launcher])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(result.stdout.startswith("bin/linux-x86_64/ccnavi|x|"), result.stdout)
+
+    def test_no_build_anywhere_still_ends_with_127(self):
+        """本体のルートにも実体が無いときは、本体の launcher に渡し直しても戻らず 127 で終わる。"""
+        self.pretend("Linux x86_64")
+        result = self.run_launcher(argv=[SHELL, self.launcher], path_dirs=())
+        self.assertEqual(result.returncode, 127, result.stderr)
+
     def test_git_bash_on_windows_starts_the_exe(self):
         self.pretend("MINGW64_NT-10.0-26100 x86_64")
         self.build("windows-x86_64", "ccnavi.exe")
