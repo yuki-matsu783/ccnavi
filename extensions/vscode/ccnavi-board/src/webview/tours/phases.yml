@@ -477,7 +477,7 @@ courses:
           more: acceptance
       - target: find
         title: 使う場面で探す
-        body: 絞り込みの欄は、id・タイトル・範囲・成果物に加えて、使う場面の文字にもヒットします。見本では「実装より先」で、受入テスト作成だけが残ります。
+        body: 絞り込み欄は、id・タイトル・範囲・成果物に加えて、使う場面の文字にもヒットします。見本では「実装より先」で、受入テスト作成だけが残ります。
         scene:
           find: 実装より先
       - target: help-panel
@@ -512,7 +512,7 @@ courses:
           open: implement-feedback
       - target: phase-scope
         title: 指摘の種類で範囲を絞る
-        body: 設計への指摘だけを直す定義は、範囲をwip/designとdocsに絞ります。実装への指摘は、範囲をinheritにして親チケットの範囲そのままにすると、指摘が多岐にわたっても収まります。
+        body: 設計への指摘だけを直す定義は、範囲をwip/designとdocsに絞ります。実装への指摘は、範囲をinheritにすると親チケットの範囲をそのまま使うので、指摘が多岐にわたっても収まります。
         scene:
           open: design-feedback
       - target: phase-when
@@ -523,7 +523,7 @@ courses:
           more: implement-feedback
       - target: find
         title: feedbackだけを見る
-        body: 絞り込みの欄にfeedbackと入れると、idにfeedbackを含む定義だけが残ります。定義が増えたときに、workとfeedbackの取り違えを防げます。
+        body: 絞り込み欄にfeedbackと入れると、idにfeedbackを含む定義だけが残ります。定義が増えたときに、workとfeedbackの取り違えを防げます。
         scene:
           find: feedback
       - target: help-panel

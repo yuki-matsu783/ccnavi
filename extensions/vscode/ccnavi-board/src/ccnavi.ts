@@ -285,7 +285,7 @@ export async function runApprovePreview(
   if (ran.code !== 0) {
     // 標準エラーは全部見せる。絞りが通らなかった理由（「親の改版が承認待ちなのに承認の対象に無い」など）は
     // 読めない提案の行より後ろに出るので、1行目だけでは伝わらない。
-    return { ok: false, error: `ccnavi --agree --preview --jsonが失敗しました:\n${ran.stderr.trim()}` };
+    return { ok: false, error: `ccnavi --agree --preview --jsonが失敗しました。\n${ran.stderr.trim()}` };
   }
   const parsed = parseApprovePreview(ran.stdout);
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };

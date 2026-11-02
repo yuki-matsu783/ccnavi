@@ -159,7 +159,7 @@ courses:
         diagram: risk-level
       - target: level-high
         title: 小さな変更はLOW
-        body: login.pyだけを12行変えた子は、どの項目にもヒットせず0点でLOWです。判定の項目があるので、小さな変更でもnoの答えを記録してから閉じます。
+        body: login.pyだけを12行変えた子は、どの項目にもヒットせず0点でLOWです。判定の項目があるので、小さな変更でもnoの答えを記録してからクローズします。
         diagram: risk-score-low
         focus: diff, c-all, sum
       - target: save
@@ -321,7 +321,7 @@ courses:
           find: github
       - target: factor-row
         title: 要約の行と開閉
-        body: 畳んだ行は、id・点・加点条件を読める文にした1行です。行を押すと欄が開き、もう一度押すと畳みます。開いている行は、画面を作り直したあとも覚えています。
+        body: 畳んだ行は、id・点・加点条件を読める文にした1行です。行を押すと欄が開き、もう一度押すと畳みます。画面を描き直しても、開いている行は開いたままです。
         scene:
           open: ci
       - target: factor-buttons
@@ -354,7 +354,7 @@ courses:
           sum: lib
       - target: sum-table
         title: 項目の連結と由来
-        body: 項目は両方を連結して並べ、由来の列に、共通の設定か追加した設定かを出します。同じidで中身が違うときは両方を数え、後ろの設定の側はlib:big-diffのように設定名を前に付けた名前になります。
+        body: 項目は両方を連結して並べ、由来の列に、共通の設定か追加した設定かを出します。同じidで中身が違うときは両方を数え、後から重ねた設定の項目は、lib:big-diffのように設定名を前に付けた名前になります。
         scene:
           sum: lib
       - target: factors

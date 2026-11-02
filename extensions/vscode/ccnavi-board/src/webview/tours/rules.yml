@@ -761,7 +761,7 @@ courses:
         scene: { tab: rules, open: no-rm-rf }
       - target: rule-no-rm-rf-type
         title: タイプを移す
-        body: 「タイプ」の欄でdeny / ask / allowを替えると、行は移した先の末尾に移ります。絞り込み中は動かせないため、先に検索欄を空にします。止めすぎだと分かったdenyをaskに下げる、のように使います。askとallowにmessageが残るとlintがerrorにするので、移したらmessageをadditionalContextへ移します。
+        body: 「タイプ」の欄でdeny / ask / allowを替えると、行は移した先の末尾に移ります。絞り込み中は動かせないため、先に絞り込み欄を空にします。止めすぎだと分かったdenyをaskに下げる、のように使います。askとallowにmessageが残るとlintがerrorにするので、移したらmessageをadditionalContextへ移します。
         scene: { tab: rules, open: no-rm-rf }
       - target: save
         title: 保存
@@ -782,7 +782,7 @@ courses:
         scene: { tab: rules, error: true }
       - target: rule-db-migrate
         title: idで直す行を探す
-        body: 報告のid（db-migrate）で、直す行を探します。多いときは絞り込みの欄にidを入れます。idが空のルールは、行の見出しに「（id未設定）」と出ます。
+        body: 報告のid（db-migrate）で、直す行を探します。多いときは絞り込み欄にidを入れます。idが空のルールは、行の見出しに「（id未設定）」と出ます。
         scene: { tab: rules, open: db-migrate, error: true }
       - target: rule-db-migrate-context
         title: 内容を直す

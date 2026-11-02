@@ -335,7 +335,7 @@ courses:
     steps:
       - target: list
         title: 利用できるテンプレートを探す
-        body: エージェントはccnavi --templatesで、共通の設定に自分のレイヤーを重ねたものを引きます。この画面の一覧と統合結果と同じ答えです。名前・説明・使う場面で絞れます。
+        body: エージェントはccnavi --templatesで、共通の設定に自分のレイヤーを重ねたものを引きます。この画面の一覧と統合結果と同じ内容です。名前・説明・使う場面で絞れます。
         scene: {}
         diagram: template-propose
         focus: list,found
@@ -359,7 +359,7 @@ courses:
         focus: write
       - target: template
         title: フィードバック計画は書かれない
-        body: フィードバック計画は、全体計画の最後のレビューを見てから、改版で1回だけ足す決まりです。--with-feedbackを付けなければ書かず、あることだけを知らせます。提案は通常の承認を通ります。
+        body: フィードバック計画は、全体計画の最後のレビューのあとに、改版で1回だけ足す決まりです。--with-feedbackを付けなければ書かず、あることだけを知らせます。提案は通常の承認を通ります。
         scene: { open: feature }
         diagram: template-propose
         focus: skip,approve
