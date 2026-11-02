@@ -3,7 +3,7 @@ type: guide
 title: リスクの配点が育つ流れ
 description: risks.yml の配点が、実績の点を見たユーザの違和感から下書き・検証・配置・効き始め・配布までどう育つかの全体像
 tags: [risk, config]
-keywords: [リスク, risks.yml, 配点, 育つ, 全体像, risk.json, 実績, lint, 境目, HIGH, 定性, script, judge, ミラー]
+keywords: [リスク, risks.yml, 配点, 育つ, 全体像, risk.json, 実績, lint, 閾値, HIGH, 定性, script, judge, ミラー]
 ---
 
 # リスクの配点が育つ流れ
@@ -16,8 +16,8 @@ keywords: [リスク, risks.yml, 配点, 育つ, 全体像, risk.json, 実績, l
 | 段階 | 配点での中身 | 使うもの |
 |---|---|---|
 | きっかけ | 軽いと思った変更が HIGH になった、重い変更が LOW で通った。点と加点の理由は、閉じたときの出力・`--explain`・レビュー依頼の先頭に出る | `risk.json`、`ccnavi --explain` |
-| 下書き | 項目を足す・点を変える・境目（既定 20 / 40 / 70）を動かす | `/ccnavi-config` |
-| 検証 | 読めるか、境目の順、`id` の重複、`script:` の置き場。`--risk` で下書きを差し替えて本物の残り 2 本と組み合わせて見る | `ccnavi --lint --risk <下書き>` |
+| 下書き | 項目を足す・点を変える・閾値（既定 20 / 40 / 70）を動かす | `/ccnavi-config` |
+| 検証 | 読めるか、閾値の順、`id` の重複、`script:` の置き場。`--risk` で下書きを差し替えて本物の残り 2 本と組み合わせて見る | `ccnavi --lint --risk <下書き>` |
 | 効く | 次に子を閉じるときから。進行中の子の記録は変わらない | `ticket finish` |
 
 ## 項目の 3 系統
