@@ -2,7 +2,7 @@
 
 VS Code 拡張のリスク管理画面が、編集中のレイヤー（自身かプロジェクト）の配点を保存せずに、
 共通レイヤーと合わせて検証するための差し替え。config 単体の形式だけでなく、合成したあとの
-境目の逆転・同 id の衝突・`script:` の存在確認
+閾値の逆転・同 id の衝突・`script:` の存在確認
 （解決先はそのレイヤーの git プロジェクトルート）を見る。
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ（共通レイヤーに
 `big-diff` と `levels: {medium: 20, high: 40, critical: 70}`、lib のレイヤーに `schema` と

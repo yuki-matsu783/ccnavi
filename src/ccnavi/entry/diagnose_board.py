@@ -261,7 +261,7 @@ def _sums(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> l
         name     "self" か プロジェクトの名前
         layers   ["common", <name>]
         rules    path・unreadable・missing と、deny / ask / allow（共通レイヤーに足した和）
-        risk     共通 + そのレイヤーの配点。levels（実際に使う境目の点）・factors・
+        risk     共通 + そのレイヤーの配点。levels（実際に使う閾値）・factors・
                  problems・fallback
         phases   共通 + そのレイヤーの定義。path・unreadable（そのレイヤーのファイル）・types
                  （各定義の source が出どころのレイヤー。定義は順序を持たないので、先行関係の欄は

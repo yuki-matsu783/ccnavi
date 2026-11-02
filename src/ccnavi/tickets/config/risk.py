@@ -11,7 +11,7 @@
 
 ## 点が何をするか
 
-リスクレベルの名前は 4 つで固定（LOW / MEDIUM / HIGH / CRITICAL）。境目の点は `levels` で動かす。
+リスクレベルの名前は 4 つで固定（LOW / MEDIUM / HIGH / CRITICAL）。閾値は `levels` で動かす。
 `HIGH` 以上なら、定義が `review: false` でも子が `required: false` でも、そのフェーズは
 人間レビューが要る扱いになり、レビューが済むまで止まる。実績で宣言を厳しい側にだけ上書きする。
 
@@ -169,7 +169,7 @@ class Factor:
 class Definition:
     # levels は書かれたキーだけ。書かれていないキーは DEFAULT_LEVELS で読む
     # （`level_of`）。既定で埋めて持つと、合成のときに「書いていないレイヤー」が
-    # 共通レイヤーの緩めた境目の点を気づかないうちに戻すことになる。
+    # 共通レイヤーの緩めた閾値を気づかないうちに戻すことになる。
     levels: dict[str, int] = field(default_factory=dict)
     factors: list[Factor] = field(default_factory=list)
     # どこから読んだか。組み込みなら BUILTIN。
@@ -306,10 +306,10 @@ def parse(
             )
         ]
     # 書かれたキーだけを持つ。既定で埋めると、合成のときに「書いていないレイヤー」が
-    # 共通レイヤーの緩めた境目の点を気づかないうちに戻す。
+    # 共通レイヤーの緩めた閾値を気づかないうちに戻す。
     # 順を見るときだけ既定で補う。
     levels: dict[str, int] = {}
-    # 境目の点。書かれたキーだけを読む。
+    # 閾値。書かれたキーだけを読む。
     raw_levels = data.get("levels")
     if raw_levels is not None:
         if not isinstance(raw_levels, dict):
@@ -346,7 +346,7 @@ def parse(
 
 
 def effective_levels(levels: dict[str, int]) -> dict[str, int]:
-    """書かれたキーに既定を足した、実際に使われる境目の点。"""
+    """書かれたキーに既定を足した、実際に使われる閾値。"""
     return {**DEFAULT_LEVELS, **levels}
 
 
@@ -704,7 +704,7 @@ def layer_definition(
     if merged.dropped:
         dropped = ", ".join(merged.dropped)
         merged.fallback = (
-            f"{dropped} の配点の境目の点が合成で逆転している。このレイヤーは空として数える"
+            f"{dropped} の配点の閾値が合成で逆転している。このレイヤーは空として数える"
         )
     return merged, list(notes) + problems
 
