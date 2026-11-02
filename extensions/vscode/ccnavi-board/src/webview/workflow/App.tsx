@@ -376,7 +376,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
                 }
               }}
             >
-              編集を続ける（保存はできない）
+              編集を続ける（保存はできません）
             </button>
           )}
         </div>
@@ -384,7 +384,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
       {shownChanged !== undefined && shownDiff && shownGone === undefined && (
         <section id="changed-diff" data-tour="changed-diff">
           {rows.length === 0 ? (
-            <p className="dim small">計画の順序は同じです。子の提案か、親の提案のほかの欄が変わりました。</p>
+            <p className="dim small">計画の順序は同じです。子の提案か、親の提案の別の欄が変わりました。</p>
           ) : (
             <table className="workflow-diff">
               <thead>
@@ -419,7 +419,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
           </span>
         </div>
         <div className="controls" data-tour="controls">
-          <button type="button" className="action" data-action="relayout" data-tour="relayout" title="今の線で点の置き場所を並べ直します（番号は変わりません）" onClick={relayout}>
+          <button type="button" className="action" data-action="relayout" data-tour="relayout" title="いまの線で点の置き場所を並べ直します（番号は変わりません）" onClick={relayout}>
             並べ直す
           </button>
           <button
@@ -456,7 +456,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
       </ScreenHeader>
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <p className="dim small">
-        ステップの右の点から別のステップの左の点へドラッグすると、線の先のステップの先行に、元のステップが加わります（逆向きでも引けます）。線の真ん中の × で先行を外せます。線を変えるたびにccnaviが番号を振り直します。循環になる線と、子が承認された番号へ入る線は引けません。
+        ステップの右の点から別のステップの左の点へドラッグすると、線の先のステップに、元のステップが先行として加わります（逆向きでも引けます）。線の真ん中の × で先行を外せます。線を変えるたびにccnaviが番号を振り直します。循環になる線と、子が承認された番号へ入る線は引けません。
       </p>
       {moved.length > 0 && (
         <p id="workflow-renumbered" className="small" data-tour="renumbered">

@@ -17,7 +17,7 @@ test("CB-D1236 絞り込みが3タイプとも0件のときだけ案内を出す
     assert.equal(dom.all("#tab-rules > p.empty").length, 0);
     dom.type(dom.one("#find"), "存在しない文字列-zzz");
     await dom.settle();
-    assert.match(dom.one("#tab-rules > p.empty").textContent ?? "", /絞り込みに一致するルールがありません/);
+    assert.match(dom.one("#tab-rules > p.empty").textContent ?? "", /絞り込みにヒットするルールがありません/);
     // 1件でも一致すれば出ない（全角の「ＧＩＴ」はgit-pushに一致する）
     dom.type(dom.one("#find"), "ＧＩＴ ＰＵＳＨ");
     await dom.settle();

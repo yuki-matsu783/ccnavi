@@ -168,7 +168,7 @@ async function startRecording(current: Session): Promise<void> {
   if (recording.exit !== undefined) {
     current.noRecording = "録画を始められなかった";
     current.errors.push(`ffmpeg（録画）: ${recording.stderr.trim()}`);
-    const hint = current.capture === "mac" ? "macOSの「システム設定」→「プライバシーとセキュリティ」→「画面収録」でVS Codeを許可してから、もう一度始めます。" : "";
+    const hint = current.capture === "mac" ? "macOSの「システム設定」→「プライバシーとセキュリティ」→「画面収録」でVS Codeを許可してから、もう一度バグ報告を始めてください。" : "";
     void vscode.window.showWarningMessage(`録画を始められなかったので、録画はしません。スクリーンショットとログは保存します。${hint}`);
     return;
   }
@@ -403,7 +403,7 @@ export async function finishReport(): Promise<void> {
 
   const reveal = "フォルダで表示";
   const picked = await vscode.window.showInformationMessage(
-    `バグ報告を${zipFile}に保存しました。録画とスクリーンショットには、画面に映っていた内容（秘密の値を含む）が入ります。ログには、その間の操作の記録が入ります。渡す前に中身を確かめてください。`,
+    `バグ報告を${zipFile}に保存しました。録画とスクリーンショットには、画面に映っていた内容が入ります。その中には秘密の値が含まれることがあります。ログには、その間の操作の記録が入ります。渡す前に中身を確かめてください。`,
     reveal,
   );
   if (picked === reveal) {

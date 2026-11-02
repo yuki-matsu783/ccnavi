@@ -33,7 +33,7 @@ export interface RiskSum {
   readonly name: string;
   readonly label: string;
   readonly layers: readonly string[];
-  /** リスクレベルの境目の点（実際に使う値） */
+  /** リスクレベルの閾値（実際に使う値） */
   readonly levels: SumJson["risk"]["levels"];
   readonly factors: readonly SumFactorJson[];
   /** 内容が不正で空に戻したときの理由。空なら無い */

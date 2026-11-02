@@ -109,7 +109,7 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
   const rawReview = map.get("review");
   const review = typeof rawReview === "boolean" ? rawReview : true;
   if (rawReview !== undefined && rawReview !== null && typeof rawReview !== "boolean") {
-    problems.push(`定義${id}のreview \`${String(rawReview)}\`はtrueかfalseではありません。画面はtrueとして出し、保存するとtrueになります（\`none\`や \`mr\`などの文字列もtrueで書きます。falseにしたいときは書き直してください）`);
+    problems.push(`定義${id}のreview \`${String(rawReview)}\`はtrueかfalseではありません。画面はtrueとして出し、保存するとtrueになります（\`none\`や\`mr\`などの文字列は、trueとして扱われます。falseにしたいときは書き直してください）`);
   }
 
   const rawScope = map.get("scope", true);

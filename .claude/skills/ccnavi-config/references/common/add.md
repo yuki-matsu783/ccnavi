@@ -223,7 +223,7 @@ phases:
 
 ```yaml
 version: 1
-levels: {medium: 20, high: 40, critical: 70}   # リスクレベルの名前は 4 つで固定。境目の点だけ動かす
+levels: {medium: 20, high: 40, critical: 70}   # リスクレベルの名前は 4 つで固定。閾値だけ動かす
 factors:
   - {id: big-diff,   points: 25, lines_over: 300,   message: 行数が多い}
   - {id: many-files, points: 15, files_over: 10,    message: ファイルが多い}

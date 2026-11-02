@@ -1,7 +1,7 @@
 {
   "name": "ccnavi-board",
   "displayName": "ccnaviボード",
-  "description": "ccnaviのチケットと、それに付随する提案・承認済みチケット・マーカー・ワークツリーをカンバンで表示します。承認する内容をオーバーレイで確認して承認できます。ルールとhookを画面で確認し、ルールを直して判定を試せます。実際の変更内容に基づくリスク評価の配点や、フェーズ定義も画面で編集できます。projects/のプロジェクトを一覧し、git cloneをターミナルに送れます。ルール管理とリスク管理では共通・ワークスペース・プロジェクトの設定を、フェーズ管理ではワークスペース・プロジェクトの設定を切り替えて直せます。テンプレート管理では、作業・レビュー計画のテンプレートと下書きを表示します（読むだけ）。取り込み待ちでは、wip/handoff/に置いた下書き（テンプレート・設定・docs）の差分を読んで、選んだ対象を取り込めます。ルールとリスクでは、共通の設定との統合結果も読み取り専用で確認できます。",
+  "description": "ccnaviのチケットと、それに付随する提案・承認済みチケット・マーカー・ワークツリーをカンバンで表示します。承認する内容をオーバーレイで確認し、そのまま承認できます。ルールとhookを画面で確認し、ルールを直して判定を試せます。実際の変更内容に基づくリスク評価の配点や、フェーズ定義も画面で編集できます。projects/のプロジェクトを一覧し、git cloneをターミナルに送れます。ルール管理とリスク管理では共通・ワークスペース・プロジェクトの設定を、フェーズ管理ではワークスペース・プロジェクトの設定を切り替えて直せます。テンプレート管理では、作業・レビュー計画のテンプレートと下書きを表示し、テンプレートを編集して保存できます。取り込み待ちでは、wip/handoff/に置いた下書き（テンプレート・設定・docs）の差分を読んで、選んだ対象を取り込めます。ルールとリスクでは、共通の設定との統合結果も読み取り専用で確認できます。",
   "version": "0.12.0",
   "publisher": "local",
   "private": true,
@@ -176,7 +176,7 @@
         "ccnaviBoard.binPath": {
           "type": "string",
           "default": "",
-          "description": "ccnaviの実行ファイルのパスです。空のときは .claude/settings.jsonのCCNAVI_ENTRY_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.shの順に探し、どれも無く、src/ccnavi/__main__.pyがあればuv run python -m ccnaviを使います。起動スクリプト（ccnavi-launcher.sh）を指定した場合は、スクリプトを実行せず、shのあるフォルダの親のbin/<os>-<arch>/にある、このOSとCPU向けの実行ファイルを使います。それが無ければ次の候補へ進みます。ほかのパスは、そのまま実行ファイルとして使います。ワークスペースルートからの相対パスでも絶対パスでも指定できます。"
+          "description": "ccnaviの実行ファイルのパスです。空のときは.claude/settings.jsonのCCNAVI_ENTRY_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.shの順に探し、どれも無く、src/ccnavi/__main__.pyがあればuv run python -m ccnaviを使います。起動スクリプト（ccnavi-launcher.sh）を指定した場合は、スクリプトを実行せず、shのあるフォルダの親のbin/<os>-<arch>/にある、このOSとCPU向けの実行ファイルを使います。それが無ければ次の候補へ進みます。ほかのパスは、そのまま実行ファイルとして使います。ワークスペースルートからの相対パスでも絶対パスでも指定できます。"
         },
         "ccnaviBoard.bashPath": {
           "type": "string",
@@ -186,7 +186,7 @@
         "ccnaviBoard.expectationsPath": {
           "type": "string",
           "default": ".ccnavi/config/common/rule-expectations.yml",
-          "description": "ルール管理画面の「期待する判定を一括で確認する」で使用するテストケースのYAMLファイルです（deny / ask / allowのタイプにtoolとsubjectを並べたYAML）。ワークスペースルートからの相対パスでも絶対パスでも指定できます。"
+          "description": "ルール管理画面の「期待する判定を一括で確認する」で使うテストケースのYAMLファイルです（deny / ask / allowのタイプにtoolとsubjectを並べたYAML）。ワークスペースルートからの相対パスでも絶対パスでも指定できます。"
         },
         "ccnaviBoard.flowSaveReview": {
           "type": "boolean",
@@ -211,7 +211,7 @@
             "Claudeの配色（ダーク）"
           ],
           "default": "vscode",
-          "description": "ccnaviの7つの画面の配色です。vscodeならVS Codeのテーマ変数に従います。claude-light / claude-darkは、背景・枠・文字の色と、意味を表す色をClaudeの配色に置き換えます（ハイコントラストのテーマでは置き換えません）。サイドパネルのタイトルバーの配色のアイコンからも切り替えられます（今の値は見出しの横に出ます）。切り替えると、開いている画面にもその場で反映されます。"
+          "description": "ccnaviの画面の配色です。vscodeならVS Codeのテーマ変数に従います。claude-light / claude-darkは、背景・枠・文字の色と、意味を表す色をClaudeの配色に置き換えます（ハイコントラストのテーマでは置き換えません）。サイドパネルのタイトルバーにある配色アイコンからも切り替えられます（今の値は見出しの横に出ます）。切り替えると、開いている画面にもその場で反映されます。"
         },
         "ccnaviBoard.zoom": {
           "type": "number",

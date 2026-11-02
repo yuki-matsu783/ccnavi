@@ -29,7 +29,7 @@ factors:
   #   script: .ccnavi/config/common/risk/complexity.sh
 `;
 
-test("CB-T72 境目の点と項目を読む。加点条件は1つで、値は欄の文字として持つ", () => {
+test("CB-T72 閾値と項目を読む。加点条件は1つで、値は欄の文字として持つ", () => {
   const { model } = readRisk(TEXT);
   assert.equal(model.version, 1);
   assert.deepEqual(model.problems, []);
@@ -108,7 +108,7 @@ test("CB-T76 加点条件を変えると前の加点条件の欄は消え、新�
   ]);
 });
 
-test("CB-T77 新しいglobは引用符で囲み、空の境目の点は書かない。整数でない文字はそのまま書く", () => {
+test("CB-T77 新しいglobは引用符で囲み、空の閾値は書かない。整数でない文字はそのまま書く", () => {
   const doc = readRisk("version: 1\nfactors: []\n");
   const out = doc.apply({
     levels: { medium: "", high: "50", critical: "" },

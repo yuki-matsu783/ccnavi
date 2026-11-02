@@ -174,7 +174,7 @@ test("CB-T126 項目の欄名は日本語で、値の欄は加点条件で名前
       caps.map((cap) => cap.getAttribute("title")),
       ["YAMLのキー: id", "YAMLのキー: points", "YAMLのキー: lines_over / files_over / deleted_over / glob / script / judge", "YAMLのキー: lines_over", "YAMLのキー: include", "YAMLのキー: exclude", "YAMLのキー: message"],
     );
-    // 境目の点はリスクレベルの名前を欄名にし、飾りのラベルは出さない
+    // 閾値はリスクレベルの名前を欄名にし、飾りのラベルは出さない
     assert.deepEqual(
       dom.all("#levels > .field > .cap").map((cap) => cap.textContent),
       ["MEDIUM", "HIGH", "CRITICAL"],
@@ -365,7 +365,7 @@ test("CB-D100 拡張ホストが頼んだらリスク管理の基本の案内（
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
-    assert.deepEqual(titles, ["リスクレベルの境目の点", "項目", "保存", "案内"]);
+    assert.deepEqual(titles, ["リスクレベルの閾値", "項目", "保存", "案内"]);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
   } finally {
     await dom.close();
@@ -375,7 +375,7 @@ test("CB-D100 拡張ホストが頼んだらリスク管理の基本の案内（
   try {
     await missing.send({ type: "tour" });
     await missing.settle();
-    assert.equal(missing.one("#tour-title").textContent, "リスクレベルの境目の点");
+    assert.equal(missing.one("#tour-title").textContent, "リスクレベルの閾値");
   } finally {
     await missing.close();
   }
@@ -454,7 +454,7 @@ test("CB-T315 配点のファイルがないのは正常。組み込みを見せ
   }
 });
 
-test("CB-T316 統合結果は読み取り専用で、境目の点・項目・由来を実行ファイルが出したまま並べる。選び直しても拡張ホストへ何も送らない", async () => {
+test("CB-T316 統合結果は読み取り専用で、閾値・項目・由来を実行ファイルが出したまま並べる。選び直しても拡張ホストへ何も送らない", async () => {
   const sums = riskSums(sumsBoard());
   const dom = await openRisk({ target: { kind: "project", name: "lib" }, sums, notices: ["読み込めない <理由>"] });
   try {

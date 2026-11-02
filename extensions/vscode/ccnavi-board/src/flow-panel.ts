@@ -291,7 +291,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
     return { target, exists: false, mtimeMs: 0, hash: "", doc, shown, offer: readOffer(root, target, doc) };
   }
   const { bytes, mtimeMs } = read;
-  const refuse = (why: string): Error => new Error(`フローのファイルを開きません（${shown}）: ${why}。エディタで直してから更新してください`);
+  const refuse = (why: string): Error => new Error(`フローのファイルを開けません（${shown}）: ${why}。エディタで直してから更新してください`);
   // 正しいかは実行ファイルに聞く（SubagentStartと同じ読み）。読んだバイトのまま渡す（UTF-8として不正かどうかも
   // 実行ファイルが言う）。読めないフローを画面で直すと、読めなかった部分を省いて書くことになる。エディタで直させる
   const verdict = await lintText(root, tmpDir, bytes, shown);
@@ -310,7 +310,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   // 値の意味が変わる（`0755` `yes` `1:30`マージキー など）。意味の答えは実行ファイルが持つ（core/flow-match.ts）
   const mismatch = flowMismatch(value.value, verdict.data);
   if (mismatch !== undefined) {
-    throw new Error(`フローのファイルを開きません（${shown}）: ${openMismatchText(mismatch)}。直したら更新してください`);
+    throw new Error(`フローのファイルを開けません（${shown}）: ${openMismatchText(mismatch)}。直したら更新してください`);
   }
   const doc = asFlowDoc(value.value);
   if (doc === undefined) {

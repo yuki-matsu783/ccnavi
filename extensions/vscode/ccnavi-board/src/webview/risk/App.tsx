@@ -1,5 +1,5 @@
 /**
- * リスク管理画面の本体。リスクレベルの境目の点と、加点する項目の一覧。
+ * リスク管理画面の本体。リスクレベルの閾値と、加点する項目の一覧。
  *
  * 見せる中身は拡張ホストが渡す（`RiskData`）。画面が持つのは、ユーザが触って決めるもの
  * （編集中の配点、開いている行、絞り込み、直前の操作の一言）だけ。点は数えず、ファイルも書かない。
@@ -367,7 +367,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       )}
       {shownPage !== undefined && shownReadOnly && (
         <div className="banner missing" data-tour="missing">
-          <span>{shownPage.riskPath}がありません。実行ファイルは組み込みの配点で数えています（画面の値はその組み込みの配点です）。配点を直すには、まずファイルを作ってください。</span>
+          <span>{shownPage.riskPath}がありません。実行ファイルは組み込みの配点で数えています（画面の値も、その配点によります）。配点を直すには、まずファイルを作ってください。</span>
           <button
             type="button"
             className="action primary"
@@ -388,12 +388,12 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         </div>
       )}
       <section className="block">
-        <h2>リスクレベルの境目の点</h2>
+        <h2>リスクレベルの閾値</h2>
         <details className="help">
           <summary>説明</summary>
           <p className="hint">
             子チケットをクローズするとき、下の「項目」でヒットした点を合計して、その変更のリスクの点を出します。
-            合計点がしきい値以上になると、リスクレベルがLOW → MEDIUM → HIGH → CRITICALの順に上がっていきます。
+            合計点が閾値以上になると、リスクレベルがLOW → MEDIUM → HIGH → CRITICALの順に上がっていきます。
             <strong>HIGH以上になったフェーズは、レビューが終わるまで先へ進めません。</strong>
             チケット作成時に「レビュー不要」と宣言していても、ユーザのレビューが必要になります。
             値はMEDIUM ≤ HIGH ≤ CRITICALとなるように入れてください。空欄にしたリスクレベルは、組み込みの値（
