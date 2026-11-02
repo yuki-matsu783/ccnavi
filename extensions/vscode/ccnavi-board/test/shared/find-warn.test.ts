@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { MAX_WARN_LINES, errorLinesOf, warnLinesOf } from "../../src/core/lintmodel.js";
+import { MAX_WARN_LINES, errorLinesOf, truncateLines, warnLinesOf } from "../../src/core/lintmodel.js";
 import { foldFind, moveTitle } from "../../src/webview/shared/find.js";
 import { findText as ruleFind } from "../../src/webview/rules/text.js";
 import { findText as phaseFind } from "../../src/webview/phases/text.js";
@@ -67,4 +67,10 @@ test("CB-T1244 保存拒否のerror行は日本語の行頭にし、今保存す
   assert.equal(lines[0], "エラー: r1: .ccnavi/rules.ymlの条件が不正");
   assert.ok(lines.slice(1, MAX_WARN_LINES).every((l) => l.startsWith("エラー: ")));
   assert.match(lines[MAX_WARN_LINES], /^ほか5件/);
+});
+
+test("CB-T1262 「ほかN件」の案内は呼ぶ側が渡す。渡さなければ「ほかN件」だけ", () => {
+  const lines = Array.from({ length: MAX_WARN_LINES + 2 }, (_, i) => `l${i}`);
+  assert.equal(truncateLines(lines, "")[MAX_WARN_LINES], "ほか2件");
+  assert.equal(truncateLines(lines, "。続きはここ")[MAX_WARN_LINES], "ほか2件。続きはここ");
 });

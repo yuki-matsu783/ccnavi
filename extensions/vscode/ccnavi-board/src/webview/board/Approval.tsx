@@ -72,7 +72,7 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
       return (
         <>
           <h2 id="approval-title">{overlay.count}件を承認しました</h2>
-          {overlay.carried === true ? <p className="approval-note">承認済みチケットをコミット・pushするコマンドをターミナルで実行しました。</p> : null}
+          {overlay.carried === true ? <p className="approval-note">承認済みチケットをコミット・pushするコマンドをターミナルに送りました。結果はターミナルで確認してください。</p> : null}
           <p className="approval-note">{HANDOVER_NOTE}</p>
           <HandOver />
           <details className="approval-more" data-tour="approval-prompt">
@@ -223,7 +223,7 @@ function Body({
         <>
           <h3>読み込めなかった提案・承認済みチケット</h3>
           <ul className="approval-problems">
-            {truncateLines(preview.problems).map((p, i) => (
+            {truncateLines(preview.problems, "").map((p, i) => (
               <li key={i}>{p}</li>
             ))}
           </ul>

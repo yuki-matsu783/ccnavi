@@ -15,3 +15,10 @@ test("CB-T1245 承認対象外の提案は、理由が全文一致するもの�
   assert.equal(groups[0].more, 47);
   assert.deepEqual(groups[0].reasons, ["長い理由"]);
 });
+
+test("CB-T1263 理由が上限を超えたら「ほかN件」だけにする（承認画面に--lintの案内は出さない）", () => {
+  const problems = Array.from({ length: 7 }, (_, i) => `error: C0: 理由${i}`);
+  const { groups } = foldRejected([{ ticket: "C0", problems }]);
+  assert.equal(groups[0].reasons.length, 6);
+  assert.equal(groups[0].reasons[5], "ほか2件");
+});

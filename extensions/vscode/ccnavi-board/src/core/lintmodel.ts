@@ -124,12 +124,19 @@ function problem(raw: Record<string, unknown>): LintProblem {
  */
 export const MAX_WARN_LINES = 5;
 
-export function truncateLines(lines: readonly string[], max: number = MAX_WARN_LINES): string[] {
+/** `--lint`の報告を切り詰めたときの「ほかN件」に続ける案内。報告の元が`--lint`のときだけ渡す */
+export const LINT_MORE_HINT = "。`ccnavi --lint`で全部見られます";
+
+/**
+ * `hint`は「ほかN件」の後ろに続ける案内（なければ空文字）。全部を見る手段は呼ぶ側の出どころで違う
+ * （`--lint`の報告なら`LINT_MORE_HINT`、承認画面の理由には案内なし）。
+ */
+export function truncateLines(lines: readonly string[], hint: string, max: number = MAX_WARN_LINES): string[] {
   const all = [...new Set(lines)];
   if (all.length <= max) {
     return all;
   }
-  return [...all.slice(0, max), `ほか${all.length - max}件。\`ccnavi --lint\`で全部見られます`];
+  return [...all.slice(0, max), `ほか${all.length - max}件${hint}`];
 }
 
 /** 報告から`prefix`で始まる行を取り出し、一時ファイルのパスを対象のパスに直す。切り詰めは直したあとに行う */
@@ -148,7 +155,7 @@ function linesOf(report: string, prefix: string, tmp: string, shown: string): st
  * まちまち）ので、絞らない。
  */
 export function warnLinesOf(report: string, tmp: string, shown: string): string[] {
-  return truncateLines(linesOf(report, "warn: ", tmp, shown));
+  return truncateLines(linesOf(report, "warn: ", tmp, shown), LINT_MORE_HINT);
 }
 
 /**
@@ -159,7 +166,7 @@ export function warnLinesOf(report: string, tmp: string, shown: string): string[
 export function errorLinesOf(report: string, tmp: string, shown: string): string[] {
   const all = linesOf(report, "error: ", tmp, shown).map((line) => `エラー: ${line.slice("error: ".length)}`);
   const own = all.filter((line) => line.includes(shown));
-  return truncateLines([...own, ...all.filter((line) => !line.includes(shown))]);
+  return truncateLines([...own, ...all.filter((line) => !line.includes(shown))], LINT_MORE_HINT);
 }
 
 /** そのプロジェクトについての苦情。`where`が`(projects/<名前>)`で始まるもの */

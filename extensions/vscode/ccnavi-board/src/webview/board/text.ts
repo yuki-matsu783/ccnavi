@@ -31,7 +31,7 @@ const MAX_GROUP_TICKETS = 3;
 export function foldRejected(rejected: readonly ApproveRejected[]): { groups: RejectedGroup[]; more: number } {
   const byReasons = new Map<string, { tickets: string[]; reasons: string[] }>();
   for (const r of rejected) {
-    const reasons = truncateLines(r.problems.map((p) => rejectedReason(r.ticket, p)));
+    const reasons = truncateLines(r.problems.map((p) => rejectedReason(r.ticket, p)), "");
     const key = JSON.stringify(reasons);
     const group = byReasons.get(key) ?? { tickets: [], reasons };
     group.tickets.push(r.ticket);
