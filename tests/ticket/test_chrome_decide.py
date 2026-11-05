@@ -1,4 +1,4 @@
-"""Chrome の decide（残った指摘の行き先を決める）の Python の入口の受入テスト。
+"""Chrome の decide（残った指摘の対応方針を決める）の Python の入口の受入テスト。
 
 見るのは 8 つ。
 

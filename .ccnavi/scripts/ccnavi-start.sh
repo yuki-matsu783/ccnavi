@@ -933,7 +933,7 @@ stop_host() {
 		title) printf 'ccnavi-start: GitHub APIに接続できず、issue #%s を読めなかった（%s）。実在を確かめられないので、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$number" "$sh_why" ;;
 		merged) printf 'ccnavi-start: GitHub APIに接続できず、ブランチ %s と同じ名前のマージ済みの MR があるかを確かめられなかった（%s）。マージ済みのブランチを再利用しないため、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$stop_branch" "$sh_why" ;;
 	issue-link) printf 'ccnavi-start: MR !%s が閉じる issue を確かめられなかった（%s）。issue と MR のセットが確定しないため、続けずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$stop_mr" "$sh_why" ;;
-		*) printf 'ccnavi-start: GitHub APIに接続できず、マージリクエストを作れなかった（%s）。MCP（mcp__github__のツール）で代行してください。\n' "$sh_why" ;;
+		*) printf 'ccnavi-start: GitHub APIに接続できず、プルリクエストを作れなかった（%s）。MCP（mcp__github__のツール）で代行してください。\n' "$sh_why" ;;
 		esac
 		printf '完了済みの処理:\n'
 		if [ "$sh_stage" = create ]; then

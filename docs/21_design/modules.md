@@ -80,7 +80,7 @@ keywords: [モジュール, 構成, infra, records, policy, tickets, catalog, ho
 | 5 | `sync/` | 設定・スキル・ミラー・プロンプトの写しの同期、保護対象の下書きの取り込み |
 | 6 | `lifecycle/` | 状態を動かす操作。`ticket start / finish / cancel / record-risk`、動かしてよいかの検査、Stop で打ち忘れや道の途中を見つけて促す判定、ワークツリーとブランチの片付け、ブランチの探索、統合の子を作る、合流の前に聞くこと |
 | 7 | `notice/` | セッション開始で示す一覧と却下された要求、SessionStart の学びの通知、終わっていない integrate の記録、直接作業のワークツリーの一覧、`scratchpad/` の容量の知らせ |
-| 7 | `review/` | 依頼と確認、sh との契約の JSON の形、残った指摘の行き先の決定、親を閉じる |
+| 7 | `review/` | 依頼と確認、sh との契約の JSON の形、残った指摘の対応方針の決定、親を閉じる |
 | 8 | `core/` | 承認・レビュー済みの判定のコア。入口の `tickets/core/api.py` は名前を束ね直すだけで、`entry/cli.py` と、`entry/ext.py` を通した Chrome 拡張（Pyodide）はここを引く。共通部分、手元の承認、レビュー済みの判定に分けてある |
 
 ## catalog
