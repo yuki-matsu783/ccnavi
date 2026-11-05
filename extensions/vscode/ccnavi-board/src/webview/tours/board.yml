@@ -18,7 +18,7 @@
 #   ヘッダsummary / filter-project / filter-parent / filter-attention / filter-archived / refresh / merge-check / approve / tour
 #   ボードboard / column-<列> / card-<識別子> / merge-band / merge-retire / merge-abandon
 #   カード内status（状態のバッジ）/ turn（ユーザ待ち）/ approve-one / review-done / mr / notes / badge-<種類>（blocked preds worktree
-#              risk seen issue unsent）/ phases / phase-review / details / moved / flow-<状態>（create edit locked）/ workflow-button
+#              risk seen issue unsent）/ phases / details / moved / flow-<状態>（create edit locked）/ workflow-button
 #   承認の画面approval-batch / approval-plan / approve-confirm / approval-prompt / approval-handover / edit-workflow /
 #              decide-threads / decide-consult / decide-confirm
 #
@@ -260,7 +260,7 @@ courses:
         body: カードの見出しの右端に、いまの状況を表すバッジが1つ出ます。「承認待ち」「開始前」「作業中」「レビュー準備中」「レビュー待ち」「完了」「取り消し」「要確認」のどれかです。「要確認」は、どちらが正か決まらない・書き込み停止中・状態が合わない、のどれかのときです。理由はマウスを載せると出ます。
       - target: turn
         title: ユーザ待ち
-        body: ユーザができることがあるカードだけに「ユーザ待ち」が出ます。承認待ちなら［承認］、レビュー待ちなら［MRを開く］と［レビュー完了］です。バッジはカードの状況を表し、ここにはユーザができることが出ます。両者は別々に決まります（「要確認」のバッジのカードにも、承認待ちなら［承認］が出ます）。
+        body: ユーザができることがあるカードだけに「ユーザ待ち」が出ます。承認待ちなら［承認］、レビュー待ちの子なら［MRを開く］と［レビュー完了］です。バッジはカードの状況を、「ユーザ待ち」の欄はユーザができることを表します。両者は別々に決まります（「要確認」のバッジのカードにも、承認待ちなら［承認］が出ます）。
       - target: details
         title: 詳細
         body: issue・ブランチ・ワークツリー・リスク・人間レビューの要否と、不備や停止の理由の全文は「詳細」に畳んであります。MRは「MR #番号」として位置の下に出ます。開きたいときだけ開けます。開閉はカードごとに記録されるので、更新しても閉じません。
@@ -380,9 +380,9 @@ courses:
         image: gitlab-submit-review
         alt: GitLabの「Submit your review」の画面。「Comment」「Approve」「Request changes」の選択肢と、「Submit review」ボタン、ためた指摘の一覧がある
         scene: { parent: sample-c }
-      - target: phase-review
+      - target: review-done
         title: レビューを終える
-        body: 指摘を付け終えたら、レビュー待ちの行の［レビュー完了］を押します。押すまでは、ボードは指摘を読みません。
+        body: 指摘を付け終えたら、レビュー待ちの子のカードの［レビュー完了］を押します。押すまでは、ボードは指摘を読みません。
         scene: { parent: sample-c }
       - target: decide-threads
         title: 残った指摘の対応方針を決める
@@ -412,7 +412,7 @@ courses:
         image: gitlab-threads-resolved
         alt: GitLabの差分画面。スレッドの右上のチェックマークが緑になり「Resolved by」と出ていて、画面の右上に「All threads resolved」と出ている
         scene: { parent: sample-c }
-      - target: phase-review
+      - target: review-done
         title: 直ったら、もう一度レビューする
         body: 直し終えると、フェーズは再びレビュー待ちになります。MRで直った点を確かめます。直すと決めた指摘のスレッドは、ユーザがGitLab上で解決済みにします（エージェントは解決済みにしません。「対応しない」と「issueに回す」を選んだスレッドは、ccnaviが返信して解決済みにします）。そのうえで［レビュー完了］を押します。未解決の指摘が0件になるまで、直すことと確かめることを繰り返します。
         scene: { parent: sample-c }
@@ -489,10 +489,10 @@ courses:
         body: 親チケットのバッジが「レビュー待ち」なら、どれかのフェーズが、ユーザのレビューを待っています。依頼を出す前は「レビュー準備中」で、エージェントが作業する段階です。
       - target: phases
         title: どのフェーズが待っているか
-        body: フェーズ一覧の右に、フェーズごとの状態が一言で出ます。「レビュー待ち」の行がユーザ待ちです。複数のフェーズが同時に待っているときは、それぞれの行に操作が付きます。
-      - target: phase-review
-        title: 行の中の操作
-        body: レビュー待ちの行に、［MRを開く］と［レビュー完了］があります。主ボタンは［レビュー完了］だけです。子チケットのカードも、バッジが「レビュー待ち」なら同じ操作が「ユーザ待ち」に出ます。
+        body: フェーズ一覧の右に、フェーズごとの状態が一言で出ます。「レビュー待ち」のフェーズがユーザ待ちです。行に操作は付きません。操作は、そのフェーズの子のカードにあります。
+      - target: review-done
+        title: 子のカードの操作
+        body: バッジが「レビュー待ち」の子のカードの「ユーザ待ち」に、［MRを開く］と［レビュー完了］があります。主ボタンは［レビュー完了］だけです。レビューはフェーズ単位なので、同じフェーズの子のどのカードから押しても同じ操作です。
       - target: mr
         title: MRを開く
         body: ［MRを開く］から、レビュー用のMRを開きます。指摘はそこにコメントで書きます。ボードはMRの中身を読みません。

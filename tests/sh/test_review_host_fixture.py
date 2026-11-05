@@ -28,7 +28,7 @@ import tempfile
 import unittest
 
 from ccnavi.entry import version
-from ccnavi.tickets.model import review_host
+from ccnavi.tickets.model import oplog, review_host
 from tests import ROOT, can_pass_argument, common_sh
 from tests.sh import github_host, gitlab_host
 
@@ -71,6 +71,7 @@ case " $* " in
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
+*" ops "*) PYTHONPATH='@SRC@' exec '@PY@' -m ccnavi "$@" ;;
 esac
 prev=""
 for a in "$@"; do
@@ -85,6 +86,7 @@ done
 for a in "$@"; do printf '%s\\n' "$a"; done >>'{log}'
 exit 0
 """
+STUB = STUB.replace("@PY@", sys.executable).replace("@SRC@", os.path.join(ROOT, "src"))
 
 
 # マージリクエストを作ったときのホストの返事（GitLab の形）。
@@ -113,6 +115,39 @@ def conclusion(copy: dict, poster: str = "") -> dict:
         "changes_requested": sorted(r.url for r in changes),
         "unresolved": sorted(t.id for t in unresolved),
     }
+
+
+def accept_plan_file(tmp, ws, mr_url, nodes):
+    """実物の書き手（実行ファイルが使う `review_host.write_accept_plan`）で書いた計画。
+
+    実行ファイルと同じく、本物の操作記録を作って、その操作ID を計画に書く。
+    """
+    path = os.path.join(tmp, "plan.json")
+    items = [
+        (
+            review_host.Thread(id=node, url=f"u/{node}"),
+            review_host.accept_reply("テスト", issue=False),
+        )
+        for node in nodes
+    ]
+    op = oplog.begin(
+        os.path.join(ws, "logs", "state"),
+        "decide",
+        repo={"host": "test", "mr_url": mr_url},
+        parent="i0001",
+        phase=1,
+        mr=1,
+        shown=[
+            {"key": t.url, "id": t.id, "url": t.url, "path": "a.py", "line": 3, "version": "v1",
+             "body": "指摘の本文"}
+            for t, _ in items
+        ],
+        choices={t.url: "keep" for t, _ in items},
+        plan={"digest": "d"},
+        stages=[("reply", "reply")],
+    )
+    assert review_host.write_accept_plan(path, items, "d", op) == ""
+    return path
 
 
 @unittest.skipIf(SHELL is None or not NEEDED, "sh・git・jq のどれかが無い")
@@ -146,6 +181,8 @@ class HostFixtureTest(unittest.TestCase):
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("GITLAB_TOKEN", None)
+        if "decide" in args and "STUB_PLAN" not in extra:
+            extra["STUB_PLAN"] = self.accept_plan()
         env.update(
             {
                 "GITHUB_TOKEN": "t0k",
@@ -396,17 +433,9 @@ class HostFixtureTest(unittest.TestCase):
     NODE = "PRRT_kwDOAbCdEs5AAAAB"
 
     def accept_plan(self, *nodes):
-        """実物の書き手（実行ファイルが使う `review_host.write_accept_plan`）で書いた計画。"""
-        path = os.path.join(self._tmp.name, "plan.json")
-        items = [
-            (
-                review_host.Thread(id=node, url=f"u/{node}"),
-                review_host.accept_reply("テスト", issue=False),
-            )
-            for node in nodes
-        ]
-        self.assertEqual(review_host.write_accept_plan(path, items, "d"), "")
-        return path
+        return accept_plan_file(
+            self._tmp.name, self.ws, "https://github.com/acme/widgets/pull/1", nodes
+        )
 
     def mutations(self):
         path = os.path.join(self._tmp.name, "mutations.jsonl")
@@ -512,6 +541,10 @@ class GitLabHostFixtureTest(unittest.TestCase):
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("GITHUB_TOKEN", None)
+        if "decide" in args and "STUB_PLAN" not in extra:
+            extra["STUB_PLAN"] = accept_plan_file(
+                self._tmp.name, self.ws, "https://gitlab.com/acme/widgets/-/merge_requests/1", ()
+            )
         env.update(
             {
                 "GITLAB_TOKEN": "glpat-t0k",
@@ -628,6 +661,8 @@ class GitLabHostFixtureTest(unittest.TestCase):
             + "; exit 0 ;; esac\n"
             + 'case " $* " in *" write-and-push family "*)'
             + " printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;; esac\n"
+            + 'case " $* " in *" ops "*)'
+            + f" PYTHONPATH='{os.path.join(ROOT, 'src')}' exec '{sys.executable}' -m ccnavi \"$@\" ;; esac\n"
             f"for a in \"$@\"; do printf '%s\\n' \"$a\"; done >>'{out}/args.txt'\n"
             'case " $* " in *" prepare "*)\n'
             f"  printf '<!-- ccnavi:request i0001:1 key=k -->\\n依頼\\n' >'{out}/body.md'\n"
@@ -806,6 +841,8 @@ class GitLabHostFixtureTest(unittest.TestCase):
                 self.assertIn("消した", done.stdout)
                 shutil.rmtree(os.path.join(self._tmp.name, "out"), ignore_errors=True)
                 os.remove(os.path.join(self._tmp.name, "notes.json"))
+                # 本物の操作記録は送信済みを覚えている。次の回で投稿が省かれないよう、ここで消す
+                shutil.rmtree(os.path.join(self.ws, "logs", "state"), ignore_errors=True)
 
     def test_request_keeps_a_body_file_outside_scratchpad(self):
         """scratchpad/ の外（外のファイル、wip/、名前だけ似た場所、.. で出る道）は消さない。"""
@@ -826,6 +863,8 @@ class GitLabHostFixtureTest(unittest.TestCase):
                 self.assertNotIn("消した", done.stdout)
                 shutil.rmtree(os.path.join(self._tmp.name, "out"), ignore_errors=True)
                 os.remove(os.path.join(self._tmp.name, "notes.json"))
+                # 本物の操作記録は送信済みを覚えている。次の回で投稿が省かれないよう、ここで消す
+                shutil.rmtree(os.path.join(self.ws, "logs", "state"), ignore_errors=True)
         for path in (outside, near, likeness, escaped):
             self.assertTrue(os.path.exists(path), path)
 

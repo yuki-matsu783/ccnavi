@@ -974,7 +974,8 @@ class SelfGuardTest(unittest.TestCase):
 
         reason = self.assert_limit_denied(result, command)
         self.assertNotIn("anything-else", reason)
-        self.assertEqual(reason.count("[ccnavi] "), 1)
+        # 拒否の見出しは 1 つだけ。最初の失敗に付く資料の案内（`[ccnavi] ` で始まる）は数えない。
+        self.assertEqual(reason.count("[ccnavi] DENY_"), 1)
         self.assertEqual(self.records()[-1]["rules"], ["builtin:redirect-limit"])
 
     def test_外す保護がヒットしないなら上限を掛けない(self):

@@ -26,6 +26,7 @@ import sys
 import tempfile
 import unittest
 
+from ccnavi.tickets.model import oplog
 from tests import ROOT, common_sh
 from tests.sh import github_host
 from tests.sh.test_review_host_fixture import conclusion
@@ -43,6 +44,7 @@ case " $* " in
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
+*" ops "*) PYTHONPATH='@SRC@' exec '@PY@' -m ccnavi "$@" ;;
 esac
 prev=""
 for a in "$@"; do
@@ -164,7 +166,10 @@ class RestFallbackTest(unittest.TestCase):
         from ccnavi.entry import version
 
         self.exe = write(
-            os.path.join(tmp, "exe", "ccnavi"), EXE.format(compat=version.COMPAT, copy=self.copy)
+            os.path.join(tmp, "exe", "ccnavi"),
+            EXE.format(compat=version.COMPAT, copy=self.copy)
+            .replace("@PY@", sys.executable)
+            .replace("@SRC@", os.path.join(ROOT, "src")),
         )
         os.chmod(self.exe, 0o755)
 
@@ -411,12 +416,30 @@ class RestFallbackTest(unittest.TestCase):
     # ---- decide の返信と解決
 
     def accept(self, ids, **kw):
+        # 実行ファイルと同じく、本物の操作記録を作って、その操作ID を計画に書く
+        op = oplog.begin(
+            os.path.join(self.ws, "logs", "state"),
+            "decide",
+            repo={"host": "github", "mr_url": "https://github.com/acme/widgets/pull/42"},
+            parent="i0001",
+            phase=1,
+            mr=42,
+            shown=[
+                {"key": f"k{i}", "id": i, "url": f"k{i}", "path": "a.py", "line": 3,
+                 "version": "v1", "body": "指摘の本文"}
+                for i in ids
+            ],
+            choices={f"k{i}": "keep" for i in ids},
+            plan={"digest": "d"},
+            stages=[("reply", "reply")],
+        )
         plan = write(
             os.path.join(self._tmp.name, "plan.json"),
             json.dumps(
                 {
                     "version": 1,
                     "digest": "d",
+                    "op": op,
                     "threads": [
                         {"id": i, "key": f"k{i}", "reply": "<!-- ccnavi:accept -->\n受け入れる"}
                         for i in ids

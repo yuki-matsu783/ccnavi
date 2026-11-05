@@ -101,9 +101,13 @@ class ChildBaseTest(unittest.TestCase):
         self.upstream(seed="theirs\n")
         commit(self.child, "seed", "mine\n")
         done = subprocess.run(
-            ["git", "merge", "--no-edit", "origin/m"], cwd=self.child, capture_output=True
+            ["git", "-c", "user.email=t@example.com", "-c", "user.name=t"]
+            + ["merge", "--no-edit", "origin/m"],
+            cwd=self.child,
+            capture_output=True,
         )
-        self.assertNotEqual(done.returncode, 0)
+        # 衝突で止まる（128 は識別子不明などの別の失敗）
+        self.assertEqual(done.returncode, 1)
         commit_text = "resolved\n"
         with open(os.path.join(self.child, "seed"), "w", encoding="utf-8") as f:
             f.write(commit_text)
