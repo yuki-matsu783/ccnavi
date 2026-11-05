@@ -11,7 +11,7 @@
 3. 止まっている理由: 親が未着手・先行・write-and-push が止める親子。基準点が HEAD
 の祖先でないことと、
    再開で残った欄は注意
-4. 承認待ち・閉じたもの。状態を動かす行には「親（メインエージェント）だけが実行する」
+4. 承認待ち・閉じたもの。状態を動かす行には「メインエージェントのみ実行可能」
 5. 親を省けば開いている親子を全部、知らない親なら終了コード 1
 """
 
@@ -98,7 +98,7 @@ class TicketStatusTest(PhaseHarness):
         self.assertIn("エージェントはコミットも push もしない", mine)
         self.assertIn("start へ進んでよい", mine)
         self.assertIn("ccnavi-ticket.sh start i0001", mine)
-        self.assertIn("親（メインエージェント）だけが実行する", mine)
+        self.assertIn("メインエージェントのみ実行可能", mine)
         # エージェントが運ぶコマンド（git の add・commit・push）は出さない。
         self.assertNotIn("ccnavi-git.sh add", out)
         self.assertNotIn("commit", mine)
