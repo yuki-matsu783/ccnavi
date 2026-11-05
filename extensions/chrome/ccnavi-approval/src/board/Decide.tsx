@@ -1,12 +1,12 @@
 /**
- * 残った指摘の行き先を決める画面（`div.decide`）。レビューの欄（`Review.tsx`）の中に表示する。
+ * 残った指摘の対応方針を決める画面（`div.decide`）。レビューの欄（`Review.tsx`）の中に表示する。
  *
- * - 指摘を 1 件ずつ並べ、行き先（対応しない・このフェーズで直す・issue に回す）を選ばせる。何も選ばなければ、全件を「このフェーズで直す」とする。
- * - 2 件以上あるときは、全件を同じ行き先にする小さな行を出す。個別の選び直しは、そのあとでもできる。
+ * - 指摘を 1 件ずつ並べ、対応方針（対応しない・このフェーズで直す・issue に回す）を選ばせる。何も選ばなければ、全件を「このフェーズで直す」とする。
+ * - 2 件以上あるときは、全件を同じ対応方針にする小さな行を出す。個別の選び直しは、そのあとでもできる。
  * - 解決できない指摘、Chrome で扱えない指摘（`unsupported`）は、選択肢を出さずに理由を出す。1 件でもあれば、確定のボタンは出さない。
  * - 指摘が 0 件のときは、押すとレビュー済みになるだけ。
  *
- * 選び直した行き先だけをここに持つ。見せ直して `digest` が変わったときは、この選択を捨てる。
+ * 選び直した対応方針だけをここに持つ。見せ直して `digest` が変わったときは、この選択を捨てる。
  * 見せる指摘と確定の最中かどうかは controller が持つ。ここは渡されたものを描く。
  * 本文は承認の画面と同じ消毒（`Markdown.tsx`）で描く。
  */
@@ -42,7 +42,7 @@ export function Decide({ preview, deciding, notice, inherited, onConfirm, onCanc
   const blocked = preview.threads.some((t) => t.unsupported);
   return (
     <div className="decide" data-phase={String(preview.phase)}>
-      <h5>{count === 0 ? `フェーズ ${preview.phase} に未解決の指摘はありません` : `フェーズ ${preview.phase} で未解決の指摘 ${count} 件の行き先`}</h5>
+      <h5>{count === 0 ? `フェーズ ${preview.phase} に未解決の指摘はありません` : `フェーズ ${preview.phase} で未解決の指摘 ${count} 件の対応方針`}</h5>
       {notice ? <p className="notice warn" role="status">{notice}</p> : null}
       {count > 0 ? <p className="decide-note">「このフェーズで直す」を 1 件でも選ぶと、続きの子チケットを作り、このフェーズを再開します。</p> : null}
       {supported.length >= 2 && count >= 2 ? (
@@ -73,9 +73,9 @@ export function Decide({ preview, deciding, notice, inherited, onConfirm, onCanc
               </div>
               <Body body={t.body} />
               {t.unsupported ? (
-                <p className="notice error decide-unsupported" role="alert">{`Chrome では扱えません。VS Code で。${t.unsupported}`}</p>
+                <p className="notice error decide-unsupported" role="alert">{`この指摘への対応は Chrome 拡張では行えません。VS Code 拡張で対応方針を確定してください。理由：${t.unsupported}`}</p>
               ) : (
-                <div className="decide-choices" role="radiogroup" aria-label={`${t.path || t.key} の行き先`}>
+                <div className="decide-choices" role="radiogroup" aria-label={`${t.path || t.key} の対応方針`}>
                   {DECIDE_CHOICES.map((c) => (
                     <label key={c} className="decide-choice">
                       <input type="radio" name={`decide-${t.key}`} value={c} data-choice={c} checked={choices[t.key] === c} disabled={busy} onChange={() => choose(t.key, c)} />
@@ -91,7 +91,7 @@ export function Decide({ preview, deciding, notice, inherited, onConfirm, onCanc
       <div className="actions">
         {blocked ? null : (
           <button type="button" className="action" data-action="decide-confirm" disabled={busy} onClick={() => onConfirm(choices, preview.digest)}>
-            {deciding ? "反映中…" : count === 0 ? `フェーズ ${preview.phase} をレビュー済みにする` : "この行き先で確定"}
+            {deciding ? "反映中…" : count === 0 ? `フェーズ ${preview.phase} をレビュー済みにする` : "この対応方針を確定"}
           </button>
         )}
         <button type="button" className="action" data-action="decide-cancel" disabled={busy} onClick={onCancel}>

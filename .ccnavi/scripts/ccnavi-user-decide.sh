@@ -187,7 +187,7 @@ accept_before_place() {
 	accept_execute "$accept_plan"
 }
 
-# ---- 決めた行き先を投稿する。exe が state の置き場に書いた下書きから、issue を作ってコメントを残す。
+# ---- 決めた対応方針を投稿する。exe が state の置き場に書いた下書きから、issue を作ってコメントを残す。
 #
 # 置いたあとの投稿なので、ここで失敗しても決めたことは戻さない。失敗は post_warning に言い、
 # 下書きは残す（打ち直せば投稿できる）。下書きの名前は exe と揃える（親の識別子。ブランチ名と違うことがある）。
@@ -268,7 +268,7 @@ if [ -n "$choices" ]; then
 	ccnavi_wap_capture="$state/review-decide-$$.out"
 	decide_rc=0
 	# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
-	wap_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
+	wap_ccnavi "$branch のフェーズ $n の指摘の対応方針を決めた" -- \
 		--entry sh user reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" --accept-done "$accept_file" $decide_who ||
 		decide_rc=$?
 	out=$(cat "$ccnavi_wap_capture" 2>/dev/null || :)
@@ -322,7 +322,7 @@ yes)
 	ccnavi_wap_capture="$state/review-decide-$$.out"
 	decide_rc=0
 	# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
-	wap_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
+	wap_ccnavi "$branch のフェーズ $n の指摘の対応方針を決めた" -- \
 		--entry sh user reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" --accept-done "$accept_file" $decide_who ||
 		decide_rc=$?
 	out=$(cat "$ccnavi_wap_capture" 2>/dev/null || :)
@@ -333,7 +333,7 @@ yes)
 		[ -z "$out" ] || printf '%s\n' "$out"
 		exit 1
 	fi
-	printf 'OK: フェーズ %s の指摘の行き先を置いて送った（%s）\n' "$n" "$out"
+	printf 'OK: フェーズ %s の指摘の対応方針を置いて送った（%s）\n' "$n" "$out"
 	;;
 *)
 	decide_rc=0
@@ -345,7 +345,7 @@ yes)
 		[ -z "$out" ] || printf '%s\n' "$out"
 		exit 1
 	fi
-	printf 'OK: フェーズ %s の指摘の行き先を置いた（%s）\n' "$n" "$out"
+	printf 'OK: フェーズ %s の指摘の対応方針を置いた（%s）\n' "$n" "$out"
 	;;
 esac
 post_decision "$n"

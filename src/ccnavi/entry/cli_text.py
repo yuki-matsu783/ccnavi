@@ -34,10 +34,11 @@ def run(stdout: TextIO, stderr: TextIO, root: str, words: list[str]) -> int:
     try:
         entry = texts.find(root, words[0])
         if entry is None:
-            raise texts.TextError(f"{words[0]}: 文面が無い")
+            stderr.write(f"ccnavi: 指定した識別子のメッセージが見つかりません: {words[0]}\n")
+            return EXIT_UNAVAILABLE
         text = texts.render(entry, values, variants, root)
     except (texts.TextError, OSError, ValueError) as exc:
-        stderr.write(f"ccnavi: 文面を引けません: {exc}\n")
+        stderr.write(f"ccnavi: メッセージを生成できません: {exc}\n")
         return EXIT_UNAVAILABLE
     stdout.write(text + "\n")
     return EXIT_OK

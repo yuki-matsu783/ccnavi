@@ -11,7 +11,7 @@ import { Decide } from "./Decide.js";
 import { Markdown } from "./Markdown.js";
 import { ActionButton, Link, Notice } from "./parts.js";
 
-/** 残った指摘の行き先を決める画面への入口。渡さなければ画面を出さない（`decide` は開いている画面の状態） */
+/** 残った指摘の対応方針を決める画面への入口。渡さなければ画面を出さない（`decide` は開いている画面の状態） */
 export interface DecideHandlers {
   readonly state?: DecideState;
   open(phase: number): void;
@@ -21,11 +21,13 @@ export interface DecideHandlers {
 
 export function Review({ panel, writable, onReview, decide }: { panel: ReviewPanel; writable: boolean; onReview?: (phase: number) => void; decide?: DecideHandlers }): JSX.Element {
   // GitLab の MR は `!番号`、GitHub の PR は `#番号`
-  const mark = (panel.copy?.host ?? panel.host) === "gitlab" ? "!" : "#";
+  const isGitlab = (panel.copy?.host ?? panel.host) === "gitlab";
+  const mark = isGitlab ? "!" : "#";
+  const noun = isGitlab ? "マージリクエスト" : "プルリクエスト";
   const head = (
     <h4>
       {`フェーズ ${panel.phase} のレビュー（`}
-      {panel.copy ? <Link href={panel.copy.mr.url} text={`マージリクエスト ${mark}${panel.copy.mr.number}`} /> : `マージリクエスト ${mark}${panel.mr}`}
+      {panel.copy ? <Link href={panel.copy.mr.url} text={`${noun} ${mark}${panel.copy.mr.number}`} /> : `${noun} ${mark}${panel.mr}`}
       {`）: ${panel.children.join(", ")}`}
     </h4>
   );
@@ -41,7 +43,7 @@ export function Review({ panel, writable, onReview, decide }: { panel: ReviewPan
   // ccnavi の依頼のスレッドを数えないのは Python。ここは未解決の件数を取得した結果のとおりに出す
   const threads = [...(panel.copy?.threads ?? [])].sort((a, b) => Number(a.resolved) - Number(b.resolved));
   const unresolved = threads.filter((t) => !t.resolved).length;
-  // 未解決の指摘が残るフェーズは、行き先を決める画面から確定する（0 件のときは「レビュー済みにする」）
+  // 未解決の指摘が残るフェーズは、対応方針を決める画面から確定する（0 件のときは「レビュー済みにする」）
   const showDecide = writable && decide !== undefined && (unresolved > 0 || (panel.decide?.threads.length ?? 0) > 0);
   return (
     <section className="review" data-phase={String(panel.phase)} data-waiting="review">
@@ -91,7 +93,7 @@ function DecideEntry({ panel, decide }: { panel: ReviewPanel; decide: DecideHand
       ) : null}
       {state === undefined ? (
         <div className="actions">
-          <ActionButton action="decide-open" onClick={() => decide.open(panel.phase)}>{`フェーズ ${panel.phase} の残った指摘の行き先を決める`}</ActionButton>
+          <ActionButton action="decide-open" onClick={() => decide.open(panel.phase)}>{`フェーズ ${panel.phase} の残った指摘の対応方針を決める`}</ActionButton>
         </div>
       ) : preview === null ? (
         <>

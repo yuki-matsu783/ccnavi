@@ -595,7 +595,7 @@ export async function openPull(client: Client, owner: string, repo: string, bran
   const first = status === 404 || !Array.isArray(body) ? undefined : (body[0] as { number?: unknown; html_url?: unknown } | undefined);
   if (!first) return null;
   if (typeof first.number !== "number" || !Number.isInteger(first.number)) {
-    throw new HostError("マージリクエストの番号を取得できません");
+    throw new HostError("プルリクエストの番号を取得できません");
   }
   return { number: first.number, url: String(alt(first.html_url, "")) };
 }
@@ -626,7 +626,7 @@ export async function reviewThreads(client: Client, owner: string, repo: string,
     const data = await graphql(client, THREADS, { owner: checkName(owner, "owner"), name: checkName(repo, "repo"), number, after });
     const threads = (data.repository as { pullRequest?: { reviewThreads?: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: ThreadNode[] } } | null } | null)
       ?.pullRequest?.reviewThreads;
-    if (!threads) throw new HostError(`マージリクエスト #${number} のスレッドを取得できません`);
+    if (!threads) throw new HostError(`プルリクエスト #${number} のスレッドを取得できません`);
     for (const t of threads.nodes) {
       const c = t.comments?.nodes?.[0] ?? {};
       const l = t.last?.nodes?.[0] ?? {};
@@ -656,8 +656,8 @@ export async function pullReviews(client: Client, owner: string, repo: string, n
   for (let page = 1; ; page += 1) {
     const { status, body } = await rest(client, `${repoPath(owner, repo)}/pulls/${number}/reviews?per_page=${PER_PAGE}&page=${page}`);
     // 404 や配列でない答えを「レビュー無し」と読むと、変更要求を見落として通してしまう
-    if (status === 404) throw new HostError(`マージリクエスト #${number} のレビューを取得できません（404）`, 404);
-    if (!Array.isArray(body)) throw new HostError(`マージリクエスト #${number} のレビューの応答が配列ではありません`);
+    if (status === 404) throw new HostError(`プルリクエスト #${number} のレビューを取得できません（404）`, 404);
+    if (!Array.isArray(body)) throw new HostError(`プルリクエスト #${number} のレビューの応答が配列ではありません`);
     const chunk = body as Record<string, unknown>[];
     for (const r of chunk) {
       const user = (r.user ?? null) as { id?: unknown; login?: unknown } | null;
@@ -679,7 +679,7 @@ export async function pullReviews(client: Client, owner: string, repo: string, n
  */
 export async function reviewCopy(client: Client, owner: string, repo: string, branch: string): Promise<ReviewCopy> {
   const mr = await openPull(client, owner, repo, branch);
-  if (mr === null) throw new HostError(`親のブランチ ${branch} に対応する、オープン状態のマージリクエストがありません`);
+  if (mr === null) throw new HostError(`親のブランチ ${branch} に対応する、オープン状態のプルリクエストがありません`);
   const threads = await reviewThreads(client, owner, repo, mr.number);
   const reviews = await pullReviews(client, owner, repo, mr.number);
   return { host: "github", mr, threads, reviews, fetched_at: new Date().toISOString() };
@@ -800,7 +800,7 @@ export interface MrInfo {
 /** 開いた MR（PR）の全部。issue を閉じる MR の探索と、採用の確認に使う。読むだけ */
 export async function listOpenMrs(client: Client, owner: string, repo: string): Promise<MrInfo[]> {
   const { items, more } = await restPages(client, `${repoPath(owner, repo)}/pulls?state=open&per_page=100`, MR_PAGES);
-  if (more) throw new HostError("開いたマージリクエストが多すぎて読み切れません。既存の MR を見落とさないよう、「始める」は手元で行ってください");
+  if (more) throw new HostError("オープン状態のプルリクエストが多すぎて読み切れません。既存のプルリクエスト を見落とさないよう、「始める」は手元で行ってください");
   const own = `${owner}/${repo}`.toLowerCase();
   const out: MrInfo[] = [];
   for (const p of items as { number?: unknown; title?: unknown; body?: unknown; html_url?: unknown; head?: { ref?: unknown; repo?: { full_name?: unknown } | null }; base?: { ref?: unknown } }[]) {
@@ -824,7 +824,7 @@ export async function listOpenMrs(client: Client, owner: string, repo: string): 
 export async function listMergedMrs(client: Client, owner: string, repo: string, branch: string): Promise<{ number: number; url: string }[]> {
   const head = encodeURIComponent(`${checkName(owner, "owner")}:${checkBranch(branch)}`);
   const { items, more } = await restPages(client, `${repoPath(owner, repo)}/pulls?state=closed&head=${head}&per_page=100`, MR_PAGES);
-  if (more) throw new HostError("閉じたマージリクエストが多すぎて読み切れません");
+  if (more) throw new HostError("クローズ済みのプルリクエストが多すぎて読み切れません");
   const out: { number: number; url: string }[] = [];
   for (const p of items as { number?: unknown; html_url?: unknown; merged_at?: unknown }[]) {
     if (typeof p.number === "number" && p.merged_at !== null && p.merged_at !== undefined) out.push({ number: p.number, url: String(alt(p.html_url, "")) });
@@ -866,9 +866,9 @@ export async function createDraftMr(client: Client, owner: string, repo: string,
     { method: "POST", headers: { ...headers(client), "Content-Type": "application/json" }, body: JSON.stringify({ head: checkBranch(head), base: checkBranch(base), title, body, draft: true }) },
     `POST ${path}`,
   );
-  if (!res.ok) throw new HostError(`GitHub が Draft のマージリクエストを作りませんでした（${res.status}）`, res.status);
+  if (!res.ok) throw new HostError(`GitHub が Draft のプルリクエストを作りませんでした（${res.status}）`, res.status);
   const made = (await res.json()) as { number?: unknown; html_url?: unknown };
-  if (typeof made.number !== "number") throw new HostError("作ったマージリクエストの番号を取得できません");
+  if (typeof made.number !== "number") throw new HostError("作ったプルリクエストの番号を取得できません");
   return { number: made.number, url: String(alt(made.html_url, "")) };
 }
 
@@ -1161,7 +1161,7 @@ export async function writeInfo(client: Client, owner: string, repo: string, num
       pullRequest?: { reviewThreads?: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: Record<string, unknown>[] } } | null;
     } | null;
     const conn = r?.pullRequest?.reviewThreads;
-    if (!r || !conn) throw new HostError(`マージリクエスト #${n} のスレッドを取得できません`);
+    if (!r || !conn) throw new HostError(`プルリクエスト #${n} のスレッドを取得できません`);
     if (page === 0) {
       if (r.isArchived === true) missing.push({ need: "リポジトリのアーカイブの解除（読み取り専用です）", for: "all" });
       if (r.hasIssuesEnabled === false) missing.push({ need: "リポジトリの Issues の有効化", for: "issue" });

@@ -15,8 +15,8 @@ _VERSION = """\
     ccnavi --version [--json]
 
 バージョン、ビルド元のコミット（ソースから実行した場合は "unknown"）、.ccnavi/scripts/
-のスクリプトとVS Code拡張機能が自身の値と照合する互換バージョン、
-互換の版を出力します。ペイロードも設定も読み込みません。--json の形式は
+のスクリプトとVS Code拡張機能との互換性確認に使用するバージョン情報を
+出力します。ペイロードも設定も読み込みません。--json の形式は
 docs/11_requirements/json-shapes.md（「版の JSON」）に記載しています。
 """
 
@@ -616,7 +616,7 @@ ccnavi-review.sh decide N --preview が呼び、エージェントも実行で�
 
 # (話題, 引き方, 一覧に出す 1 行, 本文)。一覧と全文はこの順で並ぶ。
 TOPICS = (
-    ("version", "ccnavi --version", "版・ビルド情報・互換の版を出す", _VERSION),
+    ("version", "ccnavi --version", "バージョン・ビルド情報・互換性の情報を出す", _VERSION),
     ("lint", "ccnavi --lint", "ルール・フェーズ・リスクの設定を検証する", _LINT),
     ("test", "ccnavi --test", "ツールを動かさずにルールの判定を試す", _TEST),
     ("explain", "ccnavi --explain", "チケットとその置き場を、機械が読める形で一覧する", _EXPLAIN),

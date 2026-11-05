@@ -13,7 +13,7 @@ keywords: [設計, 構成, service worker, Pyodide, Web Worker, hosts.json, ccna
 | 場所 | 役目 |
 |---|---|
 | `src/background/` | service worker。PAT を持ち、ホストの API を呼ぶのはここだけ（画面には PAT を渡さない）。PAT の期限のバッジ |
-| `src/board/` | ボード（拡張のページ）。Worker を起動し、読んだ中身を Python に渡し、答えを描く。状態と副作用（読み直し・書く操作・確認が必要な状態・PAT の期限の帯・自動の読み直し）は `controller.ts` が持つ（`chrome`・`window` には、入口の `main.tsx` が渡す外界 `BoardEnv` を通してだけ触る）。描くのは React（`App.tsx` が `useSyncExternalStore` で controller を読み、リポジトリの欄 `Repo.tsx`、親子のチケット `Family.tsx`、レビュー `Review.tsx`（未解決の指摘が残るフェーズは、行き先を決める画面 `Decide.tsx` を開く。開いているか・確定中・結果は controller が持ち、画面は渡された状態を描く）、「始める」`Start.tsx`、要確認 `Attention.tsx` を並べる）。Markdown の本文は `Markdown.tsx` が消毒した断片（`src/core/sanitize.ts`）を ref で差し込む（HTML の文字列には戻さない）。CSS の入口は `style.css`（共通の部品の CSS と、部品 1 つに 1 本のボードの CSS（`App.css`・`Repo.css` など）を読み、ビルドが `board.css` に組む） |
+| `src/board/` | ボード（拡張のページ）。Worker を起動し、読んだ中身を Python に渡し、答えを描く。状態と副作用（読み直し・書く操作・確認が必要な状態・PAT の期限の帯・自動の読み直し）は `controller.ts` が持つ（`chrome`・`window` には、入口の `main.tsx` が渡す外界 `BoardEnv` を通してだけ触る）。描くのは React（`App.tsx` が `useSyncExternalStore` で controller を読み、リポジトリの欄 `Repo.tsx`、親子のチケット `Family.tsx`、レビュー `Review.tsx`（未解決の指摘が残るフェーズは、対応方針を決める画面 `Decide.tsx` を開く。開いているか・確定中・結果は controller が持ち、画面は渡された状態を描く）、「始める」`Start.tsx`、要確認 `Attention.tsx` を並べる）。Markdown の本文は `Markdown.tsx` が消毒した断片（`src/core/sanitize.ts`）を ref で差し込む（HTML の文字列には戻さない）。CSS の入口は `style.css`（共通の部品の CSS と、部品 1 つに 1 本のボードの CSS（`App.css`・`Repo.css` など）を読み、ビルドが `board.css` に組む） |
 | `src/options/` | 設定画面。通信先（追加すると許可を求め、削除すると PAT と許可（画面と API の origin すべて。GHE.com は 2 つ）を削除する。`Hosts.tsx`）、リポジトリ（統合先の名前・直近の日数・指定のブランチ）と PAT。React で組み、見た目は VS Code 拡張と共通の部品（`extensions/shared` の `@ccnavi/shared`。ボタン・骨組み・一覧の CSS と、Claude の配色で `--vscode-*` を定義する `browser-theme.css`）を使う。CSS の入口は `style.css`（ビルドが `options.css` に組む） |
 | `src/worker/` | Pyodide を動かす Web Worker |
 | `src/core/` | 画面に依らない部品（描いたボードの DOM の要約 `dom-summary.ts`（開発用ツール `scripts/render-scene.js` が使う。拡張のバンドルには入らない）、通信先と manifest、設定画面で足すホスト（`custom-hosts.ts`）、GitHub の読み書き（`github.ts`）、GitLab の読み書き（`gitlab.ts`）、「始める」（`start.ts`）、画面と service worker の約束、読み取りの流れ、レビュー済みの材料の読み（`reviewed.ts`）、承認・レビュー済みの流れ（`write.ts`）、decide のホスト書き込み（`decide-host.ts`）、PAT の期限、Markdown の消毒） |
@@ -22,7 +22,7 @@ keywords: [設計, 構成, service worker, Pyodide, Web Worker, hosts.json, ccna
 
 ## decide のホスト書き込み
 
-残った指摘の行き先を確定するとき、Python の `decide` が返すホストへの書き込みの計画（issue・返信・解決・コメント）を、
+残った指摘の対応方針を確定するとき、Python の `decide` が返すホストへの書き込みの計画（issue・返信・解決・コメント）を、
 `src/core/decide-host.ts` が順序を守って実行する。
 
 - ホストへの操作は `HostOps` を通す。ボードは service worker 経由の `callOps` を渡し、PAT は service worker だけが持つ。

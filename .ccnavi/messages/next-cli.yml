@@ -64,42 +64,42 @@ messages:
     kind: next
     values: [verb, ticket]
     next: |-
-      上の理由を直して、'{script:ccnavi-ticket.sh} {verb} {ticket}' を打ち直す
+      上記の問題を解消して、'{script:ccnavi-ticket.sh} {verb} {ticket}' を打ち直す
 
   # cancel は --reason を添える。
   NEXT_OPS_REFUSED__CANCEL:
     kind: next
     values: [ticket]
     next: |-
-      上の理由を直して、'{script:ccnavi-ticket.sh} cancel {ticket} --reason <理由>' を打ち直す
+      上記の問題を解消して、'{script:ccnavi-ticket.sh} cancel {ticket} --reason <理由>' を打ち直す
 
   # review-request が、取り込みの前に分かる前提で断ったあと（理由の行のあとに 1 行）。
   NEXT_REVIEW_REQUEST_REFUSED:
     kind: next
     values: [phase]
     next: |-
-      上の理由を直して、'{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文>' を打ち直す
+      上記の問題を解消して、'{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文>' を打ち直す
 
   # confirm が、取り込みの前に分かる前提で断ったあと（理由の行のあとに 1 行）。
   NEXT_CONFIRM_REFUSED:
     kind: next
     values: [phase]
     next: |-
-      上の理由を直して、'{script:ccnavi-review.sh} confirm --phase {phase}' を打ち直す
+      上記の問題を解消して、'{script:ccnavi-review.sh} confirm --phase {phase}' を打ち直す
 
   # ready が、取り込みの前に分かる前提で断ったあと（理由の行のあとに 1 行）。
   NEXT_READY_REFUSED:
     kind: next
     values: [parent]
     next: |-
-      上の理由を直して、親のワークツリーの外から '{script:ccnavi-review.sh} ready --parent {parent}' を打ち直す
+      上記の問題を解消して、親のワークツリーの外から '{script:ccnavi-review.sh} ready --parent {parent}' を打ち直す
 
   # decide が、取り込みの前に分かる前提で断ったあと（理由の行のあとに 1 行）。
   NEXT_DECIDE_REFUSED:
     kind: next
     values: [phase]
     next: |-
-      上の理由を直して、ユーザが '{script:ccnavi-user-decide.sh} {phase}' を打ち直す
+      上記の問題を解消して、ユーザが '{script:ccnavi-user-decide.sh} {phase}' を打ち直す
 
   # 定性のリスク項目の判定を記録したあと。
   NEXT_OPS_RECORD_RISK:
@@ -221,7 +221,7 @@ messages:
   NEXT_APPROVAL_FIX_PROPOSAL:
     kind: next
     next: |-
-      上の理由を直して、approval-request を打ち直す（何も送っていません）
+      上記の問題を解消して、approval-request を打ち直す（何も送っていません）
 
   # 提案を識別子と違う名前のワークツリーに書いている。
   NEXT_APPROVAL_PLACE:
@@ -253,7 +253,7 @@ messages:
     values: [ident]
     note: |-
       書けたら '{script:ccnavi-launcher.sh} --lint' で確かめ、'{script:ccnavi-ticket.sh} approval-request {ident} --check' が通ったら、'{script:ccnavi-ticket.sh} approval-request {ident}'（親の識別子で打つ。子の識別子では打たない）で提案を親のブランチへ送り、承認をユーザに頼んで返事を待つ。承認が済むまで実装はしない
-      plan を変えたら '{script:ccnavi-launcher.sh} --plan-order {ident} --fill-phases' で phases: を再実行します。承認が通らないなど詰まったら、直接実装に切り替えず、ユーザに報告して止まる
+      plan を変えたら '{script:ccnavi-launcher.sh} --plan-order {ident} --fill-phases' を実行して、phases: を更新してください。承認が通らないなど詰まったら、直接実装に切り替えず、ユーザに報告して止まる
 
   # ---- tickets/proposal/revise.py（ticket revise の雛形を書いたあと）
   NOTE_REVISE_FEEDBACK:

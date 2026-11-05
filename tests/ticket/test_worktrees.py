@@ -78,7 +78,7 @@ class ReviewTurnTest(PhaseHarness):
         self.assertTrue(os.path.isdir(tree))
         before = self.next_step("i0001-01-01")
         self.assertIn("次の操作: まだレビュー準備中", before)
-        self.assertIn("親（メインエージェント）だけが実行する", before)
+        self.assertIn("メインエージェントのみ実行可能", before)
         fixture = self.remote()
         requested = self.request(fixture, 1)
         self.assertEqual(requested.returncode, 0, requested.stderr)
@@ -103,7 +103,7 @@ class ReviewTurnTest(PhaseHarness):
         self.child("i0001-01-01")
         with mock.patch.object(phase, "review_next", return_value=""):
             step = self.next_step("i0001-01-01")
-        self.assertIn("依頼済みかを言えない", step)
+        self.assertIn("レビュー依頼済みかどうかを確認できません", step)
         self.assertIn("request", step)
         self.assertNotIn("次の操作: ユーザのレビューを待つ", step)
 

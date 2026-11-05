@@ -428,7 +428,7 @@ class WriteAndPushReviewTest(WriteAndPushHarness):
         rel = f"{APPROVED}/phases/{PARENT}/1.reviewed"
         self.assertEqual(self.committed(), [rel])
         self.assertEqual(
-            self.subjects(1), [f"ccnavi: {PARENT} のフェーズ 1 の指摘の行き先を決めた"]
+            self.subjects(1), [f"ccnavi: {PARENT} のフェーズ 1 の指摘の対応方針を決めた"]
         )
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         # 決めた内容のコメントは、送った後に投稿する。

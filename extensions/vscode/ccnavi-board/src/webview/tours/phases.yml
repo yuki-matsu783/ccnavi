@@ -242,7 +242,7 @@ diagrams:
       - id: confirm
         from: ユーザ
         to: ccnavi
-        text: 指摘が片付いたら、レビュー済みにする。未解決の指摘が残るなら、decideで行き先を選ぶ
+        text: 指摘が片付いたら、レビュー済みにする。未解決の指摘が残るなら、decideで対応方針を選ぶ
         value: ボードの［レビュー完了］、または sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 2
       - id: open
         from: ccnavi

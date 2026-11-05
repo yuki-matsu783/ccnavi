@@ -656,7 +656,7 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
     if (value.followup) {
       title = "対応方針を確定しました";
       note =
-        `直す指摘は、子チケット${value.followup}に載せました（承認済み）。フェーズ${value.phase}は作業に戻ります。` +
+        `直す指摘は、子チケット${value.followup}に載せました（承認済み）。フェーズ${value.phase}は再開します。` +
         // fixのスレッドはホスト上で未解決のまま残る。keep・issueのときにshが返信してresolveする仕組みは対象外
         "直したあとの確認と、MR上の指摘を解決済みにする作業は、ユーザが行います。" +
         (extra > 0 ? `表示した後に増えた指摘${extra}件は、今回は判断していません。` : "");

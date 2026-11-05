@@ -350,7 +350,7 @@ const PREVIEW = {
   threads: [{ key: "k0", url: "", path: "a.ts", line: 1, body: "指摘", version: "v", last_comment: { id: "", at: "", author: "" } }],
 };
 
-test("CX-T273 決める: 開くとプレビューを読み、確定はキー→行き先とダイジェストを ops.decide に渡す。成功の一言と画面の閉じ方", async () => {
+test("CX-T273 決める: 開くとプレビューを読み、確定はキー→対応方針とダイジェストを ops.decide に渡す。成功の一言と画面の閉じ方", async () => {
   const seen: unknown[][] = [];
   let out: DecideOutcome = { kind: "written", oid: "0123456789abcdef", reviewed: false, followup: "i0001-f1", issues: ["https://example.test/issues/9"] };
   const h = harness({
@@ -370,7 +370,7 @@ test("CX-T273 決める: 開くとプレビューを読み、確定はキー→�
   await until(() => h.c.snapshot().result.kind === "written" && !h.c.snapshot().busy, "確定");
   assert.deepEqual(seen.at(-1), ["decide", "i0001", 1, { k0: "issue" }, "v2.aaa"]);
   assert.equal(h.c.snapshot().decide, undefined);
-  assert.match(h.c.snapshot().result.text, /行き先を反映しました。続きの子：i0001-f1。作った issue：https:\/\/example.test\/issues\/9（コミット：0123456）/);
+  assert.match(h.c.snapshot().result.text, /対応方針を反映しました。続きの子：i0001-f1。作った issue：https:\/\/example.test\/issues\/9（コミット：0123456）/);
   // 見せた指摘が変わった: 画面は開いたまま読み直して選び直させる
   out = { kind: "mismatch", message: "指摘が増えました" };
   h.c.actions.decideOpen?.(b, family(), 1);
@@ -436,7 +436,7 @@ test("CX-T295 決める: ホストへ書き込み済みの失敗（conflict・re
 
 test("CX-T296 決める: 再利用した issue は『作った』に数えず、増えた指摘が判断待ちなら文面で言う", () => {
   const text = sayDecide({ kind: "written", oid: "", reviewed: false, followup: "", issues: [], reusedIssues: ["https://example.test/issues/3"], pendingExtra: 2 }).text;
-  assert.match(text, /行き先は反映しましたが、見せた後に増えた指摘 2 件が判断待ちで、フェーズはレビュー済みにしていません/);
+  assert.match(text, /対応方針は反映しましたが、見せた後に増えた指摘 2 件が判断待ちで、フェーズはレビュー済みにしていません/);
   assert.match(text, /既にあった issue 1 件：https:\/\/example.test\/issues\/3/);
   assert.ok(!text.includes("作った issue"));
   const halted = sayDecide({ kind: "halted", done: { issues: [], reusedIssues: ["https://example.test/issues/3"], replied: 0, resolved: 0 }, message: "x" }).text;
@@ -506,7 +506,7 @@ test("CX-T277 決める: 確認文に内訳と続きの子の注意が入る。0
   h.c.actions.decideConfirm?.(b, family(), 1, { a: "fix", b: "keep", z: "issue" }, "v2.aaa");
   await until(() => settled(h), "照合");
   assert.deepEqual(called, []);
-  assert.match(h.c.snapshot().decide?.notice ?? "", /行き先を選んでいない指摘か/);
+  assert.match(h.c.snapshot().decide?.notice ?? "", /対応方針を選んでいない指摘か/);
   h.c.actions.decideConfirm?.(b, family(), 1, { a: "fix", b: "keep", c: "issue" }, "v2.aaa");
   await until(() => called.length === 1 && settled(h), "失敗");
   assert.match(h.log.confirm.at(-1) ?? "", /このフェーズで直す 1 件・issue に回す 1 件・対応しない 1 件）。「このフェーズで直す」が 1 件以上あるので、続きの子チケットを作り/);

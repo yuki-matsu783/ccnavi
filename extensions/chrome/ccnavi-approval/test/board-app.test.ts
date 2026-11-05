@@ -390,7 +390,7 @@ function decideActions(): Actions {
 const radio = (key: string, choice: DecideChoice) => $<HTMLInputElement>(`li[data-key=${key}] input[data-choice=${choice}]`);
 const checkedOf = (key: string) => [...doc.querySelectorAll<HTMLInputElement>(`li[data-key=${key}] input`)].find((i) => i.checked)?.dataset.choice;
 
-test("CX-T270 決める画面: 既定は全件 fix で確定が押せる。一括で全件が切り替わり、個別の選び直しが一括を上書きする。確定はキー→行き先とダイジェストを渡す", async () => {
+test("CX-T270 決める画面: 既定は全件 fix で確定が押せる。一括で全件が切り替わり、個別の選び直しが一括を上書きする。確定はキー→対応方針とダイジェストを渡す", async () => {
   decided.length = 0;
   const fakeActions = decideActions();
   const f = fake({ sections: sections(withThreads(2)), state: "done" });
@@ -449,7 +449,7 @@ test("CX-T272 決める画面: 扱えない指摘は選択肢を出さず理由�
   (f.controller as { actions: Actions }).actions = decideActions();
   await mountOn(f.controller);
   assert.equal(doc.querySelectorAll("li[data-key=k1] input").length, 0);
-  assert.match($("li[data-key=k1] .decide-unsupported").textContent ?? "", /Chrome では扱えません。VS Code で。差分の外のコメントです/);
+  assert.match($("li[data-key=k1] .decide-unsupported").textContent ?? "", /この指摘への対応は Chrome 拡張では行えません。VS Code 拡張で対応方針を確定してください。理由：差分の外のコメントです/);
   assert.equal(doc.querySelector("button[data-action=decide-confirm]"), null);
   assert.equal(doc.querySelectorAll("li[data-key=k0] input").length, 3);
   // 指摘が 0 件のフェーズ

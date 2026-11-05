@@ -1,5 +1,5 @@
 /**
- * Chrome からの残った指摘の行き先（decide）の試験。模擬の GitHub・GitLab と、Node 上の Pyodide（拡張と同じ zip）を使う。
+ * Chrome からの残った指摘の対応方針（decide）の試験。模擬の GitHub・GitLab と、Node 上の Pyodide（拡張と同じ zip）を使う。
  * 読む（preview）から、ホストへ書く（issue・返信・解決）、親のブランチへの 1 コミット、MR へのコメントまでを通す。
  *
  * - 一気通貫: keep・issue・fix の混在、全 fix（ホストに書かない）、0 件（レビュー済み）。書いた順は issue → 返信 → 解決 → コミット → コメント
@@ -100,7 +100,7 @@ async function preview(w: World): Promise<DecidePreview> {
   return await decidePreview(w.repo, FAMILY, 1, w.d);
 }
 
-/** 画面の並びの順に行き先を付ける（足りない分は fix） */
+/** 画面の並びの順に対応方針を付ける（足りない分は fix） */
 function pick(pv: DecidePreview, ...choices: DecideChoice[]): Record<string, DecideChoice> {
   return Object.fromEntries(pv.threads.map((t, i) => [t.key, choices[i] ?? "fix"]));
 }
@@ -327,13 +327,13 @@ for (const kind of KINDS) {
     assert.match(w.mock.w.comments[0], /見せたあとに増えた指摘 1 件は判断待ち/);
   });
 
-  test(`CX-T363 ${label}: 見せたあとに指摘が増えて積むものが無ければ、文面は「行き先は反映したが、増えた指摘が判断待ち」と言う`, async () => {
+  test(`CX-T363 ${label}: 見せたあとに指摘が増えて積むものが無ければ、文面は「対応方針は反映したが、増えた指摘が判断待ち」と言う`, async () => {
     const w = world(kind, threadsOf(kind, 2));
     const pv = await preview(w);
     w.mock.w.threads.push(threadsOf(kind, 3)[2]);
     const out = written(await decidePhase(w.repo, FAMILY, 1, pick(pv, "keep", "keep"), pv.digest, w.d));
     assert.equal(out.pendingExtra, 1);
-    assert.match(sayDecide(out).text, /行き先は反映しましたが、見せた後に増えた指摘 1 件が判断待ちで、フェーズはレビュー済みにしていません/);
+    assert.match(sayDecide(out).text, /対応方針は反映しましたが、見せた後に増えた指摘 1 件が判断待ちで、フェーズはレビュー済みにしていません/);
   });
 
   test(`CX-T364 ${label}: ホストの読み取りが遅れて、書いた解決が次の取得に映らなくても、短く待って取り直して完了する`, async () => {
