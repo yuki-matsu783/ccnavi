@@ -32,9 +32,9 @@ export interface Actions {
   approve(repo: RepoBoard, family: FamilyBoard): void;
   /** レビュー済みにする。渡さなければ「レビュー済みにする」を出さない */
   review?(repo: RepoBoard, family: FamilyBoard, phase: number): void;
-  /** 残った指摘の行き先を決める画面を開く（プレビューを読む）。渡さなければ画面を出さない */
+  /** 残った指摘の対応方針を決める画面を開く（プレビューを読む）。渡さなければ画面を出さない */
   decideOpen?(repo: RepoBoard, family: FamilyBoard, phase: number): void;
-  /** 選んだ行き先（キー → 行き先）と、見せたダイジェストで確定する */
+  /** 選んだ対応方針（キー → 対応方針）と、見せたダイジェストで確定する */
   decideConfirm?(repo: RepoBoard, family: FamilyBoard, phase: number, choices: Readonly<Record<string, DecideChoice>>, digest: string): void;
   /** 決める画面を閉じる */
   decideCancel?(): void;
@@ -112,7 +112,7 @@ export interface BoardSnapshot {
   readonly banner: readonly BannerLine[];
   readonly status: StatusLine;
   readonly result: ResultLine;
-  /** 残った指摘の行き先を決める画面（開いていなければ無い） */
+  /** 残った指摘の対応方針を決める画面（開いていなければ無い） */
   readonly decide?: DecideState;
   /** 書く操作の最中 */
   readonly busy: boolean;
@@ -131,7 +131,7 @@ export interface BoardOps {
   /** 決める画面の材料（残った指摘とダイジェスト）を読む。書かない */
   readonly decidePreview: (repo: RepoConfig, family: string, phase: number, deps: WriteDeps) => Promise<DecidePreview>;
   /**
-   * 選んだ行き先を、issue・返信・解決の順にホストへ書いてから親のブランチへ 1 コミットする。
+   * 選んだ対応方針を、issue・返信・解決の順にホストへ書いてから親のブランチへ 1 コミットする。
    * `choices` が空（未解決の指摘が 0 件）のときは、「レビュー済みにする」と同じ結果（`reviewed: true`）にする。
    */
   readonly decide: (
@@ -197,7 +197,7 @@ const DEFAULT_OPS: BoardOps = {
 export function sayDecide(out: DecideOutcome): ResultLine {
   if (out.kind === "written") {
     const extra = out.pendingExtra ?? 0;
-    const head = out.reviewed ? "レビュー済みにしました" : extra > 0 && !out.followup ? `行き先は反映しましたが、見せた後に増えた指摘 ${extra} 件が判断待ちで、フェーズはレビュー済みにしていません` : "行き先を反映しました";
+    const head = out.reviewed ? "レビュー済みにしました" : extra > 0 && !out.followup ? `対応方針は反映しましたが、見せた後に増えた指摘 ${extra} 件が判断待ちで、フェーズはレビュー済みにしていません` : "対応方針を反映しました";
     const parts = [head];
     if (out.followup) parts.push(`続きの子：${out.followup}`);
     if (extra > 0 && out.followup) parts.push(`見せた後に増えた指摘 ${extra} 件は判断待ちで、フェーズはレビュー済みにしていません`);
@@ -219,7 +219,7 @@ export function sayDecide(out: DecideOutcome): ResultLine {
     };
   }
   if (out.kind === "mismatch") return { kind: "changed", className: "notice error", text: `指摘が変わっていたので反映していません：${out.message}` };
-  return sayOutcome(out, "指摘の行き先");
+  return sayOutcome(out, "指摘の対応方針");
 }
 
 function newStats(): Stats {
@@ -250,10 +250,10 @@ function decideMessage(family: string, phase: number, choices: Readonly<Record<s
   const n = (c: DecideChoice): number => Object.values(choices).filter((v) => v === c).length;
   const parts = `${DECIDE_LABELS.fix} ${n("fix")} 件・${DECIDE_LABELS.issue} ${n("issue")} 件・${DECIDE_LABELS.keep} ${n("keep")} 件`;
   const fix = n("fix") > 0 ? `「${DECIDE_LABELS.fix}」が 1 件以上あるので、続きの子チケットを作り、このフェーズを再開します。` : "";
-  return `${family} のフェーズ ${phase} の残った指摘の行き先を反映します（${parts}）。${fix}issue の作成、スレッドへの返信、スレッドの解決の順にホストへ書いてから、親のブランチへ1つのコミットとして反映します。${warn}`;
+  return `${family} のフェーズ ${phase} の残った指摘の対応方針を反映します（${parts}）。${fix}issue の作成、スレッドへの返信、スレッドの解決の順にホストへ書いてから、親のブランチへ1つのコミットとして反映します。${warn}`;
 }
 
-/** 読み取った指摘のキーが空か重複していれば理由を返す（行き先を結ぶキーとして使えない） */
+/** 読み取った指摘のキーが空か重複していれば理由を返す（対応方針を結ぶキーとして使えない） */
 function previewProblem(preview: DecidePreview): string {
   const seen = new Set<string>();
   for (const t of preview.threads) {
@@ -264,14 +264,14 @@ function previewProblem(preview: DecidePreview): string {
   return "";
 }
 
-/** 選んだ行き先が、見せた指摘の全部に 1 つずつ付いているか。付いていなければ理由を返す */
+/** 選んだ対応方針が、見せた指摘の全部に 1 つずつ付いているか。付いていなければ理由を返す */
 function choicesProblem(preview: DecidePreview, choices: Readonly<Record<string, DecideChoice>>, digest: string): string {
   if (digest !== preview.digest) return "見せた指摘と確定の内容が食い違っています。閉じて開き直してください";
   if (preview.threads.some((t) => t.unsupported)) return "Chrome では扱えない指摘があります。VS Code で決めてください";
   const keys = preview.threads.map((t) => t.key);
   const given = Object.keys(choices);
-  if (given.length !== keys.length || !keys.every((k) => k in choices)) return "行き先を選んでいない指摘か、見せていない指摘があります";
-  if (!given.every((k) => DECIDE_CHOICES.includes(choices[k]))) return "不明な行き先があります";
+  if (given.length !== keys.length || !keys.every((k) => k in choices)) return "対応方針を選んでいない指摘か、見せていない指摘があります";
+  if (!given.every((k) => DECIDE_CHOICES.includes(choices[k]))) return "不明な対応方針があります";
   return "";
 }
 
@@ -475,7 +475,7 @@ export function createBoardController(env: BoardEnv): BoardController {
     },
     start(repoBoard, issue) {
       void act(async () => {
-        if (!env.confirm(`Issue #${issue.number} から作業を始めます。issue を閉じる開いたマージリクエストがあれば、その元ブランチを採用します（ブランチもマージリクエストも作りません）。無ければ、統合先 ${repoBoard.integration?.name ?? ""} の最新コミットを起点に、親ブランチと Draft のマージリクエストを作成します。`)) return false;
+        if (!env.confirm(`Issue #${issue.number} から作業を始めます。この Issue をクローズする、オープン状態のマージリクエストがあれば、そのソースブランチを使用します（ブランチもマージリクエストも作りません）。無ければ、統合先 ${repoBoard.integration?.name ?? ""} の最新コミットを起点に、親ブランチと Draft のマージリクエストを作成します。`)) return false;
         const deps = await writeDeps(repoBoard.repo);
         const taken = [...repoBoard.candidates, ...repoBoard.families.map((f) => f.family.name)];
         const out = await ops.startIssue(repoBoard.repo, issue, repoBoard.seen ?? null, taken, deps);

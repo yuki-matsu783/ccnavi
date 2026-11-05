@@ -277,7 +277,7 @@ export const py = {
       phase: number;
       result: unknown;
       mode: "preview" | "apply";
-      /** apply のとき必須。指摘のキー → 行き先 */
+      /** apply のとき必須。指摘のキー → 対応方針 */
       choices?: Readonly<Record<string, string>>;
       /** apply のとき必須。preview が返した digest */
       shown_digest?: string;

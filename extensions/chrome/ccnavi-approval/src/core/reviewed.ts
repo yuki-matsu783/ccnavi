@@ -79,7 +79,7 @@ export async function askConfirm(call: PyCall, ask: Ask, input: ConfirmInput): P
 
 export interface DecideInput extends ConfirmInput {
   readonly mode: "preview" | "apply";
-  /** apply のとき。指摘のキー → 行き先 */
+  /** apply のとき。指摘のキー → 対応方針 */
   readonly choices?: Readonly<Record<string, DecideChoice>>;
   /** apply のとき。preview が返した digest */
   readonly digest?: string;
@@ -119,11 +119,11 @@ export interface ReviewPanel {
   readonly problems: readonly string[];
   /** 読めなかった・扱えない（GitLab など）理由 */
   readonly error: string;
-  /** 残った指摘の行き先を決める画面の材料（未解決の指摘があるときに、読めていれば入る） */
+  /** 残った指摘の対応方針を決める画面の材料（未解決の指摘があるときに、読めていれば入る） */
   readonly decide?: DecidePreview;
 }
 
-/** 残った指摘の行き先。対応しない・このフェーズで直す（続きの子）・issue に回す */
+/** 残った指摘の対応方針。対応しない・このフェーズで直す（続きの子）・issue に回す */
 export type DecideChoice = "keep" | "fix" | "issue";
 
 export const DECIDE_CHOICES: readonly DecideChoice[] = ["keep", "fix", "issue"];
@@ -145,7 +145,7 @@ export interface DecideThread {
   readonly version: string;
   /** 最後のコメント（再提起を見分ける）。取れなければ空 */
   readonly last_comment: { readonly id: string; readonly at: string; readonly author: string };
-  /** Chrome では扱えない理由（解決できない種類のスレッドなど）。あれば行き先を選ばせない */
+  /** Chrome では扱えない理由（解決できない種類のスレッドなど）。あれば対応方針を選ばせない */
   readonly unsupported?: string;
 }
 

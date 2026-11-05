@@ -16,7 +16,7 @@ import { Review, type DecideHandlers } from "./Review.js";
 export interface FamilyActions {
   approve(): void;
   review?(phase: number): void;
-  /** 残った指摘の行き先を決める画面。渡さなければ画面を出さない */
+  /** 残った指摘の対応方針を決める画面。渡さなければ画面を出さない */
   decide?: Omit<DecideHandlers, "state">;
 }
 

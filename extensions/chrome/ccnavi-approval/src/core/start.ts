@@ -114,7 +114,7 @@ export async function startIssue(
     if (open.length > 1) {
       return {
         kind: "refused",
-        message: `Issue #${issue.number} を閉じる開いたマージリクエストが ${open.length} 本あります（${open.map((m) => `!${m.number} ${m.branch}`).join("、")}）。どれで続けるかを決めてから、手元で ccnavi-start.sh --mr <番号> を実行してください。`,
+        message: `Issue #${issue.number} をクローズする、オープン状態のマージリクエストが ${open.length} 本あります（${open.map((m) => `!${m.number} ${m.branch}`).join("、")}）。どれで続けるかを決めてから、手元で ccnavi-start.sh --mr <番号> を実行してください。`,
       };
     }
     if (open.length === 1) {

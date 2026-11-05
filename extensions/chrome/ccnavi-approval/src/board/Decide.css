@@ -1,5 +1,5 @@
 /*
- * 残った指摘の行き先を決める画面（`Decide.tsx`）。VS Code 拡張の決める画面（`Approval.css` の `.decide-*`）と同じ作り。
+ * 残った指摘の対応方針を決める画面（`Decide.tsx`）。VS Code 拡張の決める画面（`Approval.css` の `.decide-*`）と同じ作り。
  * 3 択のラジオは見えなくして、ラベルを同じ寸法の切り替えにする（フォーカスと矢印キーの操作はラジオのまま）。
  */
 .decide { border-top: 1px solid var(--vscode-panel-border); margin-top: 8px; padding-top: 4px; }

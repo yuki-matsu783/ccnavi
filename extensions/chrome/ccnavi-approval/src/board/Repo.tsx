@@ -22,7 +22,7 @@ export interface RepoProps {
   readonly attention?: Readonly<Record<string, string>>;
   /** 読んだ issue の一覧（「始める」） */
   readonly issues?: IssueList;
-  /** 残った指摘の行き先を決める画面（開いているとき） */
+  /** 残った指摘の対応方針を決める画面（開いているとき） */
   readonly decide?: DecideState;
 }
 

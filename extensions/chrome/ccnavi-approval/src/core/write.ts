@@ -542,7 +542,7 @@ export async function confirmPhase(repo: RepoConfig, family: string, phase: numb
 }
 
 
-// ---- 残った指摘の行き先を決める（decide） --------------------------------------------------------
+// ---- 残った指摘の対応方針を決める（decide） --------------------------------------------------------
 
 /** 途中で止まったときの、済んだ分 */
 export interface DecideDone {
@@ -652,7 +652,7 @@ function afterHost(out: Exclude<Outcome, { readonly kind: "written" }>, note: st
 const CARRY_TRIES = 3;
 
 /**
- * 選んだ行き先を反映する。順序は次のとおり。(1) 見せた指摘のまま通るかを Python に聞き、計画（`host_plan`）を得る。
+ * 選んだ対応方針を反映する。順序は次のとおり。(1) 見せた指摘のまま通るかを Python に聞き、計画（`host_plan`）を得る。
  * (2) 書く前の確かめ（権限・Chrome で扱えない種類）。(3) ホストへ issue・返信・解決を書く（`writeLoop` の外で 1 度だけ）。
  * (4) 読み直して、`writeLoop` で親のブランチへ 1 コミットする。(5) MR にコメントを投稿する。
  *
@@ -706,7 +706,7 @@ export async function decidePhase(
       const res = await askDecide(deps.py, ask, { ...base, snapshot: read.input, copy, stamp: localStamp(deps.now()), carry: [] });
       if (res.code === DECIDE_MISMATCH || res.mismatch) return { kind: "mismatch", message: res.problems.join("\n") || "見せた指摘が今の指摘と違います" };
       if (res.problems.length > 0 || !res.host_plan) {
-        return { kind: "refused", message: res.problems.join("\n") || "残った指摘の行き先を反映できません", ...codeOf(res) };
+        return { kind: "refused", message: res.problems.join("\n") || "残った指摘の対応方針を反映できません", ...codeOf(res) };
       }
       const plan = res.host_plan;
       planned = { comment: plan.comment, followup: res.followup };
@@ -764,7 +764,7 @@ export async function decidePhase(
       return { kind: "stop", outcome: { kind: "changed", message: res.problems.join("\n") || "見せた指摘が今の指摘と違います", code: DECIDE_MISMATCH } };
     }
     if (res.problems.length > 0 || res.stopped) {
-      return { kind: "stop", outcome: { kind: "refused", message: res.problems.join("\n") || (res.stopped ? `${res.stopped.ticket}: ${res.stopped.reason}` : "残った指摘の行き先を反映できません"), ...codeOf(res) } };
+      return { kind: "stop", outcome: { kind: "refused", message: res.problems.join("\n") || (res.stopped ? `${res.stopped.ticket}: ${res.stopped.reason}` : "残った指摘の対応方針を反映できません"), ...codeOf(res) } };
     }
     last = res;
     if (!res.changes || Object.keys(res.changes).length === 0) return { kind: "stop", outcome: NO_COMMIT };
@@ -772,7 +772,7 @@ export async function decidePhase(
     if (typeof rows === "string") return { kind: "stop", outcome: { kind: "refused", message: rows } };
     const message = res.reviewed
       ? commitMessage([family], `のフェーズ ${phase} のレビュー済みを置いた`, "レビュー済みを置いた", deps.version)
-      : commitMessage([family], `のフェーズ ${phase} の残った指摘の行き先を反映`, "行き先を反映した", deps.version);
+      : commitMessage([family], `のフェーズ ${phase} の残った指摘の対応方針を反映`, "対応方針を反映した", deps.version);
     return { kind: "rows", rows, message, lines: res.lines };
   });
 

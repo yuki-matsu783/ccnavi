@@ -1011,7 +1011,7 @@ def _op_confirm(req: dict, root: str) -> dict:
 
 
 def _op_decide(req: dict, root: str) -> dict:
-    """残った指摘の行き先（keep・fix・issue）を決める。書かない。
+    """残った指摘の対応方針（keep・fix・issue）を決める。書かない。
 
     VS Code のボードの decide と同じ判断を、Chrome が直接書く形で行う。Python はネットワークに出ない
     ので、ホストへの書き込み（issue の作成、スレッドへの返信、解決、MR へのコメント）は計画
