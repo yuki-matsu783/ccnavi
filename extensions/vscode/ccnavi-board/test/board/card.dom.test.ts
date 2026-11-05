@@ -156,43 +156,29 @@ test("CB-D703 ユーザ待ち: バッジが「レビュー待ち」の子には�
   }
 });
 
-test("CB-D704 フェーズ行: 一言（9通り）・手で動かした注意の1行・レビュー待ちの行の［MRを開く］［レビュー完了］。複数が同時に待てば行ごとに置く", async () => {
+test("CB-D704 フェーズ行: 一言（9通り）・手で動かした注意の1行。行に［MRを開く］［レビュー完了］は置かない（子のカードだけ）", async () => {
   const page = await openBoard(scene());
   try {
     const rows = page.all(`${card(page, "busy")} .phase`);
     assert.deepEqual(rows.map((r) => r.querySelector(".phase-status")?.textContent), ["レビュー省略", "レビュー待ち"]);
     assert.deepEqual(rows.map((r) => r.querySelector(".phase-label")?.textContent), ["1（調査）", "2（設計）"]);
-    assert.equal(rows[0].querySelectorAll(".phase-actions").length, 0, "操作の無い行には2段目を出さない");
+    assert.equal(page.all(`${card(page, "busy")} .phase button, ${card(page, "busy")} .phase a`).length, 0, "フェーズ行にボタンやリンクを置かない");
     assert.equal(rows[1].querySelector(".phase-manual")?.textContent, "手で動かした子の確認待ち");
     assert.equal(rows[0].querySelectorAll(".phase-manual").length, 0);
     assert.ok(rows[1].classList.contains("review-hold"));
-    assert.equal(rows[1].querySelector("a.card-button")?.getAttribute("href"), "https://example.com/o/r/pull/18");
-    const done = rows[1].querySelector('button[data-action="review-done"]')!;
-    assert.ok(done.classList.contains("card-button") && done.classList.contains("primary"));
-    page.click(done);
-    await page.settle();
-    assert.deepEqual(page.posted.at(-1), { type: "decide", parent: "busy", phase: 2 });
     // 状態は1か所にだけ描く。段の名前やマーカーの経過は出さない
     assert.ok(!rows[1].textContent.includes("レビュー依頼済み"));
   } finally {
     await page.close();
   }
-  // 複数のフェーズが同時にレビュー待ち: それぞれの行に置く。主ボタンは行ごとに1つ
+  // 複数のフェーズが同時にレビュー待ちでも、親のフェーズ行にボタンは置かない
   const two = await openBoard(boardOf([ticketJson("p")], [parentJson("p", [waitingPhase(1, 11), waitingPhase(2, 22, "https://example.com/o/r/pull/22")])]));
   try {
     const rows = two.all(`${card(two, "p")} .phase`);
     assert.equal(rows.length, 2);
     for (const [i, row] of rows.entries()) {
-      assert.equal(row.querySelectorAll("button.primary").length, 1, `行${i + 1}`);
-      assert.equal(row.querySelectorAll('button[data-action="review-done"]').length, 1);
-      assert.equal(row.querySelector("a.card-button")?.getAttribute("href"), `https://example.com/o/r/pull/${(i + 1) * 11}`);
+      assert.equal(row.querySelectorAll("button, a.card-button").length, 0, `行${i + 1}`);
     }
-    two.click(two.one(`${card(two, "p")} .phase[data-phase="1"] button.primary`));
-    await two.settle();
-    assert.deepEqual(two.posted.at(-1), { type: "decide", parent: "p", phase: 1 });
-    two.click(two.one(`${card(two, "p")} .phase[data-phase="2"] button.primary`));
-    await two.settle();
-    assert.deepEqual(two.posted.at(-1), { type: "decide", parent: "p", phase: 2 });
   } finally {
     await two.close();
   }
@@ -225,7 +211,7 @@ test("CB-D705 操作のまとまりごとに主ボタンは1つ以下。操作�
     }
     // 操作のMRリンク（open-mr）は全部card-button
     const mrLinks = page.all("li.card a[data-action='open-mr']");
-    assert.ok(mrLinks.length >= 3);
+    assert.ok(mrLinks.length >= 1);
     for (const a of mrLinks) {
       assert.ok(a.classList.contains("card-button"));
     }
@@ -234,7 +220,7 @@ test("CB-D705 操作のまとまりごとに主ボタンは1つ以下。操作�
     for (const a of inDetails) {
       assert.ok(!a.classList.contains("card-button"));
     }
-    // 操作のまとまりごとに主ボタンは1つ以下: ユーザ待ち・各フェーズ行・補助の操作
+    // 操作のまとまりごとに主ボタンは1つ以下: ユーザ待ち・補助の操作
     const groups = page.all("li.card .turn, li.card .phase, li.card .card-actions");
     assert.ok(groups.length >= 5);
     for (const g of groups) {
@@ -242,9 +228,9 @@ test("CB-D705 操作のまとまりごとに主ボタンは1つ以下。操作�
     }
     // 補助の操作は通常の色（主ボタンにしない）
     assert.equal(page.all("li.card .card-actions .primary").length, 0);
-    // 親の「ユーザ待ち」は承認の1つだけ、フェーズ行の［レビュー完了］は行ごと
+    // 親の「ユーザ待ち」は承認の1つだけ、フェーズ行にボタンは無い
     assert.equal(page.all(`${card(page, "rev")} .turn button.primary`).length, 1);
-    assert.equal(page.all(`${card(page, "rev")} .phase button.primary`).length, 2);
+    assert.equal(page.all(`${card(page, "rev")} .phase button`).length, 0);
     // 補助の操作が3つ種類とも出る
     assert.equal(page.all('button[data-action="flow"]').length, 1);
     assert.equal(page.all('button[data-action="workflow"]').length, 1);
@@ -466,10 +452,6 @@ test("CB-D711 カードを押す（または焦点を当ててEnter）とチケ�
     const before = opened();
     page.key("Enter", page.one(`${target} button[data-action="review-done"]`));
     page.key("Enter", page.one(`${target} details > summary`));
-    assert.equal(opened(), before);
-    // フェーズ行のボタンも同じ
-    page.click(page.one(`${card(page, "p")} .phase button[data-action="review-done"]`));
-    await page.settle();
     assert.equal(opened(), before);
   } finally {
     await page.close();

@@ -272,7 +272,7 @@ test("CB-T609 親のバッジ: アーカイブの親は完了（取り消しな�
 
 // --- 操作（ユーザ待ち） ---
 
-test("CB-T610 操作: 子の承認待ち + レビュー待ちは承認だけ。親は承認待ちなら承認、レビュー完了は各フェーズ行に置く。改版の承認待ちとレビュー待ちが同時でもそれぞれ", () => {
+test("CB-T610 操作: 子の承認待ち + レビュー待ちは承認だけ。親は承認待ちなら承認、レビュー完了は子のカードだけに置く。改版の承認待ちとレビュー待ちが同時でも、それぞれの操作が付く", () => {
   const json = pending(
     boardOf(
       [
@@ -291,13 +291,10 @@ test("CB-T610 操作: 子の承認待ち + レビュー待ちは承認だけ。�
   // 子: バッジがレビュー待ち → レビュー完了（承認は出ない）
   assert.equal(label(cards.get("r")), "レビュー待ち");
   assert.deepEqual(cards.get("r")!.actions.map((a) => a.kind), ["review"]);
-  // 親: 改版の承認待ちがバッジ。承認はカード、レビュー完了は同時に待っている2フェーズそれぞれの行
+  // 親: 改版の承認待ちがバッジ。承認はカード。フェーズ行に操作は無い
   const p = cards.get("p")!;
   assert.equal(p.status.label, "承認待ち（改版）");
   assert.deepEqual(p.actions, [{ kind: "approve" }]);
-  assert.deepEqual(p.phases.map((c) => c.actions.map((a) => a.kind)), [["review"], ["review"]]);
-  assert.deepEqual(p.phases.map((c) => (c.actions[0] as { phase: number }).phase), [1, 2]);
-  assert.deepEqual(p.phases.map((c) => (c.actions[0] as { mrUrl: string }).mrUrl), ["https://example.com/o/r/pull/11", "https://example.com/o/r/pull/22"]);
 });
 
 test("CB-T1247 開始前・作業中・レビュー準備中のバッジは、ツールチップに次の一手（誰の番か）を添える", () => {
