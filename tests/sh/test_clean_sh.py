@@ -21,7 +21,7 @@ import sys
 import tempfile
 import unittest
 
-from tests import ROOT, common_sh
+from tests import ROOT, common_sh, put_messages
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
@@ -306,6 +306,7 @@ class WorktreeOptionTest(unittest.TestCase):
             f"#!/bin/sh\nPYTHONPATH='{ROOT}/src' exec '{sys.executable}' -m ccnavi \"$@\"\n",
         )
         os.chmod(self.bin, 0o755)
+        put_messages(self.ws)
         git(self.ws, "init", "-q", "-b", "main")
         git(self.ws, "config", "user.email", "t@example.invalid")
         git(self.ws, "config", "user.name", "t")
