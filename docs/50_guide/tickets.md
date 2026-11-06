@@ -210,9 +210,9 @@ Write / Edit の対象が `.claude/worktrees/<名前>/` の中なら、その名
 - 改版で変えられるのは `plan`・`feedback`・`phases:`・範囲だけである。範囲を変える改版は、作業中（`doing/`）の子が居ないときだけ通る
 - 改版は、承認済みチケットが在るツリー（親のワークツリーがあればそこ）の `todo/` に書く。ほかのツリーに書いた改版は承認待ちに入らず、`ccnavi-user-agree.sh` と `--lint` が置き場を名指しする
 
-すぐ始まるステップに子の提案が無い親の提案は、承認の確認と `approval-request` が警告する（止めないが、親だけを承認すると子の承認がもう 1 回要る）。承認済みの親の改版の雛形は、エージェントが `ccnavi ticket revise` で作る。親を閉じる前の、フィードバック計画なし（`feedback: []`）の改版は `--feedback` を付ける。
+すぐ始まるステップに子の提案が無い親の提案は、承認の確認と `approval-request` が警告する（止めないが、親だけを承認すると子の承認がもう 1 回要る）。承認済みの親の改版の雛形は、エージェントが `sh .ccnavi/scripts/ccnavi-launcher.sh ticket revise` で作る。親を閉じる前の、フィードバック計画なし（`feedback: []`）の改版は `--feedback` を付ける。
 
-提案の雛形は、エージェントが `ccnavi ticket new` で作る（書式は [.ccnavi/docs/proposal-format.md](../../.ccnavi/docs/proposal-format.md)）。
+提案の雛形は、エージェントが `sh .ccnavi/scripts/ccnavi-launcher.sh ticket new` で作る（書式は [.ccnavi/docs/proposal-format.md](../../.ccnavi/docs/proposal-format.md)）。
 
 ## 実績のリスク
 
