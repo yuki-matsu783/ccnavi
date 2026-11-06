@@ -229,7 +229,7 @@ def unmatched_scopes(conf: settings.Settings, root: str) -> list[Problem]:
                 problems.append(
                     Problem(
                         SEVERITY_WARN,
-                        f"{where} (phases) {ident}".rstrip(),
+                        f"{where} (phases) {ident}",
                         f"`scope` の `{entry.glob}` がどのファイルにも当たりません。"
                         "この配置では範囲に合う型が無く、作業が止まります。"
                         "このレイヤーの `.ccnavi/config/project/phases.yml` に、実際の置き場を"

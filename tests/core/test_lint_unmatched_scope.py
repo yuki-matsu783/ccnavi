@@ -57,6 +57,16 @@ class UnmatchedScopes(unittest.TestCase):
         write(os.path.join(self.root, "tests/test_a.py"))
         self.assertEqual(self.problems(), [])
 
+    def test_wip_scope_is_not_reported(self):
+        write(os.path.join(self.root, "src/a.py"))
+        write(os.path.join(self.root, "tests/test_a.py"))
+        # wip/research/* は空でも言わない（上の PHASES の research）
+        self.assertFalse(any("research" in p.rule for p in self.problems()))
+
+    def test_not_a_git_repository_is_silent(self):
+        shutil.rmtree(os.path.join(self.root, ".git"))
+        self.assertEqual(self.problems(), [])
+
 
 if __name__ == "__main__":
     unittest.main()
