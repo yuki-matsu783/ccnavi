@@ -1,0 +1,111 @@
+package useronly
+
+// seedCommands は Python の hook のテスト（tests/guard/test_user_entry.py・test_cleanup_forms.py・test_repo_rules.py・
+// test_prune_form.py、tests/ticket の plan-order・fill-phases）が止める形・通す形として並べたコマンド。
+// CLI を通すテストは移さないので、判定の部品の答えをここで Python と突き合わせる。
+var seedCommands = []string{
+	// user の入口
+	"ccnavi user agree", "ccnavi user prune", "ccnavi --entry sh --root '' user agree",
+	`ccnavi --root "" --entry board user mirror`, "ccnavi --cwd '' user agree", "ccnavi --root '' user handoff --json",
+	"ccnavi -- user agree", "ccnavi --root /x user reviewed 3", "sh .ccnavi/scripts/ccnavi-launcher.sh user agree",
+	"ccnavi $X agree", "ccnavi --root /x u${X}ser agree", "ccnavi us*r agree",
+	// ユーザ専用の sh
+	"sh .ccnavi/scripts/ccnavi-user-agree.sh", "bash -x .ccnavi/scripts/ccnavi-user-forget.sh P",
+	"flock /tmp/l sh .ccnavi/scripts/ccnavi-user-close-early.sh --reason r", "cd /x && sh /tmp/copy/CCNAVI-USER-DECIDE.SH 3",
+	"setsid sh .ccnavi/scripts/ccnavi-user-clean-branch.sh i0001-01-01",
+	"sh .ccnavi/scripts/ccnavi-user-clean-branch.sh i0001-01-01 --confirmed",
+	"bash -x .ccnavi/scripts/ccnavi-user-clean-branch.sh --confirmed i0001-01-01",
+	// ボードの経路
+	"/tmp/x user agree --yes i1 --digest d", "uv run python main.py user agree --yes i1 --digest d",
+	"flock /tmp/l ccnavi user reviewed 3 --accept-unresolved --yes 1",
+	`python3 -c "import subprocess;subprocess.run(['c','user','agree','--yes','i1'])"`,
+	"/tmp/x user handoff a.md --yes --expect h --via board --json", "/tmp/x user mirror lib --yes --expect h --via board --json",
+	`python3 -c "import subprocess;subprocess.run(['c','user','mirror','--yes'])"`,
+	`python3 -c "import subprocess;subprocess.run(['c','user','handoff','--yes'])"`, "/tmp/x --agree --yes i1 --digest d",
+	"/tmp/x foo --via board", "/tmp/x --handoff a.md --via=board", "/tmp/x --via board --json",
+	"/tmp/x user handoff a.md --y$X --expect h --via board", "sh .ccnavi/scripts/ccnavi-review.sh decide 3 --choices c --digest d",
+	// 読むだけ
+	"ccnavi --docs --keyword user", "ccnavi --keyword user --docs", "ccnavi --agree --preview --json",
+	"ccnavi --agree --preview --verify", "ccnavi --prune --preview", "grep -rn 'user agree' docs",
+	"cat docs/30_adr/rules/0143-user-only-entries-are-separate.md", "ccnavi --lint", "ccnavi --templates --json",
+	"ccnavi --templates --draft i0001", "grep -rn 'user handoff' docs", "grep -n 'ccnavi --agree --yes' README.md",
+	"echo ccnavi --agree --yes x", "grep -rn ccnavi --yes docs", "git log --grep ccnavi --yes",
+	"git commit -m 'docs: ccnavi --agree --yes の説明'", "sh .ccnavi/scripts/ccnavi-git.sh commit -m 'user --via board'",
+	`git commit -m "$(echo ccnavi --agree --yes)"`,
+	// Python から走らせる表記
+	"python3 -u -m ccnavi user agree", "python3 -I -m ccnavi user agree", "python3 -OO -m ccnavi user handoff",
+	"python3 -W ignore -m ccnavi user agree", "python3 -Wignore -m ccnavi user agree", "python3 -X utf8 -m ccnavi user agree",
+	"python3 -Xutf8 -m ccnavi user agree", "python3 -Im ccnavi user agree", "python3 -mccnavi user agree",
+	"python3 -m ccnavi.__main__ user agree", "/usr/bin/python3.12 -B -m ccnavi user reviewed 3", "python3 main.py user agree",
+	"python3 /repo/main.py user handoff", "py -m ccnavi user agree", "py -3 -m ccnavi user agree",
+	"python3 -u -m ccnavi ticket finish i0001", "uv run python -m ccnavi user agree", "uv run --frozen python -m ccnavi user agree",
+	"uv run --with x --project /p python3 -u -m ccnavi user agree", "uv run -m ccnavi user agree", "uv run main.py user close-early",
+	"poetry run python -m ccnavi user agree", "pipenv run python -m ccnavi user agree", "poetry run ccnavi user agree",
+	"python3 -u -m ccnavi $X agree", "poetry run ccnavi $X agree",
+	// 展開を含むオプション
+	"/tmp/x user agree --y${X}es i1", "/tmp/x user agree --y$(echo es) i1", "/tmp/x user agree --y`echo es` i1",
+	`/tmp/x user handoff a.md "--y$X" --expect h`, "/tmp/x --root /w user agree --${Y}",
+	"env CCNAVI_GUARD_TICKET_${X}APPROVAL=disable /tmp/x user agree", "env CCNAVI_GUARD_${X}=disable /tmp/x user agree --yes i1",
+	"export CCNAVI_GUARD_TICKET_$(printf APPROVAL)=disable", "env CCNAVI_GUARD_TICKET_`echo APPROVAL`=disable /tmp/x",
+	"python3 -u -m ccnavi --agree --preview --json", "python3 -m ccnavi --prune --preview", "uv run python -m ccnavi --docs --keyword user",
+	"python3 -m ccnavi --templates --draft i0001", "python3 -m unittest discover -s tests/guard", "uv run --frozen python -m pytest -q",
+	"py -m pip list", "python3 build.py", "echo user --x=$Y", "echo $CCNAVI_ROOT$X", "ls ${CCNAVI_HOME}",
+	"sh .ccnavi/scripts/ccnavi-ticket.sh status", "sh .ccnavi/scripts/ccnavi-review.sh decide 3 --preview",
+	// ターミナル要求を切る形
+	"CCNAVI_GUARD_TICKET_APPROVAL=disable ccnavi --agree x", "export CCNAVI_GUARD_TICKET_APPROVAL=0",
+	"echo $CCNAVI_GUARD_TICKET_APPROVAL", "echo ${CCNAVI_GUARD_TICKET_APPROVAL}", "ls; echo $env:CCNAVI_GUARD_TICKET_APPROVAL",
+	"ccnavi --guard-ticket-approval disable --agree x", "ccnavi --guard-ticket-approval=enable --agree --preview",
+	"ccnavi --GUARD-TICKET-APPROVAL = off", "X=$CCNAVI_GUARD_TICKET_APPROVAL ccnavi",
+	// 片付けとサブコマンド
+	"ccnavi --record-writes /a --record-tree /b ticket -- finish i0001-01-01", "python -m ccnavi ticket -- cancel i0001-01-01",
+	"ccnavi review -- ready --result /tmp/r.json", "ccnavi ticket --  start i0001", "ccnavi ticket -- status",
+	"ccnavi sync tidy i0001 self i0001 0123456789abcdef", "ccnavi --cwd /x sync -- tidy i0001 self i0001 0123456789abcdef",
+	"python -m ccnavi worktree retire i0001", "uv run python -m ccnavi worktree retire i0001",
+	".ccnavi/bin/ccnavi worktree branch i0001-01-01", "ccnavi --root /x worktree branch i0001-01-01 confirmed",
+	"sh .ccnavi/scripts/ccnavi-clean.sh --worktree i0001-01-01", "sh .ccnavi/scripts/ccnavi-clean.sh i0001-01-01 --dry-run",
+	"sh .ccnavi/scripts/ccnavi-sync.sh i0001", "sh .ccnavi/scripts/ccnavi-sync.sh", "ccnavi worktree drop i0001-01-01",
+	"ccnavi worktree remaining i0001", "ccnavi worktree $X i0001", "ccnavi worktree retire $A i0001", "ccnavi worktree re* --abandon i1",
+	"ccnavi ops begin x", "ccnavi ops pending", "ccnavi ops mark-sent 3",
+	// --preview の免除
+	`uv run python -m ccnavi --agree i0001 "a --preview"`, `ccnavi --agree "i0001 --preview"`, "ccnavi --agree --reason=--preview",
+	"ccnavi --agree --digest=--preview", "ccnavi --agree --preview=x", "ccnavi --agree x--preview",
+	"uv run python -m ccnavi --agree --reason=--preview i0001", "ccnavi --agree --preview --verify i0001",
+	"ccnavi --agree --preview --verify --json i0001", "ccnavi --agree --yes x", "ccnavi --agree x; echo --preview",
+	"ccnavi --agree x | grep --preview", `echo "$(ccnavi --agree x)"`, "ls\nccnavi --agree x",
+	"sudo -u me sh -c 'ccnavi --agree --yes x'", `find . -name x -exec ccnavi --agree --yes {} \;`,
+	// --prune
+	"sh .ccnavi/scripts/ccnavi-launcher.sh --prune", "sh .ccnavi/scripts/ccnavi-launcher.sh --prune --preview", "ccnavi --prune",
+	"ccnavi --preview --prune", `ccnavi --prune "--preview"`, "ccnavi --prune '' --preview", `bash -c "ccnavi --prune" x --preview`,
+	"script -qc 'ccnavi --prune' /dev/null", "git fetch --prune", "sh .ccnavi/scripts/ccnavi-git.sh fetch --prune",
+	"CCNAVI.EXE --prune; ls", "/opt/x/bin/ccnavi --prune", `C:\tools\ccnavi.exe --prune`, "my-ccnavi --prune", "ccnavi --prune\t--preview",
+	"ccnavi user prune --yes", "ccnavi --root /r user prune", "ccnavi -- user PRUNE", "ccnavi user prunes",
+	// 入口を流し込む形
+	"echo user agree --yes | xargs ccnavi", "xargs sh .ccnavi/scripts/ccnavi-review.sh decide < args",
+	"sh < .ccnavi/scripts/ccnavi-review.sh", "cat .ccnavi/scripts/ccnavi-review.sh | sh -s decide 3",
+	"echo 'ccnavi user agree --yes' | sh", "sh <<'EOF'\nccnavi --agree --yes x\nEOF", "bash <<< 'ccnavi --agree --yes'",
+	"sh -s -- ccnavi", "cd /home/user/ccnavi && cat x | sh", "sh .ccnavi/scripts/ccnavi-review.sh decide $N --$C",
+	"sh .ccnavi/scripts/ccnavi-review.sh $V 3 --ch*", "sh .ccnavi/scripts/ccnavi-review.sh decide 3 '--$C'",
+	`sh .ccnavi/scripts/ccnavi-review.sh decide 3 "--ch*"`, "sh .ccnavi/scripts/ccnavi-review.sh decide 3 --ch\\*",
+	"ccnavi --docs $X --yes", "ccnavi --list $X --agree", "ccnavi --agree --preview $X --yes", "ccnavi --agree $Y $Z", "ccnavi --agree --yes [a]", "ccnavi user prune $X", "my-ccnavi user prune",
+	"ccnavi --handoff a.md --y$X", "ccnavi --guard-ticket-${X} disable", "ccnavi -- $X --agree --yes",
+	"ccnavi --root /r $U agree", "sh -c 'ccnavi $X --yes --agree'", "env ccnavi --agree ${Y}", "nohup ccnavi --agree $Y --yes",
+	// plan-order と fill-phases（エージェントが打てる）
+	"ccnavi --plan-order i0001 --json", `ccnavi --plan-order i0001 --json --order '[{"from":1,"to":2}]'`,
+	".ccnavi/bin/ccnavi --plan-order i0001 --order '[]' --expect abc --write", "ccnavi --plan-order i0001 --fill-phases",
+	".ccnavi/bin/ccnavi --plan-order i0001 --fill-phases",
+	// 止めている間に通す形とサブエージェントの禁止
+	"sh .ccnavi/scripts/ccnavi-ticket.sh finish x\x00sh .ccnavi/scripts/ccnavi-git.sh status", "cd /tmp\x00tail -3",
+	"sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 1 --body-file b.md\x00tail > out",
+	`sh "/tmp/My Projects/ws/.ccnavi/scripts/ccnavi-review.sh" review-request --phase 1 --body-file b.md`,
+	"sh .ccnavi/scripts/ccnavi-launcher.sh --docs x", "sh .ccnavi/scripts/ccnavi-launcher.sh --lint", "sh ccnavi-review.sh ready",
+	"sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01", "sh .ccnavi/scripts/ccnavi-ticket.sh status",
+	"SH .ccnavi/scripts/CCNAVI-TICKET.SH start", "./.ccnavi/scripts/ccnavi-git.sh push", "sh ccnavi-git.sh worktree add",
+	"sh ccnavi-git.sh status", "sh ccnavi-sync.sh", "exec sh ccnavi-clean.sh", "sh ccnavi-start.sh --list-open",
+	"sh ccnavi-start.sh new", `sh ccnavi-review.sh decide 3 --preview`, "sh ccnavi-review.sh decide 3", "cd /w && sh ccnavi-ticket.sh learn",
+	`sh .ccnavi/scripts/ccnavi-git.sh commit -m "$(cat f)"`, `echo "$(sh .ccnavi/scripts/ccnavi-ticket.sh finish x)"`,
+	"sh .ccnavi/scripts/ccnavi-git.sh commit -m \"docs: a b\"", "ls; sh .ccnavi/scripts/ccnavi-git.sh commit -m \"docs: a b\"",
+	"sh .ccnavi/scripts/ccnavi-review.sh fetch | head -n 3", "sh .ccnavi/scripts/ccnavi-review.sh fetch | tail -f",
+	// Unicode の綴りと大小
+	"ccnavi uſer agree", "ccnavi ＵＳＥＲ agree", "CCNAVI USER AGREE", "ccnavi user hando\ufb00 --yes", "ccnavi --ＡＧＲＥＥ --yes",
+	"ccnavi\u00a0--agree --yes", "ccnavi --prune\u3000x", "ccnavi\u2003user prune",
+}
