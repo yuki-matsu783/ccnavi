@@ -119,7 +119,9 @@ func CopyConfigProblems(t *ticket.Ticket, cfg *phases.Types, held map[string]*ph
 	if approved {
 		severity = rules.Warn
 	}
-	say := func(detail string) rules.Problem { return rules.Problem{Severity: severity, Rule: t.ID, Detail: detail} }
+	say := func(detail string) rules.Problem {
+		return rules.Problem{Severity: severity, Rule: t.ID, Detail: detail}
+	}
 	fill := "`" + config.Launcher + " --plan-order " + t.ID + " --fill-phases`"
 	if cfg == nil {
 		return []rules.Problem{say("`plan` があるのにフェーズ定義（phases.yml）が読めない。" +

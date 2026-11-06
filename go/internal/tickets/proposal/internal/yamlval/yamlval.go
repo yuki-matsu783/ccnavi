@@ -1,13 +1,16 @@
-// Package pyeq は YAML から読んだ値を Python の == で比べる（マップはキーの順を見ず、数は値で比べる。True == 1）。
-// infra/yaml に Equal が入るまでの置き場（tickets/approval の sameValue と同じ答え）。
-package pyeq
+// Package yamlval は YAML の値の、infra/yaml に足りない扱いを持つ。Equal は Python の ==（マップはキーの順を見ず、
+// 数は値で比べる。True == 1）、Without は欄を除いた写し、Step は計画のステップの書き戻す形を YAML の値にする。
+// infra/yaml に入るまでの置き場（Equal は tickets/approval の sameValue と同じ答え）。
+package yamlval
 
 import (
 	"math/big"
 	"reflect"
 	"slices"
 
+	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/yaml"
+	"ccnavi/internal/tickets/model/ticket"
 )
 
 // Equal は Python の a == b。
@@ -66,4 +69,36 @@ func number(v any) (*big.Float, bool) {
 		return big.NewFloat(x), true
 	}
 	return nil, false
+}
+
+// Step は計画のステップの書き戻す形（PlanItem.Raw）を YAML の値にする（Raw は JSON のオブジェクトを返す）。
+func Step(item *ticket.PlanItem) any {
+	return fromJSON(item.Raw())
+}
+
+func fromJSON(v any) any {
+	switch x := v.(type) {
+	case *pyjson.Object:
+		m := &yaml.Map{}
+		for k, val := range x.All() {
+			m.Put(k, fromJSON(val))
+		}
+		return m
+	case []any:
+		out := make([]any, len(x))
+		for i, val := range x {
+			out[i] = fromJSON(val)
+		}
+		return out
+	}
+	return v
+}
+
+// Steps は Step の並び。
+func Steps(items []ticket.PlanItem) []any {
+	out := make([]any, len(items))
+	for i := range items {
+		out[i] = Step(&items[i])
+	}
+	return out
 }

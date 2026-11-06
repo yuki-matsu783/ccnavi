@@ -14,7 +14,7 @@ import (
 	"ccnavi/internal/tickets/model/place"
 	"ccnavi/internal/tickets/model/ticket"
 	"ccnavi/internal/tickets/phase"
-	"ccnavi/internal/tickets/proposal/internal/pyeq"
+	"ccnavi/internal/tickets/proposal/internal/yamlval"
 )
 
 // revisionProblems は親の改版を受けてよいか。変えてよいのは計画・コピー（phases:）・範囲。コピーは子が承認
@@ -40,7 +40,7 @@ func revisionProblems(conf *config.Settings, root string, revised, current *tick
 	// 範囲を変える改版は、作業中の子が居ないときだけ（子の範囲は親の範囲の中に収まる前提で承認されている）。
 	// 書かれる節が違うなら読めない項が混ざっていないかを見る（読めない項は entries に入らず、署名に出ない）。
 	if slices.ContainsFunc(rules.Sections, func(s rules.Decision) bool {
-		return !pyeq.Equal(revised.Raw.Get(string(s)), current.Raw.Get(string(s)))
+		return !yamlval.Equal(revised.Raw.Get(string(s)), current.Raw.Get(string(s)))
 	}) {
 		problems = append(problems, unreadableScope(revised)...)
 	}
