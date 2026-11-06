@@ -1,0 +1,192 @@
+// Package propose は提案を親のブランチへ送る入口（`ccnavi ticket approval-request <識別子>`）。エージェントが書いた
+// 承認待ちの提案（todo/）と子のフローの下書き（flows/）は、書いただけでは手元にしかないので、親のブランチに載せて
+// 別の PC の承認に届ける。実行ファイルは書き換えず、送るパスを「この実行で書いたもの」の一覧に載せるだけで
+// （fsio.NoteInput）、ロック・取り込み・commit --only・push は sh が write-and-push の手順で行う。ネットワークにも
+// git にも触らない。
+//
+// 対象は親のワークツリーの中の、識別子の親子の提案（todo/<親>.md・todo/<子>.md・flows/<子>.yml）だけ。計画を持つ
+// 親の提案だけ、送る前に after の形と終端を検査し、誤りがあれば何も送らない（承認で落ちる誤りを承認の前に返す）。
+// 最初の親の提案で、すぐ始まるステップに子の提案が無ければ警告する（止めない。親を先に承認する進め方も正規）。
+//
+// Python からの対応: tickets/proposal/propose。run → Run（引数は conf, root の順。gate は呼び手の検査）、FLOWS →
+// flow.FlowsDir。
+package propose
+
+import (
+	"fmt"
+	"io"
+	"slices"
+	"strings"
+
+	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
+	"ccnavi/internal/policy/texts"
+	"ccnavi/internal/tickets/approval"
+	"ccnavi/internal/tickets/approval/wap"
+	"ccnavi/internal/tickets/config/phases"
+	"ccnavi/internal/tickets/flow"
+	"ccnavi/internal/tickets/model/ids"
+	"ccnavi/internal/tickets/model/place"
+	"ccnavi/internal/tickets/model/ticket"
+)
+
+const mdExt = ".md"
+
+func same(a, b string) bool { return pathcase.Fold(a) == pathcase.Fold(b) }
+
+// belongs はファイル名の語幹が、この親か、その子の識別子か（大文字小文字を問わない）。
+func belongs(stem, parent string) bool {
+	if same(stem, parent) {
+		return true
+	}
+	child, ok := ids.ParseChild(stem)
+	return ok && same(child.Parent, parent)
+}
+
+// candidates は親のワークツリー base の中の、この親子の提案と子のフローの下書き（絶対パス、名前順）。
+func candidates(base, ticketsRel, parent string) []string {
+	var found []string
+	for _, folder := range []struct {
+		name     string
+		suffixes []string
+	}{{string(place.Todo), []string{mdExt}}, {flow.FlowsDir, []string{".yml", ".yaml"}}} {
+		directory := ospath.Join(base, append(strings.Split(strings.Trim(ticketsRel, "/"), "/"), folder.name)...)
+		names, err := fsio.Listdir(directory)
+		if err != nil {
+			continue
+		}
+		slices.Sort(names)
+		for _, name := range names {
+			stem, ext := ospath.Splitext(name)
+			if !slices.Contains(folder.suffixes, pathcase.Fold(ext)) || !belongs(stem, parent) {
+				continue
+			}
+			path := ospath.Join(directory, name)
+			if ospath.IsFile(path) && !ospath.IsLink(path) {
+				found = append(found, path)
+			}
+		}
+	}
+	return found
+}
+
+// ownProposal は todo/<親>.md か（大文字小文字を問わない）。
+func ownProposal(path, parent string) bool {
+	stem, ext := ospath.Splitext(ospath.Basename(path))
+	return same(ospath.Basename(ospath.Dirname(path)), string(place.Todo)) && same(stem, parent) && same(ext, mdExt)
+}
+
+// planProblems は計画を持つ親の提案の after と終端の誤り。
+func planProblems(paths []string, parent string) []string {
+	var found []string
+	for _, path := range paths {
+		if !ownProposal(path, parent) {
+			continue
+		}
+		loaded, _ := ticket.Load(path)
+		if loaded == nil || (!loaded.HasPlan() && len(loaded.Feedback) == 0) {
+			continue
+		}
+		for _, p := range slices.Concat(phases.AfterProblems(loaded, ""), phases.TerminalProblems(loaded, nil, "")) {
+			found = append(found, p.Detail)
+		}
+	}
+	return found
+}
+
+// childlessProblems は最初の親の提案で、すぐ始まるステップに子の提案が無い警告（承認の確認と同じ文）。
+func childlessProblems(conf *config.Settings, root string, paths []string, parent string) []string {
+	i := slices.IndexFunc(paths, func(p string) bool {
+		return same(ospath.Basename(p), parent+mdExt) && same(ospath.Basename(ospath.Dirname(p)), string(place.Todo))
+	})
+	if i < 0 {
+		return nil
+	}
+	loaded, _ := ticket.Load(paths[i])
+	if loaded == nil || !loaded.HasPlan() {
+		return nil
+	}
+	opened, _ := approval.Scan(conf, root, false, nil)
+	closed, _ := approval.Scan(conf, root, true, nil)
+	if approval.ByID(slices.Concat(opened, closed))[parent] != nil {
+		return nil // 承認済みの親の改版。子はもう承認の側にある
+	}
+	var numbers []int
+	for _, path := range paths {
+		stem, _ := ospath.Splitext(ospath.Basename(path))
+		if child, ok := ids.ParseChild(stem); ok && strings.HasSuffix(path, mdExt) && !slices.Contains(numbers, child.Phase) {
+			numbers = append(numbers, child.Phase)
+		}
+	}
+	var out []string
+	for _, p := range phases.ChildlessReady(loaded, numbers) {
+		out = append(out, p.Detail)
+	}
+	return out
+}
+
+// Run は `ticket approval-request <識別子>`。送る提案を一覧に載せ、載せたものを標準出力に 1 行ずつ出す。gate は
+// 送る提案の識別子（todo/ の .md）を受け取り、承認の画面と同じ検査を通す（通らなければ 0 以外。検査そのものは
+// 上の段が持つ）。check は検査だけをして、何も一覧に載せない。
+func Run(stdout, stderr io.Writer, conf *config.Settings, root, ident string, check bool, gate func([]string) int) int {
+	parent := wap.FamilyOf(ident)
+	verdict, why, st := wap.TargetOf(conf, root, parent)
+	if verdict == wap.Stop || st.Home == nil {
+		if why == "" {
+			why = "親のワークツリーが決まらない"
+		}
+		fmt.Fprintf(stderr, "ccnavi: 提案を送れません（%s）。\n", why)
+		return 1
+	}
+	if verdict == wap.No {
+		fmt.Fprintf(stdout, "案内: %s には送る先がありません（%s）。提案は手元に書かれたままです。\n", parent, why)
+		return 0
+	}
+	base := st.Home.Root
+	ticketsRel := conf.Tickets
+	if ticketsRel == "" {
+		ticketsRel = config.DefaultTickets
+	}
+	paths := candidates(base, ticketsRel, parent)
+	if len(paths) == 0 {
+		fmt.Fprintf(stderr, "ccnavi: 送る提案がありません（親のワークツリー %s の %s/%s/%s.md など）。"+
+			"提案は識別子と同名のワークツリーの中に書いてください。\n", base, strings.Trim(ticketsRel, "/"), place.Todo, parent)
+		return 1
+	}
+	if wrong := planProblems(paths, parent); len(wrong) > 0 {
+		fmt.Fprintf(stderr, "ccnavi: %s の提案の計画に誤りがあるので送りません（何も送っていません）。\n", parent)
+		for _, detail := range wrong {
+			fmt.Fprintf(stderr, "  %s\n", detail)
+		}
+		fmt.Fprintln(stderr, texts.Say(root, "NEXT_APPROVAL_REQUEST_PLAN_WRONG", texts.Values{"parent": parent}, nil))
+		return 1
+	}
+	for _, detail := range childlessProblems(conf, root, paths, parent) {
+		fmt.Fprintf(stderr, "ccnavi: 注意: %s\n", detail)
+	}
+	if gate != nil {
+		var sending []string
+		for _, p := range paths {
+			if strings.HasSuffix(p, mdExt) && ospath.Basename(ospath.Dirname(p)) == string(place.Todo) {
+				stem, _ := ospath.Splitext(ospath.Basename(p))
+				sending = append(sending, stem)
+			}
+		}
+		if gate(sending) != 0 {
+			return 1
+		}
+	}
+	if check {
+		fmt.Fprintln(stdout, "確認: ok（approval-request を打てる状態。提案は送っていません）")
+		fmt.Fprintln(stdout, texts.Say(root, "NEXT_APPROVAL_REQUEST_CHECKED", texts.Values{"parent": parent}, nil))
+		return 0
+	}
+	for _, path := range paths {
+		fsio.NoteInput(path)
+		rel, _ := ospath.Relpath(path, base)
+		fmt.Fprintf(stdout, "提案: %s\n", ospath.Slashed(rel))
+	}
+	return 0
+}
