@@ -2,17 +2,17 @@ package selfguard
 
 import (
 	"bytes"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/digest"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/git"
@@ -21,11 +21,11 @@ import (
 )
 
 const (
-	// BackupDir はバックアップの置き場（state の下）。セッションごとに分ける。別のセッションの断面で戻すと、
+	// backupDir はバックアップの置き場（state の下）。セッションごとに分ける。別のセッションの断面で戻すと、
 	// こちらが一度も見ていない内容へ書き換えてしまうため。
-	BackupDir = "selfguard"
-	// StoreDir は大きい対象の実体の置き場（BackupDir の直下）。中身のハッシュで名前を付け、同じ中身を何本も持たない。
-	StoreDir = "store"
+	backupDir = config.SelfguardDir
+	// storeDir は大きい対象の実体の置き場（backupDir の直下）。中身のハッシュで名前を付け、同じ中身を何本も持たない。
+	storeDir = config.SelfguardStore
 	// refSuffix はセッションの側に置く参照（実体のハッシュ・大きさ・更新時刻）の拡張子。
 	refSuffix = ".ref"
 	// absentSuffix は「置かれていない」印（無いことを毎回 git に確かめに行かない）。
@@ -38,17 +38,19 @@ const (
 	noSession = "no-session"
 
 	// keepFor より長く触られていないセッションのバックアップはセッション開始で消す（中断して翌日に開き直した形まで拾う）。
+	// ctxfile.OnceKeep と同じ 3 日だが別の約束（Python も KEEP_DAYS と ONCE_KEEP_DAYS を分ける）なので、片方だけ変えてよい。
 	keepFor = 3 * 24 * time.Hour
 	// refreshAfter は変わっていないバックアップの更新時刻を新しくする間隔（掃除に古いと読まれないよう keepFor より短く）。
 	refreshAfter = 24 * time.Hour
 	// asideStamp は退避した版の名前の頭の時刻。
 	asideStamp = "20060102-150405"
 
-	// commonRulesKey は共通レイヤーのルールファイルの key。
-	commonRulesKey = "rules"
-	// commonRulesDraft は共通レイヤーのルールファイルの下書きの置き場（ワークスペースルートからの相対）。
-	commonRulesDraft = "wip/handoff/.ccnavi/config/common/rules.yml"
+	// commonRulesKey は共通レイヤーのルールファイルの key（レイヤーの key と同じ。重ねて持たない）。
+	commonRulesKey = string(config.KindRules)
 )
+
+// commonRulesDraft は共通レイヤーのルールファイルの下書きの置き場（ワークスペースルートからの相対、"/" 区切り）。
+var commonRulesDraft = strings.Join(append(slices.Clone(handoffParts), ospath.Slashed(config.DefaultRules)), "/")
 
 // Choices は戻す働きの設定が取る値。GateChoices は、戻す働きを持たない切り替え（チケットの承認の経路など）の値。
 // dry-run が無い。通せば済んでしまい、報告では戻らないからである。
@@ -59,12 +61,14 @@ var (
 
 // Resolve は設定の値を解く。読めない値（allowed に無い語も）は enable にし、stderr に言う。
 // 書き損じた 1 語で保護が消えるより、残るほうがよいため。
+// config.ResolveMode・stopreview.Setting に寄せない（Python も別の関数で、答えが違う）。ResolveMode は前後の空白を落とさず、
+// disable を環境からだけ認める。Setting は空と読めない値を黙って dry-run にする。
 func Resolve(stderr io.Writer, flag, declared, name string, allowed []config.Mode) config.Mode {
 	written := flag
 	if written == "" {
 		written = declared
 	}
-	value := strings.ToLower(ospath.Strip(written))
+	value := pyfmt.Lower(ospath.Strip(written))
 	if value == "" {
 		return config.Enable
 	}
@@ -278,7 +282,7 @@ func sweep(stateDir, session string) {
 	if stateDir == "" {
 		return
 	}
-	root := ospath.Join(stateDir, BackupDir)
+	root := ospath.Join(stateDir, backupDir)
 	names, err := ospath.DiskListdir(root)
 	if err != nil {
 		return
@@ -288,7 +292,7 @@ func sweep(stateDir, session string) {
 	var kept []string
 	for _, name := range names {
 		path := ospath.Join(root, name)
-		if name == mine || name == StoreDir || !ospath.IsDir(path) || !touched(path).Before(cutoff) {
+		if name == mine || name == storeDir || !ospath.IsDir(path) || !touched(path).Before(cutoff) {
 			kept = append(kept, name)
 			continue
 		}
@@ -325,7 +329,7 @@ func joinAll(dir string, names []string) []string {
 
 // sweepStore は残るセッションの参照に出てこず、cutoff より古い実体を消す（参照だけ・時刻だけのどちらでも足りない）。
 func sweepStore(root string, kept []string, cutoff time.Time) {
-	store := ospath.Join(root, StoreDir)
+	store := ospath.Join(root, storeDir)
 	entries, err := ospath.DiskListdir(store)
 	if err != nil {
 		return
@@ -354,6 +358,7 @@ func sweepStore(root string, kept []string, cutoff time.Time) {
 		if mtime, _, ok := ospath.Stat(path); !ok || !mtime.Before(cutoff) {
 			continue
 		}
+		// Python も os.remove で直に消す（store/ は記録に載せない）。
 		os.Remove(path)
 	}
 }
@@ -367,7 +372,7 @@ type backup struct {
 // path はバックアップの置き場。key はレイヤーの `:` を含むので（Windows では代替データストリームになる）、使える字に置き換える。
 // 切り詰めない。ワークツリー側の key の末尾の digest を削ると、別のワークツリーと同じ名前になるためである。
 func (b backup) path() string {
-	return ospath.Join(b.stateDir, BackupDir, safeSession(b.session), fsio.SafeName(b.target.Key, fsio.NoLimit))
+	return ospath.Join(b.stateDir, backupDir, safeSession(b.session), fsio.SafeName(b.target.Key, fsio.NoLimit))
 }
 
 func (b backup) ref() string    { return b.path() + refSuffix }
@@ -386,18 +391,21 @@ func (b backup) write(content []byte) string {
 
 func (b backup) absentNoted() bool { return ospath.DiskExists(b.absent()) }
 func (b backup) noteAbsent()       { fsio.WriteFile(b.absent(), nil, fsio.Plain) }
-func (b backup) clearAbsent()      { os.Remove(b.absent()) }
+
+// clearAbsent は os で直に消す（Python も fsio を通さない。印は溜める段にも記録にも載せない）。
+func (b backup) clearAbsent() { os.Remove(b.absent()) }
 
 func (b backup) readRef() (heavyRef, bool) { return parseRef(fsio.ReadBytes(b.ref())) }
 
 // saveHeavy は大きい対象をバックアップする。先にコピーしてから、その中身のハッシュで名前を付ける。ハッシュを読んでから
 // コピーすると、その間に書き換えられた版が、読んだハッシュの名前で入ってしまう。参照にはバックアップした時点の大きさと更新時刻を書く。
+// 途中の名前の差し替えと片付けは os で直に行う（Python も os.replace・os.remove。store/ は記録に載せない）。
 func (b backup) saveHeavy() string {
 	mtime, size, err := statTimes(b.target.Path)
 	if err != nil {
 		return fsio.ErrorText(err)
 	}
-	scratch := b.storePath("scratch-"+randomHex()) + partSuffix
+	scratch := b.storePath("scratch-"+digest.RandomHex(digest.UUIDBytes)) + partSuffix
 	if failed := copyFile(b.target.Path, scratch); failed != "" {
 		return failed
 	}
@@ -424,7 +432,7 @@ func (b backup) saveHeavy() string {
 }
 
 func (b backup) storePath(name string) string {
-	return ospath.Join(b.stateDir, BackupDir, StoreDir, name)
+	return ospath.Join(b.stateDir, backupDir, storeDir, name)
 }
 
 // checkHeavy は実行後、大きい対象を大きさと更新時刻で照合し、変わっていれば直前の版に戻す（中身は読まない）。
@@ -549,14 +557,15 @@ func fileDigest(path string) string {
 		return ""
 	}
 	defer f.Close()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
+	sum, err := digest.HexOf(digest.SHA256, f)
+	if err != nil {
 		return ""
 	}
-	return hex.EncodeToString(h.Sum(nil))
+	return sum
 }
 
 // replaceWith は別の名前へコピーしてから置き換える（中断したコピーを揃ったものとして拾わせない）。
+// os で直に差し替える（Python も os.replace。実行ファイルは溜める段にも記録にも載せない）。
 func replaceWith(source, destination string) string {
 	part := destination + partSuffix
 	if failed := copyFile(source, part); failed != "" {
@@ -570,45 +579,15 @@ func replaceWith(source, destination string) string {
 	return ""
 }
 
-// copyFile は中身と権限と更新時刻ごとコピーする（shutil.copy2。実行ファイルの実行の権限を落とさない）。
-// TODO(infra): 汎用の部品なので fsio に置くのがよい。
+// copyFile は親を作ってから shutil.copy2 で写す（実行ファイルの実行の権限を落とさない）。写せたら空、駄目なら理由。
 func copyFile(source, target string) string {
-	if err := os.MkdirAll(ospath.Dirname(target), 0o777); err != nil {
+	if err := fsio.MakeDirs(ospath.Dirname(target)); err != nil {
 		return fsio.ErrorText(err)
 	}
-	in, err := os.Open(source)
-	if err != nil {
-		return fsio.ErrorText(err)
-	}
-	defer in.Close()
-	info, err := in.Stat()
-	if err != nil {
-		return fsio.ErrorText(err)
-	}
-	out, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, info.Mode().Perm())
-	if err != nil {
-		return fsio.ErrorText(err)
-	}
-	if _, err := io.Copy(out, in); err != nil {
-		out.Close()
-		return fsio.ErrorText(err)
-	}
-	if err := out.Close(); err != nil {
-		return fsio.ErrorText(err)
-	}
-	if err := os.Chmod(target, info.Mode().Perm()); err != nil {
-		return fsio.ErrorText(err)
-	}
-	if err := os.Chtimes(target, time.Now(), info.ModTime()); err != nil {
+	if err := fsio.CopyFile(source, target); err != nil {
 		return fsio.ErrorText(err)
 	}
 	return ""
-}
-
-func randomHex() string {
-	var b [16]byte
-	rand.Read(b[:])
-	return hex.EncodeToString(b[:])
 }
 
 // refresh は更新時刻が refreshAfter より古ければ新しくする（中身には触らない）。
@@ -621,12 +600,7 @@ func refresh(path string) {
 }
 
 // safeSession はセッション識別子から作る置き場の名前（区切り文字で別の場所へ書かせない）。
-func safeSession(session string) string {
-	if session == "" {
-		session = noSession
-	}
-	return fsio.SafeName(session, fsio.NoLimit)
-}
+func safeSession(session string) string { return fsio.SafeNameOr(session, noSession, fsio.NoLimit) }
 
 // recoverMissing は実行前に対象が無かったとき、バックアップ（このセッションで最後に見た内容）か、無ければ git から戻す。
 func recoverMissing(setting config.Mode, root string, t Target, saved []byte, hasSaved bool) Outcome {
@@ -675,5 +649,5 @@ func fallBackToGit(setting config.Mode, root string, t Target, hasNow bool) Outc
 
 func restoreCommitted(root string, t Target) string {
 	top := gitTop(root, t)
-	return git.RestoreCommitted(top, strings.ReplaceAll(relative(top, t.Path), ospath.Sep, "/"))
+	return git.RestoreCommitted(top, filepath.ToSlash(relative(top, t.Path)))
 }

@@ -19,18 +19,18 @@ type SubjectField struct {
 // 対象を差し込む側（試験と lint）もこの表を読む。欄の名前を SubjectOf の中だけに持つと、ツールを足したときに
 // そちらが気づかないうちに食い違うため。
 var SubjectFields = []SubjectField{
-	{"Bash", "command"},
-	{"PowerShell", "command"},
-	{"Read", "file_path"},
-	{"Grep", "path"},
-	{"Glob", "path"},
-	{"Edit", "file_path"},
-	{"Write", "file_path"},
-	{"NotebookEdit", "notebook_path"},
-	{"Skill", "skill"},
-	{"Agent", "description"},
-	{"Task", "description"},
-	{"WebFetch", "url"},
+	{config.ToolBash, "command"},
+	{config.ToolPowerShell, "command"},
+	{config.ToolRead, "file_path"},
+	{config.ToolGrep, "path"},
+	{config.ToolGlob, "path"},
+	{config.ToolEdit, "file_path"},
+	{config.ToolWrite, "file_path"},
+	{config.ToolNotebookEdit, "notebook_path"},
+	{config.ToolSkill, "skill"},
+	{config.ToolAgent, "description"},
+	{config.ToolTask, "description"},
+	{config.ToolWebFetch, "url"},
 }
 
 // agentPlaceholder は起動の見出しも依頼文も無いサブエージェントの起動の対象。
@@ -63,7 +63,7 @@ func SubjectOf(in hookio.Input) string {
 		return agentPlaceholder
 	}
 	value := in.Field(field)
-	if tool == "NotebookEdit" && value == "" {
+	if tool == config.ToolNotebookEdit && value == "" {
 		value = in.Field("file_path")
 	}
 	if slices.Contains(config.SearchTools, tool) && value == "" {

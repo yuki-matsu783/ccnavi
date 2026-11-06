@@ -36,6 +36,7 @@ var subTiers = map[string]map[string]int{
 		"env":    0,
 		"pyfmt":  0,
 		"ospath": 0,
+		"digest": 0, // 16 進の要約と乱数（記録・バックアップの名前）
 		// 1: 土台だけを読む
 		"pathcase":    1,
 		"pyjson":      1,

@@ -81,6 +81,22 @@ func IntOf(v any) (int, bool) {
 	return 0, false
 }
 
+// EqualsInt は Python の v == n。v は JSON か YAML から読んだ値で、真偽は 0・1、小数は値で比べる（true も 1.0 も 1 と等しい）。
+// 文字列などほかの型は等しくない。
+func EqualsInt(v any, n int) bool {
+	switch x := v.(type) {
+	case bool:
+		return x && n == 1 || !x && n == 0
+	case int:
+		return x == n
+	case *big.Int:
+		return x.IsInt64() && x.Int64() == int64(n)
+	case float64:
+		return x == float64(n)
+	}
+	return false
+}
+
 // Grouped は Python の f"{n:,}"（3 桁ごとに "," を入れる）。
 func Grouped(n int) string {
 	digits := strconv.Itoa(n)

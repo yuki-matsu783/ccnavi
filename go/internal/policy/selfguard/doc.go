@@ -11,7 +11,7 @@
 //
 // Python からの対応: selfguard_targets・selfguard・selfguard_shell をまとめた。targets → Targets、
 // SETTINGS・GATE_SETTINGS → Choices・GateChoices、resolve → Resolve、before・after・accept・at_start →
-// Before・After・Accept・AtStart、report → Report、ACTION_* → Action の定数、BACKUP_DIR・STORE_DIR → BackupDir・StoreDir、
+// Before・After・Accept・AtStart、report → Report、ACTION_* → Action の定数、BACKUP_DIR・STORE_DIR → config.SelfguardDir・SelfguardStore（records/prune と同じ定数）、
 // guard_shell_regex → ShellRegex、common_layer_files → CommonLayerFiles、git_dir_shell_regex → GitDirShellRegex、
 // GIT_DIR_PATH_REGEX → GitDirPathRegex、_WRITE_VERBS → WriteVerbs、_NOT_A_WORD → NotAWord、under → Under、
 // holder_regex → HolderRegex（named_only は引数）、copy_destination_regex・copy_last_place → CopyDestinationRegex・

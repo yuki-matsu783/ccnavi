@@ -190,3 +190,30 @@ func TestStat(t *testing.T) {
 		t.Error("無いファイルで ok")
 	}
 }
+
+// 字は符号位置で数える（Python の p[1]。日: の 2 字目は ":"）。
+func TestHasDrive(t *testing.T) {
+	cases := []struct {
+		path        string
+		letter, any bool
+	}{
+		{`C:\x`, true, true},
+		{"c:", true, true},
+		{"1:", false, true},
+		{"日:x", false, true},
+		{"C", false, false},
+		{"", false, false},
+		{"/C:", false, false},
+	}
+	for _, c := range cases {
+		if got := HasDrive(c.path, true); got != c.letter {
+			t.Errorf("HasDrive(%q, true) = %v", c.path, got)
+		}
+		if got := HasDrive(c.path, false); got != c.any {
+			t.Errorf("HasDrive(%q, false) = %v", c.path, got)
+		}
+	}
+	if n, ok := HardLinks(t.TempDir()); !ok || n == 0 {
+		t.Errorf("HardLinks = %d, %v", n, ok)
+	}
+}

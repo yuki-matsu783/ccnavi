@@ -2,7 +2,6 @@ package texts
 
 import (
 	"fmt"
-	"math"
 	"regexp"
 	"slices"
 	"strings"
@@ -66,9 +65,10 @@ var kindOrder = []Kind{KindDeny, KindNudge, KindNext, KindChoices, KindNote, Kin
 var ruleLooseFields = fields{[]string{fieldWhat}, []string{fieldWhy, fieldNext, fieldNoBypass, fieldNote}}
 
 const (
+	// rulePrefix は組み込みルールの文の識別子の頭。
 	rulePrefix = "RULE_"
 	// RuleAsk は確認の文の識別子。
-	RuleAsk = "RULE_ASK"
+	RuleAsk = rulePrefix + "ASK"
 )
 
 // prefixes は識別子の頭と種類（並びは苦情の文の順）。
@@ -76,7 +76,7 @@ var prefixes = []struct {
 	head string
 	kind Kind
 }{
-	{"DENY_", KindDeny}, {"RULE_", KindDeny}, {"NUDGE_", KindNudge}, {"NEXT_", KindNext},
+	{"DENY_", KindDeny}, {rulePrefix, KindDeny}, {"NUDGE_", KindNudge}, {"NEXT_", KindNext},
 	{"CHOICES_", KindChoices}, {"NOTE_", KindNote}, {"NOTICE_", KindNotice},
 }
 
@@ -92,8 +92,9 @@ const (
 var labels = map[string]string{fieldWhy: whyLabel, fieldNext: NextLabel, fieldNoBypass: noBypassLabel}
 
 const (
-	// SubjectLimit は、理由や報告に載せる対象の文字列の長さの上限。ヒアドキュメントの全文で本体を押し出さないためである。
-	SubjectLimit = 200
+	// ShownSubjectLimit は、理由や報告に載せる対象の文字列の長さの上限。ヒアドキュメントの全文で本体を押し出さないためである。
+	// 判定の記録に残す長さ（audit.RecordedSubjectLimit）とは別の約束。
+	ShownSubjectLimit = 200
 	// limitField は 1 欄の長さ（場合ごと）、limitEntry は 1 件の欄の長さの合計の上限。
 	limitField = 600
 	limitEntry = 2000
@@ -474,19 +475,6 @@ func hasDuplicate(list []string) bool {
 	return false
 }
 
-// isVersion は書かれた版が Python の == で Version と等しいか（true も 1.0 も 1 と等しい）。
-func isVersion(v any) bool {
-	switch x := v.(type) {
-	case bool:
-		return x == (Version == 1)
-	case int:
-		return x == Version
-	case float64:
-		return x == Version && !math.IsNaN(x)
-	}
-	return false
-}
-
 // parseFile はファイルの外側（version と messages）を読む。
 func parseFile(text, path string) (*yaml.Map, []rules.Problem) {
 	where := basename(path)
@@ -498,7 +486,7 @@ func parseFile(text, path string) (*yaml.Map, []rules.Problem) {
 		return fail("読めない: " + err.Error())
 	}
 	m, ok := data.(*yaml.Map)
-	if !ok || !isVersion(m.Get("version")) {
+	if !ok || !pyfmt.EqualsInt(m.Get("version"), Version) {
 		return fail(fmt.Sprintf("`version: %d` の表で書く", Version))
 	}
 	body, ok := m.Get("messages").(*yaml.Map)

@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/pyre"
@@ -27,7 +28,7 @@ const Version = 1
 
 const (
 	// StopMatch は match に書ける、ツールではない名前。メインのターンの終わりに当たる（見るのは allow だけ）。
-	StopMatch = "Stop"
+	StopMatch = string(hookio.Stop)
 	// StopSubject は StopMatch のルールを当てる固定の文字列。
 	StopSubject = "(stop)"
 	// IDSeparator はレイヤーの名前と id の間の字（`self:docs`）。書いた id には使えない。
@@ -339,9 +340,15 @@ func RecordName(r *Rule) string {
 	return r.ID
 }
 
+// matchSep は match のツール名の区切り。
+const matchSep = "|"
+
+// MatchOf はツール名を match の 1 本（"|" 区切り）にする。
+func MatchOf(tools ...string) string { return strings.Join(tools, matchSep) }
+
 // ToolMatches は match（"|" 区切り）がこのツール名を含むか。大文字小文字を区別した完全一致。
 func ToolMatches(match, tool string) bool {
-	for _, want := range strings.Split(match, "|") {
+	for _, want := range strings.Split(match, matchSep) {
 		if ospath.Strip(want) == tool {
 			return true
 		}

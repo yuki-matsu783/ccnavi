@@ -1,12 +1,15 @@
 package selfguard
 
 import (
+	"path/filepath"
 	"regexp"
 	"strings"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/shell"
+	"ccnavi/internal/infra/tree"
 )
 
 // 下書きの置き場（各ツリー直下の `wip/handoff/`）。守る場所を直すときは、ここへ写したコピーを直す
@@ -25,10 +28,10 @@ func handoffPlace(root string) *regexp.Regexp {
 		quoted[i] = regexp.QuoteMeta(p)
 	}
 	return regexp.MustCompile(`^` + regexp.QuoteMeta(base) +
-		`(?:/projects/[^/]+)?(?:/\.claude/worktrees/[^/]+)?/` + strings.Join(quoted, "/") + `/`)
+		`(?:/projects/[^/]+)?(?:/` + regexp.QuoteMeta(filepath.ToSlash(tree.WorktreesDir)) + `/[^/]+)?/` + strings.Join(quoted, "/") + `/`)
 }
 
-func slashFold(path string) string { return strings.ReplaceAll(pathcase.Fold(path), `\`, "/") }
+func slashFold(path string) string { return ospath.Slashed(pathcase.Fold(path)) }
 
 // handoffLinked は、置き場の中の対象が、リンクを通る・ハードリンクでほかの名前とつながる・`..` を含むかを返す。
 // 確かめられなければ、つながっているとみなす。
@@ -45,7 +48,7 @@ func handoffLinked(subject, spelledPath string) bool {
 	if !ospath.IsFile(subject) {
 		return false
 	}
-	n, ok := hardLinks(subject)
+	n, ok := ospath.HardLinks(subject)
 	return !ok || n > 1
 }
 
@@ -106,7 +109,7 @@ func deleteTargets(words []string) []string {
 	switch name := commandBase(words[k]); {
 	case name == "rm":
 		rest = words[k+1:]
-	case (name == "git" || name == "ccnavi-git.sh") && k+1 < len(words) && words[k+1] == "rm":
+	case (name == "git" || name == config.GitWrapper) && k+1 < len(words) && words[k+1] == "rm":
 		rest = words[k+2:]
 	default:
 		return nil
@@ -178,10 +181,14 @@ func handoffLinkTarget(root string) func(string) string {
 }
 
 // リンクを作るコマンド。ln・link と、リンクを作る選択肢を付けた cp。
+// shell.IsRunner・shell.IsAssignment には寄せない（Python の selfguard_shell も shellread と別の表を持つ）。答えが変わるため:
+// linkPrefixes は busybox・xargs を含み doas・stdbuf などを含まない。assignment は配列の要素（`a[1]=`）を代入と読まない。
 var (
 	linkers       = map[string]bool{"ln": true, "link": true, "gln": true}
 	linkPrefixes  = map[string]bool{"sudo": true, "env": true, "command": true, "exec": true, "nice": true, "nohup": true, "time": true, "busybox": true, "xargs": true, "timeout": true}
 	cpLinkOptions = []string{"--link", "--symbolic-link"}
+	// cpOptionLeast は省略した長い選択肢として読む最短の字数（`--l` は --link と読む。`--` だけは読まない）。
+	cpOptionLeast = 3
 	segments      = regexp.MustCompile("[\x00;&|\n()`]+")
 	linkOption    = regexp.MustCompile(`^-[A-Za-z]*[ls][A-Za-z]*$`)
 	assignment    = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*\+?=`)
@@ -205,7 +212,7 @@ func makesLink(words []string) bool {
 	for _, word := range words[k+1:] {
 		option, _, _ := strings.Cut(word, "=")
 		// GNU の長い選択肢は省略できる（`--li` は `--link`）。
-		if len([]rune(option)) >= 3 {
+		if len([]rune(option)) >= cpOptionLeast {
 			for _, full := range cpLinkOptions {
 				if strings.HasPrefix(full, option) {
 					return true
@@ -219,7 +226,8 @@ func makesLink(words []string) bool {
 	return false
 }
 
-// commandBase はコマンドの名前（ディレクトリと `.exe` を除き、大文字小文字を畳む）。
+// commandBase はコマンドの名前（ディレクトリと `.exe` を除き、大文字小文字を畳む）。shell.Base と違い、casefold してから
+// `.exe` だけを除く（`RM` は rm、`x.cmd` は x.cmd のまま）。Python の _base と同じ答えにするため別に持つ。
 func commandBase(word string) string {
 	name := strings.ReplaceAll(word, `\`, "/")
 	name = pathcase.Fold(name[strings.LastIndex(name, "/")+1:])

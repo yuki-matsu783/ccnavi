@@ -374,7 +374,7 @@ func TestSweep(t *testing.T) {
 	state := t.TempDir()
 	old := time.Now().Add(-10 * 24 * time.Hour)
 	put := func(rel, text string, stamp time.Time) {
-		path := filepath.Join(state, BackupDir, filepath.FromSlash(rel))
+		path := filepath.Join(state, backupDir, filepath.FromSlash(rel))
 		write(t, path, text)
 		os.Chtimes(path, stamp, stamp)
 		os.Chtimes(filepath.Dir(path), stamp, stamp)
@@ -389,7 +389,7 @@ func TestSweep(t *testing.T) {
 	for rel, want := range map[string]bool{
 		"gone": false, "mine/settings": true, "live/bin.ref": true, "store/kept": true, "store/orphan": false, "store/fresh": true,
 	} {
-		if got := fileExists(filepath.Join(state, BackupDir, filepath.FromSlash(rel))); got != want {
+		if got := fileExists(filepath.Join(state, backupDir, filepath.FromSlash(rel))); got != want {
 			t.Errorf("%s: 残った=%v", rel, got)
 		}
 	}

@@ -1,13 +1,12 @@
 package tally
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"sort"
 	"strings"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/digest"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
@@ -65,8 +64,7 @@ func RuleOf(r *audit.Record) string {
 }
 
 func keyOf(rule, subject string) string {
-	digest := sha256.Sum256([]byte(Normalize(subject)))
-	return rule + " " + hex.EncodeToString(digest[:])[:keyHashLen]
+	return rule + " " + digest.Hex(digest.SHA256, Normalize(subject), keyHashLen)
 }
 
 func denyPath(stateDir, session string) string {

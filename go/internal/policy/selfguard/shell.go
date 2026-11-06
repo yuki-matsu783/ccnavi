@@ -8,6 +8,7 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/platformtag"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyre"
 	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/infra/tree"
@@ -207,9 +208,9 @@ func projectHomeClause(projectHome string, f form) string {
 		return ""
 	}
 	if f == copyForm {
-		return inWord + strings.Join(parts, `[\\/]`) + copyEnd
+		return inWord + strings.Join(parts, pyre.AnySeparator) + copyEnd
 	}
-	return strings.Join(parts, `[\\/]`) + end
+	return strings.Join(parts, pyre.AnySeparator) + end
 }
 
 // projectHomeGlob は ccnavi ディレクトリの下を、名指しのツールで止める glob（`*/.ccnavi/*`）。
@@ -222,7 +223,7 @@ func projectHomeGlob(projectHome string) string {
 
 // homeName は ccnavi ディレクトリの名前。前後の区切りを除き、区切りを含むパスは 1 つの節のまま。
 func homeName(projectHome string) string {
-	return strings.Trim(strings.ReplaceAll(projectHome, `\`, "/"), "/")
+	return strings.Trim(ospath.Slashed(projectHome), "/")
 }
 
 // escapedParts は "/" で割った空でない節を re.escape する。
@@ -250,14 +251,14 @@ func binaryClause(binPath string, f form) string {
 		sh := joinEscaped(parts[max(len(parts)-2, 0):])
 		home := ""
 		if len(parts) >= 3 {
-			home = pyre.Escape(parts[len(parts)-3]) + `[\\/]`
+			home = pyre.Escape(parts[len(parts)-3]) + pyre.AnySeparator
 		}
 		var onPath, onPathCopy string
 		for _, p := range pathSpellings(binPath) {
 			onPath += "|" + p
 			onPathCopy += "|" + p + copyTail
 		}
-		built := home + `bin[\\/]` + buildDir
+		built := home + `bin` + pyre.AnySeparator + buildDir
 		if f == copyForm {
 			return inWord + `(?:` + sh + copyTail + `|` + built + copyEnd + onPathCopy + `)`
 		}
@@ -282,7 +283,7 @@ func pathSpellings(launcher string) []string {
 		every := pathParts(path)
 		spelled := joinEscaped(every[max(len(every)-3, 0):])
 		if len(every) <= 3 {
-			spelled = `(?<![\w.~-])[\\/]` + spelled
+			spelled = `(?<![\w.~-])` + pyre.AnySeparator + spelled
 		}
 		if len(every) > 0 && !slices.Contains(found, spelled) {
 			found = append(found, spelled)
@@ -303,7 +304,7 @@ func binaryHolders(binPath string) []holder {
 	if parts[n-1] == platformtag.LauncherName && n >= 3 {
 		home := pyre.Escape(parts[n-3])
 		found = append(found,
-			holder{Under(home + `[\\/]bin`), buildDir},
+			holder{Under(home + pyre.AnySeparator + `bin`), buildDir},
 			holder{Under(home), "bin|" + pyre.Escape(parts[n-2])})
 	}
 	return found
@@ -322,7 +323,7 @@ func pathParts(path string) []string {
 
 // splitSeps は re.split(r"[\\/]", path)（空の節も残す）。
 func splitSeps(path string) []string {
-	return strings.Split(strings.ReplaceAll(path, `\`, "/"), "/")
+	return strings.Split(ospath.Slashed(path), "/")
 }
 
 func joinEscaped(parts []string) string {
@@ -330,7 +331,7 @@ func joinEscaped(parts []string) string {
 	for i, p := range parts {
 		out[i] = pyre.Escape(p)
 	}
-	return strings.Join(out, `[\\/]`)
+	return strings.Join(out, pyre.AnySeparator)
 }
 
 // spelled はパスを、区切りをどちらの表記でも当てる形にする。
@@ -365,7 +366,7 @@ func movedHolders(root, projectHome string, commonFiles []string) []holder {
 	}
 	// ccnavi ディレクトリの下は、行き先がそこなら名前を問わずに止まる（場所の表記）。いちばん上の名前だけ足す。
 	homes := []string{}
-	for _, h := range []string{strings.ToLower(homeName(projectHome)), config.DefaultProjectHome} {
+	for _, h := range []string{pyfmt.Lower(homeName(projectHome)), config.DefaultProjectHome} {
 		if h != "" && !slices.Contains(homes, h) {
 			homes = append(homes, h)
 		}
@@ -381,7 +382,7 @@ func movedHolders(root, projectHome string, commonFiles []string) []holder {
 			continue
 		}
 		top = append(top, pyre.Escape(parts[0]))
-		joined := strings.ToLower(strings.Join(parts, "/"))
+		joined := pyfmt.Lower(strings.Join(parts, "/"))
 		if slices.ContainsFunc(homes, func(h string) bool { return strings.HasPrefix(joined, h+"/") }) {
 			continue
 		}
@@ -438,7 +439,7 @@ func commonLayerRegex(root string, commonFiles []string) string {
 	if root != "" {
 		bases = sortedSet(ospath.Realpath(root), ospath.Abspath(root))
 	}
-	worktrees := `(?:[\\/]` + spelled(tree.WorktreesDir) + `[\\/][^\\/]+)?`
+	worktrees := `(?:` + pyre.AnySeparator + spelled(tree.WorktreesDir) + pyre.AnySeparator + `[^\\/]+)?`
 	var alternatives []string
 	for _, path := range commonFiles {
 		if path == "" {
@@ -450,7 +451,7 @@ func commonLayerRegex(root string, commonFiles []string) string {
 		}
 		if rel != "" {
 			for _, b := range bases {
-				alternatives = append(alternatives, spelled(b)+worktrees+`[\\/]`+spelled(rel))
+				alternatives = append(alternatives, spelled(b)+worktrees+pyre.AnySeparator+spelled(rel))
 			}
 			continue
 		}
@@ -464,8 +465,14 @@ func commonLayerRegex(root string, commonFiles []string) string {
 	return folded("^(?:" + strings.Join(alternatives, "|") + ")$")
 }
 
-// recordsPlaces は記録と state の既定の置き場を、名指しのツール（解決済みの絶対パス）に当てる表記。
-const recordsPlaces = `[\\/]logs[\\/](?:decisions(?:\.[^\\/]*)?\.jsonl$|(?:state|archive)(?:[\\/]|$))`
+// recordsPlaces は記録と state の既定の置き場（config.DefaultLog・DefaultState）と、閉じたチケットの退避（archive）を、
+// 名指しのツール（解決済みの絶対パス）に当てる表記。archive の持ち主は上の段（tickets）なので、名前をここに書く。
+var recordsPlaces = func() string {
+	stem, ext := ospath.Splitext(ospath.Basename(config.DefaultLog))
+	return pyre.AnySeparator + pyre.Escape(ospath.Dirname(config.DefaultLog)) + pyre.AnySeparator +
+		`(?:` + pyre.Escape(stem) + `(?:\.[^\\/]*)?` + pyre.Escape(ext) + `$|(?:` +
+		pyre.Escape(ospath.Basename(config.DefaultState)) + `|archive)(?:[\\/]|$))`
+}()
 
 // recordsRegex は記録と state の置き場を名指しのツールに当てる式。診断のフラグで動かした置き場にも当てる
 // （記録はいまの 1 本と同じディレクトリのローテートした分。書かれたパスと行き着く先の両方）。
@@ -476,7 +483,7 @@ func recordsRegex(logPath, stateDir string) string {
 		stem, ext := ospath.Splitext(base)
 		for _, where := range sortedSet(ospath.Abspath(directory), ospath.Realpath(directory)) {
 			alternatives = append(alternatives,
-				"^"+spelled(where)+`[\\/]`+pyre.Escape(stem)+`(?:\.[^\\/]*)?`+pyre.Escape(ext)+"$")
+				"^"+spelled(where)+pyre.AnySeparator+pyre.Escape(stem)+`(?:\.[^\\/]*)?`+pyre.Escape(ext)+"$")
 		}
 	}
 	if stateDir != "" {

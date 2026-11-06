@@ -237,7 +237,7 @@ func goSteps(t *testing.T, root, state, bin string, ops []stepOp, watch []string
 		case "remove":
 			os.Remove(path)
 		case "wipe":
-			os.RemoveAll(filepath.Join(state, BackupDir, op.Session))
+			os.RemoveAll(filepath.Join(state, backupDir, op.Session))
 		default:
 			step := map[string]Step{"before": Before, "after": After, "accept": Accept, "at_start": AtStart}[op.Name]
 			got := step(config.Mode(op.Setting), state, op.Session, root, found)

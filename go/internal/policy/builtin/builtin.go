@@ -13,22 +13,22 @@ const (
 	// シェルの書き込みで設定を壊し、保護の甘い既定に戻す手順を成り立たせないよう、読めない間も止める。
 	// 止めるのは書き込む形だけで、場所の名前では止めない。`git add`・`git restore --ours` でマージの衝突を解く手を止めると、
 	// ガードが機能しない状態から出られなくなるためである。
-	ConfigViaBashRuleID = "builtin:guard-config-via-bash"
+	ConfigViaBashRuleID = rules.ReservedIDPrefix + "guard-config-via-bash"
 	// GitDirRuleID と GitDirShellRuleID は、`.git` の中身を直接書き換える形（名指しのツールとシェル）。
 	// 適用する先（パスとコマンド文字列）が違うので id を分ける。読むだけなら止めない。
-	GitDirRuleID      = "builtin:guard-git-dir"
-	GitDirShellRuleID = "builtin:guard-git-dir-via-bash"
+	GitDirRuleID      = rules.ReservedIDPrefix + "guard-git-dir"
+	GitDirShellRuleID = rules.ReservedIDPrefix + "guard-git-dir-via-bash"
 
-	recursiveDeleteRuleID = "builtin:recursive-delete"
-	gitPushRuleID         = "builtin:git-push"
-	gitResetHardRuleID    = "builtin:git-reset-hard"
-	credentialsRuleID     = "builtin:credentials"
-	readAnythingRuleID    = "builtin:read-anything"
+	recursiveDeleteRuleID = rules.ReservedIDPrefix + "recursive-delete"
+	gitPushRuleID         = rules.ReservedIDPrefix + "git-push"
+	gitResetHardRuleID    = rules.ReservedIDPrefix + "git-reset-hard"
+	credentialsRuleID     = rules.ReservedIDPrefix + "credentials"
+	readAnythingRuleID    = rules.ReservedIDPrefix + "read-anything"
 )
 
 const (
 	// Fallback は既定に戻ったことを記録に残す値。数えれば、ガードが機能しないまま何回動いたかが分かる。
-	Fallback = "builtin:rules"
+	Fallback = rules.ReservedIDPrefix + "rules"
 	// Source は既定を使っているときの出所。読めなかったファイルの名前を出すと、見に行ったユーザが
 	// 適用されたルールを見つけられないため、既定の名前を出す。
 	Source = "(ccnavi built-in defaults)"
@@ -49,13 +49,16 @@ const (
 )
 
 const (
-	matchBash = "Bash"
+	matchBash    = config.ToolBash
+	matchRead    = config.ToolRead
+	globAnything = "*"
+)
+
+var (
 	// matchCredentials は設定で切れない土台なので、誤検知を承知で広げる。Grep・Glob・PowerShell は入れない。
 	// 探す先のパスは探索の中身を代表しないためである。
-	matchCredentials = "Bash|Read|Write|Edit|NotebookEdit"
-	matchWriteTools  = "Write|Edit|NotebookEdit"
-	matchRead        = "Read"
-	globAnything     = "*"
+	matchCredentials = rules.MatchOf(append([]string{config.ToolBash, config.ToolRead}, config.WriteTools...)...)
+	matchWriteTools  = rules.MatchOf(config.WriteTools...)
 )
 
 // Load は共通レイヤーが読めないときの既定を返す。土台の deny、シェルから設定へ書き込む形の deny、Read を通す allow からなる。

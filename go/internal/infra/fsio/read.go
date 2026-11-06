@@ -42,16 +42,27 @@ func LoadSource(path string) ([]byte, string, error) {
 	if !staged {
 		var err error
 		if content, err = readFile(path); err != nil {
-			return nil, "", wrap(err)
+			return nil, "", Wrap(err)
 		}
 	} else if !ok {
-		return nil, "", wrap(notFound(path))
+		return nil, "", Wrap(notFound(path))
 	}
 	text, err := Decode(content, Strict)
 	if err != nil {
 		return nil, "", err
 	}
 	return content, text, nil
+}
+
+// ReadDiskText は open(path, encoding="utf-8", errors=bad).read()。溜める段は見ない（Python も fsio を通さずに開く
+// 読み）。読めなければ Wrap したエラー（errors.Is(err, fs.ErrNotExist) で「無い」を分けられる）、Strict で UTF-8 でなければ
+// *DecodeError。改行は "\n" にそろう。
+func ReadDiskText(path string, bad Undecodable) (string, error) {
+	content, err := readFile(path)
+	if err != nil {
+		return "", Wrap(err)
+	}
+	return Decode(content, bad)
 }
 
 // ReadJSON は JSON を読む。返すエラーで「無い」（errors.Is(err, fs.ErrNotExist)）と
@@ -64,7 +75,7 @@ func LoadSource(path string) ([]byte, string, error) {
 func ReadJSON(path string) (any, error) {
 	content, staged, ok := stagedContent(path)
 	if staged && !ok {
-		return nil, wrap(notFound(path))
+		return nil, Wrap(notFound(path))
 	}
 	if !staged {
 		var err error
@@ -74,7 +85,7 @@ func ReadJSON(path string) (any, error) {
 			}
 			// 無い（ENOENT）は待っても現れないので打ち直さない。
 			if !transient(err) || attempt == retries {
-				return nil, wrap(err)
+				return nil, Wrap(err)
 			}
 			sleep(retryWait)
 		}
@@ -156,7 +167,7 @@ func Listdir(directory string) ([]string, error) {
 func listNames(directory string) ([]string, error) {
 	names, err := ospath.DiskListdir(directory)
 	if err != nil {
-		return nil, wrap(err)
+		return nil, Wrap(err)
 	}
 	return names, nil
 }

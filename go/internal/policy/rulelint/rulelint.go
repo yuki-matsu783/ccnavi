@@ -1,14 +1,10 @@
-// Package rulelint は、ルールファイルの中身を検査する。組み上がらないルール、何も止めない match、届かない
-// message、広すぎる allow などを名指しする。`--lint`・保護対象の下書きの取り込み・提案（suggest）が呼ぶ。
-// 判定と同じ読み（rules.Load）で読む。別の読み方をすると、検査は通ったのに実運用で失敗するためである。
-//
-// Python からの対応: policy.rule_lint。file_problems → FileProblems（home・layer・project は Options）。
 package rulelint
 
 import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"ccnavi/internal/infra/config"
@@ -77,7 +73,7 @@ func fail(name, detail string) rules.Problem {
 }
 
 // scriptsDir はルールの文面の sh の置き場（ワークスペースルートからの相対）。
-var scriptsDir = []string{config.DefaultProjectHome, "scripts"}
+var scriptsDir = []string{config.DefaultProjectHome, config.ScriptsDir}
 
 func ruleProblems(rule *rules.Rule, name, home string, project bool) []rules.Problem {
 	var problems []rules.Problem
@@ -479,7 +475,10 @@ func everyProblems(rule *rules.Rule, name string) []rules.Problem {
 	return nil
 }
 
-// broad は allow のルールが広いと言える理由（何にでも当たる・選択肢が 3 つ以上）。無ければ空。
+// broadAlternatives は allow のルールを広いと言う、正規表現の選択肢の数。
+const broadAlternatives = 3
+
+// broad は allow のルールが広いと言える理由（何にでも当たる・選択肢が broadAlternatives 以上）。無ければ空。
 func broad(rule *rules.Rule) string {
 	if rule.When != nil && rule.Compiled == nil {
 		// 組み合わせ条件は 1 つの文字列で試すと、`not: {regex: '^rm'}` のような形を取り違える。
@@ -489,8 +488,8 @@ func broad(rule *rules.Rule) string {
 	} else if rule.Built() && rule.BodyHits("x") {
 		return "何にでもヒットする"
 	}
-	if alternatives(rule.Regex) >= 3 {
-		return "選択肢が 3 つ以上"
+	if alternatives(rule.Regex) >= broadAlternatives {
+		return "選択肢が " + strconv.Itoa(broadAlternatives) + " つ以上"
 	}
 	return ""
 }

@@ -1,12 +1,10 @@
 package selfguard
 
 import (
-	"crypto/sha1"
-	"crypto/sha256"
-	"encoding/hex"
 	"strings"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/digest"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
@@ -27,9 +25,16 @@ const (
 
 // settingsFiles は守る設定ファイル（root からの相対）。rules は設定で動くのでここに無い。
 var settingsFiles = []struct{ key, rel string }{
-	{"settings", ospath.Join(".claude", "settings.json")},
-	{"settings-local", ospath.Join(".claude", "settings.local.json")},
+	{"settings", config.SharedClaudeSettings},
+	{"settings-local", config.LocalClaudeSettings},
 }
+
+const (
+	// copyNameLimit はワークツリー側の key に入れるワークツリーの名前の字数の上限（置き換えたあと）。
+	copyNameLimit = 40
+	// markLength は key に付ける digest の 16 進の字数。
+	markLength = 8
+)
 
 // Target は守る対象 1 つ。
 type Target struct {
@@ -176,8 +181,7 @@ func worktreeCopies(root, projectsDir string, places []place) []Target {
 // copyKey はワークツリー側の設定のバックアップの名前。使えない字を置き換えた名前に、元の名前の digest を付ける。
 // 置き換えだけだと `a/b` と `a_b` が同じ名前になり、別のワークツリーの中身を書き戻してしまうためである。
 func copyKey(key, name string) string {
-	sum := sha256.Sum256([]byte(name))
-	return key + "." + fsio.SafeName(name, 40) + "-" + hex.EncodeToString(sum[:])[:8]
+	return key + "." + fsio.SafeName(name, copyNameLimit) + "-" + digest.Hex(digest.SHA256, name, markLength)
 }
 
 // inside は path が root の下なら root からの相対、外なら空。
@@ -210,6 +214,5 @@ func relative(base, path string) string {
 
 // pathMark は PATH の実体の key に付けるパスの印。
 func pathMark(real string) string {
-	sum := sha1.Sum([]byte(pathcase.Fold(real)))
-	return hex.EncodeToString(sum[:])[:8]
+	return digest.Hex(digest.SHA1, pathcase.Fold(real), markLength)
 }

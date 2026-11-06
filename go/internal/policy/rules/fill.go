@@ -46,8 +46,6 @@ func RootPattern(root string) string {
 	return b.String()
 }
 
-const anySeparator = `[\\/]`
-
 func isSeparator(ch rune) bool { return ch == '/' || ch == '\\' }
 
 // differs は、その 1 字と違う字に当たる文字クラス。区切りは両方の書き方を除く。
@@ -60,7 +58,7 @@ func differs(ch rune) string {
 
 func same(ch rune) string {
 	if isSeparator(ch) {
-		return anySeparator
+		return pyre.AnySeparator
 	}
 	return pyre.Escape(string(ch))
 }

@@ -11,6 +11,7 @@
 //
 // Python からの対応: re.compile → Compile（読めなければ *Error）、Pattern.search・match・fullmatch →
 // Search・Match・FullMatch、finditer → FindAll、groupindex → Group、pattern → Pattern、re.escape → Escape、
-// fnmatch.translate → TranslateGlob。入れ子が深すぎて Python が RecursionError で止まる式は ErrTooDeep、
+// globmatch.translate（fnmatch.translate の "/" を両方の区切りに当てる）→ TranslateGlob、
+// 区切りの式 `[\\/]` → AnySeparator。入れ子が深すぎて Python が RecursionError で止まる式は ErrTooDeep、
 // 繰り返しの数が大きすぎて OverflowError になる式は ErrOverflow になる。
 package pyre

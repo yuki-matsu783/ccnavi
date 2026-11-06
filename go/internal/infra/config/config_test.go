@@ -241,7 +241,7 @@ func TestBranchPrefixes(t *testing.T) {
 		}
 	}
 	check(DefaultBranchPrefixes...)
-	write(sharedClaudeSettings, "feature,hotfix")
+	write(SharedClaudeSettings, "feature,hotfix")
 	check("feature", "hotfix")
 	write(LocalClaudeSettings, "spike")
 	check("spike")

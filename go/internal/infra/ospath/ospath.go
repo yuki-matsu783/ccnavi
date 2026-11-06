@@ -342,6 +342,16 @@ func Slashed(path string) string {
 	return strings.ReplaceAll(path, `\`, "/")
 }
 
+// HasDrive は p の 2 字目が ":" か（Python の len(p) > 1 and p[1] == ":"。字は符号位置で数える）。letter なら、
+// 1 字目が ASCII の英字のときだけ（Windows のドライブ。re.match(r"[A-Za-z]:", p)）。
+func HasDrive(p string, letter bool) bool {
+	head, size := utf8.DecodeRuneInString(p)
+	if size == 0 || !strings.HasPrefix(p[size:], ":") {
+		return false
+	}
+	return !letter || head < utf8.RuneSelf && unicode.IsLetter(head)
+}
+
 // Splitlines は str.splitlines()。行の区切りは Python と同じ集合で、区切り自体は残さない。
 func Splitlines(s string) []string {
 	var lines []string

@@ -209,11 +209,6 @@ func isDigits(s string) bool {
 	return true
 }
 
-// lower は Python の str.lower()。違いが出る U+0130 だけを合わせる。
-func lower(s string) string {
-	return strings.ToLower(strings.ReplaceAll(s, "İ", "i̇"))
-}
-
 // separators は区切りの演算子。長いものを先に置く（`;;&` を `;;` と `&` に割らない）。
 var separators = regexp.MustCompile(`;;&|;&|;;|&&|\|\||\|&|;|&|\||\(|\)`)
 

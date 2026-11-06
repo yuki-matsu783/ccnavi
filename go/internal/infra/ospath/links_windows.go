@@ -1,12 +1,11 @@
 //go:build windows
 
-package selfguard
+package ospath
 
 import "syscall"
 
-// hardLinks はファイルのハードリンクの数。数えられなければ false。
-// TODO(infra): OS の分岐は infra に置く決まり。infra に同じ部品ができたらそちらへ移す。
-func hardLinks(path string) (uint64, bool) {
+// HardLinks はファイルのハードリンクの数（os.stat の st_nlink）。数えられなければ false。
+func HardLinks(path string) (uint64, bool) {
 	name, err := syscall.UTF16PtrFromString(path)
 	if err != nil {
 		return 0, false

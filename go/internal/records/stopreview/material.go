@@ -58,7 +58,7 @@ const criteriaMD = `# Stop の AI 判定の基準
 
 // MaterialVersion は材料の版。抽出器の版と判定用 Markdown の版から決まる。record が計画の版と突き合わせる。
 func MaterialVersion(criteria string) string {
-	return extractorVersion + ":" + digest(criteria)
+	return extractorVersion + ":" + shortKey(criteria)
 }
 
 // LoadCriteria は判定用 Markdown の中身を返す。ワークスペースに `.ccnavi/config/stop-review.md` があればそれを、無ければ組み込みの定義を返す。

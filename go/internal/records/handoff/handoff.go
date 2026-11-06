@@ -1,8 +1,6 @@
 package handoff
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -11,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/digest"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/hookio"
@@ -238,10 +237,7 @@ func Start(state, session string, usage *Usage, limit int, waitOverride, transcr
 	if data.Value(keyState) == string(fired) || !due(data, usage.Tokens, limit) {
 		return Plan{}, false
 	}
-	token, err := newToken()
-	if err != nil {
-		return Plan{}, false
-	}
+	token := digest.RandomHex(tokenBytes)
 	fresh := pyjson.NewObject(
 		keyState, string(waiting),
 		keyToken, token,
@@ -254,14 +250,6 @@ func Start(state, session string, usage *Usage, limit int, waitOverride, transcr
 		return Plan{}, false
 	}
 	return Plan{Wait: waitFor(usage.TTL, waitOverride), Token: token}, true
-}
-
-func newToken() (string, error) {
-	b := make([]byte, tokenBytes)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
 }
 
 // Check は待機のあとで呼ぶ。起こすべきなら指示の文を返し、状態を fired にして基準を進める。

@@ -2,8 +2,9 @@ package pyre
 
 import "strings"
 
-// separator は "/" と書いた glob を "\" にも当てる式（ルールは 1 回書いて、どの機械でも同じ意味にする）。
-const separator = `[\\/]`
+// AnySeparator はどちらの区切り（"/" と "\"）にも当たる式。"/" と書いた glob を "\" にも当て、組み込みの保護の式も
+// これで区切りをつなぐ（ルールは 1 回書いて、どの機械でも同じ意味にする）。
+const AnySeparator = `[\\/]`
 
 // TranslateGlob は glob を Python 3.13 の fnmatch.translate と同じ式にし、"/" を両方の区切りに当てる
 // （Python の globmatch.translate）。文字列全体に当たる形（末尾は `\Z`）で、先頭の `^` は呼び手が付ける。
@@ -12,7 +13,7 @@ const separator = `[\\/]`
 // 置き換えるのは翻訳後の "/" で、文字クラスの中の "/"（`[a/b]`）も置き換わる。Python と同じ答えにするため
 // そのままにしてある。
 func TranslateGlob(glob string) string {
-	return strings.ReplaceAll(fnmatchTranslate([]rune(glob)), "/", separator)
+	return strings.ReplaceAll(fnmatchTranslate([]rune(glob)), "/", AnySeparator)
 }
 
 // star は翻訳の途中で `*` の位置を表す印。

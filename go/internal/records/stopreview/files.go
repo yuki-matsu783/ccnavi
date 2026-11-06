@@ -1,12 +1,11 @@
 package stopreview
 
 import (
-	"crypto/sha1"
-	"encoding/hex"
 	"slices"
 	"strings"
 	"time"
 
+	"ccnavi/internal/infra/digest"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
@@ -84,10 +83,10 @@ func readObject(path string) *pyjson.Object {
 	return obj
 }
 
-func digest(text string) string {
-	sum := sha1.Sum([]byte(text))
-	return hex.EncodeToString(sum[:])[:16]
-}
+// keyLength は名前と版に使う要約の 16 進の字数。
+const keyLength = 16
+
+func shortKey(text string) string { return digest.Hex(digest.SHA1, text, keyLength) }
 
 // moment は記録の UNIX 秒を時刻として読む（Python の float(v)。真偽も数に入る）。数でなければ fallback。
 func moment(v any, fallback time.Time) time.Time {

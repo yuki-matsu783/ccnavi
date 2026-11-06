@@ -86,7 +86,7 @@ func TestFieldsAreRedacted(t *testing.T) {
 
 // 上限の手前で始まり、上限をまたぐ値も伏せる（切ってから伏せると形が途中で切れて残る）。
 func TestRedactRunsBeforeTheLimit(t *testing.T) {
-	pad := strings.Repeat("x", SubjectLimit-20)
+	pad := strings.Repeat("x", RecordedSubjectLimit-20)
 	line := writeOne(t, &Record{Decision: Allow, Subject: pad + " --token " + long + long})
 	if strings.Contains(line.String("subject")[len(pad)+9:], long[:10]) {
 		t.Errorf("subject = %q", line.String("subject"))
@@ -101,14 +101,14 @@ func TestLongSubjectIsCutFirst(t *testing.T) {
 	if d := time.Since(start); d > 500*time.Millisecond {
 		t.Errorf("took %v", d)
 	}
-	if want := "…(+" + strconv.Itoa(len(subject)-SubjectLimit) + ")"; !strings.HasSuffix(line.String("subject"), want) {
-		t.Errorf("subject ends %q", line.String("subject")[SubjectLimit:])
+	if want := "…(+" + strconv.Itoa(len(subject)-RecordedSubjectLimit) + ")"; !strings.HasSuffix(line.String("subject"), want) {
+		t.Errorf("subject ends %q", line.String("subject")[RecordedSubjectLimit:])
 	}
 }
 
 func TestLimitedCountsCodePoints(t *testing.T) {
-	text := strings.Repeat("あ", SubjectLimit+2)
-	if got := limited(text, 0); got != strings.Repeat("あ", SubjectLimit)+"…(+2)" {
+	text := strings.Repeat("あ", RecordedSubjectLimit+2)
+	if got := limited(text, 0); got != strings.Repeat("あ", RecordedSubjectLimit)+"…(+2)" {
 		t.Errorf("limited = %q", got[len(got)-10:])
 	}
 	if got := limited("abc", 0); got != "abc" {

@@ -118,7 +118,7 @@ func IsUserPrompt(in Input) bool {
 	if text == "" || in.FromBackgroundTask() {
 		return false
 	}
-	lower := strings.ToLower(text)
+	lower := pyfmt.Lower(text)
 	for _, mark := range NotUserStarts {
 		if strings.HasPrefix(lower, mark) {
 			return false

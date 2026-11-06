@@ -10,7 +10,7 @@
 // Python からの対応: say → Say（値は Values、場合は Variants）、spec → Spec（SpecOptions）、spoken → Spoken、
 // load → Load（Catalog）、find → Find、render → Render、check_text → CheckText、fallback → Fallback、
 // lines_of → LinesOf、ID.fullmatch → IsID、LABELS["next"] → NextLabel、NOTE_LABEL → NoteLabel、
-// SUBJECT_LIMIT → SubjectLimit、TextError → *Error、dirs → Dir。上の段が使わない fields_for・kind_of_id・
+// SUBJECT_LIMIT → ShownSubjectLimit、TextError → *Error、dirs → Dir。上の段が使わない fields_for・kind_of_id・
 // scan・fill は私的にした。呼び手の無い code_of_id は移さなかった。読んだ結果を覚えておく _CACHE・_FILES は
 // 持たない。実行ファイルは呼び出しごとに別のプロセスとして動くため、覚える必要がないからである。
 package texts

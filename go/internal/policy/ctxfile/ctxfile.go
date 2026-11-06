@@ -1,16 +1,3 @@
-// Package ctxfile は、当たったルールがモデルへ渡す文（additionalContext）を組む。文、ファイルの本文
-// （additionalContextFile）、1 度だけ渡す文（…Once）の 3 つを並べる。どの回に渡すかを決める every と、
-// その数えの記録（state の `once-*.json`・`stop-*.json`）も持つ。文脈はセッションと、サブエージェントならその 1 回の起動で分ける。
-//
-// 読むのはワークスペースの中だけにする。絶対パスと、`..` で上に出るパスは lint が止め、実行時も読まない。
-// ルールから任意のファイルをモデルに渡せる形にしないためである。本文は固定の上限で切り、切ったことを末尾に書く。
-// 黙って切ると、モデルは途中で終わる文を全部だと思って読んでしまう。
-//
-// Python からの対応: deliver と for_rules → Deliver（for_rules は 2 つ目の戻り値を捨てる呼び方）、
-// unsure_speaks=False → Options.QuietWhenUnsure、load → Body、bad_path・locate・over_limit・bases・
-// stop_path・forget → BadPath・Locate・OverLimit・Bases・StopPath・Forget、told_refs・remember_refs・
-// told_peers・remember_peers → ToldRefs・RememberRefs・ToldPeers・RememberPeers（set は map[string]bool）、
-// MAX_CHARS → MaxChars、`once-` の頭 → OncePrefix。
 package ctxfile
 
 import (
@@ -18,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -37,13 +23,11 @@ import (
 const MaxChars = 4000
 
 // OnceKeep は「1 度だけ渡す文」の記憶を残す期間。セッションの開始で消えるのが本筋だが、これは開始が来ないまま
-// 終わったセッションの分を掃くための上限である。
+// 終わったセッションの分を掃くための上限である。selfguard のバックアップの期間と同じ 3 日だが、別の約束（Python も別の定数）。
 const OnceKeep = 3 * 24 * time.Hour
 
 // 記録の名前。
 const (
-	OncePrefix = "once-"
-	StopPrefix = "stop-"
 	// 文脈の名前が無いときの代わり。
 	unknownSession = "unknown"
 	mainAgent      = "main"
@@ -58,7 +42,7 @@ func BadPath(rel string) string {
 		return ""
 	}
 	slashed := ospath.Slashed(rel)
-	if ospath.IsAbs(rel) || strings.HasPrefix(slashed, "/") || len(slashed) > 1 && slashed[1] == ':' {
+	if ospath.IsAbs(rel) || strings.HasPrefix(slashed, "/") || ospath.HasDrive(slashed, false) {
 		return "絶対パスは指定できない。ルートからの相対パスで書く"
 	}
 	if slices.Contains(strings.Split(slashed, "/"), "..") {
@@ -73,7 +57,7 @@ func Locate(bases []string, rel string) string {
 		return ""
 	}
 	for _, base := range bases {
-		full := ospath.Join(base, strings.ReplaceAll(rel, "/", string(os.PathSeparator)))
+		full := ospath.Join(base, strings.ReplaceAll(rel, "/", ospath.Sep))
 		if ospath.IsFile(full) {
 			return full
 		}
@@ -83,11 +67,10 @@ func Locate(bases []string, rel string) string {
 
 // head は先頭の MaxChars+1 字（UTF-8 として読めないバイトは U+FFFD）。
 func head(full string) ([]rune, error) {
-	content, err := os.ReadFile(full)
+	text, err := fsio.ReadDiskText(full, fsio.Replace)
 	if err != nil {
-		return nil, errors.New(fsio.ErrorText(err))
+		return nil, err
 	}
-	text, _ := fsio.Decode(content, fsio.Replace)
 	runes := []rune(text)
 	return runes[:min(len(runes), MaxChars+1)], nil
 }
@@ -211,21 +194,15 @@ func Bases(conf *config.Settings, root string, target *tree.Tree) []string {
 	return append(bases, root)
 }
 
-func safeOr(text, fallback string) string {
-	if s := fsio.SafeName(text, fsio.SafeNameLimit); s != "" {
-		return s
-	}
-	return fallback
-}
-
 func oncePath(stateDir, session, agentID string) string {
-	return ospath.Join(stateDir, OncePrefix+safeOr(session, unknownSession)+"-"+safeOr(agentID, mainAgent)+fsio.JSONExt)
+	name := fsio.SafeNameOr(session, unknownSession, fsio.SafeNameLimit) + "-" + fsio.SafeNameOr(agentID, mainAgent, fsio.SafeNameLimit)
+	return ospath.Join(stateDir, config.OncePrefix+name+fsio.JSONExt)
 }
 
 // StopPath は Stop の促し（ターンの終わり N 回に 1 度）の数えの記録の場所。compact・再開・clear では消さず、
 // 起動の Forget と後始末だけが消す。文脈ごとに消すと、compact が N 回より先に来る長いセッションで促しが届かなくなる。
 func StopPath(stateDir, session string) string {
-	return ospath.Join(stateDir, StopPrefix+safeOr(session, unknownSession)+fsio.JSONExt)
+	return ospath.Join(stateDir, config.StopPrefix+fsio.SafeNameOr(session, unknownSession, fsio.SafeNameLimit)+fsio.JSONExt)
 }
 
 // loadOnce は、この文脈でどのルールが何回当たったかを返す。まだ無ければ空、読めなければ unreadable が真になる。
@@ -335,7 +312,7 @@ func Forget(stateDir, session string, startup bool) {
 		return
 	}
 	if startup {
-		_ = os.Remove(StopPath(stateDir, session))
+		fsio.Remove(StopPath(stateDir, session))
 	}
 	own := ospath.Basename(oncePath(stateDir, session, ""))
 	mine := own[:strings.LastIndex(own, "-")+1]
@@ -347,16 +324,16 @@ func Forget(stateDir, session string, startup bool) {
 	for _, entry := range names {
 		// 書きかけで残った一時ファイル（`.once-….part.json`）も、先頭の `.` を外して同じ条件で掃く。
 		name := fsio.TempOrigin(entry)
-		if !strings.HasSuffix(name, fsio.JSONExt) || !strings.HasPrefix(name, OncePrefix) {
+		if !strings.HasSuffix(name, fsio.JSONExt) || !strings.HasPrefix(name, config.OncePrefix) {
 			continue
 		}
 		path := ospath.Join(stateDir, entry)
 		if strings.HasPrefix(name, mine) {
-			_ = os.Remove(path)
+			fsio.Remove(path)
 			continue
 		}
 		if mtime, _, ok := ospath.Stat(path); ok && mtime.Before(cutoff) {
-			_ = os.Remove(path)
+			fsio.Remove(path)
 		}
 	}
 }

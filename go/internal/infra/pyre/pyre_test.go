@@ -130,3 +130,54 @@ func TestEscape(t *testing.T) {
 		t.Error(got)
 	}
 }
+
+// ルールの glob は先頭に ^ を付けて当てる（ルールの読み込みと同じ）。式の字面は python_test.go が Python と突き合わせるので、
+// ここでは当たり方の境界（全体に当たる・区切りの両方の表記・改行・文字クラス）を確かめる。
+func TestTranslateGlobMatches(t *testing.T) {
+	cases := []struct {
+		glob, subject string
+		want          bool
+	}{
+		// 文字列全体に当たる。部分一致は自動で足さない。
+		{"git push", "git push", true},
+		{"git push", "cd /repo && git push", false},
+		{"*git push*", "cd /repo && git push", true},
+		// 区切りはどちらの表記にも当たる。
+		{"*/secrets/*", "/repo/secrets/token.txt", true},
+		{"*/secrets/*", `C:\repo\secrets\token.txt`, true},
+		{"*/secrets/*", "/repo/docs/readme.md", false},
+		// 語の切れ目は入らない（仕様）。
+		{"*sed*", "sedate --now", true},
+		{"*sed *", "sedate --now", false},
+		{"*foo*bar*", "foobar", true},
+		{"*rm -rf *", "rm -r /tmp/x", false},
+		{"*", "a\nb", true},
+		{"a?c", "a\nc", true},
+		{"?", "é", true},
+		{"a.b", "axb", false},
+		// 文字クラスは fnmatch と同じ答え。
+		{"[!a-c]x", "ax", false},
+		{"[!a-c]x", "dx", true},
+		{"[]]", "]", true},
+		{"[z-a]", "m", false},
+		{"[]-a]", "-", false},
+		{"[]-a]", "^", true},
+		{`[\]`, `\`, true},
+		{"[!]", "[!]", true},
+		{"[^a]", "^", true},
+		{"[^a]", "b", false},
+		{"[[:x]", ":", true},
+		// クラスの中の "/" も置き換わり、クラスが途中で閉じる（Python と同じ）。
+		{"[a/b]", "/", false},
+		{"[a/b]", `\b]`, true},
+	}
+	for _, c := range cases {
+		re, err := Compile("^"+TranslateGlob(c.glob), 0)
+		if err != nil {
+			t.Fatalf("TranslateGlob(%q) = %q: %v", c.glob, TranslateGlob(c.glob), err)
+		}
+		if got := re.Match(c.subject); got != c.want {
+			t.Errorf("glob %q on %q = %v, want %v (%s)", c.glob, c.subject, got, c.want, TranslateGlob(c.glob))
+		}
+	}
+}

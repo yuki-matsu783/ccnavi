@@ -5,9 +5,6 @@ import (
 	"io"
 	"slices"
 
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
-
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/pyfmt"
 )
@@ -34,8 +31,6 @@ const (
 	Enable  Mode = "enable"  // 判定を呼び出しに適用する
 )
 
-var lower = cases.Lower(language.Und)
-
 // ResolveMode は設定された値をモードにする。フラグ > 設定（環境か上書き設定ファイル）。値が無ければ enable。
 //
 // disable を認めるのは、フラグでも設定ファイルでもなく、セッションを起動したユーザの環境から来たときだけ。
@@ -46,12 +41,12 @@ func ResolveMode(stderr io.Writer, flagValue string, conf *Settings) Mode {
 	if flagValue != "" {
 		source, value = "--mode", flagValue
 	}
-	switch Mode(lower.String(value)) {
+	switch Mode(pyfmt.Lower(value)) {
 	case DryRun:
 		return DryRun
 	case Disable:
-		fromFile := Mode(lower.String(conf.ModeDeclaredInFile))
-		fromEnv := Mode(lower.String(conf.ModeFromEnvironment))
+		fromFile := Mode(pyfmt.Lower(conf.ModeDeclaredInFile))
+		fromEnv := Mode(pyfmt.Lower(conf.ModeFromEnvironment))
 		if flagValue == "" && fromEnv == Disable && fromFile != Disable {
 			return Disable
 		}

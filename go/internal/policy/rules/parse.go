@@ -1,10 +1,8 @@
 package rules
 
 import (
-	"errors"
 	"fmt"
 	"math"
-	"os"
 	"slices"
 	"strings"
 
@@ -22,11 +20,8 @@ const needsMessage = Deny
 // 読めない（ファイルが無い、UTF-8 でない、YAML として読めない、マッピングでない）ときは error を返す。error の文は Python の例外の文と同じにする。
 // 組み立てられないルールは外して Problem で名指しし、組み立てられたものは返す。1 件の不備でガード全体を止めないためである。
 func Load(path, root string) (*RuleSet, []Problem, error) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return nil, nil, errors.New(fsio.ErrorText(err))
-	}
-	text, err := fsio.Decode(content, fsio.Strict)
+	// Python の open(path, encoding="utf-8")。fsio を通さないので、溜める段も見ない。
+	text, err := fsio.ReadDiskText(path, fsio.Strict)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -51,7 +46,7 @@ func Parse(data *yaml.Map, root string) (*RuleSet, []Problem) {
 	}
 	rs := &RuleSet{Version: versionOf(written)}
 	var problems []Problem
-	if !isVersion(written) {
+	if !pyfmt.EqualsInt(written, Version) {
 		problems = append(problems, Problem{Severity: Error, Detail: fmt.Sprintf(
 			"ルール書式の版 %s は扱えない（このビルドが読むのは %d）。"+
 				"書式は `%s` の 3 タイプで、照合に指定できるのは `glob` か `regex`。"+
@@ -95,28 +90,18 @@ func joinSections(sep string) string {
 	return strings.Join(names, sep)
 }
 
-// isVersion は書かれた版が Python の == で Version と等しいか（true も 1.0 も 1 と等しい）。
-func isVersion(v any) bool {
-	switch x := v.(type) {
-	case bool:
-		return x && Version == 1
-	case int:
-		return x == Version
-	case float64:
-		return x == Version
-	}
-	return false
-}
+// versionLimit は書かれた小数の版を RuleSet.Version（int）に入れる上限。超えた版は 0 にする（どのみち扱えない版）。
+const versionLimit = math.MaxInt32
 
 func versionOf(v any) int {
-	if isVersion(v) {
+	if pyfmt.EqualsInt(v, Version) {
 		return Version
 	}
 	switch x := v.(type) {
 	case int:
 		return x
 	case float64:
-		if x == math.Trunc(x) && math.Abs(x) < math.MaxInt32 {
+		if x == math.Trunc(x) && math.Abs(x) < versionLimit {
 			return int(x)
 		}
 	}
@@ -200,7 +185,7 @@ func build(raw rawRule, section Decision, where, root string) (*Rule, []Problem)
 	fail := func(detail string) (*Rule, []Problem) {
 		return nil, []Problem{{Severity: Error, Rule: name, Detail: detail}}
 	}
-	if !raw.builtin && strings.HasPrefix(strings.ToLower(raw.id), ReservedIDPrefix) {
+	if !raw.builtin && strings.HasPrefix(pyfmt.Lower(raw.id), ReservedIDPrefix) {
 		return fail("`" + ReservedIDPrefix + "` で始まる id は組み込みルールの名前で、" +
 			"ルールファイルには書けない。同じ名前で書いても組み込みは置き換わらない。" +
 			"別の名前にしてください。" +
