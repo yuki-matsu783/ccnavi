@@ -38,7 +38,7 @@ const (
 	// Azure の接続文字列の AccountKey も読む。
 	keyWords = `token|password|passwd|[_-]pwd|secret|secret[_-]?key|api[_-]?key|apikey|access[_-]?key|` +
 		`private[_-]?key|client[_-]?secret|auth[_-]?token|account[_-]?key|credentials?|cookie`
-	flagWords = `password|passwd|token|secret|api-key|apikey|access-token|auth-token`
+	flagWords = `password|passwd|token|secret|api-key|apikey|access-token|auth-token|access-key|secret-key|account-key|client-secret|private-key`
 	// コマンドの範囲は、名前から次のコマンドの切れ目の手前まで。
 	segmentEnd = "\n;|&\x00"
 )

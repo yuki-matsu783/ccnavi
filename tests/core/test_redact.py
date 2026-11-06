@@ -186,6 +186,11 @@ class RedactTest(unittest.TestCase):
             "abc123def456==",
             ("AccountName=acct;AccountKey=", ";EndpointSuffix=core.windows.net"),
         )
+        self.assertHidden(
+            "az storage blob list --account-name acct --account-key abc123def456",
+            "abc123def456",
+            ("--account-name acct --account-key",),
+        )
 
     def test_cookie_header(self):
         # `;` で並ぶ値は 1 つの値として伏せる（長ければ頭と尻が残る）。

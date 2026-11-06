@@ -55,7 +55,8 @@ _ASSIGN = re.compile(
 )
 # 空白で値を渡すフラグ（`--password xxx`、`--token xxx`）。`=` の形は _ASSIGN が読む。
 _FLAG = re.compile(
-    r"(?<![A-Za-z0-9-])--(?:password|passwd|token|secret|api-key|apikey|access-token|auth-token)"
+    r"(?<![A-Za-z0-9-])--(?:password|passwd|token|secret|api-key|apikey|access-token|auth-token|"
+    r"access-key|secret-key|account-key|client-secret|private-key)"
     r"\s+" + _VALUE,
     re.IGNORECASE,
 )

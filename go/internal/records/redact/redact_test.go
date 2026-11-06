@@ -166,6 +166,9 @@ func TestLongNames(t *testing.T) {
 	if strings.Contains(got, "abc123def456") || !strings.Contains(got, "AccountKey=***;EndpointSuffix=core.windows.net") {
 		t.Errorf("AccountKey: %q", got)
 	}
+	if got := Redact("az storage blob list --account-name acct --account-key abc123def456"); got != "az storage blob list --account-name acct --account-key ***" {
+		t.Errorf("--account-key: %q", got)
+	}
 }
 
 // 長い入力でも手間が長さにほぼ比例すること。記録は実行前チェックの期限の中で書き、期限を過ぎると hook の拒否が破棄される。
