@@ -1193,7 +1193,7 @@ class TicketTest(unittest.TestCase):
         )
         self.assertIn("DENY_PHASE_REVIEW", self.reason(other))
         self.assertIn(phase_forms.EXEMPT_NOTE, self.reason(other))
-        # 改版は単独なら通る。提案を heredoc で書く連結は止まり、案内が Write・Edit と単独実行を言う。
+        # 改版は単独なら通る。heredoc で提案を書く連結は止まり、案内に Write・Edit と単独実行が書かれている。
         ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
         revise = self.hook(
             "PreToolUse", "Bash", self.parent_tree, command=f"{ticket_sh} revise P-1"
