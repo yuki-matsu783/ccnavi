@@ -77,6 +77,12 @@ var subTiers = map[string]map[string]int{
 		"ctxfile": 2,
 		// 3: ルールファイルの検査（文脈ファイルの置き場を見る）
 		"rulelint": 3,
+		// 3: 自己防衛（守る場所への書き込みを止める組み込みのルールと、守る対象のバックアップと戻し）
+		"selfguard": 3,
+		// 4: 組み込みのルール（selfguard の守る形を読む）
+		"builtin": 4,
+		// 5: 適用するルール集合を決める（組み込みとレイヤーを重ねる）
+		"ruleload": 5,
 	},
 	"tickets": {
 		"model":     0,
