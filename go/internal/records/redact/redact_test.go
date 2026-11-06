@@ -168,8 +168,8 @@ func TestLongNames(t *testing.T) {
 	}
 }
 
-// 長い入力でも手間が長さにほぼ比例すること。記録は実行前チェックの期限の中で書くので、名前の形の頭が
-// 長さを限らずに読み進めると、`-` が続くだけの 1.5 万字で期限を過ぎ、hook の拒否が破棄される（回帰）。
+// 長い入力でも手間が長さにほぼ比例すること。記録は実行前チェックの期限の中で書き、期限を過ぎると hook の拒否が破棄される。
+// 名前の形を名前の頭から照らすと、`-` が続くだけの 1.5 万字で期限を過ぎた（回帰）。
 func TestSpeed(t *testing.T) {
 	const limit = 500 * time.Millisecond
 	check := func(t *testing.T, text string) {
