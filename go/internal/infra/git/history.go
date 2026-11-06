@@ -57,7 +57,7 @@ func firstLine(done Done) string {
 
 // ForkBase は others（ターンの始まりに記録した別のツリーの HEAD）から、このツリーが分かれた点。
 // ターンの途中で切ったワークツリーはターンの始まりの HEAD を持たないので、merge-base で代える。
-// どれとも共通の祖先が無い・読めないときは空文字（数えられない側へ倒す）。
+// どれとも共通の祖先が無い・読めないときは空文字（数えられない側にする）。
 func ForkBase(top string, others []string, timeout time.Duration) string {
 	if top == "" {
 		return ""
@@ -114,7 +114,7 @@ func zPaths(top string, args []string, timeout time.Duration) (map[string]bool, 
 // 子が統合先を merge すると、他人の変更のパスが差分に入る。範囲の検査とリスクの計測から外すのは、
 // first-parent の merge のうち 2 つめ以降の親がリモート追跡ブランチに入っているものについて、
 // merge が 1 つめの親から変えたパスで、head の中身が取り込んだ側と同じもの。衝突を解いて書き換えたパスと
-// merge のあとに子が直したパスは残る。読めなかったときは何も外さない（数える側へ倒す）。
+// merge のあとに子が直したパスは残る。読めなかったときは何も外さない（数える側にする）。
 func TakenFromRemote(top, base, head string, timeout time.Duration) map[string]bool {
 	taken := map[string]bool{}
 	if top == "" || base == "" || head == "" {

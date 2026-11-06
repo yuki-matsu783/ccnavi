@@ -165,7 +165,7 @@ func (t *cdTracker) chdir(segment []string, here where) where {
 	case pushd[name]:
 		return where{}
 	case !here.known || t.budget <= 0 || classify([][]string{rest}) != "":
-		// 最後はコードとして実行する形。どの語がパスかが表記に無い。読み全体が縮退する。
+		// 最後はコードとして実行される形になる。どの語がパスかは表記から分からず、読み全体が縮退する。
 		return here
 	}
 	// 居場所が動いていなくても、`env -C <パス>` はその 1 本だけ動かす。

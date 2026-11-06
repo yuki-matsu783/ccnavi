@@ -1,5 +1,5 @@
 // ccnavi の実行ファイルの入口（Python の ccnavi.__main__ と entry.cli）。
-// 書き直しの途中。入口は entry 段を移したときに埋める。
+// 書き直しの途中で、入口は entry 段を移すときに書く。
 package main
 
 import (

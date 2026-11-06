@@ -86,7 +86,7 @@ const (
 	General HoldKind = "general"
 	// Gate はチケット制御のゲート。dry-run でも止める。
 	Gate HoldKind = "gate"
-	// Aux はゲートを外す抜け道（生の git、環境変数の指定など）をふさぐ補助。dry-run でも止める。
+	// Aux はゲートを外す抜け道（生の git、環境変数の指定など）を止める補助。dry-run でも止める。
 	Aux HoldKind = "aux"
 )
 

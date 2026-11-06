@@ -9,7 +9,7 @@ import (
 	"ccnavi/internal/infra/pathcase"
 )
 
-// 調べきれないとき（パスが解けない・root の外に出る）は、HasLink と Escapes は拒否する側に倒す。
+// 調べきれないとき（パスが解けない・root の外に出る）は、HasLink と Escapes は拒否する側にする。
 // Scan は lstat の失敗を Missing として返し、呼び手が決める。IsLink は失敗を偽にする（os.path.islink と同じ）。
 
 // LinkState は Scan の答え。

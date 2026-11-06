@@ -197,7 +197,7 @@ func Load(root string) (*Settings, []string) {
 }
 
 // resolveBin は実行ファイルのパスを、この環境に在る形へ直す。書かれたとおりに在ればそれ、無ければ
-// `.exe` を継ぎ足して在るもの。OS で分けないのは、WSL から Windows 側の置き場を指す形でも守るため。
+// `.exe` を継ぎ足して在るもの。OS で分けないのは、WSL から Windows 側の置き場を指すときも守るため。
 // どちらも無ければ書かれたまま返す（空にすると「守らない設定」と見分けられない）。
 func resolveBin(root, path string) string {
 	full := path
