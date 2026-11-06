@@ -187,7 +187,7 @@ func TestTooManyRedirects(t *testing.T) {
 }
 
 // 浅い PATH の実体（/bin/ccnavi）は区切りで始まる形だけに当て、別のプロジェクトの ./bin/ccnavi は止めない。
-// 浅い PATH の実体（`/tmp/x/ccnavi`）は区切りで始まる形だけに当てる。ルールの式は後読みを受けないので、
+// 浅い PATH の実体（`/tmp/x/ccnavi`）は区切りで始まる形だけに当てる。ルールの式は後読みを受けない。
 // 組み立てに失敗して保護が黙って外れないことも確かめる。
 func TestShallowPathExecutable(t *testing.T) {
 	if ospath.Windows {

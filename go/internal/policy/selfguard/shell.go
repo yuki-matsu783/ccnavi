@@ -115,7 +115,7 @@ type form int
 const (
 	writeForm  form = iota // 書き込みの形のあと（空白で閉じる）
 	copyForm               // cp・ln・install の最後の引数（引数の並びの終わりで閉じる）
-	targetForm             // `-t` の値。書き込みの形から、ディレクトリになり得ないもの（PATH の実体）を除く
+	targetForm             // `-t` の値の形。書き込みの形から、ディレクトリになり得ないもの（PATH の実体）を除いたもの
 )
 
 // Under はディレクトリの表記を、語の頭からでも置き場の下からでもヒットする行き先の形にする
@@ -262,8 +262,8 @@ func binaryClause(binPath string, f form) string {
 			}
 			return `(?:` + inWord + `(?:` + sh + copyTail + `|` + built + copyEnd + `)` + onPathCopy + `)`
 		}
-		// PATH の実体はファイルなので `-t` の値（ディレクトリ）には足さない。浅い実体は前の 1 文字から当てるので、
-		// 足すと `-t /tmp/out /bin/ccnavi` の元の側にヒットする。
+		// PATH の実体はファイルなので `-t` の値（ディレクトリ）には足さない。
+		// 浅い実体は前の 1 文字から当てるので、足すと `-t /tmp/out /bin/ccnavi` の元の側にヒットする。
 		var onPath string
 		if f == writeForm {
 			for _, p := range pathSpellings(binPath, writeForm) {

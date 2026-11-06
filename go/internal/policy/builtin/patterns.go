@@ -61,7 +61,7 @@ var (
 // それ以外は `-` で始まる語を 1 つ読む。値まで読んだ語は読み直さないので、`git commit -m push` や
 // `git -c push.default=current status` の `push` はサブコマンドとして読まれない。値とのあいだの空白は 1 字だけ読む。
 // 空の語 `git -C "" push` は空白 2 字になり、まとめて読むと次の `push` を値として読んで外れるためである。
-// 読みを通らずに来た文字列では空白が何字続いても語の区切りで、`git  -C  x  push` の `x` は値になる。
+// 読みを通らずに来た文字列では、空白が何字続いても語の区切りになるので、`git  -C  x  push` の `x` は値になる。
 // どちらの読みでもヒットするように、空白を 1 字だけ読む形とまとめて読む形を「または」で並べる。
 var gitOptions = `(?:` + gitOptionsWith(`\s`) + `|` + gitOptionsWith(`\s++`) + `)`
 
@@ -137,7 +137,7 @@ var recursiveDeleteRegex = rmStart + `\s*+` + rmRestart + `(?:` + rmOther("rf") 
 	`|` + rmRecursive + `\s++(?:` + rmOther("f") + `\s++)*+` + rmForce + wordEnd +
 	`|` + rmForce + `\s++(?:` + rmOther("r") + `\s++)*+` + rmRecursive + wordEnd + `)`
 
-// credentialsRegex は認証情報の場所の形。先頭に境界（行頭か、語の字・`.`・`,`・`-`・引用の中の空白の目印 `\x01` でない字）を付け、
+// credentialsRegex は認証情報の場所の形。先頭に境界（行頭か、語を作る字・`.`・`,`・`-`・引用の中の空白の目印 `\x01` でない字）を付け、
 // `jq '.a,.env.X'` や `process.env` を巻き込まない。引用符・`:`・`=`・`@` のあと（`open('.env')`・`HEAD:.env`・
 // `--file=.env`・`@.env`）は止める。`,` のあとは通す（`{a,.env}` はブレース展開のルールが止める）。
 // `.env` の後ろに続く `.envrc`・`.env.local`・`.env.example` は止める。キーのファイルは、拡張子として
