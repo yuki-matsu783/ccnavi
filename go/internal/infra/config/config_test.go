@@ -276,3 +276,9 @@ func TestLoadReadsLocalFileOnlyInOwnSourceTree(t *testing.T) {
 		t.Errorf("problems = %q", problems)
 	}
 }
+
+func TestLauncher(t *testing.T) {
+	if want := "sh .ccnavi/scripts/ccnavi-launcher.sh"; Launcher != want {
+		t.Errorf("Launcher = %q, want %q", Launcher, want)
+	}
+}

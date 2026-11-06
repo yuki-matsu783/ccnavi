@@ -16,6 +16,8 @@ const (
 	scriptsDir = "scripts"
 	// defaultBin は実行ファイルの指定が無いときの案内。PATH に置いたユーザはそのまま打てる。
 	defaultBin = "ccnavi"
+	// Launcher は文面でエージェントに打たせる起動の sh。配布先では `ccnavi` が PATH に無い。ルートで打つ形。
+	Launcher = "sh " + DefaultProjectHome + "/" + scriptsDir + "/ccnavi-launcher.sh"
 )
 
 // ScriptCommand は `.ccnavi/scripts/` の sh をワークスペースルートから書いた打ち方。
