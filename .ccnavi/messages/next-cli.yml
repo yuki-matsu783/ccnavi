@@ -73,6 +73,13 @@ messages:
     next: |-
       上記の問題を解消して、'{script:ccnavi-ticket.sh} cancel {ticket} --reason <理由>' を打ち直す
 
+  # approval-request が、計画の誤りで何も送らずに断ったあと（誤りの行のあとに 1 行）。
+  NEXT_APPROVAL_REQUEST_PLAN_WRONG:
+    kind: next
+    values: [parent]
+    next: |-
+      直して `ccnavi-ticket.sh approval-request {parent}` を打ち直す
+
   # review-request が、取り込みの前に分かる前提で断ったあと（理由の行のあとに 1 行）。
   NEXT_REVIEW_REQUEST_REFUSED:
     kind: next

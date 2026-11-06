@@ -175,7 +175,7 @@ def run(
         )
         for detail in wrong:
             stderr.write(f"  {detail}\n")
-        stderr.write(f"次: 直して `ccnavi-ticket.sh approval-request {parent}` を打ち直す\n")
+        stderr.write(texts.say(root, "NEXT_APPROVAL_REQUEST_PLAN_WRONG", {"parent": parent}) + "\n")
         return 1
     for detail in _childless_problems(conf, root, paths, parent):
         stderr.write(f"ccnavi: 注意: {detail}\n")

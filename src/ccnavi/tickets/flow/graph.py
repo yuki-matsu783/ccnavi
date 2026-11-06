@@ -866,27 +866,12 @@ def briefing(
     lines.append(FENCE_CLOSE)
     ticket = flow_text.clean(child.ticket)
     if flow_shape.ASK in kinds:
-        lines.append(
-            f"    {flow_shape.ASK} のノード: サブエージェントはユーザに聞けない"
-            "（AskUserQuestion は渡されない）。そのノードで手を止め、問いと選択肢を添えて"
-            "メインに返してください。メインがユーザに聞き、答えを持って同じサブエージェントを再開させる。"
-        )
+        said = texts.say(root, "NOTICE_FLOW_BRIEF__ASK", {"node": flow_shape.ASK})
+        lines.append(f"    {said}")
     if flow_shape.LOOP in kinds:
-        lines.append(
-            f"    {flow_shape.LOOP} のノード: 条件が成り立つあいだ「繰り返す」側へ進み、"
-            "成り立たなくなったか、繰り返した回数が最大に達したら「抜ける」側へ進んでください。"
-            "回数は自分で数えてください。最大に達しても条件が成り立つままだったときは、"
-            "最後の報告にそのことを書いてください。"
-        )
+        said = texts.say(root, "NOTICE_FLOW_BRIEF__LOOP", {"node": flow_shape.LOOP})
+        lines.append(f"    {said}")
     if kinds & set(SPAWN):
-        lines.append(
-            "    subAgent / subAgentFlow のノード: Agent ツールがあれば入れ子の"
-            "サブエージェントとして起動してください。そのプロンプトには担当の子の識別子 "
-            f"{ticket} を 1 つだけ書き（ccnavi が範囲とフローの案内を書き足す）、"
-            "担当以外の子の識別子とワークツリーのパスは書かないでください。isolation は使いません。"
-            "Agent ツールが無ければ（入れ子の上限）、"
-            "そのノードで手を止め、起動してほしいエージェントの種類・プロンプト・担当の子チケットの"
-            "識別子を添えてメインに返してください。メインがそのとおり起動し、結果を持って"
-            "同じサブエージェントを再開させる。"
-        )
+        said = texts.say(root, "NOTICE_FLOW_BRIEF__SPAWN", {"ticket": ticket})
+        lines.append(f"    {said}")
     return lines

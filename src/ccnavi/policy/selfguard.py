@@ -130,7 +130,7 @@ from typing import TextIO
 
 from ..infra import fsio, gitstate
 from ..infra.modes import DISABLE, DRY_RUN, ENABLE
-from . import selfguard_targets
+from . import selfguard_targets, texts
 
 # 設定の値。mode と同じ 3 語。定義は modes にあり、ここは借りているだけ。
 SETTINGS = (ENABLE, DRY_RUN, DISABLE)
@@ -868,7 +868,7 @@ def _copy(source: str, target: str) -> str:
     return ""
 
 
-def report(outcomes: list[Outcome]) -> str:
+def report(root: str, outcomes: list[Outcome]) -> str:
     """モデルに返す文。何が起きたかと、次に何をすべきかを書く。
 
     処理フロー:
@@ -890,29 +890,18 @@ def report(outcomes: list[Outcome]) -> str:
         # ワークツリー側の設定が混じっている。今の時点の判定は変わらないので、
         # 「何も起きていないのに戻された」と読まれる。時間差で反映される経路であることを
         # 言わないと、次に同じ操作が繰り返される。
-        lines.append(
-            "ワークツリー側の設定は、その場では誰も読みませんが、統合すれば統合先の "
-            "hook の登録とルールになります。"
-        )
+        lines.append(texts.say(root, "NOTICE_SELFGUARD__COPY"))
     if any(_common_rules(outcome) for outcome in outcomes):
         # 壊れたルールファイルを直した書き込みも戻る。直す道を言わないと、黙って戻されたように
         # 見え、同じ書き込みが繰り返される。
         lines.append(
-            f"共通レイヤーのルールファイルを直すときは、下書きを {COMMON_RULES_DRAFT} に置き、"
-            "ユーザにターミナルの ccnavi-user-handoff.sh での取り込みを頼んでください。"
-            "読めない間も同じです。"
+            texts.say(root, "NOTICE_SELFGUARD__COMMON_RULES", {"draft": COMMON_RULES_DRAFT})
         )
     if any(outcome.action == ACTION_REBASED for outcome in outcomes):
         # 取り直した版は、ccnavi の外で作り直されたものも含めて、この時点から基準になる。
-        lines.append(
-            "実行ファイルは新しい版を基準に取り直しました。ccnavi の外で作り直された版も、"
-            "この時点から基準になります。"
-        )
+        lines.append(texts.say(root, "NOTICE_SELFGUARD__REBASED"))
     if any(outcome.action != ACTION_REBASED for outcome in outcomes):
-        lines.append(
-            "変更が必要なら、何をなぜ変えたいのかをユーザに伝えて依頼してください。"
-            "自分で書き換えると、次の呼び出しで同じように戻ります。"
-        )
+        lines.append(texts.say(root, "NOTICE_SELFGUARD__ASK_USER"))
     return "\n".join(lines)
 
 

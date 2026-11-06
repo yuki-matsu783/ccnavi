@@ -99,6 +99,8 @@ GH_URL = "https://github.com/acme/widgets.git"
 GL_URL = "https://gitlab.com/acme/widgets.git"
 GITHUB = "https://api.github.com/repos/acme/widgets"
 GL_API = "https://gitlab.com/api/v4"
+# 出力に漏れていないことを確かめるダミーのトークン。一時ディレクトリ名に含まれにくい綴りにする
+DUMMY_TOKEN = "tok-start-sh-test-7f3a91c2e5"
 GITLAB = "https://gitlab.com/api/v4/projects/acme%2Fwidgets"
 GRAPHQL = "POST https://api.github.com/graphql"
 PULLS = f"GET {GITHUB}/pulls?state=open&per_page=100&page=1"
@@ -246,7 +248,7 @@ class StartShTest(unittest.TestCase):
             ):
                 env.pop(name)
         if token:
-            env["GITLAB_TOKEN" if self.origin_url == GL_URL else "GITHUB_TOKEN"] = "t0k"
+            env["GITLAB_TOKEN" if self.origin_url == GL_URL else "GITHUB_TOKEN"] = DUMMY_TOKEN
         env.update(
             {
                 "PATH": os.pathsep.join([self.bin, os.environ.get("PATH", "")]),
@@ -827,8 +829,8 @@ class StartShTest(unittest.TestCase):
     def test_the_branch_from_a_title_is_the_one_chrome_makes(self):
         """タイトルからのブランチ名は Chrome の「始める」と同じ関数（`issue_identifier`）で作る。
 
-        末尾が `-<2 桁>` になるタイトルは、その部分を除く（除かないと、作ったあとに採用の確認で止まり、
-        手で消すまで戻れない）。日本語のタイトルは日本語のまま残す。
+        末尾が `-<2 桁>` になるタイトルは、その部分を除く（除かないと、作ったあとに
+        採用の確認で止まり、手で消すまで戻れない）。日本語のタイトルは日本語のまま残す。
         """
         for title, branch in (
             ("Update 10 20", "feature-152-update"),
@@ -843,7 +845,8 @@ class StartShTest(unittest.TestCase):
                 self.assertEqual(self.local_branches(), ["main"])
 
     def test_a_long_title_stops_and_asks_for_a_short_slug(self):
-        """タイトルが長くて slug が切れるときは、何も作らずに止め、短い --slug での打ち直しを案内する。
+        """タイトルが長くて slug が切れるときは、何も作らずに止め、
+        短い --slug での打ち直しを案内する。
 
         --slug を付ければ、同じ issue で進める。タイトルが収まるときは止めない。
         """
@@ -1416,7 +1419,7 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(self.local_branches(), ["main"])
         self.assertEqual(self.remote_branches(), ["main"])
         self.assertFalse(os.path.isdir(os.path.join(self.ws, ".claude", "worktrees")))
-        self.assertNotIn("t0k", done.stdout + done.stderr)
+        self.assertNotIn(DUMMY_TOKEN, done.stdout + done.stderr)
 
     def test_check_ok_tells_to_try_new_issue_before_asking_the_user(self):
         done = self.check()
@@ -1463,7 +1466,7 @@ class StartShTest(unittest.TestCase):
                 self.assertIn(fix, done.stdout)
                 # git のリモートは API の結果によらず確かめる
                 self.assertEqual(self.labels(done.stdout)["git"], "OK")
-                self.assertNotIn("t0k", done.stdout + done.stderr)
+                self.assertNotIn(DUMMY_TOKEN, done.stdout + done.stderr)
 
     def test_check_probe_500_is_unverified(self):
         done = self.check({f"GET {GITHUB}": [500, {"message": "boom"}]})
@@ -1779,7 +1782,8 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(self.posts(), [])
 
     def test_a_branch_that_cannot_be_deleted_is_reported_as_the_only_leftover(self):
-        # 手元の統合先が origin より遅れていると、切ったばかりの空のブランチでも branch -d が通らない
+        # 手元の統合先が origin より遅れていると、
+        # 切ったばかりの空のブランチでも branch -d が通らない
         tip = git(self.ws, "commit-tree", "-p", "main", "-m", "ahead", "main^{tree}")
         git(self.ws, "push", "-q", self.bare, f"{tip}:refs/heads/main")
         self.github_new()
@@ -2011,7 +2015,8 @@ exec '{self.bin}/curl' -X "$method" "https://gitlab.com/api/v4/$path"
         done = self.run_sh("--new-issue", "Add login", "--similar-checked", token=False)
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
         self.assertIn(
-            "次: --new-issue で作れなかったので、ユーザに、ブラウザで issue を作って番号を伝えるよう頼んで",
+            "次: --new-issue で作れなかったので、"
+            "ユーザに、ブラウザで issue を作って番号を伝えるよう頼んで",
             done.stdout,
         )
         self.assertIn("glab を gitlab.com に認証する", done.stdout)

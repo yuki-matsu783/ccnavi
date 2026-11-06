@@ -352,7 +352,7 @@ def decide_at_prompt(
                 if o.action == selfguard.ACTION_FAILED:
                     stderr.write(f"ccnavi: {o.target.label}: {o.detail}\n")
         else:
-            guard = selfguard.report(found)
+            guard = selfguard.report(root, found)
     raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
     watched, scope = watch_context(stderr, conf, root, record, raw)
     post.at_prompt(
@@ -1094,7 +1094,7 @@ def decide_at_start(
     blocks = []
     if outcomes:
         record.guarded = [f"{o.target.key}:{o.action}" for o in outcomes]
-        blocks.append(selfguard.report(outcomes))
+        blocks.append(selfguard.report(root, outcomes))
     # 承認済みチケットの要求のうち、上位（ルールの deny・親の範囲・フェーズ定義の上限）に
     # 却下されて効かないもの（REQ-SES-02）。モデルにもユーザにも出す。サブエージェントには
     # 出さない。索引（docsearch）より先に組むのは、こちらが短い予算で済み、索引に期限の

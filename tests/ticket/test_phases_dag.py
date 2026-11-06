@@ -398,7 +398,7 @@ class NextHintTest(unittest.TestCase):
                 ph.tickets, ph.states = [done], {"c": ticket_model.DONE}
                 ph.marks = {approval_marks.MARK_SKIPPED: {}}
             phases.append(ph)
-        hint = phase_mod._next_hint(owner, phases, 3)
+        hint = phase_mod._next_hint(os.getcwd(), owner, phases, 3)
         self.assertIn("次に始められるのは 2", hint)
 
 

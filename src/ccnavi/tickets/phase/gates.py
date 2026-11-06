@@ -494,7 +494,7 @@ def announce(
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。"
                 f"レビューは {at} 番目と一緒に見る計画なので、ここでは止めません。"
-                + _next_hint(parent, phases, n)
+                + _next_hint(root, parent, phases, n)
             )
         elif phase.review_required:
             failed = approval_marks.write_mark(
@@ -545,41 +545,34 @@ def announce(
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。{risk_note}"
                 "レビューは不要なので、省略して次へ進めます。省略した事実は記録に残しました。"
-                + _next_hint(parent, phases, n)
+                + _next_hint(root, parent, phases, n)
             )
     return "\n\n".join(texts)
 
 
-def _next_hint(parent: ticket_model.Ticket, phases: list[Phase], number: int) -> str:
+def _next_hint(root: str, parent: ticket_model.Ticket, phases: list[Phase], number: int) -> str:
     """次のフェーズの計画を促す 1 文。計画が無ければ空。"""
     if not parent.has_plan:
         return ""
     following = [p for p in phases if p.number > number]
     if not following:
         if parent.feedback is None:
-            return (
-                "全体計画のフェーズは全部終わりました。最後のフェーズのレビューが済んだら、次はフィードバック計画です"
-                "（承認できるのは最後のレビューが済んだあとだけで、承認でレビューの状態は変わりません）。"
-                "親チケットに `feedback:` を追加して（対応が無くても `[]` で）改版を提案し、"
-                "承認を受けてください。ステップには `after` で先に済んでいるべきステップの番号"
-                "（フィードバック計画の番号だけ）を書き、最後のステップにほかの全部が先行するようにします。"
-                "独立した対応は最後に 1 ステップで受けるか、一直線に並べます。ステップが使う定義は "
-                f"'{settings.LAUNCHER} --plan-order {parent.ticket} --fill-phases' "
-                "で `phases:` に差し込みます。"
-                "改版の提案では `started_at`・`completed_at`・`base_sha`・`merged_sha`・"
-                "`cancelled_at`・`cancel_reason` は空にします。"
+            return texts.say(
+                root,
+                "NOTICE_PHASE_NEXT__FEEDBACK",
+                {"parent": parent.ticket, "launcher": settings.LAUNCHER},
             )
-        return "計画のフェーズは全部終わりました。親チケットを閉じられます。"
+        return texts.say(root, "NOTICE_PHASE_NEXT__DONE")
     # 並行して始められるものを全部挙げる。番号が前でも、まだ子の無い枝は拾う。
     # 先行が済んだ番号だけ案内する。
     ready = [p for p in phases if not p.tickets and waits_done(parent, phases, p.number)]
     if not ready:
-        return "次に始められるフェーズは、先行のフェーズが済むまでありません。"
+        return texts.say(root, "NOTICE_PHASE_NEXT__WAITING")
     names = "、".join(p.label for p in ready)
     hints = "".join(
         f"（{p.label} の案内: {p.type.when}）" for p in ready if p.type is not None and p.type.when
     )
-    return f"次に始められるのは {names} です。子チケットを提案して承認を受けてください。{hints}"
+    return texts.say(root, "NOTICE_PHASE_NEXT__READY", {"names": names, "hints": hints})
 
 
 def downstream_touched(
@@ -666,7 +659,6 @@ def review_next(
     - 未依頼: レビュー準備中。子がまだ残っていればそれを言い、前に依頼していた（続きの子を足した
       ときに依頼の記録が外れた）なら、依頼し直しが要ることも言う
     """
-    review_sh = settings.script_command(root, "ccnavi-review.sh")
     if not child.is_child or child.phase is None:
         return ""
     phases = phases_of(root, conf, child.parent, raw=raw)
@@ -676,48 +668,29 @@ def review_next(
     owner = ph
     if ph.deferred and ph.review_at is not None:
         owner = next((p for p in phases if p.number == ph.review_at), ph)
-    n = owner.number
     lead = ""
     if owner is not ph:
         lead = f"フェーズ {ph.label} のレビューは {owner.label} と一緒に見る計画。"
+    values = {
+        "lead": lead,
+        "label": owner.label,
+        "phase": str(owner.number),
+        "done": f"{conf.approved}/{ticket_model.DONE}/",
+    }
     if approval_marks.MARK_REVIEWED in owner.marks:
-        return (
-            f"{lead}フェーズ {owner.label} はレビュー済み。"
-            "ユーザの操作（confirm / decide、Chrome 拡張のレビュー済み）で "
-            f"{conf.approved}/{ticket_model.DONE}/ へ動く"
-        )
-    request = f"'{review_sh} review-request --phase {n} --body-file <依頼文>'"
+        return texts.say(root, "NOTICE_REVIEW_NEXT__REVIEWED", values)
     requested = owner.marks.get(approval_marks.MARK_REQUESTED)
     if requested is not None:
         if _later(child.completed_at, str(requested.get("at") or "")):
-            return (
-                f"{lead}フェーズ {owner.label} は依頼済みだが、この子は前回の依頼より後に閉じた。"
-                "依頼し直すまで、この子の分はユーザに回らない。親が合流を済ませて push し、"
-                f"{request} で依頼し直す"
-            ) + _AFTER_REQUEST.format(done=f"{conf.approved}/{ticket_model.DONE}/")
-        return (
-            f"{lead}フェーズ {owner.label} は依頼済み（{LABEL_WAITING}）。ユーザのレビューを待つ"
-            "（ユーザが confirm / decide か Chrome 拡張のレビュー済みで done/ へ動かす）"
+            return texts.say(root, "NOTICE_REVIEW_NEXT__REREQUEST", values)
+        return texts.say(
+            root, "NOTICE_REVIEW_NEXT__REQUESTED", {**values, "waiting": LABEL_WAITING}
         )
+    values["preparing"] = LABEL_PREPARING
     if not ph.ended or not owner.ended:
         left = "このフェーズ" if owner is ph else f"フェーズ {owner.label}"
-        text = (
-            f"{lead}まだ{LABEL_PREPARING}。{left}にはまだ閉じていない子がある。全部閉じてから、"
-            f"親が合流・{request} を済ませるまで、ユーザには回らない"
-        )
-    else:
-        text = (
-            f"{lead}まだ{LABEL_PREPARING}。親が合流・{request} を済ませるまで、ユーザには回らない"
-        )
-    return text + _AFTER_REQUEST.format(done=f"{conf.approved}/{ticket_model.DONE}/")
-
-
-# 依頼の前の文の結び。依頼の後に誰が done/ へ動かすか
-# （依頼済み・レビュー済みの文はそれぞれ言っている）。
-_AFTER_REQUEST = (
-    "。依頼の後、ユーザがレビューを終えて confirm / decide か "
-    "Chrome 拡張のレビュー済みを実行すると {done} へ動く"
-)
+        return texts.say(root, "NOTICE_REVIEW_NEXT__PREPARING_OPEN", {**values, "left": left})
+    return texts.say(root, "NOTICE_REVIEW_NEXT__PREPARING", values)
 
 
 def _later(a: str, b: str) -> bool:
