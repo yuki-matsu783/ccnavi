@@ -728,6 +728,19 @@ def scan_all(
     return found, problems
 
 
+GLOB_SPACE_REASON = (
+    "空白がある。glob は 1 項目に 1 パターンで、空白は区切りにならない。"
+    "空白で区切って複数のパスを書いたなら、承認しても何も一致せず編集が全部止まる。"
+    "パターンごとに項目を分けて書く。空白を含むファイル名は `?` で置き換える"
+)
+
+
+def glob_has_space(glob: str) -> bool:
+    """範囲の glob に空白（スペース・タブなど）があるか。提案の範囲・`phases.yml` の `scope`・
+    `ccnavi ticket new --scope` が同じ判定を通る（空白区切りで複数のパスを 1 項目に書く誤りを断つ）。"""
+    return re.search(r"\s", glob) is not None
+
+
 def _entries(front: dict, name: str) -> tuple[list[ticket_model.Entry], list[Problem]]:
     """frontmatter の欄（`rules.SECTIONS`）の項目を、判定に使える Entry の列にする。
 
@@ -736,7 +749,7 @@ def _entries(front: dict, name: str) -> tuple[list[ticket_model.Entry], list[Pro
     2. 項目ごとに、マッピングか、`match` に書き込みのツールがあるかを見る。
        書き込みのツールが無い項目は WARN にして読まない。
     3. `glob` と `regex` は、どちらか 1 つだけを書く。`_forbidden` で書けない範囲を弾き、
-       絶対パスも弾く。
+       空白入りの glob（空白で区切って複数のパスを 1 項目に書いたもの）と絶対パスも弾く。
     4. `glob` は `globmatch.translate` で式にし、`regex` はそのまま式にする。
        どちらも大文字小文字を区別せずに組む。
     5. 組めた項目を Entry にする。
@@ -786,6 +799,11 @@ def _entries(front: dict, name: str) -> tuple[list[ticket_model.Entry], list[Pro
             bad = _forbidden(glob or regex)
             if bad:
                 problems.append(Problem(SEVERITY_ERROR, name, f"{where} の範囲に{bad}は書けない"))
+                continue
+            if glob and glob_has_space(glob):
+                problems.append(
+                    Problem(SEVERITY_ERROR, name, f"{where} の glob `{glob}` に{GLOB_SPACE_REASON}")
+                )
                 continue
             if glob and (os.path.isabs(glob) or (len(glob) > 1 and glob[1] == ":")):
                 problems.append(

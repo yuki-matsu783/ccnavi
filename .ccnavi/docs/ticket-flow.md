@@ -31,7 +31,7 @@ keywords: [チケット, 親, 子, 手順, 流れ, approval-request, review-requ
 3. **ユーザに案内する。** 成功した出力の案内（承認方法、レビュー先）をそのまま伝えて、ターンを終える
 4. **ユーザの一言のあとに確かめる。** ユーザの発言を承認やレビュー完了の根拠にせず、`ccnavi-ticket.sh status [<親>]` で承認済み・レビュー済みになったかを見てから続ける。ターミナル・Chrome 拡張・ファイル移動の経路は、セッションに通知が届かない
 
-`approval-request` の拒否条件（`--check` と `--agree --preview --verify` も同じ条件で調べる）は、計画の誤り・未 push のコード・親のワークツリーの未コミットの変更・承認の画面（`sh .ccnavi/scripts/ccnavi-launcher.sh --agree`）で外される理由（`issue:` `mr:` の欠け、置き場、先行、フェーズ定義、子の整合など）・事前確認（ホストの API と git のリモート）。承認のあとで初めて分かる止まりも、渡す前に拒否される。
+`approval-request` の拒否条件（`--check` と `--agree --preview --verify` も同じ条件で調べる）は、計画の誤り・範囲の `glob` の空白・未 push のコード・親のワークツリーの未コミットの変更・承認の画面（`sh .ccnavi/scripts/ccnavi-launcher.sh --agree`）で外される理由（`issue:` `mr:` の欠け、置き場、先行、フェーズ定義、子の整合など）・事前確認（ホストの API と git のリモート）。承認のあとで初めて分かる止まりも、渡す前に拒否される。
 `review-request` の拒否条件は、フェーズ未完了・子が未合流・未合流の修正・未コミット・未 push（置き場の外のコード）・依頼済み・MR の不一致。
 
 ## 全体の流れ

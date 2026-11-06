@@ -365,6 +365,15 @@ def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_model.Entry], l
             problems.append(Problem(SEVERITY_ERROR, ident, f"`{key}[{i}]` が文字列ではない"))
             continue
         glob = item.strip()
+        if ticket_mod.glob_has_space(glob):
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    ident,
+                    f"`{key}[{i}]` の `{glob}` に{ticket_mod.GLOB_SPACE_REASON}",
+                )
+            )
+            continue
         if ".." in glob or "~" in glob or "$" in glob or os.path.isabs(glob):
             problems.append(
                 Problem(
