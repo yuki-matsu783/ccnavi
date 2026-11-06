@@ -123,7 +123,7 @@ Bash は実行される部分にヒットする。`$( )` の中や `&&` の先�
 素朴に `deny: ^{!root}` と置かない。セッションのスクラッチパッド（.ccnavi/docs/scratchpad.md）、
 `projects/` の外の参照用ツリー、他ツールの一時出力先まで一度に塞がる。
 
-- `match` を絞る。「外への書き込みを止める」なら `Write|Edit|NotebookEdit` にして `Read` は残す
+- `match` を絞る。「外への書き込みを止める」なら `Write|Edit|MultiEdit|NotebookEdit` にして `Read` は残す
 - 例外が要るなら `except:` で除く（`except: [{regex: '^{!root}.*[\\/]tmp[\\/]'}]` のように、除く側にも `{!root}` が書ける）。
   除く場所が多いなら、場所を名指しするルールにする
 
