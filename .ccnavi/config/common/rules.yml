@@ -31,7 +31,7 @@ deny:
   # Bash の書き込み（`>`・`tee`・`sed -i`・`rm`・`cp` など）も、書き込み先を解いたパスに対して
   # このルールを適用して止める（src/ccnavi/hook/rootwrite.py。id を `workspace-root` から変えると外れる）。
   - id: workspace-root
-    match: Write|Edit|NotebookEdit
+    match: Write|Edit|MultiEdit|NotebookEdit
     regex: '^{root}[\\/]'
     except:
       - regex: '^{root}[\\/]wip[\\/]handoff(?:[\\/]|$)'
@@ -50,7 +50,7 @@ deny:
   # 一時の物はワークスペースルート直下の scratchpad/、ユーザに渡す物は wip/handoff/ に置く
   # （.ccnavi/docs/scratchpad.md）。シェルのリダイレクトなどによる書き込みは止めない。
   - id: session-scratchpad
-    match: Write|Edit|NotebookEdit
+    match: Write|Edit|MultiEdit|NotebookEdit
     regex: '^(?:/private)?/tmp/claude-[^\\/]+[\\/](?:[^\\/]+[\\/])*scratchpad(?:[\\/]|$)'
     message: >-
       セッションのスクラッチパッドには書けません。一時ファイル・コミットしたくない物・直接作業で
