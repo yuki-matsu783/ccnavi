@@ -1,8 +1,3 @@
-// Package env は ccnavi が読む環境変数の名前を 1 か所に集める。
-//
-// 名前はここの定数だけで書き、コードに文字列で直書きしない。値の読み方（既定値・範囲・単位）は、
-// その値を使う責務のパッケージが持つ（設定は infra/settings、時間の上限は infra/tunables など）。
-// git に渡す GIT_* は git の起動の決まりなので infra/git が持つ。
 package env
 
 // Claude Code が hook に渡す変数。

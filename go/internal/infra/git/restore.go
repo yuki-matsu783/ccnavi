@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"ccnavi/internal/infra/fsio"
@@ -53,7 +54,7 @@ func Restore(top string, c Change, aside string) string {
 		}
 	}
 	source := ospath.Join(top, c.Path)
-	target := ospath.Join(aside, strings.ReplaceAll(c.Path, "/", ospath.Sep))
+	target := ospath.Join(aside, filepath.FromSlash(c.Path))
 	if err := fsio.MakeDirs(ospath.Dirname(target)); err != nil {
 		return fsio.ErrorText(err)
 	}
@@ -90,7 +91,7 @@ func gitText(top string, args []string) string {
 func moveAside(source, target string) error {
 	if ospath.IsDir(target) {
 		target = ospath.Join(target, ospath.Basename(strings.TrimRight(source, ospath.Sep)))
-		if ospath.Exists(target) {
+		if ospath.DiskExists(target) {
 			return fmt.Errorf("Destination path '%s' already exists", target)
 		}
 	}

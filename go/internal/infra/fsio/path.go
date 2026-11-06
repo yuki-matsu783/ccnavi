@@ -4,27 +4,19 @@ import (
 	"os"
 	"os/user"
 	"regexp"
-	"runtime"
 	"strings"
 
 	"ccnavi/internal/infra/ospath"
 )
 
-const windows = runtime.GOOS == "windows"
-
 // lineSep は os.linesep。
-var lineSep = map[bool]string{true: "\r\n", false: "\n"}[windows]
+var lineSep = map[bool]string{true: "\r\n", false: "\n"}[ospath.Windows]
 
 // SafeNameLimit は SafeName が既定で切り詰める長さ（文字数）。
 const SafeNameLimit = 64
 
 // NoLimit は SafeName で切り詰めない印。
 const NoLimit = -1
-
-// Slashed は区切りを "/" に揃える。ルールと範囲の glob は "/" で書かれている。
-func Slashed(path string) string {
-	return strings.ReplaceAll(path, `\`, "/")
-}
 
 // FullPath はファイルのパスを、行き着く先が 1 つに決まる絶対パスに直す。空なら空。
 //
@@ -77,7 +69,7 @@ func expandUser(path string) string {
 	name := path[1:i]
 	var home string
 	switch {
-	case windows:
+	case ospath.Windows:
 		home = windowsHome(name)
 	case name == "":
 		home = os.Getenv("HOME")
@@ -94,7 +86,7 @@ func expandUser(path string) string {
 	if home == "" {
 		return path
 	}
-	if !windows {
+	if !ospath.Windows {
 		home = strings.TrimRight(home, "/")
 		if home+path[i:] == "" {
 			return "/"

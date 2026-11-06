@@ -4,4 +4,7 @@
 // （env・sudo・sh -c）・`cd` の先で実行されるものは見逃さない。読み切れない形は Degraded にして、
 // 呼び手が生の文字列との一致（厳しい側）に切り替えられるようにする。語の分割は Python の shlex と
 // 同じ答えを返し、読み違いの向きは常に止める側にする。
+//
+// Python からの対応: shellread・shellread_cd・shellread_scan・shellread_words をまとめた。
+// shellread.read → Read、placed → PlacedCommands、shellread_words.reads_stdin → ReadsStdin。
 package shell

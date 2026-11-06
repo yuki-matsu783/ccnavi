@@ -5,23 +5,13 @@ import (
 	"errors"
 	"io"
 	"os"
-	"time"
 
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyjson"
 )
 
-// 読みの打ち直し。差し替えの一瞬に重なっただけなら、すぐ開けるようになる。
-const (
-	readRetries   = 3
-	readRetryWait = 20 * time.Millisecond
-)
-
 // readFile はディスクから読む（テストが失敗を差し込む）。
 var readFile = os.ReadFile
-
-// sleep は打ち直しの間の待ち（テストが差し替える）。
-var sleep = time.Sleep
 
 // ReadBytes は中身をそのまま読む。読めなければ false。
 // 改行を変換しない。バックアップから戻したファイルを元とバイト単位で同じにするため。
@@ -83,10 +73,10 @@ func ReadJSON(path string) (any, error) {
 				break
 			}
 			// 無い（ENOENT）は待っても現れないので打ち直さない。
-			if !transient(err) || attempt == readRetries {
+			if !transient(err) || attempt == retries {
 				return nil, wrap(err)
 			}
-			sleep(readRetryWait)
+			sleep(retryWait)
 		}
 	}
 	text, err := Decode(content, Strict)
@@ -122,7 +112,7 @@ func Exists(path string) bool {
 	if _, staged, ok := stagedContent(path); staged {
 		return ok
 	}
-	return ospath.Exists(path)
+	return ospath.DiskExists(path)
 }
 
 // Lexists は在るか（リンクそのものも数える）。溜める段は Exists と同じに見る。
@@ -130,7 +120,7 @@ func Lexists(path string) bool {
 	if _, staged, ok := stagedContent(path); staged {
 		return ok
 	}
-	return ospath.Lexists(path)
+	return ospath.DiskLexists(path)
 }
 
 // Listdir はディレクトリの名前の一覧（順序は決めない）。溜める段があれば、そこで足した名前を足し、

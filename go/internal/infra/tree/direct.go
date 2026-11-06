@@ -92,7 +92,7 @@ func DirectRecords(root string, main Tree) []DirectRecord {
 		if !ospath.IsFile(path) || strings.HasPrefix(name, ".") {
 			continue
 		}
-		text, err := ospath.ReadText(path)
+		text, err := ospath.ReadDiskText(path)
 		if err != nil {
 			continue
 		}

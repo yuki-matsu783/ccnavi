@@ -2,7 +2,6 @@ package pathmatch
 
 import (
 	"os"
-	"runtime"
 	"strings"
 
 	"ccnavi/internal/infra/ospath"
@@ -26,7 +25,7 @@ const (
 
 // isJunction は Windows の junction か。Go は junction を ModeIrregular で返す。テストで差し替える。
 var isJunction = func(path string) bool {
-	if runtime.GOOS != "windows" {
+	if !ospath.Windows {
 		return false
 	}
 	info, err := os.Lstat(path)

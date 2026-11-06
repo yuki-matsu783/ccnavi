@@ -28,7 +28,7 @@ func GitDir(treeRoot string) (string, bool) {
 // commonGitDir は git ディレクトリの共通の側（リンクされたワークツリーなら `commondir` の先）。
 // refs/remotes と config はこちらにある。`commondir` が無い・読めない・空なら gitdir のまま。
 func commonGitDir(gitdir string) string {
-	text, err := ospath.ReadText(ospath.Join(gitdir, "commondir"))
+	text, err := ospath.ReadDiskText(ospath.Join(gitdir, "commondir"))
 	if err != nil {
 		return gitdir
 	}
@@ -39,12 +39,17 @@ func commonGitDir(gitdir string) string {
 	return ospath.Normpath(ospath.Join(gitdir, common))
 }
 
-func headText(treeRoot string) (string, bool) {
+// headFile は git ディレクトリの中の HEAD の名前。
+const headFile = "HEAD"
+
+// HeadText はこのツリーの `HEAD` の中身（前後の空白を除く）。読めなければ ok が偽。
+// HEAD をファイルから読むのはここだけにする。
+func HeadText(treeRoot string) (string, bool) {
 	gitdir, ok := GitDir(treeRoot)
 	if !ok {
 		return "", false
 	}
-	text, err := ospath.ReadText(ospath.Join(gitdir, "HEAD"))
+	text, err := ospath.ReadDiskText(ospath.Join(gitdir, headFile))
 	if err != nil {
 		return "", false
 	}
@@ -58,7 +63,7 @@ func OriginRepo(repoRoot string) string {
 	if !ok {
 		return ""
 	}
-	text, err := ospath.ReadText(ospath.Join(commonGitDir(gitdir), "config"))
+	text, err := ospath.ReadDiskText(ospath.Join(commonGitDir(gitdir), "config"))
 	if err != nil {
 		return ""
 	}
@@ -113,7 +118,7 @@ func OriginHead(repoRoot string) string {
 	if !ok {
 		return ""
 	}
-	text, err := ospath.ReadText(ospath.Join(commonGitDir(gitdir), "refs", "remotes", "origin", "HEAD"))
+	text, err := ospath.ReadDiskText(ospath.Join(commonGitDir(gitdir), "refs", "remotes", "origin", headFile))
 	if err != nil {
 		return ""
 	}
@@ -134,7 +139,7 @@ func BusyOf(treeRoot string) string {
 		return ""
 	}
 	for _, name := range BusyMarks {
-		if ospath.Lexists(ospath.Join(gitdir, name)) {
+		if ospath.DiskLexists(ospath.Join(gitdir, name)) {
 			return name
 		}
 	}
@@ -146,7 +151,7 @@ const headsPrefix = "ref: refs/heads/"
 // BranchOf はこのツリーが今いるブランチの名前。切り離した HEAD・空・読めないものは ok が偽
 // （呼び手はツリーの名前で代える）。
 func BranchOf(treeRoot string) (string, bool) {
-	head, ok := headText(treeRoot)
+	head, ok := HeadText(treeRoot)
 	if !ok || !strings.HasPrefix(head, headsPrefix) {
 		return "", false
 	}

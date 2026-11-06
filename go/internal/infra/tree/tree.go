@@ -15,7 +15,7 @@ import (
 
 // WorktreesDir はワークツリーの置き場（ワークスペースルートからの相対）。セッションの道具と権限が
 // 届くよう、ワークスペースルートの中に置く。
-var WorktreesDir = filepath.Join(".claude", "worktrees")
+var WorktreesDir = ospath.Join(".claude", "worktrees")
 
 // Main はワークスペースルートの名前（空）。
 const Main = ""
@@ -89,7 +89,7 @@ func Projects(projectsDir string) []Tree {
 	var found []Tree
 	for _, name := range names {
 		candidate := ospath.Join(projectsDir, name)
-		if ospath.IsDir(candidate) && ospath.Exists(ospath.Join(candidate, ".git")) {
+		if ospath.IsDir(candidate) && ospath.DiskExists(ospath.Join(candidate, ".git")) {
 			found = append(found, Tree{Name: name, Root: resolved(candidate), Project: name, Kind: KindProject})
 		}
 	}
@@ -164,7 +164,7 @@ func WorktreesWithoutProject(root, projectsDir string) []ProjectlessWorktree {
 		if !ospath.IsAbs(written) {
 			target = ospath.Join(candidate, written)
 		}
-		found = append(found, ProjectlessWorktree{NFC(name), candidate, written, ospath.Exists(target)})
+		found = append(found, ProjectlessWorktree{NFC(name), candidate, written, ospath.DiskExists(target)})
 	}
 	return found
 }
@@ -178,7 +178,7 @@ func writtenGitdir(treeRoot string) (string, bool) {
 	if !ospath.IsFile(gitfile) {
 		return "", false
 	}
-	text, err := ospath.ReadText(gitfile)
+	text, err := ospath.ReadDiskText(gitfile)
 	if err != nil {
 		return "", false
 	}
@@ -226,7 +226,7 @@ func IsWorktreeOf(root, candidate string) bool {
 	if !strings.HasPrefix(key(gitdir), registry+ospath.Sep) {
 		return false
 	}
-	back, err := ospath.ReadText(ospath.Join(gitdir, "gitdir"))
+	back, err := ospath.ReadDiskText(ospath.Join(gitdir, "gitdir"))
 	if err != nil {
 		return false
 	}
@@ -277,7 +277,7 @@ func Relative(t Tree, full string) string {
 	if !ok {
 		rel = resolved(full)
 	}
-	return strings.ReplaceAll(rel, ospath.Sep, "/")
+	return filepath.ToSlash(rel)
 }
 
 // WorktreePath はこの名前のワークツリーの場所。大文字小文字だけが違う名前は同じ場所なので、在れば

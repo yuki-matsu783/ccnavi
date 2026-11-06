@@ -84,7 +84,7 @@ func (c Change) Key() string {
 func TopLevel(root string) string {
 	directory := ospath.Abspath(root)
 	for {
-		if ospath.Exists(ospath.Join(directory, ".git")) {
+		if ospath.DiskExists(ospath.Join(directory, ".git")) {
 			return directory
 		}
 		parent := ospath.Dirname(directory)

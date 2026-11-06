@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
 )
 
@@ -258,6 +259,7 @@ func Base(name string) string {
 		}
 	}
 	for _, extension := range []string{".exe", ".cmd", ".bat"} {
+		// コマンドの名前の拡張子（ASCII）を Python の lower() と同じに比べる。パスの比べではないので pathcase.Fold は使わない。
 		if len(name) >= len(extension) && strings.EqualFold(name[len(name)-len(extension):], extension) &&
 			isASCII(name[len(name)-len(extension):]) {
 			return name[:len(name)-len(extension)]
@@ -385,7 +387,7 @@ var (
 )
 
 func stdinBase(word string) string {
-	word = strings.ReplaceAll(word, `\`, "/")
+	word = ospath.Slashed(word)
 	return lower(word[strings.LastIndex(word, "/")+1:])
 }
 

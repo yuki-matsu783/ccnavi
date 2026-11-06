@@ -7,18 +7,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/BurntSushi/toml"
-	"golang.org/x/text/cases"
 
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyjson"
 )
-
-// errNotUTF8 は上書き設定が UTF-8 でないとき。Python はここで内部エラーになるが、読めないファイルとして扱う。
-var errNotUTF8 = errors.New("UTF-8 として読めない")
 
 // 置き場の既定（ワークスペースルートからの相対）。env でも上書き設定でも動かない。
 // 診断で動かせるのはフラグだけで、hook は引数を渡さないので判定の入口はここから動かない。
@@ -204,11 +199,11 @@ func resolveBin(root, path string) string {
 	if !ospath.IsAbs(path) {
 		full = ospath.Join(root, path)
 	}
-	if ospath.Exists(full) {
+	if ospath.DiskExists(full) {
 		return full
 	}
 	for _, suffix := range binSuffixes {
-		if !strings.HasSuffix(full, suffix) && ospath.Exists(full+suffix) {
+		if !strings.HasSuffix(full, suffix) && ospath.DiskExists(full+suffix) {
 			return full + suffix
 		}
 	}
@@ -240,17 +235,15 @@ const (
 // readLocal は上書き設定を読む。不正なファイルは報告して読み飛ばす
 // （カンマ 1 つの書き損じでガードが消えないように）。
 func readLocal(root string) (*pyjson.Object, []string) {
-	data, err := os.ReadFile(filepath.Join(root, localFile))
+	// UTF-8 でないとき（ospath.ErrNotUTF8）、Python は内部エラーになるが、ここでは読めないファイルとして扱う。
+	text, err := ospath.ReadDiskText(filepath.Join(root, localFile))
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, []string{fmt.Sprintf(localUnreadable, localFile, err)}
 	}
-	if !utf8.Valid(data) {
-		return nil, []string{fmt.Sprintf(localUnreadable, localFile, errNotUTF8)}
-	}
-	conf, err := pyjson.Loads(string(data))
+	conf, err := pyjson.Loads(text)
 	if err != nil {
 		return nil, []string{fmt.Sprintf(localNotJSON, localFile, err)}
 	}
@@ -263,11 +256,11 @@ func readLocal(root string) (*pyjson.Object, []string) {
 
 // readEnvBlock は Claude Code の設定ファイルの `env`。読めない・形が違うときは ok が偽。
 func readEnvBlock(path string) (*pyjson.Object, bool) {
-	data, err := os.ReadFile(path)
-	if err != nil || !utf8.Valid(data) {
+	text, err := ospath.ReadDiskText(path)
+	if err != nil {
 		return nil, false
 	}
-	doc, err := pyjson.Loads(string(data))
+	doc, err := pyjson.Loads(text)
 	if err != nil {
 		return nil, false
 	}
@@ -372,5 +365,3 @@ func branchPrefixes(root string) ([]string, []string) {
 	}
 	return append([]string(nil), DefaultBranchPrefixes...), nil
 }
-
-var folder = cases.Fold()

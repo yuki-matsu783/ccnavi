@@ -2,7 +2,6 @@ package config
 
 import (
 	"regexp"
-	"runtime"
 	"strings"
 
 	"ccnavi/internal/infra/ospath"
@@ -23,7 +22,7 @@ const (
 // ScriptCommand は `.ccnavi/scripts/` の sh をワークスペースルートから書いた打ち方。
 // スクリプトはワークスペースにしか無く、プロジェクトから切ったワークツリーでは相対パスが届かない。
 func ScriptCommand(root, name string) string {
-	base := strings.TrimRight(strings.ReplaceAll(ospath.Realpath(root), `\`, "/"), "/")
+	base := strings.TrimRight(ospath.Slashed(ospath.Realpath(root)), "/")
 	return "sh " + quoted(base+"/"+DefaultProjectHome+"/"+scriptsDir+"/"+name)
 }
 
@@ -32,8 +31,8 @@ var windowsDrive = regexp.MustCompile(`^[A-Za-z]:\\`)
 // ShellPath は `cd <パス> && …` に置くパス。区切りを "/" にそろえるのは Windows のパスだけ
 // （POSIX の `\` は名前の一部）。
 func ShellPath(path string) string {
-	if runtime.GOOS == "windows" || windowsDrive.MatchString(path) {
-		path = strings.ReplaceAll(path, `\`, "/")
+	if ospath.Windows || windowsDrive.MatchString(path) {
+		path = ospath.Slashed(path)
 	}
 	return quoted(path)
 }
@@ -69,7 +68,8 @@ func BinCommand(binPath string) string {
 	if binPath == "" {
 		return defaultBin
 	}
-	path := strings.ReplaceAll(binPath, `\`, "/")
+	path := ospath.Slashed(binPath)
+	// 拡張子の綴りの判定で、Python の lower() と同じ答えにする（casefold の pathcase.Fold は ſ を s にする）。
 	if strings.HasSuffix(strings.ToLower(path), ".sh") {
 		return "sh " + quoted(path)
 	}

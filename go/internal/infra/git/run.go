@@ -8,7 +8,6 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -24,10 +23,11 @@ const Program = "git"
 // DefaultTimeout は期限を渡されなかったときの期限。
 const DefaultTimeout = 5 * time.Second
 
-// RunUntil が期限の手前に残す余白と、これ以下の残りなら起こさない下限。
+// RunUntil が期限の手前に残す余白（DeadlineMargin）と、これ以下の残りなら起こさない下限（DeadlineFloor）。
+// 期限が足りるかは Expired で見る。
 const (
-	deadlineMargin = 500 * time.Millisecond
-	deadlineFloor  = 200 * time.Millisecond
+	DeadlineMargin = 500 * time.Millisecond
+	DeadlineFloor  = 200 * time.Millisecond
 )
 
 // killedPipeWait は期限で殺した後、出力の管が閉じるのを待つ長さ。孫のプロセスが管を握っていても戻る。
@@ -126,12 +126,16 @@ var runGit = Run
 // 残りが 0.2 秒以下なら起こさずに TimedOut の Done を返す。守るのは「期限を過ぎてから起こさない」ことだけで、
 // 処理全体が期限内に終わることは約束しない。
 func RunUntil(cwd string, args []string, deadline time.Time, o Options) Done {
-	left := time.Until(deadline) - deadlineMargin
-	if left <= deadlineFloor {
+	if Expired(deadline) {
 		return Done{Code: 1, Failure: failure{text: "期限不足", kind: ErrTimeout}}
 	}
-	o.Timeout = min(o.timeout(), left)
+	o.Timeout = min(o.timeout(), time.Until(deadline)-DeadlineMargin)
 	return Run(cwd, args, o)
+}
+
+// Expired は期限までの残りが、余白を引くと下限以下か（もう git を起こさない）。
+func Expired(deadline time.Time) bool {
+	return time.Until(deadline)-DeadlineMargin <= DeadlineFloor
 }
 
 // Output は終了コードと標準出力。起こせなければ (1, "")。
@@ -225,7 +229,7 @@ func checkDir(cwd string) error {
 	if err == nil && info.IsDir() {
 		return nil
 	}
-	if runtime.GOOS == "windows" {
+	if ospath.Windows {
 		return failure{text: fsio.ErrorText(syscall.Errno(errorDirectory))}
 	}
 	if err == nil {
@@ -258,7 +262,7 @@ func startFailure(err error) error {
 		}
 	}
 	var text string
-	if runtime.GOOS == "windows" {
+	if ospath.Windows {
 		text = fsio.ErrorText(errno)
 	} else {
 		text = fsio.ErrorText(&fs.PathError{Op: "exec", Path: Program, Err: errno})
@@ -289,7 +293,8 @@ func environ(plainPathspecs bool) []string {
 // hasName は環境変数の名前が names にあるか。Windows の名前は大文字小文字を区別しない。
 func hasName(names []string, name string) bool {
 	for _, n := range names {
-		if n == name || (runtime.GOOS == "windows" && strings.EqualFold(n, name)) {
+		// 環境変数の名前は OS の決まりで比べる（どの機械でも区別しない pathcase.Fold ではない）。
+		if n == name || (ospath.Windows && strings.EqualFold(n, name)) {
 			return true
 		}
 	}

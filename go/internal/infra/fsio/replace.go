@@ -42,7 +42,7 @@ func replaceFile(path string, content []byte, durable bool) error {
 	if durable {
 		// 差し替えはディレクトリの書き込み権だけで通るので、読み取り専用にしたファイルも上書きできてしまう。
 		// ユーザが chmod で止めた書き換えを、差し替えで素通りさせない。
-		if ospath.Lexists(path) && !writable(path) {
+		if ospath.DiskLexists(path) && !writable(path) {
 			return pathError("open", path, errnoEACCES)
 		}
 	} else {

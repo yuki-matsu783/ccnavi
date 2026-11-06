@@ -31,6 +31,26 @@ var topTiers = map[string]int{
 }
 
 var subTiers = map[string]map[string]int{
+	"infra": {
+		// 0: 何も読まない土台（環境変数の名前・Python の表記・os.path の写しと OS の分岐）
+		"env":    0,
+		"pyfmt":  0,
+		"ospath": 0,
+		// 1: 土台だけを読む
+		"pathcase":    1,
+		"pyjson":      1,
+		"platformtag": 1,
+		"yaml":        1,
+		// 2: ファイル・設定・入出力・照合
+		"fsio":      2,
+		"config":    2,
+		"hookio":    2,
+		"pathmatch": 2,
+		"shell":     2,
+		"tree":      2,
+		// 3: fsio の上に立つ
+		"git": 3,
+	},
 	"tickets": {
 		"model":     0,
 		"config":    1,
@@ -137,6 +157,10 @@ func TestViolation(t *testing.T) {
 		{"tickets/model", "tickets/core", true},
 		{"tickets/notice", "tickets/review", true},
 		{"infra/git", "infra/fsio", false},
+		{"infra/fsio", "infra/git", true},
+		{"infra/pathcase", "infra/ospath", false},
+		{"infra/ospath", "infra/pathcase", true},
+		{"infra/tree", "infra/fsio", true},
 	}
 	for _, c := range cases {
 		if got := violation(c.from, c.to) != ""; got != c.bad {

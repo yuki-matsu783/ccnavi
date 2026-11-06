@@ -65,7 +65,7 @@ func NoteInput(path string) {
 // NoteRemoved はもう無いパスを、消したものとして一覧に載せる（無いときだけ）。
 // ワークツリーから先に消えていた追跡済みのファイルの削除も、write-and-push のコミットに含めるため。
 func NoteRemoved(path string) {
-	if len(recorders) > 0 && !ospath.Lexists(path) {
+	if len(recorders) > 0 && !ospath.DiskLexists(path) {
 		record(path, "")
 	}
 }

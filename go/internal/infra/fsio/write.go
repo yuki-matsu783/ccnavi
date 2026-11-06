@@ -30,14 +30,17 @@ const (
 	NewDurable
 )
 
-// 同じ名前への書き込みが一時的に失敗したときの打ち直し。並列に走る hook が同じ記録を
+// 一時的に開けない・書けないときの打ち直し（読みと書きで同じ）。並列に走る hook が同じ記録を
 // 置き換え・削除している最中に開くと、Windows は ERROR_DELETE_PENDING や共有違反で返す
 // （Python の errno で EINVAL と EACCES）。待てば通るので数回だけ打ち直す。EPERM は本物の
-// 権限エラーでも出て待っても直らないので入れない。
+// 権限エラーでも出て待っても直らないので入れない（transient）。
 const (
-	writeRetries   = 3
-	writeRetryWait = 20 * time.Millisecond
+	retries   = 3
+	retryWait = 20 * time.Millisecond
 )
+
+// sleep は打ち直しの間の待ち（テストが差し替える）。
+var sleep = time.Sleep
 
 // newFileMode は素の open が作るファイルの権限（umask が引かれる）。
 const newFileMode = 0o666
@@ -57,10 +60,10 @@ func withRetry(write func() error) string {
 		if err == nil {
 			return ""
 		}
-		if !transient(err) || attempt == writeRetries {
+		if !transient(err) || attempt == retries {
 			return ErrorText(err)
 		}
-		sleep(writeRetryWait)
+		sleep(retryWait)
 	}
 }
 
@@ -101,7 +104,7 @@ func writeNow(path string, content []byte, how How) string {
 		return withRetry(func() error { return replaceFile(path, content, true) })
 	case NewDurable:
 		return withRetry(func() error {
-			if ospath.Lexists(path) {
+			if ospath.DiskLexists(path) {
 				return pathError("open", path, errnoEEXIST)
 			}
 			return replaceFile(path, content, true)
@@ -157,7 +160,7 @@ func MakeDirs(name string) error {
 	if tail == "" {
 		head, tail = ospath.Dirname(head), ospath.Basename(head)
 	}
-	if head != "" && tail != "" && !ospath.Exists(head) {
+	if head != "" && tail != "" && !ospath.DiskExists(head) {
 		// 頭が在った（作り合いに負けた）ことだけは飲み、次の mkdir で決める。
 		if err := MakeDirs(head); err != nil && pyErrno(err) != errnoEEXIST {
 			return err

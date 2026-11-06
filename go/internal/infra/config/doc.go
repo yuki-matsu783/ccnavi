@@ -4,4 +4,8 @@
 // 判定が読む値はプロセスの環境から取り、ワークツリーの中の設定ファイルからは取らない。
 // エージェントが書けるファイルから読むと、監視される側が次の呼び出しから監視を緩められる。
 // 例外は ccnavi 自身のソースツリーだけ（ownSourceTree）。
+//
+// Python からの対応: settings・tunables・modes・toolnames をまとめた。settings.hook_view → ReadHookView、
+// tunables の Tunable(…).value() → Tunable.Value（time.Duration）、modes.fail_closed(mode, None) →
+// FailClosedEvent、fail_closed(mode, tool, safe=…) → FailClosed。
 package config

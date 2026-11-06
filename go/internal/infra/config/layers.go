@@ -1,9 +1,11 @@
 package config
 
 import (
+	"path/filepath"
 	"strings"
 
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
 )
 
 // レイヤーの置き場（ccnavi ディレクトリからの相対、"/" 区切り）。
@@ -70,9 +72,9 @@ type LayerFile struct {
 // IsReservedLayerName はその名前がレイヤーの名前に予約してあるか。大文字小文字はどの機械でも区別しない
 // （`Self:schema` を `self:schema` と取り違えないため）。予約の判断はここ 1 か所に置く。
 func IsReservedLayerName(name string) bool {
-	folded := folder.String(name)
+	folded := pathcase.Fold(name)
 	for _, reserved := range ReservedLayerNames {
-		if folded == folder.String(reserved) {
+		if folded == pathcase.Fold(reserved) {
 			return true
 		}
 	}
@@ -86,21 +88,19 @@ func (s *Settings) projectHome() string {
 	return DefaultProjectHome
 }
 
-func toOSSep(p string) string { return strings.ReplaceAll(p, "/", ospath.Sep) }
-
 // ApprovedDir はこのツリーの承認済みチケットの置き場（絶対）。承認はそのツリーの git に乗るのでツリーごとに解く。
 func (s *Settings) ApprovedDir(treeRoot string) string {
 	approved := s.Approved
 	if approved == "" {
 		approved = DefaultApproved
 	}
-	return ospath.Join(treeRoot, toOSSep(approved))
+	return ospath.Join(treeRoot, filepath.FromSlash(approved))
 }
 
 // LayerScriptHome は自身とプロジェクトのレイヤーの `script:` に書ける唯一の場所（"/" 区切り、
 // そのレイヤーの git プロジェクトルートから）。
 func (s *Settings) LayerScriptHome() string {
-	home := strings.Trim(strings.ReplaceAll(s.projectHome(), `\`, "/"), "/")
+	home := strings.Trim(ospath.Slashed(s.projectHome()), "/")
 	return home + "/scripts/"
 }
 
@@ -125,20 +125,20 @@ func (s *Settings) LayerPath(homeRoot string, kind LayerKind, layer string) stri
 
 // LayerRealPath はレイヤーの設定ファイルが本来ある場所。
 func (s *Settings) LayerRealPath(homeRoot string, kind LayerKind) string {
-	return ospath.Join(homeRoot, toOSSep(s.projectHome()), LayerConfigDir, LayerFileNames[kind])
+	return ospath.Join(homeRoot, filepath.FromSlash(s.projectHome()), LayerConfigDir, LayerFileNames[kind])
 }
 
 // LayerTemplatesDir はレイヤーのテンプレートの置き場（絶対）。
 func (s *Settings) LayerTemplatesDir(homeRoot string) string {
-	return ospath.Join(homeRoot, toOSSep(s.projectHome()), LayerConfigDir, TemplatesDir)
+	return ospath.Join(homeRoot, filepath.FromSlash(s.projectHome()), LayerConfigDir, TemplatesDir)
 }
 
 // CommonTemplatesDir は共通レイヤー（とミラー）のテンプレートの置き場（絶対）。
 func (s *Settings) CommonTemplatesDir(root string) string {
-	return ospath.Join(root, toOSSep(s.projectHome()), CommonDir, TemplatesDir)
+	return ospath.Join(root, filepath.FromSlash(s.projectHome()), CommonDir, TemplatesDir)
 }
 
 // MirrorRealPath はプロジェクトの共通レイヤーのミラーの設定ファイルの場所。
 func (s *Settings) MirrorRealPath(homeRoot string, kind LayerKind) string {
-	return ospath.Join(homeRoot, toOSSep(s.projectHome()), CommonDir, LayerFileNames[kind])
+	return ospath.Join(homeRoot, filepath.FromSlash(s.projectHome()), CommonDir, LayerFileNames[kind])
 }

@@ -5,4 +5,9 @@
 // yes/no/on/off の真偽、0 始まりの 8 進、時刻、タブや "?" の受け入れ方が違うため使わない。
 // 値は nil・bool・int（範囲を超えれば *big.Int）・float64・string・[]byte・[]any・*Map・Date・
 // DateTime・Set・Tuple で返す。上の段は *Map の取り出し（Text・Strings・Map など）で型付きの値へ移す。
+//
+// Python からの対応: yamlread.load・safe_load → Load、別名を拒む読み手（flow._Loader）→ LoadRefusingAliases。
+// 読めない文書は errors.Is(err, ErrUnreadable)（yaml.YAMLError と LoadError に当たる）、別名で断ったものは
+// ErrAlias（flow._AliasRefused）。問題と位置は errors.As で *Error の Problem・ProblemMark から読み、
+// Problem が空なら Error() を使う（flow._yaml_problem と同じ）。
 package yaml

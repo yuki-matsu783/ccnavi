@@ -1,11 +1,7 @@
-// Package ospath は Python の os.path と str の、答えが Go の標準と食い違う部分だけを同じ答えで返す。
-//
-// filepath.Join・filepath.Dir は途中で Clean するが、Python の join・dirname は綴りを変えない。
-// filepath.EvalSymlinks は無いパスで失敗するが、os.path.realpath は解けたところまで解いて残りを足す。
-// 比べるキーや記録に残すパスがこの差で変わらないよう、移した側はここを通す。
 package ospath
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,7 +10,8 @@ import (
 	"unicode/utf8"
 )
 
-const windows = runtime.GOOS == "windows"
+// Windows はこの機械が Windows か。OS で分ける場所はこの定数を見る（runtime.GOOS を直に比べない）。
+const Windows = runtime.GOOS == "windows"
 
 // Sep は機械の区切り（os.sep）。
 const Sep = string(filepath.Separator)
@@ -25,7 +22,7 @@ func isSepRune(r rune) bool { return r < utf8.RuneSelf && isSep(byte(r)) }
 
 // IsAbs は os.path.isabs。
 func IsAbs(p string) bool {
-	if windows {
+	if Windows {
 		return filepath.IsAbs(p)
 	}
 	return strings.HasPrefix(p, "/")
@@ -36,10 +33,10 @@ func Join(base string, elems ...string) string {
 	path := base
 	for _, e := range elems {
 		switch {
-		case windows && filepath.VolumeName(e) != "":
+		case Windows && filepath.VolumeName(e) != "":
 			path = e
 		case e != "" && isSep(e[0]):
-			if windows {
+			if Windows {
 				path = filepath.VolumeName(path) + e
 			} else {
 				path = e
@@ -80,7 +77,7 @@ func Basename(p string) string {
 
 // Normpath は os.path.normpath。POSIX では頭のちょうど 2 つの "/" を残す（Clean は 1 つにする）。
 func Normpath(p string) string {
-	if windows {
+	if Windows {
 		return filepath.Clean(p)
 	}
 	if p == "" {
@@ -125,7 +122,7 @@ func Abspath(p string) string {
 // Realpath は os.path.realpath（strict でない）。無い名前から先は書かれたまま足す。
 // リンクの輪はそこで解くのをやめる。
 func Realpath(p string) string {
-	if windows {
+	if Windows {
 		return realpathWindows(p)
 	}
 	rest := reversed(strings.Split(p, "/"))
@@ -246,14 +243,14 @@ func Relpath(path, start string) (string, bool) {
 	return rel, err == nil
 }
 
-// Exists は os.path.exists（リンクは先を見る）。
-func Exists(p string) bool {
+// DiskExists は os.path.exists（リンクは先を見る）。fsio の溜める段は見ない（記録やマーカーは fsio.Exists）。
+func DiskExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
 }
 
-// Lexists は os.path.lexists。
-func Lexists(p string) bool {
+// DiskLexists は os.path.lexists。fsio の溜める段は見ない（記録やマーカーは fsio.Lexists）。
+func DiskLexists(p string) bool {
 	_, err := os.Lstat(p)
 	return err == nil
 }
@@ -280,23 +277,29 @@ func Strip(s string) string {
 	return strings.TrimFunc(s, IsSpace)
 }
 
-// ReadText は open(path, encoding="utf-8").read()。UTF-8 でなければ失敗にする
+// ErrNotUTF8 は中身が UTF-8 として読めないこと（ReadDiskText が返す）。
+var ErrNotUTF8 = errors.New("UTF-8 として読めない")
+
+// ReadDiskText は open(path, encoding="utf-8").read()。UTF-8 でなければ ErrNotUTF8
 // （Python の UnicodeDecodeError）。改行の "\r\n" と "\r" は "\n" にそろえる（テキストモード）。
-func ReadText(path string) (string, error) {
+// fsio の溜める段は見ない（記録やマーカーは fsio.ReadText）。
+func ReadDiskText(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
 	}
 	if !utf8.Valid(data) {
-		return "", errNotUTF8{path}
+		return "", ErrNotUTF8
 	}
 	text := strings.ReplaceAll(string(data), "\r\n", "\n")
 	return strings.ReplaceAll(text, "\r", "\n"), nil
 }
 
-type errNotUTF8 struct{ path string }
-
-func (e errNotUTF8) Error() string { return e.path + ": UTF-8 として読めない" }
+// Slashed は区切りを "/" に揃える（どの機械でも `\` を "/" にする）。ルールと範囲の glob は "/" で書かれている。
+// 機械の区切りだけを "/" にするなら filepath.ToSlash を使う（POSIX の `\` は名前の一部）。
+func Slashed(path string) string {
+	return strings.ReplaceAll(path, `\`, "/")
+}
 
 // Splitlines は str.splitlines()。行の区切りは Python と同じ集合で、区切り自体は残さない。
 func Splitlines(s string) []string {

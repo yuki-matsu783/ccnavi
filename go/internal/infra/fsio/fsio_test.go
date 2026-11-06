@@ -67,7 +67,7 @@ func TestWriteRetriesOnlyTransientFailures(t *testing.T) {
 	}{
 		{"一時的な失敗は打ち直す", syscall.EINVAL, 2, 3, true},
 		{"共有違反も打ち直す", syscall.EACCES, 1, 2, true},
-		{"続く失敗は上限で理由を返す", syscall.EINVAL, 99, writeRetries + 1, false},
+		{"続く失敗は上限で理由を返す", syscall.EINVAL, 99, retries + 1, false},
 		{"待っても変わらない失敗はすぐ返す", syscall.ENOSPC, 99, 1, false},
 		{"EPERM は本物の権限エラーなので打ち直さない", syscall.EPERM, 99, 1, false},
 	}
@@ -116,7 +116,7 @@ func TestReadJSONRetriesOnlyTransientFailures(t *testing.T) {
 		wantOK    bool
 	}{
 		{"一時的な失敗は打ち直す", syscall.EACCES, 2, 3, true},
-		{"続く失敗は上限で返す", syscall.EACCES, 99, readRetries + 1, false},
+		{"続く失敗は上限で返す", syscall.EACCES, 99, retries + 1, false},
 		{"EPERM は打ち直さない", syscall.EPERM, 99, 1, false},
 		{"無いのは待っても現れない", syscall.ENOENT, 99, 1, false},
 	}

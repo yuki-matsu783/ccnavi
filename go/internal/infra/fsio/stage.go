@@ -108,7 +108,7 @@ func (op *Op) Apply() string {
 	case opUnlink:
 		return Unlink(op.Path)
 	case opMove:
-		if ospath.Lexists(op.Path) {
+		if ospath.DiskLexists(op.Path) {
 			return moveTargetExists
 		}
 		return Move(op.Source, op.Path)
@@ -193,7 +193,7 @@ func (s *Stage) set(path string, content []byte, gone bool) {
 	key := stageKey(path)
 	v, ok := s.views[key]
 	if !ok {
-		v = &view{existed: ospath.Lexists(path)}
+		v = &view{existed: ospath.DiskLexists(path)}
 		s.views[key] = v
 		s.order = append(s.order, key)
 	}
