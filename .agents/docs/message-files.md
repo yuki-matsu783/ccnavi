@@ -17,19 +17,19 @@ keywords: [文面, 文面ファイル, messages, ccnavi text, ccnavi_text, texts
 1. 文面ファイルに 1 件足す。種類は識別子の頭で決まる（`DENY_*`・`RULE_*` は `deny`、`NUDGE_*` は `nudge`、`NEXT_*` は `next`、`CHOICES_*` は `choices`、`NOTE_*` は `note`、`NOTICE_*` は `notice`）。拒否と促しの識別子は、記録の `code` と同じ（組み込みルールの文 `RULE_<ルールの id>` は別。記録の `code` ではなく、ルールの id から決める）。同じコードで文が分かれるときだけ `__<区別>` を足す
 2. 種類ごとの欄を書く。必須の欄と任意の欄は、設計書の文面ファイルの設計（`messages.md`）の「形式」の節の、種類ごとの欄の表に従う。文は `|-` のブロックで書くと、`{` や backtick を含んでも引用符で囲まずに済む
 3. 差し込む値の名前を `values` に全部書く。文面に書いた `{名前}` と過不足なく一致させる
-4. 呼ぶ側に識別子と値を渡す。Python は `texts.say(root, "ID", {"名前": 値})`（値の辞書は直接書く。テストが名前を数えるため）。sh は `ccnavi_text "$root" ID "名前=値"`。出力の `次:` と `案内:` の見出しは文面ファイルの側が付けるので、コードや sh に書かない
-5. `tests/core/test_texts_catalog.py` が、引く識別子が文面ファイルにあること、値の名前が一致すること、どこからも引かれない識別子が無いことを見る。通るまで直す
+4. 呼ぶ側に識別子と値を渡す。Python は `texts.say(root, "ID", {"名前": 値})`（値の辞書は直接書く。テストが名前を数えるため。Go は `texts.Say(root, "ID", texts.Values{"名前": 値}, nil)`）。sh は `ccnavi_text "$root" ID "名前=値"`。出力の `次:` と `案内:` の見出しは文面ファイルの側が付けるので、コードや sh に書かない
+5. `tests/core/test_texts_catalog.py`（Go は `go/internal/policy/texts/catalog_test.go`）が、引く識別子が文面ファイルにあること、値の名前が一致すること、どこからも引かれない識別子が無いことを見る。通るまで直す
 6. 移した出力は、文面ファイルを引いた結果に対して、`次:` の行が 1 行で値が埋まっていることを確かめる
 7. [文面の移行の一覧](message-migration.md)の行を「残り」から「移した」の表へ動かす
 
 ## 組み込みルールの文を足す
 
-`builtin:` で始まる id の組み込みルール（`policy/builtin.py`・`policy/selfguard_shell.py`・`tickets/model/ticket_guard.py`・`tickets/model/phase_forms.py`）の文は、ルールの組み立てでは引かない。ルールは hook の呼び出しごとに組み立てるので、組み立てで引くと、拒否に当たらない呼び出しにも文面ファイルの冷たい読み（YAML の読み）が乗る。
+`builtin:` で始まる id の組み込みルール（`policy/builtin.py`・`policy/selfguard_shell.py`・`tickets/model/ticket_guard.py`・`tickets/model/phase_forms.py`。Go は `go/internal/policy/builtin/builtin.go`・`go/internal/policy/selfguard/rules.go`）の文は、ルールの組み立てでは引かない。ルールは hook の呼び出しごとに組み立てるので、組み立てで引くと、拒否に当たらない呼び出しにも文面ファイルの冷たい読み（YAML の読み）が乗る。
 
 1. 文面ファイルに `RULE_<ルールの id>` を足す。`what` だけが必須で、言うことが無い欄は省く
-2. ルールの dict（または `Rule`）に `**texts.spec("RULE_…", git=…, wrapper=…, cased=(…))` を渡す。ラッパーの有無で分かれる欄は `cased` に、それ以外の場合の選びは `variants` に書く。`message` は書かない
-3. 拒否に当たった回に、`texts.spoken(rule)` が識別子と値と場合から文を組む。文を使う側は `rule.spoken_message()` ではなく `texts.spoken(rule)` を呼ぶ
-4. `tests/core/test_texts_catalog.py` が、組み込みのルールが持つ識別子が文面ファイルにあり、渡す値の名前が `values` と一致することを見る
+2. ルールの dict（または `Rule`）に `**texts.spec("RULE_…", git=…, wrapper=…, cased=(…))` を渡す（Go は `rules.Spec` の `Text` に `texts.Spec("RULE_…", texts.SpecOptions{…})`）。ラッパーの有無で分かれる欄は `cased` に、それ以外の場合の選びは `variants` に書く。`message` は書かない
+3. 拒否に当たった回に、`texts.spoken(rule)`（Go は `texts.Spoken(rule)`）が識別子と値と場合から文を組む。文を使う側は `rule.spoken_message()` ではなく `texts.spoken(rule)` を呼ぶ
+4. `tests/core/test_texts_catalog.py`（Go は `go/internal/policy/texts/catalog_test.go`）が、組み込みのルールが持つ識別子が文面ファイルにあり、渡す値の名前が `values` と一致することを見る
 
 `message_id` はルールファイルからは書けない（`from_file` が偽のルールだけが持つ）。
 

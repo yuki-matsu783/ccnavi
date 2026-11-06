@@ -88,8 +88,8 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 |---|---|
 | `str.casefold()` | `golang.org/x/text/cases.Fold()`。`pathcase.Fold` を通す |
 | `os.path.normcase` | Windows だけ `/` を `\` にして小文字にする。Linux・macOS は何もしない |
-| 正規表現の先読み・後読み（`(?=` など。`src/` に約 50 か所） | Go の RE2 には無い。手で書いた照合か、2 段の照合に直す |
-| YAML（PyYAML の SafeLoader、YAML 1.1） | `gopkg.in/yaml.v3` は libyaml の写しで、1.1 の真偽・8 進・時刻の読みも、読める・読めないの境界も違う。そこで PyYAML の純 Python の読み手を `infra/yaml` に写した。上の段は `*yaml.Map` の取り出し（`Text`・`Strings`・`Map` など）で値を読む |
+| 正規表現 | Python の re の答えが要る式は `infra/pyre`（Python 3.13 の re の写し）を使う。固定の式で RE2 で書けるものは `regexp`。pyre は RE2 の 5〜10 倍遅い |
+| YAML（PyYAML の SafeLoader、YAML 1.1） | `gopkg.in/yaml.v3` は libyaml の写しで、1.1 の真偽・8 進・時刻の読みも、読める・読めないの境界も違う。そこで PyYAML の純 Python の読み手を `infra/yaml` に写した。上の段は `*yaml.Map` の取り出し（`Text`・`Strings`・`Map` など）で値を読む。壊れた YAML の苦情の文は純 Python の読み手（SafeLoader）に合わせる。libyaml（CSafeLoader）の文とは違う |
 | 辞書の順序 | Python の dict は入れた順。JSON を出すところは順序を持つ型で組む |
 | JSON の出力 | Python の `json.dumps` の既定（`ensure_ascii`・区切りの空白）に合わせる。呼び出しごとに引数を確かめる |
 | 文字列の長さ・切り出し | Python は符号位置で数える。Go の `len` はバイト。`[]rune` か `utf8` で数える |
@@ -100,10 +100,10 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 
 | パッケージ | 行数（Python） | 状態 |
 |---|---|---|
-| `infra` | 6,468 | 移した（レビュー前） |
+| `infra` | 6,468 | 移した（レビュー前）。Python の re の写し（`infra/pyre`）を含む |
 | `records` | 4,562 | 移した（レビュー前） |
-| `policy` | 6,805 | 未着手 |
-| `tickets` | 36,741 | 未着手 |
+| `policy` | 6,794 | 移した（レビュー前） |
+| `tickets` | 36,700 | 未着手 |
 | `catalog` | 1,683 | 未着手 |
 | `hook` | 10,634 | 未着手 |
 | `entry` | 11,210 | 未着手 |
@@ -117,7 +117,8 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 | 上の段を移すとき | 呼び手の無い公開名（`fsio`・`git`・`tree`・`shell` など）を、使う段で絞る |
 | `entry` を移すとき | `config.LayerPath` の差し替えの表を、名前の大文字小文字を区別せずに引く（`pathcase.Fold`） |
 | `entry` を移すとき | stopreview の呼び方が変わったもの（`log_event` → `LogNoKey`・`LogPlanTimeout`・`LogSuspected`、clear 3 つ → `turn.Clear`、stopeval の 3 つ → `Report`、`wiki.pending` → `PendingImpacts`）に呼び手を合わせる |
-| policy・tickets・hook を移すとき | records/prune が持つ上の段のファイル名の写し（selfguard・store・ops・sent・nudged- など）を、持ち主の定数と突き合わせるテストを置く（Python は tests/core/test_prune.py が見ていた） |
+| tickets・hook を移すとき | records/prune が持つ上の段のファイル名の写し（ops・sent・nudged- など）を、持ち主の定数と突き合わせるテストを置く（Python は tests/core/test_prune.py が見ていた）。policy の分（selfguard・store・once-・stop-）は `config` の定数を両方が読む |
+| Python を外すとき | Python の policy・infra のファイルを指す設計書と sh（`docs/21_design/messages.md`・`startup-config.md`・`modules.md`、`.agents/docs/environment.md`・`e2e-exploration.md`、`.ccnavi/scripts/ccnavi-launcher.sh`・`ccnavi-git.sh` のコメント）を Go の置き場に直す |
 | Python を外すとき | `git.Undo` の案内でパスを `"` で囲むだけの引用を、`config` の引用と同じ規則にする（`$` やバッククォートを含むパスで壊れる。いまは Python と同じ出力を保つため残す） |
 
 ## 回す
