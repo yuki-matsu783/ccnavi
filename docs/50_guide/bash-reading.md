@@ -240,7 +240,7 @@ uv run python scratch.py    # 通る。scratch.py は Write で置く
 
 ## ファイルのパスは行き着く先で見る
 
-`Read` `Write` `Edit` `NotebookEdit`のルールは、呼び出しに来た
+`Read` `Write` `Edit` `MultiEdit` `NotebookEdit`のルールは、呼び出しに来た
 `file_path`そのものではなく、絶対パスに直し`..`を解決しシンボリックリンクを解いた
 結果に適用する。同じ場所を指す別の表記でルールを外せない。
 
@@ -267,7 +267,7 @@ docs/../.env
 |---|---|
 | `.gitignore`（ripgrepが読む） | `Grep`が起点から降りていく途中で出会うファイル |
 | `.claude/settings.json`の`permissions.deny`の`Read(...)` | ファイル 1 つ 1 つ。`Grep`のファイル読み取りにも適用される |
-| ccnaviのルール | `Read` `Write` `Edit` `NotebookEdit` `Bash`。`Grep`と`Glob`は受け持たない |
+| ccnaviのルール | `Read` `Write` `Edit` `MultiEdit` `NotebookEdit` `Bash`。`Grep`と`Glob`は受け持たない |
 
 `projects/foo/.env`がfooの`.gitignore`に入っている場合に、それぞれの段がどう働くか。
 
