@@ -252,7 +252,7 @@ var codeBlock = regexp.MustCompile("(?s)```.*?```")
 func matchReference(text string) (int, int, bool) {
 	prev := rune(-1)
 	for i, r := range text {
-		if (r == '#' || r == '!') && (prev < 0 || !(isWord(prev) || prev == '/')) {
+		if (r == '#' || r == '!') && (prev < 0 || !(pyfmt.IsWord(prev) || prev == '/')) {
 			j, count := i+1, 0
 			for j < len(text) {
 				d, size := utf8.DecodeRuneInString(text[j:])
@@ -263,7 +263,7 @@ func matchReference(text string) (int, int, bool) {
 				count++
 			}
 			next, _ := utf8.DecodeRuneInString(text[j:])
-			if count >= 1 && count <= 6 && (j == len(text) || !isWord(next)) {
+			if count >= 1 && count <= 6 && (j == len(text) || !pyfmt.IsWord(next)) {
 				return i, j, true
 			}
 		}
@@ -319,7 +319,7 @@ func defang(text string) string {
 	last := 0
 	for _, m := range delimiter.FindAllStringSubmatchIndex(text, -1) {
 		next, _ := utf8.DecodeRuneInString(text[m[1]:])
-		if m[1] < len(text) && isWord(next) {
+		if m[1] < len(text) && pyfmt.IsWord(next) {
 			continue // Python の \b が成り立たない（語が続く）
 		}
 		b.WriteString(text[last:m[0]])
@@ -334,7 +334,7 @@ func defang(text string) string {
 func attr(value string) string {
 	runes := []rune(value)
 	for i, r := range runes {
-		if !isWord(r) && !strings.ContainsRune(".:/@+-", r) {
+		if !pyfmt.IsWord(r) && !strings.ContainsRune(".:/@+-", r) {
 			runes[i] = '_'
 		}
 	}

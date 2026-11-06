@@ -15,6 +15,14 @@ func TestIsDigit(t *testing.T) {
 	}
 }
 
+func TestIsWord(t *testing.T) {
+	for r, want := range map[rune]bool{'a': true, '_': true, '9': true, 'あ': true, '²': true, '-': false, ' ': false, '/': false} {
+		if got := IsWord(r); got != want {
+			t.Errorf("IsWord(%q) = %v, want %v", r, got, want)
+		}
+	}
+}
+
 func TestIntOf(t *testing.T) {
 	cases := []struct {
 		in   any

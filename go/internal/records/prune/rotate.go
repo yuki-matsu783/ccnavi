@@ -50,10 +50,13 @@ func reserve(logPath string, now time.Time) (string, error) {
 	}
 }
 
-func rotatedPattern(logPath string) *regexp.Regexp {
-	stem, ext := ospath.Splitext(ospath.Basename(logPath))
-	return regexp.MustCompile("^" + regexp.QuoteMeta(stem) + `\.\p{Nd}{8}-\p{Nd}{6}(?:-\p{Nd}+)?` + regexp.QuoteMeta(ext) + pyEnd)
+// rotatedPattern はローテートした名前（`<stem>.<日時>[-<n>]<ext>`）。stem は正規表現の断片で、ext はそのまま比べる。
+func rotatedPattern(stem, ext string) *regexp.Regexp {
+	return regexp.MustCompile("^" + stem + `\.\p{Nd}{8}-\p{Nd}{6}(?:-\p{Nd}+)?` + regexp.QuoteMeta(ext) + `$`)
 }
+
+// diagRotated はローテートした診断ログ（`<出どころ>.<日時>.log`）。出どころは問わない。
+var diagRotated = rotatedPattern(`.*`, diaglog.FileExt)
 
 // rotate は大きさが上限を超えていたら名前を変える。変えた（dry-run なら変える）とき真。
 // 名前を変えるだけでコピーしない。同じ時に追記している hook は開いたハンドルのままローテート先へ書き、
@@ -101,7 +104,8 @@ func (r *run) pruneLogs(logPath string, before time.Time) {
 	if directory == "" {
 		directory = "."
 	}
-	pattern := rotatedPattern(logPath)
+	stem, ext := ospath.Splitext(ospath.Basename(logPath))
+	pattern := rotatedPattern(regexp.QuoteMeta(stem), ext)
 	names, err := ospath.DiskListdir(directory)
 	if err != nil {
 		return

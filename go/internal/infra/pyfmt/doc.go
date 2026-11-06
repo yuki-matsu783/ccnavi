@@ -5,6 +5,6 @@
 // 同じ答えで読む。
 //
 // Python からの対応: int(s) → ParseInt、int(s, base) → ParseBigInt、float(s) → ParseFloat、s[:n] → Head、
-// s.isdigit() → IsDigit、int(v)（JSON・YAML の値）→ IntOf、f"{n:,}" → Grouped、
+// s.isdigit() → IsDigit、re の `\w` の 1 文字 → IsWord、int(v)（JSON・YAML の値）→ IntOf、f"{n:,}" → Grouped、
 // datetime.fromisoformat → FromISOFormat（比べるための UTC の時刻と、時差が書かれていたか）。
 package pyfmt

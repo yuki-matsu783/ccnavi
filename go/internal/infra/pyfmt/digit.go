@@ -51,6 +51,9 @@ func IsDigit(s string) bool {
 	return true
 }
 
+// IsWord は Python の re の Unicode の `\w` に当たる 1 文字（文字・数字・"_"）。
+func IsWord(r rune) bool { return r == '_' || unicode.IsLetter(r) || unicode.IsNumber(r) }
+
 // IntOf は Python の int(v)。JSON か YAML から読んだ値（真偽・整数・小数・文字列）を受ける。
 // 小数は 0 の側へ切り捨てる。読めない値・int に収まらない値は false。
 func IntOf(v any) (int, bool) {

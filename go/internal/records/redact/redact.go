@@ -4,10 +4,10 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pyfmt"
 )
 
 // 伏せ方。short 字未満の短い値は全部を Stars にし、長い値は頭と尻を残す。
@@ -85,9 +85,6 @@ func nextRune(text string, at int) (rune, bool) {
 	return r, true
 }
 
-// isWord は Python の re の `\w`（str.isalnum か "_"）。
-func isWord(r rune) bool { return r == '_' || unicode.IsLetter(r) || unicode.IsNumber(r) }
-
 func isASCIIAlnum(r rune) bool {
 	return r < utf8.RuneSelf && (r >= '0' && r <= '9' || r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z')
 }
@@ -106,13 +103,13 @@ func isFlagRune(r rune) bool { return isASCIIAlnum(r) || r == '-' || foldsToASCI
 // wordStart は `\b`（始まりの字は語の字）。前が語の字でない。
 func wordStart(text string, at int) bool {
 	r, ok := prevRune(text, at)
-	return !ok || !isWord(r)
+	return !ok || !pyfmt.IsWord(r)
 }
 
 // wordEnd は終わりの `\b`（終わりの字は語の字）。後ろが語の字でない。
 func wordEnd(text string, end int) bool {
 	r, ok := nextRune(text, end)
-	return !ok || !isWord(r)
+	return !ok || !pyfmt.IsWord(r)
 }
 
 // afterSpace は `(?<=\s)`。

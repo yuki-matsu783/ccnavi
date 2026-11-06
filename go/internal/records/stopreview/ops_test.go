@@ -2,6 +2,7 @@ package stopreview
 
 import (
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -86,6 +87,29 @@ func TestBindIgnores(t *testing.T) {
 		if _, ok := Bind(state, "tu1", sec(102)); ok {
 			t.Errorf("%s: 結んだ", name)
 		}
+	}
+}
+
+// op を書けないまま pre を bound にすると、結び直せなくなっていた。
+func TestUnwritableOpLeavesThePreUnbound(t *testing.T) {
+	state := t.TempDir()
+	kv(t, state, "a.kv", "p1", "sent", 100, 101)
+	Register(state, "s1", "tu1", "p1", sec(100))
+	blocker := opPath(state, "tu1", "p1")
+	if err := os.MkdirAll(blocker, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := Bind(state, "tu1", sec(102)); ok {
+		t.Error("op を書けないのに結んだ")
+	}
+	if bound := readObject(prePath(state, "tu1", "p1")).Value("bound"); bound != "" {
+		t.Errorf("pre の bound = %v", bound)
+	}
+	if err := os.Remove(blocker); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := Bind(state, "tu1", sec(102)); !ok {
+		t.Error("書けるようになっても結べない")
 	}
 }
 

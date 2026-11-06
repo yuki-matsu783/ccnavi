@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 	"time"
-	"unicode"
 
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
@@ -108,11 +107,6 @@ func strs(v any) []string {
 		}
 	}
 	return out
-}
-
-// isWord は Python の re の Unicode の \w（文字・数字・"_"）。
-func isWord(r rune) bool {
-	return r == '_' || unicode.IsLetter(r) || unicode.IsNumber(r)
 }
 
 // clip は先頭から limit 文字（符号位置）で切る。切ったら true。

@@ -236,7 +236,7 @@ func parseImpact(body string) (Impact, string) {
 	if problem != "" {
 		return Impact{}, problem
 	}
-	status, ok := decision(data)
+	state, ok := decision(data)
 	if !ok {
 		return Impact{}, "status が " + decisionsText() + " のどれでもない"
 	}
@@ -251,10 +251,10 @@ func parseImpact(body string) (Impact, string) {
 			return Impact{}, problem
 		}
 		decided = &when
-	} else if status != Pending {
+	} else if state != Pending {
 		return Impact{}, "decided_at が無い（承認待ちのほかは日時が要る）"
 	}
-	return Impact{proposal, t, files, patterns, status, reason, decided}, ""
+	return Impact{proposal, t, files, patterns, state, reason, decided}, ""
 }
 
 // moment は decided_at。タイムゾーン付きの日時か、読めない理由。

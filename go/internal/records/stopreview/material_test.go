@@ -215,3 +215,14 @@ func TestSaveMaterialKeepsOnlyTheRedactedText(t *testing.T) {
 		t.Errorf("保存した材料 = %s", data)
 	}
 }
+
+func TestSaveMaterialReportsAnUnwritablePlace(t *testing.T) {
+	logs := t.TempDir()
+	// 書く先にディレクトリがあると、置き場は作れても書けない。
+	if err := os.MkdirAll(filepath.Join(logs, "stop-review", "material", "a1.json"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if n := SaveMaterial(logs, "a1", "# c", "本文"); n != -1 {
+		t.Errorf("書けないのに %d を返した", n)
+	}
+}

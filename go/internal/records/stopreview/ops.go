@@ -272,7 +272,9 @@ func bindOne(state string, pre *pyjson.Object, now time.Time) (Op, bool) {
 	}
 	toolUseID, ident := pre.String("tool_use_id"), pre.String("ident")
 	op := best.With("tool_use_id", toolUseID, "session", pre.Value("session"), "ident", ident)
-	fsio.WriteJSON(opPath(state, toolUseID, ident), op)
+	if fsio.WriteJSON(opPath(state, toolUseID, ident), op) != "" {
+		return Op{}, false // pre を bound にすると、結べなかった op を結び直せなくなる
+	}
 	pre.Set("bound", best.String("file"))
 	fsio.WriteJSON(prePath(state, toolUseID, ident), pre)
 	return parseOp(op), true

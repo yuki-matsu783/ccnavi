@@ -32,14 +32,11 @@ const (
 // stampLayout はローテートした名前の日時。名前の順と時刻の順が合う。
 const stampLayout = "20060102-150405"
 
-// pyEnd は Python の re の `$`（最後の改行の手前でも当たる）。
-const pyEnd = `\n?$`
-
 const anyName = `(?P<s>.+)`
 
 // named は `^<prefix><セッション><suffix>$` の形。
 func named(prefix, suffix string) *regexp.Regexp {
-	return regexp.MustCompile(`^` + regexp.QuoteMeta(prefix) + anyName + regexp.QuoteMeta(suffix) + pyEnd)
+	return regexp.MustCompile(`^` + regexp.QuoteMeta(prefix) + anyName + regexp.QuoteMeta(suffix) + `$`)
 }
 
 // 名前からセッションがそのまま読める記録（括弧の中は書く側）。
@@ -59,7 +56,7 @@ var sessionOnly = []*regexp.Regexp{
 	named("direct-", fsio.JSONExt),                  // direct_candidates（compact・clear では破棄しない）
 	// `<セッション>.reported.json`（post）。Claude Code のセッションは UUID なので、その形に限る。広く読むと
 	// 同じ置き場の別のファイル（package.json など）を消す。
-	regexp.MustCompile(`^(?P<s>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\.reported\.json` + pyEnd),
+	regexp.MustCompile(`^(?P<s>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\.reported\.json$`),
 }
 
 // ownDate はセッションを名前に持たない Stop の AI 判定の記録と、ミラーの指紋（親の識別子ごと）。それ自身の日付で消す。
@@ -69,7 +66,7 @@ var ownDate = regexp.MustCompile(`^(?:` + strings.Join([]string{
 	regexp.QuoteMeta(stopreview.PrePrefix) + `.+`,
 	regexp.QuoteMeta(stopreview.OpPrefix) + `.+`,
 	`mirror-.+`, // promptsync
-}, "|") + `)` + regexp.QuoteMeta(fsio.JSONExt) + pyEnd)
+}, "|") + `)` + regexp.QuoteMeta(fsio.JSONExt) + `$`)
 
 // sessionAndKey は名前の後ろにセッション以外のキーが `-` で続く記録。セッションにも `-` が入るので、
 // 名前だけでは切れ目が決まらない。既に分かっているセッションの表記に当てて決める。
@@ -83,9 +80,6 @@ var sessionAndKey = []struct{ prefix, suffix string }{
 	{"subagent-", ".outcome"},              // subagent_outcome
 	{"turngate-", fsio.JSONExt},            // turngate（1 件 1 ファイル）
 }
-
-// diagRotated はローテートした診断ログ（`<出どころ>.<日時>.log`）。
-var diagRotated = regexp.MustCompile(`\.\p{Nd}{8}-\p{Nd}{6}(?:-\p{Nd}+)?` + regexp.QuoteMeta(diaglog.FileExt) + pyEnd)
 
 // Rotation はローテートした 1 本（見せるパス）。
 type Rotation struct{ From, To string }
