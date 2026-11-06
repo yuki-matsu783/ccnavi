@@ -58,9 +58,9 @@ func Clean(text string) string {
 	return b.String()
 }
 
-// Text は文字列か数だけを文にする（Python の _text）。リストやマップは中身を辿らない。
+// textOf は文字列か数だけを文にする（Python の _text）。リストやマップは中身を辿らない。
 // 整数の値の小数（1.0）は整数の表記にする（ボードの JavaScript の String と揃える）。
-func Text(v any) string {
+func textOf(v any) string {
 	switch x := v.(type) {
 	case bool:
 		return ""
@@ -87,7 +87,7 @@ func Line(v any) string {
 		if err, isErr := v.(error); isErr {
 			text = err.Error()
 		} else {
-			text = Text(v)
+			text = textOf(v)
 		}
 	}
 	shown := strings.Join(strings.FieldsFunc(Clean(pyfmt.Head(text, textLimit*8)), ospath.IsSpace), " ")

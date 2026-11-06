@@ -8,7 +8,7 @@
 // PhaseType.scope の None → Inherit、key・same・differing → Same・Differing、as_copy → PhaseType.AsCopy、
 // load・parse（where 付き）・read_copy・types_of・has_copy・origin・copy_problems・scope_problems・
 // parent_scope_problems・consolidate_type・_globs → Load・Parse・ReadCopy・TypesOf・HasCopy・Origin・CopyProblems・
-// ScopeProblems・ParentScopeProblems・ConsolidateType・Globs、types_path・common_types・merge・layer_types・
+// ScopeProblems・ParentScopeProblems・ConsolidateType・globs、types_path・common_types・merge・layer_types・
 // load_types → TypesPath・CommonTypes・Merge・LayerTypes・LoadTypes、COPY_KEY → ticket.PhasesKey、
 // KIND_* → Work・Feedback、LEARNING_* → LearningOn・LearningOff。workflow の compute・waits_of・loose・ready・
 // childless_ready・CHILDLESS_MARK・terminal_problems・problems・after_problems・errors・lines → Compute・WaitsOf・

@@ -21,8 +21,8 @@ import (
 	"ccnavi/internal/infra/yaml"
 )
 
-// FileLimit は読むファイルの大きさの上限（バイト）。超えたら読まずに知らせる。
-const FileLimit = 256 * 1024
+// fileLimit は読むファイルの大きさの上限（バイト）。超えたら読まずに知らせる。
+const fileLimit = 256 * 1024
 
 // 読まない理由。
 const (
@@ -59,8 +59,8 @@ func ReadBytes(file, treeRoot string) ([]byte, string) {
 	if n, ok := ospath.HardLinks(file); ok && n > 1 {
 		return nil, hardLinked
 	}
-	if before.Size() > FileLimit {
-		return nil, fmt.Sprintf("大きすぎるので読まない（%d バイト、上限 %d）", before.Size(), FileLimit)
+	if before.Size() > fileLimit {
+		return nil, fmt.Sprintf("大きすぎるので読まない（%d バイト、上限 %d）", before.Size(), fileLimit)
 	}
 	f, err := os.Open(file)
 	if err != nil {
@@ -80,12 +80,12 @@ func ReadBytes(file, treeRoot string) ([]byte, string) {
 	if n, ok := ospath.HardLinks(file); ok && n > 1 {
 		return nil, hardLinked
 	}
-	raw, err := io.ReadAll(io.LimitReader(f, FileLimit+1))
+	raw, err := io.ReadAll(io.LimitReader(f, fileLimit+1))
 	if err != nil {
 		return nil, unreadable(err)
 	}
-	if len(raw) > FileLimit {
-		return nil, fmt.Sprintf("大きすぎるので読まない（上限 %d バイト）", FileLimit)
+	if len(raw) > fileLimit {
+		return nil, fmt.Sprintf("大きすぎるので読まない（上限 %d バイト）", fileLimit)
 	}
 	return raw, ""
 }
@@ -159,14 +159,14 @@ func yamlProblem(err error) string {
 	return e.Problem
 }
 
-// JSONMark は AsJSON の目印のキー。JSON にそのまま載らない値をこのキーを持つオブジェクトで表す。
-const JSONMark = "$ccnavi"
+// jsonMark は AsJSON の目印のキー。JSON にそのまま載らない値をこのキーを持つオブジェクトで表す。
+const jsonMark = "$ccnavi"
 
 // safeInt は JSON の数として拡張（JavaScript）が崩さずに読める整数の範囲。
 const safeInt = 1<<53 - 1
 
 func marked(kind string, kv ...any) *pyjson.Object {
-	return pyjson.NewObject(append([]any{JSONMark, kind}, kv...)...)
+	return pyjson.NewObject(append([]any{jsonMark, kind}, kv...)...)
 }
 
 // AsJSON は読めた中身を JSON に載せる形にする（--lint --json --flow の flow.data）。拡張のフロー編集画面は
@@ -208,7 +208,7 @@ func AsJSON(v any) any {
 		}
 		return out
 	case *yaml.Map:
-		if keys, ok := x.StringKeys(); ok && !x.Has(JSONMark) {
+		if keys, ok := x.StringKeys(); ok && !x.Has(jsonMark) {
 			out := pyjson.NewObject()
 			for _, k := range keys {
 				out.Set(k, AsJSON(x.Get(k)))

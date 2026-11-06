@@ -43,9 +43,9 @@ var learnings = []Learning{LearningOn, LearningOff}
 const (
 	// inherit は定義の範囲が「親の範囲そのまま」であることを言う表記。
 	inherit = "inherit"
-	// MaxEntries は定義の scope と deliverables の件数の上限。定義は親の phases: にコピーするので、ここで
+	// maxEntries は定義の scope と deliverables の件数の上限。定義は親の phases: にコピーするので、ここで
 	// 縛らないと親の大きさが縛れない。レビューしきれない数を並べて広い範囲を紛れ込ませる手口も防ぐ。
-	MaxEntries = ticket.MaxScopeEntries
+	maxEntries = ticket.MaxScopeEntries
 	// Where は phases.yml の苦情の出どころ（ファイル全体への苦情の rule）。
 	Where = "(phases)"
 )
@@ -351,10 +351,10 @@ func one(id string, body *yaml.Map) (*PhaseType, []rules.Problem) {
 		if !ok {
 			return bad("`scope` は glob のリストか `inherit`")
 		}
-		if len(list) > MaxEntries {
+		if len(list) > maxEntries {
 			return bad(tooMany("scope", len(list)))
 		}
-		entries, problems := Globs(id, "scope", list)
+		entries, problems := globs(id, "scope", list)
 		if len(problems) > 0 {
 			return nil, problems
 		}
@@ -368,7 +368,7 @@ func one(id string, body *yaml.Map) (*PhaseType, []rules.Problem) {
 		if !ok {
 			return bad("`deliverables` は文字列のリスト")
 		}
-		if len(list) > MaxEntries {
+		if len(list) > maxEntries {
 			return bad(tooMany("deliverables", len(list)))
 		}
 		for _, x := range list {
@@ -431,12 +431,12 @@ func joinLearnings() string {
 }
 
 func tooMany(key string, count int) string {
-	return fmt.Sprintf("`%s` が %d 件ある（上限 %d 件）。まとめるか、定義を分けてください", key, count, MaxEntries)
+	return fmt.Sprintf("`%s` が %d 件ある（上限 %d 件）。まとめるか、定義を分けてください", key, count, maxEntries)
 }
 
-// Globs は範囲の glob を、子チケットの範囲と同じ規則で式にする（大文字小文字はどの機械でも区別しない。
+// globs は範囲の glob を、子チケットの範囲と同じ規則で式にする（大文字小文字はどの機械でも区別しない。
 // 子 ⊆ 定義 ⊆ 親 の 3 つを 1 つの規則で揃える）。苦情の rule は id、文は `<key>[i]` で項を名指しする。
-func Globs(id, key string, raw []any) ([]ticket.Entry, []rules.Problem) {
+func globs(id, key string, raw []any) ([]ticket.Entry, []rules.Problem) {
 	var entries []ticket.Entry
 	var problems []rules.Problem
 	for i, item := range raw {
@@ -468,7 +468,7 @@ func Globs(id, key string, raw []any) ([]ticket.Entry, []rules.Problem) {
 
 // consolidate は統合の子の範囲の上限を持つ、ccnavi の中に固定した定義。
 var consolidate = func() *PhaseType {
-	entries, _ := Globs(ticket.MaintenanceConsolidate, "scope", strs(ticket.ConsolidateScope))
+	entries, _ := globs(ticket.MaintenanceConsolidate, "scope", strs(ticket.ConsolidateScope))
 	p := &PhaseType{
 		ID: ticket.MaintenanceConsolidate, Title: "学びの統合", Kind: Feedback,
 		Scope: entries, Learning: LearningOff,

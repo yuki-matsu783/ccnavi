@@ -17,12 +17,12 @@ const itemLimit = 10
 
 // ノードの種類のうち、ここが扱いを変えるもの。
 const (
-	// Ask は止まってメインに返すノード。サブエージェントにはユーザに聞く道具が無い。
-	Ask = "askUserQuestion"
-	// Group は図の上の囲み（ボードの枠）。手順ではないので並べない。
-	Group = "group"
-	// Loop は繰り返し。出口は branches の 2 項目（body = 繰り返す、done = 抜ける）で、上限の回数を持つ。
-	Loop = "loop"
+	// ask は止まってメインに返すノード。サブエージェントにはユーザに聞く道具が無い。
+	ask = "askUserQuestion"
+	// group は図の上の囲み（ボードの枠）。手順ではないので並べない。
+	group = "group"
+	// loop は繰り返し。出口は branches の 2 項目（body = 繰り返す、done = 抜ける）で、上限の回数を持つ。
+	loop = "loop"
 
 	kindStart        = "start"
 	kindEnd          = "end"
@@ -47,8 +47,8 @@ var branchKeys = map[string]string{
 	kindIfElse: "branches",
 	kindSwitch: "branches",
 	kindBranch: "branches",
-	Loop:       "branches",
-	Ask:        "options",
+	loop:       "branches",
+	ask:        "options",
 }
 
 // spawn は入れ子のサブエージェントを起こすノード。
@@ -94,16 +94,16 @@ func ShapeProblem(data any) string {
 	return ""
 }
 
-func nodeID(node *yaml.Map) string { return Text(node.Get("id")) }
+func nodeID(node *yaml.Map) string { return textOf(node.Get("id")) }
 
-func kindOf(node *yaml.Map) string { return Text(node.Get("type")) }
+func kindOf(node *yaml.Map) string { return textOf(node.Get("type")) }
 
 // stepNodes は構造を見るノード。マップで id を持ち、グループでないもの（重なった id は最初の 1 つ）。
 func stepNodes(data *yaml.Map) []*yaml.Map {
 	var nodes []*yaml.Map
 	seen := map[string]bool{}
 	for _, n := range mapsIn(data.Get("nodes")) {
-		if kindOf(n) == Group {
+		if kindOf(n) == group {
 			continue
 		}
 		if id := nodeID(n); id != "" && !seen[id] {
@@ -147,7 +147,7 @@ func branchIndex(port string) (int, bool) {
 
 // portTaken は項目（分岐・選択肢）の出口に線があるか。読み方は portLabel と同じ（項目の id か branch-<番号>）。
 func portTaken(index int, item *yaml.Map, ports map[string]bool) bool {
-	if id := Text(item.Get("id")); id != "" && ports[id] {
+	if id := textOf(item.Get("id")); id != "" && ports[id] {
 		return true
 	}
 	for port := range ports {
@@ -158,8 +158,8 @@ func portTaken(index int, item *yaml.Map, ports map[string]bool) bool {
 	return false
 }
 
-// PositiveInt は 1 以上の整数か。真偽は数えず、整数の値の小数（3.0）は整数と読む。
-func PositiveInt(v any) bool {
+// positiveInt は 1 以上の整数か。真偽は数えず、整数の値の小数（3.0）は整数と読む。
+func positiveInt(v any) bool {
 	switch x := v.(type) {
 	case float64:
 		return x == math.Trunc(x) && !math.IsInf(x, 0) && x >= 1
@@ -185,7 +185,7 @@ func StructureProblems(raw any) []string {
 	}
 	groups := map[string]bool{}
 	for _, n := range mapsIn(data.Get("nodes")) {
-		if kindOf(n) == Group {
+		if kindOf(n) == group {
 			groups[nodeID(n)] = true
 		}
 	}
@@ -206,7 +206,7 @@ func StructureProblems(raw any) []string {
 		if cid == "" {
 			cid = fmt.Sprintf("connections[%d]", i)
 		}
-		src, dst := Text(conn.Get("from")), Text(conn.Get("to"))
+		src, dst := textOf(conn.Get("from")), textOf(conn.Get("to"))
 		bad := false
 		for _, end := range [][2]string{{"from", src}, {"to", dst}} {
 			if groups[end[1]] {
@@ -221,7 +221,7 @@ func StructureProblems(raw any) []string {
 				bad = true
 			}
 		}
-		port := Text(conn.Get("fromPort"))
+		port := textOf(conn.Get("fromPort"))
 		if _, known := byID[src]; !bad && known {
 			if ports[src] == nil {
 				ports[src] = map[string]bool{}
@@ -294,7 +294,7 @@ func StructureProblems(raw any) []string {
 		}
 		taken := ports[id]
 		info := asMap(node.Get("data"))
-		if kinds[id] == Ask && info.Get("multiSelect") == true {
+		if kinds[id] == ask && info.Get("multiSelect") == true {
 			if !taken[portOutput] {
 				out = append(out, "問い "+named(node)+" の出口に線が無い: output（複数選択）")
 			}
@@ -314,9 +314,9 @@ func StructureProblems(raw any) []string {
 		if len(empty) > 0 {
 			what := "分岐"
 			switch kinds[id] {
-			case Ask:
+			case ask:
 				what = "問い"
-			case Loop:
+			case loop:
 				what = "繰り返し"
 			}
 			shown := strings.Join(capped(head(empty, itemLimit), len(empty)), ", ")
@@ -332,16 +332,16 @@ type edgePort struct{ to, port string }
 func loopProblems(order []string, byID map[string]*yaml.Map, kinds map[string]string, edgePorts map[string][]edgePort) []string {
 	var out []string
 	for _, id := range order {
-		if kinds[id] != Loop {
+		if kinds[id] != loop {
 			continue
 		}
 		node := byID[id]
 		info := asMap(node.Get("data"))
-		if ospath.Strip(Text(info.Get("condition"))) == "" {
+		if ospath.Strip(textOf(info.Get("condition"))) == "" {
 			out = append(out, "繰り返し "+named(node)+" の condition が空"+
 				"（何が成り立つあいだ繰り返すかが決まらない）")
 		}
-		if !PositiveInt(info.Get("maxIterations")) {
+		if !positiveInt(info.Get("maxIterations")) {
 			out = append(out, "繰り返し "+named(node)+" の maxIterations が 1 以上の整数ではない"+
 				"（回数の上限が無いと、いつ終えるかを判断できなくなる）")
 		}
@@ -361,7 +361,7 @@ func isBodyPort(node *yaml.Map, port string) bool {
 	if len(items) == 0 {
 		return false
 	}
-	first := Text(items[0].Get("id"))
+	first := textOf(items[0].Get("id"))
 	return first != "" && port == first
 }
 
@@ -376,7 +376,7 @@ func cycleProblems(order []string, byID map[string]*yaml.Map, kinds map[string]s
 	onCycle := map[string]bool{}
 	for src, pairs := range edgePorts {
 		for _, e := range pairs {
-			if _, ok := graph[e.to]; !ok || (kinds[src] == Loop && isBodyPort(byID[src], e.port)) {
+			if _, ok := graph[e.to]; !ok || (kinds[src] == loop && isBodyPort(byID[src], e.port)) {
 				continue
 			}
 			graph[src] = append(graph[src], e.to)
@@ -481,9 +481,9 @@ func NameProblems(raw any, cat Catalog) []string {
 		var known []string
 		switch kindOf(node) {
 		case kindSubAgent:
-			what, value, known = "サブエージェントの種類", Text(info.Get("builtInType")), agents
+			what, value, known = "サブエージェントの種類", textOf(info.Get("builtInType")), agents
 		case kindSkill:
-			what, value, known = "スキル", Text(info.Get("name")), skills
+			what, value, known = "スキル", textOf(info.Get("name")), skills
 			if strings.Contains(value, ":") {
 				continue
 			}

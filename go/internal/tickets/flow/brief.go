@@ -141,11 +141,11 @@ func Briefing(conf *config.Settings, root string, child *ticket.Ticket, budget i
 		lines = append(lines, "      "+s)
 	}
 	lines = append(lines, fenceClose)
-	if kinds[Ask] {
-		lines = append(lines, "    "+texts.Say(root, "NOTICE_FLOW_BRIEF__ASK", texts.Values{"node": Ask}, nil))
+	if kinds[ask] {
+		lines = append(lines, "    "+texts.Say(root, "NOTICE_FLOW_BRIEF__ASK", texts.Values{"node": ask}, nil))
 	}
-	if kinds[Loop] {
-		lines = append(lines, "    "+texts.Say(root, "NOTICE_FLOW_BRIEF__LOOP", texts.Values{"node": Loop}, nil))
+	if kinds[loop] {
+		lines = append(lines, "    "+texts.Say(root, "NOTICE_FLOW_BRIEF__LOOP", texts.Values{"node": loop}, nil))
 	}
 	for _, k := range spawn {
 		if kinds[k] {

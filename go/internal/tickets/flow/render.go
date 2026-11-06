@@ -43,7 +43,7 @@ func summary(node *yaml.Map, flows map[string]*yaml.Map) string {
 			parts = append(parts, "種類: "+t)
 		}
 		return joinNonEmpty(parts, " / ")
-	case Ask:
+	case ask:
 		options := strings.Join(labels(data.Get("options"), "label"), " | ")
 		multi := ""
 		if data.Get("multiSelect") == true {
@@ -62,11 +62,11 @@ func summary(node *yaml.Map, flows map[string]*yaml.Map) string {
 			target += ": "
 		}
 		return target + strings.Join(parts, " | ")
-	case Loop:
+	case loop:
 		limit := data.Get("maxIterations")
 		bound := "最大回数が書かれていない（1 以上の整数でない）"
-		if PositiveInt(limit) {
-			bound = "最大 " + Text(limit) + " 回"
+		if positiveInt(limit) {
+			bound = "最大 " + textOf(limit) + " 回"
 		}
 		return "条件: " + Line(data.Get("condition")) + " / " + bound
 	case kindSkill:
@@ -79,7 +79,7 @@ func summary(node *yaml.Map, flows map[string]*yaml.Map) string {
 		return out
 	case kindSubAgentFlow:
 		name := ""
-		if ref, ok := flows[Text(data.Get("subAgentFlowId"))]; ok {
+		if ref, ok := flows[textOf(data.Get("subAgentFlowId"))]; ok {
 			name = Line(ref.Get("name"))
 		}
 		out := Line(data.Get("label"))
@@ -110,7 +110,7 @@ func joinNonEmpty(parts []string, sep string) string {
 
 // portLess は出口の並べ順。branch-<番号> は番号の順で前、それ以外は文字列の順で後ろ。
 func portLess(a, b *yaml.Map) bool {
-	pa, pb := Text(a.Get("fromPort")), Text(b.Get("fromPort"))
+	pa, pb := textOf(a.Get("fromPort")), textOf(b.Get("fromPort"))
 	ia, oka := branchIndex(pa)
 	ib, okb := branchIndex(pb)
 	switch {
@@ -131,7 +131,7 @@ func portLabel(node *yaml.Map, port string) string {
 	}
 	items := mapsIn(asMap(node.Get("data")).Get(key))
 	for _, item := range items {
-		if id := Text(item.Get("id")); id != "" && id == port {
+		if id := textOf(item.Get("id")); id != "" && id == port {
 			return Line(item.Get("label"))
 		}
 	}
@@ -166,7 +166,7 @@ func order(ids []string, kinds map[string]string, out map[string][]*yaml.Map) []
 		seen[current] = true
 		visited = append(visited, current)
 		for _, c := range out[current] {
-			queue = append(queue, Text(c.Get("to")))
+			queue = append(queue, textOf(c.Get("to")))
 		}
 	}
 	for _, id := range ids {
@@ -186,7 +186,7 @@ func Render(raw any, textLimit int) ([]string, map[string]bool) {
 	seenIDs := map[string]bool{}
 	for _, n := range mapsIn(data.Get("nodes")) {
 		// グループは図の上の囲みで手順ではない。並べない（線が繋がっていても辿らない）
-		if kindOf(n) == Group {
+		if kindOf(n) == group {
 			continue
 		}
 		if id := nodeID(n); id != "" && !seenIDs[id] {
@@ -196,7 +196,7 @@ func Render(raw any, textLimit int) ([]string, map[string]bool) {
 	}
 	flows := map[string]*yaml.Map{}
 	for _, f := range mapsIn(data.Get("subAgentFlows")) {
-		if id := Text(f.Get("id")); id != "" {
+		if id := textOf(f.Get("id")); id != "" {
 			flows[id] = f
 		}
 	}
@@ -211,7 +211,7 @@ func Render(raw any, textLimit int) ([]string, map[string]bool) {
 	}
 	out := map[string][]*yaml.Map{}
 	for _, c := range mapsIn(data.Get("connections")) {
-		from := Text(c.Get("from"))
+		from := textOf(c.Get("from"))
 		out[from] = append(out[from], c)
 	}
 	for _, edges := range out {
@@ -244,7 +244,7 @@ func Render(raw any, textLimit int) ([]string, map[string]bool) {
 		}
 		var edges []*yaml.Map
 		for _, c := range out[id] {
-			if _, ok := number[Text(c.Get("to"))]; ok {
+			if _, ok := number[textOf(c.Get("to"))]; ok {
 				edges = append(edges, c)
 			}
 		}
@@ -252,9 +252,9 @@ func Render(raw any, textLimit int) ([]string, map[string]bool) {
 		for _, c := range head(edges, itemLimit) {
 			label := Line(c.Get("condition"))
 			if label == "" {
-				label = portLabel(node, Text(c.Get("fromPort")))
+				label = portLabel(node, textOf(c.Get("fromPort")))
 			}
-			next := strconv.Itoa(number[Text(c.Get("to"))])
+			next := strconv.Itoa(number[textOf(c.Get("to"))])
 			if label != "" {
 				next += "（" + label + "）"
 			}

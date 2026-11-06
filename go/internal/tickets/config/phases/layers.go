@@ -5,7 +5,7 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/ospath"
-		"ccnavi/internal/policy/rules"
+	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/config/layer"
 )
 

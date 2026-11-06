@@ -12,6 +12,6 @@
 // locked_message → HardLinked・InodeHit・LockedMessage、catalog → LoadCatalog（Catalog。JSON は Object）、
 // fingerprint・record_digest・changed_notice・briefing → Fingerprint・RecordDigest・ChangedNotice・Briefing、
 // _Loader（別名を拒む読み手）→ yaml.LoadRefusingAliases。render.render → Render（ノードの上限は固定）、
-// shape.shape_problem・structure_problems・name_problems・positive_int → ShapeProblem・StructureProblems・
-// NameProblems・PositiveInt、text.clean・_line・_text・_FENCE_PHRASES → Clean・Line・Text・FencePhrases。
+// shape.shape_problem・structure_problems・name_problems → ShapeProblem・StructureProblems・NameProblems、
+// text.clean・_line・_FENCE_PHRASES → Clean・Line・FencePhrases。
 package flow
