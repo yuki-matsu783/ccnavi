@@ -56,22 +56,22 @@ ccnavi の判定と進め方は 3 本のファイルで決まる。どれもユ�
 
 - 3 本のファイルを書き換えない。下書きはワークツリーの `wip/handoff/`（.ccnavi/docs/scratchpad.md）に置き、検証を通してから
   「何をなぜ変えるか」と一緒にユーザに渡す。置くのはユーザ。`dry-run` で警告だけで通っても同じ
-- 判定を目で真似しない。ヒットするかどうかは必ず `ccnavi --test-expectations` か `--lint` に聞く
+- 判定を目で真似しない。ヒットするかどうかは必ず `sh .ccnavi/scripts/ccnavi-launcher.sh --test-expectations` か `--lint` に聞く
 - 期待する判定を実際の判定に合わせて書き換えない。食い違いが出たら、ルールと期待のどちらを直すかはユーザが決める
 - TodoWrite と Agent ツールを使わない
 
 ## ccnavi の打ち方
 
-以下で `ccnavi` と書いたら、settings.json の `CCNAVI_ENTRY_PATH` が指す launcher
-（`sh "$CCNAVI_ENTRY_PATH" <引数>`。未設定なら `.ccnavi/scripts/ccnavi-launcher.sh`）。
+配布先では `ccnavi` が PATH に無いので、以下は `sh .ccnavi/scripts/ccnavi-launcher.sh <引数>` で打つ
+（`CCNAVI_ENTRY_PATH` が指すのも同じ launcher）。
 
 診断のときは記録と state を外す（`--log "" --state ""`）。
 
 ```sh
-ccnavi --lint --log "" --state ""
-ccnavi --lint --log "" --state "" --rules <下書き> --phases <下書き> --risk <下書き>
-ccnavi --test-expectations <期待.yml> --log "" --state "" --approved "" [--rules <下書き>]
-ccnavi --explain --log "" --state ""
+sh .ccnavi/scripts/ccnavi-launcher.sh --lint --log "" --state ""
+sh .ccnavi/scripts/ccnavi-launcher.sh --lint --log "" --state "" --rules <下書き> --phases <下書き> --risk <下書き>
+sh .ccnavi/scripts/ccnavi-launcher.sh --test-expectations <期待.yml> --log "" --state "" --approved "" [--rules <下書き>]
+sh .ccnavi/scripts/ccnavi-launcher.sh --explain --log "" --state ""
 ```
 
 - `--lint` は判定をせず、防御を消す・全部止める記述を error、意図した防御が効いていない
@@ -81,5 +81,5 @@ ccnavi --explain --log "" --state ""
 - `--explain` はいま効いているルールと承認済みのチケットの範囲を並べる
 - `--rules` / `--phases` / `--risk` で下書きを差し替えられる
 
-`--test` に禁止語を書かない（`ccnavi --test Bash "git push"` はその Bash 自体が `builtin:guard-raw-git` にヒットする）。
+`--test` に禁止語を書かない（`sh .ccnavi/scripts/ccnavi-launcher.sh --test Bash "git push"` はその Bash 自体が `builtin:guard-raw-git` にヒットする）。
 単発で試したいものも、期待する判定のファイルを `wip/handoff/` に書いて `--test-expectations` で回す。その形は [references/common/add.md](references/common/add.md) の rules.yml の節にある（`.ccnavi/config/common/rule-expectations.yml` が既にあればそれも見る）。

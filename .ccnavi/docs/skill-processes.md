@@ -3,13 +3,13 @@ type: guide
 title: 工程スキルと reference
 description: スキルを標準の工程ごとの薄い入口に絞り、細かい挙動を references に溜める置き場・書き方・引き方
 tags: [skills, docs-search]
-keywords: [工程スキル, reference, references, skill-reference, 入口, process-design, process-research, process-implement, process-test, process-debug, process-review, process-release, フェーズ定義, tags, ccnavi --docs, コンテキスト]
+keywords: [工程スキル, reference, references, skill-reference, 入口, process-design, process-research, process-implement, process-test, process-debug, process-review, process-release, フェーズ定義, tags, sh .ccnavi/scripts/ccnavi-launcher.sh --docs, コンテキスト]
 ---
 
 # 工程スキルと reference
 
 スキルの `name` と `description` は、セッションの文脈に常に入る。スキルが増えるほど文脈が汚れるため、スキルは標準の工程ごとの入口に絞り、
-細かい挙動は `references/` に溜めて、必要なときに `ccnavi --docs` で引く。
+細かい挙動は `references/` に溜めて、必要なときに `sh .ccnavi/scripts/ccnavi-launcher.sh --docs` で引く。
 
 ## 工程スキル
 
@@ -41,7 +41,7 @@ keywords: [工程スキル, reference, references, skill-reference, 入口, proc
 `common/` と `project/` の中のディレクトリ構造は任意。最上段の 2 つ以外のディレクトリや、`references/` 直下のファイルは作らない。
 
 - 共通の工程スキルの `SKILL.md` と `references/common/` は、着手済みの親があるときのユーザの発言が、そのワークツリーのプロジェクトの `skills/<工程>/` へコピーする。`common/` は共通のコピーなので、上書き・追加に加えて、共通側から無くなった `.md` を消す（空になったディレクトリも片付ける）。`SKILL.md` は消さない。
-  プロジェクトだけを clone した人の手元にも入口と reference が入るようにするため。コピーした分は同期の出力に出るので、その場でコミットする。単体 clone では、reference は`ccnavi --docs`で引ける。入口の`SKILL.md`を読ませる目録は出ない（未解決）
+  プロジェクトだけを clone した人の手元にも入口と reference が入るようにするため。コピーした分は同期の出力に出るので、その場でコミットする。単体 clone では、reference は`sh .ccnavi/scripts/ccnavi-launcher.sh --docs`で引ける。入口の`SKILL.md`を読ませる目録は出ない（未解決）
 - 共通の工程スキルは、SKILL.md の frontmatter に `process: true`（真偽値。文字列の `"true"` や BOM 付きの SKILL.md はコピーされない）を持つ。コピーされるのはこのスキルだけ。ディレクトリ名は `^[A-Za-z0-9._-]+$` にする。ヒットしない名前は、コピーされても目録に載らない
 - 工程スキルのディレクトリ自体や、その下にシンボリックリンクがあると、何もコピーせず、理由を言う（発言と着手は止めない）
 - コピーされたファイル（`SKILL.md` と `references/common/`）は共通側のコピーなので、プロジェクトの中で直さない。直すと次の発言のときに上書きされる。共通を直したいときは、共通の置き場（`.claude/skills/<工程>/`）を直す提案をする
@@ -60,8 +60,8 @@ keywords: [工程スキル, reference, references, skill-reference, 入口, proc
 ## 引き方
 
 ```sh
-ccnavi --docs --type skill-reference --tag process-test                # 共通とプロジェクトの両方から工程で絞る
-ccnavi --docs --type skill-reference --tag process-test --keyword <語> # 語でさらに絞る
+sh .ccnavi/scripts/ccnavi-launcher.sh --docs --type skill-reference --tag process-test                # 共通とプロジェクトの両方から工程で絞る
+sh .ccnavi/scripts/ccnavi-launcher.sh --docs --type skill-reference --tag process-test --keyword <語> # 語でさらに絞る
 ```
 
 ワークスペースとプロジェクトは同じ索引で引けるので、cwd にかかわらず両方が出る。ヒットしなかったときは、キーワードの付け方を疑い、reference の `keywords` を足す。

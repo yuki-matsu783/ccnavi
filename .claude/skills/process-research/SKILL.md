@@ -2,12 +2,12 @@
 name: process-research
 process: true
 description: >-
-  調査の標準的な考え方への入口。既存コードの読み解き、技術や案の比較、変更の影響範囲の洗い出しなど、不具合の原因調査以外の調べもので使う。不具合の原因調査は process-debug。細かい手順は references にあり、ccnavi --docs で共通とプロジェクトの両方から引く。
+  調査の標準的な考え方への入口。既存コードの読み解き、技術や案の比較、変更の影響範囲の洗い出しなど、不具合の原因調査以外の調べもので使う。不具合の原因調査は process-debug。細かい手順は references にあり、sh .ccnavi/scripts/ccnavi-launcher.sh --docs で共通とプロジェクトの両方から引く。
 ---
 
 # process-research
 
-調査の作業に入る前に、`ccnavi --docs --type skill-reference --tag process-research` で共通とプロジェクトの reference を引き、ヒットしたものを読む。
+調査の作業に入る前に、`sh .ccnavi/scripts/ccnavi-launcher.sh --docs --type skill-reference --tag process-research` で共通とプロジェクトの reference を引き、ヒットしたものを読む。
 
 ## 基本の考え方
 

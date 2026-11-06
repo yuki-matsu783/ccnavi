@@ -24,14 +24,14 @@ keywords: [wiki, パターン, impact, sources, target, purpose.md, 知識, 蓄�
 | `patterns/<名前>.md` | 失敗や有効だった進め方 1 つ。説明、原因（なぜ起きるか）、実際の操作の例、回避策。10〜30 行に収める。成功したやり方も書く |
 | `impact/<提案>.md` | 提案 1 本の対象・要点・差分・決着と理由。本文に要点と差分を書く。却下された提案は差分ごと残す |
 
-`ccnavi --learnings` はこの 2 つの frontmatter を読む。キーが足りないファイルは壊れたものとして名指しされ、数えられない。
+`sh .ccnavi/scripts/ccnavi-launcher.sh --learnings` はこの 2 つの frontmatter を読む。キーが足りないファイルは壊れたものとして名指しされ、数えられない。
 
 | ファイル | 必須のキー |
 |---|---|
 | `patterns/<名前>.md` | `type: learning-wiki`、`target`（反映先 1 つ。`rule` `risk` `phase` `template` `skill` `docs` のどれか）、`sources`（観測元の ID の一覧。空にしない） |
 | `impact/<提案>.md` | `type: learning-wiki`、`proposal`（提案の名前）、`target`、`files`（対象のパスの一覧）、`patterns`（動機のパターン名: そのときの観測元の数）、`status`（承認待ち・承認・却下・延期）、`decided_at`（決着の日時。タイムゾーン付き。承認待ちのときだけ空にできる）。決着の理由は `reason` に書く |
 
-一覧は `ccnavi --learnings`、経過は git の履歴で見る（`index.md` と `log.md` は置かない）。
+一覧は `sh .ccnavi/scripts/ccnavi-launcher.sh --learnings`、経過は git の履歴で見る（`index.md` と `log.md` は置かない）。
 
 - `title` `description` `tags` `keywords` は `.ccnavi/docs/frontmatter.md` に従う
 - パターンは重複して作らない。似たものがあれば、そのページに根拠を足すか言い直す。1 つの事実は 1 か所に書く
@@ -43,8 +43,8 @@ keywords: [wiki, パターン, impact, sources, target, purpose.md, 知識, 蓄�
 
 | 場面 | すること |
 |---|---|
-| 候補や提案を書く前 | `ccnavi --learnings` の一覧と `impact/` を読む。却下された提案を、理由を覆す根拠なしに出し直さない。関係するパターンのページと、そこから参照される記録を読む |
-| 振り返り | 気づきは `ccnavi ticket learn` で記録に書く。パターンに溜めるのは親を閉じる前の統合の子で、その子が同じパターンの `sources` に観測元の ID を足す |
+| 候補や提案を書く前 | `sh .ccnavi/scripts/ccnavi-launcher.sh --learnings` の一覧と `impact/` を読む。却下された提案を、理由を覆す根拠なしに出し直さない。関係するパターンのページと、そこから参照される記録を読む |
+| 振り返り | 気づきは `sh .ccnavi/scripts/ccnavi-launcher.sh ticket learn` で記録に書く。パターンに溜めるのは親を閉じる前の統合の子で、その子が同じパターンの `sources` に観測元の ID を足す |
 | 通常の作業 | 読まない。wiki は手順書を作る側の材料なので、作業のエージェントが読むと、手順書（スキル）の効きが見えなくなる |
 
 ## スキルとの対応

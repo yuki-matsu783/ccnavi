@@ -15,9 +15,9 @@ keywords: [リスク, risks.yml, 配点, 育つ, 全体像, risk.json, 実績, l
 
 | 段階 | 配点での中身 | 使うもの |
 |---|---|---|
-| きっかけ | 軽いと思った変更が HIGH になった、重い変更が LOW で通った。点と加点の理由は、閉じたときの出力・`--explain`・レビュー依頼の先頭に出る | `risk.json`、`ccnavi --explain` |
+| きっかけ | 軽いと思った変更が HIGH になった、重い変更が LOW で通った。点と加点の理由は、閉じたときの出力・`--explain`・レビュー依頼の先頭に出る | `risk.json`、`sh .ccnavi/scripts/ccnavi-launcher.sh --explain` |
 | 下書き | 項目を足す・点を変える・閾値（既定 20 / 40 / 70）を動かす | `/ccnavi-config` |
-| 検証 | 読めるか、閾値の順、`id` の重複、`script:` の置き場。`--risk` で下書きを差し替えて本物の残り 2 本と組み合わせて見る | `ccnavi --lint --risk <下書き>` |
+| 検証 | 読めるか、閾値の順、`id` の重複、`script:` の置き場。`--risk` で下書きを差し替えて本物の残り 2 本と組み合わせて見る | `sh .ccnavi/scripts/ccnavi-launcher.sh --lint --risk <下書き>` |
 | 効く | 次に子を閉じるときから。進行中の子の記録は変わらない | `ticket finish` |
 
 ## 項目の 3 系統

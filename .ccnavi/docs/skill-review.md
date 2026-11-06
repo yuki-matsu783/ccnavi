@@ -41,7 +41,7 @@ keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, refere
 
 ## どこに足すか
 
-候補を書く前に、`ccnavi --learnings` の一覧と `docs/wiki/impact/`（採否の記録）を読む。wiki は `.ccnavi/docs/skill-wiki.md`。
+候補を書く前に、`sh .ccnavi/scripts/ccnavi-launcher.sh --learnings` の一覧と `docs/wiki/impact/`（採否の記録）を読む。wiki は `.ccnavi/docs/skill-wiki.md`。
 足す先は、上の項目ほど優先する。
 
 1. このセッションで読んだスキルを直す
@@ -77,7 +77,7 @@ keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, refere
    `feedback:` は最後のステップの `after` にほかの全部を並べる形にする（終端は1つ）。後ろに足すだけだと承認で落ちるので、
    `after` の書き方は3つ。(1) フィードバック計画の番号は全体計画の続き（計画が1本なら最初のステップは2）。(2) `after` に全体計画の番号は書けない（全体計画は全部済んでいる前提）。書くと `approval-request` で断られる。(3) 最初のステップには `after` を書かない。`skill-improve` を1つだけ足すときは `{type: skill-improve}` で足りる
    最後のステップの `after` に `skill-improve` の番号も足すか、`skill-improve` を最後に置いてほかの全部を先行させる。
-   定義は `ccnavi --plan-order <親> --fill-phases` で親の `phases:` にコピーする
+   定義は `sh .ccnavi/scripts/ccnavi-launcher.sh --plan-order <親> --fill-phases` で親の `phases:` にコピーする
 3. フィードバック計画が承認されたら、`skill-improve` のフェーズに子チケットを提案して承認を受け、その子でスキルを直してMRで見てもらう
 
-提案チケットの書き方と、候補を書くときの注意は `.ccnavi/docs/skill-review-propose.md`（`ccnavi --docs --keyword 提案チケット`）。
+提案チケットの書き方と、候補を書くときの注意は `.ccnavi/docs/skill-review-propose.md`（`sh .ccnavi/scripts/ccnavi-launcher.sh --docs --keyword 提案チケット`）。

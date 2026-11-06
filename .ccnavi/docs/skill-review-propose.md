@@ -38,7 +38,7 @@ keywords: [振り返り, スキル, 候補, 提案, 提案チケット, ccnavi-s
 
 - `ticket` は上の識別子、`mr` は `ccnavi-start.sh` の出力の「必須」の行の番号
 - `human_review` は `required: true`、理由は「エージェントの手順を変えるため」
-- `plan` は `quick-work` の 1 ステップ（`scope: inherit`）にする。`phases:` は手で書かず、`ccnavi --plan-order <親> --fill-phases` でコピーしてよい
+- `plan` は `quick-work` の 1 ステップ（`scope: inherit`）にする。`phases:` は手で書かず、`sh .ccnavi/scripts/ccnavi-launcher.sh --plan-order <親> --fill-phases` でコピーしてよい
 - `allow` に、直すスキルのパス（例: `.claude/skills/commit/*`）と、動機のパターンと採否の記録を入れる wiki の置き場（`skill-wiki.md`）を書く。`allow` を空のまま出すと、作業の範囲が決まらず子を起こせない
 - `title` は変更の要点、`rationale` は拾った信号と、次のセッションで何が変わるか
 - 本文は、対象の SKILL.md（と references/）の差分。新しく作るなら全文の下書き。動機になったパターンと、採否の記録（`承認待ち`）も同じチケットに入れる

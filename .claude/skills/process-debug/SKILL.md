@@ -2,12 +2,12 @@
 name: process-debug
 process: true
 description: >-
-  デバッグの標準的な考え方への入口。不具合の原因調査(それ以外の調べものは process-research)、再現手順の作成、失敗したコマンドやログの切り分けで使う。細かい手順は references にあり、ccnavi --docs で共通とプロジェクトの両方から引く。
+  デバッグの標準的な考え方への入口。不具合の原因調査(それ以外の調べものは process-research)、再現手順の作成、失敗したコマンドやログの切り分けで使う。細かい手順は references にあり、sh .ccnavi/scripts/ccnavi-launcher.sh --docs で共通とプロジェクトの両方から引く。
 ---
 
 # process-debug
 
-デバッグの作業に入る前に、`ccnavi --docs --type skill-reference --tag process-debug` で共通とプロジェクトの reference を引き、ヒットしたものを読む。
+デバッグの作業に入る前に、`sh .ccnavi/scripts/ccnavi-launcher.sh --docs --type skill-reference --tag process-debug` で共通とプロジェクトの reference を引き、ヒットしたものを読む。
 
 ## 基本の考え方
 
