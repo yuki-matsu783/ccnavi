@@ -65,14 +65,10 @@ func Locate(bases []string, rel string) string {
 	return ""
 }
 
-// head は先頭の MaxChars+1 字（UTF-8 として読めないバイトは U+FFFD）。
+// head は先頭の MaxChars+1 字（UTF-8 として読めないバイトは U+FFFD）。ファイルの先頭だけを読む。
 func head(full string) ([]rune, error) {
-	text, err := fsio.ReadDiskText(full, fsio.Replace)
-	if err != nil {
-		return nil, err
-	}
-	runes := []rune(text)
-	return runes[:min(len(runes), MaxChars+1)], nil
+	text, err := fsio.ReadDiskTextHead(full, MaxChars+1, fsio.Replace)
+	return []rune(text), err
 }
 
 // Body はファイルの本文。無ければ空。上限を超えたら先頭だけを返し、切ったことを末尾に書く。

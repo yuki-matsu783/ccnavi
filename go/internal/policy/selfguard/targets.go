@@ -81,7 +81,7 @@ func Targets(root, rulesPath, binPath string, layers []config.LayerFile, project
 			real := ospath.Realpath(onPath)
 			known := false
 			for _, t := range found {
-				known = known || t.Path == real
+				known = known || pathcase.Fold(t.Path) == pathcase.Fold(real)
 			}
 			if !known {
 				found = append(found, Target{Key: PathKey + pathMark(real), Path: real, Label: real, Heavy: true})

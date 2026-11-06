@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"unicode/utf8"
 
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyjson"
@@ -63,6 +64,38 @@ func ReadDiskText(path string, bad Undecodable) (string, error) {
 		return "", Wrap(err)
 	}
 	return Decode(content, bad)
+}
+
+// ReadDiskTextHead は open(path, encoding="utf-8", errors=bad).read(chars)。先頭の chars 字だけを返す（ファイルが短ければ全部）。
+// UTF-8 の 1 字は最大 4 バイトなので chars*4 バイトまで読み、切れ目で欠けた文字は捨ててから解く。エラーは ReadDiskText と同じ。
+func ReadDiskTextHead(path string, chars int, bad Undecodable) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", Wrap(err)
+	}
+	defer f.Close()
+	content := make([]byte, chars*utf8.UTFMax)
+	n, err := io.ReadFull(f, content)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return "", Wrap(err)
+	}
+	content = content[:n]
+	if n == len(content) && n > 0 {
+		// 続きがあるかもしれない。最後の文字の先頭まで戻り、そこから欠けていれば捨てる。
+		start := n - 1
+		for start > 0 && n-start < utf8.UTFMax && !utf8.RuneStart(content[start]) {
+			start--
+		}
+		if !utf8.FullRune(content[start:]) {
+			content = content[:start]
+		}
+	}
+	text, err := Decode(content, bad)
+	if err != nil {
+		return "", err
+	}
+	runes := []rune(text)
+	return string(runes[:min(len(runes), chars)]), nil
 }
 
 // ReadJSON は JSON を読む。返すエラーで「無い」（errors.Is(err, fs.ErrNotExist)）と

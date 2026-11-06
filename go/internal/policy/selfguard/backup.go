@@ -17,6 +17,7 @@ import (
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/pyfmt"
 )
 
@@ -632,7 +633,7 @@ func fallBackToGit(setting config.Mode, root string, t Target, hasNow bool) Outc
 	}
 	dirty := false
 	for _, c := range changes {
-		dirty = dirty || ospath.Realpath(c.Full) == t.Path
+		dirty = dirty || pathcase.Fold(ospath.Realpath(c.Full)) == pathcase.Fold(t.Path)
 	}
 	if !dirty && hasNow {
 		return Outcome{t, ActionKept, "バックアップは無いが、コミット済みの内容と同じ"}

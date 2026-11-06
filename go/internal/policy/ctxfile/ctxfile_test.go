@@ -10,6 +10,7 @@ import (
 
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/hookio"
+	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/policy/rules"
 )
 
@@ -59,6 +60,39 @@ func TestBodyIsCutAtTheLimit(t *testing.T) {
 	write(t, filepath.Join(near, "docs", "guide.md"), "近い")
 	if got := Body(&stderr, []string{near, root}, "docs/guide.md"); got != "近い" {
 		t.Errorf("%q", got)
+	}
+}
+
+// 先頭だけを読んでも、全部を読んで切ったときと同じ答えになる（読む切れ目が文字の途中・改行の途中に来ても）。
+func TestBodyOfLargeFileMatchesFullRead(t *testing.T) {
+	root := t.TempDir()
+	cases := map[string]string{
+		"three.md": strings.Repeat("あ", 100_000),
+		"four.md":  strings.Repeat("𝄞", 100_000),
+		"mixed.md": strings.Repeat("a\r\nい\xff\xe3\x81𝄞 ", 20_000),
+		"crlf.md":  strings.Repeat("\r\n", 50_000),
+	}
+	var stderr bytes.Buffer
+	for name, text := range cases {
+		full := filepath.Join(root, "docs", name)
+		write(t, full, text)
+		whole, err := fsio.ReadDiskText(full, fsio.Replace)
+		if err != nil {
+			t.Fatal(err)
+		}
+		runes := []rune(whole)
+		over := len(runes) > MaxChars
+		want := ospath.Strip(whole)
+		if over {
+			want = strings.TrimRightFunc(string(runes[:MaxChars]), ospath.IsSpace) +
+				"\n\n(ccnavi: docs/" + name + " は 4000 文字を超えるので先頭だけを載せた。続きはこのファイルを読んでください)"
+		}
+		if got := Body(&stderr, []string{root}, "docs/"+name); got != want {
+			t.Errorf("%s: Body が全部を読んだときと違う", name)
+		}
+		if OverLimit(full) != over {
+			t.Errorf("%s: OverLimit = %v", name, !over)
+		}
 	}
 }
 
