@@ -103,7 +103,7 @@ func Gather(stderr io.Writer, conf *config.Settings, root string, only []string)
 			Refused: strings.Join(lines, "\n"), Elsewhere: elsewhere}
 	}
 	note := ""
-	if only != nil {
+	if len(only) > 0 {
 		// 識別子の検査は「承認待ちが無い」より先（終了コードがほかの承認待ちの有無で変わらないように）。
 		var wanted []string
 		for _, id := range only {
