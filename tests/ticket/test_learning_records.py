@@ -169,6 +169,13 @@ class PendingTest(unittest.TestCase):
         self.commit()
         self.assertEqual(lr.pending(self.root).items, [])
 
+    def test_error_signal_can_be_reflected_with_two_sources(self):
+        self.pattern("pat", "[c-01-01, other]")
+        sec = "## a\n\n- 信号: 誤り\n- 内容: x\n- 処理: 反映 pat\n"
+        self.record("c-01-01", 1, sec)
+        self.commit()
+        self.assertEqual(lr.pending(self.root).items, [])
+
     def test_issue_form(self):
         for line, ok in (
             ("- 処理: issue 12 理由", True),

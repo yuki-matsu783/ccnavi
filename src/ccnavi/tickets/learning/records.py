@@ -42,8 +42,9 @@ _PROCESS_LINE = re.compile(r"^- 処理:")
 _SIGNAL_LINE = re.compile(r"^- 信号:[ \t\u3000]*(\S+)")
 _ISSUE_REST = re.compile(r"^#?\d+[ \t\u3000]+\S")
 # 区切りには、日本語入力で入りやすい全角空白（U+3000）も使える。
+_PROCESS_KINDS = f"{PROCESS_REFLECT}|{PROCESS_SKIP}|{PROCESS_ISSUE}"
 _PROCESS_FORM = re.compile(
-    r"^- 処理:[ \t\u3000]+(反映|対象外|issue)(?:[ \t\u3000]+(.*\S))?[ \t\u3000]*$"
+    rf"^- 処理:[ \t\u3000]+({_PROCESS_KINDS})(?:[ \t\u3000]+(.*\S))?[ \t\u3000]*$"
 )
 
 
