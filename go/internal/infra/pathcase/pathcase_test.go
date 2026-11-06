@@ -4,10 +4,10 @@ import "testing"
 
 func TestFold(t *testing.T) {
 	cases := map[string]string{
-		"ABC/Def":  "abc/def",
-		"Straße":   "strasse",
-		"ﬁle.TXT":  "file.txt",
-		"already":  "already",
+		"ABC/Def": "abc/def",
+		"Straße":  "strasse",
+		"ﬁle.TXT": "file.txt",
+		"already": "already",
 	}
 	for in, want := range cases {
 		if got := Fold(in); got != want {
