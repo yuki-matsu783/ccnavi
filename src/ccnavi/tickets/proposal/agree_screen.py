@@ -345,8 +345,8 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
 def _bullets(label: str, items: list[str]) -> list[str]:
     """範囲の項を 1 行 1 項目の箇条書きにする。項目が無ければ何も出さない。
 
-    カンマでつなぐと、承認する人が項目の切れ目を読み違える（空白区切りの 1 項目も、
-    複数の項目に見える）。
+    カンマでつなぐと、承認する人が項目の切れ目を読み違える。空白でつないだ 1 項目も、
+    複数の項目に見えてしまう。
     """
     if not items:
         return []
