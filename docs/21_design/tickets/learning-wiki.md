@@ -185,7 +185,7 @@ learnings: 2
 |---|---|
 | `type` | `learning-wiki` |
 | `target` | 反映先の種類（`rule` `risk` `phase` `template` `skill` `docs`）。複数にまたがるときは、手順を実行する側の 1 つだけ |
-| `sources` | 重複しない観測元の ID の一覧。この数を**観測元の数**と呼ぶ（「再発の回数」とは言わない）。子の記録は子の識別子、親の記録は親の識別子、受信箱は `inbox:<ファイル名から .md を除いたもの>` |
+| `sources` | 重複しない観測元の ID の一覧。この数を**観測元の数**と呼ぶ（「再発の回数」とは言わない）。子の記録は子の識別子、親の記録は親の識別子、受信箱は `inbox:<ファイル名から .md を除いたもの>`。統合の子が `反映` できるのは 2 件以上のパターンだけ（`MIN_SOURCES_TO_REFLECT`） |
 | `title` `description` `tags` `keywords` | `.ccnavi/docs/frontmatter.md` に従う |
 
 `index.md` と `log.md` は置かない。一覧は `ccnavi --learnings`、経過は git の履歴で見る。プロジェクトの wiki は、親と同じリポジトリの `docs/wiki/` に溜め、その親の統合の子が処理する。

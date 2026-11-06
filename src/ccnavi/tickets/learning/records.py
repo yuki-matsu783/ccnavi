@@ -153,7 +153,7 @@ def consistency_problem(record: Record) -> str:
             return (
                 f"「{sec.title}」の処理の行の形が分からない"
                 "（`- 処理: 反映 <パターン名>`・`- 処理: 対象外 <理由>`・"
-            "`- 処理: issue <番号> <理由>`）"
+                "`- 処理: issue <番号> <理由>`）"
             )
     return ""
 
@@ -263,7 +263,7 @@ def _section_problem(tree_root: str, ident: str, sec: Section) -> str:
         return "処理の行が無い"
     kind, rest = got
     if kind == PROCESS_SKIP:
-        if sec.signal == SIGNAL_ERROR:
+        if sec.signal.startswith(SIGNAL_ERROR):
             return (
                 "`信号: 誤り`（仕様バグの学び）は `処理: 対象外` で消せない"
                 "（issue にするなら `- 処理: issue <番号> <理由>`、パターンにするなら `反映`）"

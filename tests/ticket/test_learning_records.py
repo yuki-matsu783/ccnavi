@@ -160,6 +160,11 @@ class PendingTest(unittest.TestCase):
         self.record("c-01-01", 1, sec.format(p="- 処理: 対象外 環境の都合"))
         self.commit()
         self.assertIn("誤り", lr.pending(self.root).items[0].why)
+        # 値に注釈が付いても誤りとして扱う
+        note = "## a\n\n- 信号: 誤り（仕様バグ）\n{p}\n"
+        self.record("c-01-01", 1, note.format(p="- 処理: 対象外 環境の都合"))
+        self.commit()
+        self.assertIn("誤り", lr.pending(self.root).items[0].why)
         self.record("c-01-01", 1, sec.format(p="- 処理: issue 12 手順書の誤り"))
         self.commit()
         self.assertEqual(lr.pending(self.root).items, [])
