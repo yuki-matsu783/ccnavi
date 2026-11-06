@@ -11,7 +11,7 @@ keywords: [提案, 書式, frontmatter, 範囲, allow, deny]
 ### 9.3 提案の書式
 
 frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書く。判定に使われるのは `match` に
-`Write` `Edit` `NotebookEdit` を含む項だけ。`tools` `deny_commands` `target_directories` は
+`Write` `Edit` `MultiEdit` `NotebookEdit` を含む項だけ。`tools` `deny_commands` `target_directories` は
 「効かない」と警告して無視する。
 
 | 欄 | 対象 | 中身と検査 |
@@ -261,7 +261,7 @@ error があれば理由を出して開かない・保存しない。
 **承認とロック。** フローは承認の対象ではなく、承認のダイジェスト（9.4）にも入らない。中身は子の着手の前と、
 終わった後（`finish` / `cancel` の後）ならユーザが書き換えられる。
 **着手中**（`started_at` があり、`completed_at` も `cancelled_at` も無く、`doing/` に在る）は、実行前
-チェックが `Write` / `Edit` / `NotebookEdit` を `DENY_TICKET_FLOW_LOCKED` で止める。覆うのは
+チェックが `Write` / `Edit` / `MultiEdit` / `NotebookEdit` を `DENY_TICKET_FLOW_LOCKED` で止める。覆うのは
 その子の `flows/<子>.yml` で、チケットと同じリポジトリのどのツリーでも、誰が書いても
 同じ。大文字小文字は区別しない。パスは解いた先・解く前（cwd から繋いで `..` を正規化しただけ）・ディレクトリだけを
 解いたパスの 3 通りに適用し、`./` `//` `x/..` と Windows で同じファイルに届くパス（末尾の `.` と空白、`:` から

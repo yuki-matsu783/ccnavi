@@ -113,8 +113,9 @@ type holder struct{ dir, names string }
 type form int
 
 const (
-	writeForm form = iota // 書き込みの形のあと（空白で閉じる）
-	copyForm              // cp・ln・install の最後の引数（引数の並びの終わりで閉じる）
+	writeForm  form = iota // 書き込みの形のあと（空白で閉じる）
+	copyForm               // cp・ln・install の最後の引数（引数の並びの終わりで閉じる）
+	targetForm             // `-t` の値の形。書き込みの形から、ディレクトリになり得ないもの（PATH の実体）を除いたもの
 )
 
 // Under はディレクトリの表記を、語の頭からでも置き場の下からでもヒットする行き先の形にする
@@ -162,7 +163,7 @@ func shellWriteRegex(binPath string, extra []triple, moved []holder) string {
 	copyWhere := slices.Clone(copyPlaces)
 	targetWhere := slices.Clone(places)
 	binary := BinaryClause(binPath)
-	for _, t := range append([]triple{{binary, binaryClause(binPath, copyForm), binary}}, extra...) {
+	for _, t := range append([]triple{{binary, binaryClause(binPath, copyForm), binaryClause(binPath, targetForm)}}, extra...) {
 		if t.write != "" {
 			where = append(where, t.write)
 		}
@@ -253,14 +254,21 @@ func binaryClause(binPath string, f form) string {
 		if len(parts) >= 3 {
 			home = pyre.Escape(parts[len(parts)-3]) + pyre.AnySeparator
 		}
-		var onPath, onPathCopy string
-		for _, p := range pathSpellings(binPath) {
-			onPath += "|" + p
-			onPathCopy += "|" + p + copyTail
-		}
 		built := home + `bin` + pyre.AnySeparator + buildDir
 		if f == copyForm {
-			return inWord + `(?:` + sh + copyTail + `|` + built + copyEnd + onPathCopy + `)`
+			var onPathCopy string
+			for _, p := range pathSpellings(binPath, copyForm) {
+				onPathCopy += "|" + p + copyTail
+			}
+			return `(?:` + inWord + `(?:` + sh + copyTail + `|` + built + copyEnd + `)` + onPathCopy + `)`
+		}
+		// PATH の実体はファイルなので `-t` の値（ディレクトリ）には足さない。
+		// 浅い実体は前の 1 文字から当てるので、足すと `-t /tmp/out /bin/ccnavi` の元の側にヒットする。
+		var onPath string
+		if f == writeForm {
+			for _, p := range pathSpellings(binPath, writeForm) {
+				onPath += "|" + p
+			}
 		}
 		return `(?:` + sh + `|` + built + `(?:[\\/][^\x00]*)?` + onPath + `)`
 	}
@@ -273,7 +281,9 @@ func binaryClause(binPath string, f form) string {
 
 // pathSpellings は PATH の ccnavi に当てる表記（末尾 3 要素。2 要素の `bin/ccnavi` は別のプロジェクトにも当たる）。
 // 書かれたパスと、リンクを解いた先の両方を含む。浅い実体（`/bin/ccnavi`）は、区切りで始まる形だけに当てる。
-func pathSpellings(launcher string) []string {
+// ルールの式は後読みを受けないので、前の 1 文字も含めて当てる（commonShellClause と同じ作り）。最後の引数（copyForm）では
+// 前の 1 文字は語の中に限り、語の頭なら要らない（copyLast が手前の空白まで読んである）。
+func pathSpellings(launcher string, f form) []string {
 	exe := platformtag.PathExecutable(launcher)
 	if exe == "" {
 		return nil
@@ -282,8 +292,13 @@ func pathSpellings(launcher string) []string {
 	for _, path := range []string{exe, ospath.Realpath(exe)} {
 		every := pathParts(path)
 		spelled := joinEscaped(every[max(len(every)-3, 0):])
-		if len(every) <= 3 {
-			spelled = `(?<![\w.~-])` + pyre.AnySeparator + spelled
+		switch {
+		case len(every) <= 3 && f == copyForm:
+			spelled = `(?:[^ \x00]*[^\w.~ \x00-])?` + pyre.AnySeparator + spelled
+		case len(every) <= 3:
+			spelled = `(?:^|[^\w.~-])` + pyre.AnySeparator + spelled
+		case f == copyForm:
+			spelled = inWord + spelled
 		}
 		if len(every) > 0 && !slices.Contains(found, spelled) {
 			found = append(found, spelled)

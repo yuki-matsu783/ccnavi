@@ -28,7 +28,7 @@ ccnaviが止めたとき、報告したとき、止めなかったときに、�
 実行前チェックは引数しか見ないので、引数に現れない書き込み（ビルドの出力、スクリプトの内部、読み切れないシェル構文）は
 止められずに通る。実行後チェックは、走ったあとのワークツリーを`git status`で読んでそれを拾う。
 
-保護領域は別に宣言しない。`match`に`Write` `Edit` `NotebookEdit`のどれかを含むルールが、そのまま保護領域の宣言になる。
+保護領域は別に宣言しない。`match`に`Write` `Edit` `MultiEdit` `NotebookEdit`のどれかを含むルールが、そのまま保護領域の宣言になる。
 記録とstateの置き場は最初から保護領域に入らない。チケットの置き場では、ccnaviのサブコマンドが書いたと内容から見分けられる変更だけが外れる。
 作業範囲・親・フェーズが変わっていれば報告する。
 
@@ -115,7 +115,7 @@ undo: rm -- ".ccnavi/config/common/probe.json"
 
 戻す前に止める側も組み込みで持つ。この機能が有効な間、これらのファイルと`.ccnavi`の下、記録とstateの置き場へシェルから書き込む形は、ルールに書いていなくても拒否される。
 ルールファイルが不正で組み込みの既定を使っている間も同じである。`rm -rf .ccnavi`や`mv .ccnavi .ccnavi.bak`も止まる。
-`ccnavi-git.sh`を通しても同じ場所は消せない。名指しのツール（`Write` / `Edit` / `NotebookEdit`）からも守られる。期待する判定のファイル`.ccnavi/config/common/rule-expectations.yml`も同じである。
+`ccnavi-git.sh`を通しても同じ場所は消せない。名指しのツール（`Write` / `Edit` / `MultiEdit` / `NotebookEdit`）からも守られる。期待する判定のファイル`.ccnavi/config/common/rule-expectations.yml`も同じである。
 
 止めるのは書き込みの形と場所の組で、場所の名前が出ただけでは止めない（`cat .ccnavi/config/common/rules.yml`や`git add <パス>`は通る）。
 `builtin:guard-`で始まるidはどのレイヤーのルールファイルにも書けない（書けばerror。`--lint`も指摘する）。外したいならenvでこの機能ごと切る。

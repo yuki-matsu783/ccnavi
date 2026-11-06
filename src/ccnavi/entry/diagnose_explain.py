@@ -197,7 +197,7 @@ def _explain_modes(stdout: TextIO, conf: settings.Settings) -> None:
     stdout.write("\n■ 判定に達せなかったとき（内部の例外・期限切れ・payload が読めない）\n")
     labels = {
         "": "ツールが分からない",
-        "Write": "Write・Edit・NotebookEdit・Agent・Task",
+        "Write": "Write・Edit・MultiEdit・NotebookEdit・Agent・Task",
         "Read": "Read・Grep・Glob",
         "SubagentHandback": "サブエージェントの報告用（SubagentHandback・StructuredOutput）",
         "Bash": "Bash",

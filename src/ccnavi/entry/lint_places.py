@@ -72,7 +72,7 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                     f"（id の `{p.name}:` がどちらのレイヤーを指すか決まらないため。"
                     "大文字小文字の違いは問わない）。ここに置いた宣言は 1 件も使われておらず、"
                     "このプロジェクトを行き先にするパスを持つツール（Read / Grep / Glob / Write / "
-                    "Edit / NotebookEdit）は共通レイヤーだけで判定している。"
+                    "Edit / MultiEdit / NotebookEdit）は共通レイヤーだけで判定している。"
                     "プロジェクトを別の名前に変えてください",
                 )
             )

@@ -23,6 +23,7 @@ SUBJECT_FIELDS: dict[str, str] = {
     "Grep": "path",
     "Glob": "path",
     "Edit": "file_path",
+    "MultiEdit": "file_path",
     "Write": "file_path",
     "NotebookEdit": "notebook_path",
     "Skill": "skill",

@@ -31,7 +31,7 @@ deny:
   # Bash の書き込み（`>`・`tee`・`sed -i`・`rm`・`cp` など）も、書き込み先を解いたパスに対して
   # このルールを適用して止める（src/ccnavi/hook/rootwrite.py。id を `workspace-root` から変えると外れる）。
   - id: workspace-root
-    match: Write|Edit|NotebookEdit
+    match: Write|Edit|MultiEdit|NotebookEdit
     regex: '^{root}[\\/]'
     except:
       - regex: '^{root}[\\/]wip[\\/]handoff(?:[\\/]|$)'
@@ -50,7 +50,7 @@ deny:
   # 一時の物はワークスペースルート直下の scratchpad/、ユーザに渡す物は wip/handoff/ に置く
   # （.ccnavi/docs/scratchpad.md）。シェルのリダイレクトなどによる書き込みは止めない。
   - id: session-scratchpad
-    match: Write|Edit|NotebookEdit
+    match: Write|Edit|MultiEdit|NotebookEdit
     regex: '^(?:/private)?/tmp/claude-[^\\/]+[\\/](?:[^\\/]+[\\/])*scratchpad(?:[\\/]|$)'
     message: >-
       セッションのスクラッチパッドには書けません。一時ファイル・コミットしたくない物・直接作業で
@@ -120,7 +120,7 @@ ask:
 
   # 依存関係の変更。pyproject.toml は依存の宣言、uv.lock は依存の固定。
   - id: dependencies
-    match: Write|Edit
+    match: Write|Edit|MultiEdit
     regex: 'pyproject\.toml|uv\.lock'
     additionalContextOnce: >-
       実行時の依存が変わる場所です。増やす 1 本は、ガード自身が点検できない供給網の
@@ -144,7 +144,7 @@ allow:
   # 書き込みを許すのはワークツリーの中だけ。ワークスペースルートの側は deny の workspace-root が止める。
   # ワークツリーの中でも hook・スクリプト・settings.json などは deny が先にヒットする。
   - id: worktrees
-    match: Write|Edit
+    match: Write|Edit|MultiEdit
     glob: "*/.claude/worktrees/*"
 
   # スキルの振り返り（.ccnavi/docs/skill-review.md）。ターンの終わり 10 回に 1 度、止めて手順を渡す。
@@ -159,7 +159,7 @@ allow:
   # 提案を書くとき（親のフィードバック計画の改版を含む）に、振り返りの候補を思い出させる。
   # 適用するのはワークツリーの中の todo/ だけで、上の worktrees の allow の内側。判定は変わらない。
   - id: skill-review-at-proposal
-    match: Write|Edit
+    match: Write|Edit|MultiEdit
     glob: "*/.claude/worktrees/*/wip/proposals/todo/*"
     additionalContext: >-
       親の feedback: を書くなら、振り返りで残したスキルの候補（親のワークツリーの
@@ -181,11 +181,11 @@ allow:
 
   # ワークツリーの中でコード・文書の本体を最初に書き換えるとき。提案・wip/・scratchpad/・.ccnavi/・
   # .claude/（スキルや設定）は除き、先にそちらで消費されないようにする。Once は文脈ごと
-  # （サブエージェントの起動ごと）に 1 度。作業を伴わない問いは Write|Edit に当たらないので出ない。
+  # （サブエージェントの起動ごと）に 1 度。作業を伴わない問いは Write|Edit|MultiEdit に当たらないので出ない。
   # except の * は / を跨ぐので、src/wip/ のようにパスの途中にある同名の階層も除く（促しが出ないだけ）。
   # sed -i など Bash での書き換えと NotebookEdit には出さない（単純さを優先）。
   - id: process-skill-first-edit
-    match: Write|Edit
+    match: Write|Edit|MultiEdit
     glob: "*/.claude/worktrees/*"
     except:
       - glob: "*/.claude/worktrees/*/wip/*"

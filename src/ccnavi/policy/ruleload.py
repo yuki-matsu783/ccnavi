@@ -16,7 +16,7 @@
 
 自身のレイヤーとプロジェクトのレイヤーの置き場も固定で、env では動かない。
 
-パスを持つツール（Read / Grep / Glob / Write / Edit / NotebookEdit）
+パスを持つツール（Read / Grep / Glob / Write / Edit / MultiEdit / NotebookEdit）
 は共通レイヤー + 行き先のレイヤーの 1 つ。
 パスを持たないツール（Bash / PowerShell / WebFetch / Skill / Agent）
 は共通レイヤー + 自身のレイヤー +

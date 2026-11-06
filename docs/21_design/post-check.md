@@ -24,7 +24,7 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 
 ### 7.2 保護領域と違反
 
-そのツリーのルールのうち、`match` に `Write` `Edit` `NotebookEdit` の
+そのツリーのルールのうち、`match` に `Write` `Edit` `MultiEdit` `NotebookEdit` の
 どれかを含む `deny` / `ask` が、そのまま「この場所に書かせない」の宣言になる。
 変更の実パスがそれにヒットすれば違反（`POST_VIOLATION`）。そうでなく、ワークツリーに結び付くチケットの
 範囲の外（チケットの `deny` の項を含む）なら、ルールの `allow` にヒットしていても `POST_TICKET_SCOPE`（9.5）。

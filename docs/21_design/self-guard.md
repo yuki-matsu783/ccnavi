@@ -37,14 +37,14 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 | id | 足すとき | 止めるもの |
 |---|---|---|
 | `builtin:guard-setting-files` | 常に | Bash で、書き込みの形（`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先、`cp` `ln` `install` `mv` で守る名前を入っているディレクトリへ置く形）と場所（`.claude/hooks/`、`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、レイヤーの設定 3 本と ccnavi ディレクトリ、共通レイヤーの 3 本（`.ccnavi/config/common/`）、記録と state の `logs/decisions.jsonl` `logs/state`、閉じたチケットの退避の `logs/archive`）の組 |
-| `builtin:guard-binary` | `CCNAVI_ENTRY_PATH` が設定されているとき | `Write` `Edit` `NotebookEdit` |
+| `builtin:guard-binary` | `CCNAVI_ENTRY_PATH` が設定されているとき | `Write` `Edit` `MultiEdit` `NotebookEdit` |
 | `builtin:guard-project-home` | 常に（ccnavi ディレクトリは固定の `.ccnavi`） | 同上 |
 | `builtin:guard-common-layer` | 共通レイヤーの 3 本の置き場が決まっているとき（11.6） | 同上 |
-| `builtin:guard-records` | 常に | `Write` `Edit` `NotebookEdit` で、記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`、閉じたチケットの退避 `logs/archive/`。診断のフラグ `--log` / `--state` で動かしたときは、その置き場とローテートした分にも適用する）。シェルの側の `builtin:guard-setting-files` と同じ場所 |
-| `builtin:guard-handoff-links` | ワークスペースルートが決まっているとき | `Write` `Edit` `NotebookEdit` で、ツリーの直下の `wip/handoff/` の下の対象のうち、リンクを通るもの・ハードリンクでほかの名前とつながったもの・`..` を含むもの。つながっていないコピーと置き場の外にはヒットしない |
+| `builtin:guard-records` | 常に | `Write` `Edit` `MultiEdit` `NotebookEdit` で、記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`、閉じたチケットの退避 `logs/archive/`。診断のフラグ `--log` / `--state` で動かしたときは、その置き場とローテートした分にも適用する）。シェルの側の `builtin:guard-setting-files` と同じ場所 |
+| `builtin:guard-handoff-links` | ワークスペースルートが決まっているとき | `Write` `Edit` `MultiEdit` `NotebookEdit` で、ツリーの直下の `wip/handoff/` の下の対象のうち、リンクを通るもの・ハードリンクでほかの名前とつながったもの・`..` を含むもの。つながっていないコピーと置き場の外にはヒットしない |
 | `builtin:guard-handoff-ln` | ワークスペースルートが決まっているとき | Bash で、リンクを作るコマンド（`ln`・`link`・`cp -l` / `-s` / `--link` / `--symbolic-link`）があり、コマンド行に `handoff` の綴りがあるか、作業ディレクトリが置き場の中の形。行き先は読み分けない（止める側に倒す） |
 
-名前で書くツールの 4 本（`selfguard_shell.add_named_rules`。`Write` `Edit` `NotebookEdit`）。`CCNAVI_GUARD_CORE_FILES` の実効値が `disable` でなければ足す。
+名前で書くツールの 4 本（`selfguard_shell.add_named_rules`。`Write` `Edit` `MultiEdit` `NotebookEdit`）。`CCNAVI_GUARD_CORE_FILES` の実効値が `disable` でなければ足す。
 
 | id | 適用するもの | 書き込みを許す例外 |
 |---|---|---|

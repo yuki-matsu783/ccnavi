@@ -82,7 +82,7 @@ allow:
 
 | ツール | ヒットするレイヤー |
 |---|---|
-| パスを持つツール: `Read` / `Grep` / `Glob` / `Write` / `Edit` / `NotebookEdit` | 共通レイヤー + 行き先の 1 レイヤー。行き先がプロジェクトの中ならそのレイヤー、ワークスペースのツリー（ワークスペースルートと、そこから切ったワークツリー）なら自身のレイヤー。`Grep`と`Glob`が探す場所を省いたときは`cwd`が行き先 |
+| パスを持つツール: `Read` / `Grep` / `Glob` / `Write` / `Edit` / `MultiEdit` / `NotebookEdit` | 共通レイヤー + 行き先の 1 レイヤー。行き先がプロジェクトの中ならそのレイヤー、ワークスペースのツリー（ワークスペースルートと、そこから切ったワークツリー）なら自身のレイヤー。`Grep`と`Glob`が探す場所を省いたときは`cwd`が行き先 |
 | パスを持たないツール: `Bash` / `PowerShell` / `WebFetch` / `Skill` / `Agent` | 共通レイヤー + 自身のレイヤー + 全プロジェクトのレイヤー。どこに`cwd`があっても、`cd`を挟んでも同じ判定になる。あるレイヤーの`allow`は他のプロジェクトの作業にも適用される |
 
 順は 共通レイヤー → 自身のレイヤー → プロジェクトのレイヤー（名前順）で、`deny` `ask` `allow`の順は変わらない。
@@ -299,7 +299,7 @@ ccnaviは判定を返さず、Claude Codeの権限モードに従う。
 | `match`に書く名前 | 適用する対象 |
 |---|---|
 | `Bash` `PowerShell` | コマンド（`Bash`は実行される部分に適用する。[Bashの読み方とパスの見方](bash-reading.md)） |
-| `Read` `Edit` `Write` `NotebookEdit` | ファイルのパス（行き着く先のパス） |
+| `Read` `Edit` `MultiEdit` `Write` `NotebookEdit` | ファイルのパス（行き着く先のパス） |
 | `Grep` `Glob` | 探す場所のパス（`path`。省略されていれば呼び出し側のcwd） |
 | `Skill` | スキル名 |
 | `Agent` | 起動の見出し（`description`、無ければ`prompt`） |

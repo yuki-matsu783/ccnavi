@@ -1520,6 +1520,26 @@ class SelfGuardTest(unittest.TestCase):
         self.assertFalse(re.search(regex, "cp x ./bin/ccnavi"))
         self.assertFalse(re.search(regex, "cp x vendor/bin/ccnavi-old"))
 
+    def test_浅い_PATH_の実体でも組み込みの保護がすべて組み立てられる(self):
+        # 組み立てに失敗したルールは診断ログに残すだけで外れる。ルールの式は後読みを受けない。
+        shallow = os.path.join(os.sep, "bin", "ccnavi")
+        rule_set = rules.RuleSet()
+        with mock.patch.object(platformtag, "path_executable", return_value=shallow):
+            selfguard_shell.add_rules(
+                rule_set, "/ws/.ccnavi/scripts/ccnavi-launcher.sh", root="/ws"
+            )
+        ids = {r.id for r in rule_set.deny}
+
+        self.assertIn(selfguard_shell.SHELL_RULE_ID, ids)
+        self.assertIn(selfguard_shell.BINARY_RULE_ID, ids)
+        shell = next(r for r in rule_set.deny if r.id == selfguard_shell.SHELL_RULE_ID)
+        for command in ("cp x /bin/ccnavi", "echo x > /bin/ccnavi", "rm /bin/ccnavi"):
+            with self.subTest(command=command):
+                self.assertTrue(shell.matches("Bash", shellread.read(command).text))
+        for command in ("cp x ./bin/ccnavi", "cp -t /tmp/out /bin/ccnavi", "cp /bin/ccnavi /tmp/x"):
+            with self.subTest(command=command):
+                self.assertFalse(shell.matches("Bash", shellread.read(command).text))
+
     def test_PATH_に_ccnavi_が無ければ守る対象も増えない(self):
         spelled, _, _ = self.path_layout()
 

@@ -73,7 +73,7 @@ ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` 
 
     deny:
       - id: workspace-root
-        match: Write|Edit|NotebookEdit
+        match: Write|Edit|MultiEdit|NotebookEdit
         regex: '^{root}[\\/]'
         except:
           - regex: '^{root}[\\/]wip[\\/]handoff(?:[\\/]|$)'
