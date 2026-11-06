@@ -127,7 +127,7 @@ def guard_setting_files(
     if not outcomes:
         return ""
     record.guarded = [f"{o.target.key}:{o.action}" for o in outcomes]
-    return selfguard.report(outcomes)
+    return selfguard.report(root, outcomes)
 
 
 def decide_before(

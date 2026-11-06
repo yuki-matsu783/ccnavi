@@ -188,7 +188,7 @@ class FeedbackHintTest(unittest.TestCase):
 
     def test_the_hint_says_how_to_join_and_to_fill_phases(self):
         parent = ticket_model.Ticket(ticket="i0001", plan=[item("design")])
-        text = phase._next_hint(parent, [], 1)
+        text = phase._next_hint(os.getcwd(), parent, [], 1)
         self.assertIn("フィードバック計画", text)
         self.assertIn("after", text)
         self.assertIn("最後のステップ", text)

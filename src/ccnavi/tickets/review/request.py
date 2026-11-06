@@ -119,8 +119,11 @@ def request_gate(
         unmet.append(already)
     if ph.deferred:
         unmet.append(
-            f"フェーズ {ph.label} のレビューは {ph.review_at} 番目と一緒に見る計画。"
-            f"--phase {ph.review_at} で依頼してください"
+            texts.say(
+                root,
+                "NOTICE_REVIEW_REQUEST_DEFERRED",
+                {"label": ph.label, "at": str(ph.review_at)},
+            )
         )
     if unmet:
         stderr.write(f"ccnavi: 依頼の前提が {len(unmet)} 件満たされていない\n")
@@ -373,9 +376,11 @@ def review_problems(
     ]
     if changes:
         return [
-            f"ccnavi: {review_host.changes_requested_note(result.host)}。"
-            "decide でも通せない。変更要求があるため、レビュー済みにはできません。"
-            "修正する場合は同じフェーズに新しい子を提案し、ユーザの承認を受けてください",
+            texts.say(
+                root,
+                "NOTICE_REVIEW_CHANGES_REQUESTED",
+                {"note": review_host.changes_requested_note(result.host)},
+            ),
             *[f"  - {r.url}" for r in changes],
         ]
     unresolved = review_host._unresolved(
@@ -400,11 +405,7 @@ def review_problems(
             "新しいフィードバック作業フェーズは足せません。",
         ]
     else:
-        lines.append(
-            "ユーザに解決してもらって再実行する。または、ユーザがターミナルで "
-            f"'{review_sh} decide {phase_no}'（ボードの「決める」）を使い、指摘ごとに"
-            "受け入れて進むか、続きの子チケットで直すかを選ぶ"
-        )
+        lines.append(texts.say(root, "NOTICE_REVIEW_UNRESOLVED__DECIDE", {"phase": str(phase_no)}))
     return lines
 
 

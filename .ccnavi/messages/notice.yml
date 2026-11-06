@@ -206,3 +206,136 @@ messages:
     kind: notice
     what: |-
       他のセッションの作業の可能性があります。続きとして操作する前にユーザに確かめてください。
+
+  # ---- tickets/phase/gates.py（フェーズが終わったあとの、次のフェーズの案内。`what` の 1 行だけで出る）
+  # 全体計画のフェーズが全部終わった。フィードバック計画がまだ無い。
+  NOTICE_PHASE_NEXT__FEEDBACK:
+    kind: notice
+    values: [parent, launcher]
+    what: |-
+      全体計画のフェーズは全部終わりました。最後のフェーズのレビューが済んだら、次はフィードバック計画です（承認できるのは最後のレビューが済んだあとだけで、承認でレビューの状態は変わりません）。親チケットに `feedback:` を追加して（対応が無くても `[]` で）改版を提案し、承認を受けてください。ステップには `after` で先に済んでいるべきステップの番号（フィードバック計画の番号だけ）を書き、最後のステップにほかの全部が先行するようにします。独立した対応は最後に 1 ステップで受けるか、一直線に並べます。ステップが使う定義は '{launcher} --plan-order {parent} --fill-phases' で `phases:` に差し込みます。改版の提案では `started_at`・`completed_at`・`base_sha`・`merged_sha`・`cancelled_at`・`cancel_reason` は空にします。
+
+  # 計画のフェーズが全部終わった（フィードバック計画もある）。
+  NOTICE_PHASE_NEXT__DONE:
+    kind: notice
+    what: |-
+      計画のフェーズは全部終わりました。親チケットを閉じられます。
+
+  # 次に始められるフェーズが無い。
+  NOTICE_PHASE_NEXT__WAITING:
+    kind: notice
+    what: |-
+      次に始められるフェーズは、先行のフェーズが済むまでありません。
+
+  # 次に始められるフェーズがある。`hints` はフェーズの定義の案内（無ければ空）。
+  NOTICE_PHASE_NEXT__READY:
+    kind: notice
+    values: [names, hints]
+    what: |-
+      次に始められるのは {names} です。子チケットを提案して承認を受けてください。{hints}
+
+  # ---- tickets/phase/gates.py の review_next（レビュー待ちの子について、ユーザに回るまでに誰が何をするか。`finish` の出力と `status` の次の操作）
+  # `lead` は延期したフェーズのときの前置き（無ければ空）、`done` は完了の置き場（例 .ccnavi/approved/done/）。
+  NOTICE_REVIEW_NEXT__REVIEWED:
+    kind: notice
+    values: [lead, label, done]
+    what: |-
+      {lead}フェーズ {label} はレビュー済み。ユーザの操作（confirm / decide、Chrome 拡張のレビュー済み）で {done} へ動く
+
+  # 依頼済みだが、この子が依頼より後に閉じた。
+  NOTICE_REVIEW_NEXT__REREQUEST:
+    kind: notice
+    values: [lead, label, phase, done]
+    what: |-
+      {lead}フェーズ {label} は依頼済みだが、この子は前回の依頼より後に閉じた。依頼し直すまで、この子の分はユーザに回らない。親が合流を済ませて push し、'{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文>' で依頼し直す。依頼の後、ユーザがレビューを終えて confirm / decide か Chrome 拡張のレビュー済みを実行すると {done} へ動く
+
+  # 依頼済みで、この子は依頼より前に閉じた。
+  NOTICE_REVIEW_NEXT__REQUESTED:
+    kind: notice
+    values: [lead, label, waiting]
+    what: |-
+      {lead}フェーズ {label} は依頼済み（{waiting}）。ユーザのレビューを待つ（ユーザが confirm / decide か Chrome 拡張のレビュー済みで done/ へ動かす）
+
+  # 未依頼で、閉じていない子がまだある。`left` は「このフェーズ」か「フェーズ <名前>」。
+  NOTICE_REVIEW_NEXT__PREPARING_OPEN:
+    kind: notice
+    values: [lead, preparing, left, phase, done]
+    what: |-
+      {lead}まだ{preparing}。{left}にはまだ閉じていない子がある。全部閉じてから、親が合流・'{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文>' を済ませるまで、ユーザには回らない。依頼の後、ユーザがレビューを終えて confirm / decide か Chrome 拡張のレビュー済みを実行すると {done} へ動く
+
+  # 未依頼で、子は全部閉じている。
+  NOTICE_REVIEW_NEXT__PREPARING:
+    kind: notice
+    values: [lead, preparing, phase, done]
+    what: |-
+      {lead}まだ{preparing}。親が合流・'{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文>' を済ませるまで、ユーザには回らない。依頼の後、ユーザがレビューを終えて confirm / decide か Chrome 拡張のレビュー済みを実行すると {done} へ動く
+
+  # ---- tickets/review/request.py（依頼・確認を断るときの、直し方を含む行。`what` の 1 行だけで出る）
+  # 依頼の前提の一覧の 1 件。延期したフェーズを、レビューを引き受けるフェーズ番号で依頼し直す。
+  NOTICE_REVIEW_REQUEST_DEFERRED:
+    kind: notice
+    values: [label, at]
+    what: |-
+      フェーズ {label} のレビューは {at} 番目と一緒に見る計画。--phase {at} で依頼してください
+
+  # confirm が、変更要求のレビューがあるので断る。`note` はホストごとの変更要求の呼び名。
+  NOTICE_REVIEW_CHANGES_REQUESTED:
+    kind: notice
+    values: [note]
+    what: |-
+      ccnavi: {note}。decide でも通せない。変更要求があるため、レビュー済みにはできません。修正する場合は同じフェーズに新しい子を提案し、ユーザの承認を受けてください
+
+  # confirm が、未解決のスレッドがあるので断る（最後のフィードバック対応のレビューでないとき）。
+  NOTICE_REVIEW_UNRESOLVED__DECIDE:
+    kind: notice
+    values: [phase]
+    what: |-
+      ユーザに解決してもらって再実行する。または、ユーザがターミナルで '{script:ccnavi-review.sh} decide {phase}'（ボードの「決める」）を使い、指摘ごとに受け入れて進むか、続きの子チケットで直すかを選ぶ
+
+  # ---- tickets/flow/graph.py の briefing（SubagentStart でサブエージェントに渡す、ノードの扱いの注意。行頭の空白はコードが付ける）
+  # 問いのノード。`node` はノードの種類の名前。
+  NOTICE_FLOW_BRIEF__ASK:
+    kind: notice
+    values: [node]
+    what: |-
+      {node} のノード: サブエージェントはユーザに聞けない（AskUserQuestion は渡されない）。そのノードで手を止め、問いと選択肢を添えてメインに返してください。メインがユーザに聞き、答えを持って同じサブエージェントを再開させる。
+
+  # 繰り返しのノード。
+  NOTICE_FLOW_BRIEF__LOOP:
+    kind: notice
+    values: [node]
+    what: |-
+      {node} のノード: 条件が成り立つあいだ「繰り返す」側へ進み、成り立たなくなったか、繰り返した回数が最大に達したら「抜ける」側へ進んでください。回数は自分で数えてください。最大に達しても条件が成り立つままだったときは、最後の報告にそのことを書いてください。
+
+  # サブエージェントのノード。`ticket` は担当の子の識別子。
+  NOTICE_FLOW_BRIEF__SPAWN:
+    kind: notice
+    values: [ticket]
+    what: |-
+      subAgent / subAgentFlow のノード: Agent ツールがあれば入れ子のサブエージェントとして起動してください。そのプロンプトには担当の子の識別子 {ticket} を 1 つだけ書き（ccnavi が範囲とフローの案内を書き足す）、担当以外の子の識別子とワークツリーのパスは書かないでください。isolation は使いません。Agent ツールが無ければ（入れ子の上限）、そのノードで手を止め、起動してほしいエージェントの種類・プロンプト・担当の子チケットの識別子を添えてメインに返してください。メインがそのとおり起動し、結果を持って同じサブエージェントを再開させる。
+
+  # ---- policy/selfguard.py の report（設定ファイルを戻したときの知らせに足す注意。見出しと結果の行はコードが言う）
+  # ワークツリー側の設定が混じっている。
+  NOTICE_SELFGUARD__COPY:
+    kind: notice
+    what: |-
+      ワークツリー側の設定は、その場では誰も読みませんが、統合すれば統合先の hook の登録とルールになります。
+
+  # 共通レイヤーのルールファイルを戻した。`draft` は下書きの置き場。
+  NOTICE_SELFGUARD__COMMON_RULES:
+    kind: notice
+    values: [draft]
+    what: |-
+      共通レイヤーのルールファイルを直すときは、下書きを {draft} に置き、ユーザにターミナルの ccnavi-user-handoff.sh での取り込みを頼んでください。読めない間も同じです。
+
+  # 実行ファイルを新しい版を基準に取り直した。
+  NOTICE_SELFGUARD__REBASED:
+    kind: notice
+    what: |-
+      実行ファイルは新しい版を基準に取り直しました。ccnavi の外で作り直された版も、この時点から基準になります。
+
+  # 取り直し以外の結果がある。
+  NOTICE_SELFGUARD__ASK_USER:
+    kind: notice
+    what: |-
+      変更が必要なら、何をなぜ変えたいのかをユーザに伝えて依頼してください。自分で書き換えると、次の呼び出しで同じように戻ります。

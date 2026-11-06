@@ -26,10 +26,7 @@ LABEL = "次: "
 
 # 直書きを残してよい箇所（src/ccnavi からの相対パス → 件数）。文面ファイルへ移したら外す。
 # message-migration.md の「残り」の表と食い違わないようにする。
-ALLOWED: dict[str, int] = {
-    # 計画の誤りで断るときの `次:`（日本語の直書き。1 まとまりずつ移す）
-    "tickets/proposal/propose.py": 1,
-}
+ALLOWED: dict[str, int] = {}
 
 
 def _docstrings(tree: ast.AST) -> set[int]:
