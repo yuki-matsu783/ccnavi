@@ -1634,7 +1634,7 @@ if [ "$total" -eq 0 ]; then
 	if [ "$host_rc" -eq 0 ]; then
 		issue_title_get || issue_rc=$?
 		case "$issue_rc" in
-		2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。番号を作らず、ユーザに確かめてください。issue が無ければ、--new-issue <タイトル> で作るか、ユーザに作ってもらい、その番号で打ち直します（チケット作業は issue と MR のセットです）。" 2 ;;
+		2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。番号を作らず、ユーザに確かめてください。issue が無ければ、--new-issue <タイトル> を先に打ち、作れなければユーザに作ってもらい、その番号で打ち直します（チケット作業は issue と MR のセットです）。" 2 ;;
 		1)
 			# API が失敗して実在を確かめられなかった。--slug・--title があっても無確認で進まない
 			# （確かめた後の再実行は --mcp-checked を付ける）
@@ -1826,7 +1826,7 @@ if [ -n "$resume" ]; then
 	issue_rc=0
 	issue_title_get || issue_rc=$?
 	case "$issue_rc" in
-	2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。何も作成せずに中断しました。ユーザに確かめてください。issue が無ければ、--new-issue <タイトル> で作るか、ユーザに作ってもらい、その番号で打ち直します。" 2 ;;
+	2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。何も作成せずに中断しました。ユーザに確かめてください。issue が無ければ、--new-issue <タイトル> を先に打ち、作れなければユーザに作ってもらい、その番号で打ち直します。" 2 ;;
 	3) fail issue-is-pr "#${number} は issue ではなく PR です。MR の番号なら --mr ${number} を使ってください。" 2 ;;
 	esac
 	merged_check "$cb"

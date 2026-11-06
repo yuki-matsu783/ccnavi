@@ -8,7 +8,7 @@ messages:
     next: |-
       issue を指定された依頼なら {script:ccnavi-start.sh} --issue <番号> を打つ。issue が無い依頼は、ユーザに頼む前に自分で {script:ccnavi-start.sh} --new-issue <タイトル> を打つ
     note: |-
-      ユーザに issue の作成を頼んでよいのは、--new-issue を打っても作れなかった（ホストに届かない・認証が無い・権限が無い）ときだけ
+      ユーザに issue の作成を頼んでよいのは、--new-issue を打っても作れなかったときだけ。作れなかったときの進め方は、--new-issue の出力の 次: に従う
 
   NEXT_START_DRY_RUN:
     kind: next
