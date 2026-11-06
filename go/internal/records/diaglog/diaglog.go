@@ -2,22 +2,26 @@ package diaglog
 
 import (
 	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/records/redact"
 )
 
-// Dir はワークスペースルートからの置き場。
-var Dir = filepath.Join("logs", "diag")
+// Dir はワークスペースルートからの置き場（"/" 区切り）。ディスクのパスは DirOf で組む。
+const Dir = "logs/diag"
 
-const fileExt = ".log"
+// FileExt は出どころごとの 1 本の拡張子。後始末（records/prune）がこの拡張子のファイルをローテートして消す。
+const FileExt = ".log"
+
+// DirOf は root の下の置き場（機械の区切り。Python の os.path.join(root, "logs", "diag") と同じ綴り）。
+func DirOf(root string) string { return ospath.Join(root, strings.Split(Dir, "/")...) }
 
 // Level は出力のレベル。CCNAVI_LOG_LEVEL で閾値を決める。
 type Level int
@@ -37,9 +41,6 @@ var byWord = map[string]Level{"DEBUG": Debug, "INFO": Info, "WARN": Warn, "ERROR
 // sourceName は出どころに使える名前。ほかの字（区切り・`.`・空白）を含む名前では書かない。
 // 置き換えると別の出どころの名前と重なるので、置き換えはしない。
 var sourceName = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
-
-// stampLayout は現地時刻と時差を秒まで（BSD の date がミリ秒を出せないので 3 つの logger で揃える）。
-const stampLayout = "2006-01-02T15:04:05-07:00"
 
 // threshold は CCNAVI_LOG_LEVEL。空と読めない値は Info。
 func threshold() Level {
@@ -95,10 +96,11 @@ func (l *Logger) log(level Level, msg string, kv []any) {
 	}
 	line := stamp(time.Now()) + " " + labels[level] + " " + l.name + "[" + strconv.Itoa(os.Getpid()) + "] " +
 		fold(scrub(msg)) + tail.String()
-	appendLine(ospath.Join(root, Dir, l.name+fileExt), line)
+	appendLine(ospath.Join(DirOf(root), l.name+FileExt), line)
 }
 
-func stamp(now time.Time) string { return now.Format(stampLayout) }
+// stamp は現地時刻と時差を秒まで（BSD の date がミリ秒を出せないので 3 つの logger で揃える）。
+func stamp(now time.Time) string { return now.Format(fsio.ISOStampLayout) }
 
 // text は値を文字にする。真偽は true / false、nil は空（拡張の String と揃える）。
 func text(value any) string {
@@ -136,6 +138,7 @@ func quote(value string) string {
 // appendLine は 1 行を追記モードで 1 度に書く（並行するプロセスの行と混ざらない）。
 // logs・logs/diag・書き込み先のどれかがリンクなら書かない。リンク先へ追記すると置き場の外のファイル
 // （logs/decisions.jsonl など）を書き換えるため。新しいファイルは 0600。
+// fsio.AppendLine を使わないのは、改行が機械によらず "\n"（sh と拡張の行と揃える）で、O_NOFOLLOW で開くため。
 func appendLine(path, line string) {
 	directory := ospath.Dirname(path)
 	for _, place := range []string{ospath.Dirname(directory), directory} {
@@ -149,7 +152,7 @@ func appendLine(path, line string) {
 	flags := os.O_WRONLY | os.O_APPEND | os.O_CREATE | noFollow
 	f, err := os.OpenFile(path, flags, 0o600)
 	if os.IsNotExist(err) {
-		if os.MkdirAll(directory, 0o777) != nil {
+		if fsio.MakeDirs(directory) != nil {
 			return
 		}
 		f, err = os.OpenFile(path, flags, 0o600)

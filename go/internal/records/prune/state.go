@@ -1,7 +1,6 @@
 package prune
 
 import (
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -12,7 +11,8 @@ import (
 )
 
 // pruneState は終わったセッションの記録を、セッションごとにまとめて消す。置き場そのものがリンクなら、
-// 何も消さずに報告に出す（辿って消すと置き場の外のファイルを消す）。
+// 何も消さずに報告に出す（辿って消すと置き場の外のファイルを消す）。見るのは置き場そのものだけで、
+// ワークスペースルートからの道のリンクは見ない（Python と同じ。pruneDirectory は道も見る）。
 func (r *run) pruneState(stateDir, session string, before time.Time) {
 	if ospath.IsLink(stateDir) {
 		r.problem("%s はリンクなので辿らない（記録を削除しません）", r.shown(stateDir))
@@ -64,26 +64,25 @@ type keyed struct{ entry, name, prefix, suffix string }
 // どの形にも当たらない名前は、知らないファイルとして残す（形を広げると知らないファイルまで消しうる）。
 func (r *run) sessionEntries(stateDir string) (map[string][]string, []string) {
 	groups := map[string][]string{}
-	entries, err := os.ReadDir(stateDir)
+	entries, err := ospath.DiskListdir(stateDir)
 	if err != nil {
 		return groups, nil
 	}
 	guard := ospath.Join(stateDir, selfguardDir)
 	if ospath.IsLink(guard) {
 		r.problem("%s はリンクなので辿らない（バックアップを削除しません）", r.shown(guard))
-	} else if backups, err := os.ReadDir(guard); err == nil {
-		for _, b := range backups {
-			path := ospath.Join(guard, b.Name())
-			if pathcase.Fold(b.Name()) != pathcase.Fold(selfguardStore) && ospath.IsDir(path) {
-				groups[b.Name()] = append(groups[b.Name()], path)
+	} else if backups, err := ospath.DiskListdir(guard); err == nil {
+		for _, name := range backups {
+			path := ospath.Join(guard, name)
+			if pathcase.Fold(name) != pathcase.Fold(selfguardStore) && ospath.IsDir(path) {
+				groups[name] = append(groups[name], path)
 			}
 		}
 	}
 
 	var withKey []keyed
 	var loose []string
-	for _, e := range entries {
-		entry := e.Name()
+	for _, entry := range entries {
 		path := ospath.Join(stateDir, entry)
 		if !ospath.IsFile(path) {
 			continue

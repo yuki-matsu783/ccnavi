@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/hookio"
 )
 
 const session = "sess-1"
@@ -125,7 +127,7 @@ func TestStartAndCheck(t *testing.T) {
 		t.Fatalf("Start = %+v, %v", plan, ok)
 	}
 	text, ok := Check(state, session, plan.Token, plan.Wait, 0)
-	if !ok || !strings.HasPrefix(text, Marker) || !strings.Contains(text, "scratchpad/") || !strings.Contains(text, "55 分") {
+	if !ok || !strings.HasPrefix(text, hookio.IdleHandoffMarker) || !strings.Contains(text, "scratchpad/") || !strings.Contains(text, "55 分") {
 		t.Errorf("Check = %q, %v", text, ok)
 	}
 }
@@ -137,7 +139,7 @@ func TestResetStopsOnlyForUserInput(t *testing.T) {
 		fires      bool
 	}{
 		{"続きをお願いします", false, false},
-		{Marker + " 書いてください", false, true},
+		{hookio.IdleHandoffMarker + " 書いてください", false, true},
 		{"この差分を見て: [idle-handoff] を含む実装", false, false}, // 目印は先頭にあるときだけ
 		{"<task-notification>", true, true},
 	}
@@ -243,7 +245,7 @@ func TestPrune(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, session+noticeSuffix)); err != nil {
 		t.Errorf("対の状態ファイルが新しいのに印を消した: %v", err)
 	}
-	age(t, filepath.Join(dir, session+stateSuffix))
+	age(t, filepath.Join(dir, session+fsio.JSONExt))
 	Prune(state, time.Now())
 	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
 		t.Errorf("残った: %v", entries)
@@ -296,13 +298,5 @@ func TestNoticeAfterFiring(t *testing.T) {
 	Reset(other, session, "続けます", false)
 	if text, ok := Notice(other, session, bigUsage, 400_000, ""); ok {
 		t.Errorf("打った後に知らせた: %q", text)
-	}
-}
-
-func TestGrouped(t *testing.T) {
-	for n, want := range map[int]string{0: "0", 999: "999", 1000: "1,000", 500000: "500,000", 1234567: "1,234,567"} {
-		if got := grouped(n); got != want {
-			t.Errorf("grouped(%d) = %q", n, got)
-		}
 	}
 }

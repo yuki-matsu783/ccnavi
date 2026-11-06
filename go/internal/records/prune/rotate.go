@@ -11,6 +11,7 @@ import (
 
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/records/diaglog"
 )
 
 func rotatedName(logPath string, now time.Time, n int) string {
@@ -54,20 +55,12 @@ func rotatedPattern(logPath string) *regexp.Regexp {
 	return regexp.MustCompile("^" + regexp.QuoteMeta(stem) + `\.\p{Nd}{8}-\p{Nd}{6}(?:-\p{Nd}+)?` + regexp.QuoteMeta(ext) + pyEnd)
 }
 
-func size(path string) (int64, bool) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return 0, false
-	}
-	return info.Size(), true
-}
-
 // rotate は大きさが上限を超えていたら名前を変える。変えた（dry-run なら変える）とき真。
 // 名前を変えるだけでコピーしない。同じ時に追記している hook は開いたハンドルのままローテート先へ書き、
 // 次の起動からは新しい記録を作って書くので、どちらの行も失われない。Windows で開かれていて変えられなければ、
 // 次の開始でまた試す。
 func (r *run) rotate(logPath string, limit int64) bool {
-	n, ok := size(logPath)
+	_, n, ok := ospath.Stat(logPath)
 	if !ok || n <= limit {
 		return false
 	}
@@ -78,7 +71,7 @@ func (r *run) rotate(logPath string, limit int64) bool {
 	target, err := reserve(logPath, r.now)
 	if err == nil {
 		// 同じ時に始まった別のセッションが先に変えていれば、ここには小さい新しい記録がある。
-		if n, ok := size(logPath); !ok || n <= limit {
+		if _, n, ok := ospath.Stat(logPath); !ok || n <= limit {
 			drop(target)
 			return false
 		}
@@ -118,7 +111,7 @@ func (r *run) pruneLogs(logPath string, before time.Time) {
 			continue
 		}
 		path := ospath.Join(directory, name)
-		if t, ok := mtime(path); !ok || !ospath.IsFile(path) || !t.Before(before) {
+		if t, _, ok := ospath.Stat(path); !ok || !ospath.IsFile(path) || !t.Before(before) {
 			continue
 		}
 		if r.remove(path) {
@@ -144,7 +137,8 @@ func (r *run) pruneDiag(rotateMB, logDays float64) {
 	}
 	before := cutoff(r.now, days(logDays))
 	for _, name := range names {
-		if !strings.HasSuffix(name, ".log") {
+		// 拡張子は Python と同じく大文字小文字を区別して比べる（diaglog が書く名前は小文字だけ）。
+		if !strings.HasSuffix(name, diaglog.FileExt) {
 			continue
 		}
 		path := ospath.Join(directory, name)
@@ -157,7 +151,7 @@ func (r *run) pruneDiag(rotateMB, logDays float64) {
 		if logDays <= 0 {
 			continue
 		}
-		if t, ok := mtime(path); !ok || !t.Before(before) {
+		if t, _, ok := ospath.Stat(path); !ok || !t.Before(before) {
 			continue
 		}
 		if r.remove(path) {

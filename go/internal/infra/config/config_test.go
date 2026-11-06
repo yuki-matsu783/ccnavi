@@ -282,3 +282,23 @@ func TestLauncher(t *testing.T) {
 		t.Errorf("Launcher = %q, want %q", Launcher, want)
 	}
 }
+
+func TestIntAndFinite(t *testing.T) {
+	cases := []struct {
+		written         string
+		fallback, least int
+		want            int
+	}{
+		{" 5 ", 3, 2, 5}, {"1", 3, 2, 3}, {"x", 3, 2, 3}, {"", 3, 0, 3}, {"0", 3, 0, 0},
+	}
+	for _, c := range cases {
+		if got := Int(c.written, c.fallback, c.least); got != c.want {
+			t.Errorf("Int(%q, %d, %d) = %d", c.written, c.fallback, c.least, got)
+		}
+	}
+	for written, ok := range map[string]bool{"1.5": true, " 0 ": true, "inf": false, "nan": false, "x": false, "": false} {
+		if _, got := Finite(written); got != ok {
+			t.Errorf("Finite(%q) = %v", written, got)
+		}
+	}
+}

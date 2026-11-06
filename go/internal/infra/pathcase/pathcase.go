@@ -18,3 +18,9 @@ func Fold(path string) string {
 	}
 	return folder.String(path)
 }
+
+// HasExt は name が拡張子 ext で終わるか。大文字小文字を区別しない（"A.MD" も ".md"）。
+// ospath は pathcase より下の段なので、Fold を通す比べはここに置く。
+func HasExt(name, ext string) bool {
+	return strings.HasSuffix(Fold(name), Fold(ext))
+}

@@ -12,7 +12,9 @@ import (
 
 const (
 	gitWrapper = "ccnavi-git.sh"
-	scriptsDir = "scripts"
+	// TicketWrapper はチケット操作の sh（approval-request などの入口）。
+	TicketWrapper = "ccnavi-ticket.sh"
+	scriptsDir    = "scripts"
 	// defaultBin は実行ファイルの指定が無いときの案内。PATH に置いたユーザはそのまま打てる。
 	defaultBin = "ccnavi"
 	// Launcher は文面でエージェントに打たせる起動の sh。配布先では `ccnavi` が PATH に無い。ルートで打つ形。

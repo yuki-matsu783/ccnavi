@@ -10,7 +10,7 @@ import (
 
 // レイヤーの置き場（ccnavi ディレクトリからの相対、"/" 区切り）。
 const (
-	LayerConfigDir = "config/project"
+	LayerConfigDir = ConfigDir + "/project"
 	// CommonDir は共通レイヤーとそのミラーの置き場。
 	CommonDir = "config/common"
 	// TemplatesDir は作業・レビュー計画のテンプレートの置き場。ディレクトリなので LayerKinds には入れない。

@@ -4,5 +4,7 @@
 // 逆向きに、Python の int()・float() が読む綴り（数字の間の "_"、全角などの 10 進の数字、inf・nan）を
 // 同じ答えで読む。
 //
-// Python からの対応: int(s) → ParseInt、int(s, base) → ParseBigInt、float(s) → ParseFloat、s[:n] → Head。
+// Python からの対応: int(s) → ParseInt、int(s, base) → ParseBigInt、float(s) → ParseFloat、s[:n] → Head、
+// s.isdigit() → IsDigit、int(v)（JSON・YAML の値）→ IntOf、f"{n:,}" → Grouped、
+// datetime.fromisoformat → FromISOFormat（比べるための UTC の時刻と、時差が書かれていたか）。
 package pyfmt

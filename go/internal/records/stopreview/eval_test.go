@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"ccnavi/internal/infra/fsio"
 )
 
 type evalFixture struct {
@@ -30,7 +32,7 @@ func (f evalFixture) attempt(aid, final string, results string, extra ...string)
 	// 後から足したキーが前のキーを上書きする（Python の dict.update と同じ）。
 	text := "{" + strings.Join(append(fields, extra...), ", ") + "}"
 	o := obj(f.t, text)
-	writeFile(f.t, filepath.Join(f.state, attemptPrefix+aid+jsonSuffix), dumps(f.t, o))
+	writeFile(f.t, filepath.Join(f.state, AttemptPrefix+aid+fsio.JSONExt), dumps(f.t, o))
 }
 
 func (f evalFixture) labels(rows ...string) {

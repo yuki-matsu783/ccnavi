@@ -6,6 +6,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
@@ -52,13 +53,11 @@ const (
 	// redactLimit は、伏せる前に切る長さ。上限の手前で始まって上限をまたぐ値も伏せられるだけの余りを持たせる。
 	// どれだけ長くても、伏せる手間が実行前チェックの期限に届かないようにするため。
 	redactLimit = SubjectLimit * 4
-	// RedactFailed は伏せる処理が失敗したときに、その欄へ平文の代わりに書く文。
-	RedactFailed = "[ccnavi: 機密情報を伏せる処理が失敗したため、この欄の中身は記録していません]"
 )
 
 // Record は記録の 1 行。欄の意味は記録を読む側（--test・集計）との約束。
 type Record struct {
-	Mode string
+	Mode config.Mode
 	// PermissionMode は、呼び出しが来たときの Claude Code の権限モード。ルールが言及しない呼び出しの結末は、これで変わる。
 	// 残さないと、同じ Subject に別の結末が並んだ理由を説明できないため残す。
 	PermissionMode string
@@ -134,12 +133,12 @@ func (l *Log) Write(r *Record) error {
 // object は 1 行の欄。空の欄は省く（Decision と Enforced は空でも入れる）。
 func (l *Log) object(r *Record) *pyjson.Object {
 	// 切る前に伏せる（上限で値の途中が切れると形が崩れて伏せられない）。伏せる前にも redactLimit で切る。
-	subject := limited(Redacted(pyfmt.Head(r.Subject, redactLimit)), runeLen(r.Subject))
-	unwrapped := limited(Redacted(pyfmt.Head(r.Unwrapped, redactLimit)), runeLen(r.Unwrapped))
-	detail := Redacted(r.Detail)
+	subject := limited(redact.Redact(pyfmt.Head(r.Subject, redactLimit)), runeLen(r.Subject))
+	unwrapped := limited(redact.Redact(pyfmt.Head(r.Unwrapped, redactLimit)), runeLen(r.Unwrapped))
+	detail := redact.Redact(r.Detail)
 	elapsed := float64(time.Since(l.start)) / float64(time.Millisecond)
 
-	out := pyjson.NewObject("ts", timestamp(time.Now()), "mode", r.Mode)
+	out := pyjson.NewObject("ts", fsio.ISOFormat(time.Now()), "mode", string(r.Mode))
 	putText(out, "permission_mode", r.PermissionMode)
 	putText(out, "event", r.Event)
 	putText(out, "tool", r.Tool)
@@ -177,28 +176,6 @@ func putList(o *pyjson.Object, key string, values []string) {
 	if len(values) > 0 {
 		o.Set(key, values)
 	}
-}
-
-// timestamp は Python の datetime.now(UTC).astimezone().isoformat()（マイクロ秒が 0 なら省く）。
-func timestamp(now time.Time) string {
-	if now.Nanosecond()/1000 == 0 {
-		return now.Format("2006-01-02T15:04:05-07:00")
-	}
-	return now.Format("2006-01-02T15:04:05.000000-07:00")
-}
-
-// Redacted は秘密の形を伏せた文字列。伏せる処理が失敗しても平文を返さず RedactFailed にする。
-// 記録は判定を出した後に書くので、ここで落ちると hook が 0 以外で終わる。すると、出したはずの deny が読まれずに呼び出しが通ってしまう。
-func Redacted(text string) (out string) {
-	defer func() {
-		if recover() != nil {
-			out = ""
-			if text != "" {
-				out = RedactFailed
-			}
-		}
-	}()
-	return redact.Redact(text)
 }
 
 // limited は上限で切り、切ったら残りの長さを付ける。whole は伏せる前に切る前の長さ。

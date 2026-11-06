@@ -27,6 +27,7 @@ func Busy(state, session string) bool {
 		return false
 	}
 	file := path(state, BusyPrefix, session)
+	// 溜める段は見ない。Python が os.path.exists でディスクだけを見ていたのに合わせる。
 	if !ospath.DiskExists(file) {
 		return false
 	}

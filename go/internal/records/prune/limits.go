@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
@@ -21,11 +22,24 @@ type limit struct {
 	floor    float64
 }
 
+// しきい値の既定と下限。
+const (
+	defaultRotateMB           = 10
+	defaultLogKeepDays        = 14
+	defaultStateKeepDays      = 14
+	defaultStopReviewKeepDays = 90
+	// minRotateMB・minKeepDays は 0 のほかに受ける下限。0 に近づけるだけで保持日数のうちの記録が消えないように。
+	minRotateMB = 1
+	minKeepDays = 1
+	// noFloor は下限を持たない（評価用の記録の保持日数）。
+	noFloor = 0
+)
+
 var (
-	rotateMB           = limit{env.LogRotateMB, 10, 1}
-	logKeepDays        = limit{env.LogKeepDays, 14, 1}
-	stateKeepDays      = limit{env.StateKeepDays, 14, 1}
-	stopReviewKeepDays = limit{env.StopReviewKeepDays, 90, 0}
+	rotateMB           = limit{env.LogRotateMB, defaultRotateMB, minRotateMB}
+	logKeepDays        = limit{env.LogKeepDays, defaultLogKeepDays, minKeepDays}
+	stateKeepDays      = limit{env.StateKeepDays, defaultStateKeepDays, minKeepDays}
+	stopReviewKeepDays = limit{env.StopReviewKeepDays, defaultStopReviewKeepDays, noFloor}
 )
 
 // read はしきい値と、読めなかった値の苦情（読めれば空）。
@@ -34,8 +48,8 @@ func (l limit) read() (float64, string) {
 	if raw == "" {
 		return l.fallback, ""
 	}
-	value, err := pyfmt.ParseFloat(raw)
-	if err != nil || value < 0 || math.IsInf(value, 0) || math.IsNaN(value) {
+	value, ok := config.Finite(raw)
+	if !ok || value < 0 {
 		return l.fallback, fmt.Sprintf("%s=%s は 0 以上の数ではないので既定の %s で動く", l.env, pyfmt.Repr(raw), g(l.fallback))
 	}
 	if value > 0 && value < l.floor {

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"slices"
 	"strings"
+	"time"
 	"unicode"
 
 	"ccnavi/internal/infra/fsio"
@@ -23,17 +24,17 @@ const (
 	EventsFile = "stop-review/events.jsonl"
 	labelsFile = "stop-review/labels.jsonl"
 
-	planPrefix    = "stopreview-plan-"
-	attemptPrefix = "stopreview-attempt-"
-	prePrefix     = "stopops-pre-"
-	opPrefix      = "stopops-op-"
-	// セッションごとの記録の名前の先頭。後ろはセッション（stopwrite- はセッションと識別子）。
+	// セッションを名前に持たない記録の名前の先頭。後ろはキーの要約・試行 ID・呼び出し。後始末はそれ自身の日付で消す。
+	PlanPrefix    = "stopreview-plan-"
+	AttemptPrefix = "stopreview-attempt-"
+	PrePrefix     = "stopops-pre-"
+	OpPrefix      = "stopops-op-"
+	// セッションごとの記録の名前の先頭。後ろはセッション（stopwrite- はセッションと "-" と識別子）。
 	TurnStartPrefix = "stopturn-"
 	RefsPrefix      = "stoprefs-"
 	WritePrefix     = "stopwrite-"
 	LastStopPrefix  = "stoplast-"
 	TaintPrefix     = "stoptaint-"
-	jsonSuffix      = ".json"
 	resultSuffix    = ".kv"
 )
 
@@ -45,7 +46,7 @@ func logPath(dir, name string) string {
 func safe(text string) string { return fsio.SafeName(text, fsio.SafeNameLimit) }
 
 func sessionFile(state, prefix, session string) string {
-	return ospath.Join(state, prefix+safe(session)+jsonSuffix)
+	return fsio.RecordPath(state, prefix, session, fsio.JSONExt)
 }
 
 // names はディレクトリの中の名前を並べて返す。無ければ空（結果ファイルの置き場は最初の approval-request まで無い）。
@@ -65,7 +66,7 @@ func names(dir string) []string {
 func records(dir, prefix string) []*pyjson.Object {
 	var out []*pyjson.Object
 	for _, name := range names(dir) {
-		if !strings.HasPrefix(name, prefix) || !strings.HasSuffix(name, jsonSuffix) {
+		if !strings.HasPrefix(name, prefix) || !strings.HasSuffix(name, fsio.JSONExt) {
 			continue
 		}
 		if obj, ok := fsio.ReadObject(ospath.Join(dir, name)); ok && obj.Len() > 0 {
@@ -89,18 +90,10 @@ func digest(text string) string {
 	return hex.EncodeToString(sum[:])[:16]
 }
 
-// number は JSON の数を秒などの値として読む。数でなければ fallback。
-func number(v any, fallback float64) float64 {
-	switch x := v.(type) {
-	case int:
-		return float64(x)
-	case float64:
-		return x
-	case bool: // Python の float(True)
-		if x {
-			return 1
-		}
-		return 0
+// moment は記録の UNIX 秒を時刻として読む（Python の float(v)。真偽も数に入る）。数でなければ fallback。
+func moment(v any, fallback time.Time) time.Time {
+	if n, ok := pyjson.Number(v, pyjson.BoolsAsNumbers); ok {
+		return fsio.FromUnixSeconds(n)
 	}
 	return fallback
 }

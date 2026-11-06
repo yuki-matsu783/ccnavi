@@ -6,6 +6,7 @@
 // 例外は ccnavi 自身のソースツリーだけ（ownSourceTree）。
 //
 // Python からの対応: settings・tunables・modes・toolnames をまとめた。settings.hook_view → ReadHookView、
-// tunables の Tunable(…).value() → Tunable.Value（time.Duration）、modes.fail_closed(mode, None) →
+// tunables の Tunable(…).value() → Tunable.Value（time.Duration）、書かれた整数・数の読み（記録の段の
+// 閾値・保持日数）→ Int・Finite、modes.fail_closed(mode, None) →
 // FailClosedEvent、fail_closed(mode, tool, safe=…) → FailClosed。
 package config

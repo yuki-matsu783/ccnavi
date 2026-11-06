@@ -4,9 +4,9 @@ import (
 	"slices"
 	"strings"
 	"time"
-	"unicode"
 	"unicode/utf8"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
@@ -40,14 +40,15 @@ func (r Route) effective() bool { return r == RouteSent || r == RouteUnchanged }
 
 const (
 	unlinked = "unlinked"
-	// slack は時計の粗さ（sh は秒単位）と実行の前後の隙間（秒）。
-	slack = 2.0
-	// unlinkAfter は結び直しても見つからないまま、未連携にするまでの秒数。
-	unlinkAfter = 30.0
+	// slack は時計の粗さ（sh は秒単位）と実行の前後の隙間。
+	slack = 2 * time.Second
+	// unlinkAfter は結び直しても見つからないまま、未連携にするまでの長さ。
+	unlinkAfter = 30 * time.Second
+	// turnFloorSlack はターンの操作実績を、ターンの開始より前から数える幅（sh の時刻は秒単位）。
+	turnFloorSlack = time.Second
 	// refsKept は issue・MR の指定を、新しく足す前に残す数。
 	refsKept = 19
 
-	ticketScript   = "ccnavi-ticket.sh"
 	approvalVerb   = "approval-request"
 	checkFlag      = "--check"
 	reasonFlag     = "--reason"
@@ -65,20 +66,20 @@ type File struct {
 	Path string
 }
 
-// Op は approval-request の 1 回の操作実績。時刻は UNIX 秒。
+// Op は approval-request の 1 回の操作実績。
 type Op struct {
 	Ident     string
 	Route     Route
 	Commit    string
 	Files     []File
 	ToolUseID string
-	Started   float64
-	Ended     float64
+	Started   time.Time
+	Ended     time.Time
 }
 
 // fold はパスを比べるキー。区切りは "/" にそろえ、大文字小文字は区別しない。
 func fold(path string) string {
-	return strings.ReplaceAll(pathcase.Fold(path), `\`, "/")
+	return ospath.Slashed(pathcase.Fold(path))
 }
 
 // runs はスクリプトの前に並ぶ語が、実行の前置き（シェル・VAR=値・env・timeout・オプション・数）だけか。
@@ -87,29 +88,16 @@ func runs(before []string) bool {
 		name := ospath.Basename(fold(word))
 		switch {
 		case slices.Contains(shells, name), slices.Contains(wrappers, name), strings.HasPrefix(word, "-"),
-			digits(strings.TrimLeft(word, "-")):
+			pyfmt.IsDigit(strings.TrimLeft(word, "-")):
 			continue
 		}
 		if head, _, ok := strings.Cut(word, "="); ok && !strings.Contains(head, "/") {
 			continue
 		}
-		if digits(strings.Replace(word, ".", "", 1)) {
+		if pyfmt.IsDigit(strings.Replace(word, ".", "", 1)) {
 			continue
 		}
 		return false
-	}
-	return true
-}
-
-// digits は Python の str.isdigit。
-func digits(s string) bool {
-	if s == "" {
-		return false
-	}
-	for _, r := range s {
-		if !unicode.IsDigit(r) {
-			return false
-		}
 	}
 	return true
 }
@@ -119,7 +107,7 @@ func digits(s string) bool {
 // `--check` は確かめるだけで提案を送らないので、操作実績に載せない。
 func ProposeIdent(words []string) string {
 	for at, word := range words {
-		if ospath.Basename(fold(word)) != ticketScript || !runs(words[:at]) {
+		if ospath.Basename(fold(word)) != config.TicketWrapper || !runs(words[:at]) {
 			continue // `echo …` や `grep …` の引数の中は数えない
 		}
 		rest := words[at+1:]
@@ -150,11 +138,11 @@ func ProposeIdent(words []string) string {
 func call(toolUseID, ident string) string { return toolUseID + "~" + pathcase.Fold(ident) }
 
 func prePath(state, toolUseID, ident string) string {
-	return ospath.Join(state, prePrefix+safe(call(toolUseID, ident))+jsonSuffix)
+	return fsio.RecordPath(state, PrePrefix, call(toolUseID, ident), fsio.JSONExt)
 }
 
 func opPath(state, toolUseID, ident string) string {
-	return ospath.Join(state, opPrefix+safe(call(toolUseID, ident))+jsonSuffix)
+	return fsio.RecordPath(state, OpPrefix, call(toolUseID, ident), fsio.JSONExt)
 }
 
 // StartTurn は通知でない発言のとき、ターンの開始時刻を書く。
@@ -169,7 +157,7 @@ func TurnStart(state, session string) time.Time {
 	if state == "" || session == "" {
 		return time.Unix(0, 0)
 	}
-	return fsio.FromUnixSeconds(number(readObject(sessionFile(state, TurnStartPrefix, session)).Value("t"), 0))
+	return moment(readObject(sessionFile(state, TurnStartPrefix, session)).Value("t"), time.Unix(0, 0))
 }
 
 // Register は実行前に、approval-request の呼び出しを登録する。
@@ -234,7 +222,7 @@ func results(state string) []*pyjson.Object {
 
 func boundFiles(state string) map[string]bool {
 	bound := map[string]bool{}
-	for _, op := range records(state, opPrefix) {
+	for _, op := range records(state, OpPrefix) {
 		if f := op.String("file"); f != "" {
 			bound[f] = true
 		}
@@ -250,11 +238,11 @@ func Bind(state, toolUseID string, now time.Time) (Op, bool) {
 	if state == "" || toolUseID == "" {
 		return last, false
 	}
-	for _, pre := range records(state, prePrefix) {
+	for _, pre := range records(state, PrePrefix) {
 		if pre.Value("tool_use_id") != toolUseID {
 			continue
 		}
-		if op, ok := bindOne(state, pre, fsio.UnixSeconds(now)); ok {
+		if op, ok := bindOne(state, pre, now); ok {
 			last, found = op, true
 		}
 	}
@@ -263,19 +251,19 @@ func Bind(state, toolUseID string, now time.Time) (Op, bool) {
 
 // bindOne は 1 件の登録に結果ファイルを結ぶ。識別子が合い、開始が登録の時刻より後で、終了が今より前
 // （どちらも slack を許す）、まだどの呼び出しにも結ばれていないもののうち、終了の最も新しいもの。
-func bindOne(state string, pre *pyjson.Object, now float64) (Op, bool) {
+func bindOne(state string, pre *pyjson.Object, now time.Time) (Op, bool) {
 	if pyfmt.Truthy(pre.Value("bound")) {
 		return Op{}, false
 	}
 	taken := boundFiles(state)
-	lower, upper := number(pre.Value("t0"), 0)-slack, now+slack
+	lower, upper := moment(pre.Value("t0"), epoch).Add(-slack), now.Add(slack)
 	var best *pyjson.Object
 	for _, r := range results(state) {
 		if r.Value("id") != pre.Value("ident") || taken[r.String("file")] ||
-			number(r.Value("started"), 0) < lower || number(r.Value("ended"), 0) > upper {
+			moment(r.Value("started"), epoch).Before(lower) || moment(r.Value("ended"), epoch).After(upper) {
 			continue
 		}
-		if best == nil || number(r.Value("ended"), 0) > number(best.Value("ended"), 0) {
+		if best == nil || moment(r.Value("ended"), epoch).After(moment(best.Value("ended"), epoch)) {
 			best = r
 		}
 	}
@@ -292,9 +280,8 @@ func bindOne(state string, pre *pyjson.Object, now float64) (Op, bool) {
 
 // Rebind は結び付いていない登録を、時刻の範囲で結び直す。見つからないまま古くなったものは未連携にする。
 func Rebind(state, session string, now time.Time) {
-	when := fsio.UnixSeconds(now)
 	for _, name := range names(state) {
-		if !strings.HasPrefix(name, prePrefix) || !strings.HasSuffix(name, jsonSuffix) {
+		if !strings.HasPrefix(name, PrePrefix) || !strings.HasSuffix(name, fsio.JSONExt) {
 			continue
 		}
 		path := ospath.Join(state, name)
@@ -302,10 +289,10 @@ func Rebind(state, session string, now time.Time) {
 		if pre.Len() == 0 || pre.Value("session") != session || pyfmt.Truthy(pre.Value("bound")) {
 			continue
 		}
-		if _, ok := bindOne(state, pre, when); ok {
+		if _, ok := bindOne(state, pre, now); ok {
 			continue
 		}
-		if when-number(pre.Value("t0"), 0) > unlinkAfter {
+		if now.Sub(moment(pre.Value("t0"), epoch)) > unlinkAfter {
 			pre.Set("bound", unlinked)
 			fsio.WriteJSON(path, pre)
 		}
@@ -319,8 +306,8 @@ func parseOp(obj *pyjson.Object) Op {
 		Commit:    obj.String("commit"),
 		Files:     parseFiles(obj.Value("files")),
 		ToolUseID: obj.String("tool_use_id"),
-		Started:   number(obj.Value("started"), 0),
-		Ended:     number(obj.Value("ended"), 0),
+		Started:   moment(obj.Value("started"), epoch),
+		Ended:     moment(obj.Value("ended"), epoch),
 	}
 }
 
@@ -356,19 +343,16 @@ func filesList(files []File) []any {
 
 // TurnOps はこのターン（since 以降に始まった呼び出し）の操作実績。終了の古い順。
 func TurnOps(state, session string, since time.Time) []Op {
-	floor := fsio.UnixSeconds(since) - 1
+	floor := since.Add(-turnFloorSlack)
 	var ops []Op
-	for _, obj := range records(state, opPrefix) {
-		if obj.Value("session") == session && number(obj.Value("started"), 0) >= floor {
+	for _, obj := range records(state, OpPrefix) {
+		if obj.Value("session") == session && !moment(obj.Value("started"), epoch).Before(floor) {
 			ops = append(ops, parseOp(obj))
 		}
 	}
 	slices.SortStableFunc(ops, func(a, b Op) int {
-		if a.Ended != b.Ended {
-			if a.Ended < b.Ended {
-				return -1
-			}
-			return 1
+		if c := a.Ended.Compare(b.Ended); c != 0 {
+			return c
 		}
 		return strings.Compare(a.ToolUseID, b.ToolUseID)
 	})
@@ -411,11 +395,11 @@ func TargetKey(op Op) string {
 
 // ---- 未送信の提案
 
-// Write は提案を todo/ へ書いた（Write・Edit）記録。At は UNIX 秒。
+// Write は提案を todo/ へ書いた（Write・Edit）記録。
 type Write struct {
 	Ident string
 	Path  string
-	At    float64
+	At    time.Time
 }
 
 // WrittenIdent は書き込んだパスが `<提案の置き場>/todo/<識別子>.md` なら識別子、違えば空。
@@ -437,7 +421,7 @@ func WrittenIdent(filePath, ticketsDir string) string {
 }
 
 func writePath(state, session, ident string) string {
-	return ospath.Join(state, WritePrefix+safe(session)+"-"+safe(pathcase.Fold(ident))+jsonSuffix)
+	return fsio.RecordPath(state, WritePrefix, session, "-"+safe(pathcase.Fold(ident))+fsio.JSONExt)
 }
 
 // NoteWritten は提案を todo/ へ書いたことを、書いた時刻つきで残す。
@@ -450,20 +434,15 @@ func NoteWritten(state, session, ident, path string, now time.Time) {
 
 // TurnWrites はこのターンに書いた提案。書いた時刻の古い順。
 func TurnWrites(state, session string, since time.Time) []Write {
-	floor := fsio.UnixSeconds(since)
 	var found []Write
 	for _, obj := range records(state, WritePrefix+safe(session)+"-") {
-		at := number(obj.Value("t"), 0)
-		if at >= floor {
+		if at := moment(obj.Value("t"), epoch); !at.Before(since) {
 			found = append(found, Write{Ident: obj.String("ident"), Path: obj.String("path"), At: at})
 		}
 	}
 	slices.SortStableFunc(found, func(a, b Write) int {
-		if a.At != b.At {
-			if a.At < b.At {
-				return -1
-			}
-			return 1
+		if c := a.At.Compare(b.At); c != 0 {
+			return c
 		}
 		return strings.Compare(a.Ident, b.Ident)
 	})
@@ -474,7 +453,7 @@ func TurnWrites(state, session string, since time.Time) []Write {
 // `todo/<識別子>.md` があり、その終了が書いた時刻より後（slack を許す）かで決める。親の approval-request は
 // 子の提案も一緒に送るので、識別子では決めない。
 func UnsentWrites(writes []Write, ops []Op) []Write {
-	sent := map[string]float64{}
+	sent := map[string]time.Time{}
 	for _, op := range ops {
 		if op.Route != RouteSent {
 			continue
@@ -484,8 +463,8 @@ func UnsentWrites(writes []Write, ops []Op) []Write {
 			if i := strings.LastIndex(tail, "/todo/"); i >= 0 {
 				tail = tail[i+len("/todo/"):]
 			}
-			if prev, ok := sent[tail]; !ok || op.Ended > prev {
-				sent[tail] = max(op.Ended, 0)
+			if prev, ok := sent[tail]; !ok || op.Ended.After(prev) {
+				sent[tail] = later(op.Ended, epoch)
 			}
 		}
 	}
@@ -493,13 +472,23 @@ func UnsentWrites(writes []Write, ops []Op) []Write {
 	for _, w := range writes {
 		at, ok := sent[fold(w.Ident+".md")]
 		if !ok {
-			at = -1
+			at = epoch.Add(-time.Second) // 送った版が無い（Python の既定 -1.0）
 		}
-		if at < w.At-slack {
+		if at.Before(w.At.Add(-slack)) {
 			unsent = append(unsent, w)
 		}
 	}
 	return unsent
+}
+
+// epoch は記録に時刻が無いときの UNIX 秒の 0。
+var epoch = time.Unix(0, 0)
+
+func later(a, b time.Time) time.Time {
+	if a.After(b) {
+		return a
+	}
+	return b
 }
 
 // UnsentKey は未送信の提案の対象キー。

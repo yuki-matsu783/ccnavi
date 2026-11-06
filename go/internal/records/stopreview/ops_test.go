@@ -105,7 +105,7 @@ func TestRebindLaterThenUnlinked(t *testing.T) {
 	if got := unlinkedTotal(state); got != 0 {
 		t.Errorf("未連携 = %d", got)
 	}
-	Rebind(state, "s1", sec(200+unlinkAfter+1))
+	Rebind(state, "s1", sec(200).Add(unlinkAfter+time.Second))
 	if got := unlinkedTotal(state); got != 1 {
 		t.Errorf("未連携 = %d", got)
 	}
@@ -140,8 +140,8 @@ func TestTurnStartAndTurnOps(t *testing.T) {
 }
 
 func TestFinalVersions(t *testing.T) {
-	op := func(route Route, ended float64, ident, commit string) Op {
-		return Op{Ident: ident, Route: route, Ended: ended, Commit: commit}
+	op := func(route Route, ended int, ident, commit string) Op {
+		return Op{Ident: ident, Route: route, Ended: sec(ended), Commit: commit}
 	}
 	cases := []struct {
 		name string
@@ -193,15 +193,15 @@ func TestWrittenIdent(t *testing.T) {
 }
 
 func TestUnsentWrites(t *testing.T) {
-	write := func(ident string, at float64) Write {
-		return Write{Ident: ident, At: at, Path: "/w/wip/proposals/todo/" + ident + ".md"}
+	write := func(ident string, at int) Write {
+		return Write{Ident: ident, At: sec(at), Path: "/w/wip/proposals/todo/" + ident + ".md"}
 	}
-	sent := func(ended float64, idents ...string) Op {
+	sent := func(ended int, idents ...string) Op {
 		var files []File
 		for _, i := range idents {
 			files = append(files, File{"x", "wip/proposals/todo/" + i + ".md"})
 		}
-		return Op{Route: RouteSent, Ended: ended, Files: files}
+		return Op{Route: RouteSent, Ended: sec(ended), Files: files}
 	}
 	idents := func(ws []Write) []string {
 		var out []string
@@ -219,7 +219,7 @@ func TestUnsentWrites(t *testing.T) {
 		{"書いて送っていない", []Write{write("p1", 10)}, nil, []string{"p1"}},
 		{"書いた後に親ごと送った", []Write{write("p1", 10), write("p1-01-01", 11)}, []Op{sent(20, "p1", "p1-01-01")}, nil},
 		{"送った後に直した", []Write{write("p1", 30)}, []Op{sent(20, "p1")}, []string{"p1"}},
-		{"失敗した approval-request は送ったことにならない", []Write{write("p1", 10)}, []Op{{Route: RouteFailedBefore, Ended: 20}}, []string{"p1"}},
+		{"失敗した approval-request は送ったことにならない", []Write{write("p1", 10)}, []Op{{Route: RouteFailedBefore, Ended: sec(20)}}, []string{"p1"}},
 	}
 	for _, c := range cases {
 		if got := idents(UnsentWrites(c.writes, c.ops)); !slices.Equal(got, c.want) {
@@ -234,7 +234,7 @@ func TestNotesArePerSessionAndTurn(t *testing.T) {
 	NoteWritten(state, "s1", "P1", "/w/p1.md", sec(50)) // 同じ識別子（大文字小文字違い）
 	NoteWritten(state, "s2", "p2", "/w/p2.md", sec(50))
 	got := TurnWrites(state, "s1", sec(0))
-	if len(got) != 1 || got[0].At != 50 {
+	if len(got) != 1 || !got[0].At.Equal(sec(50)) {
 		t.Errorf("TurnWrites = %+v", got)
 	}
 	if got := TurnWrites(state, "s1", sec(60)); got != nil {

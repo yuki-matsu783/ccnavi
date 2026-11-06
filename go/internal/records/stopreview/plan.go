@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
@@ -139,7 +140,7 @@ func AttemptID(key string, rejudge bool) string {
 }
 
 func (s Store) planPath(key string) string {
-	return ospath.Join(s.State, planPrefix+digest(key)+jsonSuffix)
+	return ospath.Join(s.State, PlanPrefix+digest(key)+fsio.JSONExt)
 }
 
 // ReadPlan は共有キーの計画。無い・読めない・空なら false。

@@ -122,6 +122,15 @@ func windowsHome(name string) string {
 	return home
 }
 
+// JSONExt は JSON の記録の拡張子。
+const JSONExt = ".json"
+
+// RecordPath は dir の下の、識別子 id から作る記録のパス（prefix + SafeName(id) + suffix）。
+// 識別子は SafeNameLimit で切る。後始末（records/prune）は同じ prefix と suffix で名前から識別子を読む。
+func RecordPath(dir, prefix, id, suffix string) string {
+	return ospath.Join(dir, prefix+SafeName(id, SafeNameLimit)+suffix)
+}
+
 // unsafeChar はファイル名に混ぜられない字。識別子をそのまま名前にするので、区切りが混じった値で
 // 別の場所へ書かせない。
 var unsafeChar = regexp.MustCompile(`[^A-Za-z0-9._-]`)

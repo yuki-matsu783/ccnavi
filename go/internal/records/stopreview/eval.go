@@ -70,7 +70,8 @@ type summary struct {
 	byCriteria []criterionSummary
 }
 
-// Report は評価の集計を人が読む形で返す。期限切れの確定を先に行う。
+// Report は評価の集計を人が読む形で返す。読むだけではなく、集計の前に ExpireOverdue で期限切れの試行を
+// 確定して書く（Python の stopeval.summarize も expire_overdue を呼んで書く）。
 func Report(state, logDir string) string {
 	return render(summarize(state, logDir), unlinkedTotal(state))
 }
@@ -112,8 +113,8 @@ func allEvents(logDir string) []*pyjson.Object {
 func waitOf(attempts []*pyjson.Object) *latency {
 	var waits []float64
 	for _, a := range attempts {
-		doneAt, ok1 := numeric(a.Value(keyDoneAt))
-		created, ok2 := numeric(a.Value(keyCreated))
+		doneAt, ok1 := pyjson.Number(a.Value(keyDoneAt), pyjson.BoolsAsNumbers)
+		created, ok2 := pyjson.Number(a.Value(keyCreated), pyjson.BoolsAsNumbers)
 		if ok1 && ok2 {
 			waits = append(waits, doneAt-created)
 		}
@@ -125,19 +126,10 @@ func waitOf(attempts []*pyjson.Object) *latency {
 	return &latency{n: len(waits), median: waits[len(waits)/2], max: waits[len(waits)-1]}
 }
 
-// numeric は Python の isinstance(v, (int, float))（真偽も数に入る）。
-func numeric(v any) (float64, bool) {
-	switch v.(type) {
-	case int, float64, bool:
-		return number(v, 0), true
-	}
-	return 0, false
-}
-
-func countEvents(events []*pyjson.Object, name string) int {
+func countEvents(events []*pyjson.Object, name event) int {
 	n := 0
 	for _, e := range events {
-		if e.Value("event") == name {
+		if e.Value("event") == string(name) {
 			n++
 		}
 	}
@@ -148,7 +140,7 @@ func summarize(state, logDir string) summary {
 	Store{State: state}.ExpireOverdue(time.Now())
 	// 再判定の試行は元の試行の修正率にだけ使う。Stop の機会を二重に数えない。
 	var attempts []*pyjson.Object
-	for _, a := range records(state, attemptPrefix) {
+	for _, a := range records(state, AttemptPrefix) {
 		if !pyfmt.Truthy(a.Value(keyOriginal)) {
 			attempts = append(attempts, a)
 		}
@@ -167,7 +159,7 @@ func summarize(state, logDir string) summary {
 		case st == planWait:
 			c.planMissing++
 		case final == string(FinalOutOfScope):
-			if judge == judgeAI {
+			if judge == string(judgeAI) {
 				c.aiOutOfScope++
 			} else {
 				c.ccnaviOutOfScope++
@@ -195,11 +187,11 @@ func summarize(state, logDir string) summary {
 		if sent {
 			f.sentBack++
 			switch a.Value(keyRejudge) {
-			case "resolved":
+			case string(verdictResolved):
 				f.resolved++
-			case "unresolved":
+			case string(verdictUnresolved):
 				f.unresolved++
-			case "inconclusive":
+			case string(verdictInconclusive):
 				f.inconclusive++
 			default:
 				f.notRejudged++
@@ -221,18 +213,32 @@ func summarize(state, logDir string) summary {
 	}
 }
 
-// 単位ごとの検出の結果。結果の行が無い単位（未検査・AI の誤った対象外・期限切れ）は検出できなかったとする。
+// detection は単位ごとの検出の結果。結果の行が無い単位（未検査・AI の誤った対象外・期限切れ）は検出できなかったとする。
+type detection string
+
 const (
-	outcomeFlawed = "flawed"
-	outcomeClear  = "clear"
-	outcomeMissed = "missed"
+	detectedFlaw detection = "flawed"
+	detectedNone detection = "clear"
+	notDetected  detection = "missed"
 )
 
-type labelKey struct{ attempt, criterion, target string }
+// truth は独立した評価の答え。
+type truth string
+
+const (
+	truthFlaw truth = "flaw"
+	truthOK   truth = "ok"
+)
+
+type labelKey struct {
+	attempt   string
+	criterion criterionID
+	target    string
+}
 
 // units は (試行, 基準, 対象) → 検出の結果。対象は大文字小文字を区別せずに比べる。
-func units(attempts []*pyjson.Object) map[labelKey]string {
-	out := map[labelKey]string{}
+func units(attempts []*pyjson.Object) map[labelKey]detection {
+	out := map[labelKey]detection{}
 	for _, a := range attempts {
 		rows, _ := a.Value(keyResults).([]any)
 		for _, r := range rows {
@@ -240,18 +246,18 @@ func units(attempts []*pyjson.Object) map[labelKey]string {
 			if !ok {
 				continue
 			}
-			criterion, ok1 := row.Value("criterion").(string)
+			name, ok1 := row.Value("criterion").(string)
 			target, ok2 := row.Value("target").(string)
-			outcome, ok3 := row.Value("result").(string)
+			result, ok3 := row.Value("result").(string)
 			if !ok1 || !ok2 || !ok3 {
 				continue
 			}
-			flawed := a.Value(keyAccepted) != false && slices.Contains(flawCriteria, criterion) && outcome == fail
-			result := outcomeClear
-			if flawed {
-				result = outcomeFlawed
+			criterion := criterionID(name)
+			found := detectedNone
+			if a.Value(keyAccepted) != false && slices.Contains(flawCriteria, criterion) && outcome(result) == fail {
+				found = detectedFlaw
 			}
-			out[labelKey{a.String(keyAttemptID), criterion, pathcase.Fold(target)}] = result
+			out[labelKey{a.String(keyAttemptID), criterion, pathcase.Fold(target)}] = found
 		}
 	}
 	return out
@@ -270,16 +276,16 @@ func cleanLabels(rows []*pyjson.Object) []label {
 		attempt, ok1 := row.Value("attempt_id").(string)
 		criterion, ok2 := row.Value("criterion").(string)
 		target, ok3 := row.Value("target").(string)
-		truth := row.Value("truth")
-		if !ok1 || !ok2 || !ok3 || (truth != "flaw" && truth != "ok") {
+		answer, ok4 := row.Value("truth").(string)
+		if !ok1 || !ok2 || !ok3 || !ok4 || (truth(answer) != truthFlaw && truth(answer) != truthOK) {
 			continue
 		}
-		key := labelKey{attempt, criterion, pathcase.Fold(target)}
+		key := labelKey{attempt, criterionID(criterion), pathcase.Fold(target)}
 		if seen[key] {
 			continue
 		}
 		seen[key] = true
-		kept = append(kept, label{key, truth == "flaw"})
+		kept = append(kept, label{key, truth(answer) == truthFlaw})
 	}
 	return kept
 }
@@ -290,8 +296,8 @@ func byCriterion(attempts, labelRows []*pyjson.Object) []criterionSummary {
 	var out []criterionSummary
 	for _, criterion := range criteria {
 		flagged := 0
-		for key, outcome := range found {
-			if key.criterion == criterion && outcome == outcomeFlawed {
+		for key, result := range found {
+			if key.criterion == criterion && result == detectedFlaw {
 				flagged++
 			}
 		}
@@ -301,21 +307,21 @@ func byCriterion(attempts, labelRows []*pyjson.Object) []criterionSummary {
 				continue
 			}
 			labeled++
-			outcome, ok := found[l.labelKey]
+			result, ok := found[l.labelKey]
 			if !ok {
-				outcome = outcomeMissed
+				result = notDetected
 			}
-			if outcome == outcomeFlawed {
+			if result == detectedFlaw {
 				labeledFlagged++
 			}
 			if l.flaw {
 				flawTotal++
-				if outcome != outcomeFlawed {
+				if result != detectedFlaw {
 					missed++
 				}
 			} else {
 				okTotal++
-				if outcome == outcomeFlawed {
+				if result == detectedFlaw {
 					okFlagged++
 				}
 			}
@@ -325,7 +331,7 @@ func byCriterion(attempts, labelRows []*pyjson.Object) []criterionSummary {
 			unit = "stop"
 		}
 		out = append(out, criterionSummary{
-			name: criterion, unit: unit, flagged: flagged, labeled: labeled,
+			name: string(criterion), unit: unit, flagged: flagged, labeled: labeled,
 			missRate: ratio(missed, flawTotal), falseBlockRate: ratio(okFlagged, labeledFlagged), needless: ratio(okFlagged, okTotal),
 		})
 	}
@@ -361,7 +367,7 @@ func render(s summary, unlinked int) string {
 // unlinkedTotal は未連携の approval-request 呼び出しの数（全セッション）。
 func unlinkedTotal(state string) int {
 	n := 0
-	for _, pre := range records(state, prePrefix) {
+	for _, pre := range records(state, PrePrefix) {
 		if pre.Value("bound") == unlinked {
 			n++
 		}

@@ -58,19 +58,34 @@ const (
 	StatusExpired      Status = "expired"
 )
 
-// 判定者。
+// judge は試行の最終分類を書いた者。
+type judge string
+
 const (
-	judgeAI     = "ai"
-	judgeCcnavi = "ccnavi"
+	judgeAI     judge = "ai"
+	judgeCcnavi judge = "ccnavi"
 )
 
-// 試行のイベントの名前（状態の名前もそのまま使う）。
+// event は試行のイベントの名前。状態が移ったときは状態の名前をそのまま使う（eventOf）。
+type event string
+
 const (
-	eventFinal     = "final"
-	eventRejudge   = "rejudge"
-	eventNoKey     = "no_key"
-	eventTimeout   = "plan_timeout"
-	eventSuspected = "suspected_unrecorded_stop"
+	eventFinal     event = "final"
+	eventRejudge   event = "rejudge"
+	eventNoKey     event = "no_key"
+	eventTimeout   event = "plan_timeout"
+	eventSuspected event = "suspected_unrecorded_stop"
+)
+
+func eventOf(s State) event { return event(s) }
+
+// verdict は再判定の結果を元の試行に残す値。
+type verdict string
+
+const (
+	verdictResolved     verdict = "resolved"
+	verdictUnresolved   verdict = "unresolved"
+	verdictInconclusive verdict = "inconclusive"
 )
 
 // 試行のキー。
@@ -93,13 +108,18 @@ const (
 	keyInsuff    = "insufficient"
 )
 
-const reasonUnreadable = "attempt_unreadable"
-const reasonExpired = "expired"
+// ccnavi が最終分類を書いた試行の理由（候補にしなかった理由のほか）。
+const (
+	reasonUnreadable Reason = "attempt_unreadable"
+	reasonExpired    Reason = "expired"
+	// reasonRejected は判定結果を受理しなかった理由の頭。後ろに拒否の理由が続く。
+	reasonRejected Reason = "rejected: "
+)
 
 func stateOf(a *pyjson.Object) State { return State(a.String(keyState)) }
 
 func (s Store) attemptPath(aid string) string {
-	return ospath.Join(s.State, attemptPrefix+safe(aid)+jsonSuffix)
+	return fsio.RecordPath(s.State, AttemptPrefix, aid, fsio.JSONExt)
 }
 
 func (s Store) readAttempt(aid string) *pyjson.Object {
@@ -123,7 +143,7 @@ func (s Store) WritePlan(key string, plan Plan, now time.Time) (string, error) {
 	if attempt == nil {
 		fresh := pyjson.NewObject(keyAttemptID, aid, keyKey, key, keyCreated, fsio.UnixSeconds(now), keyState, string(pending), keyOriginal, plan.Original)
 		if !plan.IsCandidate {
-			byCcnavi(fresh, plan.Final, string(plan.Reason), true)
+			byCcnavi(fresh, plan.Final, plan.Reason, true)
 		}
 		// 排他的に作る。material が先に plan_wait を置く競合で、どちらも上書きしないため。
 		created, err := s.create(fresh)
@@ -149,7 +169,7 @@ func (s Store) WritePlan(key string, plan Plan, now time.Time) (string, error) {
 		if plan.IsCandidate {
 			s.move(attempt, pending)
 		} else {
-			byCcnavi(attempt, plan.Final, string(plan.Reason), false)
+			byCcnavi(attempt, plan.Final, plan.Reason, false)
 			if s.move(attempt, done) {
 				s.logEvent(eventFinal, attempt)
 			}
@@ -159,7 +179,7 @@ func (s Store) WritePlan(key string, plan Plan, now time.Time) (string, error) {
 }
 
 // byCcnavi は候補でない試行の最終分類を ccnavi が書く。settle なら状態も done にする。
-func byCcnavi(attempt *pyjson.Object, final Final, reason string, settle bool) {
+func byCcnavi(attempt *pyjson.Object, final Final, reason Reason, settle bool) {
 	if settle {
 		attempt.Set(keyState, string(done))
 	}
@@ -167,8 +187,8 @@ func byCcnavi(attempt *pyjson.Object, final Final, reason string, settle bool) {
 		final = FinalSkipped
 	}
 	attempt.Set(keyFinal, string(final))
-	attempt.Set(keyJudge, judgeCcnavi)
-	attempt.Set(keyReason, reason)
+	attempt.Set(keyJudge, string(judgeCcnavi))
+	attempt.Set(keyReason, string(reason))
 }
 
 // create は試行のファイルを、まだ無いものとして作る。在れば false（上書きしない）。
@@ -182,6 +202,7 @@ func (s Store) create(attempt *pyjson.Object) (bool, error) {
 	if reason == "" {
 		return true, nil
 	}
+	// 溜める段は見ない。Python が os.path.lexists でディスクだけを見ていたのに合わせる。
 	if ospath.DiskLexists(path) {
 		return false, nil // 別のプロセスが先に作った
 	}
@@ -201,7 +222,7 @@ func (s Store) move(attempt *pyjson.Object, target State) bool {
 		attempt.Set(keyDoneAt, fsio.UnixSeconds(time.Now())) // 作成から完了までの待ち時間を集計で出す
 	}
 	s.store(attempt)
-	s.logEvent(string(target), attempt)
+	s.logEvent(eventOf(target), attempt)
 	return true
 }
 
@@ -244,25 +265,24 @@ func (s Store) NoteInsufficient(key string, insufficient bool) {
 // ExpireOverdue は期限（config.StopReviewTTL）を過ぎても終わっていない試行を、未検査の期限切れとして確定し、
 // その試行 ID を返す。差し戻した試行の最終分類（不備検出）は残し、閉じるだけにする。
 func (s Store) ExpireOverdue(now time.Time) []string {
-	when := fsio.UnixSeconds(now)
-	ttl := config.StopReviewTTL.Value().Seconds()
+	ttl := config.StopReviewTTL.Value()
 	var out []string
-	for _, attempt := range records(s.State, attemptPrefix) {
+	for _, attempt := range records(s.State, AttemptPrefix) {
 		if finalState(stateOf(attempt)) {
 			continue
 		}
 		wasSentBack := stateOf(attempt) == sentBack
-		started := number(attempt.Value(keyCreated), when)
+		started := moment(attempt.Value(keyCreated), now)
 		if wasSentBack {
-			started = number(attempt.Value(keySentAt), when)
+			started = moment(attempt.Value(keySentAt), now)
 		}
-		if when-started < ttl {
+		if now.Sub(started) < ttl {
 			continue
 		}
 		if !wasSentBack {
 			attempt.Set(keyFinal, string(FinalUnchecked))
-			attempt.Set(keyJudge, judgeCcnavi)
-			attempt.Set(keyReason, reasonExpired)
+			attempt.Set(keyJudge, string(judgeCcnavi))
+			attempt.Set(keyReason, string(reasonExpired))
 		}
 		if s.move(attempt, expired) {
 			s.logEvent(eventFinal, attempt)
@@ -275,13 +295,12 @@ func (s Store) ExpireOverdue(now time.Time) []string {
 // ConsumeContinuation は、stop_hook_active の Stop で、同じセッションに差し戻した試行があれば消費して、その試行 ID を返す。
 // 差し戻しから期限を過ぎたものは消費しない。ユーザが割り込んだ後の別の連鎖を、AI による継続と取り違えないため。
 func (s Store) ConsumeContinuation(session string, now time.Time) (string, bool) {
-	when := fsio.UnixSeconds(now)
-	window := config.StopReviewTTL.Value().Seconds()
+	window := config.StopReviewTTL.Value()
 	found, ok := "", false
-	for _, attempt := range records(s.State, attemptPrefix) {
+	for _, attempt := range records(s.State, AttemptPrefix) {
 		if stateOf(attempt) == sentBack &&
 			strings.HasPrefix(attempt.String(keyKey), session+":") &&
-			when-number(attempt.Value(keySentAt), 0) <= window &&
+			now.Sub(moment(attempt.Value(keySentAt), epoch)) <= window &&
 			s.move(attempt, consumed) {
 			found, ok = attempt.String(keyAttemptID), true
 		}
@@ -295,14 +314,14 @@ func (s Store) resolveOriginal(original string, final Final) {
 	if attempt == nil {
 		return
 	}
-	verdict := "inconclusive"
+	result := verdictInconclusive
 	switch final {
 	case FinalOK:
-		verdict = "resolved"
+		result = verdictResolved
 	case FinalFlawed:
-		verdict = "unresolved"
+		result = verdictUnresolved
 	}
-	attempt.Set(keyRejudge, verdict)
+	attempt.Set(keyRejudge, string(result))
 	s.store(attempt)
 	s.logEvent(eventRejudge, attempt)
 }

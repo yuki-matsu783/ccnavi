@@ -5,6 +5,7 @@ import (
 	"math"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"ccnavi/internal/infra/pyfmt"
@@ -12,6 +13,18 @@ import (
 
 // StampLayout は、マーカーと記録に書く時刻の形。Python の "%Y-%m-%dT%H:%M:%S%z" に当たる。
 const StampLayout = "2006-01-02T15:04:05-0700"
+
+// ISOStampLayout は、時差にコロンを入れた ISO 8601 の時刻（Python の datetime.isoformat の秒まで）。
+// 判定の記録と診断ログが書く。
+const ISOStampLayout = "2006-01-02T15:04:05-07:00"
+
+// ISOFormat は Python の t.isoformat()。マイクロ秒が 0 でなければ秒の後ろに 6 桁で書く。
+func ISOFormat(t time.Time) string {
+	if t.Nanosecond()/1000 == 0 {
+		return t.Format(ISOStampLayout)
+	}
+	return t.Format(strings.Replace(ISOStampLayout, "05", "05.000000", 1))
+}
 
 // stampFormat は、エラーの文に出す Python の書式の表記。
 const stampFormat = "%Y-%m-%dT%H:%M:%S%z"

@@ -70,7 +70,7 @@ func TestNonCandidateIsFinalisedByCcnavi(t *testing.T) {
 	s := newStore(t)
 	aid := mustPlan(t, s, testKey, Plan{Final: FinalOutOfScope, Reason: ReasonExistingNudge}, time.Now())
 	a := s.readAttempt(aid)
-	if stateOf(a) != done || a.String(keyJudge) != judgeCcnavi || a.String(keyFinal) != string(FinalOutOfScope) {
+	if stateOf(a) != done || a.String(keyJudge) != string(judgeCcnavi) || a.String(keyFinal) != string(FinalOutOfScope) {
 		t.Errorf("試行 = %s", dumps(t, a))
 	}
 	if got := begin(t, s, testKey); got != StatusNotCandidate {
@@ -117,7 +117,7 @@ func TestExpiry(t *testing.T) {
 		t.Errorf("ExpireOverdue = %v", got)
 	}
 	a := s.readAttempt(aid)
-	if stateOf(a) != expired || a.String(keyFinal) != string(FinalUnchecked) || a.String(keyReason) != reasonExpired {
+	if stateOf(a) != expired || a.String(keyFinal) != string(FinalUnchecked) || a.String(keyReason) != string(reasonExpired) {
 		t.Errorf("試行 = %s", dumps(t, a))
 	}
 	if got := begin(t, s, testKey); got != StatusExpired {
@@ -183,7 +183,7 @@ func TestPlanWaitExpiresAndALateNonCandidatePlanIsFinalised(t *testing.T) {
 	}
 	aid := mustPlan(t, s, other, Plan{Final: FinalOutOfScope, Reason: ReasonExistingNudge}, time.Now())
 	a := s.readAttempt(aid)
-	if stateOf(a) != done || a.String(keyFinal) != string(FinalOutOfScope) || a.String(keyJudge) != judgeCcnavi {
+	if stateOf(a) != done || a.String(keyFinal) != string(FinalOutOfScope) || a.String(keyJudge) != string(judgeCcnavi) {
 		t.Errorf("試行 = %s", dumps(t, a))
 	}
 }
@@ -194,7 +194,7 @@ func TestUnreadableExistingAttemptIsClosedUnchecked(t *testing.T) {
 	writeFile(t, s.attemptPath(aid), "{broken")
 	mustPlan(t, s, testKey, Plan{IsCandidate: true, Targets: []string{StopTarget}}, time.Now())
 	a := s.readAttempt(aid)
-	if stateOf(a) != done || a.String(keyFinal) != string(FinalUnchecked) || a.String(keyReason) != reasonUnreadable {
+	if stateOf(a) != done || a.String(keyFinal) != string(FinalUnchecked) || a.String(keyReason) != string(reasonUnreadable) {
 		t.Errorf("試行 = %s", dumps(t, a))
 	}
 	// 判定役は材料を受け取っても判定せず、record は何もせず止めない。

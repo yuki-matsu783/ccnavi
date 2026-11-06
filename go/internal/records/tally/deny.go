@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
@@ -28,8 +29,8 @@ const DefaultDenyThreshold = 3
 const minDenyThreshold = 2
 
 const (
-	denyPrefix = "denied-"
-	jsonExt    = ".json"
+	// DenyPrefix は拒否の数えの名前の先頭（後ろはセッション）。後始末（records/prune）が名前からセッションを読む。
+	DenyPrefix = "denied-"
 	// keyHashLen はキーに使うハッシュの長さ（16 進の字数）。
 	keyHashLen = 16
 	// noRule は理由の名前が無いときの名前。
@@ -38,10 +39,7 @@ const (
 
 // DenyThreshold は書かれた N。読めない値と 2 未満は既定値になる。
 func DenyThreshold(written string) int {
-	if n, err := pyfmt.ParseInt(ospath.Strip(written)); err == nil && n >= minDenyThreshold {
-		return n
-	}
-	return DefaultDenyThreshold
+	return config.Int(written, DefaultDenyThreshold, minDenyThreshold)
 }
 
 // Normalize は同じ呼び出しとして数えるための均し（引用符を除き、空白をまとめる）。
@@ -72,7 +70,7 @@ func keyOf(rule, subject string) string {
 }
 
 func denyPath(stateDir, session string) string {
-	return ospath.Join(stateDir, denyPrefix+fsio.SafeName(session, fsio.SafeNameLimit)+jsonExt)
+	return fsio.RecordPath(stateDir, DenyPrefix, session, fsio.JSONExt)
 }
 
 // CountDeny はこの拒否を数え、同じキーのこれまでの回数（今回を含む）を返す。数えられなければ 0 を返す。

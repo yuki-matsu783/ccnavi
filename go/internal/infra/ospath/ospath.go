@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 )
@@ -278,6 +279,16 @@ func DiskListdir(dir string) ([]string, error) {
 		names[i] = e.Name()
 	}
 	return names, nil
+}
+
+// Stat は os.stat の更新時刻と大きさ（os.path.getmtime・getsize。リンクは先を見る）。無ければ false。
+// fsio の溜める段は見ない。
+func Stat(p string) (mtime time.Time, size int64, ok bool) {
+	info, err := os.Stat(p)
+	if err != nil {
+		return time.Time{}, 0, false
+	}
+	return info.ModTime(), info.Size(), true
 }
 
 // IsFile は os.path.isfile。

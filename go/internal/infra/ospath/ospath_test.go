@@ -177,3 +177,16 @@ func TestDiskListdirAndIsLink(t *testing.T) {
 		t.Error("壊れたリンクを見落とした")
 	}
 }
+
+func TestStat(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "f")
+	if err := os.WriteFile(path, []byte("abc"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if mtime, size, ok := Stat(path); !ok || size != 3 || mtime.IsZero() {
+		t.Errorf("Stat = %v, %d, %v", mtime, size, ok)
+	}
+	if _, _, ok := Stat(path + "x"); ok {
+		t.Error("無いファイルで ok")
+	}
+}

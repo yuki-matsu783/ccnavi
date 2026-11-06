@@ -11,7 +11,7 @@
 // 多ければ候補、多くなければ決着。記録が無ければ候補。名前は大文字小文字を区別せず比べる。
 //
 // Python からの対応: wiki と wiki_load をまとめた。build → Build、rows → Rows、candidates → Candidates、
-// pending → Pending、parse_pattern → ParsePattern、sources_threshold・notice_count → SourcesThreshold・
+// pending → PendingImpacts、parse_pattern → ParsePattern、sources_threshold・notice_count → SourcesThreshold・
 // NoticeCount、PATTERNS_DIR・IMPACT_DIR → PatternsDir・ImpactDir、TARGETS → Targets、
 // wiki_load.load_tree・load_commit・commit_of → LoadTree・LoadCommit・CommitOf（期限は time.Time。
 // ゼロ値なら git の既定の期限）。

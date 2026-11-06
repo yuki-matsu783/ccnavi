@@ -2,8 +2,6 @@ package stopreview
 
 import (
 	"bytes"
-	"io"
-	"os"
 	"time"
 
 	"ccnavi/internal/infra/fsio"
@@ -11,8 +9,11 @@ import (
 )
 
 const (
+	// 末尾から tailChunk ずつ 2 倍に広げて読み、tailLimit で止める。Python は 64 KiB ずつ足して読むが、
+	// 末尾から並べた完全な行は広げても前に足されるだけなので、倍に広げても見つかる行は同じ。
 	tailChunk = 64 * 1024
 	tailLimit = 4 * 1024 * 1024
+	tailGrow  = 2
 	// 末尾の行が書きかけなら、少し待って読み直す。
 	rereads    = 3
 	rereadWait = 50 * time.Millisecond
@@ -44,34 +45,15 @@ func SharedKey(sessionID, transcript string) string {
 
 // lastAssistantUUID は末尾のアシスタント行の uuid。無ければ空。末尾が書きかけなら complete が偽。
 func lastAssistantUUID(path string) (uuid string, complete bool) {
-	f, err := os.Open(path)
+	uuid, complete = "", true
+	err := fsio.ScanTail(path, tailChunk, tailLimit, tailGrow, func(tail []byte, _ bool) bool {
+		uuid, complete = scan(bytes.Split(tail, []byte("\n")))
+		return !complete || uuid != ""
+	})
 	if err != nil {
 		return "", true
 	}
-	defer f.Close()
-	info, err := f.Stat()
-	if err != nil {
-		return "", true
-	}
-	end := info.Size()
-	var tail []byte
-	for end > 0 && len(tail) < tailLimit {
-		start := max(0, end-tailChunk)
-		chunk := make([]byte, end-start)
-		if _, err := f.ReadAt(chunk, start); err != nil && err != io.EOF {
-			return "", true
-		}
-		tail = append(chunk, tail...)
-		end = start
-		lines := bytes.Split(tail, []byte("\n"))
-		if end > 0 {
-			lines = lines[1:] // 先頭は途中で切れているかもしれない
-		}
-		if found, ok := scan(lines); !ok || found != "" {
-			return found, ok
-		}
-	}
-	return "", true
+	return uuid, complete
 }
 
 func scan(lines [][]byte) (string, bool) {

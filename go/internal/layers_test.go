@@ -63,9 +63,10 @@ var subTiers = map[string]map[string]int{
 		"diaglog": 1,
 		// 1: 伏せ字を通して材料を残す（Stop の AI 判定の計画・試行・操作実績・集計）
 		"stopreview": 1,
-		// 2: 判定の記録と診断ログの上に立つ（後始末・拒否と失敗の数え）
-		"prune": 2,
+		// 2: 判定の記録の上に立つ（拒否と失敗の数え）
 		"tally": 2,
+		// 3: 記録の名前を持ち主のパッケージから読んで消す（後始末）
+		"prune": 3,
 	},
 	"tickets": {
 		"model":     0,

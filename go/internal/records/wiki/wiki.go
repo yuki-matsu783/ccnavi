@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
-	"ccnavi/internal/infra/pyfmt"
 )
 
 // 置き場（wiki を含むツリーからの相対。区切りは "/"）。
@@ -268,14 +268,7 @@ func PendingImpacts(w *Wiki) []Impact {
 }
 
 // SourcesThreshold は書かれた閾値。読めない値と 1 未満は既定。
-func SourcesThreshold(written string) int { return positive(written, DefaultSources) }
+func SourcesThreshold(written string) int { return config.Int(written, DefaultSources, 1) }
 
 // NoticeCount は書かれた通知の件数。読めない値と 1 未満は既定。
-func NoticeCount(written string) int { return positive(written, DefaultNoticeCount) }
-
-func positive(written string, fallback int) int {
-	if n, err := pyfmt.ParseInt(ospath.Strip(written)); err == nil && n >= 1 {
-		return n
-	}
-	return fallback
-}
+func NoticeCount(written string) int { return config.Int(written, DefaultNoticeCount, 1) }

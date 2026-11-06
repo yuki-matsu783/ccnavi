@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/records/stopreview"
 )
 
 var now = time.Now()
@@ -293,7 +294,7 @@ func TestStatePrune(t *testing.T) {
 			put(t, filepath.Join(p.state, "subagent-"+sOld+"-x.bounced"), "x", 20),
 			put(t, filepath.Join(p.state, "turn-"+sOld+".json"), "x", 20),
 			put(t, filepath.Join(p.state, "mirror-i0001.json"), "x", 20),
-			put(t, filepath.Join(p.state, stopOpsResult, "1-2.kv"), "x", 20),
+			put(t, filepath.Join(p.state, stopreview.ResultDir, "1-2.kv"), "x", 20),
 		}
 		kept := []string{
 			put(t, filepath.Join(p.state, "subagent-"+sLive+"-x.bounced"), "x", 1),
@@ -345,7 +346,7 @@ func TestLinksAreNotFollowed(t *testing.T) {
 		p := newPlace(t)
 		elsewhere := t.TempDir()
 		victim := put(t, filepath.Join(elsewhere, sOld+".turn.json"), "x", 90)
-		result := put(t, filepath.Join(elsewhere, stopOpsResult, "x.kv"), "x", 90)
+		result := put(t, filepath.Join(elsewhere, stopreview.ResultDir, "x.kv"), "x", 90)
 		linked := filepath.Join(p.logs, "state-link")
 		link(t, elsewhere, linked)
 		r := Run(p.root, p.log, linked, "", Options{Now: now})

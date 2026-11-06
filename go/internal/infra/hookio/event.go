@@ -31,10 +31,9 @@ const (
 const TaskNotification = "<task-notification>"
 
 // NotUserStarts は、ユーザが打ったのではない UserPromptSubmit の prompt の先頭に付く目印（小文字で比べる）。
-// "[idle-handoff]" は ccnavi 自身が放置したセッションを起こす指示（records/idlehandoff の目印と同じ値）。
-// 残りは、外部の出来事がセッションを起こす封筒の形。
+// IdleHandoffMarker は ccnavi 自身が放置したセッションを起こす指示。残りは、外部の出来事がセッションを起こす封筒の形。
 var NotUserStarts = []string{
-	"[idle-handoff]",
+	IdleHandoffMarker,
 	"<wake",
 	"<webhook-payload",
 	"<child-session-event",

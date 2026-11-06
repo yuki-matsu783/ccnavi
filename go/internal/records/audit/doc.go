@@ -5,5 +5,5 @@
 // redact で伏せてから書く。伏せるのは記録だけで、判定は伏せる前の文字列で済んでいる。
 //
 // Python からの対応: Record → Record、Log → Log（write → Write は error を返す）、ALLOW などの判定 →
-// Decision の定数、REASON_* → Reason の定数、_redacted → Redacted（上の段が見せる文にも使う）。
+// Decision の定数、REASON_* → Reason の定数、_redacted → redact.Redact（Go の伏せ字は失敗しないので、REDACT_FAILED に置き換える経路は持たない）。
 package audit

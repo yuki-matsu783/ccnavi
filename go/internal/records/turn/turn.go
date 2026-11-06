@@ -16,10 +16,9 @@ const (
 	TurnPrefix       = "turn-"
 	BusyPrefix       = "busy-"
 	UserPromptPrefix = "userprompt-"
-	suffix           = ".json"
 )
 
-var turnName = regexp.MustCompile(`^turn-(.+)\.json$`)
+var turnName = regexp.MustCompile(`^` + regexp.QuoteMeta(TurnPrefix) + `(.+)` + regexp.QuoteMeta(fsio.JSONExt) + `$`)
 
 // Ongoing はターン中のセッション 1 つ。
 type Ongoing struct {
@@ -29,7 +28,7 @@ type Ongoing struct {
 }
 
 func path(state, prefix, session string) string {
-	return ospath.Join(state, prefix+fsio.SafeName(session, fsio.SafeNameLimit)+suffix)
+	return fsio.RecordPath(state, prefix, session, fsio.JSONExt)
 }
 
 // Begin はターンの始まりを書く（ユーザの発言とバックグラウンド作業の完了通知）。書けなくても何も言わない。
@@ -72,24 +71,20 @@ func Active(state string, now time.Time) []Ongoing {
 	if state == "" {
 		return nil
 	}
-	entries, err := os.ReadDir(state)
+	names, err := ospath.DiskListdir(state)
 	if err != nil {
 		return nil
 	}
 	stale := config.TurnStale.Value()
 	var found []Ongoing
-	for _, entry := range entries {
-		match := turnName.FindStringSubmatch(entry.Name())
+	for _, name := range names {
+		match := turnName.FindStringSubmatch(name)
 		if match == nil {
 			continue
 		}
-		file := ospath.Join(state, entry.Name())
-		info, err := os.Stat(file)
-		if err != nil {
-			continue
-		}
-		seen := info.ModTime()
-		if now.Sub(seen) >= stale {
+		file := ospath.Join(state, name)
+		seen, _, ok := ospath.Stat(file)
+		if !ok || now.Sub(seen) >= stale {
 			continue
 		}
 		data, err := fsio.ReadJSON(file)
@@ -97,7 +92,7 @@ func Active(state string, now time.Time) []Ongoing {
 		if err != nil || !ok {
 			continue
 		}
-		since, ok := number(obj.Value("since"))
+		since, ok := pyjson.Number(obj.Value("since"), pyjson.BoolsRejected)
 		if !ok {
 			continue
 		}
@@ -108,15 +103,4 @@ func Active(state string, now time.Time) []Ongoing {
 		found = append(found, Ongoing{Session: session, Since: fsio.FromUnixSeconds(since), Seen: seen})
 	}
 	return found
-}
-
-// number は JSON の数（真偽は除く）。
-func number(v any) (float64, bool) {
-	switch x := v.(type) {
-	case int:
-		return float64(x), true
-	case float64:
-		return x, true
-	}
-	return 0, false
 }

@@ -1,8 +1,8 @@
 package tally
 
 import (
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
-	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
 )
@@ -27,7 +27,9 @@ const (
 )
 
 const (
-	streakPrefix = "failstreak-"
+	// StreakPrefix は失敗の連続の名前の先頭（後ろはセッションと "-" とエージェント）。後始末（records/prune）が
+	// 既に分かったセッションの表記に当ててまとめる。
+	StreakPrefix = "failstreak-"
 	mainAgent    = "main"
 	keyCount     = "count"
 	keyFirst     = "first"
@@ -35,10 +37,7 @@ const (
 
 // StreakThreshold は書かれた回数。0 は機能を使わない。読めない値と負数は既定。
 func StreakThreshold(written string) int {
-	if n, err := pyfmt.ParseInt(ospath.Strip(written)); err == nil && n >= 0 {
-		return n
-	}
-	return DefaultStreakThreshold
+	return config.Int(written, DefaultStreakThreshold, 0)
 }
 
 func streakPath(stateDir, session, agent string) string {
@@ -46,7 +45,7 @@ func streakPath(stateDir, session, agent string) string {
 	if part == "" {
 		part = mainAgent
 	}
-	return ospath.Join(stateDir, streakPrefix+fsio.SafeName(session, fsio.SafeNameLimit)+"-"+part+jsonExt)
+	return fsio.RecordPath(stateDir, StreakPrefix, session, "-"+part+fsio.JSONExt)
 }
 
 // Fail は失敗か拒否を 1 回数え、案内の種類と今の連続の長さを返す。出さない回は NoNotice。

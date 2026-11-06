@@ -23,7 +23,7 @@ func SaveMaterial(logDir, attemptID, criteria, rendered string) int {
 		"material", shown,
 		"redactions", changed,
 	)
-	path := ospath.Join(logPath(logDir, MaterialDir), safe(attemptID)+jsonSuffix)
+	path := fsio.RecordPath(logPath(logDir, MaterialDir), "", attemptID, fsio.JSONExt)
 	if fsio.MakeDirs(ospath.Dirname(path)) != nil {
 		return -1
 	}

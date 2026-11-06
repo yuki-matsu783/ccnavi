@@ -27,7 +27,7 @@ func LastPrompt(state, session string) (time.Time, bool) {
 	if err != nil || !ok {
 		return time.Time{}, false
 	}
-	at, ok := number(obj.Value("at"))
+	at, ok := pyjson.Number(obj.Value("at"), pyjson.BoolsRejected)
 	if !ok {
 		return time.Time{}, false
 	}

@@ -3,5 +3,6 @@
 // encoding/json ではなくここを通す。オブジェクトは Object（キーの順序を保つ）で受け渡し、整数と
 // 小数は区別して読む（1 と 1.0 は書き戻すと違う）。
 //
-// Python からの対応: dict(data, **kv) → Object.With、dict.pop(key, None) → Object.Pop。
+// Python からの対応: dict(data, **kv) → Object.With、dict.pop(key, None) → Object.Pop、
+// isinstance(v, (int, float)) の数の読み → Number、isinstance(v, int) and v > 0 → PositiveInt。
 package pyjson

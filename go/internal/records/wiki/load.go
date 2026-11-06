@@ -1,15 +1,15 @@
 package wiki
 
 import (
-	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
+	"ccnavi/internal/infra/pyfmt"
 )
 
 // fileLimit は 1 本の上限（バイト）。パターンも採否の記録も、これを超えない。
@@ -30,7 +30,8 @@ const (
 
 // stem は .md（大文字小文字を問わない）を除いた名前。.md でなければ空。
 func stem(file string) string {
-	if len(file) >= len(mdExt) && strings.EqualFold(file[len(file)-len(mdExt):], mdExt) {
+	// 畳んで ".md" になる字は M・m・D・d だけなので、元の綴りの末尾も 3 バイト。
+	if pathcase.HasExt(file, mdExt) {
 		return file[:len(file)-len(mdExt)]
 	}
 	return ""
@@ -71,16 +72,11 @@ func LoadTree(treeRoot string) *Wiki {
 	t := newTexts()
 	for _, place := range places {
 		directory := ospath.Join(treeRoot, strings.Split(place.dir, "/")...)
-		entries, err := os.ReadDir(directory)
+		names, err := ospath.DiskListdir(directory)
 		if err != nil {
 			continue
 		}
 		t.present = true
-		names := make([]string, len(entries))
-		for i, e := range entries {
-			names[i] = e.Name()
-		}
-		sort.Strings(names)
 		for _, file := range names {
 			name := stem(file)
 			if name == "" {
@@ -88,12 +84,12 @@ func LoadTree(treeRoot string) *Wiki {
 			}
 			path := ospath.Join(directory, file)
 			where := place.dir + "/" + file
-			info, err := os.Lstat(path)
+			_, size, _ := ospath.Stat(path)
 			switch {
-			case err == nil && info.Mode()&os.ModeSymlink != 0:
+			case ospath.IsLink(path):
 				t.broken = append(t.broken, Broken{where, place.kind, problemLink})
-			case err != nil || !ospath.IsFile(path):
-			case info.Size() > fileLimit:
+			case !ospath.IsFile(path):
+			case size > fileLimit:
 				t.broken = append(t.broken, Broken{where, place.kind, problemTooLarge})
 			default:
 				body, ok := fsio.ReadText(path, fsio.Replace)
@@ -158,11 +154,13 @@ func LoadCommit(repo, rev string, deadline time.Time) *Wiki {
 			continue
 		}
 		mode, typ, sha, size := fields[0], fields[1], fields[2], fields[3]
-		n, sizeErr := strconv.Atoi(size)
+		// Python の size.isdigit() and int(size) > FILE_LIMIT。int() が読めない数字（²）は大きすぎるとして名指しする
+		// （Python は例外で止まる。git の出力には現れない）。
+		n, sizeErr := pyfmt.ParseInt(size)
 		switch {
 		case typ != "blob" || !regularModes[mode]:
 			t.broken = append(t.broken, Broken{path, kind, problemIrregular})
-		case !digits(size) || sizeErr != nil || n > fileLimit:
+		case !pyfmt.IsDigit(size) || sizeErr != nil || n > fileLimit:
 			t.broken = append(t.broken, Broken{path, kind, problemTooLarge})
 		default:
 			blob := run(repo, []string{"cat-file", "blob", sha}, deadline)

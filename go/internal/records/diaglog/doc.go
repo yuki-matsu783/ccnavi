@@ -6,6 +6,6 @@
 // 共通）と redact を通す。秘密の値をそもそも渡さないのが先で、これは最後の安全網。
 //
 // Python からの対応: get → Get、Logger の debug・info・warn・error → Debug・Info・Warn・Error（値は
-// key, value の組を並べる）、enabled → Enabled、DIAG_DIR → Dir、mask_userinfo → MaskUserinfo。
+// key, value の組を並べる）、enabled → Enabled、DIAG_DIR → Dir（ディスクのパスは DirOf）、mask_userinfo → MaskUserinfo。
 // threshold・stamp・text・fold・quote・format_line・append は私的にした。
 package diaglog

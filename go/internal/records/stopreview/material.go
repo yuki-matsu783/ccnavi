@@ -2,13 +2,13 @@ package stopreview
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
@@ -29,6 +29,8 @@ const (
 	excerptLimit  = 160
 	// attrLimit は囲みの属性に入れる値の上限（文字数）。
 	attrLimit = 120
+	// criteriaFile はワークスペースの判定用 Markdown（ccnavi ディレクトリの設定の置き場の下）。
+	criteriaFile = "stop-review.md"
 )
 
 // criteriaMD は組み込みの判定用 Markdown。ワークスペースに `.ccnavi/config/stop-review.md` があればそちらを使う。
@@ -65,7 +67,7 @@ func LoadCriteria(root string) string {
 	if root == "" {
 		return criteriaMD
 	}
-	path := ospath.Join(root, ".ccnavi", "config", "stop-review.md")
+	path := ospath.Join(root, config.DefaultProjectHome, config.ConfigDir, criteriaFile)
 	if !ospath.DiskLexists(path) {
 		return criteriaMD
 	}
@@ -115,8 +117,8 @@ const (
 // 境界にもしない。compact より前は要約になっていて元の発言ではないので材料に含めない。
 // transcript が UTF-8 として読めなければエラー（Python は例外のまま上へ抜けていた）。
 func TurnMaterial(transcript string) (Material, error) {
-	data, err := os.ReadFile(transcript)
-	if err != nil {
+	data, ok := fsio.ReadBytes(transcript)
+	if !ok {
 		return Material{Insufficient: true, Reason: insufficientUnreadable}, nil
 	}
 	text, err := fsio.Decode(data, fsio.Strict)

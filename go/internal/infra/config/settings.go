@@ -19,11 +19,11 @@ import (
 // 診断で動かせるのはフラグだけで、hook は引数を渡さないので判定の入口はここから動かない。
 var (
 	DefaultLog   = filepath.Join("logs", "decisions.jsonl")
-	DefaultRules = filepath.Join(DefaultProjectHome, "config", "common", "rules.yml")
+	DefaultRules = filepath.Join(DefaultProjectHome, ConfigDir, "common", "rules.yml")
 	// DefaultState はセッションごとの一時的な状態。消えても次の起動で取り直せる。
 	DefaultState   = filepath.Join("logs", "state")
-	defaultPhases  = filepath.Join(DefaultProjectHome, "config", "common", "phases.yml")
-	defaultRisk    = filepath.Join(DefaultProjectHome, "config", "common", "risks.yml")
+	defaultPhases  = filepath.Join(DefaultProjectHome, ConfigDir, "common", "phases.yml")
+	defaultRisk    = filepath.Join(DefaultProjectHome, ConfigDir, "common", "risks.yml")
 	defaultProject = "projects"
 
 	// LocalClaudeSettings は個人の上書き設定。`env` は Claude Code が起こしたプロセスに渡る。
@@ -39,6 +39,8 @@ const (
 	DefaultApproved = ".ccnavi/approved"
 	// DefaultProjectHome は ccnavi ディレクトリ。組み込みの deny を `*/.ccnavi/*` の 1 行で済ませるため 1 つにまとめる。
 	DefaultProjectHome = ".ccnavi"
+	// ConfigDir は ccnavi ディレクトリの下の設定の置き場。
+	ConfigDir = "config"
 
 	// ownProject は ccnavi 自身のソースツリーを見分ける pyproject.toml の名前。
 	ownProject = "ccnavi"

@@ -3,15 +3,17 @@ package handoff
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
-	"io"
-	"os"
-	"strconv"
+	"math"
 	"strings"
 	"time"
+	"unicode/utf8"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
@@ -20,10 +22,6 @@ import (
 const (
 	// DefaultTokens は閾値の既定（トークン数）。
 	DefaultTokens = 400000
-	// Marker は起こすときの指示の先頭に付ける目印。この目印で始まる入力では待機を戻さない。
-	// hookio がユーザの発言から除く目印と同じ値にする。
-	Marker = "[idle-handoff]"
-
 	// 1 時間のキャッシュの失効の 5 分前と、5 分のキャッシュの失効の 1 分前。
 	waitLong  = 55 * time.Minute
 	waitShort = 4 * time.Minute
@@ -36,14 +34,15 @@ const (
 	ttlLong  = 3600 * time.Second
 
 	// 末尾から読むトランスクリプトの大きさ。末尾に応答の行が無ければ（巨大なツールの結果が続いたとき）
-	// 4 倍ずつ広げ、tailLimit で止める。
+	// tailGrow 倍ずつ広げ、tailLimit で止める。
 	tailBytes = 1024 * 1024
 	tailLimit = 16 * 1024 * 1024
+	tailGrow  = 4
 	// lookback はキャッシュの保持時間を探して遡る応答の行数の上限。
 	lookback = 40
 
+	// folderName は state の下の置き場。records/prune は中を見ず、ここの Prune が消す。
 	folderName   = "idle"
-	stateSuffix  = ".json"
 	noticeSuffix = ".notice"
 	tokenBytes   = 8
 )
@@ -83,15 +82,7 @@ type Plan struct {
 
 // Threshold は閾値（トークン数）を読む。0 は無効。空・読めない値は既定、負数は 0。
 func Threshold(raw string) int {
-	text := ospath.Strip(raw)
-	if text == "" {
-		return DefaultTokens
-	}
-	value, err := pyfmt.ParseInt(text)
-	if err != nil {
-		return DefaultTokens
-	}
-	return max(value, 0)
+	return max(config.Int(raw, DefaultTokens, math.MinInt), 0)
 }
 
 // Unattended は見ている人がいない実行（`claude -p`・SDK）か。待機がプロセスを引き止めるので除く。
@@ -106,11 +97,8 @@ func UsageOf(transcript string) *Usage {
 		return nil
 	}
 	var rows []*pyjson.Object
-	for reach := tailBytes; reach <= tailLimit; reach *= 4 {
-		raw, whole, ok := tail(transcript, reach)
-		if !ok {
-			return nil
-		}
+	err := fsio.ScanTail(transcript, tailBytes, tailLimit, tailGrow, func(tail []byte, _ bool) bool {
+		raw, _ := fsio.Decode(tail, fsio.Replace)
 		// 中断や API の誤りの行は使用量がすべて 0 で、大きさを測れないので飛ばす。
 		rows = rows[:0]
 		for _, u := range assistantUsages(raw) {
@@ -118,11 +106,9 @@ func UsageOf(transcript string) *Usage {
 				rows = append(rows, u)
 			}
 		}
-		if len(rows) > 0 || whole {
-			break
-		}
-	}
-	if len(rows) == 0 {
+		return len(rows) > 0
+	})
+	if err != nil || len(rows) == 0 {
 		return nil
 	}
 	return &Usage{Tokens: sizeOf(rows[0]), TTL: ttlOf(rows[:min(len(rows), lookback)])}
@@ -133,44 +119,9 @@ var sizeKeys = []string{"input_tokens", "cache_read_input_tokens", "cache_creati
 func sizeOf(usage *pyjson.Object) int {
 	total := 0
 	for _, k := range sizeKeys {
-		total += positive(usage.Value(k))
+		total += pyjson.PositiveInt(usage.Value(k))
 	}
 	return total
-}
-
-// positive は正の整数ならその値、ほかは 0。
-func positive(v any) int {
-	if n, ok := v.(int); ok && n > 0 {
-		return n
-	}
-	return 0
-}
-
-// tail は末尾から reach バイトを読む。返すのは本文と、ファイル全体を読んだか。先頭の欠けた行は捨てる。
-func tail(path string, reach int) (string, bool, bool) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", true, false
-	}
-	defer f.Close()
-	info, err := f.Stat()
-	if err != nil {
-		return "", true, false
-	}
-	size := info.Size()
-	if _, err := f.Seek(max(size-int64(reach), 0), io.SeekStart); err != nil {
-		return "", true, false
-	}
-	data, err := io.ReadAll(f)
-	if err != nil {
-		return "", true, false
-	}
-	text, _ := fsio.Decode(data, fsio.Replace)
-	whole := size <= int64(reach)
-	if !whole {
-		_, text, _ = strings.Cut(text, "\n")
-	}
-	return text, whole, true
 }
 
 // assistantUsages は新しい順に、サブエージェントでない応答の usage を返す。
@@ -203,8 +154,8 @@ func ttlOf(rows []*pyjson.Object) time.Duration {
 		if !ok {
 			continue
 		}
-		short := positive(made.Value("ephemeral_5m_input_tokens"))
-		long := positive(made.Value("ephemeral_1h_input_tokens"))
+		short := pyjson.PositiveInt(made.Value("ephemeral_5m_input_tokens"))
+		long := pyjson.PositiveInt(made.Value("ephemeral_1h_input_tokens"))
 		if short > 0 {
 			return ttlShort
 		}
@@ -217,13 +168,13 @@ func ttlOf(rows []*pyjson.Object) time.Duration {
 
 // waitFor は放置してから起こすまでの待ち時間。上書き（秒）が正の整数ならそれ（maxWait まで）。
 func waitFor(ttl time.Duration, override string) time.Duration {
-	text := ospath.Strip(override)
-	if text != "" && strings.Trim(text, "0123456789") == "" {
-		n, err := strconv.Atoi(text)
-		if err != nil {
+	// Python の text.isascii() and text.isdigit()。int() が読めない上付きの数字（²）などを除く。
+	if text := ospath.Strip(override); pyfmt.IsDigit(text) && !strings.ContainsFunc(text, nonASCII) {
+		n, err := pyfmt.ParseInt(text)
+		if errors.Is(err, pyfmt.ErrIntRange) {
 			return maxWait // 桁あふれは上限より大きい
 		}
-		if n > 0 {
+		if err == nil && n > 0 {
 			return min(time.Duration(n)*time.Second, maxWait)
 		}
 	}
@@ -233,16 +184,18 @@ func waitFor(ttl time.Duration, override string) time.Duration {
 	return waitLong
 }
 
+func nonASCII(r rune) bool { return r >= utf8.RuneSelf }
+
 // ---- 状態
 
 func folder(state string) string { return ospath.Join(state, folderName) }
 
 func statePath(state, session, suffix string) string {
-	return ospath.Join(folder(state), fsio.SafeName(session, fsio.SafeNameLimit)+suffix)
+	return fsio.RecordPath(folder(state), "", session, suffix)
 }
 
 func read(state, session string) *pyjson.Object {
-	obj, ok := fsio.ReadObject(statePath(state, session, stateSuffix))
+	obj, ok := fsio.ReadObject(statePath(state, session, fsio.JSONExt))
 	if !ok {
 		return pyjson.NewObject()
 	}
@@ -253,12 +206,12 @@ func write(state, session string, data *pyjson.Object) bool {
 	if fsio.MakeDirs(folder(state)) != nil {
 		return false
 	}
-	return fsio.WriteJSON(statePath(state, session, stateSuffix), data) == ""
+	return fsio.WriteJSON(statePath(state, session, fsio.JSONExt), data) == ""
 }
 
 // base は基準。会話が基準より小さくなっていたら 0 に戻っているものとして読む。
 func base(data *pyjson.Object, size int) int {
-	b := positive(data.Value(keyBase))
+	b := pyjson.PositiveInt(data.Value(keyBase))
 	if size >= b {
 		return b
 	}
@@ -330,19 +283,19 @@ func Check(state, session, token string, wait time.Duration, limit int) (string,
 			return "", false
 		}
 	}
-	next := data.With(keyState, string(fired), keyBase, positive(data.Value(keyDue)), keyWait, int(wait/time.Second))
+	next := data.With(keyState, string(fired), keyBase, pyjson.PositiveInt(data.Value(keyDue)), keyWait, int(wait/time.Second))
 	next.Pop(keyToken)
 	next.Pop(keyTold)
 	if !write(state, session, next) {
 		return "", false
 	}
-	return fmt.Sprintf(wakeText, Marker, minutes(wait)), true
+	return fmt.Sprintf(wakeText, hookio.IdleHandoffMarker, minutes(wait)), true
 }
 
 // Reset はユーザの入力で待機をやめる。基準は残す。起こす指示（目印付き）とバックグラウンド作業の
 // 完了通知はユーザの入力ではないので戻さない。
 func Reset(state, session, prompt string, background bool) {
-	if !sessionOK(session) || background || strings.HasPrefix(strings.TrimLeftFunc(prompt, ospath.IsSpace), Marker) {
+	if !sessionOK(session) || background || strings.HasPrefix(strings.TrimLeftFunc(prompt, ospath.IsSpace), hookio.IdleHandoffMarker) {
 		return
 	}
 	data := read(state, session)
@@ -369,12 +322,13 @@ func Notice(state, session string, usage *Usage, limit int, waitOverride string)
 		if !write(state, session, data.With(keyTold, true)) {
 			return "", false
 		}
-		return fmt.Sprintf(doneText, minutes(time.Duration(positive(data.Value(keyWait)))*time.Second)), true
+		return fmt.Sprintf(doneText, minutes(time.Duration(pyjson.PositiveInt(data.Value(keyWait)))*time.Second)), true
 	}
 	if usage == nil || !due(data, usage.Tokens, limit) {
 		return "", false
 	}
 	mark := statePath(state, session, noticeSuffix)
+	// 溜める段は見ない。Python が os.path.exists でディスクだけを見ていたのに合わせる。
 	if ospath.DiskExists(mark) {
 		return "", false
 	}
@@ -384,50 +338,31 @@ func Notice(state, session string, usage *Usage, limit int, waitOverride string)
 	if fsio.WriteText(mark, "1\n", fsio.NativeNewline, fsio.Atomic) != "" {
 		return "", false
 	}
-	return fmt.Sprintf(noticeText, grouped(usage.Tokens), int(usage.TTL/time.Minute),
+	return fmt.Sprintf(noticeText, pyfmt.Grouped(usage.Tokens), int(usage.TTL/time.Minute),
 		minutes(waitFor(usage.TTL, waitOverride)), env.HandoffSuggestTokens), true
 }
 
 // minutes は文に出す分。1 分未満でも 1 と書く。
 func minutes(d time.Duration) int { return max(int(d/time.Minute), 1) }
 
-// grouped は Python の f"{n:,}"。
-func grouped(n int) string {
-	digits := strconv.Itoa(n)
-	sign := ""
-	if strings.HasPrefix(digits, "-") {
-		sign, digits = "-", digits[1:]
-	}
-	var b strings.Builder
-	for i, c := range digits {
-		if i > 0 && (len(digits)-i)%3 == 0 {
-			b.WriteByte(',')
-		}
-		b.WriteRune(c)
-	}
-	return sign + b.String()
-}
-
 // Prune は古い状態ファイルを消す。知らせ済みの印は書き換わらないので、対の状態ファイルが在る間は残す。
 func Prune(state string, now time.Time) {
 	dir := folder(state)
-	entries, err := os.ReadDir(dir)
+	names, err := ospath.DiskListdir(dir)
 	if err != nil {
 		return
 	}
 	cutoff := now.Add(-keep)
-	for _, entry := range entries {
-		name := entry.Name()
+	for _, name := range names {
 		file := ospath.Join(dir, name)
-		if stem, ok := strings.CutSuffix(name, noticeSuffix); ok && ospath.DiskExists(ospath.Join(dir, stem+stateSuffix)) {
+		if stem, ok := strings.CutSuffix(name, noticeSuffix); ok && ospath.DiskExists(ospath.Join(dir, stem+fsio.JSONExt)) {
 			continue
 		}
-		info, err := os.Stat(file)
-		if err != nil || !info.ModTime().Before(cutoff) {
+		if mtime, _, ok := ospath.Stat(file); !ok || !mtime.Before(cutoff) {
 			continue
 		}
 		fsio.Remove(file)
-		if stem, ok := strings.CutSuffix(name, stateSuffix); ok {
+		if stem, ok := strings.CutSuffix(name, fsio.JSONExt); ok {
 			fsio.Remove(ospath.Join(dir, stem+noticeSuffix))
 		}
 	}

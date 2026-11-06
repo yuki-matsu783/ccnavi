@@ -1,6 +1,10 @@
 package diaglog
 
-import "strings"
+import (
+	"strings"
+
+	"ccnavi/internal/records/redact"
+)
 
 // MaskUserinfo は URL と scp 形に埋まった資格情報を Stars にする（sh の ccnavi_log_mask・拡張と同じ読み）。
 //
@@ -32,9 +36,6 @@ func MaskUserinfo(value string) string {
 // gaps は語を切る字（sh の ccnavi_log_space と同じ）。
 const gaps = " \t\n\r"
 
-// stars は伏せた部分の字（redact と同じ）。
-const stars = "***"
-
 func maskWord(word string) string {
 	if !strings.Contains(word, "@") {
 		return word
@@ -45,7 +46,7 @@ func maskWord(word string) string {
 		if at < 0 || !strings.Contains(head[:at], ":") {
 			return word
 		}
-		return stars + "@" + word[at+1:]
+		return redact.Stars + "@" + word[at+1:]
 	}
 	var b strings.Builder
 	rest := word
@@ -58,7 +59,7 @@ func maskWord(word string) string {
 		rest = after
 		authority, _, _ := strings.Cut(rest, "/")
 		if at := strings.LastIndex(authority, "@"); at >= 0 {
-			b.WriteString(stars + "@" + authority[at+1:])
+			b.WriteString(redact.Stars + "@" + authority[at+1:])
 			rest = rest[len(authority):]
 		}
 	}

@@ -11,11 +11,11 @@ import (
 )
 
 // logEvent は試行のイベントを専用の記録に 1 行足す。書けなくても判定は止めない。
-func (s Store) logEvent(event string, attempt *pyjson.Object) {
+func (s Store) logEvent(name event, attempt *pyjson.Object) {
 	if s.Logs == "" {
 		return
 	}
-	row := pyjson.NewObject("at", fsio.Stamp(), "event", event)
+	row := pyjson.NewObject("at", fsio.Stamp(), "event", string(name))
 	for _, key := range []string{keyAttemptID, keyState, keyFinal, keyJudge, keyReason} {
 		row.Set(key, attempt.Value(key))
 	}
@@ -29,9 +29,17 @@ func (s Store) logEvent(event string, attempt *pyjson.Object) {
 	}
 }
 
-// LogNoKey は共有キーを導けなかった Stop を数える（`stop-review report` の件数）。who は "hook" か "judge"。
-func (s Store) LogNoKey(who string) {
-	s.logEvent(eventNoKey, pyjson.NewObject(keyReason, who))
+// Side は共有キーを導こうとした側。
+type Side string
+
+const (
+	SideHook  Side = "hook"
+	SideJudge Side = "judge"
+)
+
+// LogNoKey は共有キーを導けなかった Stop を数える（`stop-review report` の件数）。
+func (s Store) LogNoKey(who Side) {
+	s.logEvent(eventNoKey, pyjson.NewObject(keyReason, string(who)))
 }
 
 // LogPlanTimeout は判定役が計画を待ち切れなかったことを数える。

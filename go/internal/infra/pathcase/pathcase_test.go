@@ -15,3 +15,11 @@ func TestFold(t *testing.T) {
 		}
 	}
 }
+
+func TestHasExt(t *testing.T) {
+	for name, want := range map[string]bool{"a.md": true, "A.MD": true, "a.mdx": false, "md": false, ".md": true} {
+		if got := HasExt(name, ".md"); got != want {
+			t.Errorf("HasExt(%q) = %v", name, got)
+		}
+	}
+}

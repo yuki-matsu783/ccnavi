@@ -8,10 +8,9 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/config"
-	"ccnavi/internal/infra/fsio"
 )
 
-func row(criterion, target, result string) string {
+func row(criterion criterionID, target string, result outcome) string {
 	return fmt.Sprintf(`{"criterion": %q, "target": %q, "result": %q}`, criterion, target, result)
 }
 
@@ -19,8 +18,8 @@ const flawRow = `{"criterion": "R2", "target": "p1", "result": "fail", ` +
 	`"locations": [{"kind": "proposal", "text": "完了の確かめ方が無い"}], ` +
 	`"fixes": [{"kind": "revise_proposal", "text": "確認の手順を足す"}], "mismatch": "依頼は結合の確認を求めている"}`
 
-func result(aid, classification string, rows ...string) string {
-	return fmt.Sprintf(`{"attempt_id": %q, "classification": %q, "results": [%s]}`, aid, classification, strings.Join(rows, ", "))
+func result(aid string, class classification, rows ...string) string {
+	return fmt.Sprintf(`{"attempt_id": %q, "classification": %q, "results": [%s]}`, aid, class, strings.Join(rows, ", "))
 }
 
 func passing(aid string, withP1 bool) string {
@@ -119,7 +118,7 @@ func TestNotTicketWorkIsOutOfScopeByAI(t *testing.T) {
 		t.Errorf("Accept = %+v", out)
 	}
 	a := s.readAttempt(aid)
-	if a.String(keyFinal) != string(FinalOutOfScope) || a.String(keyJudge) != judgeAI {
+	if a.String(keyFinal) != string(FinalOutOfScope) || a.String(keyJudge) != string(judgeAI) {
 		t.Errorf("試行 = %s", dumps(t, a))
 	}
 }
@@ -289,7 +288,7 @@ func TestSentBackIsNotExpiredEarlyNorConsumedByOthers(t *testing.T) {
 		t.Error("別のセッションが消費した")
 	}
 	// 差し戻しから期限を過ぎたものは継続として消費せず、期限切れで閉じても不備検出を残す。
-	later := fsio.FromUnixSeconds(number(s.readAttempt(first).Value(keySentAt), 0)).Add(10_000 * time.Second)
+	later := moment(s.readAttempt(first).Value(keySentAt), epoch).Add(10_000 * time.Second)
 	if _, ok := s.ConsumeContinuation("s1", later); ok {
 		t.Error("古い差し戻しを消費した")
 	}

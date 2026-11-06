@@ -15,5 +15,7 @@
 // 関数は Store のメソッドにした（Logs が空ならイベントを書かない）。stopeval.render(summarize(…),
 // unlinked_total(…)) → Report。load_criteria → LoadCriteria（出どころは誰も読まないので返さない）。
 // save_material の抽出器の版は常に同じ値なので引数から外した。stopops.unlinked は集計の総数に寄せた。
-// JUDGE_LAUNCHER → config.Launcher。
+// JUDGE_LAUNCHER → config.Launcher。秒の値（SLACK_SECONDS・UNLINK_AFTER_SECONDS・操作実績と書いた記録の時刻）は
+// time.Duration・time.Time にし、記録の数との変換は moment と fsio.UnixSeconds だけで行う。
+// log_event(…, "no_key", {"reason": who}) → LogNoKey（who は Side）。
 package stopreview
