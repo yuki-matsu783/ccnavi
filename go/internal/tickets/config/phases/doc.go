@@ -1,0 +1,17 @@
+// Package phases はフェーズ定義（phases.yml。共通レイヤーと、親の project: が指すレイヤーの和）と、親の計画の
+// 先行関係を読む。定義はユーザが持つ（置き場は組み込みの保護の内側で、エージェントは書けない）。組み込みの既定は
+// 持たず、ファイルが無ければフェーズは番号だけの挙動になる。計画を持つ親は、計画が使う定義のコピーを
+// frontmatter の phases: に持ち、承認のあとの判定はコピーを読む（TypesOf・CopyProblems）。順序は定義に書かず、
+// 親の計画のステップの after から都度計算する（Compute）。
+//
+// Python からの対応: tickets/config の phasetypes と workflow をまとめた。PhaseTypes（dict）→ Types（nil は None）、
+// PhaseType.scope の None → Inherit、key・same・differing → Same・Differing、as_copy → PhaseType.AsCopy、
+// load・parse（where 付き）・read_copy・types_of・has_copy・origin・copy_problems・scope_problems・
+// parent_scope_problems・consolidate_type・_globs → Load・Parse・ReadCopy・TypesOf・HasCopy・Origin・CopyProblems・
+// ScopeProblems・ParentScopeProblems・ConsolidateType・Globs、types_path・common_types・merge・layer_types・
+// load_types → TypesPath・CommonTypes・Merge・LayerTypes・LoadTypes、COPY_KEY → ticket.PhasesKey、
+// KIND_* → Work・Feedback、LEARNING_* → LearningOn・LearningOff。workflow の compute・waits_of・loose・ready・
+// childless_ready・CHILDLESS_MARK・terminal_problems・problems・after_problems・errors・lines → Compute・WaitsOf・
+// Loose・Ready・ChildlessReady・ChildlessMark・TerminalProblems・PlanProblems・AfterProblems・Errors・Lines
+// （part の文字列 → Part、wf の None → nil）。
+package phases
