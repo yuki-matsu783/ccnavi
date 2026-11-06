@@ -89,7 +89,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 | `str.casefold()` | `golang.org/x/text/cases.Fold()`。`pathcase.Fold` を通す |
 | `os.path.normcase` | Windows だけ `/` を `\` にして小文字にする。Linux・macOS は何もしない |
 | 正規表現の先読み・後読み（`(?=` など。`src/` に約 50 か所） | Go の RE2 には無い。手で書いた照合か、2 段の照合に直す |
-| YAML（PyYAML の SafeLoader、YAML 1.1） | `gopkg.in/yaml.v3` は 1.2 寄り。`yes`・`no`・`on`・`off` の真偽、`0o` と `0` 始まりの 8 進、時刻の扱いが違う。`infra/yamlread` で 1.1 の読みに合わせる |
+| YAML（PyYAML の SafeLoader、YAML 1.1） | `gopkg.in/yaml.v3` は libyaml の写しで、1.1 の真偽・8 進・時刻の読みも、読める・読めないの境界も違う。そこで PyYAML の純 Python の読み手を `infra/yaml` に写した。上の段は `*yaml.Map` の取り出し（`Text`・`Strings`・`Map` など）で値を読む |
 | 辞書の順序 | Python の dict は入れた順。JSON を出すところは順序を持つ型で組む |
 | JSON の出力 | Python の `json.dumps` の既定（`ensure_ascii`・区切りの空白）に合わせる。呼び出しごとに引数を確かめる |
 | 文字列の長さ・切り出し | Python は符号位置で数える。Go の `len` はバイト。`[]rune` か `utf8` で数える |
@@ -98,7 +98,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 
 | パッケージ | 行数（Python） | 状態 |
 |---|---|---|
-| `infra` | 6,466 | 着手 |
+| `infra` | 6,466 | 移した（レビュー前） |
 | `records` | 4,562 | 未着手 |
 | `policy` | 6,804 | 未着手 |
 | `tickets` | 36,732 | 未着手 |
@@ -114,4 +114,4 @@ cd go && go vet ./... && go test ./...
 
 依存の向きは `go/internal/layers_test.go` が見る。パッケージを足したら、先にその表（`topTiers`・`subTiers`）を直す。
 
-`go mod tidy` は、まだ使っていない依存（YAML・TOML）を消すので回さない。依存を足すときは `go mod edit -require` と `go mod download` で足す。
+依存は `go mod tidy` で整える。外の依存は `golang.org/x/text` と `github.com/BurntSushi/toml` だけにする。
