@@ -42,7 +42,9 @@ _PROCESS_LINE = re.compile(r"^- 処理:")
 _SIGNAL_LINE = re.compile(r"^- 信号:[ \t\u3000]*(\S+)")
 _ISSUE_REST = re.compile(r"^#?\d+[ \t\u3000]+\S")
 # 区切りには、日本語入力で入りやすい全角空白（U+3000）も使える。
-_PROCESS_FORM = re.compile(r"^- 処理:[ \t\u3000]+(反映|対象外|issue)(?:[ \t\u3000]+(.*\S))?[ \t\u3000]*$")
+_PROCESS_FORM = re.compile(
+    r"^- 処理:[ \t\u3000]+(反映|対象外|issue)(?:[ \t\u3000]+(.*\S))?[ \t\u3000]*$"
+)
 
 
 @dataclass
@@ -150,7 +152,8 @@ def consistency_problem(record: Record) -> str:
         if sec.process_lines and sec.process is None:
             return (
                 f"「{sec.title}」の処理の行の形が分からない"
-                "（`- 処理: 反映 <パターン名>`・`- 処理: 対象外 <理由>`・`- 処理: issue <番号> <理由>`）"
+                "（`- 処理: 反映 <パターン名>`・`- 処理: 対象外 <理由>`・"
+            "`- 処理: issue <番号> <理由>`）"
             )
     return ""
 
@@ -267,7 +270,8 @@ def _section_problem(tree_root: str, ident: str, sec: Section) -> str:
             )
         return "" if rest else "`処理: 対象外` の後ろに理由が無い"
     if kind == PROCESS_ISSUE:
-        return "" if _ISSUE_REST.match(rest) else "`処理: issue` の後ろは `<番号> <理由>` の形で書く"
+        ok = _ISSUE_REST.match(rest)
+        return "" if ok else "`処理: issue` の後ろは `<番号> <理由>` の形で書く"
     if not rest:
         return "`処理: 反映` の後ろにパターン名が無い"
     sources = pattern_sources(tree_root, rest)
