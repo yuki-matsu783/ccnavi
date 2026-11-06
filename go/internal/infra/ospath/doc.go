@@ -9,5 +9,6 @@
 //
 // Python からの対応: os.path.exists・lexists → DiskExists・DiskLexists、open(...).read() → ReadDiskText、
 // fsio.slashed → Slashed、os.path.splitext → Splitext、os.path.islink → IsLink、sorted(os.listdir) → DiskListdir、
-// os.path.getmtime・getsize（os.stat）→ Stat。
+// os.path.getmtime・getsize（os.stat）→ Stat、
+// os.stat(...).st_nlink → HardLinks、ドライブの頭（`C:`）の判定 → HasDrive。
 package ospath

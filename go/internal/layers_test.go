@@ -36,11 +36,13 @@ var subTiers = map[string]map[string]int{
 		"env":    0,
 		"pyfmt":  0,
 		"ospath": 0,
+		"digest": 0, // 16 進の要約と乱数（記録・バックアップの名前）
 		// 1: 土台だけを読む
 		"pathcase":    1,
 		"pyjson":      1,
 		"platformtag": 1,
 		"yaml":        1,
+		"pyre":        1, // Python の re の写し（RE2 で書けない式を Python と同じ答えで読む）
 		// 2: ファイル・設定・入出力・照合
 		"fsio":      2,
 		"config":    2,
@@ -67,6 +69,21 @@ var subTiers = map[string]map[string]int{
 		"tally": 2,
 		// 3: 記録の名前を持ち主のパッケージから読んで消す（後始末）
 		"prune": 3,
+	},
+	"policy": {
+		// 1: ルールの型・読み込み・照合と、ルールを当てる文字列
+		"rules": 1,
+		// 2: ルールの上に立つ（文面ファイル・ルールの文脈ファイル）
+		"texts":   2,
+		"ctxfile": 2,
+		// 3: ルールファイルの検査（文脈ファイルの置き場を見る）
+		"rulelint": 3,
+		// 3: 自己防衛（守る場所への書き込みを止める組み込みのルールと、守る対象のバックアップと戻し）
+		"selfguard": 3,
+		// 4: 組み込みのルール（selfguard の守る形を読む）
+		"builtin": 4,
+		// 5: 適用するルール集合を決める（組み込みとレイヤーを重ねる）
+		"ruleload": 5,
 	},
 	"tickets": {
 		"model":     0,

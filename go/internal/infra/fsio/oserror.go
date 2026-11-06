@@ -106,7 +106,9 @@ type pyError struct{ err error }
 func (e pyError) Error() string { return ErrorText(e.err) }
 func (e pyError) Unwrap() error { return e.err }
 
-func wrap(err error) error {
+// Wrap は err を、Error() が Python の str(OSError) と同じ文（ErrorText）で、Unwrap で元の err を返す error にする。
+// nil は nil のまま。
+func Wrap(err error) error {
 	if err == nil {
 		return nil
 	}

@@ -2,7 +2,6 @@ package git
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -132,21 +131,5 @@ func copyTree(source, target string) error {
 		}
 		return nil
 	}
-	in, err := os.Open(source)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	out, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, info.Mode().Perm())
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(out, in)
-	if cerr := out.Close(); err == nil {
-		err = cerr
-	}
-	if err != nil {
-		return err
-	}
-	return os.Chtimes(target, info.ModTime(), info.ModTime())
+	return fsio.CopyFile(source, target)
 }

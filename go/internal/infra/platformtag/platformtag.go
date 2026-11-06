@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pyfmt"
 )
 
 // Systems は組み立ての語として読めるディレクトリ名の OS の側。
@@ -39,7 +40,7 @@ func hostTarget(system, machine string) string {
 	case strings.HasPrefix(system, "linux"):
 		name = "linux"
 	}
-	arch := strings.ToLower(machine)
+	arch := pyfmt.Lower(machine)
 	switch arch {
 	case "amd64", "x86_64":
 		arch = "x86_64"

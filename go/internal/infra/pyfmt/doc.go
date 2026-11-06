@@ -6,5 +6,6 @@
 //
 // Python からの対応: int(s) → ParseInt、int(s, base) → ParseBigInt、float(s) → ParseFloat、s[:n] → Head、
 // s.isdigit() → IsDigit、re の `\w` の 1 文字 → IsWord、int(v)（JSON・YAML の値）→ IntOf、f"{n:,}" → Grouped、
-// datetime.fromisoformat → FromISOFormat（比べるための UTC の時刻と、時差が書かれていたか）。
+// datetime.fromisoformat → FromISOFormat（比べるための UTC の時刻と、時差が書かれていたか）、str.lower() → Lower、
+// 読んだ値と整数の == → EqualsInt。
 package pyfmt

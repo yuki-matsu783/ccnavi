@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
@@ -22,11 +23,10 @@ import (
 
 // records より上の段（policy・tickets・hook）が書く置き場の名前。上の段は読めないので、名前を写して持つ
 // （持ち主は括弧の中）。records の中の名前は、持ち主のパッケージの定数を読む。
+// policy が書く名前（自己防衛のバックアップ・ctxfile の数え）は config の定数を読む。
 const (
-	selfguardDir   = "selfguard" // policy の自己防衛のバックアップ
-	selfguardStore = "store"     // 自己防衛の実体（消さない）
-	opsDir         = "ops"       // tickets/model の操作記録
-	stateSent      = "sent"      // 操作記録の段階が送り終えた印
+	opsDir    = "ops"  // tickets/model の操作記録
+	stateSent = "sent" // 操作記録の段階が送り終えた印
 )
 
 // stampLayout はローテートした名前の日時。名前の順と時刻の順が合う。
@@ -43,7 +43,7 @@ func named(prefix, suffix string) *regexp.Regexp {
 var sessionOnly = []*regexp.Regexp{
 	named("nudged-", fsio.JSONExt),                  // lifecycle の Stop の促し
 	named(tally.DenyPrefix, fsio.JSONExt),           // tally の拒否の数え
-	named("stop-", fsio.JSONExt),                    // ctxfile
+	named(config.StopPrefix, fsio.JSONExt),          // ctxfile
 	named("", ".turn"+fsio.JSONExt),                 // post のターンの基準
 	named("", ".accepted"+fsio.JSONExt),             // post
 	named(turn.BusyPrefix, fsio.JSONExt),            // turn
@@ -71,7 +71,7 @@ var ownDate = regexp.MustCompile(`^(?:` + strings.Join([]string{
 // sessionAndKey は名前の後ろにセッション以外のキーが `-` で続く記録。セッションにも `-` が入るので、
 // 名前だけでは切れ目が決まらない。既に分かっているセッションの表記に当てて決める。
 var sessionAndKey = []struct{ prefix, suffix string }{
-	{"once-", fsio.JSONExt},                // ctxfile
+	{config.OncePrefix, fsio.JSONExt},      // ctxfile
 	{tally.StreakPrefix, fsio.JSONExt},     // tally の失敗の連続
 	{"subagent-", ".bounced"},              // subagent
 	{"subagent-", ".unchecked"},            // subagent

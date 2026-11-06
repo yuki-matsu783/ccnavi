@@ -13,5 +13,7 @@
 // recording → StartRecording と Recorder.Stop、policy → SetPolicy、slashed → ospath.Slashed。
 // open(path, "a") の 1 行の追記 → AppendLine、time.time() の秒との変換 → UnixSeconds・FromUnixSeconds、
 // datetime.isoformat → ISOFormat（秒までの書式は ISOStampLayout）、f"{prefix}{safe_name(id)}.json" の
-// 記録のパス → RecordPath（拡張子は JSONExt）、会話の記録を末尾から広げて読む → ScanTail。
+// 記録のパス → RecordPath（拡張子は JSONExt）、会話の記録を末尾から広げて読む → ScanTail、
+// shutil.copy2 → CopyFile、safe_name(x) or 既定 → SafeNameOr、fsio を通さない open(path, encoding="utf-8").read() →
+// ReadDiskText、OSError を Python の文のまま上へ渡す → Wrap。
 package fsio

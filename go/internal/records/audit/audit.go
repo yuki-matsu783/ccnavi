@@ -47,12 +47,12 @@ const (
 )
 
 const (
-	// SubjectLimit は記録に残すコマンドやパスの上限（字数）。ヒアドキュメントでファイル 1 本の中身を
+	// RecordedSubjectLimit は記録に残すコマンドやパスの上限（字数）。ヒアドキュメントでファイル 1 本の中身を
 	// ヒアドキュメントでファイル 1 本の中身を書けるため、1 回の呼び出しで記録が膨らまないようにする。
-	SubjectLimit = 1000
+	RecordedSubjectLimit = 1000
 	// redactLimit は、伏せる前に切る長さ。上限の手前で始まって上限をまたぐ値も伏せられるだけの余りを持たせる。
 	// どれだけ長くても、伏せる手間が実行前チェックの期限に届かないようにするため。
-	redactLimit = SubjectLimit * 4
+	redactLimit = RecordedSubjectLimit * 4
 )
 
 // Record は記録の 1 行。欄の意味は記録を読む側（--test・集計）との約束。
@@ -180,11 +180,11 @@ func putList(o *pyjson.Object, key string, values []string) {
 
 // limited は上限で切り、切ったら残りの長さを付ける。whole は伏せる前に切る前の長さ。
 func limited(text string, whole int) string {
-	rest := max(runeLen(text), whole) - SubjectLimit
+	rest := max(runeLen(text), whole) - RecordedSubjectLimit
 	if rest <= 0 {
 		return text
 	}
-	return pyfmt.Head(text, SubjectLimit) + "…(+" + strconv.Itoa(rest) + ")"
+	return pyfmt.Head(text, RecordedSubjectLimit) + "…(+" + strconv.Itoa(rest) + ")"
 }
 
 func runeLen(s string) int { return utf8.RuneCountInString(s) }

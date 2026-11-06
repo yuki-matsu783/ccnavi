@@ -1,8 +1,6 @@
 package stopreview
 
 import (
-	"strings"
-
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
@@ -86,8 +84,9 @@ type Plan struct {
 }
 
 // Setting は CCNAVI_STOP_REVIEW に全体のモードを掛けた実効値。既定と未知の値は dry-run。
+// 既定が dry-run で、読めない値を言わないので、enable に倒す selfguard.Resolve・config.ResolveMode とは分ける（Python も別）。
 func Setting(mode config.Mode, declared string) config.Mode {
-	value := config.Mode(strings.ToLower(ospath.Strip(declared)))
+	value := config.Mode(pyfmt.Lower(ospath.Strip(declared)))
 	if value != config.Disable && value != config.DryRun && value != config.Enable {
 		value = config.DryRun
 	}
@@ -134,13 +133,13 @@ func Candidate(in CandidateInput) (bool, Reason) {
 // AttemptID は共有キーから試行 ID を作る。再判定は別の試行にする。
 func AttemptID(key string, rejudge bool) string {
 	if rejudge {
-		return digest(key) + "-r"
+		return shortKey(key) + "-r"
 	}
-	return digest(key)
+	return shortKey(key)
 }
 
 func (s Store) planPath(key string) string {
-	return ospath.Join(s.State, PlanPrefix+digest(key)+fsio.JSONExt)
+	return ospath.Join(s.State, PlanPrefix+shortKey(key)+fsio.JSONExt)
 }
 
 // ReadPlan は共有キーの計画。無い・読めない・空なら false。

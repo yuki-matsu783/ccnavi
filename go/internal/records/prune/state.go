@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
@@ -68,13 +69,13 @@ func (r *run) sessionEntries(stateDir string) (map[string][]string, []string) {
 	if err != nil {
 		return groups, nil
 	}
-	guard := ospath.Join(stateDir, selfguardDir)
+	guard := ospath.Join(stateDir, config.SelfguardDir)
 	if ospath.IsLink(guard) {
 		r.problem("%s はリンクなので辿らない（バックアップを削除しません）", r.shown(guard))
 	} else if backups, err := ospath.DiskListdir(guard); err == nil {
 		for _, name := range backups {
 			path := ospath.Join(guard, name)
-			if pathcase.Fold(name) != pathcase.Fold(selfguardStore) && ospath.IsDir(path) {
+			if pathcase.Fold(name) != pathcase.Fold(config.SelfguardStore) && ospath.IsDir(path) {
 				groups[name] = append(groups[name], path)
 			}
 		}

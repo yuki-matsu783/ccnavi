@@ -1,39 +1,39 @@
 package config
 
 import (
-	"regexp"
 	"strings"
 
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pyfmt"
 )
 
 // 文面で案内するコマンドの組み立て。案内した形をそのまま打てて、打った形が判定（止めている間の例外や
 // サブエージェントの禁止）にも当たるように、区切りは "/"、引用は要るときだけにそろえる。
 
 const (
-	gitWrapper = "ccnavi-git.sh"
+	// GitWrapper は git の入口の sh。
+	GitWrapper = "ccnavi-git.sh"
 	// TicketWrapper はチケット操作の sh（approval-request などの入口）。
 	TicketWrapper = "ccnavi-ticket.sh"
-	scriptsDir    = "scripts"
+	// ScriptsDir は ccnavi ディレクトリの下の sh の置き場。
+	ScriptsDir = "scripts"
 	// defaultBin は実行ファイルの指定が無いときの案内。PATH に置いたユーザはそのまま打てる。
 	defaultBin = "ccnavi"
 	// Launcher は文面でエージェントに打たせる起動の sh。配布先では `ccnavi` が PATH に無い。ルートで打つ形。
-	Launcher = "sh " + DefaultProjectHome + "/" + scriptsDir + "/ccnavi-launcher.sh"
+	Launcher = "sh " + DefaultProjectHome + "/" + ScriptsDir + "/ccnavi-launcher.sh"
 )
 
 // ScriptCommand は `.ccnavi/scripts/` の sh をワークスペースルートから書いた打ち方。
 // スクリプトはワークスペースにしか無く、プロジェクトから切ったワークツリーでは相対パスが届かない。
 func ScriptCommand(root, name string) string {
 	base := strings.TrimRight(ospath.Slashed(ospath.Realpath(root)), "/")
-	return "sh " + quoted(base+"/"+DefaultProjectHome+"/"+scriptsDir+"/"+name)
+	return "sh " + quoted(base+"/"+DefaultProjectHome+"/"+ScriptsDir+"/"+name)
 }
-
-var windowsDrive = regexp.MustCompile(`^[A-Za-z]:\\`)
 
 // ShellPath は `cd <パス> && …` に置くパス。区切りを "/" にそろえるのは Windows のパスだけ
 // （POSIX の `\` は名前の一部）。
 func ShellPath(path string) string {
-	if ospath.Windows || windowsDrive.MatchString(path) {
+	if ospath.Windows || ospath.HasDrive(path, true) && strings.HasPrefix(path[2:], `\`) {
 		path = ospath.Slashed(path)
 	}
 	return quoted(path)
@@ -44,7 +44,7 @@ func ShellWord(text string) string { return quoted(text) }
 
 // HasGitWrapper はワークスペースルートに git のラッパーがあるか。
 func HasGitWrapper(root string) bool {
-	return root != "" && ospath.IsFile(ospath.Join(root, DefaultProjectHome, scriptsDir, gitWrapper))
+	return root != "" && ospath.IsFile(ospath.Join(root, DefaultProjectHome, ScriptsDir, GitWrapper))
 }
 
 // GitWrapperCommand は git の入口の打ち方。ラッパーが無ければ ok が偽で、呼び手はユーザに頼む文にする
@@ -53,7 +53,7 @@ func GitWrapperCommand(root string) (string, bool) {
 	if !HasGitWrapper(root) {
 		return "", false
 	}
-	return ScriptCommand(root, gitWrapper), true
+	return ScriptCommand(root, GitWrapper), true
 }
 
 // GitCommand はラッパーがあればその打ち方、無ければ `git`。HasGitWrapper が偽なら文に入れないこと。
@@ -72,7 +72,7 @@ func BinCommand(binPath string) string {
 	}
 	path := ospath.Slashed(binPath)
 	// 拡張子の綴りの判定で、Python の lower() と同じ答えにする（casefold の pathcase.Fold は ſ を s にする）。
-	if strings.HasSuffix(strings.ToLower(path), ".sh") {
+	if strings.HasSuffix(pyfmt.Lower(path), ".sh") {
 		return "sh " + quoted(path)
 	}
 	return quoted(path)

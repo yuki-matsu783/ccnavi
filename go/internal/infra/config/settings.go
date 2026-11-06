@@ -27,8 +27,9 @@ var (
 	defaultProject = "projects"
 
 	// LocalClaudeSettings は個人の上書き設定。`env` は Claude Code が起こしたプロセスに渡る。
-	LocalClaudeSettings  = filepath.Join(".claude", "settings.local.json")
-	sharedClaudeSettings = filepath.Join(".claude", "settings.json")
+	LocalClaudeSettings = filepath.Join(ClaudeDir, "settings.local.json")
+	// SharedClaudeSettings はリポジトリで共有する Claude Code の設定（hook の登録）。
+	SharedClaudeSettings = filepath.Join(ClaudeDir, "settings.json")
 )
 
 const (
@@ -41,6 +42,8 @@ const (
 	DefaultProjectHome = ".ccnavi"
 	// ConfigDir は ccnavi ディレクトリの下の設定の置き場。
 	ConfigDir = "config"
+	// ClaudeDir は Claude Code の設定の置き場（ワークスペースルートの直下）。
+	ClaudeDir = ".claude"
 
 	// ownProject は ccnavi 自身のソースツリーを見分ける pyproject.toml の名前。
 	ownProject = "ccnavi"
@@ -285,7 +288,7 @@ type HookView struct {
 // Claude Code と同じ順（共有 → 個人）で重ねる。判定は Load だけを読む。
 func ReadHookView(root string) HookView {
 	values := map[string]string{env.Mode: os.Getenv(env.Mode), env.TicketControl: os.Getenv(env.TicketControl)}
-	for _, rel := range []string{sharedClaudeSettings, LocalClaudeSettings} {
+	for _, rel := range []string{SharedClaudeSettings, LocalClaudeSettings} {
 		block, ok := readEnvBlock(filepath.Join(root, rel))
 		if !ok {
 			continue
@@ -356,7 +359,7 @@ func branchPrefixes(root string) ([]string, []string) {
 	if v, ok := os.LookupEnv(env.BranchPrefixes); ok {
 		return parseBranchPrefixes(v)
 	}
-	for _, rel := range []string{LocalClaudeSettings, sharedClaudeSettings} {
+	for _, rel := range []string{LocalClaudeSettings, SharedClaudeSettings} {
 		block, ok := readEnvBlock(filepath.Join(root, rel))
 		if !ok {
 			continue

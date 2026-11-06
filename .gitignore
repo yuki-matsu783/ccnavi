@@ -69,3 +69,6 @@ settings.local.json*
 
 # macOS の Finder が作るゴミ。
 .DS_Store
+
+# Go のテストの実行ファイル（go test -c の出力）。
+/go/**/*.test

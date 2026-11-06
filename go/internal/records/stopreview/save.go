@@ -18,7 +18,7 @@ func SaveMaterial(logDir, attemptID, criteria, rendered string) int {
 	row := pyjson.NewObject(
 		"attempt_id", attemptID,
 		"extractor", extractorVersion,
-		"criteria_version", digest(criteria),
+		"criteria_version", shortKey(criteria),
 		"criteria", redact.Redact(criteria),
 		"material", shown,
 		"redactions", changed,

@@ -2,6 +2,7 @@ package pyfmt
 
 import (
 	"math"
+	"math/big"
 	"testing"
 	"time"
 )
@@ -63,6 +64,23 @@ func TestFromISOFormat(t *testing.T) {
 		got, zoned, ok := FromISOFormat(c.in)
 		if ok != c.ok || zoned != c.zoned || !got.Equal(c.want) {
 			t.Errorf("FromISOFormat(%q) = %v, %v, %v", c.in, got, zoned, ok)
+		}
+	}
+}
+
+func TestEqualsInt(t *testing.T) {
+	cases := []struct {
+		v    any
+		n    int
+		want bool
+	}{
+		{true, 1, true}, {false, 0, true}, {true, 0, false}, {false, 1, false}, {true, 2, false},
+		{1, 1, true}, {1.0, 1, true}, {1.5, 1, false}, {math.NaN(), 0, false}, {big.NewInt(1), 1, true},
+		{"1", 1, false}, {nil, 0, false},
+	}
+	for _, c := range cases {
+		if got := EqualsInt(c.v, c.n); got != c.want {
+			t.Errorf("EqualsInt(%v, %d) = %v, want %v", c.v, c.n, got, c.want)
 		}
 	}
 }

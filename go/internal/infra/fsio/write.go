@@ -274,7 +274,7 @@ func Move(source, target string) string {
 	if pyErrno(err) != errnoEXDEV {
 		return ErrorText(err)
 	}
-	if err := copyFile(source, target); err != nil {
+	if err := CopyFile(source, target); err != nil {
 		Remove(target)
 		return ErrorText(err)
 	}
@@ -286,8 +286,9 @@ func Move(source, target string) string {
 	return record(target, "")
 }
 
-// copyFile は shutil.copy2（中身・権限・更新時刻を写す）。
-func copyFile(source, target string) error {
+// CopyFile は shutil.copy2（中身・権限・更新時刻を写す。リンクは辿る）。親のディレクトリは作らない。
+// 溜める段は通さない（実行ファイルのバックアップと退避に使う）。
+func CopyFile(source, target string) error {
 	in, err := os.Open(source)
 	if err != nil {
 		return err

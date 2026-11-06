@@ -7,6 +7,7 @@ import (
 
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
+	"ccnavi/internal/infra/pyfmt"
 )
 
 // 語の並びだけを見て、コマンド名・実行役・オプションの幅・リダイレクトを見分ける。
@@ -388,7 +389,7 @@ var (
 
 func stdinBase(word string) string {
 	word = ospath.Slashed(word)
-	return lower(word[strings.LastIndex(word, "/")+1:])
+	return pyfmt.Lower(word[strings.LastIndex(word, "/")+1:])
 }
 
 // ReadsStdin は標準入力からスクリプトを読むシェルか（`sh`・`sh -s …`・`sh < x`・`busybox sh`・

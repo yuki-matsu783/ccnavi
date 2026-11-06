@@ -6,4 +6,5 @@
 //
 // Python からの対応: Record → Record、Log → Log（write → Write は error を返す）、ALLOW などの判定 →
 // Decision の定数、REASON_* → Reason の定数、_redacted → redact.Redact（Go の伏せ字は失敗しないので、REDACT_FAILED に置き換える経路は持たない）。
+// SUBJECT_LIMIT → RecordedSubjectLimit（texts.ShownSubjectLimit とは別の上限）。
 package audit

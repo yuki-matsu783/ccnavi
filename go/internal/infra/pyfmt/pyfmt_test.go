@@ -72,3 +72,12 @@ func TestStrAndTruthy(t *testing.T) {
 		}
 	}
 }
+
+// İ の小文字は Python では "i̇"（i と結合の点）なので、"builtİn:" は "builtin:" で始まらない。
+func TestLower(t *testing.T) {
+	for in, want := range map[string]string{"DRY-RUN": "dry-run", "builtİn:x": "builti̇n:x", "\u212a": "k"} {
+		if got := Lower(in); got != want {
+			t.Errorf("Lower(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
