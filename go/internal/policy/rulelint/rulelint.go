@@ -1,6 +1,6 @@
-// Package rulelint はルールファイルの中身の検査。組み上がらないルール、何も止めない match、届かない
+// Package rulelint は、ルールファイルの中身を検査する。組み上がらないルール、何も止めない match、届かない
 // message、広すぎる allow などを名指しする。`--lint`・保護対象の下書きの取り込み・提案（suggest）が呼ぶ。
-// 判定と同じ読み（rules.Load）で読む。別の読み方をすると、検査は通ったのに実運用で失敗する。
+// 判定と同じ読み（rules.Load）で読む。別の読み方をすると、検査は通ったのに実運用で失敗するためである。
 //
 // Python からの対応: policy.rule_lint。file_problems → FileProblems（home・layer・project は Options）。
 package rulelint
@@ -153,8 +153,8 @@ func ruleProblems(rule *rules.Rule, name, home string, project bool) []rules.Pro
 	problems = append(problems, whenProblems(rule, name)...)
 	problems = append(problems, catchAllDenyProblems(rule, name)...)
 
-	// once の文と every > 1 の文は毎回は積まれないので、広さの報告から外す。読めない every は 1 になっている
-	// ので、この式は読めない every も拾う。
+	// once の文と every > 1 の文は毎回は積まれないので、広さの報告から外す。読めない every は 1 として扱われるため、
+	// この式は読めない every も拾う。
 	if (rule.AdditionalContext != "" || rule.AdditionalContextFile != "") && rule.Decision == rules.Allow && rule.Every <= 1 {
 		if why := broad(rule); why != "" {
 			problems = append(problems, warn(name, "広い allow に additionalContext がある（"+why+"）。"+
@@ -461,8 +461,8 @@ func whenProblems(rule *rules.Rule, name string) []rules.Problem {
 	return problems
 }
 
-// everyProblems は every の値と、刻んだ先に渡すものがあるか。読めない値は error（判定は毎回渡すので、
-// 書いたユーザは刻んだつもりで毎回渡ることになる）。
+// everyProblems は every の値と、刻んだ先に渡すものがあるかを検査する。読めない値は error にする。判定は毎回渡すので、
+// 書いたユーザは刻んだつもりで毎回渡ることになってしまうためである。
 func everyProblems(rule *rules.Rule, name string) []rules.Problem {
 	if rule.EveryWritten == nil {
 		return nil
@@ -518,8 +518,8 @@ func alternatives(regex string) int {
 	return count
 }
 
-// inert は match に並んだツール名のうち、判定が対象を取り出せないもの。一覧を写さず、rules.SubjectOf を
-// 実際に呼んで確かめる（判定がツールを増やしたときに、こちらが気づかないうちに古くならないように）。
+// inert は match に並んだツール名のうち、判定が対象を取り出せないものを返す。一覧を写さず、rules.SubjectOf を
+// 実際に呼んで確かめる。判定がツールを増やしたときに、こちらが気づかないうちに古くならないようにするためである。
 func inert(match string) []string {
 	probe := pyjson.NewObject()
 	for _, f := range rules.SubjectFields {

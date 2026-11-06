@@ -18,9 +18,9 @@ import (
 // （書いた文面は lint が言うが、読み込みは通す。外すとその文面のせいでルールごと通ってしまう）。
 const needsMessage = Deny
 
-// Load はルールファイルを読んで組み立てる。root は {root} の置き換え先。読めない（無い・UTF-8 でない・
-// YAML として読めない・マッピングでない）ときは error（文は Python の例外の文）。組み立てられないルールは
-// 外して Problem で名指しし、組み立てられたものは返す（1 件の不備がガード全体を止めない）。
+// Load はルールファイルを読んで組み立てる。root は {root} の置き換え先。
+// 読めない（ファイルが無い、UTF-8 でない、YAML として読めない、マッピングでない）ときは error を返す。error の文は Python の例外の文と同じにする。
+// 組み立てられないルールは外して Problem で名指しし、組み立てられたものは返す。1 件の不備でガード全体を止めないためである。
 func Load(path, root string) (*RuleSet, []Problem, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -42,8 +42,8 @@ func Load(path, root string) (*RuleSet, []Problem, error) {
 	return rs, problems, nil
 }
 
-// Parse は読み込み済みのルールを組み立てる。ファイルを開く部分と分けてあるのは、ルールファイルを
-// 書き換えずに組み立てる呼び手（設定の取り込み）が同じ経路を通るため。
+// Parse は読み込み済みのルールを組み立てる。ファイルを開く部分と分けるのは、ルールファイルを
+// 書き換えずに組み立てる呼び手（設定の取り込み）が同じ経路を通れるようにするため。
 func Parse(data *yaml.Map, root string) (*RuleSet, []Problem) {
 	written := data.Get("version")
 	if !pyfmt.Truthy(written) {
@@ -135,7 +135,7 @@ type Spec struct {
 }
 
 // Builtin は組み込みのルールを組み立てる。builtin: で始まる id を書けるのはこちらだけ。
-// 苦情はこのビルドの不備。
+// 苦情はこのビルドの不備を指す。
 func Builtin(section Decision, specs []Spec, root string) ([]*Rule, []Problem) {
 	var out []*Rule
 	var problems []Problem
@@ -154,8 +154,8 @@ func Builtin(section Decision, specs []Spec, root string) ([]*Rule, []Problem) {
 	return out, problems
 }
 
-// rawRule は書かれたルール 1 件（ルールファイルの欄か、組み込みの Spec）。文字列の欄は Python の
-// str(raw.get(key) or "") で読んだ形。
+// rawRule は書かれたルール 1 件（ルールファイルの欄か、組み込みの Spec）。文字列の欄は、
+// Python の str(raw.get(key) or "") で読んだ形にそろえる。
 type rawRule struct {
 	builtin                            bool
 	id, match, glob, regex, message    string
@@ -180,8 +180,8 @@ func fromYAML(m *yaml.Map) rawRule {
 	}
 }
 
-// build はルール 1 件を組み立てる。返るのは (ルール, 苦情) で、苦情があってもルールが返ることがある
-// （{!root} を組み立てられずに止める側へ倒した deny・ask と、{!root} の後ろの書き方への warn）。
+// build はルール 1 件を組み立てる。返すのは (ルール, 苦情)。苦情があってもルールが返ることがある。
+// {!root} を組み立てられずに止める側へ倒した deny・ask と、{!root} の後ろの書き方への warn がそれにあたる。
 func build(raw rawRule, section Decision, where, root string) (*Rule, []Problem) {
 	if !raw.builtin && ospath.Strip(raw.id) == "" {
 		return nil, []Problem{{Severity: Error, Rule: where, Detail: "id がありません。ルールには id を書いてください（記録と文面にこの名前が出る）"}}
@@ -324,8 +324,8 @@ func build(raw rawRule, section Decision, where, root string) (*Rule, []Problem)
 	return rule, problems
 }
 
-// readExcepts は except を読む。キーが無ければ空。書いてあるのに空・null・形が違うものは error
-// （書いたユーザは何かを除いたつもりでいる）。
+// readExcepts は except を読む。キーが無ければ空。書いてあるのに空・null・形が違うものは error にする。
+// 書いたユーザは何かを除いたつもりでいるため、黙って無視しない。
 func readExcepts(raw rawRule, name string) ([]Exclusion, *Problem) {
 	if !raw.hasExcept {
 		return nil, nil

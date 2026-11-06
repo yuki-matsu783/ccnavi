@@ -22,7 +22,7 @@ import (
 
 const (
 	// BackupDir はバックアップの置き場（state の下）。セッションごとに分ける。別のセッションの断面で戻すと、
-	// こちらが一度も見ていない内容へ書き換える。
+	// こちらが一度も見ていない内容へ書き換えてしまうため。
 	BackupDir = "selfguard"
 	// StoreDir は大きい対象の実体の置き場（BackupDir の直下）。中身のハッシュで名前を付け、同じ中身を何本も持たない。
 	StoreDir = "store"
@@ -50,15 +50,15 @@ const (
 	commonRulesDraft = "wip/handoff/.ccnavi/config/common/rules.yml"
 )
 
-// Choices は戻す働きの設定が取る値。GateChoices は戻す働きを持たない切り替え（チケットの承認の経路など）の値で、
-// dry-run が無い（通せば済んでしまい、報告では戻らない）。
+// Choices は戻す働きの設定が取る値。GateChoices は、戻す働きを持たない切り替え（チケットの承認の経路など）の値。
+// dry-run が無い。通せば済んでしまい、報告では戻らないからである。
 var (
 	Choices     = []config.Mode{config.Enable, config.DryRun, config.Disable}
 	GateChoices = []config.Mode{config.Enable, config.Disable}
 )
 
-// Resolve は設定の値を解く。読めない値（allowed に無い語も）は enable にし、stderr に言う。書き損じた 1 語で保護が
-// 消えるより、残るほうがよい。
+// Resolve は設定の値を解く。読めない値（allowed に無い語も）は enable にし、stderr に言う。
+// 書き損じた 1 語で保護が消えるより、残るほうがよいため。
 func Resolve(stderr io.Writer, flag, declared, name string, allowed []config.Mode) config.Mode {
 	written := flag
 	if written == "" {
@@ -104,9 +104,9 @@ type Outcome struct {
 // Step は Before・After・Accept・AtStart の形（呼び手が契機ごとに選ぶ）。
 type Step func(setting config.Mode, stateDir, session, root string, found []Target) []Outcome
 
-// Before は実行前。在る対象の断面をバックアップし、消されていれば戻してからバックアップする。内容の照合はしない
-// （ユーザがエディタで直している最中の 1 文字を消さない）。最初から無い対象（settings.local.json を置かないプロジェクト）は
-// 印を残し、以後は何も言わない。大きい対象は大きさと更新時刻が変わったときだけ、新しい版を基準に取り直す（enable のとき）。
+// Before は実行前の処理。在る対象の断面をバックアップし、消されていれば戻してからバックアップする。内容の照合はしない。
+// ユーザがエディタで直している最中の 1 文字を消さないためである。最初から無い対象（settings.local.json を置かないプロジェクトなど）は、
+// 印を残し、以後は何も言わない。大きい対象は、大きさと更新時刻が変わったときだけ、新しい版を基準に取り直す（enable のとき）。
 func Before(setting config.Mode, stateDir, session, root string, found []Target) []Outcome {
 	if setting == config.Disable || stateDir == "" {
 		return nil
@@ -154,8 +154,8 @@ func Before(setting config.Mode, stateDir, session, root string, found []Target)
 	return outcomes
 }
 
-// After は実行後。バックアップと違えば戻す。バックアップが読めなければ git のコミット済みの内容を使い、そう報告する
-// （ユーザの書きかけが残っているかが変わる）。
+// After は実行後の処理。バックアップと違えば戻す。バックアップが読めなければ git のコミット済みの内容を使い、そう報告する。
+// ユーザの書きかけが残っているかどうかが変わるため、そう報告する。
 func After(setting config.Mode, stateDir, session, root string, found []Target) []Outcome {
 	if setting == config.Disable || stateDir == "" {
 		return nil
@@ -206,9 +206,9 @@ func After(setting config.Mode, stateDir, session, root string, found []Target) 
 	return reported
 }
 
-// Accept はユーザの発言で、前のターンの終わりからの変更をユーザの手によるものとして受け入れる（基準を取り直すだけで戻さない。
-// dry-run でも取り直す）。消えたものを受け入れるのはここだけ。在るのに読めないもの（権限・壊れたリンク）は消えたことにしない。
-// 実行ファイルは開始で基準を取ったものだけ取り直す。バックグラウンド作業の完了通知では呼ばない（呼び手）。
+// Accept はユーザの発言を受け、前のターンの終わりからの変更をユーザの手によるものとして受け入れる。基準を取り直すだけで、戻さない。
+// dry-run でも取り直す。消えたものを受け入れるのはここだけで、在るのに読めないもの（権限・壊れたリンク）は消えたことにしない。
+// 実行ファイルは開始で基準を取ったものだけ取り直す。バックグラウンド作業の完了通知では呼ばない（呼び手の責任）。
 func Accept(setting config.Mode, stateDir, session, root string, found []Target) []Outcome {
 	if setting == config.Disable || stateDir == "" {
 		return nil
@@ -248,8 +248,8 @@ func Accept(setting config.Mode, stateDir, session, root string, found []Target)
 	return outcomes
 }
 
-// AtStart はセッション開始。古いバックアップを消し、大きい対象をバックアップする（戻さない。dry-run でも取る）。
-// 小さい対象は最初の発言で Accept が取る（開始から最初の発言までの変更はユーザの手によるもので、戻す根拠が無い）。
+// AtStart はセッション開始時の処理。古いバックアップを消し、大きい対象をバックアップする（戻さない。dry-run でも取る）。
+// 小さい対象は最初の発言で Accept が取る。開始から最初の発言までの変更はユーザの手によるもので、戻す根拠が無いためである。
 func AtStart(setting config.Mode, stateDir, session, root string, found []Target) []Outcome {
 	if setting == config.Disable || stateDir == "" {
 		return nil
@@ -272,8 +272,8 @@ func AtStart(setting config.Mode, stateDir, session, root string, found []Target
 	return outcomes
 }
 
-// sweep は keepFor より長く触られていないセッションの置き場と、どこからも参照されない古い実体を消す。件数ではなく日付で
-// 切る（長く返事を待っているだけの生きたセッションを消さない）。自分の置き場は日付を見ずに残す。失敗しても開始は続ける。
+// sweep は、keepFor より長く触られていないセッションの置き場と、どこからも参照されない古い実体を消す。件数ではなく日付で
+// 切る。長く返事を待っているだけの生きたセッションを消さないためである。自分の置き場は日付を見ずに残す。失敗しても開始は続ける。
 func sweep(stateDir, session string) {
 	if stateDir == "" {
 		return
@@ -364,8 +364,8 @@ type backup struct {
 	target            Target
 }
 
-// path はバックアップの置き場。key はレイヤーで `:` を含む（Windows では代替データストリームになる）ので、使える字に置き換える。
-// 切り詰めない（ワークツリー側の key の末尾の digest を削ると、別のワークツリーと同じ名前になる）。
+// path はバックアップの置き場。key はレイヤーの `:` を含むので（Windows では代替データストリームになる）、使える字に置き換える。
+// 切り詰めない。ワークツリー側の key の末尾の digest を削ると、別のワークツリーと同じ名前になるためである。
 func (b backup) path() string {
 	return ospath.Join(b.stateDir, BackupDir, safeSession(b.session), fsio.SafeName(b.target.Key, fsio.NoLimit))
 }
@@ -390,8 +390,8 @@ func (b backup) clearAbsent()      { os.Remove(b.absent()) }
 
 func (b backup) readRef() (heavyRef, bool) { return parseRef(fsio.ReadBytes(b.ref())) }
 
-// saveHeavy は大きい対象をバックアップする。先にコピーしてからその中身のハッシュで名前を付ける（ハッシュを読んでから
-// コピーすると、その間に書き換えられた版が読んだハッシュの名前で入る）。参照にはバックアップした時点の大きさと更新時刻を書く。
+// saveHeavy は大きい対象をバックアップする。先にコピーしてから、その中身のハッシュで名前を付ける。ハッシュを読んでから
+// コピーすると、その間に書き換えられた版が、読んだハッシュの名前で入ってしまう。参照にはバックアップした時点の大きさと更新時刻を書く。
 func (b backup) saveHeavy() string {
 	mtime, size, err := statTimes(b.target.Path)
 	if err != nil {
@@ -428,7 +428,7 @@ func (b backup) storePath(name string) string {
 }
 
 // checkHeavy は実行後、大きい対象を大きさと更新時刻で照合し、変わっていれば直前の版に戻す（中身は読まない）。
-// 参照が無いのは、開始のイベントを登録していないか実行ファイルを指していない設定で、異常ではない。
+// 参照が無いのは、開始のイベントを登録していないか、実行ファイルを指していない設定によるもので、異常ではない。
 func (b backup) checkHeavy(setting config.Mode) (Outcome, bool) {
 	t := b.target
 	r, ok := b.readRef()
@@ -450,7 +450,7 @@ func (b backup) checkHeavy(setting config.Mode) (Outcome, bool) {
 }
 
 // restoreHeavy は実行ファイルを参照の版に戻す。今の版は消す前に aside/ へ退避し、退避できなければ戻さない。
-// 実体はコピーなので、更新時刻を参照の時刻に戻す（戻さないと次の照合で毎回一致しない）。
+// 実体はコピーなので、更新時刻を参照の時刻に戻す。戻さないと、次の照合で毎回一致しなくなる。
 func (b backup) restoreHeavy(r heavyRef) Outcome {
 	t := b.target
 	entry := b.storePath(r.digest)
@@ -645,8 +645,8 @@ func recoverMissing(setting config.Mode, root string, t Target, saved []byte, ha
 	return Outcome{t, ActionRestoredGit, "対象が無かったので、コミット済みの内容から戻した"}
 }
 
-// fallBackToGit はバックアップが無いまま実行後に来たとき。git が変わっていないと言うなら何もしない（毎回 restore すると、
-// 何も起きていない呼び出しがファイルを書き換える）。
+// fallBackToGit は、バックアップが無いまま実行後に来たときに使う。git が変わっていないと言うなら何もしない。
+// 毎回 restore すると、何も起きていない呼び出しがファイルを書き換えてしまうため。
 func fallBackToGit(setting config.Mode, root string, t Target, hasNow bool) Outcome {
 	top := gitTop(root, t)
 	changes, unreadable := git.Read(top, 0)

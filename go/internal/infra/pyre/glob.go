@@ -5,9 +5,9 @@ import "strings"
 // separator は "/" と書いた glob を "\" にも当てる式（ルールは 1 回書いて、どの機械でも同じ意味にする）。
 const separator = `[\\/]`
 
-// TranslateGlob は glob を、Python 3.13 の fnmatch.translate と同じ式にし、"/" を両方の区切りに当てる
+// TranslateGlob は glob を Python 3.13 の fnmatch.translate と同じ式にし、"/" を両方の区切りに当てる
 // （Python の globmatch.translate）。文字列全体に当たる形（末尾は `\Z`）で、先頭の `^` は呼び手が付ける。
-// 式の字面も Python と同じにする（判定の説明に式をそのまま出すため）。
+// 式の字面も Python と同じにする。判定の説明に式をそのまま出すためである。
 //
 // 置き換えるのは翻訳後の "/" で、文字クラスの中の "/"（`[a/b]`）も置き換わる。Python と同じ答えにするため
 // そのままにしてある。

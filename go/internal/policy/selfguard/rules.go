@@ -49,8 +49,8 @@ type Options struct {
 	Cwd string
 }
 
-// AddRules はガード自身を守るルールを、ルールファイルの外から判定の先頭に足す（ルールに書かせると消せる）。
-// シェルから書き込む形・実行ファイル・ccnavi ディレクトリ・置き場のリンク 2 本・記録の置き場・共通レイヤーの 3 本。
+// AddRules はガード自身を守るルールを、ルールファイルの外から判定の先頭に足す（ルールに書かせると消せるため）。
+// 足すのは、シェルから書き込む形・実行ファイル・ccnavi ディレクトリ・置き場のリンク 2 本・記録の置き場・共通レイヤーの 3 本。
 // 先頭に挿すので、後に足したものほど先に当たる（共通レイヤーの 1 本が ccnavi ディレクトリの 1 本より先）。
 func AddRules(rs *rules.RuleSet, o Options) {
 	hint := nextHint(o.Root)
@@ -101,9 +101,9 @@ func AddRules(rs *rules.RuleSet, o Options) {
 	}
 }
 
-// AddNamedRules は hook・settings・scripts・共通の設定 3 本を、名前で書くツールから守る 4 本を先頭に足す。
-// ルールファイルが読めない間も、実行後の保護範囲にも同じ 4 本を使う。実行前は AddRules の後に呼ぶ（専用の文が先に並ぶ）。
-// 置き場の中のつながっていないコピーは外す。ccnavi ディレクトリの名前が空なら scripts と共通の設定は足さない。
+// AddNamedRules は、hook・settings・scripts・共通の設定 3 本を名前で書くツールから守る 4 本を、先頭に足す。
+// ルールファイルが読めない間も、実行後の保護範囲に同じ 4 本を使う。実行前は AddRules の後に呼ぶ（専用の文が先に並ぶため）。
+// 置き場の中のつながっていないコピーは外す。ccnavi ディレクトリの名前が空なら、scripts と共通の設定は足さない。
 func AddNamedRules(rs *rules.RuleSet, projectHome, root string) {
 	exempt := handoffWriteExempt(root)
 	variants := texts.SpecOptions{Variants: texts.Variants{nextVariant: nextHint(root)}}
@@ -135,9 +135,9 @@ func nextHint(root string) string {
 	return "noroot"
 }
 
-// insert は組み込みの 1 本を判定の先頭に挿す。組み立てられないのはこのビルドの書き損じで、判定は止めない
-// （止めると直すための呼び出しごと止まる）。黙って外すと保護が欠けたことに気づけないので、診断ログに id と問題の件数だけを
-// 残す（式には守る先のパスが入る）。
+// insert は組み込みの 1 本を判定の先頭に挿す。組み立てられないのはこのビルドの書き損じなので、判定は止めない。
+// 止めると、直すための呼び出しごと止まってしまう。黙って外すと保護が欠けたことに気づけないので、診断ログに id と問題の件数だけを
+// 残す（式には守る先のパスが入るため、式そのものはログに出さない）。
 func insert(rs *rules.RuleSet, s rules.Spec, root string) {
 	built, problems := rules.Builtin(rules.Deny, []rules.Spec{s}, root)
 	if len(problems) > 0 || len(built) == 0 {

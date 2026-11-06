@@ -10,7 +10,7 @@ import (
 )
 
 // 下書きの置き場（各ツリー直下の `wip/handoff/`）。守る場所を直すときは、ここへ写したコピーを直す
-// （.ccnavi/docs/scratchpad.md）。コピーにはルールとしての効力が無いので書けるようにし、つながった（リンク・ハードリンク）
+// （.ccnavi/docs/scratchpad.md）。コピーにはルールとしての効力が無いので書けるようにする。ただし、つながった（リンク・ハードリンク）
 // 対象と、そこにリンクを作る形は止める。式は固定の形なので RE2 で読む。
 
 // handoffParts は置き場（ワークスペースルートからの相対）。
@@ -30,8 +30,8 @@ func handoffPlace(root string) *regexp.Regexp {
 
 func slashFold(path string) string { return strings.ReplaceAll(pathcase.Fold(path), `\`, "/") }
 
-// handoffLinked は置き場の中の対象が、リンクを通る・ハードリンクでほかの名前とつながる・`..` を含むか。
-// 確かめられなければつながっているとみなす。
+// handoffLinked は、置き場の中の対象が、リンクを通る・ハードリンクでほかの名前とつながる・`..` を含むかを返す。
+// 確かめられなければ、つながっているとみなす。
 func handoffLinked(subject, spelledPath string) bool {
 	for _, part := range strings.Split(spelledPath, "/") {
 		if part == ".." {
@@ -127,7 +127,7 @@ func deleteTargets(words []string) []string {
 }
 
 // handoffDeleteExempt はシェルの保護から、置き場の中だけを消すコマンドを取り除く関数。対象の語がすべて置き場の中と
-// 読めるときだけ取り除き、ほかのコマンドと書き込みは残す。外すのは絶対パスの語だけ（`sh -c` の層の中の `cd` は見えない）。
+// 読めるときだけ取り除き、ほかのコマンドと書き込みは残す。取り除くのは絶対パスの語だけである。`sh -c` の層の中の `cd` は見えないため。
 func handoffDeleteExempt(root string) func(string) string {
 	if root == "" {
 		return nil
@@ -161,8 +161,8 @@ func allPlain(root string, targets []string) bool {
 	return true
 }
 
-// handoffLinkTarget は名指しのツールで、置き場の中のつながった対象に書く形だけを残す関数（利用者のルールの except が
-// 置き場を外していても、ハードリンクでつながった守る場所へは書かせない）。
+// handoffLinkTarget は名指しのツールで、置き場の中のつながった対象に書く形だけを残す関数。利用者のルールの except が
+// 置き場を外していても、ハードリンクでつながった守る場所へは書かせないためである。
 func handoffLinkTarget(root string) func(string) string {
 	if root == "" {
 		return nil
@@ -227,7 +227,7 @@ func commandBase(word string) string {
 }
 
 // handoffLinkCommand はシェルで、置き場の中にリンクを作る形だけを残す関数。リンクを作るコマンドがあり、コマンド行に
-// `handoff` の綴りがあるか作業ディレクトリが置き場の中なら残す（行き先は変数や cd で組めるので読み分けない）。
+// `handoff` の綴りがあるか作業ディレクトリが置き場の中なら残す。行き先は変数や cd で組めるので、読み分けない。
 func handoffLinkCommand(root, cwd string) func(string) string {
 	if root == "" {
 		return nil

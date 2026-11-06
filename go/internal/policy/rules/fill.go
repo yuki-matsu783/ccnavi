@@ -11,10 +11,10 @@ import (
 	"ccnavi/internal/infra/pyre"
 )
 
-// RootPlaceholder はワークスペースルートを指す合言葉。glob・regex・文面の中で使え、その実パスに置き換わる。
+// RootPlaceholder はワークスペースルートを指す合言葉。glob・regex・文面の中で使え、実パスに置き換わる。
 const RootPlaceholder = "{root}"
 
-// NotRootPlaceholder は「ワークスペースルートの外」を指す合言葉。regex の `^` の直後に 1 回だけ書ける。
+// NotRootPlaceholder は「ワークスペースルートの外」を指す合言葉。regex では `^` の直後に 1 回だけ書ける。
 const NotRootPlaceholder = "{!root}"
 
 // ScriptPlaceholder は文の差し込み `{script:<名前>}`（名前は `.ccnavi/scripts/` のファイル名）。
@@ -23,21 +23,21 @@ var ScriptPlaceholder = regexp.MustCompile(`\{script:([^{}]*)\}`)
 // scriptName は ScriptPlaceholder の名前に書ける形。
 var scriptName = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
-// IsScriptName は {script:<名前>} の名前として受ける形か。
+// IsScriptName は {script:<名前>} の名前として受け付ける形かどうかを返す。
 func IsScriptName(name string) bool { return scriptName.MatchString(name) }
 
-// RealRoot はルートを {!root} の展開に使える形にする（実パスにして、末尾の区切りを除く）。
-// 除かないと、ルート直下の普通のファイル名が「外」になる（Windows のドライブ直下は realpath が `C:\` を返す）。
+// RealRoot はルートを {!root} の展開に使える形にする。実パスにして、末尾の区切りを除く。
+// 除かないと、ルート直下の普通のファイル名が「外」になってしまう。Windows のドライブ直下では realpath が `C:\` を返すため。
 func RealRoot(root string) string {
 	return strings.TrimRight(ospath.Realpath(root), `\/`)
 }
 
-// RootGlob はワークスペースルートの実パスを glob と文面に埋める形（区切りは "/"）。
+// RootGlob はワークスペースルートの実パスを glob と文面に埋める形にする（区切りは "/"）。
 func RootGlob(root string) string {
 	return strings.TrimRight(ospath.Slashed(ospath.Realpath(root)), "/")
 }
 
-// RootPattern はワークスペースルートの実パスを regex に埋める形。区切りは "/" と "\" のどちらにも当てる。
+// RootPattern はワークスペースルートの実パスを regex に埋める形にする。区切りは "/" と "\" のどちらにも当たる。
 func RootPattern(root string) string {
 	var b strings.Builder
 	for _, ch := range RealRoot(root) {
@@ -50,7 +50,7 @@ const anySeparator = `[\\/]`
 
 func isSeparator(ch rune) bool { return ch == '/' || ch == '\\' }
 
-// differs はその 1 字と違う字に当たる文字クラス。区切りは両方の書き方を除く。
+// differs は、その 1 字と違う字に当たる文字クラス。区切りは両方の書き方を除く。
 func differs(ch rune) string {
 	if isSeparator(ch) {
 		return `[^\\/]`
@@ -65,15 +65,14 @@ func same(ch rune) string {
 	return pyre.Escape(string(ch))
 }
 
-// notRootEnd は展開の各段の「ここで文字列が終わる」。`$` は末尾の改行の直前にも当たるので使わない。
+// notRootEnd は展開の各段で「ここで文字列が終わる」ことを表す式。`$` は末尾の改行の直前にも当たるので使わない。
 const notRootEnd = `\Z`
 
-// NotRootPattern は「ワークスペースルートで始まらない」を先読みなしに書いた式。ルートを 1 字ずつ
-// 「ここで終わる／ここが違う／ここは同じ」の入れ子に分ける。繰り返しを含まず、判定はルートの長さに比例する。
-// 引数は RealRoot で正規化したパス。`^` は呼ぶ側が書く。
+// NotRootPattern は「ワークスペースルートで始まらない」を、先読みなしに書いた式。ルートを 1 字ずつ
+// 「ここで終わる」「ここが違う」「ここは同じ」の入れ子に分けて書く。繰り返しを含まないので、判定の時間はルートの長さに比例する。
+// 引数は RealRoot で正規化したパスを渡す。先頭の `^` は呼ぶ側が書く。
 //
-// 最内に `\Z` を置かない。そこはルートを最後までたどり終えた位置で、そこで終わる対象はルートそのもの
-// （中と数える）。
+// 最内には `\Z` を置かない。そこはルートを最後までたどり終えた位置で、そこで終わる対象はルートそのもの（中と数える）になるため。
 func NotRootPattern(root string) string {
 	body := differs('/')
 	runes := []rune(root)
@@ -84,8 +83,8 @@ func NotRootPattern(root string) string {
 	return body
 }
 
-// FillText はモデルへ渡す文の差し込みを置き換える。`{script:<名前>}` は sh の打ち方に（名前の形が
-// 違えば残す。lint が言う）、`{root}` はルートの実パスに。ルートが渡らない読み方では何もしない。
+// FillText はモデルへ渡す文の差し込みを置き換える。`{script:<名前>}` は sh の打ち方に変える（名前の形が違えば残す。lint が指摘する）。
+// `{root}` はルートの実パスに変える。ルートが渡らない読み方では何もしない。
 func FillText(text, root string) string {
 	if root == "" {
 		return text
@@ -111,7 +110,7 @@ func FillRoot(text, root string) string {
 // relativeScripts は `.ccnavi/scripts/` の当たり。手前の `./` と `../` の連なりは相対の書き方なので含める。
 var relativeScripts = regexp.MustCompile(`(?:\.{1,2}/)*\.ccnavi/scripts/`)
 
-// pathMid はその手前の 1 字がこれなら、当たりがパスの途中（絶対パス・`$VAR/`・`{root}/`・`~/`）であること。
+// pathMid は、その手前の 1 字がこれに当たるとき、当たりがパスの途中（絶対パス・`$VAR/`・`{root}/`・`~/`）であることを表す。
 const pathMid = `/\}~$._-`
 
 // HasRelativeScripts は文に、cwd に左右される相対パスの `.ccnavi/scripts/` があるか。
@@ -130,8 +129,8 @@ func HasRelativeScripts(text string) bool {
 	return false
 }
 
-// ReadableEvery は書かれた every から読み取れる刻み。読めない値（真偽・整数でない・1 未満）なら 0、
-// 書いていなければ EveryDefault。読めないときにどうするかは呼び手が決める（判定は 1、lint は苦情）。
+// ReadableEvery は、書かれた every から読み取れる刻みを返す。読めない値（真偽・整数でない・1 未満）なら 0、
+// 書いていなければ EveryDefault を返す。読めないときの扱いは呼び手が決める（判定は 1、lint は苦情にする）。
 func ReadableEvery(written any) int {
 	switch v := written.(type) {
 	case nil:

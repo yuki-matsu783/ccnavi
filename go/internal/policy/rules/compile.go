@@ -9,15 +9,15 @@ import (
 	"ccnavi/internal/infra/pyre"
 )
 
-// MaxRootLen はこの長さ以上のルートでは {!root} を展開しない。Python 3.12 ではこの形の入れ子は 493 字で
-// 組み立てが RecursionError になり、その半分以下で止める（Windows の MAX_PATH は 260 で、256 字のルートは
-// その時点で実用にならない）。
+// MaxRootLen は、この長さ以上のルートでは {!root} を展開しない。Python 3.12 では、この形の入れ子が 493 字で
+// 組み立ての RecursionError になるので、その半分以下で止める。Windows の MAX_PATH は 260 なので、
+// 256 字のルートはその時点で実用にならない。
 const MaxRootLen = 256
 
-// matchEverything は組み立てられなかった deny・ask に持たせる、何にでも当たる式。
+// matchEverything は、組み立てられなかった deny・ask に持たせる、何にでも当たる式。
 const matchEverything = "^"
 
-// unsupported はルールの regex に書けない形。書ける範囲を狭く保ち、組み合わせ爆発を起こしやすい書き方を断つ。
+// unsupported は、ルールの regex に書けない形。書ける範囲を狭く保ち、組み合わせ爆発を起こしやすい書き方を断つ。
 var unsupported = []struct{ literal, label string }{
 	{"(?=", "先読み"},
 	{"(?!", "否定先読み"},
@@ -25,7 +25,7 @@ var unsupported = []struct{ literal, label string }{
 	{"(?<!", "否定後読み"},
 }
 
-// unsupportedIn は書けない形の名前。無ければ空。`\` に 1〜9 が続けば後方参照と数える（`\\1` も含む。Python と同じ）。
+// unsupportedIn は書けない形の名前を返す。無ければ空。`\` に 1〜9 が続けば後方参照と数える（`\1` も含む。Python と同じ）。
 func unsupportedIn(expression string) string {
 	for _, u := range unsupported {
 		if strings.Contains(expression, u.literal) {
@@ -40,7 +40,7 @@ func unsupportedIn(expression string) string {
 	return ""
 }
 
-// generatedQuantifier は展開した式に繰り返し（`*`・`+`・`{数字`）があるか。逃がした字（`\*`）は数えない。
+// generatedQuantifier は、展開した式に繰り返し（`*`・`+`・`{数字`）があるかを返す。逃がした字（`\*`）は数えない。
 func generatedQuantifier(expression string) bool {
 	runes := []rune(expression)
 	for i, r := range runes {
@@ -58,7 +58,7 @@ func generatedQuantifier(expression string) bool {
 	return false
 }
 
-// skipsAnywhere は {!root} の直後に続けてよい書き始め（任意の位置まで進む書き方）。
+// skipsAnywhere は、{!root} の直後に続けてよい書き始め（任意の位置まで進む書き方）。
 var skipsAnywhere = []string{".*", ".+", `[\s\S]*`, `[\s\S]+`}
 
 // compiled は式 1 つを組み立てた結果。refused は {!root} を展開できなかった理由。
@@ -69,9 +69,9 @@ type compiled struct {
 	refused string
 }
 
-// compileExpr は glob か regex の 1 つを判定に使う式にする。本体・except・when の個別条件がこの 1 本を通る
-// （{root} の置き換え、{!root} の展開、先読み・後方参照の禁止、大文字小文字の無視を食い違わせないため）。
-// label は苦情の頭に付ける語（本体なら空、except なら `except[0] の `）。
+// compileExpr は、glob か regex の 1 つを判定に使う式にする。本体・except・when の個別条件は、すべてこの 1 本を通る。
+// {root} の置き換え、{!root} の展開、先読み・後方参照の禁止、大文字小文字の無視が食い違わないようにするためである。
+// label は苦情の頭に付ける語。本体なら空、except なら `except[0] の ` のようになる。
 func compileExpr(glob, regex, root, name, label string) compiled {
 	fail := func(detail string) compiled {
 		return compiled{err: &Problem{Severity: Error, Rule: name, Detail: label + detail}}
@@ -134,9 +134,8 @@ func compileExpr(glob, regex, root, name, label string) compiled {
 	return fail("正規表現として組み立てられない: " + err.Error())
 }
 
-// CompileCondition はルールの外で glob か regex の 1 つを、ルールと同じ読み方で組み立てる（ターン分離の
-// ゲートなど、ルールファイルに書かない組み込みの宣言のため）。{root} と {!root} は使えない。
-// 組み立てられなければ式は nil で、理由を返す。
+// CompileCondition は、ルールの外で glob か regex の 1 つを、ルールと同じ読み方で組み立てる。ターン分離のゲートなど、
+// ルールファイルに書かない組み込みの宣言のために使う。{root} と {!root} は使えない。組み立てられなければ式は nil で、理由を返す。
 func CompileCondition(glob, regex, name string) (*pyre.Regexp, string) {
 	built := compileExpr(glob, regex, "", name, "")
 	if built.err != nil {
@@ -151,8 +150,8 @@ func CompileCondition(glob, regex, name string) (*pyre.Regexp, string) {
 	return built.re, ""
 }
 
-// notRootPlacement は {!root} の置き場所への苦情。置けるのは `^` の直後に 1 回だけで、直後に量化子は書けない
-// （展開結果ごと省けると「外だけを止める」式がどの対象にも当たる）。
+// notRootPlacement は、{!root} の置き場所への苦情。置けるのは `^` の直後に 1 回だけで、直後に量化子は書けない。
+// 展開結果ごと省けると「外だけを止める」式がどの対象にも当たってしまうため。
 func notRootPlacement(expression string) string {
 	if strings.Count(expression, NotRootPlaceholder) > 1 {
 		return "`" + NotRootPlaceholder + "` は 1 つの式に 1 回だけ書ける"
@@ -172,8 +171,8 @@ func notRootPlacement(expression string) string {
 	return ""
 }
 
-// notRootSuffix は {!root} の後ろに続く式への苦情（warn）。展開した式が読み終える位置はパスの区切りとは
-// 限らないので、区切りを前提にした書き方は意図どおりに動かない。
+// notRootSuffix は、{!root} の後ろに続く式への苦情（warn）。展開した式が読み終わる位置は、パスの区切りとは限らない。
+// そのため、区切りを前提にした書き方は意図どおりに動かない。
 func notRootSuffix(expression string) string {
 	rest := expression[len("^"+NotRootPlaceholder):]
 	if rest == "" {
@@ -193,7 +192,7 @@ func notRootSuffix(expression string) string {
 		"表記は意図どおりに動かない。任意の位置から続けるなら `.*` で受けてください"
 }
 
-// expandNotRoot は {!root} を展開した式。組み立てられなければ (元の式, 理由)。
+// expandNotRoot は {!root} を展開した式を返す。組み立てられなければ (元の式, 理由) を返す。
 func expandNotRoot(expression, root string) (string, string) {
 	real := RealRoot(root)
 	if real == "" {
@@ -211,8 +210,8 @@ func expandNotRoot(expression, root string) (string, string) {
 	return strings.ReplaceAll(expression, NotRootPlaceholder, generated), ""
 }
 
-// degrade は {!root} を組み立てられなかったときの扱い。deny・ask は match の全部に当てて止め、
-// allow はルールごと使わない（当たったものとして扱うと、ccnavi が判定を返さない範囲が広がる）。
+// degrade は {!root} を組み立てられなかったときの扱いを決める。deny・ask は match のすべてに当てて止める。
+// allow はルールごと使わない。当たったものとして扱うと、ccnavi が判定を返さない範囲が広がるため。
 // 書いた文面は残し、止めた説明は DegradedMessage に持つ。
 func degrade(rule *Rule, section Decision, name, detail string) (*Rule, Problem) {
 	problem := Problem{Severity: Error, Rule: name, Detail: detail}

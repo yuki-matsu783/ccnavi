@@ -15,8 +15,8 @@ import (
 	"ccnavi/internal/infra/tree"
 )
 
-// PathKey は PATH の ccnavi の実体の key の頭。パスの印が続く（PATH が変わって指す先が替わったとき、
-// 別の実体の参照を新しい実体に書き戻さないため）。
+// PathKey は PATH の ccnavi の実体の key の頭。パスの印が続く。PATH が変わって指す先が替わったとき、
+// 別の実体の参照を新しい実体に書き戻さないためである。
 const PathKey = "bin-path-"
 
 // 実行ファイルの key。
@@ -52,7 +52,7 @@ type Target struct {
 type place struct{ key, home, path string }
 
 // Targets は守る対象を組み立てる。rulesPath と binPath は解決済みのパスで、空ならその対象を持たない。
-// layers はレイヤーごとの設定ファイル（共通レイヤーの rules は rulesPath が渡すので重ねない）。
+// layers はレイヤーごとの設定ファイルを渡す。共通レイヤーの rules は rulesPath が渡すので、重ねない。
 func Targets(root, rulesPath, binPath string, layers []config.LayerFile, projectsDir string) []Target {
 	places := collectPlaces(root, projectsDir, rulesPath, layers)
 	var found []Target
@@ -113,8 +113,8 @@ func collectPlaces(root, projectsDir, rulesPath string, layers []config.LayerFil
 	return places
 }
 
-// layerKey はレイヤーのバックアップの key。名前ではなく種別で決める（`projects/common/` が共通レイヤーと同じ key に
-// なると、重なりの排除でその 3 本が保護から外れる）。予約名のプロジェクトとミラーは置き場の前置きを付ける。
+// layerKey はレイヤーのバックアップの key。名前ではなく種別で決める。`projects/common/` が共通レイヤーと同じ key に
+// なると、重なりの排除でその 3 本が保護から外れるためである。予約名のプロジェクトとミラーは置き場の前置きを付ける。
 func layerKey(origin config.Origin, layer string, kind config.LayerKind) string {
 	switch {
 	case origin == config.OriginCommon:
@@ -146,8 +146,8 @@ func homeTop(root, home string) string {
 	return home
 }
 
-// worktreeCopies はワークツリー側の設定。元リポジトリが追跡しているぶんだけを、元リポジトリからの相対で組む
-// （相互参照の揃ったワークツリーだけ。元リポジトリの外を指す置き場には対応するものが無い）。
+// worktreeCopies はワークツリー側の設定を組む。元リポジトリが追跡しているぶんだけを、元リポジトリからの相対で組む
+// （相互参照の揃ったワークツリーだけ。元リポジトリの外を指す置き場には、対応するものが無いため）。
 func worktreeCopies(root, projectsDir string, places []place) []Target {
 	type rel struct{ key, rel string }
 	byHome := map[string][]rel{}
@@ -173,8 +173,8 @@ func worktreeCopies(root, projectsDir string, places []place) []Target {
 	return copies
 }
 
-// copyKey はワークツリー側の設定のバックアップの名前。使えない字を置き換えた名前に元の名前の digest を付ける
-// （置き換えだけだと `a/b` と `a_b` が同じ名前になり、別のワークツリーの中身を書き戻す）。
+// copyKey はワークツリー側の設定のバックアップの名前。使えない字を置き換えた名前に、元の名前の digest を付ける。
+// 置き換えだけだと `a/b` と `a_b` が同じ名前になり、別のワークツリーの中身を書き戻してしまうためである。
 func copyKey(key, name string) string {
 	sum := sha256.Sum256([]byte(name))
 	return key + "." + fsio.SafeName(name, 40) + "-" + hex.EncodeToString(sum[:])[:8]

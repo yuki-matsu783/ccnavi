@@ -1,11 +1,10 @@
-// Package ctxfile は、当たったルールがモデルへ渡す文（additionalContext）を組む。文と、ファイルの本文
-// （additionalContextFile）と、1 度だけ渡す文（…Once）の 3 つを並べ、どの回に渡すかを刻む every と、
-// その数えの記録（state の `once-*.json`・`stop-*.json`）も持つ。文脈はセッションと、サブエージェントなら
-// その 1 回の起動で分ける。
+// Package ctxfile は、当たったルールがモデルへ渡す文（additionalContext）を組む。文、ファイルの本文
+// （additionalContextFile）、1 度だけ渡す文（…Once）の 3 つを並べる。どの回に渡すかを決める every と、
+// その数えの記録（state の `once-*.json`・`stop-*.json`）も持つ。文脈はセッションと、サブエージェントならその 1 回の起動で分ける。
 //
-// 読むのはワークスペースの中だけ。絶対パスと `..` で上に出るパスは lint が止め、実行時も読まない
-// （ルールから任意のファイルをモデルに渡せる形にしない）。本文は固定の上限で切り、切ったことを末尾に書く
-// （黙って切ると、モデルは途中で終わる文を全部だと思って読む）。
+// 読むのはワークスペースの中だけにする。絶対パスと、`..` で上に出るパスは lint が止め、実行時も読まない。
+// ルールから任意のファイルをモデルに渡せる形にしないためである。本文は固定の上限で切り、切ったことを末尾に書く。
+// 黙って切ると、モデルは途中で終わる文を全部だと思って読んでしまう。
 //
 // Python からの対応: deliver と for_rules → Deliver（for_rules は 2 つ目の戻り値を捨てる呼び方）、
 // unsure_speaks=False → Options.QuietWhenUnsure、load → Body、bad_path・locate・over_limit・bases・
@@ -37,8 +36,8 @@ import (
 // MaxChars は 1 回の応答に載せる本文の上限（文字数）。超えた分は載せず、切ったことを言う。
 const MaxChars = 4000
 
-// OnceKeep は「1 度だけ渡す文」の記憶を残す期間。セッションの開始で消えるのが本筋で、これは開始が来ないまま
-// 終わったセッションの分を掃く上限。
+// OnceKeep は「1 度だけ渡す文」の記憶を残す期間。セッションの開始で消えるのが本筋だが、これは開始が来ないまま
+// 終わったセッションの分を掃くための上限である。
 const OnceKeep = 3 * 24 * time.Hour
 
 // 記録の名前。
@@ -122,16 +121,16 @@ type Options struct {
 	// Bases はファイルを探すルート（近い順）。
 	Bases []string
 	// QuietWhenUnsure は、覚えられない回（記録の置き場が無い・読めない・書けない）に、刻みを持つルールも
-	// once を持つルールも渡さない。既定（偽）は逆に、覚えられないなら毎回渡す（届かない案内は書いていないのと
-	// 同じなので）。真にするのは、案内を渡すとターンの終わりが引き止められる Stop の促し。
+	// once を持つルールも渡さない。既定（偽）は逆に、覚えられないなら毎回渡す。届かない案内は書いていないのと
+	// 同じになるためである。真にするのは、案内を渡すとターンの終わりが引き止められる Stop の促しだけ。
 	QuietWhenUnsure bool
 	// CountsPath は数えの記録の置き場の差し替え。空なら文脈ごとの `once-*.json`。
 	CountsPath string
 }
 
-// Deliver は当たったルールがモデルへ渡す案内（1 件ごとに空行で区切る）と、この呼び出しで once の案内を
-// 渡したか。渡すのは「渡す回」で、every: N は当たった回数が N の倍数になった回。additionalContext は渡す回の
-// たび、additionalContextOnce は渡す回の最初の 1 回。数えはルール 1 件で 1 回（文とファイルで分けない）。
+// Deliver は、当たったルールがモデルへ渡す案内（1 件ごとに空行で区切る）と、この呼び出しで once の案内を
+// 渡したかを返す。渡すのは「渡す回」で、every: N は当たった回数が N の倍数になった回を指す。additionalContext は渡す回の
+// たびに、additionalContextOnce は渡す回の最初の 1 回に渡す。数えはルール 1 件につき 1 回（文とファイルで分けない）。
 // 記録の置き場が無い（stateDir が空）なら刻まず、once の案内も毎回渡す。
 func Deliver(stderr io.Writer, stateDir string, in hookio.Input, group []*rules.Rule, o Options) (string, bool) {
 	if o.QuietWhenUnsure && stateDir == "" {
@@ -199,8 +198,8 @@ func withFile(stderr io.Writer, bases []string, text, rel string) string {
 	return strings.Join(parts, "\n\n")
 }
 
-// Bases はルールが指すファイルを探すルート（近い順）。行き先がワークツリーならそのワークツリー、
-// 元のプロジェクト、最後にワークスペースルート（ワークツリーで直している最中の案内がそのまま使われる）。
+// Bases はルールが指すファイルを探すルートを、近い順に返す。行き先がワークツリーならそのワークツリー、
+// 次に元のプロジェクト、最後にワークスペースルートの順にする。ワークツリーで直している最中の案内が、そのまま使われるためである。
 func Bases(conf *config.Settings, root string, target *tree.Tree) []string {
 	var bases []string
 	if target != nil && !target.IsMain() {
@@ -223,14 +222,14 @@ func oncePath(stateDir, session, agentID string) string {
 	return ospath.Join(stateDir, OncePrefix+safeOr(session, unknownSession)+"-"+safeOr(agentID, mainAgent)+fsio.JSONExt)
 }
 
-// StopPath は Stop の促し（ターンの終わり N 回に 1 度）の数えの記録。compact・再開・clear では消さず、
-// 起動の Forget と後始末だけが消す（文脈ごとに消すと、compact が N 回より先に来る長いセッションで届かない）。
+// StopPath は Stop の促し（ターンの終わり N 回に 1 度）の数えの記録の場所。compact・再開・clear では消さず、
+// 起動の Forget と後始末だけが消す。文脈ごとに消すと、compact が N 回より先に来る長いセッションで促しが届かなくなる。
 func StopPath(stateDir, session string) string {
 	return ospath.Join(stateDir, StopPrefix+safeOr(session, unknownSession)+fsio.JSONExt)
 }
 
-// loadOnce はこの文脈で、どのルールが何回当たったか。まだ無ければ空、読めなければ unreadable が真。
-// 分けるのは、読めなかった回に「まだ 1 回も当たっていない」として書き戻し、覚えていた分を消さないため。
+// loadOnce は、この文脈でどのルールが何回当たったかを返す。まだ無ければ空、読めなければ unreadable が真になる。
+// 読めない回に「まだ 1 回も当たっていない」として書き戻すと、覚えていた分が消えてしまう。そのため分けている。
 func loadOnce(stderr io.Writer, path string) (map[string]int, bool) {
 	data, err := fsio.ReadJSON(path)
 	if err != nil {
@@ -295,8 +294,8 @@ func remember(stderr io.Writer, path string, told map[string]bool) bool {
 	return saveOnce(stderr, path, given)
 }
 
-// ToldRefs はこのセッションで案内した issue・MR の指定（`<種類>:<番号>`）。覚えられない（置き場が無い・
-// 読めない）なら ok が偽で、呼ぶ側は案内する側に倒す。
+// ToldRefs は、このセッションで案内した issue・MR の指定（`<種類>:<番号>`）を返す。覚えられない（置き場が無い・
+// 読めない）なら ok が偽になり、呼ぶ側は案内する側に倒す。
 func ToldRefs(stderr io.Writer, stateDir, session string) (map[string]bool, bool) {
 	if stateDir == "" || session == "" {
 		return nil, false
@@ -312,8 +311,8 @@ func RememberRefs(stderr io.Writer, stateDir, session string, told map[string]bo
 	return remember(stderr, oncePath(stateDir, session, refsContext), told)
 }
 
-// ToldPeers はこのサブエージェントに、同じワークツリーの相手として案内した相手のキー。Deliver の記録とは
-// 別のファイルに置く（同じファイルだと、Deliver が書き戻すときに消える）。
+// ToldPeers は、このサブエージェントに同じワークツリーの相手として案内した相手のキーを返す。Deliver の記録とは
+// 別のファイルに置く。同じファイルだと、Deliver が書き戻すときに消えてしまうためである。
 func ToldPeers(stderr io.Writer, stateDir, session, agentID string) (map[string]bool, bool) {
 	if stateDir == "" || session == "" || agentID == "" {
 		return nil, false
@@ -329,8 +328,8 @@ func RememberPeers(stderr io.Writer, stateDir, session, agentID string, told map
 	return remember(stderr, oncePath(stateDir, session, peersContext+agentID), told)
 }
 
-// Forget はこのセッションの数え（渡した回）を全部消し、古いセッションの分も掃く。Stop の促しの数え
-// （StopPath）は起動（startup）のときだけ消す。消せなくても次の開始でまた試す。
+// Forget は、このセッションの数え（渡した回）を全部消し、古いセッションの分も掃く。Stop の促しの数え
+// （StopPath）は、起動（startup）のときだけ消す。消せなくても、次の開始でまた試す。
 func Forget(stateDir, session string, startup bool) {
 	if stateDir == "" || !ospath.IsDir(stateDir) {
 		return

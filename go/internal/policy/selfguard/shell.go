@@ -19,7 +19,7 @@ import (
 // 書き込みの形と場所は組でヒットする。場所の名前が出ただけ（cat・git add）では止めない。
 // shell.Read が語を空白で、コマンドを Sep で、引用がつないだ空白を WordSep で区切って渡すので、語の並びを式で読める。
 // 読み違えの向きは止まる側に倒す。照合の手数が長さに比例するよう、割り方が 1 通りに決まる形
-// （`(?>...)` で決め打ち・語の頭の文字を並びと取り合わない）で書く。後読みは使わない（ルールの regex が受け付けない）。
+// （`(?>...)` で決め打ち・語の頭の文字を並びと取り合わない）で書く。後読みは使わない。ルールの regex が受け付けないからである。
 
 // NotAWord は語に入らない目印（コマンドの切れ目と語の中の切れ目）。re.escape はどちらも変えない。
 const NotAWord = shell.Sep + shell.WordSep
@@ -40,7 +40,7 @@ const (
 
 	// 短い選択肢の文字の組（cp・ln・install を合わせたもの）。flags は値を取らない文字、dirWord は行き先を名指しする語、
 	// valued は次の語を値に取りうる語、notDir は行き先を名指ししない語。dirWord と notDir は重ならないので、
-	// 語の並びの割り方は 1 通りに決まる（何通りもあると、ヒットしない長い並びで手数が指数的に増える）。
+	// 語の並びの割り方は 1 通りに決まる。何通りもあると、ヒットしない長い並びで手数が指数的に増えてしまう。
 	flags      = `[a-fh-lnp-su-zA-RT-Z]`
 	dirHead    = `(?:-(?-i:` + flags + `*t)|--(?-i:t))`
 	dirWord    = dirHead + `[^ \x00]*`
@@ -120,9 +120,9 @@ const (
 // （`logs` は `./logs`・`/abs/logs` にヒットし、`mylogs` にはヒットしない）。
 func Under(directory string) string { return `(?:[^ \x00]*[\\/])?` + directory }
 
-// HolderRegex は守るものが入っているディレクトリを行き先にした cp・ln・install・mv にヒットする式。元の側に names の語か、
+// HolderRegex は、守るものが入っているディレクトリを行き先にした cp・ln・install・mv にヒットする式。元の側に names の語か、
 // 名前の決まらない語（namedOnly なら数えない）があるときだけヒットする。行き先は `-t` の値か、選択肢でない最後の引数。
-// 元の語は最初に見つかったもので決め打ちする（ヒットしない長い並びで読み直さない）。
+// 元の語は最初に見つかったもので決め打ちする。ヒットしない長い並びで読み直さないためである。
 func HolderRegex(directory, names string, namedOnly bool) string {
 	source := `(?:` + head + `(?:` + names + `)[\\/]*|` + unknown + `)`
 	flag := `|` + noTargetFlag
@@ -141,7 +141,7 @@ func HolderRegex(directory, names string, namedOnly bool) string {
 }
 
 // CopyDestinationRegex は cp・ln・install の行き先にヒットする式。lastPlace は最後の引数の語の頭から当てる表記
-// （CopyLastPlace で組む）、targetPlace は `-t` の値の語のどこから当ててもよい表記。
+// （CopyLastPlace で組む）。targetPlace は `-t` の値の語のどこから当ててもよい表記。
 func CopyDestinationRegex(lastPlace, targetPlace string) string {
 	return copyLast + lastPlace + `|` + copyTarget + targetPlace
 }
@@ -182,8 +182,8 @@ func shellWriteRegex(binPath string, extra []triple, moved []holder) string {
 	return strings.Join(forms, "|")
 }
 
-// ShellRegex はこの設定で組んだ、シェルから守る場所へ書き込む形（Python の guard_shell_regex）。実行前の保護（AddRules）と
-// 組み込みの既定（builtin）が同じものを取る。片方だけ空の設定で組むと、動かした ccnavi ディレクトリや実行ファイルが
+// ShellRegex は、この設定で組んだ、シェルから守る場所へ書き込む形（Python の guard_shell_regex）を返す。実行前の保護（AddRules）と
+// 組み込みの既定（builtin）が同じものを取る。片方だけ空の設定で組むと、動かした ccnavi ディレクトリや実行ファイルが、
 // ルールファイルの壊れた間だけ守られなくなる。commonFiles は共通レイヤーの 3 本（CommonLayerFiles）。
 func ShellRegex(root, binPath, projectHome string, commonFiles []string) string {
 	home := projectHomeClause(projectHome, writeForm)
@@ -271,7 +271,7 @@ func binaryClause(binPath string, f form) string {
 }
 
 // pathSpellings は PATH の ccnavi に当てる表記（末尾 3 要素。2 要素の `bin/ccnavi` は別のプロジェクトにも当たる）。
-// 書かれたパスとリンクを解いた先の両方。浅い実体（`/bin/ccnavi`）は区切りで始まる形だけに当てる。
+// 書かれたパスと、リンクを解いた先の両方を含む。浅い実体（`/bin/ccnavi`）は、区切りで始まる形だけに当てる。
 func pathSpellings(launcher string) []string {
 	exe := platformtag.PathExecutable(launcher)
 	if exe == "" {
@@ -336,7 +336,7 @@ func joinEscaped(parts []string) string {
 // spelled はパスを、区切りをどちらの表記でも当てる形にする。
 func spelled(path string) string { return joinEscaped(splitSeps(path)) }
 
-// movedHolders は設定で動く場所の、入っているディレクトリと名前の組。
+// movedHolders は、設定で動く場所の、入っているディレクトリと名前の組。
 //   - ccnavi ディレクトリと、ルートの下に置いた共通レイヤー: ルートからの相対の各段の組。いちばん上の名前はルートの組に足す
 //   - ルートの外に置いた共通レイヤー: 書かれた表記と行き着く先の、すぐ上のディレクトリと名前の組だけ
 //   - ルート: rootNames と上で足した名前を、ルートを指す行き先（`.` とルートの絶対パス）で組む
@@ -432,7 +432,7 @@ func commonShellClause(root, path string, f form) string {
 }
 
 // commonLayerRegex は共通レイヤーの 3 本を、名指しのツール（解決済みの絶対パス）に当てる式。ルートの下なら、ワークスペースと
-// そこから切ったワークツリーの同じ相対に当てる（統合で統合先の設定になる経路がある）。
+// そこから切ったワークツリーの同じ相対に当てる。統合で統合先の設定になる経路があるためである。
 func commonLayerRegex(root string, commonFiles []string) string {
 	var bases []string
 	if root != "" {
@@ -488,7 +488,7 @@ func recordsRegex(logPath, stateDir string) string {
 }
 
 // GitDirPathRegex は `.git` の中（とワークツリーの `.git` ファイル）を名指しのツールに当てる式。前は区切りで閉じる
-// （`.gitignore`・`.github/` には当たらない）。名前の後ろの `.` と空白は Windows が開くときに落とすので飛ばす。
+// （`.gitignore`・`.github/` には当たらない）。名前の後ろの `.` と空白は Windows が開くときに落とすので、飛ばす。
 const GitDirPathRegex = `[\\/]\.git[. ]*(?:[\\/]|$)`
 
 const (
@@ -522,7 +522,7 @@ const (
 	gitRedirect = `(?:^|[^>|&])[|&]*>[>|&]* ?(?:[^ ` + NotAWord + `>|&][^ \x00>]*[\\/])?`
 )
 
-// GitDirShellRegex は `.git` へシェルから書き込む形（組み込みの土台が持つ）。読むだけ（`cat .git/config`・
+// GitDirShellRegex は `.git` へシェルから書き込む形（組み込みの土台が持つ）を返す。読むだけ（`cat .git/config`・
 // `cp .git/config /tmp/x`）は通す。いま居る場所へ `.git` をコピーする形は、元の名前が `.git` のときだけ止める。
 func GitDirShellRegex() string {
 	writes := `(?:` + gitRedirect + `|` + gitVerbWrite + `|` + gitDDWrite + `)`
@@ -538,9 +538,9 @@ func GitDirShellRegex() string {
 }
 
 const (
-	// RedirectLimit は生の文字列（読み切れなかった Bash と PowerShell）に、シェルから書き込む形の保護を当ててよい `>` の個数の
-	// 上限。生の文字列では引用の中の `>` にも当たり、手数が `>` の個数 × 語の長さになる。超えたら照合を飛ばし、権限モードに
-	// 依らず拒否にする（判定の期限を超えると理由も案内も返せない）。`>>` も `2>&1` も文字の数で数える。
+	// RedirectLimit は、生の文字列（読み切れなかった Bash と PowerShell）に、シェルから書き込む形の保護を当ててよい `>` の個数の
+	// 上限。生の文字列では引用の中の `>` にも当たるので、手数が `>` の個数 × 語の長さになる。超えたら照合を飛ばし、権限モードに
+	// 依らず拒否にする。判定の期限を超えると、理由も案内も返せないためである。`>>` も `2>&1` も文字の数で数える。
 	RedirectLimit = 50
 	// RawLengthLimit は `>` を含む生の文字列の長さの上限。個数の上限だけでは尾の長さを止められない（#241）。
 	RawLengthLimit = 100_000

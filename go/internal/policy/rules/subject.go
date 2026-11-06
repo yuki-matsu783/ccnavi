@@ -14,10 +14,10 @@ type SubjectField struct {
 	Field string
 }
 
-// SubjectFields はツールごとのルールを当てる欄。ここに無いツールは対象を持たず、判定に届かないまま通る。
+// SubjectFields は、ツールごとにルールを当てる欄。ここに無いツールは対象を持たず、判定に届かないまま通る。
 // 名前は Claude Code の権限ルール `ToolName(指定子)` から括弧を除いたもの。並びは画面の候補の順。
-// 対象を差し込む側（試験と lint）もこの表を読む（欄の名前を SubjectOf の中にだけ持つと、ツールを足したときに
-// そちらが気づかないうちに食い違う）。
+// 対象を差し込む側（試験と lint）もこの表を読む。欄の名前を SubjectOf の中だけに持つと、ツールを足したときに
+// そちらが気づかないうちに食い違うため。
 var SubjectFields = []SubjectField{
 	{"Bash", "command"},
 	{"PowerShell", "command"},

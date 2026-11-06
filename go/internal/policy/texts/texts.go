@@ -87,8 +87,8 @@ func Load(root string) *Catalog {
 	return c
 }
 
-// Find は識別子の 1 件。識別子の字を含むファイルだけを名前順に YAML として読み、検査を通る形で持つ
-// 最初のファイルの 1 件を採る（全件を読む Load と同じ 1 件になる）。無い・検査を通らないなら nil。
+// Find は識別子の 1 件を返す。識別子の字を含むファイルだけを名前順に YAML として読み、検査を通る形で持つ
+// 最初のファイルの 1 件を採る。全件を読む Load と同じ 1 件になる。無い・検査を通らないなら nil を返す。
 func Find(root, id string) *Entry {
 	dir := Dir(root)
 	names, ok := fileNames(dir)
@@ -289,8 +289,8 @@ const (
 	valueGit    = "git"
 )
 
-// SpecOptions は組み込みのルールの文の指定。Git は文に出す git の打ち方（文が {git} を使うときだけ渡す）、
-// Cased はラッパーの有無で文が分かれる欄（Wrapper なら wrapper、でなければ plain を選ぶ）、
+// SpecOptions は組み込みのルールの文の指定。Git は、文に出す git の打ち方（文が {git} を使うときだけ渡す）。
+// Cased はラッパーの有無で文が分かれる欄（Wrapper なら wrapper、でなければ plain を選ぶ）。
 // Variants はそれ以外の場合の選び方。
 type SpecOptions struct {
 	Git      string

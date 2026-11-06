@@ -34,9 +34,9 @@ const (
 // plainBut は plain のうち、字 c（大文字小文字を問わない）を除いたもの。
 func plainBut(c string) string { return `(?:[^\W` + c + `]|[.-])` }
 
-// tail は最後の切れ目の後ろが `git` / `git.exe` でない語の、その後ろの部分（空でない）。選択肢は長いほうから
-// 並べる。短いほう（`g`）を先に置くと `gitx` の頭の `g` だけでヒットし、所有的な繰り返しが読み直さないので
-// 残り（`itx`）で読みが止まる。
+// tail は、最後の切れ目の後ろが `git` / `git.exe` でない語の、その後ろの部分（空でない）。選択肢は長いほうから
+// 並べる。短いほう（`g`）を先に置くと、`gitx` の頭の `g` だけでヒットしてしまう。所有的な繰り返しは読み直さないので、
+// 残り（`itx`）で読みが止まるためである。
 var tail = `(?:` +
 	`git\.exe` + plain + `++` +
 	`|git\.ex(?:` + plainBut("e") + plain + `*+)?` +
@@ -58,9 +58,9 @@ var (
 )
 
 // gitOptions はサブコマンドの前に挟める git のグローバルオプション。値を空白で区切って取るものは値まで読み、
-// それ以外は `-` で始まる語を 1 つ読む。値まで読んだ語を読み直さないので、`git commit -m push` や
-// `git -c push.default=current status` の `push` はサブコマンドに読まない。値とのあいだの空白は 1 字だけ
-// 読む（空の語 `git -C ” push` は空白 2 字になり、まとめて読むと次の `push` を値として読んで外れる）。
+// それ以外は `-` で始まる語を 1 つ読む。値まで読んだ語は読み直さないので、`git commit -m push` や
+// `git -c push.default=current status` の `push` はサブコマンドとして読まれない。値とのあいだの空白は 1 字だけ読む。
+// 空の語 `git -C "" push` は空白 2 字になり、まとめて読むと次の `push` を値として読んで外れるためである。
 var gitOptions = `(?:\s++(?:(?:-c|--(?:git-dir|work-tree|namespace|config-env|super-prefix` +
 	`|attr-source))\s` + gitFree + `?|` + gitFreeOption + `))*+`
 
@@ -130,9 +130,9 @@ var recursiveDeleteRegex = rmStart + `\s*+` + rmRestart + `(?:` + rmOther("rf") 
 	`|` + rmRecursive + `\s++(?:` + rmOther("f") + `\s++)*+` + rmForce + wordEnd +
 	`|` + rmForce + `\s++(?:` + rmOther("r") + `\s++)*+` + rmRecursive + wordEnd + `)`
 
-// credentialsRegex は認証情報の場所の形。先頭の境界を付け、`jq '.env.X'` や `process.env` を巻き込まない。
-// `.env` の後ろに続く `.envrc`・`.env.local`・`.env.example` は止める。キーのファイルは拡張子として
-// 書かれた形（`x.pem`・`x.pem.bak`・`x.key.json`）。
+// credentialsRegex は認証情報の場所の形。先頭に境界を付け、`jq '.env.X'` や `process.env` を巻き込まない。
+// `.env` の後ろに続く `.envrc`・`.env.local`・`.env.example` は止める。キーのファイルは、拡張子として
+// 書かれた形（`x.pem`・`x.pem.bak`・`x.key.json`）で止める。
 const credentialsRegex = `(^|[ \\/\x00])\.(env|dev\.vars|netrc|npmrc|pypirc)` +
 	`|(^|[ \\/\x00])\.(aws|ssh)[\\/]` +
 	`|[\w\-\\/]\.(pem|key)\b` +

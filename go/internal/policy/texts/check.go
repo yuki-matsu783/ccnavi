@@ -61,8 +61,8 @@ var kindFields = map[Kind]fields{
 // kindOrder は種類を苦情の文に並べる順（Python の FIELDS の順）。
 var kindOrder = []Kind{KindDeny, KindNudge, KindNext, KindChoices, KindNote, KindNotice}
 
-// ruleLooseFields は `RULE_` の文（組み込みルールの文）の欄。what だけが必須（言うことが無い欄を作り足さない）。
-// RuleAsk とその場合は記録の code と同じ識別子で、ほかの拒否と同じ 4 欄を必ず持つ。
+// ruleLooseFields は `RULE_` の文（組み込みルールの文）の欄。what だけが必須で、言うことが無い欄は作り足さない。
+// RuleAsk とその場合は、記録の code と同じ識別子を持ち、ほかの拒否と同じ 4 欄を必ず持つ。
 var ruleLooseFields = fields{[]string{fieldWhat}, []string{fieldWhy, fieldNext, fieldNoBypass, fieldNote}}
 
 const (
@@ -92,7 +92,7 @@ const (
 var labels = map[string]string{fieldWhy: whyLabel, fieldNext: NextLabel, fieldNoBypass: noBypassLabel}
 
 const (
-	// SubjectLimit は理由や報告に載せる対象の文字列の長さの上限（ヒアドキュメントの全文で本体を押し出さない）。
+	// SubjectLimit は、理由や報告に載せる対象の文字列の長さの上限。ヒアドキュメントの全文で本体を押し出さないためである。
 	SubjectLimit = 200
 	// limitField は 1 欄の長さ（場合ごと）、limitEntry は 1 件の欄の長さの合計の上限。
 	limitField = 600
@@ -508,7 +508,7 @@ func parseFile(text, path string) (*yaml.Map, []rules.Problem) {
 	return body, nil
 }
 
-// CheckText は文面ファイル 1 本の中身を 1 件ずつ単独で検査する（下書きの取り込み前の検査も使う）。
+// CheckText は文面ファイル 1 本の中身を、1 件ずつ単独で検査する。下書きの取り込み前の検査にも使う。
 // 誤りのある 1 件は結果に入らない。
 func CheckText(text, path string) (map[string]*Entry, []rules.Problem) {
 	list, problems := checkFile(text, path)

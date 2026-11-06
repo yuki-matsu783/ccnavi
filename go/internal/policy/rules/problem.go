@@ -11,8 +11,8 @@ const (
 	Info Severity = "info"
 )
 
-// KindNotYet は「いまは通らないが、書いた側に直すものは無い」苦情（前のフェーズが閉じていない子）。
-// 承認は通さないが、全体を見る lint は Warn にする。
+// KindNotYet は、いまは通らないが書いた側が直すものは無い苦情（前のフェーズが閉じていない子）。
+// 承認は通さないが、全体を見る lint では Warn にする。
 const KindNotYet = "not-yet"
 
 // Problem はルールファイルなどへの苦情 1 件。直せるように名指しする。

@@ -63,8 +63,8 @@ const (
 // whenKinds は when のノードに書けるキー（並びは苦情の文の順）。
 var whenKinds = []WhenKind{WhenGlob, WhenRegex, WhenAll, WhenAny, WhenNot}
 
-// TextRef は組み込みのルールが持つ文面ファイルの指定（識別子・差し込む値・場合）。文は止めた回に
-// texts が引く（hook の呼び出しごとにルールを組み立てるので、通る呼び出しに文面ファイルの読みを乗せない）。
+// TextRef は組み込みのルールが持つ文面ファイルの指定（識別子・差し込む値・場合）。文は止めた回に texts が引く。
+// hook は呼び出しごとにルールを組み立てるので、通る呼び出しに文面ファイルの読みを乗せないためである。
 type TextRef struct {
 	ID       string
 	Values   map[string]string
@@ -86,7 +86,7 @@ func (e Exclusion) Written() *pyjson.Object {
 	return pyjson.NewObject(string(WhenRegex), e.Regex)
 }
 
-// Condition は when のノード 1 つ。Where は苦情と lint で名指しする位置（`when.any[1].not`）で、
+// Condition は when のノード 1 つ。Where は苦情と lint で名指しする位置（`when.any[1].not`）。
 // 比べるとき（Key）と書き戻し（Written）には入れない。
 type Condition struct {
 	Kind     WhenKind
@@ -248,7 +248,7 @@ func (r *Rule) WrittenBody() string {
 	return r.Regex
 }
 
-// SpokenMessage はモデルへ渡す文面（{root} と {script:…} を置き換えたもの）。止める側へ倒したルールは
+// SpokenMessage はモデルへ渡す文面（{root} と {script:…} を置き換えたもの）。止める側へ倒したルールは、
 // その説明を先に返す。文面ファイルを引く組み込みのルールの文は texts.Spoken が組む。
 func (r *Rule) SpokenMessage() string {
 	if r.DegradedMessage != "" {
