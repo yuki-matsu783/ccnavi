@@ -130,7 +130,7 @@ printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"Bash","cwd":"<サン�
 | 続きのセッションが前の状態を引きずる | サンプルを作り直す |
 | code-server の子プロセスが残る | ファイル監視の子（`--type=fileWatcher`）は `pgrep` に当たらない。親と子を止める |
 | 組み立てのたびに開発側のセッションに「would-restore」が付く | 開発側が dry-run のため。測定の挙動ではない |
-| サブエージェントに子の作業を任せると、ワークツリーを切る操作（`ccnavi-git.sh worktree`）が `DENY_SUBAGENT_TICKET_OP` で止まる | 親（観測役）が先にワークツリーを切り、そのパスを渡して委任する |
+| サブエージェントに子の作業を任せると、ワークツリーを切る操作（`ccnavi-git.sh worktree`）が `DENY_SUBAGENT_TICKET_OP` で止まる | 親（観測役）が先にワークツリーを切り、その名前を description に書いて委任する |
 
 ## さらに詳しく
 
