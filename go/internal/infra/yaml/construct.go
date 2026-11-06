@@ -50,14 +50,18 @@ func construct(root *node) (any, error) {
 			return nil, err
 		}
 	}
-	return finalize(data, map[any]bool{})
+	return finalize(data, map[any]bool{}, map[any]any{})
 }
 
 // finalize は組み立て中の箱を公開する型（[]any・Set）に置き換える。自分を含む値（別名で自分を
 // 指す列やマップ）は Go の値にできないので、入れ子が深すぎるものとして断る。
-func finalize(v any, active map[any]bool) (any, error) {
+// 別名で 2 か所から指される箱は同じ列にする（書き出し（Dump）が PyYAML と同じく &id001 で書けるように）。
+func finalize(v any, active map[any]bool, done map[any]any) (any, error) {
 	switch x := v.(type) {
 	case *seqBox:
+		if f, ok := done[x]; ok {
+			return f, nil
+		}
 		if active[x] {
 			return nil, tooDeep()
 		}
@@ -65,32 +69,37 @@ func finalize(v any, active map[any]bool) (any, error) {
 		defer delete(active, x)
 		out := make([]any, len(x.items))
 		for i, item := range x.items {
-			f, err := finalize(item, active)
+			f, err := finalize(item, active, done)
 			if err != nil {
 				return nil, err
 			}
 			out[i] = f
 		}
+		done[x] = out
 		return out, nil
 	case *setBox:
 		return Set(x.m.keys), nil
 	case *Map:
+		if _, ok := done[x]; ok {
+			return x, nil
+		}
 		if active[x] {
 			return nil, tooDeep()
 		}
 		active[x] = true
 		defer delete(active, x)
 		for i, item := range x.vals {
-			f, err := finalize(item, active)
+			f, err := finalize(item, active, done)
 			if err != nil {
 				return nil, err
 			}
 			x.vals[i] = f
 		}
+		done[x] = x
 		return x, nil
 	case Tuple:
 		for i, item := range x {
-			f, err := finalize(item, active)
+			f, err := finalize(item, active, done)
 			if err != nil {
 				return nil, err
 			}

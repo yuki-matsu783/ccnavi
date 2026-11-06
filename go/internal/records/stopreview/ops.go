@@ -404,11 +404,14 @@ type Write struct {
 	At    time.Time
 }
 
+// todoMarker は提案の置き場の下の todo/ を、"/" で区切ったパスの中で探す印。
+const todoMarker = "/" + config.TodoDir + "/"
+
 // WrittenIdent は書き込んだパスが `<提案の置き場>/todo/<識別子>.md` なら識別子、違えば空。
 // 大文字小文字は区別しない。置き場は設定の相対パス（既定 wip/proposals）。
 func WrittenIdent(filePath, ticketsDir string) string {
 	path := fold(filePath)
-	marker := "/" + strings.Trim(fold(ticketsDir), "/") + "/todo/"
+	marker := "/" + strings.Trim(fold(ticketsDir), "/") + todoMarker
 	at := strings.LastIndex(path, marker)
 	original := []rune(strings.ReplaceAll(filePath, `\`, "/"))
 	if at < 0 || utf8.RuneCountInString(path) != len(original) {
@@ -462,8 +465,8 @@ func UnsentWrites(writes []Write, ops []Op) []Write {
 		}
 		for _, f := range op.Files {
 			tail := fold(f.Path)
-			if i := strings.LastIndex(tail, "/todo/"); i >= 0 {
-				tail = tail[i+len("/todo/"):]
+			if i := strings.LastIndex(tail, todoMarker); i >= 0 {
+				tail = tail[i+len(todoMarker):]
 			}
 			if prev, ok := sent[tail]; !ok || op.Ended.After(prev) {
 				sent[tail] = later(op.Ended, epoch)

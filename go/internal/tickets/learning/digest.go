@@ -1,0 +1,270 @@
+package learning
+
+import (
+	"errors"
+	"regexp"
+	"slices"
+	"sort"
+	"strings"
+
+	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
+	"ccnavi/internal/infra/pyfmt"
+	"ccnavi/internal/infra/pyjson"
+	"ccnavi/internal/records/audit"
+)
+
+// minRepeated は「繰り返した止め」に入れる回数の下限。
+const minRepeated = 2
+
+// readLogRecords は判定ログとそのローテートした写し（`<名前>.*<拡張子>`）の、オブジェクトの行。
+// recorded は 1 本でも開けたか。
+func readLogRecords(log string) (records []*pyjson.Object, recorded bool) {
+	if log == "" {
+		return nil, false
+	}
+	base, ext := ospath.Splitext(log)
+	dir, stem := ospath.Dirname(base), ospath.Basename(base)
+	var paths []string
+	if names, err := ospath.DiskListdir(dirOrDot(dir)); err == nil {
+		head, tail := pathcase.Fold(stem+"."), pathcase.Fold(ext)
+		for _, name := range names {
+			folded := pathcase.Fold(name)
+			if len(folded) >= len(head)+len(tail) && strings.HasPrefix(folded, head) && strings.HasSuffix(folded, tail) {
+				paths = append(paths, ospath.Join(dir, name))
+			}
+		}
+	}
+	sort.Strings(paths)
+	if !slices.Contains(paths, log) {
+		paths = append(paths, log)
+	}
+	for _, path := range paths {
+		text, err := fsio.ReadDiskText(path, fsio.Replace)
+		if err != nil {
+			continue
+		}
+		recorded = true
+		for _, line := range strings.Split(text, "\n") {
+			if v, err := pyjson.Loads(line); err == nil {
+				if obj, ok := v.(*pyjson.Object); ok {
+					records = append(records, obj)
+				}
+			}
+		}
+	}
+	return records, recorded
+}
+
+func dirOrDot(dir string) string {
+	if dir == "" {
+		return "."
+	}
+	return dir
+}
+
+var (
+	assignment = regexp.MustCompile(`(?s)^[A-Za-z_][A-Za-z0-9_]*=.*$`)
+	plainWord  = regexp.MustCompile(`^[A-Za-z0-9._+-]+$`)
+	pathSep    = regexp.MustCompile(`[/\\]`)
+)
+
+const envCommand = "env"
+
+// commandWord は実行の文字列から、先頭の環境変数の代入と `env` を飛ばした最初の語の名前。
+// 記録に残すので、名前の形でないもの（秘密を含みうる）は空にする。
+func commandWord(subject string) string {
+	tokens, err := shlexSplit(subject)
+	if err != nil {
+		return ""
+	}
+	i := commandIndex(tokens)
+	if i >= len(tokens) {
+		return ""
+	}
+	parts := pathSep.Split(tokens[i], -1)
+	word := parts[len(parts)-1]
+	if !plainWord.MatchString(word) {
+		return ""
+	}
+	return word
+}
+
+// commandIndex は先頭の代入と `env`（とその後の `-` で始まる語）を飛ばした位置。
+func commandIndex(tokens []string) int {
+	afterEnv := false
+	for i, tok := range tokens {
+		switch {
+		case assignment.MatchString(tok):
+		case tok == envCommand:
+			afterEnv = true
+		case afterEnv && strings.HasPrefix(tok, "-"):
+		default:
+			return i
+		}
+	}
+	return len(tokens)
+}
+
+// digest の件数を数える判定。並びは書き出す順。
+var digestKinds = []struct {
+	name     string
+	decision audit.Decision
+}{{"deny", audit.Deny}, {"ask", audit.Ask}, {"nudge", audit.Nudge}, {"handover", audit.Handover}}
+
+// buildDigest はログの記録から、判定の件数と繰り返した止めを作る。treeName が nil でなければその木の記録だけ。
+// repeated は、強制された deny のうち（先頭のルート・ツール・コマンドの語）が同じものを回数の多い順に並べ、
+// 2 回以上のものだけ入れる。
+func buildDigest(records []*pyjson.Object, recorded bool, treeName *string) *pyjson.Object {
+	if treeName != nil {
+		var kept []*pyjson.Object
+		for _, r := range records {
+			if v, ok := r.Get("tree"); (ok && v == any(*treeName)) || (!ok && *treeName == "") {
+				kept = append(kept, r)
+			}
+		}
+		records = kept
+	}
+	is := func(r *pyjson.Object, d audit.Decision) bool { return r.Value("decision") == any(string(d)) }
+	counts := pyjson.NewObject()
+	for _, k := range digestKinds {
+		n := 0
+		for _, r := range records {
+			if is(r, k.decision) {
+				n++
+			}
+		}
+		counts.Set(k.name, n)
+	}
+	type key struct{ rule, tool, word string }
+	tally := map[key]int{}
+	for _, r := range records {
+		if !is(r, audit.Deny) || !pyfmt.Truthy(r.Value("enforced")) {
+			continue
+		}
+		rules, ok := r.Value("rules").([]any)
+		if !ok || len(rules) == 0 {
+			continue
+		}
+		rule, ok := rules[0].(string)
+		if !ok {
+			continue
+		}
+		tool := ""
+		if v := r.Value("tool"); pyfmt.Truthy(v) {
+			tool = pyfmt.Str(v)
+		}
+		word := ""
+		if slices.Contains(config.ShellTools, tool) {
+			if subject, ok := r.Value("subject").(string); ok {
+				word = commandWord(subject)
+			}
+		}
+		tally[key{rule, tool, word}]++
+	}
+	keys := make([]key, 0, len(tally))
+	for k := range tally {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		a, b := keys[i], keys[j]
+		if tally[a] != tally[b] {
+			return tally[a] > tally[b]
+		}
+		if a.rule != b.rule {
+			return a.rule < b.rule
+		}
+		if a.tool != b.tool {
+			return a.tool < b.tool
+		}
+		return a.word < b.word
+	})
+	repeated := []any{}
+	for _, k := range keys {
+		if n := tally[k]; n >= minRepeated {
+			repeated = append(repeated, pyjson.NewObject("rule", k.rule, "tool", k.tool, "word", k.word, "count", n))
+		}
+	}
+	return pyjson.NewObject("recorded", recorded, "counts", counts, "repeated", repeated)
+}
+
+// errShlex は shlex.split が ValueError で断る形（閉じない引用・末尾の `\`）。
+var errShlex = errors.New("shlex")
+
+// shlexSplit は Python の shlex.split(s)（posix・whitespace_split・コメント無し）。
+// infra/shell の割り方は punctuation_chars 付きで、`;` などでも割るので使えない。
+func shlexSplit(s string) ([]string, error) {
+	const (
+		space   = ' '
+		word    = 'a'
+		escape  = '\\'
+		squote  = '\''
+		dquote  = '"'
+		isSpace = " \t\r\n"
+	)
+	var out []string
+	var tok strings.Builder
+	state, escaped := rune(space), rune(word)
+	quoted := false
+	emit := func() {
+		out = append(out, tok.String())
+		tok.Reset()
+		quoted = false
+	}
+	for _, c := range s {
+		switch state {
+		case space:
+			switch {
+			case strings.ContainsRune(isSpace, c):
+			case c == escape:
+				escaped, state = word, escape
+			case c == squote || c == dquote:
+				state = c
+			default:
+				tok.WriteRune(c)
+				state = word
+			}
+		case squote, dquote:
+			quoted = true
+			switch {
+			case c == state:
+				state = word
+			case c == escape && state == dquote:
+				escaped, state = state, escape
+			default:
+				tok.WriteRune(c)
+			}
+		case escape:
+			if (escaped == squote || escaped == dquote) && c != state && c != escaped {
+				tok.WriteRune(state)
+			}
+			tok.WriteRune(c)
+			state = escaped
+		case word:
+			switch {
+			case strings.ContainsRune(isSpace, c):
+				state = space
+				if tok.Len() > 0 || quoted {
+					emit()
+				}
+			case c == squote || c == dquote:
+				state = c
+			case c == escape:
+				escaped, state = word, escape
+			default:
+				tok.WriteRune(c)
+			}
+		}
+	}
+	switch state {
+	case squote, dquote, escape:
+		return nil, errShlex
+	case word:
+		if tok.Len() > 0 || quoted {
+			emit()
+		}
+	}
+	return out, nil
+}

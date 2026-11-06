@@ -17,7 +17,7 @@ import (
 // 対象と、そこにリンクを作る形は止める。式は固定の形なので RE2 で読む。
 
 // handoffParts は置き場（ワークスペースルートからの相対）。
-var handoffParts = []string{"wip", "handoff"}
+var handoffParts = []string{config.WipRoot, config.HandoffName}
 
 // handoffPlace はツリー（ワークスペース・`projects/<名前>`・その中のワークツリー）の直下の置き場の下にヒットする式。
 // 当てる先は fold して `/` 区切りにした絶対パス。
@@ -251,7 +251,7 @@ func handoffLinkCommand(root, cwd string) func(string) string {
 				break
 			}
 		}
-		if linked && (in || strings.Contains(pathcase.Fold(text), "handoff")) {
+		if linked && (in || strings.Contains(pathcase.Fold(text), config.HandoffName)) {
 			return subject
 		}
 		return ""

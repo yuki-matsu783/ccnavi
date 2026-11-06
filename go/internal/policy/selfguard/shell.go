@@ -80,7 +80,7 @@ const (
 	dirTail = `(?:[\\/]\.?)*`
 
 	// logsNames は `logs/` の中で守る名前（記録・ローテートした記録・state・閉じたチケットの退避）。
-	logsNames = `decisions(?:\.[^\s\\/\x00]*)?\.jsonl|state|archive`
+	logsNames = `decisions(?:\.[^\s\\/\x00]*)?\.jsonl|state|` + config.ArchiveName
 )
 
 // places は書き込みの形に続く既定の場所。copyPlaces は cp・ln・install の最後の引数用。
@@ -480,13 +480,13 @@ func commonLayerRegex(root string, commonFiles []string) string {
 	return folded("^(?:" + strings.Join(alternatives, "|") + ")$")
 }
 
-// recordsPlaces は記録と state の既定の置き場（config.DefaultLog・DefaultState）と、閉じたチケットの退避（archive）を、
-// 名指しのツール（解決済みの絶対パス）に当てる表記。archive の持ち主は上の段（tickets）なので、名前をここに書く。
+// recordsPlaces は記録と state の既定の置き場（config.DefaultLog・DefaultState）と、閉じたチケットの退避
+// （config.ArchiveName）を、名指しのツール（解決済みの絶対パス）に当てる表記。
 var recordsPlaces = func() string {
 	stem, ext := ospath.Splitext(ospath.Basename(config.DefaultLog))
 	return pyre.AnySeparator + pyre.Escape(ospath.Dirname(config.DefaultLog)) + pyre.AnySeparator +
 		`(?:` + pyre.Escape(stem) + `(?:\.[^\\/]*)?` + pyre.Escape(ext) + `$|(?:` +
-		pyre.Escape(ospath.Basename(config.DefaultState)) + `|archive)(?:[\\/]|$))`
+		pyre.Escape(ospath.Basename(config.DefaultState)) + `|` + pyre.Escape(config.ArchiveName) + `)(?:[\\/]|$))`
 }()
 
 // recordsRegex は記録と state の置き場を名指しのツールに当てる式。診断のフラグで動かした置き場にも当てる

@@ -1,6 +1,7 @@
 // Package config は ccnavi の設定を 1 か所で持つ。環境変数で渡る値の解決（Settings・Load）、
 // enable / dry-run / disable のモードと終了コード、秒数のしきい値（Tunable）、判定が使うツール名（Tool*）とその組、
-// 上の段が state に書き records/prune が消す記録の名前（SelfguardDir・OncePrefix など）。
+// 上の段が state に書き records/prune が消す記録の名前（SelfguardDir・OncePrefix など）、上の段の tickets が持ち下の段も
+// 名前で見る置き場の名前（OpsDir・DirectPrefix・ArchiveName・WipRoot・HandoffName・TodoDir・ReservedBranchIDs）。
 //
 // 判定が読む値はプロセスの環境から取り、ワークツリーの中の設定ファイルからは取らない。
 // エージェントが書けるファイルから読むと、監視される側が次の呼び出しから監視を緩められる。
@@ -10,4 +11,5 @@
 // tunables の Tunable(…).value() → Tunable.Value（time.Duration）、書かれた整数・数の読み（記録の段の
 // 閾値・保持日数）→ Int・Finite、modes.fail_closed(mode, None) →
 // FailClosedEvent、fail_closed(mode, tool, safe=…) → FailClosed。toolnames の組の中のツール名 1 つ → Tool* の定数。
+// settings が写していた ticket_ids.RESERVED_BRANCH_IDS → ReservedBranchIDs（ids.ReservedBranchIDs はこれを指す）。
 package config

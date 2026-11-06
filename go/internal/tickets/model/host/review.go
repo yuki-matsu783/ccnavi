@@ -4,8 +4,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/text/unicode/norm"
-
 	"ccnavi/internal/infra/digest"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/pyfmt"
@@ -99,7 +97,7 @@ func ThreadKey(t Thread) string {
 // 先頭 32 桁。見せた指摘・適用の直前に取り直した指摘・受け入れ台帳の項目が同じかを、この版で照合する。
 func ThreadVersion(t Thread) string {
 	body := strings.ReplaceAll(strings.ReplaceAll(t.Body, "\r\n", "\n"), "\r", "\n")
-	return digest.Hex(digest.SHA256, ThreadKey(t)+"\n"+norm.NFC.String(body), versionLen)
+	return digest.Hex(digest.SHA256, ThreadKey(t)+"\n"+pyfmt.NFC(body), versionLen)
 }
 
 // Unresolved はまだ解決されていない指摘。付いた時刻では絞らない（絞ると、子を 1 本足して依頼をやり直す

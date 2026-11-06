@@ -171,7 +171,7 @@ func HumanPathForm(subject string) (HumanKind, string) {
 	if onlyReaders(text) {
 		return HumanNone, ""
 	}
-	if found, ok := guardMention.text(removeAll(guardRead, text)); ok {
+	if found, ok := guardMention.text(guardRead.removed(text)); ok {
 		return HumanGuardOff, found
 	}
 	if found, ok := guardExpandedName.text(ticked); ok {
@@ -203,22 +203,6 @@ func HumanPathForm(subject string) (HumanKind, string) {
 	return HumanNone, ""
 }
 
-// removeAll は Python の x.sub("", s)。
-func removeAll(x rx, s string) string {
-	if x.re == nil {
-		return s
-	}
-	runes := []rune(s)
-	var b strings.Builder
-	last := 0
-	for _, f := range x.all(s) {
-		b.WriteString(string(runes[last:f.Start]))
-		last = f.End
-	}
-	b.WriteString(string(runes[last:]))
-	return b.String()
-}
-
 // 文面ファイルの識別子と欄。
 const (
 	textExpanded   = "DENY_TICKET_APPROVAL_CLI__EXPANDED"
@@ -240,7 +224,7 @@ func HumanMessage(root string, kind HumanKind, found string) string {
 		return texts.Say(root, textExpanded, values, nil)
 	}
 	// 取り込みの形は、承認と残った指摘の対応方針の文に当たらない。
-	lowered := folder.String(found)
+	lowered := pyfmt.Casefold(found)
 	why := "approval"
 	switch {
 	case strings.Contains(lowered, "mirror"):

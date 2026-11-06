@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/ospath"
 )
 
@@ -77,7 +78,7 @@ func expandUser(path string) string {
 	case ospath.Windows:
 		home = windowsHome(name)
 	case name == "":
-		home = os.Getenv("HOME")
+		home = os.Getenv(env.Home)
 		if home == "" {
 			if u, err := user.Current(); err == nil {
 				home = u.HomeDir
@@ -103,16 +104,16 @@ func expandUser(path string) string {
 // windowsHome は ntpath.expanduser の家。USERPROFILE、無ければ HOMEDRIVE と HOMEPATH。
 // 別の人の名前なら、自分の家の最後の名前が自分の名前のときだけ、そこをその名前に替える。
 func windowsHome(name string) string {
-	home, ok := os.LookupEnv("USERPROFILE")
+	home, ok := os.LookupEnv(env.UserProfile)
 	if !ok {
-		homePath, ok := os.LookupEnv("HOMEPATH")
+		homePath, ok := os.LookupEnv(env.HomePath)
 		if !ok {
 			return ""
 		}
-		home = ospath.Join(os.Getenv("HOMEDRIVE"), homePath)
+		home = ospath.Join(os.Getenv(env.HomeDrive), homePath)
 	}
 	if name != "" {
-		if mine := os.Getenv("USERNAME"); name != mine {
+		if mine := os.Getenv(env.UserName); name != mine {
 			if mine != ospath.Basename(home) {
 				return ""
 			}

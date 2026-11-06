@@ -6,10 +6,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"golang.org/x/text/unicode/norm"
-
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
+	"ccnavi/internal/infra/pyfmt"
 )
 
 // WorktreesDir はワークツリーの置き場（ワークスペースルートからの相対）。セッションの道具と権限が
@@ -100,7 +99,7 @@ func Worktrees(root, projectsDir string) []Tree {
 			continue
 		}
 		if owner, ok := OwnerOf(candidate, owners); ok {
-			found = append(found, Tree{Name: NFC(name), Root: resolved(candidate), Project: owner.Project, Kind: KindWorktree})
+			found = append(found, Tree{Name: pyfmt.NFC(name), Root: resolved(candidate), Project: owner.Project, Kind: KindWorktree})
 		}
 	}
 	return found
@@ -148,7 +147,7 @@ func WorktreesWithoutProject(root, projectsDir string) []ProjectlessWorktree {
 		if !ospath.IsAbs(written) {
 			target = ospath.Join(candidate, written)
 		}
-		found = append(found, ProjectlessWorktree{NFC(name), candidate, written, ospath.DiskExists(target)})
+		found = append(found, ProjectlessWorktree{pyfmt.NFC(name), candidate, written, ospath.DiskExists(target)})
 	}
 	return found
 }
@@ -269,18 +268,14 @@ func Relative(t Tree, full string) string {
 func WorktreePath(root, name string) string {
 	base := ospath.Join(root, WorktreesDir)
 	existing, _ := ospath.DiskListdir(base)
-	folded := pathcase.Fold(NFC(name))
+	folded := pathcase.Fold(pyfmt.NFC(name))
 	for _, entry := range existing {
-		if pathcase.Fold(NFC(entry)) == folded {
+		if pathcase.Fold(pyfmt.NFC(entry)) == folded {
 			return ospath.Join(base, entry)
 		}
 	}
 	return ospath.Join(base, name)
 }
-
-// NFC はディレクトリの名前を NFC にそろえる。macOS の HFS+ は名前を NFD で返すので、日本語の
-// 識別子のワークツリーを識別子と同じ表記で引くために要る。
-func NFC(name string) string { return norm.NFC.String(name) }
 
 // Lookup はワークツリーの名前で引く。大文字小文字はどの機械でも区別しない。綴りまで同じキーを先に返し、
 // 無ければ畳んで同じキーのうち名前順で最初のもの（Go の map は順序を持たないので順を決めておく）。

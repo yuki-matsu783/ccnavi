@@ -4,9 +4,6 @@ import (
 	"slices"
 	"strings"
 
-	"golang.org/x/text/cases"
-	"golang.org/x/text/unicode/norm"
-
 	"ccnavi/internal/infra/pyfmt"
 )
 
@@ -37,10 +34,8 @@ func asciiLower(word string) string {
 	}, word)
 }
 
-var folder = cases.Fold()
-
 // loose は互換の読み（NFKC と casefold）。ASCII でない綴りが入口の語に化けるかを見るためだけに使う。
-func loose(word string) string { return folder.String(norm.NFKC.String(word)) }
+func loose(word string) string { return pyfmt.Casefold(pyfmt.NFKC(word)) }
 
 func isASCII(s string) bool {
 	for i := 0; i < len(s); i++ {

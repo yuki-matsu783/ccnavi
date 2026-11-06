@@ -10,6 +10,7 @@ import (
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/tree"
 )
@@ -21,7 +22,7 @@ const MaxEntries = 50
 const refreshWindow = 60 * time.Second
 
 const (
-	recordPrefix   = "direct-"
+	recordPrefix   = config.DirectPrefix
 	unknownSession = "unknown"
 	fieldFilePath  = "file_path"
 	fieldNotebook  = "notebook_path"
@@ -84,7 +85,7 @@ func pathOf(stateDir, session string) string {
 // samePlace はリンクを解いて比べる。tree は解いたパスを返すが、hook のルートは解いていないことがある。
 func samePlace(a, b string) bool { return key(ospath.Realpath(a)) == key(ospath.Realpath(b)) }
 
-func key(s string) string { return pathcase.Fold(tree.NFC(s)) }
+func key(s string) string { return pathcase.Fold(pyfmt.NFC(s)) }
 
 // read は記録の項目（形の検査だけ済んだもの）。別のセッションの記録・読めない記録は空。
 func read(stateDir, session string) []row {

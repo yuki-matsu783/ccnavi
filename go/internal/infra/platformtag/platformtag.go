@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 
+	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 )
@@ -72,7 +73,7 @@ func IsLauncher(path string) bool {
 // PathExecutable は PATH から見つかる ccnavi の実行ファイル。無ければ空。sh が bin/ に何も
 // 見つけなかったときに起動するもの。skip（振り分けの sh）と同じファイルは飛ばす（起動すると自分に戻る）。
 func PathExecutable(skip string) string {
-	return pathExecutable(os.Getenv("PATH"), skip)
+	return pathExecutable(os.Getenv(env.Path), skip)
 }
 
 // pathExecutable は sh と同じ規則で探す。絶対パスの項目だけを書かれた順に見て（空と相対は cwd で

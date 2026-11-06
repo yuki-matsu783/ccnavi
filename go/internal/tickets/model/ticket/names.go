@@ -6,12 +6,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"golang.org/x/text/cases"
-
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/tickets/model/ids"
 )
-
-var folder = cases.Fold()
 
 // BranchNameProblems は新規の提案の識別子が、親のブランチ名の規則に合わないところ（ユーザに見せる文。深刻度は
 // 呼び手が決める）。ref として安全な形、統合先や保護されたブランチの名前を使わない、新しい親は
@@ -19,7 +16,7 @@ var folder = cases.Fold()
 // integration は統合先の名前（渡したときだけ予約に足す）、prefixes は使える先頭の語。
 func (t *Ticket) BranchNameProblems(integration string, prefixes []string) []string {
 	name := t.ID
-	folded := folder.String(name)
+	folded := pyfmt.Casefold(name)
 	var found []string
 	if strings.Contains(name, "..") {
 		found = append(found, "識別子に `..` を含む。git のブランチ名に使えない")
@@ -35,7 +32,7 @@ func (t *Ticket) BranchNameProblems(integration string, prefixes []string) []str
 	if slices.Contains(ids.ReservedBranchIDs, folded) || strings.HasPrefix(folded, "release-") {
 		found = append(found, "識別子が統合先や保護されたブランチの名前（main・master・develop・release・release-*）"+
 			"と同じ。親のブランチ名が統合先と同じになる")
-	} else if integration != "" && folded == folder.String(integration) {
+	} else if integration != "" && folded == pyfmt.Casefold(integration) {
 		found = append(found, "識別子が統合先の名前（"+integration+"）と同じ。親のブランチ名が統合先と同じになる")
 	}
 	return append(found, t.formProblems(prefixes)...)
@@ -60,7 +57,7 @@ func (t *Ticket) formProblems(prefixes []string) []string {
 			"（`ccnavi-start.sh --issue <番号>` が決める名前にする）"}
 	}
 	var found []string
-	slug, project := folder.String(form.Slug), folder.String(t.Project)
+	slug, project := pyfmt.Casefold(form.Slug), pyfmt.Casefold(t.Project)
 	switch {
 	case ownIssue && form.Number != t.Issue:
 		found = append(found, fmt.Sprintf("識別子の番号 %d が `issue: %d` と違う。"+

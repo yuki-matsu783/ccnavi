@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/digest"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
@@ -17,7 +18,7 @@ import (
 const Version = 1
 
 // DirName は state の下の置き場の名前（records/prune も同じ名前を残す側に数える）。
-const DirName = "ops"
+const DirName = config.OpsDir
 
 // idLen は操作ID の桁数（uuid4().hex と同じ 32 桁の 16 進）。
 const idLen = 32

@@ -3,5 +3,7 @@
 // 大文字小文字だけが違う名前は同じパスとして扱い、両立させない。どの機械でも同じ答えにするため、
 // 比べるときは必ずここを通す。返すのは比べるための文字列で、ファイルを開く表記には使わない。
 //
+// パスでない語の比べ（区切りを変えない str.casefold）は pyfmt.Casefold で、Fold もそれで組む。
+//
 // Python からの対応: pathcase.fold → Fold。name.lower().endswith(ext) → HasExt。
 package pathcase

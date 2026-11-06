@@ -25,8 +25,7 @@ import (
 // （持ち主は括弧の中）。records の中の名前は、持ち主のパッケージの定数を読む。
 // policy が書く名前（自己防衛のバックアップ・ctxfile の数え）は config の定数を読む。
 const (
-	opsDir    = "ops"  // tickets/model の操作記録
-	stateSent = "sent" // 操作記録の段階が送り終えた印
+	stateSent = "sent" // tickets/model/oplog の段階が送り終えた印（oplog.StateSent）
 )
 
 // stampLayout はローテートした名前の日時。名前の順と時刻の順が合う。
@@ -53,7 +52,7 @@ var sessionOnly = []*regexp.Regexp{
 	named(stopreview.RefsPrefix, fsio.JSONExt),      // stopreview
 	named(stopreview.TaintPrefix, fsio.JSONExt),     // hook の stopjudge
 	named(stopreview.LastStopPrefix, fsio.JSONExt),  // stopreview
-	named("direct-", fsio.JSONExt),                  // direct_candidates（compact・clear では破棄しない）
+	named(config.DirectPrefix, fsio.JSONExt),        // direct_candidates（compact・clear では破棄しない）
 	// `<セッション>.reported.json`（post）。Claude Code のセッションは UUID なので、その形に限る。広く読むと
 	// 同じ置き場の別のファイル（package.json など）を消す。
 	regexp.MustCompile(`^(?P<s>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\.reported\.json$`),
@@ -192,7 +191,7 @@ func Lines(r *Report, dryRun bool) []string {
 		out = append(out, remove+"  "+path)
 	}
 	if r.KeptOps > 0 {
-		out = append(out, fmt.Sprintf("残す  未完了の操作記録 %d 件（%s/。消さない）", r.KeptOps, opsDir))
+		out = append(out, fmt.Sprintf("残す  未完了の操作記録 %d 件（%s/。消さない）", r.KeptOps, config.OpsDir))
 	}
 	if len(out) == 0 {
 		out = append(out, "動かすものはありません。")
@@ -289,7 +288,7 @@ func countOps(stateDir string) int {
 	if stateDir == "" {
 		return 0
 	}
-	names, err := ospath.DiskListdir(ospath.Join(stateDir, opsDir))
+	names, err := ospath.DiskListdir(ospath.Join(stateDir, config.OpsDir))
 	if err != nil {
 		return 0
 	}
@@ -299,7 +298,7 @@ func countOps(stateDir string) int {
 		if !strings.HasSuffix(name, fsio.JSONExt) {
 			continue
 		}
-		data, ok := fsio.ReadObject(ospath.Join(stateDir, opsDir, name))
+		data, ok := fsio.ReadObject(ospath.Join(stateDir, config.OpsDir, name))
 		if !ok || !allSent(data) {
 			n++
 		}

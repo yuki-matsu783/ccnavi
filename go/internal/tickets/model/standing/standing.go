@@ -16,6 +16,7 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/model/ids"
@@ -192,7 +193,7 @@ func (f *Families) read(family, project string) Standing {
 // （NFD のブランチ名は使えない名前で、sh もバイト列のまま比べる）。ファイルだけを読む。
 func HeadBranch(treeRoot, family string) string {
 	head, ok := tree.BranchOf(treeRoot)
-	if ok && head != "" && ids.BranchToID(head) == tree.NFC(family) {
+	if ok && head != "" && ids.BranchToID(head) == pyfmt.NFC(family) {
 		return head
 	}
 	return ""
