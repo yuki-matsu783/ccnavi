@@ -14,9 +14,9 @@ import io
 import os
 from typing import TextIO
 
-from ...infra import pathcase, settings, tree
+from ...infra import gitcmd, pathcase, settings, tree
 from ...policy import rule_lint, ruleload
-from ...policy.rules import SEVERITY_ERROR, Problem
+from ...policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 from . import phasetypes, risk
 
 
@@ -189,3 +189,53 @@ def file_problems(conf: settings.Settings, root: str, kind: str, layer: str) -> 
     if kind == settings.KIND_RULES:
         return layer_rules(io.StringIO(), conf, root, only=layer)
     return layer_configs(conf, root, only=layer, kind=kind)
+
+
+# `scope` が当たらなくてもよい置き場。作業の途中で生まれる下書きの置き場なので、対象から外す。
+_SCOPE_SPARE_PREFIX = "wip/"
+
+
+def unmatched_scopes(conf: settings.Settings, root: str) -> list[Problem]:
+    """フェーズ定義の `scope` の glob で、git が挙げるどのファイルにも当たらないものを warn で出す。
+
+    共通レイヤーの `implement` は `src/*`・`tests/*` 固定なので、`textkit/` のような配置では
+    当たらず、エージェントが範囲に合う型を見つけられずに止まる。見るのは自身と各プロジェクトの
+    レイヤーそれぞれについて、共通と合成した結果（共通 + レイヤー）の glob を 1 つずつ見る。
+    `inherit` と `wip/` の下は見ない。git が使えないレイヤーは何も出さない
+    （一覧が取れないだけで、設定の不備ではない）。
+    """
+    problems: list[Problem] = []
+    for name in layer_names(conf):
+        project = "" if name == ruleload.LAYER_SELF else name
+        home = tree.project_root(conf.projects, project) if project else root
+        types, _ = phasetypes.layer_types(conf, root, project)
+        if not types or not home:
+            continue
+        done = gitcmd.run(
+            home,
+            ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+            plain_pathspecs=True,
+        )
+        if not done.ok:
+            continue
+        files = [f for f in done.out.split("\0") if f]
+        where = layer_where(name)
+        for ident, pt in types.items():
+            for entry in pt.scope or []:
+                if not entry.glob or entry.glob.startswith(_SCOPE_SPARE_PREFIX):
+                    continue
+                if any(entry.matches(f) for f in files):
+                    continue
+                problems.append(
+                    Problem(
+                        SEVERITY_WARN,
+                        f"{where} (phases) {ident}",
+                        f"`scope` の `{entry.glob}` がどのファイルにも当たりません。"
+                        "この配置では範囲に合う型が無く、作業が止まります。"
+                        "このレイヤーの `.ccnavi/config/project/phases.yml` に、実際の置き場を"
+                        f"`scope` に書いた定義を足してください（`{ident}` と同じ id は使えません。"
+                        "別の id と表示名を付けてください。書き方は `/ccnavi-config`、"
+                        "流れは `.ccnavi/docs/grow-phases.md` を見てください）",
+                    )
+                )
+    return problems
