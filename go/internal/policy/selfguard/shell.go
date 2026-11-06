@@ -1,15 +1,12 @@
 package selfguard
 
 import (
-	"crypto/sha1"
-	"encoding/hex"
 	"slices"
 	"strings"
 	"unicode/utf8"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/ospath"
-	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/platformtag"
 	"ccnavi/internal/infra/pyre"
 	"ccnavi/internal/infra/shell"
@@ -577,10 +574,4 @@ func unique[T comparable](items []T) []T {
 		}
 	}
 	return out
-}
-
-// pathMark は PATH の実体の key に付けるパスの印。
-func pathMark(real string) string {
-	sum := sha1.Sum([]byte(pathcase.Fold(real)))
-	return hex.EncodeToString(sum[:])[:8]
 }

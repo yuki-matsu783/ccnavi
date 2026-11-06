@@ -11,20 +11,17 @@ import (
 // 組み込みの保護の id。どれも rules.ReservedIDPrefix で始まり、ルールファイルからは書けない（消せない）。
 const (
 	ShellRuleID        = "builtin:guard-setting-files"
-	BinaryRuleID       = "builtin:guard-binary"
-	CommonLayerRuleID  = "builtin:guard-common-layer"
-	RecordsRuleID      = "builtin:guard-records"
-	ProjectHomeRuleID  = "builtin:guard-project-home"
-	HandoffLinkRuleID  = "builtin:guard-handoff-links"
-	HandoffLnRuleID    = "builtin:guard-handoff-ln"
-	HooksRuleID        = "builtin:guard-hooks"
-	SettingsRuleID     = "builtin:guard-settings"
-	ScriptsRuleID      = "builtin:guard-scripts"
-	CCNaviConfigRuleID = "builtin:guard-ccnavi-config"
+	binaryRuleID       = "builtin:guard-binary"
+	commonLayerRuleID  = "builtin:guard-common-layer"
+	recordsRuleID      = "builtin:guard-records"
+	projectHomeRuleID  = "builtin:guard-project-home"
+	handoffLinkRuleID  = "builtin:guard-handoff-links"
+	handoffLnRuleID    = "builtin:guard-handoff-ln"
+	hooksRuleID        = "builtin:guard-hooks"
+	settingsRuleID     = "builtin:guard-settings"
+	scriptsRuleID      = "builtin:guard-scripts"
+	ccnaviConfigRuleID = "builtin:guard-ccnavi-config"
 )
-
-// NamedRuleIDs は名前で書くツールから守る 4 本（AddNamedRules）。
-var NamedRuleIDs = []string{HooksRuleID, SettingsRuleID, ScriptsRuleID, CCNaviConfigRuleID}
 
 const (
 	// shellMatch はシェルから書き込む形の 1 本を当てるツール。
@@ -69,14 +66,14 @@ func AddRules(rs *rules.RuleSet, o Options) {
 	}
 	if clause := BinaryClause(o.Bin); clause != "" {
 		insert(rs, rules.Spec{
-			ID: BinaryRuleID, Match: namedMatch,
+			ID: binaryRuleID, Match: namedMatch,
 			// 当てる先は解決済みの絶対パスなので、末尾で閉じる。
 			Regex: clause + "$", Text: texts.Spec("RULE_GUARD_BINARY", texts.SpecOptions{}),
 		}, o.Root)
 	}
 	if glob := projectHomeGlob(o.ProjectHome); glob != "" {
 		insert(rs, rules.Spec{
-			ID: ProjectHomeRuleID, Match: namedMatch, Glob: glob,
+			ID: projectHomeRuleID, Match: namedMatch, Glob: glob,
 			Text:   texts.Spec("RULE_GUARD_PROJECT_HOME", texts.SpecOptions{}),
 			Exempt: handoffWriteExempt(o.Root),
 		}, o.Root)
@@ -84,21 +81,21 @@ func AddRules(rs *rules.RuleSet, o Options) {
 	if o.Root != "" {
 		// 当てる対象は関数が決める（式は 1 文字で組み立てが軽いので、ツールに依らず足す）。
 		insert(rs, rules.Spec{
-			ID: HandoffLinkRuleID, Match: namedMatch, Regex: ".",
+			ID: handoffLinkRuleID, Match: namedMatch, Regex: ".",
 			Text: texts.Spec("RULE_GUARD_HANDOFF_LINKS", texts.SpecOptions{}), Exempt: handoffLinkTarget(o.Root),
 		}, o.Root)
 		insert(rs, rules.Spec{
-			ID: HandoffLnRuleID, Match: shellMatch, Regex: ".",
+			ID: handoffLnRuleID, Match: shellMatch, Regex: ".",
 			Text: texts.Spec("RULE_GUARD_HANDOFF_LN", texts.SpecOptions{}), Exempt: handoffLinkCommand(o.Root, o.Cwd),
 		}, o.Root)
 	}
 	insert(rs, rules.Spec{
-		ID: RecordsRuleID, Match: namedMatch, Regex: recordsRegex(o.Log, o.State),
+		ID: recordsRuleID, Match: namedMatch, Regex: recordsRegex(o.Log, o.State),
 		Text: texts.Spec("RULE_GUARD_RECORDS", texts.SpecOptions{}),
 	}, o.Root)
 	if common := commonLayerRegex(o.Root, o.CommonFiles); common != "" {
 		insert(rs, rules.Spec{
-			ID: CommonLayerRuleID, Match: namedMatch, Regex: common,
+			ID: commonLayerRuleID, Match: namedMatch, Regex: common,
 			Text: texts.Spec("RULE_GUARD_COMMON_LAYER", texts.SpecOptions{}),
 		}, o.Root)
 	}
@@ -111,15 +108,15 @@ func AddNamedRules(rs *rules.RuleSet, projectHome, root string) {
 	exempt := handoffWriteExempt(root)
 	variants := texts.SpecOptions{Variants: texts.Variants{nextVariant: nextHint(root)}}
 	named := []rules.Spec{
-		{ID: HooksRuleID, Glob: "*/.claude/hooks/*", Text: texts.Spec("RULE_GUARD_HOOKS", variants)},
-		{ID: SettingsRuleID, Regex: settingsRegex, Text: texts.Spec("RULE_GUARD_SETTINGS", variants)},
+		{ID: hooksRuleID, Glob: "*/.claude/hooks/*", Text: texts.Spec("RULE_GUARD_HOOKS", variants)},
+		{ID: settingsRuleID, Regex: settingsRegex, Text: texts.Spec("RULE_GUARD_SETTINGS", variants)},
 	}
 	if parts := escapedParts(homeName(projectHome)); len(parts) > 0 {
 		home := strings.Join(parts, `[\\/]`)
 		named = append(named,
-			rules.Spec{ID: ScriptsRuleID, Glob: "*/" + homeName(projectHome) + "/scripts/*", Text: texts.Spec("RULE_GUARD_SCRIPTS", variants)},
+			rules.Spec{ID: scriptsRuleID, Glob: "*/" + homeName(projectHome) + "/scripts/*", Text: texts.Spec("RULE_GUARD_SCRIPTS", variants)},
 			rules.Spec{
-				ID:    CCNaviConfigRuleID,
+				ID:    ccnaviConfigRuleID,
 				Regex: `[\\/]` + home + `[\\/]config[\\/]common[\\/](rules|phases|risks)\.yml$`,
 				Text:  texts.Spec("RULE_GUARD_CCNAVI_CONFIG", variants),
 			})

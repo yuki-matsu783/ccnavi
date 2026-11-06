@@ -16,6 +16,7 @@
 // holder_regex → HolderRegex（named_only は引数）、copy_destination_regex・copy_last_place → CopyDestinationRegex・
 // CopyLastPlace、binary_clause(p) → BinaryClause、too_many_redirects → TooManyRedirects、REDIRECT_LIMIT・
 // RAW_LENGTH_LIMIT → RedirectLimit・RawLengthLimit、add_rules → AddRules（Options。tool=None は Tool が空）、
-// add_named_rules → AddNamedRules、handoff_delete_word → HandoffDeleteWord（base=None は空）、*_RULE_ID → *RuleID。
-// 上の段が使わない sweep・records_regex・common_layer_regex・handoff_* の残りは私的にした。
+// add_named_rules → AddNamedRules、handoff_delete_word → HandoffDeleteWord（base=None は空）、SHELL_RULE_ID → ShellRuleID。
+// 上の段が使わない sweep・records_regex・common_layer_regex・handoff_* の残り・ほかの *_RULE_ID は私的にし、呼び手の無い
+// ACTION_SAVED・NAMED_RULE_IDS は移さなかった。before などの関数の形は Step。
 package selfguard

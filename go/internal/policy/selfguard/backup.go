@@ -85,7 +85,6 @@ type Action string
 
 const (
 	ActionKept        Action = "kept"              // 変わっていない（報告には出さない）
-	ActionSaved       Action = "saved"             // バックアップを取った
 	ActionRestored    Action = "restored"          // バックアップから戻した
 	ActionRestoredGit Action = "restored-from-git" // バックアップが無く、git から戻した
 	ActionMissing     Action = "missing"           // 対象が無く、戻す先も無い
