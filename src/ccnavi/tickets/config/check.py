@@ -191,17 +191,18 @@ def file_problems(conf: settings.Settings, root: str, kind: str, layer: str) -> 
     return layer_configs(conf, root, only=layer, kind=kind)
 
 
-# `scope` が当たらなくてよい置き場。作業の途中で生まれる下書きの場所なので、最初は空。
+# `scope` が当たらなくてもよい置き場。作業の途中で生まれる下書きの置き場なので、対象から外す。
 _SCOPE_SPARE_PREFIX = "wip/"
 
 
 def unmatched_scopes(conf: settings.Settings, root: str) -> list[Problem]:
-    """フェーズ定義の `scope` の glob が、git が挙げるどのファイルにも当たらないものを warn で言う。
+    """フェーズ定義の `scope` の glob で、git が挙げるどのファイルにも当たらないものを warn で出す。
 
     共通レイヤーの `implement` は `src/*`・`tests/*` 固定なので、`textkit/` のような配置では
     当たらず、エージェントが範囲に合う型を見つけられずに止まる。見るのは自身と各プロジェクトの
-    レイヤーそれぞれの合成結果（共通 + レイヤー）で、glob 1 つずつ。`inherit` と `wip/` の下は
-    見ない。git が使えないレイヤーは何も言わない（一覧が取れないだけで、設定の不備ではない）。
+    レイヤーそれぞれについて、共通と合成した結果（共通 + レイヤー）の glob を 1 つずつ見る。
+    `inherit` と `wip/` の下は見ない。git が使えないレイヤーは何も出さない
+    （一覧が取れないだけで、設定の不備ではない）。
     """
     problems: list[Problem] = []
     for name in layer_names(conf):
@@ -229,12 +230,12 @@ def unmatched_scopes(conf: settings.Settings, root: str) -> list[Problem]:
                     Problem(
                         SEVERITY_WARN,
                         f"{where} (phases) {ident}".rstrip(),
-                        f"`scope` の `{entry.glob}` がどのファイルにも当たらない。"
-                        "この配置では範囲に合う型が無く、作業が止まる。"
+                        f"`scope` の `{entry.glob}` がどのファイルにも当たりません。"
+                        "この配置では範囲に合う型が無く、作業が止まります。"
                         "このレイヤーの `.ccnavi/config/project/phases.yml` に、実際の置き場を"
-                        f"`scope` に書いた定義を足す（`{ident}` と同じ id は使えない。別の id と"
-                        "表示名を付ける。書き方は `/ccnavi-config`、"
-                        "流れは `.ccnavi/docs/grow-phases.md`）",
+                        f"`scope` に書いた定義を足してください（`{ident}` と同じ id は使えません。"
+                        "別の id と表示名を付けてください。書き方は `/ccnavi-config`、"
+                        "流れは `.ccnavi/docs/grow-phases.md` を見てください）",
                     )
                 )
     return problems

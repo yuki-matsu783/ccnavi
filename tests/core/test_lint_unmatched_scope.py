@@ -1,4 +1,4 @@
-"""`--lint` の「scope がどのファイルにも当たらない」warn（`check.unmatched_scopes`）。"""
+"""`--lint` の「scope がどのファイルにも当たらない」warn（`check.unmatched_scopes`）を確かめる。"""
 
 from __future__ import annotations
 
