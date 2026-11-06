@@ -2,7 +2,7 @@
 
 `description`（短い作業名）の言及（承認済みの子の識別子、ccnavi のツリーに認識された
 ワークツリーの名前）だけから担当を決め、決まらないときは止め、決まったときは担当の案内をプロンプトに書き足す
-（`hook.agentlaunch`）。プロンプトは読まない。
+（`hook.agentlaunch`）。担当の決定にプロンプトは使わない。
 
 作業場所（cwd）の注入は、実測で効かなかったので行わない（`agentlaunch.INJECT_CWD`）。返すのは
 `updatedInput.prompt` で、`permissionDecision` は付けない。

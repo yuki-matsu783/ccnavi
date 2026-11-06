@@ -5,8 +5,9 @@
 `description`（短い作業名）に書かれた担当の子（またはワークツリー）から担当を決め、決まらないときは
 止める理由を返し、決まったときはプロンプトに書き足す案内を返す。
 
-- 担当は `description` だけで決める。プロンプトは読まない。ccnavi が足した案内にはほかのワークツリー
-  （親のフローのパスなど）が入るので、プロンプトを読むと、書き換えたあとの再送で担当が増えて見える
+- 担当は `description` だけで決める。プロンプトは担当の決定に使わず、案内の差し替えにだけ読む。
+  ccnavi が足した案内にはほかのワークツリー（親のフローのパスなど）が入るので、担当の決定に
+  プロンプトを使うと、書き換えたあとの再送で担当が増えて見える
 - 言及は、承認済みの子の識別子と、ccnavi のツリーに認識されたワークツリーの名前（`mentions`）
 - 担当にまとめてから検証する。止める理由の優先順位は `decide` の順
 - 返すのは「止める理由」か「更新の計画」だけ。応答は書かず、判定も途中で終えない
@@ -159,16 +160,16 @@ def decide(
 ) -> Result:
     """起動ツールの呼び出しについて、止める理由か更新の計画を返す。無ければ空の Result。
 
-    処理フロー:
+    処理フロー（止める理由の優先順位。番号は本体のコメントと設計書の優先順位に合わせる）:
     1. 起動ツールでなければ空を返す。`isolation` の指定は値によらず止める（`_isolation`）。
-    2. `description` の言及を拾う（`mentions`）。cwd の所属ツリーを `tree.tree_of` で求める。
-    3. 言及を担当にまとめる（`_targets`）。プロンプトは読まない。
-    4. 入れ子なら呼び手の子（`_caller_child`）を足す。
-    5. 担当先が 2 つ以上なら止める（`_multi_target`）。
-    6. 担当先が 1 つなら、親（`_parent_tree`）・子で担当にできない（`unavailable`、
-       `_child_unavailable`）・既存の cwd との食い違い（`_cwd_conflict`）の順に止める。
-       どれにもヒットしなければ更新の計画を返す（`_plan`）。
-    7. 言及が 0 件で、親のワークツリーから編集する起動なら、子の指定を求めて止める（`_no_child`）。
+    `description` の言及を拾い（`mentions`）、担当にまとめ（`_targets`）、入れ子なら呼び手の子
+    （`_caller_child`）を足したうえで、次の順に見る。
+    2. 担当先が 2 つ以上なら止める（`_multi_target`）。
+    3. 担当先が 1 つで親なら止める（`_parent_tree`）。
+    4. 子で担当にできないなら止める（`unavailable`、`_child_unavailable`）。
+    5. 既存の cwd と食い違うなら止める（`_cwd_conflict`）。どれにもヒットしなければ更新の計画を返す
+       （`_plan`）。
+    6. 言及が 0 件で、親のワークツリーから編集する起動なら、子の指定を求めて止める（`_no_child`）。
     """
     if payload.tool_name not in toolnames.AGENT_TOOLS:
         return Result()
@@ -182,10 +183,11 @@ def decide(
     book = Book(conf, root, raw) if conf.tickets_enabled else None
     here = tree.tree_of(root, payload.cwd, conf.projects) if payload.cwd else None
 
-    # 担当は description だけで決める。プロンプトは読まない（ccnavi が足した案内に入る
-    # パスなどを、担当の指定と取り違えないため）。
-    names = mentions(conf, root, payload.field_value("description"), book)
-    groups = {t.key: t for t in _targets(conf, root, names, book)}
+    # 担当は description だけで決める（ccnavi が足した案内に入るパスなどを、担当の指定と
+    # 取り違えないため。プロンプトは案内の差し替えにだけ読む）。
+    trees = tree.worktrees(root, conf.projects)
+    names = mentions(trees, payload.field_value("description"), book)
+    groups = {t.key: t for t in _targets(trees, names, book)}
     caller = _caller_child(book, here) if payload.agent_id and book is not None else None
     if caller is not None:
         # 入れ子で、呼び手の担当が子のとき。呼び手の子も 1 つの担当先として数え、違う言及があれば
@@ -234,9 +236,7 @@ def decide(
     return Result()
 
 
-def mentions(
-    conf: settings.Settings, root: str, description: str, book: Book | None
-) -> list[str]:
+def mentions(trees: list[tree.Tree], description: str, book: Book | None) -> list[str]:
     """description に語として現れる、担当の名前。
 
     名前は、承認済みの子の識別子と、ccnavi のツリーに認識されたワークツリーの名前。
@@ -245,7 +245,7 @@ def mentions(
     if not description:
         return []
     names = [t.ticket for t in sorted(book.children(), key=lambda t: t.ticket)] if book else []
-    names += [t.name for t in tree.worktrees(root, conf.projects)]
+    names += [t.name for t in trees]
     return [name for name in dict.fromkeys(names) if _word_in(name, description)]
 
 
@@ -264,11 +264,8 @@ def _real(path: str) -> str:
         return os.path.abspath(path)
 
 
-def _targets(
-    conf: settings.Settings, root: str, names: list[str], book: Book | None
-) -> list[Target]:
+def _targets(trees: list[tree.Tree], names: list[str], book: Book | None) -> list[Target]:
     """名前を、ワークツリーの実体ごとにまとめる。"""
-    trees = tree.worktrees(root, conf.projects)
     by_key: dict[str, Target] = {}
     for name in names:
         worktree = next(

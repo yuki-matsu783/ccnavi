@@ -915,8 +915,9 @@ class FlowLockTest(FlowHarness):
         self.assertIn("[fancyNewNode] 未来の種類", text)
         # askUserQuestion: 止まってメインに返す。
         self.assertIn("問いと選択肢を添えてメインに返して", text)
-        # subAgent: 入れ子で起こし、description に担当の子の識別子を 1 つだけ書く（ccnavi がその子の
-        # ワークツリーで案内する）。担当以外の子は書かず、isolation は使わない。Agent が無ければ返す。
+        # subAgent: 入れ子で起こし、description に担当の子の識別子を 1 つだけ書く（ccnavi がその
+        # 子のワークツリーで案内する）。担当以外の子は書かず、isolation は使わない。
+        # Agent が無ければメインに返す。
         self.assertIn(f"description（作業名の欄）に担当の子の識別子 {CHILD} を 1 つだけ書き", text)
         self.assertIn("ccnavi が範囲とフローの案内をプロンプトに書き足す", text)
         self.assertIn("担当以外の子の識別子は書かないでください", text)
