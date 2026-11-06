@@ -188,15 +188,13 @@ def screen(
                 "    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、"
                 "親の範囲にない場所が新たに編集可能になることはありません"
             )
-            head = "親の範囲: " + (
-                ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK))
-                if parent
-                else "親がまだ承認されていない"
-            )
-            lines.append(f"    {head}")
+            if parent:
+                lines += _bullets("親の範囲", parent.paths(rules.ALLOW) + parent.paths(rules.ASK))
+            else:
+                lines.append("    親の範囲: 親がまだ承認されていない")
             bound = _type_of(t, pool, cand_types)
             if bound is not None and not bound.inherits_scope:
-                lines.append(f"    定義「{bound.title}」の範囲: " + ", ".join(bound.scope_globs))
+                lines += _bullets(f"定義「{bound.title}」の範囲", bound.scope_globs)
         else:
             lines.append("■ このチケットで編集可能な範囲")
             lines.append(
@@ -211,9 +209,7 @@ def screen(
                 "ルールで禁止（deny）にした場所は、この範囲の中でも止まります"
             )
         for name in rules.SECTIONS:
-            paths = t.paths(name)
-            if paths:
-                lines.append(f"    {name}: " + ", ".join(paths))
+            lines += _bullets(name, t.paths(name))
         if cand.overflow:
             # 範囲のすぐ下に置く。判定では止まる。判定に影響しない記述の
             # 注意と混ぜると、承認すれば書けると読み違える。
@@ -344,6 +340,17 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
         lines.append("■ この親では使わない定義（phases.yml にあるが phases: にない）")
         lines.append("    使わない: " + "、".join(f"{pt.title} / {pt.id}" for pt in left))
     return lines
+
+
+def _bullets(label: str, items: list[str]) -> list[str]:
+    """範囲の項を 1 行 1 項目の箇条書きにする。項目が無ければ何も出さない。
+
+    カンマでつなぐと、承認する人が項目の切れ目を読み違える（空白区切りの 1 項目も、
+    複数の項目に見える）。
+    """
+    if not items:
+        return []
+    return [f"    {label}:", *(f"      - {item}" for item in items)]
 
 
 def _scope_diff_lines(current: ticket_model.Ticket, revised: ticket_model.Ticket) -> list[str]:
