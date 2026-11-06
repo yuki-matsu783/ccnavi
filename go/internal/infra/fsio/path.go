@@ -10,7 +10,12 @@ import (
 )
 
 // lineSep は os.linesep。
-var lineSep = map[bool]string{true: "\r\n", false: "\n"}[ospath.Windows]
+var lineSep = func() string {
+	if ospath.Windows {
+		return "\r\n"
+	}
+	return "\n"
+}()
 
 // SafeNameLimit は SafeName が既定で切り詰める長さ（文字数）。
 const SafeNameLimit = 64
@@ -42,7 +47,7 @@ func SpelledPath(path, cwd string) string {
 
 func joined(path, cwd string) string {
 	if cwd == "" {
-		if wd, err := os.Getwd(); err == nil {
+		if wd, err := ospath.Getwd(); err == nil {
 			cwd = wd
 		}
 	}

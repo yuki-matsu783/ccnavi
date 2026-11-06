@@ -347,7 +347,7 @@ func (d *decoder) str(end int) (any, int, error) {
 		}
 		next++
 		end = next + 4
-		if end >= n {
+		if end > n {
 			return nil, 0, d.fail(`Invalid \uXXXX escape`, next-1)
 		}
 		c = 0

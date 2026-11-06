@@ -74,6 +74,8 @@ var loadsErrors = []struct{ name, in, want string }{
 	{"bom", "\ufeff{}", "Unexpected UTF-8 BOM (decode using utf-8-sig): line 1 column 1 (char 0)"},
 	{"minus", "-", "Expecting value: line 1 column 1 (char 0)"},
 	{"pair-then-bad", "\"\\ud800\\u12\"", "Invalid \\uXXXX escape: line 1 column 9 (char 8)"},
+	// 回帰: 4 桁が入力の末尾にちょうど届くときは、桁の誤りではなく閉じていない文字列になる。
+	{"u-escape-at-end", "\"\\u1234", "Unterminated string starting at: line 1 column 1 (char 0)"},
 	{"wide", "[\"日本\", \"語\", 1 2]", "Expecting ',' delimiter: line 1 column 15 (char 14)"},
 }
 

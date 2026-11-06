@@ -1,6 +1,8 @@
 package shell
 
 import (
+	"ccnavi/internal/infra/ospath"
+
 	"errors"
 	"strings"
 )
@@ -457,7 +459,7 @@ func renderWord(token string) string {
 	var b strings.Builder
 	for _, c := range token {
 		switch {
-		case isSpace(c):
+		case ospath.IsSpace(c):
 			b.WriteString(WordSep)
 		case string(c) == quotedGT:
 			b.WriteString(WordSep + ">" + WordSep)

@@ -209,19 +209,6 @@ func isDigits(s string) bool {
 	return true
 }
 
-// isSpace は Python の str.isspace（1 文字）。Go の unicode.IsSpace と違い \x1c-\x1f も含む。
-func isSpace(r rune) bool {
-	switch {
-	case r >= 0x09 && r <= 0x0D, r >= 0x1C && r <= 0x20, r == 0x85, r == 0xA0, r == 0x1680,
-		r >= 0x2000 && r <= 0x200A, r == 0x2028, r == 0x2029, r == 0x202F, r == 0x205F, r == 0x3000:
-		return true
-	}
-	return false
-}
-
-// strip は Python の str.strip()。
-func strip(s string) string { return strings.TrimFunc(s, isSpace) }
-
 // lower は Python の str.lower()。違いが出る U+0130 だけを合わせる。
 func lower(s string) string {
 	return strings.ToLower(strings.ReplaceAll(s, "İ", "i̇"))

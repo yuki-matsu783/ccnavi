@@ -108,10 +108,22 @@ func Normpath(p string) string {
 	return out
 }
 
+// Getwd は os.getcwd()。os.Getwd は $PWD がリンクを含んでもそのまま返すが、Python は実体のパスを返す。
+func Getwd() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	if real, err := filepath.EvalSymlinks(cwd); err == nil {
+		return real, nil
+	}
+	return cwd, nil
+}
+
 // Abspath は os.path.abspath。
 func Abspath(p string) string {
 	if !IsAbs(p) {
-		cwd, err := os.Getwd()
+		cwd, err := Getwd()
 		if err == nil {
 			p = Join(cwd, p)
 		}
@@ -129,7 +141,7 @@ func Realpath(p string) string {
 	count := len(rest)
 	path := "/"
 	if !strings.HasPrefix(p, "/") {
-		cwd, err := os.Getwd()
+		cwd, err := Getwd()
 		if err != nil {
 			return Abspath(p)
 		}
@@ -291,8 +303,7 @@ func ReadDiskText(path string) (string, error) {
 	if !utf8.Valid(data) {
 		return "", ErrNotUTF8
 	}
-	text := strings.ReplaceAll(string(data), "\r\n", "\n")
-	return strings.ReplaceAll(text, "\r", "\n"), nil
+	return UnifyNewlines(string(data)), nil
 }
 
 // Slashed は区切りを "/" に揃える（どの機械でも `\` を "/" にする）。ルールと範囲の glob は "/" で書かれている。
@@ -324,4 +335,9 @@ func Splitlines(s string) []string {
 		lines = append(lines, s[start:])
 	}
 	return lines
+}
+
+// UnifyNewlines は Python のテキストの読み（newline=None）と同じく、"\r\n" と "\r" を "\n" にする。
+func UnifyNewlines(text string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
 }

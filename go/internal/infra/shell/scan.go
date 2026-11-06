@@ -1,6 +1,8 @@
 package shell
 
 import (
+	"ccnavi/internal/infra/ospath"
+
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -621,7 +623,7 @@ func (x *scanner) heredocBodies(collect bool) error {
 				end = x.i + j
 				next = end + 1
 			}
-			if strip(s[x.i:end]) == h.delim {
+			if ospath.Strip(s[x.i:end]) == h.delim {
 				if !h.quoted {
 					if err := x.body(s[start:x.i], collect); err != nil {
 						return err

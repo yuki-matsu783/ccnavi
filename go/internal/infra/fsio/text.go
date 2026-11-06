@@ -1,6 +1,8 @@
 package fsio
 
 import (
+	"ccnavi/internal/infra/ospath"
+
 	"fmt"
 	"strings"
 )
@@ -47,11 +49,7 @@ func Decode(content []byte, bad Undecodable) (string, error) {
 		}
 		i = end
 	}
-	return unifyNewlines(b.String()), nil
-}
-
-func unifyNewlines(text string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
+	return ospath.UnifyNewlines(b.String()), nil
 }
 
 // utf8Sequence は i から始まる 1 文字の終わりと、読めなければその理由。

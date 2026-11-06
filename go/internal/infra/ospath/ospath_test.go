@@ -96,3 +96,31 @@ func TestTextHelpers(t *testing.T) {
 		t.Errorf("Strip = %q", got)
 	}
 }
+
+// 回帰: cwd がリンクを通って入った場所でも、相対パスは Python の os.getcwd() と同じく実体から作る。
+func TestRelativeFromLinkedCwd(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("シンボリックリンクを作れない環境がある")
+	}
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	real := filepath.Join(base, "real")
+	link := filepath.Join(base, "link")
+	if err := os.Mkdir(real, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(link)
+	t.Setenv("PWD", link)
+	want := filepath.Join(real, "x")
+	if got := Abspath("x"); got != want {
+		t.Errorf("Abspath = %q, want %q", got, want)
+	}
+	if got := Realpath("x"); got != want {
+		t.Errorf("Realpath = %q, want %q", got, want)
+	}
+}
