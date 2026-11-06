@@ -20,7 +20,7 @@ version: 1
 
 # ccnavi 自身の保護（hook・settings・scripts・共通の設定・承認済みの置き場・認証情報・再帰的な強制削除）は
 # 組み込みにあり、ここには書かない（builtin:guard-*、builtin:ticket-approved、builtin:credentials、
-# builtin:recursive-delete。`ccnavi --test` で判定を試せる）。ここに書くのはこのワークスペースの決まり。
+# builtin:recursive-delete。`sh .ccnavi/scripts/ccnavi-launcher.sh --test` で判定を試せる）。ここに書くのはこのワークスペースの決まり。
 deny:
   # チェックアウトしたブランチでは編集しない。`wip/handoff/`・`scratchpad/`・`.claude/worktrees/` だけが編集可能。
   # `wip/handoff/` は追跡して push する、ユーザに渡す物の置き場（統合時に wip/ ごと消す）。
@@ -166,7 +166,7 @@ allow:
       wip/handoff/skill-candidates.md）を見て、あれば skill-improve を入れる。feedback: は
       最後のステップにほかの全部が after で先行する形にする（後ろに足すだけだと承認で落ちる）ので、
       最後のステップの after に skill-improve の番号も足すか、skill-improve を最後に置いてほかの全部を
-      待たせる。定義は ccnavi --plan-order <親> --fill-phases で親の phases: にコピーする。
+      待たせる。定義は {script:ccnavi-launcher.sh} --plan-order <親> --fill-phases で親の phases: にコピーする。
       手順は .ccnavi/docs/skill-review-propose.md。
 
   # 工程スキル（process-*）の入口を Skill で呼ばせる（.ccnavi/docs/skill-processes.md）。

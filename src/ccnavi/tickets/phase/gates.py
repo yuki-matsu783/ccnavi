@@ -564,7 +564,8 @@ def _next_hint(parent: ticket_model.Ticket, phases: list[Phase], number: int) ->
                 "承認を受けてください。ステップには `after` で先に済んでいるべきステップの番号"
                 "（フィードバック計画の番号だけ）を書き、最後のステップにほかの全部が先行するようにします。"
                 "独立した対応は最後に 1 ステップで受けるか、一直線に並べます。ステップが使う定義は "
-                f"'ccnavi --plan-order {parent.ticket} --fill-phases' で `phases:` に差し込みます。"
+                f"'{settings.LAUNCHER} --plan-order {parent.ticket} --fill-phases' "
+                "で `phases:` に差し込みます。"
                 "改版の提案では `started_at`・`completed_at`・`base_sha`・`merged_sha`・"
                 "`cancelled_at`・`cancel_reason` は空にします。"
             )

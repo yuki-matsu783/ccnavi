@@ -19,7 +19,7 @@ keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.s
 
 | sh | 役割 | 打つ人 |
 |---|---|---|
-| `ccnavi-launcher.sh` | hook が起動する振り分け。`.ccnavi/bin/<os>-<arch>/` から、この機械の実行ファイルを選んで起動する。無ければ PATH の `ccnavi` | hook |
+| `ccnavi-launcher.sh` | hook が起動する振り分け。エージェントが打つ `ccnavi` の呼び出しも、この sh 経由にする（実行環境では PATH に無いことがある）。`.ccnavi/bin/<os>-<arch>/` から、この機械の実行ファイルを選んで起動する。無ければ PATH の `ccnavi` | hook |
 | `ccnavi-session-start.sh` | セッション開始の入口。下の `ccnavi-fetch.sh` と `ccnavi-dirs.sh` を順に呼ぶ | hook |
 | `ccnavi-fetch.sh` | リモートの最新を取る。親ブランチと、ワークツリーの起点になる統合先ブランチ。進めるのは fast-forward だけ | hook |
 | `ccnavi-dirs.sh` | `projects/` に clone 済みの外リポジトリを、最新コミットが新しい順に出す | hook |

@@ -97,7 +97,7 @@ class ChildIdFormTest(unittest.TestCase):
         self.assertEqual(1, len(messages), problems)
         self.assertIn("`parent: feature-1-memo` が自分の識別子と同じ", messages[0])
         self.assertIn("親の提案を書いているなら、`parent:` と `phase:` の行を消す", messages[0])
-        self.assertIn("ccnavi ticket new", messages[0])
+        self.assertIn("ccnavi-launcher.sh ticket new", messages[0])
 
     def test_a_phase_of_three_digits_cannot_be_written(self):
         for name in ("i0012-99-01", "i0012-00-01"):

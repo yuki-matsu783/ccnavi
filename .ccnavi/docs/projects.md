@@ -43,7 +43,7 @@ Draftを外したマーカー（`ready.json`）は、`ready`が閉じたチケ�
 閉じた親子のチケットは`ready`が`logs/archive/`へ移して親のブランチから消すので、既定のブランチには残らない。
 
 効力のあるフロー（`.ccnavi/approved/flows/`）は、エージェントが書かず、シェルからも書かない。下書きは`wip/proposals/flows/<子>.yml`に、
-頼まれたときだけ書き、`ccnavi --lint --flow <下書き>`で確かめてから渡す。下書きには効力が無く、ユーザがボードのフロー編集画面で
+頼まれたときだけ書き、`sh .ccnavi/scripts/ccnavi-launcher.sh --lint --flow <下書き>`で確かめてから渡す。下書きには効力が無く、ユーザがボードのフロー編集画面で
 差分を読んで取り込み、保存したものだけが効く。保存とコミット・pushはユーザが`ccnavi-user-push-approved.sh`で行う。取り込んで消えた下書きも
 一緒にコミットして push する。着手中はユーザも書き換えられない。着手のあとにフローが変わると、`NOTICE_TICKET_FLOW_CHANGED`で
 ユーザに知らされる。親のツリーから起動されたときは、自分が担当する子のフローだけに従う。

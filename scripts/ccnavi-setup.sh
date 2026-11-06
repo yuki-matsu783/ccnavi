@@ -2176,7 +2176,7 @@ if [ -n "$source_root" ] && [ -d "$source_root/$DEPLOY_DOCS_DIR" ]; then
 		[ -f "$doc_entry" ] || continue
 		doc_name=$(basename "$doc_entry")
 		if [ ! -f "$root/$DEPLOY_DOCS_DIR/$doc_name" ]; then
-			note_missing "${DEPLOY_DOCS_DIR}/${doc_name}（ccnavi の使い方の文書。ccnavi --docs で引く）"
+			note_missing "${DEPLOY_DOCS_DIR}/${doc_name}（ccnavi の使い方の文書。sh .ccnavi/scripts/ccnavi-launcher.sh --docs で引く）"
 		fi
 	done
 fi

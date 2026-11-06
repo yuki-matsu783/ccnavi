@@ -53,7 +53,7 @@ class ProposalHintTest(unittest.TestCase):
         got = self.hint("wip/proposals/todo/feature-1-memo.md", PARENT_WRONG)
         self.assertIn(proposalhint.CODE_PARENT_KEY, got)
         self.assertIn("`parent:` と `phase:` の行を消して", got)
-        self.assertIn("ccnavi ticket new", got)
+        self.assertIn("ccnavi-launcher.sh ticket new", got)
 
     def test_a_parent_missing_fields_is_named(self):
         got = self.hint("wip/proposals/todo/feature-1-memo.md", PARENT_BARE)

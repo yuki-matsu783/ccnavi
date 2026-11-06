@@ -2,12 +2,12 @@
 name: process-review
 process: true
 description: >-
-  レビューの標準的な考え方への入口。差分やチケットを他者として読む作業、レビューの指摘への対応で使う。細かい手順は references にあり、ccnavi --docs で共通とプロジェクトの両方から引く。
+  レビューの標準的な考え方への入口。差分やチケットを他者として読む作業、レビューの指摘への対応で使う。細かい手順は references にあり、sh .ccnavi/scripts/ccnavi-launcher.sh --docs で共通とプロジェクトの両方から引く。
 ---
 
 # process-review
 
-レビューの作業に入る前に、`ccnavi --docs --type skill-reference --tag process-review` で共通とプロジェクトの reference を引き、ヒットしたものを読む。
+レビューの作業に入る前に、`sh .ccnavi/scripts/ccnavi-launcher.sh --docs --type skill-reference --tag process-review` で共通とプロジェクトの reference を引き、ヒットしたものを読む。
 
 ## 基本の考え方
 

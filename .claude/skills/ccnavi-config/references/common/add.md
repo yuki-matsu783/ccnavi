@@ -8,7 +8,7 @@ keywords: [rules.yml, phases.yml, risks.yml, deny, ask, allow, glob, regex, ル�
 
 # 足す・直す
 
-書式の細部で迷ったら、下書きを `ccnavi --lint` に掛けて指摘を読む。`ccnavi --explain` で、いま効いている設定が見える。
+書式の細部で迷ったら、下書きを `sh .ccnavi/scripts/ccnavi-launcher.sh --lint` に掛けて指摘を読む。`sh .ccnavi/scripts/ccnavi-launcher.sh --explain` で、いま効いている設定が見える。
 
 ## 手順
 
@@ -104,7 +104,7 @@ allow:
   及ぼすなら `Bash|PowerShell`。ツールでない名前は `Stop`（メインエージェントのターンの終わり）だけで、
   `allow` に `glob: "*"` と `every: N` を添えて置く。渡す回にターンの終わりを止めて文を渡す。
   `every` が 2 より小さいもの、プロジェクトのレイヤーに置いたものは使われない（`--lint` が warn）。
-  ヒットするかは `ccnavi --test Stop "(stop)"` か期待の `tool: Stop` で確かめる
+  ヒットするかは `sh .ccnavi/scripts/ccnavi-launcher.sh --test Stop "(stop)"` か期待の `tool: Stop` で確かめる
 
 Bash は実行される部分にヒットする。`$( )` の中や `&&` の先も 1 本ずつヒットし、ヒアドキュメントの中身はヒットしない
 （既定の `heredoc` ルールが入口ごと止める）。
@@ -158,7 +158,7 @@ allow:
 
 フェーズ定義を書く。親チケットの `plan:` にフェーズ定義の名前を並べ、項に `after: [番号]` で先行を書いたものが
 全体計画で、子は `phase: N` で番号を指す。フェーズ定義は順序を持たない（順序は計画のステップの `after` で書く）。
-計画を持つ親は、計画が使う定義のコピーを `phases:` に持ち（`ccnavi --plan-order <親> --fill-phases` で差し込む）、
+計画を持つ親は、計画が使う定義のコピーを `phases:` に持ち（`sh .ccnavi/scripts/ccnavi-launcher.sh --plan-order <親> --fill-phases` で差し込む）、
 承認のあとの判定はそのコピーを読む。使う定義は共通レイヤーと親の `project:` のレイヤーの phases.yml の和で、どちらにも無ければ
 計画を持つ親は承認できない。どのプロジェクトでも同じ構成を前提にできる定義は共通に、`scope` がレイアウトに依存する定義は
 config に置く。共通にある定義と同じ `id` を config で別の中身にはできない（error）ので、変えたいときは別の `id` と `title` を付ける。
@@ -207,13 +207,13 @@ phases:
 - `scope` と `deliverables` はそれぞれ 20 件まで
 - `feedback` のフェーズ定義に `review: false` は書けない
 - 小さい作業を親 1 本・子 1 本で回すなら、`review: true`・`scope: inherit` の定義（例: `quick`）を 1 つ置き、親は `plan: [quick]`・`feedback: []` にする
-  （親の `phases:` は `ccnavi --plan-order <親> --fill-phases` で差し込む）
+  （親の `phases:` は `sh .ccnavi/scripts/ccnavi-launcher.sh --plan-order <親> --fill-phases` で差し込む）
 - `when` と `agent` は判定に使われない案内。`when` は「次は X の計画です（定義の案内: …）」の
   形でモデルに届くので、そのフェーズ定義を飛ばしてよい条件まで書く
 
 承認済みの親は、承認したときの定義のコピー（`phases:`）で判定されるので、phases.yml を直しても進行中の親には
 届かない（`--lint` が食い違いを warn で言う）。承認待ちの提案はコピーが phases.yml と違うと `--agree` で落ちるので、
-直したら提案に `ccnavi --plan-order <親> --fill-phases` を打ち直してもらう。
+直したら提案に `sh .ccnavi/scripts/ccnavi-launcher.sh --plan-order <親> --fill-phases` を打ち直してもらう。
 
 ## risks.yml
 

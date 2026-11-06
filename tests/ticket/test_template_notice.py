@@ -2,7 +2,7 @@
 
 見るのは次のとおり。
 
-1. 計画を持つ親が閉じると、`ready` の前に `ccnavi --templates --draft <親>` を打つ案内が 1 行出る
+1. 計画を持つ親が閉じると、`ready` の前に起動の sh で `--templates --draft <親>` を打つ案内が 1 行出る
 2. 出さない: その親の識別子の下書きが在る、同じ計画の形のテンプレートが取り込み済み、
    子の `finish`、`ready` 済み（材料が退避されて拾えない。`close_notice` が空を返す）
 3. 案内は出力に足すだけ。終了コードも、閉じる判定も変えない
@@ -62,7 +62,7 @@ class CloseNoticeTest(ReadyHarness):
         lines = notice_lines(closed)
         self.assertEqual(len(lines), 1, closed.stdout)
         self.assertIn("`ready` の前に", lines[0])
-        self.assertIn("ccnavi --templates --draft i0001", lines[0])
+        self.assertIn("ccnavi-launcher.sh --templates --draft i0001", lines[0])
         self.assertIn("退避されて拾えない", lines[0])
         # 下書きを残したままでは ready が止まるので、そのことも言う。
         self.assertIn("ccnavi-user-handoff.sh", lines[0])

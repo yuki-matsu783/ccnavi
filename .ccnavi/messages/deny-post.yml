@@ -26,7 +26,7 @@ messages:
     kind: deny
     values: [ticket, worktree, blocked]
     what: |-
-      The approved ticket {ticket} for worktree {worktree} does not hold together ({blocked}), so its work area is not in effect and every change here is reported. Nothing you write can fix this: the user has to repair the approved ticket or where it sits. Tell them the problem above and ask them to run 'ccnavi --lint', which names every ticket in this state.
+      The approved ticket {ticket} for worktree {worktree} does not hold together ({blocked}), so its work area is not in effect and every change here is reported. Nothing you write can fix this: the user has to repair the approved ticket or where it sits. Tell them the problem above and ask them to run '{script:ccnavi-launcher.sh} --lint', which names every ticket in this state.
 
   RULE_TICKET_SCOPE__TYPE:
     kind: deny

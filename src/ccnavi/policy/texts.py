@@ -584,7 +584,8 @@ def fallback(text_id: str) -> str:
     kind = kind_of_id(text_id)
     gone = f"文面（{text_id}）を引けませんでした。"
     ask = (
-        f"ユーザに、文面ファイル（{_FILE_HINT}）が読めるかを `ccnavi --lint` で確かめてもらい、"
+        f"ユーザに、文面ファイル（{_FILE_HINT}）が読めるかを "
+        f"`{settings.LAUNCHER} --lint` で確かめてもらい、"
         "返事を待つ"
     )
     if kind == NOTE:

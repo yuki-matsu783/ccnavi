@@ -2,12 +2,12 @@
 name: process-test
 process: true
 description: >-
-  テストの標準的な考え方への入口。テストを書く・回す・直す作業、失敗したテストの切り分けで使う。細かい手順は references にあり、ccnavi --docs で共通とプロジェクトの両方から引く。
+  テストの標準的な考え方への入口。テストを書く・回す・直す作業、失敗したテストの切り分けで使う。細かい手順は references にあり、sh .ccnavi/scripts/ccnavi-launcher.sh --docs で共通とプロジェクトの両方から引く。
 ---
 
 # process-test
 
-テストの作業に入る前に、`ccnavi --docs --type skill-reference --tag process-test` で共通とプロジェクトの reference を引き、ヒットしたものを読む。
+テストの作業に入る前に、`sh .ccnavi/scripts/ccnavi-launcher.sh --docs --type skill-reference --tag process-test` で共通とプロジェクトの reference を引き、ヒットしたものを読む。
 
 ## 基本の考え方
 

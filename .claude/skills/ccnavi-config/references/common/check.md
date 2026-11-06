@@ -14,7 +14,7 @@ keywords: [lint, 期待する判定, テスト, deny, allow, ask, 検証]
 ## 1. lint
 
 ```sh
-ccnavi --lint --log "" --state ""
+sh .ccnavi/scripts/ccnavi-launcher.sh --lint --log "" --state ""
 ```
 
 3 本まとめて読む。error が 1 件でもあればそこで止めて報告する。warn は読んで
@@ -33,7 +33,7 @@ ccnavi --lint --log "" --state ""
 ## 2. rules: 期待する判定を回す
 
 ```sh
-ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml --log "" --state "" --approved ""   # ファイルが無ければ add.md の形で下書きを作って渡す
+sh .ccnavi/scripts/ccnavi-launcher.sh --test-expectations .ccnavi/config/common/rule-expectations.yml --log "" --state "" --approved ""   # ファイルが無ければ add.md の形で下書きを作って渡す
 ```
 
 出力は 3 つに分かれる。
@@ -64,7 +64,7 @@ settings.json への Write / Edit を deny の期待に置いて回す。ワー�
 lint が通っても、フェーズ定義が計画と噛み合っているかは lint の外。
 
 ```sh
-ccnavi --explain --log "" --state ""
+sh .ccnavi/scripts/ccnavi-launcher.sh --explain --log "" --state ""
 ```
 
 承認済みの親とその計画が出る。見るのは 4 つ。
