@@ -1422,7 +1422,7 @@ class StartShTest(unittest.TestCase):
         done = self.check()
         nexts = [line for line in done.stdout.splitlines() if line.startswith("次: ")]
         self.assertEqual(len(nexts), 1, done.stdout)
-        self.assertIn("--new-issue <タイトル> を先に打つ", nexts[0])
+        self.assertIn("--new-issue <タイトル> を打つ", nexts[0])
         self.assertIn("作れなかった", done.stdout)
         ng = self.check(**self.no_identity())
         self.assertNotIn("--new-issue", ng.stdout)
