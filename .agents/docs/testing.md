@@ -8,6 +8,8 @@ keywords: [テスト, 代役, STUB, 操作記録, 全件, discover, グループ
 
 # ccnaviのPythonのテストを回す
 
+Go のテストの回し方は[実行ファイルをGoに書き直す](go-rewrite.md)の「回す」にある。
+
 ## 全件を1本で回さない
 
 全件を`uv run python -m unittest discover -s tests -t .`の1本で回さない。

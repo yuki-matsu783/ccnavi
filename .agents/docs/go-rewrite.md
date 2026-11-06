@@ -35,7 +35,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
   - git に渡す `GIT_*` と git の引数は `infra/git`
   - チケット・提案・承認済みの置き場のパスは `tickets/model`
 - 選択肢の決まった値（モード、フェーズの状態、判定の結果など）は、`type Mode string` のような型を作り、その型の定数で列挙する。文字列の比較を散らさない
-- 時間は `time.Duration` で持つ（`HookDeadline = 5 * time.Second`）。秒の整数を受け渡さない
+- 時間は `time.Duration` で持つ（`HookDeadline` の既定は `3 * time.Second`）。秒の整数を受け渡さない
 - 0・1・空文字列のように意味が自明な値は、定数にしなくてよい
 
 ### 文面
@@ -54,13 +54,13 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 - ファイルは責務ごとに分ける。1 ファイルに型とその操作をまとめる
 - interface は使う側のパッケージで、使うメソッドだけを持つ形で定義する
 - 略語は Go の慣習に従う（`ID`・`JSON`・`URL`・`SHA`）
-- OS の違いは `runtime.GOOS` で分ける。分ける場所は `infra` の中に閉じ、上の段に OS の分岐を書かない
+- OS の違いは `ospath.Windows` で分ける（`runtime.GOOS` を直に比べない）。分ける場所は `infra` の中に閉じ、上の段に OS の分岐を書かない。build タグでファイルを分けるのはよい
 - 外部のプロセスは `exec.CommandContext` で、期限を定数から渡して起動する
 
 ### 検査
 
 - `gofmt` と `go vet` を通す
-- 依存の向きは `go/internal/layers_test.go`、定数の決まりは `go/internal/conventions_test.go` が見る。機械で見られる決まりを足したら、`conventions_test.go` に検査も足す
+- 依存の向きは `go/internal/layers_test.go` が見る。`go/internal/conventions_test.go` が見るのは、いまは環境変数の名前の直書き（`CCNAVI_*`・`CLAUDE_*`）だけで、ほかの定数の決まりは読む人が守る。機械で見られる決まりを足したら、`conventions_test.go` に検査も足す
 
 ## テスト
 
@@ -96,21 +96,27 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 
 ## 進み具合
 
+行数は `find src/ccnavi/<段> -name '*.py' | xargs cat | wc -l` で数える（空行・コメントも含む）。
+
 | パッケージ | 行数（Python） | 状態 |
 |---|---|---|
-| `infra` | 6,466 | 移した（レビュー前） |
+| `infra` | 6,468 | 移した（レビュー前） |
 | `records` | 4,562 | 未着手 |
-| `policy` | 6,804 | 未着手 |
-| `tickets` | 36,732 | 未着手 |
+| `policy` | 6,805 | 未着手 |
+| `tickets` | 36,741 | 未着手 |
 | `catalog` | 1,683 | 未着手 |
-| `hook` | 10,631 | 未着手 |
+| `hook` | 10,634 | 未着手 |
 | `entry` | 11,210 | 未着手 |
 
 ## 回す
 
+Go の版は `go/go.mod` の `go 1.26.0` に合わせる。
+
 ```sh
 cd go && go vet ./... && go test ./...
 ```
+
+`go/cmd/ccnavi/main.go` はまだ入口を持たない（`entry` を移すまで、起動すると移していないと言って終わる）。`build.py` と `.ccnavi/bin/` の組み立てには入らず、配る実行ファイルは Python のまま。
 
 依存の向きは `go/internal/layers_test.go` が見る。パッケージを足したら、先にその表（`topTiers`・`subTiers`）を直す。
 
