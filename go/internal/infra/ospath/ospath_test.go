@@ -88,7 +88,7 @@ func TestRealpath(t *testing.T) {
 }
 
 func TestTextHelpers(t *testing.T) {
-	got := Splitlines("a\r\nb\rc\vd\x1ce f\n")
+	got := Splitlines("a\r\nb\rc\vd\x1ce\u2028f\n")
 	if want := []string{"a", "b", "c", "d", "e", "f"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("Splitlines = %q, want %q", got, want)
 	}

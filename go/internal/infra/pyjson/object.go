@@ -1,6 +1,9 @@
 package pyjson
 
-import "iter"
+import (
+	"fmt"
+	"iter"
+)
 
 // Object は JSON のオブジェクト。Python の dict と同じく、入れた順を保ち、同じキーを入れ直すと
 // 位置は最初のまま値だけを変える。ゼロ値は空のオブジェクトとして使える。
@@ -9,11 +12,16 @@ type Object struct {
 	vals map[string]any
 }
 
-// NewObject は key, value, key, value, ... の順に並べたオブジェクトを作る。
+// NewObject は key, value, key, value, ... の順に並べたオブジェクトを作る。キーは文字列で渡す
+// （文字列でないキーは fmt.Sprint の形にする）。
 func NewObject(kv ...any) *Object {
 	o := &Object{}
 	for i := 0; i+1 < len(kv); i += 2 {
-		o.Set(kv[i].(string), kv[i+1])
+		key, ok := kv[i].(string)
+		if !ok {
+			key = fmt.Sprint(kv[i])
+		}
+		o.Set(key, kv[i+1])
 	}
 	return o
 }

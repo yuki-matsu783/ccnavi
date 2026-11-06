@@ -3,6 +3,7 @@ package yaml
 import (
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 // YAML 1.1 の型のタグ。
@@ -88,7 +89,8 @@ func resolveScalar(value string, implicit bool) string {
 			if value == "" {
 				applies = r.empty
 			} else {
-				applies = strings.ContainsRune(r.first, []rune(value)[0])
+				first, _ := utf8.DecodeRuneInString(value)
+				applies = strings.ContainsRune(r.first, first)
 			}
 			if applies && r.re.MatchString(value) {
 				return r.tag
