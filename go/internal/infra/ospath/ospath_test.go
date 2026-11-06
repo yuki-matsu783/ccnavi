@@ -124,3 +124,56 @@ func TestRelativeFromLinkedCwd(t *testing.T) {
 		t.Errorf("Realpath = %q, want %q", got, want)
 	}
 }
+
+// 期待値は Python 3.13 の posixpath.splitext と ntpath.splitext。
+func TestSplitext(t *testing.T) {
+	cases := []struct{ in, root, ext, winRoot, winExt string }{
+		{"a.txt", "a", ".txt", "a", ".txt"},
+		{"/x/a.b.c", "/x/a.b", ".c", "/x/a.b", ".c"},
+		{".bashrc", ".bashrc", "", ".bashrc", ""},
+		{"..bashrc", "..bashrc", "", "..bashrc", ""},
+		{"a.", "a", ".", "a", "."},
+		{"/x.y/z", "/x.y/z", "", "/x.y/z", ""},
+		{"x.y/", "x.y/", "", "x.y/", ""},
+		{"...", "...", "", "...", ""},
+		{"", "", "", "", ""},
+		{".a.b", ".a", ".b", ".a", ".b"},
+		{"a/.b", "a/.b", "", "a/.b", ""},
+		{`a\b.c\d`, `a\b`, `.c\d`, `a\b.c\d`, ""},
+	}
+	for _, c := range cases {
+		root, ext := c.root, c.ext
+		if Windows {
+			root, ext = c.winRoot, c.winExt
+		}
+		if gotRoot, gotExt := Splitext(c.in); gotRoot != root || gotExt != ext {
+			t.Errorf("Splitext(%q) = %q %q, want %q %q", c.in, gotRoot, gotExt, root, ext)
+		}
+	}
+}
+
+func TestDiskListdirAndIsLink(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"b", "a", "C"} {
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// sorted(os.listdir(dir)) と同じく、コード位置の順
+	if got, err := DiskListdir(dir); err != nil || !reflect.DeepEqual(got, []string{"C", "a", "b"}) {
+		t.Errorf("DiskListdir = %v, %v", got, err)
+	}
+	if _, err := DiskListdir(filepath.Join(dir, "none")); err == nil {
+		t.Error("無いディレクトリを読めた")
+	}
+	if IsLink(filepath.Join(dir, "a")) || IsLink(filepath.Join(dir, "none")) {
+		t.Error("リンクでないものをリンクと言った")
+	}
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink(filepath.Join(dir, "none"), link); err != nil {
+		t.Skip("リンクを作れない:", err)
+	}
+	if !IsLink(link) {
+		t.Error("壊れたリンクを見落とした")
+	}
+}

@@ -13,17 +13,8 @@ import (
 	"ccnavi/internal/infra/ospath"
 )
 
-// splitext は Python の os.path.splitext（先頭の "." は拡張子の始まりと数えない）。
-func splitext(base string) (string, string) {
-	i := strings.LastIndex(base, ".")
-	if i <= 0 || strings.Trim(base[:i], ".") == "" {
-		return base, ""
-	}
-	return base[:i], base[i:]
-}
-
 func rotatedName(logPath string, now time.Time, n int) string {
-	stem, ext := splitext(ospath.Basename(logPath))
+	stem, ext := ospath.Splitext(ospath.Basename(logPath))
 	suffix := ""
 	if n > 1 {
 		suffix = "-" + strconv.Itoa(n)
@@ -59,7 +50,7 @@ func reserve(logPath string, now time.Time) (string, error) {
 }
 
 func rotatedPattern(logPath string) *regexp.Regexp {
-	stem, ext := splitext(ospath.Basename(logPath))
+	stem, ext := ospath.Splitext(ospath.Basename(logPath))
 	return regexp.MustCompile("^" + regexp.QuoteMeta(stem) + `\.\p{Nd}{8}-\p{Nd}{6}(?:-\p{Nd}+)?` + regexp.QuoteMeta(ext) + pyEnd)
 }
 
@@ -118,8 +109,8 @@ func (r *run) pruneLogs(logPath string, before time.Time) {
 		directory = "."
 	}
 	pattern := rotatedPattern(logPath)
-	names, ok := sortedNames(directory)
-	if !ok {
+	names, err := ospath.DiskListdir(directory)
+	if err != nil {
 		return
 	}
 	for _, name := range names {
@@ -142,13 +133,13 @@ func (r *run) pruneLogs(logPath string, before time.Time) {
 func (r *run) pruneDiag(rotateMB, logDays float64) {
 	directory := r.diagDir()
 	for _, place := range []string{ospath.Dirname(directory), directory} {
-		if isLink(place) {
+		if ospath.IsLink(place) {
 			r.problem("%s はリンクなので辿らない（診断ログを削除しません）", r.shown(place))
 			return
 		}
 	}
-	names, ok := sortedNames(directory)
-	if !ok {
+	names, err := ospath.DiskListdir(directory)
+	if err != nil {
 		return
 	}
 	before := cutoff(r.now, days(logDays))
@@ -157,7 +148,7 @@ func (r *run) pruneDiag(rotateMB, logDays float64) {
 			continue
 		}
 		path := ospath.Join(directory, name)
-		if isLink(path) || !ospath.IsFile(path) {
+		if ospath.IsLink(path) || !ospath.IsFile(path) {
 			continue
 		}
 		if rotateMB > 0 && !diagRotated.MatchString(name) && r.rotate(path, bytesOf(rotateMB)) {

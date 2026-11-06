@@ -2,6 +2,7 @@ package fsio
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"time"
@@ -64,4 +65,13 @@ func validStamp(text string) bool {
 		return false
 	}
 	return time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC).Day() == day
+}
+
+// UnixSeconds は記録に書く UNIX 秒（Python の time.time() と同じ小数）。
+func UnixSeconds(t time.Time) float64 { return float64(t.UnixNano()) / 1e9 }
+
+// FromUnixSeconds は記録の UNIX 秒を時刻に戻す。小数の部分はナノ秒に丸める。
+func FromUnixSeconds(f float64) time.Time {
+	whole, frac := math.Modf(f)
+	return time.Unix(int64(whole), int64(math.Round(frac*1e9)))
 }

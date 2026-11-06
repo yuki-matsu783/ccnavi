@@ -313,3 +313,18 @@ func copyFile(source, target string) error {
 	}
 	return os.Chtimes(target, info.ModTime(), info.ModTime())
 }
+
+// AppendLine は line に機械の改行を付けて、追記モードの 1 回の書き込みで足す（Python の open(path, "a") の
+// write(line + "\n") と、Windows でテキストモードになる os.open の O_APPEND）。並行するプロセスの行と混ざらない。
+// perm は新しく作るファイルの権限。親のディレクトリは作らない。溜める段は通さない（記録のログ用）。
+func AppendLine(path, line string, perm os.FileMode) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, perm)
+	if err != nil {
+		return err
+	}
+	_, err = f.WriteString(line + lineSep)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	return err
+}

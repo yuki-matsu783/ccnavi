@@ -13,7 +13,7 @@ func NotePrompt(state, session string, now time.Time) {
 	if state == "" || session == "" {
 		return
 	}
-	fsio.WriteJSON(path(state, UserPromptPrefix, session), pyjson.NewObject("session", session, "at", seconds(now)))
+	fsio.WriteJSON(path(state, UserPromptPrefix, session), pyjson.NewObject("session", session, "at", fsio.UnixSeconds(now)))
 }
 
 // LastPrompt は最後のユーザの発言の時刻。無い・読めない・形が違うときは false（発言が無いものとして読み、
@@ -31,5 +31,5 @@ func LastPrompt(state, session string) (time.Time, bool) {
 	if !ok {
 		return time.Time{}, false
 	}
-	return fromSeconds(at), true
+	return fsio.FromUnixSeconds(at), true
 }

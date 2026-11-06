@@ -1,7 +1,6 @@
 package tree
 
 import (
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -65,27 +64,12 @@ func MainTree(root string) Tree {
 	return Tree{Name: Main, Root: resolved(root), Kind: KindMain}
 }
 
-// sortedNames は os.listdir を名前順にしたもの。読めなければ ok が偽。
-func sortedNames(dir string) ([]string, bool) {
-	f, err := os.Open(dir)
-	if err != nil {
-		return nil, false
-	}
-	defer f.Close()
-	names, err := f.Readdirnames(-1)
-	if err != nil {
-		return nil, false
-	}
-	sort.Strings(names)
-	return names, true
-}
-
 // Projects は置き場の直下で `.git`（ディレクトリでもファイルでもよい）を持つディレクトリ。深さ 1。
 func Projects(projectsDir string) []Tree {
 	if projectsDir == "" {
 		return nil
 	}
-	names, _ := sortedNames(projectsDir)
+	names, _ := ospath.DiskListdir(projectsDir)
 	var found []Tree
 	for _, name := range names {
 		candidate := ospath.Join(projectsDir, name)
@@ -99,8 +83,8 @@ func Projects(projectsDir string) []Tree {
 // worktreeCandidates はワークツリーの置き場の下のディレクトリと、元リポジトリの候補。
 func worktreeCandidates(root, projectsDir string) (names []string, base string, owners []Tree) {
 	base = ospath.Join(root, WorktreesDir)
-	names, ok := sortedNames(base)
-	if !ok {
+	names, err := ospath.DiskListdir(base)
+	if err != nil {
 		return nil, base, nil
 	}
 	return names, base, append([]Tree{MainTree(root)}, Projects(projectsDir)...)
@@ -284,7 +268,7 @@ func Relative(t Tree, full string) string {
 // ディレクトリの実際の表記で返す。
 func WorktreePath(root, name string) string {
 	base := ospath.Join(root, WorktreesDir)
-	existing, _ := sortedNames(base)
+	existing, _ := ospath.DiskListdir(base)
 	folded := pathcase.Fold(NFC(name))
 	for _, entry := range existing {
 		if pathcase.Fold(NFC(entry)) == folded {
@@ -324,8 +308,3 @@ func resolved(path string) string { return ospath.Normpath(ospath.Realpath(path)
 
 // key は同じ場所かを比べるためのキー。
 func key(path string) string { return pathcase.Fold(resolved(path)) }
-
-func isSymlink(path string) bool {
-	info, err := os.Lstat(path)
-	return err == nil && info.Mode()&os.ModeSymlink != 0
-}

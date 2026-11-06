@@ -1,7 +1,6 @@
 package turn
 
 import (
-	"math"
 	"os"
 	"regexp"
 	"time"
@@ -38,7 +37,7 @@ func Begin(state, session string, now time.Time) {
 	if state == "" || session == "" {
 		return
 	}
-	fsio.WriteJSON(path(state, TurnPrefix, session), pyjson.NewObject("session", session, "since", seconds(now)))
+	fsio.WriteJSON(path(state, TurnPrefix, session), pyjson.NewObject("session", session, "since", fsio.UnixSeconds(now)))
 }
 
 // Touch は印があるときだけ更新時刻を新しくする。無い印は作らない。
@@ -106,7 +105,7 @@ func Active(state string, now time.Time) []Ongoing {
 		if session == "" {
 			session = match[1]
 		}
-		found = append(found, Ongoing{Session: session, Since: fromSeconds(since), Seen: seen})
+		found = append(found, Ongoing{Session: session, Since: fsio.FromUnixSeconds(since), Seen: seen})
 	}
 	return found
 }
@@ -120,12 +119,4 @@ func number(v any) (float64, bool) {
 		return x, true
 	}
 	return 0, false
-}
-
-// seconds と fromSeconds は記録に書く UNIX 秒（Python の time.time()）との変換。
-func seconds(t time.Time) float64 { return float64(t.UnixNano()) / 1e9 }
-
-func fromSeconds(f float64) time.Time {
-	whole, frac := math.Modf(f)
-	return time.Unix(int64(whole), int64(math.Round(frac*1e9)))
 }

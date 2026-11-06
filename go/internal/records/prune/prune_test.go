@@ -502,14 +502,3 @@ func TestLinkless(t *testing.T) {
 		t.Error("相対の root")
 	}
 }
-
-func TestSplitext(t *testing.T) {
-	for in, want := range map[string][2]string{
-		"decisions.jsonl": {"decisions", ".jsonl"}, "a.b.log": {"a.b", ".log"},
-		".hidden": {".hidden", ""}, "..x": {"..x", ""}, "noext": {"noext", ""}, "a.": {"a", "."},
-	} {
-		if stem, ext := splitext(in); stem != want[0] || ext != want[1] {
-			t.Errorf("splitext(%q) = %q %q", in, stem, ext)
-		}
-	}
-}

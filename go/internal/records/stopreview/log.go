@@ -1,7 +1,6 @@
 package stopreview
 
 import (
-	"os"
 	"strings"
 	"time"
 
@@ -24,24 +23,10 @@ func (s Store) logEvent(event string, attempt *pyjson.Object) {
 	if err != nil {
 		return
 	}
-	appendLine(logPath(s.Logs, EventsFile), line)
-}
-
-// appendLine は 1 行をテキストとして足す（Python の open(path, "a") と同じく、改行は機械のもの）。
-func appendLine(path, line string) {
-	if fsio.MakeDirs(ospath.Dirname(path)) != nil {
-		return
+	path := logPath(s.Logs, EventsFile)
+	if fsio.MakeDirs(ospath.Dirname(path)) == nil {
+		_ = fsio.AppendLine(path, line, 0o666)
 	}
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o666)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	newline := "\n"
-	if ospath.Windows {
-		newline = "\r\n"
-	}
-	_, _ = f.WriteString(line + newline)
 }
 
 // LogNoKey は共有キーを導けなかった Stop を数える（`stop-review report` の件数）。who は "hook" か "judge"。
@@ -69,7 +54,7 @@ type LastStop struct {
 
 // NoteLastStop はこの Stop で促しか差し戻しが出たかを書く。
 func (s Store) NoteLastStop(session, key string, nudged, sentBack bool, now time.Time) {
-	s.noteLastStop(session, key, nudged, sentBack, seconds(now))
+	s.noteLastStop(session, key, nudged, sentBack, fsio.UnixSeconds(now))
 }
 
 func (s Store) noteLastStop(session, key string, nudged, sentBack bool, t any) {

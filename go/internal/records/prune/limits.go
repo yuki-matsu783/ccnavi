@@ -1,12 +1,10 @@
 package prune
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"ccnavi/internal/infra/env"
@@ -36,8 +34,8 @@ func (l limit) read() (float64, string) {
 	if raw == "" {
 		return l.fallback, ""
 	}
-	value, ok := pyFloat(raw)
-	if !ok || value < 0 || math.IsInf(value, 0) || math.IsNaN(value) {
+	value, err := pyfmt.ParseFloat(raw)
+	if err != nil || value < 0 || math.IsInf(value, 0) || math.IsNaN(value) {
 		return l.fallback, fmt.Sprintf("%s=%s は 0 以上の数ではないので既定の %s で動く", l.env, pyfmt.Repr(raw), g(l.fallback))
 	}
 	if value > 0 && value < l.floor {
@@ -49,27 +47,6 @@ func (l limit) read() (float64, string) {
 
 // g は Python の format(x, "g")。
 func g(x float64) string { return strconv.FormatFloat(x, 'g', 6, 64) }
-
-// pyFloat は Python の float(text) が読める綴りだけを読む（16 進は読まず、数字の間の "_" は読む）。
-// 桁あふれは Python と同じく inf か 0 にする。
-func pyFloat(text string) (float64, bool) {
-	lower := strings.ToLower(text)
-	if strings.Contains(lower, "0x") || strings.Contains(lower, "p") {
-		return 0, false
-	}
-	if strings.Contains(text, "_") {
-		for i := 0; i < len(text); i++ {
-			if text[i] == '_' && (i == 0 || i == len(text)-1 || !isDigit(text[i-1]) || !isDigit(text[i+1])) {
-				return 0, false
-			}
-		}
-		text = strings.ReplaceAll(text, "_", "")
-	}
-	value, err := strconv.ParseFloat(text, 64)
-	return value, err == nil || errors.Is(err, strconv.ErrRange)
-}
-
-func isDigit(c byte) bool { return c >= '0' && c <= '9' }
 
 // days は日数を長さにする。表せないほど長ければ上限にする（何も消さない）。
 func days(n float64) time.Duration {

@@ -115,7 +115,8 @@ func TestParseProblems(t *testing.T) {
 	cases := []struct{ text, want string }{
 		{"---\ntype: x\n", "frontmatter が閉じていない"},
 		{"---\n- a\n---\n", "frontmatter が対応表（key: value）でない"},
-		{"---\na: [\n---\n", "frontmatter を YAML として読めない (YAMLError)"},
+		{"---\na: [\n---\n", "frontmatter を YAML として読めない (ParserError)"},
+		{"---\na: b: c\n---\n", "frontmatter を YAML として読めない (ScannerError)"},
 		{"---\ntype: other\n---\n", "type が learning-wiki でない"},
 		{"---\ntype: learning-wiki\ntarget: x\n---\n", "target が rule risk phase template skill docs のどれでもない"},
 		{"---\ntype: learning-wiki\ntarget: docs\nsources: []\n---\n", "sources が空（観測元が無い）"},

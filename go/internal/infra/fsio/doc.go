@@ -11,4 +11,5 @@
 // write_new_durable → NewDurable。write_json_atomic → WriteJSON、replace_bytes → ReplaceFile、
 // read_dict → ReadObject、read_json の (値, 例外) → ReadJSON の (値, error)、clock → FixClock、
 // recording → StartRecording と Recorder.Stop、policy → SetPolicy、slashed → ospath.Slashed。
+// open(path, "a") の 1 行の追記 → AppendLine、time.time() の秒との変換 → UnixSeconds・FromUnixSeconds。
 package fsio

@@ -149,7 +149,7 @@ func (p *parser) parseDocumentStart() (*event, error) {
 		if err != nil {
 			return nil, err
 		}
-		return nil, markedError("", nil, "expected '<document start>', but found "+quoteID(t), markPtr(t.start))
+		return nil, markedError(ParserError, "", nil, "expected '<document start>', but found "+quoteID(t), markPtr(t.start))
 	}
 	t, err = p.sc.getToken()
 	if err != nil {
@@ -217,15 +217,15 @@ func (p *parser) processDirectives() error {
 		switch t.name {
 		case "YAML":
 			if hasVersion {
-				return markedError("", nil, "found duplicate YAML directive", markPtr(t.start))
+				return markedError(ParserError, "", nil, "found duplicate YAML directive", markPtr(t.start))
 			}
 			if t.major != 1 {
-				return markedError("", nil, "found incompatible YAML document (version 1.* is required)", markPtr(t.start))
+				return markedError(ParserError, "", nil, "found incompatible YAML document (version 1.* is required)", markPtr(t.start))
 			}
 			hasVersion = true
 		case "TAG":
 			if _, dup := p.tagHandles[t.handle]; dup {
-				return markedError("", nil, "duplicate tag handle "+pyfmt.Quote(t.handle), markPtr(t.start))
+				return markedError(ParserError, "", nil, "duplicate tag handle "+pyfmt.Quote(t.handle), markPtr(t.start))
 			}
 			p.tagHandles[t.handle] = t.prefix
 		}
@@ -308,7 +308,7 @@ func (p *parser) parseNode(block, indentlessSequence bool) (*event, error) {
 		if tagToken.hasHandle {
 			prefix, ok := p.tagHandles[tagToken.handle]
 			if !ok {
-				return nil, markedError("while parsing a node", start,
+				return nil, markedError(ParserError, "while parsing a node", start,
 					"found undefined tag handle "+pyfmt.Quote(tagToken.handle), tagMark)
 			}
 			tag = prefix + tagToken.prefix
@@ -371,7 +371,7 @@ func (p *parser) parseNode(block, indentlessSequence bool) (*event, error) {
 		if block {
 			node = "block"
 		}
-		return nil, markedError("while parsing a "+node+" node", start,
+		return nil, markedError(ParserError, "while parsing a "+node+" node", start,
 			"expected the node content, but found "+quoteID(t), markPtr(t.start))
 	}
 	return ev, nil
@@ -420,7 +420,7 @@ func (p *parser) blockEnd(context string, kind eventKind) (*event, error) {
 		return nil, err
 	}
 	if t.kind != tBlockEnd {
-		return nil, markedError(context, markPtr(p.marks[len(p.marks)-1]),
+		return nil, markedError(ParserError, context, markPtr(p.marks[len(p.marks)-1]),
 			"expected <block end>, but found "+quoteID(t), markPtr(t.start))
 	}
 	if _, err := p.sc.getToken(); err != nil {
@@ -537,7 +537,7 @@ func (p *parser) parseFlowSequenceEntry(first bool) (*event, error) {
 				if err != nil {
 					return nil, err
 				}
-				return nil, markedError("while parsing a flow sequence", markPtr(p.marks[len(p.marks)-1]),
+				return nil, markedError(ParserError, "while parsing a flow sequence", markPtr(p.marks[len(p.marks)-1]),
 					"expected ',' or ']', but got "+quoteID(t), markPtr(t.start))
 			}
 			if _, err := p.sc.getToken(); err != nil {
@@ -642,7 +642,7 @@ func (p *parser) parseFlowMappingKey(first bool) (*event, error) {
 				if err != nil {
 					return nil, err
 				}
-				return nil, markedError("while parsing a flow mapping", markPtr(p.marks[len(p.marks)-1]),
+				return nil, markedError(ParserError, "while parsing a flow mapping", markPtr(p.marks[len(p.marks)-1]),
 					"expected ',' or '}', but got "+quoteID(t), markPtr(t.start))
 			}
 			if _, err := p.sc.getToken(); err != nil {

@@ -87,7 +87,7 @@ func Threshold(raw string) int {
 	if text == "" {
 		return DefaultTokens
 	}
-	value, err := strconv.Atoi(text)
+	value, err := pyfmt.ParseInt(text)
 	if err != nil {
 		return DefaultTokens
 	}
@@ -275,25 +275,6 @@ func sessionOK(session string) bool {
 	return session != "" && fsio.SafeName(session, fsio.SafeNameLimit) == session
 }
 
-// with は data に kv を重ねた写し（Python の dict(data, **kv)）。drop のキーは除く。
-func with(data *pyjson.Object, drop []string, kv ...any) *pyjson.Object {
-	out := pyjson.NewObject()
-	for k, v := range data.All() {
-		key := k.(string)
-		dropped := false
-		for _, d := range drop {
-			dropped = dropped || d == key
-		}
-		if !dropped {
-			out.Set(key, v)
-		}
-	}
-	for i := 0; i+1 < len(kv); i += 2 {
-		out.Set(kv[i].(string), kv[i+1])
-	}
-	return out
-}
-
 // Start はターンの終わりに待機を始める。始めないなら false。見ている人がいない実行・サブエージェントは
 // 呼ぶ前に除く。状態は waiting と印（token）にし、基準は持ち越す。
 func Start(state, session string, usage *Usage, limit int, waitOverride, transcript string) (Plan, bool) {
@@ -349,8 +330,9 @@ func Check(state, session, token string, wait time.Duration, limit int) (string,
 			return "", false
 		}
 	}
-	next := with(data, []string{keyToken, keyTold},
-		keyState, string(fired), keyBase, positive(data.Value(keyDue)), keyWait, int(wait/time.Second))
+	next := data.With(keyState, string(fired), keyBase, positive(data.Value(keyDue)), keyWait, int(wait/time.Second))
+	next.Pop(keyToken)
+	next.Pop(keyTold)
 	if !write(state, session, next) {
 		return "", false
 	}
@@ -367,7 +349,9 @@ func Reset(state, session, prompt string, background bool) {
 	if data.Len() == 0 || data.Value(keyState) == string(active) {
 		return
 	}
-	write(state, session, with(data, []string{keyToken}, keyState, string(active)))
+	data.Pop(keyToken)
+	data.Set(keyState, string(active))
+	write(state, session, data)
 }
 
 // Notice はユーザへの知らせ。出すなら文を返し、知らせ済みの印を置く。
@@ -382,7 +366,7 @@ func Notice(state, session string, usage *Usage, limit int, waitOverride string)
 		if pyfmt.Truthy(data.Value(keyTold)) {
 			return "", false
 		}
-		if !write(state, session, with(data, nil, keyTold, true)) {
+		if !write(state, session, data.With(keyTold, true)) {
 			return "", false
 		}
 		return fmt.Sprintf(doneText, minutes(time.Duration(positive(data.Value(keyWait)))*time.Second)), true

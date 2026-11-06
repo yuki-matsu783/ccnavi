@@ -2,12 +2,13 @@ package audit
 
 import (
 	"math"
-	"os"
 	"strconv"
 	"time"
 	"unicode/utf8"
 
+	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/records/redact"
 )
@@ -121,27 +122,20 @@ func (l *Log) Write(r *Record) error {
 		return err
 	}
 	if directory := ospath.Dirname(l.path); directory != "" {
-		if err := os.MkdirAll(directory, 0o777); err != nil {
+		if err := fsio.MakeDirs(directory); err != nil {
 			return err
 		}
 	}
 	// 同じイベントの hook は同時に走るので、1 行を追記モードの 1 回の書き込みで出す（2 件が混ざらない）。
-	f, err := os.OpenFile(l.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
-	}
-	_, err = f.Write([]byte(line + "\n"))
-	if cerr := f.Close(); err == nil {
-		err = cerr
-	}
-	return err
+	// Python は O_BINARY を付けずに os.open するので、Windows では改行が CRLF になる。
+	return fsio.AppendLine(l.path, line, 0o600)
 }
 
 // object は 1 行の欄。空の欄は省く（Decision と Enforced は空でも入れる）。
 func (l *Log) object(r *Record) *pyjson.Object {
 	// 切る前に伏せる（上限で値の途中が切れると形が崩れて伏せられない）。伏せる前にも redactLimit で切る。
-	subject := limited(Redacted(head(r.Subject, redactLimit)), runeLen(r.Subject))
-	unwrapped := limited(Redacted(head(r.Unwrapped, redactLimit)), runeLen(r.Unwrapped))
+	subject := limited(Redacted(pyfmt.Head(r.Subject, redactLimit)), runeLen(r.Subject))
+	unwrapped := limited(Redacted(pyfmt.Head(r.Unwrapped, redactLimit)), runeLen(r.Unwrapped))
 	detail := Redacted(r.Detail)
 	elapsed := float64(time.Since(l.start)) / float64(time.Millisecond)
 
@@ -214,19 +208,7 @@ func limited(text string, whole int) string {
 	if rest <= 0 {
 		return text
 	}
-	return head(text, SubjectLimit) + "…(+" + strconv.Itoa(rest) + ")"
+	return pyfmt.Head(text, SubjectLimit) + "…(+" + strconv.Itoa(rest) + ")"
 }
 
 func runeLen(s string) int { return utf8.RuneCountInString(s) }
-
-// head は頭の n 字（符号位置で数える）。
-func head(s string, n int) string {
-	i := 0
-	for k := range s {
-		if i == n {
-			return s[:k]
-		}
-		i++
-	}
-	return s
-}

@@ -139,11 +139,11 @@ func quote(value string) string {
 func appendLine(path, line string) {
 	directory := ospath.Dirname(path)
 	for _, place := range []string{ospath.Dirname(directory), directory} {
-		if isLink(place) {
+		if ospath.IsLink(place) {
 			return
 		}
 	}
-	if noFollow == 0 && isLink(path) {
+	if noFollow == 0 && ospath.IsLink(path) {
 		return
 	}
 	flags := os.O_WRONLY | os.O_APPEND | os.O_CREATE | noFollow
@@ -159,9 +159,4 @@ func appendLine(path, line string) {
 	}
 	defer f.Close()
 	_, _ = f.Write([]byte(line + "\n"))
-}
-
-func isLink(path string) bool {
-	info, err := os.Lstat(path)
-	return err == nil && info.Mode()&os.ModeSymlink != 0
 }

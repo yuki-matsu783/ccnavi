@@ -2,7 +2,6 @@ package stopreview
 
 import (
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -161,7 +160,7 @@ func opPath(state, toolUseID, ident string) string {
 // StartTurn は通知でない発言のとき、ターンの開始時刻を書く。
 func StartTurn(state, session string, now time.Time) {
 	if state != "" && session != "" {
-		fsio.WriteJSON(sessionFile(state, TurnStartPrefix, session), pyjson.NewObject("t", seconds(now)))
+		fsio.WriteJSON(sessionFile(state, TurnStartPrefix, session), pyjson.NewObject("t", fsio.UnixSeconds(now)))
 	}
 }
 
@@ -170,7 +169,7 @@ func TurnStart(state, session string) time.Time {
 	if state == "" || session == "" {
 		return time.Unix(0, 0)
 	}
-	return fromSeconds(number(readObject(sessionFile(state, TurnStartPrefix, session)).Value("t"), 0))
+	return fsio.FromUnixSeconds(number(readObject(sessionFile(state, TurnStartPrefix, session)).Value("t"), 0))
 }
 
 // Register は実行前に、approval-request の呼び出しを登録する。
@@ -179,7 +178,7 @@ func Register(state, session, toolUseID, ident string, now time.Time) {
 		return
 	}
 	fsio.WriteJSON(prePath(state, toolUseID, ident), pyjson.NewObject(
-		"tool_use_id", toolUseID, "session", session, "ident", ident, "t0", seconds(now), "bound", ""))
+		"tool_use_id", toolUseID, "session", session, "ident", ident, "t0", fsio.UnixSeconds(now), "bound", ""))
 }
 
 // readResult は結果ファイル（key=value の行）を読む。読めない・経路が分からない・識別子が無ければ nil。
@@ -210,7 +209,7 @@ func readResult(path string) *pyjson.Object {
 	for _, key := range []string{"started", "ended", "rc"} {
 		value := 0.0
 		if text, ok := result.Value(key).(string); ok {
-			if parsed, err := strconv.ParseFloat(ospath.Strip(text), 64); err == nil {
+			if parsed, err := pyfmt.ParseFloat(text); err == nil {
 				value = parsed
 			}
 		}
@@ -255,7 +254,7 @@ func Bind(state, toolUseID string, now time.Time) (Op, bool) {
 		if pre.Value("tool_use_id") != toolUseID {
 			continue
 		}
-		if op, ok := bindOne(state, pre, seconds(now)); ok {
+		if op, ok := bindOne(state, pre, fsio.UnixSeconds(now)); ok {
 			last, found = op, true
 		}
 	}
@@ -284,7 +283,7 @@ func bindOne(state string, pre *pyjson.Object, now float64) (Op, bool) {
 		return Op{}, false
 	}
 	toolUseID, ident := pre.String("tool_use_id"), pre.String("ident")
-	op := with(best, "tool_use_id", toolUseID, "session", pre.Value("session"), "ident", ident)
+	op := best.With("tool_use_id", toolUseID, "session", pre.Value("session"), "ident", ident)
 	fsio.WriteJSON(opPath(state, toolUseID, ident), op)
 	pre.Set("bound", best.String("file"))
 	fsio.WriteJSON(prePath(state, toolUseID, ident), pre)
@@ -293,7 +292,7 @@ func bindOne(state string, pre *pyjson.Object, now float64) (Op, bool) {
 
 // Rebind は結び付いていない登録を、時刻の範囲で結び直す。見つからないまま古くなったものは未連携にする。
 func Rebind(state, session string, now time.Time) {
-	when := seconds(now)
+	when := fsio.UnixSeconds(now)
 	for _, name := range names(state) {
 		if !strings.HasPrefix(name, prePrefix) || !strings.HasSuffix(name, jsonSuffix) {
 			continue
@@ -357,7 +356,7 @@ func filesList(files []File) []any {
 
 // TurnOps はこのターン（since 以降に始まった呼び出し）の操作実績。終了の古い順。
 func TurnOps(state, session string, since time.Time) []Op {
-	floor := seconds(since) - 1
+	floor := fsio.UnixSeconds(since) - 1
 	var ops []Op
 	for _, obj := range records(state, opPrefix) {
 		if obj.Value("session") == session && number(obj.Value("started"), 0) >= floor {
@@ -445,13 +444,13 @@ func writePath(state, session, ident string) string {
 func NoteWritten(state, session, ident, path string, now time.Time) {
 	if state != "" && session != "" && ident != "" {
 		fsio.WriteJSON(writePath(state, session, ident), pyjson.NewObject(
-			"session", session, "ident", ident, "path", path, "t", seconds(now)))
+			"session", session, "ident", ident, "path", path, "t", fsio.UnixSeconds(now)))
 	}
 }
 
 // TurnWrites はこのターンに書いた提案。書いた時刻の古い順。
 func TurnWrites(state, session string, since time.Time) []Write {
-	floor := seconds(since)
+	floor := fsio.UnixSeconds(since)
 	var found []Write
 	for _, obj := range records(state, WritePrefix+safe(session)+"-") {
 		at := number(obj.Value("t"), 0)
@@ -526,7 +525,7 @@ func NoteRefs(state, session string, labels []string, now time.Time) {
 	}
 	kept = kept[max(len(kept)-refsKept, 0):]
 	for _, label := range labels {
-		kept = append(kept, pyjson.NewObject("label", label, "t", seconds(now)))
+		kept = append(kept, pyjson.NewObject("label", label, "t", fsio.UnixSeconds(now)))
 	}
 	fsio.WriteJSON(path, pyjson.NewObject("refs", kept))
 }

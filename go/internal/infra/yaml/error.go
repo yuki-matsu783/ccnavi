@@ -69,8 +69,24 @@ type Error struct {
 	Problem     string
 	ProblemMark *Mark
 	text        string // 位置を持たない理由（文字の検査・組み立ての途中の失敗）
+	class       Class
 	cause       error
 }
+
+// Class は Python が上げた例外の型の名前（type(exc).__name__）。
+type Class string
+
+const (
+	ReaderError      Class = "ReaderError"      // 許されない文字
+	ScannerError     Class = "ScannerError"     // 字句の誤り
+	ParserError      Class = "ParserError"      // 構文の誤り
+	ComposerError    Class = "ComposerError"    // 別名・アンカー・文書の数の誤り
+	ConstructorError Class = "ConstructorError" // 値の組み立てを PyYAML が断った
+	LoadError        Class = "LoadError"        // 組み立ての途中の素の例外・深すぎる入れ子（yamlread が包む）
+)
+
+// Class は Python の例外の型の名前。別名で断ったもの（LoadRefusingAliases）は空（呼び手の例外で上がる）。
+func (e *Error) Class() Class { return e.class }
 
 func (e *Error) Error() string {
 	if e.text != "" {
@@ -100,15 +116,15 @@ func (e *Error) Is(target error) bool {
 
 func (e *Error) Unwrap() error { return e.cause }
 
-func markedError(context string, contextMark *Mark, problem string, problemMark *Mark) *Error {
-	return &Error{Context: context, ContextMark: contextMark, Problem: problem, ProblemMark: problemMark}
+func markedError(class Class, context string, contextMark *Mark, problem string, problemMark *Mark) *Error {
+	return &Error{Context: context, ContextMark: contextMark, Problem: problem, ProblemMark: problemMark, class: class}
 }
 
 func markPtr(m Mark) *Mark { return &m }
 
 // buildError は値を組み立てる途中の失敗。kind は Python の例外の名前で、文に残す。
 func buildError(kind, detail string) *Error {
-	return &Error{text: fmt.Sprintf("%s (%s: %s)", msgUnbuildable, kind, detail)}
+	return &Error{text: fmt.Sprintf("%s (%s: %s)", msgUnbuildable, kind, detail), class: LoadError}
 }
 
-func tooDeep() *Error { return &Error{text: msgTooDeep} }
+func tooDeep() *Error { return &Error{text: msgTooDeep, class: LoadError} }

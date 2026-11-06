@@ -267,10 +267,29 @@ func DiskLexists(p string) bool {
 	return err == nil
 }
 
+// DiskListdir は os.listdir を名前の順にしたもの。fsio の溜める段は見ない（記録の置き場は fsio.Listdir）。
+func DiskListdir(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir) // 名前の順に返る
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, len(entries))
+	for i, e := range entries {
+		names[i] = e.Name()
+	}
+	return names, nil
+}
+
 // IsFile は os.path.isfile。
 func IsFile(p string) bool {
 	info, err := os.Stat(p)
 	return err == nil && info.Mode().IsRegular()
+}
+
+// IsLink は os.path.islink。
+func IsLink(p string) bool {
+	info, err := os.Lstat(p)
+	return err == nil && info.Mode()&os.ModeSymlink != 0
 }
 
 // IsDir は os.path.isdir。
@@ -340,4 +359,21 @@ func Splitlines(s string) []string {
 // UnifyNewlines は Python のテキストの読み（newline=None）と同じく、"\r\n" と "\r" を "\n" にする。
 func UnifyNewlines(text string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
+}
+
+// Splitext は os.path.splitext。拡張子は最後の名前の最後の "." から。名前の頭に並ぶ "." は拡張子の始まりと
+// 数えない（".bashrc" は拡張子を持たない）。
+func Splitext(p string) (root, ext string) {
+	sep := -1
+	for i := len(p) - 1; i >= 0; i-- {
+		if isSep(p[i]) {
+			sep = i
+			break
+		}
+	}
+	dot := strings.LastIndexByte(p, '.')
+	if dot > sep && strings.Trim(p[sep+1:dot], ".") != "" {
+		return p[:dot], p[dot:]
+	}
+	return p, ""
 }

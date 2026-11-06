@@ -121,7 +121,7 @@ func (s Store) WritePlan(key string, plan Plan, now time.Time) (string, error) {
 	}
 	attempt := s.readAttempt(aid)
 	if attempt == nil {
-		fresh := pyjson.NewObject(keyAttemptID, aid, keyKey, key, keyCreated, seconds(now), keyState, string(pending), keyOriginal, plan.Original)
+		fresh := pyjson.NewObject(keyAttemptID, aid, keyKey, key, keyCreated, fsio.UnixSeconds(now), keyState, string(pending), keyOriginal, plan.Original)
 		if !plan.IsCandidate {
 			byCcnavi(fresh, plan.Final, string(plan.Reason), true)
 		}
@@ -198,7 +198,7 @@ func (s Store) move(attempt *pyjson.Object, target State) bool {
 	}
 	attempt.Set(keyState, string(target))
 	if target == done || target == sentBack {
-		attempt.Set(keyDoneAt, seconds(time.Now())) // 作成から完了までの待ち時間を集計で出す
+		attempt.Set(keyDoneAt, fsio.UnixSeconds(time.Now())) // 作成から完了までの待ち時間を集計で出す
 	}
 	s.store(attempt)
 	s.logEvent(string(target), attempt)
@@ -209,7 +209,7 @@ func (s Store) move(attempt *pyjson.Object, target State) bool {
 func (s Store) Begin(key string, now time.Time) (Status, Plan, error) {
 	plan, ok := s.ReadPlan(key)
 	if !ok {
-		_, err := s.create(pyjson.NewObject(keyAttemptID, AttemptID(key, false), keyKey, key, keyCreated, seconds(now), keyState, string(planWait)))
+		_, err := s.create(pyjson.NewObject(keyAttemptID, AttemptID(key, false), keyKey, key, keyCreated, fsio.UnixSeconds(now), keyState, string(planWait)))
 		return StatusWait, Plan{}, err
 	}
 	if !plan.IsCandidate {
@@ -244,7 +244,7 @@ func (s Store) NoteInsufficient(key string, insufficient bool) {
 // ExpireOverdue は期限（config.StopReviewTTL）を過ぎても終わっていない試行を、未検査の期限切れとして確定し、
 // その試行 ID を返す。差し戻した試行の最終分類（不備検出）は残し、閉じるだけにする。
 func (s Store) ExpireOverdue(now time.Time) []string {
-	when := seconds(now)
+	when := fsio.UnixSeconds(now)
 	ttl := config.StopReviewTTL.Value().Seconds()
 	var out []string
 	for _, attempt := range records(s.State, attemptPrefix) {
@@ -276,7 +276,7 @@ func (s Store) ExpireOverdue(now time.Time) []string {
 // 試行 ID を返す。差し戻しから期限を過ぎたものは消費しない（ユーザが割り込んだ後の別の連鎖を、AI による
 // 継続と取り違えないため）。
 func (s Store) ConsumeContinuation(session string, now time.Time) (string, bool) {
-	when := seconds(now)
+	when := fsio.UnixSeconds(now)
 	window := config.StopReviewTTL.Value().Seconds()
 	found, ok := "", false
 	for _, attempt := range records(s.State, attemptPrefix) {

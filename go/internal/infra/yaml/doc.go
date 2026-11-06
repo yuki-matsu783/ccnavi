@@ -9,5 +9,6 @@
 // Python からの対応: yamlread.load・safe_load → Load、別名を拒む読み手（flow._Loader）→ LoadRefusingAliases。
 // 読めない文書は errors.Is(err, ErrUnreadable)（yaml.YAMLError と LoadError に当たる）、別名で断ったものは
 // ErrAlias（flow._AliasRefused）。問題と位置は errors.As で *Error の Problem・ProblemMark から読み、
-// Problem が空なら Error() を使う（flow._yaml_problem と同じ）。
+// Problem が空なら Error() を使う（flow._yaml_problem と同じ）。例外の型の名前（type(exc).__name__）は
+// *Error の Class。
 package yaml

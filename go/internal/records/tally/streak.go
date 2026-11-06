@@ -36,7 +36,7 @@ const (
 
 // StreakThreshold は書かれた回数。0 は機能を使わない。読めない値と負数は既定。
 func StreakThreshold(written string) int {
-	if n, ok := pyInt(written); ok && n >= 0 {
+	if n, err := pyfmt.ParseInt(ospath.Strip(written)); err == nil && n >= 0 {
 		return n
 	}
 	return DefaultStreakThreshold

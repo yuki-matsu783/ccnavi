@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -211,24 +210,6 @@ func (r *run) shown(path string) string {
 	return ospath.Slashed(rel)
 }
 
-func isLink(path string) bool {
-	info, err := os.Lstat(path)
-	return err == nil && info.Mode()&os.ModeSymlink != 0
-}
-
-func sortedNames(directory string) ([]string, bool) {
-	entries, err := os.ReadDir(directory)
-	if err != nil {
-		return nil, false
-	}
-	names := make([]string, len(entries))
-	for i, e := range entries {
-		names[i] = e.Name()
-	}
-	sort.Strings(names)
-	return names, true
-}
-
 func mtime(path string) (time.Time, bool) {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -286,13 +267,13 @@ func (r *run) pruneDirectory(directory string, before time.Time) {
 	if !r.linkless(directory) || !ospath.IsDir(directory) {
 		return
 	}
-	names, ok := sortedNames(directory)
-	if !ok {
+	names, err := ospath.DiskListdir(directory)
+	if err != nil {
 		return
 	}
 	for _, name := range names {
 		path := ospath.Join(directory, name)
-		if isLink(path) || !ospath.IsFile(path) || !touched(path).Before(before) {
+		if ospath.IsLink(path) || !ospath.IsFile(path) || !touched(path).Before(before) {
 			continue
 		}
 		if r.remove(path) {

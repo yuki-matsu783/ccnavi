@@ -46,7 +46,7 @@ func replaceFile(path string, content []byte, durable bool) error {
 			return pathError("open", path, errnoEACCES)
 		}
 	} else {
-		stem, ext := splitext(name)
+		stem, ext := ospath.Splitext(name)
 		prefix, suffix = tempPrefix+stem+".", tempMark+ext
 	}
 	if err := MakeDirs(directory); err != nil {
@@ -130,24 +130,4 @@ func syncDirectory(directory string) {
 	}
 	_ = d.Sync()
 	d.Close()
-}
-
-// splitext は os.path.splitext。先頭の "." だけの名前（".bashrc"）は拡張子を持たない。
-func splitext(name string) (string, string) {
-	dot := -1
-	for i := len(name) - 1; i >= 0; i-- {
-		if name[i] == '.' {
-			dot = i
-			break
-		}
-	}
-	if dot <= 0 {
-		return name, ""
-	}
-	for i := 0; i < dot; i++ {
-		if name[i] != '.' {
-			return name[:dot], name[dot:]
-		}
-	}
-	return name, ""
 }

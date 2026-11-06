@@ -154,13 +154,9 @@ func Listdir(directory string) ([]string, error) {
 }
 
 func listNames(directory string) ([]string, error) {
-	entries, err := os.ReadDir(directory)
+	names, err := ospath.DiskListdir(directory)
 	if err != nil {
 		return nil, wrap(err)
-	}
-	names := make([]string, len(entries))
-	for i, e := range entries {
-		names[i] = e.Name()
 	}
 	return names, nil
 }

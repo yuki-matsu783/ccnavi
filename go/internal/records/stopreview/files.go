@@ -3,14 +3,13 @@ package stopreview
 import (
 	"crypto/sha1"
 	"encoding/hex"
-	"math"
 	"slices"
 	"strings"
-	"time"
 	"unicode"
 
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
 )
 
@@ -106,26 +105,6 @@ func number(v any, fallback float64) float64 {
 	return fallback
 }
 
-// seconds は記録に書く UNIX 秒（Python の time.time()）。
-func seconds(t time.Time) float64 { return float64(t.UnixNano()) / 1e9 }
-
-func fromSeconds(f float64) time.Time {
-	whole, frac := math.Modf(f)
-	return time.Unix(int64(whole), int64(math.Round(frac*1e9)))
-}
-
-// with は data に kv を重ねた写し（Python の dict(data, **kv)）。
-func with(data *pyjson.Object, kv ...any) *pyjson.Object {
-	out := pyjson.NewObject()
-	for k, v := range data.All() {
-		out.Set(k.(string), v)
-	}
-	for i := 0; i+1 < len(kv); i += 2 {
-		out.Set(kv[i].(string), kv[i+1])
-	}
-	return out
-}
-
 // strs は JSON の列から文字列だけを取り出す。
 func strs(v any) []string {
 	items, _ := v.([]any)
@@ -145,9 +124,6 @@ func isWord(r rune) bool {
 
 // clip は先頭から limit 文字（符号位置）で切る。切ったら true。
 func clip(text string, limit int) (string, bool) {
-	runes := []rune(text)
-	if len(runes) <= limit {
-		return text, false
-	}
-	return string(runes[:limit]), true
+	head := pyfmt.Head(text, limit)
+	return head, len(head) < len(text)
 }

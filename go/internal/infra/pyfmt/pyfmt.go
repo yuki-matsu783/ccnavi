@@ -231,3 +231,15 @@ func Bytes(data []byte) string {
 	b.WriteByte(quote)
 	return b.String()
 }
+
+// Head は Python の s[:n]（符号位置で数える）。n が長さ以上なら s のまま。
+func Head(s string, n int) string {
+	i := 0
+	for k := range s {
+		if i == n {
+			return s[:k]
+		}
+		i++
+	}
+	return s
+}

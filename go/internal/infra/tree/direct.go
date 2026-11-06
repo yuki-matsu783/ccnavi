@@ -67,7 +67,7 @@ func validDirect(root string, main Tree, common, name string, fields map[string]
 		return false
 	}
 	work := WorktreePath(root, name)
-	if !ospath.IsDir(work) || isSymlink(work) || !IsWorktreeOf(main.Root, work) {
+	if !ospath.IsDir(work) || ospath.IsLink(work) || !IsWorktreeOf(main.Root, work) {
 		return false
 	}
 	workCommon, ok := CommonDir(work)
@@ -85,7 +85,7 @@ func DirectRecords(root string, main Tree) []DirectRecord {
 		return nil
 	}
 	base := ospath.Join(common, DirectDir)
-	names, _ := sortedNames(base)
+	names, _ := ospath.DiskListdir(base)
 	var out []DirectRecord
 	for _, name := range names {
 		path := ospath.Join(base, name)

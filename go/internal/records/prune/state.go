@@ -14,7 +14,7 @@ import (
 // pruneState は終わったセッションの記録を、セッションごとにまとめて消す。置き場そのものがリンクなら、
 // 何も消さずに報告に出す（辿って消すと置き場の外のファイルを消す）。
 func (r *run) pruneState(stateDir, session string, before time.Time) {
-	if isLink(stateDir) {
+	if ospath.IsLink(stateDir) {
 		r.problem("%s はリンクなので辿らない（記録を削除しません）", r.shown(stateDir))
 		return
 	}
@@ -69,7 +69,7 @@ func (r *run) sessionEntries(stateDir string) (map[string][]string, []string) {
 		return groups, nil
 	}
 	guard := ospath.Join(stateDir, selfguardDir)
-	if isLink(guard) {
+	if ospath.IsLink(guard) {
 		r.problem("%s はリンクなので辿らない（バックアップを削除しません）", r.shown(guard))
 	} else if backups, err := os.ReadDir(guard); err == nil {
 		for _, b := range backups {

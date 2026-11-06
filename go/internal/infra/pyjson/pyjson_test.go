@@ -116,3 +116,36 @@ func TestLoadsDepth(t *testing.T) {
 		t.Errorf("%d 段: %v", n, err)
 	}
 }
+
+// 期待値は Python の dict(data, **kv) と dict.pop(key, None)。
+func TestObjectWithAndPop(t *testing.T) {
+	data := NewObject("a", 1, "b", 2)
+	cases := []struct {
+		name string
+		got  *Object
+		want string
+	}{
+		{"上書きは位置を保つ", data.With("a", 9, "c", 3), `{"a": 9, "b": 2, "c": 3}`},
+		{"何も足さない写し", data.With(), `{"a": 1, "b": 2}`},
+		{"nil からの写し", (*Object)(nil).With("x", true), `{"x": true}`},
+	}
+	for _, c := range cases {
+		if got, _ := Dumps(c.got, Options{}); got != c.want {
+			t.Errorf("%s: %s, want %s", c.name, got, c.want)
+		}
+	}
+	if got, _ := Dumps(data, Options{}); got != `{"a": 1, "b": 2}` {
+		t.Errorf("元が変わった: %s", got)
+	}
+	popped := data.With("c", 3)
+	if v, ok := popped.Pop("a"); !ok || v != 1 {
+		t.Errorf("Pop = %v %v", v, ok)
+	}
+	if _, ok := popped.Pop("zz"); ok {
+		t.Error("無いキーを除いた")
+	}
+	popped.Set("a", 5) // 除いたキーは後ろに足し直す
+	if got, _ := Dumps(popped, Options{}); got != `{"b": 2, "c": 3, "a": 5}` {
+		t.Errorf("Pop の後 = %s", got)
+	}
+}

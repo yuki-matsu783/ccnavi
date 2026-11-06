@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fsio"
 )
 
 func row(criterion, target, result string) string {
@@ -288,7 +289,7 @@ func TestSentBackIsNotExpiredEarlyNorConsumedByOthers(t *testing.T) {
 		t.Error("別のセッションが消費した")
 	}
 	// 差し戻しから期限を過ぎたものは継続として消費せず、期限切れで閉じても不備検出を残す。
-	later := fromSeconds(number(s.readAttempt(first).Value(keySentAt), 0)).Add(10_000 * time.Second)
+	later := fsio.FromUnixSeconds(number(s.readAttempt(first).Value(keySentAt), 0)).Add(10_000 * time.Second)
 	if _, ok := s.ConsumeContinuation("s1", later); ok {
 		t.Error("古い差し戻しを消費した")
 	}

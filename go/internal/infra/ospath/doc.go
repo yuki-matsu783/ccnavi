@@ -8,5 +8,5 @@
 // チケットは、溜めている書き込みも見る fsio の Exists・Lexists・ReadText で読む。
 //
 // Python からの対応: os.path.exists・lexists → DiskExists・DiskLexists、open(...).read() → ReadDiskText、
-// fsio.slashed → Slashed。
+// fsio.slashed → Slashed、os.path.splitext → Splitext、os.path.islink → IsLink、sorted(os.listdir) → DiskListdir。
 package ospath

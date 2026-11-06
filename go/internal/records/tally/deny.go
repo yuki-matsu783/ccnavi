@@ -38,7 +38,7 @@ const (
 
 // DenyThreshold は書かれた N。読めない値と 2 未満は既定。
 func DenyThreshold(written string) int {
-	if n, ok := pyInt(written); ok && n >= minDenyThreshold {
+	if n, err := pyfmt.ParseInt(ospath.Strip(written)); err == nil && n >= minDenyThreshold {
 		return n
 	}
 	return DefaultDenyThreshold

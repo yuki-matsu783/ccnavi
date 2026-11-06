@@ -1,6 +1,7 @@
 package wiki
 
 import (
+	"errors"
 	"math"
 	"math/big"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/yaml"
 )
 
@@ -23,10 +25,7 @@ const (
 
 // frontMatter は頭の frontmatter（--- で囲んだ YAML）のマップ。読めなければ理由。
 func frontMatter(text string) (*yaml.Map, string) {
-	if utf8.RuneCountInString(text) > headLimit {
-		text = string([]rune(text)[:headLimit])
-	}
-	lines := ospath.Splitlines(strings.TrimLeft(text, byteMark))
+	lines := ospath.Splitlines(strings.TrimLeft(pyfmt.Head(text, headLimit), byteMark))
 	if len(lines) == 0 || rstrip(lines[0]) != fence {
 		return nil, "frontmatter が無い"
 	}
@@ -42,8 +41,11 @@ func frontMatter(text string) (*yaml.Map, string) {
 	}
 	data, err := yaml.Load(strings.Join(lines[1:end], "\n"))
 	if err != nil {
-		// Python は例外の型の名前を添えていた（ScannerError など）。Go の yaml.Error は型の名前を持たない。
-		return nil, "frontmatter を YAML として読めない (" + yamlErrorName + ")"
+		var yerr *yaml.Error
+		if !errors.As(err, &yerr) {
+			return nil, "frontmatter を YAML として読めない"
+		}
+		return nil, "frontmatter を YAML として読めない (" + string(yerr.Class()) + ")"
 	}
 	m, ok := data.(*yaml.Map)
 	if !ok {
@@ -51,9 +53,6 @@ func frontMatter(text string) (*yaml.Map, string) {
 	}
 	return m, ""
 }
-
-// yamlErrorName は読めない YAML の理由に添える名前（PyYAML の例外の基の型）。
-const yamlErrorName = "YAMLError"
 
 func rstrip(s string) string { return strings.TrimRightFunc(s, ospath.IsSpace) }
 
@@ -398,16 +397,4 @@ func digits(s string) bool {
 func atoi(s string) int {
 	n, _ := strconv.Atoi(s)
 	return n
-}
-
-// pyInt は Python の int(text.strip())。数字の間の "_" を 1 つずつ受ける。
-func pyInt(text string) (int, bool) {
-	text = ospath.Strip(text)
-	body := strings.TrimLeft(text, "+-")
-	if len(text)-len(body) > 1 || body == "" || body[0] == '_' || body[len(body)-1] == '_' ||
-		strings.Contains(body, "__") {
-		return 0, false
-	}
-	n, err := strconv.Atoi(text[:len(text)-len(body)] + strings.ReplaceAll(body, "_", ""))
-	return n, err == nil
 }

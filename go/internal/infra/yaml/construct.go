@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 )
 
@@ -23,9 +21,6 @@ const (
 )
 
 const msgStringIndex = "string index out of range"
-
-// maxIntDigits は Python が 10 進の文字列から作る整数の桁の上限（sys.get_int_max_str_digits の既定）。
-const maxIntDigits = 4300
 
 var timestampRe = fullMatch(timestampPattern)
 
@@ -107,7 +102,7 @@ func finalize(v any, active map[any]bool) (any, error) {
 }
 
 func constructorError(context string, contextMark *Mark, problem string, problemMark Mark) *Error {
-	return markedError(context, contextMark, problem, &problemMark)
+	return markedError(ConstructorError, context, contextMark, problem, &problemMark)
 }
 
 func (c *constructor) object(n *node) (any, error) {
@@ -390,93 +385,22 @@ func intValue(n *big.Int) any {
 	return n
 }
 
-// pyInt は Python の int(text, base)。前後の空白、符号、基数の頭（0b・0o・0x）、数字の間の "_" を読む。
+// pyInt は Python の int(text, base)。読めなければ素の ValueError を包んだエラー。
 func pyInt(text string, base int) (*big.Int, error) {
-	invalid := func() error {
-		r := pyfmt.Quote(text)
-		if rs := []rune(r); len(rs) > 200 {
-			r = string(rs[:200])
-		}
-		return buildError(excValue, fmt.Sprintf("invalid literal for int() with base %d: %s", base, r))
+	n, err := pyfmt.ParseBigInt(text, base)
+	if err != nil {
+		return nil, buildError(excValue, err.Error())
 	}
-	s := ospath.Strip(text)
-	neg := false
-	if s != "" && (s[0] == '+' || s[0] == '-') {
-		neg = s[0] == '-'
-		s = s[1:]
-	}
-	prefixed := false
-	if len(s) >= 2 && s[0] == '0' {
-		if p := map[int]byte{2: 'b', 8: 'o', 16: 'x'}[base]; p != 0 && (s[1]|0x20) == p {
-			s, prefixed = s[2:], true
-		}
-	}
-	digitValue := func(ch byte) int {
-		switch {
-		case ch >= '0' && ch <= '9':
-			return int(ch - '0')
-		case ch >= 'a' && ch <= 'z':
-			return int(ch-'a') + 10
-		case ch >= 'A' && ch <= 'Z':
-			return int(ch-'A') + 10
-		}
-		return 99
-	}
-	var digits strings.Builder
-	count := 0
-	for i := 0; i < len(s); i++ {
-		if s[i] == '_' {
-			if i == len(s)-1 || s[i+1] == '_' || i == 0 && !prefixed {
-				return nil, invalid()
-			}
-			continue
-		}
-		if digitValue(s[i]) >= base {
-			if count > maxIntDigits && base == 10 {
-				return nil, digitLimit(count)
-			}
-			return nil, invalid()
-		}
-		digits.WriteByte(s[i])
-		count++
-	}
-	if count == 0 {
-		return nil, invalid()
-	}
-	if count > maxIntDigits && base == 10 {
-		return nil, digitLimit(count)
-	}
-	out, _ := new(big.Int).SetString(digits.String(), base)
-	if neg {
-		out.Neg(out)
-	}
-	return out, nil
+	return n, nil
 }
-
-func digitLimit(count int) error {
-	return buildError(excValue, fmt.Sprintf("Exceeds the limit (%d digits) for integer string conversion: "+
-		"value has %d digits; use sys.set_int_max_str_digits() to increase the limit", maxIntDigits, count))
-}
-
-// pyFloatSyntax は Python の float(text) が読む綴り（前後の空白は先に外す）。
-var pyFloatSyntax = regexp.MustCompile(`^[+-]?(?:(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?|(?i:inf|infinity|nan))$`)
 
 // pyFloat は Python の float(text)。桁あふれは Python と同じく inf になる。
 func pyFloat(text string) (float64, error) {
-	s := ospath.Strip(text)
-	if !pyFloatSyntax.MatchString(s) {
-		return 0, buildError(excValue, "could not convert string to float: "+pyfmt.Quote(text))
-	}
-	f, err := strconv.ParseFloat(s, 64)
-	if err != nil && !isRangeError(err) {
-		return 0, buildError(excValue, "could not convert string to float: "+pyfmt.Quote(text))
+	f, err := pyfmt.ParseFloat(text)
+	if err != nil {
+		return 0, buildError(excValue, err.Error())
 	}
 	return f, nil
-}
-
-func isRangeError(err error) bool {
-	ne, ok := err.(*strconv.NumError)
-	return ok && ne.Err == strconv.ErrRange
 }
 
 // float は YAML 1.1 の小数。.inf・.nan と、":" の 60 進を読む。

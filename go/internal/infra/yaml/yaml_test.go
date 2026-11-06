@@ -252,3 +252,35 @@ func TestMapAccessors(t *testing.T) {
 		t.Error("真偽のキーがあるのに StringKeys が真")
 	}
 }
+
+// 期待値は Python の yamlread.safe_load が上げた例外の type(exc).__name__。
+func TestErrorClassMatchesPyYAML(t *testing.T) {
+	cases := []struct {
+		doc  string
+		want Class
+	}{
+		{"a: \x01", ReaderError},
+		{"a: b: c", ScannerError},
+		{"a:\tb", ScannerError},
+		{"a: '", ScannerError},
+		{"a: [", ParserError},
+		{"- a\nb: 1", ParserError},
+		{"%YAML 1.1\n%YAML 1.1\n--- a", ParserError},
+		{"a: *x", ComposerError},
+		{"a: &x 1\nb: &x 2", ComposerError},
+		{"--- a\n--- b", ComposerError},
+		{"a: !!python/name:os.system x", ConstructorError},
+		{"? [a]\n: 1", ConstructorError},
+		{"a: !!int abc", LoadError},
+		{"a: !!bool maybe", LoadError},
+		{"a: !!timestamp 2020-13-01", LoadError},
+		{"a: " + strings.Repeat("[", 3000), LoadError},
+	}
+	for _, c := range cases {
+		_, err := Load(c.doc)
+		var yerr *Error
+		if !errors.As(err, &yerr) || yerr.Class() != c.want {
+			t.Errorf("Load(%q) = %v, want %s", c.doc, err, c.want)
+		}
+	}
+}

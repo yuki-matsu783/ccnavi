@@ -7,6 +7,7 @@ import (
 
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
+	"ccnavi/internal/infra/pyfmt"
 )
 
 // 置き場（wiki を含むツリーからの相対。区切りは "/"）。
@@ -273,7 +274,7 @@ func SourcesThreshold(written string) int { return positive(written, DefaultSour
 func NoticeCount(written string) int { return positive(written, DefaultNoticeCount) }
 
 func positive(written string, fallback int) int {
-	if n, ok := pyInt(written); ok && n >= 1 {
+	if n, err := pyfmt.ParseInt(ospath.Strip(written)); err == nil && n >= 1 {
 		return n
 	}
 	return fallback

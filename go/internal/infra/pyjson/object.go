@@ -3,6 +3,7 @@ package pyjson
 import (
 	"fmt"
 	"iter"
+	"slices"
 )
 
 // Object は JSON のオブジェクト。Python の dict と同じく、入れた順を保ち、同じキーを入れ直すと
@@ -86,4 +87,31 @@ func (o *Object) All() iter.Seq2[any, any] {
 			}
 		}
 	}
+}
+
+// With は o に kv（key, value, ... の順）を重ねた写し（Python の dict(o, **kv)）。o は変えない。
+// 既にあるキーは位置を保って値だけを変え、無いキーは後ろに足す。nil の Object でも使える。
+func (o *Object) With(kv ...any) *Object {
+	out := &Object{}
+	for _, k := range o.Keys() {
+		out.Set(k, o.vals[k])
+	}
+	for i := 0; i+1 < len(kv); i += 2 {
+		key, ok := kv[i].(string)
+		if !ok {
+			key = fmt.Sprint(kv[i])
+		}
+		out.Set(key, kv[i+1])
+	}
+	return out
+}
+
+// Pop は key を除き、除いた値を返す（Python の dict.pop(key, None)）。無ければ (nil, false)。
+func (o *Object) Pop(key string) (any, bool) {
+	v, ok := o.Get(key)
+	if ok {
+		delete(o.vals, key)
+		o.keys = slices.DeleteFunc(o.keys, func(k string) bool { return k == key })
+	}
+	return v, ok
 }

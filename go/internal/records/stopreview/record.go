@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
@@ -114,7 +115,7 @@ func validate(result any, plan Plan) (*pyjson.Object, error) {
 		}
 		kept = append(kept, r)
 	}
-	valid := with(obj, "results", kept)
+	valid := obj.With("results", kept)
 	seen := map[unit]bool{}
 	for _, r := range kept {
 		if err := checkRow(r, plan, seen); err != nil {
@@ -340,7 +341,7 @@ func (s Store) Accept(key string, in AcceptInput) Return {
 	target := done
 	if sendsBack {
 		target = sentBack
-		attempt.Set(keySentAt, seconds(time.Now()))
+		attempt.Set(keySentAt, fsio.UnixSeconds(time.Now()))
 	}
 	s.move(attempt, target)
 	s.logEvent(eventFinal, attempt)

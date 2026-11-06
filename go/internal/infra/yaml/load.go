@@ -46,7 +46,7 @@ func checkPrintable(buf []rune) error {
 			r >= 0xa0 && r <= 0xd7ff || r >= 0xe000 && r <= 0xfffd || r >= 0x10000 && r <= 0x10ffff
 		if !ok {
 			return &Error{text: fmt.Sprintf("unacceptable character #x%04x: special characters are not allowed\n"+
-				"  in \"%s\", position %d", r, sourceName, i)}
+				"  in \"%s\", position %d", r, sourceName, i), class: ReaderError}
 		}
 	}
 	return nil

@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyjson"
 )
 
@@ -571,5 +572,52 @@ func TestReadTextUndecodable(t *testing.T) {
 	}
 	if raw, _ := ReadBytes(path); !bytes.Equal(raw, []byte("a\xffb\r\n")) {
 		t.Error("ReadBytes は改行を変えない")
+	}
+}
+
+// open(path, "a") の write(line + "\n") と同じく、改行は機械のもので、前の行の後ろに足す。
+func TestAppendLine(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "events.jsonl")
+	for _, line := range []string{`{"a": 1}`, "日本語"} {
+		if err := AppendLine(path, line, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	nl := "\n"
+	if ospath.Windows {
+		nl = "\r\n"
+	}
+	if data, _ := os.ReadFile(path); string(data) != `{"a": 1}`+nl+"日本語"+nl {
+		t.Errorf("中身 = %q", data)
+	}
+	if err := AppendLine(filepath.Join(path+".d", "x"), "a", 0o600); err == nil {
+		t.Error("無いディレクトリに書けた")
+	}
+}
+
+// 期待値は Python の time.time()（ナノ秒を float にして 1e9 で割る）と datetime.fromtimestamp。
+func TestUnixSeconds(t *testing.T) {
+	cases := []struct {
+		at      time.Time
+		seconds float64
+	}{
+		{time.Unix(1700000000, 500000000), 1700000000.5},
+		{time.Unix(0, 0), 0},
+		{time.Unix(-2, 500000000), -1.5},
+	}
+	for _, c := range cases {
+		if got := UnixSeconds(c.at); got != c.seconds {
+			t.Errorf("UnixSeconds(%v) = %v, want %v", c.at, got, c.seconds)
+		}
+		if got := FromUnixSeconds(c.seconds); !got.Equal(c.at) {
+			t.Errorf("FromUnixSeconds(%v) = %v, want %v", c.seconds, got, c.at)
+		}
+	}
+	// float(1700000000250000000) / 1e9 は 2 進で表せず、Python でも 1700000000.2499998 になる。
+	if got := UnixSeconds(time.Unix(1700000000, 250000000)); got != 1700000000.2499998 {
+		t.Errorf("UnixSeconds = %v", got)
+	}
+	if got := FromUnixSeconds(1700000000.25); !got.Equal(time.Unix(1700000000, 250000000)) {
+		t.Errorf("FromUnixSeconds = %v", got)
 	}
 }
