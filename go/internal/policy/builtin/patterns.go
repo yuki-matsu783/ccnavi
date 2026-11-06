@@ -137,13 +137,16 @@ var recursiveDeleteRegex = rmStart + `\s*+` + rmRestart + `(?:` + rmOther("rf") 
 	`|` + rmRecursive + `\s++(?:` + rmOther("f") + `\s++)*+` + rmForce + wordEnd +
 	`|` + rmForce + `\s++(?:` + rmOther("r") + `\s++)*+` + rmRecursive + wordEnd + `)`
 
+// credentialHead は認証情報の名前の前の境界（行頭か、下の字の組でない字）。
+const credentialHead = `(^|[^\w.,\x01-])`
+
 // credentialsRegex は認証情報の場所の形。先頭に境界（行頭か、語を作る字・`.`・`,`・`-`・引用の中の空白の目印 `\x01` でない字）を付け、
 // `jq '.a,.env.X'` や `process.env` を巻き込まない。引用符・`:`・`=`・`@` のあと（`open('.env')`・`HEAD:.env`・
 // `--file=.env`・`@.env`）は止める。`,` のあとは通す（`{a,.env}` はブレース展開のルールが止める）。
 // `.env` の後ろに続く `.envrc`・`.env.local`・`.env.example` は止める。キーのファイルは、拡張子として
 // 書かれた形（`x.pem`・`x.pem.bak`・`x.key.json`）で止める。
-const credentialsRegex = `(^|[^\w.,\x01-])\.(env|dev\.vars|netrc|npmrc|pypirc)` +
-	`|(^|[^\w.,\x01-])\.(aws|ssh)[\\/]` +
+const credentialsRegex = credentialHead + `\.(env|dev\.vars|netrc|npmrc|pypirc)` +
+	`|` + credentialHead + `\.(aws|ssh)[\\/]` +
 	`|[\w\-\\/]\.(pem|key)\b` +
 	`|[\\/]secrets[\\/]` +
 	`|[\\/]credentials([\\/]|\.json\b)` +

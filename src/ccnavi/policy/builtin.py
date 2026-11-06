@@ -170,6 +170,10 @@ _FIRST = r"(?:^|\x00)(?>(?:[^\x00]*?[^\w.\x00-])??"
 # 語の中の、名前の前の切れ目までを読む。語の頭か、切れ目の字の直後に名前があることを表す。
 _IN_WORD = r"(?:[^\s\x00]*?[^\w\s\x00.-])??"
 
+# 認証情報の名前の前の境界。行頭か、語の字・`.`・`,`・`-`・引用の中の空白の目印（`\x01`）でない字。
+# hook/failsafe.py の _BOUND も同じ字の組にする（failsafe は policy を読まない）。
+_CREDENTIAL_HEAD = r"(^|[^\w.,\x01-])"
+
 # ---- git
 #
 # 語の中の字を、名前の前の切れ目になる字（`_ANCHOR`）とそれ以外（`_PLAIN`）に分ける。
@@ -370,8 +374,8 @@ def _deny(root: str) -> list[dict]:
             # `.env` の後ろに続く `.envrc` `.env.local` `.env.example` は止める。
             # キーのファイルは拡張子として書かれた形（`x.pem`、`x.pem.bak`、`x.key.json`）。
             "regex": (
-                r"(^|[^\w.,\x01-])\.(env|dev\.vars|netrc|npmrc|pypirc)"
-                r"|(^|[^\w.,\x01-])\.(aws|ssh)[\\/]"
+                rf"{_CREDENTIAL_HEAD}\.(env|dev\.vars|netrc|npmrc|pypirc)"
+                rf"|{_CREDENTIAL_HEAD}\.(aws|ssh)[\\/]"
                 r"|[\w\-\\/]\.(pem|key)\b"
                 r"|[\\/]secrets[\\/]"
                 r"|[\\/]credentials([\\/]|\.json\b)"
