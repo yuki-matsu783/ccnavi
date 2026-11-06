@@ -11,7 +11,8 @@ import unittest
 
 from ccnavi.policy import rules
 from ccnavi.tickets.model import ticket as ticket_mod
-from ccnavi.tickets.proposal import agree_screen
+from ccnavi.tickets.config import phasetypes
+from ccnavi.tickets.proposal import agree_screen, scaffold
 from tests.ticketsample import child_text
 
 
@@ -27,6 +28,22 @@ class ScopeGlobWhitespaceTest(unittest.TestCase):
 
     def test_one_pattern_per_entry_passes(self):
         self.assertEqual(errors_of(["textkit/words.py", "textkit/__init__.py"]), [])
+
+
+class OtherEntrancesTest(unittest.TestCase):
+    """範囲を書く別の入口（`phases.yml` の `scope`・`--scope`）も同じ判定を通る。"""
+
+    def test_phase_definition_scope(self):
+        _, problems = phasetypes._globs("research", "scope", ["wip/a.md wip/b.md"])
+        self.assertTrue(any("空白がある" in p.detail for p in problems), problems)
+
+    def test_scope_option(self):
+        globs, why = scaffold.parse_scope(["src/a.py src/b.py"])
+        self.assertEqual(globs, [])
+        self.assertIn("空白がある", why)
+        self.assertEqual(
+            scaffold.parse_scope(["src/a.py,src/b.py"]), (["src/a.py", "src/b.py"], "")
+        )
 
 
 class BulletsTest(unittest.TestCase):

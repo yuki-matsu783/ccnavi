@@ -728,6 +728,19 @@ def scan_all(
     return found, problems
 
 
+GLOB_SPACE_REASON = (
+    "空白がある。glob は 1 項目に 1 パターンで、空白は区切りにならない"
+    "（承認しても何も一致せず、編集が全部止まる）。"
+    "パターンごとに項目を分けて書く。空白を含むファイル名は `?` で置き換える"
+)
+
+
+def glob_has_space(glob: str) -> bool:
+    """範囲の glob に空白（スペース・タブなど）があるか。提案の範囲・`phases.yml` の `scope`・
+    `ccnavi ticket new --scope` が同じ判定を通る（空白区切りで複数のパスを 1 項目に書く誤りを断つ）。"""
+    return re.search(r"\s", glob) is not None
+
+
 def _entries(front: dict, name: str) -> tuple[list[ticket_model.Entry], list[Problem]]:
     """frontmatter の欄（`rules.SECTIONS`）の項目を、判定に使える Entry の列にする。
 
@@ -787,15 +800,9 @@ def _entries(front: dict, name: str) -> tuple[list[ticket_model.Entry], list[Pro
             if bad:
                 problems.append(Problem(SEVERITY_ERROR, name, f"{where} の範囲に{bad}は書けない"))
                 continue
-            if glob and re.search(r"\s", glob):
+            if glob and glob_has_space(glob):
                 problems.append(
-                    Problem(
-                        SEVERITY_ERROR,
-                        name,
-                        f"{where} の glob `{glob}` に空白がある。glob は 1 項目に 1 パターンで、"
-                        "空白は区切りにならない（承認しても何も一致せず、編集が全部止まる）。"
-                        "パターンごとに項目を分けて書く。空白を含むファイル名は `?` で置き換える",
-                    )
+                    Problem(SEVERITY_ERROR, name, f"{where} の glob `{glob}` に{GLOB_SPACE_REASON}")
                 )
                 continue
             if glob and (os.path.isabs(glob) or (len(glob) > 1 and glob[1] == ":")):

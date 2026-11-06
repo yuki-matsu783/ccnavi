@@ -110,6 +110,8 @@ def parse_scope(values: list[str] | None) -> tuple[list[str], str]:
                     f"--scope {glob!r} に `<` `>` は指定できない。"
                     "`<触るファイルの glob>` のような案内の仮の値は、実際のパスに置き換える"
                 )
+            if ticket_mod.glob_has_space(glob):
+                return [], f"--scope {glob!r} に{ticket_mod.GLOB_SPACE_REASON}"
             norm = glob.replace("\\", "/")
             if norm.startswith("/") or re.match(r"[A-Za-z]:", norm) or ".." in norm.split("/"):
                 return [], (
