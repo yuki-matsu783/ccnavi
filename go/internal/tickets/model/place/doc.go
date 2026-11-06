@@ -1,0 +1,14 @@
+// Package place はチケットの置き場の名前と、パスの文字列だけで決まる置き場の見分けを持つ。状態の名前（置き場の
+// ディレクトリ名そのもの）、範囲を適用しない置き場（提案・承認済みチケット・下書き）、途中の作業の置き場、
+// 退避と承認済みの領域の下の名前をここに集める。ファイルも git も読まない。
+//
+// 下の段（records/prune・policy/selfguard・records/stopreview）は tickets を読めないので、名前を写して持っている。
+// 写しの持ち主はここの定数（ArchiveName・Handoff・Todo など）。
+//
+// Python からの対応: ticket_model の状態（TODO・REVIEW・DOING・DONE・CANCELLED・STATES・FINISHED・GUARDED_STATES）→
+// State と States・Finished・GuardedStates、ticket_fold.progress → State.Progress、ticket_places の
+// is_ticket_place・in_wip・leaves_open_state・lands_in_finished_state・is_handoff_place・is_unscoped・scratch_dir
+// → IsTicketPlace・InWip・LeavesOpenState・LandsInFinishedState・IsHandoffPlace・IsUnscoped・ScratchDir、
+// HANDOFF・SCRATCH_ROOT・WIP_ROOT → Handoff・ScratchRoot・WipRoot、archive の ARCHIVE_DIR・PHASES_DIR・FLOWS_DIR・
+// READY_DIR・PLACE → ArchiveDir・PhasesDir・FlowsDir・ReadyDir・ArchiveName、ticket_guard.OPS_REL → OpsRel。
+package place

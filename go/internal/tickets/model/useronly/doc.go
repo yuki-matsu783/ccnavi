@@ -1,0 +1,15 @@
+// Package useronly は、ユーザだけが打つ操作を 1 か所で宣言し、それをエージェントが打った形を見分ける。
+// 表（オプション・サブコマンド・`user <操作>` の読み替え）が正本で、実行ファイルの入口の読み替え
+// （TakeEntry・Rewrite・Refused）と、hook が止める形（TicketApprovalRule・HumanPathForm・HiddenUserEntry・
+// PruneForm・Exempt・Forbidden）は、どちらもこの表から組む。操作を足す・外すときは表の行を直し、式は直さない。
+// コマンドの文字列だけを見て、チケットもマーカーも読まない。
+//
+// Python からの対応: tickets/model の user_only と phase_forms をまとめた。user_only.take_entry・rewrite・
+// refused・direct_refusal・terminal → TakeEntry・Rewrite・Refused・DirectRefusal・Terminal、UserEntryError →
+// EntryError、Verb → Verb、USER_SCRIPT_PREFIX → UserScriptPrefix。phase_forms の exempt・forbidden・
+// human_path_form・hidden_user_entry・prune_form・user_prune_form・ticket_approval_rule → Exempt・Forbidden・
+// HumanPathForm・HiddenUserEntry・PruneForm・UserPruneForm・TicketApprovalRule、*_message → *Message、
+// HELD_TOOLS・EXEMPT_NOTE・TURN_DEFINED・EXE_OPTIONS → HeldTools・ExemptNote・TurnDefined・ExeOptions、
+// CODE_*・*_RULE_ID → Code*・*RuleID。表の中の式の組み立て（cli_forms・script_forms など）と commands は私的にした。
+// 行の無い SCRIPTS と、どの行も使わない unless の "no-yes"、表の読み手しか使わない Op の what は移さなかった。
+package useronly
