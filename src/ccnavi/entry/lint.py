@@ -473,6 +473,7 @@ def check(
     # そこが書く標準エラーにも出るので、受け皿で受け取って二重に言わない。
     problems.extend(config_check.layer_rules(io.StringIO(), conf, root))
     problems.extend(config_check.layer_configs(conf, root))
+    problems.extend(config_check.unmatched_scopes(conf, root))
     problems.extend(lint_templates._templates(conf, root))
     problems.extend(lint_texts._messages(root))
     problems.extend(lint_layers._worktree_layers(conf, root))
