@@ -30,6 +30,7 @@ ccnavi の使い方（`.ccnavi/docs/`）は `.ccnavi/CCNAVI.md` の表に記載�
 | 読むとき | 開くファイル |
 |---|---|
 | ccnavi の開発の入口（環境のコマンド・構成・文書の案内）を確かめる、利用者向けの手引き（`docs/50_guide/`）を足す・直す | `docs/40_development.md` |
+| 実行ファイルを Go（`go/`）に書き直す作業をする | `.agents/docs/go-rewrite.md` |
 | 開発用の hook（`.claude/hooks/`）を足す・直す、ターンの終わりのテストの仕組みを確かめる | `.agents/docs/dev-hooks.md` |
 | 実行ファイルを組み立てる（`build.py`）、`.ccnavi/bin/` や `dist/` を扱う、配布する sh を確かめる | `.agents/docs/build-and-dist.md` |
 | 作業の決まり（`.ccnavi/CCNAVI.md`）に、実行ファイル側で条件の名前を足す | `.agents/docs/ccnavimd-conditions.md` |
