@@ -110,6 +110,8 @@ func TestTokenShapes(t *testing.T) {
 		"sk-" + strings.Repeat("A1b2C3d4E5", 4), "sk_live_" + strings.Repeat("A1b2C3d4E5", 2),
 		"rk_live_" + strings.Repeat("A1b2C3d4E5", 2), "AIza" + "SyA1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6",
 		"npm_" + strings.Repeat("A1b2C3d4E5", 3) + "abcdef",
+		"hf_" + strings.Repeat("A1b2C3d4E5", 3) + "abcd", "dop_v1_" + strings.Repeat("0123456789abcdef", 4),
+		"ya29." + "a0AfH6SMB" + strings.Repeat("A1b2C3d4E5", 2), "pypi-" + "AgEIcHlwaS5vcmc" + strings.Repeat("A1b2C3d4E5", 4),
 		"eyJhbGciOiJIUzI1NiJ9" + ".eyJzdWIiOiIxMjM0NTY3ODkwIn0" + ".dozjgNryP4J3jVmNHl0w5N",
 	} {
 		out := Redact("echo " + token + " > /dev/null")
@@ -141,6 +143,28 @@ func TestExactOutputs(t *testing.T) {
 		if strings.Contains(out, secret) {
 			t.Errorf("%q still has %q", out, secret)
 		}
+	}
+}
+
+// 名前の長さに上限を置かない。65 字以上の名前の値も伏せる（回帰）。
+func TestLongNames(t *testing.T) {
+	const secret = "abcdefghijklmnopqrst"
+	for _, size := range []int{64, 65, 200, 10_000} {
+		for _, head := range []string{"x", "-", "_."} {
+			name := strings.Repeat(head, size)[:size] + "token="
+			if got, want := Redact(name+secret), name+Mask(secret); got != want {
+				t.Errorf("size %d head %q: got …%q", size, head, got[len(got)-30:])
+			}
+		}
+	}
+	// 長くても名前がキーワードで終わらなければ読まない。
+	if text := strings.Repeat("x", 100) + "tokenizer=abc123"; Redact(text) != text {
+		t.Errorf("tokenizer: %q", Redact(text))
+	}
+	got := Redact("az storage blob list --connection-string " +
+		"'DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=abc123def456==;EndpointSuffix=core.windows.net'")
+	if strings.Contains(got, "abc123def456") || !strings.Contains(got, "AccountKey=***;EndpointSuffix=core.windows.net") {
+		t.Errorf("AccountKey: %q", got)
 	}
 }
 

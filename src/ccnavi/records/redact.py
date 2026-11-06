@@ -36,19 +36,20 @@ _VALUE = r"(?:'(?P<sq>[^'\n]*)'|\"(?P<dq>[^\"\n]*)\"|(?P<bare>" + _BARE_VALUE + 
 
 # 名前が秘密を指す `名前=値` / `名前: 値`。名前はこれで終わるもの（`GITHUB_TOKEN`、
 # `db_password`、`x-api-key`、`aws_secret_access_key`、`SECRET_KEY`、`MYSQL_PWD`、`_authToken`、
-# `SESSION_COOKIE`）。途中に含むだけの名前（`tokenizer`、`secretName`）は読まない。
+# `SESSION_COOKIE`、Azure の接続文字列の `AccountKey`）。途中に含むだけの名前（`tokenizer`、
+# `secretName`）は読まない。
 # `pwd` は前に `_` か `-` が付いた形だけ。単体の `PWD` はいまの場所で、秘密ではない。
 _KEY_WORDS = (
     r"token|password|passwd|[_-]pwd|secret|secret[_-]?key|api[_-]?key|apikey|access[_-]?key|"
-    r"private[_-]?key|client[_-]?secret|auth[_-]?token|credentials?|cookie"
+    r"private[_-]?key|client[_-]?secret|auth[_-]?token|account[_-]?key|credentials?|cookie"
 )
-# 名前の頭は長さを限り、名前の途中から始めない（前の字が名前の字なら適用しない）。どちらかが
-# 無いと、`-` や `_` が続くだけの文字列で、始まりの位置ごとに末尾まで読み進めては戻る形になり、
-# 手間が長さの 2 乗で増える（1.5 万字で 10 秒）。記録は実行前チェックの期限の中で書くので、
-# 期限を過ぎると hook の拒否ごと破棄される。これより長い名前は取りこぼす。
-_NAME_HEAD = r"[A-Za-z0-9_.-]{0,64}"
+# 照らすのはキーワードから値までで、名前の頭は読まない。伏せるのは値だけなので、名前がどこから
+# 始まるかは結果に効かない。キーワードの後ろに `=` か `:` が来るので、名前はキーワードで終わる
+# （`tokenizer=` は読まない）。名前の頭から照らすと、長さを限らなければ `-` や `_` が続くだけの
+# 文字列で手間が長さの 2 乗で増え（1.5 万字で 10 秒、実行前チェックの期限を過ぎて hook の拒否ごと
+# 破棄される）、限れば長い名前の値を取りこぼす。
 _ASSIGN = re.compile(
-    r"(?<![A-Za-z0-9_.-])" + _NAME_HEAD + r"(?:" + _KEY_WORDS + r")[\"']?\s*[=:]\s*" + _VALUE,
+    r"(?:" + _KEY_WORDS + r")[\"']?\s*[=:]\s*" + _VALUE,
     re.IGNORECASE,
 )
 # 空白で値を渡すフラグ（`--password xxx`、`--token xxx`）。`=` の形は _ASSIGN が読む。
@@ -84,6 +85,10 @@ _TOKENS = re.compile(
     r"|[sr]k_(?:live|test)_[A-Za-z0-9]{10,}"  # Stripe の秘密キーと制限付きキー
     r"|AIza[0-9A-Za-z_-]{30,}"  # Google の API キー
     r"|npm_[A-Za-z0-9]{30,}"  # npm のアクセストークン
+    r"|hf_[A-Za-z0-9]{30,}"  # Hugging Face のアクセストークン
+    r"|do[opr]_v1_[0-9a-f]{64}"  # DigitalOcean の個人アクセストークンと OAuth のトークン
+    r"|ya29\.[0-9A-Za-z_-]{20,}"  # Google の OAuth のアクセストークン
+    r"|pypi-[A-Za-z0-9_-]{50,}"  # PyPI の API トークン
     r"|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"  # JWT
     r")(?![A-Za-z0-9])"
 )

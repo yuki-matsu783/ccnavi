@@ -35,12 +35,10 @@ const (
 	value = `(?:'(?P<sq>[^'\n]*)'|"(?P<dq>[^"\n]*)"|(?P<bare>` + bareBody + `))`
 	// 秘密を指す `名前=値` の名前の終わり（GITHUB_TOKEN・db_password・MYSQL_PWD など）。
 	// 名前の途中に含むだけのもの（tokenizer）は読まない。pwd は前に _ か - が付いた形だけ読む（単体の PWD はいまの場所）。
+	// Azure の接続文字列の AccountKey も読む。
 	keyWords = `token|password|passwd|[_-]pwd|secret|secret[_-]?key|api[_-]?key|apikey|access[_-]?key|` +
-		`private[_-]?key|client[_-]?secret|auth[_-]?token|credentials?|cookie`
+		`private[_-]?key|client[_-]?secret|auth[_-]?token|account[_-]?key|credentials?|cookie`
 	flagWords = `password|passwd|token|secret|api-key|apikey|access-token|auth-token`
-	// 名前の頭の長さに上限を設ける。上限が無いと、`-` が続くだけの文字列で手間が長さの 2 乗に増え、実行前チェックの期限を過ぎてしまう（Python で 1.5 万字 10 秒）。
-	// そのため、これより長い名前は取りこぼす。
-	nameHead = `{0,64}`
 	// コマンドの範囲は、名前から次のコマンドの切れ目の手前まで。
 	segmentEnd = "\n;|&\x00"
 )
@@ -53,13 +51,12 @@ func iword(words string) string {
 func mustRE(pattern string) *regexp.Regexp { return regexp.MustCompile(pattern) }
 
 // form は Python の 1 つの正規表現。start で始まりの候補を探し、before が通れば whole をその位置に
-// 固定して照らし、after が通れば当たりとする。before が偽なら skip（nil なら 1 字先）から探し直す。
+// 固定して照らし、after が通れば当たりとする。before が偽なら 1 字先から探し直す。
 type form struct {
 	start  *regexp.Regexp
 	whole  *regexp.Regexp
 	before func(text string, at int) bool
 	after  func(text string, end int) bool
-	skip   func(text string, at int) int
 }
 
 // segment はコマンドを限って読むフラグ。`-p` や `-u` はほかのコマンドでは別の意味なので
@@ -92,11 +89,6 @@ func isASCIIAlnum(r rune) bool {
 // foldsToASCII は IGNORECASE で英字に当たる ASCII の外の字。
 func foldsToASCII(r rune) bool { return r == 0x130 || r == 0x131 || r == 0x17f || r == 0x212a }
 
-// isNameRune は IGNORECASE の `[A-Za-z0-9_.-]`。
-func isNameRune(r rune) bool {
-	return isASCIIAlnum(r) || r == '_' || r == '.' || r == '-' || foldsToASCII(r)
-}
-
 // isFlagRune は IGNORECASE の `[A-Za-z0-9-]`。
 func isFlagRune(r rune) bool { return isASCIIAlnum(r) || r == '-' || foldsToASCII(r) }
 
@@ -125,20 +117,6 @@ func notAfter(in func(rune) bool) func(string, int) bool {
 	}
 }
 
-// pastRun は at から in の字が続く間を飛ばした位置。続きの中の位置は、前の字で後読みに落ちる。
-func pastRun(in func(rune) bool) func(string, int) int {
-	return func(text string, at int) int {
-		for at < len(text) {
-			r, size := utf8.DecodeRuneInString(text[at:])
-			if !in(r) {
-				break
-			}
-			at += size
-		}
-		return at
-	}
-}
-
 var forms = []form{
 	// 秘密キーの本文。見出しと結びの行は残す。結びが無ければ終わりまで（Python の `$` は最後の改行の手前）。
 	{
@@ -147,7 +125,7 @@ var forms = []form{
 	},
 	// 形そのものがトークンだと言えるもの。
 	{
-		start: mustRE(`AKIA|ASIA|gh[pousr]_|github_pat_|glpat-|xox[abprs]-|sk-|[sr]k_(?:live|test)_|AIza|npm_|eyJ`),
+		start: mustRE(`AKIA|ASIA|gh[pousr]_|github_pat_|glpat-|xox[abprs]-|sk-|[sr]k_(?:live|test)_|AIza|npm_|hf_|do[opr]_v1_|ya29\.|pypi-|eyJ`),
 		whole: mustRE(`^(?P<bare>` +
 			`(?:AKIA|ASIA)[0-9A-Z]{16}` + // AWS のアクセスキー ID
 			`|gh[pousr]_[A-Za-z0-9]{20,}` + // GitHub の各種トークン
@@ -158,6 +136,10 @@ var forms = []form{
 			`|[sr]k_(?:live|test)_[A-Za-z0-9]{10,}` + // Stripe
 			`|AIza[0-9A-Za-z_-]{30,}` + // Google の API キー
 			`|npm_[A-Za-z0-9]{30,}` + // npm
+			`|hf_[A-Za-z0-9]{30,}` + // Hugging Face
+			`|do[opr]_v1_[0-9a-f]{64}` + // DigitalOcean
+			`|ya29\.[0-9A-Za-z_-]{20,}` + // Google の OAuth のアクセストークン
+			`|pypi-[A-Za-z0-9_-]{50,}` + // PyPI
 			`|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}` + // JWT
 			`)`),
 		before: notAfter(isASCIIAlnum),
@@ -189,12 +171,12 @@ var forms = []form{
 		whole:  mustRE(`^(?i)(?:set-)?` + iword(`cookie`) + sp + `*:` + sp + `*(?P<bare>[^'"\n\x00]+)`),
 		before: wordStart,
 	},
-	// 名前が秘密を指す `名前=値` / `名前: 値`。名前の途中からは始めない。
+	// 名前が秘密を指す `名前=値` / `名前: 値`。照らすのはキーワードから値までで、名前の頭は読まない。
+	// 伏せるのは値だけなので、名前の始まりは結果に効かない。頭から照らすと、長さを限らなければ `-` が続くだけの
+	// 文字列で手間が長さの 2 乗に増えて実行前チェックの期限を過ぎ、限れば長い名前の値を取りこぼす。
 	{
-		start:  mustRE(`(?i)[A-Za-z0-9_.` + dottedI + `-]*(?:` + iword(keyWords) + `)["']?` + sp + `*[=:]`),
-		whole:  mustRE(`^(?i)[A-Za-z0-9_.` + dottedI + `-]` + nameHead + `(?:` + iword(keyWords) + `)["']?` + sp + `*[=:]` + sp + `*` + value),
-		before: notAfter(isNameRune),
-		skip:   pastRun(isNameRune),
+		start: mustRE(`(?i)(?:` + iword(keyWords) + `)["']?` + sp + `*[=:]`),
+		whole: mustRE(`^(?i)(?:` + iword(keyWords) + `)["']?` + sp + `*[=:]` + sp + `*` + value),
 	},
 	// 空白で値を渡すフラグ（`--password xxx`）。`=` の形は上の名前の形が読む。
 	{
@@ -326,11 +308,7 @@ func (f form) spans(text string, offset int, out []span) []span {
 		}
 		at := s + loc[0]
 		if f.before != nil && !f.before(text, at) {
-			if f.skip != nil {
-				s = max(f.skip(text, at), at+1)
-			} else {
-				s = at + runeSize(text, at)
-			}
+			s = at + runeSize(text, at)
 			continue
 		}
 		m := f.whole.FindStringSubmatchIndex(text[at:])

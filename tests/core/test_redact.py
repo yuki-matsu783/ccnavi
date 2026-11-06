@@ -165,6 +165,28 @@ class RedactTest(unittest.TestCase):
         # 素の PWD（いまの場所）は秘密ではない。
         self.assertEqual(redact.redact("PWD=/home/me make"), "PWD=/home/me make")
 
+    def test_long_names(self):
+        # 名前の長さに上限を置かない。65 字以上の名前の値も伏せる（回帰）。
+        for size in (64, 65, 200, 10_000):
+            for head in ("x", "-", "_."):
+                name = (head * size)[:size] + "token="
+                with self.subTest(size=size, head=head):
+                    self.assertEqual(
+                        redact.redact(name + "abcdefghijklmnopqrst"),
+                        name + redact.mask("abcdefghijklmnopqrst"),
+                    )
+        # 長くても名前がキーワードで終わらなければ読まない。
+        text = "x" * 100 + "tokenizer=abc123"
+        self.assertEqual(redact.redact(text), text)
+
+    def test_azure_account_key(self):
+        self.assertHidden(
+            "az storage blob list --connection-string "
+            "'DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=abc123def456==;EndpointSuffix=core.windows.net'",
+            "abc123def456==",
+            ("AccountName=acct;AccountKey=", ";EndpointSuffix=core.windows.net"),
+        )
+
     def test_cookie_header(self):
         # `;` で並ぶ値は 1 つの値として伏せる（長ければ頭と尻が残る）。
         out = self.assertHidden(
@@ -193,6 +215,10 @@ class RedactTest(unittest.TestCase):
             "rk_live_" + "A1b2C3d4E5" * 2,
             "AIza" + "SyA1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6",
             "npm_" + "A1b2C3d4E5" * 3 + "abcdef",
+            "hf_" + "A1b2C3d4E5" * 3 + "abcd",
+            "dop_v1_" + "0123456789abcdef" * 4,
+            "ya29." + "a0AfH6SMB" + "A1b2C3d4E5" * 2,
+            "pypi-" + "AgEIcHlwaS5vcmc" + "A1b2C3d4E5" * 4,
             "eyJhbGciOiJIUzI1NiJ9" + ".eyJzdWIiOiIxMjM0NTY3ODkwIn0" + ".dozjgNryP4J3jVmNHl0w5N",
         ):
             with self.subTest(token=token[:8]):
