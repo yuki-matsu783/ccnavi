@@ -1,0 +1,324 @@
+// Package ospath は Python の os.path と str の、答えが Go の標準と食い違う部分だけを同じ答えで返す。
+//
+// filepath.Join・filepath.Dir は途中で Clean するが、Python の join・dirname は綴りを変えない。
+// filepath.EvalSymlinks は無いパスで失敗するが、os.path.realpath は解けたところまで解いて残りを足す。
+// 比べるキーや記録に残すパスがこの差で変わらないよう、移した側はここを通す。
+package ospath
+
+import (
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"unicode"
+	"unicode/utf8"
+)
+
+const windows = runtime.GOOS == "windows"
+
+// Sep は機械の区切り（os.sep）。
+const Sep = string(filepath.Separator)
+
+func isSep(c byte) bool { return os.IsPathSeparator(c) }
+
+func isSepRune(r rune) bool { return r < utf8.RuneSelf && isSep(byte(r)) }
+
+// IsAbs は os.path.isabs。
+func IsAbs(p string) bool {
+	if windows {
+		return filepath.IsAbs(p)
+	}
+	return strings.HasPrefix(p, "/")
+}
+
+// Join は os.path.join。絶対の要素が来ると前を捨て、綴りは正規化しない（join("a", "") は "a/"）。
+func Join(base string, elems ...string) string {
+	path := base
+	for _, e := range elems {
+		switch {
+		case windows && filepath.VolumeName(e) != "":
+			path = e
+		case e != "" && isSep(e[0]):
+			if windows {
+				path = filepath.VolumeName(path) + e
+			} else {
+				path = e
+			}
+		case path == "" || isSep(path[len(path)-1]):
+			path += e
+		default:
+			path += Sep + e
+		}
+	}
+	return path
+}
+
+func splitLast(p string) (vol, head, tail string) {
+	vol = filepath.VolumeName(p)
+	rest := p[len(vol):]
+	i := len(rest)
+	for i > 0 && !isSep(rest[i-1]) {
+		i--
+	}
+	return vol, rest[:i], rest[i:]
+}
+
+// Dirname は os.path.dirname。末尾の区切りは落とすが、区切りだけの頭はそのまま残す。
+func Dirname(p string) string {
+	vol, head, _ := splitLast(p)
+	if trimmed := strings.TrimRightFunc(head, isSepRune); trimmed != "" {
+		head = trimmed
+	}
+	return vol + head
+}
+
+// Basename は os.path.basename（最後の区切りの後ろ。末尾が区切りなら空）。
+func Basename(p string) string {
+	_, _, tail := splitLast(p)
+	return tail
+}
+
+// Normpath は os.path.normpath。POSIX では頭のちょうど 2 つの "/" を残す（Clean は 1 つにする）。
+func Normpath(p string) string {
+	if windows {
+		return filepath.Clean(p)
+	}
+	if p == "" {
+		return "."
+	}
+	initial := 0
+	if strings.HasPrefix(p, "/") {
+		initial = 1
+		if strings.HasPrefix(p, "//") && !strings.HasPrefix(p, "///") {
+			initial = 2
+		}
+	}
+	var comps []string
+	for _, c := range strings.Split(p, "/") {
+		if c == "" || c == "." {
+			continue
+		}
+		if c != ".." || (initial == 0 && len(comps) == 0) || (len(comps) > 0 && comps[len(comps)-1] == "..") {
+			comps = append(comps, c)
+		} else if len(comps) > 0 {
+			comps = comps[:len(comps)-1]
+		}
+	}
+	out := strings.Repeat("/", initial) + strings.Join(comps, "/")
+	if out == "" {
+		return "."
+	}
+	return out
+}
+
+// Abspath は os.path.abspath。
+func Abspath(p string) string {
+	if !IsAbs(p) {
+		cwd, err := os.Getwd()
+		if err == nil {
+			p = Join(cwd, p)
+		}
+	}
+	return Normpath(p)
+}
+
+// Realpath は os.path.realpath（strict でない）。無い名前から先は書かれたまま足す。
+// リンクの輪はそこで解くのをやめる。
+func Realpath(p string) string {
+	if windows {
+		return realpathWindows(p)
+	}
+	rest := reversed(strings.Split(p, "/"))
+	count := len(rest)
+	path := "/"
+	if !strings.HasPrefix(p, "/") {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return Abspath(p)
+		}
+		path = cwd
+	}
+	// rest の中の nil の印は「この名前のリンクを解き終えた」を表す。
+	type item struct {
+		name string
+		mark bool
+	}
+	stack := make([]item, 0, len(rest))
+	for _, r := range rest {
+		stack = append(stack, item{name: r})
+	}
+	seen := map[string]*string{}
+	for count > 0 {
+		top := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if top.mark {
+			link := stack[len(stack)-1].name
+			stack = stack[:len(stack)-1]
+			resolved := path
+			seen[link] = &resolved
+			continue
+		}
+		count--
+		name := top.name
+		if name == "" || name == "." {
+			continue
+		}
+		if name == ".." {
+			i := strings.LastIndex(path, "/")
+			path = path[:i]
+			if path == "" {
+				path = "/"
+			}
+			continue
+		}
+		newpath := path + "/" + name
+		if path == "/" {
+			newpath = path + name
+		}
+		info, err := os.Lstat(newpath)
+		if err != nil || info.Mode()&os.ModeSymlink == 0 {
+			path = newpath
+			continue
+		}
+		if done, ok := seen[newpath]; ok {
+			if done != nil {
+				path = *done
+			} else {
+				path = newpath
+			}
+			continue
+		}
+		target, err := os.Readlink(newpath)
+		if err != nil {
+			path = newpath
+			continue
+		}
+		if strings.HasPrefix(target, "/") {
+			path = "/"
+		}
+		seen[newpath] = nil
+		stack = append(stack, item{name: newpath}, item{mark: true})
+		parts := reversed(strings.Split(target, "/"))
+		for _, t := range parts {
+			stack = append(stack, item{name: t})
+		}
+		count += len(parts)
+	}
+	return path
+}
+
+// realpathWindows は在る部分までを EvalSymlinks で解き、無い残りを足す（ntpath.realpath の近似）。
+func realpathWindows(p string) string {
+	abs := Abspath(p)
+	head, tail := abs, ""
+	for {
+		if resolved, err := filepath.EvalSymlinks(head); err == nil {
+			if tail == "" {
+				return resolved
+			}
+			return Join(resolved, tail)
+		}
+		parent := filepath.Dir(head)
+		if parent == head {
+			return abs
+		}
+		name := filepath.Base(head)
+		if tail == "" {
+			tail = name
+		} else {
+			tail = Join(name, tail)
+		}
+		head = parent
+	}
+}
+
+func reversed(s []string) []string {
+	out := make([]string, len(s))
+	for i, v := range s {
+		out[len(s)-1-i] = v
+	}
+	return out
+}
+
+// Relpath は os.path.relpath。Windows で別のドライブのときは false。
+func Relpath(path, start string) (string, bool) {
+	rel, err := filepath.Rel(Abspath(start), Abspath(path))
+	return rel, err == nil
+}
+
+// Exists は os.path.exists（リンクは先を見る）。
+func Exists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
+}
+
+// Lexists は os.path.lexists。
+func Lexists(p string) bool {
+	_, err := os.Lstat(p)
+	return err == nil
+}
+
+// IsFile は os.path.isfile。
+func IsFile(p string) bool {
+	info, err := os.Stat(p)
+	return err == nil && info.Mode().IsRegular()
+}
+
+// IsDir は os.path.isdir。
+func IsDir(p string) bool {
+	info, err := os.Stat(p)
+	return err == nil && info.IsDir()
+}
+
+// IsSpace は Python の str.isspace の 1 文字版。Go の unicode.IsSpace に無い U+001C〜U+001F も空白に数える。
+func IsSpace(r rune) bool {
+	return unicode.IsSpace(r) || (r >= 0x1c && r <= 0x1f)
+}
+
+// Strip は引数なしの str.strip()。
+func Strip(s string) string {
+	return strings.TrimFunc(s, IsSpace)
+}
+
+// ReadText は open(path, encoding="utf-8").read()。UTF-8 でなければ失敗にする
+// （Python の UnicodeDecodeError）。改行の "\r\n" と "\r" は "\n" にそろえる（テキストモード）。
+func ReadText(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	if !utf8.Valid(data) {
+		return "", errNotUTF8{path}
+	}
+	text := strings.ReplaceAll(string(data), "\r\n", "\n")
+	return strings.ReplaceAll(text, "\r", "\n"), nil
+}
+
+type errNotUTF8 struct{ path string }
+
+func (e errNotUTF8) Error() string { return e.path + ": UTF-8 として読めない" }
+
+// Splitlines は str.splitlines()。行の区切りは Python と同じ集合で、区切り自体は残さない。
+func Splitlines(s string) []string {
+	var lines []string
+	start := 0
+	for i := 0; i < len(s); {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		switch r {
+		case '\n', '\v', '\f', 0x1c, 0x1d, 0x1e, 0x85, 0x2028, 0x2029:
+			lines = append(lines, s[start:i])
+			start = i + size
+		case '\r':
+			lines = append(lines, s[start:i])
+			if i+1 < len(s) && s[i+1] == '\n' {
+				size = 2
+			}
+			start = i + size
+		}
+		i += size
+	}
+	if start < len(s) {
+		lines = append(lines, s[start:])
+	}
+	return lines
+}
