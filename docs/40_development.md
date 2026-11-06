@@ -36,6 +36,7 @@ ccnavi 自身を開発する人向けの入口である。使う人向けの手�
 | 実行ファイルの組み立てと配布物、配布する sh の確かめ方 | [組み立てと配布物](../.agents/docs/build-and-dist.md) |
 | 作業の決まり（`.ccnavi/CCNAVI.md`）に条件を足す | [作業の決まりに条件を足す](../.agents/docs/ccnavimd-conditions.md) |
 | 環境の版、環境固有の落とし穴 | [実行環境とADRの扱い](../.agents/docs/environment.md) |
+| 実行ファイルを Go に書き直す作業の決まりと進み具合 | [実行ファイルをGoに書き直す](../.agents/docs/go-rewrite.md) |
 
 ## 開発環境
 
@@ -48,6 +49,7 @@ uv run --with ruff ruff check .                    # 静的検査
 uv run --with ruff ruff format .                   # 整形
 uv run --with ruff ruff format --check .           # 整形の確認だけ
 uv run --with pyinstaller python build.py          # 実行ファイルの組み立て
+cd go && go vet ./... && go test ./...             # Go に書き直している実行ファイルの検査とテスト
 ```
 
 - テストは `python -m tests` か `python -m unittest` で回す。ファイルを直接実行すると `tests` パッケージを import できずに失敗する。全件の回し方と、回すグループの決め方は[ccnaviのPythonのテストを回す](../.agents/docs/testing.md)にある
@@ -70,6 +72,7 @@ echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command"
 | 場所 | 中身 |
 |---|---|
 | `src/ccnavi/` | 実行ファイルのソース。サブパッケージは役割ごとに 7 つ |
+| `go/` | Go に書き直している実行ファイル（`internal/` に段ごとのパッケージ、`cmd/ccnavi/` に入口）。移し終えるまでは配らない（[実行ファイルをGoに書き直す](../.agents/docs/go-rewrite.md)） |
 | `main.py`・`build.py` | 配布物の入口（PyInstaller に渡すスクリプト）と、配布物の組み立て |
 | `pyproject.toml`・`uv.lock` | Python のプロジェクト設定と、依存の固定 |
 | `tests/` | テスト。グループごとのディレクトリに分ける（グループは[ccnaviのPythonのテストを回す](../.agents/docs/testing.md)で決める）。入口の標準入出力・終了コード・ファイルだけを見る受入テスト（`guard`・`sh`・`e2e` が中心）と、`ccnavi` の部品を直接呼ぶ単体テスト（`core`・`ticket` に多い）が混在する。GitLab の模擬と契約テスト（`contract/`）、受入シナリオ（`scenarios/`）、手動の道具（`manual/`）、テスト用の見本（`fixtures/`）もここにある |
@@ -84,4 +87,4 @@ echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command"
 | `README.md`・`AGENTS.md`・`CLAUDE.md` | 利用者向けの入口、開発者のエージェント向けの決まり、`AGENTS.md` を読み込ませる 1 行 |
 | `wip/` | 作業ブランチで使う下書きの置き場。main には入れない（`.github` の CI と `scripts/ccnavi-check-no-wip.sh` が、main へ入れる PR の差分を見る） |
 
-git 管理外のもの: `dist/`・`build/`（組み立ての出力）、`logs/`（記録。絶対パスとコマンド全文が入るのでコミットしない）、`knowledge/`（参照専用の資料。Claude Code の hook にまつわる実測）、`.venv/`、`projects/`、`scratchpad/`。
+git 管理外のもの: `dist/`・`build/`・`go/ccnavi`（組み立ての出力）、`logs/`（記録。絶対パスとコマンド全文が入るのでコミットしない）、`knowledge/`（参照専用の資料。Claude Code の hook にまつわる実測）、`.venv/`、`projects/`、`scratchpad/`。
