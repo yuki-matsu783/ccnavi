@@ -32,7 +32,7 @@ messages:
     kind: deny
     values: [ticket, area, worktree, type_title, type_id, scope]
     what: |-
-      This path is inside the work area that ticket {ticket} declares ({area}) for worktree {worktree}, but outside what phase type {type_title} ({type_id}) allows ({scope}). The ticket was approved with that overflow shown as a warning; writes there stay blocked. Send the output to a path that type covers, do the work in a later phase whose type covers this path, or ask the user to change the definition fixed in the parent's approved ticket (its `phases:`); editing phases.yml does not reach a parent that is already approved.
+      This path is inside the work area that ticket {ticket} declares ({area}) for worktree {worktree}, but outside what phase type {type_title} ({type_id}) allows ({scope}). The ticket was approved with that overflow shown as a warning; writes there stay blocked. Send the output to a path that type covers, do the work in a later phase whose type covers this path, or ask the user to change the definition fixed in the parent's approved ticket (its `phases:`); editing phases.yml does not reach a parent that is already approved. Raise it before `finish`: the parent consults the user first (add a child to the same phase, or revise the parent's plan).
 
   RULE_TICKET_SCOPE__PARENT:
     kind: deny
