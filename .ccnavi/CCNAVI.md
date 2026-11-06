@@ -38,7 +38,7 @@
 <!-- ccnavi:if tickets -->
   - 承認済みチケットの状態は、ファイルを読んで推測せず {{ticket_sh}} status [<親>] で確かめる。
 <!-- ccnavi:endif -->
-- サブエージェントに子の作業を任せるときは、プロンプトに担当の子の識別子を 1 つだけ書く（他の子やパスは書かず、isolation は使わない）。範囲とフローの案内は ccnavi が書き足す。
+- サブエージェントに子の作業を任せるときは、Agent の description（作業名の欄）に担当の子の識別子を 1 つだけ書く（他の子は書かず、isolation は使わない）。ccnavi は description だけで担当を決め、範囲とフローの案内をプロンプトに書き足す。
 <!-- ccnavi:if docs -->
   - 詳しい決まりは案内の --docs で、--keyword <語> を付けて引く。
 <!-- ccnavi:endif -->

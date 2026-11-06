@@ -1,27 +1,27 @@
 """サブエージェントの起動（Agent・Task の PreToolUse）で、担当を決める。
 
-プロンプトの言及（子の識別子、`.claude/worktrees/` のパス）から担当を決め、決まらないときは止め、
-決まったときは担当の案内をプロンプトに書き足す（`hook.agentlaunch`）。
+`description`（短い作業名）の言及（承認済みの子の識別子、ccnavi のツリーに認識された
+ワークツリーの名前）だけから担当を決め、決まらないときは止め、決まったときは担当の案内をプロンプトに書き足す
+（`hook.agentlaunch`）。プロンプトは読まない。
 
 作業場所（cwd）の注入は、実測で効かなかったので行わない（`agentlaunch.INJECT_CWD`）。返すのは
 `updatedInput.prompt` で、`permissionDecision` は付けない。
 
-1. 子の識別子 → 案内が書き足される（Agent と Task の両方）
-2. 同じ子を識別子とパスの両方で書く → 1 つにまとまる
+1. 子の識別子 → 案内が書き足される（Agent と Task の両方）。プロンプトだけの言及は担当にしない
+2. 直接作業のワークツリーの名前も担当になる
 3. 違う担当が 2 つ以上 → `DENY_AGENT_MULTI_TARGET`
 4. 言及に数えないもの
 5. 親のワークツリーから、言及なしで編集する種類を起こす → `DENY_AGENT_NO_CHILD`
 6. isolation → `DENY_AGENT_ISOLATION`（チケット制御が無効でも、dry-run でも。disable では通す）
 7. 担当にできない子 → `DENY_AGENT_CHILD_UNAVAILABLE`
-8. 担当にできない子のワークツリーのパスは、直接作業として扱い直さない
-9. 無効なパス → `DENY_AGENT_TARGET_INVALID`
-10. 親のワークツリー → `DENY_AGENT_PARENT_TREE`
-11. レビュー待ちの止めが先に効く
-12. 既にある cwd → `DENY_AGENT_CWD_CONFLICT`
-13. 既存の判定との合成
-14. チケット制御が無効のとき
-15. 入れ子
-16. 案内の組み立て（偽の囲み、上限）
+8. 親のワークツリーの名前 → `DENY_AGENT_PARENT_TREE`
+9. プロンプトの別のワークツリー名・パス・案内の囲みは担当を増やさず、再送でも案内は 1 つ
+10. レビュー待ちの止めが先に効く
+11. 既にある cwd → `DENY_AGENT_CWD_CONFLICT`
+12. 既存の判定との合成
+13. チケット制御が無効のとき
+14. 入れ子
+15. 案内の組み立て（偽の囲み、上限）
 """
 
 from __future__ import annotations
@@ -134,9 +134,13 @@ class AssignmentTest(LaunchHarness):
         child_tree = self.one_child()
         for tool in TOOLS:
             with self.subTest(tool=tool):
-                prompt = f"{CHILD} の調査をする"
+                prompt = "調査をする"
                 out = self.call(
-                    self.root, tool, description="調査", prompt=prompt, subagent_type="Explore"
+                    self.root,
+                    tool,
+                    description=f"{CHILD} の調査",
+                    prompt=prompt,
+                    subagent_type="Explore",
                 )
                 new = self.updated(out)
                 self.assertTrue(new["prompt"].startswith(prompt))
@@ -147,105 +151,75 @@ class AssignmentTest(LaunchHarness):
                 self.assertIn("Bash の cd はコマンドをまたいで続かない", new["prompt"])
                 self.assertIn(agentlaunch.GUIDE_CLOSE, new["prompt"])
                 # 起動の他の欄は元のまま。cwd は注入しない（実測で効かなかった）。
-                self.assertEqual(new["description"], "調査")
+                self.assertEqual(new["description"], f"{CHILD} の調査")
                 self.assertEqual(new["subagent_type"], "Explore")
                 self.assertNotIn("cwd", new)
 
-    def test_the_same_child_by_identifier_and_by_path_is_one_target(self):
+    def test_the_prompt_alone_does_not_decide_the_target(self):
         child_tree = self.one_child()
-        out = self.call(
-            self.root,
-            description="d",
-            prompt=f"{CHILD} を、{child_tree} で実装する",
-        )
-        prompt = self.updated(out)["prompt"]
-        self.assertEqual(prompt.count(agentlaunch.GUIDE_OPEN), 1)
-        self.assertEqual(prompt.count(f"担当の子: {CHILD}"), 1)
+        out = self.call(self.root, description="d", prompt=f"{CHILD} を、{child_tree} で実装する")
+        self.assertEqual(out, {})
 
-    def test_a_child_path_alone_is_a_target(self):
-        child_tree = self.one_child()
-        out = self.call(self.root, description="d", prompt=f"{child_tree} で実装する")
-        self.assertIn(f"担当の子: {CHILD}", self.updated(out)["prompt"])
-        # 相対の書き方（ワークスペースルートから）でも同じ
-        out = self.call(self.root, description="d", prompt=f".claude/worktrees/{CHILD}/ で実装する")
-        self.assertIn(f"担当の子: {CHILD}", self.updated(out)["prompt"])
+    def test_a_direct_worktree_name_is_a_target(self):
+        direct = self.worktree("direct-a", "main")
+        out = self.call(self.root, description="direct-a の作業", prompt="直す")
+        prompt = self.updated(out)["prompt"]
+        self.assertIn("担当: 直接作業のワークツリー direct-a", prompt)
+        self.assertIn(direct, prompt)
 
     def test_two_targets_are_refused(self):
-        a, b = self.two_children()
-        direct = self.worktree("direct-a", "main")
-        direct2 = self.worktree("direct-b", "main")
+        self.two_children()
+        self.worktree("direct-a", "main")
+        self.worktree("direct-b", "main")
         cases = {
             "two children": f"{CHILD} と {CHILD2} を並行で",
-            "child and a direct worktree": f"{CHILD} と {direct} で",
-            "two direct worktrees": f"{direct} と {direct2} で",
-            "a child by path and another by identifier": f"{a} と {CHILD2}",
+            "child and a direct worktree": f"{CHILD} と direct-a で",
+            "two direct worktrees": "direct-a と direct-b で",
         }
-        for name, prompt in cases.items():
+        for name, description in cases.items():
             for tool in TOOLS:
                 with self.subTest(name=name, tool=tool):
-                    out = self.call(self.root, tool, description="d", prompt=prompt)
+                    out = self.call(self.root, tool, description=description, prompt="直す")
                     self.assert_stopped(out, "DENY_AGENT_MULTI_TARGET")
                     self.assertIn("1 体に 1 つ", out["permissionDecisionReason"])
-        self.assertTrue(b)
 
     def test_a_negative_mention_still_counts(self):
         self.two_children()
-        out = self.call(self.root, description="d", prompt=f"{CHILD2} には触れず、{CHILD} を直す")
+        out = self.call(self.root, description=f"{CHILD2} には触れず、{CHILD} を直す", prompt="p")
         self.assert_stopped(out, "DENY_AGENT_MULTI_TARGET")
         self.assertIn("担当以外", out["permissionDecisionReason"])
 
     def test_what_does_not_count_as_a_mention(self):
         self.one_child()
-        # 長い別の識別子の一部、親の識別子
-        for prompt in (
-            f"{CHILD}-extra を調べる",
-            f"x-{CHILD} を調べる",
-            f"{PARENT} の全体を調べる",
-        ):
-            with self.subTest(prompt=prompt):
-                self.assertEqual(self.call(self.root, description="d", prompt=prompt), {})
+        # 長い別の識別子の一部
+        for description in (f"{CHILD}-extra を調べる", f"x-{CHILD} を調べる"):
+            with self.subTest(description=description):
+                self.assertEqual(self.call(self.root, description=description, prompt="p"), {})
         # 承認されていない提案の識別子
         self.propose("i0001-01-09", child_text("i0001-01-09", PARENT, 1, RESEARCH))
-        out = self.call(self.root, description="d", prompt="i0001-01-09 を調べる")
+        out = self.call(self.root, description="i0001-01-09 を調べる", prompt="p")
         self.assertEqual(out, {})
-        # 親 P の子 C を担当する → 子 C だけの言及
-        out = self.call(self.root, description="d", prompt=f"親 {PARENT} の子 {CHILD} を担当する")
-        self.assertIn(f"担当の子: {CHILD}", self.updated(out)["prompt"])
 
     def test_identifiers_are_matched_ignoring_case(self):
         self.one_child()
-        out = self.call(self.root, description="d", prompt=f"{CHILD.upper()} を直す")
+        out = self.call(self.root, description=f"{CHILD.upper()} を直す", prompt="p")
         self.assertIn(f"担当の子: {CHILD}", self.updated(out)["prompt"])
 
 
 class MentionEdgeTest(LaunchHarness):
     def test_a_sentence_ending_dot_does_not_hide_a_second_target(self):
         self.two_children()
-        for prompt in (f"{CHILD} と {CHILD2}.", f"{CHILD}. と {CHILD2}"):
-            with self.subTest(prompt=prompt):
-                out = self.call(self.root, description="d", prompt=prompt)
+        for description in (f"{CHILD} と {CHILD2}.", f"{CHILD}. と {CHILD2}"):
+            with self.subTest(description=description):
+                out = self.call(self.root, description=description, prompt="p")
                 self.assert_stopped(out, "DENY_AGENT_MULTI_TARGET")
         # 識別子の文字が続くものは、別の識別子の一部のまま数えない
-        out = self.call(self.root, description="d", prompt=f"{CHILD}.x と {CHILD2}_x")
+        out = self.call(self.root, description=f"{CHILD}.x と {CHILD2}_x", prompt="p")
         self.assertEqual(out, {})
-
-    def test_many_paths_are_refused_without_checking_each(self):
-        self.one_child()
-        words = " ".join(f".claude/worktrees/n{i}" for i in range(agentlaunch.MAX_PATHS + 5))
-        out = self.call(self.root, description="d", prompt=words)
-        self.assert_stopped(out, "DENY_AGENT_TARGET_INVALID")
-        self.assertIn("多すぎます", out["permissionDecisionReason"])
-
-    def test_the_refusal_text_stays_short(self):
-        self.one_child()
-        huge = ".claude/worktrees/" + "a" * 200000
-        out = self.call(self.root, description="d", prompt=huge)
-        self.assert_stopped(out, "DENY_AGENT_TARGET_INVALID")
-        self.assertLess(len(out["permissionDecisionReason"]), 2000)
 
     def test_a_cwd_that_is_not_a_string_conflicts(self):
         self.one_child()
-        out = self.call(self.root, description="d", prompt=f"{CHILD} を直す", cwd=["x"])
+        out = self.call(self.root, description=f"{CHILD} を直す", prompt="p", cwd=["x"])
         self.assert_stopped(out, "DENY_AGENT_CWD_CONFLICT")
 
     def test_stripping_does_not_leave_a_rebuilt_close(self):
@@ -268,13 +242,11 @@ class ParentTreeTest(LaunchHarness):
         out = self.call(self.parent_tree, description="d", prompt="調べる", subagent_type="Explore")
         self.assertEqual(out, {})
 
-    def test_the_parent_worktree_path_is_refused(self):
+    def test_the_parent_worktree_name_is_refused(self):
         self.one_child()
-        out = self.call(self.root, description="d", prompt=f"{self.parent_tree} で作業する")
+        out = self.call(self.root, description=f"{PARENT} で作業する", prompt="p")
         self.assert_stopped(out, "DENY_AGENT_PARENT_TREE")
         self.assertIn("子の識別子", out["permissionDecisionReason"])
-        out = self.call(self.root, description="d", prompt=f"{PARENT}-wt {self.parent_tree}")
-        self.assert_stopped(out, "DENY_AGENT_PARENT_TREE")
 
 
 class IsolationTest(LaunchHarness):
@@ -325,7 +297,7 @@ class AvailabilityTest(LaunchHarness):
     def test_each_reason_for_an_unavailable_child_is_named(self):
         self.open_family(["research", "design"], [(CHILD, 1, RESEARCH)])
         # 未着手（ワークツリーも無い）: 着手の案内がある
-        out = self.call(self.root, description="d", prompt=f"{CHILD} を直す")
+        out = self.call(self.root, description=f"{CHILD} を直す", prompt="p")
         self.assert_stopped(out, "DENY_AGENT_CHILD_UNAVAILABLE")
         text = out["permissionDecisionReason"]
         self.assertIn("未着手", text)
@@ -334,38 +306,32 @@ class AvailabilityTest(LaunchHarness):
 
     def test_a_started_child_without_a_worktree_says_start(self):
         child_tree = self.one_child()
-        # ワークツリーを消す（識別子だけ書いた回）
         self.git_remove(child_tree)
-        out = self.call(self.root, description="d", prompt=f"{CHILD} を直す")
+        out = self.call(self.root, description=f"{CHILD} を直す", prompt="p")
         self.assert_stopped(out, "DENY_AGENT_CHILD_UNAVAILABLE")
         text = out["permissionDecisionReason"]
         self.assertIn("ワークツリーがありません", text)
         self.assertIn(f"start {CHILD}", text)
-        # 登録の無いパスだけを書いたときは TARGET_INVALID
-        out = self.call(self.root, description="d", prompt=".claude/worktrees/gone/ を直す")
-        self.assert_stopped(out, "DENY_AGENT_TARGET_INVALID")
 
     def git_remove(self, path):
         from tests.ticket.test_ticket import git
 
         git(self.root, "worktree", "remove", "--force", path)
 
-    def test_a_blocked_child_is_not_a_target_even_by_its_worktree_path(self):
+    def test_a_blocked_child_is_not_a_target(self):
         self.open_family(PARALLEL, [(CHILD, 1, RESEARCH), (CHILD2, 2, DESIGN)])
-        tree2 = self.worktree(CHILD2, PARENT)
+        self.worktree(CHILD2, PARENT)
         copy = os.path.join(self.approved, "doing", f"{CHILD2}.md")
         with open(copy, encoding="utf-8") as f:
             text = f.read()
         # 着手していないのに基準点がある形は、判定が信頼しない（blocked）
         write(copy, text.replace('base_sha: ""', "base_sha: abc123"))
-        for prompt in (f"{CHILD2} を直す", f"{tree2} を直す"):
-            with self.subTest(prompt=prompt):
-                out = self.call(self.root, description="d", prompt=prompt)
-                self.assert_stopped(out, "DENY_AGENT_CHILD_UNAVAILABLE")
-                self.assertIn("blocked", out["permissionDecisionReason"])
-                # 直接作業として扱い直さない（案内も cwd も付かない）
-                self.assertNotIn("直接作業", out["permissionDecisionReason"])
-                self.assertNotIn("ccnavi-ticket.sh", out["permissionDecisionReason"])
+        out = self.call(self.root, description=f"{CHILD2} を直す", prompt="p")
+        self.assert_stopped(out, "DENY_AGENT_CHILD_UNAVAILABLE")
+        self.assertIn("blocked", out["permissionDecisionReason"])
+        # 直接作業として扱い直さない（案内も cwd も付かない）
+        self.assertNotIn("直接作業", out["permissionDecisionReason"])
+        self.assertNotIn("ccnavi-ticket.sh", out["permissionDecisionReason"])
 
     def test_closed_and_review_waiting_children_have_their_own_reasons(self):
         base = ticket_model.Ticket(ticket="x", parent=PARENT, started_at="t")
@@ -381,70 +347,40 @@ class AvailabilityTest(LaunchHarness):
         self.assertIn("なぜか", agentlaunch.unavailable(None, "", target))
 
 
-class InvalidPathTest(LaunchHarness):
-    def test_each_kind_of_bad_path_is_named(self):
-        child_tree = self.one_child()
-        plain = os.path.join(self.root, ".claude", "worktrees", "plain")
-        os.makedirs(plain)
-        link = os.path.join(self.root, ".claude", "worktrees", "link")
-        try:
-            os.symlink(child_tree, link)
-        except (OSError, NotImplementedError):
-            link = ""
-        other = os.path.join("/tmp", "elsewhere-ws", ".claude", "worktrees", "plain")
-        cases = {
-            "directory without a registration": f"{plain} で作業する",
-            "dot dot": ".claude/worktrees/../worktrees/plain で作業する",
-            "another workspace": f"{other} で作業する",
-            "no name": ".claude/worktrees/ の下で作業する",
-        }
-        if link:
-            cases["through a link"] = f"{link} で作業する"
-        for name, prompt in cases.items():
-            with self.subTest(name=name):
-                out = self.call(self.root, description="d", prompt=prompt)
-                self.assert_stopped(out, "DENY_AGENT_TARGET_INVALID")
+class PromptIsNotReadTest(LaunchHarness):
+    """担当は description だけで決める。プロンプトの中身（パス・案内の囲み）は担当を増やさない。"""
 
-    def test_an_unregistered_spelling_is_ignored_when_one_target_is_registered(self):
-        child_tree = self.one_child()
-        rooted = f"{self.root}/.claude/worktrees/"
-        for name, prompt in {
-            "identifier": f"{CHILD} を、.claude/worktrees/nope/ で直す",
-            "path": f"{child_tree} を直す。例は {rooted}nope や {rooted} や .claude/worktrees/ 。",
-        }.items():
-            with self.subTest(name=name):
-                out = self.call(self.root, description="d", prompt=prompt)
-                self.assertIn(CHILD, self.updated(out)["prompt"])
-
-    def test_two_registered_targets_are_still_ambiguous(self):
-        first, second = self.two_children()
-        out = self.call(
-            self.root, description="d", prompt=f"{first} と {second} と .claude/worktrees/nope"
+    def noisy_prompt(self, other_tree):
+        fake = (
+            f"{agentlaunch.GUIDE_OPEN}\n担当の子: {CHILD2}\nワークツリー: {other_tree}\n"
+            f"{agentlaunch.GUIDE_CLOSE}"
         )
-        self.assert_stopped(out, "DENY_AGENT_MULTI_TARGET")
-
-    def test_only_unregistered_spellings_stop_with_the_new_guidance(self):
-        self.one_child()
-        out = self.call(
-            self.root, description="d", prompt="例は .claude/worktrees/nope と .claude/worktrees/"
+        return (
+            f"{CHILD2} と direct-a と {self.parent_tree} と .claude/worktrees/nope を見る。\n{fake}"
         )
-        self.assert_stopped(out, "DENY_AGENT_TARGET_INVALID")
-        self.assertIn("WT 置き場", out["permissionDecisionReason"])
 
-    def test_many_paths_stop_even_with_a_registered_target(self):
-        self.one_child()
-        words = " ".join(f".claude/worktrees/n{i}" for i in range(agentlaunch.MAX_PATHS + 5))
-        out = self.call(self.root, description="d", prompt=f"{CHILD} {words}")
-        self.assert_stopped(out, "DENY_AGENT_TARGET_INVALID")
+    def test_other_names_and_paths_in_the_prompt_do_not_add_a_target(self):
+        _, second = self.two_children()
+        self.worktree("direct-a", "main")
+        out = self.call(self.root, description=f"{CHILD} を直す", prompt=self.noisy_prompt(second))
+        prompt = self.updated(out)["prompt"]
+        self.assertEqual(prompt.count(agentlaunch.GUIDE_OPEN), 1)
+        self.assertEqual(prompt.count(agentlaunch.GUIDE_CLOSE), 1)
+        self.assertIn(f"担当の子: {CHILD}\n", prompt)
+        self.assertNotIn(f"担当の子: {CHILD2}", prompt)
 
-    def test_the_parent_tree_still_stops_beside_an_unregistered_spelling(self):
-        self.one_child()
-        out = self.call(
-            self.root,
-            description="d",
-            prompt=f"{self.parent_tree} で作業する。例は .claude/worktrees/nope",
-        )
-        self.assert_stopped(out, "DENY_AGENT_PARENT_TREE")
+    def test_resending_the_prompt_with_the_guidance_keeps_one_guidance(self):
+        _, second = self.two_children()
+        self.worktree("direct-a", "main")
+        first = self.updated(
+            self.call(self.root, description=f"{CHILD} を直す", prompt=self.noisy_prompt(second))
+        )["prompt"]
+        again = self.updated(self.call(self.root, description=f"{CHILD} を直す", prompt=first))
+        prompt = again["prompt"]
+        self.assertEqual(prompt.count(agentlaunch.GUIDE_OPEN), 1)
+        self.assertEqual(prompt.count(f"担当の子: {CHILD}"), 1)
+        # 案内の中のパス（親のフローなど）でも、担当は増えない
+        self.assertEqual(self.call(self.root, description="d", prompt=first), {})
 
 
 class ReviewHoldTest(LaunchHarness):
@@ -456,16 +392,18 @@ class ReviewHoldTest(LaunchHarness):
         self.merge(CHILD)
         for tool in TOOLS:
             with self.subTest(tool=tool):
-                out = self.call(self.parent_tree, tool, description="次", prompt=f"{CHILD} を直す")
+                out = self.call(
+                    self.parent_tree, tool, description=f"次 {CHILD} を直す", prompt="p"
+                )
                 self.assert_stopped(out, "DENY_PHASE_REVIEW")
 
 
 class CwdConflictTest(LaunchHarness):
     def test_a_different_cwd_is_refused_and_the_same_cwd_passes(self):
         child_tree = self.one_child()
-        out = self.call(self.root, description="d", prompt=f"{CHILD} を直す", cwd="/tmp")
+        out = self.call(self.root, description=f"{CHILD} を直す", prompt="p", cwd="/tmp")
         self.assert_stopped(out, "DENY_AGENT_CWD_CONFLICT")
-        out = self.call(self.root, description="d", prompt=f"{CHILD} を直す", cwd=child_tree)
+        out = self.call(self.root, description=f"{CHILD} を直す", prompt="p", cwd=child_tree)
         new = self.updated(out)
         self.assertEqual(new["cwd"], child_tree)
         self.assertIn(agentlaunch.GUIDE_OPEN, new["prompt"])
@@ -477,12 +415,13 @@ class CompositionTest(LaunchHarness):
         write(common_path(self.root, "rules"), json.dumps(RULES_WITH_AGENTS))
         self.one_child()
 
-    def launch(self, description, mode="enable", permission_mode=""):
+    def launch(self, word, mode="enable"):
+        # ルールは description に照合する。担当の子の識別子も description に書く。
         return self.call(
             self.root,
             mode=mode,
-            description=description,
-            prompt=f"{CHILD} を直す",
+            description=f"{CHILD} {word}",
+            prompt="直す",
             subagent_type="general-purpose",
         )
 
@@ -490,7 +429,7 @@ class CompositionTest(LaunchHarness):
         out = self.launch("allowed")
         new = self.updated(out)
         self.assertIn(f"担当の子: {CHILD}", new["prompt"])
-        self.assertEqual(new["description"], "allowed")
+        self.assertEqual(new["description"], f"{CHILD} allowed")
 
     def test_no_rule_hands_over_with_the_update_and_no_decision(self):
         out = self.launch("unlisted")
@@ -521,43 +460,37 @@ class CompositionTest(LaunchHarness):
     def test_the_task_tool_meets_the_same_rules(self):
         """Task は Agent と同じく description を対象にルールがヒットする
         （判定に届かずに通らない）。"""
-        out = self.call(self.root, "Task", description="denied", prompt=f"{CHILD} を直す")
+        out = self.call(self.root, "Task", description=f"{CHILD} denied", prompt="直す")
         self.assertEqual(out.get("permissionDecision"), "deny", out)
-        out = self.call(self.root, "Task", description="asked", prompt=f"{CHILD} を直す")
+        out = self.call(self.root, "Task", description=f"{CHILD} asked", prompt="直す")
         self.assertEqual(out.get("permissionDecision"), "ask", out)
 
     def test_the_rules_see_the_original_input(self):
         # 書き足した案内の語（「担当」「ワークツリー」）が description のルールの照合に混ざらない。
         out = self.launch("allowed")
-        self.assertEqual(out["updatedInput"]["description"], "allowed")
+        self.assertEqual(out["updatedInput"]["description"], f"{CHILD} allowed")
 
 
 class TicketControlOffTest(LaunchHarness):
     OFF = ("--ticket-control", "disable")
 
-    def test_identifiers_are_ignored_and_a_valid_path_changes_nothing(self):
+    def test_identifiers_are_ignored_and_a_direct_worktree_changes_nothing(self):
         self.one_child()
-        direct = self.worktree("direct-a", "main")
+        self.worktree("direct-a", "main")
         self.assertEqual(
-            self.call(self.root, extra=self.OFF, description="d", prompt=f"{CHILD} を直す"), {}
+            self.call(self.root, extra=self.OFF, description=f"{CHILD} を直す", prompt="p"), {}
         )
-        out = self.call(self.root, extra=self.OFF, description="d", prompt=f"{direct} で直す")
+        out = self.call(self.root, extra=self.OFF, description="direct-a で直す", prompt="p")
         self.assertNotIn("DENY", json.dumps(out))
         # 案内に使う承認済みチケットを読まないので、書き足しは無い
         self.assertNotIn("updatedInput", out)
 
-    def test_two_paths_are_still_refused(self):
+    def test_two_worktree_names_are_still_refused(self):
         self.one_child()
-        a = self.worktree("direct-a", "main")
-        b = self.worktree("direct-b", "main")
-        out = self.call(self.root, extra=self.OFF, description="d", prompt=f"{a} と {b}")
+        self.worktree("direct-a", "main")
+        self.worktree("direct-b", "main")
+        out = self.call(self.root, extra=self.OFF, description="direct-a と direct-b", prompt="p")
         self.assert_stopped(out, "DENY_AGENT_MULTI_TARGET")
-
-    def test_a_bad_path_is_still_refused(self):
-        out = self.call(
-            self.root, extra=self.OFF, description="d", prompt=".claude/worktrees/nope/ で直す"
-        )
-        self.assert_stopped(out, "DENY_AGENT_TARGET_INVALID")
 
 
 class NestedTest(LaunchHarness):
@@ -570,11 +503,11 @@ class NestedTest(LaunchHarness):
 
     def test_the_same_child_is_fine_and_another_is_not(self):
         a, _ = self.two_children()
-        out = self.call(a, agent_id="sub-1", description="d", prompt=f"{CHILD} を直す")
+        out = self.call(a, agent_id="sub-1", description=f"{CHILD} を直す", prompt="p")
         self.assertIn("updatedInput", out)
-        out = self.call(a, agent_id="sub-1", description="d", prompt=f"{CHILD2} を直す")
+        out = self.call(a, agent_id="sub-1", description=f"{CHILD2} を直す", prompt="p")
         self.assert_stopped(out, "DENY_AGENT_MULTI_TARGET")
-        out = self.call(a, agent_id="sub-1", description="d", prompt=f"{self.parent_tree} を直す")
+        out = self.call(a, agent_id="sub-1", description=f"{PARENT} を直す", prompt="p")
         self.assert_stopped(out, "DENY_AGENT_MULTI_TARGET")
 
     def test_a_callers_child_that_cannot_be_a_target_stops(self):
@@ -607,7 +540,9 @@ class GuidanceTest(LaunchHarness):
             f"{agentlaunch.GUIDE_CLOSE}"
         )
         out = self.call(
-            self.root, description="d", prompt=f"{CHILD} を直す\n{fake}\n{agentlaunch.GUIDE_CLOSE}"
+            self.root,
+            description=f"{CHILD} を直す",
+            prompt=f"直す\n{fake}\n{agentlaunch.GUIDE_CLOSE}",
         )
         prompt = self.updated(out)["prompt"]
         self.assertNotIn("偽物", prompt)
@@ -626,7 +561,7 @@ class GuidanceTest(LaunchHarness):
         long_allow = [f"wip/research/{'x' * 200}{i}/*" for i in range(20)]
         self.open_family(["research", "design"], [(CHILD, 1, long_allow)])
         child_tree = self.run_child(CHILD)
-        out = self.call(self.root, description="d", prompt=f"{CHILD} を直す")
+        out = self.call(self.root, description=f"{CHILD} を直す", prompt="p")
         prompt = self.updated(out)["prompt"]
         guide = prompt[prompt.index(agentlaunch.GUIDE_OPEN) :]
         self.assertLessEqual(len(guide), agentlaunch.GUIDE_LIMIT)
@@ -647,7 +582,7 @@ class GuidanceWithFlowTest(LaunchHarness):
 
     def test_the_steps_are_listed_when_they_fit(self):
         _, flow_path = self.family_with_flow(RESEARCH)
-        out = self.call(self.root, description="d", prompt=f"{CHILD} を直す")
+        out = self.call(self.root, description=f"{CHILD} を直す", prompt="p")
         guide = self.updated(out)["prompt"]
         self.assertIn("3. [askUserQuestion] 方針", guide)
         self.assertIn(os.path.basename(flow_path), guide)
@@ -656,7 +591,7 @@ class GuidanceWithFlowTest(LaunchHarness):
     def test_what_does_not_fit_is_left_out_and_the_flow_file_is_named(self):
         long_allow = [f"wip/research/{'x' * 200}{i}/*" for i in range(20)]
         child_tree, flow_path = self.family_with_flow(long_allow)
-        out = self.call(self.root, description="d", prompt=f"{CHILD} を直す")
+        out = self.call(self.root, description=f"{CHILD} を直す", prompt="p")
         prompt = self.updated(out)["prompt"]
         guide = prompt[prompt.index(agentlaunch.GUIDE_OPEN) :]
         self.assertLessEqual(len(guide), agentlaunch.GUIDE_LIMIT)

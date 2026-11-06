@@ -1,12 +1,14 @@
 """サブエージェントの起動（Agent・Task の PreToolUse）で、担当を決める。
 
 サブエージェントの hook の cwd は、起動した瞬間のメインの cwd に固定される。そのままでは、メインが
-ワークスペースルートから任せた体に、子の範囲とフローの案内が届かない。ここでは、依頼文（プロンプト）の
-言及から担当の子（かワークツリー）を決め、決まらないときは止める理由を返し、決まったときは
-プロンプトに書き足す案内を返す。
+ワークスペースルートから任せた体に、子の範囲とフローの案内が届かない。ここでは、起動の
+`description`（短い作業名）に書かれた担当の子（またはワークツリー）から担当を決め、決まらないときは
+止める理由を返し、決まったときはプロンプトに書き足す案内を返す。
 
-- 言及は 2 種類。承認済みの子の識別子と、`.claude/worktrees/` を含むパス（`mentions`）
-- 1 つずつ検証してから担当にまとめる（`_judge`）。止める理由の優先順位は `decide` の順
+- 担当は `description` だけで決める。プロンプトは読まない。ccnavi が足した案内にはほかのワークツリー
+  （親のフローのパスなど）が入るので、プロンプトを読むと、書き換えたあとの再送で担当が増えて見える
+- 言及は、承認済みの子の識別子と、ccnavi のツリーに認識されたワークツリーの名前（`mentions`）
+- 担当にまとめてから検証する。止める理由の優先順位は `decide` の順
 - 返すのは「止める理由」か「更新の計画」だけ。応答は書かず、判定も途中で終えない
   （`judge.decide_before` が既存の判定と合成する）
 
@@ -19,9 +21,9 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from ..infra import modes, pathcase, pathsafe, settings, toolnames, tree
+from ..infra import modes, pathcase, settings, toolnames, tree
 from ..policy import texts
 from ..tickets.approval import checks as approval_checks
 from ..tickets.approval import store as approval
@@ -34,7 +36,6 @@ CODE_NO_CHILD = "DENY_AGENT_NO_CHILD"
 CODE_MULTI_TARGET = "DENY_AGENT_MULTI_TARGET"
 CODE_PARENT_TREE = "DENY_AGENT_PARENT_TREE"
 CODE_CHILD_UNAVAILABLE = "DENY_AGENT_CHILD_UNAVAILABLE"
-CODE_TARGET_INVALID = "DENY_AGENT_TARGET_INVALID"
 CODE_CWD_CONFLICT = "DENY_AGENT_CWD_CONFLICT"
 
 RULE_ISOLATION = "builtin:agent-isolation"
@@ -42,7 +43,6 @@ RULE_NO_CHILD = "builtin:agent-no-child"
 RULE_MULTI_TARGET = "builtin:agent-multi-target"
 RULE_PARENT_TREE = "builtin:agent-parent-tree"
 RULE_CHILD_UNAVAILABLE = "builtin:agent-child-unavailable"
-RULE_TARGET_INVALID = "builtin:agent-target-invalid"
 RULE_CWD_CONFLICT = "builtin:agent-cwd-conflict"
 
 # tool_input.cwd を担当のワークツリーに書き換えるか。この環境の実測（claude 2.1.309）では、
@@ -52,20 +52,13 @@ INJECT_CWD = False
 
 # 案内の長さの上限（文字）。
 GUIDE_LIMIT = 4000
-# 1 回のプロンプトから検証するパスの数の上限。
-# 止める理由にコピーする表記の長さと件数の上限も別にある。
-MAX_PATHS = 20
-MAX_SHOWN = 5
+# 止める理由に載せる表記の長さの上限。
 MAX_SHOWN_CHARS = 120
 GUIDE_OPEN = "[ccnavi] 担当の案内（ここから）"
 GUIDE_CLOSE = "[ccnavi] 担当の案内（ここまで）"
 
-# 子の識別子に使われる文字。言及は語として一致するものだけ（前後がこの文字でないこと）。
+# 識別子に使われる文字。言及は語として一致するものだけ（前後がこの文字でないこと）。
 _ID_CHARS = "A-Za-z0-9._-"
-# プロンプトを語に分ける区切り（パスの候補を拾うため）。
-_SPLIT = re.compile(r"[\s'\"`<>()（）「」『』\[\]{},、。;*：！？…]+")
-_FOLDER = ".claude/worktrees"
-_ABSOLUTE = re.compile(r"^(?:/|[A-Za-z]:[/\\])")
 
 KIND_CHILD = "child"
 KIND_PARENT = "parent"
@@ -109,29 +102,14 @@ class Result:
 
 
 @dataclass
-class Mention:
-    """プロンプトで拾った言及 1 件。text は元の表記、name は結び付く名前（識別子か名前）。"""
-
-    kind: str  # "child" か "path"
-    text: str
-    name: str = ""
-    # パスの検証の結果。空なら有効。
-    invalid: str = ""
-    worktree: tree.Tree | None = None
-    # 数え切れない（パスが多すぎる）。担当が決まっていても止める。
-    fatal: bool = False
-
-
-@dataclass
 class Target:
-    """検証を終えた担当の候補。同じワークツリーの言及は 1 つにまとまる。"""
+    """担当の候補。同じワークツリーの言及は 1 つにまとまる。"""
 
     name: str
     role: str
     worktree: tree.Tree | None
     ticket: ticket_model.Ticket | None = None
     state: str = ""
-    texts: list[str] = field(default_factory=list)
 
     @property
     def key(self) -> str:
@@ -183,9 +161,8 @@ def decide(
 
     処理フロー:
     1. 起動ツールでなければ空を返す。`isolation` の指定は値によらず止める（`_isolation`）。
-    2. プロンプトの言及を拾う（`mentions`）。cwd の所属ツリーを `tree.tree_of` で求める。
-    3. 言及を担当にまとめる（`_targets`。登録にない綴りのパスは担当にせず無視する）。
-       担当が 0 件で無効なパスがあるか、パスが多すぎるときは止める（`_target_invalid`）。
+    2. `description` の言及を拾う（`mentions`）。cwd の所属ツリーを `tree.tree_of` で求める。
+    3. 言及を担当にまとめる（`_targets`）。プロンプトは読まない。
     4. 入れ子なら呼び手の子（`_caller_child`）を足す。
     5. 担当先が 2 つ以上なら止める（`_multi_target`）。
     6. 担当先が 1 つなら、親（`_parent_tree`）・子で担当にできない（`unavailable`、
@@ -202,19 +179,14 @@ def decide(
     if "isolation" in tool_input:
         return Result(stop=_isolation(root))
 
-    prompt = payload.field_value("prompt")
     book = Book(conf, root, raw) if conf.tickets_enabled else None
-    found = mentions(conf, root, prompt, book)
     here = tree.tree_of(root, payload.cwd, conf.projects) if payload.cwd else None
 
-    # 1. 担当にできる言及が 1 つも無いのに無効なパスがあるとき、またはパスが多すぎるときは止める。
-    #    担当が決まっているなら、登録にない綴り（説明に書いた例など）は無視する。
-    targets = _targets(conf, root, found, book)
-    bad = [m for m in found if m.kind == "path" and m.invalid]
-    if bad and (not targets or any(m.fatal for m in bad)):
-        return Result(stop=_target_invalid(root, bad))
+    # 担当は description だけで決める。プロンプトは読まない（ccnavi が足した案内に入る
+    # パスなどを、担当の指定と取り違えないため）。
+    names = mentions(conf, root, payload.field_value("description"), book)
+    groups = {t.key: t for t in _targets(conf, root, names, book)}
     caller = _caller_child(book, here) if payload.agent_id and book is not None else None
-    groups = {t.key: t for t in targets}
     if caller is not None:
         # 入れ子で、呼び手の担当が子のとき。呼び手の子も 1 つの担当先として数え、違う言及があれば
         # 2 つ以上になる（2）。言及が無い・同じ子だけなら、担当先は呼び手の子になる。
@@ -244,7 +216,7 @@ def decide(
             )
             if not same:
                 return Result(stop=_cwd_conflict(root, str(given)[:MAX_SHOWN_CHARS], target))
-        return Result(plan=_plan(conf, root, prompt, target, book))
+        return Result(plan=_plan(conf, root, payload.field_value("prompt"), target, book))
 
     # 6. 言及が 0 件。親のワークツリーから、編集する種類を起こす（呼び手が子の体なら決まっている）。
     if book is not None and here is not None and not here.is_main:
@@ -262,62 +234,27 @@ def decide(
     return Result()
 
 
-def mentions(conf: settings.Settings, root: str, prompt: str, book: Book | None) -> list[Mention]:
-    """プロンプトの言及を拾う。承認済みの子の識別子と、`.claude/worktrees/` を含むパス。
+def mentions(
+    conf: settings.Settings, root: str, description: str, book: Book | None
+) -> list[str]:
+    """description に語として現れる、担当の名前。
 
-    ここでは担当にできるかを見ない。パスの検証だけは済ませて `invalid` に理由を持たせる。
-    チケット制御が無効なときは、子の識別子は拾わない。
+    名前は、承認済みの子の識別子と、ccnavi のツリーに認識されたワークツリーの名前。
+    ここでは担当にできるかを見ない。チケット制御が無効なときは、子の識別子は拾わない。
     """
-    found: list[Mention] = []
-    if book is not None:
-        for child in sorted(book.children(), key=lambda t: t.ticket):
-            if _word_in(child.ticket, prompt):
-                found.append(Mention("child", child.ticket, name=child.ticket))
-    trees = tree.worktrees(root, conf.projects) if _FOLDER.replace("/", os.sep) else []
-    tokens = _path_tokens(prompt)
-    if len(tokens) > MAX_PATHS:
-        # 数百のパスを 1 つずつ検証して期限を使い切らない。担当は 1 つだけ書く。
-        found.append(
-            Mention(
-                "path",
-                tokens[0],
-                invalid=f"パスの指定が {len(tokens)} 件あり、多すぎます（上限 {MAX_PATHS} 件）",
-                fatal=True,
-            )
-        )
-        return found
-    for text in tokens:
-        mention = Mention("path", text)
-        _check_path(root, mention, trees)
-        found.append(mention)
-    return found
+    if not description:
+        return []
+    names = [t.ticket for t in sorted(book.children(), key=lambda t: t.ticket)] if book else []
+    names += [t.name for t in tree.worktrees(root, conf.projects)]
+    return [name for name in dict.fromkeys(names) if _word_in(name, description)]
 
 
-def _word_in(ident: str, prompt: str) -> bool:
-    """識別子が語として現れるか。前後の文字が識別子に使う文字でないこと。大文字小文字は区別しない。"""
+def _word_in(ident: str, text: str) -> bool:
+    """名前が語として現れるか。前後の文字が識別子に使う文字でないこと。大文字小文字は区別しない。"""
     # 後ろは識別子の文字が続かないこと。ただし文末の `.` は識別子の一部と読まない
     # （`C-1 と C-2.` の C-2 を落として、担当が 2 つあるのを 1 つと読まないため）。
     pattern = rf"(?<![{_ID_CHARS}]){re.escape(ident)}(?![A-Za-z0-9_-])(?!\.[A-Za-z0-9_-])"
-    return re.search(pattern, prompt, re.IGNORECASE) is not None
-
-
-def _path_tokens(prompt: str) -> list[str]:
-    """プロンプトの中の、`.claude/worktrees/` を含む語。元の表記のまま、重複は 1 つにする。"""
-    out: list[str] = []
-    seen: set[str] = set()
-    for token in _SPLIT.split(prompt):
-        flat = token.replace("\\", "/")
-        at = flat.casefold().find(_FOLDER)
-        if at < 0:
-            continue
-        # `path=/abs/…` のような前置きは外す。
-        eq = token.rfind("=", 0, at)
-        text = token[eq + 1 :] if eq >= 0 else token
-        text = text.rstrip(".:!?…")
-        if text and text not in seen:
-            seen.add(text)
-            out.append(text)
-    return out
+    return re.search(pattern, text, re.IGNORECASE) is not None
 
 
 def _real(path: str) -> str:
@@ -327,80 +264,22 @@ def _real(path: str) -> str:
         return os.path.abspath(path)
 
 
-def _parts(path: str) -> list[str]:
-    return [p for p in path.replace("\\", "/").split("/") if p not in ("", ".")]
-
-
-def _lexical_rest(root: str, full: str) -> list[str] | None:
-    """`full` がルートの下なら、ルートからの残りの名前（書かれた表記のまま）。外なら None。"""
-    want = _parts(full)
-    for base in (root, _real(root)):
-        have = _parts(os.path.normpath(base))
-        if len(want) >= len(have) and all(
-            pathcase.fold(a) == pathcase.fold(b) for a, b in zip(have, want, strict=False)
-        ):
-            return want[len(have) :]
-    return None
-
-
-def _check_path(root: str, mention: Mention, trees: list[tree.Tree]) -> None:
-    """パスが、認識されたワークツリーを指すか。指さなければ理由を `invalid` に書く。"""
-    text = mention.text
-    parts = _parts(text)
-    if ".." in parts:
-        mention.invalid = "`..` を含むので指定できません"
-        return
-    full = text if _ABSOLUTE.match(text) else os.path.join(root, text)
-    rest = _lexical_rest(root, full)
-    if rest is None:
-        mention.invalid = "このワークスペースの外を指しています"
-        return
-    wanted = [".claude", "worktrees"]
-    if len(rest) < 2 or [pathcase.fold(p) for p in rest[:2]] != wanted:
-        mention.invalid = "このワークスペースの .claude/worktrees/ の下を指していません"
-        return
-    if len(rest) < 3:
-        mention.invalid = "ワークツリーの名前がありません"
-        return
-    # 途中にシンボリックリンクが無いこと。書かれたパスを辿り、実在する分だけ見る。
-    link = pathsafe.first_link(root, rest)
-    if link:
-        mention.invalid = f"途中にシンボリックリンクがあります（{os.path.basename(link)}）"
-        return
-    name = tree.nfc(rest[2])
-    for candidate in trees:
-        if pathcase.fold(candidate.name) == pathcase.fold(name):
-            mention.name, mention.worktree = candidate.name, candidate
-            return
-    mention.invalid = "ccnavi のツリーに認識されたワークツリーではありません（登録がありません）"
-
-
 def _targets(
-    conf: settings.Settings, root: str, found: list[Mention], book: Book | None
+    conf: settings.Settings, root: str, names: list[str], book: Book | None
 ) -> list[Target]:
-    """有効な言及を、ワークツリーの実体ごとにまとめる。"""
+    """名前を、ワークツリーの実体ごとにまとめる。"""
     trees = tree.worktrees(root, conf.projects)
     by_key: dict[str, Target] = {}
-    for m in found:
-        if m.kind == "path" and m.invalid:
-            continue
-        worktree = m.worktree
-        if m.kind == "child":
-            worktree = next(
-                (t for t in trees if pathcase.fold(t.name) == pathcase.fold(tree.nfc(m.name))),
-                None,
-            )
-        ticket, state = book.find(m.name) if book is not None else (None, "")
+    for name in names:
+        worktree = next(
+            (t for t in trees if pathcase.fold(t.name) == pathcase.fold(tree.nfc(name))), None
+        )
+        ticket, state = book.find(name) if book is not None else (None, "")
         role = KIND_DIRECT
         if ticket is not None:
             role = KIND_CHILD if ticket.is_child else KIND_PARENT
-        target = Target(m.name, role, worktree, ticket, state)
-        key = target.key
-        if key in by_key:
-            by_key[key].texts.append(m.text)
-        else:
-            target.texts.append(m.text)
-            by_key[key] = target
+        target = Target(name, role, worktree, ticket, state)
+        by_key.setdefault(target.key, target)
     return list(by_key.values())
 
 
@@ -411,7 +290,7 @@ def _caller_child(book: Book | None, here: tree.Tree | None) -> Target | None:
     ticket, state = book.find(here.name)
     if ticket is None or not ticket.is_child:
         return None
-    return Target(ticket.ticket, KIND_CHILD, here, ticket, state, [here.name])
+    return Target(ticket.ticket, KIND_CHILD, here, ticket, state)
 
 
 def unavailable(conf: settings.Settings, root: str, target: Target) -> str:
@@ -449,21 +328,6 @@ def _working_children(book: Book, parent: ticket_model.Ticket) -> list[ticket_mo
 
 def _isolation(root: str) -> Stop:
     return Stop(CODE_ISOLATION, RULE_ISOLATION, texts.say(root, "DENY_AGENT_ISOLATION"), modes.AUX)
-
-
-def _target_invalid(root: str, bad: list[Mention]) -> Stop:
-    items = []
-    for m in bad[:MAX_SHOWN]:
-        shown = m.text if len(m.text) <= MAX_SHOWN_CHARS else m.text[:MAX_SHOWN_CHARS] + "…"
-        items.append(f"{shown}: {m.invalid}")
-    rest = len(bad) - MAX_SHOWN
-    text = texts.say(
-        root,
-        "DENY_AGENT_TARGET_INVALID",
-        {"listed": " / ".join(items), "rest": str(max(rest, 0))},
-        {"what": "many" if rest > 0 else "few"},
-    )
-    return Stop(CODE_TARGET_INVALID, RULE_TARGET_INVALID, text, modes.AUX)
 
 
 def _multi_target(root: str, targets: list[Target], gate: bool) -> Stop:
