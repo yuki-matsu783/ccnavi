@@ -99,7 +99,7 @@ allow:
 - 大文字小文字は `glob` も `regex` も区別せずにヒットする（コマンド名も）。区別が要る部分だけ `(?-i:...)` で囲む。
   パスの文字を除外する否定（`\.[^c\\/]` など）は囲む。囲まないと大文字の側まで除外され、ヒットする範囲が変わる
 - `match` に書けるのは、判定が対象を取り出せるツールだけ。`Bash` `PowerShell`（コマンド）、
-  `Read` `Edit` `Write` `NotebookEdit`（パス）、`Grep` `Glob`（探す場所）、`Skill`（スキル名）、
+  `Read` `Edit` `MultiEdit` `Write` `NotebookEdit`（パス）、`Grep` `Glob`（探す場所）、`Skill`（スキル名）、
   `Agent`（見出し）、`WebFetch`（URL）。`Bash` のルールは `PowerShell` に及ばない。
   及ぼすなら `Bash|PowerShell`。ツールでない名前は `Stop`（メインエージェントのターンの終わり）だけで、
   `allow` に `glob: "*"` と `every: N` を添えて置く。渡す回にターンの終わりを止めて文を渡す。
