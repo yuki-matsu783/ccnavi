@@ -138,7 +138,7 @@ JSON も、同じコードをキー `code` に持つ（通れば `null`。`stopp
 #### 秘密の伏せ方
 
 `subject`・`unwrapped`・`detail` は、書く直前に秘密の形（`Authorization:` / `Cookie:` の値、`token=` / `password=` /
-`SECRET_KEY=` / `MYSQL_PWD=` などの値、`ghp_…` / `glpat-…` / `AKIA…` / `sk-…` / `AIza…` / `npm_…` / JWT などのトークン、
+`SECRET_KEY=` / `MYSQL_PWD=` / `AccountKey=` などの値（名前の長さは問わない）、`ghp_…` / `glpat-…` / `AKIA…` / `sk-…` / `AIza…` / `ya29.…` / `npm_…` / `pypi-…` / `hf_…` / `dop_v1_…` / JWT などのトークン、
 URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、redis-cli の `-a` など）を伏せる（4.7）。
 18 字未満の値は `***`、それより長い値は先頭 6 字と末尾 4 字を残す（`ghp_Ab***Q7r8`）。判定は伏せる前の文字列で下す。
 
