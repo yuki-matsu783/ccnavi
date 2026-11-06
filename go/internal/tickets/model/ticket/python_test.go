@@ -343,3 +343,41 @@ func TestPlanFieldsDefault(t *testing.T) {
 		t.Fatalf("%+v", tk)
 	}
 }
+
+const renderOracle = `
+import json, sys
+from ccnavi.tickets.model import ticket as tm
+out = []
+for text in json.load(sys.stdin):
+    t, _ = tm.parse(text)
+    out.append(None if t is None else tm.render(t))
+json.dump(out, sys.stdout, ensure_ascii=False)
+`
+
+// 書き戻した文面が Python の ticket.render と 1 字も違わないこと（承認済みチケットのバイト列になる）。
+func TestRenderMatchesPython(t *testing.T) {
+	cases := append([]string{renderSample}, parseCases...)
+	want := pyoracle.Answers[[]*string](t, "render", renderOracle, cases)
+	for i, text := range cases {
+		tk, _ := Parse(text)
+		if tk == nil {
+			if want[i] != nil {
+				t.Errorf("case %d: Go は読めない", i)
+			}
+			continue
+		}
+		got, err := Render(tk)
+		if err != nil {
+			t.Fatalf("case %d: %v", i, err)
+		}
+		if want[i] == nil || got != *want[i] {
+			t.Errorf("case %d %q\n got  %q\n want %v", i, text, got, want[i])
+		}
+	}
+}
+
+// renderSample は書き出しで形が変わる値（長い文・引用が要る文字列・日付・別名・空の列）を並べたチケット。
+const renderSample = "---\nversion: 1\nticket: i0009\nhuman_review: &hr\n  required: false\n  reason: テスト\n" +
+	"title: 'yes'\nwhen: 2026-01-02\nrationale: |\n  理由の 1 行目\n  とても長い理由の 2 行目。八十字を超えるように、同じことを何度も書いて、PyYAML が行を折るかを確かめる。\n" +
+	"allow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - {match: Bash, regex: '^git (status|diff)'}\n" +
+	"copy: *hr\npredecessors: []\nstarted_at: \"\"\nnote: \"a: b # c\"\n---\n\n本文\n"

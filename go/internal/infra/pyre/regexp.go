@@ -172,8 +172,7 @@ func (re *Regexp) Search(s string) bool {
 
 // Match は先頭から当たるか（Python の match）。
 func (re *Regexp) Match(s string) bool {
-	m := re.newMatcher([]rune(s), false, false, 0)
-	_, ok := m.try(re.prog, 0)
+	_, ok := re.MatchIn(s, 0, maxPos)
 	return ok
 }
 
@@ -184,7 +183,10 @@ func (re *Regexp) FullMatch(s string) bool {
 	return ok
 }
 
-// Found は FindAll の 1 件。位置は符号位置。
+// maxPos は endpos を文字列の終わりまでにするときに渡す値。
+const maxPos = int(^uint(0) >> 1)
+
+// Found は当たった 1 件（Python の Match）。位置は符号位置。
 type Found struct {
 	Start, End int
 	text       []rune
@@ -208,11 +210,60 @@ func (f Found) Named(name string) (string, bool) {
 	return string(f.text[s:e]), true
 }
 
-// FindAll は Python の finditer。空の一致のすぐ後ろは、空でない一致だけを採る（3.7 からの規則）。
-func (re *Regexp) FindAll(s string) []Found {
+// window は Python の pos・endpos を文字列の長さに収め、endpos で切った文字列を返す（sre と同じく、
+// 後ろは endpos で終わったものとして読み、前は pos より手前も後読みと \b が見る）。pos が endpos を
+// 越えれば偽（Python は None を返す）。
+func window(s string, pos, endpos int) ([]rune, int, bool) {
 	text := []rune(s)
+	pos = min(max(pos, 0), len(text))
+	endpos = min(max(endpos, 0), len(text))
+	if pos > endpos {
+		return nil, 0, false
+	}
+	return text[:endpos], pos, true
+}
+
+// Find は Python の search（最初に当たった所）。
+func (re *Regexp) Find(s string) (Found, bool) { return re.FindIn(s, 0, maxPos) }
+
+// FindIn は Python の search(s, pos, endpos)。位置は符号位置で、範囲の外は Python と同じく端に寄せる。
+func (re *Regexp) FindIn(s string, pos, endpos int) (Found, bool) {
+	text, pos, ok := window(s, pos, endpos)
+	if !ok {
+		return Found{}, false
+	}
+	m, ok := re.search(text, pos, false)
+	if !ok {
+		return Found{}, false
+	}
+	return Found{Start: m.start, End: m.end, text: text, marks: slices.Clone(m.marks), re: re}, true
+}
+
+// MatchIn は Python の match(s, pos, endpos)。pos から当たるか。^ と \A は pos でなく文字列の先頭にだけ当たる。
+func (re *Regexp) MatchIn(s string, pos, endpos int) (Found, bool) {
+	text, pos, ok := window(s, pos, endpos)
+	if !ok {
+		return Found{}, false
+	}
+	m := re.newMatcher(text, false, false, pos)
+	end, ok := m.try(re.prog, pos)
+	if !ok {
+		return Found{}, false
+	}
+	return Found{Start: pos, End: end, text: text, marks: m.marks, re: re}, true
+}
+
+// FindAll は Python の finditer。空の一致のすぐ後ろは、空でない一致だけを採る（3.7 からの規則）。
+func (re *Regexp) FindAll(s string) []Found { return re.FindAllIn(s, 0, maxPos) }
+
+// FindAllIn は Python の finditer(s, pos, endpos)。
+func (re *Regexp) FindAllIn(s string, pos, endpos int) []Found {
+	text, pos, ok := window(s, pos, endpos)
+	if !ok {
+		return nil
+	}
 	var out []Found
-	pos, advance := 0, false
+	advance := false
 	for pos <= len(text) {
 		m, ok := re.search(text, pos, advance)
 		if !ok {
@@ -224,6 +275,25 @@ func (re *Regexp) FindAll(s string) []Found {
 		pos = f.End
 	}
 	return out
+}
+
+// Sub は Python の re.sub(pattern, repl, s) で repl に関数を渡した形。当たった所を repl の答えに置き換える。
+// 置き換えの文字列のテンプレート（\1・\g<name>）は読まない（固定の文字列なら、それを返す関数を渡す）。
+func (re *Regexp) Sub(s string, repl func(Found) string) string {
+	found := re.FindAll(s)
+	if len(found) == 0 {
+		return s
+	}
+	text := found[0].text
+	var b strings.Builder
+	last := 0
+	for _, f := range found {
+		b.WriteString(string(text[last:f.Start]))
+		b.WriteString(repl(f))
+		last = f.End
+	}
+	b.WriteString(string(text[last:]))
+	return b.String()
 }
 
 type span struct {

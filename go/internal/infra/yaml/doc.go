@@ -11,4 +11,10 @@
 // ErrAlias（flow._AliasRefused）。問題と位置は errors.As で *Error の Problem・ProblemMark から読み、
 // Problem が空なら Error() を使う（flow._yaml_problem と同じ）。例外の型の名前（type(exc).__name__）は
 // *Error の Class。
+//
+// 書き出しは PyYAML の純 Python の書き手（SafeDumper）を写した。ccnavi が使う引数の組み合わせ
+// （allow_unicode=True・sort_keys=False と width・default_flow_style・default_style='"'）だけを持つ。
+// yaml.safe_dump → Dump（引数は DumpOptions）、plan_templates の _Dumper（改行を含む文字列を | で書き、別名を付けない）→
+// DumpOptions の Literal と NoAliases、ticket_fields._yaml_scalar → Quoted、RepresenterError → ErrUnrepresentable、
+// 上の段が組む dict の代入 → Map.Put。
 package yaml

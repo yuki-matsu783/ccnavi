@@ -4,7 +4,7 @@
 //
 // Python からの対応: ticket_fields をそのまま移した。set_fields → SetFields、set_mr → SetMR（MR_* → MRResult）、
 // plain_int_field → PlainIntField、mr_is_empty → MREmpty、script_fields_set → ScriptFieldsSet、
-// script_shape → ScriptShape。
+// script_shape → ScriptShape。_yaml_scalar は infra の yaml.Quoted を使う。
 package fields
 
 import (
@@ -87,12 +87,12 @@ func SetFields(text string, fields [][2]string) string {
 		key := keyOf(lines[i])
 		at := slices.IndexFunc(pending, func(f [2]string) bool { return f[0] == key })
 		if at >= 0 && !indented(lines[i]) {
-			lines[i] = key + ": " + Quoted(pending[at][1])
+			lines[i] = key + ": " + yaml.Quoted(pending[at][1])
 			pending = slices.Delete(pending, at, at+1)
 		}
 	}
 	for _, f := range pending {
-		lines = slices.Insert(lines, end, f[0]+": "+Quoted(f[1]))
+		lines = slices.Insert(lines, end, f[0]+": "+yaml.Quoted(f[1]))
 		end++
 	}
 	return join(lines, text)

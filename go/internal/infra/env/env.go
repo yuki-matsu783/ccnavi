@@ -66,3 +66,16 @@ const (
 	StateKeepDays      = "CCNAVI_STATE_KEEP_DAYS"
 	StopReviewKeepDays = "CCNAVI_STOP_REVIEW_KEEP_DAYS"
 )
+
+// ccnavi の外が決める変数。リモートの API に付けるトークンと、実行ファイルの探し方・家の場所（Python は
+// shutil.which と os.path.expanduser が読んでいた）。
+const (
+	GitHubToken = "GITHUB_TOKEN"
+	GitLabToken = "GITLAB_TOKEN"
+	Path        = "PATH"
+	Home        = "HOME"
+	UserProfile = "USERPROFILE"
+	HomeDrive   = "HOMEDRIVE"
+	HomePath    = "HOMEPATH"
+	UserName    = "USERNAME"
+)

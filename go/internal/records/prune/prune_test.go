@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/records/stopreview"
 )
@@ -399,7 +400,7 @@ func TestStopReview(t *testing.T) {
 
 func TestKeptOps(t *testing.T) {
 	p := newPlace(t)
-	ops := filepath.Join(p.state, opsDir)
+	ops := filepath.Join(p.state, config.OpsDir)
 	put(t, filepath.Join(ops, "a.json"), `{"stages": [{"state": "pending"}]}`, 400)
 	put(t, filepath.Join(ops, "b.json"), `{"stages": [{"state": "sent"}]}`, 400)
 	put(t, filepath.Join(ops, "c.json"), `broken`, 400)

@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/pyfmt"
 )
 
@@ -35,15 +36,12 @@ const (
 	hidden        = "//<伏せた>@"
 )
 
-// 道具の名前と、curl に付けるトークンの環境変数。
-// TODO(infra/env): GITHUB_TOKEN・GITLAB_TOKEN は infra/env に置く（env はいま CCNAVI_*・CLAUDE_* だけを持つ）。
+// 道具の名前。
 const (
-	toolJQ      = "jq"
-	toolCurl    = "curl"
-	toolGH      = "gh"
-	toolGLab    = "glab"
-	githubToken = "GITHUB_TOKEN"
-	gitlabToken = "GITLAB_TOKEN"
+	toolJQ   = "jq"
+	toolCurl = "curl"
+	toolGH   = "gh"
+	toolGLab = "glab"
 )
 
 const (
@@ -114,9 +112,9 @@ func TransportProblem(url string) string {
 	if !onPath(toolJQ) {
 		return msgNoJQ
 	}
-	cli, token := toolGH, githubToken
+	cli, token := toolGH, env.GitHubToken
 	if found.Kind == GitLab {
-		cli, token = toolGLab, gitlabToken
+		cli, token = toolGLab, env.GitLabToken
 	}
 	if onPath(cli) {
 		return ""

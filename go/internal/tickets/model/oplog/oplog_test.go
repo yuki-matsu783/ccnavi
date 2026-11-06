@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/pyjson"
+	"ccnavi/internal/records/prune"
 )
 
 var testStages = []StageSpec{{"reply", StageReply}, {"issue", StageIssue}, {"note", StageComment}}
@@ -339,5 +340,20 @@ func TestReconcile(t *testing.T) {
 		if got, why := Reconcile(c.r, c.stage, c.found, c.listing, c.account, c.at); got != c.want {
 			t.Errorf("%s: %s（%s）", c.name, got, why)
 		}
+	}
+}
+
+// records/prune は操作記録の置き場と「送り終えた」の綴りを写して持つ（tickets を読めない）。写しが持ち主と
+// ずれると、送り終えていない記録を数え損ねる（Python は tests/core/test_prune.py が見ていた）。
+func TestPruneCountsUnsentRecords(t *testing.T) {
+	state := stateDir(t)
+	id := begin(t, state, Options{Stages: []StageSpec{{"note", StageComment}}})
+	root := filepath.Dir(filepath.Dir(state))
+	if got := prune.Run(root, "", state, "", prune.Options{DryRun: true}).KeptOps; got != 1 {
+		t.Fatalf("送り終えていない記録を %d 件と数えた", got)
+	}
+	stageSet(t, state, id, "note", StateSent, "", "")
+	if got := prune.Run(root, "", state, "", prune.Options{DryRun: true}).KeptOps; got != 0 {
+		t.Fatalf("送り終えた記録を %d 件と数えた", got)
 	}
 }

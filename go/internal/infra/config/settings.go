@@ -313,9 +313,9 @@ func ReadHookView(root string) HookView {
 // DefaultBranchPrefixes は親の識別子の先頭の語の既定。`release` は統合先の名前（`release-*`）に当たるので入れない。
 var DefaultBranchPrefixes = []string{"feature", "hotfix", "fix", "bugfix", "chore", "refactor", "docs"}
 
-// reservedPrefixes は先頭の語に使えない名前。tickets の識別子の予約と同じリストのコピー
-// （infra は tickets を読めない）。
-var reservedPrefixes = []string{"main", "master", "develop", "release"}
+// ReservedBranchIDs は統合先や保護されたブランチの名前（ccnavi-git.sh の push の拒否と同じリスト）。親の識別子の
+// 先頭の語にも使えない。持ち主は tickets/model/ids（ids.ReservedBranchIDs）で、infra は tickets を読めないのでここに置く。
+var ReservedBranchIDs = []string{"main", "master", "develop", "release"}
 
 var prefixPattern = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
 
@@ -324,7 +324,7 @@ func IsBranchPrefix(word string) bool {
 	if !prefixPattern.MatchString(word) {
 		return false
 	}
-	for _, r := range reservedPrefixes {
+	for _, r := range ReservedBranchIDs {
 		if word == r {
 			return false
 		}

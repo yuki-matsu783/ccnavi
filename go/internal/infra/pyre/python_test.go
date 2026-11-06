@@ -329,3 +329,93 @@ func TestTranslateGlobAgainstPython(t *testing.T) {
 		}
 	}
 }
+
+const windowOracle = `
+import json, re, sys
+def span(m):
+    return None if m is None else [m.start(), m.end()]
+out = []
+for c in json.load(sys.stdin):
+    p = re.compile(c["p"], c["f"])
+    s, pos, end = c["s"], c["pos"], c["end"]
+    out.append({
+        "search": span(p.search(s, pos, end)), "match": span(p.match(s, pos, end)),
+        "all": [span(m) for m in p.finditer(s, pos, end)], "sub": p.sub(lambda m: "<" + m.group(0) + ">", s),
+    })
+json.dump(out, sys.stdout)
+`
+
+type windowCase struct {
+	P   string `json:"p"`
+	F   int    `json:"f"`
+	S   string `json:"s"`
+	Pos int    `json:"pos"`
+	End int    `json:"end"`
+}
+
+type windowResult struct {
+	Search []int   `json:"search"`
+	Match  []int   `json:"match"`
+	All    [][]int `json:"all"`
+	Sub    string  `json:"sub"`
+}
+
+// pos・endpos は文字列を切るのとは違う: 後読み・\b は pos の手前を見て、^・\A は pos に当たらず、$ は endpos に当たる。
+var windowCases = []windowCase{
+	{`(?<=b)a`, 0, "baba", 1, 4},
+	{`^a`, 0, "ba", 1, 2},
+	{`^a`, int(Multiline), "b\na", 2, 3},
+	{`\Aa`, 0, "ba", 1, 2},
+	{`a$`, 0, "abc", 0, 1},
+	{`\ba`, 0, "xa a", 1, 4},
+	{`x*`, 0, "axxb", 0, 4},
+	{``, 0, "abc", 1, 2},
+	{`a`, 0, "abc", 2, 1},
+	{`a`, 0, "aaa", -5, 99},
+	{`日.`, 0, "日本日本", 1, 4},
+	{`(?i)prune`, 0, "x PRUNE y prune", 3, 15},
+	{`(?=c)`, 0, "abc", 0, 2},
+}
+
+func spanOf(f Found, ok bool) []int {
+	if !ok {
+		return nil
+	}
+	return []int{f.Start, f.End}
+}
+
+func TestWindowMatchesPython(t *testing.T) {
+	want := answers(t, "window", func(py string) []windowResult {
+		in, _ := json.Marshal(windowCases)
+		cmd := exec.Command(py, "-I", "-c", windowOracle)
+		cmd.Stdin = bytes.NewReader(in)
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatal(err)
+		}
+		var res []windowResult
+		if err := json.Unmarshal(out, &res); err != nil {
+			t.Fatal(err)
+		}
+		return res
+	})
+	for i, c := range windowCases {
+		re, err := Compile(c.P, Flag(c.F))
+		if err != nil {
+			t.Fatal(err)
+		}
+		all := [][]int{}
+		for _, f := range re.FindAllIn(c.S, c.Pos, c.End) {
+			all = append(all, []int{f.Start, f.End})
+		}
+		got := windowResult{
+			Search: spanOf(re.FindIn(c.S, c.Pos, c.End)), Match: spanOf(re.MatchIn(c.S, c.Pos, c.End)), All: all,
+			Sub: re.Sub(c.S, func(f Found) string { return "<" + f.Text() + ">" }),
+		}
+		gj, _ := json.Marshal(got)
+		wj, _ := json.Marshal(want[i])
+		if !bytes.Equal(gj, wj) {
+			t.Errorf("%+v\n got  %s\n want %s", c, gj, wj)
+		}
+	}
+}

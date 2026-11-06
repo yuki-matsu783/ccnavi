@@ -3,6 +3,7 @@ package useronly
 import (
 	"errors"
 	"fmt"
+	"unicode/utf8"
 
 	"ccnavi/internal/infra/pyre"
 )
@@ -31,11 +32,23 @@ func (x rx) first(s string) (pyre.Found, bool) {
 	if x.re == nil {
 		return pyre.Found{}, true
 	}
-	all := x.re.FindAll(s)
-	if len(all) == 0 {
-		return pyre.Found{}, false
+	return x.re.Find(s)
+}
+
+// firstIn は Python の search(s, pos, endpos)。式を組めなかったときは pos に当たったものとする。
+func (x rx) firstIn(s string, pos, end int) (pyre.Found, bool) {
+	if x.re == nil {
+		return pyre.Found{Start: pos, End: pos}, true
 	}
-	return all[0], true
+	return x.re.FindIn(s, pos, end)
+}
+
+// matchAt は Python の match(s, pos)。式を組めなかったときは pos から終わりまで当たったものとする。
+func (x rx) matchAt(s string, pos int) (pyre.Found, bool) {
+	if x.re == nil {
+		return pyre.Found{Start: pos, End: utf8.RuneCountInString(s)}, true
+	}
+	return x.re.MatchIn(s, pos, utf8.RuneCountInString(s))
 }
 
 // text は first の当たった部分（式を組めなかったときは対象の全体）。
@@ -56,4 +69,20 @@ func (x rx) all(s string) []pyre.Found {
 		return nil
 	}
 	return x.re.FindAll(s)
+}
+
+// allIn は Python の finditer(s, pos, endpos)。式を組めなかったときは pos に 1 件当たったものとする。
+func (x rx) allIn(s string, pos, end int) []pyre.Found {
+	if x.re == nil {
+		return []pyre.Found{{Start: pos, End: pos}}
+	}
+	return x.re.FindAllIn(s, pos, end)
+}
+
+// removed は Python の x.sub("", s)。式を組めなかったときは s のまま。
+func (x rx) removed(s string) string {
+	if x.re == nil {
+		return s
+	}
+	return x.re.Sub(s, func(pyre.Found) string { return "" })
 }

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/model/ticket"
 )
@@ -93,7 +94,7 @@ func TestFieldsMatchPython(t *testing.T) {
 		}
 	}
 	for _, v := range quotedValues {
-		got.Quoted = append(got.Quoted, Quoted(v))
+		got.Quoted = append(got.Quoted, yaml.Quoted(v))
 	}
 	for _, f := range []struct {
 		name      string
