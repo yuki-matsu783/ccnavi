@@ -13,7 +13,7 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
 ## issue・MRの指定を受けたとき
 
 - ホスト（issue・MRなど）の操作は、ccnaviのスクリプト（`ccnavi-start.sh`・`ccnavi-review.sh`など）がある操作ならスクリプトを優先する。ない操作はglabを基本にし、ghはoriginがGitHubのときだけ使う。
-- チケット作業は必ずissueとMRのセットで進める。issueが無ければ`ccnavi-start.sh --new-issue <タイトル>`で作ってから進める（タイトルの似たopenのissue・MRがあれば作らずに止まり、ユーザに聞く。詳しくは下の表）。ホストに届かないなどで作れなければ、ユーザに作ってもらう。
+- チケット作業は必ずissueとMRのセットで進める。issueが無ければ`ccnavi-start.sh --new-issue <タイトル>`で作ってから進める（タイトルの似たopenのissue・MRがあれば作らずに止まり、ユーザに聞く。詳しくは下の表）。`--new-issue`を打って、ホストに届かないなどで作れなかったときだけ、ユーザに作ってもらう（打つ前にユーザへ頼まない）。
   最初に`sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --check`を打ち、ホストのAPIとgitのリモートが使える状態かを確かめる（下の「事前確認」）。
 - issueやMRを指定して作業を頼まれたら（`#152`・`!5`・URLなど。ただし、ユーザが直接作業を明示したときは除く。その扱いは[ticket-work.md](ticket-work.md)の「ユーザが直接作業を明示したとき」）、ワークツリーを切る前に
   `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue <番号>`（MRなら`--mr <番号>`。`--issue`と`--mr`は一緒に渡せる）を打つ。

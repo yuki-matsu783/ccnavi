@@ -1418,6 +1418,15 @@ class StartShTest(unittest.TestCase):
         self.assertFalse(os.path.isdir(os.path.join(self.ws, ".claude", "worktrees")))
         self.assertNotIn("t0k", done.stdout + done.stderr)
 
+    def test_check_ok_tells_to_try_new_issue_before_asking_the_user(self):
+        done = self.check()
+        nexts = [line for line in done.stdout.splitlines() if line.startswith("次: ")]
+        self.assertEqual(len(nexts), 1, done.stdout)
+        self.assertIn("--new-issue <タイトル> を先に打つ", nexts[0])
+        self.assertIn("作れなかった", done.stdout)
+        ng = self.check(**self.no_identity())
+        self.assertNotIn("--new-issue", ng.stdout)
+
     def test_check_without_a_git_author_is_ng_and_asks_for_the_config(self):
         done = self.check(**self.no_identity())
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
@@ -2001,7 +2010,10 @@ exec '{self.bin}/curl' -X "$method" "https://gitlab.com/api/v4/$path"
     def test_gitlab_new_issue_unreachable_asks_the_user(self):
         done = self.run_sh("--new-issue", "Add login", "--similar-checked", token=False)
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
-        self.assertIn("次: ユーザに、ブラウザで issue を作って番号を伝えるよう頼んで", done.stdout)
+        self.assertIn(
+            "次: --new-issue で作れなかったので、ユーザに、ブラウザで issue を作って番号を伝えるよう頼んで",
+            done.stdout,
+        )
         self.assertIn("glab を gitlab.com に認証する", done.stdout)
         self.assertIn("直接実装には切り替えない", done.stdout)
         self.assertNotIn("mcp__github__", done.stdout)

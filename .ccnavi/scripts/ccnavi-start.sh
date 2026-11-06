@@ -395,7 +395,10 @@ if [ -n "$check" ]; then
 		printf '確認: %s\n' "$ccnavi_pf_line_text"
 	done
 	case "$ccnavi_pf_result" in
-	ok) printf '結論: チケット作業を始められる状態です。\n' ;;
+	ok)
+		printf '結論: チケット作業を始められる状態です。\n'
+		ccnavi_text "$root" NEXT_START_CHECK_OK
+		;;
 	ng) printf '結論: 不備があり、チケット作業を始められません。\n' ;;
 	*) printf '結論: 確かめられなかった項目があります（省略は前提の項目が OK でないため確かめていません）。\n' ;;
 	esac
