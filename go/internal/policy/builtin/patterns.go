@@ -61,8 +61,15 @@ var (
 // それ以外は `-` で始まる語を 1 つ読む。値まで読んだ語は読み直さないので、`git commit -m push` や
 // `git -c push.default=current status` の `push` はサブコマンドとして読まれない。値とのあいだの空白は 1 字だけ読む。
 // 空の語 `git -C "" push` は空白 2 字になり、まとめて読むと次の `push` を値として読んで外れるためである。
-var gitOptions = `(?:\s++(?:(?:-c|--(?:git-dir|work-tree|namespace|config-env|super-prefix` +
-	`|attr-source))\s` + gitFree + `?|` + gitFreeOption + `))*+`
+// 読みを通らずに来た文字列では空白が何字続いても語の区切りで、`git  -C  x  push` の `x` は値になる。
+// どちらの読みでもヒットするように、空白を 1 字だけ読む形とまとめて読む形を「または」で並べる。
+var gitOptions = `(?:` + gitOptionsWith(`\s`) + `|` + gitOptionsWith(`\s++`) + `)`
+
+// gitOptionsWith は git のグローバルオプションの並び。gap は値とのあいだの空白の読み方。
+func gitOptionsWith(gap string) string {
+	return `(?:\s++(?:(?:-c|--(?:git-dir|work-tree|namespace|config-env|super-prefix` +
+		`|attr-source))` + gap + gitFree + `?|` + gitFreeOption + `))*+`
+}
 
 // gitSub は `git <オプション> <sub>` と、git のサブコマンドを直接起こす `git-<sub>`。
 func gitSub(sub string) string {
@@ -130,11 +137,13 @@ var recursiveDeleteRegex = rmStart + `\s*+` + rmRestart + `(?:` + rmOther("rf") 
 	`|` + rmRecursive + `\s++(?:` + rmOther("f") + `\s++)*+` + rmForce + wordEnd +
 	`|` + rmForce + `\s++(?:` + rmOther("r") + `\s++)*+` + rmRecursive + wordEnd + `)`
 
-// credentialsRegex は認証情報の場所の形。先頭に境界を付け、`jq '.env.X'` や `process.env` を巻き込まない。
+// credentialsRegex は認証情報の場所の形。先頭に境界（行頭か、語の字・`.`・`,`・`-`・引用の中の空白の目印 `\x01` でない字）を付け、
+// `jq '.a,.env.X'` や `process.env` を巻き込まない。引用符・`:`・`=`・`@` のあと（`open('.env')`・`HEAD:.env`・
+// `--file=.env`・`@.env`）は止める。`,` のあとは通す（`{a,.env}` はブレース展開のルールが止める）。
 // `.env` の後ろに続く `.envrc`・`.env.local`・`.env.example` は止める。キーのファイルは、拡張子として
 // 書かれた形（`x.pem`・`x.pem.bak`・`x.key.json`）で止める。
-const credentialsRegex = `(^|[ \\/\x00])\.(env|dev\.vars|netrc|npmrc|pypirc)` +
-	`|(^|[ \\/\x00])\.(aws|ssh)[\\/]` +
+const credentialsRegex = `(^|[^\w.,\x01-])\.(env|dev\.vars|netrc|npmrc|pypirc)` +
+	`|(^|[^\w.,\x01-])\.(aws|ssh)[\\/]` +
 	`|[\w\-\\/]\.(pem|key)\b` +
 	`|[\\/]secrets[\\/]` +
 	`|[\\/]credentials([\\/]|\.json\b)` +

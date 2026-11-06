@@ -59,7 +59,7 @@ class ToolNamesTest(unittest.TestCase):
         self.assertEqual([], found, "ツール名の組は infra/toolnames.py から引く")
 
     def test_groups_keep_their_meaning(self):
-        self.assertEqual(("Write", "Edit", "NotebookEdit"), toolnames.WRITE_TOOLS)
+        self.assertEqual(("Write", "Edit", "MultiEdit", "NotebookEdit"), toolnames.WRITE_TOOLS)
         self.assertEqual(("Agent", "Task"), toolnames.AGENT_TOOLS)
         self.assertEqual({"Bash", "PowerShell"}, set(toolnames.SHELL_TOOLS))
         self.assertTrue(set(toolnames.WRITE_TOOLS) <= set(toolnames.STRICT_TOOLS))

@@ -25,6 +25,7 @@ var SubjectFields = []SubjectField{
 	{config.ToolGrep, "path"},
 	{config.ToolGlob, "path"},
 	{config.ToolEdit, "file_path"},
+	{config.ToolMultiEdit, "file_path"},
 	{config.ToolWrite, "file_path"},
 	{config.ToolNotebookEdit, "notebook_path"},
 	{config.ToolSkill, "skill"},

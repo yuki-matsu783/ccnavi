@@ -26,7 +26,7 @@ from __future__ import annotations
 import os
 from typing import TextIO
 
-from ...infra import fsio, settings, tree
+from ...infra import fsio, settings, toolnames, tree
 from ...policy import rules, texts
 from ...records import wiki
 from ..approval import marks as approval_marks
@@ -124,8 +124,7 @@ def build(
         "learning-wiki のパターンへ溜める。ccnavi が `ticket consolidate` で作った保守用の子。\n"
     )
     front[rules.ALLOW] = [
-        {"match": "Write|Edit|NotebookEdit", "glob": glob}
-        for glob in ticket_model.CONSOLIDATE_SCOPE
+        {"match": toolnames.WRITE_MATCH, "glob": glob} for glob in ticket_model.CONSOLIDATE_SCOPE
     ]
     front.update({"started_at": "", "completed_at": "", "base_sha": "", "merged_sha": ""})
     t = ticket_model.Ticket(ticket=ident, raw=front, body=_body(items))

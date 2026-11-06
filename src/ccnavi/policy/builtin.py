@@ -71,7 +71,7 @@ YAML として読めないので既定に戻る。そこで解決の手が止ま
 
 from __future__ import annotations
 
-from ..infra import settings
+from ..infra import settings, toolnames
 from . import rules, selfguard_shell, texts
 
 
@@ -214,10 +214,21 @@ _GIT_FREE_OPTION = rf"-{_PLAIN}*+(?:{_UPTO_ANCHOR}{_TAIL}?)?"
 # 値とのあいだの空白は 1 字だけ読む。読み（shellread）は語を空白 1 字でつなぎ、空の語
 # （`git -C '' push` の `''`）は空のまま残すので、空白が 2 字続くところは空の値になる。
 # 空白をまとめて読むと、空の値の次の `push` を値として読んで外れる。
-_GIT_OPTIONS = (
-    r"(?:\s++(?:(?:-c|--(?:git-dir|work-tree|namespace|config-env|super-prefix"
-    rf"|attr-source))\s{_GIT_FREE}?|{_GIT_FREE_OPTION}))*+"
-)
+#
+# 読みを通らずに来た文字列（読めなかったコマンド）では、空白が何字続いても語の区切りで、
+# `git  -C  x  push` の `x` は値になる。どちらの読みでもヒットするように、値とのあいだの空白を
+# 1 字だけ読む形と、まとめて読む形を「または」で並べる（_git_sub）。
+
+
+def _git_options(gap: str) -> str:
+    """git のグローバルオプションの並び。gap は値とのあいだの空白の読み方。"""
+    return (
+        r"(?:\s++(?:(?:-c|--(?:git-dir|work-tree|namespace|config-env|super-prefix"
+        rf"|attr-source)){gap}{_GIT_FREE}?|{_GIT_FREE_OPTION}))*+"
+    )
+
+
+_GIT_OPTIONS = rf"(?:{_git_options(r'\s')}|{_git_options(r'\s++')})"
 
 
 def _git_sub(sub: str) -> str:
@@ -346,16 +357,20 @@ def _deny(root: str) -> list[dict]:
             "id": "builtin:credentials",
             # 常に効く土台なので、設定で切れない。誤検知が出ても外せない。範囲を広げるときは、
             # 誤検知の出方（見本の `.env.example` も `x.pem.bak` も止まる）を承知の上で広げる。
-            # 対象は Bash / Read / Write / Edit / NotebookEdit の 5 つ。Grep / Glob / PowerShell は
-            # match に無いのでヒットしない（探す先のパスは取り出せるが、探索の中身を代表しない）。
-            "match": "Bash|Read|Write|Edit|NotebookEdit",
-            # 先頭の境界（行頭・空白・区切り）を付ける。常時有効の土台なので、
-            # `jq '.env.X'` のようなフィールド参照や `process.env` を巻き込まない。
+            # 対象は Bash / Read と書き込むツール（toolnames.WRITE_TOOLS）。
+            # Grep / Glob / PowerShell は match に無いのでヒットしない
+            # （探す先のパスは取り出せるが、探索の中身を代表しない）。
+            "match": "Bash|Read|" + toolnames.WRITE_MATCH,
+            # 先頭の境界（行頭か、語の字・`.`・`,`・`-`・引用の中の空白の目印 `\x01` でない字）を
+            # 付ける。常時有効の土台なので、`jq '.a,.env.X'` のようなフィールド参照や
+            # `process.env` を巻き込まない。引用符・`:`・`=`・`@` のあと
+            # （`open('.env')`・`HEAD:.env`・`--file=.env`・`@.env`）は止める。
+            # `,` のあとは通す（`{a,.env}` はブレース展開のルールが止める）。
             # `.env` の後ろに続く `.envrc` `.env.local` `.env.example` は止める。
             # キーのファイルは拡張子として書かれた形（`x.pem`、`x.pem.bak`、`x.key.json`）。
             "regex": (
-                r"(^|[ \\/\x00])\.(env|dev\.vars|netrc|npmrc|pypirc)"
-                r"|(^|[ \\/\x00])\.(aws|ssh)[\\/]"
+                r"(^|[^\w.,\x01-])\.(env|dev\.vars|netrc|npmrc|pypirc)"
+                r"|(^|[^\w.,\x01-])\.(aws|ssh)[\\/]"
                 r"|[\w\-\\/]\.(pem|key)\b"
                 r"|[\\/]secrets[\\/]"
                 r"|[\\/]credentials([\\/]|\.json\b)"
@@ -365,7 +380,7 @@ def _deny(root: str) -> list[dict]:
         },
         {
             "id": GIT_DIR_RULE_ID,
-            "match": "Write|Edit|NotebookEdit",
+            "match": toolnames.WRITE_MATCH,
             "regex": selfguard_shell.GIT_DIR_PATH_REGEX,
             **texts.spec("RULE_GUARD_GIT_DIR", git=git, wrapper=wrapper, cased=("next",)),
         },
@@ -392,7 +407,7 @@ _ALLOW: list[dict] = [
         # ここまで確認を出すと、本当に見てほしい 1 件が見落とされる。
         # Grep と Glob は書かない。対象は取り出せる（探し始める場所のパス）が、
         # それは探索の中身を代表しない。Read は 1 ファイルずつなので
-        # builtin:credentials（match は Bash|Read|Write|Edit|NotebookEdit）が先にヒットして
+        # builtin:credentials（match は Bash|Read と書き込むツール）が先にヒットして
         # 止まるのに対し、Grep はその deny の match に無いので、ここで広く許すと
         # credentials ごと止められずに通る。
         "id": "builtin:read-anything",

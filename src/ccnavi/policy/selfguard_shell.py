@@ -9,7 +9,7 @@ import os
 import re
 from collections.abc import Callable
 
-from ..infra import pathcase, platformtag, settings, shellread, tree
+from ..infra import pathcase, platformtag, settings, shellread, toolnames, tree
 from ..records import diaglog
 from . import rules, selfguard_targets, texts
 
@@ -342,7 +342,10 @@ def shell_write_regex(
     copy_places = [*_COPY_PLACES]
     target_places = [*_PLACES]
     binary = binary_clause(bin_path)
-    triples = ((binary, binary_clause(bin_path, copy=True), binary), *extra_clauses)
+    triples = (
+        (binary, binary_clause(bin_path, copy=True), binary_clause(bin_path, target=True)),
+        *extra_clauses,
+    )
     for clause, copy_clause, target_clause in triples:
         if clause:
             places.append(clause)
@@ -414,7 +417,7 @@ def _home_name(project_home: str) -> str:
     return (project_home or "").replace("\\", "/").strip("/")
 
 
-def binary_clause(bin_path: str, *, copy: bool = False) -> str:
+def binary_clause(bin_path: str, *, copy: bool = False, target: bool = False) -> str:
     """実行ファイルのパスを、適用する形に直す。
 
     末尾の 2 要素だけを使う（PATH の実体だけは 3 要素。`bin/ccnavi` では別の道具にヒットしすぎる）。
@@ -443,6 +446,10 @@ def binary_clause(bin_path: str, *, copy: bool = False) -> str:
     書き込み用の形は終わりを決めないので、`(?:[\\/][^\x00]*)?` が空白をまたいで
     `cp <置き場>/bin/<os>-<arch>/ccnavi /tmp/x` のような外へコピーするだけの読みにもヒットする。
     名指しのツール（BINARY_RULE_ID）は書き込み用の形に `$` を足して使う。
+
+    target を立てると、`-t` の値に適用する形を返す。書き込み用の形から PATH の実体を除いたもの。
+    PATH の実体はファイルで、`-t` の値はディレクトリなので要らない。浅い実体は前の 1 文字から
+    適用するので（_path_spellings）、足すと `-t /tmp/out /bin/ccnavi` の元の側にヒットする。
     """
     if not bin_path:
         return ""
@@ -454,22 +461,25 @@ def binary_clause(bin_path: str, *, copy: bool = False) -> str:
         home = re.escape(parts[-3]) + r"[\\/]" if len(parts) >= 3 else ""
         # PATH の ccnavi（bin/ に実体が無いとき sh が起動するもの）。末尾 3 要素で適用する。
         # 2 要素（`bin/ccnavi`）だと別のプロジェクトの `./bin/ccnavi` にまでヒットする。
-        spellings = _path_spellings(bin_path)
-        on_path = "".join(f"|{p}" for p in spellings)
-        on_path_copy = "".join(f"|{p}{_COPY_TAIL}" for p in spellings)
         built = rf"{home}bin[\\/]{_BUILD_DIR}"
         if copy:
-            return rf"{_IN_WORD}(?:{sh}{_COPY_TAIL}|{built}{_COPY_END}{on_path_copy})"
+            on_path_copy = "".join(
+                f"|{p}{_COPY_TAIL}" for p in _path_spellings(bin_path, copy=True)
+            )
+            return rf"(?:{_IN_WORD}(?:{sh}{_COPY_TAIL}|{built}{_COPY_END}){on_path_copy})"
+        on_path = "" if target else "".join(f"|{p}" for p in _path_spellings(bin_path))
         return rf"(?:{sh}|{built}(?:[\\/][^\x00]*)?{on_path})"
     plain = r"[\\/]".join(re.escape(p) for p in parts[-2:])
     return _IN_WORD + plain + _COPY_TAIL if copy else plain
 
 
-def _path_spellings(launcher: str = "") -> list[str]:
+def _path_spellings(launcher: str = "", *, copy: bool = False) -> list[str]:
     """PATH の ccnavi を適用する形（末尾 3 要素）。書かれたパスと、リンクを解いた先の両方。
 
     置き場のディレクトリ（`~/.local/bin` 全体）は守らない。無関係な道具を入れる操作まで止まる。
     PATH に無ければ空。
+
+    copy を立てると、cp / ln / install の最後の引数の語の頭から適用する形（_IN_WORD を前に付ける）。
     """
     exe = platformtag.path_executable(skip=launcher)
     if not exe:
@@ -480,8 +490,14 @@ def _path_spellings(launcher: str = "") -> list[str]:
         spelled = r"[\\/]".join(re.escape(p) for p in every[-3:])
         if len(every) <= 3:
             # 浅い実体（`/bin/ccnavi`）は、区切りで始まる形だけに適用する。
-            # 付けないと、別のプロジェクトの `./bin/ccnavi` にもヒットする。
-            spelled = r"(?<![\w.~-])[\\/]" + spelled
+            # 付けないと、別のプロジェクトの `./bin/ccnavi` にもヒットする。ルールの regex は
+            # 後読みを受けない（rules._UNSUPPORTED）ので、前の 1 文字も含めて適用する
+            # （common_shell_clause と同じ作り）。最後の引数では、前の 1 文字は語の中に限る。
+            # 語の頭なら前の文字は要らない（_COPY_LAST が手前の空白まで読んである）。
+            head = r"(?:[^ \x00]*[^\w.~ \x00-])?" if copy else r"(?:^|[^\w.~-])"
+            spelled = head + r"[\\/]" + spelled
+        elif copy:
+            spelled = _IN_WORD + spelled
         if every and spelled not in found:
             found.append(spelled)
     return found
@@ -1161,7 +1177,7 @@ def add_rules(
             rule_set,
             {
                 "id": BINARY_RULE_ID,
-                "match": "Write|Edit|NotebookEdit",
+                "match": toolnames.WRITE_MATCH,
                 # 適用する先は解決済みの絶対パスなので、末尾で閉じる。
                 "regex": clause + "$",
                 **texts.spec("RULE_GUARD_BINARY"),
@@ -1174,7 +1190,7 @@ def add_rules(
             rule_set,
             {
                 "id": PROJECT_HOME_RULE_ID,
-                "match": "Write|Edit|NotebookEdit",
+                "match": toolnames.WRITE_MATCH,
                 # ccnavi ディレクトリの下はすべて守る。レイヤーの設定 3 本だけを名指しすると、
                 # 配点が呼ぶスクリプトが外れる。適用する先は解決済みの絶対パスなので、
                 # どの ccnavi ディレクトリ（ワークスペース、プロジェクト、ワークツリー）にも
@@ -1190,7 +1206,7 @@ def add_rules(
             rule_set,
             {
                 "id": HANDOFF_LINK_RULE_ID,
-                "match": "Write|Edit|NotebookEdit",
+                "match": toolnames.WRITE_MATCH,
                 # 適用する対象は関数が決める（置き場の中のつながった対象だけが残る）。
                 "regex": ".",
                 **texts.spec("RULE_GUARD_HANDOFF_LINKS"),
@@ -1214,7 +1230,7 @@ def add_rules(
         rule_set,
         {
             "id": RECORDS_RULE_ID,
-            "match": "Write|Edit|NotebookEdit",
+            "match": toolnames.WRITE_MATCH,
             "regex": records_regex(*records),
             **texts.spec("RULE_GUARD_RECORDS"),
         },
@@ -1227,7 +1243,7 @@ def add_rules(
             rule_set,
             {
                 "id": COMMON_LAYER_RULE_ID,
-                "match": "Write|Edit|NotebookEdit",
+                "match": toolnames.WRITE_MATCH,
                 "regex": common,
                 **texts.spec("RULE_GUARD_COMMON_LAYER"),
             },
@@ -1241,7 +1257,7 @@ SCRIPTS_RULE_ID = "builtin:guard-scripts"
 CCNAVI_CONFIG_RULE_ID = "builtin:guard-ccnavi-config"
 NAMED_RULE_IDS = (HOOKS_RULE_ID, SETTINGS_RULE_ID, SCRIPTS_RULE_ID, CCNAVI_CONFIG_RULE_ID)
 
-_NAMED_MATCH = "Write|Edit|NotebookEdit"
+_NAMED_MATCH = toolnames.WRITE_MATCH
 _SETTINGS_REGEX = r"[\\/]\.claude[\\/]settings(\.local)?\.json$"
 
 
@@ -1276,7 +1292,7 @@ def add_named_rules(rule_set: rules.RuleSet, project_home: str = "", root: str =
     1. 下書きの置き場の例外（`handoff_write_exempt`）と、直す手順の場合（ルートの有無）を用意する
     2. hook 本体と hook の登録（settings）の 2 本は、必ず名前で足す
     3. ccnavi ディレクトリの名前（`_home_regex`）があれば、scripts と共通の設定の 2 本を足す
-    4. 4 本とも、`match` を `Write|Edit|NotebookEdit` にして `_insert` で足す
+    4. 4 本とも、`match` を書き込むツール（toolnames.WRITE_MATCH）にして `_insert` で足す
     """
     exempt = handoff_write_exempt(root)
     # 守る場所を直す手順の文は、ワークスペースルートがあるか（`root`）で分かれる。

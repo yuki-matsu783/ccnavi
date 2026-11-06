@@ -26,7 +26,8 @@ var (
 	// WriteTools はワークツリーのファイルを書き換えるツール。範囲を問うのと、保護領域の宣言とみなすのはこれだけ。
 	// Bash は入れない。コマンドの中のパスは追い切れず、当たったり外れたりする判定になる。
 	// シェル経由の書き込みは実行後チェックが実物を見て拾う。
-	WriteTools = []string{ToolWrite, ToolEdit, ToolNotebookEdit}
+	// MultiEdit は 1 回で同じファイルを何か所も直す。現行の Claude Code にも編集ツールの組として残る。
+	WriteTools = []string{ToolWrite, ToolEdit, ToolMultiEdit, ToolNotebookEdit}
 	// WrittenFileTools は書いたファイルを記録に残すツール（MultiEdit を含む）。
 	WrittenFileTools = []string{ToolWrite, ToolEdit, ToolMultiEdit}
 	// AgentTools はサブエージェントの起動。Claude Code の版によって名前が違う。
@@ -44,7 +45,7 @@ var (
 	SearchTools = []string{ToolGrep, ToolGlob}
 
 	// PathTools は行き先のパスで判定するツール。
-	PathTools = concat(ReadTools, []string{ToolEdit, ToolWrite, ToolNotebookEdit})
+	PathTools = concat(ReadTools, WriteTools)
 	// StrictTools は判定に達せなかったときに止めるツール。
 	StrictTools = concat(WriteTools, AgentTools)
 	// ReadOnlyTools は実行後チェックを省けるツール。省いても次の書きうるツールの後に同じ変更が見える。

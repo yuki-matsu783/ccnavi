@@ -68,7 +68,7 @@ func TestTunableDefaults(t *testing.T) {
 }
 
 func TestToolGroups(t *testing.T) {
-	if !reflect.DeepEqual(WriteTools, []string{"Write", "Edit", "NotebookEdit"}) ||
+	if !reflect.DeepEqual(WriteTools, []string{"Write", "Edit", "MultiEdit", "NotebookEdit"}) ||
 		!reflect.DeepEqual(AgentTools, []string{"Agent", "Task"}) ||
 		!reflect.DeepEqual(ShellTools, []string{"Bash", "PowerShell"}) {
 		t.Fatal("ツール名の組の中身が変わった")

@@ -71,7 +71,7 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     spec = texts.spec("RULE_TICKET_STATE")
     write_rule = rules.Rule(
         id=STATE_RULE_ID,
-        match="|".join(toolnames.WRITE_TOOLS),
+        match=toolnames.WRITE_MATCH,
         regex=place,
         root=root,
         decision=rules.DENY,
@@ -122,7 +122,7 @@ def _dir_rules(
     path = rf"(^|[\\/]){place}[\\/]"
     write_rule = rules.Rule(
         id=rule_id,
-        match="|".join(toolnames.WRITE_TOOLS),
+        match=toolnames.WRITE_MATCH,
         regex=path,
         root=root,
         decision=rules.DENY,
