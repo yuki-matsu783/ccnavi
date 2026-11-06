@@ -41,6 +41,7 @@ var subTiers = map[string]map[string]int{
 		"pyjson":      1,
 		"platformtag": 1,
 		"yaml":        1,
+		"pyre":        1, // Python の re の写し（RE2 で書けない式を Python と同じ答えで読む）
 		// 2: ファイル・設定・入出力・照合
 		"fsio":      2,
 		"config":    2,
@@ -67,6 +68,15 @@ var subTiers = map[string]map[string]int{
 		"tally": 2,
 		// 3: 記録の名前を持ち主のパッケージから読んで消す（後始末）
 		"prune": 3,
+	},
+	"policy": {
+		// 1: ルールの型・読み込み・照合と、ルールを当てる文字列
+		"rules": 1,
+		// 2: ルールの上に立つ（文面ファイル・ルールの文脈ファイル）
+		"texts":   2,
+		"ctxfile": 2,
+		// 3: ルールファイルの検査（文脈ファイルの置き場を見る）
+		"rulelint": 3,
 	},
 	"tickets": {
 		"model":     0,
