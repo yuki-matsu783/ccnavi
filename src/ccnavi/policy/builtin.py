@@ -323,8 +323,9 @@ def _deny(root: str) -> list[dict]:
        - `builtin:recursive-delete`: 再帰と強制の両方を持つ rm（`RECURSIVE_DELETE_REGEX`）
        - `builtin:git-push`: git push（`GIT_PUSH_REGEX`）
        - `builtin:git-reset-hard`: git reset --hard（`GIT_RESET_HARD_REGEX`）
-       - `builtin:credentials`: 認証情報の場所の形（Bash・Read・Write・Edit・NotebookEdit の入力）
-       - `builtin:guard-git-dir`: `.git` の中を書く Write・Edit・NotebookEdit
+       - `builtin:credentials`: 認証情報の場所の形
+         （Bash・Read・Write・Edit・MultiEdit・NotebookEdit の入力）
+       - `builtin:guard-git-dir`: `.git` の中を書く Write・Edit・MultiEdit・NotebookEdit
          （`selfguard_shell.GIT_DIR_PATH_REGEX`）
        - `builtin:guard-git-dir-via-bash`: `.git` の中を書く Bash
          （`selfguard_shell.git_dir_shell_regex`）

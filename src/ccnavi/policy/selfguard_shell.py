@@ -1270,7 +1270,7 @@ def _home_regex(project_home: str) -> str:
 def add_named_rules(rule_set: rules.RuleSet, project_home: str = "", root: str = "") -> None:
     """hook・settings・scripts・共通の設定 3 本を、名前で書くツールから守る。
 
-    対象のツールは Write / Edit / NotebookEdit。
+    対象のツールは Write / Edit / MultiEdit / NotebookEdit。
 
     自己防衛の設定（`CCNAVI_GUARD_CORE_FILES`）が disable でないときに、呼び手が足す。
     ルールファイルの外から足すので、ルールを書き換えても消えない。ルールファイルが読めずに

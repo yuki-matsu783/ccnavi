@@ -30,8 +30,9 @@ from ..infra import fsio, hookio, pathcase, shellread, toolnames
 # failsafe 独自に、通常より広く止めるものがある: `.gnupg`、`id_ecdsa`、`.p12` / `.pfx`、
 # `.git` の中と操作記録の置き場の読み取り、先頭が区切りでない `credentials/`。
 # 片方だけ直る事故を避けるため、`builtin:credentials` に形を足したらここも見直す。
+# 前の字の境界（_BOUND）も `builtin:credentials` と同じ字の組にする。
 # 承認済みの置き場のうち秘密にヒットするものは無いので、ここには入れない。
-_BOUND = r"(?:^|[ \\/\x00=])"
+_BOUND = r"(?:^|[^\w.,\x01-])"
 _MINIMAL_DENY = re.compile(
     rf"{_BOUND}\.(env|netrc|npmrc|pypirc|dev\.vars)"
     rf"|{_BOUND}\.(ssh|aws|gnupg)(?:[\\/]|$)"
