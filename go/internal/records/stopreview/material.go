@@ -59,9 +59,8 @@ func MaterialVersion(criteria string) string {
 	return extractorVersion + ":" + digest(criteria)
 }
 
-// LoadCriteria は判定用 Markdown の中身。ワークスペースに 1 枚あれば（`.ccnavi/config/stop-review.md`）それを、
-// 無ければ組み込みの定義を返す。あるのに読めない・空・大きすぎるときは空を返す（別の定義を推測しない。
-// 呼び手は未検査にする）。
+// LoadCriteria は判定用 Markdown の中身を返す。ワークスペースに `.ccnavi/config/stop-review.md` があればそれを、無ければ組み込みの定義を返す。
+// あるのに読めない・空・大きすぎるときは空を返す。別の定義を推測せず、呼び手は未検査にする。
 func LoadCriteria(root string) string {
 	if root == "" {
 		return criteriaMD

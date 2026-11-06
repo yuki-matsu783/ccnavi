@@ -7,10 +7,9 @@ import (
 	"ccnavi/internal/infra/pyjson"
 )
 
-// コマンドが失敗したり拒否されたりしても、エージェントは資料を引かずに試行錯誤を重ねることがある。
-// 失敗（PostToolUseFailure）と拒否（PreToolUse の deny。dry-run も数える）の連続を数え、成功で 0 に戻す。
-// 案内の文面は catalog が持つ。サブエージェントの呼び出しは、その子の連続として別に数える（案内は
-// その文脈のモデルにしか届かないので、メインの成功が子の連続を消さないように）。
+// コマンドが失敗や拒否で止まっても、エージェントは資料を引かずに試行錯誤を重ねることがある。
+// 失敗（PostToolUseFailure）と拒否（PreToolUse の deny。dry-run も含む）の連続を数え、成功で 0 に戻す。
+// 案内の文面は catalog が持つ。サブエージェントの呼び出しは、その子の連続として別に数える。案内はその文脈のモデルにしか届かないため、メインの成功が子の連続を消さないようにする。
 
 // DefaultStreakThreshold は回数の既定（CCNAVI_FAIL_STREAK_COUNT）。0 は数えない。
 const DefaultStreakThreshold = 3
@@ -51,8 +50,8 @@ func streakPath(stateDir, session, agent string) string {
 }
 
 // Fail は失敗か拒否を 1 回数え、案内の種類と今の連続の長さを返す。出さない回は NoNotice。
-// 回数を書けなければ出さない（覚えられないまま出すと、失敗のたびに同じ案内が並ぶ）。n が 0 以下、
-// 置き場が無い、セッションが空のときは数えない。
+// 記録に回数を書けなければ案内を出さない。覚えられないまま出すと、失敗のたびに同じ案内が並ぶため。
+// n が 0 以下のとき、置き場が無いとき、セッションが空のときは数えない。
 func Fail(stateDir, session, agent string, n int) (Notice, int) {
 	if n <= 0 || stateDir == "" || session == "" {
 		return NoNotice, 0

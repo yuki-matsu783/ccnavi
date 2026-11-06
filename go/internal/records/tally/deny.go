@@ -14,17 +14,17 @@ import (
 	"ccnavi/internal/records/audit"
 )
 
-// 止められたエージェントは言い回しを少し変えて打ち直すことがある。同じルールが同じ呼び出しを止めた
-// 回数を数え、N 回目から拒否の文面に「言い換えずに相談する」一文を足し、ターンの終わりにも報告する。
+// 止められたエージェントは、言い回しを変えて打ち直すことがある。
+// 同じルールが同じ呼び出しを止めた回数を数え、N 回目から拒否の文面に「言い換えずに相談する」一文を足す。ターンの終わりにも報告する。
 //
-// 数えるキーは（ルールの id, 均した対象のハッシュ）。均すのは引用符を除くことと空白をまとめることだけで、
-// 大文字小文字は分けたまま（パスもコマンドも大小を区別する環境がある）。記録にはハッシュだけを置く
-// （認証情報を残さないため）。
+// 数えるキーは、ルールの id と、均した対象のハッシュの組。均すのは、引用符を除くことと空白をまとめることだけ。
+// 大文字と小文字は分けたままにする。パスもコマンドも、大小を区別する環境があるため。
+// 認証情報を残さないように、記録にはハッシュだけを置く。
 
 // DefaultDenyThreshold は N の既定（CCNAVI_DENY_REPEAT）。
 const DefaultDenyThreshold = 3
 
-// minDenyThreshold より小さい N は既定に戻す。1 は 1 回目の拒否が案内する代わりの方法を試す前に止まる。
+// minDenyThreshold より小さい N は既定に戻す。N が 1 だと、1 回目の拒否の時点で、代わりの方法を試す前に止まってしまう。
 const minDenyThreshold = 2
 
 const (
@@ -36,7 +36,7 @@ const (
 	noRule = "(deny)"
 )
 
-// DenyThreshold は書かれた N。読めない値と 2 未満は既定。
+// DenyThreshold は書かれた N。読めない値と 2 未満は既定値になる。
 func DenyThreshold(written string) int {
 	if n, err := pyfmt.ParseInt(ospath.Strip(written)); err == nil && n >= minDenyThreshold {
 		return n
@@ -55,7 +55,7 @@ func Normalize(subject string) string {
 	return strings.Join(strings.FieldsFunc(subject, ospath.IsSpace), " ")
 }
 
-// RuleOf は止めた理由の名前。判定を下したルールの id、無ければ根拠の種別。
+// RuleOf は、止めた理由の名前を返す。判定を下したルールの id。無ければ根拠の種別。
 func RuleOf(r *audit.Record) string {
 	if len(r.Rules) > 0 {
 		return r.Rules[0]
@@ -75,9 +75,8 @@ func denyPath(stateDir, session string) string {
 	return ospath.Join(stateDir, denyPrefix+fsio.SafeName(session, fsio.SafeNameLimit)+jsonExt)
 }
 
-// CountDeny はこの拒否を数え、同じキーのこれまでの回数（今回を含む）を返す。数えられなければ 0。
-// state の置き場が無い（--test）ときも、セッションが無いときも数えない（別のセッションの拒否と混ぜて、
-// 打ち直していない相手に「言い換えるな」と言わないため）。
+// CountDeny はこの拒否を数え、同じキーのこれまでの回数（今回を含む）を返す。数えられなければ 0 を返す。
+// 置き場が無いとき（--test）と、セッションが無いときは数えない。別のセッションの拒否と混ぜると、打ち直していない相手に「言い換えるな」と言ってしまうため。
 func CountDeny(stateDir string, r *audit.Record) int {
 	if stateDir == "" || r.Subject == "" || r.Session == "" {
 		return 0
@@ -115,8 +114,8 @@ func DenyNote(rule string, n int) string {
 const denyReportHead = "[ccnavi] このセッションで、同じ理由で同じ呼び出しを繰り返し止めました。" +
 	"言い換えて同じ呼び出しを繰り返していないか、ユーザの判断が必要な場面ではないかを確かめてください。"
 
-// DenyReport はターンの終わりにユーザへ言うこと。N 回に達したキーのうち、まだ言っていない回数のもの。
-// 言った回数は記録に残す。書けなければ言わない（覚えられないまま言うと、ターンの終わりごとに同じ行が並ぶ）。
+// DenyReport は、ターンの終わりにユーザへ言うことを返す。N 回に達したキーのうち、まだ言っていない回数のもの。
+// 言った回数は記録に残す。記録に書けなければ言わない。覚えられないまま言うと、ターンの終わりごとに同じ行が並ぶため。
 func DenyReport(stateDir, session string, n int) string {
 	if stateDir == "" || session == "" {
 		return ""

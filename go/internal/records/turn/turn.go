@@ -66,8 +66,8 @@ func Clear(state, session string) {
 	}
 }
 
-// Active はいまターン中のセッション。更新時刻が config.TurnStale より前の印（途中で落ちた・中断で
-// Stop が来なかった）と、読めない印は数えない。読むだけで、何も書かない・消さない。
+// Active は、いまターン中のセッション。更新時刻が config.TurnStale より前の印（途中で落ちた、中断で Stop が来なかった）と、読めない印は数えない。
+// Active は読むだけで、何も書かない・消さない。
 func Active(state string, now time.Time) []Ongoing {
 	if state == "" {
 		return nil

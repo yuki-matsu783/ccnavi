@@ -11,15 +11,14 @@ import (
 	"unicode"
 )
 
-// MaxIntDigits は Python が 10 進の文字列から作る整数の桁の上限（sys.get_int_max_str_digits の既定）。
+// MaxIntDigits は、Python が 10 進の文字列から整数を作るときの桁数の上限。sys.get_int_max_str_digits の既定値と同じ。
 const MaxIntDigits = 4300
 
-// ErrIntRange は ParseInt の値が Go の int に収まらないこと。Python の int() は読めるが、呼び手は
-// 読めない値と同じに扱う。
+// ErrIntRange は、値が Go の int に収まらないときのエラー。Python の int() はこの値を読めるが、呼び手は読めない値と同じに扱う。
 var ErrIntRange = errors.New("int に収まらない")
 
-// numberSpace は int()・float() が前後から外す空白。ASCII の 0x1c〜0x1f は str.strip() と違って外さない
-// （ASCII の外の空白だけを先に " " にし、残りは C の isspace で外すため）。
+// numberSpace は int() と float() が前後から外す空白。ASCII の 0x1c〜0x1f は str.strip() と違って外さない。
+// ASCII の外の空白は先に " " に置き換えてから、残りを C の isspace で外すため。
 func numberSpace(r rune) bool {
 	if r < 0x80 {
 		return strings.ContainsRune(" \t\n\v\f\r", r)
@@ -27,9 +26,9 @@ func numberSpace(r rune) bool {
 	return unicode.IsSpace(r)
 }
 
-// asciiNumber は Python が数を読む前に行う置き換え（_PyUnicode_TransformDecimalAndSpaceToASCII）と
-// 前後の空白の除去。ASCII の外の 10 進の数字（全角・アラビア数字など）は 0〜9 に、空白は " " にする。
-// ほかの ASCII の外の文字があれば読めない。
+// asciiNumber は、Python が数を読む前に行う置き換えと前後の空白の除去（CPython の _PyUnicode_TransformDecimalAndSpaceToASCII と同じ）。
+// ASCII の外の 10 進の数字（全角・アラビア数字など）は 0〜9 に、空白は " " に置き換える。
+// ASCII の外のほかの文字があれば、読めないとして false を返す。
 func asciiNumber(text string) (string, bool) {
 	var b strings.Builder
 	for _, r := range text {
@@ -47,7 +46,7 @@ func asciiNumber(text string) (string, bool) {
 	return strings.TrimFunc(b.String(), numberSpace), true
 }
 
-// digitValue は 10 進の数字の値。Unicode の 10 進の数字は 0 から 9 が続けて並ぶので、並びの頭から数える。
+// digitValue は 10 進の数字の値。Unicode の 10 進の数字は 0 から 9 が続けて並ぶので、前へたどって並びの先頭からの距離を数える。
 func digitValue(r rune) byte {
 	n := 0
 	for unicode.IsDigit(r - rune(n) - 1) {
@@ -56,8 +55,8 @@ func digitValue(r rune) byte {
 	return byte(n % 10)
 }
 
-// ParseInt は Python の int(text)。読めなければ Python の ValueError と同じ文のエラー、int に収まらなければ
-// ErrIntRange。
+// ParseInt は Python の int(text)。
+// 読めなければ Python の ValueError と同じ文のエラーを返し、int に収まらなければ ErrIntRange を返す。
 func ParseInt(text string) (int, error) {
 	n, err := ParseBigInt(text, 10)
 	if err != nil {
@@ -69,8 +68,8 @@ func ParseInt(text string) (int, error) {
 	return int(n.Int64()), nil
 }
 
-// ParseBigInt は Python の int(text, base)（base は 2〜36）。前後の空白、符号、基数の頭（0b・0o・0x）、
-// 数字の間の "_" を読む。エラーの文は Python の ValueError と同じ。
+// ParseBigInt は Python の int(text, base)。base は 2〜36。
+// 前後の空白、符号、基数の接頭辞（0b・0o・0x）、数字の間の "_" を読む。エラーの文は Python の ValueError と同じにする。
 func ParseBigInt(text string, base int) (*big.Int, error) {
 	invalid := func() error {
 		return fmt.Errorf("invalid literal for int() with base %d: %s", base, Head(Quote(text), 200))
@@ -137,11 +136,11 @@ func digitLimit(count int) error {
 		"value has %d digits; use sys.set_int_max_str_digits() to increase the limit", MaxIntDigits, count)
 }
 
-// floatSyntax は Python の float(text) が読む綴り（"_" を外した後）。16 進は読まない。
+// floatSyntax は、"_" を外した後に Python の float(text) が読む綴り。16 進は読まない。
 var floatSyntax = regexp.MustCompile(`^[+-]?(?:(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?|(?i:inf|infinity|nan))$`)
 
-// ParseFloat は Python の float(text)。数字の間の "_" を 1 つずつ読み、桁あふれは Python と同じく ±inf か 0 に
-// なる。読めなければ Python の ValueError と同じ文のエラー。
+// ParseFloat は Python の float(text)。数字の間の "_" を 1 つずつ読む。
+// 桁あふれは Python と同じく ±inf か 0 になる。読めなければ Python の ValueError と同じ文のエラーを返す。
 func ParseFloat(text string) (float64, error) {
 	invalid := fmt.Errorf("could not convert string to float: %s", Quote(text))
 	s, ok := asciiNumber(text)
@@ -160,7 +159,7 @@ func ParseFloat(text string) (float64, error) {
 		return 0, invalid
 	}
 	if strings.EqualFold(strings.TrimLeft(s, "+-"), "nan") {
-		return math.NaN(), nil // Go の ParseFloat は符号付きの nan を読まない
+		return math.NaN(), nil // Go の ParseFloat は符号付きの nan を読めないため、ここで扱う。
 	}
 	f, err := strconv.ParseFloat(s, 64)
 	if err != nil && !errors.Is(err, strconv.ErrRange) {

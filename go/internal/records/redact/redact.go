@@ -10,8 +10,8 @@ import (
 	"ccnavi/internal/infra/ospath"
 )
 
-// 伏せ方。短い値（short 字未満）は全部を Stars にし、長い値は頭と尻を残す。残すのは、同じ値が
-// 繰り返し出ているか、どの種類のトークンかを記録から見分けるため。短い値で残すと値の大半が読める。
+// 伏せ方。short 字未満の短い値は全部を Stars にし、長い値は頭と尻を残す。
+// 頭と尻を残すのは、記録から同じ値の繰り返しやトークンの種類を見分けるため。短い値で残すと、値の大半が読めてしまう。
 const (
 	short    = 18
 	keepHead = 6
@@ -20,7 +20,7 @@ const (
 	Stars = "***"
 )
 
-// Python の re の `\s`（str.isspace と同じ集合）。RE2 の `\s` は ASCII だけなので、字の集合で書く。
+// Python の re の `\s`（str.isspace と同じ集合）。RE2 の `\s` は ASCII だけなので、字を並べて書く。
 const spaceSet = `\t\n\v\f\r\x1c-\x1f \x{85}\x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}`
 
 const (
@@ -33,13 +33,13 @@ const (
 	bareBody = `[^` + spaceSet + `'"&;|,)}<>` + "`" + `\x00]+`
 	// 値。引用されていれば閉じ引用まで、されていなければ区切りの字の手前まで。
 	value = `(?:'(?P<sq>[^'\n]*)'|"(?P<dq>[^"\n]*)"|(?P<bare>` + bareBody + `))`
-	// 名前が秘密を指す `名前=値` の名前の終わり（GITHUB_TOKEN・db_password・MYSQL_PWD など）。途中に含むだけの
-	// 名前（tokenizer）は読まない。pwd は前に _ か - が付いた形だけ（単体の PWD はいまの場所）。
+	// 秘密を指す `名前=値` の名前の終わり（GITHUB_TOKEN・db_password・MYSQL_PWD など）。
+	// 名前の途中に含むだけのもの（tokenizer）は読まない。pwd は前に _ か - が付いた形だけ読む（単体の PWD はいまの場所）。
 	keyWords = `token|password|passwd|[_-]pwd|secret|secret[_-]?key|api[_-]?key|apikey|access[_-]?key|` +
 		`private[_-]?key|client[_-]?secret|auth[_-]?token|credentials?|cookie`
 	flagWords = `password|passwd|token|secret|api-key|apikey|access-token|auth-token`
-	// 名前の頭の長さの上限。限らないと `-` が続くだけの文字列で手間が長さの 2 乗で増え、実行前チェックの
-	// 期限を過ぎる（Python で 1.5 万字 10 秒）。これより長い名前は取りこぼす。
+	// 名前の頭の長さに上限を設ける。上限が無いと、`-` が続くだけの文字列で手間が長さの 2 乗に増え、実行前チェックの期限を過ぎてしまう（Python で 1.5 万字 10 秒）。
+	// そのため、これより長い名前は取りこぼす。
 	nameHead = `{0,64}`
 	// コマンドの範囲は、名前から次のコマンドの切れ目の手前まで。
 	segmentEnd = "\n;|&\x00"
@@ -291,9 +291,9 @@ func Mask(value string) string {
 	return string(runes[:keepHead]) + Stars + string(runes[len(runes)-keepTail:])
 }
 
-// spans は伏せる範囲を、重なりをまとめて前から並べる。同じ値に 2 つの形が当たる
-// （GITHUB_TOKEN=ghp_… は名前でもトークンの形でも当たる）ので、先に集めて 1 度だけ伏せる。
-// 形ごとに順に置き換えると、伏せた後を次の形がもう 1 度伏せ、残した頭と尻まで消える。
+// spans は伏せる範囲を、重なりをまとめて前から並べる。
+// 同じ値に 2 つの形が当たることがある（GITHUB_TOKEN=ghp_… は名前でもトークンの形でも当たる）。そこで先に範囲を集めて、1 度だけ伏せる。
+// 形ごとに順に置き換えると、伏せた後の文字列を次の形がもう 1 度伏せてしまい、残した頭と尻まで消える。
 func spans(text string) []span {
 	var found []span
 	for _, f := range forms {

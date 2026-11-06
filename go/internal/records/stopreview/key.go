@@ -20,9 +20,9 @@ const (
 	asciiSpace = " \t\n\r\v\f"
 )
 
-// SharedKey は hook と判定役が同じ Stop を指すためのキー。セッション ID と、transcript の末尾にある
-// サイドチェーンでないアシスタント行の uuid。導けなければ空。末尾の行が書きかけなら少し待って読み直し、
-// それでも読めなければ導けないとする（1 つ前の行の uuid で代用すると、hook と判定役でキーがずれる）。
+// SharedKey は、hook と判定役が同じ Stop を指すためのキー。セッション ID と、transcript 末尾のサイドチェーンでないアシスタント行の uuid からなる。
+// 導けなければ空を返す。末尾の行が書きかけなら少し待って読み直す。
+// それでも読めなければ導けないとする。1 つ前の行の uuid で代用すると、hook と判定役でキーがずれるため。
 func SharedKey(sessionID, transcript string) string {
 	if sessionID == "" || transcript == "" {
 		return ""

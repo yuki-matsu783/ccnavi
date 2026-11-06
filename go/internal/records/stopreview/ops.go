@@ -14,10 +14,10 @@ import (
 	"ccnavi/internal/infra/pyjson"
 )
 
-// approval-request の操作実績。実行前（PreToolUse）に呼び出しを登録し（Register）、ccnavi-ticket.sh が出口で
-// どの経路を通っても書く結果ファイルを、実行後に tool_use_id・識別子・時刻の範囲で結び付ける（Bind）。
-// 標準出力の識別行は、出力が切られると消えるので頼らない。バックグラウンドの実行などで結べなかったものは
-// Stop で結び直し（Rebind）、それでも結べなければ未連携にする。
+// approval-request の操作実績。実行前（PreToolUse）に呼び出しを登録する（Register）。
+// ccnavi-ticket.sh が出口でどの経路を通っても書く結果ファイルを、実行後に tool_use_id・識別子・時刻の範囲で結び付ける（Bind）。
+// 標準出力の識別行は、出力が切られると消えるので頼らない。
+// バックグラウンドの実行などで結べなかったものは、Stop で結び直し（Rebind）、それでも結べなければ未連携にする。
 
 // Route は approval-request の経路。
 type Route string

@@ -100,8 +100,8 @@ func validate(result any, plan Plan) (*pyjson.Object, error) {
 	if !ok {
 		return nil, rejected("results がリストではない")
 	}
-	// 本文が無い版の R2 は対象外。判定役が余分に出した行は、受理せず捨てる（記録ごと拒否すると、ほかの
-	// 基準の結果まで失う。実機で余分な行を出す例があった）。
+	// 本文が無い版の R2 は対象外。判定役が余分に出した行は、受理せず捨てる。
+	// 記録ごと拒否すると、ほかの基準の結果まで失う。実機で余分な行を出す例があった。
 	kept := []any{}
 	for _, r := range rows {
 		if row, ok := r.(*pyjson.Object); ok && row.Value("criterion") == r2 {
@@ -298,7 +298,7 @@ type AcceptInput struct {
 
 // Accept は record の本体。結果を検証して最終分類を確定し、agent hook の返り値を返す。
 // 計画か試行が無い、または試行が実行中でなければ何もしない。拒否したときは未検査で閉じて止めない。
-// 受理した結果が不備検出で enable のときだけ差し戻す。再判定は差し戻さず、元の試行に解消か未解消を残す。
+// 不備検出の結果は、enable のときだけ差し戻す。再判定は差し戻さず、元の試行に解消か未解消を残す。
 func (s Store) Accept(key string, in AcceptInput) Return {
 	plan, ok := s.ReadPlan(key)
 	if !ok {

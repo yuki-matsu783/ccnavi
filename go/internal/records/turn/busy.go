@@ -6,8 +6,8 @@ import (
 	"ccnavi/internal/infra/pyjson"
 )
 
-// RecordBusy はメインエージェントの Stop で、動かしている作業（バックグラウンドのコマンド・予約した繰り返し）が
-// 残っていたかを書く。残っていれば印を置き、残っていなければ消す。
+// RecordBusy は、メインエージェントの Stop で動かしている作業（バックグラウンドのコマンドや予約した繰り返し）が残っているかを書く。
+// 残っていれば印を置き、残っていなければ消す。
 func RecordBusy(state, session string, busy bool) {
 	if state == "" || session == "" {
 		return
@@ -20,8 +20,8 @@ func RecordBusy(state, session string, busy bool) {
 	fsio.Remove(file)
 }
 
-// Busy は前のターンの終わりに、動かしている作業が残っていたか。在るのに読めない印は残っているものとして読む
-// （覚えられないまま変更を受け入れて保護を外すより、受け入れない側が安全）。
+// Busy は、前のターンの終わりに動かしている作業が残っていたかを返す。印があるのに読めないときは、残っているものとして読む。
+// 覚えられないまま変更を受け入れて保護を外すより、受け入れない側が安全なため。
 func Busy(state, session string) bool {
 	if state == "" || session == "" {
 		return false

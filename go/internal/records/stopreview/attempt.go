@@ -110,8 +110,8 @@ func (s Store) readAttempt(aid string) *pyjson.Object {
 }
 
 // WritePlan は計画を 1 件書いて試行を作り、試行 ID を返す。同じキーで呼び直しても結果は変わらない（冪等）。
-// 候補でない計画は、作ると同時に ccnavi が最終分類まで確定する。在るのに読めない試行は未検査で確定する
-// （次の Stop は別のキーなので新しい試行になる）。計画より先に material が来ていたら、その試行を進める。
+// 候補でない計画は、作ると同時に ccnavi が最終分類まで確定する。在るのに読めない試行は、未検査で確定する。
+// 次の Stop は別のキーなので、新しい試行になる。計画より先に material が来ていたら、その試行を進める。
 // 試行を作れない（権限・ディスク）ときは、書けなかった理由の文をエラーで返す。
 func (s Store) WritePlan(key string, plan Plan, now time.Time) (string, error) {
 	aid := AttemptID(key, plan.Rejudge)
@@ -272,9 +272,8 @@ func (s Store) ExpireOverdue(now time.Time) []string {
 	return out
 }
 
-// ConsumeContinuation は stop_hook_active の Stop で、同じセッションに差し戻した試行があれば消費して、その
-// 試行 ID を返す。差し戻しから期限を過ぎたものは消費しない（ユーザが割り込んだ後の別の連鎖を、AI による
-// 継続と取り違えないため）。
+// ConsumeContinuation は、stop_hook_active の Stop で、同じセッションに差し戻した試行があれば消費して、その試行 ID を返す。
+// 差し戻しから期限を過ぎたものは消費しない。ユーザが割り込んだ後の別の連鎖を、AI による継続と取り違えないため。
 func (s Store) ConsumeContinuation(session string, now time.Time) (string, bool) {
 	when := fsio.UnixSeconds(now)
 	window := config.StopReviewTTL.Value().Seconds()
@@ -290,8 +289,7 @@ func (s Store) ConsumeContinuation(session string, now time.Time) (string, bool)
 	return found, ok
 }
 
-// resolveOriginal は再判定の結果を元の試行に残す。解消と言えるのは終了可のときだけで、未検査・対象外では
-// 決められない。
+// resolveOriginal は再判定の結果を元の試行に残す。解消と言えるのは終了可のときだけ。未検査や対象外では決められない。
 func (s Store) resolveOriginal(original string, final Final) {
 	attempt := s.readAttempt(original)
 	if attempt == nil {

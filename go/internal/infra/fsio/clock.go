@@ -10,16 +10,16 @@ import (
 	"ccnavi/internal/infra/pyfmt"
 )
 
-// StampLayout はマーカーと記録に書く時刻の形（Python の "%Y-%m-%dT%H:%M:%S%z"）。
+// StampLayout は、マーカーと記録に書く時刻の形。Python の "%Y-%m-%dT%H:%M:%S%z" に当たる。
 const StampLayout = "2006-01-02T15:04:05-0700"
 
-// stampFormat はエラーの文に出す、Python の書式の表記。
+// stampFormat は、エラーの文に出す Python の書式の表記。
 const stampFormat = "%Y-%m-%dT%H:%M:%S%z"
 
 // fixedStamp は FixClock で固定した時刻。空なら手元の時計を読む。
 var fixedStamp string
 
-// Stamp はマーカーと記録に書く時刻。手元の時計、オフセット付き。FixClock の間は固定した時刻。
+// Stamp は、マーカーと記録に書く時刻。手元の時計の値で、オフセット付き。FixClock の間は固定した時刻を返す。
 func Stamp() string {
 	if fixedStamp != "" {
 		return fixedStamp
@@ -27,9 +27,9 @@ func Stamp() string {
 	return time.Now().Format(StampLayout)
 }
 
-// FixClock は、返した関数を呼ぶまでの Stamp を fixed に固定する。空なら固定しない（外側の固定は残る）。
+// FixClock は、返した関数を呼ぶまで Stamp を fixed に固定する。fixed が空なら固定しない（外側の固定は残る）。
 //
-// 承認の plan が書く時刻を固定し、Chrome と手元が同じ入力から同じバイト列を出すために使う。
+// 承認の plan が書く時刻を固定する。Chrome と手元が同じ入力から同じバイト列を出すために使う。
 // fixed が StampLayout の形でなければ、固定せずにエラーを返す。
 func FixClock(fixed string) (restore func(), err error) {
 	before := fixedStamp
@@ -42,12 +42,12 @@ func FixClock(fixed string) (restore func(), err error) {
 	return func() { fixedStamp = before }, nil
 }
 
-// stampPattern は Python の strptime が "%Y-%m-%dT%H:%M:%S%z" で受ける形。T は大文字小文字を問わず、
-// 月日時分秒は 1 桁も受け、%z は Z・±HHMM・±HH:MM（秒と小数秒も付けられる）を受ける。
+// stampPattern は、Python の strptime が "%Y-%m-%dT%H:%M:%S%z" で受ける形。T は大文字でも小文字でもよい。
+// 月日時分秒は 1 桁でもよい。%z は Z、±HHMM、±HH:MM を受け、秒と小数秒も付けられる。
 var stampPattern = regexp.MustCompile(`^(\d{4})-(1[0-2]|0[1-9]|[1-9])-(3[01]|[12]\d|0[1-9]|[1-9]| [1-9])[Tt]` +
 	`(2[0-3]|[0-1]\d|\d):([0-5]\d|\d):(6[0-1]|[0-5]\d|\d)(Z|[+-](\d\d):?[0-5]\d(:?[0-5]\d(\.\d{1,6})?)?)$`)
 
-// validStamp は strptime が受け、datetime が作れる時刻か（2 月 30 日や 60 秒は作れない）。
+// validStamp は、strptime が受けて datetime が作れる時刻かを調べる。2 月 30 日や 60 秒は作れない。
 func validStamp(text string) bool {
 	m := stampPattern.FindStringSubmatch(text)
 	if m == nil {
@@ -67,10 +67,10 @@ func validStamp(text string) bool {
 	return time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC).Day() == day
 }
 
-// UnixSeconds は記録に書く UNIX 秒（Python の time.time() と同じ小数）。
+// UnixSeconds は、記録に書く UNIX 秒。Python の time.time() と同じ小数の形。
 func UnixSeconds(t time.Time) float64 { return float64(t.UnixNano()) / 1e9 }
 
-// FromUnixSeconds は記録の UNIX 秒を時刻に戻す。小数の部分はナノ秒に丸める。
+// FromUnixSeconds は、記録の UNIX 秒を時刻に戻す。小数部分はナノ秒に丸める。
 func FromUnixSeconds(f float64) time.Time {
 	whole, frac := math.Modf(f)
 	return time.Unix(int64(whole), int64(math.Round(frac*1e9)))

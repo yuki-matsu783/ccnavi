@@ -22,23 +22,23 @@ const (
 	Deny  Decision = "deny"
 	// Skip は判定に至らなかった。必ず Reason が付くので「判定しなかった」と「判定して何も無かった」を分けられる。
 	Skip Decision = "skip"
-	// Handover は判定を Claude Code の権限モードへ渡した。Ask と分けるのは、ルールが言及していない呼び出しの
-	// 総量（ルールを足すべきか）と、誰かが実際に判断した回（ガードが効いたか）を別に数えるため。
+	// Handover は判定を Claude Code の権限モードへ渡した。
+	// Ask と分けるのは、ルールが言及していない呼び出しの総量（ルールを足すべきか）と、誰かが実際に判断した回（ガードが効いたか）を別々に数えるため。
 	Handover Decision = "handover"
 	// Nudge はターンの終わりの促し。Deny の集計（止めた呼び出しの数）に混ぜない。
 	Nudge Decision = "nudge"
 )
 
 // Reason は判定に至らなかった理由。実行後チェックだけが出す理由は、その段が自分で持つ。
-// ルールが読めないことは理由ではなく、組み込みの既定で判定して Fallback に残す（拒否にすると、壊れた
-// ファイルを直す呼び出しまで止まって戻れなくなる）。
+// ルールが読めないことは理由にせず、組み込みの既定で判定して Fallback に残す。
+// 拒否にすると、壊れたファイルを直す呼び出しまで止まって、戻れなくなるため。
 type Reason string
 
 const (
 	ReasonModeDisabled     Reason = "mode-disabled"
 	ReasonEventNotChecked  Reason = "event-not-checked"
 	ReasonNoSubject        Reason = "no-subject"
-	ReasonNothingToRun     Reason = "nothing-to-run" // コメントだけの行のように、実行される部分が無い
+	ReasonNothingToRun     Reason = "nothing-to-run" // コメントだけの行など、実行される部分が無い
 	ReasonPayloadUnusable  Reason = "payload-unusable"
 	ReasonDeadlineExceeded Reason = "deadline-exceeded"
 	// ReasonInternalError は ccnavi 自身の失敗。例外の型と場所は Detail に入れる。
@@ -47,10 +47,10 @@ const (
 
 const (
 	// SubjectLimit は記録に残すコマンドやパスの上限（字数）。ヒアドキュメントでファイル 1 本の中身を
-	// 書けるので、1 回の呼び出しが記録を膨らませないようにする。
+	// ヒアドキュメントでファイル 1 本の中身を書けるため、1 回の呼び出しで記録が膨らまないようにする。
 	SubjectLimit = 1000
-	// redactLimit は伏せる前に切る長さ。上限の手前で始まって上限をまたぐ値を伏せられるだけの余りを持たせ、
-	// どれだけ長くても伏せる手間が実行前チェックの期限に届かないようにする。
+	// redactLimit は、伏せる前に切る長さ。上限の手前で始まって上限をまたぐ値も伏せられるだけの余りを持たせる。
+	// どれだけ長くても、伏せる手間が実行前チェックの期限に届かないようにするため。
 	redactLimit = SubjectLimit * 4
 	// RedactFailed は伏せる処理が失敗したときに、その欄へ平文の代わりに書く文。
 	RedactFailed = "[ccnavi: 機密情報を伏せる処理が失敗したため、この欄の中身は記録していません]"
@@ -59,15 +59,15 @@ const (
 // Record は記録の 1 行。欄の意味は記録を読む側（--test・集計）との約束。
 type Record struct {
 	Mode string
-	// PermissionMode は呼び出しが来たときの Claude Code の権限モード。ルールが言及しない呼び出しの結末が
-	// これで変わるので、残さないと同じ Subject に別の結末が並ぶ理由を説明できない。
+	// PermissionMode は、呼び出しが来たときの Claude Code の権限モード。ルールが言及しない呼び出しの結末は、これで変わる。
+	// 残さないと、同じ Subject に別の結末が並んだ理由を説明できないため残す。
 	PermissionMode string
 	Event          string
 	Tool           string
 	Subject        string
 	Decision       Decision
-	// Enforced はその判定を適用したか。warn は deny に達して偽のまま残す（止めるはずだったものと実際に
-	// 止めたものの両方に答えるため）。
+	// Enforced は、その判定を適用したか。warn のときは、deny に達しても偽のまま残す。
+	// 止めるはずだったものと実際に止めたものの両方に答えるため。
 	Enforced bool
 	// Code は判定の根拠の種別（拒否の文の先頭と同じ）。
 	Code   string
@@ -111,8 +111,8 @@ type Log struct {
 // NewLog は path に書く Log。経過時間はここから測る。
 func NewLog(path string) *Log { return &Log{path: path, start: time.Now()} }
 
-// Write は 1 件を追記する。時刻と経過時間はここで埋める。失敗は返すが、呼び手は判定を変えない
-// （記録の 1 行を失うほうが、帳簿の都合で実行の可否が決まるより害が小さい）。
+// Write は 1 件を追記する。時刻と経過時間はここで埋める。失敗は返すが、呼び手は判定を変えない。
+// 記録の 1 行を失うほうが、帳簿の都合で実行の可否が決まるより害が小さいため。
 func (l *Log) Write(r *Record) error {
 	if l.path == "" {
 		return nil
@@ -188,8 +188,7 @@ func timestamp(now time.Time) string {
 }
 
 // Redacted は秘密の形を伏せた文字列。伏せる処理が失敗しても平文を返さず RedactFailed にする。
-// 記録は判定を出した後に書くので、ここで落ちると hook が 0 以外で終わり、出したはずの deny が読まれずに
-// 呼び出しが通る。
+// 記録は判定を出した後に書くので、ここで落ちると hook が 0 以外で終わる。すると、出したはずの deny が読まれずに呼び出しが通ってしまう。
 func Redacted(text string) (out string) {
 	defer func() {
 		if recover() != nil {
