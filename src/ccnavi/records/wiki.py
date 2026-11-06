@@ -361,6 +361,10 @@ def pending(wiki: Wiki) -> list[Impact]:
     return sorted((i for i in wiki.impacts if i.status == PENDING), key=lambda i: key(i.proposal))
 
 
+# 統合の子がパターンに「反映」できる観測元の数の下限。1 件だけの気づきは、環境の癖や一回限りの
+# 事情のことが多いので、パターンにしない。提案の候補にする閾値（下の DEFAULT_SOURCES）とは別。
+MIN_SOURCES_TO_REFLECT = 2
+
 # 観測元の数の閾値と、通知する候補の件数の既定。
 # 書かれた値は、settings の LEARNING_SOURCES_ENV と LEARNING_NOTICE_COUNT_ENV から読む。
 DEFAULT_SOURCES = 3

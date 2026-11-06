@@ -5,7 +5,8 @@
 未コミットの変更は見ない（届くのはコミットしたものだけ）。
 
 書式: frontmatter の後の `## ` で始まる行を 1 件の気づきの見出しとする。処理の行は、その節の中の
-`- 処理: 反映 <パターン名>` か `- 処理: 対象外 <理由>` の 1 行。
+`- 処理: 反映 <パターン名>`・`- 処理: 対象外 <理由>`・`- 処理: issue <番号> <理由>` のどれか 1 行。
+観測元が 1 件だけのパターンへの `反映` と、`信号: 誤り` の節の `対象外` は、処理済みと見なさない。
 
 2 段の検査:
 - 読み取りの検査: 読めない・通常のファイルでない・frontmatter が無い／壊れている・`learnings` が
@@ -31,12 +32,20 @@ WATCHED = (LEARNING_DIR, PATTERN_DIR, INBOX_DIR)
 
 PROCESS_REFLECT = "反映"
 PROCESS_SKIP = "対象外"
+PROCESS_ISSUE = "issue"
+# 節の `- 信号: 誤り`（読んだ手順や文書の誤り＝仕様バグの学び）は、対象外にして消せない。
+SIGNAL_ERROR = "誤り"
 
 TIMEOUT = 5.0
 _REGULAR = ("100644", "100755")
 _PROCESS_LINE = re.compile(r"^- 処理:")
+_SIGNAL_LINE = re.compile(r"^- 信号:[ \t\u3000]*(\S+)")
+_ISSUE_REST = re.compile(r"^#?\d+[ \t\u3000]+\S")
 # 区切りには、日本語入力で入りやすい全角空白（U+3000）も使える。
-_PROCESS_FORM = re.compile(r"^- 処理:[ \t\u3000]+(反映|対象外)(?:[ \t\u3000]+(.*\S))?[ \t\u3000]*$")
+_PROCESS_KINDS = f"{PROCESS_REFLECT}|{PROCESS_SKIP}|{PROCESS_ISSUE}"
+_PROCESS_FORM = re.compile(
+    rf"^- 処理:[ \t\u3000]+({_PROCESS_KINDS})(?:[ \t\u3000]+(.*\S))?[ \t\u3000]*$"
+)
 
 
 @dataclass
@@ -46,10 +55,12 @@ class Section:
     title: str
     # 処理の行（`- 処理:` で始まる行）の原文。
     process_lines: list[str] = field(default_factory=list)
+    # `- 信号:` の値（無ければ空）。
+    signal: str = ""
 
     @property
     def process(self) -> tuple[str, str] | None:
-        """`(反映|対象外, 後ろ)`。行が 1 つで形が合うときだけ。"""
+        """`(反映|対象外|issue, 後ろ)`。行が 1 つで形が合うときだけ。"""
         if len(self.process_lines) != 1:
             return None
         found = _PROCESS_FORM.match(self.process_lines[0])
@@ -124,6 +135,8 @@ def parse(path: str, ident: str, text: str) -> tuple[Record | None, str]:
             sections.append(Section(title=line[3:].strip()))
         elif sections and _PROCESS_LINE.match(line):
             sections[-1].process_lines.append(line)
+        elif sections and (sig := _SIGNAL_LINE.match(line)):
+            sections[-1].signal = sig.group(1)
     return Record(path, ident, count, sections), ""
 
 
@@ -140,7 +153,8 @@ def consistency_problem(record: Record) -> str:
         if sec.process_lines and sec.process is None:
             return (
                 f"「{sec.title}」の処理の行の形が分からない"
-                "（`- 処理: 反映 <パターン名>` か `- 処理: 対象外 <理由>`）"
+                "（`- 処理: 反映 <パターン名>`・`- 処理: 対象外 <理由>`・"
+                "`- 処理: issue <番号> <理由>`）"
             )
     return ""
 
@@ -250,7 +264,15 @@ def _section_problem(tree_root: str, ident: str, sec: Section) -> str:
         return "処理の行が無い"
     kind, rest = got
     if kind == PROCESS_SKIP:
+        if sec.signal.startswith(SIGNAL_ERROR):
+            return (
+                "`信号: 誤り`（仕様バグの学び）は `処理: 対象外` で消せない"
+                "（issue にするなら `- 処理: issue <番号> <理由>`、パターンにするなら `反映`）"
+            )
         return "" if rest else "`処理: 対象外` の後ろに理由が無い"
+    if kind == PROCESS_ISSUE:
+        ok = _ISSUE_REST.match(rest)
+        return "" if ok else "`処理: issue` の後ろは `<番号> <理由>` の形で書く"
     if not rest:
         return "`処理: 反映` の後ろにパターン名が無い"
     sources = pattern_sources(tree_root, rest)
@@ -258,6 +280,12 @@ def _section_problem(tree_root: str, ident: str, sec: Section) -> str:
         return f"`処理: 反映 {rest}` が指すパターンが無い（{PATTERN_DIR}/{rest}.md）"
     if pathcase.fold(ident) not in {pathcase.fold(s) for s in sources}:
         return f"パターン {rest} の `sources` に観測元の ID（{ident}）が無い"
+    if len(sources) < wiki.MIN_SOURCES_TO_REFLECT:
+        return (
+            f"パターン {rest} の観測元が {len(sources)} 件で、反映には"
+            f" {wiki.MIN_SOURCES_TO_REFLECT} 件以上が要る"
+            "（1 件の気づきは `対象外 <理由>` か `issue <番号> <理由>` にする）"
+        )
     return ""
 
 
