@@ -13,7 +13,7 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
 ## issue・MRの指定を受けたとき
 
 - ホスト（issue・MRなど）の操作は、ccnaviのスクリプト（`ccnavi-start.sh`・`ccnavi-review.sh`など）がある操作ならスクリプトを優先する。ない操作はglabを基本にし、ghはoriginがGitHubのときだけ使う。
-- チケット作業は必ずissueとMRのセットで進める。issueが無ければ`ccnavi-start.sh --new-issue <タイトル>`で作ってから進める（タイトルの似たopenのissue・MRがあれば作らずに止まり、ユーザに聞く。詳しくは下の表）。ホストに届かないなどで作れなければ、ユーザに作ってもらう。
+- チケット作業は必ずissueとMRのセットで進める。issueが無ければ`ccnavi-start.sh --new-issue <タイトル>`で作ってから進める（タイトルの似たopenのissue・MRがあれば作らずに止まり、ユーザに聞く。詳しくは下の表）。`--new-issue`を打っても、ホストに届かないなどで作れなかったときだけ、ユーザに作ってもらう（打つ前にユーザへ頼まない）。
   最初に`sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --check`を打ち、ホストのAPIとgitのリモートが使える状態かを確かめる（下の「事前確認」）。
 - issueやMRを指定して作業を頼まれたら（`#152`・`!5`・URLなど。ただし、ユーザが直接作業を明示したときは除く。その扱いは[ticket-work.md](ticket-work.md)の「ユーザが直接作業を明示したとき」）、ワークツリーを切る前に
   `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue <番号>`（MRなら`--mr <番号>`。`--issue`と`--mr`は一緒に渡せる）を打つ。
@@ -42,7 +42,7 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
   - 既存のMRを採用するとき（`--issue M`でも`--mr N`でも）は、MRの採用の確認のあとで、そのMRが**閉じる**issueを読む（GitHubでGraphQLが使えない環境では、MRの本文の`Closes #n`・`Fixes #n`・`Resolves #n`を読む。コードブロック・コメント・引用行の中の文字は対象外）。`--issue`があれば、それが含まれること（参照しているだけでは足りない。説明欄に`Closes #M`を書くようユーザに頼む）。無ければ、ちょうど1件に決まること（0件は終了コード1、2件以上は一覧を出して3）。読めなければ終了コード4で、MCPなどで確かめて打ち直す
   - 作りかけ（初期コミットだけで、MRが無い）の再開は、MRを作って続ける。それ以外の、MRの無い候補は成功させない
 
-  事前確認（`ccnavi-start.sh --check`。単独で使う）: 先頭の行は`対象リポジトリ: …`、続けて1項目1行で`確認: <項目>: OK|NG|未確認|省略|注意 (<理由>)`、最後に結論の1行と、必要なら`次:`を1本出す。項目はtools（git・jq）・origin（ホストのURLで読める）・integration（統合先が決まる）・api（認証とリポジトリの有無）・access（書き込みの権限）・git（リモートに届く）・ident（gitの作成者。authorとcommitterの両方が決まる。手元の設定だけを見る）。identがNGなら、ユーザに`git config user.name`と`user.email`の設定を頼んで返事を待つ（エージェントは設定しない）。`ccnavi-ticket.sh`のstart・finish・approval-request・consolidateの自動の確認も同じ項目を見る（コミットを積むため）。
+  事前確認（`ccnavi-start.sh --check`。単独で使う）: 先頭の行は`対象リポジトリ: …`、続けて1項目1行で`確認: <項目>: OK|NG|未確認|省略|注意 (<理由>)`、最後に結論の1行と、`次:`を1本出す（OKのときは、issueが無い依頼なら`--new-issue`を先に打つよう案内し、作れなかったときだけユーザに頼むよう補う。それ以外は不備の直し方）。項目はtools（git・jq）・origin（ホストのURLで読める）・integration（統合先が決まる）・api（認証とリポジトリの有無）・access（書き込みの権限）・git（リモートに届く）・ident（gitの作成者。authorとcommitterの両方が決まる。手元の設定だけを見る）。identがNGなら、ユーザに`git config user.name`と`user.email`の設定を頼んで返事を待つ（エージェントは設定しない）。`ccnavi-ticket.sh`のstart・finish・approval-request・consolidateの自動の確認も同じ項目を見る（コミットを積むため）。
   結果は4種類で、`ng`（確定した不備。直すにはユーザの対応が要る）・`unverified`（通信できない・時間切れ・応答が読めない）・`skipped`（前提の項目がokでないので確かめなかった）・`ok`。全体は、ngが1つでもあればng、無くてunverifiedかskippedがあればunverified、それ以外はok。
   終了コード: 0 使える / 1 不備がある（ng） / 2 引数の誤り / 4 確かめられなかった項目がある。
   「権限が足りる」は、リポジトリのロール上は書き込める、の意味に限る（トークンのscope・ブランチの保護・APIとgitが別の資格情報で動いていることは確かめていない）。`--issue`・`--mr`も、何かを作る前に同じ確認の一部（認証・リポジトリの有無・権限）を行い、足りなければ終了コード1で止まる。1回の問い合わせは15秒、全体は60秒まで

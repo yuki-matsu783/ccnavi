@@ -28,6 +28,7 @@ from typing import TextIO
 
 from ...infra import fsio, settings, tree
 from ...policy import rules, texts
+from ...records import wiki
 from ..approval import marks as approval_marks
 from ..approval import ops as approval_ops
 from ..approval import store as approval
@@ -59,8 +60,12 @@ def _body(items: list[learning_records.Item]) -> str:
         "",
         "## 進め方",
         "",
-        "- 気づき 1 件ごとに判定し、節の末尾に `- 処理: 反映 <パターン名>` か",
-        "  `- 処理: 対象外 <理由>` の 1 行を書く（食い違いのある節は処理の行を直す）",
+        "- 気づき 1 件ごとに判定し、節の末尾に `- 処理: 反映 <パターン名>`・",
+        "  `- 処理: 対象外 <理由>`・`- 処理: issue <番号> <理由>` のどれか 1 行を書く",
+        "  （食い違いのある節は処理の行を直す）",
+        f"- 観測元が {wiki.MIN_SOURCES_TO_REFLECT} 件に満たないパターンへの `反映` は通らない",
+        "  （`対象外` か `issue` にする）。",
+        "  `信号: 誤り` の節の `対象外` も通らない（`反映` か `issue` にする）",
         "- 反映するときは、似たパターンがあれば `sources` に観測元の ID を足して言い直し、",
         "  無ければ `docs/wiki/patterns/<名前>.md` を新しく作る",
         "- 記録には処理の行を足すか直すだけにする。受信箱のファイルは判定してから消すだけにする",

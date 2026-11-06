@@ -395,7 +395,10 @@ if [ -n "$check" ]; then
 		printf '確認: %s\n' "$ccnavi_pf_line_text"
 	done
 	case "$ccnavi_pf_result" in
-	ok) printf '結論: チケット作業を始められる状態です。\n' ;;
+	ok)
+		printf '結論: チケット作業を始められる状態です。\n'
+		ccnavi_text "$root" NEXT_START_CHECK_OK
+		;;
 	ng) printf '結論: 不備があり、チケット作業を始められません。\n' ;;
 	*) printf '結論: 確かめられなかった項目があります（省略は前提の項目が OK でないため確かめていません）。\n' ;;
 	esac
@@ -1631,7 +1634,7 @@ if [ "$total" -eq 0 ]; then
 	if [ "$host_rc" -eq 0 ]; then
 		issue_title_get || issue_rc=$?
 		case "$issue_rc" in
-		2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。番号を作らず、ユーザに確かめてください。issue が無ければ、--new-issue <タイトル> で作るか、ユーザに作ってもらい、その番号で打ち直します（チケット作業は issue と MR のセットです）。" 2 ;;
+		2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。番号を作らず、ユーザに確かめてください。issue が無ければ、--new-issue <タイトル> を先に打ち、作れなければユーザに作ってもらい、その番号で打ち直します（チケット作業は issue と MR のセットです）。" 2 ;;
 		1)
 			# API が失敗して実在を確かめられなかった。--slug・--title があっても無確認で進まない
 			# （確かめた後の再実行は --mcp-checked を付ける）
@@ -1823,7 +1826,7 @@ if [ -n "$resume" ]; then
 	issue_rc=0
 	issue_title_get || issue_rc=$?
 	case "$issue_rc" in
-	2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。何も作成せずに中断しました。ユーザに確かめてください。issue が無ければ、--new-issue <タイトル> で作るか、ユーザに作ってもらい、その番号で打ち直します。" 2 ;;
+	2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。何も作成せずに中断しました。ユーザに確かめてください。issue が無ければ、--new-issue <タイトル> を先に打ち、作れなければユーザに作ってもらい、その番号で打ち直します。" 2 ;;
 	3) fail issue-is-pr "#${number} は issue ではなく PR です。MR の番号なら --mr ${number} を使ってください。" 2 ;;
 	esac
 	merged_check "$cb"

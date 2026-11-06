@@ -2,6 +2,14 @@
 # 引数の並び（real_args_q など）は sh が引用を済ませて渡す。
 version: 1
 messages:
+  NEXT_START_CHECK_OK:
+    kind: next
+    values: []
+    next: |-
+      issue を指定された依頼なら {script:ccnavi-start.sh} --issue <番号> を打つ。issue が無い依頼は、ユーザに頼む前に自分で {script:ccnavi-start.sh} --new-issue <タイトル> を打つ
+    note: |-
+      ユーザに issue の作成を頼んでよいのは、--new-issue を打っても作れなかったときだけ。作れなかったときの進め方は、--new-issue の出力の 次: に従う
+
   NEXT_START_DRY_RUN:
     kind: next
     values: [real_args_q]
@@ -83,7 +91,7 @@ messages:
     kind: next
     values: [host]
     next: |-
-      ユーザに、ブラウザで issue を作って番号を伝えるよう頼んで返事を待つ。番号が分かったら {script:ccnavi-start.sh} --issue <番号> を打つ。直接実装には切り替えない
+      --new-issue で作れなかったので、ユーザに、ブラウザで issue を作って番号を伝えるよう頼んで返事を待つ。番号が分かったら {script:ccnavi-start.sh} --issue <番号> を打つ。直接実装には切り替えない
     note: |-
       glab を {host} に認証する（または GITLAB_TOKEN を置く）と、--new-issue で作れるようになる
 

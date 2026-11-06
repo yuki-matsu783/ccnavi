@@ -28,7 +28,7 @@ keywords: [wiki, パターン, impact, sources, target, purpose.md, 知識, 蓄�
 
 | ファイル | 必須のキー |
 |---|---|
-| `patterns/<名前>.md` | `type: learning-wiki`、`target`（反映先 1 つ。`rule` `risk` `phase` `template` `skill` `docs` のどれか）、`sources`（観測元の ID の一覧。空にしない） |
+| `patterns/<名前>.md` | `type: learning-wiki`、`target`（反映先 1 つ。`rule` `risk` `phase` `template` `skill` `docs` のどれか）、`sources`（観測元の ID の一覧。空にしない。統合の子が反映できるのは 2 件以上のパターンだけ） |
 | `impact/<提案>.md` | `type: learning-wiki`、`proposal`（提案の名前）、`target`、`files`（対象のパスの一覧）、`patterns`（動機のパターン名: そのときの観測元の数）、`status`（承認待ち・承認・却下・延期）、`decided_at`（決着の日時。タイムゾーン付き。承認待ちのときだけ空にできる）。決着の理由は `reason` に書く |
 
 一覧は `sh .ccnavi/scripts/ccnavi-launcher.sh --learnings`、経過は git の履歴で見る（`index.md` と `log.md` は置かない）。

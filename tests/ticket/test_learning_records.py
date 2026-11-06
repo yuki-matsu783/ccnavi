@@ -142,6 +142,51 @@ class PendingTest(unittest.TestCase):
         self.commit()
         self.assertEqual(lr.pending(self.root).items, [])
 
+    def test_reflect_needs_two_sources(self):
+        self.pattern("pat", "[c-01-01]")
+        self.record("c-01-01", 1, SEC.format(t="a", p="- 処理: 反映 pat"))
+        self.commit()
+        self.assertIn("1 件", lr.pending(self.root).items[0].why)
+        # 大文字小文字だけが違う ID は同じ観測元
+        self.pattern("pat", "[c-01-01, C-01-01]")
+        self.commit()
+        self.assertIn("1 件", lr.pending(self.root).items[0].why)
+        self.pattern("pat", "[c-01-01, other]")
+        self.commit()
+        self.assertEqual(lr.pending(self.root).items, [])
+
+    def test_error_signal_cannot_be_skipped(self):
+        sec = "## a\n\n- 信号: 誤り\n- 内容: x\n{p}\n"
+        self.record("c-01-01", 1, sec.format(p="- 処理: 対象外 環境の都合"))
+        self.commit()
+        self.assertIn("誤り", lr.pending(self.root).items[0].why)
+        # 値に注釈が付いても誤りとして扱う
+        note = "## a\n\n- 信号: 誤り（仕様バグ）\n{p}\n"
+        self.record("c-01-01", 1, note.format(p="- 処理: 対象外 環境の都合"))
+        self.commit()
+        self.assertIn("誤り", lr.pending(self.root).items[0].why)
+        self.record("c-01-01", 1, sec.format(p="- 処理: issue 12 手順書の誤り"))
+        self.commit()
+        self.assertEqual(lr.pending(self.root).items, [])
+
+    def test_error_signal_can_be_reflected_with_two_sources(self):
+        self.pattern("pat", "[c-01-01, other]")
+        sec = "## a\n\n- 信号: 誤り\n- 内容: x\n- 処理: 反映 pat\n"
+        self.record("c-01-01", 1, sec)
+        self.commit()
+        self.assertEqual(lr.pending(self.root).items, [])
+
+    def test_issue_form(self):
+        for line, ok in (
+            ("- 処理: issue 12 理由", True),
+            ("- 処理: issue #12 理由", True),
+            ("- 処理: issue 12", False),
+            ("- 処理: issue 理由だけ", False),
+        ):
+            self.record("c-01-01", 1, SEC.format(t="a", p=line))
+            self.commit()
+            self.assertEqual(not lr.pending(self.root).items, ok, line)
+
     def test_broken_pattern_does_not_count_as_reflected(self):
         # type も target も無いパターンは --learnings が数えないので、反映済みとも見なさない
         write(self.root, "docs/wiki/patterns/bad.md", "---\nsources: [c-01-01]\n---\n")
@@ -150,7 +195,7 @@ class PendingTest(unittest.TestCase):
         self.assertIn("パターンが無い", lr.pending(self.root).items[0].why)
 
     def test_names_are_compared_without_case(self):
-        self.pattern("Foo", "[C-01-01]")
+        self.pattern("Foo", "[C-01-01, other]")
         self.record("c-01-01", 1, SEC.format(t="a", p="- 処理: 反映 foo"))
         self.commit()
         self.assertEqual(lr.pending(self.root).items, [])
