@@ -23,7 +23,7 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 | 促し（nudge） | `Stop` で 1 回だけ止めて文を渡す | 次の一手を忘れさせたくない | 同じ | `NUDGE_INTEGRATE`、`NUDGE_TICKET_FINISH` |
 | 案内（context） | `additionalContext` / `additionalContextOnce` | 止めずに言う | 同じ | ルール `prefer-read-grep`、`prefer-webfetch` |
 
-- 拒否は、`dry-run` では一般の `deny` が報告だけになり、ゲートと補助の保護は止める（`infra/modes.py` の分類）。発言をまたぐゲートはゲートに入れる
+- 拒否は、`dry-run` では一般の `deny` が報告だけになり、ゲートと補助の保護は止める（`infra/modes.py` の分類。Go は `go/internal/infra/config` の `HoldsInDryRun`）。発言をまたぐゲートはゲートに入れる
 - 促しは判断ではなく文を渡すだけ。促しで続けた同じターンは、ユーザの発言に数えない
 
 ## 選び方
@@ -109,7 +109,7 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 
 ### ユーザの発言の数え方
 
-ユーザの発言の時刻は、`state/userprompt-<セッション>.json` に、`hookio.is_user_prompt` が真の `UserPromptSubmit` だけが書く。ターンの印（`records/turn.py`）は `Stop` で消えるので使えない。迷うものは数えない。
+ユーザの発言の時刻は、`state/userprompt-<セッション>.json` に、`hookio.is_user_prompt`（Go は `hookio.IsUserPrompt`）が真の `UserPromptSubmit` だけが書く。ターンの印（`records/turn.py`。Go は `go/internal/records/turn`）は `Stop` で消えるので使えない。迷うものは数えない。
 
 | 形 | 数えるか | 根拠 |
 |---|---|---|

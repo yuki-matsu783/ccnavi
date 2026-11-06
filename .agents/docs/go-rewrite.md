@@ -101,7 +101,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 | パッケージ | 行数（Python） | 状態 |
 |---|---|---|
 | `infra` | 6,468 | 移した（レビュー前） |
-| `records` | 4,562 | 未着手 |
+| `records` | 4,562 | 移した（レビュー前） |
 | `policy` | 6,805 | 未着手 |
 | `tickets` | 36,741 | 未着手 |
 | `catalog` | 1,683 | 未着手 |
@@ -116,6 +116,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 |---|---|
 | 上の段を移すとき | 呼び手の無い公開名（`fsio`・`git`・`tree`・`shell` など）を、使う段で絞る |
 | `entry` を移すとき | `config.LayerPath` の差し替えの表を、名前の大文字小文字を区別せずに引く（`pathcase.Fold`） |
+| `entry` を移すとき | stopreview の呼び方が変わったもの（`log_event` → `LogNoKey`・`LogPlanTimeout`・`LogSuspected`、clear 3 つ → `turn.Clear`、stopeval の 3 つ → `Report`、`wiki.pending` → `PendingImpacts`）に呼び手を合わせる |
 | Python を外すとき | `git.Undo` の案内でパスを `"` で囲むだけの引用を、`config` の引用と同じ規則にする（`$` やバッククォートを含むパスで壊れる。いまは Python と同じ出力を保つため残す） |
 
 ## 回す
