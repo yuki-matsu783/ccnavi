@@ -643,7 +643,7 @@ def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
                 "親の計画のステップを指す。子の `phases:` は削除してください"
             )
         return found
-    fill = f"`ccnavi --plan-order {name} --fill-phases`"
+    fill = f"`{settings.LAUNCHER} --plan-order {name} --fill-phases`"
     if has_copy(t):
         for p in read_copy(t.phases_raw)[1]:
             detail = p.detail if p.rule == "(phases)" else f"`phases:` の `{p.rule}`: {p.detail}"

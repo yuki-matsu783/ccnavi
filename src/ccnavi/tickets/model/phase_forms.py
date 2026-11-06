@@ -848,7 +848,7 @@ def _unquoted_marks(subject: str) -> tuple[str, set[int]]:
 
 def _prune_names(bin_path: str) -> re.Pattern[str]:
     """ccnavi の名前。語の終わりで閉じた形だけ。"""
-    names = [r"ccnavi(?:\.exe)?"]
+    names = [r"ccnavi(?:\.exe)?", r"ccnavi-launcher\.sh"]
     base = os.path.basename((bin_path or "").replace("\\", "/"))
     if base:
         names.append(re.escape(base))

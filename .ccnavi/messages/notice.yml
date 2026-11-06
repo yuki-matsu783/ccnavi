@@ -17,7 +17,7 @@ messages:
     kind: notice
     values: [layers]
     what: |-
-      [ccnavi] レイヤー {layers} のルールのファイルを読めません。そのレイヤーの deny は効いていません。`ccnavi --lint` で原因を確かめ、ユーザに直してもらってください（下書きは wip/handoff/ に置き、ユーザが `ccnavi-user-handoff.sh` で取り込みます）。
+      [ccnavi] レイヤー {layers} のルールのファイルを読めません。そのレイヤーの deny は効いていません。`{script:ccnavi-launcher.sh} --lint` で原因を確かめ、ユーザに直してもらってください（下書きは wip/handoff/ に置き、ユーザが `ccnavi-user-handoff.sh` で取り込みます）。
 
   # どのルールも言及しなかった呼び出し。結末（ask／deny）と、読み切れたか、組み込みの既定に退避したかで分ける。
   # 危険だと判定したわけではない。判定できないので権限モードに委ねている。

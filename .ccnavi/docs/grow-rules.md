@@ -12,9 +12,9 @@ keywords: [ルール, rules.yml, 育つ, 全体像, suggest, 下書き, lint, te
 
 | 段階 | ルールでの中身 | 使うもの |
 |---|---|---|
-| きっかけ | 通したくなかった操作が通った、止めすぎた、`UNDECLARED` が多い、記録で同じ呼び出しが何度も止まった | `ccnavi --suggest`、`--explain`、記録（`decisions.jsonl`） |
+| きっかけ | 通したくなかった操作が通った、止めすぎた、`UNDECLARED` が多い、記録で同じ呼び出しが何度も止まった | `sh .ccnavi/scripts/ccnavi-launcher.sh --suggest`、`--explain`、記録（`decisions.jsonl`） |
 | 下書き | ルールを 1 件足す。期待する判定も 1 行足す（止めたくないものも一緒に） | `/ccnavi-config` |
-| 検証 | 防御を消す記述が無いか、期待する判定と合うか | `ccnavi --lint`、`--test-expectations` |
+| 検証 | 防御を消す記述が無いか、期待する判定と合うか | `sh .ccnavi/scripts/ccnavi-launcher.sh --lint`、`--test-expectations` |
 | 効く | 次の判定から効く。`dry-run` の間、一般の保護は止めず「enable なら止めていた」を伝えるだけ（チケットのゲートと補助の保護は止める） | `CCNAVI_MODE` |
 
 ## 規則

@@ -550,7 +550,7 @@ def close_notice(conf: settings.Settings, root: str, parent: str) -> str:
                 return ""
     return (
         "テンプレートにするなら、`ready` の前に "
-        f"`ccnavi --templates --draft {parent}` で下書きを作る"
+        f"`{settings.LAUNCHER} --templates --draft {parent}` で下書きを作る"
         "（ready で閉じると下書きの材料は退避されて拾えない）。"
         "下書きはユーザが `ccnavi-user-handoff.sh --root "
         f"{shlex.quote(found.tree_root)}` で取り込むか、削除してから ready\n"

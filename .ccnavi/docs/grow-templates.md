@@ -15,11 +15,11 @@ keywords: [テンプレート, 育つ, 全体像, 作業・レビュー計画, d
 | 段階 | 何が起きるか | 誰が | 使うもの |
 |---|---|---|---|
 | きっかけ | 計画を持つ親が閉じるとき、ccnavi が案内を 1 行出す | ccnavi | 親の `finish` |
-| 下書き | `ready` の前に下書きを作る。`ready` を打つと材料が退避されて拾えない | エージェント | `ccnavi --templates --draft <親>`、置き場は `wip/handoff/`（取り込み先と同じ相対パス） |
+| 下書き | `ready` の前に下書きを作る。`ready` を打つと材料が退避されて拾えない | エージェント | `sh .ccnavi/scripts/ccnavi-launcher.sh --templates --draft <親>`、置き場は `wip/handoff/`（取り込み先と同じ相対パス） |
 | 整え | `description` と `when` の `TODO` の印を消す。固有名を一般化し、効かなかった手順を削る | エージェント | 下書きを直接編集 |
-| 検証 | `TODO` の残りは warn、制御文字を含む下書きは error。`ccnavi-user-handoff.sh` の下見が差分（既存があれば前後）を見せる | ccnavi | `ccnavi --lint`、`ccnavi-user-handoff.sh`（`--yes` なし） |
+| 検証 | `TODO` の残りは warn、制御文字を含む下書きは error。`ccnavi-user-handoff.sh` の下見が差分（既存があれば前後）を見せる | ccnavi | `sh .ccnavi/scripts/ccnavi-launcher.sh --lint`、`ccnavi-user-handoff.sh`（`--yes` なし） |
 | 承認 | 下見を読み、表示された `--expect <ハッシュ>` を付けて `--yes` で書く。ターミナルの前のユーザだけが打てる | ユーザ | `ccnavi-user-handoff.sh <相対パス> --yes --expect <ハッシュ>` |
-| 効く | 次の親の提案を、テンプレートから始められる | エージェント | `ccnavi ticket new <識別子> --title <タイトル> --template <名前> --issue <値> --mr <番号>` |
+| 効く | 次の親の提案を、テンプレートから始められる | エージェント | `sh .ccnavi/scripts/ccnavi-launcher.sh ticket new <識別子> --title <タイトル> --template <名前> --issue <値> --mr <番号>` |
 
 ## 規則
 
@@ -28,7 +28,7 @@ keywords: [テンプレート, 育つ, 全体像, 作業・レビュー計画, d
 - 取り込み先は 2 つ。`common` は全プロジェクトに届く、`project`（既定）はそのプロジェクトだけ。同名で中身が違えば error で、プロジェクト側は使われない
 - 提案の書き方（全体計画とフィードバック計画の分け方、子のフロー）は [proposal-format.md](proposal-format.md)
 - フェーズ定義が変わるとテンプレートが古くなる。`--lint` は warn、使うときの承認で error になる。`ccnavi-stage.sh` で既存を `wip/handoff/` にコピーして直し、`ccnavi-user-handoff.sh` で取り込む
-- 一覧と検索は `ccnavi --templates`（`--keyword` `--show`）。`--docs` の索引には載らない
+- 一覧と検索は `sh .ccnavi/scripts/ccnavi-launcher.sh --templates`（`--keyword` `--show`）。`--docs` の索引には載らない
 
 ## 次に読む
 

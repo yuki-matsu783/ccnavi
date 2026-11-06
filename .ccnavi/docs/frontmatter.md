@@ -1,14 +1,14 @@
 ---
 title: md の frontmatter の決まり
 type: guide
-description: mdの頭に付けるfrontmatterのキーとtypeの選び方。ccnavi --docsはこれを索引にして検索する
+description: mdの頭に付けるfrontmatterのキーとtypeの選び方。--docsはこれを索引にして検索する
 tags: [frontmatter, docs-search]
-keywords: [frontmatter, type, tags, keywords, ccnavi-index.jsonl, ccnavi --docs, 索引, 検索, タグ, kebab-case]
+keywords: [frontmatter, type, tags, keywords, ccnavi-index.jsonl, --docs, 索引, 検索, タグ, kebab-case]
 ---
 
 # md の frontmatter の決まり
 
-`ccnavi --docs`はmdの本文ではなく、頭のfrontmatterを検索する。絞り込みは`--type` `--tag` `--keyword` `--text` `--path`、出力の形式は`--format`で選ぶ。旗の一覧は`ccnavi --docs --help`で出る。
+`--docs`はmdの本文ではなく、頭のfrontmatterを検索する。絞り込みは`--type` `--tag` `--keyword` `--text` `--path`、出力の形式は`--format`で選ぶ。旗の一覧は`sh .ccnavi/scripts/ccnavi-launcher.sh --docs --help`で出る。
 frontmatterが無いmdも一覧には出るが、`--type` `--tag` `--keyword`では見つからず、`--text`で照合されるのもパスと日時だけになる。
 frontmatterの書き方しだいで、文書の探しやすさがそのまま決まる。
 
@@ -36,7 +36,7 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
   UTF-8でないmdはfrontmatterを読めないので、frontmatterが無いもの（`null`）として扱う
 - 値は1行で書く。`tags`と`keywords`は`[a, b]`の形で書く。`tags: a`のように括弧なしで書いても1要素として読めるが、`[a]`と書いて揃える
 - YAMLのエイリアス（`*名前`）は使わない。使うとfrontmatter全体を読めず`null`になる
-- すでに使われているtagsは`ccnavi --docs --format jsonl`の`frontmatter.tags`で確かめられる。同じ意味で表記だけ違う語を増やさない
+- すでに使われているtagsは`sh .ccnavi/scripts/ccnavi-launcher.sh --docs --format jsonl`の`frontmatter.tags`で確かめられる。同じ意味で表記だけ違う語を増やさない
 
 ## keywordsの注意
 
@@ -45,8 +45,8 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 
 ## typeの値
 
-`type`は文書の種類で、値はプロジェクトで決める。`ccnavi --docs`は値の意味を解釈せず、`--type`で完全一致の絞り込みに使うだけである。
-既に使われている値は`ccnavi --docs --format jsonl`の`frontmatter.type`で確かめ、同じ意味で表記だけ違う値を増やさない。
+`type`は文書の種類で、値はプロジェクトで決める。`--docs`は値の意味を解釈せず、`--type`で完全一致の絞り込みに使うだけである。
+既に使われている値は`sh .ccnavi/scripts/ccnavi-launcher.sh --docs --format jsonl`の`frontmatter.type`で確かめ、同じ意味で表記だけ違う値を増やさない。
 選ぶときは、文書の役割（何のために読まれるか）で分ける。迷ったら、近い役割の既存の値に揃える。値の例は次のとおり。
 
 | 値 | 役割 |
@@ -65,7 +65,7 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 
 ## プロジェクト
 
-`projects/<名前>/`のmdも同じ決まりで書く。`ccnavi --docs`はワークスペースとプロジェクトをまとめて検索し、プロジェクトのmdは
+`projects/<名前>/`のmdも同じ決まりで書く。`--docs`はワークスペースとプロジェクトをまとめて検索し、プロジェクトのmdは
 `projects/<名前>/…`のパスで表示する。`docs/spec/`のような、プロジェクト固有の置き場にある文書には、既にある値で近いものを使う。
 プロジェクトの`.gitignore`に`**/ccnavi-index.jsonl`が無ければ、ccnaviが索引を書く前にその1行を追記する（ファイルが無ければ作る）。
 追記するのは1行だけで、既存の行は変えない。追記したプロジェクトは、SessionStartの案内とstderrに名前が出る。

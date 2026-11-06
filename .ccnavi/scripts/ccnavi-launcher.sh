@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-launcher hook が起動する 1 本。CCNAVI_ENTRY_PATH はここを指す。1 つ上の bin/ に
+# ccnavi-launcher hook が起動する 1 本。エージェントが打つ ccnavi の呼び出しも、この sh 経由にする（PATH に無いため）。CCNAVI_ENTRY_PATH はここを指す。1 つ上の bin/ に
 # 並ぶ機械ごとの組み立てから、この機械で動くものを選んで起動する。
 #
 #   .ccnavi/scripts/ccnavi-launcher.sh      ← これ

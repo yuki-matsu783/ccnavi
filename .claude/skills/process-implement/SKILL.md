@@ -2,12 +2,12 @@
 name: process-implement
 process: true
 description: >-
-  実装の標準的な考え方への入口。機能の追加、不具合の修正、挙動を変えないコード整理など、コードを書き換える作業で使う。原因が分からない不具合は process-debug、テストを書く・回す作業は process-test。細かい手順は references にあり、ccnavi --docs で共通とプロジェクトの両方から引く。
+  実装の標準的な考え方への入口。機能の追加、不具合の修正、挙動を変えないコード整理など、コードを書き換える作業で使う。原因が分からない不具合は process-debug、テストを書く・回す作業は process-test。細かい手順は references にあり、sh .ccnavi/scripts/ccnavi-launcher.sh --docs で共通とプロジェクトの両方から引く。
 ---
 
 # process-implement
 
-実装の作業に入る前に、`ccnavi --docs --type skill-reference --tag process-implement` で共通とプロジェクトの reference を引き、ヒットしたものを読む。
+実装の作業に入る前に、`sh .ccnavi/scripts/ccnavi-launcher.sh --docs --type skill-reference --tag process-implement` で共通とプロジェクトの reference を引き、ヒットしたものを読む。
 
 ## 基本の考え方
 

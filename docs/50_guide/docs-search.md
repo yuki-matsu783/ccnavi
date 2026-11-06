@@ -13,9 +13,9 @@ keywords: [--docs, 索引, frontmatter, type, tags, keywords, 検索, NOTICE_DOC
 文書やスキルの本文を最初から全部は渡さず、目録と索引で読む対象を絞り、本文はエージェントが必要になったときに読む。
 引くのはワークスペースと下のプロジェクトの文書で、ccnavi 自身のヘルプに限らない。流れは次の 3 つ。
 
-- 文書: `ccnavi --docs` で frontmatter（`type` `tags` `keywords` `title` `description` など）とパスを引いて読む文書を特定し、本文は別に読む
+- 文書: `sh .ccnavi/scripts/ccnavi-launcher.sh --docs` で frontmatter（`type` `tags` `keywords` `title` `description` など）とパスを引いて読む文書を特定し、本文は別に読む
 - プロジェクトのスキル: セッション開始・サブエージェント開始・プロジェクトに入った最初の呼び出しで、スキルの名前・説明・パスの目録だけを渡す。本文は渡さない
-- 工程スキル（`process-*`）: 短い基本の考え方だけを持ち、細かい手順は `references` にある。`ccnavi --docs --type skill-reference --tag <工程スキル名>` で引いて読む
+- 工程スキル（`process-*`）: 短い基本の考え方だけを持ち、細かい手順は `references` にある。`sh .ccnavi/scripts/ccnavi-launcher.sh --docs --type skill-reference --tag <工程スキル名>` で引いて読む
 
 **検索の実態。** `--docs` が見るのは frontmatter とパスと更新日時だけで、本文は読まない。種類・タグ・キーワード（完全一致）、パスと語（部分一致）、更新日時で絞る。
 本文の関連箇所の抽出、意味検索、自動要約、トークンの予算に応じた選別はしない。`--limit` は件数で切るだけである。

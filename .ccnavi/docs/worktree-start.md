@@ -62,14 +62,14 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
     MCPで確かめたあと、新規作成の道は`--mcp-checked`を付けて打ち直す。既存のMRを採用する道は、`--issue`・`--mr`・`--branch`の3つをそろえて`--mcp-checked`を付ける
 - 続けるブランチは、手元にあっても毎回`origin`から取って早送りする（分かれていれば動かさず言う。取り込みは`ccnavi-sync.sh`）。
   取れなかったときは手元のまま続け、「リモート未確認」と言う。最後に`ccnavi-sync.sh <識別子>`を打つ（親チケットも提案もまだ無いと取り込まれない。止めずに言う）
-- MRの番号とissueは手元に保存しない。出力の「必須」の行にある`issue: <値>`と`mr: <番号>`を、親の提案のfrontmatterに必ず書く（`ccnavi ticket new ... --issue <値> --mr <番号>`が書く。どちらかが無いと`ticket new`・承認・`--lint`が止める）。雛形の空欄の目印（`（ここに〜を書く）`）が残っていると止まるので、書き換える。
+- MRの番号とissueは手元に保存しない。出力の「必須」の行にある`issue: <値>`と`mr: <番号>`を、親の提案のfrontmatterに必ず書く（`sh .ccnavi/scripts/ccnavi-launcher.sh ticket new ... --issue <値> --mr <番号>`が書く。どちらかが無いと`ticket new`・承認・`--lint`が止める）。雛形の空欄の目印（`（ここに〜を書く）`）が残っていると止まるので、書き換える。
   `ccnavi-sync.sh`などが閉じたかを聞くときは、この`mr:`の番号を使う
 - issue・MRを指定された作業は、直接作業にせずチケット作業で進める（ユーザがホストで作ったものを途中から頼まれた場合も同じ）。
   ただし、ユーザが「直接作業で」「承認は要らない」のように直接作業を明示したときは、その指示に従って直接作業で進める。指定しただけで明示が無いときは、チケット作業のまま。issue がある依頼を直接作業で進めるときは、`ccnavi-start.sh` は打たず、`ccnavi-worktree.sh` で切ったワークツリーで作業して push し、MR を作ってユーザに確認を頼む。親のワークツリーの中からは、親の提案が承認前のときだけ切り替えられ、それ以外は断られる。承認待ちの提案や MR が残る場合の取り下げは、[ticket-work.md](ticket-work.md)の「作業のパターン」と「ユーザが直接作業を明示したとき」を参照する。
-  親チケットも提案も無いワークツリーでは、出力に「次:」の行が出る。識別子・タイトル・`--issue`・`--mr`を埋めた`ccnavi ticket new`なので、
+  親チケットも提案も無いワークツリーでは、出力に「次:」の行が出る。識別子・タイトル・`--issue`・`--mr`を埋めた`sh .ccnavi/scripts/ccnavi-launcher.sh ticket new`なので、
   `--scope`の`<触るファイルの glob>`だけを実際のパスに直して、ワークツリーの中で打つ。設計判断が要らない作業は、範囲が複数のディレクトリや文書・設定にまたがっても`--plan quick-work`で足りる。
   大きい作業は`--plan`を`design,implement`のように変える（型と範囲は`.ccnavi/config/common/phases.yml`）。
-  使えるテンプレートがあるプロジェクトでは、その後に「案内:」が 1 行出る。合うものがあれば`--plan`の代わりに`--template <名前>`を使う（一覧は`ccnavi --templates`。[templates.md](templates.md)）。
+  使えるテンプレートがあるプロジェクトでは、その後に「案内:」が 1 行出る。合うものがあれば`--plan`の代わりに`--template <名前>`を使う（一覧は`sh .ccnavi/scripts/ccnavi-launcher.sh --templates`。[templates.md](templates.md)）。
   提案は手で書かない。承認が通らないなど詰まったら、直接実装に切り替えず、ユーザに報告して止まる。
   チケットが既にあるワークツリーでは、「次:」の行が`ccnavi-ticket.sh status <識別子>`を勧める。行頭の語は[terms.md](terms.md)
 - ホストに届かないか、断られたとき（Claude remoteのコンテナでは、GitHubのAPIに届かないことがある）、`ccnavi-start.sh`は終了コード4で止まり、

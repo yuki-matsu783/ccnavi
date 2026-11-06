@@ -26,17 +26,17 @@ keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedba
 
 ## 見つける
 
-- `ccnavi --templates` で一覧を見る。`--keyword <語>` で名前・説明・使う場面を検索し、`--show <名前>` で中身を見る
-- `ccnavi --templates --json` が機械向けの答え。`ccnavi --lint` もテンプレートを検査する
-- `ccnavi --templates --check-file <パス> [--layer <名前>] --json` は、任意のパスのテンプレートを置き場に入れずに検査する（読むだけ。保存前の確かめに使う）
+- `sh .ccnavi/scripts/ccnavi-launcher.sh --templates` で一覧を見る。`--keyword <語>` で名前・説明・使う場面を検索し、`--show <名前>` で中身を見る
+- `sh .ccnavi/scripts/ccnavi-launcher.sh --templates --json` が機械向けの答え。`sh .ccnavi/scripts/ccnavi-launcher.sh --lint` もテンプレートを検査する
+- `sh .ccnavi/scripts/ccnavi-launcher.sh --templates --check-file <パス> [--layer <名前>] --json` は、任意のパスのテンプレートを置き場に入れずに検査する（読むだけ。保存前の確かめに使う）
 - `--layer <名前>` で、統合結果の相手のレイヤー（プロジェクト名）を選ぶ。省けば自身のレイヤー
-- `ccnavi --docs` の索引には載らない。yml なので `--templates` で探す
+- `--docs` の索引には載らない。yml なので `--templates` で探す
 
 ## 溜める
 
 エージェントが溜める手順は、ほかの保護対象と同じ handoff に一本化している（[scratchpad.md](scratchpad.md)）。
 
-1. 計画を持つ親が閉じるときに、ccnavi が案内を 1 行出す。`ready` の前に `ccnavi --templates --draft <親>` で下書きを作る。`ready` を打つと下書きの材料が退避されて拾えなくなる
+1. 計画を持つ親が閉じるときに、ccnavi が案内を 1 行出す。`ready` の前に `sh .ccnavi/scripts/ccnavi-launcher.sh --templates --draft <親>` で下書きを作る。`ready` を打つと下書きの材料が退避されて拾えなくなる
 2. 下書きは `wip/handoff/` の下の、取り込み先と同じ相対パス（既定は `wip/handoff/.ccnavi/config/project/templates/<名前>.yml`）に書かれる。`description` と `when` に `TODO` の印が付くので、固有名を一般化し、効かなかった手順を削り、印を消す。直すのはエージェントでよい（Write で直接編集する）
 3. ユーザが `ccnavi-user-handoff.sh [<相対パス>…]` で見る。何も書かず、検査と差分（既存があれば文の前後まで）と `--expect` のハッシュを見せる。読んだうえで、`--yes --expect <ハッシュ>` を付けて取り込む
 4. 取り込んだ下書きは消える
@@ -59,7 +59,7 @@ keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedba
 
 ## 使う
 
-`ccnavi ticket new <識別子> --title <タイトル> --template <名前> [--layer <名前>] [--with-feedback] --issue <値> --mr <番号>` で、親の提案（`wip/proposals/todo/`）と、子のフローの下書き（`wip/proposals/flows/`）を作る。親のブランチへ送るのは `ccnavi-ticket.sh approval-request <識別子>`（承認を頼む前に打つ）。
+`sh .ccnavi/scripts/ccnavi-launcher.sh ticket new <識別子> --title <タイトル> --template <名前> [--layer <名前>] [--with-feedback] --issue <値> --mr <番号>` で、親の提案（`wip/proposals/todo/`）と、子のフローの下書き（`wip/proposals/flows/`）を作る。親のブランチへ送るのは `ccnavi-ticket.sh approval-request <識別子>`（承認を頼む前に打つ）。
 
 - 提案に書くのは全体計画 `plan:` だけ。テンプレートにフィードバック計画があっても、`--with-feedback` を付けないかぎり `feedback:` は書かない。フィードバック計画は全体計画の最後のレビューを見てから、改版で 1 回だけ足す決まりで、最初の提案に入れると、承認後に全体計画を改版できなくなる。書かなかったときは、出力がフィードバック計画のステップ数を言う。全体計画のレビューを見てから足すなら、`--with-feedback` を付けて作り直すか、提案を改版で足す。`--with-feedback` は `ticket new --template` でだけ使える
 - 提案の `plan:` / `feedback:` の `after` は、提案の番号に付け直される（フィードバック計画は全体計画の続きの番号）
