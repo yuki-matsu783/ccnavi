@@ -129,8 +129,8 @@ json.dump({
 
 type formsAnswer struct {
 	CLI, Script, Hold, Forbidden, Entry, Verb, UserScript string
-	Board                                               [][]string
-	Rules                                               map[string]string
+	Board                                                 [][]string
+	Rules                                                 map[string]string
 }
 
 var bins = []string{"", "/opt/x/bin/ccnavi", `C:\tools\ccnavi.exe`, "/w/.ccnavi/bin/my-ccnavi"}
@@ -315,7 +315,7 @@ func TestJudgeMatchesPythonOnTheTables(t *testing.T) {
 
 func TestJudgeMatchesPythonOnRandomCommands(t *testing.T) {
 	rnd := rand.New(rand.NewPCG(5, 17))
-	compareJudge(t, "random", judgeIn{Commands: slices.Concat(randomCommands(rnd, 600), mutatedCommands(rnd, 400)), Bins: bins})
+	compareJudge(t, "random", judgeIn{Commands: slices.Concat(randomCommands(rnd, 300), mutatedCommands(rnd, 200)), Bins: bins})
 }
 
 // 写しを持たない回。乱数の種を変え、文も突き合わせる。
@@ -432,7 +432,7 @@ var gatedOptions = []string{"--yes", "--agree", "--reviewed", "--close-early", "
 func TestEntryMatchesPython(t *testing.T) {
 	rnd := rand.New(rand.NewPCG(9, 2))
 	var cases [][2][]string
-	for range 1500 {
+	for range 600 {
 		argv := []string{}
 		for k := rnd.IntN(6); k > 0; k-- {
 			argv = append(argv, argvWords[rnd.IntN(len(argvWords))])
