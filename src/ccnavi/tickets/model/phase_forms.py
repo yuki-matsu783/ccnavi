@@ -33,6 +33,8 @@ EXEMPT_NOTE = (
     "ccnavi-launcher.sh --docs を sh で実行する形だけです。"
     "前に cd、後ろに | head -n 3 のような行数だけの head・tail を付けてもよく、"
     "ファイル名・リダイレクト（2>&1 など）・ほかのコマンドを足すと止まります。"
+    "提案（wip/proposals/todo/）は Write・Edit で書き、ticket revise と approval-request は"
+    "heredoc などと連結せず、単独で打ちます。"
 )
 
 # ユーザとモデルに見せる文で「ターン」を初めて使うところに置く表記。LLM の用語で、
