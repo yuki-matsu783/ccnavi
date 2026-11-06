@@ -13,7 +13,7 @@ keywords: [非対話, 直接作業, チケット作業, 提案, approval-request
 - 直接作業（調査・小さな修正）: チケットを起こさずそのまま進める。判定は全体のルールだけに従う。成果は `integrate` で取り込む。ただし、issue がある依頼をユーザが直接作業と明示したときは、成果を MR で受ける（「作業のパターン」の表の 4）。
 - チケット作業（設計に触れる・複数のフェーズに分かれる・ユーザのレビューが要る）: `wip/proposals/todo/` に提案を書き、`ccnavi-ticket.sh approval-request <識別子>` で親のブランチへ送って承認を受ける。承認されると提案は承認済みの置き場の `doing/` へ動く（置き場は設定で変わる。既定は `wip/proposals/` と `.ccnavi/approved/`。[projects.md](projects.md)）。以後の操作は `ccnavi-ticket.sh` を通す（使い方は `--help`）。
 
-チケット作業は必ず issue と MR のセットで進める。issue が無ければ `ccnavi-start.sh --new-issue <タイトル>` で作ってから進める（タイトルの似ている open の issue・MR があれば、作らずに止まり、ユーザに聞く。似たものが無くても、haiku のサブエージェントに `ccnavi-start.sh --list-open` を読ませ、意味が近いものがないか確かめる段を挟む。詳細は [worktree-start.md](worktree-start.md)）。作れなければユーザに作ってもらう。入口で `ccnavi-start.sh --check` を打ち、ホストの API と git のリモートが使えるかを確かめる。子の作業から始めるセッションでは、`ccnavi-ticket.sh` の `start`・`finish`・`approval-request`・`consolidate` が自動で確かめる。直接作業では確かめない。
+チケット作業は必ず issue と MR のセットで進める。issue が無ければ `ccnavi-start.sh --new-issue <タイトル>` で作ってから進める（タイトルの似ている open の issue・MR があれば、作らずに止まり、ユーザに聞く。似たものが無くても、haiku のサブエージェントに `ccnavi-start.sh --list-open` を読ませ、意味が近いものがないか確かめる段を挟む。詳細は [worktree-start.md](worktree-start.md)）。`--new-issue` を打っても作れなかったときだけ、ユーザに作ってもらう（進め方は`--new-issue`の出力の`次:`に従う）。打つ前にユーザへ頼まない。入口で `ccnavi-start.sh --check` を打ち、ホストの API と git のリモートが使えるかを確かめる。子の作業から始めるセッションでは、`ccnavi-ticket.sh` の `start`・`finish`・`approval-request`・`consolidate` が自動で確かめる。直接作業では確かめない。
 
 どちらで進めるか迷ったら、ユーザに聞く。ただし issue・MR を指定された実装は、直接作業にせずチケット作業で進める（ホストで作られたものを途中から頼まれた場合も同じ）。詰まったら直接実装に切り替えず、ユーザに報告して止まる。
 例外はユーザが直接作業を明示したときだけで、その指示に従う（次の節）。ただし、親のワークツリーからは、親の提案が承認前のときだけ切り替えられる（「拒否される条件と、切り替える前の取り下げ」）。
@@ -91,7 +91,7 @@ issue（または MR）を指定され、かつユーザが直接作業を明示
 
 ## 直接作業からチケット作業に移るとき
 
-直接作業のワークツリーで調べて提案を書き始め、そのままチケット作業になることがある。チケット作業は必ず issue と MR のセットなので、issue が無ければ `ccnavi-start.sh --new-issue <タイトル>` で作り（作れなければユーザに作ってもらい）、`ccnavi-start.sh --issue <番号>` で親のワークツリーと MR を作って、書いた提案をそこへ移す。
+直接作業のワークツリーで調べて提案を書き始め、そのままチケット作業になることがある。チケット作業は必ず issue と MR のセットなので、issue が無ければ `ccnavi-start.sh --new-issue <タイトル>` で作り（`--new-issue` を打っても作れなかったときだけ、ユーザに作ってもらい）、`ccnavi-start.sh --issue <番号>` で親のワークツリーと MR を作って、書いた提案をそこへ移す。
 
 - 識別子の番号は issue の番号にする（`ccnavi-start.sh --issue <番号>` が決める。通し番号の `next-id` は直接作業のワークツリー名だけに使う）。同じリポジトリの別の親と番号が重なると`--lint`が警告する
 - 提案を書いたツリーが識別子と違う名前なら、承認の前に、識別子と同名のワークツリーへ提案を移し（`wip/proposals/todo/`の同じ相対位置）、元のツリーの提案は消す。提案の`issue:`と`mr:`は、`ccnavi-start.sh`の「必須」の行の値にする
