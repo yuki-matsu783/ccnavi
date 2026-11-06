@@ -16,8 +16,12 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 
 - 一括で書き直す。このブランチで全部を Go にしてから、Python を外して切り替える。途中で Python と Go を混ぜて配らない
 - CLI の引数・標準出力（JSON を含む）・標準エラー・終了コードは変えない。拡張（TS）・sh・Chrome 拡張はそれを読むので、直さずに済ませる
-- Go のパッケージは Python のモジュールと 1 対 1 にする。`ccnavi.infra.fsio` は `go/internal/infra/fsio`。段と依存の向き（`tests/core/test_module_layers.py`）をそのまま守る。下の段から移す
-- 文書コメントと識別子の説明は、Python の docstring の中身を日本語のまま移す
+- 書き直しを機にリファクタする。外から見える振る舞いは変えず、中の構成は今後の拡張がしやすい形に変える
+- 下の段から移す。段の並び（`infra` → `records` → `policy` → `tickets` → `catalog` → `hook` → `entry`）と、依存を下へだけ向ける決まりは Python と同じ
+- Go のパッケージは責務ごとにまとめる。Python のモジュールと 1 対 1 にしない。大きさだけで分けたモジュールは、1 つのパッケージの複数ファイルにする（例: `shellread_*` の 4 つは `infra/shell`、`gitcmd` と `gitstate` は `infra/git`）
+- 同じことをしている関数は 1 つにまとめ、差はオプションで表す。呼び手の無い関数は移さない。公開する API は、上の段が使うものに絞る
+- コメントは docstring を丸写ししない。読む人が知るべきこと（なぜそうするか、守る約束、落とし穴）だけを短く書く。経緯、ほかのファイルの説明の繰り返し、コードを読めば分かることは書かない。パッケージの役割は `doc.go` に 1 段落で書く
+- 上の段が同じ下ごしらえを繰り返さないための土台を、下の段に置く（YAML の値を型を確かめて取り出す関数、Python の `json.dumps` と同じバイト列を作る JSON の出力など）
 
 ## テスト
 
@@ -54,5 +58,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 ```sh
 cd go && go vet ./... && go test ./...
 ```
+
+依存の向きは `go/internal/layers_test.go` が見る。パッケージを足したら、先にその表（`topTiers`・`subTiers`）を直す。
 
 `go mod tidy` は、まだ使っていない依存（YAML・TOML）を消すので回さない。依存を足すときは `go mod edit -require` と `go mod download` で足す。
