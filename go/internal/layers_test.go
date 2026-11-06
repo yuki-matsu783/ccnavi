@@ -51,6 +51,22 @@ var subTiers = map[string]map[string]int{
 		// 3: fsio の上に立つ
 		"git": 3,
 	},
+	"records": {
+		// 0: records のほかを読まない（伏せ字・学びの wiki）
+		"redact": 0,
+		"wiki":   0,
+		// 0: セッションごとのターンの状態と、放置したセッションの引き継ぎ
+		"turn":    0,
+		"handoff": 0,
+		// 1: 伏せ字を通して書く（判定の記録・診断ログ）
+		"audit":   1,
+		"diaglog": 1,
+		// 1: 伏せ字を通して材料を残す（Stop の AI 判定の計画・試行・操作実績・集計）
+		"stopreview": 1,
+		// 2: 判定の記録と診断ログの上に立つ（後始末・拒否と失敗の数え）
+		"prune": 2,
+		"tally": 2,
+	},
 	"tickets": {
 		"model":     0,
 		"config":    1,
