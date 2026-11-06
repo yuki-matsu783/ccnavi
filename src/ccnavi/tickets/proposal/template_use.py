@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ...infra import settings
 from ...policy.rules import SEVERITY_ERROR, SEVERITY_WARN
 from ..model import ticket_ids
 from . import plan_templates
@@ -62,7 +63,7 @@ def resolve(conf, root: str, layer: str, name: str) -> tuple[Found | None, str]:
         listed = ", ".join(usable) or "無い"
         return None, (
             f"テンプレート {name!r} がありません（{layer} で利用できるもの: {listed}）。"
-            "一覧は 'ccnavi --templates'"
+            f"一覧は '{settings.LAUNCHER} --templates'"
         )
     if entry.effective and entry.layer == plan_templates.LAYER_COMMON:
         # 共通の側は、統合結果の定義で検査し直す。

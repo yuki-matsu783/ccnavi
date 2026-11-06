@@ -329,7 +329,7 @@ def script_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
             "finished_to・settled_by を"
             "空にする"
             "（改版は承認済みチケットの側の値を残し、計画・`phases:`・範囲だけを差し替える）。"
-            "`ccnavi ticket revise <親>` が作る雛形は、これらの欄を外してある",
+            f"`{settings.LAUNCHER} ticket revise <親>` が作る雛形は、これらの欄を外してある",
         )
     ]
 
@@ -424,7 +424,7 @@ def plan_problems(
                     t.ticket,
                     "親の提案に計画（`plan:`）がありません。計画の無い親は承認しても"
                     "`ticket start` が止まります。"
-                    "`ccnavi ticket new <識別子> --title <タイトル> --plan <型,…>"
+                    f"`{settings.LAUNCHER} ticket new <識別子> --title <タイトル> --plan <型,…>"
                     " --issue <値> --mr <番号>` の雛形に揃えてください",
                 )
             )
@@ -466,7 +466,7 @@ def copy_config_problems(
     if not phasetypes.has_copy(t) or not t.has_plan:
         return []
     severity = rules.SEVERITY_WARN if approved else rules.SEVERITY_ERROR
-    fill = f"`ccnavi --plan-order {t.ticket} --fill-phases`"
+    fill = f"`{settings.LAUNCHER} --plan-order {t.ticket} --fill-phases`"
     if config is None:
         return [
             rules.Problem(
@@ -671,7 +671,9 @@ def unreadable_scope(t: ticket_model.Ticket) -> list[rules.Problem]:
     if raw != len(t.entries):
         return [
             _unreadable(
-                t, f"判定が読めない項が {raw - len(t.entries)} 件ある（`ccnavi --lint` で確かめる）"
+                t,
+                f"判定が読めない項が {raw - len(t.entries)} 件ある"
+                f"（`{settings.LAUNCHER} --lint` で確かめる）",
             )
         ]
     return []

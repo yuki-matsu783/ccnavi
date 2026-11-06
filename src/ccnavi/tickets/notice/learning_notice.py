@@ -85,7 +85,7 @@ def message(label: str, rows: list[wiki.Row], threshold: int) -> str:
         f"[ccnavi] {where}学びの提案の候補が {len(rows)} 件ある"
         f"（観測元が {threshold} 以上: {len(reached)} 件。内訳: {'、'.join(parts)}）。"
         "提案を出すには、エージェントに「学びの提案を出して」と頼んでください"
-        "（手順は .ccnavi/docs/learning-propose.md、一覧は ccnavi --learnings）。"
+        f"（手順は .ccnavi/docs/learning-propose.md、一覧は {settings.LAUNCHER} --learnings）。"
     )
 
 

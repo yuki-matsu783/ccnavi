@@ -180,6 +180,8 @@ DEFAULT_PROJECTS = "projects"
 # 3 本とスクリプトを 1 つのディレクトリにまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で
 # 済ませるため。
 DEFAULT_PROJECT_HOME = ".ccnavi"
+# 文面でエージェントに打たせる起動の sh。配布先では `ccnavi` が PATH に無い。ルートで打つ形。
+LAUNCHER = f"sh {DEFAULT_PROJECT_HOME}/scripts/ccnavi-launcher.sh"
 # 引用せずにシェルへ渡せるパス。空白とシェルの記号を含まない。
 _BARE_PATH = re.compile(r"[^\s'\"\\$`!*?\[\]{}()<>|&;#~]+")
 # 二重引用符の中でも意味を持つ文字。

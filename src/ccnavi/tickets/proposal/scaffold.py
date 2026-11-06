@@ -287,7 +287,7 @@ def run(
     if ticket_ids.child_pattern().fullmatch(ident):
         return refuse(
             f"{ident} は子の識別子の形（<親>-<NN>-<NN>）。雛形を出すのは親だけ。"
-            "子の提案は手で書く（書式は ccnavi --docs --keyword 提案書式）"
+            f"子の提案は手で書く（書式は {settings.LAUNCHER} --docs --keyword 提案書式）"
         )
     if not (title or "").strip():
         return refuse("--title <タイトル> が必要です")
@@ -447,7 +447,8 @@ def run(
     stdout.write(
         f"必須: 子の提案（'{ident}-<フェーズ番号 2 桁>-<連番 2 桁>'。例: '{ident}-01-01'）を、"
         "すぐ始まるステップごとに 1 つ以上 wip/proposals/todo/ に手で書く。"
-        "親と同じ承認で通すので、先に書く（書式は ccnavi --docs --keyword 提案書式）。"
+        "親と同じ承認で通すので、先に書く"
+        f"（書式は {settings.LAUNCHER} --docs --keyword 提案書式）。"
         "無いと approval-request（--check も）が警告し、子の承認がもう 1 回要る\n"
     )
     stdout.write(texts.say(root, "NOTE_NEW_SEND", {"ident": ident}) + "\n")

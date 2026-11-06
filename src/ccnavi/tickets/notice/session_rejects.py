@@ -270,7 +270,8 @@ def _count_line(found: Found) -> str:
     cut = "（時間の上限で途中まで数えた）" if found.truncated else ""
     return (
         f"[ccnavi] 承認済みチケット {len(names)} 件に、上位の設定に却下された要求がある{cut}。"
-        "そのワークツリーで始めたセッションに詳細を出す。ccnavi --explain でも範囲を見られる。"
+        "そのワークツリーで始めたセッションに詳細を出す。"
+        f"{settings.LAUNCHER} --explain でも範囲を見られる。"
     )
 
 
@@ -287,8 +288,11 @@ def render(ticket: str, found: Found) -> str:
     for r in found.rejects[:SHOWN]:
         lines.append(f"- {r.decision} `{r.request}`: {r.reason}（出所: {r.origin}）")
     if total > SHOWN:
-        lines.append(f"- ほか {total - SHOWN} 件。全部は ccnavi --explain で範囲とルールを見る。")
+        lines.append(
+            f"- ほか {total - SHOWN} 件。"
+            f"全部は {settings.LAUNCHER} --explain で範囲とルールを見る。"
+        )
     else:
-        lines.append("詳しくは ccnavi --explain で範囲とルールを見る。")
+        lines.append(f"詳しくは {settings.LAUNCHER} --explain で範囲とルールを見る。")
     lines.append(APPROXIMATE_NOTE + _unchecked_note(found))
     return "\n".join(lines)

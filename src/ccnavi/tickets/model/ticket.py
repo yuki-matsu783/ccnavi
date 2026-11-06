@@ -77,7 +77,7 @@ import re
 
 import yaml
 
-from ...infra import fsio, globmatch, toolnames, tree, yamlread
+from ...infra import fsio, globmatch, settings, toolnames, tree, yamlread
 from ...policy import rules
 from ...policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 from . import ticket_fold, ticket_ids, ticket_model
@@ -329,7 +329,7 @@ def _read_identity(ticket: ticket_model.Ticket, front: dict, problems: list[Prob
                         f" の形で書く（フェーズ 5 の 1 枚目なら `{example}`）。"
                         "親の提案を書いているなら、`parent:` と `phase:` の行を消す"
                         "（この 2 つは子だけの欄）。雛形は "
-                        "`ccnavi ticket new <識別子> --title <タイトル> --plan <型,…>"
+                        f"`{settings.LAUNCHER} ticket new <識別子> --title <タイトル> --plan <型,…>"
                         " --issue <値> --mr <番号>` が作る",
                     )
                 )

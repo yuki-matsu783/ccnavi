@@ -144,7 +144,7 @@ messages:
   NEXT_PLAN_VERIFY:
     kind: next
     next: |-
-      `ccnavi --lint` か `ccnavi --agree --preview --verify` で確かめる
+      `{script:ccnavi-launcher.sh} --lint` か `{script:ccnavi-launcher.sh} --agree --preview --verify` で確かめる
 
   # ---- tickets/learning/notes.py（ticket learn のあと）
   NEXT_LEARN_NOTE_COMMIT:
