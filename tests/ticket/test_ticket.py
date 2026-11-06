@@ -1205,6 +1205,7 @@ class TicketTest(unittest.TestCase):
             self.parent_tree,
             command=f"{ticket_sh} revise P-1 && cat > wip/proposals/todo/x.md <<'EOF'\nb\nEOF",
         )
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(chained))
         self.assertIn("Write・Edit", self.reason(chained))
         # 付き添いだけでは通さない。
         self.assertFalse(phase_forms.exempt("cd /tmp\x00tail -3", ""))
