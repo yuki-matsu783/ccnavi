@@ -1,7 +1,9 @@
 package config
 
 import (
+	"maps"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"ccnavi/internal/infra/ospath"
@@ -116,8 +118,15 @@ func (s *Settings) LayerPath(homeRoot string, kind LayerKind, layer string) stri
 		if layer == "" && homeRoot != "" {
 			layer = ospath.Basename(ospath.Normpath(homeRoot))
 		}
+		// レイヤーの名前は大文字小文字を区別せずに引く（同じ綴り違いは同じレイヤー）。綴りどおりの名前を先に見る。
 		if override := swaps[layer]; override != "" {
 			return override
+		}
+		names := slices.Sorted(maps.Keys(swaps))
+		for _, name := range names {
+			if override := swaps[name]; override != "" && pathcase.Fold(name) == pathcase.Fold(layer) {
+				return override
+			}
 		}
 	}
 	return s.LayerRealPath(homeRoot, kind)

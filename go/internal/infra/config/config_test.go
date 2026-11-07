@@ -302,3 +302,20 @@ func TestIntAndFinite(t *testing.T) {
 		}
 	}
 }
+
+// 診断の差し替え（--project-rules-file など）は、レイヤーの名前を大文字小文字を区別せずに引く。
+func TestLayerPathSwapsIgnoreCase(t *testing.T) {
+	s := &Settings{ProjectRulesFiles: map[string]string{"Alpha": "/swap/rules.yml"}}
+	home := filepath.Join(string(filepath.Separator)+"ws", "projects", "alpha")
+	for _, layer := range []string{"Alpha", "alpha", "ALPHA", ""} {
+		if got := s.LayerPath(home, KindRules, layer); got != "/swap/rules.yml" {
+			t.Errorf("LayerPath(%q) = %q", layer, got)
+		}
+	}
+	if got := s.LayerPath(home, KindRules, "beta"); got == "/swap/rules.yml" {
+		t.Errorf("別の名前に差し替えが当たった: %q", got)
+	}
+	if got := s.LayerPath(home, KindPhases, "alpha"); got == "/swap/rules.yml" {
+		t.Errorf("別の種類に差し替えが当たった: %q", got)
+	}
+}
