@@ -47,6 +47,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 
 - 下の段は `error` を返し、包むときは `fmt.Errorf("…: %w", err)` を使う。呼び手が種類で分けるエラーは、`var ErrX = errors.New(…)` か型で定義し、`errors.Is`・`errors.As` で見る
 - `panic` は使わない。想定外のエラーは入口（`entry`）で受け、Python の内部エラーと同じ出力にする
+- 起動時に組む固定の式の `pyre.MustCompile` は `panic` の例外として許す（組めないのはビルドの不備で、テストが起動の時点で落ちる）
 
 ### 構成と名前
 
@@ -119,7 +120,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 | `entry` を移すとき | stopreview の呼び方が変わったもの（`log_event` → `LogNoKey`・`LogPlanTimeout`・`LogSuspected`、clear 3 つ → `turn.Clear`、stopeval の 3 つ → `Report`、`wiki.pending` → `PendingImpacts`）に呼び手を合わせる |
 | hook を移すとき | records/prune が持つ上の段のファイル名の残りの写し（subagent-・turngate-・.turn・.accepted・.reported）を、持ち主の定数と突き合わせるテストを置く（Python は tests/core/test_prune.py が見ていた）。ops と direct- は `config` の定数を両方が読み、sent は oplog のテストが prune の数えで、nudged- と mirror- は持ち主（lifecycle/stop・sync/mirror）のテストが古い記録が消えることで確かめる |
 | hook を移すとき | `infra/pyre` の照合に深さ（歩数）の上限を入れ、超えたら照合を打ち切って拒否側に倒す。いまは繰り返しを含む利用者の式を数 MB のコマンドに当てると、呼び出しが深くなってスタックがあふれ、hook が落ちる（落ちると止めずに通る）。判定の期限（Python も持たない）と一緒に設計する |
-| Python を外すとき | Python の policy・infra のファイルを指す設計書と sh（`docs/21_design/messages.md`・`startup-config.md`・`modules.md`、`.agents/docs/environment.md`・`e2e-exploration.md`、`.ccnavi/scripts/ccnavi-launcher.sh`・`ccnavi-git.sh` のコメント）を Go の置き場に直す |
+| Python を外すとき | Python の policy・infra のファイルを指す設計書と sh（`docs/21_design/messages.md`・`startup-config.md`・`modules.md`・`diagnostics.md`（`docsearch.START_SECONDS`）・`multi-repo/skills.md`（`projskills`）、配る `.ccnavi/docs/skill-processes.md`（`projskills` の名前が出る）、`.agents/docs/environment.md`・`e2e-exploration.md`、`.ccnavi/scripts/ccnavi-launcher.sh`・`ccnavi-git.sh` のコメント）を Go の置き場に直す |
 | Python を外すとき | Chrome 拡張（`extensions/chrome/ccnavi-approval`）は Pyodide で Python の `entry.ext` → `tickets.core.api` を読む。Go には移せないので、Pyodide 用に Python の判定一式を残して配るか、拡張の判定を TS か WASM に書き直すかを決める（ユーザと合意が要る）。それまでは Go と Python の判定のずれを Chrome の見本（`extensions/chrome/ccnavi-approval/test/fixtures/core-scenarios.json`）で見張る |
 | Python を外すとき | `git.Undo` の案内でパスを `"` で囲むだけの引用を、`config` の引用と同じ規則にする（`$` やバッククォートを含むパスで壊れる。いまは Python と同じ出力を保つため残す） |
 | Python を外すとき | sync/handoff の `Apply` で、書いた後の読み直しに失敗したエントリが戻されない（Python も同じ。直すなら Python と同時に直す） |
