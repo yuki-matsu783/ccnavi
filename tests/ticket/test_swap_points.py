@@ -649,14 +649,16 @@ def _default_placement(chrome):
     approved = ".ccnavi/approved"
     layer = ".ccnavi/config/project"
     done = f"{approved}/done"
+    # 文面ファイルは拒否の文を手元の CLI と同じにするため、統合先とワークスペースから読む。
+    messages = ".ccnavi/messages"
     return {
         "tickets": tickets,
         "approved": approved,
         "layer_dir": layer,
-        "integration_paths": sorted({done, chrome.COMMON_LAYER, layer}),
+        "integration_paths": sorted({done, chrome.COMMON_LAYER, layer, messages}),
         "integration_files": [chrome.SETTINGS_FILE, chrome.COMPAT_FILE],
         "branch_paths": [approved, tickets],
-        "workspace_paths": sorted({chrome.COMMON_LAYER, layer}),
+        "workspace_paths": sorted({chrome.COMMON_LAYER, layer, messages}),
         "workspace_files": [chrome.SETTINGS_FILE, chrome.COMPAT_FILE],
         "project_paths": sorted({done, layer}),
     }
