@@ -7,12 +7,13 @@ import (
 	"ccnavi/internal/infra/argparse"
 )
 
-// bareYes は値なしで渡された `--yes`。取り込み（`user handoff --yes`）とミラーの同期（`user mirror --yes`）だけが読む
-// （ほかの経路の `--yes` は識別子を取る）。
+// bareYes は値なしで渡された `--yes` を表す。読むのは取り込み（`user handoff --yes`）とミラーの同期（`user mirror
+// --yes`）だけである。ほかの経路の `--yes` は識別子を取る。
 const bareYes = "\x00bare"
 
-// 前方一致は受けない（argparse は allow_abbrev=False で組む）。受けると `--close` や `--review` が `--close-early` /
-// `--reviewed` として走り、省略せずに書いた形しか見ない組み込みの deny に止められない。help の本文は usage の自前の文。
+// 前方一致は受け付けない（argparse は allow_abbrev=False で組む）。受け付けると、
+// `--close` や `--review` が `--close-early` や `--reviewed` として走ってしまう。
+// 省略せずに書いた形しか見ない組み込みの deny では止められないためである。help の本文は usage の文である。
 func newParser() *argparse.Parser {
 	p := argparse.New("ccnavi")
 	str := func(flag string) { p.Add(argparse.Arg{Flags: []string{flag}, Default: ""}) }
@@ -123,8 +124,9 @@ func newParser() *argparse.Parser {
 	return p
 }
 
-// opts は読めた引数。Python の argparse の Namespace と同じく、経路の途中で値を差し替える（sh が渡すパスを 1 本に
-// まとめる、診断の外の差し替えを捨てる）。欄の名前は argparse の dest。
+// opts は読めた引数である。Python の argparse の Namespace と同じく、
+// 経路の途中で値を差し替える（sh が渡すパスを 1 本にまとめる、診断の外の差し替えを捨てる）。
+// 欄の名前は argparse の dest と同じにする。
 type opts struct{ argparse.Namespace }
 
 func (a opts) command() []string { return a.Strings("command") }
@@ -179,9 +181,9 @@ func beforeDashes(argv []string) []string {
 	return argv
 }
 
-// takeTestWords は `--test` と続く 2 語を argparse に渡す前に抜き出す。続く 2 語をそのまま取れば、2 語の中の
-// オプションの名前（`--test Bash --permission-mode auto ls`）も語として取り、testUsage の案内まで届く。
-// 2 語に満たないときと `--` の後ろにあるときは、そのまま argparse に任せる。
+// takeTestWords は `--test` と続く 2 語を、argparse に渡す前に抜き出す。続く 2 語をそのまま取ると、
+// 2 語の中のオプションの名前（`--test Bash --permission-mode auto ls`）まで語として取り込み、
+// testUsage の案内まで届いてしまう。2 語に満たないときと `--` の後ろにあるときは、そのまま argparse に任せる。
 func takeTestWords(argv []string) ([]string, []string) {
 	if !slices.Contains(beforeDashes(argv), "--test") {
 		return argv, nil

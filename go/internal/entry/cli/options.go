@@ -23,10 +23,12 @@ type placeFlag struct {
 	absent     any
 }
 
-// layerOverrides はレイヤーの置き場を動かすフラグ。前の 3 本は共通レイヤーの中身、後の 2 本はレイヤーを探す先で、
-// どちらも外すとプロジェクトのレイヤーがまるごと消える（実績リスクが下がり、レビュー待ちを飛ばして閉じられる）。
-// placeOverrides は記録と状態とチケットの置き場を動かすフラグ。どちらも診断の経路でだけ効く。sh は受け取った引数を
-// そのまま渡すので、診断の外で受けると記録を消した形や置き場を差し替えた形でサブコマンドを動かせる。
+// layerOverrides はレイヤーの置き場を動かすフラグである。前の 3 本は共通レイヤーの中身、
+// 後の 2 本はレイヤーを探す先を指す。どれを外しても、プロジェクトのレイヤーが丸ごと消える。
+// そうなると実績リスクが下がり、レビュー待ちを飛ばして閉じられてしまう。
+// placeOverrides は記録と状態とチケットの置き場を動かすフラグである。どちらも診断の経路でだけ効く。
+// sh は受け取った引数をそのまま渡すので、診断の外で受けると、記録を消した形や置き場を差し替えた形でサブコマンドが
+// 動いてしまう。
 var (
 	layerOverrides = []placeFlag{
 		{"--rules", "rules", ""},
@@ -41,8 +43,9 @@ var (
 		{"--approved", "approved", nil},
 		{"--tickets", "tickets", ""},
 	}
-	// wrapperFlags は sh が自分で計算して渡すパス。sh は自分のぶんを先に置き、エージェントの引数を後ろに繋ぐので、
-	// argparse の後勝ちでは 2 本目で上書きできる。2 度渡す正しい使い方が無いので、2 本目が在ること自体を断る。
+	// wrapperFlags は sh が自分で計算して渡すパスである。sh は自分の分を先に置き、
+	// エージェントの引数を後ろに付けるので、argparse の後勝ちでは 2 本目で上書きできてしまう。
+	// 2 度渡す正しい使い方は無いので、2 本目があること自体を断る。
 	wrapperFlags = []placeFlag{{"--root", "root", nil}, {"--cwd", "cwd", ""}}
 	// docsFlags は `--docs` でだけ読むフラグ。
 	docsFlags = []placeFlag{
@@ -61,9 +64,9 @@ var (
 	}
 )
 
-// notWithDocs は `--docs` と同時に指定できないフラグ。ほかの経路と、その経路でだけ読むもの。何も出さずに無視すると、
-// 打ったユーザは反映されたと思う。`--root` は引く場所そのもの、`--log`・`--state` は `--docs` が何も記録しないので
-// 受ける。
+// notWithDocs は `--docs` と同時に指定できないフラグである。ほかの経路と、その経路でだけ読むフラグが対象になる。
+// 何も出さずに無視すると、打ったユーザは反映されたと思ってしまう。`--root` は引く場所そのものなので例外とし、
+// `--log`・`--state` は `--docs` が何も記録しないので受け入れる。
 var notWithDocs = []string{
 	"--lint", "--learnings", "--handoff", "--mirror", "--test", "--test-expectations", "--explain", "--suggest",
 	"--prune", "--agree", "--reviewed", "--close-early", "--yes", "--preview", "--verify", "--digest", "--result",
@@ -98,8 +101,9 @@ func sameValue(v, absent any) bool {
 	return false
 }
 
-// oneWrapperFlagEach は sh が渡すパスが 2 度来ていないかを見て、1 本にまとめる。2 度来ていたら false。
-// 数えるのは argparse に任せる。argv を数えると `--reason=--root` のような別のオプションの値まで数える。
+// oneWrapperFlagEach は、sh が渡すパスが 2 度来ていないかを見て、1 本にまとめる。2 度来ていたら false を返す。
+// 数えるのは argparse に任せる。argv を直接数えると、`--reason=--root` のような別のオプションの値まで数えてしまう
+// ためである。
 func oneWrapperFlagEach(stderr io.Writer, a opts) bool {
 	for _, w := range wrapperFlags {
 		v := a.Namespace[w.dest]
@@ -119,8 +123,8 @@ func oneWrapperFlagEach(stderr io.Writer, a opts) bool {
 	return true
 }
 
-// diagnosing は診断の経路か。置き場を動かすフラグはここでだけ効く。診断は payload を読まず、判定を実行にも
-// 記録にも繋げないので、保存していない設定を指しても実運用に影響しない。
+// diagnosing は、診断の経路かどうかを返す。置き場を動かすフラグはここでだけ効く。診断は payload を読まず、
+// 判定を実行にも記録にも繋げない。そのため、保存していない設定を指しても実運用には影響しない。
 func diagnosing(a opts) bool {
 	return a.Truthy("lint") || !a.IsNone("test") || a.Str("test_expectations") != "" || a.Truthy("explain") ||
 		a.Truthy("suggest")
@@ -194,8 +198,8 @@ func docsFlagsGiven(a opts) []string {
 	return out
 }
 
-// notWithDocsGiven は `--docs` に添えられた、ほかの経路のフラグ（最初の 1 つ）。own は調べている経路自身のフラグで、
-// 数えない。`--reviewed 0` の 0 は渡したと数える。
+// notWithDocsGiven は `--docs` に添えられた、ほかの経路のフラグを最初の 1 つ返す。
+// own は調べている経路自身のフラグで、数えない。`--reviewed 0` の 0 も、渡したものとして数える。
 func notWithDocsGiven(a opts, own string) string {
 	for _, flag := range notWithDocs {
 		if flag == own {
@@ -252,8 +256,9 @@ func runDocs(stdout, stderr io.Writer, conf *config.Settings, root string, a opt
 	return docs.Run(stdout, stderr, conf, root, q, !a.Truthy("no_refresh"))
 }
 
-// runPrune は記録と state の後始末を 1 度走らせ、動かしたものを出す。消すのは記録なので、`--preview` でなければ
-// ターミナルを求める（エージェントが打てると、しきい値を 0 に近づけて自分の記録を消せる）。
+// runPrune は記録と state の後始末を 1 度実行し、動かしたものを出す。消すのは記録なので、
+// `--preview` でなければターミナルを求める。エージェントが打てると、
+// しきい値を 0 に近づけて自分の記録を消せてしまうためである。
 func runPrune(in *input, stdout, stderr io.Writer, conf *config.Settings, root string, preview bool) int {
 	if !preview && !fromTerminal(in, conf, stderr, useronly.OpPrune) {
 		return config.ExitError
@@ -268,10 +273,10 @@ func runPrune(in *input, stdout, stderr io.Writer, conf *config.Settings, root s
 	return config.ExitOK
 }
 
-// fromTerminal はユーザの判断の経路が、ターミナルの前のユーザから打たれているか。標準入力がターミナルであることが、
-// hook の中や `echo y |` から来ていないことのいちばん手間の少ない証拠になる。CCNAVI_GUARD_TICKET_APPROVAL=disable で
-// 切れる（テストと端末の無い実行環境のため）。切り方は文面に書かない（読むのはエージェントで、書けばユーザの判断を
-// 自分で出す方法を教えることになる）。
+// fromTerminal は、ユーザの判断の経路がターミナルの前のユーザから打たれているかを返す。
+// 標準入力がターミナルであることは、hook の中や `echo y |` から来ていないことを確かめる最も手間の少ない根拠にな
+// る。CCNAVI_GUARD_TICKET_APPROVAL=disable で切れる（テストと端末の無い実行環境のため）。切り方は文面に書かない。
+// 読むのはエージェントなので、書けばユーザの判断をエージェント自身が出す方法を教えることになる。
 func fromTerminal(in *input, conf *config.Settings, stderr io.Writer, op useronly.Op) bool {
 	if conf.GuardTicketApproval == string(config.Disable) {
 		return true

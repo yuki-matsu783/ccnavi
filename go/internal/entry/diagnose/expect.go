@@ -101,8 +101,8 @@ type expectations struct {
 	results               []expectationResult
 }
 
-// runExpectations は期待する判定をぜんぶ判定（TryOne）に掛ける。判定を作り直さないのが肝で、別の経路で確かめると、
-// 期待が通ったのに実運用で失敗する。
+// runExpectations は期待する判定をすべて判定（TryOne）に掛ける。判定を作り直さないことが大事である。
+// 別の経路で確かめると、期待は通るのに実運用では失敗しうるからである。
 func runExpectations(stderr io.Writer, conf *config.Settings, root, path string) (*expectations, error) {
 	list, err := loadExpectations(path, root)
 	if err != nil {

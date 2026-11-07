@@ -32,8 +32,9 @@ import (
 // head は答えの頭の行。
 const head = "tree 1"
 
-// answer は yes・no で答える行の値。unreadable は、置き場に名前のファイルが在るのに frontmatter を読めず、親かどうかを
-// 決められなかったこと（止める側の検査は親として、ツリーを動かす側は親でないとして扱う。呼ぶ側が決める）。
+// answer は yes・no で答える行の値である。unreadable は、置き場に名前のファイルが在るのに frontmatter を読めず、
+// 親かどうかを決められなかったことを表す。止める側の検査は親として、ツリーを動かす側は親でないとして扱う。
+// どちらとして扱うかは呼ぶ側が決める。
 type answer string
 
 const (
@@ -172,9 +173,10 @@ func boundTree(stdout, stderr io.Writer, root string, conf *config.Settings, pat
 	return true
 }
 
-// leftoverTree は `tree leftover`。頭に続けて leftover・proposal・doing・mr・stage。stage は親の段階で、doing/ に在れば
-// doing（改版の提案が todo/ にあっても）、なければ review/ なら review、todo/ なら todo、どれも無ければ "-"。
-// 親のワークツリーでなければ（読めないときも）leftover no で、案内を出さない向きに倒す。
+// leftoverTree は `tree leftover`。頭に続けて leftover・proposal・doing・mr・stage を返す。
+// stage は親の段階である。doing/ に在れば doing（改版の提案が todo/ にあっても）、なければ review/ なら review、
+// todo/ なら todo、どれも無ければ "-" とする。親のワークツリーでなければ（読めないときも）leftover no を返し、
+// 案内を出さない答えにする。
 func leftoverTree(stdout, stderr io.Writer, root string, conf *config.Settings, path, name string) bool {
 	if !identOK(stderr, "tree leftover", name) || !treeOK(stderr, "tree leftover", path) {
 		return false

@@ -183,8 +183,9 @@ func afterCheck(root string) []rules.Problem {
 	return nil
 }
 
-// projectSettings は `.claude/settings.json` の env に、防御を無効化する値が無いかを見る。このファイルはエージェントが
-// 書き換えられ、ここに書かれた off は「ユーザが起動のときに渡した off」と見分けのつかない形で届く。
+// projectSettings は `.claude/settings.json` の env に、防御を無効化する値が無いかを見る。
+// このファイルはエージェントが書き換えられるため、ここに書かれた off は、
+// ユーザが起動のときに渡した off と見分けのつかない形で届いてしまう。
 func projectSettings(root string) []rules.Problem {
 	data, err := readSettingsFile(root, projectSettingsRel)
 	if errors.Is(err, fs.ErrNotExist) {

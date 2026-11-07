@@ -69,8 +69,8 @@ func operate(in *input, stdout, stderr io.Writer, conf *config.Settings, root st
 	case hasReviewed && acceptUnresolved && (a.Truthy("preview") || a.Truthy("yes")):
 		return decideBoard(stdout, stderr, conf, root, a, cwd, reviewed)
 	case hasReviewed && a.Str("choose_out") != "":
-		// 対話の decide の前半（ロックを持ったままユーザを待たないため分ける）。選択とダイジェストを state の置き場に
-		// 書くだけで、置くのは sh が write-and-push の中で打つ。
+		// 対話の decide の前半である。ロックを持ったままユーザを待たないように分けている。
+		// 選択とダイジェストを state の置き場に書くだけである。置き場への配置は、sh が write-and-push の中で行う。
 		if !inState(conf, a.Str("choose_out")) {
 			fmt.Fprintf(stderr, inStateOnly, "--choose-out の出力先")
 			return config.ExitError
@@ -382,10 +382,10 @@ var checkable = [][]string{
 	{"ticket", "consolidate"}, {"review", "confirm"}, {"review", "ready"},
 }
 
-// writeAndPushBypass は、write-and-push を通らずに取り込み済みの親子のチケットの状態を書こうとしているなら、その親の
-// 識別子。状態の操作は write-and-push の対象の親子のチケットでは sh が `--record-tree` を付けて起こすので、付いて
-// いなければ sh の引数の読み違いや直打ちで write-and-push を通っていない。ユーザの判断の操作（`--close-early`）と
-// 書かない形は見ない。
+// writeAndPushBypass は、write-and-push を通らずに取り込み済みの親子のチケットの状態を書こうとしているときの、
+// その親の識別子を返す。write-and-push の対象の親子のチケットでは、
+// 状態の操作を sh が `--record-tree` を付けて起こす。付いていなければ、sh の引数の読み違いか直打ちで、
+// write-and-push を通っていないことになる。ユーザの判断の操作（`--close-early`）と書かない形は見ない。
 func writeAndPushBypass(root string, conf *config.Settings, a opts, cwd string) string {
 	words := a.command()
 	if a.Str("record_tree") != "" {

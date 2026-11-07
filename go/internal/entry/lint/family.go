@@ -9,11 +9,12 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// FamilyCheck は取り込みの後の検査（`ccnavi sync check <P> [<リポジトリ>]`）。この親子のチケットの承認済みチケットを
-// 取り込みのあとに判定し直し、正とする側の検査（親のワークツリーの外のチケット・決まらない）とあわせて、止める理由を
-// error で返す。手元のレイヤーが origin/<統合先> と違うことは warn（origin/<統合先> が手元に無ければ黙る）。何も書かない
-// （error の扱いは sh が決める）。repo は self かプロジェクト名で、空なら同じ名前の親のワークツリーのあるリポジトリを
-// 全部探す。
+// FamilyCheck は取り込みの後の検査（`ccnavi sync check <P> [<リポジトリ>]`）である。この親子の承認済みチケットを、
+// 取り込みの後に判定し直す。正とする側の検査（親のワークツリーの外のチケット、
+// どれが正か決まらないもの）とあわせて、止める理由を error で返す。
+// 手元のレイヤーが origin/<統合先> と違うことは warn にする（origin/<統合先> が手元に無ければ黙る）。
+// 何も書かない。error の扱いは sh が決める。repo は self かプロジェクト名で、
+// 空なら同じ名前の親のワークツリーがあるリポジトリを全部探す。
 func FamilyCheck(conf *config.Settings, root, family, repo string) []rules.Problem {
 	fams := standing.NewFamilies(conf, root)
 	var st standing.Standing

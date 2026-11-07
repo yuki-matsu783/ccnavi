@@ -14,7 +14,8 @@ import (
 	"ccnavi/internal/tickets/sync/handoff"
 )
 
-// writeJSON は答えの JSON を 1 つ書く。asciiOnly は ensure_ascii=True。indent は indent=N（0 は 1 行）。
+// writeJSON は答えの JSON を 1 つ書く。asciiOnly が真なら ensure_ascii=True にし、
+// indent は indent=N に合わせる（0 なら 1 行）。
 func writeJSON(stdout io.Writer, v any, asciiOnly bool, indent int) error {
 	return pyjson.Write(stdout, v, pyjson.Options{RawUnicode: !asciiOnly, Indent: indent})
 }
@@ -51,8 +52,8 @@ func wanted(a opts) []string {
 	return nil
 }
 
-// sidewaysRoute は `--yes` で書くときの経路を決める。ボードの経路（`--via board`）はターミナルを求めず、ターミナルの
-// 経路はターミナルの前のユーザであることを確かめる。
+// sidewaysRoute は `--yes` で書くときの経路を決める。ボードの経路（`--via board`）はターミナルを求めない。
+// ターミナルの経路は、ターミナルの前のユーザであることを確かめる。
 func sidewaysRoute(in *input, conf *config.Settings, stderr io.Writer, a opts, op useronly.Op) (board, ok bool) {
 	if a.Str("via") == string(via.Board) {
 		via.SetRoute(via.Board)
@@ -65,7 +66,7 @@ func sidewaysRoute(in *input, conf *config.Settings, stderr io.Writer, a opts, o
 	return false, true
 }
 
-// failAnswer は失敗の答え。`--json` なら標準出力に JSON、でなければ標準エラーに 1 行。
+// failAnswer は失敗の答えを書く。`--json` なら標準出力に JSON を、でなければ標準エラーに 1 行を書く。
 func failAnswer(stdout, stderr io.Writer, asJSON bool, version int, text string) int {
 	if asJSON {
 		writeAnswer(stdout, pyjson.NewObject("version", version, "ok", false, "error", text))
@@ -95,8 +96,8 @@ func handoffUsage(parser *argparse.Parser, a opts) string {
 	return ""
 }
 
-// runHandoff は `ccnavi user handoff`。保護対象の下書き（wip/handoff/）を、見るだけか、`--yes` で元の場所へ取り込む。
-// 見るだけの形を含めてユーザ専用（hook が止める）。
+// runHandoff は `ccnavi user handoff` を処理する。保護対象の下書き（wip/handoff/）を、見るだけか、
+// `--yes` で元の場所へ取り込む。見るだけの形も含めてユーザ専用で、hook が止める。
 func runHandoff(in *input, stdout, stderr io.Writer, parser *argparse.Parser, conf *config.Settings, root string, a opts) int {
 	asJSON := a.Truthy("json")
 	if refused := handoffUsage(parser, a); refused != "" {

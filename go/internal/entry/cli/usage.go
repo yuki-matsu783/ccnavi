@@ -6,7 +6,8 @@ import (
 	"unicode/utf8"
 )
 
-// usage/ の各話題の節は `ccnavi --help` の本文そのもの。改行と空白まで出力に出るので、文書としてではなく出力として直す。
+// usage/ の各話題の節は `ccnavi --help` の本文そのものである。改行と空白まで出力に出るので、
+// 文書の体裁ではなく出力の形として扱う。
 //
 //go:embed usage/*.txt
 var usageFiles embed.FS
