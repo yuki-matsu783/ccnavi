@@ -37,7 +37,7 @@ keywords: [単体 clone, ワークスペース内 clone, 根, ルート, 統合�
 ## 実行ファイルの見つけ方
 
 - `.ccnavi/bin/` は setup が `.gitignore` に入れるので、clone 直後のプロジェクトには無い
-- `CCNAVI_ENTRY_PATH` が無いとき、sh は `dist/ccnavi/ccnavi`、`.ccnavi/bin/` があればランチャー、の順に探す。`bin/` もソース（`src/ccnavi/__main__.py`）も無いときは PATH の `ccnavi` を返し、PATH にも無ければ見つからない
+- `CCNAVI_ENTRY_PATH` が無いとき、sh は `dist/ccnavi/ccnavi`、`.ccnavi/bin/` があればランチャー、の順に探す。`bin/` が無いときは PATH の `ccnavi` を返し、PATH にも無ければ見つからない
 - 見つからないとき、hook は終了コード 127 で終わり、ガードは働かない（設計書「起動と設定」の導入と配布の節）
 
 ## 共通レイヤーと工程スキル

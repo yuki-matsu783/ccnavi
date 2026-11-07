@@ -59,6 +59,8 @@ uv run python -m unittest discover -s tests/<グループ> -t .
 表にヒットしない変更や、統合先に取り込む前・MR に出す前は全件（`uv run python -m tests`。[テストを回す](../../../.agents/docs/testing.md)）を回す。
 worktree で作業しているときは、そのツリーの中で実行する（`pyproject.toml` はツリーごと）。
 
+実行ファイル（`go/`）のファイルが変わっているなら、`cd go && gofmt -l . && go vet ./... && go test ./...` も通す（`gofmt -l` は何も出さないこと）。Python のテストは Go の実行ファイルを組んで起こすので、上の表のグループも回す。
+
 拡張（`extensions/vscode/ccnavi-board`）のファイルが変わっているなら、そのぶんも通す。
 
 ```sh
@@ -75,8 +77,8 @@ hook（`lint-py.sh` `test-py.sh` `mark-ext.sh` `test-ext.sh`）が同じ検査�
 
 | prefix | このリポジトリでの対象 |
 |---|---|
-| `feat` | `go/` / `src/ccnavi/` への機能追加 |
-| `fix` | `go/` / `src/ccnavi/` / hook スクリプトのバグ修正 |
+| `feat` | `go/` への機能追加 |
+| `fix` | `go/` / hook スクリプトのバグ修正 |
 | `refactor` | 挙動を変えないコード整理 |
 | `test` | `tests/*.py` / `tests/fixtures/` |
 | `docs` | `README.md` / `docs/10_requirements.md`・`docs/11_requirements/` / `docs/20_design.md`・`docs/21_design/` / `docs/30_adr.md`・`docs/30_adr/` / `docs/CONTEXT.md` |

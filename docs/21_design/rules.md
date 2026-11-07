@@ -20,7 +20,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 | `id` | 識別子。必須。文面と記録に出す。記録では `<ワークスペースのルートからの相対パス>:<id>`（組み込みは `builtin:<名前>`）。id の無いルールは読み込まず error で名指しする |
 | `match` | ツール名を `\|` でつないだもの。`Bash` `PowerShell` `Read` `Edit` `MultiEdit` `Write` `NotebookEdit` `Grep` `Glob` `Skill` `Agent` `WebFetch`。ツールでない名前として `Stop`（メインエージェントのターンの終わり）。`Stop` を書けるのは `allow` だけ（6.6） |
 | `glob` | `fnmatch` の記法。文字列全体にヒットする |
-| `regex` | Python の正規表現。`re.search`。先読み・後読み・後方参照は受け付けない |
+| `regex` | Python の正規表現の書き方で、`re.search` と同じ答えを返す（実行ファイルは `infra/pyre` で読む）。先読み・後読み・後方参照は受け付けない |
 | `when` | 組み合わせ条件。`glob` / `regex` の個別条件を `all` / `any` / `not` で組む（5.3） |
 | `except` | 省略できる。`glob` か `regex` の片方だけを持つマッピングのリスト。本体にヒットしても、どれかにヒットすればヒットしない扱い（5.3） |
 | `message` | `deny` だけ。必須。止められたモデルに届く「なぜ止めたか、代わりに何をするか」 |
@@ -54,10 +54,10 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 
 `{root}` は、読み込み時にワークスペースルートの実パスへ置き換わる。regex では区切りが `[\\/]` になる。
 ルートは hook なら `CLAUDE_PROJECT_DIR`、ターミナルなら `--root` の実パス。区切りは `/` と `\` のどちらにもヒットし、大文字小文字は区別しない。ルートを渡さずに読むと error。文面（`message` / `additionalContext` / `additionalContextOnce`）の `{root}` は、
-モデルへ渡すときに、実パス（区切りは `/`）へ置き換える（`rules.fill_text`）。`{script:<名前>}` は `settings.script_command` の値に置き換える。ルートが渡されない読み方では、置き換えない。`<名前>` は `[A-Za-z0-9._-]+` だけで、形が違うものは置き換えず、スクリプトが無いものは置き換える。どちらも `--lint` が warn する。`--explain` と `--test` は書いた表記のまま `{root}` を出す。
+モデルへ渡すときに、実パス（区切りは `/`）へ置き換える（`rules.FillText`）。`{script:<名前>}` は `config.ScriptCommand` の値に置き換える。ルートが渡されない読み方では、置き換えない。`<名前>` は `[A-Za-z0-9._-]+` だけで、形が違うものは置き換えず、スクリプトが無いものは置き換える。どちらも `--lint` が warn する。`--explain` と `--test` は書いた表記のまま `{root}` を出す。
 
 先読み・後読み・後方参照を弾くのは、ルールがエンジンをまたいでも同じ意味になり、組み合わせ爆発を起こしうる書き方を受け付けないため
-（Python の `re` に時間制限は無く、判定の途中で止まったままの hook は期限に達し、呼び出しは止められずに通る）。
+（正規表現の照合（`infra/pyre`）に時間制限は無く、判定の途中で止まったままの hook は期限に達し、呼び出しは止められずに通る）。
 
 `{!root}` は、読み込み時に「ワークスペースルートで始まらない」へ展開される。`(?!...)` を使わずに否定を書くための
 記法である。ルートを 1 文字ずつ分解した入れ子の式になり、繰り返しを含まない。展開先はどのレイヤーのルールでもワークスペースルート。
@@ -186,7 +186,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 
 認証情報の 1 本（`builtin:credentials`）も、既定のときに限らず常にヒットする土台の deny。設定で切れず、誤検知が出ても外せない。
 見本の `.env.example` も、対象の 6 つのツール（`Bash` `Read` `Write` `Edit` `MultiEdit` `NotebookEdit`）で止まる。`Grep` `Glob` `PowerShell` は対象に入れない。
-キーのファイルは拡張子として書かれた形（`x.pem`、`x.pem.bak`、`x.key.json`）で適用する。判定に達せなかったときの許可リスト（`hook/failsafe.py`）は、
+キーのファイルは拡張子として書かれた形（`x.pem`、`x.pem.bak`、`x.key.json`）で適用する。判定に達せなかったときの許可リスト（`hook/failsafe`）は、
 この式に揃え、独自に `.gnupg`、`id_ecdsa`、`.p12` / `.pfx`、`.git`、操作記録の置き場を足している。
 
 `.git` の中への書き込みの 2 本（`builtin:guard-git-dir`・`builtin:guard-git-dir-via-bash`）も、既定のときに限らず常にヒットする土台の deny。
@@ -212,12 +212,12 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 - git のラッパーの中で行う `.git` への書き込み（統合の片付けなど）は、外側のコマンド文字列に `.git` が出ないのでヒットしない
 - リダイレクトの行き先は `>` をまたがずに読むので、読み切れなかった生の文字列でも照合が長さに比例して終わる
 - `cd .git` のあとの相対パスへの書き込みは、同じコマンドの中なら止める（`cd .git && echo x > config`・`cd .git && find . -delete`）。
-  `cd` で移った先から見たパス（`shellread` の moved）にも適用するため
+  `cd` で移った先から見たパス（`shell.Reading` の `Moved`）にも適用するため
 - 止めないもの。守る場所の検出と同じく、形の分かる書き込みだけを見る
   - `git` 自身のサブコマンド（`git config` など）
   - `cd` が別の Bash の呼び出しにまたがる形（`cd .git/hooks` のあと、別の呼び出しで `echo x > pre-commit`）。判定はセッションの cwd を見ない
   - インタプリタ（`python -c` など）の中の書き込み
-  - 変数・コマンド置換・グロブで書いたパス（`$h/pre-commit`、`$(… --git-path hooks)/x`、`.gi?/config`）。`shellread` は変数の値も展開の結果も知らない
+  - 変数・コマンド置換・グロブで書いたパス（`$h/pre-commit`、`$(… --git-path hooks)/x`、`.gi?/config`）。`infra/shell` は変数の値も展開の結果も知らない
   - 上に無い書き込みの動詞（`touch` `chmod` `mkdir` `perl -pi` `rsync` `tar` `curl -o` `awk -i inplace`）は未実装。足すと読むだけの形の誤検知が増えるため
   - 親から始める `find`（`find . -name index.lock -delete`）。開始点が `.git` の形だけを見る
   - Windows の別名（8.3 形式の `GIT~1`、`.git::$INDEX_ALLOCATION`）。解決済みのパスでも別名のまま残る

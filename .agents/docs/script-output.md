@@ -11,7 +11,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チ
 エージェントは、スクリプトの出力を読んで次に何をするかを決める。出力が次の一手を言わないと、エージェントは
 手元の知識で手順を補う。補えなければ、決まりを外れた道（提案を手で書く、チケットを起こさずに直接実装するなど）に進む。
 
-チケット作業を進めるsh（`.ccnavi/scripts/`）と実行ファイル（`src/ccnavi/`）の出力は、次の決まりで書く。拒否の文面の型と、止め方の選び方は[止め方の型と選び方](stop-patterns.md)にある。
+チケット作業を進めるsh（`.ccnavi/scripts/`）と実行ファイル（`go/`）の出力は、次の決まりで書く。拒否の文面の型と、止め方の選び方は[止め方の型と選び方](stop-patterns.md)にある。
 
 ## 行頭の語
 
@@ -29,10 +29,10 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チ
 ## 決まり
 
 - 成功の終わりと、「止まったが続きがある」終わり（終了コード4の代行案内など）では、次の一手が1つに決まるなら `次:` を出す
-- `次:` は1行に1手だけ。手が複数あって順に打つときは、1手目だけを `次:` にし、2手目以降は `案内:`（文面ファイルの `note`）に回す。承認のゲート（`tickets/core/approve.py` の `Readiness`。Go は `go/internal/tickets/core` の `readiness`）が複数の手を出すときも、最初の手だけを `次:` にする
+- `次:` は1行に1手だけ。手が複数あって順に打つときは、1手目だけを `次:` にし、2手目以降は `案内:`（文面ファイルの `note`）に回す。承認のゲート（`go/internal/tickets/core` の `readiness`）が複数の手を出すときも、最初の手だけを `次:` にする
 - 次の一手が複数あって決まらないときは、`次:` にせず、`次の手:` に番号つきで並べる。決められるのはユーザなら、そう言う
 - 次がユーザの操作のときは、「ユーザに〜を頼んで返事を待つ」の形にする。エージェントが打てない操作を、エージェントへの指示として書かない
-- パスの引用: パスは `ccnavi_sh_quote`（sh）・`settings.shell_path`（Python）で引用し、別のツリーで打つものは 1 行で完結する `cd <引用したパス> && …` で始める。Write/Edit に渡すパスだけは、引用しない生の形で出す。メッセージは `-m '<メッセージ>'` と単引用符で書き、文全体を `'...'` で囲まない
+- パスの引用: パスは `ccnavi_sh_quote`（sh）・`config.ShellPath`（Go）で引用し、別のツリーで打つものは 1 行で完結する `cd <引用したパス> && …` で始める。Write/Edit に渡すパスだけは、引用しない生の形で出す。メッセージは `-m '<メッセージ>'` と単引用符で書き、文全体を `'...'` で囲まない
 - 識別子・タイトル・番号・パスは、分かる値を埋めて、そのまま打てる形にする。分からない値だけ `'<触るファイルの glob>'` のように `<…>` で残し、`sh_quote` などで1語に包む
 - `<…>` の仮の値を残した次の一手を、そのまま打たれても、誤った成果物ができないようにする。受け側（`ccnavi ticket new` の `--scope` と `--title`）が `<…>` を含む値を断る。新しく仮の値を出すときは、受け側にも同じ断りを足す
 - 「環境が揃っていない」で止まる出力（終了コード 3 など、道具・依存・ブラウザが無い失敗）には、直し方を書いた文書のパスと、その索引の引き方（`sh .ccnavi/scripts/ccnavi-launcher.sh --docs --keyword <語>`）を `案内:` で添える。エージェントが出力の 1 行を読み飛ばして、資料を引かずに「この環境には無い」と報告しないようにする。hook も、失敗の最初の 1 回と、連続が 3 の倍数になる回に索引の案内を出すが、スクリプトの出力そのものにも直し方の行き先を置く（例は `extensions/vscode/ccnavi-board/scripts/render-board.js`）。索引に載らない文書（frontmatter の無い手順書）へ案内するときは、パスだけ書く
@@ -55,18 +55,18 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チ
 
 | 場面 | 出力元 | 次 |
 |---|---|---|
-| 子の `ticket cancel` | `tickets/lifecycle/commands.py`（`NEXT_OPS_CHILD_DONE`。Go は `go/internal/tickets/lifecycle/ops`） | 親の `status` を確かめる。親の取り消しと、close-early がまとめて行う取り消しでは言わない |
+| 子の `ticket cancel` | `go/internal/tickets/lifecycle/ops`（`NEXT_OPS_CHILD_DONE`） | 親の `status` を確かめる。親の取り消しと、close-early がまとめて行う取り消しでは言わない |
 | `ticket record-risk` | 同上（`NEXT_OPS_RECORD_RISK`） | `finish` を打ち直す |
-| `ticket start`・`finish`・`cancel`・`consolidate` が、書く前に分かる条件で断ったとき（`--check` も同じ） | 同上・`tickets/lifecycle/consolidate.py`（`NEXT_OPS_REFUSED`・`NEXT_OPS_REFUSED__CANCEL`。Go は `go/internal/tickets/lifecycle/consolidate`） | 理由の行のあとに 1 行。直して同じ操作を打ち直す（`cancel` は `--reason <理由>` つき） |
-| `review-request`・`decide` が、書く前に分かる条件で断ったとき（`--check` も同じ） | `tickets/review/request.py`・`tickets/review/decide.py`（`NEXT_REVIEW_REQUEST_REFUSED`・`NEXT_DECIDE_REFUSED`。Go は `go/internal/tickets/review/request`・`review/decide`） | 理由の行のあとに 1 行。直して同じ操作を打ち直す（`decide` はユーザが打つ） |
-| `review confirm`・`review ready` が、ロック・取り込みの前に分かる条件で断ったとき（`--check` も同じ） | `tickets/core/review.py`・`tickets/review/close.py`（`NEXT_CONFIRM_REFUSED`・`NEXT_READY_REFUSED`。Go は `go/internal/tickets/core`・`review/closeout`） | 理由の行のあとに 1 行。直して同じ操作を打ち直す（`ready` は親のワークツリーの外から `--parent` つき）。`ready --check` は、前の回が退避を始めている打ち直しなら通して本体に任せる |
-| 親の `ticket start` | 同上・`tickets/lifecycle/plan.py`（`NEXT_OPS_START_PARENT`・`NEXT_OPS_START_CHILDLESS`。Go は `go/internal/tickets/lifecycle/plan`） | `status` で承認済みの子を確かめる。子のないフェーズがあれば、子の提案を書く |
-| `ccnavi-review.sh confirm` | `tickets/core/review.py`（`NEXT_REVIEW_CONFIRMED`・`NEXT_REVIEW_LAST`。Go は `go/internal/tickets/core`） | 途中は親の `status`。最後のフェーズは親の `finish`（そのあとの ready は `案内:`） |
-| `approval-request --check` | `tickets/proposal/propose.py`（`NEXT_APPROVAL_REQUEST_CHECKED`。Go は `go/internal/tickets/proposal/propose`） | `approval-request` を打つ |
-| `--fill-phases`・`--plan-order --write` | `entry/cli_plan.py`（`NEXT_PLAN_VERIFY`） | `--lint` か `--agree --preview --verify` で確かめる |
-| `ticket learn` | `tickets/learning/notes.py`（`NEXT_LEARN_*`。Go は `go/internal/tickets/learning`） | 記録をコミットする |
-| `ticket new`・`ticket revise` | `tickets/proposal/scaffold.py`・`revise.py`（`NEXT_NEW_REWRITE`・`NEXT_REVISE`。Go は `go/internal/tickets/proposal/scaffold`） | 雛形を直す。送るまでの手は `案内:` |
-| レビューの依頼 | `tickets/review/request.py`（`NEXT_REVIEW_REQUESTED`。Go は `go/internal/tickets/review/request`） | ユーザのレビューを待つ |
+| `ticket start`・`finish`・`cancel`・`consolidate` が、書く前に分かる条件で断ったとき（`--check` も同じ） | 同上・`go/internal/tickets/lifecycle/consolidate`（`NEXT_OPS_REFUSED`・`NEXT_OPS_REFUSED__CANCEL`） | 理由の行のあとに 1 行。直して同じ操作を打ち直す（`cancel` は `--reason <理由>` つき） |
+| `review-request`・`decide` が、書く前に分かる条件で断ったとき（`--check` も同じ） | `go/internal/tickets/review/request`・`review/decide`（`NEXT_REVIEW_REQUEST_REFUSED`・`NEXT_DECIDE_REFUSED`） | 理由の行のあとに 1 行。直して同じ操作を打ち直す（`decide` はユーザが打つ） |
+| `review confirm`・`review ready` が、ロック・取り込みの前に分かる条件で断ったとき（`--check` も同じ） | `go/internal/tickets/core`・`review/closeout`（`NEXT_CONFIRM_REFUSED`・`NEXT_READY_REFUSED`） | 理由の行のあとに 1 行。直して同じ操作を打ち直す（`ready` は親のワークツリーの外から `--parent` つき）。`ready --check` は、前の回が退避を始めている打ち直しなら通して本体に任せる |
+| 親の `ticket start` | 同上・`go/internal/tickets/lifecycle/plan`（`NEXT_OPS_START_PARENT`・`NEXT_OPS_START_CHILDLESS`） | `status` で承認済みの子を確かめる。子のないフェーズがあれば、子の提案を書く |
+| `ccnavi-review.sh confirm` | `go/internal/tickets/core`（`NEXT_REVIEW_CONFIRMED`・`NEXT_REVIEW_LAST`） | 途中は親の `status`。最後のフェーズは親の `finish`（そのあとの ready は `案内:`） |
+| `approval-request --check` | `go/internal/tickets/proposal/propose`（`NEXT_APPROVAL_REQUEST_CHECKED`） | `approval-request` を打つ |
+| `--fill-phases`・`--plan-order --write` | `go/internal/entry/cli`（`NEXT_PLAN_VERIFY`） | `--lint` か `--agree --preview --verify` で確かめる |
+| `ticket learn` | `go/internal/tickets/learning`（`NEXT_LEARN_*`） | 記録をコミットする |
+| `ticket new`・`ticket revise` | `go/internal/tickets/proposal/scaffold`（`NEXT_NEW_REWRITE`・`NEXT_REVISE`） | 雛形を直す。送るまでの手は `案内:` |
+| レビューの依頼 | `go/internal/tickets/review/request`（`NEXT_REVIEW_REQUESTED`） | ユーザのレビューを待つ |
 | `ccnavi-review.sh ready` の成功 | `ccnavi-review.sh`（`NEXT_READY_DONE`。`next-sh.yml`） | マージをユーザに頼んで待つ。マージ後の同期は `案内:` |
 
 ユーザが端末で打つ入口（`ccnavi-user-decide.sh`・`ccnavi-user-close-early.sh`）の完了の行は、事実と手順の説明に留め、`次:` を足さない（上の「出さない場面」）。

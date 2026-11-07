@@ -15,14 +15,14 @@ Stop ─┬─ command hook（ccnavi）: 既存の促しを実行 → 共有キ�
       └─ agent hook（判定役）  : 材料を取る → 判定 → 結果を渡す → 返り値をそのまま返す
 ```
 
-- **共有キー**: セッション ID と、transcript 末尾のサイドチェーンでないアシスタント行の `uuid`（`records/stopreview.py` の `shared_key`）。末尾が書きかけなら短く読み直し、それでも読めなければ導けない（未検査）。
+- **共有キー**: セッション ID と、transcript 末尾のサイドチェーンでないアシスタント行の `uuid`（`records/stopreview` の `SharedKey`）。末尾が書きかけなら短く読み直し、それでも読めなければ導けない（未検査）。
 - **判定計画**（`stopreview-plan-*.json`）: 候補か否かと理由、AI による継続か・再判定か、対象（Stop の機会と提案の版）、材料の版、実効モード、issue／MR の指定、提出済みの提案と承認状態、汚染の印。同じキーへ何度書いても結果は変わらない。
-- **候補条件**（`stopreview.candidate`）: メインエージェントの Stop、`stop_hook_active` が偽（または AI による継続で未再判定）、`CCNAVI_STOP_REVIEW` が disable でない、チケット制御が有効、agent hook が登録済み、既存の促しが止めていない、対象を解決できる、かつ（着手済みでない親に属する提案の操作実績か未送信の提案がある、または cwd に着手済みの承認済みチケットが無い）。候補でない Stop は ccnavi が最終分類（対象外・検査省略・未検査）まで確定する。
+- **候補条件**（`stopreview.Candidate`）: メインエージェントの Stop、`stop_hook_active` が偽（または AI による継続で未再判定）、`CCNAVI_STOP_REVIEW` が disable でない、チケット制御が有効、agent hook が登録済み、既存の促しが止めていない、対象を解決できる、かつ（着手済みでない親に属する提案の操作実績か未送信の提案がある、または cwd に着手済みの承認済みチケットが無い）。候補でない Stop は ccnavi が最終分類（対象外・検査省略・未検査）まで確定する。
 - **試行の状態**: `plan_wait` → `pending` → `running`（material）→ `done`（record が受理）／ `sent_back`（差し戻し送出）→ `consumed`（次の Stop で消費）。期限切れ（`expired`）は次の hook 起動時と集計時に確定する。計画を書くときに試行のファイルが在るのに読めなければ、判定せず未検査（`attempt_unreadable`）で確定する。次の Stop は別の共有キーなので、新しい試行になる。
 
 ## stop-review
 
-判定役が使う 2 つの入口（材料を取る・結果を渡す。`entry/cli_stopreview.py`）。どちらも終了コード 0 で、結果を渡す側の標準出力は agent hook がそのまま返す JSON 1 行だけ。拒否・失敗・実行できないときは `{"ok": true}`。作業者向けの文書と索引には、打ち方を載せない。
+判定役が使う 2 つの入口（材料を取る・結果を渡す。`entry/cli` の `stopreview.go`）。どちらも終了コード 0 で、結果を渡す側の標準出力は agent hook がそのまま返す JSON 1 行だけ。拒否・失敗・実行できないときは `{"ok": true}`。作業者向けの文書と索引には、打ち方を載せない。
 
 - 材料を取る側: 計画を最大 5 秒待ち、材料を区切ったデータとして返す。材料は、今回のターン、直前 8 件のユーザ発言、判定用 Markdown（`.ccnavi/config/stop-review.md`、無ければ組み込み）、issue／MR の指定、提出済みの提案と承認状態、提案の版ごとの本文（送ったコミットから読む。未送信は書いたファイルの中身）。本文に区切りの文字列があっても無害にする。判定に渡した材料は伏せ字にして `logs/stop-review/material/` に保存する。
 - 結果を渡す側: 構造を検証し（試行 ID・対象・基準・種別つきの問題箇所と修正・必要な基準の網羅）、材料の版と承認状態を確かめ直し、最終分類を確定する。enable で不備検出のときだけ `{"ok": false, "reason": …}`。差し戻しの文に、試行 ID、基準 ID・問題箇所・修正、「本当にユーザの判断が要る問いなら、修正の後にその問いを最後に書き直して終える」の一文を必ず含める。再判定は差し戻さない。
@@ -30,14 +30,14 @@ Stop ─┬─ command hook（ccnavi）: 既存の促しを実行 → 共有キ�
 
 最終分類は、AI が「チケット作業の依頼ではない」→ 対象外（判定者 AI）、材料不足 → 未検査、R1・R2・R4 に受理された不備 → 不備検出、必要な基準に判定不能 → 未検査、それ以外 → 終了可。出力の検証は構造だけを確かめる。指摘が正しいことは保証しない。
 
-## approval-request の操作実績（`records/stopops.py`）
+## approval-request の操作実績（`records/stopreview`）
 
 - PreToolUse が `ccnavi-ticket.sh approval-request <識別子>` を読んで `tool_use_id` と識別子を登録する（1 つの Bash に複数あれば識別子ごと）。
 - `ccnavi-ticket.sh approval-request` は、自分をもう一度起動する外側の層で、どの道を通っても `logs/state/stopops-result/*.kv` を 1 つ書く。経路は 6 つ（送った・変更なし・書くだけ・止めた・送る前に失敗（コードが未 push で拒否した回を含む）・push 後の後処理で失敗）。送ったコミットとパスごとのブロブも書く。
 - PostToolUse・PostToolUseFailure が識別子と時刻の範囲で結び付ける。結べないものは Stop と集計で結び直し、30 秒過ぎても見つからなければ未連携。
 - 提案ごとの最終の有効版が判定の対象。`todo/<識別子>.md` への Write・Edit を記録し、書いた後に送った操作が無いものを未送信とする（Bash で書いた提案は検出できない）。
 
-## 判定役の除外（`hook/stopjudge.py`）
+## 判定役の除外（`hook/stopjudge`）
 
 判定役の呼び出しは、payload の `agent_id` が `hook-agent-` で始まることで見分ける（実機で確かめた。登録したワークスペースだけ）。PreToolUse は、判定役の 2 つの入口を呼ぶ Bash と返り値の道具だけ通し、ほかは止める。PostToolUse・PostToolUseFailure・SubagentStart・SubagentStop・Stop は何もしない。作業者の `stop-review` は止めて汚染の印を付ける（dry-run では印だけ）。
 
@@ -56,7 +56,7 @@ Stop ─┬─ command hook（ccnavi）: 既存の促しを実行 → 共有キ�
 
 ## 記録の置き場と後始末
 
-試行のイベントは `logs/stop-review/events.jsonl`（`decisions.jsonl` には書かない）。計画・試行・操作は state の置き場。`records/prune.py` が、セッションを名前に持つものはセッションごとに、持たないものはそれ自身の日付で（state の保持日数）、再評価用の材料と events は `CCNAVI_STOP_REVIEW_KEEP_DAYS`（既定 90 日）で消す。
+試行のイベントは `logs/stop-review/events.jsonl`（`decisions.jsonl` には書かない）。計画・試行・操作は state の置き場。`records/prune` が、セッションを名前に持つものはセッションごとに、持たないものはそれ自身の日付で（state の保持日数）、再評価用の材料と events は `CCNAVI_STOP_REVIEW_KEEP_DAYS`（既定 90 日）で消す。
 
 ## 実測で確かめた前提（Claude Code 2.1.303、`claude -p`）
 

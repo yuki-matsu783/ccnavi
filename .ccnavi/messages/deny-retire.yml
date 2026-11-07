@@ -1,5 +1,5 @@
 # `ccnavi worktree retire <親>` が、子に触る前に断るときの文。親のワークツリーを消せない理由（cwd が中・
-# 未コミット・そのほか）で分ける。判定は lifecycle/worktrees.py の blocked が持つ。
+# 未コミット・そのほか）で分ける。判定は tickets/lifecycle/worktrees の Blocked が持つ。
 version: 1
 messages:
   DENY_RETIRE_PARENT:

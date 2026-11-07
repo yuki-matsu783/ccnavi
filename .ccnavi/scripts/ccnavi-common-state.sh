@@ -31,7 +31,7 @@ ccnavi_repo_key() {
 # 親のブランチ名として <名前> を受けてよいなら 0。<名前> <識別子>
 #
 # 識別子と同じ名前は識別子の検査（ccnavi_is_ident）で見る（前からの識別子は ccnavi_is_branch の予約に
-# ヒットすることがある）。違う名前は ccnavi_is_branch で見る。どちらも実行ファイルの検査（`ticket_ids.id_problem`・
+# ヒットすることがある）。違う名前は ccnavi_is_branch で見る。どちらも実行ファイルの検査（`ids.IDProblem`・
 # `branch_problem`）の、ASCII で見分けられる分だけの複製で、受けたものを使う側の 2 段目の確認にあたる。
 ccnavi_branch_ok() {
 	if [ "$1" = "$2" ]; then

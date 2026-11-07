@@ -3,7 +3,7 @@ type: guide
 title: 実行ファイルの境界
 description: ccnavi実行ファイルの責務範囲。ネットワークに出ない、gitとの連携、シェルスクリプトとの役割分担
 tags: [exe-boundary, sh-scripts]
-keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, hook, payload, レビュー, 取得した結果]
+keywords: [実行ファイル, ネットワーク, 境界, sh, Go, WASM, 判定, hook, payload, レビュー, 取得した結果]
 ---
 
 # 実行ファイルの境界
@@ -15,7 +15,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   実行ファイルが行うのは、そのJSONを読んでチケットを状態ごとの置き場へ移すことと、マーカーを置くことだけ
 - 例外が1つある。リスクの配点の`script:`は、ユーザが置いたスクリプトを実行ファイルが`sh`で起動し、標準出力の点を受け取る
   （設計 9.9）。起動するのはプロジェクトの中のユーザのスクリプトだけで、実行ファイル自身はネットワークに出ない
-- ホストへ出るのは、shと、Chrome 拡張の TypeScript（service worker）だけ。Chrome 拡張は、取得した結果を実行ファイルと同じ Python のコアへ渡して判定させ、ホストへの書き込み（issue・返信・解決・コミット）は、拡張自身が行う
+- ホストへ出るのは、shと、Chrome 拡張の TypeScript（service worker）だけ。Chrome 拡張は、取得した結果を、実行ファイルと同じ判定のコア（Go を WASM に組んだもの。`go/cmd/ccnavi-chrome`）へ渡して判定させ、ホストへの書き込み（issue・返信・解決・コミット）は、拡張自身が行う
 - メッセージ送信（UserPromptSubmit）のhookも実行ファイルの側にあり、ホストに問い合わせない。ホストへの問い合わせは
   sh（`ccnavi-start.sh`・`ccnavi-branches.sh`）が受け持ち、hookは記録（承認済みチケット・マーカーなど）を読むだけ。
   hookのtimeoutは10秒で、ネットワークを待てないため
@@ -64,7 +64,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   コミットして送ってからDraftを外す（設計 9.10）。ファイルを`logs/archive/`へ動かすのと`wip/`の追跡済みのファイルを消すのは実行ファイルで、
   ネットワーク（push・Draftを外す・コメント）はshが受け持つ
 - 親を閉じたときのブランチの片付けも実行ファイルが行う（`worktree retire <親>`・`worktree branch <名前> [confirmed]`・
-  `sync tidy <親> <リポジトリ> <ブランチ> <sha>`。`tickets/lifecycle/retire.py`。Go は `go/internal/tickets/lifecycle/retire`）。MR がマージ済みかと、その先頭の sha は sh が
+  `sync tidy <親> <リポジトリ> <ブランチ> <sha>`。`go/internal/tickets/lifecycle/retire`）。MR がマージ済みかと、その先頭の sha は sh が
   `ccnavi-review.sh merged [<番号>]` で取って渡し、実行ファイルはその sha を基準に、手元の先頭が含まれるかなどをローカルの git で
   確かめて消す。エージェントに `git branch -D` を開けないので、消す入口はこれらだけ（`ccnavi-user-clean-branch.sh`）。最後の行が
   `record yes|no`（片付けが済んだか）で、`yes`のときは実行ファイルが`retire/<親>.json`も消す（shは消さない）。

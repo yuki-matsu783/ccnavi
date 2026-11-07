@@ -1901,7 +1901,7 @@ restore)
 	# エラーになる）ので、マージの最中だけ意味を持つ。ガード自身の設定が
 	# 衝突したときに解く方法はここしかない。ルールファイルに衝突マーカーが
 	# 入っていると YAML として読めず、判定は組み込みの既定を使っているが、
-	# 既定もこの形は止めない（src/ccnavi/policy/builtin.py）。
+	# 既定もこの形は止めない（go/internal/policy/builtin）。
 	#
 	# 別のコミットの中身で戻す形（--source）と、衝突を片側の中身で解く形（--ours / --theirs）は、
 	# 承認済みチケットの置き場にヒットするパスには使わせない。
@@ -2307,7 +2307,7 @@ push)
 			esac
 			for push_tree in "$push_root" "$push_projects"/* "$push_root"/.claude/worktrees/*; do
 				[ -d "$push_tree" ] || continue
-				# hook 側の既定（settings.py の DEFAULT_APPROVED・DEFAULT_TICKETS）と同じ場所を見る。
+				# hook 側の既定（go/internal/infra/config の DefaultApproved・DefaultTickets）と同じ場所を見る。
 				# 食い違うと、この検査が別の場所を見て、気づかないうちに行われなくなる。
 				push_copies="$push_tree/.ccnavi/approved" # 固定
 				push_proposals="$push_tree/wip/proposals" # 固定

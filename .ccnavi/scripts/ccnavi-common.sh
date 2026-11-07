@@ -368,7 +368,7 @@ ccnavi_mask_url() {
 # 範囲（`[a-z]`）の読み方も変わるので、ここでは字の種類を細かく見ない。止めるのは、パスや
 # シェルで意味を持つ書き方だけ: 空、先頭の `-` と `.`、`..`、`/`、`\`、ASCII の英数字と `.` `_` `-`
 # 以外の ASCII の字（空白・制御文字・`$` `;` `*` などの記号）。ASCII の外のバイトは通し、
-# 字の種類（全角記号や NFD を止める）は実行ファイル（`ticket_ids.id_problem`）が確かめる。
+# 字の種類（全角記号や NFD を止める）は実行ファイル（`ids.IDProblem`）が確かめる。
 ccnavi_is_ident() {
 	case "$1" in
 	'' | -* | .* | *..* | */* | *\\*) return 1 ;;
@@ -382,12 +382,12 @@ ccnavi_is_ident() {
 
 # 親のブランチ名として受けてよい書き方なら 0。<語>
 #
-# 実行ファイルの `ticket_ids.branch_problem` の複製（ASCII で見分けられる分だけ）。write-and-push の対象決めなど、呼ぶたびに
+# 実行ファイルの `ids.BranchProblem` の複製（ASCII で見分けられる分だけ）。write-and-push の対象決めなど、呼ぶたびに
 # 実行ファイルを起こせない所で使う。名前を受け入れる入口（ccnavi-start.sh・
 # ccnavi-worktree.sh・ccnavi-git.sh の worktree add）は実行ファイルに聞く（`ccnavi_id_ask`）。規則を変えるときは両方を直す。
 #
 # 親のブランチ名は識別子の字に階層の区切りの `/` を足したもの（`feature/123-login`）。実行ファイル
-# （`ticket_ids.branch_problem`）が字と形を確かめたものを受け取る側の 2 段目の確認で、パスや ref で意味を持つ
+# （`ids.BranchProblem`）が字と形を確かめたものを受け取る側の 2 段目の確認で、パスや ref で意味を持つ
 # 書き方を止める: 空、先頭の `-` `.` `/`、末尾の `/` `.`、`..`、`//`、`/.`（`.` で始まる階層）、`.lock` で終わる
 # 階層、`\`、ASCII の英数字と `.` `_` `-` `/` 以外の ASCII の字（空白・制御文字・記号）、git の ref の名前
 # （refs/・origin/ など）や保護されたブランチの名前を先頭の階層に持つもの、HEAD の階層を持つもの。
@@ -401,7 +401,7 @@ ccnavi_is_branch() {
 	ccnavi_ib_rest=$(printf '%s\\' "$1" | LC_ALL=C tr -d 'A-Za-z0-9._/\200-\377-')
 	[ "$ccnavi_ib_rest" = '\' ] || return 1
 	# git の ref の名前・リモートの名前・保護されたブランチの名前を先頭の階層に持つもの、`HEAD`・`*_HEAD` の
-	# 階層を持つもの（`ticket_ids.branch_problem` と同じ。大文字小文字は区別しない）。
+	# 階層を持つもの（`ids.BranchProblem` と同じ。大文字小文字は区別しない）。
 	ccnavi_ib_low=$(printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
 	case "$ccnavi_ib_low" in
 	refs | refs/* | heads | heads/* | remotes | remotes/* | tags | tags/* | origin | origin/* | upstream | upstream/*) return 1 ;;
@@ -414,7 +414,7 @@ ccnavi_is_branch() {
 # 親のブランチ名から親の識別子を作る。`/` を `-` に置き換えるだけ。<ブランチ>
 #
 # ワークツリーは `.claude/worktrees/<識別子>` に、識別子のブランチを作らず親のブランチを直接チェックアウトする。
-# Python（`ticket_ids.branch_to_id`）・TS（拡張の `branchToId`）と同じ変換で、`tests/fixtures/branch-to-id.json`
+# 実行ファイル（`ids.BranchToID`）・TS（拡張の `branchToId`）と同じ変換で、`tests/fixtures/branch-to-id.json`
 # の同じ表で一致を確かめる。
 ccnavi_branch_to_id() {
 	printf '%s\n' "$1" | tr '/' '-'

@@ -44,8 +44,8 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | 変えたもの | 足すグループ |
 |---|---|
 | `tests/<グループ>/` の中 | そのグループ |
-| `go/**`・`src/ccnavi/**/*.py` | `guard` `config` `ticket` |
-| `src/ccnavi/infra/platformtag.py` | 上に加えて `sh` |
+| `go/**` | `guard` `config` `ticket` |
+| `go/internal/infra/platformtag/` | 上に加えて `sh` |
 | `scripts/ccnavi-build.sh` | `core` `sh` `e2e` |
 | `.ccnavi/scripts/ccnavi-ticket.sh`・`ccnavi-user-agree.sh`・`ccnavi-review.sh` | `ticket` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-git.sh` | `sh` `guard` `config` `e2e` |
@@ -62,7 +62,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | `extensions/vscode/` | `ticket`（`core` の `test_test_json` と `guard` の `test_suggest` も `test/fixtures/` を読む） |
 | `tests/contract/`（`shape.py`・`*.json`） | `contract`。あわせて `extensions/chrome/ccnavi-approval` の `pnpm test`（TS の比較器が同じ表を読む） |
 | `extensions/chrome/ccnavi-approval/test/helpers/mock-gitlab.ts`・`shape.ts` | `extensions/chrome/ccnavi-approval` の `pnpm test`（契約の試験） |
-| `extensions/chrome/ccnavi-approval/`（`py/`・`test/fixtures/`） | `ticket` `sh`（Chrome の入口を手元のコアと突き合わせる）。`test/fixtures/host/gitlab/` と `tests/sh/gitlab_host.py` は `contract` も（見本の応答の形を比べる） |
+| `extensions/chrome/ccnavi-approval/`（`test/fixtures/`）と `go/internal/entry/chrome/`・`go/cmd/ccnavi-chrome/` | `ticket` `sh`（Chrome の入口を手元のコアと突き合わせる）。`test/fixtures/host/gitlab/` と `tests/sh/gitlab_host.py` は `contract` も（見本の応答の形を比べる） |
 | `docs/30_adr/`・`docs/30_adr.md`（枚を足す・番号を動かす） | `core`（`test_adr_numbers`） |
 | そのほかのドキュメントだけ（`*.md`・`docs/`） | 回さない |
 
@@ -83,7 +83,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 Python のテスト（`tests/core/test_test_json.py`・`tests/guard/test_suggest.py`）も読むので、fixtures の旧キーのままだと落ちる。
 拡張を別のフェーズに分けて計画するなら、前のフェーズでこの 2 本が落ちると分かったうえで分ける（直すのは fixtures を持つフェーズ）。
 
-`src/ccnavi/**/*.py` を変えたとき `e2e` は足さない（e2e は組み立て済みの実行ファイルを試す）。組み立て直したなら足す。
+`go/**` を変えたとき `e2e` は足さない（e2e は組み立て済みの実行ファイルを試す）。組み立て直したなら足す。
 
 ## 拡張（`extensions/vscode/ccnavi-board`）のグループ
 
@@ -105,7 +105,7 @@ pnpm test                              # 全部
 
 ```sh
 cd extensions/chrome/ccnavi-approval
-pnpm test        # 組み立て → 単体・Pyodide・手元の CPython との突き合わせ（node scripts/test.js）
+pnpm test        # 組み立て → 単体・WASM（Node）・手元向けの同じ入口との突き合わせ（node scripts/test.js）
 pnpm test:e2e    # 拡張を読み込んだ Chromium での試験。Chromium が要る
 ```
 

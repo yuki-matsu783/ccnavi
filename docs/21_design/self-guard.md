@@ -24,15 +24,15 @@ keywords: [自己防衛, コアファイル, 保護, バックアップ, 復元]
 
 作業・レビュー計画のテンプレート（`.ccnavi/config/{common,project}/templates/`）は、この表に足さない。`*/.ccnavi/*` の一般の保護で止める。
 
-名指しのツール（Write / Edit）の保護には、ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`）の直下の `wip/handoff/` の下を除く例外がある。守る場所のコピー（`wip/handoff/.ccnavi/scripts/x.sh` など）は、ユーザが `ccnavi user handoff` で取り込むまで効力が無い。例外が効くのは、`..` の段が無く、リンクを解いた実パスが綴りと同じで、既にあるファイルがハードリンクでつながっていないとき。`docs/wip/handoff/` や `wip/handoffX/` のような綴りは除かない。組み込みの保護（`builtin:guard-project-home` と、名前で書くツールの 4 本 `builtin:guard-hooks`・`builtin:guard-settings`・`builtin:guard-scripts`・`builtin:guard-ccnavi-config`。どれも `selfguard_shell.handoff_write_exempt`）が同じ範囲を除く。この関数は、ハードリンクでつながったコピーを除かない。置き場の中のリンクを通る対象・ハードリンクでつながった対象・`..` を含む対象への書き込みは、組み込みの `builtin:guard-handoff-links`（`selfguard_shell.handoff_link_target`）が別に止める。置き場の中にリンクを作るシェルの形も `builtin:guard-handoff-ln` が止める（8.2）。シェルからの書き込みの保護は、削除を除いて変えない。削除（`rm`・`ccnavi-git.sh rm`）は、対象がすべて、上の例外と同じ条件（`selfguard_shell.handoff_delete_path`）の置き場の中なら通す。対象の語は `selfguard_shell.handoff_delete_word` が読む。許す文字（英数字と `_ . / : @ + , % -`）だけの語に限り、`~`・`$`・グロブ・`{}`・`=`・`!`・引用符・空白・バックスラッシュを持つ語は外さない（シェルが別のパスに直す）。入り口は 2 つ。素の `rm` は `builtin:guard-setting-files` の `selfguard_shell.handoff_delete_exempt` が、コマンド単位で外す。外すのは絶対パスの語だけで、相対パスは外さない（`sh -c` や `find -execdir` の中身は別の層になり、層の中の `cd` が見えない）。`ccnavi-git.sh rm` は `wrapguard._core_hit` が、`cd` を追った居場所から相対パスも解いて外す（承認済み・レビュー待ちの置き場の判定より後）。`unlink` は元から止まらないので、例外の対象にしない。置き場への書き込み（`cp`・`mv`・リダイレクト）は外さない。
+名指しのツール（Write / Edit）の保護には、ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`）の直下の `wip/handoff/` の下を除く例外がある。守る場所のコピー（`wip/handoff/.ccnavi/scripts/x.sh` など）は、ユーザが `ccnavi user handoff` で取り込むまで効力が無い。例外が効くのは、`..` の段が無く、リンクを解いた実パスが綴りと同じで、既にあるファイルがハードリンクでつながっていないとき。`docs/wip/handoff/` や `wip/handoffX/` のような綴りは除かない。組み込みの保護（`builtin:guard-project-home` と、名前で書くツールの 4 本 `builtin:guard-hooks`・`builtin:guard-settings`・`builtin:guard-scripts`・`builtin:guard-ccnavi-config`。どれも `selfguard.handoffWriteExempt`）が同じ範囲を除く。この関数は、ハードリンクでつながったコピーを除かない。置き場の中のリンクを通る対象・ハードリンクでつながった対象・`..` を含む対象への書き込みは、組み込みの `builtin:guard-handoff-links`（`selfguard.handoffLinkTarget`）が別に止める。置き場の中にリンクを作るシェルの形も `builtin:guard-handoff-ln` が止める（8.2）。シェルからの書き込みの保護は、削除を除いて変えない。削除（`rm`・`ccnavi-git.sh rm`）は、対象がすべて、上の例外と同じ条件（`selfguard.handoffDeletePath`）の置き場の中なら通す。対象の語は `selfguard.HandoffDeleteWord` が読む。許す文字（英数字と `_ . / : @ + , % -`）だけの語に限り、`~`・`$`・グロブ・`{}`・`=`・`!`・引用符・空白・バックスラッシュを持つ語は外さない（シェルが別のパスに直す）。入り口は 2 つ。素の `rm` は `builtin:guard-setting-files` の `selfguard.handoffDeleteExempt` が、コマンド単位で外す。外すのは絶対パスの語だけで、相対パスは外さない（`sh -c` や `find -execdir` の中身は別の層になり、層の中の `cd` が見えない）。`ccnavi-git.sh rm` は `shellguard.coreHit` が、`cd` を追った居場所から相対パスも解いて外す（承認済み・レビュー待ちの置き場の判定より後）。`unlink` は元から止まらないので、例外の対象にしない。置き場への書き込み（`cp`・`mv`・リダイレクト）は外さない。
 
 上のうち追跡されているものは、その元リポジトリから切ったワークツリー側の設定も対象に入る（11.6）。実行ファイルは除く。
 無いファイルは対象から外れる。無かったところに現れた場合は報告するが、消さない。`.ccnavi/scripts/` のスクリプトはこの一式に入れない。組み込みの `deny`（`*/.ccnavi/*`）と `CCNAVI_RESTORE_IF_DENY` が受け持つ。
-hook スクリプトと保護済みスクリプトは、この表の対象（バックアップと復元）には無い。名前で書くツールからの書き込みは、組み込みの 4 本（8.2）が実行前に止め、実行後の保護範囲（`events.watched_for`）が未コミットの変更を検知する。ccnavi ディレクトリの下のスクリプトも同じで、`builtin:guard-project-home` も止める。
+hook スクリプトと保護済みスクリプトは、この表の対象（バックアップと復元）には無い。名前で書くツールからの書き込みは、組み込みの 4 本（8.2）が実行前に止め、実行後の保護範囲（`events.watchedFor`）が未コミットの変更を検知する。ccnavi ディレクトリの下のスクリプトも同じで、`builtin:guard-project-home` も止める。
 
 ### 8.2 止める側
 
-`CCNAVI_GUARD_CORE_FILES` が有効な間、`deny` の先頭に最大 7 本を挿す（`selfguard_shell.add_rules`）。そのあとに、名前で書くツールの 4 本（下）を挿す（`selfguard_shell.add_named_rules`）。これとは別に、チケット制御が有効な間は、承認済みの置き場（`.ccnavi/approved/` の下すべて）と操作記録の置き場（`logs/state/ops/`）への書き込みを止める組み込みのゲート（`ticket_guard.gate_rules`）を足す。ゲートは `CCNAVI_GUARD_CORE_FILES` の値にも `dry-run` にも依らず止める。承認済みの置き場は、チケット制御の保護として扱う。チケット制御が有効な間は自己防衛の値に依らず、実行前は拒否し（`builtin:ticket-approved`。文面は承認の経路・`status`・`finish`・`approval-request` を案内する）、実行後は未コミットの変更を検知する。実行後の保護範囲には、同じ式と文面の 1 本（`ticket_guard.approved_write_rule`。シェル版は要らない）を `events.watched_for` が足す。復元は `CCNAVI_RESTORE_IF_DENY` の実効値が `enable` のときだけ。ccnavi のスクリプトによる正規の書き込みは、コマンド名ではなく変更の中身の形で外れる（`post_findings._script_writes`）。コミット済みの変更の `Stop` での報告は対象外で（`post._committed_findings` がチケットの置き場のコミット済みの変更を一律に外す）、MR のレビューで確かめる。チケット制御を `disable` にすると、実行後の保護は外れる（実行前は、自己防衛が有効なら `builtin:guard-project-home` が止める）。
+`CCNAVI_GUARD_CORE_FILES` が有効な間、`deny` の先頭に最大 7 本を挿す（`selfguard.AddRules`）。そのあとに、名前で書くツールの 4 本（下）を挿す（`selfguard.AddNamedRules`）。これとは別に、チケット制御が有効な間は、承認済みの置き場（`.ccnavi/approved/` の下すべて）と操作記録の置き場（`logs/state/ops/`）への書き込みを止める組み込みのゲート（`guard.GateRules`）を足す。ゲートは `CCNAVI_GUARD_CORE_FILES` の値にも `dry-run` にも依らず止める。承認済みの置き場は、チケット制御の保護として扱う。チケット制御が有効な間は自己防衛の値に依らず、実行前は拒否し（`builtin:ticket-approved`。文面は承認の経路・`status`・`finish`・`approval-request` を案内する）、実行後は未コミットの変更を検知する。実行後の保護範囲には、同じ式と文面の 1 本（`guard.ApprovedWriteRule`。シェル版は要らない）を `events.watchedFor` が足す。復元は `CCNAVI_RESTORE_IF_DENY` の実効値が `enable` のときだけ。ccnavi のスクリプトによる正規の書き込みは、コマンド名ではなく変更の中身の形で外れる（`post.scriptWrites`）。コミット済みの変更の `Stop` での報告は対象外で（`post.committedFindings` がチケットの置き場のコミット済みの変更を一律に外す）、MR のレビューで確かめる。チケット制御を `disable` にすると、実行後の保護は外れる（実行前は、自己防衛が有効なら `builtin:guard-project-home` が止める）。
 
 | id | 足すとき | 止めるもの |
 |---|---|---|
@@ -44,7 +44,7 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 | `builtin:guard-handoff-links` | ワークスペースルートが決まっているとき | `Write` `Edit` `MultiEdit` `NotebookEdit` で、ツリーの直下の `wip/handoff/` の下の対象のうち、リンクを通るもの・ハードリンクでほかの名前とつながったもの・`..` を含むもの。つながっていないコピーと置き場の外にはヒットしない |
 | `builtin:guard-handoff-ln` | ワークスペースルートが決まっているとき | Bash で、リンクを作るコマンド（`ln`・`link`・`cp -l` / `-s` / `--link` / `--symbolic-link`）があり、コマンド行に `handoff` の綴りがあるか、作業ディレクトリが置き場の中の形。行き先は読み分けない（止める側に倒す） |
 
-名前で書くツールの 4 本（`selfguard_shell.add_named_rules`。`Write` `Edit` `MultiEdit` `NotebookEdit`）。`CCNAVI_GUARD_CORE_FILES` の実効値が `disable` でなければ足す。
+名前で書くツールの 4 本（`selfguard.AddNamedRules`。`Write` `Edit` `MultiEdit` `NotebookEdit`）。`CCNAVI_GUARD_CORE_FILES` の実効値が `disable` でなければ足す。
 
 | id | 適用するもの | 書き込みを許す例外 |
 |---|---|---|
@@ -56,14 +56,14 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 - 共通のルールファイルには書かない
 - ccnavi ディレクトリの名前が空なら、それを使う 2 本（scripts と共通の設定）は足さない
 - `builtin:guard-ccnavi-config` はルートを固定せず、パスの末尾で適用する。`builtin:guard-common-layer` と同じ範囲だとは仮定しない
-- 足す場所は 3 つで、同じ関数から足す。実行前の通常時は `add_rules` の後に呼ぶ（`deny` の先頭に挿すので、専用の文面が `builtin:guard-project-home` / `builtin:guard-common-layer` より先に並ぶ。`add_rules` の中身は変えず、二重に足さない）。実行前で、共通のルールファイルが読めず組み込みの既定で動いている間は、`add_rules` は呼ばずこの関数だけ呼ぶ。実行後は `events.watched_for` が、各ツリーのルールの組にこの関数だけを足す（読めない間も同じ。`builtin:guard-project-home` 全体は足さない）
-- 一般の保護と同じ扱いで、`dry-run` では報告だけにする。実行後は、`CCNAVI_RESTORE_IF_DENY` を全体モードと掛け合わせた実効値（`modes.effective_setting`）が `enable` なら未コミットの変更を復元し、全体モードが `dry-run` なら報告だけにする。`Stop` は報告だけで復元しない。`UserPromptSubmit` と `SessionStart` は同じ保護範囲で基準を取り、前からある変更とユーザが受け入れた変更を戻さない
+- 足す場所は 3 つで、同じ関数から足す。実行前の通常時は `add_rules` の後に呼ぶ（`deny` の先頭に挿すので、専用の文面が `builtin:guard-project-home` / `builtin:guard-common-layer` より先に並ぶ。`add_rules` の中身は変えず、二重に足さない）。実行前で、共通のルールファイルが読めず組み込みの既定で動いている間は、`add_rules` は呼ばずこの関数だけ呼ぶ。実行後は `events.watchedFor` が、各ツリーのルールの組にこの関数だけを足す（読めない間も同じ。`builtin:guard-project-home` 全体は足さない）
+- 一般の保護と同じ扱いで、`dry-run` では報告だけにする。実行後は、`CCNAVI_RESTORE_IF_DENY` を全体モードと掛け合わせた実効値（`config.EffectiveSetting`）が `enable` なら未コミットの変更を復元し、全体モードが `dry-run` なら報告だけにする。`Stop` は報告だけで復元しない。`UserPromptSubmit` と `SessionStart` は同じ保護範囲で基準を取り、前からある変更とユーザが受け入れた変更を戻さない
 - `disable` のときは、実行前にも実行後にも足さない。ワークスペースルートの `.claude/hooks/` と `.claude/settings*.json` は、ルールの `workspace-root` が実行前に止める
 
-共通のルールファイルが読めない間の修復は、エージェントが `Write` / `Edit` で直接直す形では通さない。読めない間も `builtin:guard-ccnavi-config` は外れない。直し方は 1 つで、エージェントが `wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（置き場は例外で書ける）、ユーザがターミナルから `ccnavi user handoff` で取り込むか、手で直す。今の中身が読めない `rules.yml` の取り込みは、`handoff._defense_change` が「確かめられないのでターミナルに限る」と扱う。そのため、ボードからの取り込みは断られる。`builtin:guard-config-via-bash` と `builtin:guard-ccnavi-config` の文面が、この手順を案内する。
+共通のルールファイルが読めない間の修復は、エージェントが `Write` / `Edit` で直接直す形では通さない。読めない間も `builtin:guard-ccnavi-config` は外れない。直し方は 1 つで、エージェントが `wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（置き場は例外で書ける）、ユーザがターミナルから `ccnavi user handoff` で取り込むか、手で直す。今の中身が読めない `rules.yml` の取り込みは、`handoff.defenseChange` が「確かめられないのでターミナルに限る」と扱う。そのため、ボードからの取り込みは断られる。`builtin:guard-config-via-bash` と `builtin:guard-ccnavi-config` の文面が、この手順を案内する。
 
 同じ設定が有効な間、`ccnavi user prune` をシェルから打つ形も、チケット制御に依らず
-`DENY_RECORDS_PRUNE`（`builtin:guard-records-prune`）で止める（`phase_forms.prune_form`）。
+`DENY_RECORDS_PRUNE`（`builtin:guard-records-prune`）で止める（`useronly.PruneForm`）。
 見るのは引用符を外したコマンド行で、コマンドの切れ目の中に ccnavi の名前と `user prune`（`user` の次の語が `prune`）が並べば止める。免除は無い。
 
 `logs/` の下の git のラッパースクリプトの記録は守らない。
@@ -72,7 +72,7 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 リダイレクトと `cp` `ln` `install` の行き先は同じ部品で読み、書き換える動詞・`dd`・`sed -i` は読むだけの語を外した `.git` 用の形で読む（`find` と `xargs` の形も足す）。
 `CCNAVI_GUARD_CORE_FILES` にも、ルールファイルが読めるかにも依らずヒットする。
 
-実行ファイルのパス（`selfguard_shell.binary_clause`）: hook が実際に走らせるのは sh が起動する実体（4.6）なので、実体の置き場にも適用する。
+実行ファイルのパス（`selfguard.BinaryClause`）: hook が実際に走らせるのは sh が起動する実体（4.6）なので、実体の置き場にも適用する。
 このパスは `builtin:guard-binary` と、`builtin:guard-setting-files` の場所の一覧と、承認のルール（9.5）の実行ファイルの名前に入る。
 パスを `.` `..` を除いた要素に割り、名前で 2 つの形を切り替える。
 
@@ -81,11 +81,11 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 | `ccnavi-launcher.sh` | sh の末尾 2 要素（`scripts/ccnavi-launcher.sh`）と、その 1 つ上の親の下の `bin/<os>-<arch>/`（既定なら `.ccnavi/bin/<os>-<arch>/`）。sh の隣の `<os>-<arch>/` は適用しない |
 | それ以外 | 末尾 2 要素（実行ファイルそのもの） |
 
-- sh かどうかは名前だけで決め、`platformtag.launched_executable`（8.3）と条件を揃える。ファイルは読まない。
+- sh かどうかは名前だけで決め、`platformtag.LaunchedExecutable`（8.3）と条件を揃える。ファイルは読まない。
   別の名前で置いた sh は実行ファイルそのものとして読まれ、その `../bin/` は `builtin:guard-binary` から外れる
 - 既定の配置では、`builtin:guard-setting-files` の `.ccnavi` のパスと `builtin:guard-project-home` でも二重に止まる
 
-判定に渡るパスはワークスペースルートを継ぎ足した絶対パス（`settings._resolve_bin`）なので、名指しのツールは浅いパスでも止まる。
+判定に渡るパスはワークスペースルートを継ぎ足した絶対パス（`config.resolveBin`）なので、名指しのツールは浅いパスでも止まる。
 相対で書いたシェルのコマンドは守らない（`CCNAVI_ENTRY_PATH=scripts/ccnavi-launcher.sh` での `rm -rf bin/linux-x86_64`、
 `ccnavi-launcher.sh` での `rm -rf ../bin/linux-x86_64` は `builtin:guard-binary` にヒットしない）。導入スクリプトはこのパスを作らない。
 実行後のバックアップと復元（8.3）は、どのパスでも働く。
@@ -114,7 +114,7 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 
 git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PATH`、`builtin:guard-wrapper-paths`）: `ccnavi-git.sh` の
 `rm`（`--cached` も）・`restore --source <ref>`・`checkout <ref> <パス>` で、`builtin:guard-setting-files` と同じ場所を
-消す・別のコミットの中身に戻す形を、ルールより先に止める（`wrapguard.check_core_paths`）。`ccnavi-git.sh` 自身が消えても、生の git の組み込みは足したままなので外れない。
+消す・別のコミットの中身に戻す形を、ルールより先に止める（`shellguard.CheckCorePaths`）。`ccnavi-git.sh` 自身が消えても、生の git の組み込みは足したままなので外れない。
 `CCNAVI_GUARD_CORE_FILES` が有効な間、チケット制御と組み込みの既定への退避に依らず足す。
 
 | ヒットするもの | 扱い |
@@ -186,10 +186,10 @@ hook 自身は settings.json の env で起動するので、ここで見る代�
 共通レイヤーのルールファイルを戻した報告には、直し方（下書きを `wip/handoff/.ccnavi/config/common/rules.yml` に置き、ユーザがターミナルの `ccnavi-user-handoff.sh` で取り込む）を添える。
 
 実行ファイルは `SessionStart` でバックアップする（ツール呼び出しの外で変わったら、次の発言か実行前に取り直す）。バックアップするのは `CCNAVI_ENTRY_PATH` が指す sh（バックアップのキー `bin`）と、
-sh がこの機械で起動する実体（`bin-launched`）の 2 つ。実体は `platformtag.launched_executable` が sh と同じ順で探し、
+sh がこの機械で起動する実体（`bin-launched`）の 2 つ。実体は `platformtag.LaunchedExecutable` が sh と同じ順で探し、
 名前が `ccnavi-launcher.sh` なら `../bin/`、それ以外は隣を見る（8.2 と同じ条件）。見つからなければ足さない。
 実体は中身のハッシュで名前を付けて `state/selfguard/store/` へ 1 本だけ置き、セッションの側は参照（ハッシュ・大きさ・更新時刻）だけ
-持つ。比べるのは大きさと更新時刻。`CCNAVI_ENTRY_PATH` が振り分けの sh のときは、PATH にある `ccnavi`（`platformtag.path_executable`。絶対パスの項目だけを、sh と同じ順で見る）の実体も、`bin/` の有無に関わらず守る。自分と同じファイル（`ccnavi` という名前で張った launcher へのリンク）は sh と同じく飛ばす。PATH の実体はセッション開始のあとに現れることもあるので、参照が無いまま現れたら、実行前に最初に見た版を基準に取る（`_rebase_if_changed`）。キーは `bin-path-<実パスの印>` で、PATH が変わって指す先が替わっても、古い実体の参照を新しい実体に適用しない。止める正規表現は実体のパスの末尾 3 要素で適用し（要素が 3 以下の浅い実体は、区切りで始まる形だけに適用する）、置き場のディレクトリ全体は守らない。3 日より長く触られていないセッションのバックアップは、次のセッション開始で消す。
+持つ。比べるのは大きさと更新時刻。`CCNAVI_ENTRY_PATH` が振り分けの sh のときは、PATH にある `ccnavi`（`platformtag.PathExecutable`。絶対パスの項目だけを、sh と同じ順で見る）の実体も、`bin/` の有無に関わらず守る。自分と同じファイル（`ccnavi` という名前で張った launcher へのリンク）は sh と同じく飛ばす。PATH の実体はセッション開始のあとに現れることもあるので、参照が無いまま現れたら、実行前に最初に見た版を基準に取る（`_rebase_if_changed`）。キーは `bin-path-<実パスの印>` で、PATH が変わって指す先が替わっても、古い実体の参照を新しい実体に適用しない。止める正規表現は実体のパスの末尾 3 要素で適用し（要素が 3 以下の浅い実体は、区切りで始まる形だけに適用する）、置き場のディレクトリ全体は守らない。3 日より長く触られていないセッションのバックアップは、次のセッション開始で消す。
 
 実行前にも照合する。`PreToolUse` の登録ごと消された場合は ccnavi が一切動かない（12.1）。
 
@@ -206,4 +206,4 @@ sh がこの機械で起動する実体（`bin-launched`）の 2 つ。実体は
 セッションごとに別のファイルで、並行するセッションは互いの印を書き換えも消しもしない。印の読み書きの失敗は、発言とツールの結果を変えない。書けないときは印が無い（ターン中ではない）側に倒れ、警告が出ないだけで、保護の動きは変わらない。
 読み手は `--explain --json` の `turns` で、拡張が設定ファイルを保存する前の確認に使う。
 
-ターンの印は `Stop` で消えるので、ターンをまたぐ事実は持てない。ユーザが最後に発言した時刻は、別の記録 `state/userprompt-<セッション>.json` に、ユーザの発言と言い切れる `UserPromptSubmit`（`hookio.is_user_prompt`）だけが書く。ターン分離のゲート（6.7）が読む。起動と再開で消し、compact と clear では消さない。ユーザの手による変更の受け入れ（8.3）の判定（`from_background_task`）とは別に決める。
+ターンの印は `Stop` で消えるので、ターンをまたぐ事実は持てない。ユーザが最後に発言した時刻は、別の記録 `state/userprompt-<セッション>.json` に、ユーザの発言と言い切れる `UserPromptSubmit`（`hookio.IsUserPrompt`）だけが書く。ターン分離のゲート（6.7）が読む。起動と再開で消し、compact と clear では消さない。ユーザの手による変更の受け入れ（8.3）の判定（`from_background_task`）とは別に決める。

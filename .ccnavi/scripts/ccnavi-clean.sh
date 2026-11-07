@@ -22,7 +22,7 @@
 # 趣旨（消す対象を名指しする）に合わせてある。
 #
 # 消すのは、作り直せば戻る決まった名前のディレクトリだけ。何を消すかと消し方は実行ファイル
-# （src/ccnavi/tickets/lifecycle/worktrees.py の run_clean）にある。
+# （go/internal/tickets/lifecycle/worktrees の RunClean）にある。
 #
 # ワークツリーに未コミットの変更があれば、何も消さずに止める。別のセッションが
 # そこで作業している見込みが高い。git に登録の残っていない、消しきれなかったディレクトリ（.git が無い、

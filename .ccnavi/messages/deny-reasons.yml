@@ -1,9 +1,9 @@
-# 組み込みの拒否と確認の理由の文（hook/reasons.py が組む）。条件（いつ止めるか）はコード側にある。
+# 組み込みの拒否と確認の理由の文（hook/reasons が組む）。条件（いつ止めるか）はコード側にある。
 # ここは何を言うかだけを持つ。先頭の `[ccnavi] CODE (…)` と `subject:` の行はコード側が付ける。
 # 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
 version: 1
 messages:
-  # ---- 書き直しを求める形（shellread の FORM_*）。識別子は reasons.CODE_REWRITE の値と同じ。
+  # ---- 書き直しを求める形（infra/shell の Form*）。識別子は reasons.RewriteCode の値と同じ。
   DENY_BRACE_EXPANSION:
     kind: deny
     values: [found]

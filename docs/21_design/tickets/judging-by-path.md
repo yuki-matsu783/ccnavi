@@ -81,20 +81,20 @@ limit: parent i0001: src/*, tests/*
 範囲の外として扱わない（次のチケットを提案する手段を残すため。提案は承認されるまで判定に何も反映されない）。状態の置き場と
 承認済みチケットは組み込みの `deny`（9.2、8.2）が先に止めるが、組み込みが入るのは実行前のルール集合だけ。
 外し方は、実行前チェック・サブエージェント終了時チェック・ターンの終わりのコミット済みのぶんは置き場ごと
-（`ticket_places.is_ticket_place`）、呼び出しごとの実行後チェックは内容で選ぶ（`post_findings._script_writes`、7.2）。
+（`place.IsTicketPlace`）、呼び出しごとの実行後チェックは内容で選ぶ（`post.scriptWrites`、7.2）。
 ワークツリーのルートからの相対パスを `/` の境で見て大文字小文字を区別しない。
 
 下書きの置き場（ワークツリーのルートからの相対で `wip/handoff/` の下）も、範囲の外として扱わない
-（`ticket_places.is_handoff_place`）。ワークツリーで作業するエージェントが、範囲を宣言したワークツリーでも手元に下書きを
+（`place.IsHandoffPlace`）。ワークツリーで作業するエージェントが、範囲を宣言したワークツリーでも手元に下書きを
 置けるようにするため。追跡して push する置き場で、`ccnavi-git.sh integrate` が取り込むときに外し、`ready` が `wip/` ごと
-消すので、統合先の成果物には残らない。追跡されるので、実行前チェック（`ticket_places.is_unscoped`）に加えて、
+消すので、統合先の成果物には残らない。追跡されるので、実行前チェック（`place.IsUnscoped`）に加えて、
 実行後チェック（`post_findings.ScopeGuard.finding`）とサブエージェント終了時チェック（`phase.scope.scope_findings`）でも外す。
 外さないと、実行前に通った書き込みがコミットのあとで範囲外として報告される。
 外すのは `wip/handoff/` の下だけで、`wip/` のほかの場所・`wip/handoffX/`・`docs/wip/handoff/`・
 同じ名前のファイルは外さない。大文字小文字は区別する。置き場の名前は固定。
 
-`tree.relative` が `os.sep` を `/` に直すので、Windows の区切りはこれで足りる。チケットの置き場（`ticket_places._under`）と
-下書きの置き場（`ticket_places.is_handoff_place`）は、`\` を `/` に直さずに見る。名前は設定で動かさない。
+`tree.Relative` が `os.sep` を `/` に直すので、Windows の区切りはこれで足りる。チケットの置き場（`place.under`）と
+下書きの置き場（`place.IsHandoffPlace`）は、`\` を `/` に直さずに見る。名前は設定で動かさない。
 `wip/` は `ready` の前に丸ごと消すので、ここに置いたものは squash した成果物に残らない。`ready` の前提は大文字小文字を区別せず、
 名前が `wip\` で始まる 1 ファイルも `wip/` の残りとして止める（区別しない FS で `WIP/handoff/` を先に作った形を拾う）。
 **この除外は、チケットの `deny` と、チケットが信頼できないときの全面停止（`LIMIT_BLOCKED`）より先に適用される**（`is_unscoped` が
@@ -112,9 +112,9 @@ limit: parent i0001: src/*, tests/*
 `user` の入口（`ccnavi user …`）付き、または状態とレビューを動かすサブコマンド（`ticket start|finish|cancel|approval-request|consolidate|record-risk`、
 `review prepare|requested|confirm|ready`）付きで直接打つ形は、素性によらず
 `DENY_TICKET_APPROVAL_CLI` で止める。`ccnavi-user-*.sh` は引数に依らず、名前がコマンド行のどこにあっても同じ理由コードで止める。
-大文字小文字によらない。止めは `tickets/model/user_only.py` の表から作る（9.18）。
+大文字小文字によらない。止めは `tickets/model/useronly` の表から作る（9.18）。
 `comment` / `fetch` / `origin` は sh だけの仕事なので適用していない。
-**hook のほかに保護が無い形**は、実行ファイルの表記によらず、同じ理由コードで止める（`phase_forms.human_path_form`）。
+**hook のほかに保護が無い形**は、実行ファイルの表記によらず、同じ理由コードで止める（`useronly.HumanPathForm`）。
 
 - ボードの経路。`user agree` / `user reviewed` / `user handoff` / `user mirror` と `--yes` の組（実行ファイルを直接実行する `--agree` / `--reviewed` と `--yes` の組も）、
   sh の `--choices` と `--digest` の組。`--yes` の経路はターミナルを求めないので、ここが唯一の保護になる。
@@ -130,7 +130,7 @@ limit: parent i0001: src/*, tests/*
 止まる（Grep ツールと Edit ツールで済む）。コミットの文面（`git commit` / `ccnavi-git.sh commit` の `-m` の値）は
 外す。ただし値の中にコマンド置換があれば外さない。
 
-**2 段目の無い入口は、止める操作を組み立てうる引数を読み切れなければ止める**（`phase_forms.hidden_user_entry`、同じ理由コード）。
+**2 段目の無い入口は、止める操作を組み立てうる引数を読み切れなければ止める**（`useronly.HiddenUserEntry`、同じ理由コード）。
 上の 2 つは文字として並んだ表記を見るので、引数を変数・置換・glob で組み立てると外れる。ターミナル要求という 2 段目が
 無い次の入口では、それが唯一の保護になるため。展開を含む語は、`$`・バッククォート・`*` `?` `[`・`{}` を含む語で、
 単引用符の中と `\` を付けた文字（glob は二重引用符の中も）は文字どおりに読む。shellread が実行役（`sh`・`env` など）を外した層は引用を外して組み直してあるので、外側のコマンドの後ろ側と語が同じ層は、印の残った外側の語で読む（`sh …ccnavi-sync.sh '$X'` は通る）。`sh -c '…'` の文字列を読み直した層は外側と並びが合わないので、組み直した語のまま読む（止める側）。リダイレクトの演算子と行き先は引数に数えない。
@@ -149,7 +149,7 @@ limit: parent i0001: src/*, tests/*
   コマンドの切れ目と引用符で切り、前置き・代入・選択肢を飛ばした頭の語を見る。パスの一部（`cd /home/user/ccnavi`）・コメント・
   シェルの引数（`sh -s -- ccnavi`）として出るだけの名前は数えない。sh の入口はファイルとして渡すだけで中身が流れ込むので、語として出れば数える
 - 走査が止まる形（バッククォート）は生の文字列の語で探す
-- 実行ファイルが知っているオプションの一覧（`phase_forms.EXE_OPTIONS`）は、実行ファイルの引数の定義とテストで比べる
+- 実行ファイルが知っているオプションの一覧（`useronly.ExeOptions`）は、実行ファイルの引数の定義とテストで比べる
 - 止めた文は、止めた語が何になりうるかと、通る形（識別子をそのまま書く・`ccnavi-review.sh decide <N> --preview`・診断のオプションを前に置く）を言う。値を変数で渡す形のうち、組み立てうるもの（`ccnavi-sync.sh "$P"`）は止まる
 
 **これで止められないもの。** 表記を組み立てて隠す形（base64、文字の連結）、ファイルに書いたスクリプトを別の
@@ -157,5 +157,5 @@ limit: parent i0001: src/*, tests/*
 変数に入れた形（`sh -c "$CMD"`）で上の入口を呼ぶ形。hook は最終防衛線ではない（12.4）。
 
 どちらも実行役のコマンド越し（`env`・`sudo`・`sh -c`・`source`・`find -exec`）に打った形を、中で実行される
-コマンドで止める（6.3.1）。実行ファイルのパスには `selfguard_shell.binary_clause`（8.2）が入るので、
+コマンドで止める（6.3.1）。実行ファイルのパスには `selfguard.BinaryClause`（8.2）が入るので、
 `sh .ccnavi/bin/<os>-<arch>/ccnavi user agree …` も同じルールで止まる。

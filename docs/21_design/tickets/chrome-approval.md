@@ -3,7 +3,7 @@ type: design
 title: 9.20 Chrome 拡張による承認
 description: 承認者がブラウザと PAT だけで親のブランチに承認・レビュー済み・「始める」を書く Chrome 拡張の構成。形と CSP、ブランチの読み方と読み取り量、承認の流れと競合、1 コミットの作り方、PAT の権限、ccnavi-review.sh との関係、レビュー済みのマーカー、ホストの Approve が外れる設定
 tags: [design-doc, ticket, extension, approval]
-keywords: [Chrome拡張, PAT, Pyodide, MV3, CSP, createCommitOnBranch, expectedHeadOid, last_commit_id, IndexedDB, GraphQL, レビュー済み, 始める, Approve, 競合, GitLab Commits API]
+keywords: [Chrome拡張, PAT, WASM, MV3, CSP, createCommitOnBranch, expectedHeadOid, last_commit_id, IndexedDB, GraphQL, レビュー済み, 始める, Approve, 競合, GitLab Commits API]
 ---
 
 [設計書の入口](../../20_design.md) > [9. チケット制御](../tickets.md)
@@ -11,13 +11,13 @@ keywords: [Chrome拡張, PAT, Pyodide, MV3, CSP, createCommitOnBranch, expectedH
 ### 9.20 Chrome 拡張による承認
 
 承認者の機械に clone も ccnavi も無い場合に、承認者がブラウザと PAT だけで、リモートの親のブランチ（`P`）へ承認を書くための拡張（`extensions/chrome/ccnavi-approval/`）。
-判定は同梱の ccnavi を Pyodide で動かして出し、拡張は判定を自分で書かない。要求は [承認の要件](../../11_requirements/approval.md)（REQ-APV）と [拡張の入口](../../11_requirements/extension-if.md)。
+判定は同梱の ccnavi（`go/cmd/ccnavi-chrome` を WASM に組んだもの）を動かして出し、拡張は判定を自分で書かない。要求は [承認の要件](../../11_requirements/approval.md)（REQ-APV）と [拡張の入口](../../11_requirements/extension-if.md)。
 有効とするチケットを `P` の上のものだけに限る規則は [9.5](judging-by-path.md)、共有の全体は [9.17](sharing.md)。
 
 #### 形
 
-- MV3。ボードは拡張のページ（サイドパネルかタブ）。Pyodide はそのページが起動する Web Worker で動かす
-- CSP: `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*`。Pyodide・PyYAML・ccnavi の .pyc・DOMPurify を同梱する
+- MV3。ボードは拡張のページ（サイドパネルかタブ）。WASM はそのページが起動する Web Worker で動かす
+- CSP: `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*`。ccnavi の WASM（`ccnavi.wasm`）と、同じ Go の版の `wasm_exec.js`・DOMPurify を同梱する
 - PAT とホストの API の呼び出しは service worker が持つ
 - ビルドのときに API のホストの一覧から `host_permissions` を生成する
 - 同梱の ccnavi の互換の版が統合先の `CCNAVI_COMPAT` と違えば、承認・「始める」など書く操作は出さない（表示だけ）

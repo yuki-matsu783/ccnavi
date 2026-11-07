@@ -76,7 +76,7 @@ JSON の欄名は `gate_closed`。これは判定とボードの契約で、こ�
 `finish` が置いた先を `finished_to` に、ccnavi が動かした経路を `settled_by` に書くので、`finished_to: review` で
 `settled_by` が無い子が `done/` にあれば手で動かした子とする。`finished_to` が無い子（finish を通らず手で動かした子など）は
 手動とみなさず、`confirm` か `decide` で確かめる。確定してよいのは、依頼のマーカーがあり、レビューを待つ子が残らず、
-動かした `done/` のファイルが HEAD にコミット済みで `origin/<親のブランチ>` に入っているときだけ（`manual_settle.assess`。
+動かした `done/` のファイルが HEAD にコミット済みで `origin/<親のブランチ>` に入っているときだけ（`phase.AssessManual`。
 判定に使うのは親の正本の置き場と git の履歴で、PC ごとの state は使わない。エージェントは代わりに push しない）。
 移動が未コミット・未 push なら「移動が未共有」と言って確定せず、依頼が無ければ `review-request` を案内する。確定は `confirm` が行い、
 移動の前に付いた未解決の指摘を、ホストで解決せずに版つき（キー・指摘の版・最後のコメントの id）で受け入れ台帳

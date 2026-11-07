@@ -14,15 +14,15 @@ ccnavi の開発で、操作を止める条件を足す・直すとき、実装�
 
 操作を止める条件（親のワークツリーに未コミットの変更がある、親のブランチが未 push、など）は、条件ごとに 1 つの関数に置く。複数の操作が同じ条件を見るときは、全部がその関数を呼ぶ。同じ意味の条件を、操作ごとに別の関数や sh で書き直さない。
 
-- 置き場は実行ファイル（`src/ccnavi/`）。sh は実行ファイルに聞く（[exe-boundary.md](exe-boundary.md)）
+- 置き場は実行ファイル（`go/`）。sh は実行ファイルに聞く（[exe-boundary.md](exe-boundary.md)）
 - 「どの操作がどの条件を見るか」は、条件の側で宣言する。操作の側に条件を書き並べない。条件を足したら、見る操作を宣言に足す
 - 条件が返すのは、理由と次の一手を持つ共通の形（Problem）。表示（ターミナルの文・ボードの JSON・案内）は、その結果を言い換えるだけにする。表示の入口が複数あっても、判定の実装は 1 つ
 
-`start`・`finish`・`cancel`・`consolidate` の書く前の検査は、`lifecycle/commands.py` の `start_gate`・`finish_gate`・`cancel_gate` と `consolidate.py` の `gate` に置き、本体と `--check`（sh が取り込みの前に呼ぶ）が同じ関数を通る。Go は `go/internal/tickets/lifecycle/ops` の `startGate`・`finishGate`・`cancelGate` と `lifecycle/consolidate` の `gate`。合流のあとでないと分からない検査だけが本体に残る。
+`start`・`finish`・`cancel`・`consolidate` の書く前の検査は、`go/internal/tickets/lifecycle/ops` の `startGate`・`finishGate`・`cancelGate` と `lifecycle/consolidate` の `gate` に置き、本体と `--check`（sh が取り込みの前に呼ぶ）が同じ関数を通る。合流のあとでないと分からない検査だけが本体に残る。
 
-`review-request` の前提は `tickets/review/request.py` の `request_gate`、`decide` の依頼の記録・動きの検査は `tickets/review/decide.py` の `decide_gate` に置く（Go は `go/internal/tickets/review/request` と `review/decide` の `gate`）。本体と `--check`（`ccnavi --check review prepare`・`ccnavi --entry sh user reviewed N --check --accept-unresolved`。sh がロック・取り込みの前に呼ぶ）が同じ関数を通る。`approval-request`・`review confirm`・`ready` も同じ型で、sh がロック・取り込みの前に `--check` を呼び、本体と同じ関数で断る（`confirm_gate`・`ready_gate`。Go は `go/internal/tickets/core` の `confirmGate`、`review/closeout` の `readyGate`。断るときは `次:` を足す。`ready --check` は、前の回が退避を始めている打ち直しなら通して本体に任せる。Draft かどうかはホストの結果が要る）。マージリクエストの有無など、ホストの API が要る条件は事前には判断しない。
+`review-request` の前提は `go/internal/tickets/review/request` の `gate`、`decide` の依頼の記録・動きの検査は `go/internal/tickets/review/decide` の `gate` に置く。本体と `--check`（`ccnavi --check review prepare`・`ccnavi --entry sh user reviewed N --check --accept-unresolved`。sh がロック・取り込みの前に呼ぶ）が同じ関数を通る。`approval-request`・`review confirm`・`ready` も同じ型で、sh がロック・取り込みの前に `--check` を呼び、本体と同じ関数で断る（`go/internal/tickets/core` の `confirmGate`、`review/closeout` の `readyGate`。断るときは `次:` を足す。`ready --check` は、前の回が退避を始めている打ち直しなら通して本体に任せる。Draft かどうかはホストの結果が要る）。マージリクエストの有無など、ホストの API が要る条件は事前には判断しない。
 
-親のワークツリーの未コミットの変更と親ブランチの未 push は、`lifecycle/treegate.py`（`check`）に寄せた。操作が見る条件は `WATCHES` に宣言する。Go は `go/internal/tickets/lifecycle/treegate` の `Check` と `watches`（confirm・decide の未 push の確かめ直しも `Reviewed` として宣言する）。git の呼び出しが重複していないことは `tests/core/test_gate_single_source.py`、操作ごとの拒否は `tests/core/test_treegate.py` が守る。置き場の判定は `ticket_places.is_ticket_place` に一本化した。
+親のワークツリーの未コミットの変更と親ブランチの未 push は、`go/internal/tickets/lifecycle/treegate` の `Check` に寄せた。操作が見る条件は `watches` に宣言する（confirm・decide の未 push の確かめ直しも `Reviewed` として宣言する）。git の呼び出しが重複していないことは `tests/core/test_gate_single_source.py`、操作ごとの拒否は `tests/core/test_treegate.py` が守る。置き場の判定は `place.IsTicketPlace`（`go/internal/tickets/model/place`）に一本化した。
 
 ## ユーザに頼む操作は、後のゲートで止まる条件を先に拒否する
 
@@ -60,10 +60,10 @@ ccnavi の開発で、操作を止める条件を足す・直すとき、実装�
 
 共通化や関数の移動で、置き場と import の向きを崩さない。
 
-- 1 つのモジュールは 1 つの責務を持つ。条件の関数は「何を調べるか」だけを持ち、表示（文・JSON）、操作の流れ、書き込みを持たない
-- import は、同じ段か下の段へだけ向ける（`tests/core/test_module_layers.py`。サブパッケージの層は `docs/21_design/modules.md`）。共通の条件の関数は、それを呼ぶ操作の全部より下の段に置く。操作の側から共通の条件へ向け、逆は作らない
-- 共通化のために上の段のモジュールを呼ぶ必要が出たら、呼び方を直さず、置き場を下へ動かす。関数の中の import や引数での注入は、循環を隠すだけなので避ける（循環は `test_module_layers` が全部拾う）
-- 新しいモジュールを足したら、段と役割（docstring）を決めて `test_module_layers` の表に足す
+- 1 つのパッケージは 1 つの責務を持つ。条件の関数は「何を調べるか」だけを持ち、表示（文・JSON）、操作の流れ、書き込みを持たない
+- import は、同じ段か下の段へだけ向ける（`go/internal/layers_test.go`。パッケージの層は `docs/21_design/modules.md`）。共通の条件の関数は、それを呼ぶ操作の全部より下の段に置く。操作の側から共通の条件へ向け、逆は作らない
+- 共通化のために上の段のパッケージを呼ぶ必要が出たら、呼び方を直さず、置き場を下へ動かす。引数での注入は、循環を隠すだけなので避ける
+- 新しいパッケージを足したら、段と役割（`doc.go`）を決めて `layers_test.go` の表に足す
 - 環境を読む処理（git・ホスト）と、状態（チケット・マーカー）を読む処理は分ける。環境だけで決まる条件は、状態を知らない関数にして、承認の前後どちらの操作からも呼べるようにする
 
 ## 後方互換を考えない
@@ -79,4 +79,4 @@ ccnavi の開発で、操作を止める条件を足す・直すとき、実装�
 
 次は、同じ条件が別々に書かれている箇所。上の決まりに沿って 1 つに寄せる。
 
-- 子が親に合流済みか: `write_and_push_merge.py:plan` と `review/request.py:_unmet`
+- 子が親に合流済みか: `lifecycle/wapmerge` の `Plan` と `review/request` の `unmetIn`

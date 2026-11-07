@@ -4,7 +4,7 @@
 # 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
 version: 1
 messages:
-  # ---- tickets/lifecycle/commands.py
+  # ---- tickets/lifecycle/ops
   # 子の着手のあと。
   NEXT_OPS_START_CHILD:
     kind: next
@@ -115,7 +115,7 @@ messages:
     next: |-
       '{script:ccnavi-ticket.sh} finish {ticket}' を打ち直す
 
-  # ---- tickets/core/review.py（confirm_local の成功のあと）
+  # ---- tickets/core（手元の確認が通ったあと）
   # まだ先のフェーズがあるとき。
   NEXT_REVIEW_CONFIRMED:
     kind: next
@@ -133,27 +133,27 @@ messages:
       finish のあと、親のワークツリーの外に出て '{ready_command}' で Draft を解除する。ready はクローズ済みのチケットの記録と `{wip}/` の追跡済みのファイルを削除してコミットし、push してから Draft を解除し、最後に親のワークツリーを削除します（--parent なしで実行すると、何も変えずに止まり、外から実行するコマンドを表示する）
       残っている子のワークツリーは finish が片付ける。マージはユーザが squash で行う。{flow_agreed}
 
-  # ---- tickets/review/decide.py（続きの子を起こしたあと。ユーザの端末に出る行）
+  # ---- tickets/review/decide（続きの子を起こしたあと。ユーザの端末に出る行）
   NEXT_DECIDE_FOLLOWUP:
     kind: next
     values: [words]
     next: |-
       {words}
 
-  # ---- tickets/proposal/propose.py（--check が通ったあと）
+  # ---- tickets/proposal/propose（--check が通ったあと）
   NEXT_APPROVAL_REQUEST_CHECKED:
     kind: next
     values: [parent]
     next: |-
       '{script:ccnavi-ticket.sh} approval-request {parent}' を打つ（本番。提案を送る）
 
-  # ---- entry/cli_plan.py（--fill-phases・--plan-order --write のあと）
+  # ---- entry/cli（--fill-phases・--plan-order --write のあと）
   NEXT_PLAN_VERIFY:
     kind: next
     next: |-
       `{script:ccnavi-launcher.sh} --lint` か `{script:ccnavi-launcher.sh} --agree --preview --verify` で確かめる
 
-  # ---- tickets/learning/notes.py（ticket learn のあと）
+  # ---- tickets/learning（ticket learn のあと）
   NEXT_LEARN_NOTE_COMMIT:
     kind: next
     next: |-
@@ -172,7 +172,7 @@ messages:
     next: |-
       気づきを書いて、記録と要約のファイルをステージしてコミットする（気づきが無ければ learnings: none のまま）
 
-  # ---- tickets/lifecycle/worktrees.py（cwd がワークツリーの中にあって削除しなかったあと）
+  # ---- tickets/lifecycle/worktrees（cwd がワークツリーの中にあって削除しなかったあと）
   NEXT_OPS_DROP_OUTSIDE:
     kind: next
     values: [command, classifier_note]
@@ -181,7 +181,7 @@ messages:
     note: |-
       {classifier_note}
 
-  # ---- tickets/proposal/agree_screen.py（承認されたあとの案内）
+  # ---- tickets/proposal/agree（承認されたあとの案内）
   # 場合は、この回に承認された親が居るか（parent）と、子の開始の仕方（child: 子のワークツリーを切る手順も言う、
   # child_wt: 切ったワークツリーが計画に出ている）で選ぶ。改版と子だけの回で親の着手を勧めると、
   # 案内どおりに打っても「着手済み」で終わるので、親が居ない回は親の着手を言わない。
@@ -201,7 +201,7 @@ messages:
       parent_child_wt: |-
         後工程を進める。親は自分のワークツリーで '{script:ccnavi-ticket.sh} start <親>' を先に実行してください。子は'{script:ccnavi-ticket.sh} start <識別子>' で開始してください（親が未着手だと止まります）。
 
-  # ---- tickets/review/request.py
+  # ---- tickets/review/request
   # レビューを依頼したあと。次はユーザの操作なので、待つ形で言う。
   NEXT_REVIEW_REQUESTED:
     kind: next
@@ -217,7 +217,7 @@ messages:
     next: |-
       `mr:` の値が今回のレビューの MR と合っているか、ユーザに確かめてもらう
 
-  # ---- tickets/approval/checks.py（承認しない理由に添える次の一手。理由はコードが言う）
+  # ---- tickets/approval（承認しない理由に添える次の一手。理由はコードが言う）
   # 提案が親のワークツリーの外にある。
   NEXT_APPROVAL_PROPOSAL_OUTSIDE:
     kind: next
@@ -225,7 +225,7 @@ messages:
     next: |-
       親のワークツリー（.claude/worktrees/{family}）で書き、'{script:ccnavi-ticket.sh} approval-request {family}' で親のブランチへ送ってから承認を頼む
 
-  # tickets/core/approve.py（承認を頼む前の検査で、提案の不備を直す）。
+  # tickets/core（承認を頼む前の検査で、提案の不備を直す）。
   NEXT_APPROVAL_FIX_PROPOSAL:
     kind: next
     next: |-
@@ -238,7 +238,7 @@ messages:
     next: |-
       '{script:ccnavi-worktree.sh} {family}' で切り、提案を移して元を削除してから承認を頼む
 
-  # ---- tickets/proposal/scaffold.py（ticket new の雛形を書いたあと。`必須:` の行はコードが言う）
+  # ---- tickets/proposal/scaffold（ticket new の雛形を書いたあと。`必須:` の行はコードが言う）
   NEXT_NEW_REWRITE:
     kind: next
     values: [path]
@@ -263,7 +263,7 @@ messages:
       書けたら '{script:ccnavi-launcher.sh} --lint' で確かめ、'{script:ccnavi-ticket.sh} approval-request {ident} --check' が通ったら、'{script:ccnavi-ticket.sh} approval-request {ident}'（親の識別子で打つ。子の識別子では打たない）で提案を親のブランチへ送り、承認をユーザに頼んで返事を待つ。承認が済むまで実装はしない
       plan を変えたら '{script:ccnavi-launcher.sh} --plan-order {ident} --fill-phases' を実行して、phases: を更新してください。承認が通らないなど詰まったら、直接実装に切り替えず、ユーザに報告して止まる
 
-  # ---- tickets/proposal/revise.py（ticket revise の雛形を書いたあと）
+  # ---- tickets/proposal/scaffold の revise（ticket revise の雛形を書いたあと）
   NOTE_REVISE_FEEDBACK:
     kind: note
     values: [path]
@@ -286,7 +286,7 @@ messages:
         範囲を変えるときは、作業中の子を先に '{script:ccnavi-ticket.sh} cancel <子> --reason <理由>' で取り消す
         直したら、'{script:ccnavi-ticket.sh} approval-request {ident} --check' が通ったあと '{script:ccnavi-ticket.sh} approval-request {ident}' で親のブランチへ送り、承認をユーザに頼んで返事を待つ
 
-  # ---- tickets/proposal/agree.py（--agree --preview --verify の終わり）
+  # ---- tickets/proposal/agree（--agree --preview --verify の終わり）
   NEXT_VERIFY_REJECTED:
     kind: next
     next: |-
@@ -308,7 +308,7 @@ messages:
     note: |-
       承認が済むまで実装はしない
 
-  # ---- tickets/lifecycle/consolidate.py（統合の子を作った・開いているとき）
+  # ---- tickets/lifecycle/consolidate（統合の子を作った・開いているとき）
   NEXT_CONSOLIDATE:
     kind: next
     values: [ident]
@@ -319,7 +319,7 @@ messages:
       処理の行は節に 1 行だけ、注釈なしで書く: '- 処理: 反映 <パターン名>'（sources 2 件以上）・'- 処理: 対象外 <理由>'（'信号: 誤り' の節は不可）・'- 処理: issue <番号> <理由>'。sources には観測元のチケット ID を書く（.ccnavi/docs/learning-propose.md）
       子のワークツリー .claude/worktrees/{ident} は start が作る。作れないときは '{script:ccnavi-git.sh} worktree add ".claude/worktrees/{ident}" -b {ident}'
 
-  # ---- entry/cli_templates.py（テンプレートの下書きを書いたあと）
+  # ---- entry/cli（テンプレートの下書きを書いたあと）
   NEXT_TEMPLATE_DRAFT:
     kind: next
     values: [target, tree_root]

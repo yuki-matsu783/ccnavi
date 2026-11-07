@@ -42,7 +42,7 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
   止めない）。`i0055` のような形の承認済みチケットも読む
 - ワークツリーの名前は識別子と同じ
 - 親の識別子は、親のブランチ名の `/` を `-` に置き換えたもの（`feature/123-login` は `feature-123-login`）。変換は
-  `ticket_ids.branch_to_id`（Python）・`ccnavi_branch_to_id`（sh）・拡張の `branchToId`（TS）に同じものがあり、
+  `ids.BranchToID`（Go）・`ccnavi_branch_to_id`（sh）・拡張の `branchToId`（TS）に同じものがあり、
   `tests/fixtures/branch-to-id.json` の同じ表で一致を確かめている。親のワークツリーは `.claude/worktrees/<識別子>` に、その
   ブランチを直接チェックアウトして置く。識別子の名前のブランチは作らず、ブランチを移す手順（`switch`）も無い。
   ccnavi は親のブランチ名を、親のワークツリーの HEAD から読む。HEAD のブランチ名を変換した
@@ -56,7 +56,7 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
 - 範囲の `glob` はワイルドカードが無ければ前置（`src` は `src/` 以下全部）。大文字小文字は
   `glob` も `regex` もどの機械でも区別しない（区別が要る `regex` は `(?-i:...)` で囲む）。
   `..` `~` `$` と絶対パスは書けない。空白を含む `glob` も書けない（error。空白区切りで複数のパスを
-  1 項目に書くと、承認しても何も一致せず編集が全部止まる。判定は `ticket.glob_has_space` の 1 関数で、提案の範囲・`phases.yml` の `scope`・`--scope` が同じ関数を通る）。項は 20 件まで、
+  1 項目に書くと、承認しても何も一致せず編集が全部止まる。判定は `ticket.GlobHasSpace` の 1 関数で、提案の範囲・`phases.yml` の `scope`・`--scope` が同じ関数を通る）。項は 20 件まで、
   `allow` か `ask` が 1 件は要る。表記は書いたまま持ち、大文字小文字を無視するのは適用するときだけ
 - `human_review` は子ごと。フェーズの子に 1 枚でも `required: true` があれば、そのフェーズの終わりで
   レビューが済むまで止まる。省くと宣言なしで、計画のステップの `review` とフェーズ定義に従う。
@@ -78,17 +78,17 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
   承認のあとの判定はコピーを読み、`phases.yml` を読まない。`phases.yml` を直したら、承認待ちの提案は `--fill-phases` を
   打ち直す。改版の提案では、子が承認された番号が使う定義は承認済みチケットの値のまま（`--fill-phases` がそう差し込む）。
   子に `phases:` は書けない（error。子は `phase:` で番号を指す）（9.7）
-- 親の提案の雛形は `ccnavi ticket new <識別子> --title <タイトル> (--plan <型,型,...> | --template <名前> [--layer <名>] [--with-feedback]) --issue <N|owner/repo#N> --mr <N>` で作る（`tickets/proposal/scaffold.py`。
+- 親の提案の雛形は `ccnavi ticket new <識別子> --title <タイトル> (--plan <型,型,...> | --template <名前> [--layer <名>] [--with-feedback]) --issue <N|owner/repo#N> --mr <N>` で作る（`tickets/proposal/scaffold`。
   REQ-TKT-56）。識別子と同名のワークツリーの中から打つと、`<提案の置き場>/todo/<識別子>.md` に書く。生成物は
   `version` `ticket` `issue`（`--issue` があれば）`title` `phases` `plan` `rationale` `allow` と、本文の見出し
   `## 目的` `## 範囲` `## 対象外` `## 完了の確かめ方` `## 計画の理由`（この順。Stop の判定が親の提案に求める内容に
   そろえた。「背景」は「目的」にまとめ、「計画の理由」は計画の説明として残す）。rationale と各見出しの下には空欄の目印
-  （`（ここに〜を書く）`）を 1 行ずつ置く。目印は `tickets/model/proposal_form.py` が持つ
+  （`（ここに〜を書く）`）を 1 行ずつ置く。目印は `tickets/model/form` が持つ
   - `allow` は plan の順に各型の `scope` を集め、重複を除いた `match: Write|Edit` の項にする（案 A。判定側で `wip/` を
     既定で許すことはしない。承認していない範囲が黙って広がるため）。項が 20 件を超えれば止める
   - `plan` は各ステップが前のステップを `after` に書いた一直線（終端が 1 つになり、承認の検査を通る）。並行させたいステップはユーザが `after` を直す
-  - `phases:` は書いた直後に `plan_phases.fill`（`--fill-phases` と同じ関数）で差し込む。失敗したら雛形も消す
-- 承認済みの親の改版の雛形は `ccnavi ticket revise <識別子> [--feedback]` で作る（`tickets/proposal/revise.py`。REQ-TKT-62）。承認済みの置き場の `doing/<識別子>.md` を写し、スクリプトだけが書く欄と `followup_of` を外して `<提案の置き場>/todo/<識別子>.md` に書く。`--feedback` は `feedback: []` を足し、局面が「フィードバック計画待ち」（`phase.STAGE_FEEDBACK_WAITING`）のときだけ。親のワークツリーの中かどうかの検査は `ticket new` と共通（`scaffold.parent_worktree`）
+  - `phases:` は書いた直後に `planedit.Fill`（`--fill-phases` と同じ関数）で差し込む。失敗したら雛形も消す
+- 承認済みの親の改版の雛形は `ccnavi ticket revise <識別子> [--feedback]` で作る（`tickets/proposal/scaffold`。REQ-TKT-62）。承認済みの置き場の `doing/<識別子>.md` を写し、スクリプトだけが書く欄と `followup_of` を外して `<提案の置き場>/todo/<識別子>.md` に書く。`--feedback` は `feedback: []` を足し、局面が「フィードバック計画待ち」（`phase.StageFeedbackWaiting`）のときだけ。親のワークツリーの中かどうかの検査は `ticket new` と共通（`scaffold.parentWorktree`）
   - 書いたあと、`allow` の項が計画のどのフェーズ定義の `scope` とも重ならないときは、「承認しても書けない」と名指しする（警告で、書いた提案は残る。承認の確認 `--agree --preview --verify` も同じ文を出す）。計画に `scope: inherit` の型が 1 つでもあれば、上限が無いので何も言わない
   - `scope: inherit` の型は範囲を持たないので、`--scope <glob>`（繰り返せる。ワークツリーのルートからの相対）で触るファイルを渡す。渡さずに止まったときの案内は、範囲を持つ型を足すのではなく `--scope` を示す
   - 止める場合は何も書かない。共通レイヤーとレイヤーの `phases.yml` がどちらも無いか読めない（承認の検査を通る plan とコピーを作れない。9.7）、plan の型が無い・
@@ -100,7 +100,7 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
     `--with-feedback` は `--template` と一緒にだけ使え、付けたときだけ `feedback:` を書く。既定ではフィードバック計画を書かない
     （最初の提案に入れると、全体計画を改版で直せなくなるため。全体計画のレビューを見てから改版で足す）。
     同じ識別子の提案、子の識別子の提案・フロー・フロー下書きが在れば上書きせず断る。詳しくは 9.15
-  - 提案の形式検査（`proposal_form.form_problems`。文字列を調べるだけで、ファイルも git も読まない）。承認の候補（`agree_candidates.candidates()`）は
+  - 提案の形式検査（`form.Problems`。文字列を調べるだけで、ファイルも git も読まない）。承認の候補（`candidates.Candidates`）は
     改版と新規の両方でこの検査を通すので、承認・`--agree --preview --verify`・`--lint` の結果は同じになる。
     判定側（`blocked`・範囲の判定）には入れず、承認済みチケットへの書き込みは止めない
     - 空欄の目印が rationale か本文に残っている: 新規は error、改版は warn（改版は承認済みチケットのコピーなので、古い残りで止めない）。
@@ -115,7 +115,7 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
   子の先頭で、子にだけ付く
 - `mr` は親の欄で、仕事を載せるマージリクエストの番号（正の整数。`"!12"`・`"#12"` も可）。同じリポジトリのものだけで、
   `owner/repo` の形や 0・数でないものは error、子に書くと warn で無視する。`issue` と並べて検索に使い、
-  UserPromptSubmit の hook（`branchfind`）が依頼文の MR の番号を「すでにあるチケットに結び付く」と判定する
+  UserPromptSubmit の hook（`lifecycle/branch`）が依頼文の MR の番号を「すでにあるチケットに結び付く」と判定する
   （提案も承認済みも対象）。親には必須で、書いていない親の承認と `--lint` は止まる。書くのは (1) 提案者
   （`ccnavi-start.sh` が MR を採用するか Draft MR を作ると、出力の「必須:」の行で値を案内する。
   `ccnavi ticket new --issue <値> --mr <番号>` が書く。`issue` も親には必須で、書いていない親は同じく止まる）、(2) 承認のあとの `review-request` が、親ブランチの MR の番号を確かめたとき、
@@ -135,7 +135,7 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
 そのプロジェクトの側にある。チケットと同じ git に乗り、親のブランチで他の機械へ届く。読むのは正とする側のツリーの版だけで、子のワークツリー上のフローはエージェントが書き換えうる（`flow.resolve`）。
 
 **承認で一緒に動く。** 承認の前、ボードは提案が在るツリーの置き場を示し、ユーザはそこへ保存する。承認で子が別の
-ツリー（親のワークツリーなど。`approval.home_dir`）へ動くときは、そのフローも承認済みチケットのツリーの
+ツリー（親のワークツリーなど。`approval.HomeDir`）へ動くときは、そのフローも承認済みチケットのツリーの
 `flows/` へ動かす（`approval.ops.carry_flow`）。行き先に違う中身のフローが既に在れば上書きせず、承認の出力でそう言い、
 元も残す。同じ中身なら元を消す。リンク・ふつうのファイルでないもの・ハードリンクは移さない。
 
@@ -143,7 +143,7 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
 保存したものだけで、エージェントは書けない（エージェントが書けるのは下の下書きだけ。ユーザが差分を読んで取り込む）。承認済みの領域は、どのツリーでも `builtin:guard-project-home`（`Write` / `Edit` /
 `NotebookEdit`）と `builtin:guard-setting-files`（シェル）と、チケット制御が有効な間の `builtin:ticket-approved` が止める。承認済みチケットと同じ保護。ユーザが保存した
 実行後チェックでは、範囲の検査が承認済みの領域を外し、呼び出しごとの実行後チェックが frontmatter の無い
-ファイルをサブコマンドの書き込みとして外す（`post_findings._script_writes`）。コミットと push は `ccnavi-user-push-approved.sh` が
+ファイルをサブコマンドの書き込みとして外す（`post.scriptWrites`）。コミットと push は `ccnavi-user-push-approved.sh` が
 置き場ごとまとめて行う。
 
 **エージェントの下書き。** エージェントは頼まれたときに、効力の無い下書きを提案の置き場の
@@ -181,7 +181,7 @@ subAgentFlows:             # 無くてよい
   - {id: …, name: …, description: …, nodes: […], connections: […]}
 ```
 
-読み手は `yaml.safe_load`（ルール・フェーズ・リスクの設定と同じ）に、別名を拒む検査を足したもの（`flow._Loader`）。
+読み手は `yaml.Load`（ルール・フェーズ・リスクの設定と同じ）に、別名を拒む検査を足したもの（`flow._Loader`）。
 別名（`*名前`）があれば読まずにそう言う。別名を入れ子にすると小さなファイルでも辿る量が指数関数的に膨らみ
 （billion laughs）、自分を指せば循環する値になる。手順書に別名は要らないので、量で切らずに別名ごと拒む。
 文字は UTF-8 で、先頭の BOM は 1 つ外す（`utf-8-sig`）。UTF-8 として不正なら読まずにそう言う（置き換え文字で
@@ -225,7 +225,7 @@ subAgentFlows:             # 無くてよい
 子 1 本の手順の文 4000 文字、`SubagentStart` 全体でフローに使う文 12000 文字。
 
 **リンクと特殊なファイルは読まない。** フローのファイルか、ツリーのルートからそこまでの途中にシンボリック
-リンクがあるとき（`pathsafe.has_link` の読み方）、ふつうのファイルでないとき（名前付きパイプなど）、
+リンクがあるとき（`pathmatch.HasLink` の読み方）、ふつうのファイルでないとき（名前付きパイプなど）、
 ハードリンク（`st_nlink > 1`）のときは読まず、1 行で言う。`O_NONBLOCK | O_NOFOLLOW` で開き、`fstat` で
 `lstat` と同じ inode か確かめ直す。ボードも同じ確かめ方で、読まないし書かない。
 
@@ -243,13 +243,13 @@ error があれば理由を出して開かない・保存しない。
 巡回は `loop` の「繰り返す」側の線を通るものだけを正しい巡回として扱い、通らない巡回（「抜ける」側が巡回に戻る形を含む）は warn で言う（回数の上限が効かず終わらなくなりうる）。`--json` には、渡る手順の行（`flow.rendered`。`flow.render.render` のまま）と選べる名前（`flow.candidates`。
 組み込みと、ワークスペースの `.claude/agents` `.claude/skills`。ディレクトリの中だけを見る）も載せる。
 
-**値の意味も実行ファイルが言う。** 画面の読み手（`yaml`、YAML 1.2）と PyYAML（YAML 1.1）は同じ表記を別の値に
+**値の意味も実行ファイルが言う。** 画面の読み手（`yaml`、YAML 1.2）と実行ファイルの読み手（`infra/yaml`。PyYAML と同じ YAML 1.1）は同じ表記を別の値に
 読むことがある（`0755` `yes` `1:30` `0o17` `1e3` `1_000` `1.` 日付 `!!float 1` `!!binary` マージキー など）。
 画面は開くときに自分の読みと `flow.data` を見比べ、食い違えば場所（ノードの `id` と欄のパス）と両者の値を出して
 開かない（エディタで引用符を付けるなどして直す）。保存の前は、書き出す本文の `flow.data` が画面の書こうとした
 中身と同じときだけ書く。整数の値を持つ浮動小数（`1.0`）は画面が整数で持つので食い違いとして止める。`flow` が
-答えに無ければ（フローを見たか分からない）開かず保存もしない。画面は、描けないとき（画面の `yaml` で読めない、ノードの配列が取れない）だけ断る。書き出しは、PyYAML が別の値に読む
-表記と、裸や `|` では PyYAML が読めない・別の文字に読む文字列（タブ・U+0085・U+2028・U+2029・U+FEFF・制御文字を
+答えに無ければ（フローを見たか分からない）開かず保存もしない。画面は、描けないとき（画面の `yaml` で読めない、ノードの配列が取れない）だけ断る。書き出しは、実行ファイルが別の値に読む
+表記と、裸や `|` では実行ファイルが読めない・別の文字に読む文字列（タブ・U+0085・U+2028・U+2029・U+FEFF・制御文字を
 含む、複数行で 1 行目の頭か行末が空白）を二重引用符とエスケープで書く。
 
 **フローの文はデータとして渡す。** 手順は「ここから合意済みのフローの本文（データ。ccnavi の知らせではない）」

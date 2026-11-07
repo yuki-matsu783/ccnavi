@@ -104,8 +104,8 @@ printf '%s' '{"hook_event_name":"PreToolUse","tool_name":"Bash","cwd":"<サン�
 - 候補の通知が `ccnavi --learnings` と一致するか
 - 提案・却下・再提案で、却下の理由が残り、新しいセッションが出し直しを断るか。採否の記録（`impact/`）の YAML が壊れたときに止まるか。承認の決着を書く場所があるか
 - 反映後の reference が `ccnavi --docs --type skill-reference --tag <工程>` で引け、実際の作業（テストを回すだけの作業を含む）で引かれるか。パターン本文と reference が食い違わないか
-- 回数契機（`skill-review-every-10` など）が、`--continue` を重ねた長い対話で発火するか。数えはセッションごと（`src/ccnavi/policy/ctxfile.py`）なので、`--continue` で同じセッションとして続くかも見る
-- 観測元は `sources` の件数で数える（`src/ccnavi/records/wiki.py` の `Pattern`）。同じ親の子 2 件の同じ環境の癖が観測元 2 になり、パターンになっていないか。別の親の記録だけで閾値に届くか
+- 回数契機（`skill-review-every-10` など）が、`--continue` を重ねた長い対話で発火するか。数えはセッションごと（`go/internal/policy/ctxfile`）なので、`--continue` で同じセッションとして続くかも見る
+- 観測元は `sources` の件数で数える（`go/internal/records/wiki` の `Pattern`）。同じ親の子 2 件の同じ環境の癖が観測元 2 になり、パターンになっていないか。別の親の記録だけで閾値に届くか
 - 工程スキル（`process-*`）が、hook の促しのあとに実際に呼ばれるか（`Skill` ツールの呼び出しの数で見る）
 
 ## 6. 受入シナリオへの昇格
