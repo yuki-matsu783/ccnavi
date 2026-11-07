@@ -1,0 +1,23 @@
+// Package request はレビューの依頼（`ccnavi review prepare|requested` と `prepare --check`）と、依頼の記録から
+// レビューの状態を読む部品を置く。ネットワークには出ない。マージリクエストの中身は sh
+// （`.ccnavi/scripts/ccnavi-review.sh`）が取ってきて `--result` の JSON で渡す。その形が sh との契約。
+//
+// 依頼は 2 段で、Prepare が前提を全部確かめて投稿する本文を state の置き場に書き、sh が投稿した結果で
+// Requested が依頼のマーカーを置く。前提の検査は Gate の 1 か所にあり、本体と `--check` が同じものを通る。
+// 残った指摘の決め方（decide）・親を閉じる操作（close）・コア（confirm）は、ここの部品（依頼の後に
+// 動いたか・結果の照合・未解決の数え方・子の決着とレビュー済みのマーカー・wip/ の片付け）を読む。
+//
+// Python からの対応: tickets/review/request をこのパッケージにした。request_gate → Gate、check_request →
+// Check、prepare → Prepare、requested → Requested、_parent → Parent、_parent_any → ParentAny、
+// _phase → PhaseOf、_parent_phase → ParentPhase、_result → LoadResult、_result_with_mr → ResultWithMR、
+// _matching → Matching、matching_problems → MatchingProblems、review_problems → ReviewProblems、
+// changes_requested → ChangesRequested、unresolved_for → UnresolvedFor、ledger_of → LedgerOf、
+// _mark・_parent_mark → Mark・ParentMark、reviewed_mark → ReviewedMark、_settle_children →
+// SettleChildren、settle_and_mark → SettleAndMark、thread_label → ThreadLabel、_redo_request → RedoRequest、
+// is_sha → IsSHA、Moved・KIND_* → Moved・MovedKind の定数、moved_detail・moved_since → MovedDetail
+// （changed の None は listed が偽）、_moved_detail → MovedInTree、moved_explanation → MovedExplanation、
+// wip_tracked → WipTracked、remove_wip → RemoveWip、_merge_problems → MergeProblems、_write_text →
+// WriteDraft、RESOLVE_NOTE → ResolveNote。thread_key・thread_version は host.ThreadKey・ThreadVersion を
+// 直に使う。_moved_since_request・_seen_changes・_unseen_by_review・_first_line・_read_body・_resolve・
+// _git は中に畳んだ。home_dir が NoParentWorktree を投げる所は *approval.NoParentError を返す（入口が受ける）。
+package request
