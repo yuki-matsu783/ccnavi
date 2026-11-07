@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の tickets/proposal/propose と同じワークスペースを 2 つ作って approval-request を打たせ、出力と終了コードが
@@ -37,24 +37,26 @@ var proposeCases = [][3]any{
 // proposeWorkspace: i0001 は送れる親子（子のフローの下書きと、ほかの親の提案も置く）。i0002 は after の誤り、
 // i0003 は送る提案が無い。i0004 は origin の無いプロジェクトの親（送る先が無い）。
 func proposeWorkspace(t *testing.T) string {
-	root := workspace(t, "i0001", "i0002", "i0003")
+	root := testkit.ProposalWorkspace(t, "i0001", "i0002", "i0003")
 	remote := filepath.Join(root, "remote.git")
-	runGit(t, root, "init", "-q", "--bare", remote)
-	runGit(t, root, "remote", "add", "origin", remote)
-	todo := func(parent, id, text string) { put(t, filepath.Join(todoDir(root, parent), id+".md"), text) }
-	todo("i0001", "i0001", parentText("i0001", []string{"  - research", "  - {type: design, after: [1]}"}))
-	todo("i0001", "I0001-02-01", childText("i0001-02-01", "i0001", "2", []string{"wip/design/*"}))
-	todo("i0001", "i0009", parentText("i0009", nil))
-	put(t, filepath.Join(worktree(root, "i0001"), "wip", "proposals", "flows", "i0001-02-01.yml"), "flow: x\n")
-	put(t, filepath.Join(worktree(root, "i0001"), "wip", "proposals", "flows", "i0001-02-01.txt"), "x\n")
-	todo("i0002", "i0002", parentText("i0002", []string{"  - research", "  - {type: design, after: [5]}"}))
+	testkit.Git(t, root, "init", "-q", "--bare", remote)
+	testkit.Git(t, root, "remote", "add", "origin", remote)
+	todo := func(parent, id, text string) {
+		testkit.Put(t, filepath.Join(testkit.TodoDir(root, parent), id+".md"), text)
+	}
+	todo("i0001", "i0001", testkit.ProposalParent("i0001", []string{"  - research", "  - {type: design, after: [1]}"}))
+	todo("i0001", "I0001-02-01", testkit.ProposalChild("i0001-02-01", "i0001", "2", []string{"wip/design/*"}))
+	todo("i0001", "i0009", testkit.ProposalParent("i0009", nil))
+	testkit.Put(t, filepath.Join(testkit.Worktree(root, "i0001"), "wip", "proposals", "flows", "i0001-02-01.yml"), "flow: x\n")
+	testkit.Put(t, filepath.Join(testkit.Worktree(root, "i0001"), "wip", "proposals", "flows", "i0001-02-01.txt"), "x\n")
+	todo("i0002", "i0002", testkit.ProposalParent("i0002", []string{"  - research", "  - {type: design, after: [5]}"}))
 	return root
 }
 
 func TestMatchesPython(t *testing.T) {
 	pyRoot, goRoot := proposeWorkspace(t), proposeWorkspace(t)
-	want := pyoracle.Answers[[]any](t, "propose", proposeOracle, map[string]any{"root": pyRoot, "cases": proposeCases})
-	conf := settingsOf(t, goRoot)
+	want := testkit.Answers[[]any](t, "propose", proposeOracle, map[string]any{"root": pyRoot, "cases": proposeCases})
+	conf := testkit.Settings(t, goRoot)
 	got := []any{}
 	for _, c := range proposeCases {
 		var out, errs strings.Builder

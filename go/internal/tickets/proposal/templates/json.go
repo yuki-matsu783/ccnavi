@@ -123,7 +123,7 @@ func AsJSON(conf *config.Settings, root string, s *Scan, layer string, keywords 
 		}
 	}
 	layers := []any{}
-	for _, l := range s.all() {
+	for _, l := range s.All() {
 		layers = append(layers, layerJSON(l))
 	}
 	sums := []any{}

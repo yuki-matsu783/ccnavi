@@ -340,7 +340,7 @@ func templateCollisions(conf *config.Settings, root string, e *Entry, t *templat
 		others[k] = v
 	}
 	scanned := templates.Load(conf, root)
-	for _, view := range append([]*templates.LayerRead{scanned.Common}, scanned.Layers...) {
+	for _, view := range scanned.All() {
 		for _, other := range view.Entries {
 			if other.Template != nil {
 				put(rivalKey{view.Name, FoldPart(other.Name)}, rivalBody{other.Rel, templates.Dump(other.Template)})

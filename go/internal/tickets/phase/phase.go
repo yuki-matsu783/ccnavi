@@ -83,7 +83,7 @@ func (p *Phase) RiskEscalates() bool {
 	if v := record.Value("level"); pyfmt.Truthy(v) {
 		level = pyfmt.Str(v)
 	}
-	return risk.Escalates(level)
+	return risk.Escalates(risk.Level(level))
 }
 
 // RiskLine はユーザ向けの 1 行（`リスク: 58 (HIGH) — …`）。無ければ空。

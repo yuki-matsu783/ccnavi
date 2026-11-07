@@ -47,7 +47,7 @@ func CloseProblems(conf *config.Settings, root, parentID string, raw *approval.R
 	} else {
 		home = approval.HomeDirReadAny(conf, root, parentID, "")
 	}
-	if mark, ok := marks.ReadParent(home, parentID, marks.CloseEarly); ok && mark.Len() > 0 {
+	if _, ok := marks.ReadFilledParent(home, parentID, marks.CloseEarly); ok {
 		return nil
 	}
 	var problems []string

@@ -402,11 +402,9 @@ func ApproveYes(stdout, stderr io.Writer, conf *config.Settings, root string, ex
 		}
 	}
 	// 子のワークツリーの計画。拡張が create の子を承認の後に作る（作れなければ案内に名指しで出る）。
-	childPlans := worktrees.ChildWorktrees(root, tickets)
-	worktreePlans := make([]agree.ChildWorktree, 0, len(childPlans))
+	worktreePlans := worktrees.ChildWorktrees(root, tickets)
 	plansJSON := []any{}
-	for _, p := range childPlans {
-		worktreePlans = append(worktreePlans, agree.ChildWorktree{Ticket: p.Ticket, Path: p.Path, State: agree.WorktreeState(p.State), Base: p.Base})
+	for _, p := range worktreePlans {
 		plansJSON = append(plansJSON, p.JSON())
 	}
 	// 承認は止めない。親のワークツリーに残る提案以外の変更は、エージェントに渡す文に載せる。

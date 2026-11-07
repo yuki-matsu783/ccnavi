@@ -10,8 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"ccnavi/internal/tickets/lifecycle/internal/gitfixture"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の branchfind・base_bound・next_id と同じワークスペースを 2 つ作って聞き、依頼文の指定・候補の一覧
@@ -29,34 +28,34 @@ func ticketText(id, extra string) string {
 //	feature-7-a      done/ の閉じた親（ブランチ名が識別子と一致）
 //	projects/proj    origin が grp/Proj のプロジェクト
 func fixture(t *testing.T) string {
-	root := gitfixture.Workspace(t)
-	gitfixture.Git(t, root, "remote", "add", "origin", "https://host.example/acme/w.git")
-	parent := gitfixture.AddWorktree(t, root, "i0001", "main")
-	gitfixture.Put(t, gitfixture.Approved(root, "i0001", "doing", "i0001"), ticketText("i0001", "issue: 152\nmr: 5\nbranch: feature/152-login\n"))
-	gitfixture.Put(t, gitfixture.Approved(root, "i0001", "done", "feature-7-a"), ticketText("feature-7-a", "issue: 7\n"))
-	gitfixture.Commit(t, parent, "approve")
-	gitfixture.Put(t, filepath.Join(root, "wip", "proposals", "todo", "feature-9-new.md"), ticketText("feature-9-new", "issue: 152\n"))
+	root := testkit.ShapedWorkspace(t)
+	testkit.Git(t, root, "remote", "add", "origin", "https://host.example/acme/w.git")
+	parent := testkit.AddWorktree(t, root, "i0001", "main")
+	testkit.Put(t, testkit.Approved(root, "i0001", "doing", "i0001"), ticketText("i0001", "issue: 152\nmr: 5\nbranch: feature/152-login\n"))
+	testkit.Put(t, testkit.Approved(root, "i0001", "done", "feature-7-a"), ticketText("feature-7-a", "issue: 7\n"))
+	testkit.Commit(t, parent, "approve")
+	testkit.Put(t, filepath.Join(root, "wip", "proposals", "todo", "feature-9-new.md"), ticketText("feature-9-new", "issue: 152\n"))
 	for _, name := range []string{"feature-152-login", "feature/152-login", "feature-1520-x", "claude/tender-volta-qmy99q", "feature-7-a", "x-152"} {
-		gitfixture.Git(t, root, "branch", name, "main")
+		testkit.Git(t, root, "branch", name, "main")
 	}
 	for _, name := range []string{"fix/152-y", "feature-152-login", "HEAD"} {
-		gitfixture.Git(t, root, "update-ref", "refs/remotes/origin/"+name, "main")
+		testkit.Git(t, root, "update-ref", "refs/remotes/origin/"+name, "main")
 	}
-	gitfixture.AddWorktree(t, root, "feature-20-z", "main")
-	gitfixture.Git(t, gitfixture.Worktree(root, "feature-20-z"), "checkout", "-q", "feature-152-login")
+	testkit.AddWorktree(t, root, "feature-20-z", "main")
+	testkit.Git(t, testkit.Worktree(root, "feature-20-z"), "checkout", "-q", "feature-152-login")
 	proj := filepath.Join(root, "projects", "proj")
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	gitfixture.Git(t, proj, "init", "-q", "-b", "main")
-	gitfixture.Git(t, proj, "remote", "add", "origin", "git@host.example:grp/Proj.git")
-	gitfixture.Commit(t, proj, "init")
-	gitfixture.Git(t, proj, "branch", "feature-152-p", "main")
-	gitfixture.Put(t, filepath.Join(root, "host.json"), `{"checked": true, "host": "gitlab\n", "repo": "acme/w", "mrs": [`+
+	testkit.Git(t, proj, "init", "-q", "-b", "main")
+	testkit.Git(t, proj, "remote", "add", "origin", "git@host.example:grp/Proj.git")
+	testkit.Commit(t, proj, "init")
+	testkit.Git(t, proj, "branch", "feature-152-p", "main")
+	testkit.Put(t, filepath.Join(root, "host.json"), `{"checked": true, "host": "gitlab\n", "repo": "acme/w", "mrs": [`+
 		`{"number": 5, "branch": "feature-152-login", "state": "opened", "url": "https://h/5", "title": "t\tx", "base": "main", "fork": true},`+
 		`{"number": true, "branch": "b"}, {"number": 6, "branch": ""}, "x", {"number": 8, "branch": "only-host", "state": "merged"}]}`)
-	gitfixture.Put(t, filepath.Join(root, "unchecked.json"), `{"checked": false, "reason": "glab が無い\n"}`)
-	gitfixture.Put(t, filepath.Join(root, "broken.json"), `[`)
+	testkit.Put(t, filepath.Join(root, "unchecked.json"), `{"checked": false, "reason": "glab が無い\n"}`)
+	testkit.Put(t, filepath.Join(root, "broken.json"), `[`)
 	return root
 }
 
@@ -132,12 +131,12 @@ func TestMatchesPython(t *testing.T) {
 		texts = append(texts, text)
 	}
 	slices.Sort(texts)
-	want := pyoracle.Answers[map[string]any](t, "branch", oracle, map[string]any{
+	want := testkit.Answers[map[string]any](t, "branch", oracle, map[string]any{
 		"root": pyRoot, "texts": texts, "reports": reports(pyRoot), "contexts": contexts, "bounds": bounds, "next": nextIDs,
 	})
 	root := goRoot
-	conf := gitfixture.Settings(t, root)
-	rel := func(s string) string { return gitfixture.Rel(root, s) }
+	conf := testkit.Settings(t, root)
+	rel := func(s string) string { return testkit.Rel(root, s) }
 	got := map[string]any{}
 	refs := []any{}
 	for _, text := range texts {

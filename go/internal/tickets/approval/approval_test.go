@@ -10,6 +10,8 @@ import (
 	"ccnavi/internal/tickets/config/phases"
 	"ccnavi/internal/tickets/model/place"
 	"ccnavi/internal/tickets/model/ticket"
+
+	"ccnavi/internal/tickets/testkit"
 )
 
 func parse(t *testing.T, text string) *ticket.Ticket {
@@ -108,7 +110,7 @@ func TestAuthoritative(t *testing.T) {
 func TestMoveFile(t *testing.T) {
 	const text = "---\nticket: i0001\n---\nbody\n"
 	dir := t.TempDir()
-	source := put(t, filepath.Join(dir, "doing", "i0001.md"), text)
+	source := testkit.Put(t, filepath.Join(dir, "doing", "i0001.md"), text)
 	target := filepath.Join(dir, "done", "i0001.md")
 	if failed := MoveFile(source, target); failed != "" {
 		t.Fatal(failed)
@@ -120,8 +122,8 @@ func TestMoveFile(t *testing.T) {
 		t.Error("元が残った")
 	}
 	// 行き先に同じ名前が在れば動かさず、どちらにも触らない。
-	put(t, source, text)
-	put(t, target, "older\n")
+	testkit.Put(t, source, text)
+	testkit.Put(t, target, "older\n")
 	if failed := MoveFile(source, target); !strings.Contains(failed, "移動先に既にある") {
 		t.Errorf("断らない: %q", failed)
 	}
@@ -136,17 +138,17 @@ func TestMoveFile(t *testing.T) {
 func TestAdmitKeepsTheBytesAndRefusesAChangedProposal(t *testing.T) {
 	dir := t.TempDir()
 	text := "---\r\nversion: 1\r\nticket: i0003\r\ntitle: t\r\nallow:\r\n- {glob: \"src/*\", match: \"Write\"}\r\n---\r\n本文\r\n"
-	proposal := put(t, filepath.Join(dir, "todo", "i0003.md"), text)
+	proposal := testkit.Put(t, filepath.Join(dir, "todo", "i0003.md"), text)
 	approved := filepath.Join(dir, "approved")
 	tk, problems := ticket.Load(proposal)
 	if tk == nil {
 		t.Fatal(problems)
 	}
-	put(t, proposal, text+"x")
+	testkit.Put(t, proposal, text+"x")
 	if failed := Admit(approved, tk); !strings.Contains(failed, "提案の内容が更新されました") {
 		t.Fatalf("差し替えを見落とした: %q", failed)
 	}
-	put(t, proposal, text)
+	testkit.Put(t, proposal, text)
 	if failed := Admit(approved, tk); failed != "" {
 		t.Fatal(failed)
 	}
@@ -176,9 +178,9 @@ func TestPlaceAndMisplacedHome(t *testing.T) {
 }
 
 func TestPlaceProblemsInADifferentlyNamedWorktree(t *testing.T) {
-	root := workspace(t, "skill-proposals")
-	conf := settingsOf(t, root)
-	stray := worktree(root, "skill-proposals")
+	root := testkit.Workspace(t, "skill-proposals")
+	conf := testkit.Settings(t, root)
+	stray := testkit.Worktree(root, "skill-proposals")
 	parent := &ticket.Ticket{ID: "i0003", TreeRoot: stray}
 	got := PlaceProblems(root, conf, parent)
 	if len(got) != 1 || !strings.Contains(got[0].Detail, "提案 i0003 を識別子と違う名前のワークツリー skill-proposals") ||
@@ -209,21 +211,21 @@ func TestBranchProblems(t *testing.T) {
 }
 
 func TestApprovedTimes(t *testing.T) {
-	root := workspace(t, "i0001")
-	conf := settingsOf(t, root)
-	home := worktree(root, "i0001")
+	root := testkit.Workspace(t, "i0001")
+	conf := testkit.Settings(t, root)
+	home := testkit.Worktree(root, "i0001")
 	doing := filepath.Join(home, ".ccnavi", "approved", "doing")
-	put(t, filepath.Join(home, "wip", "proposals", "todo", "i0001-01-01.md"), childText("i0001-01-01", "i0001", "1", "wip/*"))
-	runGit(t, home, "add", "-A")
-	runGit(t, home, "commit", "-q", "-m", "proposal")
+	testkit.Put(t, filepath.Join(home, "wip", "proposals", "todo", "i0001-01-01.md"), childText("i0001-01-01", "i0001", "1", "wip/*"))
+	testkit.Git(t, home, "add", "-A")
+	testkit.Git(t, home, "commit", "-q", "-m", "proposal")
 	if err := os.MkdirAll(doing, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	// GitHub の画面での移動は rename のコミットになる。--no-renames で足したことにする。
-	runGit(t, home, "mv", filepath.Join("wip", "proposals", "todo", "i0001-01-01.md"), filepath.Join(".ccnavi", "approved", "doing", "i0001-01-01.md"))
-	runGit(t, home, "commit", "-q", "-m", "Rename")
-	when := strings.TrimSpace(runGit(t, home, "log", "-1", "--format=%cI"))
-	put(t, filepath.Join(doing, "i0001.md"), parentText("i0001", "  - research"))
+	testkit.Git(t, home, "mv", filepath.Join("wip", "proposals", "todo", "i0001-01-01.md"), filepath.Join(".ccnavi", "approved", "doing", "i0001-01-01.md"))
+	testkit.Git(t, home, "commit", "-q", "-m", "Rename")
+	when := strings.TrimSpace(testkit.Git(t, home, "log", "-1", "--format=%cI"))
+	testkit.Put(t, filepath.Join(doing, "i0001.md"), parentText("i0001", "  - research"))
 	found, _ := ScanAll(conf, root, false)
 	times := ApprovedTimes(conf, found)
 	for _, tk := range found {

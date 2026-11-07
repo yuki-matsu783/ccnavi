@@ -8,8 +8,8 @@ import (
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/model/host"
 	"ccnavi/internal/tickets/model/oplog"
-	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/review/request"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の tickets/review/decide と同じ材料を渡し、ダイジェスト・見せる JSON・転記・issue の分け方・コメント・
@@ -140,7 +140,7 @@ func TestTextsMatchPython(t *testing.T) {
 		}
 		return out
 	}(), "record": recordData, "stages": stages}
-	want := pyoracle.Answers[textAnswers](t, "texts", textOracle, in)
+	want := testkit.Answers[textAnswers](t, "texts", textOracle, in)
 
 	check := func(name string, got, wantV any) {
 		t.Helper()

@@ -11,7 +11,7 @@ import (
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/records/wiki"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 func TestDecideLearning(t *testing.T) {
@@ -52,16 +52,16 @@ json.dump([learning_notice.state_path(conf, n).replace(c["root"], "<root>") for 
 func TestLearningStatePath(t *testing.T) {
 	root := t.TempDir()
 	names := []string{"", "学習", "調査", "a b", "a_b", "a:b", "_self", "Foo", "foo", strings.Repeat("長い名前", 20)}
-	want := pyoracle.Answers[[]any](t, "statepath", statePathOracle, map[string]any{"root": root, "names": names})
-	conf := settingsOf(t, root)
+	want := testkit.Answers[[]any](t, "statepath", statePathOracle, map[string]any{"root": root, "names": names})
+	conf := testkit.Settings(t, root)
 	seen := map[string]bool{}
 	var got []any
 	for _, n := range names {
 		p := learningStatePath(conf, n)
-		got = append(got, rel(root, p))
+		got = append(got, testkit.Rel(root, p))
 		seen[p] = true
 	}
-	sameAsPython(t, map[string]any{"paths": got}, map[string]any{"paths": want})
+	testkit.SameJSON(t, map[string]any{"paths": got}, map[string]any{"paths": want})
 	if len(seen) != len(names)-1 || learningStatePath(conf, "Foo") != learningStatePath(conf, "foo") {
 		t.Errorf("名前は大文字小文字だけ違うものを除いて衝突しない: %v", got)
 	}
@@ -73,14 +73,14 @@ func learningRepo(t *testing.T, path string) {
 	if err := os.MkdirAll(path, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	runGit(t, path, "init", "-q", "-b", "main")
-	put(t, filepath.Join(path, "README"), "x\n")
-	commitAll(t, path, "init")
+	testkit.Git(t, path, "init", "-q", "-b", "main")
+	testkit.Put(t, filepath.Join(path, "README"), "x\n")
+	testkit.Commit(t, path, "init")
 	origin := path + ".origin.git"
-	runGit(t, path, "init", "-q", "--bare", origin)
-	runGit(t, path, "remote", "add", "origin", origin)
-	runGit(t, path, "push", "-q", "origin", "main")
-	runGit(t, path, "remote", "set-head", "origin", "main")
+	testkit.Git(t, path, "init", "-q", "--bare", origin)
+	testkit.Git(t, path, "remote", "add", "origin", origin)
+	testkit.Git(t, path, "push", "-q", "origin", "main")
+	testkit.Git(t, path, "remote", "set-head", "origin", "main")
 }
 
 // publish はパターンを書いて統合先へ送る。sources は観測元の数。
@@ -91,12 +91,12 @@ func publish(t *testing.T, path string, sources map[string]int, target string) {
 		for i := range count {
 			ids = append(ids, fmt.Sprintf("s%d", i))
 		}
-		put(t, filepath.Join(path, "docs", "wiki", "patterns", name+".md"), "---\ntype: learning-wiki\ntarget: "+target+
+		testkit.Put(t, filepath.Join(path, "docs", "wiki", "patterns", name+".md"), "---\ntype: learning-wiki\ntarget: "+target+
 			"\nsources: ["+strings.Join(ids, ", ")+"]\ntitle: t\ndescription: d\ntags: [a]\nkeywords: [b]\n---\n\n本文\n")
 	}
-	commitAll(t, path, "wiki")
-	runGit(t, path, "push", "-q", "origin", "main")
-	runGit(t, path, "fetch", "-q", "origin")
+	testkit.Commit(t, path, "wiki")
+	testkit.Git(t, path, "push", "-q", "origin", "main")
+	testkit.Git(t, path, "fetch", "-q", "origin")
 }
 
 const learningOracle = `
@@ -148,16 +148,16 @@ func TestLearningMatchesPython(t *testing.T) {
 		{"again", func(string) {}},
 		{"reached", func(root string) { publish(t, root, map[string]int{"p0": 3}, "docs") }},
 		{"broken", func(root string) {
-			put(t, learningStatePath(settingsOf(t, root), ""), "{broken")
+			testkit.Put(t, learningStatePath(testkit.Settings(t, root), ""), "{broken")
 		}},
 		{"undecidable", func(root string) {
-			runGit(t, filepath.Join(root, "projects", "web"), "remote", "remove", "origin")
+			testkit.Git(t, filepath.Join(root, "projects", "web"), "remote", "remove", "origin")
 		}},
 	}
 	for _, step := range steps {
 		both(step.change)
-		want := pyoracle.Answers[map[string]any](t, "learning-"+step.name, learningOracle, map[string]any{"root": pyRoot})
-		conf := settingsOf(t, goRoot)
+		want := testkit.Answers[map[string]any](t, "learning-"+step.name, learningOracle, map[string]any{"root": pyRoot})
+		conf := testkit.Settings(t, goRoot)
 		text := Learning(conf, goRoot, time.Time{})
 		var states []any
 		for _, name := range []string{"", "web"} {
@@ -168,10 +168,10 @@ func TestLearningMatchesPython(t *testing.T) {
 			}
 			states = append(states, string(data))
 		}
-		sameAsPython(t, map[string]any{"text": text, "states": states}, want)
+		testkit.SameJSON(t, map[string]any{"text": text, "states": states}, want)
 	}
 	t.Setenv(env.Learning, "disable")
-	if text := Learning(settingsOf(t, goRoot), goRoot, time.Time{}); text != "" {
+	if text := Learning(testkit.Settings(t, goRoot), goRoot, time.Time{}); text != "" {
 		t.Errorf("学びの蓄積を止めていれば黙る: %s", text)
 	}
 }

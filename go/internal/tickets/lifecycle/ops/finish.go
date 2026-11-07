@@ -160,7 +160,7 @@ func closeParent(stdout, stderr io.Writer, conf *config.Settings, root string, f
 	if failed := marks.WriteParent(where, found.ID, marks.Closed, pyjson.NewObject("reviews", reviews)); failed != "" {
 		fmt.Fprintf(stderr, "ccnavi: クローズ済みの記録を保存できませんでした: %s\n", failed)
 	}
-	if mark, ok := marks.ReadParent(where, found.ID, marks.Ready); ok && mark.Len() > 0 {
+	if _, ok := marks.ReadFilledParent(where, found.ID, marks.Ready); ok {
 		// ready は印を置いたあとに done/ を退避するので、材料は拾えず案内も空になる。ここに来るのは、退避が途中で
 		// 止まって ready の印が残ったまま、作業中の親を finish したときだけ。
 		io.WriteString(stdout, "Draft は外してある。マージはユーザが行う\n")

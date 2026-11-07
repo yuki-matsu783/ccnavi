@@ -16,11 +16,7 @@ const msgCloseNotice = "テンプレートにするなら、`ready` の前に `"
 // sameShape は計画の形（全体計画とフィードバック計画のステップ）が同じか。取り込み済みかを見るときの比べ方で、
 // フローの本文は比べない（一般化でフローの文も直るので、文まで比べると取り込んだ直後でも同じに読めない）。
 func sameShape(a, b *templates.Template) bool {
-	return slices.EqualFunc(a.Plan, b.Plan, sameItem) && slices.EqualFunc(a.Feedback, b.Feedback, sameItem)
-}
-
-func sameItem(a, b templates.Item) bool {
-	return a.Type == b.Type && a.Review == b.Review && a.Deferred == b.Deferred && slices.Equal(a.After, b.After)
+	return slices.EqualFunc(a.Plan, b.Plan, templates.Item.Equal) && slices.EqualFunc(a.Feedback, b.Feedback, templates.Item.Equal)
 }
 
 // CloseNotice は親が閉じたときに出す、テンプレート化の案内 1 行（末尾の改行つき）。出さないときは空。
@@ -42,7 +38,7 @@ func CloseNotice(conf *config.Settings, root, parent string) string {
 	}
 	t, _ := build(conf, found, children, parent)
 	scanned := templates.Load(conf, root)
-	for _, view := range append([]*templates.LayerRead{scanned.Common}, scanned.Layers...) {
+	for _, view := range scanned.All() {
 		for _, e := range view.Entries {
 			if e.Template != nil && sameShape(e.Template, t) {
 				return ""

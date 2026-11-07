@@ -2,40 +2,22 @@ package standing
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"ccnavi/internal/infra/config"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
-
-func git(t *testing.T, dir string, args ...string) {
-	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
-		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-}
 
 // workspace はワークスペースと、親のワークツリー（フォルダ名 → チェックアウトするブランチ）を作る。
 func workspace(t *testing.T, trees map[string]string) string {
 	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git が無い")
-	}
-	root, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	git(t, root, "init", "-q", "-b", "main")
-	git(t, root, "commit", "-q", "--allow-empty", "-m", "init")
+	root := testkit.GitRoot(t)
+	testkit.Git(t, root, "init", "-q", "-b", "main")
+	testkit.Git(t, root, "commit", "-q", "--allow-empty", "-m", "init")
 	for name, branch := range trees {
-		git(t, root, "worktree", "add", "-q", "-b", branch, filepath.Join(".claude", "worktrees", name))
+		testkit.Git(t, root, "worktree", "add", "-q", "-b", branch, filepath.Join(".claude", "worktrees", name))
 	}
 	return root
 }
@@ -81,7 +63,7 @@ func TestBusyStops(t *testing.T) {
 
 // 文は種別ごとに文面ファイルから引き、見出し（次: ）を外して返す。
 func TestGuidance(t *testing.T) {
-	root := pyoracle.RepoRoot(t)
+	root := testkit.RepoRoot(t)
 	for _, kind := range []StopKind{StopBusy, StopMismatch, StopAmbiguous, StopAbsent, StopNone} {
 		lines := Guidance(root, Standing{Family: "feature-1-x", Kind: kind, Head: "h"})
 		if len(lines) != 1 || lines[0] == "" || strings.HasPrefix(lines[0], "次: ") {

@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -14,43 +13,16 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/tickets/lifecycle/ops"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // 早めに閉じてから Draft を外すまでを、同じ形のワークスペースを 2 つ作って Python と Go に同じ順で打たせ、終了
 // コード・標準出力・標準エラー・置いたファイル（承認済みの領域・wip/・state・退避）が 1 字も違わないことを見る。
 // 順は ready --check と ready（子が開いている）→ close-early（理由なし・変更要求・n・計画・計画の照合 2 つ・
 // 解決前・解決後）→ 親の finish → ready --check → ready → 退避をコミット → ready（打ち直し）→ ready（Draft が
-// 外れた結果）→ ready --check（打ち直し）。git のワークスペースの道具は review/decide と同じ形をここに書く。
+// 外れた結果）→ ready --check（打ち直し）。
 
-const commitDate = "2026-01-05T00:00:00+0000"
 const fixedClock = "2026-01-06T03:04:05+0900"
-
-var gitEnv = []string{"GIT_CONFIG_GLOBAL=" + os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
-	"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
-	"GIT_AUTHOR_DATE=" + commitDate, "GIT_COMMITTER_DATE=" + commitDate}
-
-func runGit(t *testing.T, dir string, args ...string) string {
-	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), gitEnv...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return string(out)
-}
-
-func put(t *testing.T, path, text string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
 
 const phasesCopy = "phases:\n  work:\n    kind: work\n    title: 作業\n    review: true\n    when: 作業の案内\n    scope:\n    - src/*\n    - wip/*\n" +
 	"  impl:\n    kind: work\n    title: 実装\n    review: true\n    when: 実装の案内\n    scope:\n    - src/*\n"
@@ -65,57 +37,43 @@ func childText(id string, phase int, extra string) string {
 // の子はレビュー待ち、フェーズ 2 の子は承認したが未着手。フィードバック計画は無い。親のブランチは push 済み。
 func workspace(t *testing.T) string {
 	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git が無い")
-	}
-	root, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	runGit(t, root, "init", "-q", "-b", "main")
-	put(t, filepath.Join(root, ".gitignore"), "/logs\n/remote.git\n/.ccnavi/messages\n")
-	runGit(t, root, "add", ".gitignore")
-	runGit(t, root, "commit", "-q", "-m", "init")
-	from := filepath.Join(pyoracle.RepoRoot(t), ".ccnavi", "messages")
-	entries, err := os.ReadDir(from)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, e := range entries {
-		data, _ := os.ReadFile(filepath.Join(from, e.Name()))
-		put(t, filepath.Join(root, ".ccnavi", "messages", e.Name()), string(data))
-	}
-	runGit(t, root, "init", "-q", "--bare", filepath.Join(root, "remote.git"))
-	runGit(t, root, "remote", "add", "origin", filepath.Join(root, "remote.git"))
-	runGit(t, root, "worktree", "add", "-q", "-b", "i0001", filepath.Join(".claude", "worktrees", "i0001"), "main")
+	root := testkit.GitRoot(t)
+	testkit.Git(t, root, "init", "-q", "-b", "main")
+	testkit.Put(t, filepath.Join(root, ".gitignore"), "/logs\n/remote.git\n/.ccnavi/messages\n")
+	testkit.Git(t, root, "add", ".gitignore")
+	testkit.Git(t, root, "commit", "-q", "-m", "init")
+	testkit.CopyMessages(t, root)
+	testkit.Git(t, root, "init", "-q", "--bare", filepath.Join(root, "remote.git"))
+	testkit.Git(t, root, "remote", "add", "origin", filepath.Join(root, "remote.git"))
+	testkit.Git(t, root, "worktree", "add", "-q", "-b", "i0001", filepath.Join(".claude", "worktrees", "i0001"), "main")
 	tree := filepath.Join(root, ".claude", "worktrees", "i0001")
-	put(t, filepath.Join(tree, "src", "a.go"), "package a\n")
-	put(t, filepath.Join(tree, "wip", "design", "plan.md"), "d\n")
-	runGit(t, tree, "add", "-A")
-	runGit(t, tree, "commit", "-q", "-m", "child work")
-	merged := strings.TrimSpace(runGit(t, tree, "rev-parse", "HEAD"))
+	testkit.Put(t, filepath.Join(tree, "src", "a.go"), "package a\n")
+	testkit.Put(t, filepath.Join(tree, "wip", "design", "plan.md"), "d\n")
+	testkit.Git(t, tree, "add", "-A")
+	testkit.Git(t, tree, "commit", "-q", "-m", "child work")
+	merged := strings.TrimSpace(testkit.Git(t, tree, "rev-parse", "HEAD"))
 	approved := filepath.Join(tree, ".ccnavi", "approved")
-	put(t, filepath.Join(approved, "doing", "i0001.md"), "---\nversion: 1\nticket: i0001\nmr: 7\nissue: 1\n"+
+	testkit.Put(t, filepath.Join(approved, "doing", "i0001.md"), "---\nversion: 1\nticket: i0001\nmr: 7\nissue: 1\n"+
 		phasesCopy+"plan:\n  - work\n  - impl\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\n"+
 		"allow:\n  - match: Write|Edit\n    glob: \"src/*\"\nstarted_at: \"2026-01-02T00:00:00+0900\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n")
-	put(t, filepath.Join(tree, "wip", "proposals", "review", "i0001-01-01.md"), childText("i0001-01-01", 1,
+	testkit.Put(t, filepath.Join(tree, "wip", "proposals", "review", "i0001-01-01.md"), childText("i0001-01-01", 1,
 		"started_at: \"2026-01-02T00:00:00+0900\"\ncompleted_at: \"2026-01-03T00:00:00+0900\"\nfinished_to: \"review\"\nmerged_sha: \""+merged+"\"\n"))
-	put(t, filepath.Join(approved, "doing", "i0001-02-01.md"), childText("i0001-02-01", 2, "started_at: \"\"\ncompleted_at: \"\"\n"))
-	runGit(t, tree, "add", "-A")
-	runGit(t, tree, "commit", "-q", "-m", "tickets")
-	runGit(t, tree, "push", "-q", "-u", "origin", "i0001")
+	testkit.Put(t, filepath.Join(approved, "doing", "i0001-02-01.md"), childText("i0001-02-01", 2, "started_at: \"\"\ncompleted_at: \"\"\n"))
+	testkit.Git(t, tree, "add", "-A")
+	testkit.Git(t, tree, "commit", "-q", "-m", "tickets")
+	testkit.Git(t, tree, "push", "-q", "-u", "origin", "i0001")
 	mr := `"mr": {"number": 7, "url": "https://h/pr/7", "draft": true}`
 	threads := `[{"id": "d1", "url": "u1", "path": "src/a.go", "line": 1, "body": "指摘 1", "last_id": "c1"},` +
 		`{"id": "d2", "url": "u2", "path": "", "line": 0, "body": "指摘 2\n2 行目", "last_id": "c2"},` +
 		`{"id": "d3", "url": "u3", "resolved": true, "body": "済み"}]`
 	logs := filepath.Join(root, "logs")
-	put(t, filepath.Join(logs, "threads.json"), `{"host": "github", `+mr+`, "threads": `+threads+`, "reviews": []}`)
-	put(t, filepath.Join(logs, "fewer.json"), `{"host": "github", `+mr+`, "threads": [{"id": "d1", "url": "u1", "body": "指摘 1"}], "reviews": []}`)
-	put(t, filepath.Join(logs, "resolved.json"), `{"host": "github", `+mr+`, "threads": `+
+	testkit.Put(t, filepath.Join(logs, "threads.json"), `{"host": "github", `+mr+`, "threads": `+threads+`, "reviews": []}`)
+	testkit.Put(t, filepath.Join(logs, "fewer.json"), `{"host": "github", `+mr+`, "threads": [{"id": "d1", "url": "u1", "body": "指摘 1"}], "reviews": []}`)
+	testkit.Put(t, filepath.Join(logs, "resolved.json"), `{"host": "github", `+mr+`, "threads": `+
 		strings.ReplaceAll(threads, `"last_id"`, `"resolved": true, "last_id"`)+`, "reviews": []}`)
-	put(t, filepath.Join(logs, "changes.json"), `{"host": "github", `+mr+`, "threads": [], `+
+	testkit.Put(t, filepath.Join(logs, "changes.json"), `{"host": "github", `+mr+`, "threads": [], `+
 		`"reviews": [{"state": "CHANGES_REQUESTED", "url": "r/1", "submitted_at": "2026-01-05T02:00:00Z", "author": "rev"}]}`)
-	put(t, filepath.Join(logs, "undrafted.json"), `{"host": "github", "mr": {"number": 7, "url": "https://h/pr/7", "draft": false}, "threads": [], "reviews": []}`)
+	testkit.Put(t, filepath.Join(logs, "undrafted.json"), `{"host": "github", "mr": {"number": 7, "url": "https://h/pr/7", "draft": false}, "threads": [], "reviews": []}`)
 	return root
 }
 
@@ -185,7 +143,7 @@ type flowAnswers struct {
 
 func TestFlowMatchesPython(t *testing.T) {
 	py, golang := workspace(t), workspace(t)
-	want := pyoracle.Answers[flowAnswers](t, "flow", flowOracle, map[string]any{"root": py, "env": gitEnv, "clock": fixedClock})
+	want := testkit.Answers[flowAnswers](t, "flow", flowOracle, map[string]any{"root": py, "env": testkit.GitEnv(), "clock": fixedClock})
 	root := golang
 	// ready の目印はツリーのパスを畳んで書く。
 	rel := func(s string) string {
@@ -215,9 +173,9 @@ func TestFlowMatchesPython(t *testing.T) {
 		})
 	}
 	commit := func(message string) {
-		runGit(t, tree, "add", "-A")
-		runGit(t, tree, "commit", "-q", "-m", message)
-		runGit(t, tree, "push", "-q", "origin", "i0001")
+		testkit.Git(t, tree, "add", "-A")
+		testkit.Git(t, tree, "commit", "-q", "-m", message)
+		testkit.Git(t, tree, "push", "-q", "origin", "i0001")
 	}
 	ready := func(name, result string) {
 		run(name, func(o, e *bytes.Buffer) (int, error) {

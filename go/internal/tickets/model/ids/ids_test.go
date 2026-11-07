@@ -9,12 +9,12 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python・sh・TS が同じ表（tests/fixtures/branch-to-id.json）で変換と採用の可否の一致を確かめる。
 func TestBranchToIDTable(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join(pyoracle.RepoRoot(t), "tests", "fixtures", "branch-to-id.json"))
+	data, err := os.ReadFile(filepath.Join(testkit.RepoRoot(t), "tests", "fixtures", "branch-to-id.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ var idsIssues = [][]any{
 }
 
 func TestIDsMatchPython(t *testing.T) {
-	want := pyoracle.Answers[idsAnswers](t, "ids", idsOracle, map[string]any{"names": idsNames, "issues": idsIssues})
+	want := testkit.Answers[idsAnswers](t, "ids", idsOracle, map[string]any{"names": idsNames, "issues": idsIssues})
 	p := config.DefaultBranchPrefixes
 	got := idsAnswers{}
 	for _, x := range idsNames {

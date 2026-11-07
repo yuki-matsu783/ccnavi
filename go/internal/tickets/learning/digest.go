@@ -17,8 +17,8 @@ import (
 const minRepeated = 2
 
 var (
-	assignment = regexp.MustCompile(`(?s)^[A-Za-z_][A-Za-z0-9_]*=.*$`)
-	plainWord  = regexp.MustCompile(`^[A-Za-z0-9._+-]+$`)
+	assignment = regexp.MustCompile(`(?s)\A[A-Za-z_][A-Za-z0-9_]*=.*\z`)
+	plainWord  = regexp.MustCompile(`\A[A-Za-z0-9._+-]+\z`)
 	pathSep    = regexp.MustCompile(`[/\\]`)
 )
 

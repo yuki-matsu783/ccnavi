@@ -3,32 +3,20 @@ package wap
 import (
 	"bytes"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
 	"ccnavi/internal/infra/config"
+
+	"ccnavi/internal/tickets/testkit"
 )
 
 // tests/ticket/test_write_and_push.py の FamilyTest・SortTest を、CLI を通さずに移したもの。sh の側（ロック・
 // 取り込み・コミット・push）と --record-tree は CLI を通すテストが見る。
 
 const approved = ".ccnavi/approved"
-
-func runGit(t *testing.T, dir string, args ...string) string {
-	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
-		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return string(out)
-}
 
 type fixture struct {
 	t    *testing.T
@@ -39,29 +27,16 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git が無い")
-	}
-	root, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	runGit(t, root, "init", "-q", "-b", "main")
-	runGit(t, root, "commit", "-q", "--allow-empty", "-m", "init")
-	runGit(t, root, "worktree", "add", "-q", "-b", "i0001", filepath.Join(".claude", "worktrees", "i0001"))
-	conf, _ := config.Load(root)
-	return &fixture{t, root, filepath.Join(root, ".claude", "worktrees", "i0001"), conf}
+	root := testkit.GitRoot(t)
+	testkit.Git(t, root, "init", "-q", "-b", "main")
+	testkit.Git(t, root, "commit", "-q", "--allow-empty", "-m", "init")
+	home := testkit.AddWorktree(t, root, "i0001", "main")
+	return &fixture{t, root, home, testkit.Settings(t, root)}
 }
 
 func (f *fixture) put(rel, text string) string {
 	f.t.Helper()
-	path := filepath.Join(f.home, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		f.t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		f.t.Fatal(err)
-	}
+	testkit.Put(f.t, filepath.Join(f.home, filepath.FromSlash(rel)), text)
 	return rel
 }
 
@@ -73,8 +48,7 @@ func (f *fixture) remove(rel string) {
 }
 
 func (f *fixture) commit(message string) {
-	runGit(f.t, f.home, "add", "-A")
-	runGit(f.t, f.home, "commit", "-q", "--allow-empty", "-m", message)
+	testkit.Commit(f.t, f.home, message)
 }
 
 // sort は分けの行を (分け, パス) の名前の順で返す。
@@ -181,7 +155,7 @@ func TestSort(t *testing.T) {
 			f.commit("settle")
 			since := ""
 			if c.since {
-				since = strings.TrimSpace(runGit(t, f.home, "rev-parse", "HEAD"))
+				since = strings.TrimSpace(testkit.Git(t, f.home, "rev-parse", "HEAD"))
 			}
 			want := c.setup(f)
 			if got := f.sort(since); !reflect.DeepEqual(got, want) {
@@ -229,7 +203,7 @@ func TestFamily(t *testing.T) {
 		got["tree"] != nil {
 		t.Errorf("origin が無い: %v", got)
 	}
-	runGit(t, f.root, "remote", "add", "origin", filepath.Join(f.root, "nowhere.git"))
+	testkit.Git(t, f.root, "remote", "add", "origin", filepath.Join(f.root, "nowhere.git"))
 	got = family(t, f, "i0001")
 	want := map[string][]string{
 		"family": {"i0001"}, "repo": {"self"}, "branch": {"i0001"}, "approved": {approved},
@@ -238,13 +212,13 @@ func TestFamily(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("\n got %v\nwant %v", got, want)
 	}
-	runGit(t, f.home, "checkout", "-q", "-b", "elsewhere")
+	testkit.Git(t, f.home, "checkout", "-q", "-b", "elsewhere")
 	got = family(t, f, "i0001")
 	if got["target"][0] != "stop" || !strings.Contains(got["why"][0], "合わない") || len(got["hint"]) == 0 ||
 		got["branch_refused"] == nil {
 		t.Errorf("別のブランチ: %v", got)
 	}
-	runGit(t, f.root, "worktree", "remove", "--force", f.home)
+	testkit.Git(t, f.root, "worktree", "remove", "--force", f.home)
 	if got = family(t, f, "i0001"); got["target"][0] != "stop" || !strings.Contains(got["why"][0], "親のワークツリー") {
 		t.Errorf("親のワークツリーが無い: %v", got)
 	}
@@ -271,5 +245,19 @@ func TestOneLine(t *testing.T) {
 	got := []string{oneLine(" a \t b\n\x1cc "), oneLine("")}
 	if want := []string{"a b c", ""}; !reflect.DeepEqual(got, want) {
 		t.Errorf("%q", got)
+	}
+}
+
+// 回帰: Python の search の `$` は末尾の改行 1 つの前でも当たる。Go の `$` に写したときは、パスの末尾が改行の
+// 書きかけ（`.part`・`flows/.*.tmp`・`.ccnavi-sync`）を一時ファイルと見ずに分けていた。
+func TestTempLikePython(t *testing.T) {
+	for rel, want := range map[string]bool{
+		".x.part": true, "a/.x.part\n": true, "a/.x.part\n\n": false,
+		"flows/.f.tmp": true, "a/flows/.f.tmp\n": true, "flows/.f.tmp\n\n": false,
+		"x.ccnavi-sync": true, "x.ccnavi-sync\n": true, "x.ccnavi-sync\n\n": false, "x.ccnavi-syncs": false, "a.part": false,
+	} {
+		if got := temp.MatchString(rel); got != want {
+			t.Errorf("temp(%q) = %v, want %v", rel, got, want)
+		}
 	}
 }

@@ -1,5 +1,3 @@
-// Package yamlval は計画のステップの書き戻す形（PlanItem.Raw の JSON の形）を、yaml.Dump と yaml.Equal に渡せる
-// YAML の値にする。
 package yamlval
 
 import (

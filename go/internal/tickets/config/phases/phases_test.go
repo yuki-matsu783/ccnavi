@@ -11,8 +11,8 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/policy/rules"
-	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/model/ticket"
+	"ccnavi/internal/tickets/testkit"
 )
 
 func parsed(t *testing.T, lines ...string) *ticket.Ticket {
@@ -28,7 +28,7 @@ func parsed(t *testing.T, lines ...string) *ticket.Ticket {
 
 // 計画と先行関係の見本の表（tests/fixtures/plan-waits.json）。決まりを直すときは表も一緒に直す。
 func TestPlanWaitsFixture(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(pyoracle.RepoRoot(t), "tests", "fixtures", "plan-waits.json"))
+	raw, err := os.ReadFile(filepath.Join(testkit.RepoRoot(t), "tests", "fixtures", "plan-waits.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,17 +81,6 @@ func TestWorkflowIsComputedOnlyWhenMissing(t *testing.T) {
 	}
 }
 
-func write(t *testing.T, path, text string) string {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
 func idsOf(types *Types) []string {
 	var out []string
 	for p := range types.All() {
@@ -108,11 +97,11 @@ func TestLayerTypes(t *testing.T) {
 	if types, notes := LayerTypes(conf, root, ""); types != nil || notes != nil {
 		t.Errorf("無いのに %v %v", idsOf(types), notes)
 	}
-	write(t, conf.Phases, defs("  a: {title: A}", "  b: {title: B}"))
+	testkit.Put(t, conf.Phases, defs("  a: {title: A}", "  b: {title: B}"))
 	if got := idsOf(LoadTypes(conf, root, "")); !reflect.DeepEqual(got, []string{"a@common", "b@common"}) {
 		t.Errorf("共通だけ %v", got)
 	}
-	write(t, layer, defs("  a: {title: A}", "  c: {title: B}", "  d: {title: D}"))
+	testkit.Put(t, layer, defs("  a: {title: A}", "  c: {title: B}", "  d: {title: D}"))
 	types, notes := LayerTypes(conf, root, "")
 	if got := idsOf(types); !reflect.DeepEqual(got, []string{"a@common", "b@common", "d@self"}) {
 		t.Errorf("和 %v", got)
@@ -125,14 +114,14 @@ func TestLayerTypes(t *testing.T) {
 		t.Error("予約名にパスがある")
 	}
 	// 壊れたレイヤーは空として扱い、そのレイヤーの苦情を返す。
-	write(t, layer, "version: 1\nphases: [\n")
+	testkit.Put(t, layer, "version: 1\nphases: [\n")
 	types, notes = LayerTypes(conf, root, "")
 	if got := idsOf(types); !reflect.DeepEqual(got, []string{"a@common", "b@common"}) || len(notes) != 1 {
 		t.Errorf("壊れたレイヤー %v %v", got, notes)
 	}
 	// 共通レイヤーが壊れていれば、レイヤーの定義だけを使う（共通レイヤーの苦情は返さない）。
-	write(t, conf.Phases, "\xff")
-	write(t, layer, defs("  d: {}"))
+	testkit.Put(t, conf.Phases, "\xff")
+	testkit.Put(t, layer, defs("  d: {}"))
 	types, notes = LayerTypes(conf, root, "")
 	if got := idsOf(types); !reflect.DeepEqual(got, []string{"d@self"}) || len(notes) != 0 {
 		t.Errorf("壊れた共通 %v %v", got, notes)

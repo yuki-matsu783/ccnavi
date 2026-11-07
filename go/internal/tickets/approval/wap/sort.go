@@ -35,10 +35,10 @@ const (
 
 var (
 	// temp は書きかけの一時ファイル（fsio の `.<名前>.<一意>.part.*`、フローの保存の `flows/.*.tmp`、
-	// configsync の `*.ccnavi-sync`）。
-	temp = regexp.MustCompile(`(^|/)\.[^/]*\.part(\.[^/]*)?$|(^|/)flows/\.[^/]*\.tmp$|\.ccnavi-sync$`)
+	// configsync の `*.ccnavi-sync`）。Python の search の `$` は末尾の改行 1 つの前でも当たるので `\n?\z` にする。
+	temp = regexp.MustCompile(`(?:(?:\A|/)\.[^/]*\.part(?:\.[^/]*)?|(?:\A|/)flows/\.[^/]*\.tmp|\.ccnavi-sync)\n?\z`)
 	// number はマーカーのフェーズ番号（ASCII の数字だけ。全角の数字は通さない）。
-	number = regexp.MustCompile(`^[0-9]+$`)
+	number = regexp.MustCompile(`\A[0-9]+\z`)
 	// hookFields は hook の告知が置くマーカーの欄。これ以外の欄があれば (b) にしない。
 	hookFields = map[string]bool{"at": true, "review": true, "source": true, "deferred_to": true, "tickets": true}
 	// humanMarkNames はユーザの判断が書く親ごとのマーカー（受け入れ台帳は reviewed と一緒に書かれる）。

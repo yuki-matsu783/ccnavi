@@ -9,7 +9,6 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -23,6 +22,7 @@ import (
 	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/config/layer"
+	"ccnavi/internal/tickets/model/ids"
 )
 
 // Version は risks.yml の版。
@@ -39,22 +39,16 @@ const (
 )
 
 // Escalates は、宣言（定義の review: false・子の required: false）に関わらずレビューが要る扱いにするリスク
-// レベルか。実績で宣言を厳しい側にだけ上書きする。記録から読んだ文字列をそのまま渡してよい。
-func Escalates(level string) bool {
-	return level == string(High) || level == string(Critical)
-}
+// レベルか。実績で宣言を厳しい側にだけ上書きする。記録から読んだ文字列を Level にして渡してよい。
+func Escalates(level Level) bool { return level == High || level == Critical }
+
+// key は levels の欄の名前（レベルの小文字）。Low は書いてもよいが読まない。
+func (l Level) key() string { return strings.ToLower(string(l)) }
 
 // levels の欄の名前と既定の閾値。
-const (
-	levelMedium   = "medium"
-	levelHigh     = "high"
-	levelCritical = "critical"
-	levelLow      = "low" // 書いてもよいが読まない名前
-)
+var levelNames = []string{Medium.key(), High.key(), Critical.key()}
 
-var levelNames = []string{levelMedium, levelHigh, levelCritical}
-
-var defaultLevels = map[string]int{levelMedium: 20, levelHigh: 40, levelCritical: 70}
+var defaultLevels = map[string]int{Medium.key(): 20, High.key(): 40, Critical.key(): 70}
 
 // Kind は加点条件の種類。
 type Kind string
@@ -86,8 +80,6 @@ const (
 // ScriptHomes は共通レイヤーの script: を置いてよい場所（ワークスペースルートからの相対の先頭）。guard の内側。
 // エージェントが書ける場所のスクリプトを許すと、自分のリスクを自分で決められる。
 var ScriptHomes = []string{config.DefaultProjectHome + "/" + config.CommonDir + "/" + config.ScriptsDir + "/"}
-
-var idPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 
 // Factor は加点の項目 1 つ。
 type Factor struct {
@@ -249,7 +241,7 @@ type Thresholds struct{ Medium, High, Critical int }
 
 // Object は JSON に載せる形（{"medium", "high", "critical"}）。
 func (t Thresholds) Object() *pyjson.Object {
-	return pyjson.NewObject(levelMedium, t.Medium, levelHigh, t.High, levelCritical, t.Critical)
+	return pyjson.NewObject(Medium.key(), t.Medium, High.key(), t.High, Critical.key(), t.Critical)
 }
 
 // EffectiveLevels は書かれた閾値に既定を足した、実際に使われる閾値。
@@ -260,7 +252,7 @@ func EffectiveLevels(levels map[string]int) Thresholds {
 		}
 		return defaultLevels[name]
 	}
-	return Thresholds{get(levelMedium), get(levelHigh), get(levelCritical)}
+	return Thresholds{get(Medium.key()), get(High.key()), get(Critical.key())}
 }
 
 func ordered(levels map[string]int) bool {
@@ -389,7 +381,7 @@ func Parse(text, where string, homes []string) (*Definition, []rules.Problem) {
 		var unknown []string
 		for k := range written.All() {
 			name := pyfmt.Str(k)
-			if _, isString := k.(string); isString && (contains(levelNames, name) || name == levelLow) {
+			if _, isString := k.(string); isString && (contains(levelNames, name) || name == Low.key()) {
 				continue
 			}
 			unknown = append(unknown, name)
@@ -458,7 +450,7 @@ func readFactors(raw []any, where string, homes []string) ([]*Factor, []rules.Pr
 				i, rules.IDSeparator, rules.IDSeparator, rules.IDSeparator)))
 			continue
 		}
-		if !idPattern.MatchString(id) {
+		if !ids.IsValidName(id) {
 			problems = append(problems, problem(rules.Error, where, fmt.Sprintf("`factors[%d].id` が無いか形が違う", i)))
 			continue
 		}

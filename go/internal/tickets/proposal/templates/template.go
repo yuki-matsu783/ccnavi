@@ -53,12 +53,12 @@ type Item struct {
 	After    []int
 }
 
-// plain は型の名前だけで書けるか（`- design`）。
-func (i Item) plain() bool { return !i.Review.Said() && !i.Deferred && len(i.After) == 0 }
+// Plain は型の名前だけで書けるか（`- design`）。
+func (i Item) Plain() bool { return !i.Review.Said() && !i.Deferred && len(i.After) == 0 }
 
 // asData は書き戻せる形。offset は After に足す数（提案の絶対番号に直すとき）。
 func (i Item) asData(offset int) any {
-	if i.plain() {
+	if i.Plain() {
 		return i.Type
 	}
 	out := &yaml.Map{}
@@ -79,7 +79,8 @@ func (i Item) asData(offset int) any {
 	return out
 }
 
-func (i Item) equal(o Item) bool {
+// Equal は 4 つの欄が同じか（Python の dataclass の ==）。
+func (i Item) Equal(o Item) bool {
 	return i.Type == o.Type && i.Review == o.Review && i.Deferred == o.Deferred && slices.Equal(i.After, o.After)
 }
 

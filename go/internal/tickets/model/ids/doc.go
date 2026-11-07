@@ -4,6 +4,7 @@
 // 識別子の字の集合（IDChars）は、拡張（TS）と sh（ccnavi-branches.sh の jq）が写している。変えるなら両方を直す。
 //
 // Python からの対応: ticket_ids をそのまま移した。id_problem → IDProblem、is_valid_id → IsValidID、
+// is_valid_name → IsValidName（リスクとフェーズの定義・テンプレートの名前の形もこれで見る）、
 // child_pattern().match → ParseChild、child_id → ChildID、child_tail_pattern().search → HasChildTail、
 // form_of → FormOf、direct_name_warning → DirectNameWarning、identifier_number → IdentifierNumber、
 // next_serial → NextSerial、issue_identifier_parts → IssueIdentifier（ValueError は error）、branch_to_id →

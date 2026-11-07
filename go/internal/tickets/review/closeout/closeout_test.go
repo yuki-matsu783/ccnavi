@@ -3,7 +3,6 @@ package closeout
 import (
 	"bytes"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,6 +10,8 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/tickets/model/archive"
 	"ccnavi/internal/tickets/model/ticket"
+
+	"ccnavi/internal/tickets/testkit"
 )
 
 func closedText(name string) string {
@@ -21,19 +22,11 @@ func closedText(name string) string {
 
 // 回帰: ワークスペースルートの承認済みの領域から退避しない（done/ には他の親子のチケットも在り、まとめて消す）。
 func TestArchiveRefusesTheWorkspaceRoot(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git が無い")
-	}
-	root, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if out, err := exec.Command("git", "init", "-q", "-b", "main", root).CombinedOutput(); err != nil {
-		t.Fatalf("%v %s", err, out)
-	}
+	root := testkit.GitRoot(t)
+	testkit.Git(t, root, "init", "-q", "-b", "main")
 	approved := filepath.Join(root, ".ccnavi", "approved")
 	for _, name := range []string{"i0001", "other"} {
-		put(t, filepath.Join(approved, "done", name+".md"), closedText(name))
+		testkit.Put(t, filepath.Join(approved, "done", name+".md"), closedText(name))
 	}
 	conf, _ := config.Load(root)
 	parent, _ := ticket.Parse(closedText("i0001"))

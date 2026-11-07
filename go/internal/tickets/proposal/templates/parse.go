@@ -2,7 +2,6 @@ package templates
 
 import (
 	"fmt"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -12,13 +11,12 @@ import (
 	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/flow"
+	"ccnavi/internal/tickets/model/ids"
 	"ccnavi/internal/tickets/model/ticket"
 )
 
 // NameLimit は名前の長さの上限。名前はファイル名になるので、区切りも空白も入れない。
 const NameLimit = 64
-
-var namePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 
 // windowsReserved は Windows でファイル名にできない予約名（拡張子が付いても同じ）。新しく作る名前だけを断り、
 // 置いてあるファイルの読み込みは断らない。
@@ -33,7 +31,7 @@ var windowsReserved = func() map[string]bool {
 
 // validName は名前の形か。Python の re の `$` は末尾の改行 1 つの前でも当たるので、それも通す。
 func validName(name string) bool {
-	return namePattern.MatchString(strings.TrimSuffix(name, "\n")) && len([]rune(name)) <= NameLimit
+	return ids.IsValidName(strings.TrimSuffix(name, "\n")) && len([]rune(name)) <= NameLimit
 }
 
 // NewNameProblem は新しく作るテンプレートの名前を断る理由。通れば空。読み込みと同じ形に加えて、末尾の `.` と

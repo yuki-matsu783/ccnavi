@@ -86,6 +86,11 @@ func ReadParent(approvedDir, parent string, name Parent) (*pyjson.Object, bool) 
 	return fsio.ReadObject(ParentPath(approvedDir, parent, name))
 }
 
+// ReadFilledParent は中身のある親ごとのマーカー。無い・読めない・空のマップなら偽（Python の `if read_parent(…)`）。
+func ReadFilledParent(approvedDir, parent string, name Parent) (*pyjson.Object, bool) {
+	return filled(ReadParent(approvedDir, parent, name))
+}
+
 // WriteParent は親ごとのマーカーを書く（at が無ければ今の時刻を足す）。書けなければ理由。
 func WriteParent(approvedDir, parent string, name Parent, data *pyjson.Object) string {
 	return writeJSON(ParentPath(approvedDir, parent, name), stamped(data), fsio.JSONIndentOne)
@@ -100,6 +105,13 @@ func RecordPath(approvedDir, parent, child string, kind Record) string {
 func ReadRecord(approvedDir, parent, child string, kind Record) (*pyjson.Object, bool) {
 	return fsio.ReadObject(RecordPath(approvedDir, parent, child, kind))
 }
+
+// ReadFilledRecord は中身のある子ごとの記録。無い・読めない・空のマップなら偽。
+func ReadFilledRecord(approvedDir, parent, child string, kind Record) (*pyjson.Object, bool) {
+	return filled(ReadRecord(approvedDir, parent, child, kind))
+}
+
+func filled(data *pyjson.Object, ok bool) (*pyjson.Object, bool) { return data, ok && data.Len() > 0 }
 
 // WriteRecord は子ごとの記録を書く（時刻は足さない）。書けなければ理由。
 func WriteRecord(approvedDir, parent, child string, kind Record, data *pyjson.Object) string {

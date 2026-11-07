@@ -11,7 +11,7 @@ import (
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/lifecycle/stop"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の tickets/lifecycle/stop_integrate と同じワークスペースを 2 つ作って、直接作業のワークツリーごとに
@@ -83,51 +83,51 @@ var candidates = [][]any{{"clean", 4}, {"gone", 3}, {"i0001", 2}, {"scratch", 1}
 //	feat    origin に同じ名前のブランチがある（親のブランチのワークツリー）
 //	away    記録の取り込み先と、ユーザのチェックアウトのブランチが違う
 func integrateWorkspace(t *testing.T) string {
-	root := workspace(t)
+	root := clock.Workspace(t)
 	remote := filepath.Join(t.TempDir(), "remote.git")
-	runGit(t, root, "init", "-q", "--bare", remote)
-	runGit(t, root, "remote", "add", "origin", remote)
-	runGit(t, root, "push", "-q", "origin", "main")
-	runGit(t, root, "remote", "set-head", "origin", "main")
-	snap := strings.TrimSpace(runGit(t, root, "rev-parse", "HEAD"))
+	clock.Git(t, root, "init", "-q", "--bare", remote)
+	clock.Git(t, root, "remote", "add", "origin", remote)
+	clock.Git(t, root, "push", "-q", "origin", "main")
+	clock.Git(t, root, "remote", "set-head", "origin", "main")
+	snap := strings.TrimSpace(clock.Git(t, root, "rev-parse", "HEAD"))
 	gitDir := filepath.Join(root, ".git")
 	commit := func(name, file string) {
-		put(t, filepath.Join(worktree(root, name), "src", file), file+"\n")
-		commitAll(t, worktree(root, name), file)
+		testkit.Put(t, filepath.Join(testkit.Worktree(root, name), "src", file), file+"\n")
+		commitAll(t, testkit.Worktree(root, name), file)
 	}
 	record := func(name string, lines ...string) {
-		put(t, filepath.Join(gitDir, "ccnavi-direct", name), strings.Join(lines, "\n")+"\n")
+		testkit.Put(t, filepath.Join(gitDir, "ccnavi-direct", name), strings.Join(lines, "\n")+"\n")
 	}
 	full := []string{"version 4", "base_branch main", "snap_sha " + snap, "common_dir " + gitDir}
 	for _, name := range directNames {
-		addWorktree(t, root, name, "main")
+		testkit.AddWorktree(t, root, name, "main")
 	}
 	commit("scratch", "a")
 	commit("dirty1", "b")
-	put(t, filepath.Join(worktree(root, "dirty1"), "new.txt"), "n\n")
+	testkit.Put(t, filepath.Join(testkit.Worktree(root, "dirty1"), "new.txt"), "n\n")
 	commit("rec", "c")
 	record("rec", full...)
-	runGit(t, root, "branch", "-q", "ahead", "main")
-	put(t, filepath.Join(root, "ahead.txt"), "x\n")
-	runGit(t, root, "add", "ahead.txt")
-	runGit(t, root, "commit", "-q", "-m", "ahead")
-	runGit(t, root, "update-ref", "refs/remotes/origin/main", "HEAD")
-	runGit(t, root, "reset", "-q", "--hard", snap)
+	clock.Git(t, root, "branch", "-q", "ahead", "main")
+	testkit.Put(t, filepath.Join(root, "ahead.txt"), "x\n")
+	clock.Git(t, root, "add", "ahead.txt")
+	clock.Git(t, root, "commit", "-q", "-m", "ahead")
+	clock.Git(t, root, "update-ref", "refs/remotes/origin/main", "HEAD")
+	clock.Git(t, root, "reset", "-q", "--hard", snap)
 	commit("broken", "d")
 	record("broken", "version 4", "base_branch main")
 	commit("mk", "e")
 	record("mk", full...)
-	put(t, filepath.Join(gitDir, RecordDir, "mk", "marker"), "version 3\n")
+	testkit.Put(t, filepath.Join(gitDir, RecordDir, "mk", "marker"), "version 3\n")
 	commit("v4m", "f")
-	put(t, filepath.Join(gitDir, RecordDir, "v4m", "marker"), "version 4\n")
+	testkit.Put(t, filepath.Join(gitDir, RecordDir, "v4m", "marker"), "version 4\n")
 	commit("donec", "g")
-	head := strings.TrimSpace(runGit(t, worktree(root, "donec"), "rev-parse", "HEAD"))
-	put(t, filepath.Join(gitDir, DoneDir, "donec"), "state staged\nbranch_sha "+head+"\n")
+	head := strings.TrimSpace(clock.Git(t, testkit.Worktree(root, "donec"), "rev-parse", "HEAD"))
+	testkit.Put(t, filepath.Join(gitDir, DoneDir, "donec"), "state staged\nbranch_sha "+head+"\n")
 	commit("i0001", "h")
-	put(t, filepath.Join(root, "wip", "proposals", "todo", "I0001.md"), "---\nticket: i0001\n---\n")
-	runGit(t, worktree(root, "wb"), "checkout", "-q", "-b", "other")
+	testkit.Put(t, filepath.Join(root, "wip", "proposals", "todo", "I0001.md"), "---\nticket: i0001\n---\n")
+	clock.Git(t, testkit.Worktree(root, "wb"), "checkout", "-q", "-b", "other")
 	commit("feat", "i")
-	runGit(t, worktree(root, "feat"), "push", "-q", "origin", "feat")
+	clock.Git(t, testkit.Worktree(root, "feat"), "push", "-q", "origin", "feat")
 	commit("away", "j")
 	record("away", "version 4", "base_branch develop", "snap_sha "+snap, "common_dir "+gitDir)
 	return root
@@ -135,9 +135,9 @@ func integrateWorkspace(t *testing.T) string {
 
 func TestMatchesPython(t *testing.T) {
 	pyRoot, goRoot := integrateWorkspace(t), integrateWorkspace(t)
-	want := pyoracle.Answers[map[string]any](t, "integrate", integrateOracle,
+	want := testkit.Answers[map[string]any](t, "integrate", integrateOracle,
 		map[string]any{"root": pyRoot, "names": directNames, "candidates": candidates})
-	conf := settingsOf(t, goRoot)
+	conf := testkit.Settings(t, goRoot)
 	rel := func(s string) string { return strings.ReplaceAll(s, goRoot, "<root>") }
 	direct := func(d *Direct) any {
 		if d == nil {
@@ -148,7 +148,7 @@ func TestMatchesPython(t *testing.T) {
 	}
 	trees := map[string]any{}
 	for _, name := range directNames {
-		here, ok := tree.TreeOf(goRoot, worktree(goRoot, name), conf.Projects)
+		here, ok := tree.TreeOf(goRoot, testkit.Worktree(goRoot, name), conf.Projects)
 		if !ok {
 			t.Fatal(name)
 		}
@@ -191,10 +191,10 @@ func TestMatchesPython(t *testing.T) {
 	path := filepath.Join(conf.State, "direct-s1.json")
 	var entries []any
 	for _, c := range candidates {
-		entries = append(entries, map[string]any{"name": c[0], "path": worktree(goRoot, c[0].(string)), "seen": c[1], "checked": 0})
+		entries = append(entries, map[string]any{"name": c[0], "path": testkit.Worktree(goRoot, c[0].(string)), "seen": c[1], "checked": 0})
 	}
 	data, _ := json.Marshal(map[string]any{"session": "s1", "entries": entries})
-	put(t, path, string(data))
+	testkit.Put(t, path, string(data))
 	first := DirectAtStop(conf, goRoot, goRoot, "s1", time.Time{})
 	var left []any
 	var saved struct {
@@ -219,7 +219,7 @@ func TestMatchesPython(t *testing.T) {
 		"left":        left,
 		"remember":    remember,
 		"again":       direct(DirectAtStop(conf, goRoot, goRoot, "s1", time.Time{})),
-		"here":        direct(DirectAtStop(conf, goRoot, worktree(goRoot, "dirty1"), "", time.Time{})),
+		"here":        direct(DirectAtStop(conf, goRoot, testkit.Worktree(goRoot, "dirty1"), "", time.Time{})),
 	}
-	sameAsPython(t, got, want)
+	testkit.SameJSON(t, got, want)
 }

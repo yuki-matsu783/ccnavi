@@ -14,8 +14,8 @@ import (
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/approval/marks"
 	"ccnavi/internal/tickets/approval/wap"
-	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/model/ticket"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の tickets/approval と同じワークスペースを読ませ、置き場の読み・信頼できない理由・先行・続きの子・
@@ -134,43 +134,43 @@ const fixedClock = "2026-01-02T03:04:05+0900"
 // 信頼できない形（中身の矛盾・計画に無い番号・親のワークツリーの外・読めない・識別子違い）と、先行の状態
 // （作業中・取り消し・自分・親・循環・無い）、正とするツリーの外に残った提案を作る。
 func oracleWorkspace(t *testing.T) string {
-	root := workspace(t, "i0001", "i0001-01-01")
-	runGit(t, root, "remote", "add", "origin", filepath.Join(root, "nowhere.git"))
-	home := worktree(root, "i0001")
+	root := testkit.Workspace(t, "i0001", "i0001-01-01")
+	testkit.Git(t, root, "remote", "add", "origin", filepath.Join(root, "nowhere.git"))
+	home := testkit.Worktree(root, "i0001")
 	doing := filepath.Join(home, ".ccnavi", "approved", "doing")
 	done := filepath.Join(home, ".ccnavi", "approved", "done")
-	put(t, filepath.Join(doing, "i0001.md"), parentText("i0001", "  - research", "  - {type: design, after: [1]}"))
-	put(t, filepath.Join(doing, "i0001-01-01.md"), childText("i0001-01-01", "i0001", "1", "wip/research/*",
+	testkit.Put(t, filepath.Join(doing, "i0001.md"), parentText("i0001", "  - research", "  - {type: design, after: [1]}"))
+	testkit.Put(t, filepath.Join(doing, "i0001-01-01.md"), childText("i0001-01-01", "i0001", "1", "wip/research/*",
 		`started_at: "2026-01-01T00:00:00+0900"`, `base_sha: "abc"`))
-	put(t, filepath.Join(doing, "i0001-02-01.md"), childText("i0001-02-01", "i0001", "2", "wip/design/*",
+	testkit.Put(t, filepath.Join(doing, "i0001-02-01.md"), childText("i0001-02-01", "i0001", "2", "wip/design/*",
 		"predecessors: [i0001-01-01]"))
-	put(t, filepath.Join(doing, "i0001-01-02.md"), childText("i0001-01-02", "i0001", "1", "wip/research/a/*",
+	testkit.Put(t, filepath.Join(doing, "i0001-01-02.md"), childText("i0001-01-02", "i0001", "1", "wip/research/a/*",
 		`base_sha: "abc"`))
-	put(t, filepath.Join(doing, "i0001-05-01.md"), childText("i0001-05-01", "i0001", "5", "wip/design/*"))
-	put(t, filepath.Join(doing, "i0001-02-02.md"), childText("i0001-02-02", "i0001", "2", "wip/design/*",
+	testkit.Put(t, filepath.Join(doing, "i0001-05-01.md"), childText("i0001-05-01", "i0001", "5", "wip/design/*"))
+	testkit.Put(t, filepath.Join(doing, "i0001-02-02.md"), childText("i0001-02-02", "i0001", "2", "wip/design/*",
 		"predecessors: [i0001-01-03, i0001-02-02, i0001, i0001-09-01, i0001-01-03]"))
-	put(t, filepath.Join(doing, "i0001-02-03.md"), childText("i0001-02-03", "i0001", "2", "wip/design/*",
+	testkit.Put(t, filepath.Join(doing, "i0001-02-03.md"), childText("i0001-02-03", "i0001", "2", "wip/design/*",
 		"predecessors: [i0001-02-04]"))
-	put(t, filepath.Join(doing, "i0001-02-04.md"), childText("i0001-02-04", "i0001", "2", "wip/design/*",
+	testkit.Put(t, filepath.Join(doing, "i0001-02-04.md"), childText("i0001-02-04", "i0001", "2", "wip/design/*",
 		"predecessors: [i0001-02-03]"))
-	put(t, filepath.Join(doing, "bad.md"), "not a ticket\n")
-	put(t, filepath.Join(doing, "i0001-01-07.md"), childText("i0001-01-08", "i0001", "1", "wip/research/*"))
-	put(t, filepath.Join(doing, ".i0001.md.abc.part"), "x")
-	put(t, filepath.Join(done, "i0001-01-03.md"), childText("i0001-01-03", "i0001", "1", "wip/research/*",
+	testkit.Put(t, filepath.Join(doing, "bad.md"), "not a ticket\n")
+	testkit.Put(t, filepath.Join(doing, "i0001-01-07.md"), childText("i0001-01-08", "i0001", "1", "wip/research/*"))
+	testkit.Put(t, filepath.Join(doing, ".i0001.md.abc.part"), "x")
+	testkit.Put(t, filepath.Join(done, "i0001-01-03.md"), childText("i0001-01-03", "i0001", "1", "wip/research/*",
 		`completed_at: "2026-01-01T00:00:00+0900"`, `cancelled_at: "2026-01-01T00:00:00+0900"`, "cancel_reason: r"))
-	put(t, filepath.Join(home, "wip", "proposals", "review", "i0001-01-04.md"), childText("i0001-01-04", "i0001", "1",
+	testkit.Put(t, filepath.Join(home, "wip", "proposals", "review", "i0001-01-04.md"), childText("i0001-01-04", "i0001", "1",
 		"wip/research/*", `completed_at: "2026-01-01T00:00:00+0900"`))
-	put(t, filepath.Join(home, "wip", "proposals", "review", "i0001-01-05.md"), childText("i0001-01-05", "i0001", "1",
+	testkit.Put(t, filepath.Join(home, "wip", "proposals", "review", "i0001-01-05.md"), childText("i0001-01-05", "i0001", "1",
 		"wip/research/*"))
-	put(t, filepath.Join(home, ".ccnavi", "approved", "phases", "i0001", "2.pending"), `{"review": true, "at": "t"}`)
-	put(t, filepath.Join(home, ".ccnavi", "approved", "phases", "i0001", "i0001-01-01.judge.json"), "{}")
+	testkit.Put(t, filepath.Join(home, ".ccnavi", "approved", "phases", "i0001", "2.pending"), `{"review": true, "at": "t"}`)
+	testkit.Put(t, filepath.Join(home, ".ccnavi", "approved", "phases", "i0001", "i0001-01-01.judge.json"), "{}")
 	// 正とするツリー（親のワークツリー）の外のコピー。
-	put(t, filepath.Join(root, ".ccnavi", "approved", "doing", "i0001-01-01.md"), childText("i0001-01-01", "i0001", "1", "src/*"))
-	put(t, filepath.Join(root, ".ccnavi", "approved", "doing", "i0001-01-09.md"), childText("i0001-01-09", "i0001", "1", "wip/research/*"))
+	testkit.Put(t, filepath.Join(root, ".ccnavi", "approved", "doing", "i0001-01-01.md"), childText("i0001-01-01", "i0001", "1", "src/*"))
+	testkit.Put(t, filepath.Join(root, ".ccnavi", "approved", "doing", "i0001-01-09.md"), childText("i0001-01-09", "i0001", "1", "wip/research/*"))
 	// 提案。親のワークツリーの改版と、ワークスペースルートに残った計画の違う版。
-	put(t, filepath.Join(home, "wip", "proposals", "todo", "i0001.md"), parentText("i0001", "  - research"))
-	put(t, filepath.Join(root, "wip", "proposals", "todo", "i0001.md"), parentText("i0001", "  - design"))
-	put(t, filepath.Join(root, "wip", "proposals", "todo", "i0002.md"), parentText("i0002", "  - research"))
+	testkit.Put(t, filepath.Join(home, "wip", "proposals", "todo", "i0001.md"), parentText("i0001", "  - research"))
+	testkit.Put(t, filepath.Join(root, "wip", "proposals", "todo", "i0001.md"), parentText("i0001", "  - design"))
+	testkit.Put(t, filepath.Join(root, "wip", "proposals", "todo", "i0002.md"), parentText("i0002", "  - research"))
 	return root
 }
 
@@ -186,10 +186,10 @@ func TestMatchesPython(t *testing.T) {
 	cleared := marks.Clear(goDir, "i0001", 2, nil)
 	restore()
 
-	want := pyoracle.Answers[approvalAnswers](t, "approval", approvalOracle,
+	want := testkit.Answers[approvalAnswers](t, "approval", approvalOracle,
 		map[string]string{"root": root, "py": pyDir, "go": goDir, "clock": fixedClock})
 	rel := func(s string) string { return strings.ReplaceAll(s, root, "<root>") }
-	conf := settingsOf(t, root)
+	conf := testkit.Settings(t, root)
 	raw := ReadRaw(conf, root)
 	opened, notes := Scan(conf, root, false, raw)
 	closed, cnotes := Scan(conf, root, true, raw)

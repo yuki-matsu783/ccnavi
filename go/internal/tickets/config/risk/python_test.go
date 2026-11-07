@@ -9,7 +9,7 @@ import (
 
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/policy/rules"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の risk（parse・merge・evaluate・judge_prompt）と突き合わせる。配点は承認の判定（HIGH 以上は宣言に
@@ -286,7 +286,7 @@ func judgementsOf(t *testing.T, raw map[string]any) *pyjson.Object {
 func TestPythonRisk(t *testing.T) {
 	in := map[string]any{"defs": riskDefCases, "merges": riskMergeCases, "scores": scoreCases,
 		"homes": layerHomes, "points": riskPoints}
-	want := pyoracle.Answers[riskAnswers](t, "risk", riskOracle, in)
+	want := testkit.Answers[riskAnswers](t, "risk", riskOracle, in)
 	for i, text := range riskDefCases {
 		d, problems := Parse(text, Where, layerHomes)
 		same(t, "def "+strconv.Itoa(i), riskDefRow{probs(problems), show(d)}, want.Defs[i])

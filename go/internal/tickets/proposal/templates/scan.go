@@ -93,7 +93,8 @@ func (s *Scan) Layer(name string) *LayerRead {
 	return nil
 }
 
-func (s *Scan) all() []*LayerRead { return append([]*LayerRead{s.Common}, s.Layers...) }
+// All は共通レイヤーと、続くレイヤーの読み（この順）。
+func (s *Scan) All() []*LayerRead { return append([]*LayerRead{s.Common}, s.Layers...) }
 
 // Relative は root からの相対（/ 区切り）。root の外なら path を / 区切りにしたもの。
 func Relative(root, path string) string {
@@ -239,7 +240,7 @@ func Merge(common, extra *LayerRead) []rules.Problem {
 func differing(a, b *Template) []string {
 	same := []bool{
 		a.Name == b.Name, a.Description == b.Description, a.When == b.When,
-		slices.EqualFunc(a.Plan, b.Plan, Item.equal), slices.EqualFunc(a.Feedback, b.Feedback, Item.equal),
+		slices.EqualFunc(a.Plan, b.Plan, Item.Equal), slices.EqualFunc(a.Feedback, b.Feedback, Item.Equal),
 		yaml.Equal(a.flowsData(), b.flowsData()),
 	}
 	var out []string
@@ -330,7 +331,7 @@ type LayerProblem struct {
 // Problems は全部の苦情（--lint が使う）。
 func (s *Scan) Problems() []LayerProblem {
 	var out []LayerProblem
-	for _, view := range s.all() {
+	for _, view := range s.All() {
 		for _, p := range view.Problems {
 			out = append(out, LayerProblem{view.Name, p})
 		}
@@ -345,7 +346,7 @@ func (s *Scan) Problems() []LayerProblem {
 
 // HasAny は置き場がどこかに在るか。
 func (s *Scan) HasAny() bool {
-	return slices.ContainsFunc(s.all(), func(l *LayerRead) bool { return l.Exists })
+	return slices.ContainsFunc(s.All(), func(l *LayerRead) bool { return l.Exists })
 }
 
 // Find は名前の Entry。取り込まれたものを先に、破棄したものは最後に探す。

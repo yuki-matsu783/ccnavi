@@ -1,7 +1,6 @@
 package ticket
 
 import (
-	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -10,27 +9,19 @@ import (
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/model/place"
+
+	"ccnavi/internal/tickets/testkit"
 )
 
 const sample = "---\nversion: 1\nticket: i0001\nhuman_review:\n  required: false\n  reason: テスト\ntitle: 作業\n" +
 	"rationale: |\n  理由\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\nstarted_at: \"\"\n---\n\n本文の 1 行目\n本文の 2 行目\n"
 
-func put(t *testing.T, path, text string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // CRLF のチケットも LF と同じ中身に読み、本文に \r を残さない（機械によって範囲の判定を変えない）。
 func TestLoadReadsCRLFTheSame(t *testing.T) {
 	dir := t.TempDir()
 	lf, crlf := filepath.Join(dir, "lf.md"), filepath.Join(dir, "crlf.md")
-	put(t, lf, sample)
-	put(t, crlf, strings.ReplaceAll(sample, "\n", "\r\n"))
+	testkit.Put(t, lf, sample)
+	testkit.Put(t, crlf, strings.ReplaceAll(sample, "\n", "\r\n"))
 	a, _ := Load(lf)
 	b, _ := Load(crlf)
 	if a == nil || b == nil {
@@ -54,10 +45,10 @@ func TestLoadMissingIsNotAProblem(t *testing.T) {
 func TestScanAll(t *testing.T) {
 	root, _ := filepath.EvalSymlinks(t.TempDir())
 	base := filepath.Join(root, "wip", "proposals")
-	put(t, filepath.Join(base, "todo", "i0001.md"), sample)
-	put(t, filepath.Join(base, "todo", "i0002.md"), sample)
-	put(t, filepath.Join(base, "todo", "note.txt"), "x")
-	put(t, filepath.Join(base, "review", "bad.md"), "x")
+	testkit.Put(t, filepath.Join(base, "todo", "i0001.md"), sample)
+	testkit.Put(t, filepath.Join(base, "todo", "i0002.md"), sample)
+	testkit.Put(t, filepath.Join(base, "todo", "note.txt"), "x")
+	testkit.Put(t, filepath.Join(base, "review", "bad.md"), "x")
 	found, problems := Scan(root, "wip/proposals", filepath.Join(root, "projects"), nil)
 	if len(found) != 1 || found[0].ID != "i0001" || found[0].State != place.Todo || found[0].TreeRoot != root || found[0].Tree != tree.Main {
 		t.Fatalf("%+v", found)

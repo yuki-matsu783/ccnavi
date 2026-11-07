@@ -29,26 +29,10 @@ func declaredReview(n ticket.Need) string {
 	return "宣言なし（計画のステップとフェーズ定義に従う）"
 }
 
-// WorktreeState は子のワークツリーの計画の状態。
-type WorktreeState string
-
-const (
-	WorktreeCreate WorktreeState = "create"
-	WorktreeExists WorktreeState = "exists"
-)
-
-// ChildWorktree は子のワークツリーの計画 1 件（承認の後に作るか、既にあるか、作れないか）。
-type ChildWorktree struct {
-	Ticket string
-	Path   string
-	State  WorktreeState
-	Base   string
-}
-
 // ApprovedText はチケットが承認されたことをモデルに伝える文（`--agree --yes` の prompt。拡張が Claude Code に
 // 渡す）。revisions は親の改版だった識別子、worktrees は子のワークツリーの計画（nil なら案内だけ）、notices は
 // 1 件ごとに 1 行の `案内:` として添える補足。
-func ApprovedText(tickets []*ticket.Ticket, revisions map[string]bool, root string, worktrees []ChildWorktree, notices []string) string {
+func ApprovedText(tickets []*ticket.Ticket, revisions map[string]bool, root string, worktrees []ticket.WorktreePlan, notices []string) string {
 	lines := []string{"[ccnavi] チケットが承認され、承認済みチケットの置き場（doing/）へ動いた。"}
 	for _, t := range tickets {
 		where := "親"
@@ -106,8 +90,8 @@ func ApprovedText(tickets []*ticket.Ticket, revisions map[string]bool, root stri
 }
 
 // childWorktreeLines は子のワークツリーの状態を 1 子 1 行で言う。作れていない子は、名前と手で打つコマンドを出す。
-func childWorktreeLines(tickets []*ticket.Ticket, worktrees []ChildWorktree, gitSh string) []string {
-	byTicket := map[string]ChildWorktree{}
+func childWorktreeLines(tickets []*ticket.Ticket, worktrees []ticket.WorktreePlan, gitSh string) []string {
+	byTicket := map[string]ticket.WorktreePlan{}
 	for _, w := range worktrees {
 		byTicket[w.Ticket] = w
 	}
@@ -118,11 +102,11 @@ func childWorktreeLines(tickets []*ticket.Ticket, worktrees []ChildWorktree, git
 			continue
 		}
 		switch w.State {
-		case WorktreeCreate:
+		case ticket.WorktreeCreate:
 			lines = append(lines, "子 "+t.ID+" のワークツリー "+w.Path+" は、親のブランチ "+w.Base+" から"+
 				"承認の後に作られる予定（作れなければ案内の警告に理由が出る）。"+
 				"無ければ '"+gitSh+" worktree add "+w.Path+" -b "+t.ID+" "+w.Base+"' で作る")
-		case WorktreeExists:
+		case ticket.WorktreeExists:
 			lines = append(lines, "子 "+t.ID+" のワークツリー "+w.Path+" は既にある")
 		default:
 			lines = append(lines, "子 "+t.ID+" のワークツリー "+w.Path+" は、まだありません（親 "+t.Parent+

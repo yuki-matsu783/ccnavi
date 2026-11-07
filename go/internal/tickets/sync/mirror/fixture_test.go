@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // テストの道具。共通レイヤー・工程スキル・プロジェクトを持つワークスペースを作る。
@@ -30,12 +30,6 @@ const (
 
 // countScript は UTF-8 でなく、改行に \r を含むスクリプト。バイト列のまま写ることを見る。
 var countScript = []byte("# \x82\xa0\rprintf 1\n")
-
-func write(t *testing.T, path, text string) string {
-	t.Helper()
-	putBytes(t, path, []byte(text))
-	return path
-}
 
 func putBytes(t *testing.T, path string, data []byte) {
 	t.Helper()
@@ -72,15 +66,6 @@ func link(t *testing.T, target, path string) {
 	}
 }
 
-func tempRoot(t *testing.T) string {
-	t.Helper()
-	root, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return root
-}
-
 func commonPath(root string, rel ...string) string {
 	return filepath.Join(append([]string{root, ".ccnavi", "config", "common"}, rel...)...)
 }
@@ -92,19 +77,19 @@ func skillPath(root, name string, rel ...string) string {
 // skill はワークスペースの工程スキルを作る。refs は references/common/ からの相対 → 中身。
 func skill(t *testing.T, root, name, body string, refs map[string]string) {
 	t.Helper()
-	write(t, skillPath(root, name, "SKILL.md"), "---\nname: "+name+"\nprocess: true\n---\n"+body)
+	testkit.Put(t, skillPath(root, name, "SKILL.md"), "---\nname: "+name+"\nprocess: true\n---\n"+body)
 	for rel, text := range refs {
-		write(t, skillPath(root, name, "references", "common", filepath.FromSlash(rel)), text)
+		testkit.Put(t, skillPath(root, name, "references", "common", filepath.FromSlash(rel)), text)
 	}
 }
 
 // workspace は共通レイヤー（設定 3 本）と、プロジェクト app・lib（.git だけ）を持つワークスペース。
 func workspace(t *testing.T) string {
 	t.Helper()
-	root := tempRoot(t)
-	write(t, commonPath(root, "rules.yml"), commonRules)
-	write(t, commonPath(root, "phases.yml"), commonPhases)
-	write(t, commonPath(root, "risks.yml"), commonRisk)
+	root := testkit.TempRoot(t)
+	testkit.Put(t, commonPath(root, "rules.yml"), commonRules)
+	testkit.Put(t, commonPath(root, "phases.yml"), commonPhases)
+	testkit.Put(t, commonPath(root, "risks.yml"), commonRisk)
 	for _, name := range []string{"app", "lib"} {
 		if err := os.MkdirAll(filepath.Join(root, "projects", name, ".git"), 0o755); err != nil {
 			t.Fatal(err)
@@ -153,17 +138,6 @@ func dump(t *testing.T, base string) map[string]string {
 	return out
 }
 
-func runGit(t *testing.T, dir string, args ...string) {
-	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
-		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-}
-
 // startedParent は lib から切った親 i0001 のワークツリーに、着手済みの承認済みチケットを置く。ワークツリーを返す。
 func startedParent(t *testing.T, root string) string {
 	t.Helper()
@@ -174,15 +148,15 @@ func startedParent(t *testing.T, root string) string {
 	if err := os.RemoveAll(filepath.Join(lib, ".git")); err != nil {
 		t.Fatal(err)
 	}
-	runGit(t, root, "init", "-q", "-b", "main")
-	runGit(t, lib, "init", "-q", "-b", "main")
-	write(t, filepath.Join(lib, "README.md"), "lib\n")
-	runGit(t, lib, "add", "-A")
-	runGit(t, lib, "commit", "-q", "-m", "init")
+	testkit.Git(t, root, "init", "-q", "-b", "main")
+	testkit.Git(t, lib, "init", "-q", "-b", "main")
+	testkit.Put(t, filepath.Join(lib, "README.md"), "lib\n")
+	testkit.Git(t, lib, "add", "-A")
+	testkit.Git(t, lib, "commit", "-q", "-m", "init")
 	worktree := filepath.Join(root, ".claude", "worktrees", "i0001")
-	runGit(t, lib, "worktree", "add", "-q", "-b", "i0001", worktree)
-	write(t, filepath.Join(worktree, ".ccnavi", "approved", "doing", "i0001.md"), parentTicket)
-	copyMessages(t, root)
+	testkit.Git(t, lib, "worktree", "add", "-q", "-b", "i0001", worktree)
+	testkit.Put(t, filepath.Join(worktree, ".ccnavi", "approved", "doing", "i0001.md"), parentTicket)
+	testkit.CopyMessages(t, root)
 	return worktree
 }
 
@@ -191,19 +165,3 @@ const parentTicket = "---\nversion: 1\nticket: i0001\nproject: lib\nmr: 1\nissue
 	"plan:\n  - work\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\n" +
 	"allow:\n  - match: Write|Edit\n    glob: \"src/*\"\n" +
 	"started_at: \"2026-01-02T03:04:05+09:00\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n"
-
-func copyMessages(t *testing.T, root string) {
-	t.Helper()
-	from := filepath.Join(pyoracle.RepoRoot(t), ".ccnavi", "messages")
-	entries, err := os.ReadDir(from)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, e := range entries {
-		data, err := os.ReadFile(filepath.Join(from, e.Name()))
-		if err != nil {
-			t.Fatal(err)
-		}
-		putBytes(t, filepath.Join(root, ".ccnavi", "messages", e.Name()), data)
-	}
-}

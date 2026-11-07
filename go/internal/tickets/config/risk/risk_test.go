@@ -10,18 +10,9 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/shell"
-)
 
-func write(t *testing.T, path, text string) string {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
+	"ccnavi/internal/tickets/testkit"
+)
 
 func factorIDs(d *Definition) []string {
 	var out []string
@@ -37,7 +28,7 @@ func TestLoadFallsBackToTheBuiltin(t *testing.T) {
 		t.Errorf("無いファイル: %#v %v", d, problems)
 	}
 	// UTF-8 として読めない定義は、共通レイヤーなら組み込みへ、レイヤーなら空にして苦情を返す。
-	path := write(t, filepath.Join(t.TempDir(), "risks.yml"), "version: 1\nfactors: [{id: a, message: \xff\xfe\x80}]\n")
+	path := testkit.Put(t, filepath.Join(t.TempDir(), "risks.yml"), "version: 1\nfactors: [{id: a, message: \xff\xfe\x80}]\n")
 	d, problems = Load(path)
 	if d.Source != Builtin || !strings.Contains(d.Fallback, "を読めない ('utf-8' codec can't decode byte 0xff") || len(problems) != 1 {
 		t.Errorf("読めない: %#v %v", d, problems)
@@ -45,7 +36,7 @@ func TestLoadFallsBackToTheBuiltin(t *testing.T) {
 	if layer, problems := LoadLayer(path, ScriptHomes); layer != nil || len(problems) != 1 {
 		t.Errorf("読めないレイヤー: %v %v", layer, problems)
 	}
-	broken := write(t, filepath.Join(t.TempDir(), "risks.yml"), "version: 2\n")
+	broken := testkit.Put(t, filepath.Join(t.TempDir(), "risks.yml"), "version: 2\n")
 	if d, _ := Load(broken); d.Source != Builtin || d.Fallback != broken+" が不正。組み込みの配点で数える" {
 		t.Errorf("不正: %#v", d)
 	}
@@ -55,7 +46,7 @@ func TestLoadFallsBackToTheBuiltin(t *testing.T) {
 }
 
 func TestEscalates(t *testing.T) {
-	for level, want := range map[string]bool{"HIGH": true, "CRITICAL": true, "MEDIUM": false, "LOW": false, "high": false, "": false} {
+	for level, want := range map[Level]bool{"HIGH": true, "CRITICAL": true, "MEDIUM": false, "LOW": false, "high": false, "": false} {
 		if Escalates(level) != want {
 			t.Errorf("%q", level)
 		}
@@ -71,37 +62,37 @@ func TestLayerDefinition(t *testing.T) {
 		t.Errorf("組み込み: %v %v", factorIDs(d), notes)
 	}
 	// 共通レイヤーだけが無ければ、共通レイヤーは空として、レイヤーの項目だけを数える。
-	write(t, layer, factors("  - {id: own, points: 5, files_over: 1}"))
+	testkit.Put(t, layer, factors("  - {id: own, points: 5, files_over: 1}"))
 	d, _ := LayerDefinition(conf, root, "")
 	if got := factorIDs(d); !reflect.DeepEqual(got, []string{"own@self"}) || d.Factors[0].Home != root {
 		t.Errorf("レイヤーだけ: %v", got)
 	}
-	write(t, conf.Risk, sampleRisk)
+	testkit.Put(t, conf.Risk, sampleRisk)
 	d, notes := LayerDefinition(conf, root, "")
 	if got := factorIDs(d); len(got) != 7 || got[6] != "own@self" || len(notes) != 0 {
 		t.Errorf("和: %v %v", got, notes)
 	}
 	// レイヤーが壊れていれば空として数え、そのことを fallback に言う。
-	write(t, layer, "version: 1\nfactors: x\n")
+	testkit.Put(t, layer, "version: 1\nfactors: x\n")
 	d, notes = LayerDefinition(conf, root, "")
 	if len(d.Factors) != 6 || d.Fallback != "self の配点が不正。このレイヤーは空として数える" ||
 		!reflect.DeepEqual(d.Dropped, []string{"self"}) || len(notes) != 1 {
 		t.Errorf("壊れたレイヤー: %v %q %v", factorIDs(d), d.Fallback, notes)
 	}
 	// 合成で閾値が逆転すれば、レイヤーを空として数える。
-	write(t, layer, "version: 1\nlevels: {high: 39, critical: 39}\n")
-	write(t, conf.Risk, "version: 1\nlevels: {medium: 40, high: 60}\n")
+	testkit.Put(t, layer, "version: 1\nlevels: {high: 39, critical: 39}\n")
+	testkit.Put(t, conf.Risk, "version: 1\nlevels: {medium: 40, high: 60}\n")
 	d, notes = LayerDefinition(conf, root, "")
 	if d.Fallback != "self の配点の閾値が合成で逆転している。このレイヤーは空として数える" || len(notes) != 1 || notes[0].Rule != levelsWhere {
 		t.Errorf("逆転: %q %v", d.Fallback, notes)
 	}
 	// 共通レイヤーが壊れていれば組み込みに戻り、レイヤーを足さない。
-	write(t, conf.Risk, "version: 9\n")
+	testkit.Put(t, conf.Risk, "version: 9\n")
 	if d, notes := LayerDefinition(conf, root, ""); d.Source != Builtin || d.Fallback == "" || notes != nil {
 		t.Errorf("壊れた共通: %#v %v", d, notes)
 	}
 	// 予約名のプロジェクトはレイヤーとして数えない（配点を書ける側がレイヤーを選べないように）。
-	write(t, conf.Risk, sampleRisk)
+	testkit.Put(t, conf.Risk, sampleRisk)
 	if d := LoadDefinition(conf, root, config.LayerSelf); len(d.Factors) != 6 {
 		t.Errorf("予約名: %v", factorIDs(d))
 	}
@@ -109,9 +100,9 @@ func TestLayerDefinition(t *testing.T) {
 
 func TestScriptKeyComparesContentNotPlace(t *testing.T) {
 	root := t.TempDir()
-	write(t, filepath.Join(root, ".ccnavi", "config", "common", "scripts", "c.sh"), "echo 1\r\n")
-	write(t, filepath.Join(root, ".ccnavi", "scripts", "c.sh"), "echo 1\n")
-	write(t, filepath.Join(root, ".ccnavi", "scripts", "d.sh"), "echo 2\n")
+	testkit.Put(t, filepath.Join(root, ".ccnavi", "config", "common", "scripts", "c.sh"), "echo 1\r\n")
+	testkit.Put(t, filepath.Join(root, ".ccnavi", "scripts", "c.sh"), "echo 1\n")
+	testkit.Put(t, filepath.Join(root, ".ccnavi", "scripts", "d.sh"), "echo 2\n")
 	common, _ := Parse(factors("  - {id: c, points: 1, script: .ccnavi/config/common/scripts/c.sh}"), Where, ScriptHomes)
 	common.markLayer(config.LayerCommon, root)
 	homes := []string{".ccnavi/scripts/"}
@@ -154,7 +145,7 @@ func TestRunScript(t *testing.T) {
 		"cwd.sh":     `[ "$(basename "$PWD")" = tree ] && echo 9`,
 	}
 	for name, body := range scripts {
-		write(t, filepath.Join(root, filepath.FromSlash(dir), name), body+"\n")
+		testkit.Put(t, filepath.Join(root, filepath.FromSlash(dir), name), body+"\n")
 	}
 	worktree := filepath.Join(root, "tree")
 	if err := os.MkdirAll(worktree, 0o755); err != nil {
@@ -198,30 +189,20 @@ func TestRunScript(t *testing.T) {
 
 func runGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@x", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@x")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return strings.TrimSpace(string(out))
+	return strings.TrimSpace(testkit.Git(t, dir, args...))
 }
 
 func TestMeasure(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git が無い")
-	}
-	repo := t.TempDir()
+	repo := testkit.GitRoot(t)
 	runGit(t, repo, "init", "-q", "-b", "main")
-	write(t, filepath.Join(repo, "keep.txt"), "a\nb\nc\n")
-	write(t, filepath.Join(repo, "gone.txt"), "x\n")
-	write(t, filepath.Join(repo, "old name.txt"), strings.Repeat("same line\n", 20))
+	testkit.Put(t, filepath.Join(repo, "keep.txt"), "a\nb\nc\n")
+	testkit.Put(t, filepath.Join(repo, "gone.txt"), "x\n")
+	testkit.Put(t, filepath.Join(repo, "old name.txt"), strings.Repeat("same line\n", 20))
 	runGit(t, repo, "add", "-A")
 	runGit(t, repo, "commit", "-q", "-m", "base")
 	base := runGit(t, repo, "rev-parse", "HEAD")
-	write(t, filepath.Join(repo, "keep.txt"), "a\nB\nc\nd\n")
-	write(t, filepath.Join(repo, "新しい.bin"), "\x00\x01\x02")
+	testkit.Put(t, filepath.Join(repo, "keep.txt"), "a\nB\nc\nd\n")
+	testkit.Put(t, filepath.Join(repo, "新しい.bin"), "\x00\x01\x02")
 	if err := os.Remove(filepath.Join(repo, "gone.txt")); err != nil {
 		t.Fatal(err)
 	}

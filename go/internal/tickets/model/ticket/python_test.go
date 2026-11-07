@@ -10,7 +10,7 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の ticket.parse・subset_problems・decide・branch_name_problems・donecopy.copy_fields と突き合わせる。
@@ -265,7 +265,7 @@ func roundTrip(t *testing.T, v any) any {
 
 func TestParseMatchesPython(t *testing.T) {
 	in := map[string]any{"parent": parentText, "texts": parseCases, "paths": decidePaths}
-	want := pyoracle.Answers[[]pyRow](t, "parse", parseOracle, in)
+	want := testkit.Answers[[]pyRow](t, "parse", parseOracle, in)
 	parent, _ := Parse(parentText)
 	for i, text := range parseCases {
 		got := pyRow{Problems: [][]string{}}
@@ -357,7 +357,7 @@ json.dump(out, sys.stdout, ensure_ascii=False)
 // 書き戻した文面が Python の ticket.render と 1 字も違わないこと（承認済みチケットのバイト列になる）。
 func TestRenderMatchesPython(t *testing.T) {
 	cases := append([]string{renderSample}, parseCases...)
-	want := pyoracle.Answers[[]*string](t, "render", renderOracle, cases)
+	want := testkit.Answers[[]*string](t, "render", renderOracle, cases)
 	for i, text := range cases {
 		tk, _ := Parse(text)
 		if tk == nil {

@@ -106,12 +106,16 @@ func ThreadVersion(t Thread) string {
 func Unresolved(threads []Thread, host Kind, poster string, ledger []*pyjson.Object) []Thread {
 	var out []Thread
 	for _, t := range threads {
-		if t.Resolved || ccnaviPost(t, host, poster) || (len(ledger) > 0 && acceptedByLedger(t, ledger)) {
-			continue
+		if IsUnresolved(t, host, poster, ledger) {
+			out = append(out, t)
 		}
-		out = append(out, t)
 	}
 	return out
+}
+
+// IsUnresolved は Unresolved が数える 1 本か。結果の並びのまま、ほかの条件と合わせて選ぶ呼び手が使う。
+func IsUnresolved(t Thread, host Kind, poster string, ledger []*pyjson.Object) bool {
+	return !t.Resolved && !ccnaviPost(t, host, poster) && (len(ledger) == 0 || !acceptedByLedger(t, ledger))
 }
 
 // ccnaviPost は ccnavi 自身が投稿したスレッドか。GitLab の結果で、書き手が依頼を投稿したアカウントで、

@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/env"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 func putSize(t *testing.T, root, rel string, size int) string {
 	t.Helper()
-	return put(t, filepath.Join(root, "scratchpad", filepath.FromSlash(rel)), strings.Repeat("x", size))
+	return testkit.Put(t, filepath.Join(root, "scratchpad", filepath.FromSlash(rel)), strings.Repeat("x", size))
 }
 
 func TestScratchBytes(t *testing.T) {
@@ -67,11 +67,11 @@ func TestScratchpadMatchesPython(t *testing.T) {
 	root := workspace(t)
 	putSize(t, root, "big.bin", 2*mb+mb/2)
 	limits := []string{"1", "1.5", "2.5", "3", "0", "0.000001"}
-	want := pyoracle.Answers[map[string]any](t, "scratchpad", scratchOracle, map[string]any{"root": root, "limits": limits})
+	want := testkit.Answers[map[string]any](t, "scratchpad", scratchOracle, map[string]any{"root": root, "limits": limits})
 	got := map[string]any{}
 	for _, limit := range limits {
 		t.Setenv(env.ScratchpadWarnMB, limit)
-		got[limit] = rel(root, Scratchpad(root, time.Time{}))
+		got[limit] = testkit.Rel(root, Scratchpad(root, time.Time{}))
 	}
-	sameAsPython(t, got, want)
+	testkit.SameJSON(t, got, want)
 }

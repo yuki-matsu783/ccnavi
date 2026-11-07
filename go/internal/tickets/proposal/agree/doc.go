@@ -13,5 +13,5 @@
 // PreviewBody、VERIFY_* → VerifyReason の定数、Verdict・verify_verdict → Verdict・VerifyVerdict（held の組 → *Held）、
 // Applied・Planned・plan_batch → Applied・Planned・PlanBatch（stopped の組 → *Stop。home_dir の NoParentWorktree は
 // error で返す）。agree_digest: proposals_digest → ProposalsDigest、revise_copy・revised_front は私的。
-// agree_screen: screen → Screen、approved_text → ApprovedText（worktrees の dict → ChildWorktree）。
+// agree_screen: screen → Screen、approved_text → ApprovedText（worktrees の dict → ticket.WorktreePlan）。
 package agree

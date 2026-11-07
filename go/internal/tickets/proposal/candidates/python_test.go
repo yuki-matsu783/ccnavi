@@ -10,8 +10,8 @@ import (
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/approval"
 	"ccnavi/internal/tickets/config/phases"
-	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/model/ticket"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の agree_candidates の検査を、同じ見本（チケットの文面）と同じワークスペースに当て、苦情が 1 字も違わない
@@ -77,30 +77,30 @@ func sampleTickets() map[string]string {
 		return text + "title: 親\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n---\n本文\n"
 	}
 	return map[string]string{
-		"parent":       parentText("i0001", plan3),
-		"deferBad":     parentText("i0001", []string{"  - {type: research, deferred: true}", "  - {type: design, after: [1]}"}),
-		"copyDiff":     strings.Replace(parentText("i0001", plan3), "title: 設計\n", "title: 設計 別\n", 1),
-		"noPlan":       parentText("i0001", nil),
+		"parent":       testkit.ProposalParent("i0001", plan3),
+		"deferBad":     testkit.ProposalParent("i0001", []string{"  - {type: research, deferred: true}", "  - {type: design, after: [1]}"}),
+		"copyDiff":     strings.Replace(testkit.ProposalParent("i0001", plan3), "title: 設計\n", "title: 設計 別\n", 1),
+		"noPlan":       testkit.ProposalParent("i0001", nil),
 		"noCopy":       bare("i0001", plan3),
-		"maint":        parentText("i0001", plan3, "maintenance: learning-consolidate"),
-		"child1":       childText("i0001-01-01", "i0001", "1", []string{"wip/research/*"}),
-		"childOver":    childText("i0001-01-02", "i0001", "1", []string{"docs/*", "wip/research/a/*"}),
-		"childRegex":   childText("i0001-01-03", "i0001", "1", nil, "  - match: Write|Edit\n    regex: \"wip/.*\""),
-		"childBad":     childText("i0001-05-01", "i0001", "5", []string{"src/*"}),
-		"childMaint":   childText("i0001-00-01", "i0001", "0", []string{"docs/wiki/inbox/*", "src/*"}, "maintenance: learning-consolidate"),
-		"childNoCopy":  childText("i0001-02-01", "i0001", "2", []string{"src/*"}),
-		"fields":       parentText("i0001", plan3, "workflow: dag", "started_at: false", "base_sha: \" \"", "followup_of: x", "human_review: false"),
-		"hashIssue":    strings.Replace(parentText("i0001", plan3), "issue: 1\n", "issue: \" #12 \"\n", 1),
+		"maint":        testkit.ProposalParent("i0001", plan3, "maintenance: learning-consolidate"),
+		"child1":       testkit.ProposalChild("i0001-01-01", "i0001", "1", []string{"wip/research/*"}),
+		"childOver":    testkit.ProposalChild("i0001-01-02", "i0001", "1", []string{"docs/*", "wip/research/a/*"}),
+		"childRegex":   testkit.ProposalChild("i0001-01-03", "i0001", "1", nil, "  - match: Write|Edit\n    regex: \"wip/.*\""),
+		"childBad":     testkit.ProposalChild("i0001-05-01", "i0001", "5", []string{"src/*"}),
+		"childMaint":   testkit.ProposalChild("i0001-00-01", "i0001", "0", []string{"docs/wiki/inbox/*", "src/*"}, "maintenance: learning-consolidate"),
+		"childNoCopy":  testkit.ProposalChild("i0001-02-01", "i0001", "2", []string{"src/*"}),
+		"fields":       testkit.ProposalParent("i0001", plan3, "workflow: dag", "started_at: false", "base_sha: \" \"", "followup_of: x", "human_review: false"),
+		"hashIssue":    strings.Replace(testkit.ProposalParent("i0001", plan3), "issue: 1\n", "issue: \" #12 \"\n", 1),
 		"lockCurrent":  bare("i0009", plan4),
 		"lockType":     bare("i0009", []string{"  - design", "  - {type: docs, after: [1]}", "  - {type: implement, after: [1]}", "  - {type: docs, after: [2, 3]}"}),
 		"lockAfter":    bare("i0009", []string{"  - design", "  - {type: acceptance, after: [1]}", "  - {type: implement}", "  - {type: docs, after: [2, 3]}"}),
 		"lockSwap":     bare("i0009", []string{"  - implement", "  - {type: acceptance, after: [1]}", "  - {type: implement, after: [1]}", "  - {type: docs, after: [2, 3]}"}),
 		"lockDeferred": bare("i0009", []string{"  - design", "  - {type: acceptance, after: [1], deferred: true}", "  - {type: implement, after: [1]}", "  - {type: docs, after: [2, 3]}"}),
-		"revScope":     strings.Replace(parentText("i0002", plan3), "    glob: \"wip/*\"\n", "    glob: \"wip/*\"\n  - match: Write\n    glob: \"/abs\"\n", 1),
-		"revTitle":     strings.Replace(strings.Replace(parentText("i0002", plan3[:2]), "title: 親 i0002", "title: 別", 1), "mr: 1\n", "mr: 2\n", 1),
-		"revFeedback":  parentText("i0002", plan3[:2], "feedback: [implement]"),
-		"revBusy":      strings.Replace(parentText("i0002", plan3[:2]), "allow:\n", "allow:\n  - match: Write|Edit\n    glob: \"tests/*\"\n", 1),
-		"revLocked":    parentText("i0002", []string{"  - design", "  - {type: research, after: [1]}"}),
+		"revScope":     strings.Replace(testkit.ProposalParent("i0002", plan3), "    glob: \"wip/*\"\n", "    glob: \"wip/*\"\n  - match: Write\n    glob: \"/abs\"\n", 1),
+		"revTitle":     strings.Replace(strings.Replace(testkit.ProposalParent("i0002", plan3[:2]), "title: 親 i0002", "title: 別", 1), "mr: 1\n", "mr: 2\n", 1),
+		"revFeedback":  testkit.ProposalParent("i0002", plan3[:2], "feedback: [implement]"),
+		"revBusy":      strings.Replace(testkit.ProposalParent("i0002", plan3[:2]), "allow:\n", "allow:\n  - match: Write|Edit\n    glob: \"tests/*\"\n", 1),
+		"revLocked":    testkit.ProposalParent("i0002", []string{"  - design", "  - {type: research, after: [1]}"}),
 	}
 }
 
@@ -131,26 +131,26 @@ var revisionCases = []string{"revScope", "revTitle", "revFeedback", "revLocked",
 // i0003 の提案がワークスペースルートの todo/ にある（親のワークツリーの外）。i0010 はワークスペースに同じ名前の
 // ブランチがある新規の親、i0001 は自分のワークツリーの中の新規の親（自分のブランチなので言わない）。
 func candidatesWorkspace(t *testing.T) string {
-	root := workspace(t, "i0001", "i0002", "i0003")
-	runGit(t, root, "branch", "I0010")
-	runGit(t, root, "branch", "feature/x")
-	put(t, filepath.Join(approvedDir(root, "i0002"), "doing", "i0002.md"), parentText("i0002", plan3[:2]))
-	put(t, filepath.Join(approvedDir(root, "i0002"), "doing", "i0002-02-01.md"),
-		childText("i0002-02-01", "i0002", "2", []string{"wip/design/*"}, `started_at: "2026-01-01T00:00:00+0900"`))
-	put(t, filepath.Join(approvedDir(root, "i0002"), "done", "i0002-01-01.md"),
-		childText("i0002-01-01", "i0002", "1", []string{"wip/research/*"}, `completed_at: "2026-01-01T00:00:00+0900"`))
-	put(t, filepath.Join(todoDir(root, "i0001"), "i0001.md"), parentText("i0001", plan3))
-	put(t, filepath.Join(todoDir(root, "i0003"), "i0003-01-01.md"), childText("i0003-01-01", "i0003", "1", []string{"src/*"}))
-	put(t, filepath.Join(root, "wip", "proposals", "todo", "i0003.md"), parentText("i0003", plan3))
-	put(t, filepath.Join(root, "wip", "proposals", "todo", "i0010.md"), parentText("i0010", plan3))
-	put(t, filepath.Join(root, "wip", "proposals", "todo", "feature-x.md"), parentText("feature-x", plan3))
+	root := testkit.ProposalWorkspace(t, "i0001", "i0002", "i0003")
+	testkit.Git(t, root, "branch", "I0010")
+	testkit.Git(t, root, "branch", "feature/x")
+	testkit.Put(t, filepath.Join(testkit.ApprovedDir(root, "i0002"), "doing", "i0002.md"), testkit.ProposalParent("i0002", plan3[:2]))
+	testkit.Put(t, filepath.Join(testkit.ApprovedDir(root, "i0002"), "doing", "i0002-02-01.md"),
+		testkit.ProposalChild("i0002-02-01", "i0002", "2", []string{"wip/design/*"}, `started_at: "2026-01-01T00:00:00+0900"`))
+	testkit.Put(t, filepath.Join(testkit.ApprovedDir(root, "i0002"), "done", "i0002-01-01.md"),
+		testkit.ProposalChild("i0002-01-01", "i0002", "1", []string{"wip/research/*"}, `completed_at: "2026-01-01T00:00:00+0900"`))
+	testkit.Put(t, filepath.Join(testkit.TodoDir(root, "i0001"), "i0001.md"), testkit.ProposalParent("i0001", plan3))
+	testkit.Put(t, filepath.Join(testkit.TodoDir(root, "i0003"), "i0003-01-01.md"), testkit.ProposalChild("i0003-01-01", "i0003", "1", []string{"src/*"}))
+	testkit.Put(t, filepath.Join(root, "wip", "proposals", "todo", "i0003.md"), testkit.ProposalParent("i0003", plan3))
+	testkit.Put(t, filepath.Join(root, "wip", "proposals", "todo", "i0010.md"), testkit.ProposalParent("i0010", plan3))
+	testkit.Put(t, filepath.Join(root, "wip", "proposals", "todo", "feature-x.md"), testkit.ProposalParent("feature-x", plan3))
 	return root
 }
 
 func TestMatchesPython(t *testing.T) {
 	pyRoot, goRoot := candidatesWorkspace(t), candidatesWorkspace(t)
 	samples := sampleTickets()
-	want := pyoracle.Answers[map[string]any](t, "candidates", candidatesOracle, map[string]any{
+	want := testkit.Answers[map[string]any](t, "candidates", candidatesOracle, map[string]any{
 		"root": pyRoot, "tickets": samples, "validate": validateCases, "plan": planCases, "lock": lockCases,
 		"revision": revisionCases,
 	})
@@ -193,7 +193,7 @@ func goAnswers(t *testing.T, root string, samples map[string]string) map[string]
 		}
 		return found
 	}
-	conf := settingsOf(t, root)
+	conf := testkit.Settings(t, root)
 	cfg := phases.LoadTypes(conf, root, "")
 	fields := map[string]any{}
 	for name := range samples {

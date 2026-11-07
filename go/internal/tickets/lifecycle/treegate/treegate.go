@@ -26,6 +26,9 @@ const (
 	Finish          Op = "finish"
 	ReviewRequest   Op = "review-request"
 	Ready           Op = "ready"
+	// Reviewed はレビュー済みにする前（confirm・decide）の確かめ直し。ユーザがマージで見るのはリモートの HEAD
+	// なので、依頼の後も親のブランチが push 済みかを見る。止めるかどうかだけを使い、文は呼び手が持つ。
+	Reviewed Op = "reviewed"
 )
 
 // Kind は拒否の種類。`--verify` の `reason` にもこの値が出る。
@@ -36,10 +39,11 @@ const (
 	UnpushedCode Kind = "unpushed_code"
 )
 
-// watch は 1 つの操作が見るもの。ignorePlaces は未 push を置き場の外のパスだけで数えるか、strict は読めない
+// watch は 1 つの操作が見るもの。dirty は未コミットの変更を見るか、ignorePlaces は未 push を置き場の外のパスだけで数えるか、strict は読めない
 // とき（git が答えない・比べる origin/<ブランチ> が無い）に止めるか。止めない操作は、一度も送っていない親の
 // ブランチでも通る。
 type watch struct {
+	dirty        bool
 	wipRemovals  bool
 	unpushed     bool
 	ignorePlaces bool
@@ -48,13 +52,15 @@ type watch struct {
 
 var watches = map[Op]watch{
 	// 親のブランチを push するので、設計途中のコードまで公開しない。
-	ApprovalRequest: {unpushed: true, ignorePlaces: true},
+	ApprovalRequest: {dirty: true, unpushed: true, ignorePlaces: true},
 	// 子の finish の合流前に、親の側を見る。未 push は合流の後の push で届くので見ない。
-	Finish: {strict: true},
+	Finish: {dirty: true, strict: true},
 	// ユーザが見るのはコードなので、未 push は置き場を除いて数える（置き場の push は別の仕事）。
-	ReviewRequest: {unpushed: true, ignorePlaces: true, strict: true},
+	ReviewRequest: {dirty: true, unpushed: true, ignorePlaces: true, strict: true},
 	// ユーザがリモートを見てマージする。ready が消した wip/ のファイルは write-and-push がコミットする。
-	Ready: {wipRemovals: true, unpushed: true, strict: true},
+	Ready: {dirty: true, wipRemovals: true, unpushed: true, strict: true},
+	// 依頼の後に動いたかは request.MovedDetail が見るので、ここは未 push だけ（置き場は数えない）。
+	Reviewed: {unpushed: true, ignorePlaces: true, strict: true},
 }
 
 // Refusal は操作を止める理由 1 件。Paths は理由になったパス（未 push で置き場を数えないときは sha）。
@@ -170,6 +176,16 @@ type Options struct {
 func Check(op Op, treeRoot string, conf *config.Settings, o Options) []Refusal {
 	w := watches[op]
 	var found []Refusal
+	if w.dirty {
+		found = dirtyRefusals(op, w, treeRoot, conf, o)
+	}
+	if w.unpushed {
+		found = append(found, unpushedRefusal(op, w, treeRoot, conf, o.Branch)...)
+	}
+	return found
+}
+
+func dirtyRefusals(op Op, w watch, treeRoot string, conf *config.Settings, o Options) []Refusal {
 	paths, ok := Dirty(treeRoot, conf, w.wipRemovals)
 	switch {
 	case !ok:
@@ -178,15 +194,12 @@ func Check(op Op, treeRoot string, conf *config.Settings, o Options) []Refusal {
 			if op == Finish {
 				tail = "。何も変えずに止めた"
 			}
-			found = append(found, Refusal{Kind: DirtyParent, Reason: "親のワークツリーの状態を読めない" + tail})
+			return []Refusal{{Kind: DirtyParent, Reason: "親のワークツリーの状態を読めない" + tail}}
 		}
 	case len(paths) > 0:
-		found = append(found, DirtyRefusal(op, treeRoot, conf, paths, o.Root, !o.PlainDirty))
+		return []Refusal{DirtyRefusal(op, treeRoot, conf, paths, o.Root, !o.PlainDirty)}
 	}
-	if w.unpushed {
-		found = append(found, unpushedRefusal(op, w, treeRoot, conf, o.Branch)...)
-	}
-	return found
+	return nil
 }
 
 // DirtyRefusal は未コミットの変更があるために止めるときの文。paths は Dirty の答え。変更がミラーのコピー先に

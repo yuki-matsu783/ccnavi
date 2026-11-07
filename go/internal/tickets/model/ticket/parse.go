@@ -27,7 +27,7 @@ const fileRule = "(file)"
 var forbidden = []string{"..", "~", "$"}
 
 // issueRef は別のリポジトリの課題の表記（`owner/repo#12`。GitLab の入れ子のグループも）。数字は Python の \d。
-var issueRef = regexp.MustCompile(`^([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)#(\p{Nd}+)$`)
+var issueRef = regexp.MustCompile(`\A([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)#(\p{Nd}+)\z`)
 
 // GlobSpaceReason は範囲の glob に空白がある理由の文。提案・phases.yml の scope・ticket new --scope が同じ文を使う。
 const GlobSpaceReason = "空白がある。glob は 1 項目に 1 パターンで、空白は区切りにならない。" +

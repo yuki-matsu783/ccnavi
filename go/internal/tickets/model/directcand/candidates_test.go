@@ -3,7 +3,6 @@ package directcand
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,6 +11,8 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/pyjson"
+
+	"ccnavi/internal/tickets/testkit"
 )
 
 type fixture struct {
@@ -19,30 +20,14 @@ type fixture struct {
 	conf                 *config.Settings
 }
 
-func git(t *testing.T, dir string, args ...string) {
-	t.Helper()
-	cmd := exec.Command("git", append([]string{"-c", "user.email=t@example.com", "-c", "user.name=t"}, args...)...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-}
-
 // newFixture はワークスペースと、直接作業のワークツリー scratch を作る。
 func newFixture(t *testing.T) fixture {
 	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git が無い")
-	}
-	root, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	git(t, root, "init", "--quiet", "-b", "main")
-	git(t, root, "commit", "--quiet", "--allow-empty", "-m", "init")
+	root := testkit.GitRoot(t)
+	testkit.Git(t, root, "init", "--quiet", "-b", "main")
+	testkit.Git(t, root, "commit", "--quiet", "--allow-empty", "-m", "init")
 	scratch := filepath.Join(root, ".claude", "worktrees", "scratch")
-	git(t, root, "worktree", "add", "--quiet", "-b", "scratch", scratch)
+	testkit.Git(t, root, "worktree", "add", "--quiet", "-b", "scratch", scratch)
 	state := filepath.Join(root, "logs", "state")
 	return fixture{root, state, scratch, &config.Settings{State: state}}
 }

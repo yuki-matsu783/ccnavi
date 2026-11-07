@@ -30,8 +30,9 @@ const mdExt = ".md"
 // flowSuffixes は flows/ の子のフローの拡張子。
 var flowSuffixes = []string{".yml", ".yaml"}
 
-// tempName は書きかけの一時ファイル（fsio の `.<名前>.<一意>.part`）。移さない。
-var tempName = regexp.MustCompile(`^\..*\.part(\.[^/]*)?$`)
+// tempName は書きかけの一時ファイル（fsio の `.<名前>.<一意>.part`）。移さない。Python の search の `$` は末尾の
+// 改行 1 つの前でも当たるので `\n?\z` にする。
+var tempName = regexp.MustCompile(`\A\..*\.part(\.[^/]*)?\n?\z`)
 
 // readyPlaces は ready のマーカーに載せてよい、承認済みの領域の下の置き場。
 var readyPlaces = []string{string(place.Done) + "/", place.PhasesDir + "/", place.FlowsDir + "/"}

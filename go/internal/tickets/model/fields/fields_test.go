@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/yaml"
-	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/model/ticket"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の ticket_fields と突き合わせる。行単位の書き換えは、ユーザのコメントと `|` のブロックを残すことと、
@@ -72,7 +72,7 @@ var quotedValues = []string{
 
 func TestFieldsMatchPython(t *testing.T) {
 	in := map[string]any{"texts": fieldsTexts, "fields": fieldsWrites, "values": quotedValues}
-	want := pyoracle.Answers[fieldsAnswers](t, "fields", fieldsOracle, in)
+	want := testkit.Answers[fieldsAnswers](t, "fields", fieldsOracle, in)
 	got := fieldsAnswers{}
 	for _, text := range fieldsTexts {
 		got.Set = append(got.Set, SetFields(text, fieldsWrites))

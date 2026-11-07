@@ -14,6 +14,8 @@ import (
 	"ccnavi/internal/tickets/model/host"
 	"ccnavi/internal/tickets/model/ticket"
 	"ccnavi/internal/tickets/proposal/agree"
+
+	"ccnavi/internal/tickets/testkit"
 )
 
 // staged は fn が溜めた書き込みの並び。
@@ -44,7 +46,7 @@ func exists(path string) bool {
 func TestWriteFailureModes(t *testing.T) {
 	dir := t.TempDir()
 	blocked := filepath.Join(dir, "blocked")
-	put(t, blocked, "x")
+	testkit.Put(t, blocked, "x")
 	fail := filepath.Join(blocked, "x.md")
 	first := filepath.Join(dir, "first.md")
 	undone := filepath.Join(dir, "undone.md")
@@ -121,9 +123,9 @@ func TestWriteStoppedWhilePlanning(t *testing.T) {
 func TestWriteMoveTargetAppeared(t *testing.T) {
 	dir := t.TempDir()
 	source, target := filepath.Join(dir, "todo.md"), filepath.Join(dir, "done.md")
-	put(t, source, "a")
+	testkit.Put(t, source, "a")
 	s := staged(t, func(*fsio.Stage) { fsio.Move(source, target) })
-	put(t, target, "other")
+	testkit.Put(t, target, "other")
 	var out, errs bytes.Buffer
 	if applied := write(&out, &errs, &agree.Planned{Stage: s}); applied.Code != 1 || errs.String() != "ccnavi: 移動先に既にある\n" {
 		t.Errorf("%+v %q", applied, errs.String())
@@ -191,7 +193,7 @@ func TestLateThreads(t *testing.T) {
 // 親のワークツリーが無いときは黙って数えない（承認は止めない）。
 func TestDirtyParentsWithoutTheWorktree(t *testing.T) {
 	root := workspace(t)
-	if ospath.IsDir(worktree(root, "i9999")) {
+	if ospath.IsDir(testkit.Worktree(root, "i9999")) {
 		t.Fatal("ワークツリーが在る")
 	}
 	conf, _ := config.Load(root)

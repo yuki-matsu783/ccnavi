@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/pyjson"
-	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/model/ticket"
 	"ccnavi/internal/tickets/proposal/candidates"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // 振り直しの決まりは拡張の計画編集タブと共有する見本の表（tests/fixtures/plan-reorder.json）で固定する。
@@ -80,7 +80,7 @@ type reorderCase struct {
 }
 
 func TestReorderTable(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join(pyoracle.RepoRoot(t), "tests", "fixtures", "plan-reorder.json"))
+	data, err := os.ReadFile(filepath.Join(testkit.RepoRoot(t), "tests", "fixtures", "plan-reorder.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

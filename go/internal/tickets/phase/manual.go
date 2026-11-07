@@ -37,8 +37,6 @@ const (
 // 返さないので、余裕の内側か後に作られたスレッドは受け入れない。
 const Margin = 10 * time.Minute
 
-const finishedToReview = "review"
-
 // 手動の移動の 1 行と、確かめられない理由。
 const (
 	readyLine        = "レビュー完了確認待ち: 子 %s が手で done/ に動かされている。親が confirm を打つと確定する"
@@ -134,7 +132,7 @@ func AssessManual(conf *config.Settings, root string, parent *ticket.Ticket, p *
 		switch states[t.ID] {
 		case place.Done:
 			switch {
-			case t.FinishedTo == finishedToReview:
+			case t.FinishedTo == string(place.Review):
 				reviewed = true
 				if t.SettledBy == "" {
 					hand = append(hand, t)

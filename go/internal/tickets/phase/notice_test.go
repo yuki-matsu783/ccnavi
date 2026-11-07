@@ -14,8 +14,8 @@ import (
 	"ccnavi/internal/tickets/approval/marks"
 	"ccnavi/internal/tickets/config/phases"
 	"ccnavi/internal/tickets/model/place"
-	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/model/ticket"
+	"ccnavi/internal/tickets/testkit"
 )
 
 func phaseWith(number int, states []place.State, kinds ...marks.Kind) *Phase {
@@ -68,7 +68,7 @@ func item(kind string, after ...int) ticket.PlanItem {
 
 // 全体計画が終わったときの案内は、合流の書き方と phases: の差し込みを言う（Python の test_feedback_order）。
 func TestNextHintAfterTheLastPhaseAsksForTheFeedbackPlan(t *testing.T) {
-	root := pyoracle.RepoRoot(t)
+	root := testkit.RepoRoot(t)
 	parent := &ticket.Ticket{ID: "i0001", Plan: []ticket.PlanItem{item("design")}}
 	text := nextHint(root, parent, nil, 1)
 	for _, want := range []string{"フィードバック計画", "after", "最後のステップ", "1 ステップで受ける",
@@ -102,7 +102,7 @@ func TestNextHintOffersAnEarlierBranchWithoutChildren(t *testing.T) {
 		}
 		list = append(list, p)
 	}
-	if hint := nextHint(pyoracle.RepoRoot(t), owner, list, 3); !strings.Contains(hint, "次に始められるのは 2") {
+	if hint := nextHint(testkit.RepoRoot(t), owner, list, 3); !strings.Contains(hint, "次に始められるのは 2") {
 		t.Errorf("案内 = %q", hint)
 	}
 }
@@ -232,14 +232,14 @@ func TestAssessManualWithoutGit(t *testing.T) {
 // 親のワークツリーが別のブランチなら、そこにあるマーカーは読まず、終わりのマーカーも書かない
 // （Python の test_unsettled_home）。
 func TestUnsettledParentFolderIsNeitherReadNorMarked(t *testing.T) {
-	root := workspace(t, "i0001")
-	home := worktree(root, "i0001")
-	put(t, filepath.Join(approvedDir(root, "i0001"), "doing", "i0001.md"), parentText("i0001", "  - research"))
-	put(t, filepath.Join(approvedDir(root, "i0001"), "done", "i0001-01-01.md"),
+	root := testkit.Workspace(t, "i0001")
+	home := testkit.Worktree(root, "i0001")
+	testkit.Put(t, filepath.Join(testkit.ApprovedDir(root, "i0001"), "doing", "i0001.md"), parentText("i0001", "  - research"))
+	testkit.Put(t, filepath.Join(testkit.ApprovedDir(root, "i0001"), "done", "i0001-01-01.md"),
 		childText("i0001-01-01", "i0001", "1", "false", []string{"wip/research/*"}, `completed_at: "2026-01-01T00:00:00+0900"`))
-	runGit(t, home, "checkout", "-q", "-b", "other")
-	put(t, filepath.Join(approvedDir(root, "i0001"), "phases", "i0001", "1.reviewed"), `{"at": "2026-01-01"}`)
-	conf := settingsOf(t, root)
+	testkit.Git(t, home, "checkout", "-q", "-b", "other")
+	testkit.Put(t, filepath.Join(testkit.ApprovedDir(root, "i0001"), "phases", "i0001", "1.reviewed"), `{"at": "2026-01-01"}`)
+	conf := testkit.Settings(t, root)
 	list := Phases(conf, root, "i0001", nil)
 	if len(list) != 1 || len(list[0].Marks) != 0 {
 		t.Fatalf("別のブランチのマーカーを読んだ: %+v", list)
@@ -250,7 +250,7 @@ func TestUnsettledParentFolderIsNeitherReadNorMarked(t *testing.T) {
 	if said := Announce(&stderr, conf, root, parent, nil); said != "" || stderr.Len() != 0 {
 		t.Errorf("決まらない置き場に知らせた: %q %q", said, stderr.String())
 	}
-	if _, err := os.Stat(filepath.Join(approvedDir(root, "i0001"), "phases", "i0001", "1.skipped")); err == nil {
+	if _, err := os.Stat(filepath.Join(testkit.ApprovedDir(root, "i0001"), "phases", "i0001", "1.skipped")); err == nil {
 		t.Error("決まらない置き場にマーカーを書いた")
 	}
 }
@@ -259,30 +259,30 @@ func TestUnsettledParentFolderIsNeitherReadNorMarked(t *testing.T) {
 // 見る（Python の test_multi_project_gaps）。
 func TestSharedReadsTheProjectHistory(t *testing.T) {
 	const parentID, childID = "feature-1-web-x", "feature-1-web-x-01-01"
-	root := workspace(t)
+	root := testkit.Workspace(t)
 	project := filepath.Join(root, "projects", "web")
-	put(t, filepath.Join(project, "a.txt"), "a\n")
-	runGit(t, project, "init", "-q", "-b", "main")
-	runGit(t, project, "add", "-A")
-	runGit(t, project, "commit", "-q", "-m", "init")
+	testkit.Put(t, filepath.Join(project, "a.txt"), "a\n")
+	testkit.Git(t, project, "init", "-q", "-b", "main")
+	testkit.Git(t, project, "add", "-A")
+	testkit.Git(t, project, "commit", "-q", "-m", "init")
 	remote := filepath.Join(root, "remote.git")
-	runGit(t, root, "init", "-q", "--bare", remote)
-	runGit(t, project, "remote", "add", "origin", remote)
-	runGit(t, project, "push", "-q", "origin", "main")
-	home := worktree(root, parentID)
-	runGit(t, project, "worktree", "add", "-q", home, "-b", parentID, "main")
-	runGit(t, home, "push", "-q", "-u", "origin", parentID)
-	moved := &ticket.Ticket{ID: childID, Path: put(t, filepath.Join(home, ".ccnavi", "approved", "done", childID+".md"), "x\n")}
+	testkit.Git(t, root, "init", "-q", "--bare", remote)
+	testkit.Git(t, project, "remote", "add", "origin", remote)
+	testkit.Git(t, project, "push", "-q", "origin", "main")
+	home := testkit.Worktree(root, parentID)
+	testkit.Git(t, project, "worktree", "add", "-q", home, "-b", parentID, "main")
+	testkit.Git(t, home, "push", "-q", "-u", "origin", parentID)
+	moved := &ticket.Ticket{ID: childID, Path: testkit.Put(t, filepath.Join(home, ".ccnavi", "approved", "done", childID+".md"), "x\n")}
 	parent := &ticket.Ticket{ID: parentID}
 	if _, why := shared(root, parent, []*ticket.Ticket{moved}); why != unsharedNote {
 		t.Errorf("未コミット: %q", why)
 	}
-	runGit(t, home, "add", "-A", "-f")
-	runGit(t, home, "commit", "-q", "-m", "move")
+	testkit.Git(t, home, "add", "-A", "-f")
+	testkit.Git(t, home, "commit", "-q", "-m", "move")
 	if _, why := shared(root, parent, []*ticket.Ticket{moved}); why != unsharedNote {
 		t.Errorf("未 push: %q", why)
 	}
-	runGit(t, home, "push", "-q", "origin", parentID)
+	testkit.Git(t, home, "push", "-q", "origin", parentID)
 	at, why := shared(root, parent, []*ticket.Ticket{moved})
 	if want, _ := time.Parse(time.RFC3339, "2026-01-05T00:00:00Z"); why != "" || !at.Equal(want) {
 		t.Errorf("共有済み: %v %q", at, why)

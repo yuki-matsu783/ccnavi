@@ -63,7 +63,7 @@ func contains(list []string, s string) bool {
 	return false
 }
 
-var drivePrefix = regexp.MustCompile(`^[A-Za-z]:`)
+var drivePrefix = regexp.MustCompile(`\A[A-Za-z]:`)
 
 // parseScope は --scope の値（繰り返し可。カンマ区切りも可）を glob の並びにする。不正なら理由。
 func parseScope(values []string) ([]string, string) {
@@ -101,7 +101,7 @@ func parseScope(values []string) ([]string, string) {
 }
 
 // plainName は引用符なしで書いてよい型の名前（YAML の真偽・null の語は除く）。
-var plainName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
+var plainName = regexp.MustCompile(`\A[A-Za-z][A-Za-z0-9_-]*\z`)
 
 var yamlWords = map[string]bool{"y": true, "n": true, "yes": true, "no": true, "on": true, "off": true,
 	"true": true, "false": true, "null": true}
@@ -121,7 +121,7 @@ func quote(text string) string {
 
 // itemLine は計画の 1 ステップ（ticket.Parse が読む形。PlanItem.Raw と同じ書き分け）。
 func itemLine(item templates.Item) string {
-	if !item.Review.Said() && !item.Deferred && len(item.After) == 0 {
+	if item.Plain() {
 		return "  - " + scalar(item.Type)
 	}
 	parts := []string{"type: " + scalar(item.Type)}

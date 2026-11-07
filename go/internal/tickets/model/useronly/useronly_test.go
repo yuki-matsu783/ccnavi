@@ -2,7 +2,6 @@ package useronly
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -11,6 +10,8 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/policy/texts"
+
+	"ccnavi/internal/tickets/testkit"
 )
 
 // 表と読み替え（tests/guard/test_user_entry.py の TableTest・RewriteTest・EntryMarkTest のうち CLI を通さない分）。
@@ -317,32 +318,10 @@ func TestPlanOrderIsNotStopped(t *testing.T) {
 	}
 }
 
-func copyMessages(t *testing.T, root string) {
-	t.Helper()
-	from := filepath.Join(repoRoot(t), ".ccnavi", "messages")
-	entries, err := os.ReadDir(from)
-	if err != nil {
-		t.Fatal(err)
-	}
-	to := filepath.Join(root, ".ccnavi", "messages")
-	if err := os.MkdirAll(to, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	for _, e := range entries {
-		data, err := os.ReadFile(filepath.Join(from, e.Name()))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(to, e.Name()), data, 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
 // 案内どおりに打った承認の sh に当たり、文がその打ち方を名指す（tests/core/test_script_command.py）。
 func TestRuleNamesTheScriptToType(t *testing.T) {
 	root := t.TempDir()
-	copyMessages(t, root)
+	testkit.CopyMessages(t, root)
 	rule, err := TicketApprovalRule("", root)
 	if err != nil {
 		t.Fatal(err)
@@ -360,10 +339,10 @@ func TestRuleNamesTheScriptToType(t *testing.T) {
 // 組み込みのルールが持つ文の識別子・値・場合が文面ファイルと合っている（tests/core/test_texts_catalog.py の
 // BuiltinRuleTextsTest の phase_forms の分）。判定の文（HumanMessage など）も引けること。
 func TestBuiltinRuleTexts(t *testing.T) {
-	repo := repoRoot(t)
+	repo := testkit.RepoRoot(t)
 	catalog := texts.Load(repo)
 	root := t.TempDir()
-	copyMessages(t, root)
+	testkit.CopyMessages(t, root)
 	rule, err := TicketApprovalRule(filepath.Join(root, "bin", "ccnavi"), root)
 	if err != nil {
 		t.Fatal(err)

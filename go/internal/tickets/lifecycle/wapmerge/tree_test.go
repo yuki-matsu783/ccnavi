@@ -7,8 +7,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
-	"ccnavi/internal/tickets/lifecycle/internal/gitfixture"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // ミラーのずれ（共通レイヤーのコピー・skills/）の案内は、プロジェクトの親の finish だけに出す（#707）。
@@ -21,12 +20,12 @@ const (
 
 func dirtyTree(t *testing.T, rels ...string) string {
 	t.Helper()
-	root := gitfixture.Workspace(t)
+	root := testkit.ShapedWorkspace(t)
 	for _, rel := range rels {
-		gitfixture.Put(t, filepath.Join(root, filepath.FromSlash(rel)), "old\n")
+		testkit.Put(t, filepath.Join(root, filepath.FromSlash(rel)), "old\n")
 	}
-	gitfixture.Git(t, root, "add", "-A", "-f")
-	gitfixture.Git(t, root, "commit", "-q", "-m", "x")
+	testkit.Git(t, root, "add", "-A", "-f")
+	testkit.Git(t, root, "commit", "-q", "-m", "x")
 	for _, rel := range rels {
 		if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(rel)), []byte("new\n"), 0o644); err != nil {
 			t.Fatal(err)
@@ -89,16 +88,16 @@ json.dump({"reasons": reasons, "why": why}, sys.stdout, ensure_ascii=False)
 
 func TestUnrestorableMatchesPython(t *testing.T) {
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	root := gitfixture.Workspace(t)
-	base := gitfixture.Head(t, root)
-	blob := strings.TrimSpace(gitfixture.Git(t, root, "hash-object", "-w", "--", ".gitignore"))
+	root := testkit.ShapedWorkspace(t)
+	base := testkit.Head(t, root)
+	blob := strings.TrimSpace(testkit.Git(t, root, "hash-object", "-w", "--", ".gitignore"))
 	for _, entry := range []string{"100644," + blob + ",src/A.py", "100644," + blob + ",src/a.py",
 		"100644," + blob + ",src/x\ny.py", "160000," + base + ",sub"} {
-		gitfixture.Git(t, root, "update-index", "--add", "--cacheinfo", entry)
+		testkit.Git(t, root, "update-index", "--add", "--cacheinfo", entry)
 	}
-	gitfixture.Git(t, root, "commit", "-q", "-m", "unsafe")
-	head := gitfixture.Head(t, root)
-	want := pyoracle.Answers[map[string]any](t, "unrestorable", unrestorableOracle,
+	testkit.Git(t, root, "commit", "-q", "-m", "unsafe")
+	head := testkit.Head(t, root)
+	want := testkit.Answers[map[string]any](t, "unrestorable", unrestorableOracle,
 		map[string]any{"tree": root, "base": base, "head": head})
 	reasons, why := unrestorable(root, base, head)
 	got := []any{}

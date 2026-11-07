@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/fs"
 	"iter"
-	"regexp"
 	"strings"
 
 	"ccnavi/internal/infra/fsio"
@@ -14,6 +13,7 @@ import (
 	"ccnavi/internal/infra/pyre"
 	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/policy/rules"
+	"ccnavi/internal/tickets/model/ids"
 	"ccnavi/internal/tickets/model/ticket"
 )
 
@@ -49,8 +49,6 @@ const (
 	// Where は phases.yml の苦情の出どころ（ファイル全体への苦情の rule）。
 	Where = "(phases)"
 )
-
-var idPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 
 // PhaseType はフェーズ定義 1 つ。フェーズは親の計画に並ぶ番号付きの実体で、子が phase: N で指す。
 type PhaseType struct {
@@ -210,6 +208,15 @@ func (t *Types) put(p *PhaseType) {
 	t.list = append(t.list, p)
 }
 
+// With は定義を足した写し（同じ id は位置を保って置き換える。Python の {**t, **extra}）。t は変えない。
+func (t *Types) With(extra ...*PhaseType) *Types {
+	out := t.clone()
+	for _, p := range extra {
+		out.put(p)
+	}
+	return out
+}
+
 func (t *Types) clone() *Types {
 	out := &Types{}
 	for p := range t.All() {
@@ -291,7 +298,7 @@ func readDefs(raw *yaml.Map) (*Types, []rules.Problem) {
 				"`<プロジェクト名>"+rules.IDSeparator+"id`）と見分けが付かない"))
 			continue
 		}
-		if !idPattern.MatchString(id) {
+		if !ids.IsValidName(id) {
 			problems = append(problems, problem(rules.Error, id, "識別子に使えない文字がある"))
 			continue
 		}

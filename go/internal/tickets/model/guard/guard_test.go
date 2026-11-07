@@ -11,7 +11,7 @@ import (
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/policy/rules"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の ticket_guard と突き合わせる。式の文字列が 1 字も違わないことと、組んだルールが同じ呼び出しに
@@ -81,7 +81,7 @@ var guardCommands = []string{
 
 func TestGuardMatchesPython(t *testing.T) {
 	in := map[string]any{"cases": guardCases, "paths": guardPaths, "commands": guardCommands}
-	want := pyoracle.Answers[[]guardAnswer](t, "guard", guardOracle, in)
+	want := testkit.Answers[[]guardAnswer](t, "guard", guardOracle, in)
 	for i, c := range guardCases {
 		var all []*rules.Rule
 		raw, err := RawGitRule(c.Root)

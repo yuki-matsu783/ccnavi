@@ -9,8 +9,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
-	"ccnavi/internal/tickets/lifecycle/internal/gitfixture"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の retire と同じワークスペースを 2 つ作り、片付けの記録・親を閉じた後の片付け・残したブランチの消し直し・
@@ -24,38 +23,38 @@ import (
 //	i0001-01-03  合流した子だが、合流のあとに進んだ
 //	i0001-02-01  合流した子。ワークツリーに無視された .env がある
 func fixture(t *testing.T) (string, string) {
-	root := gitfixture.Workspace(t)
-	gitfixture.Remote(t, root)
-	parent := gitfixture.AddWorktree(t, root, "i0001", "main")
+	root := testkit.ShapedWorkspace(t)
+	testkit.Remote(t, root)
+	parent := testkit.AddWorktree(t, root, "i0001", "main")
 	shas := map[string]string{}
 	for _, name := range []string{"i0001-01-01", "i0001-01-02", "i0001-01-03", "i0001-02-01"} {
-		child := gitfixture.AddWorktree(t, root, name, "i0001")
-		gitfixture.Put(t, filepath.Join(child, "src", name+".py"), "x = 1\n")
-		gitfixture.Commit(t, child, "work "+name)
+		child := testkit.AddWorktree(t, root, name, "i0001")
+		testkit.Put(t, filepath.Join(child, "src", name+".py"), "x = 1\n")
+		testkit.Commit(t, child, "work "+name)
 		if name != "i0001-01-02" {
-			gitfixture.Git(t, parent, "merge", "-q", "--no-ff", "-m", "merge "+name, name)
-			shas[name] = gitfixture.Head(t, child)
+			testkit.Git(t, parent, "merge", "-q", "--no-ff", "-m", "merge "+name, name)
+			shas[name] = testkit.Head(t, child)
 		}
 	}
-	gitfixture.Commit(t, gitfixture.Worktree(root, "i0001-01-03"), "合流のあとの変更")
-	exclude := gitfixture.Git(t, gitfixture.Worktree(root, "i0001-02-01"), "rev-parse", "--git-path", "info/exclude")
+	testkit.Commit(t, testkit.Worktree(root, "i0001-01-03"), "合流のあとの変更")
+	exclude := testkit.Git(t, testkit.Worktree(root, "i0001-02-01"), "rev-parse", "--git-path", "info/exclude")
 	excludePath := filepath.Clean(exclude[:len(exclude)-1])
 	if !filepath.IsAbs(excludePath) {
-		excludePath = filepath.Join(gitfixture.Worktree(root, "i0001-02-01"), excludePath)
+		excludePath = filepath.Join(testkit.Worktree(root, "i0001-02-01"), excludePath)
 	}
-	gitfixture.Put(t, excludePath, ".env\n")
-	gitfixture.Put(t, filepath.Join(gitfixture.Worktree(root, "i0001-02-01"), ".env"), "SECRET=1\n")
-	put := func(state, id, text string) { gitfixture.Put(t, gitfixture.Approved(root, "i0001", state, id), text) }
+	testkit.Put(t, excludePath, ".env\n")
+	testkit.Put(t, filepath.Join(testkit.Worktree(root, "i0001-02-01"), ".env"), "SECRET=1\n")
+	put := func(state, id, text string) { testkit.Put(t, testkit.Approved(root, "i0001", state, id), text) }
 	done := `completed_at: "2026-01-02T00:00:00+0900"`
-	put("doing", "i0001", gitfixture.ParentText("i0001", nil))
+	put("doing", "i0001", testkit.ParentText("i0001", nil))
 	for _, name := range []string{"i0001-01-01", "i0001-01-03", "i0001-02-01"} {
 		phase := name[len(name)-4 : len(name)-3]
-		put("done", name, gitfixture.ChildText(name, "i0001", phase, done, `merged_sha: "`+shas[name]+`"`))
+		put("done", name, testkit.ChildText(name, "i0001", phase, done, `merged_sha: "`+shas[name]+`"`))
 	}
-	put("done", "i0001-01-02", gitfixture.ChildText("i0001-01-02", "i0001", "1", `cancelled_at: "2026-01-02T00:00:00+0900"`))
-	gitfixture.Commit(t, parent, "close")
-	gitfixture.Git(t, parent, "push", "-q", "origin", "i0001")
-	return root, gitfixture.Head(t, parent)
+	put("done", "i0001-01-02", testkit.ChildText("i0001-01-02", "i0001", "1", `cancelled_at: "2026-01-02T00:00:00+0900"`))
+	testkit.Commit(t, parent, "close")
+	testkit.Git(t, parent, "push", "-q", "origin", "i0001")
+	return root, testkit.Head(t, parent)
 }
 
 const oracle = `
@@ -123,11 +122,11 @@ func TestMatchesPython(t *testing.T) {
 	if head != goHead {
 		t.Fatalf("2 つのワークスペースの sha が違う: %s %s", head, goHead)
 	}
-	want := pyoracle.Answers[map[string]any](t, "retire", gitfixture.ShapePy+oracle, map[string]any{"root": pyRoot, "head": head})
+	want := testkit.Answers[map[string]any](t, "retire", testkit.ShapePy+oracle, map[string]any{"root": pyRoot, "head": head})
 	root := goRoot
-	conf := gitfixture.Settings(t, root)
-	rel := func(s string) string { return gitfixture.Rel(root, s) }
-	parent := gitfixture.Worktree(root, "i0001")
+	conf := testkit.Settings(t, root)
+	rel := func(s string) string { return testkit.Rel(root, s) }
+	parent := testkit.Worktree(root, "i0001")
 	record := filepath.Join(conf.State, "retire", "i0001.json")
 	got := map[string]any{}
 	run := func(name string, f func(o, e *bytes.Buffer) int) {
@@ -154,7 +153,7 @@ func TestMatchesPython(t *testing.T) {
 	got["entries"] = entries()
 	run("branch early ask", func(o, e *bytes.Buffer) int { return RunBranch(o, e, conf, root, "i0001-01-02", false) })
 	run("branch early confirmed", func(o, e *bytes.Buffer) int { return RunBranch(o, e, conf, root, "i0001-01-02", true) })
-	memo := gitfixture.Put(t, filepath.Join(parent, "memo.txt"), "書きかけ\n")
+	memo := testkit.Put(t, filepath.Join(parent, "memo.txt"), "書きかけ\n")
 	run("retire blocked", func(o, e *bytes.Buffer) int { return RunRetire(o, e, conf, root, "i0001", root) })
 	os.Remove(memo)
 	run("retire inside", func(o, e *bytes.Buffer) int {
@@ -165,7 +164,7 @@ func TestMatchesPython(t *testing.T) {
 	run("branch unknown", func(o, e *bytes.Buffer) int { return RunBranch(o, e, conf, root, "main", false) })
 	run("branch ask", func(o, e *bytes.Buffer) int { return RunBranch(o, e, conf, root, "i0001-01-02", false) })
 	run("branch moved", func(o, e *bytes.Buffer) int { return RunBranch(o, e, conf, root, "I0001-01-03", false) })
-	got["after retire"] = gitfixture.Shape(t, root)
+	got["after retire"] = testkit.Shape(t, root)
 	run("merged", func(o, e *bytes.Buffer) int { return RunMerged(o, conf, root, "i0001", "", "i0001", head, root) })
 	got["record"] = readRecord()
 	run("merged again", func(o, e *bytes.Buffer) int { return RunMerged(o, conf, root, "i0001", "", "i0001", head, root) })
@@ -176,12 +175,12 @@ func TestMatchesPython(t *testing.T) {
 		"i0008.json": `{"parent": "x"}`, "i0009.json": `{"parent": "I0009", "mr": " 0012 ", "branch": "a b"}`,
 		"i0010.json": `{"parent": "i0010", "mr": 3, "branch": "b", "project": "p"}`, "i0011.tmp.json": "{}", "x y.json": "{}",
 	} {
-		gitfixture.Put(t, filepath.Join(filepath.Dir(record), name), text)
+		testkit.Put(t, filepath.Join(filepath.Dir(record), name), text)
 	}
 	got["entries broken"] = entries()
 	run("retire broken", func(o, e *bytes.Buffer) int { return RunRetire(o, e, conf, root, "i0005", root) })
 	got["note broken"] = rel(Note(conf, root, "i0005", "", "", nil))
-	got["shape"] = gitfixture.Shape(t, root)
+	got["shape"] = testkit.Shape(t, root)
 	compare(t, got, want)
 }
 

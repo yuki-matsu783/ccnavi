@@ -215,9 +215,7 @@ func decision(stderr io.Writer, conf *config.Settings, root, cwd string, number 
 	ledger := request.LedgerOf(conf, root, gated.Parent)
 	var unresolved []host.Thread
 	for _, t := range result.Threads {
-		// Unresolved は 1 本ずつの判定なので、1 本ずつ当てて見せた並び（結果の並び）を保つ。
-		open := len(host.Unresolved([]host.Thread{t}, result.Host, poster, ledger)) > 0
-		if open || t.ID != "" && slices.Contains(carry, t.ID) {
+		if host.IsUnresolved(t, result.Host, poster, ledger) || t.ID != "" && slices.Contains(carry, t.ID) {
 			unresolved = append(unresolved, t)
 		}
 	}

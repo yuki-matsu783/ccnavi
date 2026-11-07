@@ -152,8 +152,23 @@ const jsonMark = "$ccnavi"
 // safeInt は JSON の数として拡張（JavaScript）が崩さずに読める整数の範囲。
 const safeInt = 1<<53 - 1
 
-func marked(kind string, kv ...any) *pyjson.Object {
-	return pyjson.NewObject(append([]any{jsonMark, kind}, kv...)...)
+// markKind は目印の種類（拡張のフロー編集画面が読む値）。
+type markKind string
+
+const (
+	markFloat    markKind = "float"
+	markInt      markKind = "int"
+	markMap      markKind = "map"
+	markDate     markKind = "date"
+	markDateTime markKind = "datetime"
+	markBytes    markKind = "bytes"
+	markSet      markKind = "set"
+	markTuple    markKind = "tuple"
+	markOther    markKind = "other"
+)
+
+func marked(kind markKind, kv ...any) *pyjson.Object {
+	return pyjson.NewObject(append([]any{jsonMark, string(kind)}, kv...)...)
 }
 
 // AsJSON は読めた中身を JSON に載せる形にする（--lint --json --flow の flow.data）。拡張のフロー編集画面は
@@ -168,7 +183,7 @@ func AsJSON(v any) any {
 		if -safeInt <= x && x <= safeInt {
 			return x
 		}
-		return marked("int", "text", pyfmt.Str(x))
+		return marked(markInt, "text", pyfmt.Str(x))
 	case *big.Int:
 		if x.IsInt64() && -safeInt <= x.Int64() && x.Int64() <= safeInt {
 			return int(x.Int64())
@@ -177,17 +192,17 @@ func AsJSON(v any) any {
 		if len(strings.TrimPrefix(text, "-")) > pyfmt.MaxIntDigits {
 			text = "(桁が多すぎる)"
 		}
-		return marked("int", "text", text)
+		return marked(markInt, "text", text)
 	case float64:
 		switch {
 		case math.IsNaN(x):
-			return marked("float", "text", "nan")
+			return marked(markFloat, "text", "nan")
 		case math.IsInf(x, 1):
-			return marked("float", "text", "inf")
+			return marked(markFloat, "text", "inf")
 		case math.IsInf(x, -1):
-			return marked("float", "text", "-inf")
+			return marked(markFloat, "text", "-inf")
 		}
-		return marked("float", "value", x)
+		return marked(markFloat, "value", x)
 	case []any:
 		out := make([]any, len(x))
 		for i, item := range x {
@@ -206,22 +221,22 @@ func AsJSON(v any) any {
 		for k, item := range x.All() {
 			items = append(items, []any{AsJSON(k), AsJSON(item)})
 		}
-		return marked("map", "items", items)
+		return marked(markMap, "items", items)
 	case yaml.DateTime:
-		return marked("datetime", "text", x.ISOFormat())
+		return marked(markDateTime, "text", x.ISOFormat())
 	case yaml.Date:
-		return marked("date", "text", x.ISOFormat())
+		return marked(markDate, "text", x.ISOFormat())
 	case []byte:
-		return marked("bytes", "text", base64.StdEncoding.EncodeToString(x))
+		return marked(markBytes, "text", base64.StdEncoding.EncodeToString(x))
 	case yaml.Set:
 		shown := make([]string, len(x))
 		for i, item := range x {
 			shown[i] = pyfmt.Repr(item)
 		}
 		sort.Strings(shown)
-		return marked("set", "text", Line(pyfmt.Repr(shown)))
+		return marked(markSet, "text", Line(pyfmt.Repr(shown)))
 	case yaml.Tuple:
-		return marked("tuple", "text", Line(x.PyRepr()))
+		return marked(markTuple, "text", Line(x.PyRepr()))
 	}
-	return marked("other", "text", fmt.Sprintf("%T", v))
+	return marked(markOther, "text", fmt.Sprintf("%T", v))
 }

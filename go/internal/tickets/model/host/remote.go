@@ -20,8 +20,8 @@ import (
 //
 // Python の `$` は末尾の改行の前でも当たるので、`\n?` を置いて同じ答えにする。
 var remote = regexp.MustCompile(
-	`^(?:(?i:https?)://|(?i:ssh)://git@|git@)(?:[^/]*@)?` +
-		`(?P<host>\[[^\]/]+\]|[^/:@]+)(?::(?P<port>[0-9]+))?[/:]+(?P<path>.+?)(?:\.git)?/?\n?$`)
+	`\A(?:(?i:https?)://|(?i:ssh)://git@|git@)(?:[^/]*@)?` +
+		`(?P<host>\[[^\]/]+\]|[^/:@]+)(?::(?P<port>[0-9]+))?[/:]+(?P<path>.+?)(?:\.git)?/?\n?\z`)
 
 // credentials は URL に埋めた資格情報（`//user:token@`）。苦情の文には残さない。
 var credentials = regexp.MustCompile(`//[^/@]*@`)

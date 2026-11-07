@@ -8,9 +8,8 @@ import (
 	"testing"
 
 	"ccnavi/internal/tickets/approval"
-	"ccnavi/internal/tickets/lifecycle/internal/gitfixture"
-	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/model/ticket"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の plan と同じワークスペースを読ませ、計画の無い親を止める文と、子の無いフェーズの案内が 1 字も違わない
@@ -21,17 +20,17 @@ import (
 //	i0003  計画が 1 つで、子がある
 //	i0004  プロジェクト p の計画の無い親（置き場はプロジェクト）
 func fixture(t *testing.T) string {
-	root := gitfixture.Workspace(t)
+	root := testkit.ShapedWorkspace(t)
 	for _, id := range []string{"i0001", "i0002", "i0003"} {
-		gitfixture.AddWorktree(t, root, id, "main")
+		testkit.AddWorktree(t, root, id, "main")
 	}
-	gitfixture.Put(t, gitfixture.Approved(root, "i0001", "doing", "i0001"), gitfixture.ParentText("i0001", []string{"  - work", "  - work", "  - work"}))
-	gitfixture.Put(t, gitfixture.Approved(root, "i0001", "doing", "i0001-01-01"), gitfixture.ChildText("i0001-01-01", "i0001", "1"))
-	gitfixture.Put(t, filepath.Join(gitfixture.Worktree(root, "i0001"), "wip", "proposals", "todo", "i0001-02-01.md"),
-		gitfixture.ChildText("i0001-02-01", "i0001", "2"))
-	gitfixture.Put(t, gitfixture.Approved(root, "i0002", "doing", "i0002"), gitfixture.ParentText("i0002", nil))
-	gitfixture.Put(t, gitfixture.Approved(root, "i0003", "doing", "i0003"), gitfixture.ParentText("i0003", []string{"  - work"}))
-	gitfixture.Put(t, gitfixture.Approved(root, "i0003", "doing", "i0003-01-01"), gitfixture.ChildText("i0003-01-01", "i0003", "1"))
+	testkit.Put(t, testkit.Approved(root, "i0001", "doing", "i0001"), testkit.ParentText("i0001", []string{"  - work", "  - work", "  - work"}))
+	testkit.Put(t, testkit.Approved(root, "i0001", "doing", "i0001-01-01"), testkit.ChildText("i0001-01-01", "i0001", "1"))
+	testkit.Put(t, filepath.Join(testkit.Worktree(root, "i0001"), "wip", "proposals", "todo", "i0001-02-01.md"),
+		testkit.ChildText("i0001-02-01", "i0001", "2"))
+	testkit.Put(t, testkit.Approved(root, "i0002", "doing", "i0002"), testkit.ParentText("i0002", nil))
+	testkit.Put(t, testkit.Approved(root, "i0003", "doing", "i0003"), testkit.ParentText("i0003", []string{"  - work"}))
+	testkit.Put(t, testkit.Approved(root, "i0003", "doing", "i0003-01-01"), testkit.ChildText("i0003-01-01", "i0003", "1"))
 	return root
 }
 
@@ -56,9 +55,9 @@ json.dump(out, sys.stdout, ensure_ascii=False)
 
 func TestMatchesPython(t *testing.T) {
 	root := fixture(t)
-	project := gitfixture.ParentText("i0004", nil, "project: p")
-	want := pyoracle.Answers[[]any](t, "plan", oracle, map[string]any{"root": root, "project": project})
-	conf := gitfixture.Settings(t, root)
+	project := testkit.ParentText("i0004", nil, "project: p")
+	want := testkit.Answers[[]any](t, "plan", oracle, map[string]any{"root": root, "project": project})
+	conf := testkit.Settings(t, root)
 	opened, _ := approval.Scan(conf, root, false, nil)
 	found := approval.ByID(opened)
 	found["i0004"], _ = ticket.Parse(project)
@@ -68,7 +67,7 @@ func TestMatchesPython(t *testing.T) {
 		missing := MissingPlan(&e, found[id])
 		notice := []string{}
 		for _, line := range ChildlessNotice(conf, root, found[id]) {
-			notice = append(notice, gitfixture.Rel(root, line))
+			notice = append(notice, testkit.Rel(root, line))
 		}
 		got = append(got, []any{missing, e.String(), notice})
 	}

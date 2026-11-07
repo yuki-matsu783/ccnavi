@@ -9,8 +9,8 @@ import (
 	"ccnavi/internal/tickets/approval/marks"
 	"ccnavi/internal/tickets/config/phases"
 	"ccnavi/internal/tickets/model/place"
-	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/model/ticket"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // ゲートの表。計画のステップ・定義・引き受けた延期・子の宣言と状態・実績のリスク・マーカーの組み合わせを全部
@@ -143,9 +143,9 @@ func flag(b bool) string {
 }
 
 func TestGateMatchesPython(t *testing.T) {
-	root := pyoracle.RepoRoot(t)
+	root := testkit.RepoRoot(t)
 	cases := gateCases()
-	want := pyoracle.Answers[struct {
+	want := testkit.Answers[struct {
 		Rows  []string `json:"rows"`
 		Holds []string `json:"holds"`
 	}](t, "gate", gateOracle, map[string]any{"root": root, "cases": cases})

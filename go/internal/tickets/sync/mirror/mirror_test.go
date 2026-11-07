@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"ccnavi/internal/tickets/testkit"
 )
 
 func byName(plan *Plan) map[string]*Project {
@@ -83,13 +85,13 @@ func TestPrepareSeesDeletesUpdatesAndIgnoresLineEndings(t *testing.T) {
 		want [][2]string
 	}{
 		{"共通に無いファイルは削除", func(t *testing.T, lib string) {
-			write(t, commonPath(lib, "old.yml"), "version: 1\n")
+			testkit.Put(t, commonPath(lib, "old.yml"), "version: 1\n")
 		}, [][2]string{{".ccnavi/config/common/old.yml", "delete"}}},
 		{"中身が違えば更新", func(t *testing.T, lib string) {
-			write(t, commonPath(lib, "risks.yml"), "version: 1\nlevels: {}\nfactors: []\n")
+			testkit.Put(t, commonPath(lib, "risks.yml"), "version: 1\nlevels: {}\nfactors: []\n")
 		}, [][2]string{{".ccnavi/config/common/risks.yml", "update"}}},
 		{"改行の違いはずれではない", func(t *testing.T, lib string) {
-			write(t, commonPath(lib, "risks.yml"), strings.ReplaceAll(commonRisk, "\n", "\r\n"))
+			testkit.Put(t, commonPath(lib, "risks.yml"), strings.ReplaceAll(commonRisk, "\n", "\r\n"))
 		}, nil},
 	}
 	for _, c := range cases {
@@ -132,7 +134,7 @@ func TestPrepareSelectsByNameWithoutCase(t *testing.T) {
 func TestPrepareExpectFollowsTheCommonContent(t *testing.T) {
 	root := workspace(t)
 	before := Prepare(settingsOf(root), root, nil).Expect()
-	write(t, commonPath(root, "risks.yml"), commonRisk+"  - {id: extra, points: 1, lines_over: 99, message: 足した}\n")
+	testkit.Put(t, commonPath(root, "risks.yml"), commonRisk+"  - {id: extra, points: 1, lines_over: 99, message: 足した}\n")
 	if Prepare(settingsOf(root), root, nil).Expect() == before {
 		t.Error("中身が変わっても expect が同じ")
 	}
@@ -140,12 +142,16 @@ func TestPrepareExpectFollowsTheCommonContent(t *testing.T) {
 
 func TestPrepareStopsWhenTheCommonLayerCannotBeMirrored(t *testing.T) {
 	cases := map[string]func(t *testing.T, root string){
-		"rules の版":    func(t *testing.T, root string) { write(t, commonPath(root, "rules.yml"), "version: 99\n") },
-		"phases の形":   func(t *testing.T, root string) { write(t, commonPath(root, "phases.yml"), "version: 1\nphases: 3\n") },
-		"risk の YAML": func(t *testing.T, root string) { write(t, commonPath(root, "risks.yml"), "version: 1\nfactors: [\n") },
-		"UTF-8 でない":   func(t *testing.T, root string) { putBytes(t, commonPath(root, "rules.yml"), []byte{0xff}) },
+		"rules の版": func(t *testing.T, root string) { testkit.Put(t, commonPath(root, "rules.yml"), "version: 99\n") },
+		"phases の形": func(t *testing.T, root string) {
+			testkit.Put(t, commonPath(root, "phases.yml"), "version: 1\nphases: 3\n")
+		},
+		"risk の YAML": func(t *testing.T, root string) {
+			testkit.Put(t, commonPath(root, "risks.yml"), "version: 1\nfactors: [\n")
+		},
+		"UTF-8 でない": func(t *testing.T, root string) { putBytes(t, commonPath(root, "rules.yml"), []byte{0xff}) },
 		"スクリプトが無い": func(t *testing.T, root string) {
-			write(t, commonPath(root, "risks.yml"), commonRisk+scriptFactors)
+			testkit.Put(t, commonPath(root, "risks.yml"), commonRisk+scriptFactors)
 		},
 	}
 	for name, edit := range cases {
@@ -192,7 +198,7 @@ func TestAnEmptyCommonLayerDeletesNothing(t *testing.T) {
 
 func TestApplyWritesOnlyTheChosenMirror(t *testing.T) {
 	root := workspace(t)
-	own := write(t, filepath.Join(project(root, "lib"), ".ccnavi", "config", "project", "rules.yml"), "version: 1\n")
+	own := testkit.Put(t, filepath.Join(project(root, "lib"), ".ccnavi", "config", "project", "rules.yml"), "version: 1\n")
 	plan := Prepare(settingsOf(root), root, []string{"lib"})
 	done := Apply(settingsOf(root), plan, plan.Expect())
 	if !done.OK || len(done.Synced) != 1 || done.Synced[0].Name != "lib" {
@@ -218,7 +224,7 @@ func TestApplyRefusesAnExpectThatIsNotTheShownOne(t *testing.T) {
 		},
 		"空": func(t *testing.T, root string, plan *Plan) (*Plan, string) { return plan, "" },
 		"見せた後に共通が変わった": func(t *testing.T, root string, plan *Plan) (*Plan, string) {
-			write(t, commonPath(root, "risks.yml"), commonRisk+"# 直した\n")
+			testkit.Put(t, commonPath(root, "risks.yml"), commonRisk+"# 直した\n")
 			return Prepare(settingsOf(root), root, nil), plan.Expect()
 		},
 	}
@@ -266,8 +272,8 @@ func TestSkillsAreCheckedAndSyncedWithTheMirror(t *testing.T) {
 	root := workspace(t)
 	without := Prepare(settingsOf(root), root, nil).Expect()
 	skill(t, root, "process-test", "# 本文\n", map[string]string{"a.md": "A\n", "sub/b.md": "B\n", "note.txt": "x\n"})
-	write(t, skillPath(root, "process-test", "references", "local", "x.md"), "local\n")
-	write(t, skillPath(root, "plain", "SKILL.md"), "---\nname: plain\n---\n")
+	testkit.Put(t, skillPath(root, "process-test", "references", "local", "x.md"), "local\n")
+	testkit.Put(t, skillPath(root, "plain", "SKILL.md"), "---\nname: plain\n---\n")
 	plan := Prepare(settingsOf(root), root, nil)
 	if plan.Expect() == without {
 		t.Error("工程スキルが expect に入っていない")
@@ -289,7 +295,7 @@ func TestSkillsAreCheckedAndSyncedWithTheMirror(t *testing.T) {
 
 	// 中身が変われば更新で、expect も変わる。
 	before := Prepare(settingsOf(root), root, nil).Expect()
-	write(t, skillPath(root, "process-test", "SKILL.md"), "---\nname: process-test\nprocess: true\n---\n# 変えた\n")
+	testkit.Put(t, skillPath(root, "process-test", "SKILL.md"), "---\nname: process-test\nprocess: true\n---\n# 変えた\n")
 	plan = Prepare(settingsOf(root), root, nil)
 	if got := actions(byName(plan)["lib"], true); !reflect.DeepEqual(got, [][2]string{{"skills/process-test/SKILL.md", "update"}}) {
 		t.Errorf("%v", got)
@@ -299,7 +305,7 @@ func TestSkillsAreCheckedAndSyncedWithTheMirror(t *testing.T) {
 	}
 
 	// 共通側から消えた .md は消し、空になったディレクトリを片付ける。プロジェクトのものは残す。
-	own := write(t, filepath.Join(lib, "skills", "process-test", "references", "own.md"), "mine\n")
+	own := testkit.Put(t, filepath.Join(lib, "skills", "process-test", "references", "own.md"), "mine\n")
 	if err := os.Remove(skillPath(root, "process-test", "references", "common", "sub", "b.md")); err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +364,7 @@ func TestASkillsFailureLeavesTheMirrorUnwritten(t *testing.T) {
 	skill(t, root, "process-test", "# 本文\n", nil)
 	plan := Prepare(settingsOf(root), root, []string{"lib"})
 	// 書く直前に、写し先の途中をファイルにして skills/ の書き込みを失敗させる。
-	write(t, filepath.Join(project(root, "lib"), "skills", "process-test"), "x")
+	testkit.Put(t, filepath.Join(project(root, "lib"), "skills", "process-test"), "x")
 	done := Apply(settingsOf(root), plan, plan.Expect())
 	if done.OK || !strings.HasPrefix(done.Error, "lib: skills/process-test/SKILL.md を保存できませんでした: ") || len(done.Synced) > 0 {
 		t.Errorf("%+v", done)
@@ -369,14 +375,14 @@ func TestASkillsFailureLeavesTheMirrorUnwritten(t *testing.T) {
 }
 
 func TestProcessesCountOnlyRealProcessSkills(t *testing.T) {
-	root := tempRoot(t)
+	root := testkit.TempRoot(t)
 	skill(t, root, "process-test", "", nil)
-	write(t, skillPath(root, "said-yes", "SKILL.md"), "---\nprocess: yes\n---\n")
-	write(t, skillPath(root, "as-text", "SKILL.md"), "---\nprocess: \"true\"\n---\n")
-	write(t, skillPath(root, "as-number", "SKILL.md"), "---\nprocess: 1\n---\n")
-	write(t, skillPath(root, "open", "SKILL.md"), "---\nprocess: true\n")
-	write(t, skillPath(root, "alias", "SKILL.md"), "---\na: &x 1\nb: *x\nprocess: true\n---\n")
-	write(t, skillPath(root, "late", "SKILL.md"), "\n---\nprocess: true\n---\n")
+	testkit.Put(t, skillPath(root, "said-yes", "SKILL.md"), "---\nprocess: yes\n---\n")
+	testkit.Put(t, skillPath(root, "as-text", "SKILL.md"), "---\nprocess: \"true\"\n---\n")
+	testkit.Put(t, skillPath(root, "as-number", "SKILL.md"), "---\nprocess: 1\n---\n")
+	testkit.Put(t, skillPath(root, "open", "SKILL.md"), "---\nprocess: true\n")
+	testkit.Put(t, skillPath(root, "alias", "SKILL.md"), "---\na: &x 1\nb: *x\nprocess: true\n---\n")
+	testkit.Put(t, skillPath(root, "late", "SKILL.md"), "\n---\nprocess: true\n---\n")
 	link(t, skillPath(root, "process-test"), skillPath(root, "linked"))
 	if got := processes(root); !reflect.DeepEqual(got, []string{"process-test", "said-yes"}) {
 		t.Errorf("%v", got)
@@ -400,9 +406,9 @@ func TestSkillSourcesStopAtALink(t *testing.T) {
 	}
 	for name, edit := range cases {
 		t.Run(name, func(t *testing.T) {
-			root := tempRoot(t)
-			write(t, filepath.Join(root, "outside", "common", "y.md"), "y\n")
-			write(t, filepath.Join(root, "outside.md"), "o\n")
+			root := testkit.TempRoot(t)
+			testkit.Put(t, filepath.Join(root, "outside", "common", "y.md"), "y\n")
+			testkit.Put(t, filepath.Join(root, "outside.md"), "o\n")
 			skill(t, root, "process-test", "", nil)
 			edit(t, root)
 			if files, why := skillSources(root); files != nil || !strings.HasSuffix(why, linkedEntry) {
@@ -416,17 +422,17 @@ func TestSkillSourcesStopAtALink(t *testing.T) {
 
 func TestCommonPlanCopiesScriptsAndTemplates(t *testing.T) {
 	root := workspace(t)
-	write(t, commonPath(root, "risks.yml"), commonRisk+scriptFactors)
+	testkit.Put(t, commonPath(root, "risks.yml"), commonRisk+scriptFactors)
 	putBytes(t, commonPath(root, "scripts", "count.sh"), countScript)
-	write(t, commonPath(root, "rule-expectations.yml"), expectations)
-	write(t, commonPath(root, "templates", "feature.yml"), featureTemplate)
-	write(t, commonPath(root, "templates", "warned.yml"), "name: warned\ndescription: d\nwhen: w\nplan: [nothing-like-it]\n")
-	write(t, commonPath(root, "templates", "broken.yml"), "plan: [work\n")
-	write(t, commonPath(root, "templates", "shape.yml"), "name: shape\ndescription: d\nplan: [work]\nflows: 3\n")
-	write(t, commonPath(root, "templates", ".hidden.yml"), "x: 1\n")
-	write(t, commonPath(root, "templates", "notes.txt"), "x\n")
+	testkit.Put(t, commonPath(root, "rule-expectations.yml"), expectations)
+	testkit.Put(t, commonPath(root, "templates", "feature.yml"), featureTemplate)
+	testkit.Put(t, commonPath(root, "templates", "warned.yml"), "name: warned\ndescription: d\nwhen: w\nplan: [nothing-like-it]\n")
+	testkit.Put(t, commonPath(root, "templates", "broken.yml"), "plan: [work\n")
+	testkit.Put(t, commonPath(root, "templates", "shape.yml"), "name: shape\ndescription: d\nplan: [work]\nflows: 3\n")
+	testkit.Put(t, commonPath(root, "templates", ".hidden.yml"), "x: 1\n")
+	testkit.Put(t, commonPath(root, "templates", "notes.txt"), "x\n")
 	lib := project(root, "lib")
-	write(t, commonPath(lib, "scripts", "old.sh"), "old\n")
+	testkit.Put(t, commonPath(lib, "scripts", "old.sh"), "old\n")
 	conf := settingsOf(root)
 
 	changes, why := commonPlan(conf, root, lib)
@@ -467,7 +473,7 @@ func TestCommonPlanCopiesScriptsAndTemplates(t *testing.T) {
 
 func TestASymlinkedTemplatesPlaceSkipsOnlyTheTemplates(t *testing.T) {
 	root := workspace(t)
-	write(t, filepath.Join(root, "elsewhere", "feature.yml"), featureTemplate)
+	testkit.Put(t, filepath.Join(root, "elsewhere", "feature.yml"), featureTemplate)
 	link(t, filepath.Join(root, "elsewhere"), commonPath(root, "templates"))
 	files, why := commonSources(settingsOf(root), root)
 	if why != "" || files["rules.yml"] == nil || files["templates/feature.yml"] != nil {
@@ -481,7 +487,7 @@ func TestCommonPlanStopsAtALinkInTheTree(t *testing.T) {
 		want string
 	}{
 		"ミラーの上のディレクトリ": {func(t *testing.T, root, lib string) {
-			write(t, filepath.Join(root, "elsewhere", "common", "rules.yml"), commonRules)
+			testkit.Put(t, filepath.Join(root, "elsewhere", "common", "rules.yml"), commonRules)
 			link(t, filepath.Join(root, "elsewhere"), filepath.Join(lib, ".ccnavi", "config"))
 		}, ".ccnavi/config/common" + linkedPath},
 		"ミラーの置き場": {func(t *testing.T, root, lib string) {
@@ -495,7 +501,7 @@ func TestCommonPlanStopsAtALinkInTheTree(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			root := workspace(t)
 			lib := project(root, "lib")
-			write(t, filepath.Join(lib, "README"), "x\n")
+			testkit.Put(t, filepath.Join(lib, "README"), "x\n")
 			if err := os.MkdirAll(filepath.Join(root, "elsewhere"), 0o755); err != nil {
 				t.Fatal(err)
 			}
@@ -510,8 +516,8 @@ func TestCommonPlanStopsAtALinkInTheTree(t *testing.T) {
 func TestAFailedWritePutsEverythingBack(t *testing.T) {
 	root := workspace(t)
 	lib := project(root, "lib")
-	write(t, commonPath(lib, "scripts", "old.sh"), "old\n")
-	write(t, commonPath(lib, "rules.yml"), "version: 1\n")
+	testkit.Put(t, commonPath(lib, "scripts", "old.sh"), "old\n")
+	testkit.Put(t, commonPath(lib, "rules.yml"), "version: 1\n")
 	changes, why := commonPlan(settingsOf(root), root, lib)
 	if why != "" {
 		t.Fatal(why)
@@ -568,12 +574,12 @@ func TestSyncCopiesToTheStartedParentOnce(t *testing.T) {
 	}
 
 	// ターンの間にミラーが手で直されれば、元が動いていなくても比べ直す。
-	write(t, commonPath(worktree, "risks.yml"), "version: 1\n")
+	testkit.Put(t, commonPath(worktree, "risks.yml"), "version: 1\n")
 	if lines := Sync(conf, root); !slices.Contains(lines, "  - .ccnavi/config/common/risks.yml（上書き）") {
 		t.Errorf("%q", lines)
 	}
 	// 共通レイヤーが直されれば、次の発言で届く。
-	write(t, commonPath(root, "risks.yml"), commonRisk+"# 直した\n")
+	testkit.Put(t, commonPath(root, "risks.yml"), commonRisk+"# 直した\n")
 	Sync(conf, root)
 	if read(t, commonPath(worktree, "risks.yml")) != commonRisk+"# 直した\n" {
 		t.Error("届いていない")
@@ -583,7 +589,7 @@ func TestSyncCopiesToTheStartedParentOnce(t *testing.T) {
 func TestAFailedSyncIsSaidEveryTime(t *testing.T) {
 	root := workspace(t)
 	worktree := startedParent(t, root)
-	write(t, commonPath(root, "risks.yml"), "version: 1\nfactors: [\n")
+	testkit.Put(t, commonPath(root, "risks.yml"), "version: 1\nfactors: [\n")
 	conf := settingsOf(root)
 	for range 2 {
 		lines := Sync(conf, root)
@@ -591,7 +597,7 @@ func TestAFailedSyncIsSaidEveryTime(t *testing.T) {
 			t.Errorf("%q", lines)
 		}
 	}
-	write(t, commonPath(root, "risks.yml"), commonRisk)
+	testkit.Put(t, commonPath(root, "risks.yml"), commonRisk)
 	Sync(conf, root)
 	if read(t, commonPath(worktree, "risks.yml")) != commonRisk {
 		t.Error("直っても写さない")
@@ -601,7 +607,7 @@ func TestAFailedSyncIsSaidEveryTime(t *testing.T) {
 func TestSyncSkipsParentsThatAreNotStarted(t *testing.T) {
 	root := workspace(t)
 	worktree := startedParent(t, root)
-	write(t, filepath.Join(worktree, ".ccnavi", "approved", "doing", "i0001.md"),
+	testkit.Put(t, filepath.Join(worktree, ".ccnavi", "approved", "doing", "i0001.md"),
 		strings.Replace(parentTicket, `started_at: "2026-01-02T03:04:05+09:00"`, `started_at: ""`, 1))
 	if lines := Sync(settingsOf(root), root); lines != nil || exists(commonPath(worktree)) {
 		t.Errorf("%q", lines)
@@ -618,7 +624,7 @@ func TestSyncNoticesARewriteWithTheSameSizeAndTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	write(t, source, strings.Replace(commonRisk, "points: 25", "points: 26", 1))
+	testkit.Put(t, source, strings.Replace(commonRisk, "points: 25", "points: 26", 1))
 	if err := os.Chtimes(source, time.Time{}, info.ModTime()); err != nil {
 		t.Fatal(err)
 	}
@@ -632,7 +638,7 @@ func TestSyncNoticesARewriteWithTheSameSizeAndTime(t *testing.T) {
 // ---- ずれの見分け
 
 func TestSplitLabelsTheMirroredPaths(t *testing.T) {
-	conf := settingsOf(tempRoot(t))
+	conf := settingsOf(testkit.TempRoot(t))
 	paths := []string{".ccnavi/config/common/rules.yml", ".CCNAVI/Config/Common/x", "skills/a/SKILL.md", "Skills/b", "src/a.go", "skillsx/c"}
 	mirrored, others := Split(conf, paths)
 	if !reflect.DeepEqual(mirrored, paths[:4]) || !reflect.DeepEqual(others, paths[4:]) {

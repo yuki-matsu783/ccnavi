@@ -3,17 +3,15 @@ package useronly
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"math/rand/v2"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"ccnavi/internal/infra/shell"
+
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の user_only・phase_forms と突き合わせる。表から組む式の文字列が 1 字も違わないこと、同じコマンドに
@@ -21,91 +19,11 @@ import (
 // （shellread.read の text・層）は Python の答えをそのまま当てる（突き合わせは infra/shell が持つ）。
 // リポジトリの .venv の Python が無ければ testdata の写しと比べる。
 
-var update = flag.Bool("update", false, "testdata の Python の答えを取り直す")
-
-func repoRoot(t *testing.T) string {
-	t.Helper()
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, ".ccnavi", "messages")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Skip("リポジトリが見つからない")
-		}
-		dir = parent
-	}
-}
-
-func venvPython(root string) string {
-	for _, rel := range []string{".venv/bin/python", ".venv/Scripts/python.exe"} {
-		if p := filepath.Join(root, rel); fileExists(p) {
-			return p
-		}
-	}
-	return ""
-}
-
-func fileExists(p string) bool {
-	_, err := os.Stat(p)
-	return err == nil
-}
-
-// answers は Python の答え。name が空なら写しを持たない（Python が無ければ飛ばす）。
+// answers は testkit.Answers に、文面ファイルを読むリポジトリのルートを添えて渡す（Python の側は c["root"] と
+// c["in"] で読む）。name が空なら写しを持たない。
 func answers[T any](t *testing.T, name, script string, in any) T {
 	t.Helper()
-	var saved T
-	path := filepath.Join("testdata", name+".json")
-	data, readErr := os.ReadFile(path)
-	if name != "" && readErr == nil {
-		if err := json.Unmarshal(data, &saved); err != nil {
-			t.Fatal(err)
-		}
-	}
-	root := repoRoot(t)
-	py := venvPython(root)
-	if py == "" {
-		if name == "" || readErr != nil {
-			t.Skip("Python も testdata の写しも無い")
-		}
-		return saved
-	}
-	payload, err := json.Marshal(map[string]any{"root": root, "in": in})
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmd := exec.Command(py, "-c", script)
-	cmd.Env = append(os.Environ(), "PYTHONPATH="+filepath.Join(root, "src"), "PYTHONDONTWRITEBYTECODE=1")
-	cmd.Stdin = bytes.NewReader(payload)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("python: %v\n%s", err, stderr.String())
-	}
-	var fresh T
-	if err := json.Unmarshal(out, &fresh); err != nil {
-		t.Fatalf("%v\n%s", err, out)
-	}
-	if name == "" {
-		return fresh
-	}
-	got, _ := json.Marshal(fresh)
-	if *update {
-		if err := os.MkdirAll("testdata", 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, append(got, '\n'), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	} else if readErr != nil || !bytes.Equal(bytes.TrimSpace(data), got) {
-		t.Errorf("%s が Python の答えと違う（go test -run %s -update で取り直す）", path, t.Name())
-	}
-	return fresh
+	return testkit.Answers[T](t, name, script, map[string]any{"root": testkit.RepoRoot(t), "in": in})
 }
 
 // 文は root の文面ファイルから引くので、写しにはリポジトリの外の答え（文の中身）を入れない。文の突き合わせは
@@ -237,7 +155,7 @@ type judgeRow struct {
 func compareJudge(t *testing.T, name string, in judgeIn) {
 	t.Helper()
 	want := answers[[]judgeRow](t, name, judgeOracle, in)
-	root := repoRoot(t)
+	root := testkit.RepoRoot(t)
 	ruleFor := map[string]func(string) bool{}
 	for _, b := range in.Bins {
 		rule, err := TicketApprovalRule(b, root)

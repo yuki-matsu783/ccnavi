@@ -9,7 +9,7 @@ import (
 
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/records/wiki"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の tickets/learning と同じ入力を読ませ、記録の読み取り・整合の検査・節の文・追記・コマンドの語・要約の JSON・
@@ -122,7 +122,7 @@ func TestMatchesPython(t *testing.T) {
 	records := digestRecords()
 	in := map[string]any{"parse": parseCases, "entry": entryCases, "append": appendCases, "words": wordCases,
 		"validate": validateCases, "records": records}
-	want := pyoracle.Answers[textAnswers](t, "text", textOracle, in)
+	want := testkit.Answers[textAnswers](t, "text", textOracle, in)
 
 	for i, text := range parseCases {
 		got := []any{"", "", []any{}}
@@ -255,7 +255,7 @@ func TestFindMatchesPython(t *testing.T) {
 	put(t, root, "docs/wiki/patterns/new.md", "x\n")
 	put(t, root, "src/other.go", "x\n")
 
-	want := pyoracle.Answers[findAnswers](t, "find", findOracle, map[string]string{"root": root})
+	want := testkit.Answers[findAnswers](t, "find", findOracle, map[string]string{"root": root})
 	found := Find(root)
 	got := findAnswers{Uncommitted: Uncommitted(root)}
 	for _, i := range found.Items {

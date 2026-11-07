@@ -74,7 +74,7 @@ func (s section) numbers() []int {
 	return out
 }
 
-var digits = regexp.MustCompile(`^[0-9]+$`)
+var digits = regexp.MustCompile(`\A[0-9]+\z`)
 
 // ParseOrder は `--order` の JSON を読む。形は {"plan": {"1": [], "2": [3]}, "feedback": {...}}。番号は元の番号で、
 // 渡した計画は全部の番号の先行をそこから取る（書いていない番号は先行なし）。読めなければ (nil, 理由)。

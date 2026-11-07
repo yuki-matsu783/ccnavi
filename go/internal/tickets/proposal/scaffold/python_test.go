@@ -4,13 +4,12 @@ import (
 	"bytes"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"ccnavi/internal/infra/config"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の scaffold（ticket new）と revise（ticket revise）を、同じ形のワークスペースで同じ順に走らせ、標準出力・
@@ -136,59 +135,21 @@ base_sha: abc
 
 var worktreeNames = []string{"feat-a", "feat-b", "feat-c", "feat-d", "feat-e"}
 
-func gitRun(t *testing.T, dir string, args ...string) {
-	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
-		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-}
-
-func put(t *testing.T, path, text string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func scaffoldWorkspace(t *testing.T) string {
 	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git が無い")
-	}
-	root, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	gitRun(t, root, "init", "-q", "-b", "main")
-	gitRun(t, root, "commit", "-q", "--allow-empty", "-m", "init")
+	root := testkit.GitRoot(t)
+	testkit.Git(t, root, "init", "-q", "-b", "main")
+	testkit.Git(t, root, "commit", "-q", "--allow-empty", "-m", "init")
 	for _, name := range worktreeNames {
-		gitRun(t, root, "worktree", "add", "-q", "-b", name, filepath.Join(".claude", "worktrees", name), "main")
+		testkit.Git(t, root, "worktree", "add", "-q", "-b", name, filepath.Join(".claude", "worktrees", name), "main")
 	}
-	from := filepath.Join(pyoracle.RepoRoot(t), ".ccnavi", "messages")
-	entries, err := os.ReadDir(from)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, e := range entries {
-		data, err := os.ReadFile(filepath.Join(from, e.Name()))
-		if err != nil {
-			t.Fatal(err)
-		}
-		put(t, filepath.Join(root, ".ccnavi", "messages", e.Name()), string(data))
-	}
+	testkit.CopyMessages(t, root)
 	common := filepath.Join(root, ".ccnavi", "config", "common")
-	put(t, filepath.Join(common, "phases.yml"), scaffoldPhases)
-	put(t, filepath.Join(common, "templates", "feature.yml"), featureTemplate)
-	put(t, filepath.Join(common, "templates", "wrongkind.yml"), kindTemplate)
+	testkit.Put(t, filepath.Join(common, "phases.yml"), scaffoldPhases)
+	testkit.Put(t, filepath.Join(common, "templates", "feature.yml"), featureTemplate)
+	testkit.Put(t, filepath.Join(common, "templates", "wrongkind.yml"), kindTemplate)
 	conf, _ := config.Load(root)
-	put(t, filepath.Join(conf.ApprovedDir(filepath.Join(root, ".claude", "worktrees", "feat-d")), "doing", "feat-d.md"), doingParent)
+	testkit.Put(t, filepath.Join(conf.ApprovedDir(filepath.Join(root, ".claude", "worktrees", "feat-d")), "doing", "feat-d.md"), doingParent)
 	return root
 }
 
@@ -242,7 +203,7 @@ func scaffoldCases() []scaffoldCase {
 func TestMatchesPython(t *testing.T) {
 	cases := scaffoldCases()
 	pyRoot := scaffoldWorkspace(t)
-	want := pyoracle.Answers[[][3]any](t, "scaffold", scaffoldOracle, map[string]any{"root": pyRoot, "cases": cases})
+	want := testkit.Answers[[][3]any](t, "scaffold", scaffoldOracle, map[string]any{"root": pyRoot, "cases": cases})
 
 	root := scaffoldWorkspace(t)
 	conf, _ := config.Load(root)

@@ -1,7 +1,4 @@
-// Package pyoracle は model のテストが Python の実装の答えと突き合わせるための部品（テストからだけ読む）。
-// リポジトリの .venv の Python で src/ccnavi を走らせて答えを取り、testdata の写しと比べる。Python が無ければ
-// 写しを答えにする。写しを取り直すときは go test の -update を付ける。
-package pyoracle
+package testkit
 
 import (
 	"bytes"
@@ -10,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -49,13 +47,16 @@ func exists(p string) bool {
 }
 
 // Answers は script（標準入力の JSON の in を読み、答えの JSON を書く Python）の答え。testdata/<name>.json の
-// 写しと違えば落とす。
+// 写しと違えば落とす。Python が無ければ写しを答えにする。写しを取り直すときは go test の -update を付ける。
+// name が空なら写しを持たない（リポジトリの文面ファイルの中身のように、写しに入れない答え。Python が無ければ飛ばす）。
 func Answers[T any](t *testing.T, name, script string, in any) T {
 	t.Helper()
 	path := filepath.Join("testdata", name+".json")
 	var saved T
 	data, readErr := os.ReadFile(path)
-	if readErr == nil {
+	if name == "" {
+		readErr = os.ErrNotExist
+	} else if readErr == nil {
 		if err := json.Unmarshal(data, &saved); err != nil {
 			t.Fatal(err)
 		}
@@ -85,6 +86,9 @@ func Answers[T any](t *testing.T, name, script string, in any) T {
 	if err := json.Unmarshal(out, &fresh); err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
+	if name == "" {
+		return fresh
+	}
 	got, _ := json.Marshal(fresh)
 	if *update {
 		if err := os.MkdirAll("testdata", 0o755); err != nil {
@@ -97,4 +101,29 @@ func Answers[T any](t *testing.T, name, script string, in any) T {
 		t.Errorf("%s が Python の答えと違う（go test -run %s -update で取り直す）", path, t.Name())
 	}
 	return fresh
+}
+
+// SameJSON は Go の答えを JSON にして、Python の答えとキーごとに比べる。
+func SameJSON(t *testing.T, got, want map[string]any) {
+	t.Helper()
+	data, err := json.Marshal(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var norm map[string]any
+	if err := json.Unmarshal(data, &norm); err != nil {
+		t.Fatal(err)
+	}
+	for key, w := range want {
+		if g := norm[key]; !reflect.DeepEqual(g, w) {
+			a, _ := json.MarshalIndent(g, "", " ")
+			b, _ := json.MarshalIndent(w, "", " ")
+			t.Errorf("%s が Python と違う\nGo:\n%s\nPython:\n%s", key, a, b)
+		}
+	}
+	for key := range norm {
+		if _, ok := want[key]; !ok {
+			t.Errorf("%s が Python の答えに無い", key)
+		}
+	}
 }

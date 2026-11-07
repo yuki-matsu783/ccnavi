@@ -148,7 +148,7 @@ func Stage(conf *config.Settings, root string, parent *ticket.Ticket, raw *appro
 		return strings.Join(parts, "、")
 	}
 	home := approval.HomeDirRead(conf, root, parent.ID, "", parent.Project)
-	if mark, ok := marks.ReadParent(home, parent.ID, marks.CloseEarly); ok && mark.Len() > 0 {
+	if _, ok := marks.ReadFilledParent(home, parent.ID, marks.CloseEarly); ok {
 		// 残りは別の issue に書き出してあるので、閉じられる。
 		return stageCloseEarly
 	}

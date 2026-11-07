@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/tree"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 const rejectsRules = `version: 1
@@ -27,21 +27,21 @@ deny:
 //	i0003        却下が無い親
 func rejectsWorkspace(t *testing.T) string {
 	root := workspace(t)
-	put(t, filepath.Join(root, ".ccnavi", "config", "common", "rules.yml"), rejectsRules)
+	testkit.Put(t, filepath.Join(root, ".ccnavi", "config", "common", "rules.yml"), rejectsRules)
 	plan := []string{"  - work", "  - {type: research, after: [1]}"}
-	addWorktree(t, root, "i0001", "main")
-	put(t, approvedPath(root, "i0001", "doing", "i0001"),
+	testkit.AddWorktree(t, root, "i0001", "main")
+	testkit.Put(t, approvedPath(root, "i0001", "doing", "i0001"),
 		parentText("i0001", plan, []string{"src/*", "wip/*", "src/secret/*", "re:^src/[a-z]+[.]py"}))
-	put(t, approvedPath(root, "i0001", "doing", "i0001-01-01"), childText("i0001-01-01", "i0001", "1",
+	testkit.Put(t, approvedPath(root, "i0001", "doing", "i0001-01-01"), childText("i0001-01-01", "i0001", "1",
 		[]string{"src/*", "docs/*", "wip/research/*", ".claude/hooks/*", ".ccnavi/approved/*"}))
-	put(t, approvedPath(root, "i0001", "doing", "i0001-02-01"), childText("i0001-02-01", "i0001", "2",
+	testkit.Put(t, approvedPath(root, "i0001", "doing", "i0001-02-01"), childText("i0001-02-01", "i0001", "2",
 		[]string{"wip/research/*", "src/secret/a.md"}))
-	addWorktree(t, root, "i0001-01-01", "i0001")
-	addWorktree(t, root, "i0002", "main")
-	put(t, approvedPath(root, "i0002", "doing", "i0002"), parentText("i0002", nil,
+	testkit.AddWorktree(t, root, "i0001-01-01", "i0001")
+	testkit.AddWorktree(t, root, "i0002", "main")
+	testkit.Put(t, approvedPath(root, "i0002", "doing", "i0002"), parentText("i0002", nil,
 		[]string{"src/secret/*", "src/secret/a/*", ".claude/hooks/*", ".ccnavi/config/common/*", "src/*"}))
-	addWorktree(t, root, "i0003", "main")
-	put(t, approvedPath(root, "i0003", "doing", "i0003"), parentText("i0003", nil, []string{"src/*"}))
+	testkit.AddWorktree(t, root, "i0003", "main")
+	testkit.Put(t, approvedPath(root, "i0003", "doing", "i0003"), parentText("i0003", nil, []string{"src/*"}))
 	return root
 }
 
@@ -82,20 +82,20 @@ json.dump({
 
 func TestRejectsMatchesPython(t *testing.T) {
 	root := rejectsWorkspace(t)
-	want := pyoracle.Answers[map[string]any](t, "rejects", rejectsOracle,
+	want := testkit.Answers[map[string]any](t, "rejects", rejectsOracle,
 		map[string]any{"root": root, "cwds": rejectsCwds, "rels": guardedRels})
-	conf := settingsOf(t, root)
+	conf := testkit.Settings(t, root)
 	found, err := FindRejects(conf, root, RejectOptions{Budget: time.Minute})
 	if err != nil {
 		t.Fatal(err)
 	}
 	var all []any
 	for _, r := range found.Rejects {
-		all = append(all, []any{r.Ticket, r.Decision, r.Request, rel(root, r.Reason), rel(root, r.Origin)})
+		all = append(all, []any{r.Ticket, r.Decision, r.Request, testkit.Rel(root, r.Reason), testkit.Rel(root, r.Origin)})
 	}
 	var explain []string
 	for _, line := range ExplainLines(found) {
-		explain = append(explain, rel(root, line))
+		explain = append(explain, testkit.Rel(root, line))
 	}
 	only, _ := FindRejects(conf, root, RejectOptions{Only: "I0001-01-01", Budget: time.Minute})
 	var requests []any
@@ -109,10 +109,10 @@ func TestRejectsMatchesPython(t *testing.T) {
 		if cwd != "" {
 			at = filepath.Join(root, filepath.FromSlash(cwd))
 		}
-		notices = append(notices, rel(root, Rejects(conf, root, at, time.Now().Add(time.Minute))))
+		notices = append(notices, testkit.Rel(root, Rejects(conf, root, at, time.Now().Add(time.Minute))))
 	}
 	cut, _ := FindRejects(conf, root, RejectOptions{Budget: time.Nanosecond})
-	target := tree.Tree{Name: "w", Root: worktree(root, "i0001-01-01"), Kind: tree.KindWorktree}
+	target := tree.Tree{Name: "w", Root: testkit.Worktree(root, "i0001-01-01"), Kind: tree.KindWorktree}
 	rs, err := ruleSetFor(conf, root, target)
 	if err != nil {
 		t.Fatal(err)
@@ -125,7 +125,7 @@ func TestRejectsMatchesPython(t *testing.T) {
 			denied = append(denied, nil)
 		}
 	}
-	sameAsPython(t, map[string]any{
+	testkit.SameJSON(t, map[string]any{
 		"all": all, "unchecked": found.Unchecked, "explain": explain, "only": requests, "missing": len(missing.Rejects),
 		"notice": notices, "cut": ExplainLines(cut), "denied": denied,
 	}, want)

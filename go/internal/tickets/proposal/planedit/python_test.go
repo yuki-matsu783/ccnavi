@@ -10,7 +10,7 @@ import (
 
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/approval"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の plan_order と plan_phases と同じワークスペースを 2 つ作って読ませ、--plan-order の JSON・保存の結果と
@@ -73,27 +73,29 @@ json.dump(out, sys.stdout, ensure_ascii=False)
 //	i0003 phases: のコピーが計画と合わない新規の親（fill で差し替える）。i0004 は計画の無い親、i0006 は phases.yml に
 //	      無い定義を使う親
 func planWorkspace(t *testing.T) string {
-	root := workspace(t, "i0001", "i0002", "i0003", "i0004", "i0005", "i0006")
-	todo := func(parent, id, text string) { put(t, filepath.Join(todoDir(root, parent), id+".md"), text) }
+	root := testkit.ProposalWorkspace(t, "i0001", "i0002", "i0003", "i0004", "i0005", "i0006")
+	todo := func(parent, id, text string) {
+		testkit.Put(t, filepath.Join(testkit.TodoDir(root, parent), id+".md"), text)
+	}
 	plan4 := []string{"  - research", "  - {type: design, after: [1]}", "  # 値の中のコメント", "  - {type: implement, after: [1]}",
 		"  - {type: implement, after: [2, 3]}"}
-	todo("i0001", "i0001", strings.Replace(parentText("i0001", plan4), "human_review:", "# 値の外のコメント\nhuman_review:", 1))
-	todo("i0001", "i0001-02-01", childText("i0001-02-01", "i0001", "2", []string{"wip/design/*"}))
-	todo("i0001", "i0001-03-01", childText("i0001-03-01", "i0001", "3", []string{"src/*"}, "predecessors: [i0001-02-01]"))
-	put(t, filepath.Join(worktree(root, "i0001"), "wip", "proposals", "flows", "i0001-03-01.yml"), "flow: x\n")
-	todo("i0005", "i0005-01-01", childText("i0005-01-01", "i0005", "1", []string{"src/*"}, "predecessors: [i0001-03-01]"))
+	todo("i0001", "i0001", strings.Replace(testkit.ProposalParent("i0001", plan4), "human_review:", "# 値の外のコメント\nhuman_review:", 1))
+	todo("i0001", "i0001-02-01", testkit.ProposalChild("i0001-02-01", "i0001", "2", []string{"wip/design/*"}))
+	todo("i0001", "i0001-03-01", testkit.ProposalChild("i0001-03-01", "i0001", "3", []string{"src/*"}, "predecessors: [i0001-02-01]"))
+	testkit.Put(t, filepath.Join(testkit.Worktree(root, "i0001"), "wip", "proposals", "flows", "i0001-03-01.yml"), "flow: x\n")
+	todo("i0005", "i0005-01-01", testkit.ProposalChild("i0005-01-01", "i0005", "1", []string{"src/*"}, "predecessors: [i0001-03-01]"))
 
 	plan3 := []string{"  - research", "  - {type: design, after: [1]}", "  - {type: implement, after: [1]}"}
-	approvedCopy := strings.Replace(parentText("i0002", plan3), "title: 設計\n", "title: 設計 承認時\n", 1)
-	put(t, filepath.Join(approvedDir(root, "i0002"), "doing", "i0002.md"), approvedCopy)
-	put(t, filepath.Join(approvedDir(root, "i0002"), "done", "i0002-02-01.md"),
-		childText("i0002-02-01", "i0002", "2", []string{"wip/design/*"}, `completed_at: "2026-01-01T00:00:00+0900"`))
-	todo("i0002", "i0002", parentText("i0002", plan3))
+	approvedCopy := strings.Replace(testkit.ProposalParent("i0002", plan3), "title: 設計\n", "title: 設計 承認時\n", 1)
+	testkit.Put(t, filepath.Join(testkit.ApprovedDir(root, "i0002"), "doing", "i0002.md"), approvedCopy)
+	testkit.Put(t, filepath.Join(testkit.ApprovedDir(root, "i0002"), "done", "i0002-02-01.md"),
+		testkit.ProposalChild("i0002-02-01", "i0002", "2", []string{"wip/design/*"}, `completed_at: "2026-01-01T00:00:00+0900"`))
+	todo("i0002", "i0002", testkit.ProposalParent("i0002", plan3))
 
-	third := strings.Replace(parentText("i0003", []string{"  - research", "  - design"}), "  implement:\n", "  # 定義の間のコメント\n  implement:\n", 1)
+	third := strings.Replace(testkit.ProposalParent("i0003", []string{"  - research", "  - design"}), "  implement:\n", "  # 定義の間のコメント\n  implement:\n", 1)
 	todo("i0003", "i0003", strings.Replace(third, "title: 調査\n", "title: 調べる\n", 1))
-	todo("i0004", "i0004", parentText("i0004", nil))
-	todo("i0006", "i0006", parentText("i0006", []string{"  - research", "  - {type: deploy, after: [1]}"}))
+	todo("i0004", "i0004", testkit.ProposalParent("i0004", nil))
+	todo("i0006", "i0006", testkit.ProposalParent("i0006", []string{"  - research", "  - {type: deploy, after: [1]}"}))
 	return root
 }
 
@@ -133,7 +135,7 @@ var fillCases = []string{"i0003", "i0002", "i0004", "i0006", "i0003"}
 
 func TestMatchesPython(t *testing.T) {
 	pyRoot, goRoot := planWorkspace(t), planWorkspace(t)
-	want := pyoracle.Answers[map[string]any](t, "plan", planOracle, map[string]any{
+	want := testkit.Answers[map[string]any](t, "plan", planOracle, map[string]any{
 		"root": pyRoot, "orders": orderCases, "saves": saveCases, "fills": fillCases,
 	})
 	got := goAnswers(t, goRoot)
@@ -175,7 +177,7 @@ func goAnswers(t *testing.T, root string) map[string]any {
 		}
 		return out
 	}
-	conf := settingsOf(t, root)
+	conf := testkit.Settings(t, root)
 	source := func(name string) *Source {
 		proposals := approval.ReadProposals(conf, root, nil).Kept
 		target, _ := Pick(proposals, name, root)

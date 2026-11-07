@@ -11,7 +11,6 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
-	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/approval"
@@ -197,53 +196,26 @@ func RunRemaining(stdout io.Writer, conf *config.Settings, root, family string) 
 	return 0
 }
 
-// ChildState は承認した子のワークツリーの計画の状態。拡張は Create だけを実行する。
-type ChildState string
-
-const (
-	// ChildCreate は親のワークツリーが在り、子のワークツリーはまだ無い。承認の後に作る。
-	ChildCreate ChildState = "create"
-	// ChildExists は子のワークツリーが既に在る。何もしない。
-	ChildExists ChildState = "exists"
-	// ChildNoParent は親のワークツリーが無い（親を先に用意する）。作れない。
-	ChildNoParent ChildState = "no-parent"
-	// ChildProject はプロジェクトの子。置き場の決まりが別なので、承認の後には作らない。
-	ChildProject ChildState = "project"
-)
-
-// ChildPlan は承認した子 1 つのワークツリーの計画（承認の JSON の worktrees の 1 件）。Path はワークスペース
-// ルートからの相対（区切りは "/"）、Base は Create のときの元のブランチ。
-type ChildPlan struct {
-	Ticket, Parent, Path, Branch, Base string
-	State                              ChildState
-}
-
-// JSON は承認の JSON の worktrees に載せる形（キーの順も拡張との契約）。
-func (p ChildPlan) JSON() *pyjson.Object {
-	return pyjson.NewObject("ticket", p.Ticket, "parent", p.Parent, "path", p.Path, "branch", p.Branch,
-		"base", p.Base, "state", string(p.State))
-}
-
 // ChildWorktrees は承認した子それぞれのワークツリーの計画。Create の子は拡張が
 // `ccnavi-git.sh worktree add <path> -b <子> <base>` で作る。base は親のワークツリーが今チェックアウトしている
 // ブランチで、親が `feature/123-login` のように "/" を含むときもそこから切れる。
-func ChildWorktrees(root string, tickets []*ticket.Ticket) []ChildPlan {
-	var out []ChildPlan
+func ChildWorktrees(root string, tickets []*ticket.Ticket) []ticket.WorktreePlan {
+	var out []ticket.WorktreePlan
 	for _, t := range tickets {
 		if !t.IsChild() {
 			continue
 		}
-		p := ChildPlan{Ticket: t.ID, Parent: t.Parent, Path: ospath.Slashed(tree.WorktreesDir) + "/" + t.ID, Branch: t.ID}
+		p := ticket.WorktreePlan{Ticket: t.ID, Parent: t.Parent, Path: ospath.Slashed(tree.WorktreesDir) + "/" + t.ID, Branch: t.ID}
 		switch {
 		case t.Project != "":
-			p.State = ChildProject
+			p.State = ticket.WorktreeProject
 		case ospath.DiskExists(worktreePath(root, t.ID)):
-			p.State = ChildExists
+			p.State = ticket.WorktreeExists
 		default:
 			if base := checkedOut(root, worktreePath(root, t.Parent)); base != "" {
-				p.Base, p.State = base, ChildCreate
+				p.Base, p.State = base, ticket.WorktreeCreate
 			} else {
-				p.State = ChildNoParent
+				p.State = ticket.WorktreeNoParent
 			}
 		}
 		out = append(out, p)

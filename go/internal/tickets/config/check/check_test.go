@@ -3,13 +3,14 @@ package check
 import (
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/policy/rules"
+
+	"ccnavi/internal/tickets/testkit"
 )
 
 const phasesYML = `version: 1
@@ -18,26 +19,11 @@ phases:
   research: {kind: work, title: 調査, review: false, scope: ["wip/research/*"]}
 `
 
-func write(t *testing.T, path, text string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func workspace(t *testing.T) (string, *config.Settings) {
 	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git が無い")
-	}
-	root := t.TempDir()
-	if out, err := exec.Command("git", "init", "-q", root).CombinedOutput(); err != nil {
-		t.Fatalf("%v %s", err, out)
-	}
-	write(t, filepath.Join(root, ".ccnavi", "config", "common", "phases.yml"), phasesYML)
+	root := testkit.GitRoot(t)
+	testkit.Git(t, root, "init", "-q")
+	testkit.Put(t, filepath.Join(root, ".ccnavi", "config", "common", "phases.yml"), phasesYML)
 	conf, _ := config.Load(root)
 	return root, conf
 }
@@ -45,14 +31,14 @@ func workspace(t *testing.T) (string, *config.Settings) {
 func TestUnmatchedScopes(t *testing.T) {
 	root, conf := workspace(t)
 	// textkit/ の配置では src/* だけが当たらない。wip/ の下は空でも言わない。
-	write(t, filepath.Join(root, "textkit", "a.py"), "")
-	write(t, filepath.Join(root, "tests", "test_a.py"), "")
+	testkit.Put(t, filepath.Join(root, "textkit", "a.py"), "")
+	testkit.Put(t, filepath.Join(root, "tests", "test_a.py"), "")
 	found := UnmatchedScopes(conf, root)
 	if len(found) != 1 || found[0].Severity != rules.Warn || found[0].Rule != "(self) (phases) implement" ||
 		!strings.HasPrefix(found[0].Detail, "`scope` の `src/*` がどのファイルにも当たりません。") {
 		t.Errorf("%v", found)
 	}
-	write(t, filepath.Join(root, "src", "a.py"), "")
+	testkit.Put(t, filepath.Join(root, "src", "a.py"), "")
 	if found := UnmatchedScopes(conf, root); len(found) != 0 {
 		t.Errorf("当たるのに %v", found)
 	}
@@ -70,25 +56,25 @@ func TestFileProblems(t *testing.T) {
 	if found := FileProblems(conf, root, config.KindPhases, config.LayerCommon); len(found) != 0 {
 		t.Errorf("読めるのに %v", found)
 	}
-	write(t, conf.Phases, "version: 1\nphases: {a:b: {}}\n")
+	testkit.Put(t, conf.Phases, "version: 1\nphases: {a:b: {}}\n")
 	found := FileProblems(conf, root, config.KindPhases, config.LayerCommon)
 	if len(found) != 1 || found[0].Rule != "(phases)" || !strings.HasPrefix(found[0].Detail, "a:b: 識別子に `:` は書けない") {
 		t.Errorf("共通の phases: %v", found)
 	}
 	// 共通レイヤーの配点は script: の指す先も見る。
-	write(t, conf.Risk, "version: 1\nfactors:\n  - {id: s, points: 1, script: .ccnavi/config/common/scripts/none.sh}\n")
+	testkit.Put(t, conf.Risk, "version: 1\nfactors:\n  - {id: s, points: 1, script: .ccnavi/config/common/scripts/none.sh}\n")
 	found = FileProblems(conf, root, config.KindRisk, config.LayerCommon)
 	if len(found) != 1 || found[0].Rule != "(risk)" || !strings.HasPrefix(found[0].Detail, "s: `script` の `.ccnavi/config/common/scripts/none.sh` が "+root+" にありません。") {
 		t.Errorf("共通の risk: %v", found)
 	}
 	// レイヤーの phases は共通レイヤーと合成した結果を見る。
-	write(t, conf.Phases, phasesYML)
-	write(t, filepath.Join(root, ".ccnavi", "config", "project", "phases.yml"), "version: 1\nphases:\n  implement: {title: 別}\n")
+	testkit.Put(t, conf.Phases, phasesYML)
+	testkit.Put(t, filepath.Join(root, ".ccnavi", "config", "project", "phases.yml"), "version: 1\nphases:\n  implement: {title: 別}\n")
 	found = FileProblems(conf, root, config.KindPhases, config.LayerSelf)
 	if len(found) != 1 || found[0].Severity != rules.Error || found[0].Rule != "(self) (phases) implement" {
 		t.Errorf("レイヤーの phases: %v", found)
 	}
-	write(t, filepath.Join(root, ".ccnavi", "config", "project", "risks.yml"), "version: 1\nfactors: x\n")
+	testkit.Put(t, filepath.Join(root, ".ccnavi", "config", "project", "risks.yml"), "version: 1\nfactors: x\n")
 	found = LayerConfigs(conf, root, "", config.KindRisk)
 	if len(found) != 1 || found[0].Rule != "(self) (risk) "+conf.LayerPath(root, config.KindRisk, config.LayerSelf) {
 		t.Errorf("レイヤーの risk: %v", found)

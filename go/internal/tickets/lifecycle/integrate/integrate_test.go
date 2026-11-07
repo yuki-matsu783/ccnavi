@@ -11,22 +11,24 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/tree"
+
+	"ccnavi/internal/tickets/testkit"
 )
 
 // candidateWorkspace は記録の無い直接作業 2 本（どちらもコミットあり）と、その候補の記録。
 func candidateWorkspace(t *testing.T) (string, *config.Settings, string) {
-	root := workspace(t)
+	root := clock.Workspace(t)
 	var entries []any
 	for i, name := range []string{"aaa", "bbb"} {
-		addWorktree(t, root, name, "main")
-		put(t, filepath.Join(worktree(root, name), "src", "x.txt"), name+"\n")
-		commitAll(t, worktree(root, name), name)
-		entries = append(entries, map[string]any{"name": name, "path": worktree(root, name), "seen": i + 1, "checked": 0})
+		testkit.AddWorktree(t, root, name, "main")
+		testkit.Put(t, filepath.Join(testkit.Worktree(root, name), "src", "x.txt"), name+"\n")
+		commitAll(t, testkit.Worktree(root, name), name)
+		entries = append(entries, map[string]any{"name": name, "path": testkit.Worktree(root, name), "seen": i + 1, "checked": 0})
 	}
-	conf := settingsOf(t, root)
+	conf := testkit.Settings(t, root)
 	path := filepath.Join(conf.State, "direct-s1.json")
 	data, _ := json.Marshal(map[string]any{"session": "s1", "entries": entries})
-	put(t, path, string(data))
+	testkit.Put(t, path, string(data))
 	return root, conf, path
 }
 
@@ -89,7 +91,7 @@ func TestAnUnknownProbeKeepsTheCandidate(t *testing.T) {
 
 // 促しの文の git は、ラッパー（ccnavi-git.sh）を通るものだけ。
 func TestTheNudgeHasNoGitOutsideTheWrapper(t *testing.T) {
-	root := workspace(t)
+	root := clock.Workspace(t)
 	d := &Direct{Name: "scratch", Worktree: root + "/.claude/worktrees/scratch", Head: "h", Dirty: true, Ahead: 1,
 		Integration: "main", IntegTree: root}
 	for _, d := range []*Direct{d, {Name: d.Name, Worktree: d.Worktree, Head: "h", Ahead: 1, Integration: "main",

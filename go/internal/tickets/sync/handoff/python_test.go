@@ -11,7 +11,7 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/pyjson"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の tickets/sync/handoff と同じワークスペースを読ませ、見るだけの JSON（ハッシュ・差分・断る理由）、
@@ -301,7 +301,7 @@ func TestMatchesPython(t *testing.T) {
 		goRoots = append(goRoots, mine)
 		_ = i
 	}
-	answers := pyoracle.Answers[[]handoffAnswer](t, "handoff", handoffOracle, map[string]any{"cases": cases})
+	answers := testkit.Answers[[]handoffAnswer](t, "handoff", handoffOracle, map[string]any{"cases": cases})
 	if len(answers) != len(scenarios) {
 		t.Fatalf("答えが %d 件（%d 件のはず）", len(answers), len(scenarios))
 	}

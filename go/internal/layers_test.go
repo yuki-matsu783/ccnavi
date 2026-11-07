@@ -101,18 +101,20 @@ var subTiers = map[string]map[string]int{
 		"notice":    7,
 		"review":    7,
 		"core":      8,
+		// テストの道具（testkit）。一番上に置き、本体のコードから読めないようにする。
+		"testkit": 9,
 	},
 	// tickets の各パッケージの中。並びはいまの依存のとおり。
 	"tickets/approval": {"marks": 0, "wap": 1},
 	"tickets/config":   {"layer": 0, "phases": 1, "risk": 1, "check": 2},
 	"tickets/lifecycle": {
-		"internal": 0, "closing": 0, "plan": 0, "treegate": 0, "worktrees": 0,
+		"closing": 0, "plan": 0, "treegate": 0, "worktrees": 0,
 		"stop": 1, "consolidate": 1, "retire": 1, "wapmerge": 1, "ops": 1,
 		"integrate": 2,
 		"branch":    3,
 	},
 	"tickets/model": {
-		"ids": 0, "place": 0, "directcand": 0, "handoffnames": 0, "host": 0, "oplog": 0, "pyoracle": 0,
+		"ids": 0, "place": 0, "directcand": 0, "handoffnames": 0, "host": 0, "oplog": 0,
 		"useronly": 0, "via": 0,
 		"ticket": 1, "standing": 1, "guard": 1,
 		"archive": 2, "fields": 2, "form": 2,
@@ -232,6 +234,7 @@ func TestViolation(t *testing.T) {
 		{"tickets/lifecycle/integrate/x", "tickets/lifecycle/stop", false},
 		{"tickets/approval", "tickets/approval/marks", false},
 		{"tickets/lifecycle/stop", "tickets/model", false},
+		{"tickets/core", "tickets/testkit", true},
 	}
 	for _, c := range cases {
 		if got := violation(c.from, c.to) != ""; got != c.bad {

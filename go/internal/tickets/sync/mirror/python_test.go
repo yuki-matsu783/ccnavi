@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/pyjson"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の tickets/sync（mirrorsync・promptsync・mirror_gap・skillsync.installed）と同じワークスペースを作って
@@ -103,7 +103,7 @@ var userVariants = []struct {
 		link(t, filepath.Join(root, "elsewhere"), commonPath(project(root, "app")))
 	}},
 	{"共通の rules が読めない", func(t *testing.T, root string) {
-		write(t, commonPath(root, "rules.yml"), "version: 99\n")
+		testkit.Put(t, commonPath(root, "rules.yml"), "version: 99\n")
 	}},
 	{"工程スキルの common がリンク", func(t *testing.T, root string) {
 		if err := os.RemoveAll(skillPath(root, "process-test", "references", "common")); err != nil {
@@ -127,24 +127,24 @@ func fullWorkspace(t *testing.T) string {
 	if err := os.MkdirAll(filepath.Join(root, "elsewhere"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	write(t, commonPath(root, "risks.yml"), commonRisk+scriptFactors)
+	testkit.Put(t, commonPath(root, "risks.yml"), commonRisk+scriptFactors)
 	putBytes(t, commonPath(root, "scripts", "count.sh"), countScript)
-	write(t, commonPath(root, "rule-expectations.yml"), expectations)
-	write(t, commonPath(root, "templates", "feature.yml"), featureTemplate)
-	write(t, commonPath(root, "templates", "broken.yml"), "plan: [work\n")
-	write(t, commonPath(root, "templates", "notes.txt"), "x\n")
+	testkit.Put(t, commonPath(root, "rule-expectations.yml"), expectations)
+	testkit.Put(t, commonPath(root, "templates", "feature.yml"), featureTemplate)
+	testkit.Put(t, commonPath(root, "templates", "broken.yml"), "plan: [work\n")
+	testkit.Put(t, commonPath(root, "templates", "notes.txt"), "x\n")
 	skill(t, root, "process-test", "# 本文\n", map[string]string{"a.md": "A\n", "sub/b.md": "B\n", "note.txt": "x\n"})
-	write(t, skillPath(root, "process-test", "references", "local", "x.md"), "local\n")
-	write(t, skillPath(root, "said-yes", "SKILL.md"), "---\nprocess: yes\n---\n")
-	write(t, skillPath(root, "plain", "SKILL.md"), "---\nname: plain\n---\n")
+	testkit.Put(t, skillPath(root, "process-test", "references", "local", "x.md"), "local\n")
+	testkit.Put(t, skillPath(root, "said-yes", "SKILL.md"), "---\nprocess: yes\n---\n")
+	testkit.Put(t, skillPath(root, "plain", "SKILL.md"), "---\nname: plain\n---\n")
 	lib := project(root, "lib")
-	write(t, commonPath(lib, "rules.yml"), strings.ReplaceAll(commonRules, "\n", "\r\n"))
-	write(t, commonPath(lib, "old.yml"), "version: 1\n")
-	write(t, commonPath(lib, "templates", "old.yml"), featureTemplate)
-	write(t, filepath.Join(lib, "skills", "process-test", "SKILL.md"), "前のもの\n")
-	write(t, filepath.Join(lib, "skills", "process-test", "references", "common", "deep", "gone.md"), "gone\n")
-	write(t, filepath.Join(lib, "skills", "process-test", "references", "common", "keep.txt"), "keep\n")
-	write(t, filepath.Join(lib, "skills", "process-test", "references", "own.md"), "mine\n")
+	testkit.Put(t, commonPath(lib, "rules.yml"), strings.ReplaceAll(commonRules, "\n", "\r\n"))
+	testkit.Put(t, commonPath(lib, "old.yml"), "version: 1\n")
+	testkit.Put(t, commonPath(lib, "templates", "old.yml"), featureTemplate)
+	testkit.Put(t, filepath.Join(lib, "skills", "process-test", "SKILL.md"), "前のもの\n")
+	testkit.Put(t, filepath.Join(lib, "skills", "process-test", "references", "common", "deep", "gone.md"), "gone\n")
+	testkit.Put(t, filepath.Join(lib, "skills", "process-test", "references", "common", "keep.txt"), "keep\n")
+	testkit.Put(t, filepath.Join(lib, "skills", "process-test", "references", "own.md"), "mine\n")
 	if err := os.MkdirAll(filepath.Join(root, "projects", "Zed", ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +210,7 @@ func promptWorkspace(t *testing.T, broken bool) string {
 	root := fullWorkspace(t)
 	startedParent(t, root)
 	if broken {
-		write(t, commonPath(root, "phases.yml"), "version: 1\nphases: 3\n")
+		testkit.Put(t, commonPath(root, "phases.yml"), "version: 1\nphases: 3\n")
 	}
 	return root
 }
@@ -228,7 +228,7 @@ func TestMatchesPython(t *testing.T) {
 		pyPrompt = append(pyPrompt, promptWorkspace(t, broken))
 		goPrompts = append(goPrompts, promptWorkspace(t, broken))
 	}
-	answers := pyoracle.Answers[mirrorAnswers](t, "mirror", mirrorOracle, map[string]any{
+	answers := testkit.Answers[mirrorAnswers](t, "mirror", mirrorOracle, map[string]any{
 		"user": pyUser, "prompt": pyPrompt, "wanted": oracleWanted, "skills": oracleSkills, "paths": oraclePaths,
 	})
 	for i, v := range userVariants {

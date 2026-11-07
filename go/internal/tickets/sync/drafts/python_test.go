@@ -12,8 +12,8 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/policy/rules"
-	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/proposal/templates"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の tickets/sync/template_drafts と同じワークスペースで、閉じるときの案内・下書きの作成（断る理由と、
@@ -267,7 +267,7 @@ func TestMatchesPython(t *testing.T) {
 	py, mine := filepath.Join(top, "py"), filepath.Join(top, "go")
 	lay(t, py)
 	lay(t, mine)
-	answer := pyoracle.Answers[draftsAnswer](t, "drafts", draftsOracle, map[string]any{"root": py, "calls": calls})
+	answer := testkit.Answers[draftsAnswer](t, "drafts", draftsOracle, map[string]any{"root": py, "calls": calls})
 	conf, _ := config.Load(mine)
 	for i, c := range calls {
 		if got := goCall(t, conf, mine, c); got != answer.Out[i] {

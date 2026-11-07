@@ -10,7 +10,7 @@ import (
 
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の flow（parse_yaml・as_json・shape・render・text）と突き合わせる。読める・読めないの境界と、
@@ -262,7 +262,7 @@ func TestPythonFlow(t *testing.T) {
 		encoded[i] = base64.StdEncoding.EncodeToString(c)
 	}
 	in := map[string]any{"flows": encoded, "lines": lineCases, "catalog": catalogJSON(catalogFixture())}
-	want := pyoracle.Answers[flowAnswers](t, "flow", flowOracle, in)
+	want := testkit.Answers[flowAnswers](t, "flow", flowOracle, in)
 	if len(want.Flows) != len(cases) || len(want.Lines) != len(lineCases) {
 		t.Fatalf("答えの数が違う: %d/%d, %d/%d", len(want.Flows), len(cases), len(want.Lines), len(lineCases))
 	}

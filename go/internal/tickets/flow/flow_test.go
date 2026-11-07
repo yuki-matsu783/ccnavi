@@ -8,8 +8,8 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/tickets/model/place"
-	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/model/ticket"
+	"ccnavi/internal/tickets/testkit"
 )
 
 const child = "i0001-01-01"
@@ -27,17 +27,6 @@ func childTicket(t *testing.T, started bool) *ticket.Ticket {
 		c.StartedAt = "2026-09-25T00:00:00Z"
 	}
 	return c
-}
-
-func write(t *testing.T, path, text string) string {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return path
 }
 
 func TestPlaceIsNormalized(t *testing.T) {
@@ -132,12 +121,12 @@ func TestLockHit(t *testing.T) {
 
 func TestReadBytesRefusesOddFiles(t *testing.T) {
 	root := t.TempDir()
-	file := write(t, filepath.Join(root, "flows", "a.yml"), sampleFlow)
+	file := testkit.Put(t, filepath.Join(root, "flows", "a.yml"), sampleFlow)
 	if data, why := Load(file, root); data == nil {
 		t.Fatal(why)
 	}
 	// 先頭の BOM は外して読む。
-	if data, why := Load(write(t, filepath.Join(root, "bom.yml"), "\ufeff"+sampleFlow), root); data == nil {
+	if data, why := Load(testkit.Put(t, filepath.Join(root, "bom.yml"), "\ufeff"+sampleFlow), root); data == nil {
 		t.Fatal(why)
 	}
 	if err := os.Link(file, filepath.Join(root, "alias.yml")); err == nil {
@@ -155,7 +144,7 @@ func TestReadBytesRefusesOddFiles(t *testing.T) {
 	if _, why := Load(dir, root); why != notRegular {
 		t.Errorf("ディレクトリ: %q", why)
 	}
-	big := write(t, filepath.Join(root, "big.yml"), "nodes: []\npad: "+strings.Repeat("x", fileLimit+10)+"\n")
+	big := testkit.Put(t, filepath.Join(root, "big.yml"), "nodes: []\npad: "+strings.Repeat("x", fileLimit+10)+"\n")
 	if _, why := Load(big, root); !strings.Contains(why, "大きすぎる") {
 		t.Errorf("大きい: %q", why)
 	}
@@ -166,7 +155,7 @@ func TestReadBytesRefusesOddFiles(t *testing.T) {
 
 func TestReadBytesRefusesLinks(t *testing.T) {
 	root := t.TempDir()
-	real := write(t, filepath.Join(root, "wip", "real.yml"), sampleFlow)
+	real := testkit.Put(t, filepath.Join(root, "wip", "real.yml"), sampleFlow)
 	flows := filepath.Join(root, ".ccnavi", "approved", "flows")
 	if err := os.MkdirAll(flows, 0o755); err != nil {
 		t.Fatal(err)
@@ -179,7 +168,7 @@ func TestReadBytesRefusesLinks(t *testing.T) {
 			t.Errorf("%q: %q", base, why)
 		}
 	}
-	write(t, filepath.Join(root, "elsewhere", "b.yml"), sampleFlow)
+	testkit.Put(t, filepath.Join(root, "elsewhere", "b.yml"), sampleFlow)
 	if err := os.Symlink(filepath.Join(root, "elsewhere"), filepath.Join(root, ".ccnavi", "approved", "x")); err != nil {
 		t.Fatal(err)
 	}
@@ -218,8 +207,8 @@ func TestInfo(t *testing.T) {
 		shown.Draft.Path != filepath.Join(root, "wip", "proposals", "flows", child+".yml") || shown.Draft.Exists {
 		t.Errorf("下書き: %#v", shown.Draft)
 	}
-	write(t, shown.Draft.Path, sampleFlow)
-	write(t, FlowFile(conf, root, child), sampleFlow)
+	testkit.Put(t, shown.Draft.Path, sampleFlow)
+	testkit.Put(t, FlowFile(conf, root, child), sampleFlow)
 	for _, s := range []place.State{place.Done, place.Cancelled, place.Todo} {
 		shown := FlowInfo(conf, root, with(s, true))
 		if shown == nil || !shown.Exists || shown.Linked || !shown.Draft.Exists || shown.Rel != ".ccnavi/approved/flows/"+child+".yml" {
@@ -232,7 +221,7 @@ func TestInfo(t *testing.T) {
 }
 
 func TestBriefing(t *testing.T) {
-	repo := pyoracle.RepoRoot(t)
+	repo := testkit.RepoRoot(t)
 	root := t.TempDir()
 	conf := &config.Settings{}
 	running := childTicket(t, true)
@@ -240,7 +229,7 @@ func TestBriefing(t *testing.T) {
 	if got := Briefing(conf, repo, running, TotalTextLimit, true); got != nil {
 		t.Errorf("フローが無いのに %q", got)
 	}
-	file := write(t, FlowFile(conf, root, child), sampleFlow)
+	file := testkit.Put(t, FlowFile(conf, root, child), sampleFlow)
 	text := strings.Join(Briefing(conf, repo, running, TotalTextLimit, true), "\n")
 	for _, want := range []string{"フロー: " + file, "合意済みの手順。編集しない", fenceOpen, fenceClose, "1. [start] 開始 → 2"} {
 		if !strings.Contains(text, want) {
@@ -256,11 +245,11 @@ func TestBriefing(t *testing.T) {
 	if text := strings.Join(Briefing(conf, repo, running, 0, true), "\n"); strings.Contains(text, fenceOpen) || !strings.Contains(text, "上限") {
 		t.Errorf("上限:\n%s", text)
 	}
-	write(t, file, "nodes:\n  - {id: s, type: start}\n  - {id: l, type: loop, data: {condition: c, maxIterations: 2}}\n")
+	testkit.Put(t, file, "nodes:\n  - {id: s, type: start}\n  - {id: l, type: loop, data: {condition: c, maxIterations: 2}}\n")
 	if text := strings.Join(Briefing(conf, repo, running, TotalTextLimit, true), "\n"); !strings.Contains(text, "loop のノード") {
 		t.Errorf("loop の扱いが無い:\n%s", text)
 	}
-	write(t, file, "nodes: [\n")
+	testkit.Put(t, file, "nodes: [\n")
 	if text := strings.Join(Briefing(conf, repo, running, TotalTextLimit, true), "\n"); !strings.Contains(text, "フローを読めない: YAML として読めない") {
 		t.Errorf("読めない:\n%s", text)
 	}
@@ -284,7 +273,7 @@ func TestDigestRecordAndNotice(t *testing.T) {
 	if want := "{\n \"fingerprint\": \"absent\",\n \"path\": \".ccnavi/approved/flows/" + child + ".yml\",\n \"at\": \"2026-09-25T00:00:00Z\"\n}\n"; string(raw) != want {
 		t.Errorf("記録 %q", raw)
 	}
-	write(t, file, sampleFlow)
+	testkit.Put(t, file, sampleFlow)
 	if got := ChangedNotice(conf, root, running); !strings.Contains(got, "着手後にフローが書き換わった") ||
 		!strings.Contains(got, "着手のとき（無い）と違う（いま sha256:") {
 		t.Errorf("現れたのに %q", got)
@@ -296,7 +285,7 @@ func TestDigestRecordAndNotice(t *testing.T) {
 	if !strings.HasPrefix(Fingerprint(file, root), markSHA256) {
 		t.Error("ハッシュ")
 	}
-	write(t, file, "nodes: []\n")
+	testkit.Put(t, file, "nodes: []\n")
 	if got := ChangedNotice(conf, root, running); !strings.Contains(got, codeChanged) || !strings.Contains(got, child) {
 		t.Errorf("書き換えたのに %q", got)
 	}
@@ -312,7 +301,7 @@ func TestInodeHit(t *testing.T) {
 	conf := &config.Settings{}
 	running := childTicket(t, true)
 	running.TreeRoot = root
-	file := write(t, FlowFile(conf, root, child), sampleFlow)
+	file := testkit.Put(t, FlowFile(conf, root, child), sampleFlow)
 	alias := filepath.Join(root, "alias.yml")
 	if err := os.Link(file, alias); err != nil {
 		t.Skip(err)
@@ -323,7 +312,7 @@ func TestInodeHit(t *testing.T) {
 	if InodeHit(conf, root, []*ticket.Ticket{childTicket(t, false)}, alias) != nil {
 		t.Error("着手前なのに止める")
 	}
-	other := write(t, filepath.Join(root, "other.yml"), "x")
+	other := testkit.Put(t, filepath.Join(root, "other.yml"), "x")
 	if InodeHit(conf, root, []*ticket.Ticket{running}, other) != nil {
 		t.Error("別のファイルを止める")
 	}
@@ -331,14 +320,14 @@ func TestInodeHit(t *testing.T) {
 
 func TestCatalog(t *testing.T) {
 	root := t.TempDir()
-	write(t, filepath.Join(root, ".claude", "agents", "reviewer.md"), "---\nname: >-\n  code\n  reviewer # x\n---\n")
-	write(t, filepath.Join(root, ".claude", "agents", "plain.MD"), "no front\n")
-	write(t, filepath.Join(root, ".claude", "agents", "aliased.md"), "---\nname: &a x\nother: *a\n---\n")
-	write(t, filepath.Join(root, ".claude", "agents", "notes.txt"), "")
-	write(t, filepath.Join(root, ".claude", "agents", "dup.md"), "---\nname: Explore\n---\n")
-	write(t, filepath.Join(root, ".claude", "skills", "process-debug", "SKILL.md"), "\ufeff---\nname: debug\n---\n")
-	write(t, filepath.Join(root, ".claude", "skills", "bare", "SKILL.md"), "")
-	write(t, filepath.Join(root, ".claude", "skills", "empty", "README.md"), "")
+	testkit.Put(t, filepath.Join(root, ".claude", "agents", "reviewer.md"), "---\nname: >-\n  code\n  reviewer # x\n---\n")
+	testkit.Put(t, filepath.Join(root, ".claude", "agents", "plain.MD"), "no front\n")
+	testkit.Put(t, filepath.Join(root, ".claude", "agents", "aliased.md"), "---\nname: &a x\nother: *a\n---\n")
+	testkit.Put(t, filepath.Join(root, ".claude", "agents", "notes.txt"), "")
+	testkit.Put(t, filepath.Join(root, ".claude", "agents", "dup.md"), "---\nname: Explore\n---\n")
+	testkit.Put(t, filepath.Join(root, ".claude", "skills", "process-debug", "SKILL.md"), "\ufeff---\nname: debug\n---\n")
+	testkit.Put(t, filepath.Join(root, ".claude", "skills", "bare", "SKILL.md"), "")
+	testkit.Put(t, filepath.Join(root, ".claude", "skills", "empty", "README.md"), "")
 	got := LoadCatalog(root)
 	wantAgents := Candidates{{"general-purpose", SourceBuiltin}, {"Explore", SourceBuiltin}, {"Plan", SourceBuiltin},
 		{"aliased", SourceProject}, {"plain", SourceProject}, {"code reviewer # x", SourceProject}}

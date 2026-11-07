@@ -52,7 +52,7 @@ const (
 func full(patterns ...string) []*regexp.Regexp {
 	out := make([]*regexp.Regexp, len(patterns))
 	for i, p := range patterns {
-		out[i] = regexp.MustCompile(`^(?:` + p + `)$`)
+		out[i] = regexp.MustCompile(`\A(?:` + p + `)\z`)
 	}
 	return out
 }

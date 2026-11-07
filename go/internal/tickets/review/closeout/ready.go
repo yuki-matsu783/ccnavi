@@ -206,7 +206,7 @@ func archivePlaceProblem(conf *config.Settings, root string, parent *ticket.Tick
 
 // earlyMark は早めに閉じたマーカーの中身。無い・空なら nil。
 func earlyMark(approvedDir, parentID string) *pyjson.Object {
-	if mark, ok := marks.ReadParent(approvedDir, parentID, marks.CloseEarly); ok && mark.Len() > 0 {
+	if mark, ok := marks.ReadFilledParent(approvedDir, parentID, marks.CloseEarly); ok {
 		return mark
 	}
 	return nil

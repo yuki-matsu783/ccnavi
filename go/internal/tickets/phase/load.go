@@ -83,7 +83,7 @@ func phasesOf(conf *config.Settings, root, parentID string, proposed *ticket.Tic
 		numbers = append(numbers, n)
 		p.Marks = marks.Marks(where, parentID, n)
 		for _, t := range p.Tickets {
-			if record, ok := marks.ReadRecord(where, parentID, t.ID, marks.Risk); ok && record.Len() > 0 {
+			if record, ok := marks.ReadFilledRecord(where, parentID, t.ID, marks.Risk); ok {
 				p.Risks[t.ID] = record
 			}
 		}

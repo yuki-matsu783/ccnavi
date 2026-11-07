@@ -10,7 +10,7 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/tickets/model/handoffnames"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // 表・断る形・書く直前の確かめ直し・起点の木との突き合わせ。Python と同じ答えかは python_test.go \u304c見る。
@@ -85,7 +85,7 @@ func TestNFDFoldsToTheSameKey(t *testing.T) {
 
 // 表を直したら設計書の表も直す（文書に無い行を表に足さない）。
 func TestKindsAgreeWithDesign(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(pyoracle.RepoRoot(t), "docs", "21_design", "tickets", "handoff.md"))
+	raw, err := os.ReadFile(filepath.Join(testkit.RepoRoot(t), "docs", "21_design", "tickets", "handoff.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -327,17 +327,6 @@ func TestARowAddedToTheNamesTableWorksTheSame(t *testing.T) {
 	}
 }
 
-func runGit(t *testing.T, dir string, args ...string) {
-	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
-		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-}
-
 func TestSurvey(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git \u304c無い")
@@ -345,9 +334,9 @@ func TestSurvey(t *testing.T) {
 	root, _ := workspace(t, map[string]string{
 		draftRoot + "same.md": "s\n",
 	})
-	runGit(t, root, "init", "-q", "-b", "main")
-	runGit(t, root, "add", "-A")
-	runGit(t, root, "commit", "-q", "-m", "init")
+	testkit.Git(t, root, "init", "-q", "-b", "main")
+	testkit.Git(t, root, "add", "-A")
+	testkit.Git(t, root, "commit", "-q", "-m", "init")
 	build(t, root, map[string]string{
 		draftRoot + docsRel:                         "# 手引き\n\n古い文\n",
 		draftRoot + scriptRel:                       "#!/bin/sh\necho changed\n",

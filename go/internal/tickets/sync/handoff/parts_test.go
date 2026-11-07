@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/difflib"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // 差分（difflib.unified_diff の写し）と、rules.yml の下書きが防御の記述を動かすかの判定を、Python の答えと突き合わせる。
@@ -125,7 +125,7 @@ func TestPartsMatchPython(t *testing.T) {
 	for _, c := range defenseCases {
 		defense = append(defense, [2]any{b64(c[0]), b64(c[1])})
 	}
-	answers := pyoracle.Answers[partsAnswers](t, "parts", partsOracle, map[string]any{
+	answers := testkit.Answers[partsAnswers](t, "parts", partsOracle, map[string]any{
 		"diff": diffCases, "lines": lines, "defense": defense,
 	})
 	for i, c := range diffCases {

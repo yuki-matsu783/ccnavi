@@ -11,28 +11,30 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
-	"ccnavi/internal/tickets/lifecycle/internal/gitfixture"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
-var ops = []Op{ApprovalRequest, Finish, ReviewRequest, Ready}
+// pythonOps は Python の treegate にもある操作。Reviewed は Python では request が unpushed を直に読んでいた。
+var pythonOps = []Op{ApprovalRequest, Finish, ReviewRequest, Ready}
+
+var ops = append(slices.Clone(pythonOps), Reviewed)
 
 const placeFile = "wip/proposals/todo/i0001.md"
 
 // parentTree は bare のリモートを持つ親のツリー（main を push 済み）。
 func parentTree(t *testing.T) string {
 	t.Helper()
-	root := gitfixture.Workspace(t)
-	gitfixture.Remote(t, root)
+	root := testkit.ShapedWorkspace(t)
+	testkit.Remote(t, root)
 	for rel, text := range map[string]string{
 		"src/keep.py": "print(1)\n", placeFile: "v1\n", "wip/note.md": "n\n",
 		".ccnavi/config/common/rules.yml": "a\n", "skills/process-test/SKILL.md": "s\n",
 		"wip/proposals/todo/日本語.md": "j\n",
 	} {
-		gitfixture.Put(t, filepath.Join(root, filepath.FromSlash(rel)), text)
+		testkit.Put(t, filepath.Join(root, filepath.FromSlash(rel)), text)
 	}
-	gitfixture.Commit(t, root, "first")
-	gitfixture.Git(t, root, "push", "-q", "origin", "main")
+	testkit.Commit(t, root, "first")
+	testkit.Git(t, root, "push", "-q", "origin", "main")
 	return root
 }
 
@@ -45,8 +47,8 @@ func kinds(rs []Refusal) []Kind {
 }
 
 func commitFile(t *testing.T, dir, rel string) {
-	gitfixture.Put(t, filepath.Join(dir, filepath.FromSlash(rel)), "new\n")
-	gitfixture.Commit(t, dir, "x")
+	testkit.Put(t, filepath.Join(dir, filepath.FromSlash(rel)), "new\n")
+	testkit.Commit(t, dir, "x")
 }
 
 // 宣言した操作の全部で、条件ごとに止める・通すが宣言どおりか（Python の tests/core/test_treegate.py）。
@@ -59,22 +61,22 @@ func TestWatches(t *testing.T) {
 	}{
 		{"何も無ければ全部通る", func(*testing.T, string) {}, nil},
 		{"置き場の外の未コミットは全部止める", func(t *testing.T, dir string) {
-			gitfixture.Put(t, filepath.Join(dir, "src", "keep.py"), "print(2)\n")
+			testkit.Put(t, filepath.Join(dir, "src", "keep.py"), "print(2)\n")
 		}, map[Op][]Kind{ApprovalRequest: {DirtyParent}, Finish: {DirtyParent}, ReviewRequest: {DirtyParent}, Ready: {DirtyParent}}},
 		{"置き場の中の未コミットは数えない", func(t *testing.T, dir string) {
-			gitfixture.Put(t, filepath.Join(dir, filepath.FromSlash(placeFile)), "v2\n")
-			gitfixture.Put(t, filepath.Join(dir, "wip", "proposals", "todo", "日本語.md"), "k\n")
+			testkit.Put(t, filepath.Join(dir, filepath.FromSlash(placeFile)), "v2\n")
+			testkit.Put(t, filepath.Join(dir, "wip", "proposals", "todo", "日本語.md"), "k\n")
 		}, nil},
 		{"ready だけが消した wip/ を通す", func(t *testing.T, dir string) {
 			os.Remove(filepath.Join(dir, "wip", "note.md"))
 		}, map[Op][]Kind{ApprovalRequest: {DirtyParent}, Finish: {DirtyParent}, ReviewRequest: {DirtyParent}}},
 		{"未 push のコードはそれを見る操作が止める", func(t *testing.T, dir string) { commitFile(t, dir, "src/new.py") },
-			map[Op][]Kind{ApprovalRequest: {UnpushedCode}, ReviewRequest: {UnpushedCode}, Ready: {UnpushedCode}}},
+			map[Op][]Kind{ApprovalRequest: {UnpushedCode}, ReviewRequest: {UnpushedCode}, Ready: {UnpushedCode}, Reviewed: {UnpushedCode}}},
 		{"未 push の置き場は ready だけが止める", func(t *testing.T, dir string) { commitFile(t, dir, "wip/proposals/todo/i0002.md") },
 			map[Op][]Kind{Ready: {UnpushedCode}}},
 		{"一度も送っていないブランチは承認の依頼だけが通る", func(t *testing.T, dir string) {
-			gitfixture.Git(t, dir, "checkout", "-q", "-b", "fresh")
-		}, map[Op][]Kind{ReviewRequest: {UnpushedCode}, Ready: {UnpushedCode}}},
+			testkit.Git(t, dir, "checkout", "-q", "-b", "fresh")
+		}, map[Op][]Kind{ReviewRequest: {UnpushedCode}, Ready: {UnpushedCode}, Reviewed: {UnpushedCode}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -98,7 +100,7 @@ func TestWatches(t *testing.T) {
 
 func TestDirtyNamesThePathAndApprovalNamesTheCode(t *testing.T) {
 	dir := parentTree(t)
-	gitfixture.Put(t, filepath.Join(dir, "src", "keep.py"), "print(2)\n")
+	testkit.Put(t, filepath.Join(dir, "src", "keep.py"), "print(2)\n")
 	if got := Check(Finish, dir, &config.Settings{}, Options{}); len(got) != 1 || !reflect.DeepEqual(got[0].Paths, []string{"src/keep.py"}) {
 		t.Fatalf("%+v", got)
 	}
@@ -168,24 +170,24 @@ func oracleTrees(t *testing.T) []string {
 	}
 	add(func(string) {})
 	add(func(dir string) {
-		gitfixture.Put(t, filepath.Join(dir, "src", "keep.py"), "print(2)\n")
-		gitfixture.Put(t, filepath.Join(dir, "wip", "proposals", "todo", "日本語.md"), "k\n")
+		testkit.Put(t, filepath.Join(dir, "src", "keep.py"), "print(2)\n")
+		testkit.Put(t, filepath.Join(dir, "wip", "proposals", "todo", "日本語.md"), "k\n")
 	})
 	add(func(dir string) { os.Remove(filepath.Join(dir, "wip", "note.md")) })
 	add(func(dir string) { commitFile(t, dir, "src/new.py") })
 	add(func(dir string) { commitFile(t, dir, "wip/proposals/todo/i0002.md") })
-	add(func(dir string) { gitfixture.Git(t, dir, "checkout", "-q", "-b", "fresh") })
+	add(func(dir string) { testkit.Git(t, dir, "checkout", "-q", "-b", "fresh") })
 	add(func(dir string) {
 		for _, rel := range []string{".ccnavi/config/common/rules.yml", "skills/process-test/SKILL.md", "src/keep.py"} {
-			gitfixture.Put(t, filepath.Join(dir, filepath.FromSlash(rel)), "drift\n")
+			testkit.Put(t, filepath.Join(dir, filepath.FromSlash(rel)), "drift\n")
 		}
 	})
 	add(func(dir string) {
 		for n := range 10 {
-			gitfixture.Put(t, filepath.Join(dir, "src", fmt.Sprintf("f%02d.py", n)), "x\n")
-			gitfixture.Git(t, dir, "add", "-N", "src")
+			testkit.Put(t, filepath.Join(dir, "src", fmt.Sprintf("f%02d.py", n)), "x\n")
+			testkit.Git(t, dir, "add", "-N", "src")
 		}
-		gitfixture.Put(t, filepath.Join(dir, "src", "keep.py"), "print(3)\n")
+		testkit.Put(t, filepath.Join(dir, "src", "keep.py"), "print(3)\n")
 	})
 	return trees
 }
@@ -221,14 +223,14 @@ func optional(paths []string, ok bool) any {
 func TestMatchesPython(t *testing.T) {
 	trees := oracleTrees(t)
 	opNames := []string{}
-	for _, op := range ops {
+	for _, op := range pythonOps {
 		opNames = append(opNames, string(op))
 	}
-	want := pyoracle.Answers[[]map[string]any](t, "treegate", oracle, map[string]any{"trees": trees, "ops": opNames})
+	want := testkit.Answers[[]map[string]any](t, "treegate", oracle, map[string]any{"trees": trees, "ops": opNames})
 	conf := &config.Settings{}
 	for i, tree := range trees {
 		got := map[string]any{}
-		for _, op := range ops {
+		for _, op := range pythonOps {
 			got[string(op)] = refusalsOf(Check(op, tree, conf, Options{}), tree)
 			got[string(op)+"+root"] = refusalsOf(Check(op, tree, conf, Options{Root: tree, PlainDirty: true}), tree)
 		}

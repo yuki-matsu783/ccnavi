@@ -15,9 +15,8 @@ import (
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/tickets/lifecycle/consolidate"
-	"ccnavi/internal/tickets/lifecycle/internal/gitfixture"
 	"ccnavi/internal/tickets/lifecycle/wapmerge"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の commands・consolidate・write_and_push_merge と同じワークスペースを 2 つ作り、着手・判定の記録・合流の前の
@@ -55,25 +54,25 @@ func recordNone(id, parent string) string {
 //	i0003  提案（todo/）だけの親
 //	i0004  計画のある親。子 01-01 は気づき無しで閉じ、親も閉じる
 func fixture(t *testing.T) string {
-	root := gitfixture.Workspace(t)
-	gitfixture.Put(t, filepath.Join(root, ".ccnavi", "config", "common", "risks.yml"), risks)
+	root := testkit.ShapedWorkspace(t)
+	testkit.Put(t, filepath.Join(root, ".ccnavi", "config", "common", "risks.yml"), risks)
 	for _, parent := range []string{"i0001", "i0002", "i0004"} {
-		tree := gitfixture.AddWorktree(t, root, parent, "main")
+		tree := testkit.AddWorktree(t, root, parent, "main")
 		var extra []string
 		if parent != "i0002" {
 			extra = append(extra, "feedback: []")
 		}
-		gitfixture.Put(t, gitfixture.Approved(root, parent, "doing", parent), gitfixture.ParentText(parent, []string{"  - work"}, extra...))
+		testkit.Put(t, testkit.Approved(root, parent, "doing", parent), testkit.ParentText(parent, []string{"  - work"}, extra...))
 		children := []string{parent + "-01-01"}
 		if parent == "i0001" {
 			children = append(children, "i0001-01-02")
 		}
 		for _, c := range children {
-			gitfixture.Put(t, gitfixture.Approved(root, parent, "doing", c), gitfixture.ChildText(c, parent, "1"))
+			testkit.Put(t, testkit.Approved(root, parent, "doing", c), testkit.ChildText(c, parent, "1"))
 		}
-		gitfixture.Commit(t, tree, "approve "+parent)
+		testkit.Commit(t, tree, "approve "+parent)
 	}
-	gitfixture.Put(t, filepath.Join(root, "wip", "proposals", "todo", "i0003.md"), gitfixture.ParentText("i0003", []string{"  - work"}))
+	testkit.Put(t, filepath.Join(root, "wip", "proposals", "todo", "i0003.md"), testkit.ParentText("i0003", []string{"  - work"}))
 	return root
 }
 
@@ -208,19 +207,14 @@ json.dump(out, sys.stdout, ensure_ascii=False)
 `
 
 func TestMatchesPython(t *testing.T) {
-	for _, kv := range [][2]string{
-		{"GIT_CONFIG_GLOBAL", os.DevNull}, {"GIT_CONFIG_NOSYSTEM", "1"},
-		{"GIT_AUTHOR_NAME", "t"}, {"GIT_AUTHOR_EMAIL", "t@example.com"},
-		{"GIT_COMMITTER_NAME", "t"}, {"GIT_COMMITTER_EMAIL", "t@example.com"},
-		{"GIT_AUTHOR_DATE", "2026-01-05T00:00:00+0000"}, {"GIT_COMMITTER_DATE", "2026-01-05T00:00:00+0000"},
-		{env.Learning, "enable"},
-	} {
-		t.Setenv(kv[0], kv[1])
+	for _, kv := range append(testkit.GitEnv(), env.Learning+"=enable") {
+		name, value, _ := strings.Cut(kv, "=")
+		t.Setenv(name, value)
 	}
 	pyRoot, goRoot := fixture(t), fixture(t)
 	in := map[string]any{"root": pyRoot, "stamp": stamp, "record1": record1, "record3": recordNone("i0002-01-01", "i0002"),
 		"record4": recordNone("i0004-01-01", "i0004")}
-	want := pyoracle.Answers[map[string]any](t, "ops", gitfixture.ShapePy+oracle, in)
+	want := testkit.Answers[map[string]any](t, "ops", testkit.ShapePy+oracle, in)
 
 	root := goRoot
 	restore, err := fsio.FixClock(stamp)
@@ -228,9 +222,9 @@ func TestMatchesPython(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer restore()
-	conf := gitfixture.Settings(t, root)
-	rel := func(s string) string { return gitfixture.Rel(root, s) }
-	wt := func(name string) string { return gitfixture.Worktree(root, name) }
+	conf := testkit.Settings(t, root)
+	rel := func(s string) string { return testkit.Rel(root, s) }
+	wt := func(name string) string { return testkit.Worktree(root, name) }
 	got := map[string]any{}
 	run := func(name string, f func(o, e *bytes.Buffer) int) {
 		var o, e bytes.Buffer
@@ -261,7 +255,7 @@ func TestMatchesPython(t *testing.T) {
 		got[name] = []any{code, rel(o.String())}
 	}
 	merge := func(parent, child string) {
-		gitfixture.Git(t, wt(parent), "merge", "--no-ff", "--no-commit", gitfixture.Head(t, wt(child)))
+		testkit.Git(t, wt(parent), "merge", "--no-ff", "--no-commit", testkit.Head(t, wt(child)))
 	}
 	const c1, c2, c3, c4 = "i0001-01-01", "i0001-01-02", "i0002-01-01", "i0004-01-01"
 
@@ -270,12 +264,12 @@ func TestMatchesPython(t *testing.T) {
 	start("start child early", c1)
 	start("start parent", "i0001")
 	start("start parent again", "i0001")
-	gitfixture.Commit(t, wt("i0001"), "start")
-	gitfixture.Git(t, root, "worktree", "add", "-q", "-b", c1, filepath.Join(".claude", "worktrees", c1), "i0001")
+	testkit.Commit(t, wt("i0001"), "start")
+	testkit.Git(t, root, "worktree", "add", "-q", "-b", c1, filepath.Join(".claude", "worktrees", c1), "i0001")
 	start("start c1", c1)
-	gitfixture.Put(t, filepath.Join(wt(c1), "src", "a.py"), "a = 1\n")
-	gitfixture.Put(t, filepath.Join(wt(c1), "wip", "handoff", "learnings", c1+".md"), record1)
-	gitfixture.Commit(t, wt(c1), "work c1")
+	testkit.Put(t, filepath.Join(wt(c1), "src", "a.py"), "a = 1\n")
+	testkit.Put(t, filepath.Join(wt(c1), "wip", "handoff", "learnings", c1+".md"), record1)
+	testkit.Commit(t, wt(c1), "work c1")
 	check("check finish c1", VerbFinish, c1)
 	recordRisk("risk bad answer", c1, "untested", "maybe", "r")
 	recordRisk("risk no reason", c1, "untested", "yes", "  ")
@@ -287,12 +281,12 @@ func TestMatchesPython(t *testing.T) {
 	wap("wap c1", c1)
 	merge("i0001", c1)
 	finish("finish c1", c1)
-	gitfixture.Commit(t, wt("i0001"), "finish c1")
+	testkit.Commit(t, wt("i0001"), "finish c1")
 	check("check cancel c2", VerbCancel, c2)
 	cancel("cancel c2 no reason", c2, " ")
 	cancel("cancel todo", "i0003", "r")
 	cancel("cancel c2", c2, " やめた ")
-	gitfixture.Commit(t, wt("i0001"), "cancel c2")
+	testkit.Commit(t, wt("i0001"), "cancel c2")
 	finish("finish parent learning", "i0001")
 	cons("check consolidate", "i0001", consolidate.Check)
 	cons("consolidate child", c1, consolidate.Run)
@@ -300,54 +294,54 @@ func TestMatchesPython(t *testing.T) {
 	cons("consolidate again", "i0001", consolidate.Run)
 	cons("check consolidate absent", "i0098", consolidate.Check)
 	start("start parent 2", "i0002")
-	gitfixture.Commit(t, wt("i0002"), "start")
-	gitfixture.Git(t, root, "worktree", "add", "-q", "-b", c3, filepath.Join(".claude", "worktrees", c3), "i0002")
+	testkit.Commit(t, wt("i0002"), "start")
+	testkit.Git(t, root, "worktree", "add", "-q", "-b", c3, filepath.Join(".claude", "worktrees", c3), "i0002")
 	wap("wap c3 not started", c3)
 	start("start c3", c3)
-	gitfixture.Put(t, filepath.Join(wt(c3), "src", "hot", "x.py"), "x = 1\n")
+	testkit.Put(t, filepath.Join(wt(c3), "src", "hot", "x.py"), "x = 1\n")
 	wap("wap c3 dirty", c3)
-	gitfixture.Put(t, filepath.Join(wt(c3), "wip", "handoff", "learnings", c3+".md"), recordNone(c3, "i0002"))
-	gitfixture.Commit(t, wt(c3), "work c3")
-	gitfixture.Put(t, filepath.Join(wt(c3), "docs", "out.md"), "out\n")
-	gitfixture.Commit(t, wt(c3), "outside")
+	testkit.Put(t, filepath.Join(wt(c3), "wip", "handoff", "learnings", c3+".md"), recordNone(c3, "i0002"))
+	testkit.Commit(t, wt(c3), "work c3")
+	testkit.Put(t, filepath.Join(wt(c3), "docs", "out.md"), "out\n")
+	testkit.Commit(t, wt(c3), "outside")
 	wap("wap c3 outside", c3)
-	gitfixture.Git(t, wt(c3), "rm", "-q", "docs/out.md")
-	gitfixture.Commit(t, wt(c3), "back")
-	gitfixture.Put(t, filepath.Join(wt(c3), "src", "cache.txt"), "child\n")
-	gitfixture.Git(t, wt(c3), "add", "-f", "src/cache.txt")
-	gitfixture.Commit(t, wt(c3), "cache")
-	exclude := strings.TrimSpace(gitfixture.Git(t, wt("i0002"), "rev-parse", "--git-path", "info/exclude"))
+	testkit.Git(t, wt(c3), "rm", "-q", "docs/out.md")
+	testkit.Commit(t, wt(c3), "back")
+	testkit.Put(t, filepath.Join(wt(c3), "src", "cache.txt"), "child\n")
+	testkit.Git(t, wt(c3), "add", "-f", "src/cache.txt")
+	testkit.Commit(t, wt(c3), "cache")
+	exclude := strings.TrimSpace(testkit.Git(t, wt("i0002"), "rev-parse", "--git-path", "info/exclude"))
 	if !filepath.IsAbs(exclude) {
 		exclude = filepath.Join(wt("i0002"), exclude)
 	}
-	gitfixture.Put(t, exclude, "src/cache.txt\n")
-	gitfixture.Put(t, filepath.Join(wt("i0002"), "src", "cache.txt"), "parent\n")
+	testkit.Put(t, exclude, "src/cache.txt\n")
+	testkit.Put(t, filepath.Join(wt("i0002"), "src", "cache.txt"), "parent\n")
 	wap("wap c3 ignored", c3)
 	os.Remove(filepath.Join(wt("i0002"), "src", "cache.txt"))
 	recordRisk("risk c3", c3, "untested", "yes", "テストが無い")
 	wap("wap c3", c3)
 	merge("i0002", c3)
 	finish("finish c3", c3)
-	gitfixture.Commit(t, wt("i0002"), "finish c3")
+	testkit.Commit(t, wt("i0002"), "finish c3")
 	finish("finish parent 2", "i0002")
 	check("check finish parent 2", VerbFinish, "i0002")
 	start("start parent 4", "i0004")
-	gitfixture.Commit(t, wt("i0004"), "start")
-	gitfixture.Git(t, root, "worktree", "add", "-q", "-b", c4, filepath.Join(".claude", "worktrees", c4), "i0004")
+	testkit.Commit(t, wt("i0004"), "start")
+	testkit.Git(t, root, "worktree", "add", "-q", "-b", c4, filepath.Join(".claude", "worktrees", c4), "i0004")
 	start("start c4", c4)
-	gitfixture.Put(t, filepath.Join(wt(c4), "src", "b.py"), "b = 1\n")
-	gitfixture.Put(t, filepath.Join(wt(c4), "wip", "handoff", "learnings", c4+".md"), recordNone(c4, "i0004"))
-	gitfixture.Commit(t, wt(c4), "work c4")
+	testkit.Put(t, filepath.Join(wt(c4), "src", "b.py"), "b = 1\n")
+	testkit.Put(t, filepath.Join(wt(c4), "wip", "handoff", "learnings", c4+".md"), recordNone(c4, "i0004"))
+	testkit.Commit(t, wt(c4), "work c4")
 	recordRisk("risk c4", c4, "untested", "no", "r")
 	wap("wap c4", c4)
 	merge("i0004", c4)
 	finish("finish c4", c4)
-	gitfixture.Commit(t, wt("i0004"), "finish c4")
+	testkit.Commit(t, wt("i0004"), "finish c4")
 	check("check finish parent 4", VerbFinish, "i0004")
 	finish("finish parent 4", "i0004")
 	finish("finish parent 4 again", "i0004")
 	got["texts"] = fileTexts(t, root)
-	got["shape"] = gitfixture.Shape(t, root)
+	got["shape"] = testkit.Shape(t, root)
 	compare(t, got, want)
 }
 
@@ -373,7 +367,7 @@ func fileTexts(t *testing.T, root string) map[string]any {
 			if err != nil {
 				return err
 			}
-			found[r] = gitfixture.Rel(root, string(data))
+			found[r] = testkit.Rel(root, string(data))
 		}
 		return nil
 	})

@@ -9,7 +9,7 @@ import (
 
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/lifecycle/integrate"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // directWorkspace は直接作業のワークツリーを並べたワークスペース。記録の更新時刻は i 番目が i 分前。
@@ -25,40 +25,40 @@ import (
 func directWorkspace(t *testing.T, fill int) string {
 	root := workspace(t)
 	common := filepath.Join(root, ".git")
-	snap := headOf(t, root)
+	snap := testkit.Head(t, root)
 	base := time.Date(2026, 1, 5, 12, 0, 0, 0, time.UTC)
 	age := 0
 	record := func(name string, lines ...string) {
 		if lines == nil {
 			lines = []string{"version 4", "base_branch main", "snap_sha " + snap}
 		}
-		stamp := put(t, filepath.Join(common, tree.DirectDir, name), strings.Join(lines, "\n")+"\n")
+		stamp := testkit.Put(t, filepath.Join(common, tree.DirectDir, name), strings.Join(lines, "\n")+"\n")
 		age++
 		touch(t, stamp, base.Add(-time.Duration(age)*time.Minute))
 	}
-	newer := addWorktree(t, root, "new-1-b", "main")
-	put(t, filepath.Join(newer, "work.txt"), "y\n")
-	commitAll(t, newer, "work")
+	newer := testkit.AddWorktree(t, root, "new-1-b", "main")
+	testkit.Put(t, filepath.Join(newer, "work.txt"), "y\n")
+	testkit.Commit(t, newer, "work")
 	record("new-1-b")
-	addWorktree(t, root, "rec-1-a", "main")
+	testkit.AddWorktree(t, root, "rec-1-a", "main")
 	record("rec-1-a")
-	put(t, filepath.Join(common, integrate.RecordDir, "rec-1-a", "marker"), "version 4\n")
-	done := addWorktree(t, root, "done-1-e", "main")
+	testkit.Put(t, filepath.Join(common, integrate.RecordDir, "rec-1-a", "marker"), "version 4\n")
+	done := testkit.AddWorktree(t, root, "done-1-e", "main")
 	record("done-1-e")
-	put(t, filepath.Join(common, integrate.DoneDir, "done-1-e"), "version 4\nbranch_sha "+headOf(t, done)+"\n")
-	addWorktree(t, root, "nosnap-1", "main")
+	testkit.Put(t, filepath.Join(common, integrate.DoneDir, "done-1-e"), "version 4\nbranch_sha "+testkit.Head(t, done)+"\n")
+	testkit.AddWorktree(t, root, "nosnap-1", "main")
 	record("nosnap-1", "version 4", "base_branch main")
-	addWorktree(t, root, "tick-1-c", "main")
+	testkit.AddWorktree(t, root, "tick-1-c", "main")
 	record("tick-1-c")
-	put(t, filepath.Join(root, "wip", "proposals", "todo", "tick-1-c.md"), "---\n---\n")
-	addWorktree(t, root, "none-1-d", "main")
+	testkit.Put(t, filepath.Join(root, "wip", "proposals", "todo", "tick-1-c.md"), "---\n---\n")
+	testkit.AddWorktree(t, root, "none-1-d", "main")
 	for i := range fill {
 		name := fmt.Sprintf("w-%02d-x", i)
-		addWorktree(t, root, name, "main")
+		testkit.AddWorktree(t, root, name, "main")
 		record(name)
 	}
-	old := addWorktree(t, root, "old-1-a", "main")
-	put(t, filepath.Join(old, "draft.txt"), "d\n")
+	old := testkit.AddWorktree(t, root, "old-1-a", "main")
+	testkit.Put(t, filepath.Join(old, "draft.txt"), "d\n")
 	record("old-1-a")
 	return root
 }
@@ -77,14 +77,14 @@ json.dump(out, sys.stdout, ensure_ascii=False)
 
 func TestDirectWorktreesMatchesPython(t *testing.T) {
 	empty := workspace(t)
-	addWorktree(t, empty, "no-record", "main")
+	testkit.AddWorktree(t, empty, "no-record", "main")
 	roots := map[string]string{"empty": empty, "few": directWorkspace(t, 0), "many": directWorkspace(t, 8)}
-	want := pyoracle.Answers[map[string]any](t, "direct", directOracle, map[string]any{"roots": roots})
+	want := testkit.Answers[map[string]any](t, "direct", directOracle, map[string]any{"roots": roots})
 	got := map[string]any{}
 	for key, root := range roots {
-		got[key] = rel(root, DirectWorktrees(settingsOf(t, root), root, time.Now().Add(time.Minute)))
+		got[key] = testkit.Rel(root, DirectWorktrees(testkit.Settings(t, root), root, time.Now().Add(time.Minute)))
 	}
-	sameAsPython(t, got, want)
+	testkit.SameJSON(t, got, want)
 	few := got["few"].(string)
 	for _, s := range []string{"new-1-b（取り込み先 main）: 未コミット なし、起点から 1 コミット、integrate の記録 なし",
 		"rec-1-a（取り込み先 main）: 未コミット なし、起点から 0 コミット、integrate の記録 あり（取り込みの途中）",

@@ -10,8 +10,8 @@ import (
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/records/wiki"
-	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/model/ticket"
+	"ccnavi/internal/tickets/testkit"
 )
 
 const child = "feat-1-01-01"
@@ -20,7 +20,7 @@ const child = "feat-1-01-01"
 func workspace(t *testing.T) (string, *config.Settings) {
 	t.Helper()
 	root := repo(t)
-	from := filepath.Join(pyoracle.RepoRoot(t), ".ccnavi", "messages")
+	from := filepath.Join(testkit.RepoRoot(t), ".ccnavi", "messages")
 	entries, err := os.ReadDir(from)
 	if err != nil {
 		t.Fatal(err)
@@ -242,7 +242,7 @@ func TestRecordBlocked(t *testing.T) {
 	if err := os.MkdirAll(wt, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	runGit(t, wt, "init", "-q", "-b", "main")
+	testkit.Git(t, wt, "init", "-q", "-b", "main")
 	found := childTicket()
 	blocked := func() (bool, string) {
 		var errOut strings.Builder
@@ -255,7 +255,7 @@ func TestRecordBlocked(t *testing.T) {
 	if ok, _ := blocked(); !ok {
 		t.Error("追跡前に通した")
 	}
-	runGit(t, wt, "add", "-f", RecordRel(child))
+	testkit.Git(t, wt, "add", "-f", RecordRel(child))
 	if ok, _ := blocked(); !ok {
 		t.Error("コミット前に通した")
 	}
@@ -299,7 +299,7 @@ func TestParentBlocked(t *testing.T) {
 	if err := os.MkdirAll(wt, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	runGit(t, wt, "init", "-q", "-b", "main")
+	testkit.Git(t, wt, "init", "-q", "-b", "main")
 	put(t, wt, "README", "x\n")
 	put(t, wt, RecordRel("feat-1-01-01"), rec("none"))
 	commit(t, wt)

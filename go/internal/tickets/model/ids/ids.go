@@ -46,13 +46,13 @@ var ReservedBranchIDs = config.ReservedBranchIDs
 var refPrefixes = []string{"refs", "heads", "remotes", "tags", "origin", "upstream", "head"}
 
 var (
-	idPattern     = regexp.MustCompile(`^[A-Za-z0-9][` + IDChars + `]*$`)
-	childPattern  = regexp.MustCompile(`^([A-Za-z0-9][` + IDChars + `]*)-([0-9]{2})-([0-9]{2})$`)
-	childTail     = regexp.MustCompile(`-[0-9]{2}$`)
-	namePattern   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
-	formPattern   = regexp.MustCompile(`^([a-z][a-z0-9]*)-([1-9][0-9]*)-([A-Za-z0-9` + JAChars + `][` + IDChars + `]*)$`)
+	idPattern     = regexp.MustCompile(`\A[A-Za-z0-9][` + IDChars + `]*\z`)
+	childPattern  = regexp.MustCompile(`\A([A-Za-z0-9][` + IDChars + `]*)-([0-9]{2})-([0-9]{2})\z`)
+	childTail     = regexp.MustCompile(`-[0-9]{2}\z`)
+	namePattern   = regexp.MustCompile(`\A[A-Za-z0-9][A-Za-z0-9._-]*\z`)
+	formPattern   = regexp.MustCompile(`\A([a-z][a-z0-9]*)-([1-9][0-9]*)-([A-Za-z0-9` + JAChars + `][` + IDChars + `]*)\z`)
 	slugDrop      = regexp.MustCompile(`[^A-Za-z0-9` + JAChars + `]+`)
-	branchPattern = regexp.MustCompile(`^[A-Za-z0-9][` + IDChars + `/]*$`)
+	branchPattern = regexp.MustCompile(`\A[A-Za-z0-9][` + IDChars + `/]*\z`)
 )
 
 func runes(s string) int { return utf8.RuneCountInString(s) }
@@ -79,6 +79,10 @@ func IDProblem(text string) string {
 // IsValidID は識別子として読めるか。区切り文字と先頭の "." を持たないので、ファイル名を組む側と sh から
 // 引数を受ける側が自分でも同じ検査を当てるのに使う。
 func IsValidID(text string) bool { return IDProblem(text) == "" }
+
+// IsValidName は ASCII の 1 語の名前の形か（プロジェクト・リスクとフェーズの定義の識別子・テンプレートの名前）。
+// 全文で見る。Python の `$` で書いた呼び手は、末尾の改行 1 つを外してから渡す。
+func IsValidName(text string) bool { return namePattern.MatchString(text) }
 
 // Child は子の識別子（`<親>-<2 桁のフェーズ番号>-<2 桁の連番>`）を読んだもの。
 type Child struct {
@@ -215,7 +219,7 @@ func IssueIdentifier(number int, title, project, prefix string) (string, bool, e
 	if number <= 0 {
 		return fail(fmt.Sprintf("issue の番号は正の整数: %d", number))
 	}
-	if project != "" && !namePattern.MatchString(project) {
+	if project != "" && !IsValidName(project) {
 		return fail("プロジェクト名が識別子の形でない: " + pyfmt.Repr(project))
 	}
 	if !config.IsBranchPrefix(prefix) {

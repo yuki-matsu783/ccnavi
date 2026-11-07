@@ -12,7 +12,7 @@ import (
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/yamljson"
 	"ccnavi/internal/policy/rules"
-	"ccnavi/internal/tickets/model/pyoracle"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の plan_templates と template_use と突き合わせる。同じワークスペースを読ませ、--templates の JSON
@@ -180,7 +180,7 @@ func templatesWorkspace(t *testing.T, phases bool) string {
 		t.Fatal(err)
 	}
 	if phases {
-		put(t, filepath.Join(common, "phases.yml"), phasesYML)
+		testkit.Put(t, filepath.Join(common, "phases.yml"), phasesYML)
 	}
 	files := map[string]string{
 		filepath.Join(common, "templates", "research.yml"): researchYML,
@@ -211,19 +211,9 @@ func templatesWorkspace(t *testing.T, phases bool) string {
 		filepath.Join(lib, "libonly.yml"):                  tmpl("libonly", "  - design\n  - {type: implement, after: [1]}\n"),
 	}
 	for path, text := range files {
-		put(t, path, text)
+		testkit.Put(t, path, text)
 	}
 	return root
-}
-
-func put(t *testing.T, path, text string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
 }
 
 var parseCases = []struct{ text, stem string }{
@@ -273,7 +263,7 @@ func TestMatchesPython(t *testing.T) {
 	}
 	bareFile := filepath.Join(bare, ".ccnavi", "config", "project", "templates", "feature.yml")
 	in := map[string]any{"root": root, "bare": bare, "bareFile": bareFile, "lists": lists, "checks": checks, "parses": parses, "names": nameCases, "resolves": resolves}
-	want := pyoracle.Answers[templatesAnswers](t, "templates", templatesOracle, in)
+	want := testkit.Answers[templatesAnswers](t, "templates", templatesOracle, in)
 
 	conf, _ := config.Load(root)
 	s := Load(conf, root)

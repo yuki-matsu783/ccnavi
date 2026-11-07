@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -16,44 +15,17 @@ import (
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/model/host"
 	"ccnavi/internal/tickets/model/oplog"
-	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/review/request"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // 依頼から決め方までを、同じ形のワークスペースを 2 つ作って Python と Go に同じ順で打たせ、終了コード・標準出力・
 // 標準エラー・置いたファイル（マーカー・下書き・承認済みチケット）が 1 字も違わないことを見る。順は
 // prepare --check → prepare → requested → prepare（依頼済み）→ 依頼のマーカーをコミット → decide --check →
 // preview（変更要求・ふつう）→ yes（古いダイジェスト・選択がそろわない・keep と issue）→ prepare（レビュー済み）→
-// wip/ の片付け（ready の前提と RemoveWip）。git のワークスペースの道具は lifecycle の internal と同じ形をここに書く。
+// wip/ の片付け（ready の前提と RemoveWip）。
 
-const commitDate = "2026-01-05T00:00:00+0000"
 const fixedClock = "2026-01-06T03:04:05+0900"
-
-var gitEnv = []string{"GIT_CONFIG_GLOBAL=" + os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
-	"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
-	"GIT_AUTHOR_DATE=" + commitDate, "GIT_COMMITTER_DATE=" + commitDate}
-
-func runGit(t *testing.T, dir string, args ...string) string {
-	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), gitEnv...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return string(out)
-}
-
-func put(t *testing.T, path, text string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
 
 const phasesCopy = "phases:\n  work:\n    kind: work\n    title: 作業\n    review: true\n    when: 作業の案内\n    scope:\n    - src/*\n    - wip/*\n"
 
@@ -61,53 +33,39 @@ const phasesCopy = "phases:\n  work:\n    kind: work\n    title: 作業\n    rev
 // 親のブランチを push する。子の merged_sha は親のブランチの作業のコミット。
 func flowWorkspace(t *testing.T) string {
 	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git が無い")
-	}
-	root, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	runGit(t, root, "init", "-q", "-b", "main")
-	put(t, filepath.Join(root, ".gitignore"), "/logs\n/remote.git\n/.ccnavi/messages\n/body.md\n")
-	runGit(t, root, "add", ".gitignore")
-	runGit(t, root, "commit", "-q", "-m", "init")
-	from := filepath.Join(pyoracle.RepoRoot(t), ".ccnavi", "messages")
-	entries, err := os.ReadDir(from)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, e := range entries {
-		data, _ := os.ReadFile(filepath.Join(from, e.Name()))
-		put(t, filepath.Join(root, ".ccnavi", "messages", e.Name()), string(data))
-	}
-	runGit(t, root, "init", "-q", "--bare", filepath.Join(root, "remote.git"))
-	runGit(t, root, "remote", "add", "origin", filepath.Join(root, "remote.git"))
-	runGit(t, root, "worktree", "add", "-q", "-b", "i0001", filepath.Join(".claude", "worktrees", "i0001"), "main")
+	root := testkit.GitRoot(t)
+	testkit.Git(t, root, "init", "-q", "-b", "main")
+	testkit.Put(t, filepath.Join(root, ".gitignore"), "/logs\n/remote.git\n/.ccnavi/messages\n/body.md\n")
+	testkit.Git(t, root, "add", ".gitignore")
+	testkit.Git(t, root, "commit", "-q", "-m", "init")
+	testkit.CopyMessages(t, root)
+	testkit.Git(t, root, "init", "-q", "--bare", filepath.Join(root, "remote.git"))
+	testkit.Git(t, root, "remote", "add", "origin", filepath.Join(root, "remote.git"))
+	testkit.Git(t, root, "worktree", "add", "-q", "-b", "i0001", filepath.Join(".claude", "worktrees", "i0001"), "main")
 	tree := filepath.Join(root, ".claude", "worktrees", "i0001")
-	put(t, filepath.Join(tree, "src", "a.go"), "package a\n")
-	runGit(t, tree, "add", "-A")
-	runGit(t, tree, "commit", "-q", "-m", "child work")
-	merged := strings.TrimSpace(runGit(t, tree, "rev-parse", "HEAD"))
-	put(t, filepath.Join(tree, ".ccnavi", "approved", "doing", "i0001.md"), "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\n"+
+	testkit.Put(t, filepath.Join(tree, "src", "a.go"), "package a\n")
+	testkit.Git(t, tree, "add", "-A")
+	testkit.Git(t, tree, "commit", "-q", "-m", "child work")
+	merged := strings.TrimSpace(testkit.Git(t, tree, "rev-parse", "HEAD"))
+	testkit.Put(t, filepath.Join(tree, ".ccnavi", "approved", "doing", "i0001.md"), "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\n"+
 		phasesCopy+"plan:\n  - work\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\n"+
 		"allow:\n  - match: Write|Edit\n    glob: \"src/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n")
-	put(t, filepath.Join(tree, "wip", "proposals", "review", "i0001-01-01.md"), "---\nversion: 1\nticket: i0001-01-01\n"+
+	testkit.Put(t, filepath.Join(tree, "wip", "proposals", "review", "i0001-01-01.md"), "---\nversion: 1\nticket: i0001-01-01\n"+
 		"parent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子\nrationale: r\nallow:\n"+
 		"  - match: Write|Edit\n    glob: \"src/*\"\ncompleted_at: \"2026-01-03T00:00:00+0900\"\nfinished_to: \"review\"\n"+
 		"merged_sha: \""+merged+"\"\n---\n\n本文\n")
-	runGit(t, tree, "add", "-A")
-	runGit(t, tree, "commit", "-q", "-m", "tickets")
-	runGit(t, tree, "push", "-q", "-u", "origin", "i0001")
-	put(t, filepath.Join(root, "body.md"), "依頼の本文\n")
+	testkit.Git(t, tree, "add", "-A")
+	testkit.Git(t, tree, "commit", "-q", "-m", "tickets")
+	testkit.Git(t, tree, "push", "-q", "-u", "origin", "i0001")
+	testkit.Put(t, filepath.Join(root, "body.md"), "依頼の本文\n")
 	threads := `[{"id": "d1", "url": "u1", "path": "src/a.go", "line": 1, "body": "指摘 1", "last_id": "c1"},` +
 		`{"id": "d2", "url": "u2", "path": "", "line": 0, "body": "指摘 2\n2 行目", "last_id": "c2"},` +
 		`{"id": "d3", "url": "u3", "resolved": true, "body": "済み"}]`
-	put(t, filepath.Join(root, "logs", "posted.json"), `{"host": "github", "mr": {"number": 7, "url": "https://h/pr/7"}, `+
+	testkit.Put(t, filepath.Join(root, "logs", "posted.json"), `{"host": "github", "mr": {"number": 7, "url": "https://h/pr/7"}, `+
 		`"url": "https://h/pr/7#c1", "created_at": "2026-01-05T01:00:00Z", "author": "bot", "threads": [], "reviews": []}`)
-	put(t, filepath.Join(root, "logs", "threads.json"), `{"host": "github", "mr": {"number": 7, "url": "https://h/pr/7"}, `+
+	testkit.Put(t, filepath.Join(root, "logs", "threads.json"), `{"host": "github", "mr": {"number": 7, "url": "https://h/pr/7"}, `+
 		`"threads": `+threads+`, "reviews": []}`)
-	put(t, filepath.Join(root, "logs", "changes.json"), `{"host": "github", "mr": {"number": 7, "url": "https://h/pr/7"}, `+
+	testkit.Put(t, filepath.Join(root, "logs", "changes.json"), `{"host": "github", "mr": {"number": 7, "url": "https://h/pr/7"}, `+
 		`"threads": [], "reviews": [{"state": "CHANGES_REQUESTED", "url": "r/1", "submitted_at": "2026-01-05T02:00:00Z", "author": "rev"}]}`)
 	return root
 }
@@ -185,7 +143,7 @@ func TestFlowMatchesPython(t *testing.T) {
 	py, golang := flowWorkspace(t), flowWorkspace(t)
 	// 見せたあとに本文が変わった指摘のダイジェスト（親・フェーズ・MR は同じ）。
 	stale := Digest(decisionOf([]host.Thread{thread("u1", "前の本文")}, 1))
-	want := pyoracle.Answers[flowAnswers](t, "flow", flowOracle, map[string]any{"root": py, "env": gitEnv, "clock": fixedClock, "stale": stale})
+	want := testkit.Answers[flowAnswers](t, "flow", flowOracle, map[string]any{"root": py, "env": testkit.GitEnv(), "clock": fixedClock, "stale": stale})
 	root := golang
 	rel := func(s string) string { return strings.ReplaceAll(s, root, "<root>") }
 	tree := filepath.Join(root, ".claude", "worktrees", "i0001")
@@ -218,9 +176,9 @@ func TestFlowMatchesPython(t *testing.T) {
 		return noErr(request.Requested(o, e, conf, root, tree, 1, filepath.Join(logs, "posted.json")))
 	})
 	run("again", func(o, e *bytes.Buffer) int { return request.Prepare(o, e, conf, root, tree, 1, body) })
-	runGit(t, tree, "add", "-A")
-	runGit(t, tree, "commit", "-q", "-m", "requested")
-	runGit(t, tree, "push", "-q", "origin", "i0001")
+	testkit.Git(t, tree, "add", "-A")
+	testkit.Git(t, tree, "commit", "-q", "-m", "requested")
+	testkit.Git(t, tree, "push", "-q", "origin", "i0001")
 	run("decide-check", func(o, e *bytes.Buffer) int { return Check(o, e, conf, root, tree, 1, "", "") })
 	run("decide-check-bad", func(o, e *bytes.Buffer) int { return Check(o, e, conf, root, tree, 1, "{", "v2.x") })
 	run("changes", func(o, e *bytes.Buffer) int {
@@ -242,11 +200,11 @@ func TestFlowMatchesPython(t *testing.T) {
 	run("uneven", yes(`{"u1": "keep"}`, digest))
 	run("yes", yes(`{"u1": "fix", "u2": "issue"}`, digest))
 	run("reviewed", func(o, e *bytes.Buffer) int { return request.Prepare(o, e, conf, root, tree, 1, body) })
-	put(t, filepath.Join(tree, "wip", "design", "x.html"), "<p>x</p>\n")
-	runGit(t, tree, "add", "-A")
-	runGit(t, tree, "commit", "-q", "-m", "wip")
-	runGit(t, tree, "push", "-q", "origin", "i0001")
-	put(t, filepath.Join(tree, "wip", "u.txt"), "u\n")
+	testkit.Put(t, filepath.Join(tree, "wip", "design", "x.html"), "<p>x</p>\n")
+	testkit.Git(t, tree, "add", "-A")
+	testkit.Git(t, tree, "commit", "-q", "-m", "wip")
+	testkit.Git(t, tree, "push", "-q", "origin", "i0001")
+	testkit.Put(t, filepath.Join(tree, "wip", "u.txt"), "u\n")
 	relAll := func(list []string) []string {
 		out := []string{}
 		for _, s := range list {
@@ -343,9 +301,9 @@ func requestedWorkspace(t *testing.T) (root, tree string, conf *config.Settings)
 	if code, err := request.Requested(&o, &e, conf, root, tree, 1, filepath.Join(root, "logs", "posted.json")); code != 0 || err != nil {
 		t.Fatalf("requested: %s", e.String())
 	}
-	runGit(t, tree, "add", "-A")
-	runGit(t, tree, "commit", "-q", "-m", "requested")
-	runGit(t, tree, "push", "-q", "origin", "i0001")
+	testkit.Git(t, tree, "add", "-A")
+	testkit.Git(t, tree, "commit", "-q", "-m", "requested")
+	testkit.Git(t, tree, "push", "-q", "origin", "i0001")
 	return root, tree, conf
 }
 
@@ -380,7 +338,7 @@ func TestYesInThreeSteps(t *testing.T) {
 	}
 	resolved := filepath.Join(root, "logs", "resolved.json")
 	data, _ := os.ReadFile(threads)
-	put(t, resolved, strings.Replace(string(data), `"id": "d1", "url": "u1",`, `"id": "d1", "url": "u1", "resolved": true,`, 1))
+	testkit.Put(t, resolved, strings.Replace(string(data), `"id": "d1", "url": "u1",`, `"id": "d1", "url": "u1", "resolved": true,`, 1))
 	o.Reset()
 	e.Reset()
 	if code, err := Yes(&o, &e, conf, root, tree, 1, resolved, choices, digest, YesOptions{PlanDone: plan}); code != 0 || err != nil {
@@ -412,7 +370,7 @@ func TestYesMismatchAfterTheHostKeepsTheReplies(t *testing.T) {
 	planned := host.ReadAcceptPlan(plan)
 	changed := filepath.Join(root, "logs", "changed.json")
 	data, _ := os.ReadFile(threads)
-	put(t, changed, strings.Replace(string(data), `"body": "指摘 1"`, `"body": "書き換えた指摘"`, 1))
+	testkit.Put(t, changed, strings.Replace(string(data), `"body": "指摘 1"`, `"body": "書き換えた指摘"`, 1))
 	o.Reset()
 	if code, _ := Yes(&o, &e, conf, root, tree, 1, changed, choices, digest, YesOptions{PlanDone: plan}); code == 0 ||
 		!strings.Contains(o.String(), `"mismatch": true`) || !strings.Contains(o.String(), `"changed": ["u1"]`) {

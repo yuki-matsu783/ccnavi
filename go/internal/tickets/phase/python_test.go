@@ -14,9 +14,9 @@ import (
 
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/tickets/approval"
-	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/model/ticket"
 	"ccnavi/internal/tickets/phase/scope"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の tickets/phase と同じワークスペースを 2 つ作って読ませ、フェーズの組み方・ゲート・止めたときの文・
@@ -138,23 +138,23 @@ var oracleParents = []string{"i0001", "i0002", "i0003", "i0004", "i0005", "i0006
 //	i0011 2 つの子のうち 1 つだけを手で done/ に動かした
 //	i0012 手で done/ に動かしたが、依頼の記録が無い
 func oracleWorkspace(t *testing.T) string {
-	root := workspace(t, oracleParents...)
+	root := testkit.Workspace(t, oracleParents...)
 	remote := filepath.Join(root, "remote.git")
-	runGit(t, root, "init", "-q", "--bare", remote)
-	runGit(t, root, "remote", "add", "origin", remote)
+	testkit.Git(t, root, "init", "-q", "--bare", remote)
+	testkit.Git(t, root, "remote", "add", "origin", remote)
 	done := `completed_at: "2026-01-01T00:00:00+0900"`
 	write := func(parent, where, id, text string) {
 		var dir string
 		switch where {
 		case "review":
-			dir = filepath.Join(worktree(root, parent), "wip", "proposals", "review")
+			dir = filepath.Join(testkit.Worktree(root, parent), "wip", "proposals", "review")
 		default:
-			dir = filepath.Join(approvedDir(root, parent), where)
+			dir = filepath.Join(testkit.ApprovedDir(root, parent), where)
 		}
-		put(t, filepath.Join(dir, id+".md"), text)
+		testkit.Put(t, filepath.Join(dir, id+".md"), text)
 	}
 	mark := func(parent, name, text string) {
-		put(t, filepath.Join(approvedDir(root, parent), "phases", parent, name), text)
+		testkit.Put(t, filepath.Join(testkit.ApprovedDir(root, parent), "phases", parent, name), text)
 	}
 
 	write("i0001", "doing", "i0001", parentText("i0001", "  - research", "  - {type: design, after: [1]}",
@@ -166,15 +166,15 @@ func oracleWorkspace(t *testing.T) string {
 	mark("i0001", "2.requested", `{"at": "2026-01-02T00:00:00+0900", "by": "cli"}`)
 	mark("i0001", "i0001-02-01.risk.json",
 		`{"points": 58, "level": "HIGH", "hits": [{"detail": "行数が多い"}, "x", {"detail": null}, {"detail": 3}]}`)
-	child := addWorktree(t, root, "i0001-02-01", "i0001")
+	child := testkit.AddWorktree(t, root, "i0001-02-01", "i0001")
 	for _, rel := range []string{"wip/design/a.md", "src/b.go", "docs/c.md", "wip/design/日本語 名.md",
 		".ccnavi/approved/phases/i0001/1.reviewed", "wip/handoff/h.md", "wip/proposals/todo/x.md", `wip\handoff\y.md`} {
-		put(t, filepath.Join(child, filepath.FromSlash(rel)), "x\n")
+		testkit.Put(t, filepath.Join(child, filepath.FromSlash(rel)), "x\n")
 	}
-	runGit(t, child, "add", "-A", "-f")
-	runGit(t, child, "commit", "-q", "-m", "child work")
-	put(t, filepath.Join(child, "other", "u.txt"), "u\n")
-	put(t, filepath.Join(child, "wip", "design", "b.md"), "b\n")
+	testkit.Git(t, child, "add", "-A", "-f")
+	testkit.Git(t, child, "commit", "-q", "-m", "child work")
+	testkit.Put(t, filepath.Join(child, "other", "u.txt"), "u\n")
+	testkit.Put(t, filepath.Join(child, "wip", "design", "b.md"), "b\n")
 
 	write("i0002", "doing", "i0002", parentText("i0002", "  - {type: design, deferred: true}", "  - {type: implement, after: [1]}"))
 	write("i0002", "done", "i0002-01-01", childText("i0002-01-01", "i0002", "1", "true", []string{"wip/design/*"},
@@ -182,9 +182,9 @@ func oracleWorkspace(t *testing.T) string {
 	write("i0002", "done", "i0002-02-01", childText("i0002-02-01", "i0002", "2", "", []string{"src/*"},
 		`completed_at: "2026-01-04T00:00:00+0900"`, `finished_to: "review"`))
 	mark("i0002", "2.requested", `{"at": "2026-01-02T00:00:00+0900"}`)
-	runGit(t, worktree(root, "i0002"), "add", "-A", "-f")
-	runGit(t, worktree(root, "i0002"), "commit", "-q", "-m", "move by hand")
-	runGit(t, worktree(root, "i0002"), "push", "-q", "origin", "i0002")
+	testkit.Git(t, testkit.Worktree(root, "i0002"), "add", "-A", "-f")
+	testkit.Git(t, testkit.Worktree(root, "i0002"), "commit", "-q", "-m", "move by hand")
+	testkit.Git(t, testkit.Worktree(root, "i0002"), "push", "-q", "origin", "i0002")
 
 	write("i0003", "doing", "i0003", parentText("i0003"))
 	write("i0003", "doing", "i0003-01-01", childText("i0003-01-01", "i0003", "1", "true", []string{"src/*"},
@@ -265,13 +265,13 @@ var scopeCases = []map[string]any{
 
 func TestMatchesPython(t *testing.T) {
 	pyRoot, goRoot := oracleWorkspace(t), oracleWorkspace(t)
-	head := strings.TrimSpace(runGit(t, worktree(goRoot, "i0001-02-01"), "rev-parse", "HEAD"))
+	head := strings.TrimSpace(testkit.Git(t, testkit.Worktree(goRoot, "i0001-02-01"), "rev-parse", "HEAD"))
 	cwds := func(root string) []string {
-		return []string{root, worktree(root, "i0001"), filepath.Join(worktree(root, "i0001"), "src", "deep"),
-			worktree(root, "i0001-02-01"), filepath.Join(root, "elsewhere")}
+		return []string{root, testkit.Worktree(root, "i0001"), filepath.Join(testkit.Worktree(root, "i0001"), "src", "deep"),
+			testkit.Worktree(root, "i0001-02-01"), filepath.Join(root, "elsewhere")}
 	}
 	findings := []string{"i0001-02-01", "i0002-01-01"}
-	want := pyoracle.Answers[map[string]any](t, "phase", phaseOracle, map[string]any{
+	want := testkit.Answers[map[string]any](t, "phase", phaseOracle, map[string]any{
 		"root": pyRoot, "parents": oracleParents, "order": orderCases(), "cwds": cwds(pyRoot),
 		"scopes": scopeCases, "findings": findings, "head": head, "clock": fixedClock,
 	})
@@ -307,7 +307,7 @@ func list[T any](xs []T) []T {
 
 func goAnswers(t *testing.T, root string, cwds, findings []string, head string) map[string]any {
 	rel := func(s string) string { return strings.ReplaceAll(s, root, "<root>") }
-	conf := settingsOf(t, root)
+	conf := testkit.Settings(t, root)
 	raw := approval.ReadRaw(conf, root)
 	opened, _ := approval.Scan(conf, root, false, raw)
 	closed, _ := approval.Scan(conf, root, true, raw)

@@ -9,7 +9,7 @@ import (
 
 // 共通の 1 文は全部の段の促しと finish の促しに 1 回ずつ入り、段ごとの次の一手は残る。
 func TestEveryStepKeepsItsGuidanceAndGetsTheCommonNote(t *testing.T) {
-	root := workspace(t)
+	root := clock.Workspace(t)
 	guide := map[Step][]string{
 		StepFinish:  {"finish i0001-01-01", "レビューの依頼（review-request）へ進む"},
 		StepConfirm: {"confirm --phase 1", "decide をユーザに頼む"},

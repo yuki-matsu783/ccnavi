@@ -10,8 +10,8 @@ import (
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/policy/rules"
-	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/model/ticket"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の phasetypes（parse・merge・コピーの検査・範囲）と workflow（先行関係と計画の検査）と突き合わせる。
@@ -325,7 +325,7 @@ func same(t *testing.T, label string, got, want any) {
 
 func TestPythonPhases(t *testing.T) {
 	in := map[string]any{"defs": defCases, "merges": mergeCases, "tickets": ticketCases, "paths": probePaths}
-	want := pyoracle.Answers[phasesAnswers](t, "phases", phasesOracle, in)
+	want := testkit.Answers[phasesAnswers](t, "phases", phasesOracle, in)
 	for i, text := range defCases {
 		types, problems := Parse(text, Where)
 		var raw any

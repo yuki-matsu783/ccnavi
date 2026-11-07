@@ -187,7 +187,7 @@ func scoreChild(stderr io.Writer, conf *config.Settings, root string, found *tic
 	}
 	lines := score.Lines()
 	lines[0] += "（" + diff.Summary() + "、配点 " + definition.Source + "）"
-	if risk.Escalates(string(score.Level)) {
+	if risk.Escalates(score.Level) {
 		lines = append(lines, "  実績のリスクが高いので、宣言に関わらずこのフェーズは人間レビューが必要です")
 	}
 	return lines, true

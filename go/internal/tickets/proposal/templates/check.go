@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/policy/rules"
@@ -82,7 +81,7 @@ func orderErrors(t *Template) []rules.Problem {
 func planConfig(t *Template, known *phases.Types) (*yaml.Map, *phases.Types, []rules.Problem) {
 	said := &problems{rule: t.Name}
 	copies := &yaml.Map{}
-	placeholders := &yaml.Map{}
+	var placeholders []*phases.PhaseType
 	for _, p := range t.parts() {
 		for i, item := range p.items {
 			if copies.Has(item.Type) {
@@ -95,21 +94,19 @@ func planConfig(t *Template, known *phases.Types) (*yaml.Map, *phases.Types, []r
 			pt := &phases.PhaseType{ID: item.Type, Title: placeholderTitle + item.Type, Kind: p.kind,
 				Review: true, Inherit: true, Learning: phases.LearningOn}
 			copies.Put(item.Type, pt.AsCopy())
-			placeholders.Put(item.Type, pt.AsCopy())
+			placeholders = append(placeholders, pt)
 			if known != nil {
 				said.add(rules.Warn, fmt.Sprintf("`%s[%d]` の型 `%s` が phases.yml にありません（定義が変わったか、このレイヤーにありません。使う前に直す）",
 					p.key, i+1, item.Type))
 			}
 		}
 	}
-	if known == nil && placeholders.Len() > 0 {
+	if known == nil && len(placeholders) > 0 {
 		said.add(rules.Warn, "フェーズ定義（phases.yml）が無いので、型が在るか・kind が合うかは確かめていない")
 	}
 	all := known
-	if placeholders.Len() > 0 {
-		// phases は定義を足す公開の入口を持たないので、仮の定義をコピーとして読んで重ねる。
-		extra, _ := phases.ReadCopy(placeholders)
-		all, _ = phases.Merge(known, extra, config.LayerSelf)
+	if len(placeholders) > 0 {
+		all = known.With(placeholders...)
 	}
 	return copies, all, said.list
 }

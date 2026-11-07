@@ -8,9 +8,8 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/pyjson"
-	"ccnavi/internal/tickets/lifecycle/internal/gitfixture"
-	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/model/ticket"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の worktrees と同じワークスペースを 2 つ作り、片付けの操作を同じ順に打って、出力・終了コード・残った
@@ -31,44 +30,44 @@ const completed = `completed_at: "2026-01-02T00:00:00+0900"`
 //	plain          git のワークツリーでないディレクトリ
 //	stale          git の登録が消えたディレクトリ（.git が消えた先を指す）
 func fixture(t *testing.T) string {
-	root := gitfixture.Workspace(t)
-	parent := gitfixture.AddWorktree(t, root, "i0001", "main")
-	put := func(state, id, text string) { gitfixture.Put(t, gitfixture.Approved(root, "i0001", state, id), text) }
-	put("doing", "i0001", gitfixture.ParentText("i0001", nil))
-	put("doing", "i0001-01-03", gitfixture.ChildText("i0001-01-03", "i0001", "1", `started_at: "2026-01-01T00:00:00+0900"`))
-	put("done", "i0001-01-01", gitfixture.ChildText("i0001-01-01", "i0001", "1", completed, merged))
-	put("done", "i0001-01-02", gitfixture.ChildText("i0001-01-02", "i0001", "1", `cancelled_at: "2026-01-02T00:00:00+0900"`, `cancel_reason: "やめた"`))
-	put("done", "i0001-02-01", gitfixture.ChildText("i0001-02-01", "i0001", "2", completed, merged))
-	gitfixture.Commit(t, parent, "approve")
+	root := testkit.ShapedWorkspace(t)
+	parent := testkit.AddWorktree(t, root, "i0001", "main")
+	put := func(state, id, text string) { testkit.Put(t, testkit.Approved(root, "i0001", state, id), text) }
+	put("doing", "i0001", testkit.ParentText("i0001", nil))
+	put("doing", "i0001-01-03", testkit.ChildText("i0001-01-03", "i0001", "1", `started_at: "2026-01-01T00:00:00+0900"`))
+	put("done", "i0001-01-01", testkit.ChildText("i0001-01-01", "i0001", "1", completed, merged))
+	put("done", "i0001-01-02", testkit.ChildText("i0001-01-02", "i0001", "1", `cancelled_at: "2026-01-02T00:00:00+0900"`, `cancel_reason: "やめた"`))
+	put("done", "i0001-02-01", testkit.ChildText("i0001-02-01", "i0001", "2", completed, merged))
+	testkit.Commit(t, parent, "approve")
 	for _, name := range []string{"i0001-01-01", "i0001-01-02", "i0001-01-03", "i0001-02-01", "work-a"} {
-		gitfixture.AddWorktree(t, root, name, "i0001")
+		testkit.AddWorktree(t, root, name, "i0001")
 	}
-	child := gitfixture.Worktree(root, "i0001-01-01")
-	gitfixture.Put(t, filepath.Join(child, ".gitignore"), "node_modules/\n.env\nout/\n")
-	gitfixture.Put(t, filepath.Join(child, "ext", "package.json"), "{}")
-	gitfixture.Commit(t, child, "ignore")
-	gitfixture.Put(t, filepath.Join(child, "node_modules", "a", "index.js"), "")
-	gitfixture.Put(t, filepath.Join(child, "ext", "out", "e.js"), "")
-	gitfixture.Put(t, filepath.Join(child, ".env"), "TOKEN=x\n")
-	gitfixture.Put(t, filepath.Join(child, "data", "out", "keep.md"), "記録\n")
-	gitfixture.Put(t, filepath.Join(gitfixture.Worktree(root, "i0001-01-02"), "wip", "handoff", "memo.md"), "メモ\n")
-	gitfixture.Put(t, filepath.Join(gitfixture.Worktree(root, "work-a"), "wip", "handoff", "memo.md"), "メモ\n")
-	gitfixture.AddWorktree(t, root, "i0002", "main")
-	gitfixture.Git(t, root, "worktree", "lock", gitfixture.Worktree(root, "i0002"))
-	gitfixture.Put(t, filepath.Join(gitfixture.Worktree(root, "plain"), "node_modules", "keep.js"), "")
-	stale := gitfixture.Worktree(root, "stale")
-	gitfixture.Put(t, filepath.Join(stale, ".git"), "gitdir: "+filepath.Join(root, ".git", "worktrees", "gone")+"\n")
-	gitfixture.Put(t, filepath.Join(stale, "node_modules", "x.js"), "")
-	gitfixture.Put(t, filepath.Join(stale, "src", "a.py"), "")
+	child := testkit.Worktree(root, "i0001-01-01")
+	testkit.Put(t, filepath.Join(child, ".gitignore"), "node_modules/\n.env\nout/\n")
+	testkit.Put(t, filepath.Join(child, "ext", "package.json"), "{}")
+	testkit.Commit(t, child, "ignore")
+	testkit.Put(t, filepath.Join(child, "node_modules", "a", "index.js"), "")
+	testkit.Put(t, filepath.Join(child, "ext", "out", "e.js"), "")
+	testkit.Put(t, filepath.Join(child, ".env"), "TOKEN=x\n")
+	testkit.Put(t, filepath.Join(child, "data", "out", "keep.md"), "記録\n")
+	testkit.Put(t, filepath.Join(testkit.Worktree(root, "i0001-01-02"), "wip", "handoff", "memo.md"), "メモ\n")
+	testkit.Put(t, filepath.Join(testkit.Worktree(root, "work-a"), "wip", "handoff", "memo.md"), "メモ\n")
+	testkit.AddWorktree(t, root, "i0002", "main")
+	testkit.Git(t, root, "worktree", "lock", testkit.Worktree(root, "i0002"))
+	testkit.Put(t, filepath.Join(testkit.Worktree(root, "plain"), "node_modules", "keep.js"), "")
+	stale := testkit.Worktree(root, "stale")
+	testkit.Put(t, filepath.Join(stale, ".git"), "gitdir: "+filepath.Join(root, ".git", "worktrees", "gone")+"\n")
+	testkit.Put(t, filepath.Join(stale, "node_modules", "x.js"), "")
+	testkit.Put(t, filepath.Join(stale, "src", "a.py"), "")
 	return root
 }
 
 var plans = []string{
-	gitfixture.ChildText("i0001-01-03", "i0001", "1"),
-	gitfixture.ChildText("i0001-01-09", "i0001", "1"),
-	gitfixture.ChildText("i0009-01-01", "i0009", "1"),
-	gitfixture.ChildText("i0001-01-08", "i0001", "1", "project: p"),
-	gitfixture.ParentText("i0003", nil),
+	testkit.ChildText("i0001-01-03", "i0001", "1"),
+	testkit.ChildText("i0001-01-09", "i0001", "1"),
+	testkit.ChildText("i0009-01-01", "i0009", "1"),
+	testkit.ChildText("i0001-01-08", "i0001", "1", "project: p"),
+	testkit.ParentText("i0003", nil),
 }
 
 const oracle = `
@@ -112,10 +111,10 @@ json.dump(out, sys.stdout, ensure_ascii=False)
 
 func TestMatchesPython(t *testing.T) {
 	pyRoot, goRoot := fixture(t), fixture(t)
-	want := pyoracle.Answers[map[string]any](t, "worktrees", gitfixture.ShapePy+oracle, map[string]any{"root": pyRoot, "plans": plans})
+	want := testkit.Answers[map[string]any](t, "worktrees", testkit.ShapePy+oracle, map[string]any{"root": pyRoot, "plans": plans})
 	root := goRoot
-	conf := gitfixture.Settings(t, root)
-	rel := func(s string) string { return gitfixture.Rel(root, s) }
+	conf := testkit.Settings(t, root)
+	rel := func(s string) string { return testkit.Rel(root, s) }
 	got := map[string]any{}
 	run := func(name string, f func(stdout, stderr *bytes.Buffer) int) {
 		var o, e bytes.Buffer
@@ -148,7 +147,7 @@ func TestMatchesPython(t *testing.T) {
 	var o bytes.Buffer
 	got["remaining"] = []any{RunRemaining(&o, conf, root, "i0001-01-01"), rel(o.String())}
 	run("clean_preview", func(o, e *bytes.Buffer) int { return RunClean(o, e, root, "i0001-01-01", true) })
-	inside := filepath.Join(gitfixture.Worktree(root, "i0001"), "src")
+	inside := filepath.Join(testkit.Worktree(root, "i0001"), "src")
 	blocked := []any{}
 	for _, name := range []string{"i0001-01-01", "i0001-01-02", "nothing", "plain", "i0001", ".."} {
 		if b := Blocked(root, name, inside); b == nil {
@@ -168,7 +167,7 @@ func TestMatchesPython(t *testing.T) {
 	run("clean doing", func(o, e *bytes.Buffer) int { return RunClean(o, e, root, "i0001-01-03", false) })
 	run("clean bad", func(o, e *bytes.Buffer) int { return RunClean(o, e, root, "a/b", false) })
 	run("clean plain file", func(o, e *bytes.Buffer) int { return RunClean(o, e, root, "nothing", false) })
-	got["shape"] = gitfixture.Shape(t, root)
+	got["shape"] = testkit.Shape(t, root)
 	compare(t, got, want)
 }
 

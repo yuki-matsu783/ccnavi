@@ -155,7 +155,7 @@ func Scan(conf *config.Settings, root string, catalog *flow.Catalog) *Scanned {
 // layersWith は同じ名前のテンプレートが在るレイヤー（共通を先に）。
 func layersWith(scanned *templates.Scan, name string) []any {
 	out := []any{}
-	for _, view := range append([]*templates.LayerRead{scanned.Common}, scanned.Layers...) {
+	for _, view := range scanned.All() {
 		for _, e := range view.Entries {
 			if e.Name == name {
 				out = append(out, view.Name)

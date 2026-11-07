@@ -75,7 +75,7 @@ var readers = map[string]bool{
 // 区切りとシェルの代入。どちらも ASCII だけを見るので RE2 で読む。
 var (
 	segmentSep     = regexp.MustCompile(`[;&|\n]+`)
-	assignmentWord = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*\+?=`)
+	assignmentWord = regexp.MustCompile(`\A[A-Za-z_][A-Za-z0-9_]*\+?=`)
 )
 
 // fields は Python の str.split()。
