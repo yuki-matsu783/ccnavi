@@ -108,7 +108,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 | `tickets` | 36,711 | 移した（レビュー済み） |
 | `catalog` | 1,683 | 移した（レビュー済み） |
 | `hook` | 10,497 | 移した（レビュー済み） |
-| `entry` | 11,210 | 移した（レビュー前）。Chrome 拡張の Pyodide 用の `entry/ext.py` は移さない |
+| `entry` | 11,210 | 移した（レビュー済み）。Chrome 拡張の Pyodide 用の `entry/ext.py` は移さない |
 
 ## 後で扱うこと
 
