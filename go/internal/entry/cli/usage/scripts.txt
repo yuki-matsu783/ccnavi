@@ -1,0 +1,194 @@
+共通レイヤーの3つのファイルは --rules、--phases、--risk で、レイヤーを探す場所は --projects と
+--project-home で変更します。この5つはいずれも同じ制限が適用され、診断専用で、
+それ以外の実行では無視されます。
+
+--root と --cwd は、この実行がどこで行われているかを指定します。.ccnavi/scripts/
+のラッパースクリプトがこれらを判定して渡すため、各1回のみ指定できます。2回目の指定は、
+上書きとしては扱われず拒否されます。
+
+設定の値を上書きするフラグもあります。--mode、--ticket-control、--restore-if-deny、
+--guard-core-files、--guard-ticket-approval は環境変数と同じ値を取ります。--log、--state、
+--approved、--tickets は記録と置き場の場所を動かし、上の5つと同じく診断専用です。
+
+.ccnavi/scripts/ のスクリプトが付けるフラグは次のとおりです。
+
+    --record-writes <file> [--record-tree <dir>]
+        （この実行で書いた・消したパスを、logs/state/write-and-push/ の下の <file> に1行1つで
+         書き出します。--record-tree を渡すと一覧はそのツリーからの相対になり、
+         置き場の外に書いたらエラーになります。write-and-push と ccnavi-user-agree.sh が使います）
+    --placed-out <file>
+        （--agree 専用。実際に書けた承認済みチケットのパスなどを JSON で書き出します）
+    --choose-out <file>
+        （decide の前半。選択とダイジェストを書くだけです）
+    --accept-plan <file>
+        （decide の --yes と --close-early 用。受け入れる指摘と、スレッドに残す返信の
+         本文を書くだけです。スクリプトが返信と解決を済ませてから、
+         置く呼び出しを打ちます）
+    --accept-check <file>
+        （--close-early 用。--accept-plan で書いた計画のあとで、未解決の指摘が変わっていないかを
+         確かめるだけです）
+    --accept-done <file>
+        （decide の --yes と --close-early 用。--accept-plan で書いた計画を読み、返信と解決が済んだ
+         結果を確かめて置きます。--close-early は y/N を聞き直しません）
+    --no-issue
+        （--close-early 用。受け入れた指摘への返信に、issue に回すと書かないようにします）
+    --via terminal|board
+        （decide が書くレビュー済みの印と、user handoff --yes の経路。handoff は board だけ）
+
+    ccnavi review prepare   --cwd <dir> --phase N --body-file <path>
+    ccnavi review requested --cwd <dir> --phase N --result <json>
+    ccnavi review confirm   --cwd <dir> --phase N --result <json> [--actor <account>]
+        （手で done/ に動かして共有済みの子は、移動の前の未解決の指摘を受け入れ台帳 accepted.json に
+         版つきで足して確定します。移動の後に付いた指摘が残れば確定しません）
+    ccnavi review ready     --cwd <dir> --result <json>
+        （標準出力: コメントの下書き、"tree <dir>"、続いて "wip-from <sha>" と、
+         wip/ から削除した追跡済みファイルごとに "wip <path>" を1行ずつ出力します）
+    ccnavi worktree drop <name> [--cwd <dir>]
+        （ビルド成果物を削除し、.claude/worktrees/<name> に対して --force なしで
+         `git worktree remove` を実行します。ブランチは残します。--cwd がその中にある場合、
+         または未コミットの変更がある場合は何もせず、その旨を表示します）
+    ccnavi worktree clean <name> [--preview]
+        （ビルド成果物だけを削除します。ワークツリーは削除しません。cwd は見ません。
+         未コミットの変更がある場合は何も削除しません。git の登録が残っていない
+         ディレクトリは、未コミットの変更を確かめずに掃除します。--preview は削除する
+         ものを表示するだけです）
+    ccnavi worktree tidy <parent> [--phase N] [--cwd <dir>]
+        （クローズ済み（完了または取り消し）の子のワークツリーを削除します。--phase N を
+         指定した場合はそのフェーズのみが対象です。doing/ にある子のワークツリーだけは残ります。
+         子のidは、チケットから読み取った親を指すものとして扱われます）
+    ccnavi worktree remaining <parent> [--cwd <dir>]
+        （そのファミリーのワークツリーのうち、まだ残っているものを一覧表示します。削除はしません。
+         対象は、チケットを保持する親と異なる名前のワークツリーと、クローズ済みの子のワークツリーで
+         未保存の下書きがあるものです。該当がなければ何も表示しません）
+    ccnavi worktree retire --abandon <parent>
+        （放棄した親（MR をマージせずに閉じた親）の片付けの記録 state/retire/<parent>.json を
+         消します。親のワークツリーが残っている間は断ります。ユーザがターミナルで打ちます。
+         エージェントからは打てません）
+    ccnavi worktree retire <parent> [--cwd <dir>]
+        （ready が Draft を外した後に、親を閉じる片付けを行います。閉じた子のワークツリーと、
+         子の手元のブランチ（合流した子: 先頭が merged_sha と同じで、それが push 済みの親に含まれる
+         場合のみ）、親のワークツリーを削除します。取り消した子のブランチは一覧表示のみで、
+         ユーザが確認した後に、ユーザが ! を付けて
+         ccnavi-user-clean-branch.sh <name> --confirmed を打って削除します。
+         ccnavi-review.sh ready が中で呼びます。エージェントからは打てません。
+         未コミットの変更があるワークツリーは理由を出して残します。git が無視しているファイルは scratchpad/worktrees/<名前>/ へ退避します）
+    ccnavi worktree branch <name> [confirmed]
+        （retire が記録した子のブランチだけを、条件を確かめ直して削除します。記録の子が
+         チケットの parent: でもその親の子であることを確かめます。取り消した子は confirmed が
+         要ります。ユーザが ! を付けて打つコマンドで、エージェントからは打てません）
+    ccnavi sync tidy <parent> <repo> <branch> <sha>
+        （ccnavi-sync.sh 用。親の MR がマージ済みと分かった後に、親のワークツリーと
+         手元のブランチを、<branch> が親のブランチで、手元の先頭が push 済みの先頭
+         （origin/<branch>）と <sha>（MR の先頭）の両方に含まれるときだけ削除します。
+         エージェントからは打てません。
+         1 行ずつ報告し、最後に
+         "record yes|no"（片付けが済んだか）を出力します。済んだときは retire/<parent>.json も
+         消します。ネットワークには出ません）
+    ccnavi worktree name <name>
+        （直接作業するワークツリーの名前が <prefix>-<number>-<slug> の形式でない場合に、
+         "warn: ..." を1行表示します。形式どおりなら何も表示しません。拒否はしません）
+    ccnavi sync paths
+        （.ccnavi/scripts/ccnavi-sync.sh 用。1行に "<key> <value>" を1組ずつ出力します。
+         対象は、承認済みと提案の置き場、ccnaviのディレクトリです。統合先ブランチは返しません
+         （sh が各リポジトリの origin/HEAD で決めます））
+    ccnavi sync check <parent> [<repo>]
+        （ccnavi-sync.sh が <parent> を取り込んだ後に使用します。ファミリーの承認済みチケットと
+         その権限を再判定します。"check 1" の行に続いて、"error <detail>" か "warn <detail>" を
+         1行ずつ出力します（warn には、手元のレイヤーが取得済みの origin/<統合先> のレイヤーと
+         違うことを含みます。git show でローカルの参照を読むだけで、ネットワークには出ません）。
+         error がある場合は終了コード1になります）
+    ccnavi sync retired
+        （ccnavi-sync.sh 用。"retired 1" の行に続いて、親を閉じた後の片付けの列挙元
+         （state/retire/<parent>.json）を "retired <parent> <self|project> <mr|-> <branch|->" の
+         形で1行ずつ出力します。読めない記録や mr の無い記録は "incomplete <parent> <理由>"
+         です。ネットワークにも git にも触れません）
+    ccnavi tree parent <tree> <name>
+        （スクリプト用。"tree 1" の行に続いて、"parent yes|no|unreadable"（そのツリーが
+         親のチケットまたは提案 <name> を保持しているか）、"approved yes|no|unreadable"
+         （承認済みの親チケットがあるか。提案は数えません）、"requested yes|no"
+         （.requested のマーカーがあるか）、"archived yes|no"（手元の退避に親があるか）、
+         "mr <番号>|-"（親チケットの mr:）を出力します。スクリプト自身は
+         チケットのYAMLを読み込みません）
+    ccnavi tree bound <tree> <name>
+        （ccnavi-git.sh integrate 用。"tree 1" の行に続いて、"bound yes|no"（その名前の
+         ワークツリーがチケットに結び付くか。結び付くと integrate は断ります）、結び付くなら
+         "why <理由>" を出力します。Stop の促しと同じ判定です）
+    ccnavi tree leftover <tree> <name>
+        （ccnavi-worktree.sh 用。"tree 1" の行に続いて、"leftover yes|no"（そのツリーが親の
+         ワークツリーで、承認待ちの提案・着手中の子・MR が残っているか）、"proposal yes|no"
+         （todo/ か review/ の提案があるか）、"doing <件数>"（doing/ の子の数）、
+         "mr <番号>|-"（親の mr:）、"stage doing|review|todo|-"（親の段階。doing が最優先で、
+         承認済みなら doing、finish 済みでレビュー待ちなら review、承認前の提案だけなら todo）
+         を出力します。親でなければ "leftover no"、"stage -" です）
+    ccnavi tree base-bound <main-checkout> <branch>
+        （ccnavi-worktree.sh 用。"tree 1" の行に続いて、"bound yes|no|unknown"（取り込み先の
+         ブランチがチケットに結び付くか。yes と unknown は切るのを断ります）、yes なら
+         "why <理由>" を出力します。結び付きは取り込み先のリポジトリだけを見ます）
+    ccnavi tree guarded <main-checkout> <path>...
+        （ccnavi-git.sh integrate 用。"tree 1" の行に続いて、"guarded yes|no"（パスが自己防衛の
+         守る対象にヒットするか。
+         ヒットすると integrate-done はターミナルから打つよう案内します）、
+         ヒットするパスごとに "path <パス>" を出力します。
+         パスはユーザのチェックアウトからの相対です）
+    ccnavi tree handoff-pending <tree> [<start>]
+        （ccnavi-git.sh integrate 用。"tree 1" の行に続いて、"pending <件数>"（取り込んでいない
+         wip/handoff/ の下書きの数）と、1 件ごとに "path <パス>" を出力します。<start>（コミット）を
+         渡すと、起点の木の元のパス（wip/handoff/ を除いた相対パス。大文字と小文字は区別しない）と
+         突き合わせ、元があり中身が違う写しごとに "foreign <パス>"、元の無い下書きごとに
+         "note <パス>" を足します）
+    ccnavi text <id> [name=value]... [@field=case]...
+        （スクリプト用。文面ファイル（.ccnavi/messages/）の識別子 <id> の文を
+         組み立てて出力します。
+         name=value は文面の {name} に入る値、@field=case は欄の場合分けの選択です。
+         引けないとき（識別子が無い・値の不足・文面ファイルの不備）は何も出力せず、
+         理由を標準エラーに出して終了コード1になります）
+    ccnavi worktree id <branch>
+        （スクリプト用。"id <識別子>"（ブランチ名の / を - に置き換えたもの）に続いて、
+         親に採用できなければ "problem <理由>"（58文字以内・末尾が -2桁でない・字の種類・NFC）、
+         直接作業や子のワークツリーの名前に指定できなければ
+         "direct <理由>"（64文字以内・字の種類・NFC）、
+         子の識別子の形なら "child yes" を出力します）
+    ccnavi worktree issue-id <number> <prefix> [<project>] --title <title>
+        （ccnavi-start.sh 用。issue から新しい親のブランチ名（= 識別子）を作り、"id <名前>" を
+         出力します。Chrome 拡張の「始める」と同じ作り方です。タイトルが長くて slug を
+         語の区切りで切ったときは、続けて "long yes" を出力します）
+    ccnavi write-and-push family <id>
+        （write-and-push 用。"write-and-push 1" の行に続いて、
+        親子のチケット・リポジトリ・write-and-push の対象か
+         （target yes|no|stop）・親のワークツリーとブランチなどを1行ずつ出力します。読み取り専用）
+    ccnavi write-and-push sort <parent> [<rev>]
+        （write-and-push 用。
+        置き場の変更をコミットしてよいものと止めるものに分けて1行ずつ出力します）
+    ccnavi write-and-push merge <child>
+        （write-and-push 用。finish が子を親のブランチへ合流する前の検査）
+    ccnavi branches issue|mr <number> [--result <json>] [--json]
+        （ccnavi-branches.sh 用。issue・MR に紐づくブランチの候補を出力します。読み取り専用）
+
+ccnavi自身は、リモートに接続しません。スクリプトがマージリクエストとそのスレッド、
+レビューを取得し、--result <json> として渡します。
+
+未解決のレビュースレッドは、人が親のワークツリーのターミナルから、次のコマンドで受け入れます
+（VS Code のボードの「決める」も、同じ判定を通ります）。
+
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-decide.sh N
+
+（スクリプトはワークスペースにのみ存在するため、プロジェクトから作成したワークツリーからは、
+相対パスで到達できません）
+
+このコマンドはスレッドを取得し、次を実行します。
+
+    ccnavi --entry sh user reviewed N --accept-unresolved --result <json> --cwd <parent worktree>
+        [--actor=<account> --via=terminal|board]
+        （スクリプトは、読み取れる場合はトークンの所有者を渡します。レビュー済みの印には、
+         アカウントと実行方法が記録されます。渡さなかった場合、印はこれまでどおりです）
+
+実行ファイルは user reviewed を内部で --reviewed に読み替えます。--reviewed を user の外で
+渡すと断ります。見るだけの --reviewed N --accept-unresolved --preview は
+ccnavi-review.sh decide N --preview が呼び、エージェントも実行できます。
+
+人が親を早期にクローズする（「今のところ十分」とする）には、次を実行します。
+
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-close-early.sh --reason <why>
+
+`ccnavi --entry sh user close-early --reason <why> --result <json>` を実行した後、
+マージリクエストのDraftを解除し、残った項目を新しいissueとして登録します。

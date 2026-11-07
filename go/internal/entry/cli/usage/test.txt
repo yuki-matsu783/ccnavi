@@ -1,0 +1,27 @@
+プロジェクトのルールを保存前に試験または検証するには、
+編集中のファイルをプロジェクト名とともに渡します。このオプションは --test、--test-expectations、
+--lint、--explain 専用です。それ以外（フックの呼び出し、
+チケットやレビューのサブコマンド）では無視され、その旨が標準エラー出力に表示されます。
+
+    ccnavi --test Write projects/lib/src/a.py --project-rules-file lib=/tmp/rules.yml
+
+ツールを実行せずにルールの判定結果を確認する、
+またはファイル内の期待する判定をすべてルールに照らして実行するには、
+次のコマンドを実行してください。
+
+    ccnavi --test Bash "git push" [--json]
+    ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml [--json]
+
+どちらもフックと同じ判定処理を通ります。
+--json で出力される形式は docs/11_requirements/json-shapes.md（「試験の
+JSON」）に記載しており、VS Code拡張機能がこれを読み込みます。--test は、
+ワークスペースルートから、権限モードなし・メインセッションとして呼び出しを試験します。
+別の呼び出し条件で試験するには、次を追加します。
+
+    --cwd <dir> --permission-mode <mode> --agent-id <id>
+
+mode には auto、default、acceptEdits、plan、dontAsk、bypassPermissions のいずれかを指定します。
+これ以外の名前や、ディレクトリではない --cwd は拒否されます。--permission-mode と --agent-id は
+--test 専用です（--lint や --explain とも併用できません）。フラグは "--test <TOOL> <SUBJECT>"
+の前後に置いてください。2つの語の間に置いた場合や、
+2つの語の後に余分な語がある場合は拒否されます。

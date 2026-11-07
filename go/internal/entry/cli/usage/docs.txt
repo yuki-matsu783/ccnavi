@@ -1,0 +1,26 @@
+本文中の行ではなく、ドキュメントの性質でマークダウン文書を探すには、
+ワークスペースとそのプロジェクトのfrontmatter索引を検索します（パスはワークスペースルートからの相対パスです。
+例: projects/lib/docs/x）。
+
+    ccnavi --docs [--type T] [--tag T] [--keyword K] [--path SUB] [--text SUB]
+                  [--since DATE] [--until DATE] [--sort path|mtime|type|title]
+                  [-r] [--limit N] [--format table|path|detail|json|jsonl|count]
+                  [--no-refresh]
+
+同じフィルターを2回指定した場合はOR、異なるフィルターはANDで評価され、
+大文字・小文字は区別されません。--type、--tag、--keyword は値の全体に一致します。--path は .md
+を除いたパスの一部に一致します。--text はパス、更新日時、
+またはfrontmatterのいずれかの値の一部に一致します。文字列はNFCで比較されます。--since と --until
+には YYYY-MM-DD[THH[:MM[:SS]]] を指定でき、--until
+は指定した単位の末尾までを範囲に含めます（日付は23:59:59まで、THHは:59:59まで、
+THH:MMは:59まで）。一致するものがなくても終了コードは0です。検索の前に、ディレクトリごとの
+ccnavi-index.jsonl を最新の状態に更新します。更新するのは、gitが ccnavi-index.jsonl
+を無視しており、かつそのファイルがccnavi自身のものである場所だけです。
+何も無視していないツリーでは、先に .gitignore へ1行を追加します。それに失敗した場合のみ、
+そのツリーは対象から外れ、標準エラー出力に名前が表示されます。
+初回は全マークダウンファイルの先頭部分を読み込み、
+2回目以降は更新日時が変わったファイルのみを読み込みます。--no-refresh を指定すると、
+既存の索引をそのまま再利用します。--json は --format json と同じです。各行の形式は
+docs/21_design/diagnostics.md（10.1）に記載しています。これらのフィルターは --docs 専用です。
+ほかの実行で指定すると、終了コード1で停止します。他の実行用のフラグを --docs
+に指定した場合も同様に停止します。

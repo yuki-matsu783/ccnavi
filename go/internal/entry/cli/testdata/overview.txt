@@ -1,0 +1,27 @@
+ccnaviはエージェントのツール呼び出しを制御し、より安全な操作へ誘導します。
+
+通常はフックとして実行します。標準入力からフックのJSONデータを1件読み込み、
+処理結果を標準出力に出力します。
+
+ツールの実行前に呼び出しを判定するには、PreToolUseに登録してください。
+実行後に保護対象ファイルへの変更を確認するには、PostToolUseにも登録してください。
+動作確認は次のように行います。
+
+    echo '{"hook_event_name":"PreToolUse","tool_name":"Bash",
+           "tool_input":{"command":"git push"}}' | ccnavi
+
+話題ごとの使い方は、話題のオプションかサブコマンドに --help を付けると出ます
+（例: ccnavi --docs --help、ccnavi ticket --help）。ccnavi --help <話題> でも同じです。
+全文は ccnavi --help --all で出ます。
+
+    version    ccnavi --version                   バージョン・ビルド情報・互換性の情報を出す
+    lint       ccnavi --lint                      ルール・フェーズ・リスクの設定を検証する
+    test       ccnavi --test                      ツールを動かさずにルールの判定を試す
+    explain    ccnavi --explain                   チケットとその置き場を、機械が読める形で一覧する
+    docs       ccnavi --docs                      md の frontmatter の索引を引く
+    templates  ccnavi --templates                 作業・レビュー計画のテンプレートを扱う
+    learnings  ccnavi --learnings                 学びの蓄積のパターンの状態を一覧する
+    logs       ccnavi-user-prune.sh / --suggest   判定ログを整理し、ルールの候補を作る
+    agree      ccnavi-user-agree.sh / --plan-order 提案の承認と、計画の順序
+    ticket     ccnavi ticket                      チケットの開始・終了・状態・雛形
+    scripts    ccnavi review|worktree|sync ほか     スクリプトが呼ぶサブコマンドと内部オプション

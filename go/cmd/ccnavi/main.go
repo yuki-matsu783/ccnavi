@@ -1,13 +1,12 @@
-// ccnavi の実行ファイルの入口（Python の ccnavi.__main__ と entry.cli）。
-// 書き直しの途中で、入口は entry 段を移すときに書く。
+// ccnavi の実行ファイルの入口。標準入出力と引数を entry/cli に渡し、終了コードで終える。
 package main
 
 import (
-	"fmt"
 	"os"
+
+	"ccnavi/internal/entry/cli"
 )
 
 func main() {
-	fmt.Fprintln(os.Stderr, "ccnavi (Go): entry はまだ移していません")
-	os.Exit(2)
+	os.Exit(cli.Run(os.Stdin, os.Stdout, os.Stderr, os.Args[1:]))
 }

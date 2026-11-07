@@ -1,0 +1,67 @@
+親エージェントは、.ccnavi/scripts/ のスクリプトを通じて、チケットの状態を移動し、
+レビューを依頼します。スクリプトは次を呼び出します。
+
+    ccnavi ticket start|finish|cancel <id> [--reason <why>]
+    ccnavi ticket consolidate <親>
+        （親の finish が「判定されていない気づきがある」と止めたときに打つ。処理する統合の子
+         <親>-00-NN を doing/ に作る。処理すべきものが無いとき、disable のときは作らない）
+        （start は、基点を .ccnavi/approved/doing/<id>.md に書き込みます。finish は、
+         フェーズがレビュー対象の場合は wip/proposals/review/ に、それ以外は
+         .ccnavi/approved/done/ に移動します。cancel は .ccnavi/approved/done/ に移動します）
+    ccnavi ticket approval-request <id>
+        （親子の承認待ちの提案 wip/proposals/todo/ と子のフローの下書き wip/proposals/flows/ を、
+         書いたパスの一覧に載せます。親の提案の計画に誤り（after・終端）があれば、何も載せずに断ります。
+         コミットと push は
+         ccnavi-ticket.sh approval-request が write-and-push の手順で行います。
+         --check は承認の画面と同じ検査と未コミットの変更の確認だけを行い、何も載せません）
+    ccnavi ticket record-risk <child> <factor> yes|no --reason <why>   （定性的なリスク）
+    ccnavi ticket learn [<id>] [--note <text> [--target <kind>] [--signal <kind>]]
+        （学習記録の雛形と判定ログのダイジェストを wip/handoff/learnings/<id>.* に書き込みます。
+         --note を指定すると学習内容を1件追記します。チケット外の場合は
+         docs/wiki/inbox/ に書き込みます。
+         <id> はオプションの前に指定します）
+    ccnavi ticket new <id> --title <title> --plan <type,type,...> [--scope <glob>]...
+                           --issue <N|owner/repo#N> --mr <N>
+        （<id> という名前のワークツリーの wip/proposals/todo/<id>.md に、親の提案の雛形を
+         書き込みます。そのワークツリーの中で実行してください。選択したフェーズの範囲を
+         phases.yml から集めて allow に入れ、--scope の glob（この作業が触れるファイル。
+         ワークツリーのルートからの相対パス。複数指定可）を追加し、計画を直線状につなぎ、
+         phases: を補完します。本文の見出しは、目的・範囲・対象外・完了の確かめ方・計画の理由
+         の順で、rationale と各見出しの下に空欄の目印「（ここに〜を書く）」が入ります。目印が
+         残った新規の提案は、承認と --lint が止めるので書き換えてください。
+         quick-work のような scope: inherit のタイプは、それ自体では
+         何も集めないため、--scope を指定してください。--issue と --mr は必須で、
+         ccnavi-start.sh が「必須」の行で出す値（issue は番号か owner/repo#番号。MR は親のブランチの
+         マージリクエストの番号）。親の提案の issue: と mr: に書き、足りなければ停止
+         します。phases.yml が
+         ない場合、子のidを指定した場合、または allow が空になる場合は停止します。
+         allow の項が計画のどのフェーズの範囲とも重ならないときは、停止せず
+         「承認しても書けない」と警告します
+         （scope: inherit のタイプが計画にあれば警告しません）。
+         子の提案は雛形にならないので手で書きます（<id>-<フェーズ番号 2 桁>-<連番 2 桁>）。
+         ccnavi-ticket.sh approval-request は親の識別子で打ち、子も同じ承認で通します。
+         ccnavi を直接実行します（sh のラッパーは使いません））
+    ccnavi ticket new <id> --title <title> --template <name> [--layer <name>]
+                           [--with-feedback] --issue <N|owner/repo#N> --mr <N>
+        （上と同じですが、計画と子フローの下書きは --plan の代わりにテンプレートから取得します。
+         フィードバック計画は --with-feedback を指定した場合のみ書き込まれます。
+         上記の --templates の節を参照してください）
+    ccnavi ticket revise <id> [--feedback]
+        （承認済みの親（doing/）の改版の雛形を、ID と同名のワークツリーの
+         wip/proposals/todo/ID.md に書きます。承認済みチケットのコピーから、
+         スクリプトだけが書く欄（started_at・base_sha など）を外します。
+         --feedback は、全体計画のフェーズが全部閉じてレビューが済んだあとに、フィードバック計画なし
+         （feedback: []）の改版を作ります。範囲や計画を直す改版は、雛形を編集します。
+         どちらも、書いたあとに ccnavi-ticket.sh approval-request <ID> --check が通れば、
+         ccnavi-ticket.sh approval-request で送ります。
+         承認済みの親が無い・todo/ に同じ識別子が既にある・フィードバック計画が既にある・
+         局面が違う（--feedback）ときは何も書きません）
+    ccnavi ticket status [<parent>]
+        （読み取り専用。置き場、承認時刻、着手済みかどうか、未コミット・未pushの有無
+         （ローカルのリモート追跡参照に基づく）、停止している理由、次の手順を表示します。
+         サブエージェントも実行できます）
+    ccnavi ticket next-id [<prefix> <slug>]
+        （読み取り専用。直接作業のワークツリー名に付ける次の連番、またはそれから組み立てた
+         識別子 <prefix>-<number>-<slug> を表示します。サブエージェントも実行できます。
+         チケット制御が無効でも利用できます。手元のブランチとワークツリーの名前も数え、
+         数えきれなかったときは番号を出さず、終了コード 2 で理由を標準エラーへ出します）
