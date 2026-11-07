@@ -73,9 +73,14 @@ func TestStrAndTruthy(t *testing.T) {
 	}
 }
 
-// İ の小文字は Python では "i̇"（i と結合の点）なので、"builtİn:" は "builtin:" で始まらない。
+// 期待は Python の str.lower()。İ の小文字は "i̇"（i と結合の点）なので、"builtİn:" は "builtin:" で始まらない。
+// 語末の Σ は ς（前の大小を問わない字を飛ばした先に大小のある字があり、後ろには無いとき）。
 func TestLower(t *testing.T) {
-	for in, want := range map[string]string{"DRY-RUN": "dry-run", "builtİn:x": "builti̇n:x", "\u212a": "k"} {
+	for in, want := range map[string]string{
+		"DRY-RUN": "dry-run", "builtİn:x": "builti̇n:x", "\u212a": "k",
+		"ΑΣ": "ας", "ΛΟΓΟΣ": "λογος", "Σ": "σ", "ΑΣΑ": "ασα", "ΑΣ.": "ας.", "ΑΣ Β": "ας β", "ΑΣ.Β": "ασ.β",
+		"Α.Σ": "α.ς", "ΑʰΣ": "αʰς", "ΑΣ\u0301": "ας\u0301", "ΑΣΣ": "ασς", "1Σ": "1σ", "ΑΣ1": "ας1",
+	} {
 		if got := Lower(in); got != want {
 			t.Errorf("Lower(%q) = %q, want %q", in, got, want)
 		}

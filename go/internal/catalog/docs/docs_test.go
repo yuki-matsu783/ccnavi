@@ -157,12 +157,12 @@ func TestLearningWikiOnlyWhenTyped(t *testing.T) {
 
 func TestProblemsNameBadValues(t *testing.T) {
 	eq(t, "4 つ", len(usageProblems(Query{Sort: "size", Format: "xml", Since: "yesterday", Until: "2026-8-5"})), 4)
-	for _, bad := range []string{"2026-13-45", "2026-02-30", "2026-08-05T25", "2026-08-05T10:61", "2026-08-05T10:00:60", "0000-01-01", "2026-08-05\n"} {
+	for _, bad := range []string{"2026-13-45", "2026-02-30", "2026-08-05T25", "2026-08-05T10:61", "2026-08-05T10:00:60", "0000-01-01", "2026-08-05\n", "2024-02-１9", "2026-0８-05", "2026-08-05T2３"} {
 		if len(usageProblems(Query{Since: bad})) != 1 {
 			t.Errorf("%q を受けた", bad)
 		}
 	}
-	for _, good := range []string{"2024-02-29", "2026-08-05T10:59", "2026-08-05T23:59:59", "２０２６-08-05"} {
+	for _, good := range []string{"2024-02-29", "2026-08-05T10:59", "2026-08-05T23:59:59", "２０２６-08-05", "2024-02-2９", "2026-08-05T1３:5９:0９"} {
 		if p := usageProblems(Query{Until: good}); len(p) != 0 {
 			t.Errorf("%q を断った: %v", good, p)
 		}

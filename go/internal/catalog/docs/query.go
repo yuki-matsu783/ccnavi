@@ -5,6 +5,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"ccnavi/internal/catalog/docindex"
@@ -82,91 +84,46 @@ func (q Query) format() Format {
 }
 
 // when の形。書き誤った値が 0 件の結果に紛れて気づかれないのを避けるため、読めない日時は断る。
-var whenShape = pyre.MustCompile(`^\d{4}-\d{2}-\d{2}(T\d{2}(:\d{2}(:\d{2})?)?)?$`, 0)
+// \d は全角などの数字にも当たる。strptime の式が \d で受ける桁（年の 4 桁、日・時・分・秒の 2 桁目）だけに許し、
+// 式が 0-9 の字で書く桁（月、日・時の 1 桁目）は [0-9] にする。日の 2 桁目は 1 桁目が 1・2 のとき、時の 2 桁目は
+// 0・1 のときだけ \d で受ける（3・2 のときは 3[01]・2[0-3] の字で受ける）。
+var whenShape = pyre.MustCompile(`^\d{4}-[0-9]{2}-([12]\d|[03][0-9])(T([01]\d|2[0-9])(:[0-5]\d(:[0-5]\d)?)?)?$`, 0)
 
-const (
-	strptimeY = `(?P<Y>\d\d\d\d)`
-	strptimeM = `-(?P<m>1[0-2]|0[1-9]|[1-9])`
-	strptimeD = `-(?P<d>3[01]|[12]\d|0[1-9]|[1-9]| [1-9])`
-	strptimeH = `T(?P<H>2[0-3]|[0-1]\d|\d)`
-	strptimeI = `:(?P<M>[0-5]\d|\d)`
-	strptimeS = `:(?P<S>6[0-1]|[0-5]\d|\d)`
-)
-
-// whenPieces は日時の桁の区切り（頭から）。text の字数が形の長さを決め、--until は後ろの区切りの text（その桁の
-// 最大）を足して延ばす。strptime は datetime.strptime の式（Python 3.13 の _strptime が組む式と同じ）。
-var whenPieces = []struct{ text, strptime string }{
-	{"YYYY-MM-DD", strptimeY + strptimeM + strptimeD},
-	{"T23", strptimeH},
-	{":59", strptimeI},
-	{":59", strptimeS},
+// whenForms は字数ごとの日時の形（10・13・16・19 字）。layout は time.Parse の形、tail は --until を延ばす尾
+// （後ろの桁の最大）。
+var whenForms = map[int]struct{ layout, tail string }{
+	10: {"2006-01-02", "T23:59:59"},
+	13: {"2006-01-02T15", ":59:59"},
+	16: {"2006-01-02T15:04", ":59"},
+	19: {"2006-01-02T15:04:05", ""},
 }
 
-// whenForm は字数ごとの日時の形。re は書いた桁までの strptime の式、tail は --until を延ばす尾。
-type whenForm struct {
-	re   *pyre.Regexp
-	tail string
-}
-
-// whenForms は字数から形（10・13・16・19 字）。
-var whenForms = func() map[int]whenForm {
-	forms := map[int]whenForm{}
-	pattern, width := "", 0
-	for i, p := range whenPieces {
-		pattern += p.strptime
-		width += utf8.RuneCountInString(p.text)
-		var tail strings.Builder
-		for _, rest := range whenPieces[i+1:] {
-			tail.WriteString(rest.text)
-		}
-		forms[width] = whenForm{pyre.MustCompile(pattern, pyre.IgnoreCase), tail.String()}
-	}
-	return forms
-}()
-
-// validWhen は `--since`・`--until` に受ける日時か（datetime.strptime が読めるか）。
+// validWhen は `--since`・`--until` に受ける日時か（datetime.strptime が読めるか）。whenShape が桁の幅と数字の字を
+// 決めるので、残るのは日時として在るかと、datetime が作れない 0 年。
 func validWhen(value string) bool {
 	if !whenShape.Search(value) {
 		return false
 	}
-	runes := []rune(value)
-	form, ok := whenForms[len(runes)]
+	form, ok := whenForms[utf8.RuneCountInString(value)]
 	if !ok {
 		return false
 	}
-	found, ok := form.re.MatchIn(value, 0, len(runes))
-	if !ok || found.End != len(runes) {
-		return false
-	}
-	field := func(name string, fallback int) int {
-		text, ok := found.Named(name)
-		if !ok || text == "" {
-			return fallback
-		}
-		n, err := pyfmt.ParseInt(text)
-		if err != nil {
-			return -1
-		}
-		return n
-	}
-	year, month, day := field("Y", 0), field("m", 1), field("d", 1)
-	if year < 1 || month < 1 || month > 12 || day < 1 || day > daysIn(year, month) {
-		return false
-	}
-	return field("H", 0) <= 23 && field("M", 0) <= 59 && field("S", 0) <= 59
+	t, err := time.Parse(form.layout, asciiDigits(value))
+	return err == nil && t.Year() >= 1
 }
 
-func daysIn(year, month int) int {
-	switch month {
-	case 2:
-		if year%4 == 0 && (year%100 != 0 || year%400 == 0) {
-			return 29
+// asciiDigits は 10 進の数字を ASCII の数字にする。
+func asciiDigits(value string) string {
+	return strings.Map(func(r rune) rune {
+		if r <= unicode.MaxASCII || !unicode.IsDigit(r) {
+			return r
 		}
-		return 28
-	case 4, 6, 9, 11:
-		return 30
-	}
-	return 31
+		n, err := pyfmt.ParseInt(string(r))
+		if err != nil {
+			return r
+		}
+		return '0' + rune(n)
+	}, value)
 }
 
 // usageProblems は使い方の誤り。空なら引ける。
