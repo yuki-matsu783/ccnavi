@@ -87,6 +87,7 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 	c := *conf
 	c.TicketControl = string(control)
 	conf = &c
+	// 1. 設定・ツリー・レイヤーなど、チケットを読まなくても決まる欄を組む。チケットの欄は空で置いて、後で埋める。
 	var problems []string
 	trees := tree.AllTrees(root, conf.Projects)
 	treeRows := make([]any, len(trees))
@@ -126,6 +127,7 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 			problems = append(problems, "引き継ぎ未完了: "+oplog.Summary(r))
 		}
 	}
+	// チケット制御が切れていれば、チケットの欄は空のまま返す（手元の退避の表示だけは残す）。
 	if !conf.TicketsEnabled() {
 		problems = append(problems, env.TicketControl+"=disable。チケット制御を使っていない")
 		payload.Set("problems", nonNil(problems))
@@ -133,6 +135,7 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 		return payload
 	}
 
+	// 2. 全ツリーのチケットを読む。
 	everything, scanProblems := ticket.ScanAll(root, conf.Tickets, conf.Projects)
 	for _, p := range scanProblems {
 		problems = append(problems, p.String())
@@ -151,6 +154,8 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 	reviewCopies, notes := approval.ScanReview(conf, root, raw)
 	problems = append(problems, notes...)
 
+	// 3. 承認待ち（新規と改版）の識別子を決める。先行の判定は承認と同じ関数に任せ、親子のチケットの先行は
+	// Chrome 拡張の判定と答えがそろうよう、親のブランチ上のチケットで読み直す。
 	pending, revisions := agree.Waiting(proposals, openCopies, closedCopies, reviewCopies)
 	preds := approval.PoolOf(openCopies, reviewCopies, closedCopies, proposals)
 	preds.AlignImported(conf, root)
@@ -161,6 +166,7 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 	pendingIDs := nonNil(slices.Sorted(maps.Keys(waiting)))
 	payload.Set("pending_approval", pendingIDs)
 
+	// 4. 識別子ごとの行を組む。状態（提案・承認済み・閉じた）ごとに、同じ識別子のチケットを引く表を用意する。
 	worktrees := map[string]tree.Tree{}
 	for _, t := range trees {
 		if t.Kind == tree.KindWorktree {
@@ -192,6 +198,7 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 	}
 
 	// 親ごとの局面とフェーズ。承認済みチケットのある親だけ（承認前の親はフェーズを持たない）。
+	// 5. 親の行を組み、不備と要対応を付ける。
 	parents := slices.Clone(slices.Concat(openCopies, closedCopies))
 	sort.SliceStable(parents, func(i, j int) bool { return parents[i].ID < parents[j].ID })
 	var families []*parentRow
@@ -218,6 +225,7 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 	return payload
 }
 
+// nonNil は nil を空のスライスにする（JSON で null でなく [] として出すため）。
 func nonNil(s []string) []string {
 	if s == nil {
 		return []string{}
@@ -225,7 +233,7 @@ func nonNil(s []string) []string {
 	return s
 }
 
-// byIDValues は approval.ByID の値を、Python の dict と同じ順（識別子の初出の順、値は後のもの）で並べる。
+// byIDValues は approval.ByID の値を、識別子が初めて出た順（値は後に出たもの）で並べる。
 func byIDValues(list []*ticket.Ticket) []*ticket.Ticket {
 	index := approval.ByID(list)
 	var out []*ticket.Ticket

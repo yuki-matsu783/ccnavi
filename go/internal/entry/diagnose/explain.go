@@ -70,7 +70,7 @@ func pad(text string, width int) string {
 	return text + strings.Repeat(" ", max(0, width-displayWidth(text)))
 }
 
-// ljust は Python の f"{text:<width}"（字数で数える）。
+// ljust は text を width 字になるまで右に空白で埋める（字数で数える）。
 func ljust(text string, width int) string {
 	return text + strings.Repeat(" ", max(0, width-utf8.RuneCountInString(text)))
 }
@@ -91,6 +91,7 @@ func shown(root, path string) string {
 // 「チケットの範囲が有効か」まで（パスごとの実効権限は、宣言済み領域という概念がまだ無いので言わない）。
 func Explain(stdout, stderr io.Writer, conf *config.Settings, root string) (int, error) {
 	p := func(format string, a ...any) { fmt.Fprintf(stdout, format, a...) }
+	// 1. レイヤーごとのルールを調べる。共通レイヤーが読めなければ、判定は組み込みの既定で動くので、出所をそう表示する。
 	views := ruleload.Survey(stderr, conf, root)
 	source := conf.Rules
 	if views[0].Unreadable != "" {
@@ -98,6 +99,7 @@ func Explain(stdout, stderr io.Writer, conf *config.Settings, root string) (int,
 	}
 	p("ccnavi: いま有効な宣言（出所 %s）\n", source)
 	p("  パスを持つツールは共通レイヤー + 対象のレイヤー、持たないツールは全部のレイヤーを組み合わせて判定する\n")
+	// 2. ルール・フェーズ・リスク・宣言の無い領域・モードの順に、節ごとに書く。
 	for _, view := range views {
 		explainRules(stdout, root, view)
 	}
@@ -113,6 +115,7 @@ func Explain(stdout, stderr io.Writer, conf *config.Settings, root string) (int,
 		}
 	}
 
+	// 3. チケットの範囲。チケット制御が切れていれば、範囲の一覧は出さない。
 	p("\n■ チケットの作業範囲（承認済みチケット）\n")
 	p("  ワークツリーに結び付いたチケットの範囲は、ルールの allow / ask より優先されます。編集可能範囲の外への書き込みは拒否されます。\n")
 	control := conf.TicketControl
@@ -133,6 +136,7 @@ func Explain(stdout, stderr io.Writer, conf *config.Settings, root string) (int,
 	return config.ExitOK, nil
 }
 
+// explainRules は 1 つのレイヤーのルールを、タイプの順に 1 行ずつ書く。
 func explainRules(w io.Writer, root string, view ruleload.LayerView) {
 	p := func(format string, a ...any) { fmt.Fprintf(w, format, a...) }
 	counts := make([]string, len(rules.Sections()))
@@ -172,6 +176,7 @@ func explainRules(w io.Writer, root string, view ruleload.LayerView) {
 	}
 }
 
+// leaves は組み合わせ条件の、個別条件（葉）の数。
 func leaves(c *rules.Condition) int {
 	n := 0
 	for _, node := range c.Walk() {
@@ -182,6 +187,7 @@ func leaves(c *rules.Condition) int {
 	return n
 }
 
+// explainPhases は共通レイヤーと、親チケットの project: で指すレイヤーのフェーズ定義を表にして書く。
 func explainPhases(w io.Writer, conf *config.Settings, root string, views []ruleload.LayerView) {
 	type table struct {
 		name       string

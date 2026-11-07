@@ -34,6 +34,7 @@ func collect(conf *config.Settings, root string, notes []string, mode config.Mod
 		problems = append(problems, rules.Problem{Severity: rules.Warn, Rule: whereMode,
 			Detail: string(config.DryRun) + " なので一般の保護は報告だけにする（チケットのゲートと補助の保護は止める）"})
 	}
+	// 検査を順に当てて、並べた順に出力する。
 	for _, found := range [][]rules.Problem{
 		projectSettings(root),
 		shCompat(root, compat),

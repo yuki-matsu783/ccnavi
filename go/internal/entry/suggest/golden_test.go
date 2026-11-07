@@ -104,7 +104,7 @@ func slicesConcat(parts ...[]string) []string {
 	return out
 }
 
-func TestReportMatchesPython(t *testing.T) {
+func TestReportMatchesGolden(t *testing.T) {
 	for name := range scenes("") {
 		t.Run(name, func(t *testing.T) {
 			root := testkit.Workspace(t)
@@ -123,7 +123,7 @@ func TestReportMatchesPython(t *testing.T) {
 				inner, _ := json.Marshal(root)
 				text := strings.ReplaceAll(strings.ReplaceAll(out.String(), string(inner[1:len(inner)-1]), "<root>"), root, "<root>")
 				if got := (answer{code, text}); got != want[i] {
-					t.Errorf("json=%v\nGo:\n%d %s\nPython:\n%d %s", asJSON, got.Code, got.Stdout, want[i].Code, want[i].Stdout)
+					t.Errorf("json=%v\nGo:\n%d %s\n見本:\n%d %s", asJSON, got.Code, got.Stdout, want[i].Code, want[i].Stdout)
 				}
 			}
 		})

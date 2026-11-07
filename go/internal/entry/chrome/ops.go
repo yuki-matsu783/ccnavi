@@ -49,6 +49,8 @@ func opBoard(req *pyjson.Object, root string) (*pyjson.Object, error) {
 	if err != nil {
 		return nil, err
 	}
+	// 1. 判定の入力になる親子のチケットの閉包を決める。広がりすぎ・読み足りない・持ち主が決まらない・
+	// 本文を読めないファイルがあるときは、判定せず理由を返す（誤った承認を出さないため）。
 	c, err := s.closure(family, hints)
 	if err != nil {
 		return nil, err
@@ -66,6 +68,7 @@ func opBoard(req *pyjson.Object, root string) (*pyjson.Object, error) {
 	if why := s.unreadable(c); why != "" {
 		return pyjson.NewObject("family", family, "undecided", why, "closure", c.json()), nil
 	}
+	// 2. 仮のツリーを組み、手元と同じ `--agree --preview` で承認待ちを出す。
 	if err := s.build(root, c.families); err != nil {
 		return nil, err
 	}
@@ -73,6 +76,8 @@ func opBoard(req *pyjson.Object, root string) (*pyjson.Object, error) {
 	if first == nil {
 		return pyjson.NewObject("family", family, "closure", c.json(), "refused", previewRefusal(root, code, errText)), nil
 	}
+	// 3. 承認待ちのうち、この親子のチケット（親の識別子が ident のもの）だけを mine に集める。
+	// 1 回の承認は 1 つの親に限るので、ほかの親子の分が混ざっていたら絞って組み直す。
 	var mine []string
 	batchOf := func(body *pyjson.Object) []*pyjson.Object {
 		items, _ := body.Value("batch").([]any)
@@ -103,6 +108,7 @@ func opBoard(req *pyjson.Object, root string) (*pyjson.Object, error) {
 			return pyjson.NewObject("family", family, "closure", c.json(), "refused", previewRefusal(root, code, errText)), nil
 		}
 	}
+	// 4. 画面に出す一覧と本文、ダイジェストを組む。一覧が空なら本文もダイジェストも出さない。
 	batch := []any{}
 	for _, e := range batchOf(body) {
 		if id, _ := e.Value("ticket").(string); slices.Contains(mine, id) {
@@ -118,6 +124,7 @@ func opBoard(req *pyjson.Object, root string) (*pyjson.Object, error) {
 	if narrowed {
 		only = mine
 	}
+	// 5. 承認の対象から外れたチケットは、この親子のものだけ理由を付けて返す。
 	rejected := []any{}
 	for _, item := range listOf(first.Value("rejected")) {
 		r, ok := item.(*pyjson.Object)
@@ -154,6 +161,7 @@ func opBoard(req *pyjson.Object, root string) (*pyjson.Object, error) {
 	), nil
 }
 
+// firstOf は空でない最初の文。すべて空なら空。
 func firstOf(texts ...string) string {
 	for _, t := range texts {
 		if t != "" {
@@ -171,6 +179,7 @@ func previewRefusal(root string, code int, errText string) string {
 	return fmt.Sprintf("終了 %d", code)
 }
 
+// reviewable は、レビュー済みの印を付けられるフェーズの候補。印を付けてよいかは confirm が決める。
 func reviewable(root, ident string) []any {
 	conf, _ := config.Load(root)
 	out := []any{}
@@ -230,6 +239,7 @@ func familyTree(req *pyjson.Object, root string) (*snapshot, string, *closure, e
 }
 
 // stamp は要求の時刻（fsio.Stamp と同じ、オフセット付き）。読めなければ断る。
+// 時計を固定してすぐ戻すのは、書式を確かめるためだけ。時刻の値は呼び手が使う。
 func stamp(req *pyjson.Object) (string, error) {
 	value, ok := text(req, "stamp")
 	if !ok || value == "" {
@@ -259,6 +269,7 @@ func changesJSON(root string, c *core.Changes) *pyjson.Object {
 	if c == nil {
 		return pyjson.NewObject("changes", nil, "lines", []string{}, "stopped", nil)
 	}
+	// ブランチごとの書き込みの列。内容は UTF-8 の本文なら文字列で、そうでなければ base64 で渡す。
 	out := pyjson.NewObject()
 	for _, b := range c.PerBranch() {
 		rows := []any{}
@@ -282,7 +293,7 @@ func changesJSON(root string, c *core.Changes) *pyjson.Object {
 	return pyjson.NewObject("changes", out, "lines", relativeAll(root, c.Lines()), "stopped", stopped)
 }
 
-// merged は答えの頭に body の欄を足す（Python の {**a, **b}）。
+// merged は head に rest の欄を足す。同じキーは rest が勝つ。
 func merged(head *pyjson.Object, rest ...*pyjson.Object) *pyjson.Object {
 	for _, r := range rest {
 		for _, k := range r.Keys() {
@@ -348,6 +359,7 @@ func opPlan(req *pyjson.Object, root string) (*pyjson.Object, error) {
 	when, _ := stamp(req)
 	who := actor(req)
 	conf, _ := config.Load(root)
+	// 承認の判定と計画は、記録に残る経路（Chrome とアカウント）を設定した間だけ行う。
 	restore := via.Session(who.Via, who.Account)
 	judged := core.JudgeApproval(conf, root, only, seen)
 	var changes *core.Changes
@@ -362,6 +374,7 @@ func opPlan(req *pyjson.Object, root string) (*pyjson.Object, error) {
 	if err := oneBranch(body, family); err != nil {
 		return nil, err
 	}
+	// 書くものを出せなかったときだけ、通らなかった根拠の種別を返す。
 	var code any
 	if changes == nil && judged.Code != "" {
 		code = judged.Code
@@ -402,6 +415,7 @@ type reviewInput struct {
 	compare any
 }
 
+// readReview は confirm と decide が共に使う入力を読む。書けない状態（互換の版が違うなど）はここで断る。
 func readReview(req *pyjson.Object, root string) (*reviewInput, error) {
 	s, family, c, err := familyTree(req, root)
 	if err != nil {
@@ -432,6 +446,7 @@ type hostView struct {
 	manual      *phase.Manual
 }
 
+// view はホストで読んだ値を使って、依頼の後に見るものが動いたかを決める。
 func (in *reviewInput) view(req *pyjson.Object, conf *config.Settings, root string) (hostView, error) {
 	recorded, has := core.RequestedHead(conf, root, in.ident, in.number)
 	if in.compare == nil && has && recorded != "" && recorded != in.head && request.IsSHA(recorded) {
@@ -442,6 +457,7 @@ func (in *reviewInput) view(req *pyjson.Object, conf *config.Settings, root stri
 		return hostView{}, err
 	}
 	moved := core.MovedDetailOnHost(conf, root, in.ident, in.number, in.head, files, listed)
+	// 手で動かした子の移動時刻。JSON の数の型は int・float64・big.Int のどれでも届くので、float64 にそろえる。
 	var at *float64
 	switch v := req.Value("manual_moved_at").(type) {
 	case int:
@@ -491,6 +507,7 @@ func compareFiles(compare any, base string, hasBase bool, headSHA string) ([]str
 	return files, true, nil
 }
 
+// pending は拡張がホストから読み足してから呼び直す必要があるときの答え（need_compare・need_manual を含む）。
 func pending(family string, extra ...*pyjson.Object) *pyjson.Object {
 	out := pyjson.NewObject("family", family)
 	return merged(out, extra...)
@@ -532,6 +549,7 @@ func opConfirm(req *pyjson.Object, root string) (*pyjson.Object, error) {
 	), body), nil
 }
 
+// nullIfEmpty は空の文字列を JSON の null にする。
 func nullIfEmpty(s string) any {
 	if s == "" {
 		return nil
@@ -633,6 +651,7 @@ type compatState struct {
 	message    string
 }
 
+// compat は同梱の互換の版と、統合先のマーカーの版を比べる。
 func compat(s *snapshot) compatState {
 	ours := version.Compat
 	var theirs *int
@@ -654,6 +673,7 @@ func compat(s *snapshot) compatState {
 	return compatState{repository: theirs, message: fmt.Sprintf("拡張は互換 %d、リポジトリは互換 %d です。%s", ours, *theirs, hint)}
 }
 
+// opCompat は compat 操作。互換の版が合うかだけを返す。
 func opCompat(req *pyjson.Object, _ string) (*pyjson.Object, error) {
 	s, err := readSnapshot(req)
 	if err != nil {
@@ -675,6 +695,7 @@ func closedMatch(s *snapshot, folded string) bool {
 	return false
 }
 
+// closedProblem は、クローズ済みの識別子を使おうとしたときの文。
 func closedProblem(ident, integ string) string {
 	return ident + " は統合先 " + integ + " の done/ でクローズ済みです（クローズ済みの識別子は再利用できません）"
 }
@@ -711,6 +732,8 @@ func opStart(req *pyjson.Object, _ string) (*pyjson.Object, error) {
 		}
 		prefix = p
 	}
+	// 識別子の候補を決め、使えない理由（名前の形・クローズ済み・大文字小文字だけが違うブランチ・
+	// 未クローズの同じ識別子・互換の版）を集める。1 つでもあれば手動の指定へ案内する。
 	ident, _, err := ids.IssueIdentifier(number, title, s.project, prefix)
 	if err != nil {
 		return nil, refused(err.Error())
@@ -805,6 +828,7 @@ func opAdopt(req *pyjson.Object, _ string) (*pyjson.Object, error) {
 	return pyjson.NewObject("identifier", ident, "integration", integ, "problems", problems), nil
 }
 
+// opVersion は version 操作。拡張が、組み込まれた ccnavi の版と互換の版を見る。
 func opVersion(*pyjson.Object, string) (*pyjson.Object, error) {
 	return pyjson.NewObject("version", version.Version, "compat", version.Compat, "go", runtime.Version()), nil
 }

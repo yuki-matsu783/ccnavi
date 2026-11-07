@@ -6,7 +6,7 @@ import (
 	"unicode/utf8"
 )
 
-// usage/ の各話題の節は `ccnavi --help` の本文そのものである。改行と空白まで出力に出るので、
+// usage/ の各話題の節は `ccnavi --help` の本文そのもの。改行と空白まで出力に出るので、
 // 文書の体裁ではなく出力の形として扱う。
 //
 //go:embed usage/*.txt
@@ -29,7 +29,7 @@ var topicRows = []topicRow{
 	{"scripts", "ccnavi review|worktree|sync ほか", "スクリプトが呼ぶサブコマンドと内部オプション"},
 }
 
-// 一覧の欄の幅（Python の f"{name:<10} {how:<34}"。幅は符号位置で数える）。
+// 一覧の欄の幅（名前 10、説明 34。幅は符号位置で数える）。
 const (
 	nameWidth = 10
 	howWidth  = 34
@@ -47,6 +47,7 @@ const overviewGuide = `
 
 `
 
+// usageText は話題の節の本文。
 func usageText(name string) string {
 	// 読めないのは埋め込みの組み立ての不備で、テストが本文を比べて見つける。
 	b, _ := usageFiles.ReadFile("usage/" + name + ".txt")
@@ -71,6 +72,7 @@ func topicWord(word string) string {
 	return ""
 }
 
+// padRight は s を、符号位置で width 字になるまで右に空白で埋める。
 func padRight(s string, width int) string {
 	if n := utf8.RuneCountInString(s); n < width {
 		return s + strings.Repeat(" ", width-n)

@@ -32,6 +32,8 @@ const (
 	whyError       = "error"
 )
 
+// writeNotCandidate は「候補でない」の応答を書く。判定役はこの形（目印の行、理由の行、返り値の行）を読んで、
+// 判定をせずに終える。終了コードは 0（判定役の失敗が作業を止めてはならない）。
 func writeNotCandidate(stdout io.Writer, why string) int {
 	fmt.Fprintf(stdout, "%s\nreason: %s\n", notCandidate, why)
 	fmt.Fprint(stdout, "return: ")
@@ -39,6 +41,7 @@ func writeNotCandidate(stdout io.Writer, why string) int {
 	return config.ExitOK
 }
 
+// writeOK は判定役が返す返り値 {"ok": true} を書く。record が拒否・失敗したときもこれを返し、作業を止めない。
 func writeOK(stdout io.Writer) int {
 	writeJSON(stdout, stopreview.OKReturn.Object(), true, 0)
 	return config.ExitOK
@@ -56,6 +59,7 @@ func runStopReview(in *input, stdout, stderr io.Writer, conf *config.Settings, w
 	if len(words) == 2 && words[1] == "report" {
 		return stopReviewReport(stdout, stderr, conf)
 	}
+	// 1. 引数を読む。record の JSON は最後の引数でも渡せる。形が合わなければ使い方を言って、成功の応答で終える。
 	inline := ""
 	if len(words) == 5 && words[1] == "record" {
 		// JSON を最後の引数で渡す形（権限の許可に合わせた、パイプ・ヒアドキュメントの無い形）
@@ -70,6 +74,7 @@ func runStopReview(in *input, stdout, stderr io.Writer, conf *config.Settings, w
 		return config.ExitOK
 	}
 	verb, session, transcript := words[1], words[2], words[3]
+	// skip は判定をしない回の応答。record は {"ok": true}、material は候補でない旨を返す。
 	skip := func(why string) int {
 		if recording {
 			return writeOK(stdout)
@@ -79,12 +84,14 @@ func runStopReview(in *input, stdout, stderr io.Writer, conf *config.Settings, w
 	if conf.State == "" {
 		return skip(whyNoState)
 	}
+	// 2. 判定役と判定の計画を結ぶ共有キーを決める。決まらなければ候補にしない。
 	store := stopreview.Store{State: conf.State, Logs: stopreview.LogsDir(conf.Log)}
 	key := stopreview.SharedKey(session, transcript)
 	if key == "" {
 		store.LogNoKey(stopreview.SideJudge)
 		return skip(whyNoKey)
 	}
+	// 3. 本体。想定外の失敗は、判定役の返り値を保ったまま skip に倒す。期限切れの計画は、先に片付ける。
 	code, fail := stopReviewStep(func() (int, error) {
 		store.ExpireOverdue(time.Now())
 		if recording {
@@ -110,6 +117,7 @@ func stopReviewStep(step func() (int, error)) (code int, fail *failure) {
 	return code, nil
 }
 
+// stopReviewReport は評価の集計を出す。ユーザが判定役を採用するかを決める材料。
 func stopReviewReport(stdout, stderr io.Writer, conf *config.Settings) (code int) {
 	// 集計の失敗で落ちない。壊れた記録を名指しする
 	defer onPanic(func(r any, f failure) {
@@ -120,6 +128,7 @@ func stopReviewReport(stdout, stderr io.Writer, conf *config.Settings) (code int
 	return config.ExitOK
 }
 
+// stopReviewMaterial は判定役に渡す材料を書く。判定の計画が届くまで少し待ち、届かなければ候補にしない。
 func stopReviewMaterial(stdout io.Writer, conf *config.Settings, store stopreview.Store, key, transcript, root string) (int, error) {
 	deadline := time.Now().Add(planWait)
 	var status stopreview.Status
@@ -142,6 +151,7 @@ func stopReviewMaterial(stdout io.Writer, conf *config.Settings, store stoprevie
 	if status != stopreview.StatusCandidate {
 		return writeNotCandidate(stdout, string(status)), nil
 	}
+	// 計画が候補になったら、判定の基準と、このターンの会話から材料を組む。
 	criteria := stopreview.LoadCriteria(root)
 	material, err := stopreview.TurnMaterial(transcript)
 	if err != nil {
@@ -163,6 +173,7 @@ func stopReviewMaterial(stdout io.Writer, conf *config.Settings, store stoprevie
 // proposalBody は送った版の提案の本文。送ったコミットから読む（ワークツリーの今の姿ではなく、送った版）。読めなければ
 // 空（材料に本文が無いと示す）。送っていない提案は、書いた md の今の中身を読む。
 func proposalBody(root string, p stopreview.Proposal) string {
+	// 送っていない提案は今のファイルから、送った提案は送ったコミットから読む。root の外のパスや `..` を含むパスは読まない。
 	var parts []string
 	if p.Route == stopreview.RouteUnsent {
 		for _, f := range p.Files {
@@ -193,7 +204,7 @@ func proposalBody(root string, p stopreview.Proposal) string {
 	return strings.Join(parts, "\n")
 }
 
-// headRunes は先頭 n 字（Python の s[:n]）。
+// headRunes は先頭 n 字。
 func headRunes(s string, n int) string {
 	for i := range s {
 		if n == 0 {
@@ -204,6 +215,8 @@ func headRunes(s string, n int) string {
 	return s
 }
 
+// stopReviewRecord は判定役の結果を検証して受け付け、agent hook がそのまま返す返り値を書く。
+// 結果の JSON が読めなければ nil として渡し、受け付ける側が拒否する。
 func stopReviewRecord(in *input, stdout io.Writer, conf *config.Settings, store stopreview.Store, key, root, inline string) (int, error) {
 	text := inline
 	if text == "" {

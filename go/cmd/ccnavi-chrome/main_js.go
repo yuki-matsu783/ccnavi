@@ -16,10 +16,12 @@ const root = "/ws"
 
 func main() {
 	js.Global().Set("ccnaviHandle", js.FuncOf(func(_ js.Value, args []js.Value) any {
+		// 引数が無い呼び出しは、空の要求として handle に渡し、handle の苦情の形で返す。
 		if len(args) == 0 {
 			return chrome.Handle("", root)
 		}
 		return chrome.Handle(args[0].String(), root)
 	}))
+	// main が戻るとランタイムが止まり、登録した ccnaviHandle を呼べなくなる。そのため永久に待つ。
 	select {}
 }

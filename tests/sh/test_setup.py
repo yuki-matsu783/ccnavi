@@ -2962,8 +2962,8 @@ class KeepsTheRegionTidy(DeploysWhatTheProjectNeeds):
         self.assertEqual(written.count("ccnavi begin"), 1)
         self.assertIn(WORKTREES_LINE, written)
 
-    def test_index_negation_keeps_the_user_tracking_the_index(self):
-        """ユーザが ccnavi-index.jsonl を否定していれば足さず、そう言う（--check でも）。"""
+    def test_index_negation_does_not_stop_the_index_line(self):
+        """ccnavi-index.jsonl を否定する行があっても、実行ファイルと同じく末尾に足す（--check でも足すと言う）。"""
         for negation in (
             "!**/ccnavi-index.jsonl",
             "!ccnavi-index.jsonl",
@@ -2977,14 +2977,16 @@ class KeepsTheRegionTidy(DeploysWhatTheProjectNeeds):
                 )
                 src = self.settle(before)
                 checked = self.run_setup("--deploy", src, "--check")
-                self.assertIn("ユーザが索引を追跡しているので", checked.stdout)
-                self.assertIn(negation, checked.stdout)
-                self.assertNotIn(INDEX_LINE, section(checked.stdout, ".gitignore に足す"))
+                self.assertNotIn("ユーザが索引を追跡しているので", checked.stdout)
+                self.assertIn(INDEX_LINE, section(checked.stdout, ".gitignore に足す"))
                 self.assertEqual(self.read_raw(), before)
 
                 result = self.run_setup("--deploy", src)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertEqual(self.read_raw(), before)
+                written = self.read_raw()
+                self.assertTrue(written.startswith(before), written)
+                self.assertEqual(written.splitlines().count(INDEX_LINE), 1, written)
+                self.assertNotIn("まだ無視していません", result.stdout)
 
     def test_scratchpad_and_logs_equivalents_and_negations(self):
         for existing in (SCRATCH_LINE, "/scratchpad/", "scratchpad/", "scratchpad"):

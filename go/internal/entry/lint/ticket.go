@@ -67,11 +67,13 @@ func ticketProblems(conf *config.Settings, root string) []rules.Problem {
 	if root == "" {
 		root, _ = ospath.Getwd()
 	}
+	// 1. チケットを使っていないプロジェクトは、ほとんどの検査を飛ばす。
 	if !anyCopies(conf, root) && !treeHasTickets(root, conf.Tickets) {
 		// チケットによる制御は任意。使っていないプロジェクトに苦情を返すと、その 1 行が常態になって他の報告ごと読まれなく
 		// なる。送信の途中で止まった操作は、チケットが無くても言う。
 		return operationProblems(conf, root, nil, nil)
 	}
+	// 2. 承認済み・閉じた・審査中のチケットを読む。読めないファイルは error にする。
 	problems := approvedGuarded(conf)
 	raw := approval.ReadRaw(conf, root)
 	copies, notes := approval.Scan(conf, root, false, raw)
@@ -81,12 +83,14 @@ func ticketProblems(conf *config.Settings, root string) []rules.Problem {
 	for _, note := range slices.Concat(notes, closedNotes, reviewNotes) {
 		problems = append(problems, ticketProblem(rules.Error, note))
 	}
+	// done は閉じた・審査中の識別子。todo/ に同じ識別子が残っていないかを見るために使う。
 	index := approval.ByID(copies)
 	done := map[string]bool{}
 	for _, t := range slices.Concat(closed, review) {
 		done[t.ID] = true
 	}
 
+	// 3. 提案を読み、チケットの状態ごとの検査を当てる。
 	read := approval.ReadProposals(conf, root, raw)
 	proposals := read.Kept
 	problems = append(problems, read.Problems...)
@@ -108,10 +112,12 @@ func ticketProblems(conf *config.Settings, root string) []rules.Problem {
 		}
 		repoOf[name] = t.Project
 	}
+	// 先行の判定は承認・着手と同じ関数に任せる。親子のチケットの先行は、Chrome 拡張の判定と答えがそろうよう、親のブランチ上のチケットで読み直す。
 	preds := approval.PoolOf(copies, review, closed, proposals)
 	preds.AlignImported(conf, root)
 	problems = append(problems, proposalProblems(root, proposals, copies, index, closed, done, repoOf, preds)...)
 
+	// 4. ブランチ名と置き場の検査。統合先の名前はリポジトリごとに 1 回だけ引く（git を呼ぶため）。
 	integrations := map[string]string{}
 	integrationOf := func(project string) string {
 		// 統合先はリポジトリごと。チケットの project のリポジトリの origin/HEAD で引く。
@@ -134,6 +140,7 @@ func ticketProblems(conf *config.Settings, root string) []rules.Problem {
 	}
 	problems = append(problems, approvalProblems(conf, root, proposals, copies, closed, review)...)
 
+	// 5. ワークツリーの側の検査。
 	worktrees := tree.Worktrees(root, conf.Projects)
 	known := map[string]bool{}
 	for _, t := range slices.Concat(proposals, copies, closed, review) {
@@ -360,6 +367,7 @@ func proposalProblems(root string, proposals, copies []*ticket.Ticket, index map
 		}
 		return spot{repo, at, string(state)}
 	}
+	// 同じ識別子が、どのリポジトリ・ツリー・状態に在るかを集める（order は初めて出た順）。
 	var order []string
 	seen := map[string][]spot{}
 	held := map[string][]*ticket.Ticket{}
@@ -370,6 +378,7 @@ func proposalProblems(root string, proposals, copies []*ticket.Ticket, index map
 		seen[t.ID] = append(seen[t.ID], placeOf(t, state))
 		held[t.ID] = append(held[t.ID], t)
 	}
+	// state が空のチケットは、承認済みなら doing、閉じたなら done として数える。
 	for _, t := range copies {
 		hold(t, stateOr(t.State, place.Doing))
 	}
@@ -381,6 +390,7 @@ func proposalProblems(root string, proposals, copies []*ticket.Ticket, index map
 		if t.State != place.Todo {
 			continue
 		}
+		// todo/ の提案が、承認済みの同じ識別子と重なる形を分ける。親の改版（計画が違う）だけは正しい状態。
 		if current, ok := index[t.ID]; ok {
 			if !t.IsChild() && t.HasPlan() && approval.PlanDiffers(t, current) {
 				continue // 親の改版。承認待ちに入る
@@ -410,6 +420,7 @@ func proposalProblems(root string, proposals, copies []*ticket.Ticket, index map
 			out = append(out, ticketProblem(rules.Warn, t.ID+" は先行 "+strings.Join(names, ", ")+" を満たしていないのに着手している"))
 		}
 	}
+	// 識別子ごとに、重複を調べる。リポジトリをまたぐ重複を先に言い、同じリポジトリの中の重複はその後で調べる。
 	for _, id := range order {
 		places := seen[id]
 		repos := map[string]bool{}
@@ -418,6 +429,7 @@ func proposalProblems(root string, proposals, copies []*ticket.Ticket, index map
 		}
 		if len(repos) > 1 {
 			sorted := slices.Clone(places)
+			// 文面を機械に依らず同じにするため、リポジトリ・ツリー・状態の順に並べる。
 			slices.SortFunc(sorted, func(a, b spot) int {
 				return strings.Compare(a.repo+"\x00"+a.at+"\x00"+a.state, b.repo+"\x00"+b.at+"\x00"+b.state)
 			})
@@ -459,7 +471,7 @@ func proposalProblems(root string, proposals, copies []*ticket.Ticket, index map
 	return out
 }
 
-// indexValues は index（ByID(copies)）の値を、識別子が copies に初めて出た順に並べる（Python の dict の順）。
+// indexValues は index（ByID(copies)）の値を、識別子が copies に初めて出た順に並べる（ByID が作る順）。
 func indexValues(copies []*ticket.Ticket, index map[string]*ticket.Ticket) []*ticket.Ticket {
 	var out []*ticket.Ticket
 	listed := map[string]bool{}

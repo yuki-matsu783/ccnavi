@@ -26,6 +26,7 @@ var (
 // slugLimit は候補の id の元にする部分の長さの上限（字）。
 const slugLimit = 40
 
+// slug は候補の id に使える形（小文字の英数字をハイフンでつないだもの）にする。空になったら "x"。
 func slug(text string) string {
 	s := strings.Trim(notSlug.ReplaceAllString(pyfmt.Lower(text), "-"), "-")
 	if len(s) > slugLimit {
@@ -64,7 +65,10 @@ func shapeOf(tool, subject, root string) (shaped, bool) {
 	return shaped{}, false
 }
 
+// bashShape は Bash の呼び出しを、先頭のコマンド名（と、続く語がサブコマンドらしければそれ）の形にする。
+// 先頭の環境変数の代入は飛ばす。パス付きで呼ばれても同じ形になるよう、コマンド名はパスの最後の部分だけを使う。
 func bashShape(subject string) (shaped, bool) {
+	// 複数行なら 1 行目だけを見る。
 	first, _, _ := strings.Cut(ospath.Strip(subject), "\n")
 	words := ospath.Fields(first)
 	for len(words) > 0 && envAssign.MatchString(words[0]) {
@@ -82,6 +86,8 @@ func bashShape(subject string) (shaped, bool) {
 	if len(words) > 1 && subcommand.MatchString(words[1]) {
 		sub = words[1]
 	}
+	// 当てる式は、コマンド名の前が行頭か区切り（空白・`;`・`&`・`|`・`(`）で、後ろが空白か行末のときだけ当たる形。
+	// 別のコマンドの名前の一部（`xnpm` など）には当たらないようにする。
 	spelled := strings.TrimSpace(head + " " + sub)
 	pattern := `(^|[\s;&|(])(\S*[\\/])?` + pyre.Escape(head)
 	if sub != "" {
@@ -91,6 +97,9 @@ func bashShape(subject string) (shaped, bool) {
 	return shaped{spelled, pyjson.NewObject(string(rules.WhenRegex), pattern), spelled}, true
 }
 
+// pathShape はパスのツールの呼び出しを、置かれたディレクトリの下全部を指す glob の形にする。
+// ワークスペースの下のパスは、機械ごとに違う絶対パスを避けるため、ルートの合言葉に置き換える。
+// 次のパスは形にしない。glob の記号を含むもの（記号がパターンとして読まれてしまう）と、`/` 直下のもの（広すぎる）。
 func pathShape(tool, subject, root string) (shaped, bool) {
 	where := ospath.Dirname(strings.ReplaceAll(subject, `\`, "/"))
 	top := rules.RootGlob(root)
@@ -103,6 +112,7 @@ func pathShape(tool, subject, root string) (shaped, bool) {
 	case where == "/":
 		return shaped{}, false
 	}
+	// 候補の id の元は、ディレクトリ名の最後の 2 段。
 	spelled := where + "/*"
 	parts := strings.Split(strings.Trim(strings.ReplaceAll(where, rules.RootPlaceholder, ""), "/"), "/")
 	name := strings.Join(parts[max(0, len(parts)-2):], "-")
@@ -112,16 +122,18 @@ func pathShape(tool, subject, root string) (shaped, bool) {
 	return shaped{spelled, pyjson.NewObject(string(rules.WhenGlob), spelled), tool + "-" + name}, true
 }
 
-// schemeChars は URL の scheme に書ける字（Python の urllib.parse.scheme_chars）。
+// schemeChars は URL の scheme に書ける字。
 const schemeChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-."
 
-// splitURL は Python の urllib.parse.urlsplit の scheme と netloc。角括弧の片方だけを持つ netloc は Python が ValueError で
-// 止まるもので、ここでは形にしない（偽）。
+// splitURL は URL から scheme と netloc を取り出す。角括弧の片方しかない netloc は URL の形として読めないので、
+// 取り出さず false を返す。
 func splitURL(url string) (scheme, netloc string, ok bool) {
 	url = strings.TrimLeftFunc(url, func(r rune) bool { return r <= ' ' })
 	for _, unsafe := range []string{"\t", "\r", "\n"} {
 		url = strings.ReplaceAll(url, unsafe, "")
 	}
+	// 先頭の空白と、途中のタブ・改行は取り除いてから読む（URL として解釈されるときと同じ扱いにするため）。
+	// `:` より前が、英字で始まり scheme に使える字だけなら scheme とみなす。
 	if i := strings.Index(url, ":"); i > 0 && isASCIILetter(url[0]) &&
 		strings.IndexFunc(url[:i], func(r rune) bool { return !strings.ContainsRune(schemeChars, r) }) < 0 {
 		scheme, url = strings.ToLower(url[:i]), url[i+1:]
@@ -139,4 +151,5 @@ func splitURL(url string) (scheme, netloc string, ok bool) {
 	return scheme, netloc, true
 }
 
+// isASCIILetter は ASCII の英字か。
 func isASCIILetter(b byte) bool { return 'a' <= b && b <= 'z' || 'A' <= b && b <= 'Z' }

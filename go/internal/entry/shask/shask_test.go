@@ -9,8 +9,7 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// Python の entry/sh_ask と同じワークスペースに同じ問いを投げ、答えの行・標準エラー・終了コードが 1 字も違わないことを
-// 見る。sh は行の形をそのまま読むので、ここが sh との契約の見張りになる。
+// ワークスペースに問いを投げ、答えの行・標準エラー・終了コードが見本（testdata）と 1 字も違わないことを見る。sh は行の形をそのまま読むので、ここが sh との契約の見張りになる。
 
 func parentFront(id string, extra ...string) string {
 	return "---\nversion: 1\nticket: " + id + "\n" + strings.Join(extra, "\n") + "\ntitle: 親\n---\n\n本文\n"
@@ -43,7 +42,7 @@ func shaskWorkspace(t *testing.T) string {
 	return root
 }
 
-func TestAnswersMatchPython(t *testing.T) {
+func TestAnswersMatchGolden(t *testing.T) {
 	root := shaskWorkspace(t)
 	w := func(name string) string { return testkit.Worktree(root, name) }
 	nope := filepath.Join(root, "nope")

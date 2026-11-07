@@ -40,6 +40,7 @@ var commit string
 // built は組み立てた実行ファイルとして動いているか（commit を埋めたか）。
 func built() bool { return commit != "" }
 
+// commitOrUnknown は埋めたコミット。埋めていなければ unknown。
 func commitOrUnknown() string {
 	if commit == "" {
 		return unknown
@@ -57,6 +58,7 @@ func formats() *pyjson.Object {
 	)
 }
 
+// describe は `--version --json` の本文。欄の並びは読み手との契約。
 func describe() *pyjson.Object {
 	return pyjson.NewObject(
 		"schema", schema,
@@ -78,6 +80,7 @@ func Report(stdout io.Writer, asJSON bool) int {
 		}
 		return config.ExitOK
 	}
+	// ユーザ向けの形。built の行は、組み立てた実行ファイルかどうかを yes・no と説明の両方で言う。
 	how, yes := "scripts/ccnavi-build.sh で組んでいない", "no"
 	if built() {
 		how, yes = "組み立てた実行ファイル", "yes"

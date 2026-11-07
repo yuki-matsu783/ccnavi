@@ -45,10 +45,12 @@ func mirrorUsage(parser *argparse.Parser, a opts) string {
 // runMirror は `ccnavi user mirror`。プロジェクトのミラーを、ワークスペースの共通レイヤーに揃える。見るだけの形を
 // 含めてユーザ専用。書くのはワークツリーだけで、コミットはしない。
 func runMirror(in *input, stdout, stderr io.Writer, parser *argparse.Parser, conf *config.Settings, root string, a opts) int {
+	// 1. 引数の組み合わせを確かめる。
 	asJSON := a.Truthy("json")
 	if refused := mirrorUsage(parser, a); refused != "" {
 		return failAnswer(stdout, stderr, asJSON, mirror.JSONVersion, refused)
 	}
+	// 2. 書く形（--yes）。経路（ターミナルかボード）を確かめてから、--expect の値が計画と合うときだけ揃える。
 	if a.Str("yes") != "" {
 		if _, ok := sidewaysRoute(in, conf, stderr, a, useronly.OpMirror); !ok {
 			return config.ExitError
@@ -66,6 +68,7 @@ func runMirror(in *input, stdout, stderr io.Writer, parser *argparse.Parser, con
 		mirrorApplied(stdout, done)
 		return config.ExitOK
 	}
+	// 3. 見るだけの形。計画を出して、何も書かない。
 	plan := mirror.Prepare(conf, root, wanted(a))
 	if plan.Error != "" {
 		return failAnswer(stdout, stderr, asJSON, mirror.JSONVersion, plan.Error)
@@ -99,6 +102,7 @@ func mirrorPlan(w io.Writer, plan *mirror.Plan, named bool, root string) {
 			fmt.Fprintf(w, "  [調べられない] %s: %s\n", p.Name, p.Error)
 		default:
 			fmt.Fprintf(w, "  [ずれ %d 件] %s\n", len(p.Changes), p.Name)
+			// ずれの内訳と、見比べる方法。skills/ の元は .claude/skills/ にあり、それ以外は .ccnavi/ のミラーなので、案内が分かれる。
 			skills, others := false, false
 			for _, c := range p.Changes {
 				fmt.Fprintf(w, "      %s %s\n", mirrorActionText[c.Action()], c.Rel)
@@ -136,6 +140,7 @@ func mirrorPlan(w io.Writer, plan *mirror.Plan, named bool, root string) {
 	fmt.Fprint(w, "何も反映していません。この内容で揃えるなら、次を実行します。ワークツリーに書くだけで、")
 	fmt.Fprintln(w, "コミットはしません。")
 	fmt.Fprintf(w, "  %s--yes --expect %s\n", command, plan.Expect())
+	// 新規の作成だけなら注意は要らない。更新と削除があれば、ミラーの手入れを失うので、確かめてから実行するよう添える。
 	for _, p := range chosen {
 		for _, c := range p.Changes {
 			if c.Action() != mirror.ActionCreate {
@@ -147,6 +152,7 @@ func mirrorPlan(w io.Writer, plan *mirror.Plan, named bool, root string) {
 	}
 }
 
+// mirrorApplied は揃えたプロジェクトごとに、ファイルの一覧を書く。
 func mirrorApplied(w io.Writer, done *mirror.Applied) {
 	for _, s := range done.Synced {
 		fmt.Fprintf(w, "揃えた: %s（%d 件。コミットはしていません）\n", s.Name, len(s.Files))

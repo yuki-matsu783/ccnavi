@@ -28,7 +28,7 @@ const fixedClock = "2026-01-06T03:04:05+0900"
 
 var oracleParents = []string{"i0001", "i0002", "i0003", "i0004", "i0005", "i0006", "i0007", "i0010", "i0011", "i0012"}
 
-// oracleWorkspace は見本の答えを取ったワークスペース。親ごとに 1 つの形を置く。
+// goldenWorkspace は見本の答えを取ったワークスペース。親ごとに 1 つの形を置く。
 //
 //	i0001 並行する枝（2 と 3 が 1 の後、4 が 2 と 3 の後）。1 は閉じてレビュー不要、2 はレビュー待ちで依頼済み
 //	      （子は依頼の後に閉じた）、実績のリスクが高い。子 i0001-02-01 のワークツリーに範囲の内外の変更を置く
@@ -41,7 +41,7 @@ var oracleParents = []string{"i0001", "i0002", "i0003", "i0004", "i0005", "i0006
 //	i0010 done/ の子が動かした経路（finished_to）が無い
 //	i0011 2 つの子のうち 1 つだけを手で done/ に動かした
 //	i0012 手で done/ に動かしたが、依頼の記録が無い
-func oracleWorkspace(t *testing.T) string {
+func goldenWorkspace(t *testing.T) string {
 	root := testkit.Workspace(t, oracleParents...)
 	remote := filepath.Join(root, "remote.git")
 	testkit.Git(t, root, "init", "-q", "--bare", remote)
@@ -168,7 +168,7 @@ var scopeCases = []map[string]any{
 }
 
 func TestMatchesGolden(t *testing.T) {
-	goRoot := oracleWorkspace(t)
+	goRoot := goldenWorkspace(t)
 	head := strings.TrimSpace(testkit.Git(t, testkit.Worktree(goRoot, "i0001-02-01"), "rev-parse", "HEAD"))
 	cwds := func(root string) []string {
 		return []string{root, testkit.Worktree(root, "i0001"), filepath.Join(testkit.Worktree(root, "i0001"), "src", "deep"),

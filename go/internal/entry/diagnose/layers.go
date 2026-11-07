@@ -50,6 +50,7 @@ func scopeWords(pt *phases.PhaseType) []string {
 	return out
 }
 
+// problemsText は読めなかった理由の文。苦情が空なら unreadableFallback。
 func problemsText(notes []rules.Problem) string {
 	parts := make([]string, len(notes))
 	for i, n := range notes {
@@ -104,7 +105,7 @@ func layerRisk(conf *config.Settings, name, path string) ([]*risk.Factor, string
 	return d.Factors, ""
 }
 
-// factorValue は項目の加点条件の値（数える項目は閾値、ほかは文）。
+// factorValue は項目の加点条件の値。行・ファイル・削除を数える項目は閾値、ほかは条件の文。
 func factorValue(f *risk.Factor) any {
 	switch f.Kind {
 	case risk.KindLines, risk.KindFiles, risk.KindDeleted:

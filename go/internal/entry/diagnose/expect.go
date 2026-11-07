@@ -17,8 +17,8 @@ import (
 	"ccnavi/internal/records/audit"
 )
 
-// errUnreadable は期待する判定のファイルを読めない・形が違う（Python の OSError と ValueError）。文はそのまま見せる。
-// YAML として読めないものは包まずに返す（Python でも例外のまま抜けていた）。
+// errUnreadable は期待する判定のファイルを読めない・形が違う。文はそのまま見せる。
+// YAML として読めないものは包まずに返す。
 var errUnreadable = errors.New("期待する判定を読めない")
 
 type unreadable struct{ text string }
@@ -54,7 +54,7 @@ func loadExpectations(path, root string) ([]expectation, error) {
 		if !pyfmt.Truthy(value) {
 			continue
 		}
-		// 列でない値（Python では要素を 1 つずつ見て、対応表でないと言う）も同じ苦情にする。
+		// 列でない値は、要素が対応表でないときと同じ苦情にする。
 		cases, _ := value.([]any)
 		if cases == nil {
 			cases = []any{nil}
@@ -72,7 +72,7 @@ func loadExpectations(path, root string) ([]expectation, error) {
 	return out, nil
 }
 
-// text0 は str(case.get(key) or "")。
+// text0 は m の key の値を文字列で返す。欄が無い・空・偽の値なら空。
 func text0(m *yaml.Map, key string) string {
 	if v := m.Get(key); pyfmt.Truthy(v) {
 		return pyfmt.Str(v)
@@ -89,6 +89,7 @@ type expectationResult struct {
 	ok, skipped bool
 }
 
+// object は `--test-expectations --json` の expectations の 1 件。
 func (r expectationResult) object() *pyjson.Object {
 	return pyjson.NewObject("expected", string(r.expected), "tool", r.expectation.tool,
 		"subject", r.expectation.subject, "resolved_subject", r.resolvedSubject, "why", r.why,
@@ -96,13 +97,14 @@ func (r expectationResult) object() *pyjson.Object {
 		"ok", r.ok, "skipped", r.skipped)
 }
 
+// expectations は期待する判定を全部回した結果。
 type expectations struct {
 	root, rulesPath, path string
 	results               []expectationResult
 }
 
-// runExpectations は期待する判定をすべて判定（TryOne）に掛ける。判定を作り直さないことが大事である。
-// 別の経路で確かめると、期待は通るのに実運用では失敗しうるからである。
+// runExpectations は期待する判定をすべて判定（TryOne）に掛ける。判定を作り直さずに本番と同じ経路を通す。
+// 別の経路で確かめると、期待は通るのに実運用では失敗することがある。
 func runExpectations(stderr io.Writer, conf *config.Settings, root, path string) (*expectations, error) {
 	list, err := loadExpectations(path, root)
 	if err != nil {
@@ -124,6 +126,7 @@ func runExpectations(stderr io.Writer, conf *config.Settings, root, path string)
 				io.WriteString(stderr, line)
 			}
 		}
+		// 判定が対象を取り出せないツールは、判定に入らない（skip）。allow の期待だけは、通るので満たしたと数える。
 		got := string(audit.Skip)
 		if out.known {
 			got = out.Verdict
@@ -135,6 +138,7 @@ func runExpectations(stderr io.Writer, conf *config.Settings, root, path string)
 	return body, nil
 }
 
+// count は want の期待のうち、満たしたものの数と全体の数。
 func (b *expectations) count(want rules.Decision) (ok, total int) {
 	for _, r := range b.results {
 		if r.expected == want {
@@ -147,6 +151,7 @@ func (b *expectations) count(want rules.Decision) (ok, total int) {
 	return ok, total
 }
 
+// tally は食い違い（満たさなかった期待）の数と、判定に入らずに通った期待の数。
 func (b *expectations) tally() (mismatches, skipped int) {
 	for _, r := range b.results {
 		if !r.ok {
@@ -159,6 +164,7 @@ func (b *expectations) tally() (mismatches, skipped int) {
 	return mismatches, skipped
 }
 
+// object は `--test-expectations --json` の本文。
 func (b *expectations) object() *pyjson.Object {
 	counts := pyjson.NewObject()
 	for _, want := range rules.Sections() {
@@ -191,6 +197,7 @@ func TestExpectations(stdout, stderr io.Writer, conf *config.Settings, root, pat
 		return config.ExitOK, writeJSON(stdout, body.object())
 	}
 
+	// 文字の出力。食い違いを先に、判定に入らずに通ったものを次に、タイプごとの件数を最後に出す。
 	p := func(format string, a ...any) { fmt.Fprintf(stdout, format, a...) }
 	for _, r := range body.results {
 		if r.ok {

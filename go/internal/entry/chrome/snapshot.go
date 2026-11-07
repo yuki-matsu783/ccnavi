@@ -22,6 +22,7 @@ type branch struct {
 	links  []any
 }
 
+// text はブランチの中のパスの本文。ブランチが無い（nil）ときも、パスが無いときも ok が偽。
 func (b *branch) text(path string) (string, bool) {
 	if b == nil {
 		return "", false
@@ -74,6 +75,7 @@ func readBranch(name string, v any) (*branch, error) {
 	return b, nil
 }
 
+// listOf は値が真で、かつ配列のときだけ配列を返す（偽の値は空の配列と同じ扱い）。
 func listOf(v any) []any {
 	if !pyfmt.Truthy(v) {
 		return nil
@@ -155,6 +157,7 @@ func checkRel(path string) error {
 
 // rooted は絶対パス・ホーム・ドライブで始まるか。
 func rooted(path string) bool {
+	// 先頭の 1 字で、絶対パス（`/`・`\`）、ホーム（`~`）、ドライブ（`C:`）を見分ける。
 	c := path[0]
 	if c == '/' || c == '\\' || c == '~' {
 		return true
@@ -163,13 +166,16 @@ func rooted(path string) bool {
 	return letter && len(path) > 1 && path[1] == ':'
 }
 
+// branch は名前のブランチの中身。無ければ nil。
 func (s *snapshot) branch(name string) *branch { return s.branches[name] }
 
+// has はそのブランチが snapshot にあるか。
 func (s *snapshot) has(name string) bool {
 	_, ok := s.branches[name]
 	return ok
 }
 
+// isAbsent はsnapshot の absent に載った（ホストが読めなかった）ブランチか。
 func (s *snapshot) isAbsent(name string) bool { return slices.Contains(s.absent, name) }
 
 // workspaceFiles はワークスペースの統合先の中身（共通レイヤー・設定・互換のマーカー）。ワークスペース自身なら統合先。

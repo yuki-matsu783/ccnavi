@@ -60,8 +60,8 @@ func TestFormsMatchGolden(t *testing.T) {
 	}
 }
 
-// pythonStop は見本の中で、HiddenUserEntry の答えが「判定が例外で止まった」ことを表す印。
-const pythonStop = "!StopIteration"
+// stopIterationMark は見本の中で、HiddenUserEntry の答えが「判定が例外で止まった」ことを表す印。
+const stopIterationMark = "!StopIteration"
 
 type judgeIn struct {
 	Commands []string `json:"commands"`
@@ -122,8 +122,8 @@ func compareJudge(t *testing.T, name string, in judgeIn) {
 		}
 		for _, b := range in.Bins {
 			entry, word := HiddenUserEntry(c, inner, b)
-			// 見本が例外で止まる形（pythonStop）は、Go が止める側に答えれば合う。
-			if got := [2]string{entry, word}; got != w.Hidden[b] && !(w.Hidden[b][0] == pythonStop && entry != "") {
+			// 見本が例外で止まる形（stopIterationMark）は、Go が止める側に答えれば合う。
+			if got := [2]string{entry, word}; got != w.Hidden[b] && !(w.Hidden[b][0] == stopIterationMark && entry != "") {
 				report(c, "HiddenUserEntry "+b, got, w.Hidden[b])
 			}
 			if got := PruneForm(c, b); got != w.Prune[b] {

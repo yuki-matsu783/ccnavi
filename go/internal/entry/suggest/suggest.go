@@ -68,6 +68,7 @@ type candidate struct {
 	expectations []any
 }
 
+// yamlText は候補の下書き。rules と expectations を並べ、頭に 1 行の説明を付ける。
 func (c candidate) yamlText() (string, error) {
 	body := pyjson.NewObject(
 		"rules", pyjson.NewObject(string(c.section), []any{c.rule}),
@@ -80,6 +81,7 @@ func (c candidate) yamlText() (string, error) {
 	return "# " + c.summary + "\n" + dumped, nil
 }
 
+// object は `--suggest --json` の候補 1 件。
 func (c candidate) object() (*pyjson.Object, error) {
 	text, err := c.yamlText()
 	if err != nil {
@@ -95,6 +97,8 @@ func (c candidate) object() (*pyjson.Object, error) {
 }
 
 // placeholder は期待する判定に書く文字列。ルートを合言葉にする。
+// 記録のパスはリンクを解いた綴りと、解く前の綴りのどちらで書かれているか分からないので、両方を置き換える。
+// ルートが空か `/` だと全部の `/` を置き換えてしまうので、その場合は置き換えない。
 func placeholder(subject, root string) string {
 	spellings := []string{ospath.Realpath(root)}
 	if root != spellings[0] {
@@ -108,10 +112,12 @@ func placeholder(subject, root string) string {
 	return subject
 }
 
+// expectation は期待する判定 1 件（rule-expectations.yml の 1 項目）。
 func expectation(tool, subject, why string) *pyjson.Object {
 	return pyjson.NewObject("tool", tool, "subject", subject, "why", why)
 }
 
+// textOf は記録の欄を文字列で返す。欄が無い・空なら空。
 func textOf(rec *pyjson.Object, key string) string {
 	if v := rec.Value(key); pyfmt.Truthy(v) {
 		return pyfmt.Str(v)
@@ -136,6 +142,7 @@ type group struct {
 
 // handoverGroups は、ルールが言及しなかった呼び出しを形ごとにまとめ、多い順に並べる。
 func handoverGroups(records []*pyjson.Object, root string) []group {
+	// 呼び出しを (ツール, 形の書き表し) ごとの組にまとめる。subjects は組の中の呼び出しの文字列で、同じ文字列は1つにまとめて数える。
 	type key struct{ tool, spelled string }
 	index := map[key]int{}
 	var groups []group
@@ -144,6 +151,7 @@ func handoverGroups(records []*pyjson.Object, root string) []group {
 		if !usable(rec) {
 			continue
 		}
+		// ルールに言及されず権限モードへ渡った呼び出しだけを数える。
 		if rec.Value("decision") != string(audit.Handover) && rec.Value("code") != reasons.CodeUndeclared {
 			continue
 		}
@@ -166,6 +174,7 @@ func handoverGroups(records []*pyjson.Object, root string) []group {
 		}
 		counts[i][subject]++
 	}
+	// 並べ替えは安定にして、同数なら先に来たものを前に置く（出力を実行のたびに変えない）。
 	for i := range groups {
 		c := counts[i]
 		sort.SliceStable(groups[i].subjects, func(a, b int) bool { return c[groups[i].subjects[a]] > c[groups[i].subjects[b]] })
@@ -180,6 +189,7 @@ func handoverGroups(records []*pyjson.Object, root string) []group {
 		}
 		return x.shape.spelled < y.shape.spelled
 	})
+	// 回数が少ない組は、ルールを書くよりユーザが見たほうが早いので候補にしない。
 	var out []group
 	for _, g := range groups {
 		if g.n >= handoverMin {
@@ -196,6 +206,8 @@ type repeated struct {
 	subjects     []string
 }
 
+// repeatedDenies は、同じルールが同じ呼び出し（空白などをそろえた形）を n 回以上止めたものを、ルールごとに集める。
+// 実際に止めた回（enforced）だけを数え、dry-run の報告は数えない。
 func repeatedDenies(records []*pyjson.Object, n int) []repeated {
 	type key struct{ rule, norm string }
 	var order []key
@@ -225,6 +237,7 @@ func repeatedDenies(records []*pyjson.Object, n int) []repeated {
 			tools[first] = textOf(rec, "tool")
 		}
 	}
+	// 数が n 以上の呼び出しだけを、ルールごとに集め直す。
 	type hit struct {
 		got     int
 		subject string
@@ -264,7 +277,7 @@ func repeatedDenies(records []*pyjson.Object, n int) []repeated {
 	return out
 }
 
-// writtenRule はルール 1 件を、書いた表記の形に戻す。
+// writtenRule はルール 1 件を、書いた表記の形に戻す。翻訳後の式ではなく、ユーザが書いた glob・regex・when を使う。
 func writtenRule(r *rules.Rule) *pyjson.Object {
 	id := r.BareID
 	if id == "" {
@@ -336,6 +349,7 @@ func expectationsPass(conf *config.Settings, root string, expectations []any, wa
 // ruleCandidates は、足すと良い ask のルールの候補と、検証を通らずに捨てた数。共通レイヤーを読めなければ、足した
 // コピーで試せないので候補を出さず、全部を捨てた数にする。
 func ruleCandidates(conf *config.Settings, root string, records []*pyjson.Object) ([]candidate, int, error) {
+	// 1. 候補の材料（渡った回数の多い形）を集め、足し先の共通レイヤーを読む。
 	groups := handoverGroups(records, root)
 	if len(groups) == 0 {
 		return nil, 0, nil
@@ -349,6 +363,7 @@ func ruleCandidates(conf *config.Settings, root string, records []*pyjson.Object
 	if err != nil || !ok {
 		return nil, len(groups), nil
 	}
+	// 既にあるルールの id と重ならないよう、使われている id を集める。
 	taken := map[string]bool{}
 	for _, name := range rules.Sections() {
 		list, _ := base.Get(string(name)).([]any)
@@ -358,6 +373,7 @@ func ruleCandidates(conf *config.Settings, root string, records []*pyjson.Object
 			}
 		}
 	}
+	// 2. 候補ごとに、共通レイヤーに 1 件足したコピーを一時ディレクトリに書いて試す。実際のファイルは書き換えない。
 	scratch, err := os.MkdirTemp("", scratchPrefix)
 	if err != nil {
 		return nil, 0, err
@@ -383,6 +399,7 @@ func ruleCandidates(conf *config.Settings, root string, records []*pyjson.Object
 			expectations = append(expectations, expectation(g.tool, placeholder(s, root),
 				"記録で、どのルールにもヒットせず権限モードへ渡った形（"+g.shape.spelled+"）"))
 		}
+		// 候補を ask の末尾に足したコピーの内容を作る。
 		trialData := &yaml.Map{}
 		for k, v := range base.All() {
 			trialData.Put(k, v)
@@ -401,6 +418,7 @@ func ruleCandidates(conf *config.Settings, root string, records []*pyjson.Object
 		trial.Rules = path
 		// 候補は試す共通レイヤー（path）に書いてあるので、記録名はその相対パスと書いた id。
 		recordName := ruleload.RelPath(path, root) + rules.IDSeparator + id
+		// 3. 検証。--lint の error が付く候補と、期待が通らない候補は捨てて、捨てた数に数える。
 		if lintErrors(path, root, id, false) {
 			dropped++
 			continue
@@ -424,6 +442,7 @@ func ruleCandidates(conf *config.Settings, root string, records []*pyjson.Object
 // messageCandidates は、記録で同じ呼び出しを繰り返し止めた deny のルールについて、message の見直し候補を作る。ルール
 // ファイルに見つからないもの（組み込みや、もう無いルール）は、文面を直す先が無いので捨てる。
 func messageCandidates(conf *config.Settings, root string, records []*pyjson.Object, n int) ([]candidate, int, error) {
+	// 読めたレイヤーのルールだけを、deny の探し先にする。
 	list := repeatedDenies(records, n)
 	if len(list) == 0 {
 		return nil, 0, nil
@@ -472,6 +491,7 @@ func messageCandidates(conf *config.Settings, root string, records []*pyjson.Obj
 	return found, dropped, nil
 }
 
+// findDeny は記録の名前で deny のルールを探す。見つからなければ rule は nil。
 func findDeny(views []ruleload.LayerView, recordName string) (ruleload.LayerView, *rules.Rule) {
 	for _, v := range views {
 		for _, r := range v.RuleSet.Deny {
@@ -492,6 +512,7 @@ type collected struct {
 	dropped    int
 }
 
+// collect は記録を読み、ルールを足す候補と message の見直しの候補を集める。
 func collect(conf *config.Settings, root string) (*collected, error) {
 	// 試験と同じく記録を持たない。候補の検証で「1 度だけ渡す文」を消費しない。
 	c := *conf

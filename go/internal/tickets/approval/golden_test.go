@@ -52,10 +52,10 @@ type approvalAnswers struct {
 
 const fixedClock = "2026-01-02T03:04:05+0900"
 
-// oracleWorkspace は見本の答えを取ったワークスペース。親 i0001 のワークツリーに承認済みチケットを並べ、
+// goldenWorkspace は見本の答えを取ったワークスペース。親 i0001 のワークツリーに承認済みチケットを並べ、
 // 信頼できない形（中身の矛盾・計画に無い番号・親のワークツリーの外・読めない・識別子違い）と、先行の状態
 // （作業中・取り消し・自分・親・循環・無い）、正とするツリーの外に残った提案を作る。
-func oracleWorkspace(t *testing.T) string {
+func goldenWorkspace(t *testing.T) string {
 	root := testkit.Workspace(t, "i0001", "i0001-01-01")
 	testkit.Git(t, root, "remote", "add", "origin", filepath.Join(root, "nowhere.git"))
 	home := testkit.Worktree(root, "i0001")
@@ -97,7 +97,7 @@ func oracleWorkspace(t *testing.T) string {
 }
 
 func TestMatchesGolden(t *testing.T) {
-	root := oracleWorkspace(t)
+	root := goldenWorkspace(t)
 	scratch := t.TempDir()
 	pyDir, goDir := filepath.Join(scratch, "py"), filepath.Join(scratch, "go")
 	restore, err := fsio.FixClock(fixedClock)
@@ -254,7 +254,7 @@ func TestMatchesGolden(t *testing.T) {
 		list = append(list, toPlain(e))
 	}
 	gotRead["ledger"] = []any{list, problem}
-	check("readPython", gotRead, want.ReadGo)
+	check("read", gotRead, want.ReadGo)
 }
 
 func writeMarks(t *testing.T, dir string) {

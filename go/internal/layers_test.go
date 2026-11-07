@@ -33,20 +33,20 @@ var topTiers = map[string]int{
 
 var subTiers = map[string]map[string]int{
 	"infra": {
-		// 0: 何も読まない土台（環境変数の名前・Python の表記・os.path の写しと OS の分岐）
+		// 0: 何も読まない土台（環境変数の名前・値の書式化・パスの扱いと OS の分岐）
 		"env":     0,
 		"pyfmt":   0,
 		"ospath":  0,
 		"digest":  0, // 16 進の要約と乱数（記録・バックアップの名前）
-		"difflib": 0, // Python の difflib の写し（見せる差分）
+		"difflib": 0, // 見せる差分（difflib の写し）
 		"golden":  0, // テストの見本（testdata の JSON）を読む。テストからだけ読む
 		// 1: 土台だけを読む
 		"pathcase":    1,
 		"pyjson":      1,
 		"platformtag": 1,
 		"yaml":        1,
-		"pyre":        1, // Python の re の写し（RE2 で書けない式を Python と同じ答えで読む）
-		"argparse":    1, // Python の argparse の写し（CLI の引数の読みと usage・エラーの文を Python と同じにする）
+		"pyre":        1, // re の写し（RE2 で書けない式を、ルールの書き手が想定する re と同じ答えで読む）
+		"argparse":    1, // argparse の写し（CLI の引数の読みと usage・エラーの文）
 		// 2: ファイル・設定・入出力・照合
 		"fsio":      2,
 		"config":    2,
@@ -160,6 +160,7 @@ func importsOf(t *testing.T) map[string][]string {
 		if err != nil {
 			return err
 		}
+		// テストの import は数えない。テストは本体より上の段のパッケージ（testkit など）を読んでよい。
 		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
@@ -174,6 +175,7 @@ func importsOf(t *testing.T) map[string][]string {
 				out[pkg] = append(out[pkg], rest)
 			}
 		}
+		// import が 1 つも無いパッケージも表の検査に載せるため、空の項目を作る。
 		if _, ok := out[pkg]; !ok {
 			out[pkg] = nil
 		}
@@ -194,6 +196,7 @@ func violation(from, to string) string {
 		}
 		return ""
 	}
+	// 最上位が同じなら、最初に名前が違う深さ d を探す。
 	d := 1
 	for d < len(fs) && d < len(ts) && fs[d] == ts[d] {
 		d++
@@ -211,16 +214,21 @@ func violation(from, to string) string {
 	return ""
 }
 
+// TestLayers は、全パッケージの import が段の表に沿うこと、表に載らないパッケージが無いことを確かめる。
+// 表に無いパッケージを黙って通すと、足した段が検査されないままになる。
 func TestLayers(t *testing.T) {
+	// テストはこのディレクトリ（go/internal）で走る。ここに infra が無ければ、相対パスの前提が崩れている。
 	if _, err := os.Stat("infra"); err != nil {
 		t.Fatal(err)
 	}
 	for pkg, deps := range importsOf(t) {
+		// 最上位の段の表に載っているか。
 		top := strings.Split(pkg, "/")[0]
 		if _, ok := topTiers[top]; !ok {
 			t.Errorf("%s: 段の表（topTiers）に無い", pkg)
 			continue
 		}
+		// 兄弟の表（subTiers）を持つ親の下にあるなら、その表にも載っているか。
 		parts := strings.Split(pkg, "/")
 		for d := 1; d < len(parts); d++ {
 			parent := strings.Join(parts[:d], "/")
@@ -230,6 +238,7 @@ func TestLayers(t *testing.T) {
 				}
 			}
 		}
+		// 読んでいる先が、同じ段か上でないか。
 		for _, dep := range deps {
 			if why := violation(pkg, dep); why != "" {
 				t.Errorf("%s → %s: %s", pkg, dep, why)

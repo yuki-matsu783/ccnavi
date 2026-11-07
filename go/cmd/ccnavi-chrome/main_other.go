@@ -22,6 +22,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "使い方: ccnavi-chrome <仮のツリーを組む空のディレクトリ>")
 		os.Exit(1)
 	}
+	// 仮のツリーの場所をリンクのない絶対パスにそろえる。答えに入るパスを、拡張の試験が見本と比べるときにぶれないようにする。
 	root, err := filepath.EvalSymlinks(os.Args[1])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "ccnavi-chrome:", err)
@@ -31,15 +32,18 @@ func main() {
 		fmt.Fprintln(os.Stderr, "ccnavi-chrome:", err)
 		os.Exit(1)
 	}
+	// 1 行が 1 要求。1 要求は snapshot を含むので大きく、既定の行の上限（64KB）では足りない。
 	in := bufio.NewScanner(os.Stdin)
 	in.Buffer(make([]byte, 64<<10), maxLine)
 	out := bufio.NewWriter(os.Stdout)
 	for in.Scan() {
+		// 空行は読み飛ばす。
 		line := in.Text()
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
 		fmt.Fprintln(out, chrome.Handle(line, root))
+		// 1 要求ごとに流す。呼び手は答えを待ってから次の要求を送る。
 		out.Flush()
 	}
 }

@@ -43,6 +43,7 @@ func init() {
 // Handle は要求 1 つに答える。root は仮のツリーを組む場所（WASM では仮想のファイルシステムの /ws、手元の試験では
 // 一時ディレクトリ）。失敗しても error にせず、答えの error で返す（拡張の Worker が止まらないように）。
 func Handle(request, root string) string {
+	// 要求の拒否（refusal）はその文面を、想定外の失敗は失敗の文を、答えの error に入れる。
 	body, err := answer(request, root)
 	var r *refusal
 	switch {
@@ -51,10 +52,12 @@ func Handle(request, root string) string {
 	case err != nil:
 		body = pyjson.NewObject("error", "ccnavi: 想定外の失敗で止まった: "+err.Error())
 	}
+	// schema を先頭のキーに置いて、本文のキーを続ける。拡張は schema で答えの形の版を確かめる。
 	out := pyjson.NewObject("schema", schema)
 	for _, k := range body.Keys() {
 		out.Set(k, body.Value(k))
 	}
+	// 日本語はエスケープせずそのまま出す（拡張の画面に出る文面で、JSON を読む側が変換し直さずに済む）。
 	text, err := pyjson.Dumps(out, pyjson.Options{RawUnicode: true})
 	if err != nil {
 		return fmt.Sprintf(`{"schema": %d, "error": "答えを JSON にできません"}`, schema)
@@ -63,6 +66,7 @@ func Handle(request, root string) string {
 }
 
 func answer(request, root string) (body *pyjson.Object, err error) {
+	// 操作の中の panic は、WASM のプロセスごと落とさずに失敗の答えにする。
 	defer func() {
 		if r := recover(); r != nil {
 			body, err = nil, fmt.Errorf("%v", r)
@@ -91,7 +95,7 @@ func text(req *pyjson.Object, key string) (string, bool) {
 	return v, ok
 }
 
-// integer は真偽を除いた整数。
+// integer は整数として読む。JSON の数は float64 で届くが、整数の欄に小数や真偽が入った要求は読まない。
 func integer(v any) (int, bool) {
 	switch v.(type) {
 	case bool, float64, nil, string:
@@ -117,7 +121,7 @@ func stringList(v any) ([]string, bool) {
 	return out, true
 }
 
-// orEmpty は値が空（Python で偽）なら空のリスト、そうでなければ文字列のリストとして読む。
+// orEmpty は値が空（nil・false・空文字・0）なら空のリスト、そうでなければ文字列のリストとして読む。
 func orEmpty(v any) ([]string, bool) {
 	if !pyfmt.Truthy(v) {
 		return []string{}, true
@@ -125,6 +129,7 @@ func orEmpty(v any) ([]string, bool) {
 	return stringList(v)
 }
 
+// orNull は nil のポインタを JSON の null にし、そうでなければ指す値にする。
 func orNull[T any](v *T) any {
 	if v == nil {
 		return nil
@@ -132,6 +137,7 @@ func orNull[T any](v *T) any {
 	return *v
 }
 
+// list は nil のスライスを空のスライスにする（JSON で null でなく [] として出すため）。
 func list[T any](xs []T) []T {
 	if xs == nil {
 		return []T{}

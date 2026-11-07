@@ -52,12 +52,14 @@ func operate(in *input, stdout, stderr io.Writer, conf *config.Settings, root st
 		io.WriteString(stderr, ticketControlOff)
 		return config.ExitError
 	}
+	// write-and-push を通らずに、取り込み済みの親子の状態を書こうとしていれば、何も書かずに止める。
 	if bypass := writeAndPushBypass(root, conf, a, cwd); bypass != "" {
 		fmt.Fprintf(stderr, "ccnavi: 親子のチケット %s は取り込み済み（write-and-push の対象）。状態の操作は '%s' か '%s' から"+
 			"実行してください。write-and-push を通らない書き込みは親のブランチへ送られないので、何も反映せずに中止しました。\n",
 			bypass, config.ScriptCommand(root, config.TicketWrapper), config.ScriptCommand(root, config.ReviewWrapper))
 		return config.ExitError
 	}
+	// ユーザの判断の操作（decide・close-early）を先に振り分ける。どれにも当たらなければ、`ticket`・`review` の動詞として読む。
 	reviewed, hasReviewed := a.Int("reviewed")
 	acceptUnresolved := a.Truthy("accept_unresolved")
 	switch {
@@ -176,6 +178,7 @@ func ticketOrReview(stdout, stderr io.Writer, conf *config.Settings, root string
 		}
 		return ""
 	}
+	// words は `<ticket|review> <動詞> <対象>…`。足りない語は空として扱う。
 	kind, verb, target := at(0), at(1), at(2)
 	number, hasPhase := a.Int("phase")
 	check := a.Truthy("check")
@@ -189,6 +192,7 @@ func ticketOrReview(stdout, stderr io.Writer, conf *config.Settings, root string
 			return core.ApprovalRequestGate(stderr, conf, root, idents)
 		}), nil
 	case kind == "ticket" && slices.Contains([]string{"start", "finish", "cancel"}, verb) && target != "":
+		// --check は副作用の前の検査だけ。cancel は理由を渡し、他の 2 つは対象だけを渡す。
 		switch {
 		case check:
 			// 副作用の前に分かる検査だけ。sh が取り込みやコミットの前に呼ぶ。
@@ -252,6 +256,7 @@ func ticketOrReview(stdout, stderr io.Writer, conf *config.Settings, root string
 		return core.CheckConfirm(stdout, stderr, conf, root, cwd, number), nil
 	case kind == "review" && verb == "ready" && check:
 		return closeout.CheckReady(stdout, stderr, conf, root, cwd), nil
+	// ここから下の review の操作は、リモートから取得した結果（--result）を受けて書く。
 	case kind == "review" && (verb == "requested" || verb == "confirm"):
 		if !hasPhase || a.Str("result") == "" {
 			fmt.Fprintf(stderr, "ccnavi: review %s には --phase <N> と --result <json> を指定してください。\n", verb)
@@ -285,6 +290,7 @@ func worktree(stdout, stderr io.Writer, conf *config.Settings, root string, a op
 	if len(words) > 1 {
 		verb = words[1]
 	}
+	// 1. 放棄した親の記録を消す形（retire --abandon）と、引数が名前だけで済む動詞（name・id・issue-id・branch・clean）。
 	if !a.IsNone("abandon") {
 		// 放棄した親の片付けの記録を消す。ユーザがターミナルで打つ（hook がエージェントからは止める）。
 		if !slices.Equal(words, []string{"worktree", "retire"}) || !ids.IsValidID(a.Str("abandon")) {
@@ -318,6 +324,7 @@ func worktree(stdout, stderr io.Writer, conf *config.Settings, root string, a op
 	case verb == "clean" && len(words) == 3:
 		return okIf(worktrees.RunClean(stdout, stderr, root, words[2], a.Truthy("preview")) == 0)
 	}
+	// 2. 親の識別子を取る動詞（drop・tidy・remaining・retire）。識別子の形を確かめてから、動詞ごとの処理へ渡す。
 	if !slices.Contains([]string{"drop", "tidy", "remaining", "retire"}, verb) || len(words) != 3 {
 		io.WriteString(stderr, worktreeUsage)
 		return config.ExitError
@@ -327,6 +334,7 @@ func worktree(stdout, stderr io.Writer, conf *config.Settings, root string, a op
 		fmt.Fprintf(stderr, "ccnavi: worktree %s の %s は有効な識別子の形式ではありません。\n", verb, pyfmt.Repr(target))
 		return config.ExitError
 	}
+	// drop はチケット制御が無くても打てる。ほかの動詞はチケットを読むので、チケット制御が要る。
 	if verb == "drop" {
 		return okIf(worktrees.RunDrop(stdout, root, target, cwd) == 0)
 	}

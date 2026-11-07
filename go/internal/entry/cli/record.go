@@ -26,6 +26,7 @@ const recordDir = "write-and-push"
 // コマンドが失敗しても、そこまでに書いたパスで一覧を書く（失敗した回も戻すのに一覧を使う）。一覧を書けなければ、
 // コマンドの結果に依らず 1 で終わる。
 func recordedRun(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts, unmarked *useronly.Verb) int {
+	// 1. 書き出し先を決めて検査する。書き出し先はワークスペースの既定の state の下だけ（行き着く先で比べる）。
 	wrapper := opts{maps.Clone(a.Namespace), a.parser}
 	if !oneWrapperFlagEach(stderr, wrapper) {
 		return config.ExitError
@@ -44,6 +45,7 @@ func recordedRun(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a
 	if p := a.Str("placed_out"); p != "" {
 		placedTarget = resolvedTarget(p)
 	}
+	// 一覧に書くパスの基準。`--record-tree` があればそのツリー、無ければワークスペースルート。
 	base := realRoot
 	if t := a.Str("record_tree"); t != "" {
 		base = realPath(ospath.Abspath(t))
@@ -58,10 +60,12 @@ func recordedRun(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a
 			movedState = realPath(conf.State)
 		}
 	}
+	// 2. 書き込みを記録しながら、本来の処理を通常の経路で走らせる。
 	recorder := fsio.StartRecording()
 	code := parsed(in, stdout, stderr, parser, a, unmarked)
 	written := recorder.Stop()
 
+	// 3. 書いたパスを、行き着く先で一覧にする。state の中と、一覧そのもの（と結果の控え）は載せない。
 	var lines strings.Builder
 	var reals []string
 	for _, path := range written {
@@ -83,6 +87,7 @@ func recordedRun(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a
 		fmt.Fprintf(stderr, "ccnavi: 反映したパスの一覧を %s に保存できませんでした (%s)\n", target, failed)
 		return config.ExitError
 	}
+	// 4. write-and-push がコミットするのは置き場の状態だけ。ほかの場所への書き込みがあれば、コミットさせずに止める。
 	if a.Str("record_tree") != "" {
 		if outside := outsidePlaces(root, a, base, reals); len(outside) > 0 {
 			fmt.Fprintf(stderr, "ccnavi: write-and-push がコミットするのは状態だけで、置き場の外に書き込みがあった（%s）。"+
@@ -133,6 +138,7 @@ func outsidePlaces(root string, a opts, base string, reals []string) []string {
 	return found
 }
 
+// anyInside は path が bases のどれかの下か。
 func anyInside(path string, bases []string) bool {
 	for _, b := range bases {
 		if inside(path, b) {
@@ -184,8 +190,8 @@ func writeRecordFile(target, text string) string {
 	if !same(realPath(directory), directory) {
 		return "書き出し先のディレクトリがリンクを含む"
 	}
-	// fsio の Atomic は差し替えた後の権限を素の open に戻すが、Python（mkstemp と os.replace）は 0600 のまま残す。
-	// 同じ権限にするため、ここは一時ファイルを手で作る。
+	// fsio の Atomic は差し替えた後の権限を素の open の権限に戻すが、ここは一時ファイルの 0600 のまま残したい
+	// （記録には絶対パスとコマンドが入る）。そのため、一時ファイルを手で作る。
 	f, err := os.CreateTemp(directory, ".record.*.part")
 	if err != nil {
 		return fsio.ErrorText(err)

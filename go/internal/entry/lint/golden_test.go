@@ -13,7 +13,7 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// Python の lint.report と lint.family_check を同じワークスペースに当て、出力（本文と --json）・終了コード・苦情が
+// Report と FamilyCheck をワークスペースに当て、出力（本文と --json）・終了コード・苦情が見本（testdata）と
 // 1 字も違わないことを見る。ワークスペースは苦情が出る形をまとめて作る。
 
 type reportRun struct {
@@ -45,7 +45,7 @@ func quietEnv(t *testing.T) {
 	}
 }
 
-// compare は Python と Go の答えを比べる。
+// compare は Go の答えを見本と比べる。
 func compare(t *testing.T, name, root string, runs []reportRun, family [][2]string) {
 	t.Helper()
 	if family == nil {
@@ -59,7 +59,7 @@ func compare(t *testing.T, name, root string, runs []reportRun, family [][2]stri
 			GuardCoreFiles: r.Core, JSON: r.JSON, Flow: r.Flow, Compat: want.Compat})
 		got := testkit.Rel(root, out.String())
 		if code != want.Runs[i].Code || got != want.Runs[i].Out {
-			t.Errorf("run %d (%+v): Go の答えが Python と違う\nGo (%d):\n%s\nPython (%d):\n%s", i, r, code, got, want.Runs[i].Code, want.Runs[i].Out)
+			t.Errorf("run %d (%+v): Go の答えが見本と違う\nGo (%d):\n%s\n見本 (%d):\n%s", i, r, code, got, want.Runs[i].Code, want.Runs[i].Out)
 		}
 	}
 	for i, f := range family {
@@ -69,7 +69,7 @@ func compare(t *testing.T, name, root string, runs []reportRun, family [][2]stri
 			got = append(got, []string{string(p.Severity), p.Rule, testkit.Rel(root, p.Detail)})
 		}
 		if !sameRows(got, want.Family[i]) {
-			t.Errorf("family %v: Go の答えが Python と違う\nGo:\n%v\nPython:\n%v", f, got, want.Family[i])
+			t.Errorf("family %v: Go の答えが見本と違う\nGo:\n%v\n見本:\n%v", f, got, want.Family[i])
 		}
 	}
 }
@@ -163,7 +163,7 @@ func TestReportTickets(t *testing.T) {
 	put(t, todo, "chore-2-x-03.md", testkit.ProposalParent("chore-2-x-03", plan))
 	put(t, todo, "feature-1-alpha-02-01.md",
 		testkit.ProposalChild("feature-1-alpha-02-01", "feature-1-alpha", "2", []string{"wip/design/*"}))
-	// 壊れた YAML は入れない（写しを取った PyYAML が libyaml の文を出したので、純 Python の読み手を写した infra/yaml の文と合わない）。
+	// 壊れた YAML は入れない（見本を取ったときの読み手が出した苦情の文が、infra/yaml の文と合わない）。
 	put(t, todo, "broken.md", "---\nticket: 1\n---\n")
 	stray := testkit.Worktree(root, "stray")
 	put(t, stray, "wip/proposals/todo/feature-3-moved.md", testkit.ProposalParent("feature-3-moved", plan))

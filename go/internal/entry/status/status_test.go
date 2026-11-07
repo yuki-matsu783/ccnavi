@@ -9,7 +9,7 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// Python の entry/status と同じワークスペースを読ませ、出力・標準エラー・終了コードが 1 字も違わないことを見る。
+// ワークスペースを読ませ、出力・標準エラー・終了コードが見本（testdata）と 1 字も違わないことを見る。
 // 置き場のファイルの git での姿（push 済み・未 push・変更あり・未コミット・追跡参照なし）、作業中・レビュー待ち・閉じた
 // （完了・取り消し）・承認待ち・改版・同じ識別子が 2 か所、先行の待ち、親子の引数の読み（子の識別子・無い親・2 件）を並べる。
 
@@ -44,7 +44,7 @@ func statusWorkspace(t *testing.T) string {
 	return root
 }
 
-func TestRunMatchesPython(t *testing.T) {
+func TestRunMatchesGolden(t *testing.T) {
 	root := statusWorkspace(t)
 	args := [][]string{{}, {"i0001"}, {"i0001-02-01"}, {"i0002"}, {"i0009"}, {"i0001", "i0002"}}
 	want := golden.Load[[][3]any](t, "run")

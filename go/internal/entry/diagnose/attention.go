@@ -7,6 +7,7 @@ import (
 // markAttention は各チケットに issues（不備の文）と attention（ユーザが動く必要があるか）を足す。ボードはこの 2 つを
 // 読むだけにする（判定と同じ答えを 2 か所で出さない）。
 func markAttention(rows []*ticketRow, parents []*parentRow, pending map[string]bool) {
+	// 親の有無を調べるための識別子の集合と、親の行を引く表。
 	ids := map[string]bool{}
 	for _, r := range rows {
 		ids[r.id] = true
@@ -41,6 +42,7 @@ func issues(r *ticketRow, ids map[string]bool) []string {
 // レビュー待ち、未着手・作業中の列なのにワークツリーが無い、実績のリスクが HIGH 以上、どれが正か決まらない、不備がある、
 // 親でフェーズのどれかが止まっている・レビュー待ち・リスクでレビュー必須。
 func attention(r *ticketRow, parents map[string]*parentRow, pending map[string]bool, hasIssues bool) bool {
+	// 自分の親子のチケットのフェーズ表を引く。子なら親の行、親なら自分の行。
 	isParent := r.parent == ""
 	family := parents[r.parent]
 	if isParent {
@@ -50,6 +52,7 @@ func attention(r *ticketRow, parents map[string]*parentRow, pending map[string]b
 	if family != nil {
 		list = family.phases
 	}
+	// 子は、自分のフェーズの行を探す。
 	var own *phaseRow
 	if !isParent {
 		for i := range list {

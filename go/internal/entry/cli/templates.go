@@ -142,10 +142,12 @@ func templatesUsage(a opts) string {
 // runTemplates は `--templates` の一覧・検索・表示と、下書きの作成。`--layer` を省けば、一覧と表示はワークスペース
 // 自身のレイヤー（共通 + self）。
 func runTemplates(stdout, stderr io.Writer, conf *config.Settings, root string, a opts) int {
+	// 1. 下書きを作る形（--draft）は、レイヤーの指定を使わずに先に分ける。
 	asJSON := a.Truthy("json")
 	if !a.IsNone("draft") {
 		return templateDraft(stdout, stderr, conf, root, a)
 	}
+	// 2. 対象のレイヤー（既定は自身のレイヤー）を確かめる。ファイルの検査（--check-file）だけは、共通レイヤーも指せる。
 	layer := ospath.Strip(cmpOr(a.Str("layer"), config.LayerSelf))
 	known := layerNames(conf, root)
 	if !a.IsNone("check_file") {
@@ -157,6 +159,7 @@ func runTemplates(stdout, stderr io.Writer, conf *config.Settings, root string, 
 	if !slices.Contains(known, layer) {
 		return failAnswer(stdout, stderr, asJSON, templates.JSONVersion, unknownLayer(layer, known))
 	}
+	// 3. 1 つの中身を見る形（--show）と、一覧の形。
 	scanned := templates.Load(conf, root)
 	if !a.IsNone("show") {
 		return showTemplate(stdout, stderr, conf, root, scanned, layer, ospath.Strip(a.Str("show")), asJSON)
@@ -167,6 +170,7 @@ func runTemplates(stdout, stderr io.Writer, conf *config.Settings, root string, 
 			keywords = append(keywords, k)
 		}
 	}
+	// 一覧には下書きも載せる。下書きにも絞り込みの語（keyword）を当てる。
 	found := drafts.Scan(conf, root, &scanned.Catalog).Drafts
 	rows := []any{}
 	for _, d := range found {
@@ -301,6 +305,7 @@ func listTemplates(w io.Writer, answer *pyjson.Object, layer string, filtered bo
 // templateDraft は完了した親から下書きを作る（`--draft`）。上書きはしない。効力は無いのでエージェントが打ってよい。
 func templateDraft(stdout, stderr io.Writer, conf *config.Settings, root string, a opts) int {
 	parent := ospath.Strip(a.Str("draft"))
+	// 下書きは既存のファイルを上書きしない。書けなければ why に理由が入り、made は nil になる。
 	made, why := drafts.Make(conf, root, drafts.Request{Parent: parent, Name: ospath.Strip(a.Str("name")),
 		To: drafts.Target(cmpOr(a.Str("to"), string(drafts.ToProject))), Layer: ospath.Strip(a.Str("layer"))})
 	if a.Truthy("json") {
@@ -354,6 +359,7 @@ func showTemplate(stdout, stderr io.Writer, conf *config.Settings, root string, 
 	if entry.Layer == config.LayerCommon {
 		entry = templates.Recheck(entry, templates.TypesFor(conf, root, layer), &scanned.Catalog)
 	}
+	// 共通レイヤーのテンプレートは、見ているレイヤーの定義で検査し直したものを見せる（使えない部分は「使わない」と添える）。
 	row := templates.EntryJSON(entry)
 	text, _ := fsio.DecodeBytes(yaml.TrimBOM(entry.Raw), fsio.Replace)
 	if asJSON {
@@ -361,6 +367,7 @@ func showTemplate(stdout, stderr io.Writer, conf *config.Settings, root string, 
 			"template", row.With("text", text)))
 		return config.ExitOK
 	}
+	// 文字の出力。見出し、計画（全体・フィードバック）、フロー、苦情、ファイルの中身の順。
 	w := stdout
 	fmt.Fprintf(w, "テンプレート: %s（%s）\n", jstr(row, "name"), jstr(row, "layer"))
 	fmt.Fprintf(w, "  置き場: %s\n", jstr(row, "path"))

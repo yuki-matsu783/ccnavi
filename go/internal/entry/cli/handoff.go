@@ -139,6 +139,7 @@ func handoffPlan(w io.Writer, plan *handoff.Plan, named bool, root string) {
 	if len(plan.Entries) == 0 {
 		fmt.Fprintln(w, "  取り込める下書きはありません。")
 	}
+	// 下書きごとに状態と、error・warn・差分を出す。選んだ下書き（*）だけ差分を付ける。
 	for _, e := range plan.Entries {
 		mark := " "
 		if e.Selected {
@@ -163,6 +164,7 @@ func handoffPlan(w io.Writer, plan *handoff.Plan, named bool, root string) {
 	if len(plan.Ignored) > 0 {
 		fmt.Fprintf(w, "対象外: %d 件（取り込める種類の表にヒットしない）\n", len(plan.Ignored))
 	}
+	// 選んだ対象が無い、または error があるときは、実行するコマンドを案内せず、何も反映していないと言って終える。
 	chosen := plan.Selected()
 	if len(chosen) == 0 {
 		fmt.Fprintln(w, "選んだ対象はありません。何も反映していません。")
@@ -172,6 +174,7 @@ func handoffPlan(w io.Writer, plan *handoff.Plan, named bool, root string) {
 		fmt.Fprintln(w, "選んだ対象に error があるため、取り込めません。直すか、パスを選び直してください。何も反映していません。")
 		return
 	}
+	// 取り込むコマンドの案内。パスを名指しで選んだときだけ、そのパスを引数に付ける。
 	command := config.ScriptCommand(root, useronly.UserScriptPrefix+"handoff.sh") + " "
 	if named {
 		rels := make([]string, len(chosen))
@@ -191,6 +194,7 @@ func handoffPlan(w io.Writer, plan *handoff.Plan, named bool, root string) {
 	}
 }
 
+// handoffApplied は取り込んだ結果を、取り込んだもの、削除した下書き、残した下書きの順に書く。
 func handoffApplied(w io.Writer, done *handoff.Applied) {
 	for _, e := range done.Applied {
 		fmt.Fprintf(w, "取り込んだ: %s（%s）\n", e.Rel, e.Kind.ID)

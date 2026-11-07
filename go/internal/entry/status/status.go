@@ -22,7 +22,7 @@ const (
 	pushScript = "ccnavi-user-push-approved.sh"
 )
 
-// 読み手が文の形で探すので、Python の文のまま置く。
+// 読み手が文の形で探すので、文面を変えない。
 const (
 	msgTooMany  = "ccnavi: ticket status に指定できる親チケットは1件のみです。\n"
 	msgNotFound = "ccnavi: 親 %s のチケットが見つからない（%s/ と %s/ の下を全ツリーで探した）\n"
@@ -64,6 +64,13 @@ func Run(stdout, stderr io.Writer, root string, conf *config.Settings, args []st
 	return run(stdout, stderr, root, conf, family)
 }
 
+// run は状態を出す。family が空なら作業中の親すべて、あればその親だけ。
+//
+// 処理フロー:
+//  1. 置き場の全チケット（作業中・レビュー待ち・閉じた・提案）を読む
+//  2. 識別子ごとにまとめ、出す親（family）を決める
+//  3. 親ごとに、子と手で動かされた子の状態を出す
+//  4. 送り終えていない操作を最後に出す
 func run(stdout, stderr io.Writer, root string, conf *config.Settings, family string) int {
 	raw := approval.ReadRaw(conf, root)
 	doing, notes := approval.Scan(conf, root, false, raw)
@@ -73,6 +80,7 @@ func run(stdout, stderr io.Writer, root string, conf *config.Settings, family st
 	notes = append(notes, more...)
 	proposals := approval.ReadProposals(conf, root, raw).Kept
 
+	// 識別子ごとのまとまり（entry）に、同じ識別子のチケットを集める。order は初めて出た順。
 	var order []*entry
 	entries := map[string]*entry{}
 	add := func(t *ticket.Ticket) {
@@ -106,6 +114,7 @@ func run(stdout, stderr io.Writer, root string, conf *config.Settings, family st
 		}
 	}
 
+	// 出す親を決める。指定があれば存在を確かめ、無ければ閉じていない状態のチケットがある親を名前順に出す。
 	var families []string
 	if family != "" {
 		if !slices.ContainsFunc(order, func(e *entry) bool { return e.home() == family }) {
@@ -158,6 +167,7 @@ func run(stdout, stderr io.Writer, root string, conf *config.Settings, family st
 			fmt.Fprintln(stdout, notice.Line(row))
 		}
 	}
+	// 親ごとに、親、子の順（同じ種類の中ではフェーズ番号、識別子の順）で出す。
 	for _, name := range families {
 		var members []*entry
 		for _, e := range order {
@@ -191,6 +201,7 @@ func run(stdout, stderr io.Writer, root string, conf *config.Settings, family st
 	return config.ExitOK
 }
 
+// boolKey は並べ替えの比較に使う。偽（親）を真（子）より前にする。
 func boolKey(b bool) int {
 	if b {
 		return 1

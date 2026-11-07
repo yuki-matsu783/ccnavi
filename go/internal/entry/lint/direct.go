@@ -68,6 +68,7 @@ func directRecords(root string, main tree.Tree, common, label string) []rules.Pr
 	if !ok {
 		return nil
 	}
+	// 実行時の判定が有効と読む記録の名前。ファイルがあっても、ここに入らないものは「有効な横作業」と言わない。
 	valid := map[string]bool{}
 	for _, r := range tree.DirectRecords(root, main) {
 		valid[r.Name] = true
@@ -79,6 +80,7 @@ func directRecords(root string, main tree.Tree, common, label string) []rules.Pr
 			continue
 		}
 		text, _ := fsio.ReadDiskText(path, fsio.Replace)
+		// 記録の壊れ方を調べる。版が違うか必須の欄が欠けていれば、取り込み先と起点を読めない。
 		fields := tree.ParseDirect(text)
 		where := directWhere(label, name)
 		var missing []string
@@ -101,6 +103,7 @@ func directRecords(root string, main tree.Tree, common, label string) []rules.Pr
 					"ユーザに確かめてから、記録を消して切り直すか、--adopt で引き取ります", tree.DirectDir, name, strings.Join(why, "、"))})
 			continue
 		}
+		// 壊れていない記録は、実体（ワークツリーとブランチ）が残っているかで言うことを分ける。
 		switch {
 		case !ospath.IsDir(tree.WorktreePath(root, name)) && !hasBranch(main.Root, name):
 			out = append(out, rules.Problem{Severity: rules.Info, Rule: where, Detail: fmt.Sprintf(
@@ -147,12 +150,14 @@ func directMarkers(common, label string) []rules.Problem {
 // directLeftovers は残った一時ワークツリーと専用の ref（info）。
 func directLeftovers(root string, main tree.Tree, label string) []rules.Problem {
 	var out []rules.Problem
+	// 取り込みの途中の一時ワークツリー。リポジトリごとの置き場に作られる。
 	tmp := ospath.Join(root, config.DirectTmpDir, notice.RepoKey(root, main.Root))
 	entries, _ := ospath.DiskListdir(tmp)
 	for _, entry := range entries {
 		out = append(out, rules.Problem{Severity: rules.Info, Rule: directWhere(label, entry), Detail: "一時ワークツリー（" +
 			ospath.Join(tmp, entry) + "）が残っています。integrate --abort か integrate-done が片付けます。中身を確かめずに消しません"})
 	}
+	// 専用の ref の名前は `<接頭辞>/<名前>/<種類>` の形。種類が取り込みの途中を表すものだけ言う。
 	listed := git.Run(main.Root, []string{"for-each-ref", "--format=%(refname)", directRefs}, git.Options{})
 	if !listed.OK() {
 		return out
@@ -180,6 +185,7 @@ func directUnrecorded(conf *config.Settings, root string, main tree.Tree, common
 		if !ospath.IsDir(work) || ospath.IsLink(work) {
 			continue
 		}
+		// 別のリポジトリのワークツリーや、リンクは言わない。共通の .git が同じものだけを、ここのワークツリーとみなす。
 		mine, ok := tree.CommonDir(work)
 		if !ok || pathcase.Fold(mine) != pathcase.Fold(common) {
 			continue
@@ -187,6 +193,7 @@ func directUnrecorded(conf *config.Settings, root string, main tree.Tree, common
 		if ospath.IsFile(ospath.Join(common, tree.DirectDir, name)) {
 			continue
 		}
+		// 直接作業として取り込める形のものだけ言う（DirectCheck が断る・決められないものは、直接作業ではない）。
 		here := tree.Tree{Name: name, Root: work, Project: main.Project, Kind: tree.KindWorktree}
 		if reason, unsure := integrate.DirectCheck(conf, root, here, time.Time{}); reason != "" || unsure {
 			continue

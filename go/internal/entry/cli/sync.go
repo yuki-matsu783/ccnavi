@@ -78,6 +78,8 @@ func syncTidy(stdout, stderr io.Writer, root string, conf *config.Settings, cwd,
 		return config.ExitError
 	}
 	// 片付けは MR のマージの後に走るので、合流と同じ期限で待つ。
+	// ブランチ名は sh から渡る。git の名前の規則に合い、`-` で始まらず（git のオプションと読まれない）、
+	// 親の識別子から作る名前と一致するものだけを扱う。
 	checked := git.Run(root, []string{"check-ref-format", "--branch", branchName}, git.Options{Timeout: git.MergeTimeout})
 	if branchName == "" || strings.HasPrefix(branchName, "-") || !checked.OK() {
 		fmt.Fprintf(stderr, "ccnavi: sync tidy のブランチ %s はブランチ名の形ではない\n", pyfmt.Repr(branchName))
@@ -89,6 +91,7 @@ func syncTidy(stdout, stderr io.Writer, root string, conf *config.Settings, cwd,
 			pyfmt.Repr(branchName), family, pyfmt.Repr(made))
 		return config.ExitError
 	}
+	// sh はワークスペース自身を self と呼ぶが、内部ではプロジェクト名を空で表す。
 	project := repo
 	if repo == selfRepo {
 		project = ""

@@ -24,7 +24,7 @@ func report(t *testing.T, asJSON bool) string {
 
 // 組み立ての sh を通さずに組んだとき（commit を埋めていない）の 2 つの形が、見本と
 // 1 字も違わない。
-func TestReportMatchesPython(t *testing.T) {
+func TestReportMatchesGolden(t *testing.T) {
 	want := golden.Load[map[string]string](t, "report")
 	if got := report(t, false); got != want["text"] {
 		t.Errorf("text:\n%s\n見本:\n%s", got, want["text"])

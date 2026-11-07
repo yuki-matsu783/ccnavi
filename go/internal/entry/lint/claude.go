@@ -47,16 +47,19 @@ var localForbidden = []string{
 	env.Mode,
 }
 
-// readSettingsFile は設定ファイルを JSON として読む。エラーの文は Python の str(exc) と同じ。
+// readSettingsFile は設定ファイルを JSON として読む。エラーの文は読み込みの error の文をそのまま使う。
 func readSettingsFile(root, rel string) (any, error) {
 	return fsio.ReadJSON(ospath.Join(root, rel))
 }
 
+// objectOf は JSON の値をオブジェクトとして読む。オブジェクトでなければ nil（nil への Value は nil を返すので、
+// 呼び手は形の違いを確かめずに辿れる）。
 func objectOf(v any) *pyjson.Object {
 	o, _ := v.(*pyjson.Object)
 	return o
 }
 
+// listOf は JSON の値を配列として読む。配列でなければ nil。
 func listOf(v any) []any {
 	l, _ := v.([]any)
 	return l
@@ -87,6 +90,7 @@ func stopReviewProblems(root string, conf *config.Settings) []rules.Problem {
 	if v := declared(conf.StopReview); v != "" && !modeIn(v, valid) {
 		warn(fmt.Sprintf("%s=%s。%s のどれでもないので%s として動いている", env.StopReview, v, joinModes(valid, "・"), config.DryRun))
 	}
+	// 登録の印（環境変数）と agent 型の Stop hook は、どちらか片方だけだと動かない。両方がそろっているかを見る。
 	hooks, fileFlag := stopReviewHooks(root)
 	// ターミナルの --lint には settings.json の env が渡らないので、settings.json の env も読む。
 	registered := conf.StopReviewAgent || fileFlag == "1"
@@ -129,6 +133,7 @@ func stopReviewHooks(root string) ([]string, string) {
 	if data == nil {
 		return nil, ""
 	}
+	// hooks.Stop は「グループの配列」で、各グループの hooks にコマンドや agent が並ぶ。ccnavi の prompt の目印で絞る。
 	var found []string
 	for _, group := range listOf(objectOf(data.Value("hooks")).Value("Stop")) {
 		for _, h := range listOf(objectOf(group).Value("hooks")) {
@@ -195,6 +200,7 @@ func projectSettings(root string) []rules.Problem {
 	if err != nil {
 		return []rules.Problem{{Severity: rules.Warn, Rule: whereProject, Detail: fmt.Sprintf("%s を読めない: %s", projectSettingsRel, fsio.ErrorText(err))}}
 	}
+	// env の CCNAVI_MODE を調べる。disable は監視する側が書けるファイルからの停止なので error、読めない値は enable 扱いと知らせる。
 	vars := objectOf(objectOf(data).Value("env"))
 	if vars == nil {
 		return nil
@@ -261,8 +267,8 @@ func binPath(root string, written any) []rules.Problem {
 			"（chmod +x %s）か、scripts/ccnavi-setup.sh を再実行してください", projectSettingsRel, env.EntryPath, path, path)}}
 }
 
-// executable は実行ビットのどれかが立っているか。os.access(X_OK) の近似で、持ち主以外にだけ立つ形は区別しない
-// （infra に os.access の写しが無いため）。
+// executable は実行ビットのどれかが立っているか。access(X_OK) のように呼んだ人が実行できるかまでは見ない。
+// 持ち主以外にだけ実行ビットが立つ形も、実行できる扱いにする。
 func executable(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.Mode().Perm()&0o111 != 0

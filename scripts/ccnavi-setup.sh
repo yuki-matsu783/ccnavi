@@ -1182,9 +1182,9 @@ fi
 # 行が無い配布先では索引が作られない。そこで、実行ファイルと同じ回に `**/ccnavi-index.jsonl` も足す。
 # 見出しは実行ファイルの塊と分ける。同じ見出しの下に置くと、何のための行かが分からなくなる。
 # `/` を含まない `ccnavi-index.jsonl` もどの階層にも該当するので、その行が既にあれば足さない。
-# `ccnavi-index.jsonl` を否定する行（`!**/ccnavi-index.jsonl`、`!docs/ccnavi-index.jsonl` など）があれば、ユーザは
-# 索引を追跡すると決めている。後ろに足すと git は後の行を優先するので、その否定を無効にして
-# しまう。この場合は足さずに、その旨を伝える（「揃っていない」には数えない）。
+# `ccnavi-index.jsonl` を否定する行（`!**/ccnavi-index.jsonl`、`!docs/ccnavi-index.jsonl` など）があっても、
+# 実行ファイル（catalog/docindex の addIgnore）と同じく末尾に足す。git は後の行を優先するので、足した行が勝つ。
+# 書いたあとに `git check-ignore` で効いたかを確かめ、効いていなければ知らせる（領域が否定の行より前にあるときなど）。
 # ccnavi が足した行は、目印の行で囲んだ 1 つの領域にまとめる。領域の中の各エントリは、コメント 1 行と、
 # その下の足す行のセット。領域を使い始める前の古い見出しブロックは、そのまま残す（移さない）。
 IGNORE_REGION_BEGIN="# ---ccnavi begin--- (scripts/ccnavi-setup.sh が管理する範囲)"
@@ -1230,8 +1230,8 @@ ignore_region_broken=""
 ignore_logs_negated=""
 # ユーザが scratchpad を否定している行（改行で終わる）。あれば /scratchpad は足さない。
 ignore_scratch_negated=""
-# ユーザが ccnavi-index.jsonl を否定している行（改行で終わる）。あれば索引の行は足さない。
-ignore_index_negated=""
+# 索引の行を足したのに git が索引を無視していないときの知らせ（改行で終わる）。空でなければ書いたあとに出す。
+ignore_index_ineffective=""
 # .gitignore の行を、比べやすい形で出す。CRLF の `\r` と行末の空白を取り除く。
 # ファイルが無ければ出力は空。
 gitignore_lines() {
@@ -1253,11 +1253,7 @@ if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 		ignore_bin_todo="/$BUILD_ROOT/$built/
 "
 	fi
-	negated=$(gitignore_lines | grep -E '^!.*(ccnavi-index|\*)\.jsonl$' || true)
-	if [ -n "$negated" ]; then
-		ignore_index_negated="$negated
-"
-	elif ! ignored_already "$INDEX_IGNORE_LINE" "ccnavi-index.jsonl"; then
+	if ! ignored_already "$INDEX_IGNORE_LINE" "ccnavi-index.jsonl"; then
 		ignore_index_todo="$INDEX_IGNORE_LINE
 "
 	fi
@@ -1483,10 +1479,6 @@ report_deploy() {
 	if [ -n "$ignore_todo" ]; then
 		printf '%s:\n' "$3"
 		printf '%s' "$ignore_todo" | sed 's/^/  /'
-	fi
-	if [ -n "$ignore_index_negated" ]; then
-		printf '.gitignore に ccnavi-index.jsonl を否定する行があり、ユーザが索引を追跡しているので %s は足していません:\n' "$INDEX_IGNORE_LINE"
-		printf '%s' "$ignore_index_negated" | sed 's/^/  /'
 	fi
 	if [ -n "$ignore_scratch_negated" ]; then
 		printf '.gitignore に scratchpad を否定する行があり、ユーザが追跡しているので %s は足していません:\n' "$SCRATCH_IGNORE_LINE"
@@ -2071,10 +2063,24 @@ if [ "$deploy_work" = yes ]; then
 			} >>"$root/.gitignore"
 		fi
 		rm -f "$ignore_ins" "$ignore_out"
+		# 索引の行を足したときは、git が索引を無視するようになったかを確かめる。否定の行が足した行より後ろに
+		# 残っていると効かない。直すのは人（否定の行を消すか、足した行を後ろへ動かす）。
+		# check-ignore の終了コードは、無視していれば 0、無視していなければ 1、git が使えないなどなら 128。1 のときだけ知らせる。
+		ignore_check=0
+		if [ -n "$ignore_index_todo" ]; then
+			git -C "$root" check-ignore -q -- ccnavi-index.jsonl 2>/dev/null || ignore_check=$?
+		fi
+		if [ "$ignore_check" -eq 1 ]; then
+			ignore_index_ineffective="$INDEX_IGNORE_LINE を足しましたが、git は ccnavi-index.jsonl をまだ無視していません。.gitignore に、足した行より後ろで索引を否定する行がないか確かめてください。
+"
+		fi
 	fi
 fi
 
 report_deploy '配った' '入れ替えた' '.gitignore に足した' '実行ビットを付けた'
+if [ -n "$ignore_index_ineffective" ]; then
+	printf '%s' "$ignore_index_ineffective"
+fi
 report_user_bin_path
 if [ -n "$launcher_mode_failed" ]; then
 	printf '実行ビットを付けられなかった振り分けの sh（hook が起動しません。chmod +x で付けてください）:\n'

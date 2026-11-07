@@ -73,7 +73,7 @@ func runGo(t *testing.T, root string, c diagCase) diagAnswer {
 	return diagAnswer{code, normalize(root, o.String()), normalize(root, e.String())}
 }
 
-// compare は cases を Python と Go で回して、1 件ずつ突き合わせる。
+// compare は cases を Go で回して、1 件ずつ見本（testdata）と突き合わせる。
 func compare(t *testing.T, name, root string, cases []diagCase) {
 	t.Helper()
 	sent := make([]diagCase, len(cases))
@@ -87,7 +87,7 @@ func compare(t *testing.T, name, root string, cases []diagCase) {
 	for i, c := range sent {
 		got := runGo(t, root, c)
 		if got != want[i] {
-			t.Errorf("%s %s %q:\nGo:\n%d\n%s\n%s\nPython:\n%d\n%s\n%s", c.Kind, c.Tool, cases[i].Subject,
+			t.Errorf("%s %s %q:\nGo:\n%d\n%s\n%s\n見本:\n%d\n%s\n%s", c.Kind, c.Tool, cases[i].Subject,
 				got.Code, got.Stdout, got.Stderr, want[i].Code, want[i].Stdout, want[i].Stderr)
 		}
 	}
@@ -160,7 +160,7 @@ func rulesWorkspace(t *testing.T) string {
 	return root
 }
 
-func TestTryMatchesPython(t *testing.T) {
+func TestTryMatchesGolden(t *testing.T) {
 	root := rulesWorkspace(t)
 	var cases []diagCase
 	for _, c := range []diagCase{
@@ -189,7 +189,7 @@ func TestTryMatchesPython(t *testing.T) {
 	compare(t, "try", root, cases)
 }
 
-func TestExpectationsMatchPython(t *testing.T) {
+func TestExpectationsMatchGolden(t *testing.T) {
 	root := rulesWorkspace(t)
 	compare(t, "expectations", root, []diagCase{
 		{Kind: "expect", Path: rootMark + "/expect.yml"},
@@ -199,7 +199,7 @@ func TestExpectationsMatchPython(t *testing.T) {
 	})
 }
 
-func TestStopWithoutRulesMatchesPython(t *testing.T) {
+func TestStopWithoutRulesMatchesGolden(t *testing.T) {
 	root := testkit.Workspace(t)
 	compare(t, "stop-empty", root, []diagCase{{Kind: "test", Tool: "Stop", Subject: "(stop)"}})
 }
@@ -235,7 +235,7 @@ func boardWorkspace(t *testing.T) string {
 	return root
 }
 
-func TestBoardAndExplainMatchPython(t *testing.T) {
+func TestBoardAndExplainMatchGolden(t *testing.T) {
 	root := boardWorkspace(t)
 	compare(t, "board", root, []diagCase{
 		{Kind: "board"},

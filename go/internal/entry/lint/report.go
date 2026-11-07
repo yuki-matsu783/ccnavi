@@ -81,6 +81,7 @@ var (
 // モードと戻す働きの解決は判定と同じ関数に任せる。別に書くと、検証は通ったのに実運用では違う値になる。
 // 苦情は受け皿で拾い、出どころを取り違えないよう受け皿を分けて深刻度を付け直す。
 func Report(stdout io.Writer, o Options) int {
+	// 1. モードと切り替えを解く。解くときの苦情は、受け皿ごとに集めて後で警告にする（出どころを取り違えないため）。
 	conf, root := o.Conf, o.Root
 	var complaints strings.Builder
 	mode := config.ResolveMode(&complaints, o.Mode, conf)
@@ -91,6 +92,7 @@ func Report(stdout io.Writer, o Options) int {
 	var unwatchedSaid strings.Builder
 	guardUnwatched := selfguard.Resolve(&unwatchedSaid, "", conf.GuardUnwatched, env.GuardUnwatched, selfguard.GateChoices())
 
+	// 2. 検査を集める。フローを指定されたときだけ、フローの検査も足す。
 	problems := collect(conf, root, o.Notes, mode, complaints.String(), o.Compat)
 	var read flowRead
 	var catalog flow.Catalog
@@ -100,6 +102,7 @@ func Report(stdout io.Writer, o Options) int {
 		found, read = flowProblems(o.Flow, root, &catalog)
 		problems = append(problems, found...)
 	}
+	// 3. 切り替えの書き誤りと、止めない値になっていることを足す。
 	problems = append(problems, saidLines(said.String(), whereRestore)...)
 	problems = append(problems, saidLines(unwatchedSaid.String(), whereUnwatched)...)
 	problems = append(problems, switchProblems(conf, guardUnwatched)...)
@@ -108,6 +111,7 @@ func Report(stdout io.Writer, o Options) int {
 	problems = append(problems, gate(env.RestoreIfDeny, restoreIfDeny, mode, restoreVoice)...)
 	problems = append(problems, stopReviewProblems(root, conf)...)
 
+	// 4. 深刻度ごとに数え、error が 1 件でもあれば失敗の終了コードにする（CI を落とすのは error だけ）。
 	counts := map[rules.Severity]int{}
 	for _, p := range problems {
 		counts[p.Severity]++
@@ -121,6 +125,7 @@ func Report(stdout io.Writer, o Options) int {
 		return code
 	}
 
+	// 5. 人が読む本文。いまの設定の要約を先に出し、苦情を続け、最後に件数を出す。
 	w := func(format string, a ...any) { fmt.Fprintf(stdout, format, a...) }
 	w("ccnavi: 設定を検証する\n")
 	w("  ルール: %s\n", conf.Rules)
@@ -148,6 +153,7 @@ func Report(stdout io.Writer, o Options) int {
 	return code
 }
 
+// writeJSON は拡張が読む JSON を書く。キーの並びと indent は契約の一部。
 func writeJSON(stdout io.Writer, o Options, mode config.Mode, problems []rules.Problem, counts map[rules.Severity]int,
 	read flowRead, catalog flow.Catalog) {
 	projects := []any{}
@@ -200,6 +206,7 @@ func saidLines(text, where string) []rules.Problem {
 // declared は書かれた切り替えの値を、判定と同じく前後の空白を落とし小文字にして読む。
 func declared(value string) string { return pyfmt.Lower(ospath.Strip(value)) }
 
+// modeIn は value が choices のどれかの名前か。
 func modeIn(value string, choices []config.Mode) bool {
 	for _, c := range choices {
 		if string(c) == value {
@@ -209,6 +216,7 @@ func modeIn(value string, choices []config.Mode) bool {
 	return false
 }
 
+// joinModes は choices の名前を sep でつなぐ。
 func joinModes(choices []config.Mode, sep string) string {
 	names := make([]string, len(choices))
 	for i, c := range choices {

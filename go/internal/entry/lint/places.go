@@ -36,6 +36,7 @@ const shSpecial = " \t\n'\"\\$`!*?[](){}<>|&;#~"
 // 無視されているかを見る（置き場のディレクトリが在るときだけ。無いのはプロジェクトを使わないワークスペース）。
 // 予約名のプロジェクト（error）と、プロジェクトの中のワークツリー（warn）も言う。
 func projectPlaces(conf *config.Settings, root string) []rules.Problem {
+	// 1. 置き場が索引に載っているか、載っていなければ無視されているかを見る。
 	var out []rules.Problem
 	rel := projectsRel(conf, root)
 	indexed, isIndexed := "", false
@@ -53,6 +54,7 @@ func projectPlaces(conf *config.Settings, root string) []rules.Problem {
 				Kind: kindProjectsUnignored})
 		}
 	}
+	// 2. プロジェクトごとの検査。予約名のプロジェクトはレイヤーとして数えないので error にする。
 	quoted := make([]string, len(config.ReservedLayerNames()))
 	for i, name := range config.ReservedLayerNames() {
 		quoted[i] = "`" + name + "`"
@@ -76,6 +78,7 @@ func projectPlaces(conf *config.Settings, root string) []rules.Problem {
 // misplacedWorktrees はプロジェクトの中の `.claude/worktrees/` にあるワークツリー（warn。承認の走査の対象外で、そこに
 // 書いた提案は承認待ちに並ばない）。プロジェクトの ccnavi-common.sh のコピーをルートと取り違えて着手するとこの形になる。
 func misplacedWorktrees(project tree.Tree, where string) []rules.Problem {
+	// ディレクトリだけを数える（ファイルは置き場の飾りで、ワークツリーではない）。
 	base := tree.WorktreesPath(project.Root)
 	entries, err := ospath.DiskListdir(base)
 	if err != nil {
@@ -125,6 +128,7 @@ func indexUnder(root, rel string) (string, []string, bool) {
 	if code != 0 {
 		return "", nil, false
 	}
+	// -z の出力は `<mode> <object> <stage>\t<path>` を NUL でつないだもの。mode が gitlink のものだけを別に集める。
 	firstFile := ""
 	var links []string
 	seen := map[string]bool{}
@@ -146,7 +150,7 @@ func indexUnder(root, rel string) (string, []string, bool) {
 }
 
 // shWord は案内のコマンドに載せるパスを、sh で 1 語として読める表記にする。割れる文字を含まなければそのまま、
-// 含めば `'…'` で囲み、中の `'` は `'\”` に置く。導入スクリプトの sh_word と 1 字違わず同じ表記にする。
+// 含めば `'…'` で囲み、中の `'` は、引用を閉じて `\'` を挟み、また開く形に置き換える。導入スクリプトの sh_word と 1 字違わず同じ表記にする。
 func shWord(path string) string {
 	if !strings.ContainsAny(path, shSpecial) {
 		return path
@@ -162,6 +166,7 @@ func inIndex(root, rel string) (string, bool) {
 	if !ok {
 		return "", false
 	}
+	// 通常のファイルがあるとき（ぶつかり）と、gitlink だけのとき（載せ忘れ）で、直し方が逆になる。
 	lead := fmt.Sprintf(trackedLead, rel)
 	if firstFile != "" {
 		text := fmt.Sprintf("%s（例: `%s`）。ccnavi はワークスペース直下の `%s/` をプロジェクトの置き場として使い、名前は変えられない。"+
@@ -198,6 +203,7 @@ func inIndex(root, rel string) (string, bool) {
 // ticketPlaces は走査されないチケットの置き場（ワークスペースの `wip/<名前>/proposals/`）が残っていないか。提案があっても
 // 画面にもボードにも出ず、気づかないうちに消えるので名指しする。判定は動いているので warn。
 func ticketPlaces(conf *config.Settings, root string) []rules.Problem {
+	// チケットの置き場のパス（例 `wip/<名前>/proposals`）を要素に分け、名前を挟む位置を決める。
 	var parts []string
 	for _, p := range strings.Split(conf.Tickets, "/") {
 		if p != "" {
@@ -220,6 +226,7 @@ func ticketPlaces(conf *config.Settings, root string) []rules.Problem {
 	if where == "" {
 		where = "(無し)"
 	}
+	// 先頭の下にある兄弟のうち、提案の置き場の形をしているものを探す。tail[0] と同じ名前は、走査される本来の置き場なので飛ばす。
 	names, err := ospath.DiskListdir(ospath.Join(root, head))
 	if err != nil {
 		return nil
@@ -245,6 +252,7 @@ func ticketPlaces(conf *config.Settings, root string) []rules.Problem {
 
 // isIgnored はこのパスをワークスペースの git が無視しているか。git が無い・答えが読めなければ known が偽。
 func isIgnored(root, rel string) (ignored, known bool) {
+	// check-ignore の終了コードは、無視していれば 0、していなければ 1。それ以外（128 など）は答えが読めない。
 	done := git.Run(root, []string{"check-ignore", "-q", rel}, git.Options{Timeout: git.StateTimeout})
 	if done.Failure != nil {
 		return false, false

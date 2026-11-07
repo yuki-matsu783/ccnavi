@@ -10,14 +10,14 @@ import (
 	"testing"
 )
 
-// 一覧は Python の cli_usage.OVERVIEW と同じ（testdata/overview.txt は Python で書き出した）。幅は符号位置で数える。
-func TestOverviewMatchesPython(t *testing.T) {
+// 一覧が testdata/overview.txt と一致する。幅は符号位置で数える。
+func TestOverviewMatchesGolden(t *testing.T) {
 	want, err := os.ReadFile(filepath.Join("testdata", "overview.txt"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := overview(); got != string(want) {
-		t.Errorf("overview が Python と違う:\n%s", got)
+		t.Errorf("overview が testdata と違う:\n%s", got)
 	}
 	if n := len(strings.Split(strings.TrimSuffix(overview(), "\n"), "\n")); n >= 40 {
 		t.Errorf("一覧が %d 行（40 行未満にする）", n)

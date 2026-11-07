@@ -112,8 +112,10 @@ type closure struct {
 	over      bool
 }
 
+// ident はブランチ名 name の親子のチケットの識別子。無ければ空。
 func (c *closure) ident(name string) string { s, _ := c.idents.Value(name).(string); return s }
 
+// message は広がりすぎたときの、拡張に見せる文面。広がりすぎでなければ空。
 func (c *closure) message() string {
 	if !c.over {
 		return ""
@@ -123,6 +125,7 @@ func (c *closure) message() string {
 		familyLimit, strings.Join(c.families, ", "))
 }
 
+// json は拡張へ返す閉包の答え。広がりすぎたときは、読み足しを頼んでも終わらないので need を空にする。
 func (c *closure) json() *pyjson.Object {
 	need := c.need
 	if c.over {
@@ -143,6 +146,8 @@ func (c *closure) ambiguousProblem() string {
 		"どれを正とするか決まらないので、この親子のチケットは判定しません"
 }
 
+// closure は family から始めて、先行を幅優先で辿る。親子のチケットの識別子とブランチ名が食い違う（rivals）ときは
+// 両方を調べる対象にする。辿る先のブランチが snapshot に無ければ need に入れ、拡張が読んでから呼び直す。
 func (s *snapshot) closure(family string, hints map[string]string) (*closure, error) {
 	closed := s.closed()
 	owners := s.identBranches()
@@ -160,6 +165,7 @@ func (s *snapshot) closure(family string, hints map[string]string) (*closure, er
 			}
 		}
 	}
+	// 幅優先で先行を辿る。閉じた親子のチケットで止まり、辿った先は families に足す。
 	queue := []string{family}
 	for len(queue) > 0 {
 		name := queue[0]
@@ -184,6 +190,8 @@ func (s *snapshot) closure(family string, hints map[string]string) (*closure, er
 					}
 					continue
 				}
+				// 先行の親子のチケットのブランチ名を決める。snapshot の中で持ち主が 1 本に決まればそれ、
+				// 無ければ拡張のヒント、それも無ければ識別子と同じ名前とみなす。
 				next := fam
 				if len(owned) == 1 {
 					next = owned[0]
@@ -199,6 +207,7 @@ func (s *snapshot) closure(family string, hints map[string]string) (*closure, er
 			}
 		}
 	}
+	// 上限を超えたら判定しない。辿った分のうち、ホストが読めなかったブランチは absent で知らせる。
 	c.over = len(c.families) > familyLimit
 	for _, name := range c.families {
 		if s.isAbsent(name) && !slices.Contains(c.absent, name) {
@@ -209,6 +218,7 @@ func (s *snapshot) closure(family string, hints map[string]string) (*closure, er
 	return c, nil
 }
 
+// opClosure は closure 操作。要求の family から辿った閉包を返す。
 func opClosure(req *pyjson.Object, _ string) (*pyjson.Object, error) {
 	s, err := readSnapshot(req)
 	if err != nil {
@@ -261,7 +271,7 @@ func (s *snapshot) unreadable(c *closure) string {
 		"この親子チケットは判定できません。手元で `--agree --preview --verify` を実行して確認してください。"
 }
 
-// uniqueNames は並びを保ったまま重なりを除く（Python の dict.fromkeys）。
+// uniqueNames は並びを保ったまま重なりを除く。
 func uniqueNames(names []string) []string {
 	var out []string
 	for _, n := range names {

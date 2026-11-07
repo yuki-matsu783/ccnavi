@@ -92,31 +92,3 @@ func Shape(t *testing.T, root string) map[string]any {
 		"branches":  strings.Fields(Git(t, root, "branch", "--format=%(refname:short)")),
 	}
 }
-
-// shapePy は Shape と同じ形を組む Python の関数 shape(root) のソース。どこからも参照されていない。
-const shapePy = `
-def shape(root):
-    import os, subprocess
-    skip = ("remote.git", "logs", ".ccnavi/messages")
-    files = []
-    for base, dirs, names in os.walk(root):
-        at = os.path.relpath(base, root).replace(os.sep, "/")
-        kept = []
-        for d in dirs:
-            r = d if at == "." else at + "/" + d
-            if d == ".git" or r in skip:
-                continue
-            kept.append(d)
-            files.append(r + "/")
-        dirs[:] = kept
-        for n in names:
-            r = n if at == "." else at + "/" + n
-            if n == ".git" or r in skip:
-                continue
-            files.append(r)
-    files.sort()
-    def git(*args):
-        return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True).stdout
-    return {"files": files, "worktrees": git("worktree", "list", "--porcelain").replace(root, "<root>"),
-            "branches": git("branch", "--format=%(refname:short)").split()}
-`

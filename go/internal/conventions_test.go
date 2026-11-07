@@ -24,14 +24,17 @@ var envReaders = map[string]bool{"Getenv": true, "LookupEnv": true, "Setenv": tr
 
 const envPackage = "infra/env"
 
+// TestEnvNamesOnlyInEnvPackage は、本体のコードが環境変数の名前を直に書いていないことを確かめる。
 func TestEnvNamesOnlyInEnvPackage(t *testing.T) {
 	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
+		// テストは対象外（テストは環境を組むために名前を書いてよい）。
 		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
+		// 名前を定義する infra/env 自身は除く。
 		if filepath.ToSlash(filepath.Dir(path)) == envPackage {
 			return nil
 		}
@@ -41,6 +44,7 @@ func TestEnvNamesOnlyInEnvPackage(t *testing.T) {
 			return err
 		}
 		ast.Inspect(f, func(n ast.Node) bool {
+			// os.Getenv("…") のような呼び出しの第 1 引数の直書きを見る。名前の形に合わない短い名前（PATH など）もここで拾う。
 			if call, ok := n.(*ast.CallExpr); ok && len(call.Args) > 0 {
 				if sel, ok := call.Fun.(*ast.SelectorExpr); ok && envReaders[sel.Sel.Name] {
 					pkg, isIdent := sel.X.(*ast.Ident)
@@ -51,6 +55,7 @@ func TestEnvNamesOnlyInEnvPackage(t *testing.T) {
 					}
 				}
 			}
+			// どの位置の文字列でも、ccnavi / Claude Code の環境変数の名前の形なら直書きとみなす。
 			lit, ok := n.(*ast.BasicLit)
 			if !ok || lit.Kind != token.STRING {
 				return true

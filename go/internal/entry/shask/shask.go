@@ -32,9 +32,9 @@ import (
 // head は答えの頭の行。
 const head = "tree 1"
 
-// answer は yes・no で答える行の値である。unreadable は、置き場に名前のファイルが在るのに frontmatter を読めず、
-// 親かどうかを決められなかったことを表す。止める側の検査は親として、ツリーを動かす側は親でないとして扱う。
-// どちらとして扱うかは呼ぶ側が決める。
+// answer は yes・no で答える行の値。unreadable は、置き場に名前のファイルが在るのに frontmatter を読めず、
+// 親かどうかを決められなかったことを表す。止める側の検査は親として、ツリーを動かす側は親でないとして扱う
+// （どちらにするかは sh が決める。ここでは決めない）。
 type answer string
 
 const (
@@ -43,6 +43,7 @@ const (
 	unreadable answer = "unreadable"
 )
 
+// yesNo は真偽を yes・no にする。
 func yesNo(b bool) answer {
 	if b {
 		return yes
@@ -64,6 +65,8 @@ func Answer(stdout, stderr io.Writer, root string, conf *config.Settings, comman
 	if len(command) < 3 || command[0] != "tree" {
 		return 0, false
 	}
+	// 問いの名前と引数の数が合うものだけ答える。合わなければ、cli がほかの形として読めるよう何も書かずに返す。
+	// ok が偽（引数の誤り）のときは、答えの行を書かずに終了コード 1 にする。sh は頭の行が無いことを「答えられなかった」と読む。
 	verb, args := command[1], command[2:]
 	var ok bool
 	switch {
@@ -88,6 +91,7 @@ func Answer(stdout, stderr io.Writer, root string, conf *config.Settings, comman
 	return config.ExitError, true
 }
 
+// identOK は名前が識別子の形か。違えば標準エラーに理由を書く。
 func identOK(stderr io.Writer, verb, value string) bool {
 	if ids.IsValidFamily(value) {
 		return true
@@ -96,6 +100,7 @@ func identOK(stderr io.Writer, verb, value string) bool {
 	return false
 }
 
+// treeOK はツリーのパスがディレクトリか。違えば標準エラーに理由を書く。
 func treeOK(stderr io.Writer, verb, path string) bool {
 	if path != "" && ospath.IsDir(path) {
 		return true
@@ -113,6 +118,7 @@ func treeOf(root string, conf *config.Settings, path, name string) tree.Tree {
 	return tree.Tree{Name: name, Root: full, Project: owner.Project, Kind: tree.KindWorktree}
 }
 
+// projectsDir はプロジェクトの置き場の絶対パス。
 func projectsDir(root string, conf *config.Settings) string {
 	if conf.Projects == "" || ospath.IsAbs(conf.Projects) {
 		return conf.Projects
@@ -120,12 +126,14 @@ func projectsDir(root string, conf *config.Settings) string {
 	return ospath.Join(root, conf.Projects)
 }
 
+// underWorktrees は path が `.claude/worktrees/` の下か（大文字小文字を畳んで比べる）。
 func underWorktrees(root, path string) bool {
 	base := pathcase.Fold(ospath.Normpath(tree.WorktreesPath(root)))
 	full := pathcase.Fold(ospath.Normpath(ospath.Abspath(path)))
 	return strings.HasPrefix(full, base+ospath.Sep)
 }
 
+// writeLines は行を 1 行ずつ、最後も改行で終えて書く。
 func writeLines(w io.Writer, lines ...string) {
 	fmt.Fprint(w, strings.Join(lines, "\n")+"\n")
 }
@@ -135,6 +143,7 @@ func parentTree(stdout, stderr io.Writer, root string, conf *config.Settings, pa
 	if !identOK(stderr, "tree parent", name) || !treeOK(stderr, "tree parent", path) {
 		return false
 	}
+	// 置き場（提案と承認済み）から、親か・承認済みか・着手済みか・MR の番号を読む。
 	work := treeOf(root, conf, path, name)
 	held := holdsParent(conf, work)
 	approved, mr, started := approvedParent(conf, work)
@@ -181,6 +190,8 @@ func leftoverTree(stdout, stderr io.Writer, root string, conf *config.Settings, 
 	if !identOK(stderr, "tree leftover", name) || !treeOK(stderr, "tree leftover", path) {
 		return false
 	}
+	// 親の置き場（doing・todo・review）を順に見て、残っているものを集める。
+	// doing は承認済みの置き場なので提案ではない（held が偽）。todo と review は提案の置き場。
 	work := treeOf(root, conf, path, name)
 	approvedDir := conf.ApprovedDir(work.Root)
 	proposal, mr := no, ""
@@ -207,6 +218,7 @@ func leftoverTree(stdout, stderr io.Writer, root string, conf *config.Settings, 
 			mr = mrOf(front)
 		}
 	}
+	// 段階は doing、review、todo の順で最初に見つかったもの（doing に在れば、改版の提案が todo にあっても doing）。
 	stage := none
 	for _, s := range []place.State{place.Doing, place.Review, place.Todo} {
 		if found[s] {
@@ -214,6 +226,7 @@ func leftoverTree(stdout, stderr io.Writer, root string, conf *config.Settings, 
 			break
 		}
 	}
+	// 親のワークツリーと言える材料があるときだけ、作業中の子を数える（親でないツリーに案内を出さないため）。
 	doing := 0
 	if proposal == yes || mr != "" || holdsParent(conf, work) == yes {
 		doing = childrenInDoing(approvedDir, name)
@@ -318,6 +331,7 @@ func handoffPendingTree(stdout, stderr io.Writer, path string, start []string) b
 	return true
 }
 
+// frontOfText は本文の frontmatter を対応表として読む。読めなければ nil。
 func frontOfText(text string) *yaml.Map {
 	front, err := ticket.FrontMapping(text)
 	if err != nil {

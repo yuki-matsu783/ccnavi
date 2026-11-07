@@ -53,6 +53,7 @@ type Call struct {
 	Cwd, PermissionMode, AgentID string
 }
 
+// given は打つ側が payload の欄を 1 つでも指定したか。指定したときだけ、結果に payload の欄を付ける。
 func (c Call) given() bool { return c.Cwd != "" || c.PermissionMode != "" || c.AgentID != "" }
 
 // permissionModes は --permission-mode に渡せる名前。判定は知らない名前を ask にするが、試験で打ち間違えた名前を
@@ -78,6 +79,7 @@ type payload struct {
 	cwd, permissionMode, agentID string
 }
 
+// payload は判定に渡す payload の欄を決める。Cwd が空ならワークスペースルート、あれば絶対パスにそろえる。
 func (c Call) payload(root string) payload {
 	cwd := root
 	if c.Cwd != "" {
@@ -86,6 +88,7 @@ func (c Call) payload(root string) payload {
 	return payload{cwd: cwd, permissionMode: c.PermissionMode, agentID: c.AgentID}
 }
 
+// object は `--test --json` の payload の欄。
 func (p payload) object() *pyjson.Object {
 	return pyjson.NewObject("cwd", p.cwd, "permission_mode", p.permissionMode, "agent_id", p.agentID)
 }
@@ -98,6 +101,7 @@ type Hit struct {
 	form
 }
 
+// object は `--test --json` の rules の 1 件。
 func (h Hit) object() *pyjson.Object {
 	return h.put(pyjson.NewObject("id", h.ID, "source", string(h.source), "section", string(h.section)))
 }
@@ -116,6 +120,7 @@ type Result struct {
 	payload *payload
 }
 
+// hitObjects は Hit の並びを JSON の配列にする。
 func hitObjects(hits []Hit) []any {
 	out := make([]any, len(hits))
 	for i, h := range hits {
@@ -124,6 +129,7 @@ func hitObjects(hits []Hit) []any {
 	return out
 }
 
+// put は結果を o の末尾に足す。キーの並びは拡張との契約。
 func (r Result) put(o *pyjson.Object) *pyjson.Object {
 	for _, kv := range [][2]any{
 		{"known", r.known}, {"tool", r.tool}, {"subject", r.subject}, {"resolved", r.resolved},
@@ -141,6 +147,7 @@ func (r Result) put(o *pyjson.Object) *pyjson.Object {
 	return o
 }
 
+// known は判定が対象を取り出せるツールか（ターンの終わりの試しか、対象の欄を持つツール）。
 func known(tool string) bool { return tool == rules.StopMatch || rules.SubjectFieldOf(tool) != "" }
 
 // TryOne は 1 件を判定して、結果とすべての理由を返す。文字と JSON の両方がここを読む（読み手ごとに判定を呼び直すと、
@@ -157,6 +164,7 @@ func TryOne(stderr io.Writer, conf *config.Settings, root, tool, subject string,
 		return tryStop(&trial, root, out), nil
 	}
 
+	// 本番の hook が受け取る payload と同じ形の入力を組み、判定の本体をそのまま呼ぶ。
 	used := call.payload(root)
 	in := hookio.Input{
 		Event:          hookio.PreToolUse,
@@ -166,6 +174,7 @@ func TryOne(stderr io.Writer, conf *config.Settings, root, tool, subject string,
 		PermissionMode: used.permissionMode,
 		AgentID:        used.agentID,
 	}
+	// 記録は書かず、判定が埋めた中身（決定・理由・ヒットしたルール）を読むために渡す。
 	record := &audit.Record{Mode: config.Enable, PermissionMode: in.PermissionMode, Event: string(in.Event), Tool: tool,
 		Subject: rules.SubjectOf(in)}
 	// 応答は拾ってそのまま見せる。ここで文を組み直すと、試験で読んだ文とエージェントに届く文が違うものになる。
@@ -175,6 +184,7 @@ func TryOne(stderr io.Writer, conf *config.Settings, root, tool, subject string,
 		return out, err
 	}
 
+	// 判定が記録に書いた内容を、結果に移す。決定が空なら、どのルールも止めなかったので allow と読む。
 	out.Verdict = string(record.Decision)
 	if out.Verdict == "" {
 		out.Verdict = string(audit.Allow)
@@ -216,6 +226,7 @@ func tryStop(conf *config.Settings, root string, out Result) Result {
 // 重複で外れた側の定義を引けない。Hits は Rules の末尾と同じ順なので、id ではなく位置で対応させる。
 func rulesHit(record *audit.Record) []Hit {
 	hits := []Hit{}
+	// Hits は Rules の末尾のぶんだけ入る（先頭の側には、ルールそのものを持たない根拠が並ぶ）。
 	offset := len(record.Rules) - len(record.Hits)
 	applied := record.Hits
 	if offset < 0 {
@@ -285,10 +296,13 @@ func Test(stdout, stderr io.Writer, conf *config.Settings, root, tool, subject s
 	return config.ExitOK, nil
 }
 
-// writeJSON は json.dumps(body, ensure_ascii=True, indent=1) と改行。
+// writeJSON は body を、字下げ 1・非 ASCII をエスケープした形の JSON で書き、改行で終える。
+// 読み手（拡張）はこの書式を前提にするので、変えない。
 func writeJSON(w io.Writer, body any) error { return pyjson.Write(w, body, pyjson.Options{Indent: 1}) }
 
+// writeTest は `--test` の文字の出力。行の見出し（verdict・tool・rules など）は利用者が探す読みで、変えない。
 func writeTest(w io.Writer, root string, out Result, call Call) {
+	// 1. ターンの終わりの試しと、判定が対象を取り出せないツールは、短い形で終える。
 	p := func(format string, a ...any) { fmt.Fprintf(w, format, a...) }
 	tool := out.tool
 	if tool == rules.StopMatch {
@@ -310,6 +324,7 @@ func writeTest(w io.Writer, root string, out Result, call Call) {
 		return
 	}
 
+	// 2. 判定の結果と、判定が見た入力（解いた先・payload・理由）。
 	code := ""
 	if out.code != "" {
 		code = " (" + out.code + ")"
@@ -339,6 +354,7 @@ func writeTest(w io.Writer, root string, out Result, call Call) {
 		p("fallback: %s（組み込みの既定で判定した）\n", out.fallback)
 	}
 
+	// 3. ヒットしたルール。ルールファイルの外の根拠と、ファイルのルール（翻訳後の式つき）で書き方を分ける。
 	if len(out.Rules) == 0 {
 		p("rules: (どのルールにもヒットしなかった)\n")
 	} else {
@@ -365,6 +381,7 @@ func writeTest(w io.Writer, root string, out Result, call Call) {
 		p("quoted: %s（引用の中から切り出したコマンドにだけヒットした）\n", strings.Join(out.quoted, ", "))
 	}
 
+	// 4. エージェントに届く応答の文面。
 	if out.response == "" {
 		p("response: (何も返さない)\n")
 		return

@@ -16,16 +16,17 @@ import (
 	"ccnavi/internal/tickets/model/useronly"
 )
 
-// layerOverrides はレイヤーの置き場を動かすフラグである。前の 3 本は共通レイヤーの中身、
-// 後の 2 本はレイヤーを探す先を指す。どれを外しても、プロジェクトのレイヤーが丸ごと消える。
-// そうなると実績リスクが下がり、レビュー待ちを飛ばして閉じられてしまう。
-// placeOverrides は記録と状態とチケットの置き場を動かすフラグである。どちらも診断の経路でだけ効く。
-// sh は受け取った引数をそのまま渡すので、診断の外で受けると、記録を消した形や置き場を差し替えた形でサブコマンドが
-// 動いてしまう。渡されたかは、値が argparse の既定と違うかで見る。
+// 置き場を動かすフラグは 2 組ある。どちらも診断の経路でだけ効く。sh は受け取った引数をそのまま渡すので、
+// 診断の外で受けると、記録を消した形や置き場を差し替えた形でサブコマンドが動いてしまう。
+// 渡されたかは、値が argparse の既定と違うかで見る。
 var (
+	// layerOverrides はレイヤーの置き場を動かすフラグ。前の 3 本は共通レイヤーの中身、後の 2 本はレイヤーを探す先を
+	// 指す。どれを外しても、プロジェクトのレイヤーが丸ごと消える。そうなると実績リスクが下がり、レビュー待ちを
+	// 飛ばして閉じられてしまう。
 	layerOverrides = []string{"--rules", "--phases", "--risk", "--projects", "--project-home"}
+	// placeOverrides は記録と状態とチケットの置き場を動かすフラグ。
 	placeOverrides = []string{"--log", "--state", "--approved", "--tickets"}
-	// wrapperFlags は sh が自分で計算して渡すパスと、渡されなかったときにまとめる値である。sh は自分の分を先に置き、
+	// wrapperFlags は sh が自分で計算して渡すパスと、渡されなかったときにまとめる値。sh は自分の分を先に置き、
 	// エージェントの引数を後ろに付けるので、argparse の後勝ちでは 2 本目で上書きできてしまう。
 	// 2 度渡す正しい使い方は無いので、2 本目があること自体を断る。
 	wrapperFlags = []struct {
@@ -39,7 +40,7 @@ var (
 	}
 )
 
-// notWithDocs は `--docs` と同時に指定できないフラグである。ほかの経路と、その経路でだけ読むフラグが対象になる。
+// notWithDocs は `--docs` と同時に指定できないフラグ。ほかの経路と、その経路でだけ読むフラグが対象になる。
 // 何も出さずに無視すると、打ったユーザは反映されたと思ってしまう。`--root` は引く場所そのものなので例外とし、
 // `--log`・`--state` は `--docs` が何も記録しないので受け入れる。
 var notWithDocs = []string{
@@ -62,8 +63,7 @@ const (
 )
 
 // oneWrapperFlagEach は、sh が渡すパスが 2 度来ていないかを見て、1 本にまとめる。2 度来ていたら false を返す。
-// 数えるのは argparse に任せる。argv を直接数えると、`--reason=--root` のような別のオプションの値まで数えてしまう
-// ためである。
+// 数えるのは argparse に任せる。argv を直接数えると、`--reason=--root` のような別のオプションの値まで数えてしまう。
 func oneWrapperFlagEach(stderr io.Writer, a opts) bool {
 	for _, w := range wrapperFlags {
 		v := a.Namespace[w.dest]
@@ -227,9 +227,9 @@ func runPrune(in *input, stdout, stderr io.Writer, conf *config.Settings, root s
 }
 
 // fromTerminal は、ユーザの判断の経路がターミナルの前のユーザから打たれているかを返す。
-// 標準入力がターミナルであることは、hook の中や `echo y |` から来ていないことを確かめる最も手間の少ない根拠にな
-// る。CCNAVI_GUARD_TICKET_APPROVAL=disable で切れる（テストと端末の無い実行環境のため）。切り方は文面に書かない。
-// 読むのはエージェントなので、書けばユーザの判断をエージェント自身が出す方法を教えることになる。
+// 標準入力がターミナルであることは、hook の中や `echo y |` から来ていないことを確かめる、最も手間の少ない根拠になる。
+// 切り替え（ガードの disable）で切れる。テストと、端末の無い実行環境のため。切り方は文面に書かない。
+// 文面を読むのはエージェントなので、書けば、ユーザの判断をエージェント自身が出す方法を教えてしまう。
 func fromTerminal(in *input, conf *config.Settings, stderr io.Writer, op useronly.Op) bool {
 	if conf.GuardTicketApproval == string(config.Disable) {
 		return true
@@ -249,6 +249,7 @@ var shaForm = regexp.MustCompile(`\A[0-9a-f]{7,64}\z`)
 
 const originRef = "refs/remotes/origin/"
 
+// revisionOK は `write-and-push sort` の版として渡された文字列が、許す 2 つの形のどちらかか。
 func revisionOK(since string) bool {
 	if shaForm.MatchString(since) {
 		return true

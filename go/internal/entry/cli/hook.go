@@ -136,6 +136,7 @@ func hookSteps(in *input, stdout, stderr io.Writer, conf *config.Settings, probl
 	for _, problem := range problems {
 		fmt.Fprintf(stderr, "ccnavi: %s\n", problem)
 	}
+	// 1. モードと切り替えを解き、記録の置き場と時間の上限を決める。
 	mode := config.ResolveMode(stderr, a.Str("mode"), conf)
 	so.mode = mode
 	resolveSwitches(stderr, conf, a)
@@ -148,6 +149,7 @@ func hookSteps(in *input, stdout, stderr io.Writer, conf *config.Settings, probl
 		io.WriteString(stderr, overview())
 		return config.ExitError
 	}
+	// 2. 標準入力の payload を読む。読めない payload は、イベントによって止める側か通す側に倒す。
 	payload, err := hookio.Decode(in.buf)
 	var unusable *hookio.UnusableError
 	switch {
@@ -171,17 +173,20 @@ func hookSteps(in *input, stdout, stderr io.Writer, conf *config.Settings, probl
 		return hookCrashed(stdout, stderr, conf, root, so, failedWith(err))
 	}
 
+	// 3. 記録の枠を作り、判定する。
 	so.payload = &payload
 	record := &audit.Record{Mode: mode, PermissionMode: payload.PermissionMode, Event: string(payload.Event),
 		Tool: payload.ToolName, Session: payload.SessionID, Agent: payload.AgentID}
 	so.record = record
 
+	// 判定の失敗（error か panic）は、手元に溜めた出力を捨てて内部エラーの応答に置き換える。
 	var buffered hookio.Held
 	code, fail := judgeEvent(&buffered, stderr, mode, conf, root, payload, record, deadline)
 	if fail != nil {
 		buffered.Reset()
 		code = internalError(&buffered, stderr, mode, conf, root, payload, record, *fail)
 	}
+	// 4. 記録と診断ログを書き、最後に溜めておいた出力を出す。
 	so.recorded = true
 	writeRecord(stderr, log, record)
 	// 受け付けたイベントと最終判定だけを書く。subject（コマンドの全文）は書かない。

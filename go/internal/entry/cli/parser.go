@@ -7,13 +7,14 @@ import (
 	"ccnavi/internal/infra/argparse"
 )
 
-// bareYes は値なしで渡された `--yes` を表す。読むのは取り込み（`user handoff --yes`）とミラーの同期（`user mirror
-// --yes`）だけである。ほかの経路の `--yes` は識別子を取る。
+// bareYes は値なしで渡された `--yes` を表す。値なしで読むのは、取り込み（`user handoff --yes`）とミラーの同期
+// （`user mirror --yes`）だけ。ほかの経路の `--yes` は識別子を取る。
+// 値の空文字と区別するため、利用者が打てない NUL 入りの文字列にしてある。
 const bareYes = "\x00bare"
 
-// 前方一致は受け付けない（argparse は allow_abbrev=False で組む）。受け付けると、
-// `--close` や `--review` が `--close-early` や `--reviewed` として走ってしまう。
-// 省略せずに書いた形しか見ない組み込みの deny では止められないためである。help の本文は usage の文である。
+// newParser は ccnavi の引数の読み手を組む。オプションの前方一致は受け付けない。受け付けると、
+// `--close` や `--review` が `--close-early` や `--reviewed` として走ってしまうが、省略せずに書いた形しか見ない
+// 組み込みの deny では止められない。help の本文は usage/ の文。
 func newParser() *argparse.Parser {
 	p := argparse.New("ccnavi")
 	str := func(flag string) { p.Add(argparse.Arg{Flags: []string{flag}, Default: ""}) }
@@ -124,7 +125,7 @@ func newParser() *argparse.Parser {
 	return p
 }
 
-// opts は読めた引数と、それを読んだ parser である。Python の argparse の Namespace と同じく、
+// opts は読めた引数と、それを読んだ parser である。argparse の Namespace のように、
 // 経路の途中で値を差し替える（sh が渡すパスを 1 本にまとめる、診断の外の差し替えを捨てる）。
 // 欄の名前は argparse の dest と同じにする。
 type opts struct {
@@ -143,13 +144,13 @@ func (a opts) reset(flag string) {
 
 func (a opts) command() []string { return a.Strings("command") }
 
-// head は位置引数の頭の n 語が words と同じか（Python の list(args.command[:n]) == words）。
+// head は位置引数の頭が words と同じか。
 func (a opts) head(words ...string) bool {
 	cmd := a.command()
 	return len(cmd) >= len(words) && slices.Equal(cmd[:len(words)], words)
 }
 
-// unset は Python の user_only._unset（None・False・空文字）。0 は渡したと数える。
+// unset は値が渡されていないか（nil・false・空文字）。0 は渡したと数える。
 func unset(v any) bool {
 	switch x := v.(type) {
 	case nil:
@@ -215,6 +216,7 @@ func helpOfTest(argv []string) []string {
 	if !slices.Contains(head, "--test") || !(slices.Contains(head, "-h") || slices.Contains(head, "--help")) {
 		return argv
 	}
+	// `--test` に続く 2 語のうち、先頭が `-` でない語までを `--test` の引数とみなして取り除く。
 	at := slices.Index(argv, "--test")
 	n := 0
 	for _, w := range argv[at+1 : min(at+3, len(argv))] {

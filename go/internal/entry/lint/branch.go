@@ -37,6 +37,7 @@ func branchNameProblems(conf *config.Settings, root string, proposals, copies, c
 	integrationOf func(string) string, adopted map[string]bool) []rules.Problem {
 	var out []rules.Problem
 	warn := func(detail string) { out = append(out, ticketProblem(rules.Warn, detail)) }
+	// everyone は全部の状態のチケット。settled は承認以降（承認済み・閉じた・審査中）の識別子で、ブランチ名はもう決まっている。
 	everyone := slices.Concat(copies, closed, review, proposals)
 	settled := map[string]bool{}
 	for _, t := range slices.Concat(copies, closed, review) {
@@ -47,6 +48,7 @@ func branchNameProblems(conf *config.Settings, root string, proposals, copies, c
 	if _, counting := branch.SerialNames(conf, root, known); len(counting) > 0 {
 		warn("次の通し番号を数えきれなかった（" + strings.Join(counting, "。") + "）。番号を決めずに、ユーザに確かめる" + branchRule)
 	}
+	// 新しく切る親の提案（fresh）だけに、ブランチ名の形を確かめる。同じ識別子が複数の場所にあっても 1 回だけ言う。
 	prefixes := conf.BranchPrefixes
 	said := map[string]bool{}
 	var fresh []*ticket.Ticket
@@ -65,6 +67,7 @@ func branchNameProblems(conf *config.Settings, root string, proposals, copies, c
 	}
 	out = append(out, numberProblems(everyone, fresh, prefixes)...)
 
+	// 大文字小文字だけが違う識別子の組を探す。比べる綴り（key）は casefold で畳み、見つけた順に報告する。
 	var folds []string
 	spellings := map[string]map[string]bool{}
 	for _, t := range everyone {
@@ -82,6 +85,7 @@ func branchNameProblems(conf *config.Settings, root string, proposals, copies, c
 		}
 	}
 
+	// 親の識別子の末尾が `-<2 桁>` だと、子の識別子と読み分けられない。
 	parents := map[string]bool{}
 	for _, t := range everyone {
 		if !t.IsChild() {
@@ -109,6 +113,7 @@ func numberProblems(everyone, fresh []*ticket.Ticket, prefixes []string) []rules
 		project string
 		number  int
 	}
+	// 番号ごとに、その番号を使っている親の識別子を集める。
 	owners := map[key]map[string]bool{}
 	for _, t := range everyone {
 		if t.IsChild() {
@@ -122,6 +127,7 @@ func numberProblems(everyone, fresh []*ticket.Ticket, prefixes []string) []rules
 			owners[k][t.ID] = true
 		}
 	}
+	// 新規の提案の番号を、自分以外の持ち主と突き合わせる。
 	var out []rules.Problem
 	for _, t := range fresh {
 		if t.IsChild() {
@@ -162,6 +168,7 @@ func worktreeProblems(conf *config.Settings, root string, worktrees []tree.Tree,
 	copies []*ticket.Ticket, known map[string]bool) []rules.Problem {
 	var out []rules.Problem
 	for _, w := range worktrees {
+		// ワークツリー名と同じ識別子のチケットを探す。無ければ、直接作業のツリーとして名前の形だけ確かめる。
 		bound := index[w.Name]
 		if bound == nil {
 			out = append(out, ticketProblem(rules.Warn, "ワークツリー "+w.Name+" にチケットがありません。そこへの書き込みはルールだけで判定する"))
@@ -170,6 +177,7 @@ func worktreeProblems(conf *config.Settings, root string, worktrees []tree.Tree,
 			}
 			continue
 		}
+		// 子のチケットの元リポジトリは、親の project で決まる。
 		owner := bound.Project
 		if bound.IsChild() {
 			if parent := index[bound.Parent]; parent != nil {
@@ -182,6 +190,7 @@ func worktreeProblems(conf *config.Settings, root string, worktrees []tree.Tree,
 				w.Name, orWorkspace(w.Project), orWorkspace(owner))))
 		}
 	}
+	// 承認済みなのにワークツリーが無いチケットを探す（ワークツリーができるまで範囲が有効にならない）。
 	names := map[string]bool{}
 	for _, w := range worktrees {
 		names[w.Name] = true
@@ -222,10 +231,12 @@ func placeProblems(root string, proposals, settledList []*ticket.Ticket, repoOf 
 		if t.State != place.Todo {
 			continue
 		}
+		// 提案が置かれているツリー。プロジェクトの元ツリー（名前が元リポジトリと同じ）は置き場所を言わない扱いにする。
 		at := t.Tree
 		if repo, ok := repoOf[at]; at != "" && ok && repo == at {
 			at = "" // プロジェクトの元ツリー
 		}
+		// 子の提案は親と同名のワークツリーに置く。親が承認以降なら、置き場の移動を頼んでも意味が無いので言わない。
 		if t.IsChild() {
 			if at == "" || at == t.Parent || settled[t.Parent] || t.Parent == "" {
 				continue
@@ -240,6 +251,7 @@ func placeProblems(root string, proposals, settledList []*ticket.Ticket, repoOf 
 				"提案を移して元を削除します。このままだと親が取り込み済みにならない", t.ID, at, t.Parent, cut)))
 			continue
 		}
+		// 親の提案は自分の識別子と同名のワークツリーに置く。plan の有無は置き場とは別に確かめる。
 		if settled[t.ID] {
 			continue
 		}
@@ -267,6 +279,7 @@ func unregisteredWorktrees(root string, worktrees []tree.Tree) []rules.Problem {
 	if err != nil {
 		return nil
 	}
+	// 登録のあるツリーの名前は、大文字小文字と Unicode の正規形の違い（macOS の NFD など）を畳んで比べる。
 	known := map[string]bool{}
 	for _, w := range worktrees {
 		known[pathcase.Fold(pyfmt.NFC(w.Name))] = true
@@ -280,6 +293,7 @@ func unregisteredWorktrees(root string, worktrees []tree.Tree) []rules.Problem {
 	if len(pending) == 0 {
 		return nil
 	}
+	// ファイルだけでは登録済みかを決められない候補を、git の一覧と突き合わせる。
 	code, text := git.Output(root, []string{"worktree", "list", "--porcelain"}, git.Options{Timeout: git.ReadTimeout})
 	if code != 0 {
 		return nil
@@ -314,6 +328,7 @@ func registeredElsewhere(path, registry string) bool {
 	if !strings.HasPrefix(line, gitdirHead) {
 		return false
 	}
+	// `.git` ファイルの gitdir は相対のこともあり、Windows では `\` 区切りのこともあるので、`/` にそろえて絶対パスにする。
 	gitdir := strings.ReplaceAll(ospath.Strip(line[len(gitdirHead):]), `\`, "/")
 	if !ospath.IsAbs(gitdir) {
 		gitdir = ospath.Join(path, gitdir)

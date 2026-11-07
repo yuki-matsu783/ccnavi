@@ -66,8 +66,8 @@ func worktreeLayers(conf *config.Settings, root string) []rules.Problem {
 	return out
 }
 
-// filesUnder は base の下のファイルを、base からの相対（"/" 区切り）で文字列の順に並べる。os.walk と同じく
-// ディレクトリへのリンクは辿らず、ファイルにも数えない。読めないディレクトリは飛ばす。
+// filesUnder は base の下のファイルを、base からの相対（"/" 区切り）で文字列の順に並べる。ディレクトリへのリンクは
+// 辿らず、ファイルにも数えない（リンクの先で同じ木を二重に数えたり、輪になったりしないため）。読めないディレクトリは飛ばす。
 func filesUnder(base string) []string {
 	var found []string
 	var walk func(dir, rel string)
@@ -179,10 +179,12 @@ func drift(conf *config.Settings, root, project string) ([]rules.Problem, bool) 
 	if branch != "" {
 		ref = "refs/remotes/origin/" + branch
 	}
+	// 比べる相手（origin/<統合先>）が手元に無ければ、比べられなかったと返す。
 	if ref == "" || !git.Run(home, []string{"rev-parse", "--verify", "--quiet", ref + "^{commit}"}, git.Options{}).OK() {
 		// origin が無いリポジトリ（git でない、リモートを持たない）は、取得で解けないので言わない。
 		return nil, !git.Run(home, []string{"remote", "get-url", "origin"}, git.Options{}).OK()
 	}
+	// 比べるファイル。ワークスペース自身は共通レイヤーの 3 本も含み、どのリポジトリも自身のレイヤーの 3 本を比べる。
 	homeRel := strings.Trim(ospath.Slashed(projectHome(conf)), "/")
 	var rels []string
 	if project == "" {
@@ -200,6 +202,7 @@ func drift(conf *config.Settings, root, project string) ([]rules.Problem, bool) 
 	where := check.LayerWhere(layer)
 	var out []rules.Problem
 	for _, rel := range rels {
+		// 統合先を読めないファイルは、比べる相手が無いので飛ばす。ワークツリーに無いだけなら local を nil にして違いとして言う。
 		remote, read := git.Blob(home, ref, rel, git.Options{})
 		if !read {
 			continue

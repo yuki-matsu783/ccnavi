@@ -27,7 +27,7 @@ type input struct {
 
 func newInput(r io.Reader) *input { return &input{raw: r, buf: bufio.NewReader(r)} }
 
-// terminal は標準入力がターミナルか（Python の stdin.isatty()）。
+// terminal は標準入力がターミナルか。
 func (in *input) terminal() bool {
 	f, ok := in.raw.(*os.File)
 	return ok && ospath.IsTerminal(f.Fd())
@@ -82,6 +82,7 @@ func okIf(ok bool) int {
 // （オプションで偽装できないようにするため）。印（`--entry`）の無い入口は、parsed が設定を読んでから断る
 // （テストの逃げ道を設定で見るため）。
 func run(in *input, stdout, stderr io.Writer, argv []string) int {
+	// ユーザ専用の入口（`ccnavi user …`）の印と動詞を取り除き、内部の形の引数に直す。
 	argv, marker, err := useronly.TakeEntry(argv)
 	var entry *useronly.Verb
 	if err == nil {
@@ -91,6 +92,7 @@ func run(in *input, stdout, stderr io.Writer, argv []string) int {
 		fmt.Fprintf(stderr, "ccnavi: %s\n", err)
 		return config.ExitBlock
 	}
+	// 引数を読む。`--test` の語と `--help`・`--json` の位置は、argparse に渡す前に整える（どの順に書いても同じに読むため）。
 	parser := newParser()
 	rest, testWords := takeTestWords(jsonOutOfTest(helpOfTest(argv)))
 	ns, err := parser.Parse(rest)
@@ -101,6 +103,7 @@ func run(in *input, stdout, stderr io.Writer, argv []string) int {
 		}
 		return config.ExitError
 	}
+	// `--test` は後ろの 2 語（TOOL と SUBJECT）を取る。整えるときに取り出した語をここで戻す。
 	a := opts{ns, parser}
 	if testWords != nil && a.IsNone("test") {
 		a.Namespace["test"] = []any{testWords[0], testWords[1]}
@@ -121,10 +124,12 @@ func run(in *input, stdout, stderr io.Writer, argv []string) int {
 		fmt.Fprintf(stderr, "ccnavi: %s\n", refused)
 		return config.ExitError
 	}
+	// 入口の印（--entry）が無いのにユーザ専用の入口から来た回は、unmarked に残す。parsed が設定を読んでから断る。
 	var unmarked *useronly.Verb
 	if entry != nil && marker == "" {
 		unmarked = entry
 	}
+	// 書き込みの記録を取る回（試験が使う）は、通常の経路を記録の枠で包む。--version は何も書かないので包まない。
 	if a.Str("record_writes") != "" && !a.Truthy("version") {
 		return recordedRun(in, stdout, stderr, parser, a, unmarked)
 	}

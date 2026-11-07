@@ -31,6 +31,7 @@ func runIdle(in *input, stdout, stderr io.Writer, conf *config.Settings, words [
 		fmt.Fprintln(stderr, "使い方: ccnavi idle notice|start|check|reset")
 		return config.ExitOK
 	}
+	// 1. 設定を確かめる。state が空か、閾値が 0（無効）なら、何もせず終える。
 	limit := handoff.Threshold(conf.HandoffSuggestTokens)
 	if conf.State == "" || limit == 0 {
 		idleSkip(stdout, verb, "disabled")
@@ -40,6 +41,7 @@ func runIdle(in *input, stdout, stderr io.Writer, conf *config.Settings, words [
 		idleCheck(stdout, conf, words[2:], limit)
 		return config.ExitOK
 	}
+	// 2. check 以外は hook の payload を読む。読めなければ促さない。
 	payload, err := hookio.Decode(in.buf)
 	if err != nil {
 		idleSkip(stdout, verb, "no-payload")
@@ -53,6 +55,7 @@ func runIdle(in *input, stdout, stderr io.Writer, conf *config.Settings, words [
 		idleSkip(stdout, verb, why)
 		return config.ExitOK
 	}
+	// 3. 会話の使用量を読み、notice（その場の知らせ）か start（待機の開始）を決める。
 	usage := handoff.UsageOf(payload.TranscriptPath)
 	if verb == "notice" {
 		if text, ok := handoff.Notice(conf.State, payload.SessionID, usage, limit, conf.HandoffWaitSeconds); ok {
@@ -70,6 +73,8 @@ func runIdle(in *input, stdout, stderr io.Writer, conf *config.Settings, words [
 	return config.ExitOK
 }
 
+// idleSkip は start・check のときだけ、促さない理由を `skip <理由>` の 1 行で返す。
+// notice と reset は何も出さない。
 func idleSkip(stdout io.Writer, verb, why string) {
 	if verb == "start" || verb == "check" {
 		fmt.Fprintf(stdout, "skip %s\n", why)
@@ -91,6 +96,7 @@ func notForIdle(payload hookio.Input) string {
 
 // idleCheck は `idle check <セッション> <印> <待ち秒>`。待機のあと、起こすべきか、起こすときの指示を返す。
 func idleCheck(stdout io.Writer, conf *config.Settings, rest []string, limit int) {
+	// 待ち秒は ASCII の数字だけを受ける。負の値は読めなかった印。
 	seconds := -1
 	if len(rest) == 3 && pyfmt.IsASCIIDigits(rest[2]) {
 		if n, err := pyfmt.ParseInt(rest[2]); err == nil {
@@ -98,7 +104,7 @@ func idleCheck(stdout io.Writer, conf *config.Settings, rest []string, limit int
 		}
 	}
 	if seconds < 0 {
-		// int に収まらない待ち秒も読めない引数と同じに扱う（Python は大きな整数のまま進む）。
+		// int に収まらない待ち秒も読めない引数と同じに扱う。
 		fmt.Fprintln(stdout, "skip usage")
 		return
 	}

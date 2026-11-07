@@ -24,10 +24,13 @@ const headPrefix = "ref: refs/heads/"
 // レイヤー）を projects/<名前>/ に置き、親子のチケットをそのプロジェクトのワークツリーにする。HEAD はブランチの
 // 名前を読む先（承認の記録の source_tree はブランチ名）。
 func (s *snapshot) build(root string, families []string) error {
+	// 前の要求の仮のツリーを消して、組み直す。
 	os.RemoveAll(root)
 	if err := os.MkdirAll(ospath.Join(root, tree.GitWorktrees), 0o755); err != nil {
 		return err
 	}
+	// keep はブランチの中身のうち、dirs の下と files に当たるパスだけを base の下に書く。
+	// owner は、ワークツリーの登録（.git/worktrees）を置くリポジトリのルート。
 	owner := root
 	keep := func(b *branch, base string, dirs, files []string) error {
 		for _, path := range b.paths {
@@ -39,6 +42,7 @@ func (s *snapshot) build(root string, families []string) error {
 		}
 		return nil
 	}
+	// 1. ワークスペースルートとプロジェクトに、統合先の中身（done/ とレイヤー）を置く。
 	integ := s.branch(s.integration)
 	stamped := []string{settingsFile, config.CompatFile}
 	if s.project == "" {
@@ -70,6 +74,8 @@ func (s *snapshot) build(root string, families []string) error {
 			return err
 		}
 	}
+	// 2. 親子のチケットのブランチごとに、ワークツリーを作る。ブランチの中身を全部書き、HEAD と登録をそろえる
+	// （ワークツリーかどうかの判定が .git ファイルと登録の gitdir の往復を見るため）。
 	for _, name := range families {
 		if !s.has(name) || name == s.integration {
 			continue
@@ -109,6 +115,7 @@ func (s *snapshot) build(root string, families []string) error {
 	return nil
 }
 
+// hasDirPrefix は path が dirs のどれかの下にあるか。
 func hasDirPrefix(path string, dirs []string) bool {
 	for _, d := range dirs {
 		if strings.HasPrefix(path, d+"/") {
@@ -118,6 +125,7 @@ func hasDirPrefix(path string, dirs []string) bool {
 	return false
 }
 
+// containsPath は path が paths に含まれるか。
 func containsPath(paths []string, path string) bool {
 	for _, p := range paths {
 		if p == path {
@@ -127,10 +135,12 @@ func containsPath(paths []string, path string) bool {
 	return false
 }
 
+// head は gitdir の HEAD に、ブランチ名を読む先を書く。
 func head(gitdir, branch string) error {
 	return os.WriteFile(ospath.Join(gitdir, "HEAD"), []byte(headPrefix+branch+"\n"), 0o644)
 }
 
+// write は rel を base の下に書く。rel が base の外へ出る形は、書く前に断る。
 func write(base, rel, text string) error {
 	if err := checkRel(rel); err != nil {
 		return err
@@ -154,6 +164,7 @@ func preview(root string, only []string) (int, *pyjson.Object, string) {
 	if code != config.ExitOK {
 		return code, nil, errOut.String()
 	}
+	// core.Preview が書いた JSON を読み戻して、拡張へ返すオブジェクトにする。
 	value, err := pyjson.Loads(out.String())
 	body, ok := value.(*pyjson.Object)
 	if err != nil || !ok {
@@ -186,6 +197,7 @@ func entry(root string, e *pyjson.Object) *pyjson.Object {
 // （`wip/ws/x`）は畳まない。
 const beforeRoot = `(?<![^\s'"` + "`" + `(（「:：,、=])`
 
+// relativeForms は root ごとにコンパイルした式の置き場。relative は答えの文面ごとに呼ぶので、使い回す。
 var relativeForms sync.Map // root → [2]*pyre.Regexp
 
 func relativeRes(root string) [2]*pyre.Regexp {
@@ -216,6 +228,7 @@ func relative(root, text string) string {
 	return out
 }
 
+// relativeAll は relative を行ごとに当てる。
 func relativeAll(root string, lines []string) []string {
 	out := make([]string, len(lines))
 	for i, line := range lines {

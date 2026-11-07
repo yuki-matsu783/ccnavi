@@ -36,6 +36,7 @@ func opsCommand(stdout, stderr io.Writer, conf *config.Settings, words []string)
 		fmt.Fprintln(stderr, "ccnavi: state の置き場が空。操作記録を扱えない")
 		return config.ExitError
 	}
+	// 操作記録の誤り（oplog.Error）は文をそのまま見せる。それ以外の error は想定外の失敗として扱う。
 	code, handled, err := opsStep(stdout, stderr, conf.State, words)
 	var opErr *oplog.Error
 	switch {
@@ -63,6 +64,7 @@ func opsStep(stdout, stderr io.Writer, state string, words []string) (code int, 
 		}
 		return ""
 	}
+	// 副命令の名前と語の数が合うものだけ処理する。合わなければ handled を偽にして、呼び手が使い方を出す。
 	n := len(words)
 	switch {
 	case verb == "pending" && n == 1:
@@ -96,6 +98,8 @@ func opsStep(stdout, stderr io.Writer, state string, words []string) (code int, 
 		if r == nil {
 			return config.ExitError, true, err
 		}
+		// reconcile <ID> <段階ID> <見つけた投稿のURL（コンマ区切り）> <一覧を全部読めたか yes|no> [<キー>]。
+		// yes・no 以外の値は、一覧を読めなかった（ListFailed）扱いにする。
 		var found []string
 		for _, u := range strings.Split(words[3], ",") {
 			if u != "" {
@@ -171,6 +175,7 @@ func loadRecord(stderr io.Writer, state, id string) (*oplog.Record, error) {
 // opsBegin は `begin <種類> <親> <フェーズ> <MR> <キー> <段階ID:種類>…`。キーから決めた ID で記録を作り（既にあれば
 // 作らない）、ID を出す。エージェントの review-request・comment・ready が、打ち直しで同じ記録に当たるため。
 func opsBegin(stdout, stderr io.Writer, state string, words []string) (int, bool, error) {
+	// キーは「@<ファイル>」でファイルの本文から取れる。読めない・空のときは、パスで代えずに止める。
 	kind, parent, phaseText, mrText, key := words[1], words[2], words[3], words[4], words[5]
 	if path, ok := strings.CutPrefix(key, keyFromFile); ok {
 		body, _ := fsio.ReadText(path, fsio.Strict)
@@ -181,6 +186,7 @@ func opsBegin(stdout, stderr io.Writer, state string, words []string) (int, bool
 		}
 		key = body
 	}
+	// 段階は `<ID>:<種類>`。種類を省くとコメントの段階とする。
 	var stages []oplog.StageSpec
 	for _, spec := range words[6:] {
 		id, kindText, _ := strings.Cut(spec, ":")
@@ -199,7 +205,7 @@ func opsBegin(stdout, stderr io.Writer, state string, words []string) (int, bool
 	return config.ExitOK, true, nil
 }
 
-// digits は数字だけの語の数（Python の int(x) if x.isdigit() else 0）。
+// digits は数字だけの語の数（数字でない語は 0）。
 func digits(text string) int {
 	if !pyfmt.IsDigit(text) {
 		return 0
