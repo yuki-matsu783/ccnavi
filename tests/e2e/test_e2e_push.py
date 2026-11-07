@@ -22,9 +22,9 @@ tests/sh/test_push_approved_sh.py）は、実行ファイルを in-process で�
 通っていない。ここはそのつなぎ目だけを見る。個々の分岐はあちらが見るので、ここで増やさない。
 
 組み立て済みの実行ファイルが無ければ skip する（tests/e2e/test_e2e_sh.py と同じ前準備を使う）。
-試すのはソースではなくその実行ファイルなので、`src/ccnavi/` を直したら組み立て直してから回す。
+試すのはソースではなくその実行ファイルなので、`go/` を直したら組み立て直してから回す。
 
-    uv run --with pyinstaller python build.py
+    sh scripts/ccnavi-build.sh
     uv run python -m unittest tests.e2e.test_e2e_push -v
 
 承認はターミナルからしか通らない（`--agree` の壁）。テストはターミナルを持たないので、段 3 からは

@@ -170,10 +170,6 @@ info_from=""
 if bin=$(ccnavi_bin "$root"); then
 	info_from="$bin"
 	sync_info=$("$bin" --root "$root" sync paths 2>"$scratch/info" </dev/null) || info_from="failed:$bin"
-elif [ -f "$root/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
-	info_from="uv run python -m ccnavi"
-	sync_info=$(cd "$root" && uv run --quiet python -m ccnavi --root "$root" sync paths 2>"$scratch/info" </dev/null) ||
-		info_from="failed:uv run python -m ccnavi"
 fi
 # Windows の実行ファイルの CRLF の CR を除く（1 行 1 項目の値の末尾に CR を残さない）。
 sync_info=$(printf '%s\n' "$sync_info" | tr -d '\r')
@@ -190,14 +186,7 @@ info() {
 
 # 実行ファイルを起こす。`sync paths` を答えたのと同じもの。<引数>...
 run_ccnavi() {
-	case "$info_from" in
-	'uv run python -m ccnavi')
-		(cd "$root" && uv run --quiet python -m ccnavi --root "$root" "$@" </dev/null)
-		;;
-	*)
-		"$info_from" --root "$root" "$@" </dev/null
-		;;
-	esac
+	"$info_from" --root "$root" "$@" </dev/null
 }
 
 # 親子のチケットの親のブランチ名。<P>

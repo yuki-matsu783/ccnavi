@@ -62,7 +62,7 @@ class LintShCompatTest(unittest.TestCase):
         self.assertEqual(self.said(), [])
 
     def test_v22_a_different_compat_is_a_warn_naming_the_redistribution(self):
-        """V22 配布先（build.py もソースも無い）では配り直しを名指しする。"""
+        """V22 配布先（組み立ての sh もソースも無い）では配り直しを名指しする。"""
         self.put_sh(f"CCNAVI_COMPAT={version.COMPAT + 1}")
         said = self.said()
         self.assertEqual([p["severity"] for p in said], ["warn"], said)
@@ -80,11 +80,11 @@ class LintShCompatTest(unittest.TestCase):
     def test_v24_in_the_ccnavi_repository_the_fix_is_a_rebuild(self):
         """V24"""
         self.put_sh(f"CCNAVI_COMPAT={version.COMPAT + 1}")
-        write(os.path.join(self.root, "build.py"), "")
-        write(os.path.join(self.root, "src", "ccnavi", "__main__.py"), "")
+        write(os.path.join(self.root, "scripts", "ccnavi-build.sh"), "")
+        write(os.path.join(self.root, "go", "cmd", "ccnavi", "main.go"), "")
         said = self.said()
         self.assertEqual(len(said), 1, said)
-        self.assertIn("build.py を実行して組み立て直して", said[0]["detail"])
+        self.assertIn("scripts/ccnavi-build.sh を実行して組み立て直して", said[0]["detail"])
         self.assertNotIn("ccnavi-setup.sh", said[0]["detail"])
 
     def test_v25_this_repository_is_in_step(self):

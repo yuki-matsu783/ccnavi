@@ -44,10 +44,10 @@
 # 共通部（ccnavi-common*.sh）には、読む側とエージェントも使う関数だけを置く。ユーザの判断を書く処理は
 # ユーザ専用の sh（ccnavi-user-*.sh）の中だけに置く。
 
-# この sh が頼る実行ファイルの契約の版（互換の版）。実行ファイルの src/ccnavi/entry/version.py の COMPAT、
+# この sh が頼る実行ファイルの契約の版（互換の版）。実行ファイルの go/internal/entry/version/version.go の Compat、
 # VS Code 拡張の EXTENSION_COMPAT と同じ値に揃える。上げるのは、sh が頼るフラグや出力の形を
 # sh を直さないと動かない形に変えたときと、データの形（先行関係の置き場など）が
-# 変わるとき（上げ方は src/ccnavi/entry/version.py の説明）。`ccnavi --lint` もこの行を読んで比べる。
+# 変わるとき（上げ方は go/internal/entry/version/version.go の説明）。`ccnavi --lint` もこの行を読んで比べる。
 CCNAVI_COMPAT=20
 
 # 相対パスを絶対に直す。
@@ -204,13 +204,12 @@ ccnavi_workspace() {
 	done
 }
 
-# 起動する実行ファイルのパス。見つからなければ 1 を返す（ソースで動かすかは呼ぶ側が決める）。
+# 起動する実行ファイルのパス。見つからなければ 1 を返す。
 #
 # ユーザがターミナルから打つ場面では settings.json の env が反映されないので、CCNAVI_ENTRY_PATH が
 # 無いのが普通。そのときは ccnavi のリポジトリの組み立て（dist/ccnavi/ccnavi）、次に
 # hook と同じ振り分けの sh（.ccnavi/scripts/ccnavi-launcher.sh）を見る。振り分けの sh は
-# .ccnavi/bin/ があるときだけ選ぶ。無いのに選ぶと、ソースで動かせる ccnavi のリポジトリでも
-# 「実行ファイルが無い」で止まる。bin/ もソースも無い配布先では、PATH の ccnavi を返す（無ければ 1）。
+# .ccnavi/bin/ があるときだけ選ぶ。bin/ が無ければ、PATH の ccnavi を返す（無ければ 1）。
 #
 # それぞれ `.exe` を付けた名前も見る（Windows の組み立て）。
 ccnavi_bin() {
@@ -219,12 +218,9 @@ ccnavi_bin() {
 		ccnavi_bin_try "$1/dist/ccnavi/ccnavi" && return 0
 		if [ -d "$1/.ccnavi/bin" ]; then
 			ccnavi_bin_try "$1/.ccnavi/scripts/ccnavi-launcher.sh"
-		elif [ ! -f "$1/src/ccnavi/__main__.py" ]; then
-			# bin/ もソースも無い配布先。PATH の ccnavi があればそれを返す（振り分けの sh と同じ規則）。
-			# 無ければ 1 を返すので、呼び手の「実行ファイルが無い」の分岐は今までと同じ。
-			ccnavi_bin_path "$1/.ccnavi/scripts/ccnavi-launcher.sh"
 		else
-			return 1
+			# PATH の ccnavi があればそれを返す（振り分けの sh と同じ規則）。
+			ccnavi_bin_path "$1/.ccnavi/scripts/ccnavi-launcher.sh"
 		fi
 		;;
 	/* | [A-Za-z]:*) ccnavi_bin_try "$CCNAVI_ENTRY_PATH" ;;

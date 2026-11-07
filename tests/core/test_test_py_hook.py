@@ -6,8 +6,11 @@
 2. 1 時間の掃除は、他のセッションの古い記録だけを消す。自分のセッションの記録は、1 時間を
    超えたターンでも読む
 3. 失敗したら差し戻す（終了コード 2）
+4. Go のファイルを触ったモジュール（`<セッション>.go-trees`）では、Python のテストの前に
+   gofmt・go vet（この機械と Windows）・go test を回す
 
-テストそのものは回さない。`uv` を代わりのものに差し替え、呼ばれた居場所を書き出させる。
+テストそのものは回さない。`uv`・`go`・`gofmt` を代わりのものに差し替え、呼ばれた居場所を
+書き出させる。
 """
 
 from __future__ import annotations
@@ -32,6 +35,15 @@ case "$STUB_FAIL" in
 esac
 exit 0
 """
+# 代わりの go と gofmt。居場所・GOOS・引数を GO_LOG に 1 行足す。
+# GO_FAIL に挙げた「名前 最初の引数」（`go test` など）なら失敗する。
+GO_STUB = """#!/bin/sh
+printf '%s %s %s %s\\n' "$(pwd)" "${GOOS:-host}" "$(basename "$0")" "$*" >>"$GO_LOG"
+case "$(basename "$0") $1" in
+"$GO_FAIL") echo "FAIL: go stub"; exit 1 ;;
+esac
+exit 0
+"""
 
 
 @unittest.skipIf(SH is None, "sh が無い")
@@ -50,6 +62,12 @@ class TestPyHookTest(unittest.TestCase):
         with open(uv, "w", encoding="utf-8", newline="\n") as f:
             f.write(STUB)
         os.chmod(uv, 0o755)
+        for name in ("go", "gofmt"):
+            stub = os.path.join(bin_dir, name)
+            with open(stub, "w", encoding="utf-8", newline="\n") as f:
+                f.write(GO_STUB)
+            os.chmod(stub, 0o755)
+        self.go_log = os.path.join(self.base, "go.log")
         self.bin_dir = bin_dir
         self.log = os.path.join(self.base, "stub.log")
 
@@ -64,7 +82,22 @@ class TestPyHookTest(unittest.TestCase):
             f.write("".join(f"{t}\n" for t in trees))
         return path
 
-    def stop(self, session="s1", fail=""):
+    def go_module(self, name, session="s1"):
+        path = os.path.join(self.base, name)
+        os.makedirs(path)
+        with open(os.path.join(path, "go.mod"), "w", encoding="utf-8") as f:
+            f.write("module x\n")
+        with open(os.path.join(self.session, f"{session}.go-trees"), "a", encoding="utf-8") as f:
+            f.write(path + "\n")
+        return path
+
+    def go_calls(self):
+        if not os.path.exists(self.go_log):
+            return []
+        with open(self.go_log, encoding="utf-8") as f:
+            return [line.split(" ", 1)[1].strip() for line in f if line.strip()]
+
+    def stop(self, session="s1", fail="", go_fail=""):
         payload = f'{{"session_id":"{session}","hook_event_name":"Stop","stop_hook_active":false}}'
         env = {
             **os.environ,
@@ -72,6 +105,8 @@ class TestPyHookTest(unittest.TestCase):
             "PATH": self.bin_dir + os.pathsep + os.environ.get("PATH", ""),
             "STUB_LOG": self.log,
             "STUB_FAIL": fail,
+            "GO_LOG": self.go_log,
+            "GO_FAIL": go_fail,
         }
         result = subprocess.run(
             [SH, HOOK], input=payload, capture_output=True, text=True, cwd=self.ws, env=env
@@ -130,6 +165,35 @@ class TestPyHookTest(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertIn(bad, result.stderr)
         self.assertIn("失敗したテストを直して", result.stderr)
+
+    def test_a_go_module_is_checked_before_the_python_tests(self):
+        self.go_module("mod")
+        result, ran = self.stop()
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(
+            [
+                "host gofmt -l .",
+                "host go vet ./...",
+                "windows go vet ./...",
+                "host go test ./...",
+            ],
+            self.go_calls(),
+        )
+        self.assertEqual([os.path.realpath(self.ws)], ran)
+        self.assertFalse(os.path.exists(os.path.join(self.session, "s1.go-trees")))
+
+    def test_a_failing_go_check_is_pushed_back_without_the_python_tests(self):
+        module = self.go_module("mod")
+        result, ran = self.stop(go_fail="go test")
+        self.assertEqual(2, result.returncode)
+        self.assertIn(module, result.stderr)
+        self.assertIn("FAIL: go stub", result.stderr)
+        self.assertEqual([], ran)
+
+    def test_go_is_not_run_when_no_go_file_was_edited(self):
+        result, _ = self.stop()
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual([], self.go_calls())
 
 
 if __name__ == "__main__":

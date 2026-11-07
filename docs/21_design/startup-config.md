@@ -28,7 +28,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 
 `CLAUDE_PROJECT_DIR` が無いターミナルや Bash ツールから、`.claude/` を持つプロジェクトの中で `ccnavi` を直接打つと、`--root` を渡さない限りそのプロジェクトが根と見なされる。`--root` を付けるか、sh のラッパーを通す。これは未解決である。
 
-配布物は PyInstaller の onedir。実行時の依存は PyYAML 1 本で、読むのは `safe_load` に限る。
+配布物は Go で組んだ 1 本の実行ファイル。
 呼び出しごとに起動して終わる。
 
 ### 4.2 hook のイベント
@@ -195,13 +195,13 @@ Python は終了コード 1 で終わり、Claude Code は 0 と 2 以外を止�
 ```
 .ccnavi/scripts/ccnavi-launcher.sh      ← CCNAVI_ENTRY_PATH が指す振り分けの sh（追跡する）
 .ccnavi/scripts/ccnavi-ticket.sh など   ← 代わりに通る sh
-.ccnavi/bin/darwin-arm64/ccnavi         ← 機械ごとの組み立て（_internal/ も同じ置き場。無視する）
+.ccnavi/bin/darwin-arm64/ccnavi         ← 機械ごとの組み立て（無視する）
 .ccnavi/bin/linux-x86_64/ccnavi
 .ccnavi/bin/windows-x86_64/ccnavi.exe
 ```
 
 hook の `command` は振り分けの sh を指す 1 行で、どの実行ファイルを起動するかは起動した機械が決める。置き場の名前は
-`build.py` が書く `dist/ccnavi.target` の `<os>-<arch>` で、語は `src/ccnavi/infra/platformtag.py`・`.ccnavi/scripts/ccnavi-launcher.sh`・
+`scripts/ccnavi-build.sh` が書く `dist/ccnavi.target` の `<os>-<arch>` で、語は `go/internal/infra/platformtag`・`.ccnavi/scripts/ccnavi-launcher.sh`・
 `scripts/ccnavi-setup.sh` の `host_target` の 3 か所で揃える。sh は ccnavi のリポジトリでも配布先でも同じパスに置き、
 ccnavi のリポジトリの hook も同じ sh を通る。
 
@@ -213,7 +213,7 @@ sh の探し方: `here=${0%/*}`（`$0` に `/` が無ければ `.`）から `bin
 - 隣（`.ccnavi/scripts/<os>-<arch>/`）は探さない。自己防衛のパス（8.2）がヒットしない置き場になるため
 - `bin_dir` は `..` を含むまま使い、正規化しない。シンボリックリンクも解かない
 - `bin/` に何も見つからなければ、PATH の `ccnavi`（`ccnavi.exe`）を探す（`ccnavi_launcher_path`）。`bin/` が先で、PATH はそのときだけ。見るのは絶対パスの項目だけで、空と相対の項目（`.`、`~/bin`）は cwd や展開の有無で結果が変わるので飛ばす。PATH の順に、通常ファイルで実行できる最初のものを `exec` する。自分と同じファイル（`ccnavi` という名前で張ったリンク）は、自分に戻って終わらなくなるので飛ばす（`-ef`）。`exec` に失敗しても次の項目へは進まない（`bin/` と同じ。126）。launcher のコピーが PATH に 2 つあると互いを起動し合うので、置かない
-- PATH の実行ファイルは隣に onedir の `_internal/` が要る。単体のコピーは動かない。`dist/ccnavi/` を PATH に通すか、そこへのリンクを置く。版は sh と揃えるものとして配る（食い違いを実行時に断る処理は無い）
+- PATH の実行ファイルは、`dist/ccnavi/` を PATH に通すか、実行ファイルへのリンクを置く。版は sh と揃えるものとして配る（食い違いを実行時に断る処理は無い）
 - 見つからなければ終了コード 127 で、文面に `<os>-<arch>` と探した `bin_dir`、PATH も見たことを出す。在るが実行できなければ `exec` が失敗して 126
 - 保護済み sh の `ccnavi_bin` は、`bin/` もソースも無い配布先でだけ PATH の `ccnavi` を返す（無ければ 1 のまま。呼び手の「実行ファイルが無い」の分岐を保つ）。ソースのリポジトリではソースが先
 - 自己防衛は PATH の実体も守る。`bin/` の有無に関わらず、PATH に在れば `bin-path-<パスの印>` のキーでバックアップして、同じ形で戻す。キーにパスの印を付けるのは、PATH が変わって指す先が替わったとき、古い実体の参照を新しい実体に適用しないため。止める正規表現は実体のパスの末尾 3 要素で適用する（2 要素だと別の `./bin/ccnavi` までヒットする）。置き場のディレクトリ全体は守らない。PATH が `/usr/local/bin` のように書けない場所なら、戻しは失敗（`failed`）と報告する
@@ -221,10 +221,10 @@ sh の探し方: `here=${0%/*}`（`$0` に `/` が無ければ `.`）から `bin
 hook は sh を直に起動するので、sh に実行ビットが要る。ccnavi のリポジトリでは追跡するモードを 100755 にする。配布先では
 導入スクリプトが付け、付いていなければ `--lint` が error で言う（10 章）。
 
-ccnavi のリポジトリでの組み立て: `build.py` が PyInstaller の出力を `dist/ccnavi/` に作り、それを `.ccnavi/bin/<os>-<arch>/` へコピーする。
+ccnavi のリポジトリでの組み立て: `scripts/ccnavi-build.sh` が `go build` の出力を `dist/ccnavi/` に作り、それを `.ccnavi/bin/<os>-<arch>/` へコピーする。`--target <os>-<arch>` で別の機械向けにも組める。
 `dist/` は導入スクリプトの配布元で、代わりに通る sh が env の無いときに探す先でもあるので残す。
-コピーは隣の `<os>-<arch>.new` に済ませてから入れ替える。入れ替えに失敗したら `.ccnavi/bin/<os>-<arch>/` は前のままで、`build.py` は 1 を返し、
-`dist/` は新しく置き場は前のまま、と言う。組み立ての順序、入れ替えのやり直し、`--version` の `commit` に埋める値の取り方は `build.py` の説明に書いてある。
+コピーは隣の `<os>-<arch>.new` に済ませてから入れ替える。入れ替えに失敗したら `.ccnavi/bin/<os>-<arch>/` は前のままで、`scripts/ccnavi-build.sh` は 1 を返し、
+`dist/` は新しく置き場は前のまま、と言う。組み立ての順序、入れ替えのやり直し、`--version` の `commit` に埋める値の取り方は `scripts/ccnavi-build.sh` の説明に書いてある。
 Windows でも走っている実行ファイルの名前は変えられる（付録 C）ので、入れ替えは名前の変更で行う。
 
 - rename 2 回の間（数 ms）に来た hook は sh が 127 で終わり、その 1 回は判定が走らない
@@ -295,7 +295,7 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 
 **配布の目印と振り分けの代償。**
 
-- 置き場の名前は、`build.py` が `dist/ccnavi.target` に書く `<os>-<arch>` の目印から取る。別の機械向けの組み立てでも、その機械の置き場に入るだけなので配る。
+- 置き場の名前は、`scripts/ccnavi-build.sh` が `dist/ccnavi.target` に書く `<os>-<arch>` の目印から取る。別の機械向けの組み立てでも、その機械の置き場に入るだけなので配る。
   Windows と WSL で同じフォルダを開くなら、それぞれの機械で打てば両方が並ぶ。この機械で動くものが無ければ、1 行の出力と最後の「まだ無いもの」の一覧で知らせる。
 - arm64 の macOS と Windows は、自分向けが無ければ x86_64 の組み立てを変換して動かす。どこにも無ければ sh は、この機械の `<os>-<arch>` と
   探した置き場を名指しして終了コード 127 で終わる。実行できないときは 126。
@@ -343,7 +343,7 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 足すのはワークスペースの `.gitignore` だけ。`projects/<名前>/` の各プロジェクトには触らない（そのプロジェクトのチケットの範囲で足す）。
 置き場として足すのは `/.ccnavi/bin/<os>-<arch>/` だけ。`.ccnavi/` を丸ごとは無視せず、振り分けの sh と `rules.yml` は追跡する。
 
-**実行ファイルの置き方（`--bin`）。** `project`（既定）は上の `.ccnavi/bin/<os>-<arch>/`。`user` は、実体（同梱物ごと）を `~/.local/share/ccnavi/<os>-<arch>/` に置く。macOS・Linux・WSL は、PATH に通す `~/.local/bin/ccnavi` からそこへリンクを張る。Windows（Git Bash）はリンクを張らず（張れないことがある）、実体のフォルダ（`ccnavi.exe` と `_internal/` が並ぶ）を PATH に通す。配布先の `.ccnavi/bin/` には何も置かず、`.gitignore` にも行を追加しない。振り分けの sh は `bin/` に無ければ PATH の `ccnavi` を使うので、起動の仕組みは変わらない。
+**実行ファイルの置き方（`--bin`）。** `project`（既定）は上の `.ccnavi/bin/<os>-<arch>/`。`user` は、実体を `~/.local/share/ccnavi/<os>-<arch>/` に置く。macOS・Linux・WSL は、PATH に通す `~/.local/bin/ccnavi` からそこへリンクを張る。Windows（Git Bash）はリンクを張らず（張れないことがある）、実体のフォルダ（`ccnavi.exe` が在る）を PATH に通す。配布先の `.ccnavi/bin/` には何も置かず、`.gitignore` にも行を追加しない。振り分けの sh は `bin/` に無ければ PATH の `ccnavi` を使うので、起動の仕組みは変わらない。
 - 配布元と中身が違えば置き換える。比べ方は `project` と同じ（実体のフォルダを比べる）。リンクは、実体を指す自分のものなら何もせず、別のものが既にあれば `--force` のときだけ置き換える
 - ホームディレクトリに書き込むとき（実体かリンクを置く・置き換えるとき）は、書く前にターミナルで確認する。ターミナルでなければ何も書かずに断り、確認に自動で答えるオプションは無い。書くものが無いときと `--check` は確認しない
 - この機械で動く実行ファイルだけを置く。`HOME` が無いとき、`--no-deploy` と同時のときは断る

@@ -20,7 +20,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 - 下の段から移す。段の並び（`infra` → `records` → `policy` → `tickets` → `catalog` → `hook` → `entry`）と、依存を下へだけ向ける決まりは Python と同じ
 - Go のパッケージは責務ごとにまとめる。Python のモジュールと 1 対 1 にしない。大きさだけで分けたモジュールは、1 つのパッケージの複数ファイルにする（例: `shellread_*` の 4 つは `infra/shell`、`gitcmd` と `gitstate` は `infra/git`）
 - 同じことをしている関数は 1 つにまとめ、差はオプションで表す。呼び手の無い関数は移さない。公開する API は、上の段が使うものに絞る
-- コメントは docstring を丸写ししない。読む人が知るべきこと（なぜそうするか、守る約束、落とし穴）だけを短く書く。経緯、ほかのファイルの説明の繰り返し、コードを読めば分かることは書かない。パッケージの役割は `doc.go` に 1 段落で書く
+- コメントの粒度は `environment.md` の「コードのコメントの粒度」に従う。docstring は丸写ししない。直感的でない処理（Python と答えを合わせるための分岐、順序に依存する手順、意外な既定値、照合や後戻りの仕掛け、OS ごとの違い）には、何をしているかとなぜそうするかの両方を書く。長い関数は、処理のまとまりごとに何をするかを 1 行で書き、上から読めば流れが分かるようにする。経緯、ほかのファイルの説明の繰り返し、1 行ごとの実況は書かない。パッケージの役割は `doc.go` に 1 段落で書く
 - 上の段が同じ下ごしらえを繰り返さないように、下の段に土台を置く（YAML の値を型を確かめて取り出す関数、Python の `json.dumps` と同じバイト列を作る JSON の出力など）
 
 ## 書き方の標準
@@ -65,7 +65,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 
 ## テスト
 
-- CLI を通すテスト（`tests.inproc.run_ccnavi` と sh のテスト）は Python のまま残し、`CCNAVI_TEST_EXE=<Goの実行ファイル>` を指定して回す。振る舞いが同じことは、これで確かめる
+- CLI を通すテスト（`tests.inproc.run_ccnavi` と sh のテスト）は Python のまま残し、Go の実行ファイルを起こす。実行ファイルは `tests/exe.py` が `go build` で組み、ソースが同じなら組み直さない。`CCNAVI_TEST_EXE=<実行ファイル>` を渡すと、組まずにそれを使う
 - 内部のモジュールを直に import する単体テスト（約 110 ファイル）は、そのモジュールを移すときに `go test`（同じディレクトリの `*_test.go`）へ移す。表で書けるものは表駆動にする
 - Python 側の単体テストは、Python を外すときに一緒に消す。それまでは Python の実装に対して回し続ける
 
@@ -108,7 +108,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 | `tickets` | 36,711 | 移した（レビュー済み） |
 | `catalog` | 1,683 | 移した（レビュー済み） |
 | `hook` | 10,497 | 移した（レビュー済み） |
-| `entry` | 11,210 | 移した（レビュー済み）。Chrome 拡張の Pyodide 用の `entry/ext.py` は移さない |
+| `entry` | 11,210 | 移した（レビュー済み）。Chrome 拡張の入口（Python の `entry/ext.py` と拡張の `py/ccnavi_chrome.py`）は `entry/chrome` と `cmd/ccnavi-chrome`（WASM）にした |
 
 ## 後で扱うこと
 
@@ -118,11 +118,9 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 |---|---|
 | 上の段を移すとき | 呼び手の無い公開名（`fsio`・`git`・`tree`・`shell` など、pyre の `Match`・`FullMatch`・`FindAll`・`Found`・`Named`・`Group`、`selfguard.Resolve`）を、使う段で絞る。あわせて rules の文面の出どころ（`Message`・`Text`・`DegradedMessage`）の優先の決めを 1 か所にまとめ、`compileExpr` の戻りを結果の種類の型にし、公開の可変グローバル（`rules.ScriptPlaceholder`・`Sections`・`SubjectFields`、`selfguard.Choices`・`GateChoices`）を絞る。lifecycle/worktrees の `Status` の定数 `Removed` とメソッド `Dropped.Removed()`（`Absent` も真）の名前の紛らわしさを、呼び手が揃ったところで分ける。「未コミットの変更」の判定（`integrate.Dirty` と `worktrees.status`）を 1 つに寄せる（`treegate.Dirty` は未追跡を数えない別の意味なので寄せない）。承認済み・閉じた・レビュー中の 3 回の走査の繰り返し（`retire.parentOf`・`worktrees.FamilyFor`・`remaining`・`branch.SerialNames`）を、1 回の走査の結果を渡す形にする |
 | Python を外すとき | Python の policy・infra のファイルを指す設計書と sh（`docs/21_design/messages.md`・`startup-config.md`・`modules.md`・`diagnostics.md`（`docsearch.START_SECONDS`）・`multi-repo/skills.md`（`projskills`）、配る `.ccnavi/docs/skill-processes.md`（`projskills` の名前が出る）、`.agents/docs/environment.md`・`e2e-exploration.md`、`.ccnavi/scripts/ccnavi-launcher.sh`・`ccnavi-git.sh` のコメント）を Go の置き場に直す。hook の Python のファイルを指すもの（`.ccnavi/messages/*.yml` と `.ccnavi/config/common/rules.yml` のコメント（`hook/*.py` のパス）、設計書 `docs/21_design/modules.md`・`pre-check.md`・`rules.md`・`stop-review.md`・`tickets/subagents.md`（hook の Python のファイル名））も同じ |
-| Python を外すとき | Chrome 拡張（`extensions/chrome/ccnavi-approval`）は Pyodide で Python の `entry.ext` → `tickets.core.api` を読む。Go には移せないので、Pyodide 用に Python の判定一式を残して配るか、拡張の判定を TS か WASM に書き直すかを決める（ユーザと合意が要る）。それまでは Go と Python の判定のずれを Chrome の見本（`extensions/chrome/ccnavi-approval/test/fixtures/core-scenarios.json`）で見張る |
 | Python を外すとき | hook の横展開で、Python と答えを合わせるために寄せなかったもの。実行後チェックの取り込みの確かめ（`integrate.SquashedPaths` の `copyIsBound`）は `BoundCheck` と違い、既定の置き場を大文字小文字を畳まずに見て、設定・全ツリー・退避を見ない（Python の `post_findings._ticket_bound` のまま）。取り込みの記録の読み方は `ReadRecord` の `FirstKept`（`post_findings`）と `LastKept`（`stop_integrate`）で分かれる。付き添いの有無は hook の判定（`hookio.Unattended`）と引き継ぎの待機（`hookio.Headless`。SDK の入口も含む）で分かれる。揃えるなら Python と同時に決める |
-| Python を外すとき | Python の `entry/version.py` の `COMPAT` を読んでいる配布の検査（`scripts/ccnavi-package.sh` の sed）と Chrome 拡張の試験（`extensions/chrome/ccnavi-approval/test/helpers/compat.ts`。`src/types/chrome.d.ts` の説明文も）を、Go の `version.Compat` を読む形に直す（機能のある参照なので、Python を外す前に直す）。それまでは `go/internal/entry/version` のテストが 2 つの値が揃うかを見る |
 | Python を外すとき | entry の Python のファイルを指す説明文（`docs/21_design/diagnostics.md`（version.py の COMPAT）・`stop-review.md`（`entry/cli_stopreview.py`）・`startup-config.md`（`entry/cli_idle.py`）・`modules.md`（`entry/cli.py`）、`.agents/docs/next-step-placement.md`（`entry/status.py`）、`.ccnavi/messages/next-cli.yml` のコメント、`scripts/ccnavi-setup.sh`（`lint_project.py`・`lint.py` の `_in_index`・`_SH_SPECIAL`。「2 か所を直す」と書いた手作業の同期は Go 側の 1 か所に寄せる）、`.ccnavi/scripts/ccnavi-common.sh`、`extensions/vscode/ccnavi-board/src/core/version.ts`）を Go の名前に直す。Go のコメントに残る「Python の …」の参照も、移植が終わったところでまとめて直す |
-| Python を外すとき | 利用者に見える文で、Python の組み立てを前提にしたもの。`lint` の `compatFix`（`build.py`・PyInstaller を前提にした直し方の文）と、`--version` の「ソースで動いている」の表示。互換の版に関わるので、文をどう変えるかをユーザと合意してから直す |
+| Python を外すとき | 利用者に見える文で、Python の組み立てを前提にしたもの。`--version` の「ソースで動いている」の表示（`lint` の `compatFix` は組み立てを Go に切り替えたときに `scripts/ccnavi-build.sh` の文に直した）。互換の版に関わるので、文をどう変えるかをユーザと合意してから直す |
 | Python を外すとき | entry の横展開で、Python と答えを合わせるために直さなかったもの（どれも Python も同じ）。ツリーの中かの判定が大文字小文字を畳まない・`..foo` を外と見る（`lint/flow.go`・`lint/places.go`・`diagnose/explain.go`。`cli/options.go` の `inside` は畳む）。`cli/record.go` の書き出し先のリンクの確かめ、`cli/stopreview.go` の送った版の `.md` の判定、`lint/branch.go` の未登録のワークツリーの鍵、`lint/ticket.go` の承認済みの置き場の確かめが大文字小文字を区別する。親チケットの見方が `shask` と `lint/layers.go` の `holdsParent` で 2 通り。巨大な整数（`--limit`・`--mr`・`ops begin` の mr・`idle check` の待ち秒。Go は int と `time.Duration` に収まらないものを読めず、Python は巨大な値のまま使う。実害は無い）。揃えるなら Python と同時に直す |
 | Python を外すとき | `git.Undo` の案内でパスを `"` で囲むだけの引用を、`config` の引用と同じ規則にする（`$` やバッククォートを含むパスで壊れる。いまは Python と同じ出力を保つため残す） |
 | Python を外すとき | sync/handoff の `Apply` で、書いた後の読み直しに失敗したエントリが戻されない。catalog の `Problems` が文の頭にパスを付ける形（パスで始まらない文にも付く）、索引の使い回しの鍵が秒の mtime だけ（同じ秒の書き換えで前の frontmatter が残る）、`readHead` に失敗した md の既存の行が消える（コメントの「残す」と食い違う）。`infra/git` が環境から `GIT_DIR`・`GIT_WORK_TREE`・`GIT_INDEX_FILE`・`GIT_COMMON_DIR` を外さない（どれも Python も同じ。直すなら Python と同時に直す） |
@@ -138,11 +136,11 @@ Go の版は `go/go.mod` の `go 1.26.0` に合わせる。
 cd go && go vet ./... && go test ./...
 ```
 
-`go/cmd/ccnavi/main.go` は標準入出力と引数を `entry/cli` の `Run` に渡して終わるだけで、Python の `python -m ccnavi` と同じに動く。`build.py` と `.ccnavi/bin/` の組み立てにはまだ入らず、配る実行ファイルは Python のまま。組み立てて Python の CLI のテストを当てるには次のようにする（版のコミットは `-ldflags "-X ccnavi/internal/entry/version.commit=<sha>"` で入れる）。
+`go/cmd/ccnavi/main.go` は標準入出力と引数を `entry/cli` の `Run` に渡して終わるだけで、Python の `python -m ccnavi` と同じに動く。配る実行ファイルは `scripts/ccnavi-build.sh` が組む（[組み立てと配布物](build-and-dist.md)）。組み立てて Python の CLI のテストを当てるには次のようにする（版のコミットは `-ldflags "-X ccnavi/internal/entry/version.commit=<sha>"` で入れる）。
 
 ```sh
-cd go && go build -o /tmp/ccnavi-go ./cmd/ccnavi
-CCNAVI_TEST_EXE=/tmp/ccnavi-go uv run python -m unittest tests.guard.test_permission_mode
+uv run python -m unittest tests.guard.test_permission_mode   # tests/exe.py が組む
+CCNAVI_TEST_EXE=/tmp/ccnavi-go uv run python -m unittest tests.guard.test_permission_mode   # 組んだものを使う
 ```
 
 依存の向きは `go/internal/layers_test.go` が見る。パッケージを足したら、先にその表（`topTiers` と、親のパスごとの `subTiers`）に行を足す。

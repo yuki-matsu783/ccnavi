@@ -69,14 +69,14 @@ pnpm test                                             # 統合先に取り込む
 ```
 
 hook（`lint-py.sh` `test-py.sh` `mark-ext.sh` `test-ext.sh`）が同じ検査を走らせていても、コミット前に明示的に実行してよい。
-実行ファイル（PyInstaller）はここでは作り直さない。要るときは `uv run --with pyinstaller python build.py` を手で回す。
+実行ファイルはここでは作り直さない。要るときは `sh scripts/ccnavi-build.sh` を手で回す。
 
 ### 3. prefix と論理的まとまりを決める
 
 | prefix | このリポジトリでの対象 |
 |---|---|
-| `feat` | `main.py` / `src/ccnavi/` への機能追加 |
-| `fix` | `main.py` / `src/ccnavi/` / hook スクリプトのバグ修正 |
+| `feat` | `go/` / `src/ccnavi/` への機能追加 |
+| `fix` | `go/` / `src/ccnavi/` / hook スクリプトのバグ修正 |
 | `refactor` | 挙動を変えないコード整理 |
 | `test` | `tests/*.py` / `tests/fixtures/` |
 | `docs` | `README.md` / `docs/10_requirements.md`・`docs/11_requirements/` / `docs/20_design.md`・`docs/21_design/` / `docs/30_adr.md`・`docs/30_adr/` / `docs/CONTEXT.md` |
@@ -117,8 +117,8 @@ sh .ccnavi/scripts/ccnavi-git.sh commit -m "<prefix>: <日本語の説明>"
 
 ```
 コミット1: feat: PreToolUse のルール照合と判定の記録を追加
-  - main.py
-  - src/ccnavi/policy/rules.py
+  - go/internal/policy/rules/rule.go
+  - go/internal/policy/rules/rules_test.go
 コミット2: docs: モードの呼び名を判定しない・警告・ブロックに統一
   - docs/10_requirements.md
 ```

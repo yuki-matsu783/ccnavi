@@ -5,7 +5,7 @@
 1. `--version` が版・組み立ての元のコミット・受け付けるフラグ・互換の版・書式の版を言い、
    設定もワークスペースも読まずに 0 で終わること
 2. フラグは引数の定義から引くので、定義に足したフラグがそのまま並ぶこと
-3. 組み立ての元のコミットは build.py が埋めた部品から読み、無ければ `unknown` と言うこと
+3. 組み立ての元のコミットは、埋めていなければ `unknown` と言うこと（埋め方は test_build.py）
 
 4. 互換の版が、実行ファイル・sh・VS Code 拡張で同じ値であること
 
@@ -25,9 +25,8 @@ import tempfile
 import tomllib
 import unittest
 
-import build
 from ccnavi.entry import version
-from tests import GIT_ENV, ROOT
+from tests import ROOT
 from tests.inproc import run_ccnavi
 
 
@@ -113,42 +112,10 @@ class BuildInfoTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
         self.addCleanup(sys.modules.pop, version.BUILDINFO_MODULE, None)
 
-    def test_v15_the_commit_written_at_build_is_read_back(self):
-        """V15 build.py が書いた部品を、組み立てた実行ファイルと同じく import で読む。"""
-        build.write_buildinfo(self.dir, "0123abc-dirty")
-        sys.path.insert(0, self.dir)
-        self.addCleanup(sys.path.remove, self.dir)
-        sys.modules.pop(version.BUILDINFO_MODULE, None)
-        self.assertEqual(version.commit(), "0123abc-dirty")
-
     def test_v16_without_the_stamp_the_commit_is_unknown(self):
         """V16"""
         sys.modules.pop(version.BUILDINFO_MODULE, None)
         self.assertEqual(version.commit(), version.UNKNOWN)
-
-    def git(self, *args):
-        env = {**os.environ, **GIT_ENV}
-        subprocess.run(["git", *args], cwd=self.dir, env=env, check=True, capture_output=True)
-
-    @unittest.skipIf(shutil.which("git") is None, "git が無い")
-    def test_v17_the_source_commit_is_head_and_says_dirty(self):
-        """V17 HEAD を言い、未コミットの変更があれば `-dirty` を付ける。
-
-        リポジトリでなければ unknown。
-        """
-        self.assertEqual(build.source_commit(self.dir), version.UNKNOWN)
-        self.git("init", "-q")
-        self.git("config", "user.email", "t@example.com")
-        self.git("config", "user.name", "t")
-        write(os.path.join(self.dir, "a.txt"), "a\n")
-        self.git("add", "a.txt")
-        self.git("commit", "-q", "-m", "a")
-        head = subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=self.dir, capture_output=True, text=True
-        ).stdout.strip()
-        self.assertEqual(build.source_commit(self.dir), head)
-        write(os.path.join(self.dir, "a.txt"), "b\n")
-        self.assertEqual(build.source_commit(self.dir), head + "-dirty")
 
 
 if __name__ == "__main__":

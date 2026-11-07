@@ -494,15 +494,16 @@ SH_COMPAT = re.compile(r"^CCNAVI_COMPAT=([0-9]+)[ \t]*$", re.MULTILINE)
 
 def compat_fix(root: str) -> str:
     """実行ファイルと sh が食い違ったときの直し方。ccnavi のリポジトリなら組み立て直し、
-    配布先なら配り直し。配布先には組み立てる元（build.py とソース）が無い。"""
-    if os.path.isfile(os.path.join(root, "build.py")) and os.path.isfile(
-        os.path.join(root, "src", "ccnavi", "__main__.py")
+    配布先なら配り直し。配布先には組み立てる元（組み立ての sh とソース）が無い。"""
+    if os.path.isfile(os.path.join(root, "scripts", "ccnavi-build.sh")) and os.path.isfile(
+        os.path.join(root, "go", "cmd", "ccnavi", "main.go")
     ):
         return (
-            "build.py を実行して組み立て直してください（uv run --with pyinstaller python build.py）"
+            "scripts/ccnavi-build.sh を実行して組み立て直してください（sh scripts/ccnavi-build.sh）"
         )
     return (
-        "ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> "
+        "ccnavi のリポジトリで scripts/ccnavi-build.sh を実行し、"
+        "scripts/ccnavi-setup.sh <このワークスペース> "
         "--force で実行ファイルと sh を配り直してください"
     )
 

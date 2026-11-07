@@ -1,9 +1,9 @@
 ---
 type: skill-reference
 title: glab 以外の道具の入れ方
-description: git・jq・curl・unzip・uv・Node.js と pnpm を、OS とパッケージマネージャーごとに入れる方法
+description: git・jq・curl・unzip・Go・Node.js と pnpm を、OS とパッケージマネージャーごとに入れる方法
 tags: [ccnavi-install, skills]
-keywords: [git, jq, curl, unzip, uv, node, pnpm, winget, scoop, brew, apt, dnf, パッケージマネージャー, プロキシ, PATH]
+keywords: [git, jq, curl, unzip, go, node, pnpm, winget, scoop, brew, apt, dnf, パッケージマネージャー, プロキシ, PATH]
 ---
 
 # glab 以外の道具
@@ -19,7 +19,7 @@ glab は [glab.md](glab.md)。
 | jq | 設定の読み書きと API の応答の読み取り | いつも（`jq` 行） |
 | curl | glab 無しで API に届くとき | glab を使わない代わりの道（`curl` 行） |
 | unzip | zip の展開（Linux） | zip を展開するとき |
-| uv | 実行ファイルの組み立て | ビルドから（`uv` 行） |
+| Go | 実行ファイルの組み立て。1.26 以上 | ビルドから（`go` 行） |
 | Node.js と pnpm | 拡張機能の組み立て | ビルドから、かつ `--with-extensions`（`node` 行） |
 
 ## 入れ方
@@ -30,11 +30,11 @@ glab は [glab.md](glab.md)。
 | jq | `winget install --id jqlang.jq -e` | `scoop install jq` | `brew install jq` | `sudo apt install jq` | `sudo dnf install jq` |
 | curl | Windows 10 以降と Git Bash に最初から入っている | 同左 | 最初から入っている | `sudo apt install curl` | `sudo dnf install curl` |
 | unzip | 不要（エクスプローラーで展開） | 不要 | 最初から入っている | `sudo apt install unzip` | `sudo dnf install unzip` |
-| uv | `winget install --id astral-sh.uv -e` | `scoop install uv` | `brew install uv` | 下の注を見る | 下の注を見る |
+| Go | `winget install --id GoLang.Go -e` | `scoop install go` | `brew install go` | 下の注を見る | 下の注を見る |
 | Node.js | `winget install --id OpenJS.NodeJS.LTS -e` | `scoop install nodejs-lts` | `brew install node` | 下の注を見る | 下の注を見る |
 
 - パッケージマネージャーが無い macOS の git は `xcode-select --install`（コマンドラインツール）でも入る。
-- uv（Linux・WSL）: uv の公式の導入手順（https://docs.astral.sh/uv/getting-started/installation/ ）に従う。`pipx install uv` でも入る。
+- Go（Linux・WSL）: ディストリビューションの版は古いことが多い。Go の公式の配布（https://go.dev/dl/ ）から 1.26 以上を入れる。
 - Node.js（Linux・WSL）: ディストリビューションの版は古いことが多い。Node.js 22.13.1 以上を、公式の配布か nvm で入れる。
 - pnpm: Node.js を入れたあと、`corepack enable`（Node.js 22 に同梱）か `npm install -g pnpm`。
 - パッケージマネージャーも利用できない、管理者権限も無い、外のサイトから取れないときは、社内の配布手順か管理者に頼んでもらう。

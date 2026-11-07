@@ -34,7 +34,12 @@ import time
 
 import gitlab_api
 
-from ccnavi.records import diaglog
+# ccnavi はパッケージとして入れていない（pyproject.toml）。tests/ と同じく src/ を読む。
+sys.path.insert(
+    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "src")
+)
+
+from ccnavi.records import diaglog  # noqa: E402
 
 # gitlab-ce 19.4.1（ダイジェストで固定。タグの 19.4.1 は Docker Hub に無い）
 GITLAB_IMAGE = (

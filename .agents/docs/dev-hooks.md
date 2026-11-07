@@ -1,9 +1,9 @@
 ---
 type: guide
 title: 開発用の hook
-description: ccnavi 自身の開発で使う hook（編集時の整形と検査、ターンの終わりのテスト、ADR の番号の検査、拡張のテスト）の役割、登録の有無、settings.local.json への足し方
+description: ccnavi 自身の開発で使う hook（編集時の整形と検査、ターンの終わりのテスト（Python と Go）、ADR の番号の検査、拡張のテスト）の役割、登録の有無、settings.local.json への足し方
 tags: [development, testing]
-keywords: [開発用 hook, lint-py, test-py, mark-ext, test-ext, check-adr, PostToolUse, Stop, settings.local.json, 差し戻し, test-groups.js]
+keywords: [開発用 hook, lint-py, test-py, gofmt, go vet, go test, mark-ext, test-ext, check-adr, PostToolUse, Stop, settings.local.json, 差し戻し, test-groups.js]
 ---
 
 # 開発用の hook
@@ -13,9 +13,9 @@ ccnavi のリポジトリ自身の開発に使う hook は `.claude/hooks/` に�
 
 | hook | 契機 | 役割 | `.claude/settings.json` |
 |---|---|---|---|
-| `lint-py.sh` | `PostToolUse`（`Write\|Edit\|MultiEdit\|NotebookEdit`） | 編集した Python のファイルの整形と検査 | 登録済み |
+| `lint-py.sh` | `PostToolUse`（`Write\|Edit\|MultiEdit\|NotebookEdit`） | 編集した Python のファイルの整形と検査、Go のファイルの整形（gofmt） | 登録済み |
 | `check-adr.sh` | `PostToolUse`（`Write\|Edit\|MultiEdit\|NotebookEdit`） | ADR の番号の重なりと置き場の間違いを、書いた直後に止める | 登録済み |
-| `test-py.sh` | `Stop` | ターンの終わりに、触ったツリーのテストを 1 回回す | 未登録 |
+| `test-py.sh` | `Stop` | ターンの終わりに、触った Go のモジュールの検査とテスト、触ったツリーの Python のテストを 1 回回す | 未登録 |
 | `mark-ext.sh` | `PostToolUse`（`Write\|Edit`） | 拡張のファイルを触ったことの書き残し | 未登録 |
 | `test-ext.sh` | `Stop` | ターンの終わりに、触った拡張のファイルに関わるテストのグループだけ回す | 未登録 |
 
@@ -29,6 +29,11 @@ ccnavi のリポジトリ自身の開発に使う hook は `.claude/hooks/` に�
 `test-py.sh` は、ターンの終わりに 1 回だけテストを回す。失敗していたら差し戻すが、差し戻しは 3 回まで。上限に達したら止まらせて、判断をユーザへ返す。
 
 `lint-py.sh` は、編集したファイルからいちばん近い `pyproject.toml` を上に辿ってツリーを決め、触ったツリーを `logs/session/<セッション>.trees` に書き残す。`test-py.sh` は触ったツリーだけをテストする。
+
+## Go の整形・検査とテスト
+
+実行ファイルの Go（`go/`）も同じ 2 つが見る。`lint-py.sh` は、編集した `.go` のファイルを `gofmt -l` で見て、いちばん近い `go.mod` のモジュールを `logs/session/<セッション>.go-trees` に書き残す。
+`test-py.sh` は、書き残したモジュールで `gofmt -l .`・`go vet ./...`・`GOOS=windows go vet ./...`・`go test ./...` を順に回し、最初に落ちたもので差し戻す（Python のテストより先に回す）。Go のファイルを触っていないターンは Go を回さない。`go` が無い機械では飛ばす。
 
 ## 拡張のテスト
 

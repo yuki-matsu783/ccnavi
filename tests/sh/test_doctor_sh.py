@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import os
 import shutil
 import signal
@@ -14,21 +13,18 @@ import time
 import unittest
 
 from tests import ROOT
-from tests.sh.install_harness import Env, count_next, have_tools, script, write_exec
+from tests.sh.install_harness import (
+    THIS_MACHINE,
+    Env,
+    count_next,
+    have_tools,
+    script,
+    write_exec,
+)
 
 DOCTOR = script("ccnavi-doctor.sh")
 HOST_SH = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-common-host.sh")
 GITLAB = "https://gitlab.example.com/g/p.git"
-
-
-def _host_target() -> str:
-    spec = importlib.util.spec_from_file_location("ccnavi_build", os.path.join(ROOT, "build.py"))
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.build_target()
-
-
-THIS_MACHINE = _host_target()
 
 
 def checks(out: str) -> dict[str, tuple[str, str, str]]:
@@ -408,19 +404,20 @@ class DoctorTest(Env):
         )
 
     def test_build_mode_items(self):
-        build = os.path.join(self.src, "build.py")
+        build = os.path.join(self.src, "scripts", "ccnavi-build.sh")
         done = self.doctor("--mode", "build")
         got = checks(done.stdout)
-        self.assertEqual(got["uv"][:2], ("ng", "not-installed"))
+        self.assertEqual(got["go"][:2], ("ng", "not-installed"))
         self.assertEqual(got["source"][:2], ("ng", "missing"))
         self.assertNotIn("package", got)
         self.assertEqual(got["node"][:2], ("warn", "not-installed"))
+        os.makedirs(os.path.dirname(build), exist_ok=True)
         with open(build, "w", encoding="utf-8") as f:
             f.write("")
-        self.fake("uv", "echo uv 0.5.0")
+        self.fake("go", "echo go version go1.26.0 linux/amd64")
         done = self.doctor("--mode", "build", "--with-extensions")
         got = checks(done.stdout)
-        self.assertEqual(got["uv"][0], "ok")
+        self.assertEqual(got["go"], ("ok", "ok", "1.26.0"))
         self.assertEqual(got["source"][0], "ok")
         self.assertEqual(got["node"][:2], ("ng", "not-installed"))
         self.assertEqual(done.returncode, 1)

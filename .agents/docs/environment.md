@@ -3,7 +3,7 @@ type: guide
 title: 実行環境とADRの扱い
 description: ccnaviの開発で対応する実行環境（Windows、macOS、Linux）と必要な道具の版、sh・Pythonを書くときの決まり、実測で分かった環境固有の落とし穴、コードのコメントの粒度、文書やコメントでのADRへの触れ方
 tags: [sh-scripts, environment]
-keywords: [コメント, 粒度, docstring, 処理フロー, 版, PyYAML, 落とし穴, uv, jq, CP932, Docker, PyInstaller, gitdir, 大文字小文字, casefold, normcase, pathcase, 実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, sh, bash, BSD, ADR, ADR番号, コメント]
+keywords: [コメント, 粒度, docstring, 処理フロー, 版, PyYAML, 落とし穴, uv, go, jq, CP932, Docker, gitdir, 大文字小文字, casefold, normcase, pathcase, 実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, sh, bash, BSD, ADR, ADR番号, コメント]
 ---
 
 # 実行環境とADRの扱い
@@ -18,12 +18,11 @@ keywords: [コメント, 粒度, docstring, 処理フロー, 版, PyYAML, 落と
   空のファイルを作るだけのときも同じで、Writeで作る。
   ヒアドキュメントで書いたファイルは、Write / Editに掛かる権限の宣言も、編集後の検査も通らないため
 - 使える道具は`jq` 1.6、Node 22.13.1 以上（pnpm 10）、Python 3.12 以上（uv）、goだけ。これ以外の道具がある前提で書かない。
-  Pythonの実行時の依存はPyYAML 1本だけ（`pyproject.toml`）。組み立てと検査の道具（PyInstaller、ruff）は開発時にしか要らない。
+  実行ファイルはGo（`go/`）で組み立てる。Pythonはテストを回すのに使い、依存はPyYAML 1本だけ（`pyproject.toml`）。検査の道具（ruff）は開発時にしか要らない。
   例外は、ホスト（GitHub・GitLab）と話すsh（`ccnavi-review.sh`・`ccnavi-branches.sh`・`ccnavi-start.sh`など）で、
-  `gh`・`glab`・`curl`を使う。無ければ何を用意すればよいかを案内して止まる。ソースで動かしているccnaviのリポジトリでは、
-  shが実行ファイルの代わりに`uv run python -m ccnavi`で起こすことがある（`uv`が無ければその道は使わない）
+  `gh`・`glab`・`curl`を使う。無ければ何を用意すればよいかを案内して止まる
 - Claude Code on the webには`.ccnavi/bin`が無い。ccnaviのhookを動かすには、
-  `uv run --with pyinstaller python build.py`でビルドする。ビルドしていない（PATHにも`ccnavi`が無い）とランチャーが終了コード127で終わり、
+  `sh scripts/ccnavi-build.sh`でビルドする。ビルドしていない（PATHにも`ccnavi`が無い）とランチャーが終了コード127で終わり、
   hookは何もしない
 
 ## 実測で分かった環境固有の落とし穴
@@ -35,7 +34,6 @@ Claude Codeの振る舞いについて測った前提は設計書の付録C（[a
   ハードリンクで作った`.venv`はそのままなので、テストが走っていないときに作り直す。自分のテストが走っている間は残る。
   失敗したら残ったディレクトリを`mv`で`.claude/worktrees/`の外へ出して`git worktree prune`。
   先に`sh .ccnavi/scripts/ccnavi-clean.sh <名前>`で生成物を消すとnode_modulesで止まる分は避けられる
-- **PyInstallerは指定したスクリプトをパッケージの外で走らせる。** 相対importが解けないので、絶対importの`main.py`を渡す
 - **Pythonの識別子に空白は入らない。** `def test_warn は…`のように英字と日本語の間に空白を入れると構文エラー
 - **Windowsのコンソール経由で日本語を引数に渡すとCP932になり、`jq --arg`がUTF-8でないJSONを作る。** 本文はファイルで渡す。
   `jq`の実体は`C:\Program Files\jq\jq`で、`"$JQ"`と引用しないと空白で分かれる

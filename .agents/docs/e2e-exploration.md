@@ -33,7 +33,7 @@ ccnavi の弱点（止め方の過不足、案内の分かりにくさ、画面�
 
 ccnavi 本体のチェックアウトには書かない。一時物は `scratchpad/` に置く。
 
-1. 最新を取り込み（`ccnavi-git.sh pull --ff-only`）、実行ファイル（`uv run --with pyinstaller python build.py`）と拡張の vsix（`extensions/vscode/ccnavi-board` の `sh scripts/package.sh`）を組み立てる。古い実行ファイルで測ると、直したはずの弱点が残って見える
+1. 最新を取り込み（`ccnavi-git.sh pull --ff-only`）、実行ファイル（`sh scripts/ccnavi-build.sh`）と拡張の vsix（`extensions/vscode/ccnavi-board` の `sh scripts/package.sh`）を組み立てる。古い実行ファイルで測ると、直したはずの弱点が残って見える
 2. GitLab を起動する（[gitlab-manual.md](gitlab-manual.md)）。測定中に `down`・`--rotate`・コンテナの再起動をしない
 3. サンプルを用意する。受入シナリオ（`setup.host: docker-gitlab`）なら、実行器が使い捨てのプロジェクトを作って `ccnavi-reviewer` を加える。探索の本で手で作るときは、root のトークンで `POST /projects` し、`ccnavi-reviewer` をメンバーに足す（足さないと MR が 404 になる）
 4. 初期のファイルを入れて push し、`sh scripts/ccnavi-setup.sh <サンプル> --mode enable` で ccnavi を入れる。`ccnavi-launcher.sh --lint` の error が 0 件であること。**サンプルは本ごとに新しく作る**。前の実走の MR・ブランチ・wiki が残ると、育ち方の検証が混ざる

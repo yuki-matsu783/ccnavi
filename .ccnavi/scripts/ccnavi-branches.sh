@@ -96,13 +96,11 @@ result="$state/branches-host-$$.json"
 host_err="$state/branches-host-err-$$"
 trap 'rm -f "$result" "$host_err" "$host_err.status" "$host_err.body"' EXIT
 
-# ---- 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
+# ---- 実行ファイル。
 if bin=$(ccnavi_bin "$root"); then
 	ccnavi() { "$bin" --root "$root" --cwd "$here" "$@"; }
-elif [ -f "$root/src/ccnavi/__main__.py" ]; then
-	ccnavi() { (cd "$root" && uv run python -m ccnavi --root "$root" --cwd "$here" "$@"); }
 else
-	fail no-bin "ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
+	fail no-bin "ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
 fi
 
 # ---- ホスト。読めなければ理由を書いて、手元の候補だけにする。

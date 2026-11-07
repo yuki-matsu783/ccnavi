@@ -1,7 +1,9 @@
 #!/bin/sh
 # PostToolUse (Write|Edit): 編集したファイルを整形・検査する
 #
-# Python ソースのときだけ実行する。指摘は exit 2 で返す
+# Python と Go のソースのときだけ実行する。指摘は exit 2 で返す
+# Go はここでは gofmt だけを見る。go vet と go test はパッケージをまたぐので、ターンの終わりの
+# test-py.sh が、ここで書き残したモジュールに回す
 # このイベントでモデルに届く経路はこれだけなので、指摘がコミット時ではなく
 # 同じターンの中で直る
 #
@@ -20,7 +22,7 @@ file=$(printf '%s' "$payload" |
 	sed -n 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 
 case "$file" in
-*.py) ;;
+*.py | *.go) ;;
 *) exit 0 ;;
 esac
 
@@ -33,7 +35,29 @@ file=$(printf '%s' "$file" | tr '\\' '/' | tr -s '/')
 main="${CLAUDE_PROJECT_DIR:-.}"
 session=$(printf '%s' "$payload" |
 	sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-[ -z "$session" ] && session=unknown
+case "$session" in
+'' | */* | *\\*) session=unknown ;;
+esac
+
+# Go: いちばん近い go.mod でモジュールを決めて書き残し、編集したファイルの整形だけを見る
+case "$file" in
+*.go)
+	module=$(dirname "$file")
+	while [ ! -f "$module/go.mod" ]; do
+		parent=$(dirname "$module")
+		[ "$parent" = "$module" ] && exit 0
+		module=$parent
+	done
+	mkdir -p "$main/logs/session"
+	printf '%s\n' "$module" >>"$main/logs/session/$session.go-trees"
+	command -v gofmt >/dev/null 2>&1 || exit 0
+	unformatted=$(gofmt -l "$file" 2>&1) || :
+	[ -z "$unformatted" ] && exit 0
+	printf 'gofmt: 整形されていません。'"'"'gofmt -w "%s"'"'"' を実行してください:\n%s\n' "$file" "$unformatted" >&2
+	printf 'ここで報告された指摘を直してから次へ進んでください。\n' >&2
+	exit 2
+	;;
+esac
 
 # 編集したファイルが属するツリーを、いちばん近い pyproject.toml で決める
 #
@@ -86,8 +110,7 @@ fi
 # 走らせると、複数ファイルにまたがる変更では途中の状態が必ず失敗するため、
 # 意味のない失敗の山を毎回読むことになり、本当の失敗がその中に紛れる
 
-# 実行ファイルはここでは作り直さない。PyInstaller が 11 秒かかるため外してある
-# 動かして確かめるときに `uv run --with pyinstaller python build.py` を手で回す
+# 実行ファイルはここでは作り直さない。動かして確かめるときに `sh scripts/ccnavi-build.sh` を手で回す
 
 [ -z "$report" ] && exit 0
 

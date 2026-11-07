@@ -626,9 +626,6 @@ issue_branch_make() {
 	if ib_bin=$(ccnavi_bin "$root"); then
 		ib_rc=0
 		ib_out=$("$ib_bin" --root "$root" worktree issue-id "$number" "$opt_prefix" $ib_project --title "$1" 2>"$state/start-issue-id-$$" </dev/null) || ib_rc=$?
-	elif [ -f "$root/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
-		ib_rc=0
-		ib_out=$(cd "$root" && uv run --quiet python -m ccnavi --root "$root" worktree issue-id "$number" "$opt_prefix" $ib_project --title "$1" 2>"$state/start-issue-id-$$" </dev/null) || ib_rc=$?
 	else
 		return 1
 	fi
@@ -1367,7 +1364,7 @@ id_check() {
 	ic_branch="$1"
 	ic_hint="${2:-ブランチ名を直すか、ユーザに相談してください。}"
 	ccnavi_id_ask "$root" "$ic_branch" ||
-		fail id-unchecked "ブランチ ${ic_branch} から作る識別子が親に使えるか（58 文字以内・末尾が -2 桁でない・使える字）を確かめられない（ccnavi の実行ファイルが答えない）。何も作成せずに処理を中断しました。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"
+		fail id-unchecked "ブランチ ${ic_branch} から作る識別子が親に使えるか（58 文字以内・末尾が -2 桁でない・使える字）を確かめられない（ccnavi の実行ファイルが答えない）。何も作成せずに処理を中断しました。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"
 	[ -z "$ccnavi_id_problem" ] ||
 		fail adopt-id "ブランチ ${ic_branch} から作る識別子 ${ccnavi_id_ident} は使えない（${ccnavi_id_problem}）。何も作成せずに処理を中断しました。${ic_hint}" "${3:-1}"
 }
@@ -1661,7 +1658,7 @@ if [ "$total" -eq 0 ]; then
 		case "$ib_rc" in
 		0) ;;
 		2) fail no-slug "issue #${number} からブランチ名を作れませんでした（${issue_branch_why}）。--slug <語> を付けて再実行してください。" 2 ;;
-		*) fail id-unchecked "issue #${number} からブランチ名を作れませんでした（ccnavi の実行ファイルが答えない）。何も作成せずに処理を中断しました。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行するか、--slug <語> を付けて再実行してください。" ;;
+		*) fail id-unchecked "issue #${number} からブランチ名を作れませんでした（ccnavi の実行ファイルが答えない）。何も作成せずに処理を中断しました。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行するか、--slug <語> を付けて再実行してください。" ;;
 		esac
 		if [ "$issue_branch_long" = yes ]; then
 			# タイトルが長く、機械で切ると語の途中や意味の欠けた名前になる。何も作らずに、短い語を付けて打ち直させる

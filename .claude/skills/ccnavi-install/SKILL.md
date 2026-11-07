@@ -51,7 +51,7 @@ ccnavi を入れる作業を、状況の調査 → 足りないものの案内 �
 
 | check 行 | 読む reference / すること |
 |---|---|
-| `git`・`jq`・`curl`・`uv`・`node` | [references/tools.md](references/tools.md) |
+| `git`・`jq`・`curl`・`go`・`node` | [references/tools.md](references/tools.md) |
 | `glab` が todo | [references/glab.md](references/glab.md)。ただし、代わりの道（[references/auth.md](references/auth.md)）を選んでもよいとユーザに伝える |
 | `glab` が warn の `optional:` | 入れなくてよいと伝える |
 | `remote`・`host-api`・`source-remote` が todo、`origin` が warn ssh | [references/auth.md](references/auth.md) |

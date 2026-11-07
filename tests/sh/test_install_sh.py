@@ -319,13 +319,12 @@ class InstallTest(Env):
     # ---- --build
 
     def make_build_src(self) -> str:
-        with open(os.path.join(self.src, "build.py"), "w", encoding="utf-8") as f:
-            f.write("")
-        self.fake("uv", "exit 0")
-        write_exec(
-            os.path.join(self.src, "scripts", "ccnavi-build-install.sh"),
-            f'#!/bin/sh\nprintf \'build-install %s\\n\' "$*" >> "{self.calls}"\n',
-        )
+        self.fake("go", "echo go version go1.26.0 linux/amd64")
+        for name in ("build", "build-install"):
+            write_exec(
+                os.path.join(self.src, "scripts", f"ccnavi-{name}.sh"),
+                f'#!/bin/sh\nprintf \'{name} %s\\n\' "$*" >> "{self.calls}"\n',
+            )
         return self.src
 
     def test_build_check_runs_nothing(self):
@@ -336,7 +335,7 @@ class InstallTest(Env):
         )
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         calls = self.calls_text()
-        for forbidden in ("pull", "uv run", "build-install", "setup "):
+        for forbidden in ("pull", "build ", "build-install", "setup "):
             self.assertNotIn(forbidden, calls)
         self.one_next(done)
         self.assertIn("git pull --ff-only", done.stdout)
@@ -350,12 +349,12 @@ class InstallTest(Env):
         )
         self.assertIn("VS Code への拡張機能のインストール", done.stdout)
 
-    def test_build_runs_uv_and_does_not_call_setup(self):
+    def test_build_runs_the_build_sh_and_does_not_call_setup(self):
         src = self.make_build_src()
         done = self.run_sh([os.path.join(src, "scripts", "ccnavi-install.sh"), self.ws, "--build"])
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         calls = self.calls_text()
-        self.assertIn("uv run --with pyinstaller python build.py", calls)
+        self.assertIn("build \n", calls)
         self.assertNotIn("setup ", calls)
         self.one_next(done)
         last = done.stdout.splitlines()[-1]
@@ -372,7 +371,7 @@ class InstallTest(Env):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         calls = self.calls_text()
         self.assertIn("build-install", calls)
-        self.assertNotIn("uv run", calls)
+        self.assertNotIn("build \n", calls)
         self.assertNotIn("pull", calls)
 
     def test_build_pulls_only_with_a_tracking_branch(self):
@@ -397,7 +396,7 @@ class InstallTest(Env):
 
     def test_build_failure_is_4(self):
         src = self.make_build_src()
-        self.fake("uv", "exit 1")
+        write_exec(os.path.join(src, "scripts", "ccnavi-build.sh"), "#!/bin/sh\nexit 1\n")
         done = self.run_sh([os.path.join(src, "scripts", "ccnavi-install.sh"), self.ws, "--build"])
         self.assertEqual(done.returncode, 4)
         self.one_next(done)
