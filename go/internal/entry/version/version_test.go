@@ -22,7 +22,7 @@ func report(t *testing.T, asJSON bool) string {
 	return b.String()
 }
 
-// ソースで動いているとき（commit を埋めていない）の 2 つの形が、見本（Python のソースで動いていたときの写し）と
+// 組み立ての sh を通さずに組んだとき（commit を埋めていない）の 2 つの形が、見本と
 // 1 字も違わない。
 func TestReportMatchesPython(t *testing.T) {
 	want := golden.Load[map[string]string](t, "report")

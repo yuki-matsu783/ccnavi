@@ -78,7 +78,7 @@ func Report(stdout io.Writer, asJSON bool) int {
 		}
 		return config.ExitOK
 	}
-	how, yes := "ソースで動いている", "no"
+	how, yes := "scripts/ccnavi-build.sh で組んでいない", "no"
 	if built() {
 		how, yes = "組み立てた実行ファイル", "yes"
 	}
