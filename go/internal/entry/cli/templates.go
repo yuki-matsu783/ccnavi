@@ -28,11 +28,17 @@ func templatesAsked(a opts) bool {
 		a.Str("layer") != "" || !a.IsNone("draft") || !a.IsNone("check_file") || a.Str("name") != "" || a.Str("to") != ""
 }
 
-// firstGiven は (フラグ, 渡したか) の組の並びで、渡された最初のフラグ。
-func firstGiven(pairs ...any) string {
-	for i := 0; i+1 < len(pairs); i += 2 {
-		if pairs[i+1].(bool) {
-			return pairs[i].(string)
+// flagGiven はフラグと、それが渡されたか。
+type flagGiven struct {
+	flag  string
+	given bool
+}
+
+// firstGiven は並びのうち、渡された最初のフラグ。
+func firstGiven(flags []flagGiven) string {
+	for _, f := range flags {
+		if f.given {
+			return f.flag
 		}
 	}
 	return ""
@@ -48,12 +54,12 @@ func draftUsage(a opts) string {
 		if a.Str("to") != "" {
 			return "--to は --draft でだけ指定できる"
 		}
-		if flag := firstGiven("--expect", expect, "--yes", yes); flag != "" {
+		if flag := firstGiven([]flagGiven{{"--expect", expect}, {"--yes", yes}}); flag != "" {
 			return flag + " は --templates と同時に指定できない（取り込みは ccnavi-user-handoff.sh）"
 		}
 		return ""
 	}
-	if flag := firstGiven("--expect", expect, "--yes", yes); flag != "" {
+	if flag := firstGiven([]flagGiven{{"--expect", expect}, {"--yes", yes}}); flag != "" {
 		return flag + " は --draft と同時に指定できない（取り込みは ccnavi-user-handoff.sh）"
 	}
 	if !a.IsNone("show") || len(a.Strings("keyword")) > 0 {
@@ -87,9 +93,9 @@ func templatesUsage(a opts) string {
 	}
 	if !templatesOn {
 		// `ticket new --template` の `--layer` は、テンプレートを引くレイヤー。
-		if flag := firstGiven("--check-file", !a.IsNone("check_file"), "--show", !a.IsNone("show"),
-			"--layer", a.Str("layer") != "" && !ticketNew(a), "--draft", !a.IsNone("draft"),
-			"--name", a.Str("name") != "", "--to", a.Str("to") != ""); flag != "" {
+		if flag := firstGiven([]flagGiven{{"--check-file", !a.IsNone("check_file")}, {"--show", !a.IsNone("show")},
+			{"--layer", a.Str("layer") != "" && !ticketNew(a)}, {"--draft", !a.IsNone("draft")},
+			{"--name", a.Str("name") != ""}, {"--to", a.Str("to") != ""}}); flag != "" {
 			return flag + " は --templates と一緒に使う"
 		}
 		return ""
@@ -101,9 +107,9 @@ func templatesUsage(a opts) string {
 		return "--templates は " + refused + " と同時に指定できない"
 	}
 	// 絞り込みのフラグは `--docs` の物。`--keyword` だけは同じ語を使う。
-	for _, f := range docsFlags {
-		if f.flag != "--keyword" && !sameValue(a.Namespace[f.dest], f.absent) {
-			return f.flag + " は --docs でだけ指定できる"
+	for _, flag := range docsFlags {
+		if flag != "--keyword" && a.given(flag) {
+			return flag + " は --docs でだけ指定できる"
 		}
 	}
 	if cmd := a.command(); len(cmd) > 0 {
@@ -113,9 +119,9 @@ func templatesUsage(a opts) string {
 		if ospath.Strip(a.Str("check_file")) == "" {
 			return "--check-file にはパスを渡す"
 		}
-		if flag := firstGiven("--show", !a.IsNone("show"), "--draft", !a.IsNone("draft"),
-			"--keyword", len(a.Strings("keyword")) > 0, "--name", a.Str("name") != "", "--to", a.Str("to") != "",
-			"--expect", !a.IsNone("expect"), "--yes", a.Truthy("yes")); flag != "" {
+		if flag := firstGiven([]flagGiven{{"--show", !a.IsNone("show")}, {"--draft", !a.IsNone("draft")},
+			{"--keyword", len(a.Strings("keyword")) > 0}, {"--name", a.Str("name") != ""}, {"--to", a.Str("to") != ""},
+			{"--expect", !a.IsNone("expect")}, {"--yes", a.Truthy("yes")}}); flag != "" {
 			return flag + " は --check-file と同時に指定できない"
 		}
 		return ""

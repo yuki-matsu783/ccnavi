@@ -67,9 +67,9 @@ func finish(stderr io.Writer, code int, err error) int {
 	return config.ExitError
 }
 
-// okOrError は 0 を ExitOK に、ほかを ExitError に寄せる。
-func okOrError(code int) int {
-	if code == 0 {
+// okIf は成否を終了コードにする。成功は ExitOK、失敗は ExitError。
+func okIf(ok bool) int {
+	if ok {
 		return config.ExitOK
 	}
 	return config.ExitError
@@ -100,7 +100,7 @@ func run(in *input, stdout, stderr io.Writer, argv []string) int {
 		}
 		return config.ExitError
 	}
-	a := opts{ns}
+	a := opts{ns, parser}
 	if testWords != nil && a.IsNone("test") {
 		a.Namespace["test"] = []any{testWords[0], testWords[1]}
 	}

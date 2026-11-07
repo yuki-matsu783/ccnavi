@@ -343,7 +343,7 @@ func agree(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 		return core.Verify(stdout, stderr, conf, root, a.Truthy("json"), only)
 	}
 	if preview {
-		return okOrError(core.Preview(stdout, stderr, conf, root, a.Truthy("json"), only))
+		return okIf(core.Preview(stdout, stderr, conf, root, a.Truthy("json"), only) == 0)
 	}
 	// 拡張のオーバーレイでユーザが押した承認。ターミナルの確認の代わりに、見せた一覧と今の一覧が同じであることを
 	// 求める。エージェントが Bash で打つ形は組み込みの deny が止める。
@@ -354,7 +354,7 @@ func agree(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 		if err != nil {
 			return finish(stderr, code, err)
 		}
-		return okOrError(code)
+		return okIf(code == 0)
 	}
 	if !fromTerminal(in, conf, stderr, useronly.OpApprove) {
 		return config.ExitError
@@ -367,7 +367,7 @@ func agree(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 	if code == config.ExitPartial {
 		return config.ExitPartial
 	}
-	return okOrError(code)
+	return okIf(code == 0)
 }
 
 // asked は sh が聞くこと（操作記録・取り込み・文面・ツリー・write-and-push・ブランチ・放置・Stop の判定役）。
@@ -381,15 +381,15 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 		// 操作記録の読み書き。チケット制御の有無に依らない。
 		return opsCommand(stdout, stderr, conf, cmd[1:]), true
 	case slices.Equal(cmd, []string{"sync", "paths"}):
-		return okOrError(syncPaths(stdout, conf)), true
+		return okIf(syncPaths(stdout, conf) == 0), true
 	case slices.Equal(cmd, []string{"sync", "retired"}):
-		return okOrError(syncRetired(stdout, conf)), true
+		return okIf(syncRetired(stdout, conf) == 0), true
 	case (len(cmd) == 3 || len(cmd) == 4) && a.head("sync", "check"):
 		repo := ""
 		if len(cmd) == 4 {
 			repo = cmd[3]
 		}
-		return okOrError(syncCheck(stdout, stderr, root, conf, cmd[2], repo)), true
+		return okIf(syncCheck(stdout, stderr, root, conf, cmd[2], repo) == 0), true
 	case cmd[0] == "text":
 		return runText(stdout, stderr, root, cmd[1:]), true
 	}
@@ -398,13 +398,13 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 	}
 	switch {
 	case len(cmd) == 6 && a.head("sync", "tidy"):
-		return okOrError(syncTidy(stdout, stderr, root, conf, cwdOf(a), cmd[2], cmd[3], cmd[4], cmd[5])), true
+		return okIf(syncTidy(stdout, stderr, root, conf, cwdOf(a), cmd[2], cmd[3], cmd[4], cmd[5]) == 0), true
 	case len(cmd) == 3 && a.head("write-and-push", "family"):
 		if !ids.IsValidFamily(cmd[2]) {
 			fmt.Fprintf(stderr, "ccnavi: write-and-push family の %s は有効な識別子の形式ではありません。\n", pyfmt.Repr(cmd[2]))
 			return config.ExitError, true
 		}
-		return okOrError(wap.Family(stdout, conf, root, cmd[2])), true
+		return okIf(wap.Family(stdout, conf, root, cmd[2]) == 0), true
 	case (len(cmd) == 3 || len(cmd) == 4) && a.head("write-and-push", "sort"):
 		since := ""
 		if len(cmd) == 4 {
@@ -418,17 +418,17 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 			fmt.Fprintf(stderr, "ccnavi: write-and-push sort の版 %s は読めない\n", pyfmt.Repr(since))
 			return config.ExitError, true
 		}
-		return okOrError(wap.Sort(stdout, stderr, conf, root, cmd[2], since)), true
+		return okIf(wap.Sort(stdout, stderr, conf, root, cmd[2], since) == 0), true
 	case len(cmd) >= 3 && a.head("write-and-push", "merge"):
 		if !ids.IsValidFamily(cmd[2]) || len(cmd) != 3 {
 			fmt.Fprintf(stderr, "ccnavi: write-and-push merge の %s は有効な識別子の形式ではありません。\n", pyfmt.Repr(cmd[2]))
 			return config.ExitError, true
 		}
-		return okOrError(wapmerge.Plan(stdout, conf, root, cmd[2])), true
+		return okIf(wapmerge.Plan(stdout, conf, root, cmd[2]) == 0), true
 	case len(cmd) == 3 && cmd[0] == "branches":
 		// ホストの結果は sh が取ってきて `--result` で渡す。
-		return okOrError(branch.Report(stdout, stderr, conf, root, cwdOf(a), cmd[1], cmd[2], a.Str("result"),
-			a.Truthy("json"))), true
+		return okIf(branch.Report(stdout, stderr, conf, root, cwdOf(a), cmd[1], cmd[2], a.Str("result"),
+			a.Truthy("json")) == 0), true
 	case cmd[0] == "idle":
 		return runIdle(in, stdout, stderr, conf, cmd), true
 	case cmd[0] == "stop-review":

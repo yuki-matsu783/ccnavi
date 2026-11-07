@@ -132,13 +132,6 @@ func runHandoff(in *input, stdout, stderr io.Writer, parser *argparse.Parser, co
 	return config.ExitOK
 }
 
-func okIf(ok bool) int {
-	if ok {
-		return config.ExitOK
-	}
-	return config.ExitError
-}
-
 // handoffPlan は取り込みの計画を人が読む形で書く。何も反映せず、取り込めるときだけ次に打つコマンドを添える。
 func handoffPlan(w io.Writer, plan *handoff.Plan, named bool, root string) {
 	fmt.Fprintf(w, "ccnavi: 保護対象の下書き（%s の %s/）\n", plan.Tree, place.Handoff)

@@ -17,6 +17,7 @@ import (
 	"ccnavi/internal/hook/subagent"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/policy/rules"
@@ -220,8 +221,13 @@ func judgeEvent(stdout, stderr io.Writer, mode config.Mode, conf *config.Setting
 // writeRecord は 1 行を書く。書けなかったときは報告して捨てる。書けないことでツールの実行可否は変えない。
 func writeRecord(stderr io.Writer, log *audit.Log, record *audit.Record) {
 	if err := log.Write(record); err != nil {
-		fmt.Fprintf(stderr, "ccnavi: ログを保存できませんでした：%s\n", err)
+		logUnsaved(stderr, fsio.ErrorText(err))
 	}
+}
+
+// logUnsaved は記録を書けなかったことを、その理由とともに報告する。
+func logUnsaved(stderr io.Writer, reason string) {
+	fmt.Fprintf(stderr, "ccnavi: ログを保存できませんでした：%s\n", reason)
 }
 
 // hookCrashed は、判定の本体の外（モードの解決、payload の読み取り、記録など）で落ちた回の受け皿である。
@@ -254,7 +260,7 @@ func hookCrashed(stdout, stderr io.Writer, conf *config.Settings, root string, s
 // recordQuietly は受け皿の中の記録。ここで落ちても失敗を重ねない。
 func recordQuietly(stderr io.Writer, log *audit.Log, record *audit.Record) {
 	defer onPanic(func(_ any, f failure) {
-		fmt.Fprintf(stderr, "ccnavi: ログを保存できませんでした：%s\n", f.kind)
+		logUnsaved(stderr, f.kind)
 	})
 	writeRecord(stderr, log, record)
 }

@@ -65,7 +65,7 @@ func operate(in *input, stdout, stderr io.Writer, conf *config.Settings, root st
 		return closeEarly(in, stdout, stderr, conf, root, a, cwd)
 	case hasReviewed && acceptUnresolved && a.Truthy("check"):
 		// 置く前に分かる前提だけ（読むだけ）。sh が取り込み・ロックの前に呼ぶ。
-		return okOrError(decide.Check(stdout, stderr, conf, root, cwd, reviewed, a.Str("yes"), a.Str("digest")))
+		return okIf(decide.Check(stdout, stderr, conf, root, cwd, reviewed, a.Str("yes"), a.Str("digest")) == 0)
 	case hasReviewed && acceptUnresolved && (a.Truthy("preview") || a.Truthy("yes")):
 		return decideBoard(stdout, stderr, conf, root, a, cwd, reviewed)
 	case hasReviewed && a.Str("choose_out") != "":
@@ -75,7 +75,7 @@ func operate(in *input, stdout, stderr io.Writer, conf *config.Settings, root st
 			fmt.Fprintf(stderr, inStateOnly, "--choose-out の出力先")
 			return config.ExitError
 		}
-		return okOrError(decide.Choose(in.buf, stdout, stderr, conf, root, cwd, reviewed, a.Str("result"), a.Str("choose_out")))
+		return okIf(decide.Choose(in.buf, stdout, stderr, conf, root, cwd, reviewed, a.Str("result"), a.Str("choose_out")) == 0)
 	case hasReviewed:
 		via.SetRoute(via.Terminal)
 		decideActor(a)
@@ -91,7 +91,7 @@ func finishOK(stderr io.Writer, code int, err error) int {
 	if err != nil {
 		return finish(stderr, code, err)
 	}
-	return okOrError(code)
+	return okIf(code == 0)
 }
 
 // closeEarly はユーザがターミナルで打つ、親を早めに閉じる操作。`--agree`・`--reviewed` と同じくターミナルを求める。
@@ -132,7 +132,7 @@ func decideBoard(stdout, stderr io.Writer, conf *config.Settings, root string, a
 	via.SetRoute(via.Board)
 	decideActor(a)
 	if preview {
-		return okOrError(decide.Preview(stdout, stderr, conf, root, cwd, reviewed, a.Str("result")))
+		return okIf(decide.Preview(stdout, stderr, conf, root, cwd, reviewed, a.Str("result")) == 0)
 	}
 	code, err := decide.Yes(stdout, stderr, conf, root, cwd, reviewed, a.Str("result"), yes, a.Str("digest"),
 		decide.YesOptions{PlanOut: a.Str("accept_plan"), PlanDone: a.Str("accept_done")})
@@ -291,7 +291,7 @@ func worktree(stdout, stderr io.Writer, conf *config.Settings, root string, a op
 			fmt.Fprintln(stderr, "ccnavi: worktree retire --abandon <親> の形で指定してください（親は有効な識別子）。")
 			return config.ExitError
 		}
-		return okOrError(retire.RunAbandon(stdout, stderr, conf, root, a.Str("abandon")))
+		return okIf(retire.RunAbandon(stdout, stderr, conf, root, a.Str("abandon")) == 0)
 	}
 	switch {
 	case verb == "name" && len(words) == 3:
@@ -314,9 +314,9 @@ func worktree(stdout, stderr io.Writer, conf *config.Settings, root string, a op
 			fmt.Fprintf(stderr, "ccnavi: worktree branch の %s は有効な識別子の形式ではありません。\n", pyfmt.Repr(words[2]))
 			return config.ExitError
 		}
-		return okOrError(retire.RunBranch(stdout, stderr, conf, root, words[2], len(words) == 4))
+		return okIf(retire.RunBranch(stdout, stderr, conf, root, words[2], len(words) == 4) == 0)
 	case verb == "clean" && len(words) == 3:
-		return okOrError(worktrees.RunClean(stdout, stderr, root, words[2], a.Truthy("preview")))
+		return okIf(worktrees.RunClean(stdout, stderr, root, words[2], a.Truthy("preview")) == 0)
 	}
 	if !slices.Contains([]string{"drop", "tidy", "remaining", "retire"}, verb) || len(words) != 3 {
 		io.WriteString(stderr, worktreeUsage)
@@ -328,7 +328,7 @@ func worktree(stdout, stderr io.Writer, conf *config.Settings, root string, a op
 		return config.ExitError
 	}
 	if verb == "drop" {
-		return okOrError(worktrees.RunDrop(stdout, root, target, cwd))
+		return okIf(worktrees.RunDrop(stdout, root, target, cwd) == 0)
 	}
 	if !conf.TicketsEnabled() {
 		io.WriteString(stderr, ticketControlOff)
@@ -336,15 +336,15 @@ func worktree(stdout, stderr io.Writer, conf *config.Settings, root string, a op
 	}
 	switch verb {
 	case "remaining":
-		return okOrError(worktrees.RunRemaining(stdout, conf, root, target))
+		return okIf(worktrees.RunRemaining(stdout, conf, root, target) == 0)
 	case "retire":
-		return okOrError(retire.RunRetire(stdout, stderr, conf, root, target, cwd))
+		return okIf(retire.RunRetire(stdout, stderr, conf, root, target, cwd) == 0)
 	}
 	var phaseNo *int
 	if n, ok := a.Int("phase"); ok {
 		phaseNo = &n
 	}
-	return okOrError(worktrees.RunTidy(stdout, conf, root, target, phaseNo, cwd))
+	return okIf(worktrees.RunTidy(stdout, conf, root, target, phaseNo, cwd) == 0)
 }
 
 // issueID は `worktree issue-id <番号> <先頭の語> [<プロジェクト>] --title <タイトル>`。issue から新しい親のブランチ名

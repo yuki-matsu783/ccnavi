@@ -124,10 +124,22 @@ func newParser() *argparse.Parser {
 	return p
 }
 
-// opts は読めた引数である。Python の argparse の Namespace と同じく、
+// opts は読めた引数と、それを読んだ parser である。Python の argparse の Namespace と同じく、
 // 経路の途中で値を差し替える（sh が渡すパスを 1 本にまとめる、診断の外の差し替えを捨てる）。
 // 欄の名前は argparse の dest と同じにする。
-type opts struct{ argparse.Namespace }
+type opts struct {
+	argparse.Namespace
+	parser *argparse.Parser
+}
+
+// given はオプション flag の値が既定と違うか（渡されたか）。
+func (a opts) given(flag string) bool { return a.Changed(a.parser.Option(flag)) }
+
+// reset はオプション flag の値を既定に戻す。
+func (a opts) reset(flag string) {
+	action := a.parser.Option(flag)
+	a.Namespace[action.Dest] = action.Default
+}
 
 func (a opts) command() []string { return a.Strings("command") }
 

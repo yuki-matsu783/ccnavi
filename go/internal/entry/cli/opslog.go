@@ -121,7 +121,7 @@ func opsStep(stdout, stderr io.Writer, state string, words []string) (code int, 
 			fmt.Fprintln(stderr, opsOutState)
 			return config.ExitError, true, nil
 		}
-		return okOrError(decide.ResumePlan(r, words[2])), true, nil
+		return okIf(decide.ResumePlan(r, words[2]) == 0), true, nil
 	case verb == "mark-sent" && n == 8:
 		// mark-sent <種類> <親> <MR> <キー> <段階ID> <URL>: 目印で見つけた投稿を送り済みにする
 		key := words[4]

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -290,6 +291,9 @@ func TestIntAndFinite(t *testing.T) {
 		want            int
 	}{
 		{" 5 ", 3, 2, 5}, {"1", 3, 2, 3}, {"x", 3, 2, 3}, {"", 3, 0, 3}, {"0", 3, 0, 0},
+		// int に収まらない値は端に寄せてから下限と比べる（Python は巨大な値のまま使う）。
+		{"99999999999999999999", 3, 2, math.MaxInt}, {"-99999999999999999999", 3, 2, 3},
+		{"-99999999999999999999", 3, math.MinInt, math.MinInt},
 	}
 	for _, c := range cases {
 		if got := Int(c.written, c.fallback, c.least); got != c.want {

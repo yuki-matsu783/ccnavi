@@ -113,10 +113,10 @@ func optionDest(flags []string) string {
 func (p *Parser) Actions() []*Action { return p.actions }
 
 // HasOption は s がオプションの名前そのものか。
-func (p *Parser) HasOption(s string) bool {
-	_, ok := p.options[s]
-	return ok
-}
+func (p *Parser) HasOption(s string) bool { return p.Option(s) != nil }
+
+// Option は名前が s のオプション。無ければ nil。
+func (p *Parser) Option(s string) *Action { return p.options[s] }
 
 // name は誤りの文に出す引数の名前（Python の _get_action_name）。
 func (a *Action) name() string {

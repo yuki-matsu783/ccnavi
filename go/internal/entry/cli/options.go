@@ -17,50 +17,26 @@ import (
 	"ccnavi/internal/tickets/model/useronly"
 )
 
-// placeFlag は置き場を動かすフラグと、「渡されなかった」ときの値（argparse の既定と同じ。nil は None）。
-type placeFlag struct {
-	flag, dest string
-	absent     any
-}
-
 // layerOverrides はレイヤーの置き場を動かすフラグである。前の 3 本は共通レイヤーの中身、
 // 後の 2 本はレイヤーを探す先を指す。どれを外しても、プロジェクトのレイヤーが丸ごと消える。
 // そうなると実績リスクが下がり、レビュー待ちを飛ばして閉じられてしまう。
 // placeOverrides は記録と状態とチケットの置き場を動かすフラグである。どちらも診断の経路でだけ効く。
 // sh は受け取った引数をそのまま渡すので、診断の外で受けると、記録を消した形や置き場を差し替えた形でサブコマンドが
-// 動いてしまう。
+// 動いてしまう。渡されたかは、値が argparse の既定と違うかで見る。
 var (
-	layerOverrides = []placeFlag{
-		{"--rules", "rules", ""},
-		{"--phases", "phases", nil},
-		{"--risk", "risk", nil},
-		{"--projects", "projects", nil},
-		{"--project-home", "project_home", ""},
-	}
-	placeOverrides = []placeFlag{
-		{"--log", "log", nil},
-		{"--state", "state", nil},
-		{"--approved", "approved", nil},
-		{"--tickets", "tickets", ""},
-	}
-	// wrapperFlags は sh が自分で計算して渡すパスである。sh は自分の分を先に置き、
+	layerOverrides = []string{"--rules", "--phases", "--risk", "--projects", "--project-home"}
+	placeOverrides = []string{"--log", "--state", "--approved", "--tickets"}
+	// wrapperFlags は sh が自分で計算して渡すパスと、渡されなかったときにまとめる値である。sh は自分の分を先に置き、
 	// エージェントの引数を後ろに付けるので、argparse の後勝ちでは 2 本目で上書きできてしまう。
 	// 2 度渡す正しい使い方は無いので、2 本目があること自体を断る。
-	wrapperFlags = []placeFlag{{"--root", "root", nil}, {"--cwd", "cwd", ""}}
+	wrapperFlags = []struct {
+		flag, dest string
+		absent     any
+	}{{"--root", "root", nil}, {"--cwd", "cwd", ""}}
 	// docsFlags は `--docs` でだけ読むフラグ。
-	docsFlags = []placeFlag{
-		{"--type", "type", nil},
-		{"--tag", "tag", nil},
-		{"--keyword", "keyword", nil},
-		{"--path", "path", nil},
-		{"--text", "text", nil},
-		{"--since", "since", nil},
-		{"--until", "until", nil},
-		{"--sort", "sort", nil},
-		{"--reverse", "reverse", false},
-		{"--limit", "limit", nil},
-		{"--format", "format", nil},
-		{"--no-refresh", "no_refresh", false},
+	docsFlags = []string{
+		"--type", "--tag", "--keyword", "--path", "--text", "--since", "--until", "--sort", "--reverse", "--limit",
+		"--format", "--no-refresh",
 	}
 )
 
@@ -85,21 +61,6 @@ const (
 	diagnosisOnly = "ccnavi: %s は診断時のみ使用できます。今回の指定は無視されます。\n"
 	docsOnly      = "ccnavi: %s は --docs でだけ指定できる\n"
 )
-
-// sameValue は Python の ==（文字列・None・bool の値だけを比べる）。
-func sameValue(v, absent any) bool {
-	switch x := absent.(type) {
-	case nil:
-		return v == nil
-	case string:
-		s, ok := v.(string)
-		return ok && s == x
-	case bool:
-		b, ok := v.(bool)
-		return ok && b == x
-	}
-	return false
-}
 
 // oneWrapperFlagEach は、sh が渡すパスが 2 度来ていないかを見て、1 本にまとめる。2 度来ていたら false を返す。
 // 数えるのは argparse に任せる。argv を直接数えると、`--reason=--root` のような別のオプションの値まで数えてしまう
@@ -132,13 +93,12 @@ func diagnosing(a opts) bool {
 
 // dropOutsideDiagnosis は診断の外で渡された置き場の差し替えを、標準エラーに出して無視する。
 func dropOutsideDiagnosis(stderr io.Writer, a opts) {
-	for _, group := range [][]placeFlag{layerOverrides, placeOverrides} {
-		for _, f := range group {
-			if sameValue(a.Namespace[f.dest], f.absent) {
-				continue
+	for _, group := range [][]string{layerOverrides, placeOverrides} {
+		for _, flag := range group {
+			if a.given(flag) {
+				fmt.Fprintf(stderr, diagnosisOnly, flag)
+				a.reset(flag)
 			}
-			fmt.Fprintf(stderr, diagnosisOnly, f.flag)
-			a.Namespace[f.dest] = f.absent
 		}
 	}
 }
@@ -190,9 +150,9 @@ func inside(path, base string) bool {
 // docsFlagsGiven は渡された `--docs` 用のフラグ。
 func docsFlagsGiven(a opts) []string {
 	var out []string
-	for _, f := range docsFlags {
-		if !sameValue(a.Namespace[f.dest], f.absent) {
-			out = append(out, f.flag)
+	for _, flag := range docsFlags {
+		if a.given(flag) {
+			out = append(out, flag)
 		}
 	}
 	return out
@@ -202,15 +162,11 @@ func docsFlagsGiven(a opts) []string {
 // own は調べている経路自身のフラグで、数えない。`--reviewed 0` の 0 も、渡したものとして数える。
 func notWithDocsGiven(a opts, own string) string {
 	for _, flag := range notWithDocs {
-		if flag == own {
+		if flag == own || !a.given(flag) {
 			continue
 		}
-		name := destOf(flag)
-		v := a.Namespace[name]
-		if b, ok := v.(bool); v == nil || ok && !b {
-			continue
-		}
-		if s, ok := v.(string); ok && s == "" && !emptyCounts[name] {
+		dest := a.parser.Option(flag).Dest
+		if s, ok := a.Namespace[dest].(string); ok && s == "" && !emptyCounts[dest] {
 			continue
 		}
 		return flag

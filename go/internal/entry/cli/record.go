@@ -26,7 +26,7 @@ const recordDir = "write-and-push"
 // コマンドが失敗しても、そこまでに書いたパスで一覧を書く（失敗した回も戻すのに一覧を使う）。一覧を書けなければ、
 // コマンドの結果に依らず 1 で終わる。
 func recordedRun(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts, unmarked *useronly.Verb) int {
-	wrapper := opts{maps.Clone(a.Namespace)}
+	wrapper := opts{maps.Clone(a.Namespace), a.parser}
 	if !oneWrapperFlagEach(stderr, wrapper) {
 		return config.ExitError
 	}

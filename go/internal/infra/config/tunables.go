@@ -47,11 +47,23 @@ var (
 // 下限や既定の扱いは読む側ごとに違うので、ここは読めたかまでを決める（Int は下限も受ける）。
 
 // Int は書かれた整数。読めない値と least より小さい値は fallback。
+// int に収まらない値は、正なら math.MaxInt、負なら math.MinInt として least と比べる（Python は巨大な値のまま使う）。
 func Int(written string, fallback, least int) int {
-	if n, err := pyfmt.ParseInt(ospath.Strip(written)); err == nil && n >= least {
-		return n
+	value, err := pyfmt.ParseBigInt(ospath.Strip(written), 10)
+	if err != nil {
+		return fallback
 	}
-	return fallback
+	n := math.MaxInt
+	switch {
+	case value.IsInt64() && value.Int64() >= math.MinInt && value.Int64() <= math.MaxInt:
+		n = int(value.Int64())
+	case value.Sign() < 0:
+		n = math.MinInt
+	}
+	if n < least {
+		return fallback
+	}
+	return n
 }
 
 // Finite は書かれた有限の数。読めない値・inf・nan は false。
