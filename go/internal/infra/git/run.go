@@ -211,6 +211,9 @@ func Blob(cwd, rev, path string, o Options) ([]byte, bool) {
 	if fail != nil || code != 0 {
 		return nil, false
 	}
+	if out == nil {
+		out = []byte{} // 空のファイルを「パスが無い」（nil）と見分ける
+	}
 	return out, true
 }
 
