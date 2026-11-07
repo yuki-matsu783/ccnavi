@@ -15,11 +15,11 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 
 | 型 | 何で止める | 向く場面 | 非対話（`claude -p`）での挙動 | 現在の例 |
 |---|---|---|---|---|
-| 拒否（deny） | ルールファイルの `deny` と、`hook/judge.py` の組み込みのゲート | 戻せない・代わりの経路がある | 止まる。文面がエージェントに返る | ルール `workspace-root`、組み込みの `DENY_TICKET_PARENT`・`DENY_PHASE_REVIEW`・`DENY_CHILD_PUSH` |
+| 拒否（deny） | ルールファイルの `deny` と、`hook/judge.py`（Go は `go/internal/hook/judge`）の組み込みのゲート | 戻せない・代わりの経路がある | 止まる。文面がエージェントに返る | ルール `workspace-root`、組み込みの `DENY_TICKET_PARENT`・`DENY_PHASE_REVIEW`・`DENY_CHILD_PUSH` |
 | 確認（ask） | ユーザの確認ダイアログ（ルールの `ask`） | ユーザが毎回見たい | 確認に答える人が居ないので、実質の拒否。理由文（`reasons.ask_hint`）がエージェントに返る | ルール `direct-worktree-confirm`、`RULE_ASK` |
 | 確認コード | スクリプトが今の状態から出す `--accept <コード>` を付けて打ち直す | ユーザが状態の報告を見て了承し、その了承を、その状態に結び付けたい（状態が動くとコードが変わり、古い了承は通らない） | コードはルールの確認に出る行に付くので、確認と同じく実質の拒否 | `ccnavi-worktree.sh` の `--accept` |
 | ユーザ専用の入口 | `ccnavi-user-*.sh`（ユーザの端末で打つ）。エージェントが打つ形は組み込みのゲートが止める | 承認・取り下げなど、人の判断 | 止まる。対話・非対話で同じ | `ccnavi-user-agree.sh`（止めるゲートは `DENY_TICKET_APPROVAL_CLI`） |
-| 発言をまたぐゲート（ターン分離） | 前の段のあとにユーザの発言が 1 回あること（`hook/turngate.py`） | 「見せて返事を待つ」を機械で確かめたい | 1 回の発言では通らない。付き添いのある対話では、宣言に `ask_if_attended` を立てると、発言を待たず確認（ask）に出る | `integrate` → `integrate-done`（`DENY_NEEDS_USER_TURN`。対話では確認）、`review-request` → `confirm`（同じ拒否。対話でも確認に出さず、「レビューを終えた」というユーザの発言を待つ。キーは `--phase`） |
+| 発言をまたぐゲート（ターン分離） | 前の段のあとにユーザの発言が 1 回あること（`hook/turngate.py`。Go は `go/internal/hook/turngate`） | 「見せて返事を待つ」を機械で確かめたい | 1 回の発言では通らない。付き添いのある対話では、宣言に `ask_if_attended` を立てると、発言を待たず確認（ask）に出る | `integrate` → `integrate-done`（`DENY_NEEDS_USER_TURN`。対話では確認）、`review-request` → `confirm`（同じ拒否。対話でも確認に出さず、「レビューを終えた」というユーザの発言を待つ。キーは `--phase`） |
 | 促し（nudge） | `Stop` で 1 回だけ止めて文を渡す | 次の一手を忘れさせたくない | 同じ | `NUDGE_INTEGRATE`、`NUDGE_TICKET_FINISH` |
 | 案内（context） | `additionalContext` / `additionalContextOnce` | 止めずに言う | 同じ | ルール `prefer-read-grep`、`prefer-webfetch` |
 
@@ -46,7 +46,7 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 
 確認（ask）の画面に出るのは、コマンドや質問だけである。なぜその操作が要るのか、許可と拒否で何が起きるのかは出ない。確認の前の発言で、見出しを付けて言わせる。
 
-- 対象は、ccnavi が返す確認すべて（ルールの `ask`・チケットの `ask`・ターン分離のゲートの確認・どのルールも言及しない呼び出しの確認）と `AskUserQuestion`。`ExitPlanMode` と、Claude Code 自身の権限の確認（ccnavi が返さないもの）は対象外。`hook/judge.py` の `refuse`（確認を返す前）と、`AskUserQuestion` の入口が、同じ関数（`askcontext.stop_text`）を通る。条件を操作ごとに書き直さない
+- 対象は、ccnavi が返す確認すべて（ルールの `ask`・チケットの `ask`・ターン分離のゲートの確認・どのルールも言及しない呼び出しの確認）と `AskUserQuestion`。`ExitPlanMode` と、Claude Code 自身の権限の確認（ccnavi が返さないもの）は対象外。`hook/judge.py` の `refuse`（確認を返す前）と、`AskUserQuestion` の入口が、同じ関数（`askcontext.stop_text`。Go は `go/internal/hook/askcontext` の `StopText`）を通る。条件を操作ごとに書き直さない
 - 要る節は「前提・背景」（なぜ今この操作が要るか、ここまでの経緯）と「想定結果」（許可した場合と断った場合に何が起きるか）。別名は `askcontext.SECTIONS` にある。節を足す・名前を変えるときは、`SECTIONS` と文面（`DENY_ASK_NEEDS_CONTEXT`）と設計書の付録を揃える
 - 戻せない操作では、想定結果に「戻せるか・取り消し方」を含める。未確認のこと・代替案・おすすめは検査せず、書いたほうがよい内容として扱う。節が増えるほど、見出しだけを埋める発言が増えるため
 - 見出しが無いときの拒否は差し戻し。ターンは終わらず、文面の次の一手（見出しを書いて、ユーザの返事を待たずに打ち直す）がエージェントに返る
@@ -80,7 +80,7 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 
 ## ターン分離のゲート
 
-「A を打ったら、ユーザの発言が 1 回はさまるまで B を打てない」を止める汎用の部品（`hook/turngate.py`）。宣言（`Gate`）の表を渡して判定するので、別の組を止めるには宣言を足す。止めるのは B の側だけで、A と B が同じターンに起きたことを、あとから点検する処理は作らない。
+「A を打ったら、ユーザの発言が 1 回はさまるまで B を打てない」を止める汎用の部品（`hook/turngate.py`。Go は `go/internal/hook/turngate` の `Check`・`Note`）。宣言（`Gate`）の表を渡して判定するので、別の組を止めるには宣言を足す。止めるのは B の側だけで、A と B が同じターンに起きたことを、あとから点検する処理は作らない。
 
 ### 宣言の書き方
 

@@ -107,7 +107,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 | `policy` | 6,794 | 移した（レビュー前） |
 | `tickets` | 36,700 | 移した（レビュー前） |
 | `catalog` | 1,683 | 移した（レビュー前） |
-| `hook` | 10,634 | 移した（レビュー前） |
+| `hook` | 10,497 | 移した（レビュー前） |
 | `entry` | 11,210 | 未着手 |
 
 ## 後で扱うこと
@@ -120,12 +120,14 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 | `entry` を移すとき | `config.LayerPath` の差し替えの表を、名前の大文字小文字を区別せずに引く（`pathcase.Fold`）。`--sort`・`--format` の空の値を Python と同じく断る（`docs.Query` は空を既定にしているので、CLI で未指定のときだけ既定を渡す） |
 | `entry` を移すとき | stopreview の呼び方が変わったもの（`log_event` → `LogNoKey`・`LogPlanTimeout`・`LogSuspected`、clear 3 つ → `turn.Clear`、stopeval の 3 つ → `Report`、`wiki.pending` → `PendingImpacts`）に呼び手を合わせる |
 | `entry` を移すとき | hook の経路の panic を入口（cli）で受け、内部エラーの応答にする。hook の部品（`events.Decide` とその下の judge・subagent、catalog の `AtStart`・`MissingFrontmatter`・`skills.Notice` など）はどれも panic を受けず、想定外の失敗は error で返すか空にする（Python が `except Exception` で空を返していた所も、Go では入口がまとめて受ける） |
-| Python を外すとき | Python の policy・infra のファイルを指す設計書と sh（`docs/21_design/messages.md`・`startup-config.md`・`modules.md`・`diagnostics.md`（`docsearch.START_SECONDS`）・`multi-repo/skills.md`（`projskills`）、配る `.ccnavi/docs/skill-processes.md`（`projskills` の名前が出る）、`.agents/docs/environment.md`・`e2e-exploration.md`、`.ccnavi/scripts/ccnavi-launcher.sh`・`ccnavi-git.sh` のコメント）を Go の置き場に直す |
+| Python を外すとき | Python の policy・infra のファイルを指す設計書と sh（`docs/21_design/messages.md`・`startup-config.md`・`modules.md`・`diagnostics.md`（`docsearch.START_SECONDS`）・`multi-repo/skills.md`（`projskills`）、配る `.ccnavi/docs/skill-processes.md`（`projskills` の名前が出る）、`.agents/docs/environment.md`・`e2e-exploration.md`、`.ccnavi/scripts/ccnavi-launcher.sh`・`ccnavi-git.sh` のコメント）を Go の置き場に直す。hook の Python のファイルを指すもの（`.ccnavi/messages/*.yml` と `.ccnavi/config/common/rules.yml` のコメント（`hook/*.py` のパス）、設計書 `docs/21_design/modules.md`・`pre-check.md`・`rules.md`・`stop-review.md`・`tickets/subagents.md`（hook の Python のファイル名）。`docs/40_development.md` の手で動かす例（`python -m ccnavi`）は `entry` を移すときに直す）も同じ |
 | Python を外すとき | Chrome 拡張（`extensions/chrome/ccnavi-approval`）は Pyodide で Python の `entry.ext` → `tickets.core.api` を読む。Go には移せないので、Pyodide 用に Python の判定一式を残して配るか、拡張の判定を TS か WASM に書き直すかを決める（ユーザと合意が要る）。それまでは Go と Python の判定のずれを Chrome の見本（`extensions/chrome/ccnavi-approval/test/fixtures/core-scenarios.json`）で見張る |
+| Python を外すとき | hook の横展開で、Python と答えを合わせるために寄せなかったもの。実行後チェックの取り込みの確かめ（`integrate.SquashedPaths` の `copyIsBound`）は `BoundCheck` と違い、既定の置き場を大文字小文字を畳まずに見て、設定・全ツリー・退避を見ない（Python の `post_findings._ticket_bound` のまま）。取り込みの記録の読み方は `ReadRecord` の `FirstKept`（`post_findings`）と `LastKept`（`stop_integrate`）で分かれる。付き添いの有無は hook の判定（`hookio.Unattended`）と引き継ぎの待機（`hookio.Headless`。SDK の入口も含む）で分かれる。揃えるなら Python と同時に決める |
 | Python を外すとき | `git.Undo` の案内でパスを `"` で囲むだけの引用を、`config` の引用と同じ規則にする（`$` やバッククォートを含むパスで壊れる。いまは Python と同じ出力を保つため残す） |
 | Python を外すとき | sync/handoff の `Apply` で、書いた後の読み直しに失敗したエントリが戻されない。catalog の `Problems` が文の頭にパスを付ける形（パスで始まらない文にも付く）、索引の使い回しの鍵が秒の mtime だけ（同じ秒の書き換えで前の frontmatter が残る）、`readHead` に失敗した md の既存の行が消える（コメントの「残す」と食い違う）。`infra/git` が環境から `GIT_DIR`・`GIT_WORK_TREE`・`GIT_INDEX_FILE`・`GIT_COMMON_DIR` を外さない（どれも Python も同じ。直すなら Python と同時に直す） |
 | 余裕のあるとき | `infra/pyre` の照合を速くする（先頭の文字の集合で開始位置を飛ばす、開始位置ごとのクロージャをやめる）。いまは Python の C 実装の約 5 倍遅い。数 KB の通常のコマンドでは問題にならない |
 | 余裕のあるとき | pyre の `(?i)ß` が `ẞ` に当たらない（casefix に 1 組足す）。rules の unsupported が `(?P=name)` の後方参照を通す。`TranslateGlob` が文字クラスの中の `/` を壊す（Python と同じ。Python の globmatch の docstring も誤り）。`\N{名前}` の苦情を名指しの文にする |
+| 余裕のあるとき | `hint` の `recentCommit`（直前のコミットと見なす古さ、10 分）は期限ではなく 1 か所でしか使わないので `hint` に残した。`str.split()` の並びを返す `strings.FieldsFunc(…, ospath.IsSpace)` の直書き（wiki・selfguard・useronly・learning・failsafe など）を `ospath` の 1 関数に寄せる。`infra/git/restore.go` は `strings.Fields`（U+001C〜U+001F を空白に数えない）で Python と違いうる |
 
 ## 回す
 
