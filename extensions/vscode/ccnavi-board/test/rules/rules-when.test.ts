@@ -101,7 +101,7 @@ test("CB-T335 組み合わせ条件を直すとwhenを書き直し、変えて�
   assert.ok(added.includes("    message: >-\n      mainでは編集しない。\n      ワークツリーで直す。\n"), added);
   assert.ok(added.startsWith("version: 1\ndeny:\n  # ルート直下は止め、置き場だけ除く\n"), added);
   assert.deepEqual(readRules(added).model.sections.deny[0].when, addChild(EXPECTED, [], leaf("glob", "*.md")));
-  // notで包んだ・外した組み合わせ条件も読み直せる。PyYAMLと同じ形（YAMLとして読めること）も見る
+  // notで包んだ・外した組み合わせ条件も読み直せる。実行ファイルと同じ形（YAMLとして読めること）も見る
   const wrapped = wrapNot(EXPECTED, [0]);
   const text = doc.apply(withWhen(s, wrapped));
   assert.deepEqual(parseDocument(text).errors, []);
@@ -259,7 +259,7 @@ test("CB-T339 画面が送り返した組み合わせ条件は形を確認して
   assert.equal(asSections(raw), undefined);
 });
 
-test("CB-T340 個別条件の値をPyYAMLが文字列以外に読む語へ差し替えると、引用符のない個別条件でも引用符で囲む", () => {
+test("CB-T340 個別条件の値を実行ファイルが文字列以外に読む語へ差し替えると、引用符のない個別条件でも引用符で囲む", () => {
   const text = `version: 1
 deny:
   - id: plain-leaf
@@ -278,7 +278,7 @@ deny:
   // 別の型に読まれない語は元の書き方（引用符なし）のまま
   assert.ok(out.includes("        - regex: baz\n"), out);
   assert.deepEqual(readRules(out).model.sections.deny[0].when, group("any", [leaf("glob", "on"), leaf("regex", "baz")]));
-  // 読めない（引用符の無いyes）個別条件を置き換えても、PyYAMLが真偽値に読む形では書かない
+  // 読めない（引用符の無いyes）個別条件を置き換えても、実行ファイルが真偽値に読む形では書かない
   const bad = readRules(text.replace("glob: foo", "glob: yes"));
   const badTree = bad.model.sections.deny[0].when;
   assert.ok(badTree);

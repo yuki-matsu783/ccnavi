@@ -90,7 +90,7 @@ src/
     tour-workflow.ts  計画編集の案内の見本（名前付きの --plan-order の答え）を parsePlanOrder に通して、画面が描く形にする
     tour-templates.ts テンプレート管理の案内の見本（tours/templates.yml の sample:）を、小さい書き方から TemplatesPage（自身の層のテンプレート・下書き・統合結果）と本文の見本にする小さな読み取り。判定はせず、見本に書いた値をそのまま使う
     tour-phases.ts    フェーズ管理の案内の見本（tours/phases.yml の sample:）を、phases.yml と同じ書き方から PhasesPage にする小さな読み取り。yaml を持たず、readPhases と同じ結果になることをテストが見る
-    yaml11.ts         実行ファイル（PyYAML、YAML 1.1）が文字列以外に読む語の見分け。risk-doc と phases-doc が引用符を足す判断に使う
+    yaml11.ts         実行ファイル（YAML 1.1）が文字列以外に読む語の見分け。risk-doc と phases-doc が引用符を足す判断に使う
     yaml-read.ts      rules・phases・risks の文書が共通で使う、読み込みを止める問題の検出（YAMLの構文エラー・最上位がマップでない）。見つけたものはエラー画面に出す
     load-failure.ts   設定を読めなかった失敗（LoadFailure）。読めなかったファイルのパスを持ち、エラー画面の［エディタで開く］に使う
     mode-banner.ts    動作モード（dry-run・disable）の帯の文。ルール管理とチケット管理の画面が共通で使う（enable と空は出さない）
@@ -272,7 +272,7 @@ test/
   templates/          テンプレート管理（templates-model・templates-args・templates-render・template-edit の単体テストと、画面を動かす templates.dom・templates-edit.dom（編集欄）・templates-tour.dom、案内の見本の tour-templates。下書きの取り込みは持たない）
   handoff/            取り込み待ち（handoffmodel の読み取りと判断、handoff-args、取り込みの手順 handoff-import（実行ファイルを差し替えて、expect の取り方・錠・defense の案内を見る）、handoff-render の単体テストと、画面を動かす handoff.dom）
   projects/           プロジェクト管理（projects と、画面を動かす projects.dom）
-  flow/               フロー編集（flow-doc, flow-view, flow-lint, flow-match, flow-write と、書き出しを PyYAML で読み戻す flow-pyyaml（リポジトリのルートで uv run python か python3 を起動する。起動できなければ飛ばす）、画面を動かす flow.dom、線を引ける先・コピー・貼り付け・履歴・差分の flow-edit-ops、元に戻す・コピー・ミニマップ・保存前の確かめを画面で動かす flow-edit.dom、ボードのカードのボタンを動かす flow-card.dom、エージェントの下書きの取り込みと依頼のボタンを動かす flow-proposal.dom）
+  flow/               フロー編集（flow-doc, flow-view, flow-lint, flow-match, flow-write と、書き出しを実行ファイルの YAML で読み戻す flow-yaml（go/ から実行ファイルを組み立てて起動する。組み立てられなければ飛ばす）、画面を動かす flow.dom、線を引ける先・コピー・貼り付け・履歴・差分の flow-edit-ops、元に戻す・コピー・ミニマップ・保存前の確かめを画面で動かす flow-edit.dom、ボードのカードのボタンを動かす flow-card.dom、エージェントの下書きの取り込みと依頼のボタンを動かす flow-proposal.dom）
   workflow/           計画編集（planordermodel, workflow-view, ボードと結ぶ帳面の workflow-tabs と、画面を動かす workflow.dom）
   devtools/           開発用の画面確認ツール（scripts/render-board.js）。引数・--out の拒否・失敗の条件・スタブの単体テストと、Chromium で PNG が出ることを確かめる render-board.e2e.ts（node --test には渡さず test-groups.js が別に起こす）
   bugreport/          バグ報告（bug-report。ffmpeg と OS の道具は起動せず、組んだ引数・ログの切り出し・zip の読み戻しを見る）

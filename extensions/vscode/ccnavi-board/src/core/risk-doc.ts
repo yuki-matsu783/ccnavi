@@ -5,7 +5,7 @@
  * dumpし直すとそれが全部消えるので、rules-docと同じく`yaml`のDocumentを保ち、
  * 変えるところだけを差し替える。項目の入れ替えは元のノードをそのまま別のリストへ移す。
  *
- * ここは配点の意味（何点になるか）には触れない。数えるのは実行ファイル（tickets/config/risk.py）の仕事で、
+ * ここは配点の意味（何点になるか）には触れない。数えるのは実行ファイル（go/internal/tickets/config/risk）の仕事で、
  * 書式の検証も`--lint --risk <一時ファイル>`に聞く。画面の欄は文字のまま持ち、整数で
  * なければそのまま書いてlintに言わせる。
  */
@@ -353,7 +353,7 @@ function setValue(
   const current = node.get(key, true);
   if (current instanceof Scalar) {
     // 書き方（引用符）は元のまま。値が変わっても書き方まで変えない。
-    // ただし実行ファイル（PyYAML）が別の型に読む語を裸で書くことになるなら囲む。
+    // ただし実行ファイル（YAML 1.1）が別の型に読む語を裸で書くことになるなら囲む。
     if (current.value !== value) {
       current.value = value;
       if (current.type === Scalar.PLAIN && typeof value === "string" && yaml11Ambiguous(value)) {

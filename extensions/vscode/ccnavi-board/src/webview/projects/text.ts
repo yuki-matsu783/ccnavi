@@ -8,10 +8,10 @@ import type { LintProblem } from "../../core/lintmodel.js";
  *
  * 実行ファイルは、ワークスペース自身のソースに`projects/`がある（ぶつかり）ときも、
  * `.gitignore`に入れる前に`git add -A`して入れ子のリポジトリがgitlinkで載った（載せ忘れ）ときも、
- * 同じ先頭の句で言う（src/ccnavi/entry/lint.pyの`_TRACKED_LEAD`）。
+ * 同じ先頭の句で言う（go/internal/entry/lintの`trackedLead`）。
  * どちらでも`.gitignore`に`/projects/`を足すだけでは直らない（ぶつかりなら誤り、載せ忘れなら半分）ので、
  * 画面は`.gitignore`に追加のボタンと「無視されていない」の帯を出さず、苦情の帯だけを出す。
- * 2つを見分ける句（`（入れ子のリポジトリとして`）には頼らない。文面を変えるならlint.pyと揃える。
+ * 2つを見分ける句（`（入れ子のリポジトリとして`）には頼らない。文面を変えるならtrackedLeadと揃える。
  */
 export function isTrackedProjectsDir(problem: LintProblem, projectsRel: string): boolean {
   return problem.detail.startsWith(`\`${projectsRel}/\`はワークスペースのgitが追跡している`);

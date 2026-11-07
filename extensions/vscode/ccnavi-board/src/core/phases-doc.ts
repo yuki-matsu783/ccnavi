@@ -6,7 +6,7 @@
  * 元のノード（対応表の1組）をそのまま別のリストへ移す。
  *
  * ここは定義の意味（どの子がどこまで書けるか、レビューが要るか）には触れない。判定は
- * 実行ファイル（tickets/config/phasetypes.py）の仕事で、書式の検証も`--lint --phases <一時ファイル>`に聞く。
+ * 実行ファイル（go/internal/tickets/config/phases）の仕事で、書式の検証も`--lint --phases <一時ファイル>`に聞く。
  * 画面の欄は文字のまま持ち、リストの欄（scope / deliverables）は文字のリストで持つ。
  *
  * 順序は親チケットの計画のステップの`after`で決めるので、定義は順序の欄を持たない。
@@ -218,7 +218,7 @@ function applyTo(doc: Document, edited: PhasesForm): string {
     const original = form.origin === null ? undefined : originals[form.origin];
     const pair = original ?? doc.createPair(id, new YAMLMap());
     // 改名は組のキーの値だけを替える。キーの前のコメントはキーに付いているので一緒に動く。
-    // 実行ファイル（PyYAML）が別の型に読む語（yes / no / on / offなど）は囲む。
+    // 実行ファイル（YAML 1.1）が別の型に読む語（yes / no / on / offなど）は囲む。
     let key: Scalar;
     if (pair.key instanceof Scalar) {
       key = pair.key;
@@ -381,7 +381,7 @@ function setValue(doc: Document, node: YAMLMap, key: string, value: string | boo
   const current = node.get(key, true);
   if (current instanceof Scalar) {
     // 書き方（引用符）は元のまま。値が変わっても書き方まで変えない。
-    // ただし実行ファイル（PyYAML）が別の型に読む語を裸で書くことになるなら囲む。
+    // ただし実行ファイル（YAML 1.1）が別の型に読む語を裸で書くことになるなら囲む。
     if (current.value !== value) {
       current.value = value;
       if (typeof value === "boolean") {

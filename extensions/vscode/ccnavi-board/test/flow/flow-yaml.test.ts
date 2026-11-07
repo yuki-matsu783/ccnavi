@@ -1,73 +1,46 @@
 /**
- * 画面が書き出す本文（`serializeFlow`）を、実行ファイルの読み手（PyYAML。`src/ccnavi/tickets/flow/graph.py`の`parse`）で実際に読み戻す。
- * 読み戻した中身（`flow.as_json`。`--lint --json --flow`の`flow.data`と同じ形）が画面の中身と同じかを
- * `flow-match.ts`の見比べで確かめる。乱数の入力（固定の種）でも確かめる。
+ * 画面が書き出す本文（`serializeFlow`）を、実行ファイルの読み手（`ccnavi --lint --json --flow`。YAMLの読みは
+ * go/internal/infra/yaml で、PyYAML（YAML 1.1）の写し）で実際に読み戻す。読み戻した中身（`flow.data`）が
+ * 画面の中身と同じかを`flow-match.ts`の見比べで確かめる。乱数の入力（固定の種）でも確かめる。
  *
- * 実行ファイルの読み手を起こすのは、リポジトリのルートで`uv run python`（無ければ`python3`）。どちらも起こせない
- * 環境では飛ばす（理由を出す）。
+ * 実行ファイルは`test/helpers/flow-exe.ts`が組み立てる。組み立てられない環境では飛ばす（理由を出す）。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 
 import { flowMismatch } from "../../src/core/flow-match.js";
 import { parseFlowValue, serializeFlow, type FlowDoc } from "../../src/core/flow-doc.js";
-
-/** リポジトリのルート（`out/test/flow/`から6段上） */
-const REPO_ROOT = path.join(__dirname, "..", "..", "..", "..", "..", "..");
-/** ccnaviパッケージを置いたディレクトリ（srcレイアウト） */
-const PACKAGE_ROOT = path.join(REPO_ROOT, "src");
-
-const SCRIPT = `
-import base64, json, sys
-from ccnavi.tickets.flow import graph as flow
-out = []
-for item in json.load(sys.stdin):
-    data, why = flow.parse(base64.b64decode(item))
-    out.append({"why": why, "data": flow.as_json(data) if not why else None})
-sys.stdout.write(json.dumps(out, ensure_ascii=True))
-`;
+import { exeRunner } from "../helpers/flow-exe.js";
 
 interface Read {
+  /** 読めなかった理由（`(flow)`のerror）。読めれば空 */
   readonly why: string;
   readonly data: unknown;
 }
 
-type Reader = { readonly ok: true; readonly read: (bodies: readonly Uint8Array[]) => Read[] } | { readonly ok: false; readonly why: string };
+const exe = exeRunner();
+/** 読むときのワークスペース。設定の無い空のフォルダにして、リポジトリの設定を読まないぶん速くする */
+const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-flow-yaml-"));
+process.on("exit", () => fs.rmSync(ROOT, { recursive: true, force: true }));
 
-function pyyaml(): Reader {
-  const tries: readonly (readonly string[])[] = [
-    ["uv", "run", "python", "-c", SCRIPT],
-    ["python3", "-c", SCRIPT],
-  ];
-  const said: string[] = [];
-  for (const [command, ...args] of tries) {
-    const run = (input: string) =>
-      spawnSync(command, args, {
-        cwd: REPO_ROOT,
-        input,
-        encoding: "utf8",
-        maxBuffer: 64 * 1024 * 1024,
-        env: { ...process.env, PYTHONPATH: PACKAGE_ROOT, PYTHONUTF8: "1" },
-      });
-    const probe = run("[]");
-    if (probe.status === 0 && probe.stdout.trim() === "[]") {
-      return {
-        ok: true,
-        read: (bodies) => {
-          const ran = run(JSON.stringify(bodies.map((b) => Buffer.from(b).toString("base64"))));
-          assert.equal(ran.status, 0, ran.stderr);
-          return JSON.parse(ran.stdout) as Read[];
-        },
-      };
-    }
-    said.push(`${command}: ${probe.error?.message ?? probe.stderr.split("\n").filter(Boolean).pop() ?? `終了${probe.status}`}`);
-  }
-  return { ok: false, why: `実行ファイルの読み手（PyYAML）を起こせないので飛ばす（${said.join(" / ")}）` };
-}
-
-const reader = pyyaml();
+const reader =
+  exe.ok
+    ? {
+        ok: true as const,
+        read: (bodies: readonly Uint8Array[]): Read[] =>
+          bodies.map((body) => {
+            const read = exe.read(body, "<flow>", ROOT);
+            if (read.data !== null) {
+              return { why: "", data: read.data };
+            }
+            const errors = read.problems.filter((p) => p.severity === "error").map((p) => p.detail);
+            return { why: errors.join(" / ") || "読めない", data: null };
+          }),
+      }
+    : { ok: false as const, why: exe.reason };
 
 function readBack(docs: readonly unknown[]): Read[] {
   assert.ok(reader.ok);
@@ -78,7 +51,7 @@ function node(id: string, data: Record<string, unknown>): { readonly id: string;
   return { id, type: "prompt", name: id, position: { x: 80, y: 160 }, data };
 }
 
-test("CB-T248 PyYAMLが裸や`|`では読み込めない・別の文字に読む文字列を、書き出しが読める形で書く", { skip: reader.ok ? false : reader.why }, () => {
+test("CB-T248 実行ファイルのYAMLが裸や`|`では読み込めない・別の文字に読む文字列を、書き出しが読める形で書く", { skip: reader.ok ? false : reader.why }, () => {
   const values = [
     "a\tb",
     "\tlead",
@@ -101,8 +74,6 @@ test("CB-T248 PyYAMLが裸や`|`では読み込めない・別の文字に読む
     "a\x00b\x01\x1b",
     "a\x7fb\x80\x84\x86\x9f",
     "￾￿",
-    "\ud800",
-    "x\udc00",
     "😀 ﻿",
     "  - 箇条\n  - 書き",
     "1行目\n  字下げ\n戻る",
@@ -121,6 +92,13 @@ test("CB-T248 PyYAMLが裸や`|`では読み込めない・別の文字に読む
   reads.forEach((read, i) => {
     assert.equal(read.why, "", `${JSON.stringify(values[i])}: ${read.why}\n${serializeFlow(docs[i] as unknown as FlowDoc)}`);
     assert.equal(flowMismatch(docs[i], read.data), undefined, `${JSON.stringify(values[i])}\n${serializeFlow(docs[i] as unknown as FlowDoc)}`);
+  });
+  // 対になっていないサロゲートは、実行ファイル（Goの文字列はUTF-8）がU+FFFDに読む。書いても同じ中身に戻らないので、
+  // 保存の前の見比べで食い違いになって止まる
+  const lone = ["\ud800", "x\udc00"].map((v, i) => ({ id: `s${i}`, nodes: [node(`s-${i}`, { prompt: v })], connections: [] }));
+  readBack(lone).forEach((read, i) => {
+    assert.equal(read.why, "", read.why);
+    assert.notEqual(flowMismatch(lone[i], read.data), undefined, JSON.stringify(lone[i]));
   });
   // 1行の文字列のタブは裸で書かない（JSONのときからの退行）
   assert.match(serializeFlow({ nodes: [node("a", { prompt: "a\tb" })] }), /prompt: "a\\tb"/);
@@ -141,7 +119,7 @@ function random(seed: number): () => number {
 
 const PIECES = [
   "", " ", "  ", "\t", "\n", "\n\n", "\r", "\r\n", "\u0085", " ", " ", " ", "﻿", "\x00", "\x01", "\x1b", "\x7f", "\x80",
-  "\x9f", "￾", "\ud800", "\udc00", "😀", "あ", "#", " #", ":", ": ", "-", "- ", "?", "? ", "'", '"', "\\", "|", ">", "&a", "*a", "!",
+  "\x9f", "￾", "😀", "あ", "#", " #", ":", ": ", "-", "- ", "?", "? ", "'", '"', "\\", "|", ">", "&a", "*a", "!",
   "!!str", "%", "@", "`", "{", "}", "[", "]", ",", "yes", "No", "on", "OFF", "y", "n", "~", "null", "Null", "true", "0755", "0o17", "0x1F",
   "0b101", "1e3", "1_000", "1:30", "190:20:30", "2026-01-01", "2026-01-01 10:00:00", "1.", ".5", "-.5", "+1", "1.5e+3", ".inf", ".NaN",
   "<<", "=", "---", "...", "a", "b", "xyz", "プロンプト", "\\n", "\\t",
@@ -203,7 +181,7 @@ function record(rand: () => number, depth: number): Record<string, unknown> {
   return out;
 }
 
-test("CB-T249 乱数の中身（固定の種、400本）を書き出してPyYAMLで読み戻すと、どれも同じ中身になる", { skip: reader.ok ? false : reader.why }, () => {
+test("CB-T249 乱数の中身（固定の種、400本）を書き出して実行ファイルで読み戻すと、どれも同じ中身になる", { skip: reader.ok ? false : reader.why }, () => {
   const rand = random(20260926);
   const docs: Record<string, unknown>[] = [];
   for (let i = 0; i < 400; i += 1) {
@@ -231,11 +209,11 @@ test("CB-T249 乱数の中身（固定の種、400本）を書き出してPyYAML
   });
 });
 
-test("CB-T250 画面の読み（YAML 1.2）とPyYAMLの読みが違う表記は、開くときの見比べで食い違いになる。引用符で囲めば揃う", { skip: reader.ok ? false : reader.why }, () => {
+test("CB-T250 画面の読み（YAML 1.2）と実行ファイルの読み（YAML 1.1）が違う表記は、開くときの見比べで食い違いになる。引用符で囲めば揃う", { skip: reader.ok ? false : reader.why }, () => {
   assert.ok(reader.ok);
   const spelled = ["0755", "yes", "on", "1:30", "0o17", "1e3", "1_000", "1.", "2026-01-01", "!!float 1", "!!binary aGk=", ".inf", "123456789012345678901", "{1: a}"];
   const texts = spelled.map((v) => `nodes:\n  - id: a\n    data:\n      v: ${v}\n`);
-  // 別名を使わないマージキー。PyYAMLは中身を取り込み、画面の読み手は取り込まない
+  // 別名を使わないマージキー。実行ファイルは中身を取り込み、画面の読み手は取り込まない
   texts.push("nodes: [{<<: {id: a}}]\n");
   const quoted = spelled.map((v) => `nodes:\n  - id: a\n    data:\n      v: "${v}"\n`);
   const reads = reader.read([...texts, ...quoted].map((t) => Buffer.from(t, "utf8")));

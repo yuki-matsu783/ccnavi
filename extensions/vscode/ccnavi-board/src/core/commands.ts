@@ -21,10 +21,8 @@ export const PUSH_APPROVED_SCRIPT = ".ccnavi/scripts/ccnavi-user-push-approved.s
  */
 export const USER_ENTRY = ["--entry", "board"] as const;
 
-/** ccnaviの起動の仕方。実行ファイルがあればそれ、無ければソースをuvで走らせる */
-export type Launcher =
-  | { readonly kind: "exe"; readonly path: string }
-  | { readonly kind: "uv"; readonly root: string };
+/** ccnaviの起動の仕方。見つけた実行ファイルのパス */
+export type Launcher = { readonly kind: "exe"; readonly path: string };
 
 /** bashの単引用符で囲む。中の単引用符は '\'' に置き換える */
 export function shellQuote(text: string): string {

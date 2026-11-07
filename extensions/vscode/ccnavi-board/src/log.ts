@@ -1,7 +1,7 @@
 /**
  * 診断ログ。ワークスペースルートの`logs/diag/<出どころ>.log`に1行ずつ足す（.agents/docs/logging.md）。
  *
- * sh（`.ccnavi/scripts/ccnavi-common-log.sh`のlog_*）と実行ファイル（`src/ccnavi/records/diaglog.py`）と
+ * sh（`.ccnavi/scripts/ccnavi-common-log.sh`のlog_*）と実行ファイル（`go/internal/records/diaglog`）と
  * 同じ形の行を出す。
  *
  *     2026-09-27T10:15:03+09:00 ERROR ccnavi-board[4242]画面の前提が崩れているscreen=rules
@@ -9,7 +9,7 @@
  * 画面にもconsoleにも何も出さない。 書けないときは何も出さずに破棄し、例外を外へ出さない。
  * ユーザに見せる通知（showErrorMessageなど）とは分けてあり、そちらはこのモジュールと関係なく書く。
  *
- * 伏せるのはURLとscp形式に埋まった資格情報だけ（maskUserinfo。shとPythonと同じ規則で`***`にする）。
+ * 伏せるのはURLとscp形式に埋まった資格情報だけ（maskUserinfo。shと実行ファイルと同じ規則で`***`にする）。
  * ほかの秘密の形は伏せない。秘密の値・ファイルの中身・環境変数の値を渡さないのが決まり。
  *
  * シンボリックリンクはたどらない。 `logs`・`logs/diag`・書き込み先のどれかがシンボリックリンクなら書かずに破棄する
@@ -28,7 +28,7 @@ export type Level = "DEBUG" | "INFO" | "WARN" | "ERROR";
 
 const RANK: Readonly<Record<Level, number>> = { DEBUG: 10, INFO: 20, WARN: 30, ERROR: 40 };
 
-/** 値に使える形。nullとundefinedは空、真偽はtrue / false（Pythonと揃える） */
+/** 値に使える形。nullとundefinedは空、真偽はtrue / false（実行ファイルと揃える） */
 export type Value = string | number | boolean | null | undefined;
 export type Fields = Readonly<Record<string, Value>>;
 
@@ -87,7 +87,7 @@ function masked(fields: Fields): Fields {
 }
 
 /**
- * URLとscp形に埋まった資格情報を`***`にする（shのccnavi_log_mask、Pythonのmask_userinfoと同じ読み）。
+ * URLとscp形に埋まった資格情報を`***`にする（shのccnavi_log_mask、実行ファイルのdiaglogと同じ読み）。
  * 空白・タブ・LF・CRで切った語ごとに見る。`://`を含む語はauthority（次の`/`まで）の最後の`@`より前を、
  * 含まない語は最初の`/`より前の最後の`@`より前に`:`があればそこを伏せる。
  */

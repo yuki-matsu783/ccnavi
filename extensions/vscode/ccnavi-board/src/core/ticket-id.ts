@@ -1,5 +1,5 @@
 /**
- * チケットの識別子の形（Pythonの`ticket_ids._ID`と同じ。先頭はASCIIの英数字、続きは英数字・`.`・`_`・`-`と
+ * チケットの識別子の形（実行ファイルの`go/internal/tickets/model/ids`の`idPattern`と同じ。先頭はASCIIの英数字、続きは英数字・`.`・`_`・`-`と
  * ひらがな・カタカナ・長音記号・CJK統合漢字・々）。画面から届いた識別子を受けるかの見分けに使う
  * （フロー編集・計画編集）。識別子に使えない表記（空・空白・パスの区切り）は受けない。
  *
@@ -14,7 +14,7 @@ export function isTicketId(value: unknown): value is string {
 /**
  * 親のブランチ名から親の識別子を作る。`/`を`-`に置き換えるだけ。
  *
- * Python（`ticket_ids.branch_to_id`）・sh（`ccnavi_branch_to_id`）と同じ変換で、
+ * 実行ファイル（`ids.BranchToID`）・sh（`ccnavi_branch_to_id`）と同じ変換で、
  * `tests/fixtures/branch-to-id.json`の同じ表で一致を確かめる。ワークツリーは`.claude/worktrees/<識別子>`に
  * 作り、そこでブランチを直接チェックアウトする。
  */
