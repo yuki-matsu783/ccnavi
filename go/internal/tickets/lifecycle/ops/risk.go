@@ -123,12 +123,9 @@ func projectOf(conf *config.Settings, root string, found *ticket.Ticket) string 
 	return found.Project
 }
 
-// scoreChild は子の実績のリスクを数えて記録する。返すのは閉じたあとに出す行（点と内訳）で、閉じられなければ偽
-// （理由は stderr）。親・単独・統合の子は測らない。
+// scoreChild は、子の実績のリスクを数えて記録する。返すのは、閉じたあとに出す行（点と内訳）である。閉じられなければ偽を返し、理由は stderr に出す。親・単独・統合の子は測らない。
 //
-// 数えるのは子の仕事の始まり（取り込み直後の親の先頭と子の共通の祖先）から子の先頭まで。着手の基準点から数えると、
-// 衝突を解くために子へ取り込んだ親の、ほかの子の変更が混ざる。合流の途中なら子の先頭の代わりに MERGE_HEAD まで
-// 数える（検査のあとに子が積んだコミットは合流に載らない）。
+// 数えるのは、子の仕事の始まり（取り込み直後の親の先頭と子の共通の祖先）から、子の先頭までである。着手の基準点から数えると、衝突を解くために子へ取り込んだ親の、ほかの子の変更が混ざってしまう。合流の途中なら、子の先頭の代わりに MERGE_HEAD まで数える。検査のあとに子が積んだコミットは、合流に載らないからである。
 func scoreChild(stderr io.Writer, conf *config.Settings, root string, found *ticket.Ticket) ([]string, bool) {
 	if !found.IsChild() || found.IsConsolidate() {
 		return nil, true

@@ -104,9 +104,7 @@ type passed struct {
 	Requested *pyjson.Object
 }
 
-// gate は decide の、ホストに聞かずに分かる前提の検査（親とフェーズがある・依頼の記録がある・依頼のあとに
-// 見せたものが動いていない）。本体と Check が同じものを通る。断ったときは理由のあとに `次:` を 1 行足して nil。
-// ホストの状態（変更要求・未解決の指摘・ダイジェスト）は見ない（sh が取ってくる）。
+// gate は decide の、ホストに聞かずに分かる前提を検査する。確かめるのは次の 3 つである。親とフェーズがあること。依頼の記録があること。依頼のあとに見せたものが動いていないこと。本体と Check が同じものを通る。断ったときは、理由のあとに `次:` を 1 行足して nil を返す。ホストの状態（変更要求・未解決の指摘・ダイジェスト）は見ない。sh が取ってくるからである。
 func gate(stderr io.Writer, conf *config.Settings, root, cwd string, number int) *passed {
 	parent, p, ok := request.ParentPhase(stderr, conf, root, cwd, number)
 	if !ok {
@@ -196,9 +194,7 @@ func Check(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, nu
 	return config.ExitOK
 }
 
-// decision は残った指摘を決められる状態かを確かめ、見せる材料を組む。決められなければ nil。carry は受け入れ済みの
-// スレッドの id（`--accept-done`）。sh が返信と解決をしたあとの結果では解決済みだが、見せた指摘の一部として
-// 数え直す（見せたときと同じ並びでダイジェストを組み直し、見せたあとに変わっていないことを確かめるため）。
+// decision は、残った指摘を決められる状態かを確かめ、見せる材料を組む。決められなければ nil を返す。carry は受け入れ済みのスレッドの id（`--accept-done`）である。sh が返信と解決をしたあとの結果では、それらは解決済みになっている。しかし、見せた指摘の一部として数え直す。見せたときと同じ並びでダイジェストを組み直し、見せたあとに変わっていないことを確かめるためである。
 func decision(stderr io.Writer, conf *config.Settings, root, cwd string, number int, resultPath string, carry []string) *Decision {
 	gated := gate(stderr, conf, root, cwd, number)
 	if gated == nil {
@@ -338,11 +334,7 @@ type YesOptions struct {
 	PlanDone string
 }
 
-// Yes はオーバーレイ（または sh の write-and-push）で押された選択を置く（`--yes <選択> --digest <ダイジェスト>
-// --json`）。ターミナルで打つという制約の代わりに、見せた指摘と今の指摘のダイジェストが合うことを求める
-// （エージェントがこれをシェルで打つ形は組み込みの deny が止める）。受け入れる指摘（keep・issue）には置く前に
-// sh が返信を残して解決するので、実行ファイルは 3 回に分けて呼ばれる（PlanOut → sh の返信と解決 → PlanDone）。
-// 答えは JSON で、合わなければ置かずに mismatch を返す（返信・解決を済ませた分は操作記録に残す）。
+// Yes は、オーバーレイ（または sh の write-and-push）で押された選択を置く（`--yes <選択> --digest <ダイジェスト> --json`）。ターミナルで打つという制約の代わりに、見せた指摘と今の指摘のダイジェストが合うことを求める。エージェントがこれをシェルで打つ形は、組み込みの deny が止める。受け入れる指摘（keep・issue）には、置く前に sh が返信を残して解決する。そのため、実行ファイルは 3 回に分けて呼ばれる（PlanOut → sh の返信と解決 → PlanDone）。答えは JSON で返す。合わなければ、置かずに mismatch を返す。返信と解決を済ませた分は、操作記録に残す。
 func Yes(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, number int, resultPath, choicesText, digest string, o YesOptions) (int, error) {
 	shown, choices, ok := parseChoices(stderr, root, number, choicesText, digest)
 	if !ok {
@@ -617,11 +609,10 @@ func partPath(issuePath string, n int) string {
 	return fmt.Sprintf("%s.part%d%s", stem, n, ext)
 }
 
-// apply は選んだ行き先を置く。ターミナルとオーバーレイが同じここを通る。置けなければ nil。答えはオーバーレイに
-// 返す JSON の中身。
-//   - keep・issue: 受け入れる。返信と解決は置く前に sh が済ませてあり、次の confirm はホストで解決済みのスレッドを数えない
-//   - fix: 続きの子を同じ番号で doing/ に起こす。フェーズは再び開かれ、レビュー済みのマーカーは置かない
-//   - どれも直さず、見せたあとに追加された指摘も無いなら、レビュー済みのマーカーを置く
+// apply は、選んだ行き先を置く。ターミナルとオーバーレイが、同じここを通る。置けなければ nil を返す。答えは、オーバーレイに返す JSON の中身である。
+//   - keep・issue: 受け入れる。返信と解決は、置く前に sh が済ませてある。次の confirm は、ホストで解決済みのスレッドを数えない。
+//   - fix: 続きの子を同じ番号で doing/ に起こす。フェーズは再び開かれ、レビュー済みのマーカーは置かない。
+//   - どれも直さず、見せたあとに追加された指摘も無いなら、レビュー済みのマーカーを置く。
 func apply(stdout, stderr io.Writer, conf *config.Settings, root string, d *Decision, choices *pyjson.Object, op string) (*pyjson.Object, error) {
 	parent, p := d.Parent, d.Phase
 	home, err := approval.HomeDir(conf, root, parent.ID, "", parent.Project)

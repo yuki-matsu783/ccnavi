@@ -20,9 +20,7 @@ import (
 	"ccnavi/internal/tickets/review/request"
 )
 
-// issueBodyLimit は issue の本文の字数の上限（符号位置で数える）。GitHub は 65,536 字。拡張が 1 回に書く本文は
-// 60,000 字までで、そこに操作 ID の印の行（約 80 字）を足すので、余裕を 1,000 字見る。超えたら目次と続きの
-// コメントに分ける。
+// issueBodyLimit は、issue の本文の字数の上限（符号位置で数える）である。GitHub の上限は 65,536 字である。拡張が 1 回に書く本文は 60,000 字までなので、そこに操作 ID の印の行（約 80 字）を足す分として、余裕を 1,000 字見る。超えたら、目次と続きのコメントに分ける。
 const issueBodyLimit = 59000
 
 // copyHeading は転記した指摘の見出し。転記した本文が ccnavi への指示に読まれないように断る。
@@ -162,9 +160,7 @@ func Transcribe(d *Decision, threads []host.Thread, opID string) []string {
 
 func chars(s string) int { return utf8.RuneCountInString(s) }
 
-// IssueTexts は issue の下書きの本文（1 行目がタイトル、空行のあとが本文）と、続きのコメントの本文。上限
-// （issueBodyLimit）に収まらないときは、本文に目次（キー・版）だけを置き、全文は続きのコメントに分けて載せる
-// （手元の state を指すだけの形にはしない）。
+// IssueTexts は、issue の下書きの本文（1 行目がタイトル、空行のあとが本文）と、続きのコメントの本文を返す。本文が上限（issueBodyLimit）に収まらないときは、本文には目次（キーと版）だけを置く。全文は続きのコメントに分けて載せる。手元の state を指すだけの形にはしない。
 func IssueTexts(d *Decision, threads []host.Thread, opID string) (string, []string) {
 	head := []string{
 		fmt.Sprintf(issueTitle, d.Parent.ID, d.Phase.Number), "",
@@ -296,9 +292,7 @@ func keyList(threads []host.Thread) []string {
 	return out
 }
 
-// CommentText は MR に書き込む、決めた内容のコメントの本文（issue の表記は作ったあとに書き足す）。投稿者は
-// エージェントと同じアカウントになるので、ユーザの判断であることと、経路とアカウントを本文に書く（後から
-// ホストの記録だけで誰が判断したかを読めるように）。
+// CommentText は、MR に書き込む、決めた内容のコメントの本文を返す。issue の表記は、作ったあとに書き足す。投稿者はエージェントと同じアカウントになる。そこで、ユーザの判断であることと、経路とアカウントを本文に書く。後からホストの記録だけで、誰が判断したかを読めるようにするためである。
 func CommentText(d *Decision, picked map[Choice][]host.Thread, followup string) string {
 	by := decidedByLine()
 	if !anyPicked(picked) {
@@ -393,7 +387,7 @@ func fromRecord(r *oplog.Record) (*Decision, map[Choice][]host.Thread) {
 	return d, pick(threads, r.Choices)
 }
 
-// PostText は段階 stageID で投稿する本文を、保存した判断から作り直す。作れなければ偽。
+// PostText は、段階 stageID で投稿する本文を、保存した判断から作り直す。作れなければ偽を返す。
 //   - issue: issue の下書き（1 行目がタイトル、空行のあとが本文）
 //   - issue-part-<N>: issue の続きのコメント
 //   - note: 決めた内容の MR へのコメント。issue を作っていれば、その URL も書き足す

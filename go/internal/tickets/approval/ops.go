@@ -33,10 +33,7 @@ const (
 	opKey = "ccnavi_op"
 )
 
-// Admit は承認した提案を doing/ へ動かす。動かせなければ理由。中身は変えず、照合に使ったバイト列（Source）を
-// そのまま書いて元を消す（欄を書き足さず、改行も BOM も変えない）。どの経路で承認しても承認済みチケットが提案と
-// バイト単位で同じになるように。元を消せなければ書いた側を消して戻す（両方に残ると、以後どの操作も「複数の
-// 場所にある」で止まる）。承認の plan では失敗の枝が走らないので、同じ戻し方を Writer(FS) へ渡す。
+// Admit は承認した提案を doing/ へ動かす。動かせなければ理由を返す。中身は変えず、照合に使ったバイト列（Source）をそのまま書いて、元を消す。欄を書き足さず、改行も BOM も変えない。どの経路で承認しても、承認済みチケットが提案とバイト単位で同じになるようにするためである。元を消せなければ、書いた側を消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で止まってしまう。承認の plan では失敗の枝が走らないので、同じ戻し方を Writer(FS) へ渡す。
 func Admit(approvedDir string, t *ticket.Ticket) string {
 	target := CopyPath(approvedDir, t.ID)
 	if failed := ChangedSinceRead(t); failed != "" {
@@ -132,9 +129,7 @@ func MoveFile(source, target string) string {
 	return ""
 }
 
-// SettleReview はこの親の、この番号のフェーズのレビュー待ちの子を done/ へ動かす（ユーザがレビューを済ませた
-// とき）。返すのは動かした識別子と、動かせなかった理由。by は動かした経路（confirm・decide・close-early・
-// chrome）で、動かした子の settled_by に書く。書く先の置き場が決まらなければ *NoParentError（入口が受ける）。
+// SettleReview は、この親のこの番号のフェーズのレビュー待ちの子を done/ へ動かす。ユーザがレビューを済ませたときに使う。返すのは、動かした識別子と、動かせなかった理由である。by は動かした経路（confirm・decide・close-early・chrome）で、動かした子の settled_by に書く。書く先の置き場が決まらなければ *NoParentError を返し、入口が受ける。
 func SettleReview(conf *config.Settings, root, parentID string, numbers []int, by string) ([]string, string, error) {
 	review, _ := ScanReview(conf, root, nil)
 	sort.SliceStable(review, func(i, j int) bool { return review[i].ID < review[j].ID })
@@ -178,9 +173,7 @@ func writeSettledBy(path, by string) string {
 	return fsio.WriteText(path, fields.SetFields(text, [][2]string{{settledByKey, by}}), fsio.LF, fsio.Atomic)
 }
 
-// NextChildID はこの親のこのフェーズの次の子の識別子。どの置き場に在る同じフェーズの子よりも後ろの連番で、
-// 手元の退避にある子も数える（閉じた子の連番を使い回さない。退避の親は大文字小文字を区別せずに比べる）。
-// フェーズ番号か連番が 2 桁に収まらなければ error（呼び手は何も書かずに止まる）。
+// NextChildID は、この親のこのフェーズの次の子の識別子を返す。どの置き場に在る同じフェーズの子よりも後ろの連番にする。手元の退避にある子も数える。閉じた子の連番を使い回さないためである。退避の親は、大文字小文字を区別せずに比べる。フェーズ番号か連番が 2 桁に収まらなければ error を返し、呼び手は何も書かずに止まる。
 func NextChildID(conf *config.Settings, root, parentID string, phase int) (string, error) {
 	top := ids.MaxChildNumber
 	if phase < 0 || phase > top {
@@ -245,9 +238,7 @@ func ExistingTicketFile(conf *config.Settings, root, id string) string {
 	return ""
 }
 
-// followupTicket は続きの子のチケットを組む（書かない）。返すのは識別子・チケット・組めなかった理由。
-// 先行は見た子のうち取り消しでないもの（取り消した子は満たせないので、入れると着手できなくなる）。範囲は
-// 見た子の欄の和（同じ内容は 1 つ）。
+// followupTicket は、続きの子のチケットを組む（書かない）。返すのは、識別子・チケット・組めなかった理由である。先行には、見た子のうち取り消しでないものを入れる。取り消した子は満たせないので、入れると着手できなくなってしまう。範囲は、見た子の欄の和にする（同じ内容は 1 つにする）。
 func followupTicket(conf *config.Settings, root string, parent *ticket.Ticket, phase int, children []*ticket.Ticket, items []string, opID string) (string, *ticket.Ticket, string) {
 	ident, err := NextChildID(conf, root, parent.ID, phase)
 	if err != nil {
@@ -371,9 +362,7 @@ func FollowupProblem(conf *config.Settings, root string, parent *ticket.Ticket, 
 	return why
 }
 
-// Followup はレビューで残った指摘の続きの子を、ユーザの判断で doing/ に直に起こす（ユーザがターミナルで
-// 「続きの子で直す」と選んだことが承認そのもの）。同じフェーズの番号に足すので、そのフェーズは開き直り、
-// マーカーは消える。消せなかったほかの種類の知らせは stderr へ。返すのは識別子と、起こせなかった理由。
+// Followup は、レビューで残った指摘の続きの子を、ユーザの判断で doing/ に直に起こす。ユーザがターミナルで「続きの子で直す」と選んだことが、そのまま承認になる。同じフェーズの番号に足すので、そのフェーズは開き直り、マーカーは消える。消せなかったほかの種類の知らせは stderr へ出す。返すのは、起こした識別子と、起こせなかった理由である。
 func Followup(conf *config.Settings, root string, parent *ticket.Ticket, phase int, children []*ticket.Ticket, items []string, stderr io.Writer, opID string) (string, string) {
 	ident, t, why := followupTicket(conf, root, parent, phase, children, items, opID)
 	if t == nil {

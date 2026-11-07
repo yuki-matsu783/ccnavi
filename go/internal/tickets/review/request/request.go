@@ -28,10 +28,7 @@ import (
 	"ccnavi/internal/tickets/phase"
 )
 
-// ResolveNote は依頼の本文の末尾（HandoffNote のあと）と、fix を選んだあとの文に足す 1 文。fix で直した指摘の
-// スレッドはホストの上で未解決のまま残る（仕様）。resolve するのはユーザで、エージェントは fix を理由に
-// resolve しない。依頼の目印のキーはこの文を足す前の本文から作る（足す前に投稿した依頼を打ち直しても
-// 二重に投稿しない）。
+// ResolveNote は、依頼の本文の末尾（HandoffNote のあと）と、fix を選んだあとの文に足す 1 文である。fix で直した指摘のスレッドは、ホストの上で未解決のまま残る。これは仕様である。解決するのはユーザであり、エージェントは fix を理由に解決しない。依頼の目印のキーは、この文を足す前の本文から作る。足す前に投稿した依頼を打ち直しても、二重に投稿しないためである。
 const ResolveNote = "修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。" +
 	"エージェントは fix を理由に resolve しない。"
 
@@ -81,9 +78,7 @@ type passed struct {
 	Body     string
 }
 
-// gate は review-request の、ワークツリーの中で分かる前提の検査。本体（Prepare）と `prepare --check` が同じ
-// ものを通る。断ったときは理由のあとに `次:` を 1 行足して nil。ホストの状態（マージリクエストの有無・向き先）
-// は見ない（sh が取ってくる）。
+// gate は review-request の、ワークツリーの中で分かる前提の検査である。本体（Prepare）と `prepare --check` が同じものを通る。断ったときは、理由のあとに `次:` を 1 行足して nil を返す。ホストの状態（マージリクエストの有無や向き先）は見ない。sh が取ってくるからである。
 func gate(stderr io.Writer, conf *config.Settings, root, cwd string, number int, bodyFile string) *passed {
 	parent, p, ok := ParentPhase(stderr, conf, root, cwd, number)
 	if !ok {
@@ -171,9 +166,7 @@ func requestPath(conf *config.Settings, parentID string, number int) string {
 	return ospath.Join(conf.State, fmt.Sprintf(requestFile, parentID, number))
 }
 
-// Requested は投稿の結果を受けて、依頼のマーカーを置く。依頼済みで出し直せない・結果に投稿の url が無い・
-// 投稿の後に前提が崩れた（子の合流・未コミット・未 push）なら置かずに止める。マーカーには HEAD と投稿の
-// 情報（MR・url・ホスト・ホストの時刻・投稿者）を書き、投稿待ちの本文を消して、親の mr: に番号を書き足す。
+// Requested は、投稿の結果を受けて依頼のマーカーを置く。次の場合は、置かずに止める。依頼済みで出し直せないとき、結果に投稿の url が無いとき、投稿の後に前提が崩れたとき（子の合流・未コミット・未 push）である。マーカーには、HEAD と投稿の情報（MR・url・ホスト・ホストの時刻・投稿者）を書く。投稿待ちの本文は消し、親の mr: に番号を書き足す。
 func Requested(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, number int, resultPath string) (int, error) {
 	parent, p, ok := ParentPhase(stderr, conf, root, cwd, number)
 	if !ok {
@@ -302,9 +295,7 @@ func containsInt(list []int, n int) bool {
 	return false
 }
 
-// unmetIn は依頼の前提のうち、ワークツリーの中で分かるもの。子が親のブランチに合流したかは、finish が書いた
-// merged_sha が親の HEAD の祖先かで見る（子のブランチは見ない。消しても、別の PC で finish しても変わらない）。
-// 未追跡は数えない（依頼文をワークツリーに置く使い方が普通にあり、未追跡はマージリクエストに載らない）。
+// unmetIn は、依頼の前提のうち、ワークツリーの中で分かるものを返す。子が親のブランチに合流したかは、finish が書いた merged_sha が親の HEAD の祖先かどうかで見る。子のブランチは見ない。子のブランチを消しても、別の PC で finish しても、結果は変わらないようにするためである。未追跡は数えない。依頼文をワークツリーに置く使い方は普通にあり、未追跡のものはマージリクエストに載らないからである。
 func unmetIn(root, treeRoot string, conf *config.Settings, p *phase.Phase) []string {
 	var unmet []string
 	if !p.Ended() {
@@ -334,12 +325,9 @@ func unmetIn(root, treeRoot string, conf *config.Settings, p *phase.Phase) []str
 	return unmet
 }
 
-// alreadyRequested は依頼済みで出し直せないならその説明。未依頼か出し直せるなら空。
+// alreadyRequested は、依頼済みで出し直せないなら、その説明を返す。未依頼か出し直せるなら空を返す。
 //
-// 出し直せるのは、依頼の後にユーザが見るものが動き、まだレビュー済みになっていないときだけ（confirm が止まる
-// ので、ここも止めると打てる手が無くなる）。ccnavi 自身の置き場だけが動いた形では confirm が止まらないので、
-// 出し直させると依頼のコメントが増えるだけになる。レビュー済みは依頼の有無より先に見る（close-early は
-// 依頼していないフェーズにもレビュー済みを置く）。
+// 出し直せるのは、依頼の後にユーザが見るものが動き、まだレビュー済みになっていないときだけである。confirm が止まるので、ここも止めると打てる手が無くなるからである。ccnavi 自身の置き場だけが動いた形では confirm は止まらない。そのため、出し直させると依頼のコメントが増えるだけになる。レビュー済みは、依頼の有無より先に見る。close-early は、依頼していないフェーズにもレビュー済みを置くからである。
 func alreadyRequested(conf *config.Settings, treeRoot string, p *phase.Phase, number int) string {
 	if _, ok := p.Marks[marks.Reviewed]; ok {
 		return fmt.Sprintf(msgReviewedPhase, number)

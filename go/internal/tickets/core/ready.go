@@ -51,12 +51,9 @@ func follow(steps []string) []string {
 	return out
 }
 
-// checkReadiness は送る提案（ids）で承認を頼める状態か。承認の可否の判定はここだけで、approval-request（と
-// --check）のゲートと --agree --preview --verify が通る。承認を押したあとで拒否や止まりに気づく往復を避けるため、
-// 承認の画面が外す理由と、承認のあとに子の finish を止める親の状態（treegate の ApprovalRequest）を先に言う。
+// checkReadiness は、送る提案（ids）で承認を頼める状態かを見る。承認の可否を判定するのはここだけである。approval-request（と `--check`）のゲートと、`--agree --preview --verify` が、ここを通る。承認を押したあとで拒否や止まりに気づく往復を避けるため、承認の画面で外す理由と、承認のあとに子の finish を止める親の状態（treegate の ApprovalRequest）を先に伝える。
 //
-// 見るのは送る提案だけ（ほかの親子の書きかけで止めない）。承認待ちに無い識別子（承認済みなど）は止めない。
-// gathered が nil なら承認の画面の集計を取り直す。
+// 見るのは送る提案だけである。ほかの親子の書きかけでは止めない。承認待ちに無い識別子（承認済みなど）も止めない。gathered が nil なら、承認の画面の集計を取り直す。
 func checkReadiness(conf *config.Settings, root string, ids []string, gathered *agree.Gathered) readiness {
 	mine := map[string]bool{}
 	for _, id := range ids {
@@ -158,10 +155,7 @@ type dirtyParent struct {
 	text   string
 }
 
-// dirtyParents は承認した親のワークツリーにある、提案とチケットの置き場以外の未コミットの変更。承認の前は親の
-// ワークツリーへの書き込みは判定の対象外で通るが、承認の後に同じ変更を戻そうとすると断られ、子の finish も止まる。
-// 止まる前に知らせるため、承認の時点で同じ条件（treegate）を数える。承認は止めない。ワークツリーが無い・読めない
-// ときは黙って数えない。プロジェクトの子は置き場が別なので数えない。
+// dirtyParents は、承認した親のワークツリーにある、提案とチケットの置き場以外の未コミットの変更を数える。承認の前は、親のワークツリーへの書き込みは判定の対象外なので通る。しかし承認のあとに同じ変更を戻そうとすると断られ、子の finish も止まる。止まる前に知らせるため、承認の時点で同じ条件（treegate）を数える。承認は止めない。ワークツリーが無い、または読めないときは黙って数えない。プロジェクトの子は置き場が別なので数えない。
 func dirtyParents(conf *config.Settings, root string, tickets []*ticket.Ticket) []dirtyParent {
 	seen := map[string]bool{}
 	out := []dirtyParent{}

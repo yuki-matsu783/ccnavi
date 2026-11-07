@@ -53,9 +53,7 @@ type NoParentError struct{ Reason string }
 func (e *NoParentError) Error() string        { return e.Reason }
 func (e *NoParentError) Is(target error) bool { return target == ErrNoParentWorktree }
 
-// HomeDir はこの識別子の承認済みチケットを置く置き場（親のワークツリーの置き場だけ）。書く先も読む先も 1 つに
-// 決めるためのもの。子のワークツリーにも checkout されるが、そこへ書くと同じ識別子が 2 通りになる。
-// project はチケットのリポジトリ（ワークスペース自身なら空）。決まらなければ *NoParentError。
+// HomeDir は、この識別子の承認済みチケットを置く置き場を返す。親のワークツリーの置き場だけである。書く先も読む先も 1 つに決めるためである。子のワークツリーにも checkout されるが、そこへ書くと同じ識別子が 2 通りになってしまう。project はチケットのリポジトリである（ワークスペース自身なら空）。決まらなければ *NoParentError を返す。
 func HomeDir(conf *config.Settings, root, id, parent, project string) (string, error) {
 	return homeDir(conf, root, homeOf(id, parent), func(f *standing.Families, home string) standing.Standing {
 		return f.Standing(home, project)

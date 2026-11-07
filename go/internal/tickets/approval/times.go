@@ -35,12 +35,9 @@ func (a ApprovedTime) Label() string {
 	return a.At
 }
 
-// ApprovedTimes は承認済みチケットごと（Path で引く）の承認の時刻。表示（ボード・--diagnose）だけが読む。
-// 判定は git を読まない取り決めなので、hook の判定の経路からは呼ばない。
+// ApprovedTimes は、承認済みチケットごと（Path で引く）の承認の時刻を返す。表示（ボード・--diagnose）だけが読む。判定は git を読まない取り決めなので、hook の判定の経路からは呼ばない。
 //
-// ツリーごとに 1 回 `git log --no-renames --diff-filter=A` を打ち、doing/<識別子>.md を足したコミットのうち
-// 新しいものの時刻を引く。--no-renames は、GitHub の画面での移動（rename のコミット）を足したことにするため。
-// コミットが無ければ doing/ にあるものだけ「未コミット」とする。
+// ツリーごとに 1 回 `git log --no-renames --diff-filter=A` を打ち、doing/<識別子>.md を足したコミットのうち、新しいものの時刻を引く。--no-renames は、GitHub の画面での移動（rename のコミット）も、足したことにするために付ける。コミットが無ければ、doing/ にあるものだけ「未コミット」とする。
 func ApprovedTimes(conf *config.Settings, found []*ticket.Ticket) map[string]ApprovedTime {
 	out := map[string]ApprovedTime{}
 	var order []string

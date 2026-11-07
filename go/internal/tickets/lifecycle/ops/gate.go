@@ -137,9 +137,7 @@ func cancelFound(stderr io.Writer, conf *config.Settings, root, id, reason strin
 	return found
 }
 
-// Check は `ticket start|finish|cancel <識別子> --check`。副作用の前に分かる検査だけを通す（読むだけ）。sh が
-// 取り込み・コミット・子のワークツリーの作成の前に呼ぶ。どの置き場にも無いチケットは判断しない（別の PC で承認・
-// 着手された分は、取り込みのあとに本体が見る）。
+// Check は `ticket start|finish|cancel <識別子> --check` を行う。副作用の前に分かる検査だけを通す。読むだけである。sh は、取り込み・コミット・子のワークツリーの作成の前にこれを呼ぶ。どの置き場にも無いチケットは判断しない。別の PC で承認・着手された分は、取り込みのあとに本体が見る。
 func Check(stdout, stderr io.Writer, conf *config.Settings, root string, verb Verb, id, reason string) int {
 	if closing.Absent(conf, root, id) {
 		fmt.Fprintf(stdout, "案内: %s は手元で引けない。取り込みのあとに本体が確かめます\n", id)

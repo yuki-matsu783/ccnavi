@@ -47,9 +47,7 @@ type shown struct {
 	digest string
 }
 
-// judge は承認の対象を組み、ダイジェストを出す。shown を渡せば今のものと比べる。照合するのは承認の対象の識別子と
-// 各提案ファイルの元のバイト列全体だけで、承認の可否はここで最新の状態から計算し直す。絞り（only）が通らなかった
-// ときは、絞らない一覧を今の一覧として比べる（ボードが古い）。
+// judge は承認の対象を組み、ダイジェストを出す。shown を渡せば、今のものと比べる。照合するのは、承認の対象の識別子と、各提案ファイルの元のバイト列全体だけである。承認の可否は、ここで最新の状態から計算し直す。絞り（only）が通らなかったときは、絞らない一覧を今の一覧として比べる。ボードの一覧が古いからである。
 func judge(conf *config.Settings, root string, only []string, seen *shown) verdict {
 	var err bytes.Buffer
 	gathered := agree.Gather(&err, conf, root, only)
@@ -111,14 +109,9 @@ func dumps(v any) string {
 	return text
 }
 
-// Approve は未承認の提案をまとめてユーザに見せ、承認されたら承認済みチケットを置く（ユーザがターミナルで打つ
-// --agree）。承認は提案の中身を書き換えない（書き替えると、承認したユーザが承認したものの作者になる）。対象は
-// いま承認待ちのもの全部で、only は識別子で絞る（ボードの絞り込み）。絞りは対象を狭めるだけで、絞らないときに
-// 失敗するものを通さない。確認を待つ間に提案が更新されていれば承認せず、最新を見せ直して確認を取り直す。
+// Approve は未承認の提案をまとめてユーザに見せ、承認されたら承認済みチケットを置く。ユーザがターミナルで `--agree` を打って使う。承認は提案の中身を書き換えない。書き換えると、承認したユーザが承認したものの作者になってしまうからである。対象は、いま承認待ちのものすべてである。only は識別子で絞る（ボードの絞り込み）。絞りは対象を狭めるだけで、絞らないときに失敗するものを通すことはない。確認を待つ間に提案が更新されていれば、承認せず、最新を見せ直して確認を取り直す。
 //
-// placedOut があれば、書き込みに入ったあと、書けた承認済みチケットのパスと、書けなかったもの・書かなかったものを
-// JSON で書き出す（ccnavi-user-agree.sh が書けた分だけをコミット・push し、残りを名指しする）。
-// 一部を外した・途中で止まった（置いたものは残る）ときは config.ExitPartial。
+// placedOut があれば、書き込みに入ったあとに、書けた承認済みチケットのパスと、書けなかったものと書かなかったものを JSON で書き出す。ccnavi-user-agree.sh は、書けた分だけをコミットして push し、残りを名指しする。一部を外したとき、または途中で止まったとき（置いたものは残る）は config.ExitPartial を返す。
 func Approve(stdin io.Reader, stdout, stderr io.Writer, conf *config.Settings, root string, only []string, placedOut string) (int, error) {
 	answers := bufio.NewReader(stdin)
 	v := judge(conf, root, only, nil)
@@ -224,9 +217,7 @@ func copyPath(conf *config.Settings, root string, t *ticket.Ticket) (string, err
 	return approval.CopyPath(home, t.ID), nil
 }
 
-// placedReport は承認の書き込みの結果（--placed-out の JSON）。placed は書けた承認済みチケットのパス、written は
-// この承認で書いた・消したパス、failed は書き込みで止まった提案、unwritten は止まったために書かなかった提案、
-// rejected は検査で外した提案、dirty_parent は承認した親のワークツリーに残る置き場の外の変更。
+// placedReport は承認の書き込みの結果（--placed-out の JSON）を表す。placed は書けた承認済みチケットのパス。written は、この承認で書いたパスと消したパス。failed は書き込みで止まった提案。unwritten は、止まったために書かなかった提案。rejected は検査で外した提案。dirty_parent は、承認した親のワークツリーに残る、置き場の外の変更である。
 func placedReport(conf *config.Settings, root string, g *agree.Gathered, applied agree.Applied, written []string, dirty []dirtyParent) (*pyjson.Object, error) {
 	failed := []any{}
 	unwritten := []string{}
@@ -282,13 +273,9 @@ func Preview(stdout, stderr io.Writer, conf *config.Settings, root string, asJSO
 	return 0
 }
 
-// Verify は --agree --preview --verify。いま --agree を打てば通るかを、置かずに終了コードと本文で言う（エージェントが
-// 承認を頼む前に自分で確かめる）。答えを --preview に持たせないのは、ボードが 0 以外を失敗と読み、外れる提案が
-// 1 件あるだけで一覧を出せなくなるから。
+// Verify は `--agree --preview --verify` を行う。いま `--agree` を打てば通るかを、置かずに終了コードと本文で伝える。エージェントは、承認を頼む前に自分で確かめる。答えを `--preview` に持たせないのは、ボードが 0 以外を失敗と読むからである。外れる提案が 1 件あるだけで、一覧を出せなくなってしまう。
 //
-// 通るのは、指定したもの（無ければ承認待ち全部）がそのまま承認の対象に入り、承認を頼める状態（checkReadiness）に
-// あるとき。範囲の超過は --agree が止めないので失敗にしない（行につけて見せる）。答えは「はい」（0）か「いいえ」
-// （config.ExitAnswerNo）で、使い方の誤りの 1 と分ける。
+// 通るのは、指定したもの（指定が無ければ承認待ちのすべて）がそのまま承認の対象に入り、承認を頼める状態（checkReadiness）にあるときである。範囲の超過は `--agree` が止めないので、失敗にはしない。行に付けて見せる。答えは「はい」（0）か「いいえ」（config.ExitAnswerNo）で、使い方の誤り（1）とは分ける。
 func Verify(stdout, stderr io.Writer, conf *config.Settings, root string, asJSON bool, only []string) int {
 	judged := judge(conf, root, only, nil)
 	io.WriteString(stderr, judged.messages)
@@ -339,14 +326,9 @@ func Verify(stdout, stderr io.Writer, conf *config.Settings, root string, asJSON
 	return config.ExitAnswerNo
 }
 
-// ApproveYes は --agree --yes <識別子,…> --digest <ダイジェスト> [<絞り>...]（ボードのオーバーレイで押した承認）。
-// ターミナルの確認の代わりに、見せた一覧（expected）と見せた各提案ファイルのバイト列のダイジェスト（digest）が
-// 今のものと同じことを求め、違えば何も置かずに mismatch を返す（見ていないものを承認する経路を作らない）。
-// ダイジェストが無ければ承認しない。
+// ApproveYes は `--agree --yes <識別子,…> --digest <ダイジェスト> [<絞り>...]` を行う。ボードのオーバーレイで押した承認である。ターミナルの確認の代わりに、次の 2 つが今のものと同じであることを求める。見せた一覧（expected）と、見せた各提案ファイルのバイト列のダイジェスト（digest）。違えば、何も置かずに mismatch を返す。見ていないものを承認する経路を作らないためである。ダイジェストが無ければ承認しない。
 //
-// 見せた識別子と絞り（only。preview に渡したもの）は分けて受ける。絞りで狭めた対象と見せた識別子を比べると、
-// いつでも一致してしまう。途中で止まれば置いたものを partial で返し、通れば子のワークツリーの計画と承認後の案内を
-// 添える。
+// 見せた識別子と絞り（only。preview に渡したもの）は分けて受ける。絞りで狭めた対象と見せた識別子を比べると、いつも一致してしまうからである。途中で止まれば、置いたものを partial で返す。通れば、子のワークツリーの計画と承認後の案内を添える。
 func ApproveYes(stdout, stderr io.Writer, conf *config.Settings, root string, expected []string, asJSON bool, only []string, digest string) (int, error) {
 	var narrowed []string
 	for _, s := range only {

@@ -36,10 +36,7 @@ func refusedCheck(c code, problems []string) checked {
 	return checked{problems: refused(c, problems)}
 }
 
-// confirm はレビュー済みにしてよいかを見て、通れば書くもの（子を done/ へ、受け入れ台帳、レビュー済みのマーカー）を
-// 溜める段に並べる。result はホストから取得した結果。changed は依頼の後にユーザが見るものが動いたかの説明（空なら
-// 動いていない）で、moved は止めたあとの説明にだけ使う。manual が確定してよい形（SettleReady）なら、未解決の指摘を
-// 解決せず版つきで受け入れ台帳に足す。account は `--actor` のアカウント（空なら書かない）。
+// confirm は、レビュー済みにしてよいかを見る。通れば、書くもの（子を done/ へ、受け入れ台帳、レビュー済みのマーカー）を溜める段に並べる。result はホストから取得した結果である。changed は、依頼の後にユーザが見るものが動いたことの説明で、空なら動いていない。moved は、止めたあとの説明にだけ使う。manual が確定してよい形（SettleReady）なら、未解決の指摘は解決せず、版つきで受け入れ台帳に足す。account は `--actor` のアカウントである。空なら書かない。
 func confirm(conf *config.Settings, root, account, parentID string, number int, result host.Result, changed string, manual *phase.Manual, moved request.Moved) (checked, error) {
 	parent := openParent(conf, root, parentID)
 	if parent == nil {
@@ -125,9 +122,7 @@ func precondition(root string, p *phase.Phase, number int, changed string, moved
 	return nil
 }
 
-// manualRefusal は手で動かした移動の確定を止める理由。変更要求のレビューがあれば保留（移動は残す）。受け入れるのは
-// 移動のコミットより phase.Margin 以上前にホストで作られたスレッドだけで、後に付いた指摘や時刻が読めない指摘が
-// 残れば確定しない（その分は decide へ）。通れば nil。
+// manualRefusal は、手で動かした移動の確定を止める理由を返す。変更要求のレビューがあれば保留する（移動は残す）。受け入れるのは、移動のコミットより phase.Margin 以上前にホストで作られたスレッドだけである。後に付いた指摘や、時刻が読めない指摘が残っていれば確定しない。その分は decide へ回す。通れば nil を返す。
 func manualRefusal(conf *config.Settings, root string, parent *ticket.Ticket, number int, result host.Result, manual phase.Manual) *checked {
 	if len(request.ChangesRequested(result)) > 0 {
 		c := refusedCheck(codeConfirmReviewOpen, []string{"ccnavi: " + host.ChangesRequestedNote(result.Host) +
@@ -171,10 +166,7 @@ func openParent(conf *config.Settings, root, parentID string) *ticket.Ticket {
 	return found
 }
 
-// ConfirmLocal は review confirm。依頼の後を見て、通ればレビュー済みのマーカーを置いて先へ進めるようにする。検査と
-// 書くものの並べ方は confirm で、ここは手元の入力（cwd の親、git の差分、--result の取得した結果）を読んで渡し、
-// 並べたものを書く。account は ccnavi-review.sh がトークンの持ち主を引いて --actor で渡すアカウントで、あれば
-// マーカーに actor と via: cli を書く。
+// ConfirmLocal は `review confirm` を行う。依頼の後の状態を見て、通ればレビュー済みのマーカーを置いて先へ進めるようにする。検査と書くものの並べ方は confirm が持つ。ここは手元の入力（cwd の親、git の差分、--result の取得結果）を読んで渡し、並べたものを書く。account は、ccnavi-review.sh がトークンの持ち主を引いて `--actor` で渡すアカウントである。あれば、マーカーに actor と `via: cli` を書く。
 func ConfirmLocal(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, number int, resultPath, account string) (int, error) {
 	parent, p, moved, ok := confirmGate(stderr, conf, root, cwd, number)
 	if !ok {
@@ -248,9 +240,7 @@ func CheckConfirm(stdout, stderr io.Writer, conf *config.Settings, root, cwd str
 	return 0
 }
 
-// nextAfterConfirm はレビュー済みを書いたあとの出力。親を閉じられる状態（closing.CloseProblems が空）になったら
-// 親を閉じる流れを言い、まだなら status を促す（最後のフェーズのあとの手順が、親の finish の出力で初めて出てくるのを
-// 避ける）。
+// nextAfterConfirm は、レビュー済みを書いたあとの出力を組む。親を閉じられる状態（closing.CloseProblems が空）になったら、親を閉じる流れを言う。まだなら status を促す。最後のフェーズのあとの手順が、親の finish の出力で初めて出てくるのを避けるためである。
 func nextAfterConfirm(conf *config.Settings, root, parentID string) string {
 	if len(closing.CloseProblems(conf, root, parentID, nil)) > 0 {
 		return texts.Say(root, "NEXT_REVIEW_CONFIRMED", texts.Values{"parent": parentID}, nil)

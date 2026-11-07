@@ -32,9 +32,7 @@ func ParentStillBusy(stderr io.Writer, conf *config.Settings, root string, t *ti
 	return len(problems) > 0
 }
 
-// CloseProblems は親を閉じられない理由。空なら閉じてよく、マージに進んでもよい。ユーザが早めに閉じていれば、
-// 開いている子以外は問わない。raw は呼び手が approval.ReadRaw で読んだ置き場で、読んでから動かして
-// いないときだけ渡す（nil ならここで読む）。
+// CloseProblems は、親を閉じられない理由を返す。空なら閉じてよく、マージに進んでもよい。ユーザが早めに閉じていれば、開いている子以外は問わない。raw は、呼び手が approval.ReadRaw で読んだ置き場である。読んでから動かしていないときだけ渡す。nil ならここで読む。
 func CloseProblems(conf *config.Settings, root, parentID string, raw *approval.Raw) []string {
 	copies, _ := approval.Scan(conf, root, false, raw)
 	var open []string
@@ -114,9 +112,7 @@ func DeliverablesInWip(conf *config.Settings, root string, t *ticket.Ticket) []s
 	return out
 }
 
-// DeliverablesMissing はフェーズの最後の子を閉じる前に、定義の成果物が親か子のワークツリーで追跡されて
-// いなければ、名前を言って真。同じフェーズに作業中の別の子があれば、その子が出すかもしれないので通す。
-// 在って追跡されていることだけを見る（空でも在れば通る）。
+// DeliverablesMissing は、フェーズの最後の子を閉じる前に、定義の成果物が親か子のワークツリーで追跡されていなければ、その名前を言って真を返す。同じフェーズに作業中の別の子があれば、その子が成果物を出すかもしれないので通す。成果物は在って追跡されていることだけを見る。空でも在れば通る。
 func DeliverablesMissing(stderr io.Writer, conf *config.Settings, root string, t *ticket.Ticket) bool {
 	pt := PhaseType(conf, root, t)
 	if pt == nil || len(pt.Deliverables) == 0 {
@@ -148,9 +144,7 @@ func DeliverablesMissing(stderr io.Writer, conf *config.Settings, root string, t
 	return true
 }
 
-// tracked はこの glob に当たる追跡済みのファイルが、ワークツリーにも 1 つでも在るか。ls-files はインデックスを
-// 見るので、消したが git add していないもの（--deleted）を除く。名前は同じ読み方の 2 つの出力どうしで比べ、
-// ファイルシステムには聞かない（非 UTF-8 の名前を置換文字で読んでも食い違わない）。
+// tracked は、この glob に当たる追跡済みのファイルが、ワークツリーにも 1 つでも在るかを返す。ls-files はインデックスを見るので、消したが git add していないもの（--deleted）は除く。名前は同じ読み方の 2 つの出力どうしで比べ、ファイルシステムには聞かない。非 UTF-8 の名前を置換文字で読んでも、食い違わないようにするためである。
 func tracked(worktree, glob string) bool {
 	rc, out := git.Output(worktree, []string{"ls-files", "-z", "--", glob}, gitOptions())
 	if rc != 0 {

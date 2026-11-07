@@ -24,9 +24,7 @@ import (
 	"ccnavi/internal/tickets/sync/drafts"
 )
 
-// ReadyFlowAgreed は最後のレビューのあと、Draft を外すまでの手順がユーザの合意の範囲に入ることの言い切り。
-// confirm の知らせと親の finish の出力が同じ文を使う。ユーザがレビュー済みにした時点でここまでは合意済みで、
-// 外へ出る操作の前に確認を取り直すと、同じ流れの中で何度も許可を求めることになる。
+// ReadyFlowAgreed は、最後のレビューのあと Draft を外すまでの手順が、ユーザの合意の範囲に入ることを言い切る文である。confirm の知らせと親の finish の出力が、同じ文を使う。ユーザがレビュー済みにした時点で、ここまでは合意済みである。外へ出る操作の前に確認を取り直すと、同じ流れの中で何度も許可を求めることになるからである。
 const ReadyFlowAgreed = "ここから Draft を解除するまで（finish → push → ready。`wip/` の削除は ready に入っている）は、" +
 	"ユーザがレビューして合意した範囲に入る。" +
 	"push と Draft を解除する前に、ユーザへ確認を取り直さずに進める" +
@@ -50,9 +48,7 @@ func ReadyCommand(root, parentID string) string {
 	return config.ScriptCommand(root, reviewScript) + " ready --parent " + parentID
 }
 
-// Finish は doing/ から review/（レビュー要）か done/（不要）へ動かし、完了の時刻を書く。子は閉じる前に実績の
-// リスクを数え、定性の判定が揃わなければ閉じない。成果物の追跡と親の学びの置き場は、子の合流のあとでないと
-// 分からないので finishGate の後に見る。
+// Finish は doing/ から review/（レビューが要る）か done/（要らない）へ動かし、完了の時刻を書く。子は閉じる前に実績のリスクを数える。定性の判定がそろわなければ閉じない。成果物の追跡と親の学びの置き場は、子の合流のあとでないと分からないので、finishGate のあとに見る。
 func Finish(stdout, stderr io.Writer, conf *config.Settings, root, id string) int {
 	found := finishGate(stderr, conf, root, id)
 	if found == nil {
@@ -97,9 +93,7 @@ func Finish(stdout, stderr io.Writer, conf *config.Settings, root, id string) in
 	return 0
 }
 
-// mergedSHA はこの finish で親のブランチに入る子の先頭。合流の途中なら MERGE_HEAD（finish の検査が読んだ子の
-// 先頭。検査のあとに子が積んだコミットは合流に載らない）。合流の途中でなくても、子の先頭が親の先頭の祖先なら
-// （子が先に親へ入っている）その先頭。どちらでもなければ親のブランチに入らない子なので空。
+// mergedSHA は、この finish で親のブランチに入る子の先頭を返す。合流の途中なら MERGE_HEAD を使う。これは finish の検査が読んだ子の先頭である。検査のあとに子が積んだコミットは、合流に載らない。合流の途中でなくても、子の先頭が親の先頭の祖先なら、その先頭を返す。子が先に親へ入っているからである。どちらでもなければ、親のブランチに入らない子なので空を返す。
 func mergedSHA(root string, found *ticket.Ticket) string {
 	if !found.IsChild() {
 		return ""
@@ -122,9 +116,7 @@ func mergedSHA(root string, found *ticket.Ticket) string {
 	return ""
 }
 
-// mergingHead は親のワークツリーが合流している子の先頭（MERGE_HEAD）。合流の途中でなければ空。MERGE_HEAD が
-// 子のブランチの先頭かその祖先のときだけ採る。親のワークツリーで別のものを合流している途中（write-and-push の
-// 外の手作業）を、この子の合流と取り違えないため。
+// mergingHead は、親のワークツリーが合流している子の先頭（MERGE_HEAD）を返す。合流の途中でなければ空を返す。MERGE_HEAD が子のブランチの先頭か、その祖先のときだけ採る。親のワークツリーで別のものを合流している途中（write-and-push の外の手作業）を、この子の合流と取り違えないためである。
 func mergingHead(root string, found *ticket.Ticket) string {
 	if !found.IsChild() {
 		return ""
@@ -145,9 +137,7 @@ func mergingHead(root string, found *ticket.Ticket) string {
 	return ""
 }
 
-// needsReview はこの子を閉じたとき、ユーザが見る対象になるか。フェーズのレビューを、この子を閉じたものとして
-// 数え直す（実績のリスクは scoreChild が記録した直後なので、宣言に関わらず上がった分も入る）。延期したフェーズの
-// 子もレビュー待ちに置く。見るのは次にレビューがあるフェーズの番だが、ユーザが見るまでは見られていない。
+// needsReview は、この子を閉じたとき、ユーザが見る対象になるかを返す。フェーズのレビューを、この子を閉じたものとして数え直す。実績のリスクは scoreChild が記録した直後なので、宣言に関わらず上がった分も入る。延期したフェーズの子も、レビュー待ちに置く。次にレビューがあるフェーズの番だが、ユーザが見るまでは見られていないことになる。
 func needsReview(conf *config.Settings, root string, found *ticket.Ticket) bool {
 	number, child := found.ChildPhase()
 	if !child || found.IsConsolidate() {
@@ -164,9 +154,7 @@ func needsReview(conf *config.Settings, root string, found *ticket.Ticket) bool 
 	return found.ReviewRequired != ticket.Unneeded
 }
 
-// closeParent は親を閉じたあとの記録と案内。記録（closed.json）はどのフェーズをどこで見たかを親のブランチに残す
-// （提案は統合先に取り込む前に wip/ ごと消えるので、閉じた事実の残る先がここしか無い）。案内は Draft を外す合図
-// まで。ready は閉じたチケットとこの記録を手元の退避へ移してから外す。
+// closeParent は、親を閉じたあとの記録と案内を組む。記録（closed.json）は、どのフェーズをどこで見たかを親のブランチに残す。提案は統合先に取り込む前に wip/ ごと消えるので、閉じた事実が残る先はここしか無い。案内は Draft を外す合図までである。ready は、閉じたチケットとこの記録を手元の退避へ移してから外す。
 func closeParent(stdout, stderr io.Writer, conf *config.Settings, root string, found *ticket.Ticket) {
 	where, err := approval.HomeDir(conf, root, found.ID, "", found.Project)
 	if err != nil {

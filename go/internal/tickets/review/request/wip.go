@@ -35,9 +35,7 @@ const (
 	namedLimit      = 10
 )
 
-// wipTracked は途中の作業の置き場（wip）の下で追跡されているファイル（git の表記）。読めなければ ok が偽。
-// 大文字小文字を区別せずに見る（区別しない FS で `WIP/` を先に作ると、範囲の判定は通すのに git には `WIP/…` で
-// 入る）。名前に `\` を含む 1 ファイル（`wip\x`）も下と見なす。pathspec に頼らず -z で全部を読んで絞る。
+// wipTracked は、途中の作業の置き場（wip）の下で追跡されているファイル（git の表記）を返す。読めなければ ok が偽になる。大文字小文字を区別せずに見る。区別しない FS で `WIP/` を先に作ると、範囲の判定は通るのに、git には `WIP/…` で入ってしまうからである。名前に `\` を含む 1 ファイル（`wip\x`）も、wip の下と見なす。pathspec には頼らず、-z で全部を読んでから絞る。
 func wipTracked(treeRoot string) ([]string, bool) {
 	return wipFiles(treeRoot, "ls-files", "-z")
 }
@@ -92,10 +90,7 @@ func counted(names []string) string {
 	return text
 }
 
-// MergeProblems はマージに進む前にワークツリーの側で満たしていること（ready の前提）。root は文面の sh のパスに使う。
-// 未コミットが無いこと、push 済みであること（ユーザがマージで見るのはリモートの HEAD）。wip/ の追跡済みの
-// ファイルは ready が消してコミットに含めるので止めない。未追跡のファイルと、取り込んでいない保護対象の
-// 下書きは消すと戻せないので、名指しして止める。
+// MergeProblems は、マージに進む前にワークツリーの側で満たしておくこと（ready の前提）を返す。root は文面の sh のパスに使う。確かめるのは次の 2 つである。未コミットが無いこと。push 済みであること。ユーザがマージで見るのはリモートの HEAD だからである。wip/ の追跡済みのファイルは、ready が消してコミットに含めるので、止めない。未追跡のファイルと、取り込んでいない保護対象の下書きは、消すと戻せない。そのため名指しして止める。
 func MergeProblems(conf *config.Settings, root, treeRoot string) []string {
 	if !ospath.IsDir(treeRoot) {
 		return []string{fmt.Sprintf(msgNoTree, treeRoot)}
@@ -133,10 +128,7 @@ func MergeProblems(conf *config.Settings, root, treeRoot string) []string {
 	return problems
 }
 
-// RemoveWip は wip の下の追跡済みのファイルを消す（ready が退避と同じ流れで使う）。返すのは消したパス、消す前の
-// HEAD（消したものを履歴から戻すときの版）、止まった理由。消すのは fsio を通すので write-and-push がコミットする。
-// 1 本でもツリーの外へ出るものがあれば何も消さない（途中のディレクトリがリンクに置き換わっていると、リンクの
-// 先を消す）。空になったディレクトリは下から消す（git は空のディレクトリを持たない）。
+// RemoveWip は、wip の下の追跡済みのファイルを消す（ready が退避と同じ流れで使う）。返すのは、消したパス、消す前の HEAD（消したものを履歴から戻すときの版）、止まった理由である。消すときは fsio を通すので、write-and-push がコミットする。ツリーの外へ出るものが 1 本でもあれば、何も消さない。途中のディレクトリがリンクに置き換わっていると、リンクの先を消してしまうからである。空になったディレクトリは、下から消す。git は空のディレクトリを持たないからである。
 func RemoveWip(treeRoot string) ([]string, string, string) {
 	names, ok := wipTracked(treeRoot)
 	if !ok {

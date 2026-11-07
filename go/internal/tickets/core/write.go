@@ -10,15 +10,14 @@ import (
 	"ccnavi/internal/tickets/proposal/agree"
 )
 
-// write は並べた書き込みをディスクに書く（Writer(FS)）。失敗の扱いは並べたときに添えた Policy で決まる。
+// write は並べた書き込みをディスクに書く（Writer(FS)）。失敗の扱いは、並べたときに添えた Policy で決まる。
 //
-//   - FailStop: Undo を消し Restore を戻し、`ccnavi: <識別子>: <理由>` を言って止める。置いたものは戻さない
-//   - FailWarn: 同じ形で言って続ける
-//   - FailLine: 行を出し、同じ組の残り（続く書き込みと行）を飛ばす
-//   - FailQuiet: 何も出さずに続ける
+//   - FailStop: Undo を消し、Restore を戻し、`ccnavi: <識別子>: <理由>` を言って止める。置いたものは戻さない。
+//   - FailWarn: 同じ形で言って続ける。
+//   - FailLine: 行を出し、同じ組の残り（続く書き込みと行）を飛ばす。
+//   - FailQuiet: 何も出さずに続ける。
 //
-// 並べる段で止まっていたら（Stopped）、並べた分を書いてから同じ形で言って止める。Call には同じ組で書けた Tag を
-// 渡す（マーカーを消した行は、実際に消せた種類で書く）。
+// 並べる段で止まっていれば（Stopped）、並べた分を書いてから、同じ形で言って止める。Call には、同じ組で書けた Tag を渡す。マーカーを消した行は、実際に消せた種類で書く。
 func write(stdout, stderr io.Writer, planned *agree.Planned) agree.Applied {
 	placed := []string{}
 	skipped := map[int]bool{}
@@ -85,9 +84,7 @@ func head(ticket string) string {
 	return "ccnavi: " + ticket + ": "
 }
 
-// writeRecorded は write に加えて、実際に書けた・消せたパスをワークスペースルートからの相対（"/" 区切り）で返す。
-// 承認済みチケット・マーカーと、承認で消した提案が入る。`ccnavi-user-push-approved.sh --path` はこの一覧だけを
-// コミットして push する（同じ置き場のほかの変更を巻き込まない）。
+// writeRecorded は write に加えて、実際に書けた・消せたパスをワークスペースルートからの相対（"/" 区切り）で返す。対象は、承認済みチケットとマーカー、承認で消した提案である。`ccnavi-user-push-approved.sh --path` は、この一覧だけをコミットして push する。同じ置き場のほかの変更を巻き込まないためである。
 func writeRecorded(stdout, stderr io.Writer, root string, planned *agree.Planned) (agree.Applied, []string) {
 	recorder := fsio.StartRecording()
 	applied := write(stdout, stderr, planned)

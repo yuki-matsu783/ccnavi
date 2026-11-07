@@ -22,15 +22,11 @@ type Unread struct {
 	Message string
 }
 
-// LoadCopy は承認済みチケットを 1 本読む。読めなければ nil と理由（BOM のような目に見えない原因も --lint が
-// 名指しできるように、理由を返す）。
+// LoadCopy は承認済みチケットを 1 本読む。読めなければ nil と理由を返す。BOM のような目に見えない原因も、--lint が名指しできるように、理由を返す。
 //
-// requireRecord は completed_at（空でない値）を求めるか。.ccnavi/approved/ は組み込みの保護がエージェントの
-// 書き込みを止めるので置き場だけで承認と言えるが、wip/proposals/review/ はエージェントが書ける側にあるので、
-// finish が書く欄を 2 つめの保護として求める。
+// requireRecord は、completed_at（空でない値）を求めるかを決める。.ccnavi/approved/ は組み込みの保護がエージェントの書き込みを止めるので、置き場だけで承認と言える。しかし wip/proposals/review/ はエージェントが書ける側にあるので、finish が書く欄を 2 つめの保護として求める。
 //
-// 計画を持つ親には計画の after から計算した先行関係と、親に固定したフェーズ定義を入れる。形の誤りはここでは
-// 落とさない（BlockingProblems が止める）。
+// 計画を持つ親には、計画の after から計算した先行関係と、親に固定したフェーズ定義を入れる。形の誤りは、ここでは落とさない。BlockingProblems が止める。
 func LoadCopy(path string, requireRecord bool) (*ticket.Ticket, string) {
 	t, problems := ticket.Load(path)
 	if t == nil {
@@ -156,9 +152,7 @@ func ReviewAll(conf *config.Settings, root string) ([]*ticket.Ticket, []string) 
 	return found, notes
 }
 
-// Raw は全ツリーの承認済みチケットを、まとめる前のまま読んだもの（作業中・閉じた・レビュー待ち）。1 回の判定の
-// 中で Scan を続けて呼ぶ呼び手が、同じ置き場を何度も読まないために持ち回る。覚えておいたものではなく、
-// その呼び出しの中で今しがた読んだもの（判定の途中でファイルが動く経路では読み直す）。
+// Raw は、全ツリーの承認済みチケットを、まとめる前のまま読んだものである（作業中・閉じた・レビュー待ち）。1 回の判定の中で Scan を続けて呼ぶ呼び手が、同じ置き場を何度も読まないために持ち回る。覚えておいたものではなく、その呼び出しの中で今しがた読んだものである。判定の途中でファイルが動く経路では、読み直す。
 type Raw struct {
 	Open        []*ticket.Ticket
 	OpenNotes   []string
@@ -185,10 +179,7 @@ func ReadRaw(conf *config.Settings, root string) *Raw {
 	return r
 }
 
-// Scan は判定と承認が読む承認済みチケット（closed なら閉じたもの）。正とするツリー（親のツリー）の側だけを残し、
-// そこに無ければ外す。子のワークツリーに checkout されているのは切った時点の版なので、残すと閉じたチケットが
-// 開いたものとして復活する。作業中の側には BlockingProblems と親子のチケットの立ち位置から、信頼できない理由
-// （Blocked）を付ける（置き場を手で動かす承認は --agree を通らないため）。raw が nil なら読む。
+// Scan は、判定と承認が読む承認済みチケットを返す（closed なら閉じたもの）。正とするツリー（親のツリー）の側だけを残し、そこに無ければ外す。子のワークツリーに checkout されているのは切った時点の版なので、残すと閉じたチケットが開いたものとして復活してしまう。作業中の側には、BlockingProblems と親子のチケットの立ち位置から、信頼できない理由（Blocked）を付ける。置き場を手で動かす承認は --agree を通らないからである。raw が nil なら読む。
 func Scan(conf *config.Settings, root string, closed bool, raw *Raw) ([]*ticket.Ticket, []string) {
 	if raw == nil {
 		raw = ReadRaw(conf, root)
@@ -215,9 +206,7 @@ func ScanReview(conf *config.Settings, root string, raw *Raw) ([]*ticket.Ticket,
 	return kept, append([]string(nil), raw.ReviewNotes...)
 }
 
-// authoritative は正とするツリーの側だけを残す。決め方は ticket.Authority の 1 つで、承認済みの識別子の提案も
-// 同じ関数で決める。決まらなければ全部残す（ほかのツリーのコピーで代用しない。リポジトリをまたいだ衝突も
-// まとめない。どちらかが気づかないうちに消え、--lint の「複数のリポジトリにある」も出なくなる）。
+// authoritative は、正とするツリーの側だけを残す。決め方は ticket.Authority の 1 つで、承認済みの識別子の提案も同じ関数で決める。決まらなければ全部残す。ほかのツリーのコピーで代用しない。リポジトリをまたいだ衝突もまとめない。どちらかが気づかないうちに消え、--lint の「複数のリポジトリにある」も出なくなってしまうからである。
 func authoritative(found, everything []*ticket.Ticket) []*ticket.Ticket {
 	seen := groups(everything)
 	var kept []*ticket.Ticket
@@ -258,9 +247,7 @@ type Proposals struct {
 	Stale []Stale
 }
 
-// ReadProposals は提案（todo/ と review/）を、承認済みチケットがどのツリーにあるかに従ってまとめる。承認済みの
-// 識別子の提案は、承認済みチケットで正とするツリーを決め、そのツリーに在るものだけを残す。承認の前に切った
-// ワークツリーに残った todo/ を、承認待ちや改版（巻き戻し）と読まないため。raw が nil なら読む。
+// ReadProposals は、提案（todo/ と review/）を、承認済みチケットがどのツリーにあるかに従ってまとめる。承認済みの識別子の提案は、承認済みチケットで正とするツリーを決め、そのツリーに在るものだけを残す。承認の前に切ったワークツリーに残った todo/ を、承認待ちや改版（巻き戻し）と読まないためである。raw が nil なら読む。
 func ReadProposals(conf *config.Settings, root string, raw *Raw) Proposals {
 	if raw == nil {
 		raw = ReadRaw(conf, root)
@@ -314,10 +301,7 @@ func staleProposals(found, kept, everything []*ticket.Ticket) []Stale {
 	return out
 }
 
-// RevisionElsewhereText は正とするツリーの外に在る、計画・コピー・範囲の違う版の案内。ファイルの場所と改版を
-// 書く置き場を、ワークスペースルートからのパスで名指しする（--lint と --agree が同じ文を出す）。親子のチケットが
-// 決まらないなら止まった理由と手順（FamilyProblems と同じ文）を、決まっていれば親のブランチへ送る手順を足す。
-// fams が nil なら作る。
+// RevisionElsewhereText は、正とするツリーの外に在る、計画・コピー・範囲の違う版の案内を返す。ファイルの場所と、改版を書く置き場を、ワークスペースルートからのパスで名指しする（--lint と --agree が同じ文を出す）。親子のチケットが決まらないなら、止まった理由と手順（FamilyProblems と同じ文）を出す。決まっていれば、親のブランチへ送る手順を足す。fams が nil なら作る。
 func RevisionElsewhereText(conf *config.Settings, root string, t *ticket.Ticket, where string, fams *standing.Families) string {
 	rel, ok := ospath.Relpath(t.Path, root)
 	if !ok {

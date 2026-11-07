@@ -32,9 +32,7 @@ const (
 	shaShown = 12
 )
 
-// Start は doing/ の承認済みチケットに、着手の時刻と基準点（ワークツリーの HEAD）を書く。ワークツリーは承認済みの
-// project の元リポジトリから切られていること（元リポジトリが違えば、判定はそのツリーの元リポジトリで行われ、
-// チケットと食い違う）。子ならフローのハッシュも記録し、着手のあとの書き換えを SubagentStart・SubagentStop が知らせる。
+// Start は doing/ の承認済みチケットに、着手の時刻と基準点（ワークツリーの HEAD）を書く。ワークツリーは、承認済みの project の元リポジトリから切られていなければならない。元リポジトリが違えば、判定はそのツリーの元リポジトリで行われ、チケットと食い違う。子ならフローのハッシュも記録する。着手のあとのフローの書き換えは、SubagentStart・SubagentStop が知らせる。
 func Start(stdout, stderr io.Writer, conf *config.Settings, root, id string) int {
 	found := startGate(stderr, conf, root, id)
 	if found == nil {
@@ -100,9 +98,7 @@ func Start(stdout, stderr io.Writer, conf *config.Settings, root, id string) int
 	return 0
 }
 
-// createWords はワークツリーを作る案内。子は親のブランチから `-b <子>` で切る。親は識別子の名前のブランチを
-// 作らず、親のブランチ（MR の元ブランチ）を ccnavi-start.sh で直接チェックアウトする（MR の採用の確認と取り込みも
-// そこで行う）。
+// createWords は、ワークツリーを作る案内を組む。子は親のブランチから `-b <子>` で切る。親は、識別子の名前のブランチを作らない。親のブランチ（MR の元ブランチ）を ccnavi-start.sh で直接チェックアウトする。MR の採用の確認と取り込みも、そこで行う。
 func createWords(root string, t *ticket.Ticket, worktree string) string {
 	if t.IsChild() {
 		where := ""
