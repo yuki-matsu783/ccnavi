@@ -60,7 +60,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 ### 検査
 
 - `gofmt` と `go vet` を通す
-- 依存の向きは `go/internal/layers_test.go` が見る。`go/internal/conventions_test.go` が見るのは、いまは環境変数の名前の直書き（`CCNAVI_*`・`CLAUDE_*`）だけで、ほかの定数の決まりは読む人が守る。機械で見られる決まりを足したら、`conventions_test.go` に検査も足す
+- 依存の向きは `go/internal/layers_test.go` が見る。見るのは本体のファイル（`_test.go` 以外）の import で、段は親のパスごとの表で決める。`topTiers` は `internal/` 直下の段、`subTiers` は親（`infra`・`tickets`・`tickets/config` など）ごとの子の段で、兄弟は段が小さい兄弟（とその下）だけを読める。表に親が無い所の兄弟どうしと、親と子のあいだは見ない。テストだけが読む道具（`tickets/testkit`）は親の表の一番上に置き、本体から読めないようにする。`go/internal/conventions_test.go` が見るのは、いまは環境変数の名前の直書き（`CCNAVI_*`・`CLAUDE_*`）だけで、ほかの定数の決まりは読む人が守る。機械で見られる決まりを足したら、`conventions_test.go` に検査も足す
 
 ## テスト
 
@@ -135,6 +135,6 @@ cd go && go vet ./... && go test ./...
 
 `go/cmd/ccnavi/main.go` はまだ入口を持たない（`entry` を移すまで、起動すると移していないと言って終わる）。`build.py` と `.ccnavi/bin/` の組み立てには入らず、配る実行ファイルは Python のまま。
 
-依存の向きは `go/internal/layers_test.go` が見る。パッケージを足したら、先にその表（`topTiers`・`subTiers`）を直す。
+依存の向きは `go/internal/layers_test.go` が見る。パッケージを足したら、先にその表（`topTiers` と、親のパスごとの `subTiers`）に行を足す。
 
 依存は `go mod tidy` で整える。外の依存は `golang.org/x/text` と `github.com/BurntSushi/toml` だけにする。

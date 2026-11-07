@@ -18,11 +18,11 @@ ccnavi の開発で、操作を止める条件を足す・直すとき、実装�
 - 「どの操作がどの条件を見るか」は、条件の側で宣言する。操作の側に条件を書き並べない。条件を足したら、見る操作を宣言に足す
 - 条件が返すのは、理由と次の一手を持つ共通の形（Problem）。表示（ターミナルの文・ボードの JSON・案内）は、その結果を言い換えるだけにする。表示の入口が複数あっても、判定の実装は 1 つ
 
-`start`・`finish`・`cancel`・`consolidate` の書く前の検査は、`lifecycle/commands.py` の `start_gate`・`finish_gate`・`cancel_gate` と `consolidate.py` の `gate` に置き、本体と `--check`（sh が取り込みの前に呼ぶ）が同じ関数を通る。合流のあとでないと分からない検査だけが本体に残る。
+`start`・`finish`・`cancel`・`consolidate` の書く前の検査は、`lifecycle/commands.py` の `start_gate`・`finish_gate`・`cancel_gate` と `consolidate.py` の `gate` に置き、本体と `--check`（sh が取り込みの前に呼ぶ）が同じ関数を通る。Go は `go/internal/tickets/lifecycle/ops` の `startGate`・`finishGate`・`cancelGate` と `lifecycle/consolidate` の `gate`。合流のあとでないと分からない検査だけが本体に残る。
 
-`review-request` の前提は `tickets/review/request.py` の `request_gate`、`decide` の依頼の記録・動きの検査は `tickets/review/decide.py` の `decide_gate` に置く。本体と `--check`（`ccnavi --check review prepare`・`ccnavi --entry sh user reviewed N --check --accept-unresolved`。sh がロック・取り込みの前に呼ぶ）が同じ関数を通る。`approval-request`・`review confirm`・`ready` も同じ型で、sh がロック・取り込みの前に `--check` を呼び、本体と同じ関数で断る（`confirm_gate`・`ready_gate`。断るときは `次:` を足す。`ready --check` は、前の回が退避を始めている打ち直しなら通して本体に任せる。Draft かどうかはホストの結果が要る）。マージリクエストの有無など、ホストの API が要る条件は事前には判断しない。
+`review-request` の前提は `tickets/review/request.py` の `request_gate`、`decide` の依頼の記録・動きの検査は `tickets/review/decide.py` の `decide_gate` に置く（Go は `go/internal/tickets/review/request` と `review/decide` の `gate`）。本体と `--check`（`ccnavi --check review prepare`・`ccnavi --entry sh user reviewed N --check --accept-unresolved`。sh がロック・取り込みの前に呼ぶ）が同じ関数を通る。`approval-request`・`review confirm`・`ready` も同じ型で、sh がロック・取り込みの前に `--check` を呼び、本体と同じ関数で断る（`confirm_gate`・`ready_gate`。Go は `go/internal/tickets/core` の `confirmGate`、`review/closeout` の `readyGate`。断るときは `次:` を足す。`ready --check` は、前の回が退避を始めている打ち直しなら通して本体に任せる。Draft かどうかはホストの結果が要る）。マージリクエストの有無など、ホストの API が要る条件は事前には判断しない。
 
-親のワークツリーの未コミットの変更と親ブランチの未 push は、`lifecycle/treegate.py`（`check`）に寄せた。操作が見る条件は `WATCHES` に宣言する。git の呼び出しが重複していないことは `tests/core/test_gate_single_source.py`、操作ごとの拒否は `tests/core/test_treegate.py` が守る。置き場の判定は `ticket_places.is_ticket_place` に一本化した。
+親のワークツリーの未コミットの変更と親ブランチの未 push は、`lifecycle/treegate.py`（`check`）に寄せた。操作が見る条件は `WATCHES` に宣言する。Go は `go/internal/tickets/lifecycle/treegate` の `Check` と `watches`（confirm・decide の未 push の確かめ直しも `Reviewed` として宣言する）。git の呼び出しが重複していないことは `tests/core/test_gate_single_source.py`、操作ごとの拒否は `tests/core/test_treegate.py` が守る。置き場の判定は `ticket_places.is_ticket_place` に一本化した。
 
 ## ユーザに頼む操作は、後のゲートで止まる条件を先に拒否する
 
