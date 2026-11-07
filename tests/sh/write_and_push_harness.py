@@ -6,7 +6,7 @@ Chrome が未 push の古い状態で判定しないようにする。
 
 使い捨てのワークスペースと bare のリモートを組み、sh（ccnavi-ticket.sh・ccnavi-review.sh・
 ccnavi-user-push-approved.sh・ccnavi-user-decide.sh・ccnavi-user-close-early.sh）を外から呼ぶ。
-実行ファイルはこのツリーのソースを `python -m ccnavi` で
+実行ファイルは tests/exe.py が組み立てたものを
 起こす（実際の判定・見分け・書いたパスの一覧を通す）。リモートを動かすのは別に clone した押し手で、
 ワークスペースからは「他の機械（Chrome）が push した」ように見える。
 
@@ -51,7 +51,7 @@ import tempfile
 import time
 import unittest
 
-from tests import ROOT, common_path, config_path, host_stub, put_messages
+from tests import ROOT, common_path, config_path, exe, host_stub, put_messages
 from tests.ticketsample import PHASES, RULES, child_text, parent_text
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -68,7 +68,7 @@ PARENT = "i0001"
 CHILD = f"{PARENT}-01-01"
 APPROVED = ".ccnavi/approved"
 
-# 実行ファイルの代わり。このツリーのソースを起こす。
+# 実行ファイルの代わり。tests/exe.py が組み立てたものを起こす。
 EXE = """#!/bin/sh
 # `user` の入口は、ラッパーのオプション（--root など）の後の最初の語。
 # ターミナル要求を切るオプションを前に置くと読み替わらないので、`user` の呼び出しでは後ろに付ける
@@ -83,9 +83,9 @@ for a in "$@"; do
   esac
 done
 if [ "$first" = user ]; then
-  PYTHONPATH='{root}/src' exec '{python}' -m ccnavi "$@" --guard-ticket-approval disable
+  exec '{exe}' "$@" --guard-ticket-approval disable
 fi
-PYTHONPATH='{root}/src' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
+exec '{exe}' --guard-ticket-approval disable "$@"
 """
 
 # git の代わり。push だけ、実際の push を済ませてから失敗したふりをする（応答だけが失われた形）。
@@ -195,7 +195,7 @@ class WriteAndPushHarness(unittest.TestCase):
         git(self.ws, "remote", "set-head", "origin", "main")
         self.bin = executable(
             os.path.join(base, "bin", "ccnavi"),
-            EXE.format(root=ROOT, python=sys.executable),
+            EXE.format(exe=exe.sh_path()),
         )
         self.state = os.path.join(self.ws, "logs", "state")
         # ホストの代役（git remote get-url だけがホストの形を答える。本物のネットワークには出ない）
@@ -433,7 +433,7 @@ case " $* " in
   [ -z "$list" ] || printf '%s\\n' "$rel" >"$list"
   mkdir -p "$root/logs/state"
   op=$(sed -n 's/.*"op": "\\([0-9a-f]*\\)".*/\\1/p' "$done_plan" 2>/dev/null)
-  [ -z "$op" ] || PYTHONPATH='{root}/src' '{python}' -m ccnavi --root "$root" ops applied "$op" local true
+  [ -z "$op" ] || '{exe}' --root "$root" ops applied "$op" local true
   printf '<!-- ccnavi:decide -->\\n決めた\\n' >"$root/logs/state/review-decide-i0001-1.md"
   printf '{{"version":1,"ok":true,"reviewed":true,"followup":""}}\\n'
   exit 0 ;;
@@ -451,9 +451,9 @@ for a in "$@"; do
   esac
 done
 if [ "$first" = user ]; then
-  PYTHONPATH='{root}/src' exec '{python}' -m ccnavi "$@" --guard-ticket-approval disable
+  exec '{exe}' "$@" --guard-ticket-approval disable
 fi
-PYTHONPATH='{root}/src' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
+exec '{exe}' --guard-ticket-approval disable "$@"
 """
 
 # git の代役。`remote get-url origin` だけをホストの代役の URL で答え、残りは実際のものに渡す
@@ -490,7 +490,7 @@ put() {{
 }}
 m=.ccnavi/approved/phases/i0001
 case " $* " in
-*" ops "*) PYTHONPATH='{root}/src' exec '{python}' -m ccnavi "$@" ;;
+*" ops "*) exec '{exe}' "$@" ;;
 *" review prepare "*)
   mkdir -p "$root/logs/state"
   printf '<!-- ccnavi:request i0001:1 key=k1 -->\\n見てほしい\\n' >"$root/logs/state/req.md"
@@ -524,9 +524,9 @@ for a in "$@"; do
   esac
 done
 if [ "$first" = user ]; then
-  PYTHONPATH='{root}/src' exec '{python}' -m ccnavi "$@" --guard-ticket-approval disable
+  exec '{exe}' "$@" --guard-ticket-approval disable
 fi
-PYTHONPATH='{root}/src' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
+exec '{exe}' --guard-ticket-approval disable "$@"
 """
 
 
@@ -611,7 +611,7 @@ class WriteAndPushHostHarness(WriteAndPushHarness):
         self.path = shim + os.pathsep + os.environ.get("PATH", "")
         self.half = executable(
             os.path.join(self._base, "bin", "hosthalf"),
-            HOST_HALF.format(root=ROOT, python=sys.executable, plan_case=ACCEPT_PLAN_CASE),
+            HOST_HALF.format(exe=exe.sh_path(), plan_case=ACCEPT_PLAN_CASE),
         )
 
     def review(self, *args, stdin="", script="ccnavi-review.sh", cwd=None, **extra):

@@ -36,7 +36,7 @@ STUB = support.STUB.replace(
     '    done_plan=""; prev=""\n'
     '    for a in "$@"; do [ "$prev" = --accept-done ] && done_plan="$a"; prev="$a"; done\n'
     '    op=$(sed -n \'s/.*"op": "\\([0-9a-f]*\\)".*/\\1/p\' "$done_plan")\n'
-    '    "$STUB_PY" -m ccnavi --root "$root" ops applied "$op" accepted_on_host u1\n'
+    '    "$STUB_EXE" --root "$root" ops applied "$op" accepted_on_host u1\n'
     '    printf \'{"version":2,"ok":false,"mismatch":true,"changed":["u1"]}\\n\'\n'
     '    echo "ccnavi: 見せた指摘と今の指摘が違う。何も置いていない" >&2\n'
     "    exit 1\n"
@@ -64,6 +64,7 @@ class DecideRecoveryShTest(unittest.TestCase):
     def run_decide(self, *args: str, stdin: str = "", **extra: str):
         env = dict(
             STUB_PY=support.sys.executable,
+            STUB_EXE=support.exe.path(),
             STUB_BEGIN=self.begin,
             STUB_MRURL=self.mr_url,
             STUB_MISMATCH="",

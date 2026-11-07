@@ -9,11 +9,10 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import unittest
 
 from ccnavi.infra import pathcase
-from tests import ROOT
+from tests import exe
 from tests.sh.write_and_push_harness import (
     ACCEPT_PLAN_CASE,
     APPROVED,
@@ -338,14 +337,14 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             '  prev=""; for a in "$@"; do\n'
             '    [ "$prev" = --accept-done ] && dp="$a"; [ "$prev" = --root ] && r="$a"; prev="$a"; done\n'
             '  op=$(sed -n \'s/.*"op": "\\([0-9a-f]*\\)".*/\\1/p\' "$dp")\n'
-            f"  [ -z \"$op\" ] || PYTHONPATH='{ROOT}/src' '{sys.executable}' -m ccnavi --root \"$r\" ops applied \"$op\" local true\n"
+            f'  [ -z "$op" ] || \'{exe.sh_path()}\' --root "$r" ops applied "$op" local true\n'
             '  printf \'{"version":1,"ok":true}\\n\'; exit 0 ;;\n'
             "esac\n"
             f"exec '{self.half}' \"$@\"\n",
         )
         done = self.review("1", script="ccnavi-user-decide.sh", CCNAVI_ENTRY_PATH=chooser)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertIn("行き先を置いて送った", done.stdout)
+        self.assertIn("対応方針を置いて送った", done.stdout)
         self.assertNotIn("LOCKED-WHILE-CHOOSING", done.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/1.reviewed")
 
@@ -406,7 +405,7 @@ class WriteAndPushReviewTest(WriteAndPushHarness):
         self.path = shim + os.pathsep + os.environ.get("PATH", "")
         self.half = executable(
             os.path.join(self._base, "bin", "half"),
-            HALF.format(root=ROOT, python=sys.executable, plan_case=ACCEPT_PLAN_CASE),
+            HALF.format(exe=exe.sh_path(), plan_case=ACCEPT_PLAN_CASE),
         )
 
     def decide(self, *args):

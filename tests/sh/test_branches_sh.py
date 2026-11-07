@@ -1,7 +1,7 @@
 """ccnavi-branches.sh の受入テスト。
 
-使い捨てのワークスペースを組み、sh を外から呼ぶ。実行ファイルはこのツリーのソースを
-`python -m ccnavi` で起こす（tests/sh/test_branch_field_sh.py と同じ形）。ホストは PATH の
+使い捨てのワークスペースを組み、sh を外から呼ぶ。実行ファイルは tests/exe.py が
+組み立てたものを起こす（tests/sh/test_branch_field_sh.py と同じ形）。ホストは PATH の
 先頭に置いた `curl` の代役が答える（tests/sh/test_review_host_fixture.py と同じ作り方。
 gh / glab は使えない代役にして、curl とトークンの経路に切り替える）。代役は、要求の表記
 （`<METHOD> <URL>`）ごとに決めた答えを返し、決めていない要求は 404 にする。
@@ -27,14 +27,14 @@ import sys
 import tempfile
 import unittest
 
-from tests import ROOT, SRC, common_sh
+from tests import ROOT, common_sh, exe
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 NEEDED = all(shutil.which(tool) for tool in ("git", "jq"))
 SH_DIR = os.path.join(ROOT, ".ccnavi", "scripts")
 
 EXE = """#!/bin/sh
-PYTHONPATH='{src}' exec '{python}' -m ccnavi "$@"
+exec '{exe}' "$@"
 """
 
 # curl の代役。`-X <M>` と URL を読み、FAKE_ROUTES の JSON（"<M> <URL>" → [状態, 本文]）から答える。
@@ -128,9 +128,7 @@ class BranchesShTest(unittest.TestCase):
         os.makedirs(scripts)
         for name in ("ccnavi-branches.sh", *common_sh(SH_DIR)):
             shutil.copy(os.path.join(SH_DIR, name), scripts)
-        self.exe = write(
-            os.path.join(base, "exe", "ccnavi"), EXE.format(src=SRC, python=sys.executable)
-        )
+        self.exe = write(os.path.join(base, "exe", "ccnavi"), EXE.format(exe=exe.sh_path()))
         os.chmod(self.exe, os.stat(self.exe).st_mode | stat.S_IXUSR)
         self.bin = os.path.join(base, "bin")
         write(os.path.join(self.bin, "fake_curl.py"), CURL)

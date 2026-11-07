@@ -14,7 +14,7 @@ keywords: [テストグループ, tests, core, guard, config, ticket, sh, contra
 
 | グループ | 主題 | 時間 |
 |---|---|---|
-| `core` | 部品の単体と、速い受入テスト（shellread・glob・lint・`build.py` の形・sh の書き方、リポジトリの期待する判定 `rule-expectations.yml` といまのルールの突き合わせなど） | 約 6 秒 |
+| `core` | 部品の単体と、速い受入テスト（shellread・glob・lint・組み立ての sh の形・sh の書き方、リポジトリの期待する判定 `rule-expectations.yml` といまのルールの突き合わせなど） | 約 6 秒 |
 | `guard` | 判定とルール（受入テスト、自己防衛、運用のルール、縮退、実行後チェック、プロジェクト） | 約 60 秒 |
 | `config` | 設定のレイヤーの合成（rules / phases / risk） | 約 33 秒 |
 | `ticket` | チケット・フェーズ・承認・ボード・リスク・ブランチ名と識別子の変換・issue/MR のブランチ探索・学びの蓄積 | 約 140 秒 |
@@ -29,7 +29,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 全件は `uv run python -m tests`（同時実行）で回す。`discover -s tests` の 1 本は使わない。理由と手順は[テストを回す](../../../../.agents/docs/testing.md)。時間の目安は並行セッションがあると数倍になる。
 
 実行ファイル（`.ccnavi/bin/`、無ければ PATH の `ccnavi`）が無い環境（Claude Code on the web、ビルド前）では、ランチャー経由の `--lint` と `ccnavi` コマンドが動かない。
-`python main.py --lint` で代える（ランチャーが実行ファイルを探して失敗するため）。
+`sh scripts/ccnavi-build.sh` で組み立ててから回す。
 
 落ちたら新しいプロセスを起こすのをやめ、落ちた 1 本の出力だけを出す。ターンの終わりの hook はこれを使わない。
 既知の失敗が残っている間は `python -m tests` で全件を見られないので、グループごとに `discover -s tests/<グループ> -t .` で回し、失敗の数を既知と比べる。
@@ -44,9 +44,9 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | 変えたもの | 足すグループ |
 |---|---|
 | `tests/<グループ>/` の中 | そのグループ |
-| `src/ccnavi/**/*.py`・`main.py` | `guard` `config` `ticket` |
+| `go/**`・`src/ccnavi/**/*.py` | `guard` `config` `ticket` |
 | `src/ccnavi/infra/platformtag.py` | 上に加えて `sh` |
-| `build.py` | `guard` `sh` `e2e` |
+| `scripts/ccnavi-build.sh` | `core` `sh` `e2e` |
 | `.ccnavi/scripts/ccnavi-ticket.sh`・`ccnavi-user-agree.sh`・`ccnavi-review.sh` | `ticket` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-git.sh` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-launcher.sh`・`scripts/ccnavi-setup.sh` | `sh` `guard` `config` `e2e` |
@@ -74,7 +74,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 全件を回すとき:
 
 - 表のどの行にもヒットしないファイルを変えた
-- `.ccnavi/scripts/ccnavi-common*.sh`（入口と部品）、`.ccnavi/config/common/`、`.ccnavi/config/project/`、`tests/__init__.py`、`tests/inproc.py`、
+- `.ccnavi/scripts/ccnavi-common*.sh`（入口と部品）、`.ccnavi/config/common/`、`.ccnavi/config/project/`、`tests/__init__.py`、`tests/inproc.py`、`tests/exe.py`、
   `pyproject.toml`・`uv.lock` を変えた（ほぼ全グループが読む）
 - 統合先に取り込む前、MR に出す前（親の最後のフェーズの子を finish する前に済ませる。レビュー準備中はシェルの実行が止まるため）
 - どの行にヒットするか迷った

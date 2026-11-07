@@ -23,13 +23,12 @@ import os
 import shutil
 import stat
 import subprocess
-import sys
 import tempfile
 import threading
 import time
 import unittest
 
-from tests import ROOT, common_sh, live_sh_pid
+from tests import ROOT, common_sh, exe, live_sh_pid
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
@@ -143,7 +142,7 @@ class FetchTest(unittest.TestCase):
         if not os.path.exists(path):
             write(
                 path,
-                f'#!/bin/sh\nPYTHONPATH="{ROOT}/src" exec "{sys.executable}" -m ccnavi "$@"\n',
+                f'#!/bin/sh\nexec "{exe.sh_path()}" "$@"\n',
             )
             os.chmod(path, 0o755)
         return path

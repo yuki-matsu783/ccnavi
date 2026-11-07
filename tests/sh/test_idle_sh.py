@@ -1,6 +1,6 @@
 """`ccnavi-idle.sh`（放置したセッションの引き継ぎ促しの待機）の受入テスト。
 
-実行ファイルの代わりに、ソースから `python -m ccnavi` を起こす小さな sh を置いて、
+tests/exe.py が組み立てた実行ファイルを起こす小さな sh を置いて、
 Stop の payload から「待つ → 起きたら聞く → 起こす（終了コード 2 と指示）」までを通しで見る。
 待ち時間は `CCNAVI_HANDOFF_WAIT_SECONDS` で 1 秒に縮める。
 """
@@ -12,11 +12,10 @@ import os
 import shutil
 import stat
 import subprocess
-import sys
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, exe
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 SCRIPTS = os.path.join(ROOT, ".ccnavi", "scripts")
@@ -40,9 +39,7 @@ class IdleShTest(unittest.TestCase):
         shutil.copytree(SCRIPTS, os.path.join(self.ws, ".ccnavi", "scripts"))
         self.exe = os.path.join(self.ws, "fake-ccnavi")
         with open(self.exe, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(
-                f'#!/bin/sh\nPYTHONPATH="{ROOT}/src" exec "{sys.executable}" -m ccnavi "$@"\n'
-            )
+            handle.write(f'#!/bin/sh\nexec "{exe.sh_path()}" "$@"\n')
         os.chmod(self.exe, os.stat(self.exe).st_mode | stat.S_IXUSR)
         self.transcript = os.path.join(self.ws, "t.jsonl")
 

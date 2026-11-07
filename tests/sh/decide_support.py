@@ -14,7 +14,7 @@ import sys
 import unittest.mock as mock
 
 from ccnavi.entry import version
-from tests import ROOT
+from tests import ROOT, exe
 
 # 実行ファイルの代役。`ops` は本物へ渡す。`--preview` は決まった一覧を返し、`STUB_PLAN` があれば
 # その計画を使う。`--accept-plan` は本物の操作記録に判断を保存して
@@ -25,7 +25,7 @@ STUB = """#!/bin/sh
 case " $* " in
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
-*" ops "*) exec "$STUB_PY" -m ccnavi "$@" ;;
+*" ops "*) exec "$STUB_EXE" "$@" ;;
 esac
 printf '%s\\n' "$*" >>"$STUB_LOG"
 root="$2"
@@ -51,7 +51,7 @@ except user_only.UserEntryError as e:
   done_plan=""; prev=""
   for a in "$@"; do [ "$prev" = --accept-done ] && done_plan="$a"; prev="$a"; done
   op=$(sed -n 's/.*"op": "\\([0-9a-f]*\\)".*/\\1/p' "$done_plan")
-  [ -z "$op" ] || "$STUB_PY" -m ccnavi --root "$root" ops applied "$op" local true
+  [ -z "$op" ] || "$STUB_EXE" --root "$root" ops applied "$op" local true
   printf '{"version":2,"ok":true,"reviewed":true,"followup":""}\\n' ;;
 esac
 """
@@ -210,6 +210,7 @@ def stub_env(testcase) -> dict:
     """実行ファイルの代役が使う環境変数。"""
     return dict(
         STUB_PY=sys.executable,
+        STUB_EXE=exe.path(),
         STUB_BEGIN=testcase.begin,
         STUB_MRURL=testcase.mr_url,
         PYTHONPATH=os.path.join(ROOT, "src"),

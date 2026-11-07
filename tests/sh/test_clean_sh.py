@@ -4,7 +4,7 @@
 名前以外は受け付けないこと。未コミットの変更があるワークツリーでは何も消さないこと。
 
 消すのは ccnavi の実行ファイル（`worktree clean`・`worktree drop`）。
-実行ファイルの代わりに、このツリーのソースを起こす（CCNAVI_ENTRY_PATH）。
+実行ファイルは tests/exe.py が組み立てたものを起こす（CCNAVI_ENTRY_PATH）。
 
 読み返すのは終了コード・出力と、ファイルシステムに残ったものだけ。
 
@@ -17,11 +17,10 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
 
-from tests import ROOT, common_sh, put_messages
+from tests import ROOT, common_sh, exe, put_messages
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
@@ -71,7 +70,7 @@ def link_dir(target, link):
 
 
 class CleanBase:
-    """使い捨てのワークスペース。実行ファイルは、このツリーのソースを起こす shim。"""
+    """使い捨てのワークスペース。実行ファイルは、tests/exe.py が組み立てたものを起こす shim。"""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -87,7 +86,7 @@ class CleanBase:
         self.bin = os.path.join(self._tmp.name, "bin", "ccnavi")
         write(
             self.bin,
-            f"#!/bin/sh\nPYTHONPATH='{ROOT}/src' exec '{sys.executable}' -m ccnavi \"$@\"\n",
+            f"#!/bin/sh\nexec '{exe.sh_path()}' \"$@\"\n",
         )
         os.chmod(self.bin, 0o755)
 
@@ -289,7 +288,7 @@ class CleanGitStateTest(CleanBase, unittest.TestCase):
 class WorktreeOptionTest(unittest.TestCase):
     """`--worktree <名前>`。掃除とワークツリーの削除を実行ファイル（`worktree drop`）に任せる。
 
-    実行ファイルの代わりに、このツリーのソースを起こす（CCNAVI_ENTRY_PATH）。
+    実行ファイルは tests/exe.py が組み立てたものを起こす（CCNAVI_ENTRY_PATH）。
     """
 
     def setUp(self):
@@ -303,7 +302,7 @@ class WorktreeOptionTest(unittest.TestCase):
         self.bin = os.path.join(self._tmp.name, "bin", "ccnavi")
         write(
             self.bin,
-            f"#!/bin/sh\nPYTHONPATH='{ROOT}/src' exec '{sys.executable}' -m ccnavi \"$@\"\n",
+            f"#!/bin/sh\nexec '{exe.sh_path()}' \"$@\"\n",
         )
         os.chmod(self.bin, 0o755)
         put_messages(self.ws)

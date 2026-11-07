@@ -11,11 +11,10 @@ import os
 import shutil
 import stat
 import subprocess
-import sys
 import tempfile
 import unittest
 
-from tests import ROOT, SRC, common_sh, put_messages
+from tests import ROOT, common_sh, exe, put_messages
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
@@ -45,7 +44,7 @@ class StageShTest(unittest.TestCase):
         self.exe = os.path.join(self._tmp.name, "bin", "ccnavi")
         write(
             self.exe,
-            f"#!/bin/sh\nPYTHONPATH='{SRC}' exec '{sys.executable}' -m ccnavi \"$@\"\n",
+            f"#!/bin/sh\nexec '{exe.sh_path()}' \"$@\"\n",
         )
         os.chmod(self.exe, os.stat(self.exe).st_mode | stat.S_IXUSR)
         write(os.path.join(self.ws, ".ccnavi", "config", "common", "rules.yml"), "version: 1\n")

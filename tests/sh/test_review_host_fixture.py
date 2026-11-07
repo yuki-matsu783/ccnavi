@@ -29,7 +29,7 @@ import unittest
 
 from ccnavi.entry import version
 from ccnavi.tickets.model import oplog, review_host
-from tests import ROOT, can_pass_argument, common_sh
+from tests import ROOT, can_pass_argument, common_sh, exe
 from tests.sh import github_host, gitlab_host
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -71,7 +71,7 @@ case " $* " in
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
-*" ops "*) PYTHONPATH='@SRC@' exec '@PY@' -m ccnavi "$@" ;;
+*" ops "*) exec '{exe}' "$@" ;;
 esac
 prev=""
 for a in "$@"; do
@@ -86,7 +86,6 @@ done
 for a in "$@"; do printf '%s\\n' "$a"; done >>'{log}'
 exit 0
 """
-STUB = STUB.replace("@PY@", sys.executable).replace("@SRC@", os.path.join(ROOT, "src"))
 
 
 # マージリクエストを作ったときのホストの返事（GitLab の形）。
@@ -171,7 +170,7 @@ class HostFixtureTest(unittest.TestCase):
         self.args = os.path.join(self._tmp.name, "args.txt")
         self.exe = write(
             os.path.join(self._tmp.name, "exe", "ccnavi"),
-            STUB.format(compat=version.COMPAT, log=self.args),
+            STUB.format(compat=version.COMPAT, log=self.args, exe=exe.sh_path()),
         )
         os.chmod(self.exe, 0o755)
 
@@ -531,7 +530,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.args = os.path.join(self._tmp.name, "args.txt")
         self.exe = write(
             os.path.join(self._tmp.name, "exe", "ccnavi"),
-            STUB.format(compat=version.COMPAT, log=self.args),
+            STUB.format(compat=version.COMPAT, log=self.args, exe=exe.sh_path()),
         )
         os.chmod(self.exe, 0o755)
 
@@ -662,7 +661,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
             + 'case " $* " in *" write-and-push family "*)'
             + " printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;; esac\n"
             + 'case " $* " in *" ops "*)'
-            + f" PYTHONPATH='{os.path.join(ROOT, 'src')}' exec '{sys.executable}' -m ccnavi \"$@\" ;; esac\n"
+            + f" exec '{exe.sh_path()}' \"$@\" ;; esac\n"
             f"for a in \"$@\"; do printf '%s\\n' \"$a\"; done >>'{out}/args.txt'\n"
             'case " $* " in *" prepare "*)\n'
             f"  printf '<!-- ccnavi:request i0001:1 key=k -->\\n依頼\\n' >'{out}/body.md'\n"

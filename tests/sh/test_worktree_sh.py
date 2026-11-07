@@ -34,7 +34,7 @@ import unicodedata
 import unittest
 from unittest import mock
 
-from tests import ROOT, SRC, common_sh, put_messages
+from tests import ROOT, SRC, common_sh, exe, put_messages
 from tests.draft import final
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -42,7 +42,7 @@ REAL_GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, ".ccnavi", "scripts")
 
 EXE = """#!/bin/sh
-PYTHONPATH='{src}' exec '{python}' -m ccnavi "$@"
+exec '{exe}' "$@"
 """
 
 # fetch のときだけ、origin の URL を bare リポジトリへ向ける git の代役。
@@ -131,9 +131,7 @@ class WorktreeShTest(unittest.TestCase):
         for name in ("ccnavi-worktree.sh", "ccnavi-git.sh", *common_sh(SH_DIR)):
             shutil.copy(final(f".ccnavi/scripts/{name}"), scripts)
         put_messages(self.ws)
-        self.exe = write(
-            os.path.join(base, "exe", "ccnavi"), EXE.format(src=SRC, python=sys.executable)
-        )
+        self.exe = write(os.path.join(base, "exe", "ccnavi"), EXE.format(exe=exe.sh_path()))
         os.chmod(self.exe, os.stat(self.exe).st_mode | stat.S_IXUSR)
         self.bin = os.path.join(base, "bin")
         os.chmod(
@@ -377,7 +375,7 @@ class WorktreeShTest(unittest.TestCase):
             "#!/bin/sh\n"
             'for a in "$@"; do [ "$a" = leftover ] &&'
             ' { printf "tree 1\\nleftover yes\\ndoing 0\\n"; exit 0; }; done\n'
-            f'PYTHONPATH={SRC} exec {sys.executable} -m ccnavi "$@"\n',
+            f"exec '{exe.sh_path()}' \"$@\"\n",
         )
         os.chmod(stub, 0o755)
         result = self.run_sh("topic", "--base", "main", cwd=path, CCNAVI_ENTRY_PATH=stub)

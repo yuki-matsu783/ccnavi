@@ -9,7 +9,7 @@ git とファイルシステムに残ったものだけ。
 記録（`ccnavi-direct/<名前>`）は `ccnavi-worktree.sh` が書く形を、このテストが同じ形で書く。
 
 実行ファイル（`tree base-bound`・`tree guarded`・`tree handoff-pending`・`worktree drop`）の
-代わりに、このツリーのソースを起こす（CCNAVI_ENTRY_PATH）。
+代わりに、tests/exe.py が組み立てたものを起こす（CCNAVI_ENTRY_PATH）。
 """
 
 from __future__ import annotations
@@ -17,12 +17,11 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
 import unittest
 
-from tests import ROOT, common_sh, put_messages
+from tests import ROOT, common_sh, exe, put_messages
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
@@ -77,7 +76,7 @@ class Fixture(unittest.TestCase):
         self.bin = os.path.join(self._tmp.name, "bin", "ccnavi")
         write(
             self.bin,
-            f"#!/bin/sh\nPYTHONPATH='{ROOT}/src' exec '{sys.executable}' -m ccnavi \"$@\"\n",
+            f"#!/bin/sh\nexec '{exe.sh_path()}' \"$@\"\n",
         )
         os.chmod(self.bin, 0o755)
         self.path = None

@@ -20,7 +20,7 @@ import sys
 import tempfile
 import unittest
 
-from tests import ROOT, draft
+from tests import ROOT, draft, exe
 
 SH_DIR = (
     os.path.join(ROOT, os.environ["CCNAVI_SH_DIR"])
@@ -40,7 +40,7 @@ def with_exe(environment):
         atexit.register(shutil.rmtree, base, ignore_errors=True)
         path = os.path.join(base, "ccnavi")
         with open(path, "w", encoding="utf-8", newline="\n") as f:
-            f.write(f'#!/bin/sh\nPYTHONPATH="{ROOT}/src" exec "{sys.executable}" -m ccnavi "$@"\n')
+            f.write(f'#!/bin/sh\nexec "{exe.sh_path()}" "$@"\n')
         os.chmod(path, 0o755)
         _EXE.append(path)
     environment["CCNAVI_ENTRY_PATH"] = _EXE[0]

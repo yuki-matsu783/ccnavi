@@ -27,7 +27,7 @@ import tempfile
 import unittest
 
 from ccnavi.tickets.model import oplog
-from tests import ROOT, common_sh
+from tests import ROOT, common_sh, exe
 from tests.sh import github_host
 from tests.sh.test_review_host_fixture import conclusion
 
@@ -44,7 +44,7 @@ case " $* " in
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
-*" ops "*) PYTHONPATH='@SRC@' exec '@PY@' -m ccnavi "$@" ;;
+*" ops "*) exec '@EXE@' "$@" ;;
 esac
 prev=""
 for a in "$@"; do
@@ -167,9 +167,7 @@ class RestFallbackTest(unittest.TestCase):
 
         self.exe = write(
             os.path.join(tmp, "exe", "ccnavi"),
-            EXE.format(compat=version.COMPAT, copy=self.copy)
-            .replace("@PY@", sys.executable)
-            .replace("@SRC@", os.path.join(ROOT, "src")),
+            EXE.format(compat=version.COMPAT, copy=self.copy).replace("@EXE@", exe.sh_path()),
         )
         os.chmod(self.exe, 0o755)
 

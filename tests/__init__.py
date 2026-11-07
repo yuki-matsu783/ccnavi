@@ -12,14 +12,12 @@ import unittest as _unittest
 
 # リポジトリの根。テストはグループのサブパッケージにあり、深さが揃わないのでここで 1 回だけ求める。
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# ccnavi パッケージの置き場（src レイアウト）。パッケージとして入れていない Python で回しても
-# このツリーのソースを読むよう、先頭に足す。子プロセスで `-m ccnavi` を起こすときは
-# PYTHONPATH に渡す。
+# ccnavi パッケージの置き場（src レイアウト）。Python の内部を直に import する白箱のテストが、
+# パッケージとして入れていない Python で回してもこのツリーのソースを読むよう、先頭に足す。
+# ccnavi を起こすテストは実行ファイル（tests/exe.py）を使い、ここには頼らない。
 SRC = os.path.join(ROOT, "src")
 if SRC not in _sys.path:
     _sys.path.insert(0, SRC)
-
-from ccnavi.infra import settings as _settings  # noqa: E402
 
 # 使い捨ての置き場は、シンボリックリンクを解いた実パスにそろえる。macOS の一時置き場は
 # `/var/...` だが実体は `/private/var/...` で、git や realpath は後者を返す。置き場の
@@ -61,13 +59,13 @@ _drop_ccnavi_from_path()
 # `--risk` は渡さない。3 つは診断（`--lint` / `--test` / `--explain`）でだけ有効なので、
 # hook の判定とチケット・レビューのサブコマンドには届かない。
 #
-# パスは実行ファイルから引く。テスト側にもう 1 つパスを持つと、既定が動いたときに
-# 2 つが気づかないうちに食い違う。既定のパスそのものは tests/config/test_common_layer_place.py が
-# 直に書いて確かめる。
+# 置き場の名前はテストの側に持つ。既定が動いたら、ここを置いた木で実行ファイルが設定を
+# 読まなくなり、設定を前提にしたテストが落ちて気づく。
+_PROJECT_HOME = ".ccnavi"
+_LAYER_FILE_NAMES = {"rules": "rules.yml", "phases": "phases.yml", "risk": "risks.yml"}
 _COMMON_FILES = {
-    "rules": _settings.DEFAULT_RULES,
-    "phases": _settings.DEFAULT_PHASES,
-    "risk": _settings.DEFAULT_RISK,
+    kind: os.path.join(_PROJECT_HOME, "config", "common", name)
+    for kind, name in _LAYER_FILE_NAMES.items()
 }
 
 
@@ -163,12 +161,7 @@ def config_path(root: str, kind: str) -> str:
 
     フェーズ定義は共通レイヤーと config の両方に置け、判定は 2 本の和を読む。
     """
-    return os.path.join(
-        root,
-        _settings.DEFAULT_PROJECT_HOME,
-        _settings.LAYER_CONFIG_DIR,
-        _settings.LAYER_FILE_NAMES[kind],
-    )
+    return os.path.join(root, _PROJECT_HOME, "config", "project", _LAYER_FILE_NAMES[kind])
 
 
 def fixture_workspace(name: str = "rules.yml") -> str:

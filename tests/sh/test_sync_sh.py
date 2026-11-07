@@ -30,7 +30,7 @@ import tempfile
 import time
 import unittest
 
-from tests import ROOT, SRC, common_sh, live_sh_pid
+from tests import ROOT, common_sh, exe, live_sh_pid
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 DASH = shutil.which("dash")
@@ -298,14 +298,14 @@ class SyncHarness(unittest.TestCase):
         """ソースの実行ファイルを起こすもの。`launcher` とは別の置き場（上書きし合わない）。"""
         path = os.path.join(self._tmp.name, "source-bin", "ccnavi")
         if not os.path.exists(path):
-            write(path, f'#!/bin/sh\nPYTHONPATH="{SRC}" exec "{sys.executable}" -m ccnavi "$@"\n')
+            write(path, f'#!/bin/sh\nexec "{exe.sh_path()}" "$@"\n')
             os.chmod(path, 0o755)
         return path
 
     def launcher(self, body=None):
         path = write(
             os.path.join(self._tmp.name, "bin", "ccnavi"),
-            body or f'#!/bin/sh\nPYTHONPATH="{SRC}" exec "{sys.executable}" -m ccnavi "$@"\n',
+            body or f'#!/bin/sh\nexec "{exe.sh_path()}" "$@"\n',
         )
         os.chmod(path, 0o755)
         return path
@@ -1017,7 +1017,7 @@ class SyncTest(SyncHarness):
         git(other, "push", "-q", "-u", "origin", "i0002")
         body = (
             '#!/bin/sh\nif [ "$3" = sync ] && [ "$4" = paths ]; then exit 0; fi\n'
-            f'PYTHONPATH="{SRC}" exec "{sys.executable}" -m ccnavi "$@"\n'
+            f'exec "{exe.sh_path()}" "$@"\n'
         )
         done = self.sync(CCNAVI_ENTRY_PATH=self.launcher(body))
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
