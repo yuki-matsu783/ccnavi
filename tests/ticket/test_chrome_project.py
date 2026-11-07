@@ -9,6 +9,7 @@
 2. プロジェクトのレイヤーは、プロジェクトの統合先の `.ccnavi/config/project/` をそのまま使う。
    共通レイヤーはワークスペースの統合先の `.ccnavi/config/common/` だけで、プロジェクトの
    `.ccnavi/config/common/`（同期が配るミラー）は読まない。親のブランチの上のレイヤーも読まない
+   （仮のツリーに写すものは go の entry/chrome のテストが見る）
 3. 「始める」: issue の番号から識別子（`feature-12-<slug>`、プロジェクトのリポジトリなら
    `feature-12-web-<slug>`）を決め、統合先の `done/` にある・同じ名前のブランチがある・
    開いた親子のチケットに同じ識別子がある・互換の版が違う、のどれでも始められない
@@ -23,28 +24,21 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi.entry import lint, version
+from tests import exe
 from tests.ticket.test_swap_points import STAMP
-from tests.ticketsample import PHASES, child_text, load_chrome, parent_text
+from tests.ticketsample import PHASES, Chrome, child_text, load_chrome, parent_text
 
 HEAD = "0" * 40
-COMPAT = lint.SH_COMPAT_FILE.replace(os.sep, "/")
+COMPAT = Chrome.COMPAT_FILE
 ACTOR = {"account": "lab-approver", "version": "9.9.9"}
-
-RISK_COMMON = """version: 1
-factors:
-  - id: common-script
-    title: 共通レイヤーのスクリプトの変更
-    script: .ccnavi/config/common/scripts/risk.sh
-    points: 1
-"""
 
 # ミラー（プロジェクトの `.ccnavi/config/common/`）。
 # ワークスペースの中では共通レイヤーとして読まれない。
 MIRROR_RULES = '{"version": 1, "deny": [{"id": "mirror-only", "match": "Bash", "glob": "*x*"}]}\n'
 
 
-def workspace(compat=version.COMPAT, **extra):
+def workspace(compat=None, **extra):
+    compat = exe.compat() if compat is None else compat
     files = {
         ".claude/settings.json": json.dumps({"env": {"CCNAVI_TICKET_CONTROL": "enable"}}) + "\n",
         ".ccnavi/config/common/rules.yml": '{"version": 1, "deny": []}\n',
@@ -135,36 +129,6 @@ class ChromeProjectTest(unittest.TestCase):
         # 承認は提案の中身を変えない。
         self.assertNotIn("ccnavi_approved", copy)
 
-    def test_the_project_layer_is_the_integration_config_as_it_is(self):
-        place = self.chrome.placement()
-        risks = "version: 1\nfactors: []\n"
-        snap = {
-            "integration": {"name": "trunk"},
-            "branches": {
-                "trunk": project_integration(
-                    **{
-                        ".ccnavi/config/project/risks.yml": risks,
-                        # 同期が配るミラー。ワークスペースの中では共通レイヤーとして読まない
-                        ".ccnavi/config/common/rules.yml": MIRROR_RULES,
-                        "README.md": "r\n",
-                    }
-                )
-            },
-            "project": "web",
-            "workspace": workspace(**{".ccnavi/config/common/risks.yml": RISK_COMMON}),
-        }
-        layer = self.chrome.project_layer(snap, place)
-        # プロジェクトの config はそのまま（共通レイヤーのファイルで上書きしない）。
-        # config 以外（ミラーなど）は入らない
-        self.assertEqual(
-            layer,
-            {
-                ".ccnavi/config/project/rules.yml": '{"version": 1, "deny": []}\n',
-                ".ccnavi/config/project/phases.yml": PHASES,
-                ".ccnavi/config/project/risks.yml": risks,
-            },
-        )
-
     def test_the_project_family_is_judged_by_the_project_phases_and_ignores_the_mirror(self):
         """フェーズ定義は共通レイヤー（ワークスペースの統合先）と、親の `project:` が指す
         config の和。
@@ -221,7 +185,7 @@ class ChromeProjectTest(unittest.TestCase):
         self.assertIn("ワークスペースの統合先", body["error"])
 
     def test_a_different_compat_in_the_workspace_refuses_writing(self):
-        board = self.ask("board", ws=workspace(compat=version.COMPAT + 1))
+        board = self.ask("board", ws=workspace(compat=int(exe.compat()) + 1))
         self.assertFalse(board["write"]["allowed"])
         self.assertIn("拡張を更新してください。", board["write"]["reason"])
 
@@ -243,11 +207,12 @@ class StartTest(unittest.TestCase):
         project="",
         branches=None,
         taken=(),
-        compat=version.COMPAT,
+        compat=None,
         done=(),
         title="Login form",
         prefix=None,
     ):
+        compat = exe.compat() if compat is None else compat
         integ = {
             ".claude/settings.json": "{}\n",
             COMPAT: f"#!/bin/sh\nCCNAVI_COMPAT={compat}\n",
@@ -331,7 +296,7 @@ class StartTest(unittest.TestCase):
         self.assertTrue(any("未クローズの親子チケット topic" in p for p in body["problems"]), body)
 
     def test_a_different_compat_is_refused(self):
-        body = self.start(12, compat=version.COMPAT + 1)
+        body = self.start(12, compat=int(exe.compat()) + 1)
         self.assertTrue(any("互換" in p for p in body["problems"]), body)
 
     def test_bad_numbers_are_refused(self):

@@ -1,4 +1,4 @@
-"""Chrome の承認の Python の入口の受入テスト。
+"""Chrome の承認の入口（go/cmd/ccnavi-chrome）の受入テスト。
 
 見るのは 6 つ。
 
@@ -11,6 +11,8 @@
 4. 書く先は親のブランチ `P` だけ。予約の名前・統合先の名前へは書かない
 5. マーカーに経路（chrome）・アカウントが入る
 6. 手元の ccnavi が、Chrome の書いた承認済みチケットを同じに読む（判定し直しで error が出ない）
+
+書く先の名前の断り・ホストから来たパスの断り・パスの書き換えは go の entry/chrome のテストが見る。
 """
 
 from __future__ import annotations
@@ -18,11 +20,10 @@ from __future__ import annotations
 import json
 import os
 
-from ccnavi.entry import lint, version
-from ccnavi.infra import settings
+from tests import exe
 from tests.ticket.test_swap_points import CoreHarness
 from tests.ticket.test_ticket import git, write
-from tests.ticketsample import child_text, load_chrome, parent_text
+from tests.ticketsample import Chrome, child_text, load_chrome, parent_text
 
 ACTOR = {"account": "alice", "version": "9.9.9"}
 
@@ -30,11 +31,11 @@ ACTOR = {"account": "alice", "version": "9.9.9"}
 class ChromeWriteHarness(CoreHarness):
     def setUp(self):
         super().setUp()
-        self.compat(version.COMPAT)
+        self.compat(exe.compat())
 
     def compat(self, value):
         write(
-            os.path.join(self.root, *lint.SH_COMPAT_FILE.split(os.sep)),
+            os.path.join(self.root, *Chrome.COMPAT_FILE.split("/")),
             f"#!/bin/sh\nCCNAVI_COMPAT={value}\n",
         )
 
@@ -68,12 +69,6 @@ class ChromeWriteHarness(CoreHarness):
                 write(path, row["content"])
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "ccnavi: 承認（Chrome 拡張）")
-
-    def conf(self):
-        conf, _ = settings.load(self.root)
-        conf.state = self.state
-        conf.approved = ".ccnavi/approved"
-        return conf
 
 
 class RecordsTest(ChromeWriteHarness):
@@ -136,7 +131,7 @@ class WriteGuardTest(ChromeWriteHarness):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
         first = self.preview()
-        self.compat(version.COMPAT + 1)
+        self.compat(int(exe.compat()) + 1)
         board = self.answer(self.chrome_request("board", "i0001"))
         self.assertFalse(board["write"]["allowed"])
         self.assertIn("拡張を更新してください。", board["write"]["reason"])
@@ -177,25 +172,6 @@ class WriteGuardTest(ChromeWriteHarness):
         self.assertIsNone(body["mismatch"])
         self.assertEqual(body["code"], "CORE_APPROVE_NOTHING")
 
-    def test_writes_only_to_the_parent_branch(self):
-        chrome = load_chrome()
-        chrome._one_branch({"changes": {"i0001": []}}, "i0001")
-        with self.assertRaises(chrome.Refused):
-            chrome._one_branch({"changes": {"i0001": [], "i0003": []}}, "i0001")
-        with self.assertRaises(chrome.Refused):
-            chrome._one_branch({"changes": {"main": []}}, "i0001")
-
-    def test_reserved_names_and_the_integration_are_not_written(self):
-        chrome = load_chrome()
-        compat = f"#!/bin/sh\nCCNAVI_COMPAT={version.COMPAT}\n"
-        snap = {
-            "integration": {"name": "trunk", "source": "setting", "head": "0" * 40},
-            "branches": {"trunk": {"head": "0" * 40, "files": {chrome.COMPAT_FILE: compat}}},
-        }
-        self.assertEqual(chrome._write_refusal(snap, "i0001"), "")
-        for name in ("main", "Develop", "release-1", "trunk", "TRUNK"):
-            self.assertIn("予約された名前か統合先の名前", chrome._write_refusal(snap, name), name)
-
 
 class WrittenCopyTest(ChromeWriteHarness):
     def test_the_local_ccnavi_reads_what_chrome_wrote_the_same(self):
@@ -207,9 +183,7 @@ class WrittenCopyTest(ChromeWriteHarness):
         body = self.plan()
         self.assertEqual(body["identifiers"], ["i0001", "i0001-01-01"])
         self.apply(body["changes"]["i0001"], self.parent_tree)
-        # 手元の判定は Chrome と同じ仮のツリーを読む。
-        # 判定し直し（C3）で error が出ない
-        self.assertEqual(lint.family_check(self.conf(), self.root, "i0001", "self"), [])
+        # 手元の判定し直し（C3）で error が出ない
         preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         self.assertEqual(preview["batch"], [])
         explained = self.ccnavi("--lint", "--json")
@@ -221,33 +195,10 @@ class WrittenCopyTest(ChromeWriteHarness):
 
 
 class EntryDetailTest(ChromeWriteHarness):
-    def test_relative_folds_only_at_the_head_of_a_path(self):
-        chrome = load_chrome()
-        root = os.path.join(os.sep, "ws")
-        sep = os.sep
-        self.assertEqual(chrome._relative(root, "wip/ws/todo/i0001.md"), "wip/ws/todo/i0001.md")
-        self.assertEqual(
-            chrome._relative(
-                root, f"読めない: {root}{sep}.claude{sep}worktrees{sep}i0001{sep}wip/ws/x.md"
-            ),
-            "読めない: i0001:wip/ws/x.md",
-        )
-        self.assertEqual(chrome._relative(root, f"'{root}{sep}a' と a/ws/b"), "'a' と a/ws/b")
-
-    def test_host_paths_that_leave_the_tree_are_refused(self):
-        """ホストから来たパスは、根から始まるもの・区切りが `\\` のもの・`..` を含むものを断る。"""
-        chrome = load_chrome()
-        self.assertEqual(
-            chrome._check_rel("wip/proposals/todo/i0001.md"), "wip/proposals/todo/i0001.md"
-        )
-        for path in ("/a", "~/a", "C:/a", "a\\b", "a/../b"):
-            with self.subTest(path=path), self.assertRaises(chrome.Refused):
-                chrome._check_rel(path)
-
     def test_every_writing_op_checks_compat_and_the_branch(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
-        self.compat(version.COMPAT + 1)
+        self.compat(int(exe.compat()) + 1)
         for op, extra in (
             ("plan", {}),
             ("confirm", {"phase": 1, "result": {"host": "h", "mr": {"number": 1, "url": "u"}}}),

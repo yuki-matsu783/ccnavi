@@ -15,20 +15,18 @@ VS Code のボード拡張がオーバーレイで承認するための経路。
 5. `--yes` はターミナルの壁を通らない。素の `--agree` は今までどおり壁で止まる
 6. 拡張側のフィクスチャ（extensions/vscode/ccnavi-board/test/fixtures/approve-*.json）と同じ形
 
+ターミナルの `--agree` で確認を待つ間に提案が変わったときの扱い（見せ直し・取り直し）は、
+答えを返す前に提案を書き換える必要があるので go の core のテストが見る。
+
 形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてこのテストを走らせ、フィクスチャを書き直す。
 """
 
 from __future__ import annotations
 
-import contextlib
-import io
 import json
 import os
 import unittest
-from unittest import mock
 
-from ccnavi.entry import cli
-from tests import write_and_push_flag
 from tests.ticket.test_board import _portable
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, write
@@ -73,51 +71,6 @@ class ApproveJsonTest(PhaseHarness):
             "--json",
             *extra,
         )
-
-    def agree_editing(self, edit, answers=("y", "y"), only=()):
-        """ターミナルの `--agree` を、確認の入力を待つ間に提案を書き換えて動かす。
-
-        1 回目の入力を返す直前に `edit()` を呼ぶ（ユーザが画面を見ている間に提案が変わった形）。
-        答えは `answers` の順に返す。足りなければ空（やめる）。
-        返すのは (終了コード, 標準出力, 標準エラー, 確認の回数)。
-        """
-        asked = []
-
-        class Stdin(io.StringIO):
-            def readline(inner, *_):  # noqa: N805
-                asked.append(1)
-                if len(asked) == 1:
-                    edit()
-                return answers[len(asked) - 1] + "\n" if len(asked) <= len(answers) else ""
-
-        argv = write_and_push_flag.as_write_and_push(
-            self.root,
-            self.state,
-            self.parent_tree,
-            [
-                "--root",
-                self.root,
-                "user",
-                "agree",
-                "--guard-core-files",
-                "disable",
-                "--restore-if-deny",
-                "disable",
-                "--guard-ticket-approval",
-                "disable",
-                *only,
-            ],
-        )
-        env = {
-            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
-            "CCNAVI_LEARNING": "disable",
-        }
-        env.pop("CLAUDE_PROJECT_DIR", None)
-        out, err = io.StringIO(), io.StringIO()
-        with contextlib.ExitStack() as stack:
-            stack.enter_context(mock.patch.dict(os.environ, env, clear=True))
-            code = cli.run(Stdin(), out, err, list(argv))
-        return code, out.getvalue(), err.getvalue(), len(asked)
 
     def copy_exists(self, name):
         return os.path.exists(os.path.join(self.approved, "doing", name + ".md"))
@@ -561,158 +514,10 @@ class ApproveJsonTest(PhaseHarness):
 
     # ---- 4d2. 照合と書き込みは同じ読みを使う（読み直しの間に差し替えられても通さない）
 
-    def yes_in_process(self, tickets, digest):
-        """`--agree --yes … --json` を同じプロセスで動かす（途中に差し替えを挟むため）。"""
-        argv = write_and_push_flag.as_write_and_push(
-            self.root,
-            self.state,
-            self.parent_tree,
-            [
-                "--root",
-                self.root,
-                "user",
-                "agree",
-                "--guard-core-files",
-                "disable",
-                "--restore-if-deny",
-                "disable",
-                "--guard-ticket-approval",
-                "disable",
-                "--yes",
-                ",".join(tickets),
-                "--digest",
-                digest,
-                "--json",
-            ],
-        )
-        env = {
-            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
-            "CCNAVI_LEARNING": "disable",
-        }
-        env.pop("CLAUDE_PROJECT_DIR", None)
-        out, err = io.StringIO(), io.StringIO()
-        with mock.patch.dict(os.environ, env, clear=True):
-            code = cli.run(io.StringIO(), out, err, list(argv))
-        return code, out.getvalue(), err.getvalue()
-
-    def swapped(self, data):
-        return data.replace("title: 子 i0001-01-01".encode(), "title: すりかえ".encode())
-
-    def test_a_proposal_swapped_after_the_check_is_not_approved(self):
-        """照合のあと書く前に提案を差し替えると、差し替えた中身を承認せずに止める。"""
-        from ccnavi.tickets.core import base as core_base
-
-        self.pending_parent_and_child()
-        shown = self.preview()
-        child = self.child_path()
-        with open(child, "rb") as f:
-            data = f.read()
-        swapped = self.swapped(data)
-        self.assertNotEqual(swapped, data)
-        real = core_base.plan
-
-        def plan(snapshot, verdict):
-            with open(child, "wb") as f:
-                f.write(swapped)
-            return real(snapshot, verdict)
-
-        with mock.patch.object(core_base, "plan", plan):
-            code, out, err = self.yes_in_process(["i0001", "i0001-01-01"], shown["digest"])
-        self.assertNotEqual(code, 0, out + err)
-        self.assertIn("内容が更新されました", err)
-        self.assertFalse(self.copy_exists("i0001-01-01"))
-        self.assertFalse(self.copy_exists("i0001"), "一部だけ承認しない")
-        with open(child, "rb") as f:
-            self.assertEqual(f.read(), swapped, "差し替えた提案は残す")
-
-    def test_the_digest_is_taken_from_the_bytes_that_were_parsed(self):
-        """解析したあと照合の前に元に戻されても、解析した中身（見せていない）を照合で通さない。"""
-        from ccnavi.tickets.proposal import agree_digest
-
-        self.pending_parent_and_child()
-        shown = self.preview()
-        child = self.child_path()
-        with open(child, "rb") as f:
-            data = f.read()
-        with open(child, "wb") as f:
-            f.write(self.swapped(data))
-        real = agree_digest.proposals_digest
-
-        def digest(batch):
-            with open(child, "wb") as f:
-                f.write(data)
-            return real(batch)
-
-        with mock.patch.object(agree_digest, "proposals_digest", digest):
-            code, out, err = self.yes_in_process(["i0001", "i0001-01-01"], shown["digest"])
-        self.assertEqual(code, 1, out + err)
-        self.assertIsNotNone(json.loads(out)["mismatch"])
-        self.assertFalse(self.copy_exists("i0001-01-01"))
-        self.assertFalse(self.copy_exists("i0001"))
-
     # ---- 4e. ターミナルの `--agree` も、確認の入力のあとで同じ照合をする
 
     def child_path(self):
         return os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-01.md")
-
-    def test_terminal_agree_shows_again_when_the_proposal_changed_while_asking(self):
-        """y と答えたあとで提案のバイト列が変わっていたら、承認せず最新を表示し直して確認し直す。"""
-        self.pending_parent_and_child()
-        child = self.child_path()
-
-        def edit():
-            with open(child, "rb") as f:
-                data = f.read()
-            with open(child, "wb") as f:
-                f.write(data.replace(b"\n", b"\r\n"))
-
-        code, out, err, asked = self.agree_editing(edit)
-        self.assertEqual(code, 0, out + err)
-        self.assertEqual(asked, 2, "2 回目の確認を取る")
-        self.assertIn("内容が更新されました", out)
-        self.assertEqual(out.count("この 2 件を承認する場合は y"), 2, "最新の一覧をもう一度見せる")
-        self.assertTrue(self.copy_exists("i0001"))
-        with open(os.path.join(self.approved, "doing", "i0001-01-01.md"), "rb") as f:
-            self.assertIn(b"\r\n", f.read(), "承認するのは表示し直した最新のバイト列")
-
-    def test_terminal_agree_does_not_approve_when_the_second_answer_is_no(self):
-        self.pending_parent_and_child()
-        child = self.child_path()
-
-        def edit():
-            with open(child, "rb") as f:
-                data = f.read()
-            with open(child, "wb") as f:
-                f.write(b"\xef\xbb\xbf" + data)
-
-        code, out, err, asked = self.agree_editing(edit, answers=("y", "n"))
-        self.assertEqual(code, 1, out + err)
-        self.assertIn("内容が更新されました", out)
-        self.assertFalse(self.copy_exists("i0001"))
-        self.assertFalse(self.copy_exists("i0001-01-01"))
-
-    def test_terminal_agree_does_not_show_again_when_nothing_changed(self):
-        self.pending_parent_and_child()
-        code, out, err, asked = self.agree_editing(lambda: None)
-        self.assertEqual(code, 0, out + err)
-        self.assertEqual(asked, 1)
-        self.assertNotIn("内容が更新されました", out)
-
-    def test_terminal_agree_never_approves_others_in_place_of_a_removed_target(self):
-        """指名した識別子が確認の間に承認待ちから消えたら、増えた提案を代わりに承認しない。"""
-        self.pending_parent_and_child()
-
-        def edit():
-            os.remove(self.child_path())
-            self.propose(
-                "i0001-01-02", child_text("i0001-01-02", "i0001", 1, ("wip/research/*",), False)
-            )
-
-        code, out, err, asked = self.agree_editing(edit, only=("i0001", "i0001-01-01"))
-        self.assertEqual(code, 1, out + err)
-        self.assertEqual(asked, 1, "表示し直せないので、確認は 1 回で終わる")
-        for name in ("i0001", "i0001-01-01", "i0001-01-02"):
-            self.assertFalse(self.copy_exists(name), name)
 
     def test_partial_yes_names_the_written_paths(self):
         """途中で止まった `--yes` の JSON は、実際に書けたパスを `paths` で返す。"""

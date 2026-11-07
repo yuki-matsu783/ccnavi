@@ -1,10 +1,10 @@
-"""Chrome の decide（残った指摘の対応方針を決める）の Python の入口の受入テスト。
+"""Chrome の decide（残った指摘の対応方針を決める）の入口（go/cmd/ccnavi-chrome）の受入テスト。
 
 見るのは 8 つ。
 
 1. 見せる指摘とダイジェストが、手元の `--preview --json` と同じ（版 2 の形）
 2. keep・issue・fix が混ざった選択、全部 keep、全部 fix、指摘が 0 件の書くものとホストの計画
-3. 直す指摘（fix）には、返信も解決も付かない（型と計画の両方）
+3. 直す指摘（fix）には、返信も解決も付かない（計画で見る）
 4. 変更要求のレビューは通さない。見せた指摘と今の指摘が違えば、何も積まない
 5. 見せたあとに増えた指摘は、食い違いに数えず未対応として残す。受け入れ済み（carry）の扱い
 6. issue の操作ID の印が、同じ指摘なら同じ、指摘が変われば違う
@@ -17,18 +17,22 @@ from __future__ import annotations
 import json
 import os
 import re
-import sys
 
-from ccnavi.entry import lint, version
-from ccnavi.infra import fsio
-from ccnavi.tickets.core import review as core_review
-from ccnavi.tickets.model import review_host
-from ccnavi.tickets.review import decide as review_decide
+from tests import exe
 from tests.ticket.test_swap_points import CoreHarness
 from tests.ticket.test_ticket import git, read_json, write
-from tests.ticketsample import child_text, load_chrome
+from tests.ticketsample import Chrome, child_text, load_chrome
 
 STAMP = "2026-09-29T12:00:00+0900"
+# 見せる形の版（decide の版 2）と、ホストへ書く本文の目印・差し込み口・上限。
+DECIDE_VERSION = 2
+MARKER_DECIDE = "<!-- ccnavi:decide -->"
+MARKER_ACCEPT = "<!-- ccnavi:accept -->"
+MARKER_ISSUE = "<!-- ccnavi:issue op={op} -->"
+ISSUE_URL_SLOT = "{issue_url}"
+ISSUE_LINKS_SLOT = "{issue_links}"
+ISSUE_BODY_LIMIT = 59000
+MAX_ISSUES = 40
 ACTOR = {"account": "alice"}
 
 
@@ -47,8 +51,8 @@ class ChromeDecideHarness(CoreHarness):
     def setUp(self):
         super().setUp()
         write(
-            os.path.join(self.root, *lint.SH_COMPAT_FILE.split(os.sep)),
-            f"#!/bin/sh\nCCNAVI_COMPAT={version.COMPAT}\n",
+            os.path.join(self.root, *Chrome.COMPAT_FILE.split("/")),
+            f"#!/bin/sh\nCCNAVI_COMPAT={exe.compat()}\n",
         )
         self.fixture = self.reviewed_phase_one()
         self.commit_parent("requested")
@@ -132,7 +136,7 @@ class PreviewTest(ChromeDecideHarness):
         self.assertEqual(local.returncode, 0, local.stderr)
         self.assertEqual(shown, json.loads(local.stdout))
         self.assertRegex(shown["digest"], r"^v2\.[A-Za-z0-9_-]+$")
-        self.assertEqual(shown["version"], review_decide.DECIDE_VERSION)
+        self.assertEqual(shown["version"], DECIDE_VERSION)
         self.assertEqual([t["key"] for t in shown["threads"]], ["u-t1", "u-t2"])
         self.assertEqual(
             sorted(shown["threads"][0]),
@@ -200,11 +204,11 @@ class ApplyTest(ChromeDecideHarness):
             plan["resolves"],
             [{"key": "u-t1", "thread_id": "t1"}, {"key": "u-t2", "thread_id": "t2"}],
         )
-        self.assertNotIn(review_host.MARKER_ISSUE.split("{")[0], plan["replies"][0]["body"])
-        self.assertIn(review_host.MARKER_ACCEPT, plan["replies"][0]["body"])
-        self.assertNotIn(core_review.ISSUE_URL_SLOT, plan["replies"][0]["body"])
-        self.assertIn(core_review.ISSUE_URL_SLOT, plan["replies"][1]["body"])
-        self.assertIn(core_review.ISSUE_LINKS_SLOT, plan["comment"])
+        self.assertNotIn(MARKER_ISSUE.split("{")[0], plan["replies"][0]["body"])
+        self.assertIn(MARKER_ACCEPT, plan["replies"][0]["body"])
+        self.assertNotIn(ISSUE_URL_SLOT, plan["replies"][0]["body"])
+        self.assertIn(ISSUE_URL_SLOT, plan["replies"][1]["body"])
+        self.assertIn(ISSUE_LINKS_SLOT, plan["comment"])
         self.assertIn("u-t3", plan["comment"])
         # 続きの子を起こし、マーカーは置かない。レビュー待ちの子は done/ へ
         self.assertFalse(answer["reviewed"])
@@ -230,8 +234,8 @@ class ApplyTest(ChromeDecideHarness):
         self.assertEqual(plan["issues"], [])
         self.assertEqual(len(plan["replies"]), 3)
         self.assertEqual(len(plan["resolves"]), 3)
-        self.assertNotIn(core_review.ISSUE_LINKS_SLOT, plan["comment"])
-        self.assertIn(review_host.MARKER_DECIDE, plan["comment"])
+        self.assertNotIn(ISSUE_LINKS_SLOT, plan["comment"])
+        self.assertIn(MARKER_DECIDE, plan["comment"])
 
     def test_all_fix_replies_and_resolves_nothing(self):
         answer = self.apply(self.THREADS, dict.fromkeys(["u-t1", "u-t2", "u-t3"], "fix"))
@@ -255,13 +259,6 @@ class ApplyTest(ChromeDecideHarness):
         plan = answer["host_plan"]
         self.assertEqual((plan["issues"], plan["replies"], plan["resolves"]), ([], [], []))
         self.assertIn("未解決（Unresolved）の指摘なし", plan["comment"])
-
-    def test_a_fix_can_not_be_given_a_reply_or_a_resolve(self):
-        """型で固める: 受け入れる指摘の型は、直す指摘から作れない。"""
-        for choice in (review_decide.CHOICE_KEEP, review_decide.CHOICE_ISSUE):
-            core_review.Accepted("u", "t", choice)
-        with self.assertRaises(ValueError):
-            core_review.Accepted("u", "t", review_decide.CHOICE_FIX)
 
     def test_a_fix_never_appears_in_the_plan_whatever_the_mix(self):
         keys = ["u-t1", "u-t2", "u-t3"]
@@ -382,7 +379,7 @@ class CarryTest(ChromeDecideHarness):
         self.assertEqual(answer["followup"], "i0001-01-02")
         self.assertIn("u-t1", plan["comment"])
         # 今回作る issue が無いので、作った issue の一覧の枠は MR に出さない
-        self.assertNotIn(core_review.ISSUE_LINKS_SLOT, plan["comment"])
+        self.assertNotIn(ISSUE_LINKS_SLOT, plan["comment"])
         # 受け入れ済みの 2 件は、見せた指摘の一部として数える
         self.assertEqual(answer["pending_extra"], [])
 
@@ -452,9 +449,9 @@ class IssueMarkTest(ChromeDecideHarness):
         self.assertNotEqual(before["op"], after["op"])
 
     def test_a_long_body_goes_to_follow_up_comments(self):
-        long = "あ" * (review_decide.ISSUE_BODY_LIMIT + 10)
+        long = "あ" * (ISSUE_BODY_LIMIT + 10)
         issue = self.issue_of([thread("t1", long)], "u-t1")
-        self.assertLessEqual(len(issue["body"]), review_decide.ISSUE_BODY_LIMIT)
+        self.assertLessEqual(len(issue["body"]), ISSUE_BODY_LIMIT)
         self.assertTrue(issue["comments"])
         self.assertTrue(issue["body"].startswith("<!-- ccnavi:issue op="))
 
@@ -463,8 +460,8 @@ class IssueMarkTest(ChromeDecideHarness):
         extension_cap = 60000
         marker_room = 200
         for size in (
-            review_decide.ISSUE_BODY_LIMIT - 5,
-            review_decide.ISSUE_BODY_LIMIT + 5,
+            ISSUE_BODY_LIMIT - 5,
+            ISSUE_BODY_LIMIT + 5,
             150000,
         ):
             issue = self.issue_of([thread("t1", "あ" * size)], "u-t1")
@@ -609,38 +606,14 @@ class BoundaryTest(ChromeDecideHarness):
         self.assertEqual(answer["changes"], {})
 
     def test_more_than_the_limit_of_issues_places_nothing(self):
-        many = [thread(f"t{i}", f"指摘{i}") for i in range(core_review.MAX_ISSUES + 1)]
+        many = [thread(f"t{i}", f"指摘{i}") for i in range(MAX_ISSUES + 1)]
         answer = self.apply(many, {t["url"]: "issue" for t in many})
         self.assertEqual(answer["code"], "CORE_DECIDE_CHOICES")
-        self.assertIn(str(core_review.MAX_ISSUES + 1), answer["problems"][0])
+        self.assertIn(str(MAX_ISSUES + 1), answer["problems"][0])
         self.assertIsNone(answer["changes"])
         ok = self.apply(many[:-1], {t["url"]: "issue" for t in many[:-1]})
         self.assertEqual(ok["problems"], [], ok)
-        self.assertEqual(len(ok["host_plan"]["issues"]), core_review.MAX_ISSUES)
-
-    def test_the_parent_worktree_that_can_not_be_decided_stops_without_writing(self):
-        from unittest import mock
-
-        from ccnavi.tickets.approval import store as approval
-
-        calls = []
-        real = core_review.approval.home_dir
-
-        def broken(*args, **kwargs):
-            # 書くものを並べている間（溜める段の中）だけ決まらない
-            if fsio.current_stage() is None or sys._getframe(1).f_globals["__name__"] != (
-                core_review.__name__
-            ):
-                return real(*args, **kwargs)
-            calls.append(1)
-            raise approval.NoParentWorktree("決まらない")
-
-        with mock.patch.object(core_review.approval, "home_dir", broken):
-            answer = self.apply([thread("t1", "命名")], {"u-t1": "keep"})
-        self.assertTrue(calls)
-        self.assertEqual(answer["code"], "CORE_DECIDE_STOPPED")
-        self.assertIsNone(answer["changes"])
-        self.assertIsNone(answer["host_plan"])
+        self.assertEqual(len(ok["host_plan"]["issues"]), MAX_ISSUES)
 
     def test_the_keys_of_the_answers_do_not_depend_on_the_path(self):
         request = self.chrome_request(
@@ -677,7 +650,7 @@ class BoundaryTest(ChromeDecideHarness):
         pieces = issue["comments"]
         self.assertGreater(len(pieces), 1)
         for piece in pieces:
-            self.assertLessEqual(len(piece), review_decide.ISSUE_BODY_LIMIT)
+            self.assertLessEqual(len(piece), ISSUE_BODY_LIMIT)
             rows = piece.rstrip().splitlines()
             opens = [r for r in rows if r == "````text"]
             closes = [r for r in rows if r == "````"]

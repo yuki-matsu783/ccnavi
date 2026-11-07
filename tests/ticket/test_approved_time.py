@@ -1,36 +1,26 @@
 """承認の時刻。承認は承認済みチケットに時刻を書かないので、表示（ボードの JSON と `--explain`）は
 `doing/` に足したコミット → 「未コミット（手で置いた）」の順で引く。
 
-git はツリーごとに 1 回だけ打つ。git の無い場（Chrome の Pyodide）では分からない。
-判定の拒否文には時刻を出さない（hook の中では git も読まない）。
+判定の拒否文には時刻を出さない（hook の中では git も読まない）。git を打つ回数と、git の無い場での
+扱いは go の approval のテストが見る。
 """
 
 from __future__ import annotations
 
 import json
 import os
-import tempfile
 import unittest
-from unittest import mock
 
-from ccnavi.infra import gitcmd, settings
-from ccnavi.tickets.approval import store as approval
-from ccnavi.tickets.approval import times as approval_times
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
 from tests.ticketsample import child_text
 
+# ボードの JSON の `approved_from` の値。
+APPROVED_FROM_COMMIT = "commit"
+APPROVED_UNCOMMITTED = "uncommitted"
+
 
 class ApprovedTimeTest(PhaseHarness):
-    def conf(self):
-        conf, _ = settings.load(self.root)
-        conf.state = self.state
-        return conf
-
-    def copies(self):
-        found, _ = approval.scan(self.conf(), self.root)
-        return {t.ticket: t for t in found}
-
     def board_copy(self, ident):
         board = json.loads(self.ccnavi("--explain", "--json").stdout)
         return next(t for t in board["tickets"] if t["ticket"] == ident)["copy"]
@@ -48,7 +38,7 @@ class ApprovedTimeTest(PhaseHarness):
         when = git(self.parent_tree, "log", "-1", "--format=%cI").strip()
         copy = self.board_copy("i0001-01-01")
         self.assertEqual(copy["approved_at"], when)
-        self.assertEqual(copy["approved_from"], approval_times.APPROVED_FROM_COMMIT)
+        self.assertEqual(copy["approved_from"], APPROVED_FROM_COMMIT)
 
     def test_a_rename_commit_counts_as_added(self):
         # GitHub の画面での移動は rename のコミットになる。--no-renames で足したことにする。
@@ -63,7 +53,7 @@ class ApprovedTimeTest(PhaseHarness):
         shown = git(self.parent_tree, "show", "--stat", "-M", "--format=", "HEAD")
         self.assertIn("=>", shown)
         copy = self.board_copy("i0001-01-01")
-        self.assertEqual(copy["approved_from"], approval_times.APPROVED_FROM_COMMIT)
+        self.assertEqual(copy["approved_from"], APPROVED_FROM_COMMIT)
 
     def test_a_reapproval_after_a_removal_reads_the_commit_time(self):
         """承認済みチケットを消したあとに手で動かして承認し直したら、コミットの時刻を読む。"""
@@ -76,7 +66,7 @@ class ApprovedTimeTest(PhaseHarness):
         self.move_by_hand("i0001", text)
         when = git(self.parent_tree, "log", "-1", "--format=%cI").strip()
         copy = self.board_copy("i0001")
-        self.assertEqual(copy["approved_from"], approval_times.APPROVED_FROM_COMMIT)
+        self.assertEqual(copy["approved_from"], APPROVED_FROM_COMMIT)
         self.assertEqual(copy["approved_at"], when)
 
     def test_an_uncommitted_manual_approval_is_said_so(self):
@@ -85,36 +75,10 @@ class ApprovedTimeTest(PhaseHarness):
         self.move_by_hand("i0001-01-01", child, commit=False)
         copy = self.board_copy("i0001-01-01")
         self.assertEqual(copy["approved_at"], "")
-        self.assertEqual(copy["approved_from"], approval_times.APPROVED_UNCOMMITTED)
+        self.assertEqual(copy["approved_from"], APPROVED_UNCOMMITTED)
         shown = self.ccnavi("--explain").stdout
         self.assertIn("i0001-01-01（", shown)
         self.assertIn("承認 未コミット（手で置いた）", shown)
-
-    def test_git_runs_once_per_tree_and_not_without_git(self):
-        self.family(plan=["research"])
-        for n in (1, 2):
-            ident = f"i0001-01-0{n}"
-            self.move_by_hand(ident, child_text(ident, "i0001", 1, ("wip/research/*",), False))
-        found = self.copies()
-        runs = []
-        real = gitcmd.run
-
-        def counted(cwd, args, *rest, **kw):
-            runs.append(args[0])
-            return real(cwd, args, *rest, **kw)
-
-        with mock.patch.object(gitcmd, "run", counted):
-            times = approval_times.approved_times(self.conf(), list(found.values()))
-        self.assertEqual(runs, ["log"])
-        self.assertEqual(times[found["i0001"].path].source, approval_times.APPROVED_FROM_COMMIT)
-        self.assertEqual(
-            times[found["i0001-01-02"].path].source, approval_times.APPROVED_FROM_COMMIT
-        )
-        runs.clear()
-        with mock.patch.object(gitcmd, "run", counted):
-            times = approval_times.approved_times(self.conf(), list(found.values()), use_git=False)
-        self.assertEqual(runs, [])
-        self.assertNotIn(found["i0001-01-02"].path, times)
 
     def test_the_refusal_text_does_not_carry_the_approval_time(self):
         self.family(plan=["research"])
@@ -128,14 +92,6 @@ class ApprovedTimeTest(PhaseHarness):
         said = result.stdout + result.stderr
         self.assertIn("ticket: i0001", said)
         self.assertNotIn("approved", said.split("ticket: i0001", 1)[1].split("\n", 1)[0])
-
-
-class GitMissingTest(unittest.TestCase):
-    def test_a_tree_that_is_not_a_repository_gives_no_time(self):
-        with tempfile.TemporaryDirectory() as root:
-            conf, _ = settings.load(root)
-            found, ok = approval_times._added_times(conf, root)
-        self.assertEqual((found, ok), ({}, False))
 
 
 if __name__ == "__main__":

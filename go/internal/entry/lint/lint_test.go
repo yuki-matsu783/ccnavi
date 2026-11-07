@@ -102,7 +102,7 @@ func TestShWord(t *testing.T) {
 	}
 }
 
-// 直接作業の記録（tests/ticket/test_lint_direct.py のうち、突き合わせの見本に無い 2 つ）。
+// 直接作業の記録（突き合わせの見本に無い 2 つ）。
 func TestDirectRecordsQuietAndSideBySide(t *testing.T) {
 	root := testkit.Workspace(t, "w1")
 	common := filepath.Join(root, ".git")

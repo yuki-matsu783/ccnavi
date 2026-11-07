@@ -4,17 +4,16 @@
 親が閉じる → 統合先に入った後、候補が条件を満たすと通知が出る → 提案を延期 →
 観測元が増えると再び通知が出る。
 
-実行ファイルは in-process で呼ぶ（sh の write-and-push は通さない）。
+実行ファイルを直に起こす（sh の write-and-push は通さない）。通知はセッション開始の hook で見る。
 """
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import unittest
 
-from ccnavi.infra import settings
-from ccnavi.tickets.notice import learning_notice
 from tests.learningsample import impact, pattern
 from tests.ticket.test_learning_consolidate import (
     CHILD,
@@ -30,8 +29,16 @@ PATTERN = "docs/wiki/patterns/pat.md"
 
 class LearningCycleTest(FlowHarness):
     def notice(self):
-        conf, _ = settings.load(self.root)
-        return learning_notice.notice(conf, self.root)
+        """セッション開始の hook の出力（学びの提案の候補の知らせはユーザ向けの文に載る）。"""
+        payload = {
+            "hook_event_name": "SessionStart",
+            "cwd": self.root,
+            "session_id": "s1",
+            "source": "startup",
+        }
+        started = self.ccnavi(stdin=json.dumps(payload), env=EN)
+        self.assertEqual(started.returncode, 0, started.stderr)
+        return started.stdout
 
     def publish(self, message):
         git(self.root, "add", "-A")
@@ -90,7 +97,7 @@ class LearningCycleTest(FlowHarness):
         git(self.root, "remote", "set-head", "origin", "main")
         first = self.notice()
         self.assertIn("学びの提案の候補が 1 件", first)
-        self.assertEqual(self.notice(), "")
+        self.assertNotIn("学びの提案の候補", self.notice())
 
         # 6. 提案を延期（その時点の観測元の数 3 を書く）。通知は出ない
         write(
@@ -98,7 +105,7 @@ class LearningCycleTest(FlowHarness):
             impact("p1", "延期", {"pat": 3}, "2026-10-21T10:00:00+09:00", target="skill"),
         )
         self.publish("defer")
-        self.assertEqual(self.notice(), "")
+        self.assertNotIn("学びの提案の候補", self.notice())
 
         # 7. 観測元が増えると候補に戻り、再び通知が出る
         write(

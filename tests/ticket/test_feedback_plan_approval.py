@@ -16,7 +16,6 @@ import json
 import os
 import shutil
 
-from ccnavi.tickets.approval import marks as approval_marks
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text, parent_text
@@ -59,6 +58,11 @@ class FeedbackPlanApprovalTest(PhaseHarness):
     def phase_dir(self):
         return os.path.join(self.approved, "phases", "i0001")
 
+    def reviewed_mark(self):
+        """フェーズ 1 のレビュー済みのマーカー（`phases/i0001/1.reviewed`）。無ければ None。"""
+        path = os.path.join(self.phase_dir(), "1.reviewed")
+        return read_json(path) if os.path.exists(path) else None
+
     # ---- 1. レビュー済みでなければ拒む
 
     def test_requested_only_is_refused(self):
@@ -67,7 +71,7 @@ class FeedbackPlanApprovalTest(PhaseHarness):
         refused = self.approve()
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("レビューが済んでから", refused.stderr)
-        self.assertIsNone(approval_marks.read_mark(self.approved, "i0001", 1, "reviewed"))
+        self.assertIsNone(self.reviewed_mark())
 
     def test_unresolved_threads_keep_the_last_review_open_and_the_plan_refused(self):
         fixture = self.requested()
@@ -80,7 +84,7 @@ class FeedbackPlanApprovalTest(PhaseHarness):
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("レビューが済んでから", refused.stderr)
         # 拒んだだけで、何も動かしていない
-        self.assertIsNone(approval_marks.read_mark(self.approved, "i0001", 1, "reviewed"))
+        self.assertIsNone(self.reviewed_mark())
         self.assertFalse(os.path.exists(os.path.join(self.phase_dir(), "accepted.json")))
 
     # ---- 2. レビュー済みなら通る
@@ -135,15 +139,13 @@ class FeedbackPlanApprovalTest(PhaseHarness):
             ),
         )
         self.assertEqual(self.confirm(result, 1).returncode, 0)
-        mark = approval_marks.read_mark(self.approved, "i0001", 1, "reviewed")
+        mark = self.reviewed_mark()
         self.assertEqual(mark["via"], "manual")
         self.commit_parent("settled")
         self.propose_feedback(feedback=[])
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        self.assertEqual(
-            approval_marks.read_mark(self.approved, "i0001", 1, "reviewed")["via"], "manual"
-        )
+        self.assertEqual(self.reviewed_mark()["via"], "manual")
         del fixture
 
     # ---- 4. まとめて承認する
