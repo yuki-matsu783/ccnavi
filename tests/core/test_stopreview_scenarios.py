@@ -1,16 +1,18 @@
 """StopのAI判定の受入シナリオ13件を、場面データから決定的に確かめる。
 
 場面データはtests/fixtures/stop_review/scenarios/にある。実機のモデルは呼ばない。
-各場面について、場面データからstate・transcript・提案を組み、hookと同じ経路
-（`events._plan_stop_review`・`cli_stopreview` のmaterialとrecord）を通して、次を確かめる。
+各場面について、場面データからtranscript・提案を組み、hook（実行ファイルを hook として起こす）と
+`ccnavi stop-review material`・`record` を通して、次を確かめる。
 
-- 候補になるか、計画の対象と必要な基準（`sr.required`）が期待と合うか
+- 候補になるか、計画の対象と必要な基準が期待と合うか
 - 判定役に渡る材料に、`must_contain` の文字列がすべて含まれるか。これで判定役が根拠を受け取れる
 - recordに判定結果を渡したときの、返り値・試行の状態・最終分類・再判定の結果。判定結果は
   場面データの `judge_result*.json`、無ければ `expected.json` の基準ごとの期待から組んだもの
 
 検査しないもの: 判定役が正しく判定すること。基準ごとの期待は、正しい判定役が出すはずの結果として
 recordに渡す入力であり、ここで確かめるのはccnavi側の確定の規則だけ。
+計画と試行は、state の置き場
+（`logs/state/stopreview-plan-*.json`・`stopreview-attempt-*.json`）から読む。
 
 場面の置き方。1回のStopの場面は場面の直下、2回のStopは `stop-1/`・`stop-2/` に分ける。
 
@@ -25,7 +27,7 @@ recordに渡す入力であり、ここで確かめるのはccnavi側の確定�
 
 from __future__ import annotations
 
-import io
+import hashlib
 import json
 import os
 import re
@@ -35,21 +37,25 @@ import tempfile
 import time
 import unittest
 from typing import Any, NamedTuple
-from unittest import mock
 
-from ccnavi.entry import cli_stopreview
-from ccnavi.hook import events
-from ccnavi.infra import hookio, modes, settings
-from ccnavi.records import stopops
-from ccnavi.records import stopreview as sr
 from tests import ROOT
+from tests.inproc import run_ccnavi
 
 SCENES = os.path.join(ROOT, "tests", "fixtures", "stop_review", "scenarios")
 GIT = shutil.which("git")
 TODO = "wip/proposals/todo"
 SESSION = "s1"
 SCENE_COUNT = 13
-FIXES = {sr.R1: "write_proposal", sr.R2: "revise_proposal", sr.R4: "send_proposal"}
+# 判定基準。R3 は停止理由が正当かの判定で、不備検出の根拠にはしない。
+FLAW_CRITERIA = ("R1", "R2", "R4")
+FIXES = {"R1": "write_proposal", "R2": "revise_proposal", "R4": "send_proposal"}
+FAIL = "fail"
+FINALS = {"ok", "flawed", "unchecked", "out_of_scope"}
+CLASS_TICKET_WORK = "ticket_work"
+CLASS_NOT_TICKET_WORK = "not_ticket_work"
+SENT_BACK = "sent_back"
+# approval-request の結果ファイルを sh が置く場所（state の下）。
+RESULT_DIR = "stopops-result"
 
 
 def _load(path):
@@ -97,13 +103,15 @@ class Play:
         place = os.path.join(self.directory, "settings.json")
         if os.path.isfile(place):
             declared = _load(place)["stop_review"]
-        self.conf = settings.Settings(
-            state=self.state,
-            log=os.path.join(self.root, "logs", "decisions.jsonl"),
-            stop_review_agent=True,
-            stop_review=declared,
-            tickets="wip/proposals",
-        )
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env.pop("CLAUDE_PROJECT_DIR", None)
+        self.env = {
+            **env,
+            "CCNAVI_LEARNING": "disable",
+            "CCNAVI_MODE": "enable",
+            "CCNAVI_STOP_REVIEW_AGENT": "1",
+            "CCNAVI_STOP_REVIEW": declared,
+        }
         first = os.path.join(self.directory, "stop-1")
         if os.path.isdir(first):
             names = sorted(n for n in os.listdir(self.directory) if n.startswith("stop-"))
@@ -116,10 +124,15 @@ class Play:
 
     # ---- hookの足跡
 
+    def _ccnavi(self, args, stdin=""):
+        done = run_ccnavi(["--root", self.root, *args], input=stdin, cwd=self.root, env=self.env)
+        assert done.returncode == 0, (args, done.stdout, done.stderr)
+        return done
+
     def _hook(self, event, **fields):
         fields.setdefault("session_id", SESSION)
         fields.setdefault("cwd", self.root)
-        events._track_proposals(self.conf, hookio.Input(event=event, **fields))
+        return self._ccnavi([], json.dumps({"hook_event_name": event, **fields}))
 
     def _git(self, *args):
         done = subprocess.run(
@@ -148,7 +161,7 @@ class Play:
         shutil.copyfile(os.path.join(folder, "transcript.jsonl"), self.transcript)
         prompts = _prompts(self.transcript)
         for text in prompts[self.prompted :]:
-            self._hook(hookio.USER_PROMPT_SUBMIT, prompt=text)
+            self._hook("UserPromptSubmit", prompt=text)
         self.prompted = len(prompts)
         drafts = os.path.join(folder, "proposals")
         for name in sorted(os.listdir(drafts)) if os.path.isdir(drafts) else []:
@@ -157,7 +170,7 @@ class Play:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             shutil.copyfile(os.path.join(drafts, name), path)
             self._hook(
-                hookio.POST_TOOL_USE, tool_name="Write", tool_input={"file_path": path},
+                "PostToolUse", tool_name="Write", tool_input={"file_path": path},
                 tool_use_id=f"w{self.calls}-{ident}",
             )  # fmt: skip
         kv = os.path.join(folder, "propose.kv")
@@ -169,38 +182,25 @@ class Play:
             ident = re.search(r"^id=(.+)$", body, re.MULTILINE).group(1)
             command = f"sh .ccnavi/scripts/ccnavi-ticket.sh approval-request {ident}"
             call = dict(tool_name="Bash", tool_input={"command": command}, tool_use_id=tool_use_id)
-            self._hook(hookio.PRE_TOOL_USE, **call)
-            directory = os.path.join(self.state, stopops.RESULT_DIR)
+            self._hook("PreToolUse", **call)
+            directory = os.path.join(self.state, RESULT_DIR)
             os.makedirs(directory, exist_ok=True)
             place = os.path.join(directory, f"{tool_use_id}.kv")
             with open(place, "w", encoding="utf-8") as handle:
                 handle.write(body)
-            self._hook(hookio.POST_TOOL_USE, **call)
+            self._hook("PostToolUse", **call, tool_response={})
 
     # ---- Stopの計画・材料・判定結果
 
     def plan(self, continued):
-        payload = hookio.Input(
-            event=hookio.STOP, session_id=SESSION, transcript_path=self.transcript,
-            cwd=self.root, stop_hook_active=continued,
-        )  # fmt: skip
-        continuation = events._ai_continuation(self.conf, payload)
-        err = io.StringIO()
-        events._plan_stop_review(
-            err, self.conf, self.root, payload, modes.ENABLE, False, continuation, None
-        )  # fmt: skip
-        self.errors = err.getvalue()
-        self.key = sr.shared_key(SESSION, self.transcript)
-        return sr.read_plan(self.state, self.key)
+        done = self._hook("Stop", transcript_path=self.transcript, stop_hook_active=continued)
+        self.errors = done.stderr
+        self.key = f"{SESSION}:{_last_assistant_uuid(self.transcript)}"
+        digest = hashlib.sha1(self.key.encode("utf-8")).hexdigest()[:16]
+        return _read_state(self.state, f"stopreview-plan-{digest}.json")
 
     def _cli(self, verb, stdin=""):
-        out = io.StringIO()
-        code = cli_stopreview.run(
-            io.StringIO(stdin), out, io.StringIO(), self.conf,
-            ["stop-review", verb, SESSION, self.transcript], self.root,
-        )  # fmt: skip
-        assert code == 0
-        return out.getvalue()
+        return self._ccnavi(["stop-review", verb, SESSION, self.transcript], stdin).stdout
 
     def material(self):
         return self._cli("material")
@@ -215,7 +215,51 @@ class Play:
         return re.sub(r"\$PROPOSAL:([\w.-]+)", lambda m: keys[m.group(1)], text)
 
     def attempt(self, plan):
-        return sr.read_attempt(self.state, plan["attempt_id"])
+        return read_attempt(self.state, plan["attempt_id"])
+
+
+def _last_assistant_uuid(path):
+    """transcript の末尾にある、サイドチェーンでないアシスタント行の uuid（Stop の機会の鍵）。"""
+    found = ""
+    for line in _read(path).splitlines():
+        row = json.loads(line)
+        if row.get("type") == "assistant" and not row.get("isSidechain"):
+            found = row.get("uuid", "")
+    return found
+
+
+def _read_state(state, name):
+    path = os.path.join(state, name)
+    return _load(path) if os.path.isfile(path) else None
+
+
+def read_attempt(state, attempt_id):
+    return _read_state(state, f"stopreview-attempt-{attempt_id}.json")
+
+
+def required(plan):
+    """計画から決まる、結果が要る (基準, 対象) の一覧。
+
+    本文が無い版（送れなかった提案）には R2 を求めない。
+    """
+    needs = [("R1", "stop"), ("R3", "stop")]
+    no_r2 = set(plan.get("no_r2") or [])
+    for target in plan.get("targets") or []:
+        if target != "stop":
+            needs += [("R4", target)] if target in no_r2 else [("R2", target), ("R4", target)]
+    return needs
+
+
+def sent_back_left(state):
+    """同じセッションに、次の Stop で消費される差し戻しが残っているか。"""
+    for name in os.listdir(state):
+        if name.startswith("stopreview-attempt-") and name.endswith(".json"):
+            attempt = _load(os.path.join(state, name))
+            if attempt.get("state") == SENT_BACK and attempt.get("key", "").startswith(
+                f"{SESSION}:"
+            ):
+                return True
+    return False
 
 
 def notation(plan):
@@ -231,15 +275,15 @@ def ideal_result(plan, criteria):
     for criterion, per_target in criteria.items():
         for target, outcome in per_target.items():
             row = {"criterion": criterion, "target": keys.get(target, target), "result": outcome}
-            if outcome == sr.FAIL:
+            if outcome == FAIL:
                 kind = "final_answer" if target == "stop" else "proposal"
                 row["locations"] = [{"kind": kind, "text": "場面データの期待"}]
-                if criterion in sr.FLAW_CRITERIA:
+                if criterion in FLAW_CRITERIA:
                     fix = FIXES[criterion]
                     row["fixes"] = [{"kind": fix, "text": "場面データの期待"}]
             rows.append(row)
     return json.dumps(
-        {"attempt_id": plan["attempt_id"], "classification": sr.CLASS_TICKET_WORK, "results": rows}
+        {"attempt_id": plan["attempt_id"], "classification": CLASS_TICKET_WORK, "results": rows}
     )
 
 
@@ -255,11 +299,6 @@ class Record(NamedTuple):
 
 @unittest.skipIf(GIT is None, "git が無い")
 class ScenarioTest(unittest.TestCase):
-    def setUp(self):
-        patch = mock.patch.object(cli_stopreview, "PLAN_WAIT_SECONDS", 0.3)
-        patch.start()
-        self.addCleanup(patch.stop)
-
     def _judge_text(self, play, folder, plan, want, choice=None):
         """recordに渡す判定結果。場面データのファイルがあればそれ、無ければ期待から組む。"""
         path = os.path.join(folder, choice or "judge_result.json")
@@ -281,7 +320,7 @@ class ScenarioTest(unittest.TestCase):
             material = play.material()
             choice = override[1] if override and override[0] == index else None
             reply = play.record(self._judge_text(play, folder, plan, want, choice))
-            original = sr.read_attempt(play.state, plan["original"]) if plan["rejudge"] else None
+            original = read_attempt(play.state, plan["original"]) if plan["rejudge"] else None
             records.append(Record(play, plan, material, reply, want, play.attempt(plan), original))
             if choice:
                 break
@@ -309,11 +348,11 @@ class ScenarioTest(unittest.TestCase):
         self.assertEqual(plan["refs"], want["refs"], label)
         routes = {p["ident"]: p["route"] for p in plan["proposals"]}
         self.assertEqual(routes, want.get("routes", {}), label)
-        needs = sorted([c, nick(t)] for c, t in sr.required(plan))
+        needs = sorted([c, nick(t)] for c, t in required(plan))
         self.assertEqual(needs, sorted(want["required"]), label)
         self.assertEqual(plan["rejudge"], want.get("is_rejudge", False), label)
         if plan["rejudge"]:
-            original = sr.read_attempt(play.state, plan["original"])
+            original = read_attempt(play.state, plan["original"])
             self.assertEqual(original["state"], want["original_state"], label)
         for needle in want["must_contain"]:
             self.assertIn(needle, material, f"{label}: 材料に「{needle}」が無い")
@@ -335,7 +374,7 @@ class ScenarioTest(unittest.TestCase):
             record = self._play(name, (len(records) - 1, alt["judge_result"]))[-1]
             self._assert_outcome(record, alt, label)
             # 再判定やdry-runの不備検出では差し戻しが残らない。次のStopで消費されるものが無いため。
-            self.assertIsNone(sr.consume_continuation(record.play.state, SESSION), label)
+            self.assertFalse(sent_back_left(record.play.state), label)
 
 
 def _method(name):
@@ -359,13 +398,12 @@ class SceneDataTest(unittest.TestCase):
     def test_all_thirteen_scenes_are_present_and_well_formed(self):
         names = scene_names()
         self.assertEqual([n[:2] for n in names], [f"{i:02d}" for i in range(1, SCENE_COUNT + 1)])
-        finals = {sr.FINAL_OK, sr.FINAL_FLAWED, sr.FINAL_UNCHECKED, sr.FINAL_OUT_OF_SCOPE}
         for name in names:
             with self.subTest(scene=name):
                 expected = _load(os.path.join(SCENES, name, "expected.json"))
                 self.assertEqual(expected["id"], name[:2])
                 self.assertTrue(expected["title"].strip() and "\n" not in expected["title"])
-                self.assertIn(expected["final"], finals)
+                self.assertIn(expected["final"], FINALS)
                 self.assertEqual(len(expected["stops"]), len(_folders(name)))
                 for stop in expected["stops"]:
                     self.assertTrue(stop["must_contain"])
@@ -381,8 +419,8 @@ class SceneDataTest(unittest.TestCase):
                     continue
                 with self.subTest(scene=name, folder=os.path.basename(folder)):
                     result = _load(path)
-                    if result["classification"] == sr.CLASS_NOT_TICKET_WORK:
-                        self.assertEqual(want["final"], sr.FINAL_OUT_OF_SCOPE)
+                    if result["classification"] == CLASS_NOT_TICKET_WORK:
+                        self.assertEqual(want["final"], "out_of_scope")
                         continue
                     got: dict[str, dict[str, str]] = {}
                     for row in result["results"]:

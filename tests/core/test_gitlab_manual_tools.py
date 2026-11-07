@@ -122,13 +122,6 @@ class ProbePureHelpersTest(unittest.TestCase):
 
         return parent_text("i0001", ["work"])
 
-    def parse(self, text: str):
-        from ccnavi.tickets.model import ticket as ticket_mod  # noqa: PLC0415
-
-        found, problems = ticket_mod.parse(text)
-        self.assertIsNotNone(found, problems)
-        return found
-
     def test_feedback_revision_adds_only_an_empty_feedback_plan(self):
         text = self.approved_parent()
         revised = self.probe.feedback_revision(text)
@@ -146,27 +139,15 @@ class ProbePureHelpersTest(unittest.TestCase):
         self.assertNotIn("2026-01-01", revised)
         self.assertNotIn("abc123", revised)
 
-    def test_feedback_revision_is_detected_as_a_revision(self):
-        from ccnavi.tickets.approval import store as approval  # noqa: PLC0415
-
-        current = self.parse(self.approved_parent())
-        revised = self.parse(self.probe.feedback_revision(self.approved_parent()))
-        self.assertTrue(approval.plan_differs(revised, current))
-        self.assertEqual([], revised.feedback)
-        self.assertIsNone(current.feedback)
-
     def test_feedback_revision_refuses_a_text_that_already_has_feedback(self):
         once = self.probe.feedback_revision(self.approved_parent())
         with self.assertRaises(ValueError):
             self.probe.feedback_revision(once)
 
     def test_cancelled_children_live_in_done_not_in_a_cancelled_directory(self):
-        from ccnavi.tickets.model import ticket_model  # noqa: PLC0415
-
         path = self.probe.approved_copy_path("/t", "done", "i0002-01-01")
         self.assertEqual(os.path.join("/t", ".ccnavi", "approved", "done", "i0002-01-01.md"), path)
-        self.assertNotIn(ticket_model.CANCELLED, path)
-        self.assertNotIn(ticket_model.CANCELLED, ticket_model.STATES)
+        self.assertNotIn("cancelled", path)
 
     def test_cancelled_mark_needs_a_filled_cancelled_at(self):
         self.assertTrue(self.probe.is_cancelled_copy('x: 1\ncancelled_at: "2026-01-01T00:00:00"\n'))

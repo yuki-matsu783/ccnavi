@@ -1,8 +1,8 @@
-"""放置したセッションの引き継ぎ促し（records.idlehandoff と `ccnavi idle`）の受入テスト。
+"""放置したセッションの引き継ぎ促し（`ccnavi idle`）の受入テスト。
 
-会話の大きさとキャッシュの保持時間をトランスクリプトから読むこと、閾値と基準の刻み、待機の
-状態遷移（始める・ユーザの入力で取り消す・発火したら始め直さない）、ユーザへの知らせが 1 セッション
-1 回であることを見る。
+待機の始めと起こす指示・ユーザの入力での取り消し・知らせが 1 セッション 1 回であることを、
+`ccnavi idle` を起こして見る。会話の大きさの読み方・閾値と基準の刻み・状態遷移の細部は
+`go/internal/records/handoff` の go test が見る。
 """
 
 from __future__ import annotations
@@ -13,10 +13,11 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi.records import idlehandoff
 from tests.inproc import run_ccnavi
 
 SESSION = "sess-1"
+# 起こす指示に付ける目印（ユーザが打った文と見分ける）。
+MARKER = "[idle-handoff]"
 
 
 def assistant(tokens: int, short: int = 0, long: int = 0, sidechain: bool = False) -> str:
@@ -44,278 +45,6 @@ class Fixture(unittest.TestCase):
         with open(path, "w", encoding="utf-8") as handle:
             handle.write("\n".join(rows) + "\n")
         return path
-
-
-class UsageTest(Fixture):
-    def test_最新の応答の入力の合計を会話の大きさとする(self):
-        path = self.transcript(assistant(1000, long=10), assistant(2500, long=10))
-
-        usage = idlehandoff.usage_of(path)
-
-        self.assertEqual(usage.tokens, 2500)
-
-    def test_サブエージェントの行は数えない(self):
-        path = self.transcript(assistant(1000, long=10), assistant(9000, long=10, sidechain=True))
-
-        self.assertEqual(idlehandoff.usage_of(path).tokens, 1000)
-
-    def test_直近の書き込みが5分側なら保持時間は5分(self):
-        path = self.transcript(assistant(1000, long=10), assistant(2000, short=10))
-
-        self.assertEqual(idlehandoff.usage_of(path).ttl, 300)
-
-    def test_書き込みが1時間側なら保持時間は1時間(self):
-        path = self.transcript(assistant(2000, long=10))
-
-        self.assertEqual(idlehandoff.usage_of(path).ttl, 3600)
-
-    def test_直近が読み取りだけなら遡って書き込みの種類を見る(self):
-        path = self.transcript(assistant(1000, short=10), assistant(2000))
-
-        self.assertEqual(idlehandoff.usage_of(path).ttl, 300)
-
-    def test_読めないトランスクリプトは大きさを返さない(self):
-        self.assertIsNone(idlehandoff.usage_of(os.path.join(self.dir, "none.jsonl")))
-        self.assertIsNone(idlehandoff.usage_of(""))
-        self.assertIsNone(idlehandoff.usage_of(self.transcript("not json", "{}")))
-
-
-class UsageEdgeTest(Fixture):
-    def test_末尾に巨大な行が続いても直前の応答の大きさを読む(self):
-        big = json.dumps({"type": "user", "message": {"content": "x" * (1_100_000)}})
-        path = self.transcript(assistant(500_000, long=10), big)
-
-        self.assertEqual(idlehandoff.usage_of(path).tokens, 500_000)
-
-    def test_使用量が全部0の行は飛ばす(self):
-        empty = json.dumps({"type": "assistant", "message": {"usage": {"input_tokens": 0}}})
-        path = self.transcript(assistant(300_000, long=10), empty)
-
-        self.assertEqual(idlehandoff.usage_of(path).tokens, 300_000)
-
-
-class SettingTest(unittest.TestCase):
-    def test_閾値の読み方(self):
-        self.assertEqual(idlehandoff.threshold(""), 400000)
-        self.assertEqual(idlehandoff.threshold("123000"), 123000)
-        self.assertEqual(idlehandoff.threshold("0"), 0)
-        self.assertEqual(idlehandoff.threshold("-5"), 0)
-        self.assertEqual(idlehandoff.threshold("abc"), 400000)
-
-    def test_待ち時間はキャッシュの保持時間の少し手前(self):
-        self.assertEqual(idlehandoff.wait_seconds(3600), 55 * 60)
-        self.assertEqual(idlehandoff.wait_seconds(300), 4 * 60)
-
-    def test_待ち時間は確かめ用に上書きできる(self):
-        self.assertEqual(idlehandoff.wait_seconds(3600, "2"), 2)
-        self.assertEqual(idlehandoff.wait_seconds(3600, "x"), 55 * 60)
-
-    def test_上付き数字や上限を超える値で落ちない(self):
-        self.assertEqual(idlehandoff.wait_seconds(3600, "\u00b2"), 55 * 60)
-        self.assertEqual(idlehandoff.wait_seconds(3600, "999999"), idlehandoff.MAX_WAIT)
-
-    def test_見ている人がいない実行を見分ける(self):
-        self.assertTrue(idlehandoff.unattended({"CLAUDE_CODE_SESSION_ATTENDED": "0"}))
-        self.assertTrue(idlehandoff.unattended({"CLAUDE_CODE_ENTRYPOINT": "sdk-cli"}))
-        self.assertFalse(idlehandoff.unattended({"CLAUDE_CODE_ENTRYPOINT": "cli"}))
-        self.assertFalse(idlehandoff.unattended({}))
-
-
-class FlowTest(Fixture):
-    big = idlehandoff.Usage(tokens=500_000, ttl=3600)
-
-    def begin(self, usage=None, limit=400_000):
-        return idlehandoff.start(self.state, SESSION, usage or self.big, limit)
-
-    def test_閾値に届かなければ始めない(self):
-        small = idlehandoff.Usage(tokens=399_999, ttl=3600)
-
-        self.assertIsNone(self.begin(small))
-
-    def test_閾値以上なら待機の指示を返す(self):
-        plan = self.begin()
-
-        self.assertEqual(plan.wait, 55 * 60)
-        self.assertTrue(plan.token)
-
-    def test_待ったあと入力が無ければ起こす指示を返す(self):
-        plan = self.begin()
-
-        text = idlehandoff.check(self.state, SESSION, plan.token, plan.wait)
-
-        self.assertIn(idlehandoff.MARKER, text)
-        self.assertIn("scratchpad/", text)
-
-    def test_待っている間にユーザが打てば起こさない(self):
-        plan = self.begin()
-
-        idlehandoff.reset(self.state, SESSION, "続きをお願いします")
-
-        self.assertIsNone(idlehandoff.check(self.state, SESSION, plan.token, plan.wait))
-
-    def test_起こすときの指示ではユーザが打ったことにしない(self):
-        plan = self.begin()
-
-        idlehandoff.reset(self.state, SESSION, idlehandoff.MARKER + " 書いてください")
-
-        self.assertIsNotNone(idlehandoff.check(self.state, SESSION, plan.token, plan.wait))
-
-    def test_目印は先頭にあるときだけ数える(self):
-        plan = self.begin()
-
-        idlehandoff.reset(self.state, SESSION, "この差分を見て: [idle-handoff] を含む実装")
-
-        self.assertIsNone(idlehandoff.check(self.state, SESSION, plan.token, plan.wait))
-
-    def test_待っている間に会話が小さくなっていたら起こさない(self):
-        big = self.transcript(assistant(500_000, long=10))
-        plan = idlehandoff.start(
-            self.state, SESSION, idlehandoff.usage_of(big), 400_000, transcript=big
-        )
-        # /compact のあと、同じ記録が小さな会話に書き換わる。
-        self.transcript(assistant(50_000, long=10))
-
-        text = idlehandoff.check(self.state, SESSION, plan.token, plan.wait, 400_000)
-
-        self.assertIsNone(text)
-
-    def test_バックグラウンド作業の完了通知ではユーザが打ったことにしない(self):
-        plan = self.begin()
-
-        idlehandoff.reset(self.state, SESSION, "<task-notification>", background=True)
-
-        self.assertIsNotNone(idlehandoff.check(self.state, SESSION, plan.token, plan.wait))
-
-    def test_古い待機は新しい待機に置き換わると起こさない(self):
-        old = self.begin()
-        new = self.begin()
-
-        self.assertIsNone(idlehandoff.check(self.state, SESSION, old.token, old.wait))
-        self.assertIsNotNone(idlehandoff.check(self.state, SESSION, new.token, new.wait))
-
-    def test_起こしたあとはユーザが打つまで待機を始めない(self):
-        plan = self.begin()
-        idlehandoff.check(self.state, SESSION, plan.token, plan.wait)
-
-        self.assertIsNone(self.begin())
-
-        idlehandoff.reset(self.state, SESSION, "続けます")
-        grown = idlehandoff.Usage(tokens=900_000, ttl=3600)
-        self.assertIsNotNone(self.begin(grown))
-
-    def test_起こしたあとは閾値のぶん育つまで促さない(self):
-        plan = self.begin()
-        idlehandoff.check(self.state, SESSION, plan.token, plan.wait)
-        idlehandoff.reset(self.state, SESSION, "続けます")
-
-        near = idlehandoff.Usage(tokens=899_999, ttl=3600)
-        far = idlehandoff.Usage(tokens=900_000, ttl=3600)
-
-        self.assertIsNone(self.begin(near))
-        self.assertIsNotNone(self.begin(far))
-
-    def test_会話が基準より小さくなったら基準を戻す(self):
-        plan = self.begin()
-        idlehandoff.check(self.state, SESSION, plan.token, plan.wait)
-        idlehandoff.reset(self.state, SESSION, "続けます")
-
-        # 基準は 500,000。会話が 100,000 に縮んだ（/compact のあと）なら基準は 0 に戻り、
-        # 次に 400,000 以上に育てば、また促す。
-        small = idlehandoff.Usage(tokens=100_000, ttl=3600)
-        regrown = idlehandoff.Usage(tokens=450_000, ttl=3600)
-
-        self.assertIsNone(self.begin(small))
-        self.assertIsNotNone(self.begin(regrown))
-
-    def test_使えない識別子では何もしない(self):
-        self.assertIsNone(idlehandoff.start(self.state, "../x", self.big, 400_000))
-        self.assertIsNone(idlehandoff.start(self.state, "", self.big, 400_000))
-
-    def test_0なら無効(self):
-        self.assertIsNone(self.begin(limit=0))
-
-
-class PruneTest(Fixture):
-    def test_知らせ済みの印は対の状態ファイルが新しい間は残す(self):
-        idlehandoff.start(self.state, SESSION, idlehandoff.Usage(500_000, 3600), 400_000)
-        idlehandoff.notice(self.state, SESSION, idlehandoff.Usage(500_000, 3600), 400_000)
-        folder = os.path.join(self.state, "idle")
-        old = os.path.getmtime(os.path.join(folder, SESSION + ".notice")) - 8 * 86400
-        os.utime(os.path.join(folder, SESSION + ".notice"), (old, old))
-
-        idlehandoff.prune(self.state)
-
-        self.assertIn(SESSION + ".notice", os.listdir(folder))
-
-    def test_古い状態ファイルは印と一緒に消す(self):
-        idlehandoff.start(self.state, SESSION, idlehandoff.Usage(500_000, 3600), 400_000)
-        idlehandoff.notice(self.state, SESSION, idlehandoff.Usage(500_000, 3600), 400_000)
-        folder = os.path.join(self.state, "idle")
-        for name in os.listdir(folder):
-            old = os.path.getmtime(os.path.join(folder, name)) - 8 * 86400
-            os.utime(os.path.join(folder, name), (old, old))
-
-        idlehandoff.prune(self.state)
-
-        self.assertEqual(os.listdir(folder), [])
-
-
-class NoticeTest(Fixture):
-    big = idlehandoff.Usage(tokens=500_000, ttl=3600)
-
-    def test_知らせは1セッションに1回(self):
-        first = idlehandoff.notice(self.state, SESSION, self.big, 400_000)
-        second = idlehandoff.notice(self.state, SESSION, self.big, 400_000)
-
-        self.assertTrue(first)
-        self.assertIsNone(second)
-
-    def test_知らせは料金の事情を知らない人にも分かる言葉で書く(self):
-        text = idlehandoff.notice(self.state, SESSION, self.big, 400_000)
-
-        for word in ("キャッシュ", "料金", "引き継ぎ", "60 分", "scratchpad/"):
-            self.assertIn(word, text)
-        self.assertIn("500,000", text)
-
-    def test_閾値に届かなければ知らせない(self):
-        small = idlehandoff.Usage(tokens=1000, ttl=3600)
-
-        self.assertIsNone(idlehandoff.notice(self.state, SESSION, small, 400_000))
-
-    def fire(self):
-        plan = idlehandoff.start(self.state, SESSION, self.big, 400_000)
-        return idlehandoff.check(self.state, SESSION, plan.token, 3300)
-
-    def test_引き継ぎを書かせた後は書かせたことを1回だけ知らせる(self):
-        self.fire()
-
-        first = idlehandoff.notice(self.state, SESSION, self.big, 400_000)
-        second = idlehandoff.notice(self.state, SESSION, self.big, 400_000)
-
-        self.assertIn("55 分放置されたため", first)
-        self.assertIn("scratchpad/", first)
-        self.assertIsNone(second)
-
-    def test_書かせた後の知らせは会話の大きさを読めなくても出る(self):
-        self.fire()
-
-        self.assertTrue(idlehandoff.notice(self.state, SESSION, None, 400_000))
-
-    def test_ユーザが打った後は書かせた後の知らせを出さない(self):
-        self.fire()
-        idlehandoff.reset(self.state, SESSION, "続けます")
-
-        self.assertIsNone(idlehandoff.notice(self.state, SESSION, self.big, 400_000))
-
-    def test_次に書かせたときも書かせたことを知らせる(self):
-        self.fire()
-        idlehandoff.notice(self.state, SESSION, self.big, 400_000)
-        idlehandoff.reset(self.state, SESSION, "続けます")
-        grown = idlehandoff.Usage(tokens=1_000_000, ttl=3600)
-        plan = idlehandoff.start(self.state, SESSION, grown, 400_000)
-        idlehandoff.check(self.state, SESSION, plan.token, 3300)
-
-        self.assertTrue(idlehandoff.notice(self.state, SESSION, grown, 400_000))
 
 
 class CliTest(Fixture):
@@ -357,7 +86,7 @@ class CliTest(Fixture):
         result = self.idle("check", "", None, SESSION, started["token"], "7")
 
         self.assertTrue(result.stdout.startswith("fire\n"), result.stdout)
-        self.assertIn(idlehandoff.MARKER, result.stdout)
+        self.assertIn(MARKER, result.stdout)
 
     def test_resetのあとのcheckは起こさない(self):
         started = dict(
