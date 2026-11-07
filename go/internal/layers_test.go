@@ -124,6 +124,20 @@ var subTiers = map[string]map[string]int{
 	"tickets/sync":     {"handoff": 0, "mirror": 0, "drafts": 1},
 	// 目録。1 つのツリーの索引（docindex）の上に、ツリーを合わせて引く docs が立つ。
 	"catalog": {"docindex": 0, "skills": 0, "docs": 1},
+	// hook の中。
+	"hook": {
+		// サブエージェントの種類・子の担当の案内の行・終わり方の記録と、その上に立つ起動の担当の決定
+		"agentkind": 0, "childnote": 0, "outcome": 0,
+		"launch": 1,
+		// 判定に達せないときの通し方・確認の前の発言の検査・ターン分離のゲート・シェルの書き込みの組み込みの検査
+		"failsafe": 0, "askcontext": 0, "turngate": 0, "shellguard": 0,
+		// PostToolUse の案内（ラッパーの呼び出しの読みを shellguard から借りる）
+		"hint": 1,
+		// 作業の決まり（CCNAVI.md）と付き添いの有無・Stop の判定役の見分け・実行後チェック
+		"ccnavimd": 0, "stopjudge": 0, "post": 0,
+		// 判定の文と理由コード（付き添いの有無を ccnavimd から読む）
+		"reasons": 1,
+	},
 }
 
 // importsOf は internal/ の下の各パッケージ（internal/ からの相対パス）と、それが読む internal/ のパッケージを返す。
