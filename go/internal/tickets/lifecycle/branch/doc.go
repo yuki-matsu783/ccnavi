@@ -8,7 +8,8 @@
 //   - `ccnavi tree base-bound`: 直接作業の取り込み先のブランチがチケットに結び付くか（BaseBound）
 //   - `ccnavi ticket next-id`: 直接作業のワークツリー名に付ける次の通し番号（RunNextID・SerialNames）
 //
-// 依頼文の式は Python の re と同じ答えが要る（後読みと Unicode の \s・\w）ので pyre で読む。
+// 置き場を探すツリーの根と名前の照合は integrate の TreeRoots・NamedFile を使う（Python も stop_integrate の
+// _tree_roots・_named_file を使う）。依頼文の式は Python の re と同じ答えが要る（後読みと Unicode の \s・\w）ので pyre で読む。
 //
 // Python からの対応: tickets/lifecycle の branchfind・base_bound・next_id をまとめた。branchfind: Ref・label →
 // Ref・Label、prompt_refs・prompt_context → PromptRefs・PromptContext、report → Report、names_number・

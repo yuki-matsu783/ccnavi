@@ -83,7 +83,9 @@ func Commit(t *testing.T, dir, message string) {
 }
 
 // Head はそのツリーの HEAD の sha。
-func Head(t *testing.T, dir string) string { return strings.TrimSpace(Git(t, dir, "rev-parse", "HEAD")) }
+func Head(t *testing.T, dir string) string {
+	return strings.TrimSpace(Git(t, dir, "rev-parse", "HEAD"))
+}
 
 func copyMessages(t *testing.T, root string) {
 	t.Helper()
