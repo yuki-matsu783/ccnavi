@@ -3,15 +3,15 @@
 // このまま（Keep）・直す（Fix）・issue に回す（Issue）を選び、置くものは手元に置き、投稿する下書き
 // （決めた内容のコメントと issue）は state の置き場に書いて sh が投稿する。下書きのファイル名・目印・
 // `--json` の形（版 Version）・ダイジェストの形は sh とボード（拡張の decidemodel.ts）との契約で、変えない。
-// 前提の検査は Gate の 1 か所にあり、本体と `--check` が同じものを通る。
+// 前提の検査は gate の 1 か所にあり、本体と `--check` が同じものを通る。
 //
 // Python からの対応: tickets/review/decide をこのパッケージにした。CHOICE_* → Choice の定数、CHOICES →
 // Choices、DECIDE_VERSION → Version、Decision → Decision（unresolved・extra → Unresolved・Extra）、
 // decision_digest → Digest、parse_digest → ParseDigest（答えは Shown）、changed_since_shown →
-// ChangedSinceShown、decision_json → JSON、decide_gate → Gate、check → Check、decide_preview → Preview、
+// ChangedSinceShown、decision_json → JSON、decide_gate → 私的な gate、check → Check、decide_preview → Preview、
 // decide_yes → Yes、choose → Choose、reviewed → Reviewed、apply_decision → 私的な apply、plain・span・defuse・
-// fence → Plain・Span・Defuse・Fence、thread_block → ThreadBlock、transcribe → Transcribe、issue_texts →
+// fence → 私的な plain・Span・私的な defuse・fence、thread_block → 私的な threadBlock、transcribe → Transcribe、issue_texts →
 // IssueTexts、decide_comment_text → CommentText、post_text → PostText（記録は *oplog.Record）、resume_plan →
-// ResumePlan、ISSUE_BODY_LIMIT → IssueBodyLimit、COPY_HEADING → CopyHeading。_thread_line は
+// ResumePlan、ISSUE_BODY_LIMIT → issueBodyLimit、COPY_HEADING → copyHeading。_thread_line は
 // request.ThreadLabel を直に使い、_decision_of の軽い入れ物は Decision をそのまま組む。
 package decide

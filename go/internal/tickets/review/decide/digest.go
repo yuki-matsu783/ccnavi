@@ -32,8 +32,8 @@ const Version = 2
 // digestPrefix はダイジェストの前置き。版 1 のダイジェスト（64 桁の 16 進）と見分ける。
 const digestPrefix = "v2."
 
-// Target は決める材料のうち指摘の一覧以外（親・フェーズ・MR）の欄の名前。食い違いの一覧に出る。
-const Target = "target"
+// target は決める材料のうち指摘の一覧以外（親・フェーズ・MR）の欄の名前。食い違いの一覧に出る。
+const target = "target"
 
 // Decision は残った指摘を決める前の、見せる材料。見せる（Preview）と適用が同じものから組む。Result の MR は
 // nil でない。Extra は見せたあとに追加された未解決の指摘で、今回の判断の対象ではなく未対応として残す。
@@ -130,12 +130,12 @@ func ParseDigest(text string) (Shown, bool) {
 	return shown, true
 }
 
-// ChangedSinceShown は見せた材料と今の材料の食い違い。基礎が違えば Target、見せた指摘のうち無くなった・
+// ChangedSinceShown は見せた材料と今の材料の食い違い。基礎が違えば target、見せた指摘のうち無くなった・
 // 解決済みになった・本文や位置が変わったものはそのキー。見せたあとに追加された指摘は数えない。
 func ChangedSinceShown(d *Decision, shown Shown) []string {
 	var out []string
 	if shown.Base != baseDigest(d) {
-		out = append(out, Target)
+		out = append(out, target)
 	}
 	now := versionsOf(d.Unresolved)
 	for _, key := range shown.Keys {

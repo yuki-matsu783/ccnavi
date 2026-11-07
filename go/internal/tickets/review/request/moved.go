@@ -46,9 +46,9 @@ const (
 // shaForm は依頼のマーカーに記録された HEAD の形。
 var shaForm = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
 
-// IsSHA はマーカーの head が sha の形をしているか。マーカーは親のブランチに乗って他の機械から届くので、
+// isSHA はマーカーの head が sha の形をしているか。マーカーは親のブランチに乗って他の機械から届くので、
 // 中身を git の revision としてそのまま渡さない（`HEAD` や `@` は差分を空にし、`-` で始まる値はオプションになる）。
-func IsSHA(value string) bool {
+func isSHA(value string) bool {
 	// Python の re の `$` は末尾の改行 1 つの前でも当たる。
 	return shaForm.MatchString(strings.TrimSuffix(value, "\n"))
 }
@@ -71,7 +71,7 @@ func MovedDetail(conf *config.Settings, requested *pyjson.Object, head string, c
 		return Moved{}
 	}
 	moved := fmt.Sprintf(msgHeadMoved, pyfmt.Head(recorded, shortSHA), pyfmt.Head(head, shortSHA))
-	if !IsSHA(recorded) || !listed {
+	if !isSHA(recorded) || !listed {
 		return Moved{moved, KindMoved}
 	}
 	seen := seenPaths(conf, changed)
@@ -99,7 +99,7 @@ func seenPaths(conf *config.Settings, paths []string) []string {
 // HEAD が push されていなければ止める（ユーザがマージで見るのはリモートの HEAD）。push の判定も置き場を
 // 数えない。
 func MovedInTree(conf *config.Settings, treeRoot string, requested *pyjson.Object, project bool) Moved {
-	code, out := git.Output(treeRoot, []string{"rev-parse", "HEAD"}, git.Options{Timeout: Timeout})
+	code, out := git.Output(treeRoot, []string{"rev-parse", "HEAD"}, git.Options{Timeout: gitTimeout})
 	head := strings.TrimSpace(out)
 	if code != 0 {
 		return Moved{Text: msgHeadUnread}
@@ -107,7 +107,7 @@ func MovedInTree(conf *config.Settings, treeRoot string, requested *pyjson.Objec
 	recorded := markText(requested, "head")
 	var paths []string
 	listed := false
-	if recorded != "" && head != recorded && IsSHA(recorded) {
+	if recorded != "" && head != recorded && isSHA(recorded) {
 		found, failed := treegate.DiffPaths(treeRoot, recorded)
 		paths, listed = found, failed == ""
 	}

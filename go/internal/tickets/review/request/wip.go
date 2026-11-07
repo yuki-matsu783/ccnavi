@@ -35,10 +35,10 @@ const (
 	namedLimit      = 10
 )
 
-// WipTracked は途中の作業の置き場（wip）の下で追跡されているファイル（git の表記）。読めなければ ok が偽。
+// wipTracked は途中の作業の置き場（wip）の下で追跡されているファイル（git の表記）。読めなければ ok が偽。
 // 大文字小文字を区別せずに見る（区別しない FS で `WIP/` を先に作ると、範囲の判定は通すのに git には `WIP/…` で
 // 入る）。名前に `\` を含む 1 ファイル（`wip\x`）も下と見なす。pathspec に頼らず -z で全部を読んで絞る。
-func WipTracked(treeRoot string) ([]string, bool) {
+func wipTracked(treeRoot string) ([]string, bool) {
 	return wipFiles(treeRoot, "ls-files", "-z")
 }
 
@@ -47,7 +47,7 @@ func wipUntracked(treeRoot string) ([]string, bool) {
 }
 
 func wipFiles(treeRoot string, args ...string) ([]string, bool) {
-	code, out := git.Output(treeRoot, args, git.Options{Timeout: Timeout})
+	code, out := git.Output(treeRoot, args, git.Options{Timeout: gitTimeout})
 	if code != 0 {
 		return nil, false
 	}
@@ -102,7 +102,7 @@ func MergeProblems(conf *config.Settings, root, treeRoot string) []string {
 	}
 	wip := place.WipRoot
 	var problems []string
-	if tracked, ok := WipTracked(treeRoot); !ok {
+	if tracked, ok := wipTracked(treeRoot); !ok {
 		problems = append(problems, fmt.Sprintf(msgTrackedUnread, wip))
 	} else if bad := odd(treeRoot, tracked); len(bad) > 0 {
 		// 退避より前に止める（RemoveWip も同じ確かめをするが、そこでは退避が済んでいる）。
@@ -138,7 +138,7 @@ func MergeProblems(conf *config.Settings, root, treeRoot string) []string {
 // 1 本でもツリーの外へ出るものがあれば何も消さない（途中のディレクトリがリンクに置き換わっていると、リンクの
 // 先を消す）。空になったディレクトリは下から消す（git は空のディレクトリを持たない）。
 func RemoveWip(treeRoot string) ([]string, string, string) {
-	names, ok := WipTracked(treeRoot)
+	names, ok := wipTracked(treeRoot)
 	if !ok {
 		return nil, "", fmt.Sprintf(msgTrackedUnread, place.WipRoot)
 	}
@@ -149,7 +149,7 @@ func RemoveWip(treeRoot string) ([]string, string, string) {
 		return nil, "", fmt.Sprintf(msgOddRemoved, named(bad))
 	}
 	head := ""
-	if code, out := git.Output(treeRoot, []string{"rev-parse", "HEAD"}, git.Options{Timeout: Timeout}); code == 0 {
+	if code, out := git.Output(treeRoot, []string{"rev-parse", "HEAD"}, git.Options{Timeout: gitTimeout}); code == 0 {
 		head = strings.TrimSpace(out)
 	}
 	var removed []string

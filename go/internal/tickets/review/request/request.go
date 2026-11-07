@@ -73,22 +73,22 @@ const (
 	msgMRUnreadable = "ccnavi: 警告: %s の frontmatter を読めず、`mr:` を保存できませんでした\n"
 )
 
-// Gated は Gate を通った依頼の材料。
-type Gated struct {
+// passed は gate を通った依頼の材料。
+type passed struct {
 	Parent   *ticket.Ticket
 	Phase    *phase.Phase
 	TreeRoot string
 	Body     string
 }
 
-// Gate は review-request の、ワークツリーの中で分かる前提の検査。本体（Prepare）と `prepare --check` が同じ
+// gate は review-request の、ワークツリーの中で分かる前提の検査。本体（Prepare）と `prepare --check` が同じ
 // ものを通る。断ったときは理由のあとに `次:` を 1 行足して nil。ホストの状態（マージリクエストの有無・向き先）
 // は見ない（sh が取ってくる）。
-func Gate(stderr io.Writer, conf *config.Settings, root, cwd string, number int, bodyFile string) (*Gated, error) {
+func gate(stderr io.Writer, conf *config.Settings, root, cwd string, number int, bodyFile string) *passed {
 	parent, p, ok := ParentPhase(stderr, conf, root, cwd, number)
 	if !ok {
 		refused(stderr, root, number)
-		return nil, nil
+		return nil
 	}
 	var unmet []string
 	if conf.State == "" {
@@ -120,9 +120,9 @@ func Gate(stderr io.Writer, conf *config.Settings, root, cwd string, number int,
 			fmt.Fprintf(stderr, "  - %s\n", line)
 		}
 		refused(stderr, root, number)
-		return nil, nil
+		return nil
 	}
-	return &Gated{Parent: parent, Phase: p, TreeRoot: treeRoot, Body: body}, nil
+	return &passed{Parent: parent, Phase: p, TreeRoot: treeRoot, Body: body}
 }
 
 // refused は断った理由のあとに、打ち直す 1 手を `次:` で足す。
@@ -130,22 +130,21 @@ func refused(stderr io.Writer, root string, number int) {
 	fmt.Fprintln(stderr, texts.Say(root, "NEXT_REVIEW_REQUEST_REFUSED", texts.Values{"phase": strconv.Itoa(number)}, nil))
 }
 
-// Check は `review prepare --check`。Gate を通すだけで何も書かない。sh が取り込みの前に呼ぶ。
-func Check(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, number int, bodyFile string) (int, error) {
-	gated, err := Gate(stderr, conf, root, cwd, number, bodyFile)
-	if gated == nil {
-		return config.ExitError, err
+// Check は `review prepare --check`。gate を通すだけで何も書かない。sh が取り込みの前に呼ぶ。
+func Check(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, number int, bodyFile string) int {
+	if gate(stderr, conf, root, cwd, number, bodyFile) == nil {
+		return config.ExitError
 	}
 	fmt.Fprint(stdout, msgCheckOK)
-	return config.ExitOK, nil
+	return config.ExitOK
 }
 
 // Prepare は前提を全部確かめ、投稿する本文を state の置き場に書き出す。標準出力の 1 行がその置き場。
 // マージリクエストは作らない（無ければ sh が止める）。
-func Prepare(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, number int, bodyFile string) (int, error) {
-	gated, err := Gate(stderr, conf, root, cwd, number, bodyFile)
+func Prepare(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, number int, bodyFile string) int {
+	gated := gate(stderr, conf, root, cwd, number, bodyFile)
 	if gated == nil {
-		return config.ExitError, err
+		return config.ExitError
 	}
 	// 計画があれば、このレビューが含むフェーズを機械が先頭に書く（延期した分を読み落とさないように）。
 	body := coveredHeader(conf, root, gated.Parent, gated.Phase) + gated.Body
@@ -162,10 +161,10 @@ func Prepare(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, 
 	path := requestPath(conf, gated.Parent.ID, number)
 	if failed := fsio.WriteText(path, marker+body+"\n"+ResolveNote+"\n", fsio.LF, fsio.Plain); failed != "" {
 		fmt.Fprintf(stderr, msgWriteFailed, failed)
-		return config.ExitError, nil
+		return config.ExitError
 	}
 	fmt.Fprintln(stdout, path)
-	return config.ExitOK, nil
+	return config.ExitOK
 }
 
 func requestPath(conf *config.Settings, parentID string, number int) string {
@@ -201,7 +200,7 @@ func Requested(stdout, stderr io.Writer, conf *config.Settings, root, cwd string
 		}
 		return config.ExitError, nil
 	}
-	_, head := git.Output(treeRoot, []string{"rev-parse", "HEAD"}, git.Options{Timeout: Timeout})
+	_, head := git.Output(treeRoot, []string{"rev-parse", "HEAD"}, git.Options{Timeout: gitTimeout})
 	home, err := approval.HomeDir(conf, root, parent.ID, "", parent.Project)
 	if err != nil {
 		return config.ExitError, err
@@ -321,11 +320,11 @@ func unmetIn(root, treeRoot string, conf *config.Settings, p *phase.Phase) []str
 			continue
 		}
 		short := pyfmt.Head(child.MergedSHA, shortSHA)
-		if code, _ := git.Output(treeRoot, []string{"merge-base", "--is-ancestor", child.MergedSHA, "HEAD"}, git.Options{Timeout: Timeout}); code != 0 {
+		if code, _ := git.Output(treeRoot, []string{"merge-base", "--is-ancestor", child.MergedSHA, "HEAD"}, git.Options{Timeout: gitTimeout}); code != 0 {
 			unmet = append(unmet, fmt.Sprintf(msgNotAncestor, child.ID, short))
 			continue
 		}
-		if late := closing.UnmergedFix(root, treeRoot, child, Timeout); late != "" {
+		if late := closing.UnmergedFix(root, treeRoot, child, gitTimeout); late != "" {
 			unmet = append(unmet, fmt.Sprintf(msgLateFix, child.ID, pyfmt.Head(late, shortSHA), short))
 		}
 	}
@@ -349,13 +348,13 @@ func alreadyRequested(conf *config.Settings, treeRoot string, p *phase.Phase, nu
 	if !ok {
 		return ""
 	}
-	code, head := git.Output(treeRoot, []string{"rev-parse", "HEAD"}, git.Options{Timeout: Timeout})
+	code, head := git.Output(treeRoot, []string{"rev-parse", "HEAD"}, git.Options{Timeout: gitTimeout})
 	recorded := markText(mark, "head")
 	if recorded == "" {
 		return ""
 	}
 	if code == 0 && strings.TrimSpace(head) != recorded {
-		if !IsSHA(recorded) {
+		if !isSHA(recorded) {
 			return ""
 		}
 		changed, failed := treegate.DiffPaths(treeRoot, recorded)

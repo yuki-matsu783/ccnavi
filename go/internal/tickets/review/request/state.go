@@ -25,8 +25,8 @@ import (
 	"ccnavi/internal/tickets/phase"
 )
 
-// Timeout は依頼と確認で git を読むときの待ち時間。ユーザが打つ操作なので Stop の促しより長い。
-const Timeout = 15 * time.Second
+// gitTimeout は依頼と確認で git を読むときの待ち時間。ユーザが打つ操作なので Stop の促しより長い。
+const gitTimeout = 15 * time.Second
 
 // ReviewScript はレビューの操作の sh。文面の案内に載せる。
 const ReviewScript = "ccnavi-review.sh"
@@ -63,8 +63,8 @@ const (
 
 // 子を done/ へ動かした経路（子の settled_by に書く）。
 const (
-	ByConfirm    = "confirm"
-	ByChrome     = "chrome"
+	byConfirm    = "confirm"
+	byChrome     = "chrome"
 	ByDecide     = "decide"
 	ByCloseEarly = "close-early"
 )
@@ -333,9 +333,9 @@ func movedLine(conf *config.Settings, moved []string) string {
 // settledByConfirm は confirm が子を動かした経路。Chrome のレビュー済みも同じコアを通るので、経路で見分ける。
 func settledByConfirm() string {
 	if via.Current() == via.Chrome {
-		return ByChrome
+		return byChrome
 	}
-	return ByConfirm
+	return byConfirm
 }
 
 // SettleAndMark はレビュー済みで書くもの（子を done/ へ、受け入れ台帳、レビュー済みのマーカー）を溜める段に

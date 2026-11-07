@@ -97,17 +97,17 @@ const (
 	appliedFollowup = "followup"
 )
 
-// Gated は Gate を通った材料（親・フェーズ・依頼のマーカー）。
-type Gated struct {
+// passed は gate を通った材料（親・フェーズ・依頼のマーカー）。
+type passed struct {
 	Parent    *ticket.Ticket
 	Phase     *phase.Phase
 	Requested *pyjson.Object
 }
 
-// Gate は decide の、ホストに聞かずに分かる前提の検査（親とフェーズがある・依頼の記録がある・依頼のあとに
+// gate は decide の、ホストに聞かずに分かる前提の検査（親とフェーズがある・依頼の記録がある・依頼のあとに
 // 見せたものが動いていない）。本体と Check が同じものを通る。断ったときは理由のあとに `次:` を 1 行足して nil。
 // ホストの状態（変更要求・未解決の指摘・ダイジェスト）は見ない（sh が取ってくる）。
-func Gate(stderr io.Writer, conf *config.Settings, root, cwd string, number int) *Gated {
+func gate(stderr io.Writer, conf *config.Settings, root, cwd string, number int) *passed {
 	parent, p, ok := request.ParentPhase(stderr, conf, root, cwd, number)
 	if !ok {
 		refused(stderr, root, number)
@@ -128,7 +128,7 @@ func Gate(stderr io.Writer, conf *config.Settings, root, cwd string, number int)
 		refused(stderr, root, number)
 		return nil
 	}
-	return &Gated{Parent: parent, Phase: p, Requested: mark}
+	return &passed{Parent: parent, Phase: p, Requested: mark}
 }
 
 // refused は断った理由のあとに、打ち直す 1 手を `次:` で足す。
@@ -184,7 +184,7 @@ func parseChoicesRaw(stderr io.Writer, choicesText, digest string) (Shown, *pyjs
 // Check は `--entry sh user reviewed N --check --accept-unresolved`。置く前に分かる前提だけを通す（読むだけ）。
 // 選択とダイジェストを渡されたときは、その形も Yes と同じ検査で検める。sh が取り込み・ロックの前に呼ぶ。
 func Check(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, number int, choicesText, digest string) int {
-	if Gate(stderr, conf, root, cwd, number) == nil {
+	if gate(stderr, conf, root, cwd, number) == nil {
 		return config.ExitError
 	}
 	if choicesText != "" || digest != "" {
@@ -200,7 +200,7 @@ func Check(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, nu
 // スレッドの id（`--accept-done`）。sh が返信と解決をしたあとの結果では解決済みだが、見せた指摘の一部として
 // 数え直す（見せたときと同じ並びでダイジェストを組み直し、見せたあとに変わっていないことを確かめるため）。
 func decision(stderr io.Writer, conf *config.Settings, root, cwd string, number int, resultPath string, carry []string) *Decision {
-	gated := Gate(stderr, conf, root, cwd, number)
+	gated := gate(stderr, conf, root, cwd, number)
 	if gated == nil {
 		return nil
 	}
