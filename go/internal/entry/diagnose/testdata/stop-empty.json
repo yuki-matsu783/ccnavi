@@ -1,0 +1,1 @@
+[{"code":0,"stdout":"verdict: skip\ntool: Stop\nnote: ターンの終わり。使われるのは共通レイヤーと自身のレイヤーの allow で、every が 2 以上のものだけ。渡す回にだけ止める\nrules: (使われるルールがありません。ターンの終わりには止めない)\n","stderr":""}]

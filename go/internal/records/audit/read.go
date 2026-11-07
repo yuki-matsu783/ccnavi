@@ -11,11 +11,11 @@ import (
 	"ccnavi/internal/infra/pyjson"
 )
 
-// ReadRecords は判定の記録 log とそのローテートした写し（同じ置き場の `<名前>.*<拡張子>`。名前は大文字小文字を
-// 区別しない）を名前順に読み、オブジェクトの行を返す。読めない行は飛ばす。recorded は 1 本でも開けたか。
-func ReadRecords(log string) (records []*pyjson.Object, recorded bool) {
+// LogFiles は判定の記録 log とそのローテートした写し（同じ置き場の `<名前>.*<拡張子>`。名前は大文字小文字を区別しない）
+// のうち、在るファイルを名前順に並べる。log 自身は最後。
+func LogFiles(log string) []string {
 	if log == "" {
-		return nil, false
+		return nil
 	}
 	base, ext := ospath.Splitext(log)
 	dir, stem := ospath.Dirname(base), ospath.Basename(base)
@@ -24,16 +24,23 @@ func ReadRecords(log string) (records []*pyjson.Object, recorded bool) {
 		head, tail := pathcase.Fold(stem+"."), pathcase.Fold(ext)
 		for _, name := range names {
 			folded := pathcase.Fold(name)
-			if len(folded) >= len(head)+len(tail) && strings.HasPrefix(folded, head) && strings.HasSuffix(folded, tail) {
-				paths = append(paths, ospath.Join(dir, name))
+			path := ospath.Join(dir, name)
+			if len(folded) >= len(head)+len(tail) && strings.HasPrefix(folded, head) && strings.HasSuffix(folded, tail) &&
+				ospath.IsFile(path) {
+				paths = append(paths, path)
 			}
 		}
 	}
 	sort.Strings(paths)
-	if !slices.Contains(paths, log) {
+	if !slices.Contains(paths, log) && ospath.IsFile(log) {
 		paths = append(paths, log)
 	}
-	for _, path := range paths {
+	return paths
+}
+
+// ReadRecords は LogFiles の記録を順に読み、オブジェクトの行を返す。読めない行は飛ばす。recorded は 1 本でも開けたか。
+func ReadRecords(log string) (records []*pyjson.Object, recorded bool) {
+	for _, path := range LogFiles(log) {
 		text, err := fsio.ReadDiskText(path, fsio.Replace)
 		if err != nil {
 			continue
