@@ -129,7 +129,7 @@ for c in json.load(sys.stdin):
     out.append({
         "shell": s.guard_shell_regex(c["root"], c["bin"], c["home"], common),
         "binary": s.binary_clause(c["bin"]),
-        "binaryCopy": s.binary_clause(c["bin"], copy=True),
+        "binaryCopy": s.binary_clause(c["bin"], s.Form.COPY),
         "rules": listed,
         "subjects": subjects,
         "hits": hits,

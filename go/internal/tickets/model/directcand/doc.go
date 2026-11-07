@@ -1,5 +1,5 @@
 // Package directcand は、Stop で `integrate` を促すための直接作業の「候補」の記録。直接作業のワークツリー
-// （`.claude/worktrees/<名前>`）に Write・Edit・NotebookEdit で書き込んだら、そのツリーをセッションごとの記録に
+// （`.claude/worktrees/<名前>`）に Write・Edit・MultiEdit・NotebookEdit で書き込んだら、そのツリーをセッションごとの記録に
 // 加える。Stop は cwd のツリーに加えて候補も調べるので、cwd がワークスペースルートのままでも、サブエージェントが
 // 書いたツリーでも促しが届く。候補は促す対象を絞る材料で、担当の証明ではない。登録では git を呼ばない
 // （確かめるのは Stop）。

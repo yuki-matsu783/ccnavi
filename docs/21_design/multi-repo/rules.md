@@ -10,7 +10,7 @@ keywords: [ルール, レイヤー, 合成, 共通レイヤー, ミラー, 単�
 
 ### 11.4 ルール
 
-パスを持つツール（Read / Grep / Glob / Write / Edit / NotebookEdit）は共通レイヤー + 行き先のレイヤーの和。行き先は解いた先のパスで、
+パスを持つツール（Read / Grep / Glob / Write / Edit / MultiEdit / NotebookEdit）は共通レイヤー + 行き先のレイヤーの和。行き先は解いた先のパスで、
 Grep と Glob が探す場所を省いたときは `cwd`。行き先がプロジェクトに属するならその git プロジェクトルートの `.ccnavi/config/project/rules.yml`、
 ワークスペースのツリー（ワークスペースルートと、そこから切ったワークツリー）なら `<ワークスペースルート>/.ccnavi/config/project/rules.yml` を足す。
 ルールは解いた先の絶対パスに適用するので、プロジェクトのルールに `*/schema/*` と書けば、元リポジトリでもそこから切ったワークツリーでもヒットする。

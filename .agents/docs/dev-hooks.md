@@ -13,8 +13,8 @@ ccnavi のリポジトリ自身の開発に使う hook は `.claude/hooks/` に�
 
 | hook | 契機 | 役割 | `.claude/settings.json` |
 |---|---|---|---|
-| `lint-py.sh` | `PostToolUse`（`Write\|Edit\|NotebookEdit`） | 編集した Python のファイルの整形と検査 | 登録済み |
-| `check-adr.sh` | `PostToolUse`（`Write\|Edit\|NotebookEdit`） | ADR の番号の重なりと置き場の間違いを、書いた直後に止める | 登録済み |
+| `lint-py.sh` | `PostToolUse`（`Write\|Edit\|MultiEdit\|NotebookEdit`） | 編集した Python のファイルの整形と検査 | 登録済み |
+| `check-adr.sh` | `PostToolUse`（`Write\|Edit\|MultiEdit\|NotebookEdit`） | ADR の番号の重なりと置き場の間違いを、書いた直後に止める | 登録済み |
 | `test-py.sh` | `Stop` | ターンの終わりに、触ったツリーのテストを 1 回回す | 未登録 |
 | `mark-ext.sh` | `PostToolUse`（`Write\|Edit`） | 拡張のファイルを触ったことの書き残し | 未登録 |
 | `test-ext.sh` | `Stop` | ターンの終わりに、触った拡張のファイルに関わるテストのグループだけ回す | 未登録 |

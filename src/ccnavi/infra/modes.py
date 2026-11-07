@@ -138,7 +138,7 @@ def fail_closed(mode: str, tool: str | None = None, *, safe: bool = False) -> in
 
     - 空（payload が読めずツールが分からない）: 止める
     - 報告用のツール（`toolnames.REPORT_TOOLS`）: モードに関係なく通す
-    - Write・Edit・NotebookEdit・Agent・Task: dry-run でも止める
+    - Write・Edit・MultiEdit・NotebookEdit・Agent・Task: dry-run でも止める
     - Read・Grep・Glob・Bash・PowerShell: `safe` のときだけ通す。dry-run でも同じ
     - 知らないツール: enable は止め、dry-run は通す
     """
