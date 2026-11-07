@@ -10,11 +10,4 @@
 //
 // 想定外の失敗（組み込みのルールを組めない・ターン分離のゲートの宣言が不正・応答を書けない）は error で返す。入口は
 // 内部エラーの応答にする。panic は受けない。判定の途中で起きる panic は不具合であり、入口がまとめて受ける。
-//
-// Python からの対応: hook/judge。decide_before → Before、guard_setting_files → GuardSettingFiles（結果だけを返す GuardOutcomes も）、fail_streak_hint →
-// FailStreakHint、undeclared_verdict → UndeclaredVerdict、HANDOVER → Handover、PERMISSION_JUDGED・PERMISSION_NO_JUDGE →
-// PermissionJudged・PermissionNoJudge、DEADLINE_SECONDS → config.HookDeadline、subject_of・SUBJECT_FIELDS →
-// rules.SubjectOf・rules.SubjectFields。refuse・screen・ticket_verdict・project_mismatch・flow_lock・final_kind・
-// _rewrite_kind・ask_context_check・ask_subject・_write_pass と SHELL_GUARD_RULE_IDS・GATE_RULE_IDS・STRENGTH は私的にした。
-// ticket_verdict の注記（いつも空）は持たない。
 package judge

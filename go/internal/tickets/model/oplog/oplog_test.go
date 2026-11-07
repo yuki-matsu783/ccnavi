@@ -343,8 +343,8 @@ func TestReconcile(t *testing.T) {
 	}
 }
 
-// records/prune は操作記録の置き場と「送り終えた」の綴りを写して持つ（tickets を読めない）。写しが持ち主と
-// ずれると、送り終えていない記録を数え損ねる（Python は tests/core/test_prune.py が見ていた）。
+// records/prune は操作記録の置き場と「送り終えた」の綴りを写している（tickets を読めない）。写しが元と
+// ずれると、送り終えていない記録を数え損ねる（この写しのずれは、このテストが見る）。
 func TestPruneCountsUnsentRecords(t *testing.T) {
 	state := stateDir(t)
 	id := begin(t, state, Options{Stages: []StageSpec{{"note", StageComment}}})

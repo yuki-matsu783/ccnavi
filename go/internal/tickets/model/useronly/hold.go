@@ -36,7 +36,7 @@ var (
 	exemptCompanion = compile(`^(?:head|tail)(?:\s+-n?\s*\d+)?$|^cd\s+\S+$`, 0)
 	// forbiddenCommand はサブエージェントに許さない形。名前の大小は問わない（大小を区別しないファイルシステムでは
 	// 同じ sh が走る）。push を含めるのは、リモートの枝を送るのが親の仕事だから（サブエージェントが親のツリーへ
-	// cd して打てばラッパーは通すので、ここにも止めを持つ）。
+	// cd して打てばラッパーは通すので、ここにも止める処理を置く）。
 	forbiddenCommand = compile(subagentForbiddenForms(), pyre.IgnoreCase)
 )
 

@@ -20,7 +20,8 @@ import (
 	"ccnavi/internal/tickets/review/request"
 )
 
-// issueBodyLimit は、issue の本文の字数の上限（符号位置で数える）である。GitHub の上限は 65,536 字である。拡張が 1 回に書く本文は 60,000 字までなので、そこに操作 ID の印の行（約 80 字）を足す分として、余裕を 1,000 字見る。超えたら、目次と続きのコメントに分ける。
+// issueBodyLimit は、issue の本文の字数の上限（符号位置で数える）である。GitHub の上限は 65,536 字である。
+// 拡張が 1 回に書く本文は 60,000 字までなので、そこに操作 ID の印の行（約 80 字）を足す分として、余裕を 1,000 字見る。超えたら、目次と続きのコメントに分ける。
 const issueBodyLimit = 59000
 
 // copyHeading は転記した指摘の見出し。転記した本文が ccnavi への指示に読まれないように断る。
@@ -83,7 +84,7 @@ func Span(text string) string {
 	return "`" + strings.ReplaceAll(plain(text), "`", "") + "`"
 }
 
-// markerOpen は本文の中の ccnavi の目印（`<!-- ccnavi:`）。Python の re の \s と大文字小文字の畳み方で当てる。
+// markerOpen は本文の中の ccnavi の目印（`<!-- ccnavi:`）。空白は Unicode の \s、大文字小文字は畳んで当てる（pyre の読み方）。
 var markerOpen = sync.OnceValue(func() *pyre.Regexp {
 	re, _ := pyre.Compile(`<!--(?P<rest>\s*ccnavi:)`, pyre.IgnoreCase)
 	return re
@@ -160,7 +161,8 @@ func Transcribe(d *Decision, threads []host.Thread, opID string) []string {
 
 func chars(s string) int { return utf8.RuneCountInString(s) }
 
-// IssueTexts は、issue の下書きの本文（1 行目がタイトル、空行のあとが本文）と、続きのコメントの本文を返す。本文が上限（issueBodyLimit）に収まらないときは、本文には目次（キーと版）だけを置く。全文は続きのコメントに分けて載せる。手元の state を指すだけの形にはしない。
+// IssueTexts は、issue の下書きの本文（1 行目がタイトル、空行のあとが本文）と、続きのコメントの本文を返す。本文が上限（issueBodyLimit）に収まらないときは、本文には目次（キーと版）だけを置く。
+// 全文は続きのコメントに分けて載せる。手元の state を指すだけの形にはしない。
 func IssueTexts(d *Decision, threads []host.Thread, opID string) (string, []string) {
 	head := []string{
 		fmt.Sprintf(issueTitle, d.Parent.ID, d.Phase.Number), "",
@@ -292,7 +294,8 @@ func keyList(threads []host.Thread) []string {
 	return out
 }
 
-// CommentText は、MR に書き込む、決めた内容のコメントの本文を返す。issue の表記は、作ったあとに書き足す。投稿者はエージェントと同じアカウントになる。そこで、ユーザの判断であることと、経路とアカウントを本文に書く。後からホストの記録だけで、誰が判断したかを読めるようにするためである。
+// CommentText は、MR に書き込む、決めた内容のコメントの本文を返す。issue の表記は、作ったあとに書き足す。投稿者はエージェントと同じアカウントになる。
+// そこで、ユーザの判断であることと、経路とアカウントを本文に書く。後からホストの記録だけで、誰が判断したかを読めるようにするため。
 func CommentText(d *Decision, picked map[Choice][]host.Thread, followup string) string {
 	by := decidedByLine()
 	if !anyPicked(picked) {
@@ -354,7 +357,7 @@ func decidedPrompt(root string, d *Decision, picked map[Choice][]host.Thread, fo
 	return fmt.Sprintf(promptDone, head, d.Phase.Number, status)
 }
 
-// recordText は記録の欄を Python の str(row.get(key) or "") と同じに読む。
+// recordText は記録の欄を文字列で読む。値が無い・偽（空・0 など）なら空。
 func recordText(o *pyjson.Object, key string) string {
 	v := o.Value(key)
 	if !pyfmt.Truthy(v) {
@@ -405,7 +408,7 @@ func PostText(r *oplog.Record, stageID string) (string, bool) {
 		if err != nil {
 			return "", false
 		}
-		// Python の parts[n - 1]（負の番号は後ろから数える）。
+		// 番号は 1 始まり。負になる番号は後ろから数える（-1 が最後）。
 		i := n - 1
 		if i < 0 {
 			i += len(parts)

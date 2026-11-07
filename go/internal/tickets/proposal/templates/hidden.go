@@ -68,7 +68,7 @@ func Reveal(text string) string {
 	return b.String()
 }
 
-// strs は入れ子の中の文字列（キーも）を全部。集合は辿らない（Python の _strings と同じ）。
+// strs は入れ子の中の文字列（キーも）を全部。集合は辿らない。
 func strs(v any, out []string) []string {
 	switch x := v.(type) {
 	case string:
@@ -90,7 +90,7 @@ func strs(v any, out []string) []string {
 	return out
 }
 
-// line は空白をつぶして 1 行にする（Python の " ".join(str(v).split())）。
+// line は空白をつぶして 1 行にする（連続する空白は 1 つにそろえる）。
 func line(v any) string {
 	return ospath.Squeeze(pyfmt.Str(v))
 }

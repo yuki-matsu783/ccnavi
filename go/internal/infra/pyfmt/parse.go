@@ -74,6 +74,7 @@ func ParseBigInt(text string, base int) (*big.Int, error) {
 	invalid := func() error {
 		return fmt.Errorf("invalid literal for int() with base %d: %s", base, Head(Quote(text), 200))
 	}
+	// 1. 空白と全角数字を ASCII にそろえ、符号と基数の接頭辞（0b・0o・0x）を外す。
 	s, ok := asciiNumber(text)
 	if !ok {
 		return nil, invalid()
@@ -89,6 +90,7 @@ func ParseBigInt(text string, base int) (*big.Int, error) {
 			s, prefixed = s[2:], true
 		}
 	}
+	// value は 1 字の数字の値。数字でない字は 99（どの基数でも超える）。
 	value := func(ch byte) int {
 		switch {
 		case ch >= '0' && ch <= '9':
@@ -100,6 +102,8 @@ func ParseBigInt(text string, base int) (*big.Int, error) {
 		}
 		return 99
 	}
+	// 2. 数字を集める。"_" は数字の間（接頭辞の直後を含む）に 1 つだけ置け、先頭・末尾・連続は読めない。
+	// 10 進で桁が MaxIntDigits を超えるときは、読めない綴りより先に桁の上限の誤りにする。
 	var digits strings.Builder
 	count := 0
 	for i := 0; i < len(s); i++ {

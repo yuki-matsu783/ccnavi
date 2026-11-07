@@ -173,6 +173,7 @@ func order(ids []string, kinds map[string]string, out map[string][]*yaml.Map) []
 // 文は textLimit 文字まで（ChildTextLimit を渡すのがふつう）。
 func Render(raw any, textLimit int) ([]string, map[string]bool) {
 	data := asMap(raw)
+	// 1. 手順のノードを集める。同じ id が重なれば最初のものだけ。
 	var nodes []*yaml.Map
 	seenIDs := map[string]bool{}
 	for _, n := range mapsIn(data.Get("nodes")) {
@@ -185,6 +186,7 @@ func Render(raw any, textLimit int) ([]string, map[string]bool) {
 			nodes = append(nodes, n)
 		}
 	}
+	// 2. 線を出る側ごとに束ね、出口の順（portLess）に並べる。
 	flows := map[string]*yaml.Map{}
 	for _, f := range mapsIn(data.Get("subAgentFlows")) {
 		if id := textOf(f.Get("id")); id != "" {
@@ -208,6 +210,7 @@ func Render(raw any, textLimit int) ([]string, map[string]bool) {
 	for _, edges := range out {
 		sort.SliceStable(edges, func(i, j int) bool { return portLess(edges[i], edges[j]) })
 	}
+	// 3. 手順の順に並べ、番号を振る。
 	ordered := order(ids, kindsBy, out)
 	number := map[string]int{}
 	for i, id := range ordered {
@@ -217,6 +220,7 @@ func Render(raw any, textLimit int) ([]string, map[string]bool) {
 	for _, k := range kindsBy {
 		kinds[k] = true
 	}
+	// 4. 1 ノード 1 行に組む。次の番号は、番号を振ったノードへの線だけ（グループへの線は出さない）。長さが上限を超えたら、そこで打ち切る。
 	var lines []string
 	used, shown := 0, 0
 	for _, id := range head(ordered, renderLimit) {
@@ -264,6 +268,7 @@ func Render(raw any, textLimit int) ([]string, map[string]bool) {
 		used += size
 		shown++
 	}
+	// 打ち切った分は件数だけ言い、続きはファイルを読ませる。
 	if len(ordered) > shown {
 		lines = append(lines, "…ほか "+strconv.Itoa(len(ordered)-shown)+" 件。続きはファイルを読んでください")
 	}

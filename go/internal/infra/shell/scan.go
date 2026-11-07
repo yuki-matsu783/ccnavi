@@ -19,8 +19,8 @@ const (
 	formTooDeep           = "$( ) nested more than 16 deep"
 )
 
-// maxScanFrames は走査の入れ子の上限。Python の実装は再帰の上限（1000 フレーム）に当たると深すぎる
-// 入れ子として縮退していたので、同じ深さで止める。値は Python で測った境目に合わせてある。
+// maxScanFrames は走査の入れ子の上限。この深さを超える入れ子は、深すぎる入れ子として縮退
+// （Degraded）にする。再帰の上限（1000 フレーム）に近い値で、止める深さを機械によらず固定する。
 const maxScanFrames = 995
 
 // placeholder は切り出した中身の代わりに外側へ残す 1 文字。外側の語の数と形を保つ
@@ -140,6 +140,8 @@ func fold(text string) string {
 }
 
 // command は引用の外を読む。closing なら `$( )` の中で、対になる `)` の手前で戻る。
+// 特別な字（commandStop）までは一括で出力へ回し、特別な字に当たったら種類ごとの読みに渡す。
+// wordStart は「いま語の頭か」で、`case` の枝の `)` と閉じの `)` を見分けるのに使う。
 func (x *scanner) command(collect, closing bool) error {
 	if err := x.enter(); err != nil {
 		return err

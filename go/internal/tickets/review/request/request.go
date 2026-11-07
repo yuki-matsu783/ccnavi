@@ -28,7 +28,8 @@ import (
 	"ccnavi/internal/tickets/phase"
 )
 
-// ResolveNote は、依頼の本文の末尾（HandoffNote のあと）と、fix を選んだあとの文に足す 1 文である。fix で直した指摘のスレッドは、ホストの上で未解決のまま残る。これは仕様である。解決するのはユーザであり、エージェントは fix を理由に解決しない。依頼の目印のキーは、この文を足す前の本文から作る。足す前に投稿した依頼を打ち直しても、二重に投稿しないためである。
+// ResolveNote は、依頼の本文の末尾（HandoffNote のあと）と、fix を選んだあとの文に足す 1 文である。fix で直した指摘のスレッドは、ホストの上で未解決のまま残る。これは仕様である。
+// 解決するのはユーザであり、エージェントは fix を理由に解決しない。依頼の目印のキーは、この文を足す前の本文から作る。足す前に投稿した依頼を打ち直しても、二重に投稿しないため。
 const ResolveNote = "修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。" +
 	"エージェントは fix を理由に resolve しない。"
 
@@ -78,13 +79,16 @@ type passed struct {
 	body     string
 }
 
-// gate は review-request の、ワークツリーの中で分かる前提の検査である。本体（Prepare）と `prepare --check` が同じものを通る。断ったときは、理由のあとに `次:` を 1 行足して nil を返す。ホストの状態（マージリクエストの有無や向き先）は見ない。sh が取ってくるからである。
+// gate は review-request の、ワークツリーの中で分かる前提の検査。本体（Prepare）と `prepare --check` が同じものを通る。
+// 断ったときは、理由のあとに `次:` を 1 行足して nil を返す。ホストの状態（マージリクエストの有無や向き先）は
+// 見ない。sh が取ってくるため。
 func gate(stderr io.Writer, conf *config.Settings, root, cwd string, number int, bodyFile string) *passed {
 	parent, p, ok := ParentPhase(stderr, conf, root, cwd, number)
 	if !ok {
 		refused(stderr, root, number)
 		return nil
 	}
+	// 満たしていない前提を全部集めてから、件数付きでまとめて言う（1 つ直すたびに次が出る往復を避ける）。
 	var unmet []string
 	if conf.State == "" {
 		unmet = append(unmet, msgNoState)
@@ -99,9 +103,11 @@ func gate(stderr io.Writer, conf *config.Settings, root, cwd string, number int,
 	if ospath.Strip(body) == "" {
 		unmet = append(unmet, msgBodyEmpty)
 	}
+	// 依頼済み（レビュー済みを含む）で出し直せないときは断る。出し直せる条件は alreadyRequested にある。
 	if already := alreadyRequested(conf, treeRoot, p, number); already != "" {
 		unmet = append(unmet, already)
 	}
+	// 延期されたフェーズは、ここでは依頼できない。
 	if p.Deferred() {
 		at := "None"
 		if n, ok := p.ReviewAt(); ok {
@@ -162,7 +168,9 @@ func requestPath(conf *config.Settings, parentID string, number int) string {
 	return ospath.Join(conf.State, fmt.Sprintf(requestFile, parentID, number))
 }
 
-// Requested は、投稿の結果を受けて依頼のマーカーを置く。次の場合は、置かずに止める。依頼済みで出し直せないとき、結果に投稿の url が無いとき、投稿の後に前提が崩れたとき（子の合流・未コミット・未 push）である。マーカーには、HEAD と投稿の情報（MR・url・ホスト・ホストの時刻・投稿者）を書く。投稿待ちの本文は消し、親の mr: に番号を書き足す。
+// Requested は、投稿の結果を受けて依頼のマーカーを置く。次の場合は、置かずに止める。
+// 依頼済みで出し直せないとき、結果に投稿の url が無いとき、投稿の後に前提が崩れたとき（子の合流・未コミット・未 push）である。マーカーには、HEAD と投稿の情報（MR・url・ホスト・ホストの時刻・投稿者）を書く。
+// 投稿待ちの本文は消し、親の mr: に番号を書き足す。
 func Requested(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, number int, resultPath string) (int, error) {
 	parent, p, ok := ParentPhase(stderr, conf, root, cwd, number)
 	if !ok {
@@ -282,7 +290,8 @@ func coveredHeader(conf *config.Settings, root string, parent *ticket.Ticket, p 
 	return head + "\n"
 }
 
-// unmetIn は、依頼の前提のうち、ワークツリーの中で分かるものを返す。子が親のブランチに合流したかは、finish が書いた merged_sha が親の HEAD の祖先かどうかで見る。子のブランチは見ない。子のブランチを消しても、別の PC で finish しても、結果は変わらないようにするためである。未追跡は数えない。依頼文をワークツリーに置く使い方は普通にあり、未追跡のものはマージリクエストに載らないからである。
+// unmetIn は、依頼の前提のうち、ワークツリーの中で分かるものを返す。子が親のブランチに合流したかは、finish が書いた merged_sha が親の HEAD の祖先かどうかで見る。子のブランチは見ない。
+// 子のブランチを消しても、別の PC で finish しても、結果は変わらないようにするため。未追跡は数えない。依頼文をワークツリーに置く使い方は普通にあり、未追跡のものはマージリクエストに載らないため。
 func unmetIn(root, treeRoot string, conf *config.Settings, p *phase.Phase) []string {
 	var unmet []string
 	if !p.Ended() {
@@ -312,9 +321,11 @@ func unmetIn(root, treeRoot string, conf *config.Settings, p *phase.Phase) []str
 	return unmet
 }
 
-// alreadyRequested は、依頼済みで出し直せないなら、その説明を返す。未依頼か出し直せるなら空を返す。
+// alreadyRequested は、依頼済みで出し直せないなら、その説明を返す。未依頼か出し直せるなら空。
 //
-// 出し直せるのは、依頼の後にユーザが見るものが動き、まだレビュー済みになっていないときだけである。confirm が止まるので、ここも止めると打てる手が無くなるからである。ccnavi 自身の置き場だけが動いた形では confirm は止まらない。そのため、出し直させると依頼のコメントが増えるだけになる。レビュー済みは、依頼の有無より先に見る。close-early は、依頼していないフェーズにもレビュー済みを置くからである。
+// 出し直せるのは、依頼の後にユーザが見るものが動き、まだレビュー済みになっていないときだけである。confirm が止まるので、ここも止めると打てる手が無くなるため。
+// ccnavi 自身の置き場だけが動いた形では confirm は止まらない。そのため、出し直させると依頼のコメントが増えるだけになる。レビュー済みは、依頼の有無より先に見る。
+// close-early は、依頼していないフェーズにもレビュー済みを置くため。
 func alreadyRequested(conf *config.Settings, treeRoot string, p *phase.Phase, number int) string {
 	if _, ok := p.Marks[marks.Reviewed]; ok {
 		return fmt.Sprintf(msgReviewedPhase, number)

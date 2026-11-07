@@ -59,7 +59,7 @@ func (l limit) read() (float64, string) {
 	return value, ""
 }
 
-// g は Python の format(x, "g")。
+// g は printf の %g 相当（有効桁 6 で、余分な 0 を落とす）。
 func g(x float64) string { return strconv.FormatFloat(x, 'g', 6, 64) }
 
 // days は日数を長さにする。表せないほど長ければ上限にする（何も消さない）。

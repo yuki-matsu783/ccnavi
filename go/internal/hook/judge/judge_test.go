@@ -302,15 +302,15 @@ func randomCases(n int) []judgeCase {
 }
 
 // 決めた payload と環境で、標準出力・終了コード・標準エラー・記録の 1 行が見本と同じになる。
-func TestBeforeMatchesPython(t *testing.T) {
+func TestBeforeMatchesGolden(t *testing.T) {
 	if testing.Short() {
 		t.Skip("大きな表は -short では回さない")
 	}
 	checkCases(t, workspace, slices.Concat(handCases(), randomCases(400)))
 }
 
-// Python のテストの表から集めた payload（testdata/captured.jsonl）でも見本と同じになる。
-func TestBeforeMatchesPythonOnCapturedCalls(t *testing.T) {
+// 表から集めた payload（testdata/captured.jsonl）でも見本と同じになる。
+func TestBeforeMatchesGoldenOnCapturedCalls(t *testing.T) {
 	if testing.Short() {
 		t.Skip("大きな表は -short では回さない")
 	}

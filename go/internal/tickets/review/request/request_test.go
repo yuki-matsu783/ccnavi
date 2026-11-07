@@ -81,7 +81,7 @@ func TestMatchingProblems(t *testing.T) {
 		got[0] != "ccnavi: 依頼したホスト（gitlab）と結果のホスト（github）が違う" {
 		t.Errorf("違うホスト: %v", got)
 	}
-	// 小数の 7.0 は Python の str で "7.0" になり、7 と合わない。
+	// 小数の 7.0 は文字列にすると "7.0" になり、7 と合わない。
 	if got := MatchingProblems(result, obj("host", "github", "mr", 7.0)); len(got) != 1 {
 		t.Errorf("7.0: %v", got)
 	}

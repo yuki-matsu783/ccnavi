@@ -151,7 +151,7 @@ func DenyReport(stateDir, session string, n int) string {
 	return strings.Join(append([]string{denyReportHead}, lines...), "\n")
 }
 
-// orText は Python の f"{v or fallback}"。
+// orText は v を文字にする。空の値のときは fallback。
 func orText(v any, fallback string) string {
 	if !pyfmt.Truthy(v) {
 		return fallback

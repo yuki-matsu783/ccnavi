@@ -208,15 +208,15 @@ func goResult(t *testing.T, root string) result {
 	return res
 }
 
-// レイヤーの重ね方・出所・記録・診断の見え方・守る対象を、Python の ruleload の答えの写し（testdata）と突き合わせる。
-func TestMatchesPython(t *testing.T) {
+// レイヤーの重ね方・出所・記録・診断の見え方・守る対象を、答えの見本（testdata）と突き合わせる。
+func TestMatchesGolden(t *testing.T) {
 	cases := slices.Clone(scenarios)
 	for i := range cases {
 		cases[i].Root = workspace(t, cases[i])
 	}
 	want := golden.Load[[]result](t, "ruleload")
 	if len(want) != len(cases) {
-		t.Fatalf("Python の答えが %d 件（%d 件のはず）", len(want), len(cases))
+		t.Fatalf("見本が %d 件（%d 件のはず）", len(want), len(cases))
 	}
 	for i, s := range cases {
 		got := goResult(t, s.Root)

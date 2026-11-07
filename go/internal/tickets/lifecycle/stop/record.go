@@ -39,7 +39,7 @@ func readNudges(stateDir, session string) *pyjson.Object {
 	return data
 }
 
-// seen は記録が key に value を持つか。
+// seen は記録の key が value か。
 func seen(data *pyjson.Object, key, value string) bool {
 	got, ok := data.Value(key).(string)
 	return ok && got == value

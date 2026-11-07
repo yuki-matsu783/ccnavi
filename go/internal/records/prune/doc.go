@@ -16,7 +16,4 @@
 // しきい値は環境変数で動かせる。0 はその段を止める。読めない値・有限でない値・0 より大きく下限より小さい値は
 // 既定で動き、報告に出す（下限が無いと、しきい値を 0 に近づけるだけで保持日数のうちの記録が消える）。
 // 置き場への道にリンクがあれば辿らずに報告する（リンクの先は ccnavi の置き場とは限らない）。
-//
-// Python からの対応: run → Run（now・dry_run は Options）、summary → Summary、lines → Lines、
-// Report の rotated → rotated（From・To）、kept_ops → KeptOps。
 package prune

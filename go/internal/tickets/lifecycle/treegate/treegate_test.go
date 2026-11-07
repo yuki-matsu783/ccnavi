@@ -15,14 +15,14 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// pythonOps は Python の treegate にもある操作。Reviewed は Python では request が unpushed を直に読んでいた。
-var pythonOps = []Op{ApprovalRequest, Finish, ReviewRequest, Ready}
+// goldenOps は記録した答え（testdata/treegate.json）に載る操作。Reviewed は記録に載せない。
+var goldenOps = []Op{ApprovalRequest, Finish, ReviewRequest, Ready}
 
-var ops = append(slices.Clone(pythonOps), Reviewed)
+var ops = append(slices.Clone(goldenOps), Reviewed)
 
 const placeFile = "wip/proposals/todo/i0001.md"
 
-// parentTree は bare のリモートを持つ親のツリー（main を push 済み）。
+// parentTree は bare のリモートがある親のツリー（main を push 済み）。
 func parentTree(t *testing.T) string {
 	t.Helper()
 	root := testkit.ShapedWorkspace(t)
@@ -52,7 +52,7 @@ func commitFile(t *testing.T, dir, rel string) {
 	testkit.Commit(t, dir, "x")
 }
 
-// 宣言した操作の全部で、条件ごとに止める・通すが宣言どおりか（Python の tests/core/test_treegate.py）。
+// 宣言した操作の全部で、条件ごとに止める・通すが宣言どおりか。
 func TestWatches(t *testing.T) {
 	conf := &config.Settings{}
 	cases := []struct {
@@ -122,7 +122,7 @@ func TestInPlaceFoldsCase(t *testing.T) {
 	}
 }
 
-// ミラーのずれの文はずれ以外の件数を数え、大文字小文字を畳み、長い一覧を切る（Python の test_archive）。
+// ミラーのずれの文はずれ以外の件数を数え、大文字小文字を畳み、長い一覧を切る。
 func TestMirrorDriftText(t *testing.T) {
 	conf := &config.Settings{}
 	var drift []string
@@ -197,19 +197,19 @@ func optional(paths []string, ok bool) any {
 	return paths
 }
 
-// Python の treegate と同じツリーを読ませ、拒否の種類・文・次の一手・パス、未コミット・未 push・差分の読みが
-// 1 字も違わないことを見る。
-func TestMatchesPython(t *testing.T) {
+// 用意したツリーを読ませ、拒否の種類・文・次の一手・パス、未コミット・未 push・差分の読みが
+// 記録した答えと 1 字も違わないことを見る。
+func TestMatchesGolden(t *testing.T) {
 	trees := oracleTrees(t)
 	opNames := []string{}
-	for _, op := range pythonOps {
+	for _, op := range goldenOps {
 		opNames = append(opNames, string(op))
 	}
 	want := golden.Load[[]map[string]any](t, "treegate")
 	conf := &config.Settings{}
 	for i, tree := range trees {
 		got := map[string]any{}
-		for _, op := range pythonOps {
+		for _, op := range goldenOps {
 			got[string(op)] = refusalsOf(Check(op, tree, conf, Options{}), tree)
 			got[string(op)+"+root"] = refusalsOf(Check(op, tree, conf, Options{Root: tree, PlainDirty: true}), tree)
 		}
@@ -228,7 +228,7 @@ func TestMatchesPython(t *testing.T) {
 		}
 		got["diff"] = diffs
 		if i >= len(want) {
-			t.Fatalf("Python の答えが %d 件しかない", len(want))
+			t.Fatalf("golden の答えが %d 件しかない", len(want))
 		}
 		if g, w := normalize(t, got), want[i]; !reflect.DeepEqual(g, w) {
 			keys := slices.Sorted(func(yield func(string) bool) {
@@ -240,7 +240,7 @@ func TestMatchesPython(t *testing.T) {
 			})
 			for _, k := range keys {
 				if !reflect.DeepEqual(g.(map[string]any)[k], w[k]) {
-					t.Errorf("ツリー %d の %s が Python と違う\nGo:     %v\nPython: %v", i, k, g.(map[string]any)[k], w[k])
+					t.Errorf("ツリー %d の %s が golden と違う\nGo:     %v\ngolden: %v", i, k, g.(map[string]any)[k], w[k])
 				}
 			}
 		}

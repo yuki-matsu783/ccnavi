@@ -155,6 +155,7 @@ func impactWhere(name string) string  { return ImpactDir + "/" + name + config.M
 func build(patternTexts, impactTexts map[string]string, present bool) *Wiki {
 	w := &Wiki{Present: present}
 	seen := map[string]string{}
+	// 名前順に読むので、大文字小文字だけが違う同名があれば、名前順で先のものを残して後のものを壊れた扱いにする。
 	for _, name := range sortedKeys(patternTexts) {
 		if first, ok := seen[key(name)]; ok {
 			w.Broken = append(w.Broken, Broken{patternWhere(name), KindPattern, first + " と大文字小文字だけが違う同名"})
@@ -216,6 +217,8 @@ func later(a, b Impact) bool {
 }
 
 // status はパターンの状態。count は今の観測元の数、impacts は壊れていない採否の記録の全部。
+// 承認待ちの記録が 1 つでもあれば提案中。無ければ、決定日時が最も新しい記録で決める。
+// 延期は、記録したときより観測元が増えていれば候補に戻し、増えていなければ決着のまま。
 func status(name string, count int, impacts []Impact) State {
 	var last *Impact
 	for idx := range impacts {

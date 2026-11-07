@@ -79,7 +79,7 @@ func (i Item) asData(offset int) any {
 	return out
 }
 
-// Equal は 4 つの欄が同じか（Python の dataclass の ==）。
+// Equal は 4 つの欄が同じか。After は並びも見る。
 func (i Item) Equal(o Item) bool {
 	return i.Type == o.Type && i.Review == o.Review && i.Deferred == o.Deferred && slices.Equal(i.After, o.After)
 }
@@ -155,7 +155,7 @@ func toYAML(data any) (string, error) {
 	return yaml.Dump(data, yaml.DumpOptions{Width: noFold, Literal: literalOK, NoAliases: true})
 }
 
-// noFold は行を折らない幅（Python の width=10**6）。
+// noFold は行を折らない幅。YAML の出力が長い行を勝手に折らないよう、実質無限の値にする。
 const noFold = 1_000_000
 
 // dumpFlow はフローの本文を、フローのファイルの文面にする。(文面, 書けない理由)。子のフローの下書きに書く文面と、

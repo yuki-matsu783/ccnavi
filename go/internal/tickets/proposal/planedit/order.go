@@ -48,7 +48,7 @@ type renumbered struct {
 	refused  []refusal
 }
 
-// parts の順は Python の PARTS と同じ（答えの並び）。
+// parts は答えに並べる順。
 var parts = []phases.Part{phases.Plan, phases.FeedbackPart}
 
 type section struct {
@@ -79,6 +79,7 @@ var digits = regexp.MustCompile(`\A[0-9]+\z`)
 // ParseOrder は `--order` の JSON を読む。形は {"plan": {"1": [], "2": [3]}, "feedback": {...}}。番号は元の番号で、
 // 渡した計画は全部の番号の先行をそこから取る（書いていない番号は先行なし）。読めなければ (nil, 理由)。
 func ParseOrder(text string, parent *ticket.Ticket) (Order, string) {
+	// JSON の形を 1 段ずつ確かめる。計画（plan・feedback）→ 番号 → 先行のリストの順で、範囲外・自分自身・非整数の先行は断る。
 	data, err := pyjson.Loads(text)
 	if err != nil {
 		return nil, "JSON として読めない（" + errorClass(err) + "）"
@@ -144,7 +145,7 @@ func ParseOrder(text string, parent *ticket.Ticket) (Order, string) {
 	return order, ""
 }
 
-// errorClass は json.loads が投げる例外の型の名前。
+// errorClass は JSON を読めなかった理由の分類名。利用者に見える文面に出る。
 func errorClass(err error) string {
 	var decode *pyjson.DecodeError
 	switch {
@@ -178,6 +179,7 @@ func renumber(parent *ticket.Ticket, order Order, fixed map[int]bool) renumbered
 		for _, n := range numbers {
 			preds[n] = given[n]
 		}
+		// 1. 子が承認された番号（fixed）の先行は変えられない。変わる線があれば断る。
 		var locked []int
 		for _, n := range numbers {
 			if fixed[n] && !sameSet(preds[n], s.items[n-s.first].After) {
@@ -188,6 +190,7 @@ func renumber(parent *ticket.Ticket, order Order, fixed map[int]bool) renumbered
 			refused = append(refused, refusal{refusedLocked, n, fmt.Sprintf(
 				"%d 番（%s）は子が承認されているので、入る線（先行のステップ）を変えられない", n, s.items[n-s.first].Type)})
 		}
+		// 2. 循環する線を断る。
 		cycle := cycleOf(preds, numbers)
 		if len(cycle) > 0 {
 			path := ""
@@ -202,6 +205,9 @@ func renumber(parent *ticket.Ticket, order Order, fixed map[int]bool) renumbered
 		if len(locked) > 0 || len(cycle) > 0 {
 			continue
 		}
+		// 3. 番号を振り直す（placed は元の番号 → 新しい番号）。位置を 1 から順に、先行が全部置かれたステップを入れていく。
+		// 子が承認された番号は動かさない（その位置には元のステップだけが入り、ほかのステップはその位置に入れない）。
+		// 置けるステップが無い位置があれば、固定した番号を動かさずには詰められないので断る。
 		placed := map[int]int{}
 		isPlaced := func(m int) bool { _, ok := placed[m]; return ok }
 		allPlaced := func(ms []int) bool { return !slices.ContainsFunc(ms, func(m int) bool { return !isPlaced(m) }) }
@@ -232,6 +238,7 @@ func renumber(parent *ticket.Ticket, order Order, fixed map[int]bool) renumbered
 					"詰められないので、この線は引けない", stuck)})
 			continue
 		}
+		// 4. 新しい並びに組み直す。after は新しい番号に写して昇順にそろえる。読み誤りの記録（AfterErrors・AfterRepeated）は、振り直した線では不要なので空にする。
 		back := map[int]int{}
 		for old, pos := range placed {
 			moved[old] = pos
@@ -250,6 +257,7 @@ func renumber(parent *ticket.Ticket, order Order, fixed map[int]bool) renumbered
 		}
 		built[s.key] = items
 	}
+	// 断る線が 1 つでもあれば、どの計画も動かさず元のまま返す（一部だけ振り直した状態を残さない）。
 	if len(refused) > 0 {
 		identity := map[int]int{}
 		for _, step := range parent.Numbered() {

@@ -5,9 +5,4 @@
 //
 // あわせて、引き方の案内（SessionStart と、失敗が続いたとき）と、frontmatter のない md を Write で新しく作ったときの
 // 案内（PostToolUse）を返す。案内は判定を変えない。何が起きても空を返し、開始と実行後のチェックを止めない。
-//
-// Python からの対応: docsearch と docsearch_query をまとめた。run → Run、at_start → AtStart、GUIDE_HEAD → GuideHead、
-// fail_streak_note → FailStreakNote、missing_frontmatter → MissingFrontmatter、CODE_MISSING_FRONTMATTER →
-// codeMissingFrontmatter、Query → Query（sort・format は型付きの Sort・Format。ゼロ値は path・table）、
-// problems_of → usageProblems（非公開）。collect・places・search・render・dwidth は非公開。
 package docs

@@ -122,7 +122,7 @@ func reparse(raw []byte, found *ticket.Ticket) *ticket.Ticket {
 	return t
 }
 
-// decode は bytes.decode("utf-8")（改行はそのまま）。
+// decode は UTF-8 として読めるときだけ文字列にする（改行はそのまま）。
 func decode(raw []byte) (string, bool) {
 	return string(raw), utf8.Valid(raw)
 }

@@ -37,7 +37,9 @@ func (a ApprovedTime) Label() string {
 
 // ApprovedTimes は、承認済みチケットごと（Path で引く）の承認の時刻を返す。表示（ボード・--diagnose）だけが読む。判定は git を読まない取り決めなので、hook の判定の経路からは呼ばない。
 //
-// ツリーごとに 1 回 `git log --no-renames --diff-filter=A` を打ち、doing/<識別子>.md を足したコミットのうち、新しいものの時刻を引く。--no-renames は、GitHub の画面での移動（rename のコミット）も、足したことにするために付ける。コミットが無ければ、doing/ にあるものだけ「未コミット」とする。
+// ツリーごとに 1 回 `git log --no-renames --diff-filter=A` を打ち、doing/<識別子>.md を足したコミットのうち、新しいものの時刻を引く。
+// --no-renames を付けるのは、GitHub の画面での移動（rename のコミット）も、足したことにするため。
+// コミットが無ければ、doing/ にあるものだけ「未コミット」とする。
 func ApprovedTimes(conf *config.Settings, found []*ticket.Ticket) map[string]ApprovedTime {
 	out := map[string]ApprovedTime{}
 	var order []string
@@ -66,6 +68,7 @@ func ApprovedTimes(conf *config.Settings, found []*ticket.Ticket) map[string]App
 
 // addedTimes はツリーの doing/ に足したコミットの時刻（識別子ごとに新しいもの）と、git を読めたか。
 func addedTimes(conf *config.Settings, treeRoot string) (map[string]string, bool) {
+	// doing/ がツリーの外を指す設定（絶対パスの置き場）なら、git の履歴では引けないので、読めなかったものとして返す。
 	doing := ospath.Join(conf.ApprovedDir(treeRoot), string(place.Doing))
 	rel, ok := ospath.Relpath(doing, treeRoot)
 	rel = ospath.Slashed(rel)
@@ -78,6 +81,7 @@ func addedTimes(conf *config.Settings, treeRoot string) (map[string]string, bool
 	if !done.OK() {
 		return map[string]string{}, false
 	}
+	// 出力は「NUL + コミット時刻」の行のあとに、そのコミットが足したファイル名が続く。新しいコミットから並ぶので、最初に出た時刻を採る。
 	found := map[string]string{}
 	when := ""
 	for _, line := range ospath.Splitlines(done.Out) {

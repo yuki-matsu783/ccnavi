@@ -71,7 +71,7 @@ type summary struct {
 }
 
 // Report は評価の集計を人が読む形で返す。読むだけではなく、集計の前に ExpireOverdue で期限切れの試行を
-// 確定して書く（Python の stopeval.summarize も expire_overdue を呼んで書く）。
+// 確定して書く。
 func Report(state, logDir string) string {
 	return render(summarize(state, logDir), unlinkedTotal(state))
 }

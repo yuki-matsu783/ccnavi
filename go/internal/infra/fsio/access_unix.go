@@ -12,7 +12,7 @@ var writable = func(path string) bool {
 	return syscall.Access(path, accessWrite) == nil
 }
 
-// os.open に足す、Python の getattr(os, "O_NOFOLLOW", 0) と getattr(os, "O_NONBLOCK", 0)。
+// os.Open の flag に足す値。この OS に無いものは 0（足しても何も変わらない）。
 const (
 	// NoFollow はリンクを開かせない（開けずに失敗する）。
 	NoFollow = syscall.O_NOFOLLOW

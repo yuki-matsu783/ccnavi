@@ -16,7 +16,7 @@ import (
 const (
 	// headLimit は frontmatter を探す頭の長さ。本文は読まない。
 	headLimit = 64 * 1024
-	// maxDepth は frontmatter と索引の行の入れ子の上限。Python は `--format json` の字下げを再帰で書くので、
+	// maxDepth は frontmatter と索引の行の入れ子の上限。`--format json` の字下げは再帰で書くので、
 	// これより深いものは書けないものとして扱う。行は frontmatter より 1 段深いので、frontmatter は 31 段までとなる。
 	maxDepth = 32
 )
@@ -52,8 +52,8 @@ func FrontMatter(raw []byte) *pyjson.Object {
 	return front
 }
 
-// jsonable は YAML の値を JSON に載る形にする（Python の _jsonable）。キーは str()、日時は isoformat() にする。
-// バイト列は UTF-8 として読み、無限と NaN と残りの型は str() にする。yamljson.ToJSON とは文字列にする規則が違う。
+// jsonable は YAML の値を JSON に載る形にする。キーは文字列、日時は ISO 8601 形式の文字列にする。
+// バイト列は UTF-8 として読み、無限と NaN と残りの型も文字列にする。yamljson.ToJSON とは文字列にする規則が違う。
 func jsonable(v any) any {
 	switch x := v.(type) {
 	case *yaml.Map:
@@ -93,7 +93,7 @@ func jsonableList(items []any) []any {
 }
 
 // checkJSON は、どの出力の形（字下げの JSON を含む）でも書けるかを確かめる。
-// 深すぎる入れ子、NaN・無限、Python が文字列にできない桁の整数は書けないものとする。
+// 深すぎる入れ子、NaN・無限、文字列にできない桁の整数は書けないものとする。
 func checkJSON(v any) error {
 	if deep(v) {
 		return errTooDeep
@@ -156,7 +156,7 @@ func children(v any) ([]any, bool) {
 	return nil, true
 }
 
-// isBlank は Python の not s.strip()。
+// isBlank は、空白だけ（または空）の文字列かどうか。
 func isBlank(s string) bool {
 	return strings.IndexFunc(s, func(r rune) bool { return !ospath.IsSpace(r) }) < 0
 }

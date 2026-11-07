@@ -11,7 +11,7 @@ var writable = func(path string) bool {
 	return err == nil && info.Mode().Perm()&0o200 != 0
 }
 
-// js には O_NOFOLLOW・O_NONBLOCK が無い（Python の getattr(os, ..., 0) と同じく 0）。
+// js には O_NOFOLLOW・O_NONBLOCK が無いので、どちらも 0。
 const (
 	NoFollow = 0
 	nonBlock = 0

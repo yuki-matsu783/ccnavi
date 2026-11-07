@@ -7,12 +7,12 @@ import (
 	"syscall"
 )
 
-// osErrnoText は Python の `[WinError N] <FormatMessage の文>`。
+// osErrnoText は Windows の `[WinError N] <FormatMessage の文>`。
 func osErrnoText(e syscall.Errno) string {
 	return fmt.Sprintf("[WinError %d] %s", int(e), e.Error())
 }
 
-// winErrnos は Win32 のエラーから Python の errno への読み替え（CPython の PC/errmap.h の主なもの）。
+// winErrnos は Win32 のエラーから errno への読み替え（CPython の PC/errmap.h と同じ主なもの）。
 // 表に無いものは EINVAL になる。ERROR_DELETE_PENDING（303）がこれにあたり、待てば通る失敗として打ち直す。
 var winErrnos = map[syscall.Errno]int{
 	2: errnoENOENT, 3: errnoENOENT, 15: errnoENOENT, 18: errnoENOENT, 53: errnoENOENT, 67: errnoENOENT,

@@ -282,11 +282,13 @@ func fromTemplate(conf *config.Settings, root string, where tree.Tree, types *ph
 	if found == nil {
 		return nil, why
 	}
+	// テンプレートの相対の after は、全体計画の絶対の番号に直す。フィードバック計画の番号は全体計画の続き。
 	plan, feedback := templates.Absolute(found.Template)
 	skipped := 0
 	if !withFeedback {
 		skipped, feedback = len(feedback), nil
 	}
+	// 1. ステップの型が、今のレイヤーの phases.yml に全部あるか。
 	var names []string
 	for _, item := range append(append([]templates.Item{}, plan...), feedback...) {
 		names = append(names, item.Type)
@@ -302,6 +304,7 @@ func fromTemplate(conf *config.Settings, root string, where tree.Tree, types *ph
 			"phases.yml にありません（" + layerLabel(where.Project) + " のレイヤー）。テンプレートを直すか、" +
 			"ユーザに phases.yml へ追加してもらう"
 	}
+	// 2. 型の kind が、置く計画に合うか（plan は作業、feedback はフィードバックの定義だけ）。
 	for _, p := range []struct {
 		key   string
 		items []templates.Item
@@ -318,6 +321,7 @@ func fromTemplate(conf *config.Settings, root string, where tree.Tree, types *ph
 				pyfmt.Repr(name), p.key, strings.Join(unique(wrong), ", "), p.kind, p.key, p.kind)
 		}
 	}
+	// 3. 子の提案とフローの下書きを、この識別子で書けるか。
 	if why := templates.ChildProblem(ident, found.Template); why != "" {
 		return nil, why
 	}

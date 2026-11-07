@@ -36,7 +36,7 @@ const (
 	resultSuffix    = ".kv"
 )
 
-// logPath は "a/b" の形の名前を、機械の区切りで dir に足す（Python の os.path.join と同じ綴り）。
+// logPath は "a/b" の形の名前を、機械の区切りで dir に足す。
 func logPath(dir, name string) string {
 	return ospath.Join(dir, strings.Split(name, "/")...)
 }
@@ -88,7 +88,7 @@ const keyLength = 16
 
 func shortKey(text string) string { return digest.Hex(digest.SHA1, text, keyLength) }
 
-// moment は記録の UNIX 秒を時刻として読む（Python の float(v)。真偽も数に入る）。数でなければ fallback。
+// moment は記録の UNIX 秒を時刻として読む（真偽値も数として読む）。数でなければ fallback。
 func moment(v any, fallback time.Time) time.Time {
 	if n, ok := pyjson.Number(v, pyjson.BoolsAsNumbers); ok {
 		return fsio.FromUnixSeconds(n)

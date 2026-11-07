@@ -85,6 +85,8 @@ func build(conf *config.Settings, root string, parent *ticket.Ticket, items []le
 	if taken := approval.ExistingTicketFile(conf, root, ident); taken != "" {
 		return "", "", ident + " のファイルがすでに在る（" + taken + "）。上書きしないので、中身を確かめてから決める"
 	}
+	// frontmatter を組む。人の承認が要らない保守の子なので、human_review は required: false にする。
+	// 編集できる範囲は学びの置き場（ConsolidateScope）だけ。着手・完了・SHA の欄は空で置き、start や finish が埋める。
 	front := &yaml.Map{}
 	front.Put("version", ticket.Version)
 	front.Put("ticket", ident)
@@ -113,6 +115,7 @@ func build(conf *config.Settings, root string, parent *ticket.Ticket, items []le
 	for _, key := range []string{"started_at", "completed_at", "base_sha", "merged_sha"} {
 		front.Put(key, "")
 	}
+	// 書き出した文面を読み直し、チケットとして読めないものは書かない。
 	text, err := ticket.Render(&ticket.Ticket{ID: ident, Raw: front, Body: body(items)})
 	if err != nil {
 		return "", "", "統合の子 " + ident + " を書き出せない（" + err.Error() + "）"
@@ -145,6 +148,7 @@ func found(stderr io.Writer, conf *config.Settings, root, parentID string) *pass
 		fmt.Fprintf(stderr, "ccnavi: 学びの蓄積が disable（%s）なので動かない\n", env.Learning)
 		return nil
 	}
+	// 検査は、止めるものが軽い順に並べる。開いている統合の子が既にあれば、残りの検査を通さずそれを返す（送り直しのため）。
 	parent := closing.Find(stderr, conf, root, parentID)
 	if parent == nil {
 		return nil
@@ -163,6 +167,7 @@ func found(stderr io.Writer, conf *config.Settings, root, parentID string) *pass
 	if closing.MisplacedHome(stderr, conf, root, parent) {
 		return nil
 	}
+	// 親の finish が学びより前に見る検査を先に通す。統合の子を作ったのに、別の理由で親を閉じられない状態にしないため。
 	if problems := closing.CloseProblems(conf, root, parentID, nil); len(problems) > 0 {
 		for _, p := range problems {
 			fmt.Fprintf(stderr, "ccnavi: %s\n", p)

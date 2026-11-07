@@ -110,7 +110,7 @@ func Normpath(p string) string {
 	return out
 }
 
-// Getwd は os.getcwd()。os.Getwd は $PWD がリンクを含んでもそのまま返すが、Python は実体のパスを返す。
+// Getwd はカレントディレクトリ。os.Getwd は $PWD がリンクを含んでもそのまま返すが、ここは実体のパスを返す。
 func Getwd() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -133,12 +133,15 @@ func Abspath(p string) string {
 	return Normpath(p)
 }
 
-// Realpath は os.path.realpath（strict でない）。無い名前から先は書かれたまま足す。
+// Realpath は path を実体のパスにする。無い名前から先は書かれたまま足し、失敗にしない。
 // リンクの輪はそこで解くのをやめる。
+// 名前を 1 つずつ左から取り出して、リンクなら中身（行き先の名前）を積み直す方式で解く。
+// EvalSymlinks と違い、途中の名前が無くてもそこまでの結果を返すため。
 func Realpath(p string) string {
 	if Windows {
 		return realpathWindows(p)
 	}
+	// 1. 起点を決める。相対パスはカレントディレクトリから始める。
 	rest := reversed(strings.Split(p, "/"))
 	count := len(rest)
 	path := "/"
@@ -158,6 +161,7 @@ func Realpath(p string) string {
 	for _, r := range rest {
 		stack = append(stack, item{name: r})
 	}
+	// 2. 残りの名前を 1 つずつ取り出す。seen はリンクごとの解けた結果（解いている最中は nil。輪の検出に使う）。
 	seen := map[string]*string{}
 	for count > 0 {
 		top := stack[len(stack)-1]
@@ -182,6 +186,7 @@ func Realpath(p string) string {
 			}
 			continue
 		}
+		// 3. リンクでない名前（無い名前も）はそのまま足す。リンクは行き先の名前を積み直して続きで解く。
 		newpath := path + "/" + name
 		if path == "/" {
 			newpath = path + name
@@ -257,8 +262,7 @@ func Relpath(path, start string) (string, bool) {
 	return rel, err == nil
 }
 
-// RelOr は start からの相対パス。相対にできない（Windows で別のドライブ）ときは path のまま
-// （Python の `try: os.path.relpath(path, start) except ValueError: path`）。
+// RelOr は start からの相対パス。相対にできない（Windows で別のドライブ）ときは path のまま。
 func RelOr(path, start string) string {
 	if rel, ok := Relpath(path, start); ok {
 		return rel
@@ -329,7 +333,7 @@ func IsDir(p string) bool {
 	return err == nil && info.IsDir()
 }
 
-// IsSpace は Python の str.isspace の 1 文字版。Go の unicode.IsSpace に無い U+001C〜U+001F も空白に数える。
+// IsSpace は 1 文字が空白か（Python の str.isspace と同じ範囲）。Go の unicode.IsSpace に無い U+001C〜U+001F も空白に数える。
 func IsSpace(r rune) bool {
 	return unicode.IsSpace(r) || (r >= 0x1c && r <= 0x1f)
 }
@@ -355,8 +359,7 @@ func Rstrip(s string) string {
 // errNotUTF8 は中身が UTF-8 として読めないこと（ReadDiskText が返す）。
 var errNotUTF8 = errors.New("UTF-8 として読めない")
 
-// ReadDiskText は open(path, encoding="utf-8").read()。UTF-8 でなければ errNotUTF8
-// （Python の UnicodeDecodeError）。改行の "\r\n" と "\r" は "\n" にそろえる（テキストモード）。
+// ReadDiskText はディスクの本文を UTF-8 として読む。UTF-8 でなければ errNotUTF8。改行の "\r\n" と "\r" は "\n" にそろえる（テキストモード）。
 // fsio の溜める段は見ない（記録やマーカーは fsio.ReadText）。
 func ReadDiskText(path string) (string, error) {
 	data, err := os.ReadFile(path)
@@ -375,8 +378,8 @@ func Slashed(path string) string {
 	return strings.ReplaceAll(path, `\`, "/")
 }
 
-// HasDrive は p の 2 字目が ":" か（Python の len(p) > 1 and p[1] == ":"。字は符号位置で数える）。letter なら、
-// 1 字目が ASCII の英字のときだけ（Windows のドライブ。re.match(r"[A-Za-z]:", p)）。
+// HasDrive は p の 2 字目が ":" か（字は符号位置で数える）。letter なら、
+// 1 字目が ASCII の英字のときだけ（Windows のドライブ `C:`）。
 func HasDrive(p string, letter bool) bool {
 	head, size := utf8.DecodeRuneInString(p)
 	if size == 0 || !strings.HasPrefix(p[size:], ":") {
@@ -385,10 +388,10 @@ func HasDrive(p string, letter bool) bool {
 	return !letter || head < utf8.RuneSelf && unicode.IsLetter(head)
 }
 
-// Splitlines は str.splitlines()。行の区切りは Python と同じ集合で、区切り自体は残さない。
+// Splitlines は行に分ける。区切りは Python の str.splitlines と同じ集合（\r\n・\v・\f・U+001C〜U+001E・U+0085・U+2028・U+2029）で、区切り自体は残さない。
 func Splitlines(s string) []string { return splitLines(s, false) }
 
-// SplitlinesKeep は str.splitlines(keepends=True)。区切りを行の末尾に残す（つなげると元に戻る）。
+// SplitlinesKeep は Splitlines と同じ区切りで分け、区切りを行の末尾に残す（つなげると元に戻る）。
 func SplitlinesKeep(s string) []string { return splitLines(s, true) }
 
 func splitLines(s string, keep bool) []string {
@@ -416,7 +419,7 @@ func splitLines(s string, keep bool) []string {
 	return lines
 }
 
-// UnifyNewlines は Python のテキストの読み（newline=None）と同じく、"\r\n" と "\r" を "\n" にする。
+// UnifyNewlines はテキストの読みと同じく、"\r\n" と "\r" を "\n" にする。
 func UnifyNewlines(text string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
 }

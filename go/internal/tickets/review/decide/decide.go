@@ -104,7 +104,8 @@ type passed struct {
 	requested *pyjson.Object
 }
 
-// gate は decide の、ホストに聞かずに分かる前提を検査する。確かめるのは次の 3 つである。親とフェーズがあること。依頼の記録があること。依頼のあとに見せたものが動いていないこと。本体と Check が同じものを通る。断ったときは、理由のあとに `次:` を 1 行足して nil を返す。ホストの状態（変更要求・未解決の指摘・ダイジェスト）は見ない。sh が取ってくるからである。
+// gate は decide の、ホストに聞かずに分かる前提を検査する。確かめるのは次の 3 つである。親とフェーズがあること。依頼の記録があること。依頼のあとに見せたものが動いていないこと。
+// 本体と Check が同じものを通る。断ったときは、理由のあとに `次:` を 1 行足して nil を返す。ホストの状態（変更要求・未解決の指摘・ダイジェスト）は見ない。sh が取ってくるため。
 func gate(stderr io.Writer, conf *config.Settings, root, cwd string, number int) *passed {
 	parent, p, ok := request.ParentPhase(stderr, conf, root, cwd, number)
 	if !ok {
@@ -194,7 +195,8 @@ func Check(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, nu
 	return config.ExitOK
 }
 
-// decision は、残った指摘を決められる状態かを確かめ、見せる材料を組む。決められなければ nil を返す。carry は受け入れ済みのスレッドの id（`--accept-done`）である。sh が返信と解決をしたあとの結果では、それらは解決済みになっている。しかし、見せた指摘の一部として数え直す。見せたときと同じ並びでダイジェストを組み直し、見せたあとに変わっていないことを確かめるためである。
+// decision は、残った指摘を決められる状態かを確かめ、見せる材料を組む。決められなければ nil を返す。carry は受け入れ済みのスレッドの id（`--accept-done`）である。
+// sh が返信と解決をしたあとの結果では、それらは解決済みになっている。しかし、見せた指摘の一部として数え直す。見せたときと同じ並びでダイジェストを組み直し、見せたあとに変わっていないことを確かめるため。
 func decision(stderr io.Writer, conf *config.Settings, root, cwd string, number int, resultPath string, carry []string) *Decision {
 	gated := gate(stderr, conf, root, cwd, number)
 	if gated == nil {
@@ -326,7 +328,10 @@ type YesOptions struct {
 	PlanDone string
 }
 
-// Yes は、オーバーレイ（または sh の write-and-push）で押された選択を置く（`--yes <選択> --digest <ダイジェスト> --json`）。ターミナルで打つという制約の代わりに、見せた指摘と今の指摘のダイジェストが合うことを求める。エージェントがこれをシェルで打つ形は、組み込みの deny が止める。受け入れる指摘（keep・issue）には、置く前に sh が返信を残して解決する。そのため、実行ファイルは 3 回に分けて呼ばれる（PlanOut → sh の返信と解決 → PlanDone）。答えは JSON で返す。合わなければ、置かずに mismatch を返す。返信と解決を済ませた分は、操作記録に残す。
+// Yes は、オーバーレイ（または sh の write-and-push）で押された選択を置く（`--yes <選択> --digest <ダイジェスト> --json`）。
+// ターミナルで打つという制約の代わりに、見せた指摘と今の指摘のダイジェストが合うことを求める。エージェントがこれをシェルで打つ形は、組み込みの deny が止める。
+// 受け入れる指摘（keep・issue）には、置く前に sh が返信を残して解決する。そのため、実行ファイルは 3 回に分けて呼ばれる（PlanOut → sh の返信と解決 → PlanDone）。答えは JSON で返す。
+// 合わなければ、置かずに mismatch を返す。返信と解決を済ませた分は、操作記録に残す。
 func Yes(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, number int, resultPath, choicesText, digest string, o YesOptions) (int, error) {
 	shown, choices, ok := parseChoices(stderr, root, number, choicesText, digest)
 	if !ok {
@@ -497,6 +502,8 @@ func beginOp(stderr io.Writer, conf *config.Settings, d *Decision, choices *pyjs
 		fmt.Fprint(stderr, msgNoStateOp)
 		return ""
 	}
+	// 1. 段階を組む。返信（残す指摘か issue にする指摘があるとき）→ issue の起票と、その分割コメント → 最後に総括のコメント。
+	// 2. 見せた指摘を、版つきで操作記録に控える。送るときに、見せた時点と変わっていないかを確かめるため。
 	picked := pick(d.Unresolved, choices)
 	var stages []oplog.StageSpec
 	if len(picked[Keep]) > 0 || len(picked[Issue]) > 0 {
@@ -522,6 +529,7 @@ func beginOp(stderr io.Writer, conf *config.Settings, d *Decision, choices *pyjs
 	if v := d.Phase.Marks[marks.Requested].Value("head"); pyfmt.Truthy(v) {
 		head = pyfmt.Str(v)
 	}
+	// 3. 記録を開始し、同じ親・フェーズの触られていない古い記録は捨てる。
 	op, err := oplog.Begin(conf.State, oplog.KindDecide, oplog.Options{
 		Repo:        pyjson.NewObject("host", string(d.Result.Host), "mr_url", d.Result.MR.URL),
 		Parent:      d.Parent.ID,

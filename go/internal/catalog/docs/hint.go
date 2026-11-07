@@ -61,7 +61,7 @@ func MissingFrontmatter(conf *config.Settings, root string, in hookio.Input) str
 	if v := in.ToolInput.Value("file_path"); pyfmt.Truthy(v) {
 		raw = pyfmt.Str(v)
 	}
-	// raw.rsplit("/", 1)[-1]。ospath.Basename は Windows でドライブ（`C:README.md`）も外すので使わない。
+	// 最後の `/` より後ろをファイル名とする。ospath.Basename は Windows でドライブ（`C:README.md`）も外すので使わない。
 	name := ospath.Slashed(raw)
 	name = name[strings.LastIndex(name, "/")+1:]
 	if !pathcase.HasExt(raw, config.MdExt) || isNoFrontmatterName(name) {
@@ -71,6 +71,7 @@ func MissingFrontmatter(conf *config.Settings, root string, in hookio.Input) str
 	if cwd == "" {
 		cwd = root
 	}
+	// 書いた先のツリーを求め、案内の対象かを絞り込む。対象外（git の外・ccnavi 配下・付けない名前・索引が無視されている）は黙る。
 	written := ospath.Abspath(ospath.Join(cwd, raw))
 	where, ok := tree.TreeOf(root, fsio.FullPath(raw, cwd), conf.Projects)
 	if !ok || !tree.HasGit(where.Root) {
@@ -91,6 +92,7 @@ func MissingFrontmatter(conf *config.Settings, root string, in hookio.Input) str
 	if err != nil || ignored[rel] {
 		return ""
 	}
+	// 書いた md の頭だけを読み、frontmatter と type があるか確かめる。読めなければ案内しない（誤って促すより黙る）。
 	head, ok := docindex.ReadHead(written)
 	if !ok {
 		return ""
@@ -106,7 +108,7 @@ func MissingFrontmatter(conf *config.Settings, root string, in hookio.Input) str
 	return frontmatterHint(conf, root, shown, front != nil)
 }
 
-// typeText は str(v or "")。
+// typeText は type 欄の値を文字列にする。空とみなす値は空文字。
 func typeText(v any) string {
 	if !pyfmt.Truthy(v) {
 		return ""

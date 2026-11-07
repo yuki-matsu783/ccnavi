@@ -26,7 +26,7 @@ const fileRule = "(file)"
 // 行き先が決まらない。
 var forbidden = []string{"..", "~", "$"}
 
-// issueRef は別のリポジトリの課題の表記（`owner/repo#12`。GitLab の入れ子のグループも）。数字は Python の \d。
+// issueRef は別のリポジトリの課題の表記（`owner/repo#12`。GitLab の入れ子のグループも）。数字は Unicode の十進数字（\p{Nd}）。
 var issueRef = regexp.MustCompile(`\A([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)#(\p{Nd}+)\z`)
 
 // GlobSpaceReason は範囲の glob に空白がある理由の文。提案・phases.yml の scope・ticket new --scope が同じ文を使う。
@@ -34,7 +34,7 @@ const GlobSpaceReason = "空白がある。glob は 1 項目に 1 パターン�
 	"空白で区切って複数のパスを書いたなら、承認しても何も一致せず編集が全部止まる。" +
 	"パターンごとに項目を分けて書く。空白を含むファイル名は `?` で置き換える"
 
-// GlobHasSpace は範囲の glob に空白（Python の \s）があるか。空白区切りで複数のパスを 1 項目に書く誤りを断つ。
+// GlobHasSpace は範囲の glob に空白（Unicode の空白）があるか。空白区切りで複数のパスを 1 項目に書く誤りを断つ。
 func GlobHasSpace(glob string) bool { return strings.ContainsFunc(glob, ospath.IsSpace) }
 
 // RegexOverflowDetail は子の範囲の regex を名指しする文。親の検査と定義の検査が同じ文を使い、承認の画面で
@@ -117,6 +117,7 @@ func readIdentity(t *Ticket, front *yaml.Map, problems *[]rules.Problem) bool {
 		*problems = append(*problems, problem(rules.Error, name, detail))
 		return true
 	}
+	// 1. 書式の版と識別子の形を確かめる。
 	if version := front.Get("version"); !pyfmt.EqualsInt(version, Version) {
 		return fail(fmt.Sprintf("チケット書式の版 %s は扱えない（このビルドが読むのは %d）。"+
 			"タイプは rules.yml と同じ deny / ask / allow で、`target_directories` は読まない", pyfmt.Repr(version), Version))
@@ -124,6 +125,7 @@ func readIdentity(t *Ticket, front *yaml.Map, problems *[]rules.Problem) bool {
 	if p := ids.IDProblem(name); p != "" {
 		return fail(p)
 	}
+	// 2. 親（parent: が無い）は、子だけの欄が書かれていれば警告するだけで終わる。
 	if t.Parent == "" {
 		for _, key := range []string{"phase", "predecessors"} {
 			if front.Has(key) {
@@ -132,6 +134,7 @@ func readIdentity(t *Ticket, front *yaml.Map, problems *[]rules.Problem) bool {
 		}
 		return false
 	}
+	// 3. 子は、識別子が `<親>-<フェーズ>-<連番>` の形で、親と phase: が識別子と一致するか確かめる。
 	example := ids.ChildID(t.Parent, 5, 1)
 	child, ok := ids.ParseChild(name)
 	if !ok {
@@ -156,6 +159,7 @@ func readIdentity(t *Ticket, front *yaml.Map, problems *[]rules.Problem) bool {
 		return fail(fmt.Sprintf("`phase: %s` は子の識別子に指定できません。識別子のフェーズ番号は"+
 			" 2 桁（0〜%d）なので、計画を %d フェーズまでに分ける", written, ids.MaxChildNumber, ids.MaxChildNumber))
 	}
+	// phase: は 0 以上の整数。大きすぎる値（big.Int）も、識別子の 2 桁に収まらないものとして同じ文で断る。
 	var phase int
 	switch v := front.Get("phase").(type) {
 	case int:
@@ -190,6 +194,7 @@ func readRelations(t *Ticket, front *yaml.Map, problems *[]rules.Problem) bool {
 	t.DeclaredProject = ospath.Strip(text(front.Get("project")))
 	t.Project = t.DeclaredProject
 
+	// predecessors はリストだけを読む。空の項目は捨てる。
 	switch preds := front.Get("predecessors").(type) {
 	case nil:
 	case []any:
@@ -203,6 +208,7 @@ func readRelations(t *Ticket, front *yaml.Map, problems *[]rules.Problem) bool {
 		return true
 	}
 
+	// plan と feedback は親だけの欄。子に書かれていれば警告して読み飛ばす。
 	for _, key := range []string{"plan", "feedback"} {
 		raw := front.Get(key)
 		if raw == nil {
@@ -230,6 +236,7 @@ func readRelations(t *Ticket, front *yaml.Map, problems *[]rules.Problem) bool {
 	// 形の誤りも子に書いた phases: も、ここでは落とさず判定の blocked の理由にする（tickets/config）。
 	t.PhasesRaw = front.Get(PhasesKey)
 
+	// issue と mr は親だけの欄。数字に読めなければエラー、子に書かれていれば警告する。
 	if raw := front.Get("issue"); raw != nil {
 		repo, number := issueOf(raw)
 		if number == 0 {
@@ -497,6 +504,7 @@ func readEntries(front *yaml.Map, name string) ([]Entry, []rules.Problem) {
 	var problems []rules.Problem
 	var entries []Entry
 	bad := func(detail string) { problems = append(problems, problem(rules.Error, name, detail)) }
+	// deny / ask / allow の欄を順に読み、項目ごとに形を確かめて Entry にする。1 項目の誤りで他の項目は捨てない。
 	for _, section := range rules.Sections() {
 		raw := front.Get(string(section))
 		if raw == nil {
@@ -515,6 +523,7 @@ func readEntries(front *yaml.Map, name string) ([]Entry, []rules.Problem) {
 				continue
 			}
 			match := text(m.Get("match"))
+			// match に書き込みのツールが 1 つも無い項目は、範囲の判定に効かないので警告して読み飛ばす。
 			writes := false
 			for _, w := range strings.Split(match, "|") {
 				if slices.Contains(config.WriteTools(), ospath.Strip(w)) {
@@ -526,6 +535,7 @@ func readEntries(front *yaml.Map, name string) ([]Entry, []rules.Problem) {
 					"この版の判定はパスの範囲しか見ないので反映されない"))
 				continue
 			}
+			// glob か regex のどちらか 1 つだけ。範囲に使えない字（`..`・`~`・`$`）、空白、絶対パスは断る。
 			glob := ospath.Strip(text(m.Get("glob")))
 			regex := ospath.Strip(text(m.Get("regex")))
 			written := glob
@@ -552,11 +562,13 @@ func readEntries(front *yaml.Map, name string) ([]Entry, []rules.Problem) {
 				bad(where + " の範囲 `" + glob + "` が絶対パス。ワークツリーのルートからの相対で書く")
 				continue
 			}
+			// glob は区切りを `/` にそろえ、前後の `/` を落としてから式にする（Windows の書き方を同じ範囲として扱う）。
 			glob = strings.Trim(strings.ReplaceAll(glob, `\`, "/"), "/")
 			expression := regex
 			if expression == "" {
 				expression = "^" + pyre.TranslateGlob(glob)
 			}
+			// 大文字小文字を区別せずに組む。区別したい式は `(?-i:...)` で囲んで書く。
 			compiled, err := pyre.Compile(expression, pyre.IgnoreCase)
 			if err != nil {
 				bad(where + " を式にできない: " + err.Error())

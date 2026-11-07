@@ -10,7 +10,7 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// Python の ticket_fields と突き合わせる。行単位の書き換えは、ユーザのコメントと `|` のブロックを残すことと、
+// 見本と突き合わせる。行単位の書き換えは、ユーザのコメントと `|` のブロックを残すことと、
 // スクリプトが書いた直後の内容が正規化で元と同じになること（実行後チェックの約束）が要。
 
 type fieldsAnswers struct {
@@ -49,7 +49,7 @@ var quotedValues = []string{
 	" lead and trail ", strings.Repeat("ab", 39) + "  c d",
 }
 
-func TestFieldsMatchPython(t *testing.T) {
+func TestFieldsMatchGolden(t *testing.T) {
 	want := golden.Load[fieldsAnswers](t, "fields")
 	got := fieldsAnswers{}
 	for _, text := range fieldsTexts {

@@ -9,7 +9,7 @@ import (
 	"ccnavi/internal/infra/shell"
 )
 
-// 生の git の式は、長い入力ですぐ返る（tests/config/test_config_absent.py の BuiltinSpeedTest から移した）。
+// 生の git の式は、長い入力ですぐ返る。
 // 組み込みの Bash の deny は go/internal/policy/builtin の TestLongInputsReturnQuickly が見る。
 func TestRawGitRegexReturnsQuickly(t *testing.T) {
 	const limit = 500 * time.Millisecond

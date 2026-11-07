@@ -5,6 +5,4 @@
 // これは、学びの蓄積が有効なときにシステムが事前に許す、限られた保守操作である。ユーザの承認の代わりではない。
 // 書いたパスは sh が write-and-push でコミットして push する。開いている統合の子がすでにあれば、新しく作らず、
 // 書いたパスの一覧に載せる。前回の push が済んでいなければ、送り直す。
-//
-// Python からの対応: tickets/lifecycle/consolidate を移した。run → Run、check → Check。gate・build・_body は私的。
 package consolidate

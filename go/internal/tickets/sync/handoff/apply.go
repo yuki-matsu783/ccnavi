@@ -93,6 +93,7 @@ func Apply(plan *Plan, expect string, viaBoard bool) *Applied {
 	if plan.Error != "" {
 		return failed(plan.Error)
 	}
+	// 1. 書く前の確かめ。止める条件は、計画の誤り → 対象なし → ボードから取り込めない対象 → 計画の error → 照合の値の欠け・不一致の順。
 	chosen := sortedByKey(plan.Selected())
 	if len(chosen) == 0 {
 		return failed(msgNothing)
@@ -111,6 +112,7 @@ func Apply(plan *Plan, expect string, viaBoard bool) *Applied {
 	if now := plan.Expect(); expect != now {
 		return failed(sprintf(msgExpectDiffer, now))
 	}
+	// 2. 変わるものを順に書く。失敗したら、そこまでに書いた分を書く前のバイト列へ戻す。戻せなかったものがあれば、その名前を添えて言う。
 	var written []*Entry
 	failure := ""
 	for _, e := range chosen {
@@ -132,6 +134,7 @@ func Apply(plan *Plan, expect string, viaBoard bool) *Applied {
 		}
 		return failed(sprintf(msgRolledBack, failure))
 	}
+	// 3. 書けたら、取り込んだ下書きを片付ける。
 	done := &Applied{OK: true, Applied: written}
 	for _, e := range chosen {
 		cleanDraft(plan.Tree, e, done)
@@ -155,6 +158,7 @@ func writeOne(root string, e *Entry) (failure string, wrote bool) {
 			return sprintf(msgTargetNoGo, e.Rel, why), false
 		}
 	}
+	// 確かめた後に取り込み先や下書きが外で変わっていないかを、書く直前にもう一度確かめる。
 	if contentDigest(now) != contentDigest(e.current) {
 		return sprintf(msgTargetMoved, e.Rel), false
 	}
@@ -168,6 +172,7 @@ func writeOne(root string, e *Entry) (failure string, wrote bool) {
 	if err := fsio.WriteFile(e.target, e.raw, how); err != "" {
 		return sprintf(msgWriteFailed, e.Rel, line(err)), false
 	}
+	// 書いたあとの読み直し。書いた中身と違えば失敗にする。取り込み先は書き換わっているので wrote は真を返し、呼び手が元に戻す。
 	if back, why := readBack(e.target, root); !same(back, e.raw) {
 		if why == "" {
 			why = msgReadBackWhat
@@ -180,6 +185,7 @@ func writeOne(root string, e *Entry) (failure string, wrote bool) {
 // rollBack は書いたものを書く前のバイト列に戻す。戻せなかったものの相対パス。
 func rollBack(written []*Entry) []string {
 	var undone []string
+	// 書いた順の逆に戻す。新規のファイルは消し、既存のファイルは元のバイト列を書き直す。
 	for i := len(written) - 1; i >= 0; i-- {
 		e := written[i]
 		var err string

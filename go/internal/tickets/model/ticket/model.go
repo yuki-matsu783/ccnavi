@@ -51,7 +51,7 @@ func ConsolidateScope() []string { return slices.Clone(consolidateScope) }
 // 承認と lint が error にする。
 var scriptFields = []string{
 	"started_at", "completed_at", "base_sha", "merged_sha", "cancelled_at", "cancel_reason",
-	// finish が子をどこに置いたかと、レビュー待ちの子を done/ へ動かした経路。手で動かした子は settled_by を持たない。
+	// finish が子をどこに置いたかと、レビュー待ちの子を done/ へ動かした経路。手で動かした子は settled_by が無い。
 	"finished_to", "settled_by",
 }
 
@@ -129,7 +129,7 @@ type AfterError struct {
 }
 
 // PlanItem は親の計画の 1 ステップ。After は読めた正しい番号（1 以上、自分より小さい、その計画の範囲の中）
-// だけを小さい順に持つ。形の誤りは読み込みで落とさず AfterErrors に持つ（落とすと承認済みチケットが索引に
+// だけを小さい順に並べる。形の誤りは読み込みで落とさず AfterErrors に残す（落とすと承認済みチケットが索引に
 // 入らず、判定がその親を知らないまま範囲を当てなくなる）。AfterRepeated は 2 度挙げた番号。
 type PlanItem struct {
 	Type          string
@@ -168,7 +168,7 @@ func (p *PlanItem) Same(o *PlanItem) bool {
 	return p.Type == o.Type && p.Review == o.Review && p.Deferred == o.Deferred
 }
 
-// Workflow は計画のステップの先行関係。after から都度計算する結果で、ファイルにもチケットの欄にも持たない。
+// Workflow は計画のステップの先行関係。after から都度計算する結果で、ファイルにもチケットの欄にも書かない。
 // Waits は番号 → 推移的に辿った先行の全部（小さい順）、ReviewAt は延期した番号 → 引き受ける番号。
 type Workflow struct {
 	Order    string
@@ -186,10 +186,10 @@ type Step struct {
 type Ticket struct {
 	ID     string
 	Parent string
-	// Phase は子のフェーズ番号。子でなければ意味を持たない（ChildPhase で読む）。
+	// Phase は子のフェーズ番号。子でなければ意味が無い（ChildPhase で読む）。
 	Phase        int
 	Predecessors []string
-	// Issue は元になった課題の番号（0 は無し）。親だけが持つ。IssueRepo は別のリポジトリの課題の `owner/repo`。
+	// Issue は元になった課題の番号（0 は無し）。親にだけ入る。IssueRepo は別のリポジトリの課題の `owner/repo`。
 	Issue     int
 	IssueRepo string
 	// MR はこの親の仕事を載せるマージリクエストの番号（0 は無し）。スクリプトだけが書く欄ではない。
@@ -298,7 +298,7 @@ func (t *Ticket) MaintenanceProblem() string {
 	return ""
 }
 
-// HasPlan は全体計画を持つか。
+// HasPlan は全体計画があるか。
 func (t *Ticket) HasPlan() bool { return len(t.Plan) > 0 }
 
 // InProgress は着手していて、終わってもいないし取り消されてもいない。

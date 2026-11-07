@@ -29,7 +29,7 @@ func (f evalFixture) attempt(aid, final string, results string, extra ...string)
 	if final != "" {
 		fields = append(fields, fmt.Sprintf(`"final": %q`, final))
 	}
-	// 後から足したキーが前のキーを上書きする（Python の dict.update と同じ）。
+	// 後から足したキーが前のキーを上書きする。
 	text := "{" + strings.Join(append(fields, extra...), ", ") + "}"
 	o := obj(f.t, text)
 	writeFile(f.t, filepath.Join(f.state, AttemptPrefix+aid+fsio.JSONExt), dumps(f.t, o))

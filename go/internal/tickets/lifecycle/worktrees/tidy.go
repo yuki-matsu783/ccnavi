@@ -118,7 +118,7 @@ func leftoverFacts(path string) (why, check []string) {
 }
 
 // remaining は ready の最後の `drop <親>` の後に、まだ残っている親子のワークツリー。見るだけで消さない。
-// 名前が親と違うがその親のチケットを持つワークツリー（drop は名前で消すので拾えない）と、未保存の下書きがあって
+// 名前が親と違うがその親のチケットがあるワークツリー（drop は名前で消すので拾えない）と、未保存の下書きがあって
 // Drop が消さなかった閉じた子のワークツリー。
 func remaining(conf *config.Settings, root, family string) []left {
 	// 親は正とするツリーの側で引き、親子のチケットはどのツリーのコピーも拾う（コピーの持ち主のワークツリーを探すため）。

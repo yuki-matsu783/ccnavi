@@ -133,7 +133,7 @@ func update(state, id string, change func(*Record) (bool, error)) error {
 	return save(state, r)
 }
 
-// lock は記録の読み書きの間だけ持つ短いロック。並行する更新が互いの書き込みを失わせないため。
+// lock は記録の読み書きの間だけ取る短いロック。並行する更新が互いの書き込みを失わせないため。
 func lock(state, id string) (unlock func(), err error) {
 	if err := checkID(id); err != nil {
 		return nil, err
@@ -141,6 +141,7 @@ func lock(state, id string) (unlock func(), err error) {
 	if err := fsio.MakeDirs(dir(state)); err != nil {
 		return nil, &Error{fsio.ErrorText(err)}
 	}
+	// ロックは「排他的に作ったファイル」で表す。作れたら取得、既にあれば他の更新が使用中。
 	path := ospath.Join(dir(state), id+lockExt)
 	deadline := time.Now().Add(lockWait)
 	for {
@@ -155,9 +156,11 @@ func lock(state, id string) (unlock func(), err error) {
 			return nil, &Error{fsio.ErrorText(err)}
 		}
 		// 待つ上限は先に見る（消せない・読めないときに、上限を飛ばして回り続けない）
+		// 待つ上限は先に見る（消せない・読めないときに、上限を飛ばして回り続けない）
 		if time.Now().After(deadline) {
 			return nil, &Error{msgBusy}
 		}
+		// 古すぎるロックは、前の更新が途中で死んだ残りと見て消し、取り直す。
 		if mtime, _, ok := ospath.Stat(path); ok && time.Since(mtime) > lockStale {
 			os.Remove(path)
 			continue

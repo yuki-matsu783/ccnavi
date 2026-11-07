@@ -17,7 +17,7 @@ import (
 
 // 振り直しの決まりは拡張の計画編集タブと共有する見本の表（tests/fixtures/plan-reorder.json）で固定する。
 
-// parsedPlan は計画のステップ（見本の表の形。JSON は YAML の flow として読める）を持つ親。
+// parsedPlan は計画のステップ（見本の表の形。JSON は YAML の flow として読める）がある親。
 func parsedPlan(t *testing.T, plan, feedback any) *ticket.Ticket {
 	t.Helper()
 	text := "---\nversion: 1\nticket: i0001\nplan: " + jsonText(t, plan) + "\n"

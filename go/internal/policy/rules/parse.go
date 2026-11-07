@@ -17,10 +17,10 @@ import (
 const needsMessage = Deny
 
 // Load はルールファイルを読んで組み立てる。root は {root} の置き換え先。
-// 読めない（ファイルが無い、UTF-8 でない、YAML として読めない、マッピングでない）ときは error を返す。error の文は Python の例外の文と同じにする。
-// 組み立てられないルールは外して Problem で名指しし、組み立てられたものは返す。1 件の不備でガード全体を止めないためである。
+// 読めない（ファイルが無い、UTF-8 でない、YAML として読めない、マッピングでない）ときは error を返す。
+// 組み立てられないルールは外して Problem で名指しし、組み立てられたものは返す。1 件の不備でガード全体を止めないため。
 func Load(path, root string) (*RuleSet, []Problem, error) {
-	// Python の open(path, encoding="utf-8")。fsio を通さないので、溜める段も見ない。
+	// UTF-8 として厳密に読む。fsio を通さずディスクだけを読むので、溜める段も見ない。
 	text, err := fsio.ReadDiskText(path, fsio.Strict)
 	if err != nil {
 		return nil, nil, err
@@ -44,6 +44,7 @@ func Parse(data *yaml.Map, root string) (*RuleSet, []Problem) {
 	if !pyfmt.Truthy(written) {
 		written = 0
 	}
+	// 版が合わなくても読み込みは続ける（苦情に載せる）。版が違うファイルを読んで、保護を丸ごと失わないため。
 	rs := &RuleSet{Version: versionOf(written)}
 	var problems []Problem
 	if !pyfmt.EqualsInt(written, Version) {
@@ -140,7 +141,7 @@ func Builtin(section Decision, specs []Spec, root string) ([]*Rule, []Problem) {
 }
 
 // rawRule は書かれたルール 1 件（ルールファイルの欄か、組み込みの Spec）。文字列の欄は、
-// Python の str(raw.get(key) or "") で読んだ形にそろえる。
+// 無い・空は空文字、文字列でない値は文字にした形にそろえる。
 type rawRule struct {
 	builtin                            bool
 	id, match, glob, regex, message    string
@@ -167,10 +168,17 @@ func fromYAML(m *yaml.Map) rawRule {
 
 // build はルール 1 件を組み立てる。返すのは (ルール, 苦情)。苦情があってもルールが返ることがある。
 // {!root} を組み立てられずに止める側へ倒した deny・ask と、{!root} の後ろの書き方への warn がそれにあたる。
+//
+// 処理フロー:
+//  1. 書き方の検査（id・match・文面）。通らなければルールごと外す。
+//  2. 本体を 1 つに絞る（glob・regex・when のどれか）。
+//  3. when の個別条件、または glob・regex を式に組む。組めない式は deny・ask を全部止める側に倒す（degrade）。
+//  4. except を式に組む。組めない except は外すが、allow はルールごと使わない。
 func build(raw rawRule, section Decision, where, root string) (*Rule, []Problem) {
 	if !raw.builtin && ospath.Strip(raw.id) == "" {
 		return nil, []Problem{{Severity: Error, Rule: where, Detail: "id がありません。ルールには id を書いてください（記録と文面にこの名前が出る）"}}
 	}
+	// 1. 書き方の検査。
 	every := ReadableEvery(raw.every)
 	if every == 0 {
 		every = EveryDefault
@@ -203,6 +211,7 @@ func build(raw rawRule, section Decision, where, root string) (*Rule, []Problem)
 	if rule.Match == "" {
 		return fail("match がありません。どのツールにもヒットしない")
 	}
+	// 2. 本体は glob・regex・when のうち 1 つだけ。
 	// when と並べたかはキーの有無で見る（`glob: ''` を添えた組み合わせ条件を通さない）。
 	var bodies []string
 	for _, b := range []struct {
@@ -226,6 +235,7 @@ func build(raw rawRule, section Decision, where, root string) (*Rule, []Problem)
 		return fail("glob と regex と when が並んでいる。書けるのは 1 つだけで、どれで判定するのか決められない")
 	}
 
+	// 3. 本体を式に組む。
 	var tree *Condition
 	if raw.hasWhen {
 		var problem *Problem
@@ -285,6 +295,7 @@ func build(raw rawRule, section Decision, where, root string) (*Rule, []Problem)
 		rule.Compiled = built.re
 	}
 
+	// 4. except を式に組む。
 	for i, e := range excepts {
 		label := fmt.Sprintf("except[%d] の ", i)
 		part := compileExpr(e.Glob, e.Regex, root, name, label)
@@ -355,7 +366,7 @@ func readExcepts(raw rawRule, name string) ([]Exclusion, *Problem) {
 	return out, nil
 }
 
-// unknownKeys は allowed に無いキーを str() にして並べたもの（Python の sorted）。
+// unknownKeys は allowed に無いキーを文字にして、並べ替えたもの。
 func unknownKeys(m *yaml.Map, allowed []string) []string {
 	var unknown []string
 	for k := range m.All() {

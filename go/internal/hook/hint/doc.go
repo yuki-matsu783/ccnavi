@@ -7,7 +7,4 @@
 // 積まれていれば出す。セッションの頭にも Stop の促しにも置かない。連続する作業は、前の作業の完了のときに次だけを案内する。
 // Stop の促しはターンを伸ばすため。ワークツリーの名前ごとにセッションで 1 回だけ出し、覚え方はルールの additionalContextOnce と
 // 同じ（ctxfile）。
-//
-// Python からの対応: hook/commitnote.notice → CommitNotice、proposalhint.hint → ProposalHint。CODE_PARENT_*・
-// ONCE_ID・TEXT_ID は私的な定数にした。
 package hint

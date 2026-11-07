@@ -87,7 +87,7 @@ func TestHidden(t *testing.T) {
 		{"redis-cli -h h -a hunter2 ping", "hunter2", []string{"redis-cli -h h -a", "ping"}},
 		{"cat > k <<EOF\n-----BEGIN RSA PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC\n-----END RSA PRIVATE KEY-----\nEOF",
 			"MIIEvQIBADANBgkqhkiG9w0BAQEFAASC", []string{"BEGIN RSA PRIVATE KEY", "END RSA PRIVATE KEY", "EOF"}},
-		// Python の IGNORECASE は i に ı・İ も当てる。
+		// 大文字小文字を無視する照合では i に ı・İ も当てる。
 		{"PRİVATE_KEY=abc123", "abc123", []string{"PRİVATE_KEY="}},
 	}
 	for _, c := range cases {
@@ -130,7 +130,7 @@ func TestExactOutputs(t *testing.T) {
 		{"mysql -phunter2\x00ls -a", "mysql -p***\x00ls -a"},
 		// 空白はまたがない。後ろの語の @ まで伸ばさない。
 		{"git clone https://u:pw@host/r.git && ssh me@other", "git clone https://u:***@host/r.git && ssh me@other"},
-		// 結びの無い秘密キーは終わりまで。Python の $ と同じく最後の改行は残す。
+		// 結びの無い秘密キーは終わりまで。`$` と同じく最後の改行は残す。
 		{"-----BEGIN PRIVATE KEY-----abcdefghijklmnopqrstuvwxyz\n", "-----BEGIN PRIVATE KEY-----abcdef***wxyz\n"},
 	}
 	for _, c := range cases {

@@ -35,7 +35,7 @@ func after(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, ro
 }
 
 // check は after の本体。期限は渡さない。止められないイベントで、遅れは待ち時間にしかならないため。ワークツリーを読む側が
-// 自前の短い時間を持つ。差し戻すのは、直前の実行が汚したと言える deny があるときだけ。enable なら標準エラーと
+// 自前の短い時間を決めている。差し戻すのは、直前の実行が汚したと言える deny があるときだけ。enable なら標準エラーと
 // ExitBlock、dry-run なら差し戻さず、文脈の文に dry-run の頭を添える。
 func check(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, root string, in hookio.Input,
 	record *audit.Record) (int, error) {

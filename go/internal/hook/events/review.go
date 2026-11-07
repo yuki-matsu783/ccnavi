@@ -35,6 +35,7 @@ func planStopReview(stderr io.Writer, conf *config.Settings, root string, in hoo
 	if conf.State == "" || in.SessionID == "" || !conf.StopReviewAgent {
 		return
 	}
+	// 処理フロー: 共有キーを導く → 直前の Stop の記録を残す → このターンの提案を候補に集める → 判定の対象か決める → 計画を 1 件書く。
 	store := stopreview.Store{State: conf.State, Logs: stopreview.LogsDir(conf.Log)}
 	key := stopreview.SharedKey(in.SessionID, in.TranscriptPath)
 	if key == "" {
@@ -44,6 +45,7 @@ func planStopReview(stderr io.Writer, conf *config.Settings, root string, in hoo
 	}
 	effective := stopreview.Setting(mode, conf.StopReview)
 	now := time.Now()
+	// Stop が続いた回なのに、前の Stop は促しも差し戻しもしていない。判定役の差し戻しを取りこぼした疑いなので記録して、あとで数えられるようにする。
 	if last, ok := store.LastStop(in.SessionID); in.StopHookActive && !cont.ok && ok && !last.Nudged && !last.SentBack {
 		store.LogSuspected(in.SessionID, key)
 	}
@@ -53,6 +55,7 @@ func planStopReview(stderr io.Writer, conf *config.Settings, root string, in hoo
 	since := stopreview.TurnStart(conf.State, in.SessionID)
 	ops := stopreview.TurnOps(conf.State, in.SessionID, since)
 	bound := lazyBound(conf, root, raw)
+	// 着手済み（進行中）のチケットに属する提案は、判定の候補にしない。
 	unstarted := func(ident string) bool {
 		t, ok := tree.Lookup(bound(), ident)
 		return !ok || !t.InProgress()
@@ -90,6 +93,7 @@ func planStopReview(stderr io.Writer, conf *config.Settings, root string, in hoo
 	if ok && criteria == "" {
 		ok, why = false, stopreview.ReasonCriteriaUnreadable
 	}
+	// 対象外の理由のうち、結果を記録に残すもの（known）だけ計画を書く。それ以外の対象外は何も書かずに終わる。
 	final, known := notCandidateFinal[why]
 	if !ok && !known {
 		return

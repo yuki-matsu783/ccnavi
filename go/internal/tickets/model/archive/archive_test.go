@@ -29,7 +29,7 @@ func closedText(name, parent string, phase int) string {
 
 type fixture struct{ root, approved string }
 
-// newFixture は閉じた親 2 つ（i0001・old）と、開いた親（open）の子を持つ承認済みの領域を作る。git は使わない。
+// newFixture は閉じた親 2 つ（i0001・old）と、開いた親（open）の子がある承認済みの領域を作る。git は使わない。
 func newFixture(t *testing.T) fixture {
 	t.Helper()
 	root := t.TempDir()
@@ -249,9 +249,8 @@ func TestHolds(t *testing.T) {
 	}
 }
 
-// 回帰: Python の search の `$` は末尾の改行 1 つの前でも当たる。Go の `$` に写したときは、名前の末尾が改行の
-// 書きかけを一時ファイルと見ずに移していた。
-func TestTempNameLikePython(t *testing.T) {
+// 回帰: 名前の末尾が改行の書きかけを、一時ファイルと見ずに移していた。末尾の改行 1 つは許し、2 つは許さない。
+func TestTempNameAllowsOneTrailingNewline(t *testing.T) {
 	for name, want := range map[string]bool{
 		".x.part": true, ".x.part\n": true, ".x.part\n\n": false, ".x.part.1": true, ".x.part.1\n": true,
 		"x.part": false, ".x.partx": false, ".x.part/y": false,

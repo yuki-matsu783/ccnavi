@@ -25,7 +25,7 @@ func unattended(getenv func(string) string) bool {
 
 // Headless は見ている人がいない実行（`claude -p`・SDK）か。Unattended より広く、入口が SDK の実行も含める。
 // 放置したセッションの引き継ぎの待機だけが使う（待機がプロセスを引き止めるので、疑わしければ除く側に倒す）。
-// hook の判定は聞くべきところで自走しないよう狭い Unattended を使う。Python も 2 つを分けている。
+// hook の判定は聞くべきところで自走しないよう狭い Unattended を使う。2 つは意図して分けてある。
 func Headless(getenv func(string) string) bool {
 	return unattended(getenv) || strings.HasPrefix(getenv(env.ClaudeCodeEntrypoint), sdkEntrypoint)
 }

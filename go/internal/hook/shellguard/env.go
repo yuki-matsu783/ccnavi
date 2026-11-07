@@ -77,6 +77,7 @@ func CheckEnv(subject string, degraded bool) (script string, names []string) {
 // setNames はコマンド 1 本が置く・外す変数の名前。実行役の層も見る。
 func setNames(words []string) []string {
 	var names []string
+	// 先頭の環境変数の代入などを除いた語から読む。実行役（env・sudo など）を外した中の層も、同じ手順で順に読む。
 	words = stripHeads(words)
 	for depth := 0; len(words) > 0 && depth <= shell.UnwrapDepth; depth++ {
 		k := shell.NameIndex(words)
@@ -93,6 +94,7 @@ func setNames(words []string) []string {
 		if name == "env" {
 			names = append(names, envNames(args)...)
 		}
+		// export・declare などは引数の `X=…` と `X`（値なしの宣言）のどちらでも変数を置く・外すので、両方拾う。オプション語は飛ばす。
 		if slices.Contains(declares, name) {
 			for _, arg := range args {
 				if strings.HasPrefix(arg, "-") || strings.HasPrefix(arg, "+") {

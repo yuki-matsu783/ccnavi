@@ -2,7 +2,7 @@ package argparse
 
 import "strings"
 
-// Kind は引数を読んだときの振る舞い（Python の action）。
+// Kind は引数を読んだときの振る舞い（store・store_true・append）。
 type Kind int
 
 const (
@@ -18,10 +18,10 @@ const (
 	one        Nargs = 0
 	Optional   Nargs = -1 // "?"
 	ZeroOrMore Nargs = -2 // "*"
-	noArgs     Nargs = -3 // store_true（Python の nargs=0）
+	noArgs     Nargs = -3 // store_true
 )
 
-// Type は文字列を値に変える関数と、誤りの文に出す名前（Python の type.__name__）。
+// Type は文字列を値に変える関数と、誤りの文に出す名前。
 // convert が nil なら文字列のまま置く。
 type Type struct {
 	name    string
@@ -37,7 +37,7 @@ type Arg struct {
 	Const   any
 	Default any
 	Type    Type
-	Metavar []string // 1 つなら文字列、2 つ以上なら Python のタプル
+	Metavar []string // 1 つなら文字列、2 つ以上ならタプル
 	dest    string   // 空なら Flags から決める
 }
 
@@ -67,7 +67,7 @@ func New(prog string) *Parser {
 	return &Parser{prog: prog, options: map[string]*Action{}}
 }
 
-// Add は引数を足す。組み合わせの誤り（Python が ValueError で断るもの）は確かめない。固定の組み立てで使う。
+// Add は引数を足す。組み合わせの誤り（argparse なら例外で断る形）は確かめない。固定の組み立てで使う。
 func (p *Parser) Add(arg Arg) *Action {
 	a := &Action{kind: arg.Kind, nargs: arg.Nargs, konst: arg.Const, typ: arg.Type, metavar: arg.Metavar, Default: arg.Default}
 	if list, ok := arg.Default.([]string); ok {
@@ -118,7 +118,7 @@ func (p *Parser) HasOption(s string) bool { return p.Option(s) != nil }
 // Option は名前が s のオプション。無ければ nil。
 func (p *Parser) Option(s string) *Action { return p.options[s] }
 
-// name は誤りの文に出す引数の名前（Python の _get_action_name）。
+// name は誤りの文に出す引数の名前。
 func (a *Action) name() string {
 	if len(a.OptionStrings) > 0 {
 		return strings.Join(a.OptionStrings, "/")

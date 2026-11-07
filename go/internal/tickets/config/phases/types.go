@@ -195,7 +195,7 @@ func (t *Types) All() iter.Seq[*PhaseType] {
 	}
 }
 
-// put は定義を置く。同じ id があれば位置はそのままで置き換える（Python の dict と同じ）。
+// put は定義を置く。同じ id があれば位置はそのままで置き換える。
 func (t *Types) put(p *PhaseType) {
 	if t.at == nil {
 		t.at = map[string]int{}
@@ -208,7 +208,7 @@ func (t *Types) put(p *PhaseType) {
 	t.list = append(t.list, p)
 }
 
-// With は定義を足した写し（同じ id は位置を保って置き換える。Python の {**t, **extra}）。t は変えない。
+// With は定義を足した写し（同じ id は位置を保って置き換える）。t は変えない。
 func (t *Types) With(extra ...*PhaseType) *Types {
 	out := t.clone()
 	for _, p := range extra {
@@ -332,6 +332,7 @@ func one(id string, body *yaml.Map) (*PhaseType, []rules.Problem) {
 	if p.Title = ospath.Strip(body.Text("title")); p.Title == "" {
 		p.Title = id
 	}
+	// 種類（kind）は既定が work。
 	kind := body.Text("kind")
 	if kind == "" {
 		kind = string(Work)
@@ -340,6 +341,7 @@ func one(id string, body *yaml.Map) (*PhaseType, []rules.Problem) {
 	if !containsKind(p.Kind) {
 		return bad("`kind` は " + joinKinds(" か "))
 	}
+	// review は真偽だけ。文字列は読まず、書き直しを案内して断る（後方互換の読み替えは作らない）。
 	review, present := body.Lookup("review")
 	if present {
 		b, ok := review.(bool)
@@ -353,6 +355,7 @@ func one(id string, body *yaml.Map) (*PhaseType, []rules.Problem) {
 		// フィードバック対応の結果をユーザが見ない経路は作らない。
 		return bad("フィードバック対応の定義に `review: false` は書けない（`true` にする）")
 	}
+	// scope は glob のリストか `inherit`（親の allow をそのまま使う）。省略は inherit と同じ扱い。
 	if scope, present := body.Lookup("scope"); present && scope != nil && scope != inherit {
 		list, ok := scope.([]any)
 		if !ok {
@@ -370,6 +373,7 @@ func one(id string, body *yaml.Map) (*PhaseType, []rules.Problem) {
 			p.ScopeGlobs = append(p.ScopeGlobs, e.Glob)
 		}
 	}
+	// deliverables は成果物のパス。ワークツリーの外を指す形（`..`・絶対パス）は断る。
 	if raw, present := body.Lookup("deliverables"); present && raw != nil {
 		list, ok := yaml.Strings(raw)
 		if !ok {
@@ -392,6 +396,7 @@ func one(id string, body *yaml.Map) (*PhaseType, []rules.Problem) {
 	p.Agent = ospath.Strip(body.Text("agent"))
 	p.Skill = ospath.Strip(body.Text("skill"))
 	p.When = ospath.Strip(body.Text("when"))
+	// learning は on / off の文字列か真偽。真偽は true を on として読む。
 	if raw, present := body.Lookup("learning"); present && raw != nil {
 		switch x := raw.(type) {
 		case bool:
@@ -473,7 +478,7 @@ func globs(id, key string, raw []any) ([]ticket.Entry, []rules.Problem) {
 	return entries, problems
 }
 
-// consolidate は統合の子の範囲の上限を持つ、ccnavi の中に固定した定義。
+// consolidate は統合の子の範囲の上限を定める、ccnavi の中に固定した定義。
 var consolidate = func() *PhaseType {
 	entries, _ := globs(ticket.MaintenanceConsolidate, "scope", strs(ticket.ConsolidateScope()))
 	p := &PhaseType{
@@ -486,6 +491,6 @@ var consolidate = func() *PhaseType {
 	return p
 }()
 
-// ConsolidateType は統合の子の範囲の上限を持つ定義。phases.yml にも親のコピーにも置かない。統合の子は親の
+// ConsolidateType は統合の子の範囲の上限を定める定義。phases.yml にも親のコピーにも置かない。統合の子は親の
 // 計画に載らず、親の範囲の上限も当てないので、範囲を切り詰めるのはこの定義と子の allow だけ。
 func ConsolidateType() *PhaseType { return consolidate }

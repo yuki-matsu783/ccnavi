@@ -10,12 +10,4 @@
 // 結果ファイル `stopops-result/*.kv`（ccnavi-ticket.sh が出口で書く）、セッションごとの `stopturn-`・
 // `stoprefs-`・`stopwrite-`・`stoplast-`・`stoptaint-`。試行のイベントは `logs/stop-review/events.jsonl` に足し、
 // 判定の記録（decisions.jsonl）には書かない。
-//
-// Python からの対応: records.stopreview・stopops・stopeval をまとめた。configure_log と state を引数に取る
-// 関数は Store のメソッドにした（Logs が空ならイベントを書かない）。stopeval.render(summarize(…),
-// unlinked_total(…)) → Report。load_criteria → LoadCriteria（出どころは誰も読まないので返さない）。
-// save_material の抽出器の版は常に同じ値なので引数から外した。stopops.unlinked は集計の総数に寄せた。
-// JUDGE_LAUNCHER → config.Launcher。秒の値（SLACK_SECONDS・UNLINK_AFTER_SECONDS・操作実績と書いた記録の時刻）は
-// time.Duration・time.Time にし、記録の数との変換は moment と fsio.UnixSeconds だけで行う。
-// log_event(…, "no_key", {"reason": who}) → LogNoKey（who は Side）。
 package stopreview

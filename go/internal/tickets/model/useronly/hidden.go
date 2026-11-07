@@ -186,12 +186,14 @@ func literalQuoted(subject string) string {
 	if strings.Contains(subject, "$(") || strings.Contains(subject, "`") || strings.Contains(subject, "<<") || strings.Contains(subject, "$'") {
 		return subject
 	}
+	// 1 字ずつ読み、引用符の状態（quote）に応じて glob や展開の字を「文字どおりの印」に置き換える。
 	src := []rune(subject)
 	var out []rune
 	quote := rune(0)
 	for i := 0; i < len(src); i++ {
 		ch := src[i]
 		switch {
+		// 単引用符の中は、すべての字が文字どおり。
 		case quote == '\'':
 			if ch == '\'' {
 				quote = 0
@@ -201,6 +203,7 @@ func literalQuoted(subject string) string {
 			} else {
 				out = append(out, ch)
 			}
+		// `\` の次の字は引用符の外でも文字どおり。
 		case ch == '\\' && i+1 < len(src):
 			following := src[i+1]
 			out = append(out, ch)
@@ -210,6 +213,7 @@ func literalQuoted(subject string) string {
 				out = append(out, following)
 			}
 			i++
+		// 二重引用符の中は、展開は効くが glob は効かない。
 		case quote == '"':
 			if ch == '"' {
 				quote = 0
@@ -226,6 +230,7 @@ func literalQuoted(subject string) string {
 			out = append(out, ch)
 		}
 	}
+	// 引用符が閉じていない。読み違えるより、置き換えずに返して止める側に倒す。
 	if quote != 0 {
 		return subject
 	}
@@ -364,8 +369,8 @@ func hiddenArgs(kind string, args []string) string {
 				return a
 			}
 		}
-		// 展開を含む語がどれにもなりえず、文字どおりの語だけで揃った形（`--agree --yes [a]`）。Python はここで
-		// 例外になり（判定の失敗として止める）、Go は揃えた文字どおりの語で止める。
+		// 展開を含む語がどれにもなりえず、文字どおりの語だけで揃った形（`--agree --yes [a]`）。
+		// 揃えた文字どおりの語で止める側に倒す。
 		for _, a := range args {
 			if couldBe(a, all) {
 				return a
@@ -543,6 +548,7 @@ func namedInText(subject, binBase string) string {
 // executedEntry は語の並びの頭（代入・実行役・シェル・`env` などの前置きを飛ばした先）が入口なら、その入口。
 // シェルの `-s` / `-c` の後ろは引数か文字列で、実行される語ではない。
 func executedEntry(words []string, binBase string) string {
+	// 頭から前置き（代入・実行役・インタプリタ・オプション）を読み飛ばし、実際に実行される最初の語まで進む。
 	shellSeen := false
 	k := 0
 	for ; k < len(words); k++ {
@@ -569,9 +575,11 @@ func executedEntry(words []string, binBase string) string {
 		}
 		break
 	}
+	// 前置きだけで語が尽きた。実行される語は無い。
 	if k >= len(words) {
 		return ""
 	}
+	// 実行される語が入口の名前か。シェルを経由した（`sh x`）後ろの語は、入口として実行されるとは限らないので実行ファイルとは見ない。
 	base := baseName(words[k])
 	if slices.Contains(namedScripts, base) {
 		if base == config.LauncherScript {

@@ -76,6 +76,7 @@ func Candidates(conf *config.Settings, root string, pending, revisions, approved
 		return cache[name]
 	}
 
+	// 1. 承認済みの親の改版。通ったものだけを pool に入れ、新規の子の検査が改版後の親を見られるようにする。
 	for _, t := range sortedBy(revisions, func(a, b *ticket.Ticket) int { return strings.Compare(a.ID, b.ID) }) {
 		current := openIndex[t.ID]
 		cfg := configFor(t)
@@ -101,6 +102,7 @@ func Candidates(conf *config.Settings, root string, pending, revisions, approved
 		pool[t.ID] = t
 	}
 
+	// 2. 新規の提案。親 → 子（フェーズ番号 → 識別子）の順に検める。子の検査は、先に通った親を pool から引く。
 	added := map[string][]*ticket.Ticket{}
 	proposed := proposedPhases(conf, root, pending)
 	others := slices.Concat(approved, pending, revisions)
@@ -136,6 +138,7 @@ func Candidates(conf *config.Settings, root string, pending, revisions, approved
 			complaints = append(complaints, mixedProblem(t, kids, false))
 		}
 		complaints = append(complaints, approval.BranchProblems(t, others)...)
+		// フェーズの順の検査は、ほかの error が無いときだけ行う（食い違った入力に重ねて苦情を出さない）。
 		if t.IsChild() && !hasError(complaints) {
 			if parent := pool[t.Parent]; parent != nil {
 				complaints = append(complaints, phase.OrderProblems(conf, root, t, parent, added[t.Parent], nil)...)

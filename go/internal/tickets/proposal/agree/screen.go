@@ -79,7 +79,7 @@ func ApprovedText(tickets []*ticket.Ticket, revisions map[string]bool, root stri
 		lines = append(lines, "案内: "+n)
 	}
 	// 承認の前に計画編集タブで計画の順序が書き換わると、エージェントが書いた番号と承認された番号が違うことがある
-	// （コミットしていない編集と見分けられない）ので、計画を持つ親とその子があればいつも添える。
+	// （コミットしていない編集と見分けられない）ので、計画がある親とその子があればいつも添える。
 	if slices.ContainsFunc(tickets, func(t *ticket.Ticket) bool {
 		return (!t.IsChild() && t.HasPlan()) || (t.IsChild() && t.Phase != 0)
 	}) {
@@ -295,6 +295,7 @@ func copyLines(t *ticket.Ticket, types, cfg *phases.Types) []string {
 	for _, s := range t.Numbered() {
 		numbers[s.Item.Type] = append(numbers[s.Item.Type], strconv.Itoa(s.Number))
 	}
+	// このステップが使う型と使わない型に分ける。
 	var used, unused []*phases.PhaseType
 	if types != nil {
 		for pt := range types.All() {
@@ -333,6 +334,7 @@ func copyLines(t *ticket.Ticket, types, cfg *phases.Types) []string {
 			lines = append(lines, "    "+pt.Title+" / "+pt.ID)
 		}
 	}
+	// phases.yml にあって、親の phases: に無い定義を集める。
 	var left []string
 	if cfg != nil {
 		for pt := range cfg.All() {

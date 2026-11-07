@@ -9,7 +9,7 @@ import (
 	"ccnavi/internal/infra/yaml"
 )
 
-// ToJSON は YAML から読んだ値の Python の json.loads(json.dumps(v, default=str))。マップは *pyjson.Object
+// ToJSON は YAML から読んだ値を JSON の値にする（json.dumps(v, default=str) を読み直したときと同じ形）。マップは *pyjson.Object
 // （キーは json.dumps がキーに書く文字列）、並び（タプルも）は []any にし、JSON に無い値（日付・集合・バイト列）は
 // str() の文字列にする。
 func ToJSON(v any) any {

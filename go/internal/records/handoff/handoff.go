@@ -21,7 +21,7 @@ import (
 const (
 	// defaultTokens は閾値の既定（トークン数）。
 	defaultTokens = 400000
-	// 1 時間のキャッシュの失効の 5 分前と、5 分のキャッシュの失効の 1 分前。
+	// 起こす時刻は、キャッシュが消える少し前にする。1 時間のキャッシュなら 5 分前、5 分のキャッシュなら 1 分前。
 	waitLong  = 55 * time.Minute
 	waitShort = 4 * time.Minute
 	// maxWait は待ち時間の上限。hook の上限 3600 秒より前に起きる。
@@ -32,7 +32,7 @@ const (
 	ttlShort = 300 * time.Second
 	ttlLong  = 3600 * time.Second
 
-	// 末尾から読むトランスクリプトの大きさ。末尾に応答の行が無ければ（巨大なツールの結果が続いたとき）
+	// 末尾から読む transcript の大きさ。末尾に応答の行が無ければ（巨大なツールの結果が続いたとき）
 	// tailGrow 倍ずつ広げ、tailLimit で止める。
 	tailBytes = 1024 * 1024
 	tailLimit = 16 * 1024 * 1024
@@ -47,6 +47,7 @@ const (
 )
 
 // phase は待機の状態。
+// waiting（Start が置く）→ fired（Check が起こす指示を返した）の順に進む。ユーザの入力があれば Reset が active にして待機を終える。
 type phase string
 
 const (
@@ -140,8 +141,8 @@ func assistantUsages(raw string) []*pyjson.Object {
 	return rows
 }
 
-// ttlOf は直近でキャッシュを書き込んだ応答の内訳で保持時間を決める。5 分側に書き込みがあれば 5 分、
-// 無ければ 1 時間。どの応答にも書き込みが無ければ 1 時間とみなす。
+// ttlOf は直近でキャッシュを書き込んだ応答の内訳で保持時間を決める。新しい応答から順に見て、
+// 5 分側に書き込みがあれば 5 分、1 時間側だけなら 1 時間。どの応答にも書き込みが無ければ 1 時間とみなす。
 func ttlOf(rows []*pyjson.Object) time.Duration {
 	for _, usage := range rows {
 		made, ok := usage.Value("cache_creation").(*pyjson.Object)
@@ -162,7 +163,7 @@ func ttlOf(rows []*pyjson.Object) time.Duration {
 
 // waitFor は放置してから起こすまでの待ち時間。上書き（秒）が正の整数ならそれ（maxWait まで）。
 func waitFor(ttl time.Duration, override string) time.Duration {
-	// Python の text.isascii() and text.isdigit()。int() が読めない上付きの数字（²）などを除く。
+	// ASCII の数字だけを受ける。整数に読めない上付きの数字（²）などは除く。
 	if text := ospath.Strip(override); pyfmt.IsDigit(text) && !strings.ContainsFunc(text, nonASCII) {
 		n, err := pyfmt.ParseInt(text)
 		if errors.Is(err, pyfmt.ErrIntRange) {
@@ -232,6 +233,8 @@ func Start(state, session string, usage *Usage, limit int, waitOverride, transcr
 	if data.Value(keyState) == string(fired) || !due(data, usage.tokens, limit) {
 		return Plan{}, false
 	}
+	// 印（token）を状態に書く。Check は印が一致したときだけ起こすので、間にユーザが打った、
+	// あとの待機に置き換わったときの古い待機は何もしない。
 	token := digest.RandomHex(tokenBytes)
 	fresh := pyjson.NewObject(
 		keyState, string(waiting),
@@ -259,6 +262,7 @@ func Check(state, session, token string, wait time.Duration, limit int) (string,
 	if data.Value(keyState) != string(waiting) || data.Value(keyToken) != token {
 		return "", false
 	}
+	// 待っている間に /compact などで会話が小さくなっていれば起こさない（読み直して確かめる）。
 	if transcript := data.Value(keyTranscript); limit > 0 && pyfmt.Truthy(transcript) {
 		path, _ := transcript.(string)
 		usage := UsageOf(path)
@@ -266,6 +270,7 @@ func Check(state, session, token string, wait time.Duration, limit int) (string,
 			return "", false
 		}
 	}
+	// 起こす指示を返す前に、基準を今の大きさ（due）へ進めて fired にする。次に促すのはここからさらに閾値ぶん育ったとき。
 	next := data.With(keyState, string(fired), keyBase, pyjson.PositiveInt(data.Value(keyDue)), keyWait, int(wait/time.Second))
 	next.Pop(keyToken)
 	next.Pop(keyTold)
@@ -311,7 +316,7 @@ func Notice(state, session string, usage *Usage, limit int, waitOverride string)
 		return "", false
 	}
 	mark := statePath(state, session, noticeSuffix)
-	// 溜める段は見ない。Python が os.path.exists でディスクだけを見ていたのに合わせる。
+	// 有無はディスクだけで決め、溜める段は見ない。
 	if ospath.DiskExists(mark) {
 		return "", false
 	}

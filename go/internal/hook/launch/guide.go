@@ -186,6 +186,7 @@ func guidance(conf *config.Settings, root string, t *target, b *book) string {
 		more = "続きは " + flowPath + " を読む"
 	}
 	rules := childnote.RuleLines()
+	// 必須の行を先に取り、残りの字数（room）を可変の並びに割り当てる。
 	room := max(0, guideLimit-width(head)-width(rules)-width([]string{guideClose}))
 	if more != "" {
 		room = max(0, room-width([]string{more}))
@@ -199,6 +200,7 @@ func guidance(conf *config.Settings, root string, t *target, b *book) string {
 	}
 	lines := head
 	cut := false
+	// 並びは丸ごと入れるか丸ごと省く。途中で切ると文が壊れ、読み手が欠けに気づけない。省いたら cut を立てて、続きを読む行で補う。
 	for _, group := range [][]string{body, block.Brief, childnote.StageLines(conf, root, b.index, []*ticket.Ticket{child})} {
 		if len(group) == 0 {
 			continue

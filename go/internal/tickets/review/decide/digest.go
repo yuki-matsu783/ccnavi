@@ -87,6 +87,8 @@ func Digest(d *Decision) string {
 
 // ParseDigest はダイジェストを読み戻す。読めなければ偽（版 1 の値を含む）。
 func ParseDigest(text string) (Shown, bool) {
+	// 形は接頭辞 `v2.` のあとに、ASCII の JSON `{"b": 基礎, "t": {指摘のキー: 版}}` を URL セーフ base64（パディング無し）にしたもの。
+	// 1 つでも形が違えば偽にする（版 1 の値もここで偽になり、見せ直しになる）。
 	encoded, ok := strings.CutPrefix(text, digestPrefix)
 	if !ok {
 		return Shown{}, false

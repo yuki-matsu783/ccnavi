@@ -26,12 +26,14 @@ const (
 	textStartParent = "NEXT_OPS_START_PARENT"
 )
 
-// Start は doing/ の承認済みチケットに、着手の時刻と基準点（ワークツリーの HEAD）を書く。ワークツリーは、承認済みの project の元リポジトリから切られていなければならない。元リポジトリが違えば、判定はそのツリーの元リポジトリで行われ、チケットと食い違う。子ならフローのハッシュも記録する。着手のあとのフローの書き換えは、SubagentStart・SubagentStop が知らせる。
+// Start は doing/ の承認済みチケットに、着手の時刻と基準点（ワークツリーの HEAD）を書く。ワークツリーは、承認済みの project の元リポジトリから切られていなければならない。
+// 元リポジトリが違えば、判定はそのツリーの元リポジトリで行われ、チケットと食い違う。子ならフローのハッシュも記録する。着手のあとのフローの書き換えは、SubagentStart・SubagentStop が知らせる。
 func Start(stdout, stderr io.Writer, conf *config.Settings, root, id string) int {
 	found := startGate(stderr, conf, root, id)
 	if found == nil {
 		return 1
 	}
+	// 1. 着手できるチケットか（gate）と、ワークツリーが元のリポジトリのものとして在るか。
 	owner := tree.ProjectRoot(conf.Projects, found.Project)
 	if owner == "" {
 		owner = root
@@ -46,6 +48,7 @@ func Start(stdout, stderr io.Writer, conf *config.Settings, root, id string) int
 			id, worktree, project, createWords(root, found, worktree))
 		return 1
 	}
+	// 2. 着手の欄（started_at と、基準点 base_sha = 今の HEAD）を書く。基準点は、後の差分・範囲の検査の起点になる。置き場は doing/ のまま動かさない。
 	sha := git.Head(worktree, git.Options{})
 	if sha == "" {
 		fmt.Fprintf(stderr, "ccnavi: %s の HEAD を読めない\n", worktree)
@@ -57,6 +60,7 @@ func Start(stdout, stderr io.Writer, conf *config.Settings, root, id string) int
 		return 1
 	}
 	fmt.Fprintf(stdout, "OK: %s に着手した（%s / 基準点 %s）。置き場は %s/ のまま\n", found.ID, at, pyfmt.Head(sha, git.ShortSHA), place.Doing)
+	// 3. 子はフローのハッシュを記録する（着手のあとにフローが書き換わったことを検出するため）。
 	if found.IsChild() {
 		started := *found
 		started.StartedAt = at
@@ -70,6 +74,7 @@ func Start(stdout, stderr io.Writer, conf *config.Settings, root, id string) int
 		// 共通レイヤーと工程スキルのコピーは、ここでは書かない（発言ごとの写しが置く）。
 		io.WriteString(stdout, "共通レイヤーと工程スキルのプロジェクトへのコピーは、次のユーザの発言で置かれる\n")
 	}
+	// 4. 次の一手の案内。子の無いフェーズが残る親には、その案内だけを出す。
 	childless := plan.ChildlessNotice(conf, root, found)
 	for _, line := range childless {
 		io.WriteString(stdout, line+"\n")
@@ -92,7 +97,8 @@ func Start(stdout, stderr io.Writer, conf *config.Settings, root, id string) int
 	return 0
 }
 
-// createWords は、ワークツリーを作る案内を組む。子は親のブランチから `-b <子>` で切る。親は、識別子の名前のブランチを作らない。親のブランチ（MR の元ブランチ）を ccnavi-start.sh で直接チェックアウトする。MR の採用の確認と取り込みも、そこで行う。
+// createWords はワークツリーを作る案内を組む。子は親のブランチから `-b <子>` で切る。親は識別子の名前のブランチを作らず、
+// 親のブランチ（MR の元ブランチ）を ccnavi-start.sh で直接チェックアウトする。MR の採用の確認と取り込みも、そこで行う。
 func createWords(root string, t *ticket.Ticket, worktree string) string {
 	if t.IsChild() {
 		where := ""

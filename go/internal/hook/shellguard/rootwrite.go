@@ -67,7 +67,7 @@ func CheckRootWrite(set *rules.RuleSet, cwd, subject string, layers []string) Ro
 	return RootWrite{}
 }
 
-// RootWriteMessage は止めた理由。文は文面ファイルが持つ。
+// RootWriteMessage は止めた理由。文は文面ファイルに書いてある。
 func RootWriteMessage(root string, w RootWrite) string {
 	what := "plain"
 	if w.origin != "" {

@@ -86,6 +86,8 @@ func fold(path string) string {
 func runs(before []string) bool {
 	for _, word := range before {
 		name := ospath.Basename(fold(word))
+		// 前置きとして許すのは、シェル・実行の包み役・オプション・数（`timeout 30` の 30 など）・`VAR=値`。
+		// これ以外の語が先にあれば、スクリプトは引数の中に出ているだけで実行されない。
 		switch {
 		case slices.Contains(shells, name), slices.Contains(wrappers, name), strings.HasPrefix(word, "-"),
 			pyfmt.IsDigit(strings.TrimLeft(word, "-")):
@@ -117,6 +119,7 @@ func ProposeIdent(words []string) string {
 		if slices.Contains(rest[1:], checkFlag) {
 			return ""
 		}
+		// 識別子は、オプションと `--reason` の値を読み飛ばした最初の語。
 		skip := false
 		for _, arg := range rest[1:] {
 			switch {
@@ -175,6 +178,7 @@ func readResult(path string) *pyjson.Object {
 	if !ok {
 		return nil
 	}
+	// 行は `key=値`。`file=<sha> <パス>` は何行あってもよく、files に並べる。ほかのキーは後勝ち。
 	result := pyjson.NewObject("files", nil)
 	files := []any{}
 	for _, line := range ospath.Splitlines(text) {
@@ -194,6 +198,7 @@ func readResult(path string) *pyjson.Object {
 	if !slices.Contains(routes, Route(result.String("route"))) || result.String("id") == "" {
 		return nil
 	}
+	// 時刻と終了コードは文字列で書かれているので、数に直す（読めなければ 0）。
 	for _, key := range []string{"started", "ended", "rc"} {
 		value := 0.0
 		if text, ok := result.Value(key).(string); ok {
@@ -255,6 +260,8 @@ func bindOne(state string, pre *pyjson.Object, now time.Time) (Op, bool) {
 	if pyfmt.Truthy(pre.Value("bound")) {
 		return Op{}, false
 	}
+	// 範囲 [登録の時刻 - slack, 今 + slack] に収まる結果だけを候補にする。
+	// 同じ識別子の結果が複数あっても、別の呼び出しに結んだものは使わない。
 	taken := boundFiles(state)
 	lower, upper := moment(pre.Value("t0"), epoch).Add(-slack), now.Add(slack)
 	var best *pyjson.Object
@@ -368,6 +375,7 @@ func FinalVersions(ops []Op) []Op {
 	latest := map[string]Op{}
 	for _, op := range ops {
 		prev, seen := latest[op.Ident]
+		// 変更なしは、前に送った版がそのまま有効なので版を動かさない。
 		if op.Route == routeUnchanged && seen && prev.Route.effective() {
 			continue
 		}
@@ -410,6 +418,8 @@ const todoMarker = "/" + config.TodoDir + "/"
 // WrittenIdent は書き込んだパスが `<提案の置き場>/todo/<識別子>.md` なら識別子、違えば空。
 // 大文字小文字は区別しない。置き場は設定の相対パス（既定 wip/proposals）。
 func WrittenIdent(filePath, ticketsDir string) string {
+	// 比べるときは大文字小文字をそろえた形を使うが、返す識別子は元の綴りで切り出す。
+	// そろえると文字数が変わる字（İ など）があれば、元の位置とずれるので空を返す。
 	path := fold(filePath)
 	marker := "/" + strings.Trim(fold(ticketsDir), "/") + todoMarker
 	at := strings.LastIndex(path, marker)
@@ -458,6 +468,7 @@ func TurnWrites(state, session string, since time.Time) []Write {
 // `todo/<識別子>.md` があり、その終了が書いた時刻より後（slack を許す）かで決める。親の approval-request は
 // 子の提案も一緒に送るので、識別子では決めない。
 func UnsentWrites(writes []Write, ops []Op) []Write {
+	// 送った操作の files から、`todo/` 以降のパスごとに最後に送った時刻を集める。
 	sent := map[string]time.Time{}
 	for _, op := range ops {
 		if op.Route != RouteSent {
@@ -477,7 +488,7 @@ func UnsentWrites(writes []Write, ops []Op) []Write {
 	for _, w := range writes {
 		at, ok := sent[fold(w.Ident+config.MdExt)]
 		if !ok {
-			at = epoch.Add(-time.Second) // 送った版が無い（Python の既定 -1.0）
+			at = epoch.Add(-time.Second) // 送った版が無いものは、必ず未送信になる古い時刻に置く
 		}
 		if at.Before(w.at.Add(-slack)) {
 			unsent = append(unsent, w)
@@ -507,6 +518,7 @@ func NoteRefs(state, session string, labels []string, now time.Time) {
 		return
 	}
 	path := sessionFile(state, RefsPrefix, session)
+	// 同じラベルは古い行を除いて末尾に付け直す。件数は refsKept までに絞る（セッションの間に増え続けない）。
 	row := readObject(path)
 	prior, _ := row.Value("refs").([]any)
 	var kept []any

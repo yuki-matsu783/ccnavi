@@ -146,8 +146,8 @@ func LoadCommit(repo, rev string, deadline time.Time) *Wiki {
 			continue
 		}
 		mode, typ, sha, size := fields[0], fields[1], fields[2], fields[3]
-		// Python の size.isdigit() and int(size) > FILE_LIMIT。int() が読めない数字（²）は大きすぎるとして名指しする
-		// （Python は例外で止まる。git の出力には現れない）。
+		// サイズが数字でない、または fileLimit を超えるものは「大きすぎる」として名指しする。
+		// 数字に見えて整数に読めない字（²）も同じ扱い。
 		n, sizeErr := pyfmt.ParseInt(size)
 		switch {
 		case typ != "blob" || !regularModes[mode]:

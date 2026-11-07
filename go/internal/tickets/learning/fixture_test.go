@@ -11,7 +11,7 @@ import (
 
 // テストの道具。git のリポジトリとファイルを作る（git とファイルは testkit）。
 
-// repo は空でないコミットを 1 つ持つリポジトリ。
+// repo は空でないコミットが 1 つあるリポジトリ。
 func repo(t *testing.T) string {
 	t.Helper()
 	root := testkit.GitRoot(t)

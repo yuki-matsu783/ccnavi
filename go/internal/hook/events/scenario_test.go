@@ -188,7 +188,7 @@ func concat(parts ...[]step) []step {
 }
 
 // メインのセッションを、ワークスペースルートで始めから終わりまで回す。
-func TestMainSessionMatchesPython(t *testing.T) {
+func TestMainSessionMatchesGolden(t *testing.T) {
 	heavyScenario(t)
 	steps := concat(
 		[]step{
@@ -240,7 +240,7 @@ func TestMainSessionMatchesPython(t *testing.T) {
 }
 
 // チケットの作業（子のワークツリー）と、サブエージェントの始まりと終わりを回す。
-func TestTicketSessionMatchesPython(t *testing.T) {
+func TestTicketSessionMatchesGolden(t *testing.T) {
 	heavyScenario(t)
 	childRel := ".claude/worktrees/" + child
 	agent := []any{"agent_id", "ag1", "agent_type", "general-purpose"}
@@ -283,7 +283,7 @@ func TestTicketSessionMatchesPython(t *testing.T) {
 }
 
 // 直接作業のワークツリーで、integrate まで進んでいない Stop を回す。
-func TestDirectWorkMatchesPython(t *testing.T) {
+func TestDirectWorkMatchesGolden(t *testing.T) {
 	heavyScenario(t)
 	rel := ".claude/worktrees/" + direct
 	steps := concat(
@@ -324,7 +324,7 @@ func TestDirectWorkMatchesPython(t *testing.T) {
 }
 
 // Stop の AI 判定の判定役を登録したセッション。提案の操作実績・未送信の提案・計画・再開の疑いを回す。
-func TestStopReviewMatchesPython(t *testing.T) {
+func TestStopReviewMatchesGolden(t *testing.T) {
 	heavyScenario(t)
 	review := with("CCNAVI_STOP_REVIEW_AGENT", "1", "CCNAVI_STOP_REVIEW", "enable")
 	transcript := ".claude/t.jsonl"

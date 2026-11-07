@@ -47,7 +47,7 @@ type childChange struct {
 	ticket          *ticket.Ticket
 	raw             []byte
 	newTicket       string
-	newPhase        any // 子でなければ nil（Python の None）
+	newPhase        any // 子でなければ nil
 	newPredecessors []string
 }
 
@@ -68,7 +68,7 @@ func (c *childChange) json() *jsonObject {
 		"predecessors", strs(c.ticket.Predecessors), "new_predecessors", strs(c.newPredecessors))
 }
 
-// phaseOf は Python の t.phase（子でなければ None）。
+// phaseOf はチケットのフェーズ。子でなければ nil（JSON の null）。
 func phaseOf(t *ticket.Ticket) any {
 	if !t.IsChild() {
 		return nil
@@ -152,6 +152,12 @@ func childProblemsOf(s *Source, changes []childChange) []string {
 	if len(renamed) == 0 {
 		return nil
 	}
+	// 付け替え先と名前がぶつかるものを、見つけた順に集める。ぶつかる相手は todo/ の提案、ほかの置き場の提案、フローの下書き、
+	// 承認済みチケット、ワークツリー、承認済みの記録の順。
+	// leaving は今回の付け替えで元の名前が空くもの。空く名前は、別の子の付け替え先になってもぶつからない。
+	// 付け替え先と名前がぶつくものを、見つけた順に集める。ぶつかる相手は todo/ の提案、ほかの置き場の提案、フローの下書き、
+	// 承認済みチケット、ワークツリー、承認済みの記録の順。
+	// leaving は今回の付け替えで元の名前が空くもの。空く名前は、別の子の付け替え先になってもぶつからない。
 	conf, root := s.conf, s.root
 	leaving := map[string]bool{}
 	leavingPaths := map[string]bool{}
@@ -181,6 +187,7 @@ func childProblemsOf(s *Source, changes []childChange) []string {
 			found = append(found, c.ticket.ID+" の付け替え先 "+next+" の提案が既にある")
 		}
 	}
+	// 名前（元の識別子と付け替え先）を指す他の置き場の提案を探す。todo/ の提案は今回まとめて書き換えるので除く。
 	names := map[string]bool{}
 	for id := range leaving {
 		names[id] = true
@@ -196,6 +203,7 @@ func childProblemsOf(s *Source, changes []childChange) []string {
 			found = append(found, string(t.State)+"/ の提案 "+t.ID+" が付け替える識別子を指す（"+t.Path+"）")
 		}
 	}
+	// 設定が無ければ、置き場の外（下書き・承認済み・ワークツリー）は見られないので、ここまでの結果で返す。
 	if conf == nil {
 		return sortedUnique(found)
 	}
@@ -213,6 +221,8 @@ func childProblemsOf(s *Source, changes []childChange) []string {
 			found = append(found, "承認済みチケット "+t.ID+" の predecessors が付け替える "+strings.Join(hit, ", ")+" を指す")
 		}
 	}
+	// 全ツリー（ワークスペースルートとワークツリー）の承認済みの側を調べる。
+	// フローと phase マーカーは `<識別子>.` で始まる名前で置かれるので、前方一致で拾う。
 	sortedNames := make([]string, 0, len(names))
 	for id := range names {
 		sortedNames = append(sortedNames, id)
@@ -315,6 +325,8 @@ func errorsOnly(ps []rules.Problem) []rules.Problem {
 // plans は図に描く中身。計画ごとに 1 件（全体計画とフィードバック計画）。
 func (a *Answer) plans() []any {
 	parent, revised := a.source.Parent, a.revised
+	// back は振り直した番号 → 元の番号。図は新しい番号で描き、from で元の番号を示す。
+	// held は今承認されている改版前の状態（current）の進み具合で、図の current に使う。
 	wf := cmp.Or(revised.Workflow, phases.Compute(revised))
 	types := phases.TypesOf(parent)
 	back := map[int]int{}
@@ -425,7 +437,7 @@ func (a *Answer) Body() *jsonObject {
 		"child_problems", strs(a.childProblems), "mismatched", mismatched(a.source), "writable", a.writable())
 }
 
-// Parent は承認の対象に入った計画を持つ親の提案と、改版ならその承認済みチケット。
+// Parent は承認の対象に入った計画がある親の提案と、改版ならその承認済みチケット。
 type Parent struct {
 	Proposal, Current *ticket.Ticket
 }

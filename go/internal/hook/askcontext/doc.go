@@ -8,7 +8,4 @@
 // この呼び出し自身の tool_use の行があるかで分かる。自分の行がまだ無ければ、見出しが現れるまで AskContextWait まで
 // 読み直す。判定できないとき（記録が読めない・パスや tool_use_id が無い・待っても現れない）は通す。促しの検査で、
 // 保護ではないので、止めすぎるより通すほうを選ぶ。
-//
-// Python からの対応: hook/askcontext の stop_text → StopText、CODE・RULE_ID → Code・RuleID。step_text・absent_sections・
-// missing・wait_until は私的にした。
 package askcontext

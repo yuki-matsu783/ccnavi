@@ -35,7 +35,7 @@ func Hex(a Algo, text string, n int) string {
 	return HexBytes(a, []byte(text), n)
 }
 
-// HexBytes はバイト列の要約の 16 進の頭 n 字（Python の hashlib.<算法>(b).hexdigest()[:n]）。n の扱いは Hex と同じ。
+// HexBytes はバイト列の要約の 16 進の頭 n 字。n の扱いは Hex と同じ。
 func HexBytes(a Algo, b []byte, n int) string {
 	h := New(a)
 	h.Write(b)

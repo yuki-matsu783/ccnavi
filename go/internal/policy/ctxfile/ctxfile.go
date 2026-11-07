@@ -23,7 +23,7 @@ import (
 const MaxChars = 4000
 
 // onceKeep は「1 度だけ渡す文」の記憶を残す期間。セッションの開始で消えるのが本筋だが、これは開始が来ないまま
-// 終わったセッションの分を掃くための上限である。selfguard のバックアップの期間と同じ 3 日だが、別の約束（Python も別の定数）。
+// 終わったセッションの分を掃くための上限。selfguard のバックアップの期間と同じ 3 日だが、別の約束なので定数を分けている。
 const onceKeep = 3 * 24 * time.Hour
 
 // 記録の名前。
@@ -99,9 +99,9 @@ func OverLimit(full string) bool {
 type Options struct {
 	// Bases はファイルを探すルート（近い順）。
 	Bases []string
-	// QuietWhenUnsure は、覚えられない回（記録の置き場が無い・読めない・書けない）に、刻みを持つルールも
-	// once を持つルールも渡さない。既定（偽）は逆に、覚えられないなら毎回渡す。届かない案内は書いていないのと
-	// 同じになるためである。真にするのは、案内を渡すとターンの終わりが引き止められる Stop の促しだけ。
+	// QuietWhenUnsure は、覚えられない回（記録の置き場が無い・読めない・書けない）に、刻み（every）を指定したルールも
+	// once のルールも渡さない。既定（偽）は逆に、覚えられないなら毎回渡す。届かない案内は書いていないのと
+	// 同じになるため。真にするのは、案内を渡すとターンの終わりが引き止められる Stop の促しだけ。
 	QuietWhenUnsure bool
 	// CountsPath は数えの記録の置き場の差し替え。空なら文脈ごとの `once-*.json`。
 	CountsPath string
@@ -113,7 +113,7 @@ type Once struct {
 }
 
 // DeliverOnce は組み込みの案内を、ルールの additionalContextOnce と同じ数え（既定の every で、渡す回の最初の 1 回だけ）で
-// 渡す。案内を持つ側がルールの入れ物を組み直さずに済むよう、ここで組む。
+// 渡す。案内を渡す側がルールの入れ物を組み直さずに済むよう、ここで組む。
 func DeliverOnce(stderr io.Writer, stateDir string, in hookio.Input, notes ...Once) string {
 	if len(notes) == 0 {
 		return ""
@@ -138,6 +138,8 @@ func Deliver(stderr io.Writer, stateDir string, in hookio.Input, group []*rules.
 	if path == "" && stateDir != "" {
 		path = oncePath(stateDir, in.SessionID, in.AgentID)
 	}
+	// ルールごとに、(1) 数えを 1 つ進めて今回が渡す回かを決め、(2) 渡す回なら案内の文とファイルを足し、
+	// (3) その最初の回なら once の案内も足す。数えは最後にまとめて 1 度だけ書く。
 	var parts []string
 	toldOnce := false
 	var counted map[string]int
@@ -145,7 +147,7 @@ func Deliver(stderr io.Writer, stateDir string, in hookio.Input, group []*rules.
 	for _, rule := range group {
 		hasOnce := rule.AdditionalContextOnce != "" || rule.AdditionalContextOnceFile != ""
 		delivering, first := true, true
-		// 数えを残すのは刻みを持つルールと once を持つルールだけ（ほかはどのみち毎回渡す）。
+		// 数えを残すのは刻みを指定したルールと once のルールだけ（ほかはどのみち毎回渡す）。
 		if stateDir != "" && (rule.Every > 1 || hasOnce) {
 			if !consulted {
 				counted, unreadable = loadOnce(stderr, path)
@@ -197,7 +199,7 @@ func withFile(stderr io.Writer, bases []string, text, rel string) string {
 }
 
 // Bases はルールが指すファイルを探すルートを、近い順に返す。行き先がワークツリーならそのワークツリー、
-// 次に元のプロジェクト、最後にワークスペースルートの順にする。ワークツリーで直している最中の案内が、そのまま使われるためである。
+// 次に元のプロジェクト、最後にワークスペースルートの順にする。ワークツリーで直している最中の案内が、そのまま使われるため。
 func Bases(conf *config.Settings, root string, target *tree.Tree) []string {
 	var bases []string
 	if target != nil && !target.IsMain() {
@@ -266,6 +268,7 @@ func saveOnce(stderr io.Writer, path string, given map[string]int) bool {
 	return true
 }
 
+// toldIn は数えの記録を「案内済みのキーの集合」として読む。読めなければ ok が偽。
 func toldIn(stderr io.Writer, path string) (map[string]bool, bool) {
 	given, unreadable := loadOnce(stderr, path)
 	if unreadable {
@@ -278,6 +281,7 @@ func toldIn(stderr io.Writer, path string) (map[string]bool, bool) {
 	return out, true
 }
 
+// remember は案内済みのキーを、それぞれ 1 回の数えとして書く（toldIn が集合に戻す）。
 func remember(stderr io.Writer, path string, told map[string]bool) bool {
 	given := map[string]int{}
 	for k := range told {
@@ -304,7 +308,7 @@ func RememberRefs(stderr io.Writer, stateDir, session string, told map[string]bo
 }
 
 // ToldPeers は、このサブエージェントに同じワークツリーの相手として案内した相手のキーを返す。Deliver の記録とは
-// 別のファイルに置く。同じファイルだと、Deliver が書き戻すときに消えてしまうためである。
+// 別のファイルに置く。同じファイルだと、Deliver が書き戻すときに消えてしまうため。
 func ToldPeers(stderr io.Writer, stateDir, session, agentID string) (map[string]bool, bool) {
 	if stateDir == "" || session == "" || agentID == "" {
 		return nil, false

@@ -55,8 +55,8 @@ type pyAnswer struct {
 	Files   map[string]string `json:"files"`
 }
 
-// 読み・知らせ・Stop の促し・印の付け方と、書き直したファイルのバイト列が Python と同じか。
-func TestAgainstPython(t *testing.T) {
+// 読み・知らせ・Stop の促し・印の付け方と、書き直したファイルのバイト列が見本と同じか。
+func TestAgainstGolden(t *testing.T) {
 	who := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "missing", ""}
 	nudge := []string{"g", "h", "c", "b"}
 	want := golden.Load[pyAnswer](t, "outcome")

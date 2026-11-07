@@ -11,7 +11,7 @@ import (
 	"ccnavi/internal/infra/pyfmt"
 )
 
-// Python の errno の番号。Windows の Python も CRT の番号を使うので、どの機械でも同じ値になる。
+// OS の違いを埋めた errno の番号。Windows でも CRT の番号を使うので、どの機械でも同じ値になる。
 const (
 	errnoENOENT  = 2
 	errnoEACCES  = 13
@@ -21,7 +21,7 @@ const (
 	errnoEINVAL  = 22
 )
 
-// errnoMessages は自分で作る OSError の文（Python の os.strerror）。
+// errnoMessages は自分で作る OSError の文（C の strerror の英語）。
 var errnoMessages = map[int]string{
 	errnoENOENT:  "No such file or directory",
 	errnoEACCES:  "Permission denied",
@@ -29,7 +29,7 @@ var errnoMessages = map[int]string{
 	errnoENOTDIR: "Not a directory",
 }
 
-// posixError は Python のコードが自分で作っていた OSError（`FileNotFoundError(errno.ENOENT, ...)` など）。
+// posixError は ccnavi が自分で作る OSError 相当（無い・権限なし・既にある・ディレクトリでない）。
 // OS の返したエラーではないので、Windows でも `[Errno N]` の形で書く。
 type posixError int
 
@@ -55,10 +55,10 @@ func pathError(op, path string, errno int) error {
 
 func notFound(path string) error { return pathError("open", path, errnoENOENT) }
 
-// noFilenameOps は Python がファイル名を付けずに投げる操作（開いた後の読み書きと fsync）。
+// noFilenameOps はエラーの文にファイル名を付けない操作（開いた後の読み書きと fsync）。
 var noFilenameOps = map[string]bool{"write": true, "read": true, "close": true, "sync": true, "seek": true, "fcntl": true}
 
-// ErrorText は Python の str(OSError) と同じ文。`[Errno 2] No such file or directory: 'a'` の形で、
+// ErrorText は OS のエラーの文。`[Errno 2] No such file or directory: 'a'` の形で、
 // 移動は `'a' -> 'b'` を付ける。書けなかった理由・読めなかった理由として呼び手へ渡す文はここで作る。
 func ErrorText(err error) string {
 	var link *os.LinkError
@@ -87,7 +87,7 @@ func errnoText(err error) string {
 	return err.Error()
 }
 
-// pyErrno は Python の OSError.errno にあたる番号。番号の無いエラーは 0。
+// pyErrno はエラーの errno の番号。番号の無いエラーは 0。
 func pyErrno(err error) int {
 	var own posixError
 	if errors.As(err, &own) {
@@ -104,14 +104,14 @@ func pyErrno(err error) int {
 // ERROR_NOT_SAME_DEVICE も含む）。またぐときだけ、コピーや別の置き場に切り替える。
 func CrossDevice(err error) bool { return pyErrno(err) == errnoEXDEV }
 
-// pyError は Python の OSError と同じ文を Error() で返し、元のエラーを Unwrap で渡す。
+// pyError は ErrorText の文を Error() で返し、元のエラーを Unwrap で渡す。
 // 呼び手は errors.Is(err, fs.ErrNotExist) で「無い」を分けられる。
 type pyError struct{ err error }
 
 func (e pyError) Error() string { return ErrorText(e.err) }
 func (e pyError) Unwrap() error { return e.err }
 
-// wrap は err を、Error() が Python の str(OSError) と同じ文（ErrorText）で、Unwrap で元の err を返す error にする。
+// wrap は err を、Error() が ErrorText の文で、Unwrap で元の err を返す error にする。
 // nil は nil のまま。
 func wrap(err error) error {
 	if err == nil {
@@ -120,8 +120,7 @@ func wrap(err error) error {
 	return pyError{err}
 }
 
-// StrError は Python の OSError.strerror（`[Errno 13] ` を除いた文）。番号の無いエラーは空文字
-// （Python の None）で、呼び手が `exc.strerror or …` の代わりを選ぶ。
+// StrError は ErrorText から `[Errno 13] ` を除いた文。番号の無いエラーは空文字で、呼び手が代わりの文を選ぶ。
 func StrError(err error) string {
 	if pyErrno(err) == 0 {
 		return ""

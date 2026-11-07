@@ -33,7 +33,7 @@ const (
 	digestExt  = ".digest.json"
 )
 
-// errNoFrontmatter は手で書いた記録が、先頭に learnings: を持つ frontmatter を持たないこと。雛形を推測して
+// errNoFrontmatter は手で書いた記録が、先頭に learnings: を含む frontmatter が無いこと。雛形を推測して
 // 付けず、止めて直させる。
 var errNoFrontmatter = errors.New("先頭に learnings: を持つ frontmatter がありません")
 

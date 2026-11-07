@@ -8,7 +8,7 @@ import (
 	"ccnavi/internal/infra/pyfmt"
 )
 
-// 期待値は PyYAML 6.0.3 の純 Python の読み手（Python の実行ファイルの yamlread）が返した repr と文。
+// 期待値は PyYAML 6.0.3 の純 Python の読み手が返した repr と文。
 // err が真なら want は読めないときの文（Python の str(exc)）。
 var loadCases = []struct {
 	name, doc, want string
@@ -247,7 +247,7 @@ func TestMapAccessors(t *testing.T) {
 	}
 }
 
-// 期待値は Python の yamlread.safe_load が上げた例外の type(exc).__name__。
+// 期待値は PyYAML の safe_load が上げた例外の型の名前。
 func TestErrorClassMatchesPyYAML(t *testing.T) {
 	cases := []struct {
 		doc  string
@@ -280,7 +280,7 @@ func TestErrorClassMatchesPyYAML(t *testing.T) {
 }
 
 // 期待は Python の yaml.safe_load(a) == yaml.safe_load(b)。
-func TestEqualMatchesPython(t *testing.T) {
+func TestEqualMatchesExpected(t *testing.T) {
 	cases := []struct {
 		a, b string
 		want bool

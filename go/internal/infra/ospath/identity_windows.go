@@ -2,8 +2,8 @@ package ospath
 
 import "syscall"
 
-// Identity は path そのもの（リンクは辿らない）のファイルの番号と作成時刻（ナノ秒）。Windows の Python の
-// os.lstat(path) の st_ino と st_ctime_ns（どちらも、リンクを開かずに開いたハンドルから読む）。読めなければ false。
+// Identity は path そのもの（リンクは辿らない）のファイルの番号と作成時刻（ナノ秒）。
+// リンクをたどらずに開いたハンドルから、番号と作成時刻を読む。読めなければ false。
 func Identity(path string) (ino uint64, ctimeNs int64, ok bool) {
 	name, err := syscall.UTF16PtrFromString(path)
 	if err != nil {

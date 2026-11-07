@@ -16,7 +16,7 @@ var errUnreadable = errors.New("YAML として読めない")
 // ErrAlias は LoadRefusingAliases が別名（*名前）を見つけて断ったこと。errUnreadable でもある。
 var ErrAlias = errors.New("別名")
 
-// 値を組み立てる途中の失敗の文。Python は素の例外（ValueError など）を loadError に包んでいた。
+// 値を組み立てる途中の失敗の文（Class に例外の名前を添えて *Error にする）。
 const (
 	msgTooDeep     = "入れ子が深すぎる"
 	msgUnbuildable = "値を組み立てられない"
@@ -82,7 +82,7 @@ const (
 	parserError      Class = "ParserError"      // 構文の誤り
 	composerError    Class = "ComposerError"    // 別名・アンカー・文書の数の誤り
 	ConstructorError Class = "ConstructorError" // 値の組み立てを PyYAML が断った
-	loadError        Class = "LoadError"        // 組み立ての途中の素の例外・深すぎる入れ子（yamlread が包む）
+	loadError        Class = "LoadError"        // 組み立ての途中の素の例外・深すぎる入れ子
 )
 
 // Class は Python の例外の型の名前。別名で断ったもの（LoadRefusingAliases）は空（呼び手の例外で上がる）。

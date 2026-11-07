@@ -82,7 +82,7 @@ type dnode struct {
 	flow  bool
 }
 
-// identity は PyYAML の id(data) に当たる。Go で同一性を持つ値（*Map と、要素のある列）だけを見る。
+// identity は PyYAML の id(data) に当たる。Go で同一性を比べられる値（*Map と、要素のある列）だけを見る。
 type identity struct {
 	ptr  uintptr
 	kind reflect.Kind

@@ -67,7 +67,7 @@ func (p *Phase) Risk() *pyjson.Object {
 	return best
 }
 
-// points は記録の点（Python の int(record.get("points") or 0)）。読めない値は 0。
+// points は記録の点。読めない値と無い値は 0。
 func points(record *pyjson.Object) int {
 	n, _ := pyfmt.IntOf(record.Value("points"))
 	return n
@@ -119,7 +119,7 @@ func (p *Phase) RiskBody() string {
 	return text
 }
 
-// orDefault は Python の str(record.get(key, fallback))。
+// orDefault は record の key の値を文字列にする。key が無ければ fallback を使う。
 func orDefault(record *pyjson.Object, key string, fallback any) string {
 	if v, ok := record.Get(key); ok {
 		return pyfmt.Str(v)
@@ -200,7 +200,11 @@ func (p *Phase) declaredReview() ticket.Need {
 
 // ReviewRequired は、このフェーズの終わりにユーザのレビューが要るかを返す。
 //
-// 要るかを言えるのは、計画のステップ・定義・引き受けた延期である。1 つでも要ると言えば要る。子の required: true と実績のリスクは、要るの側にだけ上げる。根拠が 1 つも無いとき（計画が無い、定義が読めない）は、子が要らないと明示しない限り要る。要らない側に倒すと、定義が読めないときにレビューが消えてしまうからである。延期したフェーズは自分では要らず、引き受けたフェーズが要る。
+// レビューが要るかを言えるのは、計画のステップ・定義・引き受けた延期。1 つでも要ると言えば要る。
+// 子の required: true と実績のリスクは、要るの側にだけ上げる。
+// 根拠が 1 つも無いとき（計画が無い、定義が読めない）は、子が要らないと明示しない限り要る。
+// 要らない側に倒すと、定義が読めないときにレビューが消えてしまう。
+// 延期したフェーズは自分では要らず、引き受けたフェーズが要る。
 func (p *Phase) ReviewRequired() bool {
 	if p.Deferred() {
 		return false

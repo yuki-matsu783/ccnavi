@@ -103,7 +103,7 @@ func DraftFile(conf *config.Settings, treeRoot, id string) string {
 	return ospath.Normpath(ospath.Join(treeRoot, strings.Split(DraftRel(conf, id), "/")...))
 }
 
-// Resolve はフローのファイルの絶対パスと、それを持つツリーのルートと、在るか（リンクでも在るとする）。
+// Resolve はフローのファイルの絶対パスと、それがあるツリーのルートと、在るか（リンクでも在るとする）。
 // 読むのは正とするツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリーの版はシェルの書き込みで
 // 書き換えられうるので読まない。
 func Resolve(conf *config.Settings, root string, child *ticket.Ticket) (file, base string, exists bool) {
@@ -173,7 +173,7 @@ func fold(p string) []rune {
 }
 
 // Location は書き込み先が子のフローの置き場のときの、ファイルの名前（`<子>.yml`。小文字にしたもの）と、
-// 置き場を持つツリーのプロジェクト。known が偽なら置き場はワークスペースの外のツリーにある。
+// 置き場があるツリーのプロジェクト。known が偽なら置き場はワークスペースの外のツリーにある。
 type Location struct {
 	name    string
 	project string

@@ -7,14 +7,6 @@
 // 1 本のツリーを調べた結果は hit・Clear・unknown の 3 つのどれかになる。期限切れ・git の失敗・決められないものは
 // unknown になる。unknown のツリーは候補から外さず、促した記録も残さない。期限（deadline）のゼロ値は期限なしを表す。
 //
-// Python からの対応: tickets/lifecycle/stop_integrate を移した。direct_at_stop → DirectAtStop、
-// probe → 私的な probe、direct_record → DirectRecord（"_common"・"broken" の欄は Record の Common・broken）、
-// marker_kind → MarkerKind、ahead_since → AheadSince、integration_name → IntegrationName、
-// _integration → Integration、bound_reason → BoundReason、bound_check → boundCheck、direct_check → DirectCheck、
-// has_record → HasRecord（dirty の None は nil）、_dirty → Dirty、_git_path → GitPath、_read_record → ReadRecord（LastKept）、
-// _expired → git.Expired、_tree_roots → TreeRoots、_named_file → NamedFile、integrate_nudge → IntegrateNudge、
-// blocked_notice → BlockedNotice、nudged_before・remember_nudge → stop.NudgedBefore・RememberNudge（Direct が
-// stop.Nudge を満たす）、RECORD_DIR・DONE_DIR → RecordDir・DoneDir、HIT・CLEAR・UNKNOWN → hit・Clear・Unknown。
-// hook/post_findings の integrated_paths（取り込みの squash と K の確かめ）→ SquashedPaths。post_findings の
-// _read_record は同じキーの最初を採り、stop_integrate は最後を採るので、ReadRecord の Repeat（firstKept・LastKept）で分ける。
+// 記録（ReadRecord）は、同じキーが複数あるとき、読む側によって採る行が違う。Stop の促しは最後の行を採り
+// （LastKept）、取り込み後の確認（post_findings）は最初の行を採る（firstKept）。Repeat で分ける。
 package integrate

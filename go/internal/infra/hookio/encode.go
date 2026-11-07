@@ -21,7 +21,7 @@ const (
 	stopBlock = "block"
 )
 
-// outputOptions は応答の JSON の書き方（Python の json.dumps(..., ensure_ascii=False)）。
+// outputOptions は応答の JSON の書き方（ASCII でない字をそのまま書く）。
 var outputOptions = pyjson.Options{RawUnicode: true}
 
 // PreToolUseResponse は PreToolUse の応答。どの欄も空にできる。

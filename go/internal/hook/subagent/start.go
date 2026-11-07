@@ -172,6 +172,7 @@ func sharedTreeNote(stderr io.Writer, conf *config.Settings, in hookio.Input, he
 	me := fsio.SafeNameOr(in.AgentID, unknownName, fsio.SafeNameLimit)
 	want := string(here.Kind) + " " + pathcase.Fold(here.Name)
 	when := fsio.UnixSeconds(fsio.Now())
+	// 同じセッション・同じツリーで、期限内の別のサブエージェントの印を集める（peers は 名前 → エージェントの種類、order は見つけた順）。
 	peers := map[string]string{}
 	var order []string
 	for _, m := range marks {
@@ -183,6 +184,7 @@ func sharedTreeNote(stderr io.Writer, conf *config.Settings, in hookio.Input, he
 			continue
 		}
 		started, ok := startedAt(lines)
+		// 期限切れの印は、終了の印を残せずに終わったもの。古い印で案内を出し続けないよう外す。
 		if !ok || when-started > runningMax() {
 			continue
 		}
@@ -201,6 +203,7 @@ func sharedTreeNote(stderr io.Writer, conf *config.Settings, in hookio.Input, he
 	if len(peers) == 0 {
 		return ""
 	}
+	// 案内済みの相手を除く。覚えている記録が読めない（known が偽）ときは全員に案内する側に倒す。
 	told, known := ctxfile.ToldPeers(stderr, conf.State, in.SessionID, in.AgentID)
 	remember := map[string]bool{}
 	for k := range told {

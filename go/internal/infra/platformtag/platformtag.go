@@ -36,7 +36,7 @@ func HostTarget() string {
 	return hostTarget(system, runtime.GOARCH)
 }
 
-// hostTarget は Python の sys.platform と platform.machine() の綴り（と Go の GOARCH）から語を作る。
+// hostTarget は OS の名前（win32・darwin・linux で始まる名前）と CPU の名前（uname -m の綴りも Go の GOARCH の綴りも）から `<os>-<arch>` の語を作る。
 func hostTarget(system, machine string) string {
 	name := system
 	switch {

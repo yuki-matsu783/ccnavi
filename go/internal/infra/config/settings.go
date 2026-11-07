@@ -253,7 +253,7 @@ const (
 // readLocal は上書き設定を読む。不正なファイルは報告して読み飛ばす
 // （カンマ 1 つの書き損じでガードが消えないように）。
 func readLocal(root string) (*pyjson.Object, []string) {
-	// UTF-8 でないとき（ospath.errNotUTF8）、Python は内部エラーになるが、ここでは読めないファイルとして扱う。
+	// UTF-8 でないとき（ospath.errNotUTF8）、内部エラーにせず、読めないファイルとして報告して読み飛ばす。
 	text, err := ospath.ReadDiskText(filepath.Join(root, localFile))
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil

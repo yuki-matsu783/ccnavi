@@ -15,9 +15,9 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// Python の hook/wrapguard・parentwrite・rootwrite と同じワークスペースに同じコマンドを渡し、6 つの検査の答えと
+// 同じワークスペースに同じコマンドを渡し、6 つの検査の答えと
 // 止めた文、`ccnavi-git.sh commit` の呼び出しの読みが 1 字も違わないことを見る。ワークスペースの場所は毎回変わる
-// ので写しは持たず、Python が無ければ飛ばす（そのときは下の表のテストが要の約束を見る）。
+// ので写しは持たない（要の約束は下の表のテストが見る）。
 
 const (
 	parentTree = "i0001"
@@ -209,7 +209,7 @@ func sgCases(root string) []sgCase {
 		"env sh -c 'echo x > README.md'", "sudo tee README.md",
 	)
 	add("scratchpad", "cp x ..", "cp x .", "echo x > README.md")
-	// 引用符と演算子の乱れた組み合わせ（落ちないこと、答えが Python と同じこと）。
+	// 引用符と演算子の乱れた組み合わせ（落ちないこと、答えが見本と同じこと）。
 	pieces := []string{"'", `"`, "<", ">", ">>", "2>&1", " ", " ", "a", "b c", "&&", ";", "(", ")", "cd x", "echo", "$(", "`",
 		"sh .ccnavi/scripts/ccnavi-git.sh", "rm", ".ccnavi", "../i0001/x", "tee", "env -C ../i0001", "CCNAVI_X=1"}
 	rng := rand.New(rand.NewPCG(554, 0))
@@ -292,8 +292,8 @@ func goAnswer(t *testing.T, root string, set *rules.RuleSet, k sgCase) []any {
 	}
 }
 
-// TestMatchesPython は表の命令の読みと判定を、Go の答えの見本（Python と答えが揃っていた Go の答えから取った）と比べる。
-func TestMatchesPython(t *testing.T) {
+// TestMatchesGolden は表の命令の読みと判定を、Go の答えの見本（答えが確かめ済みだった Go の出力から取った）と比べる。
+func TestMatchesGolden(t *testing.T) {
 	root := workspace(t)
 	set, _, err := rules.Load(filepath.Join(root, ".ccnavi", "config", "common", "rules.yml"), root)
 	if err != nil {
@@ -321,7 +321,7 @@ func TestBlocked(t *testing.T) {
 	}
 }
 
-// 守る場所の表（Python の CORE_CASES）。Python が無くても、止める・通すの約束をここで見る。
+// 守る場所の表。止める・通すの約束をここで見る。
 func TestCorePathsTable(t *testing.T) {
 	root := workspace(t)
 	conf := testkit.Settings(t, root)

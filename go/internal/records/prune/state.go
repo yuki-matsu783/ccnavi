@@ -13,13 +13,14 @@ import (
 
 // pruneState は終わったセッションの記録を、セッションごとにまとめて消す。置き場そのものがリンクなら、
 // 何も消さずに報告に出す（辿って消すと置き場の外のファイルを消す）。見るのは置き場そのものだけで、
-// ワークスペースルートからの道のリンクは見ない（Python と同じ。pruneDirectory は道も見る）。
+// ワークスペースルートからの道のリンクは見ない（pruneDirectory は道も見る）。
 func (r *run) pruneState(stateDir, session string, before time.Time) {
 	if ospath.IsLink(stateDir) {
 		r.problem("%s はリンクなので辿らない（記録を削除しません）", r.shown(stateDir))
 		return
 	}
 	groups, loose := r.sessionEntries(stateDir)
+	// 今のセッションの記録は、日付を見ずに残す。表記は上限あり・なしの 2 通りで書かれうる。
 	mine := map[string]bool{}
 	if session != "" {
 		mine[fsio.SafeName(session, fsio.SafeNameLimit)] = true
@@ -30,6 +31,8 @@ func (r *run) pruneState(stateDir, session string, before time.Time) {
 		tokens = append(tokens, token)
 	}
 	sort.Strings(tokens)
+	// セッションごとに、記録のどれか 1 つでも保持日数のうちに書かれていれば全部を残す。
+	// 全部が古いセッションだけを終わったものとして消す。
 	var doomed []string
 	for _, token := range tokens {
 		if mine[token] {
@@ -69,6 +72,7 @@ func (r *run) sessionEntries(stateDir string) (map[string][]string, []string) {
 	if err != nil {
 		return groups, nil
 	}
+	// 自己防衛のバックアップは、ディレクトリ名がセッションの表記。実行ファイルの置き場（store）は消さない。
 	guard := ospath.Join(stateDir, config.SelfguardDir)
 	if ospath.IsLink(guard) {
 		r.problem("%s はリンクなので辿らない（バックアップを削除しません）", r.shown(guard))
@@ -81,6 +85,8 @@ func (r *run) sessionEntries(stateDir string) (map[string][]string, []string) {
 		}
 	}
 
+	// state 直下のファイルを、名前の形で 3 つに分ける。セッションだけで決まるものは groups へ、
+	// 日付で消すものは loose へ、セッションの後ろにキーが続くものは withKey へ（切れ目は後で決める）。
 	var withKey []keyed
 	var loose []string
 	for _, entry := range entries {
@@ -109,6 +115,8 @@ func (r *run) sessionEntries(stateDir string) (map[string][]string, []string) {
 		}
 	}
 
+	// withKey の切れ目は、セッションにも `-` が入るので名前だけでは決まらない。
+	// すでに分かっているセッションの表記に先頭が当たるものを、そのセッションの記録とする。
 	known := make([]string, 0, len(groups))
 	for token := range groups {
 		known = append(known, token)

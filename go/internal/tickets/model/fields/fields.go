@@ -195,8 +195,8 @@ func SetMR(text string, number int) (string, MRResult) {
 	return join(lines, text), MRSet
 }
 
-// ScriptFieldsSet はその版が既に値を持っている、スクリプトの欄。正規化した内容を照合する側が「除いてよい欄」を
-// 決めるのに使う。除いてよいのはコミット済みの版がまだ持っていない欄だけ（サブコマンドはどれも 1 度しか書かない
+// ScriptFieldsSet はその版で既に値が入っている、スクリプトの欄。正規化した内容を照合する側が「除いてよい欄」を
+// 決めるのに使う。除いてよいのはコミット済みの版でまだ値が入っていない欄だけ（サブコマンドはどれも 1 度しか書かない
 // ので、既に値がある欄が変わったのならサブコマンドが書いたものではない。とくに base_sha は着手の基準点）。
 func ScriptFieldsSet(text string) []string {
 	lines, end, ok := split(text)
@@ -219,7 +219,7 @@ func ScriptFieldsSet(text string) []string {
 	return held
 }
 
-// hasValue は欄の 1 行目の値の表記が空でない値を持つか。承認は欄を `started_at: ""` の形で置くので、字面ではなく
+// hasValue は欄の 1 行目の値の表記が空でない値が入っているか。承認は欄を `started_at: ""` の形で置くので、字面ではなく
 // YAML として読んで空文字と null を値なしとする。読めない・長すぎる表記は値ありとする（除く欄が減る側）。
 func hasValue(raw string) bool {
 	if ospath.Strip(raw) == "" {
@@ -235,7 +235,7 @@ func hasValue(raw string) bool {
 	return value != nil && value != ""
 }
 
-// ScriptShape は frontmatter を持つチケットなら、drop の欄（ticket.ScriptFields の部分集合）とその値として続く
+// ScriptShape は frontmatter があるチケットなら、drop の欄（ticket.ScriptFields の部分集合）とその値として続く
 // 字下げの行を除いて正規化した内容と真。無ければ偽。台帳ではなく内容で見るのは、承認とマーカーが親のブランチに
 // 乗って別の機械へ届くため。切り出し方は SetFields と揃える（揃えないと、書いた直後の内容が「スクリプトが書いて
 // いない形」に見える）。

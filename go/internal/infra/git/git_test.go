@@ -394,7 +394,7 @@ func TestBranchNamesAndCommittedText(t *testing.T) {
 	if got := sortedKeys(BranchNames(repo, 0)); !slices.Equal(got, []string{"main", "up", "日本語"}) {
 		t.Errorf("BranchNames = %v", got)
 	}
-	// 本文は Python のテキストの読みと同じく改行が "\n" にそろう。
+	// 本文はテキストの読みなので改行が "\n" にそろう。
 	if text, present, ok := CommittedText(repo, "a.txt", 0); text != "本文\n" || !present || !ok {
 		t.Errorf("CommittedText = %q %v %v", text, present, ok)
 	}
@@ -412,7 +412,7 @@ func TestBranchNamesAndCommittedText(t *testing.T) {
 	}
 }
 
-// 起こせなかったときの理由は Python の subprocess の例外と同じ文で、git が無いのと期限切れを分けられる。
+// 起こせなかったときの理由は OS のエラーの文（`[Errno 2] No such file or directory: 'git'` の形）で、git が無いのと期限切れを分けられる。
 func TestRunFailures(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("文は POSIX のもの")

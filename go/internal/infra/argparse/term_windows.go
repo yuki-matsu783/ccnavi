@@ -15,7 +15,7 @@ type consoleInfo struct {
 	maxSize                  [2]int16
 }
 
-// stdoutColumns は Python の os.get_terminal_size(1).columns（見えている窓の幅）。コンソールでなければ false。
+// stdoutColumns は標準出力のコンソールの幅（見えている窓の幅）。コンソールでなければ false。
 func stdoutColumns() (int, bool) {
 	h, err := syscall.GetStdHandle(syscall.STD_OUTPUT_HANDLE)
 	if err != nil {

@@ -145,7 +145,7 @@ func TestRedirectStarts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Python の match(text, i) と同じに、i の手前の 1 文字を読んでから始める（i > 0 では `^` が当たらない）。
+	// 正規表現の match(text, i) と同じに、i の手前の 1 文字を読んでから始める（i > 0 では `^` が当たらない）。
 	after, err := pyre.Compile(`(?s:.)(?:`+redirect+`)`, 0)
 	if err != nil {
 		t.Fatal(err)

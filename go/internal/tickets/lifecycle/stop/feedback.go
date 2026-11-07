@@ -95,7 +95,7 @@ func WaitingAtStop(conf *config.Settings, root, cwd string, raw *approval.Raw) *
 	return &Waiting{parent, head, todo, proposed(todo, parent.ID)}
 }
 
-// proposed は提案の置き場に、親と同じ識別子で feedback: を持つ提案があればそのファイル。
+// proposed は提案の置き場に、親と同じ識別子で feedback: がある提案があればそのファイル。
 func proposed(todo, id string) string {
 	names, err := ospath.DiskListdir(todo)
 	if err != nil {

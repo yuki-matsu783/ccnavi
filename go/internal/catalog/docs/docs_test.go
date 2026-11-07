@@ -104,7 +104,7 @@ func eq(t *testing.T, what string, got, want any) {
 
 // --- 引く ---------------------------------------------------------------------------
 
-// sample は引き方の見本の文書（Python の SearchTest の ROWS と同じもの）。
+// sample は引き方の見本の文書。
 var sample = []struct{ rel, text, mtime string }{
 	{"docs/adr/0001-git.md", doc("type: adr", "title: B タイトル", "tags: [git, Worktree]"), "2026-08-01T09:00:00"},
 	{"docs/adr/0002-ticket.md", doc("type: ADR", "title: A タイトル", "keywords: [承認]"), "2026-08-05T23:30:00"},

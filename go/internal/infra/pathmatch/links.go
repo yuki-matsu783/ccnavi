@@ -41,7 +41,7 @@ func IsLink(path string) bool {
 	return isJunction(path)
 }
 
-// unresolvable は Python の realpath が ValueError を投げる綴り（NUL を含む）。
+// unresolvable は実体のパスを解けない綴り（NUL を含む）。
 func unresolvable(paths ...string) bool {
 	for _, p := range paths {
 		if strings.ContainsRune(p, 0) {

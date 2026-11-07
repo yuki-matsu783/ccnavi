@@ -33,7 +33,7 @@ func TestShorten(t *testing.T) {
 	}
 }
 
-// 1 件の呼び出し。Python と同じ表で両方を呼ぶ。
+// 1 件の呼び出し。同じ表で両方を呼ぶ。
 type sayCase struct {
 	Kind     string            `json:"kind"`
 	Attended string            `json:"attended"`
@@ -180,9 +180,9 @@ func sayCases() []sayCase {
 	return cases
 }
 
-// TestTextsMatchPython は文を、Go の答えの見本（Python と答えが揃っていた Go の答えから取った）と比べる。文面ファイルの
-// 文を直したら、go test -run TestTextsMatchPython -update で見本を書き直す。
-func TestTextsMatchPython(t *testing.T) {
+// TestTextsMatchGolden は文を、Go の答えの見本（答えが確かめ済みだった Go の出力から取った）と比べる。文面ファイルの
+// 文を直したら、go test -run TestTextsMatchGolden -update で見本を書き直す。
+func TestTextsMatchGolden(t *testing.T) {
 	root := testkit.RepoRoot(t)
 	var said []string
 	for _, c := range sayCases() {

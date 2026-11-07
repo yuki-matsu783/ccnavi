@@ -1,8 +1,6 @@
 package useronly
 
-// seedCommands は Python の hook のテスト（tests/guard/test_user_entry.py・test_cleanup_forms.py・test_repo_rules.py・
-// test_prune_form.py、tests/ticket の plan-order・fill-phases）が止める形・通す形として並べたコマンド。
-// CLI を通すテストは移さないので、判定の部品の答えをここで Python と突き合わせる。
+// seedCommands は hook が止める形・通す形として並べたコマンド。CLI を通さず、判定の部品の答えを見本と突き合わせる。
 var seedCommands = []string{
 	// user の入口
 	"ccnavi user agree", "ccnavi user prune", "ccnavi --entry sh --root '' user agree",
@@ -32,7 +30,7 @@ var seedCommands = []string{
 	"echo ccnavi --agree --yes x", "grep -rn ccnavi --yes docs", "git log --grep ccnavi --yes",
 	"git commit -m 'docs: ccnavi --agree --yes の説明'", "sh .ccnavi/scripts/ccnavi-git.sh commit -m 'user --via board'",
 	`git commit -m "$(echo ccnavi --agree --yes)"`,
-	// Python から走らせる表記
+	// Python 経由で走らせる表記
 	"python3 -u -m ccnavi user agree", "python3 -I -m ccnavi user agree", "python3 -OO -m ccnavi user handoff",
 	"python3 -W ignore -m ccnavi user agree", "python3 -Wignore -m ccnavi user agree", "python3 -X utf8 -m ccnavi user agree",
 	"python3 -Xutf8 -m ccnavi user agree", "python3 -Im ccnavi user agree", "python3 -mccnavi user agree",

@@ -13,7 +13,7 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// Python・sh・TS が同じ表（tests/fixtures/branch-to-id.json）で変換と採用の可否の一致を確かめる。
+// sh・TS が同じ表（tests/fixtures/branch-to-id.json）で変換と採用の可否の一致を確かめる。
 func TestBranchToIDTable(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(testkit.RepoRoot(t), "tests", "fixtures", "branch-to-id.json"))
 	if err != nil {
@@ -41,7 +41,7 @@ func TestBranchToIDTable(t *testing.T) {
 	}
 }
 
-// 予約した名前は infra/config の先頭の語にも使えない（config はこのリストのコピーを持つ）。
+// 予約した名前は infra/config の先頭の語にも使えない（config はこのリストのコピーを置いている）。
 func TestReservedNamesAreNotBranchPrefixes(t *testing.T) {
 	for _, name := range config.ReservedBranchIDs() {
 		if config.IsBranchPrefix(name) {
@@ -106,7 +106,7 @@ var idsIssues = [][]any{
 	{3, "x", "", "Bad"},
 }
 
-func TestIDsMatchPython(t *testing.T) {
+func TestIDsMatchGolden(t *testing.T) {
 	want := golden.Load[idsAnswers](t, "ids")
 	p := config.DefaultBranchPrefixes()
 	got := idsAnswers{}

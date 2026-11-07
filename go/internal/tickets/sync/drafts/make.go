@@ -156,7 +156,7 @@ func relativeItems(items []ticket.PlanItem, offset int, key string, notes *[]str
 	return out
 }
 
-// flows は全体計画の n 番目のステップ → その子のフローの本文。フローを持つ最初の子の 1 本をコピーする。
+// flows は全体計画の n 番目のステップ → その子のフローの本文。フローがある最初の子の 1 本をコピーする。
 func flows(conf *config.Settings, parent *ticket.Ticket, children []*ticket.Ticket, notes *[]string) map[int]*yaml.Map {
 	out := map[int]*yaml.Map{}
 	for n := 1; n <= len(parent.Plan); n++ {
@@ -224,6 +224,9 @@ func build(conf *config.Settings, found *ticket.Ticket, children []*ticket.Ticke
 
 // targetOf は下書きの取り込み先（ツリーからの相対）と、そのレイヤー。決まらなければ理由。
 func targetOf(conf *config.Settings, root string, found *ticket.Ticket, name string, to Target, layer string) (string, string, string) {
+	// 取り込み先（ツリーからの相対）を決める。
+	// 共通 → 共通レイヤーのテンプレート置き場、プロジェクト → 親のプロジェクトか指定のレイヤーの置き場。
+	// 指定のレイヤーが親のツリーの外にあるときは、相対で届かないので断る。
 	home := conf.ProjectHome
 	if home == "" {
 		home = config.DefaultProjectHome
@@ -295,10 +298,12 @@ type Made struct {
 
 // Make は完了した親から下書きを作って、親のツリーの wip/handoff/ に書く。上書きはしない。止まったら (nil, 理由)。
 func Make(conf *config.Settings, root string, req Request) (*Made, string) {
+	// 1. 完了した親と、その子を引く。
 	found, children, why := findParent(conf, root, req.Parent)
 	if found == nil {
 		return nil, why
 	}
+	// 2. 名前（既定は親の識別子）と取り込み先を決める。
 	name := req.Name
 	if name == "" {
 		name = req.Parent
@@ -315,6 +320,8 @@ func Make(conf *config.Settings, root string, req Request) (*Made, string) {
 	if why != "" {
 		return nil, why
 	}
+	// 3. 書く先を確かめる。取り込み先・下書きのどちらも、すでにあれば上書きしない。
+	// リンクを通る置き場にも書かない（wip/handoff/ の外へ書き出さないため）。
 	base := found.TreeRoot
 	target, why := handoff.Spelled(base, targetRel)
 	if why != "" {
@@ -334,6 +341,7 @@ func Make(conf *config.Settings, root string, req Request) (*Made, string) {
 	if ospath.DiskLexists(spot) {
 		return nil, sprintf(msgDraftThere, rel)
 	}
+	// 4. 下書きを書き、読み直して検査する。読めたら、検査には書いた中身ではなく読み直した中身を使う。
 	t, notes := build(conf, found, children, name)
 	if err := fsio.WriteFile(spot, []byte(templates.Dump(t)), fsio.NewDurable); err != "" {
 		return nil, sprintf(msgNotSaved, line(err))

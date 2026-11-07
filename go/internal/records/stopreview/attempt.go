@@ -135,10 +135,12 @@ func (s Store) readAttempt(aid string) *pyjson.Object {
 // 試行を作れない（権限・ディスク）ときは、書けなかった理由の文をエラーで返す。
 func (s Store) WritePlan(key string, plan Plan, now time.Time) (string, error) {
 	aid := attemptID(key, plan.Rejudge)
+	// 計画は最初の 1 件を残す。呼び直しで上書きすると、先に material が見た計画と食い違う。
 	if _, ok := s.ReadPlan(key); !ok {
 		plan.key, plan.AttemptID = key, aid
 		fsio.WriteJSON(s.planPath(key), plan.object())
 	}
+	// 試行がまだ無ければ作る。候補でない計画は、作ると同時に最終分類まで確定する。
 	attempt := s.readAttempt(aid)
 	if attempt == nil {
 		fresh := pyjson.NewObject(keyAttemptID, aid, keyKey, key, keyCreated, fsio.UnixSeconds(now), keyState, string(pending), keyOriginal, plan.Original)
@@ -156,6 +158,8 @@ func (s Store) WritePlan(key string, plan Plan, now time.Time) (string, error) {
 			}
 			return aid, nil
 		}
+		// 作ろうとした間に別のプロセス（material）が先に作っていた。読み直せればそちらを進め、
+		// 読めなければ作った試行を未検査で確定する。
 		if attempt = s.readAttempt(aid); attempt == nil {
 			if stateOf(fresh) != done {
 				byCcnavi(fresh, FinalUnchecked, reasonUnreadable, true)
@@ -165,6 +169,7 @@ func (s Store) WritePlan(key string, plan Plan, now time.Time) (string, error) {
 			return aid, nil
 		}
 	}
+	// material が計画より先に来て待っていた試行を、計画に従って進める。
 	if stateOf(attempt) == planWait {
 		if plan.IsCandidate {
 			s.move(attempt, pending)
@@ -202,7 +207,7 @@ func (s Store) create(attempt *pyjson.Object) (bool, error) {
 	if reason == "" {
 		return true, nil
 	}
-	// 溜める段は見ない。Python が os.path.lexists でディスクだけを見ていたのに合わせる。
+	// 有無はディスクだけで決め、溜める段は見ない。
 	if ospath.DiskLexists(path) {
 		return false, nil // 別のプロセスが先に作った
 	}

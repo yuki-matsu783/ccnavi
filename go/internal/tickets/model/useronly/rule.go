@@ -11,7 +11,7 @@ import (
 	"ccnavi/internal/policy/texts"
 )
 
-// Python から実行ファイルの中身を走らせる表記。実行役（`uv run`・`poetry run`・`pipenv run`。間の選択肢と値は
+// Python 経由で実行ファイルの中身を走らせる表記。実行役（`uv run`・`poetry run`・`pipenv run`。間の選択肢と値は
 // 読み分けない）、インタプリタ（`python`・`python3.12`・`py` と `.exe`）とその選択肢（`-u`・`-W x`・`-Xutf8` など）、
 // 入口（`-m ccnavi`・`-mccnavi`・`-um ccnavi`・`-m ccnavi.__main__`・配布物の `main.py`）。拾いきれない表記
 // （`python -c`・名前を変えたコピー）は HumanPathForm と HiddenUserEntry が名前に依らない検査で見る。

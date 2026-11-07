@@ -20,7 +20,7 @@ const Dir = "logs/diag"
 // FileExt は出どころごとの 1 本の拡張子。後始末（records/prune）がこの拡張子のファイルをローテートして消す。
 const FileExt = ".log"
 
-// DirOf は root の下の置き場（機械の区切り。Python の os.path.join(root, "logs", "diag") と同じ綴り）。
+// DirOf は root の下の置き場（機械の区切りで root に logs/diag を足す）。
 func DirOf(root string) string { return ospath.Join(root, strings.Split(Dir, "/")...) }
 
 // Level は出力のレベル。CCNAVI_LOG_LEVEL で閾値を決める。

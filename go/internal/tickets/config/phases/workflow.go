@@ -13,7 +13,7 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// 先行関係は親の計画のステップの after から都度計算し、ファイルにもチケットの欄にも持たない。決まりは 2 つ。
+// 先行関係は親の計画のステップの after から都度計算し、ファイルにもチケットの欄にも書かない。決まりは 2 つ。
 //   - ステップの先行は、after を推移的に辿った全部の番号。after を書かないステップは先行なし
 //   - 延期したステップは、それが先行する延期していないステップのうち、番号のいちばん小さいものが引き受ける
 // フィードバック計画のステップには全体計画の番号が全部と、フィードバック計画の中で after を辿った番号が先行する。
@@ -63,6 +63,7 @@ func sortedKeys(set map[int]bool) []int {
 // Compute は親の計画の先行関係を計算する。形の誤った after は線として数えない。
 func Compute(parent *ticket.Ticket) *ticket.Workflow {
 	wf := &ticket.Workflow{Order: ticket.WorkflowDAG, Waits: map[int][]int{}, ReviewAt: map[int]int{}}
+	// 1. 全体計画。after の番号（自分より前のものだけ）と、その先行を推移的にたどった番号を、先行の集合にする。
 	planned := len(parent.Plan)
 	for i, item := range parent.Plan {
 		n := i + 1
@@ -78,6 +79,7 @@ func Compute(parent *ticket.Ticket) *ticket.Workflow {
 		}
 		wf.Waits[n] = sortedKeys(found)
 	}
+	// 2. フィードバック計画。全体計画の全部が終わってから始まり、その中では自分の after に従う。
 	whole := make([]int, planned)
 	for i := range whole {
 		whole[i] = i + 1
@@ -97,6 +99,7 @@ func Compute(parent *ticket.Ticket) *ticket.Workflow {
 		}
 		wf.Waits[n] = append(append([]int{}, whole...), sortedKeys(inside)...)
 	}
+	// 3. 延期したステップは、レビューを引き受けるステップを決める。
 	steps := parent.Numbered()
 	for _, s := range steps {
 		if !s.Item.Deferred {
@@ -256,6 +259,7 @@ func PlanProblems(parent *ticket.Ticket, types *Types, only Part) []rules.Proble
 	if !parent.HasPlan() {
 		return found
 	}
+	// 1. after の形の誤りと、同じ番号を 2 度挙げた警告。
 	selected := parts(parent, only)
 	found = append(found, AfterProblems(parent, only)...)
 	for _, p := range selected {
@@ -267,6 +271,7 @@ func PlanProblems(parent *ticket.Ticket, types *Types, only Part) []rules.Proble
 			}
 		}
 	}
+	// 2. 終端（合流）の検査。
 	wf := Compute(parent)
 	found = append(found, TerminalProblems(parent, wf, only)...)
 	for _, p := range selected {
@@ -275,6 +280,7 @@ func PlanProblems(parent *ticket.Ticket, types *Types, only Part) []rules.Proble
 			if !item.Deferred || i == len(p.items)-1 {
 				continue
 			}
+			// 3. 延期したステップごとに、引き受け手がいるか、引き受け手にレビューがあるかを見る。最後のステップの延期は、引き受け手がいないので別の検査で断る。
 			target, ok := wf.ReviewAt[n]
 			if !ok {
 				found = append(found, problem(rules.Error, parent.ID, fmt.Sprintf(

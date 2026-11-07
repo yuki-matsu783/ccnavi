@@ -10,11 +10,5 @@
 //
 // state に置く記録（`<セッション>.reported.json`・`.accepted.json`・`.turn.json`）は records/prune が名前で消す。
 //
-// Python からの対応: hook の post・post_findings・post_report をまとめた。check → Checker.Check、at_stop →
-// Checker.AtStop、at_prompt → Checker.AtPrompt、capture_baseline → Checker.CaptureBaseline（共通の引数 stderr・state_dir・
-// mine・watched・scope・places・root は Checker の欄）。Watched・ScopeGuard はそのまま、places の組 → Places、
-// REASON_WORKTREE_UNREADABLE・REPORT_LIMIT・CODE_TICKET_SCOPE → ReasonWorktreeUnreadable・ReportLimit・CodeOutOfScope（実行前の reasons.CodeTicketScope と分けた名前）。
-// post_report の文（_violation・_preexisting）と post_findings の照合（_findings・_script_writes）は
-// 私的にした（上の段は呼ばない）。integrated_paths とその下の squash の確かめは integrate の責務なので
-// tickets/lifecycle/integrate の SquashedPaths に移した。
+// 取り込み済みのパスと squash の確かめは integrate の責務なので、tickets/lifecycle/integrate の SquashedPaths にある。
 package post

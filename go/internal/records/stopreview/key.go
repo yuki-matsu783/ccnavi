@@ -9,15 +9,15 @@ import (
 )
 
 const (
-	// 末尾から tailChunk ずつ 2 倍に広げて読み、tailLimit で止める。Python は 64 KiB ずつ足して読むが、
-	// 末尾から並べた完全な行は広げても前に足されるだけなので、倍に広げても見つかる行は同じ。
+	// 末尾から tailChunk ずつ 2 倍に広げて読み、tailLimit で止める。末尾から並べた完全な行は、
+	// 読む範囲を広げても前に足されるだけなので、倍に広げても見つかる行は同じ。
 	tailChunk = 64 * 1024
 	tailLimit = 4 * 1024 * 1024
 	tailGrow  = 2
 	// 末尾の行が書きかけなら、少し待って読み直す。
 	rereads    = 3
 	rereadWait = 50 * time.Millisecond
-	// asciiSpace は Python の bytes.strip が落とす字。
+	// asciiSpace は行の前後から落とす ASCII の空白。
 	asciiSpace = " \t\n\r\v\f"
 )
 
@@ -56,6 +56,9 @@ func lastAssistantUUID(path string) (uuid string, complete bool) {
 	return uuid, complete
 }
 
+// scan は末尾の行から前へ向かって、サイドチェーンでないアシスタント行の uuid を探す。
+// 末尾の行（最初に出会う空でない行）だけが JSON として読めないときは、書きかけとして complete を偽にする。
+// それより前の読めない行は飛ばす。
 func scan(lines [][]byte) (string, bool) {
 	first := true
 	for i := len(lines) - 1; i >= 0; i-- {

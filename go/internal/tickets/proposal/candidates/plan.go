@@ -20,7 +20,7 @@ import (
 func Validate(t *ticket.Ticket, pool map[string]*ticket.Ticket, cfg *phases.Types, approved bool, missing string) ([]rules.Problem, []rules.Problem) {
 	var problems, overflow []rules.Problem
 	if t.HasMaintenance && !approved {
-		// 保守用の子の印は ticket consolidate が承認済みの置き場へ直に作る。印を持つ提案は承認しない。
+		// 保守用の子の印は ticket consolidate が承認済みの置き場へ直に作る。印がある提案は承認しない。
 		return refuse(t, "`"+ticket.MaintenanceKey+":` は通常の提案・承認の経路では指定できない印。"+
 			"提案から欄を消す（統合の子は `ccnavi-ticket.sh consolidate <親>` が作る）"), nil
 	}
@@ -115,6 +115,7 @@ func copyConfigProblems(t *ticket.Ticket, cfg *phases.Types, held map[string]*ph
 	if !phases.HasCopy(t) || !t.HasPlan() {
 		return nil
 	}
+	// 承認前は error、承認済みの親の食い違いは warn（判定はコピーを読むので、進行中の親には効かない）。
 	severity := rules.Error
 	if approved {
 		severity = rules.Warn
@@ -127,6 +128,7 @@ func copyConfigProblems(t *ticket.Ticket, cfg *phases.Types, held map[string]*ph
 		return []rules.Problem{say("`plan` があるのにフェーズ定義（phases.yml）が読めない。" +
 			"コピー（`phases:`）が phases.yml と同じかを確かめられない")}
 	}
+	// 定義ごとに、held（子が承認された番号が使う定義）→ 承認済みの親の phases.yml → 承認前の親の phases.yml の順に比べる。
 	var problems []rules.Problem
 	for pt := range phases.TypesOf(t).All() {
 		ident := pt.ID

@@ -201,7 +201,7 @@ func normalized(t *testing.T, r result, root string) string {
 }
 
 // compareScenario は場面を回し、呼び出しごとの答え（ルートと日時を置き換えたもの）を Go の答えの見本と比べる。
-// 見本は Python の post_findings と答えが揃っていた Go の答えから取った。
+// 見本は、答えが確かめ済みだった Go の出力から取った。
 func compareScenario(t *testing.T, s scenario, setup func(t *testing.T) string) {
 	t.Helper()
 	root := setup(t)
@@ -251,7 +251,7 @@ func mainWorkspace(wrapper bool) func(t *testing.T) string {
 	}
 }
 
-func TestMainTreeMatchesPython(t *testing.T) {
+func TestMainTreeMatchesGolden(t *testing.T) {
 	s := protectRules
 	s.Watched = []watchSpec{{}}
 	many := []step{}
@@ -293,7 +293,7 @@ func TestMainTreeMatchesPython(t *testing.T) {
 	compareScenario(t, s, mainWorkspace(true))
 }
 
-func TestWithoutBaselineOrWrapperMatchesPython(t *testing.T) {
+func TestWithoutBaselineOrWrapperMatchesGolden(t *testing.T) {
 	s := protectRules
 	s.Watched = []watchSpec{{}}
 	s.Steps = []step{
@@ -309,7 +309,7 @@ func TestWithoutBaselineOrWrapperMatchesPython(t *testing.T) {
 	compareScenario(t, s, mainWorkspace(false))
 }
 
-func TestSideBySideMatchesPython(t *testing.T) {
+func TestSideBySideMatchesGolden(t *testing.T) {
 	s := protectRules
 	s.Watched = []watchSpec{{Side: true}}
 	s.Steps = []step{
@@ -325,7 +325,7 @@ func TestSideBySideMatchesPython(t *testing.T) {
 	compareScenario(t, s, mainWorkspace(true))
 }
 
-func TestTicketScopeMatchesPython(t *testing.T) {
+func TestTicketScopeMatchesGolden(t *testing.T) {
 	s := protectRules
 	s.Watched = []watchSpec{{}, {Path: ".claude/worktrees/feat"}}
 	s.Scope = true

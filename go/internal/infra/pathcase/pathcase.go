@@ -8,7 +8,7 @@ import (
 )
 
 // Fold は同じ場所を同じ文字列にする。区切りは機械のもの、大文字小文字はどの機械でも区別しない。
-// Python の os.path.normcase(path).casefold() と同じ答えを返す。
+// Windows は区切りを \ にそろえ（normcase）、その上で casefold する。
 func Fold(path string) string {
 	if ospath.Windows {
 		path = strings.ReplaceAll(path, "/", `\`)
@@ -22,7 +22,7 @@ func HasExt(name, ext string) bool {
 	return strings.HasSuffix(Fold(name), Fold(ext))
 }
 
-// Real は path が実際に指す場所の比べのキー（Python の pathcase.fold(os.path.realpath(path))）。リンクは辿る。
+// Real は path が実際に指す場所の比べのキー（realpath を Fold したもの）。リンクは辿る。
 func Real(path string) string {
 	return Fold(ospath.Realpath(path))
 }
@@ -32,7 +32,7 @@ func SameReal(a, b string) bool {
 	return Real(a) == Real(b)
 }
 
-// SameNorm は a と b が表記の上で同じパスか（Python の fold(normpath(a)) == fold(normpath(b))。リンクは辿らない）。
+// SameNorm は a と b が表記の上で同じパスか（Normpath を Fold して比べる。リンクは辿らない）。
 func SameNorm(a, b string) bool {
 	return Fold(ospath.Normpath(a)) == Fold(ospath.Normpath(b))
 }

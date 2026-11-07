@@ -44,7 +44,7 @@ func handoffLinked(subject, spelledPath string) bool {
 	if slashFold(ospath.Realpath(subject)) != spelledPath {
 		return true
 	}
-	// 普通のファイルでない・無い（新しい下書き）なら、ハードリンクは見ない（Python の os.path.isfile と同じ）。
+	// 普通のファイルでない・無い（新しい下書き）なら、ハードリンクは見ない。
 	if !ospath.IsFile(subject) {
 		return false
 	}
@@ -114,6 +114,7 @@ func deleteTargets(words []string) []string {
 	default:
 		return nil
 	}
+	// `--` より前のオプションは飛ばし、`--` の後ろはすべて対象の語として数える。
 	var targets []string
 	dashes := false
 	for _, word := range rest {
@@ -130,12 +131,13 @@ func deleteTargets(words []string) []string {
 }
 
 // handoffDeleteExempt はシェルの保護から、置き場の中だけを消すコマンドを取り除く関数。対象の語がすべて置き場の中と
-// 読めるときだけ取り除き、ほかのコマンドと書き込みは残す。取り除くのは絶対パスの語だけである。`sh -c` の層の中の `cd` は見えないため。
+// 読めるときだけ取り除き、ほかのコマンドと書き込みは残す。取り除くのは絶対パスの語だけ。`sh -c` の層の中の `cd` は見えないため。
 func handoffDeleteExempt(root string) func(string) string {
 	if root == "" {
 		return nil
 	}
 	return func(subject string) string {
+		// コマンドごとに見て、置き場の中だけを消すコマンドを取り除く。語が引用でつながったコマンド（WordSep を含む）は読み切れないので残す。
 		commands := strings.Split(subject, shell.Sep)
 		var kept []string
 		for _, command := range commands {
@@ -165,7 +167,7 @@ func allPlain(root string, targets []string) bool {
 }
 
 // handoffLinkTarget は名指しのツールで、置き場の中のつながった対象に書く形だけを残す関数。利用者のルールの except が
-// 置き場を外していても、ハードリンクでつながった守る場所へは書かせないためである。
+// 置き場を外していても、ハードリンクでつながった守る場所へは書かせないため。
 func handoffLinkTarget(root string) func(string) string {
 	if root == "" {
 		return nil
@@ -181,7 +183,7 @@ func handoffLinkTarget(root string) func(string) string {
 }
 
 // リンクを作るコマンド。ln・link と、リンクを作る選択肢を付けた cp。
-// shell.IsRunner・shell.IsAssignment には寄せない（Python の selfguard_shell も shellread と別の表を持つ）。答えが変わるため:
+// shell.IsRunner・shell.IsAssignment には寄せない。別の表を持つのは、寄せると答えが変わるため。
 // linkPrefixes は busybox・xargs を含み doas・stdbuf などを含まない。assignment は配列の要素（`a[1]=`）を代入と読まない。
 var (
 	linkers       = map[string]bool{"ln": true, "link": true, "gln": true}
@@ -227,7 +229,7 @@ func makesLink(words []string) bool {
 }
 
 // commandBase はコマンドの名前（ディレクトリと `.exe` を除き、大文字小文字を畳む）。shell.Base と違い、casefold してから
-// `.exe` だけを除く（`RM` は rm、`x.cmd` は x.cmd のまま）。Python の _base と同じ答えにするため別に持つ。
+// `.exe` だけを除く（`RM` は rm、`x.cmd` は x.cmd のまま）。判定が変わらないよう、shell.Base とは別に持つ。
 func commandBase(word string) string {
 	name := strings.ReplaceAll(word, `\`, "/")
 	name = pathcase.Fold(name[strings.LastIndex(name, "/")+1:])

@@ -12,7 +12,7 @@ const (
 	keyMtime       = "mtime"
 )
 
-// rowKeys は ccnavi が書いた形の行が持つキー。
+// rowKeys は ccnavi が書いた形の行に並ぶキー。
 var rowKeys = []string{keyConceptID, keyDirectory, keyFrontmatter, keyMtime}
 
 // rootDirectory はツリーのルートの直下のファイルの `directory`。

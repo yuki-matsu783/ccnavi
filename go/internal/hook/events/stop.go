@@ -211,7 +211,7 @@ func stateNudge(stderr io.Writer, conf *config.Settings, root string, in hookio.
 }
 
 // subagentNudge は、終わったサブエージェントが範囲外の変更を残した、または範囲を確かめられなかったときの促し（同じ結果では
-// 1 回だけ）。結果の 1 行ずつはコードが組み、前後の文は文面ファイルが持つ（状態の行の次の 1 行が何をするか）。
+// 1 回だけ）。結果の 1 行ずつはコードが組み、前後の文は文面ファイルに書いてある（状態の行の次の 1 行が何をするか）。
 func subagentNudge(conf *config.Settings, root string, in hookio.Input, record *audit.Record) string {
 	if !conf.TicketsEnabled() || !nudgeable(conf, in) {
 		return ""
@@ -277,7 +277,7 @@ type continuation struct {
 }
 
 // aiContinuation は、この Stop が AI 判定の差し戻しで続いた回なら、その試行を消費して返す。
-// 消費はイベントの記録に書かない（Python は記録の置き場を結ぶ前に消費していた）。
+// 消費はイベントの記録に書かない。
 func aiContinuation(conf *config.Settings, in hookio.Input) continuation {
 	if !in.StopHookActive || !conf.StopReviewAgent || conf.State == "" || in.AgentID != "" || in.SessionID == "" {
 		return continuation{}

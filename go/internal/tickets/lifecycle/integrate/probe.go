@@ -46,6 +46,7 @@ func directAtStop(conf *config.Settings, root, cwd, session string, deadline tim
 	if cwd == "" {
 		cwd, _ = ospath.Getwd()
 	}
+	// 1. cwd が直接作業のワークツリーなら、まずそれを調べる。促した記録があるもの（already）は、同じ状態で 2 度促さないので飛ばす。
 	skip := ""
 	if here, ok := tree.TreeOf(root, cwd, conf.Projects); ok && !here.IsMain() {
 		got := look(conf, root, here, deadline)
@@ -57,6 +58,9 @@ func directAtStop(conf *config.Settings, root, cwd, session string, deadline tim
 	if session == "" || conf.State == "" {
 		return nil
 	}
+	// 2. セッションで見た直接作業の候補を、確かめていない順（確かめた時刻の古い順、同じなら最後に見た新しい順）に調べる。
+	// 1 回の Stop で見つけるのは 1 本だけ。期限が来たら残りは次の Stop に回す。
+	// 消えたワークツリーと、直接作業でなくなったものは候補から外す。
 	var entries []directcand.Entry
 	for _, e := range directcand.Load(conf, root, session) {
 		if skip == "" || pathcase.Fold(e.Name) != pathcase.Fold(skip) {
@@ -120,6 +124,7 @@ func already(conf *config.Settings, session string, d *Direct) bool {
 // では促さない）。統合先が決まらない・取り込み先のツリーが無いときは理由を付けて Hit。取り込みの途中の
 // 記録が版 4 なら Clear、版を知らなければ Hit。同じ HEAD の片付けた記録があれば Clear。
 func probe(conf *config.Settings, root string, here tree.Tree, deadline time.Time) Probe {
+	// 1. 直接作業か。違うなら候補から外す（drop）。決められなければ unknown。
 	reason, unsure := DirectCheck(conf, root, here, deadline)
 	if reason != "" {
 		return Probe{state: Clear, drop: true}
@@ -139,9 +144,11 @@ func probe(conf *config.Settings, root string, here tree.Tree, deadline time.Tim
 	if !known {
 		return Probe{state: unknown}
 	}
+	// 2. 取り込みの記録があれば、記録の側で調べる。
 	if rec := DirectRecord(owner, here.Name); rec != nil {
 		return probeRecorded(owner, here, head, dirty, rec, deadline)
 	}
+	// 3. 記録が無ければ、統合先に入っていないコミットを数える。0 なら Clear（未コミットの変更だけでは促さない）。
 	integration, ok := Integration(owner, deadline)
 	if !ok {
 		return Probe{state: unknown}
@@ -158,6 +165,7 @@ func probe(conf *config.Settings, root string, here tree.Tree, deadline time.Tim
 	if ahead == 0 {
 		return Probe{state: Clear}
 	}
+	// 4. 取り込める状態かを確かめる。統合先が決まらない・統合先を checkout しているツリーが無いときは、促すが、Blocked に理由を載せて、取り込みを打たせない。
 	found := &Direct{Name: here.Name, worktree: here.Root, head: head, dirty: dirty, ahead: ahead,
 		integration: integration, noRecord: true}
 	if integration == "" {
@@ -179,6 +187,8 @@ func probe(conf *config.Settings, root string, here tree.Tree, deadline time.Tim
 			"どのツリーで取り込むかをユーザに確かめてください"
 		return Probe{state: hit, found: found}
 	}
+	// 5. 統合先のツリーにある取り込みの目印を見る。版 4 の目印は取り込み済みなので Clear。版を知らない目印は、読めないので促す。
+	// 目印が無ければ、HEAD の取り込みを記録した行があるかで、取り込み済みかを決める。
 	marks, ok := GitPath(integTree, RecordDir, deadline)
 	if !ok {
 		return Probe{state: unknown}
@@ -214,6 +224,7 @@ func probeRecorded(owner string, here tree.Tree, head string, dirty bool, rec *R
 			"操作せず、ユーザに確かめてください"
 		return Probe{state: hit, found: found}
 	}
+	// 1. 記録が、このリポジトリのものか。git の共通ディレクトリを、ワークツリー・ユーザのチェックアウト・記録の三者で比べる（大文字小文字は畳む）。
 	mine, mineOK := tree.CommonDir(here.Root)
 	main, mainOK := tree.CommonDir(owner)
 	recorded := rec.Fields["common_dir"]
@@ -225,6 +236,7 @@ func probeRecorded(owner string, here tree.Tree, head string, dirty bool, rec *R
 		return Probe{state: hit, found: found}
 	}
 	found.marker = MarkerKind(ospath.Join(rec.Common, RecordDir), here.Name)
+	// 2. ユーザのチェックアウトが、記録した取り込み先のままか。切り替わっていれば、エージェントは checkout しないので、ユーザに戻してもらう。
 	if current, _ := tree.BranchOf(owner); current != base {
 		shown := current
 		if shown == "" {
@@ -239,6 +251,7 @@ func probeRecorded(owner string, here tree.Tree, head string, dirty bool, rec *R
 		found.Blocked = busy
 		return Probe{state: hit, found: found}
 	}
+	// 3. 起点 S のコミットが読めるか。S..先頭 のコミット数を数え、origin が取り込み先より進んでいる数も控える。
 	snap := rec.Fields["snap_sha"]
 	done := git.Run(here.Root, []string{"rev-parse", "--verify", "--quiet", snap + "^{commit}"}, git.Options{Deadline: deadline})
 	if done.Failure != nil {

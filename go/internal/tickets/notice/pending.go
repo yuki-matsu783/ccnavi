@@ -85,6 +85,7 @@ func v4Line(root, top, name string, fields map[string]string, deadline time.Time
 		return head + "記録が壊れているか、今の状態と合いません（" + why + "）。" +
 			"操作せず、`" + cd + " status` の結果をユーザに見せて確かめてください"
 	}
+	// 1. 記録に必要な欄が揃っているか。欠けていれば壊れた記録として、操作させずユーザに確かめさせる。
 	var missing []string
 	for _, k := range v4Need {
 		if fields[k] == "" {
@@ -98,6 +99,7 @@ func v4Line(root, top, name string, fields map[string]string, deadline time.Time
 	if rec := integrate.DirectRecord(top, name); rec != nil {
 		base = rec.Fields["base_branch"]
 	}
+	// 2. 取り込み先の今の HEAD を読み、記録の HEAD と比べて、どこまで進んだかを分ける。
 	now := git.Head(top, git.Options{Deadline: deadline})
 	if now == "" {
 		return broken("HEAD を読めません")
@@ -105,6 +107,8 @@ func v4Line(root, top, name string, fields map[string]string, deadline time.Time
 	abort := "やめるなら `" + cd + " integrate --abort " + name + "`"
 	redo := "ユーザに確かめてから `" + cd + " integrate --abort " + name + "` で戻し、" +
 		"`" + cd + " integrate " + name + "` を打ち直してください"
+	// K（取り込みのコミット）を作った後の状態。K の親と木が記録と違えば、K を信用しない（記録はエージェントにも書けるため、git の状態で確かめる）。
+	// K が取り込み先に載っていれば片付けの途中、載っていなければ了承待ち、取り込み先が動いていれば打ち直し。
 	if k := fields["k"]; k != "" && k != integrate.UnsetK {
 		parent, okP := git.Text(top, []string{"rev-parse", "--verify", k + "^"}, git.Options{Deadline: deadline})
 		treeOf, okT := git.TreeOf(top, k, git.Options{Deadline: deadline})
@@ -122,6 +126,7 @@ func v4Line(root, top, name string, fields map[string]string, deadline time.Time
 		}
 		return head + "K を作ったあとに取り込み先が動きました。自動では取り込みません。" + redo
 	}
+	// K を作る前の状態。取り込み先が動いていなければ、確認待ち。動いていれば打ち直し。
 	if now != fields["head"] {
 		return head + "確認の途中で取り込み先が動きました（記録の HEAD と違います）。" + redo
 	}
@@ -148,6 +153,7 @@ func leftovers(root, top string, reported map[string]bool, deadline time.Time) [
 	if !ok {
 		return nil
 	}
+	// 取り込みの途中で落ちたときの跡を、名前ごとに集める。(1) 一時ワークツリー (2) 専用の ref (3) 片付けの途中の done の記録。
 	names := map[string][]string{}
 	tmpBase := ospath.Join(root, config.DirectTmpDir, RepoKey(root, top))
 	if entries, err := ospath.DiskListdir(tmpBase); err == nil {
@@ -202,6 +208,7 @@ func leftovers(root, top string, reported map[string]bool, deadline time.Time) [
 // 元ツリー。期限が過ぎたら残りのツリーは見ず、その旨を添える。記録が多ければ名前を全件 1 行に並べる（確認が要る件を
 // 見落とさないため）。
 func PendingIntegrate(conf *config.Settings, root string, deadline time.Time) string {
+	// ワークスペースと各プロジェクトの元ツリーを順に見る。ツリーごとに、marker のある記録（版 4 か、版不明）→ marker の無い跡の順に集める。
 	tops := []string{root}
 	for _, p := range tree.Projects(conf.Projects) {
 		tops = append(tops, p.Root)
@@ -244,6 +251,7 @@ func PendingIntegrate(conf *config.Settings, root string, deadline time.Time) st
 		return ""
 	}
 	out := []string{pendingHead}
+	// 記録が多いときは、名前を 1 行に並べるだけにする（個別の説明は `status` で読ませる）。
 	if len(lines) >= pendingShortFrom {
 		var all []string
 		for _, l := range lines {

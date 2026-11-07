@@ -9,7 +9,7 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// 範囲の当て方の約束。Python と同じ答えになることは phase の TestMatchesPython が実際のワークスペースで見る。
+// 範囲の当て方の約束。見本と同じ答えになることは phase の TestMatchesGolden が実際のワークスペースで見る。
 
 func parse(t *testing.T, text string) *ticket.Ticket {
 	t.Helper()
@@ -98,7 +98,7 @@ func TestTypeForNeedsAPlannedNumber(t *testing.T) {
 	}
 }
 
-// 統合の子は親の範囲を当てず、固定の定義で切り詰める（Python の test_learning_consolidate の ScopeTest）。
+// 統合の子は親の範囲を当てず、固定の定義で切り詰める。
 func TestConsolidateChildIsCutByTheFixedDefinition(t *testing.T) {
 	parent := parentOf(t, "  - work\n", "src/*")
 	child := childOf(t, "i0001-00-01", "0", "maintenance: learning-consolidate\n", "docs/wiki/patterns/*", "src/*")

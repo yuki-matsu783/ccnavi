@@ -2,5 +2,5 @@
 
 package platformtag
 
-// executable は os.access(path, X_OK)。Windows では在れば実行できるとみなす（Python と同じ）。
+// executable は実行できるか。Windows では実行の権限ビットが無いので、あれば実行できるとみなす。
 func executable(string) bool { return true }

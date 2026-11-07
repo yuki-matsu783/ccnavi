@@ -33,8 +33,8 @@ const (
 	keyDescription = "description"
 )
 
-// name は目録に載せるスキルのディレクトリ名。ほか（改行・空白・括弧・区切りに似た文など）を持つ名前は読まない。
-// パスは文にそのまま出るので、名前で文を組み立てさせない。末尾の `\n?` は Python の `$` と同じ答えにするため。
+// name は目録に載せるスキルのディレクトリ名。改行・空白・括弧・区切りに似た文などが入った名前は読まない。
+// パスは文にそのまま出るので、名前で文を組み立てさせない。末尾の `\n?` は、`$` が末尾の改行の手前でも当たる約束に合わせる（改行 1 つの付いた名前も通す）。
 var name = regexp.MustCompile(`^[A-Za-z0-9._-]+\n?$`)
 
 type entry struct{ name, about, rel string }
@@ -75,7 +75,7 @@ func entries(projectRoot string) ([]entry, int) {
 			continue
 		}
 		fm := front(raw)
-		// 文字列でない値も flow.Line に渡す（Python の front.get(...) or 既定。str() にしない）。
+		// 文字列でない値も flow.Line に渡す（文字列に直さない。値が空なら既定を使う）。
 		shown, about := fm.Or(keyName, n), fm.Or(keyDescription, noAbout)
 		found = append(found, entry{flow.Line(shown), flow.Line(about), flow.Line(config.SkillsDir + "/" + n + "/" + config.SkillFile)})
 	}

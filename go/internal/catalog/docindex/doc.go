@@ -6,9 +6,4 @@
 // 一時ファイルは git のディレクトリに排他で作る。こうすると、ワークツリーの `git status` に出ない。`.git` が別の
 // ファイルシステムにあって置き換えが失敗したときだけ、索引の隣の `.ccnavi-tmp-*/` に作る。その前に、git が無視する
 // ことを確かめる。
-//
-// Python からの対応: docsearch_index。build → Build（引数は Options）、Built → Built、NotARepository → ErrNotRepository、
-// GitFailed → 非公開の gitError（Error() が理由の文）、_dumps → Compact、front_matter → FrontMatter、_read_head → ReadHead、
-// _ignored → Ignored、_excluded → Excluded、索引の 1 行（dict）→ Row。ツリーの下の相対の継ぎ（f"{prefix}/{rel}"）→ JoinRel、
-// 入れ子の値の走査 → Walk。_add_ignore の ADDED・PRESENT・NOT_ADDED → ignoreResult。
 package docindex

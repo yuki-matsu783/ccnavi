@@ -13,7 +13,7 @@ func decodeText(t *testing.T, text string) (Input, error) {
 	return Decode(strings.NewReader(text))
 }
 
-// 解釈できない payload は、Python の実行ファイルと同じ文とイベント名で止める。
+// 解釈できない payload は、決めた文とイベント名で止める。
 func TestDecodeRefusals(t *testing.T) {
 	cases := []struct {
 		in, msg string
@@ -44,7 +44,7 @@ func TestDecodeRefusals(t *testing.T) {
 	}
 }
 
-// 残りの欄は型が違えば既定の値にし、文字列にする欄は Python の str() と同じ形にする。
+// 残りの欄は型が違えば既定の値にし、文字列にする欄は偽の値（null・空）を空文字にする。
 func TestDecodeFields(t *testing.T) {
 	in, err := decodeText(t, `{"hook_event_name": "Stop", "agent_id": 5, "agent_type": true, "tools": ["Read", 1],
 		"error": 3, "is_interrupt": 1, "stop_hook_active": true, "source": {"a": [1, null]}, "prompt": 7,
@@ -68,7 +68,7 @@ func TestDecodeFields(t *testing.T) {
 	}
 }
 
-// 標準入力の UTF-8 として読めないバイトは、Python の errors="replace" と同じ数の U+FFFD にする。
+// 標準入力の UTF-8 として読めないバイトは、正しく始まった並びごとに 1 つの U+FFFD にする。
 func TestDecodeReplacesBrokenUTF8(t *testing.T) {
 	if got := decodeReplace([]byte("a\xff\xe3\x81\x82\xed\xa0\x80\xf0\x9f\x98")); got != "a�あ����" {
 		t.Errorf("got %q", got)
@@ -131,7 +131,7 @@ func TestIsUserPrompt(t *testing.T) {
 	}
 }
 
-// 応答は Python の実行ファイルと同じバイト列（ensure_ascii=False、区切り ", " と ": "、空の欄は出さない）。
+// 応答は決まったバイト列（ensure_ascii=False、区切り ", " と ": "、空の欄は出さない）。
 func TestWriters(t *testing.T) {
 	var b strings.Builder
 	must := func(err error) {

@@ -71,9 +71,11 @@ const (
 // pathspec・固定の部分の無いグロブ・`--pathspec-from-file`）。対象を読み切れない（変数・置換・読めない `cd` の後の相対パス・
 // 読み切れないコマンド行）。`checkout -- <パス>`。通すのは、索引の中身に戻す `restore` と、何も消さない `rm -n`・`--dry-run`。
 func CheckCorePaths(conf *config.Settings, root, cwd, subject string, degraded bool) (sub, word string, kind Core) {
+	// ラッパーの名前が語として出ない行は対象外（ここで先に落として、重い読みを避ける）。
 	if !mentionsGitScript(subject) {
 		return "", "", ""
 	}
+	// 読み切れなかった行は、語の位置が信用できない。サブコマンドの名前が見える限り、中身を調べずに止める側に倒す。
 	if degraded {
 		for _, s := range degradedSubs(subject) {
 			if s == "" {
@@ -85,10 +87,12 @@ func CheckCorePaths(conf *config.Settings, root, cwd, subject string, degraded b
 		}
 		return "", "", ""
 	}
+	// コマンドごとに、居場所（cd の追跡）つきの語に分けて読む。
 	places := shell.PlacedCommands(subject, false)
 	if word, ok := fedToStdin(places); ok {
 		return unknownParent, word, coreUnread
 	}
+	// 守る場所の式は最初に必要になるまで組まない（当たらない大半の呼び出しで組み立てを省く）。
 	var compiled *pyre.Regexp
 	for _, p := range places {
 		call, ok := findScriptCall(p.Words)
@@ -122,6 +126,7 @@ func CheckCorePaths(conf *config.Settings, root, cwd, subject string, degraded b
 				return sub, paths[0], CoreHit
 			}
 		}
+		// base はそのコマンドの居場所。cd を読み切れていなければ known を偽にして、相対パスは coreHit で止める側に倒す。
 		base, known := "", false
 		if p.Known && cwd != "" {
 			base, known = p.Here, true
@@ -180,6 +185,7 @@ func longOption(arg, full string, least int) bool {
 // `-n`・`--dry-run` があれば（後ろに `--no-dry-run` が無ければ）何も返さない。長いオプションは git が受ける省略形
 // （`--sou=`）も同じに読む。オプションを変数で書く形（`restore $O HEAD~1 <パス>`）は見ない。この検査の限界で、sh が止める。
 func coreTargets(sub string, args []string) (paths []string, unknown string, index bool) {
+	// git のオプションの読みを写す。値を取るオプションの次の語は、パスでなく値として飛ばす。
 	longs, shorts := valueLongs[sub], valueShorts[sub]
 	var positional []string
 	beforeDashes := 0
@@ -241,6 +247,7 @@ func coreTargets(sub string, args []string) (paths []string, unknown string, ind
 	if !afterDashes {
 		beforeDashes = len(positional)
 	}
+	// 戻す元（--source）が無い restore は索引からの復元で、コミットの中身に戻さない。rm の dry-run は何も消さない。どちらも通す。
 	if sub == "restore" && !source || sub == "rm" && dry {
 		return nil, "", false
 	}
@@ -267,6 +274,7 @@ func coreTargets(sub string, args []string) (paths []string, unknown string, ind
 // coreHit はパスの語 1 つが自己防衛の対象に当たるなら、理由の種類。当たるかを決められない語も当たる側に倒す。
 // base はそのコマンドが居る場所で、known が偽なら読めない。
 func coreHit(conf *config.Settings, root string, compiled *pyre.Regexp, path, base string, known bool, sub string) Core {
+	// Windows の区切りを `/` にそろえてから比べる。
 	word := strings.ReplaceAll(path, `\`, "/")
 	if strings.HasPrefix(word, ":") {
 		return CoreHit
@@ -288,6 +296,7 @@ func coreHit(conf *config.Settings, root string, compiled *pyre.Regexp, path, ba
 	if known {
 		full = ospath.Normpath(ospath.Join(base, word))
 	}
+	// 置き場の判定は理由の種類が違うので、守る場所の式より先に調べる（文が変わる）。
 	if inStore(conf, word, full) {
 		return coreStore
 	}
@@ -298,6 +307,7 @@ func coreHit(conf *config.Settings, root string, compiled *pyre.Regexp, path, ba
 		// 下書きの置き場の中の削除は守る場所の外。グロブは外さない（シェルの側と同じ。`.?` が `..` に当たりうる）。
 		return ""
 	}
+	// 守る場所の式は「rm <パス>」の形で書かれているので、頭に rm を付けて当てる。書いた語と、居場所から解いた絶対パスの両方で見る。
 	if compiled.Search("rm " + word) {
 		return CoreHit
 	}

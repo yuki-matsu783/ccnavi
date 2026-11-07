@@ -458,7 +458,7 @@ func whenProblems(rule *rules.Rule, name string) []rules.Problem {
 }
 
 // everyProblems は every の値と、刻んだ先に渡すものがあるかを検査する。読めない値は error にする。判定は毎回渡すので、
-// 書いたユーザは刻んだつもりで毎回渡ることになってしまうためである。
+// 書いたユーザは刻んだつもりで毎回渡ることになってしまうため。
 func everyProblems(rule *rules.Rule, name string) []rules.Problem {
 	if rule.EveryWritten == nil {
 		return nil
@@ -518,7 +518,7 @@ func alternatives(regex string) int {
 }
 
 // inert は match に並んだツール名のうち、判定が対象を取り出せないものを返す。一覧を写さず、rules.SubjectOf を
-// 実際に呼んで確かめる。判定がツールを増やしたときに、こちらが気づかないうちに古くならないようにするためである。
+// 実際に呼んで確かめる。判定がツールを増やしたときに、こちらが気づかないうちに古くならないようにするため。
 func inert(match string) []string {
 	probe := pyjson.NewObject()
 	for _, f := range rules.SubjectFields() {

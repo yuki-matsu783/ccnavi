@@ -11,11 +11,11 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// テストの道具。origin と親のワークツリーを持つワークスペースと、チケットの見本を作る（git とファイルは testkit）。
+// テストの道具。origin と親のワークツリーがあるワークスペースと、チケットの見本を作る（git とファイルは testkit）。
 
 const fixedClock = "2026-01-06T03:04:05+0900"
 
-// workspace は main と origin を持つワークスペースを作り、名前ごとに親のワークツリーを切って push する。
+// workspace は main と origin があるワークスペースを作り、名前ごとに親のワークツリーを切って push する。
 // main には追跡する README を置く（親のワークツリーの未コミットの変更を作るため）。
 func workspace(t *testing.T, parents ...string) string {
 	t.Helper()
@@ -77,7 +77,7 @@ func filesUnder(root string, bases ...string) map[string]string {
 	return files
 }
 
-// step は 1 手の答え（名前・終了コード・標準出力・標準エラー）。Python の答えと JSON で比べる。
+// step は 1 手の答え（名前・終了コード・標準出力・標準エラー）。記録した答えと JSON で比べる。
 type step = []any
 
 // answers は 1 本の流れの答え。

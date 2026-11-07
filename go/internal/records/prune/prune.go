@@ -21,8 +21,8 @@ import (
 	"ccnavi/internal/records/turn"
 )
 
-// records より上の段（policy・tickets・hook）が書く置き場の名前。上の段は読めないので、名前を写して持つ
-// （持ち主は括弧の中）。records の中の名前は、持ち主のパッケージの定数を読む。
+// records より上の段（policy・tickets・hook）が書く置き場の名前は、records から import できない（段が逆向きになる）。
+// そのため名前をここに写す（持ち主は括弧の中）。records の中の名前は、持ち主のパッケージの定数を読む。
 // policy が書く名前（自己防衛のバックアップ・ctxfile の数え）は config の定数を読む。
 const (
 	stateSent = "sent" // tickets/model/oplog の段階が送り終えた印（oplog.StateSent）
@@ -109,11 +109,19 @@ type run struct {
 }
 
 // Run はローテートと削除を 1 度ずつ行う。途中の失敗は Problems に積んで先へ進む。
+//
+// 処理フロー:
+//  1. しきい値を読む（読めない値は既定で動き、Problems に出す）。
+//  2. 判定の記録と診断ログをローテートし、保持日数を過ぎたものを消す。
+//  3. state をセッション単位で、結果ファイルを日付単位で消す。
+//  4. Stop の AI 判定の記録（イベント・材料）を、別の保持日数で消す。
+//  5. 消さずに残した未完了の操作記録を数える。
 func Run(root, logPath, stateDir, session string, o Options) *Report {
 	r := &run{report: &Report{}, root: root, dry: o.DryRun, now: o.now}
 	if r.now.IsZero() {
 		r.now = time.Now()
 	}
+	// 0 はその段を止める。読めない値は limit が既定に直して Problems に積む。
 	rotate, logDays, stateDays := r.limit(rotateMB), r.limit(logKeepDays), r.limit(stateKeepDays)
 	if logPath != "" {
 		if rotate > 0 {
@@ -132,6 +140,7 @@ func Run(root, logPath, stateDir, session string, o Options) *Report {
 	keep := r.limit(stopReviewKeepDays)
 	if logPath != "" {
 		// 試行のイベントも決定の記録と同じ形でローテートする。保持が 0 のときは消さないだけ。
+		// 置き場の道にリンクがあれば、リンクの先を触らないよう何もしない（linkless）。
 		logDir := ospath.Dirname(logPath)
 		events := slashedJoin(logDir, stopreview.EventsFile)
 		if rotate > 0 && r.linkless(ospath.Dirname(events)) {
@@ -149,7 +158,7 @@ func Run(root, logPath, stateDir, session string, o Options) *Report {
 	return r.report
 }
 
-// slashedJoin は "a/b" の形の名前を、機械の区切りで dir に足す（Python の os.path.join と同じ綴り）。
+// slashedJoin は "a/b" の形の名前を、機械の区切りで dir に足す。
 func slashedJoin(dir, name string) string {
 	return ospath.Join(dir, strings.Split(name, "/")...)
 }
@@ -197,6 +206,7 @@ func Lines(r *Report, dryRun bool) []string {
 }
 
 // linkless は root の下の path までの道にリンクが 1 つも無いか。path が root の外なら偽（書かれたパスのまま比べる）。
+// リンクを辿って消すと、ccnavi の置き場の外のファイルを消すことになるため、消す前にこれで確かめる。
 func (r *run) linkless(path string) bool {
 	top := pathcase.Fold(ospath.Abspath(r.root))
 	here := pathcase.Fold(ospath.Abspath(path))
@@ -242,7 +252,7 @@ func (r *run) remove(path string) bool {
 	}
 	info, err := os.Lstat(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		// 同じ時に始まった別のセッションが先に消した。
+		// 同じ時に始まった別のセッションが先に消した（失敗として報告しない）。
 		return false
 	}
 	if err == nil && info.IsDir() {
@@ -291,7 +301,7 @@ func countOps(stateDir string) int {
 	}
 	n := 0
 	for _, name := range names {
-		// 拡張子は Python と同じく大文字小文字を区別して比べる（ccnavi が書く名前は小文字だけ）。
+		// 拡張子は大文字小文字を区別して比べる（ccnavi が書く名前は小文字だけ）。
 		if !strings.HasSuffix(name, fsio.JSONExt) {
 			continue
 		}
@@ -303,7 +313,7 @@ func countOps(stateDir string) int {
 	return n
 }
 
-// allSent は段階がすべて送り終えたか（終わった記録はその操作が自分で消す）。
+// allSent は段階がすべて送り終えたか（終わった記録はその操作が自分で消す）。段が無い・形が違う記録は未完了として数える。
 func allSent(data *pyjson.Object) bool {
 	stages, ok := data.Value("stages").([]any)
 	if !ok {

@@ -13,7 +13,7 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// 表・断る形・書く直前の確かめ直し・起点の木との突き合わせ。Python と同じ答えかは python_test.go が写しで見る。
+// 表・断る形・書く直前の確かめ直し・起点の木との突き合わせ。記録した答えとの一致は golden_test.go が見る。
 
 func TestKinds(t *testing.T) {
 	cases := []struct {

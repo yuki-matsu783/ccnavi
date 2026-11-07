@@ -5,10 +5,9 @@
 // ワークツリーへ書いても、その場所のチケットで判定されるようにするため。候補は最長一致で選ぶ
 // （ワークツリーはワークスペースルートの中にあるので、短い側を先に採ると子のチケットが使われない）。
 //
-// `.claude/worktrees/<名前>/` に在るだけではワークツリーと呼ばない。`.git` ファイルの gitdir が元の
+// `.claude/worktrees/<名前>/` にあるだけではワークツリーと呼ばない。`.git` ファイルの gitdir が元の
 // `.git/worktrees/<名前>` を指し、そこの gitdir が候補を指し返す相互参照が成り立つものだけを数える。
 //
-// Python からの対応: tree と directrec をまとめた。head_text → headText（読めなければ ok が偽）、
-// directrec.parse → ParseDirect、records_of → DirectRecords、common_dir → CommonDir、各所の
-// os.path.exists(os.path.join(d, ".git")) → HasGit。
+// 直接作業の記録は ParseDirect・DirectRecords で読み、共通の .git の置き場は CommonDir、
+// HEAD の読みは headText（読めなければ ok が偽）、`.git` の有無は HasGit で調べる。
 package tree

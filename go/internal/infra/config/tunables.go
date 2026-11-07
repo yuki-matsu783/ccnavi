@@ -43,11 +43,11 @@ var (
 	StopReviewTTL = Tunable{env.StopReviewTTLSeconds, 10 * time.Minute}
 )
 
-// 書かれた数の読み。設定・環境変数の値を前後の空白を外して Python の int()・float() で読む。
+// 書かれた数の読み。設定・環境変数の値を前後の空白を外し、数字の間の "_" や全角の数字も受ける Python の int()・float() と同じ綴りで読む（pyfmt）。
 // 下限や既定の扱いは読む側ごとに違うので、ここは読めたかまでを決める（Int は下限も受ける）。
 
 // Int は書かれた整数。読めない値と least より小さい値は fallback。
-// int に収まらない値は、正なら math.MaxInt、負なら math.MinInt として least と比べる（Python は巨大な値のまま使う）。
+// int に収まらない値は、正なら math.MaxInt、負なら math.MinInt として least と比べる（桁数の大きい値を、設定の値として使い続けないため）。
 func Int(written string, fallback, least int) int {
 	value, err := pyfmt.ParseBigInt(ospath.Strip(written), 10)
 	if err != nil {

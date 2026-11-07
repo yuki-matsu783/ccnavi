@@ -2,13 +2,13 @@ package testkit
 
 import "strings"
 
-// 親が閉じる側のテスト（lifecycle の stop・closing・integrate）が使う見本。成果物を持つ定義と、着手・完了の時刻を
-// 持つ。
+// 親が閉じる側のテスト（lifecycle の stop・closing・integrate）が使う見本。成果物を書いた定義と、着手・完了の時刻の行を
+// 置く。
 
 // ClosingClock はこの見本を使うテストのコミットの時刻（testdata の写しの sha がこれで決まる）。
 const ClosingClock Clock = "2026-01-01T00:00:00+0000"
 
-// closingPhases は成果物を持つ定義のコピー（phases: の欄）。
+// closingPhases は成果物を書いた定義のコピー（phases: の欄）。
 const closingPhases = `phases:
   research:
     kind: work

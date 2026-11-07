@@ -195,8 +195,8 @@ func cases(root string) []launchCase {
 	return out
 }
 
-// 担当の決め方・止める理由と文・プロンプトに書き足す案内が、同じワークスペースで Python と 1 字も違わないか。
-func TestDecideAgainstPython(t *testing.T) {
+// 担当の決め方・止める理由と文・プロンプトに書き足す案内が、同じワークスペースで見本と 1 字も違わないか。
+func TestDecideAgainstGolden(t *testing.T) {
 	root := workspace(t)
 	cs := cases(root)
 	want := golden.Load[[]launchAnswer](t, "decide")
@@ -232,7 +232,7 @@ func TestDecideAgainstPython(t *testing.T) {
 		a, _ := json.Marshal(got)
 		b, _ := json.Marshal(want[i])
 		if string(a) != string(b) {
-			t.Errorf("%s\nGo:     %s\nPython: %s", c.Payload, a, b)
+			t.Errorf("%s\nGo:     %s\nwant:   %s", c.Payload, a, b)
 		}
 	}
 	if !sawGuide || !sawFlow || !sawCut {

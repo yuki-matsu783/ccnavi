@@ -77,7 +77,7 @@ func TestTreeProblemMirrorGuidance(t *testing.T) {
 	}
 }
 
-func TestUnrestorableMatchesPython(t *testing.T) {
+func TestUnrestorableMatchesGolden(t *testing.T) {
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	root := testkit.ShapedWorkspace(t)
 	base := testkit.Head(t, root)
@@ -95,7 +95,7 @@ func TestUnrestorableMatchesPython(t *testing.T) {
 		got = append(got, r)
 	}
 	if w, _ := want["reasons"].([]any); len(w) != 3 || strings.Join(toStrings(w), "|") != strings.Join(reasons, "|") || why != want["why"] {
-		t.Errorf("Go: %q %q\nPython: %v", got, why, want)
+		t.Errorf("Go: %q %q\ngolden: %v", got, why, want)
 	}
 }
 

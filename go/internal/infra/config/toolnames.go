@@ -34,7 +34,7 @@ var (
 	// シェル経由の書き込みは実行後チェックが実物を見て拾う。
 	// MultiEdit は 1 回で同じファイルを何か所も直す。現行の Claude Code にも編集ツールのひとつとして残っている。
 	writeTools = []string{ToolWrite, ToolEdit, ToolMultiEdit, ToolNotebookEdit}
-	// WriteMatch はルールの match: に書く WriteTools（`|` でつなぐ。Python の WRITE_MATCH）。
+	// WriteMatch はルールの match: に書く WriteTools（`|` でつなぐ）。
 	WriteMatch = strings.Join(writeTools, "|")
 	// writtenFileTools は書いたファイルを記録に残すツール（MultiEdit を含む）。
 	writtenFileTools = []string{ToolWrite, ToolEdit, ToolMultiEdit}
@@ -45,7 +45,7 @@ var (
 	// reportTools はサブエージェントが親へ報告を返すツール。判定に達せなくても止めない
 	// （止めると報告を返せずに終われない）。
 	reportTools = []string{ToolSubagentHandback, ToolStructuredOutput}
-	// readTools は読むだけで、パスを持つツール。
+	// readTools は読むだけで、パスを引数にとるツール。
 	readTools = []string{ToolRead, ToolGrep, ToolGlob}
 	// shellTools はシェルを実行するツール。
 	shellTools = []string{ToolBash, ToolPowerShell}

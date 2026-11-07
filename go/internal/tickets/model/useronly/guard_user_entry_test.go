@@ -8,7 +8,7 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// `user <操作>` のどれにも、ユーザが打つ入口の sh が配ってある（tests/guard/test_user_entry.py から移した）。
+// `user <操作>` のどれにも、ユーザが打つ入口の sh が配ってある。
 // 印の無い入口を断る文がその sh を名指しするので、無い sh を指すと打つ道が無くなる。
 func TestEveryVerbHasAScriptThatExists(t *testing.T) {
 	scripts := filepath.Join(testkit.RepoRoot(t), ".ccnavi", "scripts")

@@ -167,6 +167,7 @@ func LockProblems(revised, current *ticket.Ticket, fixed map[int]bool, moved map
 	errorf := func(format string, args ...any) {
 		problems = append(problems, rules.Problem{Severity: rules.Error, Rule: revised.ID, Detail: fmt.Sprintf(format, args...)})
 	}
+	// 1. 子が承認された番号ごとに、ステップの同一性 → 直接の先行 → 固定していない先行の順で比べる。食い違いが 1 つ見つかった番号は、次の番号へ進む。
 	heldItems, newItems := numberedMap(current), numberedMap(revised)
 	held, fresh := phases.Compute(current), phases.Compute(revised)
 	for _, n := range slices.Sorted(maps.Keys(fixed)) {
@@ -202,6 +203,7 @@ func LockProblems(revised, current *ticket.Ticket, fixed map[int]bool, moved map
 			}
 		}
 	}
+	// 2. 延期（ReviewAt）の引き受け手を比べる。番号を振り直したときは、元の番号と振り直した番号を対応させて比べる。
 	at := func(n int) int {
 		if m, ok := moved[n]; ok {
 			return m

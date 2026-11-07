@@ -74,6 +74,7 @@ func judgeStop(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings
 	}
 	// 親のツリーから起動された体はどの子の担当か分からないので、全部の子を調べても差し戻さない。
 	attributed := bound != nil && bound.IsChild()
+	// findings は範囲の外の変更、unchecked は読めなくて確かめられなかった子。
 	var findings []finding
 	var unchecked []string
 	for _, child := range targets {
@@ -146,6 +147,7 @@ func judgeStop(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings
 		recordOutcome(stderr, conf, in, who, outcome.Entry{Kind: outcome.Unattributed, Paths: paths})
 		return context(stdout, note, note)
 	}
+	// 差し戻しは enable の 1 回目だけ（印の bounced で数える）。直らなくても 2 回目は止めず、文を渡して終わる。続けさせ続けないため。
 	if mode == config.Enable && !already {
 		if conf.State != "" {
 			if failed := fsio.WriteText(markPath(conf.State, in.SessionID, who, bouncedSuffix), fsio.Stamp(),

@@ -1,9 +1,9 @@
 // Package hookio は、Claude Code が hook の標準入力に書く payload の解釈と、標準出力に返す応答の
-// 組み立てを持つ。両方の形を知っているのはここだけにして、上流が変わったときに直す場所を 1 つにする。
-// 応答の JSON は Python の実行ファイルが出していたものと同じバイト列（pyjson）で書く。
+// 組み立てを担う。両方の形を知っているのはここだけにして、上流が変わったときに直す場所を 1 つにする。
+// 応答の JSON は pyjson で書く（キーの順や空白を変えないため、バイト列が安定する）。
 //
-// Python からの対応: write_verdict と write_pre_tool_use → WritePreToolUse、decode → Decode、SessionStart の source →
-// StartSource、文の頭 "[ccnavi] " と `[ccnavi] CODE (…)`・`(source: …)`・"subject: " の組み立て → Head・Tagged・Cited・
-// SubjectPrefix、hook/ccnavimd の unattended → Unattended、records/idlehandoff の unattended → Headless（2 つは Python
-// でも答えが違う。違いは各関数のコメント）。
+// payload は Decode で読み、SessionStart の source は StartSource で取る。応答は WritePreToolUse で書く。
+// 文の頭 "[ccnavi] " と `[ccnavi] CODE (…)`・`(source: …)`・"subject: " の組み立ては Head・Tagged・Cited・SubjectPrefix。
+// 無人かどうかの判定は 2 つあり、答えが違う。hook の判定側は Unattended、記録の idle handoff 側は Headless。
+// 違いは各関数のコメントに書く。
 package hookio

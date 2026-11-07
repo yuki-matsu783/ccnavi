@@ -10,11 +10,12 @@ const pushSub = "push"
 
 // CheckChildPush は、子チケットのワークツリーからの `ccnavi-git.sh push` なら、ツリーの名前と親。
 //
-// 子の成果は、親が合流してから親のツリーで送る。sh も同じ検査を持つが、sh の検査は環境変数の代入で外れる。また、承認済み
+// 子の成果は、親が合流してから親のツリーで送る。sh にも同じ検査があるが、sh の検査は環境変数の代入で外れる。また、承認済み
 // チケットの探し方を sh の中に写して持つため、写しが食い違うと気づかないうちに外れてしまう。そこで止める場所は hook に置き、
 // sh の検査は 2 重目として残す。居場所を追えなくなった先で push を打つ形は、どのツリーから送るのかが決まらないので止める
 // （名前も親も `?`）。
 func CheckChildPush(conf *config.Settings, root, cwd, subject string, degraded bool) (name, parent string) {
+	// 読み切れない行と居場所の無い呼び出しは、ここでは調べない。sh の検査（2 重目）が受ける。
 	if degraded || cwd == "" {
 		return "", ""
 	}

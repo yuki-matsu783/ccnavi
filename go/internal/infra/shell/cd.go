@@ -71,6 +71,8 @@ type cdTracker struct {
 // サブシェル `( )` は出入りで居場所を戻し、`|` `|&` `&` の左はサブシェルなので後ろに残さない。
 // `case` の枝の `)` はサブシェルの閉じと同じ表記なので、`case` から `esac` までは読まない（取りこぼす側）。
 func resolveCD(tokens []string, places *[]Placed) ([]string, bool) {
+	// 演算子（`;` `&&` `(` など）でトークンを区切り、区切りごとに flush で 1 コマンドを読む。
+	// 区切りでは、演算子の種類に応じて「次のコマンドが居る場所」を戻す・保つ・進める。
 	t := &cdTracker{budget: movedWords, places: places}
 	var segment []string
 	here := origin
@@ -90,8 +92,10 @@ func resolveCD(tokens []string, places *[]Placed) ([]string, bool) {
 			continue
 		}
 		switch {
+		// 左がサブシェルになる演算子（`|` `&` など）の後ろは、左の cd を引き継がない。
 		case forked[token]:
 			here = start
+		// サブシェルに入るときは居場所を積み、出るときに戻す。
 		case token == "(":
 			stack = append(stack, here)
 			start = here

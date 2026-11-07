@@ -8,9 +8,9 @@ import (
 	"testing"
 )
 
-// testdata/unified.json は Python 3.13 の difflib.unified_diff(a, b, fromfile="a/x", tofile="b/x", n=n, lineterm="")
-// の答え。200 行以上でよく出る行を手がかりから外す（autojunk）形と、前後の行数（n）の違いを含む。
-func TestUnifiedDiffMatchesPython(t *testing.T) {
+// testdata/unified.json は Python 3.13 の difflib.unified_diff(fromfile="a/x", tofile="b/x", lineterm="") の答えを
+// 記録した見本。200 行以上でよく出る行を手がかりから外す（autojunk）形と、前後の行数（n）の違いを含む。
+func TestUnifiedDiffMatchesGolden(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("testdata", "unified.json"))
 	if err != nil {
 		t.Fatal(err)

@@ -39,6 +39,7 @@ type Known struct {
 // `.claude/worktrees/` の直下のディレクトリ名。origin の追跡ブランチは数えない（直接作業のブランチは push しない）。
 // どこかのリポジトリのブランチを数えられなければ理由を返す（番号を決めてはいけない）。known が nil なら読む。
 func SerialNames(conf *config.Settings, root string, known *Known) ([]string, []string) {
+	// 1. 使われている名前を集める。承認済み・退避・レビュー中のチケットと提案の識別子。
 	var problems []string
 	if known == nil {
 		approved := approval.ScanApproved(conf, root, nil)
@@ -51,6 +52,8 @@ func SerialNames(conf *config.Settings, root string, known *Known) ([]string, []
 			names = append(names, t.ID)
 		}
 	}
+	// 2. ブランチの名前も、通し番号を取り合うので集める。ワークスペースと各プロジェクトのリポジトリを数え、
+	//    ブランチ名は識別子の形（ids.BranchToID）に直す。1 つでも数えられなければ、番号を決めてはいけないので問題として返す。
 	type repo struct{ root, label string }
 	repos := []repo{{root, "ワークスペース"}}
 	for _, t := range tree.Projects(conf.Projects) {
@@ -81,6 +84,7 @@ func SerialNames(conf *config.Settings, root string, known *Known) ([]string, []
 			}
 		}
 	}
+	// 3. ワークツリーのディレクトリ名も加える（ブランチが消えても、ディレクトリが残っている間は同じ名前を使えない）。
 	homes := tree.WorktreesPath(root)
 	entries, err := ospath.DiskListdir(homes)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {

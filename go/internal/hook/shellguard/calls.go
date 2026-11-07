@@ -33,6 +33,7 @@ type scriptCall struct {
 // findScriptCall は `sh <sh>`・`bash <sh>`・`<sh>` の直接の実行・`. <sh>` と、それを `env`・`sudo` などの
 // 実行役越しに呼ぶ形を読む。`sh -c '…'` は読み切れない形として shell.Read が縮退させる。
 func findScriptCall(words []string) (scriptCall, bool) {
+	// off は、先頭の代入などを除いた分と実行役を外した分を足して、元の語の並びでスクリプトの位置を返すための数え。
 	off := len(words)
 	words = stripHeads(words)
 	off -= len(words)
@@ -55,6 +56,7 @@ func findScriptCall(words []string) (scriptCall, bool) {
 			words = inner
 			continue
 		}
+		// sh・bash・`.` は、先頭のオプションを（値を取るものはその値ごと）飛ばした次の語がスクリプト。
 		if shell.IsShell(name) || shell.IsSource(name) {
 			i := 0
 			for i < len(args) && (strings.HasPrefix(args[i], "-") || strings.HasPrefix(args[i], "+")) && args[i] != "-" {
@@ -144,6 +146,7 @@ func callPlace(cwd string, p shell.Placed, chdirs []string) (string, bool) {
 
 // runnerChdirs は実行役が後ろのコマンドを動かすディレクトリ（書いた順）。
 func runnerChdirs(name string, args []string) []string {
+	// 行き先を取る実行役（env -C・sudo -D など）だけを読む。短い形の字は実行役ごとに違う。
 	short, ok := chdirShort[name]
 	if !ok {
 		return nil
@@ -166,6 +169,7 @@ func runnerChdirs(name string, args []string) []string {
 			i += shell.RunnerOptionWidth(name, arg, args[i+1:])
 			continue
 		}
+		// まとめた短いオプション（`-uC dir` など）。行き先の字が出たら、残りの字か次の語が値。値を取る別の字が先に出たら、その後ろは値なので読まない。
 		letters := []rune(arg[1:])
 		for k, letter := range letters {
 			if letter == short {

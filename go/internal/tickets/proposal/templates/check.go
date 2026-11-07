@@ -197,6 +197,7 @@ func flowRead(body *yaml.Map) (*yaml.Map, string) {
 // 1..n、フィードバック計画はその続き。after が読めないときはステップと after を Template から組み、loose と
 // ready は空にする。problems には順序の誤りだけを入れる。
 func graph(t *Template, types *phases.Types, sha string) []any {
+	// 1. テンプレートから親の提案を合成して読み、順序の誤りがなければ進み具合を計算する。
 	copies, all, _ := planConfig(t, types)
 	parsed, _ := ticket.Parse(composed(t, copies))
 	order := orderErrors(t)
@@ -208,6 +209,7 @@ func graph(t *Template, types *phases.Types, sha string) []any {
 	if parsed != nil && wf != nil {
 		loose, ready = phases.Loose(parsed, wf), phases.Ready(parsed, wf)
 	}
+	// 2. 計画ごとに図の 1 件を作る。番号は全体計画が 1..n、フィードバック計画はその続き。
 	out := []any{}
 	for _, p := range t.parts() {
 		if len(p.items) == 0 {

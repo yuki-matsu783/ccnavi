@@ -13,7 +13,7 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// テストの道具。共通レイヤー・工程スキル・プロジェクトを持つワークスペースを作る。
+// テストの道具。共通レイヤー・工程スキル・プロジェクトを置いたワークスペースを作る。
 
 const (
 	commonRules = "version: 1\ndeny:\n" +
@@ -83,7 +83,7 @@ func skill(t *testing.T, root, name, body string, refs map[string]string) {
 	}
 }
 
-// workspace は共通レイヤー（設定 3 本）と、プロジェクト app・lib（.git だけ）を持つワークスペース。
+// workspace は共通レイヤー（設定 3 本）と、プロジェクト app・lib（.git だけ）を置いたワークスペース。
 func workspace(t *testing.T) string {
 	t.Helper()
 	root := testkit.TempRoot(t)

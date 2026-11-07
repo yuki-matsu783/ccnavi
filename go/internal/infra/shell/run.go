@@ -13,7 +13,7 @@ import (
 // Program は外部のスクリプトを走らせるシェル（PATH から探す）。
 const Program = "sh"
 
-// 目的ごとの期限。値は Python の各モジュールが持っていたもの。
+// 目的ごとの期限。
 const (
 	// ScriptTimeout はリスクの計測の script: の項目に与える時間。
 	ScriptTimeout = 30 * time.Second

@@ -69,7 +69,7 @@ type cond struct {
 
 // Gate は宣言 1 件。「first を打ったら、ユーザの発言が 1 回はさまるまで second を打てない」。
 //
-// 文は文面ファイルの message（識別子）が持つ。4 つの段のうち、段 1（what）と次の一手（next）は same_command・
+// 文は文面ファイルの message（識別子）に書いてある。4 つの段のうち、段 1（what）と次の一手（next）は same_command・
 // no_user_turn で場合分けし、firstName・secondName・宣言の id とキー（where）・key を埋める。別の組を足すときは、
 // 文面ファイルにも 1 件足す。
 type Gate struct {
@@ -335,6 +335,7 @@ func Check(gates []*Gate, commands []string, state, session string, sameCommandO
 		return nil, nil
 	}
 	for _, g := range gates {
+		// 宣言ごとに、まず B（待たせたい操作）が含まれるかを見る。B が無ければこの宣言は関係ない。
 		bHits, err := hits(g.second, secondLabel(g), commands)
 		if err != nil {
 			return nil, err
@@ -347,6 +348,7 @@ func Check(gates []*Gate, commands []string, state, session string, sameCommandO
 			return nil, err
 		}
 		for _, b := range bHits {
+			// 同じコマンドに A も B も並ぶ形は、A の記録を待たずに止める。1 回の呼び出しの中ではユーザの発言を挟めないため。
 			if slices.ContainsFunc(aHits, func(a hit) bool { return sameKey(b.key, a.key) }) {
 				return &Stop{g, sameCommand, shown(b.raw), ""}, nil
 			}
@@ -354,6 +356,7 @@ func Check(gates []*Gate, commands []string, state, session string, sameCommandO
 		if sameCommandOnly {
 			continue
 		}
+		// 記録を読む。置き場が読めない・壊れた記録がある間は、A があったかを確かめられないので止める。
 		all, broken, failed := entries(state, session)
 		if failed != "" {
 			return &Stop{g, unreadable, shown(bHits[0].raw), failed}, nil
@@ -379,6 +382,7 @@ func Check(gates []*Gate, commands []string, state, session string, sameCommandO
 		if len(matched) == 0 {
 			continue
 		}
+		// A の記録より後にユーザの発言があれば、B を通す。発言の記録が無い・読めないときは「まだ発言が無い」として止める。
 		spoken, ok := turn.LastPrompt(state, session)
 		for _, m := range matched {
 			if !ok || !spoken.After(fsio.FromUnixSeconds(m.e.at)) {

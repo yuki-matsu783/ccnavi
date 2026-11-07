@@ -32,7 +32,7 @@ type Layer struct {
 
 // readCommon は共通レイヤーのルールファイルだけを読む（土台の deny は足さない）。無いのは正常で、空として扱う。
 // 読めなければ組み込みの既定に戻し、記録の Fallback に残す。拒否にすると、壊れたファイルを直す呼び出しまで止まり、
-// 回復できなくなるためである。
+// 回復できなくなるため。
 func readCommon(stderr io.Writer, conf *config.Settings, record *audit.Record, root string) *rules.RuleSet {
 	path := conf.Rules
 	rs := &rules.RuleSet{Version: rules.Version}
@@ -57,8 +57,8 @@ func readCommon(stderr io.Writer, conf *config.Settings, record *audit.Record, r
 }
 
 // LoadRules は共通レイヤーのルール集合（土台の deny つき）と、その出所を返す。既定に戻ったときは、既定が同じ
-// deny を持つので土台は足さない。出所は既定を使っているなら builtin.Source にする。読めなかったファイルを出所として
-// 出すと、見に行ったユーザが適用されたルールを見つけられないためである。
+// deny を含むので土台は足さない。出所は既定を使っているなら builtin.Source にする。読めなかったファイルを出所として
+// 出すと、見に行ったユーザが適用されたルールを見つけられないため。
 func LoadRules(stderr io.Writer, conf *config.Settings, record *audit.Record, root string) (*rules.RuleSet, rules.Origin) {
 	rs := readCommon(stderr, conf, record, root)
 	if record.Fallback != builtin.Fallback {
@@ -155,8 +155,8 @@ func LayerFor(conf *config.Settings, root string, target *tree.Tree) []Layer {
 }
 
 // RulesFor は、この呼び出しに適用するルール集合、その出所、行き先のツリーを返す。パスを持たないツールと
-// ワークスペースルートの外は、行き先を nil にする。パスを持つツールは、共通レイヤーに行き先のレイヤーを足す。
-// 持たないツールは全部のレイヤーの和を使う。どのプロジェクトのものかは特定しない。和なら deny と ask は増える側になる。
+// ワークスペースルートの外は、行き先を nil にする。パスのあるツールは、共通レイヤーに行き先のレイヤーを足す。
+// パスの無いツールは全部のレイヤーの和を使う。どのプロジェクトのものかは特定しない。和なら deny と ask は増える側になる。
 // record.Subject は解決済みの行き先のパス。
 func RulesFor(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, record *audit.Record) (*rules.RuleSet, rules.Origin, *tree.Tree) {
 	byPath := isPathTool(in.ToolName)
@@ -193,7 +193,7 @@ func isPathTool(name string) bool {
 
 // AddLayers は共通レイヤーの上にレイヤーを順に足す。壊れたレイヤーは空として扱い、記録の Fallback と Detail に
 // 残す。レイヤーをまたいだ苦情（重複の info、同 id の warn）は捨てる。判定のたびに言うと、同じ話が毎回モデルへ
-// 届いてしまう。言う場所は lint である。
+// 届いてしまう。言う場所は lint。
 func AddLayers(stderr io.Writer, rs *rules.RuleSet, chosen []Layer, root string, record *audit.Record) {
 	var broken []string
 	for _, l := range chosen {
@@ -268,7 +268,7 @@ func merge(base, extra *rules.RuleSet, layer string) []rules.Problem {
 	return problems
 }
 
-// LayerView は診断が見るレイヤー 1 つ。RuleSet は、実際に判定へ入ったぶんを持つ（重複で捨てた定義は入らない）。
+// LayerView は診断が見るレイヤー 1 つ。RuleSet は、実際に判定へ入ったぶん（重複で捨てた定義は入らない）。
 // Unreadable は読めなかった理由（空なら読めた）。Missing はファイルが無いこと（不備ではない）。Problems は
 // レイヤーの読みの苦情と、レイヤーをまたいだ苦情。
 type LayerView struct {
@@ -348,7 +348,7 @@ func Survey(stderr io.Writer, conf *config.Settings, root string) []LayerView {
 }
 
 // SumView は、共通レイヤーに 1 つのレイヤーを足した和を、判定と同じ読み方で読む（診断用）。Survey は全レイヤーを
-// 順に重ねるので、後ろのレイヤーの欄は先のレイヤーの定義に引かれて欠ける。SumView は、パスを持つツールの判定と
+// 順に重ねるので、後ろのレイヤーの欄は先のレイヤーの定義に引かれて欠ける。SumView は、パスのあるツールの判定と
 // 同じ和を返す（RuleSet は共通レイヤーを含む。土台の deny は含まない）。
 func SumView(stderr io.Writer, conf *config.Settings, root string, l Layer) LayerView {
 	_, merged, unreadable := commonView(stderr, conf, root)
@@ -363,7 +363,7 @@ func SumView(stderr io.Writer, conf *config.Settings, root string, l Layer) Laye
 // LayerFiles は、守る対象（selfguard）に渡すレイヤーごとの設定ファイルを返す。共通レイヤーは phases と risk だけ
 // （rules は守る側が別に受け取る）。自身とプロジェクトのレイヤーは本来の置き場の 3 本を渡す（差し替えは診断のため）。
 // プロジェクトはさらに、共通レイヤーのミラーの 3 本も渡す。Origin で分けるのは、`projects/common/` の名前で比べると
-// 共通レイヤーと同じ key になって外れるためである。予約名のプロジェクトも並べる。判定に使わないものを守るだけで、
+// 共通レイヤーと同じ key になって外れるため。予約名のプロジェクトも並べる。判定に使わないものを守るだけで、
 // 緩む側にはならない。在るかどうかは見ない（無いものは守る側が外す）。
 func LayerFiles(conf *config.Settings, root string) []config.LayerFile {
 	found := []config.LayerFile{

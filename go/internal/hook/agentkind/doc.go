@@ -4,6 +4,4 @@
 //
 // 読み取り専用と確かめられたものだけを Read にし、見分けられないもの（定義が無い・読めない・種類が空・tools に
 // 制限が無い）は Edit に倒す。案内では、読み取りのものに出るノイズより、編集するものに出し損ねるほうが害が大きい。
-//
-// Python からの対応: hook/agentkind。kind_of → Of、EDIT・READ → Edit・Read（Kind）。
 package agentkind

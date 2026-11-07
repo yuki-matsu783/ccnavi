@@ -138,7 +138,7 @@ func TestRejectionsCloseUncheckedAndReturnOK(t *testing.T) {
 		"results が列でない": func(a string) string {
 			return fmt.Sprintf(`{"attempt_id": %q, "classification": "ticket_work", "results": "x"}`, a)
 		},
-		// 判定役の誤出力（Python は TypeError で拒否していた）。
+		// 判定役の誤出力（集合に入らない値は TypeError の名前で拒否する）。
 		"R2 の対象が列": func(a string) string {
 			return result(a, ticketWork, `{"criterion": "R2", "target": ["x"], "result": "pass"}`)
 		},
@@ -165,7 +165,7 @@ func TestRejectionsCloseUncheckedAndReturnOK(t *testing.T) {
 	}
 }
 
-func TestTypeErrorsAreNamedLikePython(t *testing.T) {
+func TestTypeErrorsAreNamedTypeError(t *testing.T) {
 	_, err := validate(load(t, result("a", ticketWork, `{"criterion": "R2", "target": ["x"], "result": "pass"}`)), Plan{AttemptID: "a"})
 	if err == nil || err.Error() != "TypeError" {
 		t.Errorf("validate = %v", err)

@@ -191,7 +191,8 @@ func Decide(conf *config.Settings, root string, in hookio.Input, raw *approval.R
 				return Result{Stop: childUnavailableStop(root, t, why)}
 			}
 		}
-		// JSON の null は書かれていないものとして読む（Python の dict.get）。
+		// JSON の null は書かれていないものとして読む。
+		// モデルが cwd を指定していて、担当先のワークツリーと違えば止める（実際に動く場所が担当と食い違うと、範囲の保護が別のツリーに掛かるため）。パスは実体に解いて、大文字小文字を畳んで比べる。
 		if given := in.ToolInput.Value(keyCwd); given != nil && t.worktree != nil {
 			s, ok := given.(string)
 			same := ok && (s == "" || pathcase.Fold(ospath.Realpath(s)) == pathcase.Fold(ospath.Realpath(t.worktree.Root)))
@@ -202,6 +203,7 @@ func Decide(conf *config.Settings, root string, in hookio.Input, raw *approval.R
 		return Result{prompt: plan(conf, root, in.Field(keyPrompt), t, b)}
 	}
 
+	// 担当の言及が無い場合。親のワークツリーから、子が作業中なのに編集するサブエージェントを起こす形だけを止める。
 	if b != nil && here != nil && !here.IsMain() {
 		parent, ok := tree.Lookup(b.index, here.Name)
 		if ok && !parent.IsChild() {

@@ -23,7 +23,7 @@ func keyOrName(stop *Stop) string {
 	return defaultKeyName
 }
 
-// AskMessage は確認ダイアログに添える文。文は Gate.askMessage の識別子が持つ。
+// AskMessage は確認ダイアログに添える文。文は Gate.askMessage の識別子で引く。
 func AskMessage(stop *Stop, root string) string {
 	g := stop.Gate
 	return texts.Say(root, g.askMessage, texts.Values{

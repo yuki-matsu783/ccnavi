@@ -40,7 +40,7 @@ const (
 // heading は行頭の見出し。`## 背景`・`### 1. 背景`・`**背景**`・`【背景】`・`背景:` が当たり、`背景を説明すると…` は外れる。
 func heading(words []string) *pyre.Regexp {
 	sorted := slices.Clone(words)
-	// 長い言い方を先に試す（Python の sorted(key=len, reverse=True) と同じ安定な並び）。
+	// 長い言い方を先に試す（長さの降順。同じ長さは元の並びを保つ）。短い語が先に当たって、長い語の途中で切れるのを防ぐ。
 	slices.SortStableFunc(sorted, func(a, b string) int {
 		return utf8.RuneCountInString(b) - utf8.RuneCountInString(a)
 	})
@@ -97,6 +97,7 @@ func stepText(path, toolUseID string) (string, bool, error) {
 	}
 	var found []string
 	written := false
+	// 記録を末尾から遡り、最後のユーザの発言まで（その発言より後）のアシスタントの text を集める。
 	for i := len(lines) - 1; i >= 0; i-- {
 		data, err := pyjson.Loads(lines[i])
 		if err != nil {
@@ -108,6 +109,7 @@ func stepText(path, toolUseID string) (string, bool, error) {
 		}
 		kind := row.Value("type")
 		if kind == "user" {
+			// ツールの結果は user の行で書かれるが、ユーザの発言ではない。区切りにしない。
 			if isToolResult(row) {
 				continue
 			}

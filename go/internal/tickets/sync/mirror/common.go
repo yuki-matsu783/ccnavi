@@ -24,7 +24,7 @@ import (
 // expectationsName は共通レイヤーの期待する判定のファイル名。
 const expectationsName = "rule-expectations.yml"
 
-// 苦情を入れる where（Python の parse の第 2 引数）。
+// 設定の読み込みで、苦情の出どころとして添える where。
 const (
 	phasesWhere = "(phases)"
 	riskWhere   = "(risk)"
@@ -32,6 +32,7 @@ const (
 
 // commonSources は共通レイヤーのうち写すもの（ミラーの置き場からの相対 → 中身）。写せなければ理由。
 func commonSources(conf *config.Settings, root string) (map[string][]byte, string) {
+	// 1. 共通レイヤーの設定ファイル（rules・phases・risks など）と rule-expectations.yml を読む。ファイルが無いのは構わず、在るのに読めないときは止める。
 	base := conf.CommonLayerDir(root)
 	out := map[string][]byte{}
 	riskName := config.LayerFileNames()[config.KindRisk]
@@ -48,6 +49,7 @@ func commonSources(conf *config.Settings, root string) (map[string][]byte, strin
 			out[name] = raw
 		}
 	}
+	// 2. 共通レイヤーの設定として不正な中身は、ミラーに写さずに止める。
 	for _, kind := range config.LayerKinds() {
 		name := config.LayerFileNames()[kind]
 		if raw, ok := out[name]; ok {
@@ -56,6 +58,7 @@ func commonSources(conf *config.Settings, root string) (map[string][]byte, strin
 			}
 		}
 	}
+	// 3. 配点（risks）が指すスクリプトも写す。写し先は、スクリプトの共通の接頭辞を外した相対パス。
 	prefix := scriptPrefix()
 	for _, rel := range scriptValues(out[riskName]) {
 		raw, existed, why := readStrict(ospath.Join(root, filepath.FromSlash(rel)))

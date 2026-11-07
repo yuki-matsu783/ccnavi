@@ -9,7 +9,7 @@ import (
 	"ccnavi/internal/infra/golden"
 )
 
-// 差分（difflib.unified_diff の写し）と、rules.yml の下書きが防御の記述を動かすかの判定を、Python の答えと突き合わせる。
+// 差分（difflib.unified_diff の写し）と、rules.yml の下書きが防御の記述を動かすかの判定を、記録した答え（testdata/parts.json）と突き合わせる。
 
 type partsAnswers struct {
 	Diff    [][]string `json:"diff"`
@@ -101,7 +101,7 @@ func b64(v any) any {
 	return base64.StdEncoding.EncodeToString([]byte(v.(string)))
 }
 
-func TestPartsMatchPython(t *testing.T) {
+func TestPartsMatchGolden(t *testing.T) {
 	var lines []any
 	for _, c := range linesCases {
 		lines = append(lines, b64(c))
@@ -114,18 +114,18 @@ func TestPartsMatchPython(t *testing.T) {
 	for i, c := range diffCases {
 		got := difflib.UnifiedDiff(c[0], c[1], "a/x", "b/x", diffContext)
 		if strings.Join(got, "\n") != strings.Join(answers.Diff[i], "\n") {
-			t.Errorf("差分 %d が違う\n--- go\n%s\n--- python\n%s", i, strings.Join(got, "\n"), strings.Join(answers.Diff[i], "\n"))
+			t.Errorf("差分 %d が違う\n--- go\n%s\n--- golden\n%s", i, strings.Join(got, "\n"), strings.Join(answers.Diff[i], "\n"))
 		}
 	}
 	for i, c := range linesCases {
 		got := visibleLines(bytesOf(c))
 		if strings.Join(got, "\n") != strings.Join(answers.Lines[i], "\n") || len(got) != len(answers.Lines[i]) {
-			t.Errorf("行 %q: %q, Python は %q", c, got, answers.Lines[i])
+			t.Errorf("行 %q: %q, golden は %q", c, got, answers.Lines[i])
 		}
 	}
 	for i, c := range defenseCases {
 		if got := defenseChange(bytesOf(c[0]), bytesOf(c[1])); got != answers.Defense[i] {
-			t.Errorf("防御 %d: %q, Python は %q", i, got, answers.Defense[i])
+			t.Errorf("防御 %d: %q, golden は %q", i, got, answers.Defense[i])
 		}
 	}
 }

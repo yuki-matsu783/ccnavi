@@ -73,7 +73,7 @@ func oneLine(text string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(text, "\r", `\r`), "\n", `\n`)
 }
 
-// say は値の空白（Python の str.split の空白）を 1 つの空白につめて 1 行にする。
+// say は値の空白を 1 つの空白につめて 1 行にする。
 func say(stdout io.Writer, k key, text string) {
 	fmt.Fprintf(stdout, "%s %s\n", k, ospath.Squeeze(text))
 }
@@ -94,6 +94,7 @@ func Plan(stdout io.Writer, conf *config.Settings, root, ident string) int {
 		say(stdout, keySkip, "親は合流しない")
 		return 0
 	}
+	// 1. 合流の対象か。親・引けない子・作業中でない子は合流せず（skip）、理由は後の `ticket finish` が言う。
 	found := closing.Find(io.Discard, conf, root, ident)
 	if found == nil || !found.IsChild() {
 		say(stdout, keySkip, "子の承認済みチケットを引けない（finish が理由を言う）")
@@ -103,18 +104,21 @@ func Plan(stdout io.Writer, conf *config.Settings, root, ident string) int {
 		say(stdout, keySkip, "作業中の着手済みの子ではない（finish が理由を言う）")
 		return 0
 	}
+	// 2. 親と子のワークツリーが合流できる形か。
 	parentTree := tree.WorktreePath(root, parentID)
 	childTree := tree.WorktreePath(root, ident)
 	if why, hints, bad := treeProblem(conf, parentTree, childTree, ident, found.Project != ""); bad {
 		stopWith(stdout, why, hints...)
 		return 0
 	}
+	// 3. 子の先頭を 1 回だけ読む。以降の検査も、sh の合流もこの sha を使う。
 	head := git.Head(childTree, git.Options{Timeout: git.StateTimeout})
 	parentHead := git.Head(parentTree, git.Options{Timeout: git.StateTimeout})
 	if head == "" || parentHead == "" {
 		stopWith(stdout, "子 "+ident+" の先頭を読めない。何も変えずに止めた")
 		return 0
 	}
+	// 4. 子のコミットが変えたパスを調べる。置き場（チケット・提案）の変更は持ち込ませない。範囲（allow・ask）の外のパスは、理由を添えて断る。
 	copies, _ := approval.Scan(conf, root, false, nil)
 	parent := approval.ByID(copies)[parentID]
 	places, outside, err := scope.MergeFindings(conf, root, found, parent, head)
@@ -142,6 +146,7 @@ func Plan(stdout io.Writer, conf *config.Settings, root, ident string) int {
 			"範囲の中へ戻すか、必要ならユーザに伝えて次のチケットにしてください。直してコミットしてから finish をやり直す")
 		return 0
 	}
+	// 5. 合流を戻せるか。子の仕事の起点から先頭までの変更が、親の無視ファイルを上書きしないこと、push 失敗時に sh が戻せる形であることを確かめる。
 	base, err := git.ChildBase(childTree, parentTree, 0, head)
 	if err != nil {
 		stopWith(stdout, "子 "+ident+" の先頭を読めない（"+err.Error()+"）。何も変えずに止めた")
@@ -169,6 +174,7 @@ func Plan(stdout io.Writer, conf *config.Settings, root, ident string) int {
 			"その変更を子のコミットから取り除くか、ユーザに伝えて別の手順で入れてください。直してコミットしてから finish をやり直す")
 		return 0
 	}
+	// 6. 子の先頭が親の先頭の祖先なら、合流するものが無い（merge no）。答えは 1 行 1 項目で返す。
 	merge := mergeYes
 	if git.IsAncestor(childTree, head, parentHead, git.Options{Timeout: git.MergeTimeout}).OK() {
 		merge = mergeNo
@@ -200,6 +206,7 @@ func limitNote(v scope.Verdict) string {
 // もらう（ready と同じ案内）。ワークスペース自身の親では、共通のコピーの置き場は共通レイヤー本体なので、ふつうの
 // 変更として言う。
 func treeProblem(conf *config.Settings, parentTree, childTree, ident string, project bool) (string, []string, bool) {
+	// 1. 親のワークツリーが finish できる状態か（未コミット・未 push）。treegate の条件をそのまま使う。
 	if refusals := treegate.Check(treegate.Finish, parentTree, conf, treegate.Options{PlainDirty: !project}); len(refusals) > 0 {
 		return refusals[0].Reason, refusals[0].Hints, true
 	}
@@ -207,6 +214,7 @@ func treeProblem(conf *config.Settings, parentTree, childTree, ident string, pro
 		return "子 " + ident + " のワークツリー（" + childTree + "）が無い。何も変えずに止めた",
 			[]string{"ワークツリーを作り直して、子のブランチの作業を確かめてください"}, true
 	}
+	// 2. 子のワークツリーが、親と同じリポジトリで、子のブランチを checkout していること。
 	commonParent := git.Run(parentTree, []string{"rev-parse", "--git-common-dir"}, gitOptions())
 	commonChild := git.Run(childTree, []string{"rev-parse", "--git-common-dir"}, gitOptions())
 	if !commonParent.OK() || !commonChild.OK() ||
@@ -223,6 +231,7 @@ func treeProblem(conf *config.Settings, parentTree, childTree, ident string, pro
 		return "子 " + ident + " のワークツリーが子のブランチ " + ident + " にいない（" + shownRef + "）。何も変えずに止めた",
 			[]string{"子のワークツリーで子のブランチ " + ident + " に切り替えてから finish をやり直す"}, true
 	}
+	// 3. 子のワークツリーに未コミットの変更（未追跡を含む）が無いこと。サブエージェントのコミット漏れを、合流の前に止める。
 	status := git.Status(childTree, git.Porcelain{NUL: true, Untracked: git.UntrackedAll, NoRenames: true}, gitOptions())
 	if !status.OK() {
 		return "子 " + ident + " のワークツリーの状態を読めない。何も変えずに止めた", nil, true
@@ -262,7 +271,7 @@ func ignoredInParent(parentTree, childTree, base, head string) ([]string, string
 	if len(present) == 0 {
 		return nil, ""
 	}
-	// Python と同じく `./` を付けない。`:` で始まるパスは問い合わせの失敗になり、合流を止める。
+	// パスは書かれたまま渡し、`./` を付けない。`:` で始まるパスは git の問い合わせが失敗し、合流を止める側に倒れる。
 	ignored, _, ok := git.Ignored(parentTree, present, git.AsWritten, gitOptions())
 	if !ok {
 		return nil, "親のワークツリーで無視されたファイルを確かめられない"
@@ -289,6 +298,7 @@ func unrestorable(childTree, base, head string) ([]string, string) {
 	if !diff.OK() {
 		return nil, "子の仕事の始まりからの差分を読めない"
 	}
+	// `git diff --raw -z` は、`:<旧モード> <新モード> ... <状態>` とパスを NUL で交互に並べる。モードの 2 列とパスを取る。
 	type entry struct{ old, new, rel string }
 	parts := strings.Split(diff.Out, "\x00")
 	var entries []entry
@@ -298,6 +308,7 @@ func unrestorable(childTree, base, head string) ([]string, string) {
 			entries = append(entries, entry{cols[0], cols[1], parts[i+1]})
 		}
 	}
+	// パスごとに、戻せない形かを見る。(a) 改行を含む (b) 大文字小文字だけが違う別のパスがある (c) submodule(gitlink) の追加・削除。
 	var reasons []string
 	var broken, linked []string
 	folded := map[string]map[string]bool{}

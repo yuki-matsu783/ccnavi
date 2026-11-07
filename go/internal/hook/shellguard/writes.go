@@ -74,12 +74,14 @@ func scanCommand(cwd string, p shell.Placed) scanned {
 	var out scanned
 	// リダイレクトは外側のコマンドの語にある。実行役を外す前に拾う。
 	out.targets = redirectTargets(words)
+	// 居場所は cd と実行役の行き先を足してから求める。cwd が分からなければ読めない扱い（known を偽）にして、相対パスは呼び手が止める側に倒す。
 	place := func() (string, bool) {
 		if cwd == "" {
 			return "", false
 		}
 		return callPlace(cwd, p, chdirs)
 	}
+	// env・sudo などの実行役は外側から順に外して、中のコマンドを読む。深さを区切るのは、入れ子の細工で読みが終わらないようにするため。
 	for depth := 0; len(words) > 0 && depth <= shell.UnwrapDepth; depth++ {
 		k := shell.NameIndex(words)
 		if k >= len(words) {
@@ -97,6 +99,7 @@ func scanCommand(cwd string, p shell.Placed) scanned {
 			continue
 		}
 		switch {
+		// インタプリタ（python3 などは版つきの名前なので頭で比べる）は、渡されたコードの中身を別に調べるために取っておく。
 		case hasAnyPrefix(name, interpreters):
 			text, ok := codeOf(args)
 			if ok {
@@ -115,6 +118,7 @@ func scanCommand(cwd string, p shell.Placed) scanned {
 			out.targets = append(out.targets, positionals(name, args)...)
 		case slices.Contains(copies, name):
 			out.targets = append(out.targets, copyDestination(name, args)...)
+		// sed -i は、-e/-f でスクリプトを渡さなければ最初の位置引数がスクリプトで、その後ろがファイル。
 		case name == "sed" && inPlace(name, args):
 			files := positionals(name, args)
 			scripted := slices.ContainsFunc(args, func(a string) bool {

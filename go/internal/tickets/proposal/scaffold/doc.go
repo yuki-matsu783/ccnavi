@@ -7,8 +7,4 @@
 //
 // ccnavi ticket revise（Revise）は、承認済みの親のコピーから、スクリプトだけが書く欄を外した改版の雛形を書く。
 // どちらも、既にあるものは上書きしない。ネットワークにも git にも触れない。
-//
-// Python からの対応: tickets/proposal の scaffold と revise をまとめた。scaffold.run → New（引数は Request。issue・mr
-// の None → nil）、revise.run → Revise、parent_worktree・parse_plan・collect_allow・parse_scope・render・render_items・
-// _with_feedback_none は私的（render と render_items は 1 つにまとめた）。
 package scaffold

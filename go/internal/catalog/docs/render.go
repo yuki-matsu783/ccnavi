@@ -86,6 +86,7 @@ func render(out io.Writer, hits []docindex.Row, matched, total int, f Format) {
 				"  mtime      : " + r.Mtime() + "\n")
 		}
 	default:
+		// 表の形。type と concept_id の列は、全角を 2 桁と数えた表示幅で桁をそろえる。
 		types := make([]string, len(hits))
 		tw, cw := 0, 0
 		for i, r := range hits {

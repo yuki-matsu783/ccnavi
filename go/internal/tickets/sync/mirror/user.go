@@ -121,6 +121,7 @@ func expectOf(projects []*Project) string {
 // Prepare はミラーの状態を調べる。何も書かない。wanted が空なら全プロジェクト。名前は大文字小文字を区別しない。
 // 共通レイヤーか工程スキルが読めなければ、どのプロジェクトでも同じ理由なので全体の誤りにする。
 func Prepare(conf *config.Settings, root string, wanted []string) *Plan {
+	// 1. 対象のプロジェクトを決める。名前は大文字小文字を区別せず、見つからない名前が 1 つでもあれば全体を止める。
 	plan := &Plan{CommonPath: conf.CommonLayerDir(root)}
 	found := tree.Projects(conf.Projects)
 	names := map[string]bool{}
@@ -142,6 +143,7 @@ func Prepare(conf *config.Settings, root string, wanted []string) *Plan {
 			return plan
 		}
 	}
+	// 2. 写し元（共通レイヤーと工程スキル）を読む。読めなければ、どのプロジェクトでも同じ理由なので全体の誤りにする。
 	commonFiles, why := commonSources(conf, root)
 	var skillFiles map[string][]byte
 	if why == "" {
@@ -152,6 +154,7 @@ func Prepare(conf *config.Settings, root string, wanted []string) *Plan {
 		return plan
 	}
 	plan.CommonEmpty = len(commonFiles) == 0 && len(skillFiles) == 0
+	// 3. プロジェクトごとに、写し先との差分を調べる。選ばれていないプロジェクトの状態も調べる（書くかどうかは Selected で分ける）。
 	for _, t := range found {
 		project := &Project{Name: t.Name, Root: t.Root, State: StateSynced, Selected: chosen[pathcase.Fold(t.Name)],
 			MirrorPath: conf.CommonLayerDir(t.Root)}
@@ -200,6 +203,8 @@ func Apply(conf *config.Settings, plan *Plan, expect string) *Applied {
 	if expect == "" || expect != plan.Expect() {
 		return &Applied{Error: stale}
 	}
+	// プロジェクトごとに skills/ を先に、ミラーを後に書く。skills/ が失敗したら、そのプロジェクトのミラーは書かない。
+	// 1 つ失敗しても、ほかのプロジェクトは続ける。
 	done := &Applied{OK: true}
 	var failures []string
 	for _, project := range chosen {

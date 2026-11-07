@@ -52,7 +52,7 @@ func treeLookup(index map[string]*ticket.Ticket, name string) (*ticket.Ticket, b
 }
 
 // UnfinishedAtStop は cwd のワークツリーの承認済みチケットが、finish を打ち忘れていそうなら返す。作業中で
-// 着手済み・blocked でない・基準点を持つ・親なら閉じられる（CloseProblems が空）・未コミットの変更が無い・
+// 着手済み・blocked でない・基準点がある・親なら閉じられる（CloseProblems が空）・未コミットの変更が無い・
 // 自分で作ったコミットが 1 件以上、を全部満たすときだけ。raw は CloseProblems と同じ。
 func UnfinishedAtStop(conf *config.Settings, root, cwd string, raw *approval.Raw) *Unfinished {
 	at, ok := here(conf, root, cwd)

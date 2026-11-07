@@ -154,7 +154,7 @@ func ReadEntry(layer, root, path string, writable bool) *Entry {
 	return e
 }
 
-// osReason は読めない理由（Python の exc.strerror か型の名前）。
+// osReason は読めない理由。OS の文言があればそれ、無ければエラーの型の名前。
 func osReason(err error) string {
 	return "読めない (" + line(cmp.Or(fsio.StrError(err), "OSError")) + ")"
 }
@@ -236,7 +236,7 @@ func merge(common, extra *LayerRead) []rules.Problem {
 	return said
 }
 
-// differing は既知の欄のうち中身が違うもの（Python の == で比べる）。どれも同じなら extra。
+// differing は既知の欄のうち中身が違うもの（値そのものを比べる）。どれも同じなら extra。
 func differing(a, b *Template) []string {
 	same := []bool{
 		a.Name == b.Name, a.Description == b.Description, a.When == b.When,

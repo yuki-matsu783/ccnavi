@@ -43,6 +43,7 @@ func withFeedbackNone(text string) (string, bool) {
 // todo/ に書く。書けたら 0、書かなければ 1（理由は標準エラー）。既にある提案は上書きしない。feedback は
 // feedback: []（対応なし）の改版で、全体計画のフェーズが全部閉じてレビューが済んだ局面でだけ作れる。
 func Revise(stdout, stderr io.Writer, conf *config.Settings, root, cwd, ident string, feedback bool) int {
+	// 1. 改版できる対象か。親の識別子で、親のワークツリーに承認済みの親があり、書きかけの改版が無いこと。
 	refuse := refuser(stderr, "revise")
 	if why := identProblem(ident); why != "" {
 		return refuse(why)
@@ -63,6 +64,7 @@ func Revise(stdout, stderr io.Writer, conf *config.Settings, root, cwd, ident st
 	if ospath.DiskLexists(path) {
 		return refuse(path + " が既にある。書きかけの改版は上書きしないので、それを直す")
 	}
+	// フィードバック計画の改版は、全体計画のフェーズが全部閉じてレビューが済んだあとに、1 回だけ出せる。
 	if feedback {
 		copies, _ := approval.Scan(conf, root, false, nil)
 		current := approval.ByID(copies)[ident]
@@ -76,6 +78,7 @@ func Revise(stdout, stderr io.Writer, conf *config.Settings, root, cwd, ident st
 			return refuse("全体計画のフェーズが全部閉じてレビューが済んでから出す（今の局面: " + stage + "）")
 		}
 	}
+	// 2. 承認済みのコピーから、スクリプトだけが書く欄を外して改版の雛形にする。フィードバック計画は `feedback: []` で足す。
 	body := stripped(text)
 	if feedback {
 		added, ok := withFeedbackNone(body)
@@ -88,6 +91,7 @@ func Revise(stdout, stderr io.Writer, conf *config.Settings, root, cwd, ident st
 		return refuse(failed)
 	}
 	fmt.Fprintf(stdout, "%s の改版の雛形を %s に書いた（承認済みチケットのコピー。スクリプトだけが書く欄は外した）\n", ident, path)
+	// 3. 書いた場所と次の一手を言う。
 	which := "edit"
 	if feedback {
 		which = "feedback"

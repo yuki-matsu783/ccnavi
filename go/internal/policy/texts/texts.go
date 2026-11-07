@@ -299,7 +299,7 @@ type SpecOptions struct {
 	Variants Variants
 }
 
-// Spec は組み込みのルールが持つ文の指定（Python の spec）。
+// Spec は組み込みのルールに付ける文の指定。
 func Spec(id string, o SpecOptions) rules.TextRef {
 	ref := rules.TextRef{ID: id, Values: map[string]string{}, Variants: map[string]string{}}
 	if o.Git != "" {

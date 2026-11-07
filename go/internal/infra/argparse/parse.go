@@ -10,7 +10,7 @@ import (
 	"ccnavi/internal/infra/pyfmt"
 )
 
-// Error は読めなかった引数。Message は Python の str(ArgumentError)（`argument --x: expected one argument`）。
+// Error は読めなかった引数。Message は誤りの文（`argument --x: expected one argument`）。
 type Error struct{ Message string }
 
 func (e *Error) Error() string { return e.Message }
@@ -23,7 +23,7 @@ func argError(a *Action, format string, args ...any) *Error {
 	return &Error{Message: "argument " + a.name() + ": " + msg}
 }
 
-// Int は Python の type=int。
+// Int は整数を読む type。
 var Int = Type{name: "int", convert: func(s string) (any, error) {
 	n, err := pyfmt.ParseInt(s)
 	if err != nil {
@@ -71,7 +71,11 @@ type parseState struct {
 	positionals []*Action
 }
 
+// run は語を先頭から読み、読み取れなかった語（余り）を返す。
+// 先に全語を O（オプション）・A（値）・-（最初の "--" 以降は全部値）の 1 字ずつの文字列にし、
+// 位置引数が取れる語数は、その文字列に正規表現を当てて決める（matchPartial）。
 func (st *parseState) run() ([]string, error) {
+	// 1. 各語をオプションか値かに分類して、パターンの文字列を作る。
 	var pat strings.Builder
 	maxOpt := -1
 	for i, s := range st.args {
@@ -89,12 +93,14 @@ func (st *parseState) run() ([]string, error) {
 		}
 	}
 	st.pattern = pat.String()
+	// 2. 位置引数の引数定義を集める。
 	for _, a := range st.p.actions {
 		if len(a.OptionStrings) == 0 {
 			st.positionals = append(st.positionals, a)
 		}
 	}
 
+	// 3. オプションの間にはさまれた位置引数を先に取り、次にオプションを取る、を最後のオプションまで繰り返す。
 	start := 0
 	for start <= maxOpt {
 		next := start
@@ -124,12 +130,14 @@ func (st *parseState) run() ([]string, error) {
 			return nil, err
 		}
 	}
+	// 4. 最後のオプションより後ろの位置引数を取り、残りを余りにする。
 	stop, err := st.consumePositionals(start)
 	if err != nil {
 		return nil, err
 	}
 	st.extras = append(st.extras, st.args[stop:]...)
 
+	// 5. 渡されなかった引数は、必須なら不足として集め、文字列の既定値は型を通して置く。
 	var required []string
 	for _, a := range st.p.actions {
 		if st.seen[a] {
@@ -139,7 +147,7 @@ func (st *parseState) run() ([]string, error) {
 			required = append(required, a.name())
 			continue
 		}
-		// 渡されなかった引数の文字列の既定値は、ここで型を通す（Python と同じく、渡されたときは通さない）。
+		// 渡されなかった引数の文字列の既定値は、ここで型を通す（渡されたときは通さない）。
 		if s, ok := a.Default.(string); ok && a.typ.convert != nil {
 			v, err := convert(a, s)
 			if err != nil {
@@ -154,7 +162,7 @@ func (st *parseState) run() ([]string, error) {
 	return st.extras, nil
 }
 
-// parseOptional は 1 語がオプションか（Python の _parse_optional。前方一致は受けない）。
+// parseOptional は 1 語がオプションか（前方一致は受けない）。
 // action が nil の形は「オプションに見えるが、このパーサに無い」で、余った語になる。
 func (p *Parser) parseOptional(s string) (optTuple, bool) {
 	if s == "" || s[0] != '-' {
@@ -187,7 +195,7 @@ func (p *Parser) parseOptional(s string) (optTuple, bool) {
 	return optTuple{option: s}, true
 }
 
-// negativeNumber は Python の `^-\d+$|^-\d*\.\d+$`（\d は Unicode の 10 進の数字、$ は末尾の改行の手前にも当たる）。
+// negativeNumber は負の数に見る語（`^-\d+$|^-\d*\.\d+$` に当たる形）か。\d は Unicode の 10 進の数字で、$ は末尾の改行の手前にも当たる。
 func negativeNumber(s string) bool {
 	body := strings.TrimSuffix(s[1:], "\n")
 	whole, frac, dotted := strings.Cut(body, ".")
@@ -212,6 +220,9 @@ type taken struct {
 	option string
 }
 
+// consumeOptional は start のオプションと、それが取る値を読み、次に読む位置を返す。
+// `-xyz` のような連結は、値を取らない短いオプションを 1 字ずつ todo に積んで読む。
+// 値の受け渡しは最後にまとめて行う。
 func (st *parseState) consumeOptional(start int) (int, error) {
 	t := st.optAt[start]
 	var todo []taken
@@ -275,7 +286,7 @@ func (st *parseState) consumeOptional(start int) (int, error) {
 	return stop, nil
 }
 
-// matchArgument はオプションが続く語から取る数（Python の _match_argument）。
+// matchArgument はオプションが続く語から取る数。
 func matchArgument(a *Action, pattern string) (int, error) {
 	switch a.nargs {
 	case noArgs:
@@ -303,7 +314,7 @@ func matchArgument(a *Action, pattern string) (int, error) {
 	return 0, argError(a, "expected %d arguments", n)
 }
 
-// positionalPattern は位置引数の式（Python の _get_nargs_pattern の位置引数の側）。
+// positionalPattern は位置引数の式。
 func positionalPattern(a *Action) string {
 	switch a.nargs {
 	case one:
@@ -316,7 +327,7 @@ func positionalPattern(a *Action) string {
 	return fmt.Sprintf("((?:-*A){%d}-*)", int(a.nargs))
 }
 
-// matchPartial は、残りの位置引数の頭からできるだけ多くに語を割り当てる（Python の _match_arguments_partial）。
+// matchPartial は、残りの位置引数の頭からできるだけ多くに語を割り当てる。
 func matchPartial(actions []*Action, pattern string) []int {
 	for i := len(actions); i > 0; i-- {
 		var expr strings.Builder
@@ -385,7 +396,7 @@ func (st *parseState) take(a *Action, args []string) error {
 	return nil
 }
 
-// values は語を値にする（Python の _get_values）。
+// values は語を値にする。
 func values(a *Action, args []string) (any, error) {
 	positional := len(a.OptionStrings) == 0
 	switch {

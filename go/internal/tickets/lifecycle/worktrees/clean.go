@@ -184,6 +184,8 @@ func RunClean(stdout, stderr io.Writer, root, name string, preview bool) int {
 		fmt.Fprintf(stderr, "ccnavi-clean: %s がディレクトリでないか、リンクです。\n", top)
 		return 1
 	}
+	// git の登録が残っていないディレクトリ（削除しきれなかった残り）は、git で未コミットの変更を確かめられない。確かめずに進める。
+	// 登録があるのに状態を読めないときは、確かめられないので止める。
 	registered := !unregistered(top)
 	if registered {
 		out, ok := status(top)
@@ -202,6 +204,7 @@ func RunClean(stdout, stderr io.Writer, root, name string, preview bool) int {
 	} else {
 		fmt.Fprintf(stderr, "ccnavi-clean: %s は git の登録が残っていないので、削除しきれなかったディレクトリとして扱います（未コミットの変更は確かめていません）。\n", name)
 	}
+	// 消す対象を決め、--preview なら一覧だけ出す。実際に消した結果は 1 件ずつ出し、残ったものがあれば 1 を返す。
 	found, why := targets(top, registered)
 	if why != "" {
 		fmt.Fprintf(stderr, "ccnavi-clean: %s\n", why)

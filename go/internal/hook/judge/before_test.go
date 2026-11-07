@@ -90,7 +90,7 @@ func TestDeadline(t *testing.T) {
 }
 
 // 繰り返しを含む利用者の式を数百 KB のコマンドに当てても落ちず、照合を打ち切ったルールは止める側に倒す
-// （deny は当たり、allow は通す根拠にしない）。Python は打ち切らないので、ここは Python と突き合わせない。
+// （deny は当たり、allow は通す根拠にしない）。見本は打ち切らない読みで取ったので、ここは見本と突き合わせない。
 func TestDeepUserRegexFallsToTheStoppingSide(t *testing.T) {
 	const deep = `version: 1
 deny:

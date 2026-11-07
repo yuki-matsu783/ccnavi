@@ -91,7 +91,7 @@ func Trees(conf *config.Settings, root string) []tree.Tree {
 }
 
 // ErrNoParentWorktree は親のワークツリーが無い（HEAD のブランチ名がフォルダ名と合わない・止まっている）。
-// ほかのツリーのコピーで代用しないので、書く先が決まらない。理由の文は NoParentError が持つ。
+// ほかのツリーのコピーで代用しないので、書く先が決まらない。理由の文は NoParentError に置く。
 var ErrNoParentWorktree = errors.New("親のワークツリーが決まらない")
 
 // NoParentError は書く先が決まらない理由（Error() は理由の文だけ）。errors.Is で ErrNoParentWorktree に当たる。
@@ -100,7 +100,9 @@ type NoParentError struct{ Reason string }
 func (e *NoParentError) Error() string        { return e.Reason }
 func (e *NoParentError) Is(target error) bool { return target == ErrNoParentWorktree }
 
-// HomeDir は、この識別子の承認済みチケットを置く置き場を返す。親のワークツリーの置き場だけである。書く先も読む先も 1 つに決めるためである。子のワークツリーにも checkout されるが、そこへ書くと同じ識別子が 2 通りになってしまう。project はチケットのリポジトリである（ワークスペース自身なら空）。決まらなければ *NoParentError を返す。
+// HomeDir は、この識別子の承認済みチケットを置く置き場を返す。返すのは親のワークツリーの置き場だけ。
+// 書く先も読む先も 1 つに決めるため。子のワークツリーにも checkout されるが、そこへ書くと同じ識別子が 2 通りになる。
+// project はチケットのリポジトリ（ワークスペース自身なら空）。決まらなければ *NoParentError を返す。
 func HomeDir(conf *config.Settings, root, id, parent, project string) (string, error) {
 	return homeDir(conf, root, homeOf(id, parent), func(f *standing.Families, home string) standing.Standing {
 		return f.Standing(home, project)

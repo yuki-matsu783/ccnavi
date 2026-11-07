@@ -49,7 +49,7 @@ func overviewWorkspace(t *testing.T) string {
 	return root
 }
 
-func TestOverviewMatchesPython(t *testing.T) {
+func TestOverviewMatchesGolden(t *testing.T) {
 	root := overviewWorkspace(t)
 	want := golden.Load[map[string]any](t, "overview")
 	conf := testkit.Settings(t, root)

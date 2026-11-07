@@ -36,6 +36,7 @@ func CommonTypes(conf *config.Settings) (*Types, []rules.Problem) {
 func merge(common, extra *Types, layer string) (*Types, []rules.Problem) {
 	merged := common.clone()
 	var problems []rules.Problem
+	// 共通レイヤーの定義が正。レイヤーの定義は、同じ id（中身が同じなら捨て、違えばエラー）、表示名の重なり（エラー）を除いたものだけ足す。
 	titles := map[string]string{}
 	for p := range common.All() {
 		titles[p.Title] = p.ID

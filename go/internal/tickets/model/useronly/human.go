@@ -15,7 +15,7 @@ import (
 
 // HumanPathForm が見るのは、hook のほかに保護が無いユーザの判断の形。
 //
-//  1. ターミナル要求を切る形（環境変数と `--guard-ticket-approval`）。切れなければ、ターミナルを持たない
+//  1. ターミナル要求を切る形（環境変数と `--guard-ticket-approval`）。切れなければ、ターミナルが無い
 //     エージェントは実行ファイルの側で止まる
 //  2. ボードの経路の形。`--yes` はターミナルを求めないので、ここが唯一の保護になる
 //
@@ -65,7 +65,7 @@ func buildBoardCombos() [][]rx {
 	return out
 }
 
-// readers は表示・検索・閲覧だけをする道具。コマンドを実行する機能か変数に書く機能を持つもの（`sed` の `e`、
+// readers は表示・検索・閲覧だけをする道具。コマンドを実行する機能か変数に書く機能があるもの（`sed` の `e`、
 // `awk` の `system()`、`git` の別名、`xargs`、`find -exec`、`printf -v`）は入れない。
 var readers = map[string]bool{
 	"echo": true, "grep": true, "egrep": true, "fgrep": true, "rg": true, "cat": true,
@@ -160,15 +160,19 @@ func commitMessages(subject string) []string {
 
 // HumanPathForm は hook のほかに保護が無いユーザの判断の形があれば、その種類と見つけた文字列を返す。
 func HumanPathForm(subject string) (HumanKind, string) {
+	// 引用符と `\` を除いた文字列を 2 通り作る（ticked は逆引用符も除く）。以降の検査はこの 2 通りに当てる。
 	text := dequoted(subject, false)
 	ticked := dequoted(subject, true)
+	// `git commit -m` の本文は、人が書く説明で実行される語ではない。検査の対象から外す。
 	for _, message := range commitMessages(subject) {
 		text = strings.Replace(text, dequoted(message, false), " ", 1)
 		ticked = strings.Replace(ticked, dequoted(message, true), " ", 1)
 	}
+	// 並んだコマンドが全部、表示・検索・閲覧の道具なら、入口の名前が出ていても実行ではないので通す。
 	if onlyReaders(text) {
 		return humanNone, ""
 	}
+	// 保護を外す指定（guard off）の形。読むだけの形を先に消してから探す。
 	if found, ok := guardMention.text(guardRead.removed(text)); ok {
 		return humanGuardOff, found
 	}
@@ -178,9 +182,11 @@ func HumanPathForm(subject string) (HumanKind, string) {
 	if found, ok := guardFlag.text(text); ok {
 		return humanGuardOff, ospath.Strip(found)
 	}
+	// ユーザ用スクリプトを直接呼ぶ形。
 	if found, ok := userScript.text(text); ok {
 		return humanUserScript, found
 	}
+	// ボードの経路の形。組の式が全部当たったときだけ、その形と見なす。
 	for _, combo := range boardRx {
 		var hits []string
 		for _, x := range combo {
@@ -194,6 +200,7 @@ func HumanPathForm(subject string) (HumanKind, string) {
 			return humanBoard, strings.Join(hits, " … ")
 		}
 	}
+	// 展開で組み立てたオプション（`$X` など）で user の操作を指す形。展開前の語は分からないので止める側に倒す。
 	if option, ok := expandedOption.first(ticked); ok && userAlone.search(ticked) {
 		rest := string([]rune(ticked)[option.Start:])
 		return humanExpanded, ospath.Fields(rest)[0]
@@ -221,6 +228,7 @@ func HumanMessage(root string, kind HumanKind, found string) string {
 	case humanExpanded:
 		return texts.Say(root, textExpanded, values, nil)
 	}
+	// 見つけた語から文の変種（承認・取り込み・via）を選ぶ。
 	// 取り込みの形は、承認と残った指摘の対応方針の文に当たらない。
 	lowered := pyfmt.Casefold(found)
 	why := "approval"

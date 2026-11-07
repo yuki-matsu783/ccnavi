@@ -44,7 +44,9 @@ const (
 	markerTreeName = "ツリー "
 )
 
-// ReopenImpact は、フェーズを開き直したときに、後続の着手済み・レビュー済みのフェーズを挙げて方針を促す行を返す。無ければ空を返す。後続とは、計画の先行で N 番目が先行するフェーズである。消えるのは N 番目のマーカーだけで、後続の子とレビューの状態は残る。続けるか直すかは、ユーザが決める。
+// ReopenImpact は、フェーズを開き直したときに、後続の着手済み・レビュー済みのフェーズを挙げて方針を促す行を返す。無ければ空を返す。
+// 後続とは、計画の先行で N 番目が先行するフェーズ。
+// 消えるのは N 番目のマーカーだけで、後続の子とレビューの状態は残る。続けるか直すかは、ユーザが決める。
 func ReopenImpact(conf *config.Settings, root, parentID string, number int) []string {
 	touched := downstreamTouched(Phases(conf, root, parentID, nil), number)
 	if len(touched) == 0 {
@@ -93,12 +95,16 @@ func downstreamTouched(list []*Phase, number int) []string {
 	return out
 }
 
-// ReviewNext は、レビュー待ち（review/）の子について、ユーザに回るまでに誰が何をするかを 1 文で返す。子を review/ に置いただけでは、ユーザに回らない。親が合流と review-request を済ませて初めて、レビュー待ちになる。依頼の前に「ユーザのレビューを待つ」と言うと、依頼を打ち忘れてしまう。そのため、見るのはレビューを引き受けるフェーズのマーカーである。
+// ReviewNext は、レビュー待ち（review/）の子について、ユーザに回るまでに誰が何をするかを 1 文で返す。
+// 子を review/ に置いただけでは、ユーザに回らない。親が合流と review-request を済ませて初めて、レビュー待ちになる。
+// 依頼の前に「ユーザのレビューを待つ」と言うと、依頼を打ち忘れてしまう。そのため、見るのはレビューを引き受けるフェーズの
+// マーカーである。
 func ReviewNext(conf *config.Settings, root string, child *ticket.Ticket, raw *approval.Raw) string {
 	n, isChild := child.ChildPhase()
 	if !isChild {
 		return ""
 	}
+	// 1. 子のフェーズを探す。延期したフェーズなら、レビューを引き受けるフェーズ（owner）を見る。
 	list := Phases(conf, root, child.Parent, raw)
 	p := find(list, n)
 	if p == nil {
@@ -114,6 +120,7 @@ func ReviewNext(conf *config.Settings, root string, child *ticket.Ticket, raw *a
 	if owner != p {
 		lead = fmt.Sprintf(reviewTogether, p.Label(), owner.Label())
 	}
+	// 2. owner のマーカーで、いまの段階を決める。レビュー済み→依頼済み（子の完了より前なら依頼し直し）→フェーズが終わっていない→依頼の準備中、の順。
 	label, number, done := owner.Label(), strconv.Itoa(owner.Number), conf.Approved+"/"+string(place.Done)+"/"
 	if owner.has(marks.Reviewed) {
 		return texts.Say(root, "NOTICE_REVIEW_NEXT__REVIEWED",
@@ -153,7 +160,11 @@ func later(a, b string) bool {
 
 // ResumedReview は、作業中（doing/）の子のフェーズに、レビュー済みのマーカーが残っている形の警告文を返す。無ければ空を返す。文には子の識別子を入れない（呼び手が前に付ける）。
 //
-// 閉じたチケットを手で doing/ へ戻すと、reviewed が残る。もう一度 finish しても止まらない。マーカーを消すかどうかは、レビューをやり直すかでユーザが決める。延期したフェーズの子は、一度終わった印（skipped）で言い、引き受け手は辿らない。review_required は doing/ の子の要求を数えない。そのため、閉じ直したときに要る分（この子の要求）をここでだけ足す。ゲートと告知の判定は動かさない。
+// 閉じたチケットを手で doing/ へ戻すと、reviewed が残る。もう一度 finish しても止まらない。
+// マーカーを消すかどうかは、レビューをやり直すかでユーザが決める。
+// 延期したフェーズの子は、一度終わった印（skipped）で言い、引き受け手は辿らない。
+// review_required は doing/ の子の要求を数えない。そのため、閉じ直したときに要る分（この子の要求）をここでだけ足す。
+// ゲートと告知の判定は動かさない。
 func ResumedReview(conf *config.Settings, root string, child *ticket.Ticket, raw *approval.Raw) string {
 	n, isChild := child.ChildPhase()
 	if child.State != place.Doing || !isChild {

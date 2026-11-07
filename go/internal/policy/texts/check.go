@@ -26,7 +26,7 @@ const (
 	kindNext    kind = "next"
 	kindChoices kind = "choices"
 	kindNote    kind = "note"
-	// kindNotice は止めない通知。見出しと状態の行はコードに残し、本文だけを持つ。
+	// kindNotice は止めない通知。見出しと状態の行はコードに残し、文面ファイルには本文だけを書く。
 	kindNotice kind = "notice"
 )
 
@@ -57,7 +57,7 @@ var kindFields = map[kind]fields{
 	kindNotice:  {[]string{fieldWhat}, []string{fieldWhy, fieldNext, fieldNote}},
 }
 
-// kindOrder は種類を苦情の文に並べる順（Python の FIELDS の順）。
+// kindOrder は種類を苦情の文に並べる順。
 var kindOrder = []kind{kindDeny, kindNudge, kindNext, kindChoices, kindNote, kindNotice}
 
 // ruleLooseFields は `RULE_` の文（組み込みルールの文）の欄。what だけが必須で、言うことが無い欄は作り足さない。
@@ -92,7 +92,7 @@ const (
 var labels = map[string]string{fieldWhy: whyLabel, fieldNext: NextLabel, fieldNoBypass: noBypassLabel}
 
 const (
-	// ShownSubjectLimit は、理由や報告に載せる対象の文字列の長さの上限。ヒアドキュメントの全文で本体を押し出さないためである。
+	// ShownSubjectLimit は、理由や報告に載せる対象の文字列の長さの上限。ヒアドキュメントの全文で本体を押し出さないため。
 	// 判定の記録に残す長さ（audit.recordedSubjectLimit）とは別の約束。
 	ShownSubjectLimit = 200
 	// limitField は 1 欄の長さ（場合ごと）、limitEntry は 1 件の欄の長さの合計の上限。
@@ -107,7 +107,7 @@ var (
 	unsafeChars  = regexp.MustCompile(`[\x00-\x1f\x7f-\x{9f}\x{2028}\x{2029}\x{3000}]+`)
 )
 
-// adrPattern は ADR 番号の書き方。`\s` と `\d` は Python と同じく Unicode で読む。
+// adrPattern は ADR 番号の書き方。`\s` と `\d` は Unicode で読む。
 const adrPattern = `ADR[-\s]?\d`
 
 var adr, adrErr = pyre.Compile(adrPattern, pyre.IgnoreCase)

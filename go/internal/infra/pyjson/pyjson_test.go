@@ -36,7 +36,7 @@ func sample() *Object {
 }
 
 // 引数ごとに Python の json.dumps と同じバイト列を出す（区切り・ASCII への逃がし・字下げ・並べ替え・小数の形）。
-func TestDumpsMatchesPython(t *testing.T) {
+func TestDumpsMatchesExpected(t *testing.T) {
 	for _, c := range dumpsCases {
 		got, err := Dumps(sample(), c.opts)
 		if err != nil || got != c.want {
@@ -80,7 +80,7 @@ var loadsErrors = []struct{ name, in, want string }{
 }
 
 // 読めない理由と位置（符号位置で数える）が Python の JSONDecodeError と同じ。
-func TestLoadsErrorsMatchPython(t *testing.T) {
+func TestLoadsErrorsMatchExpected(t *testing.T) {
 	for _, c := range loadsErrors {
 		_, err := Loads(c.in)
 		var de *DecodeError

@@ -21,6 +21,7 @@ func (c *childChange) rebuilt() ([]byte, string) {
 		return nil, "UTF-8 として読めない"
 	}
 	t := c.ticket
+	// 変わった欄（ticket・phase・predecessors）だけを、行の置き換えとして作る。
 	var edits [][2]string
 	if c.renamed() {
 		edits = append(edits, [2]string{"ticket", "ticket: " + c.newTicket})
@@ -35,6 +36,7 @@ func (c *childChange) rebuilt() ([]byte, string) {
 		}
 		edits = append(edits, [2]string{"predecessors", "predecessors: " + line})
 	}
+	// 置き換えを順に当てて全文を組む。
 	built := text
 	for _, e := range edits {
 		var why string
@@ -42,6 +44,8 @@ func (c *childChange) rebuilt() ([]byte, string) {
 			return nil, why
 		}
 	}
+	// 組んだ全文を読み直して確かめる。変えてよいのは 3 つの欄だけで、ほかの欄と本文が変わったら反映しない
+	// （行の置き換えが別の欄を巻き込んでも、ここで検出して止める）。
 	before, err := ticket.FrontMapping(text)
 	var after *yaml.Map
 	if err == nil {
@@ -71,12 +75,14 @@ func (c *childChange) rebuilt() ([]byte, string) {
 // （入れ替わる 2 本は読んだ中身を持っているので上書きしてよい）。フローの下書きも一緒に付け替える。途中で
 // 落ちたら、触ったパスを全部書く前の中身へ戻す（無かったものは消す）。
 func (a *Answer) write(content []byte) string {
+	// 1. 読んでから書くまでの間に外で変わっていないか確かめる。
 	s := a.source
 	for _, f := range s.files() {
 		if now, ok := fsio.ReadBytes(f.ticket.Path); !ok || !bytes.Equal(now, f.raw) {
 			return "提案 " + f.ticket.ID + " が外で変わった（読んでから書くまでの間）"
 		}
 	}
+	// 2. 書く内容を集める。order は書く順、final はパスごとの中身。同じパスは後の中身で置き換える。
 	var order []string
 	final := map[string][]byte{}
 	put := func(path string, data []byte) {
@@ -108,11 +114,13 @@ func (a *Answer) write(content []byte) string {
 			}
 		}
 	}
+	// 名前が入れ替わる 2 本は、古い名前のパスにも別の子が書かれる。書くパスは消す対象から外す。
 	leaving = slices.DeleteFunc(leaving, func(p string) bool { _, ok := final[p]; return ok })
 	touched := slices.Concat(order, leaving)
 	if content != nil {
 		touched = append(touched, s.Parent.Path)
 	}
+	// 3. 失敗したら戻せるよう、触るパスの今の中身を控える（無いパスは「無い」と控え、戻すときに消す）。
 	before := make([]fsio.Prior, len(touched))
 	for i, p := range touched {
 		before[i] = fsio.Prior{Path: p, Gone: true}
@@ -122,6 +130,8 @@ func (a *Answer) write(content []byte) string {
 			}
 		}
 	}
+	// 4. 子の書き込み → 古い名前の削除 → 親の書き込みの順に実行する。親を最後にするのは、親が書かれてから子が欠けた状態を残さないため。
+	// どこかで失敗したら、控えに戻して理由を返す。
 	done := ""
 	for _, path := range order {
 		if failed := fsio.WriteFile(path, final[path], fsio.Durable); failed != "" {
@@ -159,6 +169,7 @@ type Saved struct {
 
 // Save は振り直した計画を書き戻す。開いたときのハッシュ（expect）と検査を通らなければ書かない。
 func (a *Answer) Save(expect string) Saved {
+	// 1. 開いた後に提案が外で変わっていないか。変わっていれば、何も書かずに読み直しを頼む。
 	if expect != a.source.sha() {
 		return Saved{Messages: []string{"提案が外で変わった（--expect が親と子の提案の今の中身と違う）。何も反映しません。" +
 			"--plan-order <親> --json で読み直す"}}
@@ -170,6 +181,7 @@ func (a *Answer) Save(expect string) Saved {
 		}
 		return Saved{Messages: append(lines, "何も反映しません。")}
 	}
+	// 2. 検査ごとに、error があれば何も書かずに止める。
 	for _, check := range []struct {
 		details []any
 		header  string
@@ -186,6 +198,7 @@ func (a *Answer) Save(expect string) Saved {
 			return Saved{Messages: []string{check.header}, Details: details}
 		}
 	}
+	// 3. 親の提案の全文を組み、書く。変える所が無ければ書かずに成功とする。
 	content, why := a.rebuilt()
 	if why != "" {
 		return Saved{Messages: []string{a.source.Parent.Path + ": " + why + "。何も反映しません。"}}

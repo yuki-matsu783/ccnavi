@@ -24,8 +24,8 @@ type node struct {
 
 type nodePair struct{ key, value *node }
 
-// maxDepth は組み立てるコレクションの入れ子の上限。Python の実行ファイルは再帰の上限（1000 段）で
-// およそ 490 段の入れ子から読めなくなっていた。それに合わせて、深い文書を同じく「入れ子が深すぎる」で断る。
+// maxDepth は組み立てるコレクションの入れ子の上限。PyYAML は再帰の上限（1000 段）で
+// およそ 490 段の入れ子から読めなくなる。それに合わせて、深い文書を同じく「入れ子が深すぎる」で断る。
 const maxDepth = 480
 
 type composer struct {
@@ -78,10 +78,12 @@ func (c *composer) composeDocument() (*node, error) {
 	return n, err
 }
 
+// composeNode はイベントの列から節を 1 つ組む。コレクションは子を再帰で組む（depth は入れ子の深さ）。
 func (c *composer) composeNode(depth int) (*node, error) {
 	if depth > maxDepth {
 		return nil, tooDeep()
 	}
+	// 1. 別名は、アンカーが指す節をそのまま返す（同じ節を共有する。拒む読み手ではここで断る）。
 	ev, err := c.p.peekEvent()
 	if err != nil {
 		return nil, err
@@ -99,6 +101,8 @@ func (c *composer) composeNode(depth int) (*node, error) {
 		}
 		return n, nil
 	}
+	// 2. アンカーの重複を断り、節を作ってアンカーに登録する。
+	//    登録は中身を組む前に行う（自分を指す別名を、あとで深さの上限で断るため）。
 	if ev.anchor != "" {
 		if first, dup := c.anchors[ev.anchor]; dup {
 			return nil, markedError(composerError, "found duplicate anchor "+pyfmt.Quote(ev.anchor)+"; first occurrence",
@@ -112,6 +116,7 @@ func (c *composer) composeNode(depth int) (*node, error) {
 	if ev.anchor != "" {
 		c.anchors[ev.anchor] = n
 	}
+	// 3. 種類ごとに中身を組む。タグが無い・"!" のときは、スカラーは内容から、列とマップは既定のタグを付ける。
 	switch ev.kind {
 	case eScalar:
 		n.kind, n.value = nScalar, ev.value

@@ -55,6 +55,7 @@ func watchedFor(stderr io.Writer, conf *config.Settings, root string, record *au
 	in *hookio.Input) ([]post.Watched, error) {
 	ws := tree.MainTree(root)
 	sbs := tree.SideBySideRoots(root, conf.Projects)
+	// 横で作業するユーザのチェックアウトは、どの呼び出しでも毎回見る（書き換えが起きるのは、触ったツリーでなくそのチェックアウトのため）。
 	sbsKeys := map[string]bool{}
 	for _, t := range sbs {
 		sbsKeys[pathcase.Fold(t.Root)] = true
@@ -81,6 +82,7 @@ func watchedFor(stderr io.Writer, conf *config.Settings, root string, record *au
 			}
 		}
 	}
+	// ツリーごとにルールを組む。同じプロジェクトのツリーはルールを共有する（loaded）。
 	coreOn := conf.GuardCoreFiles != string(config.Disable)
 	loaded := map[string]*rules.RuleSet{}
 	var out []post.Watched

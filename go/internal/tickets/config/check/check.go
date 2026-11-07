@@ -121,7 +121,7 @@ func LayerRules(stderr io.Writer, conf *config.Settings, root, only string) []ru
 			out = append(out, prefixed(where, p))
 			told[problem(p.Severity, p.Rule, p.Detail)] = true
 		}
-		// Survey もレイヤーのファイルの苦情を持つ。FileProblems が同じファイルを読んで言ったものは数えない
+		// Survey の結果にもレイヤーのファイルの苦情が含まれる。FileProblems が同じファイルを読んで言ったものは数えない
 		// （同じ苦情が 2 度並び、件数も水増しされる）。
 		for _, p := range view.Problems {
 			if !told[problem(p.Severity, p.Rule, p.Detail)] {

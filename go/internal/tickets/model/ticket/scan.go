@@ -25,6 +25,7 @@ func Scan(root, ticketsRel, projectsDir string, approved []*Ticket) ([]*Ticket, 
 func ScanAll(root, ticketsRel, projectsDir string) ([]*Ticket, []rules.Problem) {
 	var found []*Ticket
 	var problems []rules.Problem
+	// 対象は、ワークスペースのメインのツリー、プロジェクトのツリー、全ワークツリー。ツリーごと・状態の置き場ごとに *.md を読む。
 	trees := append([]tree.Tree{tree.MainTree(root)}, tree.Projects(projectsDir)...)
 	trees = append(trees, tree.Worktrees(root, projectsDir)...)
 	for _, t := range trees {
@@ -41,6 +42,7 @@ func ScanAll(root, ticketsRel, projectsDir string) ([]*Ticket, []rules.Problem) 
 					ospath.RelOr(directory, root)+" の表記が状態の名前 `"+string(state)+"` と違うので読まない"))
 				continue
 			}
+			// ファイルごとに読む。読めないものと、識別子がファイル名と違うものは苦情にして、一覧に入れない。
 			for _, name := range names {
 				stem, ok := strings.CutSuffix(name, config.MdExt)
 				if !ok {

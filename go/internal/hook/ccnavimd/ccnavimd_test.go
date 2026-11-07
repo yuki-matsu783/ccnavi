@@ -212,9 +212,9 @@ func sessionWorkspace(t *testing.T, md string) string {
 	return root
 }
 
-// 決めた本文（条件の段・置き換え・長い本文・空）の組み立ては、Go の答えの見本（Python と答えが揃っていた Go の
+// 決めた本文（条件の段・置き換え・長い本文・空）の組み立ては、Go の答えの見本（答えが確かめ済みだった Go の
 // 答えから取った）と比べる。リポジトリの CCNAVI.md は書き換わるので、段と置き換えが残らないことだけを見る。
-func TestSessionTextMatchesPython(t *testing.T) {
+func TestSessionTextMatchesGolden(t *testing.T) {
 	repo := testkit.RepoRoot(t)
 	data, err := os.ReadFile(filepath.Join(repo, ".ccnavi", file))
 	if err != nil {

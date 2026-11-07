@@ -23,7 +23,7 @@ const (
 	codeParentFields = "NOTICE_PROPOSAL_PARENT_FIELDS"
 )
 
-// parentFields は親の提案が持つ欄。`project:` は置き場が決めるので数えない。
+// parentFields は親の提案に書かれる欄。`project:` は置き場が決めるので数えない。
 var parentFields = []string{"issue", fields.MRKey, "plan", ticket.PhasesKey}
 
 // createdType は Write の tool_response の type のうち、新しく作ったもの。同じ提案を直すたびには出さない。

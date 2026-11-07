@@ -1,5 +1,5 @@
 // Package wap は write-and-push で、sh（.ccnavi/scripts/ccnavi-common-write-and-push.sh の ccnavi_wap_*）が
-// 実行ファイルに聞く 2 つの問いに答える。ロック・取り込み・コミット・push は sh が持つ。ここはネットワークに出ず、
+// 実行ファイルに聞く 2 つの問いに答える。ロック・取り込み・コミット・push は sh が受け持つ。ここはネットワークに出ず、
 // コミットもしない（判定と見分けだけを行う）。git は、ローカルの読み取り（status・diff・ls-tree・cat-file・config）
 // だけに使う。
 //
@@ -12,8 +12,4 @@
 //
 // 答えは 1 行 1 項目（`<キー> <値>`。sh は jq を使わない）で、頭の行（Head）が無ければ sh は止まる。行・値・
 // 終了コードは sh との契約なので変えない。
-//
-// Python からの対応: tickets/approval/write_and_push を移した。HEAD → Head、TARGET_* → Target の定数、KIND_* →
-// 私的な kind の定数、family_of → FamilyOf、target → TargetOf、family → Family、sort → Sort（分けは classify。
-// 呼び手が無いので公開しない）、archived_removal → ArchivedRemoval。
 package wap

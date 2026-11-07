@@ -85,6 +85,7 @@ func boundCheck(conf *config.Settings, root string, here tree.Tree, deadline tim
 	if owner == "" {
 		owner = root
 	}
+	// 1. チケットや提案に同じ名前のファイルがあるか。全ツリーの承認済み・提案の置き場を見る。
 	for _, base := range TreeRoots(conf, root) {
 		approved := conf.ApprovedDir(base)
 		proposals := place.ProposalsRoot(base, conf.Tickets)
@@ -104,6 +105,8 @@ func boundCheck(conf *config.Settings, root string, here tree.Tree, deadline tim
 	if _, ok := archive.ArchivedFields(root, here.Project, name); ok {
 		return "手元の退避（ready 済み）に同じ名前の親がある", false
 	}
+	// 2. 同じ名前の親のワークツリーが、origin に追跡ブランチがあるか。ブランチ名の形（ids.BranchToID で直した名前）も候補にする。
+	// git の終了コードは 0 が有り、1 が無し。それ以外か期限不足は unsure にする。
 	cands := []string{name}
 	if ident := ids.BranchToID(name); ident != name {
 		cands = append(cands, ident)

@@ -37,8 +37,7 @@ const (
 // recentWindow は、作成直後は一覧への反映が遅れうるので 0 件でも未送信と確定しない長さ。
 const recentWindow = 120 * time.Second
 
-// atChars は段階の時刻（StampLayout）のうち読む先頭 19 字（LocalStampLayout）。時差は読まず手元の時刻として読む
-// （Python の mktime）。
+// atChars は段階の時刻（StampLayout）のうち読む先頭 19 字（LocalStampLayout）。時差は読まず、手元の時刻として読む。
 const (
 	atChars = 19
 )

@@ -33,9 +33,13 @@ const (
 	stageClosableFed     = "クローズ可（フィードバック対応済み）"
 )
 
-// OrderProblems は、N 番目の子を承認してよいかを返す。承認してよいのは、先行のフェーズが閉じてレビューが済んでいるときである。苦情は KindNotYet にする。承認は通さないが、書いた側が直すものは無い。前のフェーズが閉じれば、同じ提案が通るからである。親の計画が壊れていれば、壊れた先行で数えずに落とす。
+// OrderProblems は、N 番目の子を承認してよいかを返す。承認してよいのは、先行のフェーズが閉じてレビューが済んでいるとき。
+// 苦情は KindNotYet にする。承認は通さないが、書いた側が直すものは無い。前のフェーズが閉じれば、同じ提案が通るため。
+// 親の計画が壊れていれば、壊れた先行で数えずに落とす。
 //
-// adding は、同じ承認で先に通った、同じ親の子である。承認されればそのフェーズは開き、マーカーも消える。ディスクの上では閉じていても、開いたフェーズとして読む。読まないと、1 本ずつなら外れる組み合わせが、まとめて承認すると通ってしまう。raw は Phases と同じである。
+// adding は、同じ承認で先に通った、同じ親の子。承認されればそのフェーズは開き、マーカーも消える。
+// ディスクの上では閉じていても、開いたフェーズとして読む。読まないと、1 本ずつなら外れる組み合わせが、まとめて承認すると
+// 通ってしまう。raw は Phases と同じ。
 func OrderProblems(conf *config.Settings, root string, child, parent *ticket.Ticket, adding []*ticket.Ticket, raw *approval.Raw) []rules.Problem {
 	number, isChild := child.ChildPhase()
 	if !parent.HasPlan() || !isChild || parent.ItemAt(number) == nil {
@@ -45,9 +49,11 @@ func OrderProblems(conf *config.Settings, root string, child, parent *ticket.Tic
 		return []rules.Problem{{Severity: rules.Error, Rule: child.ID,
 			Detail: fmt.Sprintf(brokenPlanText, parent.ID, broken[0].Detail)}}
 	}
+	// 1. 先行するフェーズの番号（推移的に閉じたもの）を、小さい順に重複なしで並べる。
 	waits := slices.Clone(phases.WaitsOf(parent, number))
 	slices.Sort(waits)
 	waits = slices.Compact(waits)
+	// 2. 同じ承認で通る子のフェーズは、開き直したものとして数える。
 	reopened := map[int][]string{}
 	for _, t := range adding {
 		if n, ok := t.ChildPhase(); ok {
@@ -61,6 +67,7 @@ func OrderProblems(conf *config.Settings, root string, child, parent *ticket.Tic
 	notYet := func(detail string) []rules.Problem {
 		return []rules.Problem{{Severity: rules.Error, Rule: child.ID, Detail: detail, Kind: rules.KindNotYet}}
 	}
+	// 3. 先行のフェーズを順に見て、閉じていない・レビューが済んでいないものを最初の 1 つだけ言う。
 	for _, m := range waits {
 		if m >= number {
 			break

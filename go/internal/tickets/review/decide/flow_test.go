@@ -20,8 +20,9 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// 依頼から決め方までを、同じ形のワークスペースを 2 つ作って Python と Go に同じ順で打たせ、終了コード・標準出力・
-// 標準エラー・置いたファイル（マーカー・下書き・承認済みチケット）が 1 字も違わないことを見る。順は
+// 依頼から決め方までを、ワークスペースを作って同じ順で打たせ、終了コード・標準出力・
+// 標準エラー・置いたファイル（マーカー・下書き・承認済みチケット）が、記録した答え（testdata/flow.json）と
+// 1 字も違わないことを見る。順は
 // prepare --check → prepare → requested → prepare（依頼済み）→ 依頼のマーカーをコミット → decide --check →
 // preview（変更要求・ふつう）→ yes（古いダイジェスト・選択がそろわない・keep と issue）→ prepare（レビュー済み）→
 // wip/ の片付け（ready の前提と RemoveWip）。
@@ -78,7 +79,7 @@ type flowAnswers struct {
 	Files   map[string]string `json:"files"`
 }
 
-func TestFlowMatchesPython(t *testing.T) {
+func TestFlowMatchesGolden(t *testing.T) {
 	golang := flowWorkspace(t)
 	// 見せたあとに本文が変わった指摘のダイジェスト（親・フェーズ・MR は同じ）。
 	stale := Digest(decisionOf([]host.Thread{thread("u1", "前の本文")}, 1))

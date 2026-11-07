@@ -30,6 +30,11 @@ func tokenize(src string) ([]string, error) {
 	return dropArithmetic(splitGlued(tokens)), nil
 }
 
+// lex は src を語に分ける。shlex の状態機械と同じ手順で、1 字ずつ読み状態を移す。
+//   - stSpace は語の外、stWord は語の中、stPunct は `;&|()<>` などの記号の連なりの中。
+//   - ' と " はその引用の中、\ は直後の 1 字の逃がし。
+//
+// 閉じない引用と末尾の \ は errUnclosed。記号は語の区切りとして独立した語にする（`a;b` は a ; b）。
 func lex(src string) ([]string, error) {
 	const (
 		stSpace = ' '
@@ -40,6 +45,7 @@ func lex(src string) ([]string, error) {
 	rs := []rune(src)
 	pos := 0
 	var pushback []rune
+	// next は 1 字を読む。pushback は記号で語が終わったとき、その字を次の語のために戻す入れ物。
 	next := func() (rune, bool) {
 		if n := len(pushback); n > 0 {
 			r := pushback[n-1]
@@ -55,6 +61,7 @@ func lex(src string) ([]string, error) {
 	state := rune(stSpace)
 	var out []string
 	for {
+		// 1 回のループで語を 1 つ作る。quoted は空の引用（''）でも語として数えるための印。
 		quoted := false
 		escaped := rune(stWord)
 		var tok []rune

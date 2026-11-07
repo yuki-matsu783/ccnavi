@@ -64,7 +64,7 @@ func TestClassifyEdges(t *testing.T) {
 	if got := classify("git@x.ghe.com:٣:/a/b.git"); got.problem != "" {
 		t.Errorf("非 ASCII の数字: %+v", got)
 	}
-	// Python の `$` と同じく、末尾の改行の前で当たる
+	// `$` と同じく、末尾の改行の前で当たる
 	if got := classify("https://github.com/acme/widgets.git\n"); got.kind != GitHub || got.path != "acme/widgets" {
 		t.Errorf("末尾の改行: %+v", got)
 	}

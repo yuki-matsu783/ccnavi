@@ -44,12 +44,17 @@ func typeSource(o *pyjson.Object, p *Phase, common *phases.Types) *pyjson.Object
 	return o
 }
 
-// Announce は、終わったばかりのフェーズについて 1 度だけ言う文を返す。無ければ空を返す。書くのはマーカーだけである。書けなければ stderr に言う。マーカーを書く置き場が決まらなければ、何も書かずに空を返す。読む側に無い置き場へ書くと、そこに置き場ができてしまうからである。raw は Phases と同じである。
+// Announce は、終わったばかりのフェーズについて 1 度だけ言う文を返す。無ければ空を返す。
+// 書くのはマーカーだけ。書けなければ stderr に言う。マーカーを書く置き場が決まらなければ、何も書かずに空を返す。
+// 読む側に無い置き場へ書くと、そこに置き場ができてしまうため。raw は Phases と同じ。
+//
+// 「1 度だけ」は、マーカーを書くことで保つ。マーカーのあるフェーズは、次からは言わない。
 func Announce(stderr io.Writer, conf *config.Settings, root string, parent *ticket.Ticket, raw *approval.Raw) string {
 	where, err := approval.HomeDir(conf, root, parent.ID, "", parent.Project)
 	if errors.Is(err, approval.ErrNoParentWorktree) {
 		return ""
 	}
+	// 1. フェーズを組む。
 	list := Phases(conf, root, parent.ID, raw)
 	// source を決めるためだけに読む（判定はコピーを読む）。マーカーを置くフェーズがあるときだけ。
 	var common *phases.Types
@@ -64,6 +69,7 @@ func Announce(stderr io.Writer, conf *config.Settings, root string, parent *tick
 			fmt.Fprintf(stderr, markFailedText, failed)
 		}
 	}
+	// 2. 終わったのにマーカーが無いフェーズごとに、種類（延期・レビュー要・レビュー不要）に応じたマーカーを書き、その知らせを集める。
 	var said []string
 	for _, p := range list {
 		if !p.Ended() || len(p.Marks) > 0 {

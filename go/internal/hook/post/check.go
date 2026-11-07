@@ -193,6 +193,13 @@ func gitWrapper(root string) string {
 // 新しい変更だけを原因付きで言い、報告済みのものは繰り返さない。基準が無いセッションでは今そこに在るものを原因を付けずに
 // 1 度だけ伝え、基準が在れば起動時に在ったものを 1 度だけ伝える。戻すのは deny と宣言された場所の新しい変更だけで、
 // 予行（dry-run）なら戻していたはずのものを言う。
+//
+// 処理フロー:
+//  1. 各ワークツリーの変更を読み、違反を集める
+//  2. 報告済みの記録と突き合わせ、新しいもの（fresh）・報告済み（known）・前から在ったもの（carried）に分ける
+//  3. ユーザが受け入れた変更の上に重なった編集と、横で作業するチェックアウトの変更を、指紋で見分ける
+//  4. 設定が有効なら、戻せる新しい変更だけを git から戻す（dry-run は戻していたはずだと言う）
+//  5. 報告済みの記録と監査の記録を更新し、原因つきの文を組む
 func (c *Checker) Check(enforcing bool, restore config.Mode, in hookio.Input, record *audit.Record) (string, bool) {
 	if slices.Contains(config.ReadOnlyTools(), in.ToolName) {
 		record.Decision, record.Reason = audit.Skip, reasonToolCannotWrite
@@ -215,6 +222,7 @@ func (c *Checker) Check(enforcing bool, restore config.Mode, in hookio.Input, re
 		record.Decision, record.Enforced = audit.Allow, true
 		return "", false
 	}
+	// 報告済みのキー（seen.keys）に有るものは known、無いものは fresh。同じ違反を呼び出しのたびに繰り返さない。
 	var fresh, known []*finding
 	for _, f := range found {
 		if seen.keys[f.key()] {
@@ -247,6 +255,7 @@ func (c *Checker) Check(enforcing bool, restore config.Mode, in hookio.Input, re
 			c.saveAccepted(in.SessionID, accepted)
 		}
 	}
+	// 横で作業するチェックアウト（SideBySide）は、別の作業者の変更を含みうるので戻さない。報告時の指紋を覚え、指紋が変わったら新しい変更として言い直す。
 	side := sideRoots(read)
 	// 横で作業するチェックアウトの変更は戻さないので、報告したときの指紋と違えば新しい変更として言い直す。
 	sideSeen := c.loadAccepted(in.SessionID)
@@ -292,6 +301,7 @@ func (c *Checker) Check(enforcing bool, restore config.Mode, in hookio.Input, re
 		carried, known = known, nil
 	}
 
+	// 戻しの段。戻すのは fresh のうち戻せるものだけ。横のチェックアウトと、受け入れ済みの上に重なったものは戻さない。
 	restored := map[string]string{}
 	tried := false
 	if restore == config.Enable {
@@ -333,6 +343,7 @@ func (c *Checker) Check(enforcing bool, restore config.Mode, in hookio.Input, re
 	}
 
 	// 戻せたものは記録に入れない。同じ場所がもう一度汚れたら、それは新しい出来事なのでもう一度言う。
+	// 報告済みの記録を更新する。
 	next := seen.keys
 	for _, f := range fresh {
 		if _, ok := restored[f.key()]; !ok {
@@ -380,6 +391,7 @@ func (c *Checker) Check(enforcing bool, restore config.Mode, in hookio.Input, re
 		}
 	}
 
+	// ここから、見つけた変更ごとに原因つきの報告文を組む。
 	gated := restore == config.Enable || restore == config.DryRun
 	gitCommand := gitWrapper(c.Root)
 	var blocks []string
@@ -502,6 +514,7 @@ func (c *Checker) committedFindings(read []readTree, h heads) ([]*finding, []str
 // 記録（モデルへ 1 度伝えた）は見ず、ターンの始まりの基準に無いものだけを言う。戻しもしない（どうするかはユーザが決める）。
 // ターンの始まりを見ていなければ何も言わない（ユーザの書きかけまでこのターンの成果として並べてしまう）。
 func (c *Checker) AtStop(in hookio.Input, record *audit.Record) string {
+	// ターンの始まりの基準（AtPrompt が記録）が無ければ、何も言わない。
 	t := c.loadTurn(in.SessionID)
 	if !t.known {
 		record.Decision, record.Reason = audit.Skip, reasonNoTurnBaseline

@@ -19,8 +19,8 @@ const (
 
 var longBreak = regexp.MustCompile(`\n\n\n+`)
 
-// ErrorText は Python の parser.error(message) が標準エラーに書く文（usage と `<prog>: error: <message>`）。
-// 幅は Python の format_usage と同じく、COLUMNS か標準出力の端末から決める。
+// ErrorText は誤りのときに標準エラーへ書く文（usage と `<prog>: error: <message>`）。
+// usage の折り返す幅は、COLUMNS か標準出力の端末から決める。
 func (p *Parser) ErrorText(message string) string { return p.errorText(message, usageWidth()) }
 
 func (p *Parser) errorText(message string, width int) string {
@@ -29,7 +29,7 @@ func (p *Parser) errorText(message string, width int) string {
 
 func usageWidth() int { return columns(os.LookupEnv, stdoutColumns) - columnsMargin }
 
-// columns は shutil.get_terminal_size().columns。COLUMNS が正の整数ならそれ、無ければ端末の幅、それも 0 なら 80。
+// columns は端末の桁数。COLUMNS が正の整数ならそれ、無ければ端末の幅、それも 0 なら 80。
 func columns(lookup func(string) (string, bool), term func() (int, bool)) int {
 	if s, ok := lookup(env.Columns); ok {
 		if n, err := pyfmt.ParseInt(s); err == nil && n > 0 {

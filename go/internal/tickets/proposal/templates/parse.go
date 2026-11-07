@@ -29,7 +29,7 @@ var windowsReserved = func() map[string]bool {
 	return out
 }()
 
-// validName は名前の形か。Python の re の `$` は末尾の改行 1 つの前でも当たるので、それも通す。
+// validName は名前の形か。正規表現の `$` は末尾の改行 1 つの前にも当たる読み方に合わせ、末尾の改行 1 つは許す。
 func validName(name string) bool {
 	return ids.IsValidName(strings.TrimSuffix(name, "\n")) && len([]rune(name)) <= nameLimit
 }
@@ -71,6 +71,7 @@ func hasError(list []rules.Problem) bool {
 // Parse はテンプレートの中身（バイト）を読む。読めなければ (nil, error を含む苦情)。stem を渡せば name が
 // それと同じか確かめる（ファイル名が名前）。読み手はフローと同じ（別名を拒み、UTF-8、BOM は 1 つ外す）。
 func Parse(raw []byte, stem string) (*Template, []rules.Problem) {
+	// 1. 読み込みと最上位の形の確かめ。読めなければここで止める。
 	said := &problems{rule: stem}
 	data, why := flow.ParseYAML(raw)
 	if why != "" {
@@ -83,6 +84,7 @@ func Parse(raw []byte, stem string) (*Template, []rules.Problem) {
 		return nil, said.list
 	}
 
+	// 2. 名前を確かめる。ファイル名が名前なので、stem と違えば error にする。
 	name, ok := top.Get(keyName).(string)
 	if !ok || ospath.Strip(name) == "" {
 		said.error("`name` が無いか、文字列でない")
@@ -96,6 +98,7 @@ func Parse(raw []byte, stem string) (*Template, []rules.Problem) {
 		said.error(fmt.Sprintf("`name` の `%s` がファイル名（%s%s）と違う", name, stem, Suffix))
 	}
 
+	// 3. description（必須）と when（任意）。
 	texts := map[string]string{}
 	for _, key := range []string{keyDescription, keyWhen} {
 		switch v := top.Get(key).(type) {
@@ -110,6 +113,7 @@ func Parse(raw []byte, stem string) (*Template, []rules.Problem) {
 		said.error("`description` がありません（一覧に出す説明）")
 	}
 
+	// 4. 計画・フィードバック計画・フローを読む。未知の欄は落とさず extra に残し（書き戻しで消さない）、warn だけ出す。
 	plan := readItems(top.Get(keyPlan), keyPlan, said, true)
 	feedback := readItems(top.Get(keyFeedback), keyFeedback, said, false)
 	flows := readFlows(top.Get(keyFlows), said)
@@ -143,6 +147,7 @@ func readItems(raw any, key string, said *problems, required bool) []Item {
 		}
 		return nil
 	}
+	// ステップは定義の名前だけの文字列か、{type, review, deferred, after} のマップ。どちらも苦情のあるステップは out に入れない。
 	list, ok := raw.([]any)
 	if !ok {
 		said.error("`" + key + "` はリストで書く")

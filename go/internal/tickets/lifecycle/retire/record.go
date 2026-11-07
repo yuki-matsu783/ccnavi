@@ -147,7 +147,7 @@ func mrText(value any) string {
 	return text
 }
 
-// textOf は Python の str(value or "")。
+// textOf は欄の値を文字列で読む。値が無い・偽（空・0 など）なら空。
 func textOf(value any) string {
 	if !pyfmt.Truthy(value) {
 		return ""
@@ -177,8 +177,9 @@ func unreadableClosed(conf *config.Settings, root, treeRoot string) []string {
 // 記録は `retire/<親>.json`（親・リポジトリ・ブランチ・MR の番号・閉じた子の一覧）。前の回（途中で止まった）の
 // 一覧には足し、同じ子は今回の値で置き換える。mr が無ければ前の回の値を保つ。書かずに理由を返すのは、記録の
 // 置き場が無いとき、前の回の記録が壊れているとき、読めない閉じたチケットがあるとき。呼び手（ready）は理由が
-// あれば退避へ進まずに止める。mr は書かれたままの値（Python の mr: object。nil は無し）。
+// あれば退避へ進まずに止める。mr は書かれたままの値（型は問わない。nil は無し）。
 func Note(conf *config.Settings, root, parent, project, treeRoot string, mr any) string {
+	// 1. 書ける状態か。壊れた記録は上書きしない（直すかユーザが消す）。読めない閉じたチケットがあれば、子の一覧が欠けるので書かない。
 	path := recordPath(conf, parent)
 	if path == "" {
 		return "state の置き場が空なので、片付けの記録を書けない"
@@ -191,6 +192,7 @@ func Note(conf *config.Settings, root, parent, project, treeRoot string, mr any)
 		return "読めない閉じたチケットがあり、片付ける子の一覧に入らない（" + strings.Join(unread[:min(len(unread), 3)], "; ") +
 			"）。直してから打ち直す"
 	}
+	// 2. 子の一覧を作る。前の回の記録の子に、今回閉じた子を足す。同じ子は今回の値で置き換える。
 	children := map[string]any{}
 	if list, ok := held.Value(keyChildren).([]any); ok {
 		for _, c := range list {
@@ -206,6 +208,7 @@ func Note(conf *config.Settings, root, parent, project, treeRoot string, mr any)
 	for _, c := range closedChildren(conf, root, parent) {
 		children[c.ticket] = pyjson.NewObject(keyTicket, c.ticket, keyKind, string(c.kind), keyMerged, c.mergedSHA, keyProject, c.project)
 	}
+	// 3. 親のブランチ名は、親のツリーの今のブランチを優先し、読めなければ前の回の値を保つ。
 	var branch any = ""
 	if treeRoot != "" {
 		if name, ok := tree.BranchOf(treeRoot); ok {
@@ -224,6 +227,7 @@ func Note(conf *config.Settings, root, parent, project, treeRoot string, mr any)
 		list = append(list, children[k])
 	}
 	data := pyjson.NewObject(keyParent, parent, keyProject, project, keyBranch, branch, keyChildren, list)
+	// 4. MR の番号は今回の値を優先し、無ければ前の回の値を保つ。整数に収まらない桁でも壊さず big.Int のまま書く。
 	kept := mrText(mr)
 	if kept == "" {
 		kept = mrText(held.Value(keyMR))
@@ -236,6 +240,7 @@ func Note(conf *config.Settings, root, parent, project, treeRoot string, mr any)
 			data.Set(keyMR, n)
 		}
 	}
+	// 途中で落ちても壊れた記録を残さないよう、アトミックに書く（次の回が記録を読むので）。
 	format := fsio.JSONFormat{Indent: fsio.JSONIndentOne, FinalNewline: true, Newline: fsio.LF, How: fsio.Atomic}
 	if failed := fsio.WriteJSONAs(path, data, format); failed != "" {
 		return "片付けの記録を書けない（" + path + ": " + failed + "）"

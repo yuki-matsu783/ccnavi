@@ -14,7 +14,7 @@ import (
 	"ccnavi/internal/policy/rules"
 )
 
-// Python の ticket_guard と突き合わせる。式の文字列が 1 字も違わないことと、組んだルールが同じ呼び出しに
+// 見本と突き合わせる。式の文字列が 1 字も違わないことと、組んだルールが同じ呼び出しに
 // 同じ答えを返すこと。
 
 type guardRule struct {
@@ -62,7 +62,7 @@ var guardCommands = []string{
 	"echo x > logs/state/ops/a", "python3 x.py logs/state/ops", "rm -rf .ccnavi/approved", "mv a props/review",
 }
 
-func TestGuardMatchesPython(t *testing.T) {
+func TestGuardMatchesGolden(t *testing.T) {
 	want := golden.Load[[]guardAnswer](t, "guard")
 	for i, c := range guardCases {
 		var all []*rules.Rule

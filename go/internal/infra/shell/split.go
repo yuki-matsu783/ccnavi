@@ -5,11 +5,12 @@ import (
 	"strings"
 )
 
-// errSplit は Split が Python の shlex.split の ValueError で断る形（閉じない引用・末尾の `\`）。
+// errSplit は Split が読めない形（閉じない引用・末尾の `\`）。
 var errSplit = errors.New("shlex.split が読めない")
 
-// Split は Python の shlex.split(s)（posix・whitespace_split・コメント無し）。コマンドを読む Read の割り方
-// （punctuation_chars 付きで `;` などでも割る）とは違い、空白と引用だけで割る。
+// Split は Python の shlex.split(s)（posix・whitespace_split・コメント無し）と同じ答えで語に割る。
+// コマンドを読む Read の割り方（`;` などの記号でも割る）とは違い、空白と引用だけで割る。
+// 状態は space（語の外）・word（語の中）・squote / dquote（引用の中）・escape（\ の直後）で、lex と同じ規則。
 func Split(s string) ([]string, error) {
 	const (
 		space   = ' '

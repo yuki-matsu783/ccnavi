@@ -38,7 +38,7 @@ func Default() (*Table, error) { return defaultTable, defaultErr }
 
 // parse は表のファイルの中身を読む。`#` で始まる行と空行は読まない。1 行は空白で区切った 2 語だけで、
 // 読めない行はエラーにする（黙って捨てると、読み替えられない名前のまま下書きが置かれる）。
-// 同じ元の名前を 2 度書けば、後の行の名前を最初の行の位置で使う（Python の dict と同じ）。
+// 同じ元の名前を 2 度書けば、後の行の名前を最初の行の位置で使う（辞書への代入と同じ）。
 func parse(text string) (*Table, error) {
 	t := &Table{}
 	for i, raw := range ospath.Splitlines(text) {

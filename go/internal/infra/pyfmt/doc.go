@@ -1,13 +1,11 @@
-// Package pyfmt は Python の repr()・str()・真偽の判定を Go の値に当てる。YAML や JSON から読んだ値を
-// 文に埋めるとき、Python の実行ファイルと同じ文字列にするために使う。値の型は yaml と pyjson が
-// 返すもの（nil・bool・int・*big.Int・float64・string・[]byte・[]any・順序つきの map）を受ける。
-// 逆向きに、Python の int()・float() が読む綴り（数字の間の "_"、全角などの 10 進の数字、inf・nan）を
+// Package pyfmt は Python の repr()・str()・真偽の判定と同じ答えを Go の値で返す。YAML や JSON から読んだ値を
+// 文に埋めるとき、文字列が機械によらず安定し、ルールの書き手が Python の書き方で想定した形になるよう、ここを通す。
+// 値の型は yaml と pyjson が返すもの（nil・bool・int・*big.Int・float64・string・[]byte・[]any・順序つきの map）を受ける。
+// 逆向きに、Python の int()・float() が読む綴り（数字の間の "_"、全角などの 10 進の数字、inf・nan）も
 // 同じ答えで読む。
 //
-// Python からの対応: int(s) → ParseInt、int(s, base) → ParseBigInt、float(s) → ParseFloat、s[:n] → Head、
-// s.isdigit() → IsDigit、re の `\w` の 1 文字 → IsWord、int(v)（JSON・YAML の値）→ IntOf、f"{n:,}" → Grouped、
-// datetime.fromisoformat → FromISOFormat（比べるための UTC の時刻と、時差が書かれていたか）、str.lower() → Lower、
-// 読んだ値と整数の == → EqualsInt、パスでない語の str.casefold() → Casefold、unicodedata.normalize("NFKC")・("NFC")・
-// ("NFD") → NFKC・NFC・NFD、unicodedata.combining → Combining、unicodedata.east_asian_width → EastAsianWidth、str.upper() → Upper、format(x, "g") → FormatG、
-// 空でない文の連結（sep.join(p for p in parts if p)）と、空と重なりを除いた並び → JoinNonEmpty・NonEmpty（Repeats）。
+// 数の読みは ParseInt・ParseBigInt・ParseFloat・IntOf・IsDigit・IsWord、書式は Grouped・FormatG、
+// 日時は FromISOFormat（比べるための UTC の時刻と、時差が書かれていたか）。
+// 文字の扱いは Lower・Upper・Casefold・NFKC・NFC・NFD・Combining・EastAsianWidth。
+// そのほか、先頭 n 字の Head、読んだ値と整数の比べ EqualsInt、空でない文の連結 JoinNonEmpty と NonEmpty（Repeats）がある。
 package pyfmt

@@ -7,7 +7,7 @@ import (
 	"unsafe"
 )
 
-// stdoutColumns は Python の os.get_terminal_size(1).columns。端末でなければ false。
+// stdoutColumns は標準出力の端末の幅。端末でなければ false。
 func stdoutColumns() (int, bool) {
 	var ws struct{ row, col, xpixel, ypixel uint16 }
 	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(syscall.Stdout), uintptr(syscall.TIOCGWINSZ), uintptr(unsafe.Pointer(&ws)))

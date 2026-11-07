@@ -41,7 +41,7 @@ func exists(path string) bool {
 	return err == nil
 }
 
-// 書き手の失敗の仕方（Python の WriterFailureTest の枝）。溜める段では書き込みが失敗しないので、書くときに当てる。
+// 書き手の失敗の仕方（失敗の枝ごとに 1 つずつ）。溜める段では書き込みが失敗しないので、書くときに当てる。
 // 行き先のディレクトリをファイルで塞いで書けなくする。
 func TestWriteFailureModes(t *testing.T) {
 	dir := t.TempDir()

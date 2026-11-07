@@ -15,7 +15,7 @@ type kindCase struct {
 	want  Kind
 }
 
-// 読み取りと確かめられたものだけを Read にし、見分けられないものは Edit に倒す。Python と同じ答えか。
+// 読み取りと確かめられたものだけを Read にし、見分けられないものは Edit に倒す。見本と同じ答えか。
 func TestOf(t *testing.T) {
 	near, far := t.TempDir(), t.TempDir()
 	put := func(root, name, text string) {
@@ -70,7 +70,7 @@ func TestOf(t *testing.T) {
 	for i, c := range cases {
 		got := Of(roots, c.Type, c.Tools)
 		if got != c.want || got != py[i] {
-			t.Errorf("Of(%q, %v) = %s, want %s（Python %v）", c.Type, c.Tools, got, c.want, py)
+			t.Errorf("Of(%q, %v) = %s, want %s（見本 %v）", c.Type, c.Tools, got, c.want, py)
 		}
 	}
 }

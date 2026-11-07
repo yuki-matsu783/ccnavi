@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// 期待値は Python 3.13 の posixpath で求めたもの。
+// 期待値は Python 3.13 の posixpath の答え。
 
 func TestPosixSpelling(t *testing.T) {
 	if runtime.GOOS == "windows" {
@@ -97,7 +97,7 @@ func TestTextHelpers(t *testing.T) {
 	}
 }
 
-// 回帰: cwd がリンクを通って入った場所でも、相対パスは Python の os.getcwd() と同じく実体から作る。
+// 回帰: cwd がリンクを通って入った場所でも、相対パスは実体のパスから作る。
 func TestRelativeFromLinkedCwd(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("シンボリックリンクを作れない環境がある")
@@ -191,7 +191,7 @@ func TestStat(t *testing.T) {
 	}
 }
 
-// 字は符号位置で数える（Python の p[1]。日: の 2 字目は ":"）。
+// 字は符号位置で数える（日: の 2 字目は ":"）。
 func TestHasDrive(t *testing.T) {
 	cases := []struct {
 		path        string
@@ -218,7 +218,7 @@ func TestHasDrive(t *testing.T) {
 	}
 }
 
-// 期待は Python の os.path.relpath（POSIX）。相対にできない別のドライブは Windows でしか起きない。
+// 期待は POSIX の relpath の答え。相対にできない別のドライブは Windows でしか起きない。
 func TestRelOr(t *testing.T) {
 	cases := []struct{ path, start, want string }{
 		{"/a/b/c", "/a", "b/c"},
@@ -240,7 +240,7 @@ func TestRelOr(t *testing.T) {
 	}
 }
 
-// 期待は Python の str.splitlines() と str.splitlines(keepends=True)。
+// 期待は区切りを残さない分け方と、残す分け方の答え。
 func TestSplitlinesKeep(t *testing.T) {
 	cases := []struct {
 		in         string

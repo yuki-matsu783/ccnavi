@@ -16,7 +16,7 @@ import (
 	"ccnavi/internal/tickets/approval"
 )
 
-// ユーザの発言（UserPromptSubmit）のたびに、`project:` を持つ着手済みの親のワークツリーへ写す。ツール呼び出しの
+// ユーザの発言（UserPromptSubmit）のたびに、`project:` がある着手済みの親のワークツリーへ写す。ツール呼び出しの
 // 中では写さない（実行後チェックとバックアップから見て、エージェントの書き込みと区別が付かなくなる）。呼び手は
 // selfguard の受け入れの前に呼ぶ。写した分は、ユーザの手による変更と同じに受け入れられる。
 //
@@ -54,6 +54,7 @@ func Sync(conf *config.Settings, root string) []string {
 
 // syncOne は 1 つの親のワークツリーに、ミラー、工程スキルの順に写す。
 func syncOne(conf *config.Settings, root, ticket, project, worktree string) []string {
+	// 1. 写し元と写し先の署名（stat）が前回と同じなら、何もしない。発言のたびに呼ばれるので、中身は読まない。
 	sources := []string{conf.CommonLayerDir(root), skillSource(root)}
 	places := append(slices.Clone(sources), conf.CommonLayerDir(worktree), ospath.Join(worktree, config.SkillsDir))
 	sigPath := ""
@@ -68,6 +69,7 @@ func syncOne(conf *config.Settings, root, ticket, project, worktree string) []st
 		}
 	}
 
+	// 2. ミラー、工程スキルの順に揃える。片方が失敗してももう片方は試す。揃えたファイルは committable に集めて、最後にコミットを頼む。
 	var lines, committable []string
 	failedAny := false
 	failMirror := "ccnavi: " + ticket + " の共通レイヤーをミラーできない: "
@@ -101,6 +103,7 @@ func syncOne(conf *config.Settings, root, ticket, project, worktree string) []st
 		lines = append(lines, failSkills+why)
 	}
 
+	// 3. 署名を保存する。失敗したときや、揃える間に写し元が動いたときは保存しない（次の発言でもう一度試す）。
 	if sigPath != "" && !failedAny && signature(sources) == sourcesBefore {
 		// 次の発言は、元も先も動いていなければ stat だけで抜ける。
 		fsio.WriteJSON(sigPath, pyjson.NewObject(signatureKey, signature(places)))

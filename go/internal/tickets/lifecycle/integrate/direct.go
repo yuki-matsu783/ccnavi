@@ -175,13 +175,13 @@ func GitPath(top, name string, deadline time.Time) (string, bool) {
 type Repeat int
 
 const (
-	// LastKept は最後の行を採り、値の前後の空白を除く（Python の stop_integrate の読み方）。
+	// LastKept は最後の行を採り、値の前後の空白を除く（Stop の促しの読み方）。
 	LastKept Repeat = iota
-	// firstKept は最初の行を採り、値をそのまま残す（sh の ccnavi_record_get と、Python の post_findings の読み方）。
+	// firstKept は最初の行を採り、値をそのまま残す（sh の ccnavi_record_get と、取り込み後の確認 post_findings の読み方）。
 	firstKept
 )
 
-// ReadRecord は ccnavi_record_write が書いた「キー 値」の行の記録。読めなければ空。読む側ごとに Python の読み方が
+// ReadRecord は ccnavi_record_write が書いた「キー 値」の行の記録。読めなければ空。読む側ごとに読み方が
 // 違うので、同じキーの扱いを repeat で選ぶ。
 func ReadRecord(path string, repeat Repeat) map[string]string {
 	text, _ := fsio.ReadText(path, fsio.Replace)

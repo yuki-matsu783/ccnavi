@@ -248,7 +248,7 @@ func poster(conf *config.Settings, root string, parent *ticket.Ticket, number in
 	return markText(p.Marks[marks.Requested], "poster")
 }
 
-// markText は記録の欄を Python の str(mark.get(key) or "") と同じに読む。
+// markText は記録の欄を文字列で読む。値が無い・偽（空・0 など）なら空。
 func markText(mark *pyjson.Object, key string) string {
 	v := mark.Value(key)
 	if !pyfmt.Truthy(v) {
@@ -275,7 +275,9 @@ func ParentMark(stderr io.Writer, approvedDir, parentID string, name marks.Paren
 	return true
 }
 
-// ReviewedMark は、レビュー済みのマーカーの中身を組む（欄の順は mr・accepted・actor・via・at）。actor と via は分かるときだけ書く。at は、stamp が空なら書かない（marks.WriteMark が今の時刻を入れる）。accepted は、受け入れた指摘のキーの記録である。確認はホストの状態だけを数える。受け入れた指摘は、ホストで解決済みにしてあるからである。
+// ReviewedMark は、レビュー済みのマーカーの中身を組む（欄の順は mr・accepted・actor・via・at）。actor と via は分かるときだけ書く。
+// at は、stamp が空なら書かない（marks.WriteMark が今の時刻を入れる）。accepted は、受け入れた指摘のキーの記録である。確認はホストの状態だけを数える。
+// 受け入れた指摘は、ホストで解決済みにしてあるため。
 func ReviewedMark(mr int, accepted []string, account, route, stamp string) *pyjson.Object {
 	mark := pyjson.NewObject("mr", mr, "accepted", append([]string{}, accepted...))
 	if account != "" {
@@ -297,7 +299,8 @@ func reviewNumbers(p *phase.Phase) []int {
 
 // SettleChildren は、レビューが済んだフェーズ（延期を引き受けた分を含む）のレビュー待ちの子を done/ へ動かす。by は動かした経路（By* の定数）である。動かせなければ、理由を言って偽を返す。
 //
-// 呼ぶ側は、これをレビュー済みのマーカーより先に呼ぶ。マーカーを先に置くと、動かせなかったときに「レビュー済みなのに子が review/ に残る」形になる。confirm はレビュー済みを拒むので、取り出す操作が無くなってしまう。逆の順なら、子は動いたがマーカーだけ置けなかった場合でも、次の confirm が置き直す。
+// 呼ぶ側は、これをレビュー済みのマーカーより先に呼ぶ。マーカーを先に置くと、動かせなかったときに「レビュー済みなのに子が review/ に残る」形になる。
+// confirm はレビュー済みを拒むので、取り出す操作が無くなってしまう。逆の順なら、子は動いたがマーカーだけ置けなかった場合でも、次の confirm が置き直す。
 func SettleChildren(stdout, stderr io.Writer, conf *config.Settings, root string, parent *ticket.Ticket, p *phase.Phase, by string) (bool, error) {
 	moved, failed, err := approval.SettleReview(conf, root, parent.ID, reviewNumbers(p), by)
 	if err != nil {
@@ -329,7 +332,8 @@ func settledByConfirm() string {
 	return byConfirm
 }
 
-// SettleAndMark は、レビュー済みで書くもの（子を done/ へ、受け入れ台帳、レビュー済みのマーカー）を溜める段に並べる。順番は SettleChildren、マーカーである。子を先に動かし、台帳はマーカーより先に書く。マーカーだけが置かれて、受け入れた指摘が数えられる形を作らないためである。止まったら、その理由を返す。書き手は `ccnavi: <理由>` を言って止まる。
+// SettleAndMark は、レビュー済みで書くもの（子を done/ へ、受け入れ台帳、レビュー済みのマーカー）を溜める段に並べる。順番は SettleChildren、マーカーである。
+// 子を先に動かし、台帳はマーカーより先に書く。マーカーだけが置かれて、受け入れた指摘が数えられる形を作らないため。止まったら、その理由を返す。書き手は `ccnavi: <理由>` を言って止まる。
 func SettleAndMark(stage *fsio.Stage, conf *config.Settings, root string, parent *ticket.Ticket, p *phase.Phase, mark *pyjson.Object, ledger []*pyjson.Object) (string, error) {
 	restore := fsio.SetPolicy(func(po *fsio.Policy) {
 		po.OnFail, po.Ticket, po.Message, po.Prefix, po.Undo, po.Places = fsio.FailStop, "", "{reason}", "", nil, ""

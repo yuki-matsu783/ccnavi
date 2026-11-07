@@ -193,7 +193,7 @@ func fileDigest(home, rel string) string {
 
 // Definition は配点。
 type Definition struct {
-	// Levels は書かれた閾値だけ（medium・high・critical）。書かれていない名前は既定で読む。既定で埋めて持つと、
+	// Levels は書かれた閾値だけ（medium・high・critical）。書かれていない名前は既定で読む。既定で埋めて保持すると、
 	// 合成のときに「書いていないレイヤー」が共通レイヤーの緩めた閾値を気づかないうちに戻す。
 	Levels  map[string]int
 	Factors []*Factor
@@ -351,6 +351,7 @@ func LoadLayer(path string, homes []string) (*Definition, []rules.Problem) {
 // 各レイヤーはその ccnavi ディレクトリの scripts/ だけ。たがいの側を指す定義は error にする）。error が 1 つでも
 // あれば nil、warn だけなら定義と苦情。
 func Parse(text, where string, homes []string) (*Definition, []rules.Problem) {
+	// 1. YAML として読み、最上位がマップで、版が合うことを確かめる。
 	data, err := yaml.Load(text)
 	if err != nil {
 		return nil, []rules.Problem{problem(rules.Error, where, "YAML として読めない: "+err.Error())}
@@ -364,6 +365,7 @@ func Parse(text, where string, homes []string) (*Definition, []rules.Problem) {
 			fmt.Sprintf("版 %s は扱えない（このビルドが読むのは %d）", pyfmt.Repr(v), Version))}
 	}
 	var problems []rules.Problem
+	// 2. levels（段階の閾値）を読む。書かれたキーだけ記録し、未対応の名前は警告する。
 	levels := map[string]int{}
 	if raw, present := top.Lookup("levels"); present && raw != nil {
 		written, ok := raw.(*yaml.Map)
@@ -395,9 +397,11 @@ func Parse(text, where string, homes []string) (*Definition, []rules.Problem) {
 			problems = append(problems, problem(rules.Warn, where, "`levels."+name+"` は未対応のリスクレベル。名前は固定"))
 		}
 	}
+	// 閾値の大小（medium <= high <= critical）が崩れていると、段階が逆転するのでエラーにする。
 	if !ordered(levels) {
 		problems = append(problems, problem(rules.Error, where, "`levels` は medium <= high <= critical の順で書く"))
 	}
+	// 3. factors（加点の項目）を読む。1 つでもエラーがあれば定義を返さない。
 	rawFactors := []any{}
 	if raw, present := top.Lookup("factors"); present && raw != nil {
 		list, ok := raw.([]any)
@@ -476,6 +480,7 @@ func readFactors(raw []any, where string, homes []string) ([]*Factor, []rules.Pr
 
 // readFactor は id を確かめた項目 1 つを読む。読めなければ error の文、読めれば warn の苦情も返す。
 func readFactor(id string, item *yaml.Map, homes []string) (*Factor, string, []rules.Problem) {
+	// 加点条件は lines / files / deleted / glob / script / judge のうちちょうど 1 つ。複数あると、どれで測るのか決まらない。
 	points, ok := nonNegative(item.Get("points"))
 	if !ok {
 		return nil, "`points` が 0 以上の整数ではない", nil
@@ -504,6 +509,7 @@ func readFactor(id string, item *yaml.Map, homes []string) (*Factor, string, []r
 		}
 		f.hasMax = true
 	}
+	// include / exclude は、行数・ファイル数を数える項目だけに効く。他の項目に書いてあれば、効かないまま見落とされるのでエラーにする。
 	if !f.Kind.counts() {
 		for _, k := range []string{"include", "exclude"} {
 			if item.Has(k) {
@@ -532,6 +538,7 @@ func readFactor(id string, item *yaml.Map, homes []string) (*Factor, string, []r
 					"ファイルにしか一致しない。ディレクトリなら `"+glob+"/**` か `"+glob+"/`"))
 			}
 		}
+	// glob は、どの機械でも大文字小文字を区別せずに当てる（ルールの glob と同じ）。
 	case kindGlob:
 		s, _ := value.(string)
 		if ospath.Strip(s) == "" {
@@ -544,6 +551,7 @@ func readFactor(id string, item *yaml.Map, homes []string) (*Factor, string, []r
 			return nil, "`glob` を式にできない: " + err.Error(), nil
 		}
 		f.compiled = compiled
+	// script は、そのレイヤーの scripts/ の下の相対パスだけ。絶対パスと `..` は、守られた場所の外を指せるので断る。
 	case KindScript:
 		s, _ := value.(string)
 		if ospath.Strip(s) == "" {
@@ -627,6 +635,7 @@ func (d *Definition) markLayer(name, home string) {
 // なる側になるので、衝突は点を増やす向きにだけ効かせる）。levels は書かれたキーごとに小さいほう。合成後の
 // levels の順が崩れたら（error）、そのレイヤーを空として共通レイヤーだけを返す。
 func merge(common, extra *Definition, name string) (*Definition, []rules.Problem) {
+	// 1. 項目を足す。全欄が同じ項目は二重に数えないよう捨て、id だけ同じで中身が違う項目は両方数える（名前を変えて）。
 	var problems []rules.Problem
 	ids, keys := map[string]bool{}, map[string]bool{}
 	for _, f := range common.Factors {
@@ -651,6 +660,7 @@ func merge(common, extra *Definition, name string) (*Definition, []rules.Problem
 		ids[f.ID], keys[f.key()] = true, true
 		added = append(added, f)
 	}
+	// 2. levels は、書かれたキーごとに小さいほうを採る。厳しい側（低い閾値）に倒すため。
 	levels := copyLevels(common.Levels)
 	for k, v := range extra.Levels {
 		if prior, ok := levels[k]; ok {
@@ -664,6 +674,7 @@ func merge(common, extra *Definition, name string) (*Definition, []rules.Problem
 			"合成後の `levels` が medium %d <= high %d <= critical %d になっていない。%s のレイヤーは空として扱う",
 			t.Medium, t.High, t.Critical, name)))
 	}
+	// 3. 合成後に閾値の大小が崩れたら、そのレイヤーを空として扱い、共通レイヤーだけを返す。
 	out := &Definition{
 		Levels: levels, Factors: append(append([]*Factor{}, common.Factors...), added...),
 		Source: common.Source, Fallback: common.Fallback, Dropped: append([]string{}, common.Dropped...),
@@ -718,6 +729,7 @@ func CommonDefinition(conf *config.Settings, root string) (*Definition, []rules.
 // レイヤーの項目だけを数える。
 func LayerDefinition(conf *config.Settings, root, project string) (*Definition, []rules.Problem) {
 	home, name := layer.Home(conf, root, project), layer.Name(project)
+	// 共通レイヤーの配点を土台にする。共通レイヤーの risks.yml が無く、レイヤーの risks.yml だけがあるなら、土台は空にしてレイヤーの項目だけを数える。
 	path := layer.File(conf, root, project, config.KindRisk)
 	present := path != "" && ospath.DiskExists(path)
 	var d *Definition
@@ -730,6 +742,7 @@ func LayerDefinition(conf *config.Settings, root, project string) (*Definition, 
 	} else {
 		d, _ = Load(conf.Risk)
 	}
+	// 項目に由来するレイヤーを記録する。script: はこの基準ディレクトリで解く。
 	d.markLayer(config.LayerCommon, root)
 	if d.Fallback != "" || !present {
 		return d, nil
@@ -741,6 +754,7 @@ func LayerDefinition(conf *config.Settings, root, project string) (*Definition, 
 		return d, notes
 	}
 	extra.markLayer(name, home)
+	// 合成して、閾値が逆転したレイヤーは空として数える。
 	merged, problems := merge(d, extra, name)
 	if len(merged.Dropped) > 0 {
 		merged.Fallback = strings.Join(merged.Dropped, ", ") + " の配点の閾値が合成で逆転している。このレイヤーは空として数える"

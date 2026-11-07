@@ -13,8 +13,8 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// tests/ticket/test_write_and_push.py の FamilyTest・SortTest を、CLI を通さずに移したもの。sh の側（ロック・
-// 取り込み・コミット・push）と --record-tree は CLI を通すテストが見る。
+// Family と Sort の答えを、CLI を通さずに見る。sh の側（ロック・取り込み・コミット・push）と --record-tree は、
+// CLI を通すテストが見る。
 
 const approved = ".ccnavi/approved"
 
@@ -248,9 +248,9 @@ func TestOneLine(t *testing.T) {
 	}
 }
 
-// 回帰: Python の search の `$` は末尾の改行 1 つの前でも当たる。Go の `$` に写したときは、パスの末尾が改行の
-// 書きかけ（`.part`・`flows/.*.tmp`・`.ccnavi-sync`）を一時ファイルと見ずに分けていた。
-func TestTempLikePython(t *testing.T) {
+// 回帰: パスの末尾が改行の書きかけ（`.part`・`flows/.*.tmp`・`.ccnavi-sync`）を
+// 一時ファイルと見ずに分けていた。末尾の改行 1 つは許し、2 つは許さない。
+func TestTempAllowsOneTrailingNewline(t *testing.T) {
 	for rel, want := range map[string]bool{
 		".x.part": true, "a/.x.part\n": true, "a/.x.part\n\n": false,
 		"flows/.f.tmp": true, "a/flows/.f.tmp\n": true, "flows/.f.tmp\n\n": false,

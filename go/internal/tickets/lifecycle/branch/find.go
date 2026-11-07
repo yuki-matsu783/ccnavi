@@ -134,7 +134,7 @@ func clean(value any, limit int) string {
 	return pyfmt.Head(ospath.Strip(text), limit)
 }
 
-// readHost は sh が書いたホストの結果（checked・reason・host・repo・mrs のキーを持つ JSON）。無い・読めない・
+// readHost は sh が書いたホストの結果（checked・reason・host・repo・mrs のキーがある JSON）。無い・読めない・
 // 形が違うなら「見ていない」として理由を付ける。
 func readHost(path string) host {
 	if path == "" {
@@ -333,9 +333,10 @@ func (f *found) json() *pyjson.Object {
 }
 
 // collect は候補を集める。答えは候補と、止める理由（あれば）。ホストの MR の元ブランチ、番号の種類ごとのチケット
-// （issue は issue:、MR は mr: を持つ親。同じリポジトリだけ）と名前（issue だけ）を候補に入れ、各候補にワークツリーと
+// （issue は issue:、MR は mr: がある親。同じリポジトリだけ）と名前（issue だけ）を候補に入れ、各候補にワークツリーと
 // 識別子になるブランチのチケットを添えて、由来の順（チケット、MR、名前）に並べる。
 func collect(conf *config.Settings, root, cwd string, kind Kind, number int, h host) (*found, string) {
+	// 1. 手元の材料（リポジトリ・ブランチ・チェックアウト中のワークツリー・チケット）を読む。
 	repo, project, failed := repoOf(conf, root, cwd)
 	if repo == nil {
 		return nil, failed
@@ -362,6 +363,7 @@ func collect(conf *config.Settings, root, cwd string, kind Kind, number int, h h
 	}
 	slices.Sort(sortedNames)
 
+	// 2. 候補をブランチ名で 1 つにまとめる。同じブランチが複数の由来（MR・チケット・名前）で挙がっても 1 件にし、由来は addSource で足す。
 	byBranch := map[string]*candidate{}
 	var order []*candidate
 	candidateOf := func(branch string) *candidate {
@@ -378,6 +380,7 @@ func collect(conf *config.Settings, root, cwd string, kind Kind, number int, h h
 		c.addSource(sourceMR)
 		c.mrs = append(c.mrs, m)
 	}
+	// 3. 親のチケットから候補を足す。issue は issue 番号が同じで、別リポジトリの issue でないもの。MR は mr 番号が同じもの。子は対象にしない。
 	var linked []ticketLink
 	for _, t := range tickets {
 		if t.IsChild() {
@@ -395,6 +398,7 @@ func collect(conf *config.Settings, root, cwd string, kind Kind, number int, h h
 			candidateOf(branchOfTicket(t, sortedNames)).addSource(sourceTicket)
 		}
 	}
+	// 4. 名前に issue 番号を含むブランチも、issue のときだけ候補にする（MR は番号の取り違えが多いので名前では引かない）。
 	if kind == issue {
 		for _, name := range sortedNames {
 			if namesNumber(name, number, conf.BranchPrefixes) {
@@ -410,6 +414,7 @@ func collect(conf *config.Settings, root, cwd string, kind Kind, number int, h h
 			}
 		}
 	}
+	// 5. 由来の強い順（チケット → MR → 名前）、同じならブランチ名の順に並べる。
 	rank := func(c *candidate) int {
 		best := 9
 		for _, s := range c.sources {

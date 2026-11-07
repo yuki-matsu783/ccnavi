@@ -20,7 +20,7 @@ import (
 // program は起こす git の名前（PATH から探す）。
 const program = "git"
 
-// 目的ごとの git の期限。値は Python の各モジュールが持っていたもの。期限は場所ごとに違うので
+// 目的ごとの git の期限。期限は場所ごとに違うので
 // （実行前チェックの中は短く、ユーザが打つ操作は長く）、呼び手は目的に合う名前を選ぶ。
 // ワークツリーを読む hook の中の期限は StateTimeout（state.go）。
 const (
@@ -89,7 +89,7 @@ var (
 	errTimeout = errors.New("git が期限に達した")
 )
 
-// failure は起こせなかった理由。文は Python の subprocess が投げた例外の str と同じにする
+// failure は起こせなかった理由。文は OS のエラーの文（`[Errno 2] No such file or directory: 'git'` の形）にする
 // （呼び手がそのまま理由としてユーザに見せる）。
 type failure struct {
 	text string
@@ -158,12 +158,14 @@ func (o Options) timeout() time.Duration {
 // 起こせなかったときの捕まえ方）は同じで、別々に書くと片方だけが置いていかれる。期限は場所ごとに
 // 違う（実行前チェックの中は短く、ユーザが打つ操作は長く）ので呼び手が渡す。
 func Run(cwd string, args []string, o Options) Done {
+	// 処理全体の期限があれば、残りに合わせて 1 回の期限を縮める。
 	if !o.Deadline.IsZero() {
 		if Expired(o.Deadline) {
 			return Done{Code: 1, Failure: failure{text: "期限不足", kind: errTimeout}}
 		}
 		o.Timeout = min(o.timeout(), time.Until(o.Deadline)-deadlineMargin)
 	}
+	// 起こせたか（fail）と git の終わり方（code）は別に返す。起こせなかったときの Code は 1。
 	code, out, errOut, fail := start(cwd, args, o)
 	if fail != nil {
 		return Done{Code: 1, Failure: fail}
@@ -229,6 +231,7 @@ func start(cwd string, args []string, o Options) (int, []byte, []byte, error) {
 	if fail := checkDir(cwd); fail != nil {
 		return 1, nil, nil, fail
 	}
+	// 先頭に -c core.quotePath=false を足す。足さないと、非 ASCII のパスが "\343..." の形で返る。
 	full := args
 	if o.RawPaths {
 		full = append(append([]string(nil), rawPathsArgs...), args...)
@@ -242,6 +245,7 @@ func start(cwd string, args []string, o Options) (int, []byte, []byte, error) {
 	}
 	cmd.Dir = cwd
 	cmd.Env = environ(o.PlainPathspecs)
+	// 子プロセスが孫に出力の口を渡したまま残ると Run が返らないので、終わったあとの待ちに上限を付ける。
 	cmd.WaitDelay = killedPipeWait
 	if o.input != nil {
 		cmd.Stdin = strings.NewReader(*o.input)
@@ -251,11 +255,13 @@ func start(cwd string, args []string, o Options) (int, []byte, []byte, error) {
 	var out, errOut bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errOut
 	err := cmd.Run()
+	// 期限切れで殺されたときは終了コードを見ず、期限切れの理由にする。
 	if ctx.Err() == context.DeadlineExceeded {
 		return 1, nil, nil, timedOut(full, timeout)
 	}
 	var exit *exec.ExitError
 	switch {
+	// ErrWaitDelay は git 自身は終わっていて、出力の口の待ちだけが上限に達したこと。結果は有効。
 	case err == nil, errors.Is(err, exec.ErrWaitDelay):
 		return 0, out.Bytes(), errOut.Bytes(), nil
 	case errors.As(err, &exit):
@@ -264,7 +270,7 @@ func start(cwd string, args []string, o Options) (int, []byte, []byte, error) {
 	return 1, nil, nil, startFailure(err)
 }
 
-// timedOut は subprocess.TimeoutExpired の文（`Command '['git', ...]' timed out after 2.0 seconds`）。
+// timedOut は期限切れの理由の文（`Command '['git', ...]' timed out after 2.0 seconds`）。
 func timedOut(args []string, timeout time.Duration) error {
 	command := make([]any, 0, len(args)+1)
 	command = append(command, program)
@@ -275,8 +281,8 @@ func timedOut(args []string, timeout time.Duration) error {
 	return failure{text: text, kind: errTimeout}
 }
 
-// checkDir は作業ディレクトリへ移れるかを先に見る。Python の subprocess は無い作業ディレクトリを
-// git が無いのと同じ FileNotFoundError で返す（空の名前も無いものになる）。Windows は名前が無効の 267。
+// checkDir は作業ディレクトリへ移れるかを先に見る。無い作業ディレクトリは、
+// git が無いのと同じ「無い」エラーにそろえる（空の名前も無いものとして扱う）。Windows は名前が無効の 267。
 func checkDir(cwd string) error {
 	info, err := os.Stat(cwd)
 	if err == nil && info.IsDir() {
@@ -304,7 +310,7 @@ func checkDir(cwd string) error {
 // errorDirectory は Windows の ERROR_DIRECTORY（作業ディレクトリの名前が無効）。
 const errorDirectory = 267
 
-// startFailure は起こせなかった理由。Python は起こす名前（"git"）を付けて言う（Windows は付けない）。
+// startFailure は起こせなかった理由。文には起こす名前（"git"）を付ける（Windows は付けない）。
 func startFailure(err error) error {
 	var errno syscall.Errno
 	if !errors.As(err, &errno) {

@@ -73,7 +73,7 @@ func readError(err error) string {
 	return err.Error()
 }
 
-// reported は報告済みの記録。baseline は起動時（か初回）の基準を持つか、announced は起動時の変更をもう伝えたか。
+// reported は報告済みの記録。baseline は起動時（か初回）の基準を取ってあるか、announced は起動時の変更をもう伝えたか。
 type reported struct {
 	keys      map[string]bool
 	baseline  bool

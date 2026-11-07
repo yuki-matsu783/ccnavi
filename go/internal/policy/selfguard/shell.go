@@ -14,24 +14,25 @@ import (
 	"ccnavi/internal/infra/tree"
 )
 
-// シェルからの書き込みを止める式の部品。式はルールの regex として rules（pyre）が Python の re と同じ答えで読み、
-// 大文字小文字を区別せずに当てる。Python の selfguard_shell と 1 字も違わない式を組む（python_test.go が写しと突き合わせる）。
+// シェルからの書き込みを止める式の部品。式はルールの regex として rules（pyre）が読み、
+// 大文字小文字を区別せずに当てる。式の文字列は 1 字でも変わると止まる範囲が変わるので、写しの見本（testdata）と突き合わせる。
 //
 // 書き込みの形と場所は組でヒットする。場所の名前が出ただけ（cat・git add）では止めない。
-// shell.Read が語を空白で、コマンドを Sep で、引用がつないだ空白を WordSep で区切って渡すので、語の並びを式で読める。
-// 読み違えの向きは止まる側に倒す。照合の手数が長さに比例するよう、割り方が 1 通りに決まる形
-// （`(?>...)` で決め打ち・語の頭の文字を並びと取り合わない）で書く。後読みは使わない。ルールの regex が受け付けないからである。
+// shell.Read が語を空白で、コマンドを Sep（`\x00`）で、引用がつないだ空白を WordSep（`\x01`）で区切って渡すので、
+// 語の並びを式で読める。読み違えたときは、止める側に倒す。
+// 照合の手数が長さに比例するよう、割り方が 1 通りに決まる形で書く（`(?>...)` で決め打ちし、語の頭の文字を並びと取り合わない）。
+// 後読みは使わない。ルールの regex が受け付けないため。
 
-// NotAWord は語に入らない目印（コマンドの切れ目と語の中の切れ目）。re.escape はどちらも変えない。
+// NotAWord は語に入らない目印（コマンドの切れ目と語の中の切れ目）。pyre.Escape はどちらも変えない。
 const NotAWord = shell.Sep + shell.WordSep
 
 const (
-	// redirect はリダイレクトの行き先の語。適用し始めは `>` の並びの頭だけ、行き先の語は `>` `|` `&` で始めず、
+	// redirect はリダイレクトの形と行き先の語。`>` の並びは頭から読み始める。行き先の語は `>` `|` `&` で始めず、
 	// 語の頭と終わりに目印を置かせない（引用の中の `> 場所` を書き込みと読まない）。
 	redirect = `(?:^|[^>|&])[|&]*>[>|&]* ?` +
 		`(?:[^ ` + NotAWord + `>|&](?:[^ \x00]*[^ ` + NotAWord + `])?)?`
 	verbWrite = `(^|\x00)(mv|rm|tee|dd|truncate|patch|shred)\b[^\x00]*`
-	// sedWrite は最初の `-i` で決め打ちする。しないと `-i` が出るたびに末尾まで読み直す（#241）。
+	// sedWrite は最初の `-i` で決め打ちする。しないと `-i` が出るたびに末尾まで読み直し、手数が長さの 2 乗に増える。
 	sedWrite = `(^|\x00)sed\b(?>[^\x00]*?[ \x01](-[A-Za-z]*?i|--i))[^\x00]*`
 	// WriteVerbs は場所の前に置く書き込みの形（リダイレクト・名指しを書き換えるコマンド・sed -i）。
 	WriteVerbs = `(` + redirect + `|` + verbWrite + `|` + sedWrite + `)`
@@ -124,7 +125,7 @@ func Under(directory string) string { return `(?:[^ \x00]*[\\/])?` + directory }
 
 // HolderRegex は、守るものが入っているディレクトリを行き先にした cp・ln・install・mv にヒットする式。元の側に names の語か、
 // 名前の決まらない語（namedOnly なら数えない）があるときだけヒットする。行き先は `-t` の値か、選択肢でない最後の引数。
-// 元の語は最初に見つかったもので決め打ちする。ヒットしない長い並びで読み直さないためである。
+// 元の語は最初に見つかったもので決め打ちする。ヒットしない長い並びで読み直さないため。
 func HolderRegex(directory, names string, namedOnly bool) string {
 	source := `(?:` + head + `(?:` + names + `)[\\/]*|` + unknown + `)`
 	flag := `|` + noTargetFlag
@@ -184,7 +185,7 @@ func shellWriteRegex(binPath string, extra []triple, moved []holder) string {
 	return strings.Join(forms, "|")
 }
 
-// ShellRegex は、この設定で組んだ、シェルから守る場所へ書き込む形（Python の guard_shell_regex）を返す。実行前の保護（AddRules）と
+// ShellRegex は、この設定で組んだ、シェルから守る場所へ書き込む形を返す。実行前の保護（AddRules）と
 // 組み込みの既定（builtin）が同じものを取る。片方だけ空の設定で組むと、動かした ccnavi ディレクトリや実行ファイルが、
 // ルールファイルの壊れた間だけ守られなくなる。commonFiles は共通レイヤーの 3 本（CommonLayerFiles）。
 func ShellRegex(root, binPath, projectHome string, commonFiles []string) string {
@@ -227,7 +228,7 @@ func homeName(projectHome string) string {
 	return strings.Trim(ospath.Slashed(projectHome), "/")
 }
 
-// escapedParts は "/" で割った空でない節を re.escape する。
+// escapedParts は "/" で割った空でない節を、pyre.Escape で式の字として読めるようにする。
 func escapedParts(name string) []string {
 	var out []string
 	for _, p := range strings.Split(name, "/") {
@@ -336,7 +337,7 @@ func pathParts(path string) []string {
 	return out
 }
 
-// splitSeps は re.split(r"[\\/]", path)（空の節も残す）。
+// splitSeps はパスを `/` と `\` の両方で割る（空の節も残す）。
 func splitSeps(path string) []string {
 	return strings.Split(ospath.Slashed(path), "/")
 }
@@ -360,6 +361,7 @@ func movedHolders(root, projectHome string, commonFiles []string) []holder {
 	var found []holder
 	top := slices.Clone(rootNames)
 	ranked := []string{homeName(projectHome)}
+	// 1. 共通レイヤー。ルートの下なら相対を ranked に足し、外なら書かれた表記と行き着く先の組を作る。
 	for _, path := range commonFiles {
 		if path == "" {
 			continue
@@ -379,7 +381,8 @@ func movedHolders(root, projectHome string, commonFiles []string) []holder {
 			}
 		}
 	}
-	// ccnavi ディレクトリの下は、行き先がそこなら名前を問わずに止まる（場所の表記）。いちばん上の名前だけ足す。
+	// 2. ranked の各パスを、段ごとの組にする。ccnavi ディレクトリの下は、行き先がそこなら名前を問わずに止まる
+	//（場所の表記）ので、組は作らず、いちばん上の名前だけ top に足す。
 	homes := []string{}
 	for _, h := range []string{pyfmt.Lower(homeName(projectHome)), config.DefaultProjectHome} {
 		if h != "" && !slices.Contains(homes, h) {
@@ -405,6 +408,7 @@ func movedHolders(root, projectHome string, commonFiles []string) []holder {
 			found = append(found, holder{Under(joinEscaped(parts[:k])), pyre.Escape(parts[k])})
 		}
 	}
+	// 3. ルートを指す行き先（`.` とルートの絶対パス）と top の名前で、ルートの組を作る。
 	where := []string{`\.`}
 	if root != "" {
 		for _, b := range sortedSet(ospath.Realpath(root), ospath.Abspath(root)) {
@@ -448,7 +452,7 @@ func commonShellClause(root, path string, f form) string {
 }
 
 // commonLayerRegex は共通レイヤーの 3 本を、名指しのツール（解決済みの絶対パス）に当てる式。ルートの下なら、ワークスペースと
-// そこから切ったワークツリーの同じ相対に当てる。統合で統合先の設定になる経路があるためである。
+// そこから切ったワークツリーの同じ相対に当てる。統合で統合先の設定になる経路があるため。
 func commonLayerRegex(root string, commonFiles []string) string {
 	var bases []string
 	if root != "" {
@@ -562,7 +566,7 @@ func GitDirShellRegex() string {
 const (
 	// RedirectLimit は、生の文字列（読み切れなかった Bash と PowerShell）に、シェルから書き込む形の保護を当ててよい `>` の個数の
 	// 上限。生の文字列では引用の中の `>` にも当たるので、手数が `>` の個数 × 語の長さになる。超えたら照合を飛ばし、権限モードに
-	// 依らず拒否にする。判定の期限を超えると、理由も案内も返せないためである。`>>` も `2>&1` も文字の数で数える。
+	// 依らず拒否にする。判定の期限を超えると、理由も案内も返せないため。`>>` も `2>&1` も文字の数で数える。
 	RedirectLimit = 50
 	// RawLengthLimit は `>` を含む生の文字列の長さの上限。個数の上限だけでは尾の長さを止められない（#241）。
 	RawLengthLimit = 100_000
@@ -574,7 +578,7 @@ func TooManyRedirects(subject string) bool {
 	return count > RedirectLimit || (count > 0 && utf8.RuneCountInString(subject) > RawLengthLimit)
 }
 
-// sortedSet は sorted({a, b})。
+// sortedSet は a と b を昇順に並べる（同じなら 1 つ）。式の並びが実行のたびに変わらないようにする。
 func sortedSet(a, b string) []string {
 	if a == b {
 		return []string{a}
@@ -585,7 +589,7 @@ func sortedSet(a, b string) []string {
 	return []string{a, b}
 }
 
-// unique は dict.fromkeys（最初に出た順で重なりを除く）。
+// unique は最初に出た順を保って、重なりを除く。
 func unique[T comparable](items []T) []T {
 	var out []T
 	seen := map[T]bool{}

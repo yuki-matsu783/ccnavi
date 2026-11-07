@@ -95,6 +95,7 @@ func (j *judgement) refuse(verdict rules.Decision, parts []string, o refusal) (i
 	if verdict == rules.Deny {
 		streak = FailStreakHint(j.conf, j.root, record.Session, record.Agent)
 	}
+	// dry-run は通すのが基本だが、ゲートなど dry-run でも止める種類（holds）は強制する。止めた回には、dry-run でも止めたと文に添える。
 	holds := config.HoldsInDryRun(o.kind)
 	if j.mode == config.DryRun && holds {
 		reason += pyfmt.ParagraphBreak + dryRunHoldsNote
@@ -115,6 +116,7 @@ func (j *judgement) refuse(verdict rules.Decision, parts []string, o refusal) (i
 		return config.ExitOK, writePass(j.stdout, text, o.updated)
 	}
 
+	// ここから先は実際に止める・聞く回。記録の Enforced を真にし、deny の繰り返しと失敗の連続を数えて文に足す。
 	record.Decision, record.Enforced = decision, true
 	if verdict == rules.Deny {
 		if n := tally.CountDeny(j.conf.State, record); n >= tally.DenyThreshold(j.conf.DenyRepeat) {
@@ -128,6 +130,7 @@ func (j *judgement) refuse(verdict rules.Decision, parts []string, o refusal) (i
 	if verdict == rules.Deny {
 		answer = hookio.Deny
 	}
+	// 入力の更新は、確認のときだけ添える。拒否に添えても実行されない。
 	r := hookio.PreToolUseResponse{Decision: answer, Reason: reason, Context: o.context}
 	if verdict != rules.Deny {
 		r.UpdatedInput = o.updated

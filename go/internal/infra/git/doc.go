@@ -5,12 +5,10 @@
 // 読めなければ何も言わない）。聞く相手はローカルの git だけでネットワークへは出ない。git の管理から
 // 外れたファイル（.gitignore の中・ワークツリーの外）は見えない。
 //
-// Python からの対応: gitcmd と gitstate をまとめた。gitcmd.run → Run、run_until・output_until → Run に
-// Options.Deadline（期限が足りなければ Done.TimedOut）、output → Output、成功したときの out.strip() → Text、
-// DEADLINE_MARGIN・DEADLINE_FLOOR → deadlineMargin・deadlineFloor（足りるかは Expired。ゼロ値の期限は期限無し）、
-// gitstate.top_level → TopLevel、head → Head（期限は Options）。各モジュールの git の期限（TIMEOUT_SECONDS など）は
-// 目的ごとの DefaultTimeout・StateTimeout・RiskTimeout・ReviewTimeout・MergeTimeout・CleanupTimeout、文に出す sha の
-// 12 桁は ShortSHA。上の段が書いていた `merge-base --is-ancestor` → IsAncestor（NotAncestorCode）、
-// `status --porcelain` とそのフラグ → Status と Porcelain、`rev-list --count` の数の読み → Count、コミットが変えたパス（diff-tree --root）→ CommitPaths、
-// 2 つのツリーの差のパス → TreeDiffPaths、`rev-parse --verify <版>^{tree}` → TreeOf。
+// 起動は Run、標準出力だけ欲しいときは Output、成功したときの前後の空白を除いた文字列は Text。
+// 期限は Options.Deadline で渡す。残りが deadlineMargin・deadlineFloor に足りなければ起動せず Done.TimedOut を返す
+// （ゼロ値の期限は期限無し）。git の期限は目的ごとの DefaultTimeout・StateTimeout・RiskTimeout・ReviewTimeout・
+// MergeTimeout・CleanupTimeout で決め、文に出す sha の 12 桁は ShortSHA。
+// 状態の問い合わせは TopLevel・Head・IsAncestor（NotAncestorCode）・Status と Porcelain・Count・CommitPaths・
+// TreeDiffPaths・TreeOf。
 package git

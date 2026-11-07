@@ -447,8 +447,8 @@ func TestMoveAndUnlink(t *testing.T) {
 	}
 }
 
-// 理由の文は Python の str(exc) と同じ。
-func TestErrorTextMatchesPython(t *testing.T) {
+// 理由の文は `[Errno N] 説明: 'パス'` の形。
+func TestErrorTextMatchesExpected(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("strerror の文は Linux のもの")
 	}
@@ -468,8 +468,8 @@ func TestErrorTextMatchesPython(t *testing.T) {
 	}
 }
 
-// UTF-8 として読めないバイトの区切りと文は CPython と同じ。改行は "\n" にそろう。
-func TestDecodeMatchesPython(t *testing.T) {
+// UTF-8 として読めないバイトの区切りと文は CPython の UTF-8 の復号と同じ。改行は "\n" にそろう。
+func TestDecodeMatchesExpected(t *testing.T) {
 	cases := []struct {
 		in       string
 		err      string
@@ -601,7 +601,7 @@ func TestAppendLine(t *testing.T) {
 	}
 }
 
-// 期待値は Python の time.time()（ナノ秒を float にして 1e9 で割る）と datetime.fromtimestamp。
+// 期待値は、ナノ秒を float にして 1e9 で割った秒（time.time() の形）と、その秒からの時刻。
 func TestUnixSeconds(t *testing.T) {
 	cases := []struct {
 		at      time.Time
@@ -621,7 +621,7 @@ func TestUnixSeconds(t *testing.T) {
 			t.Errorf("FromUnixSeconds(%v) = %v, want %v", c.seconds, got, c.at)
 		}
 	}
-	// float(1700000000250000000) / 1e9 は 2 進で表せず、Python でも 1700000000.2499998 になる。
+	// float(1700000000250000000) / 1e9 は 2 進で表せず、1700000000.2499998 になる。
 	if got := UnixSeconds(time.Unix(1700000000, 250000000)); got != 1700000000.2499998 {
 		t.Errorf("UnixSeconds = %v", got)
 	}
@@ -630,7 +630,7 @@ func TestUnixSeconds(t *testing.T) {
 	}
 }
 
-// 期待は Python の json.dumps(d, ensure_ascii=…, indent=…)（+ "\n"）を open(path, "w", newline=…) で書いたもの。
+// 期待は json.dumps(d, ensure_ascii=…, indent=…) に "\n" を足し、改行の指定つきで書いたバイト列。
 func TestWriteJSONAs(t *testing.T) {
 	data := pyjson.NewObject("a", "日本", "b", []any{1, pyjson.NewObject()})
 	native := "\n"
@@ -661,7 +661,7 @@ func TestWriteJSONAs(t *testing.T) {
 	}
 }
 
-// 無い・空・中身あり・読めない（親がファイル）を分ける。Python の open(path, "rb") の FileNotFoundError と OSError。
+// 無い・空・中身あり・読めない（親がファイル）を分ける。「無い」と「読めない」を別のエラーで返す。
 func TestReadDiskBytes(t *testing.T) {
 	dir := t.TempDir()
 	empty := filepath.Join(dir, "empty")

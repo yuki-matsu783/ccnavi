@@ -131,6 +131,7 @@ func IsUserPrompt(in Input) bool {
 // 判定のキーになる欄と tool_input の文字列の欄は型を確かめて止め、残りの欄は型が違えば既定の値
 // （空の文字列・空のオブジェクト・偽）にする。
 func Decode(r io.Reader) (Input, error) {
+	// 1. 読めないバイトを U+FFFD に替えて文字列にし、空なら payload なしとして返す。
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return Input{}, err
@@ -147,6 +148,7 @@ func Decode(r io.Reader) (Input, error) {
 	if !ok {
 		return Input{}, unusable("", "payload がオブジェクトではない")
 	}
+	// 2. イベント名と文字列の欄は、型が違えば止める側に倒す（判定のキーを取り違えて通さないため）。
 	var event Event
 	switch v := obj.Value(keyEvent).(type) {
 	case string:
@@ -181,6 +183,7 @@ func Decode(r io.Reader) (Input, error) {
 			}
 		}
 	}
+	// 3. 判定に使わない残りの欄は、型が違えば既定の値にして続ける。
 	toolResponse, ok := obj.Value(keyToolResponse).(*pyjson.Object)
 	if !ok {
 		toolResponse = &pyjson.Object{}
@@ -207,7 +210,7 @@ func Decode(r io.Reader) (Input, error) {
 	}, nil
 }
 
-// text は Python の str(v or "")。
+// text は値を文字列にする。偽の値（無い・null・空など）は空文字。
 func text(v any) string {
 	if !pyfmt.Truthy(v) {
 		return ""
@@ -238,8 +241,8 @@ func hasItems(v any) bool {
 	return ok && len(items) > 0
 }
 
-// decodeReplace は bytes.decode("utf-8", errors="replace")。読めないバイトの並びは、
-// Python と同じく「正しく始まった並びの、読めた所まで」を 1 つの U+FFFD にする。
+// decodeReplace は UTF-8 として読めないバイトを U+FFFD に替える。読めないバイトの並びは、
+// 「正しく始まった並びの、読めた所まで」を 1 つの U+FFFD にする（Go の標準の替え方と数が違う）。
 func decodeReplace(data []byte) string {
 	if utf8.Valid(data) {
 		return string(data)

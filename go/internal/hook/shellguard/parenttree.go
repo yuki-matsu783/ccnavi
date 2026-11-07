@@ -80,9 +80,11 @@ func CheckParentTreeGit(conf *config.Settings, root, cwd, subject string, degrad
 		if cwd != "" {
 			where, known = callPlace(cwd, p, call.chdirs)
 		}
+		// 居場所を追えないときは、子のワークツリーか親のものか決められない。通すと親を書き換えられるので止める側に倒す。
 		if !known {
 			return first, unknownParent
 		}
+		// 書き換えるのは親のワークツリーのときだけ止める。子のワークツリーでのコミットや、親のブランチを取り込む merge は通す。
 		if name := worktreeName(root, where); name != "" && isParentTree(conf, root, name) {
 			return first, name
 		}

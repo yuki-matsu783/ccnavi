@@ -117,6 +117,8 @@ func DecidePreviewOf(conf *config.Settings, root, parentID string, number int, r
 // "resolves": [{key, thread_id}], "comment"}。書く順は issues、replies、resolves、changes のコミット、comment。
 // 続きの子（fix）の識別子は親のブランチ上の既存のチケットだけを見て決め、直す指摘も追加分も無ければマーカーを置く。
 func Decide(conf *config.Settings, root string, actor Actor, stamp, parentID string, number int, result host.Result, changed string, moved request.Moved, choices *pyjson.Object, shownDigest string, carry []string) (Decided, error) {
+	// 1. 決められる状態か（decision）と、ユーザに見せた内容（ダイジェスト・選択）が読めるか。
+	//    どれかが欠ければ、何も積まずに断る。
 	d, stop := decision(conf, root, parentID, number, result, changed, moved, carry)
 	if stop != nil {
 		return Decided{Checked: Checked{Problems: stop.problems, Code: string(stop.code)}, PendingExtra: []string{}}, nil
@@ -132,6 +134,7 @@ func Decide(conf *config.Settings, root string, actor Actor, stamp, parentID str
 		}
 		return refusedDecided(codeDecideChoices, []string{"ccnavi: 選択は {キー: " + strings.Join(names, " / ") + "} の形で渡してください"}, nil), nil
 	}
+	// 2. 受け入れ済みの指摘と、見せた内容が今の状態と合うか。見せたあとに指摘が変わっていれば、積まずに断る。
 	// 受け入れ済みのキーは、ホストの結果で解決済みでなければならない（取り直した実状態で確かめる）。
 	byKey := map[string]host.Thread{}
 	for _, t := range result.Threads {
@@ -148,6 +151,7 @@ func Decide(conf *config.Settings, root string, actor Actor, stamp, parentID str
 		mismatch := pyjson.NewObject("digest", pyjson.NewObject("expected", shownDigest, "current", decide.Digest(d)), "changed", differs)
 		return refusedDecided(codeDecideMismatch, []string{"ccnavi: 見せた指摘と今の指摘が違います。何も積んでいません"}, mismatch), nil
 	}
+	// 見せた指摘だけを決める対象にする。見せたあとに増えた未解決の指摘は Extra に回し、今回は決めない（レビュー済みにはならない）。
 	var kept []host.Thread
 	for _, t := range d.Unresolved {
 		if _, seen := shown.Versions[host.ThreadKey(t)]; seen {
@@ -160,6 +164,8 @@ func Decide(conf *config.Settings, root string, actor Actor, stamp, parentID str
 	if !sameKeySet(choices.Keys(), shown.Keys) {
 		return refusedDecided(codeDecideChoices, []string{"ccnavi: 選択が見せた指摘と揃っていません（足りないか、余分があります）"}, nil), nil
 	}
+	// 3. 選択ごとに指摘を分け、件数と受け入れの始め方を確かめる。
+	//    carry（受け入れ済み）の指摘は、もう書いてあるので書き直さない。
 	picked := map[decide.Choice][]host.Thread{}
 	for _, t := range d.Unresolved {
 		c := choiceOf(choices, host.ThreadKey(t))
@@ -179,6 +185,8 @@ func Decide(conf *config.Settings, root string, actor Actor, stamp, parentID str
 	if problem := host.AcceptPlanProblem(toWrite); problem != "" {
 		return refusedDecided(codeDecideThreadID, []string{"ccnavi: 受け入れを始められません: " + problem}, nil), nil
 	}
+	// 4. 直す指摘（fix）の操作の識別子は、指摘のキーと版から決める。同じ内容で打ち直せば同じ識別子になり、二重に起こさない。
+	//    続きの子を起こせるかは、積む前に確かめる。
 	parts := []string{opDecideFix, d.Parent.ID, strconv.Itoa(d.Phase.Number)}
 	var versions []string
 	for _, t := range fix {
@@ -197,6 +205,7 @@ func Decide(conf *config.Settings, root string, actor Actor, stamp, parentID str
 			return refusedDecided(codeDecideFollowup, []string{"ccnavi: 続きの子チケットを起こせない: " + problem}, nil), nil
 		}
 	}
+	// 5. 書き込みを溜める段に並べる。ここでは書かない（書くのは Writer）。時刻は 1 つに固定し、並べた全部で同じ値を使う。
 	stage, done, err := fsio.Staging()
 	if err != nil {
 		return Decided{}, err
@@ -285,6 +294,7 @@ type accepting struct {
 // レビュー待ちの子を動かす。直す指摘があれば続きの子を起こし（マーカーは置かない）、無くて追加分も無ければ
 // マーカーを置く。
 func stageDecision(stage *fsio.Stage, conf *config.Settings, root string, actor Actor, d *decide.Decision, picked map[decide.Choice][]host.Thread, children []*ticket.Ticket, items []string, fixOp string) (string, string, error) {
+	// 書き込みごとの失敗時の扱いを「止める」に決める。このあとに並べる書き込みが失敗したら、並べた分を戻して理由を返す。
 	restore := fsio.SetPolicy(func(po *fsio.Policy) {
 		po.OnFail, po.Ticket, po.Message, po.Prefix, po.Undo, po.Places = fsio.FailStop, "", "{reason}", "", nil, ""
 	})
@@ -295,6 +305,7 @@ func stageDecision(stage *fsio.Stage, conf *config.Settings, root string, actor 
 	for _, t := range append(slices.Clone(picked[decide.Keep]), picked[decide.Issue]...) {
 		accepted = append(accepted, host.ThreadKey(t))
 	}
+	// 1. レビュー待ちの子を done/ へ動かす。見せていない指摘（Extra）だけが残るときは、まだ動かさない。
 	if len(fix) > 0 || len(d.Extra) == 0 {
 		by := request.ByDecide
 		if via.Current() == via.Chrome {
@@ -308,6 +319,7 @@ func stageDecision(stage *fsio.Stage, conf *config.Settings, root string, actor 
 			stage.AddLine(request.MovedLine(conf, moved), 0, fsio.StreamOut)
 		}
 	}
+	// 2. 直す指摘があれば、続きの子を起こして終える（レビュー済みにはしない）。
 	if len(fix) > 0 {
 		followup, failed := approval.Followup(conf, root, parent, p.Number, children, items, io.Discard, fixOp)
 		if failed != "" {
@@ -316,9 +328,11 @@ func stageDecision(stage *fsio.Stage, conf *config.Settings, root string, actor 
 		stage.AddLine(decide.FollowupLine(conf, followup, p.Number, len(items)), 0, fsio.StreamOut)
 		return followup, "", nil
 	}
+	// 見せていない指摘が残るときは、レビュー済みのマーカーを置かない。
 	if len(d.Extra) > 0 {
 		return "", "", nil
 	}
+	// 3. どちらでもなければ、レビュー済みのマーカーを置く。マーカーの失敗は、接頭辞を付けて言う。
 	home, err := approval.HomeDir(conf, root, parent.ID, "", parent.Project)
 	if err != nil {
 		var noParent *approval.NoParentError

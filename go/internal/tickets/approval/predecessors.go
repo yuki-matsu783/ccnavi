@@ -88,7 +88,11 @@ func (h poolHit) state() PredState {
 	return PredState(h.t.State)
 }
 
-// PoolOf は、先行を引く対応表を組む。承認済みチケット（作業中・レビュー待ち・閉じた）は、どれも数える。todo/ の提案は、同じ識別子の承認済みチケットがどこにも無いときだけ数える。在れば、改版の候補か書き損じだからである。2 つ以上残れば、どれが正かが決まらない。手元の退避（logs/archive/）は PC ごとのもので答えが割れるので、読まない。
+// PoolOf は、先行を引く対応表を組む。
+// 承認済みチケット（作業中・レビュー待ち・閉じた）は、どれも数える。
+// todo/ の提案は、同じ識別子の承認済みチケットがどこにも無いときだけ数える。在れば、改版の候補か書き損じのため。
+// 2 つ以上残れば、どれが正かが決まらない。
+// 手元の退避（logs/archive/）は PC ごとのもので答えが割れるので、読まない。
 func PoolOf(open, review, closed, proposals []*ticket.Ticket) Pool {
 	pool := Pool{}
 	for _, list := range [][]*ticket.Ticket{open, review, closed} {
@@ -105,7 +109,11 @@ func PoolOf(open, review, closed, proposals []*ticket.Ticket) Pool {
 	return pool
 }
 
-// AlignImported は、親子のチケットの先行を、その親のブランチ上のチケットで読み直す。Chrome は参照の閉包の親子のチケットから引くので、手元もそれに揃える。通る向きには読み替えない。厳しくする向きだけを読み替える。親子のチケットが決まらないとき、または親のワークツリーにその識別子が無いときは「決まらない」になる。親のワークツリーのチケットが 1 つで閉じていなければ、それを採る。閉じている、または 2 つ以上あるときは、元の答えのまま使う。
+// AlignImported は、親子のチケットの先行を、その親のブランチ上のチケットで読み直す。
+// Chrome は参照の閉包の親子のチケットから引くので、手元もそれに揃える。
+// 通る向きには読み替えず、厳しくする向きだけを読み替える。
+// 親子のチケットが決まらないとき、または親のワークツリーにその識別子が無いときは「決まらない」になる。
+// 親のワークツリーのチケットが 1 つで閉じていなければ、それを採る。閉じている、または 2 つ以上あるときは、元の答えのまま使う。
 func (pool Pool) AlignImported(conf *config.Settings, root string) {
 	fams := standing.NewFamilies(conf, root)
 	for ident, hits := range pool {
@@ -144,12 +152,14 @@ func (pool Pool) AlignImported(conf *config.Settings, root string) {
 // predecessorStates はこのチケットの先行のそれぞれの今。順序は predecessors の順（重ねて書いたものは 1 つ）。
 func predecessorStates(t *ticket.Ticket, pool Pool) []Predecessor {
 	var out []Predecessor
+	// predecessors に同じ識別子を重ねて書いても、1 つとして数える。
 	seen := map[string]bool{}
 	for _, ident := range t.Predecessors {
 		if seen[ident] {
 			continue
 		}
 		seen[ident] = true
+		// 自分自身・親は、待っても満たされないので、置き場を引く前に決める。
 		hits := pool[ident]
 		switch {
 		case ident == t.ID:
@@ -159,6 +169,7 @@ func predecessorStates(t *ticket.Ticket, pool Pool) []Predecessor {
 			out = append(out, Predecessor{Ticket: ident, State: predAncestor})
 			continue
 		}
+		// 1 つに決まり、まだ閉じていない先行だけ、自分に戻る循環を調べる。閉じた先行はそこで循環が切れる。
 		if len(hits) == 1 && hits[0].state() != predDone {
 			if loop := loopBack(t.ID, ident, pool); loop != nil {
 				out = append(out, Predecessor{ident, predCycle, strings.Join(append([]string{t.ID}, loop...), " → ")})
@@ -166,6 +177,7 @@ func predecessorStates(t *ticket.Ticket, pool Pool) []Predecessor {
 			}
 		}
 		switch {
+		// 置き場の引き当ての結果で状態を決める。無い・属する親子が決まらない・複数の場所にある、のどれでもなければ、1 つの置き場の状態。
 		case len(hits) == 0:
 			out = append(out, Predecessor{Ticket: ident, State: predMissing})
 		case len(hits) == 1 && hits[0].undecided != "":
@@ -222,7 +234,7 @@ func loopBack(origin, first string, pool Pool) []string {
 	return nil
 }
 
-// UnmetPredecessors は満たしていない先行。子だけが先行を持つ。
+// UnmetPredecessors は満たしていない先行。先行を書けるのは子だけ。
 func UnmetPredecessors(t *ticket.Ticket, pool Pool) []Predecessor {
 	if !t.IsChild() {
 		return nil
@@ -236,7 +248,10 @@ func UnmetPredecessors(t *ticket.Ticket, pool Pool) []Predecessor {
 	return out
 }
 
-// PredecessorProblems は、承認を通さない先行の苦情を返す。先行が閉じれば同じ提案が通るもの（承認待ち・作業中・レビュー待ち）は rules.KindNotYet にする。--lint は warn で言う。取り消し・自分自身・親・循環・決まらない・どこにも無い・複数の場所、は待っても満たさないので error にする。approvedRel は承認済みの置き場で、文に出す。
+// PredecessorProblems は、承認を通さない先行の苦情を返す。
+// 先行が閉じれば同じ提案が通るもの（承認待ち・作業中・レビュー待ち）は rules.KindNotYet にする。--lint は warn で言う。
+// 取り消し・自分自身・親・循環・決まらない・どこにも無い・複数の場所は、待っても満たされないので error にする。
+// approvedRel は承認済みの置き場で、文に出す。
 func PredecessorProblems(t *ticket.Ticket, pool Pool, approvedRel string) []rules.Problem {
 	var out []rules.Problem
 	for _, p := range UnmetPredecessors(t, pool) {

@@ -186,7 +186,7 @@ func Waiting(proposals, approved, closed, review []*ticket.Ticket) (pending, rev
 }
 
 // PreviewBody は --preview --json の本体（--verify --json も同じものに答えを足して返す）。plans は承認の対象に
-// 入った計画を持つ親の図の中身で、--plan-order <親> --json と同じ関数で作る（--order は渡さない）。digest は
+// 入った計画がある親の図の中身で、--plan-order <親> --json と同じ関数で作る（--order は渡さない）。digest は
 // ProposalsDigest（承認のとき照合する）。
 func PreviewBody(conf *config.Settings, root string, g *Gathered, digest string) *pyjson.Object {
 	var parents []planedit.Parent

@@ -277,8 +277,8 @@ func firstCases(e *Entry) Variants {
 	return v
 }
 
-// 誤りのある文面を、Python の texts.check_text の答えの写し（testdata）と突き合わせる（苦情の文と、採る件）。
-func TestCheckTextAgainstPython(t *testing.T) {
+// 誤りのある文面を、CheckText の答えの見本（testdata）と突き合わせる（苦情の文と、採る件）。
+func TestCheckTextMatchesGolden(t *testing.T) {
 	entries := []string{
 		"  deny_x: {kind: deny}",
 		"  FOO_X: {kind: deny}",

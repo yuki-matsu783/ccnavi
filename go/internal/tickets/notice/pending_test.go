@@ -83,7 +83,7 @@ func landedWorkspace(t *testing.T) string {
 	return root
 }
 
-func TestPendingIntegrateMatchesPython(t *testing.T) {
+func TestPendingIntegrateMatchesGolden(t *testing.T) {
 	roots := map[string]string{"many": pendingWorkspace(t), "landed": landedWorkspace(t), "empty": workspace(t)}
 	braces := filepath.Join(roots["many"], "a{b}c{0}")
 	want := golden.Load[map[string]any](t, "pending")

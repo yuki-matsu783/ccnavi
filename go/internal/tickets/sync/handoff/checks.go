@@ -173,6 +173,7 @@ func ruleRows(raw []byte) (map[ruleKey][]string, bool) {
 	if raw == nil {
 		return map[ruleKey][]string{}, true
 	}
+	// ファイルが無い（nil）か空なら、ルールは 0 件として読める。形が違うもの（UTF-8 でない・YAML でない・最上位がマッピングでない）は読めない。
 	text := string(yaml.TrimBOM(raw))
 	if !utf8.Valid([]byte(text)) {
 		return nil, false
@@ -189,6 +190,8 @@ func ruleRows(raw []byte) (map[ruleKey][]string, bool) {
 		return nil, false
 	}
 	rows := map[ruleKey][]string{}
+	// 判定（deny・ask・allow）ごとに、ルール 1 件を (判定, id) の行にする。id が無いルールは、中身（キーを並べた JSON）を id の代わりにする。
+	// 同じキーが複数あっても数えられるよう、中身は並びで持つ。
 	for _, decision := range decisions {
 		value := m.Get(decision)
 		if !pyfmt.Truthy(value) {
@@ -228,6 +231,7 @@ func defenseChange(current, raw []byte) string {
 	if !ok1 || !ok2 {
 		return msgRulesUnread
 	}
+	// 1. 前後どちらかにある (判定, id) を集め、判定 → id の順に並べて比べる。
 	keys := map[ruleKey]bool{}
 	for k := range before {
 		keys[k] = true
@@ -245,6 +249,7 @@ func defenseChange(current, raw []byte) string {
 		}
 		return ordered[i].id < ordered[j].id
 	})
+	// 2. 動いた行のうち防御の記述にあたるものを集める。guard- で始まる id は大文字小文字を畳んで見る。deny は、今あるものが消える・変わるときだけ数える。
 	var moved []string
 	for _, k := range ordered {
 		b, inBefore := before[k]
@@ -300,6 +305,7 @@ func checkTemplate(conf *config.Settings, root string, e *Entry, together []*Ent
 	if t == nil {
 		return
 	}
+	// 取り込んだあとの設定（phases.yml の下書きを差し替えたもの）で型を検査する。同じ回に phases.yml の下書きがあれば、足した型も使える。
 	types := templates.TypesFor(overlay(conf, together), root, e.layer)
 	said(e, templates.Check(t, types, catalog))
 	// コメントなど、読んだ中身に出ない場所の文字も見る（CRLF の改行は差分が見せる）。
@@ -327,6 +333,8 @@ type rivalBody struct{ rel, text string }
 // templateCollisions は、取り込むと共通とレイヤーに同名で中身の違うものが並ぶ形になるなら断る（統合結果は
 // その形のレイヤーの側を使わない error にする）。比べる相手は、同じ回に取り込む下書きを優先し、無ければ今の置き場のもの。
 func templateCollisions(conf *config.Settings, root string, e *Entry, t *templates.Template, together []*Entry) {
+	// 同名のテンプレートが共通とレイヤーに並んで中身が違うと、統合結果がレイヤーの側を使わない error になる。
+	// 名前は大文字小文字を畳んで比べる。比べる相手は、同じ回に取り込む下書き → 今の置き場の順に優先する。
 	mine := templates.Dump(t)
 	name := FoldPart(t.Name)
 	others := map[rivalKey]rivalBody{}
@@ -408,7 +416,7 @@ func shSyntax(path string) string {
 	return ""
 }
 
-// decodeReplace は bytes.decode("utf-8"（sig なら "utf-8-sig"）, errors="replace")。改行は読み替えない。
+// decodeReplace は UTF-8 として読み、不正なバイトは置換文字にする（sig なら先頭の BOM を外す）。改行は読み替えない。
 // fsio.Decode は改行をそろえるので、CR（ASCII なので並びの途中に来ない）で切って復号し、つなぎ直す。
 func decodeReplace(raw []byte, sig bool) string {
 	if sig {
@@ -418,5 +426,5 @@ func decodeReplace(raw []byte, sig bool) string {
 	return text
 }
 
-// DraftText は下書きの本文を、そのまま見せる形の文字列にする（bytes.decode("utf-8-sig", errors="replace")）。
+// DraftText は下書きの本文を、そのまま見せる形の文字列にする（BOM を外し、不正なバイトは置換文字にする）。
 func DraftText(raw []byte) string { return decodeReplace(raw, true) }

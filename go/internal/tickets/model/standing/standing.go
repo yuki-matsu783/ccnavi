@@ -194,7 +194,7 @@ func SameTree(a, b string) bool {
 	return a != "" && b != "" && pathcase.SameNorm(a, b)
 }
 
-// Guidance は止めたときの解き方（1 行ずつ）。文は種別ごとに文面ファイルが持つ。呼び手は行の途中や hint の値にも
+// Guidance は止めたときの解き方（1 行ずつ）。文は種別ごとに文面ファイルに置く。呼び手は行の途中や hint の値にも
 // 使うので、見出し（次: ）は外して文だけを返す。
 func Guidance(root string, st Standing) []string {
 	kind := st.kind

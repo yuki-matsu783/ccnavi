@@ -51,7 +51,7 @@ func relSlashed(root, path string) string {
 	return ospath.Slashed(path)
 }
 
-// frontText は frontmatter の欄を Python の str(front.get(key) or "").strip() の形で読む。
+// frontText は frontmatter の欄を文字列で読む。値が無い・偽（空・0 など）なら空、それ以外は文字列にして前後の空白を除く。
 func frontText(value any) string {
 	if !pyfmt.Truthy(value) {
 		return ""
@@ -67,6 +67,7 @@ func frontText(value any) string {
 // ブランチでは断らない。デフォルトブランチにチケットのファイルが残っているだけでは結び付くと読まない。置き場や
 // frontmatter を読めず決められないときは Unknown で、呼ぶ側は断る。
 func BaseBound(conf *config.Settings, root, mainRoot, branch string) (Bound, string) {
+	// 1. ワークスペース全体のチケット・提案に、ブランチの識別子と同じ名前があるか（識別子の衝突）。
 	ident := ids.BranchToID(branch)
 	home, ok := owner(conf, root, mainRoot)
 	if !ok {
@@ -84,9 +85,12 @@ func BaseBound(conf *config.Settings, root, mainRoot, branch string) (Bound, str
 			}
 		}
 	}
+	// 2. 取り込み先のリポジトリの退避に、同じ名前の親があるか。
 	if archived, ok := archive.ArchivedFields(root, home.Project, ident); ok && archived.Parent == "" {
 		return yes, "取り込み先のリポジトリの退避（ready 済み）に同じ名前の親がある"
 	}
+	// 3. 取り込み先のリポジトリの承認済みチケット（doing/・done/）の frontmatter を読み、branch: か識別子が一致するか。
+	// 置き場を読めない・frontmatter を読めないものが 1 つでもあれば、結び付かないとは言い切れないので Unknown にする（呼び手は断る）。
 	approved := conf.ApprovedDir(home.Root)
 	unsure := false
 	for _, state := range []place.State{place.Doing, place.Done} {

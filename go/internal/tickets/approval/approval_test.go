@@ -23,7 +23,7 @@ func parse(t *testing.T, text string) *ticket.Ticket {
 	return got
 }
 
-// scopeParent は範囲だけを変えた親（tests/ticket/test_scope_revision.py の見本）。
+// scopeParent は範囲だけを変えた親の見本。
 func scopeParent(t *testing.T, section string, globs ...string) *ticket.Ticket {
 	lines := []string{"---", "version: 1", "ticket: login", "title: ログイン", "plan: [research]"}
 	if len(globs) > 0 {

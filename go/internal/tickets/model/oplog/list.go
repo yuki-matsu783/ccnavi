@@ -57,7 +57,7 @@ func removeWhere(state string, drop func(id string, r *Record) bool) []string {
 // （親を閉じる片付け。ready が呼ぶ）。
 func RetireParent(state, parent string) []string {
 	if parent == "" {
-		// 親が空だと、親を持たない記録を全部消してしまう
+		// 親が空だと、親の無い記録を全部消してしまう
 		return nil
 	}
 	return removeWhere(state, func(_ string, r *Record) bool {

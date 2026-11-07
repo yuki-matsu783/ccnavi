@@ -32,7 +32,7 @@ type Thread struct {
 	Line      int
 	Body      string
 	CreatedAt string
-	// author は最初のコメントを書いたアカウント。GitLab から取得した結果だけが持つ。
+	// author は最初のコメントを書いたアカウント。GitLab から取得した結果にだけ入る。
 	author string
 	// LastComment* は最後のコメント（system note を除く）。受け入れた後に付いたコメント（再提起）を
 	// 見分けるために取る。取れなければ空。
@@ -52,7 +52,7 @@ type Review struct {
 	author      string
 }
 
-// MergeRequest は MR（PR）。Draft は sh が取得した結果だけが持つ（分からなければ nil）。
+// MergeRequest は MR（PR）。Draft は sh が取得した結果にだけ入る（分からなければ nil）。
 type MergeRequest struct {
 	Number int
 	URL    string
@@ -93,25 +93,29 @@ func isDecodeError(err error) bool {
 }
 
 // ResultOf は読んだ JSON の値から組む。Chrome 拡張は sh と同じ形の結果を組んで渡す。マップでない項目は
-// 読み飛ばし、値は Python の str()・int()・bool() と同じに整える。
+// 読み飛ばし、値は文字列・整数・真偽に整える。
 func ResultOf(data any) Result {
 	top, ok := data.(*pyjson.Object)
 	if !ok {
 		return Result{Error: msgNotMap}
 	}
+	// sh がホストから取れなかったときは error だけの JSON を渡す。その文をそのまま持ち帰る。
 	if e := top.Value("error"); pyfmt.Truthy(e) {
 		return Result{Error: pyfmt.Str(e)}
 	}
+	// 先頭の欄（ホスト・URL・作成時刻・作者）を読む。欄の型が違っても落とさず、文字列に整える。
 	r := Result{
 		Host:      Kind(text(top.Value("host"))),
 		URL:       text(top.Value("url")),
 		CreatedAt: text(top.Value("created_at")),
 		Author:    text(top.Value("author")),
 	}
+	// MR の番号が 0 や無しなら、MR は無いものとして nil にする。
 	if mr, ok := top.Value("mr").(*pyjson.Object); ok && pyfmt.Truthy(mr.Value("number")) {
 		number, _ := pyfmt.IntOf(mr.Value("number"))
 		r.MR = &MergeRequest{Number: number, URL: text(mr.Value("url")), Draft: boolean(mr.Value("draft"))}
 	}
+	// レビューのスレッドと、レビューの判定を順に読む。
 	for _, t := range objects(top.Value("threads")) {
 		line := 0
 		if v := t.Value("line"); pyfmt.Truthy(v) {
@@ -141,7 +145,7 @@ func ResultOf(data any) Result {
 	return r
 }
 
-// text は Python の str(v or "")。
+// text は値を文字列にする。偽の値（nil・空・0 など）は空文字列。
 func text(v any) string {
 	if !pyfmt.Truthy(v) {
 		return ""

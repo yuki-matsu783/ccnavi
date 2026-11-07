@@ -123,7 +123,7 @@ func contentDigest(raw []byte) string {
 	return digest.HexBytes(digest.SHA256, raw, 0)
 }
 
-// same は Python のバイト列の ==（None と b"" は違う）。
+// same はバイト列が同じか。nil（無い）と空は別物として扱う。
 func same(a, b []byte) bool {
 	return (a == nil) == (b == nil) && bytes.Equal(a, b)
 }
@@ -189,6 +189,7 @@ func Prepare(conf *config.Settings, root string, wanted []string) *Plan {
 		plan.Error = refused
 		return plan
 	}
+	// 1. 下書きを見つける。同じ取り込み先に下書きが 2 本あれば（綴りだけ違うものを含む）、どちらも断る。
 	count := map[string]int{}
 	for _, f := range found {
 		count[f.Key]++
@@ -201,6 +202,7 @@ func Prepare(conf *config.Settings, root string, wanted []string) *Plan {
 		read(conf, root, e)
 		plan.Entries = append(plan.Entries, e)
 	}
+	// 2. 取り込む対象を選ぶ。指定が無ければ、取り込み先と同じ中身のもの以外の全部。指定があれば、その下書きだけ（見つからない指定は全体の誤りにする）。
 	if len(wanted) == 0 {
 		for _, e := range plan.Entries {
 			e.Selected = e.State() != stateUnchanged
@@ -224,6 +226,7 @@ func Prepare(conf *config.Settings, root string, wanted []string) *Plan {
 			hit.Selected = true
 		}
 	}
+	// 3. 中身を検査し、差分を作る。
 	checkContents(conf, root, plan)
 	for _, e := range plan.Entries {
 		makeDiff(e)
@@ -241,6 +244,7 @@ func wantedKey(arg string) (string, string) {
 	if strings.HasPrefix(text, "/") || ospath.IsAbs(text) || ospath.HasDrive(text, true) {
 		return "", sprintf(msgAbsolute, line(arg))
 	}
+	// 区切りは `/` にそろえ、`.` と空の部分は捨てる。`..` が 1 つでもあれば置き場の外へ出るので断る。
 	var parts []string
 	for _, p := range strings.Split(text, "/") {
 		if p != "" && p != "." {
@@ -256,6 +260,7 @@ func wantedKey(arg string) (string, string) {
 		return "", sprintf(msgParent, line(arg))
 	}
 	key := Key(strings.Join(parts, "/"))
+	// 置き場の中のパス（wip/handoff/ 以下の下書きの綴り）で指定されたら、読み替えを戻して取り込み先のパスにする。
 	if rest, ok := strings.CutPrefix(key, Key(place.Handoff)+"/"); ok {
 		key = Key(names.FromDraft(rest))
 	}
@@ -354,7 +359,7 @@ func locateLayer(conf *config.Settings, root string, e *Entry) {
 
 func sprintf(format string, a ...any) string { return fmt.Sprintf(format, a...) }
 
-// line は空白をつぶして 1 行にする（Python の " ".join(str(v).split())）。
+// line は空白をつぶして 1 行にする（連続する空白は 1 つにそろえる）。
 func line(text string) string {
 	return ospath.Squeeze(text)
 }

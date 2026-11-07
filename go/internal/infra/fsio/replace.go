@@ -15,7 +15,7 @@ const (
 	tempMark   = ".part"
 )
 
-// 一意な部分（Python の tempfile と同じ字と長さ）。"." を含めると IsTempName が元の名前を取り違える。
+// 一意な部分（Python の tempfile と同じ字と長さの乱数）。"." を含めると IsTempName が元の名前を取り違える。
 const (
 	tempChars    = "abcdefghijklmnopqrstuvwxyz0123456789_"
 	tempLength   = 8

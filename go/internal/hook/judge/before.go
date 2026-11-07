@@ -217,7 +217,7 @@ func matchedLength(tool, subject string, inner []layer) int {
 
 // addGuards は組み込みの保護（設定ファイル・チケットの置き場・生の git・ユーザの判断の経路）をルールに足す。
 func addGuards(conf *config.Settings, root string, in hookio.Input, record *audit.Record, rs *rules.RuleSet, coreFilesOn bool) error {
-	// シェルから設定ファイルへ書く形を止める側。既定に戻った間は組み込みの既定が同じ形を持つので足さない
+	// シェルから設定ファイルへ書く形を止める側。既定に戻った間は組み込みの既定に同じ形が入っているので足さない
 	// （二重に当たると同じ話が 2 度返る）。名前で書くツールの 4 本は既定に無いので、既定の間も足す（AddRules の後）。
 	if record.Fallback != builtin.Fallback && coreFilesOn {
 		selfguard.AddRules(rs, selfguard.Options{
@@ -415,6 +415,12 @@ type viaLayer struct {
 
 // byRules はルールを deny・ask・allow の順に当て、ワークスペースルート直下へのシェルの書き込みとチケットの範囲を合わせて
 // 結論を返す。
+//
+// 処理フロー:
+//  1. 読み切れない文字列への照合に上限を掛けるか決める（capped）
+//  2. deny・ask・allow の順にルールを当て、最初に当たった区分の組を結論にする（期限を越えたら失敗側に倒す）
+//  3. ワークスペースルート直下への書き込みと、チケットの範囲を合わせる（強い側を採る）
+//  4. 文脈を集め、allow・渡す・止める・聞くのどれかで応答を書く
 func (j *judgement) byRules(ruleSet *rules.RuleSet, source rules.Origin, subject, bare string, inner []layer, notices []string,
 	target, dest *tree.Tree, index map[string]*ticket.Ticket, updated *pyjson.Object, deadline time.Time) (int, error) {
 	conf, root, in, record := j.conf, j.root, j.in, j.record
@@ -431,6 +437,7 @@ func (j *judgement) byRules(ruleSet *rules.RuleSet, source rules.Origin, subject
 		return slices.Contains(shellGuardRuleIDs, r.ID) && rules.ToolMatches(r.Match, tool)
 	})
 
+	// group は結論の区分で当たったルール。via は各ルールが元の形で当たったか（空）、中で実行される層で当たったか（その層）。
 	var verdict rules.Decision
 	var group []*rules.Rule
 	var via []viaLayer

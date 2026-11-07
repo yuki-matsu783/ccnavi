@@ -32,7 +32,7 @@ func phaseWith(number int, states []place.State, kinds ...marks.Kind) *Phase {
 	return p
 }
 
-// 開き直したフェーズの後続で、着手済みかレビュー済みのものだけを挙げる（Python の test_reopen_impact）。
+// 開き直したフェーズの後続で、着手済みかレビュー済みのものだけを挙げる。
 func TestDownstreamTouched(t *testing.T) {
 	waits := func(list []*Phase, w map[int][]int) []*Phase {
 		owner := &ticket.Ticket{ID: "p", Workflow: &ticket.Workflow{Waits: w}}
@@ -66,7 +66,7 @@ func item(kind string, after ...int) ticket.PlanItem {
 	return ticket.PlanItem{Type: kind, After: after}
 }
 
-// 全体計画が終わったときの案内は、合流の書き方と phases: の差し込みを言う（Python の test_feedback_order）。
+// 全体計画が終わったときの案内は、合流の書き方と phases: の差し込みを言う。
 func TestNextHintAfterTheLastPhaseAsksForTheFeedbackPlan(t *testing.T) {
 	root := testkit.RepoRoot(t)
 	parent := &ticket.Ticket{ID: "i0001", Plan: []ticket.PlanItem{item("design")}}
@@ -86,7 +86,7 @@ func TestNextHintAfterTheLastPhaseAsksForTheFeedbackPlan(t *testing.T) {
 	}
 }
 
-// 3 が先に閉じても、まだ子の無い 2 を次に始められるものとして挙げる（Python の test_phases_dag の NextHintTest）。
+// 3 が先に閉じても、まだ子の無い 2 を次に始められるものとして挙げる。
 func TestNextHintOffersAnEarlierBranchWithoutChildren(t *testing.T) {
 	owner := &ticket.Ticket{ID: "i0001", Plan: []ticket.PlanItem{item("design"), item("acceptance", 1),
 		item("implement", 1), item("docs", 2, 3)}}
@@ -118,7 +118,7 @@ func TestLater(t *testing.T) {
 		// 同じ瞬間を違う時差で書いたものは後ではない。
 		{"2026-01-02T00:00:00+09:00", "2026-01-01T15:00:00Z", false},
 		{"2026-01-02T00:00:01+09:00", "2026-01-01T15:00:00Z", true},
-		// 時差の有無が食い違う（Python は比べられずに TypeError）・読めないなら言わない側。
+		// 時差の有無が食い違う（比べられない）・読めないなら言わない側。
 		{"2026-01-03T00:00:00", "2026-01-02T00:00:00+09:00", false},
 		{"2026-01-03T00:00:00", "2026-01-02T00:00:00", true},
 		{"", "2026-01-02T00:00:00+09:00", false},
@@ -156,7 +156,7 @@ func TestManualLine(t *testing.T) {
 }
 
 // 手で動かした子の判定は、閉じた子の経路の記録と、置き場の重なりで分ける（git を使わない形だけ。git の形は
-// TestMatchesPython が見る）。
+// TestMatchesGolden が見る）。
 func TestAssessManualWithoutGit(t *testing.T) {
 	yes := true
 	reviewPhase := func(children ...*ticket.Ticket) *Phase {
@@ -229,8 +229,7 @@ func TestAssessManualWithoutGit(t *testing.T) {
 	}
 }
 
-// 親のワークツリーが別のブランチなら、そこにあるマーカーは読まず、終わりのマーカーも書かない
-// （Python の test_unsettled_home）。
+// 親のワークツリーが別のブランチなら、そこにあるマーカーは読まず、終わりのマーカーも書かない。
 func TestUnsettledParentFolderIsNeitherReadNorMarked(t *testing.T) {
 	root := testkit.Workspace(t, "i0001")
 	home := testkit.Worktree(root, "i0001")
@@ -256,7 +255,7 @@ func TestUnsettledParentFolderIsNeitherReadNorMarked(t *testing.T) {
 }
 
 // プロジェクト（projects/<名前>/）の親のワークツリーでは、プロジェクトの履歴と origin/<親のブランチ> で共有済みかを
-// 見る（Python の test_multi_project_gaps）。
+// 見る。
 func TestSharedReadsTheProjectHistory(t *testing.T) {
 	const parentID, childID = "feature-1-web-x", "feature-1-web-x-01-01"
 	root := testkit.Workspace(t)

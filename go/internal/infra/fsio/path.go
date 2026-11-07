@@ -145,8 +145,8 @@ func SafeName(text string, limit int) string {
 	return string(runes)
 }
 
-// SafeNameOr は SafeName で、空の識別子は fallback に代える（Python の safe_name(x) or fallback と
-// safe_name(x or fallback)。空でない識別子の SafeName は空にならないので、どちらも同じ答え）。
+// SafeNameOr は SafeName で、空の識別子は fallback に代える。
+// 空でない識別子の SafeName は空にならないので、先に代えても後に代えても同じ答え。
 func SafeNameOr(text, fallback string, limit int) string {
 	if text == "" {
 		text = fallback

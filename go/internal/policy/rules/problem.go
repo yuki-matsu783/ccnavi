@@ -23,7 +23,7 @@ type Problem struct {
 	Kind     string
 }
 
-// String は Python の str(Problem)。
+// String は苦情を `<重大度>: <ルール>: <内容>` の 1 行にする。ルールが無いときは (file) と書く。
 func (p Problem) String() string {
 	rule := p.Rule
 	if rule == "" {

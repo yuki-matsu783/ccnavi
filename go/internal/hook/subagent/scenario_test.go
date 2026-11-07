@@ -19,7 +19,7 @@ import (
 )
 
 // サブエージェントの始まりと終わりの一連の呼び出しを決めた形のワークスペースへ打ち、応答・終了コード・標準エラー・
-// 判定の記録・state に書いた印を、Go の答えの見本（Python と答えが揃っていた Go の答えから取った）と比べる。
+// 判定の記録・state に書いた印を、Go の答えの見本（答えが確かめ済みだった Go の出力から取った）と比べる。
 
 // step は 1 つの手順。op が write ならワークスペースにファイルを書き、call なら呼ぶ。
 type step struct {
@@ -257,7 +257,7 @@ func workspace(t *testing.T) string {
 	return root
 }
 
-func TestScenarioMatchesPython(t *testing.T) {
+func TestScenarioMatchesGolden(t *testing.T) {
 	wt := func(name string) string { return filepath.Join(".claude", "worktrees", name) }
 	call := func(kind, cwd, agent string) step { return step{Op: "call", Kind: kind, Cwd: cwd, Agent: agent} }
 	editor := func(cwd, agent string) step {

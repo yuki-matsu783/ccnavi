@@ -60,10 +60,10 @@ func TestReferenceBoundaries(t *testing.T) {
 		"x/#12":     "",
 		"#1234567":  "",
 		"#12a":      "",
-		"#12あ":      "", // Python の \w は Unicode
+		"#12あ":      "", // \w は Unicode の語の字
 		"(#12)":     "#12",
 		"##12":      "#12",
-		"#１２":       "#１２", // Python の \d は Unicode の 10 進の数字
+		"#１２":       "#１２", // \d は Unicode の 10 進の数字
 	}
 	for text, want := range cases {
 		start, end, ok := matchReference(text)

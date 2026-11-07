@@ -36,6 +36,7 @@ const (
 // RecordRisk は定性のリスク項目の判定を記録する（判断したのはサブエージェント、記録するのは親）。判定は子の HEAD に
 // 結ぶ。HEAD が動けば判定は使えず、閉じるときに取り直しになる。
 func RecordRisk(stdout, stderr io.Writer, conf *config.Settings, root, id, factorID, answer, reason string) int {
+	// 1. 入力の検査。判定は yes か no、根拠は必須、対象は子（判定は子の差分に付く）、項目は定性（judge）のもの。
 	answer = pyfmt.Lower(ospath.Strip(answer))
 	if answer != answerYes && answer != answerNo {
 		io.WriteString(stderr, "ccnavi: 判定は yes か no\n")
@@ -68,6 +69,7 @@ func RecordRisk(stdout, stderr io.Writer, conf *config.Settings, root, id, facto
 		fmt.Fprintf(stderr, "ccnavi: %s は定性の項目ではない（%s）。あるのは: %s\n", factorID, definition.Source, listed)
 		return 1
 	}
+	// 2. 子の今の HEAD と一緒に記録する。HEAD が進むと、判定は古くなったものとして扱われる。
 	worktree := tree.WorktreePath(root, id)
 	head := git.Head(worktree, git.Options{})
 	if head == "" {
@@ -79,6 +81,7 @@ func RecordRisk(stdout, stderr io.Writer, conf *config.Settings, root, id, facto
 		fmt.Fprintf(stderr, "ccnavi: 判定を記録できない: %s\n", err)
 		return 1
 	}
+	// 3. 子の判定の記録に、この項目を足す（ほかの項目は残す）。読めない記録は空から作り直す。
 	record, ok := marks.ReadRecord(where, found.Parent, id, marks.Judge)
 	if !ok {
 		record = pyjson.NewObject()
@@ -122,9 +125,12 @@ func projectOf(conf *config.Settings, root string, found *ticket.Ticket) string 
 	return found.Project
 }
 
-// scoreChild は、子の実績のリスクを数えて記録する。返すのは、閉じたあとに出す行（点と内訳）である。閉じられなければ偽を返し、理由は stderr に出す。親・単独・統合の子は測らない。
+// scoreChild は子の実績のリスクを数えて記録する。返すのは、閉じたあとに出す行（点と内訳）。閉じられなければ偽を返し、
+// 理由は stderr に出す。親・単独・統合の子は測らない。
 //
-// 数えるのは、子の仕事の始まり（取り込み直後の親の先頭と子の共通の祖先）から、子の先頭までである。着手の基準点から数えると、衝突を解くために子へ取り込んだ親の、ほかの子の変更が混ざってしまう。合流の途中なら、子の先頭の代わりに MERGE_HEAD まで数える。検査のあとに子が積んだコミットは、合流に載らないからである。
+// 数えるのは、子の仕事の始まり（取り込み直後の親の先頭と子の共通の祖先）から、子の先頭まで。着手の基準点から数えると、
+// 衝突を解くために子へ取り込んだ親の、ほかの子の変更が混ざる。合流の途中なら、子の先頭の代わりに MERGE_HEAD まで数える。
+// 検査のあとに子が積んだコミットは、合流に載らないため。
 func scoreChild(stderr io.Writer, conf *config.Settings, root string, found *ticket.Ticket) ([]string, bool) {
 	if !found.IsChild() || found.IsConsolidate() {
 		return nil, true
@@ -134,6 +140,7 @@ func scoreChild(stderr io.Writer, conf *config.Settings, root string, found *tic
 	if definition.Fallback != "" {
 		fmt.Fprintf(stderr, "ccnavi: %s\n", definition.Fallback)
 	}
+	// 1. 測る範囲（子の仕事の始まり..先頭）の差分を取る。
 	head := mergingHead(root, found)
 	if head == "" {
 		head = "HEAD"
@@ -155,6 +162,8 @@ func scoreChild(stderr io.Writer, conf *config.Settings, root string, found *tic
 		fmt.Fprintf(stderr, "ccnavi: リスクを記録できない: %s\n", err)
 		return nil, false
 	}
+	// 2. 定性の判定の記録を読み、配点を評価する。HEAD が今の差分と違う判定は古いので使わず、判定待ちに回る。
+	// 判定待ちがあれば、問いを書き出して閉じない。
 	judgements, ok := marks.ReadRecord(where, found.Parent, found.ID, marks.Judge)
 	if !ok {
 		judgements = pyjson.NewObject()
@@ -172,6 +181,7 @@ func scoreChild(stderr io.Writer, conf *config.Settings, root string, found *tic
 		askJudges(stderr, conf, root, found, diff, score.Pending, worktree)
 		return nil, false
 	}
+	// 3. 結果を記録する。高リスクのときの人間レビューの必須化は、閉じたあとの案内で言う。
 	record := score.Object()
 	record.Set("head", diff.Head)
 	record.Set("base", diff.Base)

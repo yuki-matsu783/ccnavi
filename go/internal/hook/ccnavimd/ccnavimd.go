@@ -96,6 +96,7 @@ func NameProblems(text string) []string {
 // 差し込みの名前、対の取れていない囲みを見る。名前の形は NameProblems が言う。
 func Problems(text string, scripts map[string]bool) []string {
 	var found []string
+	// 行を上から読み、囲み（if〜endif）の入れ子を elses の積み方で追う。開く行で積み、endif で降ろす。
 	var elses []bool // 囲みごとに、else を置いたか
 	for i, line := range ospath.Splitlines(text) {
 		number := i + 1
@@ -123,6 +124,7 @@ func Problems(text string, scripts map[string]bool) []string {
 		} else if directive.Search(line) {
 			found = append(found, fmt.Sprintf("%d 行目: ccnavi: の囲みは 1 行に 1 つ、単独で書く", number))
 		}
+		// 差し込みは囲みの種類に関わらず、どの行でも調べる。
 		for _, m := range substitution.FindAll(line) {
 			name, _ := m.Named("name")
 			if !known(name) {
@@ -171,6 +173,7 @@ func dedent(line string, depth int) string {
 // else はいちばん内側の囲みの真偽を反転する。外側が成り立たなければ、反転しても載らない。
 func render(text string, flags map[string]bool, values map[string]string) string {
 	var out []string
+	// stack は開いている囲みごとの真偽。全部が真の行だけ残す。
 	var stack []bool
 	for _, line := range ospath.Splitlines(text) {
 		if name, ok := opened(line); ok {
@@ -189,6 +192,7 @@ func render(text string, flags map[string]bool, values map[string]string) string
 			}
 			continue
 		}
+		// 開いている囲みのどれかが偽なら、この行は載せない。
 		if !all(stack) {
 			continue
 		}
@@ -203,6 +207,7 @@ func render(text string, flags map[string]bool, values map[string]string) string
 	}
 	var lines []string
 	for _, line := range out {
+		// 囲みを外した跡に空行が並ばないよう、続く空行は 1 つにし、先頭の空行は捨てる。
 		if ospath.Strip(line) == "" && (len(lines) == 0 || ospath.Strip(lines[len(lines)-1]) == "") {
 			continue
 		}

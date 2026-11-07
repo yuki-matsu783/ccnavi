@@ -138,6 +138,7 @@ func read(file, session string) *Outcome {
 	if !slices.Contains(kinds, kind) {
 		return nil
 	}
+	// 手で直された記録に備え、型の合わない欄が 1 つでもあれば記録ごと無かったことにする（nil）。半端に読んだ値で、結果を誤って確定させないため。
 	bounces, ok := intOf(data.Value(keyBounces))
 	if !ok {
 		return nil
@@ -151,6 +152,7 @@ func read(file, session string) *Outcome {
 		return nil
 	}
 	final := true
+	// final の欄が無い記録は確定済みとして読む。
 	if v, has := data.Get(keyFinal); has {
 		final = pyfmt.Truthy(v)
 	}
@@ -169,13 +171,13 @@ func read(file, session string) *Outcome {
 	}
 }
 
-// isText は Python の v == text（文字列のほかは等しくない）。
+// isText は、v が文字列で、text と等しいかどうか（文字列以外は等しくない）。
 func isText(v any, text string) bool {
 	s, ok := v.(string)
 	return ok && s == text
 }
 
-// str は Python の str(v or "")。
+// str は v を文字列にする。空とみなす値（nil・空文字・0・false など）は空文字にする。
 func str(v any) string {
 	if !pyfmt.Truthy(v) {
 		return ""
@@ -183,7 +185,7 @@ func str(v any) string {
 	return pyfmt.Str(v)
 }
 
-// intOf は Python の int(v or 0)。
+// intOf は v を整数にする。空とみなす値は 0。整数にできなければ false。
 func intOf(v any) (int, bool) {
 	if !pyfmt.Truthy(v) {
 		return 0, true
@@ -191,7 +193,7 @@ func intOf(v any) (int, bool) {
 	return pyfmt.IntOf(v)
 }
 
-// floatOf は Python の float(v or 0)。
+// floatOf は v を小数にする。空とみなす値は 0。小数にできなければ false。
 func floatOf(v any) (float64, bool) {
 	if !pyfmt.Truthy(v) {
 		return 0, true
@@ -203,7 +205,7 @@ func floatOf(v any) (float64, bool) {
 	return pyjson.Number(v, pyjson.BoolsAsNumbers)
 }
 
-// strs は Python の [str(p) for p in v or []]。文字列は 1 字ずつ、マップはキーを並べる。
+// strs は v の要素を文字列に直して並べる。空とみなす値は空の並び。文字列は 1 字ずつ、マップはキーを並べる。
 func strs(v any) ([]string, bool) {
 	if !pyfmt.Truthy(v) {
 		return []string{}, true

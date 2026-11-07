@@ -32,9 +32,11 @@ func (t *Ticket) home() string {
 // approved（同じ識別子の承認済みチケットの全部）が在れば、正とするツリーは承認済みチケットだけで決め（Authority）、
 // そのツリーの提案だけを残す。承認の前に切ったワークツリーに残った todo/ を承認待ちや改版と読まないため。
 func fold(hits, approved []*Ticket) []*Ticket {
+	// リポジトリをまたいだ衝突は、どちらが正か決めずに全部返す。
 	if len(approved) > 0 && projects(approved, hits) > 1 {
 		return hits
 	}
+	// 1. 承認済みチケットが無い（提案だけ）。親のツリーの側があればそれだけ、無ければ全部返す。
 	if len(approved) == 0 {
 		if projects(hits) > 1 || len(hits) == 0 {
 			return hits
@@ -51,6 +53,7 @@ func fold(hits, approved []*Ticket) []*Ticket {
 		}
 		return hits
 	}
+	// 2. 承認済みチケットがある。正とするツリーを承認済みだけで決め、そのツリーの提案だけを残す。決まらなければ全部返す。
 	where, ok := Authority(approved)
 	if !ok {
 		return hits

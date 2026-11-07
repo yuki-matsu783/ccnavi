@@ -29,8 +29,10 @@ func ParentStillBusy(stderr io.Writer, conf *config.Settings, root string, t *ti
 	return len(problems) > 0
 }
 
-// CloseProblems は、親を閉じられない理由を返す。空なら閉じてよく、マージに進んでもよい。ユーザが早めに閉じていれば、開いている子以外は問わない。raw は、呼び手が approval.ReadRaw で読んだ置き場である。読んでから動かしていないときだけ渡す。nil ならここで読む。
+// CloseProblems は、親を閉じられない理由を返す。空なら閉じてよく、マージに進んでもよい。ユーザが早めに閉じていれば、開いている子以外は問わない。
+// raw は、呼び手が approval.ReadRaw で読んだ置き場である。読んでから動かしていないときだけ渡す。nil ならここで読む。
 func CloseProblems(conf *config.Settings, root, parentID string, raw *approval.Raw) []string {
+	// 1. 開いている子（承認済みの doing/ などにある子）が残っていないか。
 	copies, _ := approval.Scan(conf, root, false, raw)
 	var open []string
 	for _, t := range copies {
@@ -41,6 +43,7 @@ func CloseProblems(conf *config.Settings, root, parentID string, raw *approval.R
 	if len(open) > 0 {
 		return []string{fmt.Sprintf("%s には開いている子がある（%s）。子を先に閉じてください", parentID, strings.Join(open, ", "))}
 	}
+	// 2. 早めに閉じる操作（close-early）の印があれば、残りの検査は通さない（残りを承知で閉じる操作のため）。
 	var home string
 	if own := approval.ByID(copies)[parentID]; own != nil {
 		home = approval.HomeDirRead(conf, root, parentID, "", own.Project)
@@ -50,6 +53,7 @@ func CloseProblems(conf *config.Settings, root, parentID string, raw *approval.R
 	if _, ok := marks.ReadFilledParent(home, parentID, marks.CloseEarly); ok {
 		return nil
 	}
+	// 3. 親の finish が求める条件。レビュー待ちのフェーズ、フィードバック計画（無くても `feedback: []` を承認済みにする）、終わっていないフェーズ。
 	var problems []string
 	if held := phase.HeldPhase(conf, root, parentID, raw); held != nil {
 		problems = append(problems, fmt.Sprintf("%s のフェーズ %s は%s。レビューを済ませてから", parentID, held.Label(), held.ReviewLabel()))
@@ -109,7 +113,8 @@ func DeliverablesInWip(conf *config.Settings, root string, t *ticket.Ticket) []s
 	return out
 }
 
-// DeliverablesMissing は、フェーズの最後の子を閉じる前に、定義の成果物が親か子のワークツリーで追跡されていなければ、その名前を言って真を返す。同じフェーズに作業中の別の子があれば、その子が成果物を出すかもしれないので通す。成果物は在って追跡されていることだけを見る。空でも在れば通る。
+// DeliverablesMissing は、フェーズの最後の子を閉じる前に、定義の成果物が親か子のワークツリーで追跡されていなければ、その名前を言って真を返す。
+// 同じフェーズに作業中の別の子があれば、その子が成果物を出すかもしれないので通す。成果物は在って追跡されていることだけを見る。空でも在れば通る。
 func DeliverablesMissing(stderr io.Writer, conf *config.Settings, root string, t *ticket.Ticket) bool {
 	pt := PhaseType(conf, root, t)
 	if pt == nil || len(pt.Deliverables) == 0 {
@@ -141,7 +146,8 @@ func DeliverablesMissing(stderr io.Writer, conf *config.Settings, root string, t
 	return true
 }
 
-// tracked は、この glob に当たる追跡済みのファイルが、ワークツリーにも 1 つでも在るかを返す。ls-files はインデックスを見るので、消したが git add していないもの（--deleted）は除く。名前は同じ読み方の 2 つの出力どうしで比べ、ファイルシステムには聞かない。非 UTF-8 の名前を置換文字で読んでも、食い違わないようにするためである。
+// tracked は、この glob に当たる追跡済みのファイルが、ワークツリーにも 1 つでも在るかを返す。ls-files はインデックスを見るので、消したが git add していないもの（--deleted）は除く。
+// 名前は同じ読み方の 2 つの出力どうしで比べ、ファイルシステムには聞かない。非 UTF-8 の名前を置換文字で読んでも、食い違わないようにするため。
 func tracked(worktree, glob string) bool {
 	rc, out := git.Output(worktree, []string{"ls-files", "-z", "--", glob}, git.Options{})
 	if rc != 0 {

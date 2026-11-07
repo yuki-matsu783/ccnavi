@@ -36,7 +36,7 @@ const (
 	Ready      Parent = "ready"       // Draft を外した。「マージに進んでよい」の合図
 	CloseEarly Parent = "close-early" // ユーザが早めに閉じた。残りは別の issue へ
 	Closed     Parent = "closed"      // 親を閉じた（`ticket finish <親>`）
-	// Ledger は受け入れ台帳。ホストで未解決のまま受け入れた指摘を親ごとに持つ（フェーズを開き直しても残る）。
+	// Ledger は受け入れ台帳。ホストで未解決のまま受け入れた指摘を親ごとに記録する（フェーズを開き直しても残る）。
 	Ledger Parent = "accepted"
 )
 
@@ -90,7 +90,7 @@ func ReadParent(approvedDir, parent string, name Parent) (*pyjson.Object, bool) 
 	return fsio.ReadObject(parentPath(approvedDir, parent, name))
 }
 
-// ReadFilledParent は中身のある親ごとのマーカー。無い・読めない・空のマップなら偽（Python の `if read_parent(…)`）。
+// ReadFilledParent は中身のある親ごとのマーカー。無い・読めない・空のマップなら偽。
 func ReadFilledParent(approvedDir, parent string, name Parent) (*pyjson.Object, bool) {
 	return filled(ReadParent(approvedDir, parent, name))
 }
@@ -176,7 +176,7 @@ func AddLedger(approvedDir, parent string, add []*pyjson.Object) string {
 	return WriteParent(approvedDir, parent, Ledger, pyjson.NewObject("version", ledgerVersion, "entries", merged))
 }
 
-// ledgerKey は Python の str(e.get("key"))（無ければ "None"）。
+// ledgerKey は台帳の項目の key を文字列にする。key が無ければ "None"。
 func ledgerKey(e *pyjson.Object) string {
 	return pyfmt.Str(e.Value("key"))
 }

@@ -37,8 +37,13 @@ func refusedCheck(c code, problems []string) checked {
 	return checked{problems: refused(c, problems), code: c}
 }
 
-// confirm は、レビュー済みにしてよいかを見る。通れば、書くもの（子を done/ へ、受け入れ台帳、レビュー済みのマーカー）を溜める段に並べる。result はホストから取得した結果である。changed は、依頼の後にユーザが見るものが動いたことの説明で、空なら動いていない。moved は、止めたあとの説明にだけ使う。manual が確定してよい形（SettleReady）なら、未解決の指摘は解決せず、版つきで受け入れ台帳に足す。actor の Account と Via はマーカーに書く（空なら書かない）。stamp は書く時刻で、空なら今。
+// confirm は、レビュー済みにしてよいかを見る。通れば、書くもの（子を done/ へ、受け入れ台帳、レビュー済みのマーカー）を溜める段に並べる。result はホストから取得した結果である。
+// changed は、依頼の後にユーザが見るものが動いたことの説明で、空なら動いていない。moved は、止めたあとの説明にだけ使う。
+// manual が確定してよい形（SettleReady）なら、未解決の指摘は解決せず、版つきで受け入れ台帳に足す。
+// actor の Account と Via はマーカーに書く（空なら書かない）。
+// stamp は書く時刻で、空なら今。
 func confirm(conf *config.Settings, root string, actor Actor, stamp, parentID string, number int, result host.Result, changed string, manual *phase.Manual, moved request.Moved) (checked, error) {
+	// 1. 対象のフェーズと前提を確かめる。親が作業中で、フェーズに子があり、依頼済みで、依頼の後に見るものが動いていないこと。
 	parent := openParent(conf, root, parentID)
 	if parent == nil {
 		return refusedCheck(codeConfirmNoParent, []string{"ccnavi: 親 " + parentID + " の承認済みチケットが作業中にありません。"}), nil
@@ -53,6 +58,8 @@ func confirm(conf *config.Settings, root string, actor Actor, stamp, parentID st
 	if problems := request.MatchingProblems(&result, p.Marks[marks.Requested]); len(problems) > 0 {
 		return refusedCheck(codeConfirmResultMismatch, problems), nil
 	}
+	// 2. 確定してよいか。手で動かした子の確定（SettleReady）は、未解決の指摘を解決せず、版つきで受け入れ台帳に足す。
+	//    それ以外は、レビューが残っていないことを求める。
 	settled := manual != nil && manual.State == phase.SettleReady
 	var ledger []*pyjson.Object
 	if settled {
@@ -67,6 +74,7 @@ func confirm(conf *config.Settings, root string, actor Actor, stamp, parentID st
 	} else if problems := request.ReviewProblems(conf, root, parent, number, result); len(problems) > 0 {
 		return refusedCheck(codeConfirmReviewOpen, problems), nil
 	}
+	// 3. 書き込みを溜める段に並べる。ここでは書かない（書くのは Writer）。時刻は 1 つに固定し、並べた全部で同じ値を使う。
 	stage, done, err := fsio.Staging()
 	if err != nil {
 		return checked{}, err
@@ -124,7 +132,9 @@ func precondition(root string, p *phase.Phase, number int, changed string, moved
 	return nil
 }
 
-// manualRefusal は、手で動かした移動の確定を止める理由を返す。変更要求のレビューがあれば保留する（移動は残す）。受け入れるのは、移動のコミットより phase.Margin 以上前にホストで作られたスレッドだけである。後に付いた指摘や、時刻が読めない指摘が残っていれば確定しない。その分は decide へ回す。通れば nil を返す。
+// manualRefusal は、手で動かした移動の確定を止める理由を返す。変更要求のレビューがあれば保留する（移動は残す）。
+// 受け入れるのは、移動のコミットより phase.Margin 以上前にホストで作られたスレッドだけ。後に付いた指摘や、
+// 時刻が読めない指摘が残っていれば確定しない（その分は decide へ回す）。通れば nil。
 func manualRefusal(conf *config.Settings, root string, parent *ticket.Ticket, number int, result host.Result, manual phase.Manual) *checked {
 	if len(request.ChangesRequested(result)) > 0 {
 		c := refusedCheck(codeConfirmReviewOpen, []string{"ccnavi: " + host.ChangesRequestedNote(result.Host) +
@@ -168,7 +178,9 @@ func openParent(conf *config.Settings, root, parentID string) *ticket.Ticket {
 	return found
 }
 
-// ConfirmLocal は `review confirm` を行う。依頼の後の状態を見て、通ればレビュー済みのマーカーを置いて先へ進めるようにする。検査と書くものの並べ方は confirm が持つ。ここは手元の入力（cwd の親、git の差分、--result の取得結果）を読んで渡し、並べたものを書く。account は、ccnavi-review.sh がトークンの持ち主を引いて `--actor` で渡すアカウントである。あれば、マーカーに actor と `via: cli` を書く。
+// ConfirmLocal は `review confirm` を行う。依頼の後の状態を見て、通ればレビュー済みのマーカーを置いて先へ進めるようにする。検査と書くものの並べ方は confirm が持つ。
+// ここは手元の入力（cwd の親、git の差分、--result の取得結果）を読んで渡し、並べたものを書く。
+// account は、ccnavi-review.sh がトークンの持ち主を引いて `--actor` で渡すアカウントである。あれば、マーカーに actor と `via: cli` を書く。
 func ConfirmLocal(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, number int, resultPath, account string) (int, error) {
 	parent, _, moved, manual, ok := confirmGate(stderr, conf, root, cwd, number)
 	if !ok {
@@ -247,7 +259,8 @@ func CheckConfirm(stdout, stderr io.Writer, conf *config.Settings, root, cwd str
 	return 0
 }
 
-// nextAfterConfirm は、レビュー済みを書いたあとの出力を組む。親を閉じられる状態（closing.CloseProblems が空）になったら、親を閉じる流れを言う。まだなら status を促す。最後のフェーズのあとの手順が、親の finish の出力で初めて出てくるのを避けるためである。
+// nextAfterConfirm は、レビュー済みを書いたあとの出力を組む。親を閉じられる状態（closing.CloseProblems が空）になったら、親を閉じる流れを言う。まだなら status を促す。
+// 最後のフェーズのあとの手順が、親の finish の出力で初めて出てくるのを避けるため。
 func nextAfterConfirm(conf *config.Settings, root, parentID string) string {
 	if len(closing.CloseProblems(conf, root, parentID, nil)) > 0 {
 		return texts.Say(root, "NEXT_REVIEW_CONFIRMED", texts.Values{"parent": parentID}, nil)

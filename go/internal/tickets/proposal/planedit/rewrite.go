@@ -37,7 +37,7 @@ func frontOf(text string) (front, string) {
 	return front{lines, end + 1, newline}, ""
 }
 
-// keyLine は行が `key:`（key と ":" の間は空白だけ）で始まるか。Python の re.match(rf"^{key}\s*:")。
+// keyLine は行が `key:`（key と ":" の間は空白だけ）で始まるか。
 func keyLine(line, key string) bool {
 	rest, ok := strings.CutPrefix(line, key)
 	return ok && strings.HasPrefix(strings.TrimLeftFunc(rest, ospath.IsSpace), ":")
@@ -110,7 +110,7 @@ func replaceBlock(text, key string, block []string) (string, string) {
 	return f.replaced(start, stop, block), ""
 }
 
-// body は Python の text.split("---", 2)[2:]（frontmatter のあと）。
+// body は frontmatter のあとの本文。区切り `---` が 2 つ無ければ nil。
 func body(text string) []string {
 	parts := strings.SplitN(text, ticket.Fence, 3)
 	if len(parts) < 3 {
@@ -144,7 +144,7 @@ func changedElsewhere(old, new string, keys []string, values string) (*yaml.Map,
 	return nil, "組んだ全文を読み直せない（" + err.Error() + "）。" + values + "をほかの欄が別名で指していないか確かめる"
 }
 
-// flowLine は値を 1 行の flow 形式で書く（yaml.safe_dump(…, default_flow_style=True, width=1 << 30).strip()）。
+// flowLine は値を 1 行の flow 形式（`{a: 1}` の形）で書く。幅を実質無限にして、長くても折らない。
 func flowLine(v any) (string, error) {
 	dumped, err := yaml.Dump(v, yaml.DumpOptions{Flow: true, Width: 1 << 30})
 	return ospath.Strip(dumped), err

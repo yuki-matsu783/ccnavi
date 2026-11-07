@@ -62,6 +62,7 @@ func CheckParentWrite(conf *config.Settings, root, cwd, subject string, degraded
 	for n, text := range all {
 		places := shell.PlacedCommands(text, n > 0)
 		if len(places) == 0 {
+			// コマンドとして読めなかった（語が取れない）非空の文は、unread にして、あとで文字列として調べる。
 			unread = unread || ospath.Strip(text) != ""
 			continue
 		}
@@ -71,6 +72,7 @@ func CheckParentWrite(conf *config.Settings, root, cwd, subject string, degraded
 			}
 		}
 	}
+	// 読み切れなかった部分は、中で何が書かれるか分からない。親のパスと書き込みを疑う語が並んでいれば止める側に倒す。
 	if degraded || unread {
 		for _, text := range all {
 			if name := mentionedParent(root, parents, text); name != "" && writeHint.Search(text) {
@@ -151,6 +153,7 @@ func mentionedParent(root string, parents []string, text string) string {
 				continue
 			}
 			for _, m := range re.FindAll(folded) {
+				// `../p1` が `../p10` の頭に当たる誤検出を避ける。名前の続きの字が付く一致は別の名前。
 				if m.End >= len(runes) || !continuesName(runes[m.End]) {
 					return name
 				}

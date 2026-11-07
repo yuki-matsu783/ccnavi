@@ -11,7 +11,7 @@ import (
 	"ccnavi/internal/infra/pyfmt"
 )
 
-// StampLayout は、マーカーと記録に書く時刻の形。Python の "%Y-%m-%dT%H:%M:%S%z" に当たる。
+// StampLayout は、マーカーと記録に書く時刻の形（strftime の "%Y-%m-%dT%H:%M:%S%z" に当たる）。
 const StampLayout = LocalStampLayout + "-0700"
 
 // LocalStampLayout は StampLayout の時差の前まで（"%Y-%m-%dT%H:%M:%S"、19 字）。
@@ -25,11 +25,11 @@ const (
 	NameStampLayout = "20060102-150405"
 )
 
-// ISOStampLayout は、時差にコロンを入れた ISO 8601 の時刻（Python の datetime.isoformat の秒まで）。
+// ISOStampLayout は、時差にコロンを入れた ISO 8601 の時刻（秒まで）。
 // 判定の記録と診断ログが書く。
 const ISOStampLayout = "2006-01-02T15:04:05-07:00"
 
-// ISOFormat は Python の t.isoformat()。マイクロ秒が 0 でなければ秒の後ろに 6 桁で書く。
+// ISOFormat は ISO 8601 の時刻。マイクロ秒が 0 でなければ秒の後ろに 6 桁で書く。
 func ISOFormat(t time.Time) string {
 	if t.Nanosecond()/1000 == 0 {
 		return t.Format(ISOStampLayout)
@@ -37,7 +37,7 @@ func ISOFormat(t time.Time) string {
 	return t.Format(strings.Replace(ISOStampLayout, "05", "05.000000", 1))
 }
 
-// stampFormat は、エラーの文に出す Python の書式の表記。
+// stampFormat は、エラーの文に出す書式の表記（strftime 風）。
 const stampFormat = "%Y-%m-%dT%H:%M:%S%z"
 
 // fixedStamp は FixClock で固定した時刻。空なら手元の時計を読む。
@@ -66,7 +66,7 @@ func FixClock(fixed string) (restore func(), err error) {
 	return func() { fixedStamp = before }, nil
 }
 
-// stampPattern は、Python の strptime が "%Y-%m-%dT%H:%M:%S%z" で受ける形。T は大文字でも小文字でもよい。
+// stampPattern は、StampLayout の時刻として受ける綴り（strptime の "%Y-%m-%dT%H:%M:%S%z" と同じ範囲）。T は大文字でも小文字でもよい。
 // 月日時分秒は 1 桁でもよい。%z は Z、±HHMM、±HH:MM を受け、秒と小数秒も付けられる。
 var stampPattern = regexp.MustCompile(`^(\d{4})-(1[0-2]|0[1-9]|[1-9])-(3[01]|[12]\d|0[1-9]|[1-9]| [1-9])[Tt]` +
 	`(2[0-3]|[0-1]\d|\d):([0-5]\d|\d):(6[0-1]|[0-5]\d|\d)(Z|[+-](\d\d):?[0-5]\d(:?[0-5]\d(\.\d{1,6})?)?)$`)
@@ -91,7 +91,7 @@ func validStamp(text string) bool {
 	return time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC).Day() == day
 }
 
-// UnixSeconds は、記録に書く UNIX 秒。Python の time.time() と同じ小数の形。
+// UnixSeconds は、記録に書く UNIX 秒。小数つきの秒（time.time() の形）。
 // UnixNano は 1678〜2262 年の外で溢れるので、その外は秒とナノ秒を分けて足す（遠い先の年を負にしない）。
 func UnixSeconds(t time.Time) float64 {
 	sec := t.Unix()

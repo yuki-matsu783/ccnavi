@@ -20,6 +20,9 @@ type matcher struct {
 	b2j  map[string][]int
 }
 
+// newMatcher は b の各行が出る位置の表（b2j）を作る。
+// b が autojunkMin 行以上のときは、1% を超えて出る行を表から外す。
+// 空行や閉じ括弧のようなありふれた行が、無関係な位置を結び付けて差分を長くするのを防ぐため。
 func newMatcher(a, b []string) *matcher {
 	m := &matcher{a: a, b: b, b2j: map[string][]int{}}
 	for i, elt := range b {
@@ -36,6 +39,8 @@ func newMatcher(a, b []string) *matcher {
 	return m
 }
 
+// longest は a[alo:ahi] と b[blo:bhi] で最も長く続く一致を返す（同じ長さなら a の早い方、次に b の早い方）。
+// j2len[j] は「直前の a の行までで b[j] に終わる一致の長さ」。a の行ごとに 1 つ繰り上げて伸ばす。
 func (m *matcher) longest(alo, ahi, blo, bhi int) match {
 	besti, bestj, bestsize := alo, blo, 0
 	j2len := map[int]int{}
@@ -56,6 +61,7 @@ func (m *matcher) longest(alo, ahi, blo, bhi int) match {
 		}
 		j2len = next
 	}
+	// 表から外した行（autojunk）を挟んでいても、一致の前後の同じ行までは広げる。
 	for besti > alo && bestj > blo && m.a[besti-1] == m.b[bestj-1] {
 		besti, bestj, bestsize = besti-1, bestj-1, bestsize+1
 	}
@@ -65,6 +71,8 @@ func (m *matcher) longest(alo, ahi, blo, bhi int) match {
 	return match{besti, bestj, bestsize}
 }
 
+// blocks は a と b で一致する区間を、a の位置の順に並べて返す。最後に終端の印（長さ 0）を足す。
+// 最長の一致を見つけ、その左右を同じ手順で探し直す。隣り合う区間は 1 つにつなぐ。
 func (m *matcher) blocks() []match {
 	la, lb := len(m.a), len(m.b)
 	queue := [][4]int{{0, la, 0, lb}}
@@ -85,6 +93,7 @@ func (m *matcher) blocks() []match {
 			queue = append(queue, [4]int{x.a + x.size, ahi, x.b + x.size, bhi})
 		}
 	}
+	// 位置の順に並べ直し、続いている区間をつなぐ。
 	sort.Slice(found, func(i, j int) bool {
 		if found[i].a != found[j].a {
 			return found[i].a < found[j].a
@@ -175,7 +184,7 @@ func unifiedRange(start, stop int) string {
 	return strconv.Itoa(beginning) + "," + strconv.Itoa(length)
 }
 
-// UnifiedDiff は Python の difflib.unified_diff(a, b, fromfile, tofile, n=n, lineterm="")。行は改行を含まない形で
+// UnifiedDiff は a と b の unified diff の行を返す（Python の difflib.unified_diff の lineterm="" と同じ形）。行は改行を含まない形で
 // 渡し、返す行も改行を付けない。違いが無ければ nil（見出しも出さない）。
 func UnifiedDiff(a, b []string, fromFile, toFile string, n int) []string {
 	var out []string

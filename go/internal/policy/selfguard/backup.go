@@ -39,7 +39,7 @@ const (
 	noSession = "no-session"
 
 	// keepFor より長く触られていないセッションのバックアップはセッション開始で消す（中断して翌日に開き直した形まで拾う）。
-	// ctxfile.onceKeep と同じ 3 日だが別の約束（Python も KEEP_DAYS と ONCE_KEEP_DAYS を分ける）なので、片方だけ変えてよい。
+	// ctxfile.onceKeep と同じ 3 日だが別の約束なので、片方だけ変えてよい。
 	keepFor = 3 * 24 * time.Hour
 	// refreshAfter は変わっていないバックアップの更新時刻を新しくする間隔（掃除に古いと読まれないよう keepFor より短く）。
 	refreshAfter = 24 * time.Hour
@@ -51,8 +51,8 @@ const (
 // commonRulesDraft は共通レイヤーのルールファイルの下書きの置き場（ワークスペースルートからの相対、"/" 区切り）。
 var commonRulesDraft = strings.Join(append(slices.Clone(handoffParts), ospath.Slashed(config.DefaultRules)), "/")
 
-// choices は戻す働きの設定が取る値。gateChoices は、戻す働きを持たない切り替え（チケットの承認の経路など）の値。
-// dry-run が無い。通せば済んでしまい、報告では戻らないからである。
+// choices は戻す働きの設定が取る値。gateChoices は、戻す働きを伴わない切り替え（チケットの承認の経路など）の値。
+// gateChoices には dry-run を入れない。通してしまえば済み、報告にとどめても元に戻せないため。
 var (
 	choices     = []config.Mode{config.Enable, config.DryRun, config.Disable}
 	gateChoices = []config.Mode{config.Enable, config.Disable}
@@ -66,7 +66,7 @@ func GateChoices() []config.Mode { return slices.Clone(gateChoices) }
 
 // Resolve は設定の値を解く。読めない値（allowed に無い語も）は enable にし、stderr に言う。
 // 書き損じた 1 語で保護が消えるより、残るほうがよいため。
-// config.ResolveMode・stopreview.Setting に寄せない（Python も別の関数で、答えが違う）。ResolveMode は前後の空白を落とさず、
+// config.ResolveMode・stopreview.Setting に寄せない（答えが違う）。ResolveMode は前後の空白を落とさず、
 // disable を環境からだけ認める。Setting は空と読めない値を黙って dry-run にする。
 func Resolve(stderr io.Writer, flag, declared, name string, allowed []config.Mode) config.Mode {
 	written := flag
@@ -114,7 +114,7 @@ type Outcome struct {
 type Step func(setting config.Mode, stateDir, session, root string, found []Target) []Outcome
 
 // Before は実行前の処理。在る対象の断面をバックアップし、消されていれば戻してからバックアップする。内容の照合はしない。
-// ユーザがエディタで直している最中の 1 文字を消さないためである。最初から無い対象（settings.local.json を置かないプロジェクトなど）は、
+// ユーザがエディタで直している最中の 1 文字を消さないため。最初から無い対象（settings.local.json を置かないプロジェクトなど）は、
 // 印を残し、以後は何も言わない。大きい対象は、大きさと更新時刻が変わったときだけ、新しい版を基準に取り直す（enable のとき）。
 func Before(setting config.Mode, stateDir, session, root string, found []Target) []Outcome {
 	if setting == config.Disable || stateDir == "" {
@@ -133,6 +133,7 @@ func Before(setting config.Mode, stateDir, session, root string, found []Target)
 			}
 			continue
 		}
+		// 1. 在る対象は、今の内容をバックアップに取る（比べずに上書きする）。
 		if content, ok := fsio.ReadBytes(t.Path); ok {
 			b.clearAbsent()
 			if failed := b.write(content); failed != "" {
@@ -141,10 +142,12 @@ func Before(setting config.Mode, stateDir, session, root string, found []Target)
 			// 取れた回は報告に出さない（毎回 3 行増えると、言うべき 1 行が埋もれる）。
 			continue
 		}
+		// 2. 読めない対象は、「置かれていない」印があれば何もしない。印を新しくして掃除から守る。
 		if b.absentNoted() {
 			refresh(b.absent())
 			continue
 		}
+		// 3. 印が無ければ、消されたものとして戻す（recoverMissing）。戻せたらその内容をバックアップに取る。
 		saved, hasSaved := b.read()
 		outcome := recoverMissing(setting, root, t, saved, hasSaved)
 		content, ok := fsio.ReadBytes(t.Path)
@@ -163,8 +166,8 @@ func Before(setting config.Mode, stateDir, session, root string, found []Target)
 	return outcomes
 }
 
-// After は実行後の処理。バックアップと違えば戻す。バックアップが読めなければ git のコミット済みの内容を使い、そう報告する。
-// ユーザの書きかけが残っているかどうかが変わるため、そう報告する。
+// After は実行後の処理。バックアップと違えば戻す。バックアップが読めなければ git のコミット済みの内容で戻し、その旨を報告する。
+// コミット済みの内容に戻すと、ユーザの書きかけが残らないことがあるため、戻し元を報告に書く。
 func After(setting config.Mode, stateDir, session, root string, found []Target) []Outcome {
 	if setting == config.Disable || stateDir == "" {
 		return nil
@@ -178,11 +181,13 @@ func After(setting config.Mode, stateDir, session, root string, found []Target) 
 			}
 			continue
 		}
+		// 小さい対象は内容を比べる。同じなら何もしない。
 		saved, hasSaved := b.read()
 		now, hasNow := fsio.ReadBytes(t.Path)
 		if hasSaved && hasNow && bytes.Equal(now, saved) {
 			continue
 		}
+		// バックアップが無いのに対象が在るなら、git から戻すか、現れたことを言うだけにする。
 		if !hasSaved {
 			if !hasNow {
 				continue
@@ -196,6 +201,7 @@ func After(setting config.Mode, stateDir, session, root string, found []Target) 
 			outcomes = append(outcomes, fallBackToGit(setting, root, t, hasNow))
 			continue
 		}
+		// バックアップがあり内容が違う。enable のときだけ戻す。
 		if setting != config.Enable {
 			outcomes = append(outcomes, Outcome{t, ActionWould, "本来ならバックアップから戻す（今回は触っていない）"})
 			continue
@@ -206,6 +212,7 @@ func After(setting config.Mode, stateDir, session, root string, found []Target) 
 			outcomes = append(outcomes, Outcome{t, actionRestored, "このツール呼び出しの直前の内容に戻した"})
 		}
 	}
+	// 変わっていない対象（actionKept）は報告に出さない。
 	var reported []Outcome
 	for _, o := range outcomes {
 		if o.Action != actionKept {
@@ -237,6 +244,8 @@ func Accept(setting config.Mode, stateDir, session, root string, found []Target)
 			}
 			continue
 		}
+		// 小さい対象は、今の内容を新しい基準にする。ファイルがある（が読めない）ときは基準を動かさず、
+		// 消えたことの受け入れは、ディスクにも無いときだけにする。
 		content, ok := fsio.ReadBytes(t.Path)
 		if !ok {
 			if ospath.DiskLexists(t.Path) {
@@ -258,7 +267,7 @@ func Accept(setting config.Mode, stateDir, session, root string, found []Target)
 }
 
 // AtStart はセッション開始時の処理。古いバックアップを消し、大きい対象をバックアップする（戻さない。dry-run でも取る）。
-// 小さい対象は最初の発言で Accept が取る。開始から最初の発言までの変更はユーザの手によるもので、戻す根拠が無いためである。
+// 小さい対象は最初の発言で Accept が取る。開始から最初の発言までの変更はユーザの手によるもので、戻す根拠が無いため。
 func AtStart(setting config.Mode, stateDir, session, root string, found []Target) []Outcome {
 	if setting == config.Disable || stateDir == "" {
 		return nil
@@ -282,7 +291,7 @@ func AtStart(setting config.Mode, stateDir, session, root string, found []Target
 }
 
 // sweep は、keepFor より長く触られていないセッションの置き場と、どこからも参照されない古い実体を消す。件数ではなく日付で
-// 切る。長く返事を待っているだけの生きたセッションを消さないためである。自分の置き場は日付を見ずに残す。失敗しても開始は続ける。
+// 切る。長く返事を待っているだけの生きたセッションを消さないため。自分の置き場は日付を見ずに残す。失敗しても開始は続ける。
 func sweep(stateDir, session string) {
 	if stateDir == "" {
 		return
@@ -301,7 +310,7 @@ func sweep(stateDir, session string) {
 			kept = append(kept, name)
 			continue
 		}
-		// リンクの先は消さない（Python の shutil.rmtree はリンクを消さずに失敗する）。
+		// リンクの先は消さない（リンクならそのまま残す）。
 		if !ospath.IsLink(path) {
 			os.RemoveAll(path)
 		}
@@ -332,7 +341,8 @@ func joinAll(dir string, names []string) []string {
 	return out
 }
 
-// sweepStore は残るセッションの参照に出てこず、cutoff より古い実体を消す（参照だけ・時刻だけのどちらでも足りない）。
+// sweepStore は残るセッションの参照に出てこず、cutoff より古い実体を消す。
+// 参照だけで決めると、別のセッションが書いている途中の実体を消し、時刻だけで決めると、長く使われている実体を消す。
 func sweepStore(root string, kept []string, cutoff time.Time) {
 	store := ospath.Join(root, storeDir)
 	entries, err := ospath.DiskListdir(store)
@@ -363,7 +373,7 @@ func sweepStore(root string, kept []string, cutoff time.Time) {
 		if mtime, _, ok := ospath.Stat(path); !ok || !mtime.Before(cutoff) {
 			continue
 		}
-		// Python も os.remove で直に消す（store/ は記録に載せない）。
+		// os で直に消す（store/ は記録に載せない）。
 		os.Remove(path)
 	}
 }
@@ -375,7 +385,7 @@ type backup struct {
 }
 
 // path はバックアップの置き場。key はレイヤーの `:` を含むので（Windows では代替データストリームになる）、使える字に置き換える。
-// 切り詰めない。ワークツリー側の key の末尾の digest を削ると、別のワークツリーと同じ名前になるためである。
+// 切り詰めない。ワークツリー側の key の末尾の digest を削ると、別のワークツリーと同じ名前になるため。
 func (b backup) path() string {
 	return ospath.Join(b.stateDir, backupDir, safeSession(b.session), fsio.SafeName(b.target.Key, fsio.NoLimit))
 }
@@ -397,23 +407,25 @@ func (b backup) write(content []byte) string {
 func (b backup) absentNoted() bool { return ospath.DiskExists(b.absent()) }
 func (b backup) noteAbsent()       { fsio.WriteFile(b.absent(), nil, fsio.Plain) }
 
-// clearAbsent は os で直に消す（Python も fsio を通さない。印は溜める段にも記録にも載せない）。
+// clearAbsent は os で直に消す（fsio を通さない。印は溜める段にも記録にも載せない）。
 func (b backup) clearAbsent() { os.Remove(b.absent()) }
 
 func (b backup) readRef() (heavyRef, bool) { return parseRef(fsio.ReadBytes(b.ref())) }
 
 // saveHeavy は大きい対象をバックアップする。先にコピーしてから、その中身のハッシュで名前を付ける。ハッシュを読んでから
 // コピーすると、その間に書き換えられた版が、読んだハッシュの名前で入ってしまう。参照にはバックアップした時点の大きさと更新時刻を書く。
-// 途中の名前の差し替えと片付けは os で直に行う（Python も os.replace・os.remove。store/ は記録に載せない）。
+// 途中の名前の差し替えと片付けは os で直に行う（store/ は記録に載せない）。
 func (b backup) saveHeavy() string {
 	mtime, size, err := statTimes(b.target.Path)
 	if err != nil {
 		return fsio.ErrorText(err)
 	}
+	// 1. 一時の名前へコピーする。
 	scratch := b.storePath("scratch-"+digest.RandomHex(digest.UUIDBytes)) + partSuffix
 	if failed := copyFile(b.target.Path, scratch); failed != "" {
 		return failed
 	}
+	// 2. コピーした中身のハッシュを取り、その名前で実体の置き場に置く（同じ中身が既にあれば捨てる）。
 	digest := fileDigest(scratch)
 	if digest == "" {
 		os.Remove(scratch)
@@ -429,6 +441,7 @@ func (b backup) saveHeavy() string {
 	// 最後に使った時刻にする（掃除の基準）。
 	now := time.Now()
 	os.Chtimes(entry, now, now)
+	// 3. セッション側に参照（ハッシュ・大きさ・更新時刻）を書く。checkHeavy は中身を読まず、この 2 つの値で変更を見張る。
 	ref := fmt.Sprintf("%s %d %d\n", digest, size, mtime.Unix())
 	if failed := fsio.WriteFile(b.ref(), []byte(ref), fsio.Plain); failed != "" {
 		return failed
@@ -562,7 +575,7 @@ func fileDigest(path string) string {
 }
 
 // replaceWith は別の名前へコピーしてから置き換える（中断したコピーを揃ったものとして拾わせない）。
-// os で直に差し替える（Python も os.replace。実行ファイルは溜める段にも記録にも載せない）。
+// os で直に差し替える（実行ファイルは溜める段にも記録にも載せない）。
 func replaceWith(source, destination string) string {
 	part := destination + partSuffix
 	if failed := copyFile(source, part); failed != "" {
@@ -576,7 +589,7 @@ func replaceWith(source, destination string) string {
 	return ""
 }
 
-// copyFile は親を作ってから shutil.copy2 で写す（実行ファイルの実行の権限を落とさない）。写せたら空、駄目なら理由。
+// copyFile は親を作ってから、権限を保ったまま写す（実行ファイルの実行の権限を落とさない）。写せたら空、駄目なら理由。
 func copyFile(source, target string) string {
 	if err := fsio.MakeDirs(ospath.Dirname(target)); err != nil {
 		return fsio.ErrorText(err)
@@ -617,7 +630,7 @@ func recoverMissing(setting config.Mode, root string, t Target, saved []byte, ha
 }
 
 // fallBackToGit は、バックアップが無いまま実行後に来たときに使う。git が変わっていないと言うなら何もしない。
-// 毎回 restore すると、何も起きていない呼び出しがファイルを書き換えてしまうため。
+// 毎回戻すと、何も起きていない呼び出しがファイルを書き換えてしまうため。
 func fallBackToGit(setting config.Mode, root string, t Target, hasNow bool) Outcome {
 	top := gitTop(root, t)
 	changes, unreadable := git.Read(top, 0)

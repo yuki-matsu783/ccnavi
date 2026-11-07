@@ -17,7 +17,7 @@ const headLimit = 64 * 1024
 
 // frontMatter は頭の frontmatter（--- で囲んだ YAML）のマップ。読めなければ理由。
 func frontMatter(text string) (*yaml.Map, string) {
-	// 頭の BOM は並んでいても全部外す（SkipBOM は 1 つだけ外す）。
+	// 頭の BOM は並んでいても全部外す（SkipBOM は 1 つだけ外す）。frontmatter が見つからない原因にしないため。
 	body, state := yaml.FrontBody(strings.TrimLeft(pyfmt.Head(text, headLimit), yaml.BOM), yaml.FrontStyle{DocEnd: true})
 	switch state {
 	case yaml.FrontAbsent:
@@ -83,6 +83,7 @@ func strs(data *yaml.Map, name string) ([]string, string) {
 	return out, ""
 }
 
+// unique は同じ綴りの重複を除く。大文字小文字は区別せず、最初に出た綴りを残す。
 func unique(values []string) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -244,6 +245,7 @@ func parseImpact(body string) (Impact, string) {
 }
 
 // moment は decided_at。タイムゾーン付きの日時か、読めない理由。
+// 最も新しい記録で状態を決める（wiki.go）ため、タイムゾーンが無いと機械ごとに新旧が変わりうるので受けない。
 func moment(value any) (time.Time, string) {
 	switch v := value.(type) {
 	case yaml.DateTime:

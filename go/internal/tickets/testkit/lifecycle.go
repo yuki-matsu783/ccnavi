@@ -93,7 +93,7 @@ func Shape(t *testing.T, root string) map[string]any {
 	}
 }
 
-// shapePy は Shape と同じ形を Python で組む関数 shape(root)（Python の答えに入れる）。
+// shapePy は Shape と同じ形を組む Python の関数 shape(root) のソース。どこからも参照されていない。
 const shapePy = `
 def shape(root):
     import os, subprocess

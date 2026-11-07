@@ -115,7 +115,7 @@ const (
 // TurnMaterial は transcript から、今回のターン（通知でない最後のユーザの発言から末尾まで）と直前のユーザの
 // 発言を取り出す。バックグラウンド通知・ツールの出力・サブエージェントの報告は指示として扱わず、ターンの
 // 境界にもしない。compact より前は要約になっていて元の発言ではないので材料に含めない。
-// transcript が UTF-8 として読めなければエラー（Python は例外のまま上へ抜けていた）。
+// transcript が UTF-8 として読めなければエラー。
 func TurnMaterial(transcript string) (Material, error) {
 	data, ok := fsio.ReadBytes(transcript)
 	if !ok {
@@ -125,6 +125,7 @@ func TurnMaterial(transcript string) (Material, error) {
 	if err != nil {
 		return Material{}, err
 	}
+	// 1. 行を読む。compact の境目より前は要約なので捨てる。サイドチェーン・メタ行・要約行も使わない。
 	var rows []*pyjson.Object
 	compacted := false
 	for _, line := range strings.Split(text, "\n") {
@@ -142,6 +143,7 @@ func TurnMaterial(transcript string) (Material, error) {
 		}
 		rows = append(rows, row)
 	}
+	// 2. 発言だけを取り出す。通知とツールの結果だけの行は発言として数えない。
 	var said []utterance
 	for _, row := range rows {
 		role := row.String("type")
@@ -154,6 +156,7 @@ func TurnMaterial(transcript string) (Material, error) {
 		}
 		said = append(said, utterance{role: role, text: body})
 	}
+	// 3. 通知でない最後のユーザの発言が、今回のターンの始まり。
 	last := -1
 	for i, u := range said {
 		if u.role == "user" {
@@ -167,6 +170,7 @@ func TurnMaterial(transcript string) (Material, error) {
 		}
 		return Material{Insufficient: true, reason: reason}, nil
 	}
+	// 4. その前のユーザの発言を pastPrompts 件まで取り、各欄を上限で切る。
 	var past []string
 	for _, u := range said[:last] {
 		if u.role == "user" {
@@ -187,6 +191,7 @@ func TurnMaterial(transcript string) (Material, error) {
 		m.pastPrompts = append(m.pastPrompts, clipped)
 	}
 	// compact があり、取れた過去の発言が範囲の数に満たなければ、範囲が失われている。
+	// 失われた範囲に指示があったかもしれないので、材料不足として未検査に倒す。
 	lost := compacted && len(past) < pastPrompts
 	m.instructions = extractInstructions(m.pastPrompts)
 	m.Insufficient = cut || lost
@@ -226,7 +231,7 @@ func notification(text string) bool {
 	return strings.HasPrefix(text, "<task-notification") || strings.HasPrefix(text, "<system-reminder")
 }
 
-// spaces は Python の re の Unicode の \s に当たる字の並び（文字クラスの中身）。
+// spaces は Unicode の空白（`\s` 相当）に当たる字の並び（文字クラスの中身）。
 const spaces = `\t\n\v\f\r\x{1c}-\x{1f}\x{85}\p{Z}`
 
 // instructionKinds は過去の発言から明示の指示・合意を拾う形。引用（`>` で始まる行）とコードブロックの中は
@@ -247,7 +252,7 @@ var instructionKinds = []struct {
 
 var codeBlock = regexp.MustCompile("(?s)```.*?```")
 
-// matchReference は Python の `(?<![\w/])(#\d{1,6}|![\d]{1,6})(?![\w])` の最初の一致（バイトの位置）。
+// matchReference は `(?<![\w/])(#\d{1,6}|![\d]{1,6})(?![\w])` の最初の一致（バイトの位置）。
 // 先読み・後読みが RE2 に無いので手で照らす。数字の並びは 1〜6 字で、その後ろが \w でないこと。
 func matchReference(text string) (int, int, bool) {
 	prev := rune(-1)
@@ -256,7 +261,7 @@ func matchReference(text string) (int, int, bool) {
 			j, count := i+1, 0
 			for j < len(text) {
 				d, size := utf8.DecodeRuneInString(text[j:])
-				if !unicode.IsDigit(d) { // Python の \d（Unicode の 10 進の数字）
+				if !unicode.IsDigit(d) { // \d は Unicode の 10 進の数字
 					break
 				}
 				j += size
@@ -320,7 +325,7 @@ func defang(text string) string {
 	for _, m := range delimiter.FindAllStringSubmatchIndex(text, -1) {
 		next, _ := utf8.DecodeRuneInString(text[m[1]:])
 		if m[1] < len(text) && pyfmt.IsWord(next) {
-			continue // Python の \b が成り立たない（語が続く）
+			continue // 語境界 \b が成り立たない（語が続く）
 		}
 		b.WriteString(text[last:m[0]])
 		b.WriteString("＜" + text[m[2]:m[3]] + text[m[4]:m[5]])
@@ -342,6 +347,7 @@ func attr(value string) string {
 	return out
 }
 
+// pyBool は材料の文面での真偽の書き方（True / False）。
 func pyBool(b bool) string {
 	if b {
 		return "True"
@@ -352,6 +358,7 @@ func pyBool(b bool) string {
 // RenderMaterial は agent hook に渡す文字列。本文と会話は区切ったデータとして渡し、指示として読ませない。
 // bodies は提案の対象キーごとの本文（取れなければ空）。
 func RenderMaterial(plan Plan, material Material, criteria string, bodies map[string]string) string {
+	// 材料の本文は、区切り（<data>）の中に置いたデータとして渡す。区切りを破られないよう defang を通す。
 	targets := ospath.Squeeze(strings.Join(plan.Targets, ", "))
 	out := []string{
 		"STOP_REVIEW_MATERIAL",

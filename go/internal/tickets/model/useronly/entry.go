@@ -52,6 +52,7 @@ func TakeEntry(argv []string) ([]string, string, error) {
 	var kept []string
 	marker := ""
 	at := 0
+	// 先頭のラッパーのオプションだけを読む。`--entry` 以外はそのまま kept に残す。
 	for at < len(argv) && isWrapperOption(argv[at]) {
 		word := argv[at]
 		head, value, hasValue := strings.Cut(word, "=")
@@ -64,6 +65,7 @@ func TakeEntry(argv []string) ([]string, string, error) {
 			at += step
 			continue
 		}
+		// `--entry` が 2 回出たら断る。
 		if marker != "" {
 			return nil, "", entryError(entryOption + " は 1 度しか渡せない")
 		}
@@ -79,6 +81,7 @@ func TakeEntry(argv []string) ([]string, string, error) {
 			return nil, "", entryError(entryOption + " に渡せるのは " + strings.Join(entryValues, " か "))
 		}
 	}
+	// `--entry` は `user` の入口の目印なので、`user` が続かない使い方は断る。
 	if marker != "" && !(at < len(argv) && asciiLower(argv[at]) == userWord) {
 		return nil, "", entryError(entryOption + " は user の入口と一緒に渡す")
 	}
@@ -102,6 +105,7 @@ func DirectRefusal(verb Verb, script string) string {
 // `user` はラッパーのオプションを読み飛ばした後の最初の語で、ASCII の大文字小文字は区別しない。先頭の `--` は
 // 読み飛ばさない。`user` か操作の位置の ASCII でない語が、互換の読みで入口の語になるなら断る（`uſer`・`handoﬀ`）。
 func Rewrite(argv []string) ([]string, *Verb, error) {
+	// ラッパーのオプションを読み飛ばして、`user` の位置を探す。
 	at := 0
 	for at < len(argv) && isWrapperOption(argv[at]) {
 		if strings.Contains(argv[at], "=") {
@@ -113,6 +117,7 @@ func Rewrite(argv []string) ([]string, *Verb, error) {
 	if at >= len(argv) {
 		return argv, nil, nil
 	}
+	// `user` でなければ読み替えない。ただし互換の読み（`uſer` など）で `user` になる綴りは、すり抜けを防ぐため断る。
 	if asciiLower(argv[at]) != userWord {
 		if !isASCII(argv[at]) && loose(argv[at]) == userWord {
 			return nil, nil, entryError("user の入口は ASCII の綴りで打つ（" + pyfmt.Repr(argv[at]) + " は受け付けない）")
@@ -126,6 +131,7 @@ func Rewrite(argv []string) ([]string, *Verb, error) {
 	if len(words) > 0 && !isASCII(words[0]) {
 		return nil, nil, entryError("user の操作は ASCII の綴りで打つ（" + pyfmt.Repr(words[0]) + " は受け付けない）")
 	}
+	// 表の操作（1〜2 語）と先頭から比べ、当たったら内部の形に置き換える。
 	for i := range verbs {
 		verb := &verbs[i]
 		if len(words) < len(verb.words) || !slices.Equal(words[:len(verb.words)], verb.words) {
@@ -144,6 +150,7 @@ func Rewrite(argv []string) ([]string, *Verb, error) {
 		v := *verb
 		return out, &v, nil
 	}
+	// どの操作にも当たらない。使える操作を並べて断る。
 	shown := make([]string, len(verbs))
 	for i, v := range verbs {
 		shown[i] = strings.Join(v.words, " ")
@@ -155,6 +162,7 @@ func Rewrite(argv []string) ([]string, *Verb, error) {
 // given は、実行ファイルが読んだ結果でそのオプションが立っているか（値が空・偽・無しなら偽）。argv の文字列を
 // 探すと、`--keyword=--agree` のような他のオプションの値まで断るので、読んだ結果で見る。
 func Refused(given func(option string) bool) string {
+	// `--yes` はどの操作にも付くので、個別のオプションの断りを先にする。
 	// `--yes` はどの操作にも付くので最後に見る。
 	var order []option
 	for _, f := range flags {

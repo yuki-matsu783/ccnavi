@@ -122,7 +122,7 @@ func Family(stdout io.Writer, conf *config.Settings, root, id string) int {
 	return config.ExitOK
 }
 
-// oneLine は Python の ' '.join(value.split())（空白の並びを 1 つの空白にし、前後を落とす）。
+// oneLine は空白の並びを 1 つの空白にし、前後の空白を落とす。
 func oneLine(value string) string {
 	return ospath.Squeeze(value)
 }

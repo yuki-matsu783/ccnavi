@@ -81,7 +81,7 @@ func TestProposalHint(t *testing.T) {
 			t.Errorf("%s: %q", name, got)
 		}
 	}
-	// 文は見本（Python と答えが揃っていた Go の答えから取った）と 1 字も違わない。
+	// 文は見本（答えが確かめ済みだった Go の出力から取った）と 1 字も違わない。
 	var said []string
 	for _, k := range [][2]string{{todo, parentWrong}, {todo, parentBare}, {todo, parentFull}} {
 		said = append(said, testkit.Rel(root, proposalHint(t, root, k[0], k[1], config.ToolWrite, createdType)))

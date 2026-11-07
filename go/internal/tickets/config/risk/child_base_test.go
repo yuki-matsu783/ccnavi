@@ -11,7 +11,7 @@ import (
 )
 
 // リスクの計測は、統合先（リモート追跡ブランチ）から子へ取り込んだだけのパスを数えない
-// （tests/core/test_child_base.py の Go 版）。数えると、取り込んだ大きな差分で子が重い側へ倒れる。
+// 数えると、取り込んだ大きな差分で子が重い側へ倒れる。
 func TestMeasureLeavesOutPathsTakenFromTheIntegrationBranch(t *testing.T) {
 	base := testkit.GitRoot(t)
 	parent, child, up := filepath.Join(base, "parent"), filepath.Join(base, "child"), filepath.Join(base, "up")

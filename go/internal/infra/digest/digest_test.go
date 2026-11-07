@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Python の hashlib の答え（記録のキーが揃うこと）。
+// sha1・sha256 の標準の 16 進の答えと同じこと（記録のキーが揃う）。
 func TestHexMatchesHashlib(t *testing.T) {
 	cases := []struct {
 		algo Algo

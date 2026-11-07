@@ -63,7 +63,9 @@ const (
 	outWip     = "wip %s\n"
 )
 
-// Ready は、Draft を外してよいかを確かめる。確かめたうえで、マーカーとコメントの下書きを置き、閉じた親子のチケットを手元の `logs/archive/` へ退避し、wip/ の追跡済みのファイルを消す。Draft を外すのは sh の仕事である（write-and-push がコミットして push してから外す）。条件は、親を閉じられること（closing.CloseProblems）に、親が done/ に在ることを足したものである。
+// Ready は、Draft を外してよいかを確かめる。確かめたうえで、マーカーとコメントの下書きを置き、閉じた親子のチケットを手元の `logs/archive/` へ退避し、wip/ の追跡済みのファイルを消す。
+// Draft を外すのは sh の仕事である（write-and-push がコミットして push してから外す）。
+// 条件は、親を閉じられること（closing.CloseProblems）に、親が done/ に在ることを足したものである。
 //
 // 同じ親に 2 度打っても通る。前の回が退避を始めていれば（MR がまだ Draft）、ワークツリーの側の条件だけを見て、下書きを書き直し、途中で止まった残りを移す。
 func Ready(stdout, stderr io.Writer, conf *config.Settings, root, cwd, resultPath string) (int, error) {
@@ -245,7 +247,9 @@ func restartedTree(conf *config.Settings, root, cwd string) (tree.Tree, bool) {
 	return t, true
 }
 
-// archivedParent は、cwd のワークツリーの親が ready の退避を始めていれば、その親を返す。打ち直しと見るのは、次の条件がすべて当たるときだけである。sh が取得した MR がまだ Draft である（外れていれば ready は終わっている）。restartedTree が真である。親が done/ に残っている（退避が途中で止まった）か、手元の退避にだけ在る（Draft を外し損ねた）。前の回が条件を確かめている。
+// archivedParent は、cwd のワークツリーの親が ready の退避を始めていれば、その親を返す。打ち直しと見るのは、次の条件がすべて当たるときだけである。
+// sh が取得した MR がまだ Draft である（外れていれば ready は終わっている）。restartedTree が真である。
+// 親が done/ に残っている（退避が途中で止まった）か、手元の退避にだけ在る（Draft を外し損ねた）。前の回が条件を確かめている。
 func archivedParent(conf *config.Settings, root, cwd, resultPath string) *ticket.Ticket {
 	t, ok := restartedTree(conf, root, cwd)
 	if !ok {

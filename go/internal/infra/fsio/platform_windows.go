@@ -48,10 +48,10 @@ var writable = func(path string) bool {
 	return info.IsDir() || info.Mode().Perm()&0o200 != 0
 }
 
-// umask は Windows には無い（Python の os.umask は 0 を返す）。
+// umask は Windows には無い（0 を返す）。
 func umask() int { return 0 }
 
-// NoFollow と nonBlock は Windows に無い（Python の getattr(os, …, 0)）。リンクは呼び手が lstat で先に見る。
+// NoFollow と nonBlock は Windows に無い（どちらも 0）。リンクは呼び手が lstat で先に見る。
 const (
 	NoFollow = 0
 	nonBlock = 0

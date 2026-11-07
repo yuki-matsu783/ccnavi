@@ -88,7 +88,7 @@ type Plan struct {
 }
 
 // Setting は CCNAVI_STOP_REVIEW に全体のモードを掛けた実効値。既定と未知の値は dry-run。
-// 既定が dry-run で、読めない値を言わないので、enable に倒す selfguard.Resolve・config.ResolveMode とは分ける（Python も別）。
+// 既定が dry-run で、読めない値を言わないので、enable に倒す selfguard.Resolve・config.ResolveMode とは分ける。
 func Setting(mode config.Mode, declared string) config.Mode {
 	value := config.Mode(pyfmt.Lower(ospath.Strip(declared)))
 	if value != config.Disable && value != config.DryRun && value != config.Enable {
@@ -116,6 +116,8 @@ type CandidateInput struct {
 }
 
 // Candidate は AI 判定の候補にするかと、その理由。
+// 条件は上から順に当て、最初に当たったもので理由を決める（順を変えると記録に残る理由が変わる）。
+// stop_hook_active の Stop は、AI の継続で、まだ再判定していないときだけ候補にする。
 func Candidate(in CandidateInput) (bool, Reason) {
 	switch {
 	case !in.MainAgent:

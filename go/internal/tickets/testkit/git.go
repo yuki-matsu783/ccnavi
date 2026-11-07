@@ -15,7 +15,7 @@ type Clock string
 // fixed はふつうに使う時刻。
 const fixed Clock = "2026-01-05T00:00:00+0000"
 
-// env は git と、git を起こす Python に渡す環境（利用者の設定を読まず、名前と時刻を固定する）。
+// env は git に渡す環境（利用者の設定を読まず、名前と時刻を固定する）。
 func (c Clock) env() []string {
 	return []string{"GIT_CONFIG_GLOBAL=" + os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
 		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",

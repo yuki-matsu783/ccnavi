@@ -20,13 +20,13 @@ const (
 	Stars = "***"
 )
 
-// Python の re の `\s`（str.isspace と同じ集合）。RE2 の `\s` は ASCII だけなので、字を並べて書く。
+// Unicode の空白（`\s` 相当で、str.isspace と同じ集合）。RE2 の `\s` は ASCII だけなので、字を並べて書く。
 const spaceSet = `\t\n\v\f\r\x1c-\x1f \x{85}\x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}`
 
 const (
 	sp    = `[` + spaceSet + `]`
 	notSp = `[^` + spaceSet + `]`
-	// Python の IGNORECASE は英字の i に İ（U+0130）と ı（U+0131）も当てる。RE2 の (?i) は当てないので足す。
+	// 大文字小文字を無視する照合では、英字の i に İ（U+0130）と ı（U+0131）も当てる。RE2 の (?i) は当てないので足す。
 	// ſ（U+017F）と K（U+212A）は RE2 も当てる。
 	dottedI = `ı\x{130}`
 	// 引用の外で、値の終わりとして読む字。`\x00` は unwrapped がコマンドをつなぐ目印。
@@ -50,7 +50,7 @@ func iword(words string) string {
 
 func mustRE(pattern string) *regexp.Regexp { return regexp.MustCompile(pattern) }
 
-// form は Python の 1 つの正規表現。start で始まりの候補を探し、before が通れば whole をその位置に
+// form は伏せる形 1 つ。start で始まりの候補を探し、before が通れば whole をその位置に
 // 固定して照らし、after が通れば当たりとする。before が偽なら 1 字先から探し直す。
 type form struct {
 	start  *regexp.Regexp
@@ -118,7 +118,7 @@ func notAfter(in func(rune) bool) func(string, int) bool {
 }
 
 var forms = []form{
-	// 秘密キーの本文。見出しと結びの行は残す。結びが無ければ終わりまで（Python の `$` は最後の改行の手前）。
+	// 秘密キーの本文。見出しと結びの行は残す。結びが無ければ終わりまで（`$` と同じく、最後の改行の手前で終わる）。
 	{
 		start: mustRE(`-----BEGIN [A-Z ]*PRIVATE KEY-----`),
 		whole: mustRE(`^(?s)-----BEGIN [A-Z ]*PRIVATE KEY-----(?P<bare>.*?)(?:-----END [A-Z ]*PRIVATE KEY-----|\n?\z)`),
@@ -299,7 +299,7 @@ func spans(text string) []span {
 	return merged
 }
 
-// spans は Python の finditer と同じ順で当たりを探し、値の範囲（offset を足したもの）を out に足す。
+// spans は前から順に当たりを探し、値の範囲（offset を足したもの）を out に足す。
 // 変数を指すだけの値と空の値は外す。
 func (f form) spans(text string, offset int, out []span) []span {
 	for s := 0; s <= len(text); {

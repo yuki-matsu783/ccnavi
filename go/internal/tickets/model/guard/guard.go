@@ -21,7 +21,7 @@ const (
 	StateShellRuleID = StateRuleID + "-shell"
 	// proposeRuleID は提案を書いた回の確認の文の数えのキー。表には入れない。
 	proposeRuleID = rules.ReservedIDPrefix + "ticket-propose"
-	// RawGitRuleID は生の git を止めるルール。ccnavi 自身の約束を守るので、予約の接頭辞 guard- を持つ。
+	// RawGitRuleID は生の git を止めるルール。ccnavi 自身の約束を守るので、予約の接頭辞 guard- を付ける。
 	RawGitRuleID         = rules.ReservedIDPrefix + "guard-raw-git"
 	ApprovedRuleID       = rules.ReservedIDPrefix + "ticket-approved"
 	ApprovedShellRuleID  = ApprovedRuleID + "-shell"

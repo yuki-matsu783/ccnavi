@@ -26,7 +26,7 @@ func treeLabel(name string) string {
 }
 
 // Draft は下書きの置き場の <名前>.yml 1 本。layer は取り込み先のレイヤー（検査はこのフェーズ定義で行う）、
-// target は取り込み先（ツリーからの相対）、also は同じ中身の下書きを持つほかのツリーの名前（ルートは ""）。
+// target は取り込み先（ツリーからの相対）、also は同じ中身の下書きがあるほかのツリーの名前（ルートは ""）。
 type Draft struct {
 	tree   tree.Tree
 	layer  string
@@ -108,6 +108,8 @@ func Scan(conf *config.Settings, root string, catalog *flow.Catalog) *Scanned {
 		catalog = &c
 	}
 	out := &Scanned{}
+	// 同じ名前・同じ中身（SHA）の下書きは 1 本にまとめ、ほかのツリーの名前は also に足す。
+	// 中身が読めず SHA が無いものは、同じと言えないのでまとめない。
 	type seenKey struct{ name, sha string }
 	seen := map[seenKey]*Draft{}
 	said := map[string]bool{}
@@ -139,6 +141,7 @@ func Scan(conf *config.Settings, root string, catalog *flow.Catalog) *Scanned {
 			out.Drafts = append(out.Drafts, d)
 		}
 	}
+	// 表示の順を、名前 → パス → ツリー名で固定する（ツリーの走査順に依らない）。
 	sort.SliceStable(out.Drafts, func(i, j int) bool {
 		a, b := out.Drafts[i], out.Drafts[j]
 		if a.Entry.Name != b.Entry.Name {

@@ -15,7 +15,7 @@ import (
 )
 
 // ゲートの表。計画のステップ・定義・引き受けた延期・子の宣言と状態・実績のリスク・マーカーの組み合わせを全部
-// 作り、終わったか・レビューが要るか・止めているか・呼び名・止めたときの文が Python と同じことを見る。
+// 作り、終わったか・レビューが要るか・止めているか・呼び名・止めたときの文が見本と同じことを見る。
 
 type gateItem struct {
 	Review   *bool `json:"review"`
@@ -112,7 +112,7 @@ func flag(b bool) string {
 	return "F"
 }
 
-func TestGateMatchesPython(t *testing.T) {
+func TestGateMatchesGolden(t *testing.T) {
 	root := testkit.RepoRoot(t)
 	cases := gateCases()
 	want := golden.Load[struct {
@@ -149,7 +149,7 @@ func TestGateMatchesPython(t *testing.T) {
 	}
 }
 
-// 止める条件の代表。表の答えを Python に任せる前に、約束そのものを名指しで残す。
+// 止める条件の代表。表の答えを見本に任せる前に、約束そのものを名指しで残す。
 func TestGateClosedPromises(t *testing.T) {
 	yes, no := true, false
 	tests := []struct {

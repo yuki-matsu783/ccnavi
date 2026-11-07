@@ -52,7 +52,7 @@ func TestWarnMB(t *testing.T) {
 	}
 }
 
-func TestScratchpadMatchesPython(t *testing.T) {
+func TestScratchpadMatchesGolden(t *testing.T) {
 	root := workspace(t)
 	putSize(t, root, "big.bin", 2*mb+mb/2)
 	limits := []string{"1", "1.5", "2.5", "3", "0", "0.000001"}

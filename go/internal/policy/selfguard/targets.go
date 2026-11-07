@@ -14,7 +14,7 @@ import (
 )
 
 // pathKey は PATH の ccnavi の実体の key の頭。パスの印が続く。PATH が変わって指す先が替わったとき、
-// 別の実体の参照を新しい実体に書き戻さないためである。
+// 別の実体の参照を新しい実体に書き戻さないため。
 const pathKey = "bin-path-"
 
 // 実行ファイルの key。
@@ -119,7 +119,7 @@ func collectPlaces(root, projectsDir, rulesPath string, layers []config.LayerFil
 }
 
 // layerKey はレイヤーのバックアップの key。名前ではなく種別で決める。`projects/common/` が共通レイヤーと同じ key に
-// なると、重なりの排除でその 3 本が保護から外れるためである。予約名のプロジェクトとミラーは置き場の前置きを付ける。
+// なると、重なりの排除でその 3 本が保護から外れるため。予約名のプロジェクトとミラーは置き場の前置きを付ける。
 func layerKey(origin config.Origin, layer string, kind config.LayerKind) string {
 	switch {
 	case origin == config.OriginCommon:
@@ -179,7 +179,7 @@ func worktreeCopies(root, projectsDir string, places []place) []Target {
 }
 
 // copyKey はワークツリー側の設定のバックアップの名前。使えない字を置き換えた名前に、元の名前の digest を付ける。
-// 置き換えだけだと `a/b` と `a_b` が同じ名前になり、別のワークツリーの中身を書き戻してしまうためである。
+// 置き換えだけだと `a/b` と `a_b` が同じ名前になり、別のワークツリーの中身を書き戻してしまうため。
 func copyKey(key, name string) string {
 	return key + "." + fsio.SafeName(name, copyNameLimit) + "-" + digest.Hex(digest.SHA256, name, markLength)
 }

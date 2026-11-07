@@ -46,6 +46,7 @@ func Effective(reviews []Review) []Review {
 		name  string
 		index int // 書き手も URL も無いレビューは 1 件ずつ別に数える
 	}
+	// レビュアーを、最初に出た順に並べる。同じレビュアーは時刻の新しい 1 件に置き換える（時刻が同じなら後のもの）。
 	var order []key
 	latest := map[key]Review{}
 	for i, r := range reviews {
@@ -67,6 +68,7 @@ func Effective(reviews []Review) []Review {
 			latest[k] = r
 		}
 	}
+	// 最後に、最新の判断が取り下げ（dismiss）のレビュアーを除く。取り下げの前の変更要求は、これで消える。
 	var out []Review
 	for _, k := range order {
 		if r := latest[k]; pyfmt.Upper(r.State) != dismissed {
@@ -148,8 +150,7 @@ func acceptedByLedger(t Thread, ledger []*pyjson.Object) bool {
 	return false
 }
 
-// Epoch はホストの時刻（ISO 8601）のエポック秒。読めなければ 0。時差の無い時刻は手元の時刻として読む
-// （Python の naive な datetime の timestamp と同じ）。
+// Epoch はホストの時刻（ISO 8601）のエポック秒。読めなければ 0。時差の無い時刻は手元の時刻として読む。
 func Epoch(stamp string) float64 {
 	if stamp == "" {
 		return 0

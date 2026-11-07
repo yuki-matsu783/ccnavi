@@ -281,12 +281,15 @@ func (s scan) scriptWrites() map[string]bool {
 		_, nowShaped := now.shape(drop)
 		_, beforeShaped := before.shape(drop)
 		switch {
+		// 1) 書かれた欄以外が同じ: サブコマンドの書き込みなので外す。
 		case sameShape(before, now, same):
 			out[p.change.Full] = true
+		// 2) 今は無い（消えた）。開いた状態の置き場からの消失なら、finish・cancel の移動の元の候補（gone）に取っておく。
 		case !now.present || !nowShaped:
 			if before.present && place.LeavesOpenState(p.rel, s.places.Tickets, s.places.Approved) {
 				gone = append(gone, left{p.change, before, drop})
 			}
+		// 3) 前は無く、閉じた状態の置き場に現れた。移動の行き先の候補（arrived）に取っておく。
 		case !beforeShaped && place.LandsInFinishedState(p.rel, s.places.Tickets, s.places.Approved):
 			arrived = append(arrived, landed{p.change, now})
 		}
@@ -294,6 +297,7 @@ func (s scan) scriptWrites() map[string]bool {
 	for full := range s.archivedRemovals(here) {
 		out[full] = true
 	}
+	// 消えたものと現れたものを、内容の形が同じ 1 対 1 の組にして外す。
 	for _, g := range gone {
 		// 行き先は消えた側の省く欄で比べる（finish が足す completed_at は消えた側がまだ持っていない）。
 		want, _ := g.before.shape(g.drop)

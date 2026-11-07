@@ -14,9 +14,9 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// 表と読み替え（tests/guard/test_user_entry.py の TableTest・RewriteTest・EntryMarkTest のうち CLI を通さない分）。
+// 表と読み替え。CLI を通さない部品の答えを見る。
 
-// 空のグループから組んだ式は何にでも当たるので、使うグループはどれも語を持つ。
+// 空のグループから組んだ式は何にでも当たるので、使うグループにはどれも語がある。
 func TestEveryUsedGroupHasWords(t *testing.T) {
 	for name, got := range map[string][]string{
 		"approval": approvalFlags, "yes": yesFlags, "handoff": importFlags, "guard": guardFlags,
@@ -186,8 +186,7 @@ func TestRefusedLooksAtWhatWasRead(t *testing.T) {
 	}
 }
 
-// 止めている間に通す形とサブエージェントの禁止（tests/core/test_script_command.py・test_shellread.py、
-// tests/ticket/test_ticket.py の判定の部品の分）。
+// 止めている間に通す形と、サブエージェントの禁止。判定の部品の答えを見る。
 
 func TestExempt(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "My Projects", "ws")
@@ -265,7 +264,7 @@ func TestForbidden(t *testing.T) {
 	}
 }
 
-// 記録を消す --prune（tests/guard/test_prune_form.py）。起動の sh 経由の形も止める（#786）。
+// 記録を消す --prune。起動の sh 経由の形も止める（#786）。
 func TestPruneForm(t *testing.T) {
 	const launcher = "sh .ccnavi/scripts/ccnavi-launcher.sh"
 	for command, want := range map[string]string{
@@ -312,7 +311,7 @@ func TestPlanOrderIsNotStopped(t *testing.T) {
 	}
 }
 
-// 案内どおりに打った承認の sh に当たり、文がその打ち方を名指す（tests/core/test_script_command.py）。
+// 案内どおりに打った承認の sh に当たり、文がその打ち方を名指す。
 func TestRuleNamesTheScriptToType(t *testing.T) {
 	root := t.TempDir()
 	testkit.CopyMessages(t, root)
@@ -330,8 +329,7 @@ func TestRuleNamesTheScriptToType(t *testing.T) {
 	}
 }
 
-// 組み込みのルールが持つ文の識別子・値・場合が文面ファイルと合っている（tests/core/test_texts_catalog.py の
-// BuiltinRuleTextsTest の phase_forms の分）。判定の文（HumanMessage など）も引けること。
+// 組み込みのルールの文の識別子・値・場合が文面ファイルと合っている。判定の文（HumanMessage など）も引けること。
 func TestBuiltinRuleTexts(t *testing.T) {
 	repo := testkit.RepoRoot(t)
 	catalog := texts.Load(repo)

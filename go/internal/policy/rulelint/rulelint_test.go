@@ -12,7 +12,7 @@ import (
 	"ccnavi/internal/policy/ctxfile"
 )
 
-// Python の rule_lint の答えの写し（testdata）と突き合わせる。
+// 検査の答えの見本（testdata）と突き合わせる。
 
 type lintCase struct {
 	Path    string `json:"path"`
@@ -58,7 +58,7 @@ func rule(kv ...any) map[string]any {
 	return m
 }
 
-func TestFileProblemsAgainstPython(t *testing.T) {
+func TestFileProblemsMatchGolden(t *testing.T) {
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -141,7 +141,7 @@ func TestFileProblemsAgainstPython(t *testing.T) {
 	for i, c := range cases {
 		got := problemsOf(c, root)
 		if strings.HasSuffix(c.Path, "bad.yml") && len(got) == 1 && len(want[i]) == 1 {
-			// YAML の読み手の文面は infra/yaml が持つ（Python 側は libyaml の文になることがある）。頭だけを比べる。
+			// YAML の読み手の文面は infra/yaml が持つ（見本を取った環境では libyaml の文になることがある）。頭だけを比べる。
 			head := func(s string) string { return s[:strings.Index(s, "読めない: ")] }
 			got[0], want[i][0] = head(got[0]), head(want[i][0])
 		}
@@ -156,6 +156,6 @@ func TestFileProblemsAgainstPython(t *testing.T) {
 		}
 	}
 	if bad > 0 {
-		t.Errorf("%d / %d 件が Python と違う", bad, len(cases))
+		t.Errorf("%d / %d 件が見本と違う", bad, len(cases))
 	}
 }

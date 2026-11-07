@@ -4,7 +4,7 @@ import (
 	"ccnavi/internal/infra/pyjson"
 )
 
-// 拡張（handoffmodel.ts）が読む欄。キーの順も Python の答えと同じにする。
+// 拡張（handoffmodel.ts）が読む欄。キーの順も契約なので、変えない。
 
 func strs(in []string) []any {
 	out := make([]any, len(in))

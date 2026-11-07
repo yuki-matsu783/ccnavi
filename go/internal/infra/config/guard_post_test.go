@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// 戻す手順で案内する git は、ラッパーがあればその打ち方、無ければ `git`（tests/guard/test_post.py から移した）。
+// 戻す手順で案内する git は、ラッパーがあればその打ち方、無ければ `git`。
 func TestGitCommandFollowsTheWrapper(t *testing.T) {
 	root := t.TempDir()
 	if got := GitCommand(root); got != "git" {

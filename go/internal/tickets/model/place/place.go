@@ -20,7 +20,7 @@ const (
 	// Doing と Done は承認済みチケットの置き場（.ccnavi/approved/）に並ぶ。
 	Doing State = "doing"
 	Done  State = "done"
-	// Cancelled は置き場ではなく欄。done/ に在って cancelled_at を持つものをこう呼ぶ。
+	// Cancelled は置き場ではなく欄。done/ にあって cancelled_at が入っているものをこう呼ぶ。
 	Cancelled State = "cancelled"
 )
 
@@ -46,7 +46,7 @@ func States() []State { return slices.Clone(states) }
 var progressOrder = []State{Todo, Doing, Review, Done}
 
 // Progress は置き場の進み具合（todo < doing < review < done）。空は doing、取り消しは done として読む
-// （承認済みチケットは置き場を持たないことがあり、判定と同じく作業中として数える）。知らない状態は 0。
+// （承認済みチケットは置き場が無いことがあり、判定と同じく作業中として数える）。知らない状態は 0。
 func (s State) Progress() int {
 	if s == "" {
 		s = Doing

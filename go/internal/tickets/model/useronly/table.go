@@ -168,7 +168,7 @@ var entryValues = []string{entrySh, entryBoard}
 // wordGroups はオプションではない語のグループ（`user agree --yes` の `user` と `agree`）。
 var wordGroups = map[group][]string{
 	groupUser: {userWord},
-	// ターミナルを求めない経路（`--yes`）を持つ操作。
+	// ターミナルを求めない経路（`--yes`）がある操作。
 	groupUserBoardVerb: {"agree", "reviewed", "handoff", "mirror"},
 	// `--via` の値のうち、ターミナルを求めない経路を選ぶもの。
 	groupBoard: {"board"},

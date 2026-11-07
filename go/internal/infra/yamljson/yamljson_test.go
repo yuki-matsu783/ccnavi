@@ -7,8 +7,8 @@ import (
 	"ccnavi/internal/infra/yaml"
 )
 
-// 期待は Python の json.dumps(json.loads(json.dumps(yaml.safe_load(s), default=str)), ensure_ascii=False)。
-func TestToJSONMatchesPython(t *testing.T) {
+// 期待は、YAML を読んだ値を default=str で JSON にして読み直し、ASCII でない字をそのまま書いたもの。
+func TestToJSONMatchesExpected(t *testing.T) {
 	cases := map[string]string{
 		"{a: 1, 2: [x, 2001-01-02], true: null, ~: 1.5, .inf: b, 1.0: c}": `{"a": 1, "2": ["x", "2001-01-02"], "true": "c", "null": 1.5, "Infinity": "b"}`,
 		"!!set {a: null}":           `"{'a'}"`,

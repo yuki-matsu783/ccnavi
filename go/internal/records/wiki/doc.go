@@ -9,10 +9,4 @@
 // パターンの状態は、承認待ちの記録が 1 つでもあれば提案中、それ以外は decided_at が最も新しい記録で
 // 決める（同じ日時なら提案の名前順で後のもの）。承認・却下なら決着、延期は今の観測元の数が記録の数より
 // 多ければ候補、多くなければ決着。記録が無ければ候補。名前は大文字小文字を区別せず比べる。
-//
-// Python からの対応: wiki と wiki_load をまとめた。build → Build、rows → Rows、candidates → Candidates、
-// pending → PendingImpacts、parse_pattern → ParsePattern、sources_threshold・notice_count → SourcesThreshold・
-// NoticeCount、PATTERNS_DIR・IMPACT_DIR → PatternsDir・ImpactDir、tickets.learning.notes の INBOX_DIR → InboxDir、TARGETS → Targets、
-// wiki_load.load_tree・load_commit・commit_of → LoadTree・LoadCommit・CommitOf（期限は time.Time。
-// ゼロ値なら git の既定の期限）。
 package wiki

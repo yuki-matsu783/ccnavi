@@ -9,9 +9,9 @@ import (
 	"ccnavi/internal/infra/pyre"
 )
 
-// maxRootLen は、この長さ以上のルートでは {!root} を展開しない。Python 3.12 では、この形の入れ子が 493 字で
-// 組み立ての RecursionError になるので、その半分以下で止める。Windows の MAX_PATH は 260 なので、
-// 256 字のルートはその時点で実用にならない。
+// maxRootLen は、この長さ以上のルートでは {!root} を展開しない。{!root} の展開は入れ子が深く、
+// ルートが長いと式の組み立てが深さの上限（pyre.ErrTooDeep）に届く。届く長さの半分以下で止める。
+// Windows の MAX_PATH は 260 なので、256 字のルートはその時点で実用にならない。
 const maxRootLen = 256
 
 // matchEverything は、組み立てられなかった deny・ask に持たせる、何にでも当たる式。
@@ -25,7 +25,7 @@ var unsupported = []struct{ literal, label string }{
 	{"(?<!", "否定後読み"},
 }
 
-// unsupportedIn は書けない形の名前を返す。無ければ空。`\` に 1〜9 が続けば後方参照と数える（`\1` も含む。Python と同じ）。
+// unsupportedIn は書けない形の名前を返す。無ければ空。`\` に 1〜9 が続けば後方参照と数える（`\1` も含む）。
 func unsupportedIn(expression string) string {
 	for _, u := range unsupported {
 		if strings.Contains(expression, u.literal) {
@@ -84,12 +84,13 @@ type compiled struct {
 }
 
 // compileExpr は、glob か regex の 1 つを判定に使う式にする。本体・except・when の個別条件は、すべてこの 1 本を通る。
-// {root} の置き換え、{!root} の展開、先読み・後方参照の禁止、大文字小文字の無視が食い違わないようにするためである。
+// {root} の置き換え、{!root} の展開、先読み・後方参照の禁止、大文字小文字の無視が食い違わないようにするため。
 // label は苦情の頭に付ける語。本体なら空、except なら `except[0] の ` のようになる。
 func compileExpr(glob, regex, root, name, label string) compiled {
 	fail := func(detail string) compiled {
 		return compiled{outcome: exprFailed, err: &Problem{Severity: Error, Rule: name, Detail: label + detail}}
 	}
+	// 1. {root}・{!root} の使い方を検査する（置き場所、ワークスペースルートの有無）。
 	usesRoot := strings.Contains(regex, RootPlaceholder) || strings.Contains(glob, RootPlaceholder)
 	if usesRoot && root == "" {
 		return fail("`" + RootPlaceholder + "` を使うにはワークスペースルートが必要です")
@@ -110,6 +111,7 @@ func compileExpr(glob, regex, root, name, label string) compiled {
 			note = &Problem{Severity: Warn, Rule: name, Detail: label + suffix}
 		}
 	}
+	// 2. 式の文字列を作る。regex は {root}・{!root} を展開し、glob は正規表現に直す。
 	var expression string
 	if regex != "" {
 		if u := unsupportedIn(regex); u != "" {
@@ -135,6 +137,8 @@ func compileExpr(glob, regex, root, name, label string) compiled {
 		}
 		expression = "^" + pyre.TranslateGlob(written)
 	}
+	// 3. 大文字小文字を区別しない式として組み立てる。{!root} を使う式の深すぎる入れ子は、書き方の誤りでなく
+	// この機械で組めないもの（exprRefused）として、止める側に倒せるようにする。
 	re, err := pyre.Compile(expression, pyre.IgnoreCase)
 	switch {
 	case err == nil:

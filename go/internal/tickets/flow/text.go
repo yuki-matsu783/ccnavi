@@ -55,7 +55,7 @@ func Clean(text string) string {
 	return b.String()
 }
 
-// textOf は文字列か数だけを文にする（Python の _text）。リストやマップは中身を辿らない。
+// textOf は文字列か数だけを文にするリストやマップは中身を辿らない。
 // 整数の値の小数（1.0）は整数の表記にする（ボードの JavaScript の String と揃える）。
 func textOf(v any) string {
 	switch x := v.(type) {
@@ -77,7 +77,7 @@ func textOf(v any) string {
 	return ""
 }
 
-// Line は 1 行にまとめて切る（Python の _line）。ccnavi の接頭辞と案内の区切りは真似させない。
+// Line は 1 行にまとめて切る。ccnavi の接頭辞と案内の区切りは真似させない。
 func Line(v any) string {
 	text, ok := v.(string)
 	if !ok {
@@ -110,7 +110,7 @@ func skeleton(text []rune) ([]rune, []int) {
 			if ospath.IsSpace(part) || unicode.In(part, ignored...) {
 				continue
 			}
-			// 1 字の大文字小文字をそろえる（Python の part.casefold()。パスではないので区切りは読み替えない）。
+			// 1 字の大文字小文字をそろえる（パスではないので、区切りは読み替えない）。
 			for _, folded := range pyfmt.Casefold(string(part)) {
 				chars = append(chars, folded)
 				origin = append(origin, i)
@@ -144,11 +144,13 @@ func hasPrefixAt(hay, needle []rune, at int) bool {
 
 // neutral はフローの文が ccnavi の知らせや案内の区切りに見えないようにする。
 func neutral(s string) string {
+	// 文を、見た目だけで案内の印や区切りに見える形を、別の字に置き換える。置き換え対象は、`[ccnavi…]` の形の印と、区切りの句（fencePhrases）。
 	text := []rune(s)
 	skel, origin := skeleton(text)
 	replace := map[int]string{}
 	word := []rune(badgeWord)
 	open, closing := []rune("["), []rune("]")
+	// 1. `[` の直後に印の語が続く形を探し、括弧を別の括弧に置き換える。閉じ括弧が近く（badgeReach 以内）にあれば、それも置き換える。
 	for at := indexFrom(skel, open, 0); at >= 0; at = indexFrom(skel, open, at+1) {
 		if !hasPrefixAt(skel, word, at+1) {
 			continue
@@ -159,6 +161,7 @@ func neutral(s string) string {
 			replace[origin[c]] = badgeClose
 		}
 	}
+	// 2. 区切りの句を探し、その字を全部置き換える。比べるのは、見た目を畳んだ骨組み（skeleton）で。全角や結合文字の言い換えをすり抜けさせないため。
 	for _, phrase := range fencePhrases {
 		needle, _ := skeleton([]rune(phrase))
 		for at := indexFrom(skel, needle, 0); at >= 0; at = indexFrom(skel, needle, at+len(needle)) {
@@ -172,6 +175,7 @@ func neutral(s string) string {
 			}
 		}
 	}
+	// 置き換えが無ければ元の文をそのまま返す。
 	if len(replace) == 0 {
 		return s
 	}

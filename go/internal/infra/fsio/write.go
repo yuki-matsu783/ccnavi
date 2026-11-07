@@ -32,7 +32,7 @@ const (
 
 // 一時的に開けない・書けないときの打ち直し（読みと書きで同じ）。並列に走る hook が同じ記録を
 // 置き換え・削除している最中に開くと、Windows は ERROR_DELETE_PENDING や共有違反で返す
-// （Python の errno で EINVAL と EACCES）。待てば通るので数回だけ打ち直す。EPERM は本物の
+// （errno では EINVAL と EACCES）。待てば通るので数回だけ打ち直す。EPERM は本物の
 // 権限エラーでも出て待っても直らないので入れない（transient）。
 const (
 	retries   = 3
@@ -68,7 +68,7 @@ func withRetry(write func() error) string {
 }
 
 // WriteFile は中身をそのまま how で書く。親ディレクトリが無ければ作る（New は作らずに失敗しない）。
-// 書けたら空文字、駄目なら理由（Python の str(OSError) と同じ文）。
+// 書けたら空文字、駄目なら理由（ErrorText の文）。
 func WriteFile(path string, content []byte, how How) string {
 	if current != nil {
 		if (how == New || how == NewDurable) && Lexists(path) {
@@ -106,7 +106,7 @@ type JSONFormat struct {
 	How          How
 }
 
-// WriteJSON は JSON（json.dumps(data, ensure_ascii=False)）を Atomic で書く（Python の write_json_atomic）。
+// WriteJSON は JSON（json.dumps(data, ensure_ascii=False)）を Atomic で書く。
 // 書けたら空文字、駄目なら理由。
 func WriteJSON(path string, data any) string {
 	return WriteJSONAs(path, data, JSONFormat{How: Atomic})
@@ -181,8 +181,8 @@ func dirOrDot(path string) string {
 	return "."
 }
 
-// MakeDirs は os.makedirs(name, exist_ok=True)。失敗の文を Python と同じにするため、
-// os.MkdirAll ではなく同じ手順で作る（在るのがファイルなら、その名前で File exists になる）。
+// MakeDirs は親から順にディレクトリを作る（既にあれば成功）。失敗の文を ErrorText の形にそろえるため、
+// os.MkdirAll ではなく自分の手順で作る（在るのがファイルなら、その名前で File exists になる）。
 func MakeDirs(name string) error {
 	head, tail := ospath.Dirname(name), ospath.Basename(name)
 	if tail == "" {
@@ -343,8 +343,8 @@ func CopyFile(source, target string) error {
 	return os.Chtimes(target, info.ModTime(), info.ModTime())
 }
 
-// AppendLine は line に機械の改行を付けて、追記モードの 1 回の書き込みで足す（Python の open(path, "a") の
-// write(line + "\n") と、Windows でテキストモードになる os.open の O_APPEND）。並行するプロセスの行と混ざらない。
+// AppendLine は line に機械の改行を付けて、追記モードの 1 回の書き込みで足す（Windows でも
+// テキストモードの改行になる）。並行するプロセスの行と混ざらない。
 // perm は新しく作るファイルの権限。親のディレクトリは作らない。溜める段は通さない（記録のログ用）。
 func AppendLine(path, line string, perm os.FileMode) error {
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, perm)

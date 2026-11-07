@@ -4,13 +4,6 @@
 //
 // Say は失敗しない。文面ファイルが無い、壊れている、識別子や値が合わないときは、種類ごとの短い既定の文
 // （Fallback）を返す。判定は呼ぶ側が決めたままで、壊れた文面ファイルが防御を消すことはない。
-// 1 件を引くときは、識別子の字を含むファイルだけを YAML として読む。hook は 1 回ごとに別のプロセスで動くためである。
+// 1 件を引くときは、識別子の字を含むファイルだけを YAML として読む。hook は 1 回ごとに別のプロセスで動くため。
 // 形式と欄の表は docs/21_design/messages.md の「文面ファイル」にある。
-//
-// Python からの対応: say → Say（値は Values、場合は Variants）、spec → Spec（SpecOptions）、spoken → Spoken、
-// load → Load（Catalog）、find → Find、render → Render、check_text → CheckText、fallback → Fallback、
-// lines_of → LinesOf、ID.fullmatch → IsID、LABELS["next"] → NextLabel、NOTE_LABEL → NoteLabel、
-// SUBJECT_LIMIT → ShownSubjectLimit、TextError → *Error、dirs → Dir。上の段が使わない fields_for・kind_of_id・
-// scan・fill は私的にした。呼び手の無い code_of_id は移さなかった。読んだ結果を覚えておく _CACHE・_FILES は
-// 持たない。実行ファイルは呼び出しごとに別のプロセスとして動くため、覚える必要がないからである。
 package texts

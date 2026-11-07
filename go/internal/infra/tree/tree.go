@@ -66,7 +66,7 @@ func MainTree(root string) Tree {
 	return Tree{Name: Main, Root: resolved(root), Kind: kindMain}
 }
 
-// Projects は置き場の直下で `.git`（ディレクトリでもファイルでもよい）を持つディレクトリ。深さ 1。
+// Projects は置き場の直下で `.git`（ディレクトリでもファイルでもよい）があるディレクトリ。深さ 1。
 func Projects(projectsDir string) []Tree {
 	if projectsDir == "" {
 		return nil

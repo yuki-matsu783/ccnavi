@@ -2,8 +2,8 @@ package digest
 
 import "testing"
 
-// 期待は Python 3.13 の base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))。nil は binascii.Error か ValueError。
-func TestURLSafeB64DecodeMatchesPython(t *testing.T) {
+// 期待は足りないパディングを足した URL 向け base64 の復号（Python 3.13 の base64.urlsafe_b64decode と同じ）。nil は読めない入力。
+func TestURLSafeB64DecodeMatchesExpected(t *testing.T) {
 	cases := []struct {
 		in   string
 		want []byte

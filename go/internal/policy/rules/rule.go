@@ -71,14 +71,14 @@ const (
 var whenKinds = []WhenKind{WhenGlob, WhenRegex, WhenAll, WhenAny, WhenNot}
 
 // TextRef は組み込みのルールが持つ文面ファイルの指定（識別子・差し込む値・場合）。文は止めた回に texts が引く。
-// hook は呼び出しごとにルールを組み立てるので、通る呼び出しに文面ファイルの読みを乗せないためである。
+// hook は呼び出しごとにルールを組み立てるので、通る呼び出しに文面ファイルの読みを乗せないため。
 type TextRef struct {
 	ID       string
 	Values   map[string]string
 	Variants map[string]string
 }
 
-// Exclusion は except の 1 件。本体と同じ読み方で組み立てた式を持つ。
+// Exclusion は except の 1 件。本体と同じ読み方で組み立てた式を Compiled に置く。
 type Exclusion struct {
 	Glob     string
 	Regex    string
@@ -219,7 +219,7 @@ type Rule struct {
 	Match string
 	Glob  string
 	Regex string
-	// Message は止めた理由と代わりの手段。組み込みのルールは代わりに Text を持つ。
+	// Message は止めた理由と代わりの手段。組み込みのルールは、代わりに Text に文面の指定を置く。
 	Message string
 	Text    TextRef
 	// AdditionalContext 系は当たったときにモデルへ渡す文（ctxfile が並べる）。
@@ -254,7 +254,7 @@ type Rule struct {
 	When *Condition
 }
 
-// Built は判定に使える本体を持つか。
+// Built は判定に使える本体が組み上がっているか。
 func (r *Rule) Built() bool { return r.Compiled != nil || r.When != nil }
 
 // WrittenBody は本体を書いた表記で 1 行に。
@@ -270,7 +270,7 @@ func (r *Rule) WrittenBody() string {
 
 // Speech はモデルへ渡す文面の出どころを決める。文面の出どころの優先はここだけで決める。
 //   - 止める側へ倒したルールは、その説明（DegradedMessage）を返す。書いた文面より先に言う
-//   - 文面ファイルの識別子を持つ組み込みのルールは ref を返し、text は空。文は texts.Spoken がいま引く
+//   - 文面ファイルの識別子がある組み込みのルールは ref を返し、text は空。文は texts.Spoken がいま引く
 //   - ほかは書いた Message
 //
 // text は {root} と {script:…} を置き換えたもの。
@@ -327,7 +327,7 @@ func sortedItems(m map[string]string) string {
 
 // Matches はこのルールがこのツールと対象に当たるか。どれかの式が照合を打ち切ったら（数 MB のコマンドに
 // 繰り返しを含む式を当てた回）、止める側（deny・ask）は当たったことにし、allow は当たらなかったことにする。
-// 答えの分からない照合を、通す根拠にしないためである。
+// 答えの分からない照合を、通す根拠にしないため。
 func (r *Rule) Matches(tool, subject string) bool {
 	if !r.Built() || subject == "" || !ToolMatches(r.Match, tool) {
 		return false

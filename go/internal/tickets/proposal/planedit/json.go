@@ -6,7 +6,7 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// 答えの JSON は拡張（計画編集タブ・承認の画面）との契約。欄の順も Python の dict と同じにする。
+// 答えの JSON は拡張（計画編集タブ・承認の画面）との契約。欄の順も契約なので、変えない。
 
 type jsonObject = pyjson.Object
 
@@ -36,7 +36,7 @@ func problemTexts(ps []rules.Problem) []any {
 	return out
 }
 
-// needJSON は bool|None の宣言。
+// needJSON は要否の宣言を JSON の値にする。書かれていなければ null、書かれていれば true か false。
 func needJSON(n ticket.Need) any {
 	if !n.Said() {
 		return nil
@@ -44,7 +44,7 @@ func needJSON(n ticket.Need) any {
 	return n == ticket.Needed
 }
 
-// optional は Python の dict.get（無ければ None）。
+// optional は値が無いとき nil（JSON の null）にする。
 func optional(n int, ok bool) any {
 	if !ok {
 		return nil

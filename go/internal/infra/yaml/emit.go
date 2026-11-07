@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// emitter は PyYAML の Emitter（allow_unicode=True・字下げ 2・改行 "\n"）を写したもの。
+// emitter は PyYAML の Emitter（allow_unicode=True・字下げ 2・改行 "\n"）に合わせた実装。
 // canonical・版と %TAG の指示・明示の --- と ...・folded（>）は ccnavi が使わないので持たない。
 // 事象は Serializer が先に全部並べるので、先読みは events[pos:] を見る。
 // 桁はコードポイントで数える（Python の len(str)）。literal を書く間は桁を進めない（PyYAML と同じ）。

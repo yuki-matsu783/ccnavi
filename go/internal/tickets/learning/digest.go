@@ -69,6 +69,7 @@ var digestKinds = []struct {
 // repeated は、強制された deny のうち（先頭のルート・ツール・コマンドの語）が同じものを回数の多い順に並べ、
 // 2 回以上のものだけ入れる。
 func buildDigest(records []*pyjson.Object, recorded bool, treeName *string) *pyjson.Object {
+	// 1. 木（ワークツリー）の指定があれば、その木の記録だけに絞る。木の欄が無い記録は、木の名前が空のときだけ残す。
 	if treeName != nil {
 		var kept []*pyjson.Object
 		for _, r := range records {
@@ -78,6 +79,7 @@ func buildDigest(records []*pyjson.Object, recorded bool, treeName *string) *pyj
 		}
 		records = kept
 	}
+	// 2. 判定ごとの件数を数える。
 	is := func(r *pyjson.Object, d audit.Decision) bool { return r.Value("decision") == any(string(d)) }
 	counts := pyjson.NewObject()
 	for _, k := range digestKinds {
@@ -89,6 +91,7 @@ func buildDigest(records []*pyjson.Object, recorded bool, treeName *string) *pyj
 		}
 		counts.Set(k.name, n)
 	}
+	// 3. 強制された deny を（ルール・ツール・コマンドの語）で数える。コマンドの語はシェルのツールのときだけ取る。
 	type key struct{ rule, tool, word string }
 	tally := map[key]int{}
 	for _, r := range records {
@@ -115,6 +118,7 @@ func buildDigest(records []*pyjson.Object, recorded bool, treeName *string) *pyj
 		}
 		tally[key{rule, tool, word}]++
 	}
+	// 4. 回数の多い順に並べる。同数なら名前の順にして、出力を毎回同じにする。
 	keys := make([]key, 0, len(tally))
 	for k := range tally {
 		keys = append(keys, k)

@@ -82,14 +82,14 @@ func BinCommand(binPath string) string {
 		return defaultBin
 	}
 	path := ospath.Slashed(binPath)
-	// 拡張子の綴りの判定で、Python の lower() と同じ答えにする（casefold の pathcase.Fold は ſ を s にする）。
+	// 拡張子の判定は pyfmt.Lower で行う。pathcase.Fold（casefold）は ſ を s にして、`.ſh` を `.sh` と見てしまうため使わない。
 	if strings.HasSuffix(pyfmt.Lower(path), ".sh") {
 		return "sh " + quoted(path)
 	}
 	return quoted(path)
 }
 
-// bareUnsafe は引用せずにシェルへ渡せない文字（空白は Python の \s と同じく Unicode の空白も数える）。
+// bareUnsafe は引用せずにシェルへ渡せない文字（空白は Unicode の空白も数える）。
 const bareUnsafe = `'"\$` + "`" + `!*?[]{}()<>|&;#~`
 
 // doubleQuoteUnsafe は二重引用符の中でも意味を持つ文字。

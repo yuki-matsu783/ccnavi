@@ -95,7 +95,17 @@ type EarlyOptions struct {
 	NoIssue bool
 }
 
-// CloseEarly は、ユーザがターミナルで打つ「まだ残っているが、区切りのよいところまでは進んだ」という操作である。残りを全部見せ、y/N を聞く。残りとは、未着手の子、手を付けていないフェーズ、終わっていないレビュー、未計画のフィードバック、未解決のスレッドである。y なら、次の処理をする。未着手の子を取り消す。レビューが済んでいないフェーズを済んだ扱いにする。手を付けたが終わっていないフェーズに、省略のマーカーを置く。親のマーカー `close-early.json` と、issue・コメントの下書きを置く。未解決を受け入れる返信と解決は sh が行う。そのため、置く前に済ませられるよう、3 回に分けて打つ（EarlyOptions）。Draft を外すのは Ready だけである。外れた MR は必ず「片付いて push 済み」になる。作業中の子がいる間は打てない。
+// CloseEarly は、残りがあっても区切りのよいところまで進んだとき、ユーザがターミナルで打つ操作。残りを全部見せて y/N を聞く。
+// 残りは、未着手の子、手を付けていないフェーズ、終わっていないレビュー、未計画のフィードバック、未解決のスレッド。
+//
+// y のときは次のことをする。
+//   - 未着手の子を取り消す
+//   - レビューが済んでいないフェーズを、済んだ扱いにする
+//   - 手を付けたが終わっていないフェーズに、省略のマーカーを置く
+//   - 親のマーカー `close-early.json` と、issue・コメントの下書きを置く
+//
+// 未解決のスレッドを受け入れる返信と解決は sh が行うので、置く前に済ませられるよう、3 回に分けて打つ（EarlyOptions）。
+// Draft を外すのは Ready だけ。外れた MR は、必ず片付いて push 済みになる。作業中の子がいる間は打てない。
 func CloseEarly(stdin *bufio.Reader, stdout, stderr io.Writer, conf *config.Settings, root, cwd, reason, resultPath string, o EarlyOptions) (int, error) {
 	reason = ospath.Strip(reason)
 	if reason == "" {
@@ -351,7 +361,8 @@ func settle(stdout, stderr io.Writer, conf *config.Settings, root string, parent
 		}
 		out.cancelled = append(out.cancelled, t.ID)
 	}
-	// 手を付けていないフェーズは、子を取り消しても終わらない。ゲートも告知も動かないので、マーカーは置かない。親を閉じる判定は close-early.json が迂回する。一方、閉じた子の居るフェーズは、取り消すと終わる。マーカーが無いと、次の hook が「レビューを頼め」と言い出すので、省略のマーカーで抑える。
+	// 手を付けていないフェーズは、子を取り消しても終わらない。ゲートも告知も動かないので、マーカーは置かない。親を閉じる判定は close-early.json が迂回する。一方、閉じた子の居るフェーズは、取り消すと終わる。
+	// マーカーが無いと、次の hook が「レビューを頼め」と言い出すので、省略のマーカーで抑える。
 	untouched := map[int]bool{}
 	for _, p := range left.untouched {
 		untouched[p.Number] = true
@@ -436,7 +447,7 @@ func earlyDrafts(conf *config.Settings, parent *ticket.Ticket, result host.Resul
 	return request.WriteDraft(ospath.Join(conf.State, fmt.Sprintf(earlyNoteFile, parent.ID)), strings.Join(note, "\n"))
 }
 
-// orNone は Python の `', '.join(x) or '無し'`。
+// orNone は一覧を「, 」でつなぐ。空なら「無し」。
 func orNone(list []string) string {
 	if joined := strings.Join(list, ", "); joined != "" {
 		return joined

@@ -12,7 +12,7 @@ import (
 	"ccnavi/internal/infra/yaml"
 )
 
-// 工程スキル（ワークスペースの `.claude/skills/<工程>/` で、頭の frontmatter に `process: true` を持つもの）から
+// 工程スキル（ワークスペースの `.claude/skills/<工程>/` で、頭の frontmatter に `process: true` があるもの）から
 // プロジェクトの `skills/<工程>/` へ写すのは、SKILL.md と references/common/ の下の .md だけ。references/ の
 // それ以外はプロジェクトが育てるものなので、上書きも削除もしない（.ccnavi/docs/skill-processes.md）。
 

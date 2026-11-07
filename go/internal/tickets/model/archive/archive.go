@@ -29,8 +29,8 @@ import (
 // flowSuffixes は flows/ の子のフローの拡張子。
 var flowSuffixes = []string{".yml", ".yaml"}
 
-// tempName は書きかけの一時ファイル（fsio の `.<名前>.<一意>.part`）。移さない。Python の search の `$` は末尾の
-// 改行 1 つの前でも当たるので `\n?\z` にする。
+// tempName は書きかけの一時ファイル（fsio の `.<名前>.<一意>.part`）。移さない。末尾に改行が 1 つ付いていても当たる
+// （`$` と同じ扱い）ので `\n?\z` にする。
 var tempName = regexp.MustCompile(`\A\..*\.part(\.[^/]*)?\n?\z`)
 
 // readyPlaces は ready のマーカーに載せてよい、承認済みの領域の下の置き場。
@@ -43,7 +43,7 @@ func archiveParts(more ...string) []string {
 
 func top(root string) string { return ospath.Join(root, place.ArchiveDir) }
 
-// BaseDir はそのリポジトリの退避の置き場（承認済みの領域と同じ構成を持つ）。
+// BaseDir はそのリポジトリの退避の置き場（承認済みの領域と同じ構成にする）。
 func BaseDir(root, project string) string { return ospath.Join(top(root), tree.RepoKey(project)) }
 
 // linkState はルートの下の parts の道にリンクがあるか（途中が無ければ Missing）。
@@ -175,7 +175,7 @@ func ClosedTickets(root string) []*ticket.Ticket {
 	return out
 }
 
-// load は退避のチケットを読む。状態は done（取り消しの欄があれば cancelled）で、ツリーは持たない。
+// load は退避のチケットを読む。状態は done（取り消しの欄があれば cancelled）で、ツリーの情報は入れない。
 func load(path, ident, repo string) *ticket.Ticket {
 	t, _ := ticket.Load(path)
 	if t == nil || t.ID != ident {
@@ -265,7 +265,7 @@ func doneCopies(approvedDir string) map[string]ticket.DoneCopy {
 	return out
 }
 
-// ClosedParents は承認済みの領域の done/ に在る親（parent: を持たないチケット）。
+// ClosedParents は承認済みの領域の done/ に在る親（parent: が無いチケット）。
 func ClosedParents(approvedDir string) []string {
 	var out []string
 	for ident, copy := range doneCopies(approvedDir) {
@@ -299,11 +299,12 @@ func sortedKeys[V any](m map[string]V, keep func(string) bool) []string {
 	return out
 }
 
-// PlanMove は閉じた親のリストから、移すファイルを決める。親として拾うのは done/ に parent: を持たないチケットとして
+// PlanMove は閉じた親のリストから、移すファイルを決める。親として拾うのは done/ に parent: が無いチケットとして
 // 在るものと、root を渡したときは手元の退避に親として在るもの（前の回が途中で止まった残り。作業中に同じ識別子が
 // 在れば別の開いた親子なので拾わない）。子は名前の形ではなく parent: 欄で親に結ぶ（rel-01 という親を rel の子と
 // 取り違えない）。承認済みにも退避にも無い識別子（フローしか残っていない子）だけを子の形で結ぶ。
 func PlanMove(approvedDir string, parents []string, root, project string) Plan {
+	// 1. 親の集合（family）を決める。done/ の親、または退避に親として残っているもの。
 	done := doneCopies(approvedDir)
 	family := map[string]bool{}
 	for _, p := range parents {
@@ -317,6 +318,7 @@ func PlanMove(approvedDir string, parents []string, root, project string) Plan {
 			}
 		}
 	}
+	// 2. 子の集合（children）を決める。承認済みの done/ の子と、退避に残っている子。
 	children := map[string]bool{}
 	for i, copy := range done {
 		if family[copy.Parent] {
@@ -330,6 +332,7 @@ func PlanMove(approvedDir string, parents []string, root, project string) Plan {
 			}
 		}
 	}
+	// 3. フローだけが残った子を結ぶ準備。承認済みか退避に在る識別子は known とし、名前の形では結ばない。
 	known := map[string]bool{}
 	for i := range done {
 		known[i] = true
@@ -353,6 +356,7 @@ func PlanMove(approvedDir string, parents []string, root, project string) Plan {
 		return ok && family[c.Parent]
 	}
 
+	// 4. 移すファイルを並べる。phases/<親>/ の下、親子のフロー、done/ のチケット（子が先、親が後）の順。
 	out := Plan{parents: sortedKeys(family, func(string) bool { return true })}
 	for _, p := range out.parents {
 		out.files = append(out.files, walk(approvedDir, place.PhasesDir+"/"+p)...)
@@ -371,8 +375,8 @@ func PlanMove(approvedDir string, parents []string, root, project string) Plan {
 	return out
 }
 
-// walk は承認済みの領域の下の rel の下のふつうのファイル（相対、"/" 区切り）。リンクは辿らない。os.walk と同じく
-// 1 つのディレクトリのファイルを先に、下のディレクトリを後に、それぞれ名前の順で並べる。
+// walk は承認済みの領域の下の rel の下のふつうのファイル（相対、"/" 区切り）。リンクは辿らない。
+// 1 つのディレクトリのファイルを先に、下のディレクトリを後に、それぞれ名前の順で並べる（並びが機械によらず決まる）。
 func walk(approvedDir, rel string) []string {
 	start := ospath.Join(approvedDir, filepath.FromSlash(rel))
 	if ospath.IsLink(start) || !ospath.IsDir(start) {
@@ -564,10 +568,12 @@ func noteReady(root, project, parent, treeRoot string, rels []string, head strin
 // 書き換えないので止め、マーカー・フローは今の中身で置き換える。readyParent を渡せば、消す前に ready の
 // マーカーへ移すファイルを足す。途中で止まっても、移した分は戻さない（元は git に残り、write-and-push が戻す）。
 func Move(root, project, approvedDir string, todo Plan, readyParent, treeRoot string) ([]string, string) {
+	// 退避の置き場の途中がリンクなら、リンク先へ書き出してしまうので何も移さず止める。
 	base := BaseDir(root, project)
 	if rel, ok := ospath.Relpath(base, root); ok && linkState(root, strings.Split(rel, ospath.Sep)) == pathmatch.Link {
 		return nil, "退避の置き場（" + base + "）の途中にシンボリックリンクがある（辿らない）"
 	}
+	// ready のマーカーへの追記は、元を消す前に済ませる。先に消すと、途中で止まったときに記録が残らない。
 	if readyParent != "" {
 		head := TreeHead(treeRoot, "HEAD")
 		if head == "" {
@@ -577,6 +583,7 @@ func Move(root, project, approvedDir string, todo Plan, readyParent, treeRoot st
 			return nil, failed
 		}
 	}
+	// 1 本ずつ、退避へ書く（同じ中身が既にあれば書かない）→元を消す、の順に進める。
 	var moved []string
 	for _, rel := range todo.files {
 		source := ospath.Join(approvedDir, filepath.FromSlash(rel))
@@ -589,6 +596,7 @@ func Move(root, project, approvedDir string, todo Plan, readyParent, treeRoot st
 		if !heldOK && ospath.DiskLexists(target) {
 			return moved, "退避先 " + target + " を読めない（ふつうのファイルでないかリンク）"
 		}
+		// 退避先に違う中身がある。閉じた記録の done/ は書き換えず止め、マーカー・フローは今の中身で置き換える。
 		if !Holds(held, heldOK, data) {
 			if heldOK && strings.HasPrefix(rel, string(place.Done)+"/") {
 				return moved, "退避先 " + target + " に違う中身が既に在る。" +
@@ -677,7 +685,7 @@ func write(root, project, rel string, data []byte) string {
 	return ""
 }
 
-// pruneEmpty は空になったディレクトリを下から消す（git は空のディレクトリを持たない）。
+// pruneEmpty は空になったディレクトリを下から消す（git は空のディレクトリを記録しない）。
 func pruneEmpty(directory string) {
 	if ospath.IsLink(directory) || !ospath.IsDir(directory) {
 		return

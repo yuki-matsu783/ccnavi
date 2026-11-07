@@ -21,7 +21,7 @@ const (
 	ask = "askUserQuestion"
 	// group は図の上の囲み（ボードの枠）。手順ではないので並べない。
 	group = "group"
-	// loop は繰り返し。出口は branches の 2 項目（body = 繰り返す、done = 抜ける）で、上限の回数を持つ。
+	// loop は繰り返し。出口は branches の 2 項目（body = 繰り返す、done = 抜ける）で、上限の回数（maxIterations）を指定する。
 	loop = "loop"
 
 	kindStart        = "start"
@@ -42,7 +42,7 @@ const (
 	branchPrefix = "branch"
 )
 
-// branchKeys は出口を項目ごとに持つ種類と、項目の欄。
+// branchKeys は出口が項目ごとに分かれる種類と、項目の欄。
 var branchKeys = map[string]string{
 	kindIfElse: "branches",
 	kindSwitch: "branches",
@@ -175,6 +175,7 @@ func positiveInt(v any) bool {
 // 見るのは最上位の nodes の手順だけで、サブフローの中は NameProblems だけが見る。出口の読み方は
 // ボードの画面と同じ（複数選択の問いは output の 1 本だけ。グループへ出る線も出る側の出口は使っている）。
 func StructureProblems(raw any) []string {
+	// 1. 手順のノードを引ける形にする。グループは図の囲みなので、線の端として来ても手順の外として扱う。
 	data := asMap(raw)
 	nodes := stepNodes(data)
 	byID := map[string]*yaml.Map{}
@@ -193,6 +194,7 @@ func StructureProblems(raw any) []string {
 	for id, n := range byID {
 		kinds[id] = kindOf(n)
 	}
+	// 2. 線（connections）を 1 本ずつ見る。端が無いノードを指す線は集めて、後でまとめて言う（件数が多いと読めなくなる）。
 	var out, missing []string
 	edges := map[string][]string{}
 	edgePorts := map[string][]edgePort{}
@@ -221,6 +223,7 @@ func StructureProblems(raw any) []string {
 				bad = true
 			}
 		}
+		// 出口（port）の使用を記録する。出口の無い線は output を使ったものとして数える。
 		port := textOf(conn.Get("fromPort"))
 		if _, known := byID[src]; !bad && known {
 			if ports[src] == nil {
@@ -244,6 +247,7 @@ func StructureProblems(raw any) []string {
 			out = append(out, "線 "+cid+" が end（"+named(byID[src])+"）から出ている")
 		}
 	}
+	// 3. start と end が 1 つ以上あるか。
 	out = append(out, head(missing, itemLimit)...)
 	if len(missing) > itemLimit {
 		out = append(out, fmt.Sprintf("無いノードを指す線は…ほか %d 件", len(missing)-itemLimit))
@@ -264,6 +268,7 @@ func StructureProblems(raw any) []string {
 	if !hasEnd {
 		out = append(out, "end がありません（どこで終わるかが決まらない）")
 	}
+	// 4. start から線をたどって、届かないノードを挙げる（幅優先）。
 	if len(starts) > 0 {
 		reached := map[string]bool{}
 		queue := append([]string(nil), starts...)
@@ -286,6 +291,7 @@ func StructureProblems(raw any) []string {
 			out = append(out, "start から届かないノードがある: "+names(lost))
 		}
 	}
+	// 5. 問い・分岐・繰り返しの出口のうち、線が出ていないものを挙げる。複数選択の問いは output の 1 本だけが出口。
 	for _, id := range order {
 		node := byID[id]
 		key, ok := branchKeys[kinds[id]]
@@ -369,6 +375,7 @@ func isBodyPort(node *yaml.Map, port string) bool {
 // 手がかりなので外して巡回を探す。巡回の上にあるのは、強連結成分（Tarjan）の大きさが 2 以上のものと、
 // 自分に戻る線のあるノード。
 func cycleProblems(order []string, byID map[string]*yaml.Map, kinds map[string]string, edgePorts map[string][]edgePort) []string {
+	// 1. 巡回を探す有向グラフを組む。loop の「繰り返す」側の線は上限の回数で止まるので、入れない。
 	graph := map[string][]string{}
 	for _, id := range order {
 		graph[id] = nil
@@ -385,6 +392,7 @@ func cycleProblems(order []string, byID map[string]*yaml.Map, kinds map[string]s
 			}
 		}
 	}
+	// 2. 強連結成分を Tarjan 法で求める。再帰だと深いフローで深く潜るので、自前の stack（work）で反復する。
 	index, low := map[string]int{}, map[string]int{}
 	onStack := map[string]bool{}
 	var stack []string
@@ -397,6 +405,7 @@ func cycleProblems(order []string, byID map[string]*yaml.Map, kinds map[string]s
 		if _, seen := index[root]; seen {
 			continue
 		}
+		// frame は「node の隣を i 番目まで見た」状態。子へ降りるときは、戻ってこられるよう自分を積み直してから子を積む。
 		work := []frame{{root, 0}}
 		for len(work) > 0 {
 			f := work[len(work)-1]
@@ -424,6 +433,7 @@ func cycleProblems(order []string, byID map[string]*yaml.Map, kinds map[string]s
 			if advanced {
 				continue
 			}
+			// node が成分の根。stack から根までを取り出して 1 つの成分にする。
 			if low[node] == index[node] {
 				var members []string
 				for {
@@ -447,6 +457,7 @@ func cycleProblems(order []string, byID map[string]*yaml.Map, kinds map[string]s
 			}
 		}
 	}
+	// 3. 大きさ 2 以上の成分と、自分に戻る線のあるノードが巡回の上にある。
 	if len(onCycle) == 0 {
 		return nil
 	}

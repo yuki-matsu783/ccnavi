@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// Undecodable は UTF-8 として読めないバイトの扱い（Python の errors=）。
+// Undecodable は UTF-8 として読めないバイトの扱い。
 type Undecodable int
 
 const (
@@ -17,7 +17,7 @@ const (
 	Replace
 )
 
-// DecodeError は UTF-8 として読めないバイト（Python の UnicodeDecodeError。文も同じ）。
+// DecodeError は UTF-8 として読めないバイト（文は Python の UnicodeDecodeError と同じ形）。
 type DecodeError struct {
 	Start, end int // 読めなかったバイトの範囲 [Start, end)
 	byte       byte
@@ -104,7 +104,7 @@ func utf8Sequence(b []byte, i int) (int, string) {
 	return j, ""
 }
 
-// Newline は本文を書くときの改行（Python の open の newline=）。
+// Newline は本文を書くときの改行。
 type Newline string
 
 const (

@@ -13,7 +13,7 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// 計画を持つ親は、計画（plan: / feedback:）が使う定義だけのコピーを frontmatter の phases: に持つ。承認した
+// 計画のある親は、計画（plan: / feedback:）が使う定義だけのコピーを frontmatter の phases: に置く。承認した
 // ときの定義が親に固定され、承認のあとの判定はコピーを読み、phases.yml を読まない（直しても進行中の親の範囲・
 // レビューの要否・成果物は変わらない）。
 
@@ -62,6 +62,7 @@ func CopyProblems(t *ticket.Ticket) []rules.Problem {
 	var found []rules.Problem
 	name := t.ID
 	errorf := func(text string) { found = append(found, problem(rules.Error, name, text)) }
+	// 子は phases: を書かない（親の計画のステップを phase: の番号で指す）。書いてあれば断る。
 	if t.IsChild() {
 		if t.Raw.Has(ticket.PhasesKey) {
 			errorf("`phases:` は親だけの欄（計画が使うフェーズ定義のコピー）。子は `phase:`（番号）で" +
@@ -69,6 +70,7 @@ func CopyProblems(t *ticket.Ticket) []rules.Problem {
 		}
 		return found
 	}
+	// 親のコピー（phases:）そのものの形の誤りを、コピーの中のどの定義かを添えて拾う。
 	fill := "`" + config.Launcher + " --plan-order " + name + " --fill-phases`"
 	if HasCopy(t) {
 		_, problems := ReadCopy(t.PhasesRaw)
@@ -80,6 +82,7 @@ func CopyProblems(t *ticket.Ticket) []rules.Problem {
 			found = append(found, problem(p.Severity, name, detail))
 		}
 	}
+	// 計画があるのにコピーが無ければ、以降の検査は意味が無いのでここで返す。
 	types := TypesOf(t)
 	if t.HasPlan() && !HasCopy(t) {
 		errorf("計画（plan / feedback）があるのに、計画が使うフェーズ定義のコピー `phases:` がありません。" +
@@ -87,6 +90,7 @@ func CopyProblems(t *ticket.Ticket) []rules.Problem {
 			"取り消して出し直す")
 		return found
 	}
+	// 計画のステップごとに、使う定義がコピーにあるか・kind が計画の種類に合うか・フィードバックのレビューを外していないかを見る。
 	named := map[string]bool{}
 	if m, ok := t.PhasesRaw.(*yaml.Map); ok {
 		for k := range m.All() {
@@ -123,6 +127,7 @@ func CopyProblems(t *ticket.Ticket) []rules.Problem {
 			}
 		}
 	}
+	// コピーにあるのに、どのステップも使わない定義は警告する（消し忘れの目印）。
 	for p := range types.All() {
 		if !used[p.ID] {
 			found = append(found, problem(rules.Warn, name,
@@ -188,6 +193,7 @@ func overlaps(e *ticket.Entry, p *PhaseType) bool {
 // 承認しても子が書けないので、親を作るときと承認の確認で言う。見るのは plan のステップの定義だけ（feedback の
 // 定義は多くが inherit で、混ぜると警告が効かなくなる）。inherit の定義があれば上限が無いので何も言わない。
 func ParentScopeProblems(parent *ticket.Ticket) []rules.Problem {
+	// 見るのは全体計画（plan）のステップが使う定義だけ。
 	defs := TypesOf(parent)
 	var types []*PhaseType
 	for _, item := range parent.Plan {
@@ -198,11 +204,13 @@ func ParentScopeProblems(parent *ticket.Ticket) []rules.Problem {
 	if len(types) == 0 {
 		return nil
 	}
+	// scope: inherit の定義が 1 つでもあれば、範囲の上限が親の allow そのままなので、何も言わない。
 	for _, p := range types {
 		if p.Inherit {
 			return nil
 		}
 	}
+	// 親の allow（deny と regex を除く）の各項が、どの定義の範囲とも重ならなければ名指しする。
 	var problems []rules.Problem
 	for i := range parent.Entries {
 		e := &parent.Entries[i]

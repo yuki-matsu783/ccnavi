@@ -1,4 +1,4 @@
-// Package retire は、親を閉じたときの手元の片付け（ワークツリーとブランチ）を持つ。次の 3 つの段階がある。
+// Package retire は、親を閉じたときの手元の片付け（ワークツリーとブランチ）を受け持つ。次の 3 つの段階がある。
 // `ready` が子のチケットを退避へ移す前に、子の一覧を state の `retire/<親>.json` に書く（Note）。`worktree retire <親>`
 // が、その一覧を読んで子のワークツリー・子のブランチ・親のワークツリーを消す（RunRetire）。MR のマージが分かった後の
 // `sync tidy` が、親のブランチと残りを消す（RunMerged）。
@@ -9,8 +9,4 @@
 // 合流した子のブランチは、先頭が合流した sha と同じで、その sha が push 済みの親（origin/<親のブランチ>、または MR の
 // 先頭）の祖先のときだけ消す。親のブランチは、手元の先頭が push 済みの先頭と MR の先頭の両方に含まれるときだけ消す。
 // MR の先頭は sh が渡す値なので、それだけでは信じない。ブランチを消せるのはここだけで、ネットワークには出ない。
-//
-// Python からの対応: tickets/lifecycle/retire。note → Note、entries・Entry → Entries・Entry、run_abandon・
-// run_retire・run_branch・run_merged → RunAbandon・RunRetire・RunBranch・RunMerged。record_path・judge_child・
-// hand_command・repo_dir・Child・Outcome と状態の定数は私的。
 package retire

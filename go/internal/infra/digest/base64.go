@@ -2,13 +2,13 @@ package digest
 
 import "strings"
 
-// URLSafeB64Decode は Python の base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))（検めない形の a2b_base64）。
+// URLSafeB64Decode は URL 向けの base64 を読む。足りないパディングを足してから、検めない形（Python の a2b_base64）で読む。
 // 表に無い字とパディングは読み飛ばし、終わりで半端な桁が残れば読めない（false）。半端な 2・3 桁は、その後ろの
 // パディングで 4 桁にそろえば読める（途中のパディングでは読み終えない）。ASCII でない文字列も読めない。
 func URLSafeB64Decode(s string) ([]byte, bool) {
 	for i := 0; i < len(s); i++ {
 		if s[i] >= 0x80 {
-			return nil, false // Python は ASCII でない文字列を読まない（ValueError）
+			return nil, false // ASCII でない文字列は読まない
 		}
 	}
 	s = strings.NewReplacer("-", "+", "_", "/").Replace(s)

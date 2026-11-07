@@ -75,15 +75,15 @@ func (r Return) Object() *pyjson.Object {
 	return pyjson.NewObject("ok", false, "reason", r.reason)
 }
 
-// rejected は判定結果を受理しない理由。Python の Rejected の文か、判定役の誤出力で起きた例外の型の名前。
+// rejected は判定結果を受理しない理由。検証が付ける拒否の文か、判定役の誤出力で起きた型エラーの名前。
 type rejected string
 
 func (r rejected) Error() string { return string(r) }
 
-// typeError は判定役の誤出力で Python が TypeError を出していたところ（集合に入らない値を照らした）。
+// typeError は判定役の誤出力で、集合に入らない値（列・オブジェクト）を集合の要素と照らしたときの拒否の名前。
 const typeError rejected = "TypeError"
 
-// unhashable は Python の set・frozenset に入れられない JSON の値（列とオブジェクト）か。
+// unhashable は集合の要素にできない JSON の値（列とオブジェクト）か。
 func unhashable(v any) bool {
 	switch v.(type) {
 	case []any, *pyjson.Object:
@@ -131,6 +131,7 @@ func validate(result any, plan Plan) (*pyjson.Object, error) {
 		}
 		kept = append(kept, r)
 	}
+	// 行ごとの形と、(基準, 対象) の重複を確かめる。
 	valid := obj.With("results", kept)
 	seen := map[unit]bool{}
 	for _, r := range kept {
@@ -138,6 +139,8 @@ func validate(result any, plan Plan) (*pyjson.Object, error) {
 			return nil, err
 		}
 	}
+	// 分類と計画の食い違いを確かめる。提案の操作を見つけているのに「チケット作業でない」は受理しない。
+	// チケット作業なら、計画が求める (基準, 対象) の結果がすべて要る。
 	if class == notTicketWork && len(plan.Proposals) > 0 {
 		return nil, rejected("ccnavi が提案の操作を見つけているのに、チケット作業ではないと分類した")
 	}
@@ -331,6 +334,7 @@ func (s Store) Accept(key string, in AcceptInput) Return {
 	if attempt.Len() == 0 || stateOf(attempt) != running {
 		return OKReturn
 	}
+	// 1. 検証して、拒否なら未検査で閉じる（判定役の誤りで Stop を止め続けない）。
 	valid, err := s.check(plan, in)
 	if err != nil {
 		attempt.Set(keyFinal, string(FinalUnchecked))
@@ -346,6 +350,7 @@ func (s Store) Accept(key string, in AcceptInput) Return {
 		}
 		return OKReturn
 	}
+	// 2. 受理した結果から最終分類を決めて書く。実効値は引数、計画、dry-run の順で決める。
 	effective := in.effective
 	if effective == "" {
 		effective = plan.Effective
@@ -360,6 +365,7 @@ func (s Store) Accept(key string, in AcceptInput) Return {
 	attempt.Set(keyResults, valid.Value("results"))
 	attempt.Set(keyEffective, string(effective))
 	attempt.Set(keyTainted, plan.Tainted)
+	// 3. 差し戻すのは、不備検出で enable、かつ再判定でないときだけ。それ以外は done にして止めない。
 	sendsBack := final == finalFlawed && effective == config.Enable && !plan.Rejudge
 	target := done
 	if sendsBack {

@@ -27,7 +27,7 @@ func RepoRoot(t *testing.T) string {
 	}
 }
 
-// SameJSON は Go の答えを JSON にして、見本（Python の答えの写し）とキーごとに比べる。
+// SameJSON は Go の答えを JSON にして、見本とキーごとに比べる。
 func SameJSON(t *testing.T, got, want map[string]any) {
 	t.Helper()
 	data, err := json.Marshal(got)

@@ -23,7 +23,7 @@ const dirName = config.OpsDir
 // idLen は操作ID の桁数（uuid4().hex と同じ 32 桁の 16 進）。
 const idLen = 32
 
-// idSeparator は IDFor が部品をつなぐ字（Python の "\x1f"）。
+// idSeparator は IDFor が部品をつなぐ字（区切りの制御文字 0x1f）。
 const idSeparator = "\x1f"
 
 // Kind は操作の種類。
@@ -65,8 +65,7 @@ const (
 	stageDraft   StageKind = "draft"
 )
 
-// Error は記録を読み書きできない、または形が合わない。Error() は Python の str(OpError) と同じ文。
-// このパッケージが返すエラーはすべてこの型。
+// Error は記録を読み書きできない、または形が合わない。このパッケージが返すエラーはすべてこの型。
 type Error struct{ msg string }
 
 func (e *Error) Error() string { return e.msg }
@@ -106,7 +105,7 @@ type StageSpec struct {
 	Kind StageKind
 }
 
-// Record は記録 1 つ。Repo・Choices・Plan・Applied・Shown の中身は呼び手の JSON をそのまま持つ。
+// Record は記録 1 つ。Repo・Choices・Plan・Applied・Shown の中身は呼び手の JSON をそのまま入れる。
 type Record struct {
 	ID          string
 	Kind        Kind
@@ -248,7 +247,7 @@ func dir(state string) string { return ospath.Join(state, dirName) }
 
 func recordPath(state, id string) string { return ospath.Join(dir(state), id+fsio.JSONExt) }
 
-// fromObject は読んだ JSON を記録にする。Python が読めた形（version・id・stages）に加えて、
+// fromObject は読んだ JSON を記録にする。version・id・stages に加えて、
 // 段階とマップの欄の型も確かめる（合わなければ形が合わない記録として止める）。
 func fromObject(id string, o *pyjson.Object) (*Record, error) {
 	bad := fail(msgBadShape, id)

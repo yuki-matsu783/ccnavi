@@ -48,7 +48,7 @@ const (
 	noneCount     = "none"
 )
 
-// `\S` と `\d` は Python と同じく Unicode で読むので pyre。区切りには日本語入力で入りやすい全角空白（U+3000）も使える。
+// `\S` と `\d` は Unicode の字で読むので pyre を使う。区切りには日本語入力で入りやすい全角空白（U+3000）も使える。
 var (
 	signalLine, signalErr   = pyre.Compile(`^- 信号:[ \t\u3000]*(?P<value>\S+)`, 0)
 	issueRest, issueErr     = pyre.Compile(`^#?\d+[ \t\u3000]+\S`, 0)
@@ -87,6 +87,7 @@ type record struct {
 
 // parse は記録の文面を読む。読み取りの検査に落ちれば (nil, 理由)。
 func parse(ident, text string) (*record, string) {
+	// 1. frontmatter を切り出して YAML として読む（BOM と CRLF は除く）。
 	text = strings.ReplaceAll(strings.TrimLeft(text, yaml.BOM), "\r\n", "\n")
 	lines := strings.Split(text, "\n")
 	if ospath.Strip(lines[0]) != fence {
@@ -111,6 +112,7 @@ func parse(ident, text string) (*record, string) {
 	if !front.Has(learningsKey) {
 		return nil, "`learnings` が無い"
 	}
+	// 2. learnings の件数を読む。`none` か 0 以上の整数だけ。桁の多い整数も *big.Int で受ける。
 	rec := &record{ident: ident}
 	switch raw := front.Get(learningsKey); x := raw.(type) {
 	case string:
@@ -130,6 +132,7 @@ func parse(ident, text string) (*record, string) {
 	default:
 		return nil, badCount(raw)
 	}
+	// 3. 本文から節（見出し）ごとに、処理の行と信号の行を集める。
 	for _, line := range lines[end+1:] {
 		n := len(rec.sections)
 		switch {
@@ -300,6 +303,7 @@ func inboxFiles(treeRoot string) ([]string, string) {
 // Find は treeRoot の HEAD で、統合の子が処理すべきものを並べる。直せない記録は Items に入れず別に返す。
 func Find(treeRoot string) *Pending {
 	out := &Pending{}
+	// 1. HEAD の記録の置き場を名前順に読む（同名なら mode 順。並びが毎回同じになる）。
 	names, why, ok := listing(treeRoot, LearningDir)
 	if !ok {
 		out.unreadable = append(out.unreadable, problem{LearningDir + "/", why})
@@ -310,6 +314,7 @@ func Find(treeRoot string) *Pending {
 		}
 		return names[i].mode < names[j].mode
 	})
+	// 2. 記録（.md）を 1 つずつ見る。通常のファイルでない・読めない・読み取りの検査に落ちる記録は unreadable、整合の検査に落ちる記録は inconsistent に分け、処理すべきものには数えない。
 	for _, e := range names {
 		if !strings.HasSuffix(e.name, config.MdExt) {
 			continue
@@ -333,12 +338,14 @@ func Find(treeRoot string) *Pending {
 			out.inconsistent = append(out.inconsistent, problem{rel, bad})
 			continue
 		}
+		// 整合した記録の節のうち、処理済みでないものを処理すべきものとして挙げる。
 		for i := range rec.sections {
 			if reason := sectionProblem(treeRoot, rec.ident, &rec.sections[i]); reason != "" {
 				out.Items = append(out.Items, Item{rel, rec.sections[i].title, reason})
 			}
 		}
 	}
+	// 3. 受信箱のファイルは、中身を問わず判定して消す対象として挙げる。
 	inbox, why := inboxFiles(treeRoot)
 	if why != "" {
 		out.unreadable = append(out.unreadable, problem{wiki.InboxDir + "/", why})
@@ -355,6 +362,7 @@ func sectionProblem(treeRoot, ident string, sec *section) string {
 	if !ok {
 		return "処理の行が無い"
 	}
+	// 処理の種類ごとに、後ろに必要なもの（対象外は理由、issue は番号と理由）があるか見る。信号が「誤り」の学びは仕様バグなので、対象外では消せない。
 	switch kind {
 	case processSkip:
 		if strings.HasPrefix(sec.signal, signalError) {
@@ -374,6 +382,7 @@ func sectionProblem(treeRoot, ident string, sec *section) string {
 	if rest == "" {
 		return "`処理: 反映` の後ろにパターン名が無い"
 	}
+	// 反映は、指すパターンがあり、その観測元にこの記録の ID があり、観測元が最小件数以上あるときだけ処理済み（1 件の気づきでパターンにしない）。
 	sources, ok := patternSources(treeRoot, rest)
 	if !ok {
 		return "`処理: 反映 " + rest + "` が指すパターンが無い（" + wiki.PatternsDir + "/" + rest + ".md）"

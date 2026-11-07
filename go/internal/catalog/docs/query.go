@@ -151,7 +151,7 @@ func joined[T ~string](values []T) string {
 	return strings.Join(parts, " / ")
 }
 
-// text は値を比べる・出す文字列にする（Python の _text）。None は空、真偽は true・false、入れ子は詰めた JSON。
+// text は値を比べる・出す文字列にする。null は空、真偽は true・false、入れ子は詰めた JSON。
 func text(v any) string {
 	switch x := v.(type) {
 	case nil:
@@ -273,6 +273,7 @@ func search(rows []docindex.Row, q Query) ([]docindex.Row, int) {
 			hits = append(hits, r)
 		}
 	}
+	// 並べ替えは、指定の欄（小文字にそろえた値）→ concept_id（NFC）の順。同じ欄の値のとき、どの機械でも同じ順になる。
 	type keyed struct {
 		first, id string
 		row       docindex.Row
@@ -303,6 +304,7 @@ func search(rows []docindex.Row, q Query) ([]docindex.Row, int) {
 	if q.Reverse {
 		slices.Reverse(hits)
 	}
+	// matched は Limit で切る前の数。件数の行（matched= shown=）に使う。
 	matched := len(hits)
 	if q.Limit > 0 && len(hits) > q.Limit {
 		hits = hits[:q.Limit]

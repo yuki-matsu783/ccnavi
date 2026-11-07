@@ -107,6 +107,7 @@ func judgeChild(repo string, c child, reference string, confirmed bool, tool str
 	if reference != "" {
 		base = commitOf(repo, reference)
 	}
+	// 取り消した子は、親に入っていないコミットを含みうる。ユーザが確認したときだけ消し、確認がなければ尋ねる側に倒す。
 	if c.kind == cancelled {
 		extra := ""
 		if base != "" && !isAncestor(repo, tip, base) {
@@ -121,6 +122,9 @@ func judgeChild(repo string, c child, reference string, confirmed bool, tool str
 		}
 		return dropBranch(repo, name, tip, "取り消した子。ユーザが確認した")
 	}
+	// 合流した子は、次の条件を全部満たすときだけ消す。1 つでも欠ければ残す（成果を失わない側に倒す）。
+	// (a) 記録に merged_sha がある (b) その sha が手元にある (c) ブランチの先頭が merged_sha と同じ
+	// (d) merged_sha が push 済みの親（origin/<親のブランチ>）の祖先である
 	if c.mergedSHA == "" {
 		return keep(repo, name, "合流した先頭の sha（merged_sha）が記録に無く、合流済みか確かめられない")
 	}
@@ -212,6 +216,7 @@ func parentRefusal(root, family string, refused worktrees.Dropped) string {
 // 消さなかったものがあれば 1。
 func RunRetire(stdout, stderr io.Writer, conf *config.Settings, root, family, cwd string) int {
 	family = worktrees.FamilyFor(approval.ScanApproved(conf, root, nil), family)
+	// 1. 前の回の記録（ready が書いた子の一覧）を読む。壊れていれば、子の一覧が分からないので何も消さない。
 	held, broken := heldEmpty(), ""
 	if conf.State != "" {
 		held, broken = heldRecord(recordPath(conf, family))
@@ -220,10 +225,12 @@ func RunRetire(stdout, stderr io.Writer, conf *config.Settings, root, family, cw
 		fmt.Fprintf(stderr, "ccnavi: 親 %s の片付けの記録を読めない（%s）。子の一覧が分からないので、何も消さない。直すか消してから打ち直す\n", family, broken)
 		return 1
 	}
+	// 2. 親のワークツリーを消せない状態（cwd が中にあるなど）なら、子も含めて何も消さない。
 	if refused := worktrees.Blocked(root, family, cwd); refused != nil {
 		fmt.Fprintf(stderr, "%s\n", parentRefusal(root, family, *refused))
 		return 1
 	}
+	// 3. 片付ける子を集める。記録の子を先に採り、閉じた子の一覧は記録に無いものだけを足す。
 	children := map[string]child{}
 	for _, c := range childrenFrom(held) {
 		children[c.ticket] = c
@@ -238,6 +245,7 @@ func RunRetire(stdout, stderr io.Writer, conf *config.Settings, root, family, cw
 	if branch == "" && ospath.IsDir(parentPath) {
 		branch, _ = tree.BranchOf(parentPath)
 	}
+	// 4. 親のブランチ名から、合流済みを確かめる基準（origin/<親のブランチ>）を決める。記録に無ければ、親のワークツリーの今のブランチを使う。
 	reference := ""
 	if branch != "" {
 		reference = originPrefix + branch
@@ -268,6 +276,7 @@ func RunRetire(stdout, stderr io.Writer, conf *config.Settings, root, family, cw
 			code = 1
 		}
 	}
+	// 取り消した子のブランチはユーザの確認が要るので、まとめて見せて終える。エージェントからは消さない。
 	if len(asking) > 0 {
 		fmt.Fprint(stdout, "取り消した子のブランチ（親に取り込まれていないコミットを含みうる）。"+
 			"この一覧をユーザに見せる。消すのはユーザで、消してよければ次のコマンドを"+
@@ -393,9 +402,11 @@ func mergedBlocker(repo, branch, tip, headSHA string) string {
 // 消した、または元から無い）。
 //
 // 順は、ブランチの確認、ワークツリーの削除、ブランチの削除。同じ名前のブランチを作り直して使っている親の
-// ワークツリー（MR の先頭に含まれない先頭を持つ）を先に消さないため。ブランチが確認を通らなければ、ワークツリー
+// ワークツリー（MR の先頭に含まれない先頭にいる）を先に消さないため。ブランチが確認を通らなければ、ワークツリー
 // も消さない。記録が読めなければ子は片付けず、記録も消さない。
 func RunMerged(stdout io.Writer, conf *config.Settings, root, family, project, branch, headSHA, cwd string) int {
+	// 1. 親のブランチとワークツリーを片付ける。親のブランチの先頭が、push 済みの先頭と MR の先頭（headSHA）の両方に含まれるときだけ消す。
+	// clean は、全部片付いたか（記録を消してよいか）を表す。
 	repo := repoDir(conf, root, project)
 	clean := true
 	tip := tipOf(repo, branch)
@@ -427,6 +438,7 @@ func RunMerged(stdout io.Writer, conf *config.Settings, root, family, project, b
 			}
 		}
 	}
+	// 2. 前の回の記録に残る子を片付け直す。記録が壊れていれば子は触らず、記録も消さない。
 	path := recordPath(conf, family)
 	held, broken := heldEmpty(), ""
 	if path != "" {
@@ -458,6 +470,7 @@ func RunMerged(stdout io.Writer, conf *config.Settings, root, family, project, b
 			fmt.Fprintf(stdout, "%s\n", o.text)
 		}
 	}
+	// 全部片付いたときだけ記録を消す。残りがあれば記録を残し、次の `sync tidy` で続きを片付ける。答えの `record yes|no` は、sh が記録の有無を決めるために読む。
 	if clean && len(asking) == 0 && path != "" && ospath.DiskLexists(path) {
 		fsio.Unlink(path)
 	}

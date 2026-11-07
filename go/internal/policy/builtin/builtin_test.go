@@ -18,7 +18,7 @@ import (
 	"ccnavi/internal/policy/texts"
 )
 
-// 組み込みのルールの並び・id・式・文面・当たり方を、Python の builtin の答えの写し（testdata）と突き合わせる。
+// 組み込みのルールの並び・id・式・文面・当たり方を、答えの見本（testdata）と突き合わせる。
 
 const rootMark = "{ROOT}"
 
@@ -84,7 +84,7 @@ func workspace(t *testing.T, wrapper bool) string {
 	return root
 }
 
-// settingsFor は Python の Settings(project_home=…) と同じ値。moved なら実行ファイルと共通レイヤーの置き場を持つ。
+// settingsFor は見本を取ったときの設定（project_home を渡した Settings）と同じ値を作る。moved なら実行ファイルと共通レイヤーの置き場を持つ。
 func settingsFor(root string, moved bool) *config.Settings {
 	conf := &config.Settings{ProjectHome: config.DefaultProjectHome}
 	if moved {
@@ -230,7 +230,7 @@ func goAnswer(ws wsCase) answer {
 	return a
 }
 
-func TestMatchesPython(t *testing.T) {
+func TestMatchesGolden(t *testing.T) {
 	cases := []wsCase{
 		{Root: workspace(t, false)},
 		{Root: workspace(t, true)},
@@ -238,7 +238,7 @@ func TestMatchesPython(t *testing.T) {
 	}
 	want := golden.Load[[]answer](t, "builtin")
 	if len(want) != len(cases) {
-		t.Fatalf("Python の答えが %d 件（%d 件のはず）", len(want), len(cases))
+		t.Fatalf("見本が %d 件（%d 件のはず）", len(want), len(cases))
 	}
 	for i, ws := range cases {
 		got := goAnswer(ws)

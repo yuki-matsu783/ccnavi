@@ -41,7 +41,7 @@ const (
 )
 
 // shaForm は依頼のマーカーに記録された HEAD の形。
-// Python の re.match の `$` は末尾の改行 1 つの前でも当たるので `\n?\z` にする。
+// マーカーの値は末尾に改行 1 つが付いて届くことがあるので、`\n?\z` で許す。
 var shaForm = regexp.MustCompile(`\A[0-9a-f]{7,64}\n?\z`)
 
 // IsSHA はマーカーの head が sha の形をしているか。マーカーは親のブランチに乗って他の機械から届くので、
@@ -50,9 +50,12 @@ func IsSHA(value string) bool {
 	return shaForm.MatchString(value)
 }
 
-// MovedDetail は、依頼の後にユーザが見るものが動いたかを返す。手元の confirm と Chrome のレビュー済みが、この関数で同じように決める。head は親のブランチの今の先頭である。changed は、依頼時の先頭から head までに変わったパス（置き場で絞る前）である。読めなかった場合（差分を取れない、ホストの一覧が打ち切られた、依頼時のコミットが祖先でない）は listed が偽になり、動いたと数える。project はプロジェクトの親のときに真になる。その場合だけ、ミラー側が動いたもの（kindMirror）を見る。ワークスペース自身の親では、共通レイヤーが本体なので、ずれとは言わない。
+// MovedDetail は、依頼の後にユーザが見るものが動いたかを返す。手元の confirm と Chrome のレビュー済みが、この関数で同じように決める。head は親のブランチの今の先頭である。
+// changed は、依頼時の先頭から head までに変わったパス（置き場で絞る前）である。
+// 読めなかった場合（差分を取れない、ホストの一覧が打ち切られた、依頼時のコミットが祖先でない）は listed が偽になり、動いたと数える。project はプロジェクトの親のときに真になる。
+// その場合だけ、ミラー側が動いたもの（kindMirror）を見る。ワークスペース自身の親では、共通レイヤーが本体なので、ずれとは言わない。
 //
-// ccnavi 自身の置き場（承認済みチケットと提案）だけを変えたコミットは、動いたと数えない。依頼のマーカーはそこに置かれ、親のブランチにコミットされる。数えると、依頼の直後に必ず動いたことになってしまうからである。
+// ccnavi 自身の置き場（承認済みチケットと提案）だけを変えたコミットは、動いたと数えない。依頼のマーカーはそこに置かれ、親のブランチにコミットされる。数えると、依頼の直後に必ず動いたことになってしまうため。
 func MovedDetail(conf *config.Settings, requested *pyjson.Object, head string, changed []string, listed, project bool) Moved {
 	recorded := markText(requested, "head")
 	if recorded == "" {
@@ -87,7 +90,8 @@ func seenPaths(conf *config.Settings, paths []string) []string {
 	return seen
 }
 
-// MovedInTree は、MovedDetail を親のワークツリーの git から読んで決める。動いていなくても、親のブランチの HEAD が push されていなければ止める。ユーザがマージで見るのはリモートの HEAD だからである。push の判定でも、置き場は数えない。
+// MovedInTree は、MovedDetail を親のワークツリーの git から読んで決める。動いていなくても、親のブランチの HEAD が push されていなければ止める。
+// ユーザがマージで見るのはリモートの HEAD のため。push の判定でも、置き場は数えない。
 func MovedInTree(conf *config.Settings, treeRoot string, requested *pyjson.Object, project bool) Moved {
 	head := git.Head(treeRoot, git.Options{Timeout: git.ReviewTimeout})
 	if head == "" {

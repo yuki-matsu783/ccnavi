@@ -2,7 +2,7 @@ package yaml
 
 import "testing"
 
-// 囲いの読み方の違い（頭の空白・`...` の閉じ）。読み手ごとの答えは各パッケージの Python との突き合わせが見る。
+// 囲いの読み方の違い（頭の空白・`...` の閉じ）。読み手ごとの答えは、それぞれの読み手を使うパッケージのテストが見る。
 func TestFrontBody(t *testing.T) {
 	plain, document, bom := FrontStyle{Indented: true}, FrontStyle{DocEnd: true}, FrontStyle{SkipBOM: true}
 	cases := []struct {

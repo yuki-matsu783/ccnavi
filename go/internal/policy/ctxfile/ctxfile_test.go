@@ -131,7 +131,7 @@ func TestEveryAndOnce(t *testing.T) {
 			t.Errorf("%d 回目: %q %v", i+1, got[i], told[i])
 		}
 	}
-	// 数えは刻みか once を持つルールだけ。キーの順に並べ、Python と同じ形で書く。
+	// 数えは刻みか once を持つルールだけ。キーの順に並べて書く。
 	if s := readGiven(t, oncePath(state, "s1", "")); s != `{"given": {"r": 7}}` {
 		t.Errorf("%s", s)
 	}
@@ -169,7 +169,7 @@ func TestUnreadableStateIsKept(t *testing.T) {
 	if text, _ := Deliver(&stderr, state, input("s1", ""), []*rules.Rule{onceRule()}, Options{QuietWhenUnsure: true}); text != "" {
 		t.Errorf("%q", text)
 	}
-	// 数えに真偽が入っていれば Python と同じく 1 と数える。
+	// 数えに真偽が入っていれば 1 と数える。
 	write(t, path, `{"given": {"note": true, "x": "a", "y": 1.5}}`)
 	if text, _ := Deliver(&stderr, state, input("s1", ""), []*rules.Rule{onceRule()}, Options{}); text != "" {
 		t.Errorf("%q", text)
@@ -237,7 +237,7 @@ func TestForget(t *testing.T) {
 	Forget("", "s-1", true)
 }
 
-func TestNamesMatchPython(t *testing.T) {
+func TestStateFileNames(t *testing.T) {
 	if got := filepath.Base(oncePath("/s", "", "")); got != "once-unknown-main.json" {
 		t.Error(got)
 	}

@@ -212,7 +212,7 @@ func pruneEmpty(base string) {
 	}
 }
 
-// readStrict は中身。無ければ existed が偽で why は空、在るのに読めなければ why に理由（str(OSError)）。
+// readStrict は中身。無ければ existed が偽で why は空、在るのに読めなければ why に OS の文言の理由。
 func readStrict(path string) (content []byte, existed bool, why string) {
 	data, err := fsio.ReadDiskBytes(path)
 	if errors.Is(err, fs.ErrNotExist) {

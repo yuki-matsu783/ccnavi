@@ -65,6 +65,7 @@ func places(conf *config.Settings, root string) []source {
 	if h != "" {
 		own = []string{h}
 	}
+	// ワークスペースの索引からは、ccnavi ディレクトリとプロジェクトの置き場を外す（プロジェクトの中は、プロジェクト自身の git で別に拾う）。
 	workspace := append([]string(nil), own...)
 	if conf.Projects != "" {
 		if rel := relTo(conf.Projects, root); rel != "" {
@@ -74,6 +75,7 @@ func places(conf *config.Settings, root string) []source {
 	kept := keptDirs(h)
 	found := []source{{name: workspaceName, base: root, excluded: workspace, kept: kept}}
 	for _, project := range tree.Projects(conf.Projects) {
+		// 索引の concept_id はワークスペースルートからの相対にそろえる。ルートの外にあるプロジェクト（相対にできない）は、置き場の名前＋プロジェクト名を仮の接頭辞にする。
 		prefix := relTo(project.Root, root)
 		if prefix == "" {
 			prefix = ospath.Basename(ospath.Normpath(conf.Projects)) + "/" + project.Project
@@ -105,7 +107,7 @@ func withoutGit(conf *config.Settings) []string {
 // collected はワークスペースとプロジェクトを合わせた索引。パスはワークスペースルートから。
 type collected struct {
 	rows []docindex.Row
-	// unignored は md を持つが ccnavi-index.jsonl を無視していないので対象外にしたツリーの名前。
+	// unignored は、md があるのに ccnavi-index.jsonl を git が無視していないので対象外にしたツリーの名前。
 	unignored []string
 	// failed は git への問い合わせに失敗したツリー（名前: 理由）。対象外とも git の外とも別。
 	failed []string
@@ -146,6 +148,7 @@ func collect(conf *config.Settings, root string, o collectOptions) *collected {
 		}
 		built, err := docindex.Build(p.base, docindex.Options{Excluded: p.excluded, Kept: p.kept,
 			Refresh: o.refresh, Parse: o.parse, Deadline: o.deadline})
+		// git のツリーでない所は何も言わずに飛ばす。他の失敗は理由を残し、引く側に伝える。
 		if errors.Is(err, docindex.ErrNotRepository) {
 			continue
 		}
@@ -171,6 +174,7 @@ func collect(conf *config.Settings, root string, o collectOptions) *collected {
 		}
 		for _, row := range built.Rows {
 			moved := row.Prefixed(p.prefix)
+			// 同じ concept_id は先に見つけたもの（ワークスペース、次にプロジェクトの順）を優先する。表記ゆれ（NFC と NFD）は同じものとして数える。
 			key := pyfmt.NFC(moved.ConceptID())
 			if seen[key] {
 				continue

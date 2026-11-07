@@ -52,7 +52,7 @@ var rejectsCwds = []string{"", ".claude/worktrees/i0001", ".claude/worktrees/i00
 var guardedRels = []string{".claude/hooks/guard.sh", ".ccnavi/config/common/rules.yml", ".ccnavi/approved/doing/x.md",
 	"src/app.py", "src/secret/k"}
 
-func TestRejectsMatchesPython(t *testing.T) {
+func TestRejectsMatchesGolden(t *testing.T) {
 	root := rejectsWorkspace(t)
 	want := golden.Load[map[string]any](t, "rejects")
 	conf := testkit.Settings(t, root)

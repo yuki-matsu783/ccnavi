@@ -40,6 +40,7 @@ const (
 // 承認済みの領域の外の名前から書き換えられる）。treeRoot を渡せば、そこからファイルまでの途中にリンクが
 // あるものも読まない。確かめてから開くまでに差し替えられても、開いたものが違えば読まない。
 func ReadBytes(file, treeRoot string) ([]byte, string) {
+	// 1. 開く前に確かめる。途中のリンク、ふつうのファイルか、ハードリンクの数、大きさの順。
 	if treeRoot != "" && pathmatch.HasLink(treeRoot, file) {
 		return nil, linked
 	}
@@ -59,6 +60,7 @@ func ReadBytes(file, treeRoot string) ([]byte, string) {
 	if before.Size() > fileLimit {
 		return nil, fmt.Sprintf("大きすぎるので読まない（%d バイト、上限 %d）", before.Size(), fileLimit)
 	}
+	// 2. リンクを辿らずに開き、開いたものが 1. で見たものと同じファイルかを確かめる（確かめてから開くまでの差し替えを防ぐ）。
 	f, after, err := fsio.OpenNoFollow(file)
 	if err != nil {
 		return nil, unreadable(err)
@@ -73,6 +75,7 @@ func ReadBytes(file, treeRoot string) ([]byte, string) {
 	if n, ok := ospath.HardLinks(file); ok && n > 1 {
 		return nil, hardLinked
 	}
+	// 3. 上限より 1 バイト多く読み、超えたかどうかで大きすぎるファイルを断る（全部を読み込まない）。
 	raw, err := io.ReadAll(io.LimitReader(f, fileLimit+1))
 	if err != nil {
 		return nil, unreadable(err)
@@ -83,7 +86,7 @@ func ReadBytes(file, treeRoot string) ([]byte, string) {
 	return raw, ""
 }
 
-// unreadable は OSError の strerror を添えた理由（Python の exc.strerror）。番号の無いエラーは型の名前。
+// unreadable は OS のエラーの説明（strerror）を添えた理由。番号の無いエラーは型の名前。
 func unreadable(err error) string {
 	return "読めない (" + Clean(cmp.Or(fsio.StrError(err), "OSError")) + ")"
 }
@@ -143,7 +146,7 @@ func yamlProblem(err error) string {
 	return e.Problem
 }
 
-// jsonMark は AsJSON の目印のキー。JSON にそのまま載らない値をこのキーを持つオブジェクトで表す。
+// jsonMark は AsJSON の目印のキー。JSON にそのまま載らない値をこのキーを入れたオブジェクトで表す。
 const jsonMark = "$ccnavi"
 
 // safeInt は JSON の数として拡張（JavaScript）が崩さずに読める整数の範囲。

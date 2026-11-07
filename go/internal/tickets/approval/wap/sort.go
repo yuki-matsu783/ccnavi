@@ -35,7 +35,8 @@ const (
 
 var (
 	// temp は書きかけの一時ファイル（fsio の `.<名前>.<一意>.part.*`、フローの保存の `flows/.*.tmp`、
-	// configsync の `*.ccnavi-sync`）。Python の search の `$` は末尾の改行 1 つの前でも当たるので `\n?\z` にする。
+	// configsync の `*.ccnavi-sync`）。末尾に改行が 1 つ付いていても当たる
+	// （`$` と同じ扱い）ので `\n?\z` にする。
 	temp = regexp.MustCompile(`(?:(?:\A|/)\.[^/]*\.part(?:\.[^/]*)?|(?:\A|/)flows/\.[^/]*\.tmp|\.ccnavi-sync)\n?\z`)
 	// number はマーカーのフェーズ番号（ASCII の数字だけ。全角の数字は通さない）。
 	number = regexp.MustCompile(`\A[0-9]+\z`)
@@ -113,7 +114,7 @@ func changedPaths(treeRoot string, where places, since string) ([]string, string
 	return out, ""
 }
 
-// failureText は Python の (done.err or done.failure).strip()。
+// failureText は git の失敗の文。標準エラーが空なら failure を使い、前後の空白を落とす。
 func failureText(done git.Done) string {
 	text := done.Stderr
 	if text == "" && done.Failure != nil {
@@ -130,8 +131,11 @@ type contents struct {
 	readable    bool
 }
 
-// classify は、変更のリストを分ける。since が無ければ未コミット（今の中身と HEAD）を、あれば HEAD と since を比べる。ユーザの判断が一緒に書く移動は、組の両側を見て (c) にする。at を渡せば、ready がこのツリーから退避した削除を (b) にする（ArchivedRemoval）。approvedRel・reviewRel は、ツリーからの相対の置き場である。上から当てて、最初に当たったものを採る。
+// classify は、変更のリストを分ける。since が無ければ未コミット（今の中身と HEAD）を、あれば HEAD と since を比べる。
+// ユーザの判断が一緒に書く移動は、組の両側を見て (c) にする。at を渡せば、ready がこのツリーから退避した削除を (b) にする
+// （ArchivedRemoval）。approvedRel・reviewRel は、ツリーからの相対の置き場。上から当てて、最初に当たったものを採る。
 func classify(treeRoot, approvedRel, reviewRel, parent string, changed []string, since string, at *archiveAt) []entry {
+	// 1. ready の退避マーカーを読む。マーカーは、書いたときの先頭と比べる版が同じ間だけ効く。
 	var ready map[string]bool
 	if at != nil {
 		// マーカーが効くのは、書いたときの先頭と比べている版が同じ間だけ（未コミットなら HEAD）。
@@ -141,6 +145,7 @@ func classify(treeRoot, approvedRel, reviewRel, parent string, changed []string,
 		}
 		ready = archive.ReadyFiles(at.root, at.project, treeRoot, archive.TreeHead(treeRoot, rev))
 	}
+	// 2. 変更したパスごとに、今の中身と比べ先の中身を読む（どちらかを読めなければ (d)）。
 	opts := git.Options{Timeout: git.MergeTimeout}
 	states := map[string]contents{}
 	for _, rel := range changed {
@@ -156,6 +161,7 @@ func classify(treeRoot, approvedRel, reviewRel, parent string, changed []string,
 		c.readable = ok && okBefore
 		states[rel] = c
 	}
+	// 3. 追加と削除の判定。ユーザの判断が書く「review/ から done/ への移動」は、組の両側を見て分ける。
 	added := func(rel string) bool {
 		c, ok := states[rel]
 		return ok && c.readable && c.before == nil && c.now != nil
@@ -164,6 +170,7 @@ func classify(treeRoot, approvedRel, reviewRel, parent string, changed []string,
 		c, ok := states[rel]
 		return ok && c.readable && c.before != nil && c.now == nil
 	}
+	// 4. 上から当てて、最初に当たった分類を採る。一時ファイル→読めない→review/→承認済みの領域の外→領域の中（ccnavi が書いたマーカー→判定の記録→ユーザの判断）。
 	out := make([]entry, 0, len(changed))
 	for _, rel := range changed {
 		c := states[rel]
@@ -244,7 +251,9 @@ func hookMark(parts []string, parent string, now, before []byte) bool {
 	return true
 }
 
-// ArchivedRemoval は、ready の退避が消したものかを返す。rel は承認済みの領域からの相対である。ready のマーカー（そのツリーから ready が移したファイルの一覧）に載っていて、消えた中身が手元の退避したコピーと同じときだけ真になる。マーカーは、記録の保護がエージェントの書き込みを止める。退避の置き場の途中にリンクがあれば、コピーは読まない（ArchivedBytes）。
+// ArchivedRemoval は、ready の退避が消したものかを返す。rel は承認済みの領域からの相対パス。
+// ready のマーカー（そのツリーから ready が移したファイルの一覧）に載っていて、消えた中身が手元の退避したコピーと同じときだけ真になる。
+// マーカーは、記録の保護がエージェントの書き込みを止める。退避の置き場の途中にリンクがあれば、コピーは読まない（ArchivedBytes）。
 func ArchivedRemoval(rel string, now, before []byte, ready map[string]bool, root, project string) bool {
 	if now != nil || before == nil || !ready[rel] || !archive.InReadyPlaces(rel) {
 		return false
@@ -259,7 +268,12 @@ func judgeRecord(parts []string) bool {
 		strings.HasSuffix(parts[2], "."+string(marks.Judge)+fsio.JSONExt)
 }
 
-// human は、ユーザの判断が書くものの形かを返す（形だけで見る。(c) も (d) も、write-and-push は止める）。対象は、フローの本文、ユーザの承認で置かれた承認済みチケット、reviewed・(b) でない skipped・close-early・受け入れ台帳、ユーザの判断が消したマーカー、ユーザの判断が一緒に書く移動（review/ から done/、doing/ から done/）である。
+// human は、ユーザの判断が書くものの形かを返す（形だけで見る。(c) も (d) も、write-and-push は止める）。対象は次のとおり。
+//   - フローの本文
+//   - ユーザの承認で置かれた承認済みチケット
+//   - reviewed・(b) でない skipped・close-early・受け入れ台帳
+//   - ユーザの判断が消したマーカー
+//   - ユーザの判断が一緒に書く移動（review/ から done/、doing/ から done/）
 func human(parts []string, approvedRel, reviewRel string, added, removed func(string) bool) bool {
 	rel := approvedRel + "/" + strings.Join(parts, "/")
 	doing, done := string(place.Doing), string(place.Done)

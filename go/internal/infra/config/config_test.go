@@ -29,11 +29,11 @@ func TestTunableValue(t *testing.T) {
 		{"inf", true, 3 * time.Second},
 		{"-inf", true, 3 * time.Second},
 		{"1e999", true, 3 * time.Second},
-		{"0x10", true, 3 * time.Second}, // Python の float は 16 進を読まない
+		{"0x10", true, 3 * time.Second}, // float の綴りは 16 進を読まない
 		{"1__0", true, 3 * time.Second},
 		{"10", true, 10 * time.Second},
 		{" 0.5 ", true, 500 * time.Millisecond},
-		{"1_0", true, 10 * time.Second}, // Python の float は数字の間の _ を読む
+		{"1_0", true, 10 * time.Second}, // float の綴りは数字の間の _ を読む
 	}
 	for _, c := range cases {
 		if c.set {
@@ -291,7 +291,7 @@ func TestIntAndFinite(t *testing.T) {
 		want            int
 	}{
 		{" 5 ", 3, 2, 5}, {"1", 3, 2, 3}, {"x", 3, 2, 3}, {"", 3, 0, 3}, {"0", 3, 0, 0},
-		// int に収まらない値は端に寄せてから下限と比べる（Python は巨大な値のまま使う）。
+		// int に収まらない値は端に寄せてから下限と比べる（桁数の大きい値のまま使わない）。
 		{"99999999999999999999", 3, 2, math.MaxInt}, {"-99999999999999999999", 3, 2, 3},
 		{"-99999999999999999999", 3, math.MinInt, math.MinInt},
 	}

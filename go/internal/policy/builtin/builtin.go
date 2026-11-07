@@ -12,7 +12,7 @@ const (
 	// ConfigViaBashRuleID は Bash からガード自身の設定へ書き込む形。ルールファイルが読めないと既定に戻るため、
 	// シェルの書き込みで設定を壊し、保護の甘い既定に戻す手順を成り立たせないよう、読めない間も止める。
 	// 止めるのは書き込む形だけで、場所の名前では止めない。`git add`・`git restore --ours` でマージの衝突を解く手を止めると、
-	// ガードが機能しない状態から出られなくなるためである。
+	// ガードが機能しない状態から出られなくなるため。
 	ConfigViaBashRuleID = rules.ReservedIDPrefix + "guard-config-via-bash"
 	// gitDirRuleID と gitDirShellRuleID は、`.git` の中身を直接書き換える形（名指しのツールとシェル）。
 	// 適用する先（パスとコマンド文字列）が違うので id を分ける。読むだけなら止めない。
@@ -59,7 +59,7 @@ const (
 
 var (
 	// matchCredentials は設定で切れない土台なので、誤検知を承知で広げる。Grep・Glob・PowerShell は入れない。
-	// 探す先のパスは探索の中身を代表しないためである。
+	// 探す先のパスは探索の中身を代表しないため。
 	matchCredentials = rules.MatchOf(append([]string{config.ToolBash, config.ToolRead}, config.WriteTools()...)...)
 	matchWriteTools  = rules.MatchOf(config.WriteTools()...)
 )

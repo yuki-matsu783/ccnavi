@@ -129,6 +129,7 @@ func Measure(worktree, base, head string) (*Diff, string) {
 	if base == "" {
 		return nil, "子の仕事の始まり（親との共通の祖先）がありません。"
 	}
+	// 1. --numstat でパスごとの追加・削除の行数を読む。パスは NUL 区切りで読む（改行や引用符を含む名前でも崩れない）。
 	opts := git.Options{Timeout: git.RiskTimeout, RawPaths: true}
 	span := base + ".." + head
 	code, out := git.Output(worktree, []string{"diff", "--numstat", "-z", span}, opts)
@@ -156,6 +157,7 @@ func Measure(worktree, base, head string) (*Diff, string) {
 		path = ospath.Slashed(path)
 		changes.put(Change{path: path, added: count(cols[0]), deleted: count(cols[1]), status: "M", old: old})
 	}
+	// 2. --name-status で変更の種類（追加・削除・改名など）を足す。改名とコピーは元と先の 2 つのパスが続く。
 	code, out = git.Output(worktree, []string{"diff", "--name-status", "-z", span}, opts)
 	if code != 0 {
 		return nil, "子の仕事の始まりからの変更の種類を読めない"
@@ -186,9 +188,11 @@ func Measure(worktree, base, head string) (*Diff, string) {
 			changes.put(Change{path: path, status: kind})
 		}
 	}
+	// 3. 統合先を取り込んだ merge が持ち込んだだけのパスは、子が書いたものではないので数えない。
 	for path := range git.TakenFromRemote(worktree, base, head, git.RiskTimeout) {
 		changes.drop(path)
 	}
+	// 4. 測った先のコミットの sha を残す。判定の記録は、この sha と同じ差分にだけ効く。
 	code, sha := git.Output(worktree, []string{"rev-parse", head}, opts)
 	if sha = ospath.Strip(sha); code != 0 || sha == "" {
 		return nil, "測った先のコミットを読めない"
@@ -258,6 +262,7 @@ func scoped(d *Diff, f *Factor) *Diff {
 // 測れなかった script: は配点の全部を加点する（0 と数えて軽い側へ倒さない）。
 func Evaluate(d *Definition, diff *Diff, root, worktree string, env map[string]string, judgements *pyjson.Object) *Score {
 	score := &Score{}
+	// 項目を定義の順に当て、加点した項目（hits）と、測れなかった項目（unmeasured）、判定待ちの項目（Pending）を集める。
 	for _, f := range d.Factors {
 		hit := func(points int, detail string) {
 			score.hits = append(score.hits, hit{f.ID, points, detail, f.Source})
@@ -275,6 +280,7 @@ func Evaluate(d *Definition, diff *Diff, root, worktree string, env map[string]s
 			if n := scoped(diff, f).deletedFiles(); n > f.Limit {
 				hit(f.Points, fmt.Sprintf("%s（削除した %d > %d）", f.Message, n, f.Limit))
 			}
+		// パスの一致。一致したパスの数だけ加点し、上限（max）があればそこで切る。
 		case kindGlob:
 			var paths []string
 			for _, c := range diff.changes {
@@ -294,6 +300,7 @@ func Evaluate(d *Definition, diff *Diff, root, worktree string, env map[string]s
 				shown += "…"
 			}
 			hit(points, f.Message+"（"+shown+"）")
+		// スクリプトの出力を点にする。測れなければ、軽い側へ倒れないよう配点の全部を加点して unmeasured に残す。
 		case KindScript:
 			// 解く基準はそのレイヤーの git プロジェクトルート。
 			home := f.home
@@ -311,6 +318,7 @@ func Evaluate(d *Definition, diff *Diff, root, worktree string, env map[string]s
 				}
 				hit(points, f.Message+"（"+note+"）")
 			}
+		// 定性の項目。判定の記録の head が、いまの差分の head と違えば古い判定なので使わず、判定待ちに回す。
 		case KindJudge:
 			verdict, _ := judgements.Value(f.ID).(*pyjson.Object)
 			if head, ok := verdict.Value("head").(string); !ok || head != diff.Head {
@@ -329,6 +337,7 @@ func Evaluate(d *Definition, diff *Diff, root, worktree string, env map[string]s
 	for _, h := range score.hits {
 		score.points += h.points
 	}
+	// 点の合計から段階（Low〜Critical）を決める。
 	score.Level = d.levelOf(score.points)
 	return score
 }
@@ -344,6 +353,7 @@ func runScript(root, rel, worktree string, env map[string]string) (points int, n
 	for k, v := range env {
 		pairs = append(pairs, k+"="+v)
 	}
+	// 終了の様子ごとに、測れなかった理由を決める（起動できない・時間切れ・0 以外の終了）。
 	ran, err := shell.Script([]string{path}, worktree, pairs, shell.ScriptTimeout)
 	out, _ := fsio.Decode(ran.Stdout, fsio.Replace)
 	switch {
@@ -362,6 +372,7 @@ func runScript(root, rel, worktree string, env map[string]string) (points int, n
 		}
 		return 0, text, false
 	}
+	// 成功した出力を点に読む。0 以上の整数そのもの、または points を含む JSON のどちらか。
 	text := ospath.Strip(out)
 	if text == "" {
 		return 0, rel + " が何も出さなかった", false
@@ -383,7 +394,7 @@ func runScript(root, rel, worktree string, env map[string]string) (points int, n
 	return 0, rel + " の出力を点として読めない: " + pyfmt.Head(text, shownOutput), false
 }
 
-// startFailure は起動できなかった理由の、Python の例外の型の名前。
+// startFailure は起動できなかった理由を、例外名の形（FileNotFoundError など）で返す。点の判定に付ける理由の文に使う。
 func startFailure(err error) string {
 	switch {
 	case errors.Is(err, exec.ErrNotFound), errors.Is(err, fs.ErrNotExist):

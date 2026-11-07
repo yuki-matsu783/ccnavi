@@ -6,6 +6,4 @@
 // 置き場）に当たらない Read・Grep・Glob、読み切れて連結・置換・リダイレクト・glob を含まない単独のコマンドで許可の表に
 // 当たり、引数のパスが最低限の deny に当たらない Bash だけ。評価できなければ通さない。tickets の読み取りの道具の表は
 // 流用しない（`rg --pre` や `less` の `!` のようにコマンドを走らせられる道具を数えており、一方の緩みが他方に及ぶ）。
-//
-// Python からの対応: hook/failsafe の is_safe → IsSafe。read_is_safe・shell_is_safe は私的にした。
 package failsafe

@@ -95,7 +95,7 @@ func decideLearning(rows []wiki.Row, seen *pyjson.Object, threshold, noticeCount
 	return false, kept
 }
 
-// sameSeen は 2 つの記録が同じ中身か（並びは見ない。Python の dict の == と同じ）。
+// sameSeen は 2 つの記録が同じ中身か（並びは見ない）。
 func sameSeen(a, b *pyjson.Object) bool {
 	if a.Len() != b.Len() {
 		return false

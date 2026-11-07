@@ -91,9 +91,9 @@ func publish(t *testing.T, path string, sources map[string]int, target string) {
 	testkit.Git(t, path, "fetch", "-q", "origin")
 }
 
-// 同じ形のワークスペースを 2 つ作り、同じ順に変えながら、通知の文と通知済みの記録のバイト列が Python と同じことを
+// 同じ形のワークスペースを 2 つ作り、同じ順に変えながら、通知の文と通知済みの記録のバイト列が記録した答えと同じことを
 // 見る。リポジトリごとに別に判定し、決められないリポジトリは見送って記録を変えない。
-func TestLearningMatchesPython(t *testing.T) {
+func TestLearningMatchesGolden(t *testing.T) {
 	t.Setenv(env.Learning, "enable")
 	t.Setenv(env.LearningSources, "")
 	t.Setenv(env.LearningNoticeCount, "")

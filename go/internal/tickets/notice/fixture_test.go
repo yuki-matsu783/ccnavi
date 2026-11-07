@@ -24,7 +24,7 @@ func workspace(t *testing.T) string {
 	return root
 }
 
-// touch は更新時刻を決める（並びを Python と Go で同じにする）。
+// touch は更新時刻を決める（更新時刻の順が並びに効くので、記録した答えと同じ順になるよう固定する）。
 func touch(t *testing.T, path string, when time.Time) {
 	t.Helper()
 	if err := os.Chtimes(path, when, when); err != nil {

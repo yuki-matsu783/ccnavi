@@ -7,6 +7,4 @@
 //
 // SKILL.md の中身を誰が書いたか ccnavi には分からない。そこで、データとして区切りで囲み、1 行にまとめて切る
 // （flow.Line）。区切りの文は flow.fencePhrases に並べてあり、名前や説明の中に出たら置き換わる。
-//
-// Python からの対応: projskills。notice → Notice、index・entries・project_of・_front は非公開。
 package skills

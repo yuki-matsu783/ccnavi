@@ -67,7 +67,7 @@ func TestRootPlaceholders(t *testing.T) {
 		root:                                 false, // ルートそのものは中
 		root + "/README.md":                  false,
 		strings.ToUpper(root) + `\x.md`:      false, // 大文字小文字・区切りの違いは中
-		strings.ReplaceAll(root, "i", "İ"):   false, // İ・ı は i と同じに数える（Python の re と同じ。既知の例外）
+		strings.ReplaceAll(root, "i", "İ"):   false, // İ・ı は i と同じに数える（既知の例外）
 		strings.ReplaceAll(root, "i", "ı"):   false,
 		strings.ReplaceAll(root, "i", "j"):   true,
 		root + "-fork/x.md":                  true,

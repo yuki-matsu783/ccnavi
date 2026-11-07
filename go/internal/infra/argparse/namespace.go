@@ -2,7 +2,7 @@ package argparse
 
 import "ccnavi/internal/infra/pyfmt"
 
-// Namespace は読めた値（Python の vars(args)）。値は nil（None）・bool・string・int（Int）・[]any（並び）。
+// Namespace は読めた値（dest から値への対応）。値は nil（None）・bool・string・int（Int）・[]any（並び）。
 type Namespace map[string]any
 
 // IsNone は値が None か。
@@ -14,7 +14,7 @@ func (ns Namespace) Str(dest string) string {
 	return s
 }
 
-// Truthy は Python の bool(args.dest)。
+// Truthy は値が真か。None・false・0・空は偽（pyfmt.Truthy）。
 func (ns Namespace) Truthy(dest string) bool { return pyfmt.Truthy(ns[dest]) }
 
 // Int は整数の値。None なら false。
@@ -37,7 +37,7 @@ func (ns Namespace) Strings(dest string) []string {
 	return out
 }
 
-// Changed は値が既定値と違うか（Python の getattr(args, dest, default) != default）。
+// Changed は値が既定値と違うか。値が無い（渡されていない）なら false。
 func (ns Namespace) Changed(a *Action) bool {
 	v, ok := ns[a.Dest]
 	if !ok {
@@ -46,7 +46,7 @@ func (ns Namespace) Changed(a *Action) bool {
 	return !pyEqual(v, a.Default)
 }
 
-// pyEqual は Python の ==。bool は int として比べる（False == 0）。
+// pyEqual は値の等しさ。bool は int として比べる（false == 0）。
 func pyEqual(a, b any) bool {
 	if x, ok := asInt(a); ok {
 		y, ok := asInt(b)

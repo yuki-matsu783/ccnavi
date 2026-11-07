@@ -50,6 +50,7 @@ func Decide(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 		turn.Touch(conf.State, in.SessionID, time.Now())
 	}
 	switch in.Event {
+	// approval-request を打つ呼び出しを、結果が分かる前に登録する（Post で結びつけ、止められた・失敗したものも追えるようにするため）。
 	case hookio.PreToolUse:
 		code, err := judge.Before(stdout, stderr, mode, conf, root, in, record, deadline)
 		if err != nil {

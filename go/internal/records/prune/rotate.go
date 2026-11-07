@@ -71,6 +71,7 @@ func (r *run) rotate(logPath string, limit int64) bool {
 		r.report.rotated = append(r.report.rotated, rotation{r.shown(logPath), r.shown(previewName(logPath, r.now))})
 		return true
 	}
+	// 先にローテート先を押さえ、押さえてから名前を変える。
 	target, err := reserve(logPath, r.now)
 	if err == nil {
 		// 同じ時に始まった別のセッションが先に変えていれば、ここには小さい新しい記録がある。
@@ -141,7 +142,7 @@ func (r *run) pruneDiag(rotateMB, logDays float64) {
 	}
 	before := cutoff(r.now, days(logDays))
 	for _, name := range names {
-		// 拡張子は Python と同じく大文字小文字を区別して比べる（diaglog が書く名前は小文字だけ）。
+		// 拡張子は大文字小文字を区別して比べる（diaglog が書く名前は小文字だけ）。
 		if !strings.HasSuffix(name, diaglog.FileExt) {
 			continue
 		}
@@ -149,6 +150,7 @@ func (r *run) pruneDiag(rotateMB, logDays float64) {
 		if ospath.IsLink(path) || !ospath.IsFile(path) {
 			continue
 		}
+		// ローテート済みの名前（日時が付いたもの）は、さらにローテートせず保持日数だけで見る。
 		if rotateMB > 0 && !diagRotated.MatchString(name) && r.rotate(path, bytesOf(rotateMB)) {
 			continue
 		}

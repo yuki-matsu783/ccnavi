@@ -126,7 +126,7 @@ func TestTaintKeepsTheLatestCalls(t *testing.T) {
 	}
 }
 
-// 判定役に許す形と、作業者の印の見分けを Python と突き合わせる。止める形を通さないことが安全に直結する。
+// 判定役に許す形と、作業者の印の見分けを見本と突き合わせる。止める形を通さないことが安全に直結する。
 var commands = []string{
 	call,
 	"/w/.ccnavi/bin/ccnavi stop-review record s1 t",
@@ -193,12 +193,12 @@ var commands = []string{
 	"",
 }
 
-func TestCommandsMatchPython(t *testing.T) {
+func TestCommandsMatchGolden(t *testing.T) {
 	want := golden.Load[[][3]bool](t, "commands")
 	for i, command := range commands {
 		got := [3]bool{stopReviewCall(command), judgeCommandOK(command, cwd), judgeCommandOK(command, "")}
 		if got != want[i] {
-			t.Errorf("%q: %v, Python %v", command, got, want[i])
+			t.Errorf("%q: %v, want %v", command, got, want[i])
 		}
 	}
 }

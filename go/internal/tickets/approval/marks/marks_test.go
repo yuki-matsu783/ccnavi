@@ -11,7 +11,7 @@ import (
 	"ccnavi/internal/infra/pyjson"
 )
 
-// 書く形（キーの順・indent・時刻の足し方）は Python の答えの写しと突き合わせる approval の python_test が見る。
+// 書く形（キーの順・indent・時刻の足し方）は、見本と突き合わせる approval のテストが見る。
 // ここは消す順と溜める段、台帳の読めない形を見る。
 
 func TestClearTakesEveryKindInOrder(t *testing.T) {

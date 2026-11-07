@@ -72,12 +72,12 @@ func IDProblem(text string) string {
 	return ""
 }
 
-// IsValidID は識別子として読めるか。区切り文字と先頭の "." を持たないので、ファイル名を組む側と sh から
+// IsValidID は識別子として読めるか。区切り文字と先頭の "." を含まないので、ファイル名を組む側と sh から
 // 引数を受ける側が自分でも同じ検査を当てるのに使う。
 func IsValidID(text string) bool { return IDProblem(text) == "" }
 
 // IsValidName は ASCII の 1 語の名前の形か（プロジェクト・リスクとフェーズの定義の識別子・テンプレートの名前）。
-// 全文で見る。Python の `$` で書いた呼び手は、末尾の改行 1 つを外してから渡す。
+// 全文で見る。末尾の改行は許さないので、改行が付きうる呼び手は外してから渡す。
 func IsValidName(text string) bool { return namePattern.MatchString(text) }
 
 // IsValidFamily は sh から引数で渡る親の識別子の形か。識別子として読めて、パスとして読まれる ".." を含まない。
@@ -153,7 +153,7 @@ func IdentifierNumber(name string, prefixes []string) (int, bool) {
 	return f.Number, ok
 }
 
-// NextSerial は直接作業のワークツリー名に付ける次の通し番号（番号を持つ識別子の最大 + 1）。先頭の語が違っても
+// NextSerial は直接作業のワークツリー名に付ける次の通し番号（番号が付いた識別子の最大 + 1）。先頭の語が違っても
 // 同じ通し番号を使う。skipChildren が偽なら子の形の名前も数える（手元のブランチ名には親の居ない子が混ざる）。
 func NextSerial(names []string, prefixes []string, skipChildren bool) int {
 	most := 0
@@ -172,6 +172,7 @@ func NextSerial(names []string, prefixes []string, skipChildren bool) int {
 // NFKC で全角英数を半角に、ASCII の英字を小文字にそろえる。room 文字を超えるときは語の区切りで切り、
 // 最初の 1 語が room を超えるときだけその語を room 文字で切る。何も残らなければ空。
 func issueSlug(title string, room int) string {
+	// 1. 全角英数を半角（NFKC）にし、英大文字を小文字にそろえる。
 	var b strings.Builder
 	for _, c := range pyfmt.NFKC(title) {
 		if c < utf8.RuneSelf && 'A' <= c && c <= 'Z' {
@@ -179,11 +180,13 @@ func issueSlug(title string, room int) string {
 		}
 		b.WriteRune(c)
 	}
+	// 2. 英数字と日本語以外を "-" にまとめ、前後の "-" を落とす。
 	slug := strings.Trim(slugDrop.ReplaceAllString(b.String(), "-"), "-")
 	room = max(room, 0)
 	if runes(slug) <= room {
 		return slug
 	}
+	// 3. 長すぎれば語（"-" 区切り）の境目で切る。最初の 1 語だけで収まらないときに限り、その語を字数で切る。
 	kept := ""
 	for _, word := range strings.Split(slug, "-") {
 		joined := word
@@ -202,7 +205,6 @@ func issueSlug(title string, room int) string {
 }
 
 // IssueError は issue から識別子を作れない（番号・プロジェクト名・先頭の語が形に合わない）理由。
-// Error() は Python の ValueError の文と同じ。
 type IssueError struct{ detail string }
 
 func (e *IssueError) Error() string { return e.detail }
@@ -298,6 +300,7 @@ func BranchProblem(name string) string {
 	if name == "" {
 		return "ブランチ名が空"
 	}
+	// 見た目が同じ別の綴り（NFC でない表記）を許すと、同じブランチが 2 つに割れるので断る。
 	if pyfmt.NFC(name) != name {
 		return "ブランチ名が NFC でない（見た目が同じでも別の名前になるので NFC で書く）"
 	}
@@ -308,6 +311,7 @@ func BranchProblem(name string) string {
 		return "ブランチ名に使えない字がある（先頭は ASCII の英数字、続きは英数字・" +
 			"`.`・`_`・`-`・`/`・ひらがな・カタカナ・漢字。空白・制御文字・記号は使わない）"
 	}
+	// git の ref の名前として使えない形（check-ref-format の規則）。
 	if strings.Contains(name, "..") || strings.Contains(name, "//") || strings.HasPrefix(name, "/") ||
 		strings.HasSuffix(name, "/") || strings.HasSuffix(name, ".") {
 		return "git のブランチ名に使えない形（`..`・`//`・先頭や末尾の `/`・末尾の `.`）"
@@ -317,6 +321,7 @@ func BranchProblem(name string) string {
 			return "git のブランチ名に使えない形（`.` で始まる階層・`.lock` で終わる階層）"
 		}
 	}
+	// 以降は大文字小文字を区別せず比べる（区別しないファイルシステムでぶつかるため）。
 	folded := pyfmt.Casefold(name)
 	parts := strings.Split(folded, "/")
 	if slices.Contains(refPrefixes, parts[0]) {
@@ -330,6 +335,7 @@ func BranchProblem(name string) string {
 			return "`HEAD`・`FETCH_HEAD` のような階層は git の特別な名前と紛らわしい"
 		}
 	}
+	// 統合先や保護されたブランチの名前は、親のブランチにさせない。
 	if slices.Contains(config.ReservedBranchIDs(), folded) || slices.Contains(config.ReservedBranchIDs(), parts[0]) ||
 		strings.HasPrefix(folded, "release-") {
 		return "統合先や保護されたブランチの名前（main・master・develop・release と、" +

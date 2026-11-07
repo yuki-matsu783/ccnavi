@@ -5,7 +5,7 @@ import (
 	"io"
 )
 
-// Held は hook の応答を手元に溜め、Flush で書き出す出力。書き出せたあとに走らせる処理（AfterWritten）を持つ。
+// Held は hook の応答を手元に溜め、Flush で書き出す出力。書き出せたあとに走らせる処理（AfterWritten）を置ける。
 // 応答を書いた時点で「知らせた」と印を付ける処理は、溜めただけでは知らせは届いていないので、書き出しまで待たせる。
 type Held struct {
 	bytes.Buffer

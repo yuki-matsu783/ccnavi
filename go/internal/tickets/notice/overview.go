@@ -44,6 +44,7 @@ type Row struct {
 // Collect はこのPCに親のワークツリーがある、まだ閉じていない親の一覧。識別子の順。先行の引き方は承認と lint と
 // 同じ（PoolOf に AlignImported を当てる）。
 func Collect(conf *config.Settings, root string, doing, review, closed, proposals []*ticket.Ticket) []Row {
+	// 1. 親を集める。作業中・レビュー中の親と、承認待ち（todo/）の提案の親。同じ識別子は最初のものを採る。
 	parents := map[string]*ticket.Ticket{}
 	keep := func(t *ticket.Ticket) {
 		if _, ok := parents[t.ID]; !ok {
@@ -60,6 +61,7 @@ func Collect(conf *config.Settings, root string, doing, review, closed, proposal
 			keep(t)
 		}
 	}
+	// 2. このPCにワークツリーがある親だけを、識別子の順に行にする。先行の判定は承認や lint と同じ pool で引く。
 	pool := approval.PoolOf(doing, review, closed, proposals)
 	pool.AlignImported(conf, root)
 	var rows []Row

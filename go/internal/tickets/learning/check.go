@@ -133,5 +133,5 @@ func WriteBroken(stderr io.Writer, found *Pending) {
 		"書き換えない）コミットしてから打ち直してください\n")
 }
 
-// write は標準エラーへの 1 回の書き込み。書けなくても続ける（Python の sys.stderr.write と同じく結果を見ない）。
+// write は標準エラーへの 1 回の書き込み。書けなくても続ける（結果は見ない）。
 func write(w io.Writer, text string) { _, _ = io.WriteString(w, text) }

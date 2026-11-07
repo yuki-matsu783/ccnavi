@@ -8,7 +8,7 @@ import (
 	"ccnavi/internal/policy/selfguard"
 )
 
-// 表から組む式。どれも Python の re と同じ答えが要る（Unicode の `\s`・`\w`、後読み、大小の無視）ので pyre で読む。
+// 表から組む式。どれも Unicode の `\s`・`\w`、後読み、大小の無視を使うので、Go の regexp ではなく pyre で読む。
 
 func alt(words []string) string {
 	out := make([]string, len(words))
@@ -19,7 +19,7 @@ func alt(words []string) string {
 }
 
 // 免除の理由になるのは、単独の語として現れた `--preview` だけ。前は生の空白、後ろは空白か区切りか行末。
-// 区切りに `;` `&` `|` と改行も見るのは、PowerShell の生の文字列（Sep を持たない）で、後ろのコマンドの
+// 区切りに `;` `&` `|` と改行も見るのは、PowerShell の生の文字列（Sep が入らない）で、後ろのコマンドの
 // `--preview` が前のコマンドの `--agree` を免除しないため。語の中の目印（引用がつないだ空白）もまたがない。
 // またぐと `ccnavi --agree x "a --preview"` の `--preview` が免除の理由になる。`--reason=--preview`・
 // `--preview=x`・`x--preview` も免除しない（実行ファイルは `--agree` を走らせる）。
@@ -58,7 +58,7 @@ func cliForms(notPreview string) string {
 }
 
 // scriptForms はユーザ専用の sh（`ccnavi-user-*.sh`）を、引数に依らずコマンドの位置で止める式。
-// 名前がコマンド行のどこにあっても止める検査は HumanPathForm が持つ。
+// 名前がコマンド行のどこにあっても止める検査は HumanPathForm が受け持つ。
 func scriptForms() string {
 	return `(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*` + pyre.Escape(UserScriptPrefix) + `[\w-]+\.sh\b`
 }

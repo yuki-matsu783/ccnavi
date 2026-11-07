@@ -126,7 +126,7 @@ func (l *Log) Write(r *Record) error {
 		}
 	}
 	// 同じイベントの hook は同時に走るので、1 行を追記モードの 1 回の書き込みで出す（2 件が混ざらない）。
-	// Python は O_BINARY を付けずに os.open するので、Windows では改行が CRLF になる。
+	// 行末は機械の改行になる（Windows では CRLF）。読む側は行ごとに JSON として読むので、どちらでも通る。
 	return fsio.AppendLine(l.path, line, 0o600)
 }
 

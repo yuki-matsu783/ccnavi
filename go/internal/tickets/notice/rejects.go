@@ -135,6 +135,7 @@ func check(conf *config.Settings, root string, tickets []*ticket.Ticket, index m
 			continue
 		}
 		target := targetOf(conf, root, t)
+		// ルールは、効かせるツリーのプロジェクトごとに 1 回だけ読む。
 		rs, ok := loaded[target.Project]
 		if !ok {
 			var err error
@@ -148,15 +149,18 @@ func check(conf *config.Settings, root string, tickets []*ticket.Ticket, index m
 			parent = index[t.Parent]
 		}
 		pt := scope.TypeFor(t, parent)
+		// deny の項は上位に退けられる側ではないので見ない。
 		for _, e := range t.Entries {
 			if e.Decision == rules.Deny {
 				continue
 			}
+			// 件数と期限の上限で打ち切る。セッションの開始を遅らせないため、打ち切ったことは truncated で伝える。
 			count++
 			if count > rejectsMaxEntries || time.Now().After(deadline) {
 				found.truncated = true
 				return found, nil
 			}
+			// 正規表現の項はパスに当てられない（glob の形ではない）ので、判定せず数だけ数える。
 			if e.Regex != "" {
 				found.unchecked++
 				continue

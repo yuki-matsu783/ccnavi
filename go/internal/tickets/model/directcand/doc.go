@@ -10,8 +10,5 @@
 // UNIX 秒）。上限は maxEntries 件で、seen の古いものから捨てる。読むときは、session が完全に一致する記録だけを使う。
 // 名前が IntegrableName を通らない項目と、path がその名前のワークツリーと一致しない項目は捨てる。
 //
-// 保存できなくても何も言わない。登録は補助だからである。並行して書かれると 1 件落ちることがあるが、補わない。
-//
-// Python からの対応: direct_candidates をこのパッケージにした。integrable_name → IntegrableName、load → Load、
-// touch → Touch、update → Update。Touch の同じ候補の判定は、名前を realpath で解かずに畳んで比べる。
+// 保存できなくても何も言わない。登録は補助のため。並行して書かれると 1 件落ちることがあるが、補わない。
 package directcand

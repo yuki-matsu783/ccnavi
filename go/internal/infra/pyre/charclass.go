@@ -7,7 +7,7 @@ import (
 	"ccnavi/internal/infra/pyfmt"
 )
 
-// casefix は Python の re/_casefix.py の _EXTRA_CASES（小文字にした字 → 大文字が同じになるほかの小文字）。
+// casefix は Python の re の _casefix の _EXTRA_CASES（小文字にした字 → 大文字が同じになるほかの小文字）。
 var casefix = map[rune][]rune{
 	0x0069: {0x0131}, 0x0073: {0x017f}, 0x00b5: {0x03bc}, 0x0131: {0x0069}, 0x017f: {0x0073},
 	0x0345: {0x03b9, 0x1fbe}, 0x0390: {0x1fd3}, 0x03b0: {0x1fe3}, 0x03b2: {0x03d0}, 0x03b5: {0x03f5},

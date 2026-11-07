@@ -117,15 +117,18 @@ func Briefing(conf *config.Settings, root string, child *ticket.Ticket, budget i
 	if !child.IsChild() {
 		return nil
 	}
+	// 1. フローのファイルを探す。無ければ何も言わない。
 	file, base, exists := Resolve(conf, root, child)
 	if !exists {
 		return nil
 	}
+	// 2. 全文を渡さないときは、ファイルの名指しだけ（どの子の手順か決められない起動で、別の子の手順に従わせないため）。
 	if !full {
 		return []string{"    フロー: " + Clean(file)}
 	}
 	lines := []string{"    フロー: " + Clean(file) +
 		"（合意済みの手順。編集しない）。作業の前に読み、その順に進めてください。"}
+	// 3. 読めなければ、手順を渡さず理由を言う。読める分は budget までに切って並べる。
 	data, why := Load(file, base)
 	if data == nil {
 		return append(lines, "    フローを読めない: "+why+"。ユーザが確かめてください")
@@ -140,6 +143,7 @@ func Briefing(conf *config.Settings, root string, child *ticket.Ticket, budget i
 		lines = append(lines, "      "+s)
 	}
 	lines = append(lines, fenceClose)
+	// 4. 手順に出てきたノードの種類に応じて、注意書き（ユーザへの問い・繰り返し・子の起動）を足す。
 	if kinds[ask] {
 		lines = append(lines, "    "+texts.Say(root, "NOTICE_FLOW_BRIEF__ASK", texts.Values{"node": ask}, nil))
 	}

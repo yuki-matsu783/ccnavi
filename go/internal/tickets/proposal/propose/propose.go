@@ -64,7 +64,7 @@ func ownProposal(path, parent string) bool {
 	return same(ospath.Basename(ospath.Dirname(path)), string(place.Todo)) && same(stem, parent) && same(ext, config.MdExt)
 }
 
-// planProblems は計画を持つ親の提案の after と終端の誤り。
+// planProblems は計画がある親の提案の after と終端の誤り。
 func planProblems(paths []string, parent string) []string {
 	var found []string
 	for _, path := range paths {
@@ -117,6 +117,7 @@ func childlessProblems(conf *config.Settings, root string, paths []string, paren
 // 送る提案の識別子（todo/ の .md）を受け取り、承認の画面と同じ検査を通す（通らなければ 0 以外。検査そのものは
 // 上の段が持つ）。check は検査だけをして、何も一覧に載せない。
 func Run(stdout, stderr io.Writer, conf *config.Settings, root, ident string, check bool, gate func([]string) int) int {
+	// 1. 送る先（親のワークツリー）を決める。決まらなければ止める。送る先が無い設計（verdict No）のときは、止めず案内だけ出す。
 	parent := wap.FamilyOf(ident)
 	verdict, why, st := wap.TargetOf(conf, root, parent)
 	if verdict == wap.Stop || st.Home == nil {
@@ -135,12 +136,14 @@ func Run(stdout, stderr io.Writer, conf *config.Settings, root, ident string, ch
 	if ticketsRel == "" {
 		ticketsRel = config.DefaultTickets
 	}
+	// 2. 送る提案（親と子の .md、フローの下書き）を集める。
 	paths := candidates(base, ticketsRel, parent)
 	if len(paths) == 0 {
 		fmt.Fprintf(stderr, "ccnavi: 送る提案がありません（親のワークツリー %s の %s/%s/%s.md など）。"+
 			"提案は識別子と同名のワークツリーの中に書いてください。\n", base, strings.Trim(ticketsRel, "/"), place.Todo, parent)
 		return 1
 	}
+	// 3. 計画の誤りは、何も送らずに止める。子の無いフェーズは注意だけ出して続ける。
 	if wrong := planProblems(paths, parent); len(wrong) > 0 {
 		fmt.Fprintf(stderr, "ccnavi: %s の提案の計画に誤りがあるので送りません（何も送っていません）。\n", parent)
 		for _, detail := range wrong {
@@ -152,6 +155,7 @@ func Run(stdout, stderr io.Writer, conf *config.Settings, root, ident string, ch
 	for _, detail := range childlessProblems(conf, root, paths, parent) {
 		fmt.Fprintf(stderr, "ccnavi: 注意: %s\n", detail)
 	}
+	// 4. 呼び手の検査（承認の画面と同じもの）。通らなければ送らない。todo/ の .md だけが対象。
 	if gate != nil {
 		var sending []string
 		for _, p := range paths {
@@ -164,6 +168,7 @@ func Run(stdout, stderr io.Writer, conf *config.Settings, root, ident string, ch
 			return 1
 		}
 	}
+	// 5. --check ならここまで。送るなら、読んだ入力として記録し、送る提案を 1 行ずつ出す。
 	if check {
 		fmt.Fprintln(stdout, "確認: ok（approval-request を打てる状態。提案は送っていません）")
 		fmt.Fprintln(stdout, texts.Say(root, "NEXT_APPROVAL_REQUEST_CHECKED", texts.Values{"parent": parent}, nil))

@@ -280,7 +280,7 @@ func stashIgnored(root, name, top string) (string, string) {
 	return strings.Join(lines, "\n"), ""
 }
 
-// moveAside は source を target へ rename する。失敗した理由（Python の strerror）か空。
+// moveAside は source を target へ rename する。失敗した理由か、成功なら空。
 func moveAside(source, target string) string {
 	if ospath.DiskLexists(target) {
 		return "退避先に同じパスがある"

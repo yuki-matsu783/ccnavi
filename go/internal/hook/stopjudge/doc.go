@@ -9,7 +9,5 @@
 // 見分けるのは payload の agent_id の接頭辞（実機の Claude Code 2.1 では `hook-agent-<uuid>`）。登録していない
 // ワークスペースでは見分けない。ユーザ自身の agent 型 hook も同じ接頭辞になるので、登録したワークスペースでは、それも判定役になる。
 //
-// Python からの対応: hook/stopjudge。is_judge → IsJudge、before → Before、記録の reason の
-// "stop-review-judge" → ReasonJudge。印の名前は records/stopreview の TaintPrefix を使う。印を読む tainted は
-// 呼び手が無い（stopreview が読む）ので移していない。
+// 記録の reason は ReasonJudge。印の名前は records/stopreview の TaintPrefix を使う。印を読む処理は stopreview が持つので、ここには無い。
 package stopjudge

@@ -64,7 +64,7 @@ func directWorkspace(t *testing.T, fill int) string {
 	return root
 }
 
-func TestDirectWorktreesMatchesPython(t *testing.T) {
+func TestDirectWorktreesMatchesGolden(t *testing.T) {
 	empty := workspace(t)
 	testkit.AddWorktree(t, empty, "no-record", "main")
 	roots := map[string]string{"empty": empty, "few": directWorkspace(t, 0), "many": directWorkspace(t, 8)}

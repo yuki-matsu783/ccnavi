@@ -39,6 +39,8 @@ func SquashedPaths(conf *config.Settings, root, project, top, base string) map[s
 	if err != nil {
 		return nil
 	}
+	// 1. 取り込み済みの記録（.git/ccnavi-done 以下）を読む。同じキーが 2 つあるときは最初の行を採る。
+	// branch が記録の名前と一致するものが squash の記録、version が直接作業の版のものが版 4 の記録。
 	var records, direct []doneCopy
 	for _, n := range names {
 		if strings.HasPrefix(n, ".") {
@@ -59,6 +61,8 @@ func SquashedPaths(conf *config.Settings, root, project, top, base string) map[s
 	if !listed.OK() {
 		return nil
 	}
+	// 2. base..HEAD の各コミットが変えたパスを、確かめた取り込み（squashed）とそれ以外（other）に分ける。
+	// 3. 取り込み以外のコミットが 1 度でも変えたパスは、取り込みの成果から外す。
 	squashed, other := map[string]bool{}, map[string]bool{}
 	for _, line := range strings.Split(listed.Out, "\n") {
 		words := strings.Fields(line)

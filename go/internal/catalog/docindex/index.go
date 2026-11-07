@@ -42,7 +42,7 @@ type Built struct {
 	Foreign []string
 	// Problems は書けなかった・読まなかった理由。索引は組めた分だけ Rows にある。
 	Problems []Problem
-	// Unignored は md を持つディレクトリの ccnavi-index.jsonl がどれも無視されていない（索引の対象外）。
+	// Unignored は、md があるディレクトリの ccnavi-index.jsonl がどれも git に無視されていない（索引の対象外）。
 	Unignored bool
 	// Indexable は md を持ち、索引の対象になるツリーだった（打ち切りで Rows が空でも引けばヒットする）。
 	Indexable bool
@@ -126,6 +126,7 @@ func Build(base string, o Options) (*Built, error) {
 	if err != nil {
 		return nil, err
 	}
+	// git が挙げた md を、除外の指定を外してディレクトリごとに分ける。
 	byDir := map[string][]string{}
 	for _, rel := range all {
 		if Excluded(rel, o.Excluded, o.Kept) {
@@ -142,6 +143,7 @@ func Build(base string, o Options) (*Built, error) {
 		dirs = append(dirs, d)
 	}
 	sort.Strings(dirs)
+	// ディレクトリごとの索引ファイルのパスを決め、どれが git に無視されているか（＝書いてよいか）を 1 回の問い合わせで調べる。
 	indexRel := map[string]string{}
 	rels := make([]string, 0, len(dirs))
 	for _, d := range dirs {
@@ -153,6 +155,7 @@ func Build(base string, o Options) (*Built, error) {
 	if err != nil {
 		return nil, err
 	}
+	// 無視する行は Refresh のときだけ足す。読むだけの呼び出しでユーザの .gitignore を書き換えない。足した結果は git に聞き直して確かめる。
 	if len(writable) == 0 && o.Refresh && addIgnore(base) == added {
 		result.IgnoreAdded = gitignoreName
 		if writable, err = Ignored(base, rels, left(o.Deadline)); err != nil {
@@ -165,6 +168,7 @@ func Build(base string, o Options) (*Built, error) {
 	}
 	result.Indexable = true
 	var w *writer
+	// 書く場合の下ごしらえ。一時ファイルは git のディレクトリに作る（ワークツリーの git status に出ないため）。見つからなければ書かずに続ける。
 	if o.Refresh {
 		if tmpDir, ok := tree.GitDir(base); ok && ospath.IsDir(tmpDir) {
 			sweep(tmpDir)
@@ -175,6 +179,7 @@ func Build(base string, o Options) (*Built, error) {
 	}
 	baseReal := ospath.Realpath(base)
 
+	// 1 段目: 既存の索引を読んで、使い回す行と読み直す md に分ける。
 	var states []*dirState
 	for _, d := range dirs {
 		if past(o.Deadline) {
@@ -185,6 +190,7 @@ func Build(base string, o Options) (*Built, error) {
 			states = append(states, one)
 		}
 	}
+	// 2 段目: 読み直しの要る md を読む。3 段目: ディレクトリごとに行を決めて書く。
 	if o.Parse && !result.TimedOut {
 		parsePending(base, states, o.Deadline, result)
 	}
@@ -198,7 +204,7 @@ func Build(base string, o Options) (*Built, error) {
 // second は t を秒に切り捨てる（行の mtime と同じ細かさで比べる）。
 func second(t time.Time) time.Time { return t.Truncate(time.Second) }
 
-// dirOf は rel.rpartition("/") の頭（ルートの直下なら空）。
+// dirOf は rel の最後の "/" より前（ルートの直下なら空）。
 func dirOf(rel string) string {
 	if i := strings.LastIndex(rel, "/"); i >= 0 {
 		return rel[:i]
@@ -254,6 +260,7 @@ func scan(base, baseReal, directory string, names []string, indexRel string, wri
 			one.pending = append(one.pending, pending{rel, conceptID, ""})
 			continue
 		}
+		// Refresh でなければ、既存の行をそのまま信じる（mtime の確認も省いて速く返す）。
 		old, hasOld := oldRows[conceptID]
 		if !o.Refresh && hasOld {
 			one.rows[conceptID] = old
@@ -266,6 +273,7 @@ func scan(base, baseReal, directory string, names []string, indexRel string, wri
 		}
 		mtime := info.ModTime().Local().Format(mtimeLayout)
 		if hasOld && old.Mtime() == mtime && old.directory() == shownDir(directory) {
+			// mtime が秒までしか無いので、索引を書いた同じ秒の中の更新は見分けられない。索引より前の秒のものだけ使い回し、同じ秒以降のものは読み直す（racy）。
 			if second(info.ModTime()).Before(second(one.indexTime)) {
 				one.rows[conceptID] = old
 				result.reused++
@@ -280,7 +288,7 @@ func scan(base, baseReal, directory string, names []string, indexRel string, wri
 
 // readIndex は既存の ccnavi-index.jsonl の行（concept_id → 行）と、中身と、持ち主と、ours なら更新時刻を返す。
 // 空か、空でない行がすべて ccnavi の形なら ours。リンク・ふつうでないもの・大きすぎるもの・UTF-8 でないもの・
-// 形の違う行を持つものは foreign。
+// 形の違う行が含まれるものは foreign。
 func readIndex(path string) (map[string]Row, string, owner, time.Time) {
 	rows := map[string]Row{}
 	info, err := ospath.Lstat(path)
@@ -375,6 +383,7 @@ func settle(one *dirState, refresh bool, w *writer, result *Built) {
 		}
 	}
 	result.Rows = append(result.Rows, rows...)
+	// 読むだけ・書けない（無視されていない／他人の索引）ときは、行を返すだけで書かない。
 	if !refresh || !one.writable || w == nil {
 		return
 	}
