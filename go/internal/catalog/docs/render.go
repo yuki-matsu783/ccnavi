@@ -17,8 +17,8 @@ import (
 // jsonIndent は `--format json` の字下げ（json.dumps の indent=2）。
 const jsonIndent = 2
 
-// charWidth は 1 字の見た目の幅。東アジアの全角（W・F）を 2、結合文字と書式の制御を 0 と数える。
-// unicodedata.east_asian_width に当たる部品が pyfmt に無いので、ここで x/text を読む。
+// charWidth は 1 字の見た目の幅を返す。東アジアの全角（W・F）は 2、結合文字と書式の制御は 0 と数える。
+// unicodedata.east_asian_width に当たる部品は pyfmt に無いので、ここで x/text を読む。
 func charWidth(r rune) int {
 	if pyfmt.Combining(r) != 0 || unicode.In(r, unicode.Mn, unicode.Me, unicode.Cf) {
 		return 0

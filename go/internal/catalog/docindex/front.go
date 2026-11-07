@@ -16,8 +16,8 @@ import (
 const (
 	// headLimit は frontmatter を探す頭の長さ。本文は読まない。
 	headLimit = 64 * 1024
-	// maxDepth は frontmatter と索引の行の入れ子の上限。`--format json` の字下げは Python では再帰で書くので、
-	// これより深いものは書けないものとして扱う（行は frontmatter より 1 段深いので、frontmatter は 31 段まで）。
+	// maxDepth は frontmatter と索引の行の入れ子の上限。Python は `--format json` の字下げを再帰で書くので、
+	// これより深いものは書けないものとして扱う。行は frontmatter より 1 段深いので、frontmatter は 31 段までとなる。
 	maxDepth = 32
 )
 
@@ -29,8 +29,9 @@ const (
 
 var errTooDeep = errors.New("入れ子が深すぎる")
 
-// FrontMatter は頭の frontmatter（`---` で始まる YAML。別名は読まない）。無い・閉じていない・読めない・
-// マッピングでない・JSON に書けないなら nil。JSON に無い値（日付・バイト列・NaN など）は文字列にする。
+// FrontMatter は頭の frontmatter（`---` で始まる YAML。別名は読まない）を返す。
+// 無い、閉じていない、読めない、マッピングでない、JSON に書けないのいずれかなら nil を返す。
+// JSON に無い値（日付・バイト列・NaN など）は文字列にする。
 func FrontMatter(raw []byte) *pyjson.Object {
 	if len(raw) > headLimit {
 		raw = raw[:headLimit]
@@ -66,8 +67,8 @@ func FrontMatter(raw []byte) *pyjson.Object {
 
 func rstrip(s string) string { return strings.TrimRightFunc(s, ospath.IsSpace) }
 
-// jsonable は YAML の値を JSON に載る形にする（Python の _jsonable）。キーは str()、日時は isoformat()、
-// バイト列は UTF-8 として読み、無限と NaN と残りの型は str()。yamljson.ToJSON とは文字列にする規則が違う。
+// jsonable は YAML の値を JSON に載る形にする（Python の _jsonable）。キーは str()、日時は isoformat() にする。
+// バイト列は UTF-8 として読み、無限と NaN と残りの型は str() にする。yamljson.ToJSON とは文字列にする規則が違う。
 func jsonable(v any) any {
 	switch x := v.(type) {
 	case *yaml.Map:
@@ -106,8 +107,8 @@ func jsonableList(items []any) []any {
 	return out
 }
 
-// checkJSON はどの出力の形（字下げの JSON を含む）でも書けるかを見る。深すぎる入れ子、NaN・無限、
-// Python が文字列にできない桁の整数は書けない。
+// checkJSON は、どの出力の形（字下げの JSON を含む）でも書けるかを確かめる。
+// 深すぎる入れ子、NaN・無限、Python が文字列にできない桁の整数は書けないものとする。
 func checkJSON(v any) error {
 	if deep(v) {
 		return errTooDeep

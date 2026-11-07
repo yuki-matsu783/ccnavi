@@ -57,8 +57,8 @@ func relTo(path, root string) string {
 	return rel
 }
 
-// places はワークスペースルートと、プロジェクトの置き場の直下のプロジェクト（それぞれ別の git）。
-// ワークスペースからは ccnavi ディレクトリとプロジェクトの置き場を外す（プロジェクトの md はそのプロジェクトで拾う）。
+// places は、ワークスペースルートと、プロジェクトの置き場の直下のプロジェクト（それぞれ別の git）を返す。
+// ワークスペースからは ccnavi ディレクトリとプロジェクトの置き場を外す。プロジェクトの md は、そのプロジェクトで拾うため。
 func places(conf *config.Settings, root string) []source {
 	h := home(conf)
 	var own []string
@@ -126,7 +126,7 @@ type collectOptions struct {
 	deadline       time.Time
 }
 
-// collect はワークスペースとプロジェクトの索引を新しくして集める。`.git` の無いツリーは何も言わずに飛ばす。
+// collect は、ワークスペースとプロジェクトの索引を新しくして集める。`.git` の無いツリーは、何も言わずに飛ばす。
 // 同じ concept_id（NFC で比べる）は 1 つにまとめ、concept_id の順に並べる。
 func collect(conf *config.Settings, root string, o collectOptions) *collected {
 	result := &collected{}

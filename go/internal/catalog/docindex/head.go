@@ -24,8 +24,8 @@ var bomBytes = []byte(bom)
 // readHead は差し替えられる（テストが打ち切りを作る）。
 var readHead = ReadHead
 
-// ReadHead はふつうのファイルの頭（frontmatter を探す分だけ）。リンク・ふつうでないもの・読めないものは偽。
-// まず firstRead だけ読み、frontmatter が無いか閉じていればそこで止め、要るときだけ headLimit まで読み足す。
+// ReadHead は、ふつうのファイルの頭を、frontmatter を探す分だけ読んで返す。リンク・ふつうでないもの・読めないものは偽。
+// まず firstRead だけ読む。frontmatter が無いか、そこで閉じていれば止める。要るときだけ headLimit まで読み足す。
 func ReadHead(path string) ([]byte, bool) {
 	info, err := os.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() {

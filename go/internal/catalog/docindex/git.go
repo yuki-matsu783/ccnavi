@@ -22,8 +22,8 @@ const MdExt = ".md"
 // ErrNotRepository は基準のディレクトリが git のルートではない（`.git` が無い）。
 var ErrNotRepository = errors.New("git のルートではない")
 
-// GitError は git への問い合わせに失敗した（git が無い・期限切れ・破損したリポジトリ）。git の外とも、
-// 無視されていないとも別に扱う。Error() は理由の文。
+// GitError は git への問い合わせに失敗したことを表す（git が無い・期限切れ・リポジトリが壊れている）。
+// git の外とも、無視されていないとも別に扱う。Error() は理由の文を返す。
 type GitError struct{ Reason string }
 
 func (e *GitError) Error() string { return e.Reason }
@@ -44,8 +44,8 @@ func gitFailure(done git.Done) error {
 	return &GitError{lines[len(lines)-1]}
 }
 
-// listed は base の下で git が挙げる md（base からの相対、"/" 区切り）。追跡しているものと、無視されていない
-// 未追跡のもの。
+// listed は、base の下で git が挙げる md（base からの相対、"/" 区切り）を返す。追跡しているものと、
+// 無視されていない未追跡のものを含む。
 func listed(base string, timeout time.Duration) ([]string, error) {
 	if !ospath.DiskExists(ospath.Join(base, ".git")) {
 		return nil, ErrNotRepository

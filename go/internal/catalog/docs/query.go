@@ -52,10 +52,10 @@ const (
 	fieldKeywords    = "keywords"
 )
 
-// Query は `--docs` の問い。同じ欄の値どうしは OR、欄どうしは AND。大文字小文字は区別せず、NFC にそろえて
-// 比べる。Types・Tags・Keywords は値との完全一致（スカラーもリストとして扱う）、Paths は concept_id への部分一致、
-// Texts は concept_id・mtime・frontmatter のすべてのスカラーの値（キー名は含まない）への部分一致。
-// Since・Until は mtime と文字列で比べ、Until は書いた桁の終わりまで延ばす。Limit が 0 なら切らない。
+// Query は `--docs` の問い。同じ欄の値どうしは OR、欄どうしは AND で絞る。大文字小文字は区別せず、NFC にそろえて比べる。
+// Types・Tags・Keywords は値の完全一致（スカラーもリストとして扱う）。Paths は concept_id への部分一致。
+// Texts は concept_id・mtime・frontmatter のすべてのスカラーの値への部分一致（キー名は含まない）。
+// Since・Until は mtime と文字列で比べる。Until は書いた桁の終わりまで延ばす。Limit が 0 なら切らない。
 type Query struct {
 	Types, Tags, Keywords, Paths, Texts []string
 	Since, Until                        string
@@ -79,8 +79,8 @@ func (q Query) format() Format {
 	return q.Format
 }
 
-// when の形と、その形ごとの datetime.strptime の式（Python 3.13 の _strptime が組む式と同じ）。書き誤った値が
-// 気づかないうちに 0 件になるのを避けるため、読めない日時は断る。
+// when の形と、形ごとの datetime.strptime の式（Python 3.13 の _strptime が組む式と同じ）。書き誤った値が
+// 0 件の結果に紛れて気づかれないのを避けるため、読めない日時は断る。
 var (
 	whenShape = mustPyre(`^\d{4}-\d{2}-\d{2}(T\d{2}(:\d{2}(:\d{2})?)?)?$`, 0)
 	whenParts = map[int]*pyre.Regexp{}

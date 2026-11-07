@@ -30,9 +30,9 @@ const (
 // 決まりの文書（conventionDoc）の「付けていない」と揃える。
 var noFrontmatterNames = []string{"README.md", "CLAUDE.md", "AGENTS.md", "CHANGELOG.md"}
 
-// noFrontmatterPlaces は決まりの文書の「対象外」の表で、付けない・付けなくてよいとする置き場（ツリーのルート
-// からの glob。`*` は "/" もまたぐ）。表を直したらここも直す（テストが表と比べる）。チケットと下書きの置き場は
-// 設定で動くので、設定の値でも見る。
+// noFrontmatterPlaces は、決まりの文書の「対象外」の表にある置き場のうち、frontmatter を付けない・付けなくてよいもの
+// （ツリーのルートからの glob。`*` は "/" もまたぐ）。表を直したら、ここも直す。テストが表と比べる。チケットと下書きの
+// 置き場は設定で動くので、設定の値でも見る。
 var noFrontmatterPlaces = []string{
 	"wip/proposals/**",
 	".ccnavi/approved/**",
@@ -57,9 +57,9 @@ func globsRegexp(globs []string) *regexp.Regexp {
 	return regexp.MustCompile(`(?is)^(?:` + strings.Join(parts, "|") + `)$`)
 }
 
-// MissingFrontmatter は Write で新しく作った md に frontmatter か type が無ければ、1 度だけ案内を返す（判定は
-// 変えない）。既にある md の Edit・上書きでは出さない（意図して frontmatter を持たない md を直すたびに促さない）。
-// 対象は書いた先のツリー（ワークスペース・プロジェクト・ワークツリー）の git で索引に入る md から、ccnavi
+// MissingFrontmatter は、Write で新しく作った md に frontmatter か type が無ければ、1 度だけ案内を返す。判定は
+// 変えない。既にある md を Edit・上書きしたときは出さない。意図して frontmatter を持たない md を直すたびに促さないため。
+// 対象は、書いた先のツリー（ワークスペース・プロジェクト・ワークツリー）の git で索引に入る md のうち、ccnavi
 // ディレクトリの下と、決まりの文書で付けない・付けなくてよいとされる名前と置き場を除いたもの。
 func MissingFrontmatter(conf *config.Settings, root string, in hookio.Input) string {
 	if in.ToolName != writeTool || in.ToolResponse.String("type") != createdType {

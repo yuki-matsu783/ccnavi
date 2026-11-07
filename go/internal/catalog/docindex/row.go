@@ -18,8 +18,8 @@ var rowKeys = []string{keyConceptID, keyDirectory, keyFrontmatter, keyMtime}
 // rootDirectory はツリーのルートの直下のファイルの `directory`。
 const rootDirectory = "."
 
-// Row は索引の 1 行。読み直した行は 4 つのキーをこの順に持つ。使い回した行は ccnavi-index.jsonl に書かれた
-// ままの形（キーの順・余分なキー）を保つ（書き戻すときに中身を変えないため）。
+// Row は索引の 1 行。読み直した行は 4 つのキーをこの順に持つ。使い回した行は、ccnavi-index.jsonl に書かれたままの
+// 形（キーの順・余分なキー）を保つ。書き戻すときに中身を変えないため。
 type Row struct{ obj *pyjson.Object }
 
 func newRow(conceptID, directory string, front *pyjson.Object, mtime string) Row {
@@ -54,8 +54,8 @@ func (r Row) Line() string {
 	return line
 }
 
-// Prefixed は concept_id と directory の頭に prefix を付けた写し（プロジェクトの行をワークスペースルートから
-// 指す形にする）。prefix が空なら r のまま。
+// Prefixed は、concept_id と directory の頭に prefix を付けた写しを返す。プロジェクトの行を、
+// ワークスペースルートから指す形にするため。prefix が空なら r をそのまま返す。
 func (r Row) Prefixed(prefix string) Row {
 	if prefix == "" {
 		return r

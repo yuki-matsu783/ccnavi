@@ -21,8 +21,8 @@ const (
 	tmpSuffix = ".tmp"
 	// tmpStale を過ぎた一時ファイル（打ち切りの残骸）は次の回に消す。
 	tmpStale = 10 * time.Minute
-	// localTmpPrefix は `.git` が別のファイルシステムのときに索引の隣に作る一時ディレクトリの名前。中の
-	// ccnavi-index.jsonl は `**/ccnavi-index.jsonl` で無視される。
+	// localTmpPrefix は、`.git` が別のファイルシステムにあるときに索引の隣に作る一時ディレクトリの名前。
+	// 中の ccnavi-index.jsonl は `**/ccnavi-index.jsonl` で無視される。
 	localTmpPrefix = ".ccnavi-tmp-"
 	indexPerm      = 0o644
 	holderPerm     = 0o700
@@ -37,8 +37,8 @@ func uniqueName(prefix, suffix string) string {
 	return prefix + strconv.Itoa(os.Getpid()) + "-" + strconv.FormatInt(counter.Add(1)-1, 10) + suffix
 }
 
-// writer は ccnavi-index.jsonl を置き換える。一時ファイルはふだん git のディレクトリに作り、置き換えが別の
-// ファイルシステムをまたいで失敗したら、以後は索引の隣に作る。
+// writer は ccnavi-index.jsonl を置き換える。一時ファイルはふだん git のディレクトリに作る。置き換えが別のファイル
+// システムをまたいで失敗したら、以後は索引の隣に作る。
 type writer struct {
 	base     string
 	tmpDir   string
@@ -122,8 +122,8 @@ func sweep(tmpDir string) {
 	}
 }
 
-// sweepBeside は索引の隣に残った古い一時ディレクトリを消す。消すのはリンクでない古いディレクトリで、中身が
-// ふつうのファイルの ccnavi-index.jsonl だけ（か空）のものに限る。ほかは他人のものとして残す。
+// sweepBeside は、索引の隣に残った古い一時ディレクトリを消す。消すのは、リンクでない古いディレクトリのうち、
+// 中身がふつうのファイルの ccnavi-index.jsonl だけ（か空）のものに限る。ほかは他人のものとして残す。
 func sweepBeside(parent string) {
 	names, err := ospath.DiskListdir(parent)
 	if err != nil {

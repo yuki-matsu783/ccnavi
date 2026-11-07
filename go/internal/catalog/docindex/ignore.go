@@ -37,10 +37,11 @@ func negatesIndex(line string) bool {
 	return strings.HasSuffix(pattern, IndexName) || strings.HasSuffix(pattern, "*.jsonl") || strings.HasSuffix(pattern, "*")
 }
 
-// addIgnore はツリーのルートの .gitignore に IgnoreLine を 1 行足す。同じ行（末尾の空白を除いて比べる。git は
-// 先頭の空白を無視しないので残す）が既にあれば足さずに present（効いていなくても。書いていないので足したとは
-// 言わない）。`!` で索引を否定する行があれば（利用者が追跡している）足さない。既存の行は変えず、末尾に改行が
-// 無いときだけ改行を補う。リンク・ふつうでないもの・読めないもの・書けないものは足さない。
+// addIgnore は、ツリーのルートの .gitignore に IgnoreLine を 1 行足す。
+// 同じ行が既にあれば足さず、結果は present とする。末尾の空白は除いて比べる。git は先頭の空白を無視しないので、
+// 先頭は残して比べる。この行は効いていないこともあるが、ccnavi が書いたものではないので、足したとは言わない。
+// `!` で索引を否定する行があれば、利用者が追跡しているとみなして足さない。既存の行は変えず、末尾に改行が無いときだけ
+// 改行を補う。リンク・ふつうでないもの・読めないもの・書けないものには足さない。
 func addIgnore(base string) ignoreResult {
 	path := ospath.Join(base, gitignoreName)
 	var existing []byte

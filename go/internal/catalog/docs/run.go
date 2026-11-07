@@ -35,8 +35,8 @@ const (
 	guideLead = GuideHead + "、grep・Glob より先に"
 )
 
-// SessionStart で索引を新しくするのに使う時間。使い回せていれば数百本でも 1 秒に届かず、初めての大きな
-// プロジェクトだけがここに届く（書けた分は次のセッションで使い回す）。
+// SessionStart で索引を新しくするのに使う時間。使い回せていれば、数百本の md があっても 1 秒に届かない。
+// 初めての大きなプロジェクトだけがここに届く。書けた分は次のセッションで使い回す。
 const (
 	// startBudget は使ってよい時間の上限。実際は hook の判定の期限の残りと小さいほう。
 	startBudget = 3 * time.Second
@@ -46,8 +46,8 @@ const (
 	staleBudget = time.Second
 )
 
-// Run は `ccnavi --docs`。ワークスペースと、索引の対象になるプロジェクトの md を引く。使い方の誤りは ExitUsage、
-// 0 件でも 0。期限は無い（初めての回は md を全部読む。2 回目からは mtime の変わった md だけ）。
+// Run は `ccnavi --docs`。ワークスペースと、索引の対象になるプロジェクトの md を引く。使い方を誤ったときは ExitUsage を返し、
+// 0 件でも終了コードは 0。期限は無い。初めての回は md を全部読み、2 回目からは mtime の変わった md だけを読む。
 func Run(stdout, stderr io.Writer, conf *config.Settings, root string, q Query, refresh bool) int {
 	if problems := usageProblems(q); len(problems) > 0 {
 		for _, p := range problems {
@@ -82,9 +82,9 @@ func Run(stdout, stderr io.Writer, conf *config.Settings, root string, q Query, 
 }
 
 // AtStart は SessionStart の案内。ワークスペースとプロジェクトの索引を差分で新しくし、引き方の案内を返す。
-// 使う時間は startBudget と deadline（hook の判定の期限。ゼロ値は無し）の残りの小さいほう。残りが minRefresh に
-// 満たなければ、md を読まず書かずに既存の索引だけで案内する。md が 1 本も無ければ空。git への問い合わせに
-// 失敗したツリーは何も言わない（対象外と取り違えさせない）。
+// 使う時間は、startBudget と deadline（hook の判定の期限。ゼロ値は無し）の残りのうち小さいほう。残りが minRefresh
+// に届かなければ、md を読まず書かずに、既存の索引だけで案内する。md が 1 本も無ければ空を返す。git への問い合わせに
+// 失敗したツリーは何も言わない。対象外のツリーだと取り違えさせないため。
 func AtStart(conf *config.Settings, root string, deadline time.Time) string {
 	now := time.Now()
 	limit := now.Add(startBudget)
@@ -150,15 +150,15 @@ func hasMarkdown(root string) bool {
 	return false
 }
 
-// guideLines は引き方の案内（lead の後ろに `--docs` の呼び方が続く 1 行）。起動・再開・compact・clear のたびに
-// 届く常駐の文脈なので、要点の 1 行だけにする（オプションの一覧と frontmatter の書き方は渡さない）。
+// guideLines は引き方の案内を返す。lead の後ろに `--docs` の呼び方が続く 1 行。起動・再開・compact・clear のたびに
+// 届く常駐の文脈なので、要点の 1 行だけにする。オプションの一覧と frontmatter の書き方は渡さない。
 func guideLines(conf *config.Settings, root, lead string) []string {
 	return []string{texts.Say(root, "NOTICE_DOCS_GUIDE", texts.Values{"lead": lead, "command": command(conf, root)},
 		texts.Variants{"what": conventionCase(root)})}
 }
 
-// FailStreakNote は最初の失敗か拒否のとき（first）と、連続（count）が閾値の倍数になったときの案内。止められた
-// 呼び出しを迂回させず、止まった理由と決まった手順を資料で確かめさせる。
+// FailStreakNote は、最初の失敗か拒否のとき（first）と、連続（count）が閾値の倍数になったときの案内を返す。
+// 止められた呼び出しを迂回させず、止まった理由と決まった手順を資料で確かめさせる。
 func FailStreakNote(conf *config.Settings, root string, count int, first bool) string {
 	var lead string
 	if first {

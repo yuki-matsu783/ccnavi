@@ -1,12 +1,12 @@
-// Package skills はプロジェクトのスキルの目録（名前・説明・場所）を組み、モデルへ渡す。
+// Package skills は、プロジェクトのスキルの目録（名前・説明・場所）を組み、モデルへ渡す。
 //
-// スキルの形の手順書はプロジェクトの git で育てるので、プロジェクトの `skills/<名前>/SKILL.md` に置く（ccnavi
-// ディレクトリの外。中は組み込みの保護が丸ごと止める）。Claude Code は `skills/` をスキルとして読まないので、
-// ccnavi は目録だけを渡し、本文はエージェントが要るときに開く。渡すのは cwd がそのプロジェクトのツリー（元
-// リポジトリか、そこから切ったワークツリー）の中にあるときだけで、読むのは元リポジトリの版。
+// スキルの手順書はプロジェクトの git で育てるので、プロジェクトの `skills/<名前>/SKILL.md` に置く。ccnavi の
+// ディレクトリの外にあるので、中は組み込みの保護の対象にならない。Claude Code は `skills/` をスキルとして読まない。
+// そこで ccnavi は目録だけを渡し、本文はエージェントが必要なときに開く。渡すのは、cwd がそのプロジェクトのツリー
+// （元のリポジトリか、そこから切ったワークツリー）の中にあるときだけ。読むのは元のリポジトリの版。
 //
-// SKILL.md の中身は誰が書いたか ccnavi には分からないので、データとして区切りで囲み、1 行にまとめて切る
-// （flow.Line。区切りの文は flow.FencePhrases に並べてあり、名前・説明の中に出たら置き換わる）。
+// SKILL.md の中身を誰が書いたか ccnavi には分からない。そこで、データとして区切りで囲み、1 行にまとめて切る
+// （flow.Line）。区切りの文は flow.FencePhrases に並べてあり、名前や説明の中に出たら置き換わる。
 //
 // Python からの対応: projskills。notice → Notice、index・entries・project_of・_front は非公開。
 package skills
@@ -127,11 +127,11 @@ func projectOf(conf *config.Settings, root, cwd string) string {
 	return t.Project
 }
 
-// Notice は目録を、1 つの文脈（セッション、サブエージェントならその起動）でプロジェクトごとに 1 度だけ返す。
-// SessionStart と SubagentStart（atStart）に加え、cwd がプロジェクトの中にある最初の PreToolUse でも呼ぶ
-// （セッションはワークスペースルートで始まり、あとから cd で入るのがふつう）。数えは additionalContextOnce と
-// 同じ記録に置き、SessionStart（compact の後を含む）で忘れる。記録の置き場が無ければ、開始では渡し、
-// PreToolUse では渡さない（呼び出しのたびに重ねて渡さない）。
+// Notice は、1 つの文脈（セッション、またはサブエージェントの起動）ごとにプロジェクトの目録を 1 度だけ返す。
+// SessionStart と SubagentStart（atStart）に加え、cwd がプロジェクトの中にある最初の PreToolUse でも呼ぶ。
+// セッションはワークスペースルートで始まり、あとから cd で入るのがふつうだから。数えは additionalContextOnce と
+// 同じ記録に置き、SessionStart（compact の後を含む）で忘れる。記録の置き場が無いときは、開始では渡し、
+// PreToolUse では渡さない。呼び出しのたびに重ねて渡さないため。
 func Notice(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, atStart bool) string {
 	project := projectOf(conf, root, in.Cwd)
 	if project == "" {

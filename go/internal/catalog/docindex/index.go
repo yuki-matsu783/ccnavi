@@ -91,12 +91,12 @@ type dirState struct {
 // Build は base（git のワークツリーのルート）の md の索引を組み、無視されている索引を差分で書く。
 //
 // md を持つディレクトリの索引がどれも無視されていなければ、Refresh のときに限り .gitignore に IgnoreLine を足して
-// 確かめ直し、それでも無視されなければ索引の対象外（Unignored）で行を返さない。一部だけ無視されていない
-// ディレクトリと ccnavi のものでない索引のディレクトリは、行を組むが書かない。
+// 確かめ直す。それでも無視されなければ、索引の対象外（Unignored）として行を返さない。一部だけ無視されていない
+// ディレクトリと、ccnavi のものでない索引のディレクトリは、行を組むが書かない。
 //
-// 順は 3 段。全部のディレクトリで既存の索引を読んで使い回せる行を分け、読み直しの要る md を待つ数の少ない
-// ディレクトリから読み、ディレクトリごとに書く。読めなかった md は既存の行を残す（次の回に読み直す）。
-// `.git` が無ければ ErrNotRepository、git に聞けなければ *GitError。
+// 処理は 3 段。まず全部のディレクトリで既存の索引を読み、使い回せる行を分ける。次に、読み直しの要る md を待つ数が
+// 少ないディレクトリから読む。最後にディレクトリごとに書く。読めなかった md は既存の行を残し、次の回に読み直す。
+// `.git` が無ければ ErrNotRepository を、git に聞けなければ *GitError を返す。
 func Build(base string, o Options) (*Built, error) {
 	result := &Built{}
 	all, err := listed(base, left(o.Deadline))
@@ -201,8 +201,8 @@ func full(base, rel string) string {
 	return ospath.Join(base, strings.Split(rel, "/")...)
 }
 
-// scan は既存の索引を読み、使い回せる行と読み直しの要る md に分ける。実体がツリーの外のディレクトリ
-// （ジャンクションやリンク越し）は読まない。
+// scan は既存の索引を読み、使い回せる行と読み直しの要る md に分ける。
+// 実体がツリーの外にあるディレクトリ（ジャンクションやリンク越し）は読まない。
 func scan(base, baseReal, directory string, names []string, indexRel string, writable bool, o Options, result *Built) *dirState {
 	if _, ok := tree.PartsUnder(baseReal, ospath.Realpath(full(base, directory))); !ok {
 		result.Problems = append(result.Problems, directory+"/ の実体がツリーの外にあるので読まない")
@@ -248,8 +248,9 @@ func scan(base, baseReal, directory string, names []string, indexRel string, wri
 	return one
 }
 
-// readIndex は既存の ccnavi-index.jsonl の行（concept_id → 行）と中身と持ち主。空か、空でない行が全部 ccnavi の
-// 形なら ours。リンク・ふつうでないもの・大きすぎるもの・UTF-8 でないもの・形の違う行を持つものは foreign。
+// readIndex は既存の ccnavi-index.jsonl の行（concept_id → 行）と、中身と、持ち主を返す。
+// 空か、空でない行がすべて ccnavi の形なら ours。リンク・ふつうでないもの・大きすぎるもの・UTF-8 でないもの・
+// 形の違う行を持つものは foreign。
 func readIndex(path string) (map[string]Row, string, owner) {
 	rows := map[string]Row{}
 	info, err := os.Lstat(path)
