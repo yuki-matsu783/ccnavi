@@ -1,6 +1,7 @@
 package pyre
 
 import (
+	"errors"
 	"slices"
 	"strconv"
 	"strings"
@@ -175,10 +176,17 @@ func (re *Regexp) Group(name string) (int, bool) {
 	return g, ok
 }
 
-// Search は文字列のどこかに当たるか（Python の search）。
+// Search は文字列のどこかに当たるか（Python の search）。照合を打ち切ったときは偽（当たったかを言えない）。
+// 打ち切りを当たりとして扱う呼び手（止める側の照合）は SearchChecked を使う。
 func (re *Regexp) Search(s string) bool {
-	_, ok := re.search([]rune(s), 0, false)
+	ok, _ := re.SearchChecked(s)
 	return ok
+}
+
+// SearchChecked は Search と同じだが、照合を打ち切ったら ErrDepthLimit を返す（当たりは偽）。
+func (re *Regexp) SearchChecked(s string) (bool, error) {
+	_, ok, err := re.search([]rune(s), 0, false)
+	return ok, err
 }
 
 // Match は先頭から当たるか（Python の match）。
@@ -243,7 +251,7 @@ func (re *Regexp) FindIn(s string, pos, endpos int) (Found, bool) {
 	if !ok {
 		return Found{}, false
 	}
-	m, ok := re.search(text, pos, false)
+	m, ok, _ := re.search(text, pos, false)
 	if !ok {
 		return Found{}, false
 	}
@@ -276,7 +284,7 @@ func (re *Regexp) FindAllIn(s string, pos, endpos int) []Found {
 	var out []Found
 	advance := false
 	for pos <= len(text) {
-		m, ok := re.search(text, pos, advance)
+		m, ok, _ := re.search(text, pos, advance)
 		if !ok {
 			break
 		}
@@ -312,12 +320,12 @@ type span struct {
 	marks      []int
 }
 
-func (re *Regexp) search(text []rune, pos int, advance bool) (span, bool) {
+func (re *Regexp) search(text []rune, pos int, advance bool) (span, bool, error) {
 	last := len(text)
 	if re.anchor {
 		last = min(pos, last)
 		if pos > 0 {
-			return span{}, false
+			return span{}, false, nil
 		}
 	}
 	m := re.newMatcher(text, false, false, 0)
@@ -325,11 +333,24 @@ func (re *Regexp) search(text []rune, pos int, advance bool) (span, bool) {
 		// 当たらなかった試しは捕えた位置を元に戻して終わるので、同じ matcher を使い回せる。
 		m.advance, m.start = advance && start == pos, start
 		if end, ok := m.try(re.prog, start); ok {
-			return span{start: start, end: end, marks: m.marks}, true
+			return span{start: start, end: end, marks: m.marks}, true, nil
+		}
+		if m.aborted {
+			return span{}, false, ErrDepthLimit
 		}
 	}
-	return span{}, false
+	return span{}, false, nil
 }
+
+// DepthLimit は照合の入れ子（run の深さ）の上限。後戻りの照合は続きを呼び出しで積むので、繰り返しを含む式を
+// 長い文字列に当てると深さが文字数に比例して伸び、Go のスタックの上限（越えると回復できずにプロセスが落ちる）に届く。
+// Python の sre はヒープに積むので落ちない。上限を越えた照合は打ち切り、ErrDepthLimit で知らせる。
+// 値は数 KB の通常のコマンドでは届かず、最も深く積む形でもスタックが 128 MB ほどに収まる大きさ
+// （1 段に数百バイト積む。32 ビットの機械のスタックの上限 250 MB にも収まる）。
+const DepthLimit = 1 << 18
+
+// ErrDepthLimit は照合が DepthLimit を越えて打ち切られたこと。当たったかどうかは分からない。
+var ErrDepthLimit = errors.New("pyre: 照合の入れ子が上限を越えたので打ち切った")
 
 type matcher struct {
 	s        []rune
@@ -338,6 +359,9 @@ type matcher struct {
 	matchAll bool
 	advance  bool
 	start    int
+	// depth は run の入れ子の深さ。aborted は DepthLimit を越えて照合を打ち切ったこと（立ったら答えは使わない）。
+	depth   int
+	aborted bool
 }
 
 func (re *Regexp) newMatcher(s []rune, matchAll, advance bool, start int) *matcher {
@@ -364,7 +388,24 @@ type cont func(int) bool
 
 func accept(int) bool { return true }
 
+// run は prog を i から照合し、続き k に渡す。入れ子が DepthLimit を越えたら打ち切る。
+// 打ち切った後は、どの経路も偽で戻る（否定の先読みが偽を「当たらなかった」と読んで通らないよう、
+// 呼び手は答えより先に aborted を見る）。
 func (m *matcher) run(prog []*inst, i int, k cont) bool {
+	if m.aborted {
+		return false
+	}
+	if m.depth >= DepthLimit {
+		m.aborted = true
+		return false
+	}
+	m.depth++
+	ok := m.step(prog, i, k)
+	m.depth--
+	return ok && !m.aborted
+}
+
+func (m *matcher) step(prog []*inst, i int, k cont) bool {
 	for idx, n := range prog {
 		if n.test != nil {
 			if i < len(m.s) && n.test(m.s[i]) {

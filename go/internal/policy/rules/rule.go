@@ -100,27 +100,43 @@ type Condition struct {
 // IsLeaf は個別条件（glob・regex）か。
 func (c *Condition) IsLeaf() bool { return c.Kind == WhenGlob || c.Kind == WhenRegex }
 
-// Hits は subject に当たるか。
-func (c *Condition) Hits(subject string) bool {
+// Hits は subject に当たるか。照合を打ち切った式は当たらなかったものとして読む。
+func (c *Condition) Hits(subject string) bool { return c.hits(subject, &probe{}) }
+
+func (c *Condition) hits(subject string, p *probe) bool {
 	switch c.Kind {
 	case WhenGlob, WhenRegex:
-		return c.Compiled != nil && c.Compiled.Search(subject)
+		return p.search(c.Compiled, subject)
 	case WhenAll:
 		for _, child := range c.Children {
-			if !child.Hits(subject) {
+			if !child.hits(subject, p) {
 				return false
 			}
 		}
 		return true
 	case WhenAny:
 		for _, child := range c.Children {
-			if child.Hits(subject) {
+			if child.hits(subject, p) {
 				return true
 			}
 		}
 		return false
 	}
-	return !c.Children[0].Hits(subject)
+	return !c.Children[0].hits(subject, p)
+}
+
+// probe は 1 回の照合で、どれかの式が照合を打ち切ったか（pyre.ErrDepthLimit）を覚える。
+type probe struct{ unsure bool }
+
+func (p *probe) search(re *pyre.Regexp, subject string) bool {
+	if re == nil {
+		return false
+	}
+	hit, err := re.SearchChecked(subject)
+	if err != nil {
+		p.unsure = true
+	}
+	return hit
 }
 
 // Written は書いた表記に戻した形。
@@ -299,7 +315,9 @@ func sortedItems(m map[string]string) string {
 	return b.String()
 }
 
-// Matches はこのルールがこのツールと対象に当たるか。
+// Matches はこのルールがこのツールと対象に当たるか。どれかの式が照合を打ち切ったら（数 MB のコマンドに
+// 繰り返しを含む式を当てた回）、止める側（deny・ask）は当たったことにし、allow は当たらなかったことにする。
+// 答えの分からない照合を、通す根拠にしないためである。
 func (r *Rule) Matches(tool, subject string) bool {
 	if !r.Built() || subject == "" || !ToolMatches(r.Match, tool) {
 		return false
@@ -307,16 +325,23 @@ func (r *Rule) Matches(tool, subject string) bool {
 	if r.Exempt != nil {
 		subject = r.Exempt(subject)
 	}
-	return r.Hits(subject)
+	p := &probe{}
+	hit := r.hits(subject, p)
+	if p.unsure {
+		return r.Decision != Allow
+	}
+	return hit
 }
 
 // Hits はツール名を見ずに、対象だけで当たるか（本体に当たり、except のどれにも当たらない）。
-func (r *Rule) Hits(subject string) bool {
-	if !r.BodyHits(subject) {
+func (r *Rule) Hits(subject string) bool { return r.hits(subject, &probe{}) }
+
+func (r *Rule) hits(subject string, p *probe) bool {
+	if !r.bodyHits(subject, p) {
 		return false
 	}
 	for _, e := range r.Excepts {
-		if e.Compiled != nil && e.Compiled.Search(subject) {
+		if p.search(e.Compiled, subject) {
 			return false
 		}
 	}
@@ -324,11 +349,13 @@ func (r *Rule) Hits(subject string) bool {
 }
 
 // BodyHits は本体（glob・regex・when）だけで当たるか。
-func (r *Rule) BodyHits(subject string) bool {
+func (r *Rule) BodyHits(subject string) bool { return r.bodyHits(subject, &probe{}) }
+
+func (r *Rule) bodyHits(subject string, p *probe) bool {
 	if r.Compiled != nil {
-		return r.Compiled.Search(subject)
+		return p.search(r.Compiled, subject)
 	}
-	return r.When != nil && r.When.Hits(subject)
+	return r.When != nil && r.When.hits(subject, p)
 }
 
 // RecordName は記録の rules 欄と文面に出す名前。ルールファイル由来は `<相対パス>:<書いた id>`、

@@ -181,3 +181,25 @@ func TestTranslateGlobMatches(t *testing.T) {
 		}
 	}
 }
+
+// 繰り返しを含む式を数 MB の文字列に当てても落ちず、打ち切りを知らせる（打ち切った照合を当たらなかったと読まない）。
+func TestDepthLimit(t *testing.T) {
+	long := strings.Repeat("ab", 2<<20)
+	for _, p := range []string{`(?:ab)*c`, `(?:(a)(b))*?c`, `^(?!(?:ab)*$)`, `(?:(?=a)ab)*$`} {
+		ok, err := MustCompile(p, IgnoreCase).SearchChecked(long)
+		if ok || !errors.Is(err, ErrDepthLimit) {
+			t.Errorf("%s: (%v, %v), want (false, ErrDepthLimit)", p, ok, err)
+		}
+		if MustCompile(p, IgnoreCase).Search(long) {
+			t.Errorf("%s: Search の打ち切りは偽", p)
+		}
+	}
+	// 上限に届かない長さでは答えが変わらない。
+	short := strings.Repeat("ab", 4096)
+	if ok, err := MustCompile(`(?:ab)*$`, 0).SearchChecked(short); !ok || err != nil {
+		t.Errorf("short: (%v, %v)", ok, err)
+	}
+	if ok, err := MustCompile(`^(?!(?:ab)*$)`, 0).SearchChecked(short); ok || err != nil {
+		t.Errorf("short lookahead: (%v, %v)", ok, err)
+	}
+}
