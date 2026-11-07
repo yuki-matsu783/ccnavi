@@ -175,7 +175,7 @@ func TestMatchesPython(t *testing.T) {
 	for _, x := range opened {
 		states, problems := []any{}, []any{}
 		for _, p := range UnmetPredecessors(x, pool) {
-			states = append(states, []any{p.Ticket, string(p.State), rel(p.Where), rel(p.Label())})
+			states = append(states, []any{p.Ticket, string(p.State), rel(p.where), rel(p.Label())})
 		}
 		for _, p := range PredecessorProblems(x, pool, ".ccnavi/approved") {
 			problems = append(problems, []any{p.Kind, rel(p.Detail)})

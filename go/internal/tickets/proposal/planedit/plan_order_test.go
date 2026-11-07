@@ -46,10 +46,10 @@ func TestAProposalChangedWhileSavingWritesNothing(t *testing.T) {
 		t.Fatal(why)
 	}
 	answer := Reorder(s, order)
-	if len(answer.Changes) == 0 {
+	if len(answer.changes) == 0 {
 		t.Fatal("付け替える子が無い（見本が違う）")
 	}
-	expect := s.SHA()
+	expect := s.sha()
 	child := filepath.Join(testkit.TodoDir(root, "i0001"), "i0001-03-01.md")
 	data, err := os.ReadFile(child)
 	if err != nil {

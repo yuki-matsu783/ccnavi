@@ -10,7 +10,7 @@ import (
 	"ccnavi/internal/records/prune"
 )
 
-// records/prune はミラーの指紋の記録を名前の頭（SignaturePrefix）で見分けて消す。prune は上の段を読めないので名前を写して
+// records/prune はミラーの指紋の記録を名前の頭（signaturePrefix）で見分けて消す。prune は上の段を読めないので名前を写して
 // 持っている。写しが持ち主の定数とずれると記録が残り続けるので、古い記録が消えることで確かめる。
 func TestPruneRemovesOldSignaturePrefix(t *testing.T) {
 	for _, name := range []string{env.LogRotateMB, env.LogKeepDays, env.StateKeepDays, env.StopReviewKeepDays} {
@@ -21,7 +21,7 @@ func TestPruneRemovesOldSignaturePrefix(t *testing.T) {
 	if err := os.MkdirAll(state, 0o777); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(state, SignaturePrefix+"11111111-aaaa-bbbb-cccc-000000000001.json")
+	path := filepath.Join(state, signaturePrefix+"11111111-aaaa-bbbb-cccc-000000000001.json")
 	if err := os.WriteFile(path, []byte("{}"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -31,6 +31,6 @@ func TestPruneRemovesOldSignaturePrefix(t *testing.T) {
 	}
 	prune.Run(root, filepath.Join(root, "logs", "decisions.jsonl"), state, "", prune.Options{})
 	if _, err := os.Lstat(path); err == nil {
-		t.Errorf("%s の古い記録が消えない（prune の名前の写しと違う）", SignaturePrefix)
+		t.Errorf("%s の古い記録が消えない（prune の名前の写しと違う）", signaturePrefix)
 	}
 }

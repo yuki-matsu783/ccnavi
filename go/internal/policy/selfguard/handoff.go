@@ -246,7 +246,7 @@ func handoffLinkCommand(root, cwd string) func(string) string {
 		text := strings.ReplaceAll(subject, shell.WordSep, " ")
 		linked := false
 		for _, seg := range segments.Split(text, -1) {
-			if makesLink(strings.FieldsFunc(seg, ospath.IsSpace)) {
+			if makesLink(ospath.Fields(seg)) {
 				linked = true
 				break
 			}

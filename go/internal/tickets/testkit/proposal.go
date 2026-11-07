@@ -8,16 +8,16 @@ import (
 
 // proposal のテスト（承認・計画の編集・候補・送る入口）が使うワークスペースと提案の見本。
 
-// ProposalWorkspace は Workspace に、共通レイヤーの phases.yml（ProposalPhases と ProposalExtraType）を置く。
+// ProposalWorkspace は Workspace に、共通レイヤーの phases.yml（proposalPhases と proposalExtraType）を置く。
 func ProposalWorkspace(t *testing.T, worktrees ...string) string {
 	t.Helper()
 	root := Workspace(t, worktrees...)
-	Put(t, filepath.Join(root, ".ccnavi", "config", "common", "phases.yml"), "version: 1\n"+ProposalPhases+ProposalExtraType)
+	Put(t, filepath.Join(root, ".ccnavi", "config", "common", "phases.yml"), "version: 1\n"+proposalPhases+proposalExtraType)
 	return root
 }
 
-// ProposalPhases は提案の見本の定義のコピー（phases: の欄）。共通レイヤーの phases.yml にも同じ定義を置く。
-const ProposalPhases = `phases:
+// proposalPhases は提案の見本の定義のコピー（phases: の欄）。共通レイヤーの phases.yml にも同じ定義を置く。
+const proposalPhases = `phases:
   research:
     kind: work
     title: 調査
@@ -41,8 +41,8 @@ const ProposalPhases = `phases:
     - wip/design/*
 `
 
-// ProposalExtraType は phases.yml にだけある定義（承認の画面の「この親では使わない定義」）。
-const ProposalExtraType = `  release:
+// proposalExtraType は phases.yml にだけある定義（承認の画面の「この親では使わない定義」）。
+const proposalExtraType = `  release:
     kind: work
     title: リリース
     review: true
@@ -53,7 +53,7 @@ const ProposalExtraType = `  release:
 func ProposalParent(id string, plan []string, extra ...string) string {
 	head := "---\nversion: 1\nticket: " + id + "\nissue: 1\nmr: 1\n"
 	if len(plan) > 0 {
-		head += ProposalPhases + "plan:\n" + strings.Join(plan, "\n") + "\n"
+		head += proposalPhases + "plan:\n" + strings.Join(plan, "\n") + "\n"
 	}
 	for _, e := range extra {
 		head += e + "\n"

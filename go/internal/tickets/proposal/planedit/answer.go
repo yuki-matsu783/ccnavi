@@ -23,49 +23,49 @@ import (
 
 // Answer は振り直した答え。`--plan-order --json` と承認の preview の plans が同じものから作る。
 type Answer struct {
-	Source     *Source
-	Renumbered Renumbered
-	Revised    *ticket.Ticket
-	Problems   []rules.Problem
-	// RevisionProblems は改版の錠に当たったもの。
-	RevisionProblems []rules.Problem
-	// Changes は付け替える子の提案（番号の変わるステップを指す子と、その子を predecessors で指す子）。
-	Changes []ChildChange
-	// ChildProblems は付け替えられない理由（付け替え先の衝突、承認済みの側の参照）。
-	ChildProblems []string
+	source     *Source
+	renumbered renumbered
+	revised    *ticket.Ticket
+	problems   []rules.Problem
+	// revisionProblems は改版の錠に当たったもの。
+	revisionProblems []rules.Problem
+	// changes は付け替える子の提案（番号の変わるステップを指す子と、その子を predecessors で指す子）。
+	changes []childChange
+	// childProblems は付け替えられない理由（付け替え先の衝突、承認済みの側の参照）。
+	childProblems []string
 	// redrawn は --order で線を引き直した計画。
 	redrawn []phases.Part
 }
 
-// Writable は書き戻してよいか。
-func (a *Answer) Writable() bool {
-	return len(a.Renumbered.Refused) == 0 && len(a.Problems) == 0 && len(a.RevisionProblems) == 0 && len(a.ChildProblems) == 0
+// writable は書き戻してよいか。
+func (a *Answer) writable() bool {
+	return len(a.renumbered.refused) == 0 && len(a.problems) == 0 && len(a.revisionProblems) == 0 && len(a.childProblems) == 0
 }
 
-// ChildChange は子の提案 1 本の付け替え。識別子・phase:・predecessors の新しい値。
-type ChildChange struct {
-	Ticket          *ticket.Ticket
+// childChange は子の提案 1 本の付け替え。識別子・phase:・predecessors の新しい値。
+type childChange struct {
+	ticket          *ticket.Ticket
 	raw             []byte
-	NewTicket       string
-	NewPhase        any // 子でなければ nil（Python の None）
-	NewPredecessors []string
+	newTicket       string
+	newPhase        any // 子でなければ nil（Python の None）
+	newPredecessors []string
 }
 
-// Renamed は識別子が変わるか。
-func (c *ChildChange) Renamed() bool { return c.NewTicket != c.Ticket.ID }
+// renamed は識別子が変わるか。
+func (c *childChange) renamed() bool { return c.newTicket != c.ticket.ID }
 
-// NewPath は付け替えたあとのパス。
-func (c *ChildChange) NewPath() string {
-	if !c.Renamed() {
-		return c.Ticket.Path
+// newPath は付け替えたあとのパス。
+func (c *childChange) newPath() string {
+	if !c.renamed() {
+		return c.ticket.Path
 	}
-	return ospath.Join(ospath.Dirname(c.Ticket.Path), c.NewTicket+".md")
+	return ospath.Join(ospath.Dirname(c.ticket.Path), c.newTicket+config.MdExt)
 }
 
-func (c *ChildChange) json() *jsonObject {
-	return obj("ticket", c.Ticket.ID, "new_ticket", c.NewTicket, "path", c.Ticket.Path, "new_path", c.NewPath(),
-		"phase", phaseOf(c.Ticket), "new_phase", c.NewPhase,
-		"predecessors", strs(c.Ticket.Predecessors), "new_predecessors", strs(c.NewPredecessors))
+func (c *childChange) json() *jsonObject {
+	return obj("ticket", c.ticket.ID, "new_ticket", c.newTicket, "path", c.ticket.Path, "new_path", c.newPath(),
+		"phase", phaseOf(c.ticket), "new_phase", c.newPhase,
+		"predecessors", strs(c.ticket.Predecessors), "new_predecessors", strs(c.newPredecessors))
 }
 
 // phaseOf は Python の t.phase（子でなければ None）。
@@ -124,7 +124,7 @@ func retarget(parentID string, moved map[int]int, rows []row) []retargeted {
 	return out
 }
 
-func changesOf(s *Source, moved map[int]int) []ChildChange {
+func changesOf(s *Source, moved map[int]int) []childChange {
 	files := slices.Concat(s.children, s.referrers)
 	rows := make([]row, len(files))
 	byID := map[string]file{}
@@ -132,20 +132,20 @@ func changesOf(s *Source, moved map[int]int) []ChildChange {
 		rows[i] = row{f.ticket.ID, phaseOf(f.ticket), slices.Clone(f.ticket.Predecessors)}
 		byID[f.ticket.ID] = f
 	}
-	var out []ChildChange
+	var out []childChange
 	for _, r := range retarget(s.Parent.ID, moved, rows) {
 		f := byID[r.ticket]
-		out = append(out, ChildChange{f.ticket, f.raw, r.newTicket, r.newPhase, r.newPredecessors})
+		out = append(out, childChange{f.ticket, f.raw, r.newTicket, r.newPhase, r.newPredecessors})
 	}
 	return out
 }
 
 // childProblemsOf は付け替えられない理由。承認済みの側（承認済みチケット・記録・マーカー・フロー・ワークツリー）は
 // エージェントが直せないので、見つけたら書かない（直すのはユーザ）。
-func childProblemsOf(s *Source, changes []ChildChange) []string {
-	var renamed []ChildChange
+func childProblemsOf(s *Source, changes []childChange) []string {
+	var renamed []childChange
 	for _, c := range changes {
-		if c.Renamed() {
+		if c.renamed() {
 			renamed = append(renamed, c)
 		}
 	}
@@ -156,8 +156,8 @@ func childProblemsOf(s *Source, changes []ChildChange) []string {
 	leaving := map[string]bool{}
 	leavingPaths := map[string]bool{}
 	for _, c := range renamed {
-		leaving[c.Ticket.ID] = true
-		leavingPaths[ospath.Realpath(c.Ticket.Path)] = true
+		leaving[c.ticket.ID] = true
+		leavingPaths[ospath.Realpath(c.ticket.Path)] = true
 	}
 	hitsLeaving := func(preds []string) []string {
 		var hit []string
@@ -171,14 +171,14 @@ func childProblemsOf(s *Source, changes []ChildChange) []string {
 	}
 	var found []string
 	for _, c := range renamed {
-		next := c.NewTicket
+		next := c.newTicket
 		if leaving[next] {
 			continue
 		}
-		if fsio.Lexists(c.NewPath()) && !leavingPaths[ospath.Realpath(c.NewPath())] {
-			found = append(found, c.Ticket.ID+" の付け替え先 "+next+" のファイルが既にある（"+c.NewPath()+"）")
+		if fsio.Lexists(c.newPath()) && !leavingPaths[ospath.Realpath(c.newPath())] {
+			found = append(found, c.ticket.ID+" の付け替え先 "+next+" のファイルが既にある（"+c.newPath()+"）")
 		} else if slices.ContainsFunc(s.proposals, func(t *ticket.Ticket) bool { return t.ID == next }) {
-			found = append(found, c.Ticket.ID+" の付け替え先 "+next+" の提案が既にある")
+			found = append(found, c.ticket.ID+" の付け替え先 "+next+" の提案が既にある")
 		}
 	}
 	names := map[string]bool{}
@@ -186,7 +186,7 @@ func childProblemsOf(s *Source, changes []ChildChange) []string {
 		names[id] = true
 	}
 	for _, c := range renamed {
-		names[c.NewTicket] = true
+		names[c.newTicket] = true
 	}
 	for _, t := range s.proposals {
 		if t.State == place.Todo {
@@ -200,9 +200,9 @@ func childProblemsOf(s *Source, changes []ChildChange) []string {
 		return sortedUnique(found)
 	}
 	for _, c := range renamed {
-		draft := flow.DraftFile(conf, cmp.Or(c.Ticket.TreeRoot, root), c.NewTicket)
-		if !leaving[c.NewTicket] && fsio.Lexists(draft) {
-			found = append(found, c.Ticket.ID+" の付け替え先のフローの下書きが既にある（"+draft+"）")
+		draft := flow.DraftFile(conf, cmp.Or(c.ticket.TreeRoot, root), c.newTicket)
+		if !leaving[c.newTicket] && fsio.Lexists(draft) {
+			found = append(found, c.ticket.ID+" の付け替え先のフローの下書きが既にある（"+draft+"）")
 		}
 	}
 	for _, t := range approval.ReadRaw(conf, root).Everything() {
@@ -270,9 +270,9 @@ func mismatched(s *Source) []any {
 // Reorder は線（order。nil なら提案のまま）から答えを組む。
 func Reorder(s *Source, order Order) *Answer {
 	parent := s.Parent
-	got := Renumber(parent, order, s.Fixed)
+	got := renumber(parent, order, s.fixed)
 	revised := *parent
-	revised.Plan, revised.Feedback = got.Plan, got.Feedback
+	revised.Plan, revised.Feedback = got.plan, got.feedback
 	revised.Workflow = nil
 	revised.Workflow = phases.Compute(&revised)
 	types := phases.TypesOf(parent)
@@ -280,7 +280,7 @@ func Reorder(s *Source, order Order) *Answer {
 	// 振り直したステップは組み直すので、提案に元からある after の形の誤りが消える。振り直す前の誤りも入れる
 	// （読めない after を書いた提案を、線を引き直しただけで通さない）。
 	var redrawn []phases.Part
-	if len(got.Refused) == 0 {
+	if len(got.refused) == 0 {
 		for _, k := range parts {
 			if _, ok := order[k]; ok {
 				redrawn = append(redrawn, k)
@@ -292,12 +292,12 @@ func Reorder(s *Source, order Order) *Answer {
 		problems = append(problems, phases.AfterProblems(parent, k)...)
 	}
 	var lock []rules.Problem
-	var changes []ChildChange
-	if len(got.Refused) == 0 {
-		if s.Current != nil {
-			lock = candidates.LockProblems(&revised, s.Current, s.Fixed, got.Moved)
+	var changes []childChange
+	if len(got.refused) == 0 {
+		if s.current != nil {
+			lock = candidates.LockProblems(&revised, s.current, s.fixed, got.moved)
 		}
-		changes = changesOf(s, got.Moved)
+		changes = changesOf(s, got.moved)
 	}
 	return &Answer{s, got, &revised, problems, lock, changes, childProblemsOf(s, changes), redrawn}
 }
@@ -312,22 +312,22 @@ func errorsOnly(ps []rules.Problem) []rules.Problem {
 	return out
 }
 
-// Plans は図に描く中身。計画ごとに 1 件（全体計画とフィードバック計画）。
-func (a *Answer) Plans() []any {
-	parent, revised := a.Source.Parent, a.Revised
+// plans は図に描く中身。計画ごとに 1 件（全体計画とフィードバック計画）。
+func (a *Answer) plans() []any {
+	parent, revised := a.source.Parent, a.revised
 	wf := cmp.Or(revised.Workflow, phases.Compute(revised))
 	types := phases.TypesOf(parent)
 	back := map[int]int{}
-	for old, renumbered := range a.Renumbered.Moved {
+	for old, renumbered := range a.renumbered.moved {
 		back[renumbered] = old
 	}
 	loose, ready := phases.Loose(revised, wf), phases.Ready(revised, wf)
-	current := a.Source.Current
+	current := a.source.current
 	var held *ticket.Workflow
 	if current != nil {
 		held = phases.Compute(current)
 	}
-	sha := a.Source.SHA()
+	sha := a.source.sha()
 	original := map[int]*ticket.PlanItem{}
 	for _, step := range parent.Numbered() {
 		original[step.Number] = step.Item
@@ -350,7 +350,7 @@ func (a *Answer) Plans() []any {
 			reviewAt, ok := wf.ReviewAt[n]
 			items = append(items, obj("number", n, "from", cmp.Or(back[n], n), "type", item.Type, "title", title,
 				"review", needJSON(ticket.ChosenReview(item.Review, typeReview)), "deferred", item.Deferred,
-				"review_at", optional(reviewAt, ok), "locked", a.Source.Fixed[n]))
+				"review_at", optional(reviewAt, ok), "locked", a.source.fixed[n]))
 			if len(item.After) > 0 {
 				after.Set(strconv.Itoa(n), ints(item.After))
 			}
@@ -412,17 +412,17 @@ func direct(current *ticket.Ticket, wf *ticket.Workflow, part phases.Part) *json
 // Body は `--plan-order <親> --json` の答え。entry が written と source_sha を足す（plans の各要素の source_sha も）。
 func (a *Answer) Body() *jsonObject {
 	refused := []any{}
-	for _, r := range a.Renumbered.Refused {
+	for _, r := range a.renumbered.refused {
 		refused = append(refused, r.json())
 	}
 	children := []any{}
-	for i := range a.Changes {
-		children = append(children, a.Changes[i].json())
+	for i := range a.changes {
+		children = append(children, a.changes[i].json())
 	}
-	return obj("version", Version, "ticket", a.Source.Parent.ID, "source_sha", a.Source.SHA(), "plans", a.Plans(),
-		"problems", problemTexts(a.Problems), "loose", ints(phases.Loose(a.Revised, a.Revised.Workflow)), "refused", refused,
-		"revision_problems", problemTexts(a.RevisionProblems), "children", children,
-		"child_problems", strs(a.ChildProblems), "mismatched", mismatched(a.Source), "writable", a.Writable())
+	return obj("version", version, "ticket", a.source.Parent.ID, "source_sha", a.source.sha(), "plans", a.plans(),
+		"problems", problemTexts(a.problems), "loose", ints(phases.Loose(a.revised, a.revised.Workflow)), "refused", refused,
+		"revision_problems", problemTexts(a.revisionProblems), "children", children,
+		"child_problems", strs(a.childProblems), "mismatched", mismatched(a.source), "writable", a.writable())
 }
 
 // Parent は承認の対象に入った計画を持つ親の提案と、改版ならその承認済みチケット。
@@ -435,7 +435,7 @@ func PreviewPlans(conf *config.Settings, root string, parents []Parent, proposal
 	out := []any{}
 	for _, p := range parents {
 		if s, _ := Load(conf, root, p.Proposal, proposals, p.Current); s != nil {
-			out = append(out, Reorder(s, nil).Plans()...)
+			out = append(out, Reorder(s, nil).plans()...)
 		}
 	}
 	return out

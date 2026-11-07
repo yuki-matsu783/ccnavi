@@ -105,7 +105,7 @@ allow:
     match: WebFetch
     regex: '^https://x/(?:a|b)*$'
 `
-	// シェルのコマンドは長さの上限（CommandLengthLimit）で照合の前に止まるので、長い対象は WebFetch の URL で渡す。
+	// シェルのコマンドは長さの上限（commandLengthLimit）で照合の前に止まるので、長い対象は WebFetch の URL で渡す。
 	long := "https://x/" + strings.Repeat("ab", 100_000)
 	clock(t, 1<<30, 0) // 期限で止まる経路と分けるため、時計を止めておく
 	for _, tc := range []struct {

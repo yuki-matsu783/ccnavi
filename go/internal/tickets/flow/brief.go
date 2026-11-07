@@ -29,9 +29,9 @@ const (
 	fenceClose = "    ---- フローの本文ここまで ----"
 )
 
-// Fingerprint はフローのファイルのダイジェスト。無ければ absent、読めれば sha256:<16 進>、読まないなら
+// fingerprint はフローのファイルのダイジェスト。無ければ absent、読めれば sha256:<16 進>、読まないなら
 // unreadable:<理由>。読み方は Load と同じ（ReadBytes）。
-func Fingerprint(file, treeRoot string) string {
+func fingerprint(file, treeRoot string) string {
 	if !ospath.DiskLexists(file) {
 		return markAbsent
 	}
@@ -56,7 +56,7 @@ func digestRecordPath(conf *config.Settings, root string, child *ticket.Ticket) 
 func RecordDigest(conf *config.Settings, root string, child *ticket.Ticket) (string, string) {
 	file, base, _ := Resolve(conf, root, child)
 	data := pyjson.NewObject(
-		"fingerprint", Fingerprint(file, base),
+		"fingerprint", fingerprint(file, base),
 		"path", FlowRel(conf, child.ID),
 		"at", child.StartedAt,
 	)
@@ -95,7 +95,7 @@ func ChangedNotice(conf *config.Settings, root string, child *ticket.Ticket) str
 		before = pyfmt.Str(v)
 	}
 	file, base, _ := Resolve(conf, root, child)
-	now := Fingerprint(file, base)
+	now := fingerprint(file, base)
 	if before == "" || before == now {
 		return ""
 	}

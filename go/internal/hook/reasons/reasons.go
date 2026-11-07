@@ -21,9 +21,9 @@ import (
 
 // 判定の理由コード。実行後チェックのコード（POST_*）は post にある。あちらは判定ではなく、起きたことの報告なので混ぜない。
 const (
-	// CodeCommand は Bash の実行される部分に、CodePath はファイルのパスにルールがヒットした。
-	CodeCommand = "DENY_COMMAND_PATTERN"
-	CodePath    = "DENY_PATH"
+	// codeCommand は Bash の実行される部分に、codePath はファイルのパスにルールがヒットした。
+	codeCommand = "DENY_COMMAND_PATTERN"
+	codePath    = "DENY_PATH"
 	// CodeRuleAsk はルールが ask と書いた場所。毎回人間が見るべき確認ポイントで、繰り返し出ること自体に値打ちがある。
 	CodeRuleAsk = "RULE_ASK"
 	// CodeUndeclared はルールがどこも言及していない。危険の表明ではなく、扱いを権限モードに委ねたことを言う。
@@ -100,9 +100,9 @@ func CodeFor(tool string, degraded shell.Reason) string {
 		return CodeUncertain
 	}
 	if tool == config.ToolBash {
-		return CodeCommand
+		return codeCommand
 	}
-	return CodePath
+	return codePath
 }
 
 // FallenBack はルールファイルを読めずに組み込みの既定に戻ったことを伝える文。通した回にも返す（黙ると、ガードが

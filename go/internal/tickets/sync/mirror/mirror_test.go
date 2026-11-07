@@ -58,8 +58,8 @@ func TestPrepareCreatesWhatTheMirrorLacks(t *testing.T) {
 			{".ccnavi/config/common/risks.yml", "create"},
 			{".ccnavi/config/common/rules.yml", "create"},
 		}
-		if p.State != StateDiffers || !reflect.DeepEqual(actions(p, false), want) || p.Expect() == "" {
-			t.Errorf("%s: %s %v %q", name, p.State, actions(p, false), p.Expect())
+		if p.State != stateDiffers || !reflect.DeepEqual(actions(p, false), want) || p.expect() == "" {
+			t.Errorf("%s: %s %v %q", name, p.State, actions(p, false), p.expect())
 		}
 	}
 }
@@ -69,7 +69,7 @@ func TestPrepareAfterSyncHasNothing(t *testing.T) {
 	syncAll(t, root)
 	plan := Prepare(settingsOf(root), root, nil)
 	for _, p := range plan.Projects {
-		if p.State != StateSynced || len(p.Changes) > 0 || p.Expect() != "" {
+		if p.State != StateSynced || len(p.Changes) > 0 || p.expect() != "" {
 			t.Errorf("%s: %s %v", p.Name, p.State, p.Changes)
 		}
 	}
@@ -121,7 +121,7 @@ func TestPrepareSelectsByNameWithoutCase(t *testing.T) {
 				selected = append(selected, p.Name)
 			}
 		}
-		if !reflect.DeepEqual(selected, []string{"lib"}) || plan.Expect() != byName(plan)["lib"].Expect() {
+		if !reflect.DeepEqual(selected, []string{"lib"}) || plan.Expect() != byName(plan)["lib"].expect() {
 			t.Errorf("%v: %v", wanted, selected)
 		}
 	}
@@ -212,7 +212,7 @@ func TestApplyWritesOnlyTheChosenMirror(t *testing.T) {
 		t.Error("選んでいない app に書いた")
 	}
 	again := byName(Prepare(settingsOf(root), root, nil))
-	if again["lib"].State != StateSynced || again["app"].State != StateDiffers {
+	if again["lib"].State != StateSynced || again["app"].State != stateDiffers {
 		t.Errorf("lib %s app %s", again["lib"].State, again["app"].State)
 	}
 }
@@ -233,7 +233,7 @@ func TestApplyRefusesAnExpectThatIsNotTheShownOne(t *testing.T) {
 			root := workspace(t)
 			plan, expect := run(t, root, Prepare(settingsOf(root), root, nil))
 			done := Apply(settingsOf(root), plan, expect)
-			if done.OK || done.Error != Stale {
+			if done.OK || done.Error != stale {
 				t.Errorf("%+v", done)
 			}
 			if exists(commonPath(project(root, "lib"))) {
@@ -336,7 +336,7 @@ func TestSkillsOnlyAreNotCommonEmpty(t *testing.T) {
 	}
 	skill(t, root, "process-test", "# 本文\n", nil)
 	plan := Prepare(settingsOf(root), root, nil)
-	if plan.CommonEmpty || byName(plan)["lib"].State != StateDiffers {
+	if plan.CommonEmpty || byName(plan)["lib"].State != stateDiffers {
 		t.Fatalf("%v %s", plan.CommonEmpty, byName(plan)["lib"].State)
 	}
 	syncAll(t, root)
@@ -354,7 +354,7 @@ func TestALinkedSkillsDirIsAnErrorForThatProject(t *testing.T) {
 	}
 	link(t, outside, filepath.Join(project(root, "app"), "skills"))
 	found := byName(Prepare(settingsOf(root), root, nil))
-	if found["app"].State != StateError || found["lib"].State != StateDiffers {
+	if found["app"].State != StateError || found["lib"].State != stateDiffers {
 		t.Errorf("app %s lib %s", found["app"].State, found["lib"].State)
 	}
 }
@@ -532,7 +532,7 @@ func TestAFailedWritePutsEverythingBack(t *testing.T) {
 			run = append(run, c)
 		}
 	}
-	if err := os.MkdirAll(filepath.Join(last.Target, "x"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(last.target, "x"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	failed := apply(append(run, last))

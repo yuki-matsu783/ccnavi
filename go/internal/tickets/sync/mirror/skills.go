@@ -18,7 +18,6 @@ import (
 
 const (
 	processKey = "process"
-	shareExt   = ".md"
 )
 
 // sourceDir は工程スキルの置き場の、ワークスペースルートからの相対。
@@ -57,10 +56,11 @@ func Installed(root, name string) string {
 	return ""
 }
 
-// processFlag は頭の frontmatter に `process: true`（真偽の真だけ）があるか。別名は読まない。
+// processFlag は頭の frontmatter に `process: true`（真偽の真だけ）があるか。別名は読まない。頭の BOM は外して読む
+// （スキルの一覧と同じ読み方）。
 func processFlag(raw []byte) bool {
 	text, _ := fsio.Decode(raw[:min(len(raw), config.SkillHeadLimit)], fsio.Replace)
-	body, state := yaml.FrontBody(text, yaml.FrontStyle{Indented: true})
+	body, state := yaml.FrontBody(text, yaml.FrontStyle{Indented: true, SkipBOM: true})
 	if state != yaml.FrontClosed {
 		return false
 	}
@@ -78,7 +78,7 @@ func isShared(parts []string) bool {
 		return true
 	}
 	n := len(commonRefs)
-	return len(parts) > n && slices.Equal(parts[:n], commonRefs) && strings.HasSuffix(parts[len(parts)-1], shareExt) &&
+	return len(parts) > n && slices.Equal(parts[:n], commonRefs) && strings.HasSuffix(parts[len(parts)-1], config.MdExt) &&
 		!slices.ContainsFunc(parts, func(p string) bool { return p == "" || p == "." || p == ".." })
 }
 

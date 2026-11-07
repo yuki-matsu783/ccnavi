@@ -13,9 +13,9 @@ import (
 	"ccnavi/internal/infra/tree"
 )
 
-// PathKey は PATH の ccnavi の実体の key の頭。パスの印が続く。PATH が変わって指す先が替わったとき、
+// pathKey は PATH の ccnavi の実体の key の頭。パスの印が続く。PATH が変わって指す先が替わったとき、
 // 別の実体の参照を新しい実体に書き戻さないためである。
-const PathKey = "bin-path-"
+const pathKey = "bin-path-"
 
 // 実行ファイルの key。
 const (
@@ -44,13 +44,13 @@ type Target struct {
 	Path string
 	// Label は報告に出す root からの相対。
 	Label string
-	// Heavy は毎回読むには大きすぎる対象（実行ファイル）。開始でバックアップし、照合は大きさと更新時刻で行う。
-	Heavy bool
-	// Top は git から戻すときに渡すルート。空なら root の側。ワークツリー側の設定とプロジェクトのレイヤーは、
+	// heavy は毎回読むには大きすぎる対象（実行ファイル）。開始でバックアップし、照合は大きさと更新時刻で行う。
+	heavy bool
+	// top は git から戻すときに渡すルート。空なら root の側。ワークツリー側の設定とプロジェクトのレイヤーは、
 	// それを追跡している自分の git に聞く（ワークスペースの git は持っていない）。
-	Top string
-	// Copy はワークツリー側の設定であること（今は誰も読まないが、統合で反映される。報告の文が分かれる）。
-	Copy bool
+	top string
+	// copy はワークツリー側の設定であること（今は誰も読まないが、統合で反映される。報告の文が分かれる）。
+	copy bool
 }
 
 // place は守る対象の (key, 追跡している git プロジェクトルート, 絶対パス)。
@@ -62,15 +62,15 @@ func Targets(root, rulesPath, binPath string, layers []config.LayerFile, project
 	places := collectPlaces(root, projectsDir, rulesPath, layers)
 	var found []Target
 	for _, p := range places {
-		found = append(found, Target{Key: p.key, Path: p.path, Label: relative(root, p.path), Top: homeTop(root, p.home)})
+		found = append(found, Target{Key: p.key, Path: p.path, Label: relative(root, p.path), top: homeTop(root, p.home)})
 	}
 	if binPath != "" {
 		full := ospath.Realpath(binPath)
-		found = append(found, Target{Key: binKey, Path: full, Label: relative(root, full), Heavy: true})
+		found = append(found, Target{Key: binKey, Path: full, Label: relative(root, full), heavy: true})
 		// 振り分けの sh なら、hook が実際に走らせる `../bin/` の実体も守る。
 		if launched := platformtag.LaunchedExecutable(binPath); launched != "" {
 			real := ospath.Realpath(launched)
-			found = append(found, Target{Key: binLaunchedKey, Path: real, Label: relative(root, real), Heavy: true})
+			found = append(found, Target{Key: binLaunchedKey, Path: real, Label: relative(root, real), heavy: true})
 		}
 		// bin/ に実体が無いと sh は PATH の ccnavi を起動する。bin/ があるときも守る（途中で現れても組が変わらない）。
 		onPath := ""
@@ -84,7 +84,7 @@ func Targets(root, rulesPath, binPath string, layers []config.LayerFile, project
 				known = known || pathcase.Fold(t.Path) == pathcase.Fold(real)
 			}
 			if !known {
-				found = append(found, Target{Key: PathKey + pathMark(real), Path: real, Label: real, Heavy: true})
+				found = append(found, Target{Key: pathKey + pathMark(real), Path: real, Label: real, heavy: true})
 			}
 		}
 	}
@@ -171,7 +171,7 @@ func worktreeCopies(root, projectsDir string, places []place) []Target {
 		for _, r := range byHome[ospath.Realpath(home)] {
 			full := ospath.Realpath(ospath.Join(work.Root, r.rel))
 			copies = append(copies, Target{
-				Key: copyKey(r.key, work.Name), Path: full, Label: relative(root, full), Top: work.Root, Copy: true,
+				Key: copyKey(r.key, work.Name), Path: full, Label: relative(root, full), top: work.Root, copy: true,
 			})
 		}
 	}
@@ -198,8 +198,8 @@ func inside(root, path string) string {
 
 // gitTop は対象を git から戻すときに渡すワークツリーのルート。
 func gitTop(root string, t Target) string {
-	if t.Top != "" {
-		return t.Top
+	if t.top != "" {
+		return t.top
 	}
 	return git.TopLevel(root)
 }

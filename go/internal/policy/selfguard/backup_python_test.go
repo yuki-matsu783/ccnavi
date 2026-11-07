@@ -141,7 +141,7 @@ func TestTargetsAgainstPython(t *testing.T) {
 	} {
 		var got []targetJSON
 		for _, x := range Targets(root, c.rules, c.bin, goLayers(layersOf(root)), c.projects) {
-			got = append(got, targetJSON{x.Key, x.Path, x.Label, x.Heavy, x.Top, x.Copy})
+			got = append(got, targetJSON{x.Key, x.Path, x.Label, x.heavy, x.top, x.copy})
 		}
 		data, _ := json.Marshal(got)
 		// PATH で見つけた実体の鍵は、絶対パスの要約を持つ。

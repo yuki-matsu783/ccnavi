@@ -11,6 +11,7 @@ import (
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
+	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/policy/ruleload"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/policy/texts"
@@ -69,9 +70,9 @@ func draftUsage(a opts) string {
 		return "--draft には完了した親の識別子を渡す"
 	}
 	to := a.Str("to")
-	if to != "" && !slices.Contains(drafts.Targets, drafts.Target(to)) {
-		shown := make([]string, len(drafts.Targets))
-		for i, t := range drafts.Targets {
+	if to != "" && !slices.Contains(drafts.Targets(), drafts.Target(to)) {
+		shown := make([]string, len(drafts.Targets()))
+		for i, t := range drafts.Targets() {
 			shown[i] = string(t)
 		}
 		return "--to は " + strings.Join(shown, " か ")
@@ -354,7 +355,7 @@ func showTemplate(stdout, stderr io.Writer, conf *config.Settings, root string, 
 		entry = templates.Recheck(entry, templates.TypesFor(conf, root, layer), &scanned.Catalog)
 	}
 	row := templates.EntryJSON(entry)
-	text, _ := fsio.DecodeBytes(trimBOM(entry.Raw), fsio.Replace)
+	text, _ := fsio.DecodeBytes(yaml.TrimBOM(entry.Raw), fsio.Replace)
 	if asJSON {
 		writeAnswer(stdout, pyjson.NewObject("version", templates.JSONVersion, "root", root, "layer", layer,
 			"template", row.With("text", text)))
@@ -422,12 +423,4 @@ func showTemplate(stdout, stderr io.Writer, conf *config.Settings, root string, 
 	}
 	io.WriteString(w, text)
 	return config.ExitOK
-}
-
-// trimBOM は UTF-8 の BOM を外す（Python の utf-8-sig）。
-func trimBOM(raw []byte) []byte {
-	if len(raw) >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF {
-		return raw[3:]
-	}
-	return raw
 }

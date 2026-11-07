@@ -51,7 +51,8 @@ func goRules(c ruleCase) ruleResult {
 		res.Problems = append(res.Problems, p.String())
 	}
 	for _, r := range rs.All() {
-		v := ruleView{ID: r.ID, Decision: string(r.Decision), Every: r.Every, Excepts: []string{}, Body: r.WrittenBody(), Spoken: r.SpokenMessage()}
+		_, spoken := r.Speech()
+		v := ruleView{ID: r.ID, Decision: string(r.Decision), Every: r.Every, Excepts: []string{}, Body: r.WrittenBody(), Spoken: spoken}
 		if r.Compiled != nil {
 			v.Pattern = r.Compiled.Pattern()
 		}

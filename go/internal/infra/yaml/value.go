@@ -157,11 +157,6 @@ func (m *Map) String(key string) (string, bool) {
 	return s, ok
 }
 
-// Strings は値が文字列だけの列ならそれと真。無い・列でない・文字列でない要素があれば (nil, false)。
-func (m *Map) Strings(key string) ([]string, bool) {
-	return Strings(m.Get(key))
-}
-
 // List は値が列ならそれと真。
 func (m *Map) List(key string) ([]any, bool) {
 	l, ok := m.Get(key).([]any)
@@ -178,12 +173,6 @@ func (m *Map) Map(key string) *Map {
 func (m *Map) Bool(key string) (bool, bool) {
 	b, ok := m.Get(key).(bool)
 	return b, ok
-}
-
-// Int は値が整数（真偽を除く。int に収まるもの）ならそれと真。
-func (m *Map) Int(key string) (int, bool) {
-	n, ok := m.Get(key).(int)
-	return n, ok
 }
 
 // Strings は v が文字列だけの列ならそれと真。
@@ -241,26 +230,26 @@ func (t Tuple) Len() int { return len(t) }
 
 // Date は時刻の無い日付（Python の datetime.date）。YAML 1.1 では 2026-01-02 と書いた値がこれになる。
 type Date struct {
-	Year, Month, Day int
+	year, month, day int
 }
 
 // ISOFormat は Python の date.isoformat()。
-func (d Date) ISOFormat() string { return fmt.Sprintf("%04d-%02d-%02d", d.Year, d.Month, d.Day) }
+func (d Date) ISOFormat() string { return fmt.Sprintf("%04d-%02d-%02d", d.year, d.month, d.day) }
 
 // PyStr は Python の str(date)。
 func (d Date) PyStr() string { return d.ISOFormat() }
 
 // PyRepr は Python の repr(date)。
 func (d Date) PyRepr() string {
-	return fmt.Sprintf("datetime.date(%d, %d, %d)", d.Year, d.Month, d.Day)
+	return fmt.Sprintf("datetime.date(%d, %d, %d)", d.year, d.month, d.day)
 }
 
 // DateTime は日時（Python の datetime.datetime）。HasZone が偽ならタイムゾーンの無い日時。
 type DateTime struct {
 	Date
-	Hour, Minute, Second, Microsecond int
+	hour, minute, second, microsecond int
 	HasZone                           bool
-	Offset                            time.Duration // UTC からのずれ（HasZone のときだけ意味を持つ）
+	offset                            time.Duration // UTC からのずれ（HasZone のときだけ意味を持つ）
 }
 
 // ISOFormat は Python の datetime.isoformat()（区切りは T）。
@@ -270,12 +259,12 @@ func (t DateTime) ISOFormat() string { return t.format("T") }
 func (t DateTime) PyStr() string { return t.format(" ") }
 
 func (t DateTime) format(sep string) string {
-	out := t.Date.ISOFormat() + sep + fmt.Sprintf("%02d:%02d:%02d", t.Hour, t.Minute, t.Second)
-	if t.Microsecond != 0 {
-		out += fmt.Sprintf(".%06d", t.Microsecond)
+	out := t.Date.ISOFormat() + sep + fmt.Sprintf("%02d:%02d:%02d", t.hour, t.minute, t.second)
+	if t.microsecond != 0 {
+		out += fmt.Sprintf(".%06d", t.microsecond)
 	}
 	if t.HasZone {
-		sign, off := "+", t.Offset
+		sign, off := "+", t.offset
 		if off < 0 {
 			sign, off = "-", -off
 		}
@@ -286,10 +275,10 @@ func (t DateTime) format(sep string) string {
 
 // PyRepr は Python の repr(datetime)。
 func (t DateTime) PyRepr() string {
-	fields := []int{t.Year, t.Month, t.Day, t.Hour, t.Minute, t.Second, t.Microsecond}
+	fields := []int{t.year, t.month, t.day, t.hour, t.minute, t.second, t.microsecond}
 	switch {
-	case t.Microsecond != 0:
-	case t.Second != 0:
+	case t.microsecond != 0:
+	case t.second != 0:
 		fields = fields[:6]
 	default:
 		fields = fields[:5]
@@ -300,10 +289,10 @@ func (t DateTime) PyRepr() string {
 	}
 	out := "datetime.datetime(" + strings.Join(parts, ", ")
 	if t.HasZone {
-		if t.Offset == 0 {
+		if t.offset == 0 {
 			out += ", tzinfo=datetime.timezone.utc"
 		} else {
-			out += ", tzinfo=datetime.timezone(" + timedeltaRepr(t.Offset) + ")"
+			out += ", tzinfo=datetime.timezone(" + timedeltaRepr(t.offset) + ")"
 		}
 	}
 	return out + ")"
@@ -312,10 +301,10 @@ func (t DateTime) PyRepr() string {
 // Time は time.Time にする。タイムゾーンの無い日時は UTC として置く（HasZone で見分ける）。
 func (t DateTime) Time() time.Time {
 	loc := time.UTC
-	if t.HasZone && t.Offset != 0 {
-		loc = time.FixedZone("", int(t.Offset.Seconds()))
+	if t.HasZone && t.offset != 0 {
+		loc = time.FixedZone("", int(t.offset.Seconds()))
 	}
-	return time.Date(t.Year, time.Month(t.Month), t.Day, t.Hour, t.Minute, t.Second, t.Microsecond*1000, loc)
+	return time.Date(t.year, time.Month(t.month), t.day, t.hour, t.minute, t.second, t.microsecond*1000, loc)
 }
 
 // timedeltaRepr は Python の repr(timedelta)。日と秒に正規化し、0 の欄は省く。

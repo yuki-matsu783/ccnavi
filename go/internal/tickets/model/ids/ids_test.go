@@ -43,7 +43,7 @@ func TestBranchToIDTable(t *testing.T) {
 
 // 予約した名前は infra/config の先頭の語にも使えない（config はこのリストのコピーを持つ）。
 func TestReservedNamesAreNotBranchPrefixes(t *testing.T) {
-	for _, name := range ReservedBranchIDs {
+	for _, name := range config.ReservedBranchIDs() {
 		if config.IsBranchPrefix(name) {
 			t.Errorf("%s が先頭の語に使える", name)
 		}
@@ -108,7 +108,7 @@ var idsIssues = [][]any{
 
 func TestIDsMatchPython(t *testing.T) {
 	want := golden.Load[idsAnswers](t, "ids")
-	p := config.DefaultBranchPrefixes
+	p := config.DefaultBranchPrefixes()
 	got := idsAnswers{}
 	for _, x := range idsNames {
 		got.ID = append(got.ID, IDProblem(x))

@@ -194,7 +194,7 @@ func leftoverTree(stdout, stderr io.Writer, root string, conf *config.Settings, 
 		{place.Todo, true, place.File(work.Root, conf.Tickets, place.Todo, name)},
 		{place.Review, true, place.File(work.Root, conf.Tickets, place.Review, name)},
 	} {
-		front := frontOf(c.path)
+		front := approval.FrontOf(c.path)
 		if front == nil || pathcase.Fold(ospath.Strip(front.Text("ticket"))) != pathcase.Fold(name) ||
 			pyfmt.Truthy(front.Get("parent")) {
 			continue
@@ -236,10 +236,10 @@ func childrenInDoing(approvedDir, parent string) int {
 	}
 	count := 0
 	for _, entry := range names {
-		if !strings.HasSuffix(entry, place.MdExt) {
+		if !strings.HasSuffix(entry, config.MdExt) {
 			continue
 		}
-		front := frontOf(ospath.Join(directory, entry))
+		front := approval.FrontOf(ospath.Join(directory, entry))
 		if front != nil && pathcase.Fold(ospath.Strip(front.Text("parent"))) == pathcase.Fold(parent) {
 			count++
 		}
@@ -318,15 +318,6 @@ func handoffPendingTree(stdout, stderr io.Writer, path string, start []string) b
 	return true
 }
 
-// frontOf はチケットの frontmatter。無い・読めなければ nil（チケットとしての検査は掛けない）。
-func frontOf(path string) *yaml.Map {
-	text, ok := fsio.ReadText(path, fsio.Strict)
-	if !ok {
-		return nil
-	}
-	return frontOfText(text)
-}
-
 func frontOfText(text string) *yaml.Map {
 	front, err := ticket.FrontMapping(text)
 	if err != nil {
@@ -351,13 +342,7 @@ func mrOf(front *yaml.Map) string {
 	return text
 }
 
-// isParentOf は frontmatter が name の親チケット（ticket: が name で parent: が無い）か。
-func isParentOf(front *yaml.Map, name string) bool {
-	return ospath.Strip(front.Text("ticket")) == name && !pyfmt.Truthy(front.Get("parent"))
-}
-
-// holdsParent はそのツリーの置き場に ticket: <名前> の親の承認済みチケットか提案があるか。チケットとしての検査（範囲の
-// 欄など）は掛けず、frontmatter の ticket と parent だけを見る。
+// holdsParent はそのツリーの置き場に ticket: <名前> の親の承認済みチケットか提案があるか（見方は approval.ParentIn）。
 func holdsParent(conf *config.Settings, work tree.Tree) answer {
 	held, _, _ := parentIn(approval.ParentPaths(conf, work.Root, work.Name), work.Name)
 	return held
@@ -374,21 +359,11 @@ func approvedParent(conf *config.Settings, work tree.Tree) (answer, string, answ
 // parentIn は paths のうち最初に見つかった name の親チケットについて (yes, mr, started)。無ければ no、在るのに
 // 読めないものがあれば unreadable。
 func parentIn(paths []string, name string) (answer, string, answer) {
-	broken := false
-	for _, path := range paths {
-		if !ospath.IsFile(path) {
-			continue
-		}
-		front := frontOf(path)
-		if front == nil {
-			broken = true
-			continue
-		}
-		if isParentOf(front, name) {
-			return yes, mrOf(front), yesNo(ospath.Strip(front.Text("started_at")) != "")
-		}
-	}
-	if broken {
+	front, broken := approval.ParentIn(paths, name)
+	switch {
+	case front != nil:
+		return yes, mrOf(front), yesNo(ospath.Strip(front.Text("started_at")) != "")
+	case broken:
 		return unreadable, "", no
 	}
 	return no, "", no
@@ -410,7 +385,7 @@ func archivedMR(root, project, ident string) string {
 	if !ok {
 		return ""
 	}
-	data, ok := archive.ArchivedBytes(root, project, string(place.Done)+"/"+name+place.MdExt)
+	data, ok := archive.ArchivedBytes(root, project, string(place.Done)+"/"+name+config.MdExt)
 	if !ok {
 		return ""
 	}

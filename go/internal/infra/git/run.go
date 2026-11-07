@@ -17,8 +17,8 @@ import (
 	"ccnavi/internal/infra/pyfmt"
 )
 
-// Program は起こす git の名前（PATH から探す）。
-const Program = "git"
+// program は起こす git の名前（PATH から探す）。
+const program = "git"
 
 // 目的ごとの git の期限。値は Python の各モジュールが持っていたもの。期限は場所ごとに違うので
 // （実行前チェックの中は短く、ユーザが打つ操作は長く）、呼び手は目的に合う名前を選ぶ。
@@ -53,11 +53,11 @@ const (
 // ShortSHA は文に出す短い sha の桁数。
 const ShortSHA = 12
 
-// Options.Deadline の手前に残す余白（DeadlineMargin）と、これ以下の残りなら起こさない下限（DeadlineFloor）。
+// Options.Deadline の手前に残す余白（deadlineMargin）と、これ以下の残りなら起こさない下限（deadlineFloor）。
 // 期限が足りるかは Expired で見る。
 const (
-	DeadlineMargin = 500 * time.Millisecond
-	DeadlineFloor  = 200 * time.Millisecond
+	deadlineMargin = 500 * time.Millisecond
+	deadlineFloor  = 200 * time.Millisecond
 )
 
 // killedPipeWait は期限で殺した後、出力の管が閉じるのを待つ長さ。孫のプロセスが管を握っていても戻る。
@@ -65,11 +65,11 @@ const killedPipeWait = 100 * time.Millisecond
 
 // git に渡す環境変数。
 const (
-	// EnvOptionalLocks=0 は status が index のついでの更新に取る index.lock を止める。期限で殺すと
+	// envOptionalLocks=0 は status が index のついでの更新に取る index.lock を止める。期限で殺すと
 	// lock が残り、以後の add や commit が止まる。diff や restore のように index を書き換える操作の lock は止まらない。
-	EnvOptionalLocks = "GIT_OPTIONAL_LOCKS"
-	// EnvNoLazyFetch=1 は partial clone の遅延取得を止める。無い blob を取りにネットワークへ出ず、読めないにする。
-	EnvNoLazyFetch = "GIT_NO_LAZY_FETCH"
+	envOptionalLocks = "GIT_OPTIONAL_LOCKS"
+	// envNoLazyFetch=1 は partial clone の遅延取得を止める。無い blob を取りにネットワークへ出ず、読めないにする。
+	envNoLazyFetch = "GIT_NO_LAZY_FETCH"
 )
 
 // pathspecEnv はユーザの環境で pathspec の読み方を変える環境変数。check-ignore はこれらを受けず 128 で止まる。
@@ -85,8 +85,8 @@ var rawPathsArgs = []string{"-c", "core.quotePath=false"}
 
 // 起こせなかった理由の種類。Done.Failure を errors.Is で分ける。
 var (
-	ErrMissing = errors.New("git を起こせない")
-	ErrTimeout = errors.New("git が期限に達した")
+	errMissing = errors.New("git を起こせない")
+	errTimeout = errors.New("git が期限に達した")
 )
 
 // failure は起こせなかった理由。文は Python の subprocess が投げた例外の str と同じにする
@@ -111,10 +111,10 @@ type Done struct {
 func (d Done) OK() bool { return d.Failure == nil && d.Code == 0 }
 
 // Missing は git（か作業ディレクトリ）が見つからなかったか。
-func (d Done) Missing() bool { return errors.Is(d.Failure, ErrMissing) }
+func (d Done) Missing() bool { return errors.Is(d.Failure, errMissing) }
 
 // TimedOut は期限に達したか（Options.Deadline の期限不足も含む）。
-func (d Done) TimedOut() bool { return errors.Is(d.Failure, ErrTimeout) }
+func (d Done) TimedOut() bool { return errors.Is(d.Failure, errTimeout) }
 
 // FirstLine は失敗の文の 1 行目。git が言った文（標準エラー）を、無ければ起こせなかった理由を採る。どちらも無ければ空。
 func (d Done) FirstLine() string {
@@ -132,14 +132,14 @@ func (d Done) FirstLine() string {
 type Options struct {
 	// Timeout は 1 回の期限。0 なら DefaultTimeout。
 	Timeout time.Duration
-	// Deadline は処理全体の期限。ゼロ値でなければ、1 回の期限を min(Timeout, 残り - DeadlineMargin) に縮め、
+	// Deadline は処理全体の期限。ゼロ値でなければ、1 回の期限を min(Timeout, 残り - deadlineMargin) に縮め、
 	// 残りが足りなければ（Expired）起こさずに TimedOut の Done を返す。守るのは「期限を過ぎてから起こさない」
 	// ことだけで、処理全体が期限内に終わることは約束しない。
 	Deadline time.Time
 	// RawPaths は core.quotePath=false を掛ける。
 	RawPaths bool
-	// Input は標準入力に渡す文字列（check-ignore --stdin など）。nil なら親の標準入力のまま。
-	Input *string
+	// input は標準入力に渡す文字列（check-ignore --stdin など）。nil なら親の標準入力のまま。
+	input *string
 	// PlainPathspecs はユーザの環境の pathspec の読み方（pathspecEnv）を外し、git の既定に戻す。
 	PlainPathspecs bool
 }
@@ -160,9 +160,9 @@ func (o Options) timeout() time.Duration {
 func Run(cwd string, args []string, o Options) Done {
 	if !o.Deadline.IsZero() {
 		if Expired(o.Deadline) {
-			return Done{Code: 1, Failure: failure{text: "期限不足", kind: ErrTimeout}}
+			return Done{Code: 1, Failure: failure{text: "期限不足", kind: errTimeout}}
 		}
-		o.Timeout = min(o.timeout(), time.Until(o.Deadline)-DeadlineMargin)
+		o.Timeout = min(o.timeout(), time.Until(o.Deadline)-deadlineMargin)
 	}
 	code, out, errOut, fail := start(cwd, args, o)
 	if fail != nil {
@@ -176,7 +176,7 @@ var runGit = Run
 
 // Expired は期限までの残りが、余白を引くと下限以下か（もう git を起こさない）。ゼロ値の期限（期限無し）は偽。
 func Expired(deadline time.Time) bool {
-	return !deadline.IsZero() && time.Until(deadline)-DeadlineMargin <= DeadlineFloor
+	return !deadline.IsZero() && time.Until(deadline)-deadlineMargin <= deadlineFloor
 }
 
 // Output は終了コードと標準出力。起こせなければ (1, "")。
@@ -236,15 +236,15 @@ func start(cwd string, args []string, o Options) (int, []byte, []byte, error) {
 	timeout := o.timeout()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, Program, full...)
+	cmd := exec.CommandContext(ctx, program, full...)
 	if errors.Is(cmd.Err, exec.ErrNotFound) {
 		return 1, nil, nil, startFailure(cmd.Err)
 	}
 	cmd.Dir = cwd
 	cmd.Env = environ(o.PlainPathspecs)
 	cmd.WaitDelay = killedPipeWait
-	if o.Input != nil {
-		cmd.Stdin = strings.NewReader(*o.Input)
+	if o.input != nil {
+		cmd.Stdin = strings.NewReader(*o.input)
 	} else {
 		cmd.Stdin = os.Stdin
 	}
@@ -267,12 +267,12 @@ func start(cwd string, args []string, o Options) (int, []byte, []byte, error) {
 // timedOut は subprocess.TimeoutExpired の文（`Command '['git', ...]' timed out after 2.0 seconds`）。
 func timedOut(args []string, timeout time.Duration) error {
 	command := make([]any, 0, len(args)+1)
-	command = append(command, Program)
+	command = append(command, program)
 	for _, a := range args {
 		command = append(command, a)
 	}
 	text := fmt.Sprintf("Command '%s' timed out after %s seconds", pyfmt.Repr(command), pyfmt.Float(timeout.Seconds()))
-	return failure{text: text, kind: ErrTimeout}
+	return failure{text: text, kind: errTimeout}
 }
 
 // checkDir は作業ディレクトリへ移れるかを先に見る。Python の subprocess は無い作業ディレクトリを
@@ -296,7 +296,7 @@ func checkDir(cwd string) error {
 	}
 	f := failure{text: fsio.ErrorText(err)}
 	if errors.Is(err, fs.ErrNotExist) {
-		f.kind = ErrMissing
+		f.kind = errMissing
 	}
 	return f
 }
@@ -318,18 +318,18 @@ func startFailure(err error) error {
 	if ospath.Windows {
 		text = fsio.ErrorText(errno)
 	} else {
-		text = fsio.ErrorText(&fs.PathError{Op: "exec", Path: Program, Err: errno})
+		text = fsio.ErrorText(&fs.PathError{Op: "exec", Path: program, Err: errno})
 	}
 	f := failure{text: text}
 	if errors.Is(errno, fs.ErrNotExist) {
-		f.kind = ErrMissing
+		f.kind = errMissing
 	}
 	return f
 }
 
-// environ は親の環境に EnvOptionalLocks=0 と EnvNoLazyFetch=1 を足したもの。
+// environ は親の環境に envOptionalLocks=0 と envNoLazyFetch=1 を足したもの。
 func environ(plainPathspecs bool) []string {
-	drop := []string{EnvOptionalLocks, EnvNoLazyFetch}
+	drop := []string{envOptionalLocks, envNoLazyFetch}
 	if plainPathspecs {
 		drop = append(drop, pathspecEnv...)
 	}
@@ -340,7 +340,7 @@ func environ(plainPathspecs bool) []string {
 			env = append(env, kv)
 		}
 	}
-	return append(env, EnvOptionalLocks+"=0", EnvNoLazyFetch+"=1")
+	return append(env, envOptionalLocks+"=0", envNoLazyFetch+"=1")
 }
 
 // hasName は環境変数の名前が names にあるか。Windows の名前は大文字小文字を区別しない。

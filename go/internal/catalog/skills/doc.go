@@ -6,7 +6,7 @@
 // （元のリポジトリか、そこから切ったワークツリー）の中にあるときだけ。読むのは元のリポジトリの版。
 //
 // SKILL.md の中身を誰が書いたか ccnavi には分からない。そこで、データとして区切りで囲み、1 行にまとめて切る
-// （flow.Line）。区切りの文は flow.FencePhrases に並べてあり、名前や説明の中に出たら置き換わる。
+// （flow.Line）。区切りの文は flow.fencePhrases に並べてあり、名前や説明の中に出たら置き換わる。
 //
 // Python からの対応: projskills。notice → Notice、index・entries・project_of・_front は非公開。
 package skills

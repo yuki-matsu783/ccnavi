@@ -42,17 +42,17 @@ func TestEveryVerbReadsIntoAGatedOption(t *testing.T) {
 	}
 	internal := map[string]bool{}
 	for _, v := range verbs {
-		argv := append([]string{"user"}, v.Words...)
-		want := slices.Clone(v.Internal)
-		if v.Value {
+		argv := append([]string{"user"}, v.words...)
+		want := slices.Clone(v.internal)
+		if v.value {
 			argv = append(argv, "VALUE")
 			want = append(want, "VALUE")
 		}
 		got, verb, err := Rewrite(argv)
-		if err != nil || verb == nil || verb.Op != v.Op || !slices.Equal(got, want) {
-			t.Errorf("%v: %v %v %v", v.Words, got, verb, err)
+		if err != nil || verb == nil || verb.op != v.op || !slices.Equal(got, want) {
+			t.Errorf("%v: %v %v %v", v.words, got, verb, err)
 		}
-		last := v.Internal[len(v.Internal)-1]
+		last := v.internal[len(v.internal)-1]
 		internal[last] = true
 		if !gated[last] {
 			t.Errorf("%s: user の外で断らない", last)
@@ -72,7 +72,7 @@ func TestTerminal(t *testing.T) {
 			t.Errorf("%s: %q %v", op, shown, err)
 		}
 	}
-	if _, err := Terminal("decide"); !errors.Is(err, ErrNotTerminal) {
+	if _, err := Terminal("decide"); !errors.Is(err, errNotTerminal) {
 		t.Errorf("知らない操作: %v", err)
 	}
 }
@@ -109,7 +109,7 @@ func TestRewrite(t *testing.T) {
 		got, verb, err := Rewrite(c.argv)
 		var words []string
 		if verb != nil {
-			words = verb.Words
+			words = verb.words
 		}
 		if err != nil || !slices.Equal(got, c.want) || !slices.Equal(words, c.words) {
 			t.Errorf("%q: %q %v %v", c.argv, got, words, err)
@@ -306,7 +306,7 @@ func TestPlanOrderIsNotStopped(t *testing.T) {
 		if rule.Compiled.Search(command) {
 			t.Errorf("%q に当たった", command)
 		}
-		if kind, found := HumanPathForm(command); kind != HumanNone {
+		if kind, found := HumanPathForm(command); kind != humanNone {
 			t.Errorf("%q: %s %q", command, kind, found)
 		}
 	}
@@ -361,9 +361,9 @@ func TestBuiltinRuleTexts(t *testing.T) {
 		t.Errorf("文が引けない: %s", said)
 	}
 	for _, s := range []string{
-		HumanMessage(root, HumanGuardOff, "x"), HumanMessage(root, HumanUserScript, "x"),
-		HumanMessage(root, HumanExpanded, "x"), HumanMessage(root, HumanBoard, "--via … board"),
-		HumanMessage(root, HumanBoard, "user … mirror … --yes"), HiddenEntryMessage(root, entryExe, "$X"),
+		HumanMessage(root, humanGuardOff, "x"), HumanMessage(root, humanUserScript, "x"),
+		HumanMessage(root, humanExpanded, "x"), HumanMessage(root, humanBoard, "--via … board"),
+		HumanMessage(root, humanBoard, "user … mirror … --yes"), HiddenEntryMessage(root, entryExe, "$X"),
 		HiddenEntryMessage(root, config.ReviewWrapper, "$X"), HiddenEntryMessage(root, "other", "$X"),
 		HiddenEntryMessage(root, entryExe, stdinShell), HiddenEntryMessage(root, entryExe, "xargs"), PruneMessage(root),
 	} {

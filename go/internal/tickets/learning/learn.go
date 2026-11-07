@@ -120,14 +120,14 @@ func cannotWrite(stderr io.Writer, why string) int {
 // scaffold は記録が無いか空なら雛形を書き、判定ログの要約を書き直す。
 func scaffold(stdout, stderr io.Writer, conf *config.Settings, root string, here tree.Tree, parent string) int {
 	ident := here.Name
-	bad := unsafePath(here.Root, RecordRel(ident))
+	bad := unsafePath(here.Root, recordRel(ident))
 	if bad == "" {
 		bad = unsafePath(here.Root, digestRel(ident))
 	}
 	if bad != "" {
 		return refuseLink(stderr, bad)
 	}
-	recPath := ospath.Join(here.Root, strings.Split(RecordRel(ident), "/")...)
+	recPath := ospath.Join(here.Root, strings.Split(recordRel(ident), "/")...)
 	if err := fsio.MakeDirs(ospath.Dirname(recPath)); err != nil {
 		return cannotWrite(stderr, fsio.ErrorText(err))
 	}
@@ -150,7 +150,7 @@ func scaffold(stdout, stderr io.Writer, conf *config.Settings, root string, here
 	if msg := fsio.WriteJSONAs(digestPath, buildDigest(records, recorded, &here.Name), format); msg != "" {
 		return cannotWrite(stderr, msg)
 	}
-	write(stdout, "記録: "+RecordRel(ident)+"\n")
+	write(stdout, "記録: "+recordRel(ident)+"\n")
 	write(stdout, "要約: "+digestRel(ident)+"\n")
 	write(stdout, texts.Say(root, "NEXT_LEARN_SCAFFOLD_COMMIT", nil, nil)+"\n")
 	return exitWritten
@@ -158,7 +158,7 @@ func scaffold(stdout, stderr io.Writer, conf *config.Settings, root string, here
 
 // appendRecord はチケットに結び付く作業の記録に節を足す。
 func appendRecord(stdout, stderr io.Writer, root, treeRoot, ident, parent, entry string) int {
-	rel := RecordRel(ident)
+	rel := recordRel(ident)
 	if bad := unsafePath(treeRoot, rel); bad != "" {
 		return refuseLink(stderr, bad)
 	}

@@ -241,13 +241,13 @@ var (
 	policy  = DefaultPolicy()
 )
 
-// ErrNestedStaging は溜める段の中で溜める段を始めようとした。
-var ErrNestedStaging = errors.New("溜める段は入れ子にしない")
+// errNestedStaging は溜める段の中で溜める段を始めようとした。
+var errNestedStaging = errors.New("溜める段は入れ子にしない")
 
 // Staging は、返した関数を呼ぶまでの書き込みをディスクに書かずに溜める。入れ子にはしない。
 func Staging() (*Stage, func(), error) {
 	if current != nil {
-		return nil, func() {}, ErrNestedStaging
+		return nil, func() {}, errNestedStaging
 	}
 	stage := &Stage{views: map[string]*view{}}
 	current = stage

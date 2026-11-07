@@ -14,21 +14,26 @@ import (
 // RootPlaceholder はワークスペースルートを指す合言葉。glob・regex・文面の中で使え、実パスに置き換わる。
 const RootPlaceholder = "{root}"
 
-// NotRootPlaceholder は「ワークスペースルートの外」を指す合言葉。regex では `^` の直後に 1 回だけ書ける。
-const NotRootPlaceholder = "{!root}"
+// notRootPlaceholder は「ワークスペースルートの外」を指す合言葉。regex では `^` の直後に 1 回だけ書ける。
+const notRootPlaceholder = "{!root}"
 
-// ScriptPlaceholder は文の差し込み `{script:<名前>}`（名前は `.ccnavi/scripts/` のファイル名）。
-var ScriptPlaceholder = regexp.MustCompile(`\{script:([^{}]*)\}`)
+// scriptPlaceholder は文の差し込み `{script:<名前>}`（名前は `.ccnavi/scripts/` のファイル名）。
+var scriptPlaceholder = regexp.MustCompile(`\{script:([^{}]*)\}`)
 
-// scriptName は ScriptPlaceholder の名前に書ける形。
+// ScriptPlaceholders は text の中の `{script:<名前>}` を書かれた順に返す。各要素は [書いたとおりの表記, 名前]。
+func ScriptPlaceholders(text string) [][]string {
+	return scriptPlaceholder.FindAllStringSubmatch(text, -1)
+}
+
+// scriptName は scriptPlaceholder の名前に書ける形。
 var scriptName = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
 // IsScriptName は {script:<名前>} の名前として受け付ける形かどうかを返す。
 func IsScriptName(name string) bool { return scriptName.MatchString(name) }
 
-// RealRoot はルートを {!root} の展開に使える形にする。実パスにして、末尾の区切りを除く。
+// realRoot はルートを {!root} の展開に使える形にする。実パスにして、末尾の区切りを除く。
 // 除かないと、ルート直下の普通のファイル名が「外」になってしまう。Windows のドライブ直下では realpath が `C:\` を返すため。
-func RealRoot(root string) string {
+func realRoot(root string) string {
 	return strings.TrimRight(ospath.Realpath(root), `\/`)
 }
 
@@ -40,7 +45,7 @@ func RootGlob(root string) string {
 // RootPattern はワークスペースルートの実パスを regex に埋める形にする。区切りは "/" と "\" のどちらにも当たる。
 func RootPattern(root string) string {
 	var b strings.Builder
-	for _, ch := range RealRoot(root) {
+	for _, ch := range realRoot(root) {
 		b.WriteString(same(ch))
 	}
 	return b.String()
@@ -66,12 +71,12 @@ func same(ch rune) string {
 // notRootEnd は展開の各段で「ここで文字列が終わる」ことを表す式。`$` は末尾の改行の直前にも当たるので使わない。
 const notRootEnd = `\Z`
 
-// NotRootPattern は「ワークスペースルートで始まらない」を、先読みなしに書いた式。ルートを 1 字ずつ
+// notRootPattern は「ワークスペースルートで始まらない」を、先読みなしに書いた式。ルートを 1 字ずつ
 // 「ここで終わる」「ここが違う」「ここは同じ」の入れ子に分けて書く。繰り返しを含まないので、判定の時間はルートの長さに比例する。
-// 引数は RealRoot で正規化したパスを渡す。先頭の `^` は呼ぶ側が書く。
+// 引数は realRoot で正規化したパスを渡す。先頭の `^` は呼ぶ側が書く。
 //
 // 最内には `\Z` を置かない。そこはルートを最後までたどり終えた位置で、そこで終わる対象はルートそのもの（中と数える）になるため。
-func NotRootPattern(root string) string {
+func notRootPattern(root string) string {
 	body := differs('/')
 	runes := []rune(root)
 	for i := len(runes) - 1; i >= 0; i-- {
@@ -87,18 +92,18 @@ func FillText(text, root string) string {
 	if root == "" {
 		return text
 	}
-	filled := ScriptPlaceholder.ReplaceAllStringFunc(text, func(found string) string {
-		name := ScriptPlaceholder.FindStringSubmatch(found)[1]
+	filled := scriptPlaceholder.ReplaceAllStringFunc(text, func(found string) string {
+		name := scriptPlaceholder.FindStringSubmatch(found)[1]
 		if !IsScriptName(name) {
 			return found
 		}
 		return config.ScriptCommand(root, name)
 	})
-	return FillRoot(filled, root)
+	return fillRoot(filled, root)
 }
 
-// FillRoot は文の `{root}` をルートの実パス（"/" 区切り）に置き換える。
-func FillRoot(text, root string) string {
+// fillRoot は文の `{root}` をルートの実パス（"/" 区切り）に置き換える。
+func fillRoot(text, root string) string {
 	if root == "" || !strings.Contains(text, RootPlaceholder) {
 		return text
 	}

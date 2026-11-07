@@ -46,7 +46,7 @@ func Check(t *Template, types *phases.Types, cat *flow.Catalog) []rules.Problem 
 			said.add(rules.Warn, "`"+kv[0]+"` に "+TodoMark+" が残っている（固有名の一般化が済んでいない下書き）。直してから取り込む")
 		}
 	}
-	if why := HiddenProblem(strings.Join(strs(t.AsData(), nil), "\n")); why != "" {
+	if why := HiddenProblem(strings.Join(strs(t.asData(), nil), "\n")); why != "" {
 		said.error(why)
 	}
 	if total := len(t.Plan) + len(t.Feedback); total > ids.MaxChildNumber {
@@ -131,7 +131,7 @@ func composed(t *Template, copies *yaml.Map) string {
 	allow.Put("match", "Write|Edit")
 	allow.Put("glob", "src/*")
 	front.Put("allow", []any{allow})
-	body, _ := ToYAML(front)
+	body, _ := toYAML(front)
 	return ticket.Fence + "\n" + body + ticket.Fence + "\n"
 }
 
@@ -164,7 +164,7 @@ func planProblems(t *Template, types *phases.Types) []rules.Problem {
 func flowProblems(t *Template, cat *flow.Catalog) []rules.Problem {
 	said := &problems{rule: t.Name}
 	planned := len(t.Plan)
-	for _, index := range t.FlowIndexes() {
+	for _, index := range t.flowIndexes() {
 		if index < 1 || index > planned {
 			said.error(fmt.Sprintf("`flows` の添字 %d が全体計画にない（全体計画は 1〜%d）", index, planned))
 			continue
@@ -186,17 +186,17 @@ func flowProblems(t *Template, cat *flow.Catalog) []rules.Problem {
 }
 
 func flowRead(body *yaml.Map) (*yaml.Map, string) {
-	text, why := DumpFlow(body)
+	text, why := dumpFlow(body)
 	if why != "" {
 		return nil, why
 	}
 	return flow.Parse([]byte(text))
 }
 
-// Graph は計画の図の中身。--plan-order の計画ごとの図（ApprovePlan）と同じ形で、計画ごとに 1 件。番号は全体計画が
+// graph は計画の図の中身。--plan-order の計画ごとの図（ApprovePlan）と同じ形で、計画ごとに 1 件。番号は全体計画が
 // 1..n、フィードバック計画はその続き。after が読めないときはステップと after を Template から組み、loose と
 // ready は空にする。problems には順序の誤りだけを入れる。
-func Graph(t *Template, types *phases.Types, sha string) []any {
+func graph(t *Template, types *phases.Types, sha string) []any {
 	copies, all, _ := planConfig(t, types)
 	parsed, _ := ticket.Parse(composed(t, copies))
 	order := orderErrors(t)

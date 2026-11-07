@@ -8,6 +8,6 @@
 //
 // Python からの対応: docsearch と docsearch_query をまとめた。run → Run、at_start → AtStart、GUIDE_HEAD → GuideHead、
 // fail_streak_note → FailStreakNote、missing_frontmatter → MissingFrontmatter、CODE_MISSING_FRONTMATTER →
-// CodeMissingFrontmatter、Query → Query（sort・format は型付きの Sort・Format。ゼロ値は path・table）、
+// codeMissingFrontmatter、Query → Query（sort・format は型付きの Sort・Format。ゼロ値は path・table）、
 // problems_of → usageProblems（非公開）。collect・places・search・render・dwidth は非公開。
 package docs

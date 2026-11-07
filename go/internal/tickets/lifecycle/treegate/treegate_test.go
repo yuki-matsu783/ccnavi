@@ -63,21 +63,21 @@ func TestWatches(t *testing.T) {
 		{"何も無ければ全部通る", func(*testing.T, string) {}, nil},
 		{"置き場の外の未コミットは全部止める", func(t *testing.T, dir string) {
 			testkit.Put(t, filepath.Join(dir, "src", "keep.py"), "print(2)\n")
-		}, map[Op][]Kind{ApprovalRequest: {DirtyParent}, Finish: {DirtyParent}, ReviewRequest: {DirtyParent}, Ready: {DirtyParent}}},
+		}, map[Op][]Kind{ApprovalRequest: {dirtyParent}, Finish: {dirtyParent}, ReviewRequest: {dirtyParent}, Ready: {dirtyParent}}},
 		{"置き場の中の未コミットは数えない", func(t *testing.T, dir string) {
 			testkit.Put(t, filepath.Join(dir, filepath.FromSlash(placeFile)), "v2\n")
 			testkit.Put(t, filepath.Join(dir, "wip", "proposals", "todo", "日本語.md"), "k\n")
 		}, nil},
 		{"ready だけが消した wip/ を通す", func(t *testing.T, dir string) {
 			os.Remove(filepath.Join(dir, "wip", "note.md"))
-		}, map[Op][]Kind{ApprovalRequest: {DirtyParent}, Finish: {DirtyParent}, ReviewRequest: {DirtyParent}}},
+		}, map[Op][]Kind{ApprovalRequest: {dirtyParent}, Finish: {dirtyParent}, ReviewRequest: {dirtyParent}}},
 		{"未 push のコードはそれを見る操作が止める", func(t *testing.T, dir string) { commitFile(t, dir, "src/new.py") },
-			map[Op][]Kind{ApprovalRequest: {UnpushedCode}, ReviewRequest: {UnpushedCode}, Ready: {UnpushedCode}, Reviewed: {UnpushedCode}}},
+			map[Op][]Kind{ApprovalRequest: {unpushedCode}, ReviewRequest: {unpushedCode}, Ready: {unpushedCode}, Reviewed: {unpushedCode}}},
 		{"未 push の置き場は ready だけが止める", func(t *testing.T, dir string) { commitFile(t, dir, "wip/proposals/todo/i0002.md") },
-			map[Op][]Kind{Ready: {UnpushedCode}}},
+			map[Op][]Kind{Ready: {unpushedCode}}},
 		{"一度も送っていないブランチは承認の依頼だけが通る", func(t *testing.T, dir string) {
 			testkit.Git(t, dir, "checkout", "-q", "-b", "fresh")
-		}, map[Op][]Kind{ReviewRequest: {UnpushedCode}, Ready: {UnpushedCode}, Reviewed: {UnpushedCode}}},
+		}, map[Op][]Kind{ReviewRequest: {unpushedCode}, Ready: {unpushedCode}, Reviewed: {unpushedCode}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -102,13 +102,13 @@ func TestWatches(t *testing.T) {
 func TestDirtyNamesThePathAndApprovalNamesTheCode(t *testing.T) {
 	dir := parentTree(t)
 	testkit.Put(t, filepath.Join(dir, "src", "keep.py"), "print(2)\n")
-	if got := Check(Finish, dir, &config.Settings{}, Options{}); len(got) != 1 || !reflect.DeepEqual(got[0].Paths, []string{"src/keep.py"}) {
+	if got := Check(Finish, dir, &config.Settings{}, Options{}); len(got) != 1 || !reflect.DeepEqual(got[0].paths, []string{"src/keep.py"}) {
 		t.Fatalf("%+v", got)
 	}
 	dir = parentTree(t)
 	commitFile(t, dir, "src/new.py")
 	got := Check(ApprovalRequest, dir, &config.Settings{}, Options{})
-	if len(got) != 1 || !strings.Contains(got[0].Reason, "src/new.py") || !reflect.DeepEqual(got[0].Paths, []string{"src/new.py"}) || len(got[0].Hints) == 0 {
+	if len(got) != 1 || !strings.Contains(got[0].Reason, "src/new.py") || !reflect.DeepEqual(got[0].paths, []string{"src/new.py"}) || len(got[0].Hints) == 0 {
 		t.Fatalf("%+v", got)
 	}
 }
@@ -178,7 +178,7 @@ func refusalsOf(rs []Refusal, tree string) []any {
 		for _, h := range r.Hints {
 			hints = append(hints, strings.ReplaceAll(h, tree, "<tree>"))
 		}
-		paths := r.Paths
+		paths := r.paths
 		if paths == nil {
 			paths = []string{}
 		}
@@ -215,8 +215,8 @@ func TestMatchesPython(t *testing.T) {
 		}
 		got["dirty"] = optional(Dirty(tree, conf, false))
 		got["dirty_wip"] = optional(Dirty(tree, conf, true))
-		a, aok := Unpushed(tree, conf, "main", false)
-		b, bok := Unpushed(tree, conf, "main", true)
+		a, aok := unpushed(tree, conf, "main", false)
+		b, bok := unpushed(tree, conf, "main", true)
 		got["unpushed"] = []any{optional(a, aok), optional(b, bok)}
 		diffs := []any{}
 		for _, ref := range []string{"origin/main", "", "nothing"} {

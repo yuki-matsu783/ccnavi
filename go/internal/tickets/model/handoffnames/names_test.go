@@ -51,7 +51,7 @@ func TestConvert(t *testing.T) {
 		if back := tb.FromDraft(tb.ToDraft(s[0])); pathcase.Fold(back) != pathcase.Fold(s[0]) {
 			t.Errorf("往復 %q → %q", s[0], back)
 		}
-		if !strings.Contains(strings.ToLower(s[0]), "handoff-") && tb.ReservedProblem(s[0]) != "" {
+		if !strings.Contains(strings.ToLower(s[0]), "handoff-") && tb.reservedProblem(s[0]) != "" {
 			t.Errorf("予約名でないのに断った: %q", s[0])
 		}
 	}
@@ -65,7 +65,7 @@ func TestConvert(t *testing.T) {
 func TestReservedNamesAreRefused(t *testing.T) {
 	tb := table(t)
 	for _, rel := range []string{"handoff-.claude/x.json", "a/Handoff-.CLAUDE/x.json", ".claude/handoff-.claude/x.json"} {
-		if got := tb.ReservedProblem(rel); !strings.Contains(got, "予約") || !strings.Contains(got, "`.claude`") {
+		if got := tb.reservedProblem(rel); !strings.Contains(got, "予約") || !strings.Contains(got, "`.claude`") {
 			t.Errorf("ReservedProblem(%q) = %q", rel, got)
 		}
 	}
@@ -78,22 +78,22 @@ func TestNonASCIIElementsAreNeverMatched(t *testing.T) {
 	if got := tb.FromDraft(weird); got != weird {
 		t.Errorf("FromDraft = %q", got)
 	}
-	if got := tb.ReservedProblem(weird); got != "" {
+	if got := tb.reservedProblem(weird); got != "" {
 		t.Errorf("ReservedProblem = %q", got)
 	}
 }
 
 func TestParse(t *testing.T) {
-	got, err := Parse("# c\n\n.claude handoff-.claude\n  .vscode   handoff-.vscode  \n")
+	got, err := parse("# c\n\n.claude handoff-.claude\n  .vscode   handoff-.vscode  \n")
 	if err != nil || len(got.pairs) != 2 || got.pairs[1] != (Pair{".vscode", "handoff-.vscode"}) {
 		t.Errorf("Parse = %+v, %v", got, err)
 	}
 	for _, bad := range []string{".claude\n", "a b c\n", "a/b c\n", "日本 x\n"} {
-		if _, err := Parse(bad); err == nil {
+		if _, err := parse(bad); err == nil {
 			t.Errorf("Parse(%q) が通った", bad)
 		}
 	}
-	if _, err := Parse("x\ty\n日本 x\n"); err == nil || err.Error() != NamesFile+" の 2 行目を読めない: '日本 x'" {
+	if _, err := parse("x\ty\n日本 x\n"); err == nil || err.Error() != namesFile+" の 2 行目を読めない: '日本 x'" {
 		t.Errorf("苦情の文: %v", err)
 	}
 }
@@ -114,12 +114,12 @@ func TestAddedRowWorksTheSame(t *testing.T) {
 
 // 埋め込んだ写しは、sh が読む元の表と同じ中身でなければならない。
 func TestEmbeddedCopyMatchesTheScriptsTable(t *testing.T) {
-	source, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", ".ccnavi", "scripts", NamesFile))
+	source, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", ".ccnavi", "scripts", namesFile))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(source) != embedded {
-		t.Errorf("%s の写しが .ccnavi/scripts/ のものと違う。写し直す", NamesFile)
+		t.Errorf("%s の写しが .ccnavi/scripts/ のものと違う。写し直す", namesFile)
 	}
 	if got := table(t); len(got.pairs) != 1 || got.pairs[0] != (Pair{".claude", "handoff-.claude"}) {
 		t.Errorf("表: %+v", got.pairs)

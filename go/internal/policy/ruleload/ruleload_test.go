@@ -152,7 +152,7 @@ type result struct {
 
 func idsOf(rs *rules.RuleSet) map[string][][]any {
 	out := map[string][][]any{}
-	for _, name := range rules.Sections {
+	for _, name := range rules.Sections() {
 		list := [][]any{}
 		for _, r := range *rs.Section(name) {
 			list = append(list, []any{r.ID, r.Source, r.File, r.Base})

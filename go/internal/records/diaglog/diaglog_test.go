@@ -166,7 +166,7 @@ func TestMaskUserinfo(t *testing.T) {
 		"u:p@h:c\r\n":                         "***@h:c\r\n",
 	}
 	for in, want := range cases {
-		if got := MaskUserinfo(in); got != want {
+		if got := maskUserinfo(in); got != want {
 			t.Errorf("MaskUserinfo(%q) = %q, want %q", in, got, want)
 		}
 	}

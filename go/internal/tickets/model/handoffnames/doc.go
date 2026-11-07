@@ -7,7 +7,7 @@
 // 書き、要素ごとに大文字小文字を区別せずに比べる。sh は ASCII しか畳めない。そのため、非 ASCII を含む要素は、畳んで
 // 一致しても表に当てない。
 //
-// Python からの対応: ALIASES・load() → Default（*Table。テストは Parse で作った表に差し替える）、parse → Parse、
-// to_draft・from_draft・reserved_problem → Table の ToDraft・FromDraft・ReservedProblem、NAMES_FILE → NamesFile。
+// Python からの対応: ALIASES・load() → Default（*Table。テストは Parse で作った表に差し替える）、parse → parse、
+// to_draft・from_draft・reserved_problem → Table の ToDraft・FromDraft・reservedProblem、NAMES_FILE → namesFile。
 // 表のファイルの探し方（_names_path）は埋め込みにしたので無い。
 package handoffnames

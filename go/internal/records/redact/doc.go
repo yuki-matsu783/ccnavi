@@ -8,5 +8,5 @@
 // Python の re の先読み・後読み・`\b`・Unicode の `\s` と `\w` は RE2 に無い。そのため形ごとに、始まりの候補を探す正規表現、その位置に固定した全体の正規表現、前後の字の検査に分ける。
 // これで Python の finditer と同じ範囲を返す（form）。候補の検査に失敗したら全体の照合を走らせないので、手間は長さにほぼ比例する。
 //
-// Python からの対応: redact.redact → Redact、mask → Mask、MASK → Stars。
+// Python からの対応: redact.redact → Redact、mask → mask、MASK → Stars。
 package redact

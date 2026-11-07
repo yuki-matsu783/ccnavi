@@ -24,10 +24,10 @@ import (
 const (
 	// Code は拒否コード。宣言ごとには分けない。どの宣言で止めたかは記録の rules（RuleID）と文面が言う。
 	Code       = "DENY_NEEDS_USER_TURN"
-	RulePrefix = rules.ReservedIDPrefix + "turn-gate:"
-	// Prefix と Suffix は記録のファイル名の頭と尻。records/prune は Prefix で始まる名前をセッションの記録と読む。
-	Prefix = "turngate-"
-	Suffix = fsio.JSONExt
+	rulePrefix = rules.ReservedIDPrefix + "turn-gate:"
+	// prefix と suffix は記録のファイル名の頭と尻。records/prune は Prefix で始まる名前をセッションの記録と読む。
+	prefix = "turngate-"
+	suffix = fsio.JSONExt
 )
 
 // keyGroup はキーの名前つきグループ。wildcard は値に解けないキーで、どのキーとも一致する。
@@ -52,82 +52,82 @@ const (
 // stateMessage は記録を読み書きできないときの文の識別子。
 const stateMessage = "DENY_NEEDS_USER_TURN__STATE"
 
-// ErrBadGate は宣言を組み立てられない（条件・キーの有無の食い違い・id）。
-var ErrBadGate = errors.New("ターン分離のゲートの宣言が不正")
+// errBadGate は宣言を組み立てられない（条件・キーの有無の食い違い・id）。
+var errBadGate = errors.New("ターン分離のゲートの宣言が不正")
 
 func badGate(format string, args ...any) error {
-	return fmt.Errorf("%w: %s", ErrBadGate, fmt.Sprintf(format, args...))
+	return fmt.Errorf("%w: %s", errBadGate, fmt.Sprintf(format, args...))
 }
 
-// Cond は A か B の条件。Regex か Glob のどちらか 1 つ。But は regex の並びで、同じコマンドにどれかがあればこの条件に
+// cond は A か B の条件。Regex か glob のどちらか 1 つ。but は regex の並びで、同じコマンドにどれかがあればこの条件に
 // 当たらない。
-type Cond struct {
-	Regex string
-	Glob  string
-	But   []string
+type cond struct {
+	regex string
+	glob  string
+	but   []string
 }
 
-// Gate は宣言 1 件。「First を打ったら、ユーザの発言が 1 回はさまるまで Second を打てない」。
+// Gate は宣言 1 件。「first を打ったら、ユーザの発言が 1 回はさまるまで second を打てない」。
 //
-// 文は文面ファイルの Message（識別子）が持つ。4 つの段のうち、段 1（what）と次の一手（next）は same_command・
-// no_user_turn で場合分けし、FirstName・SecondName・宣言の id とキー（where）・key を埋める。別の組を足すときは、
+// 文は文面ファイルの message（識別子）が持つ。4 つの段のうち、段 1（what）と次の一手（next）は same_command・
+// no_user_turn で場合分けし、firstName・secondName・宣言の id とキー（where）・key を埋める。別の組を足すときは、
 // 文面ファイルにも 1 件足す。
 type Gate struct {
-	ID         string
-	First      Cond
-	Second     Cond
-	FirstName  string
-	SecondName string
-	Message    string
-	// KeyName は次の一手の `{key}` に、キーが解けなかったとき入れる仮の値。
-	KeyName string
-	// AskIfAttended は付き添いのあるセッションで、発言を待つ代わりに B を確認（ask）に出す。
-	AskIfAttended bool
-	// AskMessage は確認の文の識別子。AskIfAttended のときだけ使う。
-	AskMessage string
+	id         string
+	first      cond
+	second     cond
+	firstName  string
+	secondName string
+	message    string
+	// keyName は次の一手の `{key}` に、キーが解けなかったとき入れる仮の値。
+	keyName string
+	// askIfAttended は付き添いのあるセッションで、発言を待つ代わりに B を確認（ask）に出す。
+	askIfAttended bool
+	// askMessage は確認の文の識別子。askIfAttended のときだけ使う。
+	askMessage string
 }
 
-// Reason は止めた理由。
-type Reason string
+// reason は止めた理由。
+type reason string
 
 const (
-	SameCommand Reason = "same-command"
-	NoUserTurn  Reason = "no-user-turn"
-	Unreadable  Reason = "unreadable"
-	Broken      Reason = "broken"
-	Unwritable  Reason = "unwritable"
-	Ask         Reason = "ask"
+	sameCommand reason = "same-command"
+	noUserTurn  reason = "no-user-turn"
+	unreadable  reason = "unreadable"
+	Broken      reason = "broken"
+	unwritable  reason = "unwritable"
+	ask         reason = "ask"
 )
 
-// Stop は B を止める結論。Key は文面に出す B のキー（キーなしの宣言・そのまま打てない形では空）。
+// Stop は B を止める結論。key は文面に出す B のキー（キーなしの宣言・そのまま打てない形では空）。
 type Stop struct {
 	Gate   *Gate
-	Reason Reason
-	Key    string
-	Detail string
+	reason reason
+	key    string
+	detail string
 }
 
 // RuleID は記録の rules に残す名前。
-func RuleID(g *Gate) string { return RulePrefix + g.ID }
+func RuleID(g *Gate) string { return rulePrefix + g.id }
 
-// defaultKeyName は KeyName を書かない宣言の仮の値。
+// defaultKeyName は keyName を書かない宣言の仮の値。
 const defaultKeyName = "<キー>"
 
 // integrateGate は、差分をユーザに見せて返事を待つ手順書の約束を機械にする。キーは `<名前>`。`integrate-done` は
 // `-m <メッセージ>` を名前の前後どちらにも置けるので、メッセージの引数を読み飛ばしてから名前を取る。`--abort` は
 // 先頭が `-` なので名前として取れず、A にならない。
 var integrateGate = &Gate{
-	ID:    "integrate-user-turn",
-	First: Cond{Regex: `ccnavi-git\.sh\s+integrate\s+(?P<key>[^-\s\x00\x01][^\s\x00\x01]*)`},
-	Second: Cond{Regex: `ccnavi-git\.sh\s+integrate-done\s+` +
+	id:    "integrate-user-turn",
+	first: cond{regex: `ccnavi-git\.sh\s+integrate\s+(?P<key>[^-\s\x00\x01][^\s\x00\x01]*)`},
+	second: cond{regex: `ccnavi-git\.sh\s+integrate-done\s+` +
 		`(?:(?:-m|--message)\s+[^\s\x00]+\s+|--message=[^\s\x00]+\s+)*` +
 		`(?P<key>[^-\s\x00\x01][^\s\x00\x01]*)`},
-	FirstName:     "ccnavi-git.sh integrate",
-	SecondName:    "ccnavi-git.sh integrate-done",
-	Message:       "DENY_NEEDS_USER_TURN__INTEGRATE",
-	KeyName:       "<名前>",
-	AskIfAttended: true,
-	AskMessage:    "NOTICE_ASK_USER_CONFIRM__INTEGRATE",
+	firstName:     "ccnavi-git.sh integrate",
+	secondName:    "ccnavi-git.sh integrate-done",
+	message:       "DENY_NEEDS_USER_TURN__INTEGRATE",
+	keyName:       "<名前>",
+	askIfAttended: true,
+	askMessage:    "NOTICE_ASK_USER_CONFIRM__INTEGRATE",
 }
 
 // reviewCheck は `--check`（打つだけで何も変えない確認）。A にも B にもならない。
@@ -138,17 +138,20 @@ const reviewCheck = `(?:^|\s)--check(?:\s|$)`
 // あるセッションでも確認には出さず、「レビューを終えた」というユーザの発言を待つ。キーは付けない（`--phase` の書き方を
 // 読まずに済み、どのフェーズの依頼のあとでも発言を待つ。待つ間は別の依頼を受けない決まりなので困らない）。
 var reviewConfirmGate = &Gate{
-	ID:         "review-confirm-user-turn",
-	First:      Cond{Regex: `ccnavi-review\.sh\s+review-request(?:\s|$)`, But: []string{reviewCheck}},
-	Second:     Cond{Regex: `ccnavi-review\.sh\s+confirm(?:\s|$)`, But: []string{reviewCheck}},
-	FirstName:  "ccnavi-review.sh review-request",
-	SecondName: "ccnavi-review.sh confirm",
-	Message:    "DENY_NEEDS_USER_TURN__REVIEW_CONFIRM",
-	KeyName:    "<N>",
+	id:         "review-confirm-user-turn",
+	first:      cond{regex: `ccnavi-review\.sh\s+review-request(?:\s|$)`, but: []string{reviewCheck}},
+	second:     cond{regex: `ccnavi-review\.sh\s+confirm(?:\s|$)`, but: []string{reviewCheck}},
+	firstName:  "ccnavi-review.sh review-request",
+	secondName: "ccnavi-review.sh confirm",
+	message:    "DENY_NEEDS_USER_TURN__REVIEW_CONFIRM",
+	keyName:    "<N>",
 }
 
-// Builtin は組み込みの宣言の表。
-var Builtin = []*Gate{integrateGate, reviewConfirmGate}
+// builtin は組み込みの宣言の表。
+var builtin = []*Gate{integrateGate, reviewConfirmGate}
+
+// Builtin は builtin の写しを返す（呼び手が書き換えても元は変わらない）。
+func Builtin() []*Gate { return slices.Clone(builtin) }
 
 type compiledCond struct {
 	pattern *pyre.Regexp
@@ -156,17 +159,17 @@ type compiledCond struct {
 	keyed   bool
 }
 
-func compile(c Cond, label string) (compiledCond, error) {
-	if (c.Regex != "") == (c.Glob != "") {
+func compile(c cond, label string) (compiledCond, error) {
+	if (c.regex != "") == (c.glob != "") {
 		return compiledCond{}, badGate("%s: regex か glob のどちらか 1 つを書いてください", label)
 	}
-	pattern, problem := rules.CompileCondition(c.Glob, c.Regex, label)
+	pattern, problem := rules.CompileCondition(c.glob, c.regex, label)
 	if pattern == nil {
 		return compiledCond{}, badGate("%s: %s", label, problem)
 	}
 	out := compiledCond{pattern: pattern}
 	_, out.keyed = pattern.Group(keyGroup)
-	for _, text := range c.But {
+	for _, text := range c.but {
 		got, problem := rules.CompileCondition("", text, label+" の but")
 		if got == nil {
 			return compiledCond{}, badGate("%s の but: %s", label, problem)
@@ -176,24 +179,24 @@ func compile(c Cond, label string) (compiledCond, error) {
 	return out, nil
 }
 
-func firstLabel(g *Gate) string  { return g.ID + " の first" }
-func secondLabel(g *Gate) string { return g.ID + " の second" }
+func firstLabel(g *Gate) string  { return g.id + " の first" }
+func secondLabel(g *Gate) string { return g.id + " の second" }
 
-// Validate は宣言を組み立てられるか。
-func Validate(g *Gate) error {
-	if !gateID.MatchString(g.ID) {
-		return badGate("%s: id は英数字・`.`・`_`・`-` で書いてください", g.ID)
+// validate は宣言を組み立てられるか。
+func validate(g *Gate) error {
+	if !gateID.MatchString(g.id) {
+		return badGate("%s: id は英数字・`.`・`_`・`-` で書いてください", g.id)
 	}
-	first, err := compile(g.First, firstLabel(g))
+	first, err := compile(g.first, firstLabel(g))
 	if err != nil {
 		return err
 	}
-	second, err := compile(g.Second, secondLabel(g))
+	second, err := compile(g.second, secondLabel(g))
 	if err != nil {
 		return err
 	}
 	if first.keyed != second.keyed {
-		return badGate("%s: キー（名前つきグループ %s）は first と second の両方に書くか、両方に書かないかのどちらかです", g.ID, keyGroup)
+		return badGate("%s: キー（名前つきグループ %s）は first と second の両方に書くか、両方に書かないかのどちらかです", g.id, keyGroup)
 	}
 	return nil
 }
@@ -211,7 +214,7 @@ func normalKey(raw string) string {
 func sameKey(a, b string) bool { return a == wildcard || b == wildcard || a == b }
 
 // hits は条件に当たった箇所（重なりは除く）。commands のそれぞれを shell.Sep で分けたコマンドごとに見る。
-func hits(c Cond, label string, commands []string) ([]hit, error) {
+func hits(c cond, label string, commands []string) ([]hit, error) {
 	cc, err := compile(c, label)
 	if err != nil {
 		return nil, err
@@ -258,7 +261,7 @@ func safe(text string, limit int) string { return fsio.SafeName(text, limit) }
 
 func entryName(session, gate, key, call string) string {
 	sum := digest.Hex(digest.SHA1, gate+"\x00"+key, digestLen)
-	return Prefix + safe(session, sessionLimit) + "-" + safe(gate, partLimit) + "-" + sum + "-" + safe(call, partLimit) + Suffix
+	return prefix + safe(session, sessionLimit) + "-" + safe(gate, partLimit) + "-" + sum + "-" + safe(call, partLimit) + suffix
 }
 
 // sessionNames はこのセッションのものらしい記録のファイル名（名前の順）と、置き場を読めなかった理由。
@@ -271,10 +274,10 @@ func sessionNames(state, session string) ([]string, string) {
 		}
 		return nil, fsio.ErrorText(err)
 	}
-	head := Prefix + safe(session, sessionLimit) + "-"
+	head := prefix + safe(session, sessionLimit) + "-"
 	var out []string
 	for _, n := range names {
-		if strings.HasPrefix(n, head) && strings.HasSuffix(n, Suffix) {
+		if strings.HasPrefix(n, head) && strings.HasSuffix(n, suffix) {
 			out = append(out, n)
 		}
 	}
@@ -332,20 +335,20 @@ func Check(gates []*Gate, commands []string, state, session string, sameCommandO
 		return nil, nil
 	}
 	for _, g := range gates {
-		bHits, err := hits(g.Second, secondLabel(g), commands)
+		bHits, err := hits(g.second, secondLabel(g), commands)
 		if err != nil {
 			return nil, err
 		}
 		if len(bHits) == 0 {
 			continue
 		}
-		aHits, err := hits(g.First, firstLabel(g), commands)
+		aHits, err := hits(g.first, firstLabel(g), commands)
 		if err != nil {
 			return nil, err
 		}
 		for _, b := range bHits {
 			if slices.ContainsFunc(aHits, func(a hit) bool { return sameKey(b.key, a.key) }) {
-				return &Stop{g, SameCommand, shown(b.raw), ""}, nil
+				return &Stop{g, sameCommand, shown(b.raw), ""}, nil
 			}
 		}
 		if sameCommandOnly {
@@ -353,7 +356,7 @@ func Check(gates []*Gate, commands []string, state, session string, sameCommandO
 		}
 		all, broken, failed := entries(state, session)
 		if failed != "" {
-			return &Stop{g, Unreadable, shown(bHits[0].raw), failed}, nil
+			return &Stop{g, unreadable, shown(bHits[0].raw), failed}, nil
 		}
 		if len(broken) > 0 {
 			return &Stop{g, Broken, shown(bHits[0].raw), broken[0]}, nil
@@ -364,7 +367,7 @@ func Check(gates []*Gate, commands []string, state, session string, sameCommandO
 		}
 		var matched []match
 		for _, e := range all {
-			if e.gate != g.ID {
+			if e.gate != g.id {
 				continue
 			}
 			for _, b := range bHits {
@@ -379,7 +382,7 @@ func Check(gates []*Gate, commands []string, state, session string, sameCommandO
 		spoken, ok := turn.LastPrompt(state, session)
 		for _, m := range matched {
 			if !ok || !spoken.After(fsio.FromUnixSeconds(m.e.at)) {
-				return &Stop{g, NoUserTurn, shown(m.raw), ""}, nil
+				return &Stop{g, noUserTurn, shown(m.raw), ""}, nil
 			}
 		}
 		for _, m := range matched {
@@ -390,10 +393,10 @@ func Check(gates []*Gate, commands []string, state, session string, sameCommandO
 }
 
 // SplitByAttendance は宣言を、発言を待つゲートで見るものと確認（ask）に出すものに分ける。確認に出すのは、付き添いの
-// あるセッションで AskIfAttended を立てた宣言だけ。
+// あるセッションで askIfAttended を立てた宣言だけ。
 func SplitByAttendance(gates []*Gate, attended bool) (waited, asked []*Gate) {
 	for _, g := range gates {
-		if attended && g.AskIfAttended {
+		if attended && g.askIfAttended {
 			asked = append(asked, g)
 		} else {
 			waited = append(waited, g)
@@ -402,15 +405,15 @@ func SplitByAttendance(gates []*Gate, attended bool) (waited, asked []*Gate) {
 	return waited, asked
 }
 
-// Asks は B を打とうとしているコマンドが確認に出す宣言に当たれば、その宣言とキー（Reason は Ask）。
+// Asks は B を打とうとしているコマンドが確認に出す宣言に当たれば、その宣言とキー（reason は ask）。
 func Asks(gates []*Gate, commands []string) (*Stop, error) {
 	for _, g := range gates {
-		found, err := hits(g.Second, secondLabel(g), commands)
+		found, err := hits(g.second, secondLabel(g), commands)
 		if err != nil {
 			return nil, err
 		}
 		if len(found) > 0 {
-			return &Stop{g, Ask, shown(found[0].raw), ""}, nil
+			return &Stop{g, ask, shown(found[0].raw), ""}, nil
 		}
 	}
 	return nil, nil
@@ -430,17 +433,17 @@ func Note(gates []*Gate, commands []string, state, session, call string, now tim
 		token = "t" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	}
 	for _, g := range gates {
-		found, err := hits(g.First, firstLabel(g), commands)
+		found, err := hits(g.first, firstLabel(g), commands)
 		if err != nil {
 			return nil, err
 		}
 		for _, h := range found {
 			if err := fsio.MakeDirs(state); err != nil {
-				return &Stop{g, Unwritable, shown(h.raw), fsio.ErrorText(err)}, nil
+				return &Stop{g, unwritable, shown(h.raw), fsio.ErrorText(err)}, nil
 			}
-			record := pyjson.NewObject("session", session, "gate", g.ID, "key", h.key, "at", fsio.UnixSeconds(now), "call", call)
-			if failed := fsio.WriteJSON(ospath.Join(state, entryName(session, g.ID, h.key, token)), record); failed != "" {
-				return &Stop{g, Unwritable, shown(h.raw), failed}, nil
+			record := pyjson.NewObject("session", session, "gate", g.id, "key", h.key, "at", fsio.UnixSeconds(now), "call", call)
+			if failed := fsio.WriteJSON(ospath.Join(state, entryName(session, g.id, h.key, token)), record); failed != "" {
+				return &Stop{g, unwritable, shown(h.raw), failed}, nil
 			}
 		}
 	}
@@ -454,7 +457,7 @@ func ForgetCall(state, session, call string) {
 		return
 	}
 	names, _ := sessionNames(state, session)
-	tail := "-" + safe(call, partLimit) + Suffix
+	tail := "-" + safe(call, partLimit) + suffix
 	for _, name := range names {
 		if strings.HasSuffix(name, tail) {
 			fsio.Remove(ospath.Join(state, name))

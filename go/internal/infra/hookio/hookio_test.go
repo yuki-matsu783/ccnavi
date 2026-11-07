@@ -52,7 +52,7 @@ func TestDecodeFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if in.AgentID != "5" || in.AgentType != "True" || in.Tools != nil || in.Error != "" || in.IsInterrupt ||
+	if in.AgentID != "5" || in.AgentType != "True" || in.Tools != nil || in.error != "" || in.IsInterrupt ||
 		!in.StopHookActive || in.Source != "{'a': [1, None]}" || in.Prompt != "" || in.TranscriptPath != "/t" ||
 		!in.Busy || in.ToolResponse.Len() != 0 || in.ToolInput.Len() != 0 || in.Cwd != "" {
 		t.Errorf("%+v", in)

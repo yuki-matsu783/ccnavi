@@ -23,10 +23,10 @@ import (
 type State string
 
 const (
-	StateNew       State = "new"
-	StateChanged   State = "changed"
-	StateUnchanged State = "unchanged"
-	StateRejected  State = "rejected"
+	stateNew       State = "new"
+	stateChanged   State = "changed"
+	stateUnchanged State = "unchanged"
+	stateRejected  State = "rejected"
 )
 
 // absent は取り込み先が無いときの、照合の値のハッシュの欄。
@@ -72,15 +72,15 @@ type Entry struct {
 	Warnings   []string
 	Diff       string
 	Selected   bool
-	// Defense は、種類はボードで取り込めるが中身が防御の記述を動かすのでターミナルに限る理由。空なら種類のまま。
+	// defense は、種類はボードで取り込めるが中身が防御の記述を動かすのでターミナルに限る理由。空なら種類のまま。
 	Defense string
 }
 
 // Board はボードの経路（--via board）で取り込めるか。
 func (e *Entry) Board() bool { return e.Kind.onBoard && e.Defense == "" }
 
-// DraftRel は下書きのツリーからの相対パス。置いてある綴りのまま（無ければ表から組む）。
-func (e *Entry) DraftRel() string {
+// draftRel は下書きのツリーからの相対パス。置いてある綴りのまま（無ければ表から組む）。
+func (e *Entry) draftRel() string {
 	if e.drel != "" {
 		return place.Handoff + "/" + e.drel
 	}
@@ -91,13 +91,13 @@ func (e *Entry) DraftRel() string {
 func (e *Entry) State() State {
 	switch {
 	case len(e.Errors) > 0:
-		return StateRejected
+		return stateRejected
 	case e.current == nil:
-		return StateNew
+		return stateNew
 	case same(e.current, e.raw):
-		return StateUnchanged
+		return stateUnchanged
 	}
-	return StateChanged
+	return stateChanged
 }
 
 // record は照合の値の 1 件分（長さの前置きつき）。
@@ -172,7 +172,7 @@ func (p *Plan) OK() bool {
 		return false
 	}
 	for _, e := range p.Selected() {
-		if e.State() == StateRejected {
+		if e.State() == stateRejected {
 			return false
 		}
 	}
@@ -194,7 +194,7 @@ func Prepare(conf *config.Settings, root string, wanted []string) *Plan {
 		count[f.Key]++
 	}
 	for _, f := range found {
-		e := &Entry{Rel: f.Rel, key: f.Key, Kind: KindOf(f.Key), draft: f.Path, drel: f.Drel}
+		e := &Entry{Rel: f.Rel, key: f.Key, Kind: KindOf(f.Key), draft: f.Path, drel: f.drel}
 		if count[f.Key] > 1 {
 			e.Errors = append(e.Errors, msgTwins)
 		}
@@ -203,7 +203,7 @@ func Prepare(conf *config.Settings, root string, wanted []string) *Plan {
 	}
 	if len(wanted) == 0 {
 		for _, e := range plan.Entries {
-			e.Selected = e.State() != StateUnchanged
+			e.Selected = e.State() != stateUnchanged
 		}
 	} else {
 		index := map[string]*Entry{}
@@ -314,7 +314,7 @@ func inside(root, path string) bool {
 // locateLayer はテンプレートとレイヤーの設定のレイヤーを決める。読まれない置き場なら断る。
 // 文面ファイルはレイヤーを持たない（projects/<名前>/.ccnavi/messages/ は表が許さない）。
 func locateLayer(conf *config.Settings, root string, e *Entry) {
-	if e.Kind.ID != Template && e.Kind.ID != LayerConfig {
+	if e.Kind.ID != Template && e.Kind.ID != layerConfig {
 		return
 	}
 	parts := strings.Split(e.key, "/")
@@ -343,8 +343,8 @@ func locateLayer(conf *config.Settings, root string, e *Entry) {
 	default:
 		e.layer = config.LayerSelf
 	}
-	if e.Kind.ID == LayerConfig {
-		for kind, file := range config.LayerFileNames {
+	if e.Kind.ID == layerConfig {
+		for kind, file := range config.LayerFileNames() {
 			if file == parts[len(parts)-1] {
 				e.configKind = kind
 			}

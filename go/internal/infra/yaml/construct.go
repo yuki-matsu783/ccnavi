@@ -533,20 +533,20 @@ func (c *constructor) timestamp(n *node) (any, error) {
 		}
 		return date, nil
 	}
-	t := DateTime{Date: date, Hour: atoi("hour"), Minute: atoi("minute"), Second: atoi("second")}
+	t := DateTime{Date: date, hour: atoi("hour"), minute: atoi("minute"), second: atoi("second")}
 	if frac := group("fraction"); frac != "" {
 		frac = (frac + "000000")[:6]
-		t.Microsecond, _ = strconv.Atoi(frac)
+		t.microsecond, _ = strconv.Atoi(frac)
 	}
 	if sign := group("tz_sign"); sign != "" {
 		t.HasZone = true
-		t.Offset = time.Duration(atoi("tz_hour"))*time.Hour + time.Duration(atoi("tz_minute"))*time.Minute
+		t.offset = time.Duration(atoi("tz_hour"))*time.Hour + time.Duration(atoi("tz_minute"))*time.Minute
 		if sign == "-" {
-			t.Offset = -t.Offset
+			t.offset = -t.offset
 		}
-		if t.Offset <= -24*time.Hour || t.Offset >= 24*time.Hour {
+		if t.offset <= -24*time.Hour || t.offset >= 24*time.Hour {
 			return nil, buildError(excValue, "offset must be a timedelta strictly between "+
-				"-timedelta(hours=24) and timedelta(hours=24), not "+timedeltaRepr(t.Offset)+".")
+				"-timedelta(hours=24) and timedelta(hours=24), not "+timedeltaRepr(t.offset)+".")
 		}
 	} else if group("tz") != "" {
 		t.HasZone = true
@@ -558,7 +558,7 @@ func (c *constructor) timestamp(n *node) (any, error) {
 		name  string
 		value int
 		max   int
-	}{{"hour", t.Hour, 23}, {"minute", t.Minute, 59}, {"second", t.Second, 59}} {
+	}{{"hour", t.hour, 23}, {"minute", t.minute, 59}, {"second", t.second, 59}} {
 		if f.value > f.max {
 			return nil, buildError(excValue, fmt.Sprintf("%s must be in 0..%d", f.name, f.max))
 		}
@@ -569,11 +569,11 @@ func (c *constructor) timestamp(n *node) (any, error) {
 // checkDate は Python の datetime.date の検査と同じ順と文で、ありえない日付を断る。
 func checkDate(d Date) error {
 	switch {
-	case d.Year < 1:
-		return buildError(excValue, fmt.Sprintf("year %d is out of range", d.Year))
-	case d.Month < 1 || d.Month > 12:
+	case d.year < 1:
+		return buildError(excValue, fmt.Sprintf("year %d is out of range", d.year))
+	case d.month < 1 || d.month > 12:
 		return buildError(excValue, "month must be in 1..12")
-	case d.Day < 1 || d.Day > daysIn(d.Year, d.Month):
+	case d.day < 1 || d.day > daysIn(d.year, d.month):
 		return buildError(excValue, "day is out of range for month")
 	}
 	return nil

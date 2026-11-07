@@ -25,13 +25,22 @@ const (
 )
 
 var (
-	// States は提案の置き場で走査する状態。
-	States = []State{Todo, Review}
-	// Finished は作業として終わった状態（レビュー待ちも含む）。
-	Finished = []State{Review, Done, Cancelled}
-	// GuardedStates は直接の作成・移動を止める置き場。todo/ への作成と編集は自由。
-	GuardedStates = []State{Review}
+	// states は提案の置き場で走査する状態。
+	states = []State{Todo, Review}
+	// finished は作業として終わった状態（レビュー待ちも含む）。
+	finished = []State{Review, Done, Cancelled}
+	// guardedStates は直接の作成・移動を止める置き場。todo/ への作成と編集は自由。
+	guardedStates = []State{Review}
 )
+
+// Finished は finished の写しを返す（呼び手が書き換えても元は変わらない）。
+func Finished() []State { return slices.Clone(finished) }
+
+// GuardedStates は guardedStates の写しを返す（呼び手が書き換えても元は変わらない）。
+func GuardedStates() []State { return slices.Clone(guardedStates) }
+
+// States は states の写しを返す（呼び手が書き換えても元は変わらない）。
+func States() []State { return slices.Clone(states) }
 
 // progressOrder は置き場の進み具合の並び。
 var progressOrder = []State{Todo, Doing, Review, Done}
@@ -52,8 +61,6 @@ func (s State) Progress() int {
 }
 
 const (
-	// MdExt はチケット・提案のファイルの拡張子。
-	MdExt = ".md"
 	// Handoff は下書きの置き場（ツリーのルートからの相対）。設定で動かさない。動かせると、その値を
 	// ソースの置き場に向けるだけで承認した範囲を迂回して書ける場所ができる。
 	Handoff = config.WipRoot + "/" + config.HandoffName
@@ -62,8 +69,8 @@ const (
 	// WipRoot は途中の作業の置き場。マージの前に全体を消す。
 	WipRoot = config.WipRoot
 
-	// ArchiveName は閉じた親子のチケットの退避の置き場の名前（logs/ の下）。
-	ArchiveName = config.ArchiveName
+	// archiveName は閉じた親子のチケットの退避の置き場の名前（logs/ の下）。
+	archiveName = config.ArchiveName
 	// PhasesDir・FlowsDir は承認済みの領域の下の、マーカーと子のフローの置き場。
 	PhasesDir = "phases"
 	FlowsDir  = "flows"
@@ -74,7 +81,7 @@ const (
 )
 
 // ArchiveDir はワークスペースルートからの退避の置き場（logs/ は .gitignore に入っている）。
-var ArchiveDir = ospath.Join("logs", ArchiveName)
+var ArchiveDir = ospath.Join("logs", archiveName)
 
 // under は相対パスがその置き場の下にあるか。前置は "/" の境で切り、大文字小文字は区別しない。
 // rel の "\" は "/" に直さない（Linux・macOS では `wip\proposals\x` という名前の 1 ファイルになる）。
@@ -125,7 +132,7 @@ func Dir(treeRoot, ticketsRel string, s State) string {
 
 // File はツリーの提案の置き場の下の、状態 s の置き場にある識別子 id の提案のファイルのパス。
 func File(treeRoot, ticketsRel string, s State, id string) string {
-	return ospath.Join(Dir(treeRoot, ticketsRel, s), id+MdExt)
+	return ospath.Join(Dir(treeRoot, ticketsRel, s), id+config.MdExt)
 }
 
 // IsHandoffPlace は相対パスが下書きの置き場（wip/handoff/）の下にあるか。大文字小文字は区別しない。

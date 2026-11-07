@@ -446,7 +446,7 @@ func existing(conf *config.Settings, top, ident string) string {
 		states []place.State
 	}{{ticketsDir(conf, top), []place.State{place.Todo, place.Review}}, {approved, []place.State{place.Doing, place.Done}}} {
 		for _, state := range c.states {
-			candidate := ospath.Join(c.base, string(state), ident+".md")
+			candidate := ospath.Join(c.base, string(state), ident+config.MdExt)
 			if ospath.DiskLexists(candidate) {
 				return candidate
 			}

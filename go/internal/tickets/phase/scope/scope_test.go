@@ -52,12 +52,12 @@ func TestOfNarrowsByChildParentAndType(t *testing.T) {
 		want  rules.Decision
 		limit Limit
 	}{
-		{"3 つの上限の中", designer, "wip/design/a.md", rules.Allow, LimitNone},
-		{"子の範囲の外", designer, "tests/a", ticket.Outside, LimitTicket},
+		{"3 つの上限の中", designer, "wip/design/a.md", rules.Allow, limitNone},
+		{"子の範囲の外", designer, "tests/a", ticket.Outside, limitTicket},
 		{"親の範囲の外は親を名指す", designer, "docs/a.md", ticket.Outside, LimitParent},
 		{"定義の上限の外は定義を名指す", designer, "src/a.go", ticket.Outside, LimitType},
-		{"大文字小文字の違いは同じ場所", designer, "WIP/Design/a.md", rules.Allow, LimitNone},
-		{"inherit の定義は切り詰めない", worker, "src/a.go", rules.Allow, LimitNone},
+		{"大文字小文字の違いは同じ場所", designer, "WIP/Design/a.md", rules.Allow, limitNone},
+		{"inherit の定義は切り詰めない", worker, "src/a.go", rules.Allow, limitNone},
 		{"inherit でも親の範囲では切り詰める", worker, "docs/a.md", ticket.Outside, LimitParent},
 	}
 	for _, tt := range tests {

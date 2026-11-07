@@ -116,18 +116,18 @@ func TestMatchesPython(t *testing.T) {
 	for _, cwd := range cwds(goRoot) {
 		e := map[string]any{}
 		if u := UnfinishedAtStop(conf, goRoot, cwd, nil); u != nil {
-			e["unfinished"] = append([]any{u.Ticket.ID, rel(u.Worktree), u.Ahead, u.Head, rel(FinishNudge(goRoot, u))}, record(u)...)
+			e["unfinished"] = append([]any{u.Ticket.ID, rel(u.worktree), u.ahead, u.head, rel(FinishNudge(goRoot, u))}, record(u)...)
 		}
 		if p := PendingAtStop(conf, goRoot, cwd, nil); p != nil {
 			children := p.Children
 			if children == nil {
 				children = []string{}
 			}
-			e["pending"] = append([]any{p.Parent.ID, p.Number, p.Step, rel(p.Worktree), p.Head, children, p.Title,
+			e["pending"] = append([]any{p.Parent.ID, p.Number, p.Step, rel(p.worktree), p.head, children, p.title,
 				rel(RequestNudge(goRoot, p))}, record(p)...)
 		}
 		if w := WaitingAtStop(conf, goRoot, cwd, nil); w != nil {
-			e["waiting"] = append([]any{w.Parent.ID, w.Head, rel(w.Todo), rel(w.Proposal), rel(FeedbackNudge(goRoot, w))}, record(w)...)
+			e["waiting"] = append([]any{w.Parent.ID, w.head, rel(w.todo), rel(w.proposal), rel(FeedbackNudge(goRoot, w))}, record(w)...)
 		}
 		answers = append(answers, e)
 	}
@@ -136,13 +136,13 @@ func TestMatchesPython(t *testing.T) {
 	for _, c := range copies {
 		off[c.ID] = rel(BaseOffHead(conf, goRoot, c))
 	}
-	data, err := os.ReadFile(NudgePath(goState, "s1"))
+	data, err := os.ReadFile(nudgePath(goState, "s1"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := map[string]any{
 		"cwds": answers, "offHead": off, "record": base64.StdEncoding.EncodeToString(data),
-		"path": []string{filepath.Base(NudgePath(goState, "")), filepath.Base(NudgePath(goState, "a/b"))},
+		"path": []string{filepath.Base(nudgePath(goState, "")), filepath.Base(nudgePath(goState, "a/b"))},
 	}
 	testkit.SameJSON(t, got, want)
 }

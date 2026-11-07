@@ -74,7 +74,7 @@ func hookSettings(conf *config.Settings, root string, stderr io.Writer, modeFlag
 	seen.ModeFromEnvironment = view.Mode
 	var complaints bytes.Buffer
 	mode := config.ResolveMode(&complaints, modeFlag, &seen)
-	control := selfguard.Resolve(&complaints, ticketControlFlag, view.TicketControl, env.TicketControl, selfguard.GateChoices)
+	control := selfguard.Resolve(&complaints, ticketControlFlag, view.TicketControl, env.TicketControl, selfguard.GateChoices())
 	io.WriteString(stderr, complaints.String())
 	return mode, control
 }
@@ -272,7 +272,7 @@ func phaseOf(t *ticket.Ticket) any {
 
 func ruleRecords(rs *rules.RuleSet) *pyjson.Object {
 	o := pyjson.NewObject()
-	for _, section := range rules.Sections {
+	for _, section := range rules.Sections() {
 		list := []any{}
 		for _, r := range *rs.Section(section) {
 			list = append(list, ruleForm(r).put(pyjson.NewObject("id", r.ID, "section", string(r.Decision),
@@ -610,7 +610,7 @@ func phaseRecord(ph *phase.Phase, manual string) (*pyjson.Object, phaseRow) {
 		states.Set(t.ID, string(ph.States[t.ID]))
 	}
 	markObj := pyjson.NewObject()
-	for _, kind := range marks.Kinds {
+	for _, kind := range marks.Kinds() {
 		if data, ok := ph.Marks[kind]; ok {
 			markObj.Set(string(kind), data)
 		}

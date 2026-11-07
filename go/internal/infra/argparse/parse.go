@@ -24,7 +24,7 @@ func argError(a *Action, format string, args ...any) *Error {
 }
 
 // Int は Python の type=int。
-var Int = Type{Name: "int", Convert: func(s string) (any, error) {
+var Int = Type{name: "int", convert: func(s string) (any, error) {
 	n, err := pyfmt.ParseInt(s)
 	if err != nil {
 		return nil, err
@@ -140,7 +140,7 @@ func (st *parseState) run() ([]string, error) {
 			continue
 		}
 		// 渡されなかった引数の文字列の既定値は、ここで型を通す（Python と同じく、渡されたときは通さない）。
-		if s, ok := a.Default.(string); ok && a.typ.Convert != nil {
+		if s, ok := a.Default.(string); ok && a.typ.convert != nil {
 			v, err := convert(a, s)
 			if err != nil {
 				return nil, err
@@ -280,7 +280,7 @@ func matchArgument(a *Action, pattern string) (int, error) {
 	switch a.nargs {
 	case noArgs:
 		return 0, nil
-	case One:
+	case one:
 		if strings.HasPrefix(pattern, "A") {
 			return 1, nil
 		}
@@ -306,7 +306,7 @@ func matchArgument(a *Action, pattern string) (int, error) {
 // positionalPattern は位置引数の式（Python の _get_nargs_pattern の位置引数の側）。
 func positionalPattern(a *Action) string {
 	switch a.nargs {
-	case One:
+	case one:
 		return "(-*A-*)"
 	case Optional:
 		return "(-*A?-*)"
@@ -403,7 +403,7 @@ func values(a *Action, args []string) (any, error) {
 			return a.Default, nil
 		}
 		return []any{}, nil
-	case len(args) == 1 && (a.nargs == One || a.nargs == Optional):
+	case len(args) == 1 && (a.nargs == one || a.nargs == Optional):
 		return convert(a, args[0])
 	}
 	out := []any{}
@@ -418,12 +418,12 @@ func values(a *Action, args []string) (any, error) {
 }
 
 func convert(a *Action, s string) (any, error) {
-	if a.typ.Convert == nil {
+	if a.typ.convert == nil {
 		return s, nil
 	}
-	v, err := a.typ.Convert(s)
+	v, err := a.typ.convert(s)
 	if err != nil {
-		return nil, argError(a, "invalid %s value: %s", a.typ.Name, pyfmt.Quote(s))
+		return nil, argError(a, "invalid %s value: %s", a.typ.name, pyfmt.Quote(s))
 	}
 	return v, nil
 }

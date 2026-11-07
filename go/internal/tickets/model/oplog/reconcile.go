@@ -12,14 +12,14 @@ import (
 type Verdict string
 
 const (
-	// VerdictSent は送ったと確かめた（URL を保存する）。
-	VerdictSent Verdict = "sent"
-	// VerdictSend は送っていないと確定した（同じ段階 ID で送る）。
-	VerdictSend Verdict = "send"
-	// VerdictUnknown は送ったか確定できない（自動では送らない）。
-	VerdictUnknown Verdict = "unknown"
-	// VerdictStop は複数ある・読めない（止めて、確かめ方を表示する）。
-	VerdictStop Verdict = "stop"
+	// verdictSent は送ったと確かめた（URL を保存する）。
+	verdictSent Verdict = "sent"
+	// verdictSend は送っていないと確定した（同じ段階 ID で送る）。
+	verdictSend Verdict = "send"
+	// verdictUnknown は送ったか確定できない（自動では送らない）。
+	verdictUnknown Verdict = "unknown"
+	// verdictStop は複数ある・読めない（止めて、確かめ方を表示する）。
+	verdictStop Verdict = "stop"
 )
 
 // Listing はホストの一覧をどこまで読めたか。
@@ -34,8 +34,8 @@ const (
 	ListFailed
 )
 
-// RecentWindow は、作成直後は一覧への反映が遅れうるので 0 件でも未送信と確定しない長さ。
-const RecentWindow = 120 * time.Second
+// recentWindow は、作成直後は一覧への反映が遅れうるので 0 件でも未送信と確定しない長さ。
+const recentWindow = 120 * time.Second
 
 // atChars は段階の時刻（StampLayout）のうち読む先頭 19 字（LocalStampLayout）。時差は読まず手元の時刻として読む
 // （Python の mktime）。
@@ -59,26 +59,26 @@ const (
 func Reconcile(r *Record, stageID string, found []string, listing Listing, account string, at time.Time) (Verdict, string) {
 	s := r.stage(stageID)
 	if s == nil {
-		return VerdictStop, fmt.Sprintf(whyNoStage, stageID)
+		return verdictStop, fmt.Sprintf(whyNoStage, stageID)
 	}
 	if listing == ListFailed {
-		return VerdictStop, whyNoList
+		return verdictStop, whyNoList
 	}
 	if len(found) > 1 {
-		return VerdictStop, fmt.Sprintf(whyMany, len(found))
+		return verdictStop, fmt.Sprintf(whyMany, len(found))
 	}
 	if len(found) == 1 {
-		return VerdictSent, ""
+		return verdictSent, ""
 	}
-	if s.Account != "" && account != "" && s.Account != account {
-		return VerdictUnknown, fmt.Sprintf(whyOtherUser, s.Account, account)
+	if s.account != "" && account != "" && s.account != account {
+		return verdictUnknown, fmt.Sprintf(whyOtherUser, s.account, account)
 	}
 	if listing == ListedPart {
-		return VerdictUnknown, whyPartial
+		return verdictUnknown, whyPartial
 	}
-	tried, err := time.ParseInLocation(fsio.LocalStampLayout, pyfmt.Head(s.At, atChars), time.Local)
-	if s.Tries != 0 && err == nil && at.Sub(tried) < RecentWindow {
-		return VerdictUnknown, whyRecent
+	tried, err := time.ParseInLocation(fsio.LocalStampLayout, pyfmt.Head(s.at, atChars), time.Local)
+	if s.tries != 0 && err == nil && at.Sub(tried) < recentWindow {
+		return verdictUnknown, whyRecent
 	}
-	return VerdictSend, ""
+	return verdictSend, ""
 }

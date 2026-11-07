@@ -17,14 +17,14 @@ func TestRuleFormOfWhen(t *testing.T) {
 	}
 	rs, _ := rules.Parse(data.(*yaml.Map), "/w")
 	f := ruleForm(rs.Deny[0])
-	if f.Kind != rules.WhenKey {
-		t.Fatalf("kind %q", f.Kind)
+	if f.kind != rules.WhenKey {
+		t.Fatalf("kind %q", f.kind)
 	}
 	// kind が when を言うので、written に `when: ` は重ねない（画面の「when when:」を避ける）
-	if !strings.HasPrefix(f.Written, "any(") {
-		t.Errorf("written %q", f.Written)
+	if !strings.HasPrefix(f.written, "any(") {
+		t.Errorf("written %q", f.written)
 	}
-	got, _ := pyjson.Dumps(f.When, pyjson.Options{})
+	got, _ := pyjson.Dumps(f.when, pyjson.Options{})
 	want := `{"any": [{"glob": "*.pem"}, {"all": [{"glob": "*/secrets/*"}, {"not": {"glob": "*.md"}}]}]}`
 	if got != want {
 		t.Errorf("when %s", got)

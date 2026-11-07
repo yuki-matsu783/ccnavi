@@ -47,7 +47,7 @@ func headText(treeRoot, rel string) (string, bool) {
 	if code != 0 || ospath.Strip(out) == "" {
 		return "", false
 	}
-	parts := strings.FieldsFunc(out, ospath.IsSpace)
+	parts := ospath.Fields(out)
 	if len(parts) < 2 || !regularModes[parts[0]] || parts[1] != "blob" {
 		return "", false
 	}
@@ -64,7 +64,7 @@ func RecordBlocked(stderr io.Writer, conf *config.Settings, root string, found *
 	if !Applies(conf, root, found) {
 		return false
 	}
-	rel := RecordRel(found.ID)
+	rel := recordRel(found.ID)
 	text, ok := headText(tree.WorktreePath(root, found.ID), rel)
 	if !ok || ospath.Strip(text) == "" {
 		write(stderr, "ccnavi: "+found.ID+" の気づきの記録（"+rel+"）が、子のブランチの HEAD に無いか、"+
@@ -123,11 +123,11 @@ func ParentBlocked(stderr io.Writer, conf *config.Settings, root string, found *
 
 // WriteBroken は直せない記録を名指しする。統合では直せない。
 func WriteBroken(stderr io.Writer, found *Pending) {
-	for _, p := range found.Unreadable {
-		write(stderr, "ccnavi: 気づきの記録 "+p.Path+" を読み取れない: "+p.Why+"\n")
+	for _, p := range found.unreadable {
+		write(stderr, "ccnavi: 気づきの記録 "+p.path+" を読み取れない: "+p.why+"\n")
 	}
-	for _, p := range found.Inconsistent {
-		write(stderr, "ccnavi: 気づきの記録 "+p.Path+" が整合の検査にヒットする: "+p.Why+"\n")
+	for _, p := range found.inconsistent {
+		write(stderr, "ccnavi: 気づきの記録 "+p.path+" が整合の検査にヒットする: "+p.why+"\n")
 	}
 	write(stderr, "  統合では直せない。記録を直して（訂正や追加は新しい節を足す。処理済みの節の本文は"+
 		"書き換えない）コミットしてから打ち直してください\n")

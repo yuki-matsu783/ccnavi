@@ -14,11 +14,11 @@ import (
 	"ccnavi/internal/infra/pyjson"
 )
 
-// Version は記録の形の版。読むときに違えば壊れた記録として扱う。
-const Version = 1
+// version は記録の形の版。読むときに違えば壊れた記録として扱う。
+const version = 1
 
-// DirName は state の下の置き場の名前（records/prune も同じ名前を残す側に数える）。
-const DirName = config.OpsDir
+// dirName は state の下の置き場の名前（records/prune も同じ名前を残す側に数える）。
+const dirName = config.OpsDir
 
 // idLen は操作ID の桁数（uuid4().hex と同じ 32 桁の 16 進）。
 const idLen = 32
@@ -31,13 +31,13 @@ type Kind string
 
 const (
 	KindDecide     Kind = "decide"
-	KindCloseEarly Kind = "close-early"
-	KindRequest    Kind = "request"
-	KindComment    Kind = "comment"
-	KindReady      Kind = "ready"
+	kindCloseEarly Kind = "close-early"
+	kindRequest    Kind = "request"
+	kindComment    Kind = "comment"
+	kindReady      Kind = "ready"
 )
 
-var kinds = []Kind{KindDecide, KindCloseEarly, KindRequest, KindComment, KindReady}
+var kinds = []Kind{KindDecide, kindCloseEarly, kindRequest, kindComment, kindReady}
 
 // State は送信の段階の状態。
 type State string
@@ -47,11 +47,11 @@ const (
 	StatePending State = "pending"
 	// StateSent は送ったと確かめた。戻さない。
 	StateSent State = "sent"
-	// StateUnknown は送ったか確定できない。自動では送り直さない。
-	StateUnknown State = "unknown"
+	// stateUnknown は送ったか確定できない。自動では送り直さない。
+	stateUnknown State = "unknown"
 )
 
-var states = []State{StatePending, StateSent, StateUnknown}
+var states = []State{StatePending, StateSent, stateUnknown}
 
 // StageKind は段階の種類。Begin は検めない（sh が渡す種類をそのまま残す）。
 type StageKind string
@@ -60,16 +60,16 @@ const (
 	StageReply   StageKind = "reply" // スレッドへの返信・解決
 	StageIssue   StageKind = "issue"
 	StageComment StageKind = "comment"
-	StageMR      StageKind = "mr"
-	StagePush    StageKind = "push"
-	StageDraft   StageKind = "draft"
+	stageMR      StageKind = "mr"
+	stagePush    StageKind = "push"
+	stageDraft   StageKind = "draft"
 )
 
 // Error は記録を読み書きできない、または形が合わない。Error() は Python の str(OpError) と同じ文。
 // このパッケージが返すエラーはすべてこの型。
-type Error struct{ Msg string }
+type Error struct{ msg string }
 
-func (e *Error) Error() string { return e.Msg }
+func (e *Error) Error() string { return e.msg }
 
 func fail(format string, args ...any) error { return &Error{fmt.Sprintf(format, args...)} }
 
@@ -92,12 +92,12 @@ const (
 // Stage は送信の段階 1 つ。
 type Stage struct {
 	ID      string
-	Kind    StageKind
+	kind    StageKind
 	State   State
 	URL     string
-	Account string
-	Tries   int
-	At      string
+	account string
+	tries   int
+	at      string
 }
 
 // StageSpec は Begin に渡す段階（送る順に並べる）。
@@ -114,14 +114,14 @@ type Record struct {
 	Parent      string
 	Phase       int
 	MR          int
-	RequestHead string
+	requestHead string
 	Shown       []any
 	Choices     *pyjson.Object
 	Plan        *pyjson.Object
 	Applied     *pyjson.Object
 	Stages      []Stage
-	CreatedAt   string
-	UpdatedAt   string
+	createdAt   string
+	updatedAt   string
 	// Broken は Pending だけが入れる。読めなかった記録の理由（ID のほかの欄は空）。
 	Broken string
 }
@@ -137,8 +137,8 @@ func (r *Record) Unfinished() []Stage {
 	return out
 }
 
-// Finished はすべての段階が Sent か。
-func (r *Record) Finished() bool { return len(r.Unfinished()) == 0 }
+// finished はすべての段階が Sent か。
+func (r *Record) finished() bool { return len(r.Unfinished()) == 0 }
 
 // untouched は、どの段階も送っておらず、ローカルにも何も適用していない記録か。
 func (r *Record) untouched() bool {
@@ -167,8 +167,8 @@ func (r *Record) Object() *pyjson.Object {
 	stages := make([]any, 0, len(r.Stages))
 	for _, s := range r.Stages {
 		stages = append(stages, pyjson.NewObject(
-			"id", s.ID, "kind", string(s.Kind), "state", string(s.State),
-			"url", s.URL, "account", s.Account, "tries", s.Tries, "at", s.At,
+			"id", s.ID, "kind", string(s.kind), "state", string(s.State),
+			"url", s.URL, "account", s.account, "tries", s.tries, "at", s.at,
 		))
 	}
 	shown := r.Shown
@@ -176,21 +176,21 @@ func (r *Record) Object() *pyjson.Object {
 		shown = []any{}
 	}
 	return pyjson.NewObject(
-		"version", Version,
+		"version", version,
 		"id", r.ID,
 		"kind", string(r.Kind),
 		"repo", orEmpty(r.Repo),
 		"parent", r.Parent,
 		"phase", r.Phase,
 		"mr", r.MR,
-		"request_head", r.RequestHead,
+		"request_head", r.requestHead,
 		"shown", shown,
 		"choices", orEmpty(r.Choices),
 		"plan", orEmpty(r.Plan),
 		"applied", orEmpty(r.Applied),
 		"stages", stages,
-		"created_at", r.CreatedAt,
-		"updated_at", r.UpdatedAt,
+		"created_at", r.createdAt,
+		"updated_at", r.updatedAt,
 	)
 }
 
@@ -244,7 +244,7 @@ func newID() string { return digest.RandomHex(digest.UUIDBytes) }
 
 func now() string { return time.Now().Format(fsio.StampLayout) }
 
-func dir(state string) string { return ospath.Join(state, DirName) }
+func dir(state string) string { return ospath.Join(state, dirName) }
 
 func recordPath(state, id string) string { return ospath.Join(dir(state), id+fsio.JSONExt) }
 
@@ -252,7 +252,7 @@ func recordPath(state, id string) string { return ospath.Join(dir(state), id+fsi
 // 段階とマップの欄の型も確かめる（合わなければ形が合わない記録として止める）。
 func fromObject(id string, o *pyjson.Object) (*Record, error) {
 	bad := fail(msgBadShape, id)
-	if !pyfmt.EqualsInt(o.Value("version"), Version) {
+	if !pyfmt.EqualsInt(o.Value("version"), version) {
 		return nil, bad
 	}
 	if got, ok := o.Value("id").(string); !ok || got != id {
@@ -266,9 +266,9 @@ func fromObject(id string, o *pyjson.Object) (*Record, error) {
 		ID:          id,
 		Kind:        Kind(o.String("kind")),
 		Parent:      o.String("parent"),
-		RequestHead: o.String("request_head"),
-		CreatedAt:   o.String("created_at"),
-		UpdatedAt:   o.String("updated_at"),
+		requestHead: o.String("request_head"),
+		createdAt:   o.String("created_at"),
+		updatedAt:   o.String("updated_at"),
 	}
 	r.Phase, _ = pyfmt.IntOf(o.Value("phase"))
 	r.MR, _ = pyfmt.IntOf(o.Value("mr"))
@@ -295,15 +295,15 @@ func fromObject(id string, o *pyjson.Object) (*Record, error) {
 		}
 		tries, _ := pyfmt.IntOf(s.Value("tries"))
 		r.Stages = append(r.Stages, Stage{
-			ID: s.String("id"), Kind: StageKind(s.String("kind")), State: State(s.String("state")),
-			URL: s.String("url"), Account: s.String("account"), Tries: tries, At: s.String("at"),
+			ID: s.String("id"), kind: StageKind(s.String("kind")), State: State(s.String("state")),
+			URL: s.String("url"), account: s.String("account"), tries: tries, at: s.String("at"),
 		})
 	}
 	return r, nil
 }
 
 func newStage(spec StageSpec) Stage {
-	return Stage{ID: spec.ID, Kind: spec.Kind, State: StatePending}
+	return Stage{ID: spec.ID, kind: spec.Kind, State: StatePending}
 }
 
 func knownKind(k Kind) bool   { return slices.Contains(kinds, k) }

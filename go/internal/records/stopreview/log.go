@@ -44,7 +44,7 @@ func (s Store) LogNoKey(who Side) {
 
 // LogPlanTimeout は判定役が計画を待ち切れなかったことを数える。
 func (s Store) LogPlanTimeout(key string) {
-	s.logEvent(eventTimeout, pyjson.NewObject(keyAttemptID, AttemptID(key, false)))
+	s.logEvent(eventTimeout, pyjson.NewObject(keyAttemptID, attemptID(key, false)))
 }
 
 // LogSuspected は記録外の停止の疑いを数える。ほかの hook による継続を含みうるので、疑いとして数える。
@@ -54,7 +54,7 @@ func (s Store) LogSuspected(session, key string) {
 
 // LastStop は前の Stop で ccnavi の促しか差し戻しが出たか。次の Stop で、記録外の停止の疑いを決めるのに読む。
 type LastStop struct {
-	Key      string
+	key      string
 	Nudged   bool
 	SentBack bool
 	t        any // 書いた時刻をそのまま持ち越す（差し戻しの印を足すときに書き直さない）
@@ -86,7 +86,7 @@ func (s Store) LastStop(session string) (LastStop, bool) {
 		t = 0.0
 	}
 	return LastStop{
-		Key:      obj.String("key"),
+		key:      obj.String("key"),
 		Nudged:   pyfmt.Truthy(obj.Value("nudged")),
 		SentBack: pyfmt.Truthy(obj.Value("sent_back")),
 		t:        t,
@@ -96,7 +96,7 @@ func (s Store) LastStop(session string) (LastStop, bool) {
 // markSentBack は差し戻したことを、同じ Stop の記録に足す。
 func (s Store) markSentBack(key string) {
 	session, _, _ := strings.Cut(key, ":")
-	if last, ok := s.LastStop(session); ok && last.Key == key {
+	if last, ok := s.LastStop(session); ok && last.key == key {
 		s.noteLastStop(session, key, last.Nudged, true, last.t)
 	}
 }

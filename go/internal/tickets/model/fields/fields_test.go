@@ -66,7 +66,7 @@ func TestFieldsMatchPython(t *testing.T) {
 			held = []string{}
 		}
 		got.Held = append(got.Held, held)
-		for _, drop := range [][]string{ticket.ScriptFields, {"base_sha"}, nil} {
+		for _, drop := range [][]string{ticket.ScriptFields(), {"base_sha"}, nil} {
 			s, ok := ScriptShape(text, drop)
 			got.Shape = append(got.Shape, []any{ok, s})
 		}
@@ -92,12 +92,12 @@ func TestFieldsMatchPython(t *testing.T) {
 func TestShapeIgnoresWhatTheScriptWrote(t *testing.T) {
 	before := "---\nticket: a\nallow:\n  - glob: x\nstarted_at: \"\"\n---\n本文\n"
 	after := SetFields(before, [][2]string{{"started_at", "t"}, {"merged_sha", "m"}})
-	a, _ := ScriptShape(before, ticket.ScriptFields)
-	b, _ := ScriptShape(after, ticket.ScriptFields)
+	a, _ := ScriptShape(before, ticket.ScriptFields())
+	b, _ := ScriptShape(after, ticket.ScriptFields())
 	if a != b {
 		t.Fatalf("%q != %q", a, b)
 	}
-	changed, _ := ScriptShape(strings.Replace(after, "glob: x", "glob: y", 1), ticket.ScriptFields)
+	changed, _ := ScriptShape(strings.Replace(after, "glob: x", "glob: y", 1), ticket.ScriptFields())
 	if changed == a {
 		t.Fatal("範囲が変わっても同じ内容に見える")
 	}

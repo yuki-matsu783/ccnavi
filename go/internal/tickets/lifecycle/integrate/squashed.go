@@ -44,7 +44,7 @@ func SquashedPaths(conf *config.Settings, root, project, top, base string) map[s
 		if strings.HasPrefix(n, ".") {
 			continue
 		}
-		r := doneCopy{n, ReadRecord(ospath.Join(ddir, n), FirstKept)}
+		r := doneCopy{n, ReadRecord(ospath.Join(ddir, n), firstKept)}
 		if r.fields["branch"] == n {
 			records = append(records, r)
 		}
@@ -172,12 +172,12 @@ func sameButHandoff(top, left, right string) bool {
 	return true
 }
 
-// copyIsBound はその名前のチケットに結び付くか（BoundCheck と同じ材料。設定の置き場・全ツリー・退避を大文字小文字を
+// copyIsBound はその名前のチケットに結び付くか（boundCheck と同じ材料。設定の置き場・全ツリー・退避を大文字小文字を
 // 畳んで見る）、origin に同名のブランチが在るか。結び付くなら片付けた記録のコピーを信用しない。片付けの後は
-// ワークツリーが無く BoundCheck の親のブランチの確かめが効かないので、親のブランチは参照で見分ける。決められない
+// ワークツリーが無く boundCheck の親のブランチの確かめが効かないので、親のブランチは参照で見分ける。決められない
 // ものは結び付くと読む（外さずに報告する側に倒す）。
 func copyIsBound(conf *config.Settings, root, project, top, name string) bool {
-	if reason, unsure := BoundCheck(conf, root, tree.Tree{Name: name, Project: project}, time.Time{}); reason != "" || unsure {
+	if reason, unsure := boundCheck(conf, root, tree.Tree{Name: name, Project: project}, time.Time{}); reason != "" || unsure {
 		return true
 	}
 	return git.Run(top, []string{"show-ref", "--verify", "--quiet", "refs/remotes/origin/" + name}, git.Options{}).OK()

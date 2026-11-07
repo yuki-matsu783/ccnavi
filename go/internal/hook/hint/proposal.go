@@ -49,7 +49,7 @@ func ProposalHint(conf *config.Settings, root string, in hookio.Input) string {
 	if v := in.ToolInput.Value("file_path"); pyfmt.Truthy(v) {
 		raw = pyfmt.Str(v)
 	}
-	if !pathcase.HasExt(raw, ".md") || conf.Tickets == "" {
+	if !pathcase.HasExt(raw, config.MdExt) || conf.Tickets == "" {
 		return ""
 	}
 	cwd := in.Cwd

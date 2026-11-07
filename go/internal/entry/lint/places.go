@@ -15,21 +15,21 @@ import (
 // 置き場の検査。プロジェクトの置き場が正しい形か、走査されないチケットの置き場が残っていないかを見る。
 
 // trackedLead は projects/ がワークスペースの git の索引に載っているときの warn の先頭の句（%s は置き場）。ぶつかりと
-// 載せ忘れで共通にする。導入スクリプト（ccnavi-setup.sh）がこの句で見分けるので、変えるならそちらも直す。
-// 載せ忘れは句の直後が `（入れ子のリポジトリとして` になる。
+// 載せ忘れで共通にする。載せ忘れは句の直後が `（入れ子のリポジトリとして` になる。導入スクリプト（ccnavi-setup.sh）は
+// 実行ファイルを起こさずに同じ文面を組むので、変えるならそちらも直す（tests/sh/test_setup.py が文面全体の一致を見る）。
 const trackedLead = "`%s/` はワークスペースの git が追跡している"
 
 // 置き場の苦情の種類。`--lint --json` の problems[].kind に載り、VS Code 拡張のプロジェクト管理画面は文面でなく
 // これで見分ける（索引に載っている・無視されていない）。
 const (
-	KindProjectsTracked   = "projects-tracked"
-	KindProjectsUnignored = "projects-unignored"
+	kindProjectsTracked   = "projects-tracked"
+	kindProjectsUnignored = "projects-unignored"
 )
 
 // gitlinkMode は索引の mode のうち gitlink（入れ子のリポジトリを 1 つの版として載せたもの）。
 const gitlinkMode = "160000"
 
-// shSpecial は sh が語を割る・展開する文字。導入スクリプトの sh_word が同じ集合を持つ。
+// shSpecial は sh が語を割る・展開する文字。導入スクリプトの sh_word が同じ集合を持つ（TestShWordAgreesWithTheSetupSh が比べる）。
 const shSpecial = " \t\n'\"\\$`!*?[](){}<>|&;#~"
 
 // projectPlaces はプロジェクトの置き場が正しい形か。置き場が索引に載っていればそれを言い、載っていなければ git で
@@ -43,18 +43,18 @@ func projectPlaces(conf *config.Settings, root string) []rules.Problem {
 		indexed, isIndexed = inIndex(root, rel)
 	}
 	if isIndexed {
-		out = append(out, rules.Problem{Severity: rules.Warn, Rule: whereProjects, Detail: indexed, Kind: KindProjectsTracked})
+		out = append(out, rules.Problem{Severity: rules.Warn, Rule: whereProjects, Detail: indexed, Kind: kindProjectsTracked})
 	}
 	// 末尾の `/` は付けない。projects がリンクだと git が `projects/` を rc=128 で断る。
 	if rel != "" && !isIndexed && ospath.IsDir(conf.Projects) {
 		if ignored, known := isIgnored(root, rel); known && !ignored {
 			out = append(out, rules.Problem{Severity: rules.Warn, Rule: whereProjects, Detail: rel +
 				"/ がワークスペースの git で無視されていない。プロジェクトは自分の git を持つので、ワークスペースの `.gitignore` に入れてください",
-				Kind: KindProjectsUnignored})
+				Kind: kindProjectsUnignored})
 		}
 	}
-	quoted := make([]string, len(config.ReservedLayerNames))
-	for i, name := range config.ReservedLayerNames {
+	quoted := make([]string, len(config.ReservedLayerNames()))
+	for i, name := range config.ReservedLayerNames() {
 		quoted[i] = "`" + name + "`"
 	}
 	for _, p := range tree.Projects(conf.Projects) {

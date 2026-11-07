@@ -35,8 +35,8 @@ const (
 type Kind string
 
 const (
-	DirtyParent  Kind = "dirty_parent"
-	UnpushedCode Kind = "unpushed_code"
+	dirtyParent  Kind = "dirty_parent"
+	unpushedCode Kind = "unpushed_code"
 )
 
 // watch は 1 つの操作が見るもの。dirty は未コミットの変更を見るか、ignorePlaces は未 push を置き場の外のパスだけで数えるか、strict は読めない
@@ -63,12 +63,12 @@ var watches = map[Op]watch{
 	Reviewed: {unpushed: true, ignorePlaces: true, strict: true},
 }
 
-// Refusal は操作を止める理由 1 件。Paths は理由になったパス（未 push で置き場を数えないときは sha）。
+// Refusal は操作を止める理由 1 件。paths は理由になったパス（未 push で置き場を数えないときは sha）。
 type Refusal struct {
 	Kind   Kind
 	Reason string
 	Hints  []string
-	Paths  []string
+	paths  []string
 }
 
 // Line は理由と次の一手を 1 つにつないだ文。
@@ -139,9 +139,9 @@ func DiffPaths(treeRoot, ref string) ([]string, string) {
 	return paths, ""
 }
 
-// Unpushed は origin/<branch> より進んでいる分（進んでいなければ空）。読めなければ ok が偽。
+// unpushed は origin/<branch> より進んでいる分（進んでいなければ空）。読めなければ ok が偽。
 // ignorePlaces なら進んだ分が変えた置き場の外のパスを、そうでなければ進んだコミットの sha を返す。
-func Unpushed(treeRoot string, conf *config.Settings, branch string, ignorePlaces bool) ([]string, bool) {
+func unpushed(treeRoot string, conf *config.Settings, branch string, ignorePlaces bool) ([]string, bool) {
 	done := git.Run(treeRoot, []string{"rev-list", "origin/" + branch + "..HEAD"}, git.Options{Timeout: git.MergeTimeout})
 	if !done.OK() {
 		return nil, false
@@ -167,7 +167,7 @@ func Unpushed(treeRoot string, conf *config.Settings, branch string, ignorePlace
 // ルート（承認の依頼の文に載せるコマンドのパス）。PlainDirty なら未コミットをミラーのずれに分けず、ふつうの
 // 変更として言う（ワークスペース自身の親の finish）。
 type Options struct {
-	Branch     string
+	branch     string
 	Root       string
 	PlainDirty bool
 }
@@ -180,7 +180,7 @@ func Check(op Op, treeRoot string, conf *config.Settings, o Options) []Refusal {
 		found = dirtyRefusals(op, w, treeRoot, conf, o)
 	}
 	if w.unpushed {
-		found = append(found, unpushedRefusal(op, w, treeRoot, conf, o.Branch)...)
+		found = append(found, unpushedRefusal(op, w, treeRoot, conf, o.branch)...)
 	}
 	return found
 }
@@ -194,7 +194,7 @@ func dirtyRefusals(op Op, w watch, treeRoot string, conf *config.Settings, o Opt
 			if op == Finish {
 				tail = "。何も変えずに止めた"
 			}
-			return []Refusal{{Kind: DirtyParent, Reason: "親のワークツリーの状態を読めない" + tail}}
+			return []Refusal{{Kind: dirtyParent, Reason: "親のワークツリーの状態を読めない" + tail}}
 		}
 	case len(paths) > 0:
 		return []Refusal{DirtyRefusal(op, treeRoot, conf, paths, o.Root, !o.PlainDirty)}
@@ -240,7 +240,7 @@ func DirtyRefusal(op Op, treeRoot string, conf *config.Settings, paths []string,
 	if len(mirrored) > 0 {
 		hints = append(hints, mirror.Ask)
 	}
-	return Refusal{Kind: DirtyParent, Reason: reason, Hints: hints, Paths: paths}
+	return Refusal{Kind: dirtyParent, Reason: reason, Hints: hints, paths: paths}
 }
 
 // approvalDirty は承認を頼むときと承認の結果を知らせるときの文。承認のあとは親のワークツリーへの書き込みが断られる。
@@ -256,7 +256,7 @@ func approvalDirty(treeRoot string, paths []string, root string) Refusal {
 		"残す変更は、子のワークツリーへ移してコミットする。" +
 		"要らない変更は、パスを 1 つずつ名指しして戻す。例: " + restore
 	hint := "親のワークツリーの変更を片付けて、approval-request を打ち直す（何も送っていません）"
-	return Refusal{Kind: DirtyParent, Reason: reason, Hints: []string{hint}, Paths: paths}
+	return Refusal{Kind: dirtyParent, Reason: reason, Hints: []string{hint}, paths: paths}
 }
 
 func unpushedRefusal(op Op, w watch, treeRoot string, conf *config.Settings, branch string) []Refusal {
@@ -268,9 +268,9 @@ func unpushedRefusal(op Op, w watch, treeRoot string, conf *config.Settings, bra
 		if !w.strict {
 			return nil
 		}
-		return []Refusal{{Kind: UnpushedCode, Reason: "親ブランチの名前を読めない"}}
+		return []Refusal{{Kind: unpushedCode, Reason: "親ブランチの名前を読めない"}}
 	}
-	ahead, ok := Unpushed(treeRoot, conf, name, w.ignorePlaces)
+	ahead, ok := unpushed(treeRoot, conf, name, w.ignorePlaces)
 	if !ok && !w.strict {
 		return nil
 	}
@@ -280,14 +280,14 @@ func unpushedRefusal(op Op, w watch, treeRoot string, conf *config.Settings, bra
 	if op == ApprovalRequest {
 		return []Refusal{approvalUnpushed(ahead)}
 	}
-	return []Refusal{{Kind: UnpushedCode, Reason: "親ブランチの HEAD が push されていない", Paths: ahead}}
+	return []Refusal{{Kind: unpushedCode, Reason: "親ブランチの HEAD が push されていない", paths: ahead}}
 }
 
 func approvalUnpushed(paths []string) Refusal {
 	reason := fmt.Sprintf("親のブランチに未 push のコードの変更が%d件ある（%sなど）。", len(paths), strings.Join(paths[:min(len(paths), shownUnpushed)], "、")) +
 		"approval-request は提案だけを送るので、止めた。"
 	hint := "コードは先に送るか、手元の変更を整理してから approval-request を打ち直す（何も送っていません）"
-	return Refusal{Kind: UnpushedCode, Reason: reason, Hints: []string{hint}, Paths: paths}
+	return Refusal{Kind: unpushedCode, Reason: reason, Hints: []string{hint}, paths: paths}
 }
 
 // nameOf はワークツリーの名前（親の識別子）。

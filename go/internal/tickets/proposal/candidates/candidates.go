@@ -117,7 +117,7 @@ func Candidates(conf *config.Settings, root string, pending, revisions, approved
 		if !t.IsChild() && t.HasPlan() {
 			t.Workflow = phases.Compute(t)
 		}
-		types := TypesFrom(t, pool)
+		types := typesFrom(t, pool)
 		missing := ""
 		if t.IsChild() && pool[t.Parent] == nil {
 			missing = ParentElsewhereText(conf, root, t, nil)
@@ -235,8 +235,8 @@ func feedbackNotes(parent *ticket.Ticket) []string {
 	return nil
 }
 
-// TypesFrom はこのチケットに使う定義。親ならそのコピー、子なら親のコピー（親が引けなければ nil）。
-func TypesFrom(t *ticket.Ticket, pool map[string]*ticket.Ticket) *phases.Types {
+// typesFrom はこのチケットに使う定義。親ならそのコピー、子なら親のコピー（親が引けなければ nil）。
+func typesFrom(t *ticket.Ticket, pool map[string]*ticket.Ticket) *phases.Types {
 	if t.IsChild() {
 		if parent := pool[t.Parent]; parent != nil {
 			return phases.TypesOf(parent)

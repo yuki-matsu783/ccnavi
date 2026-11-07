@@ -94,7 +94,7 @@ func TestFold(t *testing.T) {
 		{"承認済みの正が決まらなければ全部残す", []*Ticket{stale, home}, []*Ticket{at("p-01-01", "p", "x", "", place.Doing)}, []string{"p-01-01:todo", "p:todo"}},
 	}
 	for _, c := range cases {
-		if got := places(Fold(c.hits, c.approved)); !reflect.DeepEqual(got, c.want) {
+		if got := places(fold(c.hits, c.approved)); !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%s: %v", c.name, got)
 		}
 	}

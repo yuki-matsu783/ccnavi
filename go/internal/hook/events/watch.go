@@ -65,7 +65,7 @@ func watchedFor(stderr io.Writer, conf *config.Settings, root string, record *au
 	} else {
 		trees = []tree.Tree{ws}
 		where := in.Cwd
-		if slices.Contains(config.PathTools, in.ToolName) {
+		if slices.Contains(config.PathTools(), in.ToolName) {
 			where = record.Subject
 		}
 		if t, ok := tree.TreeOf(root, where, conf.Projects); ok && t.Root != ws.Root {

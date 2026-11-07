@@ -12,15 +12,15 @@ import (
 	"ccnavi/internal/tickets/model/ids"
 )
 
-// StopKind は止める理由の種別。案内（Guidance）は文面ではなくこれで分ける。値は文面ファイルの場合の名前。
-type StopKind string
+// stopKind は止める理由の種別。案内（Guidance）は文面ではなくこれで分ける。値は文面ファイルの場合の名前。
+type stopKind string
 
 const (
-	StopNone      StopKind = ""
-	StopBusy      StopKind = "busy"      // 親のワークツリーに途中の操作がある
-	StopMismatch  StopKind = "mismatch"  // HEAD のブランチ名を変換した識別子がフォルダ名と合わない
-	StopAbsent    StopKind = "absent"    // 親のワークツリーがない
-	StopAmbiguous StopKind = "ambiguous" // 同じ識別子の親が複数のリポジトリにある
+	stopNone      stopKind = ""
+	stopBusy      stopKind = "busy"      // 親のワークツリーに途中の操作がある
+	stopMismatch  stopKind = "mismatch"  // HEAD のブランチ名を変換した識別子がフォルダ名と合わない
+	stopAbsent    stopKind = "absent"    // 親のワークツリーがない
+	stopAmbiguous stopKind = "ambiguous" // 同じ識別子の親が複数のリポジトリにある
 )
 
 // textStanding は止めたときの解き方の文の識別子。
@@ -29,7 +29,7 @@ const textStanding = "NEXT_STANDING"
 // branchPlaceholder は HEAD から親のブランチ名を読めなかったときに文に出す名前。
 const branchPlaceholder = "<ブランチ名>"
 
-// Standing は親子のチケットの立ち位置。Stop は決まらないので止める理由（空なら止めない）、Kind はその種別。
+// Standing は親子のチケットの立ち位置。Stop は決まらないので止める理由（空なら止めない）、kind はその種別。
 // Home は親のワークツリー、Branch はその HEAD から読んだ親のブランチ名（読めなければ空）、Head は合わないときの
 // ワークツリーの HEAD の生のブランチ名。
 type Standing struct {
@@ -38,8 +38,8 @@ type Standing struct {
 	Home   *tree.Tree
 	Stop   string
 	Branch string
-	Kind   StopKind
-	Head   string
+	kind   stopKind
+	head   string
 }
 
 // BranchName は文に出す親のブランチ名。HEAD から読めなければ `<ブランチ名>`。
@@ -104,7 +104,7 @@ func (f *Families) StandingAny(family string) Standing {
 	}
 	first := f.Standing(family, tree.ProjectOfKey(repos[0]))
 	return Standing{
-		Family: family, Repo: first.Repo, Kind: StopAmbiguous,
+		Family: family, Repo: first.Repo, kind: stopAmbiguous,
 		Stop: "親子のチケット " + family + " が複数のリポジトリ（" + strings.Join(repos, ", ") + "）にある。どれか決まらない",
 	}
 }
@@ -118,9 +118,9 @@ func containsString(list []string, s string) bool {
 	return false
 }
 
-// HomeTree は親のワークツリー（名前が親の識別子で、元が同じリポジトリで、HEAD のブランチ名を変換したものが名前と
+// homeTree は親のワークツリー（名前が親の識別子で、元が同じリポジトリで、HEAD のブランチ名を変換したものが名前と
 // 一致するもの）。無ければ nil。
-func (f *Families) HomeTree(family, project string) *tree.Tree {
+func (f *Families) homeTree(family, project string) *tree.Tree {
 	if work := f.named(family, project); work != nil && HeadBranch(work.Root, family) != "" {
 		return work
 	}
@@ -129,7 +129,7 @@ func (f *Families) HomeTree(family, project string) *tree.Tree {
 
 // Branch は親のブランチ名（親のワークツリーの HEAD から読む）。読めない・合わないときは空。
 func (f *Families) Branch(family, project string) string {
-	if home := f.HomeTree(family, project); home != nil {
+	if home := f.homeTree(family, project); home != nil {
 		return HeadBranch(home.Root, family)
 	}
 	return ""
@@ -149,7 +149,7 @@ func (f *Families) named(family, project string) *tree.Tree {
 func (f *Families) read(family, project string) Standing {
 	repo := tree.RepoKey(project)
 	branch := f.Branch(family, project)
-	if home := f.HomeTree(family, project); home != nil {
+	if home := f.homeTree(family, project); home != nil {
 		return Standing{Family: family, Repo: repo, Home: home, Branch: branch}
 	}
 	named := f.named(family, project)
@@ -161,17 +161,17 @@ func (f *Families) read(family, project string) Standing {
 	st := Standing{Family: family, Repo: repo, Branch: branch}
 	switch {
 	case busy != "":
-		st.Kind = StopBusy
+		st.kind = stopBusy
 		st.Stop = "親のワークツリー（" + where + "）に途中の操作（" + busy + "）がある。" +
 			"済ませるか取りやめるまで、どのチケットを正とするかが決まらない"
 	case named != nil:
-		st.Kind = StopMismatch
-		st.Head, _ = tree.BranchOf(named.Root)
+		st.kind = stopMismatch
+		st.head, _ = tree.BranchOf(named.Root)
 		st.Stop = "親のワークツリー（" + where + "）の HEAD のブランチ名を変換した識別子が" +
 			"フォルダ名（" + family + "）と合わない。" +
 			"どのチケットを正とするかが決まらない"
 	default:
-		st.Kind = StopAbsent
+		st.kind = stopAbsent
 		st.Stop = "親のワークツリー（" + where + "）がありません。" +
 			"ほかのツリーのコピーでは代用しない（どのチケットを正とするかが決まらない）"
 	}
@@ -197,13 +197,13 @@ func SameTree(a, b string) bool {
 // Guidance は止めたときの解き方（1 行ずつ）。文は種別ごとに文面ファイルが持つ。呼び手は行の途中や hint の値にも
 // 使うので、見出し（次: ）は外して文だけを返す。
 func Guidance(root string, st Standing) []string {
-	kind := st.Kind
-	if kind != StopBusy && kind != StopMismatch && kind != StopAmbiguous {
-		kind = StopAbsent
+	kind := st.kind
+	if kind != stopBusy && kind != stopMismatch && kind != stopAmbiguous {
+		kind = stopAbsent
 	}
 	now := "（HEAD がブランチを指していない）"
-	if st.Head != "" {
-		now = "（今の HEAD: " + st.Head + "）"
+	if st.head != "" {
+		now = "（今の HEAD: " + st.head + "）"
 	}
 	said := texts.Say(root, textStanding, texts.Values{"name": st.Family, "branch": st.BranchName(), "now": now},
 		texts.Variants{"next": string(kind)})

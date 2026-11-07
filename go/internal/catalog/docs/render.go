@@ -58,13 +58,13 @@ func countLine(shown, matched, total int) string {
 func render(out io.Writer, hits []docindex.Row, matched, total int, f Format) {
 	var b strings.Builder
 	switch f {
-	case FormatCount:
+	case formatCount:
 		b.WriteString(countLine(len(hits), matched, total))
-	case FormatPath:
+	case formatPath:
 		for _, r := range hits {
 			b.WriteString(r.ConceptID() + "\n")
 		}
-	case FormatJSONL:
+	case formatJSONL:
 		for _, r := range hits {
 			b.WriteString(r.Line() + "\n")
 		}
@@ -75,7 +75,7 @@ func render(out io.Writer, hits []docindex.Row, matched, total int, f Format) {
 		}
 		s, _ := pyjson.Dumps(list, pyjson.Options{RawUnicode: true, Indent: jsonIndent})
 		b.WriteString(s + "\n")
-	case FormatDetail:
+	case formatDetail:
 		for _, r := range hits {
 			b.WriteString("- " + r.ConceptID() + "\n" +
 				"  type       : " + oneLine(str(r, fieldType)) + "\n" +

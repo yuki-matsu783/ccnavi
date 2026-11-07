@@ -22,9 +22,9 @@ import (
 // MaxChars は 1 回の応答に載せる本文の上限（文字数）。超えた分は載せず、切ったことを言う。
 const MaxChars = 4000
 
-// OnceKeep は「1 度だけ渡す文」の記憶を残す期間。セッションの開始で消えるのが本筋だが、これは開始が来ないまま
+// onceKeep は「1 度だけ渡す文」の記憶を残す期間。セッションの開始で消えるのが本筋だが、これは開始が来ないまま
 // 終わったセッションの分を掃くための上限である。selfguard のバックアップの期間と同じ 3 日だが、別の約束（Python も別の定数）。
-const OnceKeep = 3 * 24 * time.Hour
+const onceKeep = 3 * 24 * time.Hour
 
 // 記録の名前。
 const (
@@ -71,8 +71,8 @@ func head(full string) ([]rune, error) {
 	return []rune(text), err
 }
 
-// Body はファイルの本文。無ければ空。上限を超えたら先頭だけを返し、切ったことを末尾に書く。
-func Body(stderr io.Writer, bases []string, rel string) string {
+// body はファイルの本文。無ければ空。上限を超えたら先頭だけを返し、切ったことを末尾に書く。
+func body(stderr io.Writer, bases []string, rel string) string {
 	full := Locate(bases, rel)
 	if full == "" {
 		return ""
@@ -189,7 +189,7 @@ func withFile(stderr io.Writer, bases []string, text, rel string) string {
 		parts = append(parts, text)
 	}
 	if rel != "" {
-		if body := Body(stderr, bases, rel); body != "" {
+		if body := body(stderr, bases, rel); body != "" {
 			parts = append(parts, body)
 		}
 	}
@@ -331,7 +331,7 @@ func Forget(stateDir, session string, startup bool) {
 	}
 	own := ospath.Basename(oncePath(stateDir, session, ""))
 	mine := own[:strings.LastIndex(own, "-")+1]
-	cutoff := time.Now().Add(-OnceKeep)
+	cutoff := time.Now().Add(-onceKeep)
 	names, err := ospath.DiskListdir(stateDir)
 	if err != nil {
 		return

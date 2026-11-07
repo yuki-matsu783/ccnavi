@@ -36,7 +36,7 @@ func mustPlan(t *testing.T, s Store, key string, plan Plan, now time.Time) strin
 	return aid
 }
 
-func stateIs(t *testing.T, s Store, aid string, want State) {
+func stateIs(t *testing.T, s Store, aid string, want state) {
 	t.Helper()
 	if got := stateOf(s.readAttempt(aid)); got != want {
 		t.Errorf("試行 %s の状態 = %s, want %s", aid, got, want)
@@ -73,7 +73,7 @@ func TestNonCandidateIsFinalisedByCcnavi(t *testing.T) {
 	if stateOf(a) != done || a.String(keyJudge) != string(judgeCcnavi) || a.String(keyFinal) != string(FinalOutOfScope) {
 		t.Errorf("試行 = %s", dumps(t, a))
 	}
-	if got := begin(t, s, testKey); got != StatusNotCandidate {
+	if got := begin(t, s, testKey); got != statusNotCandidate {
 		t.Errorf("Begin = %s", got)
 	}
 }
@@ -83,7 +83,7 @@ func TestMaterialBeforePlan(t *testing.T) {
 	if status, _, err := s.Begin(testKey, time.Unix(1, 0)); status != StatusWait || err != nil {
 		t.Fatalf("Begin = %s, %v", status, err)
 	}
-	aid := AttemptID(testKey, false)
+	aid := attemptID(testKey, false)
 	stateIs(t, s, aid, planWait)
 	mustPlan(t, s, testKey, basePlan(), time.Unix(2, 0))
 	stateIs(t, s, aid, pending)
@@ -120,7 +120,7 @@ func TestExpiry(t *testing.T) {
 	if stateOf(a) != expired || a.String(keyFinal) != string(FinalUnchecked) || a.String(keyReason) != string(reasonExpired) {
 		t.Errorf("試行 = %s", dumps(t, a))
 	}
-	if got := begin(t, s, testKey); got != StatusExpired {
+	if got := begin(t, s, testKey); got != statusExpired {
 		t.Errorf("Begin = %s", got)
 	}
 }
@@ -174,7 +174,7 @@ func TestPlanWaitExpiresAndALateNonCandidatePlanIsFinalised(t *testing.T) {
 	if _, _, err := s.Begin(testKey, time.Unix(0, 0)); err != nil {
 		t.Fatal(err)
 	}
-	if got := s.ExpireOverdue(time.Unix(1_000_000, 0)); !slices.Equal(got, []string{AttemptID(testKey, false)}) {
+	if got := s.ExpireOverdue(time.Unix(1_000_000, 0)); !slices.Equal(got, []string{attemptID(testKey, false)}) {
 		t.Errorf("ExpireOverdue = %v", got)
 	}
 	other := "s1:other"
@@ -190,7 +190,7 @@ func TestPlanWaitExpiresAndALateNonCandidatePlanIsFinalised(t *testing.T) {
 
 func TestUnreadableExistingAttemptIsClosedUnchecked(t *testing.T) {
 	s := newStore(t)
-	aid := AttemptID(testKey, false)
+	aid := attemptID(testKey, false)
 	writeFile(t, s.attemptPath(aid), "{broken")
 	mustPlan(t, s, testKey, Plan{IsCandidate: true, Targets: []string{StopTarget}}, time.Now())
 	a := s.readAttempt(aid)
@@ -204,7 +204,7 @@ func TestUnreadableExistingAttemptIsClosedUnchecked(t *testing.T) {
 	// 次の Stop は別のキーなので、新しい試行として始まる。
 	next := testKey + "-next"
 	mustPlan(t, s, next, Plan{IsCandidate: true, Targets: []string{StopTarget}}, time.Now())
-	stateIs(t, s, AttemptID(next, false), pending)
+	stateIs(t, s, attemptID(next, false), pending)
 }
 
 func TestUnwritableAttemptIsReported(t *testing.T) {
@@ -223,8 +223,8 @@ func TestLatePlanForThePreviousStopDoesNotFeedTheNext(t *testing.T) {
 	if got := begin(t, s, newer); got != StatusWait {
 		t.Errorf("Begin = %s", got)
 	}
-	stateIs(t, s, AttemptID(older, false), pending)
-	stateIs(t, s, AttemptID(newer, false), planWait)
+	stateIs(t, s, attemptID(older, false), pending)
+	stateIs(t, s, attemptID(newer, false), planWait)
 	// 最後の行が同じでも、セッションが違えば別の試行。
 	mustPlan(t, s, "s1:same", Plan{IsCandidate: true, Targets: []string{StopTarget}}, time.Now())
 	if got := begin(t, s, "s2:same"); got != StatusWait {

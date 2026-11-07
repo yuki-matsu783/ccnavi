@@ -42,7 +42,7 @@ const askBody = `  RULE_ASK__SAMPLE:
 
 func put(t *testing.T, root, name, body string) {
 	t.Helper()
-	path := filepath.Join(Dir(root), name)
+	path := filepath.Join(dir(root), name)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestFindGivesTheSameEntryAsLoad(t *testing.T) {
 	put(t, root, "c.yml", "version: 1\nmessages: [\n")
 	whole := Load(root).Entries
 	for _, id := range []string{"DENY_SAMPLE", "NEXT_SAMPLE"} {
-		if got := Find(root, id); got == nil || got.Path != whole[id].Path || got.Field(fieldWhat) != whole[id].Field(fieldWhat) {
+		if got := Find(root, id); got == nil || got.path != whole[id].path || got.Field(fieldWhat) != whole[id].Field(fieldWhat) {
 			t.Errorf("%s: %+v / %+v", id, got, whole[id])
 		}
 	}
@@ -96,7 +96,7 @@ func TestFindGivesTheSameEntryAsLoad(t *testing.T) {
 	if got := Find(root, "DENY_SAMPLE"); got == nil || !strings.Contains(got.Field(fieldWhat), "後ろの") {
 		t.Errorf("%+v", got)
 	}
-	if Find(root, "DENY_SAMPLE").Path != Load(root).Entries["DENY_SAMPLE"].Path {
+	if Find(root, "DENY_SAMPLE").path != Load(root).Entries["DENY_SAMPLE"].path {
 		t.Error("Find と Load が違う 1 件を採った")
 	}
 }
@@ -140,10 +140,10 @@ func TestAskReasonsAndDenialsKeepTheFourFields(t *testing.T) {
 	if p := problemText(Load(root)); !strings.Contains(p, "DENY_LOOSE") {
 		t.Error(p)
 	}
-	if got := fieldsFor(RuleAsk, KindDeny); !slices.Equal(got.Required, kindFields[KindDeny].Required) {
+	if got := fieldsFor(ruleAsk, kindDeny); !slices.Equal(got.required, kindFields[kindDeny].required) {
 		t.Error(got)
 	}
-	if got := fieldsFor("RULE_GIT_PUSH", KindDeny); !slices.Equal(got.Optional, ruleLooseFields.Optional) {
+	if got := fieldsFor("RULE_GIT_PUSH", kindDeny); !slices.Equal(got.optional, ruleLooseFields.optional) {
 		t.Error(got)
 	}
 }

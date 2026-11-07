@@ -311,7 +311,7 @@ func TestNewlineOnDisk(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		native = "a\r\nb\r\n"
 	}
-	cases := map[Newline]string{NativeNewline: native, LF: "a\nb\n", CRLF: "a\r\nb\r\n", CR: "a\rb\r"}
+	cases := map[Newline]string{NativeNewline: native, LF: "a\nb\n", crlf: "a\r\nb\r\n", cr: "a\rb\r"}
 	dir := t.TempDir()
 	for nl, want := range cases {
 		for _, how := range []How{Plain, Atomic, Durable} {
@@ -347,7 +347,7 @@ func TestStagingQueuesInsteadOfWriting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := Staging(); !errors.Is(err, ErrNestedStaging) {
+	if _, _, err := Staging(); !errors.Is(err, errNestedStaging) {
 		t.Fatal("入れ子を止めない")
 	}
 	a, b := filepath.Join(dir, "sub", "a.md"), filepath.Join(dir, "b.md")

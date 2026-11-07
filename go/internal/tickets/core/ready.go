@@ -65,7 +65,7 @@ func checkReadiness(conf *config.Settings, root string, ids []string, gathered *
 	var lines []string
 	for _, text := range gathered.Problems {
 		for id := range mine {
-			if strings.Contains(text, "/"+id+".md") {
+			if strings.Contains(text, "/"+id+config.MdExt) {
 				lines = append(lines, linePrefix+text)
 				break
 			}

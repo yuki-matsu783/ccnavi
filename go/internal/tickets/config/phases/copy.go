@@ -18,11 +18,11 @@ import (
 // レビューの要否・成果物は変わらない）。
 
 // ReadCopy は親の phases: を定義に読む。読めない定義は入れずに苦情を返す（読み方と文は phases.yml と同じ。
-// 苦情の rule は定義の id、マップでないときは Where）。
+// 苦情の rule は定義の id、マップでないときは where）。
 func ReadCopy(raw any) (*Types, []rules.Problem) {
 	m, ok := raw.(*yaml.Map)
 	if !ok {
-		return &Types{}, []rules.Problem{problem(rules.Error, Where,
+		return &Types{}, []rules.Problem{problem(rules.Error, where,
 			"`phases:` は定義の id をキーにしたマップで書く（欄は phases.yml の定義と同じ）")}
 	}
 	return readDefs(m)
@@ -74,7 +74,7 @@ func CopyProblems(t *ticket.Ticket) []rules.Problem {
 		_, problems := ReadCopy(t.PhasesRaw)
 		for _, p := range problems {
 			detail := p.Detail
-			if p.Rule != Where {
+			if p.Rule != where {
 				detail = "`phases:` の `" + p.Rule + "`: " + p.Detail
 			}
 			found = append(found, problem(p.Severity, name, detail))

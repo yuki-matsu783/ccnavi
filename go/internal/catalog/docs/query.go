@@ -21,31 +21,31 @@ type Sort string
 
 const (
 	SortPath  Sort = "path"
-	SortMtime Sort = "mtime"
-	SortType  Sort = "type"
-	SortTitle Sort = "title"
+	sortMtime Sort = "mtime"
+	sortType  Sort = "type"
+	sortTitle Sort = "title"
 )
 
 // sortFields は frontmatter の値で並べる並べ方と、その欄。
-var sortFields = map[Sort]string{SortType: fieldType, SortTitle: fieldTitle}
+var sortFields = map[Sort]string{sortType: fieldType, sortTitle: fieldTitle}
 
 // sorts は受ける並べ方（苦情に並べる順）。
-var sorts = []Sort{SortPath, SortMtime, SortType, SortTitle}
+var sorts = []Sort{SortPath, sortMtime, sortType, sortTitle}
 
 // Format は `--format` の出力の形。空は FormatTable。
 type Format string
 
 const (
 	FormatTable  Format = "table"
-	FormatPath   Format = "path"
-	FormatDetail Format = "detail"
+	formatPath   Format = "path"
+	formatDetail Format = "detail"
 	FormatJSON   Format = "json"
-	FormatJSONL  Format = "jsonl"
-	FormatCount  Format = "count"
+	formatJSONL  Format = "jsonl"
+	formatCount  Format = "count"
 )
 
 // formats は受ける出力の形（苦情に並べる順）。
-var formats = []Format{FormatTable, FormatPath, FormatDetail, FormatJSON, FormatJSONL, FormatCount}
+var formats = []Format{FormatTable, formatPath, formatDetail, FormatJSON, formatJSONL, formatCount}
 
 // frontmatter のキーのうち、引き方と出力が名前で読むもの。
 const (
@@ -282,7 +282,7 @@ func search(rows []docindex.Row, q Query) ([]docindex.Row, int) {
 		id := pyfmt.NFC(r.ConceptID())
 		k := keyed{id: id, row: r}
 		switch q.sort() {
-		case SortMtime:
+		case sortMtime:
 			k.first = r.Mtime()
 		default:
 			if field, ok := sortFields[q.sort()]; ok {

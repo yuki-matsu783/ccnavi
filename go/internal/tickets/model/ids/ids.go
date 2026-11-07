@@ -13,34 +13,30 @@ import (
 )
 
 const (
-	// JAChars は識別子に使える日本語の字（ひらがな・カタカナ・長音記号・CJK 統合漢字・々）。
-	JAChars = "々ぁ-ゖァ-ヺー一-鿿"
+	// jaChars は識別子に使える日本語の字（ひらがな・カタカナ・長音記号・CJK 統合漢字・々）。
+	jaChars = "々ぁ-ゖァ-ヺー一-鿿"
 	// IDChars は識別子の 2 文字目以降の文字クラスの中身（`[...]` に入れて使う）。拡張と sh が写している。
-	IDChars = `A-Za-z0-9._\-` + JAChars
+	IDChars = `A-Za-z0-9._\-` + jaChars
 
 	// MaxChildNumber は子の識別子のフェーズ番号と連番の上限（どちらも 2 桁）。
 	MaxChildNumber = 99
-	// MaxIDLength は識別子の長さの上限（文字数）。識別子はパスに 2 回出ることがあり、Windows の MAX_PATH に収める。
-	MaxIDLength = 64
+	// maxIDLength は識別子の長さの上限（文字数）。識別子はパスに 2 回出ることがあり、Windows の MAX_PATH に収める。
+	maxIDLength = 64
 	// SuggestedIDLength は issue から作る識別子と新規の提案に勧める長さ（lint の warn）。
 	SuggestedIDLength = 48
 	// maxAdoptIDLength は既にあるブランチを親に採用するときの上限（子は親 + 6 文字で 64 文字に収める）。
-	maxAdoptIDLength = MaxIDLength - 6
+	maxAdoptIDLength = maxIDLength - 6
 
 	// DefaultIssuePrefix は issue から始めるときの既定の先頭の語。
 	DefaultIssuePrefix = "feature"
-	// EmptySlug はタイトルから何も残らなかったときの slug。
-	EmptySlug = "issue"
+	// emptySlug はタイトルから何も残らなかったときの slug。
+	emptySlug = "issue"
 
 	// BranchKey は使えない `branch:` の欄の名前。あればチケットの読み込みが error にする。
 	BranchKey = "branch"
-	// MaxBranchLength はブランチ名の長さの上限（文字数）。ref はパスにもなる。
-	MaxBranchLength = 200
+	// maxBranchLength はブランチ名の長さの上限（文字数）。ref はパスにもなる。
+	maxBranchLength = 200
 )
-
-// ReservedBranchIDs は統合先や保護されたブランチの名前（ccnavi-git.sh の push の拒否と同じリスト）。
-// infra/config の先頭の語の予約も同じリストを読むので、名前は config に置く。
-var ReservedBranchIDs = config.ReservedBranchIDs
 
 // refPrefixes は先頭の階層に置けない語（git の ref の名前とリモートの名前）。
 var refPrefixes = []string{"refs", "heads", "remotes", "tags", "origin", "upstream", "head"}
@@ -50,8 +46,8 @@ var (
 	childPattern  = regexp.MustCompile(`\A([A-Za-z0-9][` + IDChars + `]*)-([0-9]{2})-([0-9]{2})\z`)
 	childTail     = regexp.MustCompile(`-[0-9]{2}\z`)
 	namePattern   = regexp.MustCompile(`\A[A-Za-z0-9][A-Za-z0-9._-]*\z`)
-	formPattern   = regexp.MustCompile(`\A([a-z][a-z0-9]*)-([1-9][0-9]*)-([A-Za-z0-9` + JAChars + `][` + IDChars + `]*)\z`)
-	slugDrop      = regexp.MustCompile(`[^A-Za-z0-9` + JAChars + `]+`)
+	formPattern   = regexp.MustCompile(`\A([a-z][a-z0-9]*)-([1-9][0-9]*)-([A-Za-z0-9` + jaChars + `][` + IDChars + `]*)\z`)
+	slugDrop      = regexp.MustCompile(`[^A-Za-z0-9` + jaChars + `]+`)
 	branchPattern = regexp.MustCompile(`\A[A-Za-z0-9][` + IDChars + `/]*\z`)
 )
 
@@ -70,8 +66,8 @@ func IDProblem(text string) string {
 		return "識別子に使えない文字がある（先頭は ASCII の英数字、続きは英数字・`.`・`_`・`-`・" +
 			"ひらがな・カタカナ・漢字）"
 	}
-	if n := runes(text); n > MaxIDLength {
-		return fmt.Sprintf("識別子が長すぎる（%d 文字。上限は %d 文字）", n, MaxIDLength)
+	if n := runes(text); n > maxIDLength {
+		return fmt.Sprintf("識別子が長すぎる（%d 文字。上限は %d 文字）", n, maxIDLength)
 	}
 	return ""
 }
@@ -207,9 +203,9 @@ func issueSlug(title string, room int) string {
 
 // IssueError は issue から識別子を作れない（番号・プロジェクト名・先頭の語が形に合わない）理由。
 // Error() は Python の ValueError の文と同じ。
-type IssueError struct{ Detail string }
+type IssueError struct{ detail string }
 
-func (e *IssueError) Error() string { return e.Detail }
+func (e *IssueError) Error() string { return e.detail }
 
 // IssueIdentifier は issue から親の識別子 `<prefix>-<番号>-<slug>` を決め、タイトルが長くて slug を短くしたかを
 // 添える。プロジェクトの issue なら slug の頭に `<プロジェクト名>-` を付ける（issue の番号はリポジトリごと）。
@@ -217,7 +213,7 @@ func (e *IssueError) Error() string { return e.Detail }
 // 「issue → 識別子」はこの 1 つだけ。作れなければ *IssueError。
 func IssueIdentifier(number int, title, project, prefix string) (string, bool, error) {
 	fail := func(detail string) (string, bool, error) {
-		return "", false, &IssueError{Detail: detail}
+		return "", false, &IssueError{detail: detail}
 	}
 	if number <= 0 {
 		return fail(fmt.Sprintf("issue の番号は正の整数: %d", number))
@@ -242,7 +238,7 @@ func IssueIdentifier(number int, title, project, prefix string) (string, bool, e
 		ident = head + slug
 	}
 	if slug == "" {
-		ident = head + EmptySlug
+		ident = head + emptySlug
 	}
 	if problem := IDProblem(ident); problem != "" {
 		return fail("issue から識別子を作れない: " + problem)
@@ -305,8 +301,8 @@ func BranchProblem(name string) string {
 	if pyfmt.NFC(name) != name {
 		return "ブランチ名が NFC でない（見た目が同じでも別の名前になるので NFC で書く）"
 	}
-	if n := runes(name); n > MaxBranchLength {
-		return fmt.Sprintf("ブランチ名が長すぎる（%d 文字。上限は %d 文字）", n, MaxBranchLength)
+	if n := runes(name); n > maxBranchLength {
+		return fmt.Sprintf("ブランチ名が長すぎる（%d 文字。上限は %d 文字）", n, maxBranchLength)
 	}
 	if !branchPattern.MatchString(name) {
 		return "ブランチ名に使えない字がある（先頭は ASCII の英数字、続きは英数字・" +
@@ -334,7 +330,7 @@ func BranchProblem(name string) string {
 			return "`HEAD`・`FETCH_HEAD` のような階層は git の特別な名前と紛らわしい"
 		}
 	}
-	if slices.Contains(ReservedBranchIDs, folded) || slices.Contains(ReservedBranchIDs, parts[0]) ||
+	if slices.Contains(config.ReservedBranchIDs(), folded) || slices.Contains(config.ReservedBranchIDs(), parts[0]) ||
 		strings.HasPrefix(folded, "release-") {
 		return "統合先や保護されたブランチの名前（main・master・develop・release と、" +
 			"それを先頭の階層に持つ main/*・release/* など、release-*）は親のブランチにしない"

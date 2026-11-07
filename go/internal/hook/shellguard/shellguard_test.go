@@ -287,7 +287,7 @@ func goAnswer(t *testing.T, root string, set *rules.RuleSet, k sgCase) []any {
 	}
 	return []any{
 		[]any{script, names}, []any{name, parent}, []any{sub, rel(word), string(kind)}, []any{tsub, tname},
-		[]any{rel(pw.What), pw.Parent, pwKind}, []any{rel(rw.Target), rel(rw.Path), ruleID, rel(rw.Origin)},
+		[]any{rel(pw.What), pw.Parent, pwKind}, []any{rel(rw.target), rel(rw.path), ruleID, rel(rw.origin)},
 		calls, said,
 	}
 }
@@ -315,7 +315,7 @@ func TestBlocked(t *testing.T) {
 		"CCNAVI_GIT_KEEP_LOGS": false, "CCNAVI_GIT_SOMETHING_NEW": true, "PATH": false,
 		"GIT_DIR": true, "GIT_SOMETHING_NEW": true, "GIT_AUTHOR_NAME": false, "CLAUDE_PROJECT_DIR": true,
 	} {
-		if got := Blocked(name); got != want {
+		if got := blocked(name); got != want {
 			t.Errorf("Blocked(%s) = %v, want %v", name, got, want)
 		}
 	}
@@ -358,7 +358,7 @@ func TestTicketRoleIgnoresPlantedFiles(t *testing.T) {
 		t.Errorf("曖昧な親の役 = %q", role)
 	}
 	testkit.Put(t, filepath.Join(child, ".ccnavi", "approved", "doing", childTree+".md"), ticketText(childTree, parentTree))
-	if role, p := TicketRole(conf, root, childTree); role != RoleChild || p != parentTree {
+	if role, p := TicketRole(conf, root, childTree); role != roleChild || p != parentTree {
 		t.Errorf("子の役 = %q, %q", role, p)
 	}
 	if role, _ := TicketRole(conf, root, plainTree); role != RoleParent {
@@ -367,7 +367,7 @@ func TestTicketRoleIgnoresPlantedFiles(t *testing.T) {
 			t.Errorf("plain の役 = %q", role)
 		}
 	}
-	if !IsParentTree(conf, root, parentTree) || IsParentTree(conf, root, config.DefaultTickets) {
+	if !isParentTree(conf, root, parentTree) || isParentTree(conf, root, config.DefaultTickets) {
 		t.Error("IsParentTree が TicketRole と合わない")
 	}
 }

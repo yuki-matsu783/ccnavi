@@ -80,7 +80,7 @@ func notOKReason(plan *Plan) string {
 	}
 	var named []string
 	for _, e := range plan.Selected() {
-		if e.State() == StateRejected && len(named) < shortList {
+		if e.State() == stateRejected && len(named) < shortList {
 			named = append(named, e.Rel+"（"+e.Errors[0]+"）")
 		}
 	}
@@ -114,7 +114,7 @@ func Apply(plan *Plan, expect string, viaBoard bool) *Applied {
 	var written []*Entry
 	failure := ""
 	for _, e := range chosen {
-		if e.State() == StateUnchanged {
+		if e.State() == stateUnchanged {
 			continue
 		}
 		var wrote bool
@@ -200,14 +200,14 @@ func cleanDraft(root string, e *Entry, done *Applied) {
 	now, why := flow.ReadBytes(e.draft, root)
 	switch {
 	case now == nil:
-		done.KeptDrafts = append(done.KeptDrafts, Kept{e.DraftRel(), sprintf(msgKeptUnread, why)})
+		done.KeptDrafts = append(done.KeptDrafts, Kept{e.draftRel(), sprintf(msgKeptUnread, why)})
 	case !same(now, e.raw):
-		done.KeptDrafts = append(done.KeptDrafts, Kept{e.DraftRel(), msgKeptRewrote})
+		done.KeptDrafts = append(done.KeptDrafts, Kept{e.draftRel(), msgKeptRewrote})
 	default:
 		if err := fsio.Unlink(e.draft); err != "" {
-			done.KeptDrafts = append(done.KeptDrafts, Kept{e.DraftRel(), sprintf(msgKeptNoUnlink, line(err))})
+			done.KeptDrafts = append(done.KeptDrafts, Kept{e.draftRel(), sprintf(msgKeptNoUnlink, line(err))})
 			return
 		}
-		done.RemovedDrafts = append(done.RemovedDrafts, e.DraftRel())
+		done.RemovedDrafts = append(done.RemovedDrafts, e.draftRel())
 	}
 }

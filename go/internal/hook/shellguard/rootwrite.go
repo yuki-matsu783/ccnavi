@@ -18,13 +18,13 @@ const (
 	rootSourceRuleID = "workspace-root"
 )
 
-// RootWrite はワークスペースルート直下への書き込み。Target は書いたとおりの語、Path は解いたパス、Rule は適用した
-// ルール、Origin は語を取り出した元のコマンド。当たらなければ Rule が nil。
+// RootWrite はワークスペースルート直下への書き込み。target は書いたとおりの語、path は解いたパス、Rule は適用した
+// ルール、origin は語を取り出した元のコマンド。当たらなければ Rule が nil。
 type RootWrite struct {
-	Target string
-	Path   string
+	target string
+	path   string
 	Rule   *rules.Rule
-	Origin string
+	origin string
 }
 
 // CheckRootWrite は、シェルの書き込み先がワークスペースルート直下の決まりに当たるかを見る。
@@ -70,9 +70,9 @@ func CheckRootWrite(set *rules.RuleSet, cwd, subject string, layers []string) Ro
 // RootWriteMessage は止めた理由。文は文面ファイルが持つ。
 func RootWriteMessage(root string, w RootWrite) string {
 	what := "plain"
-	if w.Origin != "" {
+	if w.origin != "" {
 		what = "origin"
 	}
-	return texts.Say(root, CodeRoot, texts.Values{"target": w.Target, "path": w.Path, "origin": w.Origin},
+	return texts.Say(root, CodeRoot, texts.Values{"target": w.target, "path": w.path, "origin": w.origin},
 		texts.Variants{"what": what})
 }

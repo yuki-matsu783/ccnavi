@@ -116,11 +116,11 @@ func FailClosed(mode Mode, tool string, safe bool) int {
 	switch {
 	case tool == "":
 		return ExitBlock
-	case slices.Contains(ReportTools, tool):
+	case slices.Contains(reportTools, tool):
 		return ExitOK
-	case slices.Contains(StrictTools, tool):
+	case slices.Contains(strictTools, tool):
 		return ExitBlock
-	case slices.Contains(ReadTools, tool) || slices.Contains(ShellTools, tool):
+	case slices.Contains(readTools, tool) || slices.Contains(shellTools, tool):
 		if safe {
 			return ExitOK
 		}

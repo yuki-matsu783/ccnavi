@@ -120,9 +120,9 @@ func onPanic(handle func(r any, f failure)) {
 // 判定はどれも解いた後の値と比べるので、解かずに判定を呼ぶと hook と違う答えになる。
 func resolveSwitches(stderr io.Writer, conf *config.Settings, a opts) {
 	conf.RestoreIfDeny = string(selfguard.Resolve(stderr, a.Str("restore_if_deny"), conf.RestoreIfDeny,
-		env.RestoreIfDeny, selfguard.Choices))
+		env.RestoreIfDeny, selfguard.Choices()))
 	conf.GuardCoreFiles = string(selfguard.Resolve(stderr, a.Str("guard_core_files"), conf.GuardCoreFiles,
-		env.GuardCoreFiles, selfguard.Choices))
+		env.GuardCoreFiles, selfguard.Choices()))
 	// この切り替えは enable / disable の 2 値。止めずに報告する段は CCNAVI_MODE=dry-run が持つ。
 	conf.GuardUnwatched = resolveGate(stderr, "", conf.GuardUnwatched, env.GuardUnwatched)
 }

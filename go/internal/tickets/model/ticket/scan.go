@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/rules"
@@ -28,7 +29,7 @@ func ScanAll(root, ticketsRel, projectsDir string) ([]*Ticket, []rules.Problem) 
 	trees = append(trees, tree.Worktrees(root, projectsDir)...)
 	for _, t := range trees {
 		base := ospath.Join(t.Root, filepath.FromSlash(ticketsRel))
-		for _, state := range place.States {
+		for _, state := range place.States() {
 			directory := ospath.Join(base, string(state))
 			names, err := ospath.DiskListdir(directory)
 			if err != nil {
@@ -41,7 +42,7 @@ func ScanAll(root, ticketsRel, projectsDir string) ([]*Ticket, []rules.Problem) 
 				continue
 			}
 			for _, name := range names {
-				stem, ok := strings.CutSuffix(name, ".md")
+				stem, ok := strings.CutSuffix(name, config.MdExt)
 				if !ok {
 					continue
 				}

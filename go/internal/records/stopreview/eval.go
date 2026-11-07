@@ -169,9 +169,9 @@ func summarize(state, logDir string) summary {
 		case st == expired:
 			c.expired++
 			c.unchecked++
-		case final == string(FinalOK):
+		case final == string(finalOK):
 			c.checkedOK++
-		case final == string(FinalFlawed):
+		case final == string(finalFlawed):
 			c.flawed++
 		case final == string(FinalUnchecked):
 			c.unchecked++

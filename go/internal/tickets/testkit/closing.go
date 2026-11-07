@@ -8,8 +8,8 @@ import "strings"
 // ClosingClock はこの見本を使うテストのコミットの時刻（testdata の写しの sha がこれで決まる）。
 const ClosingClock Clock = "2026-01-01T00:00:00+0000"
 
-// ClosingPhases は成果物を持つ定義のコピー（phases: の欄）。
-const ClosingPhases = `phases:
+// closingPhases は成果物を持つ定義のコピー（phases: の欄）。
+const closingPhases = `phases:
   research:
     kind: work
     title: 調査
@@ -35,7 +35,7 @@ func ClosingParent(id string, extra []string, plan ...string) string {
 	for _, e := range extra {
 		lines += e + "\n"
 	}
-	return "---\nversion: 1\nticket: " + id + "\nmr: 1\nissue: 1\n" + ClosingPhases +
+	return "---\nversion: 1\nticket: " + id + "\nmr: 1\nissue: 1\n" + closingPhases +
 		"plan:\n" + strings.Join(plan, "\n") + "\n" + lines +
 		"human_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\n" +
 		"allow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n---\n\n本文\n"

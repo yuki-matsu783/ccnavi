@@ -161,10 +161,10 @@ func goAnswers(t *testing.T, root string) map[string]any {
 		order, _ := ParseOrder(c[1].(string), s.Parent)
 		expect := "x"
 		if c[2].(bool) {
-			expect = s.SHA()
+			expect = s.sha()
 		}
 		r := Reorder(s, order).Save(expect)
-		saved = append(saved, []any{r.OK, r.Written, rels(r.Messages), rels(r.Details), RereadSHA(conf, root, name, s.Current, root) != ""})
+		saved = append(saved, []any{r.OK, r.Written, rels(r.Messages), rels(r.Details), RereadSHA(conf, root, name, s.current, root) != ""})
 	}
 	filled := []any{}
 	for _, name := range fillCases {

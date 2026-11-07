@@ -8,7 +8,7 @@ import (
 )
 
 // Load は PyYAML の yaml.safe_load(text) と同じ値を返す。文書が無ければ nil。
-// 読めない文書（構文の誤り・組み立ての途中の失敗・深すぎる入れ子）は ErrUnreadable を満たす *Error。
+// 読めない文書（構文の誤り・組み立ての途中の失敗・深すぎる入れ子）は errUnreadable を満たす *Error。
 func Load(text string) (any, error) { return load(text, false) }
 
 // LoadRefusingAliases は Load に、別名（*名前）を読まない制限を足したもの。別名は同じ部分木を何度も
@@ -46,7 +46,7 @@ func checkPrintable(buf []rune) error {
 			r >= 0xa0 && r <= 0xd7ff || r >= 0xe000 && r <= 0xfffd || r >= 0x10000 && r <= 0x10ffff
 		if !ok {
 			return &Error{text: fmt.Sprintf("unacceptable character #x%04x: special characters are not allowed\n"+
-				"  in \"%s\", position %d", r, sourceName, i), class: ReaderError}
+				"  in \"%s\", position %d", r, sourceName, i), class: readerError}
 		}
 	}
 	return nil

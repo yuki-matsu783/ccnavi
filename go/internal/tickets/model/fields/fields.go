@@ -18,7 +18,7 @@ type MRResult string
 
 const (
 	MRSet        MRResult = "set"        // 空だったので書いた
-	MRSame       MRResult = "same"       // 同じ番号が既にあった（何もしない）
+	mrSame       MRResult = "same"       // 同じ番号が既にあった（何もしない）
 	MRDiffers    MRResult = "differs"    // 違う値が既にあった（書かない）
 	MRUnreadable MRResult = "unreadable" // frontmatter が無い・閉じていない
 )
@@ -72,7 +72,7 @@ func SetFields(text string, fields [][2]string) string {
 	}
 	var pending [][2]string
 	for _, f := range fields {
-		if slices.Contains(ticket.ScriptFields, f[0]) {
+		if slices.Contains(ticket.ScriptFields(), f[0]) {
 			pending = append(pending, f)
 		}
 	}
@@ -171,7 +171,7 @@ func heldNumber(raw string) (int, bool) {
 	return n, err == nil
 }
 
-// SetMR は mr: が空のときだけ番号を書く。同じ番号（`!12`・`#12` も）が既にあれば MRSame、違う値なら MRDiffers で
+// SetMR は mr: が空のときだけ番号を書く。同じ番号（`!12`・`#12` も）が既にあれば mrSame、違う値なら MRDiffers で
 // 書かない。行単位で書き、コメントや本文は触らない。
 func SetMR(text string, number int) (string, MRResult) {
 	lines, end, ok := split(text)
@@ -184,7 +184,7 @@ func SetMR(text string, number int) (string, MRResult) {
 	case i >= 0 && !MREmpty(text):
 		value, _ := valueOf(lines[i])
 		if held, ok := heldNumber(value); ok && held == number {
-			return text, MRSame
+			return text, mrSame
 		}
 		return text, MRDiffers
 	case i >= 0:
@@ -212,7 +212,7 @@ func ScriptFieldsSet(text string) []string {
 		}
 		// 続きがあれば値は 2 行目以降にあるかもしれない（`|` や `# c` の次の行など）。
 		key := keyOf(line)
-		if slices.Contains(ticket.ScriptFields, key) && (continued(lines, i, end) || hasValue(value)) {
+		if slices.Contains(ticket.ScriptFields(), key) && (continued(lines, i, end) || hasValue(value)) {
 			held = append(held, key)
 		}
 	}

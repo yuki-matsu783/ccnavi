@@ -46,11 +46,11 @@ func TestDumpsMatchesPython(t *testing.T) {
 }
 
 func TestDumpsRefusals(t *testing.T) {
-	if _, err := Dumps([]any{math.NaN()}, Options{RejectNaN: true}); !errors.Is(err, ErrOutOfRange) ||
+	if _, err := Dumps([]any{math.NaN()}, Options{RejectNaN: true}); !errors.Is(err, errOutOfRange) ||
 		err.Error() != "Out of range float values are not JSON compliant: nan" {
 		t.Errorf("RejectNaN: %v", err)
 	}
-	if _, err := Dumps([]any{struct{}{}}, Options{}); !errors.Is(err, ErrUnsupported) {
+	if _, err := Dumps([]any{struct{}{}}, Options{}); !errors.Is(err, errUnsupported) {
 		t.Errorf("unsupported: %v", err)
 	}
 }
@@ -108,10 +108,10 @@ func TestLoadsValues(t *testing.T) {
 }
 
 func TestLoadsDepth(t *testing.T) {
-	if _, err := Loads(strings.Repeat("[", MaxDepth) + strings.Repeat("]", MaxDepth)); err != nil {
-		t.Errorf("%d 段: %v", MaxDepth, err)
+	if _, err := Loads(strings.Repeat("[", maxDepth) + strings.Repeat("]", maxDepth)); err != nil {
+		t.Errorf("%d 段: %v", maxDepth, err)
 	}
-	n := MaxDepth + 1
+	n := maxDepth + 1
 	if _, err := Loads(strings.Repeat(`{"a":`, n) + "1" + strings.Repeat("}", n)); !errors.Is(err, ErrTooDeep) {
 		t.Errorf("%d 段: %v", n, err)
 	}

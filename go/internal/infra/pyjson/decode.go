@@ -12,29 +12,29 @@ import (
 // DecodeError は json.loads が読めなかった場所と理由（Python の JSONDecodeError）。
 // Error() は Python の str(exc) と同じ「理由: line L column C (char N)」。
 type DecodeError struct {
-	Msg    string
-	Pos    int // 符号位置で数えた位置（0 始まり）
-	Line   int
-	Column int
+	msg    string
+	pos    int // 符号位置で数えた位置（0 始まり）
+	line   int
+	column int
 }
 
 func (e *DecodeError) Error() string {
-	return fmt.Sprintf("%s: line %d column %d (char %d)", e.Msg, e.Line, e.Column, e.Pos)
+	return fmt.Sprintf("%s: line %d column %d (char %d)", e.msg, e.line, e.column, e.pos)
 }
 
 // ErrIntDigits は 4300 桁を超える整数（Python の int の上限。json.loads は ValueError で止まる）。
 var ErrIntDigits = errors.New("Exceeds the limit (4300 digits) for integer string conversion")
 
-// ErrTooDeep は入れ子が MaxDepth 段を超えた（Python の json.loads の RecursionError）。
+// ErrTooDeep は入れ子が maxDepth 段を超えた（Python の json.loads の RecursionError）。
 var ErrTooDeep = errors.New("maximum recursion depth exceeded while decoding a JSON value")
 
-// MaxDepth は読める入れ子の段数。Python 3.13 の json.loads が RecursionError を出さずに読める最大の段数。
-const MaxDepth = 9998
+// maxDepth は読める入れ子の段数。Python 3.13 の json.loads が RecursionError を出さずに読める最大の段数。
+const maxDepth = 9998
 
 // maxIntDigits は Python が 10 進の文字列から作る整数の桁の上限（sys.get_int_max_str_digits の既定）。
 const maxIntDigits = 4300
 
-// Loads は json.loads(text)。入れ子が MaxDepth を超えれば ErrTooDeep。値は nil・bool・int（範囲を超えれば *big.Int）・float64・string・
+// Loads は json.loads(text)。入れ子が maxDepth を超えれば ErrTooDeep。値は nil・bool・int（範囲を超えれば *big.Int）・float64・string・
 // []any・*Object。NaN・Infinity・-Infinity も Python と同じく読む。
 //
 // 文字列の中の孤立したサロゲート（"\ud800"）は Go の文字列に置けないので U+FFFD にする。
@@ -77,7 +77,7 @@ func (d *decoder) fail(msg string, pos int) error {
 			last = i
 		}
 	}
-	return &DecodeError{Msg: msg, Pos: pos, Line: line, Column: pos - last}
+	return &DecodeError{msg: msg, pos: pos, line: line, column: pos - last}
 }
 
 func (d *decoder) skip(i int) int {
@@ -125,7 +125,7 @@ func (d *decoder) scanOnce(idx int) (any, int, error) {
 	case '{', '[':
 		d.depth++
 		defer func() { d.depth-- }()
-		if d.depth > MaxDepth {
+		if d.depth > maxDepth {
 			return nil, 0, ErrTooDeep
 		}
 		if d.s[idx] == '{' {

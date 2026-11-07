@@ -15,21 +15,21 @@ import (
 	"ccnavi/internal/tickets/model/directcand"
 )
 
-// State は 1 本のツリーを調べた結果。
-type State string
+// state は 1 本のツリーを調べた結果。
+type state string
 
 const (
-	Hit     State = "hit"     // 促すか、理由を言う相手になる
-	Clear   State = "clear"   // 今は促す必要が無いと確認できた
-	Unknown State = "unknown" // 期限不足・git の失敗・決められないものがあり、確認できない
+	hit     state = "hit"     // 促すか、理由を言う相手になる
+	Clear   state = "clear"   // 今は促す必要が無いと確認できた
+	unknown state = "unknown" // 期限不足・git の失敗・決められないものがあり、確認できない
 )
 
-// Probe は 1 本のツリーを調べた結果。Drop は Clear のうち候補から外してよいと確認できたもの（ディレクトリが
+// Probe は 1 本のツリーを調べた結果。drop は Clear のうち候補から外してよいと確認できたもの（ディレクトリが
 // 無い、HEAD のブランチが名前と違う、チケットに結び付く、integrate が受けない名前）。
 type Probe struct {
-	State State
-	Found *Direct
-	Drop  bool
+	state state
+	found *Direct
+	drop  bool
 }
 
 // DirectAtStop はメインエージェントが終わろうとしたとき、integrate を促す（か理由を言う）直接作業。cwd のツリー
@@ -50,8 +50,8 @@ func directAtStop(conf *config.Settings, root, cwd, session string, deadline tim
 	if here, ok := tree.TreeOf(root, cwd, conf.Projects); ok && !here.IsMain() {
 		got := look(conf, root, here, deadline)
 		skip = here.Name
-		if got.Found != nil && !already(conf, session, got.Found) {
-			return got.Found
+		if got.found != nil && !already(conf, session, got.found) {
+			return got.found
 		}
 	}
 	if session == "" || conf.State == "" {
@@ -87,11 +87,11 @@ func directAtStop(conf *config.Settings, root, cwd, session string, deadline tim
 			continue
 		}
 		got := look(conf, root, cand, deadline)
-		if got.Drop {
+		if got.drop {
 			dropped[item.Name] = true
 		}
-		if got.Found != nil && !already(conf, session, got.Found) {
-			result = got.Found
+		if got.found != nil && !already(conf, session, got.found) {
+			result = got.found
 			break
 		}
 	}
@@ -122,29 +122,29 @@ func already(conf *config.Settings, session string, d *Direct) bool {
 func probe(conf *config.Settings, root string, here tree.Tree, deadline time.Time) Probe {
 	reason, unsure := DirectCheck(conf, root, here, deadline)
 	if reason != "" {
-		return Probe{State: Clear, Drop: true}
+		return Probe{state: Clear, drop: true}
 	}
 	if unsure {
-		return Probe{State: Unknown}
+		return Probe{state: unknown}
 	}
 	head := git.Head(here.Root, git.Options{Deadline: deadline})
 	if head == "" {
-		return Probe{State: Unknown}
+		return Probe{state: unknown}
 	}
 	owner := tree.ProjectRoot(conf.Projects, here.Project)
 	if owner == "" {
 		owner = root
 	}
-	dirty, known := Dirty(here.Root, deadline)
+	dirty, known := git.Dirty(here.Root, git.Options{Deadline: deadline})
 	if !known {
-		return Probe{State: Unknown}
+		return Probe{state: unknown}
 	}
 	if rec := DirectRecord(owner, here.Name); rec != nil {
 		return probeRecorded(owner, here, head, dirty, rec, deadline)
 	}
 	integration, ok := Integration(owner, deadline)
 	if !ok {
-		return Probe{State: Unknown}
+		return Probe{state: unknown}
 	}
 	var ahead int
 	if integration != "" {
@@ -153,13 +153,13 @@ func probe(conf *config.Settings, root string, here tree.Tree, deadline time.Tim
 		ahead, ok = unique(here.Root, here.Name, deadline)
 	}
 	if !ok {
-		return Probe{State: Unknown}
+		return Probe{state: unknown}
 	}
 	if ahead == 0 {
-		return Probe{State: Clear}
+		return Probe{state: Clear}
 	}
-	found := &Direct{Name: here.Name, Worktree: here.Root, Head: head, Dirty: dirty, Ahead: ahead,
-		Integration: integration, NoRecord: true}
+	found := &Direct{Name: here.Name, worktree: here.Root, head: head, dirty: dirty, ahead: ahead,
+		integration: integration, noRecord: true}
 	if integration == "" {
 		if git.Run(owner, []string{"remote", "get-url", "origin"}, git.Options{}).OK() {
 			found.Blocked = "統合先 (origin/HEAD) が決まらない。ユーザに `git fetch origin` のあと " +
@@ -167,39 +167,39 @@ func probe(conf *config.Settings, root string, here tree.Tree, deadline time.Tim
 		} else {
 			found.Blocked = "origin が無いので統合先が決まらない。ユーザに origin の追加を頼んでください"
 		}
-		return Probe{State: Hit, Found: found}
+		return Probe{state: hit, found: found}
 	}
 	integTree, ok := integrationTree(owner, integration, deadline)
 	if !ok {
-		return Probe{State: Unknown}
+		return Probe{state: unknown}
 	}
-	found.IntegTree = integTree
+	found.integTree = integTree
 	if integTree == "" {
 		found.Blocked = "統合先（" + integration + "）をチェックアウトしているツリーが見つかりません。" +
 			"どのツリーで取り込むかをユーザに確かめてください"
-		return Probe{State: Hit, Found: found}
+		return Probe{state: hit, found: found}
 	}
 	marks, ok := GitPath(integTree, RecordDir, deadline)
 	if !ok {
-		return Probe{State: Unknown}
+		return Probe{state: unknown}
 	}
-	found.Marker = MarkerKind(marks, here.Name)
-	switch found.Marker {
+	found.marker = MarkerKind(marks, here.Name)
+	switch found.marker {
 	case MarkerV4:
-		return Probe{State: Clear}
+		return Probe{state: Clear}
 	case MarkerUnknown:
-		found.NoRecord = false
-		return Probe{State: Hit, Found: found}
+		found.noRecord = false
+		return Probe{state: hit, found: found}
 	}
 	recorded, known := HasRecord(integTree, here.Name, head, &dirty, deadline)
 	if !known {
-		return Probe{State: Unknown}
+		return Probe{state: unknown}
 	}
 	if recorded {
-		return Probe{State: Clear}
+		return Probe{state: Clear}
 	}
 	found.Blocked = integrationBusy(integTree, deadline)
-	return Probe{State: Hit, Found: found}
+	return Probe{state: hit, found: found}
 }
 
 // probeRecorded は記録（取り込み先と起点 S）がある直接作業を調べる。入っていないコミットは S..先頭 で数える。
@@ -207,12 +207,12 @@ func probe(conf *config.Settings, root string, here tree.Tree, deadline time.Tim
 // チェックアウトに途中の操作があるときだけ。ユーザの書きかけでは止めない。
 func probeRecorded(owner string, here tree.Tree, head string, dirty bool, rec *Record, deadline time.Time) Probe {
 	base := rec.Fields["base_branch"]
-	found := &Direct{Name: here.Name, Worktree: here.Root, Head: head, Dirty: dirty, Integration: base,
-		IntegTree: owner, Base: base}
-	if rec.Broken {
+	found := &Direct{Name: here.Name, worktree: here.Root, head: head, dirty: dirty, integration: base,
+		integTree: owner, base: base}
+	if rec.broken {
 		found.Blocked = "直接作業の記録（ccnavi-direct）が壊れていて、取り込み先と起点を読めません。" +
 			"操作せず、ユーザに確かめてください"
-		return Probe{State: Hit, Found: found}
+		return Probe{state: hit, found: found}
 	}
 	mine, mineOK := tree.CommonDir(here.Root)
 	main, mainOK := tree.CommonDir(owner)
@@ -222,9 +222,9 @@ func probeRecorded(owner string, here tree.Tree, head string, dirty bool, rec *R
 	if !same {
 		found.Blocked = "記録の git の共通ディレクトリが、ユーザのチェックアウトと作業ワークツリーのものと" +
 			"違います。別のリポジトリの記録かもしれないので、操作せずユーザに確かめてください"
-		return Probe{State: Hit, Found: found}
+		return Probe{state: hit, found: found}
 	}
-	found.Marker = MarkerKind(ospath.Join(rec.Common, RecordDir), here.Name)
+	found.marker = MarkerKind(ospath.Join(rec.Common, RecordDir), here.Name)
 	if current, _ := tree.BranchOf(owner); current != base {
 		shown := current
 		if shown == "" {
@@ -233,35 +233,35 @@ func probeRecorded(owner string, here tree.Tree, head string, dirty bool, rec *R
 		found.Blocked = "ユーザのチェックアウト（" + owner + "）の取り込み先が切り替わっています" +
 			"（記録: " + base + "、今: " + shown + "）。" +
 			"ユーザに戻してもらってください（エージェントは checkout しません）"
-		return Probe{State: Hit, Found: found}
+		return Probe{state: hit, found: found}
 	}
 	if busy := integrationBusy(owner, deadline); busy != "" {
 		found.Blocked = busy
-		return Probe{State: Hit, Found: found}
+		return Probe{state: hit, found: found}
 	}
 	snap := rec.Fields["snap_sha"]
 	done := git.Run(here.Root, []string{"rev-parse", "--verify", "--quiet", snap + "^{commit}"}, git.Options{Deadline: deadline})
 	if done.Failure != nil {
-		return Probe{State: Unknown}
+		return Probe{state: unknown}
 	}
 	if !done.OK() {
 		found.Blocked = "記録の起点（" + snap + "）のコミットを読めません。操作せず、ユーザに確かめてください"
-		return Probe{State: Hit, Found: found}
+		return Probe{state: hit, found: found}
 	}
 	ahead, ok := AheadSince(here.Root, snap, deadline)
 	if !ok {
-		return Probe{State: Unknown}
+		return Probe{state: unknown}
 	}
-	found.Ahead = ahead
-	found.OriginAhead, _ = count(git.Run(owner,
+	found.ahead = ahead
+	found.originAhead, _ = count(git.Run(owner,
 		[]string{"rev-list", "--count", "refs/heads/" + base + "..refs/remotes/origin/" + base}, git.Options{Deadline: deadline}))
 	switch {
-	case found.Marker == MarkerUnknown:
-		return Probe{State: Hit, Found: found}
-	case found.Marker != MarkerNone || found.Ahead == 0:
-		return Probe{State: Clear}
+	case found.marker == MarkerUnknown:
+		return Probe{state: hit, found: found}
+	case found.marker != markerNone || found.ahead == 0:
+		return Probe{state: Clear}
 	}
-	return Probe{State: Hit, Found: found}
+	return Probe{state: hit, found: found}
 }
 
 // aheadOf は統合先に入っていないコミットの数。手元のブランチを先に見て、無ければ origin/<統合先>。

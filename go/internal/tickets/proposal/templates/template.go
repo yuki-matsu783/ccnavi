@@ -11,7 +11,7 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// 欄の名前。Fields は書く順で、未知の欄（Extra）を見分けるのにも使う。
+// 欄の名前。fields は書く順で、未知の欄（extra）を見分けるのにも使う。
 const (
 	keyName        = "name"
 	keyDescription = "description"
@@ -23,8 +23,8 @@ const (
 	fieldExtra = "extra"
 )
 
-// Fields はテンプレートの既知の欄（書く順）。
-var Fields = []string{keyName, keyDescription, keyWhen, keyPlan, keyFeedback, keyFlows}
+// fields はテンプレートの既知の欄（書く順）。
+var fields = []string{keyName, keyDescription, keyWhen, keyPlan, keyFeedback, keyFlows}
 
 // ステップの欄。
 const (
@@ -85,7 +85,7 @@ func (i Item) Equal(o Item) bool {
 }
 
 // Template は 1 つの親の作業・レビュー計画と、子のフローの本文。Flows のキーは全体計画のステップの添字
-// （1 始まり）、値はフローのファイルと同じ形のマップ。Extra は未知の欄で、書き戻しで落とさない。
+// （1 始まり）、値はフローのファイルと同じ形のマップ。extra は未知の欄で、書き戻しで落とさない。
 type Template struct {
 	Name        string
 	Description string
@@ -93,11 +93,11 @@ type Template struct {
 	Plan        []Item
 	Feedback    []Item
 	Flows       map[int]*yaml.Map
-	Extra       *yaml.Map
+	extra       *yaml.Map
 }
 
-// FlowIndexes は Flows の添字（昇順）。
-func (t *Template) FlowIndexes() []int {
+// flowIndexes は Flows の添字（昇順）。
+func (t *Template) flowIndexes() []int {
 	out := make([]int, 0, len(t.Flows))
 	for i := range t.Flows {
 		out = append(out, i)
@@ -116,14 +116,14 @@ func items(list []Item, offset int) []any {
 
 func (t *Template) flowsData() *yaml.Map {
 	out := &yaml.Map{}
-	for _, i := range t.FlowIndexes() {
+	for _, i := range t.flowIndexes() {
 		out.Put(i, t.Flows[i])
 	}
 	return out
 }
 
-// AsData は書き戻せる形。読み直すと同じ Template になる。
-func (t *Template) AsData() *yaml.Map {
+// asData は書き戻せる形。読み直すと同じ Template になる。
+func (t *Template) asData() *yaml.Map {
 	out := &yaml.Map{}
 	out.Put(keyName, t.Name)
 	out.Put(keyDescription, t.Description)
@@ -137,7 +137,7 @@ func (t *Template) AsData() *yaml.Map {
 	if len(t.Flows) > 0 {
 		out.Put(keyFlows, t.flowsData())
 	}
-	for k, v := range t.Extra.All() {
+	for k, v := range t.extra.All() {
 		out.Put(k, v)
 	}
 	return out
@@ -145,23 +145,23 @@ func (t *Template) AsData() *yaml.Map {
 
 // Dump はテンプレートを YAML の文面にする。読み直すと同じ Template になる。
 func Dump(t *Template) string {
-	text, _ := ToYAML(t.AsData())
+	text, _ := toYAML(t.asData())
 	return text
 }
 
-// ToYAML はテンプレート・フロー・合成した提案を YAML の文面にする 1 か所。日本語はそのまま、キーの順は渡した
+// toYAML はテンプレート・フロー・合成した提案を YAML の文面にする 1 か所。日本語はそのまま、キーの順は渡した
 // まま、行は折らない。改行を含む文字列は literal block で書く（書けない文字列は PyYAML の選ぶ引用符）。
-func ToYAML(data any) (string, error) {
+func toYAML(data any) (string, error) {
 	return yaml.Dump(data, yaml.DumpOptions{Width: noFold, Literal: literalOK, NoAliases: true})
 }
 
 // noFold は行を折らない幅（Python の width=10**6）。
 const noFold = 1_000_000
 
-// DumpFlow はフローの本文を、フローのファイルの文面にする。(文面, 書けない理由)。子のフローの下書きに書く文面と、
+// dumpFlow はフローの本文を、フローのファイルの文面にする。(文面, 書けない理由)。子のフローの下書きに書く文面と、
 // 検査が読み直す文面は同じ。
-func DumpFlow(body *yaml.Map) (string, string) {
-	text, err := ToYAML(body)
+func dumpFlow(body *yaml.Map) (string, string) {
+	text, err := toYAML(body)
 	if err != nil {
 		return "", fmt.Sprintf("YAML に変換できません (%s)", line(err.Error()))
 	}

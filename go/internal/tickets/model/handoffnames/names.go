@@ -10,12 +10,12 @@ import (
 	"ccnavi/internal/infra/pyfmt"
 )
 
-// NamesFile は表のファイル名。`.ccnavi/scripts/` に置き、sh と実行ファイルが同じものを読む。
-const NamesFile = "ccnavi-handoff-names.txt"
+// namesFile は表のファイル名。`.ccnavi/scripts/` に置き、sh と実行ファイルが同じものを読む。
+const namesFile = "ccnavi-handoff-names.txt"
 
 const (
 	commentMark = "#"
-	msgBadLine  = NamesFile + " の %d 行目を読めない: %s"
+	msgBadLine  = namesFile + " の %d 行目を読めない: %s"
 	msgReserved = "%s の `%s` は、下書きの置き場で `%s` を読み替える予約した名前なので、この名前の階層は下書きにできない"
 )
 
@@ -31,22 +31,22 @@ type Pair struct {
 // Table は読み替えの表。行の順に当てる（先に当たった行を使う）。
 type Table struct{ pairs []Pair }
 
-var defaultTable, defaultErr = Parse(embedded)
+var defaultTable, defaultErr = parse(embedded)
 
 // Default は埋め込んだ表。中身はテストで確かめているので、エラーは写しを壊したときだけ。
 func Default() (*Table, error) { return defaultTable, defaultErr }
 
-// Parse は表のファイルの中身を読む。`#` で始まる行と空行は読まない。1 行は空白で区切った 2 語だけで、
+// parse は表のファイルの中身を読む。`#` で始まる行と空行は読まない。1 行は空白で区切った 2 語だけで、
 // 読めない行はエラーにする（黙って捨てると、読み替えられない名前のまま下書きが置かれる）。
 // 同じ元の名前を 2 度書けば、後の行の名前を最初の行の位置で使う（Python の dict と同じ）。
-func Parse(text string) (*Table, error) {
+func parse(text string) (*Table, error) {
 	t := &Table{}
 	for i, raw := range ospath.Splitlines(text) {
 		line := ospath.Strip(raw)
 		if line == "" || strings.HasPrefix(line, commentMark) {
 			continue
 		}
-		words := strings.FieldsFunc(line, ospath.IsSpace)
+		words := ospath.Fields(line)
 		if len(words) != 2 || !usable(words[0]) || !usable(words[1]) {
 			return nil, fmt.Errorf(msgBadLine, i+1, pyfmt.Quote(raw))
 		}
@@ -97,9 +97,9 @@ func (t *Table) convert(rel string, way func(Pair) (from, to string)) string {
 	return strings.Join(parts, "/")
 }
 
-// ReservedProblem は、元の相対パスが予約名（下書きでの階層名）の階層を含むなら断る理由。含まなければ空。
+// reservedProblem は、元の相対パスが予約名（下書きでの階層名）の階層を含むなら断る理由。含まなければ空。
 // 読み替えると、ほかの元のパスと区別できなくなる。
-func (t *Table) ReservedProblem(rel string) string {
+func (t *Table) reservedProblem(rel string) string {
 	for _, part := range strings.Split(rel, "/") {
 		for _, p := range t.pairs {
 			if same(part, p.Draft) {

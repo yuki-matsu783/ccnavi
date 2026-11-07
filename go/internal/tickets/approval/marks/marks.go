@@ -1,6 +1,7 @@
 package marks
 
 import (
+	"slices"
 	"strconv"
 
 	"ccnavi/internal/infra/fsio"
@@ -21,8 +22,11 @@ const (
 	Pending Kind = "pending"
 )
 
-// Kinds はマーカーの種類の全部（読む順・知らせる順）。
-var Kinds = []Kind{Requested, Reviewed, Skipped, Pending}
+// kinds はマーカーの種類の全部（読む順・知らせる順）。
+var kinds = []Kind{Requested, Reviewed, Skipped, Pending}
+
+// Kinds は kinds の写しを返す（呼び手が書き換えても元は変わらない）。
+func Kinds() []Kind { return slices.Clone(kinds) }
 
 // Parent は親ごとのマーカー（フェーズの番号に付かないもの）。closed が要るのは、提案（wip/）が統合先に
 // 取り込む前に消え、全フェーズが `review: false` の進め方では親を閉じた事実がここにしか残らないから。
@@ -50,40 +54,40 @@ const (
 	ledgerVersion = 1
 )
 
-// MarkPath はフェーズのマーカーのパス。
-func MarkPath(approvedDir, parent string, phase int, kind Kind) string {
+// markPath はフェーズのマーカーのパス。
+func markPath(approvedDir, parent string, phase int, kind Kind) string {
 	return ospath.Join(approvedDir, place.PhasesDir, parent, strconv.Itoa(phase)+"."+string(kind))
 }
 
-// ReadMark はマーカーの中身。無い・読めなければ偽、マップでなければ空のマップ。
-func ReadMark(approvedDir, parent string, phase int, kind Kind) (*pyjson.Object, bool) {
-	return fsio.ReadObject(MarkPath(approvedDir, parent, phase, kind))
+// readMark はマーカーの中身。無い・読めなければ偽、マップでなければ空のマップ。
+func readMark(approvedDir, parent string, phase int, kind Kind) (*pyjson.Object, bool) {
+	return fsio.ReadObject(markPath(approvedDir, parent, phase, kind))
 }
 
 // WriteMark はマーカーを書く（at が無ければ今の時刻を足す）。書けなければ理由。
 func WriteMark(approvedDir, parent string, phase int, kind Kind, data *pyjson.Object) string {
-	return writeJSON(MarkPath(approvedDir, parent, phase, kind), stamped(data), fsio.JSONCompact)
+	return writeJSON(markPath(approvedDir, parent, phase, kind), stamped(data), fsio.JSONCompact)
 }
 
 // Marks はこのフェーズに在るマーカー（種類 → 中身）。
 func Marks(approvedDir, parent string, phase int) map[Kind]*pyjson.Object {
 	found := map[Kind]*pyjson.Object{}
-	for _, kind := range Kinds {
-		if data, ok := ReadMark(approvedDir, parent, phase, kind); ok {
+	for _, kind := range kinds {
+		if data, ok := readMark(approvedDir, parent, phase, kind); ok {
 			found[kind] = data
 		}
 	}
 	return found
 }
 
-// ParentPath は親ごとのマーカーのパス。
-func ParentPath(approvedDir, parent string, name Parent) string {
+// parentPath は親ごとのマーカーのパス。
+func parentPath(approvedDir, parent string, name Parent) string {
 	return ospath.Join(approvedDir, place.PhasesDir, parent, string(name)+fsio.JSONExt)
 }
 
 // ReadParent は親ごとのマーカーの中身。
 func ReadParent(approvedDir, parent string, name Parent) (*pyjson.Object, bool) {
-	return fsio.ReadObject(ParentPath(approvedDir, parent, name))
+	return fsio.ReadObject(parentPath(approvedDir, parent, name))
 }
 
 // ReadFilledParent は中身のある親ごとのマーカー。無い・読めない・空のマップなら偽（Python の `if read_parent(…)`）。
@@ -93,7 +97,7 @@ func ReadFilledParent(approvedDir, parent string, name Parent) (*pyjson.Object, 
 
 // WriteParent は親ごとのマーカーを書く（at が無ければ今の時刻を足す）。書けなければ理由。
 func WriteParent(approvedDir, parent string, name Parent, data *pyjson.Object) string {
-	return writeJSON(ParentPath(approvedDir, parent, name), stamped(data), fsio.JSONIndentOne)
+	return writeJSON(parentPath(approvedDir, parent, name), stamped(data), fsio.JSONIndentOne)
 }
 
 // RecordPath は子ごとの記録のパス。
@@ -120,7 +124,7 @@ func WriteRecord(approvedDir, parent, child string, kind Record, data *pyjson.Ob
 
 // ReadLedger は台帳の項目と、読めなかった理由（読めれば空）。無ければ空の台帳。
 func ReadLedger(approvedDir, parent string) ([]*pyjson.Object, string) {
-	path := ParentPath(approvedDir, parent, Ledger)
+	path := parentPath(approvedDir, parent, Ledger)
 	if !fsio.Exists(path) {
 		return nil, ""
 	}

@@ -162,7 +162,7 @@ func TestMessagesOnTheTables(t *testing.T) {
 			inner = append(inner, Layer{Runner: l[0], Text: l[1]})
 		}
 		var human, hidden string
-		if kind, found := HumanPathForm(c); kind != HumanNone {
+		if kind, found := HumanPathForm(c); kind != humanNone {
 			human = HumanMessage(root, kind, found)
 		}
 		if entry, word := HiddenUserEntry(c, inner, ""); entry != "" {
@@ -280,7 +280,7 @@ func TestEntryMatchesPython(t *testing.T) {
 		} else {
 			var words any
 			if verb != nil {
-				words = verb.Words
+				words = verb.words
 			}
 			rewrite = [3]any{rest, words, ""}
 		}

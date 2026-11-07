@@ -28,7 +28,7 @@ const (
 type Role string
 
 const (
-	RoleChild  Role = "child"
+	roleChild  Role = "child"
 	RoleParent Role = "parent"
 )
 
@@ -39,9 +39,9 @@ const unknownParent = "?"
 // frontmatter でも `parent:` の行があれば子と見る）。
 var parentLine = regexp.MustCompile(`(?m)^parent:[ \t]*(.*?)[ \t]*$`)
 
-// WorktreeName は place がワークスペースの `.claude/worktrees/<名前>` の中なら、在るディレクトリの綴りの名前
+// worktreeName は place がワークスペースの `.claude/worktrees/<名前>` の中なら、在るディレクトリの綴りの名前
 // （呼び手がパスを組み直して開く）。git に登録されているかは問わない（sh の検査と同じ広さ）。
-func WorktreeName(root, where string) string {
+func worktreeName(root, where string) string {
 	rest, ok := tree.PartsUnder(tree.WorktreesPath(root), where)
 	if !ok || len(rest) == 0 {
 		return ""
@@ -53,7 +53,7 @@ func WorktreeName(root, where string) string {
 func ticketFiles(conf *config.Settings, top, name string) []string {
 	approved := conf.ApprovedDir(top)
 	proposals := ospath.Join(top, strings.ReplaceAll(conf.Tickets, "/", ospath.Sep))
-	file := name + ".md"
+	file := name + config.MdExt
 	return []string{
 		ospath.Join(approved, string(place.Doing), file),
 		ospath.Join(approved, string(place.Done), file),
@@ -100,11 +100,11 @@ func TicketRole(conf *config.Settings, root, name string) (Role, string) {
 			return RoleParent, ""
 		}
 	}
-	return RoleChild, parents[0]
+	return roleChild, parents[0]
 }
 
-// IsParentTree はその名前のワークツリーが親のチケットのものか（TicketRole が RoleParent）。
-func IsParentTree(conf *config.Settings, root, name string) bool {
+// isParentTree はその名前のワークツリーが親のチケットのものか（TicketRole が RoleParent）。
+func isParentTree(conf *config.Settings, root, name string) bool {
 	role, _ := TicketRole(conf, root, name)
 	return role == RoleParent
 }

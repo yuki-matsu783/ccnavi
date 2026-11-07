@@ -543,16 +543,18 @@ skills_blocked=""
 
 # 配布元のスキルが、frontmatter に `process: true` か `distribute: true` を持つか。先頭の `---` から閉じの `---` までの
 # 間に、その 1 行（行末の `# コメント`は可）があるものだけを適用する。ユーザの発言のときの同期がコピーする判定
-# （go/internal/tickets/sync/mirror の processFlag。`process` の側）に寄せてある。CRLF の改行と、`---` の前後の空白は
-# 許し、閉じの `---` が無いもの、BOM 付き、文字列の "true"、本文だけにあるものは適用しない。
+# （go/internal/tickets/sync/mirror の processFlag。`process` の側）に寄せてある。CRLF の改行と、`---` の前後の空白と、
+# 頭の BOM 1 つ（Windows のエディタが付ける。Go の SKILL.md の読み手も外す）は許し、閉じの `---` が無いもの、
+# 文字列の "true"、本文だけにあるものは適用しない。
 # SKILL.md 自体がリンクのものは、mirror の同期と同じく適用しない。
 # 書き方は文書どおりの `process: true` と `distribute: true` だけを見る。`process: yes` のような別の綴りは、
 # mirror の同期は真と読むが、ここでは適用しない（配り漏れは、まだ無いものにも出ない。文書は `true` と書く）。
 is_deployed_skill() {
 	{ [ -f "$1" ] && [ ! -L "$1" ]; } || return 1
-	awk '
+	# BOM はバイトの並びで外すので、awk には文字ではなくバイトで読ませる（LC_ALL=C）。
+	LC_ALL=C awk '
 		{ sub(/\r$/, "") }
-		NR == 1 { if ($0 !~ /^[ \t]*---[ \t]*$/) { exit } open = 1; next }
+		NR == 1 { sub(/^\357\273\277/, ""); if ($0 !~ /^[ \t]*---[ \t]*$/) { exit } open = 1; next }
 		$0 ~ /^[ \t]*---[ \t]*$/ { closed = 1; exit }
 		$0 ~ /^(process|distribute):[ \t]*true([ \t]+#.*)?[ \t]*$/ { found = 1 }
 		END { exit (open && closed && found) ? 0 : 1 }
@@ -1599,7 +1601,8 @@ fi
 #
 # 案内のコマンドに載せるパスを、sh で 1 語として読める綴りにして標準出力に出す（改行は付けない）。
 # sh が割る・展開する文字を含まなければそのまま、含めば '…' で囲み、中の ' は '\'' に置く。
-# 文字の集合と綴りは go/internal/entry/lint の shSpecial・shWord と同じ。変えるなら 2 か所を直す。
+# 文字の集合と綴りは go/internal/entry/lint の shSpecial・shWord と同じ。go test の TestShWordAgreesWithTheSetupSh が
+# この関数を切り出して走らせ、字ごとに比べる（片方だけ直すとそこで落ちる）。
 sh_word() {
 	w=$1
 	q="'"

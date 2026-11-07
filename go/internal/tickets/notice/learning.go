@@ -116,7 +116,7 @@ func learningMessage(label string, rows []wiki.Row, threshold int) string {
 		}
 	}
 	var parts []string
-	for _, target := range wiki.Targets {
+	for _, target := range wiki.Targets() {
 		n := 0
 		for _, r := range rows {
 			if r.Target == target {

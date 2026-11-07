@@ -4,9 +4,9 @@
 // ファイル名と JSON の形（キーの順・indent・ensure_ascii=False・機械の改行）は sh と拡張も読むので、変えない。
 //
 // Python からの対応: tickets/approval/marks を移した。MARK_* → Kind の定数、MARKS → Kinds、PHASES_DIR →
-// place.PhasesDir、mark_path・read_mark・write_mark → MarkPath・ReadMark・WriteMark、clear_marks → Clear（announce は
+// place.PhasesDir、mark_path・read_mark・write_mark → markPath・readMark・WriteMark、clear_marks → Clear（announce は
 // 消せた種類から見せる行を作る関数）、PARENT_MARK_* → Parent の定数、parent_mark_path・read_parent_mark・
-// write_parent_mark → ParentPath・ReadParent・WriteParent、CHILD_RECORD_* → Record の定数、child_record_path・
+// write_parent_mark → parentPath・ReadParent・WriteParent、CHILD_RECORD_* → Record の定数、child_record_path・
 // read_child_record・write_child_record → RecordPath・ReadRecord・WriteRecord、read_ledger・add_ledger →
 // ReadLedger・AddLedger、LEDGER_NAME → Ledger、marks → Marks、write_ticket → WriteTicket。now は fsio.Stamp を直に
 // 使う。呼び手の無い LEDGER_BY は移していない。

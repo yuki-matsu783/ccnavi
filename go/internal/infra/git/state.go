@@ -1,11 +1,13 @@
 package git
 
 import (
+	"maps"
 	"strings"
 	"time"
 
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/tree"
 )
 
 // Kind は変更の種類。元に戻す手順がこの 3 つ（と戻す手順を持たない Committed）で分かれる。
@@ -14,19 +16,22 @@ type Kind string
 const (
 	KindNew     Kind = "new"     // 無かったものが現れた
 	KindChanged Kind = "changed" // 中身が変わった
-	KindGone    Kind = "gone"    // 追跡されていたものが消えた
+	kindGone    Kind = "gone"    // 追跡されていたものが消えた
 	// KindCommitted はターンの間にコミットに入ったもの。status にはもう出ず、戻すには revert か履歴の
 	// 書き換えが要る（どちらもラッパーが拒む）ので、報告のためだけに在る。
 	KindCommitted Kind = "committed"
 )
 
-// KindLabels はユーザへ見せる表記。記録には Kind の英語のまま残し、報告の文面だけ日本語にする。
-var KindLabels = map[Kind]string{
+// kindLabels はユーザへ見せる表記。記録には Kind の英語のまま残し、報告の文面だけ日本語にする。
+var kindLabels = map[Kind]string{
 	KindNew:       "新規",
 	KindChanged:   "変更",
-	KindGone:      "削除",
+	kindGone:      "削除",
 	KindCommitted: "コミット済み",
 }
+
+// KindLabels は kindLabels の写しを返す（呼び手が書き換えても元は変わらない）。
+func KindLabels() map[Kind]string { return maps.Clone(kindLabels) }
 
 // StateTimeout はワークツリーを読む git の期限。実行前チェックに張る期限より短い。
 // 大きなリポジトリでは status も待たされるが、待たせるくらいなら何も言わない。
@@ -79,8 +84,8 @@ type Porcelain struct {
 	Paths []string
 }
 
-// Args は git に渡す引数。
-func (p Porcelain) Args() []string {
+// args は git に渡す引数。
+func (p Porcelain) args() []string {
 	args := []string{"status", "--porcelain"}
 	if p.NUL {
 		args = append(args, "-z")
@@ -102,7 +107,24 @@ func (p Porcelain) Args() []string {
 
 // Status は `git status --porcelain` を p のフラグで起こす。
 func Status(cwd string, p Porcelain, o Options) Done {
-	return runGit(cwd, p.Args(), o)
+	return runGit(cwd, p.args(), o)
+}
+
+// Uncommitted は cwd のワークツリーの未コミットの変更を `git status --porcelain` の行で返す。未追跡も 1 件ずつ
+// 数え、パスは引用しない。「未コミットの変更があるか」はどの操作もこの 1 本で決める。読めなければ偽。
+func Uncommitted(cwd string, o Options) (string, bool) {
+	o.RawPaths = true
+	done := Status(cwd, Porcelain{Untracked: UntrackedAll}, o)
+	return done.Out, done.OK()
+}
+
+// Dirty は Uncommitted に 1 行でもあるか。読めなければ known が偽。
+func Dirty(cwd string, o Options) (dirty, known bool) {
+	out, ok := Uncommitted(cwd, o)
+	if !ok {
+		return false, false
+	}
+	return ospath.Strip(out) != "", true
 }
 
 // Change はワークツリーの変更 1 件。
@@ -129,7 +151,7 @@ func (c Change) Key() string {
 func TopLevel(root string) string {
 	directory := ospath.Abspath(root)
 	for {
-		if ospath.DiskExists(ospath.Join(directory, ".git")) {
+		if ospath.DiskExists(ospath.Join(directory, tree.DotGit)) {
 			return directory
 		}
 		parent := ospath.Dirname(directory)
@@ -215,7 +237,7 @@ func parseStatus(top, entry string) (Change, bool) {
 	case index == 'A':
 		c.Kind, c.Staged = KindNew, true
 	case index == 'D' || worktree == 'D':
-		c.Kind = KindGone
+		c.Kind = kindGone
 	default:
 		c.Kind = KindChanged
 	}

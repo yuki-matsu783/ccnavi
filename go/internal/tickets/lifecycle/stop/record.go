@@ -8,15 +8,15 @@ import (
 	"ccnavi/internal/infra/pyjson"
 )
 
-// NudgePrefix は促した状態の記録の名前の頭（records/prune が同じ頭で消す）。
-const NudgePrefix = "nudged-"
+// nudgePrefix は促した状態の記録の名前の頭（records/prune が同じ頭で消す）。
+const nudgePrefix = "nudged-"
 
 // unknownSession は session が空のときの記録の名前。
 const unknownSession = "unknown"
 
-// UserStopNote は Stop の促しの共通の 1 文。直前にユーザが止めた・待たせた・相談したいと言ったときは、
+// userStopNote は Stop の促しの共通の 1 文。直前にユーザが止めた・待たせた・相談したいと言ったときは、
 // 促しに従わずに終えさせる。
-const UserStopNote = "直前にユーザが「止めて」「待って」「相談したい」と言った場合は、このまま進めずにターンを終えてください。" +
+const userStopNote = "直前にユーザが「止めて」「待って」「相談したい」と言った場合は、このまま進めずにターンを終えてください。" +
 	"止めた理由と、再開するときの次の一手を1行で書きます。" +
 	"ユーザの判断が本当に要る問いがある場合は、その問いを最後に書き直して終えてください。"
 
@@ -26,13 +26,13 @@ type Nudge interface {
 	Digest() string
 }
 
-// NudgePath は促した状態の記録のパス。セッションごとに置く。
-func NudgePath(stateDir, session string) string {
-	return fsio.RecordPath(stateDir, NudgePrefix, cmp.Or(session, unknownSession), fsio.JSONExt)
+// nudgePath は促した状態の記録のパス。セッションごとに置く。
+func nudgePath(stateDir, session string) string {
+	return fsio.RecordPath(stateDir, nudgePrefix, cmp.Or(session, unknownSession), fsio.JSONExt)
 }
 
 func readNudges(stateDir, session string) *pyjson.Object {
-	data, ok := fsio.ReadObject(NudgePath(stateDir, session))
+	data, ok := fsio.ReadObject(nudgePath(stateDir, session))
 	if !ok {
 		return &pyjson.Object{}
 	}
@@ -59,7 +59,7 @@ func NudgedBefore(stateDir, session string, n Nudge) bool {
 
 // RememberNudge は促した状態を記録する（キーの順に並べ直す）。書けなければ理由。git で共有する履歴には入れない。
 func RememberNudge(stateDir, session string, n Nudge) string {
-	path := NudgePath(stateDir, session)
+	path := nudgePath(stateDir, session)
 	data, ok := fsio.ReadObject(path)
 	if !ok {
 		data = &pyjson.Object{}

@@ -94,7 +94,7 @@ func TakeEntry(argv []string) ([]string, string, error) {
 
 // DirectRefusal は印の無い `user <操作>`（直に打った形）の断り文。script は打つ sh の呼び方。
 func DirectRefusal(verb Verb, script string) string {
-	return "`ccnavi user " + strings.Join(verb.Words, " ") + "` は、実行ファイルを直に打つ入口ではありません。" +
+	return "`ccnavi user " + strings.Join(verb.words, " ") + "` は、実行ファイルを直に打つ入口ではありません。" +
 		"ユーザが `" + script + "` を打ちます（実行ファイルが行わない後始末は、その sh が行います）。"
 }
 
@@ -128,14 +128,14 @@ func Rewrite(argv []string) ([]string, *Verb, error) {
 	}
 	for i := range verbs {
 		verb := &verbs[i]
-		if len(words) < len(verb.Words) || !slices.Equal(words[:len(verb.Words)], verb.Words) {
+		if len(words) < len(verb.words) || !slices.Equal(words[:len(verb.words)], verb.words) {
 			continue
 		}
-		rest := argv[at+1+len(verb.Words):]
-		internal := slices.Clone(verb.Internal)
-		if verb.Value {
+		rest := argv[at+1+len(verb.words):]
+		internal := slices.Clone(verb.internal)
+		if verb.value {
 			if len(rest) == 0 || strings.HasPrefix(rest[0], "-") {
-				return nil, nil, entryError("user " + strings.Join(verb.Words, " ") + " には値が要る")
+				return nil, nil, entryError("user " + strings.Join(verb.words, " ") + " には値が要る")
 			}
 			internal = append(internal, rest[0])
 			rest = rest[1:]
@@ -146,7 +146,7 @@ func Rewrite(argv []string) ([]string, *Verb, error) {
 	}
 	shown := make([]string, len(verbs))
 	for i, v := range verbs {
-		shown[i] = strings.Join(v.Words, " ")
+		shown[i] = strings.Join(v.words, " ")
 	}
 	return nil, nil, entryError("user の操作は " + strings.Join(shown, " / ") + " のどれか")
 }
@@ -172,7 +172,7 @@ func Refused(given func(option string) bool) string {
 			continue
 		}
 		for _, v := range verbs {
-			if v.Internal[len(v.Internal)-1] != f.name {
+			if v.internal[len(v.internal)-1] != f.name {
 				continue
 			}
 			text := f.name + " はユーザ専用です。ユーザが `" + UserScriptPrefix + v.Script + ".sh` で打ちます。"

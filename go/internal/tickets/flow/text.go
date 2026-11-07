@@ -28,9 +28,9 @@ const (
 	fenceShown = "〔区切りに似た文〕"
 )
 
-// FencePhrases は案内の区切りの行の文。フローの文の中に出たら置き換える。プロジェクトのスキルの目録の
+// fencePhrases は案内の区切りの行の文。フローの文の中に出たら置き換える。プロジェクトのスキルの目録の
 // 区切り（catalog）も同じく置き換えるので、目録の区切りはここに並べた文で書く。
-var FencePhrases = []string{
+var fencePhrases = []string{
 	"ここから合意済みのフローの本文",
 	"フローの本文ここまで",
 	"ここからプロジェクトのスキルの目録",
@@ -159,7 +159,7 @@ func neutral(s string) string {
 			replace[origin[c]] = badgeClose
 		}
 	}
-	for _, phrase := range FencePhrases {
+	for _, phrase := range fencePhrases {
 		needle, _ := skeleton([]rune(phrase))
 		for at := indexFrom(skel, needle, 0); at >= 0; at = indexFrom(skel, needle, at+len(needle)) {
 			first, last := origin[at], origin[at+len(needle)-1]

@@ -47,10 +47,10 @@ func LoadSource(path string) ([]byte, string, error) {
 	if !staged {
 		var err error
 		if content, err = readFile(path); err != nil {
-			return nil, "", Wrap(err)
+			return nil, "", wrap(err)
 		}
 	} else if !ok {
-		return nil, "", Wrap(notFound(path))
+		return nil, "", wrap(notFound(path))
 	}
 	text, err := Decode(content, Strict)
 	if err != nil {
@@ -64,7 +64,7 @@ func LoadSource(path string) ([]byte, string, error) {
 func ReadDiskBytes(path string) ([]byte, error) {
 	content, err := readFile(path)
 	if err != nil {
-		return nil, Wrap(err)
+		return nil, wrap(err)
 	}
 	if content == nil {
 		content = []byte{}
@@ -78,7 +78,7 @@ func ReadDiskBytes(path string) ([]byte, error) {
 func ReadDiskText(path string, bad Undecodable) (string, error) {
 	content, err := readFile(path)
 	if err != nil {
-		return "", Wrap(err)
+		return "", wrap(err)
 	}
 	return Decode(content, bad)
 }
@@ -88,13 +88,13 @@ func ReadDiskText(path string, bad Undecodable) (string, error) {
 func ReadDiskTextHead(path string, chars int, bad Undecodable) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return "", Wrap(err)
+		return "", wrap(err)
 	}
 	defer f.Close()
 	content := make([]byte, chars*utf8.UTFMax)
 	n, err := io.ReadFull(f, content)
 	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
-		return "", Wrap(err)
+		return "", wrap(err)
 	}
 	content = content[:n]
 	if n == len(content) && n > 0 {
@@ -125,7 +125,7 @@ func ReadDiskTextHead(path string, chars int, bad Undecodable) (string, error) {
 func ReadJSON(path string) (any, error) {
 	content, staged, ok := stagedContent(path)
 	if staged && !ok {
-		return nil, Wrap(notFound(path))
+		return nil, wrap(notFound(path))
 	}
 	if !staged {
 		var err error
@@ -135,7 +135,7 @@ func ReadJSON(path string) (any, error) {
 			}
 			// 無い（ENOENT）は待っても現れないので打ち直さない。
 			if !transient(err) || attempt == retries {
-				return nil, Wrap(err)
+				return nil, wrap(err)
 			}
 			sleep(retryWait)
 		}
@@ -226,16 +226,16 @@ func Listdir(directory string) ([]string, error) {
 func listNames(directory string) ([]string, error) {
 	names, err := ospath.DiskListdir(directory)
 	if err != nil {
-		return nil, Wrap(err)
+		return nil, wrap(err)
 	}
 	return names, nil
 }
 
 // OpenNoFollow は読むために開き、開いたものの fstat を返す。リンクは開かず（NoFollow）、名前付きパイプでも
-// 書き手を待たない（NonBlock）。lstat で確かめてから開くまでに差し替えられたものを、呼び手が返した FileInfo と
+// 書き手を待たない（nonBlock）。lstat で確かめてから開くまでに差し替えられたものを、呼び手が返した FileInfo と
 // os.SameFile で見分ける。開けなければ os の error（Python の OSError に当たる）。
 func OpenNoFollow(path string) (*os.File, fs.FileInfo, error) {
-	f, err := os.OpenFile(path, os.O_RDONLY|NoFollow|NonBlock, 0)
+	f, err := os.OpenFile(path, os.O_RDONLY|NoFollow|nonBlock, 0)
 	if err != nil {
 		return nil, nil, err
 	}

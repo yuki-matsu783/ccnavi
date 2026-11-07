@@ -23,7 +23,7 @@ func TestMask(t *testing.T) {
 		{strings.Repeat("あ", short), "ああああああ***ああああ"}, // 字数は符号位置で数える
 	}
 	for _, c := range cases {
-		if got := Mask(c.in); got != c.want {
+		if got := mask(c.in); got != c.want {
 			t.Errorf("Mask(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
@@ -52,7 +52,7 @@ func TestHidden(t *testing.T) {
 		text, secret string
 		kept         []string
 	}{
-		{"curl -H 'Authorization: Bearer " + long + "' https://api.example.com", long, []string{"Authorization: Bearer", "https://api.example.com", Mask(long)}},
+		{"curl -H 'Authorization: Bearer " + long + "' https://api.example.com", long, []string{"Authorization: Bearer", "https://api.example.com", mask(long)}},
 		{`curl -H "Authorization: tok12345" x`, "tok12345", []string{"Authorization:"}},
 		{"echo Bearer " + long, long, []string{"Bearer"}},
 		{"GITHUB_TOKEN=abc123 gh pr list", "abc123", []string{"GITHUB_TOKEN="}},
@@ -76,7 +76,7 @@ func TestHidden(t *testing.T) {
 		{"mysql -u root -phunter2 db", "hunter2", []string{"mysql -u root -p", " db"}},
 		{"cd x && mysqldump -p'hunter 2' db", "hunter 2", []string{"mysqldump"}},
 		{"curl -u me:hunter2 https://x", "hunter2", []string{"curl -u me:"}},
-		{"curl -H 'Cookie: session=abc123; id=zz99' https://x", "abc123", []string{"Cookie:", "https://x", Mask("session=abc123; id=zz99")}},
+		{"curl -H 'Cookie: session=abc123; id=zz99' https://x", "abc123", []string{"Cookie:", "https://x", mask("session=abc123; id=zz99")}},
 		{"curl -H 'Cookie: a=1; token=abc123' x", "abc123", []string{"Cookie:"}},
 		{"curl -b 'sid=abc123' https://x", "abc123", []string{"curl -b"}},
 		{"curl --cookie sid=abc123 https://x", "abc123", []string{"--cookie"}},
@@ -124,7 +124,7 @@ func TestTokenShapes(t *testing.T) {
 func TestExactOutputs(t *testing.T) {
 	cases := []struct{ in, want string }{
 		// 同じ値に 2 つの形が当たっても 1 度だけ伏せる（残した頭と尻まで消さない）。
-		{"GITHUB_TOKEN=" + ghp + " gh pr list", "GITHUB_TOKEN=" + Mask(ghp) + " gh pr list"},
+		{"GITHUB_TOKEN=" + ghp + " gh pr list", "GITHUB_TOKEN=" + mask(ghp) + " gh pr list"},
 		// unwrapped はコマンドを NUL でつなぐ。値はそこで終わる。
 		{"GITHUB_TOKEN=abc123\x00gh pr list", "GITHUB_TOKEN=***\x00gh pr list"},
 		{"mysql -phunter2\x00ls -a", "mysql -p***\x00ls -a"},
@@ -152,7 +152,7 @@ func TestLongNames(t *testing.T) {
 	for _, size := range []int{64, 65, 200, 10_000} {
 		for _, head := range []string{"x", "-", "_."} {
 			name := strings.Repeat(head, size)[:size] + "token="
-			if got, want := Redact(name+secret), name+Mask(secret); got != want {
+			if got, want := Redact(name+secret), name+mask(secret); got != want {
 				t.Errorf("size %d head %q: got …%q", size, head, got[len(got)-30:])
 			}
 		}

@@ -26,12 +26,12 @@ type unreadable struct{ text string }
 func (e unreadable) Error() string        { return e.text }
 func (e unreadable) Is(target error) bool { return target == errUnreadable }
 
-// expectation は期待する判定の 1 件。Expected はそれを置いたタイプ（deny なら止まるはず）。
+// expectation は期待する判定の 1 件。expected はそれを置いたタイプ（deny なら止まるはず）。
 type expectation struct {
-	Expected        rules.Decision
-	Tool, Subject   string
-	ResolvedSubject string
-	Why             string
+	expected        rules.Decision
+	tool, subject   string
+	resolvedSubject string
+	why             string
 }
 
 // loadExpectations は期待する判定を読み、タイプの順に平らに並べる。subject の合言葉は走らせた場所に読み替える。
@@ -49,7 +49,7 @@ func loadExpectations(path, root string) ([]expectation, error) {
 		return nil, unreadable{"期待する判定の形が違う。最上位はタイプの対応表のはず: " + path}
 	}
 	var out []expectation
-	for _, want := range rules.Sections {
+	for _, want := range rules.Sections() {
 		value := top.Get(string(want))
 		if !pyfmt.Truthy(value) {
 			continue
@@ -65,8 +65,8 @@ func loadExpectations(path, root string) ([]expectation, error) {
 				return nil, unreadable{fmt.Sprintf("期待する判定の形が違う。タイプ %s の 1 件が対応表ではない: %s", want, path)}
 			}
 			subject := text0(m, "subject")
-			out = append(out, expectation{Expected: want, Tool: text0(m, "tool"), Subject: subject,
-				ResolvedSubject: strings.ReplaceAll(subject, ExpectationPlaceholder, root), Why: text0(m, "why")})
+			out = append(out, expectation{expected: want, tool: text0(m, "tool"), subject: subject,
+				resolvedSubject: strings.ReplaceAll(subject, ExpectationPlaceholder, root), why: text0(m, "why")})
 		}
 	}
 	return out, nil
@@ -80,20 +80,20 @@ func text0(m *yaml.Map, key string) string {
 	return ""
 }
 
-// expectationResult は期待 1 件を判定に掛けた結果。Skipped は allow の期待が判定に入らずに通ったもの（呼び出しは
+// expectationResult は期待 1 件を判定に掛けた結果。skipped は allow の期待が判定に入らずに通ったもの（呼び出しは
 // 通るので期待は満たすが、ルールを書いてもヒットしない場所なので、食い違いとは別に数えて必ず見せる）。
 type expectationResult struct {
 	expectation
 	Result
-	Verdict     string
-	OK, Skipped bool
+	verdict     string
+	ok, skipped bool
 }
 
 func (r expectationResult) object() *pyjson.Object {
-	return pyjson.NewObject("expected", string(r.Expected), "tool", r.expectation.Tool,
-		"subject", r.expectation.Subject, "resolved_subject", r.ResolvedSubject, "why", r.Why,
-		"known", r.Known, "verdict", r.Verdict, "code", r.Code, "reason", r.Reason, "rules", hitObjects(r.Rules),
-		"ok", r.OK, "skipped", r.Skipped)
+	return pyjson.NewObject("expected", string(r.expected), "tool", r.expectation.tool,
+		"subject", r.expectation.subject, "resolved_subject", r.resolvedSubject, "why", r.why,
+		"known", r.known, "verdict", r.verdict, "code", r.code, "reason", r.reason, "rules", hitObjects(r.Rules),
+		"ok", r.ok, "skipped", r.skipped)
 }
 
 type expectations struct {
@@ -114,7 +114,7 @@ func runExpectations(stderr io.Writer, conf *config.Settings, root, path string)
 	said := map[string]bool{}
 	for _, e := range list {
 		var heard bytes.Buffer
-		out, err := TryOne(&heard, conf, root, e.Tool, e.ResolvedSubject, Call{})
+		out, err := TryOne(&heard, conf, root, e.tool, e.resolvedSubject, Call{})
 		if err != nil {
 			return nil, err
 		}
@@ -125,21 +125,21 @@ func runExpectations(stderr io.Writer, conf *config.Settings, root, path string)
 			}
 		}
 		got := string(audit.Skip)
-		if out.Known {
+		if out.known {
 			got = out.Verdict
 		}
-		skipped := e.Expected == rules.Allow && got == string(audit.Skip)
-		body.results = append(body.results, expectationResult{expectation: e, Result: out, Verdict: got,
-			OK: got == string(e.Expected) || skipped, Skipped: skipped})
+		skipped := e.expected == rules.Allow && got == string(audit.Skip)
+		body.results = append(body.results, expectationResult{expectation: e, Result: out, verdict: got,
+			ok: got == string(e.expected) || skipped, skipped: skipped})
 	}
 	return body, nil
 }
 
 func (b *expectations) count(want rules.Decision) (ok, total int) {
 	for _, r := range b.results {
-		if r.Expected == want {
+		if r.expected == want {
 			total++
-			if r.OK {
+			if r.ok {
 				ok++
 			}
 		}
@@ -149,10 +149,10 @@ func (b *expectations) count(want rules.Decision) (ok, total int) {
 
 func (b *expectations) tally() (mismatches, skipped int) {
 	for _, r := range b.results {
-		if !r.OK {
+		if !r.ok {
 			mismatches++
 		}
-		if r.Skipped {
+		if r.skipped {
 			skipped++
 		}
 	}
@@ -161,7 +161,7 @@ func (b *expectations) tally() (mismatches, skipped int) {
 
 func (b *expectations) object() *pyjson.Object {
 	counts := pyjson.NewObject()
-	for _, want := range rules.Sections {
+	for _, want := range rules.Sections() {
 		ok, total := b.count(want)
 		counts.Set(string(want), pyjson.NewObject("ok", ok, "total", total))
 	}
@@ -193,16 +193,16 @@ func TestExpectations(stdout, stderr io.Writer, conf *config.Settings, root, pat
 
 	p := func(format string, a ...any) { fmt.Fprintf(stdout, format, a...) }
 	for _, r := range body.results {
-		if r.OK {
+		if r.ok {
 			continue
 		}
-		p("食い違い: %s のはずが %s\n", r.Expected, r.Verdict)
-		p("  %s  %s\n", r.expectation.Tool, r.expectation.Subject)
-		p("  なぜ deny/ask/allow に置いたか: %s\n", r.Why)
+		p("食い違い: %s のはずが %s\n", r.expected, r.verdict)
+		p("  %s  %s\n", r.expectation.tool, r.expectation.subject)
+		p("  なぜ deny/ask/allow に置いたか: %s\n", r.why)
 		var hit []string
 		for _, h := range r.Rules {
-			if h.Source == FromFile {
-				hit = append(hit, string(h.Section)+":"+h.ID)
+			if h.source == fromFile {
+				hit = append(hit, string(h.section)+":"+h.ID)
 			}
 		}
 		if len(hit) > 0 {
@@ -211,12 +211,12 @@ func TestExpectations(stdout, stderr io.Writer, conf *config.Settings, root, pat
 		p("\n")
 	}
 	for _, r := range body.results {
-		if r.Skipped {
-			p("判定に入らずに通った（allow ではない）: %s  %s\n", r.expectation.Tool, r.expectation.Subject)
-			p("  %s\n\n", r.Why)
+		if r.skipped {
+			p("判定に入らずに通った（allow ではない）: %s  %s\n", r.expectation.tool, r.expectation.subject)
+			p("  %s\n\n", r.why)
 		}
 	}
-	for _, want := range rules.Sections {
+	for _, want := range rules.Sections() {
 		ok, total := body.count(want)
 		p("%s: %d/%d\n", want, ok, total)
 	}

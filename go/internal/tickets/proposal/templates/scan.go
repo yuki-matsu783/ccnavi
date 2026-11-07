@@ -23,69 +23,69 @@ import (
 	"ccnavi/internal/tickets/flow"
 )
 
-// Dropped は統合結果で取り込まれない理由。
-type Dropped string
+// dropped は統合結果で取り込まれない理由。
+type dropped string
 
 const (
-	DropNone      Dropped = ""
-	DropInvalid   Dropped = "invalid"
-	DropDuplicate Dropped = "duplicate"
-	DropConflict  Dropped = "conflict"
+	dropNone      dropped = ""
+	dropInvalid   dropped = "invalid"
+	dropDuplicate dropped = "duplicate"
+	dropConflict  dropped = "conflict"
 )
 
 // Entry は置き場の <名前>.yml 1 本。読めなかったものも載せる（Template が nil）。Notes は読むときと統合結果の
-// 苦情、Checks は計画とフローの検査の苦情（フェーズ定義が変われば変わるので分ける）。Effective は統合結果で
+// 苦情、Checks は計画とフローの検査の苦情（フェーズ定義が変われば変わるので分ける）。effective は統合結果で
 // 取り込まれたか（読めないもの・衝突で破棄したものは偽）。
 type Entry struct {
 	Layer         string
 	Name          string
-	Path          string
+	path          string
 	Rel           string
 	SHA           string
 	Raw           []byte
 	Template      *Template
 	Notes         []rules.Problem
 	Checks        []rules.Problem
-	Effective     bool
-	Dropped       Dropped
-	DroppedDetail string
-	Writable      bool
+	effective     bool
+	dropped       dropped
+	droppedDetail string
+	writable      bool
 }
 
 // Problems は読むときの苦情と検査の苦情。
 func (e *Entry) Problems() []rules.Problem { return append(slices.Clip(e.Notes), e.Checks...) }
 
-// Usable は取り込まれていて error も無いか（使う側が受けてよい）。
-func (e *Entry) Usable() bool { return e.Effective && !hasError(e.Problems()) }
+// usable は取り込まれていて error も無いか（使う側が受けてよい）。
+func (e *Entry) usable() bool { return e.effective && !hasError(e.Problems()) }
 
-func (e *Entry) drop(why Dropped, detail string) {
-	e.Effective = false
-	e.Dropped, e.DroppedDetail = why, detail
+func (e *Entry) drop(why dropped, detail string) {
+	e.effective = false
+	e.dropped, e.droppedDetail = why, detail
 }
 
-// LayerRead は 1 つのレイヤーの置き場。Problems は置き場そのものの苦情（読めない、.yml でないファイル）。
+// LayerRead は 1 つのレイヤーの置き場。problems は置き場そのものの苦情（読めない、.yml でないファイル）。
 type LayerRead struct {
 	Name       string
-	Directory  string
-	Rel        string
-	Exists     bool
+	directory  string
+	rel        string
+	exists     bool
 	Unreadable string
-	Writable   bool
+	writable   bool
 	Entries    []*Entry
-	Problems   []rules.Problem
+	problems   []rules.Problem
 }
 
 // Scan は共通と各レイヤー（自身のレイヤーが先、プロジェクトは名前順）。Catalog はフローの検査の候補。
 type Scan struct {
-	Root    string
-	Common  *LayerRead
-	Layers  []*LayerRead
+	root    string
+	common  *LayerRead
+	layers  []*LayerRead
 	Catalog flow.Catalog
 }
 
-// Layer は名前のレイヤー。無ければ nil。
-func (s *Scan) Layer(name string) *LayerRead {
-	for _, l := range s.Layers {
+// layer は名前のレイヤー。無ければ nil。
+func (s *Scan) layer(name string) *LayerRead {
+	for _, l := range s.layers {
 		if l.Name == name {
 			return l
 		}
@@ -94,7 +94,7 @@ func (s *Scan) Layer(name string) *LayerRead {
 }
 
 // All は共通レイヤーと、続くレイヤーの読み（この順）。
-func (s *Scan) All() []*LayerRead { return append([]*LayerRead{s.Common}, s.Layers...) }
+func (s *Scan) All() []*LayerRead { return append([]*LayerRead{s.common}, s.layers...) }
 
 // Relative は root からの相対（/ 区切り）。root の外なら path を / 区切りにしたもの。
 func Relative(root, path string) string {
@@ -114,8 +114,8 @@ func badFileName(base string) string {
 	return "ファイル名 `" + line(base) + "` は名前に使えない（英数字で始め、英数字と `._-` だけ）"
 }
 
-// SHA はファイルの中身のハッシュ。保存の --expect に使う。
-func SHA(raw []byte) string {
+// sha はファイルの中身のハッシュ。保存の --expect に使う。
+func sha(raw []byte) string {
 	sum, _ := digest.HexOf(digest.SHA256, bytes.NewReader(raw))
 	return sum
 }
@@ -123,18 +123,18 @@ func SHA(raw []byte) string {
 // ReadEntry は置き場の 1 本を読む。読めなければ理由を error の苦情に持つ（Template は nil）。
 func ReadEntry(layer, root, path string, writable bool) *Entry {
 	base, stem := stemOf(path)
-	e := &Entry{Layer: layer, Name: stem, Path: path, Rel: Relative(root, path), Writable: writable, Effective: true}
+	e := &Entry{Layer: layer, Name: stem, path: path, Rel: Relative(root, path), writable: writable, effective: true}
 	raw, why := flow.ReadBytes(path, root)
 	if raw == nil {
 		e.Notes = append(e.Notes, rules.Problem{Severity: rules.Error, Rule: stem, Detail: why})
-		e.drop(DropInvalid, why)
+		e.drop(dropInvalid, why)
 		return e
 	}
-	e.Raw, e.SHA = raw, SHA(raw)
+	e.Raw, e.SHA = raw, sha(raw)
 	if !validName(stem) {
 		text := badFileName(base)
 		e.Notes = append(e.Notes, rules.Problem{Severity: rules.Error, Rule: stem, Detail: text})
-		e.drop(DropInvalid, text)
+		e.drop(dropInvalid, text)
 		return e
 	}
 	t, notes := Parse(raw, stem)
@@ -147,7 +147,7 @@ func ReadEntry(layer, root, path string, writable bool) *Entry {
 				break
 			}
 		}
-		e.drop(DropInvalid, first)
+		e.drop(dropInvalid, first)
 		return e
 	}
 	e.Template = t
@@ -161,7 +161,7 @@ func osReason(err error) string {
 
 // ReadLayer はレイヤーの置き場の <名前>.yml を全部読む（名前順）。置き場が無いのは正常（空）。
 func ReadLayer(layer, root, dir string, writable bool) *LayerRead {
-	l := &LayerRead{Name: layer, Directory: dir, Rel: Relative(root, dir), Writable: writable}
+	l := &LayerRead{Name: layer, directory: dir, rel: Relative(root, dir), writable: writable}
 	before, err := os.Lstat(dir)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
@@ -173,7 +173,7 @@ func ReadLayer(layer, root, dir string, writable bool) *LayerRead {
 	case !before.IsDir():
 		l.Unreadable = "置き場がディレクトリではない"
 	}
-	l.Exists = true
+	l.exists = true
 	if l.Unreadable == "" {
 		names, err := ospath.DiskListdir(dir)
 		if err != nil {
@@ -183,7 +183,7 @@ func ReadLayer(layer, root, dir string, writable bool) *LayerRead {
 			return l
 		}
 	}
-	l.Problems = append(l.Problems, rules.Problem{Severity: rules.Error, Detail: l.Rel + ": " + l.Unreadable})
+	l.problems = append(l.problems, rules.Problem{Severity: rules.Error, Detail: l.rel + ": " + l.Unreadable})
 	return l
 }
 
@@ -193,17 +193,17 @@ func (l *LayerRead) readEntries(root string, names []string) {
 			continue
 		}
 		if !strings.HasSuffix(name, Suffix) {
-			l.Problems = append(l.Problems, rules.Problem{Severity: rules.Warn,
-				Detail: l.Rel + "/" + line(name) + " は `" + Suffix + "` でないので読まない"})
+			l.problems = append(l.problems, rules.Problem{Severity: rules.Warn,
+				Detail: l.rel + "/" + line(name) + " は `" + Suffix + "` でないので読まない"})
 			continue
 		}
-		l.Entries = append(l.Entries, ReadEntry(l.Name, root, ospath.Join(l.Directory, name), l.Writable))
+		l.Entries = append(l.Entries, ReadEntry(l.Name, root, ospath.Join(l.directory, name), l.writable))
 	}
 }
 
-// Merge は共通にレイヤーを足す。同名で全欄が同じならレイヤーの側を破棄して info、中身が違えば error で
+// merge は共通にレイヤーを足す。同名で全欄が同じならレイヤーの側を破棄して info、中身が違えば error で
 // レイヤーの側を使わない。共通の側が読めていないものは無いものとして扱う。苦情は返し、レイヤーの側の Notes にも足す。
-func Merge(common, extra *LayerRead) []rules.Problem {
+func merge(common, extra *LayerRead) []rules.Problem {
 	base := map[string]*Entry{}
 	for _, e := range common.Entries {
 		if e.Template != nil {
@@ -220,16 +220,16 @@ func Merge(common, extra *LayerRead) []rules.Problem {
 		if Dump(prior.Template) == Dump(e.Template) {
 			p = rules.Problem{Severity: rules.Info, Rule: e.Name, Detail: "`" + e.Name + "` は共通と全欄が同じなので、" +
 				e.Layer + " の側を破棄した。共通の 1 本を使う"}
-			e.Dropped = DropDuplicate
+			e.dropped = dropDuplicate
 		} else {
 			p = rules.Problem{Severity: rules.Error, Rule: e.Name, Detail: "`" + e.Name + "` は共通と同じ名前で中身が違う（違う欄: " +
 				strings.Join(differing(prior.Template, e.Template), ", ") + "）。" +
 				e.Layer + " の `" + e.Name + "` は使わず、共通の定義を使う。" +
 				"中身を変えたいなら " + e.Layer + " の側に別の名前を付ける"}
-			e.Dropped = DropConflict
+			e.dropped = dropConflict
 		}
-		e.DroppedDetail = p.Detail
-		e.Effective = false
+		e.droppedDetail = p.Detail
+		e.effective = false
 		e.Notes = append(e.Notes, p)
 		said = append(said, p)
 	}
@@ -246,7 +246,7 @@ func differing(a, b *Template) []string {
 	var out []string
 	for i, ok := range same {
 		if !ok {
-			out = append(out, Fields[i])
+			out = append(out, fields[i])
 		}
 	}
 	if len(out) == 0 {
@@ -278,7 +278,7 @@ func TypesFor(conf *config.Settings, root, layer string) *phases.Types {
 
 // Recheck は別のフェーズ定義（統合結果）で検査をやり直した写し。読むときの苦情は残す。
 func Recheck(e *Entry, types *phases.Types, cat *flow.Catalog) *Entry {
-	if e.Template == nil || !e.Effective {
+	if e.Template == nil || !e.effective {
 		return e
 	}
 	again := *e
@@ -297,29 +297,29 @@ func Load(conf *config.Settings, root string) *Scan {
 			e.Checks = append(e.Checks, Check(e.Template, commonTypes, &cat)...)
 		}
 	}
-	out := &Scan{Root: root, Common: common, Catalog: cat}
+	out := &Scan{root: root, common: common, Catalog: cat}
 	for _, view := range ruleload.Layers(conf, root) {
 		l := ReadLayer(view.Name, root, conf.LayerTemplatesDir(view.Home), true)
-		Merge(common, l)
+		merge(common, l)
 		types := TypesFor(conf, root, view.Name)
 		for _, e := range l.Entries {
-			if e.Template != nil && e.Effective {
+			if e.Template != nil && e.effective {
 				e.Checks = append(e.Checks, Check(e.Template, types, &cat)...)
 			}
 		}
-		out.Layers = append(out.Layers, l)
+		out.layers = append(out.layers, l)
 	}
 	return out
 }
 
-// Adopted は layer を足したときの、取り込まれた・破棄した全部（共通が先、名前順）。共通の側を統合結果の定義で
+// adopted は layer を足したときの、取り込まれた・破棄した全部（共通が先、名前順）。共通の側を統合結果の定義で
 // 検査し直す（Recheck）のは呼び手。
-func (s *Scan) Adopted(layer string) []*Entry {
-	view := s.Layer(layer)
+func (s *Scan) adopted(layer string) []*Entry {
+	view := s.layer(layer)
 	if view == nil {
 		return nil
 	}
-	return append(slices.Clone(s.Common.Entries), view.Entries...)
+	return append(slices.Clone(s.common.Entries), view.Entries...)
 }
 
 // LayerProblem は苦情とそのレイヤー。
@@ -332,7 +332,7 @@ type LayerProblem struct {
 func (s *Scan) Problems() []LayerProblem {
 	var out []LayerProblem
 	for _, view := range s.All() {
-		for _, p := range view.Problems {
+		for _, p := range view.problems {
 			out = append(out, LayerProblem{view.Name, p})
 		}
 		for _, e := range view.Entries {
@@ -346,18 +346,18 @@ func (s *Scan) Problems() []LayerProblem {
 
 // HasAny は置き場がどこかに在るか。
 func (s *Scan) HasAny() bool {
-	return slices.ContainsFunc(s.All(), func(l *LayerRead) bool { return l.Exists })
+	return slices.ContainsFunc(s.All(), func(l *LayerRead) bool { return l.exists })
 }
 
 // Find は名前の Entry。取り込まれたものを先に、破棄したものは最後に探す。
 func (s *Scan) Find(layer, name string) *Entry {
 	var found []*Entry
-	for _, e := range s.Adopted(layer) {
+	for _, e := range s.adopted(layer) {
 		if e.Name == name {
 			found = append(found, e)
 		}
 	}
-	slices.SortStableFunc(found, func(a, b *Entry) int { return boolInt(!a.Effective) - boolInt(!b.Effective) })
+	slices.SortStableFunc(found, func(a, b *Entry) int { return boolInt(!a.effective) - boolInt(!b.effective) })
 	if len(found) == 0 {
 		return nil
 	}

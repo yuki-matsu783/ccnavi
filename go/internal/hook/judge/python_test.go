@@ -80,12 +80,12 @@ func runGo(t *testing.T, root string, c judgeCase) judgeAnswer {
 	var stdout, stderr bytes.Buffer
 	answer := judgeAnswer{}
 	conf, _ := config.Load(root)
-	conf.GuardTicketApproval = string(selfguard.Resolve(&stderr, "", conf.GuardTicketApproval, env.GuardTicketApproval, selfguard.GateChoices))
-	conf.TicketControl = string(selfguard.Resolve(&stderr, "", conf.TicketControl, env.TicketControl, selfguard.GateChoices))
+	conf.GuardTicketApproval = string(selfguard.Resolve(&stderr, "", conf.GuardTicketApproval, env.GuardTicketApproval, selfguard.GateChoices()))
+	conf.TicketControl = string(selfguard.Resolve(&stderr, "", conf.TicketControl, env.TicketControl, selfguard.GateChoices()))
 	mode := config.ResolveMode(&stderr, "", conf)
-	conf.RestoreIfDeny = string(selfguard.Resolve(&stderr, "", conf.RestoreIfDeny, env.RestoreIfDeny, selfguard.Choices))
-	conf.GuardCoreFiles = string(selfguard.Resolve(&stderr, "", conf.GuardCoreFiles, env.GuardCoreFiles, selfguard.Choices))
-	conf.GuardUnwatched = string(selfguard.Resolve(&stderr, "", conf.GuardUnwatched, env.GuardUnwatched, selfguard.GateChoices))
+	conf.RestoreIfDeny = string(selfguard.Resolve(&stderr, "", conf.RestoreIfDeny, env.RestoreIfDeny, selfguard.Choices()))
+	conf.GuardCoreFiles = string(selfguard.Resolve(&stderr, "", conf.GuardCoreFiles, env.GuardCoreFiles, selfguard.Choices()))
+	conf.GuardUnwatched = string(selfguard.Resolve(&stderr, "", conf.GuardUnwatched, env.GuardUnwatched, selfguard.GateChoices()))
 	in, err := hookio.Decode(strings.NewReader(c.Payload))
 	if err != nil {
 		answer.Error = err.Error()

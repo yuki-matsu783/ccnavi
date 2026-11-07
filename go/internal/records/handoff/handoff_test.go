@@ -50,7 +50,7 @@ func TestUsageOf(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			usage := UsageOf(transcript(t, t.TempDir(), c.rows...))
-			if usage == nil || usage.Tokens != c.tokens || usage.TTL != c.ttl {
+			if usage == nil || usage.tokens != c.tokens || usage.ttl != c.ttl {
 				t.Errorf("UsageOf = %+v, want %d %v", usage, c.tokens, c.ttl)
 			}
 		})
@@ -91,9 +91,9 @@ func TestWaitFor(t *testing.T) {
 	}
 }
 
-var bigUsage = &Usage{Tokens: 500_000, TTL: ttlLong}
+var bigUsage = &Usage{tokens: 500_000, ttl: ttlLong}
 
-func usage(tokens int) *Usage { return &Usage{Tokens: tokens, TTL: ttlLong} }
+func usage(tokens int) *Usage { return &Usage{tokens: tokens, ttl: ttlLong} }
 
 func begin(t *testing.T, state string, u *Usage) (Plan, bool) {
 	t.Helper()

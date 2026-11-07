@@ -26,8 +26,8 @@ const (
 	ReasonUnterminated Reason = "unterminated-quote"
 	// ReasonUnterminatedSubst は閉じない `$((` と、引用の外で閉じない `$(`。
 	ReasonUnterminatedSubst Reason = "unterminated-substitution"
-	// ReasonAmbiguousSubst はシェルによって答えが分かれる形と、深すぎる入れ子。
-	ReasonAmbiguousSubst Reason = "ambiguous-substitution"
+	// reasonAmbiguousSubst はシェルによって答えが分かれる形と、深すぎる入れ子。
+	reasonAmbiguousSubst Reason = "ambiguous-substitution"
 	ReasonBackquote      Reason = "backquote"
 	// ReasonAnsiC は `\` を含む `$'…'`。展開しないと中身が決まらない。
 	ReasonAnsiC Reason = "ansi-c-escape"
@@ -88,8 +88,8 @@ type Reading struct {
 	Rewrites []Rewrite
 }
 
-// Braces はブレース展開の表記。
-func (r Reading) Braces() []string {
+// braces はブレース展開の表記。
+func (r Reading) braces() []string {
 	var out []string
 	for _, rw := range r.Rewrites {
 		if rw.Form == FormBrace {
@@ -103,7 +103,7 @@ func (r Reading) Braces() []string {
 const maxDepth = 16
 
 // reasonForm は読みを止めた理由のうち、書き直しを求める形になるもの。
-var reasonForm = map[Reason]Form{ReasonBackquote: FormBackquote, ReasonAmbiguousSubst: FormAmbiguous}
+var reasonForm = map[Reason]Form{ReasonBackquote: FormBackquote, reasonAmbiguousSubst: FormAmbiguous}
 
 // ambiguousReserved はコマンドの位置で読みが分かれるか、作業で使わない予約語。
 // `coproc NAME cmd` は bash 4 以降が NAME を名前と読み、zsh は実行する。`select` は入力を待つ。
@@ -208,7 +208,7 @@ func prepare(src string, rendered bool) string {
 // トークンに割れる限りコマンドを返す。3 つめは外側だけを置換の全文で書いた同じリストで、作れれば fullOK。
 func readAt(src string, depth int) (Reading, []runnable, []runnable, bool) {
 	if depth > maxDepth {
-		return stopped(&unreadable{ReasonAmbiguousSubst, formTooDeep}), nil, nil, false
+		return stopped(&unreadable{reasonAmbiguousSubst, formTooDeep}), nil, nil, false
 	}
 	scanned, err := scan(prepare(src, false))
 	if err != nil {

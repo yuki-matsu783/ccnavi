@@ -165,7 +165,7 @@ func TestTurnStartAndTurnOps(t *testing.T) {
 
 func TestFinalVersions(t *testing.T) {
 	op := func(route Route, ended int, ident, commit string) Op {
-		return Op{Ident: ident, Route: route, Ended: sec(ended), Commit: commit}
+		return Op{Ident: ident, Route: route, ended: sec(ended), Commit: commit}
 	}
 	cases := []struct {
 		name string
@@ -173,10 +173,10 @@ func TestFinalVersions(t *testing.T) {
 		want []Op
 	}{
 		{"最後に送った版", []Op{op(RouteSent, 1, "p1", "c1"), op(RouteSent, 2, "p1", "c2")}, []Op{op(RouteSent, 2, "p1", "c2")}},
-		{"送った後の失敗は版を残す", []Op{op(RouteSent, 1, "p1", "c1"), op(RouteFailedBefore, 2, "p1", "")}, []Op{op(RouteSent, 1, "p1", "c1")}},
-		{"変更なしは版を動かさない", []Op{op(RouteSent, 1, "p1", "c1"), op(RouteUnchanged, 2, "p1", "")}, []Op{op(RouteSent, 1, "p1", "c1")}},
-		{"失敗だけなら最後の理由", []Op{op(RouteFailedBefore, 1, "p1", ""), op(RouteStopped, 2, "p1", "")}, []Op{op(RouteStopped, 2, "p1", "")}},
-		{"親と子は別", []Op{op(RouteSent, 1, "p1", "c1"), op(RouteStopped, 2, "p1-01-01", "")}, []Op{op(RouteSent, 1, "p1", "c1"), op(RouteStopped, 2, "p1-01-01", "")}},
+		{"送った後の失敗は版を残す", []Op{op(RouteSent, 1, "p1", "c1"), op(routeFailedBefore, 2, "p1", "")}, []Op{op(RouteSent, 1, "p1", "c1")}},
+		{"変更なしは版を動かさない", []Op{op(RouteSent, 1, "p1", "c1"), op(routeUnchanged, 2, "p1", "")}, []Op{op(RouteSent, 1, "p1", "c1")}},
+		{"失敗だけなら最後の理由", []Op{op(routeFailedBefore, 1, "p1", ""), op(routeStopped, 2, "p1", "")}, []Op{op(routeStopped, 2, "p1", "")}},
+		{"親と子は別", []Op{op(RouteSent, 1, "p1", "c1"), op(routeStopped, 2, "p1-01-01", "")}, []Op{op(RouteSent, 1, "p1", "c1"), op(routeStopped, 2, "p1-01-01", "")}},
 	}
 	for _, c := range cases {
 		got := FinalVersions(c.ops)
@@ -193,7 +193,7 @@ func TestFinalVersions(t *testing.T) {
 	if got := TargetKey(Op{Ident: "p1", Route: RouteSent, Commit: "abcdef0123456789"}); got != "proposal:p1:abcdef012345" {
 		t.Errorf("TargetKey = %q", got)
 	}
-	if got := TargetKey(Op{Ident: "p1", Route: RouteStopped}); got != "proposal:p1:stopped" {
+	if got := TargetKey(Op{Ident: "p1", Route: routeStopped}); got != "proposal:p1:stopped" {
 		t.Errorf("TargetKey = %q", got)
 	}
 }
@@ -218,14 +218,14 @@ func TestWrittenIdent(t *testing.T) {
 
 func TestUnsentWrites(t *testing.T) {
 	write := func(ident string, at int) Write {
-		return Write{Ident: ident, At: sec(at), Path: "/w/wip/proposals/todo/" + ident + ".md"}
+		return Write{Ident: ident, at: sec(at), Path: "/w/wip/proposals/todo/" + ident + ".md"}
 	}
 	sent := func(ended int, idents ...string) Op {
 		var files []File
 		for _, i := range idents {
 			files = append(files, File{"x", "wip/proposals/todo/" + i + ".md"})
 		}
-		return Op{Route: RouteSent, Ended: sec(ended), Files: files}
+		return Op{Route: RouteSent, ended: sec(ended), Files: files}
 	}
 	idents := func(ws []Write) []string {
 		var out []string
@@ -243,7 +243,7 @@ func TestUnsentWrites(t *testing.T) {
 		{"書いて送っていない", []Write{write("p1", 10)}, nil, []string{"p1"}},
 		{"書いた後に親ごと送った", []Write{write("p1", 10), write("p1-01-01", 11)}, []Op{sent(20, "p1", "p1-01-01")}, nil},
 		{"送った後に直した", []Write{write("p1", 30)}, []Op{sent(20, "p1")}, []string{"p1"}},
-		{"失敗した approval-request は送ったことにならない", []Write{write("p1", 10)}, []Op{{Route: RouteFailedBefore, Ended: sec(20)}}, []string{"p1"}},
+		{"失敗した approval-request は送ったことにならない", []Write{write("p1", 10)}, []Op{{Route: routeFailedBefore, ended: sec(20)}}, []string{"p1"}},
 	}
 	for _, c := range cases {
 		if got := idents(UnsentWrites(c.writes, c.ops)); !slices.Equal(got, c.want) {
@@ -258,7 +258,7 @@ func TestNotesArePerSessionAndTurn(t *testing.T) {
 	NoteWritten(state, "s1", "P1", "/w/p1.md", sec(50)) // 同じ識別子（大文字小文字違い）
 	NoteWritten(state, "s2", "p2", "/w/p2.md", sec(50))
 	got := TurnWrites(state, "s1", sec(0))
-	if len(got) != 1 || !got[0].At.Equal(sec(50)) {
+	if len(got) != 1 || !got[0].at.Equal(sec(50)) {
 		t.Errorf("TurnWrites = %+v", got)
 	}
 	if got := TurnWrites(state, "s1", sec(60)); got != nil {

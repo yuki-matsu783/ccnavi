@@ -104,26 +104,26 @@ func TestReorderTable(t *testing.T) {
 			for _, n := range c.Fixed {
 				fixed[n] = true
 			}
-			got := Renumber(parent, order, fixed)
+			got := renumber(parent, order, fixed)
 			if c.Refused != "" {
-				if len(got.Refused) != 1 || string(got.Refused[0].Kind) != c.Refused {
-					t.Fatalf("refused = %v, want %s", got.Refused, c.Refused)
+				if len(got.refused) != 1 || string(got.refused[0].kind) != c.Refused {
+					t.Fatalf("refused = %v, want %s", got.refused, c.Refused)
 				}
 				return
 			}
-			if len(got.Refused) > 0 {
-				t.Fatalf("断った: %v", got.Refused)
+			if len(got.refused) > 0 {
+				t.Fatalf("断った: %v", got.refused)
 			}
-			if g := raws(t, got.Plan); !reflect.DeepEqual(g, c.Expect.Plan) {
+			if g := raws(t, got.plan); !reflect.DeepEqual(g, c.Expect.Plan) {
 				t.Errorf("plan = %v, want %v", g, c.Expect.Plan)
 			}
 			if c.Expect.Feedback != nil {
-				if g := raws(t, got.Feedback); !reflect.DeepEqual(g, c.Expect.Feedback) {
+				if g := raws(t, got.feedback); !reflect.DeepEqual(g, c.Expect.Feedback) {
 					t.Errorf("feedback = %v, want %v", g, c.Expect.Feedback)
 				}
 			}
 			back := map[int]int{}
-			for old, renumbered := range got.Moved {
+			for old, renumbered := range got.moved {
 				back[renumbered] = old
 			}
 			var from []int
@@ -141,7 +141,7 @@ func TestReorderTable(t *testing.T) {
 				rows = append(rows, row{ch.Ticket, ch.Phase, ch.Predecessors})
 			}
 			changed := []any{}
-			for _, r := range retarget("i0001", got.Moved, rows) {
+			for _, r := range retarget("i0001", got.moved, rows) {
 				changed = append(changed, map[string]any{"ticket": r.ticket, "new_ticket": r.newTicket,
 					"phase": phaseOfRow(rows, r.ticket), "new_phase": r.newPhase,
 					"predecessors": predsOfRow(rows, r.ticket), "new_predecessors": r.newPredecessors})
@@ -175,11 +175,11 @@ var plan3 = []any{"research", map[string]any{"type": "design", "after": []int{1}
 
 func TestWithoutOrderNothingMoves(t *testing.T) {
 	parent := parsedPlan(t, plan3, nil)
-	got := Renumber(parent, nil, nil)
-	if len(got.Refused) > 0 || !reflect.DeepEqual(got.Moved, map[int]int{1: 1, 2: 2, 3: 3}) {
+	got := renumber(parent, nil, nil)
+	if len(got.refused) > 0 || !reflect.DeepEqual(got.moved, map[int]int{1: 1, 2: 2, 3: 3}) {
 		t.Fatalf("got %+v", got)
 	}
-	if g, w := jsonText(t, raws(t, got.Plan)), jsonText(t, plan3); g != w {
+	if g, w := jsonText(t, raws(t, got.plan)), jsonText(t, plan3); g != w {
 		t.Errorf("plan = %s, want %s", g, w)
 	}
 }

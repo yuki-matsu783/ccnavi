@@ -183,7 +183,7 @@ func RulesFor(stderr io.Writer, conf *config.Settings, root string, in hookio.In
 }
 
 func isPathTool(name string) bool {
-	for _, t := range config.PathTools {
+	for _, t := range config.PathTools() {
 		if t == name {
 			return true
 		}
@@ -247,7 +247,7 @@ func merge(base, extra *rules.RuleSet, layer string) []rules.Problem {
 			ids[r.BareID] = true
 		}
 	}
-	for _, name := range rules.Sections {
+	for _, name := range rules.Sections() {
 		for _, r := range *extra.Section(name) {
 			if keys[r.Key()] {
 				problems = append(problems, rules.Problem{Severity: rules.Info, Rule: r.ID, Detail: fmt.Sprintf(
@@ -286,7 +286,7 @@ func commonView(stderr io.Writer, conf *config.Settings, root string) (common, m
 	record := &audit.Record{}
 	common = readCommon(stderr, conf, record, root)
 	merged = &rules.RuleSet{Version: common.Version}
-	for _, name := range rules.Sections {
+	for _, name := range rules.Sections() {
 		*merged.Section(name) = append(*merged.Section(name), *common.Section(name)...)
 	}
 	if record.Fallback == builtin.Fallback {
@@ -314,11 +314,11 @@ func overlay(view *LayerView, merged *rules.RuleSet, l Layer, root string) *rule
 	markFile(extra, RelPath(l.Path, root))
 	prefixIDs(extra, l.Name)
 	before := map[rules.Decision]int{}
-	for _, name := range rules.Sections {
+	for _, name := range rules.Sections() {
 		before[name] = len(*merged.Section(name))
 	}
 	view.Problems = append(view.Problems, merge(merged, extra, l.Name)...)
-	for _, name := range rules.Sections {
+	for _, name := range rules.Sections() {
 		*added.Section(name) = append(*added.Section(name), (*merged.Section(name))[before[name]:]...)
 	}
 	return added
@@ -380,11 +380,11 @@ func LayerFiles(conf *config.Settings, root string) []config.LayerFile {
 		homes = append(homes, home{config.OriginProject, p.Name, tree.ProjectRoot(conf.Projects, p.Name)})
 	}
 	for _, h := range homes {
-		for _, kind := range config.LayerKinds {
+		for _, kind := range config.LayerKinds() {
 			found = append(found, config.LayerFile{Origin: h.origin, Layer: h.name, Kind: kind, Path: conf.LayerRealPath(h.root, kind)})
 		}
 		if h.origin == config.OriginProject {
-			for _, kind := range config.LayerKinds {
+			for _, kind := range config.LayerKinds() {
 				found = append(found, config.LayerFile{Origin: config.OriginMirror, Layer: h.name, Kind: kind, Path: conf.MirrorRealPath(h.root, kind)})
 			}
 		}

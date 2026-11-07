@@ -36,7 +36,7 @@ func flawed(aid string) string {
 
 func accept(t *testing.T, text string) AcceptInput {
 	t.Helper()
-	return AcceptInput{Result: load(t, text), Effective: config.Enable, MaterialVersion: testVersion}
+	return AcceptInput{Result: load(t, text), effective: config.Enable, MaterialVersion: testVersion}
 }
 
 func startRunning(t *testing.T, s Store, key string, plan Plan) string {
@@ -60,30 +60,30 @@ func TestAcceptClassifies(t *testing.T) {
 		effective config.Mode
 		insuff    bool
 		ok        bool
-		state     State
+		state     state
 		final     Final
 	}{
-		{"終了可", func(a string) string { return passing(a, true) }, config.Enable, false, true, done, FinalOK},
-		{"dry-run の不備は止めない", flawed, config.DryRun, false, true, done, FinalFlawed},
+		{"終了可", func(a string) string { return passing(a, true) }, config.Enable, false, true, done, finalOK},
+		{"dry-run の不備は止めない", flawed, config.DryRun, false, true, done, finalFlawed},
 		{"判定不能は未検査", func(a string) string {
 			return result(a, ticketWork, row(r1, StopTarget, unknown), row(r3, StopTarget, pass), row(r2, "p1", pass), row(r4, "p1", pass))
 		}, config.Enable, false, true, done, FinalUnchecked},
 		{"不備は判定不能に勝つ", func(a string) string {
 			return result(a, ticketWork, row(r1, StopTarget, unknown), row(r3, StopTarget, pass), flawRow, row(r4, "p1", pass))
-		}, config.Enable, false, false, sentBack, FinalFlawed},
+		}, config.Enable, false, false, sentBack, finalFlawed},
 		{"材料不足は未検査で止めない", flawed, config.Enable, true, true, done, FinalUnchecked},
 		{"R3 の fail だけでは不備でない", func(a string) string {
 			r3fail := `{"criterion": "R3", "target": "stop", "result": "fail", "locations": [{"kind": "final_answer", "text": "x"}]}`
 			return result(a, ticketWork, row(r1, StopTarget, pass), r3fail, row(r2, "p1", pass), row(r4, "p1", pass))
-		}, config.Enable, false, true, done, FinalOK},
+		}, config.Enable, false, true, done, finalOK},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			s := newStore(t)
 			aid := startRunning(t, s, testKey, basePlan())
 			in := accept(t, c.build(aid))
-			in.Effective, in.Insufficient = c.effective, c.insuff
-			if out := s.Accept(testKey, in); out.OK != c.ok {
+			in.effective, in.insufficient = c.effective, c.insuff
+			if out := s.Accept(testKey, in); out.ok != c.ok {
 				t.Errorf("Accept = %+v", out)
 			}
 			stateIs(t, s, aid, c.state)
@@ -96,16 +96,16 @@ func TestFlawedEnableSendsBackWithTheRequiredText(t *testing.T) {
 	s := newStore(t)
 	aid := startRunning(t, s, testKey, basePlan())
 	out := s.Accept(testKey, accept(t, flawed(aid)))
-	if out.OK {
+	if out.ok {
 		t.Fatal("差し戻さない")
 	}
 	for _, needle := range []string{aid, "R2", "完了の確かめ方が無い", "確認の手順を足す", "依頼は結合の確認を求めている", rewriteQuestion} {
-		if !strings.Contains(out.Reason, needle) {
-			t.Errorf("差し戻しの文に %q が無い:\n%s", needle, out.Reason)
+		if !strings.Contains(out.reason, needle) {
+			t.Errorf("差し戻しの文に %q が無い:\n%s", needle, out.reason)
 		}
 	}
 	stateIs(t, s, aid, sentBack)
-	finalIs(t, s, aid, FinalFlawed)
+	finalIs(t, s, aid, finalFlawed)
 	if got := dumps(t, out.Object()); !strings.HasPrefix(got, `{"ok": false, "reason": "Stop の AI 判定`) {
 		t.Errorf("返り値 = %s", got)
 	}
@@ -206,7 +206,7 @@ func TestSecondRecordAndMissingPlanAreIgnored(t *testing.T) {
 	if out := s.Accept(testKey, accept(t, flawed(aid))); out != OKReturn {
 		t.Errorf("2 回目: %+v", out)
 	}
-	finalIs(t, s, aid, FinalOK)
+	finalIs(t, s, aid, finalOK)
 }
 
 func TestNotTicketWorkIsRefusedWhenCcnaviSawAProposal(t *testing.T) {
@@ -235,7 +235,7 @@ func TestStrayR2ForAVersionWithoutBodyIsDropped(t *testing.T) {
 		t.Errorf("Accept = %+v", out)
 	}
 	a := s.readAttempt(aid)
-	if a.Value(keyAccepted) != true || a.String(keyFinal) != string(FinalOK) || strings.Contains(dumps(t, a.Value(keyResults)), `"R2"`) {
+	if a.Value(keyAccepted) != true || a.String(keyFinal) != string(finalOK) || strings.Contains(dumps(t, a.Value(keyResults)), `"R2"`) {
 		t.Errorf("試行 = %s", dumps(t, a))
 	}
 }
@@ -243,7 +243,7 @@ func TestStrayR2ForAVersionWithoutBodyIsDropped(t *testing.T) {
 func TestRejudgeResolvesTheOriginalAndNeverSendsBack(t *testing.T) {
 	s := newStore(t)
 	first := startRunning(t, s, testKey, basePlan())
-	if s.Accept(testKey, accept(t, flawed(first))).OK {
+	if s.Accept(testKey, accept(t, flawed(first))).ok {
 		t.Fatal("差し戻さない")
 	}
 	if got, ok := s.ConsumeContinuation("s1", time.Now()); !ok || got != first {
@@ -269,7 +269,7 @@ func TestRejudgeResolvesTheOriginalAndNeverSendsBack(t *testing.T) {
 			t.Errorf("元の試行 = %s, want %s", got, c.want)
 		}
 	}
-	for final, want := range map[Final]string{FinalUnchecked: "inconclusive", FinalFlawed: "unresolved", FinalOK: "resolved"} {
+	for final, want := range map[Final]string{FinalUnchecked: "inconclusive", finalFlawed: "unresolved", finalOK: "resolved"} {
 		s.resolveOriginal(first, final)
 		if got := s.readAttempt(first).String(keyRejudge); got != want {
 			t.Errorf("%s → %s, want %s", final, got, want)
@@ -296,7 +296,7 @@ func TestSentBackIsNotExpiredEarlyNorConsumedByOthers(t *testing.T) {
 		t.Errorf("ExpireOverdue = %v", got)
 	}
 	stateIs(t, s, first, expired)
-	finalIs(t, s, first, FinalFlawed)
+	finalIs(t, s, first, finalFlawed)
 }
 
 func TestSentBackIsNotedOnTheLastStop(t *testing.T) {
@@ -305,7 +305,7 @@ func TestSentBackIsNotedOnTheLastStop(t *testing.T) {
 	aid := startRunning(t, s, testKey, basePlan())
 	s.Accept(testKey, accept(t, flawed(aid)))
 	last, ok := s.LastStop("s1")
-	if !ok || last.Key != testKey || !last.Nudged || !last.SentBack {
+	if !ok || last.key != testKey || !last.Nudged || !last.SentBack {
 		t.Errorf("LastStop = %+v, %v", last, ok)
 	}
 }

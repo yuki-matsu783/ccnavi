@@ -113,13 +113,13 @@ const (
 
 // Verb は `ccnavi user <操作>` の 1 つ。
 type Verb struct {
-	// Words は `user` の後ろに続く語。
-	Words []string
-	// Internal は読み替えた先の内部のオプション。
-	Internal []string
-	Op       Op
-	// Value は内部の最後のオプションが次の語を値に取るか（`user reviewed 3` → `--reviewed 3`）。
-	Value bool
+	// words は `user` の後ろに続く語。
+	words []string
+	// internal は読み替えた先の内部のオプション。
+	internal []string
+	op       Op
+	// value は内部の最後のオプションが次の語を値に取るか（`user reviewed 3` → `--reviewed 3`）。
+	value bool
 	// Script はユーザが打つ入口の sh（`ccnavi-user-<Script>.sh`）。
 	Script string
 	// terminal は実行ファイルがターミナルを求めるときに標準エラーに出す、ユーザが打つ形。
@@ -129,25 +129,25 @@ type Verb struct {
 // verbs の読み替え先は今の内部の形で、実行ファイルの引数の文法は変えない。続く語（ツリーからの相対パス、
 // プロジェクトの名前）は位置引数としてそのまま渡る。
 var verbs = []Verb{
-	{Words: []string{"agree"}, Internal: []string{"--agree"}, Op: OpApprove, Script: "agree", terminal: "ccnavi-user-agree.sh"},
-	{Words: []string{"reviewed"}, Internal: []string{"--reviewed"}, Op: OpReviewed, Value: true, Script: "decide", terminal: "ccnavi-user-decide.sh"},
-	{Words: []string{"close-early"}, Internal: []string{"--close-early"}, Op: OpCloseEarly, Script: "close-early", terminal: "ccnavi-user-close-early.sh"},
-	{Words: []string{"prune"}, Internal: []string{optPrune}, Op: OpPrune, Script: "prune", terminal: "ccnavi-user-prune.sh"},
-	{Words: []string{"handoff"}, Internal: []string{"--handoff"}, Op: OpHandoff, Script: "handoff", terminal: "ccnavi-user-handoff.sh --yes"},
-	{Words: []string{"mirror"}, Internal: []string{"--mirror"}, Op: OpMirror, Script: "mirror", terminal: "ccnavi-user-mirror.sh --yes"},
+	{words: []string{"agree"}, internal: []string{"--agree"}, op: OpApprove, Script: "agree", terminal: "ccnavi-user-agree.sh"},
+	{words: []string{"reviewed"}, internal: []string{"--reviewed"}, op: OpReviewed, value: true, Script: "decide", terminal: "ccnavi-user-decide.sh"},
+	{words: []string{"close-early"}, internal: []string{"--close-early"}, op: OpCloseEarly, Script: "close-early", terminal: "ccnavi-user-close-early.sh"},
+	{words: []string{"prune"}, internal: []string{optPrune}, op: OpPrune, Script: "prune", terminal: "ccnavi-user-prune.sh"},
+	{words: []string{"handoff"}, internal: []string{"--handoff"}, op: OpHandoff, Script: "handoff", terminal: "ccnavi-user-handoff.sh --yes"},
+	{words: []string{"mirror"}, internal: []string{"--mirror"}, op: OpMirror, Script: "mirror", terminal: "ccnavi-user-mirror.sh --yes"},
 }
 
-// ErrNotTerminal はターミナルを求めない操作を Terminal に渡したこと。
-var ErrNotTerminal = errors.New("ターミナルを求める操作ではない")
+// errNotTerminal はターミナルを求めない操作を Terminal に渡したこと。
+var errNotTerminal = errors.New("ターミナルを求める操作ではない")
 
 // Terminal は実行ファイルがターミナルを求める操作の、標準エラーに出す表示名（ユーザが打つ sh）。
 func Terminal(op Op) (string, error) {
 	for _, v := range verbs {
-		if v.Op == op {
+		if v.op == op {
 			return v.terminal, nil
 		}
 	}
-	return "", fmt.Errorf("%s: %w", op, ErrNotTerminal)
+	return "", fmt.Errorf("%s: %w", op, errNotTerminal)
 }
 
 const (

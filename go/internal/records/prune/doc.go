@@ -18,5 +18,5 @@
 // 置き場への道にリンクがあれば辿らずに報告する（リンクの先は ccnavi の置き場とは限らない）。
 //
 // Python からの対応: run → Run（now・dry_run は Options）、summary → Summary、lines → Lines、
-// Report の rotated → Rotated（From・To）、kept_ops → KeptOps。
+// Report の rotated → rotated（From・To）、kept_ops → KeptOps。
 package prune

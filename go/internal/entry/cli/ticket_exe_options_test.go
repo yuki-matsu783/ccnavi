@@ -19,7 +19,7 @@ func TestExeOptionsMatchTheParser(t *testing.T) {
 			}
 		}
 	}
-	want := slices.Clone(useronly.ExeOptions)
+	want := slices.Clone(useronly.ExeOptions())
 	slices.Sort(flags)
 	slices.Sort(want)
 	want = slices.Compact(want)

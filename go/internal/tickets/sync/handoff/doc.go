@@ -13,8 +13,8 @@
 // 失敗したら、書く前のバイト列へ戻す。プロセスの途中終了に対しては、原子的ではない。
 //
 // Python からの対応: tickets/sync/handoff。HANDOFF_REL → place.Handoff、JSON_VERSION → JSONVersion、
-// KIND_* → KindID の定数、STATE_* → State の定数、WHY_* → Why の定数、fold_part・key_of・kind_of → FoldPart・Key・
+// KIND_* → KindID の定数、STATE_* → State の定数、WHY_* → why の定数、fold_part・key_of・kind_of → FoldPart・Key・
 // KindOf、draft_rel・spelled・walk → DraftRel・Spelled・Walk、prepare・apply → Prepare・Apply、
-// plan_json・applied_json → Plan.JSON・Applied.JSON（失敗だけの答えは ErrorJSON）、pending・survey → Pending・Survey、
+// plan_json・applied_json → Plan.JSON・Applied.JSON（失敗だけの答えは errorJSON）、pending・survey → Pending・Survey、
 // board_refused・not_ok_reason は Apply の中だけで使う。difflib.unified_diff は diff.go に写した。
 package handoff

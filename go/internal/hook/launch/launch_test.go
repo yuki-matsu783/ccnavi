@@ -154,7 +154,7 @@ func cases(root string) []launchCase {
 		}
 		return m
 	}
-	for _, tool := range config.AgentTools {
+	for _, tool := range config.AgentTools() {
 		add(false, tool, root, "", d(child+" の調査", "prompt", "調査をする", "subagent_type", "Explore"))
 	}
 	for _, description := range []string{
@@ -261,7 +261,7 @@ func TestApply(t *testing.T) {
 	if (Result{}).Apply(base) != nil {
 		t.Error("差し替えが無いのに写しを返した")
 	}
-	got := Result{Prompt: "q"}.Apply(base)
+	got := Result{prompt: "q"}.Apply(base)
 	if got.Keys()[1] != "prompt" || got.String("prompt") != "q" || base.String("prompt") != "p" {
 		t.Errorf("Apply = %v、元 %v", got.Keys(), base.String("prompt"))
 	}

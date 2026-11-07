@@ -1,6 +1,7 @@
 package testkit
 
 import (
+	"ccnavi/internal/infra/tree"
 	"io/fs"
 	"path/filepath"
 	"slices"
@@ -69,7 +70,7 @@ func Shape(t *testing.T, root string) map[string]any {
 		if rel == "." {
 			return nil
 		}
-		if d.Name() == ".git" || slices.Contains([]string{"remote.git", "logs", ".ccnavi/messages"}, rel) {
+		if d.Name() == tree.DotGit || slices.Contains([]string{"remote.git", "logs", ".ccnavi/messages"}, rel) {
 			if d.IsDir() {
 				return filepath.SkipDir
 			}
@@ -92,8 +93,8 @@ func Shape(t *testing.T, root string) map[string]any {
 	}
 }
 
-// ShapePy は Shape と同じ形を Python で組む関数 shape(root)（Python の答えに入れる）。
-const ShapePy = `
+// shapePy は Shape と同じ形を Python で組む関数 shape(root)（Python の答えに入れる）。
+const shapePy = `
 def shape(root):
     import os, subprocess
     skip = ("remote.git", "logs", ".ccnavi/messages")

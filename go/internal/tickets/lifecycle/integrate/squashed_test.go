@@ -155,7 +155,7 @@ func TestIntegratedSquash(t *testing.T) {
 			writeDone(t, f.root, "feat", record(f))
 			put(t, f.root, ".ccnavi/approved/doing/feat.md", "---\nticket: feat\n---\n")
 		}, nil, []string{}},
-		// 名前は大文字小文字を畳んで見る（BoundCheck と同じ）。
+		// 名前は大文字小文字を畳んで見る（boundCheck と同じ）。
 		{"綴りの大文字小文字が違うチケット", func(t *testing.T, f fixture) {
 			writeDone(t, f.root, "feat", record(f))
 			put(t, f.root, ".ccnavi/approved/doing/Feat.md", "---\nticket: Feat\n---\n")

@@ -20,8 +20,6 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-const mdExt = ".md"
-
 func same(a, b string) bool { return pathcase.Fold(a) == pathcase.Fold(b) }
 
 // belongs はファイル名の語幹が、この親か、その子の識別子か（大文字小文字を問わない）。
@@ -39,7 +37,7 @@ func candidates(base, ticketsRel, parent string) []string {
 	for _, folder := range []struct {
 		name     string
 		suffixes []string
-	}{{string(place.Todo), []string{mdExt}}, {flow.FlowsDir, []string{".yml", ".yaml"}}} {
+	}{{string(place.Todo), []string{config.MdExt}}, {flow.FlowsDir, []string{".yml", ".yaml"}}} {
 		directory := ospath.Join(base, append(strings.Split(strings.Trim(ticketsRel, "/"), "/"), folder.name)...)
 		names, err := fsio.Listdir(directory)
 		if err != nil {
@@ -63,7 +61,7 @@ func candidates(base, ticketsRel, parent string) []string {
 // ownProposal は todo/<親>.md か（大文字小文字を問わない）。
 func ownProposal(path, parent string) bool {
 	stem, ext := ospath.Splitext(ospath.Basename(path))
-	return same(ospath.Basename(ospath.Dirname(path)), string(place.Todo)) && same(stem, parent) && same(ext, mdExt)
+	return same(ospath.Basename(ospath.Dirname(path)), string(place.Todo)) && same(stem, parent) && same(ext, config.MdExt)
 }
 
 // planProblems は計画を持つ親の提案の after と終端の誤り。
@@ -87,7 +85,7 @@ func planProblems(paths []string, parent string) []string {
 // childlessProblems は最初の親の提案で、すぐ始まるステップに子の提案が無い警告（承認の確認と同じ文）。
 func childlessProblems(conf *config.Settings, root string, paths []string, parent string) []string {
 	i := slices.IndexFunc(paths, func(p string) bool {
-		return same(ospath.Basename(p), parent+mdExt) && same(ospath.Basename(ospath.Dirname(p)), string(place.Todo))
+		return same(ospath.Basename(p), parent+config.MdExt) && same(ospath.Basename(ospath.Dirname(p)), string(place.Todo))
 	})
 	if i < 0 {
 		return nil
@@ -104,7 +102,7 @@ func childlessProblems(conf *config.Settings, root string, paths []string, paren
 	var numbers []int
 	for _, path := range paths {
 		stem, _ := ospath.Splitext(ospath.Basename(path))
-		if child, ok := ids.ParseChild(stem); ok && strings.HasSuffix(path, mdExt) && !slices.Contains(numbers, child.Phase) {
+		if child, ok := ids.ParseChild(stem); ok && strings.HasSuffix(path, config.MdExt) && !slices.Contains(numbers, child.Phase) {
 			numbers = append(numbers, child.Phase)
 		}
 	}
@@ -157,7 +155,7 @@ func Run(stdout, stderr io.Writer, conf *config.Settings, root, ident string, ch
 	if gate != nil {
 		var sending []string
 		for _, p := range paths {
-			if strings.HasSuffix(p, mdExt) && ospath.Basename(ospath.Dirname(p)) == string(place.Todo) {
+			if strings.HasSuffix(p, config.MdExt) && ospath.Basename(ospath.Dirname(p)) == string(place.Todo) {
 				stem, _ := ospath.Splitext(ospath.Basename(p))
 				sending = append(sending, stem)
 			}

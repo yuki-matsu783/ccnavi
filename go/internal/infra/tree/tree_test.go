@@ -189,7 +189,7 @@ func TestWorktreesWithoutProject(t *testing.T) {
 	}
 	for _, path := range []string{gonePath, brokenPath} {
 		found, ok := TreeOf(root, filepath.Join(path, "src", "a.py"), projects)
-		if !ok || found.Name != Main || found.Kind != KindMain {
+		if !ok || found.Name != Main || found.Kind != kindMain {
 			t.Errorf("TreeOf(%s) = %+v %v", path, found, ok)
 		}
 	}
@@ -205,8 +205,8 @@ func TestWorktreesWithoutProject(t *testing.T) {
 	for _, w := range WorktreesWithoutProject(root, projects) {
 		got[w.Name] = w
 	}
-	if len(got) != 2 || got["gone-target"].GitdirExists || !got["broken-backref"].GitdirExists ||
-		got["gone-target"].Gitdir != goneGitdir {
+	if len(got) != 2 || got["gone-target"].gitdirExists || !got["broken-backref"].gitdirExists ||
+		got["gone-target"].gitdir != goneGitdir {
 		t.Errorf("WorktreesWithoutProject = %+v", got)
 	}
 }

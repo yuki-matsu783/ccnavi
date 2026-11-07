@@ -340,11 +340,11 @@ func TestResolve(t *testing.T) {
 		want           config.Mode
 		warned         bool
 	}{
-		{"", "", Choices, config.Enable, false},
-		{"", " DRY-RUN ", Choices, config.DryRun, false},
-		{"disable", "enable", Choices, config.Disable, false},
-		{"", "dry-run", GateChoices, config.Enable, true},
-		{"", "off", Choices, config.Enable, true},
+		{"", "", choices, config.Enable, false},
+		{"", " DRY-RUN ", choices, config.DryRun, false},
+		{"disable", "enable", choices, config.Disable, false},
+		{"", "dry-run", gateChoices, config.Enable, true},
+		{"", "off", choices, config.Enable, true},
 	} {
 		var stderr bytes.Buffer
 		got := Resolve(&stderr, c.flag, c.declared, "X", c.allowed)
@@ -353,7 +353,7 @@ func TestResolve(t *testing.T) {
 		}
 	}
 	var stderr bytes.Buffer
-	Resolve(&stderr, "", "dry-run", "CCNAVI_X", GateChoices)
+	Resolve(&stderr, "", "dry-run", "CCNAVI_X", gateChoices)
 	if want := "ccnavi: CCNAVI_X='dry-run' は設定ではありません。enable を使います。有効な値は enable, disable です\n"; stderr.String() != want {
 		t.Errorf("%q", stderr.String())
 	}
@@ -467,9 +467,9 @@ func TestReport(t *testing.T) {
 	if Report(root, nil) != "" {
 		t.Error("結果が無いのに文がある")
 	}
-	rebased := Report(root, []Outcome{{Target{Key: "bin", Label: "bin/ccnavi", Heavy: true}, ActionRebased, "d"}})
-	common := Report(root, []Outcome{{Target{Key: commonRulesKey, Label: "rules.yml"}, ActionRestored, "d"}})
-	copied := Report(root, []Outcome{{Target{Key: "rules.w-1", Label: "w/rules.yml", Copy: true}, ActionRestored, "d"}})
+	rebased := Report(root, []Outcome{{Target{Key: "bin", Label: "bin/ccnavi", heavy: true}, actionRebased, "d"}})
+	common := Report(root, []Outcome{{Target{Key: commonRulesKey, Label: "rules.yml"}, actionRestored, "d"}})
+	copied := Report(root, []Outcome{{Target{Key: "rules.w-1", Label: "w/rules.yml", copy: true}, actionRestored, "d"}})
 	for _, c := range []struct {
 		got  string
 		id   string

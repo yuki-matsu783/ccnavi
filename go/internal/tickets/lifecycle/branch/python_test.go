@@ -104,7 +104,7 @@ func TestMatchesPython(t *testing.T) {
 	for _, text := range texts {
 		found := []any{}
 		for _, r := range PromptRefs(text) {
-			found = append(found, []any{string(r.Kind), r.Number, r.Repo})
+			found = append(found, []any{string(r.kind), r.number, r.repo})
 		}
 		refs = append(refs, found)
 	}

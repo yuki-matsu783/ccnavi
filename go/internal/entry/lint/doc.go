@@ -10,7 +10,7 @@
 //   - entry の lint・lint_branch・lint_direct・lint_layers・lint_places・lint_project・lint_templates・lint_texts・
 //     lint_ticket・lint_wiki をまとめた。
 //   - report → Report（引数は Options。version.COMPAT は段が同じ version を読めないので、Options.Compat で受ける）、
-//     family_check → FamilyCheck（repo の None は空）、LINT_VERSION → JSONVersion。
+//     family_check → FamilyCheck（repo の None は空）、LINT_VERSION → jsonVersion。
 //   - ほかの関数（stop_review_problems・flow_problems・layer_drift・tree_has_tickets・compat_fix など）は私的にした。
 //     呼び手は lint の中だけである。
 package lint

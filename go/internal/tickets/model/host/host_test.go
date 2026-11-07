@@ -35,15 +35,15 @@ func TestHostKindsTable(t *testing.T) {
 	for _, raw := range cases {
 		c := raw.(*pyjson.Object)
 		origin := c.String("origin")
-		got := Classify(origin)
-		if string(got.Kind) != c.String("kind") || got.Host != c.String("host") || got.Path != c.String("path") {
+		got := classify(origin)
+		if string(got.kind) != c.String("kind") || got.host != c.String("host") || got.path != c.String("path") {
 			t.Errorf("%s: %+v", origin, got)
 		}
 		if problem, has := c.Get("problem"); has {
-			if !strings.Contains(got.Problem, problem.(string)) || got.API != "" || got.GraphQL != "" {
+			if !strings.Contains(got.problem, problem.(string)) || got.api != "" || got.graphQL != "" {
 				t.Errorf("%s: problem %+v", origin, got)
 			}
-		} else if got.Problem != "" || got.API != c.String("api") || got.GraphQL != c.String("graphql") {
+		} else if got.problem != "" || got.api != c.String("api") || got.graphQL != c.String("graphql") {
 			t.Errorf("%s: 接続先 %+v", origin, got)
 		}
 	}
@@ -51,21 +51,21 @@ func TestHostKindsTable(t *testing.T) {
 
 func TestClassifyEdges(t *testing.T) {
 	for _, host := range []string{"evilgithub.com", "github.com.evil", "evilghe.com", "ghe.com.evil"} {
-		if got := Classify("https://" + host + "/a/b.git").Kind; got != GitLab {
+		if got := classify("https://" + host + "/a/b.git").kind; got != GitLab {
 			t.Errorf("%s: %s（区切りで照合する）", host, got)
 		}
 	}
 	for _, url := range []string{"ssh://user@host.example.com/g/p.git", "not a url"} {
-		if got := Classify(url).Kind; got != "" {
+		if got := classify(url).kind; got != "" {
 			t.Errorf("%s: %s（読めない表記）", url, got)
 		}
 	}
 	// 全角の数字はポートにしない
-	if got := Classify("git@x.ghe.com:٣:/a/b.git"); got.Problem != "" {
+	if got := classify("git@x.ghe.com:٣:/a/b.git"); got.problem != "" {
 		t.Errorf("非 ASCII の数字: %+v", got)
 	}
 	// Python の `$` と同じく、末尾の改行の前で当たる
-	if got := Classify("https://github.com/acme/widgets.git\n"); got.Kind != GitHub || got.Path != "acme/widgets" {
+	if got := classify("https://github.com/acme/widgets.git\n"); got.kind != GitHub || got.path != "acme/widgets" {
 		t.Errorf("末尾の改行: %+v", got)
 	}
 }
@@ -101,15 +101,15 @@ func TestChangesRequestedNoteByHost(t *testing.T) {
 
 func TestEffectiveKeepsTheLatestDecisionPerReviewer(t *testing.T) {
 	reviews := []Review{
-		{State: "CHANGES_REQUESTED", SubmittedAt: "2026-01-01T00:00:00Z", Author: "a"},
-		{State: "COMMENTED", SubmittedAt: "2026-01-02T00:00:00Z", Author: "a"}, // 判断を変えない
-		{State: "approved", SubmittedAt: "2026-01-01T00:00:00Z", Author: "b"},
-		{State: "DISMISSED", SubmittedAt: "2026-01-03T00:00:00Z", Author: "b"},
-		{State: "APPROVED", SubmittedAt: "2026-01-01T00:00:00Z"},
-		{State: "APPROVED", SubmittedAt: "2026-01-01T00:00:00Z"},
+		{State: "CHANGES_REQUESTED", submittedAt: "2026-01-01T00:00:00Z", author: "a"},
+		{State: "COMMENTED", submittedAt: "2026-01-02T00:00:00Z", author: "a"}, // 判断を変えない
+		{State: "approved", submittedAt: "2026-01-01T00:00:00Z", author: "b"},
+		{State: "DISMISSED", submittedAt: "2026-01-03T00:00:00Z", author: "b"},
+		{State: "APPROVED", submittedAt: "2026-01-01T00:00:00Z"},
+		{State: "APPROVED", submittedAt: "2026-01-01T00:00:00Z"},
 	}
 	got := Effective(reviews)
-	if len(got) != 3 || got[0].Author != "a" || got[0].State != ChangesRequested {
+	if len(got) != 3 || got[0].author != "a" || got[0].State != ChangesRequested {
 		t.Errorf("Effective: %+v", got)
 	}
 }
@@ -205,7 +205,7 @@ func openIDs(r Result, ledger []*pyjson.Object) []string {
 func TestRepliesToTheRequestAreCounted(t *testing.T) {
 	result := ResultOf(scene(t, "replies"))
 	threads := byPrefix(result)
-	if a := threads["a0"]; a.Body != "この方針で良いか確認したい" || !strings.HasSuffix(a.URL, "#note_5302") || a.Own == nil || *a.Own || a.Author != "202" {
+	if a := threads["a0"]; a.Body != "この方針で良いか確認したい" || !strings.HasSuffix(a.URL, "#note_5302") || a.own == nil || *a.own || a.author != "202" {
 		t.Errorf("a0: %+v", a)
 	}
 	if b := threads["b0"]; b.Body != "全体の感想です" || b.LastCommentID != "5304" {
@@ -216,7 +216,7 @@ func TestRepliesToTheRequestAreCounted(t *testing.T) {
 			t.Errorf("%s が取られた", gone)
 		}
 	}
-	if d := threads["d0"]; d.Own == nil || !*d.Own || !ccnaviPost(d, GitLab, poster) {
+	if d := threads["d0"]; d.own == nil || !*d.own || !ccnaviPost(d, GitLab, poster) {
 		t.Errorf("d0: %+v", d)
 	}
 	for name, id := range map[string]string{"h3": "5317", "h2": "5315", "h1": "5311"} {
@@ -255,12 +255,12 @@ func TestRepliesToTheRequestAreCounted(t *testing.T) {
 func TestOwnTakesOnlyJSONBooleans(t *testing.T) {
 	for _, v := range []any{"true", "false", 1, 0, nil, []any{}, pyjson.NewObject(), "yes"} {
 		r := ResultOf(pyjson.NewObject("threads", []any{pyjson.NewObject("id", "x", "own", v)}))
-		if r.Threads[0].Own != nil {
+		if r.Threads[0].own != nil {
 			t.Errorf("own=%v が読まれた", v)
 		}
 	}
 	r := ResultOf(pyjson.NewObject("threads", []any{pyjson.NewObject("id", "x", "own", false)}))
-	if r.Threads[0].Own == nil || *r.Threads[0].Own {
+	if r.Threads[0].own == nil || *r.Threads[0].own {
 		t.Error("own=false が読めない")
 	}
 }
@@ -285,7 +285,7 @@ func TestCcnaviPost(t *testing.T) {
 		{GitHub, poster, poster, &yes, marked, false},
 	}
 	for i, c := range cases {
-		if got := ccnaviPost(Thread{ID: "x", Author: c.author, Own: c.own, Body: c.body}, c.host, c.poster); got != c.want {
+		if got := ccnaviPost(Thread{ID: "x", author: c.author, own: c.own, Body: c.body}, c.host, c.poster); got != c.want {
 			t.Errorf("%d: %v", i, got)
 		}
 	}

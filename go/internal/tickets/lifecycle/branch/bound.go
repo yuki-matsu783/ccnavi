@@ -22,12 +22,10 @@ import (
 type Bound string
 
 const (
-	Yes     Bound = "yes"
-	No      Bound = "no"
-	Unknown Bound = "unknown"
+	yes     Bound = "yes"
+	no      Bound = "no"
+	unknown Bound = "unknown"
 )
-
-const mdExt = ".md"
 
 func sameName(a, b string) bool { return pathcase.Fold(pyfmt.NFC(a)) == pathcase.Fold(pyfmt.NFC(b)) }
 
@@ -72,7 +70,7 @@ func BaseBound(conf *config.Settings, root, mainRoot, branch string) (Bound, str
 	ident := ids.BranchToID(branch)
 	home, ok := owner(conf, root, mainRoot)
 	if !ok {
-		return Unknown, ""
+		return unknown, ""
 	}
 	for _, baseRoot := range integrate.TreeRoots(conf, root) {
 		approved := conf.ApprovedDir(baseRoot)
@@ -82,12 +80,12 @@ func BaseBound(conf *config.Settings, root, mainRoot, branch string) (Bound, str
 			state place.State
 		}{{approved, place.Doing}, {approved, place.Done}, {proposals, place.Todo}, {proposals, place.Review}} {
 			if found := integrate.NamedFile(ospath.Join(at.base, string(at.state)), ident); found != "" {
-				return Yes, "チケットか提案（" + relSlashed(root, found) + "）の名前がブランチの識別子と同じ"
+				return yes, "チケットか提案（" + relSlashed(root, found) + "）の名前がブランチの識別子と同じ"
 			}
 		}
 	}
 	if archived, ok := archive.ArchivedFields(root, home.Project, ident); ok && archived.Parent == "" {
-		return Yes, "取り込み先のリポジトリの退避（ready 済み）に同じ名前の親がある"
+		return yes, "取り込み先のリポジトリの退避（ready 済み）に同じ名前の親がある"
 	}
 	approved := conf.ApprovedDir(home.Root)
 	unsure := false
@@ -101,7 +99,7 @@ func BaseBound(conf *config.Settings, root, mainRoot, branch string) (Bound, str
 			continue
 		}
 		for _, e := range entries {
-			if !strings.HasSuffix(e, mdExt) {
+			if !strings.HasSuffix(e, config.MdExt) {
 				continue
 			}
 			path := ospath.Join(directory, e)
@@ -116,12 +114,12 @@ func BaseBound(conf *config.Settings, root, mainRoot, branch string) (Bound, str
 			}
 			tied := frontText(front.Get("branch"))
 			if (tied != "" && sameName(tied, branch)) || sameName(frontText(front.Get("ticket")), ident) {
-				return Yes, "取り込み先のリポジトリの承認済みチケット（" + relSlashed(root, path) + "）に結び付く"
+				return yes, "取り込み先のリポジトリの承認済みチケット（" + relSlashed(root, path) + "）に結び付く"
 			}
 		}
 	}
 	if unsure {
-		return Unknown, ""
+		return unknown, ""
 	}
-	return No, ""
+	return no, ""
 }

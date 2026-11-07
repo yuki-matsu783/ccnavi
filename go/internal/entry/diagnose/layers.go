@@ -115,11 +115,11 @@ func factorValue(f *risk.Factor) any {
 
 // form はルールの書き方。書いた表記と翻訳後の式。when は書いた形も持つ（翻訳後の式が 1 本に定まらない）。
 type form struct {
-	Kind, Written, Pattern string
-	When                   *pyjson.Object
+	kind, written, pattern string
+	when                   *pyjson.Object
 }
 
-// ruleForm はルールの書き方。when の Written は組み合わせ条件を 1 行にした形だけにする。Kind が when を言うので、
+// ruleForm はルールの書き方。when の written は組み合わせ条件を 1 行にした形だけにする。kind が when を言うので、
 // WrittenBody の頭の `when: ` を残すと、並べて出す画面で「when when: …」と二重になる。
 func ruleForm(r *rules.Rule) form {
 	pattern := ""
@@ -127,21 +127,21 @@ func ruleForm(r *rules.Rule) form {
 		pattern = r.Compiled.Pattern()
 	}
 	if r.When != nil {
-		return form{Kind: rules.WhenKey, Written: r.When.Describe(), Pattern: pattern, When: r.When.Written()}
+		return form{kind: rules.WhenKey, written: r.When.Describe(), pattern: pattern, when: r.When.Written()}
 	}
 	if r.Glob != "" {
-		return form{Kind: string(rules.WhenGlob), Written: r.Glob, Pattern: pattern}
+		return form{kind: string(rules.WhenGlob), written: r.Glob, pattern: pattern}
 	}
-	return form{Kind: string(rules.WhenRegex), Written: r.Regex, Pattern: pattern}
+	return form{kind: string(rules.WhenRegex), written: r.Regex, pattern: pattern}
 }
 
 // put は書き方の欄を o の後ろに足す。
 func (f form) put(o *pyjson.Object) *pyjson.Object {
-	o.Set("kind", f.Kind)
-	o.Set("written", f.Written)
-	o.Set("pattern", f.Pattern)
-	if f.When != nil {
-		o.Set("when", f.When)
+	o.Set("kind", f.kind)
+	o.Set("written", f.written)
+	o.Set("pattern", f.pattern)
+	if f.when != nil {
+		o.Set("when", f.when)
 	}
 	return o
 }

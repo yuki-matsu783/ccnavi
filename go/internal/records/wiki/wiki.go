@@ -1,6 +1,7 @@
 package wiki
 
 import (
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -21,8 +22,11 @@ const (
 // Target は反映先の種類。
 type Target string
 
-// Targets は反映先の種類の全部（表示の順）。
-var Targets = []Target{"rule", "risk", "phase", "template", "skill", "docs"}
+// targets は反映先の種類の全部（表示の順）。
+var targets = []Target{"rule", "risk", "phase", "template", "skill", "docs"}
+
+// Targets は targets の写しを返す（呼び手が書き換えても元は変わらない）。
+func Targets() []Target { return slices.Clone(targets) }
 
 // DocType は learning-wiki の md（パターン・受信箱）の frontmatter の type。--docs は --type で明示したときだけ引く。
 const DocType = "learning-wiki"
@@ -31,21 +35,21 @@ const DocType = "learning-wiki"
 type Decision string
 
 const (
-	Pending  Decision = "承認待ち"
-	Approved Decision = "承認"
-	Rejected Decision = "却下"
-	Deferred Decision = "延期"
+	pending  Decision = "承認待ち"
+	approved Decision = "承認"
+	rejected Decision = "却下"
+	deferred Decision = "延期"
 )
 
-var decisions = []Decision{Pending, Approved, Rejected, Deferred}
+var decisions = []Decision{pending, approved, rejected, deferred}
 
 // State はパターンの状態。
 type State string
 
 const (
-	Proposing State = "提案中"
+	proposing State = "提案中"
 	Candidate State = "候補"
-	Settled   State = "決着"
+	settled   State = "決着"
 )
 
 // Kind は壊れたファイルの種類。
@@ -53,7 +57,7 @@ type Kind string
 
 const (
 	KindPattern Kind = "pattern"
-	KindImpact  Kind = "impact"
+	kindImpact  Kind = "impact"
 )
 
 // MinSourcesToReflect は統合の子がパターンに反映できる観測元の数の下限。1 件だけの気づきは環境の癖や
@@ -63,20 +67,20 @@ const MinSourcesToReflect = 2
 // 観測元の数の閾値と、通知する候補の件数の既定（CCNAVI_LEARNING_SOURCES・CCNAVI_LEARNING_NOTICE_COUNT）。
 const (
 	DefaultSources     = 3
-	DefaultNoticeCount = 5
+	defaultNoticeCount = 5
 )
 
-// Pattern はパターン 1 本。Name はファイル名から .md を除いたもの。
+// Pattern はパターン 1 本。name はファイル名から .md を除いたもの。
 type Pattern struct {
-	Name   string
-	Target Target
+	name   string
+	target Target
 	// Sources は重複を除いた観測元の ID（大文字小文字だけが違うものは同じ。残すのは最初の綴り）。
 	Sources []string
-	Title   string
+	title   string
 }
 
-// Count は観測元の数。
-func (p Pattern) Count() int { return len(p.Sources) }
+// count は観測元の数。
+func (p Pattern) count() int { return len(p.Sources) }
 
 // Impact は採否の記録 1 本。
 type Impact struct {
@@ -85,10 +89,10 @@ type Impact struct {
 	Files    []string
 	// Patterns は動機のパターン名（書かれた綴り）と、そのときの観測元の数（書かれた順）。
 	Patterns []PatternCount
-	Status   Decision
-	Reason   string
-	// DecidedAt はタイムゾーン付きの日時。承認待ちは無いことがある。
-	DecidedAt *time.Time
+	status   Decision
+	reason   string
+	// decidedAt はタイムゾーン付きの日時。承認待ちは無いことがある。
+	decidedAt *time.Time
 }
 
 // PatternCount は採否の記録の patterns の 1 つ。
@@ -106,8 +110,8 @@ type Broken struct {
 
 // Wiki は読んだ wiki の全部。
 type Wiki struct {
-	Patterns []Pattern
-	Impacts  []Impact
+	patterns []Pattern
+	impacts  []Impact
 	Broken   []Broken
 	// Present は docs/wiki/ の下にパターンか採否の記録のディレクトリが在ったか。
 	Present bool
@@ -129,8 +133,8 @@ func (r Row) Reached(threshold int) bool { return r.Count >= threshold }
 func key(name string) string { return pathcase.Fold(ospath.Strip(name)) }
 
 func targetsText() string {
-	words := make([]string, len(Targets))
-	for i, t := range Targets {
+	words := make([]string, len(targets))
+	for i, t := range targets {
 		words[i] = string(t)
 	}
 	return strings.Join(words, " ")
@@ -144,11 +148,11 @@ func decisionsText() string {
 	return strings.Join(words, " ")
 }
 
-func patternWhere(name string) string { return PatternsDir + "/" + name + ".md" }
-func impactWhere(name string) string  { return ImpactDir + "/" + name + ".md" }
+func patternWhere(name string) string { return PatternsDir + "/" + name + config.MdExt }
+func impactWhere(name string) string  { return ImpactDir + "/" + name + config.MdExt }
 
-// Build はファイル名（.md を除く）から本文への対応から Wiki を組む。並びは名前順で、読み順によらない。
-func Build(patternTexts, impactTexts map[string]string, present bool) *Wiki {
+// build はファイル名（.md を除く）から本文への対応から Wiki を組む。並びは名前順で、読み順によらない。
+func build(patternTexts, impactTexts map[string]string, present bool) *Wiki {
 	w := &Wiki{Present: present}
 	seen := map[string]string{}
 	for _, name := range sortedKeys(patternTexts) {
@@ -162,15 +166,15 @@ func Build(patternTexts, impactTexts map[string]string, present bool) *Wiki {
 			w.Broken = append(w.Broken, Broken{patternWhere(name), KindPattern, problem})
 			continue
 		}
-		w.Patterns = append(w.Patterns, p)
+		w.patterns = append(w.patterns, p)
 	}
 	for _, name := range sortedKeys(impactTexts) {
 		i, problem := parseImpact(impactTexts[name])
 		if problem != "" {
-			w.Broken = append(w.Broken, Broken{impactWhere(name), KindImpact, problem})
+			w.Broken = append(w.Broken, Broken{impactWhere(name), kindImpact, problem})
 			continue
 		}
-		w.Impacts = append(w.Impacts, i)
+		w.impacts = append(w.impacts, i)
 	}
 	return w
 }
@@ -205,7 +209,7 @@ func countIn(i Impact, name string) int {
 
 // later は a が b より新しいか（日時をタイムゾーンを揃えて比べ、同じなら提案の名前順で後のもの）。
 func later(a, b Impact) bool {
-	if c := a.DecidedAt.Compare(*b.DecidedAt); c != 0 {
+	if c := a.decidedAt.Compare(*b.decidedAt); c != 0 {
 		return c > 0
 	}
 	return key(a.Proposal) > key(b.Proposal)
@@ -219,29 +223,29 @@ func status(name string, count int, impacts []Impact) State {
 		if !mentions(i, name) {
 			continue
 		}
-		if i.Status == Pending {
-			return Proposing
+		if i.status == pending {
+			return proposing
 		}
-		if i.DecidedAt != nil && (last == nil || later(i, *last)) {
+		if i.decidedAt != nil && (last == nil || later(i, *last)) {
 			last = &impacts[idx]
 		}
 	}
 	if last == nil {
 		return Candidate
 	}
-	if last.Status == Deferred && count > countIn(*last, name) {
+	if last.status == deferred && count > countIn(*last, name) {
 		return Candidate
 	}
-	return Settled
+	return settled
 }
 
 // Rows はパターンごとの状態と観測元の数（名前順）。
 func Rows(w *Wiki) []Row {
-	patterns := append([]Pattern(nil), w.Patterns...)
-	sort.SliceStable(patterns, func(i, j int) bool { return key(patterns[i].Name) < key(patterns[j].Name) })
+	patterns := append([]Pattern(nil), w.patterns...)
+	sort.SliceStable(patterns, func(i, j int) bool { return key(patterns[i].name) < key(patterns[j].name) })
 	out := make([]Row, 0, len(patterns))
 	for _, p := range patterns {
-		out = append(out, Row{p.Name, p.Target, status(p.Name, p.Count(), w.Impacts), p.Count(), p.Title})
+		out = append(out, Row{p.name, p.target, status(p.name, p.count(), w.impacts), p.count(), p.title})
 	}
 	return out
 }
@@ -260,8 +264,8 @@ func Candidates(w *Wiki) []Row {
 // PendingImpacts は承認待ちの採否の記録（提案の名前順）。
 func PendingImpacts(w *Wiki) []Impact {
 	var out []Impact
-	for _, i := range w.Impacts {
-		if i.Status == Pending {
+	for _, i := range w.impacts {
+		if i.status == pending {
 			out = append(out, i)
 		}
 	}
@@ -273,4 +277,4 @@ func PendingImpacts(w *Wiki) []Impact {
 func SourcesThreshold(written string) int { return config.Int(written, DefaultSources, 1) }
 
 // NoticeCount は書かれた通知の件数。読めない値と 1 未満は既定。
-func NoticeCount(written string) int { return config.Int(written, DefaultNoticeCount, 1) }
+func NoticeCount(written string) int { return config.Int(written, defaultNoticeCount, 1) }

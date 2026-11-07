@@ -17,15 +17,15 @@ const unknownBase = "<取り込み先のブランチ>"
 
 func left(d *Direct) string {
 	var parts []string
-	if d.Dirty {
+	if d.dirty {
 		parts = append(parts, "未コミットの変更")
 	}
-	if d.Ahead != 0 {
-		where := d.Base
+	if d.ahead != 0 {
+		where := d.base
 		if where == "" {
-			where = d.Integration
+			where = d.integration
 		}
-		parts = append(parts, "取り込み先（"+where+"）に入っていないコミット "+strconv.Itoa(d.Ahead)+" 件")
+		parts = append(parts, "取り込み先（"+where+"）に入っていないコミット "+strconv.Itoa(d.ahead)+" 件")
 	}
 	return strings.Join(parts, "と")
 }
@@ -34,20 +34,20 @@ func left(d *Direct) string {
 // どの状態かを決めて条件つきの補足（NOTE_INTEGRATE_*）を足す。
 func IntegrateNudge(root string, d *Direct) string {
 	head := hookio.Tagged(CodeIntegrateNudge, "worktree: "+d.Name)
-	values := texts.Values{"name": d.Name, "integ_tree": d.IntegTree}
+	values := texts.Values{"name": d.Name, "integ_tree": d.integTree}
 	// 版を知らない記録は、操作させず、ユーザに片付けを頼んで終える。
-	if d.Marker == MarkerUnknown {
+	if d.marker == MarkerUnknown {
 		return head + "\n" + texts.Say(root, "NUDGE_INTEGRATE__UNKNOWN_MARKER", values, nil)
 	}
 	values["left"] = left(d)
 	var extra []string
-	if d.Dirty {
-		extra = append(extra, texts.Say(root, "NOTE_INTEGRATE_COMMIT_FIRST", texts.Values{"work_tree": d.Worktree}, nil))
+	if d.dirty {
+		extra = append(extra, texts.Say(root, "NOTE_INTEGRATE_COMMIT_FIRST", texts.Values{"work_tree": d.worktree}, nil))
 	}
 	keepGoing := texts.Say(root, "NOTE_INTEGRATE_KEEP_GOING", nil, nil)
 	lines := []string{head}
-	if d.NoRecord {
-		base, ok := tree.BranchOf(d.IntegTree)
+	if d.noRecord {
+		base, ok := tree.BranchOf(d.integTree)
 		if !ok {
 			base = unknownBase
 		}
@@ -57,9 +57,9 @@ func IntegrateNudge(root string, d *Direct) string {
 	}
 	lines = append(lines, texts.Say(root, "NUDGE_INTEGRATE__RUN", values, nil))
 	lines = append(lines, extra...)
-	if d.OriginAhead != 0 {
+	if d.originAhead != 0 {
 		lines = append(lines, texts.Say(root, "NOTE_INTEGRATE_ORIGIN_AHEAD",
-			texts.Values{"base": d.Base, "count": strconv.Itoa(d.OriginAhead)}, nil))
+			texts.Values{"base": d.base, "count": strconv.Itoa(d.originAhead)}, nil))
 	}
 	return strings.Join(append(lines, keepGoing), "\n")
 }
@@ -69,9 +69,9 @@ func IntegrateNudge(root string, d *Direct) string {
 func BlockedNotice(d *Direct) string {
 	var where string
 	switch {
-	case d.Ahead != 0:
+	case d.ahead != 0:
 		where = left(d) + "がありますが"
-	case d.Marker != MarkerNone:
+	case d.marker != markerNone:
 		where = "取り込みの途中ですが"
 	default:
 		return hookio.Head + "直接作業 " + d.Name + " は、今は取り込めません。" + d.Blocked

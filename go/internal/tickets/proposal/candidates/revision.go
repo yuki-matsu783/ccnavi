@@ -39,7 +39,7 @@ func revisionProblems(conf *config.Settings, root string, revised, current *tick
 	}
 	// 範囲を変える改版は、作業中の子が居ないときだけ（子の範囲は親の範囲の中に収まる前提で承認されている）。
 	// 書かれる節が違うなら読めない項が混ざっていないかを見る（読めない項は entries に入らず、署名に出ない）。
-	if slices.ContainsFunc(rules.Sections, func(s rules.Decision) bool {
+	if slices.ContainsFunc(rules.Sections(), func(s rules.Decision) bool {
 		return !yaml.Equal(revised.Raw.Get(string(s)), current.Raw.Get(string(s)))
 	}) {
 		problems = append(problems, unreadableScope(revised)...)
@@ -94,7 +94,7 @@ func revisionProblems(conf *config.Settings, root string, revised, current *tick
 // 読めた項から組むので、読めなかった項は画面に出ないまま残る。数が合わなければ拒む。
 func unreadableScope(t *ticket.Ticket) []rules.Problem {
 	raw := 0
-	for _, section := range rules.Sections {
+	for _, section := range rules.Sections() {
 		value := t.Raw.Get(string(section))
 		if value == nil {
 			continue

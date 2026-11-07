@@ -8,7 +8,7 @@
 // 退避したものは消さない。消さないときは何も消さず、理由を言う。git はローカルの操作だけで、ネットワークには出ない。
 //
 // Python からの対応: tickets/lifecycle/worktrees。drop・blocked・report・run_drop → Drop・Blocked・Report・RunDrop、
-// Dropped（removed → Removed）と REMOVED などの状態 → Status の定数、tidy_targets・family_for・run_tidy →
+// Dropped（removed → Gone）と REMOVED などの状態 → Status の定数、tidy_targets・family_for・run_tidy →
 // TidyTargets・FamilyFor・RunTidy、run_remaining → RunRemaining（remaining・Left は私的）、run_clean → RunClean、
 // _owner → Owner（retire が使う）、child_worktrees → ChildWorktrees（dict と CHILD_* は
 // ticket.WorktreePlan と ticket.WorktreeState。proposal/agree と同じ型を読む）。_long は落とした（Go の os は Windows の長いパスを自分で扱う）。

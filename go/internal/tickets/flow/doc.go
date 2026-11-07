@@ -12,8 +12,8 @@
 // tickets_rel・resolve → FlowFile・FlowRel・DraftFile・DraftRel・TicketsRel・Resolve、info → FlowInfo、
 // locate・lock_hit（(名前, プロジェクト) の組）→ Locate・LockHit（Location）、hard_linked・inode_hit・
 // locked_message → HardLinked・InodeHit・LockedMessage、catalog → LoadCatalog（Catalog。JSON は Object）、
-// fingerprint・record_digest・changed_notice・briefing → Fingerprint・RecordDigest・ChangedNotice・Briefing、
+// fingerprint・record_digest・changed_notice・briefing → fingerprint・RecordDigest・ChangedNotice・Briefing、
 // _Loader（別名を拒む読み手）→ yaml.LoadRefusingAliases。render.render → Render（ノードの上限は固定）、
-// shape.shape_problem・structure_problems・name_problems → ShapeProblem・StructureProblems・NameProblems、
-// text.clean・_line・_FENCE_PHRASES → Clean・Line・FencePhrases。
+// shape.shape_problem・structure_problems・name_problems → shapeProblem・StructureProblems・NameProblems、
+// text.clean・_line・_FENCE_PHRASES → Clean・Line・fencePhrases。
 package flow

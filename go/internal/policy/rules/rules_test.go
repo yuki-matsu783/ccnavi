@@ -80,7 +80,7 @@ func TestRootPlaceholders(t *testing.T) {
 			t.Errorf("%q: 外=%v", subject, got)
 		}
 	}
-	if !strings.HasPrefix(rule.Compiled.Pattern(), `^(?:\Z|[^\\/]|[\\/](?:\Z|[^n]|n(?:`) || generatedQuantifier(NotRootPattern(RealRoot(root))) {
+	if !strings.HasPrefix(rule.Compiled.Pattern(), `^(?:\Z|[^\\/]|[\\/](?:\Z|[^n]|n(?:`) || generatedQuantifier(notRootPattern(realRoot(root))) {
 		t.Error(rule.Compiled.Pattern())
 	}
 	in, _ := one(t, "deny", "id: in\nmatch: Write\nregex: '^{root}[\\\\/]wip'\nmessage: m", root)
@@ -91,14 +91,14 @@ func TestRootPlaceholders(t *testing.T) {
 
 // {!root} を組み立てられないとき、deny・ask は match の全部を止め、allow は使わない。書いた文面は残す。
 func TestUngeneratableNotRoot(t *testing.T) {
-	long := "/nonexistent/" + strings.Repeat("a", MaxRootLen)
+	long := "/nonexistent/" + strings.Repeat("a", maxRootLen)
 	for _, section := range []string{"deny", "ask"} {
 		rule, problems := one(t, section, "id: outside\nmatch: Write\nregex: '^{!root}'\nmessage: 書いた文", long)
 		if rule == nil || len(problems) != 1 || problems[0].Severity != Error {
 			t.Fatalf("%s: %v", section, problems)
 		}
-		if !rule.Matches("Write", long+"/x") || rule.Message != "書いた文" || !strings.Contains(rule.SpokenMessage(), "長すぎて") {
-			t.Errorf("%s: %q", section, rule.SpokenMessage())
+		if _, said := rule.Speech(); !rule.Matches("Write", long+"/x") || rule.Message != "書いた文" || !strings.Contains(said, "長すぎて") {
+			t.Errorf("%s: %q", section, said)
 		}
 	}
 	if rule, problems := one(t, "allow", "id: outside\nmatch: Write\nregex: '^{!root}'", long); rule != nil || len(problems) != 1 {

@@ -214,8 +214,8 @@ func reservedProject(t *ticket.Ticket) []rules.Problem {
 	if t.Project == "" || !config.IsReservedLayerName(t.Project) {
 		return nil
 	}
-	names := make([]string, 0, len(config.ReservedLayerNames))
-	for _, n := range config.ReservedLayerNames {
+	names := make([]string, 0, len(config.ReservedLayerNames()))
+	for _, n := range config.ReservedLayerNames() {
 		names = append(names, "`"+n+"`")
 	}
 	return []rules.Problem{problem(t, "`project: "+t.Project+"` はレイヤーの名前として予約してある表記（"+strings.Join(names, " と ")+"）。"+
@@ -266,7 +266,7 @@ func ProjectProblems(t *ticket.Ticket, pool map[string]*ticket.Ticket, conf *con
 	return []rules.Problem{problem(t, "`project: "+t.Project+"` は置き場 "+where+" にありません。")}
 }
 
-// ChildProblems は、子と親の構造を検査する。どれも「子の範囲をどの親で切り詰めるか」が決まらない形なので、承認（validate）でも判定（BlockingProblems）でも通さない。1 か所に置くのは、置き場を動かして承認する進め方で判定の側だけが古くなり、承認を通ったチケットと通らないチケットで答えが分かれないようにするためである。
+// ChildProblems は、子と親の構造を検査する。どれも「子の範囲をどの親で切り詰めるか」が決まらない形なので、承認（validate）でも判定（blockingProblems）でも通さない。1 か所に置くのは、置き場を動かして承認する進め方で判定の側だけが古くなり、承認を通ったチケットと通らないチケットで答えが分かれないようにするためである。
 // 親の計画か固定したフェーズ定義が壊れていれば、子も止める。子の番号の先行・レビュー・範囲の上限が決まらないからである。定義は親のコピーから読み、phases.yml は読まない。
 //
 // missing は、親が無いときの文である（空なら「承認されていない」）。検査は同じで、承認と判定で読む人の次の手が違うだけである。
@@ -294,10 +294,10 @@ func ChildProblems(t, parent *ticket.Ticket, missing string) []rules.Problem {
 	return nil
 }
 
-// BlockingProblems は、判定がこの承認済みチケットを信頼できない理由を返す（error だけ）。空なら信頼してよい。承認のときにしか当たらなかった検査のうち、当たらないと「範囲をどこで切り詰めるか」が決まらないものを置く。中身だけで分かる矛盾（started_at の無い base_sha、workflow: 欄、計画と固定した定義の誤り）も置く。置き場を動かして承認する進め方は --agree を通らないので、判定の側でもここを通す。
+// blockingProblems は、判定がこの承認済みチケットを信頼できない理由を返す（error だけ）。空なら信頼してよい。承認のときにしか当たらなかった検査のうち、当たらないと「範囲をどこで切り詰めるか」が決まらないものを置く。中身だけで分かる矛盾（started_at の無い base_sha、workflow: 欄、計画と固定した定義の誤り）も置く。置き場を動かして承認する進め方は --agree を通らないので、判定の側でもここを通す。
 //
 // 入れないものは次のとおり。親のコピーと今の phases.yml の食い違い（進行中の親には効かない決まり）。フェーズの順序（held_phase が別に止める）。範囲の超過（判定が切り詰める）。再開で残った欄（ResumedFields。--lint が warn で言う）。
-func BlockingProblems(conf *config.Settings, t *ticket.Ticket, pool map[string]*ticket.Ticket) []rules.Problem {
+func blockingProblems(conf *config.Settings, t *ticket.Ticket, pool map[string]*ticket.Ticket) []rules.Problem {
 	problems := ProjectProblems(t, pool, conf)
 	problems = append(problems, contentProblems(t)...)
 	if !t.IsChild() {
@@ -353,12 +353,12 @@ func ResumedFields(t *ticket.Ticket) []string {
 	return out
 }
 
-// markBlocked は、判定が読む承認済みチケットに、信頼できない理由（BlockingProblems の最初）を付ける。理由は、実行前・実行後・サブエージェント終了時の 3 か所が、同じ答えで読む。別々に検査すると、実行前は通って実行後に範囲外と報告される食い違いが起きるからである。親を引く対応表は kept そのものを使う。判定が parent を引く索引と同じにするためである。閉じた親まで引ける対応表にすると、判定の側では親が見つからず、子の宣言だけで範囲が決まってしまう。
+// markBlocked は、判定が読む承認済みチケットに、信頼できない理由（blockingProblems の最初）を付ける。理由は、実行前・実行後・サブエージェント終了時の 3 か所が、同じ答えで読む。別々に検査すると、実行前は通って実行後に範囲外と報告される食い違いが起きるからである。親を引く対応表は kept そのものを使う。判定が parent を引く索引と同じにするためである。閉じた親まで引ける対応表にすると、判定の側では親が見つからず、子の宣言だけで範囲が決まってしまう。
 func markBlocked(conf *config.Settings, kept []*ticket.Ticket) {
 	pool := ByID(kept)
 	for _, t := range kept {
 		t.Blocked = ""
-		if problems := BlockingProblems(conf, t, pool); len(problems) > 0 {
+		if problems := blockingProblems(conf, t, pool); len(problems) > 0 {
 			t.Blocked = problems[0].Detail
 		}
 	}

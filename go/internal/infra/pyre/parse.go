@@ -21,9 +21,9 @@ const (
 	DotAll     Flag = 16
 	unicodeOn  Flag = 32
 	Verbose    Flag = 64
-	ASCII      Flag = 256
+	ascii      Flag = 256
 
-	typeFlags = ASCII | locale | unicodeOn
+	typeFlags = ascii | locale | unicodeOn
 )
 
 // maxRepeat は繰り返しの上限なし（Python の MAXREPEAT）。
@@ -44,32 +44,32 @@ const maxWidth = math.MaxInt64
 var (
 	// ErrTooDeep は入れ子が深すぎて Python が RecursionError で止まる式。
 	ErrTooDeep = errors.New("maximum recursion depth exceeded")
-	// ErrOverflow は繰り返しの数が Python の上限を超える式（Python は OverflowError）。
-	ErrOverflow = errors.New("the repetition number is too large")
+	// errOverflow は繰り返しの数が Python の上限を超える式（Python は OverflowError）。
+	errOverflow = errors.New("the repetition number is too large")
 )
 
 // Error は読めない式（Python の re.error）。Error() は str(re.error) と同じ文。
 type Error struct {
-	Msg     string
-	Pattern string
-	Pos     int // 符号位置。HasPos が偽なら位置なし
-	HasPos  bool
+	msg     string
+	pattern string
+	pos     int // 符号位置。hasPos が偽なら位置なし
+	hasPos  bool
 }
 
 func (e *Error) Error() string {
-	if !e.HasPos {
-		return e.Msg
+	if !e.hasPos {
+		return e.msg
 	}
-	msg := fmt.Sprintf("%s at position %d", e.Msg, e.Pos)
-	runes := []rune(e.Pattern)
-	if strings.ContainsRune(e.Pattern, '\n') {
-		head := runes[:min(e.Pos, len(runes))]
+	msg := fmt.Sprintf("%s at position %d", e.msg, e.pos)
+	runes := []rune(e.pattern)
+	if strings.ContainsRune(e.pattern, '\n') {
+		head := runes[:min(e.pos, len(runes))]
 		line := strings.Count(string(head), "\n") + 1
 		var col int
 		if i := lastRune(head, '\n'); i >= 0 {
-			col = e.Pos - i
+			col = e.pos - i
 		} else {
-			col = e.Pos + 1
+			col = e.pos + 1
 		}
 		msg = fmt.Sprintf("%s (line %d, column %d)", msg, line, col)
 	}
@@ -207,7 +207,7 @@ func (t *tokenizer) advance() error {
 	if t.src[index] == '\\' {
 		index++
 		if index >= len(t.src) {
-			return &Error{Msg: "bad escape (end of pattern)", Pattern: t.pattern, Pos: len(t.src) - 1, HasPos: true}
+			return &Error{msg: "bad escape (end of pattern)", pattern: t.pattern, pos: len(t.src) - 1, hasPos: true}
 		}
 		char += string(t.src[index])
 	}
@@ -284,7 +284,7 @@ func (t *tokenizer) seek(index int) error {
 }
 
 func (t *tokenizer) error(msg string, offset int) *Error {
-	return &Error{Msg: msg, Pattern: t.pattern, Pos: t.tell() - offset, HasPos: true}
+	return &Error{msg: msg, pattern: t.pattern, pos: t.tell() - offset, hasPos: true}
 }
 
 func (t *tokenizer) checkgroupname(name string, offset int) error {
@@ -328,7 +328,7 @@ var escapes = map[string]rune{
 }
 
 var flagLetters = map[rune]Flag{
-	'i': IgnoreCase, 'L': locale, 'm': Multiline, 's': DotAll, 'x': Verbose, 'a': ASCII, 'u': unicodeOn,
+	'i': IgnoreCase, 'L': locale, 'm': Multiline, 's': DotAll, 'x': Verbose, 'a': ascii, 'u': unicodeOn,
 }
 
 // categoryEscape は \d などの文字クラス。in が偽なら位置の検査（\A \b \B \Z）。
@@ -551,7 +551,7 @@ func parsePattern(pattern string, flags Flag) (seq, *parseState, error) {
 	if state.flags&locale != 0 {
 		return nil, nil, errors.New("cannot use LOCALE flag with a str pattern")
 	}
-	if state.flags&ASCII == 0 {
+	if state.flags&ascii == 0 {
 		state.flags |= unicodeOn
 	} else if state.flags&unicodeOn != 0 {
 		return nil, nil, errors.New("ASCII and UNICODE flags are incompatible")
@@ -561,7 +561,7 @@ func parsePattern(pattern string, flags Flag) (seq, *parseState, error) {
 	}
 	for _, g := range state.grouprefKeys {
 		if g >= state.groups() {
-			return nil, nil, &Error{Msg: fmt.Sprintf("invalid group reference %d", g), Pattern: pattern, Pos: state.grouprefpos[g], HasPos: true}
+			return nil, nil, &Error{msg: fmt.Sprintf("invalid group reference %d", g), pattern: pattern, pos: state.grouprefpos[g], hasPos: true}
 		}
 	}
 	return s, state, nil
@@ -817,14 +817,14 @@ func (p *parser) repeat(sub seq, this string) (seq, error) {
 		if los != "" {
 			v, ok := repeatCount(los)
 			if !ok {
-				return nil, ErrOverflow
+				return nil, errOverflow
 			}
 			lo = v
 		}
 		if his != "" {
 			v, ok := repeatCount(his)
 			if !ok {
-				return nil, ErrOverflow
+				return nil, errOverflow
 			}
 			hi = v
 			if hi < lo {

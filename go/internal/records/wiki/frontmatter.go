@@ -15,11 +15,10 @@ import (
 // headLimit は frontmatter を探す頭の長さ（字数）。
 const headLimit = 64 * 1024
 
-const byteMark = "\uFEFF"
-
 // frontMatter は頭の frontmatter（--- で囲んだ YAML）のマップ。読めなければ理由。
 func frontMatter(text string) (*yaml.Map, string) {
-	body, state := yaml.FrontBody(strings.TrimLeft(pyfmt.Head(text, headLimit), byteMark), yaml.FrontStyle{DocEnd: true})
+	// 頭の BOM は並んでいても全部外す（SkipBOM は 1 つだけ外す）。
+	body, state := yaml.FrontBody(strings.TrimLeft(pyfmt.Head(text, headLimit), yaml.BOM), yaml.FrontStyle{DocEnd: true})
 	switch state {
 	case yaml.FrontAbsent:
 		return nil, "frontmatter が無い"
@@ -101,7 +100,7 @@ func target(data *yaml.Map) (Target, bool) {
 	if !ok {
 		return "", false
 	}
-	for _, t := range Targets {
+	for _, t := range targets {
 		if string(t) == s {
 			return t, true
 		}
@@ -143,7 +142,7 @@ func ParsePattern(name, body string) (Pattern, string) {
 	if problem != "" {
 		return Pattern{}, problem
 	}
-	return Pattern{Name: name, Target: t, Sources: unique(sources), Title: title}, ""
+	return Pattern{name: name, target: t, Sources: unique(sources), title: title}, ""
 }
 
 // counts は patterns（パターン名から観測元の数）。同じ名前（前後の空白を除いて）は後の数で置き換える。
@@ -238,7 +237,7 @@ func parseImpact(body string) (Impact, string) {
 			return Impact{}, problem
 		}
 		decided = &when
-	} else if state != Pending {
+	} else if state != pending {
 		return Impact{}, "decided_at が無い（承認待ちのほかは日時が要る）"
 	}
 	return Impact{proposal, t, files, patterns, state, reason, decided}, ""

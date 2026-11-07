@@ -16,7 +16,7 @@ import (
 // （文だけを替える口は持たない）。
 const (
 	MessagesDir = "messages"
-	Suffix      = ".yml"
+	suffix      = ".yml"
 )
 
 // Values は差し込む値（名前 → 値）。Variants は場合分けした欄の選び方（欄の名前 → 場合）。
@@ -26,11 +26,11 @@ type (
 )
 
 // Error は文を組み立てられなかった理由（値が足りない・場合を選べない・文面が無い）。
-type Error struct{ Msg string }
+type Error struct{ msg string }
 
-func (e *Error) Error() string { return e.Msg }
+func (e *Error) Error() string { return e.msg }
 
-func failf(format string, args ...any) error { return &Error{Msg: fmt.Sprintf(format, args...)} }
+func failf(format string, args ...any) error { return &Error{msg: fmt.Sprintf(format, args...)} }
 
 // Catalog は置き場の全件。
 type Catalog struct {
@@ -38,8 +38,8 @@ type Catalog struct {
 	Problems []rules.Problem
 }
 
-// Dir は文面ファイルの置き場（`<root>/.ccnavi/messages`）。
-func Dir(root string) string {
+// dir は文面ファイルの置き場（`<root>/.ccnavi/messages`）。
+func dir(root string) string {
 	return ospath.Join(root, config.DefaultProjectHome, MessagesDir)
 }
 
@@ -50,7 +50,7 @@ func fileNames(dir string) ([]string, bool) {
 	}
 	var out []string
 	for _, n := range names {
-		if strings.HasSuffix(n, Suffix) {
+		if strings.HasSuffix(n, suffix) {
 			out = append(out, n)
 		}
 	}
@@ -62,7 +62,7 @@ func fileNames(dir string) ([]string, bool) {
 // 別のファイルに同じ識別子があれば、名前順で後ろを採らない。
 func Load(root string) *Catalog {
 	c := &Catalog{Entries: map[string]*Entry{}}
-	dir := Dir(root)
+	dir := dir(root)
 	names, ok := fileNames(dir)
 	if !ok {
 		return c // 置き場が無いのは正常
@@ -77,11 +77,11 @@ func Load(root string) *Catalog {
 		found, notes := checkFile(text, path)
 		c.Problems = append(c.Problems, notes...)
 		for _, e := range found {
-			if _, dup := c.Entries[e.ID]; dup {
-				c.Problems = append(c.Problems, rules.Problem{Severity: rules.Error, Rule: e.ID, Detail: name + ": 別のファイルにも同じ識別子がある。後ろは採らない"})
+			if _, dup := c.Entries[e.id]; dup {
+				c.Problems = append(c.Problems, rules.Problem{Severity: rules.Error, Rule: e.id, Detail: name + ": 別のファイルにも同じ識別子がある。後ろは採らない"})
 				continue
 			}
-			c.Entries[e.ID] = e
+			c.Entries[e.id] = e
 		}
 	}
 	return c
@@ -90,7 +90,7 @@ func Load(root string) *Catalog {
 // Find は識別子の 1 件を返す。識別子の字を含むファイルだけを名前順に YAML として読み、検査を通る形で持つ
 // 最初のファイルの 1 件を採る。全件を読む Load と同じ 1 件になる。無い・検査を通らないなら nil を返す。
 func Find(root, id string) *Entry {
-	dir := Dir(root)
+	dir := dir(root)
 	names, ok := fileNames(dir)
 	if !ok {
 		return nil
@@ -165,7 +165,7 @@ func (e *Entry) pick(name string, variants Variants) (string, error) {
 	c := variants[name]
 	text, ok := v.byKey[c]
 	if !ok {
-		return "", failf("%s: `%s` の場合 %s を選べない（%s）", e.ID, name, pyfmt.Repr(c), strings.Join(v.cases, " "))
+		return "", failf("%s: `%s` の場合 %s を選べない（%s）", e.id, name, pyfmt.Repr(c), strings.Join(v.cases, " "))
 	}
 	return text, nil
 }
@@ -179,7 +179,7 @@ func Render(e *Entry, values Values, variants Variants, root string) (string, er
 		}
 	}
 	if len(missing) > 0 {
-		return "", failf("%s: 値が足りない: %s", e.ID, strings.Join(missing, ", "))
+		return "", failf("%s: 値が足りない: %s", e.id, strings.Join(missing, ", "))
 	}
 	one := func(name string) (string, error) {
 		text, err := e.pick(name, variants)
@@ -189,7 +189,7 @@ func Render(e *Entry, values Values, variants Variants, root string) (string, er
 		return fill(text, values, root)
 	}
 	noted := func(name string) ([]string, error) {
-		if !e.Has(name) {
+		if !e.has(name) {
 			return nil, nil
 		}
 		text, err := one(name)
@@ -205,8 +205,8 @@ func Render(e *Entry, values Values, variants Variants, root string) (string, er
 		return out, nil
 	}
 	var lines []string
-	switch e.Kind {
-	case KindChoices:
+	switch e.kind {
+	case kindChoices:
 		lines = append(lines, choicesHead)
 		for i, item := range e.fields[fieldItems].items {
 			text, err := fill(item, values, root)
@@ -216,11 +216,11 @@ func Render(e *Entry, values Values, variants Variants, root string) (string, er
 			lines = append(lines, fmt.Sprintf("  %d. %s", i+1, text))
 		}
 		return strings.Join(lines, "\n"), nil
-	case KindNote:
+	case kindNote:
 		notes, err := noted(fieldNote)
 		return strings.Join(notes, "\n"), err
 	}
-	if e.Has(fieldWhat) {
+	if e.has(fieldWhat) {
 		text, err := one(fieldWhat)
 		if err != nil {
 			return "", err
@@ -228,7 +228,7 @@ func Render(e *Entry, values Values, variants Variants, root string) (string, er
 		lines = append(lines, text)
 	}
 	for _, name := range []string{fieldWhy, fieldNext, fieldNoBypass} {
-		if e.Has(name) {
+		if e.has(name) {
 			text, err := one(name)
 			if err != nil {
 				return "", err
@@ -253,17 +253,17 @@ func Fallback(id string) string {
 	gone := "文面（" + id + "）を引けませんでした。"
 	ask := "ユーザに、文面ファイル（" + fileHint + "）が読めるかを `" + config.Launcher + " --lint` で確かめてもらい、返事を待つ"
 	switch kind {
-	case KindNote:
+	case kindNote:
 		return NoteLabel + gone
-	case KindNotice:
+	case kindNotice:
 		return gone + "\n" + NextLabel + ask
-	case KindChoices:
+	case kindChoices:
 		return choicesHead + "\n  1. " + ask + "（" + gone + "）"
-	case KindNext:
+	case kindNext:
 		return NextLabel + ask + "（" + gone + "）"
 	}
 	lines := []string{gone + "止めた判定は変わらず、短い既定の文で伝えます。", NextLabel + ask}
-	if kind == KindDeny {
+	if kind == kindDeny {
 		lines = append(lines, noBypassLabel+"言い換えや別の経路でも、同じゲートに当たります。")
 	}
 	return strings.Join(lines, "\n")
@@ -317,12 +317,13 @@ func Spec(id string, o SpecOptions) rules.TextRef {
 	return ref
 }
 
-// Spoken はルールがモデルに渡す文。文面ファイルの識別子を持つ組み込みのルールは、いま引く。
+// Spoken はルールがモデルに渡す文。どの文面を使うかは rules.Rule.Speech が決め、文面ファイルの文はここで引く。
 func Spoken(r *rules.Rule) string {
-	if r.Text.ID != "" && r.DegradedMessage == "" {
-		return Say(r.Root, r.Text.ID, r.Text.Values, r.Text.Variants)
+	ref, text := r.Speech()
+	if ref == nil {
+		return text
 	}
-	return r.SpokenMessage()
+	return Say(r.Root, ref.ID, ref.Values, ref.Variants)
 }
 
 // LinesOf は出力の `次:` の行（テストと点検が数える）。

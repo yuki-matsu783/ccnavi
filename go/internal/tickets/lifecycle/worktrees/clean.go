@@ -69,7 +69,7 @@ func generated(top string) []string {
 				}
 				continue
 			}
-			if e.Name() == ".git" || linked {
+			if e.Name() == tree.DotGit || linked {
 				continue
 			}
 			if e.IsDir() {
@@ -144,7 +144,7 @@ func cleanGenerated(top string) string {
 // ファイルの gitdir の先が消えている。聞くと git は上へ登って別のリポジトリを答えるので、この形のときだけ
 // git に聞かずに進める。
 func unregistered(top string) bool {
-	gitPath := ospath.Join(top, ".git")
+	gitPath := ospath.Join(top, tree.DotGit)
 	if !ospath.DiskLexists(gitPath) {
 		return true
 	}

@@ -46,8 +46,8 @@ const (
 	// maxEntries は定義の scope と deliverables の件数の上限。定義は親の phases: にコピーするので、ここで
 	// 縛らないと親の大きさが縛れない。レビューしきれない数を並べて広い範囲を紛れ込ませる手口も防ぐ。
 	maxEntries = ticket.MaxScopeEntries
-	// Where は phases.yml の苦情の出どころ（ファイル全体への苦情の rule）。
-	Where = "(phases)"
+	// where は phases.yml の苦情の出どころ（ファイル全体への苦情の rule）。
+	where = "(phases)"
 )
 
 // PhaseType はフェーズ定義 1 つ。フェーズは親の計画に並ぶ番号付きの実体で、子が phase: N で指す。
@@ -253,7 +253,7 @@ func Load(path string) (*Types, []rules.Problem) {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil, nil
 		}
-		return nil, []rules.Problem{problem(rules.Error, Where, path+" を読めない ("+err.Error()+")")}
+		return nil, []rules.Problem{problem(rules.Error, where, path+" を読めない ("+err.Error()+")")}
 	}
 	return Parse(text, path)
 }
@@ -475,7 +475,7 @@ func globs(id, key string, raw []any) ([]ticket.Entry, []rules.Problem) {
 
 // consolidate は統合の子の範囲の上限を持つ、ccnavi の中に固定した定義。
 var consolidate = func() *PhaseType {
-	entries, _ := globs(ticket.MaintenanceConsolidate, "scope", strs(ticket.ConsolidateScope))
+	entries, _ := globs(ticket.MaintenanceConsolidate, "scope", strs(ticket.ConsolidateScope()))
 	p := &PhaseType{
 		ID: ticket.MaintenanceConsolidate, Title: "学びの統合", Kind: Feedback,
 		Scope: entries, Learning: LearningOff,

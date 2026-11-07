@@ -24,19 +24,19 @@ type Route string
 
 const (
 	RouteSent         Route = "sent"          // 送った
-	RouteUnchanged    Route = "unchanged"     // 変更なし
-	RouteWriteOnly    Route = "write_only"    // 書くだけ（origin なし）
-	RouteStopped      Route = "stopped"       // 止めた
-	RouteFailedBefore Route = "failed_before" // 送る前に失敗（親の状態で拒否した回を含む）
-	RouteFailedAfter  Route = "failed_after"  // push 後の後処理で失敗
+	routeUnchanged    Route = "unchanged"     // 変更なし
+	routeWriteOnly    Route = "write_only"    // 書くだけ（origin なし）
+	routeStopped      Route = "stopped"       // 止めた
+	routeFailedBefore Route = "failed_before" // 送る前に失敗（親の状態で拒否した回を含む）
+	routeFailedAfter  Route = "failed_after"  // push 後の後処理で失敗
 	// RouteUnsent は todo/ へ書いたまま送っていない提案（操作実績ではなく、書いた記録から決める）。
 	RouteUnsent Route = "unsent"
 )
 
-var routes = []Route{RouteSent, RouteUnchanged, RouteWriteOnly, RouteStopped, RouteFailedBefore, RouteFailedAfter}
+var routes = []Route{RouteSent, routeUnchanged, routeWriteOnly, routeStopped, routeFailedBefore, routeFailedAfter}
 
 // effective は提案の最終の有効版になる経路。変更なしは、前に送った版がそのまま有効のままになる。
-func (r Route) effective() bool { return r == RouteSent || r == RouteUnchanged }
+func (r Route) effective() bool { return r == RouteSent || r == routeUnchanged }
 
 const (
 	unlinked = "unlinked"
@@ -62,7 +62,7 @@ var wrappers = []string{"env", "nohup", "time", "timeout", "sudo", "uv", "run", 
 
 // File は送った版に含まれたファイル。SHA は書いた記録から作った未送信の版では空。
 type File struct {
-	SHA  string
+	sha  string
 	Path string
 }
 
@@ -73,8 +73,8 @@ type Op struct {
 	Commit    string
 	Files     []File
 	ToolUseID string
-	Started   time.Time
-	Ended     time.Time
+	started   time.Time
+	ended     time.Time
 }
 
 // fold はパスを比べるキー。区切りは "/" にそろえ、大文字小文字は区別しない。
@@ -308,8 +308,8 @@ func parseOp(obj *pyjson.Object) Op {
 		Commit:    obj.String("commit"),
 		Files:     parseFiles(obj.Value("files")),
 		ToolUseID: obj.String("tool_use_id"),
-		Started:   moment(obj.Value("started"), epoch),
-		Ended:     moment(obj.Value("ended"), epoch),
+		started:   moment(obj.Value("started"), epoch),
+		ended:     moment(obj.Value("ended"), epoch),
 	}
 }
 
@@ -318,7 +318,7 @@ func parseFiles(v any) []File {
 	var out []File
 	for _, item := range items {
 		if x, ok := item.(*pyjson.Object); ok {
-			out = append(out, File{SHA: x.String("sha"), Path: pyfmt.Str(orEmpty(x.Value("path")))})
+			out = append(out, File{sha: x.String("sha"), Path: pyfmt.Str(orEmpty(x.Value("path")))})
 		}
 	}
 	return out
@@ -334,8 +334,8 @@ func orEmpty(v any) any {
 func filesList(files []File) []any {
 	out := make([]any, 0, len(files))
 	for _, f := range files {
-		if f.SHA != "" {
-			out = append(out, pyjson.NewObject("sha", f.SHA, "path", f.Path))
+		if f.sha != "" {
+			out = append(out, pyjson.NewObject("sha", f.sha, "path", f.Path))
 		} else {
 			out = append(out, pyjson.NewObject("path", f.Path))
 		}
@@ -353,7 +353,7 @@ func TurnOps(state, session string, since time.Time) []Op {
 		}
 	}
 	slices.SortStableFunc(ops, func(a, b Op) int {
-		if c := a.Ended.Compare(b.Ended); c != 0 {
+		if c := a.ended.Compare(b.ended); c != 0 {
 			return c
 		}
 		return strings.Compare(a.ToolUseID, b.ToolUseID)
@@ -368,7 +368,7 @@ func FinalVersions(ops []Op) []Op {
 	latest := map[string]Op{}
 	for _, op := range ops {
 		prev, seen := latest[op.Ident]
-		if op.Route == RouteUnchanged && seen && prev.Route.effective() {
+		if op.Route == routeUnchanged && seen && prev.Route.effective() {
 			continue
 		}
 		if op.Route.effective() || !seen || !prev.Route.effective() {
@@ -401,7 +401,7 @@ func TargetKey(op Op) string {
 type Write struct {
 	Ident string
 	Path  string
-	At    time.Time
+	at    time.Time
 }
 
 // todoMarker は提案の置き場の下の todo/ を、"/" で区切ったパスの中で探す印。
@@ -419,7 +419,7 @@ func WrittenIdent(filePath, ticketsDir string) string {
 	}
 	start := utf8.RuneCountInString(path[:at]) + utf8.RuneCountInString(marker)
 	name := path[at+len(marker):]
-	if strings.Contains(name, "/") || !strings.HasSuffix(name, ".md") || utf8.RuneCountInString(name) <= 3 {
+	if strings.Contains(name, "/") || !strings.HasSuffix(name, config.MdExt) || utf8.RuneCountInString(name) <= 3 {
 		return ""
 	}
 	return string(original[start : len(original)-3])
@@ -442,11 +442,11 @@ func TurnWrites(state, session string, since time.Time) []Write {
 	var found []Write
 	for _, obj := range records(state, WritePrefix+safe(session)+"-") {
 		if at := moment(obj.Value("t"), epoch); !at.Before(since) {
-			found = append(found, Write{Ident: obj.String("ident"), Path: obj.String("path"), At: at})
+			found = append(found, Write{Ident: obj.String("ident"), Path: obj.String("path"), at: at})
 		}
 	}
 	slices.SortStableFunc(found, func(a, b Write) int {
-		if c := a.At.Compare(b.At); c != 0 {
+		if c := a.at.Compare(b.at); c != 0 {
 			return c
 		}
 		return strings.Compare(a.Ident, b.Ident)
@@ -468,18 +468,18 @@ func UnsentWrites(writes []Write, ops []Op) []Write {
 			if i := strings.LastIndex(tail, todoMarker); i >= 0 {
 				tail = tail[i+len(todoMarker):]
 			}
-			if prev, ok := sent[tail]; !ok || op.Ended.After(prev) {
-				sent[tail] = later(op.Ended, epoch)
+			if prev, ok := sent[tail]; !ok || op.ended.After(prev) {
+				sent[tail] = later(op.ended, epoch)
 			}
 		}
 	}
 	var unsent []Write
 	for _, w := range writes {
-		at, ok := sent[fold(w.Ident+".md")]
+		at, ok := sent[fold(w.Ident+config.MdExt)]
 		if !ok {
 			at = epoch.Add(-time.Second) // 送った版が無い（Python の既定 -1.0）
 		}
-		if at.Before(w.At.Add(-slack)) {
+		if at.Before(w.at.Add(-slack)) {
 			unsent = append(unsent, w)
 		}
 	}

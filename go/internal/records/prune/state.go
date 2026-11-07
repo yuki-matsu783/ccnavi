@@ -54,7 +54,7 @@ func (r *run) pruneState(stateDir, session string, before time.Time) {
 	sort.Strings(doomed)
 	for _, path := range doomed {
 		if r.remove(path) {
-			r.report.State = append(r.report.State, r.shown(path))
+			r.report.state = append(r.report.state, r.shown(path))
 		}
 	}
 }

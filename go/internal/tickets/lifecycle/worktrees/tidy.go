@@ -51,12 +51,8 @@ func TidyTargets(conf *config.Settings, root, family string, phaseNo *int) []*ti
 
 // FamilyFor は識別子が属する親子の親。チケットが見つかればその parent（親なら自身）を採り、見つからないときだけ
 // 名前の形で割り出す。親の識別子が子の形（`rel-2026-10-06`）で終わっていても末尾を剥がして別の親と読み違えないため。
-func FamilyFor(conf *config.Settings, root, ident string) string {
-	raw := approval.ReadRaw(conf, root)
-	open, _ := approval.Scan(conf, root, false, raw)
-	closed, _ := approval.Scan(conf, root, true, raw)
-	review, _ := approval.ScanReview(conf, root, raw)
-	for _, t := range slices.Concat(open, closed, review) {
+func FamilyFor(approved *approval.Approved, ident string) string {
+	for _, t := range approved.All() {
 		if t.ID == ident {
 			if t.Parent != "" {
 				return t.Parent
@@ -74,14 +70,14 @@ func FamilyFor(conf *config.Settings, root, ident string) string {
 // 消さなかったものが 1 本でもあれば 1。何も無ければ黙って 0。
 func RunTidy(stdout io.Writer, conf *config.Settings, root, family string, phaseNo *int, cwd string) int {
 	code := 0
-	family = FamilyFor(conf, root, family)
+	family = FamilyFor(approval.ScanApproved(conf, root, nil), family)
 	for _, t := range TidyTargets(conf, root, family, phaseNo) {
 		if !ospath.DiskLexists(worktreePath(root, t.ID)) {
 			continue
 		}
 		d := Drop(root, t.ID, cwd)
-		Report(stdout, root, d, AfterDropped)
-		if !d.Removed() {
+		Report(stdout, root, d, afterDropped)
+		if !d.Gone() {
 			code = 1
 		}
 	}
@@ -125,14 +121,13 @@ func leftoverFacts(path string) (why, check []string) {
 // 名前が親と違うがその親のチケットを持つワークツリー（drop は名前で消すので拾えない）と、未保存の下書きがあって
 // Drop が消さなかった閉じた子のワークツリー。
 func remaining(conf *config.Settings, root, family string) []left {
-	family = FamilyFor(conf, root, family)
-	open, _ := approval.ScanAll(conf, root, false)
-	closed, _ := approval.ScanAll(conf, root, true)
-	review, _ := approval.ReviewAll(conf, root)
+	// 親は正とするツリーの側で引き、親子のチケットはどのツリーのコピーも拾う（コピーの持ち主のワークツリーを探すため）。
+	raw := approval.ReadRaw(conf, root)
+	family = FamilyFor(approval.ScanApproved(conf, root, raw), family)
 	proposals, _ := ticket.ScanAll(root, conf.Tickets, conf.Projects)
 	var mine []*ticket.Ticket
 	members := map[string]bool{}
-	for _, t := range slices.Concat(open, closed, review, proposals) {
+	for _, t := range slices.Concat(raw.Everything(), proposals) {
 		owner := t.Parent
 		if owner == "" {
 			owner = t.ID

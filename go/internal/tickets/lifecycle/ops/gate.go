@@ -18,9 +18,9 @@ import (
 type Verb string
 
 const (
-	VerbStart  Verb = "start"
-	VerbFinish Verb = "finish"
-	VerbCancel Verb = "cancel"
+	verbStart  Verb = "start"
+	verbFinish Verb = "finish"
+	verbCancel Verb = "cancel"
 )
 
 const (
@@ -31,7 +31,7 @@ const (
 // refused は断った理由のあとに、打ち直す 1 手を `次:` で足す。
 func refused(stderr io.Writer, root string, verb Verb, id string) {
 	var line string
-	if verb == VerbCancel {
+	if verb == verbCancel {
 		line = texts.Say(root, textRefusedCancel, texts.Values{"ticket": id}, nil)
 	} else {
 		line = texts.Say(root, textRefused, texts.Values{"verb": string(verb), "ticket": id}, nil)
@@ -43,7 +43,7 @@ func refused(stderr io.Writer, root string, verb Verb, id string) {
 func startGate(stderr io.Writer, conf *config.Settings, root, id string) *ticket.Ticket {
 	found := startFound(stderr, conf, root, id)
 	if found == nil {
-		refused(stderr, root, VerbStart, id)
+		refused(stderr, root, verbStart, id)
 	}
 	return found
 }
@@ -77,7 +77,7 @@ func startFound(stderr io.Writer, conf *config.Settings, root, id string) *ticke
 func finishGate(stderr io.Writer, conf *config.Settings, root, id string) *ticket.Ticket {
 	found := finishFound(stderr, conf, root, id)
 	if found == nil {
-		refused(stderr, root, VerbFinish, id)
+		refused(stderr, root, verbFinish, id)
 	}
 	return found
 }
@@ -107,7 +107,7 @@ func finishFound(stderr io.Writer, conf *config.Settings, root, id string) *tick
 func cancelGate(stderr io.Writer, conf *config.Settings, root, id, reason string) *ticket.Ticket {
 	found := cancelFound(stderr, conf, root, id, reason)
 	if found == nil {
-		refused(stderr, root, VerbCancel, id)
+		refused(stderr, root, verbCancel, id)
 	}
 	return found
 }
@@ -143,9 +143,9 @@ func Check(stdout, stderr io.Writer, conf *config.Settings, root string, verb Ve
 	}
 	var ok *ticket.Ticket
 	switch verb {
-	case VerbStart:
+	case verbStart:
 		ok = startGate(stderr, conf, root, id)
-	case VerbFinish:
+	case verbFinish:
 		ok = finishGate(stderr, conf, root, id)
 	default:
 		ok = cancelGate(stderr, conf, root, id, reason)

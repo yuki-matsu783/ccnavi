@@ -72,10 +72,10 @@ const (
 
 // passed は gate を通った依頼の材料。
 type passed struct {
-	Parent   *ticket.Ticket
-	Phase    *phase.Phase
-	TreeRoot string
-	Body     string
+	parent   *ticket.Ticket
+	phase    *phase.Phase
+	treeRoot string
+	body     string
 }
 
 // gate は review-request の、ワークツリーの中で分かる前提の検査である。本体（Prepare）と `prepare --check` が同じものを通る。断ったときは、理由のあとに `次:` を 1 行足して nil を返す。ホストの状態（マージリクエストの有無や向き先）は見ない。sh が取ってくるからである。
@@ -117,7 +117,7 @@ func gate(stderr io.Writer, conf *config.Settings, root, cwd string, number int,
 		refused(stderr, root, number)
 		return nil
 	}
-	return &passed{Parent: parent, Phase: p, TreeRoot: treeRoot, Body: body}
+	return &passed{parent: parent, phase: p, treeRoot: treeRoot, body: body}
 }
 
 // refused は断った理由のあとに、打ち直す 1 手を `次:` で足す。
@@ -142,14 +142,14 @@ func Prepare(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, 
 		return config.ExitError
 	}
 	// 計画があれば、このレビューが含むフェーズを機械が先頭に書く（延期した分を読み落とさないように）。
-	body := coveredHeader(conf, root, gated.Parent, gated.Phase) + gated.Body
+	body := coveredHeader(conf, root, gated.parent, gated.phase) + gated.body
 	body = strings.TrimRight(body, "\n") + "\n\n" + handoffNote + "\n"
 	// 目印に本文と親のブランチの先頭から作ったキーを入れる。sh は同じ目印の投稿が MR に既にあれば投稿し直さない。
 	// 子を足してやり直した依頼は先頭が違うので、別のキーになる。
-	head := git.Head(gated.TreeRoot, git.Options{})
+	head := git.Head(gated.treeRoot, git.Options{})
 	key := digest.Hex(digest.SHA256, body+"\n"+head, keyDigits)
-	marker := fmt.Sprintf("%s%s:%d key=%s -->\n", host.MarkerRequest, gated.Parent.ID, number, key)
-	path := requestPath(conf, gated.Parent.ID, number)
+	marker := fmt.Sprintf("%s%s:%d key=%s -->\n", host.MarkerRequest, gated.parent.ID, number, key)
+	path := requestPath(conf, gated.parent.ID, number)
 	if failed := fsio.WriteText(path, marker+body+"\n"+ResolveNote+"\n", fsio.LF, fsio.Plain); failed != "" {
 		fmt.Fprintf(stderr, msgWriteFailed, failed)
 		return config.ExitError

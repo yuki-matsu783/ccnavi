@@ -26,12 +26,12 @@ type State string
 
 const (
 	StateSynced  State = "synced"
-	StateDiffers State = "differs"
+	stateDiffers State = "differs"
 	StateError   State = "error"
 )
 
-// Stale は見せた差分と書く直前の差分がずれたときの文。拡張はこの文で読み直しを決める。
-const Stale = "内容が更新されました。最新の差分を読み直してから、もう一度実行してください"
+// stale は見せた差分と書く直前の差分がずれたときの文。拡張はこの文で読み直しを決める。
+const stale = "内容が更新されました。最新の差分を読み直してから、もう一度実行してください"
 
 const (
 	nothingToSync = "揃えるミラーはありません。何も書いていません"
@@ -51,9 +51,9 @@ type Project struct {
 	MirrorPath string
 }
 
-// Expect はこのプロジェクトだけを揃えるときの照合の値。差分が無ければ空。
-func (p *Project) Expect() string {
-	if p.State != StateDiffers {
+// expect はこのプロジェクトだけを揃えるときの照合の値。差分が無ければ空。
+func (p *Project) expect() string {
+	if p.State != stateDiffers {
 		return ""
 	}
 	return expectOf([]*Project{p})
@@ -74,7 +74,7 @@ type Plan struct {
 func (p *Plan) Chosen() []*Project {
 	var out []*Project
 	for _, project := range p.Projects {
-		if project.Selected && project.State == StateDiffers {
+		if project.Selected && project.State == stateDiffers {
 			out = append(out, project)
 		}
 	}
@@ -107,8 +107,8 @@ func expectOf(projects []*Project) string {
 		for _, c := range changes {
 			framed(c.Rel)
 			framed(string(c.Action()))
-			content := c.Content
-			if c.Remove {
+			content := c.content
+			if c.remove {
 				content = nil
 			}
 			raw := sha256.Sum256(content)
@@ -166,7 +166,7 @@ func Prepare(conf *config.Settings, root string, wanted []string) *Plan {
 		case problem != "":
 			project.State, project.Error = StateError, problem
 		case len(changes) > 0:
-			project.State, project.Changes = StateDiffers, changes
+			project.State, project.Changes = stateDiffers, changes
 		}
 	}
 	return plan
@@ -198,7 +198,7 @@ func Apply(conf *config.Settings, plan *Plan, expect string) *Applied {
 		return &Applied{Error: nothingToSync}
 	}
 	if expect == "" || expect != plan.Expect() {
-		return &Applied{Error: Stale}
+		return &Applied{Error: stale}
 	}
 	done := &Applied{OK: true}
 	var failures []string
@@ -241,7 +241,7 @@ func projectJSON(p *Project) *pyjson.Object {
 		changes[i] = pyjson.NewObject("rel", c.Rel, "action", string(c.Action()))
 	}
 	return pyjson.NewObject("name", p.Name, "state", string(p.State), "changes", changes, "error", p.Error,
-		"expect", p.Expect())
+		"expect", p.expect())
 }
 
 // PlanJSON は見るだけの結果の JSON。載せるのは選ばれたプロジェクトだけ。形は拡張との契約。

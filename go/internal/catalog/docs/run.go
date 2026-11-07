@@ -10,6 +10,7 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/policy/texts"
 )
 
@@ -72,7 +73,7 @@ func Run(stdout, stderr io.Writer, conf *config.Settings, root string, q Query, 
 	io.WriteString(stderr, said.String())
 	hits, matched := search(found.rows, q)
 	render(stdout, hits, matched, len(found.rows), q.format())
-	if f := q.format(); f == FormatTable || f == FormatDetail {
+	if f := q.format(); f == FormatTable || f == formatDetail {
 		io.WriteString(stderr, countLine(len(hits), matched, len(found.rows)))
 	}
 	return 0
@@ -140,7 +141,7 @@ func hasMarkdown(root string) bool {
 		return false
 	}
 	for _, name := range names {
-		if strings.HasSuffix(name, ".md") && ospath.IsFile(ospath.Join(root, name)) {
+		if pathcase.HasExt(name, config.MdExt) && ospath.IsFile(ospath.Join(root, name)) {
 			return true
 		}
 	}

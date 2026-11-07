@@ -121,7 +121,7 @@ func TestRecordIsCappedAndKeepsNumberTypes(t *testing.T) {
 	}
 	save(state, "s1", rows)
 	got := read(state, "s1")
-	if len(got) != MaxEntries || got[0].name != "n10" {
+	if len(got) != maxEntries || got[0].name != "n10" {
 		t.Fatalf("上限: %d %s", len(got), got[0].name)
 	}
 	raw, _ := os.ReadFile(pathOf(state, "s1"))
@@ -130,7 +130,7 @@ func TestRecordIsCappedAndKeepsNumberTypes(t *testing.T) {
 	}
 	Update(&config.Settings{State: state}, "s1", map[string]float64{"n10": 5.5}, map[string]bool{"n11": true})
 	got = read(state, "s1")
-	if len(got) != MaxEntries-1 || got[0].entry().Checked != 5.5 || got[1].name != "n12" {
+	if len(got) != maxEntries-1 || got[0].entry().Checked != 5.5 || got[1].name != "n12" {
 		t.Errorf("Update: %+v", got[:2])
 	}
 }

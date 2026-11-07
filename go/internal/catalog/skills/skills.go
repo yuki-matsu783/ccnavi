@@ -39,9 +39,6 @@ var name = regexp.MustCompile(`^[A-Za-z0-9._-]+\n?$`)
 
 type entry struct{ name, about, rel string }
 
-// byteOrderMark は Windows のエディタが頭に付ける BOM。
-const byteOrderMark = "\ufeff"
-
 // front は頭の frontmatter（`---` で囲んだ YAML。別名は読まない）。無いか読めなければ nil。
 // 頭の BOM は外してから囲いを探す（docindex.FrontMatter と同じ読み方）。
 func front(raw []byte) *yaml.Map {
@@ -49,7 +46,7 @@ func front(raw []byte) *yaml.Map {
 		raw = raw[:config.SkillHeadLimit]
 	}
 	text, _ := fsio.DecodeBytes(raw, fsio.Replace)
-	body, state := yaml.FrontBody(strings.TrimPrefix(text, byteOrderMark), yaml.FrontStyle{Indented: true})
+	body, state := yaml.FrontBody(text, yaml.FrontStyle{Indented: true, SkipBOM: true})
 	if state != yaml.FrontClosed {
 		return nil
 	}

@@ -103,7 +103,7 @@ func build(conf *config.Settings, root string, parent *ticket.Ticket, items []le
 	front.Put("rationale", "親を閉じる前に、親の HEAD にある気づきを 1 件残らず判定し、手順の材料にするものを "+
 		"learning-wiki のパターンへ溜める。ccnavi が `ticket consolidate` で作った保守用の子。\n")
 	var allow []any
-	for _, glob := range ticket.ConsolidateScope {
+	for _, glob := range ticket.ConsolidateScope() {
 		entry := &yaml.Map{}
 		entry.Put("match", config.WriteMatch)
 		entry.Put("glob", glob)

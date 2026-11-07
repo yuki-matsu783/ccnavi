@@ -98,7 +98,7 @@ func TestFailAndReset(t *testing.T) {
 		kind, _ := Fail(state, "s1", agent, 3)
 		return kind
 	}
-	if got := []Notice{fail(""), fail(""), fail("")}; got[0] != First || got[1] != NoNotice || got[2] != Streak {
+	if got := []Notice{fail(""), fail(""), fail("")}; got[0] != First || got[1] != NoNotice || got[2] != streak {
 		t.Errorf("notices = %v", got)
 	}
 	// 成功で 0 に戻し、最初の 1 回の印は残す。
@@ -107,7 +107,7 @@ func TestFailAndReset(t *testing.T) {
 	if string(data) != `{"first": true}` {
 		t.Errorf("after reset = %s", data)
 	}
-	if got := []Notice{fail(""), fail(""), fail("")}; got[0] != NoNotice || got[2] != Streak {
+	if got := []Notice{fail(""), fail(""), fail("")}; got[0] != NoNotice || got[2] != streak {
 		t.Errorf("notices = %v", got)
 	}
 	// サブエージェントは別に数える。

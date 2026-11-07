@@ -29,8 +29,8 @@ const (
 	// FlowsDir と Suffix は置き場の形。承認済みチケットの置き場（と提案の置き場）の下の `flows/<子>.yml`。
 	FlowsDir = "flows"
 	Suffix   = ".yml"
-	// AnyProject は置き場が絶対パスかツリーの外で、どのツリーにも共通のとき。どのプロジェクトの子にも当てる。
-	AnyProject = "*"
+	// anyProject は置き場が絶対パスかツリーの外で、どのツリーにも共通のとき。どのプロジェクトの子にも当てる。
+	anyProject = "*"
 
 	// 着手のときに残すハッシュの記録（`phases/<親>/<子>.flow.json`）。形は承認の子の記録と同じ。
 	digestRecord = "flow"
@@ -173,11 +173,11 @@ func fold(p string) []rune {
 }
 
 // Location は書き込み先が子のフローの置き場のときの、ファイルの名前（`<子>.yml`。小文字にしたもの）と、
-// 置き場を持つツリーのプロジェクト。Known が偽なら置き場はワークスペースの外のツリーにある。
+// 置き場を持つツリーのプロジェクト。known が偽なら置き場はワークスペースの外のツリーにある。
 type Location struct {
-	Name    string
-	Project string
-	Known   bool
+	name    string
+	project string
+	known   bool
 }
 
 // Locate は path が子のフローの置き場か。パスは解いたものでも解く前のものでもよく、大文字小文字は区別しない。
@@ -221,14 +221,14 @@ func Locate(conf *config.Settings, root, file string) (Location, bool) {
 		return Location{}, false
 	}
 	if shared {
-		return Location{Name: name, Project: AnyProject, Known: true}, true
+		return Location{name: name, project: anyProject, known: true}, true
 	}
 	owner := string([]rune(norm)[:at])
 	if owner == "" {
 		owner = ospath.Sep
 	}
 	t, ok := tree.TreeOf(root, owner, conf.Projects)
-	return Location{Name: name, Project: t.Project, Known: ok}, true
+	return Location{name: name, project: t.Project, known: ok}, true
 }
 
 func lastIndex(hay, needle []rune) int {
@@ -243,13 +243,13 @@ func lastIndex(hay, needle []rune) int {
 // LockHit はこの書き込みを止める着手中の子。copies はどのツリー上のチケットも並べたもの（識別子で 1 本に
 // まとめる前）で、どれか 1 本でも着手中なら止める（止める向きだけ）。
 func LockHit(copies []*ticket.Ticket, at Location) *ticket.Ticket {
-	if !at.Known {
+	if !at.known {
 		return nil
 	}
 	for _, child := range copies {
 		if child.IsChild() && child.InProgress() &&
-			(at.Project == child.Project || at.Project == AnyProject) &&
-			pyfmt.Casefold(child.ID+Suffix) == pyfmt.Casefold(at.Name) {
+			(at.project == child.Project || at.project == anyProject) &&
+			pyfmt.Casefold(child.ID+Suffix) == pyfmt.Casefold(at.name) {
 			return child
 		}
 	}

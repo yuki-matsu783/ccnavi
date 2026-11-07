@@ -51,7 +51,7 @@ func TicketApprovalRule(binPath, root string) (*rules.Rule, error) {
 	}
 	return &rules.Rule{
 		ID:       TicketApprovalRuleID,
-		Match:    strings.Join(config.ShellTools, "|"),
+		Match:    strings.Join(config.ShellTools(), "|"),
 		Regex:    expression,
 		Text:     texts.Spec(textTicketApproval, texts.SpecOptions{}),
 		Every:    1,

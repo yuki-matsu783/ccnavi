@@ -43,8 +43,8 @@ func TestMeasureLeavesOutPathsTakenFromTheIntegrationBranch(t *testing.T) {
 		t.Fatal(why)
 	}
 	var paths []string
-	for _, c := range diff.Changes {
-		paths = append(paths, c.Path)
+	for _, c := range diff.changes {
+		paths = append(paths, c.path)
 	}
 	if len(paths) != 1 || paths[0] != "mine" {
 		t.Errorf("数えたパス %v（取り込んだ theirs を数えない）", paths)

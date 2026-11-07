@@ -20,8 +20,8 @@ import (
 type Limit string
 
 const (
-	LimitNone   Limit = ""
-	LimitTicket Limit = "ticket"
+	limitNone   Limit = ""
+	limitTicket Limit = "ticket"
 	LimitParent Limit = "parent"
 	LimitType   Limit = "type"
 	// LimitBlocked はチケット自体が信頼できない（Ticket.Blocked）。範囲を当てる前に止める。
@@ -32,7 +32,7 @@ const (
 type Verdict struct {
 	// Decision は Allow・Ask・Deny か ticket.Outside。
 	Decision rules.Decision
-	// Limit は最初に外へ出した上限。中なら LimitNone。
+	// Limit は最初に外へ出した上限。中なら limitNone。
 	Limit Limit
 	Type  *phases.PhaseType
 }
@@ -51,11 +51,11 @@ func Of(child, parent *ticket.Ticket, pt *phases.PhaseType, rel string) Verdict 
 	}
 	v := Verdict{Decision: child.Decide(rel), Type: pt}
 	if v.Outside() {
-		v.Limit = LimitTicket
+		v.Limit = limitTicket
 	}
 	narrow := func(by rules.Decision, limit Limit) {
 		v.Decision = ticket.Combine(v.Decision, by)
-		if v.Limit == LimitNone && v.Outside() {
+		if v.Limit == limitNone && v.Outside() {
 			v.Limit = limit
 		}
 	}
@@ -97,9 +97,9 @@ type Finding struct {
 
 // 読めなかった理由。
 var (
-	ErrNoWorktree = errors.New("ワークツリーがありません。")
-	ErrNoDiff     = errors.New("子の仕事の始まりからの差分を読めない")
-	ErrNoStatus   = errors.New("ワークツリーの状態を読めない")
+	errNoWorktree = errors.New("ワークツリーがありません。")
+	errNoDiff     = errors.New("子の仕事の始まりからの差分を読めない")
+	errNoStatus   = errors.New("ワークツリーの状態を読めない")
 )
 
 // diffArgs は、子の仕事の差分のパスを NUL 区切りで読む。既定の出力は、非 ASCII と空白を含むパスを引用して 8 進にする。そのまま照らすと、範囲の中の日本語のファイルが必ず範囲外になってしまう。--no-renames は、改名の移動元を出させる。範囲外のファイルを範囲の中へ改名したものを見落とさないためである。--ignore-submodules=none は、.gitmodules の ignore = all（追跡されるので外から届く）で submodule の進みが消えるのを防ぐ。
@@ -118,7 +118,7 @@ var scopeOptions = git.Options{Timeout: git.StateTimeout, RawPaths: true}
 func committed(root string, child *ticket.Ticket, head string) (string, map[string]bool, error) {
 	worktree := tree.WorktreePath(root, child.ID)
 	if !ospath.IsDir(worktree) {
-		return "", nil, ErrNoWorktree
+		return "", nil, errNoWorktree
 	}
 	base, err := git.ChildBase(worktree, tree.WorktreePath(root, child.Parent), git.StateTimeout, head)
 	if err != nil {
@@ -127,7 +127,7 @@ func committed(root string, child *ticket.Ticket, head string) (string, map[stri
 	diff := git.Run(worktree, diffArgs(base+".."+head), scopeOptions)
 	code, out := diff.Code, diff.Out
 	if code != 0 {
-		return "", nil, ErrNoDiff
+		return "", nil, errNoDiff
 	}
 	paths := map[string]bool{}
 	for _, p := range strings.Split(out, "\x00") {
@@ -151,7 +151,7 @@ func Findings(conf *config.Settings, root string, child, parent *ticket.Ticket) 
 	status := git.Status(worktree, uncommittedStatus, scopeOptions)
 	code, out := status.Code, status.Out
 	if code != 0 {
-		return nil, ErrNoStatus
+		return nil, errNoStatus
 	}
 	for _, entry := range strings.Split(out, "\x00") {
 		if len(entry) > 3 && entry[2] == ' ' {

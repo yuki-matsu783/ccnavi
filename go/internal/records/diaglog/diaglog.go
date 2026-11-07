@@ -116,7 +116,7 @@ func text(value any) string {
 	return pyfmt.Str(value)
 }
 
-func scrub(value string) string { return redact.Redact(MaskUserinfo(value)) }
+func scrub(value string) string { return redact.Redact(maskUserinfo(value)) }
 
 // fold は改行（CR LF・CR・LF）を `\n` の 2 字にする。
 func fold(value string) string {

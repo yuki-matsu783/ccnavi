@@ -26,38 +26,38 @@ const (
 	shownOutput = 60
 )
 
-// Change は差分の 1 ファイル。Status は git の name-status の 1 文字目（A・M・D・R など）、Old は rename・copy の
+// Change は差分の 1 ファイル。status は git の name-status の 1 文字目（A・M・D・R など）、old は rename・copy の
 // 元のパス（無ければ空）。バイナリの変更は行数 0。
 type Change struct {
-	Path           string
-	Added, Deleted int
-	Status         string
-	Old            string
+	path           string
+	added, deleted int
+	status         string
+	old            string
 }
 
 // Diff は子の仕事の始まりから先頭までの差分。Head は測った先のコミットの sha。
 type Diff struct {
-	Changes    []Change
+	changes    []Change
 	Base, Head string
 }
 
-// Lines は足した行と消した行の和。
-func (d *Diff) Lines() int {
+// lines は足した行と消した行の和。
+func (d *Diff) lines() int {
 	n := 0
-	for _, c := range d.Changes {
-		n += c.Added + c.Deleted
+	for _, c := range d.changes {
+		n += c.added + c.deleted
 	}
 	return n
 }
 
-// Files は変えたファイルの数。
-func (d *Diff) Files() int { return len(d.Changes) }
+// files は変えたファイルの数。
+func (d *Diff) files() int { return len(d.changes) }
 
-// DeletedFiles は消したファイルの数。
-func (d *Diff) DeletedFiles() int {
+// deletedFiles は消したファイルの数。
+func (d *Diff) deletedFiles() int {
 	n := 0
-	for _, c := range d.Changes {
-		if strings.HasPrefix(c.Status, "D") {
+	for _, c := range d.changes {
+		if strings.HasPrefix(c.status, "D") {
 			n++
 		}
 	}
@@ -67,11 +67,11 @@ func (d *Diff) DeletedFiles() int {
 // Summary は差分の 1 行の要約。
 func (d *Diff) Summary() string {
 	added, deleted := 0, 0
-	for _, c := range d.Changes {
-		added += c.Added
-		deleted += c.Deleted
+	for _, c := range d.changes {
+		added += c.added
+		deleted += c.deleted
 	}
-	return fmt.Sprintf("%d ファイル、+%d -%d 行、削除したファイル %d", d.Files(), added, deleted, d.DeletedFiles())
+	return fmt.Sprintf("%d ファイル、+%d -%d 行、削除したファイル %d", d.files(), added, deleted, d.deletedFiles())
 }
 
 // changeSet は path で引ける、入れた順の変更（同じ path は位置をそのままに置き換える）。
@@ -84,11 +84,11 @@ func (s *changeSet) put(c Change) {
 	if s.at == nil {
 		s.at = map[string]int{}
 	}
-	if i, ok := s.at[c.Path]; ok {
+	if i, ok := s.at[c.path]; ok {
 		s.list[i] = c
 		return
 	}
-	s.at[c.Path] = len(s.list)
+	s.at[c.path] = len(s.list)
 	s.list = append(s.list, c)
 }
 
@@ -154,7 +154,7 @@ func Measure(worktree, base, head string) (*Diff, string) {
 			i += 2
 		}
 		path = ospath.Slashed(path)
-		changes.put(Change{Path: path, Added: count(cols[0]), Deleted: count(cols[1]), Status: "M", Old: old})
+		changes.put(Change{path: path, added: count(cols[0]), deleted: count(cols[1]), status: "M", old: old})
 	}
 	code, out = git.Output(worktree, []string{"diff", "--name-status", "-z", span}, opts)
 	if code != 0 {
@@ -181,9 +181,9 @@ func Measure(worktree, base, head string) (*Diff, string) {
 		}
 		kind := pyfmt.Head(status, 1)
 		if c := changes.get(path); c != nil {
-			c.Status = kind
+			c.status = kind
 		} else {
-			changes.put(Change{Path: path, Status: kind})
+			changes.put(Change{path: path, status: kind})
 		}
 	}
 	for path := range git.TakenFromRemote(worktree, base, head, git.RiskTimeout) {
@@ -193,34 +193,34 @@ func Measure(worktree, base, head string) (*Diff, string) {
 	if sha = ospath.Strip(sha); code != 0 || sha == "" {
 		return nil, "測った先のコミットを読めない"
 	}
-	return &Diff{Changes: changes.list, Base: base, Head: sha}, ""
+	return &Diff{changes: changes.list, Base: base, Head: sha}, ""
 }
 
-// Hit は加点した項目。Source はその項目が書いてあるレイヤー（記録に残す）。
-type Hit struct {
-	ID     string
-	Points int
-	Detail string
-	Source string
+// hit は加点した項目。source はその項目が書いてあるレイヤー（記録に残す）。
+type hit struct {
+	id     string
+	points int
+	detail string
+	source string
 }
 
-// Score は差分と判定から出した点。Unmeasured は測れなかった項目（重いほうとして加点済み）、Pending は判定の
+// Score は差分と判定から出した点。unmeasured は測れなかった項目（重いほうとして加点済み）、Pending は判定の
 // 無い定性の項目（点にはまだ含まれない。揃うまで子は閉じられない）。
 type Score struct {
-	Points     int
+	points     int
 	Level      Level
-	Hits       []Hit
-	Unmeasured []string
+	hits       []hit
+	unmeasured []string
 	Pending    []*Factor
 }
 
 // Lines はユーザ向けの内訳。
 func (s *Score) Lines() []string {
-	out := []string{fmt.Sprintf("リスク: %d (%s)", s.Points, s.Level)}
-	for _, h := range s.Hits {
-		out = append(out, fmt.Sprintf("  +%d %s", h.Points, h.Detail))
+	out := []string{fmt.Sprintf("リスク: %d (%s)", s.points, s.Level)}
+	for _, h := range s.hits {
+		out = append(out, fmt.Sprintf("  +%d %s", h.points, h.detail))
 	}
-	for _, u := range s.Unmeasured {
+	for _, u := range s.unmeasured {
 		out = append(out, "  ! "+u)
 	}
 	return out
@@ -229,14 +229,14 @@ func (s *Score) Lines() []string {
 // Object は記録に書く形（points・level・hits・unmeasured）。
 func (s *Score) Object() *pyjson.Object {
 	hits := []any{}
-	for _, h := range s.Hits {
-		hits = append(hits, pyjson.NewObject("id", h.ID, "points", h.Points, "detail", h.Detail, "source", h.Source))
+	for _, h := range s.hits {
+		hits = append(hits, pyjson.NewObject("id", h.id, "points", h.points, "detail", h.detail, "source", h.source))
 	}
 	unmeasured := []any{}
-	for _, u := range s.Unmeasured {
+	for _, u := range s.unmeasured {
 		unmeasured = append(unmeasured, u)
 	}
-	return pyjson.NewObject("points", s.Points, "level", string(s.Level), "hits", hits, "unmeasured", unmeasured)
+	return pyjson.NewObject("points", s.points, "level", string(s.Level), "hits", hits, "unmeasured", unmeasured)
 }
 
 // scoped は項目の include・exclude で絞った差分。どちらも無ければ差分そのもの。
@@ -245,12 +245,12 @@ func scoped(d *Diff, f *Factor) *Diff {
 		return d
 	}
 	var kept []Change
-	for _, c := range d.Changes {
+	for _, c := range d.changes {
 		if f.inScope(c) {
 			kept = append(kept, c)
 		}
 	}
-	return &Diff{Changes: kept, Base: d.Base, Head: d.Head}
+	return &Diff{changes: kept, Base: d.Base, Head: d.Head}
 }
 
 // Evaluate は差分と判定から点を出す。env は script: に足す環境変数。judgements は子の定性の判定の記録
@@ -260,34 +260,34 @@ func Evaluate(d *Definition, diff *Diff, root, worktree string, env map[string]s
 	score := &Score{}
 	for _, f := range d.Factors {
 		hit := func(points int, detail string) {
-			score.Hits = append(score.Hits, Hit{f.ID, points, detail, f.Source})
+			score.hits = append(score.hits, hit{f.ID, points, detail, f.Source})
 		}
 		switch f.Kind {
 		case KindLines:
-			if n := scoped(diff, f).Lines(); n > f.Limit {
+			if n := scoped(diff, f).lines(); n > f.Limit {
 				hit(f.Points, fmt.Sprintf("%s（%d 行 > %d）", f.Message, n, f.Limit))
 			}
 		case KindFiles:
-			if n := scoped(diff, f).Files(); n > f.Limit {
+			if n := scoped(diff, f).files(); n > f.Limit {
 				hit(f.Points, fmt.Sprintf("%s（%d ファイル > %d）", f.Message, n, f.Limit))
 			}
 		case KindDeleted:
-			if n := scoped(diff, f).DeletedFiles(); n > f.Limit {
+			if n := scoped(diff, f).deletedFiles(); n > f.Limit {
 				hit(f.Points, fmt.Sprintf("%s（削除した %d > %d）", f.Message, n, f.Limit))
 			}
-		case KindGlob:
+		case kindGlob:
 			var paths []string
-			for _, c := range diff.Changes {
-				if f.matches(c.Path) {
-					paths = append(paths, c.Path)
+			for _, c := range diff.changes {
+				if f.matches(c.path) {
+					paths = append(paths, c.path)
 				}
 			}
 			if len(paths) == 0 {
 				continue
 			}
 			points := f.Points * len(paths)
-			if f.HasMax {
-				points = min(points, f.Max)
+			if f.hasMax {
+				points = min(points, f.max)
 			}
 			shown := strings.Join(paths[:min(len(paths), shownHits)], ", ")
 			if len(paths) > shownHits {
@@ -296,7 +296,7 @@ func Evaluate(d *Definition, diff *Diff, root, worktree string, env map[string]s
 			hit(points, f.Message+"（"+shown+"）")
 		case KindScript:
 			// 解く基準はそのレイヤーの git プロジェクトルート。
-			home := f.Home
+			home := f.home
 			if home == "" {
 				home = root
 			}
@@ -304,7 +304,7 @@ func Evaluate(d *Definition, diff *Diff, root, worktree string, env map[string]s
 			switch {
 			case !ok:
 				hit(f.Points, f.Message+"（測れなかった: "+note+"）")
-				score.Unmeasured = append(score.Unmeasured, f.ID+": "+note)
+				score.unmeasured = append(score.unmeasured, f.ID+": "+note)
 			case points > 0:
 				if note == "" {
 					note = "スクリプト"
@@ -326,10 +326,10 @@ func Evaluate(d *Definition, diff *Diff, root, worktree string, env map[string]s
 			}
 		}
 	}
-	for _, h := range score.Hits {
-		score.Points += h.Points
+	for _, h := range score.hits {
+		score.points += h.points
 	}
-	score.Level = d.LevelOf(score.Points)
+	score.Level = d.levelOf(score.points)
 	return score
 }
 
@@ -412,10 +412,10 @@ func JudgePrompt(child, parent string, diff *Diff, pending []*Factor, worktree, 
 		lines = append(lines, fmt.Sprintf("## %s（yes なら +%d）", f.ID, f.Points), "", f.Text, "")
 	}
 	lines = append(lines, "## 変更したファイル", "")
-	changes := append([]Change(nil), diff.Changes...)
-	sort.SliceStable(changes, func(i, j int) bool { return changes[i].Path < changes[j].Path })
+	changes := append([]Change(nil), diff.changes...)
+	sort.SliceStable(changes, func(i, j int) bool { return changes[i].path < changes[j].path })
 	for _, c := range changes {
-		lines = append(lines, fmt.Sprintf("- %s %s (+%d -%d)", c.Status, c.Path, c.Added, c.Deleted))
+		lines = append(lines, fmt.Sprintf("- %s %s (+%d -%d)", c.status, c.path, c.added, c.deleted))
 	}
 	lines = append(lines, "")
 	return strings.Join(lines, "\n")

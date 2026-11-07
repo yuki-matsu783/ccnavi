@@ -61,7 +61,7 @@ func RetireParent(state, parent string) []string {
 		return nil
 	}
 	return removeWhere(state, func(_ string, r *Record) bool {
-		return r.Parent == parent && r.Finished()
+		return r.Parent == parent && r.finished()
 	})
 }
 
@@ -82,7 +82,7 @@ func Pending(state string) []*Record {
 			out = append(out, &Record{ID: id, Broken: err.Error()})
 			continue
 		}
-		if r != nil && !r.Finished() {
+		if r != nil && !r.finished() {
 			out = append(out, r)
 		}
 	}
@@ -98,7 +98,7 @@ func CompleteIfDone(state, id string) (bool, error) {
 	if r == nil {
 		return true, nil
 	}
-	if r.Finished() {
+	if r.finished() {
 		remove(state, id)
 		return true, nil
 	}

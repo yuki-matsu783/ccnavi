@@ -24,8 +24,8 @@ func TestRejectsDoNotCutTheConsolidateChildByTheParent(t *testing.T) {
 	}
 	byParent := map[string]bool{}
 	for _, r := range found.Rejects {
-		if strings.Contains(r.Origin, originParent) {
-			byParent[r.Ticket] = true
+		if strings.Contains(r.origin, originParent) {
+			byParent[r.ticket] = true
 		}
 	}
 	if byParent["i0001-00-01"] {

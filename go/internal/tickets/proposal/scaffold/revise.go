@@ -20,7 +20,7 @@ const feedbackNone = "feedback: []"
 
 // stripped は承認済みチケットのコピーから、改版に残さない欄（スクリプトだけが書く欄と続きの子の目印）を外した本文。
 func stripped(text string) string {
-	drop := append(append([]string{}, ticket.ScriptFields...), approval.FollowupKey)
+	drop := append(append([]string{}, ticket.ScriptFields()...), approval.FollowupKey)
 	if kept, ok := fields.ScriptShape(text, drop); ok {
 		text = kept
 	}
@@ -54,7 +54,7 @@ func Revise(stdout, stderr io.Writer, conf *config.Settings, root, cwd, ident st
 	if why != "" {
 		return refuse(why)
 	}
-	source := ospath.Join(conf.ApprovedDir(where.Root), string(place.Doing), ident+".md")
+	source := ospath.Join(conf.ApprovedDir(where.Root), string(place.Doing), ident+config.MdExt)
 	text, err := ospath.ReadDiskText(source)
 	if err != nil {
 		return refuse("承認済みの親が " + source + " に無い。承認前の提案は、改版ではなく提案そのものを直す")

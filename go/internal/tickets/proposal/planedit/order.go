@@ -14,38 +14,38 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// Version は `--plan-order <親> --json` の答えの版。欄を足すだけなら上げない。
-const Version = 1
+// version は `--plan-order <親> --json` の答えの版。欄を足すだけなら上げない。
+const version = 1
 
-// RefusalKind は振り直せない線の種類。
-type RefusalKind string
+// refusalKind は振り直せない線の種類。
+type refusalKind string
 
 const (
-	RefusedCycle      RefusalKind = "cycle"
-	RefusedLocked     RefusalKind = "locked"
-	RefusedUnpackable RefusalKind = "unpackable"
+	refusedCycle      refusalKind = "cycle"
+	refusedLocked     refusalKind = "locked"
+	refusedUnpackable refusalKind = "unpackable"
 )
 
-// Refusal は振り直せない線。Number はその番号。
-type Refusal struct {
-	Kind   RefusalKind
-	Number int
-	Text   string
+// refusal は振り直せない線。number はその番号。
+type refusal struct {
+	kind   refusalKind
+	number int
+	text   string
 }
 
-func (r Refusal) json() *pyjson.Object {
-	return pyjson.NewObject("kind", string(r.Kind), "number", r.Number, "text", r.Text)
+func (r refusal) json() *pyjson.Object {
+	return pyjson.NewObject("kind", string(r.kind), "number", r.number, "text", r.text)
 }
 
 // Order は計画ごとの、元の番号 → 直接の先行（元の番号）。渡さない計画は提案のまま。
 type Order map[phases.Part]map[int][]int
 
-// Renumbered は振り直した計画。Moved は元の番号 → 振り直した番号（全体計画とフィードバック計画）。
-type Renumbered struct {
-	Plan     []ticket.PlanItem
-	Feedback []ticket.PlanItem
-	Moved    map[int]int
-	Refused  []Refusal
+// renumbered は振り直した計画。moved は元の番号 → 振り直した番号（全体計画とフィードバック計画）。
+type renumbered struct {
+	plan     []ticket.PlanItem
+	feedback []ticket.PlanItem
+	moved    map[int]int
+	refused  []refusal
 }
 
 // parts の順は Python の PARTS と同じ（答えの並び）。
@@ -156,11 +156,11 @@ func errorClass(err error) string {
 	return "ValueError"
 }
 
-// Renumber は線（order）から番号を振り直す。断る線が 1 つでもあれば提案のまま返す。order が nil なら線は無いもの
+// renumber は線（order）から番号を振り直す。断る線が 1 つでもあれば提案のまま返す。order が nil なら線は無いもの
 // として扱う。固定した番号に入る線の変更（locked）と循環（cycle）を断り、固定した番号を動かさずに詰められなければ
 // 断る（unpackable）。
-func Renumber(parent *ticket.Ticket, order Order, fixed map[int]bool) Renumbered {
-	var refused []Refusal
+func renumber(parent *ticket.Ticket, order Order, fixed map[int]bool) renumbered {
+	var refused []refusal
 	moved := map[int]int{}
 	built := map[phases.Part][]ticket.PlanItem{}
 	for _, s := range sectionsOf(parent) {
@@ -185,7 +185,7 @@ func Renumber(parent *ticket.Ticket, order Order, fixed map[int]bool) Renumbered
 			}
 		}
 		for _, n := range locked {
-			refused = append(refused, Refusal{RefusedLocked, n, fmt.Sprintf(
+			refused = append(refused, refusal{refusedLocked, n, fmt.Sprintf(
 				"%d 番（%s）は子が承認されているので、入る線（先行のステップ）を変えられない", n, s.items[n-s.first].Type)})
 		}
 		cycle := cycleOf(preds, numbers)
@@ -197,7 +197,7 @@ func Renumber(parent *ticket.Ticket, order Order, fixed map[int]bool) Renumbered
 				}
 				path += strconv.Itoa(n)
 			}
-			refused = append(refused, Refusal{RefusedCycle, cycle[0], "循環になる線（" + path + "）"})
+			refused = append(refused, refusal{refusedCycle, cycle[0], "循環になる線（" + path + "）"})
 		}
 		if len(locked) > 0 || len(cycle) > 0 {
 			continue
@@ -227,7 +227,7 @@ func Renumber(parent *ticket.Ticket, order Order, fixed map[int]bool) Renumbered
 			placed[pick] = pos
 		}
 		if stuck != 0 {
-			refused = append(refused, Refusal{RefusedUnpackable, stuck, fmt.Sprintf(
+			refused = append(refused, refusal{refusedUnpackable, stuck, fmt.Sprintf(
 				"子が承認された番号を動かさずに番号を振れない（%d 番に置けるステップがありません）。"+
 					"詰められないので、この線は引けない", stuck)})
 			continue
@@ -255,9 +255,9 @@ func Renumber(parent *ticket.Ticket, order Order, fixed map[int]bool) Renumbered
 		for _, step := range parent.Numbered() {
 			identity[step.Number] = step.Number
 		}
-		return Renumbered{slices.Clone(parent.Plan), slices.Clone(parent.Feedback), identity, refused}
+		return renumbered{slices.Clone(parent.Plan), slices.Clone(parent.Feedback), identity, refused}
 	}
-	return Renumbered{built[phases.Plan], built[phases.FeedbackPart], moved, nil}
+	return renumbered{built[phases.Plan], built[phases.FeedbackPart], moved, nil}
 }
 
 func sameSet(a, b []int) bool {

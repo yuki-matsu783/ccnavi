@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -57,29 +58,32 @@ const (
 	KindLines   Kind = "lines_over"
 	KindFiles   Kind = "files_over"
 	KindDeleted Kind = "deleted_over"
-	KindGlob    Kind = "glob"
+	kindGlob    Kind = "glob"
 	KindScript  Kind = "script"
 	KindJudge   Kind = "judge"
 )
 
-var factorKinds = []Kind{KindLines, KindFiles, KindDeleted, KindGlob, KindScript, KindJudge}
+var factorKinds = []Kind{KindLines, KindFiles, KindDeleted, kindGlob, KindScript, KindJudge}
 
 func (k Kind) counts() bool { return k == KindLines || k == KindFiles || k == KindDeleted }
 
 const (
 	// Builtin は組み込みの配点の出どころ（Definition.Source）。
 	Builtin = "(builtin)"
-	// Where は risks.yml の苦情の出どころ（ファイル全体への苦情の rule）。
-	Where = "(risk)"
+	// where は risks.yml の苦情の出どころ（ファイル全体への苦情の rule）。
+	where = "(risk)"
 	// levelsWhere は合成した閾値の苦情の出どころ。
 	levelsWhere = "(levels)"
 	// scriptsDir は script: の置き場の名前。レイヤーをまたいで同じ項目かを、ここからの相対で比べる。
 	scriptsDir = "/scripts/"
 )
 
-// ScriptHomes は共通レイヤーの script: を置いてよい場所（ワークスペースルートからの相対の先頭）。guard の内側。
+// scriptHomes は共通レイヤーの script: を置いてよい場所（ワークスペースルートからの相対の先頭）。guard の内側。
 // エージェントが書ける場所のスクリプトを許すと、自分のリスクを自分で決められる。
-var ScriptHomes = []string{config.DefaultProjectHome + "/" + config.CommonDir + "/" + config.ScriptsDir + "/"}
+var scriptHomes = []string{config.DefaultProjectHome + "/" + config.CommonDir + "/" + config.ScriptsDir + "/"}
+
+// ScriptHomes は scriptHomes の写しを返す（呼び手が書き換えても元は変わらない）。
+func ScriptHomes() []string { return slices.Clone(scriptHomes) }
 
 // Factor は加点の項目 1 つ。
 type Factor struct {
@@ -91,16 +95,16 @@ type Factor struct {
 	// 相対パス）・judge（問いの文）。
 	Limit int
 	Text  string
-	// Max は glob の上限（HasMax のときだけ）。ヒットするごとに加点するので、無ければ青天井。
-	Max    int
-	HasMax bool
+	// max は glob の上限（hasMax のときだけ）。ヒットするごとに加点するので、無ければ青天井。
+	max    int
+	hasMax bool
 	// Include・Exclude は数える対象のパス（glob。lines_over・files_over・deleted_over だけ）。Include が空なら
 	// 全パス、あればヒットしたパスだけ。Exclude にヒットしたパスは常に外す。
 	Include, Exclude []string
-	// Source はこの項目が書いてあるレイヤー（記録の hit と judge の項目に残す）。Home は script: を解く基準
+	// Source はこの項目が書いてあるレイヤー（記録の hit と judge の項目に残す）。home は script: を解く基準
 	// ディレクトリ（共通レイヤーと自身のレイヤーはワークスペースルート、プロジェクトはそのプロジェクトの git
 	// プロジェクトルート）。読んだ側が埋める。
-	Source, Home string
+	Source, home string
 
 	compiled         *pyre.Regexp
 	include, exclude []*pyre.Regexp
@@ -112,9 +116,9 @@ func (f *Factor) matches(rel string) bool { return f.compiled != nil && f.compil
 // inScope は数える項目がこの変更を数えるか。rename・copy は元のパスも見る（新しいパスだけで見ると、対象の外へ
 // 動かしたファイルの書き換えが数えから消え、軽い側へ倒れる）。Include はどちらかが、Exclude は両方が当たれば効く。
 func (f *Factor) inScope(c Change) bool {
-	paths := []string{c.Path}
-	if c.Old != "" {
-		paths = append(paths, c.Old)
+	paths := []string{c.path}
+	if c.old != "" {
+		paths = append(paths, c.old)
 	}
 	if len(f.include) > 0 && !anyMatch(f.include, paths) {
 		return false
@@ -138,7 +142,7 @@ func anyMatch(patterns []*pyre.Regexp, paths []string) bool {
 	return false
 }
 
-// key はレイヤーをまたいで「同じ項目か」を比べる全欄。Source と Home は含めない。script: は書かれたパスでは
+// key はレイヤーをまたいで「同じ項目か」を比べる全欄。Source と home は含めない。script: は書かれたパスでは
 // なく、スクリプトの置き場からの相対と指す先の中身で比べる（同期で共通レイヤーをコピーした配点はパスが違い、
 // パスで比べると同じ項目を 2 重に数える。中身まで見るのは、名前だけ同じ別のスクリプトを破棄しないため）。
 func (f *Factor) key() string {
@@ -149,13 +153,13 @@ func (f *Factor) key() string {
 		if _, after, ok := strings.Cut(rel, scriptsDir); ok {
 			rel = after
 		}
-		value = fmt.Sprintf("%q %q", rel, fileDigest(f.Home, f.Text))
-	case KindGlob, KindJudge:
+		value = fmt.Sprintf("%q %q", rel, fileDigest(f.home, f.Text))
+	case kindGlob, KindJudge:
 		value = fmt.Sprintf("%q", f.Text)
 	}
 	max := "-"
-	if f.HasMax {
-		max = fmt.Sprint(f.Max)
+	if f.hasMax {
+		max = fmt.Sprint(f.max)
 	}
 	return fmt.Sprintf("%q %d %q %s %s %s %q %q", f.ID, f.Points, f.Message, f.Kind, value, max,
 		uniqueSorted(f.Include), uniqueSorted(f.Exclude))
@@ -222,8 +226,8 @@ func (d *Definition) Factor(id string) *Factor {
 	return nil
 }
 
-// LevelOf は点のリスクレベル。
-func (d *Definition) LevelOf(points int) Level {
+// levelOf は点のリスクレベル。
+func (d *Definition) levelOf(points int) Level {
 	t := EffectiveLevels(d.Levels)
 	switch {
 	case points >= t.Critical:
@@ -287,7 +291,7 @@ func builtin() *Definition {
 		spec("id", "many-files", "points", 15, "files_over", 10, "message", "ファイルが多い"),
 		spec("id", "ci", "points", 35, "glob", ".github/**", "max", 35, "message", "CI やエージェント定義に触った"),
 		spec("id", "deletes", "points", 20, "deleted_over", 3, "message", "削除したファイルが多い"),
-	}, Builtin, ScriptHomes)
+	}, Builtin, scriptHomes)
 	return &Definition{Levels: map[string]int{}, Factors: factors, Source: Builtin}
 }
 
@@ -316,9 +320,9 @@ func Load(path string) (*Definition, []rules.Problem) {
 	if why != "" {
 		fallen := builtin()
 		fallen.Fallback = why
-		return fallen, []rules.Problem{problem(rules.Error, Where, why)}
+		return fallen, []rules.Problem{problem(rules.Error, where, why)}
 	}
-	d, problems := Parse(text, path, ScriptHomes)
+	d, problems := Parse(text, path, scriptHomes)
 	if d == nil {
 		fallen := builtin()
 		fallen.Fallback = path + " が不正。組み込みの配点で数える"
@@ -338,7 +342,7 @@ func LoadLayer(path string, homes []string) (*Definition, []rules.Problem) {
 		return nil, nil
 	}
 	if why != "" {
-		return nil, []rules.Problem{problem(rules.Error, Where, why)}
+		return nil, []rules.Problem{problem(rules.Error, where, why)}
 	}
 	return Parse(text, path, homes)
 }
@@ -495,10 +499,10 @@ func readFactor(id string, item *yaml.Map, homes []string) (*Factor, string, []r
 		f.Message = id
 	}
 	if raw, present := item.Lookup("max"); present && raw != nil {
-		if f.Max, ok = nonNegative(raw); !ok {
+		if f.max, ok = nonNegative(raw); !ok {
 			return nil, "`max` が 0 以上の整数ではない", nil
 		}
-		f.HasMax = true
+		f.hasMax = true
 	}
 	if !f.Kind.counts() {
 		for _, k := range []string{"include", "exclude"} {
@@ -528,7 +532,7 @@ func readFactor(id string, item *yaml.Map, homes []string) (*Factor, string, []r
 					"ファイルにしか一致しない。ディレクトリなら `"+glob+"/**` か `"+glob+"/`"))
 			}
 		}
-	case KindGlob:
+	case kindGlob:
 		s, _ := value.(string)
 		if ospath.Strip(s) == "" {
 			return nil, "`glob` が文字列ではない", nil
@@ -614,15 +618,15 @@ func scopeGlobs(raw any) ([]string, []*pyre.Regexp, string) {
 // markLayer はこの配点の項目に、レイヤーの名前と script: を解く基準ディレクトリを持たせる。
 func (d *Definition) markLayer(name, home string) {
 	for _, f := range d.Factors {
-		f.Source, f.Home = name, home
+		f.Source, f.home = name, home
 	}
 }
 
-// Merge は共通レイヤーの配点に、行き先のレイヤーの配点を足す。factors は連結で、同じ id で全欄が一致すれば
+// merge は共通レイヤーの配点に、行き先のレイヤーの配点を足す。factors は連結で、同じ id で全欄が一致すれば
 // 後ろを捨て（info）、中身が違えば両方を数え、後ろを `<レイヤー>:<id>` にする（warn。空にすると点が小さく
 // なる側になるので、衝突は点を増やす向きにだけ効かせる）。levels は書かれたキーごとに小さいほう。合成後の
 // levels の順が崩れたら（error）、そのレイヤーを空として共通レイヤーだけを返す。
-func Merge(common, extra *Definition, name string) (*Definition, []rules.Problem) {
+func merge(common, extra *Definition, name string) (*Definition, []rules.Problem) {
 	var problems []rules.Problem
 	ids, keys := map[string]bool{}, map[string]bool{}
 	for _, f := range common.Factors {
@@ -688,8 +692,8 @@ func ScriptProblems(d *Definition, name string) []rules.Problem {
 		if f.Kind != KindScript || name != "" && f.Source != name {
 			continue
 		}
-		if !ospath.IsFile(ospath.Join(f.Home, filepath.FromSlash(f.Text))) {
-			home := f.Home
+		if !ospath.IsFile(ospath.Join(f.home, filepath.FromSlash(f.Text))) {
+			home := f.home
 			if home == "" {
 				home = "(基準なし)"
 			}
@@ -737,7 +741,7 @@ func LayerDefinition(conf *config.Settings, root, project string) (*Definition, 
 		return d, notes
 	}
 	extra.markLayer(name, home)
-	merged, problems := Merge(d, extra, name)
+	merged, problems := merge(d, extra, name)
 	if len(merged.Dropped) > 0 {
 		merged.Fallback = strings.Join(merged.Dropped, ", ") + " の配点の閾値が合成で逆転している。このレイヤーは空として数える"
 	}

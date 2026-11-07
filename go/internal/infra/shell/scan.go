@@ -102,7 +102,7 @@ func scan(src string) (scanned, error) {
 func (x *scanner) enter() error {
 	*x.frames++
 	if *x.frames > maxScanFrames {
-		return stop(ReasonAmbiguousSubst, formTooDeep)
+		return stop(reasonAmbiguousSubst, formTooDeep)
 	}
 	return nil
 }
@@ -281,7 +281,7 @@ func (x *scanner) refuseCase(chunk string, wordStart bool) error {
 		}
 		at := x.i + p + 4
 		if before && (at >= len(x.s) || strings.IndexByte(wordEnd, x.s[at]) >= 0) {
-			return stop(ReasonAmbiguousSubst, formCaseInSubst)
+			return stop(reasonAmbiguousSubst, formCaseInSubst)
 		}
 		q := strings.Index(chunk[p+1:], "case")
 		if q < 0 {
@@ -484,7 +484,7 @@ func (x *scanner) arithmetic(collect, quoted bool) error {
 					return nil
 				}
 				// `$((cmd) | x)`。算術かコマンド置換かが表記から決まらない。
-				return stop(ReasonAmbiguousSubst, formArithmeticOrSubst)
+				return stop(reasonAmbiguousSubst, formArithmeticOrSubst)
 			}
 			depth--
 		}

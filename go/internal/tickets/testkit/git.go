@@ -12,11 +12,11 @@ import (
 // なる。testdata の写しに sha が入るので、パッケージごとに決めた時刻は変えない。
 type Clock string
 
-// Fixed はふつうに使う時刻。
-const Fixed Clock = "2026-01-05T00:00:00+0000"
+// fixed はふつうに使う時刻。
+const fixed Clock = "2026-01-05T00:00:00+0000"
 
-// Env は git と、git を起こす Python に渡す環境（利用者の設定を読まず、名前と時刻を固定する）。
-func (c Clock) Env() []string {
+// env は git と、git を起こす Python に渡す環境（利用者の設定を読まず、名前と時刻を固定する）。
+func (c Clock) env() []string {
 	return []string{"GIT_CONFIG_GLOBAL=" + os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
 		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
 		"GIT_AUTHOR_DATE=" + string(c), "GIT_COMMITTER_DATE=" + string(c)}
@@ -27,7 +27,7 @@ func (c Clock) Git(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), c.Env()...)
+	cmd.Env = append(os.Environ(), c.env()...)
 	out, err := cmd.Output()
 	if err != nil {
 		var stderr string
@@ -39,8 +39,8 @@ func (c Clock) Git(t *testing.T, dir string, args ...string) string {
 	return string(out)
 }
 
-// Commit はそのツリーの変更を全部コミットする（変更が無くてもコミットを作る）。
-func (c Clock) Commit(t *testing.T, dir, message string) {
+// commit はそのツリーの変更を全部コミットする（変更が無くてもコミットを作る）。
+func (c Clock) commit(t *testing.T, dir, message string) {
 	t.Helper()
 	c.Git(t, dir, "add", "-A")
 	c.Git(t, dir, "commit", "-q", "--allow-empty", "-m", message)
@@ -60,25 +60,25 @@ func (c Clock) Workspace(t *testing.T, worktrees ...string) string {
 	return root
 }
 
-// Git は Fixed の時刻で git を走らせる。
+// Git は fixed の時刻で git を走らせる。
 func Git(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	return Fixed.Git(t, dir, args...)
+	return fixed.Git(t, dir, args...)
 }
 
-// GitEnv は Fixed の時刻の環境。
-func GitEnv() []string { return Fixed.Env() }
+// GitEnv は fixed の時刻の環境。
+func GitEnv() []string { return fixed.env() }
 
-// Commit は Fixed の時刻でコミットする。
+// Commit は fixed の時刻でコミットする。
 func Commit(t *testing.T, dir, message string) {
 	t.Helper()
-	Fixed.Commit(t, dir, message)
+	fixed.commit(t, dir, message)
 }
 
-// Workspace は Fixed の時刻でワークスペースを作る。
+// Workspace は fixed の時刻でワークスペースを作る。
 func Workspace(t *testing.T, worktrees ...string) string {
 	t.Helper()
-	return Fixed.Workspace(t, worktrees...)
+	return fixed.Workspace(t, worktrees...)
 }
 
 // TempRoot はリンクを解いた一時ディレクトリ（macOS の /var → /private/var で比べるパスがずれないように）。

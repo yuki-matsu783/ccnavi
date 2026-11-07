@@ -14,20 +14,20 @@ import (
 	"ccnavi/internal/policy/rules"
 )
 
-// Version は文面ファイルの書式の版。
-const Version = 1
+// version は文面ファイルの書式の版。
+const version = 1
 
-// Kind は文の種類。識別子の頭で決まる。
-type Kind string
+// kind は文の種類。識別子の頭で決まる。
+type kind string
 
 const (
-	KindDeny    Kind = "deny"
-	KindNudge   Kind = "nudge"
-	KindNext    Kind = "next"
-	KindChoices Kind = "choices"
-	KindNote    Kind = "note"
-	// KindNotice は止めない通知。見出しと状態の行はコードに残し、本文だけを持つ。
-	KindNotice Kind = "notice"
+	kindDeny    kind = "deny"
+	kindNudge   kind = "nudge"
+	kindNext    kind = "next"
+	kindChoices kind = "choices"
+	kindNote    kind = "note"
+	// kindNotice は止めない通知。見出しと状態の行はコードに残し、本文だけを持つ。
+	kindNotice kind = "notice"
 )
 
 // 欄の名前。
@@ -44,40 +44,40 @@ const (
 
 // fields は種類ごとの（必須の欄, 任意の欄）。並びは出力の行の順。
 type fields struct {
-	Required []string
-	Optional []string
+	required []string
+	optional []string
 }
 
-var kindFields = map[Kind]fields{
-	KindDeny:    {[]string{fieldWhat, fieldWhy, fieldNext, fieldNoBypass}, []string{fieldNote}},
-	KindNudge:   {[]string{fieldWhat, fieldNext}, []string{fieldWhy, fieldNoBypass, fieldNote}},
-	KindNext:    {[]string{fieldNext}, []string{fieldNote}},
-	KindChoices: {[]string{fieldItems}, nil},
-	KindNote:    {[]string{fieldNote}, nil},
-	KindNotice:  {[]string{fieldWhat}, []string{fieldWhy, fieldNext, fieldNote}},
+var kindFields = map[kind]fields{
+	kindDeny:    {[]string{fieldWhat, fieldWhy, fieldNext, fieldNoBypass}, []string{fieldNote}},
+	kindNudge:   {[]string{fieldWhat, fieldNext}, []string{fieldWhy, fieldNoBypass, fieldNote}},
+	kindNext:    {[]string{fieldNext}, []string{fieldNote}},
+	kindChoices: {[]string{fieldItems}, nil},
+	kindNote:    {[]string{fieldNote}, nil},
+	kindNotice:  {[]string{fieldWhat}, []string{fieldWhy, fieldNext, fieldNote}},
 }
 
 // kindOrder は種類を苦情の文に並べる順（Python の FIELDS の順）。
-var kindOrder = []Kind{KindDeny, KindNudge, KindNext, KindChoices, KindNote, KindNotice}
+var kindOrder = []kind{kindDeny, kindNudge, kindNext, kindChoices, kindNote, kindNotice}
 
 // ruleLooseFields は `RULE_` の文（組み込みルールの文）の欄。what だけが必須で、言うことが無い欄は作り足さない。
-// RuleAsk とその場合は、記録の code と同じ識別子を持ち、ほかの拒否と同じ 4 欄を必ず持つ。
+// ruleAsk とその場合は、記録の code と同じ識別子を持ち、ほかの拒否と同じ 4 欄を必ず持つ。
 var ruleLooseFields = fields{[]string{fieldWhat}, []string{fieldWhy, fieldNext, fieldNoBypass, fieldNote}}
 
 const (
 	// rulePrefix は組み込みルールの文の識別子の頭。
 	rulePrefix = "RULE_"
-	// RuleAsk は確認の文の識別子。
-	RuleAsk = rulePrefix + "ASK"
+	// ruleAsk は確認の文の識別子。
+	ruleAsk = rulePrefix + "ASK"
 )
 
 // prefixes は識別子の頭と種類（並びは苦情の文の順）。
 var prefixes = []struct {
 	head string
-	kind Kind
+	kind kind
 }{
-	{"DENY_", KindDeny}, {rulePrefix, KindDeny}, {"NUDGE_", KindNudge}, {"NEXT_", KindNext},
-	{"CHOICES_", KindChoices}, {"NOTE_", KindNote}, {"NOTICE_", KindNotice},
+	{"DENY_", kindDeny}, {rulePrefix, kindDeny}, {"NUDGE_", kindNudge}, {"NEXT_", kindNext},
+	{"CHOICES_", kindChoices}, {"NOTE_", kindNote}, {"NOTICE_", kindNotice},
 }
 
 // 出力で欄の前に付ける語。what と items には付けない（items は番号を付ける）。
@@ -93,7 +93,7 @@ var labels = map[string]string{fieldWhy: whyLabel, fieldNext: NextLabel, fieldNo
 
 const (
 	// ShownSubjectLimit は、理由や報告に載せる対象の文字列の長さの上限。ヒアドキュメントの全文で本体を押し出さないためである。
-	// 判定の記録に残す長さ（audit.RecordedSubjectLimit）とは別の約束。
+	// 判定の記録に残す長さ（audit.recordedSubjectLimit）とは別の約束。
 	ShownSubjectLimit = 200
 	// limitField は 1 欄の長さ（場合ごと）、limitEntry は 1 件の欄の長さの合計の上限。
 	limitField = 600
@@ -129,7 +129,7 @@ func IsID(id string) bool { return idPattern.MatchString(id) }
 func isName(name string) bool { return namePattern.MatchString(name) }
 
 // kindOfID は識別子の頭から決まる種類。知らない頭なら空。
-func kindOfID(id string) Kind {
+func kindOfID(id string) kind {
 	for _, p := range prefixes {
 		if strings.HasPrefix(id, p.head) {
 			return p.kind
@@ -138,9 +138,9 @@ func kindOfID(id string) Kind {
 	return ""
 }
 
-// fieldsFor は識別子と種類から決まる欄。`RULE_` の文（RuleAsk の系統を除く）だけが what 以外を任意にする。
-func fieldsFor(id string, kind Kind) fields {
-	if kind == KindDeny && strings.HasPrefix(id, rulePrefix) && id != RuleAsk && !strings.HasPrefix(id, RuleAsk+"__") {
+// fieldsFor は識別子と種類から決まる欄。`RULE_` の文（ruleAsk の系統を除く）だけが what 以外を任意にする。
+func fieldsFor(id string, kind kind) fields {
+	if kind == kindDeny && strings.HasPrefix(id, rulePrefix) && id != ruleAsk && !strings.HasPrefix(id, ruleAsk+"__") {
 		return ruleLooseFields
 	}
 	return kindFields[kind]
@@ -156,15 +156,15 @@ type value struct {
 
 // Entry は文面 1 件。
 type Entry struct {
-	ID     string
-	Kind   Kind
+	id     string
+	kind   kind
 	Values []string
-	Path   string
+	path   string
 	fields map[string]value
 }
 
-// Has は欄があるか。
-func (e *Entry) Has(field string) bool {
+// has は欄があるか。
+func (e *Entry) has(field string) bool {
 	_, ok := e.fields[field]
 	return ok
 }
@@ -371,7 +371,7 @@ func checkEntry(id string, raw any, path string) (*Entry, []rules.Problem) {
 		return nil, c.problems
 	}
 	kindText, ok := m.Get(keyKind).(string)
-	kind := Kind(kindText)
+	kind := kind(kindText)
 	if _, known := kindFields[kind]; !ok || !known {
 		names := make([]string, len(kindOrder))
 		for i, k := range kindOrder {
@@ -395,8 +395,8 @@ func checkEntry(id string, raw any, path string) (*Entry, []rules.Problem) {
 		values = list
 	}
 	fields := fieldsFor(id, kind)
-	loose := slices.Equal(fields.Required, ruleLooseFields.Required) && slices.Equal(fields.Optional, ruleLooseFields.Optional)
-	known := append(append(slices.Clone(fields.Required), fields.Optional...), keyKind, keyValues)
+	loose := slices.Equal(fields.required, ruleLooseFields.required) && slices.Equal(fields.optional, ruleLooseFields.optional)
+	known := append(append(slices.Clone(fields.required), fields.optional...), keyKind, keyValues)
 	var unknown []string
 	for k := range m.All() {
 		if s, ok := k.(string); ok && slices.Contains(known, s) {
@@ -409,18 +409,18 @@ func checkEntry(id string, raw any, path string) (*Entry, []rules.Problem) {
 		unknown = slices.Compact(unknown)
 		c.err(string(kind) + " の欄に無い: " + strings.Join(unknown, ", "))
 	}
-	for _, name := range fields.Required {
+	for _, name := range fields.required {
 		if !m.Has(name) {
 			c.err("欄 `" + name + "` が無い")
 		}
 	}
 	out := map[string]value{}
-	for _, name := range append(slices.Clone(fields.Required), fields.Optional...) {
+	for _, name := range append(slices.Clone(fields.required), fields.optional...) {
 		raw, present := m.Lookup(name)
 		if !present {
 			continue
 		}
-		if loose && !slices.Contains(fields.Required, name) && blank(raw) {
+		if loose && !slices.Contains(fields.required, name) && blank(raw) {
 			continue // 言うことが無い欄は省くのと同じ（`RULE_` の文だけ）
 		}
 		before := len(c.problems)
@@ -461,7 +461,7 @@ func checkEntry(id string, raw any, path string) (*Entry, []rules.Problem) {
 	if len(c.problems) > 0 {
 		return nil, c.problems
 	}
-	return &Entry{ID: id, Kind: kind, Values: values, Path: path, fields: out}, nil
+	return &Entry{id: id, kind: kind, Values: values, path: path, fields: out}, nil
 }
 
 func hasDuplicate(list []string) bool {
@@ -486,8 +486,8 @@ func parseFile(text, path string) (*yaml.Map, []rules.Problem) {
 		return fail("読めない: " + err.Error())
 	}
 	m, ok := data.(*yaml.Map)
-	if !ok || !pyfmt.EqualsInt(m.Get("version"), Version) {
-		return fail(fmt.Sprintf("`version: %d` の表で書く", Version))
+	if !ok || !pyfmt.EqualsInt(m.Get("version"), version) {
+		return fail(fmt.Sprintf("`version: %d` の表で書く", version))
 	}
 	body, ok := m.Get("messages").(*yaml.Map)
 	if !ok {
@@ -502,7 +502,7 @@ func CheckText(text, path string) (map[string]*Entry, []rules.Problem) {
 	list, problems := checkFile(text, path)
 	entries := map[string]*Entry{}
 	for _, e := range list {
-		entries[e.ID] = e
+		entries[e.id] = e
 	}
 	return entries, problems
 }

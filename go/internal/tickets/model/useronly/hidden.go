@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyre"
 	"ccnavi/internal/infra/shell"
@@ -54,9 +55,9 @@ var (
 	exeDiagnoses = []string{"--docs", "--lint", "--test", "--test-expectations", "--explain", "--suggest", "--version", "--help", "-h"}
 )
 
-// ExeOptions は実行ファイルが受けるオプション（短い形を含む）。ここに無いオプションは実行ファイルが使い方の
+// exeOptions は実行ファイルが受けるオプション（短い形を含む）。ここに無いオプションは実行ファイルが使い方の
 // 誤りとして断り、何も動かさない。オプションを足したらここにも足す（入口の段のテストが引数の読み手と比べる）。
-var ExeOptions = []string{
+var exeOptions = []string{
 	"--abandon", "--accept-check", "--accept-done", "--accept-plan",
 	"--accept-unresolved", "--actor", "--agent-id", "--agree", "--all", "--approved",
 	"--body-file", "--check", "--check-file",
@@ -86,6 +87,9 @@ var ExeOptions = []string{
 	"--verify",
 	"--version", "--via", "--with-feedback", "--write", "--yes", "-h", "-r",
 }
+
+// ExeOptions は exeOptions の写しを返す（呼び手が書き換えても元は変わらない）。
+func ExeOptions() []string { return slices.Clone(exeOptions) }
 
 var (
 	approvalFlags = names("", groupApproval)
@@ -329,7 +333,7 @@ func hiddenArgs(kind string, args []string) string {
 		}
 	}
 	for f := range given {
-		if slices.Contains(exeDiagnoses, f) || !slices.Contains(ExeOptions, f) {
+		if slices.Contains(exeDiagnoses, f) || !slices.Contains(exeOptions, f) {
 			return ""
 		}
 	}
@@ -454,7 +458,7 @@ func entryCommands(subject string, inner []Layer) ([]entryCommand, bool) {
 	}
 	var out []entryCommand
 	for _, segment := range segmentSep.Split(text, -1) {
-		out = append(out, entryCommand{"", fields(segment)})
+		out = append(out, entryCommand{"", ospath.Fields(segment)})
 	}
 	return out, false
 }
@@ -529,7 +533,7 @@ func hiddenEntry(subject string, inner []Layer, binPath string) (string, string)
 // 語として読めないので、コマンドの切れ目と引用符で切り、それぞれの頭の語を見る。
 func namedInText(subject, binBase string) string {
 	for _, segment := range stringSegment.Split(strings.ReplaceAll(subject, shell.Sep, "\n"), -1) {
-		if found := executedEntry(fields(segment), binBase); found != "" {
+		if found := executedEntry(ospath.Fields(segment), binBase); found != "" {
 			return found
 		}
 	}

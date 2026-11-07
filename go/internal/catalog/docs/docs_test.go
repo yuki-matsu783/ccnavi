@@ -142,9 +142,9 @@ func TestSearch(t *testing.T) {
 		{"text は concept_id を見る", Query{Texts: []string{"plain"}}, []string{"notes/plain"}},
 		{"日付だけの until はその日の終わりまで", Query{Since: "2026-08-05", Until: "2026-08-05"}, []string{"docs/adr/0002-ticket", "notes/plain"}},
 		{"分までの until", Query{Until: "2026-08-05T12:00"}, []string{"README", "docs/adr/0001-git", "notes/plain"}},
-		{"mtime の逆順と件数", Query{Sort: SortMtime, Reverse: true, Limit: 2}, []string{"docs/claude/worktree", "docs/adr/0002-ticket"}},
+		{"mtime の逆順と件数", Query{Sort: sortMtime, Reverse: true, Limit: 2}, []string{"docs/claude/worktree", "docs/adr/0002-ticket"}},
 		// 同じ値は concept_id で並び、frontmatter の無いものは空として先に来る。
-		{"type の順", Query{Sort: SortType}, []string{"notes/plain", "docs/adr/0001-git", "docs/adr/0002-ticket", "README", "docs/claude/worktree"}},
+		{"type の順", Query{Sort: sortType}, []string{"notes/plain", "docs/adr/0001-git", "docs/adr/0002-ticket", "README", "docs/claude/worktree"}},
 	}
 	for _, c := range cases {
 		hits, _ := search(rows, c.query)
@@ -189,9 +189,9 @@ func TestRender(t *testing.T) {
 		render(&b, hits, matched, len(rows), q.format())
 		return b.String()
 	}
-	eq(t, "count", out(Query{Format: FormatCount}, rows), "matched=5 total=5\n")
-	eq(t, "count で切ったとき", out(Query{Format: FormatCount, Limit: 1}, rows), "matched=5 shown=1 total=5\n")
-	eq(t, "path", out(Query{Format: FormatPath, Types: []string{"guide"}}, rows), "README\ndocs/claude/worktree\n")
+	eq(t, "count", out(Query{Format: formatCount}, rows), "matched=5 total=5\n")
+	eq(t, "count で切ったとき", out(Query{Format: formatCount, Limit: 1}, rows), "matched=5 shown=1 total=5\n")
+	eq(t, "path", out(Query{Format: formatPath, Types: []string{"guide"}}, rows), "README\ndocs/claude/worktree\n")
 	var list []any
 	if v, err := pyjson.Loads(out(Query{Format: FormatJSON}, rows)); err == nil {
 		list, _ = v.([]any)
@@ -203,7 +203,7 @@ func TestRender(t *testing.T) {
 	w.put("日本語/文書.md", doc("type: ガイド", "title: タイトル"), "")
 	w.put("ab.md", doc("type: adr", "title: t"), "")
 	more := collect(w.conf(), w.root, collectOptions{refresh: true, parse: true}).rows
-	detail := out(Query{Format: FormatDetail, Paths: []string{"a"}}, more[:1])
+	detail := out(Query{Format: formatDetail, Paths: []string{"a"}}, more[:1])
 	for _, want := range []string{"  description: 1 行目 2 行目\n", "  tags       : x, y\n"} {
 		if !strings.Contains(detail, want) {
 			t.Errorf("detail に %q が無い:\n%s", want, detail)
@@ -247,7 +247,7 @@ func projects(t *testing.T) (*workspace, string, string) {
 
 func TestProjectsAreSearchedWithPathsFromTheWorkspaceRoot(t *testing.T) {
 	w, lib, bare := projects(t)
-	code, out, errOut := w.run(Query{Format: FormatJSONL})
+	code, out, errOut := w.run(Query{Format: formatJSONL})
 	eq(t, "code", code, 0)
 	var got [][2]string
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
@@ -266,10 +266,10 @@ func TestProjectsAreSearchedWithPathsFromTheWorkspaceRoot(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(bare, docindex.IndexName)); err == nil {
 		t.Error("対象外のプロジェクトに書いた")
 	}
-	_, out, _ = w.run(Query{Paths: []string{"projects/lib"}, Format: FormatPath})
+	_, out, _ = w.run(Query{Paths: []string{"projects/lib"}, Format: formatPath})
 	eq(t, "path", out, "projects/lib/docs/x\n")
 	w.put("projects/lib/.ccnavi/approved/doing/i0001.md", "---\nversion: 1\n---\n", "")
-	_, out, _ = w.run(Query{Paths: []string{".ccnavi"}, Format: FormatCount})
+	_, out, _ = w.run(Query{Paths: []string{".ccnavi"}, Format: formatCount})
 	eq(t, "ccnavi ディレクトリ", out, "matched=0 total=2\n")
 }
 
@@ -277,13 +277,13 @@ func TestAProjectWithoutIgnoreGetsTheLine(t *testing.T) {
 	w, _, _ := projects(t)
 	plain := w.project("plain", "node_modules/\n")
 	w.put("projects/plain/z.md", doc("type: guide"), "")
-	_, out, errOut := w.run(Query{Format: FormatPath})
+	_, out, errOut := w.run(Query{Format: formatPath})
 	if !slices.Contains(strings.Split(out, "\n"), "projects/plain/z") || !strings.Contains(errOut, "projects/plain/.gitignore に") {
 		t.Errorf("out = %s\nerr = %s", out, errOut)
 	}
 	want := "node_modules/\n" + docindex.IgnoreLine + "\n"
 	eq(t, ".gitignore", w.read("projects/plain/.gitignore"), want)
-	_, _, errOut = w.run(Query{Format: FormatPath})
+	_, _, errOut = w.run(Query{Format: formatPath})
 	if strings.Contains(errOut, "を追加しました") {
 		t.Error("2 回目も足した")
 	}
@@ -443,7 +443,7 @@ func TestMissingFrontmatter(t *testing.T) {
 	w := newWorkspace(t)
 	testkit.CopyMessages(t, w.root)
 	said := w.hint("docs/new.md", "# 見出し\n", "Write", "create", "")
-	for _, want := range []string{"[ccnavi] " + CodeMissingFrontmatter + " ", "(docs/new.md)", "type（必須）"} {
+	for _, want := range []string{"[ccnavi] " + codeMissingFrontmatter + " ", "(docs/new.md)", "type（必須）"} {
 		if !strings.Contains(said, want) {
 			t.Errorf("%q が無い: %s", want, said)
 		}

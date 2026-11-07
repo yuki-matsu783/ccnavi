@@ -17,9 +17,9 @@ import (
 	"ccnavi/internal/tickets/flow"
 )
 
-// JSONVersion は `--lint --json` の形の版。欄を足すだけなら上げない。欄の意味や名前を変えたら上げ、読む側
+// jsonVersion は `--lint --json` の形の版。欄を足すだけなら上げない。欄の意味や名前を変えたら上げ、読む側
 // （VS Code 拡張）は違う版を「読めない」として扱う。
-const JSONVersion = 1
+const jsonVersion = 1
 
 // 苦情の出どころの表記。
 const (
@@ -86,10 +86,10 @@ func Report(stdout io.Writer, o Options) int {
 	mode := config.ResolveMode(&complaints, o.Mode, conf)
 
 	var said strings.Builder
-	restoreIfDeny := selfguard.Resolve(&said, o.RestoreIfDeny, conf.RestoreIfDeny, env.RestoreIfDeny, selfguard.Choices)
-	guardCoreFiles := selfguard.Resolve(&said, o.GuardCoreFiles, conf.GuardCoreFiles, env.GuardCoreFiles, selfguard.Choices)
+	restoreIfDeny := selfguard.Resolve(&said, o.RestoreIfDeny, conf.RestoreIfDeny, env.RestoreIfDeny, selfguard.Choices())
+	guardCoreFiles := selfguard.Resolve(&said, o.GuardCoreFiles, conf.GuardCoreFiles, env.GuardCoreFiles, selfguard.Choices())
 	var unwatchedSaid strings.Builder
-	guardUnwatched := selfguard.Resolve(&unwatchedSaid, "", conf.GuardUnwatched, env.GuardUnwatched, selfguard.GateChoices)
+	guardUnwatched := selfguard.Resolve(&unwatchedSaid, "", conf.GuardUnwatched, env.GuardUnwatched, selfguard.GateChoices())
 
 	problems := collect(conf, root, o.Notes, mode, complaints.String(), o.Compat)
 	var read flowRead
@@ -163,7 +163,7 @@ func writeJSON(stdout io.Writer, o Options, mode config.Mode, problems []rules.P
 		listed = append(listed, item)
 	}
 	payload := pyjson.NewObject(
-		"version", JSONVersion,
+		"version", jsonVersion,
 		"root", o.Root,
 		"rules", o.Conf.Rules,
 		"mode", string(mode),
@@ -220,16 +220,16 @@ func joinModes(choices []config.Mode, sep string) string {
 // switchProblems は 2 値の切り替えの書き誤りと、切ってあることそのもの。
 func switchProblems(conf *config.Settings, guardUnwatched config.Mode) []rules.Problem {
 	var out []rules.Problem
-	gates := joinModes(selfguard.GateChoices, " か ")
+	gates := joinModes(selfguard.GateChoices(), " か ")
 	// 承認の経路の切り替えに dry-run は無い。書いたユーザは「止めずに報告する」つもりでも実際は enable と同じに止め、
 	// 直すまで設定ファイルの書き方と実際の動きが食い違ったままになるので error にする。
-	if v := declared(conf.GuardTicketApprovalDeclared); v != "" && !modeIn(v, selfguard.GateChoices) {
+	if v := declared(conf.GuardTicketApprovalDeclared); v != "" && !modeIn(v, selfguard.GateChoices()) {
 		out = append(out, rules.Problem{Severity: rules.Error, Rule: whereTicket, Detail: fmt.Sprintf(
 			"%s=%s。この設定は %s しか受け付けない（承認は一度通れば済んでしまうので、止めずに報告するだけの値がありません）。"+
 				"今は %s として動いている", env.GuardTicketApproval, v, gates, config.Enable)})
 	}
 	// 切ったつもりの書き誤りは enable として動いているので、「切れている」と思い続けないよう error にする。
-	if v := declared(conf.TicketControlDeclared); v != "" && !modeIn(v, selfguard.GateChoices) {
+	if v := declared(conf.TicketControlDeclared); v != "" && !modeIn(v, selfguard.GateChoices()) {
 		out = append(out, rules.Problem{Severity: rules.Error, Rule: whereTicket, Detail: fmt.Sprintf(
 			"%s=%s。%s しか受け付けない。今は %s として動いている", env.TicketControl, v, gates, config.Enable)})
 	}
@@ -242,7 +242,7 @@ func switchProblems(conf *config.Settings, guardUnwatched config.Mode) []rules.P
 	if guardUnwatched == config.Disable {
 		out = append(out, rules.Problem{Severity: rules.Warn, Rule: whereUnwatched, Detail: fmt.Sprintf(
 			"%s=disable。%s のモードでは、どのルールも言及しない呼び出しを止めない",
-			env.GuardUnwatched, strings.Join(judge.PermissionNoJudge, " と "))})
+			env.GuardUnwatched, strings.Join(judge.PermissionNoJudge(), " と "))})
 	}
 	if conf.TicketsEnabled() && conf.GuardTicketApproval == string(config.Disable) {
 		out = append(out, rules.Problem{Severity: rules.Warn, Rule: whereTicket, Detail: env.GuardTicketApproval +

@@ -9,7 +9,7 @@ import (
 )
 
 // 調べきれないとき（パスが解けない・root の外に出る）は、HasLink と Escapes は拒否する側にする。
-// Scan は lstat の失敗を Missing として返し、呼び手が決める。IsLink は失敗を偽にする（os.path.islink と同じ）。
+// Scan は lstat の失敗を missing として返し、呼び手が決める。IsLink は失敗を偽にする（os.path.islink と同じ）。
 
 // LinkState は Scan の答え。
 type LinkState int
@@ -19,8 +19,8 @@ const (
 	Clean LinkState = iota
 	// Link は道にリンクがある。
 	Link
-	// Missing は途中の名前を lstat できなかった。
-	Missing
+	// missing は途中の名前を lstat できなかった。
+	missing
 )
 
 // isJunction は Windows の junction か。Go は junction を ModeIrregular で返す。テストで差し替える。
@@ -94,7 +94,7 @@ func Scan(root string, relParts []string, includeLast bool) (LinkState, string) 
 		current = ospath.Join(current, part)
 		info, err := os.Lstat(current)
 		if err != nil {
-			return Missing, ""
+			return missing, ""
 		}
 		if info.Mode()&os.ModeSymlink != 0 || isJunction(current) {
 			return Link, current

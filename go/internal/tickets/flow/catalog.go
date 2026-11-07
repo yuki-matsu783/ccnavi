@@ -1,7 +1,6 @@
 package flow
 
 import (
-	"bytes"
 	"io"
 	"os"
 
@@ -16,12 +15,11 @@ import (
 
 // フローで選べるサブエージェントとスキルの名前（--lint --json --flow の flow.candidates）。
 const (
-	// SourceBuiltin は Claude Code の組み込み、SourceProject はワークスペースの .claude/ の下のもの。
-	SourceBuiltin = "builtin"
-	SourceProject = "project"
+	// sourceBuiltin は Claude Code の組み込み、sourceProject はワークスペースの .claude/ の下のもの。
+	sourceBuiltin = "builtin"
+	sourceProject = "project"
 
-	agentsDir   = "agents"
-	markdownExt = ".md"
+	agentsDir = "agents"
 	// catalogLimit は読むファイルの数の上限。1 本から読む頭の大きさは config.SkillHeadLimit。
 	catalogLimit = 200
 )
@@ -29,55 +27,55 @@ const (
 // builtinAgents は Claude Code の組み込みのサブエージェント。
 var builtinAgents = []string{"general-purpose", "Explore", "Plan"}
 
-// Candidate は選べる名前 1 つ。
-type Candidate struct{ Name, Source string }
+// candidate は選べる名前 1 つ。
+type candidate struct{ name, source string }
 
-// Candidates は名前の並び（重なりは除いてある）。
-type Candidates []Candidate
+// candidates は名前の並び（重なりは除いてある）。
+type candidates []candidate
 
-func (c Candidates) names() []string {
+func (c candidates) names() []string {
 	out := make([]string, len(c))
 	for i, x := range c {
-		out[i] = x.Name
+		out[i] = x.name
 	}
 	return out
 }
 
 // Catalog はフローで選べるサブエージェントとスキル。
-type Catalog struct{ Agents, Skills Candidates }
+type Catalog struct{ agents, skills candidates }
 
 // Object は JSON に載せる形（{"agents": [{name, source}], "skills": [...]}）。
 func (c Catalog) Object() *pyjson.Object {
-	list := func(items Candidates) []any {
+	list := func(items candidates) []any {
 		out := []any{}
 		for _, x := range items {
-			out = append(out, pyjson.NewObject("name", x.Name, "source", x.Source))
+			out = append(out, pyjson.NewObject("name", x.name, "source", x.source))
 		}
 		return out
 	}
-	return pyjson.NewObject("agents", list(c.Agents), "skills", list(c.Skills))
+	return pyjson.NewObject("agents", list(c.agents), "skills", list(c.skills))
 }
 
 // LoadCatalog はフローで選べるサブエージェントとスキルの名前。名前は frontmatter の name、無ければファイル
 // （スキルはディレクトリ）の名前。見るのはワークスペースの .claude/agents/*.md と .claude/skills/*/SKILL.md
 // だけで、ユーザのホームとプラグインのものは入らない。リンクは辿らない。
 func LoadCatalog(root string) Catalog {
-	var agents, skills Candidates
+	var agents, skills candidates
 	for _, name := range builtinAgents {
-		agents = append(agents, Candidate{name, SourceBuiltin})
+		agents = append(agents, candidate{name, sourceBuiltin})
 	}
 	if root != "" {
 		dir := ospath.Join(root, config.ClaudeDir, agentsDir)
 		for _, e := range entries(dir, root) {
 			file := ospath.Join(dir, e.Name())
-			if !pathcase.HasExt(e.Name(), markdownExt) || !ospath.IsRegular(file) {
+			if !pathcase.HasExt(e.Name(), config.MdExt) || !ospath.IsRegular(file) {
 				continue
 			}
 			name := frontName(file)
 			if name == "" {
-				name = e.Name()[:len(e.Name())-len(markdownExt)]
+				name = e.Name()[:len(e.Name())-len(config.MdExt)]
 			}
-			agents = append(agents, Candidate{name, SourceProject})
+			agents = append(agents, candidate{name, sourceProject})
 		}
 		dir = ospath.Join(root, config.ClaudeDir, config.SkillsDir)
 		for _, e := range entries(dir, root) {
@@ -92,18 +90,18 @@ func LoadCatalog(root string) Catalog {
 			if name == "" {
 				name = e.Name()
 			}
-			skills = append(skills, Candidate{name, SourceProject})
+			skills = append(skills, candidate{name, sourceProject})
 		}
 	}
-	return Catalog{Agents: unique(agents), Skills: unique(skills)}
+	return Catalog{agents: unique(agents), skills: unique(skills)}
 }
 
-func unique(items Candidates) Candidates {
+func unique(items candidates) candidates {
 	seen := map[string]bool{}
-	var kept Candidates
+	var kept candidates
 	for _, x := range items {
-		if x.Name != "" && !seen[x.Name] {
-			seen[x.Name] = true
+		if x.name != "" && !seen[x.name] {
+			seen[x.name] = true
 			kept = append(kept, x)
 		}
 	}
@@ -138,7 +136,7 @@ func frontName(file string) string {
 	if err != nil {
 		return ""
 	}
-	text, _ := fsio.Decode(bytes.TrimPrefix(raw, utf8BOM), fsio.Replace)
+	text, _ := fsio.Decode(yaml.TrimBOM(raw), fsio.Replace)
 	body, state := yaml.FrontBody(text, yaml.FrontStyle{Indented: true})
 	if state != yaml.FrontClosed {
 		return ""

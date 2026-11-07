@@ -27,12 +27,12 @@ import (
 type HumanKind string
 
 const (
-	HumanNone       HumanKind = ""
-	HumanGuardOff   HumanKind = "guard-off"
-	HumanUserScript HumanKind = "user-script"
-	HumanBoard      HumanKind = "board"
-	// HumanExpanded は `user` の語と、展開を含む `--` の語が並ぶ形。
-	HumanExpanded HumanKind = "expanded"
+	humanNone       HumanKind = ""
+	humanGuardOff   HumanKind = "guard-off"
+	humanUserScript HumanKind = "user-script"
+	humanBoard      HumanKind = "board"
+	// humanExpanded は `user` の語と、展開を含む `--` の語が並ぶ形。
+	humanExpanded HumanKind = "expanded"
 )
 
 const guardName = env.GuardTicketApproval
@@ -78,9 +78,6 @@ var (
 	assignmentWord = regexp.MustCompile(`\A[A-Za-z_][A-Za-z0-9_]*\+?=`)
 )
 
-// fields は Python の str.split()。
-func fields(s string) []string { return strings.FieldsFunc(s, ospath.IsSpace) }
-
 // lastPart は語の最後のパスの要素（`\` も区切りに読む）。
 func lastPart(word string) string {
 	word = strings.ReplaceAll(word, `\`, "/")
@@ -109,7 +106,7 @@ func dequoted(subject string, keepTicks bool) string {
 // onlyReaders は並んだコマンドが全部、表示・検索・閲覧の道具か。
 func onlyReaders(text string) bool {
 	for _, segment := range segmentSep.Split(text, -1) {
-		words := fields(segment)
+		words := ospath.Fields(segment)
 		// 前置きの代入（`X=… cmd`）は飛ばす。代入そのものは別に見る。
 		for len(words) > 0 && assignmentWord.MatchString(words[0]) {
 			words = words[1:]
@@ -170,19 +167,19 @@ func HumanPathForm(subject string) (HumanKind, string) {
 		ticked = strings.Replace(ticked, dequoted(message, true), " ", 1)
 	}
 	if onlyReaders(text) {
-		return HumanNone, ""
+		return humanNone, ""
 	}
 	if found, ok := guardMention.text(guardRead.removed(text)); ok {
-		return HumanGuardOff, found
+		return humanGuardOff, found
 	}
 	if found, ok := guardExpandedName.text(ticked); ok {
-		return HumanGuardOff, found
+		return humanGuardOff, found
 	}
 	if found, ok := guardFlag.text(text); ok {
-		return HumanGuardOff, ospath.Strip(found)
+		return humanGuardOff, ospath.Strip(found)
 	}
 	if found, ok := userScript.text(text); ok {
-		return HumanUserScript, found
+		return humanUserScript, found
 	}
 	for _, combo := range boardRx {
 		var hits []string
@@ -194,14 +191,14 @@ func HumanPathForm(subject string) (HumanKind, string) {
 			hits = append(hits, found)
 		}
 		if len(hits) == len(combo) {
-			return HumanBoard, strings.Join(hits, " … ")
+			return humanBoard, strings.Join(hits, " … ")
 		}
 	}
 	if option, ok := expandedOption.first(ticked); ok && userAlone.search(ticked) {
 		rest := string([]rune(ticked)[option.Start:])
-		return HumanExpanded, fields(rest)[0]
+		return humanExpanded, ospath.Fields(rest)[0]
 	}
-	return HumanNone, ""
+	return humanNone, ""
 }
 
 // 文面ファイルの識別子と欄。
@@ -217,11 +214,11 @@ const (
 func HumanMessage(root string, kind HumanKind, found string) string {
 	values := texts.Values{valueFound: found}
 	switch kind {
-	case HumanGuardOff:
+	case humanGuardOff:
 		return texts.Say(root, textGuardOff, values, nil)
-	case HumanUserScript:
+	case humanUserScript:
 		return texts.Say(root, textUserScript, values, nil)
-	case HumanExpanded:
+	case humanExpanded:
 		return texts.Say(root, textExpanded, values, nil)
 	}
 	// 取り込みの形は、承認と残った指摘の対応方針の文に当たらない。

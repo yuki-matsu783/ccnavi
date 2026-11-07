@@ -16,13 +16,13 @@ type Items interface {
 	All() iter.Seq2[any, any]
 }
 
-// Reprer は repr() の形を自分で持つ値（日付・組・集合など）。
-type Reprer interface {
+// reprer は repr() の形を自分で持つ値（日付・組・集合など）。
+type reprer interface {
 	PyRepr() string
 }
 
-// Stringer は str() が repr() と違う値（日付など）。
-type Stringer interface {
+// stringer は str() が repr() と違う値（日付など）。
+type stringer interface {
 	PyStr() string
 }
 
@@ -38,7 +38,7 @@ func Str(v any) string {
 	switch x := v.(type) {
 	case string:
 		return x
-	case Stringer:
+	case stringer:
 		return x.PyStr()
 	}
 	return Repr(v)
@@ -96,7 +96,7 @@ func writeRepr(b *strings.Builder, v any) {
 	case string:
 		b.WriteString(Quote(x))
 	case []byte:
-		b.WriteString(Bytes(x))
+		b.WriteString(bytes(x))
 	case []string:
 		b.WriteByte('[')
 		for i, s := range x {
@@ -115,7 +115,7 @@ func writeRepr(b *strings.Builder, v any) {
 			writeRepr(b, item)
 		}
 		b.WriteByte(']')
-	case Reprer:
+	case reprer:
 		b.WriteString(x.PyRepr())
 	case Items:
 		b.WriteByte('{')
@@ -210,8 +210,8 @@ func Quote(s string) string {
 	return b.String()
 }
 
-// Bytes は Python の repr(bytes)。
-func Bytes(data []byte) string {
+// bytes は Python の repr(bytes)。
+func bytes(data []byte) string {
 	quote := byte('\'')
 	if strings.IndexByte(string(data), '\'') >= 0 && strings.IndexByte(string(data), '"') < 0 {
 		quote = '"'

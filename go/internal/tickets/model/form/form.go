@@ -1,6 +1,8 @@
 package form
 
 import (
+	"maps"
+	"slices"
 	"strings"
 
 	"ccnavi/internal/infra/ospath"
@@ -8,14 +10,17 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// ParentHeadings は親の必須の見出し（雛形の本文の並び）。
-var ParentHeadings = []string{"目的", "範囲", "対象外", "完了の確かめ方", "計画の理由"}
+// parentHeadings は親の必須の見出し（雛形の本文の並び）。
+var parentHeadings = []string{"目的", "範囲", "対象外", "完了の確かめ方", "計画の理由"}
+
+// ParentHeadings は parentHeadings の写しを返す（呼び手が書き換えても元は変わらない）。
+func ParentHeadings() []string { return slices.Clone(parentHeadings) }
 
 // RationaleTodo は rationale の空欄の目印。
 const RationaleTodo = "（ここにこの作業をする理由を書く）"
 
-// HeadingTodo は見出しごとの空欄の目印。雛形は見出しの下に 1 行ずつ置く。
-var HeadingTodo = map[string]string{
+// headingTodo は見出しごとの空欄の目印。雛形は見出しの下に 1 行ずつ置く。
+var headingTodo = map[string]string{
 	"目的":      "（ここにこの作業の目的を書く）",
 	"範囲":      "（ここにこの作業の範囲を書く）",
 	"対象外":     "（ここにこの作業の対象外を書く）",
@@ -23,11 +28,14 @@ var HeadingTodo = map[string]string{
 	"計画の理由":   "（ここに計画の理由を書く）",
 }
 
-// Placeholders は予約した目印。提案に 1 つでも残っていれば空欄が埋まっていない。並びは rationale・見出しの順。
-var Placeholders = func() []string {
+// HeadingTodo は headingTodo の写しを返す（呼び手が書き換えても元は変わらない）。
+func HeadingTodo() map[string]string { return maps.Clone(headingTodo) }
+
+// placeholders は予約した目印。提案に 1 つでも残っていれば空欄が埋まっていない。並びは rationale・見出しの順。
+var placeholders = func() []string {
 	out := []string{RationaleTodo}
-	for _, name := range ParentHeadings {
-		out = append(out, HeadingTodo[name])
+	for _, name := range parentHeadings {
+		out = append(out, headingTodo[name])
 	}
 	return out
 }()
@@ -58,9 +66,9 @@ func fenceOf(line string) (fence, bool) {
 	return fence{}, false
 }
 
-// Headings は本文のコードフェンスの外にある `## <名前>` の名前の集まり。フェンスは開きと同じ記号で、開き以上の
+// headings は本文のコードフェンスの外にある `## <名前>` の名前の集まり。フェンスは開きと同じ記号で、開き以上の
 // 長さの、記号だけの行で閉じる。閉じなければ末尾まで続く。
-func Headings(body string) map[string]bool {
+func headings(body string) map[string]bool {
 	found := map[string]bool{}
 	var open *fence
 	for _, line := range ospath.Splitlines(body) {
@@ -93,7 +101,7 @@ func Problems(t *ticket.Ticket, revision bool) []rules.Problem {
 	}
 	for _, part := range []struct{ place, text string }{{"rationale", t.Rationale}, {"本文", t.Body}} {
 		var left []string
-		for _, mark := range Placeholders {
+		for _, mark := range placeholders {
 			if strings.Contains(part.text, mark) {
 				left = append(left, "「"+mark+"」")
 			}
@@ -108,9 +116,9 @@ func Problems(t *ticket.Ticket, revision bool) []rules.Problem {
 	if revision || t.IsChild() {
 		return out
 	}
-	present := Headings(t.Body)
+	present := headings(t.Body)
 	var missing []string
-	for _, name := range ParentHeadings {
+	for _, name := range parentHeadings {
 		if !present[name] {
 			missing = append(missing, "`## "+name+"`")
 		}

@@ -12,15 +12,15 @@ import (
 
 // SubjectField はツールと、そのツールでルールを当てる tool_input の欄。
 type SubjectField struct {
-	Tool  string
+	tool  string
 	Field string
 }
 
-// SubjectFields は、ツールごとにルールを当てる欄。ここに無いツールは対象を持たず、判定に届かないまま通る。
+// subjectFields は、ツールごとにルールを当てる欄。ここに無いツールは対象を持たず、判定に届かないまま通る。
 // 名前は Claude Code の権限ルール `ToolName(指定子)` から括弧を除いたもの。並びは画面の候補の順。
 // 対象を差し込む側（試験と lint）もこの表を読む。欄の名前を SubjectOf の中だけに持つと、ツールを足したときに
 // そちらが気づかないうちに食い違うため。
-var SubjectFields = []SubjectField{
+var subjectFields = []SubjectField{
 	{config.ToolBash, "command"},
 	{config.ToolPowerShell, "command"},
 	{config.ToolRead, "file_path"},
@@ -36,13 +36,16 @@ var SubjectFields = []SubjectField{
 	{config.ToolWebFetch, "url"},
 }
 
+// SubjectFields は subjectFields の写しを返す（呼び手が書き換えても元は変わらない）。
+func SubjectFields() []SubjectField { return slices.Clone(subjectFields) }
+
 // agentPlaceholder は起動の見出しも依頼文も無いサブエージェントの起動の対象。
 const agentPlaceholder = "(agent)"
 
 // SubjectFieldOf はツールのルールを当てる欄。無ければ空。
 func SubjectFieldOf(tool string) string {
-	for _, f := range SubjectFields {
-		if f.Tool == tool {
+	for _, f := range subjectFields {
+		if f.tool == tool {
 			return f.Field
 		}
 	}
@@ -56,7 +59,7 @@ func SubjectOf(in hookio.Input) string {
 	if field == "" {
 		return ""
 	}
-	if slices.Contains(config.AgentTools, tool) {
+	if slices.Contains(config.AgentTools(), tool) {
 		// 起動には対象の文字列が無い。レビューが済むまで止める対象なので、見出しを対象にする。
 		for _, v := range []string{in.Field(field), in.Field("prompt")} {
 			if v != "" {
@@ -69,10 +72,10 @@ func SubjectOf(in hookio.Input) string {
 	if tool == config.ToolNotebookEdit && value == "" {
 		value = in.Field("file_path")
 	}
-	if slices.Contains(config.SearchTools, tool) && value == "" {
+	if slices.Contains(config.SearchTools(), tool) && value == "" {
 		value = "."
 	}
-	if slices.Contains(config.PathTools, tool) {
+	if slices.Contains(config.PathTools(), tool) {
 		return fsio.FullPath(value, in.Cwd)
 	}
 	return value
@@ -99,7 +102,7 @@ func UnreadWriteTarget(in hookio.Input) bool {
 	if SubjectOf(in) != "" {
 		return false
 	}
-	if slices.Contains(config.WriteTools, in.ToolName) {
+	if slices.Contains(config.WriteTools(), in.ToolName) {
 		return true
 	}
 	if SubjectFieldOf(in.ToolName) != "" {

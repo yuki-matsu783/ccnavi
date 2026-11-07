@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"ccnavi/internal/infra/env"
@@ -11,8 +12,11 @@ import (
 	"ccnavi/internal/infra/pyfmt"
 )
 
-// Systems は組み立ての語として読めるディレクトリ名の OS の側。
-var Systems = []string{"darwin", "linux", "windows"}
+// systems は組み立ての語として読めるディレクトリ名の OS の側。
+var systems = []string{"darwin", "linux", "windows"}
+
+// Systems は systems の写しを返す（呼び手が書き換えても元は変わらない）。
+func Systems() []string { return slices.Clone(systems) }
 
 // executableNames は実行ファイルの名前。Windows の組み立てだけが `.exe` を付ける。
 var executableNames = []string{"ccnavi", "ccnavi.exe"}

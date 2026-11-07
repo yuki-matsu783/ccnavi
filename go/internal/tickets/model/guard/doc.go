@@ -3,6 +3,6 @@
 //
 // Python からの対応: ticket_guard を移した。guard_rules → GuardRules、approved_write_rule → ApprovedWriteRule、
 // gate_rules → GateRules、raw_git_rule → RawGitRule、propose_notice → ProposeNotice、state_dir_regex →
-// StateDirRegex、*_RULE_ID → *RuleID、RAW_GIT_REGEX → RawGitRegex。Python は式を re.compile で直に組み、失敗は
+// stateDirRegex、*_RULE_ID → *RuleID、RAW_GIT_REGEX → rawGitRegex。Python は式を re.compile で直に組み、失敗は
 // 例外で上がっていた。ここは error で返す。
 package guard

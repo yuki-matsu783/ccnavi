@@ -12,11 +12,11 @@
 // Split・Label・OthersNote・NotWork・Ask が持つ。
 //
 // Python からの対応: tickets/sync の configsync・skillsync・mirrorsync・promptsync・mirror_gap をまとめた。
-// configsync.Change → Change（content が None → Remove、before が None → !Existed）、configsync.plan・apply →
+// configsync.Change → Change（content が None → remove、before が None → !existed）、configsync.plan・apply →
 // 私的な commonPlan・apply、skillsync.plan・apply → 私的な skillPlan・apply（2 つの差分は updates・removals・
 // scan を共有する）、skillsync.installed → Installed、mirrorsync.prepare・apply → Prepare・Apply、action_of・
-// is_skill → Change.Action・Change.IsSkill、expect_of → Plan.Expect・Project.Expect、plan_json・applied_json →
-// PlanJSON・AppliedJSON、STALE・JSON_VERSION・STATE_*・ACTION_* → Stale・JSONVersion・State*・Action*、
-// promptsync.sync → Sync、SIGNATURE_PREFIX → SignaturePrefix、mirror_gap.split・label・others_note・NOT_WORK・ASK →
+// is_skill → Change.Action・Change.IsSkill、expect_of → Plan.Expect・Project.expect、plan_json・applied_json →
+// PlanJSON・AppliedJSON、STALE・JSON_VERSION・STATE_*・ACTION_* → stale・JSONVersion・State*・Action*、
+// promptsync.sync → Sync、SIGNATURE_PREFIX → signaturePrefix、mirror_gap.split・label・others_note・NOT_WORK・ASK →
 // Split・Label・OthersNote・NotWork・Ask。呼び手の無い mirrorsync.relative と skillsync.describe（Sync の行に寄せた）は移さない。
 package mirror

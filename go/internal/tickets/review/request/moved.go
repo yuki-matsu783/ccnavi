@@ -12,22 +12,22 @@ import (
 	"ccnavi/internal/tickets/sync/mirror"
 )
 
-// MovedKind は動いたと数えた理由の種類。止めたあとの説明（MovedExplanation）の出し分けにだけ使い、判定には
+// movedKind は動いたと数えた理由の種類。止めたあとの説明（MovedExplanation）の出し分けにだけ使い、判定には
 // 使わない。
-type MovedKind string
+type movedKind string
 
 const (
-	// KindMoved は依頼時の HEAD と今の HEAD が違う。
-	KindMoved MovedKind = "moved"
-	// KindMirror はプロジェクトの親で、レビューの対象を動かしたのがミラー側だけ。
-	KindMirror MovedKind = "mirror"
+	// kindMoved は依頼時の HEAD と今の HEAD が違う。
+	kindMoved movedKind = "moved"
+	// kindMirror はプロジェクトの親で、レビューの対象を動かしたのがミラー側だけ。
+	kindMirror movedKind = "mirror"
 )
 
-// Moved は依頼の後に動いたかの答え。Text が空なら動いていない（判定）。Kind が空なら説明を足さない
+// Moved は依頼の後に動いたかの答え。Text が空なら動いていない（判定）。kind が空なら説明を足さない
 // （依頼時の HEAD の記録が無い・HEAD を読めない・push されていないだけのときは、判定の文で足りる）。
 type Moved struct {
 	Text string
-	Kind MovedKind
+	kind movedKind
 }
 
 const (
@@ -50,7 +50,7 @@ func IsSHA(value string) bool {
 	return shaForm.MatchString(value)
 }
 
-// MovedDetail は、依頼の後にユーザが見るものが動いたかを返す。手元の confirm と Chrome のレビュー済みが、この関数で同じように決める。head は親のブランチの今の先頭である。changed は、依頼時の先頭から head までに変わったパス（置き場で絞る前）である。読めなかった場合（差分を取れない、ホストの一覧が打ち切られた、依頼時のコミットが祖先でない）は listed が偽になり、動いたと数える。project はプロジェクトの親のときに真になる。その場合だけ、ミラー側が動いたもの（KindMirror）を見る。ワークスペース自身の親では、共通レイヤーが本体なので、ずれとは言わない。
+// MovedDetail は、依頼の後にユーザが見るものが動いたかを返す。手元の confirm と Chrome のレビュー済みが、この関数で同じように決める。head は親のブランチの今の先頭である。changed は、依頼時の先頭から head までに変わったパス（置き場で絞る前）である。読めなかった場合（差分を取れない、ホストの一覧が打ち切られた、依頼時のコミットが祖先でない）は listed が偽になり、動いたと数える。project はプロジェクトの親のときに真になる。その場合だけ、ミラー側が動いたもの（kindMirror）を見る。ワークスペース自身の親では、共通レイヤーが本体なので、ずれとは言わない。
 //
 // ccnavi 自身の置き場（承認済みチケットと提案）だけを変えたコミットは、動いたと数えない。依頼のマーカーはそこに置かれ、親のブランチにコミットされる。数えると、依頼の直後に必ず動いたことになってしまうからである。
 func MovedDetail(conf *config.Settings, requested *pyjson.Object, head string, changed []string, listed, project bool) Moved {
@@ -64,16 +64,16 @@ func MovedDetail(conf *config.Settings, requested *pyjson.Object, head string, c
 	}
 	moved := fmt.Sprintf(msgHeadMoved, pyfmt.Head(recorded, git.ShortSHA), pyfmt.Head(head, git.ShortSHA))
 	if !IsSHA(recorded) || !listed {
-		return Moved{moved, KindMoved}
+		return Moved{moved, kindMoved}
 	}
 	seen := seenPaths(conf, changed)
 	if len(seen) == 0 {
 		return Moved{}
 	}
 	if _, others := mirror.Split(conf, seen); project && len(others) == 0 {
-		return Moved{moved, KindMirror}
+		return Moved{moved, kindMirror}
 	}
-	return Moved{moved, KindMoved}
+	return Moved{moved, kindMoved}
 }
 
 // seenPaths はユーザが見るもの（ccnavi 自身の置き場の外）のパス。git の -z の表記をそのまま見る。
@@ -112,11 +112,11 @@ func MovedInTree(conf *config.Settings, treeRoot string, requested *pyjson.Objec
 // MovedExplanation は依頼の後に動いて止めたときの説明（標準エラーの行）。判定は変えない。何が変わったかは
 // 断定せず、確かめてもらって依頼し直すことだけを言う。ミラー側だけが動いたときは直し方が違うので 1 文足す。
 func MovedExplanation(m Moved) []string {
-	if m.Text == "" || m.Kind == "" {
+	if m.Text == "" || m.kind == "" {
 		return nil
 	}
 	lines := []string{msgExplainMoved}
-	if m.Kind == KindMirror {
+	if m.kind == kindMirror {
 		lines = append(lines, msgExplainMirror)
 	}
 	return lines

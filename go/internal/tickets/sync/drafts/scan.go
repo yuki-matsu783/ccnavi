@@ -25,14 +25,14 @@ func treeLabel(name string) string {
 	return name
 }
 
-// Draft は下書きの置き場の <名前>.yml 1 本。Layer は取り込み先のレイヤー（検査はこのフェーズ定義で行う）、
-// Target は取り込み先（ツリーからの相対）、Also は同じ中身の下書きを持つほかのツリーの名前（ルートは ""）。
+// Draft は下書きの置き場の <名前>.yml 1 本。layer は取り込み先のレイヤー（検査はこのフェーズ定義で行う）、
+// target は取り込み先（ツリーからの相対）、also は同じ中身の下書きを持つほかのツリーの名前（ルートは ""）。
 type Draft struct {
-	Tree   tree.Tree
-	Layer  string
+	tree   tree.Tree
+	layer  string
 	Entry  *templates.Entry
-	Target string
-	Also   []string
+	target string
+	also   []string
 }
 
 // importable は読めて error が無いか（取り込み先の定義での検査は別）。
@@ -50,14 +50,14 @@ func (d *Draft) importable() bool {
 
 // Place は置き場そのものの苦情（置き場の相対パスと苦情）。
 type Place struct {
-	Rel     string
-	Problem rules.Problem
+	rel     string
+	problem rules.Problem
 }
 
 // Scanned は全ツリーの下書き。
 type Scanned struct {
 	Drafts []*Draft
-	Places []Place
+	places []Place
 }
 
 func known(conf *config.Settings, root string) []string {
@@ -115,7 +115,7 @@ func Scan(conf *config.Settings, root string, catalog *flow.Catalog) *Scanned {
 		found, _, refused := handoff.Walk(where.Root)
 		if refused != "" && !said[refused] {
 			said[refused] = true
-			out.Places = append(out.Places, Place{place.Handoff,
+			out.places = append(out.places, Place{place.Handoff,
 				rules.Problem{Severity: rules.Error, Detail: place.Handoff + ": " + refused}})
 		}
 		for _, f := range found {
@@ -129,10 +129,10 @@ func Scan(conf *config.Settings, root string, catalog *flow.Catalog) *Scanned {
 			}
 			key := seenKey{entry.Name, entry.SHA}
 			if first := seen[key]; entry.SHA != "" && first != nil {
-				first.Also = append(first.Also, where.Name)
+				first.also = append(first.also, where.Name)
 				continue
 			}
-			d := &Draft{Tree: where, Layer: layer, Entry: entry, Target: f.Rel}
+			d := &Draft{tree: where, layer: layer, Entry: entry, target: f.Rel}
 			if entry.SHA != "" {
 				seen[key] = d
 			}
@@ -147,7 +147,7 @@ func Scan(conf *config.Settings, root string, catalog *flow.Catalog) *Scanned {
 		if a.Entry.Rel != b.Entry.Rel {
 			return a.Entry.Rel < b.Entry.Rel
 		}
-		return a.Tree.Name < b.Tree.Name
+		return a.tree.Name < b.tree.Name
 	})
 	return out
 }
@@ -179,14 +179,14 @@ func DraftJSON(d *Draft, scanned *templates.Scan) *pyjson.Object {
 	for _, k := range draftKeys {
 		out.Set(k, row.Value(k))
 	}
-	also := make([]any, len(d.Also))
-	for i, a := range d.Also {
+	also := make([]any, len(d.also))
+	for i, a := range d.also {
 		also[i] = a
 	}
-	out.Set("tree", d.Tree.Name)
-	out.Set("target", d.Target)
-	out.Set("layer", d.Layer)
-	out.Set("checked_with", d.Layer)
+	out.Set("tree", d.tree.Name)
+	out.Set("target", d.target)
+	out.Set("layer", d.layer)
+	out.Set("checked_with", d.layer)
 	out.Set("importable", d.importable())
 	out.Set("exists_in", layersWith(scanned, d.Entry.Name))
 	out.Set("also_in", also)
@@ -203,12 +203,12 @@ func LintProblems(found *Scanned) []rules.Problem {
 		}
 		return s
 	}
-	for _, pl := range found.Places {
-		detail := pl.Problem.Detail
+	for _, pl := range found.places {
+		detail := pl.problem.Detail
 		if detail == "" {
-			detail = pl.Rel
+			detail = pl.rel
 		}
-		out = append(out, rules.Problem{Severity: lower(pl.Problem.Severity), Detail: "下書き " + detail})
+		out = append(out, rules.Problem{Severity: lower(pl.problem.Severity), Detail: "下書き " + detail})
 	}
 	for _, d := range found.Drafts {
 		for _, p := range d.Entry.Problems() {

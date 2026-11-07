@@ -54,9 +54,9 @@ var branchKeys = map[string]string{
 // spawn は入れ子のサブエージェントを起こすノード。
 var spawn = []string{kindSubAgent, kindSubAgentFlow}
 
-// ShapeProblem は読めた中身の形の誤り（最初の 1 つ）。無ければ空。見るのは手順として並べるのに要る形だけ。
+// shapeProblem は読めた中身の形の誤り（最初の 1 つ）。無ければ空。見るのは手順として並べるのに要る形だけ。
 // id が無い・重なるノードは並べるときに外れるので、気づかないうちに手順が欠けないよう読まない扱いにする。
-func ShapeProblem(data any) string {
+func shapeProblem(data any) string {
 	top, ok := data.(*yaml.Map)
 	if !ok {
 		return "最上位がマッピングではない"
@@ -473,7 +473,7 @@ func flowNodes(raw any) []*yaml.Map {
 // NameProblems は subAgent の種類（builtInType）と skill の名前が候補に無いもの（1 件 1 行）。空の欄
 // （書きかけ）と `:` を含むスキル（プラグインのもの）は言わない。大文字小文字だけが違えば正しい表記をつける。
 func NameProblems(raw any, cat Catalog) []string {
-	agents, skills := cat.Agents.names(), cat.Skills.names()
+	agents, skills := cat.agents.names(), cat.skills.names()
 	var out []string
 	for _, node := range flowNodes(raw) {
 		info := asMap(node.Get("data"))

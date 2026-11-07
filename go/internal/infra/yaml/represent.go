@@ -12,8 +12,8 @@ import (
 	"ccnavi/internal/infra/pyfmt"
 )
 
-// ErrUnrepresentable は書き出せない型の値（PyYAML の RepresenterError）。
-var ErrUnrepresentable = errors.New("cannot represent an object")
+// errUnrepresentable は書き出せない型の値（PyYAML の RepresenterError）。
+var errUnrepresentable = errors.New("cannot represent an object")
 
 // DumpOptions は yaml.safe_dump の引数のうち、ccnavi が使う組み合わせ。allow_unicode=True・sort_keys=False は
 // いつも付けたものとして書く（呼び手のすべてがそう呼ぶ）。
@@ -22,8 +22,8 @@ type DumpOptions struct {
 	Width int
 	// Flow は default_flow_style=True。偽なら列とマップをブロックで書く。
 	Flow bool
-	// Quoted は default_style='"'。文字列だけでなく、すべてのスカラーを二重引用符で書く。
-	Quoted bool
+	// quoted は default_style='"'。文字列だけでなく、すべてのスカラーを二重引用符で書く。
+	quoted bool
 	// Literal が真を返す文字列（キーも）は literal block（|）を求める。書けなければ PyYAML が引用符を選ぶ。
 	Literal func(string) bool
 	// NoAliases は ignore_aliases を常に真にする（同じ値が 2 か所にあっても &id001 を付けない）。
@@ -46,7 +46,7 @@ func Dump(data any, opts DumpOptions) (string, error) {
 // Python の yaml.safe_dump(value, allow_unicode=True, default_style='"').strip()。80 字を超えると折り、
 // 続きの行は 2 字下げる（折れた表記は複数行になる）。
 func Quoted(value string) string {
-	out, _ := Dump(value, DumpOptions{Quoted: true})
+	out, _ := Dump(value, DumpOptions{quoted: true})
 	return strings.TrimSpace(out)
 }
 
@@ -178,11 +178,11 @@ func (r *representer) represent(data any) (*dnode, error) {
 		}
 		return n, nil
 	}
-	return nil, fmt.Errorf("%w: %T", ErrUnrepresentable, data)
+	return nil, fmt.Errorf("%w: %T", errUnrepresentable, data)
 }
 
 func (r *representer) scalar(tag, value string, style scalarStyle) *dnode {
-	if style == styleNone && r.opts.Quoted {
+	if style == styleNone && r.opts.quoted {
 		style = styleDouble
 	}
 	return &dnode{kind: scalarNode, tag: tag, value: value, style: style}

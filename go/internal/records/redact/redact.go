@@ -255,15 +255,15 @@ func Redact(text string) string {
 	last := 0
 	for _, s := range found {
 		b.WriteString(text[last:s.start])
-		b.WriteString(Mask(text[s.start:s.end]))
+		b.WriteString(mask(text[s.start:s.end]))
 		last = s.end
 	}
 	b.WriteString(text[last:])
 	return b.String()
 }
 
-// Mask は値 1 つを伏せる。短ければ全部、長ければ頭と尻を残す。
-func Mask(value string) string {
+// mask は値 1 つを伏せる。短ければ全部、長ければ頭と尻を残す。
+func mask(value string) string {
 	runes := []rune(value)
 	if len(runes) < short {
 		return Stars

@@ -6,24 +6,28 @@ import (
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
+	"slices"
 )
 
 // HookMark は登録した agent hook の prompt の先頭行（scripts/ccnavi-stop-review.sh と同じ）。
 const HookMark = "[ccnavi-stop-review]"
 
-// JudgeAllowRules は判定役の Bash を許す権限。`dontAsk` で動く agent 型 hook の中では、許可が無いと実行できない。
+// judgeAllowRules は判定役の Bash を許す権限。`dontAsk` で動く agent 型 hook の中では、許可が無いと実行できない。
 // scripts/ccnavi-stop-review.sh の ALLOW_RULES と同じ。
-var JudgeAllowRules = []string{
+var judgeAllowRules = []string{
 	"Bash(" + config.Launcher + " stop-review material:*)",
 	"Bash(" + config.Launcher + " stop-review record:*)",
 }
+
+// JudgeAllowRules は judgeAllowRules の写しを返す（呼び手が書き換えても元は変わらない）。
+func JudgeAllowRules() []string { return slices.Clone(judgeAllowRules) }
 
 // Final は試行の最終分類。
 type Final string
 
 const (
-	FinalOK         Final = "ok"           // 終了可
-	FinalFlawed     Final = "flawed"       // 不備検出
+	finalOK         Final = "ok"           // 終了可
+	finalFlawed     Final = "flawed"       // 不備検出
 	FinalUnchecked  Final = "unchecked"    // 未検査
 	FinalOutOfScope Final = "out_of_scope" // 対象外
 	FinalSkipped    Final = "skipped"      // 検査省略
@@ -33,7 +37,7 @@ const (
 type Reason string
 
 const (
-	ReasonCandidate          Reason = "candidate"
+	reasonCandidate          Reason = "candidate"
 	ReasonNotMainAgent       Reason = "not_main_agent"
 	ReasonStopHookActive     Reason = "stop_hook_active"
 	ReasonDisabled           Reason = "disabled"
@@ -62,7 +66,7 @@ type Submitted struct {
 	InProgress bool
 }
 
-// Plan は同じ Stop の判定計画。hook が組み、WritePlan が Key と AttemptID を足して書く。
+// Plan は同じ Stop の判定計画。hook が組み、WritePlan が key と attemptID を足して書く。
 type Plan struct {
 	IsCandidate     bool
 	Reason          Reason
@@ -79,7 +83,7 @@ type Plan struct {
 	Original        string // 再判定なら元の試行 ID
 	ExistingNudge   bool
 
-	Key       string
+	key       string
 	AttemptID string
 }
 
@@ -101,12 +105,12 @@ type CandidateInput struct {
 	MainAgent          bool
 	StopHookActive     bool
 	AIContinuation     bool
-	AlreadyRejudged    bool
+	alreadyRejudged    bool
 	Effective          config.Mode
 	TicketsEnabled     bool
 	Registered         bool
 	ExistingNudge      bool
-	TargetUnresolvable bool
+	targetUnresolvable bool
 	ProposalActivity   bool
 	ApprovedInProgress bool
 }
@@ -116,22 +120,22 @@ func Candidate(in CandidateInput) (bool, Reason) {
 	switch {
 	case !in.MainAgent:
 		return false, ReasonNotMainAgent
-	case in.StopHookActive && !(in.AIContinuation && !in.AlreadyRejudged):
+	case in.StopHookActive && !(in.AIContinuation && !in.alreadyRejudged):
 		return false, ReasonStopHookActive
 	case in.Effective == config.Disable || !in.TicketsEnabled || !in.Registered:
 		return false, ReasonDisabled
 	case in.ExistingNudge:
 		return false, ReasonExistingNudge
-	case in.TargetUnresolvable:
+	case in.targetUnresolvable:
 		return false, ReasonTargetUnresolvable
 	case in.ProposalActivity || !in.ApprovedInProgress:
-		return true, ReasonCandidate
+		return true, reasonCandidate
 	}
 	return false, ReasonApprovedInProgress
 }
 
-// AttemptID は共有キーから試行 ID を作る。再判定は別の試行にする。
-func AttemptID(key string, rejudge bool) string {
+// attemptID は共有キーから試行 ID を作る。再判定は別の試行にする。
+func attemptID(key string, rejudge bool) string {
 	if rejudge {
 		return shortKey(key) + "-r"
 	}
@@ -178,7 +182,7 @@ func (p Plan) object() *pyjson.Object {
 		"rejudge", p.Rejudge,
 		"original", p.Original,
 		"existing_nudge", p.ExistingNudge,
-		"key", p.Key,
+		"key", p.key,
 		"attempt_id", p.AttemptID,
 	)
 }
@@ -209,7 +213,7 @@ func parsePlan(obj *pyjson.Object) Plan {
 		Rejudge:         pyfmt.Truthy(obj.Value("rejudge")),
 		Original:        obj.String("original"),
 		ExistingNudge:   pyfmt.Truthy(obj.Value("existing_nudge")),
-		Key:             obj.String("key"),
+		key:             obj.String("key"),
 		AttemptID:       obj.String("attempt_id"),
 	}
 	items, _ := obj.Value("proposals").([]any)

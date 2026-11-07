@@ -13,7 +13,7 @@ import (
 // 組み込みの Bash の deny は go/internal/policy/builtin の TestLongInputsReturnQuickly が見る。
 func TestRawGitRegexReturnsQuickly(t *testing.T) {
 	const limit = 500 * time.Millisecond
-	regex := pyre.MustCompile(RawGitRegex, pyre.IgnoreCase)
+	regex := pyre.MustCompile(rawGitRegex, pyre.IgnoreCase)
 	for _, text := range []string{
 		strings.Repeat("rm ", 8000), strings.Repeat("git -c ", 8000), strings.Repeat("rm -r a ", 3200),
 		strings.Repeat("git -C ", 8000), strings.Repeat("rm -f a ", 3200), strings.Repeat("git reset ", 2400),

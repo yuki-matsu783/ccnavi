@@ -24,21 +24,21 @@ const noBranch = "（ブランチの外）"
 type ChildState string
 
 const (
-	ChildMerged   ChildState = "合流済み"
-	ChildUnmerged ChildState = "未合流"
-	ChildDirty    ChildState = "未コミットあり"
+	childMerged   ChildState = "合流済み"
+	childUnmerged ChildState = "未合流"
+	childDirty    ChildState = "未コミットあり"
 )
 
-// Row はこのPCに親のワークツリーがある、まだ閉じていない親 1 本。MR は親チケットの `mr:`（無ければ空）。
-// Unsent は origin に送っていないものの言い方（無ければ空）。
+// Row はこのPCに親のワークツリーがある、まだ閉じていない親 1 本。mr は親チケットの `mr:`（無ければ空）。
+// unsent は origin に送っていないものの言い方（無ければ空）。
 type Row struct {
 	Ident     string
-	Path      string
-	Branch    string
-	MR        string
-	NextChild string
-	Unsent    string
-	Project   string
+	path      string
+	branch    string
+	mr        string
+	nextChild string
+	unsent    string
+	project   string
 }
 
 // Collect はこのPCに親のワークツリーがある、まだ閉じていない親の一覧。識別子の順。先行の引き方は承認と lint と
@@ -76,12 +76,12 @@ func Collect(conf *config.Settings, root string, doing, review, closed, proposal
 		}
 		rows = append(rows, Row{
 			Ident:     ident,
-			Path:      path,
-			Branch:    branch,
-			MR:        mr,
-			NextChild: nextChild(ident, doing, pool),
-			Unsent:    unsentOf(path, branch),
-			Project:   parent.Project,
+			path:      path,
+			branch:    branch,
+			mr:        mr,
+			nextChild: nextChild(ident, doing, pool),
+			unsent:    unsentOf(path, branch),
+			project:   parent.Project,
 		})
 	}
 	return rows
@@ -167,16 +167,16 @@ func RemoteInfo(path string) *pyjson.Object {
 // Line は親 1 本を 1 行で言う。
 func Line(row Row) string {
 	mr, next, unsent := "なし", "なし", "なし"
-	if row.MR != "" {
-		mr = "!" + row.MR
+	if row.mr != "" {
+		mr = "!" + row.mr
 	}
-	if row.NextChild != "" {
-		next = row.NextChild
+	if row.nextChild != "" {
+		next = row.nextChild
 	}
-	if row.Unsent != "" {
-		unsent = row.Unsent + "あり"
+	if row.unsent != "" {
+		unsent = row.unsent + "あり"
 	}
-	return "- 親 " + row.Ident + "  ブランチ " + cmp.Or(row.Branch, noBranch) + "  MR " + mr +
+	return "- 親 " + row.Ident + "  ブランチ " + cmp.Or(row.branch, noBranch) + "  MR " + mr +
 		"  次の子 " + next + "  未送信 " + unsent
 }
 
@@ -205,7 +205,7 @@ func ChildStates(root string, row Row, doing, review []*ticket.Ticket) []Child {
 		if !ok {
 			branch = t.ID
 		}
-		out = append(out, Child{t.ID, childState(path, branch, row.Path)})
+		out = append(out, Child{t.ID, childState(path, branch, row.path)})
 	}
 	return out
 }
@@ -215,14 +215,14 @@ func ChildStates(root string, row Row, doing, review []*ticket.Ticket) []Child {
 func childState(path, branch, parentPath string) ChildState {
 	dirty := git.Status(path, git.Porcelain{}, git.Options{})
 	if dirty.OK() && ospath.Strip(dirty.Out) != "" {
-		return ChildDirty
+		return childDirty
 	}
 	merged := git.IsAncestor(parentPath, "refs/heads/"+branch, "HEAD",
 		git.Options{Timeout: git.DefaultTimeout})
 	if merged.OK() {
-		return ChildMerged
+		return childMerged
 	}
-	return ChildUnmerged
+	return childUnmerged
 }
 
 // Parents はセッション開始で渡す、このPCで作業中の親の一覧。無ければ空。

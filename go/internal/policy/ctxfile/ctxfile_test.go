@@ -41,10 +41,10 @@ func TestBodyIsCutAtTheLimit(t *testing.T) {
 	write(t, filepath.Join(root, "docs", "long.md"), strings.Repeat("あ", MaxChars+50))
 	write(t, filepath.Join(root, "docs", "edge.md"), strings.Repeat("い", MaxChars))
 	var stderr bytes.Buffer
-	if got := Body(&stderr, []string{root}, "docs/guide.md"); got != "# 決まり\n\nテストは tests/ に置く。" {
+	if got := body(&stderr, []string{root}, "docs/guide.md"); got != "# 決まり\n\nテストは tests/ に置く。" {
 		t.Errorf("%q", got)
 	}
-	cut := Body(&stderr, []string{root}, "docs/long.md")
+	cut := body(&stderr, []string{root}, "docs/long.md")
 	if !strings.HasPrefix(cut, strings.Repeat("あ", MaxChars)+"\n\n(ccnavi: docs/long.md は") ||
 		strings.Contains(cut, strings.Repeat("あ", MaxChars+1)) || !strings.Contains(cut, "続きはこのファイルを読んで") {
 		t.Errorf("%q", cut[len(cut)-200:])
@@ -52,13 +52,13 @@ func TestBodyIsCutAtTheLimit(t *testing.T) {
 	if OverLimit(filepath.Join(root, "docs", "edge.md")) || !OverLimit(filepath.Join(root, "docs", "long.md")) {
 		t.Error("上限の境目を取り違えた")
 	}
-	if Body(&stderr, []string{root}, "docs/none.md") != "" || Body(&stderr, []string{root}, "../x") != "" {
+	if body(&stderr, []string{root}, "docs/none.md") != "" || body(&stderr, []string{root}, "../x") != "" {
 		t.Error("無いファイル・外のファイルを読んだ")
 	}
 	// 近いルートが先。
 	near := t.TempDir()
 	write(t, filepath.Join(near, "docs", "guide.md"), "近い")
-	if got := Body(&stderr, []string{near, root}, "docs/guide.md"); got != "近い" {
+	if got := body(&stderr, []string{near, root}, "docs/guide.md"); got != "近い" {
 		t.Errorf("%q", got)
 	}
 }
@@ -87,7 +87,7 @@ func TestBodyOfLargeFileMatchesFullRead(t *testing.T) {
 			want = strings.TrimRightFunc(string(runes[:MaxChars]), ospath.IsSpace) +
 				"\n\n(ccnavi: docs/" + name + " は 4000 文字を超えるので先頭だけを載せた。続きはこのファイルを読んでください)"
 		}
-		if got := Body(&stderr, []string{root}, "docs/"+name); got != want {
+		if got := body(&stderr, []string{root}, "docs/"+name); got != want {
 			t.Errorf("%s: Body が全部を読んだときと違う", name)
 		}
 		if OverLimit(full) != over {
@@ -220,7 +220,7 @@ func TestForget(t *testing.T) {
 	for _, p := range []string{mine, sub, other, old, leftover, foreign, stop} {
 		write(t, p, "{}")
 	}
-	past := time.Now().Add(-OnceKeep - time.Hour)
+	past := time.Now().Add(-onceKeep - time.Hour)
 	if err := os.Chtimes(old, past, past); err != nil {
 		t.Fatal(err)
 	}

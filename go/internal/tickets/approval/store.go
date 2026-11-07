@@ -3,6 +3,7 @@ package approval
 import (
 	"errors"
 	"io/fs"
+	"slices"
 	"sort"
 	"strings"
 
@@ -26,7 +27,7 @@ type Unread struct {
 //
 // requireRecord は、completed_at（空でない値）を求めるかを決める。.ccnavi/approved/ は組み込みの保護がエージェントの書き込みを止めるので、置き場だけで承認と言える。しかし wip/proposals/review/ はエージェントが書ける側にあるので、finish が書く欄を 2 つめの保護として求める。
 //
-// 計画を持つ親には、計画の after から計算した先行関係と、親に固定したフェーズ定義を入れる。形の誤りは、ここでは落とさない。BlockingProblems が止める。
+// 計画を持つ親には、計画の after から計算した先行関係と、親に固定したフェーズ定義を入れる。形の誤りは、ここでは落とさない。blockingProblems が止める。
 func LoadCopy(path string, requireRecord bool) (*ticket.Ticket, string) {
 	t, problems := ticket.Load(path)
 	if t == nil {
@@ -61,7 +62,7 @@ func loadDir(directory string, requireRecord bool) ([]*ticket.Ticket, []Unread) 
 	var found []*ticket.Ticket
 	var unread []Unread
 	for _, name := range names {
-		ident, ok := strings.CutSuffix(name, place.MdExt)
+		ident, ok := strings.CutSuffix(name, config.MdExt)
 		if !ok {
 			continue
 		}
@@ -136,9 +137,9 @@ func ScanAll(conf *config.Settings, root string, closed bool) ([]*ticket.Ticket,
 	return found, notes
 }
 
-// ReviewAll は全ツリーのレビュー待ち（提案の置き場の review/）を、重複をまとめずに集める。completed_at を
+// reviewAll は全ツリーのレビュー待ち（提案の置き場の review/）を、重複をまとめずに集める。completed_at を
 // 持たないファイルは読まない（LoadCopy の requireRecord）。
-func ReviewAll(conf *config.Settings, root string) ([]*ticket.Ticket, []string) {
+func reviewAll(conf *config.Settings, root string) ([]*ticket.Ticket, []string) {
 	var found []*ticket.Ticket
 	var notes []string
 	for _, tr := range Trees(conf, root) {
@@ -154,39 +155,39 @@ func ReviewAll(conf *config.Settings, root string) ([]*ticket.Ticket, []string) 
 
 // Raw は、全ツリーの承認済みチケットを、まとめる前のまま読んだものである（作業中・閉じた・レビュー待ち）。1 回の判定の中で Scan を続けて呼ぶ呼び手が、同じ置き場を何度も読まないために持ち回る。覚えておいたものではなく、その呼び出しの中で今しがた読んだものである。判定の途中でファイルが動く経路では、読み直す。
 type Raw struct {
-	Open        []*ticket.Ticket
-	OpenNotes   []string
-	Closed      []*ticket.Ticket
-	ClosedNotes []string
-	Review      []*ticket.Ticket
-	ReviewNotes []string
+	open        []*ticket.Ticket
+	openNotes   []string
+	closed      []*ticket.Ticket
+	closedNotes []string
+	review      []*ticket.Ticket
+	reviewNotes []string
 }
 
 // Everything は作業中・閉じた・レビュー待ちの全部（正とするツリーを決めるのに使う）。
 func (r *Raw) Everything() []*ticket.Ticket {
-	out := make([]*ticket.Ticket, 0, len(r.Open)+len(r.Closed)+len(r.Review))
-	out = append(out, r.Open...)
-	out = append(out, r.Closed...)
-	return append(out, r.Review...)
+	out := make([]*ticket.Ticket, 0, len(r.open)+len(r.closed)+len(r.review))
+	out = append(out, r.open...)
+	out = append(out, r.closed...)
+	return append(out, r.review...)
 }
 
 // ReadRaw は承認済みチケットの置き場を 1 度ずつ読む。
 func ReadRaw(conf *config.Settings, root string) *Raw {
 	r := &Raw{}
-	r.Open, r.OpenNotes = ScanAll(conf, root, false)
-	r.Closed, r.ClosedNotes = ScanAll(conf, root, true)
-	r.Review, r.ReviewNotes = ReviewAll(conf, root)
+	r.open, r.openNotes = ScanAll(conf, root, false)
+	r.closed, r.closedNotes = ScanAll(conf, root, true)
+	r.review, r.reviewNotes = reviewAll(conf, root)
 	return r
 }
 
-// Scan は、判定と承認が読む承認済みチケットを返す（closed なら閉じたもの）。正とするツリー（親のツリー）の側だけを残し、そこに無ければ外す。子のワークツリーに checkout されているのは切った時点の版なので、残すと閉じたチケットが開いたものとして復活してしまう。作業中の側には、BlockingProblems と親子のチケットの立ち位置から、信頼できない理由（Blocked）を付ける。置き場を手で動かす承認は --agree を通らないからである。raw が nil なら読む。
+// Scan は、判定と承認が読む承認済みチケットを返す（closed なら閉じたもの）。正とするツリー（親のツリー）の側だけを残し、そこに無ければ外す。子のワークツリーに checkout されているのは切った時点の版なので、残すと閉じたチケットが開いたものとして復活してしまう。作業中の側には、blockingProblems と親子のチケットの立ち位置から、信頼できない理由（Blocked）を付ける。置き場を手で動かす承認は --agree を通らないからである。raw が nil なら読む。
 func Scan(conf *config.Settings, root string, closed bool, raw *Raw) ([]*ticket.Ticket, []string) {
 	if raw == nil {
 		raw = ReadRaw(conf, root)
 	}
-	found, notes := raw.Open, raw.OpenNotes
+	found, notes := raw.open, raw.openNotes
 	if closed {
-		found, notes = raw.Closed, raw.ClosedNotes
+		found, notes = raw.closed, raw.closedNotes
 	}
 	kept := authoritative(found, raw.Everything())
 	if !closed {
@@ -201,10 +202,30 @@ func ScanReview(conf *config.Settings, root string, raw *Raw) ([]*ticket.Ticket,
 	if raw == nil {
 		raw = ReadRaw(conf, root)
 	}
-	kept := authoritative(raw.Review, raw.Everything())
+	kept := authoritative(raw.review, raw.Everything())
 	markImported(conf, root, kept)
-	return kept, append([]string(nil), raw.ReviewNotes...)
+	return kept, append([]string(nil), raw.reviewNotes...)
 }
+
+// Approved は作業中・閉じた・レビュー待ちの承認済みチケット（Scan と ScanReview の答え）。親子を引くだけの呼び手が、
+// 3 つの置き場を読む手順を繰り返さずに、1 回読んだ結果を持ち回る。
+type Approved struct {
+	Open, Closed, Review []*ticket.Ticket
+}
+
+// ScanApproved は Scan（作業中・閉じた）と ScanReview を、同じ raw から続けて求める。raw が nil なら読む。
+func ScanApproved(conf *config.Settings, root string, raw *Raw) *Approved {
+	if raw == nil {
+		raw = ReadRaw(conf, root)
+	}
+	open, _ := Scan(conf, root, false, raw)
+	closed, _ := Scan(conf, root, true, raw)
+	review, _ := ScanReview(conf, root, raw)
+	return &Approved{open, closed, review}
+}
+
+// All は作業中・閉じた・レビュー待ちの順に並べたもの。
+func (a *Approved) All() []*ticket.Ticket { return slices.Concat(a.Open, a.Closed, a.Review) }
 
 // authoritative は、正とするツリーの側だけを残す。決め方は ticket.Authority の 1 つで、承認済みの識別子の提案も同じ関数で決める。決まらなければ全部残す。ほかのツリーのコピーで代用しない。リポジトリをまたいだ衝突もまとめない。どちらかが気づかないうちに消え、--lint の「複数のリポジトリにある」も出なくなってしまうからである。
 func authoritative(found, everything []*ticket.Ticket) []*ticket.Ticket {

@@ -26,7 +26,7 @@ func Pending(treeRoot string) []string {
 			current, _ = flow.ReadBytes(target, treeRoot)
 		}
 		if raw == nil || why != "" || !same(current, raw) {
-			out = append(out, place.Handoff+"/"+f.Drel)
+			out = append(out, place.Handoff+"/"+f.drel)
 		}
 	}
 	return out

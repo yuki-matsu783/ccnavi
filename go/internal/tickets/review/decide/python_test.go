@@ -119,7 +119,7 @@ func TestTextsMatchPython(t *testing.T) {
 		for k, v := range shown.Versions {
 			versions[k] = v
 		}
-		parsed = append(parsed, []any{shown.Base, versions})
+		parsed = append(parsed, []any{shown.base, versions})
 	}
 	check("parsed", parsed, want.Parsed)
 	text, _ := pyjson.Dumps(JSON(full), pyjson.Options{RawUnicode: true})

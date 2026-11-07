@@ -1,7 +1,6 @@
 package flow
 
 import (
-	"bytes"
 	"cmp"
 	"encoding/base64"
 	"errors"
@@ -35,8 +34,6 @@ const (
 		"別名を使うと、同じ部分木を何度も辿らせて中身を膨らませられる"
 	notUTF8 = "UTF-8 として読めない"
 )
-
-var utf8BOM = []byte("\xef\xbb\xbf")
 
 // ReadBytes はフローのファイル（フローと同じ読み手で読む文書）の中身。読まないなら (nil, 理由)。
 // 読むのはふつうのファイルで名前が 1 つのものだけ（名前付きパイプは開くと応答しなくなり、ハードリンクは
@@ -106,7 +103,7 @@ func Parse(raw []byte) (*yaml.Map, string) {
 	if why != "" {
 		return nil, why
 	}
-	if why := ShapeProblem(data); why != "" {
+	if why := shapeProblem(data); why != "" {
 		return nil, why
 	}
 	return data.(*yaml.Map), ""
@@ -116,7 +113,7 @@ func Parse(raw []byte) (*yaml.Map, string) {
 // 形の検査だけ自分で行うためのもの。文字は UTF-8（先頭の BOM は 1 つ外す）で、不正なら読まない（置き換え文字で
 // 埋めて読むと、不正な部分を省いた手順が渡る）。別名は読まない（billion laughs）。空の文書は (nil, "")。
 func ParseYAML(raw []byte) (any, string) {
-	raw = bytes.TrimPrefix(raw, utf8BOM)
+	raw = yaml.TrimBOM(raw)
 	if _, err := fsio.Decode(raw, fsio.Strict); err != nil {
 		var bad *fsio.DecodeError
 		if errors.As(err, &bad) {

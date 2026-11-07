@@ -334,9 +334,12 @@ func IsSpace(r rune) bool {
 	return unicode.IsSpace(r) || (r >= 0x1c && r <= 0x1f)
 }
 
+// Fields は s.split()（引数なし）。IsSpace の並びで区切り、空の語は返さない。
+func Fields(s string) []string { return strings.FieldsFunc(s, IsSpace) }
+
 // Squeeze は " ".join(s.split())。空白の並び（改行を含む）を 1 つの空白にし、前後の空白を除く。
 func Squeeze(s string) string {
-	return strings.Join(strings.FieldsFunc(s, IsSpace), " ")
+	return strings.Join(Fields(s), " ")
 }
 
 // Strip は引数なしの str.strip()。
@@ -349,10 +352,10 @@ func Rstrip(s string) string {
 	return strings.TrimRightFunc(s, IsSpace)
 }
 
-// ErrNotUTF8 は中身が UTF-8 として読めないこと（ReadDiskText が返す）。
-var ErrNotUTF8 = errors.New("UTF-8 として読めない")
+// errNotUTF8 は中身が UTF-8 として読めないこと（ReadDiskText が返す）。
+var errNotUTF8 = errors.New("UTF-8 として読めない")
 
-// ReadDiskText は open(path, encoding="utf-8").read()。UTF-8 でなければ ErrNotUTF8
+// ReadDiskText は open(path, encoding="utf-8").read()。UTF-8 でなければ errNotUTF8
 // （Python の UnicodeDecodeError）。改行の "\r\n" と "\r" は "\n" にそろえる（テキストモード）。
 // fsio の溜める段は見ない（記録やマーカーは fsio.ReadText）。
 func ReadDiskText(path string) (string, error) {
@@ -361,7 +364,7 @@ func ReadDiskText(path string) (string, error) {
 		return "", err
 	}
 	if !utf8.Valid(data) {
-		return "", ErrNotUTF8
+		return "", errNotUTF8
 	}
 	return UnifyNewlines(string(data)), nil
 }

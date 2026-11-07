@@ -112,7 +112,7 @@ func TestMoveFile(t *testing.T) {
 	dir := t.TempDir()
 	source := testkit.Put(t, filepath.Join(dir, "doing", "i0001.md"), text)
 	target := filepath.Join(dir, "done", "i0001.md")
-	if failed := MoveFile(source, target); failed != "" {
+	if failed := moveFile(source, target); failed != "" {
 		t.Fatal(failed)
 	}
 	if data, _ := os.ReadFile(target); string(data) != text {
@@ -124,7 +124,7 @@ func TestMoveFile(t *testing.T) {
 	// 行き先に同じ名前が在れば動かさず、どちらにも触らない。
 	testkit.Put(t, source, text)
 	testkit.Put(t, target, "older\n")
-	if failed := MoveFile(source, target); !strings.Contains(failed, "移動先に既にある") {
+	if failed := moveFile(source, target); !strings.Contains(failed, "移動先に既にある") {
 		t.Errorf("断らない: %q", failed)
 	}
 	if data, _ := os.ReadFile(target); string(data) != "older\n" {
@@ -232,11 +232,11 @@ func TestApprovedTimes(t *testing.T) {
 		got := times[tk.Path]
 		switch tk.ID {
 		case "i0001-01-01":
-			if got != (ApprovedTime{when, FromCommit}) {
+			if got != (ApprovedTime{when, fromCommit}) {
 				t.Errorf("コミットの時刻: %v", got)
 			}
 		case "i0001":
-			if got != (ApprovedTime{"", Uncommitted}) || got.Label() != "未コミット（手で置いた）" {
+			if got != (ApprovedTime{"", uncommitted}) || got.Label() != "未コミット（手で置いた）" {
 				t.Errorf("未コミット: %v", got)
 			}
 		}
@@ -247,15 +247,15 @@ func TestApprovedTimes(t *testing.T) {
 }
 
 func TestPredecessorLabels(t *testing.T) {
-	if got := (Predecessor{"x", PredScattered, "a:doing, b:doing"}).Label(); got != "複数の場所にある: a:doing, b:doing" {
+	if got := (Predecessor{"x", predScattered, "a:doing, b:doing"}).Label(); got != "複数の場所にある: a:doing, b:doing" {
 		t.Error(got)
 	}
-	if !(Predecessor{State: PredReview}).Waiting() || (Predecessor{State: PredCancelled}).Waiting() || !(Predecessor{State: PredDone}).Met() {
+	if !(Predecessor{State: predReview}).Waiting() || (Predecessor{State: predCancelled}).Waiting() || !(Predecessor{State: predDone}).met() {
 		t.Error("待てば満たす状態の見分けが違う")
 	}
 	// 識別子が対応表に無い表（nil）でも引ける。
 	child := &ticket.Ticket{ID: "p-01-01", Parent: "p", Phase: 1, Predecessors: []string{"q-01-01"}}
-	if got := UnmetPredecessors(child, nil); len(got) != 1 || got[0].State != PredMissing {
+	if got := UnmetPredecessors(child, nil); len(got) != 1 || got[0].State != predMissing {
 		t.Errorf("%v", got)
 	}
 }

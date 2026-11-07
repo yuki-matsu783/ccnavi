@@ -15,8 +15,8 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// NameLimit は名前の長さの上限。名前はファイル名になるので、区切りも空白も入れない。
-const NameLimit = 64
+// nameLimit は名前の長さの上限。名前はファイル名になるので、区切りも空白も入れない。
+const nameLimit = 64
 
 // windowsReserved は Windows でファイル名にできない予約名（拡張子が付いても同じ）。新しく作る名前だけを断り、
 // 置いてあるファイルの読み込みは断らない。
@@ -31,14 +31,14 @@ var windowsReserved = func() map[string]bool {
 
 // validName は名前の形か。Python の re の `$` は末尾の改行 1 つの前でも当たるので、それも通す。
 func validName(name string) bool {
-	return ids.IsValidName(strings.TrimSuffix(name, "\n")) && len([]rune(name)) <= NameLimit
+	return ids.IsValidName(strings.TrimSuffix(name, "\n")) && len([]rune(name)) <= nameLimit
 }
 
 // NewNameProblem は新しく作るテンプレートの名前を断る理由。通れば空。読み込みと同じ形に加えて、末尾の `.` と
 // Windows の予約名を断る。管理画面（templatesmodel.ts の validNewTemplateName）と同じ決まり。
 func NewNameProblem(name string) string {
 	if !validName(name) {
-		return fmt.Sprintf("英数字で始め、英数字と `._-` だけ。%d 字まで", NameLimit)
+		return fmt.Sprintf("英数字で始め、英数字と `._-` だけ。%d 字まで", nameLimit)
 	}
 	if strings.HasSuffix(name, ".") {
 		return "末尾に `.` は付けられない（Windows でファイル名にできない）"
@@ -91,7 +91,7 @@ func Parse(raw []byte, stem string) (*Template, []rules.Problem) {
 	name = ospath.Strip(name)
 	if name != "" && !validName(name) {
 		said.error(fmt.Sprintf("`name` の `%s` は指定できない（英数字で始め、英数字と `.` `_` `-` だけ。%d 字まで）",
-			line(name), NameLimit))
+			line(name), nameLimit))
 	} else if stem != "" && name != "" && name != stem {
 		said.error(fmt.Sprintf("`name` の `%s` がファイル名（%s%s）と違う", name, stem, Suffix))
 	}
@@ -115,7 +115,7 @@ func Parse(raw []byte, stem string) (*Template, []rules.Problem) {
 	flows := readFlows(top.Get(keyFlows), said)
 	extra := &yaml.Map{}
 	for k, v := range top.All() {
-		if s, isStr := k.(string); isStr && slices.Contains(Fields, s) {
+		if s, isStr := k.(string); isStr && slices.Contains(fields, s) {
 			continue
 		}
 		extra.Put(k, v)
@@ -129,7 +129,7 @@ func Parse(raw []byte, stem string) (*Template, []rules.Problem) {
 	}
 	return &Template{
 		Name: name, Description: texts[keyDescription], When: texts[keyWhen],
-		Plan: plan, Feedback: feedback, Flows: flows, Extra: extra,
+		Plan: plan, Feedback: feedback, Flows: flows, extra: extra,
 	}, said.list
 }
 

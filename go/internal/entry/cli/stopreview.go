@@ -15,7 +15,6 @@ import (
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/records/stopreview"
 	"ccnavi/internal/tickets/approval"
-	"ccnavi/internal/tickets/model/place"
 )
 
 const (
@@ -167,7 +166,7 @@ func proposalBody(root string, p stopreview.Proposal) string {
 	var parts []string
 	if p.Route == stopreview.RouteUnsent {
 		for _, f := range p.Files {
-			if !pathcase.HasExt(f.Path, place.MdExt) || root == "" || !inside(realPath(f.Path), realPath(root)) {
+			if !pathcase.HasExt(f.Path, config.MdExt) || root == "" || !inside(realPath(f.Path), realPath(root)) {
 				continue
 			}
 			text, err := fsio.ReadDiskTextHead(f.Path, stopreview.MaterialLimit, fsio.Replace)
@@ -182,7 +181,7 @@ func proposalBody(root string, p stopreview.Proposal) string {
 		return ""
 	}
 	for _, f := range p.Files {
-		if !strings.HasSuffix(f.Path, place.MdExt) || strings.HasPrefix(f.Path, "/") ||
+		if !pathcase.HasExt(f.Path, config.MdExt) || strings.HasPrefix(f.Path, "/") ||
 			slices.Contains(strings.Split(f.Path, "/"), "..") {
 			continue
 		}

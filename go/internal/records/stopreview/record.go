@@ -60,19 +60,19 @@ const rewriteQuestion = "本当にユーザの判断が要る問いなら、修�
 
 // Return は agent hook がそのまま返す値。差し戻すときだけ OK が偽で、Reason に差し戻しの文が入る。
 type Return struct {
-	OK     bool
-	Reason string
+	ok     bool
+	reason string
 }
 
 // OKReturn は止めない返り値（`{"ok": true}`）。
-var OKReturn = Return{OK: true}
+var OKReturn = Return{ok: true}
 
 // Object は返り値の JSON。
 func (r Return) Object() *pyjson.Object {
-	if r.OK {
+	if r.ok {
 		return pyjson.NewObject("ok", true)
 	}
-	return pyjson.NewObject("ok", false, "reason", r.Reason)
+	return pyjson.NewObject("ok", false, "reason", r.reason)
 }
 
 // rejected は判定結果を受理しない理由。Python の Rejected の文か、判定役の誤出力で起きた例外の型の名前。
@@ -270,7 +270,7 @@ func classify(valid *pyjson.Object, plan Plan, insufficient bool) Final {
 	}
 	for u, result := range rows {
 		if result == fail && slices.Contains(flawCriteria, u.criterion) {
-			return FinalFlawed
+			return finalFlawed
 		}
 	}
 	for _, need := range required(plan) {
@@ -278,7 +278,7 @@ func classify(valid *pyjson.Object, plan Plan, insufficient bool) Final {
 			return FinalUnchecked
 		}
 	}
-	return FinalOK
+	return finalOK
 }
 
 // rebuke は差し戻しの文。試行 ID、基準 ID・問題箇所・修正、問いを書き直す一文を必ず含める。
@@ -309,14 +309,14 @@ func rebuke(aid string, valid *pyjson.Object) string {
 // AcceptInput は record が受け取ったものと、受理の条件。
 type AcceptInput struct {
 	Result any // 判定役が出した JSON（pyjson.Loads の値）。読めなければ nil
-	// Effective は Stop の AI 判定の実効値。空なら計画に残した値、それも無ければ dry-run。
-	Effective config.Mode
+	// effective は Stop の AI 判定の実効値。空なら計画に残した値、それも無ければ dry-run。
+	effective config.Mode
 	// MaterialVersion は今の材料の版。計画の版と違えば材料が変わったとして拒否する。
 	MaterialVersion string
 	// StillUnapproved は対象の提案がまだ承認されていないか。承認済みになっていたら材料が変わったとして拒否する。
 	// nil なら確かめない。
 	StillUnapproved func(target string) bool
-	Insufficient    bool
+	insufficient    bool
 }
 
 // Accept は record の本体。結果を検証して最終分類を確定し、agent hook の返り値を返す。
@@ -346,21 +346,21 @@ func (s Store) Accept(key string, in AcceptInput) Return {
 		}
 		return OKReturn
 	}
-	effective := in.Effective
+	effective := in.effective
 	if effective == "" {
 		effective = plan.Effective
 	}
 	if effective == "" {
 		effective = config.DryRun
 	}
-	final := classify(valid, plan, in.Insufficient || pyfmt.Truthy(attempt.Value(keyInsuff)))
+	final := classify(valid, plan, in.insufficient || pyfmt.Truthy(attempt.Value(keyInsuff)))
 	attempt.Set(keyFinal, string(final))
 	attempt.Set(keyJudge, string(judgeAI))
 	attempt.Set(keyAccepted, true)
 	attempt.Set(keyResults, valid.Value("results"))
 	attempt.Set(keyEffective, string(effective))
 	attempt.Set(keyTainted, plan.Tainted)
-	sendsBack := final == FinalFlawed && effective == config.Enable && !plan.Rejudge
+	sendsBack := final == finalFlawed && effective == config.Enable && !plan.Rejudge
 	target := done
 	if sendsBack {
 		target = sentBack
@@ -375,7 +375,7 @@ func (s Store) Accept(key string, in AcceptInput) Return {
 		return OKReturn
 	}
 	s.markSentBack(key)
-	return Return{OK: false, Reason: rebuke(attempt.String(keyAttemptID), valid)}
+	return Return{ok: false, reason: rebuke(attempt.String(keyAttemptID), valid)}
 }
 
 // check は材料の版・結果の形・承認状態を確かめる。どれかに当たれば拒否の理由を返す。

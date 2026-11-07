@@ -52,7 +52,7 @@ func Effective(reviews []Review) []Review {
 		if !deciding(r.State) {
 			continue
 		}
-		k := key{name: r.Author}
+		k := key{name: r.author}
 		if k.name == "" {
 			k.name = r.URL
 		}
@@ -63,7 +63,7 @@ func Effective(reviews []Review) []Review {
 		if !seen {
 			order = append(order, k)
 		}
-		if !seen || Epoch(r.SubmittedAt) >= Epoch(current.SubmittedAt) {
+		if !seen || Epoch(r.submittedAt) >= Epoch(current.submittedAt) {
 			latest[k] = r
 		}
 	}
@@ -119,13 +119,13 @@ func IsUnresolved(t Thread, host Kind, poster string, ledger []*pyjson.Object) b
 }
 
 // ccnaviPost は ccnavi 自身が投稿したスレッドか。GitLab の結果で、書き手が依頼を投稿したアカウントで、
-// Own が分かればそれ、分からなければ代表の note が目印で始まるとき。GitHub の依頼はスレッドにならないので、
+// own が分かればそれ、分からなければ代表の note が目印で始まるとき。GitHub の依頼はスレッドにならないので、
 // 目印で始まるスレッドもユーザが書いたものとして数える。投稿者が分からなければ見分けない
 // （誰でも目印を書けるので、本文だけで除くと未解決を隠せる）。
 func ccnaviPost(t Thread, host Kind, poster string) bool {
-	mine := host == GitLab && poster != "" && t.Author == poster
-	if t.Own != nil {
-		return mine && *t.Own
+	mine := host == GitLab && poster != "" && t.author == poster
+	if t.own != nil {
+		return mine && *t.own
 	}
 	return mine && strings.HasPrefix(t.Body, markerPrefix)
 }

@@ -41,12 +41,9 @@ type Known struct {
 func SerialNames(conf *config.Settings, root string, known *Known) ([]string, []string) {
 	var problems []string
 	if known == nil {
-		raw := approval.ReadRaw(conf, root)
-		copies, _ := approval.Scan(conf, root, false, raw)
-		closed, _ := approval.Scan(conf, root, true, raw)
-		review, _ := approval.ScanReview(conf, root, raw)
+		approved := approval.ScanApproved(conf, root, nil)
 		proposals, _ := ticket.Scan(root, conf.Tickets, conf.Projects, nil)
-		known = &Known{copies, closed, review, proposals}
+		known = &Known{approved.Open, approved.Closed, approved.Review, proposals}
 	}
 	var names []string
 	for _, group := range [][]*ticket.Ticket{known.Copies, known.Closed, known.Review, known.Proposals} {

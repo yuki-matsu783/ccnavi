@@ -198,7 +198,7 @@ func askJudges(stderr io.Writer, conf *config.Settings, root string, found *tick
 	prompt := risk.JudgePrompt(found.ID, found.Parent, diff, pending, worktree, root)
 	where := ""
 	if conf.State != "" {
-		path := ospath.Join(conf.State, judgePromptPrefix+found.ID+".md")
+		path := ospath.Join(conf.State, judgePromptPrefix+found.ID+config.MdExt)
 		if failed := fsio.WriteText(path, prompt, fsio.LF, fsio.Plain); failed != "" {
 			fmt.Fprintf(stderr, "ccnavi: 問いを書き出せない (%s)\n", failed)
 		} else {

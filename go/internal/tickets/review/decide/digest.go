@@ -2,6 +2,7 @@ package decide
 
 import (
 	"encoding/base64"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -21,12 +22,15 @@ const (
 	Issue Choice = "issue"
 )
 
-// Choices は行き先の並び（文面と JSON の順）。
-var Choices = []Choice{Keep, Fix, Issue}
+// choiceOrder は行き先の並び（文面と JSON の順）。
+var choiceOrder = []Choice{Keep, Fix, Issue}
 
-// Version はボードと取り交わす JSON の版。形を変えたら上げる（拡張の decidemodel.ts と揃える）。版 2 で
+// Choices は choiceOrder の写しを返す（呼び手が書き換えても元は変わらない）。
+func Choices() []Choice { return slices.Clone(choiceOrder) }
+
+// version はボードと取り交わす JSON の版。形を変えたら上げる（拡張の decidemodel.ts と揃える）。版 2 で
 // ダイジェストを指摘ごとの版にした（見せたあとに指摘が追加されただけなら適用できる）。
-const Version = 2
+const version = 2
 
 // digestPrefix はダイジェストの前置き。版 1 のダイジェスト（64 桁の 16 進）と見分ける。
 const digestPrefix = "v2."
@@ -46,7 +50,7 @@ type Decision struct {
 
 // Shown はダイジェストを読み戻したもの。Keys は見せた指摘のキー（ダイジェストの並び）、Versions はその版。
 type Shown struct {
-	Base     string
+	base     string
 	Keys     []string
 	Versions map[string]string
 }
@@ -112,7 +116,7 @@ func ParseDigest(text string) (Shown, bool) {
 	if !ok {
 		return Shown{}, false
 	}
-	shown := Shown{Base: base, Versions: map[string]string{}}
+	shown := Shown{base: base, Versions: map[string]string{}}
 	for _, key := range versions.Keys() {
 		v, ok := versions.Value(key).(string)
 		if !ok {
@@ -128,7 +132,7 @@ func ParseDigest(text string) (Shown, bool) {
 // 解決済みになった・本文や位置が変わったものはそのキー。見せたあとに追加された指摘は数えない。
 func ChangedSinceShown(d *Decision, shown Shown) []string {
 	var out []string
-	if shown.Base != baseDigest(d) {
+	if shown.base != baseDigest(d) {
 		out = append(out, target)
 	}
 	now := versionsOf(d.Unresolved)
@@ -151,7 +155,7 @@ func JSON(d *Decision) *pyjson.Object {
 		))
 	}
 	return pyjson.NewObject(
-		"version", Version, "parent", d.Parent.ID, "phase", d.Phase.Number,
+		"version", version, "parent", d.Parent.ID, "phase", d.Phase.Number,
 		"mr", pyjson.NewObject("number", d.Result.MR.Number, "url", d.Result.MR.URL),
 		"threads", threads, "digest", Digest(d),
 	)

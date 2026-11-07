@@ -118,7 +118,7 @@ func TestFirstLinkNamesTheLink(t *testing.T) {
 		}
 	}
 	// 途中が無ければ、その先のリンクは見ない。
-	if state, _ := Scan(f.root, []string{"nope", "dirlink"}, true); state != Missing {
+	if state, _ := Scan(f.root, []string{"nope", "dirlink"}, true); state != missing {
 		t.Errorf("Scan(無い途中) = %v, want Missing", state)
 	}
 	if state, _ := Scan(f.root, []string{"plain", "sub"}, true); state != Clean {

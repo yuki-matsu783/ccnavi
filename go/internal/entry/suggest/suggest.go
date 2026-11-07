@@ -350,7 +350,7 @@ func ruleCandidates(conf *config.Settings, root string, records []*pyjson.Object
 		return nil, len(groups), nil
 	}
 	taken := map[string]bool{}
-	for _, name := range rules.Sections {
+	for _, name := range rules.Sections() {
 		list, _ := base.Get(string(name)).([]any)
 		for _, r := range list {
 			if m, ok := r.(*yaml.Map); ok {

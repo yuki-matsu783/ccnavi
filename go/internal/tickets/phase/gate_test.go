@@ -95,13 +95,13 @@ func (k gateCase) phase() *Phase {
 			if hits, ok := k.Risk["hits"]; ok {
 				record.Set("hits", []any{pyjson.NewObject("detail", hits.([]any)[0].(map[string]any)["detail"])})
 			}
-			p.Risks[t.ID] = record
+			p.risks[t.ID] = record
 		}
 	}
 	for _, m := range k.Marks {
 		p.Marks[marks.Kind(m)] = pyjson.NewObject()
 	}
-	p.CoveredReviews = k.Covered
+	p.coveredReviews = k.Covered
 	return p
 }
 
@@ -126,7 +126,7 @@ func TestGateMatchesPython(t *testing.T) {
 	for i, k := range cases {
 		p := k.phase()
 		declared := "-"
-		if d := p.DeclaredReview(); d.Said() {
+		if d := p.declaredReview(); d.Said() {
 			declared = flag(d == ticket.Needed)
 		}
 		got := flag(p.Ended()) + declared + flag(p.ReviewRequired()) + flag(p.GateClosed()) + flag(p.ReviewWaiting()) +

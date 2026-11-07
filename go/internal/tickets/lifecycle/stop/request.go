@@ -25,10 +25,10 @@ const CodeRequestNudge = "NUDGE_TICKET_REQUEST"
 type Step string
 
 const (
-	StepFinish  Step = "finish"
-	StepMerge   Step = "merge"
-	StepLateFix Step = "late-fix"
-	StepRequest Step = "request"
+	stepFinish  Step = "finish"
+	stepMerge   Step = "merge"
+	stepLateFix Step = "late-fix"
+	stepRequest Step = "request"
 	// StepConfirm はユーザが子を手で done/ に動かした段。親が confirm を打てば確定する。
 	StepConfirm Step = "confirm"
 )
@@ -41,10 +41,10 @@ type Pending struct {
 	Parent   *ticket.Ticket
 	Number   int
 	Step     Step
-	Worktree string
-	Head     string
+	worktree string
+	head     string
 	Children []string
-	Title    string
+	title    string
 }
 
 // Key は親とフェーズ。
@@ -52,13 +52,13 @@ func (p *Pending) Key() string { return requestKey + p.Parent.ID + ":" + strconv
 
 // Digest は一手の種類・相手・HEAD。進めば（子を閉じる、合流する、コミットを足す）変わる。
 func (p *Pending) Digest() string {
-	return string(p.Step) + ":" + strings.Join(p.Children, ",") + "@" + p.Head
+	return string(p.Step) + ":" + strings.Join(p.Children, ",") + "@" + p.head
 }
 
 // finishNudged は子のツリーで finish の促し（キーは子、値は HEAD）を同じ状態で出したか。同じ状態を 2 つの
 // 促しが 1 回ずつ止めないため。
 func (p *Pending) finishNudged(data *pyjson.Object) bool {
-	return p.Step == StepFinish && len(p.Children) == 1 && seen(data, p.Children[0], p.Head)
+	return p.Step == stepFinish && len(p.Children) == 1 && seen(data, p.Children[0], p.head)
 }
 
 // PendingAtStop は cwd のツリーが結び付く親が、依頼までの道の途中にいるなら返す。子のツリーなら自分の子が
@@ -111,7 +111,7 @@ func PendingAtStop(conf *config.Settings, root, cwd string, raw *approval.Raw) *
 				number, first = n, false
 			}
 		}
-		return &Pending{parent, number, StepFinish, at.Root, head, ids, ""}
+		return &Pending{parent, number, stepFinish, at.Root, head, ids, ""}
 	}
 	if bound.IsChild() {
 		return nil
@@ -155,11 +155,11 @@ func nextStep(root, worktree string, ph *phase.Phase) (Step, []string) {
 	}
 	switch {
 	case len(unmerged) > 0:
-		return StepMerge, unmerged
+		return stepMerge, unmerged
 	case len(late) > 0:
-		return StepLateFix, late
+		return stepLateFix, late
 	}
-	return StepRequest, nil
+	return stepRequest, nil
 }
 
 // RequestNudge は Stop を止めて渡す文。段ごとの文は文面ファイルが持ち、子の finish だけは子ごとのコマンドを並べて渡す。
@@ -167,8 +167,8 @@ func RequestNudge(root string, p *Pending) string {
 	n := strconv.Itoa(p.Number)
 	ticketSh := config.ScriptCommand(root, config.TicketWrapper)
 	name := "フェーズ " + n
-	if p.Title != "" {
-		name += "（" + p.Title + "）"
+	if p.title != "" {
+		name += "（" + p.title + "）"
 	}
 	cmds := make([]string, len(p.Children))
 	for i, c := range p.Children {
@@ -176,9 +176,9 @@ func RequestNudge(root string, p *Pending) string {
 	}
 	step := p.Step
 	switch step {
-	case StepFinish, StepMerge, StepLateFix, StepRequest, StepConfirm:
+	case stepFinish, stepMerge, stepLateFix, stepRequest, StepConfirm:
 	default:
-		step = StepRequest
+		step = stepRequest
 	}
 	which := strings.ReplaceAll(string(step), "-", "_")
 	said := texts.Say(root, "NUDGE_TICKET_REQUEST", texts.Values{
@@ -187,7 +187,7 @@ func RequestNudge(root string, p *Pending) string {
 		"phase_name":     name,
 		"children":       strings.Join(p.Children, ", "),
 		"finish_cmds_q":  strings.Join(cmds, "、"),
-		"user_stop_note": UserStopNote,
+		"user_stop_note": userStopNote,
 	}, texts.Variants{"what": which, "next": which})
 	return hookio.Tagged(CodeRequestNudge, "parent: "+p.Parent.ID+", phase: "+n) + "\n" + said
 }

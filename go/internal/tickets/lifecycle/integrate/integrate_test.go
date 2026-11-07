@@ -58,7 +58,7 @@ func checkedOf(t *testing.T, path string) map[string]float64 {
 func TestAnExpiredDeadlineKeepsTheCandidates(t *testing.T) {
 	root, conf, path := candidateWorkspace(t)
 	looked := 0
-	look := func(*config.Settings, string, tree.Tree, time.Time) Probe { looked++; return Probe{State: Hit} }
+	look := func(*config.Settings, string, tree.Tree, time.Time) Probe { looked++; return Probe{state: hit} }
 	if got := directAtStop(conf, root, root, "s1", time.Now().Add(-time.Second), look); got != nil {
 		t.Fatalf("期限切れで促した: %+v", got)
 	}
@@ -76,7 +76,7 @@ func TestAnUnknownProbeKeepsTheCandidate(t *testing.T) {
 	var seen []string
 	look := func(_ *config.Settings, _ string, here tree.Tree, _ time.Time) Probe {
 		seen = append(seen, here.Name)
-		return Probe{State: Unknown}
+		return Probe{state: unknown}
 	}
 	directAtStop(conf, root, root, "s1", time.Time{}, look)
 	slices.Sort(seen)
@@ -92,10 +92,10 @@ func TestAnUnknownProbeKeepsTheCandidate(t *testing.T) {
 // 促しの文の git は、ラッパー（ccnavi-git.sh）を通るものだけ。
 func TestTheNudgeHasNoGitOutsideTheWrapper(t *testing.T) {
 	root := clock.Workspace(t)
-	d := &Direct{Name: "scratch", Worktree: root + "/.claude/worktrees/scratch", Head: "h", Dirty: true, Ahead: 1,
-		Integration: "main", IntegTree: root}
-	for _, d := range []*Direct{d, {Name: d.Name, Worktree: d.Worktree, Head: "h", Ahead: 1, Integration: "main",
-		IntegTree: root, NoRecord: true}} {
+	d := &Direct{Name: "scratch", worktree: root + "/.claude/worktrees/scratch", head: "h", dirty: true, ahead: 1,
+		integration: "main", integTree: root}
+	for _, d := range []*Direct{d, {Name: d.Name, worktree: d.worktree, head: "h", ahead: 1, integration: "main",
+		integTree: root, noRecord: true}} {
 		text := strings.ReplaceAll(IntegrateNudge(root, d), "ccnavi-git.sh", "")
 		word := func(r byte) bool {
 			return r >= 0x80 || r == '_' || r == '.' || r == '-' || ('0' <= r && r <= '9') || ('a' <= r && r <= 'z') || ('A' <= r && r <= 'Z')

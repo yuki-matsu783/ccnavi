@@ -32,7 +32,7 @@ type Gathered struct {
 	Rejected []candidates.Rejected
 	// Problems は読めなかった提案・承認済みチケットの文（標準エラーにも出したもの）。
 	Problems       []string
-	Pool           map[string]*ticket.Ticket
+	pool           map[string]*ticket.Ticket
 	NothingPending bool
 	Broken         bool
 	// Refused は絞り込みが通らなかった理由。空でなければ何も承認しない。
@@ -50,7 +50,7 @@ func (g *Gathered) Text() string {
 	if g.NothingPending {
 		return "承認待ちのチケットはありません。"
 	}
-	return Screen(g.Batch, g.Pool)
+	return screen(g.Batch, g.pool)
 }
 
 // Identifiers は承認の対象の識別子（名前順）。
@@ -99,7 +99,7 @@ func Gather(stderr io.Writer, conf *config.Settings, root string, only []string)
 		for _, line := range lines {
 			fmt.Fprintf(stderr, "ccnavi: %s\n", line)
 		}
-		return &Gathered{Problems: problems, Pool: map[string]*ticket.Ticket{}, Broken: broken,
+		return &Gathered{Problems: problems, pool: map[string]*ticket.Ticket{}, Broken: broken,
 			Refused: strings.Join(lines, "\n"), Elsewhere: elsewhere}
 	}
 	note := ""
@@ -150,7 +150,7 @@ func Gather(stderr io.Writer, conf *config.Settings, root string, only []string)
 		note = fmt.Sprintf("承認待ち %d 件のうち、指定の %d 件だけを承認の対象にする。", count, len(wanted))
 	}
 	if len(pending) == 0 && len(revisions) == 0 {
-		return &Gathered{Problems: problems, Pool: map[string]*ticket.Ticket{}, NothingPending: true, Broken: broken,
+		return &Gathered{Problems: problems, pool: map[string]*ticket.Ticket{}, NothingPending: true, Broken: broken,
 			Note: note, Elsewhere: elsewhere}
 	}
 	batch, rejected, pool := candidates.Candidates(conf, root, pending, revisions, approved)
@@ -160,7 +160,7 @@ func Gather(stderr io.Writer, conf *config.Settings, root string, only []string)
 			fmt.Fprintf(stderr, "  %s\n", p)
 		}
 	}
-	return &Gathered{Batch: batch, Rejected: rejected, Problems: problems, Pool: pool, Broken: broken, Note: note,
+	return &Gathered{Batch: batch, Rejected: rejected, Problems: problems, pool: pool, Broken: broken, Note: note,
 		Elsewhere: elsewhere, Proposals: read.Kept}
 }
 
@@ -235,10 +235,10 @@ func batchEntry(c *candidates.Candidate) *pyjson.Object {
 type VerifyReason string
 
 const (
-	VerifyOK       VerifyReason = "ok"
-	VerifyRefused  VerifyReason = "refused"
-	VerifyNothing  VerifyReason = "nothing-pending"
-	VerifyRejected VerifyReason = "rejected"
+	verifyOK       VerifyReason = "ok"
+	verifyRefused  VerifyReason = "refused"
+	verifyNothing  VerifyReason = "nothing-pending"
+	verifyRejected VerifyReason = "rejected"
 )
 
 // Verdict は --verify の答え。通るかどうかと、その理由の名前と、ターミナルに出す本文。
@@ -261,7 +261,7 @@ func VerifyVerdict(root string, g *Gathered, ticketsRel string, held *Held) Verd
 	// 読めなかったものは承認されない枝でも必ず出す（読めないのが自分の書いた 1 本である見込みがいちばん高い枝）。
 	unreadable := unreadableSection(g)
 	if g.Refused != "" {
-		return Verdict{false, VerifyRefused, head + "\n" + g.Refused + "\n" + unreadable}
+		return Verdict{false, verifyRefused, head + "\n" + g.Refused + "\n" + unreadable}
 	}
 	elsewhere := elsewhereSection(g)
 	if g.NothingPending {
@@ -273,7 +273,7 @@ func VerifyVerdict(root string, g *Gathered, ticketsRel string, held *Held) Verd
 		} else {
 			text += "（承認済みの識別子と同じ名前で置いても承認待ちにはならない）。\n"
 		}
-		return Verdict{false, VerifyNothing, head + elsewhere + text + unreadable}
+		return Verdict{false, verifyNothing, head + elsewhere + text + unreadable}
 	}
 	lines := []string{head}
 	if g.Note != "" {
@@ -329,10 +329,10 @@ func VerifyVerdict(root string, g *Gathered, ticketsRel string, held *Held) Verd
 	case held != nil:
 		reason, tail = held.Reason, "\n"+held.Text
 	case len(g.Rejected) > 0:
-		reason = VerifyRejected
+		reason = verifyRejected
 		tail = fmt.Sprintf("\n%d 件が承認の対象にならない。\n%s\n", len(g.Rejected), texts.Say(root, "NEXT_VERIFY_REJECTED", nil, nil))
 	default:
-		reason = VerifyOK
+		reason = verifyOK
 		childless := slices.ContainsFunc(g.Batch, func(c *candidates.Candidate) bool {
 			return slices.ContainsFunc(c.Complaints, func(p rules.Problem) bool { return strings.Contains(p.Detail, phases.ChildlessMark) })
 		})
@@ -344,7 +344,7 @@ func VerifyVerdict(root string, g *Gathered, ticketsRel string, held *Held) Verd
 		tail = fmt.Sprintf("\n%d 件が承認の対象に入る。\n%s\n", len(g.Batch), texts.Say(root, id, nil, nil))
 	}
 	lines = append(lines, tail)
-	return Verdict{reason == VerifyOK, reason, strings.Join(lines, "")}
+	return Verdict{reason == verifyOK, reason, strings.Join(lines, "")}
 }
 
 // elsewhereSection は正とするツリーの外に在る計画の違う版（承認待ちに入らない）を名指しする段。

@@ -24,13 +24,13 @@ const Version = "0.1.0"
 // 真偽値にして `deferred` を足した。ボード JSON の欄を必須にした。
 const Compat = 20
 
-// Schema は `--version --json` の形の版。欄を足すだけなら上げない。
-const Schema = 1
+// schema は `--version --json` の形の版。欄を足すだけなら上げない。
+const schema = 1
 
-// Unknown は組み立ての元のコミットが分からないときの表記。
-const Unknown = "unknown"
+// unknown は組み立ての元のコミットが分からないときの表記。
+const unknown = "unknown"
 
-// commit は組み立ての元のコミット。組み立てが次のように埋める（git が無いなどで分からなければ Unknown を埋める）。
+// commit は組み立ての元のコミット。組み立てが次のように埋める（git が無いなどで分からなければ unknown を埋める）。
 //
 //	go build -ldflags "-X ccnavi/internal/entry/version.commit=<sha>[-dirty]" ./cmd/ccnavi
 //
@@ -42,7 +42,7 @@ func built() bool { return commit != "" }
 
 func commitOrUnknown() string {
 	if commit == "" {
-		return Unknown
+		return unknown
 	}
 	return commit
 }
@@ -59,7 +59,7 @@ func formats() *pyjson.Object {
 
 func describe() *pyjson.Object {
 	return pyjson.NewObject(
-		"schema", Schema,
+		"schema", schema,
 		"version", Version,
 		"commit", commitOrUnknown(),
 		"built", built(),
@@ -94,7 +94,7 @@ func Report(stdout io.Writer, asJSON bool) int {
 	fmt.Fprintf(stdout, "commit: %s\n", commitOrUnknown())
 	fmt.Fprintf(stdout, "built: %s (%s)\n", yes, how)
 	fmt.Fprintf(stdout, "compat: %d\n", Compat)
-	fmt.Fprintf(stdout, "schema: %d\n", Schema)
+	fmt.Fprintf(stdout, "schema: %d\n", schema)
 	fmt.Fprintf(stdout, "formats: %s\n", strings.Join(pairs, " "))
 	return config.ExitOK
 }

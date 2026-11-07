@@ -17,13 +17,13 @@ import (
 )
 
 const (
-	// File は作業の決まりの md の名前（ccnavi ディレクトリの直下）。
-	File = "CCNAVI.md"
+	// file は作業の決まりの md の名前（ccnavi ディレクトリの直下）。
+	file = "CCNAVI.md"
 	// maxChars は 1 回の応答に載せる本文の上限（符号位置で数える）。常駐の文脈なので毎回これだけ重くなる。
 	maxChars = 6000
-	// ScriptFile は配布先が条件を足す sh（ccnavi ディレクトリの scripts/ の下）。エージェントの Write・Edit は
+	// scriptFile は配布先が条件を足す sh（ccnavi ディレクトリの scripts/ の下）。エージェントの Write・Edit は
 	// 組み込みの guard-scripts が止めるので、セッションの頭に載る文を条件の側から書き換えられない。
-	ScriptFile     = "ccnavimd.sh"
+	scriptFile     = "ccnavimd.sh"
 	functionPrefix = "ccnavi_cond_"
 	// indent は囲みの 1 段ぶんのインデント。載せるときに深さの分だけ取る。
 	indent = "  "
@@ -103,7 +103,7 @@ func Problems(text string, scripts map[string]bool) []string {
 			elses = append(elses, false)
 			if _, builtin := conditions[name]; shell.IsIdentifier(name) && !builtin && !scripts[name] {
 				found = append(found, fmt.Sprintf("%d 行目: 条件 %s は指定できない（組み込みの条件でも %s の %s でもない）",
-					number, name, ScriptFile, functionPrefix+name))
+					number, name, scriptFile, functionPrefix+name))
 			}
 		} else if elseLine.Match(line) {
 			switch {
@@ -234,11 +234,11 @@ func home(conf *config.Settings) string {
 
 // Path は作業の決まりの md の絶対パス。
 func Path(conf *config.Settings, root string) string {
-	return ospath.Join(root, home(conf), File)
+	return ospath.Join(root, home(conf), file)
 }
 
 func scriptPath(conf *config.Settings, root string) string {
-	return ospath.Join(root, home(conf), config.ScriptsDir, ScriptFile)
+	return ospath.Join(root, home(conf), config.ScriptsDir, scriptFile)
 }
 
 // ScriptNames は ccnavimd.sh に関数として書かれている条件の名前（組み込みと同じ名前は除く）。読めなければ空。
@@ -331,7 +331,7 @@ func valuesFor(conf *config.Settings, root string) map[string]string {
 // （黙ると、決まりが渡っていないことに誰も気づけない）。長すぎるときは切り、切ったことを末尾に言う。
 // docs は索引の案内を出す回か、denyIDs はワークスペースのルールの deny の id。
 func SessionText(conf *config.Settings, root string, docs bool, denyIDs map[string]bool, mode config.Mode) string {
-	shown := home(conf) + "/" + File
+	shown := home(conf) + "/" + file
 	raw, err := ospath.ReadDiskText(Path(conf, root))
 	if err != nil {
 		return hookio.Head + shown + " が無いか読めないので、作業の決まりを渡せない。導入スクリプト（ccnavi-setup.sh）で配る。"

@@ -71,13 +71,13 @@ func newPlace(t *testing.T) place {
 }
 
 func (p place) run(session string, dry bool) *Report {
-	return Run(p.root, p.log, p.state, session, Options{DryRun: dry, Now: now})
+	return Run(p.root, p.log, p.state, session, Options{DryRun: dry, now: now})
 }
 
 func TestRotate(t *testing.T) {
 	p := newPlace(t)
 	put(t, p.log, "{}\n", 0)
-	if r := p.run("", false); len(r.Rotated) != 0 || !exists(p.log) {
+	if r := p.run("", false); len(r.rotated) != 0 || !exists(p.log) {
 		t.Errorf("小さい記録を動かした: %+v", r)
 	}
 
@@ -85,11 +85,11 @@ func TestRotate(t *testing.T) {
 	body := strings.Repeat(`{"decision":"allow"}`+"\n", 60000)
 	put(t, p.log, body, 0)
 	r := p.run("", false)
-	if len(r.Rotated) != 1 || r.Rotated[0].From != "logs/decisions.jsonl" ||
-		!regexp.MustCompile(`^logs/decisions\.\d{8}-\d{6}\.jsonl$`).MatchString(r.Rotated[0].To) || exists(p.log) {
-		t.Fatalf("rotated = %+v", r.Rotated)
+	if len(r.rotated) != 1 || r.rotated[0].from != "logs/decisions.jsonl" ||
+		!regexp.MustCompile(`^logs/decisions\.\d{8}-\d{6}\.jsonl$`).MatchString(r.rotated[0].to) || exists(p.log) {
+		t.Fatalf("rotated = %+v", r.rotated)
 	}
-	if data, _ := os.ReadFile(filepath.Join(p.root, r.Rotated[0].To)); string(data) != body {
+	if data, _ := os.ReadFile(filepath.Join(p.root, r.rotated[0].to)); string(data) != body {
 		t.Error("中身が変わった")
 	}
 
@@ -97,23 +97,23 @@ func TestRotate(t *testing.T) {
 	// 先にローテートした記録を上書きしない。
 	put(t, p.log, strings.Repeat("b", len(body)), 0)
 	r = p.run("", false)
-	if len(r.Rotated) != 1 || !strings.HasSuffix(r.Rotated[0].To, "-2.jsonl") {
-		t.Errorf("rotated = %+v", r.Rotated)
+	if len(r.rotated) != 1 || !strings.HasSuffix(r.rotated[0].to, "-2.jsonl") {
+		t.Errorf("rotated = %+v", r.rotated)
 	}
-	if data, _ := os.ReadFile(filepath.Join(p.root, strings.Replace(r.Rotated[0].To, "-2.jsonl", ".jsonl", 1))); string(data) != body {
+	if data, _ := os.ReadFile(filepath.Join(p.root, strings.Replace(r.rotated[0].to, "-2.jsonl", ".jsonl", 1))); string(data) != body {
 		t.Error("先にローテートした記録を上書きした")
 	}
 
 	// dry-run は動かさずに並べる。
 	put(t, p.log, big, 0)
-	if r := p.run("", true); len(r.Rotated) != 1 || !strings.HasSuffix(r.Rotated[0].To, "-3.jsonl") || !exists(p.log) {
-		t.Errorf("dry-run = %+v", r.Rotated)
+	if r := p.run("", true); len(r.rotated) != 1 || !strings.HasSuffix(r.rotated[0].to, "-3.jsonl") || !exists(p.log) {
+		t.Errorf("dry-run = %+v", r.rotated)
 	}
 
 	// 0 はその段を止める。
 	t.Setenv(env.LogRotateMB, "0")
-	if r := p.run("", false); len(r.Rotated) != 0 {
-		t.Errorf("0 で動かした: %+v", r.Rotated)
+	if r := p.run("", false); len(r.rotated) != 0 {
+		t.Errorf("0 で動かした: %+v", r.rotated)
 	}
 }
 
@@ -158,7 +158,7 @@ func TestInfiniteRotateIsReported(t *testing.T) {
 	p := newPlace(t)
 	t.Setenv(env.LogRotateMB, "inf")
 	put(t, p.log, "{}\n", 0)
-	if r := p.run("", false); len(r.Rotated) != 0 || len(r.Problems) == 0 || !strings.Contains(r.Problems[0], env.LogRotateMB) {
+	if r := p.run("", false); len(r.rotated) != 0 || len(r.Problems) == 0 || !strings.Contains(r.Problems[0], env.LogRotateMB) {
 		t.Errorf("report = %+v", r)
 	}
 }
@@ -172,8 +172,8 @@ func TestOnlyOldRotatedLogsAreRemoved(t *testing.T) {
 	other := put(t, filepath.Join(p.logs, "git-20260101-000000-1.log"), "x", 100)
 	stray := put(t, filepath.Join(p.logs, "decisions.backup.jsonl"), "x", 100)
 	r := p.run("", false)
-	if strings.Join(r.Logs, ",") != "logs/decisions.20260101-000000-2.jsonl,logs/decisions.20260101-000000.jsonl" {
-		t.Errorf("logs = %v", r.Logs)
+	if strings.Join(r.logs, ",") != "logs/decisions.20260101-000000-2.jsonl,logs/decisions.20260101-000000.jsonl" {
+		t.Errorf("logs = %v", r.logs)
 	}
 	for _, path := range []string{old, old2} {
 		if exists(path) {
@@ -188,7 +188,7 @@ func TestOnlyOldRotatedLogsAreRemoved(t *testing.T) {
 	// 保持日数は動かせる。記録の設定が空なら触らない。
 	t.Setenv(env.LogKeepDays, "2")
 	fresh2 := put(t, filepath.Join(p.logs, "decisions.20260921-000000.jsonl"), "x", 3)
-	Run(p.root, "", p.state, "", Options{Now: now})
+	Run(p.root, "", p.state, "", Options{now: now})
 	if !exists(fresh2) {
 		t.Error("記録の設定が空なのに消した")
 	}
@@ -233,8 +233,8 @@ func TestStatePrune(t *testing.T) {
 		doomed := sessionFiles(t, p.state, sOld, 20)
 		r := p.run("", false)
 		allExist(t, doomed, false)
-		if len(r.State) != len(doomed) || !slices.Contains(r.State, "logs/state/selfguard/"+sOld) {
-			t.Errorf("state = %v", r.State)
+		if len(r.state) != len(doomed) || !slices.Contains(r.state, "logs/state/selfguard/"+sOld) {
+			t.Errorf("state = %v", r.state)
 		}
 	})
 	t.Run("新しい記録が 1 つあれば全部残す", func(t *testing.T) {
@@ -284,8 +284,8 @@ func TestStatePrune(t *testing.T) {
 		} {
 			kept = append(kept, put(t, filepath.Join(p.state, filepath.FromSlash(name)), "x", 90))
 		}
-		if r := p.run("", false); len(r.State) != 0 {
-			t.Errorf("state = %v", r.State)
+		if r := p.run("", false); len(r.state) != 0 {
+			t.Errorf("state = %v", r.state)
 		}
 		allExist(t, kept, true)
 	})
@@ -309,8 +309,8 @@ func TestStatePrune(t *testing.T) {
 	t.Run("dry-run は並べるだけ", func(t *testing.T) {
 		p := newPlace(t)
 		doomed := sessionFiles(t, p.state, sOld, 20)
-		if r := p.run("", true); len(r.State) != len(doomed) {
-			t.Errorf("state = %v", r.State)
+		if r := p.run("", true); len(r.state) != len(doomed) {
+			t.Errorf("state = %v", r.state)
 		}
 		allExist(t, doomed, true)
 	})
@@ -350,9 +350,9 @@ func TestLinksAreNotFollowed(t *testing.T) {
 		result := put(t, filepath.Join(elsewhere, stopreview.ResultDir, "x.kv"), "x", 90)
 		linked := filepath.Join(p.logs, "state-link")
 		link(t, elsewhere, linked)
-		r := Run(p.root, p.log, linked, "", Options{Now: now})
+		r := Run(p.root, p.log, linked, "", Options{now: now})
 		allExist(t, []string{victim, result}, true)
-		if len(r.State) != 0 || !hasLinkProblem(r) {
+		if len(r.state) != 0 || !hasLinkProblem(r) {
 			t.Errorf("report = %+v", r)
 		}
 	})
@@ -384,7 +384,7 @@ func TestStopReview(t *testing.T) {
 	if !exists(keep) || exists(old) {
 		t.Error("材料は別の保持日数（既定 90 日）、計画は state の保持日数")
 	}
-	Run(p.root, p.log, p.state, "", Options{Now: now.Add(60 * day)})
+	Run(p.root, p.log, p.state, "", Options{now: now.Add(60 * day)})
 	if exists(keep) {
 		t.Error("材料が保持日数を過ぎても残った")
 	}
@@ -419,7 +419,7 @@ func TestSummaryAndLines(t *testing.T) {
 	if Summary(empty) != "" || strings.Join(Lines(empty, false), "") != "動かすものはありません。" {
 		t.Error("空の報告")
 	}
-	r := &Report{Rotated: []Rotation{{"a", "b"}}, Logs: []string{"c"}, State: []string{"d", "e"}}
+	r := &Report{rotated: []rotation{{"a", "b"}}, logs: []string{"c"}, state: []string{"d", "e"}}
 	if got := Summary(r); got != "pruned rotated=1 logs=1 state=2" {
 		t.Errorf("summary = %q", got)
 	}
@@ -440,18 +440,18 @@ func TestDiagPrune(t *testing.T) {
 		old := put(t, filepath.Join(diag, "ccnavi-git.log"), "a", 30)
 		fresh := put(t, filepath.Join(diag, "ccnavi.log"), "a", 1)
 		other := put(t, filepath.Join(diag, "notes.txt"), "a", 30)
-		preview := Run(p.root, "", "", "", Options{DryRun: true, Now: now})
-		r := Run(p.root, "", "", "", Options{Now: now})
-		if exists(old) || !exists(fresh) || !exists(other) || strings.Join(r.Logs, ",") != "logs/diag/ccnavi-git.log" ||
-			strings.Join(preview.Logs, ",") != "logs/diag/ccnavi-git.log" {
-			t.Errorf("logs = %v", r.Logs)
+		preview := Run(p.root, "", "", "", Options{DryRun: true, now: now})
+		r := Run(p.root, "", "", "", Options{now: now})
+		if exists(old) || !exists(fresh) || !exists(other) || strings.Join(r.logs, ",") != "logs/diag/ccnavi-git.log" ||
+			strings.Join(preview.logs, ",") != "logs/diag/ccnavi-git.log" {
+			t.Errorf("logs = %v", r.logs)
 		}
 	})
 	t.Run("保持日数 0 は残す", func(t *testing.T) {
 		p, diag := setup(t)
 		t.Setenv(env.LogKeepDays, "0")
 		old := put(t, filepath.Join(diag, "ccnavi-git.log"), "a", 30)
-		Run(p.root, "", "", "", Options{Now: now})
+		Run(p.root, "", "", "", Options{now: now})
 		if !exists(old) {
 			t.Error("消した")
 		}
@@ -461,13 +461,13 @@ func TestDiagPrune(t *testing.T) {
 		t.Setenv(env.LogRotateMB, "1")
 		put(t, filepath.Join(diag, "ccnavi.log"), big, 30)
 		put(t, filepath.Join(diag, "ccnavi.20260901-000000.log"), big, 0) // ローテートした分はもう回さない
-		preview := Run(p.root, "", "", "", Options{DryRun: true, Now: now})
-		r := Run(p.root, "", "", "", Options{Now: now})
-		if len(r.Rotated) != 1 || len(r.Logs) != 0 || len(preview.Rotated) != 1 || len(preview.Logs) != 0 {
+		preview := Run(p.root, "", "", "", Options{DryRun: true, now: now})
+		r := Run(p.root, "", "", "", Options{now: now})
+		if len(r.rotated) != 1 || len(r.logs) != 0 || len(preview.rotated) != 1 || len(preview.logs) != 0 {
 			t.Errorf("real = %+v preview = %+v", r, preview)
 		}
-		if !regexp.MustCompile(`/ccnavi\.\d{8}-\d{6}\.log$`).MatchString(r.Rotated[0].To) {
-			t.Errorf("to = %q", r.Rotated[0].To)
+		if !regexp.MustCompile(`/ccnavi\.\d{8}-\d{6}\.log$`).MatchString(r.rotated[0].to) {
+			t.Errorf("to = %q", r.rotated[0].to)
 		}
 	})
 	t.Run("リンクの置き場は辿らない", func(t *testing.T) {
@@ -476,7 +476,7 @@ func TestDiagPrune(t *testing.T) {
 		victim := put(t, filepath.Join(outside, "x.log"), "x", 100)
 		os.RemoveAll(diag)
 		link(t, outside, diag)
-		if r := Run(p.root, "", "", "", Options{Now: now}); !exists(victim) || !hasLinkProblem(r) {
+		if r := Run(p.root, "", "", "", Options{now: now}); !exists(victim) || !hasLinkProblem(r) {
 			t.Errorf("report = %+v", r)
 		}
 	})

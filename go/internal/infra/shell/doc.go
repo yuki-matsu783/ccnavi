@@ -7,7 +7,7 @@
 //
 // Python からの対応: shellread・shellread_cd・shellread_scan・shellread_words をまとめた。
 // shellread.read → Read、placed → PlacedCommands、shellread_words.reads_stdin → ReadsStdin。shlex.split → Split
-// （閉じない引用などは ErrSplit）、shlex.quote → Quote。外部のスクリプトを sh で走らせる subprocess.run(["sh", …]) →
+// （閉じない引用などは errSplit）、shlex.quote → Quote。外部のスクリプトを sh で走らせる subprocess.run(["sh", …]) →
 // Script（sh は Program、期限は目的ごとの ScriptTimeout・SyntaxTimeout・ConditionTimeout、sh が無ければ ErrNoShell）。
 // sh の名前の形 `^[A-Za-z_][A-Za-z0-9_]*$` → IsIdentifier、代入の語の名前 → AssignedName、実行役のオプションが値を取るか →
 // RunnerTakesValue。

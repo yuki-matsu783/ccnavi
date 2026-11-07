@@ -36,7 +36,7 @@ func TestSplitMatchesShlex(t *testing.T) {
 	for _, c := range cases {
 		got, err := Split(c.src)
 		if c.want == nil {
-			if !errors.Is(err, ErrSplit) {
+			if !errors.Is(err, errSplit) {
 				t.Errorf("Split(%q) = %q, %v, want ErrSplit", c.src, got, err)
 			}
 			continue

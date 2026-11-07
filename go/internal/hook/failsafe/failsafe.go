@@ -59,11 +59,11 @@ var relativeStatus = []string{
 // IsSafe は、判定に達せなかった呼び出しのうち通してよいものか。
 func IsSafe(in hookio.Input, root string) bool {
 	switch {
-	case slices.Contains(config.ReportTools, in.ToolName):
+	case slices.Contains(config.ReportTools(), in.ToolName):
 		return true
-	case slices.Contains(config.ReadTools, in.ToolName):
+	case slices.Contains(config.ReadTools(), in.ToolName):
 		return readIsSafe(in, root)
-	case slices.Contains(config.ShellTools, in.ToolName):
+	case slices.Contains(config.ShellTools(), in.ToolName):
 		return shellIsSafe(in, root)
 	}
 	return false
@@ -83,7 +83,7 @@ func readIsSafe(in hookio.Input, root string) bool {
 	// 探す場所を省いた Grep・Glob は cwd を探す（`glob` だけ書いても探す場所は省かれたまま）。cwd が操作記録の
 	// 置き場や `.git` の中でない限り、省略は通す。
 	omitted := len(found) == 0
-	if slices.Contains(config.SearchTools, in.ToolName) {
+	if slices.Contains(config.SearchTools(), in.ToolName) {
 		omitted = in.Field("path") == ""
 	}
 	if omitted {
@@ -135,7 +135,7 @@ func shellIsSafe(in hookio.Input, root string) bool {
 		return false
 	}
 	// 引数のパスは cwd から解いて見る。引数の無い ls は cwd を一覧する。
-	words := strings.FieldsFunc(command, ospath.IsSpace)
+	words := ospath.Fields(command)
 	target := ""
 	if len(words) > 1 {
 		target = words[1]

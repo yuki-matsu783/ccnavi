@@ -2,6 +2,7 @@ package drafts
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -31,8 +32,11 @@ const (
 	ToProject Target = "project"
 )
 
-// Targets は --to に渡せる値（この順で案内する）。
-var Targets = []Target{ToCommon, ToProject}
+// targets は --to に渡せる値（この順で案内する）。
+var targets = []Target{ToCommon, ToProject}
+
+// Targets は targets の写しを返す（呼び手が書き換えても元は変わらない）。
+func Targets() []Target { return slices.Clone(targets) }
 
 // todoPrefix は下書きのタイトルの前に付ける印（templates.TodoMark を含む）。
 const todoPrefix = templates.TodoMark + " 一般化する: "
@@ -237,8 +241,8 @@ func targetOf(conf *config.Settings, root string, found *ticket.Ticket, name str
 		return home + "/" + config.CommonDir + "/" + file, config.LayerCommon, ""
 	case ToProject:
 	default:
-		shown := make([]string, len(Targets))
-		for i, t := range Targets {
+		shown := make([]string, len(targets))
+		for i, t := range targets {
 			shown[i] = string(t)
 		}
 		return "", "", sprintf(msgBadTo, strings.Join(shown, " か "))

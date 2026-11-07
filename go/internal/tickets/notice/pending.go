@@ -44,7 +44,7 @@ var leftoverRefKinds = []string{"t", "c", "k"}
 // recordsDir はそのツリーの ccnavi-integrate/。無ければ空。`.git` がディレクトリならファイルの有無で確かめ、
 // ファイル（ワークツリーやサブモジュール）のときだけ git に場所を引く。
 func recordsDir(top string, deadline time.Time) string {
-	dot := ospath.Join(top, ".git")
+	dot := ospath.Join(top, tree.DotGit)
 	if ospath.IsDir(dot) {
 		path := ospath.Join(dot, integrate.RecordDir)
 		if ospath.IsDir(path) {

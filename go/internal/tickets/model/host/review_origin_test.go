@@ -26,7 +26,7 @@ func TestClassifyReadsTheHostThroughUserinfoAndPort(t *testing.T) {
 		"not a url":                           "",
 	}
 	for url, want := range cases {
-		if got := Classify(url).Kind; got != want {
+		if got := classify(url).kind; got != want {
 			t.Errorf("Classify(%q).Kind = %q, want %q", url, got, want)
 		}
 	}

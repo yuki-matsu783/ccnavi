@@ -23,14 +23,14 @@ var clearOrder = []Kind{Reviewed, Requested, Skipped, Pending}
 func Clear(approvedDir, parent string, phase int, announce func([]Kind) []string) Cleared {
 	var present []Kind
 	for _, kind := range clearOrder {
-		if fsio.Lexists(MarkPath(approvedDir, parent, phase, kind)) {
+		if fsio.Lexists(markPath(approvedDir, parent, phase, kind)) {
 			present = append(present, kind)
 		}
 	}
 	if stage := fsio.CurrentStage(); stage != nil {
 		group := stage.NewGroup()
 		for _, kind := range present {
-			path := MarkPath(approvedDir, parent, phase, kind)
+			path := markPath(approvedDir, parent, phase, kind)
 			restore := fsio.SetPolicy(func(p *fsio.Policy) {
 				p.Group, p.Tag = group, string(kind)
 				clearPolicy(p, path, phase, kind)
@@ -54,7 +54,7 @@ func Clear(approvedDir, parent string, phase int, announce func([]Kind) []string
 	var cleared []Kind
 	out := Cleared{}
 	for _, kind := range present {
-		path := MarkPath(approvedDir, parent, phase, kind)
+		path := markPath(approvedDir, parent, phase, kind)
 		reason := fsio.Unlink(path)
 		if reason == "" {
 			cleared = append(cleared, kind)
@@ -76,7 +76,7 @@ func Clear(approvedDir, parent string, phase int, announce func([]Kind) []string
 // inOrder は Kinds の順に並べた種類。list に在るか、done（fsio.Call が受ける書けた Tag）に在るもの。
 func inOrder(list []Kind, done map[string]bool) []Kind {
 	var out []Kind
-	for _, k := range Kinds {
+	for _, k := range kinds {
 		if done[string(k)] || contains(list, k) {
 			out = append(out, k)
 		}

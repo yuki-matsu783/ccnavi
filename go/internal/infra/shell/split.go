@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// ErrSplit は Split が Python の shlex.split の ValueError で断る形（閉じない引用・末尾の `\`）。
-var ErrSplit = errors.New("shlex.split が読めない")
+// errSplit は Split が Python の shlex.split の ValueError で断る形（閉じない引用・末尾の `\`）。
+var errSplit = errors.New("shlex.split が読めない")
 
 // Split は Python の shlex.split(s)（posix・whitespace_split・コメント無し）。コマンドを読む Read の割り方
 // （punctuation_chars 付きで `;` などでも割る）とは違い、空白と引用だけで割る。
@@ -75,7 +75,7 @@ func Split(s string) ([]string, error) {
 	}
 	switch state {
 	case squote, dquote, escape:
-		return nil, ErrSplit
+		return nil, errSplit
 	case word:
 		if tok.Len() > 0 || quoted {
 			emit()

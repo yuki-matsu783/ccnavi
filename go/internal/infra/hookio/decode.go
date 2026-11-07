@@ -76,8 +76,8 @@ type Input struct {
 	Tools []string
 	// ToolResponse は PostToolUse にだけ来る。Agent の起動の後には agentId が入る。
 	ToolResponse *pyjson.Object
-	// Error と IsInterrupt は PostToolUseFailure にだけ来る。Error は判定にも記録にも使わない。
-	Error       string
+	// error と IsInterrupt は PostToolUseFailure にだけ来る。error は判定にも記録にも使わない。
+	error       string
 	IsInterrupt bool
 	// StopHookActive は Stop・SubagentStop にだけ来る。真なら Stop の hook が続けさせた結果（連鎖の 2 回目以降）。
 	StopHookActive bool
@@ -96,7 +96,7 @@ type Input struct {
 // 完了通知の prompt は <task-notification> を含む。ユーザの手による変更を受け入れる処理は、
 // この通知では行わない（バックグラウンドのプロセスが書いた変更をユーザの変更として受け入れてしまう）。
 func (in Input) FromBackgroundTask() bool {
-	return strings.Contains(in.Prompt, TaskNotification)
+	return strings.Contains(in.Prompt, taskNotification)
 }
 
 // Field は tool_input の欄の文字列（"command" や "file_path" など）。文字列でなければ空。
@@ -108,7 +108,7 @@ func (in Input) Field(name string) string {
 // （ターン分離のゲート）だけが使い、迷うものは数えない（数えると、何も打たなくてもゲートが開く）。
 //
 // 数えないもの: UserPromptSubmit でない、サブエージェントの中、prompt が空、完了通知を含む
-// （ユーザがその文字列を打っても数えない。安全側の非対称）、先頭が NotUserStarts の目印
+// （ユーザがその文字列を打っても数えない。安全側の非対称）、先頭が notUserStarts の目印
 // （大文字小文字は区別しない）。予約した実行の prompt は打った文と見分けられないので、数える側に残る。
 func IsUserPrompt(in Input) bool {
 	if in.Event != UserPromptSubmit || in.AgentID != "" {
@@ -119,7 +119,7 @@ func IsUserPrompt(in Input) bool {
 		return false
 	}
 	lower := pyfmt.Lower(text)
-	for _, mark := range NotUserStarts {
+	for _, mark := range notUserStarts {
 		if strings.HasPrefix(lower, mark) {
 			return false
 		}
@@ -174,7 +174,7 @@ func Decode(r io.Reader) (Input, error) {
 		}
 		toolInput = o
 	}
-	for _, name := range ToolInputTextFields {
+	for _, name := range toolInputTextFields {
 		if v := toolInput.Value(name); v != nil {
 			if _, ok := v.(string); !ok {
 				return Input{}, unusable(event, "payload の %s.%s が文字列ではない", keyToolInput, name)
@@ -197,7 +197,7 @@ func Decode(r io.Reader) (Input, error) {
 		AgentType:      text(obj.Value(keyAgentType)),
 		Tools:          textList(obj.Value(keyTools)),
 		ToolResponse:   toolResponse,
-		Error:          obj.String(keyError),
+		error:          obj.String(keyError),
 		IsInterrupt:    obj.Value(keyIsInterrupt) == true,
 		StopHookActive: obj.Value(keyStopHookActive) == true,
 		Source:         StartSource(text(obj.Value(keySource))),

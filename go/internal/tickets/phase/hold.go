@@ -33,7 +33,7 @@ const (
 // HoldReason は止めたときに返す文。段の名前（レビュー準備中・レビュー待ち）を見出しに置き、段ごとに次に何を
 // すればよいかを言う（依頼済みならユーザを待つ、未依頼なら子の合流を確かめて依頼する）。
 func HoldReason(p *Phase, tool, root string) string {
-	agent := slices.Contains(config.AgentTools, tool)
+	agent := slices.Contains(config.AgentTools(), tool)
 	blocked := blockedShell
 	if agent {
 		blocked = blockedAgent
@@ -48,17 +48,17 @@ func HoldReason(p *Phase, tool, root string) string {
 	var said string
 	if p.ReviewWaiting() {
 		said = texts.Say(root, "DENY_PHASE_REVIEW__WAITING", texts.Values{
-			"parent": p.Parent, "phase": number, "label": p.Label(), "review_label": p.ReviewLabel(),
+			"parent": p.parent, "phase": number, "label": p.Label(), "review_label": p.ReviewLabel(),
 			"blocked": blocked, "risk_line": p.RiskLine(),
 		}, texts.Variants{"why": why})
 	} else {
 		said = texts.Say(root, "DENY_PHASE_REVIEW__REQUEST", texts.Values{
-			"parent": p.Parent, "phase": number, "label": p.Label(), "review_label": p.ReviewLabel(),
+			"parent": p.parent, "phase": number, "label": p.Label(), "review_label": p.ReviewLabel(),
 			"blocked": blocked, "risk_line": p.RiskLine(), "turn_defined": useronly.TurnDefined,
 		}, texts.Variants{"why": why})
 	}
 	lines := []string{
-		hookio.Tagged(CodeReview, "parent: "+p.Parent+", phase: "+number+", "+p.ReviewLabel()),
+		hookio.Tagged(CodeReview, "parent: "+p.parent+", phase: "+number+", "+p.ReviewLabel()),
 		said,
 		ParallelRequestNote,
 	}

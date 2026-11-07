@@ -99,9 +99,9 @@ const (
 
 // passed は gate を通った材料（親・フェーズ・依頼のマーカー）。
 type passed struct {
-	Parent    *ticket.Ticket
-	Phase     *phase.Phase
-	Requested *pyjson.Object
+	parent    *ticket.Ticket
+	phase     *phase.Phase
+	requested *pyjson.Object
 }
 
 // gate は decide の、ホストに聞かずに分かる前提を検査する。確かめるのは次の 3 つである。親とフェーズがあること。依頼の記録があること。依頼のあとに見せたものが動いていないこと。本体と Check が同じものを通る。断ったときは、理由のあとに `次:` を 1 行足して nil を返す。ホストの状態（変更要求・未解決の指摘・ダイジェスト）は見ない。sh が取ってくるからである。
@@ -126,7 +126,7 @@ func gate(stderr io.Writer, conf *config.Settings, root, cwd string, number int)
 		refused(stderr, root, number)
 		return nil
 	}
-	return &passed{Parent: parent, Phase: p, Requested: mark}
+	return &passed{parent: parent, phase: p, requested: mark}
 }
 
 // refused は断った理由のあとに、打ち直す 1 手を `次:` で足す。
@@ -162,15 +162,15 @@ func parseChoicesRaw(stderr io.Writer, choicesText, digest string) (Shown, *pyjs
 	choices, ok := value.(*pyjson.Object)
 	if ok {
 		for _, key := range choices.Keys() {
-			if c, isText := choices.Value(key).(string); !isText || !slices.Contains(Choices, Choice(c)) {
+			if c, isText := choices.Value(key).(string); !isText || !slices.Contains(choiceOrder, Choice(c)) {
 				ok = false
 				break
 			}
 		}
 	}
 	if !ok {
-		names := make([]string, len(Choices))
-		for i, c := range Choices {
+		names := make([]string, len(choiceOrder))
+		for i, c := range choiceOrder {
 			names[i] = string(c)
 		}
 		fmt.Fprintf(stderr, msgBadChoicesShape, strings.Join(names, " / "))
@@ -200,7 +200,7 @@ func decision(stderr io.Writer, conf *config.Settings, root, cwd string, number 
 	if gated == nil {
 		return nil
 	}
-	result, ok := request.Matching(stderr, resultPath, gated.Requested)
+	result, ok := request.Matching(stderr, resultPath, gated.requested)
 	if !ok {
 		return nil
 	}
@@ -209,17 +209,17 @@ func decision(stderr io.Writer, conf *config.Settings, root, cwd string, number 
 		return nil
 	}
 	poster := ""
-	if v := gated.Requested.Value("poster"); pyfmt.Truthy(v) {
+	if v := gated.requested.Value("poster"); pyfmt.Truthy(v) {
 		poster = pyfmt.Str(v)
 	}
-	ledger := request.LedgerOf(conf, root, gated.Parent)
+	ledger := request.LedgerOf(conf, root, gated.parent)
 	var unresolved []host.Thread
 	for _, t := range result.Threads {
 		if host.IsUnresolved(t, result.Host, poster, ledger) || t.ID != "" && slices.Contains(carry, t.ID) {
 			unresolved = append(unresolved, t)
 		}
 	}
-	return &Decision{Parent: gated.Parent, Phase: gated.Phase, Result: result, Unresolved: unresolved}
+	return &Decision{Parent: gated.parent, Phase: gated.phase, Result: result, Unresolved: unresolved}
 }
 
 func dumpLine(stdout io.Writer, v any) {
@@ -351,7 +351,7 @@ func Yes(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, numb
 			// ホストに書いたあとに外れた。返信・解決は効いたユーザの選択なので記録に残す（取り消さない）。
 			_ = oplog.AppliedSet(conf.State, planned.Op, appliedOnHost, append([]string{}, planned.Keys...))
 		}
-		dumpLine(stdout, pyjson.NewObject("version", Version, "ok", false, "mismatch", true,
+		dumpLine(stdout, pyjson.NewObject("version", version, "ok", false, "mismatch", true,
 			"digest", pyjson.NewObject("expected", digest, "current", current), "changed", changed))
 		fmt.Fprint(stderr, msgMismatch)
 		return config.ExitError, nil
@@ -403,7 +403,7 @@ func Yes(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, numb
 		}
 	}
 	summary.Set("op", op)
-	answer := pyjson.NewObject("version", Version, "ok", true)
+	answer := pyjson.NewObject("version", version, "ok", true)
 	for _, key := range summary.Keys() {
 		answer.Set(key, summary.Value(key))
 	}
@@ -563,7 +563,7 @@ func writePlan(stderr io.Writer, d *Decision, choices *pyjson.Object, outPath, d
 func SettledChildren(p *phase.Phase) []*ticket.Ticket {
 	var out []*ticket.Ticket
 	for _, t := range p.Tickets {
-		if slices.Contains(place.Finished, p.States[t.ID]) {
+		if slices.Contains(place.Finished(), p.States[t.ID]) {
 			out = append(out, t)
 		}
 	}

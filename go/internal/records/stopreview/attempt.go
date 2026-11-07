@@ -26,36 +26,36 @@ func LogsDir(logFile string) string {
 	return ospath.Dirname(logFile)
 }
 
-// State は試行の状態。遷移は transitions に限る。
-type State string
+// state は試行の状態。遷移は transitions に限る。
+type state string
 
 const (
-	planWait State = "plan_wait" // 計画より先に material が来た
-	pending  State = "pending"   // 開始待ち
-	running  State = "running"   // material を渡した
-	done     State = "done"      // record が受理した（最終分類つき）
-	expired  State = "expired"   // 期限切れ（未検査）
-	sentBack State = "sent_back" // 差し戻しの返り値を出した
-	consumed State = "consumed"  // AI による継続の Stop で消費した
+	planWait state = "plan_wait" // 計画より先に material が来た
+	pending  state = "pending"   // 開始待ち
+	running  state = "running"   // material を渡した
+	done     state = "done"      // record が受理した（最終分類つき）
+	expired  state = "expired"   // 期限切れ（未検査）
+	sentBack state = "sent_back" // 差し戻しの返り値を出した
+	consumed state = "consumed"  // AI による継続の Stop で消費した
 )
 
-var transitions = map[State][]State{
+var transitions = map[state][]state{
 	planWait: {pending, done, expired},
 	pending:  {running, expired},
 	running:  {done, sentBack, expired},
 	sentBack: {consumed, expired},
 }
 
-func finalState(s State) bool { return s == done || s == expired || s == consumed }
+func finalState(s state) bool { return s == done || s == expired || s == consumed }
 
 // Status は material の入口（Begin）が見た試行の様子。
 type Status string
 
 const (
 	StatusCandidate    Status = "candidate"
-	StatusNotCandidate Status = "not_candidate"
+	statusNotCandidate Status = "not_candidate"
 	StatusWait         Status = "wait"
-	StatusExpired      Status = "expired"
+	statusExpired      Status = "expired"
 )
 
 // judge は試行の最終分類を書いた者。
@@ -77,7 +77,7 @@ const (
 	eventSuspected event = "suspected_unrecorded_stop"
 )
 
-func eventOf(s State) event { return event(s) }
+func eventOf(s state) event { return event(s) }
 
 // verdict は再判定の結果を元の試行に残す値。
 type verdict string
@@ -116,7 +116,7 @@ const (
 	reasonRejected Reason = "rejected: "
 )
 
-func stateOf(a *pyjson.Object) State { return State(a.String(keyState)) }
+func stateOf(a *pyjson.Object) state { return state(a.String(keyState)) }
 
 func (s Store) attemptPath(aid string) string {
 	return fsio.RecordPath(s.State, AttemptPrefix, aid, fsio.JSONExt)
@@ -134,9 +134,9 @@ func (s Store) readAttempt(aid string) *pyjson.Object {
 // 次の Stop は別のキーなので、新しい試行になる。計画より先に material が来ていたら、その試行を進める。
 // 試行を作れない（権限・ディスク）ときは、書けなかった理由の文をエラーで返す。
 func (s Store) WritePlan(key string, plan Plan, now time.Time) (string, error) {
-	aid := AttemptID(key, plan.Rejudge)
+	aid := attemptID(key, plan.Rejudge)
 	if _, ok := s.ReadPlan(key); !ok {
-		plan.Key, plan.AttemptID = key, aid
+		plan.key, plan.AttemptID = key, aid
 		fsio.WriteJSON(s.planPath(key), plan.object())
 	}
 	attempt := s.readAttempt(aid)
@@ -213,7 +213,7 @@ func (s Store) store(attempt *pyjson.Object) {
 	fsio.WriteJSON(s.attemptPath(attempt.String(keyAttemptID)), attempt)
 }
 
-func (s Store) move(attempt *pyjson.Object, target State) bool {
+func (s Store) move(attempt *pyjson.Object, target state) bool {
 	if !slices.Contains(transitions[stateOf(attempt)], target) {
 		return false
 	}
@@ -230,11 +230,11 @@ func (s Store) move(attempt *pyjson.Object, target State) bool {
 func (s Store) Begin(key string, now time.Time) (Status, Plan, error) {
 	plan, ok := s.ReadPlan(key)
 	if !ok {
-		_, err := s.create(pyjson.NewObject(keyAttemptID, AttemptID(key, false), keyKey, key, keyCreated, fsio.UnixSeconds(now), keyState, string(planWait)))
+		_, err := s.create(pyjson.NewObject(keyAttemptID, attemptID(key, false), keyKey, key, keyCreated, fsio.UnixSeconds(now), keyState, string(planWait)))
 		return StatusWait, Plan{}, err
 	}
 	if !plan.IsCandidate {
-		return StatusNotCandidate, plan, nil
+		return statusNotCandidate, plan, nil
 	}
 	attempt := s.readAttempt(plan.AttemptID)
 	if attempt == nil || stateOf(attempt) == planWait {
@@ -244,7 +244,7 @@ func (s Store) Begin(key string, now time.Time) (Status, Plan, error) {
 	case pending:
 		s.move(attempt, running)
 	case expired:
-		return StatusExpired, plan, nil
+		return statusExpired, plan, nil
 	}
 	return StatusCandidate, plan, nil
 }
@@ -316,9 +316,9 @@ func (s Store) resolveOriginal(original string, final Final) {
 	}
 	result := verdictInconclusive
 	switch final {
-	case FinalOK:
+	case finalOK:
 		result = verdictResolved
-	case FinalFlawed:
+	case finalFlawed:
 		result = verdictUnresolved
 	}
 	attempt.Set(keyRejudge, string(result))

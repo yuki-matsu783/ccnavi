@@ -23,8 +23,8 @@ import (
 // 発言のたびに走るので、元と先の置き場の stat だけで作る指紋が、前に揃えたときと同じなら何も読まない。
 // 写せなかったときは指紋を残さず、直るまで毎回言う。比べている間に元が動いたときも残さない。
 
-// SignaturePrefix は指紋の記録（state の置き場の `mirror-<親の識別子>.json`）の名前の頭。records/prune が名前で消す。
-const SignaturePrefix = "mirror-"
+// signaturePrefix は指紋の記録（state の置き場の `mirror-<親の識別子>.json`）の名前の頭。records/prune が名前で消す。
+const signaturePrefix = "mirror-"
 
 const signatureKey = "signature"
 
@@ -58,7 +58,7 @@ func syncOne(conf *config.Settings, root, ticket, project, worktree string) []st
 	places := append(slices.Clone(sources), conf.CommonLayerDir(worktree), ospath.Join(worktree, config.SkillsDir))
 	sigPath := ""
 	if conf.State != "" {
-		sigPath = fsio.RecordPath(conf.State, SignaturePrefix, ticket, fsio.JSONExt)
+		sigPath = fsio.RecordPath(conf.State, signaturePrefix, ticket, fsio.JSONExt)
 	}
 	before := signature(places)
 	sourcesBefore := signature(sources)

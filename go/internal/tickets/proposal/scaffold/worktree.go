@@ -49,7 +49,7 @@ func isChild(ident string) bool {
 
 // proposalPath はツリーの提案の置き場の <状態>/<識別子>.md。
 func proposalPath(conf *config.Settings, top string, state place.State, ident string) string {
-	return ospath.Join(ticketsDir(conf, top), string(state), ident+".md")
+	return ospath.Join(ticketsDir(conf, top), string(state), ident+config.MdExt)
 }
 
 func ticketsDir(conf *config.Settings, top string) string {

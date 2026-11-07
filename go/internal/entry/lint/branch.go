@@ -10,6 +10,7 @@ import (
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/rules"
@@ -268,11 +269,11 @@ func unregisteredWorktrees(root string, worktrees []tree.Tree) []rules.Problem {
 	}
 	known := map[string]bool{}
 	for _, w := range worktrees {
-		known[w.Name] = true
+		known[pathcase.Fold(pyfmt.NFC(w.Name))] = true
 	}
 	var pending []string
 	for _, n := range names {
-		if !known[pyfmt.NFC(n)] && ospath.IsDir(ospath.Join(base, n)) && !strings.HasPrefix(n, ".") {
+		if !known[pathcase.Fold(pyfmt.NFC(n))] && ospath.IsDir(ospath.Join(base, n)) && !strings.HasPrefix(n, ".") {
 			pending = append(pending, n)
 		}
 	}
@@ -286,14 +287,14 @@ func unregisteredWorktrees(root string, worktrees []tree.Tree) []rules.Problem {
 	listed := map[string]bool{}
 	for _, line := range ospath.Splitlines(text) {
 		if rest, ok := strings.CutPrefix(line, "worktree "); ok {
-			listed[ospath.Realpath(ospath.Strip(rest))] = true
+			listed[pathcase.Real(ospath.Strip(rest))] = true
 		}
 	}
-	registry := ospath.Realpath(ospath.Join(root, tree.GitWorktrees))
+	registry := pathcase.Real(ospath.Join(root, tree.GitWorktrees))
 	var out []rules.Problem
 	for _, name := range pending {
 		path := ospath.Join(base, name)
-		if listed[ospath.Realpath(path)] || registeredElsewhere(path, registry) {
+		if listed[pathcase.Real(path)] || registeredElsewhere(path, registry) {
 			continue
 		}
 		out = append(out, ticketProblem(rules.Warn, ".claude/worktrees/"+name+" は git に登録がありません。中身を確かめ、不要なら"+
@@ -302,7 +303,8 @@ func unregisteredWorktrees(root string, worktrees []tree.Tree) []rules.Problem {
 	return out
 }
 
-// registeredElsewhere は `.git` が、ワークスペースのものではない `.git/worktrees/` を指しているか。
+// registeredElsewhere は `.git` が、ワークスペースのものではない `.git/worktrees/` を指しているか。registry は
+// pathcase.Real で畳んだワークスペースの登録の置き場。
 func registeredElsewhere(path, registry string) bool {
 	text, err := ospath.ReadDiskText(ospath.Join(path, tree.DotGit))
 	if err != nil {
@@ -316,6 +318,6 @@ func registeredElsewhere(path, registry string) bool {
 	if !ospath.IsAbs(gitdir) {
 		gitdir = ospath.Join(path, gitdir)
 	}
-	gitdir = ospath.Realpath(gitdir)
-	return strings.Contains(strings.ReplaceAll(gitdir, `\`, "/"), "/"+ospath.Slashed(tree.GitWorktrees)+"/") && !strings.HasPrefix(gitdir, registry+ospath.Sep)
+	gitdir = pathcase.Real(gitdir)
+	return strings.Contains(strings.ReplaceAll(gitdir, `\`, "/"), "/"+pyfmt.Casefold(ospath.Slashed(tree.GitWorktrees))+"/") && !strings.HasPrefix(gitdir, registry+ospath.Sep)
 }

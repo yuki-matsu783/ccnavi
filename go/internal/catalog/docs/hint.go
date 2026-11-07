@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	// CodeMissingFrontmatter は frontmatter の無い md を新しく作ったときの案内の理由コード。
-	CodeMissingFrontmatter = "NOTICE_DOC_FRONTMATTER"
+	// codeMissingFrontmatter は frontmatter の無い md を新しく作ったときの案内の理由コード。
+	codeMissingFrontmatter = "NOTICE_DOC_FRONTMATTER"
 	writeTool              = config.ToolWrite
 	createdType            = "create"
 )
@@ -64,7 +64,7 @@ func MissingFrontmatter(conf *config.Settings, root string, in hookio.Input) str
 	// raw.rsplit("/", 1)[-1]。ospath.Basename は Windows でドライブ（`C:README.md`）も外すので使わない。
 	name := ospath.Slashed(raw)
 	name = name[strings.LastIndex(name, "/")+1:]
-	if !strings.HasSuffix(raw, docindex.MdExt) || isNoFrontmatterName(name) {
+	if !pathcase.HasExt(raw, config.MdExt) || isNoFrontmatterName(name) {
 		return ""
 	}
 	cwd := in.Cwd
@@ -125,7 +125,7 @@ func isNoFrontmatterName(name string) bool {
 }
 
 func frontmatterHint(conf *config.Settings, root, shown string, hasFront bool) string {
-	values := texts.Values{"code": CodeMissingFrontmatter, "shown": shown, "command": command(conf, root), "doc": conventionDoc}
+	values := texts.Values{"code": codeMissingFrontmatter, "shown": shown, "command": command(conf, root), "doc": conventionDoc}
 	variants := texts.Variants{"what": conventionCase(root)}
 	switch {
 	case !hasFront:

@@ -194,7 +194,7 @@ func gitWrapper(root string) string {
 // 1 度だけ伝え、基準が在れば起動時に在ったものを 1 度だけ伝える。戻すのは deny と宣言された場所の新しい変更だけで、
 // 予行（dry-run）なら戻していたはずのものを言う。
 func (c *Checker) Check(enforcing bool, restore config.Mode, in hookio.Input, record *audit.Record) (string, bool) {
-	if slices.Contains(config.ReadOnlyTools, in.ToolName) {
+	if slices.Contains(config.ReadOnlyTools(), in.ToolName) {
 		record.Decision, record.Reason = audit.Skip, reasonToolCannotWrite
 		return "", false
 	}
@@ -576,7 +576,7 @@ func (c *Checker) AtStop(in hookio.Input, record *audit.Record) string {
 }
 
 func kindLabel(k git.Kind) string {
-	if label, ok := git.KindLabels[k]; ok {
+	if label, ok := git.KindLabels()[k]; ok {
 		return label
 	}
 	return string(k)

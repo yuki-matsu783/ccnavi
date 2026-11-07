@@ -84,7 +84,7 @@ func TestGuardMatchesPython(t *testing.T) {
 			t.Fatal(err)
 		}
 		all = append(append(append(all, state...), gate...), approved)
-		got := guardAnswer{State: StateDirRegex(c.Tickets)}
+		got := guardAnswer{State: stateDirRegex(c.Tickets)}
 		for _, r := range all {
 			v := r.Text.Variants
 			if v == nil {

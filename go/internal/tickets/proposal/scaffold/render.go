@@ -172,8 +172,8 @@ func render(ident, title string, plan, feedback []templates.Item, allow []string
 		lines = append(lines, "  - match: "+allowMatch, "    glob: "+quote(glob))
 	}
 	lines = append(lines, ticket.Fence)
-	for _, heading := range form.ParentHeadings {
-		lines = append(lines, "## "+heading, "", form.HeadingTodo[heading], "")
+	for _, heading := range form.ParentHeadings() {
+		lines = append(lines, "## "+heading, "", form.HeadingTodo()[heading], "")
 	}
 	return strings.Join(lines, "\n")
 }

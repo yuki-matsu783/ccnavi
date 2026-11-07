@@ -108,7 +108,7 @@ func buildDigest(records []*pyjson.Object, recorded bool, treeName *string) *pyj
 			tool = pyfmt.Str(v)
 		}
 		word := ""
-		if slices.Contains(config.ShellTools, tool) {
+		if slices.Contains(config.ShellTools(), tool) {
 			if subject, ok := r.Value("subject").(string); ok {
 				word = commandWord(subject)
 			}

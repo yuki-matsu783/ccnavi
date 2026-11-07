@@ -47,21 +47,21 @@ const (
 	originType   = "フェーズ定義"
 )
 
-// Reject は却下された要求 1 件。Origin は退けた側の名指し（「ルール no-secret（レイヤー common）」
+// Reject は却下された要求 1 件。origin は退けた側の名指し（「ルール no-secret（レイヤー common）」
 // 「親 i0001」「フェーズ定義 research」のどれか）。
 type Reject struct {
-	Ticket   string
-	Decision rules.Decision
-	Request  string
-	Reason   string
-	Origin   string
+	ticket   string
+	decision rules.Decision
+	request  string
+	reason   string
+	origin   string
 }
 
-// Found は走査の結果。Unchecked は regex の項の数、Truncated は期限か件数の上限で打ち切ったこと。
+// Found は走査の結果。unchecked は regex の項の数、truncated は期限か件数の上限で打ち切ったこと。
 type Found struct {
 	Rejects   []Reject
-	Unchecked int
-	Truncated bool
+	unchecked int
+	truncated bool
 }
 
 // probeOf は項を適用するパス。ワイルドカードがあれば前置に 1 文字足す（ticket の subset の検査と同じプローブ）。
@@ -99,7 +99,7 @@ func ruleSetFor(conf *config.Settings, root string, target tree.Tree) (*rules.Ru
 func deniedBy(rs *rules.RuleSet, full string) *rules.Rule {
 	var hits []*rules.Rule
 	for _, r := range rs.Deny {
-		if slices.ContainsFunc(config.WriteTools, func(tool string) bool { return r.Matches(tool, full) }) {
+		if slices.ContainsFunc(config.WriteTools(), func(tool string) bool { return r.Matches(tool, full) }) {
 			hits = append(hits, r)
 		}
 	}
@@ -154,11 +154,11 @@ func check(conf *config.Settings, root string, tickets []*ticket.Ticket, index m
 			}
 			count++
 			if count > rejectsMaxEntries || time.Now().After(deadline) {
-				found.Truncated = true
+				found.truncated = true
 				return found, nil
 			}
 			if e.Regex != "" {
-				found.Unchecked++
+				found.unchecked++
 				continue
 			}
 			if r, ok := rejectOf(t, e, rs, target, parent, pt); ok {
@@ -195,12 +195,12 @@ func rejectOf(t *ticket.Ticket, e ticket.Entry, rs *rules.RuleSet, target tree.T
 }
 
 // RejectOptions は FindRejects の絞り方。Only はそのチケット（ツリーの名前で引く）だけを見る。Budget のゼロ値は
-// rejectsBudget、Deadline のゼロ値は期限なし（Budget だけで打ち切る）。Copies を渡せば置き場を読み直さない
+// rejectsBudget、deadline のゼロ値は期限なし（Budget だけで打ち切る）。Copies を渡せば置き場を読み直さない
 // （nil なら読む）。
 type RejectOptions struct {
-	Only     string
+	only     string
 	Budget   time.Duration
-	Deadline time.Time
+	deadline time.Time
 	Copies   []*ticket.Ticket
 }
 
@@ -212,18 +212,18 @@ func FindRejects(conf *config.Settings, root string, o RejectOptions) (*Found, e
 		budget = rejectsBudget
 	}
 	limit := time.Now().Add(budget)
-	if !o.Deadline.IsZero() && o.Deadline.Before(limit) {
-		limit = o.Deadline
+	if !o.deadline.IsZero() && o.deadline.Before(limit) {
+		limit = o.deadline
 	}
 	copies := o.Copies
 	if copies == nil {
 		copies, _ = approval.Scan(conf, root, false, nil)
 	}
 	index := approval.ByID(copies)
-	if o.Only == "" {
+	if o.only == "" {
 		return check(conf, root, copies, index, limit)
 	}
-	bound, ok := tree.Lookup(index, o.Only)
+	bound, ok := tree.Lookup(index, o.only)
 	if !ok {
 		return &Found{}, nil
 	}
@@ -234,19 +234,19 @@ func FindRejects(conf *config.Settings, root string, o RejectOptions) (*Found, e
 func ExplainLines(found *Found) []string {
 	var lines []string
 	for _, r := range found.Rejects {
-		lines = append(lines, fmt.Sprintf("  %s %s `%s`: %s（出所: %s）", r.Ticket, r.Decision, r.Request, r.Reason, r.Origin))
+		lines = append(lines, fmt.Sprintf("  %s %s `%s`: %s（出所: %s）", r.ticket, r.decision, r.request, r.reason, r.origin))
 	}
-	if found.Truncated {
+	if found.truncated {
 		lines = append(lines, "  （件数か時間の上限で途中まで数えた）")
 	}
 	return append(lines, "  "+approximateNote+uncheckedNote(found))
 }
 
 func uncheckedNote(found *Found) string {
-	if found.Unchecked == 0 {
+	if found.unchecked == 0 {
 		return ""
 	}
-	return "regex の項 " + strconv.Itoa(found.Unchecked) + " 件は確かめられない。"
+	return "regex の項 " + strconv.Itoa(found.unchecked) + " 件は確かめられない。"
 }
 
 // Rejects は SessionStart に足す、却下された要求の文。却下が無ければ空。cwd のツリーに結び付く承認済みチケット
@@ -258,7 +258,7 @@ func Rejects(conf *config.Settings, root, cwd string, deadline time.Time) string
 	}
 	here, ok := tree.TreeOf(root, cwd, conf.Projects)
 	if !ok || here.IsMain() {
-		found, err := FindRejects(conf, root, RejectOptions{Deadline: deadline})
+		found, err := FindRejects(conf, root, RejectOptions{deadline: deadline})
 		if err != nil {
 			return ""
 		}
@@ -272,7 +272,7 @@ func Rejects(conf *config.Settings, root, cwd string, deadline time.Time) string
 	if copies == nil {
 		copies = []*ticket.Ticket{}
 	}
-	found, err := FindRejects(conf, root, RejectOptions{Only: here.Name, Deadline: deadline, Copies: copies})
+	found, err := FindRejects(conf, root, RejectOptions{only: here.Name, deadline: deadline, Copies: copies})
 	if err != nil {
 		return ""
 	}
@@ -282,13 +282,13 @@ func Rejects(conf *config.Settings, root, cwd string, deadline time.Time) string
 func countLine(found *Found) string {
 	names := map[string]bool{}
 	for _, r := range found.Rejects {
-		names[r.Ticket] = true
+		names[r.ticket] = true
 	}
 	if len(names) == 0 {
 		return ""
 	}
 	cut := ""
-	if found.Truncated {
+	if found.truncated {
 		cut = "（時間の上限で途中まで数えた）"
 	}
 	return fmt.Sprintf("[ccnavi] 承認済みチケット %d 件に、上位の設定に却下された要求がある%s。"+
@@ -302,13 +302,13 @@ func renderRejects(ident string, found *Found) string {
 	}
 	total := len(found.Rejects)
 	more := ""
-	if found.Truncated {
+	if found.truncated {
 		more = "以上（時間の上限で途中まで数えた）"
 	}
 	lines := []string{fmt.Sprintf("[ccnavi] 承認済みチケット %s の要求のうち %d 件%sは、"+
 		"上位の設定に却下されていて、判定のときに退けられる（書き込めない）。", ident, total, more)}
 	for _, r := range found.Rejects[:min(total, rejectsShown)] {
-		lines = append(lines, fmt.Sprintf("- %s `%s`: %s（出所: %s）", r.Decision, r.Request, r.Reason, r.Origin))
+		lines = append(lines, fmt.Sprintf("- %s `%s`: %s（出所: %s）", r.decision, r.request, r.reason, r.origin))
 	}
 	if total > rejectsShown {
 		lines = append(lines, fmt.Sprintf("- ほか %d 件。全部は %s --explain で範囲とルールを見る。", total-rejectsShown, config.Launcher))

@@ -68,7 +68,7 @@ func OrderProblems(conf *config.Settings, root string, child, parent *ticket.Tic
 		p := find(known, m)
 		if p == nil {
 			p = newPhase(parent.ID, m)
-			p.Item, p.Owner = parent.ItemAt(m), parent
+			p.Item, p.owner = parent.ItemAt(m), parent
 			if p.Item != nil {
 				p.Type = types.Get(p.Item.Type)
 			}

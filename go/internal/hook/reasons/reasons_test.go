@@ -213,7 +213,7 @@ func TestRewriteCodeAndRule(t *testing.T) {
 	if RewriteCode(shell.FormBrace) != "DENY_BRACE_EXPANSION" || RewriteRule(shell.FormBrace) != "builtin:brace-expansion" {
 		t.Error(RewriteCode(shell.FormBrace), RewriteRule(shell.FormBrace))
 	}
-	if CodeFor("Bash", "") != CodeCommand || CodeFor("Write", "") != CodePath || CodeFor("Bash", shell.ReasonAnsiC) != CodeUncertain {
+	if CodeFor("Bash", "") != codeCommand || CodeFor("Write", "") != codePath || CodeFor("Bash", shell.ReasonAnsiC) != CodeUncertain {
 		t.Error("CodeFor")
 	}
 }

@@ -57,7 +57,7 @@ func learningsSummary(found *wiki.Wiki, threshold int) *pyjson.Object {
 		return n
 	}
 	byTarget := pyjson.NewObject()
-	for _, target := range wiki.Targets {
+	for _, target := range wiki.Targets() {
 		var mine []wiki.Row
 		for _, r := range candidates {
 			if r.Target == target {

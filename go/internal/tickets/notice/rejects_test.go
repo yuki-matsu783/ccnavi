@@ -62,18 +62,18 @@ func TestRejectsMatchesPython(t *testing.T) {
 	}
 	var all []any
 	for _, r := range found.Rejects {
-		all = append(all, []any{r.Ticket, r.Decision, r.Request, testkit.Rel(root, r.Reason), testkit.Rel(root, r.Origin)})
+		all = append(all, []any{r.ticket, r.decision, r.request, testkit.Rel(root, r.reason), testkit.Rel(root, r.origin)})
 	}
 	var explain []string
 	for _, line := range ExplainLines(found) {
 		explain = append(explain, testkit.Rel(root, line))
 	}
-	only, _ := FindRejects(conf, root, RejectOptions{Only: "I0001-01-01", Budget: time.Minute})
+	only, _ := FindRejects(conf, root, RejectOptions{only: "I0001-01-01", Budget: time.Minute})
 	var requests []any
 	for _, r := range only.Rejects {
-		requests = append(requests, r.Request)
+		requests = append(requests, r.request)
 	}
-	missing, _ := FindRejects(conf, root, RejectOptions{Only: "nothing"})
+	missing, _ := FindRejects(conf, root, RejectOptions{only: "nothing"})
 	var notices []string
 	for _, cwd := range rejectsCwds {
 		at := root
@@ -97,7 +97,7 @@ func TestRejectsMatchesPython(t *testing.T) {
 		}
 	}
 	testkit.SameJSON(t, map[string]any{
-		"all": all, "unchecked": found.Unchecked, "explain": explain, "only": requests, "missing": len(missing.Rejects),
+		"all": all, "unchecked": found.unchecked, "explain": explain, "only": requests, "missing": len(missing.Rejects),
 		"notice": notices, "cut": ExplainLines(cut), "denied": denied,
 	}, want)
 }

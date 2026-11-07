@@ -385,9 +385,9 @@ func collect(conf *config.Settings, root, cwd string, kind Kind, number int, h h
 		}
 		hit := false
 		switch kind {
-		case Issue:
+		case issue:
 			hit = t.Issue == number && t.IssueRepo == ""
-		case MR:
+		case mr:
 			hit = t.MR == number
 		}
 		if hit {
@@ -395,7 +395,7 @@ func collect(conf *config.Settings, root, cwd string, kind Kind, number int, h h
 			candidateOf(branchOfTicket(t, sortedNames)).addSource(sourceTicket)
 		}
 	}
-	if kind == Issue {
+	if kind == issue {
 		for _, name := range sortedNames {
 			if namesNumber(name, number, conf.BranchPrefixes) {
 				candidateOf(name).addSource(sourceName)
@@ -446,7 +446,7 @@ func where(c *candidate) string {
 // render は 1 候補 1 行の形。エージェントが読んでユーザに見せる。
 func render(f *found) string {
 	mark := "MR !" + strconv.Itoa(f.number)
-	if f.kind == Issue {
+	if f.kind == issue {
 		mark = "issue #" + strconv.Itoa(f.number)
 	}
 	place := "ワークスペース"
@@ -529,7 +529,7 @@ func numberText(s string) bool {
 
 // Report は `ccnavi branches <issue|mr> <番号>`。0 は出した、1 は引数か場所の誤り。
 func Report(stdout, stderr io.Writer, conf *config.Settings, root, cwd, kind, number, resultPath string, asJSON bool) int {
-	if Kind(kind) != Issue && Kind(kind) != MR {
+	if Kind(kind) != issue && Kind(kind) != mr {
 		fmt.Fprintf(stderr, "ccnavi: branches の種類は issue か mr（%s は違う）\n", pyfmt.Repr(kind))
 		return 1
 	}

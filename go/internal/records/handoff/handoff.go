@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	// DefaultTokens は閾値の既定（トークン数）。
-	DefaultTokens = 400000
+	// defaultTokens は閾値の既定（トークン数）。
+	defaultTokens = 400000
 	// 1 時間のキャッシュの失効の 5 分前と、5 分のキャッシュの失効の 1 分前。
 	waitLong  = 55 * time.Minute
 	waitShort = 4 * time.Minute
@@ -69,8 +69,8 @@ const (
 
 // Usage は直近の応答の時点での会話の大きさと、キャッシュの保持時間（5 分か 1 時間）。
 type Usage struct {
-	Tokens int
-	TTL    time.Duration
+	tokens int
+	ttl    time.Duration
 }
 
 // Plan は待機の指示。sh が Wait だけ sleep してから Check を呼ぶ。
@@ -81,7 +81,7 @@ type Plan struct {
 
 // Threshold は閾値（トークン数）を読む。0 は無効。空・読めない値は既定、負数は 0。
 func Threshold(raw string) int {
-	return max(config.Int(raw, DefaultTokens, math.MinInt), 0)
+	return max(config.Int(raw, defaultTokens, math.MinInt), 0)
 }
 
 // UsageOf はトランスクリプトの末尾から、直近の応答の会話の大きさとキャッシュの保持時間を読む。
@@ -105,7 +105,7 @@ func UsageOf(transcript string) *Usage {
 	if err != nil || len(rows) == 0 {
 		return nil
 	}
-	return &Usage{Tokens: sizeOf(rows[0]), TTL: ttlOf(rows[:min(len(rows), lookback)])}
+	return &Usage{tokens: sizeOf(rows[0]), ttl: ttlOf(rows[:min(len(rows), lookback)])}
 }
 
 var sizeKeys = []string{"input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"}
@@ -229,22 +229,22 @@ func Start(state, session string, usage *Usage, limit int, waitOverride, transcr
 		return Plan{}, false
 	}
 	data := read(state, session)
-	if data.Value(keyState) == string(fired) || !due(data, usage.Tokens, limit) {
+	if data.Value(keyState) == string(fired) || !due(data, usage.tokens, limit) {
 		return Plan{}, false
 	}
 	token := digest.RandomHex(tokenBytes)
 	fresh := pyjson.NewObject(
 		keyState, string(waiting),
 		keyToken, token,
-		keyDue, usage.Tokens,
-		keyBase, base(data, usage.Tokens),
+		keyDue, usage.tokens,
+		keyBase, base(data, usage.tokens),
 		keyAt, int(time.Now().Unix()),
 		keyTranscript, transcript,
 	)
 	if !write(state, session, fresh) {
 		return Plan{}, false
 	}
-	return Plan{Wait: waitFor(usage.TTL, waitOverride), Token: token}, true
+	return Plan{Wait: waitFor(usage.ttl, waitOverride), Token: token}, true
 }
 
 // Check は待機のあとで呼ぶ。起こすべきなら指示の文を返し、状態を fired にして基準を進める。
@@ -262,7 +262,7 @@ func Check(state, session, token string, wait time.Duration, limit int) (string,
 	if transcript := data.Value(keyTranscript); limit > 0 && pyfmt.Truthy(transcript) {
 		path, _ := transcript.(string)
 		usage := UsageOf(path)
-		if usage == nil || !due(data, usage.Tokens, limit) {
+		if usage == nil || !due(data, usage.tokens, limit) {
 			return "", false
 		}
 	}
@@ -307,7 +307,7 @@ func Notice(state, session string, usage *Usage, limit int, waitOverride string)
 		}
 		return fmt.Sprintf(doneText, minutes(time.Duration(pyjson.PositiveInt(data.Value(keyWait)))*time.Second)), true
 	}
-	if usage == nil || !due(data, usage.Tokens, limit) {
+	if usage == nil || !due(data, usage.tokens, limit) {
 		return "", false
 	}
 	mark := statePath(state, session, noticeSuffix)
@@ -321,8 +321,8 @@ func Notice(state, session string, usage *Usage, limit int, waitOverride string)
 	if fsio.WriteText(mark, "1\n", fsio.NativeNewline, fsio.Atomic) != "" {
 		return "", false
 	}
-	return fmt.Sprintf(noticeText, pyfmt.Grouped(usage.Tokens), int(usage.TTL/time.Minute),
-		minutes(waitFor(usage.TTL, waitOverride)), env.HandoffSuggestTokens), true
+	return fmt.Sprintf(noticeText, pyfmt.Grouped(usage.tokens), int(usage.ttl/time.Minute),
+		minutes(waitFor(usage.ttl, waitOverride)), env.HandoffSuggestTokens), true
 }
 
 // minutes は文に出す分。1 分未満でも 1 と書く。

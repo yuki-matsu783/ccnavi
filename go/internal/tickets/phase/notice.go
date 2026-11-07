@@ -61,8 +61,8 @@ func ReopenImpact(conf *config.Settings, root, parentID string, number int) []st
 func downstreamTouched(list []*Phase, number int) []string {
 	var owner *ticket.Ticket
 	for _, p := range list {
-		if p.Owner != nil {
-			owner = p.Owner
+		if p.owner != nil {
+			owner = p.owner
 			break
 		}
 	}
@@ -76,7 +76,7 @@ func downstreamTouched(list []*Phase, number int) []string {
 		}
 		began := false
 		for _, s := range p.States {
-			began = began || s == place.Doing || slices.Contains(place.Finished, s)
+			began = began || s == place.Doing || slices.Contains(place.Finished(), s)
 		}
 		reviewed := p.has(marks.Reviewed)
 		var notes []string
@@ -129,7 +129,7 @@ func ReviewNext(conf *config.Settings, root string, child *ticket.Ticket, raw *a
 				texts.Values{"lead": lead, "label": label, "phase": number, "done": done}, nil)
 		}
 		return texts.Say(root, "NOTICE_REVIEW_NEXT__REQUESTED",
-			texts.Values{"lead": lead, "label": label, "waiting": LabelWaiting}, nil)
+			texts.Values{"lead": lead, "label": label, "waiting": labelWaiting}, nil)
 	}
 	if !p.Ended() || !owner.Ended() {
 		left := "このフェーズ"
@@ -137,11 +137,11 @@ func ReviewNext(conf *config.Settings, root string, child *ticket.Ticket, raw *a
 			left = "フェーズ " + owner.Label()
 		}
 		return texts.Say(root, "NOTICE_REVIEW_NEXT__PREPARING_OPEN", texts.Values{
-			"lead": lead, "preparing": LabelPreparing, "left": left, "phase": number, "done": done,
+			"lead": lead, "preparing": labelPreparing, "left": left, "phase": number, "done": done,
 		}, nil)
 	}
 	return texts.Say(root, "NOTICE_REVIEW_NEXT__PREPARING",
-		texts.Values{"lead": lead, "preparing": LabelPreparing, "phase": number, "done": done}, nil)
+		texts.Values{"lead": lead, "preparing": labelPreparing, "phase": number, "done": done}, nil)
 }
 
 // later は時刻 a が b より後か。どちらかが読めない、時差の有無が食い違うなら偽（依頼し直しを言わない側）。

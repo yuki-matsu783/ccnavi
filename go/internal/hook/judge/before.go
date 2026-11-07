@@ -46,7 +46,7 @@ func Before(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 	j := &judgement{stdout: stdout, stderr: stderr, mode: mode, conf: conf, root: root, in: in, record: record,
 		askContext: askContextCheck(root, in)}
 
-	if slices.Contains(config.AskUserTools, in.ToolName) {
+	if slices.Contains(config.AskUserTools(), in.ToolName) {
 		if text := j.askContext(); text != "" {
 			return j.refuse(rules.Deny, append(pyfmt.NonEmpty([]string{guardNote}, pyfmt.KeepRepeats), askContextRefusal(record, askSubject(in), text)),
 				refusal{kind: config.General})
@@ -86,9 +86,9 @@ func Before(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 		record.Decision, record.Reason = audit.Skip, audit.ReasonNothingToRun
 		return skip(stdout, guardNote)
 	}
-	if length := matchedLength(in.ToolName, subject, inner); length > CommandLengthLimit {
+	if length := matchedLength(in.ToolName, subject, inner); length > commandLengthLimit {
 		return j.builtinRefusal(pyfmt.NonEmpty([]string{guardNote}, pyfmt.KeepRepeats), reasons.CodeCommandTooLong,
-			reasons.CommandTooLongRule, reasons.CommandTooLong(root, CommandLengthLimit, length), config.General)
+			reasons.CommandTooLongRule, reasons.CommandTooLong(root, commandLengthLimit, length), config.General)
 	}
 
 	// 組み込みの既定に戻ったときだけ知らせる。レイヤーが不正で空になったのは退避ではないので、記録と lint が伝える。
@@ -110,7 +110,7 @@ func Before(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 	var raw *approval.Raw
 
 	// レビューが要るフェーズが終わってマーカーが無い間、サブエージェントの起動と、例外以外のシェルを止める。
-	if conf.TicketsEnabled() && slices.Contains(useronly.HeldTools, in.ToolName) {
+	if conf.TicketsEnabled() && slices.Contains(useronly.HeldTools(), in.ToolName) {
 		var parent *ticket.Ticket
 		parent, raw = phase.ParentAt(conf, root, in.Cwd, raw)
 		var held *phase.Phase
@@ -127,7 +127,7 @@ func Before(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 	// サブエージェントの起動。担当が決まらないときはここで止める。担当が決まったときの入力の更新（担当の案内）は、
 	// 最後の応答に合わせるため持ったまま判定を進める。ルールには、書き足す前の入力を当てる。
 	var updated *pyjson.Object
-	if slices.Contains(config.AgentTools, in.ToolName) {
+	if slices.Contains(config.AgentTools(), in.ToolName) {
 		r := launch.Decide(conf, root, in, raw)
 		if r.Stop != nil {
 			return j.builtinRefusal(notices, r.Stop.Code, r.Stop.Rule, r.Stop.Text, r.Stop.Kind)
@@ -193,19 +193,19 @@ func Before(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 	return j.byRules(ruleSet, source, subject, bare, inner, notices, target, dest, index, updated, deadline)
 }
 
-// CommandLengthLimit は、ルールを当てるシェルのコマンドの長さ（文字数）の上限。超えたら照合せずに止める。
+// commandLengthLimit は、ルールを当てるシェルのコマンドの長さ（文字数）の上限。超えたら照合せずに止める。
 // ルールの正規表現には、区切り（`|`・`;`・`&`）の多い長い文字列で時間が長さの 2 乗で伸びるものがある（引用の中の
 // `a|b` を 2 万字並べると 1 本で 20 秒を超える）。期限はルール 1 本ごとの間でしか見られず、1 本が hook の期限
 // （Claude Code の既定 10 秒）を越えると Claude Code が hook を打ち切り、呼び出しは判定なしで通る。上限の長さなら、
 // 知られている最悪の形（`ls | ` の繰り返し・引用の中の `a|b` の繰り返し）でも、負荷の高い機械で全体が 2 秒ほどで終わる。
 // 数えるのは読んだ形（ヒアドキュメントの本文とコメントは照合しないので含まない）。引用の中の演算子の文字は、両側に
 // 目印が入るぶん打った長さより長くなる。
-const CommandLengthLimit = 4_000
+const commandLengthLimit = 4_000
 
 // matchedLength はシェルのツールで、ルールを当てる文字列（読んだ形と、中で実行される層）のうち最も長いものの文字数。
 // シェル以外のツールは 0（パスや見出しは長くならない）。
 func matchedLength(tool, subject string, inner []layer) int {
-	if !slices.Contains(config.ShellTools, tool) {
+	if !slices.Contains(config.ShellTools(), tool) {
 		return 0
 	}
 	longest := utf8.RuneCountInString(subject)
@@ -266,7 +266,7 @@ func (j *judgement) builtinStops(notices []string, subject string, inner []layer
 		c, err := j.builtinRefusal(notices, code, ruleID, text, kind)
 		return c, true, err
 	}
-	shellTool := slices.Contains(config.ShellTools, in.ToolName)
+	shellTool := slices.Contains(config.ShellTools(), in.ToolName)
 	if in.ToolName == config.ToolBash {
 		// 保護済みの sh を、sh の検査の材料を変える環境変数と同じ行で呼ぶ形（補助。dry-run でも止める）。
 		if script, names := shellguard.CheckEnv(record.Subject, degraded); len(names) > 0 {
@@ -352,7 +352,7 @@ func (j *judgement) turnGate(notices []string, subject string, inner []layer) (i
 			commands = append(commands, l.text)
 		}
 	}
-	waited, asked := turngate.SplitByAttendance(turngate.Builtin, !hookio.Unattended() && in.AgentID == "")
+	waited, asked := turngate.SplitByAttendance(turngate.Builtin(), !hookio.Unattended() && in.AgentID == "")
 	stop, err := turngate.Check(waited, commands, conf.State, in.SessionID, false)
 	if err == nil && stop == nil {
 		stop, err = turngate.Check(asked, commands, conf.State, in.SessionID, true)
@@ -426,7 +426,7 @@ func (j *judgement) byRules(ruleSet *rules.RuleSet, source rules.Origin, subject
 	// 生の文字列（読み切れなかった Bash と、読まない PowerShell）に `>` が多すぎると、シェルから書く形の保護の照合が遅くなり、
 	// 期限を越える。そのときは、その保護だけを生の文字列に当てず、ほかの deny と ask を当てたうえで権限モードに依らず拒否にする
 	// （照合を飛ばして通すと、上限の後ろの保護対象への書き込みが素通りするため）。外す保護がこのツールに当たらないなら上限も掛けない。
-	unread := degraded != "" || slices.Contains(config.ShellTools, tool) && tool != config.ToolBash
+	unread := degraded != "" || slices.Contains(config.ShellTools(), tool) && tool != config.ToolBash
 	capped := unread && selfguard.TooManyRedirects(subject) && slices.ContainsFunc(ruleSet.Deny, func(r *rules.Rule) bool {
 		return slices.Contains(shellGuardRuleIDs, r.ID) && rules.ToolMatches(r.Match, tool)
 	})
@@ -434,7 +434,7 @@ func (j *judgement) byRules(ruleSet *rules.RuleSet, source rules.Origin, subject
 	var verdict rules.Decision
 	var group []*rules.Rule
 	var via []viaLayer
-	for _, name := range rules.Sections {
+	for _, name := range rules.Sections() {
 		if name == rules.Allow && (degraded != "" || capped) {
 			// 読み切れなかったコマンドに allow は当てない（読めなかった文字列にそう書いてあった、を根拠に通さない）。
 			break
@@ -679,7 +679,7 @@ func skip(stdout io.Writer, note string) (int, error) {
 	return config.ExitOK, hookio.WriteContext(stdout, hookio.PreToolUse, note, "")
 }
 
-func isWriteTool(tool string) bool { return slices.Contains(config.WriteTools, tool) }
+func isWriteTool(tool string) bool { return slices.Contains(config.WriteTools(), tool) }
 
 func boolOrder(b bool) int {
 	if b {

@@ -34,10 +34,10 @@ const (
 func commonSources(conf *config.Settings, root string) (map[string][]byte, string) {
 	base := conf.CommonLayerDir(root)
 	out := map[string][]byte{}
-	riskName := config.LayerFileNames[config.KindRisk]
-	names := make([]string, 0, len(config.LayerKinds)+1)
-	for _, kind := range config.LayerKinds {
-		names = append(names, config.LayerFileNames[kind])
+	riskName := config.LayerFileNames()[config.KindRisk]
+	names := make([]string, 0, len(config.LayerKinds())+1)
+	for _, kind := range config.LayerKinds() {
+		names = append(names, config.LayerFileNames()[kind])
 	}
 	for _, name := range append(names, expectationsName) {
 		raw, existed, why := readStrict(ospath.Join(base, name))
@@ -48,8 +48,8 @@ func commonSources(conf *config.Settings, root string) (map[string][]byte, strin
 			out[name] = raw
 		}
 	}
-	for _, kind := range config.LayerKinds {
-		name := config.LayerFileNames[kind]
+	for _, kind := range config.LayerKinds() {
+		name := config.LayerFileNames()[kind]
 		if raw, ok := out[name]; ok {
 			if why := unreadableAsCommon(kind, raw, root); why != "" {
 				return nil, "共通レイヤーの " + name + " を、ミラーとして読めない: " + why
@@ -99,7 +99,7 @@ func commonTemplates(conf *config.Settings, root string) map[string][]byte {
 // scriptPrefix は共通のスクリプトの script: の値のうち、ミラーの置き場（`config/common/` まで）を指す先頭。
 // 写した先でも同じ値で指せるよう、ミラーの中の置き場はこれを外した相対にする。
 func scriptPrefix() string {
-	head, _, _ := strings.Cut(risk.ScriptHomes[0], config.CommonDir+"/")
+	head, _, _ := strings.Cut(risk.ScriptHomes()[0], config.CommonDir+"/")
 	return head + config.CommonDir + "/"
 }
 
@@ -109,13 +109,13 @@ func scriptValues(raw []byte) []string {
 		return nil
 	}
 	text, _ := fsio.Decode(raw, fsio.Replace)
-	definition, _ := risk.Parse(text, riskWhere, risk.ScriptHomes)
+	definition, _ := risk.Parse(text, riskWhere, risk.ScriptHomes())
 	if definition == nil {
 		return nil
 	}
 	var found []string
 	for _, f := range definition.Factors {
-		if f.Kind == risk.KindScript && strings.HasPrefix(f.Text, risk.ScriptHomes[0]) && !slices.Contains(found, f.Text) {
+		if f.Kind == risk.KindScript && strings.HasPrefix(f.Text, risk.ScriptHomes()[0]) && !slices.Contains(found, f.Text) {
 			found = append(found, f.Text)
 		}
 	}
@@ -133,7 +133,7 @@ func unreadableAsCommon(kind config.LayerKind, content []byte, root string) stri
 		types, problems := phases.Parse(text, phasesWhere)
 		return errorDetails(problems, types == nil, "フェーズ定義として読めない")
 	case config.KindRisk:
-		definition, problems := risk.Parse(text, riskWhere, risk.ScriptHomes)
+		definition, problems := risk.Parse(text, riskWhere, risk.ScriptHomes())
 		return errorDetails(problems, definition == nil, "配点として読めない")
 	}
 	data, err := yaml.Load(text)

@@ -29,7 +29,7 @@ func goResult(c pyCase) pyResult {
 		switch err {
 		case ErrTooDeep:
 			return pyResult{Err: "deep"}
-		case ErrOverflow:
+		case errOverflow:
 			return pyResult{Err: "overflow"}
 		}
 		return pyResult{Err: err.Error()}
@@ -103,7 +103,7 @@ func randomSubject(r *rand.Rand) string {
 	return b.String()
 }
 
-var flagChoices = []int{0, int(IgnoreCase), int(IgnoreCase | Multiline), int(DotAll | IgnoreCase), int(ASCII | IgnoreCase), int(Verbose)}
+var flagChoices = []int{0, int(IgnoreCase), int(IgnoreCase | Multiline), int(DotAll | IgnoreCase), int(ascii | IgnoreCase), int(Verbose)}
 
 func TestAgainstPythonRandom(t *testing.T) {
 	r := rand.New(rand.NewPCG(1, 2))

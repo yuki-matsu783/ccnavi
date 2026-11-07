@@ -111,7 +111,7 @@ func TestRecordFileShape(t *testing.T) {
 	if !strings.HasPrefix(text, want) {
 		t.Errorf("記録の形:\n%s", text)
 	}
-	if !strings.Contains(text, `"created_at": "`+r.CreatedAt+`",`) || !strings.HasSuffix(text, "\"\n}\n") {
+	if !strings.Contains(text, `"created_at": "`+r.createdAt+`",`) || !strings.HasSuffix(text, "\"\n}\n") {
 		t.Errorf("末尾の形:\n%s", text)
 	}
 	// 読んで書き戻すと同じバイト列になる（ops show の出力が記録と食い違わない）
@@ -125,7 +125,7 @@ func TestBeginWithAnExistingIDAddsOnlyMissingStages(t *testing.T) {
 	state := stateDir(t)
 	fixed := IDFor("close-early", "p", "0", "7", "k")
 	for _, stages := range [][]StageSpec{{{"issue", StageIssue}}, {{"issue", StageIssue}, {"comment", StageComment}}} {
-		if _, err := Begin(state, KindCloseEarly, Options{Stages: stages, ID: fixed}); err != nil {
+		if _, err := Begin(state, kindCloseEarly, Options{Stages: stages, ID: fixed}); err != nil {
 			t.Fatal(err)
 		}
 		if len(stages) == 1 {
@@ -154,11 +154,11 @@ func TestBadIDOrKindIsRefused(t *testing.T) {
 func TestStageSet(t *testing.T) {
 	state := stateDir(t)
 	id := begin(t, state, Options{})
-	stageSet(t, state, id, "issue", StateUnknown, "", "")
+	stageSet(t, state, id, "issue", stateUnknown, "", "")
 	stageSet(t, state, id, "issue", StatePending, "", "")
 	stageSet(t, state, id, "issue", StateSent, "https://x/1", "me")
 	s := load(t, state, id).Stages[1]
-	if s.State != StateSent || s.URL != "https://x/1" || s.Account != "me" || s.Tries != 2 || s.At == "" {
+	if s.State != StateSent || s.URL != "https://x/1" || s.account != "me" || s.tries != 2 || s.at == "" {
 		t.Errorf("段階: %+v", s)
 	}
 	stageSet(t, state, id, "reply", StateSent, "", "")
@@ -254,11 +254,11 @@ func TestStaleLockIsTakenOver(t *testing.T) {
 func TestMarkSent(t *testing.T) {
 	state := stateDir(t)
 	id := IDFor("request", "p1", "0", "7", "k")
-	if _, err := Begin(state, KindRequest, Options{Parent: "p1", MR: 7, Stages: []StageSpec{{"comment", StageComment}}, ID: id}); err != nil {
+	if _, err := Begin(state, kindRequest, Options{Parent: "p1", MR: 7, Stages: []StageSpec{{"comment", StageComment}}, ID: id}); err != nil {
 		t.Fatal(err)
 	}
-	stageSet(t, state, id, "comment", StateUnknown, "", "")
-	got, err := MarkSent(state, KindRequest, "p1", "7", "k", "comment", "u")
+	stageSet(t, state, id, "comment", stateUnknown, "", "")
+	got, err := MarkSent(state, kindRequest, "p1", "7", "k", "comment", "u")
 	if err != nil || got != id {
 		t.Fatalf("MarkSent = %q, %v", got, err)
 	}
@@ -313,7 +313,7 @@ func TestReconcile(t *testing.T) {
 	state := stateDir(t)
 	id := begin(t, state, Options{})
 	fresh := load(t, state, id)
-	stageSet(t, state, id, "issue", StateUnknown, "", "alice")
+	stageSet(t, state, id, "issue", stateUnknown, "", "alice")
 	tried := load(t, state, id)
 	now := time.Now()
 	cases := []struct {
@@ -326,15 +326,15 @@ func TestReconcile(t *testing.T) {
 		at      time.Time
 		want    Verdict
 	}{
-		{"1 件は送った", fresh, "issue", []string{"https://x/1"}, ListedAll, "me", now, VerdictSent},
-		{"複数は止める", fresh, "issue", []string{"a", "b"}, ListedAll, "me", now, VerdictStop},
-		{"最後まで読めた 0 件は未送信", fresh, "issue", nil, ListedAll, "me", now, VerdictSend},
-		{"打ち切った 0 件は不明", fresh, "issue", nil, ListedPart, "me", now, VerdictUnknown},
-		{"読めない一覧は止める", fresh, "issue", nil, ListFailed, "me", now, VerdictStop},
-		{"アカウント違いは不明", tried, "issue", nil, ListedAll, "bob", now, VerdictUnknown},
-		{"送った直後は不明", tried, "issue", nil, ListedAll, "alice", now, VerdictUnknown},
-		{"間が空けば未送信", tried, "issue", nil, ListedAll, "alice", now.Add(RecentWindow + time.Minute), VerdictSend},
-		{"無い段階は止める", fresh, "nope", nil, ListedAll, "me", now, VerdictStop},
+		{"1 件は送った", fresh, "issue", []string{"https://x/1"}, ListedAll, "me", now, verdictSent},
+		{"複数は止める", fresh, "issue", []string{"a", "b"}, ListedAll, "me", now, verdictStop},
+		{"最後まで読めた 0 件は未送信", fresh, "issue", nil, ListedAll, "me", now, verdictSend},
+		{"打ち切った 0 件は不明", fresh, "issue", nil, ListedPart, "me", now, verdictUnknown},
+		{"読めない一覧は止める", fresh, "issue", nil, ListFailed, "me", now, verdictStop},
+		{"アカウント違いは不明", tried, "issue", nil, ListedAll, "bob", now, verdictUnknown},
+		{"送った直後は不明", tried, "issue", nil, ListedAll, "alice", now, verdictUnknown},
+		{"間が空けば未送信", tried, "issue", nil, ListedAll, "alice", now.Add(recentWindow + time.Minute), verdictSend},
+		{"無い段階は止める", fresh, "nope", nil, ListedAll, "me", now, verdictStop},
 	}
 	for _, c := range cases {
 		if got, why := Reconcile(c.r, c.stage, c.found, c.listing, c.account, c.at); got != c.want {

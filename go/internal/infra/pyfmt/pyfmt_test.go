@@ -24,7 +24,7 @@ func TestQuote(t *testing.T) {
 			t.Errorf("Quote(%q) = %s, want %s", c.in, got, c.want)
 		}
 	}
-	if got := Bytes([]byte("a'\x00\xff\"")); got != `b'a\'\x00\xff"'` {
+	if got := bytes([]byte("a'\x00\xff\"")); got != `b'a\'\x00\xff"'` {
 		t.Errorf("Bytes = %s", got)
 	}
 }

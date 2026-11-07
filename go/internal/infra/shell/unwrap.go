@@ -6,9 +6,9 @@ import "strings"
 // ルールの多くはコマンドの頭に固定して書かれるので、実行役を前に置くだけで外れるのを防ぐ。
 // 層は止める側のルールにだけ適用する。
 
-// UnwrapWords は 1 回の読みで作る層の語数の上限。`eval` や `sh -c` は読み直すと語が増えるので、
+// unwrapWords は 1 回の読みで作る層の語数の上限。`eval` や `sh -c` は読み直すと語が増えるので、
 // 深さだけでは抑えきれない。
-const UnwrapWords = 2000
+const unwrapWords = 2000
 
 type layer struct {
 	runner string
@@ -22,7 +22,7 @@ type layer struct {
 // 書き直しを求める形は rewrites に足す。
 func unwrap(commands []runnable, rewrites *[]Rewrite) []layer {
 	var out []layer
-	budget := UnwrapWords
+	budget := unwrapWords
 	for _, c := range commands {
 		peelInto(c.words, 0, &out, &budget, c.quoted, rewrites, false)
 	}

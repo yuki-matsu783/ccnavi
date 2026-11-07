@@ -17,7 +17,7 @@ func strs(in []string) []any {
 func (e *Entry) json() *pyjson.Object {
 	return pyjson.NewObject(
 		"path", e.Rel,
-		"draft", e.DraftRel(),
+		"draft", e.draftRel(),
 		"kind", string(e.Kind.ID),
 		"state", string(e.State()),
 		"board", e.Board(),
@@ -33,7 +33,7 @@ func (e *Entry) json() *pyjson.Object {
 func (p *Plan) JSON() *pyjson.Object {
 	ignored := make([]any, len(p.Ignored))
 	for i, g := range p.Ignored {
-		ignored[i] = pyjson.NewObject("path", g.Path, "why", string(g.Why))
+		ignored[i] = pyjson.NewObject("path", g.path, "why", string(g.why))
 	}
 	entries := make([]any, len(p.Entries))
 	for i, e := range p.Entries {
@@ -54,15 +54,15 @@ func (p *Plan) JSON() *pyjson.Object {
 	return out
 }
 
-// ErrorJSON は失敗だけを言う答え（取り込みの失敗と、入口が組み合わせの誤りで断るときの形）。
-func ErrorJSON(text string) *pyjson.Object {
+// errorJSON は失敗だけを言う答え（取り込みの失敗と、入口が組み合わせの誤りで断るときの形）。
+func errorJSON(text string) *pyjson.Object {
 	return pyjson.NewObject("version", JSONVersion, "ok", false, "error", text)
 }
 
 // JSON は取り込み（user handoff --yes --json）の答え。
 func (a *Applied) JSON() *pyjson.Object {
 	if !a.OK {
-		return ErrorJSON(a.Error)
+		return errorJSON(a.Error)
 	}
 	applied := make([]any, len(a.Applied))
 	for i, e := range a.Applied {

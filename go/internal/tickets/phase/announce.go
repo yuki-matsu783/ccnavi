@@ -100,7 +100,7 @@ func Announce(stderr io.Writer, conf *config.Settings, root string, parent *tick
 			} else if line := p.RiskLine(); line != "" {
 				who += line + "。"
 			}
-			said = append(said, fmt.Sprintf(pendingText, parent.ID, p.Label(), LabelPreparing, who,
+			said = append(said, fmt.Sprintf(pendingText, parent.ID, p.Label(), labelPreparing, who,
 				config.ScriptCommand(root, config.ReviewWrapper), n, covers, useronly.TurnDefined,
 				holdNoteText+useronly.ExemptNote))
 		default:

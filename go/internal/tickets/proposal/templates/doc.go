@@ -11,13 +11,13 @@
 // 拡張（ccnavi-board の templatesmodel.ts）との契約である。
 //
 // Python からの対応: tickets/proposal の plan_templates と template_use をまとめた。parse_template → Parse、
-// dump・to_yaml・dump_flow → Dump・ToYAML・DumpFlow、check → Check、graph → Graph、read_entry・read_layer・merge →
+// dump・to_yaml・dump_flow → Dump・toYAML・dumpFlow、check → Check、graph → Graph、read_entry・read_layer・merge →
 // ReadEntry・ReadLayer・Merge、common_writable・types_for・recheck → CommonWritable・TypesFor・Recheck、scan → Load
-// （Scan）、adopted・find・problems_of・has_any → Scan.Adopted・Find・Problems・HasAny、matches → Matches、
+// （Scan）、adopted・find・problems_of・has_any → Scan.adopted・Find・problems・HasAny、matches → Matches、
 // relative → Relative、digest → SHA、entry_json・as_json・check_file → EntryJSON・AsJSON・CheckFile、
 // new_name_problem → NewNameProblem、hidden_chars・hidden_problem・escape_char・reveal → HiddenChars・
-// HiddenProblem・EscapeChar・Reveal、FIELDS・SUFFIX・LAYER_DRAFT・TODO_MARK・JSON_VERSION・DROP_* → Fields・Suffix・
+// HiddenProblem・EscapeChar・Reveal、FIELDS・SUFFIX・LAYER_DRAFT・TODO_MARK・JSON_VERSION・DROP_* → fields・Suffix・
 // LayerDraft・TodoMark・JSONVersion・Drop*、LAYER_COMMON・LAYER_SELF → config.LayerCommon・LayerSelf、
 // Item.review の bool|None → ticket.Need。template_use の resolve・absolute・child_id・child_problem・flow_drafts →
-// Resolve・Absolute・ChildID・ChildProblem・FlowDrafts（下書きの組は Draft）、FIRST_SEQ → FirstSeq。
+// Resolve・Absolute・childID・ChildProblem・FlowDrafts（下書きの組は Draft）、FIRST_SEQ → firstSeq。
 package templates

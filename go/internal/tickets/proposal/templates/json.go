@@ -72,10 +72,10 @@ func flowJSON(index int, body *yaml.Map) *pyjson.Object {
 }
 
 func droppedJSON(e *Entry) any {
-	if e.Dropped == DropNone {
+	if e.dropped == dropNone {
 		return nil
 	}
-	return pyjson.NewObject("reason", string(e.Dropped), "detail", e.DroppedDetail)
+	return pyjson.NewObject("reason", string(e.dropped), "detail", e.droppedDetail)
 }
 
 // EntryJSON は画面がそのまま描ける 1 本分の答え。
@@ -86,14 +86,14 @@ func EntryJSON(e *Entry) *pyjson.Object {
 	if t != nil {
 		description, when = t.Description, t.When
 		plan, feedback = itemsJSON(t.Plan, 1), itemsJSON(t.Feedback, len(t.Plan)+1)
-		for _, i := range t.FlowIndexes() {
+		for _, i := range t.flowIndexes() {
 			flows = append(flows, flowJSON(i, t.Flows[i]))
 		}
 	}
 	return pyjson.NewObject("name", e.Name, "layer", e.Layer, "path", e.Rel, "sha", e.SHA, "valid", t != nil,
 		"description", description, "when", when, "plan", plan, "feedback", feedback,
 		"has_flows", t != nil && len(t.Flows) > 0, "flows", flows,
-		"effective", e.Effective, "usable", e.Usable(), "dropped", droppedJSON(e), "writable", e.Writable,
+		"effective", e.effective, "usable", e.usable(), "dropped", droppedJSON(e), "writable", e.writable,
 		"problems", problemsJSON(e.Problems()))
 }
 
@@ -102,19 +102,19 @@ func layerJSON(l *LayerRead) *pyjson.Object {
 	for _, e := range l.Entries {
 		entries = append(entries, EntryJSON(e))
 	}
-	return pyjson.NewObject("name", l.Name, "path", l.Rel, "exists", l.Exists, "unreadable", l.Unreadable,
-		"writable", l.Writable, "problems", problemsJSON(l.Problems), "templates", entries)
+	return pyjson.NewObject("name", l.Name, "path", l.rel, "exists", l.exists, "unreadable", l.Unreadable,
+		"writable", l.writable, "problems", problemsJSON(l.problems), "templates", entries)
 }
 
 // AsJSON は ccnavi --templates --json の答え。templates は共通 + layer の統合結果（共通の側は統合結果のフェーズ
 // 定義で検査し直す。keywords で絞る）、layers は各レイヤーの生の中身、sums はレイヤーごとの統合結果の索引。
 func AsJSON(conf *config.Settings, root string, s *Scan, layer string, keywords []string) *pyjson.Object {
 	var types *phases.Types
-	if s.Layer(layer) != nil {
+	if s.layer(layer) != nil {
 		types = TypesFor(conf, root, layer)
 	}
 	chosen := []any{}
-	for _, e := range s.Adopted(layer) {
+	for _, e := range s.adopted(layer) {
 		if e.Layer == config.LayerCommon {
 			e = Recheck(e, types, &s.Catalog)
 		}
@@ -127,10 +127,10 @@ func AsJSON(conf *config.Settings, root string, s *Scan, layer string, keywords 
 		layers = append(layers, layerJSON(l))
 	}
 	sums := []any{}
-	for _, l := range s.Layers {
+	for _, l := range s.layers {
 		rows := []any{}
-		for _, e := range s.Adopted(l.Name) {
-			rows = append(rows, pyjson.NewObject("name", e.Name, "layer", e.Layer, "effective", e.Effective,
+		for _, e := range s.adopted(l.Name) {
+			rows = append(rows, pyjson.NewObject("name", e.Name, "layer", e.Layer, "effective", e.effective,
 				"dropped", droppedJSON(e)))
 		}
 		sums = append(sums, pyjson.NewObject("name", l.Name, "layers", []any{config.LayerCommon, l.Name},
@@ -171,7 +171,7 @@ func CheckFile(conf *config.Settings, root, path, layer string) *pyjson.Object {
 		answer.Set("problems", problemsJSON([]rules.Problem{{Severity: rules.Error, Rule: stem, Detail: why}}))
 		return answer
 	}
-	sha := SHA(raw)
+	sha := sha(raw)
 	answer.Set("sha", sha)
 	var found []rules.Problem
 	if !validName(stem) {
@@ -182,8 +182,8 @@ func CheckFile(conf *config.Settings, root, path, layer string) *pyjson.Object {
 	if t != nil {
 		found = append(found, Check(t, types, nil)...)
 		answer.Set("valid", true)
-		answer.Set("data", yamljson.ToJSON(t.AsData()))
-		answer.Set("plans", Graph(t, types, sha))
+		answer.Set("data", yamljson.ToJSON(t.asData()))
+		answer.Set("plans", graph(t, types, sha))
 	}
 	answer.Set("problems", problemsJSON(found))
 	return answer

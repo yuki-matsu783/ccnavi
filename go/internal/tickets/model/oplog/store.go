@@ -55,8 +55,8 @@ func Begin(state string, kind Kind, o Options) (string, error) {
 	stamp := now()
 	r := &Record{
 		ID: id, Kind: kind, Repo: orEmpty(o.Repo), Parent: o.Parent, Phase: o.Phase, MR: o.MR,
-		RequestHead: o.RequestHead, Shown: o.Shown, Choices: orEmpty(o.Choices), Plan: orEmpty(o.Plan),
-		Applied: pyjson.NewObject(), CreatedAt: stamp, UpdatedAt: stamp,
+		requestHead: o.RequestHead, Shown: o.Shown, Choices: orEmpty(o.Choices), Plan: orEmpty(o.Plan),
+		Applied: pyjson.NewObject(), createdAt: stamp, updatedAt: stamp,
 	}
 	for _, spec := range o.Stages {
 		r.Stages = append(r.Stages, newStage(spec))
@@ -87,7 +87,7 @@ func save(state string, r *Record) error {
 	if err := fsio.MakeDirs(dir(state)); err != nil {
 		return fail(msgCannotSave, fsio.ErrorText(err))
 	}
-	r.UpdatedAt = now()
+	r.updatedAt = now()
 	format := fsio.JSONFormat{Indent: fsio.JSONIndentOne, FinalNewline: true, Newline: fsio.LF, How: fsio.Atomic}
 	if failed := fsio.WriteJSONAs(recordPath(state, r.ID), r.Object(), format); failed != "" {
 		return fail(msgCannotSave, failed)
@@ -188,15 +188,15 @@ func StageSet(state, id, stageID string, to State, url, account string) error {
 		}
 		// 試行の回数は、状態が変わるか待ちに戻すたびに数える（送信済みへの変更は数えない）。
 		if (to != s.State || to == StatePending) && to != StateSent {
-			s.Tries++
+			s.tries++
 		}
 		s.State = to
-		s.At = now()
+		s.at = now()
 		if url != "" {
 			s.URL = url
 		}
 		if account != "" {
-			s.Account = account
+			s.account = account
 		}
 		return true, nil
 	})

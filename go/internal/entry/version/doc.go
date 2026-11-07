@@ -8,12 +8,12 @@
 // （version.ts）も揃える。
 //
 // 組み立ての元のコミットは、組み立てのときに -ldflags で commit に埋める（埋め方は commit のコメントにある）。
-// 埋めていなければ go run・go test で動いているとみなし、built は偽、コミットは Unknown と言う。
+// 埋めていなければ go run・go test で動いているとみなし、built は偽、コミットは unknown と言う。
 // 実行ファイルは git に聞かない。ソースで動いているときにワークツリーの HEAD を言うと、
 // 組み立てた版と取り違えるからである。
 //
 // Python からの対応は次のとおり。
-//   - entry/version を移した。VERSION・COMPAT・SCHEMA・UNKNOWN → Version・Compat・Schema・Unknown。
+//   - entry/version を移した。VERSION・COMPAT・SCHEMA・UNKNOWN → Version・Compat・schema・Unknown。
 //   - report → Report、describe → describe（私的）、commit()・built() → 埋めた commit の読み（私的）、
 //     formats() → 私的。
 //   - ccnavi_buildinfo の部品（BUILDINFO_MODULE）は、-ldflags の commit に置き換えた。

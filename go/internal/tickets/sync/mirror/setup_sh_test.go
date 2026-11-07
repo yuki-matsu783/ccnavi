@@ -21,7 +21,7 @@ func TestProcessFlagAgreesWithTheSetupSh(t *testing.T) {
 		"trailing comment":      {"---\nprocess: true # 工程\n---\n", true},
 		"no closing fence":      {"---\nprocess: true\n", false},
 		"flag before the fence": {"process: true\n---\nname: x\n---\n", false},
-		"bom":                   {"\ufeff---\nprocess: true\n---\n", false},
+		"bom":                   {"\ufeff---\nprocess: true\n---\n", true},
 		"string":                {"---\nprocess: \"true\"\n---\n", false},
 		"commented out":         {"---\n# process: true\n---\n", false},
 		"in the body":           {"---\nname: x\n---\nprocess: true\n", false},

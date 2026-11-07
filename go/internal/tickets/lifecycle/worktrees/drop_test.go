@@ -20,10 +20,10 @@ func TestDropKeepsDetachedCommits(t *testing.T) {
 	testkit.Commit(t, tree, "work")
 
 	d := Drop(root, "d", root)
-	if d.Status != Refused || !strings.Contains(d.Detail, "detached") {
+	if d.Status != refused || !strings.Contains(d.Detail, "detached") {
 		t.Fatalf("消さずに止めるはず: %+v", d)
 	}
-	if b := Blocked(root, "d", root); b == nil || b.Status != Refused {
+	if b := Blocked(root, "d", root); b == nil || b.Status != refused {
 		t.Errorf("Blocked も同じ判定で止めるはず: %+v", b)
 	}
 	if _, err := os.Stat(tree); err != nil {
@@ -31,7 +31,7 @@ func TestDropKeepsDetachedCommits(t *testing.T) {
 	}
 
 	testkit.Git(t, tree, "branch", "keep")
-	if d := Drop(root, "d", root); d.Status != Removed {
+	if d := Drop(root, "d", root); d.Status != removed {
 		t.Fatalf("ブランチを付けたら消せるはず: %+v", d)
 	}
 }
@@ -40,7 +40,7 @@ func TestDropKeepsDetachedCommits(t *testing.T) {
 func TestDropDetachedWithoutNewCommits(t *testing.T) {
 	root := testkit.ShapedWorkspace(t)
 	testkit.Git(t, root, "worktree", "add", "-q", "--detach", filepath.Join(".claude", "worktrees", "d"), "main")
-	if d := Drop(root, "d", root); d.Status != Removed {
+	if d := Drop(root, "d", root); d.Status != removed {
 		t.Fatalf("消せるはず: %+v", d)
 	}
 }
@@ -64,7 +64,7 @@ func TestDropStashesBesideLinkedMark(t *testing.T) {
 	testkit.Commit(t, tree, "files")
 	testkit.Put(t, filepath.Join(tree, "ext", "out", "data.md"), "記録\n")
 
-	if d := Drop(root, "w", root); d.Status != Removed {
+	if d := Drop(root, "w", root); d.Status != removed {
 		t.Fatalf("消せるはず: %+v", d)
 	}
 	stashed := filepath.Join(root, "scratchpad", "worktrees", "w", "ext", "out", "data.md")

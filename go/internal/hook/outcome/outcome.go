@@ -72,14 +72,14 @@ type Entry struct {
 
 // Outcome は読んだ結果。
 type Outcome struct {
-	AgentID  string
-	Child    string
+	agentID  string
+	child    string
 	Kind     Kind
-	Bounces  int
-	Paths    []string
+	bounces  int
+	paths    []string
 	Final    bool
 	Notified bool
-	Nudged   bool
+	nudged   bool
 
 	id   string
 	at   float64
@@ -155,14 +155,14 @@ func read(file, session string) *Outcome {
 		final = pyfmt.Truthy(v)
 	}
 	return &Outcome{
-		AgentID:  str(data.Value(keyAgentID)),
-		Child:    str(data.Value(keyChild)),
+		agentID:  str(data.Value(keyAgentID)),
+		child:    str(data.Value(keyChild)),
 		Kind:     kind,
-		Bounces:  bounces,
-		Paths:    paths,
+		bounces:  bounces,
+		paths:    paths,
 		Final:    final,
 		Notified: pyfmt.Truthy(data.Value(keyNotified)),
-		Nudged:   pyfmt.Truthy(data.Value(keyNudged)),
+		nudged:   pyfmt.Truthy(data.Value(keyNudged)),
 		id:       str(data.Value(keyID)),
 		at:       at,
 		file:     file,
@@ -277,31 +277,31 @@ func mark(one *Outcome, field string) string {
 
 // line は親に言う 1 行。
 func line(one *Outcome) string {
-	who := one.Child
+	who := one.child
 	if who == "" {
 		who = "（担当の子が分からない）"
 	}
-	shown := strings.Join(one.Paths[:min(len(one.Paths), shownPaths)], "、")
-	if len(one.Paths) > shownPaths {
-		shown += fmt.Sprintf(" ほか %d 件", len(one.Paths)-shownPaths)
+	shown := strings.Join(one.paths[:min(len(one.paths), shownPaths)], "、")
+	if len(one.paths) > shownPaths {
+		shown += fmt.Sprintf(" ほか %d 件", len(one.paths)-shownPaths)
 	}
 	switch one.Kind {
 	case Outside:
-		if one.Bounces == 0 {
-			return "サブエージェント " + one.AgentID + " は、子 " + who + " の範囲外の変更を残したまま終わっている" +
+		if one.bounces == 0 {
+			return "サブエージェント " + one.agentID + " は、子 " + who + " の範囲外の変更を残したまま終わっている" +
 				"（差し戻していない。dry-run か、差し戻しの対象外）: " + shown
 		}
 		return fmt.Sprintf("サブエージェント %s は、子 %s の範囲外の変更を差し戻された（%d 回）後も残したまま終わっている: %s",
-			one.AgentID, who, one.Bounces, shown)
+			one.agentID, who, one.bounces, shown)
 	case Unchecked:
 		target := "子"
-		if one.Child != "" {
-			target = "子 " + one.Child
+		if one.child != "" {
+			target = "子 " + one.child
 		}
-		return "サブエージェント " + one.AgentID + " の終わりに、" + target + "の範囲を確かめられていない" +
+		return "サブエージェント " + one.agentID + " の終わりに、" + target + "の範囲を確かめられていない" +
 			"（ワークツリーを読めないか、ccnavi の内部エラー）"
 	}
-	return "サブエージェント " + one.AgentID + " は親のツリーから起動されたため、担当の子が分からない。" +
+	return "サブエージェント " + one.agentID + " は親のツリーから起動されたため、担当の子が分からない。" +
 		"範囲外の変更が見つかっているが差し戻していない: " + shown + "。" +
 		"どの子に残っているかを確かめる（最終的には finish の範囲検査が止める）"
 }
@@ -333,7 +333,7 @@ func Confirm(done []*Outcome) string {
 
 // MarkNudged は、この相手の確定した結果を「促した」ことにする（別の経路で同じ内容を親に言ったとき）。
 func MarkNudged(stateDir, session, who string) {
-	if one := Of(stateDir, session, who); one != nil && one.Final && !one.Nudged {
+	if one := Of(stateDir, session, who); one != nil && one.Final && !one.nudged {
 		mark(one, keyNudged)
 	}
 }
@@ -343,7 +343,7 @@ func MarkNudged(stateDir, session, who string) {
 func StopLines(stateDir, session string) []string {
 	var out []string
 	for _, o := range all(stateDir, session) {
-		if !slices.Contains(nudged, o.Kind) || o.Nudged {
+		if !slices.Contains(nudged, o.Kind) || o.nudged {
 			continue
 		}
 		if mark(o, keyNudged) == "" {

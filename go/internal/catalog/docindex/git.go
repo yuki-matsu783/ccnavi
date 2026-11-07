@@ -6,14 +6,12 @@ import (
 	"strings"
 	"time"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/tree"
 )
-
-// MdExt は索引に載せる文書の拡張子（大文字小文字を区別する）。
-const MdExt = ".md"
 
 // ErrNotRepository は基準のディレクトリが git のルートではない（`.git` が無い）。
 var ErrNotRepository = errors.New("git のルートではない")
@@ -54,7 +52,7 @@ func listed(base string, timeout time.Duration) ([]string, error) {
 	seen := map[string]bool{}
 	var found []string
 	for _, p := range all {
-		if !strings.HasSuffix(p, MdExt) || seen[p] {
+		if !pathcase.HasExt(p, config.MdExt) || seen[p] {
 			continue
 		}
 		seen[p] = true

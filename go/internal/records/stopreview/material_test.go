@@ -34,7 +34,7 @@ func TestExtractInstructions(t *testing.T) {
 	}
 	var got []hit
 	for _, f := range found {
-		got = append(got, hit{f.Kind, f.TurnsAgo})
+		got = append(got, hit{f.kind, f.turnsAgo})
 	}
 	for _, want := range []hit{{"ticket_work", 5}, {"no_proposal", 4}, {"reference", 3}, {"agreement", 2}} {
 		if !slices.Contains(got, want) {
@@ -82,7 +82,7 @@ func TestExcerptCountsCharacters(t *testing.T) {
 	found := extractInstructions([]string{text})
 	// 一致（チケット作業）の前 20 字と後ろ 40 字。
 	want := string([]rune(strings.Repeat("あ", 20) + "チケット作業で" + strings.Repeat("い", 60))[:20+6+40])
-	if len(found) != 1 || found[0].Excerpt != want {
+	if len(found) != 1 || found[0].excerpt != want {
 		t.Errorf("Excerpt = %+v, want %q", found, want)
 	}
 }
@@ -98,7 +98,7 @@ func TestTurnMaterial(t *testing.T) {
 		assistant,
 	)
 	m, err := TurnMaterial(compacted)
-	if err != nil || m.PastPrompts != nil || !m.Insufficient || m.Reason != insufficientCompacted || m.Turn[0].Text != "続けて" {
+	if err != nil || m.pastPrompts != nil || !m.Insufficient || m.reason != insufficientCompacted || m.turn[0].text != "続けて" {
 		t.Errorf("TurnMaterial = %+v, %v", m, err)
 	}
 	// compact の後に範囲の数だけ発言があれば、失われたとは言わない。
@@ -106,22 +106,22 @@ func TestTurnMaterial(t *testing.T) {
 	for i := range pastPrompts + 2 {
 		rows = append(rows, user(fmt.Sprintf("発言%d", i)))
 	}
-	if m, _ := TurnMaterial(lines(t, t.TempDir(), rows...)); m.Insufficient || len(m.PastPrompts) != pastPrompts {
+	if m, _ := TurnMaterial(lines(t, t.TempDir(), rows...)); m.Insufficient || len(m.pastPrompts) != pastPrompts {
 		t.Errorf("TurnMaterial = %+v", m)
 	}
 	// 通知は今回のターンの始まりにしない。
 	notified := lines(t, t.TempDir(), user("前の依頼"), user("今の依頼"), assistant, user("<task-notification>done</task-notification>"))
-	if m, _ := TurnMaterial(notified); m.Turn[0].Text != "今の依頼" || !slices.Equal(m.PastPrompts, []string{"前の依頼"}) {
+	if m, _ := TurnMaterial(notified); m.turn[0].text != "今の依頼" || !slices.Equal(m.pastPrompts, []string{"前の依頼"}) {
 		t.Errorf("TurnMaterial = %+v", m)
 	}
 	long := lines(t, t.TempDir(), user(strings.Repeat("あ", MaterialLimit+1)))
-	if m, _ := TurnMaterial(long); !m.Insufficient || m.Reason != insufficientTruncated || len([]rune(m.Turn[0].Text)) != MaterialLimit {
-		t.Errorf("切り詰め: %v %q", m.Insufficient, m.Reason)
+	if m, _ := TurnMaterial(long); !m.Insufficient || m.reason != insufficientTruncated || len([]rune(m.turn[0].text)) != MaterialLimit {
+		t.Errorf("切り詰め: %v %q", m.Insufficient, m.reason)
 	}
-	if m, err := TurnMaterial(filepath.Join(dir, "none")); err != nil || m.Reason != insufficientUnreadable {
+	if m, err := TurnMaterial(filepath.Join(dir, "none")); err != nil || m.reason != insufficientUnreadable {
 		t.Errorf("読めない: %+v, %v", m, err)
 	}
-	if m, _ := TurnMaterial(lines(t, t.TempDir(), assistant)); m.Reason != insufficientNoPrompt {
+	if m, _ := TurnMaterial(lines(t, t.TempDir(), assistant)); m.reason != insufficientNoPrompt {
 		t.Errorf("発言なし: %+v", m)
 	}
 }
@@ -135,7 +135,7 @@ func TestDelimitersInTheBodyCannotCloseTheDataBlock(t *testing.T) {
 		t.Errorf("defang = %q", got)
 	}
 	plan := Plan{AttemptID: "a", Targets: []string{"stop"}, Proposals: []Proposal{{Key: "proposal:x>:unsent", Route: RouteUnsent, Ident: "x y>"}}}
-	material := Material{PastPrompts: []string{evil}, Turn: []Utterance{{"user", evil}}}
+	material := Material{pastPrompts: []string{evil}, turn: []utterance{{"user", evil}}}
 	rendered := RenderMaterial(plan, material, "# c", map[string]string{"proposal:x>:unsent": evil})
 	if strings.Count(rendered, "</data>") != strings.Count(rendered, "<data kind") || strings.Count(rendered, "<criteria>") != 1 ||
 		strings.Contains(rendered, "x y>") {

@@ -12,13 +12,13 @@ import (
 
 // Tunable は環境変数で秒数を動かせる時間。判定の答えは変えず、待つ長さと数える長さだけを動かす。
 type Tunable struct {
-	Env     string
+	env     string
 	Default time.Duration
 }
 
 // Value は環境変数の秒数。無い・読めない・0 以下・有限でない値は既定。
 func (t Tunable) Value() time.Duration {
-	seconds, ok := Finite(os.Getenv(t.Env))
+	seconds, ok := Finite(os.Getenv(t.env))
 	if !ok || seconds <= 0 {
 		return t.Default
 	}

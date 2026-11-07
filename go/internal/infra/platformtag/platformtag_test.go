@@ -33,7 +33,7 @@ func TestHostTarget(t *testing.T) {
 			t.Errorf("hostTarget(%q, %q) = %q, want %q", c.system, c.machine, got, c.want)
 		}
 	}
-	if !slicesHasPrefix(HostTarget(), Systems) {
+	if !slicesHasPrefix(HostTarget(), systems) {
 		t.Errorf("HostTarget() = %q", HostTarget())
 	}
 }

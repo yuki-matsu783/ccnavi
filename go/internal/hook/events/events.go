@@ -111,7 +111,7 @@ func trackProposals(conf *config.Settings, in hookio.Input) {
 	case hookio.PostToolUse, hookio.PostToolUseFailure:
 		stopreview.Bind(conf.State, in.ToolUseID, now)
 		path, ok := in.ToolInput.Value("file_path").(string)
-		if in.Event != hookio.PostToolUse || !slices.Contains(config.WrittenFileTools, in.ToolName) || !ok {
+		if in.Event != hookio.PostToolUse || !slices.Contains(config.WrittenFileTools(), in.ToolName) || !ok {
 			return
 		}
 		if ident := stopreview.WrittenIdent(path, conf.Tickets); ident != "" {

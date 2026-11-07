@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -26,8 +27,6 @@ var (
 	DirectTmpDir  = filepath.Join("logs", "direct-tmp")
 	defaultPhases = filepath.Join(DefaultProjectHome, ConfigDir, "common", "phases.yml")
 	defaultRisk   = filepath.Join(DefaultProjectHome, ConfigDir, "common", "risks.yml")
-	// DefaultProjects はプロジェクトのリポジトリの置き場（ワークスペースルートからの相対）。
-	DefaultProjects = "projects"
 
 	// LocalClaudeSettings は個人の上書き設定。`env` は Claude Code が起こしたプロセスに渡る。
 	LocalClaudeSettings = filepath.Join(ClaudeDir, "settings.local.json")
@@ -49,6 +48,11 @@ const (
 	ClaudeDir = ".claude"
 	// SkillsDir はスキルの置き場（ClaudeDir の下と、プロジェクトのルートの下）。
 	SkillsDir = "skills"
+	// DefaultProjects はプロジェクトのリポジトリの置き場（ワークスペースルートからの相対）。
+	DefaultProjects = "projects"
+	// MdExt は md の文書（チケット・提案・索引に載せる文書・学びの記録など）の拡張子。比べるときは
+	// pathcase.HasExt で大文字小文字を区別せずに見る。
+	MdExt = ".md"
 	// SkillFile はスキル 1 つの本文（SkillsDir/<名前>/ の下）。
 	SkillFile = "SKILL.md"
 	// SkillHeadLimit は SKILL.md（とサブエージェントの md）の frontmatter を探す頭の長さ（バイト）。本文は読まない。
@@ -249,7 +253,7 @@ const (
 // readLocal は上書き設定を読む。不正なファイルは報告して読み飛ばす
 // （カンマ 1 つの書き損じでガードが消えないように）。
 func readLocal(root string) (*pyjson.Object, []string) {
-	// UTF-8 でないとき（ospath.ErrNotUTF8）、Python は内部エラーになるが、ここでは読めないファイルとして扱う。
+	// UTF-8 でないとき（ospath.errNotUTF8）、Python は内部エラーになるが、ここでは読めないファイルとして扱う。
 	text, err := ospath.ReadDiskText(filepath.Join(root, localFile))
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
@@ -319,12 +323,18 @@ func ReadHookView(root string) HookView {
 	return HookView{Mode: values[env.Mode], TicketControl: ticketControl}
 }
 
-// DefaultBranchPrefixes は親の識別子の先頭の語の既定。`release` は統合先の名前（`release-*`）に当たるので入れない。
-var DefaultBranchPrefixes = []string{"feature", "hotfix", "fix", "bugfix", "chore", "refactor", "docs"}
+// defaultBranchPrefixes は親の識別子の先頭の語の既定。`release` は統合先の名前（`release-*`）に当たるので入れない。
+var defaultBranchPrefixes = []string{"feature", "hotfix", "fix", "bugfix", "chore", "refactor", "docs"}
 
-// ReservedBranchIDs は統合先や保護されたブランチの名前（ccnavi-git.sh の push の拒否と同じリスト）。親の識別子の
+// DefaultBranchPrefixes は defaultBranchPrefixes の写しを返す（呼び手が書き換えても元は変わらない）。
+func DefaultBranchPrefixes() []string { return slices.Clone(defaultBranchPrefixes) }
+
+// reservedBranchIDs は統合先や保護されたブランチの名前（ccnavi-git.sh の push の拒否と同じリスト）。親の識別子の
 // 先頭の語にも使えない。持ち主は tickets/model/ids（ids.ReservedBranchIDs）で、infra は tickets を読めないのでここに置く。
-var ReservedBranchIDs = []string{"main", "master", "develop", "release"}
+var reservedBranchIDs = []string{"main", "master", "develop", "release"}
+
+// ReservedBranchIDs は reservedBranchIDs の写しを返す（呼び手が書き換えても元は変わらない）。
+func ReservedBranchIDs() []string { return slices.Clone(reservedBranchIDs) }
 
 var prefixPattern = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
 
@@ -333,7 +343,7 @@ func IsBranchPrefix(word string) bool {
 	if !prefixPattern.MatchString(word) {
 		return false
 	}
-	for _, r := range ReservedBranchIDs {
+	for _, r := range reservedBranchIDs {
 		if word == r {
 			return false
 		}
@@ -358,7 +368,7 @@ func parseBranchPrefixes(text string) (words, rejected []string) {
 		}
 	}
 	if len(words) == 0 {
-		words = append([]string(nil), DefaultBranchPrefixes...)
+		words = append([]string(nil), defaultBranchPrefixes...)
 	}
 	return words, rejected
 }
@@ -377,5 +387,5 @@ func branchPrefixes(root string) ([]string, []string) {
 			return parseBranchPrefixes(v)
 		}
 	}
-	return append([]string(nil), DefaultBranchPrefixes...), nil
+	return append([]string(nil), defaultBranchPrefixes...), nil
 }

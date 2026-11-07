@@ -141,7 +141,7 @@ func (a *Action) formatArgs(defaultMetavar string) string {
 		return out
 	}
 	switch a.nargs {
-	case One:
+	case one:
 		return metavar(1)[0]
 	case Optional:
 		return "[" + metavar(1)[0] + "]"

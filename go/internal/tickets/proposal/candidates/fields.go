@@ -56,7 +56,7 @@ func shorthandProblems(t *ticket.Ticket) []rules.Problem {
 // 着手の基準点（base_sha）は、これらの欄をスクリプトだけが書くことを前提にしている。
 func scriptFieldProblems(t *ticket.Ticket) []rules.Problem {
 	var found []string
-	for _, name := range ticket.ScriptFields {
+	for _, name := range ticket.ScriptFields() {
 		v := t.Raw.Get(name)
 		if s, isStr := v.(string); v == nil || (isStr && s == "") {
 			continue

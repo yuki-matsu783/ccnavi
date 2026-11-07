@@ -238,7 +238,7 @@ func TestParseMatchesPython(t *testing.T) {
 		}
 		if tk != nil {
 			script := []string{}
-			for _, k := range ScriptFields {
+			for _, k := range scriptFields {
 				script = append(script, *tk.scriptField(k))
 			}
 			review := map[Need]string{Unsaid: "", Needed: "yes", Unneeded: "no"}[tk.ReviewRequired]
@@ -250,7 +250,7 @@ func TestParseMatchesPython(t *testing.T) {
 			for _, p := range SubsetProblems(tk, parent) {
 				subset = append(subset, []string{string(p.Severity), p.Rule, p.Detail})
 			}
-			names := tk.BranchNameProblems("Trunk", config.DefaultBranchPrefixes)
+			names := tk.BranchNameProblems("Trunk", config.DefaultBranchPrefixes())
 			if names == nil {
 				names = []string{}
 			}
@@ -260,7 +260,7 @@ func TestParseMatchesPython(t *testing.T) {
 			}
 			maint := "None"
 			if tk.HasMaintenance {
-				maint = pyfmt.Repr(tk.Maintenance)
+				maint = pyfmt.Repr(tk.maintenance)
 			}
 			issueText := ""
 			if tk.Raw.Has("issue") {

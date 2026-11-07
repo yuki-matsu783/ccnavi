@@ -121,7 +121,7 @@ func TestProblems(t *testing.T) {
 
 func TestRepositoryCCNAVIMDHasNoProblems(t *testing.T) {
 	root := testkit.RepoRoot(t)
-	data, err := os.ReadFile(filepath.Join(root, ".ccnavi", File))
+	data, err := os.ReadFile(filepath.Join(root, ".ccnavi", file))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func newScriptFixture(t *testing.T) scriptFixture {
 }
 
 func (f scriptFixture) write(body string) {
-	testkit.Put(f.t, filepath.Join(f.root, config.DefaultProjectHome, config.ScriptsDir, ScriptFile), body)
+	testkit.Put(f.t, filepath.Join(f.root, config.DefaultProjectHome, config.ScriptsDir, scriptFile), body)
 }
 
 func (f scriptFixture) flags(md string, docs bool, deny map[string]bool) map[string]bool {
@@ -205,9 +205,9 @@ func TestScriptConditions(t *testing.T) {
 func sessionWorkspace(t *testing.T, md string) string {
 	root := testkit.TempRoot(t)
 	if md != "" {
-		testkit.Put(t, filepath.Join(root, config.DefaultProjectHome, File), md)
+		testkit.Put(t, filepath.Join(root, config.DefaultProjectHome, file), md)
 	}
-	testkit.Put(t, filepath.Join(root, config.DefaultProjectHome, config.ScriptsDir, ScriptFile), "ccnavi_cond_mine() { return 0; }\n")
+	testkit.Put(t, filepath.Join(root, config.DefaultProjectHome, config.ScriptsDir, scriptFile), "ccnavi_cond_mine() { return 0; }\n")
 	os.MkdirAll(filepath.Join(root, "projects", "lib", ".git"), 0o755)
 	return root
 }
@@ -216,7 +216,7 @@ func sessionWorkspace(t *testing.T, md string) string {
 // 答えから取った）と比べる。リポジトリの CCNAVI.md は書き換わるので、段と置き換えが残らないことだけを見る。
 func TestSessionTextMatchesPython(t *testing.T) {
 	repo := testkit.RepoRoot(t)
-	data, err := os.ReadFile(filepath.Join(repo, ".ccnavi", File))
+	data, err := os.ReadFile(filepath.Join(repo, ".ccnavi", file))
 	if err != nil {
 		t.Fatal(err)
 	}

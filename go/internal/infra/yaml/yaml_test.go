@@ -127,12 +127,12 @@ var aliasCases = []struct {
 	{"error-before-alias", "a: [1\nb: *x\n", "while parsing a flow sequence\n  in \"<unicode string>\", line 1, column 4:\n    a: [1\n       ^\nexpected ',' or ']', but got ':'\n  in \"<unicode string>\", line 2, column 2:\n    b: *x\n     ^", true},
 }
 
-// outcome は読めたら値の repr、読めなければ文。読めない文書は必ず ErrUnreadable を満たす。
+// outcome は読めたら値の repr、読めなければ文。読めない文書は必ず errUnreadable を満たす。
 func outcome(t *testing.T, load func(string) (any, error), doc string) (string, bool) {
 	t.Helper()
 	v, err := load(doc)
 	if err != nil {
-		if !errors.Is(err, ErrUnreadable) {
+		if !errors.Is(err, errUnreadable) {
 			t.Fatalf("読めない文書が ErrUnreadable でない: %v", err)
 		}
 		return err.Error(), true
@@ -171,7 +171,7 @@ func TestLoadRefusingAliases(t *testing.T) {
 
 // 組み立ての途中の失敗は、別名を拒む読み方でも読めない文書として上がる。
 func TestRefusingAliasesStillWrapsBuildErrors(t *testing.T) {
-	if _, err := LoadRefusingAliases("ticket: !!int\n"); !errors.Is(err, ErrUnreadable) || errors.Is(err, ErrAlias) {
+	if _, err := LoadRefusingAliases("ticket: !!int\n"); !errors.Is(err, errUnreadable) || errors.Is(err, ErrAlias) {
 		t.Errorf("got %v", err)
 	}
 }
@@ -192,7 +192,7 @@ func TestDeepNesting(t *testing.T) {
 	n = 100000
 	for _, load := range []func(string) (any, error){Load, LoadRefusingAliases} {
 		_, err = load(strings.Repeat("[", n) + strings.Repeat("]", n))
-		if !errors.Is(err, ErrUnreadable) || err.Error() != msgTooDeep {
+		if !errors.Is(err, errUnreadable) || err.Error() != msgTooDeep {
 			t.Errorf("%d 段: %v", n, err)
 		}
 	}
@@ -222,10 +222,10 @@ func TestMapAccessors(t *testing.T) {
 			t.Errorf("Text(%q) = %q, want %q", key, got, want)
 		}
 	}
-	if tags, ok := m.Strings("tags"); !ok || len(tags) != 2 {
+	if tags, ok := Strings(m.Get("tags")); !ok || len(tags) != 2 {
 		t.Errorf("Strings(tags) = %v %v", tags, ok)
 	}
-	if _, ok := m.Strings("mixed"); ok {
+	if _, ok := Strings(m.Get("mixed")); ok {
 		t.Error("文字列でない要素のある列を文字列の列として読んだ")
 	}
 	if got, _ := m.Map("sub").String("x"); got != "y" {
@@ -233,12 +233,6 @@ func TestMapAccessors(t *testing.T) {
 	}
 	if m.Map("missing").Text("x") != "" || m.Map("id").Len() != 0 {
 		t.Error("無いマップの取り出しが既定の値を返さない")
-	}
-	if n, ok := m.Int("id"); !ok || n != 12 {
-		t.Errorf("Int(id) = %v %v", n, ok)
-	}
-	if _, ok := m.Int("flag"); ok {
-		t.Error("真偽を整数として読んだ")
 	}
 	at := m.Get("at").(DateTime)
 	if at.ISOFormat() != "2026-01-02T03:04:05+09:00" || at.Time().UTC().Hour() != 18 {
@@ -259,22 +253,22 @@ func TestErrorClassMatchesPyYAML(t *testing.T) {
 		doc  string
 		want Class
 	}{
-		{"a: \x01", ReaderError},
-		{"a: b: c", ScannerError},
-		{"a:\tb", ScannerError},
-		{"a: '", ScannerError},
-		{"a: [", ParserError},
-		{"- a\nb: 1", ParserError},
-		{"%YAML 1.1\n%YAML 1.1\n--- a", ParserError},
-		{"a: *x", ComposerError},
-		{"a: &x 1\nb: &x 2", ComposerError},
-		{"--- a\n--- b", ComposerError},
+		{"a: \x01", readerError},
+		{"a: b: c", scannerError},
+		{"a:\tb", scannerError},
+		{"a: '", scannerError},
+		{"a: [", parserError},
+		{"- a\nb: 1", parserError},
+		{"%YAML 1.1\n%YAML 1.1\n--- a", parserError},
+		{"a: *x", composerError},
+		{"a: &x 1\nb: &x 2", composerError},
+		{"--- a\n--- b", composerError},
 		{"a: !!python/name:os.system x", ConstructorError},
 		{"? [a]\n: 1", ConstructorError},
-		{"a: !!int abc", LoadError},
-		{"a: !!bool maybe", LoadError},
-		{"a: !!timestamp 2020-13-01", LoadError},
-		{"a: " + strings.Repeat("[", 3000), LoadError},
+		{"a: !!int abc", loadError},
+		{"a: !!bool maybe", loadError},
+		{"a: !!timestamp 2020-13-01", loadError},
+		{"a: " + strings.Repeat("[", 3000), loadError},
 	}
 	for _, c := range cases {
 		_, err := Load(c.doc)

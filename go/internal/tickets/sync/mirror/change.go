@@ -32,13 +32,13 @@ const tempSuffix = ".ccnavi-sync"
 type Change struct {
 	// Rel は写し先のツリーからの相対（リンクを解いた実体から。"/" 区切り）。
 	Rel    string
-	Target string
-	// Content は書く中身。Remove なら使わない。
-	Content []byte
-	Remove  bool
-	// Before は変える前の中身（戻すときに使う）。Existed が偽なら無かった。
-	Before  []byte
-	Existed bool
+	target string
+	// content は書く中身。remove なら使わない。
+	content []byte
+	remove  bool
+	// before は変える前の中身（戻すときに使う）。existed が偽なら無かった。
+	before  []byte
+	existed bool
 	// sweep は消したあと空になったディレクトリを片付ける置き場（消す変更だけ）。
 	sweep string
 }
@@ -46,9 +46,9 @@ type Change struct {
 // Action は変更の種類。消すなら delete、元が無ければ create、あれば update。
 func (c Change) Action() Action {
 	switch {
-	case c.Remove:
+	case c.remove:
 		return ActionDelete
-	case !c.Existed:
+	case !c.existed:
 		return ActionCreate
 	}
 	return ActionUpdate
@@ -81,8 +81,8 @@ func updates(treeRoot, base string, wanted map[string][]byte) ([]Change, string)
 		if existed && same(before, wanted[name]) {
 			continue
 		}
-		out = append(out, Change{Rel: relReal(treeRoot, target), Target: target, Content: wanted[name],
-			Before: before, Existed: existed})
+		out = append(out, Change{Rel: relReal(treeRoot, target), target: target, content: wanted[name],
+			before: before, existed: existed})
 	}
 	return out, ""
 }
@@ -102,8 +102,8 @@ func removals(treeRoot, dir string, present []string, gone func(rel string) bool
 			}
 			return nil, unreadable(relReal(treeRoot, target), why)
 		}
-		out = append(out, Change{Rel: relReal(treeRoot, target), Target: target, Remove: true,
-			Before: before, Existed: true, sweep: dir})
+		out = append(out, Change{Rel: relReal(treeRoot, target), target: target, remove: true,
+			before: before, existed: true, sweep: dir})
 	}
 	return out, ""
 }
@@ -151,14 +151,14 @@ func scan(dir, shownFrom string) ([]string, string) {
 // 戻せなかったものを名指しする。書けたら、消す変更の置き場と prune の下から空になったディレクトリを片付ける。
 func apply(changes []Change, prune ...string) string {
 	for i, c := range changes {
-		failed := put(c.Target, c.Content, c.Remove)
+		failed := put(c.target, c.content, c.remove)
 		if failed == "" {
 			continue
 		}
 		var stuck []string
 		for j := i - 1; j >= 0; j-- {
 			w := changes[j]
-			if put(w.Target, w.Before, !w.Existed) != "" {
+			if put(w.target, w.before, !w.existed) != "" {
 				stuck = append(stuck, w.Rel)
 			}
 		}
@@ -168,7 +168,7 @@ func apply(changes []Change, prune ...string) string {
 		return c.Rel + " を保存できませんでした: " + failed + "（した分は戻した）"
 	}
 	for _, c := range changes {
-		if c.Remove && !slices.Contains(prune, c.sweep) {
+		if c.remove && !slices.Contains(prune, c.sweep) {
 			prune = append(prune, c.sweep)
 		}
 	}
@@ -259,9 +259,9 @@ func describe(changes []Change) []string {
 	for _, c := range changes {
 		state := "上書き"
 		switch {
-		case c.Remove:
+		case c.remove:
 			state = "削除した"
-		case !c.Existed:
+		case !c.existed:
 			state = "新しく置いた"
 		}
 		lines = append(lines, "  - "+c.Rel+"（"+state+"）")

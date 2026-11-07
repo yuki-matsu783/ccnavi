@@ -19,7 +19,7 @@ type Kind string
 
 const (
 	Edit Kind = "edit"
-	Read Kind = "read"
+	read Kind = "read"
 )
 
 // readOnlyBuiltin は組み込みで読み取り専用のサブエージェント（畳んだ名前）。同名のプロジェクトの定義があれば
@@ -36,8 +36,6 @@ var readOnlyTools = []string{
 const (
 	// agentsDir はサブエージェントの定義の置き場（ルートの .claude/ の下）。
 	agentsDir = "agents"
-	// definitionExt は定義のファイルの拡張子。
-	definitionExt = ".md"
 	// headLimit は定義の frontmatter を読む長さの上限（バイト）。
 	headLimit = 16384
 	// keyTools・keyName は定義の frontmatter の欄。
@@ -58,7 +56,7 @@ func Of(roots []string, agentType string, tools []string) Kind {
 	meta := definition(roots, name)
 	if meta == nil {
 		if slices.Contains(readOnlyBuiltin, name) {
-			return Read
+			return read
 		}
 		return Edit
 	}
@@ -82,7 +80,7 @@ func kindOfTools(tools []string) Kind {
 			return Edit
 		}
 	}
-	return Read
+	return read
 }
 
 // names は tools の値（カンマ区切りの文字列か、文字列の列）。読めなければ偽。
@@ -110,7 +108,7 @@ func definition(roots []string, name string) *yaml.Map {
 		}
 		for _, entry := range entries {
 			path := ospath.Join(folder, entry)
-			stem, ok := strings.CutSuffix(entry, definitionExt)
+			stem, ok := strings.CutSuffix(entry, config.MdExt)
 			if !ok || !ospath.IsRegular(path) {
 				continue
 			}
@@ -143,7 +141,7 @@ func front(path string) *yaml.Map {
 		return nil
 	}
 	text, _ := fsio.DecodeBytes(head[:n], fsio.Replace)
-	body, state := yaml.FrontBody(strings.TrimPrefix(text, "\ufeff"), yaml.FrontStyle{Indented: true})
+	body, state := yaml.FrontBody(text, yaml.FrontStyle{Indented: true, SkipBOM: true})
 	if state != yaml.FrontClosed {
 		return nil
 	}

@@ -79,7 +79,7 @@ func gitText(top string, args []string) string {
 		return done.Failure.Error()
 	}
 	if done.Code != 0 {
-		if text := strings.Join(strings.Fields(done.Stderr), " "); text != "" {
+		if text := ospath.Squeeze(done.Stderr); text != "" {
 			return text
 		}
 		return fmt.Sprintf("git %s が失敗した", args[0])

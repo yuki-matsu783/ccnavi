@@ -68,7 +68,7 @@ func (r *run) rotate(logPath string, limit int64) bool {
 		return false
 	}
 	if r.dry {
-		r.report.Rotated = append(r.report.Rotated, Rotation{r.shown(logPath), r.shown(previewName(logPath, r.now))})
+		r.report.rotated = append(r.report.rotated, rotation{r.shown(logPath), r.shown(previewName(logPath, r.now))})
 		return true
 	}
 	target, err := reserve(logPath, r.now)
@@ -87,7 +87,7 @@ func (r *run) rotate(logPath string, limit int64) bool {
 		}
 		return false
 	}
-	r.report.Rotated = append(r.report.Rotated, Rotation{r.shown(logPath), r.shown(target)})
+	r.report.rotated = append(r.report.rotated, rotation{r.shown(logPath), r.shown(target)})
 	return true
 }
 
@@ -119,7 +119,7 @@ func (r *run) pruneLogs(logPath string, before time.Time) {
 			continue
 		}
 		if r.remove(path) {
-			r.report.Logs = append(r.report.Logs, r.shown(path))
+			r.report.logs = append(r.report.logs, r.shown(path))
 		}
 	}
 }
@@ -159,7 +159,7 @@ func (r *run) pruneDiag(rotateMB, logDays float64) {
 			continue
 		}
 		if r.remove(path) {
-			r.report.Logs = append(r.report.Logs, r.shown(path))
+			r.report.logs = append(r.report.logs, r.shown(path))
 		}
 	}
 }

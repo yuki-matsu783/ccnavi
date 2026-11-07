@@ -30,7 +30,7 @@ const shellMatch = config.ToolBash
 
 var (
 	// namedMatch は名前で書くツール。
-	namedMatch = rules.MatchOf(config.WriteTools...)
+	namedMatch = rules.MatchOf(config.WriteTools()...)
 	// settingsRegex は `.claude/settings.json` と `settings.local.json`（config.SharedClaudeSettings・LocalClaudeSettings）。
 	settingsRegex = pyre.AnySeparator + pyre.Escape(config.ClaudeDir) + pyre.AnySeparator + `settings(\.local)?\.json$`
 	// hooksGlob は hook の sh の置き場の下。

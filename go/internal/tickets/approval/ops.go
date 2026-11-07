@@ -105,18 +105,18 @@ func NoteMR(path string, number int) (string, fields.MRResult) {
 
 // CloseCopy は承認済みチケットを doing/ から done/ へ動かす。
 func CloseCopy(approvedDir, id string) string {
-	return MoveFile(CopyPath(approvedDir, id), ClosedPath(approvedDir, id))
+	return moveFile(CopyPath(approvedDir, id), ClosedPath(approvedDir, id))
 }
 
 // ToReview は承認済みチケットを doing/ から提案の置き場の review/ へ動かす。
 func ToReview(approvedDir, treeRoot, ticketsRel, id string) string {
 	target := place.File(treeRoot, ticketsRel, place.Review, id)
-	return MoveFile(CopyPath(approvedDir, id), target)
+	return moveFile(CopyPath(approvedDir, id), target)
 }
 
-// MoveFile はチケットを置き場から置き場へ動かす。動かせなければ理由。行き先に同じ名前が既に在れば動かさない
+// moveFile はチケットを置き場から置き場へ動かす。動かせなければ理由。行き先に同じ名前が既に在れば動かさない
 // （黙って上書きすると、閉じた側の記録が消える）。またぐときのコピーと戻しは fsio.Move が持つ。
-func MoveFile(source, target string) string {
+func moveFile(source, target string) string {
 	if fsio.Exists(target) {
 		return "チケットを動かせない (" + source + " → " + target + ": 移動先に既にある)"
 	}
@@ -149,7 +149,7 @@ func SettleReview(conf *config.Settings, root, parentID string, numbers []int, b
 				return moved, failed, nil
 			}
 		}
-		if failed := MoveFile(t.Path, ClosedPath(where, t.ID)); failed != "" {
+		if failed := moveFile(t.Path, ClosedPath(where, t.ID)); failed != "" {
 			return moved, failed, nil
 		}
 		moved = append(moved, t.ID)
@@ -210,11 +210,11 @@ func NextChildID(conf *config.Settings, root, parentID string, phase int) (strin
 // ExistingTicketFile はこの識別子のファイルが、どこかの置き場にすでに在ればそのパス（無ければ空）。読めない
 // ファイルも名前で拾い、大文字小文字は区別しない。見るのは全ツリーの承認済みの doing/ done/ と、提案の todo/ review/。
 func ExistingTicketFile(conf *config.Settings, root, id string) string {
-	want := pathcase.Fold(id + place.MdExt)
+	want := pathcase.Fold(id + config.MdExt)
 	for _, tr := range Trees(conf, root) {
 		approved := conf.ApprovedDir(tr.Root)
 		places := []string{ospath.Join(approved, string(place.Doing)), ospath.Join(approved, string(place.Done))}
-		for _, state := range place.States {
+		for _, state := range place.States() {
 			places = append(places, place.Dir(tr.Root, conf.Tickets, state))
 		}
 		for _, dir := range places {
@@ -266,7 +266,7 @@ func followupTicket(conf *config.Settings, root string, parent *ticket.Ticket, p
 	front.Put("title", "フェーズ "+n+" のレビューの指摘に応える")
 	front.Put("rationale", "フェーズ "+n+" のレビューで残った指摘に応える。"+
 		"ユーザがターミナルで起こした続きの子で、承認はその判断で済んでいる。\n")
-	for _, section := range rules.Sections {
+	for _, section := range rules.Sections() {
 		var entries []any
 		keys := map[string]bool{}
 		for _, c := range children {

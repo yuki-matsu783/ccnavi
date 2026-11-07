@@ -97,8 +97,8 @@ func TestMatchesPython(t *testing.T) {
 		if d == nil {
 			return nil
 		}
-		return []any{d.Name, rel(d.Worktree), d.Head, d.Dirty, d.Ahead, d.Integration, rel(d.IntegTree), rel(d.Blocked),
-			d.Base, d.NoRecord, d.Marker, d.OriginAhead, d.Key(), d.Digest(), rel(IntegrateNudge(goRoot, d)), rel(BlockedNotice(d))}
+		return []any{d.Name, rel(d.worktree), d.head, d.dirty, d.ahead, d.integration, rel(d.integTree), rel(d.Blocked),
+			d.base, d.noRecord, d.marker, d.originAhead, d.Key(), d.Digest(), rel(IntegrateNudge(goRoot, d)), rel(BlockedNotice(d))}
 	}
 	trees := map[string]any{}
 	for _, name := range directNames {
@@ -113,7 +113,7 @@ func TestMatchesPython(t *testing.T) {
 			for k, v := range r.Fields {
 				fields[k] = rel(v)
 			}
-			if r.Broken {
+			if r.broken {
 				fields["broken"] = "yes"
 			}
 			rec = []any{fields}
@@ -129,7 +129,7 @@ func TestMatchesPython(t *testing.T) {
 		}
 		reason, unsure := DirectCheck(conf, goRoot, here, time.Time{})
 		trees[name] = map[string]any{
-			"probe":  []any{got.State, got.Drop, direct(got.Found)},
+			"probe":  []any{got.state, got.drop, direct(got.found)},
 			"check":  []any{reason, unsure},
 			"bound":  rel(BoundReason(conf, goRoot, here)),
 			"record": rec,

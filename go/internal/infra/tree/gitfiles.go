@@ -52,9 +52,9 @@ func commonGitDir(gitdir string) string {
 // headFile は git ディレクトリの中の HEAD の名前。
 const headFile = "HEAD"
 
-// HeadText はこのツリーの `HEAD` の中身（前後の空白を除く）。読めなければ ok が偽。
+// headText はこのツリーの `HEAD` の中身（前後の空白を除く）。読めなければ ok が偽。
 // HEAD をファイルから読むのはここだけにする。
-func HeadText(treeRoot string) (string, bool) {
+func headText(treeRoot string) (string, bool) {
 	gitdir, ok := GitDir(treeRoot)
 	if !ok {
 		return "", false
@@ -139,8 +139,8 @@ func OriginHead(repoRoot string) string {
 	return ospath.Strip(text[len(originHeadPrefix):])
 }
 
-// BusyMarks は途中の操作（merge・cherry-pick・revert・rebase）の目印（git ディレクトリの中の名前）。
-var BusyMarks = []string{"MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply", "sequencer"}
+// busyMarks は途中の操作（merge・cherry-pick・revert・rebase）の目印（git ディレクトリの中の名前）。
+var busyMarks = []string{"MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply", "sequencer"}
 
 // BusyOf はこのツリーで途中の操作があればその目印の名前。無ければ空。
 func BusyOf(treeRoot string) string {
@@ -148,7 +148,7 @@ func BusyOf(treeRoot string) string {
 	if !ok {
 		return ""
 	}
-	for _, name := range BusyMarks {
+	for _, name := range busyMarks {
 		if ospath.DiskLexists(ospath.Join(gitdir, name)) {
 			return name
 		}
@@ -161,7 +161,7 @@ const headsPrefix = "ref: refs/heads/"
 // BranchOf はこのツリーが今いるブランチの名前。切り離した HEAD・空・読めないものは ok が偽
 // （呼び手はツリーの名前で代える）。
 func BranchOf(treeRoot string) (string, bool) {
-	head, ok := HeadText(treeRoot)
+	head, ok := headText(treeRoot)
 	if !ok || !strings.HasPrefix(head, headsPrefix) {
 		return "", false
 	}

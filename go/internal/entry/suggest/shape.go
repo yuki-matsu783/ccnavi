@@ -51,7 +51,7 @@ func shapeOf(tool, subject, root string) (shaped, bool) {
 	switch {
 	case tool == config.ToolBash:
 		return bashShape(subject)
-	case slices.Contains(config.PathTools, tool):
+	case slices.Contains(config.PathTools(), tool):
 		return pathShape(tool, subject, root)
 	case tool == config.ToolWebFetch:
 		scheme, netloc, ok := splitURL(subject)
@@ -66,7 +66,7 @@ func shapeOf(tool, subject, root string) (shaped, bool) {
 
 func bashShape(subject string) (shaped, bool) {
 	first, _, _ := strings.Cut(ospath.Strip(subject), "\n")
-	words := strings.FieldsFunc(first, ospath.IsSpace)
+	words := ospath.Fields(first)
 	for len(words) > 0 && envAssign.MatchString(words[0]) {
 		words = words[1:]
 	}

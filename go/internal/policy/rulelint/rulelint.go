@@ -108,7 +108,7 @@ func ruleProblems(rule *rules.Rule, name, home string, project bool) []rules.Pro
 	}
 	// {script:<名前>} の形が不正なら置き換わらず、スクリプトが無ければ置き換わっても実行できない。
 	for _, t := range texts {
-		for _, hit := range rules.ScriptPlaceholder.FindAllStringSubmatch(t.text, -1) {
+		for _, hit := range rules.ScriptPlaceholders(t.text) {
 			whole, script := hit[0], hit[1]
 			var why string
 			switch {
@@ -235,7 +235,7 @@ func hitsAll(re searcher, probes []string) bool {
 func shellTools(match string) []string {
 	tools := wants(match)
 	var shells []string
-	for _, t := range config.ShellTools {
+	for _, t := range config.ShellTools() {
 		if slices.Contains(tools, t) {
 			shells = append(shells, t)
 		}
@@ -521,7 +521,7 @@ func alternatives(regex string) int {
 // 実際に呼んで確かめる。判定がツールを増やしたときに、こちらが気づかないうちに古くならないようにするためである。
 func inert(match string) []string {
 	probe := pyjson.NewObject()
-	for _, f := range rules.SubjectFields {
+	for _, f := range rules.SubjectFields() {
 		probe.Set(f.Field, "x")
 	}
 	var out []string

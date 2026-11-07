@@ -240,7 +240,7 @@ func TestNextTextsRenderOneNextLine(t *testing.T) {
 	c := Load(repo)
 	n := 0
 	for id, e := range c.Entries {
-		if e.Kind != KindNext {
+		if e.kind != kindNext {
 			continue
 		}
 		n++
@@ -338,7 +338,7 @@ func TestCheckTextAgainstPython(t *testing.T) {
 // sh の案内（note-sh.yml）は、値を埋めると案内: の行だけになり、次: の行を足さない（次: は 1 行と数える）。
 func TestShNotesRenderAsNoteLinesOnly(t *testing.T) {
 	repo := repoRoot(t)
-	data, err := os.ReadFile(filepath.Join(Dir(repo), "note-sh.yml"))
+	data, err := os.ReadFile(filepath.Join(dir(repo), "note-sh.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}

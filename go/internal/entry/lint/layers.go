@@ -19,7 +19,6 @@ import (
 	"ccnavi/internal/tickets/lifecycle/integrate"
 	"ccnavi/internal/tickets/model/archive"
 	"ccnavi/internal/tickets/model/standing"
-	"ccnavi/internal/tickets/model/ticket"
 )
 
 // 設定のレイヤーをまたぐ検査。1 つのレイヤーの 1 本ずつの検査は tickets/config/check にある。
@@ -135,16 +134,11 @@ func parentTreesOffBranch(conf *config.Settings, root string) []rules.Problem {
 	return out
 }
 
-// holdsParent はそのツリーに `ticket: <ツリーの名前>` の親の承認済みチケットか提案があるか（sh の ccnavi_parent_tree と
-// 同じ見方）。ready の後は親が手元の退避へ移るので、そこに親が在っても親のワークツリーとして扱う。
+// holdsParent はそのツリーに `ticket: <ツリーの名前>` の親の承認済みチケットか提案があるか（見方は approval.ParentIn で、
+// sh の ccnavi_parent_tree とも同じ）。ready の後は親が手元の退避へ移るので、そこに親が在っても親のワークツリーとして扱う。
 func holdsParent(conf *config.Settings, work tree.Tree, root string) bool {
-	for _, path := range approval.ParentPaths(conf, work.Root, work.Name) {
-		if !ospath.IsFile(path) {
-			continue
-		}
-		if t, _ := ticket.Load(path); t != nil && t.ID == work.Name && t.Parent == "" {
-			return true
-		}
+	if front, _ := approval.ParentIn(approval.ParentPaths(conf, work.Root, work.Name), work.Name); front != nil {
+		return true
 	}
 	if root == "" {
 		return false
@@ -192,12 +186,12 @@ func drift(conf *config.Settings, root, project string) ([]rules.Problem, bool) 
 	homeRel := strings.Trim(ospath.Slashed(projectHome(conf)), "/")
 	var rels []string
 	if project == "" {
-		for _, kind := range config.LayerKinds {
-			rels = append(rels, config.DefaultProjectHome+"/"+config.CommonDir+"/"+config.LayerFileNames[kind])
+		for _, kind := range config.LayerKinds() {
+			rels = append(rels, config.DefaultProjectHome+"/"+config.CommonDir+"/"+config.LayerFileNames()[kind])
 		}
 	}
-	for _, kind := range config.LayerKinds {
-		rels = append(rels, homeRel+"/"+config.LayerConfigDir+"/"+config.LayerFileNames[kind])
+	for _, kind := range config.LayerKinds() {
+		rels = append(rels, homeRel+"/"+config.LayerConfigDir+"/"+config.LayerFileNames()[kind])
 	}
 	layer := project
 	if layer == "" {

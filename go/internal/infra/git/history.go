@@ -12,8 +12,8 @@ import (
 
 // 読めなかった理由（ChildBase）。
 var (
-	ErrNoTrees     = errors.New("子か親のワークツリーが決まらない")
-	ErrNoMergeBase = errors.New("子のブランチと親のブランチの共通の祖先を読めない")
+	errNoTrees     = errors.New("子か親のワークツリーが決まらない")
+	errNoMergeBase = errors.New("子のブランチと親のブランチの共通の祖先を読めない")
 )
 
 // ref の頭。
@@ -102,7 +102,7 @@ func ForkBase(top string, others []string, timeout time.Duration) string {
 // childHead が空でなければ、子の HEAD の代わりにその sha から求める。読めなければ理由のエラー。
 func ChildBase(childTree, parentTree string, timeout time.Duration, childHead string) (string, error) {
 	if childTree == "" || parentTree == "" {
-		return "", ErrNoTrees
+		return "", errNoTrees
 	}
 	parent := Head(parentTree, stateOptions(timeout))
 	if parent == "" {
@@ -113,7 +113,7 @@ func ChildBase(childTree, parentTree string, timeout time.Duration, childHead st
 	}
 	found := firstOut(runGit(childTree, []string{"merge-base", childHead, parent}, stateOptions(timeout)))
 	if found == "" {
-		return "", ErrNoMergeBase
+		return "", errNoMergeBase
 	}
 	return found, nil
 }

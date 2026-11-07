@@ -8,8 +8,8 @@ import (
 	"ccnavi/internal/infra/pyjson"
 )
 
-// Schema は要求と答えの形の版。拡張の CCNAVI_SCHEMA と揃える。
-const Schema = 1
+// schema は要求と答えの形の版。拡張の CCNAVI_SCHEMA と揃える。
+const schema = 1
 
 // refusal は要求そのものを受けない理由。答えの error に文面を入れて返す。
 type refusal struct{ text string }
@@ -51,13 +51,13 @@ func Handle(request, root string) string {
 	case err != nil:
 		body = pyjson.NewObject("error", "ccnavi: 想定外の失敗で止まった: "+err.Error())
 	}
-	out := pyjson.NewObject("schema", Schema)
+	out := pyjson.NewObject("schema", schema)
 	for _, k := range body.Keys() {
 		out.Set(k, body.Value(k))
 	}
 	text, err := pyjson.Dumps(out, pyjson.Options{RawUnicode: true})
 	if err != nil {
-		return fmt.Sprintf(`{"schema": %d, "error": "答えを JSON にできません"}`, Schema)
+		return fmt.Sprintf(`{"schema": %d, "error": "答えを JSON にできません"}`, schema)
 	}
 	return text
 }
@@ -73,8 +73,8 @@ func answer(request, root string) (body *pyjson.Object, err error) {
 		return nil, refused("要求を JSON として読めません")
 	}
 	req, ok := value.(*pyjson.Object)
-	if !ok || !pyfmt.EqualsInt(req.Value("schema"), Schema) {
-		return nil, refusedf("要求の形式の版が一致しません（拡張と ccnavi の組み立てがずれています。期待する版は %d です）", Schema)
+	if !ok || !pyfmt.EqualsInt(req.Value("schema"), schema) {
+		return nil, refusedf("要求の形式の版が一致しません（拡張と ccnavi の組み立てがずれています。期待する版は %d です）", schema)
 	}
 	op, _ := req.Value("op").(string)
 	h, ok := ops[op]

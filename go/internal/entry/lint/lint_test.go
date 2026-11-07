@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/records/stopreview"
 	"ccnavi/internal/tickets/testkit"
@@ -34,7 +36,7 @@ func anyContains(problems []rules.Problem, needle string) bool {
 // Stop の AI 判定の設定と agent hook の登録の食い違い（tests/core/test_stopreview_more.py の LintTest）。
 func TestStopReviewProblems(t *testing.T) {
 	mark := stopreview.HookMark
-	allow := `["` + strings.Join(stopreview.JudgeAllowRules, `", "`) + `"]`
+	allow := `["` + strings.Join(stopreview.JudgeAllowRules(), `", "`) + `"]`
 	hooks := func(list, allowed string) string {
 		return `{"permissions": {"allow": ` + allowed + `}, "hooks": {"Stop": [{"hooks": [` + list + `]}]}}`
 	}
@@ -57,7 +59,7 @@ func TestStopReviewProblems(t *testing.T) {
 			settings: `{"env": {"CCNAVI_STOP_REVIEW_AGENT": "1"}, "permissions": {"allow": ` + allow + `}, "hooks": {"Stop": [{"hooks": [` + ours + `]}]}}`},
 		{name: "command 型の hook は数えない", agent: true, settings: hooks(`{"type": "command", "command": "x"}`, allow), want: []string{"見つからない"}},
 		{name: "判定役の Bash の権限が無い", agent: true, settings: hooks(ours, "[]"), want: []string{"permissions.allow"}},
-		{name: "判定役の Bash の権限が片方だけ", agent: true, settings: hooks(ours, `["`+stopreview.JudgeAllowRules[0]+`"]`), want: []string{"permissions.allow"}},
+		{name: "判定役の Bash の権限が片方だけ", agent: true, settings: hooks(ours, `["`+stopreview.JudgeAllowRules()[0]+`"]`), want: []string{"permissions.allow"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -88,7 +90,7 @@ func TestStopReviewMalformedSettings(t *testing.T) {
 	}
 }
 
-// 案内のコマンドに載せるパスの綴り。導入スクリプトの sh_word と同じ綴りにする（tests/sh/test_setup.py が両方を比べる）。
+// 案内のコマンドに載せるパスの綴り。導入スクリプトの sh_word と同じ綴りにする（TestShWordAgreesWithTheSetupSh が比べる）。
 func TestShWord(t *testing.T) {
 	for path, want := range map[string]string{
 		"projects/lib":        "projects/lib",
@@ -100,6 +102,44 @@ func TestShWord(t *testing.T) {
 	} {
 		if got := shWord(path); got != want {
 			t.Errorf("shWord(%q) = %q, want %q", path, got, want)
+		}
+	}
+}
+
+// 導入スクリプトの sh_word と shWord は、どの字でも同じ表記を返す。2 か所に書いた字の集合のずれを捕まえるため、
+// scripts/ccnavi-setup.sh から関数を切り出して sh で走らせ、shSpecial の各字と割れない字の両方で比べる。
+// 改行は比べない（sh_word が受けるのは `git ls-files` の 1 行で、改行を含むパスは git が引用して渡す）。
+func TestShWordAgreesWithTheSetupSh(t *testing.T) {
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh が無い")
+	}
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "scripts", "ccnavi-setup.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	start := strings.Index(text, "\nsh_word() {\n")
+	end := strings.Index(text[start+1:], "\n}\n")
+	if start < 0 || end < 0 {
+		t.Fatal("ccnavi-setup.sh に sh_word が見つからない")
+	}
+	function := text[start+1 : start+1+end+2]
+	var chars []string
+	for _, c := range shSpecial {
+		if c != '\n' {
+			chars = append(chars, string(c))
+		}
+	}
+	chars = append(chars, "-", ".", "_", "/", "=", "%", "@", ":", ",", "+", "^", "日")
+	for _, c := range chars {
+		word := "projects/a" + c + "b"
+		out, err := exec.Command(sh, "-c", "tab=$(printf '\\t'); "+function+"\nsh_word \"$1\"", "sh", word).Output()
+		if err != nil {
+			t.Fatalf("%q: %v", word, err)
+		}
+		if got, want := string(out), shWord(word); got != want {
+			t.Errorf("%q: sh_word = %q, shWord = %q", word, got, want)
 		}
 	}
 }
@@ -328,12 +368,36 @@ func TestProjectsDirProblemsCarryKind(t *testing.T) {
 		}
 		return got
 	}
-	if got := kinds(); strings.Join(got, ",") != KindProjectsUnignored {
+	if got := kinds(); strings.Join(got, ",") != kindProjectsUnignored {
 		t.Fatalf("無視されていない置き場の kind: %v", got)
 	}
 	testkit.Put(t, filepath.Join(root, "projects", "README.md"), "x\n")
 	testkit.Git(t, root, "add", "projects/README.md")
-	if got := kinds(); strings.Join(got, ",") != KindProjectsTracked {
+	if got := kinds(); strings.Join(got, ",") != kindProjectsTracked {
 		t.Fatalf("索引に載った置き場の kind: %v", got)
+	}
+}
+
+// 承認済みの置き場が ccnavi ディレクトリの下かは、大文字小文字を畳んで見る（綴り違いを外と言わない）。
+func TestApprovedGuardedFoldsCase(t *testing.T) {
+	for approved, want := range map[string]int{".CCNAVI/approved": 0, ".ccnavi\\Approved": 0, "wip/approved": 1} {
+		if got := approvedGuarded(&config.Settings{ProjectHome: ".ccnavi", Approved: approved}); len(got) != want {
+			t.Errorf("%q: %v", approved, details(got))
+		}
+	}
+}
+
+// 登録の無いワークツリーの見分けは、ワークツリーの名前の大文字小文字を畳んで見る。
+func TestUnregisteredWorktreesFoldsCase(t *testing.T) {
+	root := testkit.GitRoot(t)
+	testkit.Git(t, root, "init", "-q")
+	if err := os.MkdirAll(filepath.Join(root, ".claude", "worktrees", "fix-a"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := unregisteredWorktrees(root, []tree.Tree{{Name: "Fix-A"}}); len(got) != 0 {
+		t.Errorf("綴り違いの名前のワークツリーを未登録と言った: %v", details(got))
+	}
+	if got := unregisteredWorktrees(root, nil); len(got) != 1 {
+		t.Errorf("未登録のディレクトリを言わない: %v", details(got))
 	}
 }

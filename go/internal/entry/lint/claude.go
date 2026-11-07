@@ -114,7 +114,7 @@ func allowsJudgeBash(root string) bool {
 			allowed[s] = true
 		}
 	}
-	for _, rule := range stopreview.JudgeAllowRules {
+	for _, rule := range stopreview.JudgeAllowRules() {
 		if !allowed[rule] {
 			return false
 		}

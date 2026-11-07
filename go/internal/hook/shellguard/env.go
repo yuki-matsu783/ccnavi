@@ -37,8 +37,8 @@ var envClears = []string{"-i", "--ignore-environment", "-"}
 // declares は引数に変数名を取り、その変数を置く・外す・書き出すコマンド。
 var declares = []string{"export", "declare", "typeset", "readonly", "local", "unset"}
 
-// Blocked は、同じコマンド行で置くと保護済みの sh を呼ぶ形を止める変数か。
-func Blocked(name string) bool {
+// blocked は、同じコマンド行で置くと保護済みの sh を呼ぶ形を止める変数か。
+func blocked(name string) bool {
 	if slices.Contains(passThrough, name) || slices.Contains(gitPassThrough, name) {
 		return false
 	}
@@ -66,7 +66,7 @@ func CheckEnv(subject string, degraded bool) (script string, names []string) {
 	}
 	for _, p := range places {
 		for _, n := range setNames(p.Words) {
-			if (n == envCleared || Blocked(n)) && !slices.Contains(names, n) {
+			if (n == envCleared || blocked(n)) && !slices.Contains(names, n) {
 				names = append(names, n)
 			}
 		}

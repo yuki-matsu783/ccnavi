@@ -28,7 +28,7 @@ keywords: [文面, 文面ファイル, messages, ccnavi text, ccnavi_text, texts
 
 1. 文面ファイルに `RULE_<ルールの id>` を足す。`what` だけが必須で、言うことが無い欄は省く
 2. ルールの dict（または `Rule`）に `**texts.spec("RULE_…", git=…, wrapper=…, cased=(…))` を渡す（Go は `rules.Spec` の `Text` に `texts.Spec("RULE_…", texts.SpecOptions{…})`）。ラッパーの有無で分かれる欄は `cased` に、それ以外の場合の選びは `variants` に書く。`message` は書かない
-3. 拒否に当たった回に、`texts.spoken(rule)`（Go は `texts.Spoken(rule)`）が識別子と値と場合から文を組む。文を使う側は `Rule.SpokenMessage` ではなく `texts.spoken(rule)` を呼ぶ
+3. 拒否に当たった回に、`texts.spoken(rule)`（Go は `texts.Spoken(rule)`）が識別子と値と場合から文を組む。文を使う側は `Rule.Speech`（どの文面を使うかを決めるだけ）ではなく `texts.Spoken(rule)` を呼ぶ
 4. `go/internal/policy/texts/catalog_test.go` が、組み込みのルールが持つ識別子が文面ファイルにあり、渡す値の名前が `values` と一致することを見る
 
 `message_id` はルールファイルからは書けない（`from_file` が偽のルールだけが持つ）。

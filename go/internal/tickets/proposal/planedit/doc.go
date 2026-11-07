@@ -16,9 +16,9 @@
 // predecessors を付け替える。書くのは、開いたときのハッシュ（source_sha）が今と同じで、順序の検査と改版の錠に当たらない
 // ときだけである。
 //
-// Python からの対応: tickets/proposal の plan_order と plan_phases をまとめた。plan_order: VERSION → Version、
-// REFUSED_* → RefusalKind の定数、Order（dict[str, dict]）→ Order（キーは phases.Part）、parse_order → ParseOrder、
-// renumber → Renumber、Source・load → Source・Load、Answer・answer → Answer・Reorder、plans → Answer.Plans、
+// Python からの対応: tickets/proposal の plan_order と plan_phases をまとめた。plan_order: VERSION → version、
+// REFUSED_* → refusalKind の定数、Order（dict[str, dict]）→ Order（キーは phases.Part）、parse_order → ParseOrder、
+// renumber → renumber、source・load → Source・Load、Answer・answer → Answer・Reorder、plans → Answer.plans、
 // body → Answer.Body、preview_plans → PreviewPlans、pick → Pick（cwd は引数）、current_parent → CurrentParent、
 // Saved・save → Saved・Save、reread_sha → RereadSHA（cwd は引数）、changed_elsewhere・retarget・rebuilt・
 // child_rebuilt・write・digest・mismatched は私的。plan_phases: Filled・fill → Filled・Fill。

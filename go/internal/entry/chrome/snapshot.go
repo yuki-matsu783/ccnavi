@@ -207,7 +207,7 @@ func (s *snapshot) ticketsIn(b *branch, states []place.State) []found {
 		state place.State
 	}
 	var dirs []dir
-	for _, st := range place.States {
+	for _, st := range place.States() {
 		dirs = append(dirs, dir{config.DefaultTickets, st})
 	}
 	dirs = append(dirs, dir{config.DefaultApproved, place.Doing}, dir{config.DefaultApproved, place.Done})
@@ -219,10 +219,10 @@ func (s *snapshot) ticketsIn(b *branch, states []place.State) []found {
 		prefix := d.base + "/" + string(d.state) + "/"
 		for _, path := range b.paths {
 			rest, ok := strings.CutPrefix(path, prefix)
-			if !ok || !strings.HasSuffix(rest, ".md") || strings.Contains(rest, "/") {
+			if !ok || !strings.HasSuffix(rest, config.MdExt) || strings.Contains(rest, "/") {
 				continue
 			}
-			if t := s.parse(b.files[path]); t != nil && t.ID == strings.TrimSuffix(rest, ".md") {
+			if t := s.parse(b.files[path]); t != nil && t.ID == strings.TrimSuffix(rest, config.MdExt) {
 				out = append(out, found{d.state, t})
 			}
 		}
@@ -231,7 +231,7 @@ func (s *snapshot) ticketsIn(b *branch, states []place.State) []found {
 }
 
 // openStates は開いた親子のチケットを数える状態（提案の todo/・review/ と承認済みの doing/）。
-var openStates = append(slices.Clone(place.States), place.Doing)
+var openStates = append(slices.Clone(place.States()), place.Doing)
 
 // familyOf は識別子が属する親子のチケットの親（子の形なら親、そうでなければ自分）。
 func familyOf(ident string) string {

@@ -7,8 +7,8 @@
 // 落ちた記録は、統合では直せない。そのため、処理すべきものに数えず、名指しして直させる。
 //
 // Python からの対応: tickets/learning の notes と records をまとめた。notes.run → Run、applies → Applies、
-// record_blocked・parent_blocked → RecordBlocked・ParentBlocked、write_broken → WriteBroken、record_rel → RecordRel、
-// records.pending → Find、Pending・Item → Pending・Item（unreadable・inconsistent は Problem の列）、uncommitted → Uncommitted。
+// record_blocked・parent_blocked → RecordBlocked・ParentBlocked、write_broken → WriteBroken、record_rel → recordRel、
+// records.pending → Find、Pending・Item → Pending・Item（unreadable・inconsistent は problem の列）、uncommitted → Uncommitted。
 // INBOX_DIR は wiki.InboxDir、read_log_records は audit.ReadRecords、shlex.split は shell.Split。
 // 呼び手の無い stamp14・tracked は移していない。parse・consistency_problem・pattern_sources などは私的にした。
 package learning

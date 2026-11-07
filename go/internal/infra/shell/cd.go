@@ -17,8 +17,8 @@ import (
 // Moved は `cd` で移った先から見たコマンドの層に付ける実行役の名前。runners に cd は無いので重ならない。
 const Moved = "cd"
 
-// MovedWords は 1 回の読みで継ぎ足す語数の上限。適用する先の総量を抑える。
-const MovedWords = 2000
+// movedWords は 1 回の読みで継ぎ足す語数の上限。適用する先の総量を抑える。
+const movedWords = 2000
 
 // hereLimit は居場所のパスの長さ（文字数）の上限。`cd a` を数千回並べると整理し直す時間が二乗になり、
 // 判定の期限は読み終えたあとに見るので、読みの中で抑える。
@@ -71,7 +71,7 @@ type cdTracker struct {
 // サブシェル `( )` は出入りで居場所を戻し、`|` `|&` `&` の左はサブシェルなので後ろに残さない。
 // `case` の枝の `)` はサブシェルの閉じと同じ表記なので、`case` から `esac` までは読まない（取りこぼす側）。
 func resolveCD(tokens []string, places *[]Placed) ([]string, bool) {
-	t := &cdTracker{budget: MovedWords, places: places}
+	t := &cdTracker{budget: movedWords, places: places}
 	var segment []string
 	here := origin
 	// start は今のコマンド列（`;` `&&` `||` で区切られる単位）の頭で居た場所。

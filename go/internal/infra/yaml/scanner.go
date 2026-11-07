@@ -136,7 +136,7 @@ func (s *scanner) mark() Mark {
 }
 
 func (s *scanner) fail(context string, contextMark *Mark, problem string) error {
-	return markedError(ScannerError, context, contextMark, problem, markPtr(s.mark()))
+	return markedError(scannerError, context, contextMark, problem, markPtr(s.mark()))
 }
 
 func repr(r rune) string { return pyfmt.Quote(string(r)) }
@@ -280,7 +280,7 @@ func (s *scanner) staleSimpleKeys() error {
 	for _, k := range s.possible {
 		if k.line != s.line || s.ptr-k.index > simpleKeyLimit {
 			if k.required {
-				return markedError(ScannerError, "while scanning a simple key", markPtr(k.mark),
+				return markedError(scannerError, "while scanning a simple key", markPtr(k.mark),
 					"could not find expected ':'", markPtr(s.mark()))
 			}
 			continue
@@ -318,7 +318,7 @@ func (s *scanner) removePossibleSimpleKey() error {
 	if i := s.findKey(s.flowLevel); i >= 0 {
 		k := s.possible[i]
 		if k.required {
-			return markedError(ScannerError, "while scanning a simple key", markPtr(k.mark),
+			return markedError(scannerError, "while scanning a simple key", markPtr(k.mark),
 				"could not find expected ':'", markPtr(s.mark()))
 		}
 		s.possible = append(s.possible[:i], s.possible[i+1:]...)
@@ -1226,7 +1226,7 @@ func (s *scanner) scanURIEscapes(name string, start Mark) (string, error) {
 		s.forward(2)
 	}
 	if problem := utf8Problem(codes); problem != "" {
-		return "", markedError(ScannerError, "while scanning a "+name, &start, problem, &m)
+		return "", markedError(scannerError, "while scanning a "+name, &start, problem, &m)
 	}
 	return string(codes), nil
 }

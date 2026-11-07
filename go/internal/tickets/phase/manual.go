@@ -26,11 +26,11 @@ type Settle string
 const (
 	SettleNone         Settle = "none"          // 該当しない（レビューが要らない・済み・手で動かした子が無い）
 	SettleReady        Settle = "ready"         // 確定してよい形（confirm が受け入れる）
-	SettlePartial      Settle = "partial"       // 動かしたのは一部の子だけ
+	settlePartial      Settle = "partial"       // 動かしたのは一部の子だけ
 	SettleUnshared     Settle = "unshared"      // 移動が未コミット・未 push
-	SettleNoRequest    Settle = "no-request"    // 依頼の記録が無い
-	SettleRouteUnknown Settle = "route-unknown" // 経路が分からない子しか無い（finished_to が無い）
-	SettleBroken       Settle = "broken"        // 読めない・重複していて確かめられない
+	settleNoRequest    Settle = "no-request"    // 依頼の記録が無い
+	settleRouteUnknown Settle = "route-unknown" // 経路が分からない子しか無い（finished_to が無い）
+	settleBroken       Settle = "broken"        // 読めない・重複していて確かめられない
 )
 
 // Margin は移動のコミットの時刻と、ホストのスレッドの作成時刻の間に置く余裕。ホストはユーザが push した時刻を
@@ -64,9 +64,9 @@ type Manual struct {
 	Children []string
 	// MovedAt は手で動かした子の移動コミットのうち、いちばん新しい時刻。
 	MovedAt time.Time
-	// Waiting はまだ動いていない子（SettlePartial）。
-	Waiting []string
-	Note    string
+	// waiting はまだ動いていない子（settlePartial）。
+	waiting []string
+	note    string
 	// NeedTime は外から移動の時刻をもらう形（Chrome）で、まだ時刻が無いとき真。Paths は動かした子の done/ の
 	// パスで、呼び手は時刻を読んで渡し直す。
 	NeedTime bool
@@ -79,16 +79,16 @@ func (m Manual) Line() string {
 	switch m.State {
 	case SettleReady:
 		return fmt.Sprintf(readyLine, who)
-	case SettlePartial:
-		return fmt.Sprintf(partialLine, who, strings.Join(m.Waiting, "、"))
+	case settlePartial:
+		return fmt.Sprintf(partialLine, who, strings.Join(m.waiting, "、"))
 	case SettleUnshared:
 		return fmt.Sprintf(unsharedLine, who)
-	case SettleNoRequest:
+	case settleNoRequest:
 		return noRequestLine
-	case SettleRouteUnknown:
+	case settleRouteUnknown:
 		return routeUnknownLine
-	case SettleBroken:
-		return fmt.Sprintf(brokenLine, m.Note)
+	case settleBroken:
+		return fmt.Sprintf(brokenLine, m.note)
 	}
 	return ""
 }
@@ -100,7 +100,7 @@ type ManualOptions struct {
 	MovedAt  *float64
 }
 
-// AssessManual は、このフェーズ（延期を引き受けた分を含む）の手動の移動を判定する。list は Phases の答えである。nil なら、ここで読む。External で時刻が無ければ NeedTime を立てて返す。読めない時刻（0 以下・NaN・無限大）は、確かめられないものとして SettleBroken にする。
+// AssessManual は、このフェーズ（延期を引き受けた分を含む）の手動の移動を判定する。list は Phases の答えである。nil なら、ここで読む。External で時刻が無ければ NeedTime を立てて返す。読めない時刻（0 以下・NaN・無限大）は、確かめられないものとして settleBroken にする。
 func AssessManual(conf *config.Settings, root string, parent *ticket.Ticket, p *Phase, list []*Phase, o ManualOptions) Manual {
 	if p.has(marks.Reviewed) || !p.ReviewRequired() {
 		return Manual{State: SettleNone}
@@ -118,7 +118,7 @@ func AssessManual(conf *config.Settings, root string, parent *ticket.Ticket, p *
 		}
 		for _, t := range q.Tickets {
 			if ids[t.ID] {
-				return Manual{State: SettleBroken, Note: duplicateNote}
+				return Manual{State: settleBroken, note: duplicateNote}
 			}
 			ids[t.ID] = true
 			children = append(children, t)
@@ -149,15 +149,15 @@ func AssessManual(conf *config.Settings, root string, parent *ticket.Ticket, p *
 	}
 	if len(hand) == 0 {
 		if len(unknown) > 0 && len(waiting) == 0 && !reviewed {
-			return Manual{State: SettleRouteUnknown, Children: unknown}
+			return Manual{State: settleRouteUnknown, Children: unknown}
 		}
 		return Manual{State: SettleNone}
 	}
 	if len(waiting) > 0 {
-		return Manual{State: SettlePartial, Children: names, Waiting: waiting}
+		return Manual{State: settlePartial, Children: names, waiting: waiting}
 	}
 	if !p.has(marks.Requested) {
-		return Manual{State: SettleNoRequest, Children: names}
+		return Manual{State: settleNoRequest, Children: names}
 	}
 	if o.External {
 		if o.MovedAt == nil {
@@ -165,7 +165,7 @@ func AssessManual(conf *config.Settings, root string, parent *ticket.Ticket, p *
 		}
 		moved := *o.MovedAt
 		if math.IsNaN(moved) || math.IsInf(moved, 0) || moved <= 0 {
-			return Manual{State: SettleBroken, Children: names, Note: badTimeNote}
+			return Manual{State: settleBroken, Children: names, note: badTimeNote}
 		}
 		// コミットの時刻は書いた側の時計で決まる。未来にずれていれば今に抑える（移動の後の指摘を、移動の前の
 		// ものとして受け入れないため）。
@@ -180,9 +180,9 @@ func AssessManual(conf *config.Settings, root string, parent *ticket.Ticket, p *
 	case "":
 		return Manual{State: SettleReady, Children: names, MovedAt: at}
 	case unsharedNote:
-		return Manual{State: SettleUnshared, Children: names, Note: why}
+		return Manual{State: SettleUnshared, Children: names, note: why}
 	}
-	return Manual{State: SettleBroken, Children: names, Note: why}
+	return Manual{State: settleBroken, Children: names, note: why}
 }
 
 // shared は動かした子の done/ のファイルが HEAD にコミット済みで、origin/<親のブランチ> に入っているか。入って

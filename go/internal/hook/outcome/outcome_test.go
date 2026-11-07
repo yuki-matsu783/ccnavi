@@ -69,12 +69,12 @@ func TestAgainstPython(t *testing.T) {
 			got.Of = append(got.Of, nil)
 			continue
 		}
-		got.Of = append(got.Of, []any{o.AgentID, o.Child, o.Kind, o.Bounces, o.Paths, o.Final, o.Notified, o.Nudged, line(o)})
+		got.Of = append(got.Of, []any{o.agentID, o.child, o.Kind, o.bounces, o.paths, o.Final, o.Notified, o.nudged, line(o)})
 	}
 	text, done := Notices(dir, "s1")
 	ids := []string{}
 	for _, o := range done {
-		ids = append(ids, o.AgentID)
+		ids = append(ids, o.agentID)
 	}
 	confirmed := Confirm(done)
 	again, _ := Notices(dir, "s1")
@@ -131,7 +131,7 @@ func TestWrite(t *testing.T) {
 		t.Errorf("id %q", id)
 	}
 	o := Of(dir, "s1", "a/b")
-	if o == nil || o.Kind != Outside || o.Final || o.Bounces != 2 || !slices.Equal(o.Paths, []string{"x", "y"}) || o.Child != "c" {
+	if o == nil || o.Kind != Outside || o.Final || o.bounces != 2 || !slices.Equal(o.paths, []string{"x", "y"}) || o.child != "c" {
 		t.Errorf("読み直し %+v", o)
 	}
 	if Write(dir, "s1", "a", Entry{Kind: "weird"}) != "知らない結果: weird" {

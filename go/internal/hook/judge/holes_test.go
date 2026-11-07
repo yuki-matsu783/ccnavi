@@ -79,7 +79,7 @@ func TestTooLongCommandIsDenied(t *testing.T) {
 			t.Errorf("%.20q: %v %.300s", command, a.Record, a.Stdout)
 		}
 	}
-	if a := run("echo " + strings.Repeat("a", CommandLengthLimit-5)); a.Record["decision"] != "allow" {
+	if a := run("echo " + strings.Repeat("a", commandLengthLimit-5)); a.Record["decision"] != "allow" {
 		t.Errorf("上限ちょうど: %v", a.Record)
 	}
 	// 本文の長いヒアドキュメント（受入テストのルールは << を deny するので、上限の止めでないことだけを見る）。

@@ -42,7 +42,7 @@ func childTree(root string) tree.Tree {
 func TestLearnAppendsAndRecounts(t *testing.T) {
 	root, conf := workspace(t)
 	here := childTree(root)
-	rec := filepath.Join(here.Root, filepath.FromSlash(RecordRel(child)))
+	rec := filepath.Join(here.Root, filepath.FromSlash(recordRel(child)))
 	for i, note := range []string{"最初の気づき", "2 件目の気づき"} {
 		var out, errOut strings.Builder
 		if code := learn(&out, &errOut, conf, root, here, childTicket(), Note{Note: note, Target: "skill"}); code != 0 {
@@ -64,7 +64,7 @@ func TestLearnWithoutNoteKeepsRecordAndWritesDigest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rec := put(t, here.Root, RecordRel(child), existing)
+	rec := put(t, here.Root, recordRel(child), existing)
 	var out, errOut strings.Builder
 	if code := learn(&out, &errOut, conf, root, here, childTicket(), Note{}); code != 0 {
 		t.Fatal(errOut.String())
@@ -76,7 +76,7 @@ func TestLearnWithoutNoteKeepsRecordAndWritesDigest(t *testing.T) {
 	if !strings.Contains(digest, "\"recorded\": true") || !strings.Contains(digest, "\"deny\": 1") {
 		t.Errorf("%s", digest)
 	}
-	if !strings.Contains(out.String(), "記録: "+RecordRel(child)) {
+	if !strings.Contains(out.String(), "記録: "+recordRel(child)) {
 		t.Errorf("%s", out.String())
 	}
 }
@@ -84,7 +84,7 @@ func TestLearnWithoutNoteKeepsRecordAndWritesDigest(t *testing.T) {
 func TestLearnRescaffoldsAnEmptyRecord(t *testing.T) {
 	root, conf := workspace(t)
 	here := childTree(root)
-	rec := put(t, here.Root, RecordRel(child), "  \n")
+	rec := put(t, here.Root, recordRel(child), "  \n")
 	var out, errOut strings.Builder
 	if code := learn(&out, &errOut, conf, root, here, childTicket(), Note{}); code != 0 {
 		t.Fatal(errOut.String())
@@ -97,8 +97,8 @@ func TestLearnRescaffoldsAnEmptyRecord(t *testing.T) {
 func TestLearnRefuses(t *testing.T) {
 	root, conf := workspace(t)
 	here := childTree(root)
-	sjis := func() { put(t, here.Root, RecordRel(child), "\x82\xa0") }
-	handwritten := func() { put(t, here.Root, RecordRel(child), "手で書いた本文\n") }
+	sjis := func() { put(t, here.Root, recordRel(child), "\x82\xa0") }
+	handwritten := func() { put(t, here.Root, recordRel(child), "手で書いた本文\n") }
 	cases := []struct {
 		name  string
 		setup func()
@@ -251,11 +251,11 @@ func TestRecordBlocked(t *testing.T) {
 	if ok, msg := blocked(); !ok || !strings.Contains(msg, "learn") {
 		t.Errorf("記録が無いのに通した: %q", msg)
 	}
-	put(t, wt, RecordRel(child), scaffoldText(child, "feat-1"))
+	put(t, wt, recordRel(child), scaffoldText(child, "feat-1"))
 	if ok, _ := blocked(); !ok {
 		t.Error("追跡前に通した")
 	}
-	testkit.Git(t, wt, "add", "-f", RecordRel(child))
+	testkit.Git(t, wt, "add", "-f", recordRel(child))
 	if ok, _ := blocked(); !ok {
 		t.Error("コミット前に通した")
 	}
@@ -264,17 +264,17 @@ func TestRecordBlocked(t *testing.T) {
 		t.Errorf("コミットした記録を止めた: %q", msg)
 	}
 	for _, body := range []string{"---\nticket: x\nlearnings:\n  - 気づき\n---\n", "---\nticket: x\nlearnings: 2\n---\n\n## 一つだけ\n"} {
-		put(t, wt, RecordRel(child), body)
+		put(t, wt, recordRel(child), body)
 		commit(t, wt)
-		if ok, msg := blocked(); !ok || !strings.Contains(msg, RecordRel(child)) {
+		if ok, msg := blocked(); !ok || !strings.Contains(msg, recordRel(child)) {
 			t.Errorf("%q を通した: %q", body, msg)
 		}
 	}
 	// ディレクトリは記録ではない。
-	if err := os.Remove(filepath.Join(wt, filepath.FromSlash(RecordRel(child)))); err != nil {
+	if err := os.Remove(filepath.Join(wt, filepath.FromSlash(recordRel(child)))); err != nil {
 		t.Fatal(err)
 	}
-	put(t, wt, RecordRel(child)+"/a", "x\n")
+	put(t, wt, recordRel(child)+"/a", "x\n")
 	commit(t, wt)
 	if ok, _ := blocked(); !ok {
 		t.Error("ディレクトリを記録とした")
@@ -301,7 +301,7 @@ func TestParentBlocked(t *testing.T) {
 	}
 	testkit.Git(t, wt, "init", "-q", "-b", "main")
 	put(t, wt, "README", "x\n")
-	put(t, wt, RecordRel("feat-1-01-01"), rec("none"))
+	put(t, wt, recordRel("feat-1-01-01"), rec("none"))
 	commit(t, wt)
 	if ok, msg := blocked(); ok {
 		t.Errorf("処理するものが無いのに止めた: %q", msg)
@@ -314,7 +314,7 @@ func TestParentBlocked(t *testing.T) {
 	if ok, msg := blocked(); !ok || !strings.Contains(msg, "consolidate feat-1") || !strings.Contains(msg, "（1 件）") {
 		t.Errorf("%q", msg)
 	}
-	put(t, wt, RecordRel("bad"), "壊れた\n")
+	put(t, wt, recordRel("bad"), "壊れた\n")
 	commit(t, wt)
 	if ok, msg := blocked(); !ok || !strings.Contains(msg, "統合では直せない") {
 		t.Errorf("%q", msg)

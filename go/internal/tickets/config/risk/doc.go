@@ -8,11 +8,11 @@
 //
 // Python からの対応: tickets/config/risk。LEVEL_* → Low・Medium・High・Critical、ESCALATE_FROM → Escalates、
 // KIND_* → Kind*、SCRIPT_HOMES → ScriptHomes、BUILTIN → Builtin、Factor.value → Limit（数える項目）と Text
-// （glob・script・judge）、max の None → HasMax、Definition.level_of・factor・judges → LevelOf・Factor・Judges、
+// （glob・script・judge）、max の None → hasMax、Definition.level_of・factor・judges → levelOf・Factor・Judges、
 // effective_levels → EffectiveLevels（Thresholds）、load・load_layer・parse・merge・script_problems・
 // layer_definition・load_definition → Load・LoadLayer・Parse・Merge・ScriptProblems・LayerDefinition・
 // LoadDefinition、definition_path → layer.File、load と mark_layer(common) の組 → CommonDefinition、
 // measure・evaluate・judge_prompt → Measure・Evaluate・JudgePrompt（judgements は記録の JSON のまま）、
-// Score.lines・as_dict → Score.Lines・Object、Diff の lines・files・deleted_files・summary → Lines・Files・
-// DeletedFiles・Summary。
+// Score.Lines・as_dict → Score.Lines・Object、Diff の lines・files・deleted_files・summary → lines・files・
+// deletedFiles・Summary。
 package risk

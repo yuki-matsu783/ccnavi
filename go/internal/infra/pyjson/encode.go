@@ -27,11 +27,11 @@ type Options struct {
 	RejectNaN bool
 }
 
-// ErrUnsupported は JSON に出せない値（Python の TypeError）。
-var ErrUnsupported = errors.New("JSON に出せない値")
+// errUnsupported は JSON に出せない値（Python の TypeError）。
+var errUnsupported = errors.New("JSON に出せない値")
 
-// ErrOutOfRange は RejectNaN のときの NaN・Infinity（Python の ValueError）。
-var ErrOutOfRange = errors.New("Out of range float values are not JSON compliant")
+// errOutOfRange は RejectNaN のときの NaN・Infinity（Python の ValueError）。
+var errOutOfRange = errors.New("Out of range float values are not JSON compliant")
 
 // Dumps は json.dumps(v, ...) と同じ文字列を返す。
 //
@@ -120,7 +120,7 @@ func (e *encoder) value(v any, level int) error {
 	case pyfmt.Items:
 		return e.object(x, level)
 	default:
-		return fmt.Errorf("%w: Object of type %T is not JSON serializable", ErrUnsupported, v)
+		return fmt.Errorf("%w: Object of type %T is not JSON serializable", errUnsupported, v)
 	}
 	return nil
 }
@@ -139,7 +139,7 @@ func (e *encoder) float(f float64) error {
 		return nil
 	}
 	if e.opts.RejectNaN {
-		return fmt.Errorf("%w: %s", ErrOutOfRange, pyfmt.Float(f))
+		return fmt.Errorf("%w: %s", errOutOfRange, pyfmt.Float(f))
 	}
 	e.b.WriteString(text)
 	return nil
@@ -178,7 +178,7 @@ func (e *encoder) object(o pyfmt.Items, level int) error {
 	for k, v := range o.All() {
 		key, ok := k.(string)
 		if !ok {
-			return fmt.Errorf("%w: keys must be str, not %T", ErrUnsupported, k)
+			return fmt.Errorf("%w: keys must be str, not %T", errUnsupported, k)
 		}
 		pairs = append(pairs, pair{key, v})
 	}

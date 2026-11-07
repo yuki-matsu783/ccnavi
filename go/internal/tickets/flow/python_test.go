@@ -224,8 +224,8 @@ var lineCases = []string{
 
 func catalogFixture() Catalog {
 	return Catalog{
-		Agents: Candidates{{"general-purpose", SourceBuiltin}, {"Explore", SourceBuiltin}, {"Plan", SourceBuiltin}},
-		Skills: Candidates{{"process-debug", SourceProject}},
+		agents: candidates{{"general-purpose", sourceBuiltin}, {"Explore", sourceBuiltin}, {"Plan", sourceBuiltin}},
+		skills: candidates{{"process-debug", sourceProject}},
 	}
 }
 
@@ -250,7 +250,7 @@ func TestPythonFlow(t *testing.T) {
 			}
 			lines, kinds := Render(data, ChildTextLimit)
 			short, _ := Render(data, 200)
-			got.JSON, got.Shape = text, ShapeProblem(data)
+			got.JSON, got.Shape = text, shapeProblem(data)
 			got.Structure, got.Names = StructureProblems(data), NameProblems(data, catalogFixture())
 			got.Render, got.Short = lines, short
 			for k := range kinds {
@@ -281,12 +281,12 @@ func emptyNil(r flowRow) flowRow {
 }
 
 func catalogJSON(c Catalog) map[string]any {
-	list := func(items Candidates) []map[string]string {
+	list := func(items candidates) []map[string]string {
 		out := []map[string]string{}
 		for _, x := range items {
-			out = append(out, map[string]string{"name": x.Name, "source": x.Source})
+			out = append(out, map[string]string{"name": x.name, "source": x.source})
 		}
 		return out
 	}
-	return map[string]any{"agents": list(c.Agents), "skills": list(c.Skills)}
+	return map[string]any{"agents": list(c.agents), "skills": list(c.skills)}
 }

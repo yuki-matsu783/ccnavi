@@ -23,7 +23,7 @@ const (
 
 // launchedAgent は Agent（Task）の PostToolUse なら起動したサブエージェントの agentId。違えば空。
 func launchedAgent(in hookio.Input) string {
-	if !slices.Contains(config.AgentTools, in.ToolName) {
+	if !slices.Contains(config.AgentTools(), in.ToolName) {
 		return ""
 	}
 	if v := in.ToolResponse.Value(keyAgentID); pyfmt.Truthy(v) {

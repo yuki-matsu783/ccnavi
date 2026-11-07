@@ -16,7 +16,7 @@ import (
 // 締め出さないとテストの答えが機械で変わる。
 func isolate(t *testing.T) {
 	t.Helper()
-	if _, err := exec.LookPath(Program); err != nil {
+	if _, err := exec.LookPath(program); err != nil {
 		t.Skip("git が無い")
 	}
 	empty := filepath.Join(t.TempDir(), "gitconfig")
@@ -27,7 +27,7 @@ func isolate(t *testing.T) {
 
 func gitIn(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command(Program, append([]string{"-c", "user.email=t@example.com", "-c", "user.name=t"}, args...)...)
+	cmd := exec.Command(program, append([]string{"-c", "user.email=t@example.com", "-c", "user.name=t"}, args...)...)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -174,7 +174,7 @@ func TestReadClassifiesChanges(t *testing.T) {
 	for _, c := range changes {
 		got[c.Path] = c
 	}
-	want := map[string]Kind{"kept": KindChanged, "gone": KindGone, "新しい/a b.txt": KindNew, "staged": KindNew}
+	want := map[string]Kind{"kept": KindChanged, "gone": kindGone, "新しい/a b.txt": KindNew, "staged": KindNew}
 	if reason != "" || len(got) != len(want) {
 		t.Fatalf("changes = %+v (%s)", changes, reason)
 	}
@@ -255,7 +255,7 @@ func TestUndoWritesOnlyWrapperForms(t *testing.T) {
 		want   string
 	}{
 		{Change{Kind: KindChanged, Path: "p/x.txt"}, wrapper + ` restore --staged --worktree -- p/x.txt`},
-		{Change{Kind: KindGone, Path: "p/a b.txt"}, wrapper + ` restore --staged --worktree -- "p/a b.txt"`},
+		{Change{Kind: kindGone, Path: "p/a b.txt"}, wrapper + ` restore --staged --worktree -- "p/a b.txt"`},
 		// ラッパーは rm -f と clean を通さない。索引から外してシェルの rm で消す。
 		{Change{Kind: KindNew, Path: "p/x.txt", Staged: true}, wrapper + ` restore --staged -- p/x.txt && rm -- p/x.txt`},
 		// "$" とバッククォートは "..." の中でも展開されるので、単引用符で囲む。
@@ -337,7 +337,7 @@ func TestChildBaseAndTakenFromRemote(t *testing.T) {
 		if got, err := ChildBase(child, filepath.Join(base, "nowhere"), 0, ""); got != "" || err == nil {
 			t.Fatal("理由が返らない")
 		}
-		if _, err := ChildBase("", "x", 0, ""); err != ErrNoTrees {
+		if _, err := ChildBase("", "x", 0, ""); err != errNoTrees {
 			t.Fatal(err)
 		}
 	})
@@ -354,7 +354,7 @@ func TestChildBaseAndTakenFromRemote(t *testing.T) {
 		}, []string{"theirs"}},
 		{"衝突を解いたパスは子のもの", map[string]string{"seed": "theirs\n"}, func(t *testing.T, parent, child string) {
 			commitFile(t, child, "seed", "mine\n")
-			cmd := exec.Command(Program, "-c", "user.email=t@example.com", "-c", "user.name=t", "merge", "--no-edit", "origin/m")
+			cmd := exec.Command(program, "-c", "user.email=t@example.com", "-c", "user.name=t", "merge", "--no-edit", "origin/m")
 			cmd.Dir = child
 			cmd.Run()
 			commitFile(t, child, "seed", "resolved\n")
@@ -449,7 +449,7 @@ func TestRunTimeoutAndDeadline(t *testing.T) {
 	repo := tempRoot(t)
 	gitIn(t, repo, "init", "-q", "-b", "main")
 	input := "x"
-	done := Run(repo, []string{"hash-object", "--stdin"}, Options{Timeout: time.Nanosecond, Input: &input, RawPaths: true})
+	done := Run(repo, []string{"hash-object", "--stdin"}, Options{Timeout: time.Nanosecond, input: &input, RawPaths: true})
 	want := "Command '['git', '-c', 'core.quotePath=false', 'hash-object', '--stdin']' timed out after 1e-09 seconds"
 	if !done.TimedOut() || done.Failure.Error() != want {
 		t.Errorf("期限切れ: %+v", done)
@@ -457,7 +457,7 @@ func TestRunTimeoutAndDeadline(t *testing.T) {
 	if done := Run(repo, []string{"status"}, Options{Deadline: time.Now().Add(600 * time.Millisecond)}); !done.TimedOut() || done.Failure.Error() != "期限不足" {
 		t.Errorf("残りが下限以下なら起こさない: %+v", done)
 	}
-	if done := Run(repo, []string{"hash-object", "--stdin"}, Options{Deadline: time.Now().Add(10 * time.Second), Input: &input}); !done.OK() || len(strings.TrimSpace(done.Out)) != 40 {
+	if done := Run(repo, []string{"hash-object", "--stdin"}, Options{Deadline: time.Now().Add(10 * time.Second), input: &input}); !done.OK() || len(strings.TrimSpace(done.Out)) != 40 {
 		t.Errorf("期限が十分なら起こす: %+v", done)
 	}
 	// ゼロ値の期限は「期限無し」で、起こす（git.Expired も偽）。
@@ -472,7 +472,7 @@ func TestRunTimeoutAndDeadline(t *testing.T) {
 // 起こす git には GIT_OPTIONAL_LOCKS=0（期限で殺しても index.lock を残さない）と GIT_NO_LAZY_FETCH=1 を渡し、
 // 親の環境も残す。PlainPathspecs はユーザの pathspec の読み方を外す。
 func TestEnviron(t *testing.T) {
-	t.Setenv(EnvOptionalLocks, "1")
+	t.Setenv(envOptionalLocks, "1")
 	t.Setenv("GIT_LITERAL_PATHSPECS", "1")
 	for _, plain := range []bool{false, true} {
 		env := environ(plain)
@@ -485,8 +485,8 @@ func TestEnviron(t *testing.T) {
 			}
 			return n
 		}
-		if !slices.Contains(env, EnvOptionalLocks+"=0") || count(EnvOptionalLocks+"=") != 1 ||
-			!slices.Contains(env, EnvNoLazyFetch+"=1") || !slices.Contains(env, "PATH="+os.Getenv("PATH")) ||
+		if !slices.Contains(env, envOptionalLocks+"=0") || count(envOptionalLocks+"=") != 1 ||
+			!slices.Contains(env, envNoLazyFetch+"=1") || !slices.Contains(env, "PATH="+os.Getenv("PATH")) ||
 			(count("GIT_LITERAL_PATHSPECS=") == 0) != plain {
 			t.Errorf("plain=%v env=%v", plain, env)
 		}
@@ -506,7 +506,7 @@ func TestPorcelainArgs(t *testing.T) {
 			"status --porcelain -z --untracked-files=all --no-renames --ignore-submodules=dirty --"},
 	}
 	for _, c := range cases {
-		if got := strings.Join(c.p.Args(), " "); got != c.want {
+		if got := strings.Join(c.p.args(), " "); got != c.want {
 			t.Errorf("%+v: %q, want %q", c.p, got, c.want)
 		}
 	}

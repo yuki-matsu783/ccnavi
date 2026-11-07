@@ -262,5 +262,5 @@ func revisionOK(since string) bool {
 
 // resolveGate は承認の経路とチケット制御の切り替え（enable / disable の 2 値）を解く。読めない値は enable にする。
 func resolveGate(stderr io.Writer, flag, declared, name string) string {
-	return string(selfguard.Resolve(stderr, flag, declared, name, selfguard.GateChoices))
+	return string(selfguard.Resolve(stderr, flag, declared, name, selfguard.GateChoices()))
 }

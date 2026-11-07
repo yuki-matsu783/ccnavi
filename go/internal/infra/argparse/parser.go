@@ -6,7 +6,7 @@ import "strings"
 type Kind int
 
 const (
-	Store     Kind = iota // 値を 1 つ（nargs によっては並び）置く
+	store     Kind = iota // 値を 1 つ（nargs によっては並び）置く
 	StoreTrue             // 値を取らず True を置く。既定は False
 	Append                // 値を並びに足す
 )
@@ -15,17 +15,17 @@ const (
 type Nargs int
 
 const (
-	One        Nargs = 0
+	one        Nargs = 0
 	Optional   Nargs = -1 // "?"
 	ZeroOrMore Nargs = -2 // "*"
 	noArgs     Nargs = -3 // store_true（Python の nargs=0）
 )
 
 // Type は文字列を値に変える関数と、誤りの文に出す名前（Python の type.__name__）。
-// Convert が nil なら文字列のまま置く。
+// convert が nil なら文字列のまま置く。
 type Type struct {
-	Name    string
-	Convert func(string) (any, error)
+	name    string
+	convert func(string) (any, error)
 }
 
 // Arg は add_argument の引数。Flags が "-" で始まらない 1 語なら位置引数、それ以外はオプション。
@@ -38,7 +38,7 @@ type Arg struct {
 	Default any
 	Type    Type
 	Metavar []string // 1 つなら文字列、2 つ以上なら Python のタプル
-	Dest    string   // 空なら Flags から決める
+	dest    string   // 空なら Flags から決める
 }
 
 // Action は足した 1 つの引数。上の段は名前と既定値だけを読む。
@@ -90,8 +90,8 @@ func (p *Parser) Add(arg Arg) *Action {
 			p.options[s] = a
 		}
 	}
-	if arg.Dest != "" {
-		a.Dest = arg.Dest
+	if arg.dest != "" {
+		a.Dest = arg.dest
 	}
 	p.actions = append(p.actions, a)
 	return a

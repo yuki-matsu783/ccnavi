@@ -5,8 +5,11 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/tree"
+	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/tickets/model/place"
 	"ccnavi/internal/tickets/model/standing"
 	"ccnavi/internal/tickets/model/ticket"
@@ -23,12 +26,12 @@ const (
 
 // CopyPath は作業中の承認済みチケット（doing/）のパス。判定が読むのはここだけ。
 func CopyPath(approvedDir, id string) string {
-	return ospath.Join(approvedDir, string(place.Doing), id+place.MdExt)
+	return ospath.Join(approvedDir, string(place.Doing), id+config.MdExt)
 }
 
 // ClosedPath は閉じた承認済みチケット（done/）のパス。
 func ClosedPath(approvedDir, id string) string {
-	return ospath.Join(approvedDir, string(place.Done), id+place.MdExt)
+	return ospath.Join(approvedDir, string(place.Done), id+config.MdExt)
 }
 
 // ParentPaths はツリーで識別子 id の親チケットが在りうるファイル（承認済みの doing/・done/、提案の todo/・review/）。
@@ -41,6 +44,40 @@ func ParentPaths(conf *config.Settings, treeRoot, id string) []string {
 		place.File(treeRoot, conf.Tickets, place.Todo, id),
 		place.File(treeRoot, conf.Tickets, place.Review, id),
 	}
+}
+
+// FrontOf はチケットのファイルの frontmatter。無い・読めなければ nil（チケットとしての検査は掛けない）。
+func FrontOf(path string) *yaml.Map {
+	text, ok := fsio.ReadText(path, fsio.Strict)
+	if !ok {
+		return nil
+	}
+	front, err := ticket.FrontMapping(text)
+	if err != nil {
+		return nil
+	}
+	return front
+}
+
+// ParentIn は paths を順に見て、最初に見つかった id の親チケット（`ticket: <id>` で parent が無い）の frontmatter を
+// 返す。見るのは frontmatter の ticket と parent だけで、チケットとしての検査（範囲の欄など）は掛けない。親チケットの
+// 見方は shask の確認と --lint で同じにするため、ここ 1 か所で決める。見つからなければ nil。在るのに読めない
+// ファイルがあれば broken が真。
+func ParentIn(paths []string, id string) (front *yaml.Map, broken bool) {
+	for _, path := range paths {
+		if !ospath.IsFile(path) {
+			continue
+		}
+		found := FrontOf(path)
+		if found == nil {
+			broken = true
+			continue
+		}
+		if ospath.Strip(found.Text("ticket")) == id && !pyfmt.Truthy(found.Get("parent")) {
+			return found, false
+		}
+	}
+	return nil, broken
 }
 
 // reviewDir はそのツリーの提案の置き場の review/。

@@ -72,7 +72,7 @@ func ChildBlock(conf *config.Settings, root string, t *ticket.Ticket, index map[
 		head += " 先行が未完了: " + strings.Join(waiting, ", ")
 	}
 	block := Block{Lines: []string{head + hint}}
-	for _, section := range rules.Sections {
+	for _, section := range rules.Sections() {
 		if paths := t.Paths(section); len(paths) > 0 {
 			block.Lines = append(block.Lines, "    "+string(section)+": "+strings.Join(paths, ", "))
 		}

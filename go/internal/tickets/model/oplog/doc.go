@@ -10,6 +10,6 @@
 // stage_set → StageSet、applied_set → AppliedSet、reconcile → Reconcile（complete の True・False・None →
 // Listing）、id_for → IDFor、mark_sent → MarkSent、retire_parent → RetireParent、discard_untouched →
 // DiscardUntouched、pending → Pending（読めない記録は Broken に理由）、complete_if_done → CompleteIfDone、
-// summary → Summary、unfinished・finished → Record.Unfinished・Record.Finished、OPS_DIR → DirName、
+// summary → Summary、unfinished・finished → Record.Unfinished・Record.finished、OPS_DIR → dirName、
 // KIND_*・STAGE_*・PENDING・SENT・UNKNOWN・V_* → Kind・StageKind・State・Verdict の定数。
 package oplog

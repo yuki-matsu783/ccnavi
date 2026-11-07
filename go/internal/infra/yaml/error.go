@@ -9,14 +9,14 @@ import (
 // sourceName は文字列から読んだ文書の名前。位置の文に出る（PyYAML と同じ）。
 const sourceName = "<unicode string>"
 
-// ErrUnreadable は読めない文書。構文の誤りも、値を組み立てる途中の失敗も、すべてこれで包む。
-// 呼び手は errors.Is(err, ErrUnreadable) で「読めない文書」として扱う。
-var ErrUnreadable = errors.New("YAML として読めない")
+// errUnreadable は読めない文書。構文の誤りも、値を組み立てる途中の失敗も、すべてこれで包む。
+// 呼び手は errors.Is(err, errUnreadable) で「読めない文書」として扱う。
+var errUnreadable = errors.New("YAML として読めない")
 
-// ErrAlias は LoadRefusingAliases が別名（*名前）を見つけて断ったこと。ErrUnreadable でもある。
+// ErrAlias は LoadRefusingAliases が別名（*名前）を見つけて断ったこと。errUnreadable でもある。
 var ErrAlias = errors.New("別名")
 
-// 値を組み立てる途中の失敗の文。Python は素の例外（ValueError など）を LoadError に包んでいた。
+// 値を組み立てる途中の失敗の文。Python は素の例外（ValueError など）を loadError に包んでいた。
 const (
 	msgTooDeep     = "入れ子が深すぎる"
 	msgUnbuildable = "値を組み立てられない"
@@ -64,8 +64,8 @@ func (m Mark) String() string {
 // Error は読めない理由。Error() は PyYAML の str(exc) と同じ文（文脈・位置・問題・位置の順）。
 // Problem と ProblemMark は、理由を 1 行にまとめたい呼び手（フローの検査）が使う。
 type Error struct {
-	Context     string
-	ContextMark *Mark
+	context     string
+	contextMark *Mark
 	Problem     string
 	ProblemMark *Mark
 	text        string // 位置を持たない理由（文字の検査・組み立ての途中の失敗）
@@ -77,12 +77,12 @@ type Error struct {
 type Class string
 
 const (
-	ReaderError      Class = "ReaderError"      // 許されない文字
-	ScannerError     Class = "ScannerError"     // 字句の誤り
-	ParserError      Class = "ParserError"      // 構文の誤り
-	ComposerError    Class = "ComposerError"    // 別名・アンカー・文書の数の誤り
+	readerError      Class = "ReaderError"      // 許されない文字
+	scannerError     Class = "ScannerError"     // 字句の誤り
+	parserError      Class = "ParserError"      // 構文の誤り
+	composerError    Class = "ComposerError"    // 別名・アンカー・文書の数の誤り
 	ConstructorError Class = "ConstructorError" // 値の組み立てを PyYAML が断った
-	LoadError        Class = "LoadError"        // 組み立ての途中の素の例外・深すぎる入れ子（yamlread が包む）
+	loadError        Class = "LoadError"        // 組み立ての途中の素の例外・深すぎる入れ子（yamlread が包む）
 )
 
 // Class は Python の例外の型の名前。別名で断ったもの（LoadRefusingAliases）は空（呼び手の例外で上がる）。
@@ -93,12 +93,12 @@ func (e *Error) Error() string {
 		return e.text
 	}
 	var lines []string
-	if e.Context != "" {
-		lines = append(lines, e.Context)
+	if e.context != "" {
+		lines = append(lines, e.context)
 	}
-	if e.ContextMark != nil && (e.Problem == "" || e.ProblemMark == nil ||
-		e.ContextMark.Line != e.ProblemMark.Line || e.ContextMark.Column != e.ProblemMark.Column) {
-		lines = append(lines, e.ContextMark.String())
+	if e.contextMark != nil && (e.Problem == "" || e.ProblemMark == nil ||
+		e.contextMark.Line != e.ProblemMark.Line || e.contextMark.Column != e.ProblemMark.Column) {
+		lines = append(lines, e.contextMark.String())
 	}
 	if e.Problem != "" {
 		lines = append(lines, e.Problem)
@@ -109,22 +109,22 @@ func (e *Error) Error() string {
 	return strings.Join(lines, "\n")
 }
 
-// Is は、どの Error も ErrUnreadable として見せる。別名で断ったものは ErrAlias でもある。
+// Is は、どの Error も errUnreadable として見せる。別名で断ったものは ErrAlias でもある。
 func (e *Error) Is(target error) bool {
-	return target == ErrUnreadable || (target == ErrAlias && e.cause == ErrAlias)
+	return target == errUnreadable || (target == ErrAlias && e.cause == ErrAlias)
 }
 
 func (e *Error) Unwrap() error { return e.cause }
 
 func markedError(class Class, context string, contextMark *Mark, problem string, problemMark *Mark) *Error {
-	return &Error{Context: context, ContextMark: contextMark, Problem: problem, ProblemMark: problemMark, class: class}
+	return &Error{context: context, contextMark: contextMark, Problem: problem, ProblemMark: problemMark, class: class}
 }
 
 func markPtr(m Mark) *Mark { return &m }
 
 // buildError は値を組み立てる途中の失敗。kind は Python の例外の名前で、文に残す。
 func buildError(kind, detail string) *Error {
-	return &Error{text: fmt.Sprintf("%s (%s: %s)", msgUnbuildable, kind, detail), class: LoadError}
+	return &Error{text: fmt.Sprintf("%s (%s: %s)", msgUnbuildable, kind, detail), class: loadError}
 }
 
-func tooDeep() *Error { return &Error{text: msgTooDeep, class: LoadError} }
+func tooDeep() *Error { return &Error{text: msgTooDeep, class: loadError} }

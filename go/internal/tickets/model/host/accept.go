@@ -43,7 +43,7 @@ const (
 const acceptPlanVersion = 1
 
 // acceptID はスレッドの id に使える字。GitHub の node id（PRRT_kw…）と GitLab の discussion の id（16 進）の
-// どちらも収まる。sh も同じ字でしか API の経路や GraphQL の変数に使わない。
+// どちらも収まる。sh も同じ字でしか API の経路や graphQL の変数に使わない。
 var acceptID = regexp.MustCompile(`\A[A-Za-z0-9_=-]+\z`)
 
 // AcceptReply は受け入れたスレッドに残す返信の本文。why は受け入れる場面（1 行）。issueURL を渡すと、

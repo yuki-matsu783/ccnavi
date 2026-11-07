@@ -7,6 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
@@ -34,7 +35,6 @@ const (
 const signalError = "誤り"
 
 const (
-	mdExt     = ".md"
 	gitkeep   = ".gitkeep"
 	fence     = "---"
 	headingMk = "## "
@@ -87,7 +87,7 @@ type record struct {
 
 // parse は記録の文面を読む。読み取りの検査に落ちれば (nil, 理由)。
 func parse(ident, text string) (*record, string) {
-	text = strings.ReplaceAll(strings.TrimLeft(text, "\uFEFF"), "\r\n", "\n")
+	text = strings.ReplaceAll(strings.TrimLeft(text, yaml.BOM), "\r\n", "\n")
 	lines := strings.Split(text, "\n")
 	if ospath.Strip(lines[0]) != fence {
 		return nil, "frontmatter が無い"
@@ -200,7 +200,7 @@ func listing(treeRoot, rel string) ([]entry, string, bool) {
 			continue
 		}
 		meta, path, _ := strings.Cut(line, "\t")
-		parts := strings.FieldsFunc(meta, ospath.IsSpace)
+		parts := ospath.Fields(meta)
 		if len(parts) < 3 {
 			continue
 		}
@@ -229,7 +229,7 @@ func patternSources(treeRoot, name string) ([]string, bool) {
 		return nil, false
 	}
 	names, _, _ := listing(treeRoot, wiki.PatternsDir)
-	want := pathcase.Fold(name + mdExt)
+	want := pathcase.Fold(name + config.MdExt)
 	found := ""
 	for _, e := range names {
 		if pathcase.Fold(e.name) == want && regularModes[e.mode] {
@@ -245,7 +245,7 @@ func patternSources(treeRoot, name string) ([]string, bool) {
 		return nil, false
 	}
 	// 畳んで ".md" になる字は M・m・D・d だけなので、元の綴りの末尾も 3 バイト。
-	parsed, problem := wiki.ParsePattern(found[:len(found)-len(mdExt)], text)
+	parsed, problem := wiki.ParsePattern(found[:len(found)-len(config.MdExt)], text)
 	if problem != "" {
 		return nil, false
 	}
@@ -254,32 +254,32 @@ func patternSources(treeRoot, name string) ([]string, bool) {
 
 // Item は統合の子が処理すべきもの 1 件。Title は節の見出しで、受信箱のファイルでは空。
 type Item struct {
-	Path, Title, Why string
+	path, title, why string
 }
 
 // Describe は一覧の 1 行の本文。
 func (i Item) Describe() string {
-	where := i.Path
-	if i.Title != "" {
-		where = i.Path + " の「" + i.Title + "」"
+	where := i.path
+	if i.title != "" {
+		where = i.path + " の「" + i.title + "」"
 	}
-	return where + "（" + i.Why + "）"
+	return where + "（" + i.why + "）"
 }
 
-// Problem は統合では直せない記録 1 つと、その理由。
-type Problem struct {
-	Path, Why string
+// problem は統合では直せない記録 1 つと、その理由。
+type problem struct {
+	path, why string
 }
 
-// Pending は Find の答え。Unreadable は読み取りの検査に、Inconsistent は整合の検査に落ちた記録。
+// Pending は Find の答え。unreadable は読み取りの検査に、inconsistent は整合の検査に落ちた記録。
 type Pending struct {
 	Items        []Item
-	Unreadable   []Problem
-	Inconsistent []Problem
+	unreadable   []problem
+	inconsistent []problem
 }
 
 // Broken は統合では直せない記録があるか。
-func (p *Pending) Broken() bool { return len(p.Unreadable) > 0 || len(p.Inconsistent) > 0 }
+func (p *Pending) Broken() bool { return len(p.unreadable) > 0 || len(p.inconsistent) > 0 }
 
 // inboxFiles は HEAD の受信箱のファイル名。`.gitkeep` 以外は全部数える（`.md` 以外も、大文字小文字違いも）。
 func inboxFiles(treeRoot string) ([]string, string) {
@@ -302,7 +302,7 @@ func Find(treeRoot string) *Pending {
 	out := &Pending{}
 	names, why, ok := listing(treeRoot, LearningDir)
 	if !ok {
-		out.Unreadable = append(out.Unreadable, Problem{LearningDir + "/", why})
+		out.unreadable = append(out.unreadable, problem{LearningDir + "/", why})
 	}
 	sort.Slice(names, func(i, j int) bool {
 		if names[i].name != names[j].name {
@@ -311,26 +311,26 @@ func Find(treeRoot string) *Pending {
 		return names[i].mode < names[j].mode
 	})
 	for _, e := range names {
-		if !strings.HasSuffix(e.name, mdExt) {
+		if !strings.HasSuffix(e.name, config.MdExt) {
 			continue
 		}
 		rel := LearningDir + "/" + e.name
 		if !regularModes[e.mode] {
-			out.Unreadable = append(out.Unreadable, Problem{rel, "通常のファイルでない（リンクかディレクトリ）"})
+			out.unreadable = append(out.unreadable, problem{rel, "通常のファイルでない（リンクかディレクトリ）"})
 			continue
 		}
 		text, ok := headBlobText(treeRoot, rel)
 		if !ok {
-			out.Unreadable = append(out.Unreadable, Problem{rel, "読めない（UTF-8 でない、または HEAD に無い）"})
+			out.unreadable = append(out.unreadable, problem{rel, "読めない（UTF-8 でない、または HEAD に無い）"})
 			continue
 		}
-		rec, why := parse(strings.TrimSuffix(e.name, mdExt), text)
+		rec, why := parse(strings.TrimSuffix(e.name, config.MdExt), text)
 		if rec == nil {
-			out.Unreadable = append(out.Unreadable, Problem{rel, why})
+			out.unreadable = append(out.unreadable, problem{rel, why})
 			continue
 		}
 		if bad := consistencyProblem(rec); bad != "" {
-			out.Inconsistent = append(out.Inconsistent, Problem{rel, bad})
+			out.inconsistent = append(out.inconsistent, problem{rel, bad})
 			continue
 		}
 		for i := range rec.sections {
@@ -341,7 +341,7 @@ func Find(treeRoot string) *Pending {
 	}
 	inbox, why := inboxFiles(treeRoot)
 	if why != "" {
-		out.Unreadable = append(out.Unreadable, Problem{wiki.InboxDir + "/", why})
+		out.unreadable = append(out.unreadable, problem{wiki.InboxDir + "/", why})
 	}
 	for _, name := range inbox {
 		out.Items = append(out.Items, Item{wiki.InboxDir + "/" + name, "", "受信箱のファイル（判定して消す）"})

@@ -132,24 +132,24 @@ func TestMovedDetail(t *testing.T) {
 		listed  bool
 		project bool
 		text    string
-		kind    MovedKind
+		kind    movedKind
 	}{
 		{"同じ HEAD", mark, strings.Repeat("a", 40), nil, false, false, "", ""},
 		{"承認済みの置き場だけ", mark, b, []string{".ccnavi/approved/x.md"}, true, false, "", ""},
 		{"提案の置き場だけ", mark, b, []string{"wip/proposals/todo/x.md"}, true, false, "", ""},
-		{"読めない", mark, b, nil, false, false, "依頼の後に親の HEAD が動いている", KindMoved},
-		{"コード", mark, b, []string{"src/app.py"}, true, false, "依頼の後に親の HEAD が動いている", KindMoved},
-		{"置き場と外", mark, b, []string{".ccnavi/approved/x", "README.md"}, true, false, "依頼の後に親の HEAD が動いている", KindMoved},
+		{"読めない", mark, b, nil, false, false, "依頼の後に親の HEAD が動いている", kindMoved},
+		{"コード", mark, b, []string{"src/app.py"}, true, false, "依頼の後に親の HEAD が動いている", kindMoved},
+		{"置き場と外", mark, b, []string{".ccnavi/approved/x", "README.md"}, true, false, "依頼の後に親の HEAD が動いている", kindMoved},
 		{"記録が無い", obj(), b, nil, true, false, "記録されていない", ""},
-		{"sha でない記録", obj("head", "HEAD"), b, nil, true, false, "動いている", KindMoved},
-		{"ミラーだけ（プロジェクト）", mark, b, []string{".ccnavi/config/common/rules.yml", "skills/process-test/SKILL.md"}, true, true, "動いている", KindMirror},
-		{"ミラーと外（プロジェクト）", mark, b, []string{".ccnavi/config/common/rules.yml", "src/keep.py"}, true, true, "動いている", KindMoved},
-		{"ミラーだけ（ワークスペース）", mark, b, []string{".ccnavi/config/common/rules.yml"}, true, false, "動いている", KindMoved},
-		{"読めない（プロジェクト）", mark, b, nil, false, true, "動いている", KindMoved},
+		{"sha でない記録", obj("head", "HEAD"), b, nil, true, false, "動いている", kindMoved},
+		{"ミラーだけ（プロジェクト）", mark, b, []string{".ccnavi/config/common/rules.yml", "skills/process-test/SKILL.md"}, true, true, "動いている", kindMirror},
+		{"ミラーと外（プロジェクト）", mark, b, []string{".ccnavi/config/common/rules.yml", "src/keep.py"}, true, true, "動いている", kindMoved},
+		{"ミラーだけ（ワークスペース）", mark, b, []string{".ccnavi/config/common/rules.yml"}, true, false, "動いている", kindMoved},
+		{"読めない（プロジェクト）", mark, b, nil, false, true, "動いている", kindMoved},
 	}
 	for _, c := range cases {
 		got := MovedDetail(conf, c.mark, c.head, c.changed, c.listed, c.project)
-		if c.text == "" && got.Text != "" || !strings.Contains(got.Text, c.text) || got.Kind != c.kind {
+		if c.text == "" && got.Text != "" || !strings.Contains(got.Text, c.text) || got.kind != c.kind {
 			t.Errorf("%s: %+v", c.name, got)
 		}
 	}
@@ -165,8 +165,8 @@ func TestMovedExplanation(t *testing.T) {
 		moved Moved
 		want  []string
 	}{
-		{Moved{"x", KindMoved}, []string{fixed}},
-		{Moved{"x", KindMirror}, []string{fixed, msgExplainMirror}},
+		{Moved{"x", kindMoved}, []string{fixed}},
+		{Moved{"x", kindMirror}, []string{fixed, msgExplainMirror}},
 		{Moved{Text: "親ブランチの HEAD が push されていない"}, nil},
 		{Moved{}, nil},
 	}

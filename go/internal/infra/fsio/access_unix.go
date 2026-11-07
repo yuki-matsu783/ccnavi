@@ -16,6 +16,6 @@ var writable = func(path string) bool {
 const (
 	// NoFollow はリンクを開かせない（開けずに失敗する）。
 	NoFollow = syscall.O_NOFOLLOW
-	// NonBlock は名前付きパイプでも書き手を待たずに開く。
-	NonBlock = syscall.O_NONBLOCK
+	// nonBlock は名前付きパイプでも書き手を待たずに開く。
+	nonBlock = syscall.O_NONBLOCK
 )

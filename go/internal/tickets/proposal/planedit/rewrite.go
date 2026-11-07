@@ -180,7 +180,7 @@ var planKeys = []string{string(phases.Plan), string(phases.FeedbackPart)}
 // rebuilt は親の提案の plan: / feedback: の値だけを振り直した形に差し替えたバイト列。変わらなければ (nil, "")、
 // 書けなければ (nil, 理由)。
 func (a *Answer) rebuilt() ([]byte, string) {
-	parent, revised := a.Source.Parent, a.Revised
+	parent, revised := a.source.Parent, a.revised
 	type change struct {
 		key   string
 		items []ticket.PlanItem
@@ -197,7 +197,7 @@ func (a *Answer) rebuilt() ([]byte, string) {
 	if len(changed) == 0 {
 		return nil, ""
 	}
-	text, ok := decode(a.Source.raw)
+	text, ok := decode(a.source.raw)
 	if !ok {
 		return nil, "UTF-8 として読めない"
 	}

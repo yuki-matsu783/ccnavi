@@ -55,7 +55,7 @@ func TreeRoots(conf *config.Settings, root string) []string {
 
 // NamedFile はディレクトリの中の <名前>.md（実際の表記のパス）。大文字小文字と NFC は畳んで比べる。無ければ空。
 func NamedFile(directory, name string) string {
-	want := pathcase.Fold(pyfmt.NFC(name + ".md"))
+	want := pathcase.Fold(pyfmt.NFC(name + config.MdExt))
 	entries, err := ospath.DiskListdir(directory)
 	if err != nil {
 		return ""
@@ -69,17 +69,17 @@ func NamedFile(directory, name string) string {
 }
 
 // BoundReason はこの名前のワークツリーがチケットに結び付く理由（integrate の判定）。結び付かなければ空。
-// 決められないものは結び付かないと読む。Stop の判定は区別する BoundCheck を使う。
+// 決められないものは結び付かないと読む。Stop の判定は区別する boundCheck を使う。
 func BoundReason(conf *config.Settings, root string, here tree.Tree) string {
-	reason, _ := BoundCheck(conf, root, here, time.Time{})
+	reason, _ := boundCheck(conf, root, here, time.Time{})
 	return reason
 }
 
-// BoundCheck は BoundReason の本体。unsure は、理由が無く、origin の追跡ブランチの有無を引く git が期限不足か
+// boundCheck は BoundReason の本体。unsure は、理由が無く、origin の追跡ブランチの有無を引く git が期限不足か
 // 失敗で終わったとき真。材料は広めに適用して断る向きで、全ツリーの承認済みチケット（doing/・done/）と提案
 // （todo/・review/）の <名前>.md、手元の退避の同じ名前の親、origin に在る親のブランチのワークツリー（直接作業の
 // 記録があるワークツリーは除く。直接作業のブランチも push で origin へ送れるので、送ると促しが黙って消える）。
-func BoundCheck(conf *config.Settings, root string, here tree.Tree, deadline time.Time) (reason string, unsure bool) {
+func boundCheck(conf *config.Settings, root string, here tree.Tree, deadline time.Time) (reason string, unsure bool) {
 	name := here.Name
 	owner := tree.ProjectRoot(conf.Projects, here.Project)
 	if owner == "" {
@@ -117,7 +117,7 @@ func BoundCheck(conf *config.Settings, root string, here tree.Tree, deadline tim
 		if !ok || branch == "" || pathcase.Fold(ids.BranchToID(branch)) != pathcase.Fold(cand) {
 			continue
 		}
-		if rec := DirectRecord(owner, cand); rec != nil && !rec.Broken {
+		if rec := DirectRecord(owner, cand); rec != nil && !rec.broken {
 			continue
 		}
 		done := git.Run(work, []string{"show-ref", "--verify", "--quiet", "refs/remotes/origin/" + branch}, git.Options{Deadline: deadline})
@@ -145,5 +145,5 @@ func DirectCheck(conf *config.Settings, root string, here tree.Tree, deadline ti
 	if !directcand.IntegrableName(here.Name) {
 		return "名前が統合できる形でない", false
 	}
-	return BoundCheck(conf, root, here, deadline)
+	return boundCheck(conf, root, here, deadline)
 }

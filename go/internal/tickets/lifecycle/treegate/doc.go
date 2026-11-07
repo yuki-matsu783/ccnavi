@@ -6,6 +6,6 @@
 // Python からの対応: tickets/lifecycle/treegate。APPROVAL_REQUEST・FINISH・REVIEW_REQUEST・READY → Op の定数（request の
 // _moved_detail が直に読んでいた unpushed(…, ignore_places=True) → Reviewed）、
 // DIRTY_PARENT・UNPUSHED_CODE → Kind の定数、Refusal（line → Line）、check → Check（branch・root・mirror_guidance
-// → Options）、tree_dirty → Dirty、diff_paths → DiffPaths、unpushed → Unpushed、in_place → InPlace、
+// → Options）、tree_dirty → Dirty、diff_paths → DiffPaths、unpushed → unpushed、in_place → InPlace、
 // dirty_refusal → DirtyRefusal。読めないときの None は ok が偽になる。WATCHES は私的（watches）。
 package treegate

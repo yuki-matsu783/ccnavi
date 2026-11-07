@@ -3,5 +3,5 @@
 // 文字列を調べるだけで、ファイルも git も読まない。
 //
 // Python からの対応: proposal_form をそのまま移した。PARENT_HEADINGS・RATIONALE_TODO・HEADING_TODO・PLACEHOLDERS →
-// ParentHeadings・RationaleTodo・HeadingTodo・Placeholders、headings_in → Headings、form_problems → Problems。
+// ParentHeadings・RationaleTodo・HeadingTodo・placeholders、headings_in → headings、form_problems → Problems。
 package form

@@ -23,20 +23,20 @@ func TestKinds(t *testing.T) {
 		{".ccnavi/config/common/templates/a.yml", Template},
 		{".ccnavi/config/project/templates/a.yml", Template},
 		{"projects/lib/.ccnavi/config/project/templates/a.yml", Template},
-		{".ccnavi/messages/a.yml", Messages},
-		{".ccnavi/config/common/rules.yml", LayerConfig},
-		{".ccnavi/config/project/phases.yml", LayerConfig},
-		{"projects/lib/.ccnavi/config/project/risks.yml", LayerConfig},
-		{".ccnavi/docs/a/b.md", Docs},
-		{".ccnavi/CCNAVI.md", Docs},
-		{".CCNAVI/Docs/Guide.MD", Docs},
-		{".claude/skills/x/SKILL.md", Defense},
-		{".claude/skills/x/y/z.md", Defense},
-		{".ccnavi/scripts/ccnavi-git.sh", Defense},
-		{".ccnavi/scripts/ccnavi-handoff-names.txt", Defense},
-		{".claude/hooks/a/b/c.py", Defense},
-		{".claude/settings.json", Defense},
-		{".claude/settings.local.json", Defense},
+		{".ccnavi/messages/a.yml", messages},
+		{".ccnavi/config/common/rules.yml", layerConfig},
+		{".ccnavi/config/project/phases.yml", layerConfig},
+		{"projects/lib/.ccnavi/config/project/risks.yml", layerConfig},
+		{".ccnavi/docs/a/b.md", docs},
+		{".ccnavi/CCNAVI.md", docs},
+		{".CCNAVI/Docs/Guide.MD", docs},
+		{".claude/skills/x/SKILL.md", defense},
+		{".claude/skills/x/y/z.md", defense},
+		{".ccnavi/scripts/ccnavi-git.sh", defense},
+		{".ccnavi/scripts/ccnavi-handoff-names.txt", defense},
+		{".claude/hooks/a/b/c.py", defense},
+		{".claude/settings.json", defense},
+		{".claude/settings.local.json", defense},
 		{"learnings/i0001.md", ""},
 		{"repro.sh", ""},
 		{".ccnavi/bin/ccnavi", ""},
@@ -68,8 +68,8 @@ func TestKinds(t *testing.T) {
 	for _, k := range kinds {
 		board[k.ID], fresh[k.ID] = k.onBoard, k.creatable
 	}
-	wantBoard := map[KindID]bool{Template: true, Messages: false, LayerConfig: true, Docs: true, Defense: false}
-	wantNew := map[KindID]bool{Template: true, Messages: true, LayerConfig: false, Docs: false, Defense: false}
+	wantBoard := map[KindID]bool{Template: true, messages: false, layerConfig: true, docs: true, defense: false}
+	wantNew := map[KindID]bool{Template: true, messages: true, layerConfig: false, docs: false, defense: false}
 	for id := range wantBoard {
 		if board[id] != wantBoard[id] || fresh[id] != wantNew[id] {
 			t.Errorf("%s: board=%v new=%v", id, board[id], fresh[id])
@@ -150,7 +150,7 @@ func TestLinksAreRefused(t *testing.T) {
 	t.Run("下書き\u304cリンク", func(t *testing.T) {
 		root, conf := workspace(t, map[string]string{"outside.md": "x\n"})
 		symlink(t, filepath.Join(root, "outside.md"), filepath.Join(root, "wip", "handoff", filepath.FromSlash(docsRel)))
-		if e := entryOf(t, Prepare(conf, root, nil), docsRel); e.State() != StateRejected || !strings.Contains(strings.Join(e.Errors, " "), "リンク") {
+		if e := entryOf(t, Prepare(conf, root, nil), docsRel); e.State() != stateRejected || !strings.Contains(strings.Join(e.Errors, " "), "リンク") {
 			t.Errorf("断らない: %q", e.Errors)
 		}
 	})
@@ -160,7 +160,7 @@ func TestLinksAreRefused(t *testing.T) {
 		build(t, outside, map[string]string{"docs/guide.md": "evil\n"})
 		symlink(t, outside, filepath.Join(root, "wip", "handoff", ".ccnavi"))
 		plan := Prepare(conf, root, nil)
-		if len(plan.Entries) != 0 || len(plan.Ignored) != 1 || plan.Ignored[0] != (Ignored{".ccnavi", WhyLinkedDir}) {
+		if len(plan.Entries) != 0 || len(plan.Ignored) != 1 || plan.Ignored[0] != (Ignored{".ccnavi", whyLinkedDir}) {
 			t.Errorf("entries=%v ignored=%v", plan.Entries, plan.Ignored)
 		}
 	})
@@ -171,7 +171,7 @@ func TestLinksAreRefused(t *testing.T) {
 			t.Fatal(err)
 		}
 		symlink(t, filepath.Join(root, "real.md"), target)
-		if e := entryOf(t, Prepare(conf, root, nil), docsRel); e.State() != StateRejected {
+		if e := entryOf(t, Prepare(conf, root, nil), docsRel); e.State() != stateRejected {
 			t.Errorf("断らない: %q", e.Errors)
 		}
 	})
@@ -213,7 +213,7 @@ func TestOddFilesAreRefused(t *testing.T) {
 		if err := mkfifo(draft); err != nil {
 			t.Skip("名前付きパイプを作れない")
 		}
-		if e := entryOf(t, Prepare(conf, root, nil), docsRel); e.State() != StateRejected {
+		if e := entryOf(t, Prepare(conf, root, nil), docsRel); e.State() != stateRejected {
 			t.Errorf("断らない: %q", e.Errors)
 		}
 	})

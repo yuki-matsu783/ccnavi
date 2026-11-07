@@ -187,7 +187,7 @@ func TestReadDegraded(t *testing.T) {
 		{`grep -n "<<" f`, ReasonUnterminated},
 		{"echo `git push", ReasonBackquote},
 		{"echo \"`git push\"", ReasonBackquote},
-		{`echo "$(case a in a) git push;; esac)"`, ReasonAmbiguousSubst},
+		{`echo "$(case a in a) git push;; esac)"`, reasonAmbiguousSubst},
 		{"echo $'a\\nb'", ReasonAnsiC},
 		{"git $'\\x70ush'", ReasonAnsiC},
 		{"printf $'\\''", ReasonAnsiC},
@@ -221,7 +221,7 @@ func TestNestingLimit(t *testing.T) {
 	}
 	for _, depth := range []int{maxDepth + 1, 400} {
 		r := Read(nested(depth))
-		if !r.Degraded || r.Reason != ReasonAmbiguousSubst {
+		if !r.Degraded || r.Reason != reasonAmbiguousSubst {
 			t.Errorf("depth %d: (%v, %q)", depth, r.Degraded, r.Reason)
 		}
 	}
@@ -245,7 +245,7 @@ func TestScanFrameLimit(t *testing.T) {
 		if Read(build(c.ok)).Unwrapped == "" {
 			t.Errorf("%q x %d は層を作るはず", c.open, c.ok)
 		}
-		if got := Read(build(c.stops)); got.Unwrapped != "" || got.Reason != ReasonAmbiguousSubst {
+		if got := Read(build(c.stops)); got.Unwrapped != "" || got.Reason != reasonAmbiguousSubst {
 			t.Errorf("%q x %d は走査で止まるはず: %q %q", c.open, c.stops, got.Reason, show(got.Unwrapped))
 		}
 	}
@@ -559,11 +559,11 @@ func TestMovedLimits(t *testing.T) {
 	if r.Degraded || len(r.Moved) >= 100_000 {
 		t.Errorf("degraded=%v len(moved)=%d", r.Degraded, len(r.Moved))
 	}
-	words := make([]string, MovedWords)
+	words := make([]string, movedWords)
 	for i := range words {
 		words[i] = fmt.Sprintf("rm x%d", i)
 	}
-	if got := moved(t, "cd a && "+strings.Join(words, " && ")); len(got) >= MovedWords {
+	if got := moved(t, "cd a && "+strings.Join(words, " && ")); len(got) >= movedWords {
 		t.Errorf("語数の上限を越えて継ぎ足した: %d", len(got))
 	}
 }
@@ -683,7 +683,7 @@ func TestBraces(t *testing.T) {
 		{`sh -c "echo '{a,b}'"`, nil},
 	}
 	for _, c := range cases {
-		if got := Read(c.src).Braces(); !slices.Equal(got, c.want) {
+		if got := Read(c.src).braces(); !slices.Equal(got, c.want) {
 			t.Errorf("Braces(%q) = %q, want %q", c.src, got, c.want)
 		}
 	}

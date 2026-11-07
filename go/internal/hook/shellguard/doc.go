@@ -12,7 +12,7 @@
 // check_core_paths・check_parent_tree_git → CheckEnv・CheckChildPush・CheckCorePaths・CheckParentTreeGit、
 // parentwrite.check → CheckParentWrite（戻りは ParentWrite。Write・Edit の書き込み先も同じ判定を ParentWriteAt で
 // 通す。Python は judge に同じ条件を書いていた）、rootwrite.check → CheckRootWrite（戻りは RootWrite）、
-// git_calls → GitCalls、blocked → Blocked、worktree_name → WorktreeName、ticket_role → TicketRole（ROLE_* は Role）、
+// git_calls → GitCalls、blocked → blocked、worktree_name → worktreeName、ticket_role → TicketRole（ROLE_* は Role）、
 // *_message → EnvMessage・ChildPushMessage・CorePathMessage・ParentTreeMessage・ParentWriteMessage・RootWriteMessage、
 // CORE_* → Core の定数、KIND_* → WriteKind の定数、CODE_*・*_RULE_ID → Code*・*RuleID。
 // parentwrite.write_targets と resolve_word は私的にした（呼び手は rootwrite とテストだけ）。

@@ -28,12 +28,12 @@ import (
 // 呼び手が書く。
 
 const (
-	// IssueURLSlot は返信の本文の、issue の URL を入れる枠。issue を作った呼び手が置き換える。
-	IssueURLSlot = "{issue_url}"
-	// IssueLinksSlot は決めた内容のコメントの、作った issue の一覧を入れる枠。issue に回す指摘があるときだけ入る。
-	IssueLinksSlot = "{issue_links}"
-	// MaxIssues は 1 回の apply で issue にできる指摘の上限（ホストへの書き込みを 1 回の操作に収める）。
-	MaxIssues = 40
+	// issueURLSlot は返信の本文の、issue の URL を入れる枠。issue を作った呼び手が置き換える。
+	issueURLSlot = "{issue_url}"
+	// issueLinksSlot は決めた内容のコメントの、作った issue の一覧を入れる枠。issue に回す指摘があるときだけ入る。
+	issueLinksSlot = "{issue_links}"
+	// maxIssues は 1 回の apply で issue にできる指摘の上限（ホストへの書き込みを 1 回の操作に収める）。
+	maxIssues = 40
 	// issueTitleLimit は issue のタイトルの字数の上限（GitHub は 256 字）。
 	issueTitleLimit = 200
 	// 操作ID の頭。続きの子と issue で分ける。
@@ -126,8 +126,8 @@ func Decide(conf *config.Settings, root string, actor Actor, stamp, parentID str
 		return refusedDecided(codeDecideNoDigest, []string{"ccnavi: 見せた指摘のダイジェストが無いか、読めません。指摘を見せ直してください。何も積んでいません"}, nil), nil
 	}
 	if !validChoices(choices) {
-		names := make([]string, len(decide.Choices))
-		for i, c := range decide.Choices {
+		names := make([]string, len(decide.Choices()))
+		for i, c := range decide.Choices() {
 			names[i] = string(c)
 		}
 		return refusedDecided(codeDecideChoices, []string{"ccnavi: 選択は {キー: " + strings.Join(names, " / ") + "} の形で渡してください"}, nil), nil
@@ -165,9 +165,9 @@ func Decide(conf *config.Settings, root string, actor Actor, stamp, parentID str
 		c := choiceOf(choices, host.ThreadKey(t))
 		picked[c] = append(picked[c], t)
 	}
-	if n := len(picked[decide.Issue]); n > MaxIssues {
+	if n := len(picked[decide.Issue]); n > maxIssues {
 		return refusedDecided(codeDecideChoices, []string{fmt.Sprintf(
-			"ccnavi: issue に回す指摘が %d 件あります。1 回で回せるのは %d 件まで。選び直してください。何も積んでいません", n, MaxIssues)}, nil), nil
+			"ccnavi: issue に回す指摘が %d 件あります。1 回で回せるのは %d 件まで。選び直してください。何も積んでいません", n, maxIssues)}, nil), nil
 	}
 	fix := picked[decide.Fix]
 	var toWrite []host.Thread
@@ -245,7 +245,7 @@ func validChoices(choices *pyjson.Object) bool {
 	}
 	for _, key := range choices.Keys() {
 		c, ok := choices.Value(key).(string)
-		if !ok || !slices.Contains(decide.Choices, decide.Choice(c)) {
+		if !ok || !slices.Contains(decide.Choices(), decide.Choice(c)) {
 			return false
 		}
 	}
@@ -384,7 +384,7 @@ func hostPlan(d *decide.Decision, accepted []accepting, picked map[decide.Choice
 	for _, a := range accepted {
 		url := ""
 		if a.choice == decide.Issue {
-			url = IssueURLSlot
+			url = issueURLSlot
 		}
 		replies = append(replies, pyjson.NewObject("key", a.key, "thread_id", a.threadID, "body", host.AcceptReply(why, a.choice == decide.Issue, url)))
 	}
@@ -393,7 +393,7 @@ func hostPlan(d *decide.Decision, accepted []accepting, picked map[decide.Choice
 	}
 	comment := decide.CommentText(d, picked, followup)
 	if len(issues) > 0 {
-		comment += "\nissue に回した分:\n" + IssueLinksSlot + "\n"
+		comment += "\nissue に回した分:\n" + issueLinksSlot + "\n"
 	}
 	return pyjson.NewObject("issues", issues, "replies", replies, "resolves", resolves, "comment", comment)
 }

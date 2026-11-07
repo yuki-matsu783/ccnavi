@@ -57,7 +57,7 @@ func reviseCopy(approvedDir string, current, revised *ticket.Ticket) string {
 // phases: に無い定義名を使い、承認したとたんに親と子が全部止まる）。提案に無い範囲の節と phases: は外す。
 func revisedFront(current, revised *ticket.Ticket) *yaml.Map {
 	var drop []string
-	for _, s := range rules.Sections {
+	for _, s := range rules.Sections() {
 		if !revised.Raw.Has(string(s)) {
 			drop = append(drop, string(s))
 		}
@@ -66,7 +66,7 @@ func revisedFront(current, revised *ticket.Ticket) *yaml.Map {
 		drop = append(drop, ticket.PhasesKey)
 	}
 	front := cmp.Or(current.Raw, &yaml.Map{}).Without(drop...)
-	for _, s := range rules.Sections {
+	for _, s := range rules.Sections() {
 		if v, ok := revised.Raw.Lookup(string(s)); ok {
 			front.Put(string(s), v)
 		}

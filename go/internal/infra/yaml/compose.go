@@ -58,7 +58,7 @@ func (c *composer) singleNode() (*node, error) {
 		if err != nil {
 			return nil, err
 		}
-		return nil, markedError(ComposerError, "expected a single document in the stream", markPtr(doc.start),
+		return nil, markedError(composerError, "expected a single document in the stream", markPtr(doc.start),
 			"but found another document", markPtr(ev.start))
 	}
 	_, err = c.p.getEvent()
@@ -95,13 +95,13 @@ func (c *composer) composeNode(depth int) (*node, error) {
 		}
 		n, ok := c.anchors[ev.anchor]
 		if !ok {
-			return nil, markedError(ComposerError, "", nil, "found undefined alias "+pyfmt.Quote(ev.anchor), markPtr(ev.start))
+			return nil, markedError(composerError, "", nil, "found undefined alias "+pyfmt.Quote(ev.anchor), markPtr(ev.start))
 		}
 		return n, nil
 	}
 	if ev.anchor != "" {
 		if first, dup := c.anchors[ev.anchor]; dup {
-			return nil, markedError(ComposerError, "found duplicate anchor "+pyfmt.Quote(ev.anchor)+"; first occurrence",
+			return nil, markedError(composerError, "found duplicate anchor "+pyfmt.Quote(ev.anchor)+"; first occurrence",
 				markPtr(first.start), "second occurrence", markPtr(ev.start))
 		}
 	}

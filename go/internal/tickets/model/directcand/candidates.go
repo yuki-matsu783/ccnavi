@@ -15,8 +15,8 @@ import (
 	"ccnavi/internal/infra/tree"
 )
 
-// MaxEntries は記録の上限。
-const MaxEntries = 50
+// maxEntries は記録の上限。
+const maxEntries = 50
 
 // refreshWindow は、同じ候補が末尾にあってこれ以内に見たばかりなら書き直さない長さ。
 const refreshWindow = 60 * time.Second
@@ -131,8 +131,8 @@ func save(stateDir, session string, rows []row) {
 		}
 		return 0
 	})
-	if len(rows) > MaxEntries {
-		rows = rows[len(rows)-MaxEntries:]
+	if len(rows) > maxEntries {
+		rows = rows[len(rows)-maxEntries:]
 	}
 	entries := make([]any, 0, len(rows))
 	for _, r := range rows {
@@ -176,7 +176,7 @@ func target(in hookio.Input) string {
 // Touch は、成功した書き込みの先が直接作業のワークツリーなら候補に加える。メインにもサブエージェントにも効く
 // （サブエージェントも親のセッションの候補になる）。git は呼ばず、保存できなくても何も言わない。
 func Touch(conf *config.Settings, root string, in hookio.Input, now time.Time) {
-	if !slices.Contains(config.WriteTools, in.ToolName) || conf.State == "" || in.SessionID == "" {
+	if !slices.Contains(config.WriteTools(), in.ToolName) || conf.State == "" || in.SessionID == "" {
 		return
 	}
 	full := target(in)

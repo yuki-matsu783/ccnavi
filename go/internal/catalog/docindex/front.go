@@ -21,10 +21,8 @@ const (
 	maxDepth = 32
 )
 
-const bom = "\ufeff"
-
 // frontStyle は索引の囲いの読み方（行末の空白だけを除き、`...` でも閉じる）。
-var frontStyle = yaml.FrontStyle{DocEnd: true}
+var frontStyle = yaml.FrontStyle{DocEnd: true, SkipBOM: true}
 
 var errTooDeep = errors.New("入れ子が深すぎる")
 
@@ -36,7 +34,7 @@ func FrontMatter(raw []byte) *pyjson.Object {
 		raw = raw[:headLimit]
 	}
 	text, _ := fsio.DecodeBytes(raw, fsio.Replace)
-	body, state := yaml.FrontBody(strings.TrimPrefix(text, bom), frontStyle)
+	body, state := yaml.FrontBody(text, frontStyle)
 	if state != yaml.FrontClosed {
 		return nil
 	}

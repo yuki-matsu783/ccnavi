@@ -83,7 +83,7 @@ func CheckParentTreeGit(conf *config.Settings, root, cwd, subject string, degrad
 		if !known {
 			return first, unknownParent
 		}
-		if name := WorktreeName(root, where); name != "" && IsParentTree(conf, root, name) {
+		if name := worktreeName(root, where); name != "" && isParentTree(conf, root, name) {
 			return first, name
 		}
 	}
@@ -105,7 +105,7 @@ func ParentWriteMessage(root, what, name string, kind WriteKind) string {
 		return texts.Say(root, "DENY_SUBAGENT_PARENT_TREE__WRITE_UNREAD", texts.Values{"what": what}, nil)
 	}
 	id := "DENY_SUBAGENT_PARENT_TREE__WRITE"
-	if kind == KindCode {
+	if kind == kindCode {
 		id = "DENY_SUBAGENT_PARENT_TREE__WRITE_CODE"
 	}
 	return texts.Say(root, id, texts.Values{"name": name, "what": what}, nil)

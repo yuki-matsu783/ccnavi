@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
@@ -246,7 +247,7 @@ func scan(base, baseReal, directory string, names []string, indexRel string, wri
 	names = slices.Clone(names)
 	sort.Strings(names)
 	for _, rel := range names {
-		conceptID := strings.TrimSuffix(rel, MdExt)
+		conceptID := rel[:len(rel)-len(config.MdExt)] // 索引に載るのは MdExt で終わる文書だけ（綴りは問わない）
 		one.order = append(one.order, conceptID)
 		if result.TimedOut || past(o.Deadline) {
 			result.TimedOut = true

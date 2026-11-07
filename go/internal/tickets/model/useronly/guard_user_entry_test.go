@@ -14,12 +14,12 @@ func TestEveryVerbHasAScriptThatExists(t *testing.T) {
 	scripts := filepath.Join(testkit.RepoRoot(t), ".ccnavi", "scripts")
 	for _, v := range verbs {
 		if v.Script == "" {
-			t.Errorf("%v: sh が無い", v.Words)
+			t.Errorf("%v: sh が無い", v.words)
 			continue
 		}
 		path := filepath.Join(scripts, UserScriptPrefix+v.Script+".sh")
 		if _, err := os.Stat(path); err != nil {
-			t.Errorf("%v: %v", v.Words, err)
+			t.Errorf("%v: %v", v.words, err)
 		}
 	}
 }

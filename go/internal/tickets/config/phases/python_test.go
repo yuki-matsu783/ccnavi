@@ -267,7 +267,7 @@ func same(t *testing.T, label string, got, want any) {
 func TestPythonPhases(t *testing.T) {
 	want := golden.Load[phasesAnswers](t, "phases")
 	for i, text := range defCases {
-		types, problems := Parse(text, Where)
+		types, problems := Parse(text, where)
 		var raw any
 		if data, err := yaml.Load(text); err == nil {
 			if m, ok := data.(*yaml.Map); ok {
@@ -279,10 +279,10 @@ func TestPythonPhases(t *testing.T) {
 			CopyProblems: probs(copyProblems), Copied: show(t, copied)}, want.Defs[i])
 	}
 	for i, pair := range mergeCases {
-		common, _ := Parse(pair[0], Where)
+		common, _ := Parse(pair[0], where)
 		common.markSource("common")
-		extra, _ := Parse(pair[1], Where)
-		merged, problems := Merge(common, extra, "web")
+		extra, _ := Parse(pair[1], where)
+		merged, problems := merge(common, extra, "web")
 		var diff [][]any
 		for p := range extra.All() {
 			if prior := common.Get(p.ID); prior != nil {

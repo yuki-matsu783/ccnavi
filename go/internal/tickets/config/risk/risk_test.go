@@ -33,14 +33,14 @@ func TestLoadFallsBackToTheBuiltin(t *testing.T) {
 	if d.Source != Builtin || !strings.Contains(d.Fallback, "を読めない ('utf-8' codec can't decode byte 0xff") || len(problems) != 1 {
 		t.Errorf("読めない: %#v %v", d, problems)
 	}
-	if layer, problems := LoadLayer(path, ScriptHomes); layer != nil || len(problems) != 1 {
+	if layer, problems := LoadLayer(path, scriptHomes); layer != nil || len(problems) != 1 {
 		t.Errorf("読めないレイヤー: %v %v", layer, problems)
 	}
 	broken := testkit.Put(t, filepath.Join(t.TempDir(), "risks.yml"), "version: 2\n")
 	if d, _ := Load(broken); d.Source != Builtin || d.Fallback != broken+" が不正。組み込みの配点で数える" {
 		t.Errorf("不正: %#v", d)
 	}
-	if d, problems := LoadLayer("", ScriptHomes); d != nil || problems != nil {
+	if d, problems := LoadLayer("", scriptHomes); d != nil || problems != nil {
 		t.Error("空のパス")
 	}
 }
@@ -64,7 +64,7 @@ func TestLayerDefinition(t *testing.T) {
 	// 共通レイヤーだけが無ければ、共通レイヤーは空として、レイヤーの項目だけを数える。
 	testkit.Put(t, layer, factors("  - {id: own, points: 5, files_over: 1}"))
 	d, _ := LayerDefinition(conf, root, "")
-	if got := factorIDs(d); !reflect.DeepEqual(got, []string{"own@self"}) || d.Factors[0].Home != root {
+	if got := factorIDs(d); !reflect.DeepEqual(got, []string{"own@self"}) || d.Factors[0].home != root {
 		t.Errorf("レイヤーだけ: %v", got)
 	}
 	testkit.Put(t, conf.Risk, sampleRisk)
@@ -103,23 +103,23 @@ func TestScriptKeyComparesContentNotPlace(t *testing.T) {
 	testkit.Put(t, filepath.Join(root, ".ccnavi", "config", "common", "scripts", "c.sh"), "echo 1\r\n")
 	testkit.Put(t, filepath.Join(root, ".ccnavi", "scripts", "c.sh"), "echo 1\n")
 	testkit.Put(t, filepath.Join(root, ".ccnavi", "scripts", "d.sh"), "echo 2\n")
-	common, _ := Parse(factors("  - {id: c, points: 1, script: .ccnavi/config/common/scripts/c.sh}"), Where, ScriptHomes)
+	common, _ := Parse(factors("  - {id: c, points: 1, script: .ccnavi/config/common/scripts/c.sh}"), where, scriptHomes)
 	common.markLayer(config.LayerCommon, root)
 	homes := []string{".ccnavi/scripts/"}
-	same, _ := Parse(factors("  - {id: c, points: 1, script: .ccnavi/scripts/c.sh}"), Where, homes)
+	same, _ := Parse(factors("  - {id: c, points: 1, script: .ccnavi/scripts/c.sh}"), where, homes)
 	same.markLayer("self", root)
-	other, _ := Parse(factors("  - {id: c, points: 1, script: .ccnavi/scripts/d.sh}"), Where, homes)
+	other, _ := Parse(factors("  - {id: c, points: 1, script: .ccnavi/scripts/d.sh}"), where, homes)
 	other.markLayer("self", root)
-	if merged, _ := Merge(common, same, "self"); len(merged.Factors) != 1 {
+	if merged, _ := merge(common, same, "self"); len(merged.Factors) != 1 {
 		t.Errorf("同じ中身を 2 重に数える: %v", factorIDs(merged))
 	}
-	if merged, _ := Merge(common, other, "self"); len(merged.Factors) != 2 || merged.Factors[1].ID != "self:c" {
+	if merged, _ := merge(common, other, "self"); len(merged.Factors) != 2 || merged.Factors[1].ID != "self:c" {
 		t.Errorf("違う中身を捨てる: %v", factorIDs(merged))
 	}
 	if problems := ScriptProblems(other, "self"); len(problems) != 0 {
 		t.Errorf("在るのに %v", problems)
 	}
-	missing, _ := Parse(factors("  - {id: m, points: 1, script: .ccnavi/scripts/none.sh}"), Where, homes)
+	missing, _ := Parse(factors("  - {id: m, points: 1, script: .ccnavi/scripts/none.sh}"), where, homes)
 	missing.markLayer("self", root)
 	if problems := ScriptProblems(missing, "self"); len(problems) != 1 || ScriptProblems(missing, "web") != nil {
 		t.Errorf("無いのに %v", problems)
@@ -178,11 +178,11 @@ func TestRunScript(t *testing.T) {
 	}
 	// 測れなかった項目は重いほうとして配点の全部を加点する。
 	d, _ := Parse(factors("  - {id: n, points: 1, script: "+dir+"int.sh, message: 数}",
-		"  - {id: z, points: 5, script: "+dir+"zero.sh}", "  - {id: b, points: 45, script: "+dir+"none.sh, message: 無い}"), Where, ScriptHomes)
+		"  - {id: z, points: 5, script: "+dir+"zero.sh}", "  - {id: b, points: 45, script: "+dir+"none.sh, message: 無い}"), where, scriptHomes)
 	d.markLayer(config.LayerCommon, "")
 	s := Evaluate(d, &Diff{}, root, worktree, env, nil)
-	if s.Points != 48 || s.Level != High || !reflect.DeepEqual(s.Unmeasured, []string{"b: " + dir + "none.sh がありません。"}) ||
-		s.Hits[0].Detail != "数（スクリプト）" || s.Hits[1].Detail != "無い（測れなかった: "+dir+"none.sh がありません。）" {
+	if s.points != 48 || s.Level != High || !reflect.DeepEqual(s.unmeasured, []string{"b: " + dir + "none.sh がありません。"}) ||
+		s.hits[0].detail != "数（スクリプト）" || s.hits[1].detail != "無い（測れなかった: "+dir+"none.sh がありません。）" {
 		t.Errorf("%#v", s)
 	}
 }
@@ -215,14 +215,14 @@ func TestMeasure(t *testing.T) {
 		t.Fatal(why)
 	}
 	got := map[string]Change{}
-	for _, c := range diff.Changes {
-		got[c.Path] = c
+	for _, c := range diff.changes {
+		got[c.path] = c
 	}
 	want := map[string]Change{
-		"keep.txt":     {Path: "keep.txt", Added: 2, Deleted: 1, Status: "M"},
-		"新しい.bin":      {Path: "新しい.bin", Status: "A"},
-		"gone.txt":     {Path: "gone.txt", Deleted: 1, Status: "D"},
-		"new name.txt": {Path: "new name.txt", Status: "R", Old: "old name.txt"},
+		"keep.txt":     {path: "keep.txt", added: 2, deleted: 1, status: "M"},
+		"新しい.bin":      {path: "新しい.bin", status: "A"},
+		"gone.txt":     {path: "gone.txt", deleted: 1, status: "D"},
+		"new name.txt": {path: "new name.txt", status: "R", old: "old name.txt"},
 	}
 	if !reflect.DeepEqual(got, want) || diff.Head != head || diff.Base != base {
 		t.Errorf("%#v", diff)
@@ -243,12 +243,12 @@ func TestIncludeExcludeNarrowWhatIsCounted(t *testing.T) {
 	// rename は旧パスが include に当たれば数え、exclude は新旧の両方に当たったときだけ外す。
 	d, _ := Parse(factors("  - {id: inc, points: 1, lines_over: 0, include: ['src/**']}",
 		"  - {id: exc, points: 2, lines_over: 0, exclude: ['vendor/**']}",
-		"  - {id: both, points: 4, lines_over: 0, exclude: ['vendor/**', 'src/**']}"), Where, ScriptHomes)
-	moved := Change{Path: "vendor/core.py", Added: 60, Deleted: 60, Status: "R", Old: "src/core.py"}
-	s := Evaluate(d, &Diff{Changes: []Change{moved}}, "", "", nil, nil)
+		"  - {id: both, points: 4, lines_over: 0, exclude: ['vendor/**', 'src/**']}"), where, scriptHomes)
+	moved := Change{path: "vendor/core.py", added: 60, deleted: 60, status: "R", old: "src/core.py"}
+	s := Evaluate(d, &Diff{changes: []Change{moved}}, "", "", nil, nil)
 	got := map[string]int{}
-	for _, h := range s.Hits {
-		got[h.ID] = h.Points
+	for _, h := range s.hits {
+		got[h.id] = h.points
 	}
 	if !reflect.DeepEqual(got, map[string]int{"inc": 1, "exc": 2}) {
 		t.Errorf("%v", got)

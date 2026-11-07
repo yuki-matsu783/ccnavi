@@ -37,9 +37,9 @@ func TestTunableValue(t *testing.T) {
 	}
 	for _, c := range cases {
 		if c.set {
-			t.Setenv(tunable.Env, c.written)
+			t.Setenv(tunable.env, c.written)
 		} else {
-			os.Unsetenv(tunable.Env)
+			os.Unsetenv(tunable.env)
 		}
 		if got := tunable.Value(); got != c.want {
 			t.Errorf("Value(%q) = %v, want %v", c.written, got, c.want)
@@ -59,19 +59,19 @@ func TestTunableDefaults(t *testing.T) {
 	seen := map[string]bool{}
 	for tunable, want := range all {
 		if tunable.Default != want {
-			t.Errorf("%s の既定 = %v, want %v", tunable.Env, tunable.Default, want)
+			t.Errorf("%s の既定 = %v, want %v", tunable.env, tunable.Default, want)
 		}
-		if seen[tunable.Env] {
-			t.Errorf("%s が重なっている", tunable.Env)
+		if seen[tunable.env] {
+			t.Errorf("%s が重なっている", tunable.env)
 		}
-		seen[tunable.Env] = true
+		seen[tunable.env] = true
 	}
 }
 
 func TestToolGroups(t *testing.T) {
-	if !reflect.DeepEqual(WriteTools, []string{"Write", "Edit", "MultiEdit", "NotebookEdit"}) ||
-		!reflect.DeepEqual(AgentTools, []string{"Agent", "Task"}) ||
-		!reflect.DeepEqual(ShellTools, []string{"Bash", "PowerShell"}) || WriteMatch != "Write|Edit|MultiEdit|NotebookEdit" {
+	if !reflect.DeepEqual(writeTools, []string{"Write", "Edit", "MultiEdit", "NotebookEdit"}) ||
+		!reflect.DeepEqual(agentTools, []string{"Agent", "Task"}) ||
+		!reflect.DeepEqual(shellTools, []string{"Bash", "PowerShell"}) || WriteMatch != "Write|Edit|MultiEdit|NotebookEdit" {
 		t.Fatal("ツール名の組の中身が変わった")
 	}
 	subset := func(a, b []string) bool {
@@ -82,11 +82,11 @@ func TestToolGroups(t *testing.T) {
 		}
 		return true
 	}
-	if !subset(WriteTools, StrictTools) || !subset(AgentTools, StrictTools) || !subset(ReadTools, ReadOnlyTools) {
+	if !subset(writeTools, strictTools) || !subset(agentTools, strictTools) || !subset(readTools, readOnlyTools) {
 		t.Error("組の包含が崩れた")
 	}
-	for _, w := range WriteTools {
-		if slices.Contains(ReadOnlyTools, w) {
+	for _, w := range writeTools {
+		if slices.Contains(readOnlyTools, w) {
 			t.Errorf("書き込みの %s が読むだけの組にある", w)
 		}
 	}
@@ -214,7 +214,7 @@ func TestBranchPrefixes(t *testing.T) {
 	}{
 		{"feature, spike feature", []string{"feature", "spike"}, nil},
 		{"feature,release,Bad,a-b", []string{"feature"}, []string{"release", "Bad", "a-b"}},
-		{"", DefaultBranchPrefixes, nil},
+		{"", defaultBranchPrefixes, nil},
 	}
 	for _, c := range cases {
 		words, rejected := parseBranchPrefixes(c.text)
@@ -222,7 +222,7 @@ func TestBranchPrefixes(t *testing.T) {
 			t.Errorf("parseBranchPrefixes(%q) = %q %q", c.text, words, rejected)
 		}
 	}
-	if slices.Contains(DefaultBranchPrefixes, "release") {
+	if slices.Contains(defaultBranchPrefixes, "release") {
 		t.Error("既定に release がある")
 	}
 
@@ -241,7 +241,7 @@ func TestBranchPrefixes(t *testing.T) {
 			t.Errorf("branchPrefixes = %q, want %q", got, want)
 		}
 	}
-	check(DefaultBranchPrefixes...)
+	check(defaultBranchPrefixes...)
 	write(SharedClaudeSettings, "feature,hotfix")
 	check("feature", "hotfix")
 	write(LocalClaudeSettings, "spike")

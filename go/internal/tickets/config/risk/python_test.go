@@ -174,14 +174,14 @@ func show(d *Definition) *riskDefinition {
 		if f.Kind.counts() {
 			value = f.Limit
 		}
-		if f.HasMax {
-			max = f.Max
+		if f.hasMax {
+			max = f.max
 		}
 		out.Factors = append(out.Factors, []any{f.ID, f.Points, f.Message, string(f.Kind), value, max,
 			orEmpty(f.Include), orEmpty(f.Exclude), f.Source})
 	}
 	for _, p := range riskPoints {
-		out.LevelOf = append(out.LevelOf, string(d.LevelOf(p)))
+		out.LevelOf = append(out.LevelOf, string(d.levelOf(p)))
 	}
 	t := EffectiveLevels(d.Levels)
 	out.Effective = map[string]int{"medium": t.Medium, "high": t.High, "critical": t.Critical}
@@ -231,8 +231,8 @@ func emptyToNil(v any) any {
 func toDiff(spec diffSpec) *Diff {
 	d := &Diff{Base: spec.Base, Head: spec.Head}
 	for _, c := range spec.Changes {
-		d.Changes = append(d.Changes, Change{Path: c[0].(string), Added: c[1].(int), Deleted: c[2].(int),
-			Status: c[3].(string), Old: c[4].(string)})
+		d.changes = append(d.changes, Change{path: c[0].(string), added: c[1].(int), deleted: c[2].(int),
+			status: c[3].(string), old: c[4].(string)})
 	}
 	return d
 }
@@ -249,22 +249,22 @@ func judgementsOf(t *testing.T, raw map[string]any) *pyjson.Object {
 func TestPythonRisk(t *testing.T) {
 	want := golden.Load[riskAnswers](t, "risk")
 	for i, text := range riskDefCases {
-		d, problems := Parse(text, Where, layerHomes)
+		d, problems := Parse(text, where, layerHomes)
 		same(t, "def "+strconv.Itoa(i), riskDefRow{probs(problems), show(d)}, want.Defs[i])
 	}
 	for i, pair := range riskMergeCases {
-		common, _ := Parse(pair[0], Where, ScriptHomes)
+		common, _ := Parse(pair[0], where, scriptHomes)
 		common.markLayer("common", "")
-		extra, _ := Parse(pair[1], Where, layerHomes)
+		extra, _ := Parse(pair[1], where, layerHomes)
 		extra.markLayer("web", "")
-		merged, problems := Merge(common, extra, "web")
+		merged, problems := merge(common, extra, "web")
 		same(t, "merge "+strconv.Itoa(i), riskDefRow{probs(problems), show(merged)}, want.Merges[i])
 	}
 	for i, c := range scoreCases {
 		d := builtin()
 		if c.Definition != "" {
 			var problems []rules.Problem
-			if d, problems = Parse(c.Definition, Where, ScriptHomes); d == nil {
+			if d, problems = Parse(c.Definition, where, scriptHomes); d == nil {
 				t.Fatal(problems)
 			}
 		}

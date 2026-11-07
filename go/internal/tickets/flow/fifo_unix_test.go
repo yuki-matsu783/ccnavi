@@ -18,7 +18,7 @@ func TestFifoIsNotReadAndDoesNotHang(t *testing.T) {
 	done := make(chan [2]string, 1)
 	go func() {
 		_, why := Load(fifo, root)
-		done <- [2]string{why, Fingerprint(fifo, root)}
+		done <- [2]string{why, fingerprint(fifo, root)}
 	}()
 	select {
 	case got := <-done:

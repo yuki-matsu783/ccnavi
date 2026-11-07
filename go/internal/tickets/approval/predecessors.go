@@ -10,53 +10,53 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// PredState は先行 1 本の今。満たしたとみなすのは PredDone だけ（done/ に在り、取り消しでない）。
+// PredState は先行 1 本の今。満たしたとみなすのは predDone だけ（done/ に在り、取り消しでない）。
 type PredState string
 
 const (
-	PredTodo                = PredState(place.Todo)
-	PredDoing               = PredState(place.Doing)
-	PredReview              = PredState(place.Review)
-	PredDone                = PredState(place.Done)
-	PredCancelled           = PredState(place.Cancelled)
-	PredMissing   PredState = "missing"
-	PredScattered PredState = "scattered"
+	predTodo                = PredState(place.Todo)
+	predDoing               = PredState(place.Doing)
+	predReview              = PredState(place.Review)
+	predDone                = PredState(place.Done)
+	predCancelled           = PredState(place.Cancelled)
+	predMissing   PredState = "missing"
+	predScattered PredState = "scattered"
 	// 形の上で満たせない先行。待っても通らないので、ふつうの error にする。
-	PredSelf     PredState = "self"     // 自分自身
-	PredAncestor PredState = "ancestor" // 自分の親（親は子より先に閉じない）
-	PredCycle    PredState = "cycle"    // 先行を辿ると自分に戻る
-	// PredUndecided は取り込み済みの親子のチケットの先行で、その親子のチケットが決まらない・親のブランチ上に無い。
-	PredUndecided PredState = "undecided"
+	predSelf     PredState = "self"     // 自分自身
+	predAncestor PredState = "ancestor" // 自分の親（親は子より先に閉じない）
+	predCycle    PredState = "cycle"    // 先行を辿ると自分に戻る
+	// predUndecided は取り込み済みの親子のチケットの先行で、その親子のチケットが決まらない・親のブランチ上に無い。
+	predUndecided PredState = "undecided"
 )
 
 var predLabels = map[PredState]string{
-	PredTodo:      "承認待ち（todo/）",
-	PredDoing:     "作業中（doing/）",
-	PredReview:    "レビュー待ち（review/）",
-	PredCancelled: "取り消し済み（done/ で cancelled_at を持つ）",
-	PredMissing: "どの置き場にもありません。閉じて片付いた親子のチケットなら、" +
+	predTodo:      "承認待ち（todo/）",
+	predDoing:     "作業中（doing/）",
+	predReview:    "レビュー待ち（review/）",
+	predCancelled: "取り消し済み（done/ で cancelled_at を持つ）",
+	predMissing: "どの置き場にもありません。閉じて片付いた親子のチケットなら、" +
 		"取り込み済みなので predecessors から削除してください",
-	PredScattered: "複数の場所にある",
-	PredSelf:      "自分自身",
-	PredAncestor:  "自分の親",
-	PredCycle:     "先行を辿ると自分に戻る",
-	PredUndecided: "親子のチケットが決まらない",
+	predScattered: "複数の場所にある",
+	predSelf:      "自分自身",
+	predAncestor:  "自分の親",
+	predCycle:     "先行を辿ると自分に戻る",
+	predUndecided: "親子のチケットが決まらない",
 }
 
-// Predecessor は先行 1 本の今。Where は複数の場所にあるときの在り処（`ツリー:置き場` の並び）、循環の経路、
+// Predecessor は先行 1 本の今。where は複数の場所にあるときの在り処（`ツリー:置き場` の並び）、循環の経路、
 // 決まらない理由。
 type Predecessor struct {
 	Ticket string
 	State  PredState
-	Where  string
+	where  string
 }
 
-// Met は満たしているか。
-func (p Predecessor) Met() bool { return p.State == PredDone }
+// met は満たしているか。
+func (p Predecessor) met() bool { return p.State == predDone }
 
 // Waiting は先行が閉じれば満たす状態か。取り消し・無い・複数の場所は、待っても満たさない。
 func (p Predecessor) Waiting() bool {
-	return p.State == PredTodo || p.State == PredDoing || p.State == PredReview
+	return p.State == predTodo || p.State == predDoing || p.State == predReview
 }
 
 // Label は見せる文。
@@ -65,8 +65,8 @@ func (p Predecessor) Label() string {
 	if !ok {
 		text = string(p.State)
 	}
-	if p.Where != "" {
-		return text + ": " + p.Where
+	if p.where != "" {
+		return text + ": " + p.where
 	}
 	return text
 }
@@ -83,7 +83,7 @@ type poolHit struct {
 
 func (h poolHit) state() PredState {
 	if h.undecided != "" {
-		return PredUndecided
+		return predUndecided
 	}
 	return PredState(h.t.State)
 }
@@ -135,7 +135,7 @@ func (pool Pool) AlignImported(conf *config.Settings, root string) {
 			}
 			pool[ident] = []poolHit{{t: hits[0].t, undecided: "親のブランチ " + st.Family + " のワークツリーに " + ident +
 				" のチケットがありません（" + strings.Join(trees, ", ") + " にしか無い）"}}
-		case len(mine) == 1 && mine[0].state() != PredDone:
+		case len(mine) == 1 && mine[0].state() != predDone:
 			pool[ident] = mine
 		}
 	}
@@ -153,23 +153,23 @@ func predecessorStates(t *ticket.Ticket, pool Pool) []Predecessor {
 		hits := pool[ident]
 		switch {
 		case ident == t.ID:
-			out = append(out, Predecessor{Ticket: ident, State: PredSelf})
+			out = append(out, Predecessor{Ticket: ident, State: predSelf})
 			continue
 		case t.Parent != "" && ident == t.Parent:
-			out = append(out, Predecessor{Ticket: ident, State: PredAncestor})
+			out = append(out, Predecessor{Ticket: ident, State: predAncestor})
 			continue
 		}
-		if len(hits) == 1 && hits[0].state() != PredDone {
+		if len(hits) == 1 && hits[0].state() != predDone {
 			if loop := loopBack(t.ID, ident, pool); loop != nil {
-				out = append(out, Predecessor{ident, PredCycle, strings.Join(append([]string{t.ID}, loop...), " → ")})
+				out = append(out, Predecessor{ident, predCycle, strings.Join(append([]string{t.ID}, loop...), " → ")})
 				continue
 			}
 		}
 		switch {
 		case len(hits) == 0:
-			out = append(out, Predecessor{Ticket: ident, State: PredMissing})
+			out = append(out, Predecessor{Ticket: ident, State: predMissing})
 		case len(hits) == 1 && hits[0].undecided != "":
-			out = append(out, Predecessor{ident, PredUndecided, hits[0].undecided})
+			out = append(out, Predecessor{ident, predUndecided, hits[0].undecided})
 		case len(hits) > 1:
 			where := make([]string, 0, len(hits))
 			for _, h := range hits {
@@ -179,11 +179,11 @@ func predecessorStates(t *ticket.Ticket, pool Pool) []Predecessor {
 				}
 				where = append(where, name+":"+string(h.state()))
 			}
-			out = append(out, Predecessor{ident, PredScattered, strings.Join(where, ", ")})
+			out = append(out, Predecessor{ident, predScattered, strings.Join(where, ", ")})
 		default:
 			state := hits[0].state()
 			if state == "" {
-				state = PredDoing
+				state = predDoing
 			}
 			out = append(out, Predecessor{Ticket: ident, State: state})
 		}
@@ -208,7 +208,7 @@ func loopBack(origin, first string, pool Pool) []string {
 		}
 		seen[top.ident] = true
 		hits := pool[top.ident]
-		if len(hits) != 1 || hits[0].state() == PredDone || !hits[0].t.IsChild() {
+		if len(hits) != 1 || hits[0].state() == predDone || !hits[0].t.IsChild() {
 			continue
 		}
 		for _, next := range hits[0].t.Predecessors {
@@ -229,7 +229,7 @@ func UnmetPredecessors(t *ticket.Ticket, pool Pool) []Predecessor {
 	}
 	var out []Predecessor
 	for _, p := range predecessorStates(t, pool) {
-		if !p.Met() {
+		if !p.met() {
 			out = append(out, p)
 		}
 	}
@@ -243,32 +243,32 @@ func PredecessorProblems(t *ticket.Ticket, pool Pool, approvedRel string) []rule
 		var detail string
 		kind := ""
 		switch p.State {
-		case PredTodo, PredDoing, PredReview:
+		case predTodo, predDoing, predReview:
 			kind = rules.KindNotYet
 			detail = "先行 " + p.Ticket + " が完了していない（いまは " + p.Label() + "）。" + p.Ticket + " が " +
 				approvedRel + "/" + string(place.Done) + "/ に入る（作業を終え、レビューが必要なら" +
 				"ユーザのレビューが済む）まで承認しない。先行が不要なら " +
 				"predecessors から削除して" +
 				"出し直してください"
-		case PredCancelled:
+		case predCancelled:
 			detail = "先行 " + p.Ticket + " は" + p.Label() + "。取り消した先行は満たせないので承認しない。" +
 				"predecessors から削除して出し直してください"
-		case PredSelf, PredAncestor, PredCycle:
+		case predSelf, predAncestor, predCycle:
 			why := map[PredState]string{
-				PredSelf: "自分自身を先行に挙げている。自分が閉じるのを待つことはできない",
-				PredAncestor: "自分の親を先行に挙げている。親は子が全部閉じてから閉じるので、" +
+				predSelf: "自分自身を先行に挙げている。自分が閉じるのを待つことはできない",
+				predAncestor: "自分の親を先行に挙げている。親は子が全部閉じてから閉じるので、" +
 					"待っても満たされない",
-				PredCycle: "先行が循環している（" + p.Where + "）。どれも他が閉じるのを待つので、" +
+				predCycle: "先行が循環している（" + p.where + "）。どれも他が閉じるのを待つので、" +
 					"待っても満たされない",
 			}[p.State]
 			detail = "先行 " + p.Ticket + " は" + predLabels[p.State] + "。" + why + "。" +
 				"predecessors から削除して出し直してください"
-		case PredUndecided:
-			detail = "先行 " + p.Ticket + " が属する親子のチケットが決まらない（" + p.Where + "）。" +
+		case predUndecided:
+			detail = "先行 " + p.Ticket + " が属する親子のチケットが決まらない（" + p.where + "）。" +
 				"取り込み済みの親子のチケットの先行は" +
 				"その親のブランチ上のチケットで確かめる。親のワークツリーを切り直すか、" +
 				"'ccnavi-sync.sh' で取り込み直してから出し直してください"
-		case PredMissing:
+		case predMissing:
 			detail = "先行 " + p.Ticket + " がどの置き場（todo/・doing/・review/・done/）にもありません。" +
 				"閉じて片付いた親子のチケットなら、取り込み済みなので predecessors から" +
 				"削除してください。表記の誤りなら直して出し直してください"

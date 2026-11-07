@@ -28,8 +28,8 @@ type Source struct {
 	Parent   *ticket.Ticket
 	raw      []byte
 	children []file
-	Current  *ticket.Ticket
-	Fixed    map[int]bool
+	current  *ticket.Ticket
+	fixed    map[int]bool
 	// referrers はほかの親の子の提案（todo/）のうち、predecessors がこの親の todo/ の子を指すもの。子の識別子を
 	// 付け替えると、この参照も直す。
 	referrers []file
@@ -43,9 +43,9 @@ func (s *Source) files() []file {
 	return slices.Concat([]file{{s.Parent, s.raw}}, s.children, s.referrers)
 }
 
-// SHA は提案のバイト列をまとめたハッシュ（source_sha）。ツリーとツリーからの相対パスで区切り、機械ごとに違う
+// sha は提案のバイト列をまとめたハッシュ（source_sha）。ツリーとツリーからの相対パスで区切り、機械ごとに違う
 // 絶対パスは入れない（拡張とテストが同じ値を見られるように）。
-func (s *Source) SHA() string {
+func (s *Source) sha() string {
 	files := s.files()
 	slices.SortStableFunc(files, func(a, b file) int {
 		return cmp.Or(strings.Compare(a.ticket.Tree, b.ticket.Tree),
@@ -102,8 +102,8 @@ func Load(conf *config.Settings, root string, proposal *ticket.Ticket, proposals
 		referrers = append(referrers, file{cmp.Or(reparse(data, t), t), data})
 	}
 	return &Source{
-		Parent: parent, raw: raw, children: children, Current: current,
-		Fixed: candidates.FixedNumbers(conf, root, parent.ID), referrers: referrers,
+		Parent: parent, raw: raw, children: children, current: current,
+		fixed: candidates.FixedNumbers(conf, root, parent.ID), referrers: referrers,
 		proposals: slices.Clone(proposals), conf: conf, root: root,
 	}, ""
 }
@@ -186,7 +186,7 @@ func RereadSHA(conf *config.Settings, root, name string, current *ticket.Ticket,
 		return ""
 	}
 	if reread, _ := Load(conf, root, found, again, current); reread != nil {
-		return reread.SHA()
+		return reread.sha()
 	}
 	return ""
 }

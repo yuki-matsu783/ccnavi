@@ -276,7 +276,7 @@ func pick(threads []host.Thread, choices *pyjson.Object) map[Choice][]host.Threa
 }
 
 func anyPicked(picked map[Choice][]host.Thread) bool {
-	for _, c := range Choices {
+	for _, c := range choiceOrder {
 		if len(picked[c]) > 0 {
 			return true
 		}
@@ -334,7 +334,7 @@ func decidedPrompt(root string, d *Decision, picked map[Choice][]host.Thread, fo
 		return fmt.Sprintf(promptNone, d.Parent.ID, d.Phase.Number, status)
 	}
 	var counts []string
-	for _, c := range Choices {
+	for _, c := range choiceOrder {
 		if n := len(picked[c]); n > 0 {
 			counts = append(counts, fmt.Sprintf("%s %d 件", countLabels[c], n))
 		}

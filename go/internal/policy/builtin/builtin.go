@@ -14,10 +14,10 @@ const (
 	// 止めるのは書き込む形だけで、場所の名前では止めない。`git add`・`git restore --ours` でマージの衝突を解く手を止めると、
 	// ガードが機能しない状態から出られなくなるためである。
 	ConfigViaBashRuleID = rules.ReservedIDPrefix + "guard-config-via-bash"
-	// GitDirRuleID と GitDirShellRuleID は、`.git` の中身を直接書き換える形（名指しのツールとシェル）。
+	// gitDirRuleID と gitDirShellRuleID は、`.git` の中身を直接書き換える形（名指しのツールとシェル）。
 	// 適用する先（パスとコマンド文字列）が違うので id を分ける。読むだけなら止めない。
-	GitDirRuleID      = rules.ReservedIDPrefix + "guard-git-dir"
-	GitDirShellRuleID = rules.ReservedIDPrefix + "guard-git-dir-via-bash"
+	gitDirRuleID      = rules.ReservedIDPrefix + "guard-git-dir"
+	gitDirShellRuleID = rules.ReservedIDPrefix + "guard-git-dir-via-bash"
 	// TicketScopeRuleID は承認されたチケットの範囲の外の書き込みの出所。実行前（Write・Edit を止める）と実行後
 	// （範囲外の変更を報告する）の 2 つの検査が同じ名前を出すので、両方より下のここに置く。
 	TicketScopeRuleID = rules.ReservedIDPrefix + "ticket-scope"
@@ -60,8 +60,8 @@ const (
 var (
 	// matchCredentials は設定で切れない土台なので、誤検知を承知で広げる。Grep・Glob・PowerShell は入れない。
 	// 探す先のパスは探索の中身を代表しないためである。
-	matchCredentials = rules.MatchOf(append([]string{config.ToolBash, config.ToolRead}, config.WriteTools...)...)
-	matchWriteTools  = rules.MatchOf(config.WriteTools...)
+	matchCredentials = rules.MatchOf(append([]string{config.ToolBash, config.ToolRead}, config.WriteTools()...)...)
+	matchWriteTools  = rules.MatchOf(config.WriteTools()...)
 )
 
 // Load は共通レイヤーが読めないときの既定を返す。土台の deny、シェルから設定へ書き込む形の deny、Read を通す allow からなる。
@@ -109,8 +109,8 @@ func denySpecs(git string, wrapper bool) []rules.Spec {
 		{ID: gitPushRuleID, Match: matchBash, Regex: gitPushRegex, Text: cased(textGitPush, fieldWhy, fieldNext)},
 		{ID: gitResetHardRuleID, Match: matchBash, Regex: gitResetHardRegex, Text: cased(textGitResetHard, fieldNext)},
 		{ID: credentialsRuleID, Match: matchCredentials, Regex: credentialsRegex, Text: texts.Spec(textCredentials, texts.SpecOptions{})},
-		{ID: GitDirRuleID, Match: matchWriteTools, Regex: selfguard.GitDirPathRegex, Text: cased(textGuardGitDir, fieldNext)},
-		{ID: GitDirShellRuleID, Match: matchBash, Regex: selfguard.GitDirShellRegex(), Text: cased(textGuardGitDir, fieldNext)},
+		{ID: gitDirRuleID, Match: matchWriteTools, Regex: selfguard.GitDirPathRegex, Text: cased(textGuardGitDir, fieldNext)},
+		{ID: gitDirShellRuleID, Match: matchBash, Regex: selfguard.GitDirShellRegex(), Text: cased(textGuardGitDir, fieldNext)},
 	}
 }
 

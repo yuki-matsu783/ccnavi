@@ -11,8 +11,8 @@ import (
 // 失敗（PostToolUseFailure）と拒否（PreToolUse の deny。dry-run も含む）の連続を数え、成功で 0 に戻す。
 // 案内の文面は catalog が持つ。サブエージェントの呼び出しは、その子の連続として別に数える。案内はその文脈のモデルにしか届かないため、メインの成功が子の連続を消さないようにする。
 
-// DefaultStreakThreshold は回数の既定（CCNAVI_FAIL_STREAK_COUNT）。0 は数えない。
-const DefaultStreakThreshold = 3
+// defaultStreakThreshold は回数の既定（CCNAVI_FAIL_STREAK_COUNT）。0 は数えない。
+const defaultStreakThreshold = 3
 
 // Notice は Fail が出す案内の種類。
 type Notice string
@@ -22,8 +22,8 @@ const (
 	NoNotice Notice = ""
 	// First はこのセッションとエージェントで最初の失敗。成功で連続が戻っても印は残す。
 	First Notice = "first"
-	// Streak は連続の長さが n の倍数になった回。First と重なれば Streak だけを出す。
-	Streak Notice = "streak"
+	// streak は連続の長さが n の倍数になった回。First と重なれば Streak だけを出す。
+	streak Notice = "streak"
 )
 
 const (
@@ -37,7 +37,7 @@ const (
 
 // StreakThreshold は書かれた回数。0 は機能を使わない。読めない値と負数は既定。
 func StreakThreshold(written string) int {
-	return config.Int(written, DefaultStreakThreshold, 0)
+	return config.Int(written, defaultStreakThreshold, 0)
 }
 
 func streakPath(stateDir, session, agent string) string {
@@ -67,7 +67,7 @@ func Fail(stateDir, session, agent string, n int) (Notice, int) {
 	count++
 	kind := NoNotice
 	if count%n == 0 {
-		kind = Streak
+		kind = streak
 	} else if data.Value(keyFirst) != true {
 		kind = First
 	}

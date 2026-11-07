@@ -32,24 +32,24 @@ type Thread struct {
 	Line      int
 	Body      string
 	CreatedAt string
-	// Author は最初のコメントを書いたアカウント。GitLab から取得した結果だけが持つ。
-	Author string
+	// author は最初のコメントを書いたアカウント。GitLab から取得した結果だけが持つ。
+	author string
 	// LastComment* は最後のコメント（system note を除く）。受け入れた後に付いたコメント（再提起）を
 	// 見分けるために取る。取れなければ空。
 	LastCommentID     string
 	LastCommentAt     string
 	LastCommentAuthor string
-	// Own は note が全部 ccnavi の目印で始まるか。GitLab の結果だけが持ち、JSON の真偽のときだけ入る。
+	// own は note が全部 ccnavi の目印で始まるか。GitLab の結果だけが持ち、JSON の真偽のときだけ入る。
 	// nil なら目印と書き手で見る。ユーザが ccnavi の依頼コメントに返信したスレッドは偽。
-	Own *bool
+	own *bool
 }
 
-// Review はレビュー 1 件。Author は同じレビュアーの最新だけを数えるために要る。
+// Review はレビュー 1 件。author は同じレビュアーの最新だけを数えるために要る。
 type Review struct {
 	State       string
 	URL         string
-	SubmittedAt string
-	Author      string
+	submittedAt string
+	author      string
 }
 
 // MergeRequest は MR（PR）。Draft は sh が取得した結果だけが持つ（分からなければ nil）。
@@ -59,7 +59,7 @@ type MergeRequest struct {
 	Draft  *bool
 }
 
-// Result は sh がリモートから取得した結果。形は 1 つで、host と mr は常に要る。confirm と --reviewed は
+// Result は sh がリモートから取得した結果。形は 1 つで、Host と mr は常に要る。confirm と --reviewed は
 // Threads と Reviews、requested は投稿の URL・CreatedAt・Author を見る。読めなければ Error に理由。
 type Result struct {
 	Host      Kind
@@ -125,17 +125,17 @@ func ResultOf(data any) Result {
 			Line:              line,
 			Body:              text(t.Value("body")),
 			CreatedAt:         text(t.Value("created_at")),
-			Author:            text(t.Value("author")),
+			author:            text(t.Value("author")),
 			LastCommentID:     text(t.Value("last_id")),
 			LastCommentAt:     text(t.Value("last_at")),
 			LastCommentAuthor: text(t.Value("last_author")),
-			Own:               boolean(t.Value("own")),
+			own:               boolean(t.Value("own")),
 		})
 	}
 	for _, v := range objects(top.Value("reviews")) {
 		r.Reviews = append(r.Reviews, Review{
 			State: text(v.Value("state")), URL: text(v.Value("url")),
-			SubmittedAt: text(v.Value("submitted_at")), Author: text(v.Value("author")),
+			submittedAt: text(v.Value("submitted_at")), author: text(v.Value("author")),
 		})
 	}
 	return r

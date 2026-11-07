@@ -28,7 +28,7 @@ func phaseWith(number int, states []place.State, kinds ...marks.Kind) *Phase {
 	for _, k := range kinds {
 		p.Marks[k] = pyjson.NewObject()
 	}
-	p.Owner = &ticket.Ticket{ID: "p"}
+	p.owner = &ticket.Ticket{ID: "p"}
 	return p
 }
 
@@ -37,7 +37,7 @@ func TestDownstreamTouched(t *testing.T) {
 	waits := func(list []*Phase, w map[int][]int) []*Phase {
 		owner := &ticket.Ticket{ID: "p", Workflow: &ticket.Workflow{Waits: w}}
 		for _, p := range list {
-			p.Owner = owner
+			p.owner = owner
 		}
 		return list
 	}
@@ -94,7 +94,7 @@ func TestNextHintOffersAnEarlierBranchWithoutChildren(t *testing.T) {
 	var list []*Phase
 	for n := 1; n <= 4; n++ {
 		p := newPhase("i0001", n)
-		p.Item, p.Owner = &owner.Plan[n-1], owner
+		p.Item, p.owner = &owner.Plan[n-1], owner
 		if n == 1 || n == 3 {
 			c := &ticket.Ticket{ID: "c", Parent: "i0001", ReviewRequired: ticket.Unneeded}
 			p.Tickets, p.States = []*ticket.Ticket{c}, map[string]place.State{"c": place.Done}
@@ -139,18 +139,18 @@ func TestManualLine(t *testing.T) {
 	}{
 		{Manual{State: SettleNone}, ""},
 		{Manual{State: SettleReady, Children: []string{"a", "b"}}, "レビュー完了確認待ち: 子 a、b が手で done/ に動かされている。親が confirm を打つと確定する"},
-		{Manual{State: SettlePartial, Children: []string{"a"}, Waiting: []string{"b", "c"}},
+		{Manual{State: settlePartial, Children: []string{"a"}, waiting: []string{"b", "c"}},
 			"子 a はレビュー完了、フェーズは未完了（まだ review/・doing/ に残る子: b、c）"},
 		{Manual{State: SettleUnshared, Children: []string{"a"}}, "移動が未共有: 子 a の done/ への移動が未コミットか未 push。ユーザの commit・push が必要（確定しない）"},
-		{Manual{State: SettleNoRequest}, "確認待ち（依頼の記録が無い）: 先に review-request を打つ"},
-		{Manual{State: SettleBroken, Note: "x"}, "手動移動を確かめられない: x"},
+		{Manual{State: settleNoRequest}, "確認待ち（依頼の記録が無い）: 先に review-request を打つ"},
+		{Manual{State: settleBroken, note: "x"}, "手動移動を確かめられない: x"},
 	}
 	for _, tt := range tests {
 		if got := tt.m.Line(); got != tt.want {
 			t.Errorf("%s: %q", tt.m.State, got)
 		}
 	}
-	if !strings.Contains(Manual{State: SettleRouteUnknown}.Line(), "経路が分からない") {
+	if !strings.Contains(Manual{State: settleRouteUnknown}.Line(), "経路が分からない") {
 		t.Error("経路が分からない形の行")
 	}
 }
@@ -188,11 +188,11 @@ func TestAssessManualWithoutGit(t *testing.T) {
 		{"done へ直に閉じた子は手動ではない", []*ticket.Ticket{child("a", place.Done, "done", "")},
 			ManualOptions{External: true}, SettleNone, nil},
 		{"経路の記録が無い子だけ", []*ticket.Ticket{child("a", place.Done, "", "")},
-			ManualOptions{External: true}, SettleRouteUnknown, []string{"a"}},
+			ManualOptions{External: true}, settleRouteUnknown, []string{"a"}},
 		{"経路の無い子とレビュー待ちの子", []*ticket.Ticket{child("a", place.Done, "", ""), child("b", place.Review, "review", "")},
 			ManualOptions{External: true}, SettleNone, nil},
 		{"一部だけ", []*ticket.Ticket{child("a", place.Done, "review", ""), child("b", place.Review, "review", "")},
-			ManualOptions{External: true}, SettlePartial, []string{"a"}},
+			ManualOptions{External: true}, settlePartial, []string{"a"}},
 		{"取り消した子は待たない", []*ticket.Ticket{child("a", place.Done, "review", ""), child("b", place.Cancelled, "", "")},
 			ManualOptions{External: true, MovedAt: &moved}, SettleReady, []string{"a"}},
 	}
@@ -208,10 +208,10 @@ func TestAssessManualWithoutGit(t *testing.T) {
 
 	p := reviewPhase(child("a", place.Done, "review", ""))
 	q := reviewPhase(child("a", place.Done, "review", ""))
-	p.Owner = &ticket.Ticket{ID: "i0001", Plan: []ticket.PlanItem{{Type: "design", Deferred: true}, {Type: "design"}}}
-	p.Item, p.Number = &p.Owner.Plan[1], 2
+	p.owner = &ticket.Ticket{ID: "i0001", Plan: []ticket.PlanItem{{Type: "design", Deferred: true}, {Type: "design"}}}
+	p.Item, p.Number = &p.owner.Plan[1], 2
 	q.Number = 1
-	if got := AssessManual(nil, "", parent, p, []*Phase{q, p}, ManualOptions{External: true}); got.State != SettleBroken {
+	if got := AssessManual(nil, "", parent, p, []*Phase{q, p}, ManualOptions{External: true}); got.State != settleBroken {
 		t.Errorf("延期分と引き受けた分に同じ子があるのに %+v", got)
 	}
 
@@ -223,7 +223,7 @@ func TestAssessManualWithoutGit(t *testing.T) {
 	}
 	for _, bad := range []float64{0, -1, math.NaN(), math.Inf(1)} {
 		got := AssessManual(nil, "", parent, one, []*Phase{one}, ManualOptions{External: true, MovedAt: &bad})
-		if got.State != SettleBroken || got.Note != badTimeNote {
+		if got.State != settleBroken || got.note != badTimeNote {
 			t.Errorf("時刻 %v: %+v", bad, got)
 		}
 	}

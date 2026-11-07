@@ -51,11 +51,11 @@ var (
 // flowsDir は承認済みの領域の下の、子のフローの置き場。
 const flowsDir = place.FlowsDir
 
-// entry は分けた 1 件。Why は分けの理由を言えるときだけ。
+// entry は分けた 1 件。why は分けの理由を言えるときだけ。
 type entry struct {
-	Class kind
-	Path  string
-	Why   string
+	class kind
+	path  string
+	why   string
 }
 
 // Sort は `ccnavi write-and-push sort <親> [<版>]`。置き場の変更を 1 行 1 つに分ける。終了コードを返す。
@@ -75,9 +75,9 @@ func Sort(stdout, stderr io.Writer, conf *config.Settings, root, parent, since s
 	fmt.Fprintln(stdout, Head)
 	at := &archiveAt{root: root, project: tree.ProjectOfKey(st.Repo)}
 	for _, e := range classify(treeRoot, where.approved, where.review, parent, changed, since, at) {
-		fmt.Fprintf(stdout, "%s %s\n", e.Class, e.Path)
-		if e.Why != "" {
-			fmt.Fprintf(stdout, "why %s %s\n", e.Path, oneLine(e.Why))
+		fmt.Fprintf(stdout, "%s %s\n", e.class, e.path)
+		if e.why != "" {
+			fmt.Fprintf(stdout, "why %s %s\n", e.path, oneLine(e.why))
 		}
 	}
 	return config.ExitOK
@@ -281,7 +281,7 @@ func human(parts []string, approvedRel, reviewRel string, added, removed func(st
 		if !number.MatchString(n) {
 			return false
 		}
-		for _, k := range marks.Kinds {
+		for _, k := range marks.Kinds() {
 			if kind == string(k) && removed(rel) {
 				return true // ユーザの承認が消したマーカー（子が足された）
 			}

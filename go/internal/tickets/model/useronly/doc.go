@@ -15,6 +15,6 @@
 // hidden_entry_message・prune_message → HiddenEntryMessage・PruneMessage、HELD_TOOLS・EXEMPT_NOTE・
 // TURN_DEFINED・EXE_OPTIONS → HeldTools・ExemptNote・TurnDefined・ExeOptions、CODE_*・*_RULE_ID → Code*・*RuleID。
 // 表から式を組む関数（cli_forms・script_forms など）と表そのもの、commands は私的にした。行の無い SCRIPTS（と、
-// それだけが読む Flag の script・op）、どの行も使わない unless の "no-yes"、読み手の無い Op の what・Sub の op は
+// それだけが読む Flag の script・op）、どの行も使わない unless の "no-yes"、読み手の無い op の what・Sub の op は
 // 移さなかった。
 package useronly

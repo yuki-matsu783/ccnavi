@@ -81,14 +81,14 @@ func checkContents(conf *config.Settings, root string, plan *Plan) {
 				catalog = &c
 			}
 			checkTemplate(conf, root, e, together, catalog)
-		case e.Kind.ID == LayerConfig && e.configKind != "":
+		case e.Kind.ID == layerConfig && e.configKind != "":
 			said(e, check.FileProblems(overlay(conf, together), root, e.configKind, e.layer))
 			if e.configKind == config.KindRules {
 				e.Defense = defenseChange(e.current, e.raw)
 			}
-		case e.Kind.ID == Messages:
+		case e.Kind.ID == messages:
 			checkMessages(e)
-		case e.Kind.ID == Defense:
+		case e.Kind.ID == defense:
 			checkDefense(e)
 		}
 	}
@@ -101,7 +101,7 @@ func overlay(conf *config.Settings, entries []*Entry) *config.Settings {
 	out.ProjectPhasesFiles = copied(conf.ProjectPhasesFiles)
 	out.ProjectRiskFiles = copied(conf.ProjectRiskFiles)
 	for _, e := range entries {
-		if e.Kind.ID != LayerConfig || e.raw == nil || e.configKind == "" {
+		if e.Kind.ID != layerConfig || e.raw == nil || e.configKind == "" {
 			continue
 		}
 		if e.layer == config.LayerCommon {
@@ -173,7 +173,7 @@ func ruleRows(raw []byte) (map[ruleKey][]string, bool) {
 	if raw == nil {
 		return map[ruleKey][]string{}, true
 	}
-	text := string(bytes.TrimPrefix(raw, utf8BOM))
+	text := string(yaml.TrimBOM(raw))
 	if !utf8.Valid([]byte(text)) {
 		return nil, false
 	}
@@ -217,8 +217,6 @@ func ruleRows(raw []byte) (map[ruleKey][]string, bool) {
 	}
 	return rows, true
 }
-
-var utf8BOM = []byte("\xef\xbb\xbf")
 
 // defenseChange は rules.yml の下書きが防御の記述を動かすなら、ターミナルに限る理由。動かさなければ空。
 // 防御の記述とみなすのは、guard- で始まる id のルール（足す・消す・判定を移す・except を含む中身を変える）と、
@@ -414,7 +412,7 @@ func shSyntax(path string) string {
 // fsio.Decode は改行をそろえるので、CR（ASCII なので並びの途中に来ない）で切って復号し、つなぎ直す。
 func decodeReplace(raw []byte, sig bool) string {
 	if sig {
-		raw = bytes.TrimPrefix(raw, utf8BOM)
+		raw = yaml.TrimBOM(raw)
 	}
 	text, _ := fsio.DecodeBytes(raw, fsio.Replace)
 	return text

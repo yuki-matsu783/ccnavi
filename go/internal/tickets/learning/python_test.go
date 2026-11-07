@@ -221,13 +221,13 @@ func TestFindMatchesPython(t *testing.T) {
 	found := Find(root)
 	got := findAnswers{Uncommitted: Uncommitted(root)}
 	for _, i := range found.Items {
-		got.Items = append(got.Items, []string{i.Path, i.Title, i.Why, i.Describe()})
+		got.Items = append(got.Items, []string{i.path, i.title, i.why, i.Describe()})
 	}
-	for _, p := range found.Unreadable {
-		got.Unreadable = append(got.Unreadable, []string{p.Path, p.Why})
+	for _, p := range found.unreadable {
+		got.Unreadable = append(got.Unreadable, []string{p.path, p.why})
 	}
-	for _, p := range found.Inconsistent {
-		got.Inconsistent = append(got.Inconsistent, []string{p.Path, p.Why})
+	for _, p := range found.inconsistent {
+		got.Inconsistent = append(got.Inconsistent, []string{p.path, p.why})
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Find:\n%#v\nPython\n%#v", got, want)

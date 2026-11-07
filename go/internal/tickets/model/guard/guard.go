@@ -19,8 +19,8 @@ import (
 const (
 	StateRuleID      = rules.ReservedIDPrefix + "ticket-state"
 	StateShellRuleID = StateRuleID + "-shell"
-	// ProposeRuleID は提案を書いた回の確認の文の数えのキー。表には入れない。
-	ProposeRuleID = rules.ReservedIDPrefix + "ticket-propose"
+	// proposeRuleID は提案を書いた回の確認の文の数えのキー。表には入れない。
+	proposeRuleID = rules.ReservedIDPrefix + "ticket-propose"
 	// RawGitRuleID は生の git を止めるルール。ccnavi 自身の約束を守るので、予約の接頭辞 guard- を持つ。
 	RawGitRuleID         = rules.ReservedIDPrefix + "guard-raw-git"
 	ApprovedRuleID       = rules.ReservedIDPrefix + "ticket-approved"
@@ -44,8 +44,8 @@ const (
 	separator = `[\x00\n;&|({` + "`" + `!]`
 	keyword   = `(?:then|do|else|elif|if|while|until|time)\s++`
 	pathChar  = `[^\s\x00\\/;&|({` + "`" + `!]`
-	// RawGitRegex は生の git の式。
-	RawGitRegex = `(?:^|` + separator + `)\s*+(?:` + keyword + `)*+` +
+	// rawGitRegex は生の git の式。
+	rawGitRegex = `(?:^|` + separator + `)\s*+(?:` + keyword + `)*+` +
 		`(?:(?:` + pathChar + `*+[\\/])*+|[a-z]:` + pathChar + `*?)git(?:\.exe)?\s`
 )
 
@@ -64,15 +64,15 @@ func placeRegex(rel string) string {
 }
 
 func guardedStates() string {
-	names := make([]string, len(place.GuardedStates))
-	for i, s := range place.GuardedStates {
+	names := make([]string, len(place.GuardedStates()))
+	for i, s := range place.GuardedStates() {
 		names[i] = string(s)
 	}
 	return strings.Join(names, "|")
 }
 
-// StateDirRegex は直接の作成・移動を止める置き場に当たる式（パス用）。
-func StateDirRegex(ticketsRel string) string {
+// stateDirRegex は直接の作成・移動を止める置き場に当たる式（パス用）。
+func stateDirRegex(ticketsRel string) string {
 	return `(^|[\\/])` + placeRegex(ticketsRel) + `[\\/](` + guardedStates() + `)[\\/]`
 }
 
@@ -92,7 +92,7 @@ func rule(id, match, regex, root string, text rules.TextRef) (*rules.Rule, error
 // 保護と同じ部品を使う（別に書くと片方だけが読む書き方が通る）。
 func GuardRules(ticketsRel, root string) ([]*rules.Rule, error) {
 	spec := texts.Spec(textTicketState, texts.SpecOptions{})
-	write, err := rule(StateRuleID, config.WriteMatch, StateDirRegex(ticketsRel), root, spec)
+	write, err := rule(StateRuleID, config.WriteMatch, stateDirRegex(ticketsRel), root, spec)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +165,7 @@ func GateRules(approvedRel, root string) ([]*rules.Rule, error) {
 // 土台（Base）なので、ほかのレイヤーの deny にも当たった回はそちらだけを言う。
 func RawGitRule(root string) (*rules.Rule, error) {
 	text := texts.Spec(textRawGit, texts.SpecOptions{Wrapper: config.HasGitWrapper(root), Cased: []string{"why", "next"}})
-	r, err := rule(RawGitRuleID, config.ToolBash, RawGitRegex, root, text)
+	r, err := rule(RawGitRuleID, config.ToolBash, rawGitRegex, root, text)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +178,7 @@ func RawGitRule(root string) (*rules.Rule, error) {
 // 通らなくなり、提案の置き場に deny・ask を書いたワークスペースにだけ届かなくなる）。渡るのは書き込みの前なので、
 // 止まった回にも届く。
 func ProposeNotice(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, subject string) string {
-	if !slices.Contains(config.WriteTools, in.ToolName) || subject == "" {
+	if !slices.Contains(config.WriteTools(), in.ToolName) || subject == "" {
 		return ""
 	}
 	// ワークスペースの中に限る。ツリーはどれもルートの下なので、正しい置き場は全部入り、外は入らない。
@@ -187,7 +187,7 @@ func ProposeNotice(stderr io.Writer, conf *config.Settings, root string, in hook
 	if err != nil || !here.Search(subject) {
 		return ""
 	}
-	return ctxfile.DeliverOnce(stderr, conf.State, in, ctxfile.Once{ID: ProposeRuleID, Text: proposeText(conf.Tickets)})
+	return ctxfile.DeliverOnce(stderr, conf.State, in, ctxfile.Once{ID: proposeRuleID, Text: proposeText(conf.Tickets)})
 }
 
 // proposeText は提案を書いた回の確認の文。

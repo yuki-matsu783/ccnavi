@@ -63,7 +63,7 @@ func TestLocateFoldsSpellings(t *testing.T) {
 		}
 	}
 	upper := filepath.Join(root, ".CCNAVI", "Approved", "FLOWS", "I0001-01-01.YML")
-	if at, ok := Locate(conf, root, upper); !ok || at.Name != child+".yml" || !at.Known {
+	if at, ok := Locate(conf, root, upper); !ok || at.name != child+".yml" || !at.known {
 		t.Errorf("upper: %#v %v", at, ok)
 	}
 	for _, miss := range []string{filepath.Join(root, "flows", child+".yml"),
@@ -73,12 +73,12 @@ func TestLocateFoldsSpellings(t *testing.T) {
 		}
 	}
 	// ワークスペースの外は、どのプロジェクトのものでもない。
-	if at, ok := Locate(conf, root, "/elsewhere/.ccnavi/approved/flows/"+child+".yml"); !ok || at.Known {
+	if at, ok := Locate(conf, root, "/elsewhere/.ccnavi/approved/flows/"+child+".yml"); !ok || at.known {
 		t.Errorf("outside: %#v %v", at, ok)
 	}
 	// ツリーの外の置き場は、どのプロジェクトの子にも当てる。
 	shared := &config.Settings{Approved: "../shared/approved"}
-	if at, _ := Locate(shared, "/w", "/elsewhere/shared/approved/flows/"+child+".yml"); at != (Location{child + ".yml", AnyProject, true}) {
+	if at, _ := Locate(shared, "/w", "/elsewhere/shared/approved/flows/"+child+".yml"); at != (Location{child + ".yml", anyProject, true}) {
 		t.Errorf("shared: %#v", at)
 	}
 	// 小文字にすると長さの変わる字（İ）が途中にあっても、位置が食い違わない。
@@ -87,7 +87,7 @@ func TestLocateFoldsSpellings(t *testing.T) {
 		"/home/İsmail/ws/.ccnavi/Approved/flows/i0001-01-01.yml",
 		"/home/ismail/ws/.CCNAVI/APPROVED/FLOWS/I0001-01-01.YML"} {
 		at, ok := Locate(conf, "/home/ismail/ws", p)
-		if !ok || at.Name != child+".yml" || LockHit([]*ticket.Ticket{running}, Location{at.Name, AnyProject, true}) != running {
+		if !ok || at.name != child+".yml" || LockHit([]*ticket.Ticket{running}, Location{at.name, anyProject, true}) != running {
 			t.Errorf("%q: %#v %v", p, at, ok)
 		}
 	}
@@ -106,11 +106,11 @@ func TestLockHit(t *testing.T) {
 	}{
 		{[]*ticket.Ticket{idle, running}, at, running}, // 識別子でまとめる前の 1 本でも着手中なら止める
 		{[]*ticket.Ticket{idle}, at, nil},
-		{[]*ticket.Ticket{running}, Location{at.Name, "", false}, nil},
+		{[]*ticket.Ticket{running}, Location{at.name, "", false}, nil},
 		{[]*ticket.Ticket{running}, Location{"i0001-01-02.yml", "", true}, nil},
-		{[]*ticket.Ticket{running}, Location{at.Name, AnyProject, true}, running},
+		{[]*ticket.Ticket{running}, Location{at.name, anyProject, true}, running},
 		{[]*ticket.Ticket{running}, Location{"I0001-01-01.YML", "", true}, running},
-		{[]*ticket.Ticket{running}, Location{at.Name, "web", true}, nil},
+		{[]*ticket.Ticket{running}, Location{at.name, "web", true}, nil},
 	}
 	for i, c := range cases {
 		if got := LockHit(c.copies, c.at); got != c.want {
@@ -282,7 +282,7 @@ func TestDigestRecordAndNotice(t *testing.T) {
 	if got := ChangedNotice(conf, root, running); got != "" {
 		t.Errorf("変わっていないのに %q", got)
 	}
-	if !strings.HasPrefix(Fingerprint(file, root), markSHA256) {
+	if !strings.HasPrefix(fingerprint(file, root), markSHA256) {
 		t.Error("ハッシュ")
 	}
 	testkit.Put(t, file, "nodes: []\n")
@@ -329,18 +329,18 @@ func TestCatalog(t *testing.T) {
 	testkit.Put(t, filepath.Join(root, ".claude", "skills", "bare", "SKILL.md"), "")
 	testkit.Put(t, filepath.Join(root, ".claude", "skills", "empty", "README.md"), "")
 	got := LoadCatalog(root)
-	wantAgents := Candidates{{"general-purpose", SourceBuiltin}, {"Explore", SourceBuiltin}, {"Plan", SourceBuiltin},
-		{"aliased", SourceProject}, {"plain", SourceProject}, {"code reviewer # x", SourceProject}}
-	wantSkills := Candidates{{"bare", SourceProject}, {"debug", SourceProject}}
-	if !equalCandidates(got.Agents, wantAgents) || !equalCandidates(got.Skills, wantSkills) {
+	wantAgents := candidates{{"general-purpose", sourceBuiltin}, {"Explore", sourceBuiltin}, {"Plan", sourceBuiltin},
+		{"aliased", sourceProject}, {"plain", sourceProject}, {"code reviewer # x", sourceProject}}
+	wantSkills := candidates{{"bare", sourceProject}, {"debug", sourceProject}}
+	if !equalCandidates(got.agents, wantAgents) || !equalCandidates(got.skills, wantSkills) {
 		t.Errorf("%#v", got)
 	}
-	if got := LoadCatalog(""); len(got.Agents) != 3 || len(got.Skills) != 0 {
+	if got := LoadCatalog(""); len(got.agents) != 3 || len(got.skills) != 0 {
 		t.Errorf("root なし: %#v", got)
 	}
 }
 
-func equalCandidates(a, b Candidates) bool {
+func equalCandidates(a, b candidates) bool {
 	if len(a) != len(b) {
 		return false
 	}

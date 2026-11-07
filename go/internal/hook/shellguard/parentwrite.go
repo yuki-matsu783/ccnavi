@@ -20,9 +20,9 @@ type WriteKind string
 const (
 	// KindWrite は書き込み先の語（リダイレクト・tee・cp の行き先など）か、Write・Edit のツール。
 	KindWrite WriteKind = "write"
-	// KindCode はインタプリタに渡したコードと、読み切れないコマンド行の文字列。中を読み切れないので、
+	// kindCode はインタプリタに渡したコードと、読み切れないコマンド行の文字列。中を読み切れないので、
 	// 親のワークツリーのパスと書き込みを疑う語が並べば止める側に倒す。
-	KindCode WriteKind = "code"
+	kindCode WriteKind = "code"
 )
 
 // writeHint は書き込みを疑う語。読むだけのコードを止めないための線引きで、広めに取る。`open(` は書くモード
@@ -74,7 +74,7 @@ func CheckParentWrite(conf *config.Settings, root, cwd, subject string, degraded
 	if degraded || unread {
 		for _, text := range all {
 			if name := mentionedParent(root, parents, text); name != "" && writeHint.Search(text) {
-				return ParentWrite{short(text), name, KindCode}
+				return ParentWrite{short(text), name, kindCode}
 			}
 		}
 	}
@@ -90,7 +90,7 @@ func parentTrees(conf *config.Settings, root string) []string {
 	}
 	var out []string
 	for _, n := range names {
-		if ospath.IsDir(ospath.Join(base, n)) && IsParentTree(conf, root, n) {
+		if ospath.IsDir(ospath.Join(base, n)) && isParentTree(conf, root, n) {
 			out = append(out, n)
 		}
 	}
@@ -122,11 +122,11 @@ func checkCode(conf *config.Settings, root string, parents []string, c code) Par
 		return ParentWrite{}
 	}
 	if name := mentionedParent(root, parents, c.text); name != "" {
-		return ParentWrite{short(c.text), name, KindCode}
+		return ParentWrite{short(c.text), name, kindCode}
 	}
 	if c.known {
 		if where := parentAt(conf, root, c.base, listed(parents)); where != "" {
-			return ParentWrite{short(c.text), where, KindCode}
+			return ParentWrite{short(c.text), where, kindCode}
 		}
 	}
 	return ParentWrite{}
@@ -191,13 +191,13 @@ func checkTarget(conf *config.Settings, root string, parents []string, base stri
 // チケット。ワークツリーが git に登録されているか・在るかは問わない）の中なら、その親の名前。下書き・提案・承認済みの
 // 置き場は空（置き場ごとの保護が別に掛かっている）。シェルの書き込み先（CheckParentWrite）も同じ parentAt で見る。
 func ParentWriteAt(conf *config.Settings, root, path string) string {
-	return parentAt(conf, root, path, func(name string) bool { return IsParentTree(conf, root, name) })
+	return parentAt(conf, root, path, func(name string) bool { return isParentTree(conf, root, name) })
 }
 
 // parentAt は path が親のワークツリーの中で、置き場ごとの保護に任せる置き場でなければ、その親の名前。親かどうかは
 // isParent で見る（シェルの検査は在るディレクトリから先に集めた親の名前、Write・Edit はチケットの役割を直に見る）。
 func parentAt(conf *config.Settings, root, path string, isParent func(string) bool) string {
-	name := WorktreeName(root, path)
+	name := worktreeName(root, path)
 	if name == "" || !isParent(name) || unscoped(conf, root, name, path) {
 		return ""
 	}

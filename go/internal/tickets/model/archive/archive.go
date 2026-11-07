@@ -13,6 +13,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
@@ -94,7 +95,7 @@ func regularMD(directory string) []string {
 	}
 	var out []string
 	for _, n := range names {
-		if stem, ok := strings.CutSuffix(n, place.MdExt); ok && regular(ospath.Join(directory, n)) {
+		if stem, ok := strings.CutSuffix(n, config.MdExt); ok && regular(ospath.Join(directory, n)) {
 			out = append(out, stem)
 		}
 	}
@@ -149,7 +150,7 @@ func FindAny(root, ident string) []*ticket.Ticket {
 		if directory == "" {
 			continue
 		}
-		path := ospath.Join(directory, ident+place.MdExt)
+		path := ospath.Join(directory, ident+config.MdExt)
 		if !regular(path) {
 			continue
 		}
@@ -166,7 +167,7 @@ func ClosedTickets(root string) []*ticket.Ticket {
 	for _, repo := range repoNames(root) {
 		directory := doneDir(root, repo)
 		for _, ident := range regularMD(directory) {
-			if t := load(ospath.Join(directory, ident+place.MdExt), ident, repo); t != nil {
+			if t := load(ospath.Join(directory, ident+config.MdExt), ident, repo); t != nil {
 				out = append(out, t)
 			}
 		}
@@ -196,7 +197,7 @@ func ArchivedParent(root, project, ident string) *ticket.Ticket {
 	if directory == "" {
 		return nil
 	}
-	path := ospath.Join(directory, ident+place.MdExt)
+	path := ospath.Join(directory, ident+config.MdExt)
 	if !regular(path) {
 		return nil
 	}
@@ -219,7 +220,7 @@ func ArchivedName(root, project, ident string) (string, bool) {
 	if !ids.IsValidID(ident) {
 		return "", false
 	}
-	if _, ok := ArchivedBytes(root, project, string(place.Done)+"/"+ident+place.MdExt); ok {
+	if _, ok := ArchivedBytes(root, project, string(place.Done)+"/"+ident+config.MdExt); ok {
 		return ident, true
 	}
 	for _, i := range regularMD(doneDir(root, tree.RepoKey(project))) {
@@ -237,19 +238,19 @@ func ArchivedFields(root, project, ident string) (ticket.DoneCopy, bool) {
 	if !ok {
 		return ticket.DoneCopy{}, false
 	}
-	copy, ok := fieldsOf(ArchivedBytes(root, project, string(place.Done)+"/"+name+place.MdExt))
+	copy, ok := fieldsOf(ArchivedBytes(root, project, string(place.Done)+"/"+name+config.MdExt))
 	if !ok || !ids.SameID(copy.Ticket, name) {
 		return ticket.DoneCopy{}, false
 	}
 	return copy, true
 }
 
-// Plan は移すもの。Files は承認済みの領域からの相対（"/" 区切り）で、マーカー・フロー・子のチケット・親の
+// Plan は移すもの。files は承認済みの領域からの相対（"/" 区切り）で、マーカー・フロー・子のチケット・親の
 // チケットの順に並ぶ。止まったときに done/<親>.md がツリーに残り、次の ready が同じ親を拾い直せるようにするため。
 type Plan struct {
-	Parents []string
-	Tickets []string
-	Files   []string
+	parents []string
+	tickets []string
+	files   []string
 }
 
 // doneCopies は承認済みの領域の done/ のふつうのファイルの、識別子 → 欄。読めない・名前と違うものは除く。
@@ -257,7 +258,7 @@ func doneCopies(approvedDir string) map[string]ticket.DoneCopy {
 	directory := ospath.Join(approvedDir, string(place.Done))
 	out := map[string]ticket.DoneCopy{}
 	for _, ident := range regularMD(directory) {
-		if copy, ok := fieldsOf(fsio.ReadBytes(ospath.Join(directory, ident+place.MdExt))); ok && copy.Ticket == ident {
+		if copy, ok := fieldsOf(fsio.ReadBytes(ospath.Join(directory, ident+config.MdExt))); ok && copy.Ticket == ident {
 			out[ident] = copy
 		}
 	}
@@ -310,7 +311,7 @@ func PlanMove(approvedDir string, parents []string, root, project string) Plan {
 		switch {
 		case ok && here.Parent == "":
 			family[p] = true
-		case !ok && root != "" && !ospath.DiskLexists(ospath.Join(approvedDir, string(place.Doing), p+place.MdExt)):
+		case !ok && root != "" && !ospath.DiskLexists(ospath.Join(approvedDir, string(place.Doing), p+config.MdExt)):
 			if held, ok := ArchivedFields(root, project, p); ok && held.Parent == "" {
 				family[p] = true
 			}
@@ -352,20 +353,20 @@ func PlanMove(approvedDir string, parents []string, root, project string) Plan {
 		return ok && family[c.Parent]
 	}
 
-	out := Plan{Parents: sortedKeys(family, func(string) bool { return true })}
-	for _, p := range out.Parents {
-		out.Files = append(out.Files, walk(approvedDir, place.PhasesDir+"/"+p)...)
+	out := Plan{parents: sortedKeys(family, func(string) bool { return true })}
+	for _, p := range out.parents {
+		out.files = append(out.files, walk(approvedDir, place.PhasesDir+"/"+p)...)
 	}
 	for _, name := range names(ospath.Join(approvedDir, place.FlowsDir)) {
 		stem, ext := ospath.Splitext(name)
 		if slices.Contains(flowSuffixes, ext) && !family[stem] && belongs(stem) {
-			out.Files = append(out.Files, place.FlowsDir+"/"+name)
+			out.files = append(out.files, place.FlowsDir+"/"+name)
 		}
 	}
-	out.Tickets = append(sortedKeys(done, func(i string) bool { return children[i] }),
+	out.tickets = append(sortedKeys(done, func(i string) bool { return children[i] }),
 		sortedKeys(done, func(i string) bool { return family[i] })...)
-	for _, i := range out.Tickets {
-		out.Files = append(out.Files, string(place.Done)+"/"+i+place.MdExt)
+	for _, i := range out.tickets {
+		out.files = append(out.files, string(place.Done)+"/"+i+config.MdExt)
 	}
 	return out
 }
@@ -572,12 +573,12 @@ func Move(root, project, approvedDir string, todo Plan, readyParent, treeRoot st
 		if head == "" {
 			return nil, "親のワークツリー（" + treeRoot + "）の先頭を読めない。何も移していない"
 		}
-		if failed := noteReady(root, project, readyParent, treeRoot, todo.Files, head); failed != "" {
+		if failed := noteReady(root, project, readyParent, treeRoot, todo.files, head); failed != "" {
 			return nil, failed
 		}
 	}
 	var moved []string
-	for _, rel := range todo.Files {
+	for _, rel := range todo.files {
 		source := ospath.Join(approvedDir, filepath.FromSlash(rel))
 		data, ok := fsio.ReadBytes(source)
 		if !ok {
@@ -603,7 +604,7 @@ func Move(root, project, approvedDir string, todo Plan, readyParent, treeRoot st
 		}
 		moved = append(moved, rel)
 	}
-	for _, p := range todo.Parents {
+	for _, p := range todo.parents {
 		pruneEmpty(ospath.Join(approvedDir, place.PhasesDir, p))
 	}
 	return moved, ""

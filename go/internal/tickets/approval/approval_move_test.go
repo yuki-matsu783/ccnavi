@@ -35,7 +35,7 @@ func TestMoveFileAcrossDevices(t *testing.T) {
 	const text = "---\nticket: i0001\n---\nbody\n"
 	target := filepath.Join(otherDevice(t), "done", "i0001.md")
 	source := testkit.Put(t, filepath.Join(t.TempDir(), "doing", "i0001.md"), text)
-	if failed := MoveFile(source, target); failed != "" {
+	if failed := moveFile(source, target); failed != "" {
 		t.Fatal(failed)
 	}
 	if data, _ := os.ReadFile(target); string(data) != text {
@@ -60,7 +60,7 @@ func TestMoveFileAcrossDevicesRollsBackWhenTheSourceStays(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.Chmod(doing, 0o700) })
-	if failed := MoveFile(source, target); !strings.Contains(failed, "チケットを動かせない") {
+	if failed := moveFile(source, target); !strings.Contains(failed, "チケットを動かせない") {
 		t.Fatalf("断らない: %q", failed)
 	}
 	if data, _ := os.ReadFile(source); string(data) != text {

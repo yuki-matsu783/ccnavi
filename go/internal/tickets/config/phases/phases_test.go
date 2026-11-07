@@ -110,7 +110,7 @@ func TestLayerTypes(t *testing.T) {
 		t.Errorf("苦情 %v", notes)
 	}
 	// 予約名のプロジェクトはレイヤーとして数えない。
-	if TypesPath(conf, root, config.LayerSelf) != "" || TypesPath(conf, root, config.LayerCommon) != "" {
+	if typesPath(conf, root, config.LayerSelf) != "" || typesPath(conf, root, config.LayerCommon) != "" {
 		t.Error("予約名にパスがある")
 	}
 	// 壊れたレイヤーは空として扱い、そのレイヤーの苦情を返す。
@@ -141,7 +141,7 @@ func TestTypesOfMarksTheParentLayer(t *testing.T) {
 	if got := idsOf(TypesOf(p)); !reflect.DeepEqual(got, []string{"a@web"}) || TypesOf(p) != types {
 		t.Errorf("引き直し %v", got)
 	}
-	common, _ := Parse(defs("  a: {title: A}"), Where)
+	common, _ := Parse(defs("  a: {title: A}"), where)
 	if Origin(types.Get("a"), common) != config.LayerCommon || Origin(types.Get("a"), nil) != "web" {
 		t.Error("Origin")
 	}

@@ -125,9 +125,9 @@ func originLine(t *ticket.Ticket) string {
 		"  ワークツリー: " + cmp.Or(t.Tree, "ワークスペースルート") + "  提案: " + approval.SourcePath(t)
 }
 
-// Screen は承認を求める画面。最初に「何が新たに書けるようになるか」を置き、子が編集できる範囲（親をどこまで
+// screen は承認を求める画面。最初に「何が新たに書けるようになるか」を置き、子が編集できる範囲（親をどこまで
 // 絞ったか）・人間レビューの要否・計画を並べる。定義は候補が持つもの（チケットごとにレイヤーが違いうる）を使う。
-func Screen(batch []*candidates.Candidate, pool map[string]*ticket.Ticket) string {
+func screen(batch []*candidates.Candidate, pool map[string]*ticket.Ticket) string {
 	lines := []string{fmt.Sprintf("チケットの承認リクエスト: %d 件", len(batch))}
 	for _, cand := range batch {
 		t := cand.Ticket
@@ -171,7 +171,7 @@ func Screen(batch []*candidates.Candidate, pool map[string]*ticket.Ticket) strin
 				"    ルールで許可（allow）されていても、このチケットの範囲外では編集できません。"+
 					"ルールで禁止（deny）にした場所は、この範囲の中でも止まります")
 		}
-		for _, name := range rules.Sections {
+		for _, name := range rules.Sections() {
 			lines = append(lines, bullets(string(name), t.Paths(name))...)
 		}
 		if len(cand.Overflow) > 0 {
@@ -396,7 +396,7 @@ func scopeItems(t *ticket.Ticket, name rules.Decision) []scopeItem {
 // ようになる範囲と書けなくなる範囲をここで見せる。
 func scopeDiffLines(current, revised *ticket.Ticket) []string {
 	var lines []string
-	for _, name := range rules.Sections {
+	for _, name := range rules.Sections() {
 		before, after := scopeItems(current, name), scopeItems(revised, name)
 		for _, i := range after {
 			if !slices.Contains(before, i) {

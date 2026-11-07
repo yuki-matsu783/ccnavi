@@ -50,7 +50,7 @@ func CommitNotice(stderr io.Writer, conf *config.Settings, root string, in hooki
 		command = pyfmt.Str(v)
 	}
 	isCommit := in.ToolName == config.ToolBash && strings.Contains(pyfmt.Lower(command), pyfmt.Lower(config.GitWrapper))
-	if !isCommit && !slices.Contains(config.AgentTools, in.ToolName) {
+	if !isCommit && !slices.Contains(config.AgentTools(), in.ToolName) {
 		return ""
 	}
 	deadline := time.Now().Add(git.CommitHintTimeout)

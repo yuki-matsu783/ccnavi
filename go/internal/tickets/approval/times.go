@@ -14,8 +14,8 @@ import (
 type TimeSource string
 
 const (
-	FromCommit  TimeSource = "commit"      // doing/ に足したコミットの時刻
-	Uncommitted TimeSource = "uncommitted" // コミットが無い（手で置いて、まだコミットしていない）
+	fromCommit  TimeSource = "commit"      // doing/ に足したコミットの時刻
+	uncommitted TimeSource = "uncommitted" // コミットが無い（手で置いて、まだコミットしていない）
 )
 
 // ApprovedTime は承認の時刻。At も Source も空なら分からない。
@@ -26,7 +26,7 @@ type ApprovedTime struct {
 
 // Label は人に見せる 1 語。
 func (a ApprovedTime) Label() string {
-	if a.Source == Uncommitted {
+	if a.Source == uncommitted {
 		return "未コミット（手で置いた）"
 	}
 	if a.At == "" {
@@ -55,9 +55,9 @@ func ApprovedTimes(conf *config.Settings, found []*ticket.Ticket) map[string]App
 		added, ok := addedTimes(conf, treeRoot)
 		for _, t := range waiting[treeRoot] {
 			if at, hit := added[t.ID]; hit {
-				out[t.Path] = ApprovedTime{at, FromCommit}
+				out[t.Path] = ApprovedTime{at, fromCommit}
 			} else if ok && t.State == place.Doing {
-				out[t.Path] = ApprovedTime{"", Uncommitted}
+				out[t.Path] = ApprovedTime{"", uncommitted}
 			}
 		}
 	}
@@ -87,10 +87,10 @@ func addedTimes(conf *config.Settings, treeRoot string) (map[string]string, bool
 		}
 		name := ospath.Strip(line)
 		ident, ok := strings.CutPrefix(name, rel+"/")
-		if !ok || !strings.HasSuffix(ident, place.MdExt) {
+		if !ok || !strings.HasSuffix(ident, config.MdExt) {
 			continue
 		}
-		ident = strings.TrimSuffix(ident, place.MdExt)
+		ident = strings.TrimSuffix(ident, config.MdExt)
 		if _, seen := found[ident]; !strings.Contains(ident, "/") && !seen {
 			found[ident] = when
 		}

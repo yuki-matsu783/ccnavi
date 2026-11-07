@@ -21,8 +21,8 @@ import (
 type Kind string
 
 const (
-	Issue Kind = "issue"
-	MR    Kind = "mr"
+	issue Kind = "issue"
+	mr    Kind = "mr"
 )
 
 const (
@@ -68,25 +68,25 @@ var (
 
 // Ref は依頼文の中の issue・MR の指定 1 つ。Repo は URL から読めたときの `owner/repo`（読めなければ空）。
 type Ref struct {
-	Kind   Kind
-	Number int
-	Repo   string
+	kind   Kind
+	number int
+	repo   string
 }
 
 // Label は指定の表示（`issue #152`・`MR !5（acme/w）`）。
 func (r Ref) Label() string {
 	mark, name := "#", "issue"
-	if r.Kind != Issue {
+	if r.kind != issue {
 		mark, name = "!", "MR"
 	}
-	out := name + " " + mark + strconv.Itoa(r.Number)
-	if r.Repo != "" {
-		out += "（" + r.Repo + "）"
+	out := name + " " + mark + strconv.Itoa(r.number)
+	if r.repo != "" {
+		out += "（" + r.repo + "）"
 	}
 	return out
 }
 
-func (r Ref) mark() string { return string(r.Kind) + ":" + strconv.Itoa(r.Number) }
+func (r Ref) mark() string { return string(r.kind) + ":" + strconv.Itoa(r.number) }
 
 // blank は当たった範囲を同じ長さ（符号位置）の空白に置き換える（位置は変えない）。
 func blank(text string, patterns ...*pyre.Regexp) string {
@@ -136,7 +136,7 @@ func PromptRefs(text string) []Ref {
 	for _, p := range []struct {
 		re   *pyre.Regexp
 		kind Kind
-	}{{urlIssuePattern, Issue}, {urlMRPattern, MR}} {
+	}{{urlIssuePattern, issue}, {urlMRPattern, mr}} {
 		for _, m := range findAll(p.re, body) {
 			found = append(found, hit{m.Start, Ref{p.kind, number(m), named(m, "repo")}})
 		}
@@ -144,22 +144,22 @@ func PromptRefs(text string) []Ref {
 	// URL の中身を消してから語と記号を探す（`.../issues/152#issuecomment-1` を 2 度数えない）。
 	rest := blank(body, urlPattern)
 	for _, m := range findAll(wordIssuePattern, rest) {
-		found = append(found, hit{m.Start, Ref{Kind: Issue, Number: number(m)}})
+		found = append(found, hit{m.Start, Ref{kind: issue, number: number(m)}})
 	}
 	for _, m := range findAll(wordMRPattern, rest) {
-		found = append(found, hit{m.Start, Ref{Kind: MR, Number: number(m)}})
+		found = append(found, hit{m.Start, Ref{kind: mr, number: number(m)}})
 	}
 	// 語で読んだ分も消す（`PR #12` の `#12` を issue としても数えない）。
 	rest = blank(rest, wordIssuePattern, wordMRPattern)
 	for _, m := range findAll(bangPattern, rest) {
-		found = append(found, hit{m.Start, Ref{Kind: MR, Number: number(m)}})
+		found = append(found, hit{m.Start, Ref{kind: mr, number: number(m)}})
 	}
 	runes := []rune(rest)
 	for _, m := range findAll(hashPattern, rest) {
 		if cssBeforePattern != nil && cssBeforePattern.Search(string(runes[max(0, m.Start-cssWindow):m.Start])) {
 			continue
 		}
-		found = append(found, hit{m.Start, Ref{Kind: Issue, Number: number(m)}})
+		found = append(found, hit{m.Start, Ref{kind: issue, number: number(m)}})
 	}
 	sort.SliceStable(found, func(i, j int) bool { return found[i].at < found[j].at })
 	var refs []Ref
@@ -168,7 +168,7 @@ func PromptRefs(text string) []Ref {
 		key := h.ref.mark()
 		if at, ok := seen[key]; ok {
 			// URL から読めたリポジトリの手がかりは残す。
-			if h.ref.Repo != "" && refs[at].Repo == "" {
+			if h.ref.repo != "" && refs[at].repo == "" {
 				refs[at] = h.ref
 			}
 			continue
@@ -237,10 +237,10 @@ type boundTo struct {
 // チケットの issue:、MR はチケットの mr: の一致。名前に番号を含むだけのブランチは数えない）。読めないときと、
 // URL で別のリポジトリが示されているときは nil（案内する側に倒す）。
 func bound(conf *config.Settings, root, cwd string, r Ref) *boundTo {
-	if r.Repo != "" {
+	if r.repo != "" {
 		return nil
 	}
-	data, failed := collect(conf, root, cwd, r.Kind, r.Number, host{})
+	data, failed := collect(conf, root, cwd, r.kind, r.number, host{})
 	if failed != "" {
 		return nil
 	}
@@ -289,20 +289,20 @@ func startLines(conf *config.Settings, root string, refs []Ref) []string {
 	}
 	for _, r := range refs {
 		where, known := "", true
-		if r.Repo != "" {
-			where, known = projectOfRepo(conf, root, r.Repo)
+		if r.repo != "" {
+			where, known = projectOfRepo(conf, root, r.repo)
 		}
 		if !known {
-			notes = append(notes, r.Label()+" のリポジトリ "+r.Repo+" は projects/ の中に無い（まだ clone していない）。"+
+			notes = append(notes, r.Label()+" のリポジトリ "+r.repo+" は projects/ の中に無い（まだ clone していない）。"+
 				"ccnavi-start.sh は実行せず、clone が要ることをユーザに伝えて止まる。")
 			continue
 		}
-		args := "--" + string(r.Kind) + " " + strconv.Itoa(r.Number)
-		if r.Repo == "" {
+		args := "--" + string(r.kind) + " " + strconv.Itoa(r.number)
+		if r.repo == "" {
 			starts = append(starts, "'"+sh+" "+args+"'")
 			continue
 		}
-		args += " --repo " + r.Repo
+		args += " --repo " + r.repo
 		// 実行する場所を絶対パスで名指しする（cwd がどこでも届く）。ワークスペース自身も同じ形。
 		place := root
 		if where != "" {

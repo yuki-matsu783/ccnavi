@@ -11,9 +11,9 @@
 //
 // Python からの対応: rules と subjects をまとめた。load → Load（読めなければ error）、parse → Parse、
 // parse(…, builtin=True) → Builtin（組み込みは Spec で書く）、compile_condition → CompileCondition、
-// Rule.matches・hits・body_hits・spoken_message・key・written_body → Matches・Hits・BodyHits・SpokenMessage・
+// Rule.matches・hits・body_hits・spoken_message・key・written_body → Matches・Hits・BodyHits・Speech・
 // Key・WrittenBody、record_name → RecordName、tool_matches → ToolMatches、fill_text・fill_root → FillText・
-// FillRoot、root_glob・root_pattern・real_root・not_root_pattern → RootGlob・RootPattern・RealRoot・NotRootPattern、
+// fillRoot、root_glob・root_pattern・real_root・not_root_pattern → RootGlob・RootPattern・realRoot・notRootPattern、
 // has_relative_scripts → HasRelativeScripts、readable_every → ReadableEvery、SECTIONS → Sections、
 // DENY・ASK・ALLOW → Deny・Ask・Allow（Decision）、SEVERITY_* → Error・Warn・Info（Severity）、
 // message_id・message_values・message_variants → Rule.Text（TextRef）、subjects.subject_of → SubjectOf、

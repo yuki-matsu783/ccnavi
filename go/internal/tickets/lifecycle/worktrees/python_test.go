@@ -9,6 +9,7 @@ import (
 
 	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
+	"ccnavi/internal/tickets/approval"
 	"ccnavi/internal/tickets/model/ticket"
 	"ccnavi/internal/tickets/testkit"
 )
@@ -94,7 +95,7 @@ func TestMatchesPython(t *testing.T) {
 	got["targets"] = []any{ids(TidyTargets(conf, root, "i0001", nil)), ids(TidyTargets(conf, root, "i0001", &one)), ids(TidyTargets(conf, root, "i0001", &two))}
 	family := []string{}
 	for _, x := range []string{"i0001-01-01", "rel-2026-10-06", "i0001", "x", "rel-2026-10-06-01-02"} {
-		family = append(family, FamilyFor(conf, root, x))
+		family = append(family, FamilyFor(approval.ScanApproved(conf, root, nil), x))
 	}
 	got["family"] = family
 	var parsed []*ticket.Ticket
@@ -116,7 +117,7 @@ func TestMatchesPython(t *testing.T) {
 		if b := Blocked(root, name, inside); b == nil {
 			blocked = append(blocked, nil)
 		} else {
-			blocked = append(blocked, []any{b.Name, string(b.Status), rel(b.Path), rel(b.Detail)})
+			blocked = append(blocked, []any{b.name, string(b.Status), rel(b.Path), rel(b.Detail)})
 		}
 	}
 	got["blocked"] = blocked

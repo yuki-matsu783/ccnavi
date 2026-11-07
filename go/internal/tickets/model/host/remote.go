@@ -61,41 +61,41 @@ const (
 	msgNoToken     = "%s が無く、curl に付ける %s もありません。"
 )
 
-// Class は origin の URL から決めたホストの分類と接続先。Kind が空なら読めない表記。
+// class は origin の URL から決めたホストの分類と接続先。kind が空なら読めない表記。
 //
-// Host は小文字にしてポートを除いたもので、照合は `.` の区切りで行う（evilgithub.com や github.com.evil は
+// host は小文字にしてポートを除いたもので、照合は `.` の区切りで行う（evilgithub.com や github.com.evil は
 // GitHub にならない）。GitHub は github.com と ghe.com・*.ghe.com で、ほかは全部 GitLab（接続先は origin の
-// scheme・ホスト・ポートを保つ）。GHE.com の origin にポートが付くと API の URL を組めないので Problem を言う
+// scheme・ホスト・ポートを保つ）。GHE.com の origin にポートが付くと API の URL を組めないので problem を言う
 // （GHE.com の API の URL の規則は実物では未検証）。
-type Class struct {
-	Kind    Kind
-	Host    string
-	API     string
-	GraphQL string
-	Path    string
-	Problem string
+type class struct {
+	kind    Kind
+	host    string
+	api     string
+	graphQL string
+	path    string
+	problem string
 }
 
 func isGHEHost(host string) bool {
 	return host == gheDomain || (strings.HasSuffix(host, "."+gheDomain) && len(host) > len(gheDomain)+1)
 }
 
-// Classify は origin の URL を GitHub か GitLab かに分け、接続先を決める。
-func Classify(url string) Class {
+// classify は origin の URL を GitHub か GitLab かに分け、接続先を決める。
+func classify(url string) class {
 	m := remote.FindStringSubmatch(url)
 	if m == nil {
-		return Class{}
+		return class{}
 	}
 	raw, port, path := m[remote.SubexpIndex("host")], m[remote.SubexpIndex("port")], m[remote.SubexpIndex("path")]
 	host := pyfmt.Lower(raw)
 	switch {
 	case host == githubHost:
-		return Class{GitHub, host, githubAPI, githubAPI + graphQLSuffix, path, ""}
+		return class{GitHub, host, githubAPI, githubAPI + graphQLSuffix, path, ""}
 	case isGHEHost(host) && port != "":
-		return Class{Kind: GitHub, Host: host, Path: path, Problem: fmt.Sprintf(msgGHEPort, host, port, host)}
+		return class{kind: GitHub, host: host, path: path, problem: fmt.Sprintf(msgGHEPort, host, port, host)}
 	case isGHEHost(host):
 		api := "https://api." + host
-		return Class{GitHub, host, api, api + graphQLSuffix, path, ""}
+		return class{GitHub, host, api, api + graphQLSuffix, path, ""}
 	}
 	scheme := "https"
 	if strings.EqualFold(pyfmt.Head(url, len(httpPrefix)), httpPrefix) {
@@ -105,24 +105,24 @@ func Classify(url string) Class {
 	if port != "" {
 		authority += ":" + port
 	}
-	return Class{GitLab, host, scheme + "://" + authority + gitlabAPIPath, "", path, ""}
+	return class{GitLab, host, scheme + "://" + authority + gitlabAPIPath, "", path, ""}
 }
 
 // TransportProblem は sh がリモートを読み書きできる形になっているか。なっていなければその説明（--lint が言う）。
 // sh と同じ順で探す: gh / glab があればそれ、無ければ curl とトークン。
 func TransportProblem(url string) string {
-	found := Classify(url)
-	if found.Kind == "" {
+	found := classify(url)
+	if found.kind == "" {
 		return fmt.Sprintf(msgNotAHost, maskCredentials(url))
 	}
-	if found.Problem != "" {
-		return found.Problem
+	if found.problem != "" {
+		return found.problem
 	}
 	if !onPath(toolJQ) {
 		return msgNoJQ
 	}
 	cli, token := toolGH, env.GitHubToken
-	if found.Kind == GitLab {
+	if found.kind == GitLab {
 		cli, token = toolGLab, env.GitLabToken
 	}
 	if onPath(cli) {

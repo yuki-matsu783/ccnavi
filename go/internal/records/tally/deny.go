@@ -21,8 +21,8 @@ import (
 // 大文字と小文字は分けたままにする。パスもコマンドも、大小を区別する環境があるため。
 // 認証情報を残さないように、記録にはハッシュだけを置く。
 
-// DefaultDenyThreshold は N の既定（CCNAVI_DENY_REPEAT）。
-const DefaultDenyThreshold = 3
+// defaultDenyThreshold は N の既定（CCNAVI_DENY_REPEAT）。
+const defaultDenyThreshold = 3
 
 // minDenyThreshold より小さい N は既定に戻す。N が 1 だと、1 回目の拒否の時点で、代わりの方法を試す前に止まってしまう。
 const minDenyThreshold = 2
@@ -38,7 +38,7 @@ const (
 
 // DenyThreshold は書かれた N。読めない値と 2 未満は既定値になる。
 func DenyThreshold(written string) int {
-	return config.Int(written, DefaultDenyThreshold, minDenyThreshold)
+	return config.Int(written, defaultDenyThreshold, minDenyThreshold)
 }
 
 // Normalize は同じ呼び出しとして数えるための均し（引用符を除き、空白をまとめる）。

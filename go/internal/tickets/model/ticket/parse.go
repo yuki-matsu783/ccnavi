@@ -105,7 +105,7 @@ func Parse(source string) (*Ticket, []rules.Problem) {
 		if v == nil {
 			v = ""
 		}
-		t.Maintenance, t.HasMaintenance = v, true
+		t.maintenance, t.HasMaintenance = v, true
 	}
 	return t, problems
 }
@@ -471,7 +471,7 @@ func readScope(t *Ticket, front *yaml.Map, problems *[]rules.Problem) bool {
 				"範囲は deny / ask / allow のタイプに `match: Write|Edit` で書く"))
 		}
 	}
-	for _, key := range ScriptFields {
+	for _, key := range scriptFields {
 		*t.scriptField(key) = ospath.Strip(text(front.Get(key)))
 	}
 	entries, found := readEntries(front, name)
@@ -497,7 +497,7 @@ func readEntries(front *yaml.Map, name string) ([]Entry, []rules.Problem) {
 	var problems []rules.Problem
 	var entries []Entry
 	bad := func(detail string) { problems = append(problems, problem(rules.Error, name, detail)) }
-	for _, section := range rules.Sections {
+	for _, section := range rules.Sections() {
 		raw := front.Get(string(section))
 		if raw == nil {
 			continue
@@ -517,7 +517,7 @@ func readEntries(front *yaml.Map, name string) ([]Entry, []rules.Problem) {
 			match := text(m.Get("match"))
 			writes := false
 			for _, w := range strings.Split(match, "|") {
-				if slices.Contains(config.WriteTools, ospath.Strip(w)) {
+				if slices.Contains(config.WriteTools(), ospath.Strip(w)) {
 					writes = true
 				}
 			}
@@ -622,7 +622,7 @@ func frontmatter(source string) (*yaml.Map, string, []rules.Problem) {
 	}
 	lines := ospath.Splitlines(source)
 	if len(lines) == 0 || ospath.Strip(lines[0]) != Fence {
-		if len(lines) > 0 && ospath.Strip(strings.TrimLeft(lines[0], BOM)) == Fence {
+		if len(lines) > 0 && ospath.Strip(strings.TrimLeft(lines[0], yaml.BOM)) == Fence {
 			return stop("先頭に BOM (U+FEFF) が付いていて `" + Fence + "` で始まっていない。" +
 				"BOM 無しの UTF-8 で保存し直してください")
 		}

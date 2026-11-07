@@ -6,12 +6,12 @@ import (
 	"ccnavi/internal/records/redact"
 )
 
-// MaskUserinfo は URL と scp 形に埋まった資格情報を Stars にする（sh の ccnavi_log_mask・拡張と同じ読み）。
+// maskUserinfo は URL と scp 形に埋まった資格情報を Stars にする（sh の ccnavi_log_mask・拡張と同じ読み）。
 //
 // 空白・タブ・LF・CR で切った語ごとに見る。`://` を含む語は、`://` の後ろから次の `/` までを authority とし、
 // `@` があれば最後の `@` より前を伏せる。含まない語は、最初の `/` より前に `@` があり、最後の `@` より前に
 // `:` があれば、そこを伏せる（`user:tok@host:path`）。
-func MaskUserinfo(value string) string {
+func maskUserinfo(value string) string {
 	if !strings.Contains(value, "@") {
 		return value
 	}

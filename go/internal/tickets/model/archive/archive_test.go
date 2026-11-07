@@ -60,18 +60,18 @@ func TestPlanTakesOnlyClosedFamilies(t *testing.T) {
 		t.Fatal(got)
 	}
 	todo := PlanMove(f.approved, ClosedParents(f.approved), "", "")
-	if !reflect.DeepEqual(todo.Parents, []string{"i0001", "old"}) {
-		t.Error(todo.Parents)
+	if !reflect.DeepEqual(todo.parents, []string{"i0001", "old"}) {
+		t.Error(todo.parents)
 	}
 	// 子のチケットが先、親のチケットが最後（止まったときに親が done/ に残る）。
-	if !reflect.DeepEqual(todo.Tickets, []string{"i0001-01-01", "old-01-01", "i0001", "old"}) {
-		t.Error(todo.Tickets)
+	if !reflect.DeepEqual(todo.tickets, []string{"i0001-01-01", "old-01-01", "i0001", "old"}) {
+		t.Error(todo.tickets)
 	}
 	// ディレクトリのファイルを先に、下のディレクトリを後に（os.walk の順）。書きかけの一時ファイルは移さない。
 	want := []string{"phases/i0001/1.reviewed.json", "phases/i0001/i0001-01-01.risk.json", "phases/i0001/sub/a.json",
 		"flows/i0001-01-01.yml", "done/i0001-01-01.md", "done/old-01-01.md", "done/i0001.md", "done/old.md"}
-	if !reflect.DeepEqual(todo.Files, want) {
-		t.Errorf("%q", todo.Files)
+	if !reflect.DeepEqual(todo.files, want) {
+		t.Errorf("%q", todo.files)
 	}
 }
 
@@ -79,14 +79,14 @@ func TestMoveCopiesThenRemoves(t *testing.T) {
 	f := newFixture(t)
 	todo := PlanMove(f.approved, []string{"i0001"}, "", "")
 	moved, failed := Move(f.root, "", f.approved, todo, "", "")
-	if failed != "" || !reflect.DeepEqual(moved, todo.Files) {
+	if failed != "" || !reflect.DeepEqual(moved, todo.files) {
 		t.Fatal(moved, failed)
 	}
 	base := BaseDir(f.root, "")
 	if base != filepath.Join(f.root, "logs", "archive", "self") {
 		t.Error(base)
 	}
-	for _, rel := range todo.Files {
+	for _, rel := range todo.files {
 		if ospath.DiskLexists(f.rel(rel)) || !ospath.IsFile(filepath.Join(base, filepath.FromSlash(rel))) {
 			t.Error(rel)
 		}
@@ -184,8 +184,8 @@ func TestFamilyIsReadFromTheParentField(t *testing.T) {
 	f := newFixture(t)
 	testkit.Put(t, f.rel("done/rel.md"), closedText("rel", "", 0))
 	testkit.Put(t, f.rel("done/rel-01-01.md"), closedText("rel-01-01", "", 0))
-	if todo := PlanMove(f.approved, []string{"rel"}, "", ""); !reflect.DeepEqual(todo.Tickets, []string{"rel"}) {
-		t.Error(todo.Tickets)
+	if todo := PlanMove(f.approved, []string{"rel"}, "", ""); !reflect.DeepEqual(todo.tickets, []string{"rel"}) {
+		t.Error(todo.tickets)
 	}
 	testkit.Put(t, f.rel("done/i0001-02-01.md"), closedText("i0001-02-01", "i0001", 2))
 	testkit.Put(t, f.rel("flows/i0001-02-01.yml"), "steps: []\n")
@@ -193,16 +193,16 @@ func TestFamilyIsReadFromTheParentField(t *testing.T) {
 	testkit.Put(t, f.rel("doing/i0001-02.md"), closedText("i0001-02", "", 0))
 	testkit.Put(t, f.rel("flows/i0001-02.yml"), "steps: []\n")
 	todo := PlanMove(f.approved, []string{"i0001"}, "", "")
-	if !reflect.DeepEqual(todo.Tickets, []string{"i0001-01-01", "i0001-02-01", "i0001"}) {
-		t.Error(todo.Tickets)
+	if !reflect.DeepEqual(todo.tickets, []string{"i0001-01-01", "i0001-02-01", "i0001"}) {
+		t.Error(todo.tickets)
 	}
 	for _, rel := range []string{"flows/i0001-03-02.yml", "flows/i0001-02-01.yml"} {
-		if !slices.Contains(todo.Files, rel) {
+		if !slices.Contains(todo.files, rel) {
 			t.Error(rel)
 		}
 	}
 	for _, rel := range []string{"flows/i0001-02.yml", "flows/open-01-01.yml"} {
-		if slices.Contains(todo.Files, rel) {
+		if slices.Contains(todo.files, rel) {
 			t.Error(rel)
 		}
 	}

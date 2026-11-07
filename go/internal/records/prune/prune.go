@@ -77,28 +77,28 @@ var sessionAndKey = []struct{ prefix, suffix string }{
 	{"turngate-", fsio.JSONExt},            // turngate（1 件 1 ファイル）
 }
 
-// Rotation はローテートした 1 本（見せるパス）。
-type Rotation struct{ From, To string }
+// rotation はローテートした 1 本（見せるパス）。
+type rotation struct{ from, to string }
 
 // Report は 1 回の後始末で起きたこと。パスはワークスペースルートからの相対（外なら絶対）で、区切りは "/"。
 type Report struct {
-	Rotated  []Rotation
-	Logs     []string
-	State    []string
+	rotated  []rotation
+	logs     []string
+	state    []string
 	Problems []string
 	// KeptOps は消さずに残した未完了の操作記録の数（消えると送り終えていない判断を復旧できない）。
 	KeptOps int
 }
 
-// Empty は何も動かさなかったか。
-func (r *Report) Empty() bool { return len(r.Rotated) == 0 && len(r.Logs) == 0 && len(r.State) == 0 }
+// empty は何も動かさなかったか。
+func (r *Report) empty() bool { return len(r.rotated) == 0 && len(r.logs) == 0 && len(r.state) == 0 }
 
 // Options は Run の動かし方。
 type Options struct {
 	// DryRun は何も動かさず、動かすはずのものを返す。
 	DryRun bool
-	// Now は基準の時刻。ゼロ値なら今。
-	Now time.Time
+	// now は基準の時刻。ゼロ値なら今。
+	now time.Time
 }
 
 type run struct {
@@ -110,7 +110,7 @@ type run struct {
 
 // Run はローテートと削除を 1 度ずつ行う。途中の失敗は Problems に積んで先へ進む。
 func Run(root, logPath, stateDir, session string, o Options) *Report {
-	r := &run{report: &Report{}, root: root, dry: o.DryRun, now: o.Now}
+	r := &run{report: &Report{}, root: root, dry: o.DryRun, now: o.now}
 	if r.now.IsZero() {
 		r.now = time.Now()
 	}
@@ -168,10 +168,10 @@ func (r *run) problem(format string, args ...any) {
 
 // Summary は記録（audit の detail）に残す 1 行。何も動かなければ空。
 func Summary(r *Report) string {
-	if r.Empty() {
+	if r.empty() {
 		return ""
 	}
-	return fmt.Sprintf("pruned rotated=%d logs=%d state=%d", len(r.Rotated), len(r.Logs), len(r.State))
+	return fmt.Sprintf("pruned rotated=%d logs=%d state=%d", len(r.rotated), len(r.logs), len(r.state))
 }
 
 // Lines はユーザに見せる行。
@@ -181,10 +181,10 @@ func Lines(r *Report, dryRun bool) []string {
 		rotate, remove = "ローテートする", "削除する"
 	}
 	var out []string
-	for _, x := range r.Rotated {
-		out = append(out, rotate+"  "+x.From+" → "+x.To)
+	for _, x := range r.rotated {
+		out = append(out, rotate+"  "+x.from+" → "+x.to)
 	}
-	for _, path := range append(append([]string(nil), r.Logs...), r.State...) {
+	for _, path := range append(append([]string(nil), r.logs...), r.state...) {
 		out = append(out, remove+"  "+path)
 	}
 	if r.KeptOps > 0 {
@@ -275,7 +275,7 @@ func (r *run) pruneDirectory(directory string, before time.Time) {
 			continue
 		}
 		if r.remove(path) {
-			r.report.State = append(r.report.State, r.shown(path))
+			r.report.state = append(r.report.state, r.shown(path))
 		}
 	}
 }

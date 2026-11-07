@@ -249,6 +249,14 @@ func TestListsUntrackedButNotIgnoredFiles(t *testing.T) {
 	eq(t, "rows", ids(r.build().Rows), []string{"new"})
 }
 
+// 拡張子が大文字（.MD）の md が索引に載らなかった不具合の回帰。拡張子は大文字小文字を区別しない。
+func TestAnUpperCaseExtensionIsIndexed(t *testing.T) {
+	r := newRepo(t)
+	r.put("UPPER.MD", doc("type: guide"))
+	r.put("docs/Mixed.Md", doc("type: guide"))
+	eq(t, "rows", sorted(ids(r.build().Rows)), []string{"UPPER", "docs/Mixed"})
+}
+
 func TestSkipsDeletedFilesAndRemovesTheIndexOfAnEmptiedDirectory(t *testing.T) {
 	r := newRepo(t)
 	r.put("keep/a.md", doc("type: guide"))

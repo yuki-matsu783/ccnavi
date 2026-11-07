@@ -10,6 +10,7 @@ import (
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyre"
 	"ccnavi/internal/infra/shell"
+	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/selfguard"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/model/place"
@@ -21,15 +22,15 @@ type Core string
 const (
 	// CoreHit は ccnavi 自身を守る場所（hook の登録・設定・保護済みのスクリプト・実行ファイル・記録）。
 	CoreHit Core = "core"
-	// CoreStore は承認済みチケットの置き場。マーカーを消すのはユーザがターミナルで打つ手順（sh は通す）。
-	CoreStore Core = "store"
-	// CoreReview はレビュー待ちの置き場（wip/proposals/review/）。承認済みと同じ扱い。
-	CoreReview Core = "review"
-	// CoreUnread は対象を読み切れない形。共通ルールの allow（`*ccnavi-git.sh*`）が生の文字列に当たるので、
+	// coreStore は承認済みチケットの置き場。マーカーを消すのはユーザがターミナルで打つ手順（sh は通す）。
+	coreStore Core = "store"
+	// coreReview はレビュー待ちの置き場（wip/proposals/review/）。承認済みと同じ扱い。
+	coreReview Core = "review"
+	// coreUnread は対象を読み切れない形。共通ルールの allow（`*ccnavi-git.sh*`）が生の文字列に当たるので、
 	// ここで見ないと確認に落ちずに通る。
-	CoreUnread Core = "unread"
-	// CoreIndex は `checkout -- <パス>`（索引の中身に戻す）。sh はこの形を通さないので restore を案内する。
-	CoreIndex Core = "index"
+	coreUnread Core = "unread"
+	// coreIndex は `checkout -- <パス>`（索引の中身に戻す）。sh はこの形を通さないので restore を案内する。
+	coreIndex Core = "index"
 )
 
 // coreSubs はラッパーのサブコマンドのうち、行き先のファイルを消す・別のコミットの中身に戻すもの。`restore` は
@@ -49,7 +50,7 @@ var (
 )
 
 // markers は、ディレクトリがこの名前を直に持つなら守る場所を中に含む印（ツリーの頂上・ccnavi ディレクトリの親）。
-var markers = []string{config.DefaultProjectHome, config.ClaudeDir, ".git"}
+var markers = []string{config.DefaultProjectHome, config.ClaudeDir, tree.DotGit}
 
 const (
 	// expandChars はシェルが実行の時点で値を決める書き方（変数・置換）。
@@ -76,17 +77,17 @@ func CheckCorePaths(conf *config.Settings, root, cwd, subject string, degraded b
 	if degraded {
 		for _, s := range degradedSubs(subject) {
 			if s == "" {
-				return unknownParent, unreadLine, CoreUnread
+				return unknownParent, unreadLine, coreUnread
 			}
 			if slices.Contains(coreSubs, s) {
-				return s, unreadLine, CoreUnread
+				return s, unreadLine, coreUnread
 			}
 		}
 		return "", "", ""
 	}
 	places := shell.PlacedCommands(subject, false)
 	if word, ok := fedToStdin(places); ok {
-		return unknownParent, word, CoreUnread
+		return unknownParent, word, coreUnread
 	}
 	var compiled *pyre.Regexp
 	for _, p := range places {
@@ -97,7 +98,7 @@ func CheckCorePaths(conf *config.Settings, root, cwd, subject string, degraded b
 		args := call.args
 		if len(args) > 0 && strings.ContainsAny(args[0], openSub) {
 			// サブコマンドが文字どおりの語でない。どのサブコマンドが走るかを読めない。
-			return args[0], args[0], CoreUnread
+			return args[0], args[0], coreUnread
 		}
 		if len(args) == 0 || !slices.Contains(coreSubs, args[0]) {
 			continue
@@ -106,7 +107,7 @@ func CheckCorePaths(conf *config.Settings, root, cwd, subject string, degraded b
 		paths, unknown, index := coreTargets(sub, args[1:])
 		if unknown != "" {
 			if strings.ContainsAny(unknown, expandChars) {
-				return sub, unknown, CoreUnread
+				return sub, unknown, coreUnread
 			}
 			return sub, unknown, CoreHit
 		}
@@ -131,7 +132,7 @@ func CheckCorePaths(conf *config.Settings, root, cwd, subject string, degraded b
 		for _, path := range paths {
 			if hit := coreHit(conf, root, compiled, path, base, known, sub); hit != "" {
 				if index && hit == CoreHit {
-					hit = CoreIndex
+					hit = coreIndex
 				}
 				return sub, path, hit
 			}
@@ -281,17 +282,17 @@ func coreHit(conf *config.Settings, root string, compiled *pyre.Regexp, path, ba
 	}
 	if !known && !ospath.IsAbs(word) {
 		// 居場所が読めない（`cd "$D"`・`pushd`）。相対パスはどこを指すかを決められない。
-		return CoreUnread
+		return coreUnread
 	}
 	full := ""
 	if known {
 		full = ospath.Normpath(ospath.Join(base, word))
 	}
 	if inStore(conf, word, full) {
-		return CoreStore
+		return coreStore
 	}
 	if inReview(conf, word, full, sub) {
-		return CoreReview
+		return coreReview
 	}
 	if sub == "rm" && !globbed && selfguard.HandoffDeleteWord(root, base, word) {
 		// 下書きの置き場の中の削除は守る場所の外。グロブは外さない（シェルの側と同じ。`.?` が `..` に当たりうる）。
@@ -454,13 +455,13 @@ func holdsCore(conf *config.Settings, root, full string) bool {
 func CorePathMessage(root, sub, word string, kind Core) string {
 	values := texts.Values{"sub": sub, "word": word}
 	switch kind {
-	case CoreStore:
+	case coreStore:
 		return texts.Say(root, "DENY_WRAPPER_CORE_PATH__STORE", values, nil)
-	case CoreReview:
+	case coreReview:
 		return texts.Say(root, "DENY_WRAPPER_CORE_PATH__REVIEW", values, nil)
-	case CoreIndex:
+	case coreIndex:
 		return texts.Say(root, "DENY_WRAPPER_CORE_PATH__INDEX", values, nil)
-	case CoreUnread:
+	case coreUnread:
 		call := config.GitWrapper + " " + sub
 		if sub == unknownParent {
 			call = config.GitWrapper + " の呼び出し"

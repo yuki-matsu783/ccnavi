@@ -9,8 +9,8 @@
 // Python からの対応: tickets/proposal/agree_candidates。Candidate（is_revision・plans_feedback → IsRevision・
 // PlansFeedback、types・config の dict|None → *phases.Types）、candidates → Candidates（引数は conf, root の順。
 // 外したものは Rejected）、validate → Validate、plan_problems → PlanProblems、copy_config_problems →
-// CopyConfigProblems、lock_problems → LockProblems、fixed_numbers → FixedNumbers（集合は map[int]bool）、
-// types_from・project_of → TypesFrom・ProjectOf、parent_elsewhere_text → ParentElsewhereText、
+// copyConfigProblems、lock_problems → LockProblems、fixed_numbers → FixedNumbers（集合は map[int]bool）、
+// types_from・project_of → typesFrom・ProjectOf、parent_elsewhere_text → ParentElsewhereText、
 // existing_branch_warnings → ExistingBranchWarnings（copies・closed・review は settled 1 つにまとめた）。
 // revision_problems・shorthand_problems・script_field_problems・record_field_problems・unreadable_scope・
 // open_children・feedback_notes・own_branch は、上の段に呼び手が無いので私的。

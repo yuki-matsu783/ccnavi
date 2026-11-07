@@ -41,12 +41,12 @@ func phasesOf(conf *config.Settings, root, parentID string, proposed *ticket.Tic
 		}
 		for _, s := range owner.Numbered() {
 			p := newPhase(parentID, s.Number)
-			p.Item, p.Type, p.Owner = s.Item, types.Get(s.Item.Type), owner
+			p.Item, p.Type, p.owner = s.Item, types.Get(s.Item.Type), owner
 			byNumber[s.Number] = p
 		}
 		for _, p := range byNumber {
 			for _, c := range p.Covers() {
-				p.CoveredReviews = append(p.CoveredReviews, coveredReview(byNumber[c]))
+				p.coveredReviews = append(p.coveredReviews, coveredReview(byNumber[c]))
 			}
 		}
 	}
@@ -84,7 +84,7 @@ func phasesOf(conf *config.Settings, root, parentID string, proposed *ticket.Tic
 		p.Marks = marks.Marks(where, parentID, n)
 		for _, t := range p.Tickets {
 			if record, ok := marks.ReadFilledRecord(where, parentID, t.ID, marks.Risk); ok {
-				p.Risks[t.ID] = record
+				p.risks[t.ID] = record
 			}
 		}
 	}

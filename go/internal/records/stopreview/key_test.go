@@ -71,18 +71,18 @@ func TestCandidate(t *testing.T) {
 		ok     bool
 		why    Reason
 	}{
-		{"候補", func(*CandidateInput) {}, true, ReasonCandidate},
-		{"着手済みのチケットが無い", func(c *CandidateInput) { c.ProposalActivity = false }, true, ReasonCandidate},
+		{"候補", func(*CandidateInput) {}, true, reasonCandidate},
+		{"着手済みのチケットが無い", func(c *CandidateInput) { c.ProposalActivity = false }, true, reasonCandidate},
 		{"サブエージェント", func(c *CandidateInput) { c.MainAgent = false }, false, ReasonNotMainAgent},
 		{"hook の継続", func(c *CandidateInput) { c.StopHookActive = true }, false, ReasonStopHookActive},
 		{"無効", func(c *CandidateInput) { c.Effective = config.Disable }, false, ReasonDisabled},
 		{"チケット制御なし", func(c *CandidateInput) { c.TicketsEnabled = false }, false, ReasonDisabled},
 		{"未登録", func(c *CandidateInput) { c.Registered = false }, false, ReasonDisabled},
 		{"既存の促し", func(c *CandidateInput) { c.ExistingNudge = true }, false, ReasonExistingNudge},
-		{"対象を決められない", func(c *CandidateInput) { c.TargetUnresolvable = true }, false, ReasonTargetUnresolvable},
+		{"対象を決められない", func(c *CandidateInput) { c.targetUnresolvable = true }, false, ReasonTargetUnresolvable},
 		{"着手済み", func(c *CandidateInput) { c.ProposalActivity, c.ApprovedInProgress = false, true }, false, ReasonApprovedInProgress},
-		{"AI による継続は 1 回", func(c *CandidateInput) { c.StopHookActive, c.AIContinuation = true, true }, true, ReasonCandidate},
-		{"再判定は 1 回まで", func(c *CandidateInput) { c.StopHookActive, c.AIContinuation, c.AlreadyRejudged = true, true, true }, false, ReasonStopHookActive},
+		{"AI による継続は 1 回", func(c *CandidateInput) { c.StopHookActive, c.AIContinuation = true, true }, true, reasonCandidate},
+		{"再判定は 1 回まで", func(c *CandidateInput) { c.StopHookActive, c.AIContinuation, c.alreadyRejudged = true, true, true }, false, ReasonStopHookActive},
 	}
 	for _, c := range cases {
 		in := base
@@ -94,7 +94,7 @@ func TestCandidate(t *testing.T) {
 }
 
 func TestAttemptIDSeparatesSessionsAndRejudge(t *testing.T) {
-	ids := []string{AttemptID("s1:same", false), AttemptID("s2:same", false), AttemptID("s1:same", true)}
+	ids := []string{attemptID("s1:same", false), attemptID("s2:same", false), attemptID("s1:same", true)}
 	slices.Sort(ids)
 	if len(slices.Compact(slices.Clone(ids))) != 3 {
 		t.Errorf("試行 ID が重なった: %v", ids)

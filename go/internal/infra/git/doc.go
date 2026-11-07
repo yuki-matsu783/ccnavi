@@ -7,7 +7,7 @@
 //
 // Python からの対応: gitcmd と gitstate をまとめた。gitcmd.run → Run、run_until・output_until → Run に
 // Options.Deadline（期限が足りなければ Done.TimedOut）、output → Output、成功したときの out.strip() → Text、
-// DEADLINE_MARGIN・DEADLINE_FLOOR → DeadlineMargin・DeadlineFloor（足りるかは Expired。ゼロ値の期限は期限無し）、
+// DEADLINE_MARGIN・DEADLINE_FLOOR → deadlineMargin・deadlineFloor（足りるかは Expired。ゼロ値の期限は期限無し）、
 // gitstate.top_level → TopLevel、head → Head（期限は Options）。各モジュールの git の期限（TIMEOUT_SECONDS など）は
 // 目的ごとの DefaultTimeout・StateTimeout・RiskTimeout・ReviewTimeout・MergeTimeout・CleanupTimeout、文に出す sha の
 // 12 桁は ShortSHA。上の段が書いていた `merge-base --is-ancestor` → IsAncestor（NotAncestorCode）、

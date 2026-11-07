@@ -16,10 +16,10 @@ func Report(root string, outcomes []Outcome) string {
 	var copied, commonRules, rebased, other bool
 	for _, o := range outcomes {
 		lines = append(lines, "  "+o.Target.Label+": "+string(o.Action)+" — "+o.Detail)
-		copied = copied || o.Target.Copy
-		commonRules = commonRules || (o.Target.Key == commonRulesKey && !o.Target.Copy && o.Action != ActionRebased)
-		rebased = rebased || o.Action == ActionRebased
-		other = other || o.Action != ActionRebased
+		copied = copied || o.Target.copy
+		commonRules = commonRules || (o.Target.Key == commonRulesKey && !o.Target.copy && o.Action != actionRebased)
+		rebased = rebased || o.Action == actionRebased
+		other = other || o.Action != actionRebased
 	}
 	if copied {
 		// ワークツリー側の設定は今の判定を変えないので、時間差で反映される経路だと言わないと同じ操作が繰り返される。

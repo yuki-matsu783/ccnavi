@@ -47,18 +47,18 @@ type Stop struct {
 	Kind config.HoldKind
 }
 
-// Result は Decide の答え。Stop があれば止める。Prompt が空でなければ、起動のプロンプトをそれに差し替える。
+// Result は Decide の答え。Stop があれば止める。prompt が空でなければ、起動のプロンプトをそれに差し替える。
 type Result struct {
 	Stop   *Stop
-	Prompt string
+	prompt string
 }
 
 // Apply は元の tool_input にプロンプトの差し替えを当てた写し。差し替えが無ければ nil。元は変えない。
 func (r Result) Apply(input *pyjson.Object) *pyjson.Object {
-	if r.Prompt == "" {
+	if r.prompt == "" {
 		return nil
 	}
-	return input.With(keyPrompt, r.Prompt)
+	return input.With(keyPrompt, r.prompt)
 }
 
 // target は担当の候補。同じワークツリーの言及は 1 つにまとまる。
@@ -152,7 +152,7 @@ func (b *book) pool(conf *config.Settings, root string) approval.Pool {
 //  5. 指定された cwd が担当先と食い違う。どれにも当たらなければ担当の案内を返す
 //  6. 言及が無く、親のワークツリーから編集する種類を起こす
 func Decide(conf *config.Settings, root string, in hookio.Input, raw *approval.Raw) Result {
-	if !slices.Contains(config.AgentTools, in.ToolName) {
+	if !slices.Contains(config.AgentTools(), in.ToolName) {
 		return Result{}
 	}
 	// 作業場所は ccnavi が決める。isolation のワークツリー（.claude/worktrees/agent-<id>）にはチケットの範囲が当たらない。
@@ -199,7 +199,7 @@ func Decide(conf *config.Settings, root string, in hookio.Input, raw *approval.R
 				return Result{Stop: cwdConflictStop(root, pyfmt.Head(pyfmt.Str(given), maxShownChars), t)}
 			}
 		}
-		return Result{Prompt: plan(conf, root, in.Field(keyPrompt), t, b)}
+		return Result{prompt: plan(conf, root, in.Field(keyPrompt), t, b)}
 	}
 
 	if b != nil && here != nil && !here.IsMain() {

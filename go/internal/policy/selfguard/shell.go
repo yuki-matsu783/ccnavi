@@ -103,7 +103,7 @@ var (
 	// rootNames はワークスペースルートの直下に置く、守るものを含む名前（ルートを指す行き先と組む）。
 	rootNames = []string{`\.ccnavi`, `\.claude`, `logs`}
 	// buildDir は機械ごとの組み立ての置き場（`bin/` の下）。
-	buildDir = `(?:` + strings.Join(platformtag.Systems, "|") + `)-[a-z0-9_]+`
+	buildDir = `(?:` + strings.Join(platformtag.Systems(), "|") + `)-[a-z0-9_]+`
 )
 
 // holder は HolderRegex に渡す組（行き先のディレクトリの表記と、その中の守る名前）。

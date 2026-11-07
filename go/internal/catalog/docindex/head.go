@@ -20,8 +20,6 @@ const (
 // closing は frontmatter を閉じる行。
 var closing = regexp.MustCompile(`\n(?:---|\.\.\.)[ \t]*\r?(?:\n|$)`)
 
-var bomBytes = []byte(bom)
-
 // readHead は差し替えられる（テストが打ち切りを作る）。
 var readHead = ReadHead
 
@@ -40,7 +38,7 @@ func ReadHead(path string) ([]byte, bool) {
 	if !ok {
 		return nil, false
 	}
-	if !bytes.HasPrefix(bytes.TrimPrefix(data, bomBytes), []byte(yaml.FrontFence)) {
+	if !bytes.HasPrefix(yaml.TrimBOM(data), []byte(yaml.FrontFence)) {
 		return data, true
 	}
 	for len(data) < headLimit && !closing.Match(data[min(len(data), len(yaml.FrontFence)):]) {

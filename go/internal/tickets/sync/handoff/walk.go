@@ -28,12 +28,12 @@ func defaultNames() *handoffnames.Table {
 	return &handoffnames.Table{}
 }
 
-// Why は対象外にした理由。拡張の「取り込み待ち」の画面に名前と並べて出す。
-type Why string
+// why は対象外にした理由。拡張の「取り込み待ち」の画面に名前と並べて出す。
+type why string
 
 const (
-	WhyNotAllowed Why = "not-allowed"
-	WhyLinkedDir  Why = "linked-dir"
+	whyNotAllowed why = "not-allowed"
+	whyLinkedDir  why = "linked-dir"
 )
 
 const (
@@ -44,15 +44,15 @@ const (
 )
 
 // Found は置き場で見つけた下書き 1 本（まだ読んでいない）。Rel と Key は読み替えを戻した取り込み先のパス、
-// Path は下書きの絶対パス、Drel は置き場の中の相対パス（置いてある綴りのまま）。
+// Path は下書きの絶対パス、drel は置き場の中の相対パス（置いてある綴りのまま）。
 type Found struct {
-	Rel, Key, Path, Drel string
+	Rel, Key, Path, drel string
 }
 
 // Ignored は対象外にした下書き（置き場からの相対パス）とその理由。
 type Ignored struct {
-	Path string
-	Why  Why
+	path string
+	why  why
 }
 
 func handoffDir(treeRoot string) string {
@@ -81,14 +81,14 @@ func Walk(treeRoot string) ([]Found, []Ignored, string) {
 			rel := names.FromDraft(drel)
 			key := Key(rel)
 			if KindOf(key) == nil {
-				ignored = append(ignored, Ignored{drel, WhyNotAllowed})
+				ignored = append(ignored, Ignored{drel, whyNotAllowed})
 				continue
 			}
 			found = append(found, Found{rel, key, full, drel})
 		}
 		for _, n := range dirs {
 			if full := ospath.Join(dir, n); ospath.IsLink(full) {
-				ignored = append(ignored, Ignored{relSlash(full, base), WhyLinkedDir})
+				ignored = append(ignored, Ignored{relSlash(full, base), whyLinkedDir})
 			}
 		}
 	})

@@ -17,8 +17,6 @@ import (
 const (
 	// Fence は frontmatter の囲い（yaml.FrontBody が読むのと同じ行）。
 	Fence = yaml.FrontFence
-	// BOM は U+FEFF。str.strip() は空白と見なさないので、付いていると先頭の `---` と一致しない。
-	BOM = "\uFEFF"
 	// Version はこのビルドが読めるチケット書式の版。
 	Version = 1
 
@@ -43,16 +41,22 @@ const (
 	Outside rules.Decision = ""
 )
 
-// ConsolidateScope は統合の子が書ける場所の上限（ccnavi の中に固定した定義）。
-var ConsolidateScope = []string{wiki.PatternsDir + "/*", wiki.InboxDir + "/*"}
+// consolidateScope は統合の子が書ける場所の上限（ccnavi の中に固定した定義）。
+var consolidateScope = []string{wiki.PatternsDir + "/*", wiki.InboxDir + "/*"}
 
-// ScriptFields はスクリプトだけが書く欄。承認は提案の中身を変えずに動かすので、提案に空でない値があれば
+// ConsolidateScope は consolidateScope の写しを返す（呼び手が書き換えても元は変わらない）。
+func ConsolidateScope() []string { return slices.Clone(consolidateScope) }
+
+// scriptFields はスクリプトだけが書く欄。承認は提案の中身を変えずに動かすので、提案に空でない値があれば
 // 承認と lint が error にする。
-var ScriptFields = []string{
+var scriptFields = []string{
 	"started_at", "completed_at", "base_sha", "merged_sha", "cancelled_at", "cancel_reason",
 	// finish が子をどこに置いたかと、レビュー待ちの子を done/ へ動かした経路。手で動かした子は settled_by を持たない。
 	"finished_to", "settled_by",
 }
+
+// ScriptFields は scriptFields の写しを返す（呼び手が書き換えても元は変わらない）。
+func ScriptFields() []string { return slices.Clone(scriptFields) }
 
 // wildcards は glob のワイルドカード。これより前が字義どおりの前置。
 const wildcards = "*?["
@@ -232,8 +236,8 @@ type Ticket struct {
 	Source []byte
 	// Blocked は「読めるが信じられない」理由。空でなければ判定は範囲を当てずに止める。
 	Blocked string
-	// Maintenance は保守用の子の印の書かれたままの値（null は空文字列）。HasMaintenance は欄があるか。
-	Maintenance    any
+	// maintenance は保守用の子の印の書かれたままの値（null は空文字列）。HasMaintenance は欄があるか。
+	maintenance    any
 	HasMaintenance bool
 }
 
@@ -270,7 +274,7 @@ func (t *Ticket) ChildPhase() (int, bool) { return t.Phase, t.IsChild() }
 // （計画への所属・範囲・学び・リスク・レビュー）はすべてこれで決める。組み合わせのおかしいものは偽になり、
 // 構造の誤り（MaintenanceProblem）で止まる。
 func (t *Ticket) IsConsolidate() bool {
-	s, ok := t.Maintenance.(string)
+	s, ok := t.maintenance.(string)
 	return t.IsChild() && t.Phase == ConsolidatePhase && ok && s == MaintenanceConsolidate
 }
 
@@ -283,8 +287,8 @@ func (t *Ticket) MaintenanceProblem() string {
 	if !t.IsChild() {
 		return "親に `" + MaintenanceKey + ":` の印がある。印は統合の子だけが持つ"
 	}
-	if s, ok := t.Maintenance.(string); !ok || s != MaintenanceConsolidate {
-		return "`" + MaintenanceKey + ": " + pyfmt.Str(t.Maintenance) + "` は知らない値" +
+	if s, ok := t.maintenance.(string); !ok || s != MaintenanceConsolidate {
+		return "`" + MaintenanceKey + ": " + pyfmt.Str(t.maintenance) + "` は知らない値" +
 			"（読めるのは `" + MaintenanceConsolidate + "` だけ）"
 	}
 	if t.Phase != ConsolidatePhase {
@@ -410,7 +414,7 @@ func (t *Ticket) Decide(rel string) rules.Decision {
 
 // EntryFor は Decide がその判定の根拠にした項。どれにも当たらなければ nil。
 func (t *Ticket) EntryFor(rel string) *Entry {
-	for _, name := range rules.Sections {
+	for _, name := range rules.Sections() {
 		for i := range t.Entries {
 			if e := &t.Entries[i]; e.Decision == name && e.Matches(rel) {
 				return e

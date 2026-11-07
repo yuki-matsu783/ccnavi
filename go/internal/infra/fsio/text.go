@@ -19,16 +19,16 @@ const (
 
 // DecodeError は UTF-8 として読めないバイト（Python の UnicodeDecodeError。文も同じ）。
 type DecodeError struct {
-	Start, End int // 読めなかったバイトの範囲 [Start, End)
-	Byte       byte
-	Reason     string
+	Start, end int // 読めなかったバイトの範囲 [Start, end)
+	byte       byte
+	reason     string
 }
 
 func (e *DecodeError) Error() string {
-	if e.End-e.Start == 1 {
-		return fmt.Sprintf("'utf-8' codec can't decode byte 0x%02x in position %d: %s", e.Byte, e.Start, e.Reason)
+	if e.end-e.Start == 1 {
+		return fmt.Sprintf("'utf-8' codec can't decode byte 0x%02x in position %d: %s", e.byte, e.Start, e.reason)
 	}
-	return fmt.Sprintf("'utf-8' codec can't decode bytes in position %d-%d: %s", e.Start, e.End-1, e.Reason)
+	return fmt.Sprintf("'utf-8' codec can't decode bytes in position %d-%d: %s", e.Start, e.end-1, e.reason)
 }
 
 // Decode は open(path, encoding="utf-8") が読むのと同じ本文を返す。改行の "\r\n" と "\r" は "\n" にそろう。
@@ -54,7 +54,7 @@ func DecodeBytes(content []byte, bad Undecodable) (string, error) {
 		} else if bad == Replace {
 			b.WriteRune('�')
 		} else {
-			return "", &DecodeError{Start: i, End: end, Byte: content[i], Reason: reason}
+			return "", &DecodeError{Start: i, end: end, byte: content[i], reason: reason}
 		}
 		i = end
 	}
@@ -112,10 +112,10 @@ const (
 	NativeNewline Newline = ""
 	// LF は書き換えない（newline="" と newline="\n"）。
 	LF Newline = "\n"
-	// CRLF は "\n" を "\r\n" にする。
-	CRLF Newline = "\r\n"
-	// CR は "\n" を "\r" にする。
-	CR Newline = "\r"
+	// crlf は "\n" を "\r\n" にする。
+	crlf Newline = "\r\n"
+	// cr は "\n" を "\r" にする。
+	cr Newline = "\r"
 )
 
 // onDisk は open(path, "w", encoding="utf-8", newline=nl) がディスクに書くバイト列。
@@ -129,7 +129,7 @@ func (nl Newline) onDisk(text string) []byte {
 // staged は溜める段に置く中身。NativeNewline は LF のまま残し、機械に依らず同じバイト列にする
 // （Chrome のコミットと手元の plan が同じ答えになるように）。
 func (nl Newline) staged(text string) []byte {
-	if nl == CRLF || nl == CR {
+	if nl == crlf || nl == cr {
 		text = strings.ReplaceAll(text, "\n", string(nl))
 	}
 	return []byte(text)

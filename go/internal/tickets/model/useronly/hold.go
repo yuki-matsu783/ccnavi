@@ -21,8 +21,11 @@ const ExemptNote = "止めている間に通るのは、ccnavi-ticket.sh・ccnav
 // TurnDefined はユーザとモデルに見せる文で「ターン」を初めて使うところに置く表記。1 通の中では最初の 1 回だけに使う。
 const TurnDefined = "ターン（ユーザが指示を出してから Claude が応答を終えるまで）"
 
-// HeldTools はレビューが済むまで止めるツール。
-var HeldTools = slices.Concat(config.AgentTools, config.ShellTools)
+// heldTools はレビューが済むまで止めるツール。
+var heldTools = slices.Concat(config.AgentTools(), config.ShellTools())
+
+// HeldTools は heldTools の写しを返す（呼び手が書き換えても元は変わらない）。
+func HeldTools() []string { return slices.Clone(heldTools) }
 
 var (
 	// exemptCommand は止めている間でも通す形。3 本の sh と資料を引く起動の sh を、コマンドの位置で `sh` から

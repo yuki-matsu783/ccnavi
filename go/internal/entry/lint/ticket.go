@@ -11,6 +11,7 @@ import (
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/approval"
@@ -299,7 +300,8 @@ func approvedGuarded(conf *config.Settings) []rules.Problem {
 		if value == "" {
 			value = fallback
 		}
-		return strings.Trim(strings.ReplaceAll(value, `\`, "/"), "/")
+		// 大文字小文字の違う綴り（`.CCNAVI/approved`）も同じ置き場として比べる。
+		return strings.Trim(strings.ReplaceAll(pathcase.Fold(value), `\`, "/"), "/")
 	}
 	home := norm(conf.ProjectHome, config.DefaultProjectHome)
 	approved := norm(conf.Approved, config.DefaultApproved)

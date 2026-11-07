@@ -205,7 +205,7 @@ func (s scan) findings() []*finding {
 
 // guardsWrites はルールがこのパスへの書き込みを禁じているか。当て方は実行前チェックと同じ Matches に任せる。
 func guardsWrites(rule *rules.Rule, path string) bool {
-	return slices.ContainsFunc(config.WriteTools, func(tool string) bool { return rule.Matches(tool, path) })
+	return slices.ContainsFunc(config.WriteTools(), func(tool string) bool { return rule.Matches(tool, path) })
 }
 
 // version はチケットの 1 つの版（無ければ present が偽）。
@@ -362,7 +362,7 @@ func droppable(before version) []string {
 		held = fields.ScriptFieldsSet(before.text)
 	}
 	var out []string
-	for _, f := range ticket.ScriptFields {
+	for _, f := range ticket.ScriptFields() {
 		if !slices.Contains(held, f) {
 			out = append(out, f)
 		}

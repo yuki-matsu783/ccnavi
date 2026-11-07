@@ -72,8 +72,8 @@ func Plan(conf *config.Settings, root string, j Judged, stamp string) (*Changes,
 
 // Change の操作。
 const (
-	OpCreate = "create"
-	OpUpdate = "update"
+	opCreate = "create"
+	opUpdate = "update"
 	OpDelete = "delete"
 )
 
@@ -129,12 +129,12 @@ func (c *Changes) PerBranch() []BranchChanges {
 			}
 			rel = tree.Relative(owner, t.Path)
 		}
-		change := Change{Op: OpCreate, Path: rel, Content: t.Content}
+		change := Change{Op: opCreate, Path: rel, Content: t.Content}
 		switch {
 		case t.Gone:
 			change = Change{Op: OpDelete, Path: rel}
 		case t.Existed:
-			change.Op = OpUpdate
+			change.Op = opUpdate
 		}
 		byName[name] = append(byName[name], change)
 	}

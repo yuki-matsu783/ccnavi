@@ -25,15 +25,15 @@ import (
 // 形を変えたら上げる。
 const testVersion = 1
 
-// Source はヒットしたルールの出どころ。値を増やすと 2 値で読む拡張（testmodel.ts）が読み違えるので、増やすなら
+// source はヒットしたルールの出どころ。値を増やすと 2 値で読む拡張（testmodel.ts）が読み違えるので、増やすなら
 // testVersion も上げる。
-type Source string
+type source string
 
 const (
-	// FromFile はルールファイルから読んだルール。
-	FromFile Source = "file"
-	// Outside はチケットの範囲や組み込みの保護のように、ルールファイルの外から来た根拠。
-	Outside Source = "outside"
+	// fromFile はルールファイルから読んだルール。
+	fromFile source = "file"
+	// outside はチケットの範囲や組み込みの保護のように、ルールファイルの外から来た根拠。
+	outside source = "outside"
 )
 
 // outsideFormLimit は外の根拠の式を見せる長さの上限（字）。組み込みの保護の式は 2 万字を超える。
@@ -58,7 +58,7 @@ func (c Call) given() bool { return c.Cwd != "" || c.PermissionMode != "" || c.A
 // permissionModes は --permission-mode に渡せる名前。判定は知らない名前を ask にするが、試験で打ち間違えた名前を
 // 黙って ask にすると、そのモードの答えとして読まれる。
 func permissionModes() []string {
-	return slices.Concat(judge.PermissionJudged, judge.PermissionNoJudge)
+	return slices.Concat(judge.PermissionJudged(), judge.PermissionNoJudge())
 }
 
 // problem は payload の欄が使えないならその理由。
@@ -75,7 +75,7 @@ func (c Call) problem() string {
 
 // payload は判定に渡した payload の欄（`--test` が出す `payload`）。
 type payload struct {
-	Cwd, PermissionMode, AgentID string
+	cwd, permissionMode, agentID string
 }
 
 func (c Call) payload(root string) payload {
@@ -83,37 +83,37 @@ func (c Call) payload(root string) payload {
 	if c.Cwd != "" {
 		cwd = ospath.Abspath(c.Cwd)
 	}
-	return payload{Cwd: cwd, PermissionMode: c.PermissionMode, AgentID: c.AgentID}
+	return payload{cwd: cwd, permissionMode: c.PermissionMode, agentID: c.AgentID}
 }
 
 func (p payload) object() *pyjson.Object {
-	return pyjson.NewObject("cwd", p.Cwd, "permission_mode", p.PermissionMode, "agent_id", p.AgentID)
+	return pyjson.NewObject("cwd", p.cwd, "permission_mode", p.permissionMode, "agent_id", p.agentID)
 }
 
-// Hit はヒットしたルール 1 件。Section が空なのは、ルールそのものの無い外の根拠。
+// Hit はヒットしたルール 1 件。section が空なのは、ルールそのものの無い外の根拠。
 type Hit struct {
 	ID      string
-	Source  Source
-	Section rules.Decision
+	source  source
+	section rules.Decision
 	form
 }
 
 func (h Hit) object() *pyjson.Object {
-	return h.put(pyjson.NewObject("id", h.ID, "source", string(h.Source), "section", string(h.Section)))
+	return h.put(pyjson.NewObject("id", h.ID, "source", string(h.source), "section", string(h.section)))
 }
 
-// Result は 1 件の試験の結果。Known が偽なら、そのツールは判定が対象を取り出せないもので、ほかは空。
+// Result は 1 件の試験の結果。known が偽なら、そのツールは判定が対象を取り出せないもので、ほかは空。
 // キーは docs/11_requirements/json-shapes.md「試験の JSON」。
 type Result struct {
-	Known                                                bool
-	Tool, Subject                                        string
-	Resolved, Verdict, Code, Reason, Degraded, Unwrapped string
-	Fallback, Response                                   string
+	known                                                bool
+	tool, subject                                        string
+	resolved, Verdict, code, reason, degraded, unwrapped string
+	fallback, response                                   string
 	Rules                                                []Hit
-	// Quoted は引用の中から切り出したコマンドにだけヒットしたルールの id。Payload は渡した payload の欄。
+	// quoted は引用の中から切り出したコマンドにだけヒットしたルールの id。payload は渡した payload の欄。
 	// どちらも、無ければ JSON にキーごと出さない（読み手の知っているキーを、この場合が無い呼び出しで変えない）。
-	Quoted  []string
-	Payload *payload
+	quoted  []string
+	payload *payload
 }
 
 func hitObjects(hits []Hit) []any {
@@ -126,17 +126,17 @@ func hitObjects(hits []Hit) []any {
 
 func (r Result) put(o *pyjson.Object) *pyjson.Object {
 	for _, kv := range [][2]any{
-		{"known", r.Known}, {"tool", r.Tool}, {"subject", r.Subject}, {"resolved", r.Resolved},
-		{"verdict", r.Verdict}, {"code", r.Code}, {"reason", r.Reason}, {"degraded", r.Degraded},
-		{"unwrapped", r.Unwrapped}, {"fallback", r.Fallback}, {"rules", hitObjects(r.Rules)}, {"response", r.Response},
+		{"known", r.known}, {"tool", r.tool}, {"subject", r.subject}, {"resolved", r.resolved},
+		{"verdict", r.Verdict}, {"code", r.code}, {"reason", r.reason}, {"degraded", r.degraded},
+		{"unwrapped", r.unwrapped}, {"fallback", r.fallback}, {"rules", hitObjects(r.Rules)}, {"response", r.response},
 	} {
 		o.Set(kv[0].(string), kv[1])
 	}
-	if len(r.Quoted) > 0 {
-		o.Set("quoted", r.Quoted)
+	if len(r.quoted) > 0 {
+		o.Set("quoted", r.quoted)
 	}
-	if r.Payload != nil {
-		o.Set("payload", r.Payload.object())
+	if r.payload != nil {
+		o.Set("payload", r.payload.object())
 	}
 	return o
 }
@@ -149,8 +149,8 @@ func TryOne(stderr io.Writer, conf *config.Settings, root, tool, subject string,
 	// 試験は記録を持たない。「1 度だけ渡す文」を試しで消費すると、本番の最初の 1 回で届かなくなる。
 	trial := *conf
 	trial.State = ""
-	out := Result{Known: known(tool), Tool: tool, Subject: subject, Rules: []Hit{}}
-	if !out.Known {
+	out := Result{known: known(tool), tool: tool, subject: subject, Rules: []Hit{}}
+	if !out.known {
 		return out, nil
 	}
 	if tool == rules.StopMatch {
@@ -162,9 +162,9 @@ func TryOne(stderr io.Writer, conf *config.Settings, root, tool, subject string,
 		Event:          hookio.PreToolUse,
 		ToolName:       tool,
 		ToolInput:      pyjson.NewObject(rules.SubjectFieldOf(tool), subject),
-		Cwd:            used.Cwd,
-		PermissionMode: used.PermissionMode,
-		AgentID:        used.AgentID,
+		Cwd:            used.cwd,
+		PermissionMode: used.permissionMode,
+		AgentID:        used.agentID,
 	}
 	record := &audit.Record{Mode: config.Enable, PermissionMode: in.PermissionMode, Event: string(in.Event), Tool: tool,
 		Subject: rules.SubjectOf(in)}
@@ -179,20 +179,20 @@ func TryOne(stderr io.Writer, conf *config.Settings, root, tool, subject string,
 	if out.Verdict == "" {
 		out.Verdict = string(audit.Allow)
 	}
-	out.Code = record.Code
+	out.code = record.Code
 	// 解いた先を見せないと、ヒットしなかった理由が「パスの表記が違う」かどうかをユーザが言えない。
 	if record.Subject != "" && record.Subject != subject {
-		out.Resolved = record.Subject
+		out.resolved = record.Subject
 	}
-	out.Reason = string(record.Reason)
-	out.Degraded = record.Degraded
-	out.Unwrapped = record.Unwrapped
-	out.Fallback = record.Fallback
+	out.reason = string(record.Reason)
+	out.degraded = record.Degraded
+	out.unwrapped = record.Unwrapped
+	out.fallback = record.Fallback
 	out.Rules = rulesHit(record)
-	out.Response = responseText(captured.String())
-	out.Quoted = record.Quoted
+	out.response = responseText(captured.String())
+	out.quoted = record.Quoted
 	if call.given() {
-		out.Payload = &used
+		out.payload = &used
 	}
 	return out, nil
 }
@@ -206,7 +206,7 @@ func tryStop(conf *config.Settings, root string, out Result) Result {
 		out.Verdict = string(audit.Allow)
 	}
 	for _, r := range picked {
-		out.Rules = append(out.Rules, Hit{ID: r.ID, Source: FromFile, Section: r.Decision, form: ruleForm(r)})
+		out.Rules = append(out.Rules, Hit{ID: r.ID, source: fromFile, section: r.Decision, form: ruleForm(r)})
 	}
 	return out
 }
@@ -227,17 +227,17 @@ func rulesHit(record *audit.Record) []Hit {
 			r, _ = applied[i-offset].(*rules.Rule)
 		}
 		if r == nil || rules.RecordName(r) != name {
-			hits = append(hits, Hit{ID: name, Source: Outside})
+			hits = append(hits, Hit{ID: name, source: outside})
 			continue
 		}
 		f := ruleForm(r)
-		source := FromFile
+		source := fromFile
 		if !r.FromFile {
 			// 組み込みの保護の式は 2 万字を超えるものがあり、そのまま出すと 1 件の試験が読めなくなる。
-			f = form{Kind: f.Kind, Written: abbreviated(f.Written), Pattern: abbreviated(f.Pattern)}
-			source = Outside
+			f = form{kind: f.kind, written: abbreviated(f.written), pattern: abbreviated(f.pattern)}
+			source = outside
 		}
-		hits = append(hits, Hit{ID: name, Source: source, Section: r.Decision, form: f})
+		hits = append(hits, Hit{ID: name, source: source, section: r.Decision, form: f})
 	}
 	return hits
 }
@@ -290,7 +290,7 @@ func writeJSON(w io.Writer, body any) error { return pyjson.Write(w, body, pyjso
 
 func writeTest(w io.Writer, root string, out Result, call Call) {
 	p := func(format string, a ...any) { fmt.Fprintf(w, format, a...) }
-	tool := out.Tool
+	tool := out.tool
 	if tool == rules.StopMatch {
 		p("verdict: %s\ntool: %s\n", out.Verdict, tool)
 		p("note: ターンの終わり。使われるのは共通レイヤーと自身のレイヤーの allow で、every が 2 以上のものだけ。渡す回にだけ止める\n")
@@ -304,39 +304,39 @@ func writeTest(w io.Writer, root string, out Result, call Call) {
 		}
 		return
 	}
-	if !out.Known {
+	if !out.known {
 		p("verdict: (判定に入らない)\ntool: %s\n", tool)
 		p("note: %s は判定が対象を取り出せないツール。ルールを書いてもヒットせず、呼び出しはそのまま通る\n", tool)
 		return
 	}
 
 	code := ""
-	if out.Code != "" {
-		code = " (" + out.Code + ")"
+	if out.code != "" {
+		code = " (" + out.code + ")"
 	}
 	p("verdict: %s%s\n", out.Verdict, code)
 	p("tool: %s\n", tool)
-	p("subject: %s\n", out.Subject)
-	if out.Resolved != "" {
-		p("resolved: %s\n", out.Resolved)
+	p("subject: %s\n", out.subject)
+	if out.resolved != "" {
+		p("resolved: %s\n", out.resolved)
 	}
 	// hook はこの 3 つを Claude Code から受け取り、判定がそれで変わる。
 	used := call.payload(root)
-	p("payload: cwd=%s  permission_mode=%s  agent_id=%s\n", used.Cwd, cmp.Or(used.PermissionMode, noneShown), cmp.Or(used.AgentID, noneShown))
-	if out.Reason != "" {
-		p("reason: %s\n", out.Reason)
+	p("payload: cwd=%s  permission_mode=%s  agent_id=%s\n", used.cwd, cmp.Or(used.permissionMode, noneShown), cmp.Or(used.agentID, noneShown))
+	if out.reason != "" {
+		p("reason: %s\n", out.reason)
 	}
-	if out.Degraded != "" {
-		p("degraded: %s（生の文字列に適用した）\n", out.Degraded)
+	if out.degraded != "" {
+		p("degraded: %s（生の文字列に適用した）\n", out.degraded)
 	}
-	if out.Unwrapped != "" {
-		for _, layer := range strings.Split(out.Unwrapped, "\x00") {
-			shown := strings.Join(strings.FieldsFunc(strings.ReplaceAll(layer, "\x01", " "), ospath.IsSpace), " ")
+	if out.unwrapped != "" {
+		for _, layer := range strings.Split(out.unwrapped, "\x00") {
+			shown := ospath.Squeeze(strings.ReplaceAll(layer, "\x01", " "))
 			p("unwrapped: %s（中で実行されるコマンドに適用した）\n", shown)
 		}
 	}
-	if out.Fallback != "" {
-		p("fallback: %s（組み込みの既定で判定した）\n", out.Fallback)
+	if out.fallback != "" {
+		p("fallback: %s（組み込みの既定で判定した）\n", out.fallback)
 	}
 
 	if len(out.Rules) == 0 {
@@ -344,33 +344,33 @@ func writeTest(w io.Writer, root string, out Result, call Call) {
 	} else {
 		p("rules:\n")
 		for _, h := range out.Rules {
-			if h.Source == Outside {
+			if h.source == outside {
 				// ルールファイルの中に無い根拠。ルールそのものがあれば、タイプと短く切った式を添える。
-				if h.Section == "" {
+				if h.section == "" {
 					p("  %s（ルールファイルの外にある根拠）\n", h.ID)
 					continue
 				}
-				p("  %s:%s（ルールファイルの外にある根拠）  %s %s\n", h.Section, h.ID, h.Kind, pyfmt.Repr(h.Written))
+				p("  %s:%s（ルールファイルの外にある根拠）  %s %s\n", h.section, h.ID, h.kind, pyfmt.Repr(h.written))
 				continue
 			}
-			p("  %s:%s  %s %s\n", h.Section, h.ID, h.Kind, pyfmt.Repr(h.Written))
-			pattern := h.Pattern
+			p("  %s:%s  %s %s\n", h.section, h.ID, h.kind, pyfmt.Repr(h.written))
+			pattern := h.pattern
 			if pattern == "" {
 				pattern = "(組み立て失敗)"
 			}
 			p("    -> %s\n", pattern)
 		}
 	}
-	if len(out.Quoted) > 0 {
-		p("quoted: %s（引用の中から切り出したコマンドにだけヒットした）\n", strings.Join(out.Quoted, ", "))
+	if len(out.quoted) > 0 {
+		p("quoted: %s（引用の中から切り出したコマンドにだけヒットした）\n", strings.Join(out.quoted, ", "))
 	}
 
-	if out.Response == "" {
+	if out.response == "" {
 		p("response: (何も返さない)\n")
 		return
 	}
 	p("response:\n")
-	for _, line := range ospath.Splitlines(out.Response) {
+	for _, line := range ospath.Splitlines(out.response) {
 		p("  %s\n", line)
 	}
 }

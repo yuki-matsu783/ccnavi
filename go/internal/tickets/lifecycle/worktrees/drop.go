@@ -14,6 +14,7 @@ import (
 	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/pathmatch"
 	"ccnavi/internal/infra/shell"
+	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/model/place"
 )
@@ -33,23 +34,23 @@ const (
 type Status string
 
 const (
-	Removed   Status = "removed"
-	Absent    Status = "absent"
+	removed   Status = "removed"
+	absent    Status = "absent"
 	CwdInside Status = "cwd"
 	Dirty     Status = "dirty"
-	Refused   Status = "refused"
+	refused   Status = "refused"
 )
 
 // Dropped は 1 本のワークツリーを消した結果。Detail は消せなかった理由や、退避したファイル。
 type Dropped struct {
-	Name   string
+	name   string
 	Status Status
 	Path   string
 	Detail string
 }
 
-// Removed は消した（もともと無いのも含む）か。
-func (d Dropped) Removed() bool { return d.Status == Removed || d.Status == Absent }
+// Gone はワークツリーがもう無いか。消した（Status が removed）のと、もともと無かった（absent）のとの両方で真。
+func (d Dropped) Gone() bool { return d.Status == removed || d.Status == absent }
 
 // classifierNote は自動モードの分類器に止められたときの道。allow は許可に足す 1 本の例。
 func classifierNote(root, allow string) string {
@@ -77,13 +78,13 @@ func badName(name string) bool {
 func screen(root, name, cwd string) (*Dropped, string) {
 	path := worktreePath(root, name)
 	refuse := func(why string) (*Dropped, string) {
-		return &Dropped{Name: name, Status: Refused, Path: path, Detail: why}, ""
+		return &Dropped{name: name, Status: refused, Path: path, Detail: why}, ""
 	}
 	if badName(name) {
 		return refuse("名前にパスは書けない（.claude/worktrees/ の直下の名前）")
 	}
 	if !ospath.DiskLexists(path) {
-		return &Dropped{Name: name, Status: Absent, Path: path}, ""
+		return &Dropped{name: name, Status: absent, Path: path}, ""
 	}
 	if pathmatch.IsLink(path) {
 		return refuse("リンクなので、リンクの先は削除しません。")
@@ -92,7 +93,7 @@ func screen(root, name, cwd string) (*Dropped, string) {
 		return refuse("ディレクトリでない")
 	}
 	if inside(cwd, path) {
-		return &Dropped{Name: name, Status: CwdInside, Path: path}, ""
+		return &Dropped{name: name, Status: CwdInside, Path: path}, ""
 	}
 	owner, why := Owner(path)
 	if owner == "" {
@@ -103,7 +104,7 @@ func screen(root, name, cwd string) (*Dropped, string) {
 		return refuse("git の状態を読めない。未コミットの変更を確かめられない")
 	}
 	if ospath.Strip(out) != "" {
-		return &Dropped{Name: name, Status: Dirty, Path: path}, ""
+		return &Dropped{name: name, Status: Dirty, Path: path}, ""
 	}
 	if why := detachedOnly(path); why != "" {
 		return refuse(why)
@@ -132,17 +133,16 @@ func detachedOnly(path string) string {
 		"ブランチを付けてから打ち直す。要らないかは、ユーザに確かめてもらう。"
 }
 
-// status は未追跡を含む `git status --porcelain`。
+// status は path の未コミットの変更（git.Uncommitted）。後始末の期限で読む。
 func status(path string) (string, bool) {
-	done := git.Status(path, git.Porcelain{Untracked: git.UntrackedAll}, git.Options{Timeout: git.CleanupTimeout, RawPaths: true})
-	return done.Out, done.OK()
+	return git.Uncommitted(path, git.Options{Timeout: git.CleanupTimeout})
 }
 
 // Blocked は Drop がこのワークツリーを消さない理由。消せる（もともと無いのも含む）なら nil。消す前に断りたい
 // 呼び手（retire）が、Drop と同じ判定を使う。
 func Blocked(root, name, cwd string) *Dropped {
 	found, _ := screen(root, name, cwd)
-	if found != nil && !found.Removed() {
+	if found != nil && !found.Gone() {
 		return found
 	}
 	return nil
@@ -150,14 +150,14 @@ func Blocked(root, name, cwd string) *Dropped {
 
 // Drop は `.claude/worktrees/<名前>` を消す。消さないときは理由を持って返す（何も消さない）。
 // 生成物を消し、無視されたそれ以外を退避してから `git worktree remove`。git が断れば（ロック・submodule など）
-// その拒否文で Refused（生成物は作り直せるので先に消えていてよい。退避したものは退避先に残る）。
+// その拒否文で refused（生成物は作り直せるので先に消えていてよい。退避したものは退避先に残る）。
 func Drop(root, name, cwd string) Dropped {
 	found, owner := screen(root, name, cwd)
 	if found != nil {
 		return *found
 	}
 	path := worktreePath(root, name)
-	refused := func(why string) Dropped { return Dropped{Name: name, Status: Refused, Path: path, Detail: why} }
+	refused := func(why string) Dropped { return Dropped{name: name, Status: refused, Path: path, Detail: why} }
 	if failed := cleanGenerated(path); failed != "" {
 		return refused(failed)
 	}
@@ -177,41 +177,41 @@ func Drop(root, name, cwd string) Dropped {
 		}
 		return refused(detail)
 	}
-	return Dropped{Name: name, Status: Removed, Path: path, Detail: note}
+	return Dropped{name: name, Status: removed, Path: path, Detail: note}
 }
 
-// AfterDropped は Report の消した行の括弧の後ろに足す既定の一言。
-const AfterDropped = "。ブランチは残してある"
+// afterDropped は Report の消した行の括弧の後ろに足す既定の一言。
+const afterDropped = "。ブランチは残してある"
 
 // Report は Drop の結果を言う。消さなかったときも標準出力へ（呼び手の操作そのものは成功している）。after は
 // 消した行の括弧の後ろに足す一言（ブランチをどうするか）。
 func Report(stdout io.Writer, root string, d Dropped, after string) {
 	switch d.Status {
-	case Removed:
-		fmt.Fprintf(stdout, "ワークツリー %s を削除しました（%s%s）\n", d.Name, d.Path, after)
+	case removed:
+		fmt.Fprintf(stdout, "ワークツリー %s を削除しました（%s%s）\n", d.name, d.Path, after)
 		if d.Detail != "" {
 			fmt.Fprintf(stdout, "%s\n", d.Detail)
 		}
-	case Absent:
-		fmt.Fprintf(stdout, "ワークツリー %s はありません（削除するものがありません）\n", d.Name)
+	case absent:
+		fmt.Fprintf(stdout, "ワークツリー %s はありません（削除するものがありません）\n", d.name)
 	case CwdInside:
-		retry := retryCommand(root, d.Name)
-		fmt.Fprintf(stdout, "cwd がワークツリー %s の中にあるので削除しませんでした。\n%s\n", d.Name,
+		retry := retryCommand(root, d.name)
+		fmt.Fprintf(stdout, "cwd がワークツリー %s の中にあるので削除しませんでした。\n%s\n", d.name,
 			texts.Say(root, textDropOutside, texts.Values{"command": retry, "classifier_note": classifierNote(root, retry)}, nil))
 	case Dirty:
 		fmt.Fprintf(stdout, "ワークツリー %s に未コミットの変更があるので、何も削除しませんでした。"+
 			"別のセッションが作業している見込みがあるので、"+
-			"ユーザに git -C %s status で確かめてもらう\n", d.Name, shell.Quote(d.Path))
+			"ユーザに git -C %s status で確かめてもらう\n", d.name, shell.Quote(d.Path))
 	default:
-		fmt.Fprintf(stdout, "ワークツリー %s を削除しなかった: %s\n", d.Name, d.Detail)
+		fmt.Fprintf(stdout, "ワークツリー %s を削除しなかった: %s\n", d.name, d.Detail)
 	}
 }
 
 // RunDrop は `worktree drop <名前>`。消したか、もともと無ければ 0。消さなかったら 1。
 func RunDrop(stdout io.Writer, root, name, cwd string) int {
 	d := Drop(root, name, cwd)
-	Report(stdout, root, d, AfterDropped)
-	if d.Removed() {
+	Report(stdout, root, d, afterDropped)
+	if d.Gone() {
 		return config.ExitOK
 	}
 	return 1
@@ -308,7 +308,7 @@ func relParts(rel string) []string {
 // Owner はワークツリーの元リポジトリ（`worktree remove` を打つ場所）。無ければ空と理由。`.git` がファイル
 // （リンクされたワークツリー）であることを求める。ディレクトリならそれ自身がリポジトリで、消す対象ではない。
 func Owner(path string) (string, string) {
-	if !ospath.IsFile(ospath.Join(path, ".git")) {
+	if !ospath.IsFile(ospath.Join(path, tree.DotGit)) {
 		return "", "git のワークツリーとして登録されていない（.git のファイルがありません）ので削除しません。"
 	}
 	done := git.Run(path, []string{"rev-parse", "--git-common-dir"}, git.Options{Timeout: git.CleanupTimeout})
@@ -323,7 +323,7 @@ func Owner(path string) (string, string) {
 		common = ospath.Join(path, common)
 	}
 	common = ospath.Normpath(common)
-	if ospath.Basename(common) != ".git" {
+	if ospath.Basename(common) != tree.DotGit {
 		return "", "元のリポジトリの形が読めない（" + common + "）"
 	}
 	return ospath.Dirname(common), ""

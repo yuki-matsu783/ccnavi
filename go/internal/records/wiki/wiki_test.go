@@ -33,7 +33,7 @@ func statusOf(sources []string, impacts ...string) State {
 	for n, text := range impacts {
 		texts[fmt.Sprint("i", n)] = text
 	}
-	return Rows(Build(map[string]string{"p": pattern("docs", sources...)}, texts, true))[0].Status
+	return Rows(build(map[string]string{"p": pattern("docs", sources...)}, texts, true))[0].Status
 }
 
 func TestStatus(t *testing.T) {
@@ -46,20 +46,20 @@ func TestStatus(t *testing.T) {
 	}{
 		{"記録が無ければ候補", []string{"a"}, nil, Candidate},
 		{"承認待ちが何より先", []string{"a"}, []string{
-			impact("x", Rejected, "2026-02-01T00:00:00+00:00", "p: 1"), impact("y", Pending, "", "p: 1")}, Proposing},
+			impact("x", rejected, "2026-02-01T00:00:00+00:00", "p: 1"), impact("y", pending, "", "p: 1")}, proposing},
 		{"新しい却下", abc, []string{
-			impact("a", Deferred, jan1, "p: 1"), impact("b", Rejected, "2026-02-01T00:00:00+00:00", "p: 1")}, Settled},
+			impact("a", deferred, jan1, "p: 1"), impact("b", rejected, "2026-02-01T00:00:00+00:00", "p: 1")}, settled},
 		{"新しい延期で数が増えた", abc, []string{
-			impact("b", Rejected, "2026-02-01T00:00:00+00:00", "p: 1"), impact("c", Deferred, "2026-03-01T00:00:00+00:00", "p: 1")}, Candidate},
+			impact("b", rejected, "2026-02-01T00:00:00+00:00", "p: 1"), impact("c", deferred, "2026-03-01T00:00:00+00:00", "p: 1")}, Candidate},
 		// 09:00+09:00 は 00:00Z。UTC の 00:30 のほうが新しい。
 		{"時差を揃えて比べる", []string{"a", "b"}, []string{
-			impact("a", Rejected, "2026-01-01T09:00:00+09:00", "p: 1"), impact("b", Deferred, "2026-01-01T00:30:00+00:00", "p: 1")}, Candidate},
+			impact("a", rejected, "2026-01-01T09:00:00+09:00", "p: 1"), impact("b", deferred, "2026-01-01T00:30:00+00:00", "p: 1")}, Candidate},
 		{"同じ日時は提案の名前で後のもの", []string{"a", "b"}, []string{
-			impact("aaa", Deferred, jan1, "p: 1"), impact("zzz", Rejected, jan1, "p: 1")}, Settled},
+			impact("aaa", deferred, jan1, "p: 1"), impact("zzz", rejected, jan1, "p: 1")}, settled},
 		// 決着のときに数を今の値へ書き直した延期は、すぐ候補へ戻らない。
-		{"書き直した延期", abc, []string{impact("d", Deferred, jan1, "p: 3")}, Settled},
-		{"書き直した延期の後に増えた", []string{"a", "b", "c", "d"}, []string{impact("d", Deferred, jan1, "p: 3")}, Candidate},
-		{"大文字小文字を区別しない", abc, []string{impact("d", Deferred, jan1, "P: 3")}, Settled},
+		{"書き直した延期", abc, []string{impact("d", deferred, jan1, "p: 3")}, settled},
+		{"書き直した延期の後に増えた", []string{"a", "b", "c", "d"}, []string{impact("d", deferred, jan1, "p: 3")}, Candidate},
+		{"大文字小文字を区別しない", abc, []string{impact("d", deferred, jan1, "P: 3")}, settled},
 	}
 	for _, c := range cases {
 		if got := statusOf(c.sources, c.impacts...); got != c.want {
@@ -67,28 +67,28 @@ func TestStatus(t *testing.T) {
 		}
 	}
 	// 延期はパターンごとに比べる。
-	w := Build(map[string]string{"p": pattern("docs", "a", "b", "c"), "q": pattern("docs", "a", "b", "c")},
-		map[string]string{"d": impact("d", Deferred, jan1, "p: 2", "q: 5")}, true)
-	if rows := Rows(w); rows[0].Status != Candidate || rows[1].Status != Settled {
+	w := build(map[string]string{"p": pattern("docs", "a", "b", "c"), "q": pattern("docs", "a", "b", "c")},
+		map[string]string{"d": impact("d", deferred, jan1, "p: 2", "q: 5")}, true)
+	if rows := Rows(w); rows[0].Status != Candidate || rows[1].Status != settled {
 		t.Errorf("rows = %+v", rows)
 	}
 }
 
 func TestDuplicateSourcesCountOnce(t *testing.T) {
-	w := Build(map[string]string{"p": pattern("docs", "a", "A", "a", "b")}, nil, true)
-	if p := w.Patterns[0]; p.Count() != 2 || strings.Join(p.Sources, ",") != "a,b" {
+	w := build(map[string]string{"p": pattern("docs", "a", "A", "a", "b")}, nil, true)
+	if p := w.patterns[0]; p.count() != 2 || strings.Join(p.Sources, ",") != "a,b" {
 		t.Errorf("sources = %v", p.Sources)
 	}
 }
 
 func TestBrokenFilesAreNamedAndNotCounted(t *testing.T) {
-	w := Build(
+	w := build(
 		map[string]string{"ok": pattern("docs", "a"), "bad": "no front", "OK": pattern("docs", "b")},
 		map[string]string{
 			"i":     "---\nstatus: x\n---\n",
-			"good":  impact("g", Rejected, jan1, "ok: 1"),
-			"naive": impact("n", Rejected, "2026-01-01T00:00:00", "p: 1"),
-			"w":     impact("w", Pending, "", "p: 1"),
+			"good":  impact("g", rejected, jan1, "ok: 1"),
+			"naive": impact("n", rejected, "2026-01-01T00:00:00", "p: 1"),
+			"w":     impact("w", pending, "", "p: 1"),
 		}, true)
 	if rows := Rows(w); len(rows) != 1 || rows[0].Name != "OK" {
 		t.Errorf("rows = %+v", rows)
@@ -131,14 +131,14 @@ func TestParseProblems(t *testing.T) {
 	}
 	impacts := []struct{ text, want string }{
 		{impact("x", "x", jan1), "status が 承認待ち 承認 却下 延期 のどれでもない"},
-		{impact("x", Rejected, ""), "decided_at が無い（承認待ちのほかは日時が要る）"},
-		{impact("x", Rejected, "yesterday"), "decided_at が日時として読めない"},
-		{impact("x", Rejected, jan1, "p: -1"), "patterns の p の数が 0 以上の整数でない"},
-		{impact("x", Rejected, jan1, "p: true"), "patterns の p の数が 0 以上の整数でない"},
-		{strings.Replace(impact("x", Rejected, jan1), "'"+jan1+"'", "2026-01-01", 1), "decided_at が日時でない"},
-		{strings.Replace(impact("x", Rejected, jan1), "'"+jan1+"'", "2026-01-01 09:00:00+09:00", 1), ""},
-		{impact("x", Rejected, "2026-01-01T00:00Z"), ""},
-		{impact("x", Rejected, "20260101T000000.5+0900"), ""},
+		{impact("x", rejected, ""), "decided_at が無い（承認待ちのほかは日時が要る）"},
+		{impact("x", rejected, "yesterday"), "decided_at が日時として読めない"},
+		{impact("x", rejected, jan1, "p: -1"), "patterns の p の数が 0 以上の整数でない"},
+		{impact("x", rejected, jan1, "p: true"), "patterns の p の数が 0 以上の整数でない"},
+		{strings.Replace(impact("x", rejected, jan1), "'"+jan1+"'", "2026-01-01", 1), "decided_at が日時でない"},
+		{strings.Replace(impact("x", rejected, jan1), "'"+jan1+"'", "2026-01-01 09:00:00+09:00", 1), ""},
+		{impact("x", rejected, "2026-01-01T00:00Z"), ""},
+		{impact("x", rejected, "20260101T000000.5+0900"), ""},
 	}
 	for _, c := range impacts {
 		if _, got := parseImpact(c.text); got != c.want {
@@ -167,8 +167,8 @@ func write(t *testing.T, root, rel, text string) {
 
 func names(w *Wiki) []string {
 	var out []string
-	for _, p := range w.Patterns {
-		out = append(out, p.Name)
+	for _, p := range w.patterns {
+		out = append(out, p.name)
 	}
 	sort.Strings(out)
 	return out
@@ -176,7 +176,7 @@ func names(w *Wiki) []string {
 
 func TestLoadTreeAndCommit(t *testing.T) {
 	root := t.TempDir()
-	if w := LoadTree(root); w.Present || len(w.Patterns) != 0 {
+	if w := LoadTree(root); w.Present || len(w.patterns) != 0 {
 		t.Errorf("empty = %+v", w)
 	}
 	write(t, root, "docs/wiki/patterns/p1.md", pattern("rule", "a", "b", "c"))
@@ -184,7 +184,7 @@ func TestLoadTreeAndCommit(t *testing.T) {
 	write(t, root, "docs/wiki/patterns/notes.txt", "x")
 	write(t, root, "docs/wiki/patterns/broken.md", "x\n")
 	write(t, root, "docs/wiki/patterns/big.md", strings.Repeat("x", fileLimit+1))
-	write(t, root, "docs/wiki/impact/w.md", impact("w", Pending, "", "p2: 1"))
+	write(t, root, "docs/wiki/impact/w.md", impact("w", pending, "", "p2: 1"))
 	w := LoadTree(root)
 	if !w.Present || strings.Join(names(w), ",") != "p1,p2" {
 		t.Errorf("tree = %+v", w)

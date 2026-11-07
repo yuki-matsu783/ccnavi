@@ -56,7 +56,7 @@ func Ignored(top string, paths []string, how CheckPaths, o Options) (found []str
 		input.WriteString(p + "\x00")
 	}
 	stdin := input.String()
-	o.Input = &stdin
+	o.input = &stdin
 	o.PlainPathspecs = true
 	done = Run(top, []string{"check-ignore", "-z", "--stdin"}, o)
 	// 0 は 1 つ以上が無視、1 はどれも無視されない。ほかは問い合わせの失敗。

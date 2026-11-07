@@ -28,11 +28,17 @@ const (
 	KindRisk   LayerKind = "risk"
 )
 
-// LayerKinds は 3 本の設定。3 本は独立に無くてよい。
-var LayerKinds = []LayerKind{KindRules, KindPhases, KindRisk}
+// layerKinds は 3 本の設定。3 本は独立に無くてよい。
+var layerKinds = []LayerKind{KindRules, KindPhases, KindRisk}
 
-// LayerFileNames はレイヤーの設定のファイル名。
-var LayerFileNames = map[LayerKind]string{KindRules: "rules.yml", KindPhases: "phases.yml", KindRisk: "risks.yml"}
+// LayerKinds は layerKinds の写しを返す（呼び手が書き換えても元は変わらない）。
+func LayerKinds() []LayerKind { return slices.Clone(layerKinds) }
+
+// layerFileNames はレイヤーの設定のファイル名。
+var layerFileNames = map[LayerKind]string{KindRules: "rules.yml", KindPhases: "phases.yml", KindRisk: "risks.yml"}
+
+// LayerFileNames は layerFileNames の写しを返す（呼び手が書き換えても元は変わらない）。
+func LayerFileNames() map[LayerKind]string { return maps.Clone(layerFileNames) }
 
 // レイヤーの名前（記録の `source` と id の前置き）。
 const (
@@ -42,8 +48,11 @@ const (
 	layerBuiltin = "builtin"
 )
 
-// ReservedLayerNames はプロジェクトが名前に使えない表記。
-var ReservedLayerNames = []string{LayerCommon, LayerSelf, layerBuiltin}
+// reservedLayerNames はプロジェクトが名前に使えない表記。
+var reservedLayerNames = []string{LayerCommon, LayerSelf, layerBuiltin}
+
+// ReservedLayerNames は reservedLayerNames の写しを返す（呼び手が書き換えても元は変わらない）。
+func ReservedLayerNames() []string { return slices.Clone(reservedLayerNames) }
 
 // バックアップの key の前置き。予約名のプロジェクト（`projects/self/`）とミラーを、名前の側と分ける。
 const (
@@ -75,7 +84,7 @@ type LayerFile struct {
 // （`Self:schema` を `self:schema` と取り違えないため）。予約の判断はここ 1 か所に置く。
 func IsReservedLayerName(name string) bool {
 	folded := pathcase.Fold(name)
-	for _, reserved := range ReservedLayerNames {
+	for _, reserved := range reservedLayerNames {
 		if folded == pathcase.Fold(reserved) {
 			return true
 		}
@@ -134,7 +143,7 @@ func (s *Settings) LayerPath(homeRoot string, kind LayerKind, layer string) stri
 
 // LayerRealPath はレイヤーの設定ファイルが本来ある場所。
 func (s *Settings) LayerRealPath(homeRoot string, kind LayerKind) string {
-	return ospath.Join(homeRoot, filepath.FromSlash(s.projectHome()), LayerConfigDir, LayerFileNames[kind])
+	return ospath.Join(homeRoot, filepath.FromSlash(s.projectHome()), LayerConfigDir, layerFileNames[kind])
 }
 
 // LayerTemplatesDir はレイヤーのテンプレートの置き場（絶対）。
@@ -155,5 +164,5 @@ func (s *Settings) CommonTemplatesDir(root string) string {
 
 // MirrorRealPath はプロジェクトの共通レイヤーのミラーの設定ファイルの場所。
 func (s *Settings) MirrorRealPath(homeRoot string, kind LayerKind) string {
-	return ospath.Join(s.CommonLayerDir(homeRoot), LayerFileNames[kind])
+	return ospath.Join(s.CommonLayerDir(homeRoot), layerFileNames[kind])
 }

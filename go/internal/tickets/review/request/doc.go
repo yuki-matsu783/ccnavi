@@ -14,7 +14,7 @@
 // changes_requested → ChangesRequested、unresolved_for → UnresolvedFor、ledger_of → LedgerOf、
 // _mark・_parent_mark → Mark・ParentMark、reviewed_mark → ReviewedMark、_settle_children →
 // SettleChildren、settle_and_mark → SettleAndMark、thread_label → ThreadLabel、_redo_request → RedoRequest、
-// is_sha → IsSHA、Moved・KIND_* → Moved・MovedKind の定数、moved_detail・moved_since → MovedDetail
+// is_sha → IsSHA、Moved・KIND_* → Moved・movedKind の定数、moved_detail・moved_since → MovedDetail
 // （changed の None は listed が偽）、_moved_detail → MovedInTree、moved_explanation → MovedExplanation、
 // wip_tracked → 私的な wipTracked、remove_wip → RemoveWip、_merge_problems → MergeProblems、_write_text →
 // WriteDraft、RESOLVE_NOTE → ResolveNote。thread_key・thread_version は host.ThreadKey・ThreadVersion を直に使う。

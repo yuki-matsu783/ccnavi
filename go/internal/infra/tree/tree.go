@@ -28,7 +28,7 @@ const Self = "self"
 type Kind string
 
 const (
-	KindMain     Kind = "main"
+	kindMain     Kind = "main"
 	KindProject  Kind = "project" // projects/ の直下にある、自分の git を持つリポジトリ
 	KindWorktree Kind = "worktree"
 )
@@ -63,7 +63,7 @@ func ProjectOfKey(repo string) string {
 
 // MainTree はワークスペースルートのツリー。
 func MainTree(root string) Tree {
-	return Tree{Name: Main, Root: resolved(root), Kind: KindMain}
+	return Tree{Name: Main, Root: resolved(root), Kind: kindMain}
 }
 
 // Projects は置き場の直下で `.git`（ディレクトリでもファイルでもよい）を持つディレクトリ。深さ 1。
@@ -112,17 +112,17 @@ func Worktrees(root, projectsDir string) []Tree {
 // ワークスペースルートとして判定されるので、その穴を診断で名指しするために使う（判定には使わない）。
 type ProjectlessWorktree struct {
 	Name string
-	Path string
-	// Gitdir は `.git` ファイルに書かれたとおりの先、GitdirExists はその先が在るか。
-	Gitdir       string
-	GitdirExists bool
+	path string
+	// gitdir は `.git` ファイルに書かれたとおりの先、gitdirExists はその先が在るか。
+	gitdir       string
+	gitdirExists bool
 }
 
 // Said は `--lint` と `--explain` で共通の文面。
 func (w ProjectlessWorktree) Said() string {
-	why := w.Gitdir + " の先が見つからない"
-	if w.GitdirExists {
-		why = w.Gitdir + " は在るが、そこからこのワークツリーへ戻る参照が成り立たない"
+	why := w.gitdir + " の先が見つからない"
+	if w.gitdirExists {
+		why = w.gitdir + " は在るが、そこからこのワークツリーへ戻る参照が成り立たない"
 	}
 	return "ワークツリー " + w.Name + " は元のプロジェクトがありません（" + why + "）。" +
 		"このパスはワークスペースルートとして判定され、そのプロジェクトの deny が効いていない。" +

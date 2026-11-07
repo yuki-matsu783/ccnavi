@@ -25,13 +25,13 @@ func (t *Ticket) home() string {
 	return t.ID
 }
 
-// Fold は同じ識別子のチケットを、正とするツリーの側にまとめる。正とするのは親のツリーの側だけで、子の
+// fold は同じ識別子のチケットを、正とするツリーの側にまとめる。正とするのは親のツリーの側だけで、子の
 // ワークツリーや元ツリーに残ったコピーは正としない。親のツリーに無ければ決めずに全部残す（立ち位置の側が止める）。
 // リポジトリをまたいだ衝突はまとめない（別のチケットなので、片方が気づかないうちに消える）。
 //
 // approved（同じ識別子の承認済みチケットの全部）が在れば、正とするツリーは承認済みチケットだけで決め（Authority）、
 // そのツリーの提案だけを残す。承認の前に切ったワークツリーに残った todo/ を承認待ちや改版と読まないため。
-func Fold(hits, approved []*Ticket) []*Ticket {
+func fold(hits, approved []*Ticket) []*Ticket {
 	if len(approved) > 0 && projects(approved, hits) > 1 {
 		return hits
 	}
@@ -66,7 +66,7 @@ func Fold(hits, approved []*Ticket) []*Ticket {
 
 // Authority は同じ識別子の承認済みチケットから、正とするツリーの名前を決める。親のツリーだけを読み、そこに無い
 // （親のワークツリーが無い・そこにチケットが無い・リポジトリをまたぐ）なら偽で、ほかのツリーのコピーで代用しない。
-// 承認済みチケットと、承認済みの識別子の提案（Fold）がこの 1 つで決める。
+// 承認済みチケットと、承認済みの識別子の提案（fold）がこの 1 つで決める。
 func Authority(copies []*Ticket) (string, bool) {
 	if len(copies) == 0 || projects(copies) > 1 {
 		return "", false
@@ -79,10 +79,10 @@ func Authority(copies []*Ticket) (string, bool) {
 	return "", false
 }
 
-// CollidedStates は 1 つのツリーの中で、どれを正とするか決まらない置き場。決まっていれば空。同じ識別子が 2 つの
+// collidedStates は 1 つのツリーの中で、どれを正とするか決まらない置き場。決まっていれば空。同じ識別子が 2 つの
 // 置き場に在るのは動かす途中で止まった形跡。ただし todo/ は親の改版の途中なので、承認済みチケットと並んでよい。
 // lint の ERROR とボードの scattered が同じ数え方をする。
-func CollidedStates(states []place.State) []place.State {
+func collidedStates(states []place.State) []place.State {
 	distinct := slices.Clone(states)
 	slices.Sort(distinct)
 	distinct = slices.Compact(distinct)
@@ -96,10 +96,10 @@ func CollidedStates(states []place.State) []place.State {
 }
 
 // Collisions はどれを正とするか決まらないチケットの全部。決まっていれば空。まとめて 2 つ以上残り、同じツリーの
-// 中で CollidedStates に当たるときだけ入る（状態の操作が止まるのと lint が言うのとで同じ条件）。acrossTrees は
+// 中で collidedStates に当たるときだけ入る（状態の操作が止まるのと lint が言うのとで同じ条件）。acrossTrees は
 // 親のツリーに無く、ほかのツリーのコピーだけが残る形も数える（閉じたものだけなら数えない）。
 func Collisions(hits []*Ticket, acrossTrees bool) []*Ticket {
-	folded := Fold(hits, nil)
+	folded := fold(hits, nil)
 	if len(folded) < 2 {
 		return nil
 	}
@@ -114,7 +114,7 @@ func Collisions(hits []*Ticket, acrossTrees bool) []*Ticket {
 		}
 	}
 	if len(trees) == 1 {
-		if len(CollidedStates(states)) > 0 {
+		if len(collidedStates(states)) > 0 {
 			return folded
 		}
 		return nil
@@ -148,7 +148,7 @@ func ByTicket(found []*Ticket) []Group {
 }
 
 // Dedupe は同じ識別子が複数のツリーにあるとき、正とするツリーの側だけを残す。approved（まとめる前の承認済み
-// チケットの全部）を渡せば、承認済みの識別子は承認済みチケットで正とするツリーを決める（Fold）。渡さないと、
+// チケットの全部）を渡せば、承認済みの識別子は承認済みチケットで正とするツリーを決める（fold）。渡さないと、
 // 正とするツリーの外に残った提案も残る。
 func Dedupe(found, approved []*Ticket) []*Ticket {
 	settled := map[string][]*Ticket{}
@@ -157,7 +157,7 @@ func Dedupe(found, approved []*Ticket) []*Ticket {
 	}
 	var kept []*Ticket
 	for _, g := range ByTicket(found) {
-		kept = append(kept, Fold(g.Tickets, settled[g.ID])...)
+		kept = append(kept, fold(g.Tickets, settled[g.ID])...)
 	}
 	return kept
 }

@@ -152,10 +152,10 @@ func compileNode(n *node, fl Flag, st *parseState) (*inst, error) {
 		if n.behind {
 			lo, hi := width(n.sub, st)
 			if lo > maxCode {
-				return nil, &Error{Msg: "looks too much behind"}
+				return nil, &Error{msg: "looks too much behind"}
 			}
 			if lo != hi {
-				return nil, &Error{Msg: "look-behind requires fixed-width pattern"}
+				return nil, &Error{msg: "look-behind requires fixed-width pattern"}
 			}
 			in.behind = lo
 		}
@@ -167,7 +167,7 @@ func compileNode(n *node, fl Flag, st *parseState) (*inst, error) {
 	return in, nil
 }
 
-// Pattern は書いた式（Python の Pattern.pattern）。
+// pattern は書いた式（Python の Pattern.pattern）。
 func (re *Regexp) Pattern() string { return re.pattern }
 
 // Group は名前の付いたグループの番号と、その名前があるか（Python の groupindex）。
@@ -183,7 +183,7 @@ func (re *Regexp) Search(s string) bool {
 	return ok
 }
 
-// SearchChecked は Search と同じだが、照合を打ち切ったら ErrDepthLimit を返す（当たりは偽）。
+// SearchChecked は Search と同じだが、照合を打ち切ったら errDepthLimit を返す（当たりは偽）。
 func (re *Regexp) SearchChecked(s string) (bool, error) {
 	_, ok, err := re.search([]rune(s), 0, false)
 	return ok, err
@@ -336,21 +336,21 @@ func (re *Regexp) search(text []rune, pos int, advance bool) (span, bool, error)
 			return span{start: start, end: end, marks: m.marks}, true, nil
 		}
 		if m.aborted {
-			return span{}, false, ErrDepthLimit
+			return span{}, false, errDepthLimit
 		}
 	}
 	return span{}, false, nil
 }
 
-// DepthLimit は照合の入れ子（run の深さ）の上限。後戻りの照合は続きを呼び出しで積むので、繰り返しを含む式を
+// depthLimit は照合の入れ子（run の深さ）の上限。後戻りの照合は続きを呼び出しで積むので、繰り返しを含む式を
 // 長い文字列に当てると深さが文字数に比例して伸び、Go のスタックの上限（越えると回復できずにプロセスが落ちる）に届く。
-// Python の sre はヒープに積むので落ちない。上限を越えた照合は打ち切り、ErrDepthLimit で知らせる。
+// Python の sre はヒープに積むので落ちない。上限を越えた照合は打ち切り、errDepthLimit で知らせる。
 // 値は数 KB の通常のコマンドでは届かず、最も深く積む形でもスタックが 128 MB ほどに収まる大きさ
 // （1 段に数百バイト積む。32 ビットの機械のスタックの上限 250 MB にも収まる）。
-const DepthLimit = 1 << 18
+const depthLimit = 1 << 18
 
-// ErrDepthLimit は照合が DepthLimit を越えて打ち切られたこと。当たったかどうかは分からない。
-var ErrDepthLimit = errors.New("pyre: 照合の入れ子が上限を越えたので打ち切った")
+// errDepthLimit は照合が depthLimit を越えて打ち切られたこと。当たったかどうかは分からない。
+var errDepthLimit = errors.New("pyre: 照合の入れ子が上限を越えたので打ち切った")
 
 type matcher struct {
 	s        []rune
@@ -359,7 +359,7 @@ type matcher struct {
 	matchAll bool
 	advance  bool
 	start    int
-	// depth は run の入れ子の深さ。aborted は DepthLimit を越えて照合を打ち切ったこと（立ったら答えは使わない）。
+	// depth は run の入れ子の深さ。aborted は depthLimit を越えて照合を打ち切ったこと（立ったら答えは使わない）。
 	depth   int
 	aborted bool
 }
@@ -388,14 +388,14 @@ type cont func(int) bool
 
 func accept(int) bool { return true }
 
-// run は prog を i から照合し、続き k に渡す。入れ子が DepthLimit を越えたら打ち切る。
+// run は prog を i から照合し、続き k に渡す。入れ子が depthLimit を越えたら打ち切る。
 // 打ち切った後は、どの経路も偽で戻る（否定の先読みが偽を「当たらなかった」と読んで通らないよう、
 // 呼び手は答えより先に aborted を見る）。
 func (m *matcher) run(prog []*inst, i int, k cont) bool {
 	if m.aborted {
 		return false
 	}
-	if m.depth >= DepthLimit {
+	if m.depth >= depthLimit {
 		m.aborted = true
 		return false
 	}

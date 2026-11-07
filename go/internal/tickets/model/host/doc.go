@@ -4,7 +4,7 @@
 //
 // Python からの対応: review_host をこのパッケージにした。Result.load → LoadResult、Result.from_data → ResultOf、
 // MARKER_ISSUE.format(op=…) → IssueMarker、_unresolved → Unresolved、epoch → Epoch（エポック秒）、
-// classify → Classify（HostClass → Class）、remote_kind → Classify(url).Kind、thread_key・thread_version →
+// classify → classify（HostClass → class）、remote_kind → Classify(url).Kind、thread_key・thread_version →
 // ThreadKey・ThreadVersion、accept_* → Accept*、read・write_accept_plan → ReadAcceptPlan・WriteAcceptPlan。
 // Thread.own と MergeRequest.draft の None は nil の *bool にする。
 package host

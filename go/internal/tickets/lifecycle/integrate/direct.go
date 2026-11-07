@@ -17,7 +17,7 @@ const (
 	RecordDir = "ccnavi-integrate"
 	// DoneDir は片付けた記録のコピーの置き場。
 	DoneDir = "ccnavi-integrate-done"
-	// squashMsg は tree.BusyMarks に無い、integrate が断る途中の操作の目印。
+	// squashMsg は tree.busyMarks に無い、integrate が断る途中の操作の目印。
 	squashMsg = "SQUASH_MSG"
 	// markerFile は取り込みの途中の記録の中で版を書くファイル。
 	markerFile = "marker"
@@ -27,7 +27,7 @@ const (
 type Marker string
 
 const (
-	MarkerNone    Marker = ""
+	markerNone    Marker = ""
 	MarkerV4      Marker = "v4"
 	MarkerUnknown Marker = "unknown" // 版を知らない（壊れた記録）
 )
@@ -35,21 +35,21 @@ const (
 // Direct は Stop で integrate を促す（か、促せない理由を言う）相手。Blocked が空でなければ促さず理由を言う。
 type Direct struct {
 	Name        string
-	Worktree    string
-	Head        string
-	Dirty       bool
-	Ahead       int
-	Integration string
-	// IntegTree は統合先をチェックアウトしているツリー（見つからなければ空）。
-	IntegTree string
+	worktree    string
+	head        string
+	dirty       bool
+	ahead       int
+	integration string
+	// integTree は統合先をチェックアウトしているツリー（見つからなければ空）。
+	integTree string
 	Blocked   string
-	// Base は記録の取り込み先。記録があるときだけ入る（無いときは統合先で数える）。
-	Base string
-	// NoRecord は記録が無い（手で切った）。integrate は断るので --adopt を案内する。
-	NoRecord bool
-	Marker   Marker
-	// OriginAhead は手元の取り込み先より origin/<取り込み先> が先に進んでいるコミットの数。
-	OriginAhead int
+	// base は記録の取り込み先。記録があるときだけ入る（無いときは統合先で数える）。
+	base string
+	// noRecord は記録が無い（手で切った）。integrate は断るので --adopt を案内する。
+	noRecord bool
+	marker   Marker
+	// originAhead は手元の取り込み先より origin/<取り込み先> が先に進んでいるコミットの数。
+	originAhead int
 }
 
 // nudgeKey は記録のキーの頭（チケットの識別子・request: と分ける）。
@@ -65,20 +65,20 @@ func (d *Direct) Digest() string {
 		kind = "blocked"
 	}
 	extra := ""
-	if d.Marker != MarkerNone {
-		extra += ":marker-" + string(d.Marker)
+	if d.marker != markerNone {
+		extra += ":marker-" + string(d.marker)
 	}
-	if d.NoRecord {
+	if d.noRecord {
 		extra += ":no-record"
 	}
-	if d.OriginAhead != 0 {
-		extra += ":origin+" + strconv.Itoa(d.OriginAhead)
+	if d.originAhead != 0 {
+		extra += ":origin+" + strconv.Itoa(d.originAhead)
 	}
 	dirt := "clean"
-	if d.Dirty {
+	if d.dirty {
 		dirt = "dirty"
 	}
-	return kind + ":" + dirt + ":" + strconv.Itoa(d.Ahead) + "@" + d.Head + extra
+	return kind + ":" + dirt + ":" + strconv.Itoa(d.ahead) + "@" + d.head + extra
 }
 
 // count は git の数の答え。走って数字だけなら真。
@@ -90,11 +90,11 @@ func count(done git.Done) (int, bool) {
 }
 
 // Record は ccnavi-worktree.sh が置いた直接作業の記録（git の共通ディレクトリの ccnavi-direct/<名前>）。
-// Broken は読めても形が違う（版・取り込み先・起点が欠ける）。
+// broken は読めても形が違う（版・取り込み先・起点が欠ける）。
 type Record struct {
 	Fields map[string]string
 	Common string
-	Broken bool
+	broken bool
 }
 
 // DirectRecord は直接作業の記録をファイルだけで読む。無ければ nil。
@@ -117,7 +117,7 @@ func DirectRecord(owner, name string) *Record {
 func MarkerKind(marks, name string) Marker {
 	folder := ospath.Join(marks, name)
 	if !ospath.DiskLexists(folder) {
-		return MarkerNone
+		return markerNone
 	}
 	text, _ := fsio.ReadText(ospath.Join(folder, markerFile), fsio.Replace)
 	if tree.ParseDirect(text)["version"] == tree.DirectVersion {
@@ -155,15 +155,6 @@ func Integration(owner string, deadline time.Time) (string, bool) {
 	return "", true
 }
 
-// Dirty はワークツリーに未コミットの変更があるか（追跡していないものも数える）。読めなければ known が偽。
-func Dirty(worktree string, deadline time.Time) (dirty, known bool) {
-	done := git.Status(worktree, git.Porcelain{Untracked: git.UntrackedAll}, git.Options{Deadline: deadline})
-	if !done.OK() {
-		return false, false
-	}
-	return ospath.Strip(done.Out) != "", true
-}
-
 // GitPath は `git rev-parse --git-path <name>`（相対ならツリーから）。引けなければ偽。
 func GitPath(top, name string, deadline time.Time) (string, bool) {
 	done := git.Run(top, []string{"rev-parse", "--git-path", name}, git.Options{Deadline: deadline})
@@ -186,8 +177,8 @@ type Repeat int
 const (
 	// LastKept は最後の行を採り、値の前後の空白を除く（Python の stop_integrate の読み方）。
 	LastKept Repeat = iota
-	// FirstKept は最初の行を採り、値をそのまま残す（sh の ccnavi_record_get と、Python の post_findings の読み方）。
-	FirstKept
+	// firstKept は最初の行を採り、値をそのまま残す（sh の ccnavi_record_get と、Python の post_findings の読み方）。
+	firstKept
 )
 
 // ReadRecord は ccnavi_record_write が書いた「キー 値」の行の記録。読めなければ空。読む側ごとに Python の読み方が
@@ -200,7 +191,7 @@ func ReadRecord(path string, repeat Repeat) map[string]string {
 		if key == "" {
 			continue
 		}
-		if repeat == FirstKept {
+		if repeat == firstKept {
 			if _, seen := out[key]; !seen {
 				out[key] = value
 			}

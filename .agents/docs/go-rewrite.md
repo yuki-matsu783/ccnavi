@@ -99,8 +99,8 @@ Python の実装と答えを突き合わせていたテストは、Python を外
 | `str.casefold()`・`unicodedata.normalize` | パスは `pathcase.Fold`、パスでない語は `pyfmt.Casefold`（区切りを変えない）。NFKC・NFC は `pyfmt.NFKC`・`pyfmt.NFC`。`golang.org/x/text` を直に使わない |
 | `os.path.normcase` | Windows だけ `/` を `\` にして小文字にする。Linux・macOS は何もしない |
 | 正規表現 | Python の re の答えが要る式は `infra/pyre`（Python 3.13 の re の写し）を使う。固定の式で RE2 で書けるものは `regexp`。pyre は RE2 の 5〜10 倍遅い |
-| 正規表現の照合の深さ | pyre は入れ子が `pyre.DepthLimit` を越えた照合を打ち切る（Python の sre は打ち切らない。Go はスタックがあふれるとプロセスごと落ちるため）。打ち切りは `SearchChecked` が知らせ、ルールの照合（`rules.Rule.Matches`）は止める側（deny・ask）を当たり、allow を外れにする。数 KB の通常のコマンドでは届かない |
-| YAML（PyYAML の SafeLoader、YAML 1.1） | `gopkg.in/yaml.v3` は libyaml の写しで、1.1 の真偽・8 進・時刻の読みも、読める・読めないの境界も違う。そこで PyYAML の純 Python の読み手を `infra/yaml` に写した。上の段は `*yaml.Map` の取り出し（`Text`・`Strings`・`Map` など）で値を読む。壊れた YAML の苦情の文は純 Python の読み手（SafeLoader）に合わせる。libyaml（CSafeLoader）の文とは違う。書き出し（`yaml.safe_dump`）は純 Python の書き手を写した `yaml.Dump`（80 字の折り返しも同じ） |
+| 正規表現の照合の深さ | pyre は入れ子が `pyre.depthLimit` を越えた照合を打ち切る（Python の sre は打ち切らない。Go はスタックがあふれるとプロセスごと落ちるため）。打ち切りは `SearchChecked` が知らせ、ルールの照合（`rules.Rule.Matches`）は止める側（deny・ask）を当たり、allow を外れにする。数 KB の通常のコマンドでは届かない |
+| YAML（PyYAML の SafeLoader、YAML 1.1） | `gopkg.in/yaml.v3` は libyaml の写しで、1.1 の真偽・8 進・時刻の読みも、読める・読めないの境界も違う。そこで PyYAML の純 Python の読み手を `infra/yaml` に写した。上の段は `*yaml.Map` の取り出し（`Text`・`Map` など）で値を読む。壊れた YAML の苦情の文は純 Python の読み手（SafeLoader）に合わせる。libyaml（CSafeLoader）の文とは違う。書き出し（`yaml.safe_dump`）は純 Python の書き手を写した `yaml.Dump`（80 字の折り返しも同じ） |
 | 辞書の順序 | Python の dict は入れた順。JSON を出すところは順序を持つ型で組む |
 | JSON の出力 | Python の `json.dumps` の既定（`ensure_ascii`・区切りの空白）に合わせる。呼び出しごとに引数を確かめる |
 | 文字列の長さ・切り出し | Python は符号位置で数える。Go の `len` はバイト。`[]rune` か `utf8` で数える |
@@ -127,14 +127,14 @@ Python の実装と答えを突き合わせていたテストは、Python を外
 
 | いつ | 何を |
 |---|---|
-| 上の段を移すとき | 呼び手の無い公開名（`fsio`・`git`・`tree`・`shell` など、pyre の `Match`・`FullMatch`・`FindAll`・`Found`・`Named`・`Group`、`selfguard.Resolve`）を、使う段で絞る。あわせて rules の文面の出どころ（`Message`・`Text`・`DegradedMessage`）の優先の決めを 1 か所にまとめ、`compileExpr` の戻りを結果の種類の型にし、公開の可変グローバル（`rules.ScriptPlaceholder`・`Sections`・`SubjectFields`、`selfguard.Choices`・`GateChoices`）を絞る。lifecycle/worktrees の `Status` の定数 `Removed` とメソッド `Dropped.Removed()`（`Absent` も真）の名前の紛らわしさを、呼び手が揃ったところで分ける。「未コミットの変更」の判定（`integrate.Dirty` と `worktrees.status`）を 1 つに寄せる（`treegate.Dirty` は未追跡を数えない別の意味なので寄せない）。承認済み・閉じた・レビュー中の 3 回の走査の繰り返し（`retire.parentOf`・`worktrees.FamilyFor`・`remaining`・`branch.SerialNames`）を、1 回の走査の結果を渡す形にする |
 | Go だけで直す | hook の横展開で、Python と答えを合わせるために寄せなかったもの。取り込みの記録の読み方は `ReadRecord` の `FirstKept`（`post_findings`）と `LastKept`（`stop_integrate`）で分かれる。付き添いの有無は hook の判定（`hookio.Unattended`）と引き継ぎの待機（`hookio.Headless`。SDK の入口も含む）で分かれる。揃えるなら Go だけで決める |
-| Go だけで直す | `scripts/ccnavi-setup.sh` の `sh_word` と `entry/lint` の `shSpecial`・`shWord` の、「2 か所を直す」と書いた手作業の同期を 1 か所に寄せる（sh のコードを変えるので、コメントの直しとは別に扱う）。Go のコメントと `doc.go` に残る「Python の …」「Python からの対応」の参照（`src/ccnavi/` を消したあとも、写した元の説明として約 600 行残る）をまとめて直す |
-| Go だけで直す | entry の横展開で、Python と答えを合わせるために直さなかったもの（どれも Python も同じ）。`cli/stopreview.go` の送った版の `.md` の判定、`lint/branch.go` の未登録のワークツリーの鍵、`lint/ticket.go` の承認済みの置き場の確かめが大文字小文字を区別する。親チケットの見方が `shask` と `lint/layers.go` の `holdsParent` で 2 通り。巨大な整数（`--limit`・`--mr`・`ops begin` の mr・`idle check` の待ち秒。Go は int と `time.Duration` に収まらないものを読めず、Python は巨大な値のまま使う。実害は無い）。揃えるなら Go だけで直す |
+| Go だけで直す | Go のコメントと `doc.go` に残る「Python の …」「Python からの対応」の参照（`src/ccnavi/` を消したあとも、写した元の説明として約 600 行残る）をまとめて直す。名前を非公開にしたので、対応の一覧の Go の側の名前もいまの綴りと合わないところがある |
+| Go だけで直す | 巨大な整数（`--limit`・`--mr`・`ops begin` の mr・`idle check` の待ち秒）。Go は int と `time.Duration` に収まらないものを読めず、Python は巨大な値のまま使っていた。実害は無い。揃えるなら Go だけで直す |
 | Go だけで直す | `infra/git` が環境から `GIT_DIR`・`GIT_WORK_TREE`・`GIT_INDEX_FILE`・`GIT_COMMON_DIR` を外さない（Python も同じ。直すなら Go だけで直す） |
-| 余裕のあるとき | entry の横展開の残り。`lint/claude.go` の `executable` は `os.Stat` で権限を読む（`ospath.Stat` は権限を返さない。Python は `os.access`）。`suggest` の一時ディレクトリは `os.MkdirTemp`・`os.RemoveAll` のまま（infra に写しが無い）。`.md` と `.git` の直書きは entry と `tickets/approval`・`archive` だけを `place.MdExt`・`tree.DotGit` に寄せ、ほかの段（`catalog`・`records`・`tickets/lifecycle` など）は残る。数字だけの語の判定は `pyfmt.IsASCIIDigits` に寄せたが、`argparse` の `allDigits`（Unicode の数字・空も真）と `shell` の `isDigits`（Python の `isdigit` の表）は意味が違うので寄せていない |
-| 当面扱わない | `infra/pyre` の照合を速くする（Python の C 実装の約 5 倍遅い）、照合の深さの上限（`DepthLimit`）を外す、`(?i)ß` などの小さな食い違い。中身は [yuki-matsu783/ccnavi#806](https://github.com/yuki-matsu783/ccnavi/issues/806) |
-| 余裕のあるとき | `hint` の `recentCommit`（直前のコミットと見なす古さ、10 分）は期限ではなく 1 か所でしか使わないので `hint` に残した。`str.split()` の並びを返す `strings.FieldsFunc(…, ospath.IsSpace)` の直書き（wiki・selfguard・useronly・learning・failsafe など）を `ospath` の 1 関数に寄せる。`infra/git/restore.go` は `strings.Fields`（U+001C〜U+001F を空白に数えない）で Python と違いうる |
+| 余裕のあるとき | entry の横展開の残り。`lint/claude.go` の `executable` は `os.Stat` で権限を読む（`ospath.Stat` は権限を返さない。Python は `os.access`）。`suggest` の一時ディレクトリは `os.MkdirTemp`・`os.RemoveAll` のまま（infra に写しが無い）。数字だけの語の判定は `pyfmt.IsASCIIDigits` に寄せたが、`argparse` の `allDigits`（Unicode の数字・空も真）と `shell` の `isDigits`（Python の `isdigit` の表）は意味が違うので寄せていない |
+| 当面扱わない | `infra/pyre` の照合を速くする（Python の C 実装の約 5 倍遅い）、照合の深さの上限（`depthLimit`）を外す、`(?i)ß` などの小さな食い違い。中身は [yuki-matsu783/ccnavi#806](https://github.com/yuki-matsu783/ccnavi/issues/806) |
+| 余裕のあるとき | `hint` の `recentCommit`（直前のコミットと見なす古さ、10 分）は期限ではなく 1 か所でしか使わないので `hint` に残した |
+| 余裕のあるとき | `scripts/ccnavi-setup.sh` は `.gitignore` に索引（`ccnavi-index.jsonl`）を否定する `!` の行があると無視の行を足さないが、`--docs`（`docindex.addIgnore`）は足してから check-ignore で確かめる。揃えるとどちらかの振る舞いが変わるので、どちらに寄せるかを決めてから直す。setup.sh は `projects/` の索引の知らせを `--lint` と同じ文面で自分で組む（実行ファイルを起こさない。`tests/sh/test_setup.py` が文面全体の一致を見る）。lint の JSON の kind で見分ける形にするには、配る前で実行ファイルが無い経路を先に決める。`handoffnames` の `Table.reservedProblem`・`With` は本体からの呼び手が無い（テストだけが使う）。予約名の検査を下書きの経路に配線するか、消すかを決める |
 
 ## 回す
 

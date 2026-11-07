@@ -15,21 +15,21 @@ import (
 var childKeys = []string{"ticket", "phase", "predecessors"}
 
 // childRebuilt は子の提案の ticket:・phase:・predecessors: の値だけを付け替えたバイト列。
-func (c *ChildChange) rebuilt() ([]byte, string) {
+func (c *childChange) rebuilt() ([]byte, string) {
 	text, ok := decode(c.raw)
 	if !ok {
 		return nil, "UTF-8 として読めない"
 	}
-	t := c.Ticket
+	t := c.ticket
 	var edits [][2]string
-	if c.Renamed() {
-		edits = append(edits, [2]string{"ticket", "ticket: " + c.NewTicket})
+	if c.renamed() {
+		edits = append(edits, [2]string{"ticket", "ticket: " + c.newTicket})
 	}
-	if c.NewPhase != phaseOf(t) {
-		edits = append(edits, [2]string{"phase", "phase: " + pyPhase(c.NewPhase)})
+	if c.newPhase != phaseOf(t) {
+		edits = append(edits, [2]string{"phase", "phase: " + pyPhase(c.newPhase)})
 	}
-	if !slices.Equal(c.NewPredecessors, t.Predecessors) {
-		line, err := flowLine(strs(c.NewPredecessors))
+	if !slices.Equal(c.newPredecessors, t.Predecessors) {
+		line, err := flowLine(strs(c.newPredecessors))
 		if err != nil {
 			return nil, err.Error()
 		}
@@ -60,7 +60,7 @@ func (c *ChildChange) rebuilt() ([]byte, string) {
 		return nil, "差し替えると本文が変わるので反映しません"
 	}
 	read, _ := ticket.Parse(built)
-	if read == nil || read.ID != c.NewTicket || phaseOf(read) != c.NewPhase || !slices.Equal(read.Predecessors, c.NewPredecessors) {
+	if read == nil || read.ID != c.newTicket || phaseOf(read) != c.newPhase || !slices.Equal(read.Predecessors, c.newPredecessors) {
 		return nil, "組んだ全文が付け替えた子の提案として読めないので反映しません"
 	}
 	return []byte(built), ""
@@ -71,7 +71,7 @@ func (c *ChildChange) rebuilt() ([]byte, string) {
 // （入れ替わる 2 本は読んだ中身を持っているので上書きしてよい）。フローの下書きも一緒に付け替える。途中で
 // 落ちたら、触ったパスを全部書く前の中身へ戻す（無かったものは消す）。
 func (a *Answer) write(content []byte) string {
-	s := a.Source
+	s := a.source
 	for _, f := range s.files() {
 		if now, ok := fsio.ReadBytes(f.ticket.Path); !ok || !bytes.Equal(now, f.raw) {
 			return "提案 " + f.ticket.ID + " が外で変わった（読んでから書くまでの間）"
@@ -86,23 +86,23 @@ func (a *Answer) write(content []byte) string {
 		final[path] = data
 	}
 	var leaving []string
-	for i := range a.Changes {
-		c := &a.Changes[i]
+	for i := range a.changes {
+		c := &a.changes[i]
 		built, why := c.rebuilt()
 		if built == nil {
-			return c.Ticket.Path + ": " + why
+			return c.ticket.Path + ": " + why
 		}
-		put(c.NewPath(), built)
-		if !c.Renamed() {
+		put(c.newPath(), built)
+		if !c.renamed() {
 			continue
 		}
-		leaving = append(leaving, c.Ticket.Path)
+		leaving = append(leaving, c.ticket.Path)
 		if s.conf != nil {
-			root := cmp.Or(c.Ticket.TreeRoot, s.root)
-			oldDraft := flow.DraftFile(s.conf, root, c.Ticket.ID)
+			root := cmp.Or(c.ticket.TreeRoot, s.root)
+			oldDraft := flow.DraftFile(s.conf, root, c.ticket.ID)
 			if fsio.Lexists(oldDraft) {
 				if draft, ok := fsio.ReadBytes(oldDraft); ok {
-					put(flow.DraftFile(s.conf, root, c.NewTicket), draft)
+					put(flow.DraftFile(s.conf, root, c.newTicket), draft)
 					leaving = append(leaving, oldDraft)
 				}
 			}
@@ -159,14 +159,14 @@ type Saved struct {
 
 // Save は振り直した計画を書き戻す。開いたときのハッシュ（expect）と検査を通らなければ書かない。
 func (a *Answer) Save(expect string) Saved {
-	if expect != a.Source.SHA() {
+	if expect != a.source.sha() {
 		return Saved{Messages: []string{"提案が外で変わった（--expect が親と子の提案の今の中身と違う）。何も反映しません。" +
 			"--plan-order <親> --json で読み直す"}}
 	}
-	if len(a.Renumbered.Refused) > 0 {
+	if len(a.renumbered.refused) > 0 {
 		var lines []string
-		for _, r := range a.Renumbered.Refused {
-			lines = append(lines, "先行の線を引けない: "+r.Text)
+		for _, r := range a.renumbered.refused {
+			lines = append(lines, "先行の線を引けない: "+r.text)
 		}
 		return Saved{Messages: append(lines, "何も反映しません。")}
 	}
@@ -174,9 +174,9 @@ func (a *Answer) Save(expect string) Saved {
 		details []any
 		header  string
 	}{
-		{problemTexts(a.Problems), "振り直した計画の順序の検査に error がある。何も反映しません。"},
-		{problemTexts(a.RevisionProblems), "改版で通らない形（子が承認された番号を固定しているので、その番号のステップは変えられない）。何も反映しません。"},
-		{strs(a.ChildProblems), "子の提案を付け替えられない。何も反映しません。"},
+		{problemTexts(a.problems), "振り直した計画の順序の検査に error がある。何も反映しません。"},
+		{problemTexts(a.revisionProblems), "改版で通らない形（子が承認された番号を固定しているので、その番号のステップは変えられない）。何も反映しません。"},
+		{strs(a.childProblems), "子の提案を付け替えられない。何も反映しません。"},
 	} {
 		if len(check.details) > 0 {
 			details := make([]string, len(check.details))
@@ -188,20 +188,20 @@ func (a *Answer) Save(expect string) Saved {
 	}
 	content, why := a.rebuilt()
 	if why != "" {
-		return Saved{Messages: []string{a.Source.Parent.Path + ": " + why + "。何も反映しません。"}}
+		return Saved{Messages: []string{a.source.Parent.Path + ": " + why + "。何も反映しません。"}}
 	}
-	if content == nil && len(a.Changes) == 0 {
+	if content == nil && len(a.changes) == 0 {
 		return Saved{OK: true}
 	}
 	if failed := a.write(content); failed != "" {
 		return Saved{Messages: []string{failed}}
 	}
 	var renamed []string
-	for i := range a.Changes {
-		c := &a.Changes[i]
-		if c.Renamed() {
+	for i := range a.changes {
+		c := &a.changes[i]
+		if c.renamed() {
 			renamed = append(renamed, fmt.Sprintf("子の提案 %s を %s に付け替えた（phase: %s → %s）",
-				c.Ticket.ID, c.NewTicket, pyPhase(phaseOf(c.Ticket)), pyPhase(c.NewPhase)))
+				c.ticket.ID, c.newTicket, pyPhase(phaseOf(c.ticket)), pyPhase(c.newPhase)))
 		}
 	}
 	return Saved{OK: true, Written: true, Messages: renamed}

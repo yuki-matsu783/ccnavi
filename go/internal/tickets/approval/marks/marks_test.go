@@ -86,7 +86,7 @@ func TestLedger(t *testing.T) {
 	if entries, problem := ReadLedger(dir, "p"); entries != nil || problem != "" {
 		t.Errorf("無い台帳: %v %q", entries, problem)
 	}
-	path := ParentPath(dir, "p", Ledger)
+	path := parentPath(dir, "p", Ledger)
 	for _, text := range []string{`{"version": 1}`, `{"entries": [1]}`, `[]`, `{`} {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			t.Fatal(err)

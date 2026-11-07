@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
@@ -18,8 +19,6 @@ const fileLimit = 256 * 1024
 // regularModes は git のふつうのファイルの mode。
 var regularModes = map[string]bool{"100644": true, "100755": true}
 
-const mdExt = ".md"
-
 // 読まない理由。
 const (
 	problemLink      = "シンボリックリンクは読まない"
@@ -31,8 +30,8 @@ const (
 // stem は .md（大文字小文字を問わない）を除いた名前。.md でなければ空。
 func stem(file string) string {
 	// 畳んで ".md" になる字は M・m・D・d だけなので、元の綴りの末尾も 3 バイト。
-	if pathcase.HasExt(file, mdExt) {
-		return file[:len(file)-len(mdExt)]
+	if pathcase.HasExt(file, config.MdExt) {
+		return file[:len(file)-len(config.MdExt)]
 	}
 	return ""
 }
@@ -56,7 +55,7 @@ func (t *texts) put(kind Kind, name, body string) {
 }
 
 func (t *texts) build() *Wiki {
-	w := Build(t.patterns, t.impacts, t.present)
+	w := build(t.patterns, t.impacts, t.present)
 	w.Broken = append(w.Broken, t.broken...)
 	sort.SliceStable(w.Broken, func(i, j int) bool { return w.Broken[i].File < w.Broken[j].File })
 	return w
@@ -65,7 +64,7 @@ func (t *texts) build() *Wiki {
 var places = []struct {
 	kind Kind
 	dir  string
-}{{KindPattern, PatternsDir}, {KindImpact, ImpactDir}}
+}{{KindPattern, PatternsDir}, {kindImpact, ImpactDir}}
 
 // LoadTree はワークツリーの docs/wiki/ を読む。無ければ Present が偽の空の Wiki。
 func LoadTree(treeRoot string) *Wiki {
@@ -127,7 +126,7 @@ func LoadCommit(repo, rev string, deadline time.Time) *Wiki {
 			continue
 		}
 		meta, path, _ := strings.Cut(entry, "\t")
-		fields := strings.FieldsFunc(meta, ospath.IsSpace)
+		fields := ospath.Fields(meta)
 		directory, file := "", path
 		if i := strings.LastIndex(path, "/"); i >= 0 {
 			directory, file = path[:i], path[i+1:]

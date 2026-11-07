@@ -135,8 +135,8 @@ func Explain(stdout, stderr io.Writer, conf *config.Settings, root string) (int,
 
 func explainRules(w io.Writer, root string, view ruleload.LayerView) {
 	p := func(format string, a ...any) { fmt.Fprintf(w, format, a...) }
-	counts := make([]string, len(rules.Sections))
-	for i, name := range rules.Sections {
+	counts := make([]string, len(rules.Sections()))
+	for i, name := range rules.Sections() {
 		counts[i] = fmt.Sprintf("%s %d", name, len(*view.RuleSet.Section(name)))
 	}
 	p("\n■ rules %s（%s、%s）\n", layerLabel(view.Name), shown(root, view.Path), strings.Join(counts, " / "))
@@ -148,7 +148,7 @@ func explainRules(w io.Writer, root string, view ruleload.LayerView) {
 		p("  このレイヤーの設定ファイルはありません。設定なしとして扱います。\n")
 		return
 	}
-	for _, name := range rules.Sections {
+	for _, name := range rules.Sections() {
 		for _, r := range *view.RuleSet.Section(name) {
 			body := r.WrittenBody()
 			if len(r.Excepts) > 0 {
@@ -258,7 +258,7 @@ func explainUndeclared(w io.Writer, conf *config.Settings) {
 	fmt.Fprintf(w, "  ccnavi は判定を持たない。読めた呼び出しは Claude Code の権限モードに委ねる。"+
 		"読み切れない呼び出し（実行される部分まで読み解けず、生の文字列に適用したコマンド）は、"+
 		"読めなかったことを言うためにモードを問わず委ねない\n")
-	for _, name := range slices.Concat(judge.PermissionJudged, judge.PermissionNoJudge, []string{unknownMode}) {
+	for _, name := range slices.Concat(judge.PermissionJudged(), judge.PermissionNoJudge(), []string{unknownMode}) {
 		pm := name
 		if name == unknownMode {
 			pm = ""
@@ -277,7 +277,7 @@ func explainUndeclared(w io.Writer, conf *config.Settings) {
 		unwatched = string(config.Enable)
 	}
 	fmt.Fprintf(w, "  %s=%s（%s の読めた呼び出しの結末を決める。disable なら委ね、それ以外は止める）\n",
-		env.GuardUnwatched, unwatched, strings.Join(judge.PermissionNoJudge, " / "))
+		env.GuardUnwatched, unwatched, strings.Join(judge.PermissionNoJudge(), " / "))
 }
 
 // failClosedRows は、判定に達せなかったときの扱いを見せるツールの代表と、その見出し。扱いは config.FailClosed で引く。
@@ -312,9 +312,9 @@ func explainModes(w io.Writer, conf *config.Settings) {
 		dry := held(config.FailClosed(config.DryRun, row.tool, false))
 		safe := held(config.FailClosed(config.Enable, row.tool, true))
 		switch {
-		case slices.Contains(config.ReadTools, row.tool):
+		case slices.Contains(config.ReadTools(), row.tool):
 			p("  %s: 最低限の deny にヒットしなければ%s、ヒットすれば%s\n", row.label, safe, enable)
-		case slices.Contains(config.ShellTools, row.tool):
+		case slices.Contains(config.ShellTools(), row.tool):
 			p("  %s: 最低限の許可リストにヒットすれば%s、ヒットしなければ%s\n", row.label, safe, enable)
 		default:
 			p("  %s: enable は%s、dry-run は%s\n", row.label, enable, dry)
@@ -375,7 +375,7 @@ func explainTickets(w io.Writer, conf *config.Settings, root string) {
 			}
 		}
 		p("  %s\n", head)
-		for _, name := range rules.Sections {
+		for _, name := range rules.Sections() {
 			for _, path := range t.Paths(name) {
 				p("    %s %s\n", ljust(string(name), 5), path)
 			}

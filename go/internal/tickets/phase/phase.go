@@ -15,14 +15,14 @@ import (
 
 // 止めている間の呼び名。依頼のマーカーが境目で、未依頼はエージェントの番、依頼済みはユーザ待ち。
 const (
-	LabelPreparing = "レビュー準備中"
-	LabelWaiting   = "レビュー待ち"
+	labelPreparing = "レビュー準備中"
+	labelWaiting   = "レビュー待ち"
 )
 
 // Phase は 1 つの親の 1 つのフェーズ。親が計画を持てば Item・Type・Owner が入り、持たなければ番号だけで、
 // 子の human_review からレビューの要否を決める。
 type Phase struct {
-	Parent  string
+	parent  string
 	Number  int
 	Tickets []*ticket.Ticket
 	// States は子の識別子 → 置き場（状態）。
@@ -31,19 +31,19 @@ type Phase struct {
 	// 計画があるときだけ。Item は計画のステップ、Type は定義、Owner は親の承認済みチケット。
 	Item  *ticket.PlanItem
 	Type  *phases.PhaseType
-	Owner *ticket.Ticket
-	// Risks は子の識別子 → 閉じるときに数えた実績のリスクの記録。
-	Risks map[string]*pyjson.Object
-	// CoveredReviews は延期を引き受けた前のフェーズが、定義として宣言している「レビューが要るか」。
-	CoveredReviews []bool
+	owner *ticket.Ticket
+	// risks は子の識別子 → 閉じるときに数えた実績のリスクの記録。
+	risks map[string]*pyjson.Object
+	// coveredReviews は延期を引き受けた前のフェーズが、定義として宣言している「レビューが要るか」。
+	coveredReviews []bool
 }
 
 func newPhase(parent string, number int) *Phase {
 	return &Phase{
-		Parent: parent, Number: number,
+		parent: parent, Number: number,
 		States: map[string]place.State{},
 		Marks:  map[marks.Kind]*pyjson.Object{},
-		Risks:  map[string]*pyjson.Object{},
+		risks:  map[string]*pyjson.Object{},
 	}
 }
 
@@ -56,7 +56,7 @@ func (p *Phase) has(kind marks.Kind) bool {
 func (p *Phase) Risk() *pyjson.Object {
 	var best *pyjson.Object
 	for _, t := range p.Tickets {
-		record, ok := p.Risks[t.ID]
+		record, ok := p.risks[t.ID]
 		if !ok {
 			continue
 		}
@@ -154,18 +154,18 @@ func (p *Phase) Deferred() bool { return p.Item != nil && p.Item.Deferred }
 
 // ReviewAt はこのフェーズのレビューが行われる番号。延期なら引き受ける番号で、引き受け手が無ければ偽。
 func (p *Phase) ReviewAt() (int, bool) {
-	if p.Owner == nil || !p.Planned() {
+	if p.owner == nil || !p.Planned() {
 		return p.Number, true
 	}
-	return p.Owner.ReviewAt(p.Number)
+	return p.owner.ReviewAt(p.Number)
 }
 
 // Covers はこのフェーズのレビューが含む、延期した前のフェーズの番号。
 func (p *Phase) Covers() []int {
-	if p.Owner == nil || !p.Planned() {
+	if p.owner == nil || !p.Planned() {
 		return nil
 	}
-	return p.Owner.CoveredBy(p.Number)
+	return p.owner.CoveredBy(p.Number)
 }
 
 // Ended は終わったか。作業中・未着手の子が無く、レビュー待ちか閉じた子が 1 枚以上。取り消しだけでは終わらない。
@@ -185,9 +185,9 @@ func (p *Phase) Ended() bool {
 	return closed
 }
 
-// DeclaredReview は計画のステップと定義が言う「レビューが要るか」。ステップの指定が定義より優先し、どちらも
+// declaredReview は計画のステップと定義が言う「レビューが要るか」。ステップの指定が定義より優先し、どちらも
 // 言わなければ Unsaid。
-func (p *Phase) DeclaredReview() ticket.Need {
+func (p *Phase) declaredReview() ticket.Need {
 	item, typ := ticket.Unsaid, ticket.Unsaid
 	if p.Item != nil {
 		item = p.Item.Review
@@ -215,8 +215,8 @@ func (p *Phase) ReviewRequired() bool {
 	for _, t := range closed {
 		needed = needed || t.ReviewRequired == ticket.Needed
 	}
-	declared := p.CoveredReviews
-	if d := p.DeclaredReview(); d.Said() {
+	declared := p.coveredReviews
+	if d := p.declaredReview(); d.Said() {
 		declared = append([]bool{d == ticket.Needed}, declared...)
 	}
 	if len(declared) > 0 {
@@ -242,9 +242,9 @@ func (p *Phase) ReviewWaiting() bool { return p.GateClosed() && p.has(marks.Requ
 // ReviewLabel は止めている間の呼び名。未依頼なら動くのはエージェントでレビュー準備中、依頼済みならレビュー待ち。
 func (p *Phase) ReviewLabel() string {
 	if p.ReviewWaiting() {
-		return LabelWaiting
+		return labelWaiting
 	}
-	return LabelPreparing
+	return labelPreparing
 }
 
 // ReviewedOrSkipped はレビューが済んでいるか、要らないか。延期は引き受けるフェーズに委ねる。
@@ -258,6 +258,6 @@ func coveredReview(p *Phase) bool {
 	if p == nil {
 		return true
 	}
-	d := p.DeclaredReview()
+	d := p.declaredReview()
 	return !d.Said() || d == ticket.Needed
 }

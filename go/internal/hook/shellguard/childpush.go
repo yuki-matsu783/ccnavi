@@ -27,7 +27,7 @@ func CheckChildPush(conf *config.Settings, root, cwd, subject string, degraded b
 		if !known {
 			return unknownParent, unknownParent
 		}
-		name := WorktreeName(root, where)
+		name := worktreeName(root, where)
 		if name == "" {
 			continue
 		}

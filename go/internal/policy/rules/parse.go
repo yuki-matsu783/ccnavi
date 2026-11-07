@@ -54,7 +54,7 @@ func Parse(data *yaml.Map, root string) (*RuleSet, []Problem) {
 				"部分一致が必要なら前後に `*` を書く",
 			pyfmt.Str(written), Version, joinSections("` `"))})
 	}
-	for _, name := range Sections {
+	for _, name := range sections {
 		raw, present := data.Lookup(string(name))
 		if !present || raw == nil {
 			continue
@@ -83,8 +83,8 @@ func Parse(data *yaml.Map, root string) (*RuleSet, []Problem) {
 }
 
 func joinSections(sep string) string {
-	names := make([]string, len(Sections))
-	for i, s := range Sections {
+	names := make([]string, len(sections))
+	for i, s := range sections {
 		names[i] = string(s)
 	}
 	return strings.Join(names, sep)
@@ -246,18 +246,18 @@ func build(raw rawRule, section Decision, where, root string) (*Rule, []Problem)
 				continue
 			}
 			label := leaf.Where + " の "
-			glob, regex := leaf.Text, ""
+			glob, regex := leaf.text, ""
 			if leaf.Kind == WhenRegex {
-				glob, regex = "", leaf.Text
+				glob, regex = "", leaf.text
 			}
 			part := compileExpr(glob, regex, root, name, label)
-			if part.err != nil {
+			if part.outcome == exprFailed {
 				return nil, append(problems, *part.err)
 			}
 			if part.note != nil {
 				problems = append(problems, *part.note)
 			}
-			if part.refused != "" && refused == "" {
+			if part.outcome == exprRefused && refused == "" {
 				refused = label + part.refused
 			}
 			leaf.Compiled = part.re
@@ -271,13 +271,13 @@ func build(raw rawRule, section Decision, where, root string) (*Rule, []Problem)
 		}
 	} else {
 		built := compileExpr(rule.Glob, rule.Regex, root, name, "")
-		if built.err != nil {
+		if built.outcome == exprFailed {
 			return nil, []Problem{*built.err}
 		}
 		if built.note != nil {
 			problems = append(problems, *built.note)
 		}
-		if built.refused != "" {
+		if built.outcome == exprRefused {
 			// except は付けない。付けると「全部止める」に穴が空く。
 			degraded, p := degrade(rule, section, name, built.refused)
 			return degraded, append(problems, p)
@@ -288,13 +288,13 @@ func build(raw rawRule, section Decision, where, root string) (*Rule, []Problem)
 	for i, e := range excepts {
 		label := fmt.Sprintf("except[%d] の ", i)
 		part := compileExpr(e.Glob, e.Regex, root, name, label)
-		if part.err != nil {
+		if part.outcome == exprFailed {
 			return nil, append(problems, *part.err)
 		}
 		if part.note != nil {
 			problems = append(problems, *part.note)
 		}
-		if part.refused != "" {
+		if part.outcome == exprRefused {
 			// 組み立てられない except は外して使う。deny・ask は当たる範囲が広がる（止める側）。allow は
 			// 広がると通す範囲が増えるので、ルールごと使わない。
 			problems = append(problems, Problem{Severity: Error, Rule: name, Detail: label + part.refused})
@@ -383,12 +383,12 @@ func readWhen(written any, name string) (*Condition, *Problem) {
 	count := 0
 	var node func(raw any, where string, depth int) (*Condition, whenError)
 	node = func(raw any, where string, depth int) (*Condition, whenError) {
-		if depth > MaxWhenDepth {
-			return nil, whenError(fmt.Sprintf("%s で入れ子が %d 段を超える。判定が重くならないように、段を浅くするか、ルールを分けてください", where, MaxWhenDepth))
+		if depth > maxWhenDepth {
+			return nil, whenError(fmt.Sprintf("%s で入れ子が %d 段を超える。判定が重くならないように、段を浅くするか、ルールを分けてください", where, maxWhenDepth))
 		}
 		count++
-		if count > MaxWhenNodes {
-			return nil, whenError(fmt.Sprintf("%s のノードが %d 個を超える。判定が重くならないように、ルールを分けてください", WhenKey, MaxWhenNodes))
+		if count > maxWhenNodes {
+			return nil, whenError(fmt.Sprintf("%s のノードが %d 個を超える。判定が重くならないように、ルールを分けてください", WhenKey, maxWhenNodes))
 		}
 		m, ok := raw.(*yaml.Map)
 		if !ok {
@@ -421,7 +421,7 @@ func readWhen(written any, name string) (*Condition, *Problem) {
 			if !ok || text == "" {
 				return nil, whenError(fmt.Sprintf("%s の %s が空か、文字列ではない", where, kind))
 			}
-			return &Condition{Kind: kind, Text: text, Where: where + "." + string(kind)}, ""
+			return &Condition{Kind: kind, text: text, Where: where + "." + string(kind)}, ""
 		case WhenNot:
 			child, err := node(value, where+"."+string(kind), depth+1)
 			if err != "" {

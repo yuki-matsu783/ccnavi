@@ -160,7 +160,7 @@ func dropWorktree(stdout io.Writer, root, name, cwd, after string) bool {
 	}
 	d := worktrees.Drop(root, name, cwd)
 	worktrees.Report(stdout, root, d, after)
-	return d.Removed()
+	return d.Gone()
 }
 
 func say(stdout io.Writer, o outcome) {
@@ -177,12 +177,8 @@ func confirmCommand(root, name string) string {
 
 // parentOf はそのチケットの parent。承認済みの置き場（作業中・閉じた・レビュー待ち）を先に、無ければ手元の退避を
 // 見る。見つからなければ空。
-func parentOf(conf *config.Settings, root, project, ident string) string {
-	raw := approval.ReadRaw(conf, root)
-	open, _ := approval.Scan(conf, root, false, raw)
-	closed, _ := approval.Scan(conf, root, true, raw)
-	review, _ := approval.ScanReview(conf, root, raw)
-	for _, t := range slices.Concat(open, closed, review) {
+func parentOf(approved *approval.Approved, root, project, ident string) string {
+	for _, t := range approved.All() {
 		if same(t.ID, ident) {
 			return t.Parent
 		}
@@ -215,7 +211,7 @@ func parentRefusal(root, family string, refused worktrees.Dropped) string {
 // 親のワークツリーを消せない（cwd が中・未コミットなど）ときは、子に触る前に何も消さずに断る（Drop と同じ判定）。
 // 消さなかったものがあれば 1。
 func RunRetire(stdout, stderr io.Writer, conf *config.Settings, root, family, cwd string) int {
-	family = worktrees.FamilyFor(conf, root, family)
+	family = worktrees.FamilyFor(approval.ScanApproved(conf, root, nil), family)
 	held, broken := heldEmpty(), ""
 	if conf.State != "" {
 		held, broken = heldRecord(recordPath(conf, family))
@@ -321,7 +317,7 @@ func RunBranch(stdout, stderr io.Writer, conf *config.Settings, root, name strin
 	name = found.ticket // 以降は記録の綴りで扱う（ブランチは git が大文字小文字を区別する）
 	// 記録は書き換えれば消す対象を広げられるので、記録の子が実際にこの親の子かを確かめ直す。
 	parent := textOf(record.Value(keyParent))
-	actual := parentOf(conf, root, found.project, name)
+	actual := parentOf(approval.ScanApproved(conf, root, nil), root, found.project, name)
 	if parent == "" || !same(actual, parent) {
 		shownParent, shownActual := parent, actual
 		if shownParent == "" {

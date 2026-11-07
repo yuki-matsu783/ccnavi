@@ -17,10 +17,10 @@ type KindID string
 
 const (
 	Template    KindID = "template"
-	Messages    KindID = "messages"
-	LayerConfig KindID = "layer-config"
-	Docs        KindID = "docs"
-	Defense     KindID = "defense"
+	messages    KindID = "messages"
+	layerConfig KindID = "layer-config"
+	docs        KindID = "docs"
+	defense     KindID = "defense"
 )
 
 // Kind は取り込み先の種類の表の 1 行。
@@ -74,13 +74,13 @@ var kinds = []*Kind{
 		creatable: true, onBoard: true,
 	},
 	{
-		ID:        Messages,
+		ID:        messages,
 		shown:     []string{".ccnavi/messages/<名前>.yml"},
 		patterns:  full(`\.ccnavi/messages/` + reName + `\.yml`),
 		creatable: true,
 	},
 	{
-		ID: LayerConfig,
+		ID: layerConfig,
 		shown: []string{
 			".ccnavi/config/{common,project}/{rules,phases,risks}.yml",
 			"projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml",
@@ -92,13 +92,13 @@ var kinds = []*Kind{
 		onBoard: true,
 	},
 	{
-		ID:       Docs,
+		ID:       docs,
 		shown:    []string{".ccnavi/docs/**/*.md", ".ccnavi/CCNAVI.md"},
 		patterns: full(`\.ccnavi/docs/`+reDeep+`\.md`, `\.ccnavi/ccnavi\.md`),
 		onBoard:  true,
 	},
 	{
-		ID: Defense,
+		ID: defense,
 		shown: []string{
 			".ccnavi/scripts/**",
 			".claude/hooks/**",

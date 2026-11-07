@@ -20,8 +20,8 @@ const DirectVersion = "4"
 // DirectRecord は有効と確かめた記録 1 つ。
 type DirectRecord struct {
 	Name       string
-	MainRoot   string
-	BaseBranch string
+	mainRoot   string
+	baseBranch string
 }
 
 // ParseDirect は `<キー> <値>` の行をマップにする。空行と形の違う行は飛ばし、同じキーは後が勝つ。

@@ -222,7 +222,7 @@ func goAnswers(t *testing.T, root string, cwds, findings []string, head string) 
 			at = n
 		}
 		var declared any
-		if d := p.DeclaredReview(); d.Said() {
+		if d := p.declaredReview(); d.Said() {
 			declared = d == ticket.Needed
 		}
 		kinds := []string{}
@@ -235,7 +235,7 @@ func goAnswers(t *testing.T, root string, cwds, findings []string, head string) 
 			ids = append(ids, c.ID)
 		}
 		return []any{p.Number, p.Label(), p.Ended(), p.ReviewRequired(), p.GateClosed(), p.ReviewWaiting(),
-			p.ReviewLabel(), p.Deferred(), at, list(p.Covers()), declared, list(p.CoveredReviews), p.RiskLine(),
+			p.ReviewLabel(), p.Deferred(), at, list(p.Covers()), declared, list(p.coveredReviews), p.RiskLine(),
 			p.RiskBody(), kinds, ids, p.ReviewedOrSkipped(), p.Planned(), p.Title()}
 	}
 	manual := func(m Manual) []any {
@@ -247,7 +247,7 @@ func goAnswers(t *testing.T, root string, cwds, findings []string, head string) 
 		if !m.MovedAt.IsZero() {
 			moved = fsio.UnixSeconds(m.MovedAt)
 		}
-		return []any{string(m.State), list(m.Children), list(m.Waiting), m.Note, m.NeedTime, paths, moved, m.Line()}
+		return []any{string(m.State), list(m.Children), list(m.waiting), m.note, m.NeedTime, paths, moved, m.Line()}
 	}
 	at := func(f float64) ManualOptions { return ManualOptions{External: true, MovedAt: &f} }
 	parents := map[string]any{}

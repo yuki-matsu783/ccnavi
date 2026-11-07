@@ -60,14 +60,14 @@ func TestOverviewMatchesPython(t *testing.T) {
 	proposals := approval.ReadProposals(conf, root, raw).Kept
 	var rows, lines, children, remotes []any
 	for _, r := range Collect(conf, root, doing, review, closed, proposals) {
-		rows = append(rows, []any{r.Ident, testkit.Rel(root, r.Path), r.Branch, r.MR, r.NextChild, r.Unsent, r.Project})
+		rows = append(rows, []any{r.Ident, testkit.Rel(root, r.path), r.branch, r.mr, r.nextChild, r.unsent, r.project})
 		lines = append(lines, Line(r))
 		states := []any{}
 		for _, c := range ChildStates(root, r, doing, review) {
 			states = append(states, []any{c.Ident, c.State})
 		}
 		children = append(children, states)
-		dumped, err := pyjson.Dumps(RemoteInfo(r.Path), pyjson.Options{})
+		dumped, err := pyjson.Dumps(RemoteInfo(r.path), pyjson.Options{})
 		if err != nil {
 			t.Fatal(err)
 		}

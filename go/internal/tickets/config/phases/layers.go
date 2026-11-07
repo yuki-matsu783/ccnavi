@@ -13,8 +13,8 @@ import (
 // どちらが無くても正常（無い = 空）で、両方無いときだけ定義が無い。足すだけで、レイヤーが共通レイヤーの
 // 定義を上書きすることはない。
 
-// TypesPath はそのプロジェクトのレイヤーの phases.yml（layer.File）。
-func TypesPath(conf *config.Settings, root, project string) string {
+// typesPath はそのプロジェクトのレイヤーの phases.yml（layer.File）。
+func typesPath(conf *config.Settings, root, project string) string {
 	return layer.File(conf, root, project, config.KindPhases)
 }
 
@@ -29,11 +29,11 @@ func CommonTypes(conf *config.Settings) (*Types, []rules.Problem) {
 	return types, notes
 }
 
-// Merge は共通レイヤーの定義に、行き先のレイヤーの定義を id ごとに足す。同じ id で全欄が一致すれば重複として
+// merge は共通レイヤーの定義に、行き先のレイヤーの定義を id ごとに足す。同じ id で全欄が一致すれば重複として
 // レイヤーの側を捨て（info）、中身が違えば error。表示名の重なりもレイヤーをまたいで error。捨てるのはいつも
 // レイヤーの側（共通レイヤーの定義は全プロジェクトで同じに読まれるべきなので、1 つのレイヤーの書き方で中身が
 // 変わらないようにする）。
-func Merge(common, extra *Types, layer string) (*Types, []rules.Problem) {
+func merge(common, extra *Types, layer string) (*Types, []rules.Problem) {
 	merged := common.clone()
 	var problems []rules.Problem
 	titles := map[string]string{}
@@ -70,7 +70,7 @@ func Merge(common, extra *Types, layer string) (*Types, []rules.Problem) {
 // 共通レイヤーの苦情は返さない（言う場所は --lint の共通レイヤーの項で、二重に言わない）。
 func LayerTypes(conf *config.Settings, root, project string) (*Types, []rules.Problem) {
 	common, _ := CommonTypes(conf)
-	path := TypesPath(conf, root, project)
+	path := typesPath(conf, root, project)
 	if path == "" || !ospath.DiskExists(path) {
 		return common, nil
 	}
@@ -83,7 +83,7 @@ func LayerTypes(conf *config.Settings, root, project string) (*Types, []rules.Pr
 	if common == nil {
 		return extra, notes
 	}
-	merged, problems := Merge(common, extra, name)
+	merged, problems := merge(common, extra, name)
 	return merged, append(notes, problems...)
 }
 

@@ -98,7 +98,7 @@ func TestTooDeepAndOverflow(t *testing.T) {
 	if _, err := Compile(deep, 0); !errors.Is(err, ErrTooDeep) {
 		t.Errorf("%d 段: %v", maxNesting+1, err)
 	}
-	if _, err := Compile("a{4294967295}", 0); !errors.Is(err, ErrOverflow) {
+	if _, err := Compile("a{4294967295}", 0); !errors.Is(err, errOverflow) {
 		t.Errorf("%v", err)
 	}
 	if _, err := Compile("a{4294967294}", 0); err != nil {
@@ -187,7 +187,7 @@ func TestDepthLimit(t *testing.T) {
 	long := strings.Repeat("ab", 2<<20)
 	for _, p := range []string{`(?:ab)*c`, `(?:(a)(b))*?c`, `^(?!(?:ab)*$)`, `(?:(?=a)ab)*$`} {
 		ok, err := MustCompile(p, IgnoreCase).SearchChecked(long)
-		if ok || !errors.Is(err, ErrDepthLimit) {
+		if ok || !errors.Is(err, errDepthLimit) {
 			t.Errorf("%s: (%v, %v), want (false, ErrDepthLimit)", p, ok, err)
 		}
 		if MustCompile(p, IgnoreCase).Search(long) {

@@ -7,8 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/records/redact"
 	"ccnavi/internal/records/wiki"
 )
@@ -35,8 +37,8 @@ const (
 // 付けず、止めて直させる。
 var errNoFrontmatter = errors.New("先頭に learnings: を持つ frontmatter がありません")
 
-// RecordRel は子の気づきの記録の置き場。
-func RecordRel(ident string) string { return LearningDir + "/" + ident + mdExt }
+// recordRel は子の気づきの記録の置き場。
+func recordRel(ident string) string { return LearningDir + "/" + ident + config.MdExt }
 
 func digestRel(ident string) string { return LearningDir + "/" + ident + digestExt }
 
@@ -45,7 +47,7 @@ func inboxRel(ident, stamp string, n int) string {
 	if n > 0 {
 		suffix = "-" + strconv.Itoa(n)
 	}
-	return wiki.InboxDir + "/" + ident + "-" + stamp + suffix + mdExt
+	return wiki.InboxDir + "/" + ident + "-" + stamp + suffix + config.MdExt
 }
 
 func utc14() string { return time.Now().UTC().Format(fsio.IDStampLayout) }
@@ -154,7 +156,7 @@ func countEntries(text string) string {
 
 // appendEntry は記録の末尾に節を足し、件数を数え直す。空の記録は雛形から始める。
 func appendEntry(text, entry, ident, parent string) (string, error) {
-	text = strings.ReplaceAll(strings.TrimLeft(text, "\uFEFF"), "\r\n", "\n")
+	text = strings.ReplaceAll(strings.TrimLeft(text, yaml.BOM), "\r\n", "\n")
 	if ospath.Strip(text) == "" {
 		text = scaffoldText(ident, parent)
 	} else if !hasUsableFrontmatter(text) {

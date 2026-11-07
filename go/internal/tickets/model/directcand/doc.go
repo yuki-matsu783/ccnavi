@@ -7,7 +7,7 @@
 //
 // 置き場は `<state>/direct-<セッション>.json` で、形は `{"session", "entries": [{"name", "path", "seen", "checked"}]}`
 // である。seen は、最後に書き込み先として見た時刻。checked は、Stop で最後に調べた時刻である（0 は未調査。どちらも
-// UNIX 秒）。上限は MaxEntries 件で、seen の古いものから捨てる。読むときは、session が完全に一致する記録だけを使う。
+// UNIX 秒）。上限は maxEntries 件で、seen の古いものから捨てる。読むときは、session が完全に一致する記録だけを使う。
 // 名前が IntegrableName を通らない項目と、path がその名前のワークツリーと一致しない項目は捨てる。
 //
 // 保存できなくても何も言わない。登録は補助だからである。並行して書かれると 1 件落ちることがあるが、補わない。

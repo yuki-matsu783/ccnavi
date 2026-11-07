@@ -19,19 +19,19 @@ import (
 // CodeFinishNudge は finish の打ち忘れを促すときの理由コード。
 const CodeFinishNudge = "NUDGE_TICKET_FINISH"
 
-// Unfinished は Stop で finish を促す相手。Ahead は自分で作ったコミットの数。
+// Unfinished は Stop で finish を促す相手。ahead は自分で作ったコミットの数。
 type Unfinished struct {
 	Ticket   *ticket.Ticket
-	Worktree string
-	Ahead    int
-	Head     string
+	worktree string
+	ahead    int
+	head     string
 }
 
 // Key はチケットの識別子（ほかの促しのキーは頭を付けて分ける）。
 func (u *Unfinished) Key() string { return u.Ticket.ID }
 
 // Digest は HEAD。コミットを足せばまた促す。
-func (u *Unfinished) Digest() string { return u.Head }
+func (u *Unfinished) Digest() string { return u.head }
 
 // here は cwd のツリー（ワークスペースルートの外・ルート自身なら偽）。
 func here(conf *config.Settings, root, cwd string) (tree.Tree, bool) {
@@ -131,10 +131,10 @@ func FinishNudge(root string, u *Unfinished) string {
 	}
 	said := texts.Say(root, "NUDGE_TICKET_FINISH", texts.Values{
 		"ticket":         t.ID,
-		"worktree":       u.Worktree,
-		"ahead":          strconv.Itoa(u.Ahead),
+		"worktree":       u.worktree,
+		"ahead":          strconv.Itoa(u.ahead),
 		"base":           prefix(t.BaseSHA, git.ShortSHA),
-		"user_stop_note": UserStopNote,
+		"user_stop_note": userStopNote,
 	}, texts.Variants{"what": what})
 	return hookio.Tagged(CodeFinishNudge, "ticket: "+t.ID) + "\n" + said
 }

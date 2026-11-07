@@ -20,8 +20,11 @@ const (
 	Allow Decision = "allow"
 )
 
-// Sections はタイプを強い順に並べたもの。判定もこの順に見る。
-var Sections = []Decision{Deny, Ask, Allow}
+// sections はタイプを強い順に並べたもの。判定もこの順に見る。
+var sections = []Decision{Deny, Ask, Allow}
+
+// Sections は sections の写しを返す（呼び手が書き換えても元は変わらない）。
+func Sections() []Decision { return slices.Clone(sections) }
 
 // Version はこのビルドが読めるルールファイルの書式の版。
 const Version = 1
@@ -37,8 +40,8 @@ const (
 	ReservedIDPrefix = "builtin:"
 	// EveryDefault は every を書かなかったときの刻み（当たるたびに渡す）。
 	EveryDefault = 1
-	// DegradedRuleName は組み立てられずに止める側へ倒したルールの文面の中の、ルールの名前の差し込み。
-	DegradedRuleName = "{rule}"
+	// degradedRuleName は組み立てられずに止める側へ倒したルールの文面の中の、ルールの名前の差し込み。
+	degradedRuleName = "{rule}"
 )
 
 // Origin はルール集合の出所。判定の文の source に出す名前で、ルールファイルの場所か、組み込みの既定（builtin.Source）。
@@ -48,9 +51,9 @@ type Origin string
 const (
 	ExceptKey = "except"
 	WhenKey   = "when"
-	// MaxWhenDepth と MaxWhenNodes は when の入れ子の段数とノードの数の上限（判定を重くしない）。
-	MaxWhenDepth = 8
-	MaxWhenNodes = 64
+	// maxWhenDepth と maxWhenNodes は when の入れ子の段数とノードの数の上限（判定を重くしない）。
+	maxWhenDepth = 8
+	maxWhenNodes = 64
 )
 
 // WhenKind は when のノードの種類。Glob と Regex は個別条件で、except の要素と同じ形。
@@ -94,7 +97,7 @@ func (e Exclusion) Written() *pyjson.Object {
 // 比べるとき（Key）と書き戻し（Written）には入れない。
 type Condition struct {
 	Kind     WhenKind
-	Text     string
+	text     string
 	Children []*Condition
 	Compiled *pyre.Regexp
 	Where    string
@@ -102,9 +105,6 @@ type Condition struct {
 
 // IsLeaf は個別条件（glob・regex）か。
 func (c *Condition) IsLeaf() bool { return c.Kind == WhenGlob || c.Kind == WhenRegex }
-
-// Hits は subject に当たるか。照合を打ち切った式は当たらなかったものとして読む。
-func (c *Condition) Hits(subject string) bool { return c.hits(subject, &probe{}) }
 
 func (c *Condition) hits(subject string, p *probe) bool {
 	switch c.Kind {
@@ -128,7 +128,7 @@ func (c *Condition) hits(subject string, p *probe) bool {
 	return !c.Children[0].hits(subject, p)
 }
 
-// probe は 1 回の照合で、どれかの式が照合を打ち切ったか（pyre.ErrDepthLimit）を覚える。
+// probe は 1 回の照合で、どれかの式が照合を打ち切ったか（pyre.errDepthLimit）を覚える。
 type probe struct{ unsure bool }
 
 func (p *probe) search(re *pyre.Regexp, subject string) bool {
@@ -145,7 +145,7 @@ func (p *probe) search(re *pyre.Regexp, subject string) bool {
 // Written は書いた表記に戻した形。
 func (c *Condition) Written() *pyjson.Object {
 	if c.IsLeaf() {
-		return pyjson.NewObject(string(c.Kind), c.Text)
+		return pyjson.NewObject(string(c.Kind), c.text)
 	}
 	if c.Kind == WhenNot {
 		return pyjson.NewObject(string(WhenNot), c.Children[0].Written())
@@ -160,7 +160,7 @@ func (c *Condition) Written() *pyjson.Object {
 // Key は比べるための形。個別条件は {root} を置き換えたあとの式で比べる（Rule.Key と同じ）。
 func (c *Condition) Key() string {
 	if c.IsLeaf() {
-		text := c.Text
+		text := c.text
 		if c.Compiled != nil {
 			text = c.Compiled.Pattern()
 		}
@@ -176,7 +176,7 @@ func (c *Condition) Key() string {
 // Describe は 1 行で読める形。`any(glob '*.pem', all(glob '*/secrets/*', not(glob '*.md')))`。
 func (c *Condition) Describe() string {
 	if c.IsLeaf() {
-		return string(c.Kind) + " '" + c.Text + "'"
+		return string(c.Kind) + " '" + c.text + "'"
 	}
 	parts := make([]string, len(c.Children))
 	for i, child := range c.Children {
@@ -268,13 +268,20 @@ func (r *Rule) WrittenBody() string {
 	return r.Regex
 }
 
-// SpokenMessage はモデルへ渡す文面（{root} と {script:…} を置き換えたもの）。止める側へ倒したルールは、
-// その説明を先に返す。文面ファイルを引く組み込みのルールの文は texts.Spoken が組む。
-func (r *Rule) SpokenMessage() string {
-	if r.DegradedMessage != "" {
-		return FillText(strings.ReplaceAll(r.DegradedMessage, DegradedRuleName, RecordName(r)), r.Root)
+// Speech はモデルへ渡す文面の出どころを決める。文面の出どころの優先はここだけで決める。
+//   - 止める側へ倒したルールは、その説明（DegradedMessage）を返す。書いた文面より先に言う
+//   - 文面ファイルの識別子を持つ組み込みのルールは ref を返し、text は空。文は texts.Spoken がいま引く
+//   - ほかは書いた Message
+//
+// text は {root} と {script:…} を置き換えたもの。
+func (r *Rule) Speech() (ref *TextRef, text string) {
+	switch {
+	case r.DegradedMessage != "":
+		return nil, FillText(strings.ReplaceAll(r.DegradedMessage, degradedRuleName, RecordName(r)), r.Root)
+	case r.Text.ID != "":
+		return &r.Text, ""
 	}
-	return FillText(r.Message, r.Root)
+	return nil, FillText(r.Message, r.Root)
 }
 
 // Key はレイヤーをまたいで「同じ定義」と言えるかのキー。式は {root} を置き換えたあとで比べる。

@@ -22,12 +22,12 @@ const CodeFeedbackNudge = "NUDGE_TICKET_FEEDBACK"
 // feedbackKey は記録のキーの頭。
 const feedbackKey = "feedback:"
 
-// Waiting はフィードバック計画待ちで促す相手。Todo は提案の置き場の絶対パス、Proposal は改版の提案（無ければ空）。
+// Waiting はフィードバック計画待ちで促す相手。todo は提案の置き場の絶対パス、proposal は改版の提案（無ければ空）。
 type Waiting struct {
 	Parent   *ticket.Ticket
-	Head     string
-	Todo     string
-	Proposal string
+	head     string
+	todo     string
+	proposal string
 }
 
 // Key は `feedback:<親>`。
@@ -36,10 +36,10 @@ func (w *Waiting) Key() string { return feedbackKey + w.Parent.ID }
 // Digest は親・HEAD・改版を提案済みか。HEAD が進むか、提案済みに変われば、また促す。
 func (w *Waiting) Digest() string {
 	state := "none"
-	if w.Proposal != "" {
+	if w.proposal != "" {
 		state = "proposed"
 	}
-	return w.Parent.ID + "@" + w.Head + ":" + state
+	return w.Parent.ID + "@" + w.head + ":" + state
 }
 
 // parentOf は cwd のツリーに結び付く承認済みチケットの、作業中で着手済みの親。子のツリーならその親。
@@ -102,7 +102,7 @@ func proposed(todo, id string) string {
 		return ""
 	}
 	for _, name := range names {
-		if !strings.HasSuffix(name, ".md") {
+		if !strings.HasSuffix(name, config.MdExt) {
 			continue
 		}
 		path := ospath.Join(todo, name)
@@ -116,15 +116,15 @@ func proposed(todo, id string) string {
 // FeedbackNudge は Stop を止めて渡す文。改版が提案済みかで言うことを分ける。
 func FeedbackNudge(root string, w *Waiting) string {
 	next := "drafting"
-	if w.Proposal != "" {
+	if w.proposal != "" {
 		next = "proposed"
 	}
 	said := texts.Say(root, "NUDGE_TICKET_FEEDBACK", texts.Values{
 		"parent":         w.Parent.ID,
 		"stage":          phase.StageFeedbackWaiting,
-		"proposal":       w.Proposal,
-		"todo":           w.Todo,
-		"user_stop_note": UserStopNote,
+		"proposal":       w.proposal,
+		"todo":           w.todo,
+		"user_stop_note": userStopNote,
 	}, texts.Variants{"next": next})
 	return hookio.Tagged(CodeFeedbackNudge, "parent: "+w.Parent.ID) + "\n" + said
 }

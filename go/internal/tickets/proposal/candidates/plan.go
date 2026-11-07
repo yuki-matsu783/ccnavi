@@ -104,14 +104,14 @@ func PlanProblems(t *ticket.Ticket, cfg *phases.Types, held map[string]*phases.P
 		}
 	}
 	problems = append(problems, phases.PlanProblems(t, types, "")...)
-	return append(problems, CopyConfigProblems(t, cfg, held, approved)...)
+	return append(problems, copyConfigProblems(t, cfg, held, approved)...)
 }
 
-// CopyConfigProblems はコピーの各定義が、承認したときの phases.yml の同じ名前の定義と読んだ形で同じか。
+// copyConfigProblems はコピーの各定義が、承認したときの phases.yml の同じ名前の定義と読んだ形で同じか。
 // phases.yml にあってコピーに無い定義は何も言わない（この親では使わないだけ）。held の定義は承認済みチケットの
 // コピーの値と比べる（進んでいるフェーズの範囲・レビューの要否・成果物を改版で変えないため）。approved なら
 // 承認済みチケットの食い違いとして warn で言う（判定はコピーを読むので、進行中の親には効かない）。
-func CopyConfigProblems(t *ticket.Ticket, cfg *phases.Types, held map[string]*phases.PhaseType, approved bool) []rules.Problem {
+func copyConfigProblems(t *ticket.Ticket, cfg *phases.Types, held map[string]*phases.PhaseType, approved bool) []rules.Problem {
 	if !phases.HasCopy(t) || !t.HasPlan() {
 		return nil
 	}

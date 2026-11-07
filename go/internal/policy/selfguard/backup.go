@@ -39,7 +39,7 @@ const (
 	noSession = "no-session"
 
 	// keepFor より長く触られていないセッションのバックアップはセッション開始で消す（中断して翌日に開き直した形まで拾う）。
-	// ctxfile.OnceKeep と同じ 3 日だが別の約束（Python も KEEP_DAYS と ONCE_KEEP_DAYS を分ける）なので、片方だけ変えてよい。
+	// ctxfile.onceKeep と同じ 3 日だが別の約束（Python も KEEP_DAYS と ONCE_KEEP_DAYS を分ける）なので、片方だけ変えてよい。
 	keepFor = 3 * 24 * time.Hour
 	// refreshAfter は変わっていないバックアップの更新時刻を新しくする間隔（掃除に古いと読まれないよう keepFor より短く）。
 	refreshAfter = 24 * time.Hour
@@ -51,12 +51,18 @@ const (
 // commonRulesDraft は共通レイヤーのルールファイルの下書きの置き場（ワークスペースルートからの相対、"/" 区切り）。
 var commonRulesDraft = strings.Join(append(slices.Clone(handoffParts), ospath.Slashed(config.DefaultRules)), "/")
 
-// Choices は戻す働きの設定が取る値。GateChoices は、戻す働きを持たない切り替え（チケットの承認の経路など）の値。
+// choices は戻す働きの設定が取る値。gateChoices は、戻す働きを持たない切り替え（チケットの承認の経路など）の値。
 // dry-run が無い。通せば済んでしまい、報告では戻らないからである。
 var (
-	Choices     = []config.Mode{config.Enable, config.DryRun, config.Disable}
-	GateChoices = []config.Mode{config.Enable, config.Disable}
+	choices     = []config.Mode{config.Enable, config.DryRun, config.Disable}
+	gateChoices = []config.Mode{config.Enable, config.Disable}
 )
+
+// Choices は choices の写しを返す（呼び手が書き換えても元は変わらない）。
+func Choices() []config.Mode { return slices.Clone(choices) }
+
+// GateChoices は gateChoices の写しを返す（呼び手が書き換えても元は変わらない）。
+func GateChoices() []config.Mode { return slices.Clone(gateChoices) }
 
 // Resolve は設定の値を解く。読めない値（allowed に無い語も）は enable にし、stderr に言う。
 // 書き損じた 1 語で保護が消えるより、残るほうがよいため。
@@ -87,14 +93,14 @@ func Resolve(stderr io.Writer, flag, declared, name string, allowed []config.Mod
 type Action string
 
 const (
-	ActionKept        Action = "kept"              // 変わっていない（報告には出さない）
-	ActionRestored    Action = "restored"          // バックアップから戻した
-	ActionRestoredGit Action = "restored-from-git" // バックアップが無く、git から戻した
-	ActionMissing     Action = "missing"           // 対象が無く、戻す先も無い
+	actionKept        Action = "kept"              // 変わっていない（報告には出さない）
+	actionRestored    Action = "restored"          // バックアップから戻した
+	actionRestoredGit Action = "restored-from-git" // バックアップが無く、git から戻した
+	actionMissing     Action = "missing"           // 対象が無く、戻す先も無い
 	ActionFailed      Action = "failed"            // 戻そうとして駄目だった
 	ActionWould       Action = "would-restore"     // dry-run。戻す代わりに言うだけ
-	ActionRebased     Action = "rebased"           // 大きい対象が変わったので、新しい版を基準に取り直した
-	ActionAccepted    Action = "accepted"          // ユーザの発言で、消えたことを受け入れた
+	actionRebased     Action = "rebased"           // 大きい対象が変わったので、新しい版を基準に取り直した
+	actionAccepted    Action = "accepted"          // ユーザの発言で、消えたことを受け入れた
 )
 
 // Outcome は対象 1 つについて、この 1 回で何をしたか。
@@ -117,7 +123,7 @@ func Before(setting config.Mode, stateDir, session, root string, found []Target)
 	var outcomes []Outcome
 	for _, t := range found {
 		b := backup{stateDir, session, t}
-		if t.Heavy {
+		if t.heavy {
 			// 参照は書き直さないので、掃除に古いと読まれないよう更新時刻だけを新しくする。
 			refresh(b.ref())
 			if setting == config.Enable {
@@ -166,7 +172,7 @@ func After(setting config.Mode, stateDir, session, root string, found []Target) 
 	var outcomes []Outcome
 	for _, t := range found {
 		b := backup{stateDir, session, t}
-		if t.Heavy {
+		if t.heavy {
 			if o, ok := b.checkHeavy(setting); ok {
 				outcomes = append(outcomes, o)
 			}
@@ -183,7 +189,7 @@ func After(setting config.Mode, stateDir, session, root string, found []Target) 
 			}
 			if b.absentNoted() {
 				// 無かったところに現れた。ユーザが置くこともあり、消すほうが取り返しが付かないので言うだけ。
-				outcomes = append(outcomes, Outcome{t, ActionMissing,
+				outcomes = append(outcomes, Outcome{t, actionMissing,
 					"無かったところに設定ファイルが現れた。hook の登録が増えているかもしれないので、中身をユーザに見てもらってください"})
 				continue
 			}
@@ -197,12 +203,12 @@ func After(setting config.Mode, stateDir, session, root string, found []Target) 
 		if failed := fsio.WriteFile(t.Path, saved, fsio.Plain); failed != "" {
 			outcomes = append(outcomes, Outcome{t, ActionFailed, "戻せない: " + failed})
 		} else {
-			outcomes = append(outcomes, Outcome{t, ActionRestored, "このツール呼び出しの直前の内容に戻した"})
+			outcomes = append(outcomes, Outcome{t, actionRestored, "このツール呼び出しの直前の内容に戻した"})
 		}
 	}
 	var reported []Outcome
 	for _, o := range outcomes {
-		if o.Action != ActionKept {
+		if o.Action != actionKept {
 			reported = append(reported, o)
 		}
 	}
@@ -219,7 +225,7 @@ func Accept(setting config.Mode, stateDir, session, root string, found []Target)
 	var outcomes []Outcome
 	for _, t := range found {
 		b := backup{stateDir, session, t}
-		if t.Heavy {
+		if t.heavy {
 			if ospath.DiskLexists(t.Path) {
 				if o, ok := b.rebaseIfChanged(); ok {
 					outcomes = append(outcomes, o)
@@ -227,7 +233,7 @@ func Accept(setting config.Mode, stateDir, session, root string, found []Target)
 			} else if _, ok := b.readRef(); ok {
 				fsio.Remove(b.ref())
 				b.noteAbsent()
-				outcomes = append(outcomes, Outcome{t, ActionAccepted, "消えたことを受け入れた"})
+				outcomes = append(outcomes, Outcome{t, actionAccepted, "消えたことを受け入れた"})
 			}
 			continue
 		}
@@ -237,7 +243,7 @@ func Accept(setting config.Mode, stateDir, session, root string, found []Target)
 				continue
 			}
 			if _, had := b.read(); had {
-				outcomes = append(outcomes, Outcome{t, ActionAccepted, "消えたことを受け入れた"})
+				outcomes = append(outcomes, Outcome{t, actionAccepted, "消えたことを受け入れた"})
 			}
 			fsio.Remove(b.path())
 			b.noteAbsent()
@@ -260,11 +266,11 @@ func AtStart(setting config.Mode, stateDir, session, root string, found []Target
 	sweep(stateDir, session)
 	var outcomes []Outcome
 	for _, t := range found {
-		if !t.Heavy {
+		if !t.heavy {
 			continue
 		}
 		if !ospath.DiskExists(t.Path) {
-			outcomes = append(outcomes, Outcome{t, ActionMissing,
+			outcomes = append(outcomes, Outcome{t, actionMissing,
 				"実行ファイルが見つからない。" + env.EntryPath + " のパスを確かめてください"})
 			continue
 		}
@@ -442,7 +448,7 @@ func (b backup) checkHeavy(setting config.Mode) (Outcome, bool) {
 	if !ok {
 		// ユーザが消したもの（Accept）がこの呼び出しの中で現れた。判定器が差し替わっていないか見る機会を残し、消さない。
 		if b.absentNoted() && ospath.DiskExists(t.Path) {
-			return Outcome{t, ActionMissing,
+			return Outcome{t, actionMissing,
 				"ユーザが消したあとに、実行ファイルが現れた。判定器が差し替わっているかもしれないので、中身をユーザに見てもらってください"}, true
 		}
 		return Outcome{}, false
@@ -478,9 +484,9 @@ func (b backup) restoreHeavy(r heavyRef) Outcome {
 	stamp := time.Unix(r.mtime, 0)
 	os.Chtimes(t.Path, stamp, stamp)
 	if existed {
-		return Outcome{t, ActionRestored, "このツール呼び出しで変わったので、直前の版に戻した（書かれていた版は " + kept + "）"}
+		return Outcome{t, actionRestored, "このツール呼び出しで変わったので、直前の版に戻した（書かれていた版は " + kept + "）"}
 	}
-	return Outcome{t, ActionRestored, "このツール呼び出しで消えたので、直前の版に戻した"}
+	return Outcome{t, actionRestored, "このツール呼び出しで消えたので、直前の版に戻した"}
 }
 
 // rebaseIfChanged は大きさか更新時刻が変わっていれば、ツール呼び出しの外の変更として今の版を基準に取り直す。
@@ -494,7 +500,7 @@ func (b backup) rebaseIfChanged() (Outcome, bool) {
 			return b.rebaseHeavy(), true
 		}
 		// PATH の実体は開始のあとに現れることがある。最初に見た版を基準にする。
-		if strings.HasPrefix(t.Key, PathKey) && ospath.DiskExists(t.Path) {
+		if strings.HasPrefix(t.Key, pathKey) && ospath.DiskExists(t.Path) {
 			return b.rebaseHeavy(), true
 		}
 		return Outcome{}, false
@@ -509,7 +515,7 @@ func (b backup) rebaseHeavy() Outcome {
 	if failed := b.saveHeavy(); failed != "" {
 		return Outcome{b.target, ActionFailed, "新しい版を基準に取れない: " + failed}
 	}
-	return Outcome{b.target, ActionRebased, "ツール呼び出しの外で変わったので、その版を基準にし直した"}
+	return Outcome{b.target, actionRebased, "ツール呼び出しの外で変わったので、その版を基準にし直した"}
 }
 
 // heavyRef は大きい対象の参照（実体のハッシュと、バックアップした時点の大きさと更新時刻の秒）。
@@ -523,7 +529,7 @@ func parseRef(raw []byte, ok bool) (heavyRef, bool) {
 	if !ok || len(raw) == 0 {
 		return heavyRef{}, false
 	}
-	parts := strings.FieldsFunc(strings.ToValidUTF8(string(raw), "�"), ospath.IsSpace)
+	parts := ospath.Fields(strings.ToValidUTF8(string(raw), "�"))
 	if len(parts) != 3 {
 		return heavyRef{}, false
 	}
@@ -602,12 +608,12 @@ func recoverMissing(setting config.Mode, root string, t Target, saved []byte, ha
 		if failed := fsio.WriteFile(t.Path, saved, fsio.Plain); failed != "" {
 			return Outcome{t, ActionFailed, "消えた対象を戻せない: " + failed}
 		}
-		return Outcome{t, ActionRestored, "消えていたので、直前の内容に戻した"}
+		return Outcome{t, actionRestored, "消えていたので、直前の内容に戻した"}
 	}
 	if failed := restoreCommitted(root, t); failed != "" {
-		return Outcome{t, ActionMissing, "対象が無く、git からも戻せない: " + failed}
+		return Outcome{t, actionMissing, "対象が無く、git からも戻せない: " + failed}
 	}
-	return Outcome{t, ActionRestoredGit, "対象が無かったので、コミット済みの内容から戻した"}
+	return Outcome{t, actionRestoredGit, "対象が無かったので、コミット済みの内容から戻した"}
 }
 
 // fallBackToGit は、バックアップが無いまま実行後に来たときに使う。git が変わっていないと言うなら何もしない。
@@ -617,7 +623,7 @@ func fallBackToGit(setting config.Mode, root string, t Target, hasNow bool) Outc
 	changes, unreadable := git.Read(top, 0)
 	if unreadable != "" {
 		if !hasNow {
-			return Outcome{t, ActionMissing, "対象もバックアップも無く、git も読めない: " + string(unreadable)}
+			return Outcome{t, actionMissing, "対象もバックアップも無く、git も読めない: " + string(unreadable)}
 		}
 		return Outcome{t, ActionFailed, "バックアップが無く、git も読めない: " + string(unreadable)}
 	}
@@ -626,7 +632,7 @@ func fallBackToGit(setting config.Mode, root string, t Target, hasNow bool) Outc
 		dirty = dirty || pathcase.Real(c.Full) == pathcase.Fold(t.Path)
 	}
 	if !dirty && hasNow {
-		return Outcome{t, ActionKept, "バックアップは無いが、コミット済みの内容と同じ"}
+		return Outcome{t, actionKept, "バックアップは無いが、コミット済みの内容と同じ"}
 	}
 	if setting != config.Enable {
 		return Outcome{t, ActionWould, "バックアップがありません。本来なら git から戻す"}
@@ -634,7 +640,7 @@ func fallBackToGit(setting config.Mode, root string, t Target, hasNow bool) Outc
 	if failed := restoreCommitted(root, t); failed != "" {
 		return Outcome{t, ActionFailed, "バックアップが無く、git からも戻せない: " + failed}
 	}
-	return Outcome{t, ActionRestoredGit,
+	return Outcome{t, actionRestoredGit,
 		"バックアップが無いのでコミット済みの内容へ戻した。コミットしていない編集があったなら、それは残っていない"}
 }
 

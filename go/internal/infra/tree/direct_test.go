@@ -53,7 +53,7 @@ func names(records []DirectRecord) []string {
 func TestDirectRecords(t *testing.T) {
 	f := newDirectFixture(t)
 	f.record(t, "yes", "", "")
-	if got := DirectRecords(f.ws, f.main); len(got) != 1 || got[0].Name != directName || got[0].BaseBranch != "main" {
+	if got := DirectRecords(f.ws, f.main); len(got) != 1 || got[0].Name != directName || got[0].baseBranch != "main" {
 		t.Fatalf("有効な記録 = %+v", got)
 	}
 	if roots := SideBySideRoots(f.ws, filepath.Join(f.ws, "projects")); len(roots) != 1 || roots[0].Name != "p" {

@@ -70,7 +70,7 @@ func DirectWorktrees(conf *config.Settings, root string, deadline time.Time) str
 
 // directLine はワークツリー 1 本の行。取れなかった項目は「不明」と言う。
 func directLine(f directFound, deadline time.Time) string {
-	dirty, known := integrate.Dirty(f.here.Root, deadline)
+	dirty, known := git.Dirty(f.here.Root, git.Options{Deadline: deadline})
 	var dirtyOf *bool
 	dirtyText := unknown
 	if known {

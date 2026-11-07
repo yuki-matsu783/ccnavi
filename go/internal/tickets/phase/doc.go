@@ -14,10 +14,10 @@
 // hold_reason → HoldReason、announce → Announce、downstream_touched・reopen_impact → ReopenImpact、
 // reviewed_or_skipped → Phase.ReviewedOrSkipped、review_next → ReviewNext、resumed_review → ResumedReview、
 // order_problems → OrderProblems（呼び手が渡しても読み直していた types の引数は持たない）、plan_finished →
-// PlanFinished、stage → Stage、LABEL_* → LabelPreparing・LabelWaiting、CODE_* → CodeReview・CodeSubagent、
+// PlanFinished、stage → Stage、LABEL_* → labelPreparing・labelWaiting、CODE_* → CodeReview・CodeSubagent、
 // PARALLEL_REQUEST_NOTE → ParallelRequestNote、STAGE_FEEDBACK_WAITING → StageFeedbackWaiting。
 // review_venues は Phases の各 ReviewRequired で足りるので持たない。types_path・layer_types・load_types の
-// 別名は phases.TypesPath・LayerTypes・LoadTypes を直に使う。TIMEOUT_SECONDS は scope が git.StateTimeout を使う。
+// 別名は phases.typesPath・LayerTypes・LoadTypes を直に使う。TIMEOUT_SECONDS は scope が git.StateTimeout を使う。
 // manual_settle: assess → AssessManual（external・moved_at → ManualOptions）、Manual・line → Manual・Line、
 // NONE などの状態 → Settle の定数、MARGIN_SECONDS → Margin（time.Duration）、moved_at の epoch 秒 →
 // Manual.MovedAt（time.Time）。
