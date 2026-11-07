@@ -15,8 +15,6 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi.hook import parentwrite
-from ccnavi.infra import shellread
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
@@ -53,6 +51,7 @@ class RootShellWriteTest(unittest.TestCase):
             cwd=ROOT,
             env=environment,
         )
+        self.last = result
         if not result.stdout.strip():
             return "", ""
         out = json.loads(result.stdout)["hookSpecificOutput"]
@@ -217,10 +216,9 @@ class RootShellWriteTest(unittest.TestCase):
         for _ in range(400):
             command = "".join(rng.choice(pieces) for _ in range(rng.randint(1, 14)))
             with self.subTest(command=command):
-                reading = shellread.read(command)
-                layers = [reading.unwrapped, reading.moved]
-                parentwrite.write_targets(self.repo, command, layers)
                 self.decide(command)
+                self.assertNotIn("internal-error", self.last.stderr)
+                self.assertEqual(self.last.returncode, 0, self.last.stderr)
 
     def test_サブシェルの直後の_セミコロンで_cd_の起点が漏れない(self):
         # サブシェルの中の行き先（checkout のルート）が後ろに漏れると、ルート直下の書き込みになる。

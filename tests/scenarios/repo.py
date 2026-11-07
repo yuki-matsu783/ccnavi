@@ -10,9 +10,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from ccnavi.infra import pathcase
 from tests.scenarios import hostenv, schema, workspace
-from tests.scenarios.common import DISPOSABLE_REL, RUNNER, Refusal, log
+from tests.scenarios.common import DISPOSABLE_REL, RUNNER, Refusal, fold, log
 
 LOCK_NAME = "ccnavi-scenario.lock"  # 対象の .git/ の中。git clean で消えず、status も汚さない
 
@@ -61,19 +60,19 @@ def _toplevel(path):
 def _common_dir(path):
     """リンクされたワークツリーも同じになる、リポジトリ共通の .git の実体（比べる形）。"""
     r = git(["rev-parse", "--git-common-dir"], cwd=path)
-    return pathcase.fold(os.path.realpath(os.path.join(path, r.stdout.strip())))
+    return fold(os.path.realpath(os.path.join(path, r.stdout.strip())))
 
 
 def _origin(top):
     r = git(["remote", "get-url", "origin"], cwd=top)
     if r.returncode != 0 or not r.stdout.strip():
         return None
-    return pathcase.fold(r.stdout.strip().rstrip("/").removesuffix(".git"))
+    return fold(r.stdout.strip().rstrip("/").removesuffix(".git"))
 
 
 def _inside(path, top):
-    top = pathcase.fold(top).rstrip(os.sep)
-    return pathcase.fold(path).startswith(top + os.sep)
+    top = fold(top).rstrip(os.sep)
+    return fold(path).startswith(top + os.sep)
 
 
 def require_disposable_repo(root, target, allowed=None):
@@ -93,7 +92,7 @@ def require_disposable_repo(root, target, allowed=None):
             use,
         )
     body = os.path.realpath(root)
-    if pathcase.fold(top) == pathcase.fold(body):
+    if fold(top) == fold(body):
         raise Refusal(
             f"対象が ccnavi 本体（ワークスペースルート）になっている: {top}",
             f"対象を使い捨てのリポジトリ（{DISPOSABLE_REL}）にして打ち直す",
@@ -113,7 +112,7 @@ def require_disposable_repo(root, target, allowed=None):
             use,
         )
     want = os.path.realpath(allowed)
-    if pathcase.fold(top) != pathcase.fold(want):
+    if fold(top) != fold(want):
         raise Refusal(
             f"対象の実体 {top} が、許可された {want} と違う",
             f"対象を {DISPOSABLE_REL} にして打ち直す",
@@ -244,9 +243,9 @@ def reset_repo(root, target, base, allowed=None):
         for line in run("worktree", "list", "--porcelain").splitlines()
         if line.startswith("worktree ")
     ]
-    keep = {pathcase.fold(os.path.realpath(p)) for p in (paths[:1] + [top])}
+    keep = {fold(os.path.realpath(p)) for p in (paths[:1] + [top])}
     for p in paths:
-        if pathcase.fold(os.path.realpath(p)) not in keep:
+        if fold(os.path.realpath(p)) not in keep:
             run("worktree", "remove", "--force", p)
     run("worktree", "prune")
     _clear_ccnavi_state(root, top, run)
@@ -306,9 +305,7 @@ def acquire_target(top, out, resuming=False):
     left = git_dir / LEFT_NAME
     if left.exists():
         who = left.read_text(encoding="utf-8").strip()
-        same = bool(who) and (
-            pathcase.fold(os.path.realpath(who)) == pathcase.fold(os.path.realpath(out))
-        )
+        same = bool(who) and (fold(os.path.realpath(who)) == fold(os.path.realpath(out)))
         if not (resuming and same):
             raise Refusal(
                 f"前の回が対象を戻さずに残している: {who}",

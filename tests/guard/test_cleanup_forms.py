@@ -1,5 +1,5 @@
 """ユーザだけが打つ実行ファイルの形を、hook の入口から確かめる
-（src/ccnavi/tickets/model/phase_forms.py）。
+（Go の tickets/model/useronly）。
 
 1. 状態の操作（`ticket finish` など）は、副命令の前に `--` を挟んでも止まる。挟んだ形に
    `--record-tree` を足すと、実行ファイルの「write-and-push を通っていない」検査も外れる
@@ -16,9 +16,11 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi.tickets.model import phase_forms
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
+
+# ユーザだけが打つ状態の操作を止めたときの拒否コード。
+CODE_TICKET_APPROVAL = "DENY_TICKET_APPROVAL_CLI"
 
 
 def _write(path, text):
@@ -73,11 +75,11 @@ class DashesBeforeTheVerbTest(HookCase):
                 with self.subTest(command=command, agent=agent):
                     decision, reason = self.hook(command, agent)
                     self.assertEqual(decision, "deny", reason)
-                    self.assertIn(phase_forms.CODE_TICKET_APPROVAL, reason)
+                    self.assertIn(CODE_TICKET_APPROVAL, reason)
 
     def test_reading_the_ticket_is_not_stopped(self):
         decision, reason = self.hook("ccnavi ticket -- status")
-        self.assertNotIn(phase_forms.CODE_TICKET_APPROVAL, reason)
+        self.assertNotIn(CODE_TICKET_APPROVAL, reason)
 
 
 class CleanupFormsTest(HookCase):
@@ -113,7 +115,7 @@ class CleanupFormsTest(HookCase):
                         # ユーザ専用の sh は名前で止まる（案内は名前の説明）。
                         self.assertIn("ccnavi-user-clean-branch.sh", reason)
                         continue
-                    self.assertIn(phase_forms.CODE_TICKET_APPROVAL, reason)
+                    self.assertIn(CODE_TICKET_APPROVAL, reason)
                     self.assertIn("! を付けて", reason)
 
     def test_the_scripts_that_call_it_are_not_stopped_by_it(self):
@@ -121,7 +123,7 @@ class CleanupFormsTest(HookCase):
         for command in self.PASSED:
             with self.subTest(command=command):
                 _, reason = self.hook(command)
-                self.assertNotIn(phase_forms.CODE_TICKET_APPROVAL, reason)
+                self.assertNotIn(CODE_TICKET_APPROVAL, reason)
 
 
 if __name__ == "__main__":

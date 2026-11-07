@@ -1,4 +1,4 @@
-"""保護済みの sh を呼ぶ形のうち、実行前に止める 2 つ（src/ccnavi/hook/wrapguard.py）。
+"""保護済みの sh を呼ぶ形のうち、実行前に止める 2 つ（Go の hook/shellguard）。
 
 止める・通すの判定は hook が持ち、sh の検査は 2 重目の確認にする。
 
@@ -19,12 +19,19 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi.hook import wrapguard
-from ccnavi.infra import settings, shellread
 from tests import GIT_ENV, ROOT, SH_SCRIPTS, common_path, common_sh
 from tests.inproc import run_ccnavi
 
 GIT = ["sh", "../../../.ccnavi/scripts/ccnavi-git.sh"]
+
+# 止めたときの拒否コードと、記録に載る組み込みのルールの名前。
+CODE_ENV = "DENY_SCRIPT_ENV_OVERRIDE"
+CODE_CHILD_PUSH = "DENY_CHILD_PUSH"
+CODE_CORE_PATH = "DENY_WRAPPER_CORE_PATH"
+CODE_PARENT_TREE = "DENY_SUBAGENT_PARENT_TREE"
+CHILD_PUSH_RULE_ID = "builtin:child-push"
+CORE_PATH_RULE_ID = "builtin:guard-wrapper-paths"
+PARENT_TREE_RULE_ID = "builtin:subagent-parent-tree"
 
 
 def write(path, text):
@@ -42,73 +49,10 @@ def ticket(name, parent=""):
     return "\n".join(lines) + "\n"
 
 
-class EnvTest(unittest.TestCase):
-    """環境変数の代入。読みだけで決まるので、ワークスペースは要らない。"""
-
-    def names(self, command):
-        return wrapguard.check_env(command, shellread.read(command).reason)[1]
-
-    def test_forms_that_set_a_blocked_variable(self):
-        for command in (
-            "CCNAVI_TICKETS_APPROVED=/x sh .ccnavi/scripts/ccnavi-git.sh push",
-            "env CCNAVI_PROJECTS=/x sh .ccnavi/scripts/ccnavi-git.sh push",
-            "env -u CCNAVI_ENTRY_PATH sh .ccnavi/scripts/ccnavi-ticket.sh finish a",
-            "export CCNAVI_WORKSPACE=/x; sh .ccnavi/scripts/ccnavi-git.sh push",
-            "CCNAVI_STATE=/x; sh .ccnavi/scripts/ccnavi-review.sh confirm",
-            "unset CCNAVI_TICKETS_PROPOSAL && sh .ccnavi/scripts/ccnavi-git.sh push",
-            "sudo env CLAUDE_PROJECT_DIR=/x bash .ccnavi/scripts/ccnavi-review.sh confirm",
-            "CCNAVI_NEW_THING=1 ../../../.ccnavi/scripts/ccnavi-git.sh status",
-            "cd a && CCNAVI_ENTRY_PATH=f sh ../.ccnavi/scripts/ccnavi-user-agree.sh",
-            # 関数の定義の本体。頭（`f()`・`function f`）を名前と読み違えると見落とす。
-            "f() { CCNAVI_TICKETS_APPROVED=/x sh .ccnavi/scripts/ccnavi-git.sh push; }; f",
-            "f(){ CCNAVI_X=1 sh .ccnavi/scripts/ccnavi-git.sh push; }; f",
-            "function f { CCNAVI_X=1 sh .ccnavi/scripts/ccnavi-git.sh push; }; f",
-            # 環境を丸ごと空にする。settings.json の env が書き出した置き場も消える。
-            "env -i sh .ccnavi/scripts/ccnavi-git.sh push",
-            "env --ignore-environment sh .ccnavi/scripts/ccnavi-git.sh push",
-            # 値を取るオプションの後ろの代入。
-            "env -C /tmp CCNAVI_X=1 sh .ccnavi/scripts/ccnavi-git.sh push",
-            # ループの中では、後ろに書いた代入も次の回の呼び出しに届く。
-            "for i in 1 2; do sh .ccnavi/scripts/ccnavi-git.sh push; CCNAVI_X=1; done",
-            # git が操作するリポジトリとワークツリーを変える変数。子の居場所で親へコミットできる。
-            "GIT_DIR=/p/.git GIT_WORK_TREE=/p sh .ccnavi/scripts/ccnavi-git.sh commit -m x",
-            "export GIT_WORK_TREE=/p; sh .ccnavi/scripts/ccnavi-git.sh add -A",
-            "env GIT_INDEX_FILE=/p/.git/index sh .ccnavi/scripts/ccnavi-git.sh status",
-            "GIT_COMMON_DIR=/p/.git sh .ccnavi/scripts/ccnavi-git.sh commit -m x",
-            "GIT_CEILING_DIRECTORIES=/x sh .ccnavi/scripts/ccnavi-git.sh commit -m x",
-        ):
-            with self.subTest(command=command):
-                self.assertTrue(self.names(command))
-
-    def test_forms_that_pass(self):
-        for command in (
-            "sh .ccnavi/scripts/ccnavi-git.sh push",
-            "CCNAVI_GIT_MAX_LINES=200 sh .ccnavi/scripts/ccnavi-git.sh log",
-            "env CCNAVI_FETCH_TIMEOUT=5 sh .ccnavi/scripts/ccnavi-fetch.sh",
-            # 作者の名前と出力の形だけを変える git の変数は置ける。
-            "GIT_AUTHOR_NAME=a GIT_PAGER=cat sh .ccnavi/scripts/ccnavi-git.sh commit -m x",
-            # 保護済みの sh を呼ばないなら、ここの話ではない。
-            "CCNAVI_ENTRY_PATH=x uv run python -m ccnavi --lint",
-            "echo CCNAVI_ENTRY_PATH=x && sh .ccnavi/scripts/ccnavi-git.sh status",
-            # 読み切れない形はここでは見ない。allow がヒットせずに確認になる。
-            "sh -c 'CCNAVI_X=1 sh .ccnavi/scripts/ccnavi-git.sh push'",
-        ):
-            with self.subTest(command=command):
-                self.assertFalse(self.names(command))
-
-    def test_pass_through_is_listed_not_guessed(self):
-        # 通すものを並べる形。sh があとから読むようになった変数は止まる側。
-        self.assertFalse(wrapguard.blocked("CCNAVI_GIT_KEEP_LOGS"))
-        self.assertTrue(wrapguard.blocked("CCNAVI_GIT_SOMETHING_NEW"))
-        self.assertFalse(wrapguard.blocked("PATH"))
-        self.assertTrue(wrapguard.blocked("GIT_DIR"))
-        self.assertTrue(wrapguard.blocked("GIT_SOMETHING_NEW"))
-        self.assertFalse(wrapguard.blocked("GIT_AUTHOR_NAME"))
-
-
 class EnvHookTest(unittest.TestCase):
-    """環境変数の代入を hook の入口から通す。上の EnvTest は読みの部品を直接呼ぶので、
-    判定の中で「ccnavi 自身を守る設定」で切れることと、ルールより先に止めることは見ない。"""
+    """環境変数の代入を hook の入口から通す。止める・通す形の表は Go のテスト
+    （go/internal/hook/shellguard の TestCheckEnvTable）が見る。ここでは、判定の中で
+    「ccnavi 自身を守る設定」で切れることと、ルールより先に止めることを見る。"""
 
     COMMAND = "CCNAVI_WORKSPACE=/x sh .ccnavi/scripts/ccnavi-git.sh push"
 
@@ -163,20 +107,20 @@ class EnvHookTest(unittest.TestCase):
     def test_stops_before_an_allow_rule(self):
         decision, reason = self.hook(self.COMMAND)
         self.assertEqual(decision, "deny")
-        self.assertIn(wrapguard.CODE_ENV, reason)
+        self.assertIn(CODE_ENV, reason)
         self.assertIn("CCNAVI_WORKSPACE", reason)
 
     def test_the_same_call_without_the_assignment_reaches_the_rule(self):
         decision, reason = self.hook("sh .ccnavi/scripts/ccnavi-git.sh push")
         # allow がヒットして通る呼び出しは何も出さない。
         self.assertEqual(decision, "")
-        self.assertNotIn(wrapguard.CODE_ENV, reason)
+        self.assertNotIn(CODE_ENV, reason)
 
     def test_not_turned_off_with_the_core_files_guard(self):
         # 環境変数の指定の止めは補助の保護で、自己防衛の設定では切れない。
         decision, reason = self.hook(self.COMMAND, CCNAVI_GUARD_CORE_FILES="disable")
         self.assertEqual(decision, "deny")
-        self.assertIn(wrapguard.CODE_ENV, reason)
+        self.assertIn(CODE_ENV, reason)
 
 
 # （cwd の置き場, コマンド, チケットをどこに置くか, 止まるか）
@@ -274,10 +218,10 @@ class ChildPushTest(unittest.TestCase):
                 try:
                     reason = self.hook(self.cwd(where), " ".join(GIT + [sub]))
                     if stops:
-                        self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
+                        self.assertIn(CODE_CHILD_PUSH, reason)
                         self.assertIn("親（", reason)
                     else:
-                        self.assertNotIn(wrapguard.CODE_CHILD_PUSH, reason)
+                        self.assertNotIn(CODE_CHILD_PUSH, reason)
                 finally:
                     os.remove(path)
 
@@ -286,27 +230,26 @@ class ChildPushTest(unittest.TestCase):
         reason = self.hook(
             self.root, "cd .claude/worktrees/i0001-01-01 && " + " ".join(GIT + ["push"])
         )
-        self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
+        self.assertIn(CODE_CHILD_PUSH, reason)
         # 親のツリーへ移ってから打つ形は通す。
         reason = self.hook(self.trees["i0001-01-01"], "cd ../i0001 && " + " ".join(GIT + ["push"]))
-        self.assertNotIn(wrapguard.CODE_CHILD_PUSH, reason)
+        self.assertNotIn(CODE_CHILD_PUSH, reason)
 
     def test_inside_a_function(self):
         self.place("parent-doing")
         command = "f() { " + " ".join(GIT + ["push"]) + "; }; f"
         reason = self.hook(self.trees["i0001-01-01"], command)
-        self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
+        self.assertIn(CODE_CHILD_PUSH, reason)
 
     def test_unreadable_cd_stops(self):
         reason = self.hook(self.root, 'cd "$X" && ' + " ".join(GIT + ["push"]))
-        self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
+        self.assertIn(CODE_CHILD_PUSH, reason)
 
     def test_refusal_names_the_builtin_rule(self):
         # 文面の先頭に、記録の `rules` と同じ識別子を出す。
         reason = self.hook(self.root, 'cd "$X" && ' + " ".join(GIT + ["push"]))
         self.assertIn(
-            f"[ccnavi] {wrapguard.CODE_CHILD_PUSH} "
-            f"(組み込みのルール: {wrapguard.CHILD_PUSH_RULE_ID})",
+            f"[ccnavi] {CODE_CHILD_PUSH} (組み込みのルール: {CHILD_PUSH_RULE_ID})",
             reason,
         )
 
@@ -321,7 +264,7 @@ class ChildPushTest(unittest.TestCase):
         self.addCleanup(os.remove, link)
         child = os.path.join(link, ".claude", "worktrees", "i0001-01-01")
         reason = self.hook(child, " ".join(GIT + ["push"]))
-        self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
+        self.assertIn(CODE_CHILD_PUSH, reason)
 
 
 class SubagentParentTreeTest(unittest.TestCase):
@@ -377,7 +320,7 @@ class SubagentParentTreeTest(unittest.TestCase):
         return out.get("permissionDecisionReason") or ""
 
     def denied(self, reason):
-        return wrapguard.CODE_PARENT_TREE in reason
+        return CODE_PARENT_TREE in reason
 
     def test_a_subagent_cannot_merge_commit_or_pick_in_the_parent_tree(self):
         parent = self.trees["i0001"]
@@ -385,7 +328,7 @@ class SubagentParentTreeTest(unittest.TestCase):
             with self.subTest(sub=sub):
                 reason = self.hook(parent, " ".join(GIT + [sub]))
                 self.assertTrue(self.denied(reason), reason)
-                self.assertIn(wrapguard.PARENT_TREE_RULE_ID, reason)
+                self.assertIn(PARENT_TREE_RULE_ID, reason)
                 self.assertIn("i0001 は親のワークツリー", reason)
 
     def test_a_subagent_commits_and_takes_in_the_parent_in_its_own_child_tree(self):
@@ -431,14 +374,6 @@ class SubagentParentTreeTest(unittest.TestCase):
         )
         reason = self.hook(child, " ".join(GIT + ["commit -m x"]))
         self.assertFalse(self.denied(reason), reason)
-        self.assertEqual(
-            wrapguard.ticket_role(self.conf(), self.root, "i0001-01-01"),
-            (wrapguard.ROLE_CHILD, "i0001"),
-        )
-
-    def conf(self):
-        conf, _ = settings.load(self.root)
-        return conf
 
     def test_the_directory_of_a_runner_is_followed(self):
         # `env -C` と `sudo -D` は後ろのコマンドを別のディレクトリで走らせる。剥がした実行役の
@@ -463,9 +398,9 @@ class SubagentParentTreeTest(unittest.TestCase):
         self.assertFalse(self.denied(reason), reason)
         # 子のワークツリーからの push も、実行役の行き先で見る。読めない行き先は止める。
         reason = self.hook(parent, f"env -C {child} " + " ".join(GIT + ["push"]))
-        self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
+        self.assertIn(CODE_CHILD_PUSH, reason)
         reason = self.hook(parent, 'env -C "$D" ' + " ".join(GIT + ["push"]))
-        self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
+        self.assertIn(CODE_CHILD_PUSH, reason)
 
     def test_an_untraceable_place_stops(self):
         child = self.trees["i0001-01-01"]
@@ -574,14 +509,14 @@ class SubagentParentTreeTest(unittest.TestCase):
         reason = self.hook(parent, f"sh {upper} commit -m x")
         self.assertTrue(self.denied(reason), reason)
         reason = self.hook(child, f"sh {mixed} push")
-        self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
+        self.assertIn(CODE_CHILD_PUSH, reason)
         ticket_sh = os.path.join(self.root, ".ccnavi", "scripts", "CCNAVI-TICKET.SH")
         reason = self.hook(child, f"sh {ticket_sh} finish i0001-01-01")
         self.assertIn("DENY_SUBAGENT_TICKET_OP", reason)
 
     def test_push_from_a_child_is_still_refused_for_its_own_reason(self):
         reason = self.hook(self.trees["i0001-01-01"], " ".join(GIT + ["push"]))
-        self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
+        self.assertIn(CODE_CHILD_PUSH, reason)
 
 
 @unittest.skipIf(shutil.which("git") is None, "git が無い")
@@ -824,15 +759,14 @@ class CorePathTest(unittest.TestCase):
                 decision, reason = self.hook("sh .ccnavi/scripts/ccnavi-git.sh " + args)
                 if stops:
                     self.assertEqual(decision, "deny", reason)
-                    self.assertIn(wrapguard.CODE_CORE_PATH, reason)
+                    self.assertIn(CODE_CORE_PATH, reason)
                 else:
                     self.assertEqual(decision, "", reason)
 
     def test_refusal_names_the_way_out(self):
         _, reason = self.hook("sh .ccnavi/scripts/ccnavi-git.sh rm .ccnavi/scripts/ccnavi-git.sh")
         self.assertIn(
-            f"[ccnavi] {wrapguard.CODE_CORE_PATH} "
-            f"(組み込みのルール: {wrapguard.CORE_PATH_RULE_ID})",
+            f"[ccnavi] {CODE_CORE_PATH} (組み込みのルール: {CORE_PATH_RULE_ID})",
             reason,
         )
         # 代わりの手段（ユーザに依頼）と、通る衝突の解決を名指しする。実パスで書く。
@@ -875,7 +809,7 @@ class CorePathTest(unittest.TestCase):
             with self.subTest(args=args):
                 decision, reason = self.hook("sh .ccnavi/scripts/ccnavi-git.sh " + args)
                 self.assertEqual(decision, "deny", reason)
-                self.assertIn(wrapguard.CODE_CORE_PATH, reason)
+                self.assertIn(CODE_CORE_PATH, reason)
                 self.assertIn(kind_text, reason)
 
     def test_text_from_a_file_goes_through_the_wrapper(self):
@@ -927,7 +861,7 @@ class CorePathTest(unittest.TestCase):
                 decision, reason = self.hook(command)
                 self.assertEqual(decision == "deny", stops, reason)
                 if stops:
-                    self.assertIn(wrapguard.CODE_CORE_PATH, reason)
+                    self.assertIn(CODE_CORE_PATH, reason)
                     self.assertIn("レビュー待ち", reason)
                     self.assertIn("ユーザに依頼", reason)
 
@@ -1012,14 +946,14 @@ class CorePathTest(unittest.TestCase):
                 decision, reason = self.hook(command)
                 self.assertEqual(decision == "deny", stops, reason)
                 if stops:
-                    self.assertIn(wrapguard.CODE_CORE_PATH, reason)
+                    self.assertIn(CODE_CORE_PATH, reason)
 
     def test_restore_from_a_list_without_source(self):
         # 索引の中身に戻すだけなら、パスをファイルから読む形もここでは止めない。
         decision, reason = self.hook(
             "sh .ccnavi/scripts/ccnavi-git.sh restore --pathspec-from-file=list.txt"
         )
-        self.assertNotIn(wrapguard.CODE_CORE_PATH, reason)
+        self.assertNotIn(CODE_CORE_PATH, reason)
 
     def test_absolute_path(self):
         target = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-git.sh")
@@ -1031,7 +965,7 @@ class CorePathTest(unittest.TestCase):
             "sh .ccnavi/scripts/ccnavi-git.sh rm .ccnavi/scripts/ccnavi-git.sh",
             CCNAVI_GUARD_CORE_FILES="disable",
         )
-        self.assertNotIn(wrapguard.CODE_CORE_PATH, reason)
+        self.assertNotIn(CODE_CORE_PATH, reason)
 
 
 @unittest.skipIf(shutil.which("git") is None, "git が無い")

@@ -13,7 +13,6 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi.records import audit, repeat
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -134,33 +133,6 @@ class DenyMessageTest(unittest.TestCase):
         self.assertIn("git-push（Bash）: 3 回", message)
         second = _run(self.ws, stop)
         self.assertNotIn("git-push", second.stdout)
-
-
-class NormalizeTest(unittest.TestCase):
-    def test_quotes_and_spaces_fold(self):
-        self.assertEqual(
-            repeat.normalize("git push origin main"),
-            repeat.normalize("  git\tpush \"origin\"\n 'main' "),
-        )
-
-    def test_case_is_kept(self):
-        self.assertNotEqual(repeat.normalize("cat /A"), repeat.normalize("cat /a"))
-
-    def test_threshold_falls_back(self):
-        for written in ("", "x", "1", "0", "-3"):
-            self.assertEqual(repeat.DEFAULT_THRESHOLD, repeat.threshold(written), written)
-        self.assertEqual(5, repeat.threshold("5"))
-
-    def test_no_state_counts_nothing(self):
-        record = audit.Record(subject="git push", rules=["git-push"], session="s")
-        self.assertEqual(0, repeat.count("", record))
-
-    def test_no_session_counts_nothing(self):
-        """セッションを見分けられない payload は数えない。別のセッションの拒否と混ぜない。"""
-        with tempfile.TemporaryDirectory(prefix="ccnavi-repeat-") as state:
-            record = audit.Record(subject="git push", rules=["git-push"])
-            self.assertEqual([0, 0, 0], [repeat.count(state, record) for _ in range(3)])
-            self.assertEqual([], os.listdir(state))
 
 
 if __name__ == "__main__":

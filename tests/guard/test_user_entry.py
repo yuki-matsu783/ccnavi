@@ -1,10 +1,12 @@
-"""ユーザ専用の入口（`ccnavi user <操作>`）を確かめる（src/ccnavi/tickets/model/user_only.py）。
+"""ユーザ専用の入口（`ccnavi user <操作>`）を確かめる（Go の tickets/model/useronly）。
 
-1. 表: `user` の操作と、`user` の外で断るオプションが、食い違わない
-2. 実行ファイル: `user <操作>` を内部の形に読み替える。`user` の外のユーザ専用のオプションは
+1. 実行ファイル: `user <操作>` を内部の形に読み替える。`user` の外のユーザ専用のオプションは
    何も動かさずに断り、見るだけの形は断らない
-3. hook: `user` の入口と `ccnavi-user-*.sh` を、呼び方に依らず止める。ターミナルを求めない経路
+2. hook: `user` の入口と `ccnavi-user-*.sh` を、呼び方に依らず止める。ターミナルを求めない経路
    （`--yes`）は、名前を変えたコピーでも止める
+
+表（`user` の操作と、`user` の外で断るオプション）が食い違わないことと、読み替えの細部は Go のテスト
+（go/internal/tickets/model/useronly）が確かめる。
 """
 
 from __future__ import annotations
@@ -12,104 +14,15 @@ from __future__ import annotations
 import os
 import unittest
 
-from ccnavi.infra.modes import EXIT_BLOCK, EXIT_ERROR
-from ccnavi.tickets.model import phase_forms, user_only
-from tests import ROOT
 from tests.guard.test_cleanup_forms import HookCase
 from tests.inproc import run_ccnavi
 
-
-class TableTest(unittest.TestCase):
-    def test_every_verb_reads_into_a_gated_option(self):
-        gated = {row.name for row in user_only.FLAGS if row.gated}
-        for verb in user_only.VERBS:
-            with self.subTest(verb=verb.words):
-                argv = ["user", *verb.words, *(["VALUE"] if verb.value else [])]
-                rewritten, entry = user_only.rewrite(argv)
-                self.assertIs(entry, verb)
-                self.assertEqual(rewritten, [*verb.internal, *(["VALUE"] if verb.value else [])])
-                self.assertIn(verb.internal[-1], gated)
-
-    def test_every_gated_option_has_a_verb_or_is_a_companion(self):
-        # `--yes` はどの操作にも付く。ほかは、読み替えの先として `user` の操作に入っている
-        internal = {verb.internal[-1] for verb in user_only.VERBS}
-        for row in user_only.FLAGS:
-            if row.gated and row.name != "--yes":
-                with self.subTest(option=row.name):
-                    self.assertIn(row.name, internal)
-
-    def test_operations_that_ask_for_a_terminal_exist(self):
-        for op_id in ("approve", "reviewed", "close-early", "prune", "handoff", "mirror"):
-            with self.subTest(op=op_id):
-                self.assertTrue(user_only.terminal(op_id))
-
-    def test_unknown_operation_is_an_error(self):
-        with self.assertRaises(KeyError):
-            user_only.terminal("decide")
-
-    def test_handoff_is_a_board_verb(self):
-        self.assertIn("handoff", user_only.WORD_GROUPS["user-board-verb"])
-
-    def test_mirror_is_a_board_verb(self):
-        self.assertIn("mirror", user_only.WORD_GROUPS["user-board-verb"])
-
-
-class RewriteTest(unittest.TestCase):
-    def test_wrapper_options_are_skipped(self):
-        argv = ["--root", "R", "--cwd=C", "--record-writes", "W", "user", "agree", "A"]
-        rewritten, entry = user_only.rewrite(argv)
-        self.assertEqual(entry.words, ("agree",))
-        self.assertEqual(
-            rewritten, ["--root", "R", "--cwd=C", "--record-writes", "W", "--agree", "A"]
-        )
-
-    def test_the_word_ignores_case(self):
-        rewritten, entry = user_only.rewrite(["USER", "Close-Early", "--reason", "x"])
-        self.assertEqual(rewritten, ["--close-early", "--reason", "x"])
-        self.assertEqual(entry.words, ("close-early",))
-
-    def test_other_places_are_not_the_entry(self):
-        for argv in (
-            ["--docs", "--keyword", "user"],
-            ["--", "user", "agree"],
-            ["--title", "user", "agree"],
-            ["ticket", "user"],
-            ["--agree", "--preview"],
-        ):
-            with self.subTest(argv=argv):
-                self.assertEqual(user_only.rewrite(argv), (argv, None))
-
-    def test_a_value_is_taken_from_the_next_word(self):
-        rewritten, _ = user_only.rewrite(["user", "reviewed", "3", "--accept-unresolved"])
-        self.assertEqual(rewritten, ["--reviewed", "3", "--accept-unresolved"])
-        rewritten, entry = user_only.rewrite(["user", "handoff", "a.md", "b.md", "--json"])
-        self.assertEqual(rewritten, ["--handoff", "a.md", "b.md", "--json"])
-        self.assertEqual(entry.op, "handoff")
-        rewritten, entry = user_only.rewrite(["user", "mirror", "lib", "app", "--json"])
-        self.assertEqual(rewritten, ["--mirror", "lib", "app", "--json"])
-        self.assertEqual(entry.op, "mirror")
-
-    def test_only_ascii_letters_are_folded(self):
-        # `casefold` は `ſ`（U+017F）を `s` に、`ﬀ`（U+FB00）を `ff` にする。ASCII の綴りだけを
-        # 入口の語として読み、互換の読みで入口の語になる綴りは断る。
-        rewritten, entry = user_only.rewrite(["USER", "HandOff", "a.md"])
-        self.assertEqual(rewritten, ["--handoff", "a.md"])
-        for argv in (
-            ["u\u017fer", "handoff"],
-            ["\uff55ser", "agree"],
-            ["user", "hando\ufb00"],
-            ["user", "agre\u0435"],
-            ["--root", "R", "user", "\u0430gree"],
-        ):
-            with self.subTest(argv=argv), self.assertRaises(user_only.UserEntryError):
-                user_only.rewrite(argv)
-        # 互換の読みでも入口の語にならない ASCII でない語は、入口ではないだけ。
-        self.assertEqual(user_only.rewrite(["ユーザ", "agree"]), (["ユーザ", "agree"], None))
-
-    def test_mistakes_say_what_is_wrong(self):
-        for argv in (["user"], ["user", "bogus"], ["user", "reviewed"]):
-            with self.subTest(argv=argv), self.assertRaises(user_only.UserEntryError):
-                user_only.rewrite(argv)
+# 止めたときの終了コードと、使い方の誤りの終了コード。
+EXIT_BLOCK = 2
+EXIT_ERROR = 1
+# ユーザだけが打つ操作を止めたときと、記録を消す操作を止めたときの拒否コード。
+CODE_TICKET_APPROVAL = "DENY_TICKET_APPROVAL_CLI"
+CODE_RECORDS_PRUNE = "DENY_RECORDS_PRUNE"
 
 
 class ExecutableTest(unittest.TestCase):
@@ -187,36 +100,16 @@ class ExecutableTest(unittest.TestCase):
 class EntryMarkTest(unittest.TestCase):
     """入口の印（`--entry sh|board`）。印の無い `user <操作>` は、直に打った形として断る。"""
 
-    def test_the_mark_is_taken_out_of_the_leading_wrapper_options(self):
-        for argv, rest, mark in (
-            (["--entry", "sh", "user", "agree"], ["user", "agree"], "sh"),
-            (["--entry=board", "user", "mirror"], ["user", "mirror"], "board"),
-            (
-                ["--root", "R", "--entry", "sh", "--cwd", "C", "user", "agree", "i1"],
-                ["--root", "R", "--cwd", "C", "user", "agree", "i1"],
-                "sh",
-            ),
-            (["user", "agree"], ["user", "agree"], ""),
-            (["--agree", "--preview"], ["--agree", "--preview"], ""),
-        ):
-            with self.subTest(argv=argv):
-                self.assertEqual(user_only.take_entry(argv), (rest, mark))
-
     def test_a_mark_in_another_place_is_left_for_argparse(self):
-        argv = ["user", "agree", "--entry", "sh"]
-        self.assertEqual(user_only.take_entry(argv), (argv, ""))
         result = run_ccnavi(["--entry", "sh", "user", "prune", "--entry", "sh"])
         self.assertEqual(result.returncode, EXIT_ERROR, result.stderr)
 
     def test_the_decide_check_form_keeps_the_mark_next_to_user(self):
         """decide の sh が打つ事前検査の並び。`--check` は `user reviewed N` の後ろに置く。"""
         good = ["--entry", "sh", "user", "reviewed", "1", "--check", "--accept-unresolved"]
-        self.assertEqual(user_only.take_entry(good), (good[2:], "sh"))
         result = run_ccnavi(good)
         self.assertNotIn("入口と一緒に", result.stderr)
         bad = ["--entry", "sh", "--check", "user", "reviewed", "1", "--accept-unresolved"]
-        with self.assertRaises(user_only.UserEntryError):
-            user_only.take_entry(bad)
         self.assertEqual(run_ccnavi(bad).returncode, EXIT_BLOCK)
 
     def test_a_bad_mark_is_an_error(self):
@@ -228,8 +121,6 @@ class EntryMarkTest(unittest.TestCase):
             ["--entry", "sh", "--entry", "board", "user", "agree"],
         ):
             with self.subTest(argv=argv):
-                with self.assertRaises(user_only.UserEntryError):
-                    user_only.take_entry(argv)
                 self.assertEqual(run_ccnavi(argv).returncode, EXIT_BLOCK)
 
     def test_every_operation_without_a_mark_names_its_script(self):
@@ -248,13 +139,6 @@ class EntryMarkTest(unittest.TestCase):
                 self.assertEqual(result.returncode, EXIT_BLOCK, result.stderr)
                 self.assertIn(script, result.stderr)
                 self.assertIn("直に打つ入口ではありません", result.stderr)
-
-    def test_every_verb_has_a_script_that_exists(self):
-        for verb in user_only.VERBS:
-            with self.subTest(verb=verb.words):
-                self.assertTrue(verb.script)
-                path = os.path.join(ROOT, ".ccnavi", "scripts", f"ccnavi-user-{verb.script}.sh")
-                self.assertTrue(os.path.isfile(path), path)
 
     def test_a_marked_entry_goes_on(self):
         for mark in ("sh", "board"):
@@ -313,13 +197,13 @@ class HookTest(HookCase):
     def test_the_entry_is_stopped_by_the_approval_rule(self):
         decision, reason = self.hook("ccnavi user agree")
         self.assertEqual(decision, "deny")
-        self.assertIn(phase_forms.CODE_TICKET_APPROVAL, reason)
+        self.assertIn(CODE_TICKET_APPROVAL, reason)
         self.assertIn("ccnavi user", reason)
 
     def test_prune_follows_the_core_files_guard(self):
         decision, reason = self.hook("ccnavi user prune")
         self.assertEqual(decision, "deny")
-        self.assertIn(phase_forms.CODE_RECORDS_PRUNE, reason)
+        self.assertIn(CODE_RECORDS_PRUNE, reason)
 
     def test_an_expanded_word_that_may_become_the_entry_is_stopped(self):
         for command in (
@@ -343,7 +227,7 @@ class HookTest(HookCase):
                 with self.subTest(command=command, agent=agent):
                     decision, reason = self.hook(command, agent)
                     self.assertEqual(decision, "deny", reason)
-                    self.assertIn(phase_forms.CODE_TICKET_APPROVAL, reason)
+                    self.assertIn(CODE_TICKET_APPROVAL, reason)
 
     def test_the_board_path_is_stopped_even_under_another_name(self):
         for command in (
@@ -360,7 +244,7 @@ class HookTest(HookCase):
             with self.subTest(command=command):
                 decision, reason = self.hook(command)
                 self.assertEqual(decision, "deny", reason)
-                self.assertIn(phase_forms.CODE_TICKET_APPROVAL, reason)
+                self.assertIn(CODE_TICKET_APPROVAL, reason)
 
     def test_reading_is_not_stopped(self):
         for command in (
@@ -378,8 +262,8 @@ class HookTest(HookCase):
         ):
             with self.subTest(command=command):
                 decision, reason = self.hook(command)
-                self.assertNotIn(phase_forms.CODE_TICKET_APPROVAL, reason)
-                self.assertNotIn(phase_forms.CODE_RECORDS_PRUNE, reason)
+                self.assertNotIn(CODE_TICKET_APPROVAL, reason)
+                self.assertNotIn(CODE_RECORDS_PRUNE, reason)
 
 
 class LauncherSpellingTest(HookCase):
@@ -392,7 +276,7 @@ class LauncherSpellingTest(HookCase):
             with self.subTest(command=command):
                 decision, reason = self.hook(command)
                 self.assertEqual(decision, "deny", reason)
-                self.assertIn(phase_forms.CODE_TICKET_APPROVAL, reason)
+                self.assertIn(CODE_TICKET_APPROVAL, reason)
 
     def test_interpreter_options_and_module_spellings(self):
         self.assert_stopped(
@@ -465,7 +349,7 @@ class LauncherSpellingTest(HookCase):
             with self.subTest(command=command):
                 decision, reason = self.hook(command)
                 self.assertEqual(decision, "deny", reason)
-                self.assertIn(phase_forms.CODE_TICKET_APPROVAL, reason)
+                self.assertIn(CODE_TICKET_APPROVAL, reason)
 
     def test_reading_forms_still_pass(self):
         for command in (
@@ -485,8 +369,8 @@ class LauncherSpellingTest(HookCase):
         ):
             with self.subTest(command=command):
                 decision, reason = self.hook(command)
-                self.assertNotIn(phase_forms.CODE_TICKET_APPROVAL, reason)
-                self.assertNotIn(phase_forms.CODE_RECORDS_PRUNE, reason)
+                self.assertNotIn(CODE_TICKET_APPROVAL, reason)
+                self.assertNotIn(CODE_RECORDS_PRUNE, reason)
 
 
 if __name__ == "__main__":

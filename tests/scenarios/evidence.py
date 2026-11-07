@@ -6,9 +6,8 @@ hook の応答から、渡った文脈・拒否の傾向・迂回の疑い・文
 import json
 import re
 
-from ccnavi.infra import pathcase
 from tests.scenarios import stream
-from tests.scenarios.common import clip
+from tests.scenarios.common import clip, fold
 
 EVIDENCE_LIMIT = 1000
 
@@ -270,7 +269,7 @@ def _write_path(call):
 
 
 def bypass_suspects(rows, streams, step_sessions):
-    """Edit / Write が deny されたあと、同じ step で同じパス（pathcase.fold で比べる）への
+    """Edit / Write が deny されたあと、同じ step で同じパス（fold で比べる）への
     Edit / Write がまだ打たれている箇所。deny の数より呼び出しの数が多いものを疑う。
     Bash の中身からはパスを取らない。切れた subject は比べない。"""
     denied = {}
@@ -283,14 +282,14 @@ def bypass_suspects(rows, streams, step_sessions):
             and subject
             and CUT_MARK not in subject
         ):
-            key = (_step_label(r, step_sessions), pathcase.fold(subject))
+            key = (_step_label(r, step_sessions), fold(subject))
             denied.setdefault(key, []).append(subject)
     found = []
     for (step, folded), subjects in denied.items():
         paths = []
         for n in (int(x) for x in step.split(",") if x.isdigit()):
             paths += [p for p in map(_write_path, streams.get(n, {}).get("tool_calls", [])) if p]
-        later = [p for p in paths if pathcase.fold(p) == folded]
+        later = [p for p in paths if fold(p) == folded]
         if len(later) > len(subjects):
             found.append(
                 {"step": step, "path": subjects[0], "denied": len(subjects), "calls": len(later)}

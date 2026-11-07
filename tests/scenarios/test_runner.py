@@ -20,9 +20,10 @@ from unittest import mock
 
 import yaml
 
-from ccnavi.entry import version
 from tests import ROOT, common_sh, fake_gitlab, host_stub
 from tests import __main__ as full_run
+from tests import exe as built
+from tests.inproc import run_ccnavi
 from tests.scenarios import (
     commands,
     common,
@@ -1497,15 +1498,11 @@ class DenialTrendTest(unittest.TestCase):
         self.assertEqual(self.flagged(ask), [])
 
     def test_real_denials_with_a_next_step_are_not_flagged(self):
-        # issue #570 の実データ 4 件。文面は実コードから取る（文面が変わっても追従する）
-        from ccnavi.policy import builtin
-        from ccnavi.policy import texts as ptexts
-        from ccnavi.tickets.lifecycle import stop_integrate as stop
-        from ccnavi.tickets.model import ticket_guard
+        # issue #570 の実データ。文面は実行ファイルから取る（文面が変わっても追従する）
+        def said(command):
+            done = run_ccnavi(["--root", ROOT, "--test", "Bash", command, "--json"], cwd=ROOT)
+            return json.loads(done.stdout)["response"]
 
-        root = str(ROOT)
-        raw_git = ptexts.spoken(ticket_guard.raw_git_rule(root))
-        by_id = {r.id: ptexts.spoken(r) for r in builtin.load_base(root)[0].deny}
         heredoc = next(
             r["message"]
             for r in yaml.safe_load(
@@ -1513,36 +1510,18 @@ class DenialTrendTest(unittest.TestCase):
             )["deny"]
             if r["id"] == "heredoc"
         )
-        found = stop.Direct(
-            name="work1",
-            worktree=f"{root}/.claude/worktrees/work1",
-            head="work1",
-            dirty=False,
-            ahead=1,
-            integration="main",
-            integ_tree=root,
-            base="main",
-        )
-        nudge = stop.integrate_nudge(root, found)
-        waiting = stop.integrate_nudge(root, stop.Direct(**{**found.__dict__, "marker": "v4"}))
-        texts = [raw_git, by_id["builtin:recursive-delete"], heredoc, nudge, waiting]
+        texts = [said("git status"), said("rm -rf /tmp/x"), heredoc]
         self.assertTrue(all(texts))
-        self.assertEqual(
-            self.flagged(*[deny_line(t) for t in texts[:3]], *[stop_block(t) for t in texts[3:]]),
-            [],
-        )
+        self.assertIn("builtin:guard-raw-git", texts[0])
+        self.assertIn("builtin:recursive-delete", texts[1])
+        self.assertEqual(self.flagged(*[deny_line(t) for t in texts]), [])
 
     def test_every_shipped_deny_message_has_a_next_step(self):
-        from ccnavi.policy import builtin
-        from ccnavi.policy import texts as ptexts
-
+        # 組み込みの deny の文は Go のテスト（go/internal/policy/builtin の
+        # TestEveryDenyTextHasANextStep）が見る。ここは配る共通ルールの文。
         rules = yaml.safe_load((Path(ROOT) / ".ccnavi/config/common/rules.yml").read_text("utf-8"))
         texts = [r["message"] for r in rules["deny"]]
-        texts += [ptexts.spoken(r) for r in builtin.load_base(str(ROOT))[0].deny]
-        with tempfile.TemporaryDirectory() as d:  # git の入口が無いワークスペースの文面
-            shutil.copytree(Path(ROOT) / ".ccnavi/messages", Path(d) / ".ccnavi/messages")
-            texts += [ptexts.spoken(r) for r in builtin.load_base(d)[0].deny]
-        self.assertGreater(len(texts), 10)
+        self.assertGreater(len(texts), 3)
         self.assertEqual([t for t in texts if not evidence.has_guide(t)], [])
 
     def test_report_names_the_empty_and_unguided(self):
@@ -2710,21 +2689,6 @@ class RunAllTest(unittest.TestCase):
                 [p for _, _, _, p in calls], [False, False]
             )  # --no-session-persistence
 
-    def test_hinted_state_is_not_carried_over_to_another_session(self):
-        from ccnavi.infra import hookio
-        from ccnavi.policy import ctxfile, rules
-
-        rule = rules.Rule(id="once", match="Write", additional_context_once="案内")
-        with tempfile.TemporaryDirectory() as state:
-
-            def told(session):
-                payload = hookio.Input(event="PreToolUse", tool_name="Write", session_id=session)
-                return ctxfile.deliver(io.StringIO(), state, payload, [rule])[1]
-
-            self.assertTrue(told("scn-1"))
-            self.assertFalse(told("scn-1"))  # 同じセッションの 2 回目は渡さない
-            self.assertTrue(told("scn-2"))  # 次のシナリオ（別のセッション）には、また渡る
-
     def test_a_changed_set_stops_before_running(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
@@ -3509,7 +3473,7 @@ class FakeGitlabHostTest(unittest.TestCase):
         git(self.ws.target, "switch", "-q", "-c", "i0001")
         exe = write(
             os.path.join(self._tmp.name, "exe", "ccnavi"),
-            EXE_STUB.format(compat=version.COMPAT, log=os.path.join(self._tmp.name, "args.txt")),
+            EXE_STUB.format(compat=built.compat(), log=os.path.join(self._tmp.name, "args.txt")),
         )
         os.chmod(exe, 0o755)
         env.update({"CCNAVI_ENTRY_PATH": exe, "CCNAVI_LEARNING": "disable"})

@@ -2,7 +2,7 @@
 
 ccnavi が配るルールと文書が自身の検査に引っかかると、配布直後のプロジェクトで
 エージェントが `--lint` を打つたびに警告を見ることになる。たとえば `additionalContextFile` の文書が
-上限（ctxfile.MAX_CHARS）を超えると、先頭までしか渡らず、残りは渡らない。
+上限（MAX_CHARS 文字）を超えると、先頭までしか渡らず、残りは渡らない。
 """
 
 from __future__ import annotations
@@ -15,11 +15,12 @@ import unittest
 
 import yaml
 
-from ccnavi.policy import ctxfile
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
 DIST = os.path.join(ROOT, ".ccnavi")
+# 1 回の応答に載せる文書の上限（文字数）。超えた分は渡らない。
+MAX_CHARS = 4000
 
 
 class DistributionLintTest(unittest.TestCase):
@@ -53,7 +54,8 @@ class DistributionLintTest(unittest.TestCase):
                         with self.subTest(rule=rule.get("id"), file=rel):
                             full = os.path.join(ROOT, rel.replace("/", os.sep))
                             self.assertTrue(os.path.isfile(full))
-                            self.assertFalse(ctxfile.over_limit(full))
+                            with open(full, encoding="utf-8", errors="replace") as f:
+                                self.assertLessEqual(len(f.read()), MAX_CHARS)
         self.assertGreater(checked, 0)
 
 

@@ -1,8 +1,7 @@
-"""ユーザへの確認（ask）の前の発言を、hook の入口から確かめる（`hook/askcontext.py`）。
+"""ユーザへの確認（ask）の前の発言を、hook の入口から確かめる（Go の `hook/askcontext`）。
 
 見るのは次の点。
 
-- 見出しの判定（`前提・背景`・`想定結果`と別名。本文中の語や別の語は当たらない）
 - `AskUserQuestion` は、直前の発言に 2 つの節が無ければ止まり、揃えば通る
 - 発言は、最後のユーザの発言より後ろだけを見る。ツールの結果の行は区切りにしない。サイドチェーンは見ない
 - ccnavi が確認に出す呼び出し（ターン分離のゲートの確認・ルールの `ask`）も、節が無ければ確認でなく止まる
@@ -22,13 +21,15 @@ import threading
 import time
 import unittest
 
-from ccnavi.hook import askcontext
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
 BOTH = "## 前提・背景\nファイルを消す必要がある。\n## 想定結果\n許可すると消える。断ると残る。"
 GIT = "sh .ccnavi/scripts/ccnavi-git.sh"
 DONE = f"{GIT} integrate-done foo -m 'msg x'"
+# 止めたときの拒否コードと、記録の rules に載る名前。
+CODE = "DENY_ASK_NEEDS_CONTEXT"
+RULE_ID = "builtin:ask-context"
 
 
 def assistant(text, **extra):
@@ -47,42 +48,6 @@ def call(tool_use_id="toolu_test"):
 
 def tool_result():
     return {"type": "user", "message": {"content": [{"type": "tool_result", "content": "ok"}]}}
-
-
-class HeadingTest(unittest.TestCase):
-    def test_見出しの書き方は何通りかに当たる(self):
-        for text in (
-            "## 背景",
-            "**背景**",
-            "【前提・背景】",
-            "前提:",
-            "- 背景：理由",
-            "  背景",
-            "### 1. 前提・背景",
-            "　背景",
-            "## 背景\r",
-        ):
-            with self.subTest(text=text):
-                self.assertNotIn("前提・背景", askcontext.absent_sections(text + "\n想定結果:"))
-
-    def test_結果の節は_2_つの言い方に当たる(self):
-        for text in ("## 想定結果", "選んだ時の結果:"):
-            with self.subTest(text=text):
-                self.assertNotIn("想定結果", askcontext.absent_sections("背景:\n" + text))
-
-    def test_本文の中の語と別の見出しは当たらない(self):
-        for text in (
-            "背景を説明すると、こうです",
-            "この背景は大きい",
-            "## 結果",
-            "選んだ結果",
-            "前提を置くと",
-        ):
-            with self.subTest(text=text):
-                self.assertEqual(askcontext.absent_sections(text), list(askcontext.SECTIONS))
-
-    def test_無い節だけを返す(self):
-        self.assertEqual(askcontext.absent_sections("## 背景\nx"), ["想定結果"])
 
 
 class AskContextHookTest(unittest.TestCase):
@@ -123,7 +88,7 @@ class AskContextHookTest(unittest.TestCase):
         )
 
     def stopped(self, done):
-        return askcontext.CODE in done.stdout and '"permissionDecision": "deny"' in done.stdout
+        return CODE in done.stdout and '"permissionDecision": "deny"' in done.stdout
 
 
 class AskUserQuestionTest(AskContextHookTest):
@@ -133,7 +98,7 @@ class AskUserQuestionTest(AskContextHookTest):
         done = self.hook()
 
         self.assertTrue(self.stopped(done))
-        self.assertIn(askcontext.RULE_ID, done.stdout)
+        self.assertIn(RULE_ID, done.stdout)
         self.assertIn("「前提・背景」・「想定結果」", done.stdout)
         self.assertIn("消してよいですか", done.stdout)
 
@@ -193,8 +158,8 @@ class AskUserQuestionTest(AskContextHookTest):
         with open(os.path.join(self.repo, "logs", "decisions.jsonl"), encoding="utf-8") as f:
             record = [json.loads(line) for line in f if line.strip()][-1]
 
-        self.assertEqual(record["code"], askcontext.CODE)
-        self.assertEqual(record["rules"], [askcontext.RULE_ID])
+        self.assertEqual(record["code"], CODE)
+        self.assertEqual(record["rules"], [RULE_ID])
         self.assertEqual(record["decision"], "deny")
 
     def test_自分の行がまだ無く_待っても見出しも現れなければ通す(self):
@@ -233,7 +198,7 @@ class AskUserQuestionTest(AskContextHookTest):
         done = self.hook(mode="dry-run")
 
         self.assertIn("dry-run", done.stdout)
-        self.assertIn(askcontext.CODE, done.stdout)
+        self.assertIn(CODE, done.stdout)
         self.assertNotIn('"permissionDecision": "deny"', done.stdout)
 
 
@@ -325,8 +290,8 @@ class RuleAskTest(AskContextHookTest):
         self.assertIn("direct-worktree-confirm", done.stdout)
         with open(os.path.join(self.repo, "logs", "decisions.jsonl"), encoding="utf-8") as f:
             record = [json.loads(line) for line in f if line.strip()][-1]
-        self.assertEqual(record["code"], askcontext.CODE)
-        self.assertIn(askcontext.RULE_ID, record["rules"])
+        self.assertEqual(record["code"], CODE)
+        self.assertIn(RULE_ID, record["rules"])
         self.assertIn("direct-worktree-confirm", " ".join(record["rules"]))
 
     def test_節が揃えば確認に出る(self):

@@ -8,7 +8,8 @@
    通常時の並び（専用の id が `guard-project-home` / `guard-common-layer` より前で、二重に入らない）
 2. 共通のルールファイルが読めない・無い間: 4 本は外れない。直し方は下書きの案内
 3. 認証情報（`builtin:credentials`）: 5 つのツールで止まり、Grep / Glob / PowerShell は対象外。
-   failsafe（判定に達せなかったときの許可リスト）は、通常の判定が止める入力を安全扱いしない
+   failsafe（判定に達せなかったときの許可リスト）が同じ綴りを安全扱いしないことは、Go のテスト
+   （go/internal/hook/failsafe）が確かめる
 4. 文面: 差し込みの目印が残らない。空白を含むルートで引用される。案内するのはワークスペースの sh
 """
 
@@ -20,9 +21,7 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi.hook import failsafe
-from ccnavi.infra import hookio, settings
-from tests import ROOT, common_path
+from tests import ROOT, common_path, script_command
 from tests.inproc import run_ccnavi
 
 HOOKS = "builtin:guard-hooks"
@@ -85,7 +84,7 @@ class Workspace(unittest.TestCase):
         }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         if tickets is not None:
-            environment[settings.TICKET_CONTROL_ENV] = tickets
+            environment["CCNAVI_TICKET_CONTROL"] = tickets
         result = run_ccnavi(
             ["--root", self.root, "--mode", mode, "--guard-core-files", guard],
             input=json.dumps(body),
@@ -397,63 +396,6 @@ class GitPushTest(Workspace):
                 self.assertIn("builtin:git-push", ids)
 
 
-class FailsafeTest(Workspace):
-    """判定に達せなかったときの許可リスト（failsafe）は、通常の判定が止める入力を安全扱いしない。"""
-
-    prefix = "ccnavi-named-failsafe-"
-
-    PATHS = CredentialsTest.PATHS
-
-    def safe(self, tool, tool_input, cwd=None):
-        payload = hookio.Input(
-            event=hookio.PRE_TOOL_USE,
-            tool_name=tool,
-            tool_input=tool_input,
-            cwd=self.root if cwd is None else cwd,
-        )
-        return failsafe.is_safe(payload, self.root)
-
-    def spellings(self, rel):
-        """生の値・絶対パス・相対パス・`./` 付きの綴り。"""
-        return {rel, f"./{rel}", self.at(rel)}
-
-    def test_what_the_normal_judgement_stops_is_not_safe_for_read(self):
-        for rel in self.PATHS:
-            for spelled in self.spellings(rel):
-                with self.subTest(path=spelled):
-                    decision, _, _ = self.hook("Read", {"file_path": spelled})
-                    self.assertEqual(decision, "deny")
-                    self.assertFalse(self.safe("Read", {"file_path": spelled}))
-
-    def test_a_relative_path_is_not_safe_whatever_the_cwd(self):
-        sub = self.at("sub")
-        os.makedirs(sub)
-        for rel in self.PATHS:
-            with self.subTest(path=rel):
-                self.assertFalse(self.safe("Read", {"file_path": rel}, cwd=sub))
-                self.assertFalse(self.safe("Read", {"file_path": rel}, cwd=self.root))
-
-    def test_grep_and_glob_are_not_safe_on_these_paths(self):
-        for rel in self.PATHS:
-            for spelled in self.spellings(rel):
-                with self.subTest(path=spelled):
-                    self.assertFalse(self.safe("Grep", {"path": spelled}))
-                    self.assertFalse(self.safe("Grep", {"glob": spelled}))
-                    self.assertFalse(self.safe("Glob", {"path": spelled}))
-
-    def test_a_single_cat_is_not_safe(self):
-        for rel in self.PATHS:
-            for spelled in self.spellings(rel):
-                with self.subTest(path=spelled):
-                    self.assertFalse(self.safe("Bash", {"command": f"cat {spelled}"}))
-
-    def test_ordinary_files_stay_safe(self):
-        for rel in ("README.md", "src/keyboard.py", "docs/credentials-policy.md"):
-            with self.subTest(path=rel):
-                self.assertTrue(self.safe("Read", {"file_path": self.at(rel)}))
-                self.assertTrue(self.safe("Bash", {"command": f"cat {rel}"}))
-
-
 class ApprovedPreTest(Workspace):
     """承認済みの置き場は、チケット制御の保護。自己防衛の値に依らず、実行前は拒否する。"""
 
@@ -487,7 +429,7 @@ class ApprovedPreTest(Workspace):
 
     def test_the_message_guides_status_finish_and_propose(self):
         _, reason, _ = self.write_to(self.DOING, tickets="enable")
-        ticket = settings.script_command(self.root, "ccnavi-ticket.sh")
+        ticket = script_command(self.root, "ccnavi-ticket.sh")
         for text in (
             f"{ticket} status",
             f"{ticket} finish <識別子>",
@@ -529,14 +471,14 @@ class MessageTest(Workspace):
 
     def test_the_root_with_a_space_is_quoted(self):
         self.assertIn(" ", self.root)
-        stage = settings.script_command(self.root, "ccnavi-stage.sh")
+        stage = script_command(self.root, "ccnavi-stage.sh")
         self.assertIn('"', stage)
         for rel, reason in self.reasons():
             with self.subTest(path=rel):
                 self.assertIn(stage, reason)
 
     def test_the_guide_points_to_the_workspace_script(self):
-        stage = settings.script_command(self.root, "ccnavi-stage.sh")
+        stage = script_command(self.root, "ccnavi-stage.sh")
         self.assertTrue(stage.endswith('/.ccnavi/scripts/ccnavi-stage.sh"'))
         self.assertIn(os.path.realpath(self.root).replace("\\", "/"), stage)
 
