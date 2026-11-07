@@ -181,7 +181,7 @@ func writeRecordFile(target, text string) string {
 		return fsio.ErrorText(err)
 	}
 	// 作った後にも、途中のディレクトリがリンクで外へ出ていないかを見る。
-	if realPath(directory) != ospath.Normpath(directory) {
+	if !same(realPath(directory), directory) {
 		return "書き出し先のディレクトリがリンクを含む"
 	}
 	// fsio の Atomic は差し替えた後の権限を素の open に戻すが、Python（mkstemp と os.replace）は 0600 のまま残す。

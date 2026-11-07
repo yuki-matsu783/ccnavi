@@ -35,7 +35,7 @@ func Load[T any](t testing.TB, name string) T {
 }
 
 // Check は got を JSON にして testdata/<name>.json と比べる。-update なら書き直す。列と表は 1 件を 1 行に書く（git の
-// 差分が件ごとに出る）。機械ごとに変わる値は呼び手が置き換えてから渡す。一時置き場の名前だけは masked が置き換える。
+// 差分が件ごとに出る）。機械ごとに変わる値は呼び手が置き換えてから渡す。一時置き場の名前とコミットの 40 桁は masked が置き換える。
 func Check(t testing.TB, name string, got any) {
 	t.Helper()
 	data := masked(encode(t, got))
@@ -136,11 +136,15 @@ var (
 	tempDir = regexp.MustCompile(`(?i)(?:` + tempPrefix(os.TempDir()) + `|` + tempPrefix(realpath(os.TempDir())) + `)[^\\/\s"'）]*`)
 	// cut は文が長い引数を切った形（頭の数十字と「...」）。頭がルートで始まると、置き場の名前の桁数で切る位置がずれる。
 	cut = regexp.MustCompile(`(<tmp>|<root>|\{ROOT\})[^\s"'）]*?\.\.\.`)
+	// sha はコミットの 40 桁。テストが写すリポジトリのファイル（CCNAVI.md・文面ファイルなど）が変わるだけで値が変わり、
+	// 見本が判定と関係なく落ちるので印に置き換える。
+	sha = regexp.MustCompile(`\b[0-9a-f]{40}\b`)
 )
 
-// masked は一時置き場の名前を <tmp> に、ルートで始まって途中で切った引数を切った印だけにする。
+// masked は一時置き場の名前を <tmp> に、コミットの 40 桁を <sha> に、ルートで始まって途中で切った引数を切った印だけにする。
 func masked(data []byte) []byte {
 	data = tempDir.ReplaceAll(data, []byte("<tmp>"))
+	data = sha.ReplaceAll(data, []byte("<sha>"))
 	return cut.ReplaceAll(data, []byte("$1..."))
 }
 

@@ -65,6 +65,7 @@ write-and-push がその削除をコミットして push してから Draft を�
 **片付けの細部。** 片付けた内容は 1 行ずつ出る。消さなかったものは、理由と手で消すコマンド（`git -C <リポジトリ> branch -D <ブランチ>`）が出る。
 ワークツリーの消し方は、生成物（`node_modules`・`.venv` など）を消してから `git worktree remove`（`--force` なし）。git が無視しているそれ以外のファイル（`.env` など）は、消さずにワークスペースルートの `scratchpad/worktrees/<名前>/` へ rename で退避してから消す（退避先が git に無視されていないとき、退避先に同じパスがあるとき、移せないときは、何も動かさず理由を言って止める。退避したものは ccnavi が消さない）
 （`worktree remove` はそれごと消して戻せない）。数えないのは生成物だけで、下書きの置き場 `wip/handoff/` は追跡されるので、ここには現れない。
+HEAD が detached で、どのブランチ・タグにも無いコミットがあるワークツリーは、消すとそのコミットが失われるので、何も消さずに止める。
 片付けの入口（`ccnavi worktree retire`・`ccnavi worktree branch`・`ccnavi sync tidy`・`ccnavi-user-clean-branch.sh`）は、メインのエージェントもサブエージェントも直には打てない。
 `ccnavi-review.sh ready` と `ccnavi-sync.sh` が中で呼ぶか、ユーザが `!` を付けて打つ。消す前に、記録の子がチケットの `parent:` でもその親の子かを確かめ直す。
 `ccnavi-user-clean-branch.sh` は、ccnavi が片付ける子として記録したブランチ以外は消さない。親の手元のブランチは MR がマージされるまで残す。

@@ -17,6 +17,9 @@ keywords: [実行前チェック, PreToolUse, 判定, Bash, パス, シンボリ
 ```
 コアファイルのバックアップを取る（8 章）
   │
+書き込みのツールで書き込み先の欄を読めない → deny（DENY_WRITE_TARGET_UNREAD）
+  │  Write・Edit などで決まった欄が空のときと、名前が書き込みの操作で書き込み先らしい欄を持つ知らないツール（MCP など）
+  │
 対象を取り出す（5.4）── 取り出せない → skip（no-subject）
   │
 ルール集合を決める（5.5）── 読めない → 組み込みの既定（5.6）
@@ -24,6 +27,9 @@ keywords: [実行前チェック, PreToolUse, 判定, Bash, パス, シンボリ
   │
 Bash なら実行される部分に絞る（6.3）── 何も残らない → skip（nothing-to-run）
   │  実行役のコマンドの中で実行されるコマンドを並べる（6.3.1）
+  │
+シェルの読んだ形が 4,000 字を超える → deny（DENY_COMMAND_TOO_LONG）
+  │  ルールの照合が hook の期限を越えて、判定なしで通るのを防ぐ
   │
 チケット制御の前置き（9 章）
   │  A のあと、ユーザの発言をはさまずに B を打った → deny（DENY_NEEDS_USER_TURN。6.7）。ルールより先。通した A は記録する
@@ -116,7 +122,9 @@ Bash のコマンドに現れるパスはコマンド文字列として見る。
 縮退（読み切れないとき）は生の文字列との一致になる。縮退した呼び出しに `allow` は適用せず、
 `deny` と `ask` は適用したままにする。どこにもヒットしなければ `PARSE_UNCERTAIN` でユーザに確認を出し、権限モードに委ねない。
 文面は「読めなかったので文字列に適用した」と伝える（REQ-HNT-04）。記録には `degraded`（`command-taken-as-code` /
-`unterminated-quote` / `unterminated-substitution` / `ambiguous-substitution` / `backquote`）が付き、文面の断りも理由ごとに変わる。
+`unterminated-quote` / `unterminated-substitution` / `ambiguous-substitution` / `backquote` / `expanded-redirect-target`）が付き、
+文面の断りも理由ごとに変わる。`expanded-redirect-target` は書き込みのリダイレクト先が変数か置換（`> $X`・`> "$(…)"`）で、
+書く先が実行するまで決まらない形。
 後ろの 2 つは書き直しを求める形として並ぶので、ルールより先に止まり、縮退の断りは出ない。
 複合コマンドは、1 つの区間が読めなければ全体が縮退する。
 

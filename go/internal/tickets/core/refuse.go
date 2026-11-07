@@ -22,6 +22,7 @@ const (
 	codeConfirmAlreadyReviewed code = "CORE_CONFIRM_ALREADY_REVIEWED" // そのフェーズはもうレビュー済み
 	codeConfirmNotRequested    code = "CORE_CONFIRM_NOT_REQUESTED"    // 依頼の記録が無い
 	codeConfirmMoved           code = "CORE_CONFIRM_MOVED"            // 依頼の後にユーザが見るものが動いた
+	codeConfirmUnshared        code = "CORE_CONFIRM_UNSHARED"         // 手で done/ へ動かした子の移動が未コミットか未 push
 	codeConfirmResultMismatch  code = "CORE_CONFIRM_RESULT_MISMATCH"  // 結果が依頼したマージリクエストと合わない
 	codeConfirmReviewOpen      code = "CORE_CONFIRM_REVIEW_OPEN"      // 変更要求か未解決のスレッドが残る
 

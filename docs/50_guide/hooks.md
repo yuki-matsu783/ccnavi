@@ -36,7 +36,7 @@ ccnaviが止めたとき、報告したとき、止めなかったときに、�
 [ccnavi] POST_VIOLATION (rule: guard-config)
 path: .ccnavi/config/common/probe.json (?? / new)
 after: Bash(npm run build)
-undo: rm -- ".ccnavi/config/common/probe.json"
+undo: rm -- .ccnavi/config/common/probe.json
 ガード自身のルールです。エージェントの判断で書き換えず、変更が要る理由を伝えてユーザに依頼してください。
 ```
 

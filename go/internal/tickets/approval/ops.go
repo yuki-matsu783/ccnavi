@@ -356,22 +356,46 @@ func FollowupProblem(conf *config.Settings, root string, parent *ticket.Ticket, 
 	return why
 }
 
-// Followup は、レビューで残った指摘の続きの子を、ユーザの判断で doing/ に直に起こす。ユーザがターミナルで「続きの子で直す」と選んだことが、そのまま承認になる。同じフェーズの番号に足すので、そのフェーズは開き直り、マーカーは消える。消せなかったほかの種類の知らせは stderr へ出す。返すのは、起こした識別子と、起こせなかった理由である。
-func Followup(conf *config.Settings, root string, parent *ticket.Ticket, phase int, children []*ticket.Ticket, items []string, stderr io.Writer, opID string) (string, string) {
-	ident, t, why := followupTicket(conf, root, parent, phase, children, items, opID)
-	if t == nil {
-		return ident, why
+// madeBy は、この親のこのフェーズで操作 opID が起こした作業中の子の識別子。無い・opID が空なら空。
+func madeBy(conf *config.Settings, root, parentID string, phase int, opID string) string {
+	if opID == "" {
+		return ""
 	}
-	text, why := renderChecked(ident, t)
-	if why != "" {
-		return ident, why
+	open, _ := Scan(conf, root, false, nil)
+	for _, t := range open {
+		if op, _ := t.Raw.String(opKey); op == opID && t.Parent == parentID && t.Phase == phase {
+			return t.ID
+		}
+	}
+	return ""
+}
+
+// Followup は、レビューで残った指摘の続きの子を、ユーザの判断で doing/ に直に起こす。ユーザがターミナルで「続きの子で直す」と選んだことが、そのまま承認になる。同じフェーズの番号に足すので、そのフェーズは開き直り、マーカーは消える。消せなかったほかの種類の知らせは stderr へ出す。返すのは、起こした識別子と、起こせなかった理由である。
+//
+// 同じ操作（opID）で起こした子が作業中に在れば、新しく作らずにそれを使い回す。マーカーが戻ったあとに同じ操作を
+// 打ち直すと、作った子を数えずに次の連番で 2 つ目を作ってしまうため。
+func Followup(conf *config.Settings, root string, parent *ticket.Ticket, phase int, children []*ticket.Ticket, items []string, stderr io.Writer, opID string) (string, string) {
+	ident := madeBy(conf, root, parent.ID, phase, opID)
+	text := ""
+	if ident == "" {
+		var t *ticket.Ticket
+		var why string
+		ident, t, why = followupTicket(conf, root, parent, phase, children, items, opID)
+		if t == nil {
+			return ident, why
+		}
+		if text, why = renderChecked(ident, t); why != "" {
+			return ident, why
+		}
 	}
 	where, err := HomeDir(conf, root, parent.ID, "", parent.Project)
 	if err != nil {
 		return ident, "続きの子を書く親のワークツリーが決まらない（" + err.Error() + "）"
 	}
-	if failed := marks.WriteTicket(CopyPath(where, ident), text); failed != "" {
-		return ident, failed
+	if text != "" {
+		if failed := marks.WriteTicket(CopyPath(where, ident), text); failed != "" {
+			return ident, failed
+		}
 	}
 	cleared := marks.Clear(where, parent.ID, phase, nil)
 	for _, warning := range cleared.Warnings {

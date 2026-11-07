@@ -129,7 +129,7 @@ func runScenario(t *testing.T, s scenario, root string) []result {
 		}
 		var stderr bytes.Buffer
 		c := &Checker{Stderr: &stderr, State: state, Mine: []string{state, filepath.Join(root, "logs", "decisions.jsonl")},
-			Watched: watched, Scope: guard, Places: Places{conf.Tickets, conf.Approved}, Root: root}
+			Watched: watched, Scope: guard, Places: Places{conf.Tickets, conf.Approved}, Root: root, Conf: conf}
 		input := pyjson.NewObject()
 		for k, v := range st.Input {
 			input.Set(k, v)

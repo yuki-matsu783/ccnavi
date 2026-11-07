@@ -27,7 +27,6 @@ const (
 	// CodeOutOfScope は承認されたチケットの範囲の外の変更（実行前に止める reasons.CodeTicketScope とは別の値）。
 	// 実行前チェックは Write・Edit の引数しか見ないので、シェル・ビルド・スクリプトが書いたものはここでしか見つからない。
 	CodeOutOfScope = "POST_TICKET_SCOPE"
-	emptyArea      = "(empty)"
 )
 
 // codeOrder は記録の code に載せる強さの順。ルールの宣言はチケットの範囲より強い（ルールの deny はチケットが緩めない）。
@@ -78,13 +77,6 @@ type ScopeGuard struct {
 	Places   Places
 }
 
-func areaOf(t *ticket.Ticket) string {
-	if area := strings.Join(append(t.Paths(rules.Allow), t.Paths(rules.Ask)...), ", "); area != "" {
-		return area
-	}
-	return emptyArea
-}
-
 // finding は full が範囲の外なら、報告する文の出所（組み込みの名前のルール）とその承認済みチケットの場所を返す。
 // チケットと下書きの置き場は外でも報告しない（次のチケットを提案できなくすると、承認した範囲から出られなくなる）。
 func (g *ScopeGuard) finding(full string) (*rules.Rule, bool) {
@@ -119,18 +111,18 @@ func (g *ScopeGuard) finding(full string) (*rules.Rule, bool) {
 		values["blocked"] = tk.Blocked
 	case found.Limit == scope.LimitType && found.Type != nil:
 		id = "RULE_TICKET_SCOPE__TYPE"
-		values["area"] = areaOf(tk)
+		values["area"] = tk.ScopeLine()
 		values["type_title"] = found.Type.Title
 		values["type_id"] = found.Type.ID
 		values["scope"] = strings.Join(found.Type.ScopeGlobs, ", ")
 	case found.Limit == scope.LimitParent && parent != nil:
 		id = "RULE_TICKET_SCOPE__PARENT"
-		values["area"] = areaOf(tk)
+		values["area"] = tk.ScopeLine()
 		values["parent"] = parent.ID
-		values["parent_area"] = areaOf(parent)
+		values["parent_area"] = parent.ScopeLine()
 	default:
 		id = "RULE_TICKET_SCOPE__PLAIN"
-		values["area"] = areaOf(tk)
+		values["area"] = tk.ScopeLine()
 	}
 	rule := &rules.Rule{ID: builtin.TicketScopeRuleID, Root: g.Root, Text: rules.TextRef{ID: id, Values: values}}
 	return rule, true
@@ -185,7 +177,7 @@ func (s scan) findings() []*finding {
 	guarding := append(slices.Clone(s.rules.Deny), s.rules.Ask...)
 	var found []*finding
 	for _, change := range s.changes {
-		if slices.ContainsFunc(own, func(p string) bool { return change.Full == p || strings.HasPrefix(change.Full, p+ospath.Sep) }) {
+		if slices.ContainsFunc(own, func(p string) bool { _, under := pathcase.Under(change.Full, p); return under }) {
 			continue
 		}
 		if script[change.Full] {

@@ -10,6 +10,7 @@ import (
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/tree"
+	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/model/ids"
 	"ccnavi/internal/tickets/model/place"
 )
@@ -25,6 +26,9 @@ var (
 	ownLayer     = config.DefaultProjectHome + "/" + config.LayerConfigDir
 	settingsFile = filepath.ToSlash(config.SharedClaudeSettings)
 	doneDir      = config.DefaultApproved + "/" + string(place.Done)
+	// 文面ファイル（拒否の文）。手元と同じくワークスペースの統合先のものだけを読む（レイヤーごとの文面は無い）。
+	// 配布先が文を書き換えていれば、手元の CLI と同じ文になる。
+	messagesDir = config.DefaultProjectHome + "/" + texts.MessagesDir
 )
 
 func sortedSet(items ...string) []string {
@@ -45,10 +49,10 @@ func opPlacement(*pyjson.Object, string) (*pyjson.Object, error) {
 	return pyjson.NewObject("placement", pyjson.NewObject(
 		"tickets", config.DefaultTickets,
 		"approved", config.DefaultApproved,
-		"integration_paths", sortedSet(doneDir, commonLayer, ownLayer),
+		"integration_paths", sortedSet(doneDir, commonLayer, ownLayer, messagesDir),
 		"integration_files", []string{settingsFile, config.CompatFile},
 		"branch_paths", []string{config.DefaultApproved, config.DefaultTickets},
-		"workspace_paths", sortedSet(commonLayer, ownLayer),
+		"workspace_paths", sortedSet(commonLayer, ownLayer, messagesDir),
 		"workspace_files", []string{settingsFile, config.CompatFile},
 		"project_paths", sortedSet(doneDir, ownLayer),
 		"layer_dir", ownLayer,

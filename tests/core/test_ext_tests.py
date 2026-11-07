@@ -311,7 +311,7 @@ class MarkExtHookTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as ws:
             path = "/repo/extensions/chrome/ccnavi-approval/src/board.ts"
             self.assertEqual([path], self.mark(ws, path))
-            relative = "extensions/chrome/ccnavi-approval/py/ccnavi_chrome.py"
+            relative = "extensions/chrome/ccnavi-approval/src/core/ccnavi.ts"
             self.assertEqual([path, relative], self.mark(ws, relative))
 
     def test_files_outside_the_extension_are_not_written_down(self):

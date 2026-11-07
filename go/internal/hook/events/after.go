@@ -105,7 +105,8 @@ func check(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, ro
 	if err := hookio.WriteContext(stdout, hookio.PostToolUse, pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, text, hints), system); err != nil {
 		return config.ExitOK, err
 	}
-	outcome.Confirm(told)
+	// 「通知済み」の印は応答が届いてから付ける（入口が応答を溜めて後で書くので、書けなかったら次の機会に出し直す）。
+	hookio.AfterWritten(stdout, func() { outcome.Confirm(told) })
 	return config.ExitOK, nil
 }
 

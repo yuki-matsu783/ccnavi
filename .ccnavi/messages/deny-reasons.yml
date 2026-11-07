@@ -55,6 +55,32 @@ messages:
     no_bypass: |-
       言い換えても、読みが分かれる形は同じゲートに当たります。
 
+  # ---- 書き込み先を読めない書き込み（policy/rules の UnreadWriteTarget）
+  DENY_WRITE_TARGET_UNREAD:
+    kind: deny
+    values: [tool]
+    what: |-
+      {tool} は書き込みのツールですが、書き込み先のパスを読めないため、呼び出しを止めました。
+    why: |-
+      ccnavi はツールごとに決まった欄（Write・Edit は file_path、NotebookEdit は notebook_path）で書き込み先を読みます。書き込み先が分からないと、設定ファイルや保護している場所への書き込みかを決められません。
+    next: |-
+      Write・Edit ツールで、file_path に書き込み先のパスを入れて書く
+    no_bypass: |-
+      別の名前のツールや欄で書いても、書き込み先を読めない形は同じゲートに当たります。
+
+  # ---- 長すぎるシェルのコマンド（hook/judge の CommandLengthLimit）
+  DENY_COMMAND_TOO_LONG:
+    kind: deny
+    values: [limit, length]
+    what: |-
+      コマンドが {length} 文字あり、上限の {limit} 文字を超えるため、呼び出しを止めました。
+    why: |-
+      長いコマンドはルールの照合が hook の期限に収まらないことがあり、期限を越えると判定なしで実行されてしまうので、照合せずに止めます。ヒアドキュメントの本文とコメントは数えません。
+    next: |-
+      コマンドを分けて打つ。長い文面は Write ツールでファイルに書き、ファイルから渡す（git commit -F <ファイル>、glab --description-file <ファイル>、gh なら --body-file <ファイル>）
+    no_bypass: |-
+      区切り方や書き方を変えても、上限を超える長さのコマンドは同じゲートに当たります。
+
   # ---- サブエージェントに許さない操作
   DENY_SUBAGENT_TICKET_OP:
     kind: deny
@@ -227,6 +253,15 @@ messages:
       raw: |-
         このコマンドは、ANSI-C 引用（$'…'）の中身が何の文字になるか読めないため、ccnavi は書かれた生の文字列にしかルールを当てられず、どのルールもそれに言及していません。
 
+  NOTE_UNREADABLE__EXPANDED_TARGET:
+    kind: note
+    values: []
+    note:
+      matched: |-
+        このコマンドは、リダイレクトの書き込み先が変数か $( ) で、実行するまでどのファイルに書くか決まらないため、このルールは実行される中身ではなく、書かれた生の文字列に当てました。語を書いただけで実行しないなら、禁止したわけではありません。書き込み先をそのまま書いて打ち直してください。
+      raw: |-
+        このコマンドは、リダイレクトの書き込み先が変数か $( ) で、実行するまでどのファイルに書くか決まらないため、ccnavi は書かれた生の文字列にしかルールを当てられず、どのルールもそれに言及していません。
+
   NOTE_UNREADABLE__OTHER:
     kind: note
     values: []
@@ -255,6 +290,12 @@ messages:
     values: []
     note: |-
       書き換え: 複数行の文字列やヒアドキュメントは、Write ツールでファイルに書き、そのファイルを渡す。引用符は閉じて書く。
+
+  NOTE_REWRITE_HINT__EXPANDED_TARGET:
+    kind: note
+    values: []
+    note: |-
+      書き換え: 書き込み先のパスを `> out/result.txt` のようにそのまま書く。パスを調べる必要があるなら、先に 1 つのコマンドで出力し、次のコマンドにその値を書く。
 
   NOTE_REWRITE_HINT__UNATTENDED:
     kind: note

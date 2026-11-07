@@ -181,9 +181,6 @@ func TestTheTreeIsLeftOut(t *testing.T) {
 		prepare func(r *repo)
 		refresh bool
 	}{
-		{"否定 **/", func(r *repo) { r.write(gitignoreName, "!**/"+IndexName+"\n") }, true},
-		{"否定", func(r *repo) { r.write(gitignoreName, "!"+IndexName+"\n") }, true},
-		{"広い否定", func(r *repo) { r.write(gitignoreName, "!docs/*.jsonl\n") }, true},
 		{".gitignore がふつうのファイルでない", func(r *repo) {
 			os.Remove(r.path(gitignoreName))
 			os.Mkdir(r.path(gitignoreName), 0o755)
@@ -203,6 +200,21 @@ func TestTheTreeIsLeftOut(t *testing.T) {
 			if r.exists(IndexName) {
 				t.Error("索引を書いた")
 			}
+		})
+	}
+}
+
+// `!` の行があっても、足す行が後ろで勝つので足す（許可リスト型の .gitignore でも索引を書く）。
+func TestANegatingLineDoesNotStopTheLine(t *testing.T) {
+	for _, before := range []string{"!**/" + IndexName + "\n", "!" + IndexName + "\n", "!docs/*.jsonl\n", "/*\n!/docs/\n!/docs/**\n"} {
+		t.Run(before, func(t *testing.T) {
+			r := newRepo(t)
+			r.write(gitignoreName, before)
+			r.put("docs/a.md", doc("type: guide"))
+			built := r.build()
+			eq(t, "built", [4]any{built.Unignored, ids(built.Rows), built.written, built.IgnoreAdded},
+				[4]any{false, []string{"docs/a"}, []string{index("docs")}, gitignoreName})
+			eq(t, ".gitignore", r.read(gitignoreName), before+IgnoreLine+"\n")
 		})
 	}
 }
@@ -268,6 +280,19 @@ func TestTheCcnaviDirectoryIsLeftOutExceptItsDocs(t *testing.T) {
 	}
 }
 
+// 除外と例外は大文字小文字を区別せずに比べる。
+func TestExcludedIgnoresCase(t *testing.T) {
+	excluded, kept := []string{".ccnavi"}, []string{".ccnavi/docs"}
+	for rel, want := range map[string]bool{
+		".CCNAVI/approved/i0001.md": true, ".Ccnavi": true, ".CCNAVI/DOCS/usage.md": false,
+		".ccnavi-other/a.md": false, "a.md": false,
+	} {
+		if got := Excluded(rel, excluded, kept); got != want {
+			t.Errorf("Excluded(%q) = %v, want %v", rel, got, want)
+		}
+	}
+}
+
 func TestNotARepository(t *testing.T) {
 	if _, err := Build(t.TempDir(), Options{Refresh: true, Parse: true}); !errors.Is(err, ErrNotRepository) {
 		t.Errorf("err = %v", err)
@@ -290,6 +315,46 @@ func TestReusesRowsByConceptIDAndMtime(t *testing.T) {
 	r.put("a.md", doc("type: changed"), noon.Add(time.Minute))
 	third := r.build()
 	eq(t, "third", [3]any{third.parsed, third.written, third.Rows[0].Front().Value("type")}, [3]any{1, []string{IndexName}, "changed"})
+}
+
+// 索引を組み始めた秒より前に更新されたとは言えない md は、mtime が同じでも読み直す（同じ秒の中の書き換え）。
+func TestAFileChangedWithinTheSecondItWasReadIsReadAgain(t *testing.T) {
+	r := newRepo(t)
+	r.put("a.md", doc("type: guide"))
+	now := time.Now().Add(time.Second) // 組み始める秒と同じか後
+	r.put("b.md", doc("type: adr"), now)
+	first := r.build()
+	eq(t, "first", [2]any{first.parsed, ids(first.Rows)}, [2]any{2, []string{"a", "b"}})
+	r.put("b.md", doc("type: changed"), now)
+	second := r.build()
+	eq(t, "second", [3]any{second.parsed, second.reused, second.Rows[1].Front().Value("type")}, [3]any{1, 1, "changed"})
+	if !strings.Contains(r.read(IndexName), `"type":"changed"`) {
+		t.Errorf("索引 = %s", r.read(IndexName))
+	}
+	// 書いた索引の更新時刻は組み始めた時刻なので、前の秒に更新された md の行は使い回す。
+	r.put("b.md", doc("type: changed"), noon)
+	r.build()
+	third := r.build()
+	eq(t, "third", [2]int{third.parsed, third.reused}, [2]int{0, 2})
+}
+
+// 読めなかった md は、索引にある前の行を残す（次の回に読み直す）。
+func TestAnUnreadableFileKeepsItsRow(t *testing.T) {
+	r := newRepo(t)
+	r.put("a.md", doc("type: guide"))
+	r.build()
+	r.put("a.md", doc("type: changed"), noon.Add(time.Minute))
+	realRead := readHead
+	t.Cleanup(func() { readHead = realRead })
+	readHead = func(string) ([]byte, bool) { return nil, false }
+	built := r.build()
+	readHead = realRead
+	eq(t, "rows", [3]any{ids(built.Rows), built.Rows[0].Front().Value("type"), built.written}, [3]any{[]string{"a"}, "guide", []string(nil)})
+	if !strings.Contains(r.read(IndexName), `"type":"guide"`) {
+		t.Errorf("前の行が消えた: %s", r.read(IndexName))
+	}
+	again := r.build()
+	eq(t, "次の回", [2]any{again.parsed, again.Rows[0].Front().Value("type")}, [2]any{1, "changed"})
 }
 
 func TestNoRefreshUsesExistingRowsAndWritesNothing(t *testing.T) {
@@ -372,7 +437,7 @@ func TestAForeignIndexIsLeftAlone(t *testing.T) {
 			r.write(IndexName, text)
 			built := r.build()
 			eq(t, "built", [4]any{built.parsed, ids(built.Rows), built.written, built.Foreign}, [4]any{1, []string{"a"}, []string(nil), []string{IndexName}})
-			if !strings.Contains(built.Problems[0], "ccnavi の索引ではない") {
+			if !strings.Contains(built.Problems[0].String(), IndexName+" は ccnavi の索引ではない") {
 				t.Errorf("problems = %v", built.Problems)
 			}
 			eq(t, "索引", r.read(IndexName), text)
@@ -555,7 +620,7 @@ func TestWritesThroughATemporaryBesideTheIndex(t *testing.T) {
 	r.put("b.md", doc("type: adr"))
 	crossDeviceGit(t, r)
 	built := r.build()
-	eq(t, "built", [2]any{built.Problems, sorted(built.written)}, [2]any{[]string(nil), []string{IndexName, index("docs")}})
+	eq(t, "built", [2]any{built.Problems, sorted(built.written)}, [2]any{[]Problem(nil), []string{IndexName, index("docs")}})
 	eq(t, "leftovers", [2]any{leftovers(t, r.path("docs")), leftovers(t, r.root)}, [2]any{[]string(nil), []string(nil)})
 	status := testkit.Git(t, r.root, "status", "--porcelain", "--untracked-files=all")
 	if strings.Contains(status, IndexName) || strings.Contains(status, localTmpPrefix) {
@@ -570,7 +635,7 @@ func TestDoesNotWriteWhenTheTemporaryWouldNotBeIgnored(t *testing.T) {
 	crossDeviceGit(t, r)
 	built := r.build()
 	eq(t, "built", [3]any{built.written, ids(built.Rows), leftovers(t, r.path("docs"))}, [3]any{[]string(nil), []string{"docs/a"}, []string(nil)})
-	if !strings.Contains(strings.Join(built.Problems, " "), "git に無視されない") {
+	if !strings.Contains(fmt.Sprint(built.Problems), "git に無視されない") {
 		t.Errorf("problems = %v", built.Problems)
 	}
 }

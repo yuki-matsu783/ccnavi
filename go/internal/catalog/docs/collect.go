@@ -125,6 +125,15 @@ type collectOptions struct {
 	deadline       time.Time
 }
 
+// problemText はワークスペースルートから見た問題の文。パスを指す文は頭に置き場を付け、ツリー全体の文は
+// ツリーの名前を添える（`lib: …`。git への問い合わせの失敗と同じ形）。
+func problemText(p source, problem docindex.Problem) string {
+	if problem.Rel == "" {
+		return p.name + ": " + problem.Text
+	}
+	return docindex.JoinRel(p.prefix, problem.Rel) + " " + problem.Text
+}
+
 // collect は、ワークスペースとプロジェクトの索引を新しくして集める。`.git` の無いツリーは、何も言わずに飛ばす。
 // 同じ concept_id（NFC で比べる）は 1 つにまとめ、concept_id の順に並べる。
 func collect(conf *config.Settings, root string, o collectOptions) *collected {
@@ -158,7 +167,7 @@ func collect(conf *config.Settings, root string, o collectOptions) *collected {
 			result.ignoreAdded = append(result.ignoreAdded, at(built.IgnoreAdded))
 		}
 		for _, problem := range built.Problems {
-			result.problems = append(result.problems, at(problem))
+			result.problems = append(result.problems, problemText(p, problem))
 		}
 		for _, row := range built.Rows {
 			moved := row.Prefixed(p.prefix)

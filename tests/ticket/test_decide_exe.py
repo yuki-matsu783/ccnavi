@@ -137,13 +137,7 @@ class DecideApplyTest(test_ticket.TicketTest):
             ["i0001-01-03.md"],
             "同じ操作ID の子があるのに、2 つ目（i0001-01-04）を作った",
         )
-
-    test_the_same_operation_replayed_after_the_marker_came_back_makes_no_second_child = (
-        unittest.expectedFailure(
-            # ccnavi_op は書くだけで、同じ操作IDの子を探して使い回さない
-            test_the_same_operation_replayed_after_the_marker_came_back_makes_no_second_child
-        )
-    )
+        self.assertEqual(json.loads(again.stdout)["followup"], "i0001-01-03")
 
     def test_a_plain_replay_is_refused_because_the_request_mark_is_gone(self):
         """AT13（印が消えたままの打ち直しは、子を増やさず断る。設計の「使い回す」とは違い、断る）"""

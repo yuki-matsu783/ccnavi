@@ -502,10 +502,6 @@ class CoreChromeTest(CoreHarness):
         write(fixture, json.dumps(changes_requested))
         return refused, self.confirm(fixture, 1)
 
-    # Chrome の入口は文面ファイル（.ccnavi/messages/）を持たず、要求の統合先のファイルにも
-    # 載らないので、拒否の文が「文面（…）を引けませんでした」になる。直るまで、手元と同じ文面には
-    # ならない。
-    @unittest.expectedFailure
     def test_a_refusal_has_the_same_text_as_the_cli(self):
         fixture = self.reviewed_phase_one()
         self.commit_parent("requested")

@@ -77,7 +77,7 @@ func decision(conf *config.Settings, root, parentID string, number int, result h
 		c := refusedCheck(codeConfirmNoPhase, []string{fmt.Sprintf("ccnavi: %s にフェーズ %d の子がありません。", parent.ID, number)})
 		return nil, &c
 	}
-	if stop := precondition(root, p, number, changed, moved); stop != nil {
+	if stop := precondition(root, p, number, changed, moved, nil); stop != nil {
 		return nil, stop
 	}
 	if problems := request.MatchingProblems(&result, p.Marks[marks.Requested]); len(problems) > 0 {

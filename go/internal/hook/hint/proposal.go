@@ -9,6 +9,7 @@ import (
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/model/fields"
@@ -29,8 +30,11 @@ var parentFields = []string{"issue", fields.MRKey, "plan", ticket.PhasesKey}
 const createdType = "create"
 
 // misplacedWorktree はワークツリーが想定外の位置（`projects/<名前>/.claude/worktrees/<識別子>/`）にあるときの、
-// プロジェクトのツリーの中での頭。その形でも案内を出す。
-var misplacedWorktree = regexp.MustCompile(`^` + regexp.QuoteMeta(filepath.ToSlash(tree.WorktreesDir)) + `/[^/]+/`)
+// プロジェクトのツリーの中での頭。その形でも案内を出す。畳んだパス（folded）に当てるので、置き場も畳んでおく。
+var misplacedWorktree = regexp.MustCompile(`^` + regexp.QuoteMeta(folded(tree.WorktreesDir)) + `/[^/]+/`)
+
+// folded はパスを大文字小文字を区別しない比べの形にし、区切りを `/` に揃える。
+func folded(path string) string { return ospath.Slashed(pathcase.Fold(filepath.ToSlash(path))) }
 
 // ProposalHint は、親の提案（ツリーの提案の置き場の `todo/` の直下の md）を Write で新しく作ったときの書式の誤りの
 // 案内。出さないときは空。
@@ -45,7 +49,7 @@ func ProposalHint(conf *config.Settings, root string, in hookio.Input) string {
 	if v := in.ToolInput.Value("file_path"); pyfmt.Truthy(v) {
 		raw = pyfmt.Str(v)
 	}
-	if !strings.HasSuffix(raw, ".md") || conf.Tickets == "" {
+	if !pathcase.HasExt(raw, ".md") || conf.Tickets == "" {
 		return ""
 	}
 	cwd := in.Cwd
@@ -58,8 +62,8 @@ func ProposalHint(conf *config.Settings, root string, in hookio.Input) string {
 		return ""
 	}
 	rel := tree.Relative(where, written)
-	folder := strings.Trim(conf.Tickets, "/") + "/" + config.TodoDir + "/"
-	inner := misplacedWorktree.ReplaceAllString(rel, "")
+	folder := folded(strings.Trim(conf.Tickets, "/") + "/" + config.TodoDir + "/")
+	inner := misplacedWorktree.ReplaceAllString(folded(rel), "")
 	if !strings.HasPrefix(inner, folder) || strings.Contains(inner[len(folder):], "/") {
 		return ""
 	}

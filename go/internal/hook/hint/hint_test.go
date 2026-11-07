@@ -52,6 +52,9 @@ func TestProposalHint(t *testing.T) {
 		{"issue の欠け", todo, strings.Replace(parentFull, "issue: 1\n", "", 1), config.ToolWrite, createdType, []string{"`issue:`"}, nil},
 		{"空の plan は欠けと数える", todo, strings.Replace(parentFull, "plan: [a]", "plan: []", 1), config.ToolWrite, createdType, []string{"`plan:`"}, nil},
 		{"想定外の位置のワークツリーでも言う", ".claude/worktrees/feature-1-memo/" + todo, parentWrong, config.ToolWrite, createdType, []string{codeParentKey}, nil},
+		// パスは大文字小文字を区別せずに比べる。
+		{"綴りの大文字小文字が違っても言う", "WIP/Proposals/TODO/feature-1-memo.MD", parentWrong, config.ToolWrite, createdType, []string{codeParentKey}, nil},
+		{"想定外の位置のワークツリーを大文字で書いても言う", ".Claude/Worktrees/feature-1-memo/" + todo, parentWrong, config.ToolWrite, createdType, []string{codeParentKey}, nil},
 	} {
 		got := proposalHint(t, root, c.rel, c.text, c.tool, c.kind)
 		for _, want := range c.has {

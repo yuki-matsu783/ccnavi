@@ -95,17 +95,18 @@ func TestDeepUserRegexFallsToTheStoppingSide(t *testing.T) {
 	const deep = `version: 1
 deny:
   - id: deep-deny
-    match: Bash
+    match: WebFetch
     regex: '(?:a|b)*c'
     message: deep
 `
 	const deepAllow = `version: 1
 allow:
   - id: deep-allow
-    match: Bash
-    regex: '^echo (?:a|b)*$'
+    match: WebFetch
+    regex: '^https://x/(?:a|b)*$'
 `
-	long := "echo " + strings.Repeat("ab", 100_000)
+	// シェルのコマンドは長さの上限（CommandLengthLimit）で照合の前に止まるので、長い対象は WebFetch の URL で渡す。
+	long := "https://x/" + strings.Repeat("ab", 100_000)
 	clock(t, 1<<30, 0) // 期限で止まる経路と分けるため、時計を止めておく
 	for _, tc := range []struct {
 		rules, decision string
@@ -114,7 +115,7 @@ allow:
 		{deepAllow, "allow"},
 	} {
 		root := fixtureWorkspace(t, tc.rules)
-		a := runGo(t, root, judgeCase{Payload: call(config.ToolBash, root, map[string]any{"command": long}),
+		a := runGo(t, root, judgeCase{Payload: call(config.ToolWebFetch, root, map[string]any{"url": long}),
 			Env: with("CCNAVI_GUARD_CORE_FILES", "disable")})
 		if a.Error != "" {
 			t.Fatalf("%s: %s", tc.decision, a.Error)

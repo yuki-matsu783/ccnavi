@@ -1,7 +1,6 @@
 package judge
 
 import (
-	"slices"
 	"strings"
 
 	"ccnavi/internal/hook/reasons"
@@ -22,9 +21,6 @@ import (
 
 // workspaceLabel は、ワークスペースから切った（プロジェクトの無い）ツリーやチケットを文で呼ぶ名前。
 const workspaceLabel = "(workspace)"
-
-// emptyScope は範囲が 1 件も無いチケットの範囲の表記。
-const emptyScope = "(空)"
 
 // scanned は承認済みチケットを 1 回の判定で 1 度だけ読むための持ち回り。読んだかを have で分ける
 // （読んで 0 件と、まだ読んでいないを分ける）。
@@ -190,7 +186,7 @@ func ticketVerdict(conf *config.Settings, root, tool, full string, t *tree.Tree,
 	lines := []string{
 		hookio.SubjectPrefix + full,
 		"ticket: " + tk.ID + " (" + tk.Title + "), worktree " + t.Name,
-		"scope: " + scopeOf(tk),
+		"scope: " + tk.ScopeLine(),
 	}
 	decided := rules.Deny
 	if found.Decision == rules.Ask {
@@ -229,7 +225,7 @@ func ticketVerdict(conf *config.Settings, root, tool, full string, t *tree.Tree,
 		lines = append(lines, "limit: phase type "+pt.Title+" ("+pt.ID+"): "+strings.Join(pt.ScopeGlobs, ", "))
 		which, limit = "type", pt.Title+"（"+pt.ID+"）"
 	} else if found.Limit == scope.LimitParent && parent != nil {
-		lines = append(lines, "limit: parent "+parent.ID+": "+scopeOf(parent))
+		lines = append(lines, "limit: parent "+parent.ID+": "+parent.ScopeLine())
 		which, limit = "parent", parent.ID
 	}
 	body := texts.Say(root, reasons.CodeTicketScope,
@@ -237,12 +233,4 @@ func ticketVerdict(conf *config.Settings, root, tool, full string, t *tree.Tree,
 		texts.Variants{"what": which, "why": which, "next": which})
 	lines = append([]string{hookio.Cited(reasons.CodeTicketScope, tk.Path)}, lines...)
 	return ticketOutcome{decision: rules.Deny, text: strings.Join(append(lines, body), "\n")}
-}
-
-// scopeOf はチケットの範囲（allow と ask の項）を 1 行に並べたもの。
-func scopeOf(t *ticket.Ticket) string {
-	if area := strings.Join(slices.Concat(t.Paths(rules.Allow), t.Paths(rules.Ask)), ", "); area != "" {
-		return area
-	}
-	return emptyScope
 }

@@ -214,6 +214,27 @@ func classify(commands [][]string) Reason {
 	return ""
 }
 
+// expandedTarget は、書き込みのリダイレクト（`>` を含む演算子）の行き先が変数か置換を含むか。行き先の語に `$` が
+// 残るのは、変数と、置換を切り出した跡（placeholder）。書く先が実行するまで決まらないので、行き先を語として見る
+// 保護（設定ファイルへの書き込みなど）が当たらない。読めない形にして、allow で通さないようにする。
+// 引用を外した語で見るので、`> '$X'` のように文字の `$` も同じに扱う（止める側に倒れるだけ）。
+func expandedTarget(commands [][]string) bool {
+	for _, command := range commands {
+		for i := 0; i < len(command); {
+			width := RedirectWidth(command, i)
+			if width == 0 {
+				i++
+				continue
+			}
+			if strings.Contains(command[i+width-2], ">") && strings.Contains(command[i+width-1], "$") {
+				return true
+			}
+			i += width
+		}
+	}
+	return false
+}
+
 func readonly(words []string) bool {
 	return len(words) > 0 && readonlyRunnee[pathcase.Fold(Base(words[0]))]
 }

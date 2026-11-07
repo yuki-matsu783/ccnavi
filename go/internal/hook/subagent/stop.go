@@ -12,7 +12,6 @@ import (
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/builtin"
-	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/records/audit"
 	"ccnavi/internal/tickets/approval"
 	"ccnavi/internal/tickets/flow"
@@ -25,7 +24,6 @@ const (
 	scopeHead = hookio.Head + "%s: 子チケットの範囲の外に変更が残っています（" +
 		"%d 件）。範囲の中へ戻すか、必要なら親に伝えて次のチケットにしてください。"
 	scopeLine      = "  %s: %s%s  範囲は %s"
-	emptyArea      = "(空)"
 	unreadableLine = "ccnavi: %s のワークツリーを読めない: %s\n"
 	uncheckedHead  = "unchecked: "
 	limitBlocked   = "（チケットを信頼できない: %s）"
@@ -138,11 +136,7 @@ func judgeStop(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings
 	record.Rules, record.Code = []string{builtin.TicketScopeRuleID}, post.CodeOutOfScope
 	lines := []string{fmt.Sprintf(scopeHead, post.CodeOutOfScope, len(findings))}
 	for _, f := range findings[:min(len(findings), post.ReportLimit)] {
-		area := strings.Join(append(f.child.Paths(rules.Allow), f.child.Paths(rules.Ask)...), ", ")
-		if area == "" {
-			area = emptyArea
-		}
-		lines = append(lines, fmt.Sprintf(scopeLine, f.child.ID, f.Path, limitNote(f), area))
+		lines = append(lines, fmt.Sprintf(scopeLine, f.child.ID, f.Path, limitNote(f), f.child.ScopeLine()))
 	}
 	text := strings.Join(append(lines, changed...), "\n")
 	already := bounced(conf.State, in.SessionID, who)

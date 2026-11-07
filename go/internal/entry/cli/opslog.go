@@ -20,7 +20,8 @@ const (
 		"stage-set <操作ID> <段階ID> <pending|sent|unknown> [URL] [アカウント] / " +
 		"begin <種類> <親> <フェーズ> <MR> <キー> <段階ID:種類>… / applied <操作ID> <キー> <値> / " +
 		"reconcile <操作ID> <段階ID> <URL,…> <yes|no|error> [アカウント] / " +
-		"done <操作ID> / retire <親>\n"
+		"post-text <操作ID> <段階ID> <ファイル> / resume-plan <操作ID> <ファイル> / " +
+		"mark-sent <種類> <親> <MR> <キー> <段階ID> <URL> / done <操作ID> / retire <親>\n"
 	opsMissing  = "ccnavi: 操作記録 %s が無い\n"
 	opsOutState = "ccnavi: 書き先は state の置き場の下に限る"
 	// keyFromFile はキーの中身をファイルから取る印（本文そのものをキーにして、衝突を避ける）。
@@ -122,8 +123,9 @@ func opsStep(stdout, stderr io.Writer, state string, words []string) (code int, 
 			return config.ExitError, true, nil
 		}
 		return okIf(decide.ResumePlan(r, words[2]) == 0), true, nil
-	case verb == "mark-sent" && n == 8:
-		// mark-sent <種類> <親> <MR> <キー> <段階ID> <URL>: 目印で見つけた投稿を送り済みにする
+	case verb == "mark-sent" && n == 7:
+		// mark-sent <種類> <親> <MR> <キー> <段階ID> <URL>: 目印で見つけた投稿を送り済みにする。キーは begin と同じく
+		// 「@<ファイル>」で本文から取れる
 		key := words[4]
 		if path, ok := strings.CutPrefix(key, keyFromFile); ok {
 			key, _ = fsio.ReadText(path, fsio.Strict)

@@ -44,6 +44,8 @@ type writer struct {
 	tmpDir   string
 	deadline time.Time
 	beside   bool
+	// started は Build を始めた時刻。書いた索引の更新時刻にする（settle）。
+	started time.Time
 }
 
 func (w *writer) write(indexPath, indexRel, text string) error {

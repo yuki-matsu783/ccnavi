@@ -2,6 +2,7 @@ package reasons
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,18 +46,34 @@ const (
 	CodeTicketBlocked = "DENY_TICKET_BLOCKED"
 	// CodeTicketParent は親のワークツリーに置き場以外を書こうとした。範囲を広げても通らず、子のワークツリーで作業する。
 	CodeTicketParent = "DENY_TICKET_PARENT"
+	// CodeWriteTargetUnread は書き込み系のツールなのに、書き込み先の欄が読めなかった（rules.UnreadWriteTarget）。
+	CodeWriteTargetUnread = "DENY_WRITE_TARGET_UNREAD"
+	// CodeCommandTooLong はシェルのコマンドが長すぎ、ルールの照合が期限に収まらないおそれがあるので止めた。
+	CodeCommandTooLong = "DENY_COMMAND_TOO_LONG"
 )
 
 // 組み込みの判定で止めたときの、記録の rules に残す名前。範囲外（builtin.TicketScopeRuleID）を使い回すと、記録の
 // 範囲外の件数に混ざり、繰り返しの文も止めた理由と違う名前を言う。
 const (
-	RedirectLimitRule    = rules.ReservedIDPrefix + "redirect-limit"
-	SubagentTicketOpRule = rules.ReservedIDPrefix + "subagent-ticket-op" // phase.CodeSubagent
-	PhaseReviewRule      = rules.ReservedIDPrefix + "phase-review"       // phase.CodeReview
-	TicketProjectRule    = rules.ReservedIDPrefix + "ticket-project"     // CodeTicketProject
-	TicketBlockedRule    = rules.ReservedIDPrefix + "ticket-blocked"     // CodeTicketBlocked
-	TicketParentRule     = rules.ReservedIDPrefix + "ticket-parent"      // CodeTicketParent
+	RedirectLimitRule     = rules.ReservedIDPrefix + "redirect-limit"
+	SubagentTicketOpRule  = rules.ReservedIDPrefix + "subagent-ticket-op"  // phase.CodeSubagent
+	PhaseReviewRule       = rules.ReservedIDPrefix + "phase-review"        // phase.CodeReview
+	TicketProjectRule     = rules.ReservedIDPrefix + "ticket-project"      // CodeTicketProject
+	TicketBlockedRule     = rules.ReservedIDPrefix + "ticket-blocked"      // CodeTicketBlocked
+	TicketParentRule      = rules.ReservedIDPrefix + "ticket-parent"       // CodeTicketParent
+	WriteTargetUnreadRule = rules.ReservedIDPrefix + "write-target-unread" // CodeWriteTargetUnread
+	CommandTooLongRule    = rules.ReservedIDPrefix + "command-length"      // CodeCommandTooLong
 )
+
+// CommandTooLong は長すぎるコマンドを止めた文。limit は上限、length はこのコマンドの文字数。
+func CommandTooLong(root string, limit, length int) string {
+	return texts.Say(root, CodeCommandTooLong, texts.Values{"limit": strconv.Itoa(limit), "length": strconv.Itoa(length)}, nil)
+}
+
+// WriteTargetUnread は書き込み先を読めない書き込みを止めた文。
+func WriteTargetUnread(root, tool string) string {
+	return texts.Say(root, CodeWriteTargetUnread, texts.Values{"tool": tool}, nil)
+}
 
 const (
 	// rewritesShown は止めた文に並べる表記の数。1 つ直せば残りも同じ直し方になる。
@@ -249,6 +266,7 @@ var unreadableTexts = map[shell.Reason]string{
 	shell.ReasonTakenAsCode:       "NOTE_UNREADABLE__TAKEN_AS_CODE",
 	shell.ReasonUnterminatedSubst: "NOTE_UNREADABLE__UNTERMINATED_SUBST",
 	shell.ReasonAnsiC:             "NOTE_UNREADABLE__ANSI_C",
+	shell.ReasonExpandedTarget:    "NOTE_UNREADABLE__EXPANDED_TARGET",
 }
 
 // unreadable はコマンドを読めないまま出した 1 件の断り。「禁止されたコマンドを実行した」と「読めない文字列のどこかに
@@ -268,9 +286,10 @@ func unreadable(root string, reason shell.Reason, matched bool) string {
 
 // rewriteHintTexts は読めなかった理由ごとの書き換え例の識別子。例の無い理由は引かない。
 var rewriteHintTexts = map[shell.Reason]string{
-	shell.ReasonTakenAsCode:  "NOTE_REWRITE_HINT__TAKEN_AS_CODE",
-	shell.ReasonAnsiC:        "NOTE_REWRITE_HINT__ANSI_C",
-	shell.ReasonUnterminated: "NOTE_REWRITE_HINT__UNTERMINATED",
+	shell.ReasonTakenAsCode:    "NOTE_REWRITE_HINT__TAKEN_AS_CODE",
+	shell.ReasonAnsiC:          "NOTE_REWRITE_HINT__ANSI_C",
+	shell.ReasonUnterminated:   "NOTE_REWRITE_HINT__UNTERMINATED",
+	shell.ReasonExpandedTarget: "NOTE_REWRITE_HINT__EXPANDED_TARGET",
 }
 
 // rewriteHint は書き換え例の行。非対話のセッションでは確認に答える人がいないので、書き直すほかないことを足す。

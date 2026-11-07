@@ -43,7 +43,8 @@ var actorForm = regexp.MustCompile(`\A[A-Za-z0-9_.-]{1,` + strconv.Itoa(actorMax
 // サブコマンド（cli）で、ユーザの判断の経路と hook は枝の中で差し替える。
 func Run(stdin io.Reader, stdout, stderr io.Writer, argv []string) (code int) {
 	defer via.Session(via.CLI, "")()
-	// hook の経路は自前の受け皿（hook.go）で終わる。ここに来るのは、打った人が見られる経路の想定外の失敗だけ。
+	// hook の経路は parsed の受け（内部エラーの応答）で終わる。ここに来るのは、打った人が見られる経路の想定外の
+	// 失敗と、経路が決まる前（引数を読む途中）の失敗だけ。
 	defer onPanic(func(r any, _ failure) {
 		fmt.Fprintf(stderr, "ccnavi: 想定外の失敗で止まった: %v\n", r)
 		code = config.ExitError

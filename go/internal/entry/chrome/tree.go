@@ -45,14 +45,14 @@ func (s *snapshot) build(root string, families []string) error {
 		if err := head(ospath.Join(root, tree.DotGit), s.integration); err != nil {
 			return err
 		}
-		if err := keep(integ, root, sortedSet(doneDir, commonLayer, ownLayer), stamped); err != nil {
+		if err := keep(integ, root, sortedSet(doneDir, commonLayer, ownLayer, messagesDir), stamped); err != nil {
 			return err
 		}
 	} else {
 		if err := head(ospath.Join(root, tree.DotGit), s.wsName); err != nil {
 			return err
 		}
-		if err := keep(s.workspace, root, sortedSet(commonLayer, ownLayer), stamped); err != nil {
+		if err := keep(s.workspace, root, sortedSet(commonLayer, ownLayer, messagesDir), stamped); err != nil {
 			return err
 		}
 		owner = ospath.Join(root, config.DefaultProjects, s.project)

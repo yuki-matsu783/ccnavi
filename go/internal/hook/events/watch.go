@@ -40,6 +40,7 @@ func checkerOf(stderr io.Writer, conf *config.Settings, root string, watched []p
 		Scope:   scopeGuard(conf, root, raw),
 		Places:  post.Places{Tickets: conf.Tickets, Approved: conf.Approved},
 		Root:    root,
+		Conf:    conf,
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/tickets/testkit"
 )
@@ -154,6 +155,15 @@ func TestIntegratedSquash(t *testing.T) {
 			writeDone(t, f.root, "feat", record(f))
 			put(t, f.root, ".ccnavi/approved/doing/feat.md", "---\nticket: feat\n---\n")
 		}, nil, []string{}},
+		// 名前は大文字小文字を畳んで見る（BoundCheck と同じ）。
+		{"綴りの大文字小文字が違うチケット", func(t *testing.T, f fixture) {
+			writeDone(t, f.root, "feat", record(f))
+			put(t, f.root, ".ccnavi/approved/doing/Feat.md", "---\nticket: Feat\n---\n")
+		}, nil, []string{}},
+		{"設定の置き場のチケット", func(t *testing.T, f fixture) {
+			writeDone(t, f.root, "feat", record(f))
+			put(t, f.root, "approved-here/doing/feat.md", "---\nticket: feat\n---\n")
+		}, nil, []string{}},
 		{"origin に同じ名前がある", func(t *testing.T, f fixture) {
 			writeDone(t, f.root, "feat", record(f))
 			testkit.Git(t, f.root, "update-ref", "refs/remotes/origin/feat", "HEAD")
@@ -169,7 +179,12 @@ func TestIntegratedSquash(t *testing.T) {
 			if c.base != nil {
 				base = c.base(f)
 			}
-			if got := pathSet(SquashedPaths(f.root, base)); !slices.Equal(got, c.want) {
+			conf := testkit.Settings(t, f.root)
+			conf.Approved = "approved-here"
+			if c.name != "設定の置き場のチケット" {
+				conf.Approved = config.DefaultApproved
+			}
+			if got := pathSet(SquashedPaths(conf, f.root, "", f.root, base)); !slices.Equal(got, c.want) {
 				t.Errorf("%v, want %v", got, c.want)
 			}
 		})
@@ -226,7 +241,7 @@ func TestIntegratedDirect(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			f := setup(t)
 			c.prepare(t, f)
-			if got := pathSet(SquashedPaths(f.root, f.turn)); !slices.Equal(got, c.want) {
+			if got := pathSet(SquashedPaths(testkit.Settings(t, f.root), f.root, "", f.root, f.turn)); !slices.Equal(got, c.want) {
 				t.Errorf("%v, want %v", got, c.want)
 			}
 		})

@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"io"
-	"os"
 	"regexp"
 	"strings"
 
@@ -141,10 +140,8 @@ func same(a, b string) bool { return pathcase.SameNorm(a, b) }
 
 // inside は path が base の下（か同じ）か。どちらも行き着く先のパスで渡す。大文字小文字は区別しない。
 func inside(path, base string) bool {
-	p := pathcase.Fold(ospath.Normpath(path))
-	b := pathcase.Fold(ospath.Normpath(base))
-	sep := string(os.PathSeparator)
-	return p == b || strings.HasPrefix(p, strings.TrimRight(b, sep)+sep)
+	_, ok := pathcase.Under(path, base)
+	return ok
 }
 
 // docsFlagsGiven は渡された `--docs` 用のフラグ。

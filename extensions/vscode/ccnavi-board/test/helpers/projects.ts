@@ -82,6 +82,6 @@ export function cardSelector(name: string): string {
 }
 
 /** 苦情の見本 */
-export function problem(severity: LintProblem["severity"], detail: string, where = "(projects/lib)"): LintProblem {
-  return { severity, where, detail };
+export function problem(severity: LintProblem["severity"], detail: string, where = "(projects/lib)", kind = ""): LintProblem {
+  return kind === "" ? { severity, where, detail } : { severity, where, detail, kind };
 }

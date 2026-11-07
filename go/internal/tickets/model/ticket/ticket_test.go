@@ -176,3 +176,14 @@ func TestPlanItemRaw(t *testing.T) {
 		t.Error("ChosenReview")
 	}
 }
+
+// 範囲の 1 行は allow・ask の順に並べ、項が無ければ「(空)」と書く（判定・実行後チェック・サブエージェントの終わりで同じ表記）。
+func TestScopeLine(t *testing.T) {
+	tk := &Ticket{Entries: []Entry{{Decision: rules.Ask, Glob: "b/*"}, {Decision: rules.Allow, Regex: "^a"}, {Decision: rules.Deny, Glob: "c"}}}
+	if got := tk.ScopeLine(); got != "^a, b/*" {
+		t.Errorf("ScopeLine = %q", got)
+	}
+	if got := (&Ticket{}).ScopeLine(); got != "(空)" {
+		t.Errorf("空の範囲 = %q", got)
+	}
+}

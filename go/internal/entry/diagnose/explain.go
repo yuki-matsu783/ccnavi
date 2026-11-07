@@ -14,6 +14,7 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/builtin"
@@ -79,8 +80,8 @@ func shown(root, path string) string {
 	if path == "" {
 		return noneShown
 	}
-	rel, ok := ospath.Relpath(path, root)
-	if !ok || strings.HasPrefix(rel, "..") {
+	rel, ok := pathcase.Under(path, root)
+	if !ok {
 		return path
 	}
 	return ospath.Slashed(rel)

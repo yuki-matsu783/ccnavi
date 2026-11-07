@@ -40,7 +40,7 @@ type Built struct {
 	// Foreign は ccnavi が書いた形でないので触らなかった ccnavi-index.jsonl。
 	Foreign []string
 	// Problems は書けなかった・読まなかった理由。索引は組めた分だけ Rows にある。
-	Problems []string
+	Problems []Problem
 	// Unignored は md を持つディレクトリの ccnavi-index.jsonl がどれも無視されていない（索引の対象外）。
 	Unignored bool
 	// Indexable は md を持ち、索引の対象になるツリーだった（打ち切りで Rows が空でも引けばヒットする）。
@@ -52,6 +52,19 @@ type Built struct {
 	// parsed・reused は読み直した md と使い回した行の数。
 	written, removed []string
 	parsed, reused   int
+}
+
+// Problem は書けなかった・読まなかった 1 つの理由。Rel はその文が指すパス（ツリーのルートからの相対）で、
+// 文はパスに続けて読む（`<Rel> <Text>`）。ツリー全体のことでパスが無ければ Rel は空。呼び手は、パスなら
+// 頭に置き場を付け、空ならツリーの名前を添える。
+type Problem struct{ Rel, Text string }
+
+// String はツリーのルートから見た文。
+func (p Problem) String() string {
+	if p.Rel == "" {
+		return p.Text
+	}
+	return p.Rel + " " + p.Text
 }
 
 // owner は既存の ccnavi-index.jsonl の持ち主。
@@ -90,6 +103,10 @@ type dirState struct {
 	order                          []string // md の concept_id を名前の順に
 	rows                           map[string]Row
 	pending                        []pending
+	// indexTime は既存の索引の更新時刻（無ければゼロ値）。racy は、行の mtime は同じでも、索引を組み始めた秒より
+	// 前とは言えないので読み直した md があった（scan）。
+	indexTime time.Time
+	racy      bool
 }
 
 // Build は base（git のワークツリーのルート）の md の索引を組み、無視されている索引を差分で書く。
@@ -102,6 +119,7 @@ type dirState struct {
 // 少ないディレクトリから読む。最後にディレクトリごとに書く。読めなかった md は既存の行を残し、次の回に読み直す。
 // `.git` が無ければ ErrNotRepository を、git に聞けなければ理由のエラーを返す。
 func Build(base string, o Options) (*Built, error) {
+	started := time.Now()
 	result := &Built{}
 	all, err := listed(base, left(o.Deadline))
 	if err != nil {
@@ -149,9 +167,9 @@ func Build(base string, o Options) (*Built, error) {
 	if o.Refresh {
 		if tmpDir, ok := tree.GitDir(base); ok && ospath.IsDir(tmpDir) {
 			sweep(tmpDir)
-			w = &writer{base: base, tmpDir: tmpDir, deadline: o.Deadline}
+			w = &writer{base: base, tmpDir: tmpDir, deadline: o.Deadline, started: started}
 		} else {
-			result.Problems = append(result.Problems, "git のディレクトリが見つからないので索引を書かない")
+			result.Problems = append(result.Problems, Problem{Text: "git のディレクトリが見つからないので索引を書かない"})
 		}
 	}
 	baseReal := ospath.Realpath(base)
@@ -175,6 +193,9 @@ func Build(base string, o Options) (*Built, error) {
 	sort.SliceStable(result.Rows, func(i, j int) bool { return result.Rows[i].ConceptID() < result.Rows[j].ConceptID() })
 	return result, nil
 }
+
+// second は t を秒に切り捨てる（行の mtime と同じ細かさで比べる）。
+func second(t time.Time) time.Time { return t.Truncate(time.Second) }
 
 // dirOf は rel.rpartition("/") の頭（ルートの直下なら空）。
 func dirOf(rel string) string {
@@ -210,18 +231,18 @@ func full(base, rel string) string {
 // 実体がツリーの外にあるディレクトリ（ジャンクションやリンク越し）は読まない。
 func scan(base, baseReal, directory string, names []string, indexRel string, writable bool, o Options, result *Built) *dirState {
 	if _, ok := tree.PartsUnder(baseReal, ospath.Realpath(full(base, directory))); !ok {
-		result.Problems = append(result.Problems, directory+"/ の実体がツリーの外にあるので読まない")
+		result.Problems = append(result.Problems, Problem{directory + "/", "の実体がツリーの外にあるので読まない"})
 		return nil
 	}
 	indexPath := full(base, indexRel)
-	oldRows, oldText, own := readIndex(indexPath)
+	oldRows, oldText, own, indexTime := readIndex(indexPath)
 	if own == foreign {
 		result.Foreign = append(result.Foreign, indexRel)
-		result.Problems = append(result.Problems, indexRel+" は ccnavi の索引ではないので書き換えない")
+		result.Problems = append(result.Problems, Problem{indexRel, "は ccnavi の索引ではないので書き換えない"})
 		writable = false
 	}
 	one := &dirState{directory: directory, indexRel: indexRel, indexPath: indexPath, writable: writable,
-		owner: own, oldRows: oldRows, oldText: oldText, rows: map[string]Row{}}
+		owner: own, oldRows: oldRows, oldText: oldText, rows: map[string]Row{}, indexTime: indexTime}
 	names = slices.Clone(names)
 	sort.Strings(names)
 	for _, rel := range names {
@@ -244,34 +265,37 @@ func scan(base, baseReal, directory string, names []string, indexRel string, wri
 		}
 		mtime := info.ModTime().Local().Format(mtimeLayout)
 		if hasOld && old.Mtime() == mtime && old.directory() == shownDir(directory) {
-			one.rows[conceptID] = old
-			result.reused++
-			continue
+			if second(info.ModTime()).Before(second(one.indexTime)) {
+				one.rows[conceptID] = old
+				result.reused++
+				continue
+			}
+			one.racy = true
 		}
 		one.pending = append(one.pending, pending{rel, conceptID, mtime})
 	}
 	return one
 }
 
-// readIndex は既存の ccnavi-index.jsonl の行（concept_id → 行）と、中身と、持ち主を返す。
+// readIndex は既存の ccnavi-index.jsonl の行（concept_id → 行）と、中身と、持ち主と、ours なら更新時刻を返す。
 // 空か、空でない行がすべて ccnavi の形なら ours。リンク・ふつうでないもの・大きすぎるもの・UTF-8 でないもの・
 // 形の違う行を持つものは foreign。
-func readIndex(path string) (map[string]Row, string, owner) {
+func readIndex(path string) (map[string]Row, string, owner, time.Time) {
 	rows := map[string]Row{}
 	info, err := ospath.Lstat(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return rows, "", absent
+		return rows, "", absent, time.Time{}
 	}
 	if err != nil || !info.Mode().IsRegular() || info.Size() > indexFileLimit {
-		return rows, "", foreign
+		return rows, "", foreign, time.Time{}
 	}
 	data, err := fsio.ReadDiskBytes(path)
 	if err != nil {
-		return rows, "", foreign
+		return rows, "", foreign, time.Time{}
 	}
 	text, err := fsio.DecodeBytes(data, fsio.Strict)
 	if err != nil {
-		return rows, "", foreign
+		return rows, "", foreign, time.Time{}
 	}
 	// 割るのは "\n" だけ。値の中の U+2028・U+2029・U+0085 は JSON の文字列に生のまま入る。
 	for _, line := range strings.Split(text, "\n") {
@@ -281,18 +305,19 @@ func readIndex(path string) (map[string]Row, string, owner) {
 		}
 		v, err := pyjson.Loads(line)
 		if err != nil {
-			return map[string]Row{}, text, foreign
+			return map[string]Row{}, text, foreign, time.Time{}
 		}
 		row, ok := validRow(v)
 		if !ok {
-			return map[string]Row{}, text, foreign
+			return map[string]Row{}, text, foreign, time.Time{}
 		}
 		rows[row.ConceptID()] = row
 	}
-	return rows, text, ours
+	return rows, text, ours, info.ModTime()
 }
 
 // parsePending は読み直しの要る md を読む。待つ数の少ないディレクトリから。期限を過ぎたらやめる。
+// 読めなかった md は既存の行を残す（mtime が違うので次の回に読み直す）。
 func parsePending(base string, states []*dirState, deadline time.Time, result *Built) {
 	ordered := slices.Clone(states)
 	sort.SliceStable(ordered, func(i, j int) bool {
@@ -314,6 +339,9 @@ func parsePending(base string, states []*dirState, deadline time.Time, result *B
 			}
 			raw, ok := readHead(full(base, p.rel))
 			if !ok {
+				if old, had := one.oldRows[p.conceptID]; had {
+					one.rows[p.conceptID] = old
+				}
 				continue
 			}
 			result.parsed++
@@ -353,7 +381,7 @@ func settle(one *dirState, refresh bool, w *writer, result *Built) {
 		// md が全部消えたディレクトリ。ccnavi の索引だけを消す。打ち切りで行が空のときは消さない。
 		if one.owner == ours && len(waiting) == 0 {
 			if err := os.Remove(one.indexPath); err != nil {
-				result.Problems = append(result.Problems, one.indexRel+" を保存できませんでした: "+fsio.ErrorText(err))
+				result.Problems = append(result.Problems, Problem{one.indexRel, "を保存できませんでした: " + fsio.ErrorText(err)})
 				return
 			}
 			result.removed = append(result.removed, one.indexRel)
@@ -364,12 +392,16 @@ func settle(one *dirState, refresh bool, w *writer, result *Built) {
 	for _, r := range rows {
 		text.WriteString(r.Line() + "\n")
 	}
-	if one.owner != absent && text.String() == one.oldText {
+	if one.owner != absent && text.String() == one.oldText && !one.racy {
 		return
 	}
 	if err := w.write(one.indexPath, one.indexRel, text.String()); err != nil {
-		result.Problems = append(result.Problems, one.indexRel+" を保存できませんでした: "+fsio.ErrorText(err))
+		result.Problems = append(result.Problems, Problem{one.indexRel, "を保存できませんでした: " + fsio.ErrorText(err)})
 		return
 	}
+	// 行の mtime は秒までなので、読んだあと同じ秒の中で書き換えられた md は mtime の文字列が変わらない。そこで
+	// 索引の更新時刻を組み始めた時刻に戻し、使い回すのはそれより前の秒に更新された md の行だけにする（scan）。
+	// 戻せなくても索引は正しいので、知らせない。
+	_ = os.Chtimes(one.indexPath, w.started, w.started)
 	result.written = append(result.written, one.indexRel)
 }

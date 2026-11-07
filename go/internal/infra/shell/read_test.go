@@ -192,6 +192,16 @@ func TestReadDegraded(t *testing.T) {
 		{"git $'\\x70ush'", ReasonAnsiC},
 		{"printf $'\\''", ReasonAnsiC},
 		{`echo "$'x'"`, ""},
+		// 書き込みのリダイレクト先が変数か置換なら、書く先が読めない。読み込み・fd の複製・引数の変数は読める。
+		{`echo x > "$(echo .claude/settings.json)"`, ReasonExpandedTarget},
+		{`echo x > $X`, ReasonExpandedTarget},
+		{`echo x >> "${HOME}/a"`, ReasonExpandedTarget},
+		{`echo x 2> "$LOG"`, ReasonExpandedTarget},
+		{`echo x &> $(pwd)/out`, ReasonExpandedTarget},
+		{`ls; echo "$(echo x > $X)"`, ReasonExpandedTarget},
+		{`echo x > out.txt 2>&1`, ""},
+		{`cat < $X`, ""},
+		{`echo $X > out.txt`, ""},
 	}
 	for _, c := range cases {
 		r := Read(c.src)
@@ -292,7 +302,7 @@ func TestShellRunsOnlyWhatShellRuns(t *testing.T) {
 		{"41", `echo "\"$(M)\""`, "中"},
 		{"42", `a=(1); echo "${a[$(M)]}"`, "中"},
 		{"43", `echo "$[1+2]"`, "-"},
-		{"44", `echo x > "$(M)"`, "中"},
+		{"44", `echo x > "$(M)"`, "expanded-redirect-target"}, // 書き込み先が置換なので読めない形
 		{"45", `for f in "$(M)"; do :; done`, "中"},
 		{"46", `[[ "$(M)" = x ]]`, "中"},
 		{"47", "echo hi\nM", "外"},

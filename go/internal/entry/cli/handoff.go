@@ -8,6 +8,7 @@ import (
 	"ccnavi/internal/infra/argparse"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/pyjson"
+	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/tickets/model/place"
 	"ccnavi/internal/tickets/model/useronly"
 	"ccnavi/internal/tickets/model/via"
@@ -175,7 +176,7 @@ func handoffPlan(w io.Writer, plan *handoff.Plan, named bool, root string) {
 	if named {
 		rels := make([]string, len(chosen))
 		for i, e := range chosen {
-			rels[i] = e.Rel
+			rels[i] = shell.Quote(e.Rel)
 		}
 		command += strings.Join(rels, " ") + " "
 	}

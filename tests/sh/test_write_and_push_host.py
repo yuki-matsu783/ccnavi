@@ -305,10 +305,25 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         first = self.review("review-request", "--phase", "1", "--body-file", body, HALF_FAIL=once)
         self.assertNotEqual(first.returncode, 0, first.stdout + first.stderr)
         self.assertEqual(len(Host.notes), 1)
+        # 投稿の後、送れたかを書く前に落ちた形にする（段階を unknown に戻す）。打ち直しは、目印で見つけた投稿を
+        # `ops mark-sent` で送り済みに直す。
+        pending = self.exe("ops", "pending")
+        self.assertEqual(pending.returncode, 0, pending.stderr)
+        self.assertEqual(pending.stdout, "")
+        records = os.listdir(os.path.join(self.ws, "logs", "state", "ops"))
+        ids = [name.removesuffix(".json") for name in records if name.endswith(".json")]
+        self.assertEqual(len(ids), 1, records)
+        stage = json.loads(self.exe("ops", "show", ids[0]).stdout)["stages"][0]["id"]
+        with open(os.path.join(self.ws, "logs", "state", "ops", records[0]), encoding="utf-8") as f:
+            record = json.load(f)
+        record["stages"][0]["state"] = "unknown"
+        write(os.path.join(self.ws, "logs", "state", "ops", records[0]), json.dumps(record))
+        self.assertIn(stage, self.exe("ops", "pending").stdout)
         again = self.review("review-request", "--phase", "1", "--body-file", body, HALF_FAIL=once)
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertIn("投稿済み", again.stdout)
         self.assertEqual(len(Host.notes), 1)
+        self.assertEqual(self.exe("ops", "pending").stdout, "")
         self.carried(f"{APPROVED}/phases/{PARENT}/1.requested")
 
     def test_terminal_decide_chooses_outside_write_and_push_and_writes_inside(self):

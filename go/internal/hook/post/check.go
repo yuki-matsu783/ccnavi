@@ -58,6 +58,8 @@ type Checker struct {
 	Scope   *ScopeGuard
 	Places  Places
 	Root    string
+	// Conf は取り込みの確かめ（integrate.SquashedPaths）が、名前がチケットに結び付くかを引く設定。
+	Conf *config.Settings
 }
 
 // readTree は git に聞いた 1 つのツリー。
@@ -483,7 +485,7 @@ func (c *Checker) committedFindings(read []readTree, h heads) ([]*finding, []str
 		// integrate-done が積んだ squash だけが変えたパスは外す（片付けの後なので staged の除外は効かない）。
 		var integrated map[string]bool
 		if len(changes) > 0 {
-			integrated = integrate.SquashedPaths(r.top, base)
+			integrated = integrate.SquashedPaths(c.Conf, c.Root, r.w.Tree.Project, r.top, base)
 		}
 		s := c.scanOf(readTree{r.w, r.top, changes}, false)
 		for _, f := range s.findings() {

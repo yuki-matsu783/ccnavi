@@ -235,7 +235,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("Bash(python build.py)", result.stderr)
         # 戻す手順。
         self.assertIn(
-            'ccnavi-git.sh restore --staged --worktree -- "protected/keep.txt"', result.stderr
+            'ccnavi-git.sh restore --staged --worktree -- protected/keep.txt', result.stderr
         )
         # ルールが持つ文面。止めるだけでは足りないという道具の目的そのもの。
         self.assertIn("Ask the user", result.stderr)
@@ -262,7 +262,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("protected/generated.env", result.stderr)
         # 現れたファイルは restore では戻せない。git のラッパーは clean を通さないので、
         # シェルの rm で消す。
-        self.assertIn('rm -- "protected/generated.env"', result.stderr)
+        self.assertIn('rm -- protected/generated.env', result.stderr)
         self.assertNotIn("git clean", result.stderr)
 
     def test_同じ変更を毎回は言わない(self):
@@ -506,7 +506,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("put it back to its committed content", result.stderr)
         # 誰も戻していないので、戻す手順は省かない。
         self.assertIn(
-            'ccnavi-git.sh restore --staged --worktree -- "protected/keep.txt"', result.stderr
+            'ccnavi-git.sh restore --staged --worktree -- protected/keep.txt', result.stderr
         )
         self.assertIn("would-restore 1", self.records()[-1]["detail"])
 
@@ -704,7 +704,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertNotIn("restored: ccnavi", result.stderr)
         # 戻していないので、戻す手順は載せたままにする。
         self.assertIn(
-            'ccnavi-git.sh restore --staged --worktree -- "watched/deps.txt"', result.stderr
+            'ccnavi-git.sh restore --staged --worktree -- watched/deps.txt', result.stderr
         )
         # 手順だけだと「自分で戻せ」としか読めない。戻さなかった理由をつける。
         self.assertIn("not-restored:", result.stderr)
@@ -1324,7 +1324,7 @@ class UndoTextTest(unittest.TestCase):
         result = harness.run_hook(command="python build.py")
         git = script_command(harness.repo, "ccnavi-git.sh")
         self.assertIn(
-            f'undo: {git} restore --staged --worktree -- "protected/keep.txt"', result.stderr
+            f'undo: {git} restore --staged --worktree -- protected/keep.txt', result.stderr
         )
 
 

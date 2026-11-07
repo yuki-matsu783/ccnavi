@@ -117,7 +117,7 @@ test("CB-T67 lintのJSONを読み、プロジェクトごとの苦情を引け�
       ticket_control: "enable",
       projects: ["app", "lib"],
       problems: [
-        { severity: "warn", where: "(projects)", detail: "projects/ がワークスペースのgitで無視されていない" },
+        { severity: "warn", where: "(projects)", detail: "projects/ がワークスペースの git で無視されていない", kind: "projects-unignored" },
         { severity: "warn", where: "(projects/lib)", detail: ".claude/ がある" },
         { severity: "error", where: "(projects/app) no-message", detail: "文面がありません" },
         { severity: "warn", where: "(projects/application)", detail: "別のプロジェクト" },
@@ -163,6 +163,9 @@ test("CB-T67 lintのJSONを読み、プロジェクトごとの苦情を引け�
   assert.equal(lib.doing, 1);
   assert.deepEqual(lib.problems.map((p) => p.detail), [".claude/ がある"]);
   assert.equal(page.dirProblems.length, 1);
+  // 種類（kind）は読んだまま渡る。無い苦情には付かない
+  assert.equal(page.dirProblems[0].kind, "projects-unignored");
+  assert.equal(lib.problems[0].kind, undefined);
   assert.deepEqual(page.workspaceWorktrees, ["i0001"]);
   assert.equal(page.selfRulesRel, ".ccnavi/config/project/rules.yml");
   assert.equal(page.selfRulesExists, false);

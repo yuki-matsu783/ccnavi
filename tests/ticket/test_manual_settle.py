@@ -19,7 +19,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import unittest
 from datetime import UTC, datetime
 
 from tests.ticket.test_phases import PhaseHarness
@@ -574,8 +573,7 @@ class ManualSettleGapsTest(PhaseHarness):
 
     # ---- AT38
 
-    # 指摘が無いと通常の confirm が通り、「確定しない」と言いながらレビュー済みにする（実装の欠陥）
-    @unittest.expectedFailure
+    # 指摘が無くても、未共有の移動は通常の confirm に回さず止める（「確定しない」と揃える）
     def test_an_unshared_move_is_not_confirmed_even_with_no_threads(self):
         fixture = self.requested()
         self.move_by_hand()
@@ -583,6 +581,7 @@ class ManualSettleGapsTest(PhaseHarness):
         self.assertIn("移動が未共有", self.status())
         refused = self.confirm(self.fixture_with(fixture, []), 1)
         self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("[CORE_CONFIRM_UNSHARED]", refused.stderr)
         self.no_reviewed_mark()
 
     def test_a_committed_but_unpushed_move_is_not_shared(self):
@@ -592,7 +591,7 @@ class ManualSettleGapsTest(PhaseHarness):
         self.assertIn("移動が未共有", self.status())
         refused = self.confirm(self.fixture_with(fixture, [_thread()]), 1)
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("移動が未共有", refused.stdout)
+        self.assertIn("移動が未共有", refused.stderr)
         self.no_reviewed_mark()
         entries = read_ledger(self.approved, "i0001")
         self.assertEqual(entries, [])

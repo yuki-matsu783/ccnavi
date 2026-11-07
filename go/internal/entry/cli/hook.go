@@ -30,16 +30,6 @@ import (
 // diagSource は hook の診断ログの出どころ（`logs/diag/ccnavi.log`）。
 const diagSource = "ccnavi"
 
-// hookRoute は、この起動が hook の経路（routes の最後）に進むかを決める。
-// 設定を読む前に分ける必要があるときに使う。payload を読まない経路のどれにも当たらない起動が対象になる。
-// 経路を足したら、ここにも足す。
-func hookRoute(a opts) bool {
-	return !(a.Truthy("docs") || a.Truthy("learnings") || a.Truthy("handoff") || a.Truthy("mirror") || diagnosing(a) ||
-		a.Truthy("prune") || !a.IsNone("plan_order") || a.Truthy("fill_phases") || !a.IsNone("order") ||
-		a.Truthy("write") || !a.IsNone("expect") || a.Truthy("agree") || len(a.command()) > 0 ||
-		!a.IsNone("reviewed") || a.Truthy("close_early"))
-}
-
 // unloaded は、設定を読めなかった回の設定である。記録と state の既定の置き場だけを持つ。
 func unloaded(root string) *config.Settings {
 	return &config.Settings{Log: ospath.Join(root, config.DefaultLog), State: ospath.Join(root, config.DefaultState)}
@@ -125,14 +115,6 @@ func onPanic(handle func(r any, f failure)) {
 	}
 }
 
-// runHook は hook として起動された 1 回を処理する。途中のどこで失敗しても、終了コード 1 で終わらせない。
-// 1 で終わると Claude Code は PreToolUse の呼び出しをそのまま通すからである。
-func runHook(in *input, stdout, stderr io.Writer, conf *config.Settings, problems []string, root string, a opts) (code int) {
-	so := &hookSoFar{mode: config.Enable}
-	defer onPanic(func(_ any, f failure) { code = hookCrashed(stdout, stderr, conf, root, so, f) })
-	return hookSteps(in, stdout, stderr, conf, problems, root, a, so)
-}
-
 // resolveSwitches は、判定が読む切り替えの環境変数を解いて設定に戻す。
 // hook と診断（`--test` など）が同じ関数を使う。解く前の値は書いたままの表記を持つ。
 // 判定はどれも解いた後の値と比べるので、解かずに判定を呼ぶと hook と違う答えになる。
@@ -145,7 +127,8 @@ func resolveSwitches(stderr io.Writer, conf *config.Settings, a opts) {
 	conf.GuardUnwatched = resolveGate(stderr, "", conf.GuardUnwatched, env.GuardUnwatched)
 }
 
-// hookSteps は hook の 1 回分の処理である。進み具合を so に残す。出力は手元に溜めておき、
+// hookSteps は hook として起動された 1 回分の処理である。進み具合を so に残す（落ちたときは parsed の受けが
+// so を読んで内部エラーの応答で終える）。出力は手元に溜めておき、
 // 記録と診断ログを終えてから出す。失敗で終えられなかった回に、途中まで書いた JSON と内部エラーの応答が混ざり、
 // どちらも読まれなくなるのを避けるためである。
 func hookSteps(in *input, stdout, stderr io.Writer, conf *config.Settings, problems []string, root string, a opts,
@@ -160,6 +143,11 @@ func hookSteps(in *input, stdout, stderr io.Writer, conf *config.Settings, probl
 	so.log = log
 	deadline := time.Now().Add(config.HookDeadline.Value())
 
+	// 引数なしで打ったターミナルの前のユーザ。payload を読みに行くと、何も出さずに入力を待ち続ける。
+	if in.terminal() {
+		io.WriteString(stderr, overview())
+		return config.ExitError
+	}
 	payload, err := hookio.Decode(in.buf)
 	var unusable *hookio.UnusableError
 	switch {
@@ -188,7 +176,7 @@ func hookSteps(in *input, stdout, stderr io.Writer, conf *config.Settings, probl
 		Tool: payload.ToolName, Session: payload.SessionID, Agent: payload.AgentID}
 	so.record = record
 
-	var buffered bytes.Buffer
+	var buffered hookio.Held
 	code, fail := judgeEvent(&buffered, stderr, mode, conf, root, payload, record, deadline)
 	if fail != nil {
 		buffered.Reset()
@@ -200,7 +188,8 @@ func hookSteps(in *input, stdout, stderr io.Writer, conf *config.Settings, probl
 	// 呼び出しごとに走るので DEBUG に置く。
 	diaglog.Get(diagSource, root).Debug("hook を判定した", "event", record.Event, "tool", record.Tool,
 		"mode", string(mode), "decision", string(record.Decision), "code", record.Code, "exit", code)
-	stdout.Write(buffered.Bytes())
+	// 書けたときだけ、応答に載せた知らせに印を付ける（hookio.AfterWritten）。書けなかった知らせは次の機会に出し直す。
+	buffered.Flush(stdout)
 	return code
 }
 

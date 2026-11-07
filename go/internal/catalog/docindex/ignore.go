@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io/fs"
 	"os"
-	"strings"
 
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
@@ -29,20 +28,11 @@ const (
 	present
 )
 
-// negatesIndex は ccnavi-index.jsonl を無視から外しうる `!` の行か（`!*.jsonl` のような広い行も含む）。
-func negatesIndex(line string) bool {
-	pattern, ok := strings.CutPrefix(line, "!")
-	if !ok {
-		return false
-	}
-	pattern = ospath.Rstrip(pattern)
-	return strings.HasSuffix(pattern, IndexName) || strings.HasSuffix(pattern, "*.jsonl") || strings.HasSuffix(pattern, "*")
-}
-
 // addIgnore は、ツリーのルートの .gitignore に IgnoreLine を 1 行足す。
 // 同じ行が既にあれば足さず、結果は present とする。末尾の空白は除いて比べる。git は先頭の空白を無視しないので、
 // 先頭は残して比べる。この行は効いていないこともあるが、ccnavi が書いたものではないので、足したとは言わない。
-// `!` で索引を否定する行があれば、利用者が追跡しているとみなして足さない。既存の行は変えず、末尾に改行が無いときだけ
+// `!` で無視を外す行（許可リスト型の `/*` と `!/docs/**` など）があっても足す。足す行は末尾に置くので、前の `!` の
+// 行より後ろが勝つ。効いたかは呼び手が check-ignore で確かめ直す。既存の行は変えず、末尾に改行が無いときだけ
 // 改行を補う。リンク・ふつうでないもの・読めないもの・書けないものには足さない。
 func addIgnore(base string) ignoreResult {
 	path := ospath.Join(base, gitignoreName)
@@ -60,13 +50,7 @@ func addIgnore(base string) ignoreResult {
 		}
 	}
 	text, _ := fsio.DecodeBytes(existing, fsio.Replace)
-	lines := ospath.Splitlines(text)
-	for _, line := range lines {
-		if negatesIndex(ospath.Strip(line)) {
-			return notAdded
-		}
-	}
-	for _, line := range lines {
+	for _, line := range ospath.Splitlines(text) {
 		if ospath.Rstrip(line) == IgnoreLine {
 			return present
 		}

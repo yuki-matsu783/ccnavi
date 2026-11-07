@@ -15,7 +15,7 @@
 //   - 次の Python の入口をまとめた: entry の cli・cli_args・cli_usage・cli_text・cli_ops・cli_handoff・cli_idle・
 //     cli_learnings・cli_mirror・cli_plan・cli_stopreview・cli_templates と __main__。
 //   - 名前の対応: run → Run、_run → run、_parsed → parsed と routes、_recorded_run → recordedRun、
-//     _hook・_hook_steps・_hook_crashed・_internal_error → runHook・hookSteps・hookCrashed・internalError、
+//     _hook・_hook_steps・_hook_crashed・_internal_error → hookSteps（受けは parsed）・hookCrashed・internalError、
 //     _resolve_switches → resolveSwitches、default_root → defaultRoot。
 //   - cli_usage の OVERVIEW・USAGE・topic → overview・fullUsage・topic（本文は usage/*.txt）。
 //     cli_args の _override・_drop_outside_diagnosis・_not_with_docs・_from_terminal・_docs・_prune → override・

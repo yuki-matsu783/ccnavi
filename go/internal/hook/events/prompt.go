@@ -80,8 +80,8 @@ func atPrompt(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings,
 			return config.ExitOK, err
 		}
 	}
-	// 書き終えてから「通知済み」にする（書く前に止まったら次の機会に出し直す）。
-	outcome.Confirm(told)
+	// 応答が届いてから「通知済み」にする（入口が応答を溜めて後で書くので、書けなかったら次の機会に出し直す）。
+	hookio.AfterWritten(stdout, func() { outcome.Confirm(told) })
 	return config.ExitOK, nil
 }
 

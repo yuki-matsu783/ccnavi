@@ -409,6 +409,16 @@ class DiffTest(HandoffCase):
         self.assertIn("何も反映していません", result.stdout)
         self.assertNotIn("次:", result.stdout)
 
+    def test_the_command_quotes_named_paths(self):
+        """名指しした下書きのパスは引用して案内する。空白を含むパスを貼っても、同じパスを指す。"""
+        rel = ".ccnavi/docs/my guide.md"
+        write(self.target(rel), "# 手引き\n")
+        self.stage(rel, "# 手引き\n\n足した\n".encode())
+        result = self.run_handoff(rel)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        expect = self.view(rel)["expect"]
+        self.assertIn(f"ccnavi-user-handoff.sh '{rel}' --yes --expect {expect}", result.stdout)
+
 
 class WriteTest(HandoffCase):
     def test_yes_writes_and_cleans_the_draft(self):

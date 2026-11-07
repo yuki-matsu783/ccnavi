@@ -8,6 +8,7 @@ import (
 
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/tree"
 )
 
@@ -76,13 +77,15 @@ func Ignored(base string, paths []string, timeout time.Duration) (map[string]boo
 }
 
 // Excluded は rel（"/" 区切り）が excluded のどれかの下にあり、kept（除外の中の例外）のどれの下にもないか。
+// 大文字小文字は区別しない（`.CCNAVI/x.md` も `.ccnavi` の下）。
 func Excluded(rel string, excluded, kept []string) bool {
 	return within(rel, excluded) && !within(rel, kept)
 }
 
 func within(rel string, dirs []string) bool {
+	folded := pathcase.Fold(rel)
 	for _, d := range dirs {
-		if rel == d || strings.HasPrefix(rel, d+"/") {
+		if dir := pathcase.Fold(d); folded == dir || strings.HasPrefix(folded, pathcase.Fold(d+"/")) {
 			return true
 		}
 	}

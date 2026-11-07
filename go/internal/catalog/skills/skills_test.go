@@ -163,3 +163,12 @@ func TestTheIndexComesOnceInAContext(t *testing.T) {
 		t.Error("同じ文脈の開始でまた渡した")
 	}
 }
+
+// Windows のエディタが頭に付ける BOM があっても、name と説明を読む。
+func TestABOMBeforeTheFrontmatterIsSkipped(t *testing.T) {
+	f := newFixture(t)
+	f.put("deploy", "\ufeff"+skill("本番", "本番へ出す手順"))
+	if said := f.notice(f.lib, "", true); !strings.Contains(said, "- 本番: 本番へ出す手順（skills/deploy/SKILL.md）") {
+		t.Errorf("BOM の後ろの frontmatter を読まない:\n%s", said)
+	}
+}

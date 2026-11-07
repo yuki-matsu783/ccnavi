@@ -262,17 +262,21 @@ class ProjectsTest(Repo):
         super().setUp()
         write(os.path.join(self.root, ".gitignore"), "**/ccnavi-index.jsonl\n/projects/\n")
         self.lib = self.project("lib", "**/ccnavi-index.jsonl\n")
-        # ユーザが索引を追跡している（否定の行がある）プロジェクトは、足さず対象外のまま。
-        self.bare = self.project("bare", "!**/ccnavi-index.jsonl\n")
+        # .gitignore に足せない（ふつうのファイルでない）プロジェクトは、対象外のまま。
+        self.bare = self.project("bare", None)
         self.put("docs/w.md", doc(type="guide", title="ワークスペース"))
         self.put("projects/lib/docs/x.md", doc(type="adr", title="lib の決定"))
         self.put("projects/bare/y.md", doc(type="guide"))
 
-    def project(self, name: str, ignore: str) -> str:
+    def project(self, name: str, ignore: str | None) -> str:
+        """ignore が None なら .gitignore をディレクトリにして、無視の行を足せなくする。"""
         home = os.path.join(self.root, "projects", name)
         os.makedirs(home)
         git(home, "init", "-q")
-        write(os.path.join(home, ".gitignore"), ignore)
+        if ignore is None:
+            os.makedirs(os.path.join(home, ".gitignore"))
+        else:
+            write(os.path.join(home, ".gitignore"), ignore)
         return home
 
     def ccnavi(self, *args: str):
@@ -303,8 +307,19 @@ class ProjectsTest(Repo):
         self.assertEqual(done.stdout, "matched=2 total=2\n")
         self.assertIn(f"bare {UNIGNORED}", done.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.bare, "ccnavi-index.jsonl")))
-        with open(os.path.join(self.bare, ".gitignore"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), "!**/ccnavi-index.jsonl\n")  # 否定があれば書き換えない
+        self.assertTrue(os.path.isdir(os.path.join(self.bare, ".gitignore")))
+
+    def test_a_negating_line_does_not_stop_the_line(self):
+        # 許可リスト型の .gitignore でも、足す行が後ろで勝つので足して索引に入れる。
+        allow = self.project("allow", "/*\n!/docs/\n!/docs/**\n")
+        self.put("projects/allow/docs/z.md", doc(type="guide"))
+        done = self.ccnavi("--format", "path")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("projects/allow/docs/z", done.stdout.splitlines())
+        self.assertEqual(
+            read(os.path.join(allow, ".gitignore")), "/*\n!/docs/\n!/docs/**\n**/ccnavi-index.jsonl\n"
+        )
+        self.assertTrue(os.path.exists(os.path.join(allow, "docs", "ccnavi-index.jsonl")))
 
     def test_a_project_without_ignore_gets_the_line_and_is_indexed(self):
         plain = self.project("plain", "node_modules/\n")
@@ -353,7 +368,7 @@ class SessionStartTest(Repo):
         home = os.path.join(self.root, "projects", "bare")
         os.makedirs(home)
         git(home, "init", "-q")
-        write(os.path.join(home, ".gitignore"), "!**/ccnavi-index.jsonl\n")
+        os.makedirs(os.path.join(home, ".gitignore"))  # 足せない
         self.put("projects/bare/y.md", doc(type="guide"))
         said = self.context(self.root)
         self.assertIn("--docs", said)
@@ -379,7 +394,8 @@ class SessionStartTest(Repo):
         self.assertIn("grep・Glob より先に", said)
 
     def test_only_the_left_out_line_when_nothing_is_indexed(self):
-        write(os.path.join(self.root, ".gitignore"), "!**/ccnavi-index.jsonl\n")
+        os.remove(os.path.join(self.root, ".gitignore"))
+        os.makedirs(os.path.join(self.root, ".gitignore"))  # 足せない
         self.put("docs/a.md", doc(type="guide"))
         said = self.context(self.root)
         self.assertIn(f"{WORKSPACE} {UNIGNORED}", said)

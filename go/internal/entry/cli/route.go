@@ -45,11 +45,68 @@ func cwdOf(a opts) string {
 	return wd
 }
 
-// parsed は読めた引数を経路ごとの処理へ振り分ける。payload を読まない経路を順に見て、どれにも当たらなければ hook の
-// 判定として扱う。経路を足したら hookRoute にも足す。
-func parsed(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts, unmarked *useronly.Verb) int {
+// route は 1 回の起動の経路。
+type route int
+
+const (
+	routeHook route = iota // payload を読まない経路のどれにも当たらない起動。hook として判定する
+	routeVersion
+	routeHandoff
+	routeMirror
+	routeTemplates
+	routeLearnings
+	routeDocs
+	routeLint
+	routeDiagnosis
+	routePrune
+	routePlanOrder
+	routeAgree
+	routeCommand // サブコマンドの語・`--reviewed`・`--close-early`
+)
+
+// routeOf は起動の経路を決める。経路の判定はここだけに置く。設定を読む前に hook の経路の受けを置くか決めるのにも、
+// 読んだ後の振り分け（routes）にも同じ答えを使い、2 か所の判定が食い違わないようにする。
+// 上の行ほど強い（`--lint --prune` は --lint）。経路を足すときは、ここに 1 行と、routes の枝を足す。
+func routeOf(a opts) route {
+	switch {
+	case a.Truthy("version"):
+		return routeVersion
+	case a.Truthy("handoff"):
+		return routeHandoff
+	case a.Truthy("mirror"):
+		return routeMirror
+	case a.Truthy("templates"):
+		return routeTemplates
+	case a.Truthy("learnings"):
+		return routeLearnings
+	case a.Truthy("docs"):
+		return routeDocs
+	case a.Truthy("lint"):
+		return routeLint
+	case !a.IsNone("test") || a.Str("test_expectations") != "" || a.Truthy("suggest") || a.Truthy("explain"):
+		return routeDiagnosis
+	case a.Truthy("prune"):
+		return routePrune
+	case !a.IsNone("plan_order") || a.Truthy("fill_phases") || !a.IsNone("order") || a.Truthy("write") ||
+		!a.IsNone("expect"):
+		return routePlanOrder
+	case a.Truthy("agree"):
+		return routeAgree
+	case len(a.command()) > 0 || !a.IsNone("reviewed") || a.Truthy("close_early"):
+		return routeCommand
+	}
+	return routeHook
+}
+
+// parsed は読めた引数を経路ごとの処理へ振り分ける（経路は routeOf が決める）。
+//
+// hook の経路は、設定を読むところから先のどこで落ちても、内部エラーの応答（hookCrashed）で終える。Run の受けまで
+// 落ちると終了コード 1 になり、Claude Code は PreToolUse の 1 を「止めない」と読むからである。受けはこの 1 つだけで、
+// 進み具合（so）は hook の処理（hookSteps）が書き足す。
+func parsed(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts, unmarked *useronly.Verb) (code int) {
+	r := routeOf(a)
 	// 版だけを出す。受け付けるオプションの一覧は出さない。
-	if a.Truthy("version") {
+	if r == routeVersion {
 		return version.Report(stdout, a.Truthy("json"))
 	}
 	if !oneWrapperFlagEach(stderr, a) {
@@ -77,23 +134,16 @@ func parsed(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts
 	}
 
 	root := rootOf(a)
-	conf, problems, crashed, ok := loadSettings(stdout, stderr, root, a)
-	if !ok {
-		return crashed
+	so := &hookSoFar{mode: config.Enable}
+	// 設定を読む前に落ちたら、記録と state の既定の置き場だけで受ける。受けは conf の変数を読むので、読めた後は
+	// 読めた設定で受ける。
+	conf := unloaded(root)
+	if r == routeHook {
+		defer onPanic(func(_ any, f failure) { code = hookCrashed(stdout, stderr, conf, root, so, f) })
 	}
-	return routes(in, stdout, stderr, parser, a, unmarked, root, conf, problems)
-}
-
-// loadSettings は設定を読む。読む途中で落ちたら、hook の経路だけは受け皿で終える（payload はまだ読んでいないので
-// イベントが分からず、PreToolUse と同じく止める）。ほかの経路は、打った人が見られるので落ちたまま伝える。
-func loadSettings(stdout, stderr io.Writer, root string, a opts) (conf *config.Settings, problems []string, code int, ok bool) {
-	if hookRoute(a) {
-		defer onPanic(func(_ any, f failure) {
-			code, ok = hookCrashed(stdout, stderr, unloaded(root), root, &hookSoFar{mode: config.Enable}, f), false
-		})
-	}
+	var problems []string
 	conf, problems = config.Load(root)
-	return conf, problems, 0, true
+	return routes(in, stdout, stderr, parser, a, r, unmarked, root, conf, problems, so)
 }
 
 // prepare はフラグを設定に重ね、切り替えを解く。診断の外では置き場の差し替えを捨てる（hook とサブコマンドに
@@ -121,8 +171,8 @@ func prepareTicketControl(stderr io.Writer, a opts, conf *config.Settings) {
 	conf.TicketControl = resolveGate(stderr, a.Str("ticket_control"), conf.TicketControl, env.TicketControl)
 }
 
-func routes(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts, unmarked *useronly.Verb,
-	root string, conf *config.Settings, problems []string) int {
+func routes(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts, r route, unmarked *useronly.Verb,
+	root string, conf *config.Settings, problems []string, so *hookSoFar) int {
 	isDiagnosis := diagnosing(a)
 	prepare(stderr, a, conf)
 	// 入口の印が無い `user <操作>` は実行ファイルを直に打った形。ユーザが打つ入口は sh で、承認のあとの後始末は
@@ -136,16 +186,16 @@ func routes(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts
 
 	// 取り込みとミラーは、書くとき（`--yes`）にターミナルの前のユーザを確かめる。ボードの経路は `--expect` の一致と
 	// hook の止めに置く。
-	switch {
-	case a.Truthy("handoff"):
+	switch r {
+	case routeHandoff:
 		return runHandoff(in, stdout, stderr, parser, conf, root, a)
-	case a.Truthy("mirror"):
+	case routeMirror:
 		return runMirror(in, stdout, stderr, parser, conf, root, a)
-	case a.Truthy("templates"):
+	case routeTemplates:
 		return runTemplates(stdout, stderr, conf, root, a)
-	case a.Truthy("learnings"):
+	case routeLearnings:
 		return runLearnings(stdout, stderr, conf, root, a)
-	case a.Truthy("docs"):
+	case routeDocs:
 		return runDocs(stdout, stderr, conf, root, a)
 	}
 	// 絞り込みのフラグは `--docs` でだけ読む。無視して先へ進めると `ticket start X --limit 3` のような打ち間違いが通る。
@@ -196,27 +246,23 @@ func routes(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts
 	}
 
 	// 検証だけを行う経路。判定にとっては読み飛ばした設定の報告でしかない苦情が、検証にとっては結論そのものになる。
-	if a.Truthy("lint") {
+	switch r {
+	case routeLint:
 		return lint.Report(stdout, lint.Options{Root: root, Conf: conf, Notes: problems, Mode: a.Str("mode"),
 			RestoreIfDeny: a.Str("restore_if_deny"), GuardCoreFiles: a.Str("guard_core_files"), JSON: a.Truthy("json"),
 			Flow: flow, Compat: version.Compat})
-	}
-	if code, done := diagnosis(stdout, stderr, conf, root, a); done {
-		return code
-	}
-	if a.Truthy("prune") {
+	case routeDiagnosis:
+		return diagnosis(stdout, stderr, conf, root, a)
+	case routePrune:
 		return runPrune(in, stdout, stderr, conf, root, a.Truthy("preview"))
-	}
-	if code, done := planOrder(stdout, stderr, conf, root, a); done {
-		return code
-	}
-	if a.Truthy("agree") {
+	case routePlanOrder:
+		return planOrder(stdout, stderr, conf, root, a)
+	case routeAgree:
 		return agree(in, stdout, stderr, conf, root, a)
-	}
-	if code, done := asked(in, stdout, stderr, conf, root, a); done {
-		return code
-	}
-	if len(a.command()) > 0 || !a.IsNone("reviewed") || a.Truthy("close_early") {
+	case routeCommand:
+		if code, done := asked(in, stdout, stderr, conf, root, a); done {
+			return code
+		}
 		// 残った指摘を見せるだけの `--preview` と、オーバーレイで押した `--yes` はターミナルを求めない。`--yes` を守るのは、
 		// 見せた指摘のダイジェストの一致と、シェルから打つ形を止める組み込みの deny。
 		board := !a.IsNone("reviewed") && a.Truthy("accept_unresolved") &&
@@ -226,12 +272,12 @@ func routes(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts
 		}
 		return operate(in, stdout, stderr, conf, root, a)
 	}
-	return runHook(in, stdout, stderr, conf, problems, root, a)
+	return hookSteps(in, stdout, stderr, conf, problems, root, a, so)
 }
 
 // diagnosis は診断の経路（`--test`・`--test-expectations`・`--suggest`・`--explain`）。どれも payload を読まず、判定を
 // 実行にも記録にも繋げない。判定が読む切り替えは hook と同じ関数で解いてから渡す。
-func diagnosis(stdout, stderr io.Writer, conf *config.Settings, root string, a opts) (int, bool) {
+func diagnosis(stdout, stderr io.Writer, conf *config.Settings, root string, a opts) int {
 	test := a.Strings("test")
 	explain := a.Truthy("explain")
 	asJSON := a.Truthy("json")
@@ -242,48 +288,44 @@ func diagnosis(stdout, stderr io.Writer, conf *config.Settings, root string, a o
 	case test != nil:
 		call := diagnose.Call{Cwd: a.Str("cwd"), PermissionMode: a.Str("permission_mode"), AgentID: a.Str("agent_id")}
 		code, err := diagnose.Test(stdout, stderr, conf, root, test[0], test[1], call, asJSON)
-		return finish(stderr, code, err), true
+		return finish(stderr, code, err)
 	case a.Str("test_expectations") != "":
 		code, err := diagnose.TestExpectations(stdout, stderr, conf, root, a.Str("test_expectations"), asJSON)
-		return finish(stderr, code, err), true
+		return finish(stderr, code, err)
 	case a.Truthy("suggest"):
 		code, err := suggest.Report(stdout, conf, root, asJSON)
-		return finish(stderr, code, err), true
-	case explain && asJSON:
+		return finish(stderr, code, err)
+	case asJSON:
 		code, err := diagnose.ExplainJSON(stdout, stderr, conf, root, a.Str("mode"), a.Str("ticket_control"))
-		return finish(stderr, code, err), true
-	case explain:
-		code, err := diagnose.Explain(stdout, stderr, conf, root)
-		return finish(stderr, code, err), true
+		return finish(stderr, code, err)
 	}
-	return 0, false
+	// 残るのは --explain（routeOf が診断の経路と決めたとき）。
+	code, err := diagnose.Explain(stdout, stderr, conf, root)
+	return finish(stderr, code, err)
 }
 
 // planOrder は親の提案の計画を書き換える補助の経路。`--agree` のターミナルの確かめより手前で分ける。書くのは
 // 承認待ちの親の提案（エージェントも書ける置き場）だけで、承認はしない。
-func planOrder(stdout, stderr io.Writer, conf *config.Settings, root string, a opts) (int, bool) {
+func planOrder(stdout, stderr io.Writer, conf *config.Settings, root string, a opts) int {
 	reordering := !a.IsNone("order") || a.Truthy("write") || !a.IsNone("expect")
-	if a.IsNone("plan_order") && !a.Truthy("fill_phases") && !reordering {
-		return 0, false
-	}
 	if problem := planOrderUsage(a, reordering); problem != "" {
 		fmt.Fprintf(stderr, "ccnavi: %s\n", problem)
-		return config.ExitError, true
+		return config.ExitError
 	}
 	if !conf.TicketsEnabled() {
 		io.WriteString(stderr, ticketControlOff)
-		return config.ExitError, true
+		return config.ExitError
 	}
 	name := ospath.Strip(a.Str("plan_order"))
 	if a.Truthy("fill_phases") {
-		return fillPhases(stdout, stderr, conf, root, name), true
+		return fillPhases(stdout, stderr, conf, root, name)
 	}
 	var order *string
 	if !a.IsNone("order") {
 		text := a.Str("order")
 		order = &text
 	}
-	return reorder(stdout, stderr, conf, root, name, a.Truthy("json"), order, a.Truthy("write"), a.Str("expect")), true
+	return reorder(stdout, stderr, conf, root, name, a.Truthy("json"), order, a.Truthy("write"), a.Str("expect"))
 }
 
 // planOrderUsage は `--plan-order` の組み合わせの誤り。

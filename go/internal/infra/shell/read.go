@@ -33,6 +33,8 @@ const (
 	ReasonAnsiC Reason = "ansi-c-escape"
 	// ReasonTakenAsCode は文字列をコードとして実行するコマンド（`sh -c`・`eval`・`xargs rm` など）。
 	ReasonTakenAsCode Reason = "command-taken-as-code"
+	// ReasonExpandedTarget は書き込みのリダイレクト先が変数か置換（`> $X`・`> "$(…)"`）。書く先は実行するまで決まらない。
+	ReasonExpandedTarget Reason = "expanded-redirect-target"
 )
 
 // Form は書き直しを求める形。書き直す方法が必ずあり、読み分けると規則が増えるか、読み違えると
@@ -269,6 +271,9 @@ func readAt(src string, depth int) (Reading, []runnable, []runnable, bool) {
 	}
 	if why := classify(commands); why != "" {
 		return degraded(why)
+	}
+	if expandedTarget(commands) {
+		return degraded(ReasonExpandedTarget)
 	}
 
 	texts := []string{render(commands)}

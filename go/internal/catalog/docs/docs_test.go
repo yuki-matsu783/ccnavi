@@ -71,6 +71,18 @@ func (w *workspace) project(name, ignore string) string {
 	return home
 }
 
+// unwritableIgnore は dir の .gitignore をディレクトリに置き換え、無視の行を足せなくする。
+func unwritableIgnore(t *testing.T, dir string) {
+	t.Helper()
+	path := filepath.Join(dir, ".gitignore")
+	if err := os.RemoveAll(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func (w *workspace) conf() *config.Settings { return testkit.Settings(w.t, w.root) }
 
 func (w *workspace) run(q Query) (int, string, string) {
@@ -224,8 +236,9 @@ func projects(t *testing.T) (*workspace, string, string) {
 	w := newWorkspace(t)
 	w.write(".gitignore", docindex.IgnoreLine+"\n/projects/\n")
 	lib := w.project("lib", docindex.IgnoreLine+"\n")
-	// 利用者が索引を追跡している（否定の行がある）プロジェクトは、足さず対象外のまま。
-	bare := w.project("bare", "!"+docindex.IgnoreLine+"\n")
+	// .gitignore に足せない（ふつうのファイルでない）プロジェクトは、対象外のまま。
+	bare := w.project("bare", "")
+	unwritableIgnore(t, bare)
 	w.put("docs/w.md", doc("type: guide", "title: ワークスペース"), "")
 	w.put("projects/lib/docs/x.md", doc("type: adr", "title: lib の決定"), "")
 	w.put("projects/bare/y.md", doc("type: guide"), "")
@@ -366,7 +379,7 @@ func TestAtStartNamesTreesThatGotTheLineOrWereLeftOut(t *testing.T) {
 	}
 
 	only := newWorkspace(t)
-	only.write(".gitignore", "!"+docindex.IgnoreLine+"\n")
+	unwritableIgnore(t, only.root)
 	only.put("docs/a.md", doc("type: guide"), "")
 	said = AtStart(only.conf(), only.root, time.Time{})
 	if !strings.Contains(said, workspaceName+" "+unignoredSaid) || strings.Contains(said, "grep・Glob より先に") {
@@ -515,4 +528,15 @@ func TestExemptPlacesMatchTheConventionTable(t *testing.T) {
 	want := slices.Clone(noFrontmatterPlaces)
 	sort.Strings(want)
 	eq(t, "places", slices.Compact(places), want)
+}
+
+// パスで始まる問題だけに置き場を付け、ツリー全体の問題にはツリーの名前を添える。
+func TestProblemsArePrefixedOnlyWhenTheyNameAPath(t *testing.T) {
+	lib := source{name: "lib", prefix: "projects/lib"}
+	eq(t, "パス", problemText(lib, docindex.Problem{Rel: "docs/" + docindex.IndexName, Text: "を保存できませんでした: x"}),
+		"projects/lib/docs/"+docindex.IndexName+" を保存できませんでした: x")
+	eq(t, "ツリー", problemText(lib, docindex.Problem{Text: "git のディレクトリが見つからないので索引を書かない"}),
+		"lib: git のディレクトリが見つからないので索引を書かない")
+	eq(t, "ワークスペース", problemText(source{name: workspaceName}, docindex.Problem{Rel: "a/", Text: "の実体がツリーの外にあるので読まない"}),
+		"a/ の実体がツリーの外にあるので読まない")
 }

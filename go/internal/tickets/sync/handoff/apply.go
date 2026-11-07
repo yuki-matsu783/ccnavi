@@ -117,10 +117,14 @@ func Apply(plan *Plan, expect string, viaBoard bool) *Applied {
 		if e.State() == StateUnchanged {
 			continue
 		}
-		if failure = writeOne(plan.Tree, e); failure != "" {
+		var wrote bool
+		failure, wrote = writeOne(plan.Tree, e)
+		if wrote {
+			written = append(written, e)
+		}
+		if failure != "" {
 			break
 		}
-		written = append(written, e)
 	}
 	if failure != "" {
 		if undone := rollBack(written); len(undone) > 0 {
@@ -135,38 +139,42 @@ func Apply(plan *Plan, expect string, viaBoard bool) *Applied {
 	return done
 }
 
-// writeOne は 1 本を書く。書く直前にリンクと取り込み先のハッシュを確かめ直す。失敗なら理由。
-func writeOne(root string, e *Entry) string {
+// readBack は書いたあとの読み直し（テストが失敗を作るために差し替える）。
+var readBack = flow.ReadBytes
+
+// writeOne は 1 本を書く。書く直前にリンクと取り込み先のハッシュを確かめ直す。失敗なら理由。wrote は取り込み先を
+// 書き換えたか。読み直しで失敗したときも真で、呼び手はその 1 本も元に戻す。
+func writeOne(root string, e *Entry) (failure string, wrote bool) {
 	if pathmatch.HasLink(root, e.target) || !inside(root, e.target) {
-		return sprintf(msgWayLinked, e.Rel)
+		return sprintf(msgWayLinked, e.Rel), false
 	}
 	var now []byte
 	if ospath.DiskLexists(e.target) {
 		var why string
 		if now, why = flow.ReadBytes(e.target, root); now == nil {
-			return sprintf(msgTargetNoGo, e.Rel, why)
+			return sprintf(msgTargetNoGo, e.Rel, why), false
 		}
 	}
 	if contentDigest(now) != contentDigest(e.current) {
-		return sprintf(msgTargetMoved, e.Rel)
+		return sprintf(msgTargetMoved, e.Rel), false
 	}
 	if draft, _ := flow.ReadBytes(e.draft, root); !same(draft, e.raw) {
-		return sprintf(msgDraftMoved, e.Rel)
+		return sprintf(msgDraftMoved, e.Rel), false
 	}
 	how := fsio.Durable
 	if e.current == nil {
 		how = fsio.NewDurable
 	}
 	if err := fsio.WriteFile(e.target, e.raw, how); err != "" {
-		return sprintf(msgWriteFailed, e.Rel, line(err))
+		return sprintf(msgWriteFailed, e.Rel, line(err)), false
 	}
-	if back, why := flow.ReadBytes(e.target, root); !same(back, e.raw) {
+	if back, why := readBack(e.target, root); !same(back, e.raw) {
 		if why == "" {
 			why = msgReadBackWhat
 		}
-		return sprintf(msgReadBackBad, e.Rel, why)
+		return sprintf(msgReadBackBad, e.Rel, why), true
 	}
-	return ""
+	return "", true
 }
 
 // rollBack は書いたものを書く前のバイト列に戻す。戻せなかったものの相対パス。

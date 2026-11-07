@@ -254,11 +254,12 @@ func TestUndoWritesOnlyWrapperForms(t *testing.T) {
 		change Change
 		want   string
 	}{
-		{Change{Kind: KindChanged, Path: "p/x.txt"}, wrapper + ` restore --staged --worktree -- "p/x.txt"`},
-		{Change{Kind: KindGone, Path: "p/x.txt"}, wrapper + ` restore --staged --worktree -- "p/x.txt"`},
+		{Change{Kind: KindChanged, Path: "p/x.txt"}, wrapper + ` restore --staged --worktree -- p/x.txt`},
+		{Change{Kind: KindGone, Path: "p/a b.txt"}, wrapper + ` restore --staged --worktree -- "p/a b.txt"`},
 		// ラッパーは rm -f と clean を通さない。索引から外してシェルの rm で消す。
-		{Change{Kind: KindNew, Path: "p/x.txt", Staged: true}, wrapper + ` restore --staged -- "p/x.txt" && rm -- "p/x.txt"`},
-		{Change{Kind: KindNew, Path: "p/x.txt"}, `rm -- "p/x.txt"`},
+		{Change{Kind: KindNew, Path: "p/x.txt", Staged: true}, wrapper + ` restore --staged -- p/x.txt && rm -- p/x.txt`},
+		// "$" とバッククォートは "..." の中でも展開されるので、単引用符で囲む。
+		{Change{Kind: KindNew, Path: "p/$x`y`.txt"}, "rm -- 'p/$x`y`.txt'"},
 		{Change{Kind: KindCommitted, Path: "p/x.txt"}, ""},
 	}
 	for _, c := range cases {

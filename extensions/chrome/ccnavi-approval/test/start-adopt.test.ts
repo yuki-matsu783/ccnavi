@@ -177,7 +177,7 @@ test("CX-T254 issue を閉じる開いた MR が複数あれば、何も作ら�
     withMr(mock, { number: 6, branch: "fix/20-other", title: "別の #20" });
     const out = await start(mock, host);
     assert.equal(out.kind, "refused", host);
-    assert.match(message(out), /開いたマージリクエストが 2 本あります（!5 feature\/20-login、!6 fix\/20-other）/, host);
+    assert.match(message(out), /オープン状態のマージリクエストが 2 本あります（!5 feature\/20-login、!6 fix\/20-other）/, host);
     assert.equal(mock.createdBranches.length + mock.createdMrs.length, 0, host);
   }
 });

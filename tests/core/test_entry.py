@@ -72,6 +72,33 @@ class EntryTest(unittest.TestCase):
         self.assertNotEqual(done.returncode, 0)
         self.assertIn("hook", done.stderr.decode("utf-8", "replace"))
 
+    @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
+    def test_a_terminal_gets_the_usage_without_waiting_for_a_payload(self):
+        """引数なしでターミナルから打つと、payload を待たずに使い方を出して 1 で終える。"""
+        import pty
+
+        master, slave = pty.openpty()
+        try:
+            proc = subprocess.Popen(
+                [exe.path(), "--root", fixture_workspace()],
+                stdin=slave,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=ROOT,
+                env={k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            )
+            os.close(slave)
+            try:
+                _, err = proc.communicate(timeout=20)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.communicate()
+                self.fail("ターミナルの入力を待ち続けた")
+        finally:
+            os.close(master)
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("hook", err.decode("utf-8", "replace"))
+
 
 if __name__ == "__main__":
     unittest.main()

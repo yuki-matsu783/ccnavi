@@ -7,6 +7,7 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/rules"
 )
@@ -14,9 +15,16 @@ import (
 // 置き場の検査。プロジェクトの置き場が正しい形か、走査されないチケットの置き場が残っていないかを見る。
 
 // trackedLead は projects/ がワークスペースの git の索引に載っているときの warn の先頭の句（%s は置き場）。ぶつかりと
-// 載せ忘れで共通にする。VS Code 拡張（ccnavi-board の isTrackedProjectsDir）と導入スクリプト（ccnavi-setup.sh）が
-// この句で見分けるので、変えるならそちらも直す。載せ忘れは句の直後が `（入れ子のリポジトリとして` になる。
+// 載せ忘れで共通にする。導入スクリプト（ccnavi-setup.sh）がこの句で見分けるので、変えるならそちらも直す。
+// 載せ忘れは句の直後が `（入れ子のリポジトリとして` になる。
 const trackedLead = "`%s/` はワークスペースの git が追跡している"
+
+// 置き場の苦情の種類。`--lint --json` の problems[].kind に載り、VS Code 拡張のプロジェクト管理画面は文面でなく
+// これで見分ける（索引に載っている・無視されていない）。
+const (
+	KindProjectsTracked   = "projects-tracked"
+	KindProjectsUnignored = "projects-unignored"
+)
 
 // gitlinkMode は索引の mode のうち gitlink（入れ子のリポジトリを 1 つの版として載せたもの）。
 const gitlinkMode = "160000"
@@ -35,13 +43,14 @@ func projectPlaces(conf *config.Settings, root string) []rules.Problem {
 		indexed, isIndexed = inIndex(root, rel)
 	}
 	if isIndexed {
-		out = append(out, rules.Problem{Severity: rules.Warn, Rule: whereProjects, Detail: indexed})
+		out = append(out, rules.Problem{Severity: rules.Warn, Rule: whereProjects, Detail: indexed, Kind: KindProjectsTracked})
 	}
 	// 末尾の `/` は付けない。projects がリンクだと git が `projects/` を rc=128 で断る。
 	if rel != "" && !isIndexed && ospath.IsDir(conf.Projects) {
 		if ignored, known := isIgnored(root, rel); known && !ignored {
 			out = append(out, rules.Problem{Severity: rules.Warn, Rule: whereProjects, Detail: rel +
-				"/ がワークスペースの git で無視されていない。プロジェクトは自分の git を持つので、ワークスペースの `.gitignore` に入れてください"})
+				"/ がワークスペースの git で無視されていない。プロジェクトは自分の git を持つので、ワークスペースの `.gitignore` に入れてください",
+				Kind: KindProjectsUnignored})
 		}
 	}
 	quoted := make([]string, len(config.ReservedLayerNames))
@@ -102,15 +111,11 @@ func projectsRel(conf *config.Settings, root string) string {
 	if conf.Projects == "" {
 		return ""
 	}
-	rel, ok := ospath.Relpath(conf.Projects, root)
-	if !ok {
+	rel, ok := pathcase.Under(conf.Projects, root)
+	if !ok || rel == "." {
 		return ""
 	}
-	rel = ospath.Slashed(rel)
-	if rel == "." || rel == "" || rel == parentDir || strings.HasPrefix(rel, parentDir+"/") {
-		return ""
-	}
-	return rel
+	return ospath.Slashed(rel)
 }
 
 // indexUnder は索引で `<rel>/` の下に載っているものの、最初の通常のファイルと gitlink の一覧。-z で読むのでパスの

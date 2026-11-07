@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"ccnavi/internal/catalog/skills"
 	"ccnavi/internal/hook/failsafe"
@@ -51,6 +52,11 @@ func Before(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 				refusal{kind: config.General})
 		}
 	}
+	if rules.UnreadWriteTarget(in) {
+		// 書き込み先が読めない書き込みは、保護の対象か決められない。判定を飛ばすと保護が素通りするので止める。
+		return j.builtinRefusal(pyfmt.NonEmpty([]string{guardNote}, pyfmt.KeepRepeats), reasons.CodeWriteTargetUnread,
+			reasons.WriteTargetUnreadRule, reasons.WriteTargetUnread(j.root, in.ToolName), config.General)
+	}
 	if record.Subject == "" {
 		record.Decision, record.Reason = audit.Skip, audit.ReasonNoSubject
 		return skip(stdout, guardNote)
@@ -79,6 +85,10 @@ func Before(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 		// コメントだけの行などは実行される部分が残らない。何も走らないものに判断を求める必要はない。
 		record.Decision, record.Reason = audit.Skip, audit.ReasonNothingToRun
 		return skip(stdout, guardNote)
+	}
+	if length := matchedLength(in.ToolName, subject, inner); length > CommandLengthLimit {
+		return j.builtinRefusal(pyfmt.NonEmpty([]string{guardNote}, pyfmt.KeepRepeats), reasons.CodeCommandTooLong,
+			reasons.CommandTooLongRule, reasons.CommandTooLong(root, CommandLengthLimit, length), config.General)
 	}
 
 	// 組み込みの既定に戻ったときだけ知らせる。レイヤーが不正で空になったのは退避ではないので、記録と lint が伝える。
@@ -181,6 +191,28 @@ func Before(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 	}
 
 	return j.byRules(ruleSet, source, subject, bare, inner, notices, target, dest, index, updated, deadline)
+}
+
+// CommandLengthLimit は、ルールを当てるシェルのコマンドの長さ（文字数）の上限。超えたら照合せずに止める。
+// ルールの正規表現には、区切り（`|`・`;`・`&`）の多い長い文字列で時間が長さの 2 乗で伸びるものがある（引用の中の
+// `a|b` を 2 万字並べると 1 本で 20 秒を超える）。期限はルール 1 本ごとの間でしか見られず、1 本が hook の期限
+// （Claude Code の既定 10 秒）を越えると Claude Code が hook を打ち切り、呼び出しは判定なしで通る。上限の長さなら、
+// 知られている最悪の形（`ls | ` の繰り返し・引用の中の `a|b` の繰り返し）でも、負荷の高い機械で全体が 2 秒ほどで終わる。
+// 数えるのは読んだ形（ヒアドキュメントの本文とコメントは照合しないので含まない）。引用の中の演算子の文字は、両側に
+// 目印が入るぶん打った長さより長くなる。
+const CommandLengthLimit = 4_000
+
+// matchedLength はシェルのツールで、ルールを当てる文字列（読んだ形と、中で実行される層）のうち最も長いものの文字数。
+// シェル以外のツールは 0（パスや見出しは長くならない）。
+func matchedLength(tool, subject string, inner []layer) int {
+	if !slices.Contains(config.ShellTools, tool) {
+		return 0
+	}
+	longest := utf8.RuneCountInString(subject)
+	for _, l := range inner {
+		longest = max(longest, utf8.RuneCountInString(l.text))
+	}
+	return longest
 }
 
 // addGuards は組み込みの保護（設定ファイル・チケットの置き場・生の git・ユーザの判断の経路）をルールに足す。

@@ -36,23 +36,9 @@ const cleanShownStatus = 10
 
 func worktreePath(root, name string) string { return tree.WorktreePath(root, name) }
 
-// isGenerated はワークツリーのルートからの相対 rel が、生成物（とその中）か。
-func isGenerated(top, rel string) bool {
-	parts := relParts(rel)
-	for i, part := range parts {
-		if always[part] {
-			return true
-		}
-		for _, mark := range beside[part] {
-			if ospath.IsFile(ospath.Join(top, append(slices.Clone(parts[:i]), mark)...)) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// generated は消す生成物（ワークツリーのルートからの相対。区切りは "/"）。リンクはたどらない。
+// generated は消す生成物（ワークツリーのルートからの相対。区切りは "/"）。生成物かどうかはここだけで決める。
+// 隣の印（package.json など）はふつうのファイルに限り、リンクは印と見ない。リンクの印で生成物と見ると、
+// 中のユーザのファイルが退避されずに消えうる。リンクのディレクトリはたどらない。
 func generated(top string) []string {
 	var found []string
 	stack := []string{top}

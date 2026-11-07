@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 )
@@ -27,7 +28,8 @@ func Undo(c Change, wrapper string) string {
 	if c.Kind == KindCommitted || wrapper == "" {
 		return ""
 	}
-	quoted := `"` + c.Path + `"`
+	// 案内と同じ引用（要るときだけ。"$" やバッククォートを含むパスは単引用符）にする。
+	quoted := config.ShellPath(c.Path)
 	if c.Kind != KindNew {
 		return wrapper + " " + strings.Join(restoreArgs, " ") + " " + quoted
 	}

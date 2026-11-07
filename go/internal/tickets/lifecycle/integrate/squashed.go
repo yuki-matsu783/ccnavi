@@ -2,6 +2,7 @@ package integrate
 
 import (
 	"strings"
+	"time"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/git"
@@ -13,16 +14,6 @@ import (
 // UnsetK は取り込みの記録の k（fast-forward で載せたコミット）がまだ無いことを表す値。
 const UnsetK = "-"
 
-// copyBound は、その名前のチケットが在れば片付けた記録のコピーを信用しない置き場。BoundCheck と違い、設定の置き場では
-// なく既定の置き場を、このツリーと同じ名前のワークツリーだけで、大文字小文字を畳まずに見る（Python の post_findings と
-// 同じ答えにするため。BoundCheck に寄せると設定と表記の扱いで答えが変わる）。
-var copyBound = []string{
-	config.DefaultApproved + "/" + string(place.Doing),
-	config.DefaultApproved + "/" + string(place.Done),
-	config.DefaultTickets + "/" + string(place.Todo),
-	config.DefaultTickets + "/" + string(place.Review),
-}
-
 type doneCopy struct {
 	name   string
 	fields map[string]string
@@ -32,7 +23,8 @@ type doneCopy struct {
 // （相対）。ターンの終わりの検査が使う。integrate-done は squash をコミットしてから片付けるので、外さないと正規の
 // 取り込みが毎回報告に並ぶ。記録は `.git` の中にありエージェントにも書けるので、内容は信用せず git の状態で確かめる。
 // 返すのは、確かめたコミットが変え、それ以外のコミットが 1 度も変えていないパスだけ。読めないものがあれば空。
-func SquashedPaths(top, base string) map[string]bool {
+// conf・root・project は、記録の名前がチケットに結び付くか（copyIsBound）を引く材料。project は top のツリーのプロジェクト。
+func SquashedPaths(conf *config.Settings, root, project, top, base string) map[string]bool {
 	if top == "" || base == "" {
 		return nil
 	}
@@ -79,7 +71,8 @@ func SquashedPaths(top, base string) map[string]bool {
 			return nil
 		}
 		into := other
-		if len(parents) == 1 && (isSquash(top, sha, parents[0], records) || isDirectK(top, sha, parents[0], direct)) {
+		bound := func(name string) bool { return copyIsBound(conf, root, project, top, name) }
+		if len(parents) == 1 && (isSquash(top, sha, parents[0], records, bound) || isDirectK(top, sha, parents[0], direct, bound)) {
 			into = squashed
 		}
 		for p := range paths {
@@ -94,7 +87,7 @@ func SquashedPaths(top, base string) map[string]bool {
 
 // isDirectK はコミットが版 4 の取り込みの K（integrate-done が fast-forward で載せたコミット）か。K の親が記録の head、
 // K の木が記録の c_tree で、記録に k があればそれが K 自身で、名前がチケットに結び付かないこと。
-func isDirectK(top, sha, parent string, records []doneCopy) bool {
+func isDirectK(top, sha, parent string, records []doneCopy, bound func(string) bool) bool {
 	treeSHA, ok := git.TreeOf(top, sha, git.Options{})
 	if !ok {
 		return false
@@ -110,7 +103,7 @@ func isDirectK(top, sha, parent string, records []doneCopy) bool {
 		if k != "" && k != UnsetK && k != sha {
 			continue
 		}
-		if copyIsBound(top, r.name) {
+		if bound(r.name) {
 			continue
 		}
 		return true
@@ -121,7 +114,7 @@ func isDirectK(top, sha, parent string, records []doneCopy) bool {
 // isSquash はコミットが、どれかの記録の squash だと git で確かめられるか。C の親が記録の base、C のツリーが
 // 記録の tree、記録の branch_sha（B）が HEAD の祖先でなく、B を含むブランチと stash が無く、merge-tree の結果が C の
 // ツリーと下書きの置き場を除いて同じこと。
-func isSquash(top, sha, parent string, records []doneCopy) bool {
+func isSquash(top, sha, parent string, records []doneCopy, bound func(string) bool) bool {
 	treeSHA, ok := git.TreeOf(top, sha, git.Options{})
 	if !ok {
 		return false
@@ -131,7 +124,7 @@ func isSquash(top, sha, parent string, records []doneCopy) bool {
 			continue
 		}
 		tip := r.fields["branch_sha"]
-		if tip == "" || copyIsBound(top, r.name) {
+		if tip == "" || bound(r.name) {
 			continue
 		}
 		if got, ok := git.Text(top, []string{"rev-parse", "--verify", "--quiet", tip + "^{commit}"}, git.Options{}); !ok || got != tip {
@@ -179,15 +172,13 @@ func sameButHandoff(top, left, right string) bool {
 	return true
 }
 
-// copyIsBound はその名前のチケットが承認済みか提案として在るか、origin に同名のブランチが在るか。片付けの後は
-// ワークツリーが無いので、親のブランチは参照で見分ける。手元の退避は見ない（記録を偽造して外させないため）。
-func copyIsBound(top, name string) bool {
-	for _, at := range copyBound {
-		for _, base := range []string{top, ospath.Join(top, tree.WorktreesDir, name)} {
-			if ospath.DiskLexists(ospath.Join(base, at, name+".md")) {
-				return true
-			}
-		}
+// copyIsBound はその名前のチケットに結び付くか（BoundCheck と同じ材料。設定の置き場・全ツリー・退避を大文字小文字を
+// 畳んで見る）、origin に同名のブランチが在るか。結び付くなら片付けた記録のコピーを信用しない。片付けの後は
+// ワークツリーが無く BoundCheck の親のブランチの確かめが効かないので、親のブランチは参照で見分ける。決められない
+// ものは結び付くと読む（外さずに報告する側に倒す）。
+func copyIsBound(conf *config.Settings, root, project, top, name string) bool {
+	if reason, unsure := BoundCheck(conf, root, tree.Tree{Name: name, Project: project}, time.Time{}); reason != "" || unsure {
+		return true
 	}
 	return git.Run(top, []string{"show-ref", "--verify", "--quiet", "refs/remotes/origin/" + name}, git.Options{}).OK()
 }

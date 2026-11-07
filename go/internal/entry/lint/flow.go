@@ -1,14 +1,11 @@
 package lint
 
 import (
-	"strings"
-
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/flow"
 )
-
-const parentDir = ".."
 
 // flowRead は読めたフローの中身（flow.AsJSON の形）と、SubagentStart で渡る手順の行。ok が偽なら読めていない。
 type flowRead struct {
@@ -30,14 +27,8 @@ func flowProblems(path, root string, catalog *flow.Catalog) ([]rules.Problem, fl
 	if !ospath.DiskLexists(path) {
 		return fail("無い")
 	}
-	inside := false
-	if root != "" {
-		if rel, ok := ospath.Relpath(path, root); ok {
-			inside = rel != parentDir && !strings.HasPrefix(rel, parentDir+ospath.Sep) && !ospath.IsAbs(rel)
-		}
-	}
 	base := ""
-	if inside {
+	if _, inside := pathcase.Under(path, root); root != "" && inside {
 		base = root
 	}
 	data, why := flow.Load(path, base)

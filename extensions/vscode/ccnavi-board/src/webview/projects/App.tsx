@@ -18,7 +18,7 @@ import { Project } from "./Project.js";
 import { post } from "./post.js";
 import { EMPTY, guessName, loadClone, saveClone, type CloneState } from "./state.js";
 import { lastUpdatedText } from "../shared/format.js";
-import { isTrackedProjectsDir } from "./text.js";
+import { isTrackedProjectsDir, isUnignoredProjectsDir } from "./text.js";
 
 /** 案内（`tours/projects.yml`）。見本は使わず、画面は今の中身のまま指す */
 const TOUR = tourOf(projectsTour);
@@ -196,7 +196,7 @@ function Banners({ page, act }: { readonly page: ProjectsPage; readonly act: (me
       </div>,
     );
   }
-  const tracked = page.dirProblems.some((p) => isTrackedProjectsDir(p, page.projectsRel));
+  const tracked = page.dirProblems.some(isTrackedProjectsDir);
   if (!page.ignored && !tracked) {
     banners.push(
       <div key="ignore" className="banner warn">
@@ -208,7 +208,7 @@ function Banners({ page, act }: { readonly page: ProjectsPage; readonly act: (me
       </div>,
     );
   }
-  const dirProblems = page.dirProblems.filter((p) => (page.ignored && !tracked) || !/無視されていない/.test(p.detail));
+  const dirProblems = page.dirProblems.filter((p) => (page.ignored && !tracked) || !isUnignoredProjectsDir(p));
   for (const [index, p] of dirProblems.entries()) {
     banners.push(
       <div key={`dir:${index}`} className={`banner ${p.severity}`}>

@@ -105,7 +105,31 @@ func screen(root, name, cwd string) (*Dropped, string) {
 	if ospath.Strip(out) != "" {
 		return &Dropped{Name: name, Status: Dirty, Path: path}, ""
 	}
+	if why := detachedOnly(path); why != "" {
+		return refuse(why)
+	}
 	return nil, owner
+}
+
+// detachedOnly は、HEAD がブランチを指していない（detached）ワークツリーに、どの ref（ブランチ・タグ・リモート）
+// からも辿れないコミットがあるときの止める理由。ブランチを指していれば、消してもブランチが残るので空。
+// detached のコミットはワークツリーの HEAD だけが辿るので、ワークツリーを消すと git gc で失われる。
+// `--all` はワークツリーの HEAD も数えてしまうので、`refs/` の下だけと比べる。
+func detachedOnly(path string) string {
+	o := git.Options{Timeout: git.CleanupTimeout}
+	if git.Run(path, []string{"symbolic-ref", "-q", "HEAD"}, o).OK() {
+		return ""
+	}
+	lost, ok := git.Text(path, []string{"rev-list", "-n", "1", "HEAD", "--not", "--glob=refs/*"}, o)
+	if !ok {
+		return "HEAD がブランチを指していない（detached）が、ほかの ref に無いコミットがあるかを読めないので削除しません。"
+	}
+	if lost == "" {
+		return ""
+	}
+	return "HEAD がブランチを指していない（detached）うえ、どのブランチ・タグにも無いコミットがあるので削除しません" +
+		"（消すとそのコミットが失われる）。残すなら git -C " + shell.Quote(path) + " branch <ブランチ名> で" +
+		"ブランチを付けてから打ち直す。要らないかは、ユーザに確かめてもらう。"
 }
 
 // status は未追跡を含む `git status --porcelain`。
@@ -193,8 +217,10 @@ func RunDrop(stdout io.Writer, root, name, cwd string) int {
 	return 1
 }
 
-// ignored は git が無視しているもの（生成物を除く）と、読めなかった理由。--directory で全体が無視された
-// ディレクトリは 1 行（末尾の "/"）にまとまる。下書きの置き場は追跡されるのでここには現れない。
+// ignored は git が無視しているものと、読めなかった理由。生成物は先に cleanGenerated が消してあるので、
+// ここで生成物かどうかを判定し直さない（判定が 2 つあると食い違い、退避も削除もされないものが消える）。
+// --directory で全体が無視されたディレクトリは 1 行（末尾の "/"）にまとまる。下書きの置き場は追跡されるので
+// ここには現れない。
 func ignored(top string) ([]string, string) {
 	done := git.Run(top, []string{"ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--directory"},
 		git.Options{Timeout: git.CleanupTimeout, RawPaths: true})
@@ -203,14 +229,14 @@ func ignored(top string) ([]string, string) {
 	}
 	var out []string
 	for _, p := range strings.Split(done.Out, "\x00") {
-		if p != "" && !isGenerated(top, p) {
+		if p != "" {
 			out = append(out, p)
 		}
 	}
 	return out, ""
 }
 
-// stashIgnored は生成物でない無視されたもの（.env など）を `<ルート>/scratchpad/worktrees/<名前>/` へ移す。
+// stashIgnored は生成物を消した後に残る無視されたもの（.env など）を `<ルート>/scratchpad/worktrees/<名前>/` へ移す。
 // 答えは（退避したことを言う文, 止まった理由）。移すのは最上位の項目ごとの rename で、中身を走査しない。
 // 退避先に同じパスがあれば上書きせず止める。退避先が git に無視されていなければ（.env がコミットされうる）、
 // 何も動かさず止める。移せなければ、再試行せず、理由と退避済みのものを言って止める。

@@ -47,7 +47,7 @@ func confirm(conf *config.Settings, root string, actor Actor, stamp, parentID st
 	if p == nil {
 		return refusedCheck(codeConfirmNoPhase, []string{fmt.Sprintf("ccnavi: %s にフェーズ %d の子がありません。", parent.ID, number)}), nil
 	}
-	if stop := precondition(root, p, number, changed, moved); stop != nil {
+	if stop := precondition(root, p, number, changed, moved, manual); stop != nil {
 		return *stop, nil
 	}
 	if problems := request.MatchingProblems(&result, p.Marks[marks.Requested]); len(problems) > 0 {
@@ -98,8 +98,9 @@ func confirm(conf *config.Settings, root string, actor Actor, stamp, parentID st
 }
 
 // precondition はホストの結果を見ずに分かる前提（レビュー済みでない・依頼の記録が在る・依頼のあとに見たものが
-// 動いていない）。confirm と confirmGate が同じものを通る。通れば nil。
-func precondition(root string, p *phase.Phase, number int, changed string, moved request.Moved) *checked {
+// 動いていない・手で動かした子の移動が共有済み）。confirm と confirmGate が同じものを通る。通れば nil。manual は
+// 手動の移動の判定で、nil なら見ない。
+func precondition(root string, p *phase.Phase, number int, changed string, moved request.Moved, manual *phase.Manual) *checked {
 	if _, ok := p.Marks[marks.Reviewed]; ok {
 		// 重ね打ちでマーカーを書き直さない。
 		c := refusedCheck(codeConfirmAlreadyReviewed, []string{fmt.Sprintf("ccnavi: フェーズ %d はレビュー済み", number)})
@@ -113,6 +114,11 @@ func precondition(root string, p *phase.Phase, number int, changed string, moved
 		lines := append([]string{"ccnavi: " + changed + "。ユーザが見たものと今の HEAD が違う。" + request.RedoRequest(root, number)},
 			request.MovedExplanation(moved)...)
 		c := refusedCheck(codeConfirmMoved, lines)
+		return &c
+	}
+	if manual != nil && manual.State == phase.SettleUnshared {
+		// 未共有の移動のまま通常の確定に回すと、指摘が無いだけでレビュー済みになり、「確定しない」と食い違う。
+		c := refusedCheck(codeConfirmUnshared, []string{linePrefix + manual.Line()})
 		return &c
 	}
 	return nil
@@ -164,16 +170,15 @@ func openParent(conf *config.Settings, root, parentID string) *ticket.Ticket {
 
 // ConfirmLocal は `review confirm` を行う。依頼の後の状態を見て、通ればレビュー済みのマーカーを置いて先へ進めるようにする。検査と書くものの並べ方は confirm が持つ。ここは手元の入力（cwd の親、git の差分、--result の取得結果）を読んで渡し、並べたものを書く。account は、ccnavi-review.sh がトークンの持ち主を引いて `--actor` で渡すアカウントである。あれば、マーカーに actor と `via: cli` を書く。
 func ConfirmLocal(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, number int, resultPath, account string) (int, error) {
-	parent, p, moved, ok := confirmGate(stderr, conf, root, cwd, number)
+	parent, _, moved, manual, ok := confirmGate(stderr, conf, root, cwd, number)
 	if !ok {
 		return 1, nil
 	}
-	// 通った時点で、依頼の記録は在り、依頼のあとに動いておらず、レビュー済みでもない。
+	// 通った時点で、依頼の記録は在り、依頼のあとに動いておらず、レビュー済みでもなく、手で動かした移動は共有済み。
 	result, ok := request.ReadResult(stderr, resultPath)
 	if !ok {
 		return 1, nil
 	}
-	manual := phase.AssessManual(conf, root, parent, p, nil, phase.ManualOptions{})
 	if manual.State != phase.SettleNone && manual.State != phase.SettleReady {
 		// 手で動かした移動が確定できない形のときの知らせ。
 		if line := manual.Line(); line != "" {
@@ -202,12 +207,13 @@ func ConfirmLocal(stdout, stderr io.Writer, conf *config.Settings, root, cwd str
 }
 
 // confirmGate はホストに聞かずに分かる前提の検査（親とフェーズがある・precondition）。ConfirmLocal と CheckConfirm が
-// 同じものを通る。断ったときは理由のあとに `次:` を 1 行足す。ホストの結果（未解決の指摘など）は見ない。
-func confirmGate(stderr io.Writer, conf *config.Settings, root, cwd string, number int) (*ticket.Ticket, *phase.Phase, request.Moved, bool) {
+// 同じものを通る。断ったときは理由のあとに `次:` を 1 行足す。ホストの結果（未解決の指摘など）は見ない。通れば
+// 手動の移動の判定も返す（ConfirmLocal が読み直さないように）。
+func confirmGate(stderr io.Writer, conf *config.Settings, root, cwd string, number int) (*ticket.Ticket, *phase.Phase, request.Moved, phase.Manual, bool) {
 	parent, p, ok := request.ParentPhase(stderr, conf, root, cwd, number)
 	if !ok {
 		sayRefusedNext(stderr, root, number)
-		return nil, nil, request.Moved{}, false
+		return nil, nil, request.Moved{}, phase.Manual{}, false
 	}
 	var moved request.Moved
 	// 依頼の記録が無ければ差分は見ない。レビュー済みなら差分も読まない（precondition が「レビュー済み」で止める）。
@@ -216,14 +222,15 @@ func confirmGate(stderr io.Writer, conf *config.Settings, root, cwd string, numb
 			moved = request.MovedInTree(conf, tree.WorktreePath(root, parent.ID), requested, parent.Project != "")
 		}
 	}
-	if stop := precondition(root, p, number, moved.Text, moved); stop != nil {
+	manual := phase.AssessManual(conf, root, parent, p, nil, phase.ManualOptions{})
+	if stop := precondition(root, p, number, moved.Text, moved, &manual); stop != nil {
 		for _, line := range stop.problems {
 			io.WriteString(stderr, line+"\n")
 		}
 		sayRefusedNext(stderr, root, number)
-		return nil, nil, request.Moved{}, false
+		return nil, nil, request.Moved{}, phase.Manual{}, false
 	}
-	return parent, p, moved, true
+	return parent, p, moved, manual, true
 }
 
 // sayRefusedNext は断った理由のあとに、打ち直す 1 手を `次:` で足す。
@@ -233,7 +240,7 @@ func sayRefusedNext(stderr io.Writer, root string, number int) {
 
 // CheckConfirm は review confirm --check。confirmGate を通すだけで何も書かない（sh が取り込みの前に呼ぶ）。
 func CheckConfirm(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, number int) int {
-	if _, _, _, ok := confirmGate(stderr, conf, root, cwd, number); !ok {
+	if _, _, _, _, ok := confirmGate(stderr, conf, root, cwd, number); !ok {
 		return 1
 	}
 	io.WriteString(stdout, "確認: ok（confirm を打てる状態。何も変えていません）\n")

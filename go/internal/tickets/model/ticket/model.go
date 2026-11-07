@@ -372,6 +372,18 @@ func (t *Ticket) CoveredBy(number int) []int {
 	return found
 }
 
+// emptyScope は範囲の項が 1 件も無いチケットの範囲の表記。
+const emptyScope = "(空)"
+
+// ScopeLine はチケットの範囲（allow と ask の項）を 1 行に並べたもの。文の中で範囲を見せるときはこれを使う
+// （判定・実行後チェック・サブエージェントの終わりで、同じ範囲が同じ表記になるように）。
+func (t *Ticket) ScopeLine() string {
+	if area := strings.Join(append(t.Paths(rules.Allow), t.Paths(rules.Ask)...), ", "); area != "" {
+		return area
+	}
+	return emptyScope
+}
+
 // Paths はそのタイプの項の式（glob か regex）。
 func (t *Ticket) Paths(decision rules.Decision) []string {
 	var out []string

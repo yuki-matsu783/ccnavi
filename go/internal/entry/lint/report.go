@@ -156,7 +156,11 @@ func writeJSON(stdout io.Writer, o Options, mode config.Mode, problems []rules.P
 	}
 	listed := []any{}
 	for _, p := range problems {
-		listed = append(listed, pyjson.NewObject("severity", string(p.Severity), "where", p.Rule, "detail", p.Detail))
+		item := pyjson.NewObject("severity", string(p.Severity), "where", p.Rule, "detail", p.Detail)
+		if p.Kind != "" {
+			item.Set("kind", p.Kind)
+		}
+		listed = append(listed, item)
 	}
 	payload := pyjson.NewObject(
 		"version", JSONVersion,

@@ -1,6 +1,8 @@
 package lint
 
 import (
+	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -281,4 +283,57 @@ func TestLayerDrift(t *testing.T) {
 			t.Fatal(details(got))
 		}
 	})
+}
+
+// プロジェクトの置き場がワークスペースの中かは、大文字小文字を畳んで見る。".." で始まる名前の置き場は中。
+func TestProjectsRelFoldsCase(t *testing.T) {
+	root := filepath.Join(string(filepath.Separator)+"ws", "Root")
+	for projects, want := range map[string]string{
+		filepath.Join(root, "projects"):                                  "projects",
+		filepath.Join(string(filepath.Separator)+"WS", "root", "p", "q"): "p/q",
+		filepath.Join(root, "..projects"):                                "..projects",
+		root:                                                             "",
+		filepath.Join(root, "..", "x"):                                   "",
+		"":                                                               "",
+	} {
+		if got := projectsRel(&config.Settings{Projects: projects}, root); got != want {
+			t.Errorf("%q: %q", projects, got)
+		}
+	}
+}
+
+// 置き場の苦情は、`--lint --json` の kind で見分けられる（VS Code 拡張は文面で比べない）。
+func TestProjectsDirProblemsCarryKind(t *testing.T) {
+	root := testkit.Workspace(t)
+	dir := filepath.Join(root, "projects", "app")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testkit.Git(t, dir, "init", "-q", "-b", "main")
+	kinds := func() []string {
+		conf, _ := config.Load(root)
+		var out bytes.Buffer
+		Report(&out, Options{Root: root, Conf: conf, JSON: true})
+		var body struct {
+			Problems []struct{ Kind string } `json:"problems"`
+		}
+		if err := json.Unmarshal(out.Bytes(), &body); err != nil {
+			t.Fatal(err, out.String())
+		}
+		var got []string
+		for _, p := range body.Problems {
+			if p.Kind != "" {
+				got = append(got, p.Kind)
+			}
+		}
+		return got
+	}
+	if got := kinds(); strings.Join(got, ",") != KindProjectsUnignored {
+		t.Fatalf("無視されていない置き場の kind: %v", got)
+	}
+	testkit.Put(t, filepath.Join(root, "projects", "README.md"), "x\n")
+	testkit.Git(t, root, "add", "projects/README.md")
+	if got := kinds(); strings.Join(got, ",") != KindProjectsTracked {
+		t.Fatalf("索引に載った置き場の kind: %v", got)
+	}
 }
