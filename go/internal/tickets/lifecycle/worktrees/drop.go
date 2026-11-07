@@ -1,6 +1,7 @@
 package worktrees
 
 import (
+	"cmp"
 	"fmt"
 	"io"
 	"os"
@@ -8,12 +9,13 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/pathmatch"
+	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/policy/texts"
-	"ccnavi/internal/tickets/lifecycle/internal/pyshim"
 	"ccnavi/internal/tickets/model/place"
 )
 
@@ -189,7 +191,7 @@ func Report(stdout io.Writer, root string, d Dropped, after string) {
 	case Dirty:
 		fmt.Fprintf(stdout, "ワークツリー %s に未コミットの変更があるので、何も削除しませんでした。"+
 			"別のセッションが作業している見込みがあるので、"+
-			"ユーザに git -C %s status で確かめてもらう\n", d.Name, pyshim.Quote(d.Path))
+			"ユーザに git -C %s status で確かめてもらう\n", d.Name, shell.Quote(d.Path))
 	default:
 		fmt.Fprintf(stdout, "ワークツリー %s を削除しなかった: %s\n", d.Name, d.Detail)
 	}
@@ -272,10 +274,10 @@ func moveAside(source, target string) string {
 		return "退避先に同じパスがある"
 	}
 	if err := os.MkdirAll(ospath.Dirname(target), 0o777); err != nil {
-		return pyshim.StrError(err)
+		return cmp.Or(fsio.StrError(err), fsio.ErrorText(err))
 	}
 	if err := os.Rename(source, target); err != nil {
-		return pyshim.StrError(err)
+		return cmp.Or(fsio.StrError(err), fsio.ErrorText(err))
 	}
 	return ""
 }

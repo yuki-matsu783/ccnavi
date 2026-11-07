@@ -1,17 +1,18 @@
 package worktrees
 
 import (
+	"cmp"
 	"fmt"
 	"io"
 	"os"
 	"slices"
 	"strings"
 
+	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathmatch"
 	"ccnavi/internal/infra/tree"
-	"ccnavi/internal/tickets/lifecycle/internal/pyshim"
 )
 
 // always はどこにあっても生成物と言える名前、beside は隣に印のファイルがあるときだけ生成物と見る名前。
@@ -126,7 +127,7 @@ func remove(top string, targets []string) ([]string, []string) {
 			err = os.RemoveAll(full)
 		}
 		if err != nil {
-			left = append(left, rel+"（"+pyshim.StrError(err)+"）")
+			left = append(left, rel+"（"+cmp.Or(fsio.StrError(err), fsio.ErrorText(err))+"）")
 			continue
 		}
 		removed = append(removed, rel)

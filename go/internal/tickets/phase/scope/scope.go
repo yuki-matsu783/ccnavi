@@ -42,12 +42,9 @@ func (v Verdict) Outside() bool { return outside(v.Decision) }
 
 func outside(d rules.Decision) bool { return d == ticket.Outside || d == rules.Deny }
 
-// Of は子の範囲を、親の範囲と定義の上限で切り詰める。厳しい側を採るので順（子 → 親 → 定義）は判定を変えないが、
-// Limit は最初に外へ出した上限を名指しする。定義の上限は中か外かしか言わず、子が ask と書いた場所が定義の中なら
-// ask のまま。統合の子は親の範囲を当てない（上限は固定の定義と子の allow だけ）。
+// Of は、子の範囲を親の範囲と定義の上限で切り詰める。厳しい側を採るので、順（子 → 親 → 定義）は判定を変えない。Limit は、最初に外へ出した上限を名指しする。定義の上限は、中か外かしか言わない。子が ask と書いた場所が定義の中なら、ask のまま残る。統合の子は親の範囲を当てない。上限は固定の定義と子の allow だけである。
 //
-// その前に Blocked を見る。承認のときにしか当たらない構造の検査に引っかかったチケットは、範囲を当てても意味が
-// 無い（親が引けない子は、どの範囲で切り詰めるかが決まらない）ので、中でも外でも止める。
+// その前に Blocked を見る。承認のときにしか当たらない構造の検査に引っかかったチケットは、範囲を当てても意味が無い。親が引けない子は、どの範囲で切り詰めるかが決まらないからである。そのため、範囲の中でも外でも止める。
 func Of(child, parent *ticket.Ticket, pt *phases.PhaseType, rel string) Verdict {
 	if child.Blocked != "" {
 		return Verdict{Decision: rules.Deny, Limit: LimitBlocked, Type: pt}
@@ -80,9 +77,7 @@ func planItem(child, parent *ticket.Ticket) *ticket.PlanItem {
 	return parent.ItemAt(n)
 }
 
-// TypeFor は子の番号の定義。親が計画を持たない、番号が計画に無い、定義が引けないなら nil。定義は親に固定した
-// コピーから引き、phases.yml は読まない（承認のあとに直しても、進行中の子の上限は変わらない）。コピーに定義が
-// 無い親は判定の側の検査で止まり、子も blocked で止まるので、定義で切り詰めずに通る形は残らない。
+// TypeFor は、子の番号の定義を返す。親が計画を持たない、番号が計画に無い、定義が引けないときは nil を返す。定義は親に固定したコピーから引き、phases.yml は読まない。承認のあとに直しても、進行中の子の上限は変わらないようにするためである。コピーに定義が無い親は、判定の側の検査で止まる。子も blocked で止まるので、定義で切り詰めずに通る形は残らない。
 func TypeFor(child, parent *ticket.Ticket) *phases.PhaseType {
 	if child.IsConsolidate() {
 		return phases.ConsolidateType()
@@ -107,10 +102,7 @@ var (
 	ErrNoStatus   = errors.New("ワークツリーの状態を読めない")
 )
 
-// diffArgs は子の仕事の差分のパスを NUL 区切りで読む。既定の出力は非 ASCII と空白を含むパスを引用して 8 進に
-// するので、そのまま照らすと範囲の中の日本語のファイルが必ず範囲外になる。--no-renames は改名の移動元を出させ
-// （範囲外のファイルを範囲の中へ改名したものを見落とさない）、--ignore-submodules=none は .gitmodules の
-// ignore = all（追跡されるので外から届く）で submodule の進みが消えるのを防ぐ。
+// diffArgs は、子の仕事の差分のパスを NUL 区切りで読む。既定の出力は、非 ASCII と空白を含むパスを引用して 8 進にする。そのまま照らすと、範囲の中の日本語のファイルが必ず範囲外になってしまう。--no-renames は、改名の移動元を出させる。範囲外のファイルを範囲の中へ改名したものを見落とさないためである。--ignore-submodules=none は、.gitmodules の ignore = all（追跡されるので外から届く）で submodule の進みが消えるのを防ぐ。
 func diffArgs(span string) []string {
 	return []string{"diff", "--name-only", "--no-renames", "--ignore-submodules=none", "-z", span}
 }
@@ -170,10 +162,7 @@ func Findings(conf *config.Settings, root string, child, parent *ticket.Ticket) 
 	return outside, nil
 }
 
-// MergeFindings は finish が親へ合流する前の検査。答えは置き場の変更と範囲外の変更。見るのは子の仕事の始まり
-// から head（呼ぶ側が 1 回だけ読んだ子の先頭）までのコミット済みの変更だけで、合流するのも同じ head なので、
-// 検査のあとのコミットは合流に載らない。置き場（承認済みの領域と提案。マーカーと記録を含む）の変更は範囲に
-// かけず別に挙げ、1 つでもあれば合流しない（子のコミットで親へ持ち込ませない）。
+// MergeFindings は、finish が親へ合流する前の検査を行う。答えは、置き場の変更と範囲外の変更である。見るのは、子の仕事の始まりから head（呼ぶ側が 1 回だけ読んだ子の先頭）までの、コミット済みの変更だけである。合流するのも同じ head なので、検査のあとのコミットは合流に載らない。置き場（承認済みの領域と提案。マーカーと記録を含む）の変更は、範囲にはかけず別に挙げる。1 つでもあれば合流しない。子のコミットで親へ持ち込ませないためである。
 func MergeFindings(conf *config.Settings, root string, child, parent *ticket.Ticket, head string) ([]string, []Finding, error) {
 	_, paths, err := committed(root, child, head)
 	if err != nil {
@@ -183,11 +172,9 @@ func MergeFindings(conf *config.Settings, root string, child, parent *ticket.Tic
 	return places, outside, nil
 }
 
-// outsideOf はパスのうち範囲の外のもの（Of）と、範囲にかけないチケットの置き場のパス。下書きの置き場は追跡
-// されるので外す（実行前チェックとそろえる）。
+// outsideOf は、パスのうち範囲の外のもの（Of）と、範囲にかけないチケットの置き場のパスを返す。下書きの置き場は追跡されるので外す。実行前チェックとそろえるためである。
 //
-// git の -z の表記をそのまま使う。git はどの OS でも区切りを "/" で返すので、"\" を "/" に直すと Linux・macOS で
-// `wip\handoff\x.py` という名前のファイルが置き場の中と判定されて報告されない。
+// git の -z の表記をそのまま使う。git はどの OS でも区切りを "/" で返す。"\" を "/" に直すと、Linux・macOS で `wip\handoff\x.py` という名前のファイルが置き場の中と判定され、報告されなくなってしまう。
 func outsideOf(conf *config.Settings, child, parent *ticket.Ticket, paths map[string]bool) ([]Finding, []string) {
 	pt := TypeFor(child, parent)
 	sorted := make([]string, 0, len(paths))

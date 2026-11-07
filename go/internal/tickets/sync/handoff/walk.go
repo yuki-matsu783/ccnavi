@@ -1,6 +1,7 @@
 package handoff
 
 import (
+	"cmp"
 	"errors"
 	"io/fs"
 	"os"
@@ -155,7 +156,7 @@ func Spelled(treeRoot, rel string) (string, string) {
 				}
 				return "", sprintf(msgNotDirOnWay, line(where))
 			}
-			return "", sprintf(msgPlaceUnread, line(strError(err)))
+			return "", sprintf(msgPlaceUnread, line(cmp.Or(fsio.StrError(err), fsio.ErrorText(err))))
 		}
 		want := FoldPart(part)
 		var hits []string
@@ -174,17 +175,4 @@ func Spelled(treeRoot, rel string) (string, string) {
 		current = ospath.Join(current, hits[0])
 	}
 	return current, ""
-}
-
-// strError は Python の exc.strerror（番号の無いエラーは str(exc)）。
-func strError(err error) string {
-	var errno syscall.Errno
-	if errors.As(err, &errno) {
-		text := fsio.ErrorText(errno)
-		if _, rest, ok := strings.Cut(text, "] "); ok {
-			return rest
-		}
-		return text
-	}
-	return fsio.ErrorText(err)
 }

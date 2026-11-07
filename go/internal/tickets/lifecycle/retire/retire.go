@@ -11,10 +11,10 @@ import (
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
+	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/approval"
-	"ccnavi/internal/tickets/lifecycle/internal/pyshim"
 	"ccnavi/internal/tickets/lifecycle/worktrees"
 	"ccnavi/internal/tickets/model/archive"
 )
@@ -371,7 +371,7 @@ func parentHeadBlocker(parentPath, branch string, hasRef bool) string {
 	if !ok || head != branch || !hasRef {
 		return "親のワークツリーの HEAD が記録のブランチ " + branch + " を指していない、" +
 			"またはその ref が手元に無いので、成果が失われないか確かめられない" +
-			"（git -C " + pyshim.Quote(parentPath) + " status で HEAD とブランチを確かめてください）"
+			"（git -C " + shell.Quote(parentPath) + " status で HEAD とブランチを確かめてください）"
 	}
 	return ""
 }

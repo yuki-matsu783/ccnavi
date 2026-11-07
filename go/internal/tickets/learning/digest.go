@@ -1,7 +1,6 @@
 package learning
 
 import (
-	"errors"
 	"regexp"
 	"slices"
 	"sort"
@@ -13,6 +12,7 @@ import (
 	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
+	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/records/audit"
 )
 
@@ -76,7 +76,7 @@ const envCommand = "env"
 // commandWord は実行の文字列から、先頭の環境変数の代入と `env` を飛ばした最初の語の名前。
 // 記録に残すので、名前の形でないもの（秘密を含みうる）は空にする。
 func commandWord(subject string) string {
-	tokens, err := shlexSplit(subject)
+	tokens, err := shell.Split(subject)
 	if err != nil {
 		return ""
 	}
@@ -188,83 +188,4 @@ func buildDigest(records []*pyjson.Object, recorded bool, treeName *string) *pyj
 		}
 	}
 	return pyjson.NewObject("recorded", recorded, "counts", counts, "repeated", repeated)
-}
-
-// errShlex は shlex.split が ValueError で断る形（閉じない引用・末尾の `\`）。
-var errShlex = errors.New("shlex")
-
-// shlexSplit は Python の shlex.split(s)（posix・whitespace_split・コメント無し）。
-// infra/shell の割り方は punctuation_chars 付きで、`;` などでも割るので使えない。
-func shlexSplit(s string) ([]string, error) {
-	const (
-		space   = ' '
-		word    = 'a'
-		escape  = '\\'
-		squote  = '\''
-		dquote  = '"'
-		isSpace = " \t\r\n"
-	)
-	var out []string
-	var tok strings.Builder
-	state, escaped := rune(space), rune(word)
-	quoted := false
-	emit := func() {
-		out = append(out, tok.String())
-		tok.Reset()
-		quoted = false
-	}
-	for _, c := range s {
-		switch state {
-		case space:
-			switch {
-			case strings.ContainsRune(isSpace, c):
-			case c == escape:
-				escaped, state = word, escape
-			case c == squote || c == dquote:
-				state = c
-			default:
-				tok.WriteRune(c)
-				state = word
-			}
-		case squote, dquote:
-			quoted = true
-			switch {
-			case c == state:
-				state = word
-			case c == escape && state == dquote:
-				escaped, state = state, escape
-			default:
-				tok.WriteRune(c)
-			}
-		case escape:
-			if (escaped == squote || escaped == dquote) && c != state && c != escaped {
-				tok.WriteRune(state)
-			}
-			tok.WriteRune(c)
-			state = escaped
-		case word:
-			switch {
-			case strings.ContainsRune(isSpace, c):
-				state = space
-				if tok.Len() > 0 || quoted {
-					emit()
-				}
-			case c == squote || c == dquote:
-				state = c
-			case c == escape:
-				escaped, state = word, escape
-			default:
-				tok.WriteRune(c)
-			}
-		}
-	}
-	switch state {
-	case squote, dquote, escape:
-		return nil, errShlex
-	case word:
-		if tok.Len() > 0 || quoted {
-			emit()
-		}
-	}
-	return out, nil
 }

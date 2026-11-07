@@ -12,9 +12,7 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// Phases はこの親のフェーズを番号順に。開いている承認済みチケットと閉じた承認済みチケットの両方から組み、
-// 親が計画を持てばまだ子の無い番号も並ぶ。raw は呼び手が approval.ReadRaw で読んだ置き場で、読んでから
-// 置き場のファイルを動かしていないときだけ渡す（nil ならここで読む）。
+// Phases は、この親のフェーズを番号順に返す。開いている承認済みチケットと、閉じた承認済みチケットの両方から組む。親が計画を持てば、まだ子の無い番号も並ぶ。raw は、呼び手が approval.ReadRaw で読んだ置き場である。読んでから置き場のファイルを動かしていないときだけ渡す。nil ならここで読む。
 func Phases(conf *config.Settings, root, parentID string, raw *approval.Raw) []*Phase {
 	return phasesOf(conf, root, parentID, nil, raw)
 }
@@ -131,12 +129,9 @@ func WorktreeAt(conf *config.Settings, root, cwd string) (tree.Tree, bool) {
 	return t, true
 }
 
-// ParentAt は cwd が親のワークツリーの中ならその親の承認済みチケットと、引くのに使った置き場。置き場を読むのは
-// cwd がワークツリーかプロジェクトの中で raw が nil のときだけで、読んだ置き場を返すので呼び手は同じ hook の
-// 残りに持ち回れる。cwd がワークスペースルートか外なら raw をそのまま返す。
+// ParentAt は、cwd が親のワークツリーの中ならその親の承認済みチケットと、引くのに使った置き場を返す。置き場を読むのは、cwd がワークツリーかプロジェクトの中で、raw が nil のときだけである。読んだ置き場を返すので、呼び手は同じ hook の残りに持ち回れる。cwd がワークスペースルートか外なら、raw をそのまま返す。
 //
-// 起動とシェルには書き込み先が無いので、止める親は cwd で引く。cd 1 回で外れるが、外れた先で起動した
-// サブエージェントの書き込みは書き込み先で止まる。
+// 起動とシェルには書き込み先が無いので、止める親は cwd で引く。cd 1 回で外れるが、外れた先で起動したサブエージェントの書き込みは、書き込み先で止まる。
 func ParentAt(conf *config.Settings, root, cwd string, raw *approval.Raw) (*ticket.Ticket, *approval.Raw) {
 	here, ok := WorktreeAt(conf, root, cwd)
 	if !ok {

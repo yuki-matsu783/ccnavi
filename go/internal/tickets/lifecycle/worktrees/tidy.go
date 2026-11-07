@@ -12,9 +12,9 @@ import (
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyjson"
+	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/approval"
-	"ccnavi/internal/tickets/lifecycle/internal/pyshim"
 	"ccnavi/internal/tickets/model/ids"
 	"ccnavi/internal/tickets/model/ticket"
 	"ccnavi/internal/tickets/phase"
@@ -117,7 +117,7 @@ func leftoverFacts(path string) (why, check []string) {
 	} else {
 		why = append(why, "未コミットの変更がある")
 	}
-	check = append(check, "`git -C "+pyshim.Quote(path)+" status` で中身を見て、必要なものはコミットするか退避する")
+	check = append(check, "`git -C "+shell.Quote(path)+" status` で中身を見て、必要なものはコミットするか退避する")
 	return why, check
 }
 

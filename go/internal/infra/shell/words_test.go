@@ -37,10 +37,13 @@ func TestTokenizeMatchesShlex(t *testing.T) {
 }
 
 func TestQuoteMatchesShlex(t *testing.T) {
-	cases := map[string]string{"": "''", "abc": "abc", "a b": "'a b'", "it's": `'it'"'"'s'`}
+	cases := map[string]string{
+		"": "''", "abc": "abc", "/tmp/ws-1.a": "/tmp/ws-1.a", "a b": "'a b'", "it's": `'it'"'"'s'`,
+		"/tmp/日本": "'/tmp/日本'", `C:\work\tree`: `'C:\work\tree'`,
+	}
 	for in, want := range cases {
-		if got := quote(in); got != want {
-			t.Errorf("quote(%q) = %q, want %q", in, got, want)
+		if got := Quote(in); got != want {
+			t.Errorf("Quote(%q) = %q, want %q", in, got, want)
 		}
 	}
 }
