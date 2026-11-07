@@ -82,6 +82,9 @@ func TestTransportProblem(t *testing.T) {
 	if got := TransportProblem("ssh://oauth2:SEC@RET@host.example/a/b"); !strings.Contains(got, "ssh://<伏せた>@host.example/a/b") {
 		t.Errorf("@ を含む資格情報: %q", got)
 	}
+	if got := TransportProblem("oauth2:SEC@RET@host.example:a/b"); !strings.Contains(got, "(<伏せた>@host.example:a/b)") {
+		t.Errorf("scheme の無い形の資格情報: %q", got)
+	}
 }
 
 func TestChangesRequestedNoteByHost(t *testing.T) {

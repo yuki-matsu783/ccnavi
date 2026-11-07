@@ -23,9 +23,17 @@ var remote = regexp.MustCompile(
 	`^(?:(?i:https?)://|(?i:ssh)://git@|git@)(?:[^/]*@)?` +
 		`(?P<host>\[[^\]/]+\]|[^/:@]+)(?::(?P<port>[0-9]+))?[/:]+(?P<path>.+?)(?:\.git)?/?\n?$`)
 
-// credentials は URL に埋めた資格情報（`//user:token@`）。苦情の文には残さない。
+// URL に埋めた資格情報（`//user:token@` と、scheme の無い `user:token@host:path`）。苦情の文には残さない。
 // トークンに `@` が入ることがあるので、ホストの手前の最後の `@` までとする（sh の ccnavi_mask_url と同じ）。
-var credentials = regexp.MustCompile(`//[^/]*@`)
+var (
+	credentials    = regexp.MustCompile(`//[^/]*@`)
+	scpCredentials = regexp.MustCompile(`^[^/:@]*:[^/]*@`)
+)
+
+func maskCredentials(url string) string {
+	url = credentials.ReplaceAllLiteralString(url, "//"+hidden)
+	return scpCredentials.ReplaceAllLiteralString(url, hidden)
+}
 
 const (
 	githubHost    = "github.com"
@@ -34,7 +42,7 @@ const (
 	graphQLSuffix = "/graphql"
 	gitlabAPIPath = "/api/v4"
 	httpPrefix    = "http://"
-	hidden        = "//<伏せた>@"
+	hidden        = "<伏せた>@"
 )
 
 // 道具の名前。
@@ -105,7 +113,7 @@ func Classify(url string) Class {
 func TransportProblem(url string) string {
 	found := Classify(url)
 	if found.Kind == "" {
-		return fmt.Sprintf(msgNotAHost, credentials.ReplaceAllLiteralString(url, hidden))
+		return fmt.Sprintf(msgNotAHost, maskCredentials(url))
 	}
 	if found.Problem != "" {
 		return found.Problem

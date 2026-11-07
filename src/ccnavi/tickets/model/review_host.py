@@ -399,9 +399,10 @@ def transport_problem(url: str) -> str:
     found = classify(url)
     kind = found.kind
     if not kind:
-        # URL に埋めた資格情報（`user:token@`）は出力に残さない。トークンに `@` が入ることが
-        # あるので、ホストの手前の最後の `@` まで伏せる（sh の ccnavi_mask_url と同じ読み）
-        shown = re.sub(r"//[^/]*@", "//<伏せた>@", url)
+        # URL に埋めた資格情報（`//user:token@` と scheme の無い `user:token@host:path`）は
+        # 出力に残さない。トークンに `@` が入ることがあるので、ホストの手前の最後の `@` まで伏せる
+        # （sh の ccnavi_mask_url と同じ読み）
+        shown = re.sub(r"^[^/:@]*:[^/]*@", "<伏せた>@", re.sub(r"//[^/]*@", "//<伏せた>@", url))
         return f"origin ({shown}) が GitHub でも GitLab でもない"
     if found.problem:
         return found.problem
