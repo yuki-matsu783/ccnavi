@@ -9,6 +9,7 @@ import (
 	"ccnavi/internal/catalog/docs"
 	"ccnavi/internal/catalog/skills"
 	"ccnavi/internal/hook/ccnavimd"
+	"ccnavi/internal/hook/judge"
 	"ccnavi/internal/hook/subagent"
 	"ccnavi/internal/hook/turngate"
 	"ccnavi/internal/infra/config"
@@ -31,7 +32,7 @@ func atStart(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, 
 	record *audit.Record, deadline time.Time) (int, error) {
 	source := in.Source
 	main := in.AgentID == ""
-	outcomes := selfguard.AtStart(guardSetting(mode, conf), conf.State, in.SessionID, root, guardTargets(conf, root))
+	guarded := judge.GuardSettingFiles(mode, conf, root, in, record, selfguard.AtStart)
 	// 再開と compact の後にも来るので、「1 度だけ渡す文」は改めて届き、every の刻みも数え直しになる。
 	ctxfile.Forget(conf.State, in.SessionID, source == hookio.StartStartup)
 	// 起動と再開は新しいプロセスで、前のプロセスのサブエージェントは生きていない（compact と clear は同じプロセス）。
@@ -48,11 +49,7 @@ func atStart(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, 
 	// 基準を取った時の注記（読めなかったツリーなど）を消さないよう、足す。
 	record.Detail = pyfmt.JoinNonEmpty("; ", record.Detail, pruneAtStart(stderr, conf, root, in.SessionID))
 	record.Decision, record.Enforced = audit.Allow, true
-	var blocks []string
-	if len(outcomes) > 0 {
-		record.Guarded = guardedOf(outcomes)
-		blocks = append(blocks, selfguard.Report(root, outcomes))
-	}
+	blocks := appendSome(nil, guarded)
 	// 上位に却下されて効かない承認済みチケットの要求。索引より先に組み、索引に期限の残りを渡す。
 	rejects := ""
 	if conf.TicketsEnabled() && main {
@@ -78,7 +75,7 @@ func atStart(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, 
 		// 読めないレイヤーの deny は黙って効かなくなる。判定のたびには言わないので、開始のたびに言う。
 		if broken := ruleload.Unreadable(conf, root); len(broken) > 0 {
 			said := texts.Say(root, "NOTICE_LAYER_UNREADABLE", texts.Values{"layers": strings.Join(broken, "、")}, nil)
-			rejects = pyfmt.JoinNonEmpty(paragraphBreak, rejects, said)
+			rejects = pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, rejects, said)
 		}
 	}
 	blocks = appendSome(blocks, rejects, pending, direct)
@@ -95,8 +92,8 @@ func atStart(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, 
 	if len(blocks) == 0 && learning == "" {
 		return config.ExitOK, nil
 	}
-	return config.ExitOK, hookio.WriteContext(stdout, hookio.SessionStart, strings.Join(blocks, paragraphBreak),
-		pyfmt.JoinNonEmpty(paragraphBreak, rejects, pending, learning))
+	return config.ExitOK, hookio.WriteContext(stdout, hookio.SessionStart, strings.Join(blocks, pyfmt.ParagraphBreak),
+		pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, rejects, pending, learning))
 }
 
 // appendSome は空でない文だけを足す。

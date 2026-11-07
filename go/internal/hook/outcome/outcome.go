@@ -317,7 +317,7 @@ func Notices(stateDir, session string) (string, []*Outcome) {
 			said = append(said, hookio.Head+noticeCode+": "+line(o))
 		}
 	}
-	return strings.Join(said, "\n\n"), todo
+	return strings.Join(said, pyfmt.ParagraphBreak), todo
 }
 
 // Confirm は書き終えた知らせに「通知済み」の印を付ける。付けられなければ理由（次の機会に出し直すだけ）。

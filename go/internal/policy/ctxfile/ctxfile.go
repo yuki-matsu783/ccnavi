@@ -180,7 +180,7 @@ func Deliver(stderr io.Writer, stateDir string, in hookio.Input, group []*rules.
 			return "", false
 		}
 	}
-	return strings.Join(parts, "\n\n"), toldOnce
+	return strings.Join(parts, pyfmt.ParagraphBreak), toldOnce
 }
 
 func withFile(stderr io.Writer, bases []string, text, rel string) string {
@@ -193,7 +193,7 @@ func withFile(stderr io.Writer, bases []string, text, rel string) string {
 			parts = append(parts, body)
 		}
 	}
-	return strings.Join(parts, "\n\n")
+	return strings.Join(parts, pyfmt.ParagraphBreak)
 }
 
 // Bases はルールが指すファイルを探すルートを、近い順に返す。行き先がワークツリーならそのワークツリー、

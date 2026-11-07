@@ -18,9 +18,6 @@ import (
 	"ccnavi/internal/tickets/lifecycle/branch"
 )
 
-// paragraphBreak は応答の文と文の区切り（空行）。
-const paragraphBreak = "\n\n"
-
 // Decide はイベントごとの処理に振り分け、hook の終了コードを返す。error は、下の部品が想定外に失敗したとき、または
 // 応答を書けなかったときに返る（入口が内部エラーの応答にする）。deadline は判定の期限（起動時刻 + config.HookDeadline）。
 // 呼ぶ前に record.Subject を rules.SubjectOf で埋めておく。

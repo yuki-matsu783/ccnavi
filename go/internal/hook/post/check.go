@@ -13,6 +13,7 @@ import (
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/policy/selfguard"
@@ -403,7 +404,7 @@ func (c *Checker) Check(enforcing bool, restore config.Mode, in hookio.Input, re
 		shown = append(shown, texts.Say(c.Root, "NOTICE_POST_DROPPED",
 			texts.Values{"dropped": fmt.Sprint(dropped), "git": gitCommand}, gitVariant(gitCommand)))
 	}
-	return strings.Join(shown, "\n\n"), tried
+	return strings.Join(shown, pyfmt.ParagraphBreak), tried
 }
 
 // restore は戻せたものを {パス: 退避先（戻しただけなら空）} で返す。戻せなかった 1 件は手順付きの報告として残る。

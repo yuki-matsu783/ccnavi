@@ -5,6 +5,9 @@ import (
 	"strings"
 )
 
+// ParagraphBreak は文と文の区切り（空行）。段落は JoinNonEmpty(ParagraphBreak, …) でつなぐ。
+const ParagraphBreak = "\n\n"
+
 // Repeats は NonEmpty が同じ文字列の 2 度目以降をどう扱うか。
 type Repeats int
 

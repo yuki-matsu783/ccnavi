@@ -56,7 +56,7 @@ func check(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, ro
 	c := checkerOf(stderr, conf, root, watched, raw)
 	text, restored := c.Check(mode == config.Enable, config.EffectiveSetting(mode, config.Mode(conf.RestoreIfDeny)), in, record)
 	// ガード自身が触られた回は、何より先に読まれてほしい。
-	text = pyfmt.JoinNonEmpty(paragraphBreak, guarded, text)
+	text = pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, guarded, text)
 	bounced := ""
 	var told []*outcome.Outcome
 	if conf.TicketsEnabled() {
@@ -66,19 +66,19 @@ func check(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, ro
 		}
 		// フェーズが終わったばかりなら、ここで 1 度だけ言う（止まるのは次の呼び出しから）。
 		if parent, latest := phase.ParentAt(conf, root, in.Cwd, raw); parent != nil {
-			text = pyfmt.JoinNonEmpty(paragraphBreak, text, phase.Announce(stderr, conf, root, parent, latest))
+			text = pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, text, phase.Announce(stderr, conf, root, parent, latest))
 		}
 		// 差し戻しは 1 回きりなので、無視して終わったサブエージェントは何も言われずに通っている。親にそれを言う。
 		ignored := subagent.IgnoredBounce(conf.State, in)
 		unchecked := subagent.UncheckedScope(conf.State, in)
 		var outcomes string
 		outcomes, told = subagent.Notices(conf.State, in)
-		bounced = pyfmt.JoinNonEmpty(paragraphBreak, ignored, unchecked, outcomes)
-		text = pyfmt.JoinNonEmpty(paragraphBreak, text, bounced)
+		bounced = pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, ignored, unchecked, outcomes)
+		text = pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, text, bounced)
 	}
 	// 判定を変えない案内（frontmatter の無い md・手書きの提案の書式・直接作業のコミットの次の一手）。
-	hints := pyfmt.JoinNonEmpty(paragraphBreak, docs.MissingFrontmatter(conf, root, in), hint.ProposalHint(conf, root, in))
-	hints = pyfmt.JoinNonEmpty(paragraphBreak, hints, hint.CommitNotice(stderr, conf, root, in))
+	hints := pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, docs.MissingFrontmatter(conf, root, in), hint.ProposalHint(conf, root, in))
+	hints = pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, hints, hint.CommitNotice(stderr, conf, root, in))
 	if text == "" && hints == "" {
 		return config.ExitOK, nil
 	}
@@ -86,7 +86,7 @@ func check(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, ro
 	pushback := record.Decision == audit.Deny
 	if pushback && mode == config.Enable {
 		// ツールはすでに走っているので、渡せるのは次に何をするかだけ。exit 2 と標準エラーで返す。
-		if _, err := io.WriteString(stderr, pyfmt.JoinNonEmpty(paragraphBreak, text, hints)+"\n"); err != nil {
+		if _, err := io.WriteString(stderr, pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, text, hints)+"\n"); err != nil {
 			return config.ExitBlock, err
 		}
 		outcome.Confirm(told)
@@ -102,7 +102,7 @@ func check(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, ro
 	if in.AgentID != "" {
 		system = bounced
 	}
-	if err := hookio.WriteContext(stdout, hookio.PostToolUse, pyfmt.JoinNonEmpty(paragraphBreak, text, hints), system); err != nil {
+	if err := hookio.WriteContext(stdout, hookio.PostToolUse, pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, text, hints), system); err != nil {
 		return config.ExitOK, err
 	}
 	outcome.Confirm(told)
@@ -135,7 +135,7 @@ func afterFailure(stdout, stderr io.Writer, mode config.Mode, conf *config.Setti
 	if !in.IsInterrupt {
 		streak = judge.FailStreakHint(conf, root, in.SessionID, in.AgentID)
 	}
-	if said := pyfmt.JoinNonEmpty(paragraphBreak, guarded, text, artifact, streak); said != "" {
+	if said := pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, guarded, text, artifact, streak); said != "" {
 		return config.ExitOK, hookio.WriteContext(stdout, hookio.PostToolUseFailure, said, "")
 	}
 	return config.ExitOK, nil

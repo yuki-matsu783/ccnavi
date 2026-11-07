@@ -37,9 +37,9 @@ const (
 // atStop は Stop。このターンで変わった保護領域を、ユーザへ systemMessage で 1 度だけ報告する（dry-run でも。見えたことを
 // 言うだけで、モードの約束を何も破らない）。報告のためには止めない。
 //
-// 止めるのは促しだけで、上から順に最初に当たった 1 つ。finish・依頼までの道・フィードバック計画・サブエージェントの
-// 結果・直接作業の integrate・`match: Stop` のルールの順に当てる。Stop でモデルに文を届ける経路は、止めて reason に書くことしか
-// ないので、dry-run でも止める。止めた回もターンの続きなので、ターン中の印は残す。
+// 止めるのは促しだけで、上から順に最初に当たった 1 つ。finish・依頼までの道・フィードバック計画（ticketNudges）・
+// サブエージェントの結果・直接作業の integrate（integrateStep）・`match: Stop` のルールの順に当てる。Stop でモデルに
+// 文を届ける経路は、止めて reason に書くことしかないので、dry-run でも止める。止めた回もターンの続きなので、ターン中の印は残す。
 func atStop(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, root string, in hookio.Input,
 	record *audit.Record, deadline time.Time) (int, error) {
 	// 次の発言での受け入れが読む。
@@ -51,7 +51,7 @@ func atStop(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 	}
 	report := c.AtStop(in, record)
 	// 拒否の文面はモデルにしか届かないので、言い換えで回っているかもしれないことをユーザにも 1 度言う。
-	report = pyfmt.JoinNonEmpty(paragraphBreak, report, tally.DenyReport(conf.State, in.SessionID, tally.DenyThreshold(conf.DenyRepeat)))
+	report = pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, report, tally.DenyReport(conf.State, in.SessionID, tally.DenyThreshold(conf.DenyRepeat)))
 	// AI 判定の差し戻しの次の Stop は、既存の促しを stop_hook_active が偽のときと同じに 1 回だけ動かす
 	// （差し戻しのせいで既存の促しが黙らないように）。
 	cont := aiContinuation(conf, in)
@@ -59,12 +59,11 @@ func atStop(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 	if cont.ok {
 		asked.StopHookActive = false
 	}
-	nudge := finishNudge(stderr, conf, root, asked, record, raw)
-	if nudge == "" {
-		nudge = requestNudge(stderr, conf, root, asked, record, raw)
-	}
-	if nudge == "" {
-		nudge = feedbackNudge(stderr, conf, root, asked, record, raw)
+	nudge := ""
+	for _, step := range ticketNudges {
+		if nudge, _ = stateNudge(stderr, conf, root, asked, record, raw, deadline, step); nudge != "" {
+			break
+		}
 	}
 	if nudge == "" {
 		nudge = subagentNudge(conf, root, in, record)
@@ -72,8 +71,8 @@ func atStop(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 	if nudge == "" {
 		// 前提を満たせず促せない回は、止めずに理由だけを報告へ足す。
 		var notice string
-		nudge, notice = integrateNudge(stderr, conf, root, asked, record, deadline)
-		report = pyfmt.JoinNonEmpty(paragraphBreak, report, notice)
+		nudge, notice = stateNudge(stderr, conf, root, asked, record, raw, deadline, integrateStep)
+		report = pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, report, notice)
 	}
 	if nudge == "" {
 		// 上で止める回はルールの促しを数えない（数えを進めて届かない回を作らない）。
@@ -115,50 +114,100 @@ func nudged(record *audit.Record, code, tree string) {
 	record.Tree = tree
 }
 
-// finishNudge は、cwd のツリーのチケットが作業を終えたように見えるのに finish されていないときの促し。同じセッションで
-// 同じチケットを同じ HEAD のまま促したことがあれば促さない。チケット制御が disable なら何もしない。
-func finishNudge(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, record *audit.Record,
-	raw *approval.Raw) string {
-	if !conf.TicketsEnabled() || !nudgeable(conf, in) {
-		return ""
-	}
-	found := stop.UnfinishedAtStop(conf, root, in.Cwd, raw)
-	if found == nil || stop.NudgedBefore(conf.State, in.SessionID, found) || !remembered(stderr, conf, in, found, "finish ") {
-		return ""
-	}
-	overReport(record)
-	nudged(record, stop.CodeFinishNudge, found.Ticket.ID)
-	return stop.FinishNudge(root, found)
+// stopScene は状態で決める促しが見る、この Stop の持ち物。
+type stopScene struct {
+	conf     *config.Settings
+	root     string
+	in       hookio.Input
+	raw      *approval.Raw
+	deadline time.Time
 }
 
-// requestNudge は、レビューの依頼までの道の途中で終えようとしたときの、次の一手の促し。最後の発言は読まず、状態だけで
-// 決める。同じ状態（親・フェーズ・残っている子・HEAD）では 1 回だけ出す。
-func requestNudge(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, record *audit.Record,
-	raw *approval.Raw) string {
-	if !conf.TicketsEnabled() || !nudgeable(conf, in) {
-		return ""
-	}
-	found := stop.PendingAtStop(conf, root, in.Cwd, raw)
-	if found == nil || stop.NudgedBefore(conf.State, in.SessionID, found) || !remembered(stderr, conf, in, found, "依頼までの道") {
-		return ""
-	}
-	nudged(record, stop.CodeRequestNudge, found.Parent.ID)
-	return stop.RequestNudge(root, found)
+// nudgeHit は状態で決める促しの当たり。say は止める文を組む（blocked なら止めずに報告へ足す理由を組む）。
+type nudgeHit struct {
+	found stop.Nudge
+	code  string
+	// tree は記録の tree に残す名前（チケットの ID かワークツリーの名前）。
+	tree string
+	// over は同じ Stop の報告を記録の detail へ移すか（overReport）。
+	over    bool
+	blocked bool
+	say     func() string
 }
 
-// feedbackNudge は、フィードバック計画待ちのまま終えようとしたときの促し。同じ状態（親・HEAD・改版を提案済みか）では
-// 1 回だけ出す。
-func feedbackNudge(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, record *audit.Record,
-	raw *approval.Raw) string {
-	if !conf.TicketsEnabled() || !nudgeable(conf, in) {
-		return ""
+// nudgeStep は状態で決める促し 1 つ。what は促した記録を残せないときの苦情で、何を促したかを言う語。tickets が真なら、
+// チケット制御が disable の回は促さない。find は当たらなければ偽。
+type nudgeStep struct {
+	what    string
+	tickets bool
+	find    func(s stopScene) (nudgeHit, bool)
+}
+
+// ticketNudges はチケットの状態で決める促しを、当てる順に並べたもの。
+//   - finish: cwd のツリーのチケットが作業を終えたように見えるのに finish されていない
+//   - 依頼までの道: レビューの依頼までの道の途中で終えようとした（最後の発言は読まず、状態だけで決める）
+//   - フィードバック計画: フィードバック計画待ちのまま終えようとした
+var ticketNudges = []nudgeStep{
+	{what: "finish ", tickets: true, find: func(s stopScene) (nudgeHit, bool) {
+		u := stop.UnfinishedAtStop(s.conf, s.root, s.in.Cwd, s.raw)
+		if u == nil {
+			return nudgeHit{}, false
+		}
+		return nudgeHit{found: u, code: stop.CodeFinishNudge, tree: u.Ticket.ID, over: true,
+			say: func() string { return stop.FinishNudge(s.root, u) }}, true
+	}},
+	{what: "依頼までの道", tickets: true, find: func(s stopScene) (nudgeHit, bool) {
+		p := stop.PendingAtStop(s.conf, s.root, s.in.Cwd, s.raw)
+		if p == nil {
+			return nudgeHit{}, false
+		}
+		return nudgeHit{found: p, code: stop.CodeRequestNudge, tree: p.Parent.ID,
+			say: func() string { return stop.RequestNudge(s.root, p) }}, true
+	}},
+	{what: "フィードバック計画", tickets: true, find: func(s stopScene) (nudgeHit, bool) {
+		w := stop.WaitingAtStop(s.conf, s.root, s.in.Cwd, s.raw)
+		if w == nil {
+			return nudgeHit{}, false
+		}
+		return nudgeHit{found: w, code: stop.CodeFeedbackNudge, tree: w.Parent.ID,
+			say: func() string { return stop.FeedbackNudge(s.root, w) }}, true
+	}},
+}
+
+// integrateStep は、直接作業が integrate まで進んでいないときの、打ち方の促し。促せない理由（統合先のツリーが綺麗で
+// ないなど）は、止めずに報告へ足す。チケット制御の有無は見ない（直接作業はチケットに結び付かない）。期限を過ぎてから
+// git を起こさない。
+var integrateStep = nudgeStep{what: "integrate ", find: func(s stopScene) (nudgeHit, bool) {
+	d := integrate.DirectAtStop(s.conf, s.root, s.in.Cwd, s.in.SessionID, s.deadline)
+	if d == nil {
+		return nudgeHit{}, false
 	}
-	found := stop.WaitingAtStop(conf, root, in.Cwd, raw)
-	if found == nil || stop.NudgedBefore(conf.State, in.SessionID, found) || !remembered(stderr, conf, in, found, "フィードバック計画") {
-		return ""
+	if d.Blocked != "" {
+		return nudgeHit{found: d, blocked: true, say: func() string { return integrate.BlockedNotice(d) }}, true
 	}
-	nudged(record, stop.CodeFeedbackNudge, found.Parent.ID)
-	return stop.FeedbackNudge(root, found)
+	return nudgeHit{found: d, code: integrate.CodeIntegrateNudge, tree: d.Name, over: true,
+		say: func() string { return integrate.IntegrateNudge(s.root, d) }}, true
+}}
+
+// stateNudge は状態で決める促し 1 つを当て、止める文と、止めずに報告へ足す理由を返す。同じセッションで同じ状態を
+// 促したことがあれば促さない。促した状態は、止める前に覚える（覚えられなければ促さない）。
+func stateNudge(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, record *audit.Record,
+	raw *approval.Raw, deadline time.Time, step nudgeStep) (string, string) {
+	if (step.tickets && !conf.TicketsEnabled()) || !nudgeable(conf, in) {
+		return "", ""
+	}
+	hit, ok := step.find(stopScene{conf: conf, root: root, in: in, raw: raw, deadline: deadline})
+	if !ok || stop.NudgedBefore(conf.State, in.SessionID, hit.found) || !remembered(stderr, conf, in, hit.found, step.what) {
+		return "", ""
+	}
+	if hit.blocked {
+		return "", hit.say()
+	}
+	if hit.over {
+		overReport(record)
+	}
+	nudged(record, hit.code, hit.tree)
+	return hit.say(), ""
 }
 
 // subagentNudge は、終わったサブエージェントが範囲外の変更を残した、または範囲を確かめられなかったときの促し（同じ結果では
@@ -176,26 +225,6 @@ func subagentNudge(conf *config.Settings, root string, in hookio.Input, record *
 	said := strings.Split(texts.Say(root, codeSubagentNudge, nil, nil), "\n")
 	out := append([]string{subagentNudgeHead, said[0]}, lines...)
 	return strings.Join(append(out, said[1:]...), "\n")
-}
-
-// integrateNudge は、直接作業が integrate まで進んでいないときの、打ち方の促しを返す。促せない理由（統合先のツリーが綺麗で
-// ないなど）は、止めずに報告へ足す。チケット制御の有無は見ない（直接作業はチケットに結び付かない）。期限を過ぎてから
-// git を起こさない。
-func integrateNudge(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, record *audit.Record,
-	deadline time.Time) (string, string) {
-	if !nudgeable(conf, in) {
-		return "", ""
-	}
-	found := integrate.DirectAtStop(conf, root, in.Cwd, in.SessionID, deadline)
-	if found == nil || stop.NudgedBefore(conf.State, in.SessionID, found) || !remembered(stderr, conf, in, found, "integrate ") {
-		return "", ""
-	}
-	if found.Blocked != "" {
-		return "", integrate.BlockedNotice(found)
-	}
-	overReport(record)
-	nudged(record, integrate.CodeIntegrateNudge, found.Name)
-	return integrate.IntegrateNudge(root, found), ""
 }
 
 // stopRulesNudge は、`match: Stop` の allow のルールが、このターンの終わりで止めて渡す文を返す。何を言うか・何回に 1 度かは
@@ -226,7 +255,7 @@ func stopRulesNudge(stderr io.Writer, conf *config.Settings, root string, in hoo
 	record.Enforced = true
 	record.Rules = delivered
 	preface := texts.Say(root, codeRuleNudge, nil, nil)
-	return codeRuleNudge + ": " + preface + paragraphBreak + strings.Join(parts, paragraphBreak)
+	return codeRuleNudge + ": " + preface + pyfmt.ParagraphBreak + strings.Join(parts, pyfmt.ParagraphBreak)
 }
 
 // overReport は、促しで止める回の記録から同じ Stop の報告を detail へ移す。1 回の Stop の記録は 1 行で、decision と

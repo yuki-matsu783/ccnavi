@@ -85,7 +85,7 @@ func UncheckedScope(state string, in hookio.Input) string {
 		}
 		said = append(said, fmt.Sprintf(uncheckedRead, string(post.ReasonWorktreeUnreadable), m.who, strings.Join(tickets, ", ")))
 	}
-	return strings.Join(said, "\n\n")
+	return strings.Join(said, pyfmt.ParagraphBreak)
 }
 
 // Notices は親に言う終わり方の知らせ（担当の子が分からなかった体）と、書き終えたあとに outcome.Confirm へ渡す結果。

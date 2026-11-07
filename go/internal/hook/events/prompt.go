@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"ccnavi/internal/hook/judge"
 	"ccnavi/internal/hook/outcome"
 	"ccnavi/internal/hook/subagent"
 	"ccnavi/internal/hook/turngate"
@@ -45,10 +46,9 @@ func atPrompt(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings,
 		mirrored = strings.Join(mirror.Sync(conf, root), "\n")
 		step = selfguard.Accept
 	}
-	found := step(guardSetting(mode, conf), conf.State, in.SessionID, root, guardTargets(conf, root))
+	found := judge.GuardOutcomes(mode, conf, root, in, record, step)
 	guarded := ""
 	if len(found) > 0 {
-		record.Guarded = guardedOf(found)
 		if byUser {
 			// 受け入れの結果は「戻る」と結ぶ知らせに合わないので、モデルには言わず、失敗だけを標準エラーに残す。
 			for _, o := range found {
@@ -75,7 +75,7 @@ func atPrompt(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings,
 		outcomes, told = subagent.Notices(conf.State, in)
 	}
 	manual := manualConfirmNote(stderr, conf, root, in, raw)
-	if text := pyfmt.JoinNonEmpty(paragraphBreak, guarded, mirrored, hint, unchecked, outcomes, manual); text != "" {
+	if text := pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, guarded, mirrored, hint, unchecked, outcomes, manual); text != "" {
 		if err := hookio.WriteContext(stdout, hookio.UserPromptSubmit, text, ""); err != nil {
 			return config.ExitOK, err
 		}

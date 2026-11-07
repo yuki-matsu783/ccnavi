@@ -36,9 +36,6 @@ import (
 	"ccnavi/internal/tickets/phase"
 )
 
-// paragraphBreak は応答の文と文の区切り（空行）。
-const paragraphBreak = "\n\n"
-
 // Before は実行前チェック。応答を stdout に書き、何が起きたかを record に書く。応答と記録は同じ結論から作る。
 // deadline は判定の期限で、入口が呼び出しの頭で config.HookDeadline を足した時刻。戻り値は hook の終了コード。
 // record.Subject は、ルールを当てる欄（rules.SubjectOf）を入口が入れておく。
@@ -547,14 +544,14 @@ func (j *judgement) byRules(ruleSet *rules.RuleSet, source rules.Origin, subject
 	if conf.TicketsEnabled() {
 		told = guard.ProposeNotice(j.stderr, conf, root, in, record.Subject)
 	}
-	told = pyfmt.JoinNonEmpty(paragraphBreak, told, skills.Notice(j.stderr, conf, root, in, false))
-	context = pyfmt.JoinNonEmpty(paragraphBreak, told, context)
+	told = pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, told, skills.Notice(j.stderr, conf, root, in, false))
+	context = pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, told, context)
 
 	if verdict == rules.Allow {
 		record.Decision, record.Enforced = audit.Allow, true
 		if len(notices) > 0 || context != "" || updated != nil {
 			// 通した回にも言う。ガードが今なにを見ていないのかを言わないと、誰も知らないまま作業が進む。
-			return config.ExitOK, writePass(j.stdout, pyfmt.JoinNonEmpty(paragraphBreak, append(slices.Clip(notices), context)...), updated)
+			return config.ExitOK, writePass(j.stdout, pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, append(slices.Clip(notices), context)...), updated)
 		}
 		return config.ExitOK, nil
 	}
@@ -630,7 +627,7 @@ func (j *judgement) byRules(ruleSet *rules.RuleSet, source rules.Origin, subject
 		// 1 度だけ渡す文（提案の確認・スキルの目録）は渡す回にも言う。
 		record.Decision, record.Enforced = audit.Handover, false
 		if len(notices) > 0 || told != "" || updated != nil {
-			return config.ExitOK, writePass(j.stdout, pyfmt.JoinNonEmpty(paragraphBreak, append(slices.Clip(notices), told)...), updated)
+			return config.ExitOK, writePass(j.stdout, pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, append(slices.Clip(notices), told)...), updated)
 		}
 		return config.ExitOK, nil
 	}

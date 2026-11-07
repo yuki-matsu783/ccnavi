@@ -10,6 +10,7 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/flow"
@@ -133,10 +134,7 @@ func plan(conf *config.Settings, root, prompt string, t *target, b *book) string
 	if guide == "" {
 		return ""
 	}
-	if body := stripGuide(prompt); body != "" {
-		return body + "\n\n" + guide
-	}
-	return guide
+	return pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, stripGuide(prompt), guide)
 }
 
 // stripGuide はプロンプトにある案内の囲みを、中身を信用せずに取り除く。開きから閉じまでを全部、閉じの無い開きは

@@ -1,8 +1,10 @@
 package askcontext
 
 import (
+	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
@@ -37,13 +39,11 @@ const (
 
 // heading は行頭の見出し。`## 背景`・`### 1. 背景`・`**背景**`・`【背景】`・`背景:` が当たり、`背景を説明すると…` は外れる。
 func heading(words []string) *pyre.Regexp {
-	sorted := append([]string(nil), words...)
+	sorted := slices.Clone(words)
 	// 長い言い方を先に試す（Python の sorted(key=len, reverse=True) と同じ安定な並び）。
-	for i := 1; i < len(sorted); i++ {
-		for j := i; j > 0 && len([]rune(sorted[j])) > len([]rune(sorted[j-1])); j-- {
-			sorted[j], sorted[j-1] = sorted[j-1], sorted[j]
-		}
-	}
+	slices.SortStableFunc(sorted, func(a, b string) int {
+		return utf8.RuneCountInString(b) - utf8.RuneCountInString(a)
+	})
 	escaped := make([]string, len(sorted))
 	for i, w := range sorted {
 		escaped[i] = pyre.Escape(w)

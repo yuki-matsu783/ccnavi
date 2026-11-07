@@ -17,6 +17,7 @@ import (
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/ctxfile"
 	"ccnavi/internal/records/audit"
@@ -64,13 +65,7 @@ func AtStart(stdout, stderr io.Writer, conf *config.Settings, root string, in ho
 	here, found := cwdTree(conf, root, in)
 	// 同じワークツリーの別の編集するサブエージェントの案内は、チケットの無いツリーでも渡すので先に組む。
 	shared := noteRunning(stderr, conf, root, in, here, found)
-	var parts []string
-	for _, part := range []string{skills.Notice(stderr, conf, root, in, true), shared, candidateNote} {
-		if part != "" {
-			parts = append(parts, part)
-		}
-	}
-	lead := strings.Join(parts, "\n\n")
+	lead := pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, skills.Notice(stderr, conf, root, in, true), shared, candidateNote)
 	if !conf.TicketsEnabled() || !found || here.IsMain() {
 		return say(stdout, lead)
 	}
@@ -109,10 +104,7 @@ func AtStart(stdout, stderr io.Writer, conf *config.Settings, root string, in ho
 	}
 	lines = append(lines, childnote.RuleLines()...)
 	lines = append(lines, changed...)
-	text := strings.Join(lines, "\n")
-	if lead != "" {
-		text = lead + "\n\n" + text
-	}
+	text := pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, lead, strings.Join(lines, "\n"))
 	if err := hookio.WriteContext(stdout, hookio.SubagentStart, text, strings.Join(changed, "\n")); err != nil {
 		return config.ExitOK, fmt.Errorf("SubagentStart の応答: %w", err)
 	}

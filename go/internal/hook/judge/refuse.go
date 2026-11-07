@@ -10,11 +10,11 @@ import (
 	"ccnavi/internal/hook/reasons"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/hookio"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/pyre"
 	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/policy/builtin"
-	"ccnavi/internal/policy/ruleload"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/policy/selfguard"
 	"ccnavi/internal/records/audit"
@@ -86,7 +86,7 @@ func (j *judgement) refuse(verdict rules.Decision, parts []string, o refusal) (i
 		}
 	}
 	// 空行で区切るのは、1 件ずつが閉じた文であることを見た目でも保つため。
-	reason := strings.Join(parts, paragraphBreak)
+	reason := strings.Join(parts, pyfmt.ParagraphBreak)
 	decision := audit.Ask
 	if verdict == rules.Deny {
 		decision = audit.Deny
@@ -97,7 +97,7 @@ func (j *judgement) refuse(verdict rules.Decision, parts []string, o refusal) (i
 	}
 	holds := config.HoldsInDryRun(o.kind)
 	if j.mode == config.DryRun && holds {
-		reason += paragraphBreak + dryRunHoldsNote
+		reason += pyfmt.ParagraphBreak + dryRunHoldsNote
 	}
 	if j.mode == config.DryRun && !holds {
 		record.Decision, record.Enforced = decision, false
@@ -107,10 +107,10 @@ func (j *judgement) refuse(verdict rules.Decision, parts []string, o refusal) (i
 		}
 		text := config.DryRunWould(would+" this call:\n") + reason
 		if streak != "" {
-			text += paragraphBreak + streak
+			text += pyfmt.ParagraphBreak + streak
 		}
 		if o.context != "" {
-			text += paragraphBreak + o.context
+			text += pyfmt.ParagraphBreak + o.context
 		}
 		return config.ExitOK, writePass(j.stdout, text, o.updated)
 	}
@@ -118,10 +118,10 @@ func (j *judgement) refuse(verdict rules.Decision, parts []string, o refusal) (i
 	record.Decision, record.Enforced = decision, true
 	if verdict == rules.Deny {
 		if n := tally.CountDeny(j.conf.State, record); n >= tally.DenyThreshold(j.conf.DenyRepeat) {
-			reason += paragraphBreak + tally.DenyNote(tally.RuleOf(record), n)
+			reason += pyfmt.ParagraphBreak + tally.DenyNote(tally.RuleOf(record), n)
 		}
 		if streak != "" {
-			reason += paragraphBreak + streak
+			reason += pyfmt.ParagraphBreak + streak
 		}
 	}
 	answer := hookio.Ask
@@ -205,22 +205,6 @@ func FailStreakHint(conf *config.Settings, root, session, agent string) string {
 		return ""
 	}
 	return docs.FailStreakNote(conf, root, got, kind == tally.First)
-}
-
-// GuardSettingFiles は ccnavi 自身の設定ファイルを、バックアップと突き合わせる 1 回。step は selfguard.Before か After。
-// 行ったことを record.Guarded に残し、知らせる文を返す。実行前と実行後で対象の決め方を 1 か所にするため、step だけを受ける。
-func GuardSettingFiles(mode config.Mode, conf *config.Settings, root string, in hookio.Input, record *audit.Record, step selfguard.Step) string {
-	setting := config.EffectiveSetting(mode, config.Mode(conf.GuardCoreFiles))
-	targets := selfguard.Targets(root, conf.Rules, conf.Bin, ruleload.LayerFiles(conf, root), conf.Projects)
-	outcomes := step(setting, conf.State, in.SessionID, root, targets)
-	if len(outcomes) == 0 {
-		return ""
-	}
-	record.Guarded = make([]string, len(outcomes))
-	for i, o := range outcomes {
-		record.Guarded[i] = o.Target.Key + ":" + string(o.Action)
-	}
-	return selfguard.Report(root, outcomes)
 }
 
 // askContextCheck は確認の前の発言を調べる関数。非対話のセッション（答える人がいない）とサブエージェントの呼び出し

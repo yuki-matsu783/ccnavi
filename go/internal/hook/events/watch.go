@@ -132,22 +132,3 @@ func readRaw(conf *config.Settings, root string) *approval.Raw {
 	}
 	return approval.ReadRaw(conf, root)
 }
-
-// guardTargets は ccnavi 自身の設定ファイルのうち、バックアップと突き合わせる対象（judge と同じ決め方）。
-func guardTargets(conf *config.Settings, root string) []selfguard.Target {
-	return selfguard.Targets(root, conf.Rules, conf.Bin, ruleload.LayerFiles(conf, root), conf.Projects)
-}
-
-// guardSetting は自己防衛の設定にモードを掛けた値。
-func guardSetting(mode config.Mode, conf *config.Settings) config.Mode {
-	return config.EffectiveSetting(mode, config.Mode(conf.GuardCoreFiles))
-}
-
-// guardedOf は記録の guarded に残す `<key>:<action>` の並び。
-func guardedOf(outcomes []selfguard.Outcome) []string {
-	out := make([]string, len(outcomes))
-	for i, o := range outcomes {
-		out[i] = o.Target.Key + ":" + string(o.Action)
-	}
-	return out
-}
