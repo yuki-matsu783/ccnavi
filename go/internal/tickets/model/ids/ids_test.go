@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/testkit"
 )
 
@@ -72,29 +73,6 @@ func TestParseChild(t *testing.T) {
 	}
 }
 
-const idsOracle = `
-import json, sys
-from ccnavi.infra import settings
-from ccnavi.tickets.model import ticket_ids as ti
-c = json.load(sys.stdin)
-P = settings.DEFAULT_BRANCH_PREFIXES
-def ident(n, title, project, prefix):
-    try:
-        return list(ti.issue_identifier_parts(n, title, project, prefix)) + [""]
-    except ValueError as e:
-        return ["", False, str(e)]
-json.dump({
-    "id": [ti.id_problem(x) for x in c["names"]],
-    "branch": [ti.branch_problem(x) for x in c["names"]],
-    "answer": [ti.id_answer(x) for x in c["names"]],
-    "tail": [bool(ti.child_tail_pattern().search(x)) for x in c["names"]],
-    "number": [ti.identifier_number(x, P) or 0 for x in c["names"]],
-    "warning": [ti.direct_name_warning(x, P) for x in c["names"][:3]] + [ti.direct_name_warning("x", P, "/ws")],
-    "serial": [ti.next_serial(c["names"], P), ti.next_serial(c["names"], P, skip_children=False)],
-    "issue": [ident(*a) for a in c["issues"]],
-}, sys.stdout, ensure_ascii=False)
-`
-
 type idsAnswers struct {
 	ID      []string   `json:"id"`
 	Branch  []string   `json:"branch"`
@@ -129,7 +107,7 @@ var idsIssues = [][]any{
 }
 
 func TestIDsMatchPython(t *testing.T) {
-	want := testkit.Answers[idsAnswers](t, "ids", idsOracle, map[string]any{"names": idsNames, "issues": idsIssues})
+	want := golden.Load[idsAnswers](t, "ids")
 	p := config.DefaultBranchPrefixes
 	got := idsAnswers{}
 	for _, x := range idsNames {

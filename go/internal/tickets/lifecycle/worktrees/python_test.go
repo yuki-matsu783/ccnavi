@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/model/ticket"
 	"ccnavi/internal/tickets/testkit"
@@ -70,48 +71,9 @@ var plans = []string{
 	testkit.ParentText("i0003", nil),
 }
 
-const oracle = `
-import io, json, os, sys
-from ccnavi.infra import settings
-from ccnavi.tickets.lifecycle import worktrees
-from ccnavi.tickets.model import ticket as tm
-c = json.load(sys.stdin)
-root = c["root"]
-def rel(s):
-    return s.replace(root, "<root>")
-conf, _ = settings.load(root)
-out = {}
-def run(name, f, *args):
-    o, e = io.StringIO(), io.StringIO()
-    code = f(o, e, *args)
-    out[name] = [code, rel(o.getvalue()), rel(e.getvalue())]
-out["targets"] = [[t.ticket for t in worktrees.tidy_targets(root, conf, "i0001", n)] for n in (None, 1, 2)]
-out["family"] = [worktrees.family_for(root, conf, x) for x in ("i0001-01-01", "rel-2026-10-06", "i0001", "x", "rel-2026-10-06-01-02")]
-out["children"] = worktrees.child_worktrees(root, [tm.parse(x)[0] for x in c["plans"]])
-o = io.StringIO()
-out["remaining"] = [worktrees.run_remaining(o, root, conf, "i0001-01-01", root), rel(o.getvalue())]
-run("clean_preview", worktrees.run_clean, root, "i0001-01-01", True)
-blocked = []
-for name in ("i0001-01-01", "i0001-01-02", "nothing", "plain", "i0001", ".."):
-    b = worktrees.blocked(root, name, os.path.join(root, ".claude", "worktrees", "i0001", "src"))
-    blocked.append(None if b is None else [b.name, b.status, rel(b.path), rel(b.detail)])
-out["blocked"] = blocked
-for name in ("plain", "..", "a/b", "i0001-01-02", "i0002"):
-    run("drop " + name, worktrees.run_drop, root, name, root)
-run("drop i0001 inside", worktrees.run_drop, root, "i0001", os.path.join(root, ".claude", "worktrees", "i0001", "src"))
-run("tidy", worktrees.run_tidy, root, conf, "i0001", None, root)
-run("drop again", worktrees.run_drop, root, "i0001-01-01", root)
-run("clean stale", worktrees.run_clean, root, "stale", False)
-run("clean doing", worktrees.run_clean, root, "i0001-01-03", False)
-run("clean bad", worktrees.run_clean, root, "a/b", False)
-run("clean plain file", worktrees.run_clean, root, "nothing", False)
-out["shape"] = shape(root)
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
-
 func TestMatchesPython(t *testing.T) {
-	pyRoot, goRoot := fixture(t), fixture(t)
-	want := testkit.Answers[map[string]any](t, "worktrees", testkit.ShapePy+oracle, map[string]any{"root": pyRoot, "plans": plans})
+	goRoot := fixture(t)
+	want := golden.Load[map[string]any](t, "worktrees")
 	root := goRoot
 	conf := testkit.Settings(t, root)
 	rel := func(s string) string { return testkit.Rel(root, s) }

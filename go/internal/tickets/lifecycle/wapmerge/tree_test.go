@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/testkit"
 )
 
@@ -76,16 +77,6 @@ func TestTreeProblemMirrorGuidance(t *testing.T) {
 	}
 }
 
-// 合流を戻せない形（改行を含むパス・大文字小文字だけが違うパス・submodule の追加）を、ファイルシステムに置かずに
-// 索引へ直に入れて作り、Python と同じ理由の文になることを見る。
-const unrestorableOracle = `
-import json, sys
-from ccnavi.tickets.lifecycle import write_and_push_merge as w
-c = json.load(sys.stdin)
-reasons, why = w._unrestorable(c["tree"], c["base"], c["head"])
-json.dump({"reasons": reasons, "why": why}, sys.stdout, ensure_ascii=False)
-`
-
 func TestUnrestorableMatchesPython(t *testing.T) {
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	root := testkit.ShapedWorkspace(t)
@@ -97,8 +88,7 @@ func TestUnrestorableMatchesPython(t *testing.T) {
 	}
 	testkit.Git(t, root, "commit", "-q", "-m", "unsafe")
 	head := testkit.Head(t, root)
-	want := testkit.Answers[map[string]any](t, "unrestorable", unrestorableOracle,
-		map[string]any{"tree": root, "base": base, "head": head})
+	want := golden.Load[map[string]any](t, "unrestorable")
 	reasons, why := unrestorable(root, base, head)
 	got := []any{}
 	for _, r := range reasons {

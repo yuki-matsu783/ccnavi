@@ -7,49 +7,13 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/approval"
 	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の tickets/lifecycle の stop・stop_request・stop_feedback と同じワークスペースを 2 つ作って、cwd ごとに
 // 促す相手・促しの文・1 回だけの記録（書いたバイト列も）・基準点の警告が 1 字も違わないことを見る。
-
-const stopOracle = `
-import base64, json, os, sys
-from ccnavi.infra import settings
-from ccnavi.tickets.approval import store as approval
-from ccnavi.tickets.lifecycle import stop as ops_stop, stop_feedback as osf, stop_request as osr
-c = json.load(sys.stdin)
-root, state = c["root"], c["state"]
-def rel(s):
-    return s.replace(root, "<root>")
-conf, _ = settings.load(root)
-out = {"cwds": []}
-for cwd in c["cwds"]:
-    e = {}
-    u = ops_stop.unfinished_at_stop(root, conf, cwd)
-    if u is not None:
-        e["unfinished"] = [u.ticket.ticket, rel(u.worktree), u.ahead, u.head, rel(ops_stop.finish_nudge(root, u)),
-                           ops_stop.nudged_before(state, "s1", u), ops_stop.remember_nudge(state, "s1", u),
-                           ops_stop.nudged_before(state, "s1", u)]
-    p = osr.pending_at_stop(root, conf, cwd)
-    if p is not None:
-        e["pending"] = [p.parent.ticket, p.number, p.step, rel(p.worktree), p.head, p.children, p.title,
-                        rel(osr.request_nudge(root, p)), osr.nudged_before(state, "s1", p),
-                        osr.remember_nudge(state, "s1", p), osr.nudged_before(state, "s1", p)]
-    w = osf.waiting_at_stop(root, conf, cwd)
-    if w is not None:
-        e["waiting"] = [w.parent.ticket, w.head, rel(w.todo), rel(w.proposal), rel(osf.feedback_nudge(root, w)),
-                        osf.nudged_before(state, "s1", w), osf.remember_nudge(state, "s1", w),
-                        osf.nudged_before(state, "s1", w)]
-    out["cwds"].append(e)
-copies, _ = approval.scan(conf, root)
-out["offHead"] = {t.ticket: rel(ops_stop.base_off_head(root, conf, t)) for t in copies}
-with open(ops_stop.nudge_path(state, "s1"), "rb") as f:
-    out["record"] = base64.b64encode(f.read()).decode()
-out["path"] = [os.path.relpath(ops_stop.nudge_path(state, x), state) for x in ("", "a/b")]
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 // noPlanParent は計画の無い親。
 func noPlanParent(id string, extra ...string) string {
@@ -138,10 +102,9 @@ func cwds(root string) []string {
 }
 
 func TestMatchesPython(t *testing.T) {
-	pyRoot, goRoot := stopWorkspace(t), stopWorkspace(t)
-	pyState, goState := t.TempDir(), t.TempDir()
-	want := testkit.Answers[map[string]any](t, "stop", stopOracle,
-		map[string]any{"root": pyRoot, "state": pyState, "cwds": cwds(pyRoot)})
+	goRoot := stopWorkspace(t)
+	goState := t.TempDir()
+	want := golden.Load[map[string]any](t, "stop")
 	conf := testkit.Settings(t, goRoot)
 	rel := func(s string) string { return strings.ReplaceAll(s, goRoot, "<root>") }
 	record := func(n Nudge) []any {

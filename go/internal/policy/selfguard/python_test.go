@@ -2,25 +2,22 @@ package selfguard
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
-	"flag"
+	"fmt"
 	"math/rand/v2"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/policy/rules"
 )
 
 // Python の selfguard_shell と突き合わせる。式の文字列が 1 字も違わないこと、組んだルールが同じ呼び出しに同じ答えを
-// 返すこと（pyre と除外の関数を含む）を、決めた入力と乱数の入力で見る。リポジトリの .venv の Python が無ければ
-// testdata の写しと比べる。
-
-var update = flag.Bool("update", false, "testdata の Python の答えを取り直す")
+// 返すこと（pyre と除外の関数を含む）を、決めた入力と乱数の入力で見る。Python の答えは testdata に写してある。
 
 func repoRoot(t *testing.T) string {
 	t.Helper()
@@ -40,102 +37,10 @@ func repoRoot(t *testing.T) string {
 	}
 }
 
-func venvPython(root string) string {
-	for _, rel := range []string{".venv/bin/python", ".venv/Scripts/python.exe"} {
-		if p := filepath.Join(root, rel); fileExists(p) {
-			return p
-		}
-	}
-	return ""
-}
-
 func fileExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
 }
-
-// answers は Python の答え。name が空なら写しを持たない（Python が無ければ飛ばす）。
-func answers[T any](t *testing.T, name, script string, in any) T {
-	t.Helper()
-	var saved T
-	path := filepath.Join("testdata", name+".json")
-	data, readErr := os.ReadFile(path)
-	if name != "" && readErr == nil {
-		if err := json.Unmarshal(data, &saved); err != nil {
-			t.Fatal(err)
-		}
-	}
-	root := repoRoot(t)
-	py := venvPython(root)
-	if py == "" {
-		if name == "" || readErr != nil {
-			t.Skip("Python も testdata の写しも無い")
-		}
-		return saved
-	}
-	in2, err := json.Marshal(in)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmd := exec.Command(py, "-c", script)
-	cmd.Env = append(os.Environ(), "PYTHONPATH="+filepath.Join(root, "src"), "PYTHONDONTWRITEBYTECODE=1")
-	cmd.Stdin = bytes.NewReader(in2)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("python: %v\n%s", err, stderr.String())
-	}
-	var fresh T
-	if err := json.Unmarshal(out, &fresh); err != nil {
-		t.Fatalf("%v\n%s", err, out)
-	}
-	if name == "" {
-		return fresh
-	}
-	got, _ := json.Marshal(fresh)
-	if *update {
-		if err := os.MkdirAll("testdata", 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, append(got, '\n'), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	} else if readErr != nil || !bytes.Equal(bytes.TrimSpace(data), got) {
-		t.Errorf("%s が Python の答えと違う（go test -run %s -update で取り直す）", path, t.Name())
-	}
-	return fresh
-}
-
-const guardOracle = `
-import json, sys
-from ccnavi.infra import shellread
-from ccnavi.policy import rules, selfguard_shell as s
-out = []
-for c in json.load(sys.stdin):
-    rs = rules.RuleSet(version=rules.VERSION)
-    common = tuple(c["common"] or ())
-    s.add_rules(rs, c["bin"], c["home"], c["root"], common, (c["log"], c["state"]), tool=c["tool"] or None, cwd=c["cwd"])
-    s.add_named_rules(rs, c["home"], c["root"])
-    listed = [{
-        "id": r.id, "match": r.match, "pattern": r.compiled.pattern if r.compiled else "",
-        "text": r.message_id, "values": r.message_values or {}, "variants": r.message_variants or {},
-        "exempt": r.exempt is not None,
-    } for r in rs.deny]
-    subjects = [[tool, subject] for tool, subject in c["subjects"] or []]
-    for command in c["commands"] or []:
-        subjects.append(["Bash", shellread.read(command).text])
-    hits = [[r.id for r in rs.deny if r.matches(tool, subject)] for tool, subject in subjects]
-    out.append({
-        "shell": s.guard_shell_regex(c["root"], c["bin"], c["home"], common),
-        "binary": s.binary_clause(c["bin"]),
-        "binaryCopy": s.binary_clause(c["bin"], s.Form.COPY),
-        "rules": listed,
-        "subjects": subjects,
-        "hits": hits,
-    })
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 type guardCase struct {
 	Root     string      `json:"root"`
@@ -206,7 +111,7 @@ func goGuard(c guardCase, subjects [][2]string) guardResult {
 
 func compareGuards(t *testing.T, name string, cases []guardCase) {
 	t.Helper()
-	want := answers[[]guardResult](t, name, guardOracle, cases)
+	want := golden.Load[[]guardResult](t, name)
 	bad := 0
 	for i, c := range cases {
 		// 読みは Python の shellread の答えをそのまま当てる（shell.Read の突き合わせは infra/shell が持つ）。
@@ -423,7 +328,7 @@ func TestGuardRulesRandomAgainstPython(t *testing.T) {
 		t.Skip("POSIX のパスで組む")
 	}
 	t.Setenv("PATH", "/nonexistent/path")
-	rnd := rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 3))
+	rnd := rand.New(rand.NewPCG(11, 3)) // 見本と比べるので種を固定する
 	parts := []string{"a", "B", ".ccnavi", ".claude", "logs", "conf", "x y", "(1)", "[z]", "$v", "a+b", "日本", "Straße", ".", "..", "", "bin",
 		"ccnavi", "ccnavi-launcher.sh", "scripts", "rules.yml", "phases.yml", "risks.yml", "c.d", "-t", "*", "^", "{}", "|"}
 	path := func(abs bool) string {
@@ -465,11 +370,22 @@ func TestGuardRulesRandomAgainstPython(t *testing.T) {
 			Subjects: randomSubjects(rnd, 25),
 		})
 	}
-	compareGuards(t, "", cases)
+	// 写しの guard.json と同じ形では大きいので、組んだ式とルールは要約にし、当たったルールはそのまま見本にする。
+	type seen struct {
+		Built string     `json:"built"`
+		Hits  [][]string `json:"hits"`
+	}
+	var all []seen
+	for _, c := range cases {
+		g := goGuard(c, c.Subjects)
+		built, _ := json.Marshal([]any{g.Shell, g.Binary, g.BinaryCopy, g.Rules})
+		all = append(all, seen{fmt.Sprintf("%x", sha256.Sum256(built))[:16], g.Hits})
+	}
+	golden.Check(t, "guard-random", all)
 }
 
 // TestGuardRulesWithFilesAgainstPython は実際のファイル（PATH の実体・ハードリンクでつながった下書き・リンクの居場所）で
-// 突き合わせる。パスが機械で変わるので写しは持たない。
+// 確かめる。パスが機械で変わるので、当たったルールだけを Go の答えの見本（golden.Check）にする。
 func TestGuardRulesWithFilesAgainstPython(t *testing.T) {
 	if ospath.Windows {
 		t.Skip("リンクを作れない機械がある")
@@ -522,10 +438,13 @@ func TestGuardRulesWithFilesAgainstPython(t *testing.T) {
 			})
 		}
 	}
+	// 式と置き場の答えはパスを含むので、どのルールに当たったかだけを見本にする。
+	var hits [][][]string
 	for _, c := range cases {
 		t.Setenv("PATH", c.Env)
-		compareGuards(t, "", []guardCase{c})
+		hits = append(hits, goGuard(c, c.Subjects).Hits)
 	}
+	golden.Check(t, "guard-files", hits)
 }
 
 func write(t *testing.T, path, text string) {
@@ -537,18 +456,6 @@ func write(t *testing.T, path, text string) {
 		t.Fatal(err)
 	}
 }
-
-const gitOracle = `
-import json, sys
-from ccnavi.infra import shellread
-from ccnavi.policy import selfguard_shell as s
-c = json.load(sys.stdin)
-json.dump({"git": s.git_dir_shell_regex(), "holder": [s.holder_regex(d, n, named_only=o) for d, n, o in c["holders"]],
-  "under": [s.under(d) for d, _, _ in c["holders"]], "copy": [s.copy_destination_regex(s.copy_last_place(d), n) for d, n, _ in c["holders"]],
-  "verbs": s._WRITE_VERBS, "notaword": s._NOT_A_WORD, "path": s.GIT_DIR_PATH_REGEX,
-  "limits": [s.REDIRECT_LIMIT, s.RAW_LENGTH_LIMIT],
-  "redirects": [s.too_many_redirects(x) for x in c["subjects"]]}, sys.stdout, ensure_ascii=False)
-`
 
 type partsAnswer struct {
 	Git       string   `json:"git"`
@@ -566,7 +473,7 @@ func TestPublicPartsAgainstPython(t *testing.T) {
 	holders := [][3]any{{`logs`, `decisions\.jsonl`, false}, {`\.`, `\.git`, true}, {`a[\\/]b`, `x|y`, false}}
 	subjects := []string{">", strings.Repeat(">", 50), strings.Repeat(">", 51), ">" + strings.Repeat("a", RawLengthLimit),
 		">" + strings.Repeat("a", RawLengthLimit-1), strings.Repeat("a", RawLengthLimit*2), ">" + strings.Repeat("日", RawLengthLimit)}
-	want := answers[partsAnswer](t, "parts", gitOracle, map[string]any{"holders": holders, "subjects": subjects})
+	want := golden.Load[partsAnswer](t, "parts")
 	if GitDirShellRegex() != want.Git || WriteVerbs != want.Verbs || NotAWord != want.NotAWord || GitDirPathRegex != want.Path {
 		t.Errorf("git の式か部品が違う\n got  %q\n want %q", GitDirShellRegex(), want.Git)
 	}

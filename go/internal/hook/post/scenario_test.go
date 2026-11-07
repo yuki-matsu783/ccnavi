@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/pyjson"
@@ -23,8 +24,8 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// 実行後チェックの一連の呼び出しを、Python の post と同じ手順で両方に打ち、返す文・記録・state のファイル・退避・
-// ワークツリーの状態を突き合わせる。止められないイベントの唯一の手立て（差し戻しの文と戻し）が Python と同じであること。
+// 実行後チェックの一連の呼び出しを決めた手順で打ち、返す文・記録・state のファイル・退避・ワークツリーの状態を
+// 見本と比べる。止められないイベントの唯一の手立て（差し戻しの文と戻し）が変わっていないこと。
 
 // step は 1 つの手順。op が write・remove・git ならワークスペースを動かし、call なら実行後チェックを呼ぶ。
 type step struct {
@@ -53,75 +54,6 @@ type scenario struct {
 	Scope   bool                `json:"scope"`
 	Steps   []step              `json:"steps"`
 }
-
-const scenarioOracle = `
-import io, json, os, re, subprocess, sys
-from ccnavi.hook import events, post
-from ccnavi.infra import hookio, settings, tree
-from ccnavi.policy import rules
-from ccnavi.records import audit
-c = json.load(sys.stdin)
-root, s = c["root"], c["scenario"]
-env = dict(os.environ, **dict(e.split("=", 1) for e in c["gitenv"]))
-def rule(r, decision):
-    x = rules.Rule(id=r["id"], bare_id=r["id"], match="Write|Edit", decision=decision, message=r["message"], root=root,
-                   from_file=True, file="rules.yml")
-    x.compiled = re.compile(r["regex"])
-    return x
-rs = rules.RuleSet(deny=[rule(r, rules.DENY) for r in s["deny"]], ask=[rule(r, rules.ASK) for r in s["ask"]])
-state = os.path.join(root, "logs", "state")
-mine = (state, os.path.join(root, "logs", "decisions.jsonl"))
-out = []
-for st in s["steps"]:
-    op = st["op"]
-    if op == "write":
-        p = os.path.join(root, st["path"])
-        os.makedirs(os.path.dirname(p), exist_ok=True)
-        with open(p, "w", encoding="utf-8", newline="") as f:
-            f.write(st["text"])
-        continue
-    if op == "remove":
-        os.remove(os.path.join(root, st["path"]))
-        continue
-    if op == "git":
-        subprocess.run(["git", *st["args"][1:]], cwd=os.path.join(root, st["args"][0]), env=env, check=True, capture_output=True)
-        continue
-    conf = settings.load(root)[0]
-    watched = []
-    for w in s["watched"]:
-        t = tree.main_tree(root) if not w["path"] else tree.tree_of(root, os.path.join(root, w["path"]), conf.projects)
-        watched.append(post.Watched(t, rs, "rules.yml", w["side"]))
-    scope = events.scope_guard(conf, root) if s["scope"] else None
-    places = (conf.tickets, conf.approved)
-    payload = hookio.Input(event="PostToolUse", session_id="s1", tool_name=st.get("tool", ""),
-                           tool_input=st.get("input") or {}, cwd=root)
-    record, err = audit.Record(), io.StringIO()
-    text, tried, kind = "", False, st["kind"]
-    if kind == "check":
-        text, tried = post.check(err, st.get("enforcing", False), st.get("restore", ""), state, mine, watched, scope,
-                                 payload, record, places, root)
-    elif kind == "at_stop":
-        text = post.at_stop(err, state, mine, watched, scope, payload, record, places, root)
-    elif kind == "at_prompt":
-        post.at_prompt(err, state, mine, watched, scope, payload, record, places, root, accept=st.get("accept", False))
-    else:
-        post.capture_baseline(err, state, "s1", watched, scope, record, mine, places, root)
-    files, aside = {}, []
-    if os.path.isdir(state):
-        for name in sorted(os.listdir(state)):
-            p = os.path.join(state, name)
-            if os.path.isfile(p):
-                with open(p, encoding="utf-8") as f:
-                    files[name] = f.read()
-        for d, _, names in os.walk(os.path.join(state, "aside")):
-            aside += [os.path.relpath(os.path.join(d, n), state).replace(os.sep, "/") for n in names]
-    status = [subprocess.run(["git", "status", "--porcelain", "-uall"], cwd=os.path.join(root, w["path"]), env=env,
-                             capture_output=True, text=True).stdout for w in s["watched"]]
-    out.append({"text": text, "tried": tried, "stderr": err.getvalue(), "decision": record.decision,
-                "reason": record.reason, "enforced": record.enforced, "code": record.code, "paths": list(record.paths),
-                "rules": list(record.rules), "detail": record.detail, "files": files, "aside": sorted(aside), "status": status})
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 type result struct {
 	Text     string            `json:"text"`
@@ -268,26 +200,20 @@ func normalized(t *testing.T, r result, root string) string {
 	return stamp.ReplaceAllString(text, "aside/<stamp>")
 }
 
+// compareScenario は場面を回し、呼び出しごとの答え（ルートと日時を置き換えたもの）を Go の答えの見本と比べる。
+// 見本は Python の post_findings と答えが揃っていた Go の答えから取った。
 func compareScenario(t *testing.T, s scenario, setup func(t *testing.T) string) {
 	t.Helper()
-	pyRoot, goRoot := setup(t), setup(t)
-	want := testkit.Answers[[]result](t, "", scenarioOracle,
-		map[string]any{"root": pyRoot, "scenario": s, "gitenv": testkit.GitEnv()})
-	got := runScenario(t, s, goRoot)
-	calls := 0
-	for i, st := range s.Steps {
-		if st.Op != "call" {
-			continue
-		}
-		g, w := normalized(t, got[calls], goRoot), normalized(t, want[calls], pyRoot)
-		if g != w {
-			t.Errorf("手順 %d（%s %s）:\nGo:\n%s\nPython:\n%s", i, st.Kind, st.Restore, g, w)
-		}
-		calls++
+	root := setup(t)
+	got := runScenario(t, s, root)
+	var seen []json.RawMessage
+	for _, r := range got {
+		seen = append(seen, json.RawMessage(normalized(t, r, root)))
 	}
-	if calls == 0 {
+	if len(seen) == 0 {
 		t.Fatal("呼び出しが無い")
 	}
+	golden.Check(t, strings.TrimPrefix(t.Name(), "Test"), seen)
 }
 
 func write(path, text string) step { return step{Op: "write", Path: path, Text: text} }

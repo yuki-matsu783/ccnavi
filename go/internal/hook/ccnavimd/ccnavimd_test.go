@@ -9,6 +9,7 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/tickets/testkit"
 )
@@ -201,18 +202,6 @@ func TestScriptConditions(t *testing.T) {
 	sameSet(t, "ScriptNames", ScriptNames(f.conf, f.root), set("unused"))
 }
 
-const sessionOracle = `
-import json, sys
-from ccnavi.hook import ccnavimd
-from ccnavi.infra import settings
-c = json.load(sys.stdin)
-conf = settings.load(c["root"])[0]
-out = []
-for docs, deny, mode in c["cases"]:
-    out.append(ccnavimd.session_text(conf, c["root"], docs, set(deny), mode))
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
-
 func sessionWorkspace(t *testing.T, md string) string {
 	root := testkit.TempRoot(t)
 	if md != "" {
@@ -223,6 +212,8 @@ func sessionWorkspace(t *testing.T, md string) string {
 	return root
 }
 
+// 決めた本文（条件の段・置き換え・長い本文・空）の組み立ては、Go の答えの見本（Python と答えが揃っていた Go の
+// 答えから取った）と比べる。リポジトリの CCNAVI.md は書き換わるので、段と置き換えが残らないことだけを見る。
 func TestSessionTextMatchesPython(t *testing.T) {
 	repo := testkit.RepoRoot(t)
 	data, err := os.ReadFile(filepath.Join(repo, ".ccnavi", File))
@@ -230,22 +221,27 @@ func TestSessionTextMatchesPython(t *testing.T) {
 		t.Fatal(err)
 	}
 	extra := "\n<!-- ccnavi:if mine -->\n- 自前 {{scratch}} {{projects}} {{tickets_dir}} {{mode_env}}\n<!-- ccnavi:endif -->\n"
+	fixed := "# 作業の決まり\n\n- 置き場 {{scratch}}\n<!-- ccnavi:if workspace-root -->\n- ルート\n<!-- ccnavi:endif -->\n" + extra
 	long := strings.Repeat("長い行。\n", 2000)
 	cases := [][]any{
 		{false, []string{}, "enable"},
 		{true, []string{"workspace-root"}, "dry-run"},
 	}
 	t.Setenv(env.ClaudeSessionAttended, "0")
-	for _, md := range []string{string(data) + extra, long, ""} {
-		pyRoot, goRoot := sessionWorkspace(t, md), sessionWorkspace(t, md)
-		want := testkit.Answers[[]string](t, "", sessionOracle, map[string]any{"root": pyRoot, "cases": cases})
-		conf := testkit.Settings(t, goRoot)
-		for i, c := range cases {
+	say := func(md string) []string {
+		root := sessionWorkspace(t, md)
+		conf := testkit.Settings(t, root)
+		var out []string
+		for _, c := range cases {
 			deny := set(c[1].([]string)...)
-			got := SessionText(conf, goRoot, c[0].(bool), deny, config.Mode(c[2].(string)))
-			if got = strings.ReplaceAll(got, goRoot, pyRoot); got != want[i] {
-				t.Errorf("case %d:\nGo:\n%s\nPython:\n%s", i, got, want[i])
-			}
+			out = append(out, strings.ReplaceAll(SessionText(conf, root, c[0].(bool), deny, config.Mode(c[2].(string))), root, "<root>"))
+		}
+		return out
+	}
+	for i, text := range say(string(data) + extra) {
+		if strings.Contains(text, "{{") || strings.Contains(text, "ccnavi:if") || strings.Contains(text, "ccnavi:endif") {
+			t.Errorf("case %d: 置き換えか条件の段が残った:\n%s", i, text)
 		}
 	}
+	golden.Check(t, "session", map[string][]string{"fixed": say(fixed), "long": say(long), "empty": say("")})
 }

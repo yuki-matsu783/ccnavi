@@ -11,11 +11,12 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/ospath"
 )
 
-// 守る対象の組み立てと、バックアップと戻しの手順を、Python と同じ並びで同じ形のディレクトリに当てて突き合わせる。
-// git のリポジトリとワークツリーを作るので、git と Python が無ければ飛ばす（パスが機械で変わるので写しは持たない）。
+// 守る対象の組み立てと、バックアップと戻しの手順を、決めた形のディレクトリに当てて Go の答えの見本（golden.Check）と
+// 比べる。パスは置き換えてから比べる。
 
 func gitRun(t *testing.T, dir string, args ...string) {
 	t.Helper()
@@ -104,16 +105,6 @@ func goLayers(in []layerJSON) []config.LayerFile {
 	return out
 }
 
-const targetsOracle = `
-import json, sys
-from ccnavi.infra import settings
-from ccnavi.policy import selfguard_targets as st
-c = json.load(sys.stdin)
-layers = [settings.LayerFile(l["origin"], l["layer"], l["kind"], l["path"]) for l in c["layers"]]
-found = st.targets(c["root"], c["rules"], c["bin"], layers, c["projects"])
-json.dump([{"key": t.key, "path": t.path, "label": t.label, "heavy": t.heavy, "top": t.top, "copy": t.copy} for t in found], sys.stdout)
-`
-
 type targetJSON struct {
 	Key   string `json:"key"`
 	Path  string `json:"path"`
@@ -122,6 +113,8 @@ type targetJSON struct {
 	Top   string `json:"top"`
 	Copy  bool   `json:"copy"`
 }
+
+var binPathKey = regexp.MustCompile(`bin-path-[0-9a-f]{8}`)
 
 func TestTargetsAgainstPython(t *testing.T) {
 	if ospath.Windows {
@@ -139,24 +132,23 @@ func TestTargetsAgainstPython(t *testing.T) {
 	}
 	t.Setenv("PATH", pathDir)
 	projects := filepath.Join(root, "projects")
+	var all []json.RawMessage
 	for _, c := range []struct{ rules, bin, projects string }{
 		{filepath.Join(root, ".ccnavi/config/common/rules.yml"), "", projects},
 		{filepath.Join(root, ".ccnavi/config/common/rules.yml"), launcher, projects},
 		{filepath.Join(dir, "outside", "rules.yml"), filepath.Join(dir, "bin", "ccnavi"), ""},
 		{"", "", ""},
 	} {
-		in := map[string]any{"root": root, "rules": c.rules, "bin": c.bin, "projects": c.projects, "layers": layersOf(root)}
-		want := answers[[]targetJSON](t, "", targetsOracle, in)
 		var got []targetJSON
 		for _, x := range Targets(root, c.rules, c.bin, goLayers(layersOf(root)), c.projects) {
 			got = append(got, targetJSON{x.Key, x.Path, x.Label, x.Heavy, x.Top, x.Copy})
 		}
-		gj, _ := json.MarshalIndent(got, "", " ")
-		wj, _ := json.MarshalIndent(want, "", " ")
-		if string(gj) != string(wj) {
-			t.Errorf("rules=%s bin=%s\n got  %s\n want %s", c.rules, c.bin, gj, wj)
-		}
+		data, _ := json.Marshal(got)
+		// PATH で見つけた実体の鍵は、絶対パスの要約を持つ。
+		norm := binPathKey.ReplaceAllString(strings.ReplaceAll(string(data), dir, "<dir>"), "bin-path-<digest>")
+		all = append(all, json.RawMessage(norm))
 	}
+	golden.Check(t, "targets", all)
 }
 
 // 手順の突き合わせ。op は write・remove・touch・step・wipe（バックアップの置き場ごと消す）。
@@ -169,42 +161,6 @@ type stepOp struct {
 	Setting string `json:"setting,omitempty"`
 	Session string `json:"session,omitempty"`
 }
-
-const stepsOracle = `
-import json, os, shutil, sys
-from ccnavi.policy import selfguard as sg, selfguard_targets as st
-c = json.load(sys.stdin)
-root, state = c["root"], c["state"]
-found = st.targets(root, os.path.join(root, ".ccnavi/config/common/rules.yml"), c["bin"], [], "")
-out = []
-for op in c["ops"]:
-    path = os.path.join(root, op.get("path", ""))
-    if op["op"] == "write":
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8", newline="") as f:
-            f.write(op["text"])
-        if op.get("mtime"):
-            os.utime(path, (op["mtime"], op["mtime"]))
-    elif op["op"] == "touch":
-        os.utime(path, (op["mtime"], op["mtime"]))
-    elif op["op"] == "remove":
-        if os.path.exists(path):
-            os.remove(path)
-    elif op["op"] == "wipe":
-        shutil.rmtree(os.path.join(state, sg.BACKUP_DIR, op.get("session", "")), ignore_errors=True)
-    else:
-        step = {"before": sg.before, "after": sg.after, "accept": sg.accept, "at_start": sg.at_start}[op["name"]]
-        got = step(op["setting"], state, op.get("session", ""), root, found)
-        out.append({"outcomes": [[o.target.key, o.action, o.detail] for o in got], "report": sg.report(root, got)})
-files = {}
-for rel in c["watch"]:
-    try:
-        with open(os.path.join(root, rel), encoding="utf-8", newline="") as f:
-            files[rel] = f.read()
-    except OSError:
-        files[rel] = None
-json.dump({"steps": out, "files": files}, sys.stdout, ensure_ascii=False)
-`
 
 type stepResult struct {
 	Outcomes [][3]string `json:"outcomes"`
@@ -328,19 +284,12 @@ func TestStepsAgainstPython(t *testing.T) {
 		},
 	}
 	watch := []string{settings, local, rulesRel, binRel, copyRel}
+	all := map[string]json.RawMessage{}
 	for name, ops := range scenarios {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			// 同じ形のワークスペースを 2 つ作り、片方に Python、片方に Go を当てる。
-			pyRoot, goRoot := workspace(t), workspace(t)
-			pyState, goState := filepath.Join(filepath.Dir(pyRoot), "state"), filepath.Join(filepath.Dir(goRoot), "state")
-			in := map[string]any{"root": pyRoot, "state": pyState, "bin": filepath.Join(pyRoot, binRel), "ops": ops, "watch": watch}
-			want := answers[stepsAnswer](t, "", stepsOracle, in)
-			got := goSteps(t, goRoot, goState, filepath.Join(goRoot, binRel), ops, watch)
-			g, w := normalized(got, goRoot, goState), normalized(want, pyRoot, pyState)
-			if g != w {
-				t.Errorf("Python と違う\n got  %s\n want %s", g, w)
-			}
-		})
+		root := workspace(t)
+		state := filepath.Join(filepath.Dir(root), "state")
+		got := goSteps(t, root, state, filepath.Join(root, binRel), ops, watch)
+		all[name] = json.RawMessage(normalized(got, root, state))
 	}
+	golden.Check(t, "steps", all)
 }

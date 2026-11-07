@@ -6,25 +6,10 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/difflib"
-	"ccnavi/internal/tickets/testkit"
+	"ccnavi/internal/infra/golden"
 )
 
 // 差分（difflib.unified_diff の写し）と、rules.yml の下書きが防御の記述を動かすかの判定を、Python の答えと突き合わせる。
-
-const partsOracle = `
-import base64, difflib, json, sys
-from ccnavi.tickets.sync import handoff
-c = json.load(sys.stdin)
-enc = lambda s: None if s is None else base64.b64decode(s)
-out = {"diff": [], "lines": [], "defense": []}
-for a, b in c["diff"]:
-    out["diff"].append(list(difflib.unified_diff(a, b, fromfile="a/x", tofile="b/x", n=3, lineterm="")))
-for raw in c["lines"]:
-    out["lines"].append(handoff.visible_lines(enc(raw)))
-for before, after in c["defense"]:
-    out["defense"].append(handoff._defense_change(enc(before), enc(after)))
-print(json.dumps(out))
-`
 
 type partsAnswers struct {
 	Diff    [][]string `json:"diff"`
@@ -125,9 +110,7 @@ func TestPartsMatchPython(t *testing.T) {
 	for _, c := range defenseCases {
 		defense = append(defense, [2]any{b64(c[0]), b64(c[1])})
 	}
-	answers := testkit.Answers[partsAnswers](t, "parts", partsOracle, map[string]any{
-		"diff": diffCases, "lines": lines, "defense": defense,
-	})
+	answers := golden.Load[partsAnswers](t, "parts")
 	for i, c := range diffCases {
 		got := difflib.UnifiedDiff(c[0], c[1], "a/x", "b/x", diffContext)
 		if strings.Join(got, "\n") != strings.Join(answers.Diff[i], "\n") {

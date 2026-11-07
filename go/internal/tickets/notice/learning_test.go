@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/records/wiki"
 	"ccnavi/internal/tickets/testkit"
@@ -40,19 +41,10 @@ func TestDecideLearning(t *testing.T) {
 	}
 }
 
-const statePathOracle = `
-import json, sys
-from ccnavi.infra import settings
-from ccnavi.tickets.notice import learning_notice
-c = json.load(sys.stdin)
-conf, _ = settings.load(c["root"])
-json.dump([learning_notice.state_path(conf, n).replace(c["root"], "<root>") for n in c["names"]], sys.stdout, ensure_ascii=False)
-`
-
 func TestLearningStatePath(t *testing.T) {
 	root := t.TempDir()
 	names := []string{"", "学習", "調査", "a b", "a_b", "a:b", "_self", "Foo", "foo", strings.Repeat("長い名前", 20)}
-	want := testkit.Answers[[]any](t, "statepath", statePathOracle, map[string]any{"root": root, "names": names})
+	want := golden.Load[[]any](t, "statepath")
 	conf := testkit.Settings(t, root)
 	seen := map[string]bool{}
 	var got []any
@@ -99,23 +91,6 @@ func publish(t *testing.T, path string, sources map[string]int, target string) {
 	testkit.Git(t, path, "fetch", "-q", "origin")
 }
 
-const learningOracle = `
-import json, sys
-from ccnavi.infra import settings
-from ccnavi.tickets.notice import learning_notice
-c = json.load(sys.stdin)
-conf, _ = settings.load(c["root"])
-text = learning_notice.notice(conf, c["root"])
-states = []
-for name in ("", "web"):
-    try:
-        with open(learning_notice.state_path(conf, name), encoding="utf-8") as f:
-            states.append(f.read())
-    except OSError:
-        states.append(None)
-json.dump({"text": text, "states": states}, sys.stdout, ensure_ascii=False)
-`
-
 // 同じ形のワークスペースを 2 つ作り、同じ順に変えながら、通知の文と通知済みの記録のバイト列が Python と同じことを
 // 見る。リポジトリごとに別に判定し、決められないリポジトリは見送って記録を変えない。
 func TestLearningMatchesPython(t *testing.T) {
@@ -131,11 +106,7 @@ func TestLearningMatchesPython(t *testing.T) {
 		learningRepo(t, filepath.Join(root, "projects", "web"))
 		return root
 	}
-	pyRoot, goRoot := build(), build()
-	both := func(change func(root string)) {
-		change(pyRoot)
-		change(goRoot)
-	}
+	goRoot := build()
 	five := map[string]int{"p0": 1, "p1": 1, "p2": 1, "p3": 1, "p4": 1}
 	steps := []struct {
 		name   string
@@ -155,8 +126,8 @@ func TestLearningMatchesPython(t *testing.T) {
 		}},
 	}
 	for _, step := range steps {
-		both(step.change)
-		want := testkit.Answers[map[string]any](t, "learning-"+step.name, learningOracle, map[string]any{"root": pyRoot})
+		step.change(goRoot)
+		want := golden.Load[map[string]any](t, "learning-"+step.name)
 		conf := testkit.Settings(t, goRoot)
 		text := Learning(conf, goRoot, time.Time{})
 		var states []any

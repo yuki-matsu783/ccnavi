@@ -9,39 +9,9 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/testkit"
 )
-
-// diagnoseOracle は Python の診断（entry/diagnose）を 1 件ずつ回し、終了コード・標準出力・標準エラーを返す。
-// 出力のワークスペースルートは <root> に、ボードの generated_at は固定の値にする（normalize と同じ）。
-const diagnoseOracle = `
-import io, json, re, sys
-from ccnavi.infra import settings
-from ccnavi.entry import diagnose
-c = json.load(sys.stdin)
-root = c["root"]
-def norm(text):
-    text = text.replace(json.dumps(root)[1:-1], "<root>").replace(root, "<root>")
-    return re.sub(r'"generated_at": "[^"]*"', '"generated_at": "-"', text)
-out = []
-for case in c["cases"]:
-    conf, _ = settings.load(root)
-    o, e = io.StringIO(), io.StringIO()
-    kind = case["kind"]
-    call = diagnose.Call(cwd=case.get("cwd", ""), permission_mode=case.get("pm", ""), agent_id=case.get("agent", ""))
-    if kind == "test":
-        code = diagnose.test(o, e, conf, root, case["tool"], case["subject"], call)
-    elif kind == "test_json":
-        code = diagnose.test_json(o, e, conf, root, case["tool"], case["subject"], call)
-    elif kind == "expect":
-        code = diagnose.test_expectations(o, e, conf, root, case["path"], case.get("json", False))
-    elif kind == "explain":
-        code = diagnose.explain(o, e, conf, root)
-    else:
-        code = diagnose.explain_json(o, e, conf, root, case.get("mode", ""), case.get("tc", ""))
-    out.append({"code": code, "stdout": norm(o.getvalue()), "stderr": norm(e.getvalue())})
-print(json.dumps(out, ensure_ascii=False))
-`
 
 type diagCase struct {
 	Kind    string `json:"kind"`
@@ -110,7 +80,7 @@ func compare(t *testing.T, name, root string, cases []diagCase) {
 	for i, c := range cases {
 		sent[i] = c.at(root)
 	}
-	want := testkit.Answers[[]diagAnswer](t, name, diagnoseOracle, map[string]any{"root": root, "cases": sent})
+	want := golden.Load[[]diagAnswer](t, name)
 	if len(want) != len(cases) {
 		t.Fatalf("答えの数 %d が cases の数 %d と違う", len(want), len(cases))
 	}

@@ -9,33 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/records/prune"
 	"ccnavi/internal/tickets/testkit"
 )
-
-const outcomeOracle = `
-import json, os, sys
-from ccnavi.hook import subagent_outcome as so
-c = json.load(sys.stdin)
-d = c["dir"]
-def one(o):
-    if o is None:
-        return None
-    return [o.agent_id, o.child, o.outcome, o.bounces, o.paths, o.final, o.notified, o.nudged, so.line(o)]
-out = {"of": [one(so.of(d, "s1", w)) for w in c["who"]]}
-text, done = so.notices(d, "s1")
-out["notices"] = [text, [o.agent_id for o in done], so.confirm(d, done), so.notices(d, "s1")[0]]
-out["stop"] = [so.stop_lines(d, "s1"), so.stop_lines(d, "s1")]
-for w in c["nudge"]:
-    so.mark_nudged(d, "s1", w)
-files = {}
-for n in sorted(os.listdir(d)):
-    with open(os.path.join(d, n), encoding="utf-8") as f:
-        files[n] = f.read()
-out["files"] = files
-print(json.dumps(out, ensure_ascii=False))
-`
 
 // fixture は記録の置き場の見本。確定・確定前・別のセッション・壊れたもの・手で直した型の違うもの。
 var fixture = map[string]string{
@@ -81,8 +59,7 @@ type pyAnswer struct {
 func TestAgainstPython(t *testing.T) {
 	who := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "missing", ""}
 	nudge := []string{"g", "h", "c", "b"}
-	want := testkit.Answers[pyAnswer](t, "outcome", outcomeOracle,
-		map[string]any{"dir": putFixture(t), "who": who, "nudge": nudge})
+	want := golden.Load[pyAnswer](t, "outcome")
 
 	dir := putFixture(t)
 	var got pyAnswer

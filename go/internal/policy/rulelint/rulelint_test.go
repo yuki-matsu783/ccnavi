@@ -3,45 +3,16 @@ package rulelint
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/policy/ctxfile"
 )
 
-// Python の rule_lint と突き合わせる。リポジトリの .venv の Python が無ければ飛ばす。
-
-func repoRoot(t *testing.T) string {
-	t.Helper()
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "src", "ccnavi")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Skip("リポジトリの src/ccnavi が無い")
-		}
-		dir = parent
-	}
-}
-
-const lintOracle = `
-import json, sys
-from ccnavi.policy import rule_lint
-out = []
-for case in json.load(sys.stdin):
-    out.append([str(p) for p in rule_lint.file_problems(case["path"], case["root"], case["home"], case["layer"], case["project"])])
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
+// Python の rule_lint の答えの写し（testdata）と突き合わせる。
 
 type lintCase struct {
 	Path    string `json:"path"`
@@ -79,66 +50,6 @@ func masked(s, root string) string {
 	return strings.ReplaceAll(s, root, rootMark)
 }
 
-func askPython(t *testing.T, py, repo string, cases []lintCase) [][]string {
-	t.Helper()
-	data, _ := json.Marshal(cases)
-	cmd := exec.Command(py, "-c", lintOracle)
-	cmd.Env = append(os.Environ(), "PYTHONPATH="+filepath.Join(repo, "src"), "PYTHONDONTWRITEBYTECODE=1")
-	cmd.Stdin = bytes.NewReader(data)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("python: %v\n%s", err, stderr.String())
-	}
-	var want [][]string
-	if err := json.Unmarshal(out, &want); err != nil {
-		t.Fatal(err)
-	}
-	return want
-}
-
-// Python の答えは testdata に写して持つ。Python があれば聞き直して写しと比べ（食い違えば -update で取り直す）、
-// 無ければ写しを読む。
-var update = flag.Bool("update", false, "testdata の Python の答えを取り直す")
-
-const golden = "testdata/file_problems.json"
-
-func answers(t *testing.T, py, repo, root string, cases []lintCase) [][]string {
-	t.Helper()
-	var saved [][]string
-	data, readErr := os.ReadFile(golden)
-	if readErr == nil {
-		if err := json.Unmarshal(data, &saved); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if py == "" {
-		if readErr != nil {
-			t.Skip("Python も testdata の写しも無い")
-		}
-		return saved
-	}
-	fresh := askPython(t, py, repo, cases)
-	for _, list := range fresh {
-		for i := range list {
-			list[i] = masked(list[i], root)
-		}
-	}
-	got, _ := json.Marshal(fresh)
-	if *update {
-		if err := os.MkdirAll("testdata", 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(golden, append(got, '\n'), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	} else if readErr != nil || !bytes.Equal(bytes.TrimSpace(data), got) {
-		t.Errorf("%s が Python の答えと違う（go test -run %s -update で取り直す）", golden, t.Name())
-	}
-	return fresh
-}
-
 func rule(kv ...any) map[string]any {
 	m := map[string]any{}
 	for i := 0; i+1 < len(kv); i += 2 {
@@ -148,11 +59,6 @@ func rule(kv ...any) map[string]any {
 }
 
 func TestFileProblemsAgainstPython(t *testing.T) {
-	repo := repoRoot(t)
-	py := filepath.Join(repo, ".venv", "bin", "python")
-	if _, err := os.Stat(py); err != nil {
-		py = ""
-	}
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -230,15 +136,7 @@ func TestFileProblemsAgainstPython(t *testing.T) {
 	cases = append(cases, lintCase{Path: filepath.Join(root, "list.yml"), Root: root})
 	write(t, filepath.Join(root, "bin.yml"), "\xff\xfe")
 	cases = append(cases, lintCase{Path: filepath.Join(root, "bin.yml"), Root: root})
-	if py != "" {
-		// 共通のルールファイルは書き換わるので写しに入れない（Python があるときだけ見る）。
-		shared := lintCase{Path: filepath.Join(repo, ".ccnavi", "config", "common", "rules.yml"), Root: repo}
-		want := askPython(t, py, repo, []lintCase{shared})
-		if got := problemsOf(shared, ""); !slices.Equal(got, want[0]) {
-			t.Errorf("共通のルールファイル\n got  %q\n want %q", got, want[0])
-		}
-	}
-	want := answers(t, py, repo, root, cases)
+	want := golden.Load[[][]string](t, "file_problems")
 	bad := 0
 	for i, c := range cases {
 		got := problemsOf(c, root)

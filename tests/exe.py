@@ -21,6 +21,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -145,3 +146,14 @@ def _drop_stale(base: str) -> None:
         with contextlib.suppress(OSError):
             if os.path.getmtime(place) < limit:
                 shutil.rmtree(place)
+
+
+def host_target() -> str:
+    """この機械の `<os>-<arch>`。sh（uname）とは別の読み方で求める（sh の語が食い違えば落ちる）。
+
+    語は scripts/ccnavi-build.sh の --target と go/internal/infra/platformtag と同じ。
+    """
+    system = {"win32": "windows", "darwin": "darwin"}.get(sys.platform, "linux")
+    machine = platform.machine().lower()
+    arch = {"amd64": "x86_64", "x86_64": "x86_64", "aarch64": "arm64", "arm64": "arm64"}
+    return f"{system}-{arch.get(machine, machine)}"

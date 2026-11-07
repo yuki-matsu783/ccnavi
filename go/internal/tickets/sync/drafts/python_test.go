@@ -10,49 +10,15 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/proposal/templates"
-	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の tickets/sync/template_drafts と同じワークスペースで、閉じるときの案内・下書きの作成（断る理由と、
 // 書いた下書きのバイト列）・全ツリーの下書きの答えと --lint の苦情が 1 字も違わないことを見る。
 // Python 側と Go 側は同じ中身の別のディレクトリで、同じ順に呼ぶ。ルートのパスは ROOT に置き換えて比べる。
-
-const draftsOracle = `
-import hashlib, json, os, sys
-from ccnavi.infra import settings
-from ccnavi.tickets.proposal import plan_templates
-from ccnavi.tickets.sync import template_drafts as td
-c = json.load(sys.stdin)
-root = c["root"]
-esc = json.dumps(root)[1:-1]
-dump = lambda v: json.dumps(v, ensure_ascii=True, indent=1).replace(esc, "ROOT")
-conf, _ = settings.load(root)
-out = []
-for call in c["calls"]:
-    if call[0] == "notice":
-        out.append(td.close_notice(conf, root, call[1]).replace(root, "ROOT"))
-    elif call[0] == "make":
-        m = td.make(conf, root, call[1], call[2], to=call[3], layer=call[4])
-        out.append(dump({"ok": m.ok, "error": m.error, "name": m.name, "path": m.rel, "target": m.target,
-            "layer": m.layer, "sha": m.sha, "tree": m.tree, "tree_root": m.tree_root, "notes": m.notes,
-            "problems": [{"severity": p.severity, "rule": p.rule, "detail": p.detail} for p in m.problems],
-            "template": plan_templates.dump(m.template) if m.template else ""}))
-    else:
-        scanned = plan_templates.scan(conf, root)
-        found = td.scan(conf, root, scanned.candidates)
-        out.append(dump({"drafts": [td.draft_json(d, scanned) for d in found.drafts],
-            "lint": [{"severity": p.severity, "rule": p.rule, "detail": p.detail} for p in td.lint_problems(found)]}))
-files = {}
-for parent, dirs, names in os.walk(root):
-    for n in names:
-        full = os.path.join(parent, n)
-        with open(full, "rb") as f:
-            files[os.path.relpath(full, root).replace(os.sep, "/")] = hashlib.sha256(f.read()).hexdigest()
-print(json.dumps({"out": out, "files": files}))
-`
 
 type draftsAnswer struct {
 	Out   []string          `json:"out"`
@@ -267,7 +233,7 @@ func TestMatchesPython(t *testing.T) {
 	py, mine := filepath.Join(top, "py"), filepath.Join(top, "go")
 	lay(t, py)
 	lay(t, mine)
-	answer := testkit.Answers[draftsAnswer](t, "drafts", draftsOracle, map[string]any{"root": py, "calls": calls})
+	answer := golden.Load[draftsAnswer](t, "drafts")
 	conf, _ := config.Load(mine)
 	for i, c := range calls {
 		if got := goCall(t, conf, mine, c); got != answer.Out[i] {

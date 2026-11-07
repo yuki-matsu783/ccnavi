@@ -47,7 +47,7 @@ sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>
               cwd がその中なら削除しません。ブランチは残す。このときの <名前> はチケットの識別子
               （.claude/worktrees/<識別子>）だけを受ける。識別子の形でない名前は断る
 
-削除するもの: node_modules / .venv / __pycache__ などのキャッシュと、印のファイル（package.json・Cargo.toml など）の隣の out / dist / .cache / target / build（一覧は worktrees.py）
+削除するもの: node_modules / .venv / __pycache__ などのキャッシュと、印のファイル（package.json・Cargo.toml など）の隣の out / dist / .cache / target / build（一覧は go/internal/tickets/lifecycle/worktrees/clean.go）
 未コミットの変更があるワークツリーでは、何も削除せずに止まる
 USAGE
 }

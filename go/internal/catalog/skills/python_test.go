@@ -8,19 +8,12 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/testkit"
 )
 
-// Python の projskills.index と突き合わせる。名前・説明の読み方、1 行への畳み方、上限での切り方を見る。
-
-const indexOracle = `
-import json, sys
-from ccnavi.catalog import projskills
-from ccnavi.infra import settings
-c = json.load(sys.stdin)
-conf = settings.load(c["root"])[0]
-json.dump([projskills.index(conf, c["root"], cwd) for cwd in c["cwds"]], sys.stdout, ensure_ascii=False)
-`
+// 目録の名前・説明の読み方、1 行への畳み方、上限での切り方を、Go の答えの見本（golden.Check）と比べる。
+// 見本は Python の projskills.index と答えが揃っていた Go の答えから取った。
 
 var indexSkills = map[string]string{
 	"deploy":     skill("deploy", "本番へ出す手順"),
@@ -56,22 +49,21 @@ func indexFixture(t *testing.T, extra int) (string, []string) {
 }
 
 func TestIndexMatchesPython(t *testing.T) {
+	got := map[string][]string{}
 	for _, extra := range []int{0, 40} {
-		pyRoot, pyCwds := indexFixture(t, extra)
-		goRoot, goCwds := indexFixture(t, extra)
-		want := testkit.Answers[[]string](t, "", indexOracle, map[string]any{"root": pyRoot, "cwds": pyCwds})
-		if !strings.Contains(want[0], "- deploy:") {
-			t.Fatalf("Python の目録 = %q", want[0])
-		}
-		conf := testkit.Settings(t, goRoot)
-		for i, cwd := range goCwds {
-			got := ""
-			if project := projectOf(conf, goRoot, cwd); project != "" {
-				got = index(conf, project)
+		root, cwds := indexFixture(t, extra)
+		conf := testkit.Settings(t, root)
+		for _, cwd := range cwds {
+			said := ""
+			if project := projectOf(conf, root, cwd); project != "" {
+				said = index(conf, project)
 			}
-			if got = strings.ReplaceAll(got, goRoot, pyRoot); got != want[i] {
-				t.Errorf("extra=%d cwd=%s:\nGo:\n%s\nPython:\n%s", extra, cwd, got, want[i])
-			}
+			key := strconv.Itoa(extra)
+			got[key] = append(got[key], strings.ReplaceAll(said, root, "<root>"))
 		}
 	}
+	if !strings.Contains(got["0"][0], "- deploy:") {
+		t.Fatalf("目録 = %q", got["0"][0])
+	}
+	golden.Check(t, "index", got)
 }

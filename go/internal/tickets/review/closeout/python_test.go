@@ -12,6 +12,7 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/lifecycle/ops"
 	"ccnavi/internal/tickets/testkit"
 )
@@ -77,73 +78,14 @@ func workspace(t *testing.T) string {
 	return root
 }
 
-const flowOracle = `
-import io, json, os, subprocess, sys
-from ccnavi.infra import fsio, settings
-from ccnavi.tickets.lifecycle import commands
-from ccnavi.tickets.review import close
-c = json.load(sys.stdin)
-root = c["root"]
-tree = os.path.join(root, ".claude", "worktrees", "i0001")
-logs = os.path.join(root, "logs")
-env = dict(os.environ, **dict(kv.split("=", 1) for kv in c["env"]))
-def git(*args, cwd=tree):
-    subprocess.run(["git", *args], cwd=cwd, env=env, check=True, capture_output=True)
-def rel(s):
-    return s.replace(root, "<root>").replace(root.lower(), "<root>")
-conf, _ = settings.load(root)
-out = []
-def run(name, f, *args, **kw):
-    o, e = io.StringIO(), io.StringIO()
-    code = f(o, e, *args, **kw)
-    out.append([name, code, rel(o.getvalue()), rel(e.getvalue())])
-def early(name, answer, reason, result, **kw):
-    run(name, lambda o, e: close.close_early(io.StringIO(answer), o, e, root, conf, tree, reason,
-        os.path.join(logs, result), **kw))
-def commit(message):
-    git("add", "-A")
-    git("commit", "-q", "-m", message)
-    git("push", "-q", "origin", "i0001")
-plan = os.path.join(conf.state, "accept-plan.json")
-with fsio.clock(c["clock"]):
-    run("check-ready", close.check_ready, root, conf, tree)
-    run("ready-refused", close.ready, root, conf, tree, os.path.join(logs, "threads.json"))
-    early("early-noreason", "y\n", "  ", "threads.json")
-    early("early-changes", "y\n", "r", "changes.json")
-    early("early-declined", "n\n", "r", "threads.json")
-    early("early-plan", " Yes \n", " 今期はここまで ", "threads.json", plan_out=plan)
-    early("early-check", "", "今期はここまで", "threads.json", plan_check=plan)
-    early("early-check-changed", "", "今期はここまで", "fewer.json", plan_check=plan)
-    early("early-done-open", "", "今期はここまで", "threads.json", plan_done=plan)
-    early("early-done", "", "今期はここまで", "resolved.json", plan_done=plan)
-    commit("close early")
-    run("finish", commands.finish, root, conf, "i0001")
-    commit("finish")
-    run("check-ready-ok", close.check_ready, root, conf, tree)
-    run("ready", close.ready, root, conf, tree, os.path.join(logs, "resolved.json"))
-    commit("ready")
-    run("ready-again", close.ready, root, conf, tree, os.path.join(logs, "resolved.json"))
-    run("ready-undrafted", close.ready, root, conf, tree, os.path.join(logs, "undrafted.json"))
-    run("check-ready-again", close.check_ready, root, conf, tree)
-files = {}
-for base in (os.path.join(tree, ".ccnavi", "approved"), os.path.join(tree, "wip"), os.path.join(logs, "state"),
-             os.path.join(logs, "archive")):
-    for here, _, names in os.walk(base):
-        for n in names:
-            p = os.path.join(here, n)
-            with open(p, encoding="utf-8") as f:
-                files[rel(p).replace(os.sep, "/")] = rel(f.read())
-json.dump({"out": out, "files": files}, sys.stdout, ensure_ascii=False)
-`
-
 type flowAnswers struct {
 	Out   [][]any           `json:"out"`
 	Files map[string]string `json:"files"`
 }
 
 func TestFlowMatchesPython(t *testing.T) {
-	py, golang := workspace(t), workspace(t)
-	want := testkit.Answers[flowAnswers](t, "flow", flowOracle, map[string]any{"root": py, "env": testkit.GitEnv(), "clock": fixedClock})
+	golang := workspace(t)
+	want := golden.Load[flowAnswers](t, "flow")
 	root := golang
 	// ready の目印はツリーのパスを畳んで書く。
 	rel := func(s string) string {

@@ -5,32 +5,13 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の entry/status と同じワークスペースを読ませ、出力・標準エラー・終了コードが 1 字も違わないことを見る。
 // 置き場のファイルの git での姿（push 済み・未 push・変更あり・未コミット・追跡参照なし）、作業中・レビュー待ち・閉じた
 // （完了・取り消し）・承認待ち・改版・同じ識別子が 2 か所、先行の待ち、親子の引数の読み（子の識別子・無い親・2 件）を並べる。
-
-const statusOracle = `
-import io, json, sys
-from ccnavi.infra import settings
-from ccnavi.entry import status
-from ccnavi.tickets.approval import write_and_push
-c = json.load(sys.stdin)
-root = c["root"]
-conf, _ = settings.load(root)
-out = []
-for args in c["args"]:
-    o, e = io.StringIO(), io.StringIO()
-    if len(args) > 1:
-        e.write("ccnavi: ticket status に指定できる親チケットは1件のみです。\n")
-        code = 1
-    else:
-        code = status.run(o, e, root, conf, write_and_push.family_of(args[0]) if args else "")
-    out.append([code, o.getvalue().replace(root, "<root>"), e.getvalue().replace(root, "<root>")])
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 func statusWorkspace(t *testing.T) string {
 	root := testkit.Workspace(t, "i0001", "i0001-01-01")
@@ -66,7 +47,7 @@ func statusWorkspace(t *testing.T) string {
 func TestRunMatchesPython(t *testing.T) {
 	root := statusWorkspace(t)
 	args := [][]string{{}, {"i0001"}, {"i0001-02-01"}, {"i0002"}, {"i0009"}, {"i0001", "i0002"}}
-	want := testkit.Answers[[][3]any](t, "run", statusOracle, map[string]any{"root": root, "args": args})
+	want := golden.Load[[][3]any](t, "run")
 	conf := testkit.Settings(t, root)
 	for i, a := range args {
 		var out, errOut strings.Builder

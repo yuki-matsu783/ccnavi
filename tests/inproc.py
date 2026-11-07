@@ -11,8 +11,9 @@ subprocess.run と同じ形（引数のリスト、input、env、cwd）を受け
 - 起こす前に、実行ファイルが使うワークスペースルートに文面ファイル（`.ccnavi/messages/`）が
   無ければ、このリポジトリの文面をコピーする（`put_messages`）。文を見るテストの大半は、文面を
   気にしない使い捨ての木を組むので、木ごとにコピーさせない。文面ファイルを置いた木（壊れた文面を
-  試す木を含む）には触らない。木が git のリポジトリなら、コピーした文面を `.git/info/exclude` に
-  書いて git から見えなくする（未追跡の保護対象として、判定や報告に混ざらないように）。
+  試す木を含む）と、このリポジトリの中の木（`tests/fixtures` など）には触らない。木が git の
+  リポジトリなら、コピーした文面を `.git/info/exclude` に書いて git から見えなくする（未追跡の
+  保護対象として、判定や報告に混ざらないように）。
   `.ccnavi/` の無い木そのものを試すテストは `messages=False` を渡す
 """
 
@@ -91,8 +92,15 @@ def same_path(a: str, b: str) -> bool:
     return _fold(a) == _fold(b)
 
 
+def _inside_repo(path: str) -> bool:
+    """このリポジトリ（ROOT）か、その下か。"""
+    folded, repo = _fold(path), _fold(ROOT)
+    return folded == repo or folded.startswith(repo.rstrip(os.sep) + os.sep)
+
+
 def _put_messages_when_absent(root: str) -> None:
-    if not root or not os.path.isdir(root) or same_path(root, ROOT):
+    # リポジトリの中（tests/fixtures など）に写すと、作業ツリーに追跡されないファイルが残る。
+    if not root or not os.path.isdir(root) or _inside_repo(root):
         return
     if os.path.lexists(os.path.join(root, ".ccnavi", "messages")):
         return

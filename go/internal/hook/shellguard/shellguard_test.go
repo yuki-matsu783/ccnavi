@@ -5,11 +5,11 @@ import (
 	"math/rand/v2"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/testkit"
@@ -224,50 +224,6 @@ func sgCases(root string) []sgCase {
 	return out
 }
 
-const shellguardOracle = `
-import json, os, sys
-from ccnavi.hook import parentwrite, rootwrite, wrapguard
-from ccnavi.infra import settings, shellread
-from ccnavi.policy import rules
-c = json.load(sys.stdin)
-root = c["root"]
-conf, _ = settings.load(root)
-rule_set, _ = rules.load(os.path.join(root, ".ccnavi", "config", "common", "rules.yml"), root)
-def rel(s):
-    return s.replace(root, "<root>")
-out = []
-for k in c["cases"]:
-    cwd = os.path.join(root, k["cwd"]) if k["cwd"] else root
-    cmd = k["command"]
-    r = shellread.read(cmd)
-    layers = (r.unwrapped.split(shellread.SEP) if r.unwrapped else []) + [x for x in r.moved.split(shellread.SEP) if x]
-    deg = r.degraded
-    script, names = wrapguard.check_env(cmd, deg)
-    name, parent, _ = wrapguard.check_child_push(conf, root, cwd, cmd, deg)
-    sub, word, kind = wrapguard.check_core_paths(conf, root, cwd, cmd, deg)
-    tsub, tname = wrapguard.check_parent_tree_git(conf, root, cwd, cmd, deg)
-    what, where, wkind = parentwrite.check(conf, root, cwd, cmd, deg, layers)
-    target, path, rule, origin = rootwrite.check(rule_set, cwd, cmd, layers)
-    calls = [[a, None if p is None else rel(p)] for a, p in wrapguard.git_calls(cwd, cmd, deg, "commit")]
-    said = []
-    if names:
-        said.append(wrapguard.env_message(root, script, names))
-    if name:
-        said.append(wrapguard.child_push_message(root, name, parent))
-    if sub:
-        said.append(wrapguard.core_path_message(root, sub, word, kind))
-    if tname:
-        said.append(wrapguard.parent_tree_message(root, tsub, tname))
-    if where:
-        said.append(wrapguard.parent_write_message(root, what, where, wkind))
-    if target:
-        said.append(rootwrite.message(root, target, path, origin))
-    out.append([[script if names else "", names], [name, parent], [sub, rel(word), kind], [tsub, tname],
-                [rel(what), where, wkind if where else ""], [rel(target), rel(path), rule.id if rule else "", rel(origin)],
-                calls, [rel(s) for s in said]])
-print(json.dumps(out))
-`
-
 func goAnswer(t *testing.T, root string, set *rules.RuleSet, k sgCase) []any {
 	t.Helper()
 	conf := testkit.Settings(t, root)
@@ -336,35 +292,22 @@ func goAnswer(t *testing.T, root string, set *rules.RuleSet, k sgCase) []any {
 	}
 }
 
-func normalized(t *testing.T, v any) any {
-	t.Helper()
-	data, err := json.Marshal(v)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var out any
-	if err := json.Unmarshal(data, &out); err != nil {
-		t.Fatal(err)
-	}
-	return out
-}
-
+// TestMatchesPython は表の命令の読みと判定を、Go の答えの見本（Python と答えが揃っていた Go の答えから取った）と比べる。
 func TestMatchesPython(t *testing.T) {
 	root := workspace(t)
-	all := sgCases(root)
-	want := testkit.Answers[[]any](t, "", shellguardOracle, map[string]any{"root": root, "cases": all})
 	set, _, err := rules.Load(filepath.Join(root, ".ccnavi", "config", "common", "rules.yml"), root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i, k := range all {
-		got := normalized(t, goAnswer(t, root, set, k))
-		if !reflect.DeepEqual(got, want[i]) {
-			g, _ := json.Marshal(got)
-			w, _ := json.Marshal(want[i])
-			t.Errorf("cwd=%q %q\nGo:     %s\nPython: %s", k.Cwd, k.Command, g, w)
+	var seen []json.RawMessage
+	for _, k := range sgCases(root) {
+		data, err := json.Marshal(goAnswer(t, root, set, k))
+		if err != nil {
+			t.Fatal(err)
 		}
+		seen = append(seen, json.RawMessage(strings.ReplaceAll(string(data), root, "<root>")))
 	}
+	golden.Check(t, "answers", seen)
 }
 
 func TestBlocked(t *testing.T) {

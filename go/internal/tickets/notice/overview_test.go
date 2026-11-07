@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/approval"
 	"ccnavi/internal/tickets/testkit"
@@ -48,34 +49,9 @@ func overviewWorkspace(t *testing.T) string {
 	return root
 }
 
-const overviewOracle = `
-import json, sys
-from ccnavi.infra import settings
-from ccnavi.tickets.approval import store as approval
-from ccnavi.tickets.notice import overview
-c = json.load(sys.stdin)
-root = c["root"]
-def rel(s):
-    return s.replace(root, "<root>")
-conf, _ = settings.load(root)
-raw = approval.read_raw(conf, root)
-doing, _ = approval.scan(conf, root, raw=raw)
-closed, _ = approval.scan(conf, root, closed=True, raw=raw)
-review, _ = approval.scan_review(conf, root, raw=raw)
-proposals, _ = approval.scan_proposals(conf, root, raw.everything)
-rows = overview.collect(conf, root, doing, review, closed, proposals)
-json.dump({
-    "rows": [[r.ident, rel(r.path), r.branch, r.mr, r.next_child, r.unsent, r.project] for r in rows],
-    "lines": [overview.line(r) for r in rows],
-    "children": [[list(x) for x in overview.child_states(root, r, doing, review)] for r in rows],
-    "remote": [overview.remote_info(r.path) for r in rows],
-    "text": overview.session_text(conf, root),
-}, sys.stdout, ensure_ascii=False)
-`
-
 func TestOverviewMatchesPython(t *testing.T) {
 	root := overviewWorkspace(t)
-	want := testkit.Answers[map[string]any](t, "overview", overviewOracle, map[string]any{"root": root})
+	want := golden.Load[map[string]any](t, "overview")
 	conf := testkit.Settings(t, root)
 	raw := approval.ReadRaw(conf, root)
 	doing, _ := approval.Scan(conf, root, false, raw)

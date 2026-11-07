@@ -3,9 +3,7 @@ package builtin
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -13,16 +11,14 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyre"
 	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/policy/texts"
 )
 
-// 組み込みのルールの並び・id・式・文面・当たり方を Python の builtin と突き合わせる。Python の答えは testdata に
-// 写して持ち、Python があれば聞き直して写しと比べる（食い違えば -update で取り直す）。
-
-var update = flag.Bool("update", false, "testdata の Python の答えを取り直す")
+// 組み込みのルールの並び・id・式・文面・当たり方を、Python の builtin の答えの写し（testdata）と突き合わせる。
 
 const rootMark = "{ROOT}"
 
@@ -42,20 +38,6 @@ func repoRoot(t *testing.T) string {
 		}
 		dir = parent
 	}
-}
-
-func venvPython(root string) string {
-	for _, rel := range []string{".venv/bin/python", ".venv/Scripts/python.exe"} {
-		if p := filepath.Join(root, rel); fileExists(p) {
-			return p
-		}
-	}
-	return ""
-}
-
-func fileExists(p string) bool {
-	_, err := os.Stat(p)
-	return err == nil
 }
 
 // copyDir は文面ファイルの置き場を写す（文は拒否に当たった回に root の文面ファイルから引く）。
@@ -114,51 +96,6 @@ func settingsFor(root string, moved bool) *config.Settings {
 	}
 	return conf
 }
-
-const oracle = `
-import json, os, re, sys
-from ccnavi.infra import settings, shellread
-from ccnavi.policy import builtin, texts
-case = json.load(sys.stdin)
-out = []
-for ws in case["workspaces"]:
-    root = ws["root"]
-    conf = settings.Settings(project_home=settings.DEFAULT_PROJECT_HOME)
-    if ws["moved"]:
-        conf.bin = os.path.join(root, "bin", "ccnavi")
-        common = os.path.join(root, "conf", "x")
-        conf.rules = os.path.join(common, "rules.yml")
-        conf.phases = os.path.join(common, "phases.yml")
-        conf.risk = os.path.join(common, "risks.yml")
-    spelled = "[\\\\/]".join(re.escape(p) for p in root.split(os.sep))
-    mark = lambda s: s.replace(root, "{ROOT}").replace(spelled, "{ROOT}")
-    def view(r):
-        return {
-            "id": r.id, "decision": r.decision, "match": r.match, "base": r.base,
-            "pattern": mark(r.compiled.pattern) if r.compiled else "",
-            "text": r.message_id,
-            "values": {k: mark(v) for k, v in r.message_values.items()},
-            "variants": r.message_variants,
-            "spoken": mark(texts.spoken(r)),
-        }
-    full, p1 = builtin.load(root, conf)
-    base, p2 = builtin.load_base(root)
-    allow = builtin.read_allow()
-    every = [*full.all(), *base.all(), *allow]
-    hits = []
-    for tool, written in case["calls"]:
-        written = written.replace("{ROOT}", root)
-        subject = (shellread.read(written).text or written) if tool == "Bash" else written
-        hits.append([r.id for r in every if r.matches(tool, subject)])
-    out.append({
-        "load": [view(r) for r in full.all()],
-        "base": [view(r) for r in base.all()],
-        "allow": [view(r) for r in allow],
-        "problems": [str(p) for p in [*p1, *p2]],
-        "hits": hits,
-    })
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 type ruleView struct {
 	ID       string            `json:"id"`
@@ -293,60 +230,13 @@ func goAnswer(ws wsCase) answer {
 	return a
 }
 
-// pythonAnswers は Python の答え。写し（testdata）があれば比べ、Python が無ければ写しを返す。
-func pythonAnswers(t *testing.T, cases []wsCase) []answer {
-	t.Helper()
-	path := filepath.Join("testdata", "builtin.json")
-	var saved []answer
-	data, readErr := os.ReadFile(path)
-	if readErr == nil {
-		if err := json.Unmarshal(data, &saved); err != nil {
-			t.Fatal(err)
-		}
-	}
-	repo := repoRoot(t)
-	py := venvPython(repo)
-	if py == "" {
-		if readErr != nil {
-			t.Skip("Python も testdata の写しも無い")
-		}
-		return saved
-	}
-	in, _ := json.Marshal(map[string]any{"workspaces": cases, "calls": calls})
-	cmd := exec.Command(py, "-c", oracle)
-	cmd.Env = append(os.Environ(), "PYTHONPATH="+filepath.Join(repo, "src"), "PYTHONDONTWRITEBYTECODE=1")
-	cmd.Stdin = bytes.NewReader(in)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	got, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("python: %v\n%s", err, stderr.String())
-	}
-	var fresh []answer
-	if err := json.Unmarshal(got, &fresh); err != nil {
-		t.Fatalf("%v\n%s", err, got)
-	}
-	again, _ := json.Marshal(fresh)
-	if *update {
-		if err := os.MkdirAll("testdata", 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, append(again, '\n'), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	} else if readErr != nil || !bytes.Equal(bytes.TrimSpace(data), again) {
-		t.Errorf("%s が Python の答えと違う（go test -run %s -update で取り直す）", path, t.Name())
-	}
-	return fresh
-}
-
 func TestMatchesPython(t *testing.T) {
 	cases := []wsCase{
 		{Root: workspace(t, false)},
 		{Root: workspace(t, true)},
 		{Root: workspace(t, true), Moved: true},
 	}
-	want := pythonAnswers(t, cases)
+	want := golden.Load[[]answer](t, "builtin")
 	if len(want) != len(cases) {
 		t.Fatalf("Python の答えが %d 件（%d 件のはず）", len(want), len(cases))
 	}

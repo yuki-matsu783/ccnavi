@@ -5,40 +5,12 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の entry/sh_ask と同じワークスペースに同じ問いを投げ、答えの行・標準エラー・終了コードが 1 字も違わないことを
 // 見る。sh は行の形をそのまま読むので、ここが sh との契約の見張りになる。
-
-const shaskOracle = `
-import io, json, sys
-from ccnavi.infra import settings
-from ccnavi.entry import sh_ask
-c = json.load(sys.stdin)
-root = c["root"]
-conf, _ = settings.load(root)
-def ask(cmd):
-    out, err = io.StringIO(), io.StringIO()
-    n, head = len(cmd), cmd[:2]
-    if n == 4 and head == ["tree", "parent"]:
-        code = sh_ask.parent_tree(out, err, root, conf, cmd[2], cmd[3])
-    elif n == 4 and head == ["tree", "bound"]:
-        code = sh_ask.bound_tree(out, err, root, conf, cmd[2], cmd[3])
-    elif n == 4 and head == ["tree", "leftover"]:
-        code = sh_ask.leftover_tree(out, err, root, conf, cmd[2], cmd[3])
-    elif n == 4 and head == ["tree", "base-bound"]:
-        code = sh_ask.base_bound_tree(out, err, root, conf, cmd[2], cmd[3])
-    elif n >= 4 and head == ["tree", "guarded"]:
-        code = sh_ask.guarded_tree(out, err, root, conf, cmd[2], list(cmd[3:]))
-    elif n in (3, 4) and head == ["tree", "handoff-pending"]:
-        code = sh_ask.handoff_pending_tree(out, err, *cmd[2:])
-    else:
-        code = -1
-    rel = lambda s: s.replace(root, "<root>")
-    return [code, rel(out.getvalue()), rel(err.getvalue())]
-json.dump([ask(cmd) for cmd in c["cmds"]], sys.stdout, ensure_ascii=False)
-`
 
 func parentFront(id string, extra ...string) string {
 	return "---\nversion: 1\nticket: " + id + "\n" + strings.Join(extra, "\n") + "\ntitle: 親\n---\n\n本文\n"
@@ -112,7 +84,7 @@ func TestAnswersMatchPython(t *testing.T) {
 		{"tree", "handoff-pending", w("fix-a"), "HEAD", "extra"},
 		{"tree", "other", root, "x"},
 	}
-	want := testkit.Answers[[][3]any](t, "answers", shaskOracle, map[string]any{"root": root, "cmds": cmds})
+	want := golden.Load[[][3]any](t, "answers")
 	conf := testkit.Settings(t, root)
 	for i, cmd := range cmds {
 		var out, errOut strings.Builder

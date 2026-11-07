@@ -14,6 +14,7 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/lifecycle/consolidate"
 	"ccnavi/internal/tickets/lifecycle/wapmerge"
 	"ccnavi/internal/tickets/testkit"
@@ -76,145 +77,13 @@ func fixture(t *testing.T) string {
 	return root
 }
 
-const oracle = `
-import io, json, os, subprocess, sys
-from ccnavi.infra import fsio, settings
-from ccnavi.tickets.lifecycle import commands as ops, consolidate, write_and_push_merge as wapmerge
-c = json.load(sys.stdin)
-root = c["root"]
-def rel(s):
-    return s.replace(root, "<root>")
-def wt(name):
-    return os.path.join(root, ".claude", "worktrees", name)
-def git(cwd, *args):
-    return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout
-def put(path, text):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8", newline="") as f:
-        f.write(text)
-def commit(cwd, msg):
-    git(cwd, "add", "-A")
-    git(cwd, "commit", "-q", "--allow-empty", "-m", msg)
-out = {}
-conf, _ = settings.load(root)
-def run(name, f, *args, **kw):
-    o, e = io.StringIO(), io.StringIO()
-    code = f(o, e, root, conf, *args, **kw)
-    out[name] = [code, rel(o.getvalue()), rel(e.getvalue())]
-def wap(name, ident):
-    o = io.StringIO()
-    code = wapmerge.plan(o, conf, root, ident)
-    out[name] = [code, rel(o.getvalue())]
-def merge(parent, child):
-    head = git(wt(child), "rev-parse", "HEAD").strip()
-    git(wt(parent), "merge", "--no-ff", "--no-commit", head)
-def texts():
-    found = {}
-    for base, _, names in os.walk(root):
-        for n in names:
-            p = os.path.join(base, n)
-            r = os.path.relpath(p, root).replace(os.sep, "/")
-            if "/.ccnavi/approved/" in "/" + r or r.startswith("wip/") or "/wip/" in r or r.startswith("logs/state/risk-judge-"):
-                if "/.git/" in "/" + r + "/":
-                    continue
-                with open(p, encoding="utf-8", newline="") as f:
-                    found[r] = rel(f.read())
-    return found
-C1, C2 = "i0001-01-01", "i0001-01-02"
-C3, C4 = "i0002-01-01", "i0004-01-01"
-with fsio.clock(c["stamp"]):
-    run("check start parent", ops.check, "start", "i0001", "")
-    run("start unknown", ops.start, "i0099")
-    run("start child early", ops.start, C1)
-    run("start parent", ops.start, "i0001")
-    run("start parent again", ops.start, "i0001")
-    commit(wt("i0001"), "start")
-    git(root, "worktree", "add", "-q", "-b", C1, os.path.join(".claude", "worktrees", C1), "i0001")
-    run("start c1", ops.start, C1)
-    put(os.path.join(wt(C1), "src", "a.py"), "a = 1\n")
-    put(os.path.join(wt(C1), "wip", "handoff", "learnings", C1 + ".md"), c["record1"])
-    commit(wt(C1), "work c1")
-    run("check finish c1", ops.check, "finish", C1, "")
-    run("risk bad answer", ops.record_risk, C1, "untested", "maybe", "r")
-    run("risk no reason", ops.record_risk, C1, "untested", "yes", "  ")
-    run("risk parent", ops.record_risk, "i0001", "untested", "yes", "r")
-    run("risk not judge", ops.record_risk, C1, "hot", "yes", "r")
-    wap("wap parent", "i0001")
-    run("finish c1 pending", ops.finish, C1)
-    run("risk c1", ops.record_risk, C1, "untested", " NO ", "テストを足した")
-    wap("wap c1", C1)
-    merge("i0001", C1)
-    run("finish c1", ops.finish, C1)
-    commit(wt("i0001"), "finish c1")
-    run("check cancel c2", ops.check, "cancel", C2, "")
-    run("cancel c2 no reason", ops.cancel, C2, " ")
-    run("cancel todo", ops.cancel, "i0003", "r")
-    run("cancel c2", ops.cancel, C2, " やめた ")
-    commit(wt("i0001"), "cancel c2")
-    run("finish parent learning", ops.finish, "i0001")
-    run("check consolidate", consolidate.check, "i0001")
-    run("consolidate child", consolidate.run, C1)
-    run("consolidate", consolidate.run, "i0001")
-    run("consolidate again", consolidate.run, "i0001")
-    run("check consolidate absent", consolidate.check, "i0098")
-    run("start parent 2", ops.start, "i0002")
-    commit(wt("i0002"), "start")
-    git(root, "worktree", "add", "-q", "-b", C3, os.path.join(".claude", "worktrees", C3), "i0002")
-    wap("wap c3 not started", C3)
-    run("start c3", ops.start, C3)
-    put(os.path.join(wt(C3), "src", "hot", "x.py"), "x = 1\n")
-    wap("wap c3 dirty", C3)
-    put(os.path.join(wt(C3), "wip", "handoff", "learnings", C3 + ".md"), c["record3"])
-    commit(wt(C3), "work c3")
-    put(os.path.join(wt(C3), "docs", "out.md"), "out\n")
-    commit(wt(C3), "outside")
-    wap("wap c3 outside", C3)
-    git(wt(C3), "rm", "-q", "docs/out.md")
-    commit(wt(C3), "back")
-    put(os.path.join(wt(C3), "src", "cache.txt"), "child\n")
-    git(wt(C3), "add", "-f", "src/cache.txt")
-    commit(wt(C3), "cache")
-    exclude = git(wt("i0002"), "rev-parse", "--git-path", "info/exclude").strip()
-    put(os.path.join(wt("i0002"), exclude), "src/cache.txt\n")
-    put(os.path.join(wt("i0002"), "src", "cache.txt"), "parent\n")
-    wap("wap c3 ignored", C3)
-    os.remove(os.path.join(wt("i0002"), "src", "cache.txt"))
-    run("risk c3", ops.record_risk, C3, "untested", "yes", "テストが無い")
-    wap("wap c3", C3)
-    merge("i0002", C3)
-    run("finish c3", ops.finish, C3)
-    commit(wt("i0002"), "finish c3")
-    run("finish parent 2", ops.finish, "i0002")
-    run("check finish parent 2", ops.check, "finish", "i0002", "")
-    run("start parent 4", ops.start, "i0004")
-    commit(wt("i0004"), "start")
-    git(root, "worktree", "add", "-q", "-b", C4, os.path.join(".claude", "worktrees", C4), "i0004")
-    run("start c4", ops.start, C4)
-    put(os.path.join(wt(C4), "src", "b.py"), "b = 1\n")
-    put(os.path.join(wt(C4), "wip", "handoff", "learnings", C4 + ".md"), c["record4"])
-    commit(wt(C4), "work c4")
-    run("risk c4", ops.record_risk, C4, "untested", "no", "r")
-    wap("wap c4", C4)
-    merge("i0004", C4)
-    run("finish c4", ops.finish, C4)
-    commit(wt("i0004"), "finish c4")
-    run("check finish parent 4", ops.check, "finish", "i0004", "")
-    run("finish parent 4", ops.finish, "i0004")
-    run("finish parent 4 again", ops.finish, "i0004")
-out["texts"] = texts()
-out["shape"] = shape(root)
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
-
 func TestMatchesPython(t *testing.T) {
 	for _, kv := range append(testkit.GitEnv(), env.Learning+"=enable") {
 		name, value, _ := strings.Cut(kv, "=")
 		t.Setenv(name, value)
 	}
-	pyRoot, goRoot := fixture(t), fixture(t)
-	in := map[string]any{"root": pyRoot, "stamp": stamp, "record1": record1, "record3": recordNone("i0002-01-01", "i0002"),
-		"record4": recordNone("i0004-01-01", "i0004")}
-	want := testkit.Answers[map[string]any](t, "ops", testkit.ShapePy+oracle, in)
+	goRoot := fixture(t)
+	want := golden.Load[map[string]any](t, "ops")
 
 	root := goRoot
 	restore, err := fsio.FixClock(stamp)

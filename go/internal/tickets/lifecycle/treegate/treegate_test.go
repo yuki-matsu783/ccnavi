@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/testkit"
 )
 
@@ -139,28 +140,6 @@ func TestMirrorDriftText(t *testing.T) {
 	}
 }
 
-const oracle = `
-import json, sys
-from ccnavi.infra import settings
-from ccnavi.tickets.lifecycle import treegate
-c = json.load(sys.stdin)
-conf = settings.Settings()
-def refusals(rs, tree):
-    return [[r.kind, r.reason.replace(tree, "<tree>"), [h.replace(tree, "<tree>") for h in r.hints], list(r.paths)] for r in rs]
-out = []
-for tree in c["trees"]:
-    e = {}
-    for op in c["ops"]:
-        e[op] = refusals(treegate.check(op, tree, conf), tree)
-        e[op + "+root"] = refusals(treegate.check(op, tree, conf, root=tree, mirror_guidance=False), tree)
-    e["dirty"] = treegate.tree_dirty(tree, conf)
-    e["dirty_wip"] = treegate.tree_dirty(tree, conf, allow_wip_removals=True)
-    e["unpushed"] = [treegate.unpushed(tree, conf, "main", ignore_places=b) for b in (False, True)]
-    e["diff"] = [list(treegate.diff_paths(tree, r)) for r in ("origin/main", "", "nothing")]
-    out.append(e)
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
-
 func oracleTrees(t *testing.T) []string {
 	var trees []string
 	add := func(setup func(dir string)) {
@@ -226,7 +205,7 @@ func TestMatchesPython(t *testing.T) {
 	for _, op := range pythonOps {
 		opNames = append(opNames, string(op))
 	}
-	want := testkit.Answers[[]map[string]any](t, "treegate", oracle, map[string]any{"trees": trees, "ops": opNames})
+	want := golden.Load[[]map[string]any](t, "treegate")
 	conf := &config.Settings{}
 	for i, tree := range trees {
 		got := map[string]any{}

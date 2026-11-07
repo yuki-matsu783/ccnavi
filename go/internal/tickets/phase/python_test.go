@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/approval"
 	"ccnavi/internal/tickets/model/ticket"
 	"ccnavi/internal/tickets/phase/scope"
@@ -22,103 +23,6 @@ import (
 // Python の tickets/phase と同じワークスペースを 2 つ作って読ませ、フェーズの組み方・ゲート・止めたときの文・
 // 局面・順序の苦情・手動の決着・範囲の当たり方・フェーズの終わりの知らせ（書いたマーカーのバイト列も）が
 // 1 字も違わないことを見る。
-
-const phaseOracle = `
-import base64, io, json, math, os, sys
-from ccnavi.infra import fsio, settings
-from ccnavi.tickets.approval import checks, store as approval
-from ccnavi.tickets.model import ticket as tm
-from ccnavi.tickets.phase import gates as phase, manual_settle, scope
-c = json.load(sys.stdin)
-root = c["root"]
-def rel(s):
-    return s.replace(root, "<root>")
-conf, _ = settings.load(root)
-raw = approval.read_raw(conf, root)
-opened, _ = approval.scan(conf, root, raw=raw)
-closed, _ = approval.scan(conf, root, closed=True, raw=raw)
-review, _ = approval.scan_review(conf, root, raw=raw)
-everything = sorted(opened + closed + review, key=lambda t: t.ticket)
-byid = checks.by_id(opened + closed)
-def summary(p):
-    return [p.number, p.label, p.ended, p.review_required, p.gate_closed, p.review_waiting, p.review_label,
-            p.deferred, p.review_at, p.covers, p.declared_review, p.covered_reviews, p.risk_line, p.risk_body,
-            sorted(p.marks), [t.ticket for t in p.tickets], phase.reviewed_or_skipped(p), p.planned, p.title]
-def manual(m):
-    return [m.state, m.children, m.waiting, m.note, m.need_time, [rel(x) for x in m.paths], m.moved_at, m.line()]
-out = {"parents": {}}
-for pid in c["parents"]:
-    parent = byid.get(pid)
-    phases = phase.phases_of(root, conf, pid)
-    held = phase.held_phase(root, conf, pid)
-    e = {"phases": [summary(p) for p in phases]}
-    e["held"] = held.number if held else None
-    e["hold"] = [rel(phase.hold_reason(held, tool, root)) for tool in ("Agent", "Task", "Bash")] if held else []
-    e["stage"] = phase.stage(root, conf, parent) if parent else ""
-    e["planFinished"] = phase.plan_finished(root, conf, parent) if parent else False
-    e["reopen"] = [phase.reopen_impact(root, conf, pid, p.number) for p in phases]
-    e["manual"] = []
-    for p in phases:
-        if parent is None:
-            continue
-        e["manual"].append([manual(manual_settle.assess(root, conf, parent, p, phases)),
-            manual(manual_settle.assess(root, conf, parent, p, external=True)),
-            manual(manual_settle.assess(root, conf, parent, p, external=True, moved_at=1700000000.5)),
-            manual(manual_settle.assess(root, conf, parent, p, external=True, moved_at=math.nan)),
-            manual(manual_settle.assess(root, conf, parent, p, external=True, moved_at=0.0))])
-    out["parents"][pid] = e
-out["children"] = [[t.ticket, rel(phase.review_next(root, conf, t)), rel(phase.resumed_review(root, conf, t))]
-                   for t in everything]
-def parse(text):
-    return tm.parse(text)[0]
-order = []
-for o in c["order"]:
-    parent = byid[o["parent"]] if o["parent"] in byid else parse(o["parent"])
-    adding = [parse(a) for a in o["adding"]]
-    order.append([[p.severity, p.rule, p.detail, p.kind]
-                  for p in phase.order_problems(root, conf, parse(o["child"]), parent, None, adding)])
-out["order"] = order
-out["cwds"] = []
-for cwd in c["cwds"]:
-    p, _ = phase.parent_at(root, conf, cwd)
-    here = phase.worktree_at(root, conf, cwd)
-    out["cwds"].append([p.ticket if p else "", here.name if here else ""])
-def verdict(v):
-    return [v.verdict, v.limit, v.type.id if v.type else ""]
-out["verdicts"] = []
-for s in c["scopes"]:
-    child = next(t for t in everything if t.ticket == s["child"])
-    parent = byid.get(child.parent)
-    pt = scope.type_for(child, parent)
-    out["verdicts"].append([verdict(scope.scope_verdict(child, parent, pt, r)) for r in s["paths"]])
-out["findings"] = []
-for s in c["findings"]:
-    child = next(t for t in everything if t.ticket == s)
-    parent = byid.get(child.parent)
-    found, why = scope.scope_findings(root, conf, child, parent)
-    places, merged, mwhy = scope.merge_findings(root, conf, child, parent, c["head"])
-    out["findings"].append([[[p] + verdict(v) for p, v in found], why, places,
-                            [[p] + verdict(v) for p, v in merged], mwhy])
-out["announce"] = []
-with fsio.clock(c["clock"]):
-    for pid in c["parents"]:
-        if pid not in byid:
-            continue
-        buf = io.StringIO()
-        said = phase.announce(buf, root, conf, byid[pid])
-        again = phase.announce(io.StringIO(), root, conf, byid[pid])
-        out["announce"].append([pid, rel(said), buf.getvalue(), again])
-files = {}
-for base, _, names in os.walk(root):
-    if os.sep + "phases" + os.sep not in base + os.sep:
-        continue
-    for n in names:
-        p = os.path.join(base, n)
-        with open(p, "rb") as f:
-            files[rel(p).replace(os.sep, "/")] = base64.b64encode(f.read()).decode()
-out["files"] = files
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 const fixedClock = "2026-01-06T03:04:05+0900"
 
@@ -264,17 +168,14 @@ var scopeCases = []map[string]any{
 }
 
 func TestMatchesPython(t *testing.T) {
-	pyRoot, goRoot := oracleWorkspace(t), oracleWorkspace(t)
+	goRoot := oracleWorkspace(t)
 	head := strings.TrimSpace(testkit.Git(t, testkit.Worktree(goRoot, "i0001-02-01"), "rev-parse", "HEAD"))
 	cwds := func(root string) []string {
 		return []string{root, testkit.Worktree(root, "i0001"), filepath.Join(testkit.Worktree(root, "i0001"), "src", "deep"),
 			testkit.Worktree(root, "i0001-02-01"), filepath.Join(root, "elsewhere")}
 	}
 	findings := []string{"i0001-02-01", "i0002-01-01"}
-	want := testkit.Answers[map[string]any](t, "phase", phaseOracle, map[string]any{
-		"root": pyRoot, "parents": oracleParents, "order": orderCases(), "cwds": cwds(pyRoot),
-		"scopes": scopeCases, "findings": findings, "head": head, "clock": fixedClock,
-	})
+	want := golden.Load[map[string]any](t, "phase")
 	got := goAnswers(t, goRoot, cwds(goRoot), findings, head)
 	for key, w := range want {
 		if g := got[key]; !reflect.DeepEqual(normalize(t, g), w) {

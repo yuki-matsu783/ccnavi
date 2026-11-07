@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/approval"
 	"ccnavi/internal/tickets/model/ticket"
 	"ccnavi/internal/tickets/testkit"
@@ -34,29 +35,10 @@ func fixture(t *testing.T) string {
 	return root
 }
 
-const oracle = `
-import io, json, sys
-from ccnavi.infra import settings
-from ccnavi.tickets.approval import store as approval
-from ccnavi.tickets.lifecycle import plan
-from ccnavi.tickets.model import ticket as tm
-c = json.load(sys.stdin)
-root = c["root"]
-conf, _ = settings.load(root)
-found = {t.ticket: t for t in approval.scan(conf, root)[0]}
-found["i0004"] = tm.parse(c["project"])[0]
-out = []
-for ident in ("i0001", "i0001-01-01", "i0002", "i0003", "i0004"):
-    e = io.StringIO()
-    missing = plan.plan_missing(e, found[ident])
-    out.append([missing, e.getvalue(), [x.replace(root, "<root>") for x in plan.childless_notice(root, conf, found[ident])]])
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
-
 func TestMatchesPython(t *testing.T) {
 	root := fixture(t)
 	project := testkit.ParentText("i0004", nil, "project: p")
-	want := testkit.Answers[[]any](t, "plan", oracle, map[string]any{"root": root, "project": project})
+	want := golden.Load[[]any](t, "plan")
 	conf := testkit.Settings(t, root)
 	opened, _ := approval.Scan(conf, root, false, nil)
 	found := approval.ByID(opened)

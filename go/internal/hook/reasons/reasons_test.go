@@ -8,6 +8,7 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/policy/rules"
@@ -97,48 +98,6 @@ func (c sayCase) run(root string) string {
 	panic(c.Kind)
 }
 
-const sayOracle = `
-import json, os, sys
-from ccnavi.hook import reasons
-from ccnavi.policy import rules
-c = json.load(sys.stdin)
-root = c["root"]
-def rule(r):
-    return rules.Rule(id=r["id"], bare_id=r["id"], message=r["message"], decision=r["decision"], root=root,
-                      from_file=bool(r["file"]), file=r["file"])
-out = []
-for k in c["cases"]:
-    os.environ["CLAUDE_CODE_SESSION_ATTENDED"] = k["attended"]
-    a, kind = k["args"], k["kind"]
-    git = a.get("git") or None
-    if kind == "fallen_back":
-        s = reasons.fallen_back(a["path"], root)
-    elif kind == "undeclared":
-        s = reasons.undeclared(a["tool"], a["subject"], a["source"], a["degraded"], verdict=a["verdict"],
-                               fell_back=a["fell_back"], root=root)
-    elif kind == "reason_for":
-        s = reasons.reason_for(rule(k["rule"]), a["tool"], a["subject"], "unused", a["degraded"], a["runner"], a["inner"],
-                               a["quoted"], root=root, git=git)
-    elif kind == "ask_hint":
-        s = "\n".join(reasons.ask_hint(root, a["bare_id"], a["subject"]))
-    elif kind == "subagent_forbidden":
-        s = reasons.subagent_forbidden(root, a["subject"], a["runner"], a["inner"])
-    elif kind == "builtin_refusal":
-        s = reasons.builtin_refusal(a["code"], a["rule_id"], a["subject"], a["text"])
-    elif kind == "internal_error":
-        s = reasons.internal_error(root, a["code"], a["event"], a["kind"], a["log"], passed=a["passed"])
-    elif kind == "internal_error_notice":
-        s = reasons.internal_error_notice(a["code"], a["event"], a["kind"], a["log"])
-    elif kind == "payload_unusable":
-        s = reasons.payload_unusable(root, a["code"], a["problem"], event=a["event"], mode=a["mode"])
-    elif kind == "deadline_exceeded":
-        s = reasons.deadline_exceeded(root, a["code"], a["seconds"], passed=a["passed"])
-    elif kind == "rewrite":
-        s = reasons.rewrite(root, a["subject"], a["form"], a["found"], git)
-    out.append(s)
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
-
 func sayCases() []sayCase {
 	long := strings.Repeat("rm -rf  x\n", 40)
 	var cases []sayCase
@@ -221,16 +180,16 @@ func sayCases() []sayCase {
 	return cases
 }
 
+// TestTextsMatchPython は文を、Go の答えの見本（Python と答えが揃っていた Go の答えから取った）と比べる。文面ファイルの
+// 文を直したら、go test -run TestTextsMatchPython -update で見本を書き直す。
 func TestTextsMatchPython(t *testing.T) {
 	root := testkit.RepoRoot(t)
-	cases := sayCases()
-	want := testkit.Answers[[]string](t, "", sayOracle, map[string]any{"root": root, "cases": cases})
-	for i, c := range cases {
+	var said []string
+	for _, c := range sayCases() {
 		t.Setenv(env.ClaudeSessionAttended, c.Attended)
-		if got := c.run(root); got != want[i] {
-			t.Errorf("%s %v %v:\nGo:\n%s\nPython:\n%s", c.Kind, c.Attended, c.Args, got, want[i])
-		}
+		said = append(said, c.run(root))
 	}
+	golden.Check(t, "texts", said)
 }
 
 func TestUndeclaredHasTextsForEveryVerdict(t *testing.T) {

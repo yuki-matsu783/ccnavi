@@ -3,97 +3,14 @@ package pyre
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"math/rand/v2"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
+
+	"ccnavi/internal/infra/golden"
 )
 
-// Python の re と突き合わせる。リポジトリの .venv の Python が無ければ飛ばす。
-
-// Python の答えは testdata に写して持つ。Python があれば聞き直して写しと比べ（食い違えば -update で取り直す）、
-// 無ければ写しを読む。Python を外したあとも、同じ答えを確かめ続けるため。
-var update = flag.Bool("update", false, "testdata の Python の答えを取り直す")
-
-func venvPython(t *testing.T) string {
-	t.Helper()
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for {
-		for _, rel := range []string{".venv/bin/python", ".venv/Scripts/python.exe"} {
-			p := filepath.Join(dir, rel)
-			if _, err := os.Stat(p); err == nil {
-				return p
-			}
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return ""
-		}
-		dir = parent
-	}
-}
-
-// answers は Python の答え（ask）と testdata/<name>.json の写しを突き合わせて返す。
-func answers[T any](t *testing.T, name string, ask func(py string) T) T {
-	t.Helper()
-	path := filepath.Join("testdata", name+".json")
-	var saved T
-	data, readErr := os.ReadFile(path)
-	if readErr == nil {
-		if err := json.Unmarshal(data, &saved); err != nil {
-			t.Fatal(err)
-		}
-	}
-	py := venvPython(t)
-	if py == "" {
-		if readErr != nil {
-			t.Skip("Python も testdata の写しも無い")
-		}
-		return saved
-	}
-	fresh := ask(py)
-	got, _ := json.Marshal(fresh)
-	if *update {
-		if err := os.MkdirAll("testdata", 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, append(got, '\n'), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	} else if readErr != nil || !bytes.Equal(bytes.TrimSpace(data), got) {
-		t.Errorf("%s が Python の答えと違う（go test -run %s -update で取り直す）", path, t.Name())
-	}
-	return fresh
-}
-
-const oracle = `
-import json, re, sys
-out = []
-for case in json.load(sys.stdin):
-    try:
-        p = re.compile(case["p"], case["f"])
-    except re.error as e:
-        out.append({"err": str(e)}); continue
-    except RecursionError:
-        out.append({"err": "deep"}); continue
-    except (OverflowError, ValueError) as e:
-        out.append({"err": "overflow"}); continue
-    res = []
-    for s in case["s"]:
-        found = []
-        for m in p.finditer(s):
-            g = m.group("k") if "k" in p.groupindex else None
-            found.append([m.start(), m.end(), g])
-        res.append([p.search(s) is not None, p.match(s) is not None, p.fullmatch(s) is not None, found])
-    out.append({"res": res})
-json.dump(out, sys.stdout)
-`
+// Python の re の答えの写し（testdata）と突き合わせる。
 
 type pyCase struct {
 	P string   `json:"p"`
@@ -104,27 +21,6 @@ type pyCase struct {
 type pyResult struct {
 	Err string  `json:"err"`
 	Res [][]any `json:"res"`
-}
-
-func runOracle(t *testing.T, py string, cases []pyCase) []pyResult {
-	t.Helper()
-	in, err := json.Marshal(cases)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmd := exec.Command(py, "-I", "-W", "ignore", "-c", oracle)
-	cmd.Stdin = bytes.NewReader(in)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("python: %v\n%s", err, stderr.String())
-	}
-	var res []pyResult
-	if err := json.Unmarshal(out, &res); err != nil {
-		t.Fatal(err)
-	}
-	return res
 }
 
 func goResult(c pyCase) pyResult {
@@ -160,7 +56,7 @@ func goResult(c pyCase) pyResult {
 
 func compare(t *testing.T, name string, cases []pyCase) {
 	t.Helper()
-	want := answers(t, name, func(py string) []pyResult { return runOracle(t, py, cases) })
+	want := golden.Load[[]pyResult](t, name)
 	bad := 0
 	for i, c := range cases {
 		got := goResult(c)
@@ -283,17 +179,6 @@ func TestAgainstPythonValid(t *testing.T) {
 	compare(t, "valid", cases)
 }
 
-const globOracle = `
-import fnmatch, json, sys
-out = []
-for g in json.load(sys.stdin):
-    try:
-        out.append(fnmatch.translate(g).replace("/", r"[\\/]"))
-    except Exception as e:
-        out.append("!" + type(e).__name__)
-json.dump(out, sys.stdout)
-`
-
 func TestTranslateGlobAgainstPython(t *testing.T) {
 	r := rand.New(rand.NewPCG(5, 6))
 	chars := []rune("*?[]!-^\\/a.bz &~|é")
@@ -305,20 +190,7 @@ func TestTranslateGlobAgainstPython(t *testing.T) {
 		}
 		globs = append(globs, b.String())
 	}
-	want := answers(t, "glob", func(py string) []string {
-		in, _ := json.Marshal(globs)
-		cmd := exec.Command(py, "-I", "-c", globOracle)
-		cmd.Stdin = bytes.NewReader(in)
-		out, err := cmd.Output()
-		if err != nil {
-			t.Fatal(err)
-		}
-		var want []string
-		if err := json.Unmarshal(out, &want); err != nil {
-			t.Fatal(err)
-		}
-		return want
-	})
+	want := golden.Load[[]string](t, "glob")
 	for i, g := range globs {
 		if strings.HasPrefix(want[i], "!") {
 			t.Logf("Python が翻訳できない glob %q: %s", g, want[i])
@@ -329,21 +201,6 @@ func TestTranslateGlobAgainstPython(t *testing.T) {
 		}
 	}
 }
-
-const windowOracle = `
-import json, re, sys
-def span(m):
-    return None if m is None else [m.start(), m.end()]
-out = []
-for c in json.load(sys.stdin):
-    p = re.compile(c["p"], c["f"])
-    s, pos, end = c["s"], c["pos"], c["end"]
-    out.append({
-        "search": span(p.search(s, pos, end)), "match": span(p.match(s, pos, end)),
-        "all": [span(m) for m in p.finditer(s, pos, end)], "sub": p.sub(lambda m: "<" + m.group(0) + ">", s),
-    })
-json.dump(out, sys.stdout)
-`
 
 type windowCase struct {
 	P   string `json:"p"`
@@ -385,20 +242,7 @@ func spanOf(f Found, ok bool) []int {
 }
 
 func TestWindowMatchesPython(t *testing.T) {
-	want := answers(t, "window", func(py string) []windowResult {
-		in, _ := json.Marshal(windowCases)
-		cmd := exec.Command(py, "-I", "-c", windowOracle)
-		cmd.Stdin = bytes.NewReader(in)
-		out, err := cmd.Output()
-		if err != nil {
-			t.Fatal(err)
-		}
-		var res []windowResult
-		if err := json.Unmarshal(out, &res); err != nil {
-			t.Fatal(err)
-		}
-		return res
-	})
+	want := golden.Load[[]windowResult](t, "window")
 	for i, c := range windowCases {
 		re, err := Compile(c.P, Flag(c.F))
 		if err != nil {

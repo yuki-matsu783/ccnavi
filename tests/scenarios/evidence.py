@@ -114,7 +114,7 @@ AGENT_TOOL = "Agent"
 
 WRITE_TOOLS = ("Edit", "Write")
 
-# decisions.jsonl の subject が上限で切られた目印（src/ccnavi/records/audit.py の _limited）
+# decisions.jsonl の subject が上限で切られた目印（go/internal/records/audit の limited）
 CUT_MARK = "…(+"
 
 

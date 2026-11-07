@@ -127,22 +127,6 @@ func cases(root string) []fsCase {
 	return out
 }
 
-const failsafeOracle = `
-import json, os, sys
-from ccnavi.hook import failsafe
-from ccnavi.infra import hookio
-c = json.load(sys.stdin)
-root = c["root"]
-os.chdir(root)
-out = []
-for k in c["cases"]:
-    here = root if k["cwd"] == "" else ("" if k["cwd"] == "-" else os.path.join(root, k["cwd"]))
-    payload = hookio.Input(event="PreToolUse", tool_name=k["tool"], tool_input=k["input"] or {}, cwd=here)
-    ws = os.path.join(root, k["root"]) if k["root"] else root
-    out.append(failsafe.is_safe(payload, ws))
-print(json.dumps(out))
-`
-
 func workspace(t *testing.T) string {
 	t.Helper()
 	root := testkit.TempRoot(t)
@@ -191,13 +175,6 @@ func TestIsSafe(t *testing.T) {
 			}
 		}
 	})
-	// Python の答えとも 1 件ずつ合わせる（ルートの場所が毎回変わるので写しは持たない）。
-	want := testkit.Answers[[]bool](t, "", failsafeOracle, map[string]any{"root": root, "cases": all})
-	for i := range all {
-		if got[i] != want[i] {
-			t.Errorf("%s %v（cwd=%q）: Go=%v Python=%v", all[i].Tool, all[i].Input, all[i].Cwd, got[i], want[i])
-		}
-	}
 }
 
 // 判定できない間の許可リストのうち、省いた探す場所は、cwd が .git の中なら通さない。

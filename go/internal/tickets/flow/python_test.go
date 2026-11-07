@@ -8,40 +8,14 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
-	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の flow（parse_yaml・as_json・shape・render・text）と突き合わせる。読める・読めないの境界と、
 // 苦情・手順の行が 1 字も違わないことを、形の崩れたフローを並べて見る。Python の読み手は純 Python の
 // SafeLoader に固定する（Go の yaml が写したのはそれ。C の読み手は壊れた YAML の文が違う）。
-
-const flowOracle = `
-import base64, json, sys, yaml
-from ccnavi.infra import yamlread
-yamlread.LOADER = yaml.SafeLoader
-from ccnavi.tickets.flow import graph as flow, render, shape, text
-c = json.load(sys.stdin)
-out = {"flows": [], "lines": []}
-for b in c["flows"]:
-    data, why = flow.parse_yaml(base64.b64decode(b))
-    row = {"why": why}
-    if not why:
-        lines, kinds = render.render(data)
-        short, _ = render.render(data, text_limit=200)
-        row.update(
-            json=json.dumps(flow.as_json(data), ensure_ascii=False),
-            shape=shape.shape_problem(data),
-            structure=shape.structure_problems(data),
-            names=shape.name_problems(data, c["catalog"]),
-            render=lines, short=short, kinds=sorted(kinds),
-        )
-    out["flows"].append(row)
-for s in c["lines"]:
-    out["lines"].append([text._line(s), text.clean(s), text._neutral(s)])
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 type flowRow struct {
 	Why       string   `json:"why"`
@@ -261,8 +235,7 @@ func TestPythonFlow(t *testing.T) {
 	for i, c := range cases {
 		encoded[i] = base64.StdEncoding.EncodeToString(c)
 	}
-	in := map[string]any{"flows": encoded, "lines": lineCases, "catalog": catalogJSON(catalogFixture())}
-	want := testkit.Answers[flowAnswers](t, "flow", flowOracle, in)
+	want := golden.Load[flowAnswers](t, "flow")
 	if len(want.Flows) != len(cases) || len(want.Lines) != len(lineCases) {
 		t.Fatalf("答えの数が違う: %d/%d, %d/%d", len(want.Flows), len(cases), len(want.Lines), len(lineCases))
 	}

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/testkit"
 )
@@ -51,39 +52,9 @@ var rejectsCwds = []string{"", ".claude/worktrees/i0001", ".claude/worktrees/i00
 var guardedRels = []string{".claude/hooks/guard.sh", ".ccnavi/config/common/rules.yml", ".ccnavi/approved/doing/x.md",
 	"src/app.py", "src/secret/k"}
 
-const rejectsOracle = `
-import json, os, sys, time
-from ccnavi.infra import settings, tree
-from ccnavi.tickets.notice import session_rejects as sr
-c = json.load(sys.stdin)
-root = c["root"]
-def rel(s):
-    return s.replace(root, "<root>")
-conf, _ = settings.load(root)
-found = sr.find_all(conf, root, budget=60)
-only = sr.find_all(conf, root, only="I0001-01-01", budget=60)
-target = tree.Tree("w", os.path.join(root, ".claude", "worktrees", "i0001-01-01"), "", "worktree")
-rule_set = sr._rule_set(conf, root, target)
-denied = []
-for r in c["rels"]:
-    rule = sr._denied_by(rule_set, os.path.join(target.root, *r.split("/")))
-    denied.append(rule.id if rule else None)
-json.dump({
-    "all": [[r.ticket, r.decision, r.request, rel(r.reason), rel(r.origin)] for r in found.rejects],
-    "unchecked": found.unchecked,
-    "explain": [rel(x) for x in sr.explain_lines(found)],
-    "only": [r.request for r in only.rejects],
-    "missing": len(sr.find_all(conf, root, only="nothing").rejects),
-    "notice": [rel(sr.notice(conf, root, os.path.join(root, cwd) if cwd else root, time.monotonic() + 60)) for cwd in c["cwds"]],
-    "cut": sr.explain_lines(sr.find_all(conf, root, budget=0.0001)),
-    "denied": denied,
-}, sys.stdout, ensure_ascii=False)
-`
-
 func TestRejectsMatchesPython(t *testing.T) {
 	root := rejectsWorkspace(t)
-	want := testkit.Answers[map[string]any](t, "rejects", rejectsOracle,
-		map[string]any{"root": root, "cwds": rejectsCwds, "rels": guardedRels})
+	want := golden.Load[map[string]any](t, "rejects")
 	conf := testkit.Settings(t, root)
 	found, err := FindRejects(conf, root, RejectOptions{Budget: time.Minute})
 	if err != nil {

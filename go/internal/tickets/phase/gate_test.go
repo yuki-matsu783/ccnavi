@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/approval/marks"
 	"ccnavi/internal/tickets/config/phases"
@@ -15,37 +16,6 @@ import (
 
 // ゲートの表。計画のステップ・定義・引き受けた延期・子の宣言と状態・実績のリスク・マーカーの組み合わせを全部
 // 作り、終わったか・レビューが要るか・止めているか・呼び名・止めたときの文が Python と同じことを見る。
-
-const gateOracle = `
-import json, sys
-from ccnavi.tickets.config import phasetypes
-from ccnavi.tickets.model import ticket_model as tm
-from ccnavi.tickets.phase import gates as phase
-c = json.load(sys.stdin)
-out, holds = [], set()
-for k in c["cases"]:
-    item = None
-    if k["item"] is not None:
-        item = tm.PlanItem(type="design", review=k["item"]["review"], deferred=k["item"]["deferred"])
-    pt = None if k["type"] is None else phasetypes.PhaseType(id="design", title="設計", review=k["type"])
-    p = phase.Phase("i0001", 2, item=item, type=pt)
-    for i, (state, need) in enumerate(k["children"]):
-        t = tm.Ticket(ticket=f"i0001-02-{i + 1:02d}", parent="i0001", phase=2, review_required=need)
-        p.tickets.append(t)
-        p.states[t.ticket] = state
-        if k["risk"] is not None:
-            p.risks[t.ticket] = dict(k["risk"], points=k["risk"]["points"] + i)
-    p.marks = {m: {} for m in k["marks"]}
-    p.covered_reviews = k["covered"]
-    flags = [p.ended, p.declared_review, p.review_required, p.gate_closed, p.review_waiting, p.risk_escalates,
-             phase.reviewed_or_skipped(p)]
-    out.append("".join({True: "T", False: "F", None: "-"}[f] for f in flags)
-               + "|" + "|".join([p.review_label, p.risk_line, p.label]))
-    if p.gate_closed:
-        for tool in ("Agent", "Bash"):
-            holds.add(phase.hold_reason(p, tool, c["root"]))
-json.dump({"rows": out, "holds": sorted(holds)}, sys.stdout, ensure_ascii=False)
-`
 
 type gateItem struct {
 	Review   *bool `json:"review"`
@@ -145,10 +115,10 @@ func flag(b bool) string {
 func TestGateMatchesPython(t *testing.T) {
 	root := testkit.RepoRoot(t)
 	cases := gateCases()
-	want := testkit.Answers[struct {
+	want := golden.Load[struct {
 		Rows  []string `json:"rows"`
 		Holds []string `json:"holds"`
-	}](t, "gate", gateOracle, map[string]any{"root": root, "cases": cases})
+	}](t, "gate")
 	if len(want.Rows) != len(cases) {
 		t.Fatalf("行の数 %d、場合の数 %d", len(want.Rows), len(cases))
 	}

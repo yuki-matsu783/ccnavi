@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/git"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/lifecycle/stop"
 	"ccnavi/internal/tickets/testkit"
@@ -16,52 +17,6 @@ import (
 
 // Python の tickets/lifecycle/stop_integrate と同じワークスペースを 2 つ作って、直接作業のワークツリーごとに
 // 調べた結果・直接作業か・結び付く理由・記録・促しの文と、Stop の候補の調べ方が 1 字も違わないことを見る。
-
-const integrateOracle = `
-import json, os, sys
-from ccnavi.infra import fsio, settings, tree
-from ccnavi.tickets.lifecycle import stop_integrate as osi
-from ccnavi.tickets.model import direct_candidates
-c = json.load(sys.stdin)
-root = c["root"]
-def rel(s):
-    return s.replace(root, "<root>")
-conf, _ = settings.load(root)
-def direct(d):
-    if d is None:
-        return None
-    return [d.name, rel(d.worktree), d.head, d.dirty, d.ahead, d.integration, rel(d.integ_tree), rel(d.blocked),
-            d.base, d.no_record, d.marker, d.origin_ahead, d.key, d.digest, rel(osi.integrate_nudge(root, d)),
-            rel(osi.blocked_notice(d))]
-out = {"trees": {}}
-for name in c["names"]:
-    here = tree.tree_of(root, os.path.join(root, ".claude", "worktrees", name), conf.projects)
-    got = osi.probe(root, conf, here)
-    rec = osi.direct_record(root, name)
-    head = osi.ops_stop.worktree_head_sha(here.root)
-    out["trees"][name] = {
-        "probe": [got.state, got.drop, direct(got.found)],
-        "check": list(osi.direct_check(root, conf, here)),
-        "bound": rel(osi.bound_reason(root, conf, here)),
-        "record": None if rec is None else [{k: rel(v) for k, v in rec.items()}],
-        "has": [osi.has_record(root, name, head, d) for d in (None, False, True)],
-        "marker": osi.marker_kind(os.path.join(root, ".git", osi.RECORD_DIR), name),
-    }
-out["integration"] = [osi.integration_name(root), osi._integration(root)]
-out["roots"] = [rel(r) for r in osi._tree_roots(root, conf)]
-path = direct_candidates.path_of(conf.state, "s1")
-os.makedirs(conf.state, exist_ok=True)
-with open(path, "w", encoding="utf-8") as f:
-    json.dump({"session": "s1", "entries": [{"name": n, "path": os.path.join(root, ".claude", "worktrees", n),
-               "seen": s, "checked": 0} for n, s in c["candidates"]]}, f)
-first = osi.direct_at_stop(root, conf, root, "s1")
-out["first"] = direct(first)
-out["left"] = [[e["name"], e["checked"] > 0] for e in fsio.read_dict(path)["entries"]]
-out["remember"] = osi.remember_nudge(conf.state, "s1", first)
-out["again"] = direct(osi.direct_at_stop(root, conf, root, "s1"))
-out["here"] = direct(osi.direct_at_stop(root, conf, os.path.join(root, ".claude", "worktrees", "dirty1"), ""))
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 var directNames = []string{"scratch", "clean", "dirty1", "rec", "broken", "mk", "v4m", "donec", "i0001", "wb", "feat", "away"}
 
@@ -134,9 +89,8 @@ func integrateWorkspace(t *testing.T) string {
 }
 
 func TestMatchesPython(t *testing.T) {
-	pyRoot, goRoot := integrateWorkspace(t), integrateWorkspace(t)
-	want := testkit.Answers[map[string]any](t, "integrate", integrateOracle,
-		map[string]any{"root": pyRoot, "names": directNames, "candidates": candidates})
+	goRoot := integrateWorkspace(t)
+	want := golden.Load[map[string]any](t, "integrate")
 	conf := testkit.Settings(t, goRoot)
 	rel := func(s string) string { return strings.ReplaceAll(s, goRoot, "<root>") }
 	direct := func(d *Direct) any {

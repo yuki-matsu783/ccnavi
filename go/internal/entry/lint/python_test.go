@@ -9,31 +9,12 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の lint.report と lint.family_check を同じワークスペースに当て、出力（本文と --json）・終了コード・苦情が
 // 1 字も違わないことを見る。ワークスペースは苦情が出る形をまとめて作る。
-
-const reportOracle = `
-import io, json, sys
-from ccnavi.entry import lint, version
-from ccnavi.infra import settings
-c = json.load(sys.stdin)
-root = c["root"]
-def rel(s):
-    return s.replace(root, "<root>")
-out = {"compat": version.COMPAT, "runs": [], "family": []}
-for r in c["runs"]:
-    conf, notes = settings.load(root)
-    o = io.StringIO()
-    code = lint.report(o, root, conf, notes, r["mode"], r["restore"], r["core"], as_json=r["json"], flow_path=r["flow"])
-    out["runs"].append({"code": code, "out": rel(o.getvalue())})
-for family, repo in c["family"]:
-    conf, _ = settings.load(root)
-    out["family"].append([[p.severity, p.rule, rel(p.detail)] for p in lint.family_check(conf, root, family, repo or None)])
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 type reportRun struct {
 	Mode    string `json:"mode"`
@@ -70,8 +51,7 @@ func compare(t *testing.T, name, root string, runs []reportRun, family [][2]stri
 	if family == nil {
 		family = [][2]string{}
 	}
-	in := map[string]any{"root": root, "runs": runs, "family": family}
-	want := testkit.Answers[reportAnswer](t, name, reportOracle, in)
+	want := golden.Load[reportAnswer](t, name)
 	for i, r := range runs {
 		conf, notes := config.Load(root)
 		var out bytes.Buffer
@@ -183,7 +163,7 @@ func TestReportTickets(t *testing.T) {
 	put(t, todo, "chore-2-x-03.md", testkit.ProposalParent("chore-2-x-03", plan))
 	put(t, todo, "feature-1-alpha-02-01.md",
 		testkit.ProposalChild("feature-1-alpha-02-01", "feature-1-alpha", "2", []string{"wip/design/*"}))
-	// 壊れた YAML は入れない（.venv の PyYAML が libyaml の文を出すので、純 Python の読み手の文と合わない）。
+	// 壊れた YAML は入れない（写しを取った PyYAML が libyaml の文を出したので、純 Python の読み手を写した infra/yaml の文と合わない）。
 	put(t, todo, "broken.md", "---\nticket: 1\n---\n")
 	stray := testkit.Worktree(root, "stray")
 	put(t, stray, "wip/proposals/todo/feature-3-moved.md", testkit.ProposalParent("feature-3-moved", plan))

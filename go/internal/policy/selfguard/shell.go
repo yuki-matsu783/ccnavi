@@ -15,7 +15,7 @@ import (
 )
 
 // シェルからの書き込みを止める式の部品。式はルールの regex として rules（pyre）が Python の re と同じ答えで読み、
-// 大文字小文字を区別せずに当てる。Python の selfguard_shell と 1 字も違わない式を組む（python_test.go が突き合わせる）。
+// 大文字小文字を区別せずに当てる。Python の selfguard_shell と 1 字も違わない式を組む（python_test.go が写しと突き合わせる）。
 //
 // 書き込みの形と場所は組でヒットする。場所の名前が出ただけ（cat・git add）では止めない。
 // shell.Read が語を空白で、コマンドを Sep で、引用がつないだ空白を WordSep で区切って渡すので、語の並びを式で読める。

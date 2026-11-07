@@ -20,8 +20,8 @@ import time
 import unittest
 
 from tests import ROOT
+from tests.exe import host_target
 from tests.inproc import run_ccnavi
-from tests.sh.install_harness import host_target
 
 # 振り分けの sh の名前。この名前なら、実体は隣ではなく `../bin/<os>-<arch>/` に在る。
 LAUNCHER_NAME = "ccnavi-launcher.sh"
@@ -1169,7 +1169,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("CCNAVI_ENTRY_PATH", result.stdout)
 
     def test_拡張子を書かないパスでも実行ファイルにヒットする(self):
-        # hook の登録は 3 つの環境で同じ 1 行を使う。PyInstaller が Windows で
+        # hook の登録は 3 つの環境で同じ 1 行を使う。実行ファイルは Windows で
         # だけ `.exe` を付けるので、設定に書いたパスと在るファイルのパスが食い違う。
         # 書いた側を直させるのではなく、在るほうを選ぶ。
         path = self.binary()

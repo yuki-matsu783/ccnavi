@@ -9,25 +9,9 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/testkit"
 )
-
-// suggestOracle は Python の --suggest（entry/suggest.report）を文字と JSON で回す。ワークスペースルートは <root> にする。
-const suggestOracle = `
-import io, json, sys
-from ccnavi.infra import settings
-from ccnavi.entry import suggest
-c = json.load(sys.stdin)
-root = c["root"]
-out = []
-for as_json in (False, True):
-    conf, _ = settings.load(root)
-    o = io.StringIO()
-    code = suggest.report(o, conf, root, as_json)
-    text = o.getvalue().replace(json.dumps(root)[1:-1], "<root>").replace(root, "<root>")
-    out.append({"code": code, "stdout": text})
-print(json.dumps(out, ensure_ascii=False))
-`
 
 type answer struct {
 	Code   int    `json:"code"`
@@ -128,7 +112,7 @@ func TestReportMatchesPython(t *testing.T) {
 			for file, lines := range scenes(root)[name] {
 				testkit.Put(t, filepath.Join(root, "logs", file), strings.Join(lines, "\n")+"\n")
 			}
-			want := testkit.Answers[[]answer](t, "report-"+name, suggestOracle, map[string]any{"root": root})
+			want := golden.Load[[]answer](t, "report-"+name)
 			for i, asJSON := range []bool{false, true} {
 				conf, _ := config.Load(root)
 				var out bytes.Buffer

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/lifecycle/integrate"
 	"ccnavi/internal/tickets/testkit"
@@ -63,23 +64,11 @@ func directWorkspace(t *testing.T, fill int) string {
 	return root
 }
 
-const directOracle = `
-import json, sys, time
-from ccnavi.infra import settings
-from ccnavi.tickets.notice import direct_worktrees
-c = json.load(sys.stdin)
-out = {}
-for key, root in c["roots"].items():
-    conf, _ = settings.load(root)
-    out[key] = direct_worktrees.session_text(root, conf, time.monotonic() + 60).replace(root, "<root>")
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
-
 func TestDirectWorktreesMatchesPython(t *testing.T) {
 	empty := workspace(t)
 	testkit.AddWorktree(t, empty, "no-record", "main")
 	roots := map[string]string{"empty": empty, "few": directWorkspace(t, 0), "many": directWorkspace(t, 8)}
-	want := testkit.Answers[map[string]any](t, "direct", directOracle, map[string]any{"roots": roots})
+	want := golden.Load[map[string]any](t, "direct")
 	got := map[string]any{}
 	for key, root := range roots {
 		got[key] = testkit.Rel(root, DirectWorktrees(testkit.Settings(t, root), root, time.Now().Add(time.Minute)))

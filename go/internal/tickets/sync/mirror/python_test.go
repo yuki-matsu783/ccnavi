@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/testkit"
 )
@@ -14,56 +15,6 @@ import (
 // Python の tickets/sync（mirrorsync・promptsync・mirror_gap・skillsync.installed）と同じワークスペースを作って
 // 両方に揃えさせ、`user mirror --json` の JSON（拡張との契約。expect の値を含む）、揃えた後の写し先のバイト列、
 // 発言ごとの写しの行が 1 字も違わないことを見る。書くので、Python と Go は同じ形の別のワークスペースで走らせる。
-
-const mirrorOracle = `
-import base64, json, os, sys, yaml
-from ccnavi.infra import settings, yamlread
-yamlread.LOADER = yaml.SafeLoader
-from ccnavi.tickets.sync import mirror_gap, mirrorsync, promptsync, skillsync
-c = json.load(sys.stdin)
-def dumps(v):
-    return json.dumps(v, ensure_ascii=True, indent=1)
-def dump(base):
-    out = {}
-    for parent, dirs, names in os.walk(base):
-        dirs[:] = [d for d in dirs if d != ".git"]
-        for n in dirs + names:
-            p = os.path.join(parent, n)
-            rel = os.path.relpath(p, base).replace(os.sep, "/")
-            if n == ".git":
-                continue
-            if os.path.islink(p):
-                out[rel] = "@"
-            elif os.path.isdir(p):
-                out[rel + "/"] = ""
-            else:
-                with open(p, "rb") as f:
-                    out[rel] = base64.b64encode(f.read()).decode()
-    return out
-out = {"user": [], "prompt": []}
-for root in c["user"]:
-    conf, _ = settings.load(root)
-    row = {"views": [dumps(mirrorsync.plan_json(mirrorsync.prepare(conf, root, w))) for w in c["wanted"]]}
-    row["stale"] = dumps(mirrorsync.applied_json(mirrorsync.apply(conf, mirrorsync.prepare(conf, root), "0" * 64)))
-    plan = mirrorsync.prepare(conf, root, ["lib", "app"])
-    row["applied"] = dumps(mirrorsync.applied_json(mirrorsync.apply(conf, plan, plan.expect)))
-    row["after"] = dumps(mirrorsync.plan_json(mirrorsync.prepare(conf, root)))
-    row["files"] = dump(os.path.join(root, "projects"))
-    row["installed"] = [skillsync.installed(root, n) for n in c["skills"]]
-    out["user"].append(json.loads(json.dumps(row).replace(root, "<root>")))
-for root in c["prompt"]:
-    conf, _ = settings.load(root)
-    row = {"first": promptsync.sync(conf, root), "second": promptsync.sync(conf, root)}
-    with open(os.path.join(root, ".ccnavi", "config", "common", "risks.yml"), "a", encoding="utf-8") as f:
-        f.write("# 直した\n")
-    row["third"] = promptsync.sync(conf, root)
-    row["files"] = dump(os.path.join(root, ".claude", "worktrees"))
-    out["prompt"].append(json.loads(json.dumps(row).replace(root, "<root>")))
-conf, _ = settings.load(c["user"][0])
-mirrored, others = mirror_gap.split(conf, c["paths"])
-out["gap"] = [mirrored, others, mirror_gap.label(mirrored), mirror_gap.others_note(others), mirror_gap.NOT_WORK, mirror_gap.ASK]
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 type userRow struct {
 	Views     []string          `json:"views"`
@@ -228,9 +179,7 @@ func TestMatchesPython(t *testing.T) {
 		pyPrompt = append(pyPrompt, promptWorkspace(t, broken))
 		goPrompts = append(goPrompts, promptWorkspace(t, broken))
 	}
-	answers := testkit.Answers[mirrorAnswers](t, "mirror", mirrorOracle, map[string]any{
-		"user": pyUser, "prompt": pyPrompt, "wanted": oracleWanted, "skills": oracleSkills, "paths": oraclePaths,
-	})
+	answers := golden.Load[mirrorAnswers](t, "mirror")
 	for i, v := range userVariants {
 		got := goUser(t, goUsers[i])
 		if !reflect.DeepEqual(got, answers.User[i]) {

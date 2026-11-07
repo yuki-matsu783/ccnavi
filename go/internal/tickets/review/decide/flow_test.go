@@ -12,6 +12,7 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/model/host"
 	"ccnavi/internal/tickets/model/oplog"
@@ -70,68 +71,6 @@ func flowWorkspace(t *testing.T) string {
 	return root
 }
 
-const flowOracle = `
-import io, json, os, subprocess, sys
-from ccnavi.infra import fsio, settings
-from ccnavi.tickets.review import decide, request
-c = json.load(sys.stdin)
-root = c["root"]
-tree = os.path.join(root, ".claude", "worktrees", "i0001")
-logs = os.path.join(root, "logs")
-env = dict(os.environ, **dict(kv.split("=", 1) for kv in c["env"]))
-def git(*args, cwd=tree):
-    subprocess.run(["git", *args], cwd=cwd, env=env, check=True, capture_output=True)
-def rel(s):
-    return s.replace(root, "<root>")
-conf, _ = settings.load(root)
-out = []
-def run(name, f, *args):
-    o, e = io.StringIO(), io.StringIO()
-    code = f(o, e, *args)
-    out.append([name, code, rel(o.getvalue()), rel(e.getvalue())])
-    return o.getvalue()
-body = os.path.join(root, "body.md")
-with fsio.clock(c["clock"]):
-    run("check", request.check_request, root, conf, tree, 1, body)
-    path = run("prepare", request.prepare, root, conf, tree, 1, body).strip()
-    with open(path, encoding="utf-8") as f:
-        out.append(["request-file", 0, rel(f.read()), ""])
-    run("requested", request.requested, root, conf, tree, 1, os.path.join(logs, "posted.json"))
-    run("again", request.prepare, root, conf, tree, 1, body)
-    git("add", "-A")
-    git("commit", "-q", "-m", "requested")
-    git("push", "-q", "origin", "i0001")
-    run("decide-check", decide.check, root, conf, tree, 1)
-    run("decide-check-bad", decide.check, root, conf, tree, 1, "{", "v2.x")
-    run("changes", decide.decide_preview, root, conf, tree, 1, os.path.join(logs, "changes.json"))
-    shown = json.loads(run("preview", decide.decide_preview, root, conf, tree, 1, os.path.join(logs, "threads.json")))
-    run("stale", decide.decide_yes, root, conf, tree, 1, os.path.join(logs, "threads.json"), '{"u1": "keep"}', c["stale"])
-    run("uneven", decide.decide_yes, root, conf, tree, 1, os.path.join(logs, "threads.json"), '{"u1": "keep"}', shown["digest"])
-    run("yes", decide.decide_yes, root, conf, tree, 1, os.path.join(logs, "threads.json"), '{"u1": "fix", "u2": "issue"}', shown["digest"])
-    run("reviewed", request.prepare, root, conf, tree, 1, body)
-    os.makedirs(os.path.join(tree, "wip", "design"), exist_ok=True)
-    with open(os.path.join(tree, "wip", "design", "x.html"), "w") as f:
-        f.write("<p>x</p>\n")
-    git("add", "-A")
-    git("commit", "-q", "-m", "wip")
-    git("push", "-q", "origin", "i0001")
-    with open(os.path.join(tree, "wip", "u.txt"), "w") as f:
-        f.write("u\n")
-    merge = [request._merge_problems(tree, conf, root)]
-    os.remove(os.path.join(tree, "wip", "u.txt"))
-    merge.append(request._merge_problems(tree, conf, root))
-    removed = list(request.remove_wip(tree))
-files = {}
-for base in (os.path.join(tree, ".ccnavi"), os.path.join(tree, "wip"), os.path.join(logs, "state")):
-    for here, _, names in os.walk(base):
-        for n in names:
-            p = os.path.join(here, n)
-            with open(p, encoding="utf-8") as f:
-                files[rel(p).replace(os.sep, "/")] = rel(f.read())
-json.dump({"out": out, "merge": [[rel(x) for x in m] for m in merge], "removed": removed,
-           "files": files}, sys.stdout, ensure_ascii=False)
-`
-
 type flowAnswers struct {
 	Out     [][]any           `json:"out"`
 	Merge   [][]string        `json:"merge"`
@@ -140,10 +79,10 @@ type flowAnswers struct {
 }
 
 func TestFlowMatchesPython(t *testing.T) {
-	py, golang := flowWorkspace(t), flowWorkspace(t)
+	golang := flowWorkspace(t)
 	// 見せたあとに本文が変わった指摘のダイジェスト（親・フェーズ・MR は同じ）。
 	stale := Digest(decisionOf([]host.Thread{thread("u1", "前の本文")}, 1))
-	want := testkit.Answers[flowAnswers](t, "flow", flowOracle, map[string]any{"root": py, "env": testkit.GitEnv(), "clock": fixedClock, "stale": stale})
+	want := golden.Load[flowAnswers](t, "flow")
 	root := golang
 	rel := func(s string) string { return strings.ReplaceAll(s, root, "<root>") }
 	tree := filepath.Join(root, ".claude", "worktrees", "i0001")

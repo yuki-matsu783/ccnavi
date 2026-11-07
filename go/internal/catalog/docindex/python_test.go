@@ -4,21 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	"ccnavi/internal/tickets/testkit"
+	"ccnavi/internal/infra/golden"
 )
 
 // Python の docsearch_index.front_matter と突き合わせる。YAML の型（日時・バイト列・集合・無限・キーの型）を
 // JSON に載せる規則、読めない・閉じていない・深すぎるものの境界を見る。
-
-const frontOracle = `
-import json, sys
-from ccnavi.catalog import docsearch_index as di
-out = []
-for text in json.load(sys.stdin):
-    front = di.front_matter(text.encode("utf-8", "surrogatepass"))
-    out.append(None if front is None else di._dumps(front))
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 var frontInputs = []string{
 	"---\ntype: guide\ntitle: はじめに\ntags: [a, b]\n---\n",
@@ -55,7 +45,7 @@ var frontInputs = []string{
 }
 
 func TestFrontMatterMatchesPython(t *testing.T) {
-	want := testkit.Answers[[]*string](t, "front_matter", frontOracle, frontInputs)
+	want := golden.Load[[]*string](t, "front_matter")
 	for i, text := range frontInputs {
 		var got *string
 		if front := FrontMatter([]byte(text)); front != nil {

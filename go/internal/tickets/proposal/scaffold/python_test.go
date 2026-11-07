@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/testkit"
 )
 
@@ -16,27 +17,6 @@ import (
 // 標準エラー・終了コードと、書いたファイルの中身が 1 字も違わないことを見る。断る場合（識別子・タイトル・issue・
 // MR・組み合わせ・ワークツリーの外・定義に無い型・範囲）と、型の列・テンプレート（フィードバック計画とフローの
 // 下書きを含む）から書く場合、既にあるものを上書きしない場合を並べる。
-
-const scaffoldOracle = `
-import io, json, sys, yaml
-from ccnavi.infra import settings, yamlread
-yamlread.LOADER = yaml.SafeLoader
-from ccnavi.tickets.proposal import revise, scaffold
-c = json.load(sys.stdin)
-root = c["root"]
-conf, _ = settings.load(root)
-out = []
-for k in c["cases"]:
-    so, se = io.StringIO(), io.StringIO()
-    cwd = root if k["cwd"] == "" else root + "/.claude/worktrees/" + k["cwd"]
-    if k["op"] == "new":
-        code = scaffold.run(so, se, conf, root, cwd, k["id"], k["title"], k["plan"], k["issue"],
-            template=k["template"], layer=k["layer"], with_feedback=k["feedback"], scope=k["scope"], mr=k["mr"])
-    else:
-        code = revise.run(so, se, conf, root, cwd, k["id"], feedback=k["feedback"])
-    out.append([code, so.getvalue().replace(root, "<root>"), se.getvalue().replace(root, "<root>")])
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 type scaffoldCase struct {
 	Op       string   `json:"op"`
@@ -202,8 +182,7 @@ func scaffoldCases() []scaffoldCase {
 
 func TestMatchesPython(t *testing.T) {
 	cases := scaffoldCases()
-	pyRoot := scaffoldWorkspace(t)
-	want := testkit.Answers[[][3]any](t, "scaffold", scaffoldOracle, map[string]any{"root": pyRoot, "cases": cases})
+	want := golden.Load[[][3]any](t, "scaffold")
 
 	root := scaffoldWorkspace(t)
 	conf, _ := config.Load(root)
@@ -226,19 +205,8 @@ func TestMatchesPython(t *testing.T) {
 			t.Errorf("%d %+v:\n%q\nwant:\n%q", i, c, got, want[i])
 		}
 	}
-	if pyWritten := written(t, pyRoot); len(pyWritten) > 0 {
-		goWritten := written(t, root)
-		for rel, text := range pyWritten {
-			if goWritten[rel] != text {
-				t.Errorf("%s:\n%s\nwant:\n%s", rel, goWritten[rel], text)
-			}
-		}
-		for rel := range goWritten {
-			if _, ok := pyWritten[rel]; !ok {
-				t.Errorf("%s は Python が書いていない", rel)
-			}
-		}
-	}
+	// 書いた提案の中身は、Go の答えの見本（Python と答えが揃っていた Go の答えから取った）と比べる。
+	golden.Check(t, "scaffold-written", written(t, root))
 }
 
 // written はワークツリーの提案の置き場（wip/）に在るファイルの中身。

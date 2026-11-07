@@ -9,6 +9,7 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/model/via"
 	"ccnavi/internal/tickets/review/request"
@@ -17,84 +18,6 @@ import (
 
 // 承認とレビュー済みは取り返しがつかないので、同じ形のワークスペースを Python 用と Go 用に作り、同じ操作を同じ順に
 // 打って、終了コード・標準出力・標準エラー（JSON を含む）・書いたファイルが 1 字も違わないことを見る。
-
-// 承認の流れ: 承認を頼む前のゲート（きれい・親のワークツリーが汚れた）→ preview（テキスト・JSON）→ verify
-// （テキスト・JSON）→ --yes（ダイジェスト無し・一覧の違い・中身の違い・絞りが通らない・テキストで通る）→ 別の親と
-// 外れる提案を足して、ターミナルの承認（いいえ・はい。--placed-out）。
-const approveOracle = `
-import io, json, os, sys
-from ccnavi.infra import fsio, settings
-from ccnavi.tickets.core import approve
-from ccnavi.tickets.model import via
-c = json.load(sys.stdin)
-root = c["root"]
-def rel(s):
-    return s.replace(root, "<root>")
-def wt(name):
-    return os.path.join(root, ".claude", "worktrees", name)
-def put(path, text):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8", newline="") as f:
-        f.write(text)
-conf, _ = settings.load(root)
-out = []
-def run(name, f, *args):
-    o, e = io.StringIO(), io.StringIO()
-    code = f(o, e, *args)
-    out.append([name, code, rel(o.getvalue()), rel(e.getvalue())])
-    return o.getvalue()
-def gate(o, e, ids):
-    return approve.approval_request_gate(e, root, conf, ids)
-family = ["i0001", "i0001-01-01"]
-placed = os.path.join(root, "placed.json")
-with fsio.clock(c["clock"]), via.session(via.VIA_CLI):
-    run("gate", gate, family)
-    put(os.path.join(wt("i0001"), "README.md"), "changed\n")
-    run("gate-dirty", gate, family)
-    run("gate-other", gate, ["nope"])
-    run("preview", approve.preview, conf, root, False, [])
-    digest = json.loads(run("preview-json", approve.preview, conf, root, True, []))["digest"]
-    run("preview-only", approve.preview, conf, root, False, ["i0001", "nope"])
-    run("verify", approve.verify, conf, root, False, [])
-    run("verify-json", approve.verify, conf, root, True, [])
-    with via.session(via.VIA_BOARD):
-        run("yes-no-digest", approve.approve_yes, conf, root, family, True, [], " ")
-        run("yes-list", approve.approve_yes, conf, root, ["i0001"], True, [], digest)
-        run("yes-digest", approve.approve_yes, conf, root, family, True, [], "0" * 64)
-        run("yes-filter", approve.approve_yes, conf, root, family, False, ["nope"], digest)
-        run("yes-json", approve.approve_yes, conf, root, [" i0001-01-01", "i0001", ""], True, [], digest.upper())
-        run("yes-again", approve.approve_yes, conf, root, family, True, [], digest)
-    put(os.path.join(wt("i0002"), "wip", "proposals", "todo", "i0002.md"), c["i0002"])
-    put(os.path.join(wt("i0004"), "wip", "proposals", "todo", "i0004.md"), c["i0004"])
-    blocker = os.path.join(wt("i0004"), ".ccnavi", "approved", "doing")
-    put(blocker, "x\n")
-    later = json.loads(run("preview-blocked", approve.preview, conf, root, True, []))
-    with via.session(via.VIA_BOARD):
-        run("yes-partial", approve.approve_yes, conf, root, [b["ticket"] for b in later["batch"]], True, [], later["digest"])
-    os.remove(blocker)
-    put(os.path.join(wt("i0003"), "wip", "proposals", "todo", "i0003.md"), c["i0003"])
-    put(blocker, "x\n")
-    with via.session(via.VIA_TERMINAL):
-        run("agree-stop", lambda o, e: approve.approve(io.StringIO("y\n"), o, e, conf, root, [], placed))
-    with open(placed, encoding="utf-8") as f:
-        out.append(["placed-stop", 0, rel(f.read()), ""])
-    os.remove(blocker)
-    with via.session(via.VIA_TERMINAL):
-        run("agree-no", lambda o, e: approve.approve(io.StringIO("n\n"), o, e, conf, root))
-        run("agree-yes", lambda o, e: approve.approve(io.StringIO(" Y \n"), o, e, conf, root, [], placed))
-        run("agree-none", lambda o, e: approve.approve(io.StringIO(""), o, e, conf, root, ["i0003"]))
-with open(placed, encoding="utf-8") as f:
-    out.append(["placed", 0, rel(f.read()), ""])
-files = {}
-for name in ("i0001", "i0002", "i0003", "i0004"):
-    for base in (os.path.join(wt(name), ".ccnavi"), os.path.join(wt(name), "wip")):
-        for here, _, names in os.walk(base):
-            for n in names:
-                p = os.path.join(here, n)
-                with open(p, encoding="utf-8") as f:
-                    files[rel(p).replace(os.sep, "/")] = rel(f.read())
-json.dump({"out": out, "files": files}, sys.stdout, ensure_ascii=False)
-`
 
 // i0003 は欄の誤り（workflow）で外れる親。
 var (
@@ -134,10 +57,8 @@ func (r *flowRun) must(code int, err error) int {
 }
 
 func TestApproveMatchesPython(t *testing.T) {
-	pyRoot, root := approveWorkspace(t), approveWorkspace(t)
-	want := testkit.Answers[answers](t, "approve", approveOracle, map[string]any{
-		"root": pyRoot, "clock": fixedClock, "i0002": i0002Text, "i0003": i0003Text, "i0004": i0004Text,
-	})
+	root := approveWorkspace(t)
+	want := golden.Load[answers](t, "approve")
 	conf, _ := config.Load(root)
 	restore, err := fsio.FixClock(fixedClock)
 	if err != nil {
@@ -221,65 +142,6 @@ func TestApproveMatchesPython(t *testing.T) {
 	compare(t, answers{r.out, filesUnder(root, bases...)}, want)
 }
 
-// レビュー済みの流れ: 子をレビュー待ちに置いた親で依頼し（request の prepare・requested）、マーカーを push してから、
-// confirm --check → 結果の無い・別の MR の・未解決の残る・変更要求の confirm → 依頼の後に HEAD を動かした --check →
-// 戻して --actor 付きの confirm（通る）→ 重ね打ちの --check と confirm。
-const confirmOracle = `
-import io, json, os, subprocess, sys
-from ccnavi.infra import fsio, settings
-from ccnavi.tickets.core import review
-from ccnavi.tickets.model import via
-from ccnavi.tickets.review import request
-c = json.load(sys.stdin)
-root = c["root"]
-tree = os.path.join(root, ".claude", "worktrees", "i0001")
-logs = os.path.join(root, "logs")
-env = dict(os.environ, **dict(kv.split("=", 1) for kv in c["env"]))
-def git(*args):
-    subprocess.run(["git", *args], cwd=tree, env=env, check=True, capture_output=True)
-def rel(s):
-    return s.replace(root, "<root>")
-conf, _ = settings.load(root)
-out = []
-def run(name, f, *args):
-    o, e = io.StringIO(), io.StringIO()
-    code = f(o, e, *args)
-    out.append([name, code, rel(o.getvalue()), rel(e.getvalue())])
-    return o.getvalue()
-def result(name):
-    return os.path.join(logs, name + ".json")
-with fsio.clock(c["clock"]), via.session(via.VIA_CLI):
-    run("prepare", request.prepare, root, conf, tree, 1, os.path.join(root, "body.md"))
-    run("requested", request.requested, root, conf, tree, 1, result("posted"))
-    git("add", "-A")
-    git("commit", "-q", "-m", "requested")
-    git("push", "-q", "origin", "i0001")
-    run("check", review.check_confirm, root, conf, tree, 1)
-    run("check-phase", review.check_confirm, root, conf, tree, 2)
-    run("no-result", review.confirm_local, root, conf, tree, 1, "")
-    run("other-mr", review.confirm_local, root, conf, tree, 1, result("other"))
-    run("threads", review.confirm_local, root, conf, tree, 1, result("threads"))
-    run("changes", review.confirm_local, root, conf, tree, 1, result("changes"))
-    with open(os.path.join(tree, "src", "a.go"), "a", encoding="utf-8") as f:
-        f.write("// more\n")
-    git("commit", "-q", "-am", "more")
-    git("push", "-q", "origin", "i0001")
-    run("moved", review.check_confirm, root, conf, tree, 1)
-    git("reset", "-q", "--hard", "HEAD~1")
-    git("push", "-q", "-f", "origin", "i0001")
-    run("confirm", review.confirm_local, root, conf, tree, 1, result("clean"), "octo")
-    run("again", review.check_confirm, root, conf, tree, 1)
-    run("again-confirm", review.confirm_local, root, conf, tree, 1, result("clean"))
-files = {}
-for base in (os.path.join(tree, ".ccnavi"), os.path.join(tree, "wip")):
-    for here, _, names in os.walk(base):
-        for n in names:
-            p = os.path.join(here, n)
-            with open(p, encoding="utf-8") as f:
-                files[rel(p).replace(os.sep, "/")] = rel(f.read())
-json.dump({"out": out, "files": files}, sys.stdout, ensure_ascii=False)
-`
-
 // reviewWorkspace は親 i0001 の承認済みチケットと、フェーズ 1 のレビュー待ちの子を親のブランチに置いて push する。
 // 子の merged_sha は親のブランチの作業のコミット。logs/ にはホストから取ってきた結果の見本を置く。
 func reviewWorkspace(t *testing.T) string {
@@ -311,10 +173,8 @@ func reviewWorkspace(t *testing.T) string {
 }
 
 func TestConfirmMatchesPython(t *testing.T) {
-	pyRoot, root := reviewWorkspace(t), reviewWorkspace(t)
-	want := testkit.Answers[answers](t, "confirm", confirmOracle, map[string]any{
-		"root": pyRoot, "clock": fixedClock, "env": testkit.GitEnv(),
-	})
+	root := reviewWorkspace(t)
+	want := golden.Load[answers](t, "confirm")
 	conf, _ := config.Load(root)
 	restore, err := fsio.FixClock(fixedClock)
 	if err != nil {
@@ -379,57 +239,6 @@ func remove(t *testing.T, path string) {
 	}
 }
 
-// 手で動かした子の確定: 依頼の後に子を review/ から done/ へ手で動かし、未コミット（移動が未共有）の confirm →
-// コミットして push し、移動の後に付いた指摘・変更要求・移動より前の指摘の confirm（版つきで受け入れ台帳に足す）。
-const manualOracle = `
-import io, json, os, shutil, subprocess, sys
-from ccnavi.infra import fsio, settings
-from ccnavi.tickets.core import review
-from ccnavi.tickets.model import via
-from ccnavi.tickets.review import request
-c = json.load(sys.stdin)
-root = c["root"]
-tree = os.path.join(root, ".claude", "worktrees", "i0001")
-logs = os.path.join(root, "logs")
-env = dict(os.environ, **dict(kv.split("=", 1) for kv in c["env"]))
-def git(*args):
-    subprocess.run(["git", *args], cwd=tree, env=env, check=True, capture_output=True)
-def rel(s):
-    return s.replace(root, "<root>")
-conf, _ = settings.load(root)
-out = []
-def run(name, f, *args):
-    o, e = io.StringIO(), io.StringIO()
-    code = f(o, e, *args)
-    out.append([name, code, rel(o.getvalue()), rel(e.getvalue())])
-def result(name):
-    return os.path.join(logs, name + ".json")
-with fsio.clock(c["clock"]), via.session(via.VIA_CLI):
-    run("prepare", request.prepare, root, conf, tree, 1, os.path.join(root, "body.md"))
-    run("requested", request.requested, root, conf, tree, 1, result("posted"))
-    git("add", "-A")
-    git("commit", "-q", "-m", "requested")
-    git("push", "-q", "origin", "i0001")
-    done = os.path.join(tree, ".ccnavi", "approved", "done")
-    os.makedirs(done, exist_ok=True)
-    shutil.move(os.path.join(tree, "wip", "proposals", "review", "i0001-01-01.md"), os.path.join(done, "i0001-01-01.md"))
-    run("unshared", review.confirm_local, root, conf, tree, 1, result("old"))
-    git("add", "-A")
-    git("commit", "-q", "-m", "move by hand")
-    git("push", "-q", "origin", "i0001")
-    run("late", review.confirm_local, root, conf, tree, 1, result("late"))
-    run("changes", review.confirm_local, root, conf, tree, 1, result("changes"))
-    run("old", review.confirm_local, root, conf, tree, 1, result("old"))
-files = {}
-for base in (os.path.join(tree, ".ccnavi"), os.path.join(tree, "wip")):
-    for here, _, names in os.walk(base):
-        for n in names:
-            p = os.path.join(here, n)
-            with open(p, encoding="utf-8") as f:
-                files[rel(p).replace(os.sep, "/")] = rel(f.read())
-json.dump({"out": out, "files": files}, sys.stdout, ensure_ascii=False)
-`
-
 func TestManualConfirmMatchesPython(t *testing.T) {
 	prepare := func(root string) string {
 		mr := `"host": "github", "mr": {"number": 7, "url": "https://h/pr/7"}`
@@ -441,10 +250,8 @@ func TestManualConfirmMatchesPython(t *testing.T) {
 		testkit.Put(t, filepath.Join(root, "logs", "late.json"), thread("2999-01-01T00:00:00Z"))
 		return root
 	}
-	pyRoot, root := prepare(reviewWorkspace(t)), prepare(reviewWorkspace(t))
-	want := testkit.Answers[answers](t, "manual", manualOracle, map[string]any{
-		"root": pyRoot, "clock": fixedClock, "env": testkit.GitEnv(),
-	})
+	root := prepare(reviewWorkspace(t))
+	want := golden.Load[answers](t, "manual")
 	conf, _ := config.Load(root)
 	restore, err := fsio.FixClock(fixedClock)
 	if err != nil {

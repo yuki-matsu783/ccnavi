@@ -21,7 +21,7 @@ import tempfile
 import unittest
 
 from tests import ROOT
-from tests.sh.install_harness import host_target
+from tests.exe import host_target
 
 LAUNCHER = os.path.join(
     ROOT,

@@ -48,7 +48,7 @@ LAUNCHER = _launcher_source()
 
 
 # この機械で組み立てたときに scripts/ccnavi-build.sh が書く目印。導入スクリプトはこれを自分の
-# uname と比べる。ここは uname とは別の読み方（install_harness.host_target）で取るので、
+# uname と比べる。ここは uname とは別の読み方（tests.exe.host_target）で取るので、
 # 2 つの語が食い違えばテストが失敗する。
 THIS_MACHINE = install_harness.THIS_MACHINE
 # どの機械とも一致しない目印。
@@ -1710,7 +1710,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             "uv run": r"\buv run\b",
             "scripts/check_rules.py": r"scripts/check_rules\.py",
             "配布元の docs/": r"(?<![\w])(?:docs/\d\d_|\.agents/docs)",
-            "配布元の src/ccnavi": r"src/ccnavi/",
+            "配布元の go/": r"(?<![\w/])go/(?:internal|cmd)/",
             "親ディレクトリをさかのぼる": r"\]\((?:\.\./)+",
         }
         problems = []

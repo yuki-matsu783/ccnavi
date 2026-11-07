@@ -3,14 +3,12 @@ package texts
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"io/fs"
 	"maps"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -18,6 +16,7 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/policy/rules"
 )
 
@@ -205,16 +204,16 @@ func keys(c *Catalog) []string {
 	return out
 }
 
-// 文面ファイルの識別子は、どこかから引かれている。引く側は Go・sh と、外すまでの Python の実行ファイル。
+// 文面ファイルの識別子は、どこかから引かれている。引く側は Go と sh。
 func TestEveryIDInTheFilesIsAskedForSomewhere(t *testing.T) {
 	repo := repoRoot(t)
 	var body strings.Builder
-	for _, dir := range []string{"go", filepath.Join("src", "ccnavi"), filepath.Join(".ccnavi", "scripts")} {
+	for _, dir := range []string{"go", filepath.Join(".ccnavi", "scripts")} {
 		_ = filepath.WalkDir(filepath.Join(repo, dir), func(path string, d fs.DirEntry, err error) error {
 			if err != nil || d.IsDir() || strings.HasSuffix(path, "_test.go") {
 				return nil
 			}
-			if ext := filepath.Ext(path); ext == ".go" || ext == ".py" || ext == ".sh" {
+			if ext := filepath.Ext(path); ext == ".go" || ext == ".sh" {
 				data, _ := os.ReadFile(path)
 				body.Write(data)
 			}
@@ -278,101 +277,8 @@ func firstCases(e *Entry) Variants {
 	return v
 }
 
-const sayOracle = `
-import json, sys
-from ccnavi.policy import texts
-out = []
-for c in json.load(sys.stdin):
-    out.append(texts.say(c["root"], c["id"], c["values"], c["variants"]))
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
-
-type sayCase struct {
-	Root     string   `json:"root"`
-	ID       string   `json:"id"`
-	Values   Values   `json:"values"`
-	Variants Variants `json:"variants"`
-}
-
-// 文面ファイルの全件を、場合ごとに組み立てて Python の texts.say と突き合わせる。
-func TestSayAgainstPython(t *testing.T) {
-	repo := repoRoot(t)
-	py := filepath.Join(repo, ".venv", "bin", "python")
-	if _, err := os.Stat(py); err != nil {
-		t.Skip("リポジトリの .venv の Python が無い")
-	}
-	c := Load(repo)
-	tricky := []string{"v", "a b", "$x `y` 'q'", "改行\n次: 偽\u3000", "C:\\a b\\c", ""}
-	var cases []sayCase
-	for i, id := range slices.Sorted(maps.Keys(c.Entries)) {
-		e := c.Entries[id]
-		values := Values{}
-		for j, name := range e.Values {
-			values[name] = tricky[(i+j)%len(tricky)]
-		}
-		cases = append(cases, sayCase{repo, id, values, firstCases(e)})
-		for name, f := range e.fields {
-			for _, k := range f.cases {
-				v := firstCases(e)
-				v[name] = k
-				cases = append(cases, sayCase{repo, id, values, v})
-			}
-		}
-		if len(e.Values) > 0 {
-			cases = append(cases, sayCase{repo, id, Values{}, firstCases(e)})
-		}
-		cases = append(cases, sayCase{repo, id, values, Variants{}})
-	}
-	cases = append(cases, sayCase{repo, "NOTICE_NOTHING", nil, nil}, sayCase{repo, "CHOICES_NOTHING", nil, nil},
-		sayCase{repo, "NEXT_NOTHING", nil, nil}, sayCase{repo, "NOTE_NOTHING", nil, nil}, sayCase{repo, "NUDGE_NOTHING", nil, nil},
-		sayCase{repo, "DENY_NOTHING", nil, nil}, sayCase{repo, "ZZZ", nil, nil}, sayCase{t.TempDir(), "DENY_X", nil, nil})
-	data, _ := json.Marshal(cases)
-	cmd := exec.Command(py, "-c", sayOracle)
-	cmd.Env = append(os.Environ(), "PYTHONPATH="+filepath.Join(repo, "src"), "PYTHONDONTWRITEBYTECODE=1")
-	cmd.Stdin = bytes.NewReader(data)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("python: %v\n%s", err, stderr.String())
-	}
-	var want []string
-	if err := json.Unmarshal(out, &want); err != nil {
-		t.Fatal(err)
-	}
-	bad := 0
-	for i, k := range cases {
-		if got := Say(k.Root, k.ID, k.Values, k.Variants); got != want[i] {
-			bad++
-			if bad <= 10 {
-				t.Errorf("%s %v %v\n got  %q\n want %q", k.ID, k.Values, k.Variants, got, want[i])
-			}
-		}
-	}
-	if bad > 0 {
-		t.Errorf("%d / %d 件が Python と違う", bad, len(cases))
-	}
-}
-
-var update = flag.Bool("update", false, "testdata の Python の答えを取り直す")
-
-const checkOracle = `
-import json, sys
-from ccnavi.policy import texts
-out = []
-for c in json.load(sys.stdin):
-    entries, problems = texts.check_text(c, "/x/m.yml")
-    out.append([sorted(entries), [str(p) for p in problems]])
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
-
-// 誤りのある文面を Python の texts.check_text と突き合わせる（苦情の文と、採る件）。
+// 誤りのある文面を、Python の texts.check_text の答えの写し（testdata）と突き合わせる（苦情の文と、採る件）。
 func TestCheckTextAgainstPython(t *testing.T) {
-	repo := repoRoot(t)
-	py := filepath.Join(repo, ".venv", "bin", "python")
-	if _, err := os.Stat(py); err != nil {
-		py = ""
-	}
 	entries := []string{
 		"  deny_x: {kind: deny}",
 		"  FOO_X: {kind: deny}",
@@ -404,49 +310,13 @@ func TestCheckTextAgainstPython(t *testing.T) {
 		docs = append(docs, "version: 1\nmessages:\n"+e+"\n")
 	}
 	docs = append(docs, "version: 2\nmessages: {}\n", "version: true\nmessages: {}\n", "messages: {}\n", "version: 1\nmessages: []\n", "- 1\n")
-	// Python の答えは testdata に写して持つ（Python を外したあとも同じ答えを確かめる）。-update で取り直す。
-	const golden = "testdata/check_text.json"
-	var want [][2][]string
-	saved, readErr := os.ReadFile(golden)
-	if py == "" {
-		if readErr != nil {
-			t.Skip("Python も testdata の写しも無い")
-		}
-		if err := json.Unmarshal(saved, &want); err != nil {
-			t.Fatal(err)
-		}
-	} else {
-		data, _ := json.Marshal(docs)
-		cmd := exec.Command(py, "-c", checkOracle)
-		cmd.Env = append(os.Environ(), "PYTHONPATH="+filepath.Join(repo, "src"), "PYTHONDONTWRITEBYTECODE=1")
-		cmd.Stdin = bytes.NewReader(data)
-		var stderr bytes.Buffer
-		cmd.Stderr = &stderr
-		out, err := cmd.Output()
-		if err != nil {
-			t.Fatalf("python: %v\n%s", err, stderr.String())
-		}
-		if err := json.Unmarshal(out, &want); err != nil {
-			t.Fatal(err)
-		}
-		fresh, _ := json.Marshal(want)
-		if *update {
-			if err := os.MkdirAll("testdata", 0o755); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(golden, append(fresh, '\n'), 0o644); err != nil {
-				t.Fatal(err)
-			}
-		} else if readErr != nil || !bytes.Equal(bytes.TrimSpace(saved), fresh) {
-			t.Errorf("%s が Python の答えと違う（go test -run %s -update で取り直す）", golden, t.Name())
-		}
-	}
+	want := golden.Load[[][2][]string](t, "check_text")
 	said := 0
 	for _, w := range want {
 		said += len(w[1])
 	}
 	if said < len(docs) {
-		t.Fatalf("Python の苦情が %d 件しかない", said)
+		t.Fatalf("見本の苦情が %d 件しかない", said)
 	}
 	for i, d := range docs {
 		found, problems := CheckText(d, "/x/m.yml")

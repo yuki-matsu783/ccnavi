@@ -7,43 +7,17 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/shell"
 
 	"ccnavi/internal/tickets/testkit"
 )
 
-// Python の user_only・phase_forms と突き合わせる。表から組む式の文字列が 1 字も違わないこと、同じコマンドに
-// 同じ答え（見つけた種類と文字列・止めた文）を返すことを、決めた入力と乱数の入力で見る。シェルの読み
-// （shellread.read の text・層）は Python の答えをそのまま当てる（突き合わせは infra/shell が持つ）。
-// リポジトリの .venv の Python が無ければ testdata の写しと比べる。
-
-// answers は testkit.Answers に、文面ファイルを読むリポジトリのルートを添えて渡す（Python の側は c["root"] と
-// c["in"] で読む）。name が空なら写しを持たない。
-func answers[T any](t *testing.T, name, script string, in any) T {
-	t.Helper()
-	return testkit.Answers[T](t, name, script, map[string]any{"root": testkit.RepoRoot(t), "in": in})
-}
-
-// 文は root の文面ファイルから引くので、写しにはリポジトリの外の答え（文の中身）を入れない。文の突き合わせは
-// 写しを持たない回（name が空）だけで見る。
-
-const formsOracle = `
-import json, sys
-from ccnavi.tickets.model import user_only as u, phase_forms as p
-json.dump({
-    "cli": u.cli_forms(p._NOT_PREVIEW),
-    "script": u.script_forms(),
-    "hold": u.hold_exempt_forms(),
-    "forbidden": u.subagent_forbidden_forms(),
-    "entry": u.user_entry_forms(excluding="prune"),
-    "verb": u.user_verb_forms("prune"),
-    "userScript": u.user_script_pattern().pattern,
-    "board": [[rx.pattern for rx in combo] for combo in u.board_combos()],
-    "rules": {b: p.ticket_approval_rule(b, "/w").regex for b in json.load(sys.stdin)["in"]},
-}, sys.stdout, ensure_ascii=False)
-`
+// Python の user_only・phase_forms の答えの写し（testdata）と突き合わせる。表から組む式の文字列が 1 字も違わない
+// こと、同じコマンドに同じ答え（見つけた種類と文字列）を返すことを、決めた入力と乱数の入力で見る。シェルの読み
+// （shellread.read の text・層）は写しの答えをそのまま当てる（読みの突き合わせは infra/shell が持つ）。
+// 文は root の文面ファイルから引くので写しには入れず、Go の答えの見本（golden.Check）で見る。
 
 type formsAnswer struct {
 	CLI, Script, Hold, Forbidden, Entry, Verb, UserScript string
@@ -54,7 +28,7 @@ type formsAnswer struct {
 var bins = []string{"", "/opt/x/bin/ccnavi", `C:\tools\ccnavi.exe`, "/w/.ccnavi/bin/my-ccnavi"}
 
 func TestFormsMatchPython(t *testing.T) {
-	want := answers[formsAnswer](t, "forms", formsOracle, bins)
+	want := golden.Load[formsAnswer](t, "forms")
 	var board [][]string
 	for _, combo := range boardRx {
 		var row []string
@@ -86,55 +60,12 @@ func TestFormsMatchPython(t *testing.T) {
 	}
 }
 
-const judgeOracle = `
-import json, sys
-from ccnavi.infra import shellread
-from ccnavi.tickets.model import phase_forms as p
-STOP = "!StopIteration"
-data = json.load(sys.stdin)
-root, messages = data["root"], data["in"]["messages"]
-rules = {b: p.ticket_approval_rule(b, root) for b in data["in"]["bins"]}
-out = []
-for c in data["in"]["commands"]:
-    r = shellread.read(c)
-    inner = []
-    if r.unwrapped:
-        inner = [[a, b] for a, b in zip(r.runners, r.unwrapped.split(shellread.SEP))]
-    inner += [[shellread.MOVED, x] for x in r.moved.split(shellread.SEP) if x]
-    subject = c if r.degraded else r.text
-    reason = r.reason if r.degraded else ""
-    unwrapped = shellread.SEP.join(x for _, x in inner)
-    row = {"subject": subject, "reason": reason, "inner": inner,
-           "exempt": p.exempt(subject, reason), "forbidden": p.forbidden(subject, unwrapped),
-           "human": list(p.human_path_form(c)), "hidden": {}, "prune": {}, "userPrune": {}, "rule": {}}
-    for b in data["in"]["bins"]:
-        try:
-            row["hidden"][b] = list(p.hidden_user_entry(c, [tuple(x) for x in inner], b))
-        except StopIteration:
-            row["hidden"][b] = [STOP, ""]
-        row["prune"][b] = p.prune_form(c, b)
-        row["userPrune"][b] = p.user_prune_form(c, b)
-        row["rule"][b] = rules[b].compiled.search(subject) is not None
-    if messages:
-        kind, found = row["human"]
-        row["humanText"] = "" if not kind else (
-            p.guard_off_message(root, found) if kind == "guard-off"
-            else p.user_script_message(root, found) if kind == "user-script"
-            else p.expanded_option_message(root, found) if kind == "expanded"
-            else p.board_form_message(root, found))
-        entry, found = row["hidden"][""]
-        row["hiddenText"] = p.hidden_entry_message(root, entry, found) if entry and entry != STOP else entry
-    out.append(row)
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
-
-// pythonStop は Python の hidden_user_entry が StopIteration で落ちる形の印（judgeOracle の STOP）。
+// pythonStop は Python の hidden_user_entry が StopIteration で落ちた形の、写しの印。
 const pythonStop = "!StopIteration"
 
 type judgeIn struct {
 	Commands []string `json:"commands"`
 	Bins     []string `json:"bins"`
-	Messages bool     `json:"messages"`
 }
 
 type judgeRow struct {
@@ -154,7 +85,7 @@ type judgeRow struct {
 
 func compareJudge(t *testing.T, name string, in judgeIn) {
 	t.Helper()
-	want := answers[[]judgeRow](t, name, judgeOracle, in)
+	want := golden.Load[[]judgeRow](t, name)
 	root := testkit.RepoRoot(t)
 	ruleFor := map[string]func(string) bool{}
 	for _, b := range in.Bins {
@@ -205,25 +136,9 @@ func compareJudge(t *testing.T, name string, in judgeIn) {
 				report(c, "TicketApprovalRule "+b, got, w.Rule[b])
 			}
 		}
-		if in.Messages {
-			text := ""
-			if kind != HumanNone {
-				text = HumanMessage(root, kind, found)
-			}
-			if text != w.HumanText {
-				report(c, "HumanMessage", text, w.HumanText)
-			}
-			text = ""
-			if entry, word := HiddenUserEntry(c, inner, ""); entry != "" {
-				text = HiddenEntryMessage(root, entry, word)
-			}
-			if text != w.HiddenText && !(w.HiddenText == pythonStop && text != "") {
-				report(c, "HiddenEntryMessage", text, w.HiddenText)
-			}
-		}
 	}
 	if bad > 0 {
-		t.Errorf("%d 件が Python と違う", bad)
+		t.Errorf("%d 件が写しと違う", bad)
 	}
 }
 
@@ -236,11 +151,26 @@ func TestJudgeMatchesPythonOnRandomCommands(t *testing.T) {
 	compareJudge(t, "random", judgeIn{Commands: slices.Concat(randomCommands(rnd, 300), mutatedCommands(rnd, 200)), Bins: bins})
 }
 
-// 写しを持たない回。乱数の種を変え、文も突き合わせる。
-func TestJudgeMatchesPythonFresh(t *testing.T) {
-	rnd := rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 3))
-	commands := slices.Concat(seedCommands, randomCommands(rnd, 1500), mutatedCommands(rnd, 1500))
-	compareJudge(t, "", judgeIn{Commands: commands, Bins: bins[:2], Messages: true})
+// 止めた文は、表のコマンド（読みは写しの judge のもの）で Go の答えの見本と比べる。
+func TestMessagesOnTheTables(t *testing.T) {
+	root := testkit.RepoRoot(t)
+	rows := golden.Load[[]judgeRow](t, "judge")
+	var said [][2]string
+	for i, c := range seedCommands {
+		var inner []Layer
+		for _, l := range rows[i].Inner {
+			inner = append(inner, Layer{Runner: l[0], Text: l[1]})
+		}
+		var human, hidden string
+		if kind, found := HumanPathForm(c); kind != HumanNone {
+			human = HumanMessage(root, kind, found)
+		}
+		if entry, word := HiddenUserEntry(c, inner, ""); entry != "" {
+			hidden = HiddenEntryMessage(root, entry, word)
+		}
+		said = append(said, [2]string{human, hidden})
+	}
+	golden.Check(t, "messages", said)
 }
 
 // 乱数のコマンドの部品。止める形の語と、それを崩す引用・展開・区切りを混ぜる。
@@ -310,28 +240,6 @@ func mutatedCommands(rnd *rand.Rand, n int) []string {
 	return out
 }
 
-const argvOracle = `
-import json, sys, types
-from ccnavi.tickets.model import user_only as u
-out = []
-for argv, given in json.load(sys.stdin)["in"]:
-    row = {}
-    try:
-        rest, verb = u.rewrite(list(argv))
-        row["rewrite"] = [rest, list(verb.words) if verb else None, ""]
-    except u.UserEntryError as e:
-        row["rewrite"] = [None, None, str(e)]
-    try:
-        rest, mark = u.take_entry(list(argv))
-        row["take"] = [rest, mark, ""]
-    except u.UserEntryError as e:
-        row["take"] = [None, "", str(e)]
-    args = types.SimpleNamespace(**{k[2:].replace("-", "_"): True for k in given})
-    row["refused"] = u.refused(args)
-    out.append(row)
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
-
 type argvRow struct {
 	Rewrite [3]any `json:"rewrite"`
 	Take    [3]any `json:"take"`
@@ -363,7 +271,7 @@ func TestEntryMatchesPython(t *testing.T) {
 		}
 		cases = append(cases, [2][]string{argv, given})
 	}
-	want := answers[[]argvRow](t, "argv", argvOracle, cases)
+	want := golden.Load[[]argvRow](t, "argv")
 	for i, c := range cases {
 		argv, given := c[0], c[1]
 		var rewrite [3]any

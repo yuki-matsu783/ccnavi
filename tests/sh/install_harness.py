@@ -10,16 +10,15 @@ from __future__ import annotations
 
 import contextlib
 import os
-import platform
 import shutil
 import stat
 import subprocess
-import sys
 import tempfile
 import time
 import unittest
 
 from tests import ROOT
+from tests.exe import host_target
 
 SHELL = shutil.which("sh")
 REAL_GIT = shutil.which("git")
@@ -226,17 +225,6 @@ esac
 
 def script(name: str) -> str:
     return os.path.join(ROOT, "scripts", name)
-
-
-def host_target() -> str:
-    """この機械の `<os>-<arch>`。sh（uname）とは別の読み方で求める（sh の語が食い違えば落ちる）。
-
-    語は scripts/ccnavi-build.sh の --target と go/internal/infra/platformtag と同じ。
-    """
-    system = {"win32": "windows", "darwin": "darwin"}.get(sys.platform, "linux")
-    machine = platform.machine().lower()
-    arch = {"amd64": "x86_64", "x86_64": "x86_64", "aarch64": "arm64", "arm64": "arm64"}
-    return f"{system}-{arch.get(machine, machine)}"
 
 
 # この機械で組み立てたときに scripts/ccnavi-build.sh が dist/ccnavi.target に書く目印。

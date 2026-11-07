@@ -9,11 +9,11 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/records/audit"
 	"ccnavi/internal/records/stopreview"
-	"ccnavi/internal/tickets/testkit"
 )
 
 const (
@@ -193,16 +193,8 @@ var commands = []string{
 	"",
 }
 
-const oracle = `
-import json, sys
-from ccnavi.hook import stopjudge
-c = json.load(sys.stdin)
-json.dump([[stopjudge.stop_review_call(x), stopjudge.judge_command_ok(x, c["cwd"]), stopjudge.judge_command_ok(x)]
-           for x in c["commands"]], sys.stdout)
-`
-
 func TestCommandsMatchPython(t *testing.T) {
-	want := testkit.Answers[[][3]bool](t, "commands", oracle, map[string]any{"cwd": cwd, "commands": commands})
+	want := golden.Load[[][3]bool](t, "commands")
 	for i, command := range commands {
 		got := [3]bool{stopReviewCall(command), judgeCommandOK(command, cwd), judgeCommandOK(command, "")}
 		if got != want[i] {

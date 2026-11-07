@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/lifecycle/integrate"
 	"ccnavi/internal/tickets/testkit"
@@ -82,41 +83,10 @@ func landedWorkspace(t *testing.T) string {
 	return root
 }
 
-const pendingOracle = `
-import json, os, sys, time
-from ccnavi.infra import settings
-from ccnavi.tickets.lifecycle import stop_integrate as osi
-from ccnavi.tickets.notice import pending_integrate as pi
-c = json.load(sys.stdin)
-out = {}
-for key, root in c["roots"].items():
-    conf = settings.Settings(projects="")
-    marks = os.path.join(root, ".git", osi.RECORD_DIR)
-    lines = {}
-    reported = set()
-    for name in sorted(os.listdir(marks)) if os.path.isdir(marks) else []:
-        reported.add(name)
-        fields = osi._read_record(os.path.join(marks, name, "marker"))
-        if fields.get("version") == "4":
-            lines[name] = pi._v4_line(root, root, name, fields, time.monotonic() + 60)
-        else:
-            lines[name] = pi._unknown_line(root, root, name, fields.get("version", ""))
-    for name, line in pi._leftovers(root, root, reported, time.monotonic() + 60):
-        lines["left:" + name] = line
-    out[key] = {
-        "lines": {k: v.replace(root, "<root>") for k, v in lines.items()},
-        "notice": pi.pending_notice(root, conf, time.monotonic() + 60).replace(root, "<root>"),
-        "expired": pi.pending_notice(root, conf, time.monotonic() - 1).replace(root, "<root>"),
-        "key": pi.repo_key(root, root),
-    }
-out["braces"] = pi._v4_line(c["roots"]["many"], c["braces"], "v7", {"version": "4"}, time.monotonic() + 60).replace(c["roots"]["many"], "<root>")
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
-
 func TestPendingIntegrateMatchesPython(t *testing.T) {
 	roots := map[string]string{"many": pendingWorkspace(t), "landed": landedWorkspace(t), "empty": workspace(t)}
 	braces := filepath.Join(roots["many"], "a{b}c{0}")
-	want := testkit.Answers[map[string]any](t, "pending", pendingOracle, map[string]any{"roots": roots, "braces": braces})
+	want := golden.Load[map[string]any](t, "pending")
 	got := map[string]any{}
 	for key, root := range roots {
 		conf := &config.Settings{}

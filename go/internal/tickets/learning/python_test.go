@@ -7,39 +7,13 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/records/wiki"
-	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の tickets/learning と同じ入力を読ませ、記録の読み取り・整合の検査・節の文・追記・コマンドの語・要約の JSON・
 // HEAD の記録から処理すべきものの列挙が 1 字も違わないことを見る。
-
-const textOracle = `
-import json, sys
-from ccnavi.tickets.learning import notes, records
-c = json.load(sys.stdin)
-out = {"parse": [], "entry": [], "append": [], "words": [], "validate": []}
-for text in c["parse"]:
-    rec, why = records.parse("p", "c-01-01", text)
-    if rec is None:
-        out["parse"].append(["", why, []])
-    else:
-        out["parse"].append([records.consistency_problem(rec), "",
-            [[s.title, s.signal, list(s.process or ())] for s in rec.sections]])
-for body in c["entry"]:
-    out["entry"].append(notes.entry_text(body, "", "", "2026-01-01T00:00:00+0900"))
-for text in c["append"]:
-    try:
-        out["append"].append(notes.append_entry(text, "## t\n\n- 内容: x\n", "c-01-01", "c"))
-    except ValueError as e:
-        out["append"].append("error: " + str(e))
-out["words"] = [notes.command_word(s) for s in c["words"]]
-out["validate"] = [notes.validate(*v) for v in c["validate"]]
-out["digest"] = json.dumps(notes.build_digest(c["records"], True, "t1"), ensure_ascii=True, indent=1)
-out["whole"] = json.dumps(notes.build_digest(c["records"], False), ensure_ascii=True, indent=1)
-print(json.dumps(out))
-`
 
 type textAnswers struct {
 	Parse    [][]any  `json:"parse"`
@@ -120,9 +94,7 @@ func digestRecords() []any {
 func TestMatchesPython(t *testing.T) {
 	validateCases := [][]string{{"", "", ""}, {"  ", "", ""}, {"本文", "x", ""}, {"本文", "", "x"}, {"本文", "skill", "訂正"}, {"本文", "docs", "誤り"}}
 	records := digestRecords()
-	in := map[string]any{"parse": parseCases, "entry": entryCases, "append": appendCases, "words": wordCases,
-		"validate": validateCases, "records": records}
-	want := testkit.Answers[textAnswers](t, "text", textOracle, in)
+	want := golden.Load[textAnswers](t, "text")
 
 	for i, text := range parseCases {
 		got := []any{"", "", []any{}}
@@ -205,16 +177,6 @@ func asObjects(t *testing.T, records []any) []*pyjson.Object {
 	return out
 }
 
-const findOracle = `
-import json, sys
-from ccnavi.tickets.learning import records
-c = json.load(sys.stdin)
-found = records.pending(c["root"])
-print(json.dumps({"items": [[i.path, i.title, i.why, i.describe()] for i in found.items],
-    "unreadable": [list(p) for p in found.unreadable], "inconsistent": [list(p) for p in found.inconsistent],
-    "uncommitted": records.uncommitted(c["root"])}))
-`
-
 type findAnswers struct {
 	Items        [][]string `json:"items"`
 	Unreadable   [][]string `json:"unreadable"`
@@ -255,7 +217,7 @@ func TestFindMatchesPython(t *testing.T) {
 	put(t, root, "docs/wiki/patterns/new.md", "x\n")
 	put(t, root, "src/other.go", "x\n")
 
-	want := testkit.Answers[findAnswers](t, "find", findOracle, map[string]string{"root": root})
+	want := golden.Load[findAnswers](t, "find")
 	found := Find(root)
 	got := findAnswers{Uncommitted: Uncommitted(root)}
 	for _, i := range found.Items {

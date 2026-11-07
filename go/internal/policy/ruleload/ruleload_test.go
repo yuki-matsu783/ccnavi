@@ -3,56 +3,21 @@ package ruleload
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/records/audit"
 )
 
-var update = flag.Bool("update", false, "testdata の Python の答えを取り直す")
-
 const rootMark = "{ROOT}"
-
-func repoRoot(t *testing.T) string {
-	t.Helper()
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, ".ccnavi", "messages")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Skip("リポジトリが見つからない")
-		}
-		dir = parent
-	}
-}
-
-func venvPython(root string) string {
-	for _, rel := range []string{".venv/bin/python", ".venv/Scripts/python.exe"} {
-		if p := filepath.Join(root, rel); fileExists(p) {
-			return p
-		}
-	}
-	return ""
-}
-
-func fileExists(p string) bool {
-	_, err := os.Stat(p)
-	return err == nil
-}
 
 func write(t *testing.T, path, text string) {
 	t.Helper()
@@ -155,47 +120,6 @@ var calls = [][2]string{
 	{"Read", "{ROOT}/README.md"},
 }
 
-const oracle = `
-import io, json, os, sys, types
-from ccnavi.infra import settings
-from ccnavi.policy import ruleload, rules
-from ccnavi.records import audit
-case = json.load(sys.stdin)
-out = []
-for s in case["scenarios"]:
-    root = s["root"]
-    mark = lambda x: x.replace(root, "{ROOT}")
-    conf, _ = settings.load(root)
-    def ids(rs):
-        return {name: [[r.id, r.source, r.file, r.base] for r in rs.section(name)] for name in rules.SECTIONS}
-    res = {"calls": []}
-    for tool, written in case["calls"]:
-        written = written.replace("{ROOT}", root)
-        record = audit.Record()
-        record.subject = written
-        said = io.StringIO()
-        rs, source, target = ruleload.rules_for(said, conf, root, types.SimpleNamespace(tool_name=tool), record)
-        res["calls"].append({
-            "rules": ids(rs), "source": mark(source),
-            "target": None if target is None else [target.name, target.project],
-            "fallback": record.fallback, "detail": mark(record.detail), "said": mark(said.getvalue()),
-        })
-    def view(v):
-        return {"name": v.name, "path": mark(v.path), "rules": ids(v.rule_set), "unreadable": mark(v.unreadable),
-                "missing": v.missing, "problems": [mark(str(p)) for p in v.problems]}
-    said = io.StringIO()
-    res["survey"] = [view(v) for v in ruleload.survey(said, conf, root)]
-    res["sums"] = [view(ruleload.sum_view(said, conf, root, l)) for l in ruleload.layers(conf, root)]
-    res["survey_said"] = mark(said.getvalue())
-    res["layers"] = [[l.name, mark(l.home), mark(l.path)] for l in ruleload.layers(conf, root)]
-    res["files"] = [[f.origin, f.layer, f.kind, mark(f.path)] for f in ruleload.layer_files(conf, root)]
-    res["stop"] = [r.id for r in ruleload.stop_rules(conf, root)]
-    res["deny_ids"] = sorted(ruleload.deny_ids(conf, root))
-    res["unreadable"] = ruleload.unreadable(conf, root)
-    out.append(res)
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
-
 type callResult struct {
 	Rules    map[string][][]any `json:"rules"`
 	Source   string             `json:"source"`
@@ -284,60 +208,13 @@ func goResult(t *testing.T, root string) result {
 	return res
 }
 
-// pythonResults は Python の答え。写し（testdata）があれば比べ、Python が無ければ写しを返す。
-func pythonResults(t *testing.T, cases []scenario) []result {
-	t.Helper()
-	path := filepath.Join("testdata", "ruleload.json")
-	var saved []result
-	data, readErr := os.ReadFile(path)
-	if readErr == nil {
-		if err := json.Unmarshal(data, &saved); err != nil {
-			t.Fatal(err)
-		}
-	}
-	repo := repoRoot(t)
-	py := venvPython(repo)
-	if py == "" {
-		if readErr != nil {
-			t.Skip("Python も testdata の写しも無い")
-		}
-		return saved
-	}
-	in, _ := json.Marshal(map[string]any{"scenarios": cases, "calls": calls})
-	cmd := exec.Command(py, "-c", oracle)
-	cmd.Env = append(os.Environ(), "PYTHONPATH="+filepath.Join(repo, "src"), "PYTHONDONTWRITEBYTECODE=1")
-	cmd.Stdin = bytes.NewReader(in)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	got, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("python: %v\n%s", err, stderr.String())
-	}
-	var fresh []result
-	if err := json.Unmarshal(got, &fresh); err != nil {
-		t.Fatalf("%v\n%s", err, got)
-	}
-	again, _ := json.Marshal(fresh)
-	if *update {
-		if err := os.MkdirAll("testdata", 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, append(again, '\n'), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	} else if readErr != nil || !bytes.Equal(bytes.TrimSpace(data), again) {
-		t.Errorf("%s が Python の答えと違う（go test -run %s -update で取り直す）", path, t.Name())
-	}
-	return fresh
-}
-
-// レイヤーの重ね方・出所・記録・診断の見え方・守る対象を Python の ruleload と突き合わせる。
+// レイヤーの重ね方・出所・記録・診断の見え方・守る対象を、Python の ruleload の答えの写し（testdata）と突き合わせる。
 func TestMatchesPython(t *testing.T) {
 	cases := slices.Clone(scenarios)
 	for i := range cases {
 		cases[i].Root = workspace(t, cases[i])
 	}
-	want := pythonResults(t, cases)
+	want := golden.Load[[]result](t, "ruleload")
 	if len(want) != len(cases) {
 		t.Fatalf("Python の答えが %d 件（%d 件のはず）", len(want), len(cases))
 	}

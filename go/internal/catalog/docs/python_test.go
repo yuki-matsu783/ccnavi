@@ -6,33 +6,21 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/testkit"
 )
 
-// Python の docsearch.run と突き合わせる。リポジトリの実際の文書（.ccnavi/docs・.agents/docs・docs/）を 2 つの
-// git に写し、片方を Python、片方を Go で引いて、出力と書いた索引が 1 字も違わないことを見る。
-
-const runOracle = `
-import io, json, sys
-from ccnavi.catalog import docsearch, docsearch_query
-from ccnavi.infra import settings
-c = json.load(sys.stdin)
-conf = settings.load(c["root"])[0]
-out = []
-for q in c["queries"]:
-    o, e = io.StringIO(), io.StringIO()
-    query = docsearch_query.Query(**q["query"])
-    code = docsearch.run(o, e, conf, c["root"], query, refresh=q["refresh"])
-    out.append({"code": code, "out": o.getvalue(), "err": e.getvalue()})
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
+// 文書の索引を引く Run と、文書の知らせを見る。決めた見本の文書で引いた答えは、Go の答えの見本（golden.Check）と
+// 比べる（見本は Python の docsearch.run と答えが揃っていた Go の答えから取った）。リポジトリの実際の文書で引く
+// ほうは、文書が変わるたびに答えが変わるので、索引を引けて書けたことだけを見る。
 
 type pyQuery struct {
 	Types    []string `json:"types,omitempty"`
@@ -155,35 +143,21 @@ var repoQueries = []runCase{
 	{pyQuery{Sort: "size", Format: "xml", Since: "2026-02-30", Until: "2026-8-5"}, true},
 }
 
-func TestRunMatchesPythonOnTheRepositoryDocs(t *testing.T) {
+func TestRunOnTheRepositoryDocs(t *testing.T) {
 	repo := testkit.RepoRoot(t)
-	pyRoot, goRoot := docsWorkspace(t, repo), docsWorkspace(t, repo)
-	want := testkit.Answers[[]runAnswer](t, "", runOracle, map[string]any{"root": pyRoot, "queries": repoQueries})
-	if len(want) != len(repoQueries) || strings.Count(want[1].Out, "\n") < 100 {
-		t.Fatalf("Python が索引を引けていない: %+v", want[:min(len(want), 2)])
-	}
-	conf := testkit.Settings(t, goRoot)
+	root := docsWorkspace(t, repo)
+	conf := testkit.Settings(t, root)
 	for i, c := range repoQueries {
 		var out, errOut bytes.Buffer
-		code := Run(&out, &errOut, conf, goRoot, c.Query.query(), c.Refresh)
-		got := runAnswer{code, out.String(), strings.ReplaceAll(errOut.String(), goRoot, pyRoot)}
-		if got != want[i] {
-			t.Errorf("%+v:\nGo  (%d): %.2000s\n%s\nPython (%d): %.2000s\n%s", c, got.Code, got.Out, got.Err, want[i].Code, want[i].Out, want[i].Err)
+		if code := Run(&out, &errOut, conf, root, c.Query.query(), c.Refresh); code != 0 && code != 1 {
+			t.Errorf("%+v: 終了コード %d\n%s", c, code, errOut.String())
+		}
+		if i == 1 && strings.Count(out.String(), "\n") < 100 {
+			t.Fatalf("索引を引けていない: %.2000s", out.String())
 		}
 	}
-	pyFiles, goFiles := indexFiles(t, pyRoot), indexFiles(t, goRoot)
-	if len(pyFiles) < 5 {
-		t.Fatalf("索引が書かれていない: %v", pyFiles)
-	}
-	for rel, text := range pyFiles {
-		if goFiles[rel] != text {
-			t.Errorf("%s が Python と違う\nGo:\n%.1500s\nPython:\n%.1500s", rel, goFiles[rel], text)
-		}
-	}
-	for rel := range goFiles {
-		if _, ok := pyFiles[rel]; !ok {
-			t.Errorf("%s は Go だけが書いた", rel)
-		}
+	if files := indexFiles(t, root); len(files) < 5 {
+		t.Fatalf("索引が書かれていない: %v", files)
 	}
 }
 
@@ -253,50 +227,26 @@ var edgeQueries = []runCase{
 }
 
 func TestRunMatchesPythonOnEdgeCases(t *testing.T) {
-	pyRoot, goRoot := edgeWorkspace(t), edgeWorkspace(t)
-	want := testkit.Answers[[]runAnswer](t, "", runOracle, map[string]any{"root": pyRoot, "queries": edgeQueries})
-	if !strings.Contains(want[0].Out, "projects/lib/docs/p") || !strings.Contains(want[0].Err, "nogit") {
-		t.Fatalf("見本が Python に届いていない: %+v", want[0])
-	}
-	conf := testkit.Settings(t, goRoot)
-	for i, c := range edgeQueries {
+	root := edgeWorkspace(t)
+	conf := testkit.Settings(t, root)
+	var answers []runAnswer
+	for _, c := range edgeQueries {
 		var out, errOut bytes.Buffer
-		code := Run(&out, &errOut, conf, goRoot, c.Query.query(), c.Refresh)
-		got := runAnswer{code, out.String(), strings.ReplaceAll(errOut.String(), goRoot, pyRoot)}
-		if got != want[i] {
-			t.Errorf("%d %+v:\nGo  (%d):\n%s\n%s\nPython (%d):\n%s\n%s", i, c, got.Code, got.Out, got.Err, want[i].Code, want[i].Out, want[i].Err)
-		}
+		code := Run(&out, &errOut, conf, root, c.Query.query(), c.Refresh)
+		answers = append(answers, runAnswer{code, out.String(), strings.ReplaceAll(errOut.String(), root, "<root>")})
 	}
-	pyFiles, goFiles := indexFiles(t, pyRoot), indexFiles(t, goRoot)
-	if len(pyFiles) < 5 {
-		t.Fatalf("索引が書かれていない: %v", pyFiles)
+	if !strings.Contains(answers[0].Out, "projects/lib/docs/p") || !strings.Contains(answers[0].Err, "nogit") {
+		t.Fatalf("見本の文書に届いていない: %+v", answers[0])
 	}
-	for rel, text := range pyFiles {
-		if goFiles[rel] != text {
-			t.Errorf("%s が Python と違う\nGo:\n%s\nPython:\n%s", rel, goFiles[rel], text)
-		}
+	files := indexFiles(t, root)
+	if len(files) < 5 {
+		t.Fatalf("索引が書かれていない: %v", files)
 	}
+	for rel, text := range files {
+		files[rel] = strings.ReplaceAll(text, root, "<root>")
+	}
+	golden.Check(t, "edge", map[string]any{"runs": answers, "files": files})
 }
-
-const noticeOracle = `
-import json, sys
-from ccnavi.catalog import docsearch
-from ccnavi.infra import hookio, settings
-c = json.load(sys.stdin)
-root = c["root"]
-conf = settings.load(root)[0]
-out = {
-    "start": docsearch.at_start(conf, root),
-    "first": docsearch.fail_streak_note(conf, root, 1, True),
-    "streak": docsearch.fail_streak_note(conf, root, 5),
-    "hints": [],
-}
-for h in c["hints"]:
-    payload = hookio.Input(event=hookio.POST_TOOL_USE, tool_name=h["tool"], cwd=h["cwd"],
-        tool_input={"file_path": root + "/" + h["rel"]}, tool_response={"type": h["kind"]})
-    out["hints"].append(docsearch.missing_frontmatter(conf, root, payload))
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 type hintCase struct {
 	Rel  string `json:"rel"`
@@ -349,42 +299,27 @@ func noticeWorkspace(t *testing.T, repo string, convention bool) string {
 func TestNoticesMatchPython(t *testing.T) {
 	repo := testkit.RepoRoot(t)
 	t.Setenv(env.EntryPath, ".ccnavi/scripts/ccnavi-launcher.sh")
+	all := map[string]noticeAnswer{}
 	for _, convention := range []bool{false, true} {
-		pyRoot, goRoot := noticeWorkspace(t, repo, convention), noticeWorkspace(t, repo, convention)
-		want := testkit.Answers[noticeAnswer](t, "", noticeOracle, map[string]any{"root": pyRoot, "hints": hintCases})
+		root := noticeWorkspace(t, repo, convention)
+		conf := testkit.Settings(t, root)
+		got := noticeAnswer{Start: AtStart(conf, root, time.Time{}), First: FailStreakNote(conf, root, 1, true), Streak: FailStreakNote(conf, root, 5, false)}
 		said := 0
-		for _, h := range want.Hints {
-			if h != "" {
-				said++
-			}
-		}
-		if said < 4 || !strings.Contains(want.Start, "書き換えなかった") || !strings.Contains(want.Start, ".gitignore") {
-			t.Fatalf("見本が Python に届いていない: %+v", want)
-		}
-		if !strings.Contains(want.Start, GuideHead) {
-			t.Fatalf("Python の案内 = %q", want.Start)
-		}
-		conf := testkit.Settings(t, goRoot)
-		got := noticeAnswer{Start: AtStart(conf, goRoot, time.Time{}), First: FailStreakNote(conf, goRoot, 1, true), Streak: FailStreakNote(conf, goRoot, 5, false)}
 		for _, h := range hintCases {
 			in := hookio.Input{Event: hookio.PostToolUse, ToolName: h.Tool, Cwd: h.Cwd,
-				ToolInput: pyjson.NewObject("file_path", goRoot+"/"+h.Rel), ToolResponse: pyjson.NewObject("type", h.Kind)}
-			got.Hints = append(got.Hints, MissingFrontmatter(conf, goRoot, in))
+				ToolInput: pyjson.NewObject("file_path", root+"/"+h.Rel), ToolResponse: pyjson.NewObject("type", h.Kind)}
+			hint := MissingFrontmatter(conf, root, in)
+			if hint != "" {
+				said++
+			}
+			got.Hints = append(got.Hints, strings.ReplaceAll(hint, root, "<root>"))
 		}
-		fix := func(s string) string { return strings.ReplaceAll(s, goRoot, pyRoot) }
+		if said < 4 || !strings.Contains(got.Start, "書き換えなかった") || !strings.Contains(got.Start, ".gitignore") || !strings.Contains(got.Start, GuideHead) {
+			t.Fatalf("見本の文書に届いていない: %+v", got)
+		}
+		fix := func(s string) string { return strings.ReplaceAll(s, root, "<root>") }
 		got.Start, got.First, got.Streak = fix(got.Start), fix(got.First), fix(got.Streak)
-		for i := range got.Hints {
-			got.Hints[i] = fix(got.Hints[i])
-		}
-		for _, f := range [][3]string{{"start", got.Start, want.Start}, {"first", got.First, want.First}, {"streak", got.Streak, want.Streak}} {
-			if f[1] != f[2] {
-				t.Errorf("%s (convention=%v):\nGo:     %s\nPython: %s", f[0], convention, f[1], f[2])
-			}
-		}
-		for i, h := range hintCases {
-			if got.Hints[i] != want.Hints[i] {
-				t.Errorf("hint %s (convention=%v):\nGo:     %s\nPython: %s", h.Rel, convention, got.Hints[i], want.Hints[i])
-			}
-		}
+		all[strconv.FormatBool(convention)] = got
 	}
+	golden.Check(t, "notices", all)
 }

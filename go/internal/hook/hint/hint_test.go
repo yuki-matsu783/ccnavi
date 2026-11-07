@@ -11,6 +11,7 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/git"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/testkit"
@@ -77,30 +78,12 @@ func TestProposalHint(t *testing.T) {
 			t.Errorf("%s: %q", name, got)
 		}
 	}
-	// 文は Python と 1 字も違わない。
-	const oracle = `
-import json, os, sys
-from ccnavi.hook import proposalhint
-from ccnavi.infra import hookio, settings
-c = json.load(sys.stdin)
-root = c["root"]
-out = []
-for rel, text in c["cases"]:
-    path = os.path.join(root, *rel.split("/"))
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(text)
-    p = hookio.Input(event="PostToolUse", tool_name="Write", tool_input={"file_path": path}, cwd=root,
-                     tool_response={"type": "create", "filePath": path})
-    out.append(proposalhint.hint(settings.load(root)[0], root, p).replace(root, "<root>"))
-print(json.dumps(out))
-`
-	cases := [][2]string{{todo, parentWrong}, {todo, parentBare}, {todo, parentFull}}
-	want := testkit.Answers[[]string](t, "", oracle, map[string]any{"root": root, "cases": cases})
-	for i, k := range cases {
-		if got := testkit.Rel(root, proposalHint(t, root, k[0], k[1], config.ToolWrite, createdType)); got != want[i] {
-			t.Errorf("%s:\nGo:     %s\nPython: %s", k[0], got, want[i])
-		}
+	// 文は見本（Python と答えが揃っていた Go の答えから取った）と 1 字も違わない。
+	var said []string
+	for _, k := range [][2]string{{todo, parentWrong}, {todo, parentBare}, {todo, parentFull}} {
+		said = append(said, testkit.Rel(root, proposalHint(t, root, k[0], k[1], config.ToolWrite, createdType)))
 	}
+	golden.Check(t, "proposal-hint", said)
 }
 
 // runGit は手元の時計でコミットする（reflog の時刻で「直前のコミット」を見るので、時刻を固定しない）。

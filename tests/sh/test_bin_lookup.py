@@ -17,7 +17,7 @@ import tempfile
 import unittest
 
 from tests import ROOT
-from tests.sh.install_harness import host_target
+from tests.exe import host_target
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 SCRIPTS = os.path.join(ROOT, ".ccnavi", "scripts")

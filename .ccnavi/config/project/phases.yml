@@ -15,13 +15,13 @@
 version: 1
 
 phases:
-  # ccnavi 自身の実装。共通レイヤーの implement（src/* と tests/*）に、このリポジトリに固有の
-  # 置き場（ビルド・配布する sh・設定・拡張機能）を足した範囲。
+  # ccnavi 自身の実装。実行ファイル（go/）とテストに、このリポジトリに固有の置き場（ビルドと配布の sh・
+  # 設定・拡張機能）を足した範囲。共通レイヤーの implement（src/* と tests/*）はこのリポジトリの形に合わない。
   implement-ccnavi:
     kind: work
     title: 実装とテスト（ccnavi 自身）
     review: true
-    scope: ["src/*", "tests/*", "build.py", "pyproject.toml", "scripts/*", ".ccnavi/*", "extensions/*"]
+    scope: ["go/*", "tests/*", "pyproject.toml", "scripts/*", ".ccnavi/*", "extensions/*"]
     skill: process-implement
     when: 振る舞いを変えるとき。受入テスト作成を先に置く（計画に受入テスト作成の項も置く）
 

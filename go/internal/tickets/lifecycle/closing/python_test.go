@@ -7,42 +7,13 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/git"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の tickets/lifecycle/close と同じワークスペースを 2 つ作って読ませ、引き方・止める文・閉じられない理由・
 // 成果物の検査・合流されていない修正が 1 字も違わないことを見る。
-
-const closingOracle = `
-import io, json, sys
-from ccnavi.infra import settings, tree
-from ccnavi.tickets.lifecycle import close as ops_close
-c = json.load(sys.stdin)
-root = c["root"]
-def rel(s):
-    return s.replace(root, "<root>")
-conf, _ = settings.load(root)
-out = {}
-for ident in c["ids"]:
-    buf = io.StringIO()
-    f = ops_close.find(buf, root, conf, ident)
-    e = {"find": rel(buf.getvalue()), "found": [f.ticket, f.state, f.tree] if f else None,
-         "absent": ops_close.absent(root, conf, ident), "close": [rel(p) for p in ops_close.close_problems(root, conf, ident)]}
-    if f is not None:
-        for name, fn in (("misplaced", ops_close.misplaced_home), ("stopped", ops_close.family_stopped),
-                         ("notStarted", ops_close.parent_not_started), ("unmet", ops_close.predecessors_unmet),
-                         ("busy", ops_close.parent_still_busy), ("missing", ops_close.deliverables_missing)):
-            b = io.StringIO()
-            r = fn(b, root, conf, f)
-            e[name] = [r, rel(b.getvalue())]
-        e["inWip"] = ops_close.deliverables_in_wip(root, conf, f)
-        pt = ops_close.phase_type(root, conf, f)
-        e["type"] = pt.id if pt else ""
-        e["fix"] = ops_close.unmerged_fix(root, tree.worktree_path(root, f.parent or f.ticket), f)
-    out[ident] = e
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 var closingIDs = []string{"i0001", "i0001-01-01", "i0001-02-01", "i0002", "i0002-01-01", "i0003", "i0003-01-01",
 	"i0005", "i0006", "i0006-01-01", "i0007", "i0007-01-01", "i0008", "i0008-01-01", "i0009-01-01", "i0010", "i0099"}
@@ -112,8 +83,8 @@ func list[T any](xs []T) []T {
 }
 
 func TestMatchesPython(t *testing.T) {
-	pyRoot, goRoot := closingWorkspace(t), closingWorkspace(t)
-	want := testkit.Answers[map[string]any](t, "closing", closingOracle, map[string]any{"root": pyRoot, "ids": closingIDs})
+	goRoot := closingWorkspace(t)
+	want := golden.Load[map[string]any](t, "closing")
 	conf := testkit.Settings(t, goRoot)
 	rel := func(s string) string { return strings.ReplaceAll(s, goRoot, "<root>") }
 	got := map[string]any{}

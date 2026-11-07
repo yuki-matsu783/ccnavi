@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/model/ticket"
 	"ccnavi/internal/tickets/testkit"
@@ -17,52 +18,6 @@ import (
 // Python の tickets/proposal（agree・agree_candidates・agree_digest・agree_screen・plan_order の preview）と同じ
 // ワークスペースを 2 つ作って読ませ、承認の対象の分け方・苦情・画面・指紋・確かめの本文・preview の JSON・
 // 承認の書き込みの並び・承認の事実の文が 1 字も違わないことを見る。
-
-const agreeOracle = `
-import base64, io, json, sys
-from ccnavi.infra import fsio, settings
-from ccnavi.tickets.proposal import agree, agree_digest, agree_screen
-c = json.load(sys.stdin)
-root = c["root"]
-def rel(s):
-    return s.replace(root, "<root>") if isinstance(s, str) else s
-conf, _ = settings.load(root)
-def gathered(only):
-    buf = io.StringIO()
-    g = agree.gather(buf, conf, root, only)
-    d = agree_digest.proposals_digest(g.batch)
-    v = agree.verify_verdict(root, g, conf.tickets)
-    h = agree.verify_verdict(root, g, conf.tickets, ("held", "止めた理由\n"))
-    with fsio.clock(c["stamp"]):
-        body = json.dumps(agree.preview_body(conf, root, g, d), ensure_ascii=False)
-    return g, {"stderr": rel(buf.getvalue()), "ids": g.identifiers,
-        "rejected": [[t.ticket, [rel(str(p)) for p in ps]] for t, ps in g.rejected],
-        "problems": [rel(p) for p in g.problems], "note": g.note, "refused": g.refused,
-        "nothing": g.nothing_pending, "broken": g.broken, "elsewhere": [rel(e) for e in g.elsewhere],
-        "text": rel(g.text), "digest": d, "verify": [v.ok, v.reason, rel(v.text)], "held": [h.ok, h.reason, rel(h.text)],
-        "body": rel(body)}
-out = {"gather": {}}
-for name, only in c["only"].items():
-    out["gather"][name] = gathered(only)[1]
-g, _ = gathered(None)
-planned = agree.plan_batch(root, conf, g.batch, c["stamp"])
-items = []
-for it in planned.stage.items:
-    if isinstance(it, fsio.Line):
-        items.append(["line", rel(it.text), it.group, it.stream])
-    elif isinstance(it, fsio.Call):
-        items.append(["call", it.group, [rel(x) for x in it.lines]])
-    else:
-        p = it.policy
-        content = None if it.content is None else base64.b64encode(it.content).decode()
-        items.append(["op", rel(it.path), content, rel(it.source), p.on_fail, rel(p.message), p.prefix,
-                      [rel(u) for u in p.undo], p.places, p.group, p.ticket, p.tag])
-out["plan"] = {"stopped": list(planned.stopped) if planned.stopped else None, "items": items}
-tickets = [cand.ticket for cand in g.batch]
-out["approved"] = [rel(agree_screen.approved_text(tickets, {"i0002"}, root, w, n)) for w, n in c["approved"]]
-out["approvedChild"] = rel(agree_screen.approved_text([cand.ticket for cand in g.batch if cand.ticket.is_child], set(), root))
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 const fixedStamp = "2026-01-06T03:04:05+0900"
 
@@ -114,10 +69,8 @@ func agreeWorkspace(t *testing.T) string {
 }
 
 func TestMatchesPython(t *testing.T) {
-	pyRoot, goRoot := agreeWorkspace(t), agreeWorkspace(t)
-	want := testkit.Answers[map[string]any](t, "agree", agreeOracle, map[string]any{
-		"root": pyRoot, "stamp": fixedStamp, "only": onlyCases, "approved": approvedCases,
-	})
+	goRoot := agreeWorkspace(t)
+	want := golden.Load[map[string]any](t, "agree")
 	got := goAnswers(t, goRoot)
 	for key, w := range want {
 		if g := normalize(t, got[key]); !reflect.DeepEqual(g, w) {

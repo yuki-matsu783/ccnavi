@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/tree"
@@ -14,27 +15,6 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 	"ccnavi/internal/tickets/testkit"
 )
-
-const launchOracle = `
-import copy, io, json, sys
-from ccnavi.hook import agentlaunch
-from ccnavi.infra import hookio, settings
-c = json.load(sys.stdin)
-root = c["root"]
-def rel(s):
-    return s.replace(root, "<root>")
-conf, _ = settings.load(root)
-off = copy.copy(conf)
-off.ticket_control = "disable"
-out = []
-for case in c["cases"]:
-    payload = hookio.decode(io.StringIO(case["payload"]))
-    r = agentlaunch.decide(off if case["off"] else conf, root, payload)
-    stop = [r.stop.code, r.stop.rule, rel(r.stop.text), r.stop.kind] if r.stop else None
-    updated = rel(json.dumps(r.plan.apply(payload.tool_input), ensure_ascii=False)) if r.plan else None
-    out.append({"stop": stop, "updated": updated})
-print(json.dumps(out, ensure_ascii=False))
-`
 
 const (
 	parent = "i0001"
@@ -219,7 +199,7 @@ func cases(root string) []launchCase {
 func TestDecideAgainstPython(t *testing.T) {
 	root := workspace(t)
 	cs := cases(root)
-	want := testkit.Answers[[]launchAnswer](t, "decide", launchOracle, map[string]any{"root": root, "cases": cs})
+	want := golden.Load[[]launchAnswer](t, "decide")
 	conf := testkit.Settings(t, root)
 	off := *conf
 	off.TicketControl = string(config.Disable)

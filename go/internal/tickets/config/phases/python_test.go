@@ -7,74 +7,15 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/model/ticket"
-	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の phasetypes（parse・merge・コピーの検査・範囲）と workflow（先行関係と計画の検査）と突き合わせる。
 // 定義の読みと苦情の文はレビューの要否と範囲の上限を決めるので、欄ごとの誤りを並べた入力で 1 字ずつ見る。
-
-const phasesOracle = `
-import json, sys, yaml
-from ccnavi.infra import yamlread
-yamlread.LOADER = yaml.SafeLoader
-from ccnavi.tickets.config import phasetypes as pt, workflow as wf
-from ccnavi.tickets.model import ticket as tm
-def probs(ps): return [[p.severity, p.rule, p.detail] for p in ps]
-def show(types, paths):
-    if types is None: return None
-    return [[i, t.title, t.kind, t.review, None if t.scope is None else t.scope_globs, t.deliverables,
-             t.agent, t.skill, t.when, t.learning, t.source, json.dumps(pt.as_copy(t), ensure_ascii=False),
-             [t.decide(p) for p in paths]] for i, t in types.items()]
-c = json.load(sys.stdin)
-paths = c["paths"]
-out = {"defs": [], "merges": [], "tickets": []}
-for text in c["defs"]:
-    types, ps = pt.parse(text, "(phases)")
-    try:
-        data = yamlread.safe_load(text)
-    except yaml.YAMLError:
-        data = None
-    raw = data.get("phases") if isinstance(data, dict) else None
-    copied, cps = pt.read_copy(raw)
-    out["defs"].append({"problems": probs(ps), "types": show(types, paths),
-                        "copyProblems": probs(cps), "copied": show(copied, paths)})
-for a, b in c["merges"]:
-    common, _ = pt.parse(a, "(phases)")
-    pt.mark_source(common, "common")
-    extra, _ = pt.parse(b, "(phases)")
-    merged, ps = pt.merge(common, extra, "web")
-    diff = [[i, pt.same(common[i], t), pt.differing(common[i], t)] for i, t in (extra or {}).items() if i in (common or {})]
-    out["merges"].append({"problems": probs(ps), "types": show(merged, paths), "diff": diff})
-for case in c["tickets"]:
-    parent, ps = tm.parse(case["parent"])
-    assert parent is not None, ps
-    parent.project = case["project"]
-    types = pt.types_of(parent)
-    w = wf.compute(parent)
-    row = {
-        "copy": probs(pt.copy_problems(parent)), "types": show(types, paths),
-        "plan": probs(wf.problems(parent, types)), "planOnly": probs(wf.problems(parent, types, "plan")),
-        "feedbackOnly": probs(wf.problems(parent, None, "feedback")),
-        "waits": {str(k): v for k, v in w.waits.items()}, "reviewAt": {str(k): v for k, v in w.review_at.items()},
-        "lines": wf.lines(parent, w), "ready": wf.ready(parent), "loose": wf.loose(parent),
-        "childless": probs(wf.childless_ready(parent, case["childPhases"] or [])), "errors": probs(wf.errors(parent)),
-        "terminal": probs(wf.terminal_problems(parent)), "after": probs(wf.after_problems(parent)),
-        "waitsOf": [wf.waits_of(parent, n) for n in range(0, 9)],
-        "parentScope": probs(pt.parent_scope_problems(parent)),
-        "scope": [], "childCopy": [],
-    }
-    if case["child"]:
-        child, ps = tm.parse(case["child"])
-        assert child is not None, ps
-        row["scope"] = [probs(pt.scope_problems(child, t)) for t in types.values()]
-        row["childCopy"] = probs(pt.copy_problems(child))
-    out["tickets"].append(row)
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 type typeRow []any
 
@@ -324,8 +265,7 @@ func same(t *testing.T, label string, got, want any) {
 }
 
 func TestPythonPhases(t *testing.T) {
-	in := map[string]any{"defs": defCases, "merges": mergeCases, "tickets": ticketCases, "paths": probePaths}
-	want := testkit.Answers[phasesAnswers](t, "phases", phasesOracle, in)
+	want := golden.Load[phasesAnswers](t, "phases")
 	for i, text := range defCases {
 		types, problems := Parse(text, Where)
 		var raw any

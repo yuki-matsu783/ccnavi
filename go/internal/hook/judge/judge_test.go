@@ -301,19 +301,18 @@ func randomCases(n int) []judgeCase {
 	return out
 }
 
-// Python の judge.decide_before と、同じワークスペース・同じ payload・同じ環境で、標準出力・終了コード・
-// 標準エラー・記録の 1 行が同じになる。
+// 決めた payload と環境で、標準出力・終了コード・標準エラー・記録の 1 行が見本と同じになる。
 func TestBeforeMatchesPython(t *testing.T) {
 	if testing.Short() {
-		t.Skip("Python と突き合わせる表は -short では回さない")
+		t.Skip("大きな表は -short では回さない")
 	}
-	compareWithPython(t, workspace, slices.Concat(handCases(), randomCases(400)))
+	checkCases(t, workspace, slices.Concat(handCases(), randomCases(400)))
 }
 
-// Python のテストの表から集めた payload（testdata/captured.jsonl）でも同じになる。
+// Python のテストの表から集めた payload（testdata/captured.jsonl）でも見本と同じになる。
 func TestBeforeMatchesPythonOnCapturedCalls(t *testing.T) {
 	if testing.Short() {
-		t.Skip("Python と突き合わせる表は -short では回さない")
+		t.Skip("大きな表は -short では回さない")
 	}
-	compareWithPython(t, workspace, readCases(t, "captured.jsonl"))
+	checkCases(t, workspace, readCases(t, "captured.jsonl"))
 }

@@ -7,27 +7,12 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の tickets/proposal/propose と同じワークスペースを 2 つ作って approval-request を打たせ、出力と終了コードが
 // 1 字も違わないことを見る。
-
-const proposeOracle = `
-import io, json, sys
-from ccnavi.infra import settings
-from ccnavi.tickets.proposal import propose
-c = json.load(sys.stdin)
-root = c["root"]
-conf, _ = settings.load(root)
-out = []
-for ident, check, gate in c["cases"]:
-    o, e = io.StringIO(), io.StringIO()
-    g = None if gate is None else (lambda sending, code=gate: (e.write(",".join(sending) + "\n"), code)[1])
-    code = propose.run(o, e, root, conf, ident, check, g)
-    out.append([code, o.getvalue().replace(root, "<root>"), e.getvalue().replace(root, "<root>")])
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 var proposeCases = [][3]any{
 	{"i0001", false, nil}, {"i0001-01-01", true, 0}, {"i0001", false, 1}, {"i0002", false, nil},
@@ -54,8 +39,8 @@ func proposeWorkspace(t *testing.T) string {
 }
 
 func TestMatchesPython(t *testing.T) {
-	pyRoot, goRoot := proposeWorkspace(t), proposeWorkspace(t)
-	want := testkit.Answers[[]any](t, "propose", proposeOracle, map[string]any{"root": pyRoot, "cases": proposeCases})
+	goRoot := proposeWorkspace(t)
+	want := golden.Load[[]any](t, "propose")
 	conf := testkit.Settings(t, goRoot)
 	got := []any{}
 	for _, c := range proposeCases {

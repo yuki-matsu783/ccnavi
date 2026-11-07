@@ -7,50 +7,13 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/policy/rules"
-	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の risk（parse・merge・evaluate・judge_prompt）と突き合わせる。配点は承認の判定（HIGH 以上は宣言に
 // 関わらずレビューが要る）に効くので、読める・読めないの境界、苦情の文、点と内訳を表で厚く見る。
-
-const riskOracle = `
-import json, sys, yaml
-from ccnavi.infra import yamlread
-yamlread.LOADER = yaml.SafeLoader
-from ccnavi.tickets.config import risk
-def probs(ps): return [[p.severity, p.rule, p.detail] for p in ps]
-def show(d):
-    if d is None: return None
-    return {"levels": d.levels, "source": d.source, "dropped": d.dropped, "fallback": d.fallback,
-            "factors": [[f.id, f.points, f.message, f.kind, f.value, f.max, list(f.include), list(f.exclude), f.source] for f in d.factors],
-            "levelOf": [d.level_of(p) for p in c["points"]],
-            "effective": risk.effective_levels(d.levels)}
-def diff_of(spec):
-    return risk.Diff(changes=[risk.Change(*ch) for ch in spec["changes"] or []], base=spec["base"], head=spec["head"])
-c = json.load(sys.stdin)
-out = {"defs": [], "merges": [], "scores": []}
-for text in c["defs"]:
-    d, ps = risk.parse(text, "(risk)", tuple(c["homes"]))
-    out["defs"].append({"problems": probs(ps), "definition": show(d)})
-for a, b in c["merges"]:
-    common, _ = risk.parse(a, "(risk)")
-    risk.mark_layer(common, "common", "")
-    extra, _ = risk.parse(b, "(risk)", tuple(c["homes"]))
-    risk.mark_layer(extra, "web", "")
-    merged, ps = risk.merge(common, extra, "web")
-    out["merges"].append({"problems": probs(ps), "definition": show(merged)})
-for case in c["scores"]:
-    d, ps = risk.parse(case["definition"], "(risk)") if case["definition"] else (risk.builtin(), [])
-    assert d is not None, ps
-    risk.mark_layer(d, "common", "")
-    diff = diff_of(case["diff"])
-    s = risk.evaluate(d, diff, "", "", {}, case["judgements"])
-    out["scores"].append({"record": s.as_dict(), "lines": s.lines(), "pending": [f.id for f in s.pending],
-        "summary": diff.summary(), "prompt": risk.judge_prompt("i0001-01-01", "i0001", diff, s.pending, "/w/tree", "/w")})
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 type riskDefinition struct {
 	Levels    map[string]int `json:"levels"`
@@ -284,9 +247,7 @@ func judgementsOf(t *testing.T, raw map[string]any) *pyjson.Object {
 }
 
 func TestPythonRisk(t *testing.T) {
-	in := map[string]any{"defs": riskDefCases, "merges": riskMergeCases, "scores": scoreCases,
-		"homes": layerHomes, "points": riskPoints}
-	want := testkit.Answers[riskAnswers](t, "risk", riskOracle, in)
+	want := golden.Load[riskAnswers](t, "risk")
 	for i, text := range riskDefCases {
 		d, problems := Parse(text, Where, layerHomes)
 		same(t, "def "+strconv.Itoa(i), riskDefRow{probs(problems), show(d)}, want.Defs[i])

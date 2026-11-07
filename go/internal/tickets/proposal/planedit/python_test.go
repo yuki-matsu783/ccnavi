@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/approval"
 	"ccnavi/internal/tickets/testkit"
@@ -15,55 +16,6 @@ import (
 
 // Python の plan_order と plan_phases と同じワークスペースを 2 つ作って読ませ、--plan-order の JSON・保存の結果と
 // 書いたバイト列・--order の読みの苦情・--fill-phases の結果と書いたバイト列が 1 字も違わないことを見る。
-
-const planOracle = `
-import json, os, sys
-from ccnavi.infra import settings
-from ccnavi.tickets.approval import store as approval
-from ccnavi.tickets.proposal import plan_order, plan_phases
-c = json.load(sys.stdin)
-root = c["root"]
-os.chdir(root)
-def rel(s):
-    return s.replace(root, "<root>") if isinstance(s, str) else s
-conf, _ = settings.load(root)
-def source(name):
-    proposals, _ = approval.scan_proposals(conf, root)
-    target, why = plan_order.pick(proposals, name)
-    current = plan_order.current_parent(conf, root, name)
-    s, why = plan_order.load(conf, root, target, proposals, current)
-    return s, why
-out = {"bodies": [], "parse": [], "saved": [], "filled": []}
-for name, text in c["orders"]:
-    s, why = source(name)
-    order = None
-    if text is not None:
-        order, why = plan_order.parse_order(text, s.parent)
-        if order is None:
-            out["parse"].append(why)
-            continue
-    out["bodies"].append(rel(json.dumps(plan_order.body(plan_order.answer(s, order)), ensure_ascii=False)))
-for name, text, expect in c["saves"]:
-    s, why = source(name)
-    order, _ = plan_order.parse_order(text, s.parent)
-    ans = plan_order.answer(s, order)
-    saved = plan_order.save(ans, s.sha if expect else "x")
-    out["saved"].append([saved.ok, saved.written, [rel(m) for m in saved.messages], [rel(d) for d in saved.details],
-                         plan_order.reread_sha(conf, root, name, s.current) != ""])
-for name in c["fills"]:
-    proposals, _ = approval.scan_proposals(conf, root)
-    target, _ = plan_order.pick(proposals, name)
-    done = plan_phases.fill(conf, root, target, plan_order.current_parent(conf, root, name))
-    out["filled"].append([rel(done.why), done.changed, done.copied, done.dropped, done.held])
-files = {}
-for base, _, names in os.walk(os.path.join(root, ".claude")):
-    for n in names:
-        if n.endswith((".md", ".yml")) and os.sep + "proposals" + os.sep in base:
-            with open(os.path.join(base, n), encoding="utf-8", newline="") as f:
-                files[rel(os.path.join(base, n))] = f.read()
-out["files"] = files
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 // planWorkspace は Python と Go に読ませるワークスペース。
 //
@@ -134,10 +86,8 @@ var saveCases = [][3]any{
 var fillCases = []string{"i0003", "i0002", "i0004", "i0006", "i0003"}
 
 func TestMatchesPython(t *testing.T) {
-	pyRoot, goRoot := planWorkspace(t), planWorkspace(t)
-	want := testkit.Answers[map[string]any](t, "plan", planOracle, map[string]any{
-		"root": pyRoot, "orders": orderCases, "saves": saveCases, "fills": fillCases,
-	})
+	goRoot := planWorkspace(t)
+	want := golden.Load[map[string]any](t, "plan")
 	got := goAnswers(t, goRoot)
 	for key, w := range want {
 		if g := normalize(t, got[key]); !reflect.DeepEqual(g, w) {

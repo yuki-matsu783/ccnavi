@@ -34,7 +34,7 @@ deny:
     subject: "/repo/README.md"
     why: ユーザのチェックアウトでは編集しない。作業はワークツリーの中で
   - tool: Edit
-    subject: "/repo/src/ccnavi/cli.py"
+    subject: "/repo/go/cmd/ccnavi/main.go"
     why: 同上。ソースもユーザのチェックアウトでは触らない
   - tool: Write
     subject: "/repo/.gitignore"
@@ -426,7 +426,7 @@ ask:
     subject: "uv run python -m unittest discover -s tests -t ."
     why: 検査コマンド。どのルールも言及しない
   - tool: Bash
-    subject: "uv run python -m ccnavi --rules /repo/.ccnavi/config/common/rules.yml --test Bash ls"
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-launcher.sh --rules /repo/.ccnavi/config/common/rules.yml --test Bash ls"
     why: ルールを確かめる手そのもの。ルールファイルの名前が引数に出ても deny にはヒットしない
   - tool: Bash
     subject: "cp /repo/.ccnavi/config/common/rules.yml /tmp/backup.yml"
@@ -487,7 +487,7 @@ allow:
     subject: "sh /repo/.ccnavi/scripts/ccnavi-git.sh integrate --abort foo"
     why: 通す。取りやめには報告の指示を添えない
   - tool: Bash
-    subject: "grep -n TODO src/ccnavi/cli.py"
+    subject: "grep -n TODO go/cmd/ccnavi/main.go"
     why: 読むだけ。prefer-read-grep が適用して通す
   - tool: Bash
     subject: "CAT /etc/hosts"
@@ -522,7 +522,7 @@ allow:
     subject: "# git push origin main"
     why: コメントだけの行は何も走らない
   - tool: Write
-    subject: "/repo/.claude/worktrees/x/src/ccnavi/cli.py"
+    subject: "/repo/.claude/worktrees/x/go/cmd/ccnavi/main.go"
     why: ワークツリーの中のソース。ユーザのチェックアウトの側は deny
   - tool: Write
     subject: "/repo/.claude/worktrees/x/tests/test_glob.py"

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// ルールと組み込みの保護が頼る Python の答え。乱数の突き合わせ（python_test.go）と別に、読める形で残す。
+// ルールと組み込みの保護が頼る Python の答え。写しとの乱数の突き合わせ（python_test.go）と別に、読める形で残す。
 func TestSearchTable(t *testing.T) {
 	cases := []struct {
 		pattern string
@@ -131,7 +131,7 @@ func TestEscape(t *testing.T) {
 	}
 }
 
-// ルールの glob は先頭に ^ を付けて当てる（ルールの読み込みと同じ）。式の字面は python_test.go が Python と突き合わせるので、
+// ルールの glob は先頭に ^ を付けて当てる（ルールの読み込みと同じ）。式の字面は python_test.go が Python の答えの写しと突き合わせるので、
 // ここでは当たり方の境界（全体に当たる・区切りの両方の表記・改行・文字クラス）を確かめる。
 func TestTranslateGlobMatches(t *testing.T) {
 	cases := []struct {

@@ -11,10 +11,6 @@ import unittest as _unittest
 
 # リポジトリの根。テストはグループのサブパッケージにあり、深さが揃わないのでここで 1 回だけ求める。
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# ccnavi の Python（src レイアウト）の置き場。共通の部品はここを読まない。
-# Python の内部を直に import する白箱のテストだけが、グループの `__init__.py` から
-# tests/whitebox/ を通して sys.path に足す。
-SRC = os.path.join(ROOT, "src")
 
 # 使い捨ての置き場は、シンボリックリンクを解いた実パスにそろえる。macOS の一時置き場は
 # `/var/...` だが実体は `/private/var/...` で、git や realpath は後者を返す。置き場の
@@ -81,7 +77,7 @@ def _block_host_git_config() -> dict[str, str]:
 
     どちらも「テストが緩む」ではなく「テストの答えが機械で変わる」問題で、
     同じチケットがどの環境でも同じ場所で止まるという設計（regex も大文字小文字を
-    区別せずに適用し、機械で答えを割らない。tickets/model/ticket.py）と
+    区別せずに適用し、機械で答えを割らない。go/internal/tickets/model/ticket）と
     合わない。
 
     空の設定ではなく `init.defaultBranch` を書いた設定を指すのは、git 自身の
@@ -124,7 +120,7 @@ def _block_host_git_config() -> dict[str, str]:
 #
 # ここで `os.environ` に入れるのは、テストが git を起こす経路が 1 つではないため。
 # 各テストの `git()` ヘルパ（13 か所ある）だけでなく、検査対象の sh
-# （`ccnavi-git.sh` など）も、ccnavi 自身（`src/ccnavi/infra/gitcmd.py`）も git を起こす。
+# （`ccnavi-git.sh` など）も、ccnavi 自身（`go/internal/infra/git`）も git を起こす。
 # 引数に `-c` を足す形では、自分が直に起こす分しか防げない。
 GIT_ENV = _block_host_git_config()
 os.environ.update(GIT_ENV)

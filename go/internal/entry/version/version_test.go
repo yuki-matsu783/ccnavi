@@ -9,19 +9,9 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/testkit"
 )
-
-const versionOracle = `
-import io, json, sys
-from ccnavi.entry import version
-out = {}
-for key, as_json in (("text", False), ("json", True)):
-    buf = io.StringIO()
-    version.report(buf, as_json)
-    out[key] = buf.getvalue()
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 func report(t *testing.T, asJSON bool) string {
 	t.Helper()
@@ -32,14 +22,15 @@ func report(t *testing.T, asJSON bool) string {
 	return b.String()
 }
 
-// ソースで動いているとき（commit を埋めていない）の 2 つの形が、Python のソースで動いているときと 1 字も違わない。
+// ソースで動いているとき（commit を埋めていない）の 2 つの形が、見本（Python のソースで動いていたときの写し）と
+// 1 字も違わない。
 func TestReportMatchesPython(t *testing.T) {
-	want := testkit.Answers[map[string]string](t, "report", versionOracle, map[string]any{})
+	want := golden.Load[map[string]string](t, "report")
 	if got := report(t, false); got != want["text"] {
-		t.Errorf("text:\n%s\nPython:\n%s", got, want["text"])
+		t.Errorf("text:\n%s\n見本:\n%s", got, want["text"])
 	}
 	if got := report(t, true); got != want["json"] {
-		t.Errorf("json:\n%s\nPython:\n%s", got, want["json"])
+		t.Errorf("json:\n%s\n見本:\n%s", got, want["json"])
 	}
 }
 
@@ -68,14 +59,13 @@ func readRepo(t *testing.T, rel ...string) string {
 	return string(data)
 }
 
-// 互換の版は実行ファイル・sh・VS Code 拡張・Python の実行ファイル（移行の間は両方を上げる）で同じ値。
+// 互換の版は実行ファイル・sh・VS Code 拡張で同じ値。
 func TestCompatAgreesWithTheShAndTheExtension(t *testing.T) {
 	for _, c := range []struct {
 		rel     []string
 		pattern string
 	}{
 		{[]string{".ccnavi", "scripts", "ccnavi-common.sh"}, `(?m)^` + env.Compat + `=([0-9]+)$`},
-		{[]string{"src", "ccnavi", "entry", "version.py"}, `(?m)^COMPAT = ([0-9]+)$`},
 		{[]string{"extensions", "vscode", "ccnavi-board", "src", "core", "version.ts"}, `(?m)^export const EXTENSION_COMPAT = ([0-9]+);$`},
 	} {
 		m := regexp.MustCompile(c.pattern).FindStringSubmatch(readRepo(t, c.rel...))

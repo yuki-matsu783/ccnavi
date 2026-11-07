@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/approval"
 	"ccnavi/internal/tickets/config/phases"
@@ -16,53 +17,6 @@ import (
 
 // Python の agree_candidates の検査を、同じ見本（チケットの文面）と同じワークスペースに当て、苦情が 1 字も違わない
 // ことを見る。承認の全体の流れ（Candidates）は agree の突き合わせが見る。
-
-const candidatesOracle = `
-import json, sys
-from ccnavi.infra import settings
-from ccnavi.tickets.model import ticket as tm
-from ccnavi.tickets.config import phasetypes
-from ccnavi.tickets.phase import gates as phase
-from ccnavi.tickets.approval import checks, store as approval
-from ccnavi.tickets.proposal import agree_candidates as ac
-c = json.load(sys.stdin)
-root = c["root"]
-def rel(s):
-    return s.replace(root, "<root>")
-conf, _ = settings.load(root)
-cfg = phase.load_types(conf, root, "")
-def P(name):
-    return tm.parse(c["tickets"][name])[0]
-def ps(problems):
-    return [[p.severity, p.rule, rel(p.detail), p.kind] for p in problems]
-out = {"fields": {}, "validate": [], "plan": [], "lock": [], "revision": [], "elsewhere": [], "branches": None}
-for name in c["tickets"]:
-    t = P(name)
-    out["fields"][name] = ps(ac._workflow_field(t) + ac.script_field_problems(t) + ac.record_field_problems(t)
-                             + ac.shorthand_problems(t))
-for name, pool, use_cfg, approved, missing in c["validate"]:
-    a, b = ac.validate(P(name), {P(n).ticket: P(n) for n in pool}, cfg if use_cfg else None, approved, missing)
-    out["validate"].append([ps(a), ps(b)])
-for name, held, approved in c["plan"]:
-    h = None
-    if held is not None:
-        types = phasetypes.types_of(P(held[0]))
-        h = {k: types[k] for k in held[1:]}
-    out["plan"].append(ps(ac.plan_problems(P(name), cfg, h, approved)))
-for revised, current, fixed, moved in c["lock"]:
-    m = {int(k): v for k, v in moved.items()} if moved is not None else None
-    out["lock"].append(ps(ac.lock_problems(P(revised), P(current), set(fixed), m)))
-copies, _ = approval.scan(conf, root)
-byid = checks.by_id(copies)
-for name in c["revision"]:
-    t = P(name)
-    out["revision"].append(ps(ac.revision_problems(root, conf, t, byid[t.ticket], cfg)))
-proposals, _ = approval.scan_proposals(conf, root)
-for t in sorted(proposals, key=lambda t: (t.ticket, t.tree)):
-    out["elsewhere"].append([t.ticket, rel(ac.parent_elsewhere_text(root, conf, t))])
-out["branches"] = [rel(x) for x in ac.existing_branch_warnings(root, conf, sorted(proposals, key=lambda t: (t.ticket, t.tree)), copies, [], [])]
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 var plan3 = []string{"  - research", "  - {type: design, after: [1]}", "  - {type: implement, after: [2]}"}
 
@@ -148,12 +102,9 @@ func candidatesWorkspace(t *testing.T) string {
 }
 
 func TestMatchesPython(t *testing.T) {
-	pyRoot, goRoot := candidatesWorkspace(t), candidatesWorkspace(t)
+	goRoot := candidatesWorkspace(t)
 	samples := sampleTickets()
-	want := testkit.Answers[map[string]any](t, "candidates", candidatesOracle, map[string]any{
-		"root": pyRoot, "tickets": samples, "validate": validateCases, "plan": planCases, "lock": lockCases,
-		"revision": revisionCases,
-	})
+	want := golden.Load[map[string]any](t, "candidates")
 	got := goAnswers(t, goRoot, samples)
 	for key, w := range want {
 		if g := normalize(t, got[key]); !reflect.DeepEqual(g, w) {

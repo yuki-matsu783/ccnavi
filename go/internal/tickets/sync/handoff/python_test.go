@@ -10,42 +10,13 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
-	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の tickets/sync/handoff と同じワークスペースを読ませ、見るだけの JSON（ハッシュ・差分・断る理由）、
 // 取り込みの JSON、取り込んだあとのファイルのバイト列、取り込み待ちの一覧が 1 字も違わないことを見る。
 // Python 側と Go 側は同じ中身の別のディレクトリで動かし、ルートのパスは ROOT に置き換えて比べる。
-
-const handoffOracle = `
-import hashlib, json, os, sys
-from ccnavi.infra import settings
-from ccnavi.tickets.sync import handoff
-c = json.load(sys.stdin)
-out = []
-for case in c["cases"]:
-    root = case["root"]
-    esc = json.dumps(root)[1:-1]
-    conf, _ = settings.load(root)
-    plan = handoff.prepare(conf, root, case["wanted"] or None)
-    row = {"view": json.dumps(handoff.plan_json(plan), ensure_ascii=True, indent=1).replace(esc, "ROOT"), "applied": ""}
-    if case["apply"]:
-        done = handoff.apply(plan, case["expect"] or plan.expect, via_board=case["board"])
-        row["applied"] = json.dumps(handoff.applied_json(done), ensure_ascii=True, indent=1).replace(esc, "ROOT")
-    files = {}
-    for parent, dirs, names in os.walk(root):
-        for n in names:
-            full = os.path.join(parent, n)
-            if os.path.isfile(full) and not os.path.islink(full):
-                with open(full, "rb") as f:
-                    files[os.path.relpath(full, root).replace(os.sep, "/")] = hashlib.sha256(f.read()).hexdigest()
-    row["files"] = files
-    row["pending"] = handoff.pending(root)
-    row["defense"] = [e.defense for e in plan.entries]
-    out.append(row)
-print(json.dumps(out))
-`
 
 type handoffAnswer struct {
 	View    string            `json:"view"`
@@ -301,7 +272,7 @@ func TestMatchesPython(t *testing.T) {
 		goRoots = append(goRoots, mine)
 		_ = i
 	}
-	answers := testkit.Answers[[]handoffAnswer](t, "handoff", handoffOracle, map[string]any{"cases": cases})
+	answers := golden.Load[[]handoffAnswer](t, "handoff")
 	if len(answers) != len(scenarios) {
 		t.Fatalf("答えが %d 件（%d 件のはず）", len(answers), len(scenarios))
 	}

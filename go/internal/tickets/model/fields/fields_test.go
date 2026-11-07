@@ -5,34 +5,13 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/tickets/model/ticket"
-	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の ticket_fields と突き合わせる。行単位の書き換えは、ユーザのコメントと `|` のブロックを残すことと、
 // スクリプトが書いた直後の内容が正規化で元と同じになること（実行後チェックの約束）が要。
-
-const fieldsOracle = `
-import json, sys
-from ccnavi.tickets.model import ticket_fields as tf, ticket_model as tm
-c = json.load(sys.stdin)
-out = {"set": [], "mr": [], "int": [], "empty": [], "held": [], "shape": [], "quoted": []}
-for text in c["texts"]:
-    out["set"].append(tf.set_fields(text, dict(c["fields"])))
-    for n in (12, 13):
-        out["mr"].append(list(tf.set_mr(text, n)))
-    v = tf.plain_int_field(text, "mr")
-    out["int"].append(0 if v is None else v)
-    out["empty"].append(tf.mr_is_empty(text))
-    out["held"].append(list(tf.script_fields_set(text)))
-    for drop in (tm.SCRIPT_FIELDS, ("base_sha",), ()):
-        s = tf.script_shape(text, drop)
-        out["shape"].append([s is not None, s or ""])
-for v in c["values"]:
-    out["quoted"].append(tf._yaml_scalar(v))
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 type fieldsAnswers struct {
 	Set    []string   `json:"set"`
@@ -71,8 +50,7 @@ var quotedValues = []string{
 }
 
 func TestFieldsMatchPython(t *testing.T) {
-	in := map[string]any{"texts": fieldsTexts, "fields": fieldsWrites, "values": quotedValues}
-	want := testkit.Answers[fieldsAnswers](t, "fields", fieldsOracle, in)
+	want := golden.Load[fieldsAnswers](t, "fields")
 	got := fieldsAnswers{}
 	for _, text := range fieldsTexts {
 		got.Set = append(got.Set, SetFields(text, fieldsWrites))

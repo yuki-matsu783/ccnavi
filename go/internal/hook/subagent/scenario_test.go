@@ -11,14 +11,15 @@ import (
 
 	"ccnavi/internal/hook/outcome"
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/records/audit"
 	"ccnavi/internal/tickets/testkit"
 )
 
-// サブエージェントの始まりと終わりの一連の呼び出しを、Python 用と Go 用に同じ形で作ったワークスペースへ打ち、
-// 応答・終了コード・標準エラー・判定の記録・state に書いた印を突き合わせる。
+// サブエージェントの始まりと終わりの一連の呼び出しを決めた形のワークスペースへ打ち、応答・終了コード・標準エラー・
+// 判定の記録・state に書いた印を、Go の答えの見本（Python と答えが揃っていた Go の答えから取った）と比べる。
 
 // step は 1 つの手順。op が write ならワークスペースにファイルを書き、call なら呼ぶ。
 type step struct {
@@ -66,58 +67,6 @@ func (s step) payload(root string) string {
 	data, _ := json.Marshal(p)
 	return string(data)
 }
-
-const scenarioOracle = `
-import copy, io, json, os, sys
-from ccnavi.hook import subagent
-from ccnavi.infra import hookio, settings
-from ccnavi.records import audit
-c = json.load(sys.stdin)
-root = c["root"]
-out = []
-for st, payload_text in zip(c["steps"], c["payloads"]):
-    if st["op"] == "write":
-        p = os.path.join(root, st["path"])
-        os.makedirs(os.path.dirname(p), exist_ok=True)
-        with open(p, "w", encoding="utf-8", newline="") as f:
-            f.write(st["text"])
-        continue
-    conf, _ = settings.load(root)
-    if st.get("off"):
-        conf = copy.copy(conf)
-        conf.ticket_control = "disable"
-    payload = hookio.decode(io.StringIO(payload_text))
-    record, so, se = audit.Record(), io.StringIO(), io.StringIO()
-    rc, text, running = 0, "", False
-    kind = st["kind"]
-    if kind == "start":
-        rc = subagent.at_start(so, se, conf, root, payload, record)
-    elif kind == "stop":
-        rc = subagent.at_stop(so, se, st.get("mode") or "enable", conf, root, payload, record)
-    elif kind == "post":
-        bounced = subagent.ignored_bounce(conf.state, payload)
-        unchecked = subagent.unchecked_scope(conf.state, payload)
-        outcomes, told = subagent.outcome_notices(conf.state, payload)
-        text = "\n\n".join(p for p in (bounced, unchecked, outcomes) if p)
-        subagent.confirm_outcomes(conf.state, told)
-    elif kind == "error":
-        subagent.unchecked_after_error(se, conf, root, payload)
-    elif kind == "running":
-        running = subagent.running(conf.state, payload.session_id)
-    else:
-        subagent.forget_running(conf.state, payload.session_id)
-    files = {}
-    if os.path.isdir(conf.state):
-        for name in sorted(os.listdir(conf.state)):
-            p = os.path.join(conf.state, name)
-            if os.path.isfile(p):
-                with open(p, encoding="utf-8", newline="") as f:
-                    files[name] = f.read()
-    out.append({"rc": rc, "stdout": so.getvalue(), "stderr": se.getvalue(), "text": text, "running": running,
-                "decision": record.decision, "reason": record.reason, "enforced": record.enforced, "code": record.code,
-                "paths": list(record.paths), "rules": list(record.rules), "detail": record.detail, "files": files})
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 type result struct {
 	RC       int               `json:"rc"`
@@ -362,34 +311,15 @@ func TestScenarioMatchesPython(t *testing.T) {
 		{Op: "call", Kind: "stop", Cwd: wt(child), Agent: "c1x", Off: true},
 		call("stop", "", "a1"),
 	}
-	pyRoot, goRoot := workspace(t), workspace(t)
-	var payloads []string
-	for _, st := range steps {
-		payloads = append(payloads, st.payload(pyRoot))
+	root := workspace(t)
+	got := runScenario(t, steps, root)
+	var seen []json.RawMessage
+	for _, r := range got {
+		seen = append(seen, json.RawMessage(normalized(t, r, root)))
 	}
-	want := testkit.Answers[[]result](t, "", scenarioOracle,
-		map[string]any{"root": pyRoot, "steps": steps, "payloads": payloads})
-	got := runScenario(t, steps, goRoot)
-	calls := 0
-	for i, st := range steps {
-		if st.Op != "call" {
-			continue
-		}
-		g, w := normalized(t, got[calls], goRoot), normalized(t, want[calls], pyRoot)
-		if g != w {
-			t.Errorf("手順 %d（%s %s %s）:\nGo:\n%s\nPython:\n%s", i, st.Kind, st.Cwd, st.Agent, g, w)
-		}
-		calls++
-	}
-	if len(want) != calls {
-		t.Fatalf("Python の答えの数 %d が呼び出しの数 %d と違う", len(want), calls)
-	}
+	golden.Check(t, "scenario", seen)
 	// 見本が覆うべき形を全部通ったか（どれかが空振りしていれば、突き合わせが一致しても意味が無い）。
 	all, _ := json.Marshal(got)
-	if os.Getenv("SUBAGENT_DUMP") != "" {
-		out, _ := json.MarshalIndent(got, "", " ")
-		os.WriteFile(os.Getenv("SUBAGENT_DUMP"), out, 0o644)
-	}
 	for _, mark := range []string{
 		ownFlowOnly, "別の編集するサブエージェントが動いています", "ワークスペースルート", "（" + child + "）",
 		"定義 設計 の上限の外", "親 " + parent + " の範囲の外", "SUBAGENT_UNATTRIBUTED", "差し戻されたまま終わっています",

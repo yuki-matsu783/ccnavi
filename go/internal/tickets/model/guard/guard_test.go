@@ -7,32 +7,15 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/policy/rules"
-	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の ticket_guard と突き合わせる。式の文字列が 1 字も違わないことと、組んだルールが同じ呼び出しに
 // 同じ答えを返すこと。
-
-const guardOracle = `
-import json, sys
-from ccnavi.infra import shellread
-from ccnavi.tickets.model import ticket_guard as g
-c = json.load(sys.stdin)
-out = []
-for k in c["cases"]:
-    rs = [g.raw_git_rule(k["root"]), *g.guard_rules(k["tickets"], k["root"]), *g.gate_rules(k["approved"], k["root"]),
-          g.approved_write_rule(k["approved"], k["root"])]
-    listed = [{"id": r.id, "match": r.match, "pattern": r.compiled.pattern, "text": r.message_id,
-               "variants": r.message_variants or {}, "base": r.base} for r in rs]
-    subjects = [[tool, s] for tool, s in c["paths"]] + [["Bash", shellread.read(x).text] for x in c["commands"]]
-    hits = [[r.id for r in rs if r.matches(tool, s)] for tool, s in subjects]
-    out.append({"rules": listed, "hits": hits, "state": g.state_dir_regex(k["tickets"])})
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 type guardRule struct {
 	ID       string            `json:"id"`
@@ -80,8 +63,7 @@ var guardCommands = []string{
 }
 
 func TestGuardMatchesPython(t *testing.T) {
-	in := map[string]any{"cases": guardCases, "paths": guardPaths, "commands": guardCommands}
-	want := testkit.Answers[[]guardAnswer](t, "guard", guardOracle, in)
+	want := golden.Load[[]guardAnswer](t, "guard")
 	for i, c := range guardCases {
 		var all []*rules.Rule
 		raw, err := RawGitRule(c.Root)

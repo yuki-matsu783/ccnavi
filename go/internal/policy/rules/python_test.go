@@ -3,137 +3,17 @@ package rules
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"math/rand/v2"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/yaml"
 )
 
-// Python の rules と突き合わせる。リポジトリの .venv の Python が無ければ飛ばす。
-
-func repoRoot(t *testing.T) string {
-	t.Helper()
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, ".ccnavi")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Skip("リポジトリが見つからない")
-		}
-		dir = parent
-	}
-}
-
-func venvPython(root string) string {
-	for _, rel := range []string{".venv/bin/python", ".venv/Scripts/python.exe"} {
-		p := filepath.Join(root, rel)
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-	return ""
-}
-
-// Python の答えは testdata に写して持つ。Python があれば聞き直して写しと比べ（食い違えば -update で取り直す）、
-// 無ければ写しを読む。Python を外したあとも、同じ答えを確かめ続けるため。
-var update = flag.Bool("update", false, "testdata の Python の答えを取り直す")
-
-// answers は Python の答えを返す。name が空なら写しを持たない（Python が無ければ飛ばす）。
-func answers[T any](t *testing.T, name, script string, in any) T {
-	t.Helper()
-	var saved T
-	path := filepath.Join("testdata", name+".json")
-	data, readErr := os.ReadFile(path)
-	if name != "" && readErr == nil {
-		if err := json.Unmarshal(data, &saved); err != nil {
-			t.Fatal(err)
-		}
-	}
-	root := repoRoot(t)
-	if venvPython(root) == "" {
-		if name == "" || readErr != nil {
-			t.Skip("Python も testdata の写しも無い")
-		}
-		return saved
-	}
-	var fresh T
-	runPython(t, script, in, &fresh)
-	if name == "" {
-		return fresh
-	}
-	got, _ := json.Marshal(fresh)
-	if *update {
-		if err := os.MkdirAll("testdata", 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, append(got, '\n'), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	} else if readErr != nil || !bytes.Equal(bytes.TrimSpace(data), got) {
-		t.Errorf("%s が Python の答えと違う（go test -run %s -update で取り直す）", path, t.Name())
-	}
-	return fresh
-}
-
-// runPython は src を読み込み先に足して、標準入力に JSON を渡したスクリプトの JSON の答えを読む。
-func runPython(t *testing.T, script string, in any, out any) {
-	t.Helper()
-	root := repoRoot(t)
-	py := venvPython(root)
-	data, err := json.Marshal(in)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmd := exec.Command(py, "-c", script)
-	cmd.Env = append(os.Environ(), "PYTHONPATH="+filepath.Join(root, "src"), "PYTHONDONTWRITEBYTECODE=1")
-	cmd.Stdin = bytes.NewReader(data)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	got, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("python: %v\n%s", err, stderr.String())
-	}
-	if err := json.Unmarshal(got, out); err != nil {
-		t.Fatalf("%v\n%s", err, got)
-	}
-}
-
-const rulesOracle = `
-import json, sys
-from ccnavi.infra import yamlread
-from ccnavi.policy import rules
-out = []
-for case in json.load(sys.stdin):
-    data = yamlread.safe_load(case["yaml"])
-    rs, problems = rules.parse(data, case["root"])
-    listed = []
-    for r in rs.all():
-        listed.append({
-            "id": r.id, "decision": r.decision, "every": r.every,
-            "pattern": r.compiled.pattern if r.compiled else "",
-            "excepts": [e.compiled.pattern if e.compiled else "" for e in r.excepts],
-            "when": r.when.describe() if r.when else "",
-            "body": r.written_body(),
-            "spoken": r.spoken_message(),
-        })
-    hits = []
-    for tool, subject in case["calls"]:
-        hits.append([r.id for r in rs.all() if r.matches(tool, subject)])
-    out.append({"problems": [str(p) for p in problems], "version": rs.version == rules.VERSION, "rules": listed, "hits": hits})
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
+// Python の rules の答えを写した見本（testdata）と突き合わせる。
 
 type ruleCase struct {
 	YAML  string      `json:"yaml"`
@@ -201,7 +81,7 @@ func goRules(c ruleCase) ruleResult {
 
 func compareRules(t *testing.T, name string, cases []ruleCase) {
 	t.Helper()
-	want := answers[[]ruleResult](t, name, rulesOracle, cases)
+	want := golden.Load[[]ruleResult](t, name)
 	bad := 0
 	for i, c := range cases {
 		got := goRules(c)
@@ -396,52 +276,6 @@ func TestRulesAgainstPython(t *testing.T) {
 		cases = append(cases, ruleCase{YAML: text, Root: root, Calls: pathCalls})
 	}
 	compareRules(t, "rules", cases)
-}
-
-func TestSharedRulesAgainstPython(t *testing.T) {
-	repo := repoRoot(t)
-	text, err := os.ReadFile(filepath.Join(repo, ".ccnavi", "config", "common", "rules.yml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	expect, err := os.ReadFile(filepath.Join(repo, ".ccnavi", "config", "common", "rule-expectations.yml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	data, err := yaml.Load(string(expect))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var calls [][2]string
-	for _, section := range []string{"deny", "ask", "allow"} {
-		list, _ := data.(*yaml.Map).List(section)
-		for _, item := range list {
-			m := item.(*yaml.Map)
-			calls = append(calls, [2]string{m.Text("tool"), m.Text("subject")})
-		}
-	}
-	r := rand.New(rand.NewPCG(7, 8))
-	for range 300 {
-		// 期待する判定の対象の綴りを崩したもの（大文字小文字・区切り・前後の字）。
-		c := calls[r.IntN(len(calls))]
-		s := []rune(c[1])
-		if len(s) > 0 {
-			i := r.IntN(len(s))
-			switch r.IntN(4) {
-			case 0:
-				s[i] = []rune(strings.ToUpper(string(s[i])))[0]
-			case 1:
-				s = append(s[:i], s[i+1:]...)
-			case 2:
-				s = append(s[:i], append([]rune{[]rune("\\/ \x00-.日İ")[r.IntN(8)]}, s[i:]...)...)
-			case 3:
-				s = append(s, '\n')
-			}
-		}
-		calls = append(calls, [2]string{c[0], string(s)})
-	}
-	// 共通のルールファイルは書き換わるので写しを持たない（Python があるときだけ見る）。
-	compareRules(t, "", []ruleCase{{YAML: string(text), Root: repo, Calls: calls}, {YAML: string(text), Root: "/repo", Calls: calls}})
 }
 
 func TestRandomRulesAgainstPython(t *testing.T) {

@@ -5,15 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/testkit"
 )
-
-const kindOracle = `
-import json, sys
-from ccnavi.hook import agentkind
-c = json.load(sys.stdin)
-print(json.dumps([agentkind.kind_of(c["roots"], k["type"], k["tools"]) for k in c["cases"]]))
-`
 
 type kindCase struct {
 	Type  string   `json:"type"`
@@ -72,7 +66,7 @@ func TestOf(t *testing.T) {
 		{Type: "", Tools: []string{"Task"}, want: Read},
 	}
 	roots := []string{near, far}
-	py := testkit.Answers[[]Kind](t, "kind", kindOracle, map[string]any{"roots": roots, "cases": cases})
+	py := golden.Load[[]Kind](t, "kind")
 	for i, c := range cases {
 		got := Of(roots, c.Type, c.Tools)
 		if got != c.want || got != py[i] {

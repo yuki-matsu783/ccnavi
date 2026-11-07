@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/testkit"
 )
 
@@ -57,72 +58,9 @@ func fixture(t *testing.T) (string, string) {
 	return root, testkit.Head(t, parent)
 }
 
-const oracle = `
-import io, json, os, sys
-from ccnavi.infra import settings
-from ccnavi.tickets.lifecycle import retire
-c = json.load(sys.stdin)
-root = c["root"]
-def rel(s):
-    return s.replace(root, "<root>")
-conf, _ = settings.load(root)
-parent = os.path.join(root, ".claude", "worktrees", "i0001")
-record = os.path.join(conf.state, "retire", "i0001.json")
-out = {}
-def run(name, f, *args):
-    o, e = io.StringIO(), io.StringIO()
-    code = f(o, e, *args)
-    out[name] = [code, rel(o.getvalue()), rel(e.getvalue())]
-def read_record():
-    try:
-        with open(record, encoding="utf-8") as f:
-            return f.read()
-    except FileNotFoundError:
-        return None
-out["note"] = [retire.note(root, conf, "i0001", "", parent, 7), read_record()]
-out["note again"] = [retire.note(root, conf, "i0001", "", parent, None), read_record()]
-out["entries"] = [[e.parent, e.repo, e.mr, e.branch, e.incomplete] for e in retire.entries(conf)]
-run("branch early ask", retire.run_branch, root, conf, "i0001-01-02", False)
-run("branch early confirmed", retire.run_branch, root, conf, "i0001-01-02", True)
-memo = os.path.join(parent, "memo.txt")
-with open(memo, "w", encoding="utf-8") as f:
-    f.write("書きかけ\n")
-run("retire blocked", retire.run_retire, root, conf, "i0001", root)
-os.remove(memo)
-run("retire inside", retire.run_retire, root, conf, "i0001", os.path.join(parent, "src"))
-run("retire", retire.run_retire, root, conf, "i0001", root)
-run("retire again", retire.run_retire, root, conf, "i0001", root)
-run("branch unknown", retire.run_branch, root, conf, "main", False)
-run("branch ask", retire.run_branch, root, conf, "i0001-01-02", False)
-run("branch moved", retire.run_branch, root, conf, "I0001-01-03", False)
-out["after retire"] = shape(root)
-run("merged", retire.run_merged, root, conf, "i0001", "", "i0001", c["head"], root)
-out["record"] = read_record()
-run("merged again", retire.run_merged, root, conf, "i0001", "", "i0001", c["head"], root)
-run("abandon", retire.run_abandon, root, conf, "i0001")
-run("abandon again", retire.run_abandon, root, conf, "i0001")
-os.makedirs(os.path.dirname(record), exist_ok=True)
-for name, text in (("i0005.json", "{"), ("i0006.json", '{"parent": "i0006", "children": {}}'),
-                   ("i0007.json", '{"parent": "i0007", "mr": true}'), ("i0008.json", '{"parent": "x"}'),
-                   ("i0009.json", '{"parent": "I0009", "mr": " 0012 ", "branch": "a b"}'),
-                   ("i0010.json", '{"parent": "i0010", "mr": 3, "branch": "b", "project": "p"}'),
-                   ("i0011.tmp.json", "{}"), ("x y.json", "{}")):
-    with open(os.path.join(os.path.dirname(record), name), "w", encoding="utf-8") as f:
-        f.write(text)
-out["entries broken"] = [[e.parent, e.repo, e.mr, e.branch, e.incomplete] for e in retire.entries(conf)]
-run("retire broken", retire.run_retire, root, conf, "i0005", root)
-out["note broken"] = rel(retire.note(root, conf, "i0005", "", "", None))
-out["shape"] = shape(root)
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
-
 func TestMatchesPython(t *testing.T) {
-	pyRoot, head := fixture(t)
-	goRoot, goHead := fixture(t)
-	if head != goHead {
-		t.Fatalf("2 つのワークスペースの sha が違う: %s %s", head, goHead)
-	}
-	want := testkit.Answers[map[string]any](t, "retire", testkit.ShapePy+oracle, map[string]any{"root": pyRoot, "head": head})
+	goRoot, head := fixture(t)
+	want := golden.Load[map[string]any](t, "retire")
 	root := goRoot
 	conf := testkit.Settings(t, root)
 	rel := func(s string) string { return testkit.Rel(root, s) }

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/testkit"
 )
 
@@ -87,53 +88,14 @@ var bounds = []string{"i0001", "I0001", "feature-9-new", "feature-7-a", "feature
 var nextIDs = [][]string{{}, {"feature", "login"}, {"bad", "x"}, {"feature", "x-01"}, {"feature"}, {"feature", "a b"},
 	{"feature", strings.Repeat("長", 60)}}
 
-const oracle = `
-import io, json, os, sys
-from ccnavi.infra import settings
-from ccnavi.tickets.lifecycle import base_bound, branchfind, next_id
-c = json.load(sys.stdin)
-root = c["root"]
-def rel(s):
-    return s.replace(root, "<root>")
-conf, _ = settings.load(root)
-out = {}
-out["refs"] = [[[r.kind, r.number, r.repo] for r in branchfind.prompt_refs(x)] for x in c["texts"]]
-reps = []
-for r in c["reports"]:
-    o, e = io.StringIO(), io.StringIO()
-    path = os.path.join(root, r["Result"]) if r["Result"] else ""
-    code = branchfind.report(o, e, conf, root, r["Cwd"], r["Kind"], r["Number"], path, r["JSON"])
-    reps.append([code, rel(o.getvalue()), rel(e.getvalue())])
-out["reports"] = reps
-ctx = []
-for text in c["contexts"]:
-    e = io.StringIO()
-    ctx.append([rel(branchfind.prompt_context(conf, root, text, root, "s1", e)), rel(e.getvalue())])
-    ctx.append([rel(branchfind.prompt_context(conf, root, text, root, "", e)), rel(e.getvalue())])
-out["contexts"] = ctx
-out["bounds"] = [list(base_bound.base_bound(root, conf, root, b)) for b in c["bounds"]]
-out["bounds"].append(list(base_bound.base_bound(root, conf, os.path.join(root, "projects", "proj"), "feature-152-p")))
-out["bounds"].append(list(base_bound.base_bound(root, conf, "/elsewhere", "main")))
-names, problems = next_id.serial_names(conf, root)
-out["serial"] = [sorted(names), problems]
-ids = []
-for args in c["next"]:
-    o, e = io.StringIO(), io.StringIO()
-    ids.append([next_id.run(o, e, root, conf, args), o.getvalue(), e.getvalue()])
-out["next"] = ids
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
-
 func TestMatchesPython(t *testing.T) {
-	pyRoot, goRoot := fixture(t), fixture(t)
+	goRoot := fixture(t)
 	texts := slices.Concat(refMisses, contexts)
 	for text := range refHits {
 		texts = append(texts, text)
 	}
 	slices.Sort(texts)
-	want := testkit.Answers[map[string]any](t, "branch", oracle, map[string]any{
-		"root": pyRoot, "texts": texts, "reports": reports(pyRoot), "contexts": contexts, "bounds": bounds, "next": nextIDs,
-	})
+	want := golden.Load[map[string]any](t, "branch")
 	root := goRoot
 	conf := testkit.Settings(t, root)
 	rel := func(s string) string { return testkit.Rel(root, s) }

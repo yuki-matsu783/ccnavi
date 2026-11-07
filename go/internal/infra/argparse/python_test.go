@@ -3,73 +3,16 @@ package argparse
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"math/rand/v2"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
+
+	"ccnavi/internal/infra/golden"
 )
 
-// Python の argparse と突き合わせる。答えは testdata に写して持つ。Python があれば聞き直して写しと比べ
-// （食い違えば -update で取り直す）、無ければ写しを読む。Python を外したあとも同じ答えを確かめ続けるため。
-var update = flag.Bool("update", false, "testdata の Python の答えを取り直す")
+// Python の argparse の答えの写し（testdata）と突き合わせる。
 
-func venvPython(t *testing.T) string {
-	t.Helper()
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for {
-		for _, rel := range []string{".venv/bin/python", ".venv/Scripts/python.exe"} {
-			p := filepath.Join(dir, rel)
-			if _, err := os.Stat(p); err == nil {
-				return p
-			}
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return ""
-		}
-		dir = parent
-	}
-}
-
-func answers[T any](t *testing.T, name string, ask func(py string) T) T {
-	t.Helper()
-	path := filepath.Join("testdata", name+".json")
-	var saved T
-	data, readErr := os.ReadFile(path)
-	if readErr == nil {
-		if err := json.Unmarshal(data, &saved); err != nil {
-			t.Fatal(err)
-		}
-	}
-	py := venvPython(t)
-	if py == "" {
-		if readErr != nil {
-			t.Skip("Python も testdata の写しも無い")
-		}
-		return saved
-	}
-	fresh := ask(py)
-	got, _ := json.Marshal(fresh)
-	if *update {
-		if err := os.MkdirAll("testdata", 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, append(got, '\n'), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	} else if readErr != nil || !bytes.Equal(bytes.TrimSpace(data), got) {
-		t.Errorf("%s が Python の答えと違う（go test -run %s -update で取り直す）", path, t.Name())
-	}
-	return fresh
-}
-
-// specArg は add_argument の引数を、Python にも Go にも渡せる JSON の形で書いたもの。
+// specArg は add_argument の引数を JSON の形で書いたもの（写しを取ったときに Python にも渡した）。
 type specArg struct {
 	Flags []string       `json:"flags"`
 	Kw    map[string]any `json:"kw"`
@@ -123,7 +66,7 @@ func build(s spec) *Parser {
 	return p
 }
 
-// ccnaviSpec は src/ccnavi/entry/cli.py の _run が組むパーサと同じ並び。
+// ccnaviSpec は ccnavi の CLI のパーサ（写しを取ったときの Python の entry/cli.py の _run）と同じ並び。
 func ccnaviSpec() spec {
 	str := func(flag string, def any) specArg { return a(flag).with("default", def) }
 	flagOf := func(flag string) specArg { return a(flag).with("action", "store_true") }
@@ -211,61 +154,6 @@ type pyResult struct {
 	Usage string         `json:"usage,omitempty"`
 }
 
-const oracle = `
-import argparse, contextlib, io, json, os, sys
-req = json.load(sys.stdin)
-def build(spec):
-    p = argparse.ArgumentParser(prog=spec["prog"], add_help=False, allow_abbrev=False)
-    for a in spec["args"]:
-        kw = dict(a["kw"])
-        if kw.get("type") == "int":
-            kw["type"] = int
-        if isinstance(kw.get("metavar"), list):
-            kw["metavar"] = tuple(kw["metavar"])
-        p.add_argument(*a["flags"], **kw)
-    return p
-parsers = {k: build(v) for k, v in req["specs"].items()}
-out = []
-for c in req["cases"]:
-    if c["columns"] is None:
-        os.environ.pop("COLUMNS", None)
-    else:
-        os.environ["COLUMNS"] = c["columns"]
-    p = parsers[c["spec"]]
-    if c.get("usage"):
-        out.append({"usage": p.format_usage()})
-        continue
-    buf = io.StringIO()
-    try:
-        with contextlib.redirect_stderr(buf):
-            ns = p.parse_args(c["argv"])
-        out.append({"ns": vars(ns)})
-    except SystemExit as e:
-        out.append({"code": e.code, "err": buf.getvalue()})
-json.dump(out, sys.stdout)
-`
-
-func runOracle(t *testing.T, py string, specs map[string]spec, cases []pyCase) []pyResult {
-	t.Helper()
-	in, err := json.Marshal(map[string]any{"specs": specs, "cases": cases})
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmd := exec.Command(py, "-I", "-c", oracle)
-	cmd.Stdin = bytes.NewReader(in)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("python: %v\n%s", err, stderr.String())
-	}
-	var res []pyResult
-	if err := json.Unmarshal(out, &res); err != nil {
-		t.Fatal(err)
-	}
-	return res
-}
-
 func goResult(parsers map[string]*Parser, c pyCase) pyResult {
 	p := parsers[c.Spec]
 	lookup := func(string) (string, bool) {
@@ -291,7 +179,7 @@ func goResult(parsers map[string]*Parser, c pyCase) pyResult {
 
 func compare(t *testing.T, name string, specs map[string]spec, cases []pyCase) {
 	t.Helper()
-	want := answers(t, name, func(py string) []pyResult { return runOracle(t, py, specs, cases) })
+	want := golden.Load[[]pyResult](t, name)
 	if len(want) != len(cases) {
 		t.Fatalf("%s の件数が違う（-update で取り直す）", name)
 	}

@@ -5,50 +5,16 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/model/host"
 	"ccnavi/internal/tickets/model/oplog"
 	"ccnavi/internal/tickets/review/request"
-	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の tickets/review/decide と同じ材料を渡し、ダイジェスト・見せる JSON・転記・issue の分け方・コメント・
 // 渡す文・記録から作り直す本文・一覧の表示が 1 字も違わないことを見る。本文には目印の崩し方（大文字小文字の
 // 畳み方と Unicode の空白）、行の区切り（splitlines の集合）、バッククォートの連続を混ぜる。
-
-const textOracle = `
-import json, sys
-from types import SimpleNamespace as N
-from ccnavi.tickets.model import review_host as h
-from ccnavi.tickets.review import decide as d, request as r
-c = json.load(sys.stdin)
-def th(x):
-    return h.Thread(id=x["id"], url=x["url"], path=x["path"], line=x["line"], body=x["body"],
-                    last_comment_id=x["lc"], last_comment_at="T", last_comment_author="me")
-threads = [th(x) for x in c["threads"]]
-def dec(ts, number=1, extra=()):
-    x = d.Decision(parent=N(ticket="i0001"), ph=N(number=number),
-                   result=N(mr=N(number=7, url="https://h/pr/7"), host="gitlab"), unresolved=list(ts))
-    x.extra = list(extra)
-    return x
-out = {}
-full = dec(threads)
-out["digest"] = d.decision_digest(full)
-out["parsed"] = [list(p) if (p := d.parse_digest(x)) else None for x in c["digests"]]
-out["json"] = json.dumps(d.decision_json(full), ensure_ascii=False)
-out["blocks"] = [d.thread_block(full, t, i, "op" if i % 2 else "") for i, t in enumerate(threads, 1)]
-out["texts"] = [[d.plain(t.body), d.span(t.body), d.defuse(t.body), d.fence(t.body), r.thread_label(t)] for t in threads]
-out["issues"] = [list(d.issue_texts(full, [threads[i] for i in idx], "o" * 32)) for idx in c["issues"]]
-out["comments"] = []
-out["prompts"] = []
-for pick, followup, extra in c["picks"]:
-    picked = {k: [threads[i] for i in v] for k, v in pick.items()}
-    x = dec(threads, extra=threads[:extra])
-    out["comments"].append(d.decide_comment_text(x, picked, followup))
-    out["prompts"].append(d._decided_prompt("/w", x, picked, followup))
-out["posts"] = [d.post_text(c["record"], s) for s in c["stages"]]
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 type textAnswers struct {
 	Digest   string     `json:"digest"`
@@ -133,14 +99,7 @@ func TestTextsMatchPython(t *testing.T) {
 		"rec_note": "",
 	}
 	stages := []string{"issue", "issue-part-1", "issue-part-2", "issue-part-0", "issue-part-9", "issue-part-", "issue-part-x", "note", "nope"}
-	in := map[string]any{"threads": specs, "digests": digests, "issues": issues, "picks": func() []any {
-		var out []any
-		for _, p := range picks {
-			out = append(out, []any{p.Picks, p.Followup, p.Extra})
-		}
-		return out
-	}(), "record": recordData, "stages": stages}
-	want := testkit.Answers[textAnswers](t, "texts", textOracle, in)
+	want := golden.Load[textAnswers](t, "texts")
 
 	check := func(name string, got, wantV any) {
 		t.Helper()

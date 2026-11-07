@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/approval/marks"
 	"ccnavi/internal/tickets/approval/wap"
@@ -18,88 +19,9 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// Python の tickets/approval と同じワークスペースを読ませ、置き場の読み・信頼できない理由・先行・続きの子・
-// write-and-push の答えが 1 字も違わないことを見る。マーカーと記録は両方が同じ時刻で書き、バイト列が同じで、
-// 相手の書いたものを読めることを見る（Python が書いた記録を Go で、Go が書いた記録を Python で読む）。
-
-const approvalOracle = `
-import base64, io, json, os, sys
-from ccnavi.infra import fsio, settings
-from ccnavi.tickets.approval import checks, marks, ops, store as approval, write_and_push as wap
-from ccnavi.tickets.model import ticket as tm
-c = json.load(sys.stdin)
-root = c["root"]
-def rel(s):
-    return s.replace(root, "<root>")
-conf, _ = settings.load(root)
-out = {}
-raw = approval.read_raw(conf, root)
-opened, notes = approval.scan(conf, root, raw=raw)
-closed, cnotes = approval.scan(conf, root, closed=True, raw=raw)
-review, rnotes = approval.scan_review(conf, root, raw=raw)
-row = lambda ts: [[t.ticket, t.tree, t.state, rel(t.blocked)] for t in ts]
-out["open"], out["closed"], out["review"] = row(opened), row(closed), row(review)
-out["notes"] = [rel(n) for n in notes + cnotes + rnotes]
-kept, problems, stale = approval.read_proposals(conf, root, raw.everything)
-out["proposals"] = [[t.ticket, t.tree, t.state] for t in kept]
-current = checks.by_id(opened)
-out["stale"] = [[t.ticket, w, rel(approval.revision_elsewhere_text(conf, root, t, w)),
-                 approval.revision_elsewhere(t, current.get(t.ticket))] for t, w in stale]
-out["family"] = [[t.ticket, [rel(p.detail) for p in checks.family_problems(conf, root, t)]] for t in kept]
-out["home"] = rel(approval.home_dir(conf, root, "i0001-01-01", "i0001", project=""))
-out["nowhere"] = rel(approval.home_dir_read(conf, root, "i0099", "", project=""))
-out["nowhereAny"] = rel(approval.home_dir_read(conf, root, "i0001", ""))
-try:
-    approval.home_dir(conf, root, "i0099", "", project="")
-except approval.NoParentWorktree as exc:
-    out["noParent"] = rel(str(exc))
-pool = ops.predecessor_pool(conf, root)
-out["unmet"] = [[t.ticket, [[p.ticket, p.state, rel(p.where), rel(p.label)] for p in checks.unmet_predecessors(t, pool)],
-                 [[p.kind, rel(p.detail)] for p in checks.predecessor_problems(t, pool, ".ccnavi/approved")]] for t in opened]
-parent = current["i0001"]
-children = sorted([t for t in opened + closed if t.parent == "i0001" and t.phase == 1], key=lambda t: t.ticket)
-ident, t, why = ops._followup_ticket(conf, root, parent, 1, children, ["1 行の指摘", "### 見出し\n本文"], "op-1")
-out["followup"] = [ident, tm.render(t) if t else "", why]
-out["followupProblem"] = ops.followup_problem(conf, root, parent, 1, children, [])
-out["next"] = [ops.next_child_id(conf, root, "i0001", 1), ops.next_child_id(conf, root, "i0001", 2)]
-try:
-    ops.next_child_id(conf, root, "i0001", 100)
-except ValueError as exc:
-    out["nextBad"] = str(exc)
-out["existing"] = rel(ops.existing_ticket_file(conf, root, "I0001-01-01"))
-for name, ident in (("wapFamily", "i0001-01-01"), ("wapStop", "i0099")):
-    buf = io.StringIO()
-    wap.family(buf, conf, root, ident)
-    out[name] = rel(buf.getvalue())
-buf, err = io.StringIO(), io.StringIO()
-out["wapSortCode"] = wap.sort(buf, err, conf, root, "i0001")
-out["wapSort"] = buf.getvalue() + err.getvalue()
-py, go = c["py"], c["go"]
-with fsio.clock(c["clock"]):
-    marks.write_mark(py, "i0001", 1, marks.MARK_REQUESTED, {"by": "cli", "名": "値"})
-    marks.write_mark(py, "i0001", 1, marks.MARK_REVIEWED, {"at": "given", "by": "decide"})
-    marks.write_mark(py, "i0001", 2, marks.MARK_PENDING, {"review": True})
-    marks.write_parent_mark(py, "i0001", marks.PARENT_MARK_READY, {"mr": 7})
-    marks.write_child_record(py, "i0001", "i0001-01-01", marks.CHILD_RECORD_RISK, {"points": 3, "level": "中"})
-    marks.add_ledger(py, "i0001", [{"key": "u/7#t1", "version": 1}, {"key": "u/7#t2", "at": "kept"}])
-    marks.add_ledger(py, "i0001", [{"key": "u/7#t1", "version": 2}])
-    cleared = marks.clear_marks(py, "i0001", 2)
-out["cleared"] = [cleared.kinds, cleared.failed, cleared.warnings]
-files = {}
-for base, _, names in os.walk(py):
-    for n in names:
-        p = os.path.join(base, n)
-        with open(p, "rb") as f:
-            files[os.path.relpath(p, py).replace(os.sep, "/")] = base64.b64encode(f.read()).decode()
-out["files"] = files
-out["readGo"] = {
-    "marks": {k: v for k, v in marks.marks(go, "i0001", 1).items()},
-    "ready": marks.read_parent_mark(go, "i0001", marks.PARENT_MARK_READY),
-    "risk": marks.read_child_record(go, "i0001", "i0001-01-01", marks.CHILD_RECORD_RISK),
-    "ledger": list(marks.read_ledger(go, "i0001")),
-}
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
+// Python の tickets/approval に読ませたのと同じワークスペースで、置き場の読み・信頼できない理由・先行・続きの子・
+// write-and-push の答えが写し（testdata）と 1 字も違わないことを見る。マーカーと記録は写しと同じ時刻で書き、
+// バイト列が写しと同じで、写しの記録（Python が書いたもの）を Go が読めることを見る。
 
 type approvalAnswers struct {
 	Open            [][]string        `json:"open"`
@@ -186,8 +108,7 @@ func TestMatchesPython(t *testing.T) {
 	cleared := marks.Clear(goDir, "i0001", 2, nil)
 	restore()
 
-	want := testkit.Answers[approvalAnswers](t, "approval", approvalOracle,
-		map[string]string{"root": root, "py": pyDir, "go": goDir, "clock": fixedClock})
+	want := golden.Load[approvalAnswers](t, "approval")
 	rel := func(s string) string { return strings.ReplaceAll(s, root, "<root>") }
 	conf := testkit.Settings(t, root)
 	raw := ReadRaw(conf, root)
@@ -309,6 +230,14 @@ func TestMatchesPython(t *testing.T) {
 		return nil
 	})
 	check("files", mine, want.Files)
+	// 写しの記録（Python が書いたバイト列）を置き直して、Go が読めることを見る。
+	for r, b64 := range want.Files {
+		data, err := base64.StdEncoding.DecodeString(b64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		testkit.Put(t, filepath.Join(pyDir, filepath.FromSlash(r)), string(data))
+	}
 	gotRead := map[string]any{}
 	read := map[string]any{}
 	for k, v := range marks.Marks(pyDir, "i0001", 1) {

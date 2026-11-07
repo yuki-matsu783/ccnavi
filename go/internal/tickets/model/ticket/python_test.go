@@ -8,52 +8,13 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
-	"ccnavi/internal/tickets/testkit"
 )
 
 // Python の ticket.parse・subset_problems・decide・branch_name_problems・donecopy.copy_fields と突き合わせる。
 // 読める・読めないの境界と苦情の文が 1 字も違わないことを、欄ごとの誤りを並べた入力で見る。
-
-const parseOracle = `
-import json, sys
-from ccnavi.infra import settings
-from ccnavi.tickets.model import ticket as tm, ticket_ids, donecopy
-def plan(items):
-    if items is None:
-        return None
-    return [{"raw": i.as_raw(), "errors": [[repr(v), w] for v, w in i.after_errors], "repeated": i.after_repeated} for i in items]
-def need(v):
-    return "" if v is None else ("yes" if v else "no")
-out = []
-c = json.load(sys.stdin)
-parent, _ = tm.parse(c["parent"])
-for text in c["texts"]:
-    t, problems = tm.parse(text)
-    row = {"problems": [[p.severity, p.rule, p.detail] for p in problems], "copy": None}
-    cp = donecopy.copy_fields(text)
-    if cp is not None:
-        row["copy"] = [cp.ticket, cp.parent]
-    if t is not None:
-        row["ticket"] = {
-            "id": t.ticket, "parent": t.parent, "phase": t.phase if t.phase is not None else 0,
-            "preds": t.predecessors, "issue": t.issue or 0, "repo": t.issue_repo, "mr": t.mr or 0,
-            "project": t.project, "plan": plan(t.plan), "feedback": plan(t.feedback),
-            "phases": repr(t.phases_raw), "review": need(t.review_required), "reason": t.review_reason,
-            "title": t.title, "rationale": t.rationale, "body": t.body,
-            "entries": [[e.decision, e.glob, e.regex] for e in t.entries],
-            "script": [getattr(t, k) for k in tm.ticket_model.SCRIPT_FIELDS],
-            "maint": repr(t.maintenance), "hasMaint": t.has_maintenance, "maintProblem": t.maintenance_problem(),
-            "consolidate": t.is_consolidate,
-            "decide": [t.decide(p) for p in c["paths"]],
-            "subset": [[p.severity, p.rule, p.detail] for p in tm.subset_problems(t, parent)],
-            "names": ticket_ids.branch_name_problems(t, "Trunk", 0, settings.DEFAULT_BRANCH_PREFIXES),
-            "issueText": tm.issue_text(t.raw.get("issue")) if "issue" in t.raw else "",
-        }
-    out.append(row)
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 type pyTicket struct {
 	ID           string     `json:"id"`
@@ -264,8 +225,7 @@ func roundTrip(t *testing.T, v any) any {
 }
 
 func TestParseMatchesPython(t *testing.T) {
-	in := map[string]any{"parent": parentText, "texts": parseCases, "paths": decidePaths}
-	want := testkit.Answers[[]pyRow](t, "parse", parseOracle, in)
+	want := golden.Load[[]pyRow](t, "parse")
 	parent, _ := Parse(parentText)
 	for i, text := range parseCases {
 		got := pyRow{Problems: [][]string{}}
@@ -344,20 +304,10 @@ func TestPlanFieldsDefault(t *testing.T) {
 	}
 }
 
-const renderOracle = `
-import json, sys
-from ccnavi.tickets.model import ticket as tm
-out = []
-for text in json.load(sys.stdin):
-    t, _ = tm.parse(text)
-    out.append(None if t is None else tm.render(t))
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
-
 // 書き戻した文面が Python の ticket.render と 1 字も違わないこと（承認済みチケットのバイト列になる）。
 func TestRenderMatchesPython(t *testing.T) {
 	cases := append([]string{renderSample}, parseCases...)
-	want := testkit.Answers[[]*string](t, "render", renderOracle, cases)
+	want := golden.Load[[]*string](t, "render")
 	for i, text := range cases {
 		tk, _ := Parse(text)
 		if tk == nil {

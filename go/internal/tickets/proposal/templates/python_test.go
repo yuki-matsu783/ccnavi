@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/yamljson"
 	"ccnavi/internal/policy/rules"
@@ -18,52 +19,6 @@ import (
 // Python の plan_templates と template_use と突き合わせる。同じワークスペースを読ませ、--templates の JSON
 // （一覧・統合結果・検査の苦情）、--check-file の答え、テンプレートの読みと書き戻し、使う側の組み方が 1 字も
 // 違わないことを見る。JSON の形は拡張との契約なので、Python の json.dumps の出力のまま比べる。
-
-const templatesOracle = `
-import base64, json, sys, yaml
-from ccnavi.infra import settings, yamlread
-yamlread.LOADER = yaml.SafeLoader
-from ccnavi.tickets.proposal import plan_templates as pt, template_use as tu
-c = json.load(sys.stdin)
-root = c["root"]
-def dump(v):
-    return json.dumps(v, ensure_ascii=True, indent=1).replace(root, "<root>")
-def probs(ps):
-    return [[p.severity, p.rule, p.detail] for p in ps]
-conf, _ = settings.load(root)
-scan = pt.scan(conf, root)
-out = {"lists": [], "checks": [], "parses": [], "names": [], "resolves": [], "uses": []}
-for layer, words in c["lists"]:
-    out["lists"].append(dump(pt.as_json(conf, root, scan, layer, words)))
-for path, layer in c["checks"]:
-    out["checks"].append(dump(pt.check_file(conf, root, path, layer)))
-for b, stem in c["parses"]:
-    t, notes = pt.parse_template(base64.b64decode(b), stem)
-    row = {"problems": probs(notes), "dump": None, "check": None}
-    if t is not None:
-        row["dump"] = pt.dump(t)
-        row["check"] = probs(pt.check(t, None, None))
-    out["parses"].append(row)
-for name in c["names"]:
-    out["names"].append(pt.new_name_problem(name))
-for layer, name in c["resolves"]:
-    found, why = tu.resolve(conf, root, layer, name)
-    row = {"why": why.replace(root, "<root>")}
-    if found is not None:
-        plan, feedback = tu.absolute(found.template)
-        drafts, dwhy = tu.flow_drafts("feature-9", found.template)
-        row.update(name=found.template.name, layer=found.entry.layer, warns=found.warns, notes=found.notes,
-            plan=[i.as_data() for i in plan], feedback=[i.as_data() for i in feedback],
-            drafts=[list(d) for d in drafts], draftsWhy=dwhy,
-            childProblem=tu.child_problem("x" * 60, found.template))
-    out["resolves"].append(row)
-out["counts"] = [pt.has_any(scan), len(pt.problems_of(scan))]
-bare = c["bare"]
-bconf, _ = settings.load(bare)
-out["bare"] = [dump(pt.check_file(bconf, bare, c["bareFile"], "self")).replace(bare, "<root>"),
-    dump(pt.as_json(bconf, bare, pt.scan(bconf, bare), "self", [])).replace(bare, "<root>")]
-json.dump(out, sys.stdout, ensure_ascii=False)
-`
 
 type resolveRow struct {
 	Why          string   `json:"why"`
@@ -262,8 +217,7 @@ func TestMatchesPython(t *testing.T) {
 		parses = append(parses, [2]string{base64.StdEncoding.EncodeToString([]byte(c.text)), c.stem})
 	}
 	bareFile := filepath.Join(bare, ".ccnavi", "config", "project", "templates", "feature.yml")
-	in := map[string]any{"root": root, "bare": bare, "bareFile": bareFile, "lists": lists, "checks": checks, "parses": parses, "names": nameCases, "resolves": resolves}
-	want := testkit.Answers[templatesAnswers](t, "templates", templatesOracle, in)
+	want := golden.Load[templatesAnswers](t, "templates")
 
 	conf, _ := config.Load(root)
 	s := Load(conf, root)
