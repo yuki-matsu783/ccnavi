@@ -5,6 +5,7 @@ import (
 
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
+	"ccnavi/internal/infra/pyfmt"
 )
 
 // 直接作業の記録（`<git の共通ディレクトリ>/ccnavi-direct/<名前>`。書くのは ccnavi-worktree.sh）を読む。
@@ -75,7 +76,7 @@ func validDirect(root string, main Tree, common, name string, fields map[string]
 		return false
 	}
 	branch, ok := BranchOf(work)
-	return ok && pathcase.Fold(NFC(branch)) == pathcase.Fold(NFC(name))
+	return ok && pathcase.Fold(pyfmt.NFC(branch)) == pathcase.Fold(pyfmt.NFC(name))
 }
 
 // DirectRecords はこのユーザのチェックアウトの、有効な横で作業する記録。

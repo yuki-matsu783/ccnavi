@@ -2,8 +2,8 @@
 // ディレクトリ名そのもの）、範囲を適用しない置き場（提案・承認済みチケット・下書き）、途中の作業の置き場、
 // 退避と承認済みの領域の下の名前をここに集める。ファイルも git も読まない。
 //
-// 下の段（records/prune・policy/selfguard・records/stopreview）は tickets を読めないので、名前を写して持っている。
-// 写しの持ち主はここの定数（ArchiveName・Handoff・Todo など）。
+// 下の段（records/prune・policy/selfguard・records/stopreview）も名前で見る置き場（ArchiveName・Handoff・WipRoot・Todo）は、
+// 下の段が tickets を読めないので infra/config に名前を置き、ここの定数がそれを指す。
 //
 // Python からの対応: ticket_model の状態（TODO・REVIEW・DOING・DONE・CANCELLED・STATES・FINISHED・GUARDED_STATES）→
 // State と States・Finished・GuardedStates、ticket_fold.progress → State.Progress、ticket_places の

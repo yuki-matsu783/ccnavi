@@ -10,7 +10,11 @@ from __future__ import annotations
 # 保護領域の宣言とみなす判定（ルールの match にこのどれかが入っていれば「この場所に書かせない」）にも使う。
 # Bash は入れていない。コマンド文字列に現れるパスは追えないので、ここで適用するとヒットしたり
 # ヒットしなかったりする判定になる。シェル経由の書き込みは実行後チェックがワークツリーの実物を見て拾う。
-WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
+# MultiEdit は 1 回で同じファイルを何か所も直す。
+# 現行の Claude Code にも編集ツールのひとつとして残っている。
+WRITE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
+# ルールの match に書く形（`Write|Edit|MultiEdit|NotebookEdit`）。組み込みのルールはこれを使う。
+WRITE_MATCH = "|".join(WRITE_TOOLS)
 # 書いたファイルの識別子を記録に残すツール（MultiEdit を含む）。
 WRITTEN_FILE_TOOLS = ("Write", "Edit", "MultiEdit")
 # サブエージェントの起動ツール。Claude Code の版によって Agent か Task で来る。
@@ -29,7 +33,7 @@ SHELL_TOOLS = ("Bash", "PowerShell")
 SEARCH_TOOLS = ("Grep", "Glob")
 
 # 行き先のパスで判定するツール。subject に解決済みのパスが入っている。
-PATH_TOOLS = (*READ_TOOLS, "Edit", "Write", "NotebookEdit")
+PATH_TOOLS = (*READ_TOOLS, *WRITE_TOOLS)
 # 判定に達せなかったときに止めるツール。
 STRICT_TOOLS = (*WRITE_TOOLS, *AGENT_TOOLS)
 # 実行後チェックを省ける、ワークツリーを変えようがないツール。ここを飛ばすぶん git を起こす回数が減る。

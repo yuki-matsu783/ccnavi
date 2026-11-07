@@ -4,8 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"golang.org/x/text/cases"
-
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 )
@@ -15,7 +14,7 @@ type State string
 
 const (
 	// Todo と Review は提案の置き場（wip/proposals/）に並ぶ。
-	Todo   State = "todo"
+	Todo   State = config.TodoDir
 	Review State = "review"
 	// Doing と Done は承認済みチケットの置き場（.ccnavi/approved/）に並ぶ。
 	Doing State = "doing"
@@ -54,14 +53,14 @@ func (s State) Progress() int {
 const (
 	// Handoff は下書きの置き場（ツリーのルートからの相対）。設定で動かさない。動かせると、その値を
 	// ソースの置き場に向けるだけで承認した範囲を迂回して書ける場所ができる。
-	Handoff = "wip/handoff"
+	Handoff = config.WipRoot + "/" + config.HandoffName
 	// ScratchRoot はワークスペースルート直下の一時の置き場。追跡されず、範囲も適用しない。
 	ScratchRoot = "scratchpad"
 	// WipRoot は途中の作業の置き場。マージの前に全体を消す。
-	WipRoot = "wip"
+	WipRoot = config.WipRoot
 
 	// ArchiveName は閉じた親子のチケットの退避の置き場の名前（logs/ の下）。
-	ArchiveName = "archive"
+	ArchiveName = config.ArchiveName
 	// PhasesDir・FlowsDir は承認済みの領域の下の、マーカーと子のフローの置き場。
 	PhasesDir = "phases"
 	FlowsDir  = "flows"
@@ -73,8 +72,6 @@ const (
 
 // ArchiveDir はワークスペースルートからの退避の置き場（logs/ は .gitignore に入っている）。
 var ArchiveDir = ospath.Join("logs", ArchiveName)
-
-var folder = cases.Fold()
 
 // under は相対パスがその置き場の下にあるか。前置は "/" の境で切り、大文字小文字は区別しない。
 // rel の "\" は "/" に直さない（Linux・macOS では `wip\proposals\x` という名前の 1 ファイルになる）。
@@ -116,7 +113,7 @@ func ScratchDir(root string) string {
 // IsHandoffPlace は相対パスが下書きの置き場（wip/handoff/）の下にあるか。大文字小文字は区別しない。
 // "\" は "/" に直さない（under と同じ理由）。
 func IsHandoffPlace(rel string) bool {
-	return strings.HasPrefix(folder.String(rel), Handoff+"/")
+	return strings.HasPrefix(pyfmt.Casefold(rel), Handoff+"/")
 }
 
 // IsUnscoped はチケットの範囲を適用しない場所か（実行前チェックが使う）。

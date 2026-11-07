@@ -7,7 +7,7 @@
 //
 // Python からの対応: 書き込みの 7 種類は WriteFile（バイト列）・WriteText（本文）の How で選ぶ。
 // write_text → WriteText(…, Plain)、write_text_atomic → Atomic、write_text_durable → Durable、
-// write_bytes → WriteFile(…, Plain)、write_bytes_atomic → Atomic、write_new → New、
+// write_bytes → WriteFile(…, Plain)、write_bytes_atomic → Durable（fsync し、`.<名前>.<一意>.part` に書いてから差し替える）、write_new → New、
 // write_new_durable → NewDurable。write_json_atomic → WriteJSON、replace_bytes → ReplaceFile、
 // read_dict → ReadObject、read_json の (値, 例外) → ReadJSON の (値, error)、clock → FixClock、
 // recording → StartRecording と Recorder.Stop、policy → SetPolicy、slashed → ospath.Slashed。

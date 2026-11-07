@@ -61,7 +61,8 @@ from ..model import proposal_form, standing, ticket_ids, ticket_model
 from ..model import ticket as ticket_mod
 from . import agree_candidates, plan_phases, plan_templates, template_use
 
-# `allow` に書く項の `match`。判定に使われるのは Write / Edit / NotebookEdit を含む項だけ。
+# `allow` に書く項の `match`。
+# 判定に使われるのは Write / Edit / MultiEdit / NotebookEdit を含む項だけ。
 ALLOW_MATCH = "Write|Edit"
 
 

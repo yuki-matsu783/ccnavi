@@ -13,6 +13,6 @@
 // regex_overflow_detail → RegexOverflowDetail、glob_has_space → GlobHasSpace、issue_text → IssueText、issue_label →
 // Ticket.IssueLabel、ticket_ids.branch_name_problems → Ticket.BranchNameProblems、ticket_fold の fold・authority・
 // collided_states・collisions・by_ticket・dedupe → Fold・Authority・CollidedStates・Collisions・ByTicket・Dedupe
-// （progress は place.State.Progress）、donecopy.copy_fields → CopyFields。
-// ticket.render は YAML の書き出し（PyYAML の safe_dump）が infra に無いので移していない。
+// （progress は place.State.Progress）、donecopy.copy_fields → CopyFields、ticket.render → Render（extra を渡す呼び手が
+// 無いので受けない。書き出せない値は error）。
 package ticket

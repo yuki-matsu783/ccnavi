@@ -10,7 +10,7 @@ keywords: [判定, ワークツリー, 承認済みチケット, 範囲, REQ-TKT
 
 ### 9.5 ファイルの行き先で選んだチケットによる判定
 
-`Write` / `Edit` / `NotebookEdit` の対象を解いた先が `.claude/worktrees/<名前>/` の中なら、その名前と
+`Write` / `Edit` / `MultiEdit` / `NotebookEdit` の対象を解いた先が `.claude/worktrees/<名前>/` の中なら、その名前と
 同じ識別子の開いた承認済みチケットで判定する。呼び出し元の `cwd` も、サブエージェントかどうかも見ない
 （REQ-TKT-01）。範囲の前置はそのワークツリーのルートから解く。
 

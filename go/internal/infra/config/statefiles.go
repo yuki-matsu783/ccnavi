@@ -12,3 +12,19 @@ const (
 	// StopPrefix は Stop の促しの数えの記録の名前の頭（`stop-<セッション>.json`）。
 	StopPrefix = "stop-"
 )
+
+// 上の段（tickets）が持つ置き場と記録の名前のうち、下の段（records・policy）も名前で見るもの。下の段は tickets を
+// 読めないので、名前をここに置き、tickets/model の定数（括弧の中）がこれを参照する。
+const (
+	// OpsDir は state の下の操作記録の置き場（oplog.DirName）。prune は送り終えていない記録を残す側に数える。
+	OpsDir = "ops"
+	// DirectPrefix は直接作業の候補の記録の名前の頭（directcand。`direct-<セッション>.json`）。
+	DirectPrefix = "direct-"
+	// ArchiveName は閉じた親子のチケットの退避の置き場の名前（place.ArchiveName。logs/ の下）。自己防衛が守る。
+	ArchiveName = "archive"
+	// WipRoot と HandoffName は下書きの置き場 wip/handoff の 2 段（place.WipRoot・place.Handoff）。
+	WipRoot     = "wip"
+	HandoffName = "handoff"
+	// TodoDir は提案の置き場の下の、承認前の提案の置き場（place.Todo）。
+	TodoDir = "todo"
+)

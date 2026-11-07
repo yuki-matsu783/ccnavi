@@ -8,9 +8,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"golang.org/x/text/cases"
-	"golang.org/x/text/unicode/norm"
-
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/pyfmt"
 )
@@ -42,8 +39,8 @@ const (
 )
 
 // ReservedBranchIDs は統合先や保護されたブランチの名前（ccnavi-git.sh の push の拒否と同じリスト）。
-// infra/config の先頭の語の予約は、このコピーを持つ。
-var ReservedBranchIDs = []string{"main", "master", "develop", "release"}
+// infra/config の先頭の語の予約も同じリストを読むので、名前は config に置く。
+var ReservedBranchIDs = config.ReservedBranchIDs
 
 // refPrefixes は先頭の階層に置けない語（git の ref の名前とリモートの名前）。
 var refPrefixes = []string{"refs", "heads", "remotes", "tags", "origin", "upstream", "head"}
@@ -58,8 +55,6 @@ var (
 	branchPattern = regexp.MustCompile(`^[A-Za-z0-9][` + IDChars + `/]*$`)
 )
 
-var folder = cases.Fold()
-
 func runes(s string) int { return utf8.RuneCountInString(s) }
 
 // IDProblem は識別子として読めない理由。読めれば空。文字・NFC・長さを見る（形は見ない）。
@@ -67,7 +62,7 @@ func IDProblem(text string) string {
 	if text == "" {
 		return "識別子がありません。"
 	}
-	if norm.NFC.String(text) != text {
+	if pyfmt.NFC(text) != text {
 		return "識別子が NFC でない（macOS で濁点が分かれた NFD の表記など）。" +
 			"見た目が同じでも別の名前になるので NFC で書く"
 	}
@@ -175,7 +170,7 @@ func NextSerial(names []string, prefixes []string, skipChildren bool) int {
 // 最初の 1 語が room を超えるときだけその語を room 文字で切る。何も残らなければ空。
 func issueSlug(title string, room int) string {
 	var b strings.Builder
-	for _, c := range norm.NFKC.String(title) {
+	for _, c := range pyfmt.NFKC(title) {
 		if c < utf8.RuneSelf && 'A' <= c && c <= 'Z' {
 			c += 'a' - 'A'
 		}
@@ -300,7 +295,7 @@ func BranchProblem(name string) string {
 	if name == "" {
 		return "ブランチ名が空"
 	}
-	if norm.NFC.String(name) != name {
+	if pyfmt.NFC(name) != name {
 		return "ブランチ名が NFC でない（見た目が同じでも別の名前になるので NFC で書く）"
 	}
 	if n := runes(name); n > MaxBranchLength {
@@ -319,7 +314,7 @@ func BranchProblem(name string) string {
 			return "git のブランチ名に使えない形（`.` で始まる階層・`.lock` で終わる階層）"
 		}
 	}
-	folded := folder.String(name)
+	folded := pyfmt.Casefold(name)
 	parts := strings.Split(folded, "/")
 	if slices.Contains(refPrefixes, parts[0]) {
 		return "先頭の階層 `" + strings.Split(name, "/")[0] + "` は git の ref の名前" +
@@ -341,4 +336,4 @@ func BranchProblem(name string) string {
 }
 
 // SameID は大文字小文字だけが違う識別子を同じと読む（区別しないファイルシステムではぶつかるため）。
-func SameID(a, b string) bool { return folder.String(a) == folder.String(b) }
+func SameID(a, b string) bool { return pyfmt.Casefold(a) == pyfmt.Casefold(b) }

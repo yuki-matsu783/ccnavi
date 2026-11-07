@@ -2,6 +2,7 @@ package selfguard
 
 import (
 	"bytes"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -186,32 +187,46 @@ func TestTooManyRedirects(t *testing.T) {
 }
 
 // 浅い PATH の実体（/bin/ccnavi）は区切りで始まる形だけに当て、別のプロジェクトの ./bin/ccnavi は止めない。
+// 浅い PATH の実体（`/tmp/x/ccnavi`）は区切りで始まる形だけに当てる。ルールの式は後読みを受けない。
+// 組み立てに失敗して保護が黙って外れないことも確かめる。
 func TestShallowPathExecutable(t *testing.T) {
 	if ospath.Windows {
 		t.Skip("PATH の実体の形が違う")
 	}
-	dir := t.TempDir()
+	dir, err := os.MkdirTemp("/tmp", "sg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
 	exe := filepath.Join(dir, "ccnavi")
 	write(t, exe, "#!/bin/sh\n")
 	if err := os.Chmod(exe, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if len(pathParts(exe)) > 3 {
+		t.Skipf("%s が浅くない", exe)
+	}
 	t.Setenv("PATH", dir)
-	clause := BinaryClause("/ws/.ccnavi/scripts/ccnavi-launcher.sh")
-	regex, err := pyre.Compile(clause, 0)
-	if err != nil {
-		t.Fatal(err)
+	rs := &rules.RuleSet{Version: rules.Version}
+	AddRules(rs, Options{Root: testRoot, Bin: "/ws/.ccnavi/scripts/ccnavi-launcher.sh", ProjectHome: config.DefaultProjectHome, CommonFiles: defaultCommon(testRoot)})
+	byID := map[string]*rules.Rule{}
+	for _, r := range rs.Deny {
+		byID[r.ID] = r
 	}
-	if !regex.Search("cp x " + exe) {
-		t.Errorf("%s に当たらない", exe)
+	if byID[ShellRuleID] == nil || byID[binaryRuleID] == nil {
+		t.Fatalf("組み立てられなかったルールがある: %v", slices.Collect(maps.Keys(byID)))
 	}
-	if parts := pathParts(exe); len(parts) <= 3 {
-		if regex.Search("cp x ./" + strings.Join(parts, "/")) {
-			t.Error("相対の綴りに当たった")
+	if !byID[binaryRuleID].Matches(config.ToolWrite, exe) {
+		t.Errorf("名指しのツールが %s に当たらない", exe)
+	}
+	rel := strings.TrimPrefix(exe, "/")
+	for command, want := range map[string]bool{
+		"cp x " + exe: true, "echo x > " + exe: true, "rm " + exe: true,
+		"cp x ./" + rel: false, "cp -t /tmp/out " + exe: false, "cp " + exe + " /tmp/x": false, "cp x vendor/bin/ccnavi-old": false,
+	} {
+		if got := byID[ShellRuleID].Matches("Bash", shell.Read(command).Text); got != want {
+			t.Errorf("%q: %v, want %v", command, got, want)
 		}
-	}
-	if regex.Search("cp x vendor/bin/ccnavi-old") {
-		t.Error("別の名前に当たった")
 	}
 }
 
