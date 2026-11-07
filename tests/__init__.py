@@ -6,18 +6,15 @@ import glob as _glob
 import os
 import shutil as _shutil
 import subprocess as _subprocess
-import sys as _sys
 import tempfile as _tempfile
 import unittest as _unittest
 
 # リポジトリの根。テストはグループのサブパッケージにあり、深さが揃わないのでここで 1 回だけ求める。
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# ccnavi パッケージの置き場（src レイアウト）。Python の内部を直に import する白箱のテストが、
-# パッケージとして入れていない Python で回してもこのツリーのソースを読むよう、先頭に足す。
-# ccnavi を起こすテストは実行ファイル（tests/exe.py）を使い、ここには頼らない。
+# ccnavi の Python（src レイアウト）の置き場。共通の部品はここを読まない。
+# Python の内部を直に import する白箱のテストだけが、グループの `__init__.py` から
+# tests/whitebox/ を通して sys.path に足す。
 SRC = os.path.join(ROOT, "src")
-if SRC not in _sys.path:
-    _sys.path.insert(0, SRC)
 
 # 使い捨ての置き場は、シンボリックリンクを解いた実パスにそろえる。macOS の一時置き場は
 # `/var/...` だが実体は `/private/var/...` で、git や realpath は後者を返す。置き場の
@@ -298,16 +295,8 @@ def put_ccnavi_md(root: str) -> str:
     return target
 
 
-def _repo_messages() -> str:
-    """このリポジトリの文面ファイルの置き場。
-
-    `git mv` で `.ccnavi/messages/` へ移すまでは古い置き場にある（#661）。
-    移したら古い側の分岐は要らない。
-    """
-    new = os.path.join(ROOT, ".ccnavi", "messages")
-    if os.path.isdir(new):
-        return new
-    return os.path.join(ROOT, ".ccnavi", "config", "common", "messages")
+# このリポジトリの文面ファイルの置き場。
+MESSAGES = os.path.join(ROOT, ".ccnavi", "messages")
 
 
 def put_messages(root: str) -> str:
@@ -317,28 +306,5 @@ def put_messages(root: str) -> str:
     無くても判定は変わらず、文が短い既定の文に落ちる。
     """
     target = os.path.join(root, ".ccnavi", "messages")
-    _shutil.copytree(_repo_messages(), target, dirs_exist_ok=True)
+    _shutil.copytree(MESSAGES, target, dirs_exist_ok=True)
     return target
-
-
-def _use_repo_messages_when_absent() -> None:
-    """使い捨てのワークスペースに文面ファイルが無いとき、このリポジトリの文面を引く。
-
-    文を見るテストの大半は、判定の外側の文面を気にしない使い捨ての木を組む。そのたびに文面ファイルを
-    コピーさせない。同じプロセスで動く Python のテストだけに効く（別プロセスで起こす sh と
-    実行ファイルには `put_messages` でコピーする）。文面ファイルを置いた木は、その木のものを引く。
-    """
-    from ccnavi.policy import texts as _texts
-
-    real = _texts.dirs
-
-    def dirs(root: str) -> str:
-        where = real(root)
-        if not os.path.isdir(where):
-            where = _repo_messages()
-        return where
-
-    _texts.dirs = dirs
-
-
-_use_repo_messages_when_absent()

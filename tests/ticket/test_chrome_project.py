@@ -136,7 +136,7 @@ class ChromeProjectTest(unittest.TestCase):
         self.assertNotIn("ccnavi_approved", copy)
 
     def test_the_project_layer_is_the_integration_config_as_it_is(self):
-        place = self.chrome._placement()
+        place = self.chrome.placement()
         risks = "version: 1\nfactors: []\n"
         snap = {
             "integration": {"name": "trunk"},

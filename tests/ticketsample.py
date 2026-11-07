@@ -7,10 +7,11 @@ import し合うと、片方のグループだけを回したときにも他方�
 
 from __future__ import annotations
 
-import importlib.util
+import json
 import os
+import subprocess
 
-from tests import ROOT, config_path, phasecopy
+from tests import ROOT, config_path, exe, phasecopy
 
 RULES = {
     "version": 1,
@@ -166,18 +167,52 @@ def child_text(name, parent, phase, allow, review=True):
     return "\n".join(lines) + "\n"
 
 
-# Chrome 拡張（承認の画面）の置き場。Python の入口 `py/ccnavi_chrome.py` を持つ。
+# Chrome 拡張（承認の画面）の置き場。
 CHROME = os.path.join(ROOT, "extensions", "chrome", "ccnavi-approval")
 
 
-def load_chrome():
-    """Chrome の入口（`ccnavi_chrome.py`）をモジュールとして読み込む。"""
-    spec = importlib.util.spec_from_file_location(
-        "ccnavi_chrome", os.path.join(CHROME, "py", "ccnavi_chrome.py")
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+class Chrome:
+    """Chrome の入口。
+
+    拡張の WASM と同じ要求を、手元向けの入口（`go/cmd/ccnavi-chrome`）に 1 件ずつ渡す。
+
+    置き場の名前は拡張と同じ値をテストの側に持つ（go/internal/entry/chrome と食い違えば、置き場を
+    比べるテストが落ちる）。
+    """
+
+    # 要求と答えの形の版（拡張の CCNAVI_SCHEMA）。
+    SCHEMA = 1
+    COMPAT_FILE = ".ccnavi/scripts/ccnavi-common.sh"
+    SETTINGS_FILE = ".claude/settings.json"
+    COMMON_LAYER = ".ccnavi/config/common"
+
+    def handle(self, request: str, root: str) -> str:
+        """要求の JSON 1 件に答える。`root` は仮のツリーを組む場所（入口が中身を作り直す）。"""
+        if not os.path.exists(root):
+            os.makedirs(root)
+        done = subprocess.run(
+            [exe.chrome_path(), root],
+            input=request.replace("\n", " ") + "\n",
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=120,
+        )
+        if done.returncode != 0:
+            raise RuntimeError(f"ccnavi-chrome が失敗しました: {done.stderr}")
+        return done.stdout.strip()
+
+    def placement(self) -> dict:
+        """置き場の答え（`op: placement`）。"""
+        answer = json.loads(
+            self.handle(json.dumps({"schema": self.SCHEMA, "op": "placement"}), os.devnull)
+        )
+        return answer["placement"]
+
+
+def load_chrome() -> Chrome:
+    """Chrome の入口。"""
+    return Chrome()
 
 
 # `plan` を持たない親は `ticket start` が止まるので、計画の中身を問わないテストの親は
@@ -247,9 +282,6 @@ def record_merge(parent_tree: str, child: str) -> None:
     `git merge`
     で済ませたあと、これで同じ記録を足してコミットする。
     """
-    import subprocess
-
-    from ccnavi.tickets.model import ticket_fields
 
     def git(*args: str) -> str:
         done = subprocess.run(
@@ -273,9 +305,24 @@ def record_merge(parent_tree: str, child: str) -> None:
         with open(path, encoding="utf-8") as f:
             text = f.read()
         with open(path, "w", encoding="utf-8", newline="\n") as f:
-            f.write(ticket_fields.set_fields(text, {"merged_sha": sha}))
+            f.write(_set_field(text, "merged_sha", sha))
         git("add", "--", rel)
         staged = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=parent_tree)
         if staged.returncode != 0:
             git("commit", "--quiet", "-m", f"merged_sha {child}")
         return
+
+
+def _set_field(text: str, key: str, value: str) -> str:
+    """frontmatter の欄 1 つを、行単位で書き換える（無ければ閉じの `---` の前に足す）。
+    値は `"…"` で囲む（実行ファイルが書く形と同じ）。"""
+    lines = text.splitlines()
+    end = lines.index("---", 1)
+    line = f'{key}: "{value}"'
+    for i in range(1, end):
+        if lines[i].split(":", 1)[0] == key:
+            lines[i] = line
+            break
+    else:
+        lines.insert(end, line)
+    return "\n".join(lines) + ("\n" if text.endswith("\n") else "")

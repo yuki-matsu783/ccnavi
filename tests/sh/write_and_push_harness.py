@@ -41,6 +41,7 @@ ccnavi-user-push-approved.sh・ccnavi-user-decide.sh・ccnavi-user-close-early.s
 
 from __future__ import annotations
 
+import atexit
 import json
 import os
 import shutil
@@ -51,7 +52,7 @@ import tempfile
 import time
 import unittest
 
-from tests import ROOT, common_path, config_path, exe, host_stub, put_messages
+from tests import ROOT, common_path, config_path, exe, host_stub, oprecord, put_messages
 from tests.ticketsample import PHASES, RULES, child_text, parent_text
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -390,25 +391,39 @@ class PhaseOne:
         self.assertEqual(finished.returncode, 0, finished.stdout + finished.stderr)
 
 
-# `--accept-plan` の代役。実行ファイルと同じく、本物の操作記録を作って、その操作ID を計画に書く。
-# `{{root}}`・`{{python}}` は `.format` で埋める（HALF・HOST_HALF）。
+# `--accept-plan` の代役。実行ファイルと同じく、操作記録を作って、その操作ID を計画に書く
+# （`tests/oprecord.py`。記録と計画の中身は ACCEPT_PLAN_SPEC）。
+ACCEPT_PLAN_SPEC = os.path.join(tempfile.mkdtemp(prefix="ccnavi-accept-plan-"), "spec.json")
+atexit.register(shutil.rmtree, os.path.dirname(ACCEPT_PLAN_SPEC), ignore_errors=True)
+with open(ACCEPT_PLAN_SPEC, "w", encoding="utf-8") as _f:
+    json.dump(
+        {
+            "begin": {
+                "kind": "decide",
+                "repo": {"host": "test", "mr_url": "u/mr"},
+                "parent": "i0001",
+                "phase": 1,
+                "mr": 1,
+                "plan": {"digest": ""},
+                "stages": [["reply", "reply"], ["note", "comment"]],
+            },
+            "plan": {"version": 1, "digest": "", "threads": []},
+        },
+        _f,
+    )
 ACCEPT_PLAN_CASE = """*" --accept-plan "*)
   plan=""; root=""; prev=""
   for a in "$@"; do
     [ "$prev" = --accept-plan ] && plan="$a"
     [ "$prev" = --root ] && root="$a"
     prev="$a"; done
-  PYTHONPATH='{root}/src' '{python}' -c 'import json, sys
-from ccnavi.tickets.model import oplog
-root, plan = sys.argv[1:3]
-op = oplog.begin(root + "/logs/state", "decide", repo={{"host": "test", "mr_url": "u/mr"}},
-                 parent="i0001", phase=1, mr=1, shown=[], choices={{}}, plan={{"digest": ""}},
-                 stages=[("reply", "reply"), ("note", "comment")])
-with open(plan, "w", encoding="utf-8") as f:
-    json.dump({{"version": 1, "digest": "", "op": op, "threads": []}}, f)' "$root" "$plan"
+  '{python}' '{oprecord}' "$root/logs/state" "$plan" '{spec}'
   exit 0 ;;
-"""
-ACCEPT_PLAN_CASE = ACCEPT_PLAN_CASE.format(root=ROOT, python=sys.executable)
+""".format(
+    python=sys.executable.replace("\\", "/"),
+    oprecord=oprecord.__file__.replace("\\", "/"),
+    spec=ACCEPT_PLAN_SPEC.replace("\\", "/"),
+)
 
 # 実行ファイルの半分の代役。残った指摘の行き先（`user reviewed ... --yes`）だけを代わりに書き
 # （親のワークツリーにレビュー済みマーカーを置き、書いたパスの一覧を出し、

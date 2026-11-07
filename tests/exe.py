@@ -5,8 +5,12 @@
 ソース（`_test.go` を除く .go と、埋め込む txt・json、go.mod・go.sum）の中身と Go の版・
 OS・CPU から作るので、ソースが同じなら回し直しても組み直さない。
 
-組み立てた後は `CCNAVI_TEST_EXE` に入れる。テストが起こす子のプロセス
-（`python -m tests` が起こす各モジュール）が、指紋を数え直さずに同じものを使う。
+Chrome 拡張の手元向けの入口（`go/cmd/ccnavi-chrome`）も同じ置き場に組む（`chrome_path`。
+渡すなら `CCNAVI_TEST_CHROME_EXE`）。
+
+組み立てた後は `CCNAVI_TEST_EXE`（Chrome は `CCNAVI_TEST_CHROME_EXE`）に入れる。
+テストが起こす子のプロセス（`python -m tests` が起こす各モジュール）が、指紋を数え直さずに
+同じものを使う。
 
 同時に走るプロセスが同じ指紋を組んでも、出来た物は置き場の中で名前を差し替えて置くので、
 組みかけのファイルを起こすことは無い。
@@ -26,19 +30,43 @@ import time
 from tests import ROOT
 
 GO = os.path.join(ROOT, "go")
-NAME = "ccnavi.exe" if os.name == "nt" else "ccnavi"
+SUFFIX = ".exe" if os.name == "nt" else ""
+NAME = "ccnavi" + SUFFIX
+CHROME_NAME = "ccnavi-chrome" + SUFFIX
 _SOURCE_SUFFIXES = (".go", ".txt", ".json", ".jsonl", ".mod", ".sum")
 
-_built: str | None = None
+_built: dict[str, str] = {}
+_compat: str | None = None
 
 
 def path() -> str:
     """ccnavi の実行ファイルのパス。初めて呼ばれたときに用意する。"""
-    global _built
-    if _built is None:
-        _built = os.environ.get("CCNAVI_TEST_EXE", "") or _build()
-        os.environ["CCNAVI_TEST_EXE"] = _built
-    return _built
+    return _ready("CCNAVI_TEST_EXE", "./cmd/ccnavi", NAME)
+
+
+def chrome_path() -> str:
+    """Chrome 拡張の手元向けの入口（`ccnavi-chrome <空のディレクトリ>`）のパス。"""
+    return _ready("CCNAVI_TEST_CHROME_EXE", "./cmd/ccnavi-chrome", CHROME_NAME)
+
+
+def compat() -> str:
+    """実行ファイルの互換の版（`--version` の `compat:` の値）。"""
+    global _compat
+    if _compat is None:
+        out = subprocess.run([path(), "--version"], capture_output=True, text=True, check=True)
+        _compat = next(
+            line.partition(":")[2].strip()
+            for line in out.stdout.splitlines()
+            if line.startswith("compat:")
+        )
+    return _compat
+
+
+def _ready(variable: str, package: str, name: str) -> str:
+    if variable not in _built:
+        _built[variable] = os.environ.get(variable, "") or _build(package, name)
+        os.environ[variable] = _built[variable]
+    return _built[variable]
 
 
 def sh_path() -> str:
@@ -76,17 +104,17 @@ def _fingerprint() -> str:
     return digest.hexdigest()[:16]
 
 
-def _build() -> str:
+def _build(package: str, name: str) -> str:
     base = os.path.join(tempfile.gettempdir(), "ccnavi-test-exe")
     place = os.path.join(base, _fingerprint())
-    target = os.path.join(place, NAME)
+    target = os.path.join(place, name)
     if os.path.isfile(target):
         return target
     _drop_stale(base)
     os.makedirs(place, exist_ok=True)
-    partial = os.path.join(place, f".{os.getpid()}.part{'.exe' if os.name == 'nt' else ''}")
+    partial = os.path.join(place, f".{name}.{os.getpid()}.part{SUFFIX}")
     done = subprocess.run(
-        ["go", "build", "-o", partial, "./cmd/ccnavi"],
+        ["go", "build", "-o", partial, package],
         cwd=GO,
         capture_output=True,
         text=True,

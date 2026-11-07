@@ -51,7 +51,7 @@ class DecideRecoveryShTest(unittest.TestCase):
     def setUp(self):
         ops.DecideOpsShTest.setUp(self)
         with open(self.stub, "w", encoding="utf-8") as f:
-            f.write(STUB.replace("{compat}", str(support.version.COMPAT)))
+            f.write(STUB.replace("{compat}", support.exe.compat()))
         # 以降の run_decide が使う cwd（AT25 で替える）
         self.cwd = self.tree
 
@@ -68,7 +68,7 @@ class DecideRecoveryShTest(unittest.TestCase):
             STUB_BEGIN=self.begin,
             STUB_MRURL=self.mr_url,
             STUB_MISMATCH="",
-            PYTHONPATH=os.path.join(support.ROOT, "src"),
+            STUB_USERFORM=support.userform.__file__,
         )
         env.update(extra)
         return self.decide_with_input(args, stdin, env)

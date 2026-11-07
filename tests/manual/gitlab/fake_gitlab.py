@@ -74,9 +74,6 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.a
 
 def load_body():
     """本体を、ファイルのパスから読む。`tests` パッケージ（PATH を変える）は読み込まない。"""
-    src = os.path.join(ROOT, "src")
-    if src not in sys.path:
-        sys.path.insert(0, src)
     path = os.path.join(ROOT, "tests", "fake_gitlab.py")
     spec = importlib.util.spec_from_file_location("fake_gitlab_body", path)
     module = importlib.util.module_from_spec(spec)

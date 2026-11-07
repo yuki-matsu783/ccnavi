@@ -282,7 +282,8 @@ class LintTest(unittest.TestCase):
     def test_ccnavi_ディレクトリが無いワークスペースは言わない(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
-        out = run_ccnavi(["--lint", "--root", os.path.realpath(directory.name)], cwd=ROOT).stdout
+        root = os.path.realpath(directory.name)
+        out = run_ccnavi(["--lint", "--root", root], cwd=ROOT, messages=False).stdout
 
         self.assertNotIn("(ccnavi-md)", out)
 
