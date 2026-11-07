@@ -24,7 +24,8 @@ var remote = regexp.MustCompile(
 		`(?P<host>\[[^\]/]+\]|[^/:@]+)(?::(?P<port>[0-9]+))?[/:]+(?P<path>.+?)(?:\.git)?/?\n?$`)
 
 // credentials は URL に埋めた資格情報（`//user:token@`）。苦情の文には残さない。
-var credentials = regexp.MustCompile(`//[^/@]*@`)
+// トークンに `@` が入ることがあるので、ホストの手前の最後の `@` までとする（sh の ccnavi_mask_url と同じ）。
+var credentials = regexp.MustCompile(`//[^/]*@`)
 
 const (
 	githubHost    = "github.com"

@@ -51,6 +51,9 @@ class HostKindsTest(unittest.TestCase):
         problem = review_host.transport_problem("ssh://user:SECRET@host.example/a/b")
         self.assertNotIn("SECRET", problem)
         self.assertIn("<伏せた>", problem)
+        # トークンに `@` が入っても、ホストの手前の最後の `@` まで伏せる。
+        problem = review_host.transport_problem("ssh://oauth2:SEC@RET@host.example/a/b")
+        self.assertIn("ssh://<伏せた>@host.example/a/b", problem)
 
     def test_a_non_ascii_digit_is_not_a_port(self):
         got = review_host.classify("git@x.ghe.com:\u0663:/a/b.git")
