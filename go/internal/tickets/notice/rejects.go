@@ -34,8 +34,8 @@ import (
 const (
 	// rejectsShown は SessionStart の文に出す件数の上限。残りは件数で言い、--explain へ誘う。
 	rejectsShown = 3
-	// RejectsBudget は走査に使う時間の既定。索引の更新（docsearch）に SessionStart の期限の残りを渡すため短く取る。
-	RejectsBudget = 500 * time.Millisecond
+	// rejectsBudget は走査に使う時間の既定。索引の更新（docsearch）に SessionStart の期限の残りを渡すため短く取る。
+	rejectsBudget = 500 * time.Millisecond
 	// rejectsMaxEntries は 1 回で適用する項の数の上限（チケット数 × 項数 × ルール数で伸びる）。
 	rejectsMaxEntries = 500
 
@@ -195,7 +195,7 @@ func rejectOf(t *ticket.Ticket, e ticket.Entry, rs *rules.RuleSet, target tree.T
 }
 
 // RejectOptions は FindRejects の絞り方。Only はそのチケット（ツリーの名前で引く）だけを見る。Budget のゼロ値は
-// RejectsBudget、Deadline のゼロ値は期限なし（Budget だけで打ち切る）。Copies を渡せば置き場を読み直さない
+// rejectsBudget、Deadline のゼロ値は期限なし（Budget だけで打ち切る）。Copies を渡せば置き場を読み直さない
 // （nil なら読む）。
 type RejectOptions struct {
 	Only     string
@@ -209,7 +209,7 @@ type RejectOptions struct {
 func FindRejects(conf *config.Settings, root string, o RejectOptions) (*Found, error) {
 	budget := o.Budget
 	if budget == 0 {
-		budget = RejectsBudget
+		budget = rejectsBudget
 	}
 	limit := time.Now().Add(budget)
 	if !o.Deadline.IsZero() && o.Deadline.Before(limit) {
@@ -251,7 +251,7 @@ func uncheckedNote(found *Found) string {
 
 // Rejects は SessionStart に足す、却下された要求の文。却下が無ければ空。cwd のツリーに結び付く承認済みチケット
 // だけを見る。ワークスペースルート（チケットを持たないツリー）からは、却下のあるチケットの件数を 1 行で言う。
-// deadline のゼロ値は期限なし（RejectsBudget だけで打ち切る）。
+// deadline のゼロ値は期限なし（rejectsBudget だけで打ち切る）。
 func Rejects(conf *config.Settings, root, cwd string, deadline time.Time) string {
 	if cwd == "" {
 		cwd = root

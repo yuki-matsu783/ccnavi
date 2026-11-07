@@ -87,7 +87,9 @@ func commitAll(t *testing.T, dir, message string) {
 	runGit(t, dir, "commit", "-q", "--allow-empty", "-m", message)
 }
 
-func headOf(t *testing.T, dir string) string { return strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD")) }
+func headOf(t *testing.T, dir string) string {
+	return strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD"))
+}
 
 func put(t *testing.T, path, text string) string {
 	t.Helper()
