@@ -16,7 +16,7 @@ import (
 
 // trackedLead は projects/ がワークスペースの git の索引に載っているときの warn の先頭の句（%s は置き場）。ぶつかりと
 // 載せ忘れで共通にする。載せ忘れは句の直後が `（入れ子のリポジトリとして` になる。導入スクリプト（ccnavi-setup.sh）は
-// 実行ファイルを起こさずに同じ文面を組むので、変えるならそちらも直す（tests/sh/test_setup.py が文面全体の一致を見る）。
+// 入れ終わりに --lint を起こして、この文面をそのまま見せる。
 const trackedLead = "`%s/` はワークスペースの git が追跡している"
 
 // 置き場の苦情の種類。`--lint --json` の problems[].kind に載り、VS Code 拡張のプロジェクト管理画面は文面でなく
@@ -29,7 +29,7 @@ const (
 // gitlinkMode は索引の mode のうち gitlink（入れ子のリポジトリを 1 つの版として載せたもの）。
 const gitlinkMode = "160000"
 
-// shSpecial は sh が語を割る・展開する文字。導入スクリプトの sh_word が同じ集合を持つ（TestShWordAgreesWithTheSetupSh が比べる）。
+// shSpecial は sh が語を割る・展開する文字。
 const shSpecial = " \t\n'\"\\$`!*?[](){}<>|&;#~"
 
 // projectPlaces はプロジェクトの置き場が正しい形か。置き場が索引に載っていればそれを言い、載っていなければ git で

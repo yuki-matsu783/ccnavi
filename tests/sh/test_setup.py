@@ -70,8 +70,8 @@ EVENTS = (
     "SubagentStop",
 )
 REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_ENTRY_PATH")
-# `projects/` がワークスペースの git に追跡されているときの知らせの先頭の句。`--lint` の
-# `(projects)` の warn と同じ句で始まる（VS Code 拡張が見分けに使う）。
+# `projects/` がワークスペースの git に追跡されているときの `--lint` の `(projects)` の warn の先頭の句。
+# 導入スクリプトは入れ終わりに `--lint` を起こし、この warn をそのまま見せる。
 TRACKED_LEAD = "`projects/` はワークスペースの git が追跡している"
 # 戻す働きの 2 つ（settings.py の RESTORE_IF_DENY_ENV / GUARD_CORE_FILES_ENV）。
 # 書かなければ enable で動くので、dry-run で導入したときにここだけ実際に動くと、
@@ -268,6 +268,7 @@ ccnavi を登録した hook:
   .ccnavi/scripts/ccnavi-idle.sh
   .ccnavi/scripts/ccnavi-launcher.sh
 env の値は、セッションを開き直すまで反映されません。
+sh .ccnavi/scripts/ccnavi-launcher.sh --lint の結果:
 """
 LAUNCHER_PARTS = (".ccnavi", "scripts", LAUNCHER_NAME)
 # CCNAVI_ENTRY_PATH に書くパス。固定。
@@ -659,261 +660,6 @@ class WritesTheExpectedShape(SetupTest):
         result = self.run_setup(env=env)
         missing = section(result.stdout, "まだ無いもの")
         self.assertTrue(names(missing, f".ccnavi/bin/{THIS_MACHINE}/ccnavi"), result.stdout)
-
-
-@unittest.skipUnless(shutil.which("git"), "git が見つからない")
-class TellsAboutAProjectsCollision(SetupTest):
-    """ワークスペースの git が `projects/` の下を追跡しているとき、入れ終わりに知らせる（A8）。
-
-    条件と文面は `--lint` と同じ（設計 §4.4）。止めず、終了コードも変えない。`--check` でも出す
-    （導入の不足ではないので「揃っていない」には数えない）。
-
-    sh と `--lint` が同じ文面を持つので、`--lint` の先頭の句がこちらの出力にも入っていることを
-    ここで確かめて、ずれを捕まえる。
-    """
-
-    def git(self, *args):
-        subprocess.run(
-            ["git", "-c", "user.email=t@example.invalid", "-c", "user.name=t", *args],
-            cwd=self.dir,
-            check=True,
-            capture_output=True,
-        )
-
-    def track_projects(self):
-        """ワークスペース自身のソースとして `projects/foo.txt` を追跡させる。"""
-        self.git("init", "--quiet", "-b", "main")
-        path = os.path.join(self.dir, "projects", "foo.txt")
-        os.makedirs(os.path.dirname(path))
-        with open(path, "w", encoding="utf-8") as f:
-            f.write("ワークスペースのソース\n")
-        self.git("add", "--", "projects/foo.txt")
-        self.git("commit", "--quiet", "-m", "init")
-
-    def test_names_the_collision_after_it_finished(self):
-        self.track_projects()
-
-        result = self.run_setup("--mode", "enable")
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(TRACKED_LEAD, result.stdout)
-        self.assertIn("projects/foo.txt", result.stdout)
-        self.assertTrue(os.path.isfile(self.settings_path()), "止めて設定を書かなかった")
-
-    def test_the_exit_code_is_the_same_with_and_without_the_collision(self):
-        plain = self.run_setup("--mode", "enable")
-        self.assertEqual(plain.returncode, 0, plain.stderr)
-        self.assertNotIn(TRACKED_LEAD, plain.stdout)
-
-        self.track_projects()
-        again = self.run_setup("--mode", "enable")
-
-        self.assertEqual(again.returncode, plain.returncode, again.stdout + again.stderr)
-        self.assertIn(TRACKED_LEAD, again.stdout)
-
-    def test_check_names_it_but_does_not_count_it_as_not_settled(self):
-        self.run_setup("--mode", "enable")
-        self.track_projects()
-
-        checked = self.run_setup("--mode", "enable", "--check")
-
-        self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
-        self.assertIn(TRACKED_LEAD, checked.stdout)
-
-    def test_says_nothing_without_a_tracked_file_under_projects(self):
-        self.git("init", "--quiet", "-b", "main")
-
-        result = self.run_setup("--mode", "enable")
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotIn(TRACKED_LEAD, result.stdout)
-
-    def test_the_lead_phrase_is_the_one_lint_uses(self):
-        """`--lint` の `(projects)` の warn の先頭の句が、こちらの出力にも入っている。"""
-        from tests.inproc import run_ccnavi
-
-        self.track_projects()
-        setup = self.run_setup("--mode", "enable")
-        linted = run_ccnavi(
-            ["--root", self.dir, "--lint", "--json", "--mode", "enable"],
-            input="",
-            env=clean_env(),
-        )
-
-        details = [
-            p["detail"] for p in json.loads(linted.stdout)["problems"] if p["where"] == "(projects)"
-        ]
-
-        self.assertEqual(len(details), 1, linted.stdout)
-        lead = details[0].split("（", 1)[0]
-        self.assertTrue(lead.startswith(TRACKED_LEAD), lead)
-        self.assertIn(lead, setup.stdout)
-
-
-@unittest.skipUnless(shutil.which("git"), "git が見つからない")
-class TellsAboutProjectsAddedByMistake(SetupTest):
-    """索引の `projects/` の下が gitlink だけのとき（載せ忘れ）の知らせ（A8b）。
-
-    `.gitignore` に `/projects/` を入れ忘れて `git add -A` しただけなので、改名ではなく
-    「索引から外して無視に入れる」を案内する。条件と文面は `--lint` と同じ（設計 §4.4）。
-    止めず、終了コードも変えず、`--check` でも出し、「揃っていない」には数えない。
-    導入スクリプトは索引を変えない。
-
-    gitlink は人が踏むのと同じ手で作る: `projects/lib` で `git init` して 1 回コミットし、
-    ワークスペースで `-f` を付けずに `git add -A`（設計 §6）。
-    """
-
-    def git(self, *args, cwd=None):
-        done = subprocess.run(
-            ["git", "-c", "user.email=t@example.invalid", "-c", "user.name=t", *args],
-            cwd=cwd or self.dir,
-            check=True,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-        return done.stdout
-
-    def forget_projects(self):
-        self.git("init", "--quiet", "-b", "main")
-        lib = os.path.join(self.dir, "projects", "lib")
-        os.makedirs(lib)
-        with open(os.path.join(lib, "main.py"), "w", encoding="utf-8") as f:
-            f.write("print(1)\n")
-        self.git("init", "--quiet", "-b", "main", cwd=lib)
-        self.git("add", "-A", cwd=lib)
-        self.git("commit", "--quiet", "-m", "init", cwd=lib)
-        self.git("add", "-A")
-        self.git("commit", "--quiet", "-m", "init")
-        self.assertIn("160000", self.index())
-
-    def index(self):
-        return self.git("ls-files", "-s")
-
-    def test_names_it_with_the_way_to_untrack_and_not_the_rename(self):
-        self.forget_projects()
-        before = self.index()
-
-        result = self.run_setup("--mode", "enable")
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(TRACKED_LEAD + "（入れ子のリポジトリとして", result.stdout)
-        self.assertIn("git rm -r --cached projects", result.stdout)
-        self.assertNotIn("git mv", result.stdout)
-        self.assertTrue(os.path.isfile(self.settings_path()), "止めて設定を書かなかった")
-        self.assertEqual(self.index(), before, "導入スクリプトが索引を変えた")
-
-    def test_the_exit_code_is_the_same_as_without_it(self):
-        plain = self.run_setup("--mode", "enable")
-        shutil.rmtree(os.path.join(self.dir, ".claude"), ignore_errors=True)
-        shutil.rmtree(os.path.join(self.dir, ".vscode"), ignore_errors=True)
-        self.forget_projects()
-
-        again = self.run_setup("--mode", "enable")
-
-        self.assertEqual(again.returncode, plain.returncode, again.stdout + again.stderr)
-        self.assertIn(TRACKED_LEAD, again.stdout)
-
-    def test_check_names_it_but_does_not_count_it_as_not_settled(self):
-        self.forget_projects()
-        self.run_setup("--mode", "enable")
-        before = self.index()
-
-        checked = self.run_setup("--mode", "enable", "--check")
-
-        self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
-        self.assertIn("git rm -r --cached projects", checked.stdout)
-        self.assertNotIn("git mv", checked.stdout)
-        self.assertEqual(self.index(), before, "--check が索引を変えた")
-
-    def test_the_first_sentence_is_the_one_lint_uses(self):
-        """`--lint` の `(projects)` の warn の 1 文目が、こちらの出力にもそのまま入っている。"""
-        from tests.inproc import run_ccnavi
-
-        self.forget_projects()
-        setup = self.run_setup("--mode", "enable")
-        linted = run_ccnavi(
-            ["--root", self.dir, "--lint", "--json", "--mode", "enable"],
-            input="",
-            env=clean_env(),
-        )
-
-        details = [
-            p["detail"] for p in json.loads(linted.stdout)["problems"] if p["where"] == "(projects)"
-        ]
-
-        self.assertEqual(len(details), 1, linted.stdout)
-        first = details[0].split("。", 1)[0] + "。"
-        self.assertTrue(first.startswith(TRACKED_LEAD + "（入れ子のリポジトリとして"), first)
-        self.assertIn(first, setup.stdout)
-        # 文面全体も揃っている（2 か所に書いた文面のずれを捕まえる）。
-        self.assertIn(details[0], setup.stdout)
-
-    def test_a_file_beside_the_gitlink_is_worded_as_lint_words_the_collision(self):
-        """通常のファイルもあればぶつかり（改名）で、gitlink を名指しする。
-
-        文面は `--lint` と同じ。
-        """
-        from tests.inproc import run_ccnavi
-
-        self.forget_projects()
-        with open(os.path.join(self.dir, "projects", "foo.txt"), "w", encoding="utf-8") as f:
-            f.write("ワークスペースのソース\n")
-        self.git("add", "--", "projects/foo.txt")
-        self.git("commit", "--quiet", "-m", "source")
-        setup = self.run_setup("--mode", "enable")
-        linted = run_ccnavi(
-            ["--root", self.dir, "--lint", "--json", "--mode", "enable"],
-            input="",
-            env=clean_env(),
-        )
-
-        details = [
-            p["detail"] for p in json.loads(linted.stdout)["problems"] if p["where"] == "(projects)"
-        ]
-
-        self.assertEqual(len(details), 1, linted.stdout)
-        self.assertIn("git mv projects apps", details[0])
-        self.assertIn("git rm --cached projects/lib", details[0])
-        self.assertIn(details[0], setup.stdout)
-
-    def test_gitlinks_with_a_space_or_a_quote_are_quoted_as_lint_quotes_them(self):
-        """`git rm --cached` に載せるパスは、sh で割れる文字を含むときだけ `'…'` で囲む。
-
-        `'` を含むなら `'\\''` に置く。綴りは `--lint` と 1 字違わず同じ。
-        """
-        from tests.inproc import run_ccnavi
-
-        self.git("init", "--quiet", "-b", "main")
-        for name in ("it's", "lib", "my lib"):
-            nested = os.path.join(self.dir, "projects", name)
-            os.makedirs(nested)
-            with open(os.path.join(nested, "main.py"), "w", encoding="utf-8") as f:
-                f.write("print(1)\n")
-            self.git("init", "--quiet", "-b", "main", cwd=nested)
-            self.git("add", "-A", cwd=nested)
-            self.git("commit", "--quiet", "-m", "init", cwd=nested)
-        with open(os.path.join(self.dir, "projects", "foo.txt"), "w", encoding="utf-8") as f:
-            f.write("ワークスペースのソース\n")
-        self.git("add", "-A")
-        self.git("commit", "--quiet", "-m", "init")
-        setup = self.run_setup("--mode", "enable")
-        linted = run_ccnavi(
-            ["--root", self.dir, "--lint", "--json", "--mode", "enable"],
-            input="",
-            env=clean_env(),
-        )
-
-        details = [
-            p["detail"] for p in json.loads(linted.stdout)["problems"] if p["where"] == "(projects)"
-        ]
-
-        self.assertEqual(len(details), 1, linted.stdout)
-        self.assertIn(
-            "`git rm --cached 'projects/it'\\''s' projects/lib 'projects/my lib'`", details[0]
-        )
-        self.assertIn(details[0], setup.stdout)
 
 
 class KeepsWhatItFinds(SetupTest):
@@ -3186,6 +2932,93 @@ class WritesTheVscodeSettings(SetupTest):
         self.assertEqual(check.returncode, 1, check.stdout)
         self.assertIn("git.detectWorktrees", check.stdout)
         self.assertFalse(os.path.exists(self.vscode_path()), "--check は書かない")
+
+
+
+# 入れ終わりに見せる `--lint` の見出しと、起こさないときの 1 行。
+LINT_HEADING = f"sh {BIN_PATH} --lint の結果:"
+LINT_LATER = f"案内: 導入したあとに、ワークスペースルートで sh {BIN_PATH} --lint を実行して"
+
+
+class ShowsTheLintAtTheEnd(SetupTest):
+    """入れ終わりに、配った振り分けの sh を通して `--lint` を 1 回起こし、結果をそのまま見せる。
+
+    `projects/` の索引の知らせなどの判定と文面は実行ファイルだけが持ち、導入スクリプトは自分で判定しない。
+    止めず、終了コードも変えない。`--check` と、振り分けの sh がまだ無いときは起こさず、確かめ方の 1 行だけを出す。
+    """
+
+    # 配布元の作り方だけを借りる（継ぐと配布のテストがもう一度走る）。
+    make_source = DeploysWhatTheProjectNeeds.make_source
+
+    def source_with_exe(self, body):
+        """配る実行ファイルを、body の sh にした配布元。"""
+        src = self.make_source()
+        with open(os.path.join(src, "dist", "ccnavi", "ccnavi"), "w", encoding="utf-8", newline="\n") as f:
+            f.write(body)
+        return src
+
+    def lint_calls(self, log):
+        if not os.path.exists(log):
+            return []
+        with open(log, encoding="utf-8") as f:
+            return f.read().splitlines()
+
+    @unittest.skipIf(os.name == "nt", "代役の実行ファイルは sh で書く")
+    def test_runs_lint_once_at_the_end_and_shows_it_as_is(self):
+        log = os.path.join(self.dir, "lint-calls.txt")
+        # 終了コードを 3 にして、導入スクリプトの終了コードが変わらないことも見る。
+        src = self.source_with_exe(
+            f"#!/bin/sh\nprintf '%s\\n' \"$*\" >>'{log}'\nprintf 'LINT-OUT\\n'\nexit 3\n"
+        )
+
+        result = self.run_setup("--deploy", src, "--mode", "enable")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(result.stdout.endswith(LINT_HEADING + "\nLINT-OUT\n"), result.stdout)
+        self.assertEqual(self.lint_calls(log), [f"--root {self.dir} --lint"])
+
+    @unittest.skipIf(os.name == "nt", "代役の実行ファイルは sh で書く")
+    def test_check_does_not_run_lint(self):
+        log = os.path.join(self.dir, "lint-calls.txt")
+        src = self.source_with_exe(f"#!/bin/sh\nprintf '%s\\n' \"$*\" >>'{log}'\n")
+        self.run_setup("--deploy", src, "--mode", "enable")
+        before = self.lint_calls(log)
+
+        checked = self.run_setup("--deploy", src, "--mode", "enable", "--check")
+
+        self.assertIn(LINT_LATER, checked.stdout)
+        self.assertNotIn(LINT_HEADING, checked.stdout)
+        self.assertEqual(self.lint_calls(log), before)
+
+    def test_without_the_launcher_it_only_says_how_to_check(self):
+        result = self.run_setup("--no-deploy", "--mode", "enable")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(LINT_LATER, result.stdout)
+        self.assertNotIn(LINT_HEADING, result.stdout)
+
+    @unittest.skipUnless(shutil.which("git"), "git が見つからない")
+    def test_the_real_lint_names_a_tracked_projects_place(self):
+        """本物の実行ファイルを配ると、`projects/` の索引の知らせは `--lint` の文面のまま出る。"""
+        from tests import exe
+
+        src = self.make_source()
+        os.remove(os.path.join(src, "dist", "ccnavi", "ccnavi"))
+        shutil.copy(exe.path(), os.path.join(src, "dist", "ccnavi", exe.NAME))
+        git = ["git", "-c", "user.email=t@example.invalid", "-c", "user.name=t"]
+        subprocess.run([*git, "init", "--quiet", "-b", "main"], cwd=self.dir, check=True)
+        os.makedirs(os.path.join(self.dir, "projects"))
+        with open(os.path.join(self.dir, "projects", "foo.txt"), "w", encoding="utf-8") as f:
+            f.write("ワークスペースのソース\n")
+        subprocess.run([*git, "add", "--", "projects/foo.txt"], cwd=self.dir, check=True)
+        subprocess.run([*git, "commit", "--quiet", "-m", "init"], cwd=self.dir, check=True)
+
+        result = self.run_setup("--deploy", src, "--mode", "enable")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        after = result.stdout.split(LINT_HEADING, 1)
+        self.assertEqual(len(after), 2, result.stdout)
+        self.assertIn(TRACKED_LEAD + "（例: `projects/foo.txt`）", after[1])
 
 
 if __name__ == "__main__":

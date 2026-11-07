@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -688,4 +689,31 @@ func TestPathsAndEnvironmentAreNotReadAsPathspecMagic(t *testing.T) {
 		}
 		os.Unsetenv(name)
 	}
+}
+
+// .gitignore に行を足したあと確かめ直しに失敗しても、足したことは結果に残す（ユーザの .gitignore を黙って変えない）。
+// 確かめ直しだけを失敗させるため、足した行があるときの check-ignore だけを落とす git を PATH の先頭に置く。
+func TestTheAddedLineIsReportedWhenTheRecheckFails(t *testing.T) {
+	if ospath.Windows {
+		t.Skip("偽の git は sh で書く")
+	}
+	real, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git が無い")
+	}
+	r := newRepo(t)
+	os.Remove(r.path(gitignoreName))
+	r.put("a.md", doc("type: guide"))
+	bin := t.TempDir()
+	fake := "#!/bin/sh\ncase \" $* \" in *\" check-ignore \"*) grep -q 'ccnavi-index' .gitignore 2>/dev/null && exit 128 ;; esac\n" +
+		"exec '" + real + "' \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(fake), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	built, err := Build(r.root, Options{Refresh: true, Parse: true})
+	if err == nil || built == nil || built.IgnoreAdded != gitignoreName {
+		t.Fatalf("built=%+v err=%v", built, err)
+	}
+	eq(t, ".gitignore", r.read(gitignoreName), IgnoreLine+"\n")
 }

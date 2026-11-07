@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
@@ -63,22 +64,13 @@ const (
 // killedPipeWait は期限で殺した後、出力の管が閉じるのを待つ長さ。孫のプロセスが管を握っていても戻る。
 const killedPipeWait = 100 * time.Millisecond
 
-// git に渡す環境変数。
-const (
-	// envOptionalLocks=0 は status が index のついでの更新に取る index.lock を止める。期限で殺すと
-	// lock が残り、以後の add や commit が止まる。diff や restore のように index を書き換える操作の lock は止まらない。
-	envOptionalLocks = "GIT_OPTIONAL_LOCKS"
-	// envNoLazyFetch=1 は partial clone の遅延取得を止める。無い blob を取りにネットワークへ出ず、読めないにする。
-	envNoLazyFetch = "GIT_NO_LAZY_FETCH"
-)
-
 // pathspecEnv はユーザの環境で pathspec の読み方を変える環境変数。check-ignore はこれらを受けず 128 で止まる。
-var pathspecEnv = []string{
-	"GIT_LITERAL_PATHSPECS",
-	"GIT_GLOB_PATHSPECS",
-	"GIT_NOGLOB_PATHSPECS",
-	"GIT_ICASE_PATHSPECS",
-}
+var pathspecEnv = []string{env.GitLiteralPathspecs, env.GitGlobPathspecs, env.GitNoglobPathspecs, env.GitIcasePathspecs}
+
+// repositoryEnv は git が見るリポジトリ・ワークツリー・索引を決める環境変数。git の hook の中（ccnavi-git.sh が打つ
+// commit の pre-commit など）から起こされると設定されていて、残すと Dir に渡したツリーでなく、その hook のリポジトリを
+// 見る。ccnavi は見るツリーを必ず Dir で渡すので、いつも外す。
+var repositoryEnv = []string{env.GitDir, env.GitWorkTree, env.GitIndexFile, env.GitCommonDir}
 
 // rawPathsArgs は非 ASCII を含むパスを 8 進の表記に引用させない設定。パスをそのまま突き合わせる側が使う。
 var rawPathsArgs = []string{"-c", "core.quotePath=false"}
@@ -333,20 +325,23 @@ func startFailure(err error) error {
 	return f
 }
 
-// environ は親の環境に envOptionalLocks=0 と envNoLazyFetch=1 を足したもの。
+// environ は親の環境から repositoryEnv を外し、GIT_OPTIONAL_LOCKS=0 と GIT_NO_LAZY_FETCH=1 を足したもの。
+// GIT_OPTIONAL_LOCKS=0 は、期限で殺したときに status が取った index.lock を残さないため（diff や restore のように
+// index を書き換える操作の lock は止まらない）。GIT_NO_LAZY_FETCH=1 は、partial clone の無い blob を取りに
+// ネットワークへ出ず、読めないにするため。
 func environ(plainPathspecs bool) []string {
-	drop := []string{envOptionalLocks, envNoLazyFetch}
+	drop := append([]string{env.GitOptionalLocks, env.GitNoLazyFetch}, repositoryEnv...)
 	if plainPathspecs {
 		drop = append(drop, pathspecEnv...)
 	}
-	var env []string
+	var out []string
 	for _, kv := range os.Environ() {
 		name, _, _ := strings.Cut(kv, "=")
 		if !hasName(drop, name) {
-			env = append(env, kv)
+			out = append(out, kv)
 		}
 	}
-	return append(env, envOptionalLocks+"=0", envNoLazyFetch+"=1")
+	return append(out, env.GitOptionalLocks+"=0", env.GitNoLazyFetch+"=1")
 }
 
 // hasName は環境変数の名前が names にあるか。Windows の名前は大文字小文字を区別しない。

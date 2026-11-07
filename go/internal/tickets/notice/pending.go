@@ -171,7 +171,7 @@ func leftovers(root, top string, reported map[string]bool, deadline time.Time) [
 	doneDir := ospath.Join(common, integrate.DoneDir)
 	if entries, err := ospath.DiskListdir(doneDir); err == nil {
 		for _, e := range entries {
-			if integrate.ReadRecord(ospath.Join(doneDir, e), integrate.LastKept)["version"] != tree.DirectVersion {
+			if integrate.ReadRecord(ospath.Join(doneDir, e))["version"] != tree.DirectVersion {
 				continue
 			}
 			var remains []string
@@ -232,7 +232,7 @@ func PendingIntegrate(conf *config.Settings, root string, deadline time.Time) st
 				}
 				// marker が無いものや版 4 でないものは、版を知らない記録として知らせる。
 				reported[name] = true
-				fields := integrate.ReadRecord(ospath.Join(marks, name, markerFile), integrate.LastKept)
+				fields := integrate.ReadRecord(ospath.Join(marks, name, markerFile))
 				if fields["version"] == tree.DirectVersion {
 					lines = append(lines, pendingLine{name, v4Line(root, top, name, fields, deadline)})
 				} else {

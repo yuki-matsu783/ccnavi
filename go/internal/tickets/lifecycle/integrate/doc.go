@@ -6,7 +6,4 @@
 //
 // 1 本のツリーを調べた結果は hit・Clear・unknown の 3 つのどれかになる。期限切れ・git の失敗・決められないものは
 // unknown になる。unknown のツリーは候補から外さず、促した記録も残さない。期限（deadline）のゼロ値は期限なしを表す。
-//
-// 記録（ReadRecord）は、同じキーが複数あるとき、読む側によって採る行が違う。Stop の促しは最後の行を採り
-// （LastKept）、取り込み後の確認（post_findings）は最初の行を採る（firstKept）。Repeat で分ける。
 package integrate

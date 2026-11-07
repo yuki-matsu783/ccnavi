@@ -685,3 +685,21 @@ func TestReadDiskBytes(t *testing.T) {
 		t.Errorf("親がファイルは無いではなく読めない: %v", err)
 	}
 }
+
+// ScratchDir は空のディレクトリを作り、返す関数が中身ごと消す。
+func TestScratchDir(t *testing.T) {
+	dir, remove, err := ScratchDir("ccnavi-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(filepath.Base(dir), "ccnavi-test-") {
+		t.Errorf("%q", dir)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	remove()
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("残った: %v", err)
+	}
+}

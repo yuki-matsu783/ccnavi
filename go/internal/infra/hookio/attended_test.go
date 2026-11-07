@@ -25,8 +25,8 @@ func TestAttendance(t *testing.T) {
 		if got := unattended(getenv); got != c.unattended {
 			t.Errorf("unattended(%v) = %v", c.env, got)
 		}
-		if got := Headless(getenv); got != c.headless {
-			t.Errorf("Headless(%v) = %v", c.env, got)
+		if got := headless(getenv); got != c.headless {
+			t.Errorf("headless(%v) = %v", c.env, got)
 		}
 	}
 }

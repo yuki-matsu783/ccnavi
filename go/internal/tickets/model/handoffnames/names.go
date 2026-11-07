@@ -16,7 +16,6 @@ const namesFile = "ccnavi-handoff-names.txt"
 const (
 	commentMark = "#"
 	msgBadLine  = namesFile + " の %d 行目を読めない: %s"
-	msgReserved = "%s の `%s` は、下書きの置き場で `%s` を読み替える予約した名前なので、この名前の階層は下書きにできない"
 )
 
 //go:embed ccnavi-handoff-names.txt
@@ -57,13 +56,6 @@ func parse(text string) (*Table, error) {
 
 func usable(word string) bool { return isASCII(word) && !strings.Contains(word, "/") }
 
-// With は p を足した写しを返す（表に 1 行足したときの往復を試すため）。
-func (t *Table) With(p Pair) *Table {
-	out := &Table{pairs: append([]Pair(nil), t.pairs...)}
-	out.put(p)
-	return out
-}
-
 func (t *Table) put(p Pair) {
 	for i := range t.pairs {
 		if t.pairs[i].Original == p.Original {
@@ -95,28 +87,6 @@ func (t *Table) convert(rel string, way func(Pair) (from, to string)) string {
 		}
 	}
 	return strings.Join(parts, "/")
-}
-
-// reservedProblem は、元の相対パスが予約名（下書きでの階層名）の階層を含むなら断る理由。含まなければ空。
-// 読み替えると、ほかの元のパスと区別できなくなる。
-func (t *Table) reservedProblem(rel string) string {
-	for _, part := range strings.Split(rel, "/") {
-		for _, p := range t.pairs {
-			if same(part, p.Draft) {
-				return fmt.Sprintf(msgReserved, rel, part, t.originalOf(p.Draft))
-			}
-		}
-	}
-	return ""
-}
-
-func (t *Table) originalOf(draft string) string {
-	for _, p := range t.pairs {
-		if p.Draft == draft {
-			return p.Original
-		}
-	}
-	return draft
 }
 
 func same(name, other string) bool {

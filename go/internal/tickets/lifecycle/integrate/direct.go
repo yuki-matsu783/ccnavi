@@ -171,19 +171,9 @@ func GitPath(top, name string, deadline time.Time) (string, bool) {
 	return ospath.Join(top, path), true
 }
 
-// Repeat は「キー 値」の記録で同じキーが 2 度あるときの読み方。
-type Repeat int
-
-const (
-	// LastKept は最後の行を採り、値の前後の空白を除く（Stop の促しの読み方）。
-	LastKept Repeat = iota
-	// firstKept は最初の行を採り、値をそのまま残す（sh の ccnavi_record_get と、取り込み後の確認 post_findings の読み方）。
-	firstKept
-)
-
-// ReadRecord は ccnavi_record_write が書いた「キー 値」の行の記録。読めなければ空。読む側ごとに読み方が
-// 違うので、同じキーの扱いを repeat で選ぶ。
-func ReadRecord(path string, repeat Repeat) map[string]string {
+// ReadRecord は ccnavi_record_write が書いた「キー 値」の行の記録。読めなければ空。同じキーが 2 行あれば最初の行を
+// 採り、値はそのまま残す。sh の ccnavi_record_get と同じ読み方にして、hook と sh が同じ記録から同じ値を読むようにする。
+func ReadRecord(path string) map[string]string {
 	text, _ := fsio.ReadText(path, fsio.Replace)
 	out := map[string]string{}
 	for _, line := range ospath.Splitlines(text) {
@@ -191,13 +181,9 @@ func ReadRecord(path string, repeat Repeat) map[string]string {
 		if key == "" {
 			continue
 		}
-		if repeat == firstKept {
-			if _, seen := out[key]; !seen {
-				out[key] = value
-			}
-			continue
+		if _, seen := out[key]; !seen {
+			out[key] = value
 		}
-		out[key] = ospath.Strip(value)
 	}
 	return out
 }
@@ -221,7 +207,7 @@ func HasRecord(integTree, name, head string, dirty *bool, deadline time.Time) (r
 	if !ospath.DiskLexists(copied) {
 		return false, true
 	}
-	if sha := ReadRecord(copied, LastKept)["branch_sha"]; sha == "" || head == "" || sha != head {
+	if sha := ReadRecord(copied)["branch_sha"]; sha == "" || head == "" || sha != head {
 		return false, true
 	}
 	if dirty == nil {

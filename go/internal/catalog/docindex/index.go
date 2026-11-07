@@ -118,7 +118,8 @@ type dirState struct {
 //
 // 処理は 3 段。まず全部のディレクトリで既存の索引を読み、使い回せる行を分ける。次に、読み直しの要る md を待つ数が
 // 少ないディレクトリから読む。最後にディレクトリごとに書く。読めなかった md は既存の行を残し、次の回に読み直す。
-// `.git` が無ければ ErrNotRepository を、git に聞けなければ理由のエラーを返す。
+// `.git` が無ければ ErrNotRepository を、git に聞けなければ理由のエラーを返す。エラーのときの結果は nil だが、
+// .gitignore に足したあとの確かめ直しに失敗したときだけ、IgnoreAdded を載せた結果も返す。
 func Build(base string, o Options) (*Built, error) {
 	started := time.Now()
 	result := &Built{}
@@ -158,8 +159,9 @@ func Build(base string, o Options) (*Built, error) {
 	// 無視する行は Refresh のときだけ足す。読むだけの呼び出しでユーザの .gitignore を書き換えない。足した結果は git に聞き直して確かめる。
 	if len(writable) == 0 && o.Refresh && addIgnore(base) == added {
 		result.IgnoreAdded = gitignoreName
+		// 確かめ直しに失敗しても、足したことは呼び手が知らせられるように結果を返す。
 		if writable, err = Ignored(base, rels, left(o.Deadline)); err != nil {
-			return nil, err
+			return result, err
 		}
 	}
 	if len(writable) == 0 {

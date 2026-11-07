@@ -152,6 +152,11 @@ func collect(conf *config.Settings, root string, o collectOptions) *collected {
 		if errors.Is(err, docindex.ErrNotRepository) {
 			continue
 		}
+		at := func(rel string) string { return docindex.JoinRel(p.prefix, rel) }
+		// .gitignore に足したことは、そのあとで失敗しても知らせる。
+		if built != nil && built.IgnoreAdded != "" {
+			result.ignoreAdded = append(result.ignoreAdded, at(built.IgnoreAdded))
+		}
 		if err != nil {
 			result.failed = append(result.failed, p.name+": "+err.Error())
 			result.timedOut = result.timedOut || docindex.Past(o.deadline)
@@ -162,12 +167,8 @@ func collect(conf *config.Settings, root string, o collectOptions) *collected {
 		}
 		result.timedOut = result.timedOut || built.TimedOut
 		result.indexable = result.indexable || built.Indexable
-		at := func(rel string) string { return docindex.JoinRel(p.prefix, rel) }
 		for _, f := range built.Foreign {
 			result.foreign = append(result.foreign, at(f))
-		}
-		if built.IgnoreAdded != "" {
-			result.ignoreAdded = append(result.ignoreAdded, at(built.IgnoreAdded))
 		}
 		for _, problem := range built.Problems {
 			result.problems = append(result.problems, problemText(p, problem))

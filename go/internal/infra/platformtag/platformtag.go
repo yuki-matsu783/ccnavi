@@ -89,7 +89,7 @@ func pathExecutable(pathEnv, skip string) string {
 		}
 		for _, name := range executableNames {
 			found := ospath.Join(place, name)
-			if !ospath.IsFile(found) || !executable(found) {
+			if !ospath.IsFile(found) || !ospath.Executable(found) {
 				continue
 			}
 			if skip != "" && sameFile(found, skip) {

@@ -20,8 +20,8 @@
 # 何度実行しても同じ結果になる。既に登録されている hook は足さず、既にある env には
 # 触らない。ccnavi と関係のない hook や設定はそのまま残す。
 #
-# 入れ終わったところで、ワークスペースの git の索引に projects/ の下が載っていないかを見て、
-# 載っていれば --lint と同じ文面で知らせる。
+# 入れ終わったところで `ccnavi --lint` を 1 回起こし、結果をそのまま見せる（projects/ の置き場が
+# ワークスペースの git に追跡されていないかなども、ここで分かる）。
 #
 # .claude/settings.json と一緒に .vscode/settings.json も確かめる。ccnavi は .claude/worktrees/
 # の中で作業させるので、VS Code にそこを表示させる 1 行が無いと、エディタには main の
@@ -1579,125 +1579,18 @@ fi
 if [ -n "$bin_custom" ]; then
 	settled=no
 fi
-# ワークスペースの git の索引に projects/ の下が載っているときの知らせ（設計 §4.1・§4.4）。
-#
-# 条件と文面は `ccnavi --lint` の `(projects)` の warn と同じ（go/internal/entry/lint の inIndex）。
-# 変えるなら 2 か所を直す。tests/sh/test_setup.py が 1 文目の一致を見る。
-#
-# - 通常のファイルが 1 本以上: ぶつかり。ワークスペースの projects/ を改名する案内
-#   （gitlink もあれば 1 文足して名指しする）
-# - gitlink（mode 160000）だけ: 載せ忘れ。索引から外して無視に入れる案内
-#
-# 知らせるだけで、止めず、終了コードも変えない。導入の不足ではないので「揃っていない」にも
-# 数えない。索引も .gitignore も変えない（git rm --cached を打つのも /projects/ を足すのも人）。
-#
-# 案内のコマンドに載せるパスを、sh で 1 語として読める綴りにして標準出力に出す（改行は付けない）。
-# sh が割る・展開する文字を含まなければそのまま、含めば '…' で囲み、中の ' は '\'' に置く。
-# 文字の集合と綴りは go/internal/entry/lint の shSpecial・shWord と同じ。go test の TestShWordAgreesWithTheSetupSh が
-# この関数を切り出して走らせ、字ごとに比べる（片方だけ直すとそこで落ちる）。
-sh_word() {
-	w=$1
-	q="'"
-	case "$w" in
-	*' '* | *"$tab"* | *"$q"* | *'"'* | *\\* | *'$'* | *'`'* | *'!'* | *'*'* | *'?'* | \
-		*'['* | *']'* | *'('* | *')'* | *'{'* | *'}'* | *'<'* | *'>'* | *'|'* | *'&'* | \
-		*';'* | *'#'* | *'~'*) ;;
-	*)
-		printf '%s' "$w"
-		return 0
-		;;
-	esac
-	out=""
-	while :; do
-		case "$w" in
-		*"$q"*)
-			head=${w%%"$q"*}
-			out=$out$head$q\\$q$q
-			w=${w#*"$q"}
-			;;
-		*)
-			out=$out$w
-			break
-			;;
-		esac
-	done
-	printf "'%s'" "$out"
-}
-
-# 標準入力に `git ls-files -s` の行（`<mode> <oid> <stage><タブ><path>`）を受ける。
-# 表示に使うだけなので -z は使わない（bash 3.2・BSD の道具で読める形）。
-projects_notice_of() {
-	tab=$(printf '\t')
-	first_file=""
-	links=""
-	links_code=""
-	links_args=""
-	first_link=""
-	link_count=0
-	last_link=""
-	while IFS= read -r line; do
-		[ -n "$line" ] || continue
-		path=${line#*"$tab"}
-		case "$line" in
-		160000\ *)
-			# 衝突中の段で同じパスが並ぶ（並びは綴り順なので隣り合う）。1 本に畳む。
-			[ "$path" = "$last_link" ] && continue
-			last_link=$path
-			link_count=$((link_count + 1))
-			if [ -z "$first_link" ]; then
-				first_link=$path
-				links_code="\`$path\`"
-				links_args=$(sh_word "$path")
-			else
-				links_code="${links_code}、\`${path}\`"
-				links_args="$links_args $(sh_word "$path")"
-			fi
-			;;
-		*)
-			if [ -z "$first_file" ]; then
-				first_file=$path
-			fi
-			;;
-		esac
-	done
-	lead='`projects/` はワークスペースの git が追跡している'
-	if [ -n "$first_file" ]; then
-		text="${lead}（例: \`${first_file}\`）。"
-		text="${text}ccnavi はワークスペース直下の \`projects/\` をプロジェクトの置き場として使い、名前は変えられない。"
-		text="${text}このままだと \`projects/\` の下で \`.git\` を持つディレクトリ（サブモジュールを含む）がプロジェクトとして数えられ、その中の設定が判定に使われる。"
-		text="${text}直すには、ワークスペースの \`projects/\` を別の名前に移す（例: \`git mv projects apps\`）。"
-		text="${text}ccnavi でプロジェクトを置かないなら、このままでも動く。そのときは \`projects/\` の下に \`.git\` を持つものを置かない"
-		if [ "$link_count" -gt 0 ]; then
-			text="${text}。索引には入れ子のリポジトリ（${links_code}）も載っている。"
-			text="${text}ccnavi のプロジェクトとして使うなら、改名の前に \`git rm --cached ${links_args}\` で索引から外し、改名のあとで \`projects/\` の下へ戻す"
-		fi
-		printf '%s\n' "$text"
+# 入れ終わりに `--lint` を 1 回起こし、結果をそのまま見せる。projects/ がワークスペースの git に追跡されていないか
+# などの判定と文面は実行ファイルだけが持つ（ここで同じ判定を組むと、文面が 2 か所に分かれてずれる）。
+# 止めず、終了コードも変えない。--check（下見）と、振り分けの sh がまだ置かれていないとき（--no-deploy）は
+# 起こさず、導入したあとに確かめる 1 行だけを出す。
+lint_command="sh $BIN_PATH --lint"
+report_lint() {
+	if [ "$check" = yes ] || [ ! -f "$root/$BIN_PATH" ]; then
+		printf '案内: 導入したあとに、ワークスペースルートで %s を実行して、設定と置き場（projects/ など）を確かめてください。\n' "$lint_command"
 		return 0
 	fi
-	[ "$link_count" -gt 0 ] || return 0
-	more=""
-	if [ "$link_count" -gt 1 ]; then
-		more=" ほか $((link_count - 1)) 件"
-	fi
-	text="${lead}（入れ子のリポジトリとして: \`${first_link}\`${more}）。"
-	text="${text}\`.gitignore\` に入れる前に \`git add\` したものとみられる。"
-	text="${text}プロジェクトは自分の git を持つので、ワークスペースの git には載せない。"
-	text="${text}載せたままだと、ワークスペースのコミットがプロジェクトの版を記録し続け、\`.gitignore\` に \`/projects/\` を追加しても追跡は外れない。"
-	text="${text}直すには、ワークスペースで \`git rm -r --cached projects\` を実行し（ファイルは消えない。まだコミットしていなければ \`git reset -- projects\`）、"
-	text="${text}\`.gitignore\` に \`/projects/\` を追加して（既にあればそのまま）、コミットする"
-	printf '%s\n' "$text"
-}
-
-# 索引を読めない（git が無い、git のリポジトリではない）ときは何も言わない。`--lint` と同じ。
-projects_notice=""
-if command -v git >/dev/null 2>&1; then
-	projects_notice=$(git -c core.quotepath=false -C "$root" ls-files -s -- projects/ 2>/dev/null | projects_notice_of) || projects_notice=""
-fi
-
-report_projects() {
-	if [ -n "$projects_notice" ]; then
-		printf '%s\n' "$projects_notice"
-	fi
+	printf '%s の結果:\n' "$lint_command"
+	(cd "$root" && sh "./$BIN_PATH" --root "$root" --lint </dev/null) || :
 }
 
 if [ "$check" = yes ]; then
@@ -1705,7 +1598,7 @@ if [ "$check" = yes ]; then
 	report_missing
 	report_deploy_plan
 	report_user_bin_path
-	report_projects
+	report_lint
 	if [ "$settled" = yes ]; then
 		if [ "$vscode" = yes ]; then
 			printf 'env と hook と %s は揃っています。\n' "$VSCODE_REL"
@@ -1741,7 +1634,7 @@ if [ "$settings_work" = no ] && [ "$vscode_work" = no ] && [ "$deploy_work" = no
 	report_missing
 	report_deploy_plan
 	report_user_bin_path
-	report_projects
+	report_lint
 	exit 0
 fi
 
@@ -2238,8 +2131,7 @@ if [ -n "$missing_parts" ]; then
 	fi
 fi
 
-# 入れ終わったところで、projects/ が索引に載っていないかを知らせる。入れる瞬間が
-# いちばん気付きやすい。止めない。
-report_projects
-
 printf 'env の値は、セッションを開き直すまで反映されません。\n'
+
+# 最後に --lint の結果を見せる。入れる瞬間がいちばん気付きやすい。
+report_lint

@@ -13,7 +13,7 @@
 //
 // そのほかの入口は次のとおり。
 //   - JSON は WriteJSON と、書式を選ぶ WriteJSONAs・JSONFormat。読みは ReadObject と ReadJSON（値と error）。
-//   - 1 行の追記は AppendLine、差し替えは ReplaceFile、コピーは CopyFile。
+//   - 1 行の追記は AppendLine、差し替えは ReplaceFile、コピーは CopyFile。試しに書く使い捨ての置き場は ScratchDir。
 //   - 記録のパスは RecordPath（拡張子は JSONExt）、会話の記録を末尾から広げて読むのは ScanTail。
 //   - fsio を通さずディスクだけを読むのは ReadDiskText・ReadDiskBytes（溜める段は見ない）、中身の要約は DiskDigest。
 //   - 名前や識別子に入れる時刻の書式は IDStampLayout・NameStampLayout・StampLayout・LocalStampLayout・ISOStampLayout、

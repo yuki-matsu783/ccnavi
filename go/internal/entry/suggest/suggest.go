@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 	"strings"
 
@@ -374,11 +373,11 @@ func ruleCandidates(conf *config.Settings, root string, records []*pyjson.Object
 		}
 	}
 	// 2. 候補ごとに、共通レイヤーに 1 件足したコピーを一時ディレクトリに書いて試す。実際のファイルは書き換えない。
-	scratch, err := os.MkdirTemp("", scratchPrefix)
+	scratch, removeScratch, err := fsio.ScratchDir(scratchPrefix)
 	if err != nil {
 		return nil, 0, err
 	}
-	defer os.RemoveAll(scratch)
+	defer removeScratch()
 	var found []candidate
 	dropped := 0
 	for _, g := range groups {

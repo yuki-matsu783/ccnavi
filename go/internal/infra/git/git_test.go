@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"ccnavi/internal/infra/env"
 )
 
 // isolate はホストの git の設定（init.defaultBranch・commit.gpgsign など）をテストから締め出す。
@@ -470,25 +472,27 @@ func TestRunTimeoutAndDeadline(t *testing.T) {
 }
 
 // 起こす git には GIT_OPTIONAL_LOCKS=0（期限で殺しても index.lock を残さない）と GIT_NO_LAZY_FETCH=1 を渡し、
-// 親の環境も残す。PlainPathspecs はユーザの pathspec の読み方を外す。
+// 見るリポジトリを決める変数（GIT_DIR など）を外し、ほかの親の環境は残す。PlainPathspecs はユーザの pathspec の
+// 読み方を外す。
 func TestEnviron(t *testing.T) {
-	t.Setenv(envOptionalLocks, "1")
-	t.Setenv("GIT_LITERAL_PATHSPECS", "1")
+	t.Setenv(env.GitOptionalLocks, "1")
+	t.Setenv(env.GitLiteralPathspecs, "1")
+	t.Setenv(env.GitDir, "x")
 	for _, plain := range []bool{false, true} {
-		env := environ(plain)
+		got := environ(plain)
 		count := func(prefix string) int {
 			n := 0
-			for _, kv := range env {
+			for _, kv := range got {
 				if strings.HasPrefix(kv, prefix) {
 					n++
 				}
 			}
 			return n
 		}
-		if !slices.Contains(env, envOptionalLocks+"=0") || count(envOptionalLocks+"=") != 1 ||
-			!slices.Contains(env, envNoLazyFetch+"=1") || !slices.Contains(env, "PATH="+os.Getenv("PATH")) ||
-			(count("GIT_LITERAL_PATHSPECS=") == 0) != plain {
-			t.Errorf("plain=%v env=%v", plain, env)
+		if !slices.Contains(got, env.GitOptionalLocks+"=0") || count(env.GitOptionalLocks+"=") != 1 ||
+			!slices.Contains(got, env.GitNoLazyFetch+"=1") || !slices.Contains(got, "PATH="+os.Getenv("PATH")) ||
+			(count(env.GitLiteralPathspecs+"=") == 0) != plain || count(env.GitDir+"=") != 0 {
+			t.Errorf("plain=%v env=%v", plain, got)
 		}
 	}
 }
@@ -542,5 +546,22 @@ func TestIsAncestor(t *testing.T) {
 	}
 	if done := IsAncestor(repo, "nope", "HEAD", Options{}); done.OK() || done.Code == NotAncestorCode {
 		t.Errorf("無い版は読めない: %+v", done)
+	}
+}
+
+// git の hook の中のように GIT_DIR などが設定された環境でも、起こす git は渡したディレクトリのリポジトリを見る。
+func TestRunIgnoresTheRepositoryOfTheEnvironment(t *testing.T) {
+	isolate(t)
+	mine, other := t.TempDir(), t.TempDir()
+	gitIn(t, mine, "init", "-q")
+	gitIn(t, other, "init", "-q")
+	t.Setenv("GIT_DIR", filepath.Join(other, ".git"))
+	t.Setenv("GIT_WORK_TREE", other)
+	t.Setenv("GIT_INDEX_FILE", filepath.Join(other, ".git", "index"))
+	t.Setenv("GIT_COMMON_DIR", filepath.Join(other, ".git"))
+	got, ok := Text(mine, []string{"rev-parse", "--show-toplevel"}, Options{})
+	want, _ := filepath.EvalSymlinks(mine)
+	if gotReal, _ := filepath.EvalSymlinks(got); !ok || gotReal != want {
+		t.Fatalf("show-toplevel = %q (%v), want %q", got, ok, want)
 	}
 }

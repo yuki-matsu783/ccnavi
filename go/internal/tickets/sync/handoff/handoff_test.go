@@ -9,7 +9,6 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/ospath"
-	"ccnavi/internal/tickets/model/handoffnames"
 	"ccnavi/internal/tickets/testkit"
 )
 
@@ -306,24 +305,6 @@ func TestFailureInTheMiddlePutsBack(t *testing.T) {
 	}
 	if raw, _ := os.ReadFile(filepath.Join(root, ".ccnavi", "CCNAVI.md")); string(raw) != "old top\n" {
 		t.Errorf("戻していない: %q", raw)
-	}
-}
-
-// 表に仮の 1 行を足しても、同じ往復\u304c通る。
-func TestARowAddedToTheNamesTableWorksTheSame(t *testing.T) {
-	saved := names
-	t.Cleanup(func() { names = saved })
-	names = names.With(handoffnames.Pair{Original: ".ccnavi", Draft: "handoff-.ccnavi"})
-	root, conf := workspace(t, map[string]string{"wip/handoff/handoff-.ccnavi/docs/guide.md": "new\n"})
-	plan := Prepare(conf, root, nil)
-	if len(plan.Entries) != 1 || plan.Entries[0].Rel != docsRel || !plan.OK() {
-		t.Fatalf("%+v", plan)
-	}
-	if done := Apply(plan, plan.Expect(), false); !done.OK || done.RemovedDrafts[0] != "wip/handoff/handoff-.ccnavi/docs/guide.md" {
-		t.Fatalf("%+v", done)
-	}
-	if raw, _ := os.ReadFile(filepath.Join(root, filepath.FromSlash(docsRel))); string(raw) != "new\n" {
-		t.Errorf("取り込み先 = %q", raw)
 	}
 }
 

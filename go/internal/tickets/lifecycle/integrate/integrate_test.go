@@ -114,3 +114,13 @@ func TestTheNudgeHasNoGitOutsideTheWrapper(t *testing.T) {
 		}
 	}
 }
+
+// 記録に同じキーが 2 行あるときは、どの読み手も最初の行を採る（sh の ccnavi_record_get と同じ）。Stop の促しと
+// 取り込み後の確認が別の行を採ると、同じ記録で片方だけが「記録あり」と言う。
+func TestReadRecordTakesTheFirstLineLikeTheSh(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "feat")
+	testkit.Put(t, path, "branch_sha aaa\nversion 4\nbranch_sha bbb\n")
+	if got := ReadRecord(path)["branch_sha"]; got != "aaa" {
+		t.Fatalf("branch_sha = %q, want aaa", got)
+	}
+}

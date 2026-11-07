@@ -101,8 +101,8 @@ func routeOf(a opts) route {
 // parsed は読めた引数を経路ごとの処理へ振り分ける（経路は routeOf が決める）。
 //
 // hook の経路は、設定を読むところから先のどこで落ちても、内部エラーの応答（hookCrashed）で終える。Run の受けまで
-// 落ちると終了コード 1 になり、Claude Code は PreToolUse の 1 を「止めない」と読むからである。受けはこの 1 つだけで、
-// 進み具合（so）は hook の処理（hookSteps）が書き足す。
+// 落ちると終了コード 1 になり、Claude Code は PreToolUse の 1 を「止めない」と読むからである。それより前の失敗は
+// Run の受け（runCrashed）が受ける。進み具合（so）は hook の処理（hookSteps）が書き足す。
 func parsed(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts, unmarked *useronly.Verb) (code int) {
 	r := routeOf(a)
 	// 版だけを出す。受け付けるオプションの一覧は出さない。

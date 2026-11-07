@@ -175,3 +175,29 @@ func TestOnPanicNamesTheKindAndThePlace(t *testing.T) {
 		t.Errorf("%+v", got)
 	}
 }
+
+// 経路が決まる前（引数を読む途中）に落ちた回。hook として起こされた形（引数なし）は内部エラーの応答で止め、記録を
+// 既定の置き場に書く。引数のある起動は、打った人に見える失敗として 1 で終える。
+func TestRunCrashedBeforeTheRoute(t *testing.T) {
+	root := testkit.TempRoot(t)
+	testkit.CopyMessages(t, root)
+	t.Setenv("CLAUDE_PROJECT_DIR", root)
+	fail := failure{kind: "RuntimeError"}
+
+	var stdout, stderr bytes.Buffer
+	if code := runCrashed(&stdout, &stderr, nil, "boom", fail); code != config.ExitBlock {
+		t.Errorf("引数なし: 終了コード %d", code)
+	}
+	if !strings.Contains(stderr.String(), "[ccnavi] internal-error") {
+		t.Errorf("引数なし: stderr %q", stderr.String())
+	}
+	if rows := logRows(t, filepath.Join(root, config.DefaultLog)); len(rows) != 1 || rows[0]["reason"] != "internal-error" {
+		t.Errorf("引数なし: 記録 %v", rows)
+	}
+
+	stderr.Reset()
+	if code := runCrashed(&stdout, &stderr, []string{"ticket", "status"}, "boom", fail); code != config.ExitError ||
+		!strings.Contains(stderr.String(), "想定外の失敗で止まった: boom") {
+		t.Errorf("引数あり: 終了コード %d stderr %q", code, stderr.String())
+	}
+}

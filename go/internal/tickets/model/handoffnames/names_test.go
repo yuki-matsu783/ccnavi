@@ -3,7 +3,6 @@ package handoffnames
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"ccnavi/internal/infra/pathcase"
@@ -51,22 +50,10 @@ func TestConvert(t *testing.T) {
 		if back := tb.FromDraft(tb.ToDraft(s[0])); pathcase.Fold(back) != pathcase.Fold(s[0]) {
 			t.Errorf("往復 %q → %q", s[0], back)
 		}
-		if !strings.Contains(strings.ToLower(s[0]), "handoff-") && tb.reservedProblem(s[0]) != "" {
-			t.Errorf("予約名でないのに断った: %q", s[0])
-		}
 	}
 	for _, s := range reverseSamples {
 		if got := tb.FromDraft(s[0]); got != s[1] {
 			t.Errorf("FromDraft(%q) = %q, want %q", s[0], got, s[1])
-		}
-	}
-}
-
-func TestReservedNamesAreRefused(t *testing.T) {
-	tb := table(t)
-	for _, rel := range []string{"handoff-.claude/x.json", "a/Handoff-.CLAUDE/x.json", ".claude/handoff-.claude/x.json"} {
-		if got := tb.reservedProblem(rel); !strings.Contains(got, "予約") || !strings.Contains(got, "`.claude`") {
-			t.Errorf("ReservedProblem(%q) = %q", rel, got)
 		}
 	}
 }
@@ -77,9 +64,6 @@ func TestNonASCIIElementsAreNeverMatched(t *testing.T) {
 	weird := "handoﬀ-.claude/x.json"
 	if got := tb.FromDraft(weird); got != weird {
 		t.Errorf("FromDraft = %q", got)
-	}
-	if got := tb.reservedProblem(weird); got != "" {
-		t.Errorf("ReservedProblem = %q", got)
 	}
 }
 
@@ -100,7 +84,10 @@ func TestParse(t *testing.T) {
 
 // 表に 1 行足せば、その名前も同じ規則で読み替える。
 func TestAddedRowWorksTheSame(t *testing.T) {
-	tb := table(t).With(Pair{".ccnavi", "handoff-.ccnavi"})
+	tb, err := parse(embedded + "\n.ccnavi handoff-.ccnavi\n")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got := tb.ToDraft(".ccnavi/docs/guide.md"); got != "handoff-.ccnavi/docs/guide.md" {
 		t.Errorf("ToDraft = %q", got)
 	}

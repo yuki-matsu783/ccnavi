@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"io"
-	"os"
 	"slices"
 	"time"
 
@@ -88,7 +87,7 @@ func notForIdle(payload hookio.Input) string {
 		return "not-stop"
 	case payload.AgentID != "":
 		return "subagent"
-	case hookio.Headless(os.Getenv):
+	case hookio.Headless():
 		return "unattended"
 	}
 	return ""

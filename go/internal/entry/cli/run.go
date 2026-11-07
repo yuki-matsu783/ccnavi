@@ -43,13 +43,23 @@ var actorForm = regexp.MustCompile(`\A[A-Za-z0-9_.-]{1,` + strconv.Itoa(actorMax
 // サブコマンド（cli）で、ユーザの判断の経路と hook は枝の中で差し替える。
 func Run(stdin io.Reader, stdout, stderr io.Writer, argv []string) (code int) {
 	defer via.Session(via.CLI, "")()
-	// hook の経路は parsed の受け（内部エラーの応答）で終わる。ここに来るのは、打った人が見られる経路の想定外の
-	// 失敗と、経路が決まる前（引数を読む途中）の失敗だけ。
-	defer onPanic(func(r any, _ failure) {
-		fmt.Fprintf(stderr, "ccnavi: 想定外の失敗で止まった: %v\n", r)
-		code = config.ExitError
-	})
+	// 経路が決まってからの hook の失敗は parsed の受け（内部エラーの応答）で終わる。ここに来るのは、打った人が
+	// 見られる経路の想定外の失敗と、経路が決まる前（引数を読む途中）の失敗だけ。
+	defer onPanic(func(r any, f failure) { code = runCrashed(stdout, stderr, argv, r, f) })
 	return run(newInput(stdin), stdout, stderr, argv)
+}
+
+// runCrashed は経路が決まる前に落ちた回の終わり方。hook として起こされた形（引数なし）なら、経路が決まってからと
+// 同じく内部エラーの応答で終える。終了コード 1 で終えると、Claude Code は PreToolUse の 1 を「止めない」と読む。
+// 導入スクリプトは hook の command に引数を書かないので、引数なしを hook とみなす。設定はまだ読んでいないので、
+// 記録は既定の置き場に書く。
+func runCrashed(stdout, stderr io.Writer, argv []string, r any, f failure) int {
+	if len(argv) == 0 {
+		root := defaultRoot()
+		return hookCrashed(stdout, stderr, unloaded(root), root, &hookSoFar{mode: config.Enable}, f)
+	}
+	fmt.Fprintf(stderr, "ccnavi: 想定外の失敗で止まった: %v\n", r)
+	return config.ExitError
 }
 
 // finish は error を返す操作の終わり方。書く側の置き場（親のワークツリー）が決まらないときは、ほかのコピーへは

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -90,7 +89,7 @@ func TestStopReviewMalformedSettings(t *testing.T) {
 	}
 }
 
-// 案内のコマンドに載せるパスの綴り。導入スクリプトの sh_word と同じ綴りにする（TestShWordAgreesWithTheSetupSh が比べる）。
+// 案内のコマンドに載せるパスの綴り。sh で割れる文字を含むときだけ `'…'` で囲む。
 func TestShWord(t *testing.T) {
 	for path, want := range map[string]string{
 		"projects/lib":        "projects/lib",
@@ -102,44 +101,6 @@ func TestShWord(t *testing.T) {
 	} {
 		if got := shWord(path); got != want {
 			t.Errorf("shWord(%q) = %q, want %q", path, got, want)
-		}
-	}
-}
-
-// 導入スクリプトの sh_word と shWord は、どの字でも同じ表記を返す。2 か所に書いた字の集合のずれを捕まえるため、
-// scripts/ccnavi-setup.sh から関数を切り出して sh で走らせ、shSpecial の各字と割れない字の両方で比べる。
-// 改行は比べない（sh_word が受けるのは `git ls-files` の 1 行で、改行を含むパスは git が引用して渡す）。
-func TestShWordAgreesWithTheSetupSh(t *testing.T) {
-	sh, err := exec.LookPath("sh")
-	if err != nil {
-		t.Skip("sh が無い")
-	}
-	data, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "scripts", "ccnavi-setup.sh"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	text := string(data)
-	start := strings.Index(text, "\nsh_word() {\n")
-	end := strings.Index(text[start+1:], "\n}\n")
-	if start < 0 || end < 0 {
-		t.Fatal("ccnavi-setup.sh に sh_word が見つからない")
-	}
-	function := text[start+1 : start+1+end+2]
-	var chars []string
-	for _, c := range shSpecial {
-		if c != '\n' {
-			chars = append(chars, string(c))
-		}
-	}
-	chars = append(chars, "-", ".", "_", "/", "=", "%", "@", ":", ",", "+", "^", "日")
-	for _, c := range chars {
-		word := "projects/a" + c + "b"
-		out, err := exec.Command(sh, "-c", "tab=$(printf '\\t'); "+function+"\nsh_word \"$1\"", "sh", word).Output()
-		if err != nil {
-			t.Fatalf("%q: %v", word, err)
-		}
-		if got, want := string(out), shWord(word); got != want {
-			t.Errorf("%q: sh_word = %q, shWord = %q", word, got, want)
 		}
 	}
 }

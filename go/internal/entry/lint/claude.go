@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"strings"
 
 	"ccnavi/internal/infra/config"
@@ -259,17 +258,10 @@ func binPath(root string, written any) []rules.Problem {
 	if !ospath.IsAbs(path) {
 		full = ospath.Join(root, path)
 	}
-	if !ospath.IsFile(full) || executable(full) {
+	if !ospath.IsFile(full) || ospath.Executable(full) {
 		return nil
 	}
 	return []rules.Problem{{Severity: rules.Error, Rule: whereProject, Detail: fmt.Sprintf(
 		"%s の env の %s=%s は在るが実行できない。hook が起動しないので何も判定していない。実行ビットを付ける"+
 			"（chmod +x %s）か、scripts/ccnavi-setup.sh を再実行してください", projectSettingsRel, env.EntryPath, path, path)}}
-}
-
-// executable は実行ビットのどれかが立っているか。access(X_OK) のように呼んだ人が実行できるかまでは見ない。
-// 持ち主以外にだけ実行ビットが立つ形も、実行できる扱いにする。
-func executable(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && info.Mode().Perm()&0o111 != 0
 }

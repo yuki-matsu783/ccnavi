@@ -155,7 +155,7 @@ sh scripts/ccnavi-setup.sh <ワークスペースルート>
 戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES`）は `CCNAVI_MODE` と同じ値で書く。`dry-run` で入れたままだとこの 2 つも `dry-run` のまま残るので、`enable` へ切り替えるときは `--mode enable` で打ち直す。切り替える前に、記録の `would-restore` で何が戻るはずだったかを確かめられる。
 `CCNAVI_GUARD_TICKET_APPROVAL` はモードに合わせず、いつも `enable` で書く。`dry-run` と書かれていたら `--lint` が error にする。
 
-入れ終わったところで、ワークスペースの git の索引に `projects/` の下が載っていないかも見る。問題があれば直し方を案内するだけで、止めず、終了コードも変えない。索引も `.gitignore` も変えない（直すのはユーザ）。
+入れ終わったところで、配った実行ファイルで `--lint` を 1 回実行し、結果をそのまま見せる（ワークスペースの git の索引に `projects/` の下が載っていないかなども、ここで分かる）。止めず、終了コードも変えない。索引も `.gitignore` も変えない（直すのはユーザ）。`--check` では実行せず、導入したあとに `sh .ccnavi/scripts/ccnavi-launcher.sh --lint` で確かめるよう 1 行で案内する。
 
 置き場は固定で env には書かない（[設定](settings.md)の「置き場」）。
 

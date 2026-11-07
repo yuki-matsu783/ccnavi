@@ -39,14 +39,14 @@ func SquashedPaths(conf *config.Settings, root, project, top, base string) map[s
 	if err != nil {
 		return nil
 	}
-	// 1. 取り込み済みの記録（.git/ccnavi-done 以下）を読む。同じキーが 2 つあるときは最初の行を採る。
+	// 1. 取り込み済みの記録（.git/ccnavi-done 以下）を読む。
 	// branch が記録の名前と一致するものが squash の記録、version が直接作業の版のものが版 4 の記録。
 	var records, direct []doneCopy
 	for _, n := range names {
 		if strings.HasPrefix(n, ".") {
 			continue
 		}
-		r := doneCopy{n, ReadRecord(ospath.Join(ddir, n), firstKept)}
+		r := doneCopy{n, ReadRecord(ospath.Join(ddir, n))}
 		if r.fields["branch"] == n {
 			records = append(records, r)
 		}

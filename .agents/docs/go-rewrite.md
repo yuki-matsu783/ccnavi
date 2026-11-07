@@ -127,14 +127,7 @@ Python の実装と答えを突き合わせていたテストは、Python を外
 
 | いつ | 何を |
 |---|---|
-| Go だけで直す | hook の横展開で、Python と答えを合わせるために寄せなかったもの。取り込みの記録の読み方は `ReadRecord` の `FirstKept`（`post_findings`）と `LastKept`（`stop_integrate`）で分かれる。付き添いの有無は hook の判定（`hookio.Unattended`）と引き継ぎの待機（`hookio.Headless`。SDK の入口も含む）で分かれる。揃えるなら Go だけで決める |
-| Go だけで直す | Go のコメントと `doc.go` に残る「Python の …」「Python からの対応」の参照（`src/ccnavi/` を消したあとも、写した元の説明として約 600 行残る）をまとめて直す。名前を非公開にしたので、対応の一覧の Go の側の名前もいまの綴りと合わないところがある |
-| Go だけで直す | 巨大な整数（`--limit`・`--mr`・`ops begin` の mr・`idle check` の待ち秒）。Go は int と `time.Duration` に収まらないものを読めず、Python は巨大な値のまま使っていた。実害は無い。揃えるなら Go だけで直す |
-| Go だけで直す | `infra/git` が環境から `GIT_DIR`・`GIT_WORK_TREE`・`GIT_INDEX_FILE`・`GIT_COMMON_DIR` を外さない（Python も同じ。直すなら Go だけで直す） |
-| 余裕のあるとき | entry の横展開の残り。`lint/claude.go` の `executable` は `os.Stat` で権限を読む（`ospath.Stat` は権限を返さない。Python は `os.access`）。`suggest` の一時ディレクトリは `os.MkdirTemp`・`os.RemoveAll` のまま（infra に写しが無い）。数字だけの語の判定は `pyfmt.IsASCIIDigits` に寄せたが、`argparse` の `allDigits`（Unicode の数字・空も真）と `shell` の `isDigits`（Python の `isdigit` の表）は意味が違うので寄せていない |
 | 当面扱わない | `infra/pyre` の照合を速くする（Python の C 実装の約 5 倍遅い）、照合の深さの上限（`depthLimit`）を外す、`(?i)ß` などの小さな食い違い。中身は [yuki-matsu783/ccnavi#806](https://github.com/yuki-matsu783/ccnavi/issues/806) |
-| 余裕のあるとき | `hint` の `recentCommit`（直前のコミットと見なす古さ、10 分）は期限ではなく 1 か所でしか使わないので `hint` に残した |
-| 余裕のあるとき | `scripts/ccnavi-setup.sh` は `.gitignore` に索引（`ccnavi-index.jsonl`）を否定する `!` の行があると無視の行を足さないが、`--docs`（`docindex.addIgnore`）は足してから check-ignore で確かめる。揃えるとどちらかの振る舞いが変わるので、どちらに寄せるかを決めてから直す。setup.sh は `projects/` の索引の知らせを `--lint` と同じ文面で自分で組む（実行ファイルを起こさない。`tests/sh/test_setup.py` が文面全体の一致を見る）。lint の JSON の kind で見分ける形にするには、配る前で実行ファイルが無い経路を先に決める。`handoffnames` の `Table.reservedProblem`・`With` は本体からの呼び手が無い（テストだけが使う）。予約名の検査を下書きの経路に配線するか、消すかを決める |
 
 ## 回す
 

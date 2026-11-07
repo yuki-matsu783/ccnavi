@@ -205,6 +205,9 @@ func negativeNumber(s string) bool {
 	return frac != "" && allDigits(whole) && allDigits(frac)
 }
 
+// allDigits は s が Unicode の 10 進の数字（Nd。全角の数字も入る）だけでできているか。空も真になるので、
+// 空かどうかは呼び手が先に見る。ASCII の数字だけを見る pyfmt.IsASCIIDigits や、上付き・丸数字も数える
+// shell の isDigits とは答えが違うので、寄せない。
 func allDigits(s string) bool {
 	for _, r := range s {
 		if !unicode.IsDigit(r) {

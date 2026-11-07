@@ -73,6 +73,24 @@ const (
 	StopReviewKeepDays = "CCNAVI_STOP_REVIEW_KEEP_DAYS"
 )
 
+// git が読む変数。ccnavi が起こす git に渡す・外すもの（infra/git）。
+const (
+	// GitOptionalLocks=0 は status が index のついでの更新に取る index.lock を止める。
+	GitOptionalLocks = "GIT_OPTIONAL_LOCKS"
+	// GitNoLazyFetch=1 は partial clone の遅延取得を止める。
+	GitNoLazyFetch = "GIT_NO_LAZY_FETCH"
+	// pathspec の読み方を変える変数。
+	GitLiteralPathspecs = "GIT_LITERAL_PATHSPECS"
+	GitGlobPathspecs    = "GIT_GLOB_PATHSPECS"
+	GitNoglobPathspecs  = "GIT_NOGLOB_PATHSPECS"
+	GitIcasePathspecs   = "GIT_ICASE_PATHSPECS"
+	// 見るリポジトリ・ワークツリー・索引を決める変数。git の hook の中などで設定されている。
+	GitDir       = "GIT_DIR"
+	GitWorkTree  = "GIT_WORK_TREE"
+	GitIndexFile = "GIT_INDEX_FILE"
+	GitCommonDir = "GIT_COMMON_DIR"
+)
+
 // ccnavi の外が決める変数。リモートの API に付けるトークンと、実行ファイルの探し方・家の場所・端末の幅。
 const (
 	GitHubToken = "GITHUB_TOKEN"
