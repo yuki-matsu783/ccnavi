@@ -71,7 +71,7 @@ const (
 )
 
 // ccnavi の外が決める変数。リモートの API に付けるトークンと、実行ファイルの探し方・家の場所（Python は
-// shutil.which と os.path.expanduser が読んでいた）。
+// shutil.which と os.path.expanduser が読んでいた）・端末の幅（shutil.get_terminal_size が読む）。
 const (
 	GitHubToken = "GITHUB_TOKEN"
 	GitLabToken = "GITLAB_TOKEN"
@@ -81,4 +81,5 @@ const (
 	HomeDrive   = "HOMEDRIVE"
 	HomePath    = "HOMEPATH"
 	UserName    = "USERNAME"
+	Columns     = "COLUMNS"
 )
