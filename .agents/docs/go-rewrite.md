@@ -127,8 +127,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 | Python を外すとき | `git.Undo` の案内でパスを `"` で囲むだけの引用を、`config` の引用と同じ規則にする（`$` やバッククォートを含むパスで壊れる。いまは Python と同じ出力を保つため残す） |
 | Python を外すとき | sync/handoff の `Apply` で、書いた後の読み直しに失敗したエントリが戻されない。catalog の `Problems` が文の頭にパスを付ける形（パスで始まらない文にも付く）、索引の使い回しの鍵が秒の mtime だけ（同じ秒の書き換えで前の frontmatter が残る）、`readHead` に失敗した md の既存の行が消える（コメントの「残す」と食い違う）。`infra/git` が環境から `GIT_DIR`・`GIT_WORK_TREE`・`GIT_INDEX_FILE`・`GIT_COMMON_DIR` を外さない（どれも Python も同じ。直すなら Python と同時に直す） |
 | 余裕のあるとき | entry の横展開の残り。`lint/claude.go` の `executable` は `os.Stat` で権限を読む（`ospath.Stat` は権限を返さない。Python は `os.access`）。`suggest` の一時ディレクトリは `os.MkdirTemp`・`os.RemoveAll` のまま（infra に写しが無い）。`.md` と `.git` の直書きは entry と `tickets/approval`・`archive` だけを `place.MdExt`・`tree.DotGit` に寄せ、ほかの段（`catalog`・`records`・`tickets/lifecycle` など）は残る。数字だけの語の判定は `pyfmt.IsASCIIDigits` に寄せたが、`argparse` の `allDigits`（Unicode の数字・空も真）と `shell` の `isDigits`（Python の `isdigit` の表）は意味が違うので寄せていない |
-| 余裕のあるとき | `infra/pyre` の照合を速くする（先頭の文字の集合で開始位置を飛ばす、開始位置ごとのクロージャをやめる）。いまは Python の C 実装の約 5 倍遅い。数 KB の通常のコマンドでは問題にならない |
-| 余裕のあるとき | pyre の `(?i)ß` が `ẞ` に当たらない（casefix に 1 組足す）。rules の unsupported が `(?P=name)` の後方参照を通す。`TranslateGlob` が文字クラスの中の `/` を壊す（Python と同じ。Python の globmatch の docstring も誤り）。`\N{名前}` の苦情を名指しの文にする |
+| 当面扱わない | `infra/pyre` の照合を速くする（Python の C 実装の約 5 倍遅い）、照合の深さの上限（`DepthLimit`）を外す、`(?i)ß` などの小さな食い違い。中身は [yuki-matsu783/ccnavi#806](https://github.com/yuki-matsu783/ccnavi/issues/806) |
 | 余裕のあるとき | `hint` の `recentCommit`（直前のコミットと見なす古さ、10 分）は期限ではなく 1 か所でしか使わないので `hint` に残した。`str.split()` の並びを返す `strings.FieldsFunc(…, ospath.IsSpace)` の直書き（wiki・selfguard・useronly・learning・failsafe など）を `ospath` の 1 関数に寄せる。`infra/git/restore.go` は `strings.Fields`（U+001C〜U+001F を空白に数えない）で Python と違いうる |
 
 ## 回す
