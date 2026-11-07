@@ -137,6 +137,8 @@ var subTiers = map[string]map[string]int{
 		"ccnavimd": 0, "stopjudge": 0, "post": 0,
 		// 判定の文と理由コード（付き添いの有無を ccnavimd から読む）
 		"reasons": 1,
+		// PreToolUse の判定の本体（上の部品を順に当てる）
+		"judge": 2,
 		// サブエージェントの始まりと終わり（子の案内・終わり方の記録・実行後チェックの定数を読む）
 		"subagent": 2,
 	},
