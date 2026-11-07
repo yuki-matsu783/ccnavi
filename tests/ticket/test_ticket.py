@@ -18,10 +18,7 @@
 
 from __future__ import annotations
 
-import argparse
-import contextlib
 import hashlib
-import io
 import json
 import os
 import shutil
@@ -29,19 +26,33 @@ import stat
 import subprocess
 import tempfile
 import unittest
-from unittest import mock
 
-from ccnavi.entry import cli
-from ccnavi.hook.subagent import CANDIDATE_NOTE
-from ccnavi.infra import settings, shellread
-from ccnavi.tickets.approval import store as approval
-from ccnavi.tickets.model import phase_forms, ticket_fields
-from ccnavi.tickets.model import ticket as ticket_mod
-from ccnavi.tickets.phase import scope as phase_scope
-from ccnavi.tickets.review import request as review
-from tests import ROOT, common_path, userform, write_and_push_flag
+from tests import ROOT, common_path, script_command, userform, write_and_push_flag
 from tests.inproc import run_ccnavi
-from tests.ticketsample import RULES, plain_parent, record_merge, write_plain_phases
+from tests.ticketsample import (
+    RULES,
+    plain_parent,
+    record_merge,
+    set_fields,
+    write_plain_phases,
+)
+
+# サブエージェントの起動にいつも付く「スキル候補」の 1 行。
+CANDIDATE_NOTE = (
+    "[ccnavi] 作業中に手順の見落としやすい点やスキルの誤りに気づいたら、最後の報告に"
+    "「スキル候補」の節を追加して書いてください（対象のスキル・何を直すか・根拠）。"
+    "スキルのファイルは自分では書かない。"
+)
+# レビューで止めている間の文に添える、通る形の案内。
+EXEMPT_NOTE = (
+    "止めている間に通るのは、ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh と "
+    "ccnavi-launcher.sh --docs を sh で実行する形だけです。"
+    "前に cd、後ろに | head -n 3 のような行数だけの head・tail を付けてもよく、"
+    "ファイル名・リダイレクト（2>&1 など）・ほかのコマンドを足すと止まります。"
+    "提案ファイルは heredoc などでは書けないので、Write・Edit で書きます。"
+)
+# 子の範囲の件数の上限。
+MAX_SCOPE_ENTRIES = 20
 
 
 def git(cwd, *args):
@@ -217,7 +228,7 @@ class TicketTest(unittest.TestCase):
         """提案を書く。`tree` を渡さなければ親 i0001 のワークツリーに書く。
 
         別の親の提案は、識別子と同じ名前のワークツリー（`tree`）に書く。別名のツリーの提案は
-        承認が止まる（`approval_checks.place_problems`）。
+        承認が止まる。
         """
         return write(
             os.path.join(tree or self.parent_tree, "wip", "proposals", "todo", name + ".md"),
@@ -604,7 +615,7 @@ class TicketTest(unittest.TestCase):
         source = os.path.join(self.parent_tree, "wip", "proposals", "todo", name + ".md")
         with open(source, encoding="utf-8") as f:
             text = f.read()
-        return ticket_fields.set_fields(text, fields)
+        return set_fields(text, fields)
 
     def test_a_base_sha_without_started_at_is_blocked(self):
         # `start` は `started_at` と `base_sha` を一緒に書く。片方だけの形は道具を通っていない。
@@ -723,9 +734,7 @@ class TicketTest(unittest.TestCase):
         review = os.path.join(self.parent_tree, "wip", "proposals", "review")
         with open(os.path.join(review, "i0001-01-01.md"), encoding="utf-8") as f:
             finished = f.read()
-        stray = ticket_fields.set_fields(
-            finished.replace("i0001-01-01", "i0001-01-05"), {"completed_at": ""}
-        )
+        stray = set_fields(finished.replace("i0001-01-01", "i0001-01-05"), {"completed_at": ""})
         write(os.path.join(review, "i0001-01-05.md"), stray)
         details = [
             p["detail"] for p in json.loads(self.ccnavi("--lint", "--json").stdout)["problems"]
@@ -733,15 +742,11 @@ class TicketTest(unittest.TestCase):
         self.assertTrue(
             any("i0001-01-05" in d and "`completed_at` がありません" in d for d in details), details
         )
-        held, why = approval.load_copy(os.path.join(review, "i0001-01-01.md"), require_record=True)
-        self.assertIsNotNone(held, why)
-        held, why = approval.load_copy(os.path.join(review, "i0001-01-05.md"), require_record=True)
-        self.assertIsNone(held)
 
     def close_parent_by_hand(self, name="i0001"):
         """親の承認済みチケットを `doing/` から `done/` へ手で動かす。
 
-        道具は開いた子がある親を閉じさせない（`ops_close.close_problems`）ので、この形は
+        道具は開いた子がある親を閉じさせないので、この形は
         置き場を手で動かしたときにしか作れない。GitHub の画面で閉じるのがそれにあたる。
         """
         os.makedirs(os.path.join(self.approved, "done"), exist_ok=True)
@@ -1015,7 +1020,7 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("i0001-01-01 の親 i0001 が未着手", refused.stderr)
         # 案内の sh はワークスペースルートからの絶対パス。子のワークツリーから打てるパス。
-        ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
+        ticket_sh = script_command(self.root, "ccnavi-ticket.sh")
         self.assertIn(f"{ticket_sh} start i0001", refused.stderr)
         self.assertNotIn("sh .ccnavi/scripts/", refused.stderr)
         # 止まった回は、子の着手の欄を書かない。
@@ -1116,7 +1121,7 @@ class TicketTest(unittest.TestCase):
         )
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(exempt))
         # 止めている間も、資料を引く `--docs` は通る（次に何をするかを調べる手段）。
-        docs = f"{settings.script_command(self.root, 'ccnavi-launcher.sh')} --docs --keyword review"
+        docs = f"{script_command(self.root, 'ccnavi-launcher.sh')} --docs --keyword review"
         passed = self.hook("PreToolUse", "Bash", self.parent_tree, command=docs)
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(passed), self.reason(passed))
         # 前の `cd` は通る。`--docs` 以外のオプションや、ほかのコマンドとの連結は止まる。
@@ -1145,7 +1150,7 @@ class TicketTest(unittest.TestCase):
         """
         self.family(plan=["work-mr"])
         self.close_phase()
-        review_sh = settings.script_command(self.root, "ccnavi-review.sh")
+        review_sh = script_command(self.root, "ccnavi-review.sh")
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertIn(f"{review_sh} review-request --phase 1", self.reason(said))
         self.assertNotIn("sh .ccnavi/scripts/", self.reason(said))
@@ -1173,9 +1178,9 @@ class TicketTest(unittest.TestCase):
         """
         self.family()
         self.close_phase()
-        review_sh = settings.script_command(self.root, "ccnavi-review.sh")
+        review_sh = script_command(self.root, "ccnavi-review.sh")
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn(phase_forms.EXEMPT_NOTE, self.reason(said))
+        self.assertIn(EXEMPT_NOTE, self.reason(said))
 
         guided = f"{review_sh} review-request --phase 1 --body-file b.md"
         decorated = self.hook(
@@ -1192,9 +1197,9 @@ class TicketTest(unittest.TestCase):
             command=f"cd {self.parent_tree} && ls && {guided}",
         )
         self.assertIn("DENY_PHASE_REVIEW", self.reason(other))
-        self.assertIn(phase_forms.EXEMPT_NOTE, self.reason(other))
+        self.assertIn(EXEMPT_NOTE, self.reason(other))
         # 改版は単独なら通る。heredoc で提案を書く連結は止まり、案内に Write・Edit と単独実行が書かれている。
-        ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
+        ticket_sh = script_command(self.root, "ccnavi-ticket.sh")
         revise = self.hook(
             "PreToolUse", "Bash", self.parent_tree, command=f"{ticket_sh} revise P-1"
         )
@@ -1207,16 +1212,11 @@ class TicketTest(unittest.TestCase):
         )
         self.assertIn("DENY_PHASE_REVIEW", self.reason(chained))
         self.assertIn("Write・Edit", self.reason(chained))
-        # 付き添いだけでは通さない。
-        self.assertFalse(phase_forms.exempt("cd /tmp\x00tail -3", ""))
-        self.assertFalse(phase_forms.exempt(f"{guided}\x00tail > out", ""))
-
         # サブエージェントの起動にはシェルのパスの話をしない。
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
-        self.assertNotIn(phase_forms.EXEMPT_NOTE, self.reason(spawn))
+        self.assertNotIn(EXEMPT_NOTE, self.reason(spawn))
 
-    @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
     def test_gate_exempts_wrapper_with_quoted_spaces(self):
         """レビューで止まっている間、引用に空白を含むラッパースクリプト呼び出しも免除されること。
 
@@ -1236,14 +1236,6 @@ class TicketTest(unittest.TestCase):
             command='sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: a b"',
         )
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(exempt), self.reason(exempt))
-
-        # 判定の土台そのもの。shellread が読んだ文字列は 1 本のコマンドで、免除の形にヒットする。
-        reading = shellread.read('sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: a b"')
-        self.assertEqual(len(phase_forms.commands(reading.text)), 1, reading.text)
-        self.assertTrue(phase_forms.exempt(reading.text, reading.reason))
-        # 連結の片方が違えば止める側は変わらない。
-        joined = shellread.read('ls; sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: a b"')
-        self.assertFalse(phase_forms.exempt(joined.text, joined.reason))
 
     def test_gate_does_not_exempt_the_command_run_inside_a_runner(self):
         """止めている間に通す形は、実行役のコマンドの中で実行されるコマンドには適用しない。
@@ -1618,61 +1610,6 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))
         self.assertFalse(os.path.exists(os.path.join(phases, "accepted.json")))
 
-    def test_remove_wip_does_not_follow_a_linked_directory_out_of_the_tree(self):
-        """追跡済みの wip/design/x.html の途中のディレクトリがリンク（無視されている）に置き換わって
-        いても、リンクの先（ツリーの外）のファイルは消さない。名指しして止める。"""
-        rel = "wip/design/x.html"
-        write(os.path.join(self.parent_tree, *rel.split("/")), "<p>x</p>\n")
-        git(self.parent_tree, "add", "--", rel)
-        git(self.parent_tree, "commit", "--quiet", "-m", "wip")
-        outside = os.path.join(self.root, "outside")
-        write(os.path.join(outside, "x.html"), "大事\n")
-        shutil.rmtree(os.path.join(self.parent_tree, "wip", "design"))
-        try:
-            os.symlink(outside, os.path.join(self.parent_tree, "wip", "design"))
-        except OSError:
-            self.skipTest("リンクが作れない")
-        # ready の前提の時点で止まる（退避より前）
-        conf, _ = settings.load(self.root)
-        problems = review._merge_problems(self.parent_tree, conf, self.root)
-        self.assertTrue(any(rel in p and "リンク" in p for p in problems), problems)
-        removed, _, failed = review.remove_wip(self.parent_tree)
-        self.assertIn(rel, failed)
-        self.assertIn("リンク", failed)
-        self.assertEqual(removed, [])
-        self.assertTrue(os.path.exists(os.path.join(outside, "x.html")))
-
-    @unittest.skipIf(os.name == "nt", "大文字違いの並存と名前の \\ は Windows では作れない")
-    def test_ready_catches_wip_in_any_case_and_a_backslashed_name(self):
-        """ready は `WIP/design/…` と `wip\\design\\…`（名前に `\\` を含む 1 ファイル）も片付ける。
-
-        大文字小文字を区別しない FS では範囲の除外が `WIP/design/` を通しうるので、ready の側で
-        区別せずに拾う。
-        """
-        self.family()
-        self.close_phase()
-        self.remote()
-        conf, _ = settings.load(self.root)
-        git(self.parent_tree, "rm", "-r", "-q", "--ignore-unmatch", "wip")
-        git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "chore: wip を片付ける")
-        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        self.assertFalse(
-            any("wip/" in p for p in review._merge_problems(self.parent_tree, conf, self.root))
-        )
-        for rel in ("WIP/design/phase-1.html", "wip\\design\\phase-1.html"):
-            with self.subTest(path=rel):
-                write(os.path.join(self.parent_tree, *rel.split("/")), "<p>x</p>\n")
-                git(self.parent_tree, "add", "--", rel)
-                git(self.parent_tree, "commit", "--quiet", "-m", f"add {rel}")
-                git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-                self.assertEqual(review.wip_tracked(self.parent_tree), [rel])
-                removed, _, failed = review.remove_wip(self.parent_tree)
-                self.assertEqual((removed, failed), ([rel], ""))
-                self.assertFalse(os.path.lexists(os.path.join(self.parent_tree, *rel.split("/"))))
-                git(self.parent_tree, "add", "-A")
-                git(self.parent_tree, "commit", "--quiet", "-m", f"rm {rel}")
-                git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-
     def test_decide_yes_places_each_choice(self):
         """指摘ごとの行き先。対応しない分は受け入れ、直す分は続きの子に載せ、フェーズは開き直る。"""
         fixture = self.two_threads()
@@ -1702,6 +1639,21 @@ class TicketTest(unittest.TestCase):
         self.assertTrue(posted.startswith("<!-- ccnavi:decide -->"))
         self.assertIn("i0001-01-03", posted)
 
+    def widen_to_the_limit(self, child):
+        """レビュー済みの子の範囲を、上限（20 件）ちょうどまで足す。
+
+        1 件の子と合わせると和が上限を超える。
+        """
+        path = os.path.join(self.parent_tree, "wip", "proposals", "review", child + ".md")
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn('glob: "src/b/*"', text)
+        extra = "".join(
+            f'\n  - match: Write|Edit\n    glob: "src/c{n}/*"' for n in range(1, MAX_SCOPE_ENTRIES)
+        )
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text.replace('glob: "src/b/*"', 'glob: "src/b/*"' + extra, 1))
+
     def test_decide_yes_refuses_a_followup_whose_scope_sum_is_over_the_limit(self):
         """見た子の範囲の和が上限を超えるとき、続きの子を書く前に止める。
 
@@ -1710,17 +1662,9 @@ class TicketTest(unittest.TestCase):
         fixture = self.two_threads()
         digest = json.loads(self.decide(fixture, "--preview", "--json").stdout)["digest"]
         choices = json.dumps({"u1": "keep", "u2": "fix"})
-        # 親は 2 件、子は 1 件と 2 件、和は 3 件。上限を 2 件にして、和だけが超える形にする。
-        second = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-02.md")
-        with open(second, encoding="utf-8") as f:
-            text = f.read()
-        self.assertIn("src/b/*", text)
-        with open(second, "w", encoding="utf-8", newline="\n") as f:
-            f.write(
-                text.replace("src/b/*", 'src/b/*"\n  - match: Write|Edit\n    glob: "src/c/*', 1)
-            )
-        with mock.patch.object(ticket_mod, "MAX_SCOPE_ENTRIES", 2):
-            refused = self.decide(fixture, "--yes", choices, "--digest", digest, "--json")
+        # 子は 1 件と上限ちょうどの件数で、和だけが上限を超える形にする。
+        self.widen_to_the_limit("i0001-01-02")
+        refused = self.decide(fixture, "--yes", choices, "--digest", digest, "--json")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("続きの子チケットを起こせない", refused.stderr)
         self.assertIn("複数の子に分ける", refused.stderr)
@@ -1823,18 +1767,11 @@ class TicketTest(unittest.TestCase):
         fixture = self.two_threads()
         digest = json.loads(self.decide(fixture, "--preview", "--json").stdout)["digest"]
         choices = json.dumps({"u1": "keep", "u2": "fix"})
-        second = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-02.md")
-        with open(second, encoding="utf-8") as f:
-            text = f.read()
-        with open(second, "w", encoding="utf-8", newline="\n") as f:
-            f.write(
-                text.replace("src/b/*", 'src/b/*"\n  - match: Write|Edit\n    glob: "src/c/*', 1)
-            )
+        self.widen_to_the_limit("i0001-01-02")
         plan = os.path.join(self.state, "plan.json")
-        with mock.patch.object(ticket_mod, "MAX_SCOPE_ENTRIES", 2):
-            refused = self.decide(
-                fixture, "--yes", choices, "--digest", digest, "--json", "--accept-plan", plan
-            )
+        refused = self.decide(
+            fixture, "--yes", choices, "--digest", digest, "--json", "--accept-plan", plan
+        )
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("続きの子チケットを起こせない", refused.stderr)
         self.assertFalse(os.path.exists(plan))
@@ -2262,12 +2199,9 @@ class TicketTest(unittest.TestCase):
             ("--review", "1", "--chat"),
             ("--agre", "--yes", "i0001"),
         ):
-            # argparse の断りは sys.stderr に直に出る（同じプロセスで動かすので、受け取りの外）。
-            refused = io.StringIO()
-            with contextlib.redirect_stderr(refused):
-                result = self.ccnavi(*args, stdin="y\n")
+            result = self.ccnavi(*args, stdin="y\n")
             self.assertNotEqual(result.returncode, 0, args)
-            self.assertIn(f"unrecognized arguments: {args[0]}", refused.getvalue(), args)
+            self.assertIn(f"unrecognized arguments: {args[0]}", result.stderr, args)
 
     def test_cli_paths_are_denied_from_the_shell_unless_disabled(self):
         self.family()
@@ -2378,7 +2312,9 @@ class TicketTest(unittest.TestCase):
             "awk 'BEGIN{system(\"sh .ccnavi/scripts/ccnavi-review.sh decide 3 --choices X "
             "--digest Y\")}'",
             "perl -e 'system(\"ccnavi --reviewed 3 --accept-unresolved --yes X --digest Y\")'",
-            'python3 -c "import ccnavi.entry.cli as c; '
+            # 打たれる文字列（読み手の Python の名前に意味は無い）
+            'python3 -c "import '
+            "ccnavi.entry.cli as c; "
             "c.run(0, 0, 0, ['--reviewed', '1', '--yes', '{}'])\"",
             "S=decide; sh .ccnavi/scripts/ccnavi-review.sh $S 1 --choices x --digest y",
             "cp .ccnavi/scripts/ccnavi-review.sh /tmp/r.sh; "
@@ -2476,7 +2412,7 @@ class TicketTest(unittest.TestCase):
             f"sh {review} decide 1",
             f"sh {review} decide 1 --preview --json",
             f'sh {review} request 1 --body-file "$F"',
-            "grep -n -- '--abandon' src/ccnavi/tickets/lifecycle/retire.py",
+            "grep -n -- '--abandon' go/internal/tickets/lifecycle/retire/retire.go",
             "echo ccnavi worktree $V --abandon",
             "ccnavi worktree drop P1",
             "ccnavi worktree tidy P1 --phase 2",
@@ -2644,25 +2580,6 @@ class TicketTest(unittest.TestCase):
             guard_ticket_approval="enable",
         )
         self.assertIn("標準入力から読むシェル", self.reason(result))
-
-    def test_executable_options_list_matches_the_parser(self):
-        """入口の止めが知っている実行ファイルのオプションは、実行ファイルが受けるオプションと同じ。"""
-        seen = []
-        real = argparse.ArgumentParser.parse_args
-
-        def spy(parser, *args, **kwargs):
-            seen.append(parser)
-            return real(parser, *args, **kwargs)
-
-        with mock.patch.object(argparse.ArgumentParser, "parse_args", spy):
-            cli.run(io.StringIO(), io.StringIO(), io.StringIO(), ["--version"])
-        flags = {
-            option
-            for action in seen[0]._actions
-            for option in action.option_strings
-            if option.startswith("--")
-        } | {"-h", "-r"}
-        self.assertEqual(flags, set(phase_forms.EXE_OPTIONS))
 
     def test_turning_off_the_terminal_requirement_is_denied(self):
         """ターミナル要求を切る形は、実行ファイルをどう呼んでいても止める。
@@ -3225,7 +3142,7 @@ class TicketTest(unittest.TestCase):
             path = os.path.join(self.approved, "done", "i0001-01-01.md")
         with open(path, encoding="utf-8") as f:
             text = f.read()
-        write(path, ticket_fields.set_fields(text, {"merged_sha": late}))
+        write(path, set_fields(text, {"merged_sha": late}))
         refused = self.request(fixture)
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("i0001-01-01", refused.stderr)
@@ -3613,10 +3530,12 @@ class TicketTest(unittest.TestCase):
         )
         found = self._outcome_of("sub-d")
         self.assertEqual((found["outcome"], found["bounces"]), ("outside", 0))
-        from ccnavi.hook import subagent_outcome
-
-        one = subagent_outcome.of(os.path.join(self.root, "logs", "state"), "s1", "sub-d")
-        self.assertIn("差し戻していない", subagent_outcome.line(one))
+        # Stop の促しが結果を言う（先に出る別の促しが 1 回ずつ出たあと）
+        stop = {"hook_event_name": "Stop", "cwd": self.parent_tree, "session_id": "s1"}
+        said = [self.ccnavi("--mode", "enable", stdin=json.dumps(stop)).stdout for _ in range(4)]
+        nudge = [out for out in said if "SUBAGENT_OUTCOME" in out]
+        self.assertEqual(len(nudge), 1, said)
+        self.assertIn("差し戻していない", nudge[0])
 
     def test_a_subagent_started_in_the_parent_tree_is_unattributed_and_not_bounced(self):
         self.family()
@@ -3646,8 +3565,8 @@ class TicketTest(unittest.TestCase):
             "session_id": "s1",
             "agent_id": "sub-7",
         }
-        with mock.patch.object(phase_scope, "scope_findings", return_value=([], "読めない")):
-            done = self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
+        self.break_git_of(child)
+        done = self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         with open(log, encoding="utf-8") as f:
             row = json.loads(f.read().splitlines()[-1])
@@ -3670,6 +3589,11 @@ class TicketTest(unittest.TestCase):
         again = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
         self.assertNotIn("worktree-unreadable", self.reason(again))
 
+    def break_git_of(self, worktree):
+        """子のワークツリーの HEAD を、親と履歴を共有しないコミットにする（子の仕事の始まりを決められない）。"""
+        git(worktree, "checkout", "--quiet", "--orphan", "unrelated")
+        git(worktree, "commit", "--quiet", "-m", "unrelated")
+
     def unreadable_stop(self, agent_id, session="s1"):
         """子のワークツリーを読めないまま、サブエージェントを終わらせる。"""
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
@@ -3679,8 +3603,8 @@ class TicketTest(unittest.TestCase):
             "session_id": session,
             "agent_id": agent_id,
         }
-        with mock.patch.object(phase_scope, "scope_findings", return_value=([], "読めない")):
-            done = self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
+        self.break_git_of(child)
+        done = self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
     def test_parent_hears_on_its_next_tool_after_a_background_subagent(self):
@@ -3726,48 +3650,13 @@ class TicketTest(unittest.TestCase):
         again = self.ccnavi("--mode", "enable", stdin=json.dumps(prompt))
         self.assertNotIn("worktree-unreadable", self.reason(again))
 
-    def test_internal_error_at_subagent_stop_leaves_the_mark(self):
-        """SubagentStop の処理が内部エラーで終わっても、範囲を確かめなかったことが親に届く。"""
-        self.family()
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
-        stop = {
-            "hook_event_name": "SubagentStop",
-            "cwd": child,
-            "session_id": "s1",
-            "agent_id": "sub-err",
-        }
-        with mock.patch.object(phase_scope, "scope_findings", side_effect=RuntimeError("x")):
-            done = self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertIn("internal-error", json.loads(done.stdout)["systemMessage"])
-        payload = {
-            "hook_event_name": "PostToolUse",
-            "tool_name": "Agent",
-            "cwd": self.parent_tree,
-            "session_id": "s1",
-            "tool_input": {"description": "子"},
-            "tool_response": {"agentId": "sub-err"},
-        }
-        said = self.reason(self.ccnavi("--mode", "enable", stdin=json.dumps(payload)))
-        self.assertIn("worktree-unreadable", said)
-        self.assertIn("sub-err", said)
-        self.assertIn("内部エラー", said)
-
     def _stop_payload(self):
         return {"hook_event_name": "Stop", "cwd": self.parent_tree, "session_id": "s1"}
 
-    def test_a_check_that_raises_is_unchecked_and_reaches_the_parent_and_stop(self):
-        """AT27: 範囲の検査が例外を起こした回は `unchecked` で記録し、親へ知らせ、Stop が促す。"""
+    def test_a_check_that_could_not_run_is_unchecked_and_reaches_the_parent_and_stop(self):
+        """AT27: 範囲を確かめられなかった回は `unchecked` で記録し、親へ知らせ、Stop が促す。"""
         self.family()
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
-        stop = {
-            "hook_event_name": "SubagentStop",
-            "cwd": child,
-            "session_id": "s1",
-            "agent_id": "sub-raise",
-        }
-        with mock.patch.object(phase_scope, "scope_findings", side_effect=RuntimeError("x")):
-            self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
+        self.unreadable_stop("sub-raise")
         found = self._outcome_of("sub-raise")
         self.assertEqual((found["outcome"], found["final"]), ("unchecked", True))
         # 親が先にツールを使うと、そこで知らせて「促した」ことにする（Stop で繰り返さない）
@@ -3781,15 +3670,7 @@ class TicketTest(unittest.TestCase):
     def test_stop_nudges_once_for_an_unchecked_subagent_the_parent_did_not_hear_of(self):
         """AT27: 親が知らせを受けないまま Stop に来たら、Stop が 1 回だけ促す。"""
         self.family()
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
-        stop = {
-            "hook_event_name": "SubagentStop",
-            "cwd": child,
-            "session_id": "s1",
-            "agent_id": "sub-raise",
-        }
-        with mock.patch.object(phase_scope, "scope_findings", side_effect=RuntimeError("x")):
-            self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
+        self.unreadable_stop("sub-raise")
         seen = [
             "SUBAGENT_OUTCOME"
             in self.ccnavi("--mode", "enable", stdin=json.dumps(self._stop_payload())).stdout
@@ -3810,44 +3691,20 @@ class TicketTest(unittest.TestCase):
         self.assertIn("SUBAGENT_UNATTRIBUTED", self.reason(first))
         self.assertTrue(self._outcome_of("sub-u")["notified"])
 
-    def test_a_notice_cut_off_while_writing_is_not_marked_and_comes_again(self):
-        """AT28: 知らせを書く途中で失敗したら「通知済み」の印を付けず、次の PostToolUse で
-        同じ結果IDの知らせがもう一度出る。"""
-        self.family()
-        self._stray()
-        self.hook("SubagentStop", "", self.parent_tree, agent_id="sub-u")
-        before = self._outcome_of("sub-u")
-        with mock.patch("ccnavi.infra.hookio.write_context", side_effect=OSError("cut")):
-            self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertFalse(self._outcome_of("sub-u")["notified"])
-        again = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn("SUBAGENT_UNATTRIBUTED", self.reason(again))
-        after = self._outcome_of("sub-u")
-        self.assertTrue(after["notified"])
-        self.assertEqual(after["id"], before["id"])
-
     def test_an_outcome_that_cannot_be_saved_is_not_treated_as_normal(self):
         """AT28: `.outcome` を保存できないとき、記録は残らない（言うのは標準エラーだけ）が、
         差し戻しを無視して終わった体は、記録が無いときの従来の経路で親に「差し戻されたまま」と
         言われる。正常（言わない）には扱われない。"""
-        from ccnavi.infra import fsio
-
         self.family()
         child, _ = self._stray()
-        real = fsio.write_json_atomic
-
-        def fail_outcome(path, *args, **kwargs):
-            if str(path).endswith(".outcome"):
-                return "disk full"
-            return real(path, *args, **kwargs)
-
-        with mock.patch.object(fsio, "write_json_atomic", side_effect=fail_outcome):
-            first = self.hook("SubagentStop", "", child, agent_id="sub-w")
-            second = self.hook("SubagentStop", "", child, agent_id="sub-w")
+        # 記録の置き場をディレクトリで塞ぐ（書き換えられない）
+        outcome = os.path.join(self.root, "logs", "state", "subagent-s1-sub-w.outcome")
+        os.makedirs(outcome)
+        first = self.hook("SubagentStop", "", child, agent_id="sub-w")
+        second = self.hook("SubagentStop", "", child, agent_id="sub-w")
         self.assertEqual(first.returncode, 2)
         self.assertIn("保存できませんでした", second.stderr)
-        state = os.path.join(self.root, "logs", "state")
-        self.assertFalse(os.path.exists(os.path.join(state, "subagent-s1-sub-w.outcome")))
+        self.assertFalse(os.path.isfile(outcome))
         self.assertIn("差し戻されたまま", self.reason(self._agent_done("sub-w")))
 
     # ---- 診断
@@ -3876,93 +3733,6 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("i0001-01-01", result.stdout)
         self.assertIn("フェーズ 1", result.stdout)
-
-
-class ScriptShapeTest(unittest.TestCase):
-    """`script_shape` は、スクリプトが書く欄だけを除く（`post_findings._script_writes` の
-    土台）。"""
-
-    body = '---\nid: i0001\nallow:\n  - match: Write|Edit\n    glob: "src/*"\n---\n本文\n'
-
-    def started(self, extra: str) -> str:
-        return self.body.replace("---\n本文", extra + "---\n本文")
-
-    def test_スクリプトの欄を足しても正規化した内容は変わらない(self):
-        after = self.started('started_at: "2026-09-22T00:00:00Z"\nbase_sha: "abc"\n')
-
-        self.assertEqual(
-            ticket_fields.script_shape(after),
-            ticket_fields.script_shape(self.body),
-            "着手の時刻と基準点は ccnavi が書く欄なので、正規化した内容に出てはいけない",
-        )
-
-    def test_合流した子の先頭の欄も除かれる(self):
-        after = self.started('merged_sha: "0123456789abcdef"\n')
-
-        self.assertEqual(ticket_fields.script_shape(after), ticket_fields.script_shape(self.body))
-        self.assertEqual(ticket_fields.script_fields_set(after), ("merged_sha",))
-
-    def test_スクリプトの欄の続きの行も除かれる(self):
-        after = self.started("cancel_reason: |\n  複数行の\n  理由\n")
-
-        self.assertEqual(ticket_fields.script_shape(after), ticket_fields.script_shape(self.body))
-
-    def test_範囲が変われば正規化した内容も変わる(self):
-        wider = self.body.replace('glob: "src/*"', 'glob: "*"')
-
-        self.assertNotEqual(
-            ticket_fields.script_shape(wider), ticket_fields.script_shape(self.body)
-        )
-
-    def test_本文が変われば正規化した内容も変わる(self):
-        self.assertNotEqual(
-            ticket_fields.script_shape(self.body.replace("本文", "別の本文")),
-            ticket_fields.script_shape(self.body),
-        )
-
-    def test_同じ表記の欄でも字下げされていれば除かない(self):
-        # 範囲の中に `started_at:` と書いても、欄ではないので正規化した内容に残る。
-        nested = self.body.replace('    glob: "src/*"', '    glob: "src/*"\n    started_at: "x"')
-
-        self.assertNotEqual(
-            ticket_fields.script_shape(nested), ticket_fields.script_shape(self.body)
-        )
-
-    def test_前置きが無いものは正規化した内容を持たない(self):
-        # マーカーと記録がこれ。範囲を宣言しないので、内容からは見分けられない。
-        self.assertIsNone(ticket_fields.script_shape('{"phase": 1}\n'))
-        self.assertIsNone(ticket_fields.script_shape(""))
-
-    def test_閉じていない前置きは正規化した内容を持たない(self):
-        self.assertIsNone(ticket_fields.script_shape("---\nid: i0001\n本文\n"))
-
-    def test_空の欄は値を持たないと数える(self):
-        # 承認は `started_at: ""` の形で欄を置く。`""` を値と数えると、`finish` が書いた
-        # 完了の時刻を「既にある値の書き換え」と読み、正規の移動を報告する。
-        placed = self.started("started_at: \"\"\ncompleted_at: ''\nbase_sha: ~\ncancel_reason:\n")
-
-        self.assertEqual(ticket_fields.script_fields_set(placed), ())
-
-    def test_値のある欄は値を持つと数える(self):
-        placed = self.started('started_at: "2026-09-22T00:00:00Z"\nbase_sha: abc\n')
-
-        self.assertEqual(ticket_fields.script_fields_set(placed), ("started_at", "base_sha"))
-
-    def test_続きの行に値がある欄は値を持つと数える(self):
-        # 1 行目だけを読むと空に見える書き方。値ありと数えないと、`base_sha` の書き換えが
-        # 正規化した内容から消える（続きの行は `script_shape` が欄と一緒に落とす）。
-        for first in ("|", ">-", "# c", "&a", "!!str", ""):
-            with self.subTest(first=first):
-                placed = self.started(f"base_sha: {first}\n  1111111111111111\n")
-
-                self.assertEqual(ticket_fields.script_fields_set(placed), ("base_sha",))
-
-    def test_読めない値は値を持つと数える(self):
-        for value in ("[" * 2000, '"' + "a" * 5000 + '"'):
-            with self.subTest(size=len(value)):
-                placed = self.started(f"base_sha: {value}\n")
-
-                self.assertEqual(ticket_fields.script_fields_set(placed), ("base_sha",))
 
 
 if __name__ == "__main__":

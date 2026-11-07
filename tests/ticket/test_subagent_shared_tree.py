@@ -19,7 +19,6 @@ import json
 import os
 import unittest
 
-from ccnavi.hook import subagent
 from tests.ticket.test_phases import PhaseHarness
 
 MARK = "別の編集するサブエージェントが動いています"
@@ -115,13 +114,6 @@ class SharedTreeTest(SharedTreeHarness):
         self.define("narrow", "disallowedTools: Write, Edit, NotebookEdit\n")
         self.assertNotIn(MARK, self.start("a1", EDITOR))
         self.assertIn(MARK, self.start("a2", "narrow"))
-
-    def test_flat_removes_every_line_break_that_splitlines_uses(self):
-        """印の値に区切りが残ると、`splitlines` で読む側が途中で切れた値を受け取る。"""
-        text = "a\nb\rc\x0bd\x0ce\x1cf\x1dg\x1eh\x85i j k"
-        flat = subagent._flat(text)
-        self.assertEqual(len(flat.splitlines()), 1, repr(flat))
-        self.assertEqual(flat.split(" "), list("abcdefghijk"))
 
     def test_an_unknown_agent_type_counts_as_an_editor(self):
         self.assertNotIn(MARK, self.start("a1", "no-such-definition"))

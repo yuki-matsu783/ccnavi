@@ -14,13 +14,8 @@ import os
 import shutil
 import time
 import unittest
-from unittest import mock
 
-from ccnavi.hook import subagent
-from ccnavi.infra import settings
-from ccnavi.tickets.approval import store as approval
-from ccnavi.tickets.lifecycle import stop as ops_stop
-from ccnavi.tickets.lifecycle import stop_request as ops_stop_request
+from tests import script_command
 from tests.ticket import test_stop_nudge as base
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
@@ -38,6 +33,15 @@ def load_tests(loader, tests, pattern):
             if name.startswith("test_"):
                 suite.addTest(cls(name))
     return suite
+
+
+# 実行中のサブエージェントの印を、古いと数えるまでの長さ（既定の 4 時間）。
+RUNNING_MAX_SECONDS = 4 * 3600
+
+
+def nudge_path(state: str, session: str) -> str:
+    """促した（チケット, HEAD）の記録。セッションごとに置く。"""
+    return os.path.join(state, f"nudged-{session}.json")
 
 
 class RequestNudgeTest(base.StopNudgeTest):
@@ -72,7 +76,7 @@ class RequestNudgeTest(base.StopNudgeTest):
     def test_open_children_are_asked_to_finish_once_from_the_parent(self):
         self.family()
         reason = self.asked(self.stop(self.parent_tree))
-        ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
+        ticket_sh = script_command(self.root, "ccnavi-ticket.sh")
         self.assertIn("i0001-01-01, i0001-01-02", reason)
         self.assertIn(f"`{ticket_sh} finish i0001-01-01`", reason)
         self.assertIn(f"`{ticket_sh} finish i0001-01-02`", reason)
@@ -112,9 +116,9 @@ class RequestNudgeTest(base.StopNudgeTest):
     def test_closed_children_are_asked_to_merge_then_request(self):
         self.family(plan=["work-mr"])
         self.close_children()
-        review_sh = settings.script_command(self.root, "ccnavi-review.sh")
-        git_sh = settings.script_command(self.root, "ccnavi-git.sh")
-        ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
+        review_sh = script_command(self.root, "ccnavi-review.sh")
+        git_sh = script_command(self.root, "ccnavi-git.sh")
+        ticket_sh = script_command(self.root, "ccnavi-ticket.sh")
         # 子 1 は親に合流した記録が無い（合流は finish が済ませる。ここは確かめを促すだけ）。
         reason = self.asked(self.stop(self.parent_tree))
         self.assertIn("レビューの依頼（review-request）がまだです", reason)
@@ -238,29 +242,6 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.assertNotIn(CODE, result.stdout)
         self.assertIn("NUDGE_STOP_RULE", result.stdout)
 
-    def test_a_parent_worktree_that_cannot_be_settled_means_no_nudge(self):
-        """置き場が決まらない（`NoParentWorktree`）親は、例外を出さずに促しの対象から外す。"""
-        self.family()
-        self.close_children()
-        conf, _ = settings.load(self.root)
-        self.assertIsNotNone(ops_stop_request.pending_at_stop(self.root, conf, self.parent_tree))
-        with mock.patch.object(
-            approval, "home_dir", side_effect=approval.NoParentWorktree("決まらない")
-        ):
-            self.assertIsNone(ops_stop_request.pending_at_stop(self.root, conf, self.parent_tree))
-
-    def test_a_writer_without_a_settled_parent_worktree_stops_with_one_line(self):
-        """書く側は、置き場が決まらなければ traceback ではなく 1 行の理由で止まる（終了 1）。"""
-        self.family()
-        self.commit_work(self.child_tree())
-        with mock.patch.object(
-            approval, "home_dir", side_effect=approval.NoParentWorktree("決まらない")
-        ):
-            result = self.ccnavi("ticket", "finish", "i0001-01-01")
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertNotIn("Traceback", result.stderr)
-        self.assertIn("ccnavi: 親のワークツリーが決まらないので止めた: 決まらない。", result.stderr)
-
     # ---- 止めない回
 
     def test_the_workspace_root_and_a_worktree_without_a_ticket_are_not_asked(self):
@@ -283,9 +264,7 @@ class RequestNudgeTest(base.StopNudgeTest):
     def test_a_record_that_cannot_be_written_means_no_nudge(self):
         """記録を残せないまま止めると、終えるたびに止まる。止めない側を採る。"""
         self.family()
-        os.makedirs(
-            ops_stop.nudge_path(self.state, "s1")
-        )  # 記録のファイルの場所をディレクトリで塞ぐ
+        os.makedirs(nudge_path(self.state, "s1"))  # 記録のファイルの場所をディレクトリで塞ぐ
         for _ in range(2):
             result = self.stop(self.parent_tree)
             self.assert_not_asked(result)
@@ -307,7 +286,7 @@ class RequestNudgeTest(base.StopNudgeTest):
     # ---- 実行中のサブエージェントが居る間は、委任して待つ回なので止めない
 
     def running_file(self, agent, session="s1"):
-        return subagent._running_path(self.state, session, agent)
+        return os.path.join(self.state, f"subagent-{session}-{agent}.running")
 
     def start_agent(self, agent, cwd=None, session="s1"):
         result = self.hook(
@@ -366,11 +345,11 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.family()
         self.start_agent("a1")
         path = self.running_file("a1")
-        old = int(time.time()) - subagent.RUNNING_MAX_SECONDS - 60
+        old = int(time.time()) - RUNNING_MAX_SECONDS - 60
         write(path, f"session s1\n{old}\n")
         self.asked(self.stop(self.parent_tree))
         # 限りの内側なら数える。
-        write(path, f"session s1\n{int(time.time()) - subagent.RUNNING_MAX_SECONDS + 600}\n")
+        write(path, f"session s1\n{int(time.time()) - RUNNING_MAX_SECONDS + 600}\n")
         self.assert_not_asked(self.stop(self.parent_tree, session="s1", extra=()))
 
     def test_a_broken_mark_holds_the_nudge_until_it_is_old(self):
@@ -379,7 +358,7 @@ class RequestNudgeTest(base.StopNudgeTest):
         path = self.running_file("a1")
         write(path, "")
         self.assert_not_asked(self.stop(self.parent_tree))
-        old = time.time() - subagent.RUNNING_MAX_SECONDS - 60
+        old = time.time() - RUNNING_MAX_SECONDS - 60
         os.utime(path, (old, old))
         self.asked(self.stop(self.parent_tree))
         write(path, "session s1\nnot-a-number\n")
@@ -404,7 +383,7 @@ class RequestNudgeTest(base.StopNudgeTest):
             self.assertFalse(os.path.exists(self.running_file("a1")), source)
             self.asked(self.stop(self.parent_tree))
             # 次の回の前提を揃える（促しの記録を破棄する）。
-            os.remove(ops_stop.nudge_path(self.state, "s1"))
+            os.remove(nudge_path(self.state, "s1"))
 
     def test_startup_and_resume_keep_the_mark_of_a_session_with_the_same_prefix(self):
         self.family()

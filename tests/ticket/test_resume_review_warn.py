@@ -15,11 +15,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import replace
 
-from ccnavi.infra import settings
-from ccnavi.tickets.approval import store as approval
-from ccnavi.tickets.phase import gates as phase
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import write
 from tests.ticketsample import child_text
@@ -197,14 +193,3 @@ class ResumedReviewWarnTest(PhaseHarness):
         self.setup_child("research", True, marker=False)
         self.assertNotIn(MARKER_WORDS, self.lint())
         self.assertNotIn(MARKER_WORDS, self.status_of_child())
-
-    # ---- 6. 呼び手に頼らず、閉じた子には言わない
-
-    def test_resumed_review_is_empty_for_a_closed_child_when_called_directly(self):
-        self.setup_child("design", True, marker=True)
-        conf, _ = settings.load(self.root)
-        doing, _ = approval.scan(conf, self.root)
-        child = next(t for t in doing if t.ticket == "i0001-01-01")
-        self.assertIn(MARKER_WORDS, phase.resumed_review(self.root, conf, child))
-        closed = replace(child, state="done")
-        self.assertEqual(phase.resumed_review(self.root, conf, closed), "")

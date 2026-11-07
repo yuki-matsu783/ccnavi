@@ -16,7 +16,7 @@ import os
 import shutil
 import unittest
 
-from ccnavi.infra import settings
+from tests import script_command, shell_path
 from tests.ticket import test_stop_nudge as base
 from tests.ticket.test_ticket import git, write
 
@@ -120,8 +120,8 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         path = self.direct(commit=True)
         self.record()
         reason = self.asked(self.stop(path))
-        git_sh = settings.script_command(self.root, "ccnavi-git.sh")
-        cd = f"cd {settings.shell_path(self.root)} && {git_sh}"
+        git_sh = script_command(self.root, "ccnavi-git.sh")
+        cd = f"cd {shell_path(self.root)} && {git_sh}"
         self.assertIn(f"`{cd} integrate scratch`", reason)
         self.assertIn(f"`{cd} integrate-done scratch -m '<メッセージ>'`", reason)
         self.assertIn(f"`{cd} integrate --abort scratch`", reason)
@@ -221,8 +221,8 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         reason = self.asked(self.stop(path))
         self.assertIn("未コミットの変更", reason)
         self.assertIn("先にコミットしてください", reason)
-        work = settings.shell_path(path)
-        git_sh = settings.script_command(self.root, "ccnavi-git.sh")
+        work = shell_path(path)
+        git_sh = script_command(self.root, "ccnavi-git.sh")
         self.assertIn(f"`cd {work} && {git_sh} commit -m '<メッセージ>'`", reason)
 
     def test_the_record_stops_the_hook_from_doing_anything(self):
@@ -342,8 +342,6 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         self.asked(off)
 
     def test_a_running_subagent_defers_the_nudge_without_using_it_up(self):
-        from ccnavi.hook import subagent
-
         path = self.direct(commit=True)
         start = {
             "hook_event_name": "SubagentStart",
@@ -353,7 +351,12 @@ class IntegrateNudgeTest(base.StopNudgeTest):
             "agent_type": "general-purpose",
         }
         self.assertEqual(self.ccnavi("--mode", "enable", stdin=json.dumps(start)).returncode, 0)
-        self.assertTrue(subagent.running(self.state, "s1"))
+        self.assertTrue(
+            any(
+                n.startswith("subagent-s1-") and n.endswith(".running")
+                for n in os.listdir(self.state)
+            )
+        )
         self.assert_not_asked(self.stop(path))
         stop = dict(start, hook_event_name="SubagentStop")
         self.assertEqual(self.ccnavi("--mode", "enable", stdin=json.dumps(stop)).returncode, 0)

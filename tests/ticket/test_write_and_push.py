@@ -25,20 +25,19 @@ from __future__ import annotations
 import json
 import os
 
-from ccnavi.tickets.approval import write_and_push
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_standing import AuthorityHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text, parent_text
 
 APPROVED = ".ccnavi/approved"
+# `write-and-push` の答えの 1 行目（形の版）。
+HEAD = "write-and-push 1"
 
 
 def lines(out):
     return dict(
-        (line.split(" ", 1) + [""])[:2]
-        for line in out.splitlines()
-        if line and line != write_and_push.HEAD
+        (line.split(" ", 1) + [""])[:2] for line in out.splitlines() if line and line != HEAD
     )
 
 
@@ -46,7 +45,7 @@ class FamilyTest(AuthorityHarness):
     def ask(self, ident):
         result = self.ccnavi("write-and-push", "family", ident)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(result.stdout.splitlines()[0], write_and_push.HEAD)
+        self.assertEqual(result.stdout.splitlines()[0], HEAD)
         return lines(result.stdout)
 
     def test_a_family_without_origin_is_not_a_target(self):
@@ -118,7 +117,7 @@ class SortTest(AuthorityHarness):
     def sort(self, since=""):
         result = self.ccnavi("write-and-push", "sort", "i0001", *([since] if since else []))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(result.stdout.splitlines()[0], write_and_push.HEAD)
+        self.assertEqual(result.stdout.splitlines()[0], HEAD)
         self.last_why = [line[4:] for line in result.stdout.splitlines() if line.startswith("why ")]
         return sorted(
             tuple(line.split(" ", 1))

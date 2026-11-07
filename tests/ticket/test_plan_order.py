@@ -2,18 +2,18 @@
 
 VS Code の計画編集タブが打つ経路。タブは図で引いた線（元の番号での直接の先行）を
 `--order` に付けて実行ファイルに渡し、実行ファイルが番号を振り直して答える。保存では
-`--write --expect <ハッシュ>` で提案の計画を書き換える。見るのは 8 つ。
+`--write --expect <ハッシュ>` で提案の計画を書き換える。見るのは 5 つ。
 
-1. 番号の振り直しの決まり。見本の表（tests/fixtures/plan-reorder.json）は拡張と共有する
-2. `--plan-order <親> --json` は読むだけ。`--order` を付ければ振り直した答えを返す
-3. `--order` の形の誤りは使い方の誤り。循環・子が承認された番号へ入る線・詰められない線は断る
-4. `--write` は親の提案の `plan:` / `feedback:` の値だけを書き換え、ほかのバイトを変えない。
+1. `--plan-order <親> --json` は読むだけ。`--order` を付ければ振り直した答えを返す
+2. `--order` の形の誤りは使い方の誤り。循環・子が承認された番号へ入る線・詰められない線は断る
+3. `--write` は親の提案の `plan:` / `feedback:` の値だけを書き換え、ほかのバイトを変えない。
    `--expect` が今の中身と違う・順序の検査に error がある・断った線なら何も書かない
-5. 改版では子が承認された番号を動かさず、改版の錠に落ちる形は書かない
-6. 書き換えたあとの一覧で承認が通り、書き換えの前のダイジェストでは止まる。`--agree --preview
+4. 改版では子が承認された番号を動かさず、改版の錠に落ちる形は書かない
+5. 書き換えたあとの一覧で承認が通り、書き換えの前のダイジェストでは止まる。`--agree --preview
    --json` の `plans` は `--plan-order <親> --json` と同じ関数で作る
-7. エージェントが打っても組み込みの止めにヒットしない
-8. 承認を渡す文は、計画を持つ親とその子に「番号は承認済みチケットで読み直す」と添える
+
+番号の振り直しの決まり（拡張と共有する見本の表 tests/fixtures/plan-reorder.json）と、承認を渡す文は
+go/internal/tickets/proposal の planedit と agree が見る。
 """
 
 from __future__ import annotations
@@ -24,15 +24,11 @@ import unittest
 
 import yaml
 
-from ccnavi.tickets.model import phase_forms, ticket_model
-from ccnavi.tickets.model import ticket as ticket_mod
-from ccnavi.tickets.proposal import agree_candidates, agree_screen, plan_order
 from tests.ticket.test_board import _portable
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, write
 from tests.ticketsample import child_text, parent_text
 
-PLAN_REORDER = os.path.join(ROOT, "tests", "fixtures", "plan-reorder.json")
 # VS Code 拡張の計画編集タブが読む `--plan-order` の答えの実例。
 PLAN_ORDER_FIXTURE = os.path.join(
     ROOT, "extensions", "vscode", "ccnavi-board", "test", "fixtures", "plan-order.json"
@@ -44,142 +40,8 @@ PLAN3 = ["research", {"type": "design", "after": [1]}, {"type": "implement", "af
 REVERSE = {"plan": {"1": [2], "2": [], "3": [1]}}
 
 
-def parsed(plan, feedback=None):
-    """計画のステップ（見本の表の形）を持つ親を読む。"""
-    front = {"version": 1, "ticket": "i0001", "plan": plan}
-    if feedback is not None:
-        front["feedback"] = feedback
-    front["title"] = "親"
-    front["allow"] = [{"match": "Write|Edit", "glob": "src/*"}]
-    text = "---\n" + yaml.safe_dump(front, allow_unicode=True, sort_keys=False) + "---\n本文\n"
-    t, problems = ticket_mod.parse(text)
-    assert t is not None, problems
-    return t
-
-
 def front_of(text: str) -> dict:
     return yaml.safe_load(text.split("---\n", 2)[1])
-
-
-class ReorderTableTest(unittest.TestCase):
-    """1. 番号の振り直しの決まりを、見本の表で固定する。"""
-
-    def test_the_table(self):
-        with open(PLAN_REORDER, encoding="utf-8") as f:
-            cases = json.load(f)["cases"]
-        self.assertTrue(cases)
-        for case in cases:
-            with self.subTest(case=case["name"]):
-                t = parsed(case["plan"], case.get("feedback"))
-                order, why = plan_order.parse_order(json.dumps(case["order"]), t)
-                self.assertEqual(why, "")
-                got = plan_order.renumber(t, order, set(case.get("fixed", [])))
-                if "refused" in case:
-                    self.assertEqual([r.kind for r in got.refused], [case["refused"]])
-                    continue
-                self.assertEqual(got.refused, [])
-                expect = case["expect"]
-                self.assertEqual([i.as_raw() for i in got.plan], expect["plan"])
-                if "feedback" in expect:
-                    self.assertEqual([i.as_raw() for i in got.feedback], expect["feedback"])
-                back = {new: old for old, new in got.moved.items()}
-                self.assertEqual([back[n] for n in range(1, len(back) + 1)], expect["from"])
-
-    def test_without_order_nothing_moves(self):
-        t = parsed(PLAN3)
-        got = plan_order.renumber(t, None, set())
-        self.assertEqual(got.refused, [])
-        self.assertEqual(got.moved, {1: 1, 2: 2, 3: 3})
-        self.assertEqual([i.as_raw() for i in got.plan], PLAN3)
-
-
-class OrderShapeTest(unittest.TestCase):
-    """3. `--order` の形の誤り。"""
-
-    def test_bad_orders_are_named(self):
-        t = parsed(PLAN3, ["implement-feedback"])
-        for text, word in (
-            ("[", "JSON"),
-            ("[]", "plan"),
-            ('{"steps": {}}', "steps"),
-            ('{"plan": []}', "plan"),
-            ('{"plan": {"x": []}}', "x"),
-            ('{"plan": {"4": []}}', "4"),
-            ('{"plan": {"2": [2]}}', "自分"),
-            ('{"plan": {"2": [9]}}', "9"),
-            ('{"plan": {"2": [true]}}', "True"),
-            ('{"plan": {"2": ["1"]}}', "'1'"),
-            ('{"plan": {"2": 1}}', "リスト"),
-            ('{"feedback": {"4": [1]}}', "1"),
-            ('{"feedback": {"3": []}}', "3"),
-            ('{"plan": {"\u00b2": []}}', "\u00b2"),
-            ('{"plan": {"\uff10": []}}', "\uff10"),
-            ("[" * 100000 + "]" * 100000, "JSON"),
-        ):
-            with self.subTest(order=text[:40]):
-                order, why = plan_order.parse_order(text, t)
-                self.assertIsNone(order)
-                self.assertIn(word, why)
-
-    def test_feedback_is_refused_when_the_proposal_has_none(self):
-        order, why = plan_order.parse_order('{"feedback": {}}', parsed(PLAN3))
-        self.assertIsNone(order)
-        self.assertIn("feedback", why)
-
-    def test_repeated_numbers_are_folded(self):
-        order, why = plan_order.parse_order('{"plan": {"3": [1, 1, 2]}}', parsed(PLAN3))
-        self.assertEqual(why, "")
-        self.assertEqual(order["plan"][3], [1, 2])
-
-
-class LockMovedTest(unittest.TestCase):
-    """5. 延期の引き受け手は、元のステップの同一性（振り直す前の番号）で比べる。"""
-
-    def test_a_moved_deferred_item_is_compared_with_its_own_target(self):
-        # 承認済み: 1 の延期は 3 が引き受ける。3 には子がある（固定）。
-        current = parsed(
-            [
-                "research",
-                {"type": "design", "deferred": True},
-                {"type": "implement", "after": [1, 2]},
-            ]
-        )
-        # 振り直しで 1 と 2 が入れ替わった。引き受け手は同じ 3。
-        revised = parsed(
-            [
-                {"type": "design", "deferred": True},
-                "research",
-                {"type": "implement", "after": [1, 2]},
-            ]
-        )
-        moved = {1: 2, 2: 1, 3: 3}
-        with_moved = agree_candidates.lock_problems(revised, current, {3}, moved)
-        self.assertFalse(any("延期" in p.detail for p in with_moved), with_moved)
-        by_number = agree_candidates.lock_problems(revised, current, {3})
-        self.assertTrue(any("延期" in p.detail for p in by_number), by_number)
-
-
-class ApprovedTextTest(unittest.TestCase):
-    """8. 承認を渡す文。"""
-
-    def test_a_parent_with_a_plan_and_its_children_are_told_to_reread_the_numbers(self):
-        parent = ticket_model.Ticket(ticket="i0001", plan=[ticket_model.PlanItem("design")])
-        child = ticket_model.Ticket(ticket="i0001-01-01", parent="i0001", phase=1)
-        for tickets in ([parent], [child]):
-            with self.subTest(tickets=[t.ticket for t in tickets]):
-                text = agree_screen.approved_text(tickets, set(), "/w")
-                self.assertIn("番号は承認済みチケットで読み直す", text)
-
-    def test_a_parent_without_a_plan_is_not_told(self):
-        parent = ticket_model.Ticket(ticket="i0001")
-        text = agree_screen.approved_text([parent], set(), "/w")
-        self.assertNotIn("読み直す", text)
-
-    def test_says_approval_is_done_and_where_to_check_state(self):
-        parent = ticket_model.Ticket(ticket="i0001")
-        text = agree_screen.approved_text([parent], set(), "/w")
-        self.assertIn("承認を頼み直さない", text)
-        self.assertIn("ccnavi-ticket.sh status' で状況は分かる", text)
 
 
 class PlanOrderHarness(PhaseHarness):
@@ -340,19 +202,6 @@ class PlanOrderJsonTest(PlanOrderHarness):
             "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], False)
         )
         self.assertNotEqual(self.body()["source_sha"], before)
-
-    def test_the_agent_may_type_plan_order(self):
-        """7. `--agree` の外の独立したフラグなので、組み込みの止めにヒットしない。"""
-        rule = phase_forms.ticket_approval_rule("", self.root)
-        order = json.dumps(REVERSE)
-        for command in (
-            "ccnavi --plan-order i0001 --json",
-            f"ccnavi --plan-order i0001 --json --order '{order}'",
-            f".ccnavi/bin/ccnavi --plan-order i0001 --order '{order}' --expect abc --write",
-        ):
-            with self.subTest(command=command):
-                self.assertIsNone(rule.compiled.search(command))
-                self.assertEqual(phase_forms.human_path_form(command), ("", ""))
 
 
 class PlanOrderAfterErrorsTest(PlanOrderHarness):
@@ -594,42 +443,12 @@ class PlanOrderUnpackableTest(PlanOrderHarness):
         # 2 番が固定した 1 番に先行する線は、子が承認された番号へ入る線なので断る。
         locked = self.body("--order", json.dumps({"plan": {"1": [2], "3": [1, 2]}}))
         self.assertEqual([r["kind"] for r in locked["refused"]], ["locked"])
-        # 詰められない形は見本の表（tests/fixtures/plan-reorder.json）が見る。
-        t = parsed(
-            [
-                "research",
-                {"type": "design", "after": [1]},
-                {"type": "acceptance", "after": [1]},
-                {"type": "implement", "after": [2, 3]},
-            ]
-        )
-        order, _ = plan_order.parse_order('{"plan": {"2": [1, 3], "3": [1], "4": [2, 3]}}', t)
-        got = plan_order.renumber(t, order, {1, 3})
-        self.assertEqual([r.kind for r in got.refused], ["unpackable"])
-        self.assertIn("詰められない", got.refused[0].text)
+        # 詰められない形は見本の表（tests/fixtures/plan-reorder.json）を Go の planedit が見る。
 
 
 def with_predecessors(text: str, preds: list[str]) -> str:
     """子の本文に `predecessors:` を足す。"""
     return text.replace("human_review:", f"predecessors: [{', '.join(preds)}]\nhuman_review:", 1)
-
-
-class ChildRetargetTableTest(unittest.TestCase):
-    """子の付け替えの決まり（見本の表の `children` のある例）。"""
-
-    def test_the_table(self):
-        with open(PLAN_REORDER, encoding="utf-8") as f:
-            cases = [c for c in json.load(f)["cases"] if "children" in c]
-        self.assertTrue(cases)
-        for case in cases:
-            with self.subTest(case=case["name"]):
-                t = parsed(case["plan"], case.get("feedback"))
-                order, _ = plan_order.parse_order(json.dumps(case["order"]), t)
-                got = plan_order.renumber(t, order, set(case.get("fixed", [])))
-                self.assertEqual(
-                    plan_order.retarget("i0001", got.moved, case["children"]),
-                    case["expect"]["children"],
-                )
 
 
 class PlanOrderChildrenTest(PlanOrderHarness):
@@ -748,23 +567,20 @@ class PlanOrderChildrenTest(PlanOrderHarness):
         self.assertEqual(self.snapshot(), before)
 
     def test_a_failure_part_way_puts_everything_back(self):
-        from unittest import mock
-
-        from ccnavi.infra import fsio
-
+        """子の提案を書いたあとで落ちたら（下書きの付け替え先がディレクトリで塞がれている）、
+        書いたものを全部戻す。"""
+        drafts = os.path.join(os.path.dirname(os.path.dirname(self.todo("i0001"))), "flows")
+        os.makedirs(os.path.join(drafts, "i0001-02-01.yml"))
+        write(os.path.join(drafts, "i0001-02-01.yml", "keep"), "k\n")
+        write(os.path.join(drafts, "i0001-01-01.yml"), "nodes: [a]\n")
         before = self.snapshot()
-        real = fsio.write_bytes_atomic
-        parent = os.path.realpath(self.todo("i0001"))
-
-        def failing(path, content):
-            if os.path.realpath(path) == parent and content != before["i0001.md"]:
-                return "書けない（テスト）"
-            return real(path, content)
-
-        with mock.patch.object(fsio, "write_bytes_atomic", failing):
-            result = self.write_order(REVERSE)
+        result = self.write_order(REVERSE)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("書いたものは戻した", result.stdout + result.stderr)
         self.assertEqual(self.snapshot(), before)
+        with open(os.path.join(drafts, "i0001-01-01.yml"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "nodes: [a]\n")
+        self.assertTrue(os.path.isfile(os.path.join(drafts, "i0001-02-01.yml", "keep")))
 
     def test_an_approved_ticket_pointing_at_a_moved_child_writes_nothing(self):
         before = self.snapshot()
@@ -790,29 +606,6 @@ class PlanOrderChildrenTest(PlanOrderHarness):
         self.assertTrue(any("review/" in p for p in body["child_problems"]), body)
         self.assertEqual(self.write_order(REVERSE).returncode, 1)
         self.assertEqual(self.snapshot(), before)
-
-    def test_a_proposal_changed_while_writing_writes_nothing(self):
-        from unittest import mock
-
-        expect = self.body()["source_sha"]
-        real = plan_order.rebuilt
-        changed = self.c.replace("本文", "別の本文")
-
-        def racing(ans):
-            out = real(ans)
-            with open(self.todo("i0001-03-01"), "w", encoding="utf-8") as f:
-                f.write(changed)
-            return out
-
-        before = self.snapshot()
-        with mock.patch.object(plan_order, "rebuilt", racing):
-            result = self.write_order(REVERSE, expect)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("外で変わった", result.stderr)
-        after = self.snapshot()
-        self.assertEqual(after["i0001-03-01.md"], changed.encode())
-        del before["i0001-03-01.md"], after["i0001-03-01.md"]
-        self.assertEqual(after, before)
 
     def test_a_flow_draft_moves_with_its_child(self):
         drafts = os.path.join(os.path.dirname(os.path.dirname(self.todo("i0001"))), "flows")

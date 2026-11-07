@@ -308,3 +308,39 @@ def put_messages(root: str) -> str:
     target = os.path.join(root, ".ccnavi", "messages")
     _shutil.copytree(MESSAGES, target, dirs_exist_ok=True)
     return target
+
+
+# 文面に置くパスを引用せずに書ける字（実行ファイルの案内と同じ決め方）。
+_BARE_PATH = r"[^\s'\"\\$`!*?\[\]{}()<>|&;#~]+"
+_SPECIAL_IN_DOUBLE_QUOTES = r'["\\$`!]'
+
+
+def _quoted(path: str) -> str:
+    """要るときだけ引用する。まず `"…"`、`"` の中でも意味を持つ字があるときは `'…'`。"""
+    import re
+    import shlex
+
+    if re.fullmatch(_BARE_PATH, path):
+        return path
+    if not re.search(_SPECIAL_IN_DOUBLE_QUOTES, path):
+        return f'"{path}"'
+    return shlex.quote(path)
+
+
+def script_command(root: str, name: str) -> str:
+    """文面が案内する `.ccnavi/scripts/` の sh の打ち方（`sh <ルートの実パス>/.ccnavi/scripts/<name>`）。
+
+    区切りは `/`。空白やシェルの記号を含むときだけ引用する。実行ファイルの書き方と食い違えば、
+    案内の文を比べるテストが落ちる。
+    """
+    base = os.path.realpath(root).replace("\\", "/").rstrip("/")
+    return f"sh {_quoted(f'{base}/{_PROJECT_HOME}/scripts/{name}')}"
+
+
+def shell_path(path: str) -> str:
+    """文面が `cd <パス> && …` の形で案内するパス。区切りは Windows のパスだけ `/` に揃える。"""
+    import re
+
+    if os.name == "nt" or re.match(r"[A-Za-z]:\\", path):
+        path = path.replace("\\", "/")
+    return _quoted(path)

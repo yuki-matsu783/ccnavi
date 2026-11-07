@@ -1,4 +1,4 @@
-"""親を閉じたときのワークツリーとブランチの片付け（`tickets/lifecycle/retire.py`）。
+"""親を閉じたときのワークツリーとブランチの片付け（`worktree retire` と `sync`）。
 
 見るのは 3 つ。
 
@@ -15,8 +15,6 @@ from __future__ import annotations
 import json
 import os
 
-from ccnavi.infra import settings
-from ccnavi.tickets.lifecycle import retire
 from tests.ticket.test_archive import ReadyHarness
 from tests.ticket.test_ticket import git, write
 
@@ -369,23 +367,6 @@ class NoteTest(RetireHarness):
         self.assertIn("読めない閉じたチケットがあり", done.stderr, done.stderr)
         self.assertFalse(os.path.exists(self.record))
 
-    def test_a_missing_state_place_is_a_failure_reason(self):
-        conf, _ = settings.load(self.root)
-        conf.state = ""
-        reason = retire.note(self.root, conf, "i0001", "", "", 7)
-        self.assertIn("state の置き場が空", reason)
-
-    def test_an_empty_new_mr_keeps_the_previous_one(self):
-        self.closed_and_pushed()
-        conf, _ = settings.load(self.root)
-        self.assertEqual(retire.note(self.root, conf, "i0001", "", self.parent_tree, None), "")
-        self.assertEqual(self.read_record()["mr"], 7)
-        self.assertEqual(retire.note(self.root, conf, "i0001", "", self.parent_tree, 9), "")
-        self.assertEqual(self.read_record()["mr"], 9)
-        self.assertEqual(
-            [c["ticket"] for c in self.read_record()["children"]], [CHILD], "子の一覧は保つ"
-        )
-
 
 class RetiredEntriesTest(RetireHarness):
     """`ccnavi sync retired`（片付けの列挙元）。"""
@@ -589,15 +570,6 @@ class BrokenSiblingRecordTest(CancelledChildTest):
 class CaseFoldTest(CancelledChildTest):
     """大文字小文字だけが違う名前は同じものとして扱う（Linux でも）。"""
 
-    def conf(self):
-        conf, _ = settings.load(self.root)
-        return conf
-
-    def test_the_record_is_found_by_a_name_that_differs_only_in_case(self):
-        self.assertEqual(retire.record_path(self.conf(), "I0001"), self.record)
-        # 無いときは与えた名前のまま組む
-        self.assertTrue(retire.record_path(self.conf(), "I0777").endswith("I0777.json"))
-
     def test_abandon_with_another_spelling_keeps_the_record_while_the_worktree_stays(self):
         refused = self.ccnavi("--cwd", self.root, "worktree", "retire", "--abandon", "I0001")
         self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
@@ -626,11 +598,3 @@ class CaseFoldTest(CancelledChildTest):
         write(self.record, json.dumps(held))
         done = self.retire("branch", "i0001-01-09", "confirmed")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-
-    def test_the_archived_mr_is_read_from_a_copy_in_another_spelling(self):
-        from ccnavi.entry import sh_ask
-
-        path = os.path.join(self.root, "logs", "archive", "self", "done", "I0042.md")
-        write(path, "---\nversion: 1\nticket: I0042\nmr: 42\n---\n")
-        self.assertEqual(sh_ask._archived_mr(self.root, "", "i0042"), "42")
-        self.assertEqual(sh_ask._archived_mr(self.root, "", "i0043"), "")

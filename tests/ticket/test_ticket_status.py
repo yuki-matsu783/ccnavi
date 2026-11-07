@@ -18,17 +18,17 @@
 from __future__ import annotations
 
 import os
+import tempfile
 import unittest
-from unittest import mock
 
-from ccnavi.tickets.approval import write_and_push
-from ccnavi.tickets.model import ticket_fields
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
-from tests.ticketsample import child_text, parent_text
+from tests.ticketsample import child_text, parent_text, set_fields
 
 
-class TicketStatusTest(PhaseHarness):
+class StatusHarness(PhaseHarness):
+    """`ticket status` を読む道具。テストは持たない。"""
+
     def status(self, *args):
         result = self.ccnavi("ticket", "status", *args)
         return result
@@ -60,6 +60,8 @@ class TicketStatusTest(PhaseHarness):
             end += 1
         return "\n".join(lines[start:end])
 
+
+class TicketStatusTest(StatusHarness):
     def test_an_unfinished_operation_is_listed_even_without_open_tickets(self):
         begun = self.ccnavi("ops", "begin", "comment", "p1", "0", "7", "k", "comment:comment")
         self.assertEqual(begun.returncode, 0, begun.stdout + begun.stderr)
@@ -72,7 +74,8 @@ class TicketStatusTest(PhaseHarness):
         self.assertIn("dry-run のときに止めるもの", out)
         self.assertIn("判定に達せなかったとき", out)
         self.assertIn(
-            "Write・Edit・MultiEdit・NotebookEdit・Agent・Task: enable は止める、dry-run は止める", out
+            "Write・Edit・MultiEdit・NotebookEdit・Agent・Task: enable は止める、dry-run は止める",
+            out,
         )
 
     def test_lint_reports_an_unfinished_operation(self):
@@ -113,25 +116,6 @@ class TicketStatusTest(PhaseHarness):
         self.assertEqual(self.write_and_push_target("i0001"), "yes")
         mine = self.block(self.said("i0001"), "i0001")
         self.assertIn("ユーザがコミットして push するまで start は実行できません", mine)
-        self.assertNotIn("start へ進んでよい", mine)
-        self.assertNotIn("ccnavi-ticket.sh start", mine)
-
-    def test_a_family_write_and_push_stops_names_the_reason_and_does_not_say_go(self):
-        # ここだけは write-and-push の見分けを差し替える。本物の状態で「write-and-push
-        # が止める」を作ると、
-        # 立ち位置の側（親のワークツリーが無い・別のブランチに居るなど）が先に
-        # 止まる理由を持ち、status はそちらを言ってこの行を出さない（同じ理由を 2 度言わない）。
-        # 立ち位置が止めずに write-and-push だけが止める本物の形は、親のワークツリーのパスに改行が
-        # ある場合だけで、Windows ではそのパスを作れない。
-        self.by_hand(text=parent_text("i0001", ["research", "design"]))
-        stop = (write_and_push.TARGET_STOP, "親のワークツリーが決まらない", None)
-        with mock.patch.object(write_and_push, "target", return_value=stop):
-            mine = self.block(self.said("i0001"), "i0001")
-        self.assertIn(
-            "止まっている理由: write-and-push では状態の操作を実行できません: "
-            "親のワークツリーが決まらない",
-            mine,
-        )
         self.assertNotIn("start へ進んでよい", mine)
         self.assertNotIn("ccnavi-ticket.sh start", mine)
 
@@ -269,7 +253,7 @@ class TicketStatusTest(PhaseHarness):
         )
         with open(done, encoding="utf-8") as f:
             text = f.read()
-        write(done, ticket_fields.set_fields(text, {"merged_sha": "0123456789ab" * 3}))
+        write(done, set_fields(text, {"merged_sha": "0123456789ab" * 3}))
         child = self.block(self.said("i0001"), "i0001-01-01")
         self.assertRegex(child, r"閉じ方: 完了（[^）]*、合流 0123456789ab）")
 
@@ -289,6 +273,37 @@ class TicketStatusTest(PhaseHarness):
     def test_nothing_open_says_so(self):
         out = self.said()
         self.assertIn("チケットはありません。", out)
+
+
+@unittest.skipIf(os.name == "nt", "改行を含むパスは Windows では作れない")
+class WriteAndPushStopTest(StatusHarness):
+    """立ち位置は止めずに write-and-push だけが止める本物の形。
+
+    親のワークツリーのパスに改行がある。
+    """
+
+    def setUp(self):
+        base = tempfile.mkdtemp(prefix="ccnavi-status-\nline-")
+        self.addCleanup(__import__("shutil").rmtree, base, ignore_errors=True)
+        saved = tempfile.tempdir
+        tempfile.tempdir = base
+        try:
+            super().setUp()
+        finally:
+            tempfile.tempdir = saved
+
+    def test_a_family_write_and_push_stops_names_the_reason_and_does_not_say_go(self):
+        self.by_hand(text=parent_text("i0001", ["research", "design"]))
+        git(self.parent_tree, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
+        self.assertEqual(self.write_and_push_target("i0001"), "stop")
+        mine = self.block(self.said("i0001"), "i0001")
+        self.assertIn(
+            "止まっている理由: write-and-push では状態の操作を実行できません: "
+            "親のワークツリーのパスに改行がある",
+            mine,
+        )
+        self.assertNotIn("start へ進んでよい", mine)
+        self.assertNotIn("ccnavi-ticket.sh start", mine)
 
 
 if __name__ == "__main__":

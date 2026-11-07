@@ -74,6 +74,40 @@ def begin(
     return op_id
 
 
+def record_path(state: str, op_id: str) -> str:
+    return os.path.join(state, "ops", f"{op_id}.json")
+
+
+def ids(state: str) -> list[str]:
+    """置いてある記録の操作ID（書いた順）。"""
+    directory = os.path.join(state, "ops")
+    try:
+        names = os.listdir(directory)
+    except OSError:
+        return []
+    found = [
+        (os.path.getmtime(os.path.join(directory, name)), name[: -len(".json")])
+        for name in names
+        if name.endswith(".json")
+    ]
+    return [op_id for _, op_id in sorted(found)]
+
+
+def load(state: str, op_id: str) -> dict[str, Any] | None:
+    """記録を読む。無ければ None。"""
+    try:
+        with open(record_path(state, op_id), encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+
+
+def save(state: str, record: dict[str, Any]) -> None:
+    """記録を書き戻す（試験の準備で段階や適用の欄を書き換えたあと）。"""
+    with open(record_path(state, record["id"]), "w", encoding="utf-8", newline="\n") as f:
+        f.write(json.dumps(record, ensure_ascii=False, indent=1) + "\n")
+
+
 def main(argv: list[str]) -> int:
     state, plan_path, spec_path = argv
     with open(spec_path, encoding="utf-8") as f:

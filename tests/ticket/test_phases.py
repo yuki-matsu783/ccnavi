@@ -23,7 +23,6 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi.tickets.model import ticket_model
 from tests import can_case_sensitive, common_path, config_path, userform, write_and_push_flag
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import ROOT, git, read_json, write
@@ -108,7 +107,7 @@ class PhaseHarness(unittest.TestCase):
         if agent_id:
             payload["agent_id"] = agent_id
         # Claude Code 側の権限モード。どのルールも言及しない呼び出しの結末がこれで変わる
-        # （judge.undeclared_verdict）ので、そこを見るテストだけが渡す。
+        # （judge.UndeclaredVerdict）ので、そこを見るテストだけが渡す。
         if permission_mode:
             payload["permission_mode"] = permission_mode
         return self.ccnavi("--mode", mode, stdin=json.dumps(payload))
@@ -291,44 +290,6 @@ class ApproveOnlyTest(PhaseHarness):
 
 class PhaseTest(PhaseHarness):
     # ---- 1. フェーズ定義
-
-    def test_phase_types_must_be_unique_and_well_formed(self):
-        from ccnavi.tickets.config import phasetypes
-
-        _, problems = phasetypes.parse(
-            "version: 1\nphases:\n  a: {title: 同じ, kind: work}\n  b: {title: 同じ, kind: work}\n"
-        )
-        self.assertTrue(any("表示名" in p.detail for p in problems), problems)
-        # フィードバック対応はユーザが見ない経路を作らない。
-        _, problems = phasetypes.parse(
-            "version: 1\nphases:\n  fb: {title: 対応, kind: feedback, review: false}\n"
-        )
-        self.assertTrue(any("review: false" in p.detail for p in problems), problems)
-        # `chat` は廃止した値。読めない。
-        _, problems = phasetypes.parse(
-            "version: 1\nphases:\n  fb: {title: 対応, kind: feedback, review: chat}\n"
-        )
-        self.assertTrue(any("`review` は" in p.detail for p in problems), problems)
-        # 順序の欄（overlap など）は読まない。指す先が無くても問題にしない。
-        types, problems = phasetypes.parse(
-            "version: 1\nphases:\n  a: {title: A, kind: work, overlap: [nope]}\n"
-        )
-        self.assertIsNotNone(types, problems)
-        self.assertEqual(problems, [])
-        types, problems = phasetypes.parse(PHASES)
-        self.assertEqual(problems, [])
-        self.assertEqual(
-            set(types),
-            {
-                "research",
-                "design",
-                "acceptance",
-                "implement",
-                "implement-feedback",
-                "chores",
-                "chores-feedback",
-            },
-        )
 
     def test_lint_reports_a_broken_phases_file(self):
         write(
@@ -609,15 +570,6 @@ class PhaseTest(PhaseHarness):
         refused = self.approve()
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("`review: false` は書けない", refused.stdout + refused.stderr)
-
-    def test_step_flags_reads_true_false_and_refuses_the_rest(self):
-        flags = ticket_model.step_flags
-        self.assertEqual(flags({"review": False}, "plan[0]"), (False, False, ""))
-        self.assertEqual(flags({"review": True}, "plan[0]"), (True, False, ""))
-        self.assertEqual(flags({}, "plan[0]"), (None, False, ""))
-        self.assertEqual(flags({"deferred": True}, "plan[0]"), (None, True, ""))
-        for bad in ({"review": "no"}, {"review": False, "deferred": True}, {"deferred": False}):
-            self.assertTrue(flags(bad, "plan[0]")[2], bad)
 
     def start_research_child(self, with_skill):
         self.family(plan=["research", "design"])
@@ -1149,32 +1101,6 @@ class PhaseTest(PhaseHarness):
         for rel in [*odd, "wip/design/plan.md"]:
             self.assertIn(rel, written)
             self.assertFalse(os.path.lexists(os.path.join(self.parent_tree, *rel.split("/"))))
-
-    def test_write_and_push_still_stops_writes_outside_the_places_for_ready(self):
-        """wip/ の例外は、今は無い wip/ の下のものだけ。
-
-        在るもの・wip/ の外・ツリーの外（別の親）は通さない。
-        """
-        from ccnavi.entry import cli
-
-        base = os.path.realpath(self.parent_tree)
-        write(os.path.join(base, "wip", "kept.md"), "x\n")
-        write(os.path.join(base, "src", "gone.py"), "x\n")
-        os.remove(os.path.join(base, "src", "gone.py"))
-        cases = {
-            os.path.join(base, "wip", "gone.md"): True,
-            os.path.join(base, "WIP", "design", "gone.html"): True,
-            os.path.join(base, "wip", "kept.md"): False,
-            os.path.join(base, "src", "gone.py"): False,
-            os.path.join(base, "wipx", "gone.md"): False,
-            os.path.join(base, "wip"): False,
-            base: False,
-            os.path.join(self.root, "wip", "gone.md"): False,
-            os.path.join(self.root, ".claude", "worktrees", "i0002", "wip", "gone.md"): False,
-        }
-        for path, expected in cases.items():
-            with self.subTest(path=path):
-                self.assertEqual(cli._ready_removed_wip(os.path.realpath(path), base), expected)
 
     def test_close_early_closes_early_and_files_the_rest(self):
         """ユーザが「キリの良いところ」と早めに閉じる。残りは取り消し・省略・受け入れになり、

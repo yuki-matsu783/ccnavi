@@ -13,7 +13,7 @@ import json
 import os
 import unittest
 
-from ccnavi.infra import settings
+from tests import script_command
 from tests.ticket.test_ticket import TicketTest, git, write
 
 
@@ -47,9 +47,7 @@ class StopNudgeTest(TicketTest):
             payload["agent_id"] = agent_id
         if mode == "disable":
             # disable を言えるのは起動した環境だけ（フラグの disable は enable になる）。
-            return self.ccnavi(
-                *extra, stdin=json.dumps(payload), env={settings.MODE_ENV: "disable"}
-            )
+            return self.ccnavi(*extra, stdin=json.dumps(payload), env={"CCNAVI_MODE": "disable"})
         return self.ccnavi("--mode", mode, *extra, stdin=json.dumps(payload))
 
     def body(self, result):
@@ -91,7 +89,7 @@ class StopNudgeTest(TicketTest):
         self.assertEqual(body.get("decision"), "block")
         reason = body["reason"]
         self.assertIn(f"[ccnavi] {CODE} (ticket: i0001-01-01)", reason)
-        ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
+        ticket_sh = script_command(self.root, "ccnavi-ticket.sh")
         self.assertIn(f"`{ticket_sh} finish i0001-01-01`", reason)
         self.assertIn("続ける理由", reason)
         self.assertIn("コミットが 1 件", reason)
