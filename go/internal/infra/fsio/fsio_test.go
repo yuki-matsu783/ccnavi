@@ -610,6 +610,8 @@ func TestUnixSeconds(t *testing.T) {
 		{time.Unix(1700000000, 500000000), 1700000000.5},
 		{time.Unix(0, 0), 0},
 		{time.Unix(-2, 500000000), -1.5},
+		// UnixNano で表せない年（2999 年）。
+		{time.Date(2999, 1, 1, 0, 0, 0, 0, time.UTC), 32472144000},
 	}
 	for _, c := range cases {
 		if got := UnixSeconds(c.at); got != c.seconds {

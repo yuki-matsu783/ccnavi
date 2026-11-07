@@ -92,7 +92,14 @@ func validStamp(text string) bool {
 }
 
 // UnixSeconds は、記録に書く UNIX 秒。Python の time.time() と同じ小数の形。
-func UnixSeconds(t time.Time) float64 { return float64(t.UnixNano()) / 1e9 }
+// UnixNano は 1678〜2262 年の外で溢れるので、その外は秒とナノ秒を分けて足す（遠い先の年を負にしない）。
+func UnixSeconds(t time.Time) float64 {
+	sec := t.Unix()
+	if sec > math.MaxInt64/int64(time.Second) || sec < math.MinInt64/int64(time.Second) {
+		return float64(sec) + float64(t.Nanosecond())/1e9
+	}
+	return float64(t.UnixNano()) / 1e9
+}
 
 // FromUnixSeconds は、記録の UNIX 秒を時刻に戻す。小数部分はナノ秒に丸める。
 func FromUnixSeconds(f float64) time.Time {
