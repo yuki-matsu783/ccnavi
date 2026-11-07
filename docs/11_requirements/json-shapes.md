@@ -374,7 +374,7 @@ ccnavi --version --json
 | `schema` | この JSON の形の版（いま 1）。欄を足すだけなら上げない |
 | `version` | ccnavi の版 |
 | `commit` | 組み立ての元のコミット。組み立てのときに埋め、未コミットの変更があれば `-dirty` が付く。ソースで動かしているときは `unknown` |
-| `built` | 組み立てた実行ファイルなら真、ソースで動いていれば偽 |
+| `built` | `scripts/ccnavi-build.sh` で組んだ実行ファイル（コミットを埋めたもの）なら真、そうでなければ偽 |
 | `compat` | 互換の版。実行ファイルと、それを呼ぶ側（sh と拡張）の契約の版（下） |
 | `formats` | 読む書式の版。レイヤーのファイル（`rules.yml` / `phases.yml` / `risks.yml`）とチケットの頭の `version:` と比べるもの |
 
