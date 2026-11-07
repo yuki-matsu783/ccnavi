@@ -1,7 +1,8 @@
-// Package stop は Stop でエージェントが終えようとしたときの、チケット作業の促しを決める。finish の打ち忘れ
-// （Unfinished）、レビューの依頼までの道の途中（Pending）、フィードバック計画待ち（Waiting）の 3 つで、どれも
-// 判定の deny ではなく 1 回だけの促し。同じ状態で 2 度促さないように、促した状態の要約をセッションごとの
-// 記録（nudged-<セッション>.json）にキーごとに残す。git か置き場を読めなければ促さない（保護ではない）。
+// Package stop は、Stop でエージェントが終えようとしたときの、チケット作業の促しを決める。促しは 3 種類ある。
+// finish の打ち忘れ（Unfinished）、レビューの依頼までの途中（Pending）、フィードバック計画の待ち（Waiting）である。
+// どれも判定の deny ではなく、1 回だけの促しにとどまる。同じ状態で 2 度促さないように、促した状態の要約を
+// セッションごとの記録（nudged-<セッション>.json）にキーごとに残す。git か置き場を読めなければ促さない。
+// これは保護ではない。
 //
 // Python からの対応: tickets/lifecycle の stop・stop_request・stop_feedback をまとめた。
 // unfinished_at_stop → UnfinishedAtStop、pending_at_stop → PendingAtStop、waiting_at_stop → WaitingAtStop、

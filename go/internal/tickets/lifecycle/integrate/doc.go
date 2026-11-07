@@ -1,11 +1,11 @@
-// Package integrate は、チケットに結び付かない直接作業のワークツリー（`.claude/worktrees/<名前>`、ブランチも同じ
-// 名前）が `integrate` まで進んでいるかを見る。Stop の促し（DirectAtStop）、`ccnavi-git.sh integrate` が断る
-// 「チケットに結び付く」判定（BoundReason）、コミット後の案内と SessionStart の一覧が使う直接作業の判定
-// （DirectCheck）、統合先の名前（IntegrationName）を 1 か所に置く。促した側と integrate が断る側で判定が
-// 食い違わないようにするため。git とファイルだけを読み、ネットワークには出ない。
+// Package integrate は、チケットに結び付かない直接作業のワークツリー（`.claude/worktrees/<名前>`。ブランチも同じ名前）が
+// `integrate` まで進んでいるかを見る。次のものを 1 か所に置く。Stop の促し（DirectAtStop）、`ccnavi-git.sh integrate`
+// が断る「チケットに結び付く」判定（BoundReason）、コミット後の案内と SessionStart の一覧が使う直接作業の判定
+// （DirectCheck）、統合先の名前（IntegrationName）。促す側と integrate が断る側で判定が食い違わないように、
+// ここに集めている。git とファイルだけを読み、ネットワークには出ない。
 //
-// 1 本のツリーを調べた結果は Hit・Clear・Unknown の 3 つ。期限不足・git の失敗・決められないものは Unknown で、
-// 候補を外さず、促した記録も残さない。期限（deadline）のゼロ値は期限なし。
+// 1 本のツリーを調べた結果は Hit・Clear・Unknown の 3 つのどれかになる。期限切れ・git の失敗・決められないものは
+// Unknown になる。Unknown のツリーは候補から外さず、促した記録も残さない。期限（deadline）のゼロ値は期限なしを表す。
 //
 // Python からの対応: tickets/lifecycle/stop_integrate を移した。direct_at_stop → DirectAtStop、
 // probe → 私的な probe、direct_record → DirectRecord（"_common"・"broken" の欄は Record の Common・Broken）、
