@@ -6,6 +6,7 @@ import (
 	"io"
 	"maps"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -136,7 +137,7 @@ func SettleReview(conf *config.Settings, root, parentID string, numbers []int, b
 	sort.SliceStable(review, func(i, j int) bool { return review[i].ID < review[j].ID })
 	var moved []string
 	for _, t := range review {
-		if t.Parent != parentID || !containsInt(numbers, t.Phase) {
+		if t.Parent != parentID || !slices.Contains(numbers, t.Phase) {
 			continue
 		}
 		where, err := HomeDir(conf, root, t.ID, parentID, t.Project)
@@ -155,15 +156,6 @@ func SettleReview(conf *config.Settings, root, parentID string, numbers []int, b
 		moved = append(moved, t.ID)
 	}
 	return moved, "", nil
-}
-
-func containsInt(list []int, n int) bool {
-	for _, x := range list {
-		if x == n {
-			return true
-		}
-	}
-	return false
 }
 
 func writeSettledBy(path, by string) string {

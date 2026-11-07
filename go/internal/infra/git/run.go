@@ -102,6 +102,18 @@ func (d Done) Missing() bool { return errors.Is(d.Failure, ErrMissing) }
 // TimedOut は期限に達したか（Options.Deadline の期限不足も含む）。
 func (d Done) TimedOut() bool { return errors.Is(d.Failure, ErrTimeout) }
 
+// FirstLine は失敗の文の 1 行目。git が言った文（標準エラー）を、無ければ起こせなかった理由を採る。どちらも無ければ空。
+func (d Done) FirstLine() string {
+	said := d.Stderr
+	if said == "" && d.Failure != nil {
+		said = d.Failure.Error()
+	}
+	if lines := ospath.Splitlines(ospath.Strip(said)); len(lines) > 0 {
+		return lines[0]
+	}
+	return ""
+}
+
 // Options は git の起こし方。ゼロ値は DefaultTimeout で、期限（Deadline）は無く、標準入力は親のものを渡す。
 type Options struct {
 	// Timeout は 1 回の期限。0 なら DefaultTimeout。

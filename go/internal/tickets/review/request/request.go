@@ -3,6 +3,7 @@ package request
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -250,7 +251,7 @@ func coveredHeader(conf *config.Settings, root string, parent *ticket.Ticket, p 
 	numbers := reviewNumbers(p)
 	var labels, risks []string
 	for _, other := range phase.Phases(conf, root, parent.ID, nil) {
-		if !containsInt(numbers, other.Number) {
+		if !slices.Contains(numbers, other.Number) {
 			continue
 		}
 		labels = append(labels, other.Label())
@@ -279,15 +280,6 @@ func coveredHeader(conf *config.Settings, root string, parent *ticket.Ticket, p 
 		return ""
 	}
 	return head + "\n"
-}
-
-func containsInt(list []int, n int) bool {
-	for _, x := range list {
-		if x == n {
-			return true
-		}
-	}
-	return false
 }
 
 // unmetIn は、依頼の前提のうち、ワークツリーの中で分かるものを返す。子が親のブランチに合流したかは、finish が書いた merged_sha が親の HEAD の祖先かどうかで見る。子のブランチは見ない。子のブランチを消しても、別の PC で finish しても、結果は変わらないようにするためである。未追跡は数えない。依頼文をワークツリーに置く使い方は普通にあり、未追跡のものはマージリクエストに載らないからである。

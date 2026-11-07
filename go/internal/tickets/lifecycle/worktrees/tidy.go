@@ -19,15 +19,16 @@ import (
 	"ccnavi/internal/tickets/phase"
 )
 
-// TidyTargets は片付けの候補。閉じた（done/ の。完了も取り消しも）子のうち、phaseNo が 0 でなければそのフェーズ
-// （延期を引き受けた分を含む）の子。作業中・レビュー待ちの子は入らない。識別子の順で、重複は 1 つにする。
-func TidyTargets(conf *config.Settings, root, family string, phaseNo int) []*ticket.Ticket {
+// TidyTargets は片付けの候補。閉じた（done/ の。完了も取り消しも）子のうち、phaseNo が nil でなければそのフェーズ
+// （延期を引き受けた分を含む）の子。0 は統合の子のフェーズ（ticket.ConsolidatePhase）で、指定なしとは別。
+// 作業中・レビュー待ちの子は入らない。識別子の順で、重複は 1 つにする。
+func TidyTargets(conf *config.Settings, root, family string, phaseNo *int) []*ticket.Ticket {
 	closed, _ := approval.Scan(conf, root, true, nil)
 	children := approval.ChildrenOf(closed, family)
-	if phaseNo != 0 {
-		numbers := map[int]bool{phaseNo: true}
+	if phaseNo != nil {
+		numbers := map[int]bool{*phaseNo: true}
 		for _, p := range phase.Phases(conf, root, family, nil) {
-			if p.Number == phaseNo {
+			if p.Number == *phaseNo {
 				for _, n := range p.Covers() {
 					numbers[n] = true
 				}
@@ -69,9 +70,9 @@ func FamilyFor(conf *config.Settings, root, ident string) string {
 	return ident
 }
 
-// RunTidy は `worktree tidy <親> [--phase <N>]`（phaseNo の 0 は指定なし）。閉じた子のワークツリーを消す。
+// RunTidy は `worktree tidy <親> [--phase <N>]`（phaseNo の nil は指定なし）。閉じた子のワークツリーを消す。
 // 消さなかったものが 1 本でもあれば 1。何も無ければ黙って 0。
-func RunTidy(stdout io.Writer, conf *config.Settings, root, family string, phaseNo int, cwd string) int {
+func RunTidy(stdout io.Writer, conf *config.Settings, root, family string, phaseNo *int, cwd string) int {
 	code := 0
 	family = FamilyFor(conf, root, family)
 	for _, t := range TidyTargets(conf, root, family, phaseNo) {
@@ -163,7 +164,7 @@ func remaining(conf *config.Settings, root, family string) []left {
 		moreWhy, moreCheck := leftoverFacts(path)
 		found = append(found, left{name, path, append(why, moreWhy...), append(check, moreCheck...)})
 	}
-	for _, t := range TidyTargets(conf, root, family, 0) {
+	for _, t := range TidyTargets(conf, root, family, nil) {
 		path := worktreePath(root, t.ID)
 		if t.ID == family || !ospath.IsDir(path) || ospath.IsLink(path) {
 			continue

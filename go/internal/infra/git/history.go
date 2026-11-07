@@ -71,8 +71,8 @@ func Count(out string) (int, bool) {
 	return n, err == nil
 }
 
-// firstLine は merge-base などの答えの 1 行目。答えが無ければ空。
-func firstLine(done Done) string {
+// firstOut は merge-base などの答えの 1 行目。答えが無ければ空。
+func firstOut(done Done) string {
 	out := ospath.Strip(done.Out)
 	if !done.OK() || out == "" {
 		return ""
@@ -88,7 +88,7 @@ func ForkBase(top string, others []string, timeout time.Duration) string {
 		return ""
 	}
 	for _, other := range others {
-		if found := firstLine(runGit(top, []string{"merge-base", "HEAD", other}, stateOptions(timeout))); found != "" {
+		if found := firstOut(runGit(top, []string{"merge-base", "HEAD", other}, stateOptions(timeout))); found != "" {
 			return found
 		}
 	}
@@ -111,7 +111,7 @@ func ChildBase(childTree, parentTree string, timeout time.Duration, childHead st
 	if childHead == "" {
 		childHead = "HEAD"
 	}
-	found := firstLine(runGit(childTree, []string{"merge-base", childHead, parent}, stateOptions(timeout)))
+	found := firstOut(runGit(childTree, []string{"merge-base", childHead, parent}, stateOptions(timeout)))
 	if found == "" {
 		return "", ErrNoMergeBase
 	}

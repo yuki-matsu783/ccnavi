@@ -2,6 +2,7 @@ package phases
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -115,20 +116,11 @@ func deferTarget(wf *ticket.Workflow, steps []ticket.Step, n int) (int, bool) {
 		if s.Number <= n || s.Item.Deferred {
 			continue
 		}
-		if containsInt(wf.Waits[s.Number], n) {
+		if slices.Contains(wf.Waits[s.Number], n) {
 			return s.Number, true
 		}
 	}
 	return 0, false
-}
-
-func containsInt(list []int, n int) bool {
-	for _, x := range list {
-		if x == n {
-			return true
-		}
-	}
-	return false
 }
 
 // effective は判定に使う先行関係。入れてあればそれを、無ければその場で計算する。
@@ -169,7 +161,7 @@ func Loose(parent *ticket.Ticket, wf *ticket.Workflow) []int {
 		}
 		last := p.first + len(p.items) - 1
 		for m := p.first; m < last; m++ {
-			if !containsInt(wf.Waits[last], m) {
+			if !slices.Contains(wf.Waits[last], m) {
 				out = append(out, m)
 			}
 		}
@@ -208,7 +200,7 @@ func ChildlessReady(parent *ticket.Ticket, childPhases []int) []rules.Problem {
 	var found []rules.Problem
 	for _, n := range Ready(parent, nil) {
 		item := parent.ItemAt(n)
-		if !parent.InPlan(n) || item == nil || containsInt(childPhases, n) {
+		if !parent.InPlan(n) || item == nil || slices.Contains(childPhases, n) {
 			continue
 		}
 		found = append(found, problem(rules.Warn, parent.ID, fmt.Sprintf(

@@ -13,6 +13,7 @@ import (
 	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/pathmatch"
 	"ccnavi/internal/infra/pyfmt"
+	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/tickets/lifecycle/treegate"
 	"ccnavi/internal/tickets/model/place"
 	"ccnavi/internal/tickets/sync/handoff"
@@ -120,7 +121,7 @@ func MergeProblems(conf *config.Settings, root, treeRoot string) []string {
 		}
 	}
 	if len(waiting) > 0 {
-		problems = append(problems, fmt.Sprintf(msgPendingDrafts, place.Handoff, len(waiting), counted(waiting), wip, shlexQuote(treeRoot)))
+		problems = append(problems, fmt.Sprintf(msgPendingDrafts, place.Handoff, len(waiting), counted(waiting), wip, shell.Quote(treeRoot)))
 	}
 	for _, r := range treegate.Check(treegate.Ready, treeRoot, conf, treegate.Options{}) {
 		problems = append(problems, r.Line())
@@ -206,19 +207,4 @@ func pruneEmpty(directory string) {
 	for _, d := range dirs {
 		_ = os.Remove(d)
 	}
-}
-
-// shlexQuote は Python の shlex.quote（案内に載せるパス）。
-func shlexQuote(s string) string {
-	if s == "" {
-		return "''"
-	}
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		safe := c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.IndexByte("_@%+=:,./-", c) >= 0
-		if !safe {
-			return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
-		}
-	}
-	return s
 }

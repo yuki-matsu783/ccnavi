@@ -143,7 +143,7 @@ func Drop(root, name, cwd string) Dropped {
 	}
 	done := git.Run(owner, []string{"worktree", "remove", path}, git.Options{Timeout: git.CleanupTimeout})
 	if !done.OK() {
-		said := firstLine(done)
+		said := done.FirstLine()
 		if said == "" {
 			said = "理由不明"
 		}
@@ -154,18 +154,6 @@ func Drop(root, name, cwd string) Dropped {
 		return refused(detail)
 	}
 	return Dropped{Name: name, Status: Removed, Path: path, Detail: note}
-}
-
-// firstLine は git の拒否文（標準エラー、無ければ起こせなかった理由）の 1 行目。
-func firstLine(done git.Done) string {
-	said := done.Stderr
-	if said == "" && done.Failure != nil {
-		said = done.Failure.Error()
-	}
-	if lines := ospath.Splitlines(ospath.Strip(said)); len(lines) > 0 {
-		return lines[0]
-	}
-	return ""
 }
 
 // AfterDropped は Report の消した行の括弧の後ろに足す既定の一言。

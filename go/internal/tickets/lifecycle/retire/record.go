@@ -97,7 +97,7 @@ func repoDir(conf *config.Settings, root, project string) string {
 
 func closedChildren(conf *config.Settings, root, parent string) []child {
 	var out []child
-	for _, t := range worktrees.TidyTargets(conf, root, parent, 0) {
+	for _, t := range worktrees.TidyTargets(conf, root, parent, nil) {
 		k := merged
 		if t.CancelledAt != "" {
 			k = cancelled

@@ -195,11 +195,3 @@ func TestReviewedMark(t *testing.T) {
 		}
 	}
 }
-
-func TestShlexQuote(t *testing.T) {
-	for in, want := range map[string]string{"": "''", "/a/b-c_d.e": "/a/b-c_d.e", "a b": "'a b'", "it's": `'it'"'"'s'`, "日本": "'日本'"} {
-		if got := shlexQuote(in); got != want {
-			t.Errorf("%q: %q", in, got)
-		}
-	}
-}

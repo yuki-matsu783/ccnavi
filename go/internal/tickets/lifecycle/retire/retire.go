@@ -83,12 +83,8 @@ func deleteBranch(repo, name string) string {
 	if done.OK() {
 		return ""
 	}
-	said := done.Stderr
-	if said == "" && done.Failure != nil {
-		said = done.Failure.Error()
-	}
-	if lines := ospath.Splitlines(ospath.Strip(said)); len(lines) > 0 {
-		return lines[0]
+	if said := done.FirstLine(); said != "" {
+		return said
 	}
 	return "理由不明"
 }

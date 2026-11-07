@@ -128,7 +128,8 @@ func TestMatchesPython(t *testing.T) {
 		}
 		return out
 	}
-	got["targets"] = []any{ids(TidyTargets(conf, root, "i0001", 0)), ids(TidyTargets(conf, root, "i0001", 1)), ids(TidyTargets(conf, root, "i0001", 2))}
+	one, two := 1, 2
+	got["targets"] = []any{ids(TidyTargets(conf, root, "i0001", nil)), ids(TidyTargets(conf, root, "i0001", &one)), ids(TidyTargets(conf, root, "i0001", &two))}
 	family := []string{}
 	for _, x := range []string{"i0001-01-01", "rel-2026-10-06", "i0001", "x", "rel-2026-10-06-01-02"} {
 		family = append(family, FamilyFor(conf, root, x))
@@ -161,7 +162,7 @@ func TestMatchesPython(t *testing.T) {
 		run("drop "+name, func(o, e *bytes.Buffer) int { return RunDrop(o, root, name, root) })
 	}
 	run("drop i0001 inside", func(o, e *bytes.Buffer) int { return RunDrop(o, root, "i0001", inside) })
-	run("tidy", func(o, e *bytes.Buffer) int { return RunTidy(o, conf, root, "i0001", 0, root) })
+	run("tidy", func(o, e *bytes.Buffer) int { return RunTidy(o, conf, root, "i0001", nil, root) })
 	run("drop again", func(o, e *bytes.Buffer) int { return RunDrop(o, root, "i0001-01-01", root) })
 	run("clean stale", func(o, e *bytes.Buffer) int { return RunClean(o, e, root, "stale", false) })
 	run("clean doing", func(o, e *bytes.Buffer) int { return RunClean(o, e, root, "i0001-01-03", false) })
