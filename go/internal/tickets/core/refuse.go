@@ -24,6 +24,14 @@ const (
 	codeConfirmMoved           code = "CORE_CONFIRM_MOVED"            // 依頼の後にユーザが見るものが動いた
 	codeConfirmResultMismatch  code = "CORE_CONFIRM_RESULT_MISMATCH"  // 結果が依頼したマージリクエストと合わない
 	codeConfirmReviewOpen      code = "CORE_CONFIRM_REVIEW_OPEN"      // 変更要求か未解決のスレッドが残る
+
+	// 残った指摘の行き先（Chrome の decide）。
+	codeDecideNoDigest code = "CORE_DECIDE_NO_DIGEST" // 見せた指摘のダイジェストが無い・読めない
+	codeDecideMismatch code = "CORE_DECIDE_MISMATCH"  // 見せた指摘と今の指摘が違う
+	codeDecideChoices  code = "CORE_DECIDE_CHOICES"   // 選択（か受け入れ済みのキー）の形が見せた指摘と合わない
+	codeDecideThreadID code = "CORE_DECIDE_THREAD_ID" // 返信と解決をするスレッドの id が無い・API の経路に使えない
+	codeDecideFollowup code = "CORE_DECIDE_FOLLOWUP"  // 続きの子を起こせない
+	codeDecideStopped  code = "CORE_DECIDE_STOPPED"   // 書くものを並べる途中で止まった（何も積まない）
 )
 
 const linePrefix = "ccnavi: "

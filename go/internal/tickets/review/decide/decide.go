@@ -80,7 +80,7 @@ const (
 	msgNoStateIssue = "ccnavi: state の置き場が空。issue に回す下書きを置けない\n"
 	msgNoFollowup   = "ccnavi: 続きの子チケットを起こせない: %s\n"
 	msgFollowupMade = "続きの子チケット %s を %s/%s/ に起こした（フェーズ %d、範囲は見た子の和、本文に指摘 %d 件）。" +
-		"フェーズは再び開かれ、マーカーは消えた。\n"
+		"フェーズは再び開かれ、マーカーは消えた。"
 	msgIssueFailed   = "ccnavi: issue の下書きを書き出せない (%s)\n"
 	msgPartFailed    = "ccnavi: issue の続きの下書きを書き出せない (%s)\n"
 	msgCommentFailed = "ccnavi: 記録を書き出せない (%s)\n"
@@ -448,7 +448,7 @@ func knownOp(stderr io.Writer, conf *config.Settings, op string) bool {
 
 // acceptedThreads は受け入れる指摘（keep・issue）と、スレッドに残す返信の本文。
 func acceptedThreads(d *Decision, choices *pyjson.Object) []host.AcceptItem {
-	why := acceptWhy(strconv.Itoa(d.Phase.Number))
+	why := AcceptWhy(strconv.Itoa(d.Phase.Number))
 	var out []host.AcceptItem
 	for _, t := range d.Unresolved {
 		c, _ := choices.Value(host.ThreadKey(t)).(string)
@@ -559,8 +559,8 @@ func writePlan(stderr io.Writer, d *Decision, choices *pyjson.Object, outPath, d
 	return config.ExitOK
 }
 
-// settledChildren はこのフェーズの、作業として終わった子。
-func settledChildren(p *phase.Phase) []*ticket.Ticket {
+// SettledChildren はこのフェーズの、作業として終わった子。
+func SettledChildren(p *phase.Phase) []*ticket.Ticket {
 	var out []*ticket.Ticket
 	for _, t := range p.Tickets {
 		if slices.Contains(place.Finished, p.States[t.ID]) {
@@ -580,7 +580,7 @@ func precheck(stderr io.Writer, conf *config.Settings, root string, d *Decision,
 	}
 	// 直す指摘があるなら、起こす続きの子がチケットとして読めるか（子が多いと範囲の和が上限を超える）を先に見る。
 	if fix := picked[Fix]; len(fix) > 0 {
-		children := settledChildren(d.Phase)
+		children := SettledChildren(d.Phase)
 		if len(children) == 0 {
 			children = d.Phase.Tickets
 		}
@@ -678,17 +678,22 @@ func apply(stdout, stderr io.Writer, conf *config.Settings, root string, d *Deci
 
 // followupFromChoice はユーザが選んだ続きの子を doing/ に起こし、識別子を返す。起こせなければ空。
 func followupFromChoice(stdout, stderr io.Writer, conf *config.Settings, root string, d *Decision, items []string, op string) string {
-	ident, failed := approval.Followup(conf, root, d.Parent, d.Phase.Number, settledChildren(d.Phase), items, stderr, op)
+	ident, failed := approval.Followup(conf, root, d.Parent, d.Phase.Number, SettledChildren(d.Phase), items, stderr, op)
 	if failed != "" {
 		fmt.Fprintf(stderr, msgNoFollowup, failed)
 		return ""
 	}
-	fmt.Fprintf(stdout, msgFollowupMade, ident, conf.Approved, place.Doing, d.Phase.Number, len(items))
+	fmt.Fprintln(stdout, FollowupLine(conf, ident, d.Phase.Number, len(items)))
 	fmt.Fprintln(stdout, texts.Say(root, "NEXT_DECIDE_FOLLOWUP", texts.Values{"words": nextOf(root, ident)}, nil))
 	for _, line := range phase.ReopenImpact(conf, root, d.Parent.ID, d.Phase.Number) {
 		fmt.Fprintln(stdout, line)
 	}
 	return ident
+}
+
+// FollowupLine は続きの子を起こしたときに見せる行。
+func FollowupLine(conf *config.Settings, ident string, number, items int) string {
+	return fmt.Sprintf(msgFollowupMade, ident, conf.Approved, place.Doing, number, items)
 }
 
 // writeIssue は issue に回す指摘の下書き（1 行目がタイトル、空行のあとが本文）。指摘は全文で転記し、長いときは

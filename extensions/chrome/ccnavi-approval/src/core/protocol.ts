@@ -11,7 +11,7 @@
  * 書く操作 `commit` を受ける。受けるのはボードからだけで、設定画面で登録したリポジトリだけに
  * 書く。書く先が予約の名前（`main`・`master`・`develop`・`release*`）か統合先の名前（ボードの値を信頼せず
  * 自分で引く）なら断り、書くパスは置き場（既定に固定。統合先の `.claude/settings.json` は読まない）の下に限る
- * （Python も同じ検査をする。画面で XSS が起きても書く先を広げないための二重の確認）。PAT の期限は、
+ * （ccnavi も同じ検査をする。画面で XSS が起きても書く先を広げないための二重の確認）。PAT の期限は、
  * GitHub なら応答ヘッダから、GitLab なら `GET /personal_access_tokens/self` から読んで記録し、画面へは期限だけを返す。
  * GitLab に問い合わせるのは 1 日 1 回。
  *
@@ -378,15 +378,15 @@ async function fileAt(client: github.Client, cfg: RepoConfig, head: string, path
 
 /**
  * 大文字小文字をそろえる（「始める」の重なりの検査）。作る名前は ASCII の英数字と記号、それに NFKC で変わらない
- * 日本語の字（ひらがな・カタカナ・長音記号・CJK 統合漢字・々）に限る（`startName`・Python の `ticket_ids._ID`）ので
- * Python の casefold と同じ答えになる。比べる相手（ホストの既にあるブランチの名前）は ASCII とは限らないので、
+ * 日本語の字（ひらがな・カタカナ・長音記号・CJK 統合漢字・々）に限る（`startName`・ccnavi の `ids.IDChars`）ので
+ * ccnavi の casefold（`pyfmt.Casefold`）と同じ答えになる。比べる相手（ホストの既にあるブランチの名前）は ASCII とは限らないので、
  * 互換分解（NFKC）してからそろえ、`ﬁ`・`ſ` のように casefold で ASCII に変わる字も重なりとして拾う（厳しくする向き）
  */
 function fold(text: string): string {
   return text.normalize("NFKC").toLowerCase();
 }
 
-/** 互換のマーカーのパス（`ccnavi_chrome.COMPAT_FILE`） */
+/** 互換のマーカーのパス（ccnavi の `config.CompatFile`） */
 const COMPAT_FILE = ".ccnavi/scripts/ccnavi-common.sh";
 
 /**
@@ -412,18 +412,18 @@ async function startGuard(deps: Deps, client: github.Client, cfg: RepoConfig, in
   return "";
 }
 
-/** 識別子に使える日本語の字（Python の `ticket_ids.JA_CHARS` と同じ文字クラス） */
+/** 識別子に使える日本語の字（ccnavi の `ids.JAChars` と同じ文字クラス） */
 const JA = "\\u3005\\u3041-\\u3096\\u30a1-\\u30fa\\u30fc\\u4e00-\\u9fff";
-/** issue から作る親の識別子の形（`<先頭の語>-<番号>-<slug>`。Python の `ticket_ids._FORM` と同じ） */
+/** issue から作る親の識別子の形（`<先頭の語>-<番号>-<slug>`。ccnavi の `ids` の形と同じ） */
 const ISSUE_BRANCH = new RegExp(`^(?<prefix>[a-z][a-z0-9]*)-[1-9][0-9]*-(?<slug>[A-Za-z0-9${JA}][A-Za-z0-9._\\-${JA}]*)$`, "u");
-/** 先頭の語に使えない名前（統合先や保護されたブランチ。Python の `settings._RESERVED_PREFIXES`） */
+/** 先頭の語に使えない名前（統合先や保護されたブランチ。ccnavi の `config.ReservedBranchIDs`） */
 const RESERVED_PREFIXES = new Set(["main", "master", "develop", "release"]);
-/** 識別子の長さの上限（Python の `ticket_ids.MAX_ID_LENGTH`） */
+/** 識別子の長さの上限（ccnavi の `ids.MaxIDLength`） */
 const MAX_ID_LENGTH = 64;
 
 /**
  * 「始める」で作るブランチの名前の形（issue から決める形）。プロジェクトなら slug の頭に `<名前>-`。
- * 名前は Python が issue のタイトルから作るが、タイトルは誰でも書けるので、ここでも字と形を確かめ直す（二重の確認）
+ * 名前は ccnavi が issue のタイトルから作るが、タイトルは誰でも書けるので、ここでも字と形を確かめ直す（二重の確認）
  */
 function startName(name: unknown, cfg: RepoConfig): string {
   const branch = github.checkBranch(name);
@@ -615,7 +615,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       const head = await x.branchHead(client, o, r, integ);
       if (head === null) return refuse(`統合先 ${integ} がリモートに見つかりません`);
       if (github.checkOid(b) !== head) return refuse(`統合先 ${integ} の先頭が、ボードで取得した時点から更新されています。ボードを更新してから、もう一度開始してください`);
-      // 統合先の今の先頭で確かめ直す（Python の答えを信頼しない）: 大文字小文字をそろえた重なり・閉じた識別子・互換の版
+      // 統合先の今の先頭で確かめ直す（ccnavi の答えを信頼しない）: 大文字小文字をそろえた重なり・閉じた識別子・互換の版
       const folded = fold(name);
       const same = (await x.branchNames(client, o, r)).filter((n) => fold(n) === folded);
       if (same.length > 0) return refuse(`${name} は既にあります（${same.join(", ")}）`);

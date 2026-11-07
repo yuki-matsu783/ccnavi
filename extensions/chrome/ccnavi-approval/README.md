@@ -5,7 +5,7 @@ issue から親のブランチを始める拡張。GitHub と GitLab の、ワ�
 GitLab での ccnavi の書き込みどうしの競合の検出は、実際の GitLab で前提を確かめるまで未実装。
 PAT に要る権限は、GitHub が Contents の Read and write、GitLab が `api` スコープである。残った指摘の対応方針を確定するときは、さらに GitHub が Pull requests・Issues の Read and write、GitLab が Developer 以上のロールを要る。設定画面の案内と [VERIFY.md](VERIFY.md) の表に、同じ内容を載せている。
 
-承認者の操作を、作業者の開発環境やセッションの外に置くための入口で、判定のコアは手元の ccnavi と同じ Python を同梱して使う。
+承認者の操作を、作業者の開発環境やセッションの外に置くための入口で、判定のコアは手元の ccnavi と同じ Go のコードを WASM に組んで同梱して使う。
 同期はリアルタイムではなく、書いた結果は作業側の次の fetch / sync で届く（ccnavi の docs/50_guide/multi-pc.md）。
 
 何をするか（ふるまい）は [docs/requirements.md](docs/requirements.md)、構成は [docs/design.md](docs/design.md) にある。この README には、組み立てと試験の手順だけを書く。
@@ -19,15 +19,15 @@ pnpm build                                  # dist/ に組む。Chrome の「パ
 node scripts/build.js --hosts <一覧の JSON> # 組織ごとのビルド（GHES など）
 ```
 
-- Pyodide（約 13MB）はリポジトリに入れない。npm の `pyodide` からコピーし、`scripts/pyodide-files.json` のハッシュと照らし合わせる
-- PyYAML は純 Python 版を PyPI の sdist から取り、版とハッシュはリポジトリの `uv.lock` から読む（手元の ccnavi と同じ版）。
-  プロキシの内側では `NODE_USE_ENV_PROXY=1` を付ける
-- ccnavi は組み立てたときのリポジトリの `src/ccnavi/` をそのまま同梱する（.pyc 付きの zip）
+- Go（リポジトリの `go/go.mod` の版）が要る。PATH の `go` で、リポジトリの `go/cmd/ccnavi-chrome` を
+  `GOOS=js GOARCH=wasm` で `dist/ccnavi.wasm`（約 9MB）に組み、同じ Go の `wasm_exec.js` を `dist/` に置く
+  （2 つは同じ Go の版でないと動かない）。ネットワークから取ってくるものは pnpm install だけ
+- 試験が突き合わせる、同じ入口の手元向けの実行ファイルを `.cache/ccnavi-chrome` に組む（配らない）
 
 ## 試験
 
 ```sh
-pnpm test       # 単体・Node の上の Pyodide での組み立て・手元の CPython との突き合わせ（uv を使う）。
+pnpm test       # 単体・Node の上の WASM での組み立て・手元向けの同じ入口（.cache/ccnavi-chrome）との突き合わせ。
                 # 判定のコアの見本 test/fixtures/core-scenarios.json は、リポジトリの tests/ticket/test_swap_points.py が
                 # 書き出す（CCNAVI_CHROME_FIXTURE=1）。
                 # 契約の試験 test/gitlab-contract.test.ts は、模擬の GitLab（MockGitLab）の応答を本物の記録と reads の範囲で比べる
@@ -62,7 +62,7 @@ sh の読み方と合うことを確かめた（1 アカウントだけ。`CHANG
 更新の手順は下の GitHub と同じ（実物は `glab api` で取る）。
 
 MR のスレッドとレビューを取ってくる処理は、手元の sh（`.ccnavi/scripts/ccnavi-review.sh` の `find_mr`・`threads`・`reviews`）と
-この拡張（`src/core/github.ts` の `reviewCopy`）の 2 か所にある。判定は Python の同じ関数なので、2 つが同じ結果を組めば同じ結論になる。
+この拡張（`src/core/github.ts` の `reviewCopy`）の 2 か所にある。判定は ccnavi の同じ関数なので、2 つが同じ結果を組めば同じ結論になる。
 2 つが同じ結果を組むかは、手で組んだホストの応答の見本で確かめる。
 
 - 置き場: `test/fixtures/host/github/<場面>/`。`scene.json`（持ち主・リポジトリ・親のブランチと、場面の説明）、ホストの応答

@@ -1,18 +1,18 @@
 /**
  * Chrome からの承認とレビュー済み。
  *
- * 判定は Python（同梱の ccnavi）が出し、ここは Python が返した書くもの（Changes）を
+ * 判定は同梱の ccnavi（WASM）が出し、ここは ccnavi が返した書くもの（Changes）を
  * 親のブランチ `P` への 1 コミットにして送るだけ。TS が判定を出すと手元と答えが 2 か所に分かれるため。流れは次のとおり。
  *
  * 1. preview: ボードが見せた画面のダイジェスト（`digest`）と一覧（`ids`）を持っている
- * 2. yes: 親子のチケット 1 組ぶんを読み直して Snapshot を組み直し、Python に見せたものと比べさせる。
+ * 2. yes: 親子のチケット 1 組ぶんを読み直して Snapshot を組み直し、ccnavi に見せたものと比べさせる。
  *    違えば書かずに「見直す」（preview からやり直し）
  * 3. `plan` の変更を `createCommitOnBranch` の 1 コミットで書く。条件は `expectedHeadOid` = 読んだ `P` の先頭
  * 4. 先頭が動いていたら、新しい先頭で Snapshot を組み直して判定と plan を必ずやり直す。
  *    ダイジェストが同じなら新しい plan を書く。違えば「見直す」。3 周しても書けなければユーザの対応に切り替える
  * 5. 書いた後、新しい先頭の中身が書いたとおりか確かめる（blob の sha を突き合わせる）
  *
- * レビュー済みも同じ流れで、毎周 MR のスレッドとレビューを読み直して Python の `confirm`
+ * レビュー済みも同じ流れで、毎周 MR のスレッドとレビューを読み直して ccnavi の `confirm`
  * （手元の `ccnavi review confirm` と同じコア）に通るかを決めさせる。
  *
  * GitLab にも書く。GitLab の Commits API には比較つきの書き込みが無いので、事後確認と元に戻すコミット（revert）で守る: 書いた答えのコミットの親が読んだ先頭と違えば（間に別の書き込みが入った）、自分の書き込みの
@@ -20,7 +20,7 @@
  * 新しい先頭から読み直して再試行する。元に戻すコミットもさらに競合して 2 回で収まらなければ、止めてユーザの対応に切り替える（`attention`）。
  * 書き込みどうしの競合は検出しない。
  */
-import { APPROVE_DIGEST_CHANGED, APPROVE_LIST_CHANGED, py, PyError, tagged, type Actor, type ChangeRow, type PlanResult, type ReasonCode, type Written } from "./py.js";
+import { APPROVE_DIGEST_CHANGED, APPROVE_LIST_CHANGED, ccnavi, CcnaviError, tagged, type Actor, type ChangeRow, type PlanResult, type ReasonCode, type Written } from "./ccnavi.js";
 import type { RepoConfig } from "./settings.js";
 import { MovedError, readFamily, type Deps as ReadDeps, type FamilyRead } from "./snapshot.js";
 import type { BlobText, FileAddition, PathObject, ReviewCopy } from "./github.js";
@@ -65,7 +65,7 @@ export function commitMessage(ids: readonly string[], verb: string, done: string
 
 export type Outcome =
   | { readonly kind: "written"; readonly oid: string; readonly rounds: number; readonly lines: readonly string[] }
-  /** `code` は Python が返した理由コード（`CORE_*`）。文面の頭にも `[<コード>]` で載る */
+  /** `code` は ccnavi が返した理由コード（`CORE_*`）。文面の頭にも `[<コード>]` で載る */
   | { readonly kind: "changed"; readonly message: string; readonly code?: string }
   | { readonly kind: "refused"; readonly message: string; readonly code?: string }
   | { readonly kind: "conflict"; readonly message: string }
@@ -298,7 +298,7 @@ async function finish(deps: WriteDeps, repo: RepoConfig, oid: string, rows: read
   return { kind: "written", oid, rounds, lines };
 }
 
-/** Python の Changes から、この親子のチケット P に書く行を取り出す。P の外・置き場の外に及べば理由 */
+/** ccnavi の Changes から、この親子のチケット P に書く行を取り出す。P の外・置き場の外に及べば理由 */
 export function rowsOf(res: Written, family: string, read: Pick<FamilyRead, "place">): readonly ChangeRow[] | string {
   if (res.stopped) return `${res.stopped.ticket}: ${res.stopped.reason}`;
   const names = Object.keys(res.changes ?? {});
@@ -420,7 +420,7 @@ async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: C
 /**
  * 事後確認。書いたコミットの親が読んだ先頭と違えば、自分の書き込みの直前（その親）の状態で、
  * 同じ時刻で判定し直す。同じ書くものなら残す（`kept`）。違えば元に戻す（`reverted` で読み直して再試行する）。
- * 途中でホストや Python が失敗したら（429・5xx・MR が消えた など）、書いたものを確かめ切れないのでユーザの対応に切り替える
+ * 途中でホストや ccnavi が失敗したら（429・5xx・MR が消えた など）、書いたものを確かめ切れないのでユーザの対応に切り替える
  */
 async function settleRace(
   deps: WriteDeps,
@@ -436,7 +436,7 @@ async function settleRace(
     try {
       again = await plan(await readFamily(repo, family, deps, done.parent), stamp);
     } catch (err) {
-      if (!(err instanceof MovedError) && !(err instanceof PyError)) throw err;
+      if (!(err instanceof MovedError) && !(err instanceof CcnaviError)) throw err;
       again = null;
     }
     if (again !== null && again.kind === "rows" && (await sameRows(again.rows, planned.rows))) return { kind: "kept" };
@@ -466,7 +466,7 @@ async function writeLoop(repo: RepoConfig, family: string, deps: WriteDeps, what
     }
     return { kind: "conflict", message: `反映中に ${family} の先頭が ${MAX_ROUNDS} 回更新されました。少し待ってからボードを更新し、${what}` };
   } catch (err) {
-    return { kind: err instanceof PyError ? "refused" : "failed", message: (err as Error).message ?? String(err) };
+    return { kind: err instanceof CcnaviError ? "refused" : "failed", message: (err as Error).message ?? String(err) };
   }
 }
 
@@ -479,7 +479,7 @@ export async function approveFamily(repo: RepoConfig, family: string, shown: Sho
     return { kind: "failed", message: (err as Error).message ?? String(err) };
   }
   return await writeLoop(repo, family, deps, "承認し直してください。", async (read, stamp) => {
-    const res = await py.plan(deps.py, {
+    const res = await ccnavi.plan(deps.ccnavi, {
       snapshot: read.input,
       family,
       only: shown.only,
@@ -510,7 +510,7 @@ async function readOrMoved(repo: RepoConfig, family: string, deps: WriteDeps): P
 
 /**
  * フェーズをレビュー済みにする。毎周、親子のチケットと MR のスレッド・レビューを読み直し、
- * Python の `confirm` が通したときだけ、レビュー待ちの子の `done/` への移動とマーカー（`actor` = PAT の持ち主、
+ * ccnavi の `confirm` が通したときだけ、レビュー待ちの子の `done/` への移動とマーカー（`actor` = PAT の持ち主、
  * `via: chrome`）を 1 コミットで書く。未解決のスレッドや変更要求が残れば書かない。
  */
 export async function confirmPhase(repo: RepoConfig, family: string, phase: number, deps: WriteDeps): Promise<Outcome> {
@@ -523,7 +523,7 @@ export async function confirmPhase(repo: RepoConfig, family: string, phase: numb
   const ask = (op: string, args: readonly unknown[]) => deps.call(op, [repo.owner, repo.repo, ...args]);
   return await writeLoop(repo, family, deps, "レビュー済みにし直してください。", async (read, stamp) => {
     const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
-    const res = await askConfirm(deps.py, ask, {
+    const res = await askConfirm(deps.ccnavi, ask, {
       snapshot: read.input,
       family,
       phase,
@@ -580,10 +580,10 @@ export type DecideOutcome =
 /** 決める判断の内側で、書かずに終える答え（コミットを積む中身が無い） */
 const NO_COMMIT: Outcome = { kind: "refused", message: "親のブランチへ反映する内容がありません" };
 
-/** Python の `CORE_DECIDE_MISMATCH`（見せた指摘と今の指摘が違う） */
+/** ccnavi の `CORE_DECIDE_MISMATCH`（見せた指摘と今の指摘が違う） */
 const DECIDE_MISMATCH = "CORE_DECIDE_MISMATCH";
 
-/** Python の `CORE_DECIDE_CHOICES`（選択の形が合わない。`carry` が読み直した結果で解決済みでないときも） */
+/** ccnavi の `CORE_DECIDE_CHOICES`（選択の形が合わない。`carry` が読み直した結果で解決済みでないときも） */
 const DECIDE_CHOICES = "CORE_DECIDE_CHOICES";
 
 /** 指摘のキー（URL か、無ければスレッドの id）→ ホストのスレッドの id。同じキーが複数あれば null（取り違えない） */
@@ -611,7 +611,7 @@ async function readSettled(repo: RepoConfig, family: string, deps: WriteDeps): P
 }
 
 /**
- * 決める画面の材料を読む（書かない）。親子のチケットと MR のスレッド・レビューを読み、Python の `decide`（preview）が
+ * 決める画面の材料を読む（書かない）。親子のチケットと MR のスレッド・レビューを読み、ccnavi の `decide`（preview）が
  * 通したときだけ、残った指摘とダイジェストを返す。通らなければ理由を投げる。
  *
  * 各指摘に、Chrome で扱えない理由（`unsupported`）を付ける。保留中のレビューのスレッド・解決できない種類のスレッド・
@@ -623,7 +623,7 @@ export async function decidePreview(repo: RepoConfig, family: string, phase: num
   const read = await readSettled(repo, family, deps);
   if (read === null) throw new Error(`読み取り中に ${family} の先頭が ${MAX_ROUNDS} 回更新されました。少し待ってからボードを更新してください`);
   const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
-  const res = await askDecide(deps.py, ask, { snapshot: read.input, family, phase, copy, stamp: localStamp(deps.now()), mode: "preview" });
+  const res = await askDecide(deps.ccnavi, ask, { snapshot: read.input, family, phase, copy, stamp: localStamp(deps.now()), mode: "preview" });
   if (res.problems.length > 0 || !res.preview) throw new Error(res.problems.join("\n") || "残った指摘を読み取れませんでした");
   const ids = threadIds(copy);
   let abilities: Map<string, string> | null = null;
@@ -648,18 +648,18 @@ function afterHost(out: Exclude<Outcome, { readonly kind: "written" }>, note: st
   return { ...out, message: `${note}${out.message}`, hostWritten: true };
 }
 
-/** 書き終えた keep・issue のキーを `carry` にしたとき、Python が読み直した結果で解決済みと確かめる回数 */
+/** 書き終えた keep・issue のキーを `carry` にしたとき、ccnavi が読み直した結果で解決済みと確かめる回数 */
 const CARRY_TRIES = 3;
 
 /**
- * 選んだ対応方針を反映する。順序は次のとおり。(1) 見せた指摘のまま通るかを Python に聞き、計画（`host_plan`）を得る。
+ * 選んだ対応方針を反映する。順序は次のとおり。(1) 見せた指摘のまま通るかを ccnavi に聞き、計画（`host_plan`）を得る。
  * (2) 書く前の確かめ（権限・Chrome で扱えない種類）。(3) ホストへ issue・返信・解決を書く（`writeLoop` の外で 1 度だけ）。
  * (4) 読み直して、`writeLoop` で親のブランチへ 1 コミットする。(5) MR にコメントを投稿する。
  *
  * - (1)(2) で通らなければ何も書かない。(3) で止まればコミットせず、済んだ分と理由を返す。
  *   止まったあとは、ボードを読み直し、未解決の指摘だけ決め直せば続きが進む。
  * - (4) のループはホストに書かない。先頭が動いて再試行しても、issue・返信・解決は重ならない。
- *   ホストで書き終えた `keep`・`issue` のキーは `carry` で渡し、読み直した結果で解決済みであることを Python が確かめる。
+ *   ホストで書き終えた `keep`・`issue` のキーは `carry` で渡し、読み直した結果で解決済みであることを ccnavi が確かめる。
  *   ホストの読み取りが遅れて確かめが通らないときだけ、短く待って取り直す。
  * - 指摘が 0 件（`choices` が空）なら、ホストには書かず、「レビュー済みにする」と同じコミットを積む。コメントも投稿しない。
  *   「レビュー済みにする」は MR への書き込み権限を要らないので、権限の足りない PAT でも通るようにする。
@@ -703,7 +703,7 @@ export async function decidePhase(
       if (read === null) return { kind: "conflict", message: `反映前の読み取り中に ${family} の先頭が ${MAX_ROUNDS} 回更新されました。少し待ってからボードを更新し、もう一度決めてください。` };
       const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
       mr = copy.mr.number;
-      const res = await askDecide(deps.py, ask, { ...base, snapshot: read.input, copy, stamp: localStamp(deps.now()), carry: [] });
+      const res = await askDecide(deps.ccnavi, ask, { ...base, snapshot: read.input, copy, stamp: localStamp(deps.now()), carry: [] });
       if (res.code === DECIDE_MISMATCH || res.mismatch) return { kind: "mismatch", message: res.problems.join("\n") || "見せた指摘が今の指摘と違います" };
       if (res.problems.length > 0 || !res.host_plan) {
         return { kind: "refused", message: res.problems.join("\n") || "残った指摘の対応方針を反映できません", ...codeOf(res) };
@@ -736,7 +736,7 @@ export async function decidePhase(
       }
     }
   } catch (err) {
-    return { kind: err instanceof PyError ? "refused" : "failed", message: reasonOf(err) };
+    return { kind: err instanceof CcnaviError ? "refused" : "failed", message: reasonOf(err) };
   }
 
   // (4) 読み直して、親のブランチへ 1 コミット（ループの中ではホストに書かない）
@@ -746,7 +746,7 @@ export async function decidePhase(
     for (let attempt = 1; attempt <= CARRY_TRIES; attempt += 1) {
       const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
       mr = copy.mr.number;
-      res = await askDecide(deps.py, ask, { ...base, snapshot: read.input, copy, stamp, carry });
+      res = await askDecide(deps.ccnavi, ask, { ...base, snapshot: read.input, copy, stamp, carry });
       // 書き終えたキーが、読み直した結果でまだ解決済みに見えない（ホストの読み取りの遅れ）ときだけ、待って取り直す
       if (carry.length === 0 || res.code !== DECIDE_CHOICES) break;
       if (attempt < CARRY_TRIES) await sleep(VERIFY_WAIT_MS);

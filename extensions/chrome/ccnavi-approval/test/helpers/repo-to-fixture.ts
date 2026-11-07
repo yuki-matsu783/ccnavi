@@ -19,7 +19,7 @@ export const MAX_FILE_BYTES = 256 * 1024;
 /** 載せる全体の上限（ブランチごとの数え。バイト） */
 export const MAX_TOTAL_BYTES = 8 * 1024 * 1024;
 
-/** 載せる場所（接頭辞）。拡張が読む・書くパス（`src/core/guard.ts`・`py/ccnavi_chrome.py`）に合わせる */
+/** 載せる場所（接頭辞）。拡張が読む・書くパス（`src/core/guard.ts`・リポジトリの `go/internal/entry/chrome`）に合わせる */
 export const ALLOW_PREFIXES: readonly string[] = ["wip/", ".ccnavi/approved/", ".ccnavi/config/common/", ".ccnavi/config/project/"];
 /** 載せる 1 ファイル */
 export const ALLOW_FILES: readonly string[] = [".ccnavi/scripts/ccnavi-common.sh", ".claude/settings.json"];

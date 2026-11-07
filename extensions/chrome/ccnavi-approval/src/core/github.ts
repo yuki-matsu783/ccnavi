@@ -569,7 +569,7 @@ export interface PullReview {
   readonly author: string;
 }
 
-/** ホストから取得した結果（`ccnavi-review.sh fetch` と同じ形。Python の `review_host.Result` が読む） */
+/** ホストから取得した結果（`ccnavi-review.sh fetch` と同じ形。ccnavi の `host.ResultOf` が読む） */
 export interface ReviewCopy {
   readonly host: "github" | "gitlab";
   readonly mr: { readonly number: number; readonly url: string };
@@ -691,7 +691,7 @@ export const COMPARE_FILES_LIMIT = 300;
 /**
  * 依頼時の先頭 `base` から今の先頭 `head` までに変わったパス。改名は元と先の両方を入れる（手元の
  * `--no-renames` と同じ）。読めない・打ち切られた・`base` が祖先でない（`ahead`・`identical` でない）なら
- * `files` は null で、Python が「動いた」と数える。
+ * `files` は null で、ccnavi が「動いた」と数える。
  */
 export async function compareFiles(client: Client, owner: string, repo: string, base: string, head: string): Promise<{ base: string; head: string; files: string[] | null }> {
   const b = checkOid(base);

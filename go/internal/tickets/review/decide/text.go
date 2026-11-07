@@ -432,15 +432,15 @@ func PostText(r *oplog.Record, stageID string) (string, bool) {
 	return text, true
 }
 
-// acceptWhy は受け入れたスレッドに残す返信の、受け入れる場面の 1 行。
-func acceptWhy(number string) string {
+// AcceptWhy は受け入れたスレッドに残す返信の、受け入れる場面の 1 行。
+func AcceptWhy(number string) string {
 	return fmt.Sprintf("フェーズ %s の未解決の指摘を、ユーザが decide で決めた", number)
 }
 
 // ResumePlan は保存した判断から受け入れの計画を書き直す（`--resume` が返信の続きに使う）。選び直させず、保存した
 // 選択（keep・issue）のスレッドに返信する計画を、同じ操作ID で書く。
 func ResumePlan(r *oplog.Record, outPath string) int {
-	why := acceptWhy(strconv.Itoa(r.Phase))
+	why := AcceptWhy(strconv.Itoa(r.Phase))
 	var items []host.AcceptItem
 	for _, item := range r.Shown {
 		row, _ := item.(*pyjson.Object)

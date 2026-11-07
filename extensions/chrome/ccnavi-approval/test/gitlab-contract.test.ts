@@ -10,7 +10,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 
-import { REPO } from "./helpers/python.js";
+import { REPO } from "./helpers/ccnavi.js";
 import { MockGitLab } from "./helpers/mock-gitlab.js";
 import { TOKEN, blobSha } from "./helpers/mock-github.js";
 import {

@@ -1,12 +1,12 @@
 /**
- * Pyodide の上の入口（`py/ccnavi_chrome.py`）との約束。判定はすべて Python が出し、
+ * 同梱の ccnavi（WASM。Go の入口は `go/internal/entry/chrome`）との約束。判定はすべて ccnavi が出し、
  * ここは形だけを持つ。TS で判定し直すと、手元の hook・lint と答えが 2 か所に分かれるため。
  */
 import type { HostPlan } from "./decide-host.js";
 import type { DecidePreview } from "./reviewed.js";
 
-/** 要求と答えの形の版。`ccnavi_chrome.SCHEMA` と揃える */
-export const PY_SCHEMA = 1;
+/** 要求と答えの形の版。Go の `chrome.Schema` と揃える */
+export const CCNAVI_SCHEMA = 1;
 
 export interface Placement {
   readonly tickets: string;
@@ -25,7 +25,7 @@ export interface Branch {
   readonly head: string;
   readonly files: Record<string, string>;
   readonly binary: readonly string[];
-  /** シンボリックリンク（読まない。Python が「決まらない」にする） */
+  /** シンボリックリンク（読まない。ccnavi が「決まらない」にする） */
   readonly links?: readonly string[];
 }
 
@@ -109,13 +109,13 @@ export interface BoardResult {
   readonly closure: Closure;
   readonly undecided?: string;
   readonly refused?: string;
-  /** 書けるかどうか。互換の版と書く先の名前をもとに Python が決める */
+  /** 書けるかどうか。互換の版と書く先の名前をもとに ccnavi が決める */
   readonly write?: { readonly allowed: boolean; readonly reason: string };
   /** レビュー済みを付けられる候補 */
   readonly reviewable?: readonly Reviewable[];
   readonly batch?: readonly BatchEntry[];
   readonly text?: string;
-  /** 見せた画面のダイジェスト（承認のときに Python が読み直した中身と比べる） */
+  /** 見せた画面のダイジェスト（承認のときに ccnavi が読み直した中身と比べる） */
   readonly digest?: string;
   /** 承認するときに `plan` へ渡す絞り（ダイジェストを出したときの絞り。null なら絞らない） */
   readonly only?: readonly string[] | null;
@@ -155,7 +155,7 @@ export const APPROVE_LIST_CHANGED = "CORE_APPROVE_LIST_CHANGED";
 /** 承認: 識別子は同じで、見せた中身（ダイジェスト）が今と違う */
 export const APPROVE_DIGEST_CHANGED = "CORE_APPROVE_DIGEST_CHANGED";
 
-/** 文面の頭にコードを載せる（Python の `core_base.tagged` の、`ccnavi: ` で始まらない行の形） */
+/** 文面の頭にコードを載せる（ccnavi の `core.tagged` の、`ccnavi: ` で始まらない行の形） */
 export function tagged(code: string, text: string): string {
   return `[${code}] ${text}`;
 }
@@ -222,41 +222,41 @@ export interface Actor {
   readonly version: string;
 }
 
-/** Python を呼ぶ関数。Worker でも、試験の Node の Pyodide でも同じ形 */
-export type PyCall = (request: Record<string, unknown>) => Promise<Record<string, unknown>>;
+/** ccnavi を呼ぶ関数。Worker でも、試験の Node の WASM でも同じ形 */
+export type CcnaviCall = (request: Record<string, unknown>) => Promise<Record<string, unknown>>;
 
-export class PyError extends Error {}
+export class CcnaviError extends Error {}
 
-async function ask<T>(call: PyCall, op: string, body: Record<string, unknown>, key: string): Promise<T> {
-  const res = await call({ schema: PY_SCHEMA, op, ...body });
+async function ask<T>(call: CcnaviCall, op: string, body: Record<string, unknown>, key: string): Promise<T> {
+  const res = await call({ schema: CCNAVI_SCHEMA, op, ...body });
   if (typeof res.error === "string") {
-    throw new PyError(res.error);
+    throw new CcnaviError(res.error);
   }
-  if (res.schema !== PY_SCHEMA) {
-    throw new PyError(`Python の応答の形式の版が一致しません（${String(res.schema)}）`);
+  if (res.schema !== CCNAVI_SCHEMA) {
+    throw new CcnaviError(`ccnavi の応答の形式の版が一致しません（${String(res.schema)}）`);
   }
   return (key === "" ? res : res[key]) as T;
 }
 
-export const py = {
-  placement: (call: PyCall) => ask<Placement>(call, "placement", {}, "placement"),
-  families: (call: PyCall, snapshot: Snapshot, candidates: readonly string[]) =>
+export const ccnavi = {
+  placement: (call: CcnaviCall) => ask<Placement>(call, "placement", {}, "placement"),
+  families: (call: CcnaviCall, snapshot: Snapshot, candidates: readonly string[]) =>
     ask<Family[]>(call, "families", { snapshot, candidates }, "families"),
-  closure: (call: PyCall, snapshot: Snapshot, family: string) =>
+  closure: (call: CcnaviCall, snapshot: Snapshot, family: string) =>
     ask<Closure>(call, "closure", { snapshot, family }, ""),
-  board: (call: PyCall, snapshot: Snapshot, family: string) =>
+  board: (call: CcnaviCall, snapshot: Snapshot, family: string) =>
     ask<BoardResult>(call, "board", { snapshot, family }, ""),
-  compat: (call: PyCall, snapshot: Snapshot) => ask<Compat>(call, "compat", { snapshot }, "compat"),
+  compat: (call: CcnaviCall, snapshot: Snapshot) => ask<Compat>(call, "compat", { snapshot }, "compat"),
   plan: (
-    call: PyCall,
+    call: CcnaviCall,
     body: { snapshot: Snapshot; family: string; only: readonly string[] | null; shown: { ids: readonly string[]; digest: string }; stamp: string; actor: Actor },
   ) => ask<PlanResult>(call, "plan", { ...body }, ""),
-  start: (call: PyCall, body: { snapshot: Snapshot; issue: number; title: string; prefix?: string; taken: readonly string[] }) =>
+  start: (call: CcnaviCall, body: { snapshot: Snapshot; issue: number; title: string; prefix?: string; taken: readonly string[] }) =>
     ask<StartResult>(call, "start", { ...body }, ""),
-  adopt: (call: PyCall, body: { snapshot: Snapshot; branch: string; names: readonly string[] }) =>
+  adopt: (call: CcnaviCall, body: { snapshot: Snapshot; branch: string; names: readonly string[] }) =>
     ask<AdoptResult>(call, "adopt", { ...body }, ""),
   confirm: (
-    call: PyCall,
+    call: CcnaviCall,
     body: {
       snapshot: Snapshot;
       family: string;
@@ -270,7 +270,7 @@ export const py = {
     },
   ) => ask<ConfirmResult>(call, "confirm", { ...body }, ""),
   decide: (
-    call: PyCall,
+    call: CcnaviCall,
     body: {
       snapshot: Snapshot;
       family: string;

@@ -26,18 +26,19 @@ import (
 // acceptedByManual は手で動かした子の確定で、受け入れ台帳とレビュー済みのマーカーに書く経路。
 const acceptedByManual = "manual"
 
-// checked は confirm の答え。problems は標準エラーに出す行で、通らなければ planned が nil。
+// checked は confirm の答え。problems は標準エラーに出す行で、通らなければ planned が nil で、code に最初の理由の種別。
 type checked struct {
 	problems []string
 	planned  *agree.Planned
+	code     code
 }
 
 func refusedCheck(c code, problems []string) checked {
-	return checked{problems: refused(c, problems)}
+	return checked{problems: refused(c, problems), code: c}
 }
 
-// confirm は、レビュー済みにしてよいかを見る。通れば、書くもの（子を done/ へ、受け入れ台帳、レビュー済みのマーカー）を溜める段に並べる。result はホストから取得した結果である。changed は、依頼の後にユーザが見るものが動いたことの説明で、空なら動いていない。moved は、止めたあとの説明にだけ使う。manual が確定してよい形（SettleReady）なら、未解決の指摘は解決せず、版つきで受け入れ台帳に足す。account は `--actor` のアカウントである。空なら書かない。
-func confirm(conf *config.Settings, root, account, parentID string, number int, result host.Result, changed string, manual *phase.Manual, moved request.Moved) (checked, error) {
+// confirm は、レビュー済みにしてよいかを見る。通れば、書くもの（子を done/ へ、受け入れ台帳、レビュー済みのマーカー）を溜める段に並べる。result はホストから取得した結果である。changed は、依頼の後にユーザが見るものが動いたことの説明で、空なら動いていない。moved は、止めたあとの説明にだけ使う。manual が確定してよい形（SettleReady）なら、未解決の指摘は解決せず、版つきで受け入れ台帳に足す。actor の Account と Via はマーカーに書く（空なら書かない）。stamp は書く時刻で、空なら今。
+func confirm(conf *config.Settings, root string, actor Actor, stamp, parentID string, number int, result host.Result, changed string, manual *phase.Manual, moved request.Moved) (checked, error) {
 	parent := openParent(conf, root, parentID)
 	if parent == nil {
 		return refusedCheck(codeConfirmNoParent, []string{"ccnavi: 親 " + parentID + " の承認済みチケットが作業中にありません。"}), nil
@@ -66,26 +67,21 @@ func confirm(conf *config.Settings, root, account, parentID string, number int, 
 	} else if problems := request.ReviewProblems(conf, root, parent, number, result); len(problems) > 0 {
 		return refusedCheck(codeConfirmReviewOpen, problems), nil
 	}
-	route := via.Current()
-	if account != "" {
-		route = via.CLI
-	}
 	stage, done, err := fsio.Staging()
 	if err != nil {
 		return checked{}, err
 	}
 	defer done()
-	restoreClock, err := fsio.FixClock(fsio.Stamp())
+	if stamp == "" {
+		stamp = fsio.Stamp()
+	}
+	restoreClock, err := fsio.FixClock(stamp)
 	if err != nil {
 		return checked{}, err
 	}
 	defer restoreClock()
-	defer via.Session(route, account)()
-	routeText := ""
-	if account != "" {
-		routeText = string(route)
-	}
-	mark := request.ReviewedMark(result.MR.Number, nil, account, routeText, "")
+	defer via.Session(actor.route(), actor.Account)()
+	mark := request.ReviewedMark(result.MR.Number, nil, actor.Account, string(actor.Via), "")
 	if settled {
 		mark.Set("via", acceptedByManual)
 		mark.Set("moved", append([]string{}, manual.Children...))
@@ -184,7 +180,11 @@ func ConfirmLocal(stdout, stderr io.Writer, conf *config.Settings, root, cwd str
 			io.WriteString(stdout, linePrefix+line+"\n")
 		}
 	}
-	c, err := confirm(conf, root, account, parent.ID, number, result, "", &manual, moved)
+	actor := Actor{}
+	if account != "" {
+		actor = Actor{Account: account, Via: via.CLI}
+	}
+	c, err := confirm(conf, root, actor, "", parent.ID, number, result, "", &manual, moved)
 	if err != nil {
 		return 1, err
 	}

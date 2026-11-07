@@ -34,22 +34,24 @@ func (m *mismatch) json() *pyjson.Object {
 		"digest", pyjson.NewObject("expected", m.shownDigest, "current", m.nowDigest))
 }
 
-// verdict は judge の答え。messages は標準エラーに出す文面（呼び手が出す）。
+// verdict は judge の答え。messages は標準エラーに出す文面（呼び手が出す）。text と digest は比べた一覧
+// （絞りが通らなかったときは絞らない一覧）の画面とダイジェスト。
 type verdict struct {
 	gathered *agree.Gathered
+	text     string
 	digest   string
 	messages string
 	mismatch *mismatch
 }
 
-// shown は見せたもの（識別子とダイジェスト）。
-type shown struct {
-	ids    []string
-	digest string
+// Shown は見せたもの（識別子とダイジェスト）。
+type Shown struct {
+	IDs    []string
+	Digest string
 }
 
 // judge は承認の対象を組み、ダイジェストを出す。shown を渡せば、今のものと比べる。照合するのは、承認の対象の識別子と、各提案ファイルの元のバイト列全体だけである。承認の可否は、ここで最新の状態から計算し直す。絞り（only）が通らなかったときは、絞らない一覧を今の一覧として比べる。ボードの一覧が古いからである。
-func judge(conf *config.Settings, root string, only []string, seen *shown) verdict {
+func judge(conf *config.Settings, root string, only []string, seen *Shown) verdict {
 	var err bytes.Buffer
 	gathered := agree.Gather(&err, conf, root, only)
 	current := gathered
@@ -57,16 +59,31 @@ func judge(conf *config.Settings, root string, only []string, seen *shown) verdi
 		current = agree.Gather(&err, conf, root, nil)
 	}
 	digest := agree.ProposalsDigest(current.Batch)
-	v := verdict{gathered: gathered, digest: digest}
+	v := verdict{gathered: gathered, text: current.Text(), digest: digest}
 	if seen != nil {
-		wanted := wantedIDs(seen.ids)
+		wanted := wantedIDs(seen.IDs)
 		now := current.Identifiers()
-		if !slices.Equal(wanted, now) || pyfmt.Lower(ospath.Strip(seen.digest)) != digest {
-			v.mismatch = &mismatch{wanted, list(now), seen.digest, digest}
+		if !slices.Equal(wanted, now) || pyfmt.Lower(ospath.Strip(seen.Digest)) != digest {
+			v.mismatch = &mismatch{wanted, list(now), seen.Digest, digest}
 		}
 	}
 	v.messages = err.String()
 	return v
+}
+
+// refusal は承認が通らない根拠の種別（通るなら空）。見せたものと違えば、識別子の違いを中身の違いより先に見る。
+// 違わなくても、承認する対象が無いか、絞りが通らなければ codeApproveNothing。
+func (v verdict) refusal() code {
+	if m := v.mismatch; m != nil {
+		if !slices.Equal(m.expected, m.current) {
+			return codeApproveListChanged
+		}
+		return codeApproveDigestChanged
+	}
+	if len(v.gathered.Batch) == 0 || v.gathered.Refused != "" {
+		return codeApproveNothing
+	}
+	return ""
 }
 
 // wantedIDs は見せた識別子（空を除き、重ねず、名前順）。
@@ -144,7 +161,7 @@ func Approve(stdin io.Reader, stdout, stderr io.Writer, conf *config.Settings, r
 			return 1, nil
 		}
 		// 確認を待つ間に提案が更新されていないか、承認の直前に最新の状態から照合する（ボード・Chrome と同じ強さ）。
-		latest := judge(conf, root, only, &shown{gathered.Identifiers(), v.digest})
+		latest := judge(conf, root, only, &Shown{gathered.Identifiers(), v.digest})
 		if latest.mismatch == nil {
 			v = latest
 			gathered = latest.gathered
@@ -343,7 +360,7 @@ func ApproveYes(stdout, stderr io.Writer, conf *config.Settings, root string, ex
 				"バイト列のダイジェスト。preview の digest）が必要です")+"\n")
 		return 1, nil
 	}
-	v := judge(conf, root, narrowed, &shown{expected, digest})
+	v := judge(conf, root, narrowed, &Shown{expected, digest})
 	io.WriteString(stderr, v.messages)
 	sayElsewhere(stderr, v.gathered)
 	g := v.gathered

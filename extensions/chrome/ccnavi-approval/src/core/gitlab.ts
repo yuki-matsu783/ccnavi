@@ -398,7 +398,7 @@ function writer(n: Note | undefined): string {
 /**
  * 機構自身のスレッドと見てよいノートの並びかどうか。目印で始まるだけでは足りず、書き手も代表のノートの書き手と同じでなければならない。
  * 依頼の投稿者のスレッドに他人が目印で始まる返信を足しても、未解決を隠せないようにするため。
- * 代表の書き手が依頼の投稿者かどうかは、呼ぶ側（Python）が依頼の記録と比べる。
+ * 代表の書き手が依頼の投稿者かどうかは、呼ぶ側（ccnavi）が依頼の記録と比べる。
  */
 function ownThread(notes: Note[], first: Note): boolean {
   const by = writer(first);

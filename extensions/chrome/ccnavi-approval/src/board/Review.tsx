@@ -1,7 +1,7 @@
 /**
  * 依頼済みのフェーズのレビューの欄（`section.review[data-phase]`）。スレッドは未解決を先に、本文は承認の画面と同じ消毒で描く
  * （Markdown は消毒した断片、隠れる書き方は通さない、HTML コメントは見える形で出す。承認者に見えないまま承認させないため）。
- * 「レビュー済みにする」は、Python が通さない理由を返さず、書ける親子のチケットで、読めたときだけ出す。
+ * 「レビュー済みにする」は、ccnavi が通さない理由を返さず、書ける親子のチケットで、読めたときだけ出す。
  */
 import type { JSX } from "react";
 
@@ -40,7 +40,7 @@ export function Review({ panel, writable, onReview, decide }: { panel: ReviewPan
     );
   }
   // 並べるのは取得した結果のとおり。GitHub では目印で始まるスレッドもユーザのものとして数え、GitLab で依頼を投稿したアカウントの
-  // ccnavi の依頼のスレッドを数えないのは Python。ここは未解決の件数を取得した結果のとおりに出す
+  // ccnavi の依頼のスレッドを数えないのは ccnavi。ここは未解決の件数を取得した結果のとおりに出す
   const threads = [...(panel.copy?.threads ?? [])].sort((a, b) => Number(a.resolved) - Number(b.resolved));
   const unresolved = threads.filter((t) => !t.resolved).length;
   // 未解決の指摘が残るフェーズは、対応方針を決める画面から確定する（0 件のときは「レビュー済みにする」）

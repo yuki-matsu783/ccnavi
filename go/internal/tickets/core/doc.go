@@ -14,6 +14,9 @@
 // （_write_op は fsio.Op.Apply）、write_recorded・written_paths・copy_paths・dirty_parents・placed_report・
 // refusal_code・tagged・refused・confirm・confirm_gate・_precondition・_manual_refusal・_ledger_entry・
 // next_after_confirm・_open_parent は私的。Snapshot・Actor・read_fs は畳んだ（時刻は fsio.Stamp、経路は via）。
-// Chrome 拡張（Pyodide）だけが引く名前（Changes.per_branch・reviewable・requested_head・moved_on_host・
-// moved_detail_on_host・manual_for・decide・decide_preview）は、Go に呼び手が無いので移していない。
+// Chrome 拡張（entry/chrome の WASM）が引く名前は chrome.go と decide.go に置いた。judge_approval → JudgeApproval
+// （答えは Judged）、plan → Plan、Changes.per_branch・lines → Changes.PerBranch・Lines、refusal_code → verdict.refusal、
+// confirm → Confirm（答えは Checked）、reviewable → ReviewableOf、requested_head → RequestedHead、moved_detail_on_host →
+// MovedDetailOnHost、manual_for → ManualFor、decide_preview → DecidePreviewOf、decide → Decide。moved_on_host は呼び手が
+// 無いので移していない。
 package core

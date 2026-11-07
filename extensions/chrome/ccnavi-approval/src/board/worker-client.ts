@@ -1,14 +1,14 @@
 /**
- * ボードから Pyodide の Worker を呼ぶ手段。
+ * ボードから ccnavi（WASM）の Worker を呼ぶ手段。
  */
-import type { PyCall } from "../core/py.js";
+import type { CcnaviCall } from "../core/ccnavi.js";
 
-export interface PyWorker {
-  readonly call: PyCall;
-  init(): Promise<{ boot_ms: number; import_ms: number; total_ms: number; pyodide: string; violations: string[] }>;
+export interface CcnaviWorker {
+  readonly call: CcnaviCall;
+  init(): Promise<{ boot_ms: number; total_ms: number; version: string; violations: string[] }>;
 }
 
-export function startWorker(): PyWorker {
+export function startWorker(): CcnaviWorker {
   const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
   let next = 1;
   const waiting = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
@@ -30,7 +30,7 @@ export function startWorker(): PyWorker {
       worker.postMessage({ id, ...body });
     });
   return {
-    init: () => send({ kind: "init" }) as ReturnType<PyWorker["init"]>,
+    init: () => send({ kind: "init" }) as ReturnType<CcnaviWorker["init"]>,
     call: async (request) => JSON.parse((await send({ kind: "call", request: JSON.stringify(request) })) as string),
   };
 }

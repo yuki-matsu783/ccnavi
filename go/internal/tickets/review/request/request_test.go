@@ -113,7 +113,7 @@ func TestIsSHA(t *testing.T) {
 		"-x": false, strings.Repeat("A", 40): false, "abc1234\n": true, "abc1234\n\n": false,
 	}
 	for value, want := range cases {
-		if isSHA(value) != want {
+		if IsSHA(value) != want {
 			t.Errorf("%q: %v", value, !want)
 		}
 	}

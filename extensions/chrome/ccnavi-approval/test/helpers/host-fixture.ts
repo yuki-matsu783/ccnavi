@@ -16,7 +16,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { HERE } from "./python.js";
+import { HERE } from "./ccnavi.js";
 
 export const SCENES = path.join(HERE, "test", "fixtures", "host", "github");
 

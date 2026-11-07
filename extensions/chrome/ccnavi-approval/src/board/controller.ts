@@ -16,7 +16,7 @@ import { collectRepo, type BlobCache, type Deps, type FamilyBoard, type HostCall
 import { listIssues, startIssue } from "../core/start.js";
 import { DECIDE_CHOICES, DECIDE_LABELS, type DecideChoice, type DecidePreview } from "../core/reviewed.js";
 import { approveFamily, confirmPhase, decidePhase, decidePreview, type DecideOutcome, type Outcome, type WriteDeps } from "../core/write.js";
-import type { PyWorker } from "./py-client.js";
+import type { CcnaviWorker } from "./worker-client.js";
 
 /** 親子のチケットごとの「要確認」（リポジトリのキー → 親のブランチ名 → 文面）。`chrome.storage.local` の `attention` */
 export type Attention = Record<string, Record<string, string>>;
@@ -62,11 +62,10 @@ export interface ResultLine {
   readonly text: string;
 }
 
-/** 読み込みの具合（`#status`）。Pyodide の起動の時間は、起動した後だけ持つ */
+/** 読み込みの具合（`#status`）。ccnavi（WASM）の起動の時間は、起動した後だけ持つ */
 export interface StatusLine {
   readonly text: string;
   readonly bootMs?: number;
-  readonly importMs?: number;
   readonly violations?: number;
 }
 
@@ -155,7 +154,7 @@ export interface BoardEnv {
   readonly openOptions: () => Promise<void> | void;
   /** `window.confirm` */
   readonly confirm: (message: string) => boolean;
-  readonly startWorker: () => PyWorker;
+  readonly startWorker: () => CcnaviWorker;
   readonly blobCache: () => Promise<BlobCache>;
   readonly now: () => Date;
   /** ボードの入力欄を触っている（自動の読み直しを飛ばす） */
@@ -290,7 +289,7 @@ export function createBoardController(env: BoardEnv): BoardController {
     state: "loading",
   };
   const listeners = new Set<() => void>();
-  let worker: PyWorker | null = null;
+  let worker: CcnaviWorker | null = null;
   /** 自動の読み直しの間隔ごとの管理（`refresh` が終わるたびに数え直す） */
   let auto: AutoRefresh | null = null;
   /** 走っている読み直し。重ねて走らせない */
@@ -325,7 +324,7 @@ export function createBoardController(env: BoardEnv): BoardController {
     };
   }
 
-  function pyWorker(): PyWorker {
+  function ccnaviWorker(): CcnaviWorker {
     if (worker === null) worker = env.startWorker();
     return worker;
   }
@@ -339,10 +338,10 @@ export function createBoardController(env: BoardEnv): BoardController {
 
   async function writeDeps(repo: RepoConfig): Promise<WriteDeps> {
     const stats = newStats();
-    const w = pyWorker();
+    const w = ccnaviWorker();
     return {
       call: hostCall(repo.host, stats),
-      py: w.call,
+      ccnavi: w.call,
       cache: await env.blobCache(),
       now: env.now,
       stats,
@@ -654,16 +653,16 @@ export function createBoardController(env: BoardEnv): BoardController {
       set({ sections: new Map(), status: { ...snap.status, text: "リポジトリが登録されていません。設定画面で登録してください。" }, state: "done" });
       return;
     }
-    if (!fromTimer) set({ status: { ...snap.status, text: "Python（Pyodide）を起動しています…" } });
-    const w = pyWorker();
+    if (!fromTimer) set({ status: { ...snap.status, text: "ccnavi（WASM）を起動しています…" } });
+    const w = ccnaviWorker();
     const t = await w.init();
-    set({ status: { text: `Pyodide ${t.pyodide}：起動 ${t.boot_ms} ms・読み込み ${t.import_ms} ms`, bootMs: t.boot_ms, importMs: t.import_ms, violations: t.violations.length } });
+    set({ status: { text: `ccnavi ${t.version}（WASM）：起動 ${t.boot_ms} ms`, bootMs: t.boot_ms, violations: t.violations.length } });
     const cache = await env.blobCache();
     const attention = await readAttention();
     set({ attention });
     for (const repo of repos) {
       const stats = newStats();
-      const board = await ops.collectRepo(repo, { call: hostCall(repo.host, stats), py: w.call, cache, now: env.now, stats, workspace: workspaceOf(repo, stats) });
+      const board = await ops.collectRepo(repo, { call: hostCall(repo.host, stats), ccnavi: w.call, cache, now: env.now, stats, workspace: workspaceOf(repo, stats) });
       set({ boards: new Map(snap.boards).set(repoKey(repo), board) });
       drawRepo(board, attention);
     }

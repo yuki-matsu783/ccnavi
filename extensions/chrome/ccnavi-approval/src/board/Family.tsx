@@ -1,7 +1,7 @@
 /**
- * 親子のチケットの欄（`article.family[data-family]`）。判定は出さず、Python の答えを並べるだけ（判定を 1 か所に保つため）。
+ * 親子のチケットの欄（`article.family[data-family]`）。判定は出さず、ccnavi の答えを並べるだけ（判定を 1 か所に保つため）。
  *
- * 承認のボタンを出すかは Python の答え（`write.allowed`）で決まり、ここは答えのとおりに
+ * 承認のボタンを出すかは ccnavi の答え（`write.allowed`）で決まり、ここは答えのとおりに
  * 並べるだけ。押したときの動き（`FamilyActions`）は呼び手が渡す。渡さなければボタンを出さない（読み取りだけ、または要確認）。
  * Markdown の本文だけを消毒した断片で入れ、ほかの素の文字列は textContent。
  */

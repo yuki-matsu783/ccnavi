@@ -329,7 +329,7 @@ func alreadyRequested(conf *config.Settings, treeRoot string, p *phase.Phase, nu
 		return ""
 	}
 	if head != "" && head != recorded {
-		if !isSHA(recorded) {
+		if !IsSHA(recorded) {
 			return ""
 		}
 		changed, failed := treegate.DiffPaths(treeRoot, recorded)

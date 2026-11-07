@@ -38,7 +38,6 @@ const (
 	msgUnresolved    = "ccnavi: 未解決のスレッドが %d 件残っている"
 	msgMovedToDone   = "レビュー待ちの子を %s/%s/ へ動かした: %s"
 	msgLedgerFailed  = "受け入れ台帳を書けない: "
-	msgMarkPrefix    = "マーカーを置けない: "
 	msgReviewedOK    = "OK: フェーズ %d はレビュー済み。先へ進める"
 	msgDraftFailed   = "下書きを書き出せない (%s: %s)"
 	msgRedo          = "push してから '%s review-request --phase %d --body-file <依頼文>' で依頼を出し直してください"
@@ -309,12 +308,16 @@ func SettleChildren(stdout, stderr io.Writer, conf *config.Settings, root string
 		return false, nil
 	}
 	if len(moved) > 0 {
-		fmt.Fprintln(stdout, movedLine(conf, moved))
+		fmt.Fprintln(stdout, MovedLine(conf, moved))
 	}
 	return true, nil
 }
 
-func movedLine(conf *config.Settings, moved []string) string {
+// MarkPrefix はマーカーを置けなかったときの理由の頭。
+const MarkPrefix = "マーカーを置けない: "
+
+// MovedLine は子を done/ へ動かしたときに見せる行。
+func MovedLine(conf *config.Settings, moved []string) string {
 	return fmt.Sprintf(msgMovedToDone, conf.Approved, place.Done, strings.Join(moved, ", "))
 }
 
@@ -340,7 +343,7 @@ func SettleAndMark(stage *fsio.Stage, conf *config.Settings, root string, parent
 		return failed, nil
 	}
 	if len(moved) > 0 {
-		stage.AddLine(movedLine(conf, moved), 0, fsio.StreamOut)
+		stage.AddLine(MovedLine(conf, moved), 0, fsio.StreamOut)
 	}
 	home, err := approval.HomeDir(conf, root, parent.ID, "", parent.Project)
 	if err != nil {
@@ -351,15 +354,18 @@ func SettleAndMark(stage *fsio.Stage, conf *config.Settings, root string, parent
 			return msgLedgerFailed + failed, nil
 		}
 	}
-	prefixed := fsio.SetPolicy(func(po *fsio.Policy) { po.Prefix = msgMarkPrefix })
+	prefixed := fsio.SetPolicy(func(po *fsio.Policy) { po.Prefix = MarkPrefix })
 	failed = marks.WriteMark(home, parent.ID, p.Number, marks.Reviewed, mark)
 	prefixed()
 	if failed != "" {
-		return msgMarkPrefix + failed, nil
+		return MarkPrefix + failed, nil
 	}
-	stage.AddLine(fmt.Sprintf(msgReviewedOK, p.Number), 0, fsio.StreamOut)
+	stage.AddLine(ReviewedLine(p.Number), 0, fsio.StreamOut)
 	return "", nil
 }
+
+// ReviewedLine はレビュー済みのマーカーを置いたときに見せる行。
+func ReviewedLine(number int) string { return fmt.Sprintf(msgReviewedOK, number) }
 
 // ThreadLabel は一覧に出す 1 スレッドの表示（`<url> <ファイル>:<行> <最初の行>`）。位置の無いスレッド
 // （PR 全体へのコメント）は位置を省き、行だけ無いときはファイル名だけを出す。

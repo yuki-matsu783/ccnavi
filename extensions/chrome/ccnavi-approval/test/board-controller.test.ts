@@ -64,7 +64,7 @@ function harness(opts: { confirm?: boolean; ops?: Partial<BoardOps>; repos?: Rep
       log.confirm.push(m);
       return opts.confirm ?? true;
     },
-    startWorker: () => ({ call: async () => ({}), init: async () => ({ boot_ms: 10, import_ms: 20, total_ms: 30, pyodide: "0.test", violations: [] }) }),
+    startWorker: () => ({ call: async () => ({}), init: async () => ({ boot_ms: 10, total_ms: 30, version: "0.test", violations: [] }) }),
     blobCache: async () => ({ get: async () => undefined, put: async () => undefined }),
     now: () => new Date("2026-01-01T00:00:00Z"),
     editing: () => editing,
@@ -124,7 +124,7 @@ test("CX-T220 読み直し: document と chrome の無いところで、差し�
   assert.equal(s.state, "done");
   assert.deepEqual([...s.sections.keys()], [KEY]);
   assert.deepEqual(s.sections.get(KEY)?.attention, {});
-  assert.deepEqual(s.status, { text: "Pyodide 0.test：起動 10 ms・読み込み 20 ms", bootMs: 10, importMs: 20, violations: 0 });
+  assert.deepEqual(s.status, { text: "ccnavi 0.test（WASM）：起動 10 ms", bootMs: 10, violations: 0 });
   assert.deepEqual(s.banner, [{ level: "soon", className: "notice warn", text: "あと 3 日で切れる" }]);
   assert.equal(s.repos.length, 1);
   assert.ok(s.boards.has(KEY));

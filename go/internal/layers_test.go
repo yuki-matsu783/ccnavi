@@ -143,11 +143,11 @@ var subTiers = map[string]map[string]int{
 		// イベント名から上の部品へ振り分ける入口（実行前・実行後・ターンの区切り・セッションの開始）
 		"events": 3,
 	},
-	// entry の中。検査・診断・状態・版・sh への答えの上に、CLI の入口（cli）が立つ。
+	// entry の中。検査・診断・状態・版・sh への答えの上に、CLI の入口（cli）と Chrome 拡張の入口（chrome）が立つ。
 	"entry": {
 		"lint": 0, "diagnose": 0, "status": 0, "version": 0, "shask": 0,
-		"suggest": 1,
-		"cli":     2,
+		"suggest": 1, "chrome": 1,
+		"cli": 2,
 	},
 }
 

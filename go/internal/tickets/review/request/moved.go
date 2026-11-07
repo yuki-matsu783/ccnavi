@@ -44,9 +44,9 @@ const (
 // Python の re.match の `$` は末尾の改行 1 つの前でも当たるので `\n?\z` にする。
 var shaForm = regexp.MustCompile(`\A[0-9a-f]{7,64}\n?\z`)
 
-// isSHA はマーカーの head が sha の形をしているか。マーカーは親のブランチに乗って他の機械から届くので、
+// IsSHA はマーカーの head が sha の形をしているか。マーカーは親のブランチに乗って他の機械から届くので、
 // 中身を git の revision としてそのまま渡さない（`HEAD` や `@` は差分を空にし、`-` で始まる値はオプションになる）。
-func isSHA(value string) bool {
+func IsSHA(value string) bool {
 	return shaForm.MatchString(value)
 }
 
@@ -63,7 +63,7 @@ func MovedDetail(conf *config.Settings, requested *pyjson.Object, head string, c
 		return Moved{}
 	}
 	moved := fmt.Sprintf(msgHeadMoved, pyfmt.Head(recorded, git.ShortSHA), pyfmt.Head(head, git.ShortSHA))
-	if !isSHA(recorded) || !listed {
+	if !IsSHA(recorded) || !listed {
 		return Moved{moved, KindMoved}
 	}
 	seen := seenPaths(conf, changed)
@@ -96,7 +96,7 @@ func MovedInTree(conf *config.Settings, treeRoot string, requested *pyjson.Objec
 	recorded := markText(requested, "head")
 	var paths []string
 	listed := false
-	if recorded != "" && head != recorded && isSHA(recorded) {
+	if recorded != "" && head != recorded && IsSHA(recorded) {
 		found, failed := treegate.DiffPaths(treeRoot, recorded)
 		paths, listed = found, failed == ""
 	}

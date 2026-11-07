@@ -5,7 +5,7 @@
  * （`custom-hosts.ts`）は、実行時に `optional_host_permissions` の許可を取って使う。拡張のページの CSP は
  * manifest に固定されて実行時には変えられないため、`connect-src` は https 全般と loopback の http を許す。
  * PAT を送る先はユーザが設定画面で入れたホストだけになる（一覧の外へ勝手に送ることはしない）。
- * CSP に足すのは Pyodide に要る `'wasm-unsafe-eval'` だけ。`'unsafe-eval'`・`'unsafe-inline'` は入れない。
+ * CSP に足すのは WASM（同梱の ccnavi）に要る `'wasm-unsafe-eval'` だけ。`'unsafe-eval'`・`'unsafe-inline'` は入れない。
  */
 
 export type HostKind = "github" | "gitlab";
@@ -80,7 +80,7 @@ export function origins(hosts: readonly Host[]): string[] {
 }
 
 /**
- * 画像・フォームの送り先・base を制限する。足すのは Pyodide に要る 'wasm-unsafe-eval' だけ。
+ * 画像・フォームの送り先・base を制限する。足すのは WASM（同梱の ccnavi）に要る 'wasm-unsafe-eval' だけ。
  * `default-src 'self'` は入れない: 悪意のある本文の style 属性を DOMPurify が取り除く前の解析で、Chromium が
  * インラインの style の違反を毎回報告する（止まるのは同じで、表示の保護は DOMPurify が受け持つ）
  */

@@ -23,10 +23,11 @@ var (
 	// DefaultState はセッションごとの一時的な状態。消えても次の起動で取り直せる。
 	DefaultState = filepath.Join("logs", "state")
 	// DirectTmpDir は integrate が一時ワークツリーを置く場所（下にリポジトリごとの名前）。sh も同じ置き場を使う。
-	DirectTmpDir   = filepath.Join("logs", "direct-tmp")
-	defaultPhases  = filepath.Join(DefaultProjectHome, ConfigDir, "common", "phases.yml")
-	defaultRisk    = filepath.Join(DefaultProjectHome, ConfigDir, "common", "risks.yml")
-	defaultProject = "projects"
+	DirectTmpDir  = filepath.Join("logs", "direct-tmp")
+	defaultPhases = filepath.Join(DefaultProjectHome, ConfigDir, "common", "phases.yml")
+	defaultRisk   = filepath.Join(DefaultProjectHome, ConfigDir, "common", "risks.yml")
+	// DefaultProjects はプロジェクトのリポジトリの置き場（ワークスペースルートからの相対）。
+	DefaultProjects = "projects"
 
 	// LocalClaudeSettings は個人の上書き設定。`env` は Claude Code が起こしたプロセスに渡る。
 	LocalClaudeSettings = filepath.Join(ClaudeDir, "settings.local.json")
@@ -158,7 +159,7 @@ func Load(root string) (*Settings, []string) {
 		Approved:                    DefaultApproved,
 		Phases:                      ospath.Join(root, defaultPhases),
 		Risk:                        ospath.Join(root, defaultRisk),
-		Projects:                    ospath.Join(root, defaultProject),
+		Projects:                    ospath.Join(root, DefaultProjects),
 		ProjectHome:                 DefaultProjectHome,
 		ProjectRulesFiles:           map[string]string{},
 		ProjectPhasesFiles:          map[string]string{},

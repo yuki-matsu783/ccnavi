@@ -1,5 +1,5 @@
 /**
- * Chrome からの承認。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
+ * Chrome からの承認。模擬の GitHub と Node の上の WASM（拡張と同じ dist/ccnavi.wasm）で回す。
  *
  * - 1 コミットの組み立て（`createCommitOnBranch`、`expectedHeadOid` = 読んだ P の先頭）と、書いた後の確かめ
  * - 先頭が動いたら新しい Snapshot で判定と plan をやり直す。ダイジェストが同じなら見せ直さずに書き、違えば書かない
@@ -9,7 +9,7 @@ import { before, test } from "node:test";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 
-import type { PyCall } from "../src/core/py.js";
+import type { CcnaviCall } from "../src/core/ccnavi.js";
 import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
@@ -19,11 +19,11 @@ import { fixture, NOW, type FixtureBranch } from "./fixtures/repo.js";
 import { deps, hostCall, memoryCache, newStats } from "./helpers/host.js";
 import { COMPAT } from "./helpers/compat.js";
 import { blobSha, MockGitHub, TOKEN } from "./helpers/mock-github.js";
-import { pyodidePy } from "./helpers/python.js";
+import { wasmCcnavi } from "./helpers/ccnavi.js";
 
-let py: PyCall;
+let ccnavi: CcnaviCall;
 before(async () => {
-  py = (await pyodidePy()).call;
+  ccnavi = (await wasmCcnavi()).call;
 });
 
 const REPO: RepoConfig = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [], project: "", workspace: "" };
@@ -33,7 +33,7 @@ function depsFor(mock: MockGitHub): WriteDeps {
   const stats = newStats();
   return {
     call: hostCall(deps(mock, new Map([["github.com", TOKEN]])), stats),
-    py,
+    ccnavi,
     cache: memoryCache(),
     now: () => new Date(NOW),
     stats,
@@ -61,7 +61,7 @@ const TODO = "wip/proposals/todo/i0001.md";
 const DOING = ".ccnavi/approved/doing/i0001.md";
 const WORKFLOW = ".ccnavi/approved/phases/i0001/workflow.yml";
 
-test("CX-T100 承認は P への 1 コミット。条件は読んだ先頭、足す・消すは Python の Changes のとおり。書いた後の中身も確かめる", async () => {
+test("CX-T100 承認は P への 1 コミット。条件は読んだ先頭、足す・消すは ccnavi の Changes のとおり。書いた後の中身も確かめる", async () => {
   const { mock, d } = world();
   const before = mock.head("i0001");
   const proposal = mock.files("i0001")[TODO];

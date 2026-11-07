@@ -3,7 +3,7 @@ title: ccnavi 承認ボードの構成
 type: design
 description: Chrome 拡張 ccnavi 承認ボードのディレクトリごとの役目
 tags: [design-doc, extension, approval]
-keywords: [設計, 構成, service worker, Pyodide, Web Worker, hosts.json, ccnavi_chrome.py, core, MEMFS, React, controller]
+keywords: [設計, 構成, service worker, WASM, Web Worker, hosts.json, ccnavi-chrome, core, memfs, React, controller]
 ---
 
 # 構成
@@ -13,16 +13,16 @@ keywords: [設計, 構成, service worker, Pyodide, Web Worker, hosts.json, ccna
 | 場所 | 役目 |
 |---|---|
 | `src/background/` | service worker。PAT を持ち、ホストの API を呼ぶのはここだけ（画面には PAT を渡さない）。PAT の期限のバッジ |
-| `src/board/` | ボード（拡張のページ）。Worker を起動し、読んだ中身を Python に渡し、答えを描く。状態と副作用（読み直し・書く操作・確認が必要な状態・PAT の期限の帯・自動の読み直し）は `controller.ts` が持つ（`chrome`・`window` には、入口の `main.tsx` が渡す外界 `BoardEnv` を通してだけ触る）。描くのは React（`App.tsx` が `useSyncExternalStore` で controller を読み、リポジトリの欄 `Repo.tsx`、親子のチケット `Family.tsx`、レビュー `Review.tsx`（未解決の指摘が残るフェーズは、対応方針を決める画面 `Decide.tsx` を開く。開いているか・確定中・結果は controller が持ち、画面は渡された状態を描く）、「始める」`Start.tsx`、要確認 `Attention.tsx` を並べる）。Markdown の本文は `Markdown.tsx` が消毒した断片（`src/core/sanitize.ts`）を ref で差し込む（HTML の文字列には戻さない）。CSS の入口は `style.css`（共通の部品の CSS と、部品 1 つに 1 本のボードの CSS（`App.css`・`Repo.css` など）を読み、ビルドが `board.css` に組む） |
+| `src/board/` | ボード（拡張のページ）。Worker を起動し、読んだ中身を同梱の ccnavi に渡し、答えを描く。状態と副作用（読み直し・書く操作・確認が必要な状態・PAT の期限の帯・自動の読み直し）は `controller.ts` が持つ（`chrome`・`window` には、入口の `main.tsx` が渡す外界 `BoardEnv` を通してだけ触る）。描くのは React（`App.tsx` が `useSyncExternalStore` で controller を読み、リポジトリの欄 `Repo.tsx`、親子のチケット `Family.tsx`、レビュー `Review.tsx`（未解決の指摘が残るフェーズは、対応方針を決める画面 `Decide.tsx` を開く。開いているか・確定中・結果は controller が持ち、画面は渡された状態を描く）、「始める」`Start.tsx`、要確認 `Attention.tsx` を並べる）。Markdown の本文は `Markdown.tsx` が消毒した断片（`src/core/sanitize.ts`）を ref で差し込む（HTML の文字列には戻さない）。CSS の入口は `style.css`（共通の部品の CSS と、部品 1 つに 1 本のボードの CSS（`App.css`・`Repo.css` など）を読み、ビルドが `board.css` に組む） |
 | `src/options/` | 設定画面。通信先（追加すると許可を求め、削除すると PAT と許可（画面と API の origin すべて。GHE.com は 2 つ）を削除する。`Hosts.tsx`）、リポジトリ（統合先の名前・直近の日数・指定のブランチ）と PAT。React で組み、見た目は VS Code 拡張と共通の部品（`extensions/shared` の `@ccnavi/shared`。ボタン・骨組み・一覧の CSS と、Claude の配色で `--vscode-*` を定義する `browser-theme.css`）を使う。CSS の入口は `style.css`（ビルドが `options.css` に組む） |
-| `src/worker/` | Pyodide を動かす Web Worker |
+| `src/worker/` | 同梱の ccnavi（`ccnavi.wasm`）を動かす Web Worker。起こし方は `src/core/wasm.ts`（Go の `wasm_exec.js` を読み、メモリの上の fs `src/core/memfs.ts` を `globalThis.fs` に置く）で、Node の試験も同じものを通る |
 | `src/core/` | 画面に依らない部品（描いたボードの DOM の要約 `dom-summary.ts`（開発用ツール `scripts/render-scene.js` が使う。拡張のバンドルには入らない）、通信先と manifest、設定画面で足すホスト（`custom-hosts.ts`）、GitHub の読み書き（`github.ts`）、GitLab の読み書き（`gitlab.ts`）、「始める」（`start.ts`）、画面と service worker の約束、読み取りの流れ、レビュー済みの材料の読み（`reviewed.ts`）、承認・レビュー済みの流れ（`write.ts`）、decide のホスト書き込み（`decide-host.ts`）、PAT の期限、Markdown の消毒） |
-| `py/ccnavi_chrome.py` | Pyodide の上の入口。MEMFS に仮のツリーを組んで`ccnavi.entry.ext` の再公開を通して今の ccnavi を呼ぶ。判定のコア（`core`）の `plan`・`confirm` の答え（書くもの）を拡張が 1 コミットにする |
+| リポジトリの `go/cmd/ccnavi-chrome`・`go/internal/entry/chrome` | WASM の入口（`globalThis.ccnaviHandle`）。メモリの上の fs の `/ws` に仮のツリーを組んで、手元と同じ判定（`--agree --preview --json` と `tickets/core`）を呼ぶ。判定のコアの `plan`・`confirm`・`decide` の答え（書くもの）を拡張が 1 コミットにする。要求と答えの形は `src/core/ccnavi.ts` と対。同じ入口を手元向けに組むと、標準入力の 1 行 1 要求に答える（試験の突き合わせ用） |
 | `hosts.json` | 焼き込む通信先（組み込み）。組織ごとのビルドはこれを替える。設定画面で足したホストは `chrome.storage.local` の `customHosts` に持つ（`custom-hosts.ts`） |
 
 ## decide のホスト書き込み
 
-残った指摘の対応方針を確定するとき、Python の `decide` が返すホストへの書き込みの計画（issue・返信・解決・コメント）を、
+残った指摘の対応方針を確定するとき、同梱の ccnavi の `decide` が返すホストへの書き込みの計画（issue・返信・解決・コメント）を、
 `src/core/decide-host.ts` が順序を守って実行する。
 
 - ホストへの操作は `HostOps` を通す。ボードは service worker 経由の `callOps` を渡し、PAT は service worker だけが持つ。
@@ -39,11 +39,11 @@ keywords: [設計, 構成, service worker, Pyodide, Web Worker, hosts.json, ccna
 - service worker は送る本文のコードフェンスの外を無害にする（GitLab は行頭の `/`、両ホストは `@` のメンション）。GitHub のスレッドは、登録したリポジトリのその MR のものかを確かめてから書く
 - issue の作成にはタイトルと本文だけを送る（assignee・labels・milestone は送らない）
 - GitLab のスレッドが機構自身のもの（`own`）になるのは、ノートが全部目印で始まり、書き手が全部代表のノートと同じときだけ。
-  依頼の投稿者と一致するかは、依頼の記録を持つ Python が比べる
+  依頼の投稿者と一致するかは、依頼の記録を持つ ccnavi が比べる
 
 ## decide の流れ（`write.ts` の `decidePreview`・`decidePhase`）
 
-`decidePreview` は親子のチケットと MR のスレッド・レビューを読み、Python の `decide`（preview）が通した指摘とダイジェストを返す（書かない）。
+`decidePreview` は親子のチケットと MR のスレッド・レビューを読み、ccnavi の `decide`（preview）が通した指摘とダイジェストを返す（書かない）。
 各指摘には、スレッドの id（取得したスレッドから、キー = URL か id で引く）と、書く前の確かめと同じ見分け方で Chrome で扱えない理由（`unsupported`）を付ける。
 
 `decidePhase` は次の順に進む。ホストへの書き込みは `writeLoop` の外で 1 度だけ行い、ループの中は判定とコミットだけを行う。

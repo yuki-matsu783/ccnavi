@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"regexp"
-	"strconv"
+	"path/filepath"
 
 	"ccnavi/internal/hook/ccnavimd"
 	"ccnavi/internal/infra/config"
@@ -65,25 +64,20 @@ func collect(conf *config.Settings, root string, notes []string, mode config.Mod
 	return problems
 }
 
-// shCompatFile は sh が互換の版を宣言する場所。`.ccnavi/scripts/` の sh はどれもこれを `.` で読む。
-var shCompatFile = ospath.Join(config.DefaultProjectHome, config.ScriptsDir, "ccnavi-common.sh")
-
-var shCompatLine = regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(env.Compat) + `=([0-9]+)[ \t]*$`)
-
 // compatFix は実行ファイルと sh が食い違ったときの直し方。ccnavi のリポジトリなら組み立て直し、配布先なら配り直し
 // （配布先には組み立てる元が無い）。
 func compatFix(root string) string {
-	if ospath.IsFile(ospath.Join(root, "build.py")) && ospath.IsFile(ospath.Join(root, "src", "ccnavi", "__main__.py")) {
-		return "build.py を実行して組み立て直してください（uv run --with pyinstaller python build.py）"
+	if ospath.IsFile(ospath.Join(root, "scripts", "ccnavi-build.sh")) && ospath.IsFile(ospath.Join(root, "go", "cmd", "ccnavi", "main.go")) {
+		return "scripts/ccnavi-build.sh を実行して組み立て直してください（sh scripts/ccnavi-build.sh）"
 	}
-	return "ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> " +
+	return "ccnavi のリポジトリで scripts/ccnavi-build.sh を実行し、scripts/ccnavi-setup.sh <このワークスペース> " +
 		"--force で実行ファイルと sh を配り直してください"
 }
 
 // shCompat は `.ccnavi/scripts/` の sh と、この実行ファイルの互換の版が揃っているか。食い違っても判定は動くので
 // warn（sh の側でチケットやレビューの操作が失敗する）。sh が無いワークスペースは言わない。
 func shCompat(root string, compat int) []rules.Problem {
-	path := ospath.Join(root, shCompatFile)
+	path := ospath.Join(root, filepath.FromSlash(config.CompatFile))
 	text, err := fsio.ReadDiskText(path, fsio.Strict)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil
@@ -94,12 +88,11 @@ func shCompat(root string, compat int) []rules.Problem {
 	if err != nil {
 		return warn(fmt.Sprintf("%s を読めない (%s)", path, fsio.ErrorText(err)))
 	}
-	found := shCompatLine.FindStringSubmatch(text)
-	if found == nil {
+	written, found := config.DeclaredCompat(text)
+	if !found {
 		return warn(fmt.Sprintf("%s に互換の版（%s）が書かれていない。実行ファイル（互換 %d）より古い sh である。%s",
 			path, env.Compat, compat, compatFix(root)))
 	}
-	written, _ := strconv.Atoi(found[1])
 	if written == compat {
 		return nil
 	}

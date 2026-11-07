@@ -1,7 +1,7 @@
 /**
  * ボードの描画（src/board/App.tsx。React）を jsdom の上で描く。controller は差し替え（状態を直に入れる）、
  * ここでは状態がどう画面に出るか（書く操作の最中に押せなくするボタン、入力中の値、ページの決まった枠）だけを見る。
- * 状態の移り変わりは test/board-controller.test.ts、欄の中身（DOM）は Pyodide で組んだボードを描く各試験が見る。
+ * 状態の移り変わりは test/board-controller.test.ts、欄の中身（DOM）は WASM で組んだボードを描く各試験が見る。
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -18,7 +18,7 @@ import type { FamilyBoard, RepoBoard } from "../src/core/snapshot.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import type { Outcome } from "../src/core/write.js";
 import type { DecideChoice, DecidePreview } from "../src/core/reviewed.js";
-import { HERE } from "./helpers/python.js";
+import { HERE } from "./helpers/ccnavi.js";
 
 // 本物のページ（static/board.html）。見出しの 2 つのボタンや枠の ID はコピーではなく実物で確かめる（scripts は動かさない）
 const PAGE = fs.readFileSync(path.join(HERE, "static", "board.html"), "utf8");
@@ -229,7 +229,7 @@ test("CX-T228 ページの決まった枠: 本物の controller が出す状態�
   assert.equal($("#result").getAttribute("class"), null);
   await act(async () => c.refresh());
   assert.equal(doc.body.dataset.state, "done");
-  assert.equal($("#status").outerHTML, '<p id="status" role="status" data-boot-ms="10" data-import-ms="20" data-violations="0">Pyodide 0.test：起動 10 ms・読み込み 20 ms</p>');
+  assert.equal($("#status").outerHTML, '<p id="status" role="status" data-boot-ms="10" data-violations="0">ccnavi 0.test（WASM）：起動 10 ms</p>');
   assert.equal($("#banner").innerHTML, '<p class="notice warn" data-level="soon">あと 3 日で切れる</p>');
   assert.equal($("#result").getAttribute("class"), null);
   const press = async () => {
@@ -278,7 +278,7 @@ function stubEnv(over: { ops?: Partial<BoardOps> } = {}): BoardEnv {
     },
     openOptions: () => undefined,
     confirm: () => true,
-    startWorker: () => ({ call: async () => ({}), init: async () => ({ boot_ms: 10, import_ms: 20, total_ms: 30, pyodide: "0.test", violations: [] }) }),
+    startWorker: () => ({ call: async () => ({}), init: async () => ({ boot_ms: 10, total_ms: 30, version: "0.test", violations: [] }) }),
     blobCache: async () => ({ get: async () => undefined, put: async () => undefined }),
     now: () => new Date("2026-01-01T00:00:00Z"),
     editing: () => false,

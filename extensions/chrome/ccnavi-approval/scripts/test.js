@@ -1,6 +1,6 @@
 // 試験を回す。
 //
-//   node scripts/test.js         組み立て（dist/）→ 単体・Pyodide（Node）・手元の CPython との突き合わせ
+//   node scripts/test.js         組み立て（dist/）→ 単体・WASM（Node）・手元向けの同じ入口との突き合わせ
 //   node scripts/test.js --e2e   試験用の通信先（127.0.0.1）で組み立て（dist-e2e/）→ 拡張を読み込んだ Chromium で実機の試験
 //
 // 実機の試験は Playwright の Chromium を使う（PLAYWRIGHT_BROWSERS_PATH。`playwright install` はしない）。
