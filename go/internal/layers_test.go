@@ -45,6 +45,7 @@ var subTiers = map[string]map[string]int{
 		"platformtag": 1,
 		"yaml":        1,
 		"pyre":        1, // Python の re の写し（RE2 で書けない式を Python と同じ答えで読む）
+		"argparse":    1, // Python の argparse の写し（CLI の引数の読みと usage・エラーの文を Python と同じにする）
 		// 2: ファイル・設定・入出力・照合
 		"fsio":      2,
 		"config":    2,
@@ -141,6 +142,12 @@ var subTiers = map[string]map[string]int{
 		"subagent": 2,
 		// イベント名から上の部品へ振り分ける入口（実行前・実行後・ターンの区切り・セッションの開始）
 		"events": 3,
+	},
+	// entry の中。検査・診断・状態・版・sh への答えの上に、CLI の入口（cli）が立つ。
+	"entry": {
+		"lint": 0, "diagnose": 0, "status": 0, "version": 0, "shask": 0,
+		"suggest": 1,
+		"cli":     2,
 	},
 }
 
