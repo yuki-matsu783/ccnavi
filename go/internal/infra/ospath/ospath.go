@@ -2,6 +2,7 @@ package ospath
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -306,6 +307,16 @@ func IsFile(p string) bool {
 	return err == nil && info.Mode().IsRegular()
 }
 
+// Lstat は os.lstat（リンクは辿らない）。無ければ errors.Is(err, fs.ErrNotExist)（FileNotFoundError）。
+func Lstat(p string) (fs.FileInfo, error) { return os.Lstat(p) }
+
+// IsRegular はリンクを辿らずに見て、ふつうのファイルか（stat.S_ISREG(os.lstat(p).st_mode)）。リンク・ディレクトリ・
+// 名前付きパイプ・見られないものは偽。
+func IsRegular(p string) bool {
+	info, err := Lstat(p)
+	return err == nil && info.Mode().IsRegular()
+}
+
 // IsLink は os.path.islink。
 func IsLink(p string) bool {
 	info, err := os.Lstat(p)
@@ -326,6 +337,11 @@ func IsSpace(r rune) bool {
 // Strip は引数なしの str.strip()。
 func Strip(s string) string {
 	return strings.TrimFunc(s, IsSpace)
+}
+
+// Rstrip は引数なしの str.rstrip()。
+func Rstrip(s string) string {
+	return strings.TrimRightFunc(s, IsSpace)
 }
 
 // ErrNotUTF8 は中身が UTF-8 として読めないこと（ReadDiskText が返す）。

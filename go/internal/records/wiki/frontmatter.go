@@ -15,29 +15,18 @@ import (
 // headLimit は frontmatter を探す頭の長さ（字数）。
 const headLimit = 64 * 1024
 
-const (
-	fence    = "---"
-	docEnd   = "..."
-	byteMark = "\uFEFF"
-)
+const byteMark = "\uFEFF"
 
 // frontMatter は頭の frontmatter（--- で囲んだ YAML）のマップ。読めなければ理由。
 func frontMatter(text string) (*yaml.Map, string) {
-	lines := ospath.Splitlines(strings.TrimLeft(pyfmt.Head(text, headLimit), byteMark))
-	if len(lines) == 0 || rstrip(lines[0]) != fence {
+	body, state := yaml.FrontBody(strings.TrimLeft(pyfmt.Head(text, headLimit), byteMark), yaml.FrontStyle{DocEnd: true})
+	switch state {
+	case yaml.FrontAbsent:
 		return nil, "frontmatter が無い"
-	}
-	end := 0
-	for i := 1; i < len(lines); i++ {
-		if line := rstrip(lines[i]); line == fence || line == docEnd {
-			end = i
-			break
-		}
-	}
-	if end == 0 {
+	case yaml.FrontUnclosed:
 		return nil, "frontmatter が閉じていない"
 	}
-	data, err := yaml.Load(strings.Join(lines[1:end], "\n"))
+	data, err := yaml.Load(body)
 	if err != nil {
 		var yerr *yaml.Error
 		if !errors.As(err, &yerr) {
@@ -51,8 +40,6 @@ func frontMatter(text string) (*yaml.Map, string) {
 	}
 	return m, ""
 }
-
-func rstrip(s string) string { return strings.TrimRightFunc(s, ospath.IsSpace) }
 
 // text は文字列の欄。無い・null は空。
 func text(data *yaml.Map, name string, required bool) (string, string) {
@@ -130,8 +117,8 @@ func ParsePattern(name, body string) (Pattern, string) {
 	if problem != "" {
 		return Pattern{}, problem
 	}
-	if s, ok := data.Get("type").(string); !ok || s != patternType {
-		return Pattern{}, "type が " + patternType + " でない"
+	if s, ok := data.Get("type").(string); !ok || s != DocType {
+		return Pattern{}, "type が " + DocType + " でない"
 	}
 	t, ok := target(data)
 	if !ok {

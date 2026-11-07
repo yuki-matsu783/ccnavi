@@ -24,8 +24,8 @@ type Target string
 // Targets は反映先の種類の全部（表示の順）。
 var Targets = []Target{"rule", "risk", "phase", "template", "skill", "docs"}
 
-// patternType はパターンの frontmatter の type。
-const patternType = "learning-wiki"
+// DocType は learning-wiki の md（パターン・受信箱）の frontmatter の type。--docs は --type で明示したときだけ引く。
+const DocType = "learning-wiki"
 
 // Decision は採否の記録の status。
 type Decision string

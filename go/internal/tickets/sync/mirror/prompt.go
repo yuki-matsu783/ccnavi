@@ -55,7 +55,7 @@ func Sync(conf *config.Settings, root string) []string {
 // syncOne は 1 つの親のワークツリーに、ミラー、工程スキルの順に写す。
 func syncOne(conf *config.Settings, root, ticket, project, worktree string) []string {
 	sources := []string{conf.CommonLayerDir(root), skillSource(root)}
-	places := append(slices.Clone(sources), conf.CommonLayerDir(worktree), ospath.Join(worktree, skillsDir))
+	places := append(slices.Clone(sources), conf.CommonLayerDir(worktree), ospath.Join(worktree, config.SkillsDir))
 	sigPath := ""
 	if conf.State != "" {
 		sigPath = fsio.RecordPath(conf.State, SignaturePrefix, ticket, fsio.JSONExt)

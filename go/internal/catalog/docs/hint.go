@@ -1,16 +1,17 @@
 package docs
 
 import (
-	"regexp"
 	"strings"
-	"time"
 
 	"ccnavi/internal/catalog/docindex"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/pyfmt"
+	"ccnavi/internal/infra/pyre"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/model/place"
@@ -19,11 +20,8 @@ import (
 const (
 	// CodeMissingFrontmatter は frontmatter の無い md を新しく作ったときの案内の理由コード。
 	CodeMissingFrontmatter = "NOTICE_DOC_FRONTMATTER"
-	// hintGitTimeout は「無視されているか」を git に聞く時間の上限。過ぎたら何も言わない。
-	hintGitTimeout = 2 * time.Second
-	skillFile      = "skill.md"
-	writeTool      = config.ToolWrite
-	createdType    = "create"
+	writeTool              = config.ToolWrite
+	createdType            = "create"
 )
 
 // noFrontmatterNames は frontmatter を付けない決まりの md（中身がそのまま人にもモデルにも見える）。
@@ -42,20 +40,14 @@ var noFrontmatterPlaces = []string{
 	".claude/skills/yomiyasu/**",
 }
 
-var noFrontmatter = globsRegexp(noFrontmatterPlaces)
-
-// globsRegexp は fnmatch.translate の和（大文字小文字を区別しない）。置き場の glob は `*` のほかの記号を使わない。
-func globsRegexp(globs []string) *regexp.Regexp {
-	parts := make([]string, len(globs))
-	for i, g := range globs {
-		pieces := strings.Split(g, "*")
-		for j, p := range pieces {
-			pieces[j] = regexp.QuoteMeta(p)
-		}
-		parts[i] = strings.Join(pieces, ".*")
+// noFrontmatter は fnmatch.translate の和（大文字小文字を区別しない）。"/" は "/" にだけ当てる（rel は "/" 区切り）。
+var noFrontmatter = func() *pyre.Regexp {
+	parts := make([]string, len(noFrontmatterPlaces))
+	for i, g := range noFrontmatterPlaces {
+		parts[i] = pyre.TranslateFnmatch(g)
 	}
-	return regexp.MustCompile(`(?is)^(?:` + strings.Join(parts, "|") + `)$`)
-}
+	return pyre.MustCompile(strings.Join(parts, "|"), pyre.IgnoreCase)
+}()
 
 // MissingFrontmatter は、Write で新しく作った md に frontmatter か type が無ければ、1 度だけ案内を返す。判定は
 // 変えない。既にある md を Edit・上書きしたときは出さない。意図して frontmatter を持たない md を直すたびに促さないため。
@@ -69,6 +61,7 @@ func MissingFrontmatter(conf *config.Settings, root string, in hookio.Input) str
 	if v := in.ToolInput.Value("file_path"); pyfmt.Truthy(v) {
 		raw = pyfmt.Str(v)
 	}
+	// raw.rsplit("/", 1)[-1]。ospath.Basename は Windows でドライブ（`C:README.md`）も外すので使わない。
 	name := ospath.Slashed(raw)
 	name = name[strings.LastIndex(name, "/")+1:]
 	if !strings.HasSuffix(raw, docindex.MdExt) || isNoFrontmatterName(name) {
@@ -80,7 +73,7 @@ func MissingFrontmatter(conf *config.Settings, root string, in hookio.Input) str
 	}
 	written := ospath.Abspath(ospath.Join(cwd, raw))
 	where, ok := tree.TreeOf(root, fsio.FullPath(raw, cwd), conf.Projects)
-	if !ok || !ospath.DiskExists(ospath.Join(where.Root, ".git")) {
+	if !ok || !tree.HasGit(where.Root) {
 		return ""
 	}
 	rel := tree.Relative(where, written)
@@ -91,10 +84,10 @@ func MissingFrontmatter(conf *config.Settings, root string, in hookio.Input) str
 			exempt = append(exempt, p)
 		}
 	}
-	if rel == "" || strings.HasPrefix(rel, "../") || docindex.Excluded(rel, exempt, keptDirs(h)) || noFrontmatter.MatchString(rel) {
+	if rel == "" || strings.HasPrefix(rel, "../") || docindex.Excluded(rel, exempt, keptDirs(h)) || noFrontmatter.Match(rel) {
 		return ""
 	}
-	ignored, err := docindex.Ignored(where.Root, []string{rel}, hintGitTimeout)
+	ignored, err := docindex.Ignored(where.Root, []string{rel}, git.FrontmatterHintTimeout)
 	if err != nil || ignored[rel] {
 		return ""
 	}
@@ -103,7 +96,7 @@ func MissingFrontmatter(conf *config.Settings, root string, in hookio.Input) str
 		return ""
 	}
 	front := docindex.FrontMatter(head)
-	if front != nil && ospath.Strip(typeText(front.Value("type"))) != "" {
+	if front != nil && ospath.Strip(typeText(front.Value(fieldType))) != "" {
 		return ""
 	}
 	shown := relTo(written, root)
@@ -122,9 +115,9 @@ func typeText(v any) string {
 }
 
 func isNoFrontmatterName(name string) bool {
-	folded := pyfmt.Casefold(name)
+	folded := pathcase.Fold(name)
 	for _, n := range noFrontmatterNames {
-		if folded == pyfmt.Casefold(n) {
+		if folded == pathcase.Fold(n) {
 			return true
 		}
 	}
@@ -134,11 +127,10 @@ func isNoFrontmatterName(name string) bool {
 func frontmatterHint(conf *config.Settings, root, shown string, hasFront bool) string {
 	values := texts.Values{"code": CodeMissingFrontmatter, "shown": shown, "command": command(conf, root), "doc": conventionDoc}
 	variants := texts.Variants{"what": conventionCase(root)}
-	slashed := ospath.Slashed(shown)
 	switch {
 	case !hasFront:
 		return texts.Say(root, "NOTICE_DOCS_FRONTMATTER__NONE", values, variants)
-	case pyfmt.Casefold(slashed[strings.LastIndex(slashed, "/")+1:]) == skillFile:
+	case pathcase.Fold(ospath.Basename(ospath.Slashed(shown))) == pathcase.Fold(config.SkillFile):
 		return texts.Say(root, "NOTICE_DOCS_FRONTMATTER__SKILL", values, variants)
 	}
 	return texts.Say(root, "NOTICE_DOCS_FRONTMATTER__TYPE", values, variants)

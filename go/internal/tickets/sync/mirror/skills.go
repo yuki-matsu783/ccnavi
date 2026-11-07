@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathmatch"
@@ -17,16 +18,11 @@ import (
 
 const (
 	processKey = "process"
-	skillFile  = "SKILL.md"
-	// skillsDir は写し先の、プロジェクトのルートからの相対。目録（catalog の projskills）の読み先と同じ。
-	skillsDir = "skills"
-	// headLimit は frontmatter を探す頭の長さ（バイト）。
-	headLimit = 8 * 1024
-	shareExt  = ".md"
+	shareExt   = ".md"
 )
 
 // sourceDir は工程スキルの置き場の、ワークスペースルートからの相対。
-var sourceDir = []string{".claude", "skills"}
+var sourceDir = []string{config.ClaudeDir, config.SkillsDir}
 
 // commonRefs は references/ の最上段で、共通として写すディレクトリ。
 var commonRefs = []string{"references", "common"}
@@ -42,7 +38,7 @@ func processes(root string) []string {
 	}
 	var found []string
 	for _, name := range names {
-		path := ospath.Join(base, name, skillFile)
+		path := ospath.Join(base, name, config.SkillFile)
 		if pathmatch.IsLink(ospath.Join(base, name)) || pathmatch.IsLink(path) || !ospath.IsFile(path) {
 			continue
 		}
@@ -63,16 +59,12 @@ func Installed(root, name string) string {
 
 // processFlag は頭の frontmatter に `process: true`（真偽の真だけ）があるか。別名は読まない。
 func processFlag(raw []byte) bool {
-	text, _ := fsio.Decode(raw[:min(len(raw), headLimit)], fsio.Replace)
-	lines := ospath.Splitlines(text)
-	if len(lines) == 0 || ospath.Strip(lines[0]) != "---" {
+	text, _ := fsio.Decode(raw[:min(len(raw), config.SkillHeadLimit)], fsio.Replace)
+	body, state := yaml.FrontBody(text, yaml.FrontStyle{Indented: true})
+	if state != yaml.FrontClosed {
 		return false
 	}
-	end := slices.IndexFunc(lines[1:], func(line string) bool { return ospath.Strip(line) == "---" })
-	if end < 0 {
-		return false
-	}
-	data, err := yaml.LoadRefusingAliases(strings.Join(lines[1:1+end], "\n"))
+	data, err := yaml.LoadRefusingAliases(body)
 	if err != nil {
 		return false
 	}
@@ -82,7 +74,7 @@ func processFlag(raw []byte) bool {
 
 // isShared は工程スキルのディレクトリからの相対（"/" で割ったもの）が、写す形か。
 func isShared(parts []string) bool {
-	if len(parts) == 1 && parts[0] == skillFile {
+	if len(parts) == 1 && parts[0] == config.SkillFile {
 		return true
 	}
 	n := len(commonRefs)
@@ -107,7 +99,7 @@ func skillSources(root string) (map[string][]byte, string) {
 		if why != "" {
 			return nil, why
 		}
-		files := []string{ospath.Join(top, skillFile)}
+		files := []string{ospath.Join(top, config.SkillFile)}
 		for _, rel := range found {
 			files = append(files, ospath.Join(shared, filepath.FromSlash(rel)))
 		}
@@ -135,7 +127,7 @@ func skillPlan(root, treeRoot string) ([]Change, string) {
 	if why != "" {
 		return nil, why
 	}
-	base := ospath.Join(treeRoot, skillsDir)
+	base := ospath.Join(treeRoot, config.SkillsDir)
 	changes, why := updates(treeRoot, base, wanted)
 	if why != "" {
 		return nil, why

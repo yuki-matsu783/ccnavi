@@ -15,12 +15,6 @@ func refsOfText(text string) [][2]any {
 	return out
 }
 
-func TestPatternsCompile(t *testing.T) {
-	if buildErr != nil {
-		t.Fatal(buildErr)
-	}
-}
-
 // 依頼文から issue・MR の指定を見つける式のヒットと外れ（Python の tests/ticket/test_branchfind_refs.py）。外れで
 // 指示を足すと、関係の無い依頼のたびにブランチを探させることになるので、外れも表で固定する。
 var refHits = map[string][][2]any{

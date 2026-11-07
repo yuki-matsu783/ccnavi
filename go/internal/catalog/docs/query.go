@@ -5,11 +5,13 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"ccnavi/internal/catalog/docindex"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/pyre"
+	"ccnavi/internal/records/wiki"
 )
 
 // Sort は `--sort` の並べ方。空は SortPath。
@@ -21,6 +23,9 @@ const (
 	SortType  Sort = "type"
 	SortTitle Sort = "title"
 )
+
+// sortFields は frontmatter の値で並べる並べ方と、その欄。
+var sortFields = map[Sort]string{SortType: fieldType, SortTitle: fieldTitle}
 
 // sorts は受ける並べ方（苦情に並べる順）。
 var sorts = []Sort{SortPath, SortMtime, SortType, SortTitle}
@@ -39,9 +44,6 @@ const (
 
 // formats は受ける出力の形（苦情に並べる順）。
 var formats = []Format{FormatTable, FormatPath, FormatDetail, FormatJSON, FormatJSONL, FormatCount}
-
-// learningWikiType は手順書を作る側の材料の type。--type で明示したときだけ引く（作業のセッションに出さない）。
-const learningWikiType = "learning-wiki"
 
 // frontmatter のキーのうち、引き方と出力が名前で読むもの。
 const (
@@ -79,12 +81,8 @@ func (q Query) format() Format {
 	return q.Format
 }
 
-// when の形と、形ごとの datetime.strptime の式（Python 3.13 の _strptime が組む式と同じ）。書き誤った値が
-// 0 件の結果に紛れて気づかれないのを避けるため、読めない日時は断る。
-var (
-	whenShape = mustPyre(`^\d{4}-\d{2}-\d{2}(T\d{2}(:\d{2}(:\d{2})?)?)?$`, 0)
-	whenParts = map[int]*pyre.Regexp{}
-)
+// when の形。書き誤った値が 0 件の結果に紛れて気づかれないのを避けるため、読めない日時は断る。
+var whenShape = pyre.MustCompile(`^\d{4}-\d{2}-\d{2}(T\d{2}(:\d{2}(:\d{2})?)?)?$`, 0)
 
 const (
 	strptimeY = `(?P<Y>\d\d\d\d)`
@@ -95,24 +93,36 @@ const (
 	strptimeS = `:(?P<S>6[0-1]|[0-5]\d|\d)`
 )
 
-func init() {
-	pattern := strptimeY + strptimeM + strptimeD
-	whenParts[10] = mustPyre(pattern, pyre.IgnoreCase)
-	pattern += strptimeH
-	whenParts[13] = mustPyre(pattern, pyre.IgnoreCase)
-	pattern += strptimeI
-	whenParts[16] = mustPyre(pattern, pyre.IgnoreCase)
-	pattern += strptimeS
-	whenParts[19] = mustPyre(pattern, pyre.IgnoreCase)
+// whenPieces は日時の桁の区切り（頭から）。text の字数が形の長さを決め、--until は後ろの区切りの text（その桁の
+// 最大）を足して延ばす。strptime は datetime.strptime の式（Python 3.13 の _strptime が組む式と同じ）。
+var whenPieces = []struct{ text, strptime string }{
+	{"YYYY-MM-DD", strptimeY + strptimeM + strptimeD},
+	{"T23", strptimeH},
+	{":59", strptimeI},
+	{":59", strptimeS},
 }
 
-func mustPyre(pattern string, flags pyre.Flag) *pyre.Regexp {
-	re, err := pyre.Compile(pattern, flags)
-	if err != nil {
-		panic(err) // 固定の式
-	}
-	return re
+// whenForm は字数ごとの日時の形。re は書いた桁までの strptime の式、tail は --until を延ばす尾。
+type whenForm struct {
+	re   *pyre.Regexp
+	tail string
 }
+
+// whenForms は字数から形（10・13・16・19 字）。
+var whenForms = func() map[int]whenForm {
+	forms := map[int]whenForm{}
+	pattern, width := "", 0
+	for i, p := range whenPieces {
+		pattern += p.strptime
+		width += utf8.RuneCountInString(p.text)
+		var tail strings.Builder
+		for _, rest := range whenPieces[i+1:] {
+			tail.WriteString(rest.text)
+		}
+		forms[width] = whenForm{pyre.MustCompile(pattern, pyre.IgnoreCase), tail.String()}
+	}
+	return forms
+}()
 
 // validWhen は `--since`・`--until` に受ける日時か（datetime.strptime が読めるか）。
 func validWhen(value string) bool {
@@ -120,11 +130,11 @@ func validWhen(value string) bool {
 		return false
 	}
 	runes := []rune(value)
-	re, ok := whenParts[len(runes)]
+	form, ok := whenForms[len(runes)]
 	if !ok {
 		return false
 	}
-	found, ok := re.MatchIn(value, 0, len(runes))
+	found, ok := form.re.MatchIn(value, 0, len(runes))
 	if !ok || found.End != len(runes) {
 		return false
 	}
@@ -195,7 +205,7 @@ func text(v any) string {
 		}
 		return "false"
 	case *pyjson.Object, []any:
-		s, err := pyjson.Dumps(x, pyjson.Options{RawUnicode: true, Compact: true})
+		s, err := docindex.Compact(x)
 		if err != nil {
 			return ""
 		}
@@ -223,34 +233,17 @@ func arr(r docindex.Row, key string) []string {
 	}
 }
 
-// scalars は入れ子のスカラーの値を、書かれた順に。再帰しない。
+// scalars は入れ子のスカラーの値を、書かれた順に。
 func scalars(v any) []string {
 	var found []string
-	stack := []any{v}
-	for len(stack) > 0 {
-		item := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
-		switch x := item.(type) {
-		case *pyjson.Object:
-			if x == nil {
-				continue
-			}
-			var values []any
-			for _, inner := range x.All() {
-				values = append(values, inner)
-			}
-			for i := len(values) - 1; i >= 0; i-- {
-				stack = append(stack, values[i])
-			}
-		case []any:
-			for i := len(x) - 1; i >= 0; i-- {
-				stack = append(stack, x[i])
-			}
-		case nil:
+	docindex.Walk(v, func(node any, _ int) bool {
+		switch node.(type) {
+		case *pyjson.Object, []any, nil:
 		default:
-			found = append(found, text(x))
+			found = append(found, text(node))
 		}
-	}
+		return true
+	})
 	return found
 }
 
@@ -275,20 +268,16 @@ func needles(values []string) []string {
 // untilEnd は `--until` を書いた桁の終わりまで延ばす（mtime は秒までの文字列で比べるので、日付だけのままだと
 // その日の分が残らない）。
 func untilEnd(until string) string {
-	switch len([]rune(until)) {
-	case 10:
-		return until + "T23:59:59"
-	case 13:
-		return until + ":59:59"
-	case 16:
-		return until + ":59"
+	if form, ok := whenForms[utf8.RuneCountInString(until)]; ok {
+		return until + form.tail
 	}
 	return until
 }
 
 func matches(r docindex.Row, q Query) bool {
 	types := needles(q.Types)
-	if fold(str(r, fieldType)) == learningWikiType && !slices.Contains(types, learningWikiType) {
+	// 手順書を作る側の材料は、--type で明示したときだけ引く（作業のセッションに出さない）。
+	if fold(str(r, fieldType)) == wiki.DocType && !slices.Contains(types, wiki.DocType) {
 		return false
 	}
 	exact := func(needles, hay []string) bool {
@@ -338,8 +327,10 @@ func search(rows []docindex.Row, q Query) ([]docindex.Row, int) {
 		switch q.sort() {
 		case SortMtime:
 			k.first = r.Mtime()
-		case SortType, SortTitle:
-			k.first = fold(str(r, string(q.sort())))
+		default:
+			if field, ok := sortFields[q.sort()]; ok {
+				k.first = fold(str(r, field))
+			}
 		}
 		keys[i] = k
 	}

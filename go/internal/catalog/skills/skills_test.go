@@ -34,7 +34,7 @@ func newFixture(t *testing.T) *fixture {
 }
 
 func (f *fixture) put(name, text string) string {
-	return testkit.Put(f.t, filepath.Join(f.lib, skillsDir, name, skillFile), text)
+	return testkit.Put(f.t, filepath.Join(f.lib, config.SkillsDir, name, config.SkillFile), text)
 }
 
 func (f *fixture) conf(state string) *config.Settings {
@@ -83,7 +83,7 @@ func TestFrontmatterAndFallbacks(t *testing.T) {
 	// 値を組み立てられない frontmatter（`!!int` の空など）でも失敗しない。
 	f.put("broken", "---\nname: !!int\ndescription: !!bool maybe\n---\n本文\n")
 	f.put("aliased", "---\nname: &a x\ndescription: *a\n---\n")
-	testkit.Put(t, filepath.Join(f.lib, ".ccnavi", "skills", "old", skillFile), skill("old", "別の置き場"))
+	testkit.Put(t, filepath.Join(f.lib, ".ccnavi", "skills", "old", config.SkillFile), skill("old", "別の置き場"))
 	said := f.notice(f.lib, "", true)
 	for _, want := range []string{"- notes: （説明がありません）", "- broken: （説明がありません）", "- aliased: （説明がありません）"} {
 		if !strings.Contains(said, want) {
@@ -120,9 +120,9 @@ func TestUnsafeNamesAndLinksAreSkipped(t *testing.T) {
 	}
 	f.put("good", skill("good", "説明"))
 	outside := testkit.Put(t, filepath.Join(f.root, "elsewhere.md"), skill("leak", "外の文"))
-	os.MkdirAll(filepath.Join(f.lib, skillsDir, "leak"), 0o755)
-	os.Symlink(outside, filepath.Join(f.lib, skillsDir, "leak", skillFile))
-	os.MkdirAll(filepath.Join(f.lib, skillsDir, "empty"), 0o755)
+	os.MkdirAll(filepath.Join(f.lib, config.SkillsDir, "leak"), 0o755)
+	os.Symlink(outside, filepath.Join(f.lib, config.SkillsDir, "leak", config.SkillFile))
+	os.MkdirAll(filepath.Join(f.lib, config.SkillsDir, "empty"), 0o755)
 	said := f.notice(f.lib, "", true)
 	listed := 0
 	for _, line := range strings.Split(said, "\n") {

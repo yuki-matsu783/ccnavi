@@ -72,7 +72,7 @@ func Projects(projectsDir string) []Tree {
 	var found []Tree
 	for _, name := range names {
 		candidate := ospath.Join(projectsDir, name)
-		if ospath.IsDir(candidate) && ospath.DiskExists(ospath.Join(candidate, ".git")) {
+		if ospath.IsDir(candidate) && HasGit(candidate) {
 			found = append(found, Tree{Name: name, Root: resolved(candidate), Project: name, Kind: KindProject})
 		}
 	}

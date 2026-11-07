@@ -8,14 +8,12 @@ import (
 
 	"ccnavi/internal/catalog/docindex"
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/policy/texts"
 )
 
 const (
-	// ExitUsage は `--docs` の使い方の誤り（引くのは 0 件でも 0）。
-	ExitUsage = 1
-
 	errPrefix = "ccnavi: "
 	// unignoredSaid・ignoreAddedSaid は標準エラーと SessionStart の案内でツリーの名前・.gitignore の後ろに続ける文。
 	unignoredSaid   = "は .gitignore に `" + docindex.IgnoreLine + "` が無く、足せなかったので索引の対象外"
@@ -38,22 +36,21 @@ const (
 // SessionStart で索引を新しくするのに使う時間。使い回せていれば、数百本の md があっても 1 秒に届かない。
 // 初めての大きなプロジェクトだけがここに届く。書けた分は次のセッションで使い回す。
 const (
-	// startBudget は使ってよい時間の上限。実際は hook の判定の期限の残りと小さいほう。
+	// startBudget は索引を新しくするのに使ってよい時間の上限。hook の判定の期限（config.HookDeadline）とは別のもので、
+	// 実際はその残りと小さいほう。HookDeadline は環境変数で延ばせるが、これは延ばさない（開始を待たせないため）。
 	startBudget = 3 * time.Second
 	// minRefresh に残りが満たなければ新しくしない（既存の ccnavi-index.jsonl だけで案内する）。
 	minRefresh = 500 * time.Millisecond
-	// staleBudget は新しくしないときに git に与える時間（ls-files と check-ignore）。
-	staleBudget = time.Second
 )
 
-// Run は `ccnavi --docs`。ワークスペースと、索引の対象になるプロジェクトの md を引く。使い方を誤ったときは ExitUsage を返し、
+// Run は `ccnavi --docs`。ワークスペースと、索引の対象になるプロジェクトの md を引く。使い方を誤ったときは config.ExitError を返し、
 // 0 件でも終了コードは 0。期限は無い。初めての回は md を全部読み、2 回目からは mtime の変わった md だけを読む。
 func Run(stdout, stderr io.Writer, conf *config.Settings, root string, q Query, refresh bool) int {
 	if problems := usageProblems(q); len(problems) > 0 {
 		for _, p := range problems {
 			io.WriteString(stderr, errPrefix+p+"\n")
 		}
-		return ExitUsage
+		return config.ExitError
 	}
 	found := collect(conf, root, collectOptions{refresh: refresh, parse: true})
 	var said strings.Builder
@@ -95,7 +92,7 @@ func AtStart(conf *config.Settings, root string, deadline time.Time) string {
 	if limit.Sub(now) >= minRefresh {
 		found = collect(conf, root, collectOptions{refresh: true, parse: true, deadline: limit})
 	} else {
-		found = collect(conf, root, collectOptions{deadline: now.Add(staleBudget)})
+		found = collect(conf, root, collectOptions{deadline: now.Add(git.IndexStaleTimeout)})
 		found.timedOut = true
 	}
 	return notice(conf, root, found)

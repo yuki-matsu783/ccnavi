@@ -2,6 +2,8 @@ package docindex
 
 import (
 	"bytes"
+	"errors"
+	"io/fs"
 	"os"
 	"strings"
 
@@ -33,7 +35,7 @@ func negatesIndex(line string) bool {
 	if !ok {
 		return false
 	}
-	pattern = rstrip(pattern)
+	pattern = ospath.Rstrip(pattern)
 	return strings.HasSuffix(pattern, IndexName) || strings.HasSuffix(pattern, "*.jsonl") || strings.HasSuffix(pattern, "*")
 }
 
@@ -45,15 +47,15 @@ func negatesIndex(line string) bool {
 func addIgnore(base string) ignoreResult {
 	path := ospath.Join(base, gitignoreName)
 	var existing []byte
-	info, err := os.Lstat(path)
+	info, err := ospath.Lstat(path)
 	switch {
-	case os.IsNotExist(err):
+	case errors.Is(err, fs.ErrNotExist):
 	case err != nil:
 		return notAdded
 	case !info.Mode().IsRegular() || info.Size() > indexFileLimit:
 		return notAdded
 	default:
-		if existing, err = os.ReadFile(path); err != nil {
+		if existing, err = fsio.ReadDiskBytes(path); err != nil {
 			return notAdded
 		}
 	}
@@ -65,7 +67,7 @@ func addIgnore(base string) ignoreResult {
 		}
 	}
 	for _, line := range lines {
-		if rstrip(line) == IgnoreLine {
+		if ospath.Rstrip(line) == IgnoreLine {
 			return present
 		}
 	}

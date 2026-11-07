@@ -34,6 +34,15 @@ const (
 	MergeTimeout = 20 * time.Second
 	// CleanupTimeout はワークツリーの片付けと、引き継ぎが版の中身を読む期限。
 	CleanupTimeout = 30 * time.Second
+	// IndexTimeout は md の索引（--docs）が ls-files と check-ignore に 1 回ずつ与える期限。索引の期限があれば
+	// 残りで縮めるが、IndexMinTimeout より短くはしない（0 にはしない）。
+	IndexTimeout    = 10 * time.Second
+	IndexMinTimeout = 100 * time.Millisecond
+	// IndexStaleTimeout は SessionStart で索引を新しくしないとき、既存の索引を集めるのに git に与える期限。
+	IndexStaleTimeout = time.Second
+	// FrontmatterHintTimeout は frontmatter の無い md の案内が、その md が無視されているかを聞く期限。
+	// 過ぎたら案内しない。
+	FrontmatterHintTimeout = 2 * time.Second
 )
 
 // ShortSHA は文に出す短い sha の桁数。

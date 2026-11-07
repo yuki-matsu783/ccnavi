@@ -50,7 +50,7 @@ func (r Row) JSON() *pyjson.Object { return r.obj }
 
 // Line は ccnavi-index.jsonl と `--format jsonl` の 1 行（改行なし）。
 func (r Row) Line() string {
-	line, _ := compact(r.obj)
+	line, _ := Compact(r.obj)
 	return line
 }
 
@@ -60,19 +60,18 @@ func (r Row) Prefixed(prefix string) Row {
 	if prefix == "" {
 		return r
 	}
-	directory := r.directory()
-	if directory == "" || directory == rootDirectory {
-		directory = prefix
-	} else {
-		directory = prefix + "/" + directory
+	directory := prefix
+	if d := r.directory(); d != "" && d != rootDirectory {
+		directory = JoinRel(prefix, d)
 	}
-	return Row{r.obj.With(keyConceptID, prefix+"/"+r.ConceptID(), keyDirectory, directory)}
+	return Row{r.obj.With(keyConceptID, JoinRel(prefix, r.ConceptID()), keyDirectory, directory)}
 }
 
-// compact は json.dumps(v, ensure_ascii=False, separators=(",", ":"))。
-func compact(v any) (string, error) {
-	return pyjson.Dumps(v, pyjson.Options{RawUnicode: true, Compact: true})
-}
+// compactOptions は json.dumps(v, ensure_ascii=False, separators=(",", ":"))。
+var compactOptions = pyjson.Options{RawUnicode: true, Compact: true}
+
+// Compact は索引の行と、frontmatter の入れ子の値を比べる・出す形（詰めた JSON）。
+func Compact(v any) (string, error) { return pyjson.Dumps(v, compactOptions) }
 
 // validRow は ccnavi が書いた形の 1 行か。
 func validRow(v any) (Row, bool) {

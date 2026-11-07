@@ -88,15 +88,14 @@ func withoutGit(conf *config.Settings) []string {
 	if conf.Projects == "" {
 		return nil
 	}
-	names, err := ospath.DiskListdir(conf.Projects)
+	names, err := ospath.DiskListdir(conf.Projects) // 名前の順
 	if err != nil {
 		return nil
 	}
-	sort.Strings(names)
 	var found []string
 	for _, name := range names {
 		dir := ospath.Join(conf.Projects, name)
-		if ospath.IsDir(dir) && !ospath.DiskExists(ospath.Join(dir, ".git")) {
+		if ospath.IsDir(dir) && !tree.HasGit(dir) {
 			found = append(found, name)
 		}
 	}
@@ -151,12 +150,7 @@ func collect(conf *config.Settings, root string, o collectOptions) *collected {
 		}
 		result.timedOut = result.timedOut || built.TimedOut
 		result.indexable = result.indexable || built.Indexable
-		at := func(rel string) string {
-			if p.prefix == "" {
-				return rel
-			}
-			return p.prefix + "/" + rel
-		}
+		at := func(rel string) string { return docindex.JoinRel(p.prefix, rel) }
 		for _, f := range built.Foreign {
 			result.foreign = append(result.foreign, at(f))
 		}

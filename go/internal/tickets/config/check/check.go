@@ -42,7 +42,7 @@ func problem(sev rules.Severity, rule, detail string) rules.Problem {
 
 // prefixed は苦情の rule の前に出どころを付ける。
 func prefixed(where string, p rules.Problem) rules.Problem {
-	return problem(p.Severity, strings.TrimRightFunc(where+" "+p.Rule, ospath.IsSpace), p.Detail)
+	return problem(p.Severity, ospath.Rstrip(where+" "+p.Rule), p.Detail)
 }
 
 // namedRules は共通レイヤーのルールの置き場が、既定の場所ではなく差し替えで名指しされたものか。
@@ -193,16 +193,9 @@ func UnmatchedScopes(conf *config.Settings, root string) []rules.Problem {
 		if types.Len() == 0 || home == "" {
 			continue
 		}
-		done := git.Run(home, []string{"ls-files", "-z", "--cached", "--others", "--exclude-standard"},
-			git.Options{PlainPathspecs: true})
+		files, done := git.Listed(home, git.ListAll, git.Options{})
 		if !done.OK() {
 			continue
-		}
-		var files []string
-		for _, f := range strings.Split(done.Out, "\x00") {
-			if f != "" {
-				files = append(files, f)
-			}
 		}
 		where := LayerWhere(name)
 		for p := range types.All() {

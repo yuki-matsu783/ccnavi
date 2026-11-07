@@ -13,8 +13,12 @@ const AnySeparator = `[\\/]`
 // 置き換えるのは翻訳後の "/" で、文字クラスの中の "/"（`[a/b]`）も置き換わる。Python と同じ答えにするため
 // そのままにしてある。
 func TranslateGlob(glob string) string {
-	return strings.ReplaceAll(fnmatchTranslate([]rune(glob)), "/", AnySeparator)
+	return strings.ReplaceAll(TranslateFnmatch(glob), "/", AnySeparator)
 }
+
+// TranslateFnmatch は Python 3.13 の fnmatch.translate そのもの（"/" は "/" にだけ当たる）。区切りを "/" に
+// そろえたパスに当てる呼び手が使う。
+func TranslateFnmatch(glob string) string { return fnmatchTranslate([]rune(glob)) }
 
 // star は翻訳の途中で `*` の位置を表す印。
 const star = "\x00*"

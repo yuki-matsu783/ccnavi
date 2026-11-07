@@ -2,6 +2,7 @@ package pyre
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 
 	"ccnavi/internal/infra/pyfmt"
@@ -50,6 +51,16 @@ func Compile(pattern string, flags Flag) (*Regexp, error) {
 		re.anchor = true
 	}
 	return re, nil
+}
+
+// MustCompile は Compile と同じだが、組めなければ panic する。起動時に組む、このビルドに書いた固定の式だけに使う
+// （組めないのはビルドの不備で、テストが起動の時点で落ちる）。利用者が書いた式は Compile で読む。
+func MustCompile(pattern string, flags Flag) *Regexp {
+	re, err := Compile(pattern, flags)
+	if err != nil {
+		panic("pyre: 固定の式 " + strconv.Quote(pattern) + " を組めない: " + err.Error())
+	}
+	return re
 }
 
 func combine(flags, add, del Flag) Flag {

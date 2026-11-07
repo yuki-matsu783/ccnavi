@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/tickets/testkit"
 )
 
@@ -44,13 +45,13 @@ func indexFixture(t *testing.T, extra int) (string, []string) {
 	os.MkdirAll(filepath.Join(lib, ".git"), 0o755)
 	os.MkdirAll(filepath.Join(root, "projects", "self", ".git"), 0o755)
 	for name, text := range indexSkills {
-		testkit.Put(t, filepath.Join(lib, skillsDir, name, skillFile), text)
+		testkit.Put(t, filepath.Join(lib, config.SkillsDir, name, config.SkillFile), text)
 	}
 	for i := range extra {
 		name := "z" + strconv.Itoa(100+i)
-		testkit.Put(t, filepath.Join(lib, skillsDir, name, skillFile), skill(name, strings.Repeat("説明", 60)))
+		testkit.Put(t, filepath.Join(lib, config.SkillsDir, name, config.SkillFile), skill(name, strings.Repeat("説明", 60)))
 	}
-	testkit.Put(t, filepath.Join(root, "projects", "self", skillsDir, "x", skillFile), skill("x", "予約名"))
+	testkit.Put(t, filepath.Join(root, "projects", "self", config.SkillsDir, "x", config.SkillFile), skill("x", "予約名"))
 	return root, []string{lib, filepath.Join(lib, "src"), root, filepath.Join(root, "projects", "self"), ""}
 }
 

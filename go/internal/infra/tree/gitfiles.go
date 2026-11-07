@@ -8,10 +8,17 @@ import (
 
 // git の状態をファイルだけから読む。読めないときは「分からない」（空か ok が偽）を返し、呼び手が代わりを決める。
 
+// dotGit はツリーのルートの git の印。ふつうはディレクトリ、ワークツリーと submodule ではファイル。
+const dotGit = ".git"
+
+// HasGit は dir の直下に `.git`（ディレクトリでもファイルでもよい。リンクは先を見る）があるか。git のツリーの
+// ルートの目安で、git は起こさない。
+func HasGit(dir string) bool { return ospath.DiskExists(ospath.Join(dir, dotGit)) }
+
 // GitDir はこのツリーの git ディレクトリ。`.git` がディレクトリならそれ、ファイルなら `gitdir:` の先
 // （相対ならツリーから）。分からなければ ok が偽。
 func GitDir(treeRoot string) (string, bool) {
-	dotgit := ospath.Join(treeRoot, ".git")
+	dotgit := ospath.Join(treeRoot, dotGit)
 	if !ospath.IsFile(dotgit) {
 		return dotgit, ospath.IsDir(dotgit)
 	}

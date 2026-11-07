@@ -171,7 +171,7 @@ func appendEntry(text, entry, ident, parent string) (string, error) {
 
 func inboxText(ident, entry, now string) string {
 	return fence + "\n" +
-		"type: learning-wiki\n" +
+		"type: " + wiki.DocType + "\n" +
 		"title: 受信箱 " + ident + " " + now + "\n" +
 		"description: 対話セッションで依頼された気づき 1 件（統合の前）\n" +
 		"tags: [inbox]\n" +

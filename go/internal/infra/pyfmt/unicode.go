@@ -3,6 +3,7 @@ package pyfmt
 import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/unicode/norm"
+	"golang.org/x/text/width"
 )
 
 var folder = cases.Fold()
@@ -23,3 +24,20 @@ func NFD(s string) string { return norm.NFD.String(s) }
 
 // Combining は Python の unicodedata.combining(r)（正準結合クラス。結合しない字は 0）。
 func Combining(r rune) int { return int(norm.NFD.PropertiesString(string(r)).CCC()) }
+
+// EastAsianWidth は Python の unicodedata.east_asian_width(r)（"W"・"F"・"H"・"Na"・"A"・"N"）。
+func EastAsianWidth(r rune) string {
+	switch width.LookupRune(r).Kind() {
+	case width.EastAsianWide:
+		return "W"
+	case width.EastAsianFullwidth:
+		return "F"
+	case width.EastAsianHalfwidth:
+		return "H"
+	case width.EastAsianNarrow:
+		return "Na"
+	case width.EastAsianAmbiguous:
+		return "A"
+	}
+	return "N"
+}

@@ -2,11 +2,11 @@ package docindex
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"ccnavi/internal/infra/fsio"
@@ -49,7 +49,7 @@ type writer struct {
 func (w *writer) write(indexPath, indexRel, text string) error {
 	if !w.beside {
 		err := writeAtomic(indexPath, text, ospath.Join(w.tmpDir, uniqueName(tmpPrefix, tmpSuffix)))
-		if err == nil || !crossDevice(err) {
+		if err == nil || !fsio.CrossDevice(err) {
 			return err
 		}
 		w.beside = true
@@ -61,13 +61,10 @@ func (w *writer) writeBeside(indexPath, indexRel, text string) error {
 	parent := ospath.Dirname(indexPath)
 	sweepBeside(parent)
 	name := uniqueName(localTmpPrefix, "")
-	probe := name + "/" + IndexName
-	if i := strings.LastIndex(indexRel, "/"); i >= 0 {
-		probe = indexRel[:i] + "/" + probe
-	}
+	probe := JoinRel(dirOf(indexRel), name+"/"+IndexName)
 	ignored, err := Ignored(w.base, []string{probe}, left(w.deadline))
 	if err != nil {
-		return errors.New("一時ファイルの置き場を git に確かめられない: " + err.Error())
+		return fmt.Errorf("一時ファイルの置き場を git に確かめられない: %w", err)
 	}
 	if !ignored[probe] {
 		return errors.New("一時ファイルの置き場 " + probe + " が git に無視されないので反映しません")
@@ -79,10 +76,6 @@ func (w *writer) writeBeside(indexPath, indexRel, text string) error {
 	defer os.Remove(holder)
 	return writeAtomic(indexPath, text, ospath.Join(holder, IndexName))
 }
-
-// crossDevice は置き換えが別のファイルシステムをまたいで失敗したか。
-// Windows の ERROR_NOT_SAME_DEVICE はここでは見分けない（fsio に判定が無い）。
-func crossDevice(err error) bool { return errors.Is(err, syscall.EXDEV) }
 
 // writeAtomic は temporary に排他で書き、path へ置き換える。残った一時ファイルは消す。
 func writeAtomic(path, text, temporary string) error {
@@ -116,7 +109,7 @@ func sweep(tmpDir string) {
 			continue
 		}
 		path := ospath.Join(tmpDir, name)
-		if info, err := os.Lstat(path); err == nil && info.Mode().IsRegular() && time.Since(info.ModTime()) > tmpStale {
+		if info, err := ospath.Lstat(path); err == nil && info.Mode().IsRegular() && time.Since(info.ModTime()) > tmpStale {
 			os.Remove(path)
 		}
 	}
@@ -134,7 +127,7 @@ func sweepBeside(parent string) {
 			continue
 		}
 		holder := ospath.Join(parent, name)
-		info, err := os.Lstat(holder)
+		info, err := ospath.Lstat(holder)
 		if err != nil || !info.IsDir() || time.Since(info.ModTime()) <= tmpStale {
 			continue
 		}
@@ -144,7 +137,7 @@ func sweepBeside(parent string) {
 		}
 		if len(inside) == 1 {
 			left := ospath.Join(holder, IndexName)
-			if info, err := os.Lstat(left); err != nil || !info.Mode().IsRegular() || os.Remove(left) != nil {
+			if !ospath.IsRegular(left) || os.Remove(left) != nil {
 				continue
 			}
 		}

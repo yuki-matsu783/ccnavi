@@ -142,6 +142,15 @@ func (m *Map) Text(key string) string {
 	return pyfmt.Str(v)
 }
 
+// Or は Python の m.get(key) or fallback。偽の値（無い・null・false・0・空）なら fallback を、ほかは値をそのまま返す
+// （Text と違い str() にしない）。
+func (m *Map) Or(key string, fallback any) any {
+	if v := m.Get(key); pyfmt.Truthy(v) {
+		return v
+	}
+	return fallback
+}
+
 // String は値が文字列ならそれと真。無い・文字列でなければ ("", false)。
 func (m *Map) String(key string) (string, bool) {
 	s, ok := m.Get(key).(string)

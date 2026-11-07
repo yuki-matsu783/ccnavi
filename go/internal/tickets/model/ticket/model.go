@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	// Fence は frontmatter の囲い。
-	Fence = "---"
+	// Fence は frontmatter の囲い（yaml.FrontBody が読むのと同じ行）。
+	Fence = yaml.FrontFence
 	// BOM は U+FEFF。str.strip() は空白と見なさないので、付いていると先頭の `---` と一致しない。
 	BOM = "\uFEFF"
 	// Version はこのビルドが読めるチケット書式の版。

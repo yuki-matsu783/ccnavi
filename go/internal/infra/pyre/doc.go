@@ -9,11 +9,11 @@
 // 読めない式の文面と位置（`missing ), unterminated subpattern at position 0`）も Python と同じにする。
 // 後戻りで照合するので、式によっては Python と同じく、長さに対して指数的に遅くなる。
 //
-// Python からの対応: re.compile → Compile（読めなければ *Error）、Pattern.search・match・fullmatch の真偽 →
+// Python からの対応: re.compile → Compile（読めなければ *Error。このビルドに書いた固定の式は MustCompile）、Pattern.search・match・fullmatch の真偽 →
 // Search・Match・FullMatch、search が返す Match → Find、search(s, pos, endpos)・match(s, pos, endpos)・
 // finditer(s, pos, endpos) → FindIn・MatchIn・FindAllIn（位置は符号位置）、finditer → FindAll、re.sub（repl に関数を
 // 渡す形）→ Sub、Match の start・end・group(0)・group(name) → Found の Start・End・Text・Named、groupindex → Group、pattern → Pattern、re.escape → Escape、
-// globmatch.translate（fnmatch.translate の "/" を両方の区切りに当てる）→ TranslateGlob、
+// globmatch.translate（fnmatch.translate の "/" を両方の区切りに当てる）→ TranslateGlob、fnmatch.translate → TranslateFnmatch、
 // 区切りの式 `[\\/]` → AnySeparator。入れ子が深すぎて Python が RecursionError で止まる式は ErrTooDeep、
 // 繰り返しの数が大きすぎて OverflowError になる式は ErrOverflow になる。
 package pyre

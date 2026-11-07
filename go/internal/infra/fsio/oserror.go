@@ -100,6 +100,10 @@ func pyErrno(err error) int {
 	return 0
 }
 
+// CrossDevice は置き換え（rename）が別のファイルシステム・別のドライブをまたいで失敗したか（errno.EXDEV。Windows の
+// ERROR_NOT_SAME_DEVICE も含む）。またぐときだけ、コピーや別の置き場に切り替える。
+func CrossDevice(err error) bool { return pyErrno(err) == errnoEXDEV }
+
 // pyError は Python の OSError と同じ文を Error() で返し、元のエラーを Unwrap で渡す。
 // 呼び手は errors.Is(err, fs.ErrNotExist) で「無い」を分けられる。
 type pyError struct{ err error }

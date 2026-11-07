@@ -1,6 +1,8 @@
 package docindex
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"slices"
 	"sort"
@@ -8,6 +10,7 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/tree"
@@ -32,14 +35,10 @@ type Options struct {
 type Built struct {
 	// Rows は concept_id の順。
 	Rows []Row
-	// Written・Removed は書いた・消した ccnavi-index.jsonl。
-	Written, Removed []string
 	// IgnoreAdded は無視の行を足した .gitignore。足していなければ空。
 	IgnoreAdded string
 	// Foreign は ccnavi が書いた形でないので触らなかった ccnavi-index.jsonl。
 	Foreign []string
-	// Parsed・Reused は読み直した md と使い回した行の数。
-	Parsed, Reused int
 	// Problems は書けなかった・読まなかった理由。索引は組めた分だけ Rows にある。
 	Problems []string
 	// Unignored は md を持つディレクトリの ccnavi-index.jsonl がどれも無視されていない（索引の対象外）。
@@ -48,6 +47,11 @@ type Built struct {
 	Indexable bool
 	// TimedOut は期限を過ぎて、読み直しの要る md を読み残した。
 	TimedOut bool
+
+	// 以下は呼び手が読まない（テストが確かめる）。written・removed は書いた・消した ccnavi-index.jsonl、
+	// parsed・reused は読み直した md と使い回した行の数。
+	written, removed []string
+	parsed, reused   int
 }
 
 // owner は既存の ccnavi-index.jsonl の持ち主。
@@ -65,12 +69,12 @@ var past = func(deadline time.Time) bool { return !deadline.IsZero() && time.Now
 // Past は期限を過ぎたか。ゼロ値は期限無し。
 func Past(deadline time.Time) bool { return past(deadline) }
 
-// left は git に与える時間。期限があれば残りで切る（minGitTimeout より短くしない）。
+// left は git に与える時間。期限があれば残りで切る（git.IndexMinTimeout より短くしない）。
 func left(deadline time.Time) time.Duration {
 	if deadline.IsZero() {
-		return gitTimeout
+		return git.IndexTimeout
 	}
-	return max(minGitTimeout, min(gitTimeout, time.Until(deadline)))
+	return max(git.IndexMinTimeout, min(git.IndexTimeout, time.Until(deadline)))
 }
 
 // pending は読み直しを待つ md。mtime が空なのは見る前に打ち切ったもの。
@@ -96,7 +100,7 @@ type dirState struct {
 //
 // 処理は 3 段。まず全部のディレクトリで既存の索引を読み、使い回せる行を分ける。次に、読み直しの要る md を待つ数が
 // 少ないディレクトリから読む。最後にディレクトリごとに書く。読めなかった md は既存の行を残し、次の回に読み直す。
-// `.git` が無ければ ErrNotRepository を、git に聞けなければ *GitError を返す。
+// `.git` が無ければ ErrNotRepository を、git に聞けなければ理由のエラーを返す。
 func Build(base string, o Options) (*Built, error) {
 	result := &Built{}
 	all, err := listed(base, left(o.Deadline))
@@ -108,7 +112,7 @@ func Build(base string, o Options) (*Built, error) {
 		if Excluded(rel, o.Excluded, o.Kept) {
 			continue
 		}
-		dir, _ := splitDir(rel)
+		dir := dirOf(rel)
 		byDir[dir] = append(byDir[dir], rel)
 	}
 	if len(byDir) == 0 {
@@ -122,7 +126,7 @@ func Build(base string, o Options) (*Built, error) {
 	indexRel := map[string]string{}
 	rels := make([]string, 0, len(dirs))
 	for _, d := range dirs {
-		indexRel[d] = joinRel(d, IndexName)
+		indexRel[d] = JoinRel(d, IndexName)
 		rels = append(rels, indexRel[d])
 	}
 	sort.Strings(rels)
@@ -172,19 +176,20 @@ func Build(base string, o Options) (*Built, error) {
 	return result, nil
 }
 
-// splitDir は rel.rpartition("/") の頭と尾。
-func splitDir(rel string) (string, string) {
+// dirOf は rel.rpartition("/") の頭（ルートの直下なら空）。
+func dirOf(rel string) string {
 	if i := strings.LastIndex(rel, "/"); i >= 0 {
-		return rel[:i], rel[i+1:]
+		return rel[:i]
 	}
-	return "", rel
+	return ""
 }
 
-func joinRel(dir, name string) string {
+// JoinRel は "/" 区切りの dir の下の rel。dir が空（ルートの直下・接頭辞の無いツリー）なら rel のまま。
+func JoinRel(dir, rel string) string {
 	if dir == "" {
-		return name
+		return rel
 	}
-	return dir + "/" + name
+	return dir + "/" + rel
 }
 
 func shownDir(dir string) string {
@@ -230,17 +235,17 @@ func scan(base, baseReal, directory string, names []string, indexRel string, wri
 		old, hasOld := oldRows[conceptID]
 		if !o.Refresh && hasOld {
 			one.rows[conceptID] = old
-			result.Reused++
+			result.reused++
 			continue
 		}
-		info, err := os.Lstat(full(base, rel))
+		info, err := ospath.Lstat(full(base, rel))
 		if err != nil || !info.Mode().IsRegular() {
 			continue // 消したがまだステージしていない、またはふつうのファイルでない
 		}
 		mtime := info.ModTime().Local().Format(mtimeLayout)
 		if hasOld && old.Mtime() == mtime && old.directory() == shownDir(directory) {
 			one.rows[conceptID] = old
-			result.Reused++
+			result.reused++
 			continue
 		}
 		one.pending = append(one.pending, pending{rel, conceptID, mtime})
@@ -253,14 +258,14 @@ func scan(base, baseReal, directory string, names []string, indexRel string, wri
 // 形の違う行を持つものは foreign。
 func readIndex(path string) (map[string]Row, string, owner) {
 	rows := map[string]Row{}
-	info, err := os.Lstat(path)
-	if os.IsNotExist(err) {
+	info, err := ospath.Lstat(path)
+	if errors.Is(err, fs.ErrNotExist) {
 		return rows, "", absent
 	}
 	if err != nil || !info.Mode().IsRegular() || info.Size() > indexFileLimit {
 		return rows, "", foreign
 	}
-	data, err := os.ReadFile(path)
+	data, err := fsio.ReadDiskBytes(path)
 	if err != nil {
 		return rows, "", foreign
 	}
@@ -311,7 +316,7 @@ func parsePending(base string, states []*dirState, deadline time.Time, result *B
 			if !ok {
 				continue
 			}
-			result.Parsed++
+			result.parsed++
 			one.rows[p.conceptID] = newRow(p.conceptID, shownDir(one.directory), FrontMatter(raw), p.mtime)
 		}
 		kept := one.pending[:0]
@@ -351,7 +356,7 @@ func settle(one *dirState, refresh bool, w *writer, result *Built) {
 				result.Problems = append(result.Problems, one.indexRel+" を保存できませんでした: "+fsio.ErrorText(err))
 				return
 			}
-			result.Removed = append(result.Removed, one.indexRel)
+			result.removed = append(result.removed, one.indexRel)
 		}
 		return
 	}
@@ -366,5 +371,5 @@ func settle(one *dirState, refresh bool, w *writer, result *Built) {
 		result.Problems = append(result.Problems, one.indexRel+" を保存できませんでした: "+fsio.ErrorText(err))
 		return
 	}
-	result.Written = append(result.Written, one.indexRel)
+	result.written = append(result.written, one.indexRel)
 }

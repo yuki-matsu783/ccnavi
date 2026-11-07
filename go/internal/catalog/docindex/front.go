@@ -21,11 +21,10 @@ const (
 	maxDepth = 32
 )
 
-const (
-	frontFence = "---"
-	frontEnd   = "..."
-	bom        = "\ufeff"
-)
+const bom = "\ufeff"
+
+// frontStyle は索引の囲いの読み方（行末の空白だけを除き、`...` でも閉じる）。
+var frontStyle = yaml.FrontStyle{DocEnd: true}
 
 var errTooDeep = errors.New("入れ子が深すぎる")
 
@@ -37,21 +36,11 @@ func FrontMatter(raw []byte) *pyjson.Object {
 		raw = raw[:headLimit]
 	}
 	text, _ := fsio.DecodeBytes(raw, fsio.Replace)
-	lines := ospath.Splitlines(strings.TrimPrefix(text, bom))
-	if len(lines) == 0 || rstrip(lines[0]) != frontFence {
+	body, state := yaml.FrontBody(strings.TrimPrefix(text, bom), frontStyle)
+	if state != yaml.FrontClosed {
 		return nil
 	}
-	end := 0
-	for i := 1; i < len(lines); i++ {
-		if s := rstrip(lines[i]); s == frontFence || s == frontEnd {
-			end = i
-			break
-		}
-	}
-	if end == 0 {
-		return nil
-	}
-	data, err := yaml.LoadRefusingAliases(strings.Join(lines[1:end], "\n"))
+	data, err := yaml.LoadRefusingAliases(body)
 	if err != nil {
 		return nil
 	}
@@ -64,8 +53,6 @@ func FrontMatter(raw []byte) *pyjson.Object {
 	}
 	return front
 }
-
-func rstrip(s string) string { return strings.TrimRightFunc(s, ospath.IsSpace) }
 
 // jsonable は YAML の値を JSON に載る形にする（Python の _jsonable）。キーは str()、日時は isoformat() にする。
 // バイト列は UTF-8 として読み、無限と NaN と残りの型は str() にする。yamljson.ToJSON とは文字列にする規則が違う。
@@ -113,12 +100,28 @@ func checkJSON(v any) error {
 	if deep(v) {
 		return errTooDeep
 	}
-	_, err := pyjson.Dumps(v, pyjson.Options{RawUnicode: true, Compact: true, RejectNaN: true})
+	opts := compactOptions
+	opts.RejectNaN = true
+	_, err := pyjson.Dumps(v, opts)
 	return err
 }
 
-// deep は入れ子が maxDepth より深いか。再帰しない（深い入れ子で落ちないように）。
+// deep は入れ子が maxDepth より深いか。
 func deep(v any) bool {
+	found := false
+	Walk(v, func(node any, depth int) bool {
+		if _, isLeaf := children(node); !isLeaf && depth > maxDepth {
+			found = true
+		}
+		return !found
+	})
+	return found
+}
+
+// Walk は JSON の値の入れ子を、書かれた順に頭から辿る（再帰しない。深い入れ子で落ちないように）。visit は
+// 入れ物（*pyjson.Object・[]any）とそのほかの値の両方に、深さ（v が 1）とともに呼ぶ。偽を返したらやめる。
+// nil の *pyjson.Object は飛ばす。
+func Walk(v any, visit func(node any, depth int) bool) {
 	type item struct {
 		v     any
 		depth int
@@ -127,25 +130,32 @@ func deep(v any) bool {
 	for len(stack) > 0 {
 		top := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
-		var children []any
-		switch x := top.v.(type) {
-		case *pyjson.Object:
-			for _, inner := range x.All() {
-				children = append(children, inner)
-			}
-		case []any:
-			children = x
-		default:
+		if obj, ok := top.v.(*pyjson.Object); ok && obj == nil {
 			continue
 		}
-		if top.depth > maxDepth {
-			return true
+		if !visit(top.v, top.depth) {
+			return
 		}
-		for _, child := range children {
-			stack = append(stack, item{child, top.depth + 1})
+		inner, _ := children(top.v)
+		for i := len(inner) - 1; i >= 0; i-- {
+			stack = append(stack, item{inner[i], top.depth + 1})
 		}
 	}
-	return false
+}
+
+// children は入れ物の中身と、入れ物でない（葉）か。
+func children(v any) ([]any, bool) {
+	switch x := v.(type) {
+	case *pyjson.Object:
+		var values []any
+		for _, inner := range x.All() {
+			values = append(values, inner)
+		}
+		return values, false
+	case []any:
+		return x, false
+	}
+	return nil, true
 }
 
 // isBlank は Python の not s.strip()。

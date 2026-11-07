@@ -262,20 +262,14 @@ func ignoredInParent(parentTree, childTree, base, head string) ([]string, string
 	if len(present) == 0 {
 		return nil, ""
 	}
-	input := strings.Join(present, "\x00") + "\x00"
-	o := gitOptions()
-	o.Input = &input
-	o.PlainPathspecs = true
-	done := git.Run(parentTree, []string{"check-ignore", "-z", "--stdin"}, o)
-	if done.Code == 1 && done.Failure == nil {
-		return nil, ""
-	}
-	if !done.OK() {
+	// Python と同じく `./` を付けない。`:` で始まるパスは問い合わせの失敗になり、合流を止める。
+	ignored, _, ok := git.Ignored(parentTree, present, git.AsWritten, gitOptions())
+	if !ok {
 		return nil, "親のワークツリーで無視されたファイルを確かめられない"
 	}
 	seen := map[string]bool{}
 	var found []string
-	for _, p := range names(done.Out) {
+	for _, p := range ignored {
 		if !seen[p] {
 			seen[p] = true
 			found = append(found, p)

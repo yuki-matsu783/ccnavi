@@ -1,8 +1,6 @@
 package branch
 
 import (
-	"errors"
-	"fmt"
 	"io"
 	"slices"
 	"sort"
@@ -47,36 +45,25 @@ const (
 	beforePattern  = `(?:^|(?<=[\s(\[（「『、。,"'をのがにはでともへや]))`
 )
 
-// buildErr は固定の式を組めなかったこと（このビルドの不備で、テストが見る）。組めなかった式は何にも当たらない。
-var buildErr error
-
-func compile(pattern string, flags pyre.Flag) *pyre.Regexp {
-	re, err := pyre.Compile(pattern, flags)
-	if err != nil {
-		buildErr = errors.Join(buildErr, fmt.Errorf("%q: %w", pattern, err))
-	}
-	return re
-}
-
 var (
-	fencePattern      = compile("```.*?(?:```|\\Z)", pyre.DotAll)
-	inlineCodePattern = compile("`[^`\\n]*`", 0)
-	urlIssuePattern   = compile(`(?:(?P<repo>[\w.-]{1,100}/[\w.-]{1,100})/)?(?:-/)?issues/`+numPattern, 0)
-	urlMRPattern      = compile(`(?:(?P<repo>[\w.-]{1,100}/[\w.-]{1,100})/)?(?:-/)?(?:pull|pulls|merge_requests)/`+numPattern, 0)
-	urlPattern        = compile(`https?://\S+`, 0)
-	wordIssuePattern  = compile(`(?<![A-Za-z0-9_])issues?[ \t]*[:：#＃-]?[ \t]*`+bodyNumPattern, pyre.IgnoreCase)
-	wordMRPattern     = compile(`(?<![A-Za-z0-9_])`+
+	fencePattern      = pyre.MustCompile("```.*?(?:```|\\Z)", pyre.DotAll)
+	inlineCodePattern = pyre.MustCompile("`[^`\\n]*`", 0)
+	urlIssuePattern   = pyre.MustCompile(`(?:(?P<repo>[\w.-]{1,100}/[\w.-]{1,100})/)?(?:-/)?issues/`+numPattern, 0)
+	urlMRPattern      = pyre.MustCompile(`(?:(?P<repo>[\w.-]{1,100}/[\w.-]{1,100})/)?(?:-/)?(?:pull|pulls|merge_requests)/`+numPattern, 0)
+	urlPattern        = pyre.MustCompile(`https?://\S+`, 0)
+	wordIssuePattern  = pyre.MustCompile(`(?<![A-Za-z0-9_])issues?[ \t]*[:：#＃-]?[ \t]*`+bodyNumPattern, pyre.IgnoreCase)
+	wordMRPattern     = pyre.MustCompile(`(?<![A-Za-z0-9_])`+
 		`(?:MR|PR|merge[ \t]+request|pull[ \t]+request|マージリクエスト|プルリクエスト|プルリク)`+
 		`[ \t]*[:：#＃!-]?[ \t]*`+bodyNumPattern, pyre.IgnoreCase)
-	hashPattern = compile(beforePattern+`[#＃]`+bodyNumPattern, 0)
-	bangPattern = compile(beforePattern+`!`+bodyNumPattern, 0)
+	hashPattern = pyre.MustCompile(beforePattern+`[#＃]`+bodyNumPattern, 0)
+	bangPattern = pyre.MustCompile(beforePattern+`!`+bodyNumPattern, 0)
 	// `#` の前がこれなら CSS の色として読む（`color: #333333`）。
-	cssBeforePattern = compile(`(?:color|background|border|fill|stroke|outline|shadow)[-a-z]*\s*:\s*$`, pyre.IgnoreCase)
+	cssBeforePattern = pyre.MustCompile(`(?:color|background|border|fill|stroke|outline|shadow)[-a-z]*\s*:\s*$`, pyre.IgnoreCase)
 	// ユーザの指定ではない文。貼り付けた内容・system-reminder・サブエージェントの報告の枠は閉じタグまで（閉じが
 	// 無ければ末尾まで）。`[ccnavi]` で始まる通知は次の空行までの 1 段落。他のセッションからの通知は末尾まで。
-	noiseTagPattern     = compile(`<(?P<tag>pasted_content|system-reminder|agent-message)\b[^>]*>.*?(?:</(?P=tag)\s*>|\Z)`, pyre.DotAll|pyre.IgnoreCase)
-	noticePattern       = compile(`^[ \t]*\[ccnavi\].*?(?:\n[ \t]*\n|\Z)`, pyre.DotAll|pyre.Multiline)
-	otherSessionPattern = compile(`Another Claude session sent a message.*\Z`, pyre.DotAll|pyre.IgnoreCase)
+	noiseTagPattern     = pyre.MustCompile(`<(?P<tag>pasted_content|system-reminder|agent-message)\b[^>]*>.*?(?:</(?P=tag)\s*>|\Z)`, pyre.DotAll|pyre.IgnoreCase)
+	noticePattern       = pyre.MustCompile(`^[ \t]*\[ccnavi\].*?(?:\n[ \t]*\n|\Z)`, pyre.DotAll|pyre.Multiline)
+	otherSessionPattern = pyre.MustCompile(`Another Claude session sent a message.*\Z`, pyre.DotAll|pyre.IgnoreCase)
 )
 
 // Ref は依頼文の中の issue・MR の指定 1 つ。Repo は URL から読めたときの `owner/repo`（読めなければ空）。

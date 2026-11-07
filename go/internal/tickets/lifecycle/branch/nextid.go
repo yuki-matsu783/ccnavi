@@ -60,7 +60,7 @@ func SerialNames(conf *config.Settings, root string, known *Known) ([]string, []
 		repos = append(repos, repo{t.Root, "プロジェクト " + t.Name})
 	}
 	for _, r := range repos {
-		if !ospath.DiskExists(ospath.Join(r.root, ".git")) {
+		if !tree.HasGit(r.root) {
 			// git のリポジトリでない（モード B のワークスペースなど）。数えるものが無いだけで、数えきれないのではない。
 			continue
 		}

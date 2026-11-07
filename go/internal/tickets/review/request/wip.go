@@ -38,21 +38,21 @@ const (
 
 // wipTracked は、途中の作業の置き場（wip）の下で追跡されているファイル（git の表記）を返す。読めなければ ok が偽になる。大文字小文字を区別せずに見る。区別しない FS で `WIP/` を先に作ると、範囲の判定は通るのに、git には `WIP/…` で入ってしまうからである。名前に `\` を含む 1 ファイル（`wip\x`）も、wip の下と見なす。pathspec には頼らず、-z で全部を読んでから絞る。
 func wipTracked(treeRoot string) ([]string, bool) {
-	return wipFiles(treeRoot, "ls-files", "-z")
+	return wipFiles(treeRoot, git.ListTracked)
 }
 
 func wipUntracked(treeRoot string) ([]string, bool) {
-	return wipFiles(treeRoot, "ls-files", "-z", "--others", "--exclude-standard")
+	return wipFiles(treeRoot, git.ListUntracked)
 }
 
-func wipFiles(treeRoot string, args ...string) ([]string, bool) {
-	code, out := git.Output(treeRoot, args, git.Options{Timeout: git.ReviewTimeout})
-	if code != 0 {
+func wipFiles(treeRoot string, l git.Listing) ([]string, bool) {
+	all, done := git.Listed(treeRoot, l, git.Options{Timeout: git.ReviewTimeout})
+	if !done.OK() {
 		return nil, false
 	}
 	var found []string
-	for _, p := range strings.Split(out, "\x00") {
-		if p != "" && place.InWip(p) {
+	for _, p := range all {
+		if place.InWip(p) {
 			found = append(found, p)
 		}
 	}

@@ -299,7 +299,7 @@ func Move(source, target string) string {
 		record(source, "")
 		return record(target, "")
 	}
-	if pyErrno(err) != errnoEXDEV {
+	if !CrossDevice(err) {
 		return ErrorText(err)
 	}
 	if err := CopyFile(source, target); err != nil {

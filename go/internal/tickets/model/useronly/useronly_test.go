@@ -16,12 +16,6 @@ import (
 
 // 表と読み替え（tests/guard/test_user_entry.py の TableTest・RewriteTest・EntryMarkTest のうち CLI を通さない分）。
 
-func TestPatternsCompile(t *testing.T) {
-	if buildErr != nil {
-		t.Fatal(buildErr)
-	}
-}
-
 // 空のグループから組んだ式は何にでも当たるので、使うグループはどれも語を持つ。
 func TestEveryUsedGroupHasWords(t *testing.T) {
 	for name, got := range map[string][]string{

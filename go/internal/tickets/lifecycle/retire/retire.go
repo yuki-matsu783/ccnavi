@@ -115,7 +115,7 @@ func judgeChild(repo string, c child, reference string, confirmed bool, tool str
 		if !confirmed {
 			text := "- " + name + extra
 			if tool != "" {
-				text = strings.TrimRightFunc(text+"\n  ユーザが打つ: "+tool, ospath.IsSpace)
+				text = ospath.Rstrip(text + "\n  ユーザが打つ: " + tool)
 			}
 			return outcome{ask, text}
 		}

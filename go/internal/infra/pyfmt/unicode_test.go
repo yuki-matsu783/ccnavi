@@ -32,3 +32,11 @@ func TestNFDAndCombining(t *testing.T) {
 		}
 	}
 }
+
+func TestEastAsianWidth(t *testing.T) {
+	for r, want := range map[rune]string{'a': "Na", 'あ': "W", 'Ａ': "F", 'ｱ': "H", '±': "A", '©': "N", '一': "W"} {
+		if got := EastAsianWidth(r); got != want {
+			t.Errorf("EastAsianWidth(%U) = %q, want %q", r, got, want)
+		}
+	}
+}

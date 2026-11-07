@@ -3,10 +3,11 @@ package docindex
 import (
 	"bytes"
 	"io"
-	"os"
 	"regexp"
 
 	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/yaml"
 )
 
 const (
@@ -27,8 +28,7 @@ var readHead = ReadHead
 // ReadHead は、ふつうのファイルの頭を、frontmatter を探す分だけ読んで返す。リンク・ふつうでないもの・読めないものは偽。
 // まず firstRead だけ読む。frontmatter が無いか、そこで閉じていれば止める。要るときだけ headLimit まで読み足す。
 func ReadHead(path string) ([]byte, bool) {
-	info, err := os.Lstat(path)
-	if err != nil || !info.Mode().IsRegular() {
+	if !ospath.IsRegular(path) {
 		return nil, false
 	}
 	f, _, err := fsio.OpenNoFollow(path)
@@ -40,10 +40,10 @@ func ReadHead(path string) ([]byte, bool) {
 	if !ok {
 		return nil, false
 	}
-	if !bytes.HasPrefix(bytes.TrimPrefix(data, bomBytes), []byte(frontFence)) {
+	if !bytes.HasPrefix(bytes.TrimPrefix(data, bomBytes), []byte(yaml.FrontFence)) {
 		return data, true
 	}
-	for len(data) < headLimit && !closing.Match(data[min(len(data), len(frontFence)):]) {
+	for len(data) < headLimit && !closing.Match(data[min(len(data), len(yaml.FrontFence)):]) {
 		before := len(data)
 		data, ok = readUpTo(f, data, min(moreRead, headLimit-len(data)))
 		if !ok {

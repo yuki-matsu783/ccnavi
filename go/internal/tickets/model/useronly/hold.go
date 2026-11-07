@@ -50,7 +50,7 @@ func commands(subject string) []string {
 
 // Exempt は止めている間でも通してよいか。degraded（読み切れなかった理由）があれば通さない。
 func Exempt(subject, degraded string) bool {
-	if degraded != "" || buildErr != nil {
+	if degraded != "" {
 		return false
 	}
 	parts := commands(subject)

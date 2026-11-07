@@ -85,7 +85,7 @@ func Body(stderr io.Writer, bases []string, rel string) string {
 	if len(runes) <= MaxChars {
 		return ospath.Strip(string(runes))
 	}
-	return strings.TrimRightFunc(string(runes[:MaxChars]), ospath.IsSpace) +
+	return ospath.Rstrip(string(runes[:MaxChars])) +
 		fmt.Sprintf("\n\n(ccnavi: %s は %d 文字を超えるので先頭だけを載せた。続きはこのファイルを読んでください)", rel, MaxChars)
 }
 

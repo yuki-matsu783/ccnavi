@@ -46,6 +46,12 @@ const (
 	ConfigDir = "config"
 	// ClaudeDir は Claude Code の設定の置き場（ワークスペースルートの直下）。
 	ClaudeDir = ".claude"
+	// SkillsDir はスキルの置き場（ClaudeDir の下と、プロジェクトのルートの下）。
+	SkillsDir = "skills"
+	// SkillFile はスキル 1 つの本文（SkillsDir/<名前>/ の下）。
+	SkillFile = "SKILL.md"
+	// SkillHeadLimit は SKILL.md（とサブエージェントの md）の frontmatter を探す頭の長さ（バイト）。本文は読まない。
+	SkillHeadLimit = 8 * 1024
 
 	// ownProject は ccnavi 自身のソースツリーを見分ける pyproject.toml の名前。
 	ownProject = "ccnavi"

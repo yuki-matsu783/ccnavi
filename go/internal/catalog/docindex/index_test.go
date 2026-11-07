@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/tickets/testkit"
 )
@@ -118,7 +119,7 @@ func TestWritesOneIndexPerDirectoryWithTheRowShape(t *testing.T) {
 	r.put("README.md", doc("type: guide", "title: はじめに"))
 	r.put("docs/adr/0001-a.md", doc("type: adr", "tags: [git, worktree]"))
 	built := r.build()
-	eq(t, "written", sorted(built.Written), []string{IndexName, "docs/adr/" + IndexName})
+	eq(t, "written", sorted(built.written), []string{IndexName, "docs/adr/" + IndexName})
 	eq(t, "row", r.read(index("docs/adr")),
 		`{"concept_id":"docs/adr/0001-a","directory":"docs/adr","frontmatter":{"type":"adr","tags":["git","worktree"]},"mtime":"`+noonText+`"}`+"\n")
 	if !strings.Contains(r.read(IndexName), `"directory":"."`) {
@@ -147,10 +148,10 @@ func TestGitignoreLine(t *testing.T) {
 			}
 			r.put("a.md", doc("type: guide"))
 			built := r.build()
-			eq(t, "ignore", [3]any{built.Unignored, built.IgnoreAdded, built.Written}, [3]any{false, gitignoreName, []string{IndexName}})
+			eq(t, "ignore", [3]any{built.Unignored, built.IgnoreAdded, built.written}, [3]any{false, gitignoreName, []string{IndexName}})
 			eq(t, ".gitignore", r.read(gitignoreName), c.after)
 			again := r.build()
-			eq(t, "2 回目", [2]any{again.IgnoreAdded, again.Written}, [2]any{"", []string(nil)})
+			eq(t, "2 回目", [2]any{again.IgnoreAdded, again.written}, [2]any{"", []string(nil)})
 			eq(t, ".gitignore", r.read(gitignoreName), c.after)
 		})
 	}
@@ -196,7 +197,7 @@ func TestTheTreeIsLeftOut(t *testing.T) {
 			r.put("a.md", doc("type: guide"))
 			before, _ := os.ReadFile(r.path(gitignoreName))
 			built := r.build(Options{Refresh: c.refresh, Parse: true})
-			eq(t, "left out", [4]any{built.Unignored, len(built.Rows), built.Written, built.IgnoreAdded}, [4]any{true, 0, []string(nil), ""})
+			eq(t, "left out", [4]any{built.Unignored, len(built.Rows), built.written, built.IgnoreAdded}, [4]any{true, 0, []string(nil), ""})
 			after, _ := os.ReadFile(r.path(gitignoreName))
 			eq(t, ".gitignore", string(after), string(before))
 			if r.exists(IndexName) {
@@ -212,7 +213,7 @@ func TestAPartlyIgnoredTreeGetsNoLine(t *testing.T) {
 	r.put("a.md", doc("type: guide"))
 	r.put("docs/b.md", doc("type: guide"))
 	built := r.build()
-	eq(t, "built", [2]any{built.IgnoreAdded, built.Written}, [2]any{"", []string{index("docs")}})
+	eq(t, "built", [2]any{built.IgnoreAdded, built.written}, [2]any{"", []string{index("docs")}})
 	eq(t, ".gitignore", r.read(gitignoreName), "/docs/"+IndexName+"\n")
 }
 
@@ -223,7 +224,7 @@ func TestATrackedIndexIsNotRewrittenButItsRowsAreBuilt(t *testing.T) {
 	r.write(IndexName, "tracked\n")
 	testkit.Git(t, r.root, "add", "-f", IndexName)
 	built := r.build()
-	eq(t, "built", [3]any{built.Unignored, ids(built.Rows), built.Written}, [3]any{false, []string{"a", "docs/b"}, []string{index("docs")}})
+	eq(t, "built", [3]any{built.Unignored, ids(built.Rows), built.written}, [3]any{false, []string{"a", "docs/b"}, []string{index("docs")}})
 	eq(t, "tracked", r.read(IndexName), "tracked\n")
 }
 
@@ -248,7 +249,7 @@ func TestSkipsDeletedFilesAndRemovesTheIndexOfAnEmptiedDirectory(t *testing.T) {
 	os.Remove(r.path("gone/b.md"))
 	built := r.build()
 	eq(t, "rows", ids(built.Rows), []string{"keep/a"})
-	eq(t, "removed", built.Removed, []string{index("gone")})
+	eq(t, "removed", built.removed, []string{index("gone")})
 	if r.exists(index("gone")) {
 		t.Error("消えたディレクトリの索引が残った")
 	}
@@ -280,15 +281,15 @@ func TestReusesRowsByConceptIDAndMtime(t *testing.T) {
 	r.put("a.md", doc("type: guide"))
 	r.put("b.md", doc("type: adr"))
 	first := r.build()
-	eq(t, "first", [2]int{first.Parsed, first.Reused}, [2]int{2, 0})
+	eq(t, "first", [2]int{first.parsed, first.reused}, [2]int{2, 0})
 	// 使い回すかは concept_id と mtime だけで決める（同じ mtime に戻した中身は読み直さない）。
 	r.put("a.md", doc("type: changed"))
 	second := r.build()
-	eq(t, "second", [3]any{second.Parsed, second.Reused, second.Written}, [3]any{0, 2, []string(nil)})
+	eq(t, "second", [3]any{second.parsed, second.reused, second.written}, [3]any{0, 2, []string(nil)})
 	eq(t, "type", second.Rows[0].Front().Value("type"), "guide")
 	r.put("a.md", doc("type: changed"), noon.Add(time.Minute))
 	third := r.build()
-	eq(t, "third", [3]any{third.Parsed, third.Written, third.Rows[0].Front().Value("type")}, [3]any{1, []string{IndexName}, "changed"})
+	eq(t, "third", [3]any{third.parsed, third.written, third.Rows[0].Front().Value("type")}, [3]any{1, []string{IndexName}, "changed"})
 }
 
 func TestNoRefreshUsesExistingRowsAndWritesNothing(t *testing.T) {
@@ -303,7 +304,7 @@ func TestNoRefreshUsesExistingRowsAndWritesNothing(t *testing.T) {
 		types[row.ConceptID()] = row.Front().Value("type")
 	}
 	eq(t, "types", types, map[string]any{"a": "guide", "b": "adr"})
-	eq(t, "written", built.Written, []string(nil))
+	eq(t, "written", built.written, []string(nil))
 }
 
 // --- frontmatter --------------------------------------------------------------------
@@ -332,7 +333,7 @@ func TestFrontMatter(t *testing.T) {
 			}
 			continue
 		}
-		line, _ := compact(got)
+		line, _ := Compact(got)
 		eq(t, "FrontMatter", line, c.want)
 	}
 }
@@ -370,7 +371,7 @@ func TestAForeignIndexIsLeftAlone(t *testing.T) {
 			r.put("a.md", doc("type: guide"))
 			r.write(IndexName, text)
 			built := r.build()
-			eq(t, "built", [4]any{built.Parsed, ids(built.Rows), built.Written, built.Foreign}, [4]any{1, []string{"a"}, []string(nil), []string{IndexName}})
+			eq(t, "built", [4]any{built.parsed, ids(built.Rows), built.written, built.Foreign}, [4]any{1, []string{"a"}, []string(nil), []string{IndexName}})
 			if !strings.Contains(built.Problems[0], "ccnavi の索引ではない") {
 				t.Errorf("problems = %v", built.Problems)
 			}
@@ -391,7 +392,7 @@ func TestAForeignIndexOfAnEmptiedDirectoryIsNotRemoved(t *testing.T) {
 	r.write(index("gone"), "not ours\n")
 	os.Remove(r.path("gone/b.md"))
 	built := r.build()
-	eq(t, "removed", built.Removed, []string(nil))
+	eq(t, "removed", built.removed, []string(nil))
 	if !r.exists(index("gone")) {
 		t.Error("よその索引を消した")
 	}
@@ -401,7 +402,7 @@ func TestAnEmptyIndexIsOurs(t *testing.T) {
 	r := newRepo(t)
 	r.put("a.md", doc("type: guide"))
 	r.write(IndexName, "\n")
-	eq(t, "written", r.build().Written, []string{IndexName})
+	eq(t, "written", r.build().written, []string{IndexName})
 }
 
 // 自分の索引を、値の中の U+2028・U+2029・U+0085 や CRLF で割って ccnavi のものでないとしない。
@@ -414,14 +415,14 @@ func TestOwnIndexSurvivesLineSeparatorsAndCRLF(t *testing.T) {
 			t.Errorf("%q が索引に生のまま入らない", char)
 		}
 		built := r.build()
-		eq(t, "built", [3]any{built.Foreign, built.Reused, built.Rows[0].Front().Value("title")}, [3]any{[]string(nil), 1, "x" + char + "y"})
+		eq(t, "built", [3]any{built.Foreign, built.reused, built.Rows[0].Front().Value("title")}, [3]any{[]string(nil), 1, "x" + char + "y"})
 	}
 	r := newRepo(t)
 	r.put("a.md", doc("type: guide"))
 	r.build()
 	r.write(IndexName, strings.ReplaceAll(r.read(IndexName), "\n", "\r\n"))
 	built := r.build()
-	eq(t, "crlf", [2]any{built.Foreign, built.Reused}, [2]any{[]string(nil), 1})
+	eq(t, "crlf", [2]any{built.Foreign, built.reused}, [2]any{[]string(nil), 1})
 }
 
 // --- ツリーの外 --------------------------------------------------------------------------
@@ -464,7 +465,7 @@ func TestADirectoryCutShortIsWrittenUpToWhereItGot(t *testing.T) {
 	budget := 1
 	stub(t, &budget)
 	built := r.build(Options{Refresh: true, Parse: true, Deadline: time.Now().Add(time.Hour)})
-	eq(t, "built", [2]any{built.TimedOut, built.Written}, [2]any{true, []string{IndexName}})
+	eq(t, "built", [2]any{built.TimedOut, built.written}, [2]any{true, []string{IndexName}})
 	eq(t, "索引", r.read(IndexName), `{"concept_id":"a","directory":".","frontmatter":{"type":"guide"},"mtime":"`+noonText+`"}`+"\n"+oldB+"\n")
 	built = r.build()
 	eq(t, "次の回", [2]any{built.TimedOut, built.Rows[1].Front().Value("type")}, [2]any{false, "guide"})
@@ -491,7 +492,7 @@ func TestABigDirectoryFillsUpOverRuns(t *testing.T) {
 	// 1 回目は zz/late と docs の 11 本、2 回目は docs の続き 12 本、3 回目で残りの 7 本。
 	eq(t, "seen", seen, []int{12, 24, 31})
 	built := r.build()
-	eq(t, "最後", [2]any{built.TimedOut, built.Parsed}, [2]any{false, 0})
+	eq(t, "最後", [2]any{built.TimedOut, built.parsed}, [2]any{false, 0})
 }
 
 // --- 一時ファイル --------------------------------------------------------------------
@@ -554,7 +555,7 @@ func TestWritesThroughATemporaryBesideTheIndex(t *testing.T) {
 	r.put("b.md", doc("type: adr"))
 	crossDeviceGit(t, r)
 	built := r.build()
-	eq(t, "built", [2]any{built.Problems, sorted(built.Written)}, [2]any{[]string(nil), []string{IndexName, index("docs")}})
+	eq(t, "built", [2]any{built.Problems, sorted(built.written)}, [2]any{[]string(nil), []string{IndexName, index("docs")}})
 	eq(t, "leftovers", [2]any{leftovers(t, r.path("docs")), leftovers(t, r.root)}, [2]any{[]string(nil), []string(nil)})
 	status := testkit.Git(t, r.root, "status", "--porcelain", "--untracked-files=all")
 	if strings.Contains(status, IndexName) || strings.Contains(status, localTmpPrefix) {
@@ -568,7 +569,7 @@ func TestDoesNotWriteWhenTheTemporaryWouldNotBeIgnored(t *testing.T) {
 	r.put("docs/a.md", doc("type: guide"))
 	crossDeviceGit(t, r)
 	built := r.build()
-	eq(t, "built", [3]any{built.Written, ids(built.Rows), leftovers(t, r.path("docs"))}, [3]any{[]string(nil), []string{"docs/a"}, []string(nil)})
+	eq(t, "built", [3]any{built.written, ids(built.Rows), leftovers(t, r.path("docs"))}, [3]any{[]string(nil), []string{"docs/a"}, []string(nil)})
 	if !strings.Contains(strings.Join(built.Problems, " "), "git に無視されない") {
 		t.Errorf("problems = %v", built.Problems)
 	}
@@ -598,14 +599,14 @@ func TestSweepsOnlyItsOwnStaleLeftovers(t *testing.T) {
 func TestPathsAndEnvironmentAreNotReadAsPathspecMagic(t *testing.T) {
 	r := newRepo(t)
 	paths := []string{":(exclude)x/" + IndexName, ":!y/" + IndexName, "*/" + IndexName}
-	got, err := Ignored(r.root, paths, gitTimeout)
+	got, err := Ignored(r.root, paths, git.IndexTimeout)
 	if err != nil {
 		t.Fatal(err)
 	}
 	eq(t, "ignored", len(got), len(paths))
 	if !ospath.Windows {
 		r.put(":(exclude)x/a.md", doc("type: guide"))
-		eq(t, "written", r.build().Written, []string{":(exclude)x/" + IndexName})
+		eq(t, "written", r.build().written, []string{":(exclude)x/" + IndexName})
 	}
 	for _, name := range []string{"GIT_LITERAL_PATHSPECS", "GIT_ICASE_PATHSPECS", "GIT_GLOB_PATHSPECS"} {
 		t.Setenv(name, "1")

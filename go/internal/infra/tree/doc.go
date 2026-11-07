@@ -9,5 +9,6 @@
 // `.git/worktrees/<名前>` を指し、そこの gitdir が候補を指し返す相互参照が成り立つものだけを数える。
 //
 // Python からの対応: tree と directrec をまとめた。head_text → HeadText（読めなければ ok が偽）、
-// directrec.parse → ParseDirect、records_of → DirectRecords、common_dir → CommonDir。
+// directrec.parse → ParseDirect、records_of → DirectRecords、common_dir → CommonDir、各所の
+// os.path.exists(os.path.join(d, ".git")) → HasGit。
 package tree

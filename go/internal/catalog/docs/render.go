@@ -6,8 +6,6 @@ import (
 	"strings"
 	"unicode"
 
-	"golang.org/x/text/width"
-
 	"ccnavi/internal/catalog/docindex"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
@@ -18,13 +16,12 @@ import (
 const jsonIndent = 2
 
 // charWidth は 1 字の見た目の幅を返す。東アジアの全角（W・F）は 2、結合文字と書式の制御は 0 と数える。
-// unicodedata.east_asian_width に当たる部品は pyfmt に無いので、ここで x/text を読む。
 func charWidth(r rune) int {
 	if pyfmt.Combining(r) != 0 || unicode.In(r, unicode.Mn, unicode.Me, unicode.Cf) {
 		return 0
 	}
-	switch width.LookupRune(r).Kind() {
-	case width.EastAsianWide, width.EastAsianFullwidth:
+	switch pyfmt.EastAsianWidth(r) {
+	case "W", "F":
 		return 2
 	}
 	return 1
@@ -98,7 +95,7 @@ func render(out io.Writer, hits []docindex.Row, matched, total int, f Format) {
 		}
 		for i, r := range hits {
 			line := pad(types[i], tw) + "  " + pad(r.ConceptID(), cw) + "  " + oneLine(str(r, fieldTitle))
-			b.WriteString(strings.TrimRightFunc(line, ospath.IsSpace) + "\n")
+			b.WriteString(ospath.Rstrip(line) + "\n")
 		}
 	}
 	io.WriteString(out, b.String())

@@ -59,7 +59,7 @@ func TestFrontMatterMatchesPython(t *testing.T) {
 	for i, text := range frontInputs {
 		var got *string
 		if front := FrontMatter([]byte(text)); front != nil {
-			line, err := compact(front)
+			line, err := Compact(front)
 			if err != nil {
 				t.Fatal(err)
 			}

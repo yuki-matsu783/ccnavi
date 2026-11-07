@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
@@ -54,7 +55,7 @@ func (c Change) Action() Action {
 }
 
 // IsSkill は工程スキルのコピー（`skills/…`）の変更か。それ以外はミラー（`.ccnavi/…`）。
-func (c Change) IsSkill() bool { return strings.HasPrefix(c.Rel, skillsDir+"/") }
+func (c Change) IsSkill() bool { return strings.HasPrefix(c.Rel, config.SkillsDir+"/") }
 
 // 写せない理由の文。
 const (

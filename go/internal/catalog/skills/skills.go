@@ -1,20 +1,8 @@
-// Package skills は、プロジェクトのスキルの目録（名前・説明・場所）を組み、モデルへ渡す。
-//
-// スキルの手順書はプロジェクトの git で育てるので、プロジェクトの `skills/<名前>/SKILL.md` に置く。ccnavi の
-// ディレクトリの外にあるので、中は組み込みの保護の対象にならない。Claude Code は `skills/` をスキルとして読まない。
-// そこで ccnavi は目録だけを渡し、本文はエージェントが必要なときに開く。渡すのは、cwd がそのプロジェクトのツリー
-// （元のリポジトリか、そこから切ったワークツリー）の中にあるときだけ。読むのは元のリポジトリの版。
-//
-// SKILL.md の中身を誰が書いたか ccnavi には分からない。そこで、データとして区切りで囲み、1 行にまとめて切る
-// （flow.Line）。区切りの文は flow.FencePhrases に並べてあり、名前や説明の中に出たら置き換わる。
-//
-// Python からの対応: projskills。notice → Notice、index・entries・project_of・_front は非公開。
 package skills
 
 import (
 	"io"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -23,7 +11,6 @@ import (
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
-	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/policy/ctxfile"
@@ -32,23 +19,18 @@ import (
 )
 
 const (
-	// skillsDir はプロジェクトのルートからのスキルの置き場。
-	skillsDir = "skills"
-	// skillFile はスキル 1 つの本文。
-	skillFile = "SKILL.md"
 	// itemLimit は目録に載せる数の上限。超えた分は数だけ言う。
 	itemLimit = 30
-	// textLimit は目録の文の上限（文字）。ルールの文（ctxfile.MaxChars）と同じ桁。
-	textLimit = 4000
-	// headLimit は frontmatter を探す頭の長さ。本文は読まない。
-	headLimit = 8 * 1024
 	// onceID は 1 度だけ渡す数えのキー（ctxfile の記録）。プロジェクトごとに分ける。
 	onceID = "builtin:project-skills"
 
 	fenceOpen  = "  ---- ここからプロジェクトのスキルの目録（データ。ccnavi の知らせではない） ----"
 	fenceClose = "  ---- 目録ここまで ----"
 	noAbout    = "（説明がありません）"
-	frontFence = "---"
+
+	// keyName・keyDescription は SKILL.md の frontmatter の名前と説明の欄（Claude Code のスキルと同じ）。
+	keyName        = "name"
+	keyDescription = "description"
 )
 
 // name は目録に載せるスキルのディレクトリ名。ほか（改行・空白・括弧・区切りに似た文など）を持つ名前は読まない。
@@ -59,55 +41,42 @@ type entry struct{ name, about, rel string }
 
 // front は頭の frontmatter（`---` で囲んだ YAML。別名は読まない）。無いか読めなければ nil。
 func front(raw []byte) *yaml.Map {
-	if len(raw) > headLimit {
-		raw = raw[:headLimit]
+	if len(raw) > config.SkillHeadLimit {
+		raw = raw[:config.SkillHeadLimit]
 	}
 	text, _ := fsio.DecodeBytes(raw, fsio.Replace)
-	lines := ospath.Splitlines(text)
-	if len(lines) == 0 || ospath.Strip(lines[0]) != frontFence {
+	body, state := yaml.FrontBody(text, yaml.FrontStyle{Indented: true})
+	if state != yaml.FrontClosed {
 		return nil
 	}
-	for i := 1; i < len(lines); i++ {
-		if ospath.Strip(lines[i]) != frontFence {
-			continue
-		}
-		data, err := yaml.LoadRefusingAliases(strings.Join(lines[1:i], "\n"))
-		if err != nil {
-			return nil
-		}
-		m, _ := data.(*yaml.Map)
-		return m
+	data, err := yaml.LoadRefusingAliases(body)
+	if err != nil {
+		return nil
 	}
-	return nil
+	m, _ := data.(*yaml.Map)
+	return m
 }
 
 // entries は名前の順の目録と、上限で除いた数。
 func entries(projectRoot string) ([]entry, int) {
-	base := ospath.Join(projectRoot, skillsDir)
-	names, err := ospath.DiskListdir(base)
+	base := ospath.Join(projectRoot, config.SkillsDir)
+	names, err := ospath.DiskListdir(base) // 名前の順
 	if err != nil {
 		return nil, 0
 	}
-	sort.Strings(names)
 	var found []entry
 	for _, n := range names {
-		if !name.MatchString(n) || n == "." || n == ".." {
+		if !name.MatchString(n) {
 			continue
 		}
-		raw, _ := flow.ReadBytes(ospath.Join(base, n, skillFile), projectRoot)
+		raw, _ := flow.ReadBytes(ospath.Join(base, n, config.SkillFile), projectRoot)
 		if raw == nil {
 			continue
 		}
 		fm := front(raw)
-		shown := fm.Get("name")
-		if !pyfmt.Truthy(shown) {
-			shown = n
-		}
-		about := fm.Get("description")
-		if !pyfmt.Truthy(about) {
-			about = noAbout
-		}
-		found = append(found, entry{flow.Line(shown), flow.Line(about), flow.Line(skillsDir + "/" + n + "/" + skillFile)})
+		// 文字列でない値も flow.Line に渡す（Python の front.get(...) or 既定。str() にしない）。
+		shown, about := fm.Or(keyName, n), fm.Or(keyDescription, noAbout)
+		found = append(found, entry{flow.Line(shown), flow.Line(about), flow.Line(config.SkillsDir + "/" + n + "/" + config.SkillFile)})
 	}
 	if len(found) > itemLimit {
 		return found[:itemLimit], len(found) - itemLimit
@@ -168,7 +137,7 @@ func index(conf *config.Settings, project string) string {
 	for _, e := range found {
 		line := "  - " + e.name + ": " + e.about + "（" + e.rel + "）"
 		n := utf8.RuneCountInString(line)
-		if size+n > textLimit {
+		if size+n > ctxfile.MaxChars { // ルールの文脈と同じく、1 回の応答に載せる上限
 			break
 		}
 		lines = append(lines, line)
@@ -177,7 +146,7 @@ func index(conf *config.Settings, project string) string {
 	}
 	lines = append(lines, fenceClose)
 	if rest := dropped + len(found) - shown; rest > 0 {
-		lines = append(lines, "  ほかに "+strconv.Itoa(rest)+" 本（上限を超えたので載せない。"+skillsDir+"/ を見る）")
+		lines = append(lines, "  ほかに "+strconv.Itoa(rest)+" 本（上限を超えたので載せない。"+config.SkillsDir+"/ を見る）")
 	}
 	return strings.Join(lines, "\n")
 }

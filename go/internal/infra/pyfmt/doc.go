@@ -8,5 +8,5 @@
 // s.isdigit() → IsDigit、re の `\w` の 1 文字 → IsWord、int(v)（JSON・YAML の値）→ IntOf、f"{n:,}" → Grouped、
 // datetime.fromisoformat → FromISOFormat（比べるための UTC の時刻と、時差が書かれていたか）、str.lower() → Lower、
 // 読んだ値と整数の == → EqualsInt、パスでない語の str.casefold() → Casefold、unicodedata.normalize("NFKC")・("NFC")・
-// ("NFD") → NFKC・NFC・NFD、unicodedata.combining → Combining、str.upper() → Upper、format(x, "g") → FormatG。
+// ("NFD") → NFKC・NFC・NFD、unicodedata.combining → Combining、unicodedata.east_asian_width → EastAsianWidth、str.upper() → Upper、format(x, "g") → FormatG。
 package pyfmt

@@ -105,9 +105,6 @@ func UserPruneForm(subject, binPath string) string {
 			continue
 		}
 		if verb, ok := userPruneRx.matchAt(segment, found.End); ok {
-			if userPruneRx.re == nil {
-				return ospath.Strip(segment)
-			}
 			return ospath.Strip(verb.Text())
 		}
 	}

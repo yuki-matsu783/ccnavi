@@ -10,7 +10,8 @@
 // 読めない文書は errors.Is(err, ErrUnreadable)（yaml.YAMLError と LoadError に当たる）、別名で断ったものは
 // ErrAlias（flow._AliasRefused）。問題と位置は errors.As で *Error の Problem・ProblemMark から読み、
 // Problem が空なら Error() を使う（flow._yaml_problem と同じ）。例外の型の名前（type(exc).__name__）は
-// *Error の Class。
+// *Error の Class。md の頭の frontmatter を `---` の行で切り出す各所の手書きの走査 → FrontBody（囲いの読み方の違いは
+// FrontStyle）、ticket.Fence → FrontFence。
 //
 // 書き出しは PyYAML の純 Python の書き手（SafeDumper）を写した。ccnavi が使う引数の組み合わせ
 // （allow_unicode=True・sort_keys=False と width・default_flow_style・default_style='"'）だけを持つ。
