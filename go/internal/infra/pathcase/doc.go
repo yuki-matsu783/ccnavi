@@ -5,5 +5,6 @@
 //
 // パスでない語の比べ（区切りを変えない str.casefold）は pyfmt.Casefold で、Fold もそれで組む。
 //
-// Python からの対応: pathcase.fold → Fold。name.lower().endswith(ext) → HasExt。
+// Python からの対応: pathcase.fold → Fold。name.lower().endswith(ext) → HasExt。fold(os.path.realpath(p)) → Real、
+// その == → SameReal、fold(os.path.normpath(a)) == fold(os.path.normpath(b)) → SameNorm。
 package pathcase

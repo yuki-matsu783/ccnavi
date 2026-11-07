@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
@@ -20,7 +19,6 @@ import (
 )
 
 const (
-	timeout = 30 * time.Second
 	// stashShown は退避したファイルを名指しする行の上限。
 	stashShown = 10
 	// stashDir は退避先（ワークスペースルートの一時の置き場の下）。
@@ -112,7 +110,7 @@ func screen(root, name, cwd string) (*Dropped, string) {
 
 // status は未追跡を含む `git status --porcelain`。
 func status(path string) (string, bool) {
-	done := git.Run(path, []string{"status", "--porcelain", "--untracked-files=all"}, git.Options{Timeout: timeout, RawPaths: true})
+	done := git.Status(path, git.Porcelain{Untracked: git.UntrackedAll}, git.Options{Timeout: git.CleanupTimeout, RawPaths: true})
 	return done.Out, done.OK()
 }
 
@@ -143,7 +141,7 @@ func Drop(root, name, cwd string) Dropped {
 	if stuck != "" {
 		return refused(stuck)
 	}
-	done := git.Run(owner, []string{"worktree", "remove", path}, git.Options{Timeout: timeout})
+	done := git.Run(owner, []string{"worktree", "remove", path}, git.Options{Timeout: git.CleanupTimeout})
 	if !done.OK() {
 		said := firstLine(done)
 		if said == "" {
@@ -211,7 +209,7 @@ func RunDrop(stdout io.Writer, root, name, cwd string) int {
 // ディレクトリは 1 行（末尾の "/"）にまとまる。下書きの置き場は追跡されるのでここには現れない。
 func ignored(top string) ([]string, string) {
 	done := git.Run(top, []string{"ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--directory"},
-		git.Options{Timeout: timeout, RawPaths: true})
+		git.Options{Timeout: git.CleanupTimeout, RawPaths: true})
 	if !done.OK() {
 		return nil, "git が無視しているファイルを読めない。削除してよいかを確かめられない"
 	}
@@ -238,7 +236,7 @@ func stashIgnored(root, name, top string) (string, string) {
 	}
 	dest := ospath.Join(root, place.ScratchRoot, stashDir, name)
 	shownDest := place.ScratchRoot + "/" + stashDir + "/" + name
-	checked := git.Run(root, []string{"check-ignore", "-q", "--", shownDest}, git.Options{Timeout: timeout, PlainPathspecs: true})
+	checked := git.Run(root, []string{"check-ignore", "-q", "--", shownDest}, git.Options{Timeout: git.CleanupTimeout, PlainPathspecs: true})
 	if !checked.OK() {
 		return "", "退避先 " + shownDest + " が git に無視されていないので、無視されたファイルを退避しません。" +
 			"ワークスペースルートの .gitignore に `/scratchpad` を足してから再実行します。"
@@ -299,7 +297,7 @@ func Owner(path string) (string, string) {
 	if !ospath.IsFile(ospath.Join(path, ".git")) {
 		return "", "git のワークツリーとして登録されていない（.git のファイルがありません）ので削除しません。"
 	}
-	done := git.Run(path, []string{"rev-parse", "--git-common-dir"}, git.Options{Timeout: timeout})
+	done := git.Run(path, []string{"rev-parse", "--git-common-dir"}, git.Options{Timeout: git.CleanupTimeout})
 	common := ""
 	if done.OK() {
 		common = ospath.Strip(done.Out)

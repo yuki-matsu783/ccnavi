@@ -201,7 +201,7 @@ func HeadBranch(treeRoot, family string) string {
 
 // SameTree は同じツリーのルートか（表記を揃えて比べる）。
 func SameTree(a, b string) bool {
-	return a != "" && b != "" && pathcase.Fold(ospath.Normpath(a)) == pathcase.Fold(ospath.Normpath(b))
+	return a != "" && b != "" && pathcase.SameNorm(a, b)
 }
 
 // Guidance は止めたときの解き方（1 行ずつ）。文は種別ごとに文面ファイルが持つ。呼び手は行の途中や hint の値にも

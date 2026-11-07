@@ -43,8 +43,6 @@ const (
 	keepFor = 3 * 24 * time.Hour
 	// refreshAfter は変わっていないバックアップの更新時刻を新しくする間隔（掃除に古いと読まれないよう keepFor より短く）。
 	refreshAfter = 24 * time.Hour
-	// asideStamp は退避した版の名前の頭の時刻。
-	asideStamp = "20060102-150405"
 
 	// commonRulesKey は共通レイヤーのルールファイルの key（レイヤーの key と同じ。重ねて持たない）。
 	commonRulesKey = string(config.KindRules)
@@ -469,7 +467,7 @@ func (b backup) restoreHeavy(r heavyRef) Outcome {
 	existed := ospath.DiskExists(t.Path)
 	kept := ""
 	if existed {
-		kept = ospath.Join(b.stateDir, asideDir, time.Now().Format(asideStamp)+"-"+ospath.Basename(t.Path))
+		kept = ospath.Join(b.stateDir, asideDir, time.Now().Format(fsio.NameStampLayout)+"-"+ospath.Basename(t.Path))
 		if failed := copyFile(t.Path, kept); failed != "" {
 			return Outcome{t, ActionFailed, "退避できないので戻さない: " + failed}
 		}
@@ -633,7 +631,7 @@ func fallBackToGit(setting config.Mode, root string, t Target, hasNow bool) Outc
 	}
 	dirty := false
 	for _, c := range changes {
-		dirty = dirty || pathcase.Fold(ospath.Realpath(c.Full)) == pathcase.Fold(t.Path)
+		dirty = dirty || pathcase.Real(c.Full) == pathcase.Fold(t.Path)
 	}
 	if !dirty && hasNow {
 		return Outcome{t, ActionKept, "バックアップは無いが、コミット済みの内容と同じ"}

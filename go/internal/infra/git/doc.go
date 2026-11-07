@@ -5,7 +5,11 @@
 // 読めなければ何も言わない）。聞く相手はローカルの git だけでネットワークへは出ない。git の管理から
 // 外れたファイル（.gitignore の中・ワークツリーの外）は見えない。
 //
-// Python からの対応: gitcmd と gitstate をまとめた。gitcmd.run → Run、run_until → RunUntil、
-// output_until → RunUntil の Done（Code・Out・TimedOut）、DEADLINE_MARGIN・DEADLINE_FLOOR → DeadlineMargin・
-// DeadlineFloor（足りるかは Expired）、gitstate.top_level → TopLevel、head → Head。
+// Python からの対応: gitcmd と gitstate をまとめた。gitcmd.run → Run、run_until・output_until → Run に
+// Options.Deadline（期限が足りなければ Done.TimedOut）、output → Output、成功したときの out.strip() → Text、
+// DEADLINE_MARGIN・DEADLINE_FLOOR → DeadlineMargin・DeadlineFloor（足りるかは Expired。ゼロ値の期限は期限無し）、
+// gitstate.top_level → TopLevel、head → Head（期限は Options）。各モジュールの git の期限（TIMEOUT_SECONDS など）は
+// 目的ごとの DefaultTimeout・StateTimeout・RiskTimeout・ReviewTimeout・MergeTimeout・CleanupTimeout、文に出す sha の
+// 12 桁は ShortSHA。上の段が書いていた `merge-base --is-ancestor` → IsAncestor（NotAncestorCode）、
+// `status --porcelain` とそのフラグ → Status と Porcelain、`rev-list --count` の数の読み → Count。
 package git

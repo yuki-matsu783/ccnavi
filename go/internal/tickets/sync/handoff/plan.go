@@ -2,14 +2,13 @@ package handoff
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/digest"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
@@ -104,7 +103,7 @@ func (e *Entry) State() State {
 // record は照合の値の 1 件分（長さの前置きつき）。
 func (e *Entry) record() []byte {
 	var b bytes.Buffer
-	for _, v := range []string{e.key, string(e.Kind.ID), digest(e.raw), digest(e.current)} {
+	for _, v := range []string{e.key, string(e.Kind.ID), contentDigest(e.raw), contentDigest(e.current)} {
 		b.WriteString(strconv.Itoa(len(v)))
 		b.WriteByte(':')
 		b.WriteString(v)
@@ -114,16 +113,14 @@ func (e *Entry) record() []byte {
 
 // sha は照合の値の 1 件分のハッシュ（JSON の entry_sha）。
 func (e *Entry) sha() string {
-	sum := sha256.Sum256(e.record())
-	return hex.EncodeToString(sum[:])
+	return digest.HexBytes(digest.SHA256, e.record(), 0)
 }
 
-func digest(raw []byte) string {
+func contentDigest(raw []byte) string {
 	if raw == nil {
 		return absent
 	}
-	sum := sha256.Sum256(raw)
-	return hex.EncodeToString(sum[:])
+	return digest.HexBytes(digest.SHA256, raw, 0)
 }
 
 // same は Python のバイト列の ==（None と b"" は違う）。
@@ -134,11 +131,11 @@ func same(a, b []byte) bool {
 // expectOf は選んだ対象の照合の値。パスの並び順で記録を連結した SHA-256。
 func expectOf(entries []*Entry) string {
 	ordered := sortedByKey(entries)
-	h := sha256.New()
+	h := digest.New(digest.SHA256)
 	for _, e := range ordered {
 		h.Write(e.record())
 	}
-	return hex.EncodeToString(h.Sum(nil))
+	return digest.HexSum(h)
 }
 
 func sortedByKey(entries []*Entry) []*Entry {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/pyfmt"
 )
 
@@ -36,10 +37,10 @@ const (
 // RecentWindow は、作成直後は一覧への反映が遅れうるので 0 件でも未送信と確定しない長さ。
 const RecentWindow = 120 * time.Second
 
-// atLayout は段階の時刻（StampLayout）の先頭 19 字。時差は読まず手元の時刻として読む（Python の mktime）。
+// atChars は段階の時刻（StampLayout）のうち読む先頭 19 字（LocalStampLayout）。時差は読まず手元の時刻として読む
+// （Python の mktime）。
 const (
-	atLayout = "2006-01-02T15:04:05"
-	atChars  = 19
+	atChars = 19
 )
 
 const (
@@ -75,7 +76,7 @@ func Reconcile(r *Record, stageID string, found []string, listing Listing, accou
 	if listing == ListedPart {
 		return VerdictUnknown, whyPartial
 	}
-	tried, err := time.ParseInLocation(atLayout, pyfmt.Head(s.At, atChars), time.Local)
+	tried, err := time.ParseInLocation(fsio.LocalStampLayout, pyfmt.Head(s.At, atChars), time.Local)
 	if s.Tries != 0 && err == nil && at.Sub(tried) < RecentWindow {
 		return VerdictUnknown, whyRecent
 	}

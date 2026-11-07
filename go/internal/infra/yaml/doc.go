@@ -16,5 +16,5 @@
 // （allow_unicode=True・sort_keys=False と width・default_flow_style・default_style='"'）だけを持つ。
 // yaml.safe_dump → Dump（引数は DumpOptions）、plan_templates の _Dumper（改行を含む文字列を | で書き、別名を付けない）→
 // DumpOptions の Literal と NoAliases、ticket_fields._yaml_scalar → Quoted、RepresenterError → ErrUnrepresentable、
-// 上の段が組む dict の代入 → Map.Put。
+// 上の段が組む dict の代入 → Map.Put、欄を除いた dict の内包 → Map.Without、読んだ値どうしの == → Equal。
 package yaml

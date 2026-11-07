@@ -227,7 +227,7 @@ func TestTimeoutsOfStateCalls(t *testing.T) {
 	}
 	reads := []func(){
 		func() { Read(top, 0) },
-		func() { Head(top, 0) },
+		func() { Head(top, Options{Timeout: StateTimeout}) },
 		func() { Committed(top, "HEAD", 0) },
 		func() { CommittedText(top, "c.txt", 0) },
 	}
@@ -453,11 +453,18 @@ func TestRunTimeoutAndDeadline(t *testing.T) {
 	if !done.TimedOut() || done.Failure.Error() != want {
 		t.Errorf("期限切れ: %+v", done)
 	}
-	if done := RunUntil(repo, []string{"status"}, time.Now().Add(600*time.Millisecond), Options{}); !done.TimedOut() || done.Failure.Error() != "期限不足" {
+	if done := Run(repo, []string{"status"}, Options{Deadline: time.Now().Add(600 * time.Millisecond)}); !done.TimedOut() || done.Failure.Error() != "期限不足" {
 		t.Errorf("残りが下限以下なら起こさない: %+v", done)
 	}
-	if done := RunUntil(repo, []string{"hash-object", "--stdin"}, time.Now().Add(10*time.Second), Options{Input: &input}); !done.OK() || len(strings.TrimSpace(done.Out)) != 40 {
+	if done := Run(repo, []string{"hash-object", "--stdin"}, Options{Deadline: time.Now().Add(10 * time.Second), Input: &input}); !done.OK() || len(strings.TrimSpace(done.Out)) != 40 {
 		t.Errorf("期限が十分なら起こす: %+v", done)
+	}
+	// ゼロ値の期限は「期限無し」で、起こす（git.Expired も偽）。
+	if Expired(time.Time{}) {
+		t.Error("ゼロ値の期限は過ぎていない")
+	}
+	if got := Head(repo, Options{Deadline: time.Now().Add(600 * time.Millisecond)}); got != "" {
+		t.Errorf("期限の足りない Head は空: %q", got)
 	}
 }
 
@@ -482,5 +489,57 @@ func TestEnviron(t *testing.T) {
 			(count("GIT_LITERAL_PATHSPECS=") == 0) != plain {
 			t.Errorf("plain=%v env=%v", plain, env)
 		}
+	}
+}
+
+func TestPorcelainArgs(t *testing.T) {
+	cases := []struct {
+		p    Porcelain
+		want string
+	}{
+		{Porcelain{}, "status --porcelain"},
+		{Porcelain{Untracked: UntrackedAll}, "status --porcelain --untracked-files=all"},
+		{Porcelain{Paths: []string{"a b"}}, "status --porcelain -- a b"},
+		{Porcelain{NUL: true, Untracked: UntrackedNo, NoRenames: true}, "status --porcelain -z --untracked-files=no --no-renames"},
+		{Porcelain{NUL: true, Untracked: UntrackedAll, NoRenames: true, IgnoreDirtySubmodules: true, Paths: []string{}},
+			"status --porcelain -z --untracked-files=all --no-renames --ignore-submodules=dirty --"},
+	}
+	for _, c := range cases {
+		if got := strings.Join(c.p.Args(), " "); got != c.want {
+			t.Errorf("%+v: %q, want %q", c.p, got, c.want)
+		}
+	}
+}
+
+func TestCount(t *testing.T) {
+	cases := []struct {
+		out string
+		n   int
+		ok  bool
+	}{
+		{"3\n", 3, true}, {" 12 ", 12, true}, {"0", 0, true}, {"", 0, false}, {"-1", 0, false}, {"+1", 0, false}, {"1a", 0, false}, {"1 2", 0, false},
+	}
+	for _, c := range cases {
+		if n, ok := Count(c.out); n != c.n || ok != c.ok {
+			t.Errorf("Count(%q) = %d, %v", c.out, n, ok)
+		}
+	}
+}
+
+func TestIsAncestor(t *testing.T) {
+	isolate(t)
+	repo := tempRoot(t)
+	gitIn(t, repo, "init", "-q", "-b", "main")
+	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "a")
+	first := Head(repo, Options{})
+	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "b")
+	if !IsAncestor(repo, first, "HEAD", Options{}).OK() {
+		t.Error("1 つめのコミットは HEAD の祖先")
+	}
+	if done := IsAncestor(repo, "HEAD", first, Options{}); done.Code != NotAncestorCode {
+		t.Errorf("HEAD は 1 つめの祖先ではない: %+v", done)
+	}
+	if done := IsAncestor(repo, "nope", "HEAD", Options{}); done.OK() || done.Code == NotAncestorCode {
+		t.Errorf("無い版は読めない: %+v", done)
 	}
 }

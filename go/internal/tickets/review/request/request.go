@@ -1,14 +1,13 @@
 package request
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"strconv"
 	"strings"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/digest"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
@@ -146,12 +145,8 @@ func Prepare(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, 
 	body = strings.TrimRight(body, "\n") + "\n\n" + handoffNote + "\n"
 	// 目印に本文と親のブランチの先頭から作ったキーを入れる。sh は同じ目印の投稿が MR に既にあれば投稿し直さない。
 	// 子を足してやり直した依頼は先頭が違うので、別のキーになる。
-	head := ""
-	if done := git.Run(gated.TreeRoot, []string{"rev-parse", "HEAD"}, git.Options{}); done.OK() {
-		head = strings.TrimSpace(done.Out)
-	}
-	sum := sha256.Sum256([]byte(body + "\n" + head))
-	key := hex.EncodeToString(sum[:])[:keyDigits]
+	head := git.Head(gated.TreeRoot, git.Options{})
+	key := digest.Hex(digest.SHA256, body+"\n"+head, keyDigits)
 	marker := fmt.Sprintf("%s%s:%d key=%s -->\n", host.MarkerRequest, gated.Parent.ID, number, key)
 	path := requestPath(conf, gated.Parent.ID, number)
 	if failed := fsio.WriteText(path, marker+body+"\n"+ResolveNote+"\n", fsio.LF, fsio.Plain); failed != "" {
@@ -193,7 +188,7 @@ func Requested(stdout, stderr io.Writer, conf *config.Settings, root, cwd string
 		}
 		return config.ExitError, nil
 	}
-	_, head := git.Output(treeRoot, []string{"rev-parse", "HEAD"}, git.Options{Timeout: gitTimeout})
+	_, head := git.Output(treeRoot, []string{"rev-parse", "HEAD"}, git.Options{Timeout: git.ReviewTimeout})
 	home, err := approval.HomeDir(conf, root, parent.ID, "", parent.Project)
 	if err != nil {
 		return config.ExitError, err
@@ -310,13 +305,13 @@ func unmetIn(root, treeRoot string, conf *config.Settings, p *phase.Phase) []str
 			unmet = append(unmet, fmt.Sprintf(msgNoMergedSHA, child.ID))
 			continue
 		}
-		short := pyfmt.Head(child.MergedSHA, shortSHA)
-		if code, _ := git.Output(treeRoot, []string{"merge-base", "--is-ancestor", child.MergedSHA, "HEAD"}, git.Options{Timeout: gitTimeout}); code != 0 {
+		short := pyfmt.Head(child.MergedSHA, git.ShortSHA)
+		if !git.IsAncestor(treeRoot, child.MergedSHA, "HEAD", git.Options{Timeout: git.ReviewTimeout}).OK() {
 			unmet = append(unmet, fmt.Sprintf(msgNotAncestor, child.ID, short))
 			continue
 		}
-		if late := closing.UnmergedFix(root, treeRoot, child, gitTimeout); late != "" {
-			unmet = append(unmet, fmt.Sprintf(msgLateFix, child.ID, pyfmt.Head(late, shortSHA), short))
+		if late := closing.UnmergedFix(root, treeRoot, child, git.ReviewTimeout); late != "" {
+			unmet = append(unmet, fmt.Sprintf(msgLateFix, child.ID, pyfmt.Head(late, git.ShortSHA), short))
 		}
 	}
 	for _, r := range treegate.Check(treegate.ReviewRequest, treeRoot, conf, treegate.Options{}) {
@@ -336,12 +331,12 @@ func alreadyRequested(conf *config.Settings, treeRoot string, p *phase.Phase, nu
 	if !ok {
 		return ""
 	}
-	code, head := git.Output(treeRoot, []string{"rev-parse", "HEAD"}, git.Options{Timeout: gitTimeout})
+	head := git.Head(treeRoot, git.Options{Timeout: git.ReviewTimeout})
 	recorded := markText(mark, "head")
 	if recorded == "" {
 		return ""
 	}
-	if code == 0 && strings.TrimSpace(head) != recorded {
+	if head != "" && head != recorded {
 		if !isSHA(recorded) {
 			return ""
 		}

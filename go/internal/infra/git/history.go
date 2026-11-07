@@ -3,6 +3,7 @@ package git
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,17 +34,41 @@ func stateOptions(timeout time.Duration) Options {
 	return Options{Timeout: timeout}
 }
 
-// Head はいまの HEAD。読めなければ空文字。ターンの始まりに記録し、終わりに「このターンで何が
-// コミットに入ったか」を数える基準にする。timeout が 0 なら StateTimeout。
-func Head(top string, timeout time.Duration) string {
+// Head はいまの HEAD の sha。読めなければ空文字。ターンの始まりに記録し、終わりに「このターンで何が
+// コミットに入ったか」を数える基準にする。期限は o で渡す（Timeout が 0 なら DefaultTimeout、Deadline も効く）。
+func Head(top string, o Options) string {
 	if top == "" {
 		return ""
 	}
-	done := runGit(top, []string{"rev-parse", "HEAD"}, stateOptions(timeout))
+	done := runGit(top, []string{"rev-parse", "HEAD"}, o)
 	if !done.OK() {
 		return ""
 	}
 	return ospath.Strip(done.Out)
+}
+
+// NotAncestorCode は IsAncestor の git が「祖先ではない」と答える終了コード（ほかの非 0 は読めない）。
+const NotAncestorCode = 1
+
+// IsAncestor は ancestor が descendant の祖先か（merge-base --is-ancestor）を git に聞く。
+// OK() なら祖先、Code が NotAncestorCode なら祖先ではない。
+func IsAncestor(cwd, ancestor, descendant string, o Options) Done {
+	return runGit(cwd, []string{"merge-base", "--is-ancestor", ancestor, descendant}, o)
+}
+
+// Count は数を答える git（rev-list --count）の出力を読む。前後の空白を除いて数字だけでなければ偽。
+func Count(out string) (int, bool) {
+	s := ospath.Strip(out)
+	if s == "" {
+		return 0, false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return 0, false
+		}
+	}
+	n, err := strconv.Atoi(s)
+	return n, err == nil
 }
 
 // firstLine は merge-base などの答えの 1 行目。答えが無ければ空。
@@ -79,7 +104,7 @@ func ChildBase(childTree, parentTree string, timeout time.Duration, childHead st
 	if childTree == "" || parentTree == "" {
 		return "", ErrNoTrees
 	}
-	parent := Head(parentTree, timeout)
+	parent := Head(parentTree, stateOptions(timeout))
 	if parent == "" {
 		return "", fmt.Errorf("親のワークツリー（%s）の HEAD を読めない", parentTree)
 	}

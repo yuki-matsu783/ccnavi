@@ -245,7 +245,7 @@ func Preview(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, 
 // Reviewed はユーザがターミナルで行う決め方。残った指摘を見せ、1 件ずつ行き先を選ばせて置く。変更要求は通せない。
 func Reviewed(stdin *bufio.Reader, stdout, stderr io.Writer, conf *config.Settings, root, cwd string, number int, acceptUnresolved bool, resultPath string) (int, error) {
 	if !acceptUnresolved {
-		fmt.Fprintf(stderr, msgNeedAccept, config.ScriptCommand(root, request.ReviewScript))
+		fmt.Fprintf(stderr, msgNeedAccept, config.ScriptCommand(root, config.ReviewWrapper))
 		return config.ExitError, nil
 	}
 	d := decision(stderr, conf, root, cwd, number, resultPath, nil)
@@ -287,14 +287,8 @@ func Choose(stdin *bufio.Reader, stdout, stderr io.Writer, conf *config.Settings
 	} else {
 		fmt.Fprintf(stdout, msgNoThreads, number, d.Parent.ID)
 	}
-	text, err := pyjson.Dumps(pyjson.NewObject("choices", choices, "digest", Digest(d)), pyjson.Options{RawUnicode: true})
-	failed := ""
-	if err != nil {
-		failed = err.Error()
-	} else {
-		failed = fsio.WriteText(outPath, text+"\n", fsio.NativeNewline, fsio.Plain)
-	}
-	if failed != "" {
+	chosen := pyjson.NewObject("choices", choices, "digest", Digest(d))
+	if failed := fsio.WriteJSONAs(outPath, chosen, fsio.JSONFormat{FinalNewline: true}); failed != "" {
 		fmt.Fprintf(stderr, msgChooseFailed, outPath, failed)
 		return config.ExitError
 	}
@@ -311,7 +305,7 @@ func ask(stdin *bufio.Reader, stdout, stderr io.Writer, d *Decision) (*pyjson.Ob
 	for i, t := range d.Unresolved {
 		fmt.Fprintf(stdout, msgAskItem, i+1, len(d.Unresolved), request.ThreadLabel(t))
 		fmt.Fprint(stdout, msgAskPrompt)
-		answer := pyfmt.Lower(ospath.Strip(fsio.ReadLine(stdin)))
+		answer := fsio.ReadAnswer(stdin)
 		picked := Choice("")
 		for _, k := range choiceKeys {
 			if k.letter == answer {

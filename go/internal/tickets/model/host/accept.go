@@ -90,11 +90,7 @@ func WriteAcceptPlan(path string, items []AcceptItem, digest, op string) string 
 		threads = append(threads, pyjson.NewObject("id", it.Thread.ID, "key", ThreadKey(it.Thread), "reply", it.Reply))
 	}
 	body := pyjson.NewObject("version", acceptPlanVersion, "digest", digest, "op", op, "threads", threads)
-	text, err := pyjson.Dumps(body, pyjson.Options{RawUnicode: true})
-	if err != nil {
-		return err.Error()
-	}
-	return fsio.WriteText(path, text+"\n", fsio.LF, fsio.Plain)
+	return fsio.WriteJSONAs(path, body, fsio.JSONFormat{FinalNewline: true, Newline: fsio.LF})
 }
 
 // AcceptPlan は書いた計画を読み戻したもの。

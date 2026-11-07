@@ -10,8 +10,6 @@ import (
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/tree"
-	"ccnavi/internal/tickets/lifecycle/closing"
-	"ccnavi/internal/tickets/lifecycle/stop"
 )
 
 const (
@@ -83,30 +81,12 @@ func (d *Direct) Digest() string {
 	return kind + ":" + dirt + ":" + strconv.Itoa(d.Ahead) + "@" + d.Head + extra
 }
 
-// Expired は期限の手前で、もう git を起こさない時点か。期限が無ければ偽。
-func Expired(deadline time.Time) bool {
-	return !deadline.IsZero() && git.Expired(deadline)
-}
-
-// run は git を起こす。期限があれば、過ぎてから起こさない。
-func run(cwd string, args []string, deadline time.Time, timeout time.Duration) git.Done {
-	o := git.Options{Timeout: timeout}
-	if deadline.IsZero() {
-		return git.Run(cwd, args, o)
-	}
-	return git.RunUntil(cwd, args, deadline, o)
-}
-
-func runDefault(cwd string, args []string, deadline time.Time) git.Done {
-	return run(cwd, args, deadline, closing.GitTimeout)
-}
-
 // count は git の数の答え。走って数字だけなら真。
 func count(done git.Done) (int, bool) {
 	if !done.OK() {
 		return 0, false
 	}
-	return stop.Count(done.Out)
+	return git.Count(done.Out)
 }
 
 // Record は ccnavi-worktree.sh が置いた直接作業の記録（git の共通ディレクトリの ccnavi-direct/<名前>）。
@@ -148,7 +128,7 @@ func MarkerKind(marks, name string) Marker {
 
 // AheadSince は記録の起点 snap から HEAD までのコミットの数。数えられなければ偽。
 func AheadSince(worktree, snap string, deadline time.Time) (int, bool) {
-	return count(runDefault(worktree, []string{"rev-list", "--count", snap + "..HEAD"}, deadline))
+	return count(git.Run(worktree, []string{"rev-list", "--count", snap + "..HEAD"}, git.Options{Deadline: deadline}))
 }
 
 // IntegrationName はそのリポジトリ（owner はそのチェックアウト）の統合先の名前。手元の origin/HEAD、無ければ
@@ -164,7 +144,7 @@ func Integration(owner string, deadline time.Time) (string, bool) {
 		return head, true
 	}
 	for _, name := range []string{"main", "master"} {
-		done := runDefault(owner, []string{"rev-parse", "--verify", "--quiet", "refs/remotes/origin/" + name}, deadline)
+		done := git.Run(owner, []string{"rev-parse", "--verify", "--quiet", "refs/remotes/origin/" + name}, git.Options{Deadline: deadline})
 		if done.Failure != nil {
 			return "", false
 		}
@@ -177,7 +157,7 @@ func Integration(owner string, deadline time.Time) (string, bool) {
 
 // Dirty はワークツリーに未コミットの変更があるか（追跡していないものも数える）。読めなければ known が偽。
 func Dirty(worktree string, deadline time.Time) (dirty, known bool) {
-	done := runDefault(worktree, []string{"status", "--porcelain", "--untracked-files=all"}, deadline)
+	done := git.Status(worktree, git.Porcelain{Untracked: git.UntrackedAll}, git.Options{Deadline: deadline})
 	if !done.OK() {
 		return false, false
 	}
@@ -186,7 +166,7 @@ func Dirty(worktree string, deadline time.Time) (dirty, known bool) {
 
 // GitPath は `git rev-parse --git-path <name>`（相対ならツリーから）。引けなければ偽。
 func GitPath(top, name string, deadline time.Time) (string, bool) {
-	done := runDefault(top, []string{"rev-parse", "--git-path", name}, deadline)
+	done := git.Run(top, []string{"rev-parse", "--git-path", name}, git.Options{Deadline: deadline})
 	path := ""
 	if done.OK() {
 		path = ospath.Strip(done.Out)

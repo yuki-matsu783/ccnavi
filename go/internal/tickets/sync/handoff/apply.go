@@ -147,7 +147,7 @@ func writeOne(root string, e *Entry) string {
 			return sprintf(msgTargetNoGo, e.Rel, why)
 		}
 	}
-	if digest(now) != digest(e.current) {
+	if contentDigest(now) != contentDigest(e.current) {
 		return sprintf(msgTargetMoved, e.Rel)
 	}
 	if draft, _ := flow.ReadBytes(e.draft, root); !same(draft, e.raw) {

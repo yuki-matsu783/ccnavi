@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/lifecycle/stop"
 	"ccnavi/internal/tickets/model/pyoracle"
@@ -163,7 +164,7 @@ func TestMatchesPython(t *testing.T) {
 			}
 			rec = []any{fields}
 		}
-		head := stop.HeadSHA(here.Root, time.Time{})
+		head := git.Head(here.Root, git.Options{})
 		has := []any{}
 		for _, d := range []*bool{nil, new(false), new(true)} {
 			if recorded, known := HasRecord(goRoot, name, head, d, time.Time{}); known {

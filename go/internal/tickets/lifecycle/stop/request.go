@@ -84,7 +84,7 @@ func PendingAtStop(conf *config.Settings, root, cwd string, raw *approval.Raw) *
 	if err != nil || closedEarly(home, parent.ID) {
 		return nil
 	}
-	head := HeadSHA(at.Root, zeroTime)
+	head := git.Head(at.Root, git.Options{})
 	if head == "" {
 		return nil
 	}
@@ -146,11 +146,10 @@ func nextStep(root, worktree string, ph *phase.Phase) (Step, []string) {
 		if s := ph.States[child.ID]; s != place.Review && s != place.Done {
 			continue
 		}
-		merged := child.MergedSHA != "" && git.Run(worktree,
-			[]string{"merge-base", "--is-ancestor", child.MergedSHA, "HEAD"}, git.Options{Timeout: closing.GitTimeout}).OK()
+		merged := child.MergedSHA != "" && git.IsAncestor(worktree, child.MergedSHA, "HEAD", git.Options{}).OK()
 		if !merged {
 			unmerged = append(unmerged, child.ID)
-		} else if closing.UnmergedFix(root, worktree, child, closing.GitTimeout) != "" {
+		} else if closing.UnmergedFix(root, worktree, child, git.DefaultTimeout) != "" {
 			late = append(late, child.ID)
 		}
 	}
@@ -166,7 +165,7 @@ func nextStep(root, worktree string, ph *phase.Phase) (Step, []string) {
 // RequestNudge は Stop を止めて渡す文。段ごとの文は文面ファイルが持ち、子の finish だけは子ごとのコマンドを並べて渡す。
 func RequestNudge(root string, p *Pending) string {
 	n := strconv.Itoa(p.Number)
-	ticketSh := config.ScriptCommand(root, "ccnavi-ticket.sh")
+	ticketSh := config.ScriptCommand(root, config.TicketWrapper)
 	name := "フェーズ " + n
 	if p.Title != "" {
 		name += "（" + p.Title + "）"

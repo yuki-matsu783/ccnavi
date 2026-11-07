@@ -9,7 +9,7 @@
 // リンクは辿らない。置き場の途中（logs・archive・<リポジトリ>・その下）がリンクなら読まず、書きもしない。退避の側の
 // 書き込みは write-and-push の一覧に載らない（リポジトリの外）ので、fsio を通さずに書く。
 //
-// Python からの対応: archive を移した。ids → IDs、find（project=None）→ FindAny、closed_tickets → ClosedTickets、
+// Python からの対応: archive を移した。ids → IDs（project=None は IDsAny）、find（project=None）→ FindAny、closed_tickets → ClosedTickets、
 // archived_parent → ArchivedParent、archived_name → ArchivedName、archived_fields → ArchivedFields、same_id →
 // ids.SameID、closed_parents → ClosedParents、archived_parents → ArchivedParents、plan → PlanMove（Plan）、move →
 // Move、archived_bytes → ArchivedBytes、holds → Holds、in_ready_places → InReadyPlaces、tree_head → TreeHead、

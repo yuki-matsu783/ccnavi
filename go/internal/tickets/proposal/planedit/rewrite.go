@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"unicode/utf8"
 
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/yaml"
@@ -15,31 +14,6 @@ import (
 
 // frontmatter の欄の値の行だけを差し替える部品。ほかの行（コメントも）と本文は変えない。
 
-// splitKeep は str.splitlines(keepends=True)。
-func splitKeep(s string) []string {
-	var lines []string
-	start := 0
-	for i := 0; i < len(s); {
-		r, size := utf8.DecodeRuneInString(s[i:])
-		switch r {
-		case '\n', '\v', '\f', 0x1c, 0x1d, 0x1e, 0x85, 0x2028, 0x2029:
-			lines = append(lines, s[start:i+size])
-			start = i + size
-		case '\r':
-			if i+1 < len(s) && s[i+1] == '\n' {
-				size = 2
-			}
-			lines = append(lines, s[start:i+size])
-			start = i + size
-		}
-		i += size
-	}
-	if start < len(s) {
-		lines = append(lines, s[start:])
-	}
-	return lines
-}
-
 // front は frontmatter の行（改行付き）、閉じる囲いの行の位置、書き足す行の改行。
 type front struct {
 	lines   []string
@@ -48,7 +22,7 @@ type front struct {
 }
 
 func frontOf(text string) (front, string) {
-	lines := splitKeep(text)
+	lines := ospath.SplitlinesKeep(text)
 	if len(lines) == 0 || ospath.Strip(lines[0]) != ticket.Fence {
 		return front{}, "frontmatter が読めない"
 	}
@@ -157,7 +131,7 @@ func changedElsewhere(old, new string, keys []string, values string) (*yaml.Map,
 			if before == nil || after == nil {
 				return nil, "組んだ全文の frontmatter が読めない"
 			}
-			if !yamlval.Equal(yamlval.Without(before, keys...), yamlval.Without(after, keys...)) {
+			if !yaml.Equal(before.Without(keys...), after.Without(keys...)) {
 				return nil, "差し替えると " + strings.Join(keys, "・") + " のほかの欄が変わる（" + values + "にアンカーがあり、" +
 					"ほかの欄が別名で指しているなど）ので反映しません"
 			}
@@ -216,7 +190,7 @@ func (a *Answer) rebuilt() ([]byte, string) {
 		key      string
 		old, new []ticket.PlanItem
 	}{{planKeys[0], parent.Plan, revised.Plan}, {planKeys[1], parent.Feedback, revised.Feedback}} {
-		if !yamlval.Equal(yamlval.Steps(c.old), yamlval.Steps(c.new)) {
+		if !yaml.Equal(yamlval.Steps(c.old), yamlval.Steps(c.new)) {
 			changed = append(changed, change{c.key, c.new})
 		}
 	}

@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/lifecycle/integrate"
-	"ccnavi/internal/tickets/lifecycle/stop"
 )
 
 // directLimit は直接作業の一覧に載せる本数の上限。超えた分は本数だけ言う。
@@ -97,7 +97,7 @@ func integrateRecord(f directFound, dirty *bool, deadline time.Time) string {
 	if ospath.DiskLexists(ospath.Join(f.rec.Common, integrate.RecordDir, f.here.Name)) {
 		return "あり（取り込みの途中）"
 	}
-	head := stop.HeadSHA(f.here.Root, deadline)
+	head := git.Head(f.here.Root, git.Options{Deadline: deadline})
 	recorded, known := integrate.HasRecord(f.owner, f.here.Name, head, dirty, deadline)
 	switch {
 	case !known:

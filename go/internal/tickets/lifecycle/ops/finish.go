@@ -5,7 +5,6 @@ import (
 	"io"
 	"strconv"
 	"strings"
-	"time"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
@@ -31,21 +30,14 @@ const ReadyFlowAgreed = "ここから Draft を解除するまで（finish → p
 	"（Claude Code の自動モードの分類器に止められたときだけ、ユーザに許可を頼む）"
 
 const (
-	reviewScript = "ccnavi-review.sh"
-
 	textFinishWipDeliverables = "NOTE_OPS_FINISH_WIP_DELIVERABLES"
 	textCloseMR               = "NEXT_OPS_CLOSE_MR"
 	textChildDone             = "NEXT_OPS_CHILD_DONE"
 )
 
-// noDeadline は期限なし（stop.HeadSHA に渡す）。
-var noDeadline time.Time
-
-func gitOptions() git.Options { return git.Options{Timeout: closing.GitTimeout} }
-
 // ReadyCommand は Draft を外す 1 本。親のワークツリーの外から打つ形（`--parent`）で、最後に親のワークツリーも消える。
 func ReadyCommand(root, parentID string) string {
-	return config.ScriptCommand(root, reviewScript) + " ready --parent " + parentID
+	return config.ScriptCommand(root, config.ReviewWrapper) + " ready --parent " + parentID
 }
 
 // Finish は doing/ から review/（レビューが要る）か done/（要らない）へ動かし、完了の時刻を書く。子は閉じる前に実績のリスクを数える。定性の判定がそろわなければ閉じない。成果物の追跡と親の学びの置き場は、子の合流のあとでないと分からないので、finishGate のあとに見る。
@@ -102,15 +94,15 @@ func mergedSHA(root string, found *ticket.Ticket) string {
 		return merging
 	}
 	childTree := tree.WorktreePath(root, found.ID)
-	head := git.Head(childTree, 0)
+	head := git.Head(childTree, git.Options{Timeout: git.StateTimeout})
 	if head == "" {
 		return ""
 	}
-	parentHead := git.Head(tree.WorktreePath(root, found.Parent), 0)
+	parentHead := git.Head(tree.WorktreePath(root, found.Parent), git.Options{Timeout: git.StateTimeout})
 	if parentHead == "" {
 		return ""
 	}
-	if git.Run(childTree, []string{"merge-base", "--is-ancestor", head, parentHead}, gitOptions()).OK() {
+	if git.IsAncestor(childTree, head, parentHead, git.Options{}).OK() {
 		return head
 	}
 	return ""
@@ -122,16 +114,16 @@ func mergingHead(root string, found *ticket.Ticket) string {
 		return ""
 	}
 	parentTree := tree.WorktreePath(root, found.Parent)
-	rc, out := git.Output(parentTree, []string{"rev-parse", "--verify", "--quiet", "MERGE_HEAD"}, gitOptions())
+	rc, out := git.Output(parentTree, []string{"rev-parse", "--verify", "--quiet", "MERGE_HEAD"}, git.Options{})
 	merging := ""
 	if rc == 0 {
 		merging = ospath.Strip(out)
 	}
-	head := git.Head(tree.WorktreePath(root, found.ID), 0)
+	head := git.Head(tree.WorktreePath(root, found.ID), git.Options{Timeout: git.StateTimeout})
 	if merging == "" || head == "" {
 		return ""
 	}
-	if git.Run(parentTree, []string{"merge-base", "--is-ancestor", merging, head}, gitOptions()).OK() {
+	if git.IsAncestor(parentTree, merging, head, git.Options{}).OK() {
 		return merging
 	}
 	return ""

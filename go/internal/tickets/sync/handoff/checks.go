@@ -2,10 +2,7 @@ package handoff
 
 import (
 	"bytes"
-	"context"
 	"errors"
-	"math/big"
-	"os/exec"
 	"sort"
 	"strings"
 	"time"
@@ -15,16 +12,15 @@ import (
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
+	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/infra/yaml"
+	"ccnavi/internal/infra/yamljson"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/config/check"
 	"ccnavi/internal/tickets/flow"
 	"ccnavi/internal/tickets/proposal/templates"
 )
-
-// shCheckTimeout は sh -n を待つ時間。
-const shCheckTimeout = 10 * time.Second
 
 // shSaidLimit は sh -n の苦情を理由に入れる字数。
 const shSaidLimit = 400
@@ -203,7 +199,7 @@ func ruleRows(raw []byte) (map[ruleKey][]string, bool) {
 			return nil, false
 		}
 		for _, item := range items {
-			body, err := pyjson.Dumps(plainJSON(item), pyjson.Options{RawUnicode: true, SortKeys: true})
+			body, err := pyjson.Dumps(yamljson.ToJSON(item), pyjson.Options{RawUnicode: true, SortKeys: true})
 			if err != nil {
 				return nil, false
 			}
@@ -223,41 +219,6 @@ func ruleRows(raw []byte) (map[ruleKey][]string, bool) {
 }
 
 var utf8BOM = []byte("\xef\xbb\xbf")
-
-// plainJSON は json.dumps(v, default=str) に渡る値。キーは JSON の文字列にし、JSON に無い値（日付・集合・バイト列）は
-// str() の文字列にする。
-func plainJSON(v any) any {
-	switch x := v.(type) {
-	case nil, bool, string, int, *big.Int, float64:
-		return x
-	case *yaml.Map:
-		out := pyjson.NewObject()
-		for k, inner := range x.All() {
-			out.Set(jsonKey(k), plainJSON(inner))
-		}
-		return out
-	case []any:
-		out := make([]any, len(x))
-		for i, inner := range x {
-			out[i] = plainJSON(inner)
-		}
-		return out
-	}
-	return pyfmt.Str(v)
-}
-
-func jsonKey(k any) string {
-	switch x := k.(type) {
-	case bool:
-		if x {
-			return "true"
-		}
-		return "false"
-	case nil:
-		return "null"
-	}
-	return pyfmt.Str(k)
-}
 
 // defenseChange は rules.yml の下書きが防御の記述を動かすなら、ターミナルに限る理由。動かさなければ空。
 // 防御の記述とみなすのは、guard- で始まる id のルール（足す・消す・判定を移す・except を含む中身を変える）と、
@@ -429,28 +390,20 @@ func checkDefense(e *Entry) {
 
 // shSyntax は sh -n で読めるか。読めなければ理由。sh が無い機械では確かめられないので断る。
 func shSyntax(path string) string {
-	shell, err := exec.LookPath("sh")
-	if err != nil {
+	ran, err := shell.Script([]string{"-n", path}, "", nil, shell.SyntaxTimeout)
+	switch {
+	case errors.Is(err, shell.ErrNoShell):
 		return msgNoSh
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), shCheckTimeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, shell, "-n", path)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	err = cmd.Run()
-	if ctx.Err() != nil {
-		return sprintf(msgShFailed, line(sprintf(msgShTimeout,
-			pyfmt.Repr([]any{shell, "-n", path}), int(shCheckTimeout/time.Second))))
-	}
-	var exit *exec.ExitError
-	if err != nil && !errors.As(err, &exit) {
+	case err != nil:
 		return sprintf(msgShFailed, line(fsio.ErrorText(err)))
+	case ran.TimedOut:
+		return sprintf(msgShFailed, line(sprintf(msgShTimeout,
+			pyfmt.Repr([]any{ran.Shell, "-n", path}), int(shell.SyntaxTimeout/time.Second))))
 	}
-	if err != nil {
-		out := stderr.String()
+	if ran.Code != 0 {
+		out := string(ran.Stderr)
 		if out == "" {
-			out = stdout.String()
+			out = string(ran.Stdout)
 		}
 		return sprintf(msgShSyntax, pyfmt.Head(line(out), shSaidLimit))
 	}
@@ -463,12 +416,8 @@ func decodeReplace(raw []byte, sig bool) string {
 	if sig {
 		raw = bytes.TrimPrefix(raw, utf8BOM)
 	}
-	pieces := bytes.Split(raw, []byte{'\r'})
-	out := make([]string, len(pieces))
-	for i, p := range pieces {
-		out[i], _ = fsio.Decode(p, fsio.Replace)
-	}
-	return strings.Join(out, "\r")
+	text, _ := fsio.DecodeBytes(raw, fsio.Replace)
+	return text
 }
 
 // DraftText は下書きの本文を、そのまま見せる形の文字列にする（bytes.decode("utf-8-sig", errors="replace")）。

@@ -14,6 +14,8 @@ import (
 const (
 	PatternsDir = "docs/wiki/patterns"
 	ImpactDir   = "docs/wiki/impact"
+	// InboxDir は学びの受信箱（ticket learn が書き、consolidate がパターンへ移す）。
+	InboxDir = "docs/wiki/inbox"
 )
 
 // Target は反映先の種類。

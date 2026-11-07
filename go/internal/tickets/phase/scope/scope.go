@@ -107,13 +107,11 @@ func diffArgs(span string) []string {
 	return []string{"diff", "--name-only", "--no-renames", "--ignore-submodules=none", "-z", span}
 }
 
-// statusArgs の dirty は、submodule の中の未コミットの変更が親のコミットに乗らないから（乗るのはポインタの
+// uncommittedStatus の dirty は、submodule の中の未コミットの変更が親のコミットに乗らないから（乗るのはポインタの
 // 移動）。none にすると submodule の中の生成物まで範囲外として報告する。
-var statusArgs = []string{"status", "--porcelain", "-z", "--untracked-files=all", "--no-renames", "--ignore-submodules=dirty"}
+var uncommittedStatus = git.Porcelain{NUL: true, Untracked: git.UntrackedAll, NoRenames: true, IgnoreDirtySubmodules: true}
 
-func run(cwd string, args []string) (int, string) {
-	return git.Output(cwd, args, git.Options{Timeout: git.StateTimeout, RawPaths: true})
-}
+var scopeOptions = git.Options{Timeout: git.StateTimeout, RawPaths: true}
 
 // committed は子の仕事の始まり（git.ChildBase）から head までに子が変えたパス。統合先を取り込んだ merge が
 // 持ち込んだだけのパスは、子が書いたものではないので数えない。
@@ -126,7 +124,8 @@ func committed(root string, child *ticket.Ticket, head string) (string, map[stri
 	if err != nil {
 		return "", nil, err
 	}
-	code, out := run(worktree, diffArgs(base+".."+head))
+	diff := git.Run(worktree, diffArgs(base+".."+head), scopeOptions)
+	code, out := diff.Code, diff.Out
 	if code != 0 {
 		return "", nil, ErrNoDiff
 	}
@@ -149,7 +148,8 @@ func Findings(conf *config.Settings, root string, child, parent *ticket.Ticket) 
 	if err != nil {
 		return nil, err
 	}
-	code, out := run(worktree, statusArgs)
+	status := git.Status(worktree, uncommittedStatus, scopeOptions)
+	code, out := status.Code, status.Out
 	if code != 0 {
 		return nil, ErrNoStatus
 	}

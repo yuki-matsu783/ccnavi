@@ -391,7 +391,7 @@ func TestBuiltinRuleTexts(t *testing.T) {
 		HumanMessage(root, HumanGuardOff, "x"), HumanMessage(root, HumanUserScript, "x"),
 		HumanMessage(root, HumanExpanded, "x"), HumanMessage(root, HumanBoard, "--via … board"),
 		HumanMessage(root, HumanBoard, "user … mirror … --yes"), HiddenEntryMessage(root, entryExe, "$X"),
-		HiddenEntryMessage(root, entryReview, "$X"), HiddenEntryMessage(root, "other", "$X"),
+		HiddenEntryMessage(root, config.ReviewWrapper, "$X"), HiddenEntryMessage(root, "other", "$X"),
 		HiddenEntryMessage(root, entryExe, stdinShell), HiddenEntryMessage(root, entryExe, "xargs"), PruneMessage(root),
 	} {
 		if strings.Contains(s, "引けませんでした") || strings.Contains(s, "{") {

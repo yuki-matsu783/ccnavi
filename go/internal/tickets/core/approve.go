@@ -11,6 +11,7 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/approval"
 	"ccnavi/internal/tickets/lifecycle/worktrees"
@@ -60,7 +61,7 @@ func judge(conf *config.Settings, root string, only []string, seen *shown) verdi
 	if seen != nil {
 		wanted := wantedIDs(seen.ids)
 		now := current.Identifiers()
-		if !slices.Equal(wanted, now) || strings.ToLower(ospath.Strip(seen.digest)) != digest {
+		if !slices.Equal(wanted, now) || pyfmt.Lower(ospath.Strip(seen.digest)) != digest {
 			v.mismatch = &mismatch{wanted, list(now), seen.digest, digest}
 		}
 	}
@@ -138,7 +139,7 @@ func Approve(stdin io.Reader, stdout, stderr io.Writer, conf *config.Settings, r
 		}
 		io.WriteString(stdout, gathered.Text()+"\n\n")
 		fmt.Fprintf(stdout, "この %d 件を承認する場合は y、やめる場合はそれ以外: ", len(gathered.Batch))
-		if answer := strings.ToLower(ospath.Strip(fsio.ReadLine(answers))); answer != "y" && answer != "yes" {
+		if !fsio.ReadYes(answers) {
 			io.WriteString(stderr, "ccnavi: 承認しなかった\n")
 			return 1, nil
 		}

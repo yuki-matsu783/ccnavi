@@ -10,7 +10,6 @@ import (
 	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/tickets/flow"
 	"ccnavi/internal/tickets/model/ticket"
-	"ccnavi/internal/tickets/proposal/internal/yamlval"
 )
 
 var childKeys = []string{"ticket", "phase", "predecessors"}
@@ -54,7 +53,7 @@ func (c *ChildChange) rebuilt() ([]byte, string) {
 	if before == nil || after == nil {
 		return nil, "組んだ全文の frontmatter が読めない"
 	}
-	if !yamlval.Equal(yamlval.Without(before, childKeys...), yamlval.Without(after, childKeys...)) {
+	if !yaml.Equal(before.Without(childKeys...), after.Without(childKeys...)) {
 		return nil, "差し替えると ticket・phase・predecessors のほかの欄が変わるので反映しません"
 	}
 	if !slices.Equal(body(text), body(built)) {

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/model/pyoracle"
 )
@@ -150,7 +151,7 @@ func TestMatchesPython(t *testing.T) {
 			if home == "" {
 				home = f.ID
 			}
-			e["fix"] = UnmergedFix(goRoot, tree.WorktreePath(goRoot, home), f, GitTimeout)
+			e["fix"] = UnmergedFix(goRoot, tree.WorktreePath(goRoot, home), f, git.DefaultTimeout)
 		}
 		got[id] = e
 	}

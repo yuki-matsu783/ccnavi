@@ -87,13 +87,41 @@ func WriteText(path, text string, nl Newline, how How) string {
 	return record(path, writeNow(path, nl.onDisk(text), how))
 }
 
-// WriteJSON は JSON（json.dumps(data, ensure_ascii=False)）を Atomic で書く。書けたら空文字、駄目なら理由。
+// JSONIndent は書き出す JSON の字下げ（json.dumps の indent）。
+type JSONIndent int
+
+const (
+	JSONCompact   JSONIndent = 0 // 1 行（indent なし）
+	JSONIndentOne JSONIndent = 1 // indent=1
+)
+
+// JSONFormat は JSON の書き出し方。ゼロ値は 1 行・ensure_ascii=False・末尾の改行なし・機械の改行・Plain。
+type JSONFormat struct {
+	Indent JSONIndent
+	// ASCII は ensure_ascii=True（非 ASCII を \uXXXX にする）。
+	ASCII bool
+	// FinalNewline は本文の後に改行を 1 つ足す（json.dumps(...) + "\n"）。
+	FinalNewline bool
+	Newline      Newline
+	How          How
+}
+
+// WriteJSON は JSON（json.dumps(data, ensure_ascii=False)）を Atomic で書く（Python の write_json_atomic）。
+// 書けたら空文字、駄目なら理由。
 func WriteJSON(path string, data any) string {
-	text, err := pyjson.Dumps(data, pyjson.Options{RawUnicode: true})
+	return WriteJSONAs(path, data, JSONFormat{How: Atomic})
+}
+
+// WriteJSONAs は data を pyjson.Dumps の JSON にして f の書き方で書く。書けたら空文字、JSON にできない・書けないときは理由。
+func WriteJSONAs(path string, data any, f JSONFormat) string {
+	text, err := pyjson.Dumps(data, pyjson.Options{RawUnicode: !f.ASCII, Indent: int(f.Indent)})
 	if err != nil {
 		return err.Error()
 	}
-	return WriteText(path, text, NativeNewline, Atomic)
+	if f.FinalNewline {
+		text += "\n"
+	}
+	return WriteText(path, text, f.Newline, f.How)
 }
 
 func writeNow(path string, content []byte, how How) string {

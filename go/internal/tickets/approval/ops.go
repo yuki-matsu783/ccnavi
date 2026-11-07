@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"maps"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -189,9 +190,13 @@ func NextChildID(conf *config.Settings, root, parentID string, phase int) (strin
 			projects[t.Project] = true
 		}
 	}
+	archived := map[string]bool{}
 	if len(projects) == 0 {
-		// 親がどの置き場にも無い。全リポジトリの退避を引く部品が無いので、ワークスペースの退避だけを見る。
-		projects[""] = true
+		// 親がどの置き場にも無い。全リポジトリの退避を見る。
+		archived = archive.IDsAny(root)
+	}
+	for project := range projects {
+		maps.Copy(archived, archive.IDs(root, project))
 	}
 	used := 0
 	for _, t := range all {
@@ -199,11 +204,9 @@ func NextChildID(conf *config.Settings, root, parentID string, phase int) (strin
 			used = max(used, c.Seq)
 		}
 	}
-	for project := range projects {
-		for ident := range archive.IDs(root, project) {
-			if c, ok := ids.ParseChild(ident); ok && ids.SameID(c.Parent, parentID) && c.Phase == phase {
-				used = max(used, c.Seq)
-			}
+	for ident := range archived {
+		if c, ok := ids.ParseChild(ident); ok && ids.SameID(c.Parent, parentID) && c.Phase == phase {
+			used = max(used, c.Seq)
 		}
 	}
 	if used >= top {
@@ -221,7 +224,7 @@ func ExistingTicketFile(conf *config.Settings, root, id string) string {
 		approved := conf.ApprovedDir(tr.Root)
 		places := []string{ospath.Join(approved, string(place.Doing)), ospath.Join(approved, string(place.Done))}
 		for _, state := range place.States {
-			places = append(places, ospath.Join(tr.Root, filepath.FromSlash(conf.Tickets), string(state)))
+			places = append(places, place.Dir(tr.Root, conf.Tickets, state))
 		}
 		for _, dir := range places {
 			names, err := ospath.DiskListdir(dir)

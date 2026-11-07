@@ -24,8 +24,6 @@ const (
 )
 
 const (
-	ticketScript = "ccnavi-ticket.sh"
-
 	textRefused       = "NEXT_OPS_REFUSED"
 	textRefusedCancel = "NEXT_OPS_REFUSED__CANCEL"
 )
@@ -95,7 +93,7 @@ func finishFound(stderr io.Writer, conf *config.Settings, root, id string) *tick
 	}
 	if found.StartedAt == "" {
 		fmt.Fprintf(stderr, "ccnavi: %s は未着手。先に '%s start %s' を通してください\n",
-			id, config.ScriptCommand(root, ticketScript), id)
+			id, config.ScriptCommand(root, config.TicketWrapper), id)
 		return nil
 	}
 	if closing.MisplacedHome(stderr, conf, root, found) || closing.ParentStillBusy(stderr, conf, root, found) ||

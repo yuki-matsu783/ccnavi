@@ -8,10 +8,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"golang.org/x/text/unicode/norm"
-
 	"ccnavi/internal/infra/ospath"
-	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/yaml"
 )
@@ -109,12 +106,12 @@ func skeleton(text []rune) ([]rune, []int) {
 	var chars []rune
 	var origin []int
 	for i, ch := range text {
-		for _, part := range norm.NFD.String(string(ch)) {
+		for _, part := range pyfmt.NFD(string(ch)) {
 			if ospath.IsSpace(part) || unicode.In(part, ignored...) {
 				continue
 			}
-			// 1 字の大文字小文字をそろえる（"/" は含まないので、Windows の区切りの読み替えは効かない）。
-			for _, folded := range pathcase.Fold(string(part)) {
+			// 1 字の大文字小文字をそろえる（Python の part.casefold()。パスではないので区切りは読み替えない）。
+			for _, folded := range pyfmt.Casefold(string(part)) {
 				chars = append(chars, folded)
 				origin = append(origin, i)
 			}

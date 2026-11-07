@@ -20,10 +20,26 @@ import (
 // Program は起こす git の名前（PATH から探す）。
 const Program = "git"
 
-// DefaultTimeout は期限を渡されなかったときの期限。
-const DefaultTimeout = 5 * time.Second
+// 目的ごとの git の期限。値は Python の各モジュールが持っていたもの。期限は場所ごとに違うので
+// （実行前チェックの中は短く、ユーザが打つ操作は長く）、呼び手は目的に合う名前を選ぶ。
+// ワークツリーを読む hook の中の期限は StateTimeout（state.go）。
+const (
+	// DefaultTimeout は期限を渡されなかったときの期限。状態の操作・Stop の促し・知らせの読み取りもこれを使う。
+	DefaultTimeout = 5 * time.Second
+	// RiskTimeout はリスクの計測が差分と状態を読む期限。
+	RiskTimeout = 10 * time.Second
+	// ReviewTimeout はレビューの依頼が親のワークツリーを読む期限。
+	ReviewTimeout = 15 * time.Second
+	// MergeTimeout は write-and-push の合流と、ワークツリーの検査（未コミット・差分）の期限。
+	MergeTimeout = 20 * time.Second
+	// CleanupTimeout はワークツリーの片付けと、引き継ぎが版の中身を読む期限。
+	CleanupTimeout = 30 * time.Second
+)
 
-// RunUntil が期限の手前に残す余白（DeadlineMargin）と、これ以下の残りなら起こさない下限（DeadlineFloor）。
+// ShortSHA は文に出す短い sha の桁数。
+const ShortSHA = 12
+
+// Options.Deadline の手前に残す余白（DeadlineMargin）と、これ以下の残りなら起こさない下限（DeadlineFloor）。
 // 期限が足りるかは Expired で見る。
 const (
 	DeadlineMargin = 500 * time.Millisecond
@@ -83,13 +99,17 @@ func (d Done) OK() bool { return d.Failure == nil && d.Code == 0 }
 // Missing は git（か作業ディレクトリ）が見つからなかったか。
 func (d Done) Missing() bool { return errors.Is(d.Failure, ErrMissing) }
 
-// TimedOut は期限に達したか（RunUntil の期限不足も含む）。
+// TimedOut は期限に達したか（Options.Deadline の期限不足も含む）。
 func (d Done) TimedOut() bool { return errors.Is(d.Failure, ErrTimeout) }
 
-// Options は git の起こし方。ゼロ値は DefaultTimeout で、標準入力は親のものを渡す。
+// Options は git の起こし方。ゼロ値は DefaultTimeout で、期限（Deadline）は無く、標準入力は親のものを渡す。
 type Options struct {
-	// Timeout は期限。0 なら DefaultTimeout。
+	// Timeout は 1 回の期限。0 なら DefaultTimeout。
 	Timeout time.Duration
+	// Deadline は処理全体の期限。ゼロ値でなければ、1 回の期限を min(Timeout, 残り - DeadlineMargin) に縮め、
+	// 残りが足りなければ（Expired）起こさずに TimedOut の Done を返す。守るのは「期限を過ぎてから起こさない」
+	// ことだけで、処理全体が期限内に終わることは約束しない。
+	Deadline time.Time
 	// RawPaths は core.quotePath=false を掛ける。
 	RawPaths bool
 	// Input は標準入力に渡す文字列（check-ignore --stdin など）。nil なら親の標準入力のまま。
@@ -112,6 +132,12 @@ func (o Options) timeout() time.Duration {
 // 起こせなかったときの捕まえ方）は同じで、別々に書くと片方だけが置いていかれる。期限は場所ごとに
 // 違う（実行前チェックの中は短く、ユーザが打つ操作は長く）ので呼び手が渡す。
 func Run(cwd string, args []string, o Options) Done {
+	if !o.Deadline.IsZero() {
+		if Expired(o.Deadline) {
+			return Done{Code: 1, Failure: failure{text: "期限不足", kind: ErrTimeout}}
+		}
+		o.Timeout = min(o.timeout(), time.Until(o.Deadline)-DeadlineMargin)
+	}
 	code, out, errOut, fail := start(cwd, args, o)
 	if fail != nil {
 		return Done{Code: 1, Failure: fail}
@@ -122,20 +148,9 @@ func Run(cwd string, args []string, o Options) Done {
 // runGit は state・history・restore が git を起こす口（テストが引数と期限を見るために差し替える）。
 var runGit = Run
 
-// RunUntil は期限（deadline）を守って git を起こす。期限は min(o の期限, 残り - 0.5 秒)。
-// 残りが 0.2 秒以下なら起こさずに TimedOut の Done を返す。守るのは「期限を過ぎてから起こさない」ことだけで、
-// 処理全体が期限内に終わることは約束しない。
-func RunUntil(cwd string, args []string, deadline time.Time, o Options) Done {
-	if Expired(deadline) {
-		return Done{Code: 1, Failure: failure{text: "期限不足", kind: ErrTimeout}}
-	}
-	o.Timeout = min(o.timeout(), time.Until(deadline)-DeadlineMargin)
-	return Run(cwd, args, o)
-}
-
-// Expired は期限までの残りが、余白を引くと下限以下か（もう git を起こさない）。
+// Expired は期限までの残りが、余白を引くと下限以下か（もう git を起こさない）。ゼロ値の期限（期限無し）は偽。
 func Expired(deadline time.Time) bool {
-	return time.Until(deadline)-DeadlineMargin <= DeadlineFloor
+	return !deadline.IsZero() && time.Until(deadline)-DeadlineMargin <= DeadlineFloor
 }
 
 // Output は終了コードと標準出力。起こせなければ (1, "")。
@@ -145,6 +160,15 @@ func Output(cwd string, args []string, o Options) (int, string) {
 		return 1, ""
 	}
 	return done.Code, done.Out
+}
+
+// Text は git が 0 で終わったときの標準出力（前後の空白を除く）。走れなかった・0 以外で終わったときは ("", false)。
+func Text(cwd string, args []string, o Options) (string, bool) {
+	done := Run(cwd, args, o)
+	if !done.OK() {
+		return "", false
+	}
+	return ospath.Strip(done.Out), true
 }
 
 // Blob はその版に入っている 1 本の中身をバイト列のまま返す。返すのは (中身, 読めた)。

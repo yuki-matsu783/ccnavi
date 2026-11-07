@@ -158,6 +158,14 @@ func Float(f float64) string {
 	return fixed
 }
 
+// FormatG は Python の format(f, "g")（有効数字 6 桁。指数が -4 未満か 6 以上なら指数表記。末尾の 0 と "." は除く）。
+func FormatG(f float64) string {
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return Float(f)
+	}
+	return strconv.FormatFloat(f, 'g', 6, 64)
+}
+
 func abs(n int) int {
 	if n < 0 {
 		return -n

@@ -32,10 +32,19 @@ func (e *DecodeError) Error() string {
 }
 
 // Decode は open(path, encoding="utf-8") が読むのと同じ本文を返す。改行の "\r\n" と "\r" は "\n" にそろう。
+func Decode(content []byte, bad Undecodable) (string, error) {
+	text, err := DecodeBytes(content, bad)
+	if err != nil {
+		return "", err
+	}
+	return ospath.UnifyNewlines(text), nil
+}
+
+// DecodeBytes は content.decode("utf-8", errors=bad)。Decode と違い、改行は読み替えない。
 //
 // 読めない並びの区切り方は CPython の UTF-8 の復号と同じにする（Replace で置く U+FFFD の数が変わるため）。
 // Go の utf8 は 1 バイトずつ区切るので使わない。
-func Decode(content []byte, bad Undecodable) (string, error) {
+func DecodeBytes(content []byte, bad Undecodable) (string, error) {
 	var b strings.Builder
 	b.Grow(len(content))
 	for i := 0; i < len(content); {
@@ -49,7 +58,7 @@ func Decode(content []byte, bad Undecodable) (string, error) {
 		}
 		i = end
 	}
-	return ospath.UnifyNewlines(b.String()), nil
+	return b.String(), nil
 }
 
 // utf8Sequence は i から始まる 1 文字の終わりと、読めなければその理由。

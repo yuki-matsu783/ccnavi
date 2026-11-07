@@ -32,7 +32,7 @@ const versionLen = 32
 // deciding は判断を示したレビューか。コメントだけ（COMMENTED）と書きかけ（PENDING）は判断を変えないので
 // 数えない（数えると、変更要求の後に同じユーザがコメントするだけで変更要求が消える）。
 func deciding(state string) bool {
-	switch strings.ToUpper(state) {
+	switch pyfmt.Upper(state) {
 	case approved, ChangesRequested, dismissed:
 		return true
 	}
@@ -69,7 +69,7 @@ func Effective(reviews []Review) []Review {
 	}
 	var out []Review
 	for _, k := range order {
-		if r := latest[k]; strings.ToUpper(r.State) != dismissed {
+		if r := latest[k]; pyfmt.Upper(r.State) != dismissed {
 			out = append(out, r)
 		}
 	}

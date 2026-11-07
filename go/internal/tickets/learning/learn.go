@@ -9,9 +9,10 @@ import (
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathmatch"
-	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/texts"
+	"ccnavi/internal/records/audit"
+	"ccnavi/internal/records/wiki"
 	"ccnavi/internal/tickets/approval"
 	"ccnavi/internal/tickets/model/ticket"
 	"ccnavi/internal/tickets/phase"
@@ -72,7 +73,7 @@ func Run(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, n No
 	here, ok := phase.WorktreeAt(conf, root, cwd)
 	if !ok {
 		write(stderr, "ccnavi: ワークスペースルートとプロジェクトのルートには気づきを書けない。"+
-			"'"+config.ScriptCommand(root, worktreeScript)+" <名前>' でワークツリーを切り、その中で打ち直してください\n")
+			"'"+config.ScriptCommand(root, config.WorktreeWrapper)+" <名前>' でワークツリーを切り、その中で打ち直してください\n")
 		return exitRefused
 	}
 	bound, _ := boundTicket(conf, root, here.Name)
@@ -143,13 +144,10 @@ func scaffold(stdout, stderr io.Writer, conf *config.Settings, root string, here
 			return cannotWrite(stderr, msg)
 		}
 	}
-	records, recorded := readLogRecords(conf.Log)
-	digest, err := pyjson.Dumps(buildDigest(records, recorded, &here.Name), pyjson.Options{Indent: 1})
-	if err != nil {
-		return cannotWrite(stderr, err.Error())
-	}
+	records, recorded := audit.ReadRecords(conf.Log)
 	digestPath := ospath.Join(here.Root, strings.Split(digestRel(ident), "/")...)
-	if msg := fsio.WriteText(digestPath, digest+"\n", fsio.NativeNewline, fsio.Atomic); msg != "" {
+	format := fsio.JSONFormat{Indent: fsio.JSONIndentOne, ASCII: true, FinalNewline: true, How: fsio.Atomic}
+	if msg := fsio.WriteJSONAs(digestPath, buildDigest(records, recorded, &here.Name), format); msg != "" {
 		return cannotWrite(stderr, msg)
 	}
 	write(stdout, "記録: "+RecordRel(ident)+"\n")
@@ -191,7 +189,7 @@ func appendRecord(stdout, stderr io.Writer, root, treeRoot, ident, parent, entry
 
 // writeInbox はチケットに結び付かない作業の気づきを、受信箱の名前が重ならない新しいファイルに書く。
 func writeInbox(stdout, stderr io.Writer, treeRoot, ident, entry, now string) int {
-	if bad := unsafePath(treeRoot, InboxDir); bad != "" {
+	if bad := unsafePath(treeRoot, wiki.InboxDir); bad != "" {
 		return refuseLink(stderr, bad)
 	}
 	stamp := utc14()

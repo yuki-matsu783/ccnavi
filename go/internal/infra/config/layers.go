@@ -133,12 +133,18 @@ func (s *Settings) LayerTemplatesDir(homeRoot string) string {
 	return ospath.Join(homeRoot, filepath.FromSlash(s.projectHome()), LayerConfigDir, TemplatesDir)
 }
 
+// CommonLayerDir は共通レイヤーの置き場（絶対）。プロジェクトのツリーでは共通レイヤーのミラーの置き場
+// （Python の configsync.mirror_dir）。
+func (s *Settings) CommonLayerDir(root string) string {
+	return ospath.Join(root, filepath.FromSlash(s.projectHome()), CommonDir)
+}
+
 // CommonTemplatesDir は共通レイヤー（とミラー）のテンプレートの置き場（絶対）。
 func (s *Settings) CommonTemplatesDir(root string) string {
-	return ospath.Join(root, filepath.FromSlash(s.projectHome()), CommonDir, TemplatesDir)
+	return ospath.Join(s.CommonLayerDir(root), TemplatesDir)
 }
 
 // MirrorRealPath はプロジェクトの共通レイヤーのミラーの設定ファイルの場所。
 func (s *Settings) MirrorRealPath(homeRoot string, kind LayerKind) string {
-	return ospath.Join(homeRoot, filepath.FromSlash(s.projectHome()), CommonDir, LayerFileNames[kind])
+	return ospath.Join(s.CommonLayerDir(homeRoot), LayerFileNames[kind])
 }

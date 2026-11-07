@@ -5,7 +5,6 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/git"
@@ -26,9 +25,6 @@ const (
 	No   Target = "no"
 	Stop Target = "stop"
 )
-
-// gitTimeout は write-and-push が打つ git の期限。
-const gitTimeout = 20 * time.Second
 
 // FamilyOf は識別子が属する親子のチケットの親。子の形なら右から 2 段を剥がした親、そうでなければ自身。
 func FamilyOf(id string) string {
@@ -75,7 +71,7 @@ func TargetOf(conf *config.Settings, root, parent string) (Target, string, stand
 		}
 		return Stop, why, st
 	}
-	origin := git.Run(st.Home.Root, []string{"config", "--get", "remote.origin.url"}, git.Options{Timeout: gitTimeout})
+	origin := git.Run(st.Home.Root, []string{"config", "--get", "remote.origin.url"}, git.Options{Timeout: git.MergeTimeout})
 	if !origin.OK() || ospath.Strip(origin.Out) == "" {
 		return No, "origin がありません（今の手元の動きのまま）", st
 	}

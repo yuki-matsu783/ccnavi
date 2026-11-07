@@ -81,3 +81,30 @@ func TestLower(t *testing.T) {
 		}
 	}
 }
+
+// 期待は Python の str.upper()。ß と合字は 2 字以上になるので、"dismißed" も DISMISSED と同じに読む。
+func TestUpper(t *testing.T) {
+	for in, want := range map[string]string{
+		"changes_requested": "CHANGES_REQUESTED", "dismißed": "DISMISSED", "Straße ﬁx ǰ abc": "STRASSE FIX J̌ ABC",
+		"ı": "I", "ſ": "S", "": "",
+	} {
+		if got := Upper(in); got != want {
+			t.Errorf("Upper(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// 期待は Python の format(x, "g")。
+func TestFormatG(t *testing.T) {
+	for in, want := range map[float64]string{
+		500: "500", 0.5: "0.5", 1e20: "1e+20", 1234567: "1.23457e+06", 1e-5: "1e-05", 123456: "123456",
+		1e16: "1e+16", 0.0001: "0.0001", 100: "100", math.Inf(1): "inf", math.Inf(-1): "-inf",
+	} {
+		if got := FormatG(in); got != want {
+			t.Errorf("FormatG(%v) = %q, want %q", in, got, want)
+		}
+	}
+	if got := FormatG(math.NaN()); got != "nan" {
+		t.Errorf("FormatG(NaN) = %q", got)
+	}
+}

@@ -28,9 +28,6 @@ const (
 	stateSent = "sent" // tickets/model/oplog の段階が送り終えた印（oplog.StateSent）
 )
 
-// stampLayout はローテートした名前の日時。名前の順と時刻の順が合う。
-const stampLayout = "20060102-150405"
-
 const anyName = `(?P<s>.+)`
 
 // named は `^<prefix><セッション><suffix>$` の形。

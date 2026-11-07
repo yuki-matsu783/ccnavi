@@ -12,7 +12,7 @@
 //
 // Python からの対応: wiki と wiki_load をまとめた。build → Build、rows → Rows、candidates → Candidates、
 // pending → PendingImpacts、parse_pattern → ParsePattern、sources_threshold・notice_count → SourcesThreshold・
-// NoticeCount、PATTERNS_DIR・IMPACT_DIR → PatternsDir・ImpactDir、TARGETS → Targets、
+// NoticeCount、PATTERNS_DIR・IMPACT_DIR → PatternsDir・ImpactDir、tickets.learning.notes の INBOX_DIR → InboxDir、TARGETS → Targets、
 // wiki_load.load_tree・load_commit・commit_of → LoadTree・LoadCommit・CommitOf（期限は time.Time。
 // ゼロ値なら git の既定の期限）。
 package wiki

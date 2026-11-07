@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/git"
@@ -14,13 +13,9 @@ import (
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/approval"
-	"ccnavi/internal/tickets/lifecycle/stop"
 	"ccnavi/internal/tickets/model/place"
 	"ccnavi/internal/tickets/model/ticket"
 )
-
-// overviewTimeout は一覧が git を 1 回起こすときの期限。
-const overviewTimeout = 5 * time.Second
 
 // noBranch は親のワークツリーがブランチの外（切り離した HEAD）にいるときの言い方。
 const noBranch = "（ブランチの外）"
@@ -121,18 +116,18 @@ func unsentOf(path, branch string) string {
 		return ""
 	}
 	ref := originRef(branch)
-	done := git.Run(path, []string{"rev-parse", "--verify", "--quiet", ref}, git.Options{Timeout: overviewTimeout})
+	done := git.Run(path, []string{"rev-parse", "--verify", "--quiet", ref}, git.Options{Timeout: git.DefaultTimeout})
 	if done.Failure != nil {
 		return ""
 	}
 	if done.Code != 0 {
 		return "一度も送っていない"
 	}
-	counted := git.Run(path, []string{"rev-list", "--count", ref + "..HEAD"}, git.Options{Timeout: overviewTimeout})
+	counted := git.Run(path, []string{"rev-list", "--count", ref + "..HEAD"}, git.Options{Timeout: git.DefaultTimeout})
 	if !counted.OK() {
 		return ""
 	}
-	if n, ok := stop.Count(counted.Out); ok && n > 0 {
+	if n, ok := git.Count(counted.Out); ok && n > 0 {
 		return strconv.Itoa(n) + " コミット"
 	}
 	return ""
@@ -144,7 +139,7 @@ func divergence(path, branch string) (ahead, behind int, ok bool) {
 		return 0, 0, false
 	}
 	done := git.Run(path, []string{"rev-list", "--left-right", "--count", "HEAD..." + originRef(branch)},
-		git.Options{Timeout: overviewTimeout})
+		git.Options{Timeout: git.DefaultTimeout})
 	if !done.OK() {
 		return 0, 0, false
 	}
@@ -152,8 +147,8 @@ func divergence(path, branch string) (ahead, behind int, ok bool) {
 	if len(parts) != 2 {
 		return 0, 0, false
 	}
-	ahead, okA := stop.Count(parts[0])
-	behind, okB := stop.Count(parts[1])
+	ahead, okA := git.Count(parts[0])
+	behind, okB := git.Count(parts[1])
 	return ahead, behind, okA && okB
 }
 
@@ -218,12 +213,12 @@ func ChildStates(root string, row Row, doing, review []*ticket.Ticket) []Child {
 // childState は未コミットがあれば未コミットあり（作業が残っているので合流の有無より先に言う）。そうでなければ、
 // 子のブランチの先頭が親のワークツリーの HEAD の祖先なら合流済み。読めなければ未合流（合流済みと言い切らない側）。
 func childState(path, branch, parentPath string) ChildState {
-	dirty := git.Run(path, []string{"status", "--porcelain"}, git.Options{Timeout: overviewTimeout})
+	dirty := git.Status(path, git.Porcelain{}, git.Options{})
 	if dirty.OK() && ospath.Strip(dirty.Out) != "" {
 		return ChildDirty
 	}
-	merged := git.Run(parentPath, []string{"merge-base", "--is-ancestor", "refs/heads/" + branch, "HEAD"},
-		git.Options{Timeout: overviewTimeout})
+	merged := git.IsAncestor(parentPath, "refs/heads/"+branch, "HEAD",
+		git.Options{Timeout: git.DefaultTimeout})
 	if merged.OK() {
 		return ChildMerged
 	}

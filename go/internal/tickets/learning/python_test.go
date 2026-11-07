@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/pyjson"
+	"ccnavi/internal/records/wiki"
 	"ccnavi/internal/tickets/model/pyoracle"
 )
 
@@ -246,9 +247,9 @@ func TestFindMatchesPython(t *testing.T) {
 	if err := os.Symlink("none.md", filepath.Join(root, LearningDir, "link.md")); err != nil {
 		t.Skip("シンボリックリンクを作れない")
 	}
-	put(t, root, InboxDir+"/.gitkeep", "")
-	put(t, root, InboxDir+"/note.txt", "x\n")
-	put(t, root, InboxDir+"/NOTE.MD", "x\n")
+	put(t, root, wiki.InboxDir+"/.gitkeep", "")
+	put(t, root, wiki.InboxDir+"/note.txt", "x\n")
+	put(t, root, wiki.InboxDir+"/NOTE.MD", "x\n")
 	commit(t, root)
 	put(t, root, LearningDir+"/c-01-01.md", "書きかけ\n")
 	put(t, root, "docs/wiki/patterns/new.md", "x\n")

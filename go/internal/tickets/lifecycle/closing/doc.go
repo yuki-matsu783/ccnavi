@@ -7,5 +7,5 @@
 // misplaced_home → MisplacedHome、family_stopped → FamilyStopped、parent_not_started → ParentNotStarted、
 // predecessors_unmet → PredecessorsUnmet、parent_still_busy → ParentStillBusy、close_problems → CloseProblems、
 // phase_type → PhaseType、deliverables_in_wip → DeliverablesInWip、deliverables_missing → DeliverablesMissing、
-// unmerged_fix → UnmergedFix、TIMEOUT_SECONDS → GitTimeout。
+// unmerged_fix → UnmergedFix。TIMEOUT_SECONDS は git.DefaultTimeout。
 package closing

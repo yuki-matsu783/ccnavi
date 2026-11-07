@@ -136,7 +136,7 @@ func DirectNameWarning(name string, prefixes []string, root string) string {
 	}
 	cut := "`ccnavi-worktree.sh <名前>`"
 	if root != "" {
-		cut = "`" + config.ScriptCommand(root, "ccnavi-worktree.sh") + " <名前>`"
+		cut = "`" + config.ScriptCommand(root, config.WorktreeWrapper) + " <名前>`"
 	}
 	return "直接作業のワークツリー名 " + name + " が `<先頭の語>-<番号>-<slug>` の形ではありません。" +
 		"次から、先頭の語（CCNAVI_BRANCH_PREFIXES）と番号（issue の番号、" +

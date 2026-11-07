@@ -30,14 +30,9 @@ const (
 	riskWhere   = "(risk)"
 )
 
-// mirrorDir はそのツリーのミラー（共通レイヤーと同じ表記の置き場。絶対）。ワークスペースルートなら共通レイヤーそのもの。
-func mirrorDir(conf *config.Settings, treeRoot string) string {
-	return ospath.Dirname(conf.CommonTemplatesDir(treeRoot))
-}
-
 // commonSources は共通レイヤーのうち写すもの（ミラーの置き場からの相対 → 中身）。写せなければ理由。
 func commonSources(conf *config.Settings, root string) (map[string][]byte, string) {
-	base := mirrorDir(conf, root)
+	base := conf.CommonLayerDir(root)
 	out := map[string][]byte{}
 	riskName := config.LayerFileNames[config.KindRisk]
 	names := make([]string, 0, len(config.LayerKinds)+1)
@@ -180,7 +175,7 @@ func commonPlan(conf *config.Settings, root, treeRoot string) ([]Change, string)
 	if why != "" || len(wanted) == 0 {
 		return nil, why
 	}
-	base := mirrorDir(conf, treeRoot)
+	base := conf.CommonLayerDir(treeRoot)
 	if !inside(treeRoot, base) || pathmatch.HasLink(treeRoot, base) {
 		return nil, relPlain(treeRoot, base) + linkedPath
 	}
@@ -204,5 +199,5 @@ func commonPlan(conf *config.Settings, root, treeRoot string) ([]Change, string)
 
 // applyCommon はミラーへ変更を書き、空になったディレクトリをミラーの下から片付ける。
 func applyCommon(conf *config.Settings, treeRoot string, changes []Change) string {
-	return apply(changes, mirrorDir(conf, treeRoot))
+	return apply(changes, conf.CommonLayerDir(treeRoot))
 }

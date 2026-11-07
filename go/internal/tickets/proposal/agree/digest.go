@@ -2,12 +2,11 @@ package agree
 
 import (
 	"cmp"
-	"crypto/sha256"
-	"encoding/hex"
 	"slices"
 	"strconv"
 	"strings"
 
+	"ccnavi/internal/infra/digest"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/policy/rules"
@@ -35,13 +34,11 @@ func ProposalsDigest(batch []*candidates.Candidate) string {
 		}
 		sum := "-"
 		if ok {
-			h := sha256.Sum256(raw)
-			sum = hex.EncodeToString(h[:])
+			sum = digest.HexBytes(digest.SHA256, raw, 0)
 		}
 		lines = append(lines, c.Ticket.ID+"\n"+sum)
 	}
-	h := sha256.Sum256([]byte(strings.Join(lines, "\n")))
-	return hex.EncodeToString(h[:])
+	return digest.Hex(digest.SHA256, strings.Join(lines, "\n"), 0)
 }
 
 // reviseCopy は承認済みチケットの計画・phases:・範囲を差し替えて書く（本文はそのまま。古い範囲は git の履歴だけに
@@ -68,7 +65,7 @@ func revisedFront(current, revised *ticket.Ticket) *yaml.Map {
 	if !revised.Raw.Has(ticket.PhasesKey) {
 		drop = append(drop, ticket.PhasesKey)
 	}
-	front := yamlval.Without(cmp.Or(current.Raw, &yaml.Map{}), drop...)
+	front := cmp.Or(current.Raw, &yaml.Map{}).Without(drop...)
 	for _, s := range rules.Sections {
 		if v, ok := revised.Raw.Lookup(string(s)); ok {
 			front.Put(string(s), v)

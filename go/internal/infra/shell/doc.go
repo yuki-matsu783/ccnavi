@@ -6,5 +6,7 @@
 // 同じ答えを返し、読み違いの向きは常に止める側にする。
 //
 // Python からの対応: shellread・shellread_cd・shellread_scan・shellread_words をまとめた。
-// shellread.read → Read、placed → PlacedCommands、shellread_words.reads_stdin → ReadsStdin。
+// shellread.read → Read、placed → PlacedCommands、shellread_words.reads_stdin → ReadsStdin。shlex.split → Split
+// （閉じない引用などは ErrSplit）、shlex.quote → Quote。外部のスクリプトを sh で走らせる subprocess.run(["sh", …]) →
+// Script（sh は Program、期限は目的ごとの ScriptTimeout・SyntaxTimeout、sh が無ければ ErrNoShell）。
 package shell

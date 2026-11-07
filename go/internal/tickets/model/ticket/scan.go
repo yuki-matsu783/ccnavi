@@ -18,14 +18,6 @@ func Scan(root, ticketsRel, projectsDir string, approved []*Ticket) ([]*Ticket, 
 	return Dedupe(found, approved), problems
 }
 
-// relTo は root からの相対の表記。出せなければそのまま。
-func relTo(path, root string) string {
-	if rel, ok := ospath.Relpath(path, root); ok {
-		return rel
-	}
-	return path
-}
-
 // ScanAll はワークスペースルートと全ワークツリーの提案を、重複をまとめずに集める（ボードが「どのツリーに
 // あるか」を見せるのに使う）。置き場がプロジェクトを決める（frontmatter の `project:` は照合に使うだけ）。
 // raw に project を差し込まない（承認は提案のバイト列をそのまま動かす）。
@@ -45,7 +37,7 @@ func ScanAll(root, ticketsRel, projectsDir string) ([]*Ticket, []rules.Problem) 
 			// 大文字小文字を区別しない機械では DONE/ が done/ として開ける。置き場が状態なので、表記まで同じものだけ読む。
 			if ospath.Basename(ospath.Realpath(directory)) != string(state) {
 				problems = append(problems, problem(rules.Warn, string(state),
-					relTo(directory, root)+" の表記が状態の名前 `"+string(state)+"` と違うので読まない"))
+					ospath.RelOr(directory, root)+" の表記が状態の名前 `"+string(state)+"` と違うので読まない"))
 				continue
 			}
 			for _, name := range names {
@@ -56,7 +48,7 @@ func ScanAll(root, ticketsRel, projectsDir string) ([]*Ticket, []rules.Problem) 
 				path := ospath.Join(directory, name)
 				ticket, complaints := Load(path)
 				for i := range complaints {
-					complaints[i].Rule += " (" + relTo(path, root) + ")"
+					complaints[i].Rule += " (" + ospath.RelOr(path, root) + ")"
 				}
 				problems = append(problems, complaints...)
 				if ticket == nil {

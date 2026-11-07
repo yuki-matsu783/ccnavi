@@ -9,6 +9,7 @@ import (
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathmatch"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/model/place"
 )
@@ -72,7 +73,7 @@ func Scratchpad(root string, until time.Time) string {
 	}
 	values := texts.Values{
 		"size":  strconv.FormatFloat(float64(size)/mb, 'f', 0, 64) + " MB",
-		"limit": strconv.FormatFloat(limit, 'g', 6, 64) + " MB",
+		"limit": pyfmt.FormatG(limit) + " MB",
 		"path":  place.ScratchDir(root),
 	}
 	return texts.Say(root, "NOTICE_SCRATCHPAD_LARGE", values, nil)

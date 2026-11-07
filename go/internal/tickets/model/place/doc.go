@@ -9,6 +9,7 @@
 // State と States・Finished・GuardedStates、ticket_fold.progress → State.Progress、ticket_places の
 // is_ticket_place・in_wip・leaves_open_state・lands_in_finished_state・is_handoff_place・is_unscoped・scratch_dir
 // → IsTicketPlace・InWip・LeavesOpenState・LandsInFinishedState・IsHandoffPlace・IsUnscoped・ScratchDir、
+// os.path.join(tree_root, *tickets.split("/")[, state]) → ProposalsRoot・Dir、
 // HANDOFF・SCRATCH_ROOT・WIP_ROOT → Handoff・ScratchRoot・WipRoot、archive の ARCHIVE_DIR・PHASES_DIR・FLOWS_DIR・
 // READY_DIR・PLACE → ArchiveDir・PhasesDir・FlowsDir・ReadyDir・ArchiveName、ticket_guard.OPS_REL → OpsRel。
 package place

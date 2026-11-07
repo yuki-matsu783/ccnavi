@@ -15,5 +15,10 @@
 // datetime.isoformat → ISOFormat（秒までの書式は ISOStampLayout）、f"{prefix}{safe_name(id)}.json" の
 // 記録のパス → RecordPath（拡張子は JSONExt）、会話の記録を末尾から広げて読む → ScanTail、
 // shutil.copy2 → CopyFile、safe_name(x) or 既定 → SafeNameOr、fsio を通さない open(path, encoding="utf-8").read() →
-// ReadDiskText、OSError を Python の文のまま上へ渡す → Wrap。
+// ReadDiskText、open(path, "rb").read() → ReadDiskBytes（溜める段は見ない）、bytes.decode("utf-8", errors=…) →
+// DecodeBytes（改行は読み替えない）、OSError を Python の文のまま上へ渡す → Wrap、exc.strerror → StrError（番号の
+// 無いエラーは空）、json.dumps(...) を書く形（indent・ensure_ascii・末尾の改行・改行・書き方）→ WriteJSONAs と
+// JSONFormat、read_line(stdin).strip().lower() → ReadAnswer（y・yes なら → ReadYes）、getattr(os, "O_NOFOLLOW", 0)・
+// O_NONBLOCK → NoFollow・NonBlock（その 2 つで開いて fstat → OpenNoFollow）、名前・識別子に入れる時刻の
+// "%Y%m%d%H%M%S"・"%Y%m%d-%H%M%S" → IDStampLayout・NameStampLayout、時差を除いた StampLayout → LocalStampLayout。
 package fsio

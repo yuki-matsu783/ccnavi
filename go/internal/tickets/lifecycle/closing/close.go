@@ -17,9 +17,6 @@ import (
 	"ccnavi/internal/tickets/phase"
 )
 
-// launcherScript は改版の雛形を作るコマンドの sh。
-const launcherScript = "ccnavi-launcher.sh"
-
 // ParentStillBusy は親を閉じられない理由（CloseProblems）があれば、全部言って真。子なら偽。
 func ParentStillBusy(stderr io.Writer, conf *config.Settings, root string, t *ticket.Ticket) bool {
 	if t.IsChild() {
@@ -60,7 +57,7 @@ func CloseProblems(conf *config.Settings, root, parentID string, raw *approval.R
 	closed, _ := approval.Scan(conf, root, true, raw)
 	if c := approval.ByID(slices.Concat(copies, closed))[parentID]; c != nil && c.HasPlan() {
 		if !c.FeedbackPlanned {
-			revise := config.ScriptCommand(root, launcherScript) + " ticket revise " + parentID + " --feedback"
+			revise := config.ScriptCommand(root, config.LauncherScript) + " ticket revise " + parentID + " --feedback"
 			problems = append(problems, fmt.Sprintf("%s はフィードバック計画がまだ。対応が無くても `feedback: []` の改版を"+
 				"出して承認を受けてから（雛形は '%s' が作る）", parentID, revise))
 		}
@@ -146,11 +143,11 @@ func DeliverablesMissing(stderr io.Writer, conf *config.Settings, root string, t
 
 // tracked は、この glob に当たる追跡済みのファイルが、ワークツリーにも 1 つでも在るかを返す。ls-files はインデックスを見るので、消したが git add していないもの（--deleted）は除く。名前は同じ読み方の 2 つの出力どうしで比べ、ファイルシステムには聞かない。非 UTF-8 の名前を置換文字で読んでも、食い違わないようにするためである。
 func tracked(worktree, glob string) bool {
-	rc, out := git.Output(worktree, []string{"ls-files", "-z", "--", glob}, gitOptions())
+	rc, out := git.Output(worktree, []string{"ls-files", "-z", "--", glob}, git.Options{})
 	if rc != 0 {
 		return false
 	}
-	rc, gone := git.Output(worktree, []string{"ls-files", "-z", "--deleted", "--", glob}, gitOptions())
+	rc, gone := git.Output(worktree, []string{"ls-files", "-z", "--deleted", "--", glob}, git.Options{})
 	if rc != 0 {
 		return false
 	}

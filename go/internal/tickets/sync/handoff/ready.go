@@ -2,16 +2,12 @@ package handoff
 
 import (
 	"strings"
-	"time"
 
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/tickets/flow"
 	"ccnavi/internal/tickets/model/place"
 )
-
-// gitTimeout は起点の木を読む git の期限。
-const gitTimeout = 30 * time.Second
 
 // Pending は表に当たる下書きのうち、取り込み先と中身が違うもの（取り込んでいないもの）の、置き場つきの相対パス。
 // ready は wip/ を消すので、残っていれば止める。読めない下書きと取り込み先も「違う」に数える（止める側）。
@@ -56,7 +52,7 @@ func draftFiles(treeRoot string) []string {
 // holds は起点の木の sources のどれかの中身が raw と同じか。起点から読めなければ ok が偽。
 func holds(treeRoot, start string, sources []string, raw []byte) (held, ok bool) {
 	for _, source := range sources {
-		blob, readable := git.Blob(treeRoot, start, source, git.Options{Timeout: gitTimeout})
+		blob, readable := git.Blob(treeRoot, start, source, git.Options{Timeout: git.CleanupTimeout})
 		if !readable {
 			return false, false
 		}
@@ -79,7 +75,7 @@ func Survey(treeRoot, start string) (foreign, notes []string, ok bool) {
 	if !ospath.IsDir(handoffDir(treeRoot)) {
 		return nil, nil, true
 	}
-	listed := git.Run(treeRoot, []string{"ls-tree", "-r", "-z", "--name-only", start}, git.Options{Timeout: gitTimeout})
+	listed := git.Run(treeRoot, []string{"ls-tree", "-r", "-z", "--name-only", start}, git.Options{Timeout: git.CleanupTimeout})
 	if !listed.OK() {
 		return nil, nil, false
 	}

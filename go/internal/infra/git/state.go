@@ -49,16 +49,61 @@ const (
 
 // 読む git の引数。
 var (
-	// statusArgs: -z はパスをそのまま NUL 区切りで返す（既定は escape を掛け、解き損ねるとルールが当たらない）。
-	// --untracked-files=all は未追跡を 1 件ずつ挙げる（既定はディレクトリ 1 つにまとめる）。
-	// --no-renames は改名を「消えた」と「現れた」の 2 件にし、1 件が 2 つのパスを持たないようにする。
-	statusArgs = []string{"status", "--porcelain", "-z", "--untracked-files=all", "--no-renames"}
+	// changesStatus: -z はパスをそのまま NUL 区切りで返す（既定は escape を掛け、解き損ねるとルールが当たらない）。
+	// 未追跡は 1 件ずつ挙げる（既定はディレクトリ 1 つにまとめる）。改名は「消えた」と「現れた」の 2 件にし、
+	// 1 件が 2 つのパスを持たないようにする。
+	changesStatus = Porcelain{NUL: true, Untracked: UntrackedAll, NoRenames: true}
 	// committedArgs: このツリーが積んだ未 push のコミットだけを数える（`--first-parent --no-merges` と
 	// `--not --remotes`）。統合先を取り込んだマージや fast-forward が持ち込んだコミットを数えないため。
 	// --no-renames と --ignore-submodules=none は、改名の移動元と submodule の進みが差分から消えないようにする。
 	committedArgs = []string{"log", "--first-parent", "--no-merges", "--format=", "--name-only", "--no-renames",
 		"--ignore-submodules=none", "-z"}
 )
+
+// Untracked は status の --untracked-files の値。空なら付けない（git の既定）。
+type Untracked string
+
+const (
+	UntrackedAll Untracked = "all" // 未追跡を 1 件ずつ挙げる
+	UntrackedNo  Untracked = "no"  // 未追跡を挙げない
+)
+
+// Porcelain は `git status --porcelain` に付けるフラグ。ゼロ値はフラグ無し（行区切り・未追跡は既定・改名を読む）。
+type Porcelain struct {
+	NUL       bool      // -z（パスを引用せず NUL で区切る）
+	Untracked Untracked // --untracked-files=<値>
+	NoRenames bool      // --no-renames
+	// IgnoreDirtySubmodules は --ignore-submodules=dirty（submodule の中の未コミットを数えない）。
+	IgnoreDirtySubmodules bool
+	// Paths は `--` の後に渡す pathspec。nil なら付けない（空でも `--` だけは付ける）。
+	Paths []string
+}
+
+// Args は git に渡す引数。
+func (p Porcelain) Args() []string {
+	args := []string{"status", "--porcelain"}
+	if p.NUL {
+		args = append(args, "-z")
+	}
+	if p.Untracked != "" {
+		args = append(args, "--untracked-files="+string(p.Untracked))
+	}
+	if p.NoRenames {
+		args = append(args, "--no-renames")
+	}
+	if p.IgnoreDirtySubmodules {
+		args = append(args, "--ignore-submodules=dirty")
+	}
+	if p.Paths != nil {
+		args = append(append(args, "--"), p.Paths...)
+	}
+	return args
+}
+
+// Status は `git status --porcelain` を p のフラグで起こす。
+func Status(cwd string, p Porcelain, o Options) Done {
+	return runGit(cwd, p.Args(), o)
+}
 
 // Change はワークツリーの変更 1 件。
 type Change struct {
@@ -101,7 +146,7 @@ func Read(top string, timeout time.Duration) ([]Change, Reason) {
 	if top == "" {
 		return nil, reasonNoWorktree
 	}
-	done := runGit(top, statusArgs, stateOptions(timeout))
+	done := Status(top, changesStatus, stateOptions(timeout))
 	if reason := readFailure(done); reason != "" {
 		return nil, reason
 	}

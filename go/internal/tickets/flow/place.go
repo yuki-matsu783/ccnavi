@@ -8,7 +8,6 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/ospath"
-	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/pathmatch"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/tree"
@@ -249,7 +248,7 @@ func LockHit(copies []*ticket.Ticket, at Location) *ticket.Ticket {
 	for _, child := range copies {
 		if child.IsChild() && child.InProgress() &&
 			(at.Project == child.Project || at.Project == AnyProject) &&
-			pathcase.Fold(child.ID+Suffix) == pathcase.Fold(at.Name) {
+			pyfmt.Casefold(child.ID+Suffix) == pyfmt.Casefold(at.Name) {
 			return child
 		}
 	}

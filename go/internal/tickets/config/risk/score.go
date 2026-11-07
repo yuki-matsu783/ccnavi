@@ -1,18 +1,14 @@
 package risk
 
 import (
-	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
@@ -20,21 +16,14 @@ import (
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
+	"ccnavi/internal/infra/shell"
 )
 
 const (
-	// scriptTimeout は script: の項目に与える時間。
-	scriptTimeout = 30 * time.Second
-	// gitTimeout は差分を数える git に与える時間。閉じるときにしか走らないので、判定より長くてよい。
-	gitTimeout = 10 * time.Second
 	// shownHits は glob の項目の内訳に並べるパスの数。
 	shownHits = 3
 	// shownOutput はスクリプトの読めない出力を苦情に添える長さ。
 	shownOutput = 60
-	// shownCommit は問いに出すコミットの桁。
-	shownCommit = 12
-	// shell は script: を走らせるシェル。
-	shell = "sh"
 )
 
 // Change は差分の 1 ファイル。Status は git の name-status の 1 文字目（A・M・D・R など）、Old は rename・copy の
@@ -124,8 +113,6 @@ func (s *changeSet) drop(path string) {
 	}
 }
 
-func slashed(p string) string { return strings.ReplaceAll(p, `\`, "/") }
-
 // count は git の numstat の数。バイナリは `-` で 0 と数える。
 func count(text string) int {
 	n, err := pyfmt.ParseInt(text)
@@ -142,7 +129,7 @@ func Measure(worktree, base, head string) (*Diff, string) {
 	if base == "" {
 		return nil, "子の仕事の始まり（親との共通の祖先）がありません。"
 	}
-	opts := git.Options{Timeout: gitTimeout, RawPaths: true}
+	opts := git.Options{Timeout: git.RiskTimeout, RawPaths: true}
 	span := base + ".." + head
 	code, out := git.Output(worktree, []string{"diff", "--numstat", "-z", span}, opts)
 	if code != 0 {
@@ -163,10 +150,10 @@ func Measure(worktree, base, head string) (*Diff, string) {
 		}
 		path, old := cols[2], ""
 		if path == "" && i+1 < len(parts) {
-			old, path = slashed(parts[i]), parts[i+1]
+			old, path = ospath.Slashed(parts[i]), parts[i+1]
 			i += 2
 		}
-		path = slashed(path)
+		path = ospath.Slashed(path)
 		changes.put(Change{Path: path, Added: count(cols[0]), Deleted: count(cols[1]), Status: "M", Old: old})
 	}
 	code, out = git.Output(worktree, []string{"diff", "--name-status", "-z", span}, opts)
@@ -183,10 +170,10 @@ func Measure(worktree, base, head string) (*Diff, string) {
 		var path string
 		switch {
 		case (strings.HasPrefix(status, "R") || strings.HasPrefix(status, "C")) && i+1 < len(parts):
-			path = slashed(parts[i+1])
+			path = ospath.Slashed(parts[i+1])
 			i += 2
 		case i < len(parts):
-			path = slashed(parts[i])
+			path = ospath.Slashed(parts[i])
 			i++
 		default:
 			i = len(parts)
@@ -199,7 +186,7 @@ func Measure(worktree, base, head string) (*Diff, string) {
 			changes.put(Change{Path: path, Status: kind})
 		}
 	}
-	for path := range git.TakenFromRemote(worktree, base, head, gitTimeout) {
+	for path := range git.TakenFromRemote(worktree, base, head, git.RiskTimeout) {
 		changes.drop(path)
 	}
 	code, sha := git.Output(worktree, []string{"rev-parse", head}, opts)
@@ -353,35 +340,27 @@ func runScript(root, rel, worktree string, env map[string]string) (points int, n
 	if !ospath.IsFile(path) {
 		return 0, rel + " がありません。", false
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), scriptTimeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, shell, path)
-	cmd.Dir = worktree
-	cmd.Env = os.Environ()
+	pairs := []string{}
 	for k, v := range env {
-		cmd.Env = append(cmd.Env, k+"="+v)
+		pairs = append(pairs, k+"="+v)
 	}
-	cmd.WaitDelay = time.Second
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	err := cmd.Run()
-	out, _ := fsio.Decode(stdout.Bytes(), fsio.Replace)
-	var exit *exec.ExitError
+	ran, err := shell.Script([]string{path}, worktree, pairs, shell.ScriptTimeout)
+	out, _ := fsio.Decode(ran.Stdout, fsio.Replace)
 	switch {
-	case ctx.Err() != nil:
+	case err != nil:
+		return 0, rel + " を走らせられない (" + startFailure(err) + ")", false
+	case ran.TimedOut:
 		return 0, rel + " を走らせられない (TimeoutExpired)", false
-	case errors.As(err, &exit):
-		said, _ := fsio.Decode(stderr.Bytes(), fsio.Replace)
+	case ran.Code != 0:
+		said, _ := fsio.Decode(ran.Stderr, fsio.Replace)
 		if said == "" {
 			said = out
 		}
-		text := rel + " が " + strconv.Itoa(exit.ExitCode()) + " で終わった"
+		text := rel + " が " + strconv.Itoa(ran.Code) + " で終わった"
 		if tail := ospath.Splitlines(ospath.Strip(said)); len(tail) > 0 {
 			text += ": " + tail[len(tail)-1]
 		}
 		return 0, text, false
-	case err != nil:
-		return 0, rel + " を走らせられない (" + startFailure(err) + ")", false
 	}
 	text := ospath.Strip(out)
 	if text == "" {
@@ -420,8 +399,8 @@ func JudgePrompt(child, parent string, diff *Diff, pending []*Factor, worktree, 
 	lines := []string{
 		"# " + child + " のリスク判定（定性）",
 		"",
-		"親: " + parent + "。ワークツリー: " + worktree + "。差分: `" + pyfmt.Head(diff.Base, shownCommit) + ".." +
-			pyfmt.Head(diff.Head, shownCommit) + "`（" + diff.Summary() + "）。",
+		"親: " + parent + "。ワークツリー: " + worktree + "。差分: `" + pyfmt.Head(diff.Base, git.ShortSHA) + ".." +
+			pyfmt.Head(diff.Head, git.ShortSHA) + "`（" + diff.Summary() + "）。",
 		"",
 		"次の問いに、差分を読んで yes / no で答え、根拠を 1〜3 行で書いてください。",
 		"判断するのはこの文書を渡されたサブエージェント。記録するのは親で、",

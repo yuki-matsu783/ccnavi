@@ -64,7 +64,7 @@ func ApprovedText(tickets []*ticket.Ticket, revisions map[string]bool, root stri
 		}
 		lines = append(lines, "- "+t.ID+title+"（"+where+"）")
 	}
-	ticketSh := config.ScriptCommand(root, "ccnavi-ticket.sh")
+	ticketSh := config.ScriptCommand(root, config.TicketWrapper)
 	lines = append(lines, "承認はユーザが済ませた。承認を頼み直さない。前の会話が無くても、この文と "+
 		"'"+ticketSh+" status' で状況は分かる。承認済みかどうかや置き場は、"+
 		"ファイルを自分で探さず status で確かめる。")
@@ -89,7 +89,7 @@ func ApprovedText(tickets []*ticket.Ticket, revisions map[string]bool, root stri
 	}
 	lines = append(lines, texts.Say(root, "NEXT_AGREE_FOLLOWUP", nil, texts.Variants{"next": next}))
 	if worktrees != nil {
-		lines = append(lines, childWorktreeLines(tickets, worktrees, config.ScriptCommand(root, "ccnavi-git.sh"))...)
+		lines = append(lines, childWorktreeLines(tickets, worktrees, config.ScriptCommand(root, config.GitWrapper))...)
 	}
 	for _, n := range notices {
 		lines = append(lines, "案内: "+n)

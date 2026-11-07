@@ -3,7 +3,6 @@ package treegate
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/git"
@@ -14,7 +13,6 @@ import (
 )
 
 const (
-	timeout = 20 * time.Second
 	// 文に名指しするパスの数（未コミット）と sha・パスの数（承認の依頼の未 push）。
 	shown         = 8
 	shownUnpushed = 3
@@ -89,8 +87,8 @@ func InPlace(conf *config.Settings, rel string) bool {
 // ファイルが置き場の外に見えるから。--no-renames は移動元のパスが XY を持たずに入り込むのを避ける。
 // wipRemovals なら、ready が消した追跡済みの wip/ のファイルは数えない。
 func Dirty(treeRoot string, conf *config.Settings, wipRemovals bool) ([]string, bool) {
-	done := git.Run(treeRoot, []string{"status", "--porcelain", "-z", "--untracked-files=no", "--no-renames"},
-		git.Options{Timeout: timeout, RawPaths: true})
+	done := git.Status(treeRoot, git.Porcelain{NUL: true, Untracked: git.UntrackedNo, NoRenames: true},
+		git.Options{Timeout: git.MergeTimeout, RawPaths: true})
 	if !done.OK() {
 		return nil, false
 	}
@@ -122,9 +120,9 @@ func DiffPaths(treeRoot, ref string) ([]string, string) {
 		return nil, "比べる相手がありません。"
 	}
 	done := git.Run(treeRoot, []string{"diff", "--name-only", "--no-renames", "--ignore-submodules=none", "-z", ref + "..HEAD"},
-		git.Options{Timeout: timeout, RawPaths: true})
+		git.Options{Timeout: git.MergeTimeout, RawPaths: true})
 	if !done.OK() {
-		return nil, pyfmt.Head(ref, 12) + " からの差分を読めない"
+		return nil, pyfmt.Head(ref, git.ShortSHA) + " からの差分を読めない"
 	}
 	paths := []string{}
 	for _, p := range strings.Split(done.Out, "\x00") {
@@ -138,7 +136,7 @@ func DiffPaths(treeRoot, ref string) ([]string, string) {
 // Unpushed は origin/<branch> より進んでいる分（進んでいなければ空）。読めなければ ok が偽。
 // ignorePlaces なら進んだ分が変えた置き場の外のパスを、そうでなければ進んだコミットの sha を返す。
 func Unpushed(treeRoot string, conf *config.Settings, branch string, ignorePlaces bool) ([]string, bool) {
-	done := git.Run(treeRoot, []string{"rev-list", "origin/" + branch + "..HEAD"}, git.Options{Timeout: timeout})
+	done := git.Run(treeRoot, []string{"rev-list", "origin/" + branch + "..HEAD"}, git.Options{Timeout: git.MergeTimeout})
 	if !done.OK() {
 		return nil, false
 	}

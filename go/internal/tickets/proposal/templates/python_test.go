@@ -10,6 +10,7 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/pyjson"
+	"ccnavi/internal/infra/yamljson"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/model/pyoracle"
 )
@@ -355,7 +356,7 @@ func probs(list []rules.Problem) [][3]string {
 func itemData(t *testing.T, list []Item) []any {
 	out := []any{}
 	for _, item := range list {
-		text, err := pyjson.Dumps(plainJSON(item.asData(0)), pyjson.Options{})
+		text, err := pyjson.Dumps(yamljson.ToJSON(item.asData(0)), pyjson.Options{})
 		if err != nil {
 			t.Fatal(err)
 		}

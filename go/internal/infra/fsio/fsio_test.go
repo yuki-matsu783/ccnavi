@@ -491,6 +491,12 @@ func TestDecodeMatchesPython(t *testing.T) {
 			t.Errorf("Decode(%q, Replace) = %q", c.in, got)
 		}
 	}
+	// DecodeBytes は bytes.decode("utf-8", errors="replace")。改行は読み替えない。
+	for in, want := range map[string]string{"ok\r\nx\ry": "ok\r\nx\ry", "\xe3\x81\r\n": "\ufffd\r\n"} {
+		if got, err := DecodeBytes([]byte(in), Replace); err != nil || got != want {
+			t.Errorf("DecodeBytes(%q) = %q, %v", in, got, err)
+		}
+	}
 }
 
 // 同じ場所を指すパスは同じ答えになる（相対・"."・".."・絶対）。まだ無いファイルも絶対パスにする。
@@ -619,5 +625,61 @@ func TestUnixSeconds(t *testing.T) {
 	}
 	if got := FromUnixSeconds(1700000000.25); !got.Equal(time.Unix(1700000000, 250000000)) {
 		t.Errorf("FromUnixSeconds = %v", got)
+	}
+}
+
+// 期待は Python の json.dumps(d, ensure_ascii=…, indent=…)（+ "\n"）を open(path, "w", newline=…) で書いたもの。
+func TestWriteJSONAs(t *testing.T) {
+	data := pyjson.NewObject("a", "日本", "b", []any{1, pyjson.NewObject()})
+	native := "\n"
+	if ospath.Windows {
+		native = "\r\n"
+	}
+	cases := []struct {
+		f    JSONFormat
+		want string
+	}{
+		{JSONFormat{}, `{"a": "日本", "b": [1, {}]}`},
+		{JSONFormat{How: Atomic}, `{"a": "日本", "b": [1, {}]}`},
+		{JSONFormat{Indent: JSONIndentOne, FinalNewline: true, Newline: LF}, "{\n \"a\": \"日本\",\n \"b\": [\n  1,\n  {}\n ]\n}\n"},
+		{JSONFormat{Indent: JSONIndentOne, ASCII: true}, strings.ReplaceAll("{\n \"a\": \"\\u65e5\\u672c\",\n \"b\": [\n  1,\n  {}\n ]\n}", "\n", native)},
+		{JSONFormat{FinalNewline: true}, `{"a": "日本", "b": [1, {}]}` + native},
+	}
+	for i, c := range cases {
+		path := filepath.Join(t.TempDir(), "x.json")
+		if failed := WriteJSONAs(path, data, c.f); failed != "" {
+			t.Fatal(failed)
+		}
+		if got, _ := os.ReadFile(path); string(got) != c.want {
+			t.Errorf("%d: %q, want %q", i, got, c.want)
+		}
+	}
+	if failed := WriteJSONAs(filepath.Join(t.TempDir(), "x.json"), func() {}, JSONFormat{}); failed == "" {
+		t.Error("JSON にできない値は理由を返す")
+	}
+}
+
+// 無い・空・中身あり・読めない（親がファイル）を分ける。Python の open(path, "rb") の FileNotFoundError と OSError。
+func TestReadDiskBytes(t *testing.T) {
+	dir := t.TempDir()
+	empty := filepath.Join(dir, "empty")
+	file := filepath.Join(dir, "file")
+	if err := os.WriteFile(empty, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file, []byte("a\r\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if data, err := ReadDiskBytes(empty); err != nil || data == nil || len(data) != 0 {
+		t.Errorf("空: %q, %v", data, err)
+	}
+	if data, err := ReadDiskBytes(file); err != nil || string(data) != "a\r\n" {
+		t.Errorf("中身は改行を変えない: %q, %v", data, err)
+	}
+	if _, err := ReadDiskBytes(filepath.Join(dir, "missing")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("無い: %v", err)
+	}
+	if _, err := ReadDiskBytes(filepath.Join(file, "x")); err == nil || errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("親がファイルは無いではなく読めない: %v", err)
 	}
 }

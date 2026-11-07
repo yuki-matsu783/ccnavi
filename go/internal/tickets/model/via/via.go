@@ -1,6 +1,8 @@
 package via
 
-import "sync"
+import (
+	"sync"
+)
 
 // Route は起動を動かした経路。
 type Route string

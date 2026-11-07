@@ -126,6 +126,19 @@ func IDs(root, project string) map[string]bool {
 	return out
 }
 
+// IDsAny は全リポジトリの退避の done/ にある識別子。
+func IDsAny(root string) map[string]bool {
+	out := map[string]bool{}
+	for _, repo := range repoNames(root) {
+		if directory := doneDir(root, repo); directory != "" {
+			for _, ident := range regularMD(directory) {
+				out[ident] = true
+			}
+		}
+	}
+	return out
+}
+
 // FindAny は全リポジトリの退避の done/<識別子>.md を読む。読めないものは除く。
 func FindAny(root, ident string) []*ticket.Ticket {
 	if !ids.IsValidID(ident) {
@@ -438,7 +451,7 @@ func treeKey(treeRoot string) string {
 	if treeRoot == "" {
 		return ""
 	}
-	return pathcase.Fold(ospath.Realpath(treeRoot))
+	return pathcase.Real(treeRoot)
 }
 
 // InReadyPlaces は承認済みの領域からの相対が、ready が移す 3 つの置き場の下か（".." などは受けない）。

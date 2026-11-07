@@ -26,6 +26,25 @@ func TestHexMatchesHashlib(t *testing.T) {
 	if got, err := HexOf(SHA256, strings.NewReader("abc")); err != nil || got != Hex(SHA256, "abc", 0) {
 		t.Errorf("HexOf = %q, %v", got, err)
 	}
+	// バイト列は UTF-8 でなくてもそのまま要約する。nil は空と同じ。
+	bytesCases := []struct {
+		b    []byte
+		want string
+	}{
+		{[]byte{0xff, 0x00, 'a'}, "f9789675a25a87605b0d60387568e25cda7b568653ecdc42e9248588dc70acd5"},
+		{nil, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+	}
+	for _, c := range bytesCases {
+		if got := HexBytes(SHA256, c.b, 0); got != c.want {
+			t.Errorf("HexBytes(%v) = %q, want %q", c.b, got, c.want)
+		}
+	}
+	h := New(SHA256)
+	h.Write([]byte("a"))
+	h.Write([]byte("bc"))
+	if got := HexSum(h); got[:10] != "ba7816bf8f" {
+		t.Errorf("塊に分けて書いても同じ要約: %q", got)
+	}
 }
 
 func TestRandomHex(t *testing.T) {

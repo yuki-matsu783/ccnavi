@@ -37,15 +37,3 @@ func TestEveryStepKeepsItsGuidanceAndGetsTheCommonNote(t *testing.T) {
 		}
 	}
 }
-
-func TestCount(t *testing.T) {
-	for _, c := range []struct {
-		in   string
-		n    int
-		read bool
-	}{{"3\n", 3, true}, {" 12 ", 12, true}, {"", 0, false}, {"+1", 0, false}, {"-1", 0, false}, {"1a", 0, false}} {
-		if n, ok := Count(c.in); n != c.n || ok != c.read {
-			t.Errorf("Count(%q) = %d, %v", c.in, n, ok)
-		}
-	}
-}

@@ -18,9 +18,6 @@ import (
 // CodeFinishNudge は finish の打ち忘れを促すときの理由コード。
 const CodeFinishNudge = "NUDGE_TICKET_FINISH"
 
-// baseShown は文に出す基準点の長さ。
-const baseShown = 12
-
 // Unfinished は Stop で finish を促す相手。Ahead は自分で作ったコミットの数。
 type Unfinished struct {
 	Ticket   *ticket.Ticket
@@ -69,7 +66,8 @@ func UnfinishedAtStop(conf *config.Settings, root, cwd string, raw *approval.Raw
 	if !bound.IsChild() && len(closing.CloseProblems(conf, root, bound.ID, raw)) > 0 {
 		return nil
 	}
-	rc, out := git.Output(at.Root, []string{"status", "--porcelain", "--untracked-files=all"}, git.Options{Timeout: closing.GitTimeout})
+	status := git.Status(at.Root, git.Porcelain{Untracked: git.UntrackedAll}, git.Options{})
+	rc, out := status.Code, status.Out
 	if rc != 0 || ospath.Strip(out) != "" {
 		return nil
 	}
@@ -78,7 +76,7 @@ func UnfinishedAtStop(conf *config.Settings, root, cwd string, raw *approval.Raw
 		parentBranch = standing.NewFamilies(conf, root).Branch(bound.Parent, bound.Project)
 	}
 	ahead := ownCommits(at.Root, bound, parentBranch)
-	head := HeadSHA(at.Root, zeroTime)
+	head := git.Head(at.Root, git.Options{})
 	if ahead <= 0 || head == "" {
 		return nil
 	}
@@ -91,7 +89,7 @@ func UnfinishedAtStop(conf *config.Settings, root, cwd string, raw *approval.Raw
 // コミットは除かれる）。親のブランチを引けなければ自分のものか決まらないので 0。親は基準点から数え、統合先
 // （origin/HEAD）にあるものを除く。origin/HEAD が無ければ基準点の先を全部数える。
 func ownCommits(worktree string, t *ticket.Ticket, parentBranch string) int {
-	o := git.Options{Timeout: closing.GitTimeout}
+	o := git.Options{}
 	resolve := func(rev string) string {
 		rc, sha := git.Output(worktree, []string{"rev-parse", "--verify", "--quiet", rev}, o)
 		if rc != 0 {
@@ -119,7 +117,7 @@ func ownCommits(worktree string, t *ticket.Ticket, parentBranch string) int {
 	if rc != 0 {
 		return 0
 	}
-	n, _ := Count(out)
+	n, _ := git.Count(out)
 	return n
 }
 
@@ -134,7 +132,7 @@ func FinishNudge(root string, u *Unfinished) string {
 		"ticket":         t.ID,
 		"worktree":       u.Worktree,
 		"ahead":          strconv.Itoa(u.Ahead),
-		"base":           prefix(t.BaseSHA, baseShown),
+		"base":           prefix(t.BaseSHA, git.ShortSHA),
 		"user_stop_note": UserStopNote,
 	}, texts.Variants{"what": what})
 	return fmt.Sprintf("[ccnavi] %s (ticket: %s)\n%s", CodeFinishNudge, t.ID, said)
@@ -163,8 +161,8 @@ func BaseOffHead(conf *config.Settings, root string, t *ticket.Ticket) string {
 	if !tree.IsWorktreeOf(owner, worktree) {
 		return ""
 	}
-	head := HeadSHA(worktree, zeroTime)
-	if head == "" || git.Run(worktree, []string{"merge-base", "--is-ancestor", t.BaseSHA, head}, git.Options{Timeout: closing.GitTimeout}).OK() {
+	head := git.Head(worktree, git.Options{})
+	if head == "" || git.IsAncestor(worktree, t.BaseSHA, head, git.Options{}).OK() {
 		return ""
 	}
 	return fmt.Sprintf("基準点（base_sha: %s）がワークツリー %s の HEAD の祖先でない。"+

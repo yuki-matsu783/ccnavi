@@ -12,7 +12,7 @@
 // marker_kind → MarkerKind、ahead_since → AheadSince、integration_name → IntegrationName、
 // _integration → Integration、bound_reason → BoundReason、bound_check → BoundCheck、direct_check → DirectCheck、
 // has_record → HasRecord（dirty の None は nil）、_dirty → Dirty、_git_path → GitPath、_read_record → ReadRecord、
-// _expired → Expired、_tree_roots → TreeRoots、_named_file → NamedFile、integrate_nudge → IntegrateNudge、
+// _expired → git.Expired、_tree_roots → TreeRoots、_named_file → NamedFile、integrate_nudge → IntegrateNudge、
 // blocked_notice → BlockedNotice、nudged_before・remember_nudge → stop.NudgedBefore・RememberNudge（Direct が
 // stop.Nudge を満たす）、RECORD_DIR・DONE_DIR → RecordDir・DoneDir、HIT・CLEAR・UNKNOWN → Hit・Clear・Unknown。
 package integrate

@@ -59,11 +59,8 @@ func RecordDigest(conf *config.Settings, root string, child *ticket.Ticket) (str
 		"at", child.StartedAt,
 	)
 	target := digestRecordPath(conf, root, child)
-	text, err := pyjson.Dumps(data, pyjson.Options{RawUnicode: true, Indent: 1})
-	if err != nil {
-		return target, Clean(err.Error())
-	}
-	return target, Clean(fsio.WriteText(target, text+"\n", fsio.LF, fsio.Plain))
+	format := fsio.JSONFormat{Indent: fsio.JSONIndentOne, FinalNewline: true, Newline: fsio.LF}
+	return target, Clean(fsio.WriteJSONAs(target, data, format))
 }
 
 func describe(mark string) string {

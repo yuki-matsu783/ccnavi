@@ -18,13 +18,10 @@ import (
 )
 
 // 置き場（ツリーのルートからの相対。区切りは "/"）。
-const (
-	LearningDir = place.Handoff + "/learnings"
-	InboxDir    = "docs/wiki/inbox"
-)
+const LearningDir = place.Handoff + "/learnings"
 
 // watched は親の finish が未コミットの変更を見る置き場。
-var watched = []string{LearningDir, wiki.PatternsDir, InboxDir}
+var watched = []string{LearningDir, wiki.PatternsDir, wiki.InboxDir}
 
 // 処理の行の種類。
 const (
@@ -286,7 +283,7 @@ func (p *Pending) Broken() bool { return len(p.Unreadable) > 0 || len(p.Inconsis
 
 // inboxFiles は HEAD の受信箱のファイル名。`.gitkeep` 以外は全部数える（`.md` 以外も、大文字小文字違いも）。
 func inboxFiles(treeRoot string) ([]string, string) {
-	names, why, ok := listing(treeRoot, InboxDir)
+	names, why, ok := listing(treeRoot, wiki.InboxDir)
 	if !ok {
 		return nil, why
 	}
@@ -344,10 +341,10 @@ func Find(treeRoot string) *Pending {
 	}
 	inbox, why := inboxFiles(treeRoot)
 	if why != "" {
-		out.Unreadable = append(out.Unreadable, Problem{InboxDir + "/", why})
+		out.Unreadable = append(out.Unreadable, Problem{wiki.InboxDir + "/", why})
 	}
 	for _, name := range inbox {
-		out.Items = append(out.Items, Item{InboxDir + "/" + name, "", "受信箱のファイル（判定して消す）"})
+		out.Items = append(out.Items, Item{wiki.InboxDir + "/" + name, "", "受信箱のファイル（判定して消す）"})
 	}
 	return out
 }
@@ -400,8 +397,8 @@ func sectionProblem(treeRoot, ident string, sec *section) string {
 
 // Uncommitted は記録・パターン・受信箱の置き場にある、未コミットか未追跡の変更のパス。
 func Uncommitted(treeRoot string) []string {
-	args := append([]string{"status", "--porcelain", "-z", "--untracked-files=all", "--no-renames", "--"}, watched...)
-	done := git.Run(treeRoot, args, git.Options{RawPaths: true})
+	done := git.Status(treeRoot, git.Porcelain{NUL: true, Untracked: git.UntrackedAll, NoRenames: true, Paths: watched},
+		git.Options{RawPaths: true})
 	if !done.OK() {
 		why := done.Stderr
 		if why == "" && done.Failure != nil {

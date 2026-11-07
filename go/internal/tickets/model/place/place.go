@@ -1,6 +1,7 @@
 package place
 
 import (
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -107,7 +108,17 @@ func LandsInFinishedState(rel, ticketsRel, approvedRel string) bool {
 
 // ScratchDir はワークスペースルート直下の scratchpad/ の絶対パス。区切りは "/"。
 func ScratchDir(root string) string {
-	return strings.ReplaceAll(ospath.Join(root, ScratchRoot), `\`, "/")
+	return ospath.Slashed(ospath.Join(root, ScratchRoot))
+}
+
+// ProposalsRoot はツリーの提案の置き場（ticketsRel は設定の tickets。区切りは "/"）の絶対パス。
+func ProposalsRoot(treeRoot, ticketsRel string) string {
+	return ospath.Join(treeRoot, filepath.FromSlash(ticketsRel))
+}
+
+// Dir はツリーの提案の置き場の下の、状態 s の置き場（todo/・review/ など）の絶対パス。
+func Dir(treeRoot, ticketsRel string, s State) string {
+	return ospath.Join(ProposalsRoot(treeRoot, ticketsRel), string(s))
 }
 
 // IsHandoffPlace は相対パスが下書きの置き場（wip/handoff/）の下にあるか。大文字小文字は区別しない。

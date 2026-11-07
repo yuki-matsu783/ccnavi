@@ -80,9 +80,6 @@ const (
 	none            = "無し"
 )
 
-// yes は y/N で「はい」と読む答え（前後の空白を除いて小文字にしたもの）。
-var yes = []string{"y", "yes"}
-
 // EarlyOptions は CloseEarly の 3 回の打ち分け（sh が間で結果を取り直す）。どれも空なら残りを見せて y/N を聞き、
 // y ならそのまま置く。
 type EarlyOptions struct {
@@ -164,7 +161,7 @@ func CloseEarly(stdin *bufio.Reader, stdout, stderr io.Writer, conf *config.Sett
 		}
 	} else {
 		showLeftovers(stdout, parent, left)
-		if !slices.Contains(yes, strings.ToLower(ospath.Strip(fsio.ReadLine(stdin)))) {
+		if !fsio.ReadYes(stdin) {
 			fmt.Fprint(stderr, msgDeclined)
 			return config.ExitError, nil
 		}

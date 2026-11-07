@@ -1,6 +1,8 @@
 package core
 
-import "strings"
+import (
+	"strings"
+)
 
 // code は通らなかった根拠の種別（付録 A の CORE_*）。ターミナル・ボード・Chrome・試験が文の言い回しでなく同じ材料で
 // 分けられるよう、文面の頭に `[<コード>]` で載せる。

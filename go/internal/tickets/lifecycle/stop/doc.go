@@ -8,6 +8,6 @@
 // unfinished_at_stop → UnfinishedAtStop、pending_at_stop → PendingAtStop、waiting_at_stop → WaitingAtStop、
 // nudged_before・remember_nudge（3 つ）→ NudgedBefore・RememberNudge（Nudge を満たす型で分ける）、
 // finish_nudge・request_nudge・feedback_nudge → FinishNudge・RequestNudge・FeedbackNudge、nudge_path → NudgePath、
-// base_off_head → BaseOffHead、worktree_head_sha → HeadSHA（deadline のゼロ値は期限なし）、
+// base_off_head → BaseOffHead、worktree_head_sha → git.Head（期限は git.Options の Deadline）、
 // CODE_* → Code*、STEP_* → Step*、USER_STOP_NOTE → UserStopNote。
 package stop

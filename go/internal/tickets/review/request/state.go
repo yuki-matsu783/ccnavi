@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
@@ -24,12 +23,6 @@ import (
 	"ccnavi/internal/tickets/model/via"
 	"ccnavi/internal/tickets/phase"
 )
-
-// gitTimeout は依頼と確認で git を読むときの待ち時間。ユーザが打つ操作なので Stop の促しより長い。
-const gitTimeout = 15 * time.Second
-
-// ReviewScript はレビューの操作の sh。文面の案内に載せる。
-const ReviewScript = "ccnavi-review.sh"
 
 // レビューの状態を読むときの文。sh とボードが読むので変えない。
 const (
@@ -190,7 +183,7 @@ func MatchingProblems(result *host.Result, requested *pyjson.Object) []string {
 func ChangesRequested(result host.Result) []host.Review {
 	var out []host.Review
 	for _, r := range host.Effective(result.Reviews) {
-		if strings.ToUpper(r.State) == host.ChangesRequested {
+		if pyfmt.Upper(r.State) == host.ChangesRequested {
 			out = append(out, r)
 		}
 	}
@@ -222,7 +215,7 @@ func ReviewProblems(conf *config.Settings, root string, parent *ticket.Ticket, n
 	}
 	if lastFeedbackReview(parent, number) {
 		return append(lines, lastFeedbackHead, fmt.Sprintf(lastFeedbackRedo, number),
-			fmt.Sprintf(lastFeedbackUser, config.ScriptCommand(root, ReviewScript), number), lastFeedbackTail)
+			fmt.Sprintf(lastFeedbackUser, config.ScriptCommand(root, config.ReviewWrapper), number), lastFeedbackTail)
 	}
 	return append(lines, texts.Say(root, "NOTICE_REVIEW_UNRESOLVED__DECIDE",
 		texts.Values{"phase": strconv.Itoa(number)}, nil))
@@ -393,7 +386,7 @@ func ThreadLabel(t host.Thread) string {
 
 // RedoRequest は依頼の後に HEAD が動いたときの案内。push 済みの今の HEAD で依頼を出し直す。
 func RedoRequest(root string, number int) string {
-	return fmt.Sprintf(msgRedo, config.ScriptCommand(root, ReviewScript), number)
+	return fmt.Sprintf(msgRedo, config.ScriptCommand(root, config.ReviewWrapper), number)
 }
 
 // WriteDraft は sh が投稿する下書きを書く。書けなければ理由。

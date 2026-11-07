@@ -20,7 +20,6 @@ import (
 
 // フェーズの終わりの知らせの文。
 const (
-	reviewScript   = "ccnavi-review.sh"
 	markFailedText = "ccnavi: フェーズのマーカーを保存できませんでした: %s\n"
 	// 延期: 親・ラベル・引き受ける番号。
 	deferredText = "[ccnavi] %s のフェーズ %s が終わりました。レビューは %s 番目と一緒に見る計画なので、ここでは止めません。"
@@ -102,7 +101,7 @@ func Announce(stderr io.Writer, conf *config.Settings, root string, parent *tick
 				who += line + "。"
 			}
 			said = append(said, fmt.Sprintf(pendingText, parent.ID, p.Label(), LabelPreparing, who,
-				config.ScriptCommand(root, reviewScript), n, covers, useronly.TurnDefined,
+				config.ScriptCommand(root, config.ReviewWrapper), n, covers, useronly.TurnDefined,
 				holdNoteText+useronly.ExemptNote))
 		default:
 			ids := make([]any, 0, len(p.Tickets))

@@ -105,6 +105,9 @@ func TestMoveCopiesThenRemoves(t *testing.T) {
 	if got := IDs(f.root, ""); !reflect.DeepEqual(got, map[string]bool{"i0001": true, "i0001-01-01": true}) {
 		t.Error(got)
 	}
+	if got := IDsAny(f.root); !reflect.DeepEqual(got, IDs(f.root, "")) || len(IDs(f.root, "other")) != 0 {
+		t.Error("全リポジトリの識別子", got)
+	}
 	if p := ArchivedParent(f.root, "", "i0001"); p == nil || p.ID != "i0001" || ArchivedParent(f.root, "", "i0001-01-01") != nil {
 		t.Error("ArchivedParent")
 	}

@@ -7,6 +7,7 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/tree"
@@ -72,7 +73,7 @@ func directAtStop(conf *config.Settings, root, cwd, session string, deadline tim
 	dropped := map[string]bool{}
 	var result *Direct
 	for _, item := range entries {
-		if Expired(deadline) {
+		if git.Expired(deadline) {
 			break
 		}
 		checked[item.Name] = fsio.UnixSeconds(time.Now())
@@ -126,7 +127,7 @@ func probe(conf *config.Settings, root string, here tree.Tree, deadline time.Tim
 	if unsure {
 		return Probe{State: Unknown}
 	}
-	head := stop.HeadSHA(here.Root, deadline)
+	head := git.Head(here.Root, git.Options{Deadline: deadline})
 	if head == "" {
 		return Probe{State: Unknown}
 	}
@@ -160,7 +161,7 @@ func probe(conf *config.Settings, root string, here tree.Tree, deadline time.Tim
 	found := &Direct{Name: here.Name, Worktree: here.Root, Head: head, Dirty: dirty, Ahead: ahead,
 		Integration: integration, NoRecord: true}
 	if integration == "" {
-		if runDefault(owner, []string{"remote", "get-url", "origin"}, time.Time{}).OK() {
+		if git.Run(owner, []string{"remote", "get-url", "origin"}, git.Options{}).OK() {
 			found.Blocked = "統合先 (origin/HEAD) が決まらない。ユーザに `git fetch origin` のあと " +
 				"`git remote set-head origin -a` を頼んでください"
 		} else {
@@ -217,7 +218,7 @@ func probeRecorded(owner string, here tree.Tree, head string, dirty bool, rec *R
 	main, mainOK := tree.CommonDir(owner)
 	recorded := rec.Fields["common_dir"]
 	same := mineOK && mainOK && pathcase.Fold(mine) == pathcase.Fold(main) &&
-		recorded != "" && pathcase.Fold(ospath.Realpath(recorded)) == pathcase.Fold(main)
+		recorded != "" && pathcase.Real(recorded) == pathcase.Fold(main)
 	if !same {
 		found.Blocked = "記録の git の共通ディレクトリが、ユーザのチェックアウトと作業ワークツリーのものと" +
 			"違います。別のリポジトリの記録かもしれないので、操作せずユーザに確かめてください"
@@ -239,7 +240,7 @@ func probeRecorded(owner string, here tree.Tree, head string, dirty bool, rec *R
 		return Probe{State: Hit, Found: found}
 	}
 	snap := rec.Fields["snap_sha"]
-	done := runDefault(here.Root, []string{"rev-parse", "--verify", "--quiet", snap + "^{commit}"}, deadline)
+	done := git.Run(here.Root, []string{"rev-parse", "--verify", "--quiet", snap + "^{commit}"}, git.Options{Deadline: deadline})
 	if done.Failure != nil {
 		return Probe{State: Unknown}
 	}
@@ -252,8 +253,8 @@ func probeRecorded(owner string, here tree.Tree, head string, dirty bool, rec *R
 		return Probe{State: Unknown}
 	}
 	found.Ahead = ahead
-	found.OriginAhead, _ = count(runDefault(owner,
-		[]string{"rev-list", "--count", "refs/heads/" + base + "..refs/remotes/origin/" + base}, deadline))
+	found.OriginAhead, _ = count(git.Run(owner,
+		[]string{"rev-list", "--count", "refs/heads/" + base + "..refs/remotes/origin/" + base}, git.Options{Deadline: deadline}))
 	switch {
 	case found.Marker == MarkerUnknown:
 		return Probe{State: Hit, Found: found}
@@ -267,27 +268,27 @@ func probeRecorded(owner string, here tree.Tree, head string, dirty bool, rec *R
 // 統合先の ref を引けない・数えられないときは偽。
 func aheadOf(worktree, integration string, deadline time.Time) (int, bool) {
 	for _, ref := range []string{"refs/heads/" + integration, "refs/remotes/origin/" + integration} {
-		done := runDefault(worktree, []string{"rev-parse", "--verify", "--quiet", ref + "^{commit}"}, deadline)
+		done := git.Run(worktree, []string{"rev-parse", "--verify", "--quiet", ref + "^{commit}"}, git.Options{Deadline: deadline})
 		if done.Failure != nil {
 			return 0, false
 		}
 		if !done.OK() {
 			continue
 		}
-		return count(runDefault(worktree, []string{"rev-list", "--count", ref + "..HEAD"}, deadline))
+		return count(git.Run(worktree, []string{"rev-list", "--count", ref + "..HEAD"}, git.Options{Deadline: deadline}))
 	}
 	return 0, false
 }
 
 // unique は統合先が決まらないときの目安。ほかのどのブランチにも入っていないコミットの数。
 func unique(worktree, name string, deadline time.Time) (int, bool) {
-	return count(runDefault(worktree,
-		[]string{"rev-list", "--count", "HEAD", "--not", "--exclude=" + name, "--branches", "--remotes"}, deadline))
+	return count(git.Run(worktree,
+		[]string{"rev-list", "--count", "HEAD", "--not", "--exclude=" + name, "--branches", "--remotes"}, git.Options{Deadline: deadline}))
 }
 
 // integrationTree は統合先のブランチをチェックアウトしているツリー。見つからなければ空、読めなければ偽。
 func integrationTree(owner, integration string, deadline time.Time) (string, bool) {
-	done := runDefault(owner, []string{"worktree", "list", "--porcelain"}, deadline)
+	done := git.Run(owner, []string{"worktree", "list", "--porcelain"}, git.Options{Deadline: deadline})
 	if !done.OK() {
 		return "", false
 	}

@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
@@ -133,7 +134,7 @@ func commitMessages(subject string) []string {
 		committing, gitLike := false, false
 		for _, w := range words {
 			committing = committing || w == "commit"
-			if n := lastPart(w); n == "git" || n == "ccnavi-git.sh" {
+			if n := lastPart(w); n == "git" || n == config.GitWrapper {
 				gitLike = true
 			}
 		}

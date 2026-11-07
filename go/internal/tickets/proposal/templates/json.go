@@ -1,7 +1,6 @@
 package templates
 
 import (
-	"math/big"
 	"slices"
 	"strings"
 
@@ -9,6 +8,7 @@ import (
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/yaml"
+	"ccnavi/internal/infra/yamljson"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/config/phases"
 	"ccnavi/internal/tickets/flow"
@@ -182,47 +182,9 @@ func CheckFile(conf *config.Settings, root, path, layer string) *pyjson.Object {
 	if t != nil {
 		found = append(found, Check(t, types, nil)...)
 		answer.Set("valid", true)
-		answer.Set("data", plainJSON(t.AsData()))
+		answer.Set("data", yamljson.ToJSON(t.AsData()))
 		answer.Set("plans", Graph(t, types, sha))
 	}
 	answer.Set("problems", problemsJSON(found))
 	return answer
-}
-
-// plainJSON は Python の json.loads(json.dumps(v, default=str)) の答え。キーは JSON の文字列にし、JSON に無い値
-// （日付・集合・バイト列）は str() の文字列にする。
-func plainJSON(v any) any {
-	switch x := v.(type) {
-	case nil, bool, string, int, *big.Int, float64:
-		return x
-	case *yaml.Map:
-		out := pyjson.NewObject()
-		for k, inner := range x.All() {
-			out.Set(jsonKey(k), plainJSON(inner))
-		}
-		return out
-	case []any:
-		out := make([]any, len(x))
-		for i, inner := range x {
-			out[i] = plainJSON(inner)
-		}
-		return out
-	case yaml.Tuple:
-		return plainJSON([]any(x))
-	}
-	return pyfmt.Str(v)
-}
-
-// jsonKey は json.dumps がキーに書く文字列（真偽は true・false、None は null）。
-func jsonKey(k any) string {
-	switch x := k.(type) {
-	case bool:
-		if x {
-			return "true"
-		}
-		return "false"
-	case nil:
-		return "null"
-	}
-	return pyfmt.Str(k)
 }

@@ -9,6 +9,7 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/tree"
+	"ccnavi/internal/records/wiki"
 	"ccnavi/internal/tickets/model/pyoracle"
 	"ccnavi/internal/tickets/model/ticket"
 )
@@ -155,7 +156,7 @@ func TestInboxNamesDoNotCollideAndSecretsAreMasked(t *testing.T) {
 			t.Fatal(errOut.String())
 		}
 	}
-	inbox := filepath.Join(here.Root, filepath.FromSlash(InboxDir))
+	inbox := filepath.Join(here.Root, filepath.FromSlash(wiki.InboxDir))
 	names, err := os.ReadDir(inbox)
 	if err != nil || len(names) != 3 {
 		t.Fatalf("%v %v", names, err)
@@ -235,23 +236,6 @@ func TestUnsafePath(t *testing.T) {
 	}
 }
 
-func TestReadLogRecords(t *testing.T) {
-	dir := t.TempDir()
-	log := put(t, dir, "decisions.jsonl", "{\"decision\": \"deny\"}\n壊れた行\n[1]\r\n")
-	put(t, dir, "decisions.1.jsonl", "{\"decision\": \"ask\"}")
-	put(t, dir, "decisions.jsonl.bak", "{\"decision\": \"ask\"}\n")
-	records, recorded := readLogRecords(log)
-	if len(records) != 2 || !recorded || records[0].Value("decision") != "ask" {
-		t.Errorf("%v %v", records, recorded)
-	}
-	if records, recorded := readLogRecords(""); records != nil || recorded {
-		t.Error("空のログ")
-	}
-	if _, recorded := readLogRecords(filepath.Join(dir, "none.jsonl")); recorded {
-		t.Error("無いログを記録ありとした")
-	}
-}
-
 func TestRecordBlocked(t *testing.T) {
 	root, conf := workspace(t)
 	wt := filepath.Join(root, ".claude", "worktrees", child)
@@ -322,7 +306,7 @@ func TestParentBlocked(t *testing.T) {
 	if ok, msg := blocked(); ok {
 		t.Errorf("処理するものが無いのに止めた: %q", msg)
 	}
-	put(t, wt, InboxDir+"/a.md", "x\n")
+	put(t, wt, wiki.InboxDir+"/a.md", "x\n")
 	if ok, msg := blocked(); !ok || !strings.Contains(msg, "未コミット") {
 		t.Errorf("%q", msg)
 	}

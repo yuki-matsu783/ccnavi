@@ -21,9 +21,6 @@ import (
 // （作った取り込みの先頭）の有無と取り込み先に載ったかで続きの一手を言い、合わないもの・版を知らないものは
 // 壊れた記録として「操作せずにユーザに確かめる」と言う。自動では再開しない。
 
-// DirectTmpDir は integrate が一時ワークツリーを置く場所（ワークスペースルートからの相対。下に RepoKey の名前）。
-var DirectTmpDir = ospath.Join("logs", "direct-tmp")
-
 const (
 	pendingHead = "[ccnavi] 終わっていない integrate の記録があります。別のセッションの取り込みの場合もあるため、" +
 		"操作する前に、担当と今の状態をユーザに確かめてください。" +
@@ -43,15 +40,6 @@ var v4Need = []string{"head", "tip", "c_tree"}
 
 // leftoverRefKinds は取り込みの跡として挙げる ref の種類。s（起点）と pending（切る前の確認待ち）は普通の状態。
 var leftoverRefKinds = []string{"t", "c", "k"}
-
-// gitOut は git の標準出力（前後の空白を除く）。成功しなければ偽。
-func gitOut(top string, args []string, deadline time.Time) (string, bool) {
-	done := git.RunUntil(top, args, deadline, git.Options{})
-	if !done.OK() {
-		return "", false
-	}
-	return ospath.Strip(done.Out), true
-}
 
 // recordsDir はそのツリーの ccnavi-integrate/。無ければ空。`.git` がディレクトリならファイルの有無で確かめ、
 // ファイル（ワークツリーやサブモジュール）のときだけ git に場所を引く。
@@ -110,22 +98,21 @@ func v4Line(root, top, name string, fields map[string]string, deadline time.Time
 	if rec := integrate.DirectRecord(top, name); rec != nil {
 		base = rec.Fields["base_branch"]
 	}
-	now, ok := gitOut(top, []string{"rev-parse", "HEAD"}, deadline)
-	if !ok {
+	now := git.Head(top, git.Options{Deadline: deadline})
+	if now == "" {
 		return broken("HEAD を読めません")
 	}
 	abort := "やめるなら `" + cd + " integrate --abort " + name + "`"
 	redo := "ユーザに確かめてから `" + cd + " integrate --abort " + name + "` で戻し、" +
 		"`" + cd + " integrate " + name + "` を打ち直してください"
 	if k := fields["k"]; k != "" && k != "-" {
-		parent, okP := gitOut(top, []string{"rev-parse", "--verify", k + "^"}, deadline)
-		treeOf, okT := gitOut(top, []string{"rev-parse", "--verify", k + "^{tree}"}, deadline)
+		parent, okP := git.Text(top, []string{"rev-parse", "--verify", k + "^"}, git.Options{Deadline: deadline})
+		treeOf, okT := git.Text(top, []string{"rev-parse", "--verify", k + "^{tree}"}, git.Options{Deadline: deadline})
 		if !okP || !okT || parent != fields["head"] || treeOf != fields["c_tree"] {
 			return broken("K の親か木が記録と違います。K を採用しません")
 		}
 		shown := pyfmt.Head(k, shaShown)
-		if base != "" && git.RunUntil(top, []string{"merge-base", "--is-ancestor", k, "refs/heads/" + base}, deadline,
-			git.Options{}).OK() {
+		if base != "" && git.IsAncestor(top, k, "refs/heads/"+base, git.Options{Deadline: deadline}).OK() {
 			return head + "K（" + shown + "）は取り込み先に載っています。片付けが途中で止まっています。" +
 				"`" + cd + " integrate-done " + name + "` を打ち直すと、残りを片付けます"
 		}
@@ -144,9 +131,9 @@ func v4Line(root, top, name string, fields map[string]string, deadline time.Time
 		"`" + cd + " integrate-done " + name + " -m '<メッセージ>'` を打ちます。" + abort
 }
 
-// RepoKey は一時ワークツリーの置き場の名前（DirectTmpDir/<repo>/）。ワークスペース自身は tree.Self。
+// RepoKey は一時ワークツリーの置き場の名前（config.DirectTmpDir/<repo>/）。ワークスペース自身は tree.Self。
 func RepoKey(root, top string) string {
-	if pathcase.Fold(ospath.Realpath(top)) == pathcase.Fold(ospath.Realpath(root)) {
+	if pathcase.SameReal(top, root) {
 		return tree.Self
 	}
 	return ospath.Basename(ospath.Normpath(top))
@@ -162,13 +149,13 @@ func leftovers(root, top string, reported map[string]bool, deadline time.Time) [
 		return nil
 	}
 	names := map[string][]string{}
-	tmpBase := ospath.Join(root, DirectTmpDir, RepoKey(root, top))
+	tmpBase := ospath.Join(root, config.DirectTmpDir, RepoKey(root, top))
 	if entries, err := ospath.DiskListdir(tmpBase); err == nil {
 		for _, e := range entries {
 			names[e] = append(names[e], "一時ワークツリー（"+config.ShellPath(ospath.Join(tmpBase, e))+"）")
 		}
 	}
-	listed, _ := gitOut(top, []string{"for-each-ref", "--format=%(refname)", directRefs}, deadline)
+	listed, _ := git.Text(top, []string{"for-each-ref", "--format=%(refname)", directRefs}, git.Options{Deadline: deadline})
 	for _, ref := range ospath.Splitlines(listed) {
 		parts := strings.Split(ref, "/")
 		if len(parts) >= 5 && slices.Contains(leftoverRefKinds, parts[4]) {
@@ -185,7 +172,7 @@ func leftovers(root, top string, reported map[string]bool, deadline time.Time) [
 			if ospath.IsDir(tree.WorktreePath(root, e)) {
 				remains = append(remains, "作業ワークツリー")
 			}
-			if _, ok := gitOut(top, []string{"show-ref", "--verify", "--quiet", "refs/heads/" + e}, deadline); ok {
+			if _, ok := git.Text(top, []string{"show-ref", "--verify", "--quiet", "refs/heads/" + e}, git.Options{Deadline: deadline}); ok {
 				remains = append(remains, "ブランチ")
 			}
 			if ospath.IsFile(ospath.Join(common, tree.DirectDir, e)) {
@@ -213,7 +200,7 @@ func leftovers(root, top string, reported map[string]bool, deadline time.Time) [
 
 // PendingIntegrate は終わっていない integrate の知らせ。無ければ空。見るのはワークスペースルートと各プロジェクトの
 // 元ツリー。期限が過ぎたら残りのツリーは見ず、その旨を添える。記録が多ければ名前を全件 1 行に並べる（確認が要る件を
-// 見落とさないため）。deadline は必須（ゼロ値では git を起こさない）。
+// 見落とさないため）。
 func PendingIntegrate(conf *config.Settings, root string, deadline time.Time) string {
 	tops := []string{root}
 	for _, p := range tree.Projects(conf.Projects) {
@@ -224,7 +211,7 @@ func PendingIntegrate(conf *config.Settings, root string, deadline time.Time) st
 	cut := false
 	for _, top := range tops {
 		before := len(lines)
-		if integrate.Expired(deadline) {
+		if git.Expired(deadline) {
 			cut = true
 			break
 		}
@@ -246,7 +233,7 @@ func PendingIntegrate(conf *config.Settings, root string, deadline time.Time) st
 				}
 			}
 		}
-		if !integrate.Expired(deadline) {
+		if !git.Expired(deadline) {
 			lines = append(lines, leftovers(root, top, reported, deadline)...)
 		}
 		if len(lines) > before {

@@ -6,6 +6,8 @@ import (
 	"iter"
 	"math"
 	"math/big"
+	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -96,6 +98,18 @@ func (m *Map) set(key, value any) {
 	}
 	m.keys = append(m.keys, key)
 	m.vals = append(m.vals, value)
+}
+
+// Without は keys の欄を除いた写し（Python の {k: v for k, v in m.items() if k not in keys}）。順は保つ。
+func (m *Map) Without(keys ...string) *Map {
+	out := &Map{}
+	for k, v := range m.All() {
+		if s, ok := k.(string); ok && slices.Contains(keys, s) {
+			continue
+		}
+		out.Put(k, v)
+	}
+	return out
 }
 
 // Lookup は key の値と、その欄があるか（Python の key in m）。
@@ -315,6 +329,37 @@ func timedeltaRepr(d time.Duration) string {
 		return "datetime.timedelta(0)"
 	}
 	return "datetime.timedelta(" + strings.Join(parts, ", ") + ")"
+}
+
+// Equal は読んだ値どうしの Python の a == b。マップはキーの順を見ず、数は値で比べる（True == 1 == 1.0）。
+// 一番上の NaN は NaN と等しくないが、入れ物の中の NaN は等しい（Python の入れ物は同じ物を等しいと見なし、
+// PyYAML の .nan は毎回同じ物を返す）。
+func Equal(a, b any) bool {
+	if x, ok := a.(float64); ok && math.IsNaN(x) {
+		return false
+	}
+	return equal(a, b)
+}
+
+func equal(a, b any) bool {
+	switch x := a.(type) {
+	case *Map:
+		y, ok := b.(*Map)
+		if !ok || x.Len() != y.Len() {
+			return false
+		}
+		for k, v := range x.All() {
+			w, found := y.Lookup(k)
+			if !found || !equal(v, w) {
+				return false
+			}
+		}
+		return true
+	case []any:
+		y, ok := b.([]any)
+		return ok && slices.EqualFunc(x, y, equal)
+	}
+	return keyEqual(a, b) || reflect.DeepEqual(a, b)
 }
 
 // keyEqual は Python の == をマップのキーに当てる。数（真偽を含む）は値で比べる。

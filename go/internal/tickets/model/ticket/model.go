@@ -10,6 +10,7 @@ import (
 	"ccnavi/internal/infra/pyre"
 	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/policy/rules"
+	"ccnavi/internal/records/wiki"
 	"ccnavi/internal/tickets/model/place"
 )
 
@@ -43,7 +44,7 @@ const (
 )
 
 // ConsolidateScope は統合の子が書ける場所の上限（ccnavi の中に固定した定義）。
-var ConsolidateScope = []string{"docs/wiki/patterns/*", "docs/wiki/inbox/*"}
+var ConsolidateScope = []string{wiki.PatternsDir + "/*", wiki.InboxDir + "/*"}
 
 // ScriptFields はスクリプトだけが書く欄。承認は提案の中身を変えずに動かすので、提案に空でない値があれば
 // 承認と lint が error にする。

@@ -45,10 +45,6 @@ func CommonDir(treeRoot string) (string, bool) {
 	return ospath.Normpath(ospath.Realpath(commonGitDir(gitdir))), true
 }
 
-func samePath(a, b string) bool {
-	return pathcase.Fold(ospath.Normpath(a)) == pathcase.Fold(ospath.Normpath(b))
-}
-
 // validDirect は記録が有効か。すべてを満たすときだけ真。
 //   - version が合い、side_by_side が yes
 //   - main_tree が記録を置いたリポジトリのユーザのチェックアウトと同じ場所
@@ -58,10 +54,10 @@ func validDirect(root string, main Tree, common, name string, fields map[string]
 	if fields["version"] != DirectVersion || fields["side_by_side"] != "yes" {
 		return false
 	}
-	if fields["main_tree"] == "" || !samePath(ospath.Realpath(fields["main_tree"]), ospath.Realpath(main.Root)) {
+	if fields["main_tree"] == "" || !pathcase.SameNorm(ospath.Realpath(fields["main_tree"]), ospath.Realpath(main.Root)) {
 		return false
 	}
-	if fields["common_dir"] == "" || !samePath(ospath.Realpath(fields["common_dir"]), common) {
+	if fields["common_dir"] == "" || !pathcase.SameNorm(ospath.Realpath(fields["common_dir"]), common) {
 		return false
 	}
 	if _, ok := fields["base_branch"]; !ok {
@@ -72,7 +68,7 @@ func validDirect(root string, main Tree, common, name string, fields map[string]
 		return false
 	}
 	workCommon, ok := CommonDir(work)
-	if !ok || !samePath(workCommon, common) {
+	if !ok || !pathcase.SameNorm(workCommon, common) {
 		return false
 	}
 	branch, ok := BranchOf(work)

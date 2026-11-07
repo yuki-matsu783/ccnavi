@@ -4,10 +4,13 @@ import (
 	"bufio"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
+	"slices"
 	"unicode/utf8"
 
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
 )
 
@@ -53,6 +56,19 @@ func LoadSource(path string) ([]byte, string, error) {
 		return nil, "", err
 	}
 	return content, text, nil
+}
+
+// ReadDiskBytes は open(path, "rb").read()。溜める段は見ない。読めた中身は空のファイルでも nil にしない（「無い」と
+// 分けるため）。読めなければ Wrap したエラーで、errors.Is(err, fs.ErrNotExist) なら無い（FileNotFoundError）。
+func ReadDiskBytes(path string) ([]byte, error) {
+	content, err := readFile(path)
+	if err != nil {
+		return nil, Wrap(err)
+	}
+	if content == nil {
+		content = []byte{}
+	}
+	return content, nil
 }
 
 // ReadDiskText は open(path, encoding="utf-8", errors=bad).read()。溜める段は見ない（Python も fsio を通さずに開く
@@ -142,13 +158,22 @@ func ReadObject(path string) (*pyjson.Object, bool) {
 	return pyjson.NewObject(), true
 }
 
-// ReadLine はユーザの答えを 1 行読む（改行も含む）。読めなければ空文字（ターミナルが閉じている、など）。
-func ReadLine(r *bufio.Reader) string {
+// ReadAnswer はユーザの答えを 1 行読み、前後の空白を除いて小文字にする（Python の read_line(r).strip().lower()）。
+// 読めなければ空文字（ターミナルが閉じている、など）。
+func ReadAnswer(r *bufio.Reader) string {
 	line, err := r.ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return ""
 	}
-	return line
+	return pyfmt.Lower(ospath.Strip(line))
+}
+
+// yesAnswers は確かめの問いに「はい」と読む答え。
+var yesAnswers = []string{"y", "yes"}
+
+// ReadYes はユーザの答えを 1 行読み、y か yes（大文字小文字と前後の空白は問わない）なら真。
+func ReadYes(r *bufio.Reader) bool {
+	return slices.Contains(yesAnswers, ReadAnswer(r))
 }
 
 // Exists は在るか（リンクは辿る）。溜める段があれば、そこで書いた・消した分を先に見る。
@@ -203,4 +228,20 @@ func listNames(directory string) ([]string, error) {
 		return nil, Wrap(err)
 	}
 	return names, nil
+}
+
+// OpenNoFollow は読むために開き、開いたものの fstat を返す。リンクは開かず（NoFollow）、名前付きパイプでも
+// 書き手を待たない（NonBlock）。lstat で確かめてから開くまでに差し替えられたものを、呼び手が返した FileInfo と
+// os.SameFile で見分ける。開けなければ os の error（Python の OSError に当たる）。
+func OpenNoFollow(path string) (*os.File, fs.FileInfo, error) {
+	f, err := os.OpenFile(path, os.O_RDONLY|NoFollow|NonBlock, 0)
+	if err != nil {
+		return nil, nil, err
+	}
+	info, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return nil, nil, err
+	}
+	return f, info, nil
 }

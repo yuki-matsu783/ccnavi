@@ -1,8 +1,10 @@
 package wap
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"regexp"
 	"sort"
 	"strings"
@@ -84,7 +86,7 @@ func Sort(stdout, stderr io.Writer, conf *config.Settings, root, parent, since s
 // changedPaths は置き場の変更のパス（ツリーからの相対、"/" 区切り、名前の順）。
 func changedPaths(treeRoot string, where places, since string) ([]string, string) {
 	specs := []string{literalSpec(where.approved), literalSpec(where.review)}
-	opts := git.Options{Timeout: gitTimeout, RawPaths: true}
+	opts := git.Options{Timeout: git.MergeTimeout, RawPaths: true}
 	var out []string
 	if since != "" {
 		done := git.Run(treeRoot, append([]string{"diff", "--name-only", "-z", "--no-renames", since, "HEAD", "--"}, specs...), opts)
@@ -97,7 +99,7 @@ func changedPaths(treeRoot string, where places, since string) ([]string, string
 			}
 		}
 	} else {
-		done := git.Run(treeRoot, append([]string{"status", "--porcelain", "-z", "--untracked-files=all", "--no-renames", "--"}, specs...), opts)
+		done := git.Status(treeRoot, git.Porcelain{NUL: true, Untracked: git.UntrackedAll, NoRenames: true, Paths: append([]string{}, specs...)}, opts)
 		if !done.OK() {
 			return nil, "git の状態を読めない（" + failureText(done) + "）"
 		}
@@ -139,7 +141,7 @@ func classify(treeRoot, approvedRel, reviewRel, parent string, changed []string,
 		}
 		ready = archive.ReadyFiles(at.root, at.project, treeRoot, archive.TreeHead(treeRoot, rev))
 	}
-	opts := git.Options{Timeout: gitTimeout}
+	opts := git.Options{Timeout: git.MergeTimeout}
 	states := map[string]contents{}
 	for _, rel := range changed {
 		var c contents
@@ -207,15 +209,9 @@ func readDisk(path string) ([]byte, bool) {
 	if ospath.IsLink(path) {
 		return nil, false
 	}
-	if !ospath.DiskLexists(path) {
-		return nil, true
-	}
-	data, ok := fsio.ReadBytes(path)
-	if !ok {
-		return nil, false
-	}
-	if data == nil {
-		data = []byte{}
+	data, err := fsio.ReadDiskBytes(path)
+	if err != nil {
+		return nil, errors.Is(err, fs.ErrNotExist)
 	}
 	return data, true
 }

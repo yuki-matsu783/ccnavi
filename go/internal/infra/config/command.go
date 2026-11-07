@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/platformtag"
 	"ccnavi/internal/infra/pyfmt"
 )
 
@@ -15,12 +16,20 @@ const (
 	GitWrapper = "ccnavi-git.sh"
 	// TicketWrapper はチケット操作の sh（approval-request などの入口）。
 	TicketWrapper = "ccnavi-ticket.sh"
+	// ReviewWrapper はレビューの操作の sh（review-request・review-decide などの入口）。
+	ReviewWrapper = "ccnavi-review.sh"
+	// StartWrapper はチケットの着手（ワークツリーを切ってセッションを始める）の sh。
+	StartWrapper = "ccnavi-start.sh"
+	// WorktreeWrapper は直接作業のワークツリーを切る sh。
+	WorktreeWrapper = "ccnavi-worktree.sh"
+	// LauncherScript は実行ファイルを振り分けて起動する sh（名前の持ち主は platformtag）。
+	LauncherScript = platformtag.LauncherName
 	// ScriptsDir は ccnavi ディレクトリの下の sh の置き場。
 	ScriptsDir = "scripts"
 	// defaultBin は実行ファイルの指定が無いときの案内。PATH に置いたユーザはそのまま打てる。
 	defaultBin = "ccnavi"
 	// Launcher は文面でエージェントに打たせる起動の sh。配布先では `ccnavi` が PATH に無い。ルートで打つ形。
-	Launcher = "sh " + DefaultProjectHome + "/" + ScriptsDir + "/ccnavi-launcher.sh"
+	Launcher = "sh " + DefaultProjectHome + "/" + ScriptsDir + "/" + LauncherScript
 )
 
 // ScriptCommand は `.ccnavi/scripts/` の sh をワークスペースルートから書いた打ち方。

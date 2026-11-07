@@ -88,11 +88,8 @@ func save(state string, r *Record) error {
 		return fail(msgCannotSave, fsio.ErrorText(err))
 	}
 	r.UpdatedAt = now()
-	text, err := pyjson.Dumps(r.Object(), pyjson.Options{RawUnicode: true, Indent: 1})
-	if err != nil {
-		return fail(msgCannotSave, err.Error())
-	}
-	if failed := fsio.WriteText(recordPath(state, r.ID), text+"\n", fsio.LF, fsio.Atomic); failed != "" {
+	format := fsio.JSONFormat{Indent: fsio.JSONIndentOne, FinalNewline: true, Newline: fsio.LF, How: fsio.Atomic}
+	if failed := fsio.WriteJSONAs(recordPath(state, r.ID), r.Object(), format); failed != "" {
 		return fail(msgCannotSave, failed)
 	}
 	return nil

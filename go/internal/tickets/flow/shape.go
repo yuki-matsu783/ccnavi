@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/ospath"
-	"ccnavi/internal/infra/pathcase"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/yaml"
 )
 
@@ -496,7 +496,7 @@ func NameProblems(raw any, cat Catalog) []string {
 		}
 		hint := ""
 		for _, k := range known {
-			if pathcase.Fold(k) == pathcase.Fold(value) {
+			if pyfmt.Casefold(k) == pyfmt.Casefold(value) {
 				hint = "。大文字小文字が違う（" + Line(k) + "）"
 				break
 			}

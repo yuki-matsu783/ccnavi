@@ -20,7 +20,7 @@ import (
 func parentWorktree(conf *config.Settings, root, cwd, ident string) (tree.Tree, string) {
 	where, ok := tree.TreeOf(root, cwd, conf.Projects)
 	if !ok || where.Kind != tree.KindWorktree || pyfmt.NFC(where.Name) != ident {
-		start := config.ScriptCommand(root, "ccnavi-start.sh")
+		start := config.ScriptCommand(root, config.StartWrapper)
 		return tree.Tree{}, "cwd が .claude/worktrees/" + ident + " の中ではない。" +
 			"提案は親のワークツリー（識別子と同名）に書く。" +
 			"先に '" + start + " --mr <MR の番号>'（MR が無ければ '--issue <issue の番号>'）で、" +

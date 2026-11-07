@@ -146,10 +146,10 @@ func appendLine(path, line string) {
 			return
 		}
 	}
-	if noFollow == 0 && ospath.IsLink(path) {
+	if fsio.NoFollow == 0 && ospath.IsLink(path) {
 		return
 	}
-	flags := os.O_WRONLY | os.O_APPEND | os.O_CREATE | noFollow
+	flags := os.O_WRONLY | os.O_APPEND | os.O_CREATE | fsio.NoFollow
 	f, err := os.OpenFile(path, flags, 0o600)
 	if os.IsNotExist(err) {
 		if fsio.MakeDirs(directory) != nil {

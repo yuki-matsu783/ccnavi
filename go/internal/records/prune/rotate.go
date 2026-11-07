@@ -20,7 +20,7 @@ func rotatedName(logPath string, now time.Time, n int) string {
 	if n > 1 {
 		suffix = "-" + strconv.Itoa(n)
 	}
-	return ospath.Join(ospath.Dirname(logPath), stem+"."+now.Local().Format(stampLayout)+suffix+ext)
+	return ospath.Join(ospath.Dirname(logPath), stem+"."+now.Local().Format(fsio.NameStampLayout)+suffix+ext)
 }
 
 // previewName は dry-run で見せるローテート先。同じ名前があれば -2 から足す。

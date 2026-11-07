@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/shell"
 )
 
 func write(t *testing.T, path, text string) string {
@@ -135,7 +136,7 @@ func TestScriptKeyComparesContentNotPlace(t *testing.T) {
 }
 
 func TestRunScript(t *testing.T) {
-	if _, err := exec.LookPath(shell); err != nil {
+	if _, err := exec.LookPath(shell.Program); err != nil {
 		t.Skip("sh が無い")
 	}
 	root := t.TempDir()

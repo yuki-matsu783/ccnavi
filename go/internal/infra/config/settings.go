@@ -21,7 +21,9 @@ var (
 	DefaultLog   = filepath.Join("logs", "decisions.jsonl")
 	DefaultRules = filepath.Join(DefaultProjectHome, ConfigDir, "common", "rules.yml")
 	// DefaultState はセッションごとの一時的な状態。消えても次の起動で取り直せる。
-	DefaultState   = filepath.Join("logs", "state")
+	DefaultState = filepath.Join("logs", "state")
+	// DirectTmpDir は integrate が一時ワークツリーを置く場所（下にリポジトリごとの名前）。sh も同じ置き場を使う。
+	DirectTmpDir   = filepath.Join("logs", "direct-tmp")
 	defaultPhases  = filepath.Join(DefaultProjectHome, ConfigDir, "common", "phases.yml")
 	defaultRisk    = filepath.Join(DefaultProjectHome, ConfigDir, "common", "risks.yml")
 	defaultProject = "projects"

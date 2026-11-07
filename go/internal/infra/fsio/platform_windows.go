@@ -50,3 +50,9 @@ var writable = func(path string) bool {
 
 // umask は Windows には無い（Python の os.umask は 0 を返す）。
 func umask() int { return 0 }
+
+// NoFollow と NonBlock は Windows に無い（Python の getattr(os, …, 0)）。リンクは呼び手が lstat で先に見る。
+const (
+	NoFollow = 0
+	NonBlock = 0
+)

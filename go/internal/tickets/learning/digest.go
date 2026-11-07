@@ -7,9 +7,6 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/config"
-	"ccnavi/internal/infra/fsio"
-	"ccnavi/internal/infra/ospath"
-	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/shell"
@@ -18,52 +15,6 @@ import (
 
 // minRepeated は「繰り返した止め」に入れる回数の下限。
 const minRepeated = 2
-
-// readLogRecords は判定ログとそのローテートした写し（`<名前>.*<拡張子>`）の、オブジェクトの行。
-// recorded は 1 本でも開けたか。
-func readLogRecords(log string) (records []*pyjson.Object, recorded bool) {
-	if log == "" {
-		return nil, false
-	}
-	base, ext := ospath.Splitext(log)
-	dir, stem := ospath.Dirname(base), ospath.Basename(base)
-	var paths []string
-	if names, err := ospath.DiskListdir(dirOrDot(dir)); err == nil {
-		head, tail := pathcase.Fold(stem+"."), pathcase.Fold(ext)
-		for _, name := range names {
-			folded := pathcase.Fold(name)
-			if len(folded) >= len(head)+len(tail) && strings.HasPrefix(folded, head) && strings.HasSuffix(folded, tail) {
-				paths = append(paths, ospath.Join(dir, name))
-			}
-		}
-	}
-	sort.Strings(paths)
-	if !slices.Contains(paths, log) {
-		paths = append(paths, log)
-	}
-	for _, path := range paths {
-		text, err := fsio.ReadDiskText(path, fsio.Replace)
-		if err != nil {
-			continue
-		}
-		recorded = true
-		for _, line := range strings.Split(text, "\n") {
-			if v, err := pyjson.Loads(line); err == nil {
-				if obj, ok := v.(*pyjson.Object); ok {
-					records = append(records, obj)
-				}
-			}
-		}
-	}
-	return records, recorded
-}
-
-func dirOrDot(dir string) string {
-	if dir == "" {
-		return "."
-	}
-	return dir
-}
 
 var (
 	assignment = regexp.MustCompile(`(?s)^[A-Za-z_][A-Za-z0-9_]*=.*$`)

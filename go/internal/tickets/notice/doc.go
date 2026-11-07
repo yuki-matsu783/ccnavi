@@ -11,7 +11,7 @@
 // learning_notice.notice → Learning（state_path・read_seen・decide・message は私的）、
 // overview.collect・line・child_states・remote_info・session_text → Collect・Line・ChildStates・RemoteInfo・
 // Parents（Row と CHILD_* → Row と Child* の定数）、pending_integrate.pending_notice・repo_key →
-// PendingIntegrate・RepoKey（`logs/direct-tmp` → DirectTmpDir）、scratchpad.session_text → Scratchpad、
+// PendingIntegrate・RepoKey（`logs/direct-tmp` → config.DirectTmpDir）、scratchpad.session_text → Scratchpad、
 // session_rejects.notice・find_all・explain_lines → Rejects・FindRejects・ExplainLines（Reject・Found は同じ名前、
 // find_all の引数は RejectOptions）。引数は conf, root の順にそろえた。
 package notice

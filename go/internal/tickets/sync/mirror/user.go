@@ -3,11 +3,11 @@ package mirror
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/hex"
 	"slices"
 	"strings"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/digest"
 	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/tree"
@@ -93,10 +93,10 @@ func (p *Plan) Expect() string {
 // expectOf は名前順に、名前と変更（パス・種類・中身の要約）を長さ付きで連結した SHA-256。中身まで入れるのは、
 // 同じ名前のファイルで共通レイヤーの中身だけが変わったときに、見せていない内容を書かないため。
 func expectOf(projects []*Project) string {
-	digest := sha256.New()
+	sum := digest.New(digest.SHA256)
 	framed := func(value string) {
-		_ = binary.Write(digest, binary.BigEndian, uint32(len(value)))
-		digest.Write([]byte(value))
+		_ = binary.Write(sum, binary.BigEndian, uint32(len(value)))
+		sum.Write([]byte(value))
 	}
 	sorted := slices.Clone(projects)
 	slices.SortFunc(sorted, func(a, b *Project) int { return strings.Compare(a.Name, b.Name) })
@@ -111,17 +111,17 @@ func expectOf(projects []*Project) string {
 			if c.Remove {
 				content = nil
 			}
-			sum := sha256.Sum256(content)
-			digest.Write(sum[:])
+			raw := sha256.Sum256(content)
+			sum.Write(raw[:])
 		}
 	}
-	return hex.EncodeToString(digest.Sum(nil))
+	return digest.HexSum(sum)
 }
 
 // Prepare はミラーの状態を調べる。何も書かない。wanted が空なら全プロジェクト。名前は大文字小文字を区別しない。
 // 共通レイヤーか工程スキルが読めなければ、どのプロジェクトでも同じ理由なので全体の誤りにする。
 func Prepare(conf *config.Settings, root string, wanted []string) *Plan {
-	plan := &Plan{CommonPath: mirrorDir(conf, root)}
+	plan := &Plan{CommonPath: conf.CommonLayerDir(root)}
 	found := tree.Projects(conf.Projects)
 	names := map[string]bool{}
 	for _, t := range found {
@@ -154,7 +154,7 @@ func Prepare(conf *config.Settings, root string, wanted []string) *Plan {
 	plan.CommonEmpty = len(commonFiles) == 0 && len(skillFiles) == 0
 	for _, t := range found {
 		project := &Project{Name: t.Name, Root: t.Root, State: StateSynced, Selected: chosen[pathcase.Fold(t.Name)],
-			MirrorPath: mirrorDir(conf, t.Root)}
+			MirrorPath: conf.CommonLayerDir(t.Root)}
 		plan.Projects = append(plan.Projects, project)
 		changes, problem := commonPlan(conf, root, t.Root)
 		if problem == "" {

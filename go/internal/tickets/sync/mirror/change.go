@@ -213,12 +213,12 @@ func pruneEmpty(base string) {
 
 // readStrict は中身。無ければ existed が偽で why は空、在るのに読めなければ why に理由（str(OSError)）。
 func readStrict(path string) (content []byte, existed bool, why string) {
-	data, err := os.ReadFile(path)
+	data, err := fsio.ReadDiskBytes(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, false, ""
 	}
 	if err != nil {
-		return nil, false, fsio.ErrorText(err)
+		return nil, false, err.Error()
 	}
 	return data, true, ""
 }
@@ -231,8 +231,7 @@ func same(a, b []byte) bool {
 
 // relPlain はリンクを解かない相対（ユーザに見せるパス）。
 func relPlain(base, path string) string {
-	rel, _ := ospath.Relpath(path, base)
-	return filepath.ToSlash(rel)
+	return filepath.ToSlash(ospath.RelOr(path, base))
 }
 
 // relReal はリンクを解いた実体どうしの相対（Change.Rel）。
@@ -240,8 +239,7 @@ func relReal(base, path string) string { return relPlain(ospath.Realpath(base), 
 
 // inside は target の実体が treeRoot の実体の中か（同じも含む）。
 func inside(treeRoot, target string) bool {
-	base := pathcase.Fold(ospath.Realpath(treeRoot))
-	real := pathcase.Fold(ospath.Realpath(target))
+	base, real := pathcase.Real(treeRoot), pathcase.Real(target)
 	return real == base || strings.HasPrefix(real, base+ospath.Sep)
 }
 

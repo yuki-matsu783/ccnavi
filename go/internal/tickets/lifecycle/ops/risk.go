@@ -19,7 +19,6 @@ import (
 	"ccnavi/internal/tickets/approval/marks"
 	"ccnavi/internal/tickets/config/risk"
 	"ccnavi/internal/tickets/lifecycle/closing"
-	"ccnavi/internal/tickets/lifecycle/stop"
 	"ccnavi/internal/tickets/model/place"
 	"ccnavi/internal/tickets/model/ticket"
 )
@@ -70,7 +69,7 @@ func RecordRisk(stdout, stderr io.Writer, conf *config.Settings, root, id, facto
 		return 1
 	}
 	worktree := tree.WorktreePath(root, id)
-	head := stop.HeadSHA(worktree, noDeadline)
+	head := git.Head(worktree, git.Options{})
 	if head == "" {
 		fmt.Fprintf(stderr, "ccnavi: %s の HEAD を読めない\n", worktree)
 		return 1
@@ -100,7 +99,7 @@ func RecordRisk(stdout, stderr io.Writer, conf *config.Settings, root, id, facto
 	if answer == answerYes {
 		points = "+" + strconv.Itoa(factor.Points)
 	}
-	fmt.Fprintf(stdout, "OK: %s の %s を %s と記録した（%s、HEAD %s）\n", id, factorID, answer, points, pyfmt.Head(head, shaShown))
+	fmt.Fprintf(stdout, "OK: %s の %s を %s と記録した（%s、HEAD %s）\n", id, factorID, answer, points, pyfmt.Head(head, git.ShortSHA))
 	io.WriteString(stdout, texts.Say(root, textRecordRisk, texts.Values{"ticket": id}, nil)+"\n")
 	return 0
 }
@@ -212,7 +211,7 @@ func askJudges(stderr io.Writer, conf *config.Settings, root string, found *tick
 	}
 	fmt.Fprintf(stderr, "ccnavi: %s を閉じる前に、定性のリスク項目の判定が必要です: %s\n"+
 		"  問いと差分の要約を渡してサブエージェントに判断させ、報告を '%s record-risk %s <項目> yes|no --reason <根拠>' "+
-		"で記録してから閉じ直してください\n", found.ID, strings.Join(names, ", "), config.ScriptCommand(root, ticketScript), found.ID)
+		"で記録してから閉じ直してください\n", found.ID, strings.Join(names, ", "), config.ScriptCommand(root, config.TicketWrapper), found.ID)
 	if where != "" {
 		fmt.Fprintf(stderr, "  問い: %s\n", where)
 	}

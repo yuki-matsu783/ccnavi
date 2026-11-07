@@ -14,3 +14,21 @@ func TestCasefoldAndNormalize(t *testing.T) {
 		}
 	}
 }
+
+// 期待は Python の unicodedata.normalize("NFD", s) と unicodedata.combining(c)。
+func TestNFDAndCombining(t *testing.T) {
+	for in, want := range map[string]string{
+		"é": "é", "Å": "Å", "が": "が", "ﬁ": "ﬁ", "한": "한",
+	} {
+		if got := NFD(in); got != want {
+			t.Errorf("NFD(%q) = %q, want %q", in, got, want)
+		}
+	}
+	for r, want := range map[rune]int{
+		'a': 0, 'A': 0, '́': 230, '̈': 230, 'ְ': 10, '़': 7, '゙': 8, 'ͅ': 240,
+	} {
+		if got := Combining(r); got != want {
+			t.Errorf("Combining(%U) = %d, want %d", r, got, want)
+		}
+	}
+}

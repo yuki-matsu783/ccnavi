@@ -284,3 +284,52 @@ func TestErrorClassMatchesPyYAML(t *testing.T) {
 		}
 	}
 }
+
+// 期待は Python の yaml.safe_load(a) == yaml.safe_load(b)。
+func TestEqualMatchesPython(t *testing.T) {
+	cases := []struct {
+		a, b string
+		want bool
+	}{
+		{"{a: 1, b: [1, 2]}", "{b: [1, 2.0], a: true}", true},
+		{"{a: .nan}", "{a: .nan}", true},
+		{".nan", ".nan", false},
+		{"[1, 2]", "[1, 2, 3]", false},
+		{"{a: 1}", "{a: 1, b: 2}", false},
+		{"2001-01-01", "2001-01-01", true},
+		{"2001-01-01", "2001-01-01 00:00:00", false},
+		{"2001-01-01 00:00:00+09:00", "2000-12-31 15:00:00Z", true},
+		{"2001-01-01 00:00:00", "2001-01-01 00:00:00Z", false},
+		{"x", "x", true},
+		{`"1"`, "1", false},
+		{"null", "~", true},
+		{"9007199254740993", "9007199254740992.0", false},
+		{"{1: a}", "{1.0: a}", true},
+		{"[.inf]", "[.inf]", true},
+		{"!!binary YQ==", "!!binary YQ==", true},
+	}
+	for _, c := range cases {
+		a, errA := Load(c.a)
+		b, errB := Load(c.b)
+		if errA != nil || errB != nil {
+			t.Fatal(errA, errB)
+		}
+		if got := Equal(a, b); got != c.want {
+			t.Errorf("Equal(%q, %q) = %v, want %v", c.a, c.b, got, c.want)
+		}
+	}
+}
+
+func TestMapWithout(t *testing.T) {
+	v, err := Load("{b: 1, a: 2, 3: x, c: 4}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := v.(*Map).Without("a", "c", "3")
+	if keys := got.Keys(); len(keys) != 2 || keys[0] != "b" || keys[1] != 3 {
+		t.Errorf("順を保ち、文字列のキーだけを外す: %v", keys)
+	}
+	if (*Map)(nil).Without("a").Len() != 0 {
+		t.Error("nil の Map は空")
+	}
+}

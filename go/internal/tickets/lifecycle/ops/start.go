@@ -6,6 +6,7 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/texts"
@@ -14,7 +15,6 @@ import (
 	"ccnavi/internal/tickets/learning"
 	"ccnavi/internal/tickets/lifecycle/closing"
 	"ccnavi/internal/tickets/lifecycle/plan"
-	"ccnavi/internal/tickets/lifecycle/stop"
 	"ccnavi/internal/tickets/model/place"
 	"ccnavi/internal/tickets/model/ticket"
 	"ccnavi/internal/tickets/sync/mirror"
@@ -24,12 +24,6 @@ const (
 	textStartChild  = "NEXT_OPS_START_CHILD"
 	textStartSkill  = "NOTE_OPS_START_SKILL"
 	textStartParent = "NEXT_OPS_START_PARENT"
-
-	gitScript   = "ccnavi-git.sh"
-	startScript = "ccnavi-start.sh"
-
-	// shaShown は出力に見せる sha の長さ。
-	shaShown = 12
 )
 
 // Start は doing/ の承認済みチケットに、着手の時刻と基準点（ワークツリーの HEAD）を書く。ワークツリーは、承認済みの project の元リポジトリから切られていなければならない。元リポジトリが違えば、判定はそのツリーの元リポジトリで行われ、チケットと食い違う。子ならフローのハッシュも記録する。着手のあとのフローの書き換えは、SubagentStart・SubagentStop が知らせる。
@@ -52,7 +46,7 @@ func Start(stdout, stderr io.Writer, conf *config.Settings, root, id string) int
 			id, worktree, project, createWords(root, found, worktree))
 		return 1
 	}
-	sha := stop.HeadSHA(worktree, noDeadline)
+	sha := git.Head(worktree, git.Options{})
 	if sha == "" {
 		fmt.Fprintf(stderr, "ccnavi: %s の HEAD を読めない\n", worktree)
 		return 1
@@ -62,7 +56,7 @@ func Start(stdout, stderr io.Writer, conf *config.Settings, root, id string) int
 		fmt.Fprintf(stderr, "ccnavi: %s に着手の欄を保存できませんでした: %s\n", id, failed)
 		return 1
 	}
-	fmt.Fprintf(stdout, "OK: %s に着手した（%s / 基準点 %s）。置き場は %s/ のまま\n", found.ID, at, pyfmt.Head(sha, shaShown), place.Doing)
+	fmt.Fprintf(stdout, "OK: %s に着手した（%s / 基準点 %s）。置き場は %s/ のまま\n", found.ID, at, pyfmt.Head(sha, git.ShortSHA), place.Doing)
 	if found.IsChild() {
 		started := *found
 		started.StartedAt = at
@@ -93,7 +87,7 @@ func Start(stdout, stderr io.Writer, conf *config.Settings, root, id string) int
 	if learning.Applies(conf, root, found) {
 		fmt.Fprintf(stdout, "学びの蓄積: 閉じる前に '%s learn' を実行し、"+
 			"%s/%s.md に気づきを書いて git add と git commit をする（無ければ learnings: none）\n",
-			config.ScriptCommand(root, ticketScript), learning.LearningDir, found.ID)
+			config.ScriptCommand(root, config.TicketWrapper), learning.LearningDir, found.ID)
 	}
 	return 0
 }
@@ -106,9 +100,9 @@ func createWords(root string, t *ticket.Ticket, worktree string) string {
 			where = "projects/" + t.Project + " の中で "
 		}
 		return fmt.Sprintf("先に %s'%s worktree add \"%s\" -b %s' で作ってください",
-			where, config.ScriptCommand(root, gitScript), worktree, t.ID)
+			where, config.ScriptCommand(root, config.GitWrapper), worktree, t.ID)
 	}
-	return "親のワークツリーは '" + config.ScriptCommand(root, startScript) + " --mr <MR の番号>'" +
+	return "親のワークツリーは '" + config.ScriptCommand(root, config.StartWrapper) + " --mr <MR の番号>'" +
 		"（MR が無ければ '--issue <issue の番号>'）で、" +
 		"親のブランチを直接チェックアウトして作ってください（識別子の名前のブランチは作らない）"
 }

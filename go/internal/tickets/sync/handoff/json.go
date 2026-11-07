@@ -1,6 +1,8 @@
 package handoff
 
-import "ccnavi/internal/infra/pyjson"
+import (
+	"ccnavi/internal/infra/pyjson"
+)
 
 // 拡張（handoffmodel.ts）が読む欄。キーの順も Python の答えと同じにする。
 

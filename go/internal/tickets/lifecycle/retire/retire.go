@@ -21,11 +21,8 @@ import (
 
 const (
 	cleanBranchScript = "ccnavi-user-clean-branch.sh"
-	launcherScript    = "ccnavi-launcher.sh"
 	originPrefix      = "refs/remotes/origin/"
 	headsPrefix       = "refs/heads/"
-	// shortSHA は文に出す sha の長さ。
-	shortSHA = 12
 
 	textRetireParent = "DENY_RETIRE_PARENT"
 )
@@ -59,7 +56,7 @@ func commitOf(repo, rev string) string {
 func tipOf(repo, name string) string { return commitOf(repo, headsPrefix+name) }
 
 func isAncestor(repo, older, newer string) bool {
-	return git.Run(repo, []string{"merge-base", "--is-ancestor", older, newer}, git.Options{}).OK()
+	return git.IsAncestor(repo, older, newer, git.Options{}).OK()
 }
 
 // checkedOutAt はそのブランチをチェックアウトしているワークツリーのパス。無ければ空。
@@ -133,17 +130,17 @@ func judgeChild(repo string, c child, reference string, confirmed bool, tool str
 	}
 	mergedHead := commitOf(repo, c.mergedSHA)
 	if mergedHead == "" {
-		return keep(repo, name, "合流した先頭 "+pyfmt.Head(c.mergedSHA, shortSHA)+" が手元に無い")
+		return keep(repo, name, "合流した先頭 "+pyfmt.Head(c.mergedSHA, git.ShortSHA)+" が手元に無い")
 	}
 	if tip != mergedHead {
-		return keep(repo, name, "ブランチの先頭 "+pyfmt.Head(tip, shortSHA)+" が、合流した先頭 "+pyfmt.Head(mergedHead, shortSHA)+
+		return keep(repo, name, "ブランチの先頭 "+pyfmt.Head(tip, git.ShortSHA)+" が、合流した先頭 "+pyfmt.Head(mergedHead, git.ShortSHA)+
 			" と違う（合流のあとに進んでいる）")
 	}
 	if base == "" {
 		return keep(repo, name, "push 済みの親の先頭を読めず、合流した先頭が含まれるか確かめられない")
 	}
 	if !isAncestor(repo, mergedHead, base) {
-		return keep(repo, name, "合流した先頭 "+pyfmt.Head(mergedHead, shortSHA)+" が push 済みの親に含まれない")
+		return keep(repo, name, "合流した先頭 "+pyfmt.Head(mergedHead, git.ShortSHA)+" が push 済みの親に含まれない")
 	}
 	return dropBranch(repo, name, tip, "合流済み")
 }
@@ -155,7 +152,7 @@ func dropBranch(repo, name, tip, why string) outcome {
 	if failed := deleteBranch(repo, name); failed != "" {
 		return keep(repo, name, "git branch -D が失敗した（"+failed+"）")
 	}
-	return outcome{deleted, "ブランチ " + name + " を削除しました（" + why + "。先頭 " + pyfmt.Head(tip, shortSHA) + "）"}
+	return outcome{deleted, "ブランチ " + name + " を削除しました（" + why + "。先頭 " + pyfmt.Head(tip, git.ShortSHA) + "）"}
 }
 
 // ---- ready の後（片付け 1）
@@ -209,7 +206,7 @@ func parentRefusal(root, family string, refused worktrees.Dropped) string {
 	case worktrees.Dirty:
 		which = "dirty"
 	}
-	command := config.ScriptCommand(root, launcherScript) + " worktree retire " + family
+	command := config.ScriptCommand(root, config.LauncherScript) + " worktree retire " + family
 	return texts.Say(root, textRetireParent, texts.Values{
 		"parent": family,
 		"path":   refused.Path,
@@ -385,15 +382,15 @@ func mergedBlocker(repo, branch, tip, headSHA string) string {
 		return "push 済みの先頭（origin/" + branch + "）が手元に無く、未 push のコミットが無いか確かめられない"
 	}
 	if !isAncestor(repo, tip, pushed) {
-		return "手元の先頭 " + pyfmt.Head(tip, shortSHA) + " が、push 済みの先頭（origin/" + branch + "）" + pyfmt.Head(pushed, shortSHA) +
+		return "手元の先頭 " + pyfmt.Head(tip, git.ShortSHA) + " が、push 済みの先頭（origin/" + branch + "）" + pyfmt.Head(pushed, git.ShortSHA) +
 			" に含まれない（未 push のコミットがある）"
 	}
 	mergedHead := commitOf(repo, headSHA)
 	if mergedHead == "" {
-		return "マージされた MR の先頭 " + pyfmt.Head(headSHA, shortSHA) + " が手元に無く、含まれるか確かめられない"
+		return "マージされた MR の先頭 " + pyfmt.Head(headSHA, git.ShortSHA) + " が手元に無く、含まれるか確かめられない"
 	}
 	if !isAncestor(repo, tip, mergedHead) {
-		return "手元の先頭 " + pyfmt.Head(tip, shortSHA) + " が、マージされた MR の先頭 " + pyfmt.Head(mergedHead, shortSHA) +
+		return "手元の先頭 " + pyfmt.Head(tip, git.ShortSHA) + " が、マージされた MR の先頭 " + pyfmt.Head(mergedHead, git.ShortSHA) +
 			" に含まれない（未 push のコミットがある）"
 	}
 	return ""

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/difflib"
 	"ccnavi/internal/tickets/model/pyoracle"
 )
 
@@ -128,7 +129,7 @@ func TestPartsMatchPython(t *testing.T) {
 		"diff": diffCases, "lines": lines, "defense": defense,
 	})
 	for i, c := range diffCases {
-		got := unifiedDiff(c[0], c[1], "a/x", "b/x", diffContext)
+		got := difflib.UnifiedDiff(c[0], c[1], "a/x", "b/x", diffContext)
 		if strings.Join(got, "\n") != strings.Join(answers.Diff[i], "\n") {
 			t.Errorf("差分 %d が違う\n--- go\n%s\n--- python\n%s", i, strings.Join(got, "\n"), strings.Join(answers.Diff[i], "\n"))
 		}

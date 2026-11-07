@@ -217,3 +217,70 @@ func TestHasDrive(t *testing.T) {
 		t.Errorf("HardLinks = %d, %v", n, ok)
 	}
 }
+
+// 期待は Python の os.path.relpath（POSIX）。相対にできない別のドライブは Windows でしか起きない。
+func TestRelOr(t *testing.T) {
+	cases := []struct{ path, start, want string }{
+		{"/a/b/c", "/a", "b/c"},
+		{"/a", "/a", "."},
+		{"/a/x", "/a/b", "../x"},
+	}
+	for _, c := range cases {
+		if Windows {
+			continue
+		}
+		if got := RelOr(c.path, c.start); got != c.want {
+			t.Errorf("RelOr(%q, %q) = %q, want %q", c.path, c.start, got, c.want)
+		}
+	}
+	if Windows {
+		if got := RelOr(`D:\x`, `C:\y`); got != `D:\x` {
+			t.Errorf("別のドライブは path のまま: %q", got)
+		}
+	}
+}
+
+// 期待は Python の str.splitlines() と str.splitlines(keepends=True)。
+func TestSplitlinesKeep(t *testing.T) {
+	cases := []struct {
+		in         string
+		keep, drop []string
+	}{
+		{"a\r\nb\rc\vd\x1ce f\n", []string{"a\r\n", "b\r", "c\v", "d\x1c", "e ", "f\n"}, []string{"a", "b", "c", "d", "e", "f"}},
+		{"", nil, nil},
+		{"x", []string{"x"}, []string{"x"}},
+		{"\n\n", []string{"\n", "\n"}, []string{"", ""}},
+		{"a\r", []string{"a\r"}, []string{"a"}},
+		{"\r\n\r", []string{"\r\n", "\r"}, []string{"", ""}},
+	}
+	for _, c := range cases {
+		if got := SplitlinesKeep(c.in); !reflect.DeepEqual(got, c.keep) {
+			t.Errorf("SplitlinesKeep(%q) = %q, want %q", c.in, got, c.keep)
+		}
+		if got := Splitlines(c.in); !reflect.DeepEqual(got, c.drop) {
+			t.Errorf("Splitlines(%q) = %q, want %q", c.in, got, c.drop)
+		}
+	}
+}
+
+// 中身と更新時刻を戻しても、変更時刻（ctime）か inode が変わる。リンクは辿らない。
+func TestIdentity(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "a")
+	if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ino, ctime, ok := Identity(path)
+	if !ok || ino == 0 || ctime == 0 {
+		t.Fatalf("Identity = %d, %d, %v", ino, ctime, ok)
+	}
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink(path, link); err == nil {
+		if other, _, ok := Identity(link); !ok || other == ino {
+			t.Errorf("リンクそのものを読む: %d, %v", other, ok)
+		}
+	}
+	if _, _, ok := Identity(filepath.Join(dir, "missing")); ok {
+		t.Error("無いものは読めない")
+	}
+}

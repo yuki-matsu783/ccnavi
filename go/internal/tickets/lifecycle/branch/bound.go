@@ -37,9 +37,9 @@ func owner(conf *config.Settings, root, mainRoot string) (tree.Tree, bool) {
 	if conf.Projects != "" {
 		projects = ospath.Join(root, conf.Projects)
 	}
-	want := pathcase.Fold(ospath.Realpath(mainRoot))
+	want := pathcase.Real(mainRoot)
 	for _, t := range append([]tree.Tree{tree.MainTree(root)}, tree.Projects(projects)...) {
-		if pathcase.Fold(ospath.Realpath(t.Root)) == want {
+		if pathcase.Real(t.Root) == want {
 			return t, true
 		}
 	}
@@ -76,7 +76,7 @@ func BaseBound(conf *config.Settings, root, mainRoot, branch string) (Bound, str
 	}
 	for _, baseRoot := range integrate.TreeRoots(conf, root) {
 		approved := conf.ApprovedDir(baseRoot)
-		proposals := ospath.Join(baseRoot, strings.ReplaceAll(conf.Tickets, "/", ospath.Sep))
+		proposals := place.ProposalsRoot(baseRoot, conf.Tickets)
 		for _, at := range []struct {
 			base  string
 			state place.State

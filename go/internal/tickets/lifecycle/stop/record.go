@@ -3,14 +3,9 @@ package stop
 import (
 	"cmp"
 	"slices"
-	"strconv"
-	"time"
 
 	"ccnavi/internal/infra/fsio"
-	"ccnavi/internal/infra/git"
-	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyjson"
-	"ccnavi/internal/tickets/lifecycle/closing"
 )
 
 // NudgePrefix は促した状態の記録の名前の頭（records/prune が同じ頭で消す）。
@@ -78,37 +73,3 @@ func RememberNudge(stateDir, session string, n Nudge) string {
 	}
 	return fsio.WriteJSON(path, sorted)
 }
-
-// HeadSHA はワークツリーの HEAD の sha。読めなければ空。deadline がゼロ値でなければ、過ぎてから git を起こさない。
-func HeadSHA(worktree string, deadline time.Time) string {
-	args := []string{"rev-parse", "HEAD"}
-	o := git.Options{Timeout: closing.GitTimeout}
-	var done git.Done
-	if deadline.IsZero() {
-		done = git.Run(worktree, args, o)
-	} else {
-		done = git.RunUntil(worktree, args, deadline, o)
-	}
-	if done.Failure != nil || done.Code != 0 {
-		return ""
-	}
-	return ospath.Strip(done.Out)
-}
-
-// Count は git の数の答え（rev-list --count）を読む。数字だけでなければ偽。
-func Count(out string) (int, bool) {
-	s := ospath.Strip(out)
-	if s == "" {
-		return 0, false
-	}
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return 0, false
-		}
-	}
-	n, err := strconv.Atoi(s)
-	return n, err == nil
-}
-
-// zeroTime は期限なし（HeadSHA に渡す）。
-var zeroTime time.Time

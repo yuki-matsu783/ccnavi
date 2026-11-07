@@ -2,7 +2,6 @@ package approval
 
 import (
 	"errors"
-	"path/filepath"
 	"strings"
 
 	"ccnavi/internal/infra/config"
@@ -35,7 +34,7 @@ func ClosedPath(approvedDir, id string) string {
 
 // reviewDir はそのツリーの提案の置き場の review/。
 func reviewDir(conf *config.Settings, treeRoot string) string {
-	return ospath.Join(treeRoot, filepath.FromSlash(conf.Tickets), string(place.Review))
+	return place.Dir(treeRoot, conf.Tickets, place.Review)
 }
 
 // Trees は承認済みチケットを持ちうるツリー全部（ワークスペース、プロジェクト、ワークツリー）。

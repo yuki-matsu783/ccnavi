@@ -1,6 +1,8 @@
 package ticket
 
-import "ccnavi/internal/infra/yaml"
+import (
+	"ccnavi/internal/infra/yaml"
+)
 
 // Render はチケットを文面に戻す。承認済みチケットを作るときと、スクリプトが欄を書くときに使う。
 // 読んだ frontmatter（Raw）をそのまま出すので、コメントと `|` のブロックは残らない（残したい書き換えは fields）。

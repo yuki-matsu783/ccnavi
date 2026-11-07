@@ -1,5 +1,9 @@
 package config
 
+import (
+	"strings"
+)
+
 // Claude Code のツール名。ツールの増減はここだけを直す（判定ごとに書くと直し漏れで食い違う）。
 const (
 	ToolBash             = "Bash"
@@ -28,6 +32,8 @@ var (
 	// シェル経由の書き込みは実行後チェックが実物を見て拾う。
 	// MultiEdit は 1 回で同じファイルを何か所も直す。現行の Claude Code にも編集ツールのひとつとして残っている。
 	WriteTools = []string{ToolWrite, ToolEdit, ToolMultiEdit, ToolNotebookEdit}
+	// WriteMatch はルールの match: に書く WriteTools（`|` でつなぐ。Python の WRITE_MATCH）。
+	WriteMatch = strings.Join(WriteTools, "|")
 	// WrittenFileTools は書いたファイルを記録に残すツール（MultiEdit を含む）。
 	WrittenFileTools = []string{ToolWrite, ToolEdit, ToolMultiEdit}
 	// AgentTools はサブエージェントの起動。Claude Code の版によって名前が違う。

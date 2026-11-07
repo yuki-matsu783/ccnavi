@@ -1,8 +1,6 @@
 package approval
 
 import (
-	"math/big"
-	"reflect"
 	"slices"
 	"sort"
 
@@ -129,56 +127,9 @@ func RevisionElsewhere(t, current *ticket.Ticket) bool {
 // sameTodo は同じ中身の todo/ の提案か。計画まで比べる（PlanItem の比べ方は after を見ない）。
 func sameTodo(t, u *ticket.Ticket) bool {
 	return samePlanItems(t.Plan, u.Plan) && t.FeedbackPlanned == u.FeedbackPlanned &&
-		samePlanItems(t.Feedback, u.Feedback) && sameValue(t.Raw, u.Raw)
+		samePlanItems(t.Feedback, u.Feedback) && yaml.Equal(t.Raw, u.Raw)
 }
 
 func samePlanItems(a, b []ticket.PlanItem) bool {
 	return slices.EqualFunc(a, b, func(x, y ticket.PlanItem) bool { return x.Same(&y) })
-}
-
-// sameValue は YAML から読んだ値の Python の ==（マップはキーの順を見ず、数は値で比べる。True == 1）。
-func sameValue(a, b any) bool {
-	if x, ok := numberOf(a); ok {
-		y, ok := numberOf(b)
-		return ok && x.Cmp(y) == 0
-	}
-	switch x := a.(type) {
-	case *yaml.Map:
-		y, ok := b.(*yaml.Map)
-		if !ok || x.Len() != y.Len() {
-			return false
-		}
-		for k, v := range x.All() {
-			w, found := y.Lookup(k)
-			if !found || !sameValue(v, w) {
-				return false
-			}
-		}
-		return true
-	case []any:
-		y, ok := b.([]any)
-		return ok && slices.EqualFunc(x, y, sameValue)
-	}
-	return reflect.DeepEqual(a, b)
-}
-
-// numberOf は真偽・整数・小数を比べられる数にする。NaN は数にしない（Python でも NaN != NaN）。
-func numberOf(v any) (*big.Float, bool) {
-	switch x := v.(type) {
-	case bool:
-		if x {
-			return big.NewFloat(1), true
-		}
-		return big.NewFloat(0), true
-	case int:
-		return new(big.Float).SetInt64(int64(x)), true
-	case *big.Int:
-		return new(big.Float).SetInt(x), true
-	case float64:
-		if x != x {
-			return nil, false
-		}
-		return big.NewFloat(x), true
-	}
-	return nil, false
 }

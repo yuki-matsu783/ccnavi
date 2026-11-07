@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/git"
@@ -41,19 +40,13 @@ const (
 )
 
 const (
-	gitTimeout = 20 * time.Second
 	// shown は文に並べるパスの数の上限。
 	shown = 8
 	// gitlink は submodule の項のモード。
 	gitlink = "160000"
 )
 
-func gitOptions() git.Options { return git.Options{Timeout: gitTimeout, RawPaths: true} }
-
-func runGit(cwd string, args ...string) (bool, string) {
-	done := git.Run(cwd, args, gitOptions())
-	return done.OK(), done.Out
-}
+func gitOptions() git.Options { return git.Options{Timeout: git.MergeTimeout, RawPaths: true} }
 
 func names(listing string) []string {
 	var out []string
@@ -116,8 +109,8 @@ func Plan(stdout io.Writer, conf *config.Settings, root, ident string) int {
 		stopWith(stdout, why, hints...)
 		return 0
 	}
-	head := git.Head(childTree, 0)
-	parentHead := git.Head(parentTree, 0)
+	head := git.Head(childTree, git.Options{Timeout: git.StateTimeout})
+	parentHead := git.Head(parentTree, git.Options{Timeout: git.StateTimeout})
 	if head == "" || parentHead == "" {
 		stopWith(stdout, "子 "+ident+" の先頭を読めない。何も変えずに止めた")
 		return 0
@@ -177,7 +170,7 @@ func Plan(stdout io.Writer, conf *config.Settings, root, ident string) int {
 		return 0
 	}
 	merge := mergeYes
-	if git.Run(childTree, []string{"merge-base", "--is-ancestor", head, parentHead}, git.Options{Timeout: gitTimeout}).OK() {
+	if git.IsAncestor(childTree, head, parentHead, git.Options{Timeout: git.MergeTimeout}).OK() {
 		merge = mergeNo
 	}
 	say(stdout, keyChild, ident)
@@ -214,14 +207,15 @@ func treeProblem(conf *config.Settings, parentTree, childTree, ident string, pro
 		return "子 " + ident + " のワークツリー（" + childTree + "）が無い。何も変えずに止めた",
 			[]string{"ワークツリーを作り直して、子のブランチの作業を確かめてください"}, true
 	}
-	ok, commonParent := runGit(parentTree, "rev-parse", "--git-common-dir")
-	okChild, commonChild := runGit(childTree, "rev-parse", "--git-common-dir")
-	if !ok || !okChild || !same(ospath.Join(parentTree, ospath.Strip(commonParent)), ospath.Join(childTree, ospath.Strip(commonChild))) {
+	commonParent := git.Run(parentTree, []string{"rev-parse", "--git-common-dir"}, gitOptions())
+	commonChild := git.Run(childTree, []string{"rev-parse", "--git-common-dir"}, gitOptions())
+	if !commonParent.OK() || !commonChild.OK() ||
+		!pathcase.SameReal(ospath.Join(parentTree, ospath.Strip(commonParent.Out)), ospath.Join(childTree, ospath.Strip(commonChild.Out))) {
 		return "子 " + ident + " のワークツリーが親のワークツリーと同じリポジトリのものでない。何も変えずに止めた", nil, true
 	}
-	ok, ref := runGit(childTree, "symbolic-ref", "-q", "HEAD")
-	ref = ospath.Strip(ref)
-	if !ok || ref != "refs/heads/"+ident {
+	symbolic := git.Run(childTree, []string{"symbolic-ref", "-q", "HEAD"}, gitOptions())
+	ref := ospath.Strip(symbolic.Out)
+	if !symbolic.OK() || ref != "refs/heads/"+ident {
 		shownRef := ref
 		if shownRef == "" {
 			shownRef = "分離した HEAD"
@@ -229,12 +223,12 @@ func treeProblem(conf *config.Settings, parentTree, childTree, ident string, pro
 		return "子 " + ident + " のワークツリーが子のブランチ " + ident + " にいない（" + shownRef + "）。何も変えずに止めた",
 			[]string{"子のワークツリーで子のブランチ " + ident + " に切り替えてから finish をやり直す"}, true
 	}
-	ok, out := runGit(childTree, "status", "--porcelain", "-z", "--untracked-files=all", "--no-renames")
-	if !ok {
+	status := git.Status(childTree, git.Porcelain{NUL: true, Untracked: git.UntrackedAll, NoRenames: true}, gitOptions())
+	if !status.OK() {
 		return "子 " + ident + " のワークツリーの状態を読めない。何も変えずに止めた", nil, true
 	}
 	var unsaved []string
-	for _, entry := range names(out) {
+	for _, entry := range names(status.Out) {
 		if len(entry) > 3 {
 			unsaved = append(unsaved, entry[3:])
 		}
@@ -255,12 +249,12 @@ func treeProblem(conf *config.Settings, parentTree, childTree, ident string, pro
 // ignoredInParent は子が base..head で変えたパスのうち、親のワークツリーに無視されたファイルとしてあるもの。git の
 // merge は無視されたファイルを黙って上書きし、合流を戻すとそのパスを消す。2 つめは読めなかった理由。
 func ignoredInParent(parentTree, childTree, base, head string) ([]string, string) {
-	ok, out := runGit(childTree, "diff", "--name-only", "--no-renames", "-z", base+".."+head)
-	if !ok {
+	diff := git.Run(childTree, []string{"diff", "--name-only", "--no-renames", "-z", base + ".." + head}, gitOptions())
+	if !diff.OK() {
 		return nil, "子の仕事の始まりからの差分を読めない"
 	}
 	var present []string
-	for _, p := range names(out) {
+	for _, p := range names(diff.Out) {
 		if ospath.DiskLexists(ospath.Join(parentTree, p)) {
 			present = append(present, p)
 		}
@@ -297,12 +291,12 @@ func ignoredInParent(parentTree, childTree, base, head string) ([]string, string
 //   - 大文字小文字だけが違うパスは、大文字小文字を区別しないファイルシステムで片方を消すともう片方の中身まで消える
 //   - submodule の追加・削除（ファイルとの入れ替えを含む）はディレクトリになり、ファイルとして戻せない
 func unrestorable(childTree, base, head string) ([]string, string) {
-	ok, out := runGit(childTree, "diff", "--raw", "--no-renames", "--ignore-submodules=none", "-z", base+".."+head)
-	if !ok {
+	diff := git.Run(childTree, []string{"diff", "--raw", "--no-renames", "--ignore-submodules=none", "-z", base + ".." + head}, gitOptions())
+	if !diff.OK() {
 		return nil, "子の仕事の始まりからの差分を読めない"
 	}
 	type entry struct{ old, new, rel string }
-	parts := strings.Split(out, "\x00")
+	parts := strings.Split(diff.Out, "\x00")
 	var entries []entry
 	for i := 0; i+1 < len(parts); i += 2 {
 		cols := strings.Fields(strings.TrimLeft(parts[i], ":"))
@@ -348,8 +342,4 @@ func unrestorable(childTree, base, head string) ([]string, string) {
 		reasons = append(reasons, "submodule の追加・削除 "+shownPaths(linked))
 	}
 	return reasons, ""
-}
-
-func same(a, b string) bool {
-	return pathcase.Fold(ospath.Realpath(a)) == pathcase.Fold(ospath.Realpath(b))
 }

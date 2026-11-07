@@ -17,16 +17,8 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// GitTimeout は git を読むときの待ち時間。Stop の促しと状態の操作の git の読み取りも使う。
-const GitTimeout = 5 * time.Second
-
-// ticketScript は案内に出す状態の操作の sh。
-const ticketScript = "ccnavi-ticket.sh"
-
 // workspaceLabel は在り処を並べるときのワークスペースルートの呼び名。
 const workspaceLabel = "(ワークスペースルート)"
-
-func gitOptions() git.Options { return git.Options{Timeout: GitTimeout} }
 
 // UnmergedFix は finish の後に子のブランチへ積まれ、親（treeRoot の HEAD）に入っていないコミットの先頭。
 // 無ければ空。子のワークツリーが無い PC（別の PC で finish した子など）では判定しない。
@@ -43,7 +35,7 @@ func UnmergedFix(root, treeRoot string, child *ticket.Ticket, timeout time.Durat
 	if head == "" || head == child.MergedSHA {
 		return ""
 	}
-	if rc, _ := git.Output(treeRoot, []string{"merge-base", "--is-ancestor", head, "HEAD"}, o); rc == 0 {
+	if git.IsAncestor(treeRoot, head, "HEAD", o).OK() {
 		return ""
 	}
 	return head
@@ -191,7 +183,7 @@ func ParentNotStarted(stderr io.Writer, conf *config.Settings, root string, t *t
 		return false
 	}
 	f := places(conf, root, t.Parent)
-	ticketSh := config.ScriptCommand(root, ticketScript)
+	ticketSh := config.ScriptCommand(root, config.TicketWrapper)
 	head := fmt.Sprintf("ccnavi: %s の親 %s ", t.ID, t.Parent)
 	if len(f.hits) == 0 {
 		fmt.Fprintf(stderr, "%sが見つからない（%s/ と %s/ を全ツリーで探した）\n", head, conf.Approved, conf.Tickets)
@@ -228,7 +220,7 @@ func PredecessorsUnmet(stderr io.Writer, conf *config.Settings, root string, t *
 	if len(unmet) == 0 {
 		return false
 	}
-	ticketSh := config.ScriptCommand(root, ticketScript)
+	ticketSh := config.ScriptCommand(root, config.TicketWrapper)
 	fmt.Fprintf(stderr, "ccnavi: %s の先行が満たされていないので開始しない（先行は %s/%s/ に在って取り消しでないこと）:\n",
 		t.ID, conf.Approved, place.Done)
 	waiting, stuck := false, false

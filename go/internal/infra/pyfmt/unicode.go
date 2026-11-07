@@ -17,3 +17,9 @@ func NFKC(s string) string { return norm.NFKC.String(s) }
 // NFC は Python の unicodedata.normalize("NFC", s)。macOS の HFS+ が NFD で返すディレクトリの名前を、
 // 識別子と同じ表記にそろえるのにも使う。
 func NFC(s string) string { return norm.NFC.String(s) }
+
+// NFD は Python の unicodedata.normalize("NFD", s)。正準分解して、正準等価の違い（合成済みの字と分解した字）をそろえる。
+func NFD(s string) string { return norm.NFD.String(s) }
+
+// Combining は Python の unicodedata.combining(r)（正準結合クラス。結合しない字は 0）。
+func Combining(r rune) int { return int(norm.NFD.PropertiesString(string(r)).CCC()) }

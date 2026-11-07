@@ -2,10 +2,10 @@ package stop
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/approval"
@@ -87,11 +87,11 @@ func WaitingAtStop(conf *config.Settings, root, cwd string, raw *approval.Raw) *
 	if phase.Stage(conf, root, parent, raw) != phase.StageFeedbackWaiting {
 		return nil
 	}
-	head := HeadSHA(at.Root, zeroTime)
+	head := git.Head(at.Root, git.Options{})
 	if head == "" {
 		return nil
 	}
-	todo := ospath.Join(st.Home.Root, filepath.FromSlash(conf.Tickets), string(place.Todo))
+	todo := place.Dir(st.Home.Root, conf.Tickets, place.Todo)
 	return &Waiting{parent, head, todo, proposed(todo, parent.ID)}
 }
 

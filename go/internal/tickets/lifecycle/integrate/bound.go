@@ -87,7 +87,7 @@ func BoundCheck(conf *config.Settings, root string, here tree.Tree, deadline tim
 	}
 	for _, base := range TreeRoots(conf, root) {
 		approved := conf.ApprovedDir(base)
-		proposals := ospath.Join(base, filepath.FromSlash(conf.Tickets))
+		proposals := place.ProposalsRoot(base, conf.Tickets)
 		for _, at := range []struct {
 			dir   string
 			state place.State
@@ -120,7 +120,7 @@ func BoundCheck(conf *config.Settings, root string, here tree.Tree, deadline tim
 		if rec := DirectRecord(owner, cand); rec != nil && !rec.Broken {
 			continue
 		}
-		done := run(work, []string{"show-ref", "--verify", "--quiet", "refs/remotes/origin/" + branch}, deadline, git.DefaultTimeout)
+		done := git.Run(work, []string{"show-ref", "--verify", "--quiet", "refs/remotes/origin/" + branch}, git.Options{Deadline: deadline})
 		switch {
 		case done.Failure != nil || (done.Code != 0 && done.Code != 1):
 			unsure = true

@@ -56,8 +56,6 @@ const (
 		`(?:(?:` + pathChar + `*+[\\/])*+|[a-z]:` + pathChar + `*?)git(?:\.exe)?\s`
 )
 
-var writeMatch = strings.Join(config.WriteTools, "|")
-
 // placeRegex は置き場のパスに当たる式。プロジェクトの名前を挟んだ形（wip/<name>/proposals）にも当たる。
 func placeRegex(rel string) string {
 	var parts []string
@@ -101,7 +99,7 @@ func rule(id, match, regex, root string, text rules.TextRef) (*rules.Rule, error
 // 保護と同じ部品を使う（別に書くと片方だけが読む書き方が通る）。
 func GuardRules(ticketsRel, root string) ([]*rules.Rule, error) {
 	spec := texts.Spec(textTicketState, texts.SpecOptions{})
-	write, err := rule(StateRuleID, writeMatch, StateDirRegex(ticketsRel), root, spec)
+	write, err := rule(StateRuleID, config.WriteMatch, StateDirRegex(ticketsRel), root, spec)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +122,7 @@ func GuardRules(ticketsRel, root string) ([]*rules.Rule, error) {
 // 作成・変更・展開の道具とコードを走らせる道具も止める（名前が現れるだけで当たるので、読み取りの道具は巻き込まない）。
 func dirRules(ruleID, shellID, placeRel string, spec rules.TextRef, root string) ([]*rules.Rule, error) {
 	where := placeRegex(placeRel)
-	write, err := rule(ruleID, writeMatch, `(^|[\\/])`+where+`[\\/]`, root, spec)
+	write, err := rule(ruleID, config.WriteMatch, `(^|[\\/])`+where+`[\\/]`, root, spec)
 	if err != nil {
 		return nil, err
 	}

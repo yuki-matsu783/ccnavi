@@ -229,17 +229,6 @@ func refsOf(repoRoot string) (map[string]bool, map[string]bool, string) {
 	return local, origin, ""
 }
 
-func relTo(root, path string) string {
-	rel, ok := ospath.Relpath(path, root)
-	if !ok {
-		return ospath.Slashed(path)
-	}
-	if rel == "." {
-		return rel
-	}
-	return ospath.Slashed(rel)
-}
-
 // repoOf は cwd のリポジトリ（元のツリー）・プロジェクト名・読めない理由。
 func repoOf(conf *config.Settings, root, cwd string) (*tree.Tree, string, string) {
 	var at tree.Tree
@@ -273,7 +262,7 @@ func checkedOutIn(conf *config.Settings, root string, repo tree.Tree) map[string
 	}
 	for _, t := range trees {
 		if name, ok := tree.BranchOf(t.Root); ok {
-			out[name] = append(out[name], relTo(root, t.Root))
+			out[name] = append(out[name], ospath.Slashed(ospath.RelOr(t.Root, root)))
 		}
 	}
 	return out
@@ -434,7 +423,7 @@ func collect(conf *config.Settings, root, cwd string, kind Kind, number int, h h
 		}
 		return order[i].branch < order[j].branch
 	})
-	return &found{kind, number, project, relTo(root, repo.Root), h, conf.TicketsEnabled(), order, linked}, ""
+	return &found{kind, number, project, ospath.Slashed(ospath.RelOr(repo.Root, root)), h, conf.TicketsEnabled(), order, linked}, ""
 }
 
 func where(c *candidate) string {

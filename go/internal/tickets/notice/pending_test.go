@@ -55,7 +55,7 @@ func pendingWorkspace(t *testing.T) string {
 	marker("v3", "version 4", "head "+head, "tip "+head, "c_tree "+treeSHA, "k "+k)
 	marker("v4b", "version 4", "head "+strings.Repeat("0", 40), "tip "+head, "c_tree "+treeSHA, "k "+k)
 	marker("v6", "version 4", "head "+head)
-	if err := os.MkdirAll(filepath.Join(root, DirectTmpDir, tree.Self, "left1"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, config.DirectTmpDir, tree.Self, "left1"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	runGit(t, root, "update-ref", "refs/ccnavi/direct/left2/c", head)

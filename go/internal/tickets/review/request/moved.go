@@ -40,7 +40,6 @@ const (
 	msgExplainMoved   = "依頼時のコミットといまの HEAD が違う。何が変わったかユーザに確かめてもらい、依頼し直す。"
 	msgExplainMirror  = "動かしたのはミラーのずれ（共通レイヤーのコピーか `skills/`）のコミット。" +
 		"ユーザが見たものと HEAD が違うので、再 `review-request` が要る。"
-	shortSHA = 12
 )
 
 // shaForm は依頼のマーカーに記録された HEAD の形。
@@ -65,7 +64,7 @@ func MovedDetail(conf *config.Settings, requested *pyjson.Object, head string, c
 	if head == recorded {
 		return Moved{}
 	}
-	moved := fmt.Sprintf(msgHeadMoved, pyfmt.Head(recorded, shortSHA), pyfmt.Head(head, shortSHA))
+	moved := fmt.Sprintf(msgHeadMoved, pyfmt.Head(recorded, git.ShortSHA), pyfmt.Head(head, git.ShortSHA))
 	if !isSHA(recorded) || !listed {
 		return Moved{moved, KindMoved}
 	}
@@ -92,9 +91,8 @@ func seenPaths(conf *config.Settings, paths []string) []string {
 
 // MovedInTree は、MovedDetail を親のワークツリーの git から読んで決める。動いていなくても、親のブランチの HEAD が push されていなければ止める。ユーザがマージで見るのはリモートの HEAD だからである。push の判定でも、置き場は数えない。
 func MovedInTree(conf *config.Settings, treeRoot string, requested *pyjson.Object, project bool) Moved {
-	code, out := git.Output(treeRoot, []string{"rev-parse", "HEAD"}, git.Options{Timeout: gitTimeout})
-	head := strings.TrimSpace(out)
-	if code != 0 {
+	head := git.Head(treeRoot, git.Options{Timeout: git.ReviewTimeout})
+	if head == "" {
 		return Moved{Text: msgHeadUnread}
 	}
 	recorded := markText(requested, "head")

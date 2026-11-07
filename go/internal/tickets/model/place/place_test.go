@@ -1,6 +1,9 @@
 package place
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 const tickets, approved = "wip/proposals", ".ccnavi/approved"
 
@@ -53,6 +56,16 @@ func TestProgress(t *testing.T) {
 
 func TestScratchDir(t *testing.T) {
 	if got := ScratchDir("/ws"); got != "/ws/scratchpad" {
+		t.Error(got)
+	}
+}
+
+func TestProposalPlaces(t *testing.T) {
+	sep := string(filepath.Separator)
+	if got := ProposalsRoot("/ws", "wip/proposals"); got != filepath.FromSlash("/ws/wip/proposals") {
+		t.Error(got)
+	}
+	if got := Dir("/ws", "wip/proposals", Review); got != filepath.FromSlash("/ws/wip/proposals")+sep+"review" {
 		t.Error(got)
 	}
 }

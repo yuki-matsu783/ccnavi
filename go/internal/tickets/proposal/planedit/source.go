@@ -2,14 +2,13 @@ package planedit
 
 import (
 	"cmp"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"slices"
 	"strings"
 	"unicode/utf8"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/digest"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/tickets/approval"
@@ -52,12 +51,12 @@ func (s *Source) SHA() string {
 		return cmp.Or(strings.Compare(a.ticket.Tree, b.ticket.Tree),
 			strings.Compare(approval.SourcePath(a.ticket), approval.SourcePath(b.ticket)))
 	})
-	h := sha256.New()
+	h := digest.New(digest.SHA256)
 	for _, f := range files {
 		fmt.Fprintf(h, "%s\x00%s\x00%d\x00", f.ticket.Tree, approval.SourcePath(f.ticket), len(f.raw))
 		h.Write(f.raw)
 	}
-	return hex.EncodeToString(h.Sum(nil))
+	return digest.HexSum(h)
 }
 
 // Load は振り直しの元を読む。親の提案を 1 回だけ読み、その中身で計画とハッシュを決める。

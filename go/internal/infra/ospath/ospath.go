@@ -256,6 +256,15 @@ func Relpath(path, start string) (string, bool) {
 	return rel, err == nil
 }
 
+// RelOr は start からの相対パス。相対にできない（Windows で別のドライブ）ときは path のまま
+// （Python の `try: os.path.relpath(path, start) except ValueError: path`）。
+func RelOr(path, start string) string {
+	if rel, ok := Relpath(path, start); ok {
+		return rel
+	}
+	return path
+}
+
 // DiskExists は os.path.exists（リンクは先を見る）。fsio の溜める段は見ない（記録やマーカーは fsio.Exists）。
 func DiskExists(p string) bool {
 	_, err := os.Stat(p)
@@ -353,20 +362,26 @@ func HasDrive(p string, letter bool) bool {
 }
 
 // Splitlines は str.splitlines()。行の区切りは Python と同じ集合で、区切り自体は残さない。
-func Splitlines(s string) []string {
+func Splitlines(s string) []string { return splitLines(s, false) }
+
+// SplitlinesKeep は str.splitlines(keepends=True)。区切りを行の末尾に残す（つなげると元に戻る）。
+func SplitlinesKeep(s string) []string { return splitLines(s, true) }
+
+func splitLines(s string, keep bool) []string {
 	var lines []string
 	start := 0
 	for i := 0; i < len(s); {
 		r, size := utf8.DecodeRuneInString(s[i:])
 		switch r {
-		case '\n', '\v', '\f', 0x1c, 0x1d, 0x1e, 0x85, 0x2028, 0x2029:
-			lines = append(lines, s[start:i])
-			start = i + size
-		case '\r':
-			lines = append(lines, s[start:i])
-			if i+1 < len(s) && s[i+1] == '\n' {
+		case '\n', '\v', '\f', 0x1c, 0x1d, 0x1e, 0x85, 0x2028, 0x2029, '\r':
+			if r == '\r' && i+1 < len(s) && s[i+1] == '\n' {
 				size = 2
 			}
+			end := i
+			if keep {
+				end = i + size
+			}
+			lines = append(lines, s[start:end])
 			start = i + size
 		}
 		i += size

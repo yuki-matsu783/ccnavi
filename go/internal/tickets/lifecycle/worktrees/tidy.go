@@ -256,7 +256,7 @@ func checkedOut(root, path string) string {
 	if !ospath.IsDir(path) || !tree.IsWorktreeOf(root, path) {
 		return ""
 	}
-	code, out := git.Output(path, []string{"rev-parse", "--abbrev-ref", "HEAD"}, git.Options{Timeout: timeout})
+	code, out := git.Output(path, []string{"rev-parse", "--abbrev-ref", "HEAD"}, git.Options{Timeout: git.CleanupTimeout})
 	name := ospath.Strip(out)
 	if code != 0 || name == "" || name == "HEAD" {
 		return ""

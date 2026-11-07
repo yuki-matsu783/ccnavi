@@ -62,15 +62,11 @@ func ReadBytes(file, treeRoot string) ([]byte, string) {
 	if before.Size() > fileLimit {
 		return nil, fmt.Sprintf("大きすぎるので読まない（%d バイト、上限 %d）", before.Size(), fileLimit)
 	}
-	f, err := os.Open(file)
+	f, after, err := fsio.OpenNoFollow(file)
 	if err != nil {
 		return nil, unreadable(err)
 	}
 	defer f.Close()
-	after, err := f.Stat()
-	if err != nil {
-		return nil, unreadable(err)
-	}
 	if !after.Mode().IsRegular() {
 		return nil, notRegular
 	}

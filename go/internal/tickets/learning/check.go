@@ -15,10 +15,7 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-const (
-	ticketScript   = "ccnavi-ticket.sh"
-	worktreeScript = "ccnavi-worktree.sh"
-)
+const ()
 
 // phaseOff はこの子のフェーズ定義（親に固定したコピー）が learning: off か。
 func phaseOff(conf *config.Settings, root string, found *ticket.Ticket) bool {
@@ -72,7 +69,7 @@ func RecordBlocked(stderr io.Writer, conf *config.Settings, root string, found *
 	if !ok || ospath.Strip(text) == "" {
 		write(stderr, "ccnavi: "+found.ID+" の気づきの記録（"+rel+"）が、子のブランチの HEAD に無いか、"+
 			"空か、リンクになっている（コミットが必要です）。"+
-			"'"+config.ScriptCommand(root, ticketScript)+" learn' を実行して記録を書き、"+
+			"'"+config.ScriptCommand(root, config.TicketWrapper)+" learn' を実行して記録を書き、"+
 			"git add と git commit をしてから閉じてください"+
 			"（気づきが無ければ learnings: none のままでよい）\n")
 		return true
@@ -100,7 +97,7 @@ func ParentBlocked(stderr io.Writer, conf *config.Settings, root string, found *
 	if !ospath.IsDir(parentTree) {
 		return false
 	}
-	ticketSh := config.ScriptCommand(root, ticketScript)
+	ticketSh := config.ScriptCommand(root, config.TicketWrapper)
 	if dirty := Uncommitted(parentTree); len(dirty) > 0 {
 		write(stderr, "ccnavi: "+found.ID+" の学びの置き場に未コミットか未追跡の変更がある: "+
 			strings.Join(dirty, ", ")+"。コミットしてから '"+ticketSh+" finish "+found.ID+"' を打ち直してください\n")

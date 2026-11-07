@@ -45,7 +45,7 @@ func wipUntracked(treeRoot string) ([]string, bool) {
 }
 
 func wipFiles(treeRoot string, args ...string) ([]string, bool) {
-	code, out := git.Output(treeRoot, args, git.Options{Timeout: gitTimeout})
+	code, out := git.Output(treeRoot, args, git.Options{Timeout: git.ReviewTimeout})
 	if code != 0 {
 		return nil, false
 	}
@@ -140,10 +140,7 @@ func RemoveWip(treeRoot string) ([]string, string, string) {
 	if bad := odd(treeRoot, names); len(bad) > 0 {
 		return nil, "", fmt.Sprintf(msgOddRemoved, named(bad))
 	}
-	head := ""
-	if code, out := git.Output(treeRoot, []string{"rev-parse", "HEAD"}, git.Options{Timeout: gitTimeout}); code == 0 {
-		head = strings.TrimSpace(out)
-	}
+	head := git.Head(treeRoot, git.Options{Timeout: git.ReviewTimeout})
 	var removed []string
 	for _, rel := range names {
 		full := ospath.Join(treeRoot, strings.Split(rel, "/")...)

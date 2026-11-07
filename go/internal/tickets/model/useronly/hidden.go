@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyre"
 	"ccnavi/internal/infra/shell"
@@ -33,15 +34,13 @@ type Layer struct {
 }
 
 const (
-	entryReview   = "ccnavi-review.sh"
-	entryLauncher = "ccnavi-launcher.sh"
-	entryExe      = "ccnavi"
+	entryExe = "ccnavi"
 	// stdinShell は、標準入力から読むシェルへ入口を流し込む形で見つけた語の代わりに返す印。
 	stdinShell = "標準入力から読むシェル"
 )
 
 var (
-	entryExes = []string{entryExe, "ccnavi.exe", "ccnavi.__main__", entryLauncher}
+	entryExes = []string{entryExe, "ccnavi.exe", "ccnavi.__main__", config.LauncherScript}
 	// entryPrefix は入口の前に置けるコマンド。どれも後ろの語をそのまま実行する。
 	entryPrefix = []string{"sh", "bash", "dash", "zsh", "ksh", "ash", "busybox", ".", "source", "exec", "command"}
 	// toolRunners は後ろの語を実行する Python のツールの実行役。間の選択肢と値は読み分けない。
@@ -50,7 +49,7 @@ var (
 	feeders     = []string{"xargs", "parallel"}
 	// execPrefix は実行される語の前に置けるもの（入口の前置きのほか、後ろの語を実行するコマンド）。
 	execPrefix   = slices.Concat(entryPrefix, []string{"env", "nice", "nohup", "time", "sudo", "timeout"})
-	namedScripts = []string{entryReview, entryLauncher}
+	namedScripts = []string{config.ReviewWrapper, config.LauncherScript}
 	// exeDiagnoses は実行ファイルの診断のオプション。どれも承認の経路より前に分かれて、承認を行わない。
 	exeDiagnoses = []string{"--docs", "--lint", "--test", "--test-expectations", "--explain", "--suggest", "--version", "--help", "-h"}
 )
@@ -231,7 +230,7 @@ func literalQuoted(subject string) string {
 
 func entryKind(word, binBase string) string {
 	base := baseName(word)
-	if base == entryReview {
+	if base == config.ReviewWrapper {
 		return base
 	}
 	if slices.Contains(entryExes, base) || binBase != "" && base == binBase {
@@ -293,7 +292,7 @@ func firstAfterWrapperOptions(args []string) string {
 // 組み合わせは HumanPathForm が先に止める。
 func hiddenArgs(kind string, args []string) string {
 	args = dropRedirects(args)
-	if kind == entryReview {
+	if kind == config.ReviewWrapper {
 		first := ""
 		if len(args) > 0 {
 			first = args[0]
@@ -486,7 +485,7 @@ func hiddenEntry(subject string, inner []Layer, binPath string) (string, string)
 			}
 			// 標準入力から読むシェルと並べて数える名前。sh の入口はファイルとして渡すだけで中身が流れ込む。
 			// 実行ファイルの名前は実行される語として立つときだけ数える（`cd /home/user/ccnavi` は数えない）。
-			if kind != entryExe || baseName(word) == entryLauncher || !positional || executedEntry(words[:i+1], binBase) != "" {
+			if kind != entryExe || baseName(word) == config.LauncherScript || !positional || executedEntry(words[:i+1], binBase) != "" {
 				if named == "" {
 					named = kind
 				}
@@ -571,7 +570,7 @@ func executedEntry(words []string, binBase string) string {
 	}
 	base := baseName(words[k])
 	if slices.Contains(namedScripts, base) {
-		if base == entryLauncher {
+		if base == config.LauncherScript {
 			return entryExe
 		}
 		return base
@@ -599,7 +598,7 @@ func HiddenEntryMessage(root, entry, found string) string {
 	}
 	kind := "other"
 	switch entry {
-	case entryReview:
+	case config.ReviewWrapper:
 		kind = "review"
 	case entryExe:
 		kind = "exe"

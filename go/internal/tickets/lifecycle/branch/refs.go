@@ -34,8 +34,6 @@ const (
 	maxPrompt = 20000
 	// cssWindow は `#` の前を CSS の色として見る長さ。
 	cssWindow = 40
-
-	startScript = "ccnavi-start.sh"
 )
 
 // 依頼文の式。番号は 0 で始まらない（`#000`・`#012345` のような色や連番を読まない）。本文の形（語のあとの番号・
@@ -297,7 +295,7 @@ func projectOfRepo(conf *config.Settings, root, repo string) (string, bool) {
 }
 
 func startLines(conf *config.Settings, root string, refs []Ref) []string {
-	sh := config.ScriptCommand(root, startScript)
+	sh := config.ScriptCommand(root, config.StartWrapper)
 	var labels, starts, notes []string
 	for _, r := range refs {
 		labels = append(labels, r.Label())

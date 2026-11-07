@@ -15,9 +15,6 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// worktreeScript はワークツリーを切る sh。
-const worktreeScript = "ccnavi-worktree.sh"
-
 func problem(t *ticket.Ticket, detail string) rules.Problem {
 	return rules.Problem{Severity: rules.Error, Rule: t.ID, Detail: detail}
 }
@@ -153,7 +150,7 @@ func BranchProblems(t *ticket.Ticket, others []*ticket.Ticket) []rules.Problem {
 // MisplacedHomeText は承認済みチケットが親のワークツリーに無いときの理由と直し方（HomeProblem と ready が使う）。
 // push と取り込みの sh はツリーの間でチケットを動かさないので、承認済みチケットは手で動かさず承認し直す。
 func MisplacedHomeText(root, family, shown string) string {
-	worktreeSh := config.ScriptCommand(root, worktreeScript)
+	worktreeSh := config.ScriptCommand(root, config.WorktreeWrapper)
 	return "親 " + family + " の承認済みチケットが親のワークツリー" +
 		"（" + tree.WorktreesDir + "/" + family + "）ではなく " + shown + " に在る。" +
 		"ccnavi は親のワークツリーを「名前が親の識別子のもの」として探すので、" +

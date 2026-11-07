@@ -102,7 +102,7 @@ func targets(top string, checkTracked bool) ([]string, string) {
 	var out []string
 	for _, rel := range generated(top) {
 		if checkTracked {
-			done := git.Run(top, []string{"ls-files", "-z", "--", ":(literal)" + rel}, git.Options{Timeout: timeout, RawPaths: true})
+			done := git.Run(top, []string{"ls-files", "-z", "--", ":(literal)" + rel}, git.Options{Timeout: git.CleanupTimeout, RawPaths: true})
 			if !done.OK() {
 				return nil, rel + " が追跡されているかを読めない。何も削除していません。"
 			}

@@ -3,9 +3,10 @@ package internal
 // internal/ の下の import の向きを守る。段の小さいパッケージは、段の大きいパッケージを読まない。
 // 循環は Go のコンパイラが止めるので、ここでは向きだけを見る。
 //
-// 段は 2 つの表で決める。topTiers は internal/ 直下の並び。subTiers は直下の中をさらに分けるときの並びで、
-// 同じ親の下の兄弟は、段が小さいものだけを読める（段が同じ兄弟は互いに読めない）。subTiers に親が
-// 無ければ、その中の兄弟どうしの向きは見ない。新しいパッケージを足すときは、先にこの表を直す。
+// 段は 2 つの表で決める。topTiers は internal/ 直下の並び。subTiers は親（"tickets" や "tickets/config"）の下を
+// さらに分けるときの並びで、同じ親の下の兄弟（とその下）は、段が小さい兄弟だけを読める（段が同じ兄弟は互いに
+// 読めない）。subTiers に親が無ければ、その中の兄弟どうしの向きは見ない。親がその下を読むのは見ない。
+// 新しいパッケージを足すときは、先にこの表を直す。
 
 import (
 	"go/parser"
@@ -33,10 +34,11 @@ var topTiers = map[string]int{
 var subTiers = map[string]map[string]int{
 	"infra": {
 		// 0: 何も読まない土台（環境変数の名前・Python の表記・os.path の写しと OS の分岐）
-		"env":    0,
-		"pyfmt":  0,
-		"ospath": 0,
-		"digest": 0, // 16 進の要約と乱数（記録・バックアップの名前）
+		"env":     0,
+		"pyfmt":   0,
+		"ospath":  0,
+		"digest":  0, // 16 進の要約と乱数（記録・バックアップの名前）
+		"difflib": 0, // Python の difflib の写し（見せる差分）
 		// 1: 土台だけを読む
 		"pathcase":    1,
 		"pyjson":      1,
@@ -50,6 +52,7 @@ var subTiers = map[string]map[string]int{
 		"pathmatch": 2,
 		"shell":     2,
 		"tree":      2,
+		"yamljson":  2, // YAML の値と JSON の値の写し替え（yaml と pyjson を読む）
 		// 3: fsio の上に立つ
 		"git": 3,
 	},
@@ -99,6 +102,24 @@ var subTiers = map[string]map[string]int{
 		"review":    7,
 		"core":      8,
 	},
+	// tickets の各パッケージの中。並びはいまの依存のとおり。
+	"tickets/approval": {"marks": 0, "wap": 1},
+	"tickets/config":   {"layer": 0, "phases": 1, "risk": 1, "check": 2},
+	"tickets/lifecycle": {
+		"internal": 0, "closing": 0, "plan": 0, "treegate": 0, "worktrees": 0,
+		"stop": 1, "consolidate": 1, "retire": 1, "wapmerge": 1, "ops": 1,
+		"integrate": 2,
+		"branch":    3,
+	},
+	"tickets/model": {
+		"ids": 0, "place": 0, "directcand": 0, "handoffnames": 0, "host": 0, "oplog": 0, "pyoracle": 0,
+		"useronly": 0, "via": 0,
+		"ticket": 1, "standing": 1, "guard": 1,
+		"archive": 2, "fields": 2, "form": 2,
+	},
+	"tickets/proposal": {"internal": 0, "candidates": 0, "propose": 0, "templates": 1, "planedit": 1, "agree": 2, "scaffold": 2},
+	"tickets/review":   {"request": 0, "closeout": 1, "decide": 1},
+	"tickets/sync":     {"handoff": 0, "mirror": 0, "drafts": 1},
 }
 
 // importsOf は internal/ の下の各パッケージ（internal/ からの相対パス）と、それが読む internal/ のパッケージを返す。
@@ -134,7 +155,7 @@ func importsOf(t *testing.T) map[string][]string {
 	return out
 }
 
-// violation は from が to を読んではいけない理由を返す。読んでよければ空。
+// violation は from が to を読んではいけない理由を返す。読んでよければ空。分かれる所（最初に違う名前）の親の表で比べる。
 func violation(from, to string) string {
 	fs, ts := strings.Split(from, "/"), strings.Split(to, "/")
 	if fs[0] != ts[0] {
@@ -143,12 +164,19 @@ func violation(from, to string) string {
 		}
 		return ""
 	}
-	tiers, ok := subTiers[fs[0]]
-	if !ok || len(fs) < 2 || len(ts) < 2 || fs[1] == ts[1] {
+	d := 1
+	for d < len(fs) && d < len(ts) && fs[d] == ts[d] {
+		d++
+	}
+	if d == len(fs) || d == len(ts) {
+		return "" // 親と子のあいだ
+	}
+	tiers, ok := subTiers[strings.Join(fs[:d], "/")]
+	if !ok {
 		return ""
 	}
-	if tiers[ts[1]] >= tiers[fs[1]] {
-		return "兄弟で上か同じ段の " + ts[0] + "/" + ts[1] + " を読んでいる"
+	if tiers[ts[d]] >= tiers[fs[d]] {
+		return "兄弟で上か同じ段の " + strings.Join(ts[:d+1], "/") + " を読んでいる"
 	}
 	return ""
 }
@@ -163,10 +191,12 @@ func TestLayers(t *testing.T) {
 			t.Errorf("%s: 段の表（topTiers）に無い", pkg)
 			continue
 		}
-		if tiers, ok := subTiers[top]; ok {
-			if parts := strings.Split(pkg, "/"); len(parts) >= 2 {
-				if _, ok := tiers[parts[1]]; !ok {
-					t.Errorf("%s: 段の表（subTiers[%s]）に無い", pkg, top)
+		parts := strings.Split(pkg, "/")
+		for d := 1; d < len(parts); d++ {
+			parent := strings.Join(parts[:d], "/")
+			if tiers, ok := subTiers[parent]; ok {
+				if _, ok := tiers[parts[d]]; !ok {
+					t.Errorf("%s: 段の表（subTiers[%s]）に無い", pkg, parent)
 				}
 			}
 		}
@@ -195,6 +225,13 @@ func TestViolation(t *testing.T) {
 		{"infra/pathcase", "infra/ospath", false},
 		{"infra/ospath", "infra/pathcase", true},
 		{"infra/tree", "infra/fsio", true},
+		{"tickets/config/check", "tickets/config/risk", false},
+		{"tickets/config/risk", "tickets/config/phases", true},
+		{"tickets/review/closeout", "tickets/review/request", false},
+		{"tickets/review/request", "tickets/review/decide", true},
+		{"tickets/lifecycle/integrate/x", "tickets/lifecycle/stop", false},
+		{"tickets/approval", "tickets/approval/marks", false},
+		{"tickets/lifecycle/stop", "tickets/model", false},
 	}
 	for _, c := range cases {
 		if got := violation(c.from, c.to) != ""; got != c.bad {

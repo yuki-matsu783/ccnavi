@@ -1,8 +1,6 @@
 package mirror
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"hash"
 	"os"
 	"slices"
@@ -10,6 +8,7 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/digest"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyjson"
@@ -55,8 +54,8 @@ func Sync(conf *config.Settings, root string) []string {
 
 // syncOne は 1 つの親のワークツリーに、ミラー、工程スキルの順に写す。
 func syncOne(conf *config.Settings, root, ticket, project, worktree string) []string {
-	sources := []string{mirrorDir(conf, root), skillSource(root)}
-	places := append(slices.Clone(sources), mirrorDir(conf, worktree), ospath.Join(worktree, skillsDir))
+	sources := []string{conf.CommonLayerDir(root), skillSource(root)}
+	places := append(slices.Clone(sources), conf.CommonLayerDir(worktree), ospath.Join(worktree, skillsDir))
 	sigPath := ""
 	if conf.State != "" {
 		sigPath = fsio.RecordPath(conf.State, SignaturePrefix, ticket, fsio.JSONExt)
@@ -120,18 +119,18 @@ func appendRels(rels []string, changes []Change) []string {
 	return rels
 }
 
-// signature は置き場の下のファイルの名前・種類・大きさ・更新時刻の指紋。stat だけで作り、中身は読まない。
+// signature は置き場の下のファイルの名前・種類・大きさ・更新時刻・inode・変更時刻の指紋。stat だけで作り、中身は読まない。
 // リンクはたどらず、リンクであることを指紋に入れる。置き場が無いことも指紋になる。
 func signature(places []string) string {
-	digest := sha256.New()
+	sum := digest.New(digest.SHA256)
 	for _, place := range places {
-		digest.Write([]byte("\x00place\x00" + place))
-		signDir(digest, place, place)
+		sum.Write([]byte("\x00place\x00" + place))
+		signDir(sum, place, place)
 	}
-	return hex.EncodeToString(digest.Sum(nil))
+	return digest.HexSum(sum)
 }
 
-func signDir(digest hash.Hash, place, dir string) {
+func signDir(sum hash.Hash, place, dir string) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return
@@ -157,11 +156,17 @@ func signDir(digest hash.Hash, place, dir string) {
 		case info.IsDir():
 			kind = "d"
 		}
+		ino, ctime, ok := ospath.Identity(path)
+		if !ok {
+			continue
+		}
+		// inode と変更時刻（ctime）も入れる。更新時刻を戻して同じ大きさで書き換えても、ctime は戻せない。
 		row := relPlain(place, path) + "\x00" + kind + "\x00" + strconv.FormatInt(info.Size(), 10) + "\x00" +
-			strconv.FormatInt(info.ModTime().UnixNano(), 10) + "\n"
-		digest.Write([]byte(row))
+			strconv.FormatInt(info.ModTime().UnixNano(), 10) + "\x00" + strconv.FormatUint(ino, 10) + "\x00" +
+			strconv.FormatInt(ctime, 10) + "\n"
+		sum.Write([]byte(row))
 	}
 	for _, e := range dirs {
-		signDir(digest, place, ospath.Join(dir, e.Name()))
+		signDir(sum, place, ospath.Join(dir, e.Name()))
 	}
 }

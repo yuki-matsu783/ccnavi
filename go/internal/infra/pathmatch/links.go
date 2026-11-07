@@ -60,7 +60,7 @@ func HasLink(root, path string) bool {
 	if unresolvable(root, path) {
 		return true
 	}
-	base := pathcase.Fold(ospath.Realpath(root))
+	base := pathcase.Real(root)
 	top := pathcase.Fold(ospath.Abspath(root))
 	inside := strings.TrimRight(top, ospath.Sep) + ospath.Sep
 	current := ospath.Abspath(path)
@@ -70,7 +70,7 @@ func HasLink(root, path string) bool {
 		}
 		// root の下の綴りなら root まで 1 段ずつ調べる（途中のリンクが root の中へ戻っても見逃さない）。
 		outside := !strings.HasPrefix(pathcase.Fold(current), inside)
-		if outside && pathcase.Fold(ospath.Realpath(current)) == base {
+		if outside && pathcase.Real(current) == base {
 			return false
 		}
 		parent := ospath.Dirname(current)
@@ -114,7 +114,6 @@ func Escapes(root, path string) bool {
 	if unresolvable(root, path) {
 		return true
 	}
-	top := pathcase.Fold(ospath.Realpath(root))
-	real := pathcase.Fold(ospath.Realpath(path))
+	top, real := pathcase.Real(root), pathcase.Real(path)
 	return real != top && !strings.HasPrefix(real, top+ospath.Sep)
 }

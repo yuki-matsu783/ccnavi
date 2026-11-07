@@ -12,7 +12,18 @@ import (
 )
 
 // StampLayout は、マーカーと記録に書く時刻の形。Python の "%Y-%m-%dT%H:%M:%S%z" に当たる。
-const StampLayout = "2006-01-02T15:04:05-0700"
+const StampLayout = LocalStampLayout + "-0700"
+
+// LocalStampLayout は StampLayout の時差の前まで（"%Y-%m-%dT%H:%M:%S"、19 字）。
+const LocalStampLayout = "2006-01-02T15:04:05"
+
+// 名前に入れる時刻の形。どれも名前の順と時刻の順が合う。
+const (
+	// IDStampLayout は識別子に入れる 14 桁の時刻（"%Y%m%d%H%M%S"）。
+	IDStampLayout = "20060102150405"
+	// NameStampLayout はローテートした記録・退避した版の名前の頭の時刻（"%Y%m%d-%H%M%S"）。
+	NameStampLayout = "20060102-150405"
+)
 
 // ISOStampLayout は、時差にコロンを入れた ISO 8601 の時刻（Python の datetime.isoformat の秒まで）。
 // 判定の記録と診断ログが書く。

@@ -26,7 +26,7 @@ const Ask = "ユーザには、`ccnavi-user-mirror.sh <プロジェクト名>` �
 
 // prefixes はプロジェクトのツリーで写したものを置く場所（ルートからの相対、末尾に "/"、畳んだもの）。
 func prefixes(conf *config.Settings) []string {
-	mirror := strings.Trim(ospath.Slashed(mirrorDir(conf, "")), "/")
+	mirror := strings.Trim(ospath.Slashed(conf.CommonLayerDir("")), "/")
 	return []string{pathcase.Fold(mirror + "/"), pathcase.Fold(skillsDir + "/")}
 }
 

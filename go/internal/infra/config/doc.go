@@ -12,4 +12,7 @@
 // 閾値・保持日数）→ Int・Finite、modes.fail_closed(mode, None) →
 // FailClosedEvent、fail_closed(mode, tool, safe=…) → FailClosed。toolnames の組の中のツール名 1 つ → Tool* の定数。
 // settings が写していた ticket_ids.RESERVED_BRANCH_IDS → ReservedBranchIDs（ids.ReservedBranchIDs はこれを指す）。
+// toolnames.WRITE_MATCH → WriteMatch、configsync.mirror_dir → Settings.CommonLayerDir、上の段が直書きしていた
+// sh の名前（ccnavi-review.sh など）→ ReviewWrapper・StartWrapper・WorktreeWrapper・LauncherScript、
+// `logs/direct-tmp` → DirectTmpDir。
 package config

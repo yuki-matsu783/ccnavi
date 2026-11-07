@@ -7,8 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/records/redact"
+	"ccnavi/internal/records/wiki"
 )
 
 // 気づき 1 件の欄の選び方。
@@ -26,7 +28,6 @@ const (
 	titleLimit = 60
 	// inboxTries は受信箱の名前を重ならないように選ぶ回数。
 	inboxTries = 50
-	stampUTC   = "20060102150405"
 	digestExt  = ".digest.json"
 )
 
@@ -44,10 +45,10 @@ func inboxRel(ident, stamp string, n int) string {
 	if n > 0 {
 		suffix = "-" + strconv.Itoa(n)
 	}
-	return InboxDir + "/" + ident + "-" + stamp + suffix + mdExt
+	return wiki.InboxDir + "/" + ident + "-" + stamp + suffix + mdExt
 }
 
-func utc14() string { return time.Now().UTC().Format(stampUTC) }
+func utc14() string { return time.Now().UTC().Format(fsio.IDStampLayout) }
 
 func scaffoldText(ident, parent string) string {
 	return fence + "\nticket: " + ident + "\nparent: " + parent + "\n" + learningsKey + ": " + noneCount + "\n" + fence + "\n\n"

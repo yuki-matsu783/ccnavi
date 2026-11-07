@@ -106,25 +106,18 @@ func LoadTree(treeRoot string) *Wiki {
 
 // CommitOf は参照が指すコミットの sha。決められなければ空。deadline がゼロ値なら git の既定の期限。
 func CommitOf(repo, ref string, deadline time.Time) string {
-	done := run(repo, []string{"rev-parse", "--verify", "--quiet", ref + "^{commit}"}, deadline)
+	done := git.Run(repo, []string{"rev-parse", "--verify", "--quiet", ref + "^{commit}"}, git.Options{Deadline: deadline})
 	if !done.OK() {
 		return ""
 	}
 	return ospath.Strip(done.Out)
 }
 
-func run(repo string, args []string, deadline time.Time) git.Done {
-	if deadline.IsZero() {
-		return git.Run(repo, args, git.Options{})
-	}
-	return git.RunUntil(repo, args, deadline, git.Options{})
-}
-
 // LoadCommit はコミット rev の docs/wiki/ を、チェックアウトせずに読む。読めなければ nil。
 // docs/wiki/ がそのコミットに無いのは読めた結果で、Present が偽の空の Wiki。期限を過ぎた・git が失敗した・
 // blob が読めないときは nil（一部だけ読んだ答えは返さない）。
 func LoadCommit(repo, rev string, deadline time.Time) *Wiki {
-	listed := run(repo, []string{"ls-tree", "-z", "-l", rev, PatternsDir + "/", ImpactDir + "/"}, deadline)
+	listed := git.Run(repo, []string{"ls-tree", "-z", "-l", rev, PatternsDir + "/", ImpactDir + "/"}, git.Options{Deadline: deadline})
 	if !listed.OK() {
 		return nil
 	}
@@ -163,7 +156,7 @@ func LoadCommit(repo, rev string, deadline time.Time) *Wiki {
 		case !pyfmt.IsDigit(size) || sizeErr != nil || n > fileLimit:
 			t.broken = append(t.broken, Broken{path, kind, problemTooLarge})
 		default:
-			blob := run(repo, []string{"cat-file", "blob", sha}, deadline)
+			blob := git.Run(repo, []string{"cat-file", "blob", sha}, git.Options{Deadline: deadline})
 			if !blob.OK() {
 				return nil
 			}

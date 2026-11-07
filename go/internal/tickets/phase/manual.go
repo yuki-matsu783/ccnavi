@@ -49,15 +49,14 @@ const (
 		"動かした経路の記録が無い。confirm か decide で確かめる"
 	brokenLine = "手動移動を確かめられない: %s"
 
-	duplicateNote   = "同じ識別子の子が重複している"
-	badTimeNote     = "移動の時刻を読めない"
-	unsharedNote    = "unshared"
-	noBranchNote    = "親のブランチを読めない"
-	outsideNote     = "%s の done/ のファイルが親のツリーの外にある"
-	noStatusNote    = "git status を読めない"
-	noLogNote       = "git log を読めない"
-	noRemoteNote    = "origin/ のブランチを読めない"
-	ancestorMissing = 1 // merge-base --is-ancestor が「入っていない」と答える終了コード
+	duplicateNote = "同じ識別子の子が重複している"
+	badTimeNote   = "移動の時刻を読めない"
+	unsharedNote  = "unshared"
+	noBranchNote  = "親のブランチを読めない"
+	outsideNote   = "%s の done/ のファイルが親のツリーの外にある"
+	noStatusNote  = "git status を読めない"
+	noLogNote     = "git log を読めない"
+	noRemoteNote  = "origin/ のブランチを読めない"
 )
 
 // Manual は手動の移動の判定。
@@ -205,7 +204,7 @@ func shared(root string, parent *ticket.Ticket, hand []*ticket.Ticket) (time.Tim
 		if !ok || rel == "" || strings.HasPrefix(rel, "..") {
 			return time.Time{}, fmt.Sprintf(outsideNote, t.ID)
 		}
-		dirty := git.Run(top, []string{"status", "--porcelain", "--", rel}, git.Options{})
+		dirty := git.Status(top, git.Porcelain{Paths: []string{rel}}, git.Options{})
 		if !dirty.OK() {
 			return time.Time{}, noStatusNote
 		}
@@ -224,8 +223,8 @@ func shared(root string, parent *ticket.Ticket, hand []*ticket.Ticket) (time.Tim
 		if err != nil {
 			return time.Time{}, noLogNote
 		}
-		contained := git.Run(top, []string{"merge-base", "--is-ancestor", fields[1], "origin/" + branch}, git.Options{})
-		if contained.Code == ancestorMissing {
+		contained := git.IsAncestor(top, fields[1], "origin/"+branch, git.Options{})
+		if contained.Code == git.NotAncestorCode {
 			return time.Time{}, unsharedNote
 		}
 		if !contained.OK() {

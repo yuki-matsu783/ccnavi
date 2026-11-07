@@ -62,7 +62,7 @@ func ReadMark(approvedDir, parent string, phase int, kind Kind) (*pyjson.Object,
 
 // WriteMark はマーカーを書く（at が無ければ今の時刻を足す）。書けなければ理由。
 func WriteMark(approvedDir, parent string, phase int, kind Kind, data *pyjson.Object) string {
-	return writeJSON(MarkPath(approvedDir, parent, phase, kind), stamped(data), 0)
+	return writeJSON(MarkPath(approvedDir, parent, phase, kind), stamped(data), fsio.JSONCompact)
 }
 
 // Marks はこのフェーズに在るマーカー（種類 → 中身）。
@@ -88,7 +88,7 @@ func ReadParent(approvedDir, parent string, name Parent) (*pyjson.Object, bool) 
 
 // WriteParent は親ごとのマーカーを書く（at が無ければ今の時刻を足す）。書けなければ理由。
 func WriteParent(approvedDir, parent string, name Parent, data *pyjson.Object) string {
-	return writeJSON(ParentPath(approvedDir, parent, name), stamped(data), 1)
+	return writeJSON(ParentPath(approvedDir, parent, name), stamped(data), fsio.JSONIndentOne)
 }
 
 // RecordPath は子ごとの記録のパス。
@@ -103,7 +103,7 @@ func ReadRecord(approvedDir, parent, child string, kind Record) (*pyjson.Object,
 
 // WriteRecord は子ごとの記録を書く（時刻は足さない）。書けなければ理由。
 func WriteRecord(approvedDir, parent, child string, kind Record, data *pyjson.Object) string {
-	return writeJSON(RecordPath(approvedDir, parent, child, kind), data, 1)
+	return writeJSON(RecordPath(approvedDir, parent, child, kind), data, fsio.JSONIndentOne)
 }
 
 // ReadLedger は台帳の項目と、読めなかった理由（読めれば空）。無ければ空の台帳。
@@ -186,16 +186,12 @@ func stamped(data *pyjson.Object) *pyjson.Object {
 	return out
 }
 
-func writeJSON(path string, data *pyjson.Object, indent int) string {
+func writeJSON(path string, data *pyjson.Object, indent fsio.JSONIndent) string {
 	if data == nil {
 		data = pyjson.NewObject()
 	}
-	text, err := pyjson.Dumps(data, pyjson.Options{RawUnicode: true, Indent: indent})
-	if err != nil {
-		return "保存できませんでした (" + err.Error() + ")"
-	}
 	defer fsio.SetPolicy(func(p *fsio.Policy) { p.Message = saveFailed })()
-	if failed := fsio.WriteText(path, text, fsio.NativeNewline, fsio.Plain); failed != "" {
+	if failed := fsio.WriteJSONAs(path, data, fsio.JSONFormat{Indent: indent}); failed != "" {
 		return "保存できませんでした (" + failed + ")"
 	}
 	return ""

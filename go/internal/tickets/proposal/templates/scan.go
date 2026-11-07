@@ -16,11 +16,11 @@ import (
 	"ccnavi/internal/infra/pathmatch"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/tree"
+	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/policy/ruleload"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/config/phases"
 	"ccnavi/internal/tickets/flow"
-	"ccnavi/internal/tickets/proposal/internal/yamlval"
 )
 
 // Dropped は統合結果で取り込まれない理由。
@@ -240,7 +240,7 @@ func differing(a, b *Template) []string {
 	same := []bool{
 		a.Name == b.Name, a.Description == b.Description, a.When == b.When,
 		slices.EqualFunc(a.Plan, b.Plan, Item.equal), slices.EqualFunc(a.Feedback, b.Feedback, Item.equal),
-		yamlval.Equal(a.flowsData(), b.flowsData()),
+		yaml.Equal(a.flowsData(), b.flowsData()),
 	}
 	var out []string
 	for i, ok := range same {

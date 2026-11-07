@@ -236,11 +236,8 @@ func Note(conf *config.Settings, root, parent, project, treeRoot string, mr any)
 			data.Set(keyMR, n)
 		}
 	}
-	text, err := pyjson.Dumps(data, pyjson.Options{RawUnicode: true, Indent: 1})
-	if err != nil {
-		return "片付けの記録を書けない（" + path + ": " + err.Error() + "）"
-	}
-	if failed := fsio.WriteText(path, text+"\n", fsio.LF, fsio.Atomic); failed != "" {
+	format := fsio.JSONFormat{Indent: fsio.JSONIndentOne, FinalNewline: true, Newline: fsio.LF, How: fsio.Atomic}
+	if failed := fsio.WriteJSONAs(path, data, format); failed != "" {
 		return "片付けの記録を書けない（" + path + ": " + failed + "）"
 	}
 	return ""
