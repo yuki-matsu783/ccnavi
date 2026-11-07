@@ -122,6 +122,8 @@ var subTiers = map[string]map[string]int{
 	"tickets/proposal": {"internal": 0, "candidates": 0, "propose": 0, "templates": 1, "planedit": 1, "agree": 2, "scaffold": 2},
 	"tickets/review":   {"request": 0, "closeout": 1, "decide": 1},
 	"tickets/sync":     {"handoff": 0, "mirror": 0, "drafts": 1},
+	// 目録。1 つのツリーの索引（docindex）の上に、ツリーを合わせて引く docs が立つ。
+	"catalog": {"docindex": 0, "skills": 0, "docs": 1},
 }
 
 // importsOf は internal/ の下の各パッケージ（internal/ からの相対パス）と、それが読む internal/ のパッケージを返す。
