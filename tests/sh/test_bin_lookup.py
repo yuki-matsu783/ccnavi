@@ -16,11 +16,13 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi.infra import platformtag
 from tests import ROOT
+from tests.sh.install_harness import host_target
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 SCRIPTS = os.path.join(ROOT, ".ccnavi", "scripts")
+
+LAUNCHER = "ccnavi-launcher.sh"
 
 # 呼ばれたら、どれが呼ばれたかと引数を 1 行で出す。
 STUB = '#!/bin/sh\nprintf "%s %s\\n" "{name}" "$*"\n'
@@ -39,8 +41,8 @@ class BinLookupTest(unittest.TestCase):
         self.ws = tempfile.mkdtemp(prefix="ccnavi-bin-")
         self.addCleanup(shutil.rmtree, self.ws, ignore_errors=True)
         shutil.copytree(SCRIPTS, os.path.join(self.ws, ".ccnavi", "scripts"))
-        os.chmod(os.path.join(self.ws, ".ccnavi", "scripts", platformtag.LAUNCHER_NAME), 0o755)
-        self.target = platformtag.host_target()
+        os.chmod(os.path.join(self.ws, ".ccnavi", "scripts", LAUNCHER), 0o755)
+        self.target = host_target()
 
     def run_ticket(self, **env):
         full = {k: v for k, v in os.environ.items() if k != "CCNAVI_ENTRY_PATH"}
@@ -107,7 +109,7 @@ class BinLookupTest(unittest.TestCase):
         無いものとして扱う。"""
         place = os.path.join(self.ws, "on-path")
         os.makedirs(place)
-        launcher = os.path.join(self.ws, ".ccnavi", "scripts", platformtag.LAUNCHER_NAME)
+        launcher = os.path.join(self.ws, ".ccnavi", "scripts", LAUNCHER)
         try:
             os.symlink(launcher, os.path.join(place, "ccnavi"))
         except (OSError, NotImplementedError):

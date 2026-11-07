@@ -28,14 +28,14 @@ import re
 import shutil
 import stat
 import subprocess
-import sys
 import tempfile
 import unicodedata
 import unittest
 from unittest import mock
 
-from tests import ROOT, SRC, common_sh, exe, put_messages
+from tests import ROOT, common_sh, exe, put_messages
 from tests.draft import final
+from tests.inproc import run_ccnavi
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 REAL_GIT = shutil.which("git")
@@ -409,16 +409,11 @@ class WorktreeShTest(unittest.TestCase):
             ).returncode,
         )
         self.assertIn("横で作業する: はい", result.stdout)
-        # 書き手の出力を、実行後チェックの読み取りが有効と読む。
-        sys.path.insert(0, SRC)
-        try:
-            from ccnavi.infra import directrec, tree
-
-            found = directrec.records_of(self.ws, tree.main_tree(self.ws))
-        finally:
-            sys.path.remove(SRC)
-        self.assertEqual(["topic"], [r.name for r in found])
-        self.assertEqual("main", found[0].base_branch)
+        # 書き手の出力を、実行ファイル（lint の直接作業の検査）の読み取りが有効と読む。
+        lint = run_ccnavi(["--root", self.ws, "--lint"], cwd=self.ws)
+        self.assertIn("横で作業する指定が有効です", lint.stdout + lint.stderr)
+        self.assertIn("/topic)", lint.stdout + lint.stderr)
+        self.assertNotIn("壊れています", lint.stdout + lint.stderr)
 
     def test_side_by_side_alone_does_not_ask_here_the_ask_rule_does(self):
         result = self.run_sh("topic", "--side-by-side")

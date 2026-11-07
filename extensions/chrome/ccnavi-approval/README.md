@@ -76,7 +76,8 @@ MR のスレッドとレビューを取ってくる処理は、手元の sh（`.
 1. 見本を直す。実際の MR を `gh api`（REST）と `gh api graphql`（`ccnavi-review.sh` の `threads` と同じ問い合わせ）で取り、
    該当の場面のファイルを置き換えるか、形の変わった欄だけを手で直す。トークン・個人の名前・社内の URL は見本に残さない
 2. リポジトリのルートで `CCNAVI_HOST_FIXTURE=1 uv run python -m unittest tests.sh.test_review_host_fixture` を回し、sh が組んだ結果で
-   `expected.json` と `conclusion.json` を書き直す。差分が意図どおりか（sh が新しい形を正しく読めているか）を目で確かめる。
+   `expected.json` を書き直す。続けて `go/` で `CCNAVI_HOST_FIXTURE=1 go test ./internal/tickets/model/host -run HostFixture` を回し、
+   実行ファイルが出す結論で `conclusion.json` を書き直す。差分が意図どおりか（sh が新しい形を正しく読めているか）を目で確かめる。
    読めていなければ `ccnavi-review.sh` を直す
 3. `pnpm test` を回す。CX-T129 が失敗したら `src/core/github.ts` を直して sh と同じ結果にする
 4. 見本・期待値・sh・TS の変更を同じコミットに入れる（片方だけ変えると、もう片方の試験が失敗する）

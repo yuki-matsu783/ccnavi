@@ -31,8 +31,7 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi.entry import version
-from tests import ROOT, common_sh
+from tests import ROOT, common_sh, exe
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
@@ -132,7 +131,7 @@ class Workspace(unittest.TestCase):
             os.path.join(self._tmp.name, "write-and-push-bin", "ccnavi"),
             "#!/bin/sh\n"
             'case " $* " in\n'
-            f"*\" --version \"*) printf 'compat: {version.COMPAT}\\n'; exit 0 ;;\n"
+            f"*\" --version \"*) printf 'compat: {exe.compat()}\\n'; exit 0 ;;\n"
             '*" write-and-push family "*) printf \'write-and-push 1\\nfamily i0001\\ntarget '
             "no\\n'; exit 0 ;;\n"
             # 親か・承認済みか（push のゲートが聞く）。STUB_PARENT があるときだけ答える。
@@ -776,7 +775,7 @@ class ApproveCarriesTest(Workspace):
         super().setUp()
         self.stub = write(
             os.path.join(self._tmp.name, "bin", "ccnavi"),
-            STUB.replace("{compat}", str(version.COMPAT)),
+            STUB.replace("{compat}", exe.compat()),
         )
         os.chmod(self.stub, os.stat(self.stub).st_mode | stat.S_IXUSR | stat.S_IXGRP)
 

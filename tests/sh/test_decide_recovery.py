@@ -20,7 +20,7 @@ import subprocess
 import time
 import unittest
 
-from ccnavi.tickets.model import oplog
+from tests import oprecord
 from tests.sh import decide_support as support
 from tests.sh import test_decide_ops as ops
 from tests.sh import test_review_decide as base
@@ -149,8 +149,8 @@ class DecideRecoveryShTest(unittest.TestCase):
         record = self.record()
         self.assertTrue(record["applied"]["local"])
         # 自分が作った子と動かした子を記録に足す。ホストは、直す指摘が未解決のまま、指摘も増えた
-        oplog.applied_set(self.state, record["id"], "followup", "i0001-01-03")
-        oplog.applied_set(self.state, record["id"], "moved", ["i0001-01-01", "i0001-01-02"])
+        record["applied"].update(followup="i0001-01-03", moved=["i0001-01-01", "i0001-01-02"])
+        oprecord.save(self.state, record)
         GitLab.discussions = {"d1": True, "d2": False, "d3": False}
         STORE["reject"].clear()
         self.age(record["id"], "note")

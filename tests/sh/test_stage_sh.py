@@ -333,38 +333,39 @@ class StageShTest(unittest.TestCase):
         self.assertEqual(1, len(nexts), result.stdout)
         self.assertIn("取り込みの手順をユーザに案内", nexts[0])
 
-    def test_importable_classification_matches_the_python_kinds(self):
-        """sh の is_importable が、実行ファイルの KINDS と同じ答えを返す（表のずれを見つける）。"""
-        from ccnavi.tickets.sync import handoff
+    def test_importable_classification(self):
+        """sh の is_importable が、取り込める種類の表と同じ答えを返す（表のずれを見つける）。
 
-        paths = [
-            ".ccnavi/config/common/templates/a.yml",
-            ".ccnavi/messages/a.yml",
-            ".ccnavi/messages/sub/a.yml",
-            "projects/p/.ccnavi/messages/a.yml",
-            ".ccnavi/config/common/messages/deny.yml",  # 古い置き場。取り込めない
-            ".ccnavi/config/project/templates/a.yml",
-            ".ccnavi/config/project/templates/sub/a.yml",
-            ".ccnavi/config/common/templates/x/templates/a.yml",
-            ".ccnavi/docs/.md",
-            "projects/p/.ccnavi/config/project/templates/a.yml",
-            ".ccnavi/config/common/rules.yml",
-            ".ccnavi/config/project/risks.yml",
-            "projects/p/.ccnavi/config/project/phases.yml",
-            "projects/p/.ccnavi/config/common/rules.yml",
-            ".ccnavi/docs/a/b.md",
-            ".ccnavi/CCNAVI.md",
-            ".ccnavi/scripts/ccnavi-stage.sh",
-            ".claude/hooks/lint-py.sh",
-            ".claude/settings.json",
-            ".claude/settings.local.json",
-            ".claude/hooks/a/b/c.py",
-            ".ccnavi/scripts/ccnavi-handoff-names.txt",
-            ".ccnavi/scripts/sub/x.sh",
-            ".claude/skills/x/SKILL.md",
-            ".claude/skills/x/y/z.md",
-            ".claude/skills/x/y/z.txt",
-            "README.md",
+        実行ファイルの種類（handoff の KindOf）は go test（stage_sh_test.go）が同じ表で見る。
+        """
+        cases = [
+            (".ccnavi/config/common/templates/a.yml", True),
+            (".ccnavi/messages/a.yml", True),
+            (".ccnavi/messages/sub/a.yml", False),
+            ("projects/p/.ccnavi/messages/a.yml", False),
+            (".ccnavi/config/common/messages/deny.yml", False),  # 古い置き場。取り込めない
+            (".ccnavi/config/project/templates/a.yml", True),
+            (".ccnavi/config/project/templates/sub/a.yml", False),
+            (".ccnavi/config/common/templates/x/templates/a.yml", False),
+            (".ccnavi/docs/.md", False),
+            ("projects/p/.ccnavi/config/project/templates/a.yml", True),
+            (".ccnavi/config/common/rules.yml", True),
+            (".ccnavi/config/project/risks.yml", True),
+            ("projects/p/.ccnavi/config/project/phases.yml", True),
+            ("projects/p/.ccnavi/config/common/rules.yml", False),
+            (".ccnavi/docs/a/b.md", True),
+            (".ccnavi/CCNAVI.md", True),
+            (".ccnavi/scripts/ccnavi-stage.sh", True),
+            (".claude/hooks/lint-py.sh", True),
+            (".claude/settings.json", True),
+            (".claude/settings.local.json", True),
+            (".claude/hooks/a/b/c.py", True),
+            (".ccnavi/scripts/ccnavi-handoff-names.txt", True),
+            (".ccnavi/scripts/sub/x.sh", True),
+            (".claude/skills/x/SKILL.md", True),
+            (".claude/skills/x/y/z.md", True),
+            (".claude/skills/x/y/z.txt", False),
+            ("README.md", False),
         ]
         script = os.path.join(SH_DIR, "ccnavi-stage.sh")
         # 保護対象の下書き（取り込み前）があれば、取り込んだ後の姿として下書きを読む。
@@ -375,10 +376,8 @@ class StageShTest(unittest.TestCase):
             text = f.read()
         start = text.index("is_importable() {")
         func = text[start : text.index("\n}\n", start) + 3]
-        for rel in paths:
+        for rel, want in cases:
             with self.subTest(rel=rel):
-                kind = handoff.kind_of(handoff.key_of(rel))
-                want = kind is not None
                 got = (
                     subprocess.run(
                         [SHELL, "-c", f"{func}\nis_importable '{rel}'"], capture_output=True

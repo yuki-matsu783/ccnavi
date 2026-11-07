@@ -28,7 +28,6 @@ import threading
 import unittest
 from datetime import UTC, datetime, timedelta
 
-from ccnavi.entry import version
 from tests import common_sh, exe, fake_gitlab
 from tests.sh.test_review_host_fixture import REVIEW_SH, SH_DIR, STUB, write
 
@@ -466,7 +465,7 @@ class ReviewShReadsTheFakeTest(unittest.TestCase):
         self.args = os.path.join(tmp, "args.txt")
         self.exe = write(
             os.path.join(tmp, "exe", "ccnavi"),
-            STUB.format(compat=version.COMPAT, log=self.args, exe=exe.sh_path()),
+            STUB.format(compat=exe.compat(), log=self.args, exe=exe.sh_path()),
         )
         os.chmod(self.exe, 0o755)
 

@@ -104,7 +104,7 @@ class NoTicketYamlInShTest(unittest.TestCase):
     """sh はチケットの YAML を自分で読まない。閉じたかは `ccnavi-review.sh merged` に、
     親のワークツリーかは `ccnavi tree parent` に聞く（答えの約束は tests/core/test_sh_ask.py）。
 
-    前は sh が frontmatter を awk で読み、Python と同じ値になることを見本で確かめていた。
+    前は sh が frontmatter を awk で読み、実行ファイルと同じ値になることを見本で確かめていた。
     読み方を 2 か所に持つと、ずれに気づけない。
     """
 

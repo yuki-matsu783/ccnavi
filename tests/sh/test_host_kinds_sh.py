@@ -1,6 +1,6 @@
 """origin の URL からのホストの分類と接続先。sh（`ccnavi_host_parse`）の読み手。
 
-実行ファイル側（`tests/ticket/test_host_kinds.py`）と Chrome 拡張も、同じ表
+実行ファイル側（go/internal/tickets/model/host の host_test.go）と Chrome 拡張も、同じ表
 （`tests/fixtures/host-kinds.json`）を読む。
 
 `CCNAVI_SH_DIR` で、読む sh の出どころを差し替えられる。既定はこのツリーの `.ccnavi/scripts/`。

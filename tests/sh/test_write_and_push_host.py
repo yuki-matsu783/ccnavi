@@ -11,7 +11,6 @@ import shutil
 import subprocess
 import unittest
 
-from ccnavi.infra import pathcase
 from tests import exe
 from tests.sh.write_and_push_harness import (
     ACCEPT_PLAN_CASE,
@@ -274,10 +273,12 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         git(self.tree, "commit", "-q", "-m", "退避の途中")
         git(self.tree, "push", "-q", "origin", PARENT)
         head = self.sha(self.tree, "HEAD")
+        # 記録のツリーは実行ファイルの pathcase.Fold と同じ形（大文字小文字を畳む）で書く
+        folded = os.path.normcase(os.path.realpath(self.tree)).casefold()
         write(
             os.path.join(archive_base, "ready", f"{PARENT}.json"),
             json.dumps(
-                {"parent": PARENT, "tree": pathcase.fold(os.path.realpath(self.tree)),
+                {"parent": PARENT, "tree": folded,
                  "head": head, "files": []}
             ),
         )  # fmt: skip

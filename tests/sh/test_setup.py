@@ -1606,19 +1606,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                     expected,
                 )
 
-    def test_a_distribute_skill_is_not_copied_into_the_projects_by_the_prompt_sync(self):
-        """配るだけのスキルは工程スキルではない。ユーザの発言のときの同期の対象に入らない。"""
-        from ccnavi.tickets.sync import skillsync
-
-        root = tempfile.mkdtemp(prefix="ccnavi-skills-")
-        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
-        for name, text in (("tool", self.DISTRIBUTE), ("process-test", self.PROCESS)):
-            path = os.path.join(root, ".claude", "skills", name, "SKILL.md")
-            os.makedirs(os.path.dirname(path))
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(text)
-        self.assertEqual(skillsync.processes(root), ["process-test"])
-
     def test_keeps_a_process_skill_the_project_already_has_unless_forced(self):
         src = self.make_source(skills=self.skill_files())
         path = self.deployed(".claude", "skills", "process-test", "SKILL.md")
@@ -1633,13 +1620,13 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             self.assertEqual(f.read(), self.PROCESS)
 
     def test_reads_the_process_flag_like_the_ticket_start_does(self):
-        """配る判定は、親チケットの着手がコピーする判定（skillsync）と同じ答えを返す。
+        """配る判定は、親チケットの着手がコピーする判定と同じ答えを返す。
 
         食い違うと、着手がコピーする元の SKILL.md が配布先に届かないまま、何の知らせも出ない。
-        特に Windows の Git Bash は、SKILL.md を CRLF で取り出すことがある。
+        特に Windows の Git Bash は、SKILL.md を CRLF で取り出すことがある。着手の側の判定は
+        go test（go/internal/tickets/sync/mirror/setup_sh_test.go）が同じ表で見る。
+        配るだけのスキル（distribute）を工程として数えないことも、そちらが見る。
         """
-        from ccnavi.tickets.sync import skillsync
-
         cases = {
             "lf": ("---\nname: x\nprocess: true\n---\n", True),
             "crlf": ("---\r\nname: x\r\nprocess: true\r\n---\r\n", True),
@@ -1654,7 +1641,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         }
         for label, (text, expected) in cases.items():
             with self.subTest(label=label):
-                self.assertIs(skillsync._process_flag(text.encode("utf-8")), expected)
                 src = self.make_source(skills={"probe/SKILL.md": text.encode("utf-8")})
                 target = tempfile.mkdtemp(prefix="ccnavi-setup-")
                 self.addCleanup(shutil.rmtree, target, ignore_errors=True)
