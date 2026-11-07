@@ -87,10 +87,10 @@ func addedTimes(conf *config.Settings, treeRoot string) (map[string]string, bool
 		}
 		name := ospath.Strip(line)
 		ident, ok := strings.CutPrefix(name, rel+"/")
-		if !ok || !strings.HasSuffix(ident, mdExt) {
+		if !ok || !strings.HasSuffix(ident, place.MdExt) {
 			continue
 		}
-		ident = strings.TrimSuffix(ident, mdExt)
+		ident = strings.TrimSuffix(ident, place.MdExt)
 		if _, seen := found[ident]; !strings.Contains(ident, "/") && !seen {
 			found[ident] = when
 		}

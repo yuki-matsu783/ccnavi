@@ -169,7 +169,7 @@ func directLeftovers(root string, main tree.Tree, label string) []rules.Problem 
 
 // directUnrecorded は記録の無い直接作業のワークツリー（手の worktree add で切ったもの。info）。
 func directUnrecorded(conf *config.Settings, root string, main tree.Tree, common, label string) []rules.Problem {
-	base := ospath.Join(root, tree.WorktreesDir)
+	base := tree.WorktreesPath(root)
 	entries, err := ospath.DiskListdir(base)
 	if err != nil {
 		return nil

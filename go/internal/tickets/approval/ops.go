@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strconv"
@@ -111,7 +110,7 @@ func CloseCopy(approvedDir, id string) string {
 
 // ToReview は承認済みチケットを doing/ から提案の置き場の review/ へ動かす。
 func ToReview(approvedDir, treeRoot, ticketsRel, id string) string {
-	target := ospath.Join(treeRoot, filepath.FromSlash(ticketsRel), string(place.Review), id+mdExt)
+	target := place.File(treeRoot, ticketsRel, place.Review, id)
 	return MoveFile(CopyPath(approvedDir, id), target)
 }
 
@@ -211,7 +210,7 @@ func NextChildID(conf *config.Settings, root, parentID string, phase int) (strin
 // ExistingTicketFile はこの識別子のファイルが、どこかの置き場にすでに在ればそのパス（無ければ空）。読めない
 // ファイルも名前で拾い、大文字小文字は区別しない。見るのは全ツリーの承認済みの doing/ done/ と、提案の todo/ review/。
 func ExistingTicketFile(conf *config.Settings, root, id string) string {
-	want := pathcase.Fold(id + mdExt)
+	want := pathcase.Fold(id + place.MdExt)
 	for _, tr := range Trees(conf, root) {
 		approved := conf.ApprovedDir(tr.Root)
 		places := []string{ospath.Join(approved, string(place.Doing)), ospath.Join(approved, string(place.Done))}

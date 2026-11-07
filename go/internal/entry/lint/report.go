@@ -180,12 +180,8 @@ func writeJSON(stdout io.Writer, o Options, mode config.Mode, problems []rules.P
 		payload.Set("flow", pyjson.NewObject("path", o.Flow, "data", read.data, "rendered", rendered,
 			"candidates", catalog.Object()))
 	}
-	text, err := pyjson.Dumps(payload, pyjson.Options{Indent: 1})
-	if err != nil {
-		// 載せる値はどれも JSON にできる型なので起きない。起きれば中身を欠いた JSON より何も書かないほうがよい。
-		return
-	}
-	io.WriteString(stdout, text+"\n")
+	// 載せる値はどれも JSON にできる型なので失敗しない。失敗すれば Write は何も書かない。
+	pyjson.Write(stdout, payload, pyjson.Options{Indent: 1})
 }
 
 // saidLines は苦情の受け皿の行を warn にする。

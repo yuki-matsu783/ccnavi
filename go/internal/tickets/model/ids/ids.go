@@ -84,6 +84,9 @@ func IsValidID(text string) bool { return IDProblem(text) == "" }
 // 全文で見る。Python の `$` で書いた呼び手は、末尾の改行 1 つを外してから渡す。
 func IsValidName(text string) bool { return namePattern.MatchString(text) }
 
+// IsValidFamily は sh から引数で渡る親の識別子の形か。識別子として読めて、パスとして読まれる ".." を含まない。
+func IsValidFamily(text string) bool { return IsValidID(text) && !strings.Contains(text, "..") }
+
 // Child は子の識別子（`<親>-<2 桁のフェーズ番号>-<2 桁の連番>`）を読んだもの。
 type Child struct {
 	Parent string

@@ -184,6 +184,8 @@ func writeRecordFile(target, text string) string {
 	if realPath(directory) != ospath.Normpath(directory) {
 		return "書き出し先のディレクトリがリンクを含む"
 	}
+	// fsio の Atomic は差し替えた後の権限を素の open に戻すが、Python（mkstemp と os.replace）は 0600 のまま残す。
+	// 同じ権限にするため、ここは一時ファイルを手で作る。
 	f, err := os.CreateTemp(directory, ".record.*.part")
 	if err != nil {
 		return fsio.ErrorText(err)

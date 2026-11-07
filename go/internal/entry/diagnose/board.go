@@ -3,6 +3,7 @@ package diagnose
 import (
 	"bytes"
 	"io"
+	"maps"
 	"slices"
 	"sort"
 	"time"
@@ -157,7 +158,7 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 	for _, t := range slices.Concat(pending, revisions) {
 		waiting[t.ID] = true
 	}
-	pendingIDs := sortedKeys(waiting)
+	pendingIDs := nonNil(slices.Sorted(maps.Keys(waiting)))
 	payload.Set("pending_approval", pendingIDs)
 
 	worktrees := map[string]tree.Tree{}
@@ -186,7 +187,7 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 		}
 	}
 	var rows []*ticketRow
-	for _, id := range sortedKeys(ids) {
+	for _, id := range slices.Sorted(maps.Keys(ids)) {
 		rows = append(rows, ticketRecord(conf, root, id, idx, worktrees, seen[id], scattered[id], preds, times))
 	}
 
@@ -222,15 +223,6 @@ func nonNil(s []string) []string {
 		return []string{}
 	}
 	return s
-}
-
-func sortedKeys(m map[string]bool) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return out
 }
 
 // byIDValues は approval.ByID の値を、Python の dict と同じ順（識別子の初出の順、値は後のもの）で並べる。

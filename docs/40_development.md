@@ -65,7 +65,7 @@ echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command"
   | uv run python -m ccnavi --mode enable
 ```
 
-Go に書き直した実行ファイルも同じに動く。`python -m ccnavi` の代わりに、`go` のディレクトリで `go run ./cmd/ccnavi --mode enable` に渡す。
+Go に書き直した実行ファイル（移行中。配るのは Python のまま）も同じ入口で動くように移した。`python -m ccnavi` の代わりに、`go` のディレクトリで `go run ./cmd/ccnavi --mode enable` に渡す。
 
 ## ディレクトリ構成（トップレベル）
 

@@ -3,6 +3,7 @@ package pyjson
 import (
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/big"
 	"slices"
@@ -48,6 +49,16 @@ func Dumps(v any, opts Options) (string, error) {
 		return "", err
 	}
 	return e.b.String(), nil
+}
+
+// Write は Dumps の文字列と改行を w に書く（print(json.dumps(v, ...)) と同じ）。
+func Write(w io.Writer, v any, opts Options) error {
+	text, err := Dumps(v, opts)
+	if err != nil {
+		return err
+	}
+	_, err = io.WriteString(w, text+"\n")
+	return err
 }
 
 type encoder struct {

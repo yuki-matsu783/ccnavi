@@ -7,7 +7,7 @@
 // 同じ判定（diagnose.TryOne）で期待を回す。ルールを足す候補は、共通レイヤーのコピーに 1 件足した一時ファイルで試し、
 // 実際のファイルには書かない。置くのはユーザ（/ccnavi-config の手順）。ネットワークには出ない。
 //
-// Python からの対応: entry/suggest。report → Report、collect・Candidate と私的な関数は同じ名前の私的な関数にした。
+// Python からの対応: entry/suggest。report → Report、Candidate → 私的な candidate、collect と私的な関数は同じ名前の私的な関数にした。
 // log_files・read_records → audit.LogFiles・audit.ReadRecords、repeat.threshold・normalize → tally.DenyThreshold・
 // tally.Normalize、urlsplit の scheme と netloc → splitURL。
 package suggest

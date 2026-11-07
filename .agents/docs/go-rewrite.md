@@ -102,10 +102,10 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 
 | パッケージ | 行数（Python） | 状態 |
 |---|---|---|
-| `infra` | 6,468 | 移した（レビュー済み）。Python の re の写し（`infra/pyre`）を含む |
-| `records` | 4,562 | 移した（レビュー済み） |
-| `policy` | 6,794 | 移した（レビュー済み） |
-| `tickets` | 36,700 | 移した（レビュー済み） |
+| `infra` | 6,472 | 移した（レビュー済み）。Python の re の写し（`infra/pyre`）を含む |
+| `records` | 4,570 | 移した（レビュー済み） |
+| `policy` | 6,842 | 移した（レビュー済み） |
+| `tickets` | 36,711 | 移した（レビュー済み） |
 | `catalog` | 1,683 | 移した（レビュー済み） |
 | `hook` | 10,497 | 移した（レビュー済み） |
 | `entry` | 11,210 | 移した（レビュー前）。Chrome 拡張の Pyodide 用の `entry/ext.py` は移さない |
@@ -120,8 +120,12 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 | Python を外すとき | Python の policy・infra のファイルを指す設計書と sh（`docs/21_design/messages.md`・`startup-config.md`・`modules.md`・`diagnostics.md`（`docsearch.START_SECONDS`）・`multi-repo/skills.md`（`projskills`）、配る `.ccnavi/docs/skill-processes.md`（`projskills` の名前が出る）、`.agents/docs/environment.md`・`e2e-exploration.md`、`.ccnavi/scripts/ccnavi-launcher.sh`・`ccnavi-git.sh` のコメント）を Go の置き場に直す。hook の Python のファイルを指すもの（`.ccnavi/messages/*.yml` と `.ccnavi/config/common/rules.yml` のコメント（`hook/*.py` のパス）、設計書 `docs/21_design/modules.md`・`pre-check.md`・`rules.md`・`stop-review.md`・`tickets/subagents.md`（hook の Python のファイル名））も同じ |
 | Python を外すとき | Chrome 拡張（`extensions/chrome/ccnavi-approval`）は Pyodide で Python の `entry.ext` → `tickets.core.api` を読む。Go には移せないので、Pyodide 用に Python の判定一式を残して配るか、拡張の判定を TS か WASM に書き直すかを決める（ユーザと合意が要る）。それまでは Go と Python の判定のずれを Chrome の見本（`extensions/chrome/ccnavi-approval/test/fixtures/core-scenarios.json`）で見張る |
 | Python を外すとき | hook の横展開で、Python と答えを合わせるために寄せなかったもの。実行後チェックの取り込みの確かめ（`integrate.SquashedPaths` の `copyIsBound`）は `BoundCheck` と違い、既定の置き場を大文字小文字を畳まずに見て、設定・全ツリー・退避を見ない（Python の `post_findings._ticket_bound` のまま）。取り込みの記録の読み方は `ReadRecord` の `FirstKept`（`post_findings`）と `LastKept`（`stop_integrate`）で分かれる。付き添いの有無は hook の判定（`hookio.Unattended`）と引き継ぎの待機（`hookio.Headless`。SDK の入口も含む）で分かれる。揃えるなら Python と同時に決める |
+| Python を外すとき | Python の `entry/version.py` の `COMPAT` を読んでいる配布の検査（`scripts/ccnavi-package.sh` の sed）と Chrome 拡張の試験（`extensions/chrome/ccnavi-approval/test/helpers/compat.ts`。`src/types/chrome.d.ts` の説明文も）を、Go の `version.Compat` を読む形に直す（機能のある参照なので、Python を外す前に直す）。それまでは `go/internal/entry/version` のテストが 2 つの値が揃うかを見る |
+| Python を外すとき | entry の Python のファイルを指す説明文（`docs/21_design/diagnostics.md`（version.py の COMPAT）・`stop-review.md`（`entry/cli_stopreview.py`）・`startup-config.md`（`entry/cli_idle.py`）・`modules.md`（`entry/cli.py`）、`.agents/docs/next-step-placement.md`（`entry/status.py`）、`.ccnavi/messages/next-cli.yml` のコメント、`scripts/ccnavi-setup.sh`（`lint_project.py`・`lint.py` の `_in_index`・`_SH_SPECIAL`。「2 か所を直す」と書いた手作業の同期は Go 側の 1 か所に寄せる）、`.ccnavi/scripts/ccnavi-common.sh`、`extensions/vscode/ccnavi-board/src/core/version.ts`）を Go の名前に直す |
+| Python を外すとき | entry の横展開で、Python と答えを合わせるために直さなかったもの（どれも Python も同じ）。ツリーの中かの判定が大文字小文字を畳まない・`..foo` を外と見る（`lint/flow.go`・`lint/places.go`・`diagnose/explain.go`。`cli/options.go` の `inside` は畳む）。`cli/record.go` の書き出し先のリンクの確かめ、`cli/stopreview.go` の送った版の `.md` の判定、`lint/branch.go` の未登録のワークツリーの鍵、`lint/ticket.go` の承認済みの置き場の確かめが大文字小文字を区別する。親チケットの見方が `shask` と `lint/layers.go` の `holdsParent` で 2 通り。`idle check` の待ち秒の上限（Go は int と `time.Duration` に収まらないものを読めない）。揃えるなら Python と同時に直す |
 | Python を外すとき | `git.Undo` の案内でパスを `"` で囲むだけの引用を、`config` の引用と同じ規則にする（`$` やバッククォートを含むパスで壊れる。いまは Python と同じ出力を保つため残す） |
 | Python を外すとき | sync/handoff の `Apply` で、書いた後の読み直しに失敗したエントリが戻されない。catalog の `Problems` が文の頭にパスを付ける形（パスで始まらない文にも付く）、索引の使い回しの鍵が秒の mtime だけ（同じ秒の書き換えで前の frontmatter が残る）、`readHead` に失敗した md の既存の行が消える（コメントの「残す」と食い違う）。`infra/git` が環境から `GIT_DIR`・`GIT_WORK_TREE`・`GIT_INDEX_FILE`・`GIT_COMMON_DIR` を外さない（どれも Python も同じ。直すなら Python と同時に直す） |
+| 余裕のあるとき | entry の横展開の残り。`lint/claude.go` の `executable` は `os.Stat` で権限を読む（`ospath.Stat` は権限を返さない。Python は `os.access`）。`suggest` の一時ディレクトリは `os.MkdirTemp`・`os.RemoveAll` のまま（infra に写しが無い）。`.md` と `.git` の直書きは entry と `tickets/approval`・`archive` だけを `place.MdExt`・`tree.DotGit` に寄せ、ほかの段（`catalog`・`records`・`tickets/lifecycle` など）は残る。数字だけの語の判定は `pyfmt.IsASCIIDigits` に寄せたが、`argparse` の `allDigits`（Unicode の数字・空も真）と `shell` の `isDigits`（Python の `isdigit` の表）は意味が違うので寄せていない |
 | 余裕のあるとき | `infra/pyre` の照合を速くする（先頭の文字の集合で開始位置を飛ばす、開始位置ごとのクロージャをやめる）。いまは Python の C 実装の約 5 倍遅い。数 KB の通常のコマンドでは問題にならない |
 | 余裕のあるとき | pyre の `(?i)ß` が `ẞ` に当たらない（casefix に 1 組足す）。rules の unsupported が `(?P=name)` の後方参照を通す。`TranslateGlob` が文字クラスの中の `/` を壊す（Python と同じ。Python の globmatch の docstring も誤り）。`\N{名前}` の苦情を名指しの文にする |
 | 余裕のあるとき | `hint` の `recentCommit`（直前のコミットと見なす古さ、10 分）は期限ではなく 1 か所でしか使わないので `hint` に残した。`str.split()` の並びを返す `strings.FieldsFunc(…, ospath.IsSpace)` の直書き（wiki・selfguard・useronly・learning・failsafe など）を `ospath` の 1 関数に寄せる。`infra/git/restore.go` は `strings.Fields`（U+001C〜U+001F を空白に数えない）で Python と違いうる |

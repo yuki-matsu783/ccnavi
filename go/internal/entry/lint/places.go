@@ -67,7 +67,7 @@ func projectPlaces(conf *config.Settings, root string) []rules.Problem {
 // misplacedWorktrees はプロジェクトの中の `.claude/worktrees/` にあるワークツリー（warn。承認の走査の対象外で、そこに
 // 書いた提案は承認待ちに並ばない）。プロジェクトの ccnavi-common.sh のコピーをルートと取り違えて着手するとこの形になる。
 func misplacedWorktrees(project tree.Tree, where string) []rules.Problem {
-	base := ospath.Join(project.Root, tree.WorktreesDir)
+	base := tree.WorktreesPath(project.Root)
 	entries, err := ospath.DiskListdir(base)
 	if err != nil {
 		return nil

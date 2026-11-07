@@ -85,6 +85,9 @@ func typeName(v any) string {
 	return name
 }
 
+// panicFrames は panic の場所を探すときに読むスタックの枠の数の上限。
+const panicFrames = 64
+
 // panicked は recover した値の失敗。場所は panic した関数の行。recover を呼んだ遅延関数の中から直に呼ぶ
 // （スタックに panic の枠が残っている間だけ場所が分かる）。
 func panicked(r any) failure {
@@ -92,7 +95,7 @@ func panicked(r any) failure {
 	if err, ok := r.(error); ok {
 		f.kind = typeName(err)
 	}
-	pcs := make([]uintptr, 64)
+	pcs := make([]uintptr, panicFrames)
 	frames := runtime.CallersFrames(pcs[:runtime.Callers(1, pcs)])
 	seen := false
 	for {
@@ -111,15 +114,19 @@ func panicked(r any) failure {
 	return f
 }
 
+// onPanic は panic を受ける遅延関数。panic していれば、値と、それを読んだ失敗を handle に渡す。recover は遅延した
+// 関数の中でしか効かないので、`defer onPanic(…)` の形で直に置く。
+func onPanic(handle func(r any, f failure)) {
+	if r := recover(); r != nil {
+		handle(r, panicked(r))
+	}
+}
+
 // runHook は hook として起動された 1 回。途中のどこで失敗しても、終了コード 1 で抜けさせない。1 で終わると
 // Claude Code は PreToolUse の呼び出しをそのまま通す。
 func runHook(in *input, stdout, stderr io.Writer, conf *config.Settings, problems []string, root string, a opts) (code int) {
 	so := &hookSoFar{mode: config.Enable}
-	defer func() {
-		if r := recover(); r != nil {
-			code = hookCrashed(stdout, stderr, conf, root, so, panicked(r))
-		}
-	}()
+	defer onPanic(func(_ any, f failure) { code = hookCrashed(stdout, stderr, conf, root, so, f) })
 	return hookSteps(in, stdout, stderr, conf, problems, root, a, so)
 }
 
@@ -194,12 +201,7 @@ func hookSteps(in *input, stdout, stderr io.Writer, conf *config.Settings, probl
 // judgeEvent はイベントを判定する。下の部品は panic を受けないので、ここで受けて error と同じく失敗として返す。
 func judgeEvent(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, root string, in hookio.Input,
 	record *audit.Record, deadline time.Time) (code int, fail *failure) {
-	defer func() {
-		if r := recover(); r != nil {
-			f := panicked(r)
-			fail = &f
-		}
-	}()
+	defer onPanic(func(_ any, f failure) { fail = &f })
 	defer via.Session(via.Hook, "")()
 	record.Subject = rules.SubjectOf(in)
 	code, err := events.Decide(stdout, stderr, mode, conf, root, in, record, deadline)
@@ -245,11 +247,9 @@ func hookCrashed(stdout, stderr io.Writer, conf *config.Settings, root string, s
 
 // recordQuietly は受け皿の中の記録。ここで落ちても失敗を重ねない。
 func recordQuietly(stderr io.Writer, log *audit.Log, record *audit.Record) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(stderr, "ccnavi: ログを保存できませんでした：%s\n", panicked(r).kind)
-		}
-	}()
+	defer onPanic(func(_ any, f failure) {
+		fmt.Fprintf(stderr, "ccnavi: ログを保存できませんでした：%s\n", f.kind)
+	})
 	writeRecord(stderr, log, record)
 }
 
@@ -280,7 +280,7 @@ func internalError(stdout, stderr io.Writer, mode config.Mode, conf *config.Sett
 		} else {
 			exit = config.FailClosed(mode, payload.ToolName, failsafe.IsSafe(payload, root))
 		}
-		passed := exit == 0 && payload.Event != hookio.PostToolUse
+		passed := exit == config.ExitOK && payload.Event != hookio.PostToolUse
 		fmt.Fprintln(stderr, reasons.InternalError(root, code, payload.Event, fail.kind, logPath, passed))
 		return exit
 	case hookio.SubagentStop:
@@ -292,6 +292,6 @@ func internalError(stdout, stderr io.Writer, mode config.Mode, conf *config.Sett
 
 // quietly は失敗の出どころが診断ログそのものでも、受け皿の中で失敗を重ねない。
 func quietly(f func()) {
-	defer func() { _ = recover() }()
+	defer onPanic(func(any, failure) {})
 	f()
 }

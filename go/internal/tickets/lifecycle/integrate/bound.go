@@ -23,7 +23,7 @@ func TreeRoots(conf *config.Settings, root string) []string {
 	for _, t := range tree.AllTrees(root, conf.Projects) {
 		roots = append(roots, t.Root)
 	}
-	homes := []string{ospath.Join(root, tree.WorktreesDir)}
+	homes := []string{tree.WorktreesPath(root)}
 	if conf.Projects != "" {
 		if ospath.IsAbs(conf.Projects) {
 			homes = append(homes, conf.Projects)

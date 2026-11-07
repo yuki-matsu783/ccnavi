@@ -8,6 +8,6 @@
 // 出さない。
 //
 // Python からの対応: entry/status を移した。run → Run（cli の「親は 1 件のみ」の照合と family_of も Run が持つ）、
-// FileState・FILE_* → 私的な fileState と fileKind の定数、Entry・_Family → 私的な entry・family。
-// TIMEOUT_SECONDS → gitTimeout。
+// FileState・FILE_* → 私的な fileState と fileKind の定数、Entry・_Family → 私的な entry・familyView。
+// TIMEOUT_SECONDS → git.ReadTimeout。
 package status

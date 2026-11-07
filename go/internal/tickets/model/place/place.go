@@ -52,6 +52,8 @@ func (s State) Progress() int {
 }
 
 const (
+	// MdExt はチケット・提案のファイルの拡張子。
+	MdExt = ".md"
 	// Handoff は下書きの置き場（ツリーのルートからの相対）。設定で動かさない。動かせると、その値を
 	// ソースの置き場に向けるだけで承認した範囲を迂回して書ける場所ができる。
 	Handoff = config.WipRoot + "/" + config.HandoffName
@@ -119,6 +121,11 @@ func ProposalsRoot(treeRoot, ticketsRel string) string {
 // Dir はツリーの提案の置き場の下の、状態 s の置き場（todo/・review/ など）の絶対パス。
 func Dir(treeRoot, ticketsRel string, s State) string {
 	return ospath.Join(ProposalsRoot(treeRoot, ticketsRel), string(s))
+}
+
+// File はツリーの提案の置き場の下の、状態 s の置き場にある識別子 id の提案のファイルのパス。
+func File(treeRoot, ticketsRel string, s State, id string) string {
+	return ospath.Join(Dir(treeRoot, ticketsRel, s), id+MdExt)
 }
 
 // IsHandoffPlace は相対パスが下書きの置き場（wip/handoff/）の下にあるか。大文字小文字は区別しない。

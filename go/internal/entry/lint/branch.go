@@ -2,10 +2,9 @@ package lint
 
 import (
 	"fmt"
+	"maps"
 	"slices"
-	"sort"
 	"strings"
-	"time"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
@@ -25,9 +24,6 @@ import (
 
 // branchRule は親のブランチ名の規則についての warn の結び。
 const branchRule = "（親のブランチ名の規則）"
-
-// worktreeListTimeout は `git worktree list` の期限（--lint の中だけで聞く）。
-const worktreeListTimeout = 10 * time.Second
 
 // gitdirHead は `.git` ファイルの頭。
 const gitdirHead = "gitdir:"
@@ -79,7 +75,7 @@ func branchNameProblems(conf *config.Settings, root string, proposals, copies, c
 		spellings[key][t.ID] = true
 	}
 	for _, key := range folds {
-		if names := sortedKeys(spellings[key]); len(names) > 1 {
+		if names := slices.Sorted(maps.Keys(spellings[key])); len(names) > 1 {
 			warn(strings.Join(names, " と ") + " は大文字小文字だけが違う。大文字小文字を区別しないファイルシステムでは、" +
 				"ブランチとワークツリーの名前がぶつかる" + branchRule)
 		}
@@ -91,7 +87,7 @@ func branchNameProblems(conf *config.Settings, root string, proposals, copies, c
 			parents[t.ID] = true
 		}
 	}
-	for _, name := range sortedKeys(parents) {
+	for _, name := range slices.Sorted(maps.Keys(parents)) {
 		if !ids.HasChildTail(name) {
 			continue
 		}
@@ -135,7 +131,7 @@ func numberProblems(everyone, fresh []*ticket.Ticket, prefixes []string) []rules
 			continue
 		}
 		var others []string
-		for _, id := range sortedKeys(owners[key{t.Project, n}]) {
+		for _, id := range slices.Sorted(maps.Keys(owners[key{t.Project, n}])) {
 			if id != t.ID {
 				others = append(others, id)
 			}
@@ -265,7 +261,7 @@ func placeProblems(root string, proposals, settledList []*ticket.Ticket, repoOf 
 // だけで決める（実行前チェックは git を起こさない）が、ここは --lint の中だけなので `git worktree list` にも聞く。
 // 他のリポジトリの `.git/worktrees` に登録されたものは言わない。git に聞けなければ何も言わない。
 func unregisteredWorktrees(root string, worktrees []tree.Tree) []rules.Problem {
-	base := ospath.Join(root, tree.WorktreesDir)
+	base := tree.WorktreesPath(root)
 	names, err := ospath.DiskListdir(base)
 	if err != nil {
 		return nil
@@ -283,7 +279,7 @@ func unregisteredWorktrees(root string, worktrees []tree.Tree) []rules.Problem {
 	if len(pending) == 0 {
 		return nil
 	}
-	code, text := git.Output(root, []string{"worktree", "list", "--porcelain"}, git.Options{Timeout: worktreeListTimeout})
+	code, text := git.Output(root, []string{"worktree", "list", "--porcelain"}, git.Options{Timeout: git.ReadTimeout})
 	if code != 0 {
 		return nil
 	}
@@ -293,7 +289,7 @@ func unregisteredWorktrees(root string, worktrees []tree.Tree) []rules.Problem {
 			listed[ospath.Realpath(ospath.Strip(rest))] = true
 		}
 	}
-	registry := ospath.Realpath(ospath.Join(root, ".git", "worktrees"))
+	registry := ospath.Realpath(ospath.Join(root, tree.GitWorktrees))
 	var out []rules.Problem
 	for _, name := range pending {
 		path := ospath.Join(base, name)
@@ -308,7 +304,7 @@ func unregisteredWorktrees(root string, worktrees []tree.Tree) []rules.Problem {
 
 // registeredElsewhere は `.git` が、ワークスペースのものではない `.git/worktrees/` を指しているか。
 func registeredElsewhere(path, registry string) bool {
-	text, err := ospath.ReadDiskText(ospath.Join(path, ".git"))
+	text, err := ospath.ReadDiskText(ospath.Join(path, tree.DotGit))
 	if err != nil {
 		return false
 	}
@@ -321,14 +317,5 @@ func registeredElsewhere(path, registry string) bool {
 		gitdir = ospath.Join(path, gitdir)
 	}
 	gitdir = ospath.Realpath(gitdir)
-	return strings.Contains(strings.ReplaceAll(gitdir, `\`, "/"), "/.git/worktrees/") && !strings.HasPrefix(gitdir, registry+ospath.Sep)
-}
-
-func sortedKeys(set map[string]bool) []string {
-	out := make([]string, 0, len(set))
-	for k := range set {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return out
+	return strings.Contains(strings.ReplaceAll(gitdir, `\`, "/"), "/"+ospath.Slashed(tree.GitWorktrees)+"/") && !strings.HasPrefix(gitdir, registry+ospath.Sep)
 }

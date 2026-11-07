@@ -15,16 +15,14 @@ import (
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/records/stopreview"
 	"ccnavi/internal/tickets/approval"
+	"ccnavi/internal/tickets/model/place"
 )
 
 const (
 	// planWait・planPoll は material が計画の届くのを待つ時間と間隔（暫定。成立性の検証の後に決める）。
-	planWait = 5 * time.Second
-	planPoll = 250 * time.Millisecond
-	// proposalShowTimeout は送った版の提案の本文を git から読む期限。
-	proposalShowTimeout = 10 * time.Second
-	notCandidate        = "STOP_REVIEW_NOT_CANDIDATE"
-	mdExt               = ".md"
+	planWait     = 5 * time.Second
+	planPoll     = 250 * time.Millisecond
+	notCandidate = "STOP_REVIEW_NOT_CANDIDATE"
 )
 
 // 候補でない理由のうち、ここで決めるもの（ほかは stopreview.Begin の状態の名前）。
@@ -104,12 +102,7 @@ func runStopReview(in *input, stdout, stderr io.Writer, conf *config.Settings, w
 
 // stopReviewStep は material・record の本体を走らせ、想定外の失敗（error と panic）を失敗として返す。
 func stopReviewStep(step func() (int, error)) (code int, fail *failure) {
-	defer func() {
-		if r := recover(); r != nil {
-			f := panicked(r)
-			fail = &f
-		}
-	}()
+	defer onPanic(func(_ any, f failure) { fail = &f })
 	code, err := step()
 	if err != nil {
 		f := failedWith(err)
@@ -119,13 +112,11 @@ func stopReviewStep(step func() (int, error)) (code int, fail *failure) {
 }
 
 func stopReviewReport(stdout, stderr io.Writer, conf *config.Settings) (code int) {
-	defer func() {
-		// 集計の失敗で落ちない。壊れた記録を名指しする
-		if r := recover(); r != nil {
-			fmt.Fprintf(stderr, "ccnavi: 評価の集計に失敗した（%s: %v）\n", panicked(r).kind, r)
-			code = config.ExitError
-		}
-	}()
+	// 集計の失敗で落ちない。壊れた記録を名指しする
+	defer onPanic(func(r any, f failure) {
+		fmt.Fprintf(stderr, "ccnavi: 評価の集計に失敗した（%s: %v）\n", f.kind, r)
+		code = config.ExitError
+	})
 	fmt.Fprintln(stdout, stopreview.Report(conf.State, stopreview.LogsDir(conf.Log)))
 	return config.ExitOK
 }
@@ -176,7 +167,7 @@ func proposalBody(root string, p stopreview.Proposal) string {
 	var parts []string
 	if p.Route == stopreview.RouteUnsent {
 		for _, f := range p.Files {
-			if !pathcase.HasExt(f.Path, mdExt) || root == "" || !inside(realPath(f.Path), realPath(root)) {
+			if !pathcase.HasExt(f.Path, place.MdExt) || root == "" || !inside(realPath(f.Path), realPath(root)) {
 				continue
 			}
 			text, err := fsio.ReadDiskTextHead(f.Path, stopreview.MaterialLimit, fsio.Replace)
@@ -191,11 +182,11 @@ func proposalBody(root string, p stopreview.Proposal) string {
 		return ""
 	}
 	for _, f := range p.Files {
-		if !strings.HasSuffix(f.Path, mdExt) || strings.HasPrefix(f.Path, "/") ||
+		if !strings.HasSuffix(f.Path, place.MdExt) || strings.HasPrefix(f.Path, "/") ||
 			slices.Contains(strings.Split(f.Path, "/"), "..") {
 			continue
 		}
-		shown := git.Run(root, []string{"show", p.Commit + ":" + f.Path}, git.Options{Timeout: proposalShowTimeout})
+		shown := git.Run(root, []string{"show", p.Commit + ":" + f.Path}, git.Options{Timeout: git.ReadTimeout})
 		if shown.OK() {
 			parts = append(parts, "--- "+f.Path+" ---\n"+headRunes(shown.Out, stopreview.MaterialLimit))
 		}

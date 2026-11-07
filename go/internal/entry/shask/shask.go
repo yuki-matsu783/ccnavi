@@ -1,6 +1,7 @@
 package shask
 
 import (
+	"cmp"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -49,7 +50,6 @@ func yesNo(b bool) answer {
 }
 
 const (
-	mdExt = ".md"
 	// none は mr・stage が無いときの値。
 	none = "-"
 )
@@ -88,7 +88,7 @@ func Answer(stdout, stderr io.Writer, root string, conf *config.Settings, comman
 }
 
 func identOK(stderr io.Writer, verb, value string) bool {
-	if ids.IsValidID(value) && !strings.Contains(value, "..") {
+	if ids.IsValidFamily(value) {
 		return true
 	}
 	fmt.Fprintf(stderr, "ccnavi: %s の名前 %s は有効な識別子の形式ではありません。\n", verb, pyfmt.Repr(value))
@@ -120,20 +120,13 @@ func projectsDir(root string, conf *config.Settings) string {
 }
 
 func underWorktrees(root, path string) bool {
-	base := pathcase.Fold(ospath.Normpath(ospath.Join(root, tree.WorktreesDir)))
+	base := pathcase.Fold(ospath.Normpath(tree.WorktreesPath(root)))
 	full := pathcase.Fold(ospath.Normpath(ospath.Abspath(path)))
 	return strings.HasPrefix(full, base+ospath.Sep)
 }
 
 func writeLines(w io.Writer, lines ...string) {
 	fmt.Fprint(w, strings.Join(lines, "\n")+"\n")
-}
-
-func orNone(s string) string {
-	if s == "" {
-		return none
-	}
-	return s
 }
 
 // parentTree は `tree parent`。頭に続けて parent・approved・requested・archived・started・mr の 6 行。
@@ -161,7 +154,7 @@ func parentTree(stdout, stderr io.Writer, root string, conf *config.Settings, pa
 		"requested "+string(requested(conf, work)),
 		"archived "+string(archived),
 		"started "+string(started),
-		"mr "+orNone(mr))
+		"mr "+cmp.Or(mr, none))
 	return true
 }
 
@@ -196,8 +189,8 @@ func leftoverTree(stdout, stderr io.Writer, root string, conf *config.Settings, 
 		path  string
 	}{
 		{place.Doing, false, approval.CopyPath(approvedDir, name)},
-		{place.Todo, true, ospath.Join(place.Dir(work.Root, conf.Tickets, place.Todo), name+mdExt)},
-		{place.Review, true, ospath.Join(place.Dir(work.Root, conf.Tickets, place.Review), name+mdExt)},
+		{place.Todo, true, place.File(work.Root, conf.Tickets, place.Todo, name)},
+		{place.Review, true, place.File(work.Root, conf.Tickets, place.Review, name)},
 	} {
 		front := frontOf(c.path)
 		if front == nil || pathcase.Fold(ospath.Strip(front.Text("ticket"))) != pathcase.Fold(name) ||
@@ -227,7 +220,7 @@ func leftoverTree(stdout, stderr io.Writer, root string, conf *config.Settings, 
 		"leftover "+string(yesNo(proposal == yes || mr != "" || doing > 0)),
 		"proposal "+string(proposal),
 		"doing "+strconv.Itoa(doing),
-		"mr "+orNone(mr),
+		"mr "+cmp.Or(mr, none),
 		"stage "+stage)
 	return true
 }
@@ -241,7 +234,7 @@ func childrenInDoing(approvedDir, parent string) int {
 	}
 	count := 0
 	for _, entry := range names {
-		if !strings.HasSuffix(entry, mdExt) {
+		if !strings.HasSuffix(entry, place.MdExt) {
 			continue
 		}
 		front := frontOf(ospath.Join(directory, entry))
@@ -364,14 +357,7 @@ func isParentOf(front *yaml.Map, name string) bool {
 // holdsParent はそのツリーの置き場に ticket: <名前> の親の承認済みチケットか提案があるか。チケットとしての検査（範囲の
 // 欄など）は掛けず、frontmatter の ticket と parent だけを見る。
 func holdsParent(conf *config.Settings, work tree.Tree) answer {
-	approvedDir := conf.ApprovedDir(work.Root)
-	paths := []string{
-		approval.CopyPath(approvedDir, work.Name),
-		approval.ClosedPath(approvedDir, work.Name),
-		ospath.Join(place.Dir(work.Root, conf.Tickets, place.Todo), work.Name+mdExt),
-		ospath.Join(place.Dir(work.Root, conf.Tickets, place.Review), work.Name+mdExt),
-	}
-	held, _, _ := parentIn(paths, work.Name)
+	held, _, _ := parentIn(approval.ParentPaths(conf, work.Root, work.Name), work.Name)
 	return held
 }
 
@@ -422,7 +408,7 @@ func archivedMR(root, project, ident string) string {
 	if !ok {
 		return ""
 	}
-	data, ok := archive.ArchivedBytes(root, project, string(place.Done)+"/"+name+mdExt)
+	data, ok := archive.ArchivedBytes(root, project, string(place.Done)+"/"+name+place.MdExt)
 	if !ok {
 		return ""
 	}

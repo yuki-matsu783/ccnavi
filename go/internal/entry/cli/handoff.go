@@ -16,12 +16,7 @@ import (
 
 // writeJSON は答えの JSON を 1 つ書く。asciiOnly は ensure_ascii=True。indent は indent=N（0 は 1 行）。
 func writeJSON(stdout io.Writer, v any, asciiOnly bool, indent int) error {
-	text, err := pyjson.Dumps(v, pyjson.Options{RawUnicode: !asciiOnly, Indent: indent})
-	if err != nil {
-		return err
-	}
-	_, err = io.WriteString(stdout, text+"\n")
-	return err
+	return pyjson.Write(stdout, v, pyjson.Options{RawUnicode: !asciiOnly, Indent: indent})
 }
 
 // writeAnswer は拡張が読む答え（ensure_ascii=True・indent=1）を書く。

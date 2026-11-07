@@ -72,12 +72,10 @@ func describe() *pyjson.Object {
 // 読めるようにする。
 func Report(stdout io.Writer, asJSON bool) int {
 	if asJSON {
-		body, err := pyjson.Dumps(describe(), pyjson.Options{Indent: 1})
-		if err != nil {
+		if pyjson.Write(stdout, describe(), pyjson.Options{Indent: 1}) != nil {
 			// 中身はこのパッケージの定数だけなので届かない。
 			return config.ExitError
 		}
-		fmt.Fprint(stdout, body+"\n")
 		return config.ExitOK
 	}
 	how, yes := "ソースで動いている", "no"

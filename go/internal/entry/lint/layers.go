@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
@@ -17,7 +18,6 @@ import (
 	"ccnavi/internal/tickets/config/check"
 	"ccnavi/internal/tickets/lifecycle/integrate"
 	"ccnavi/internal/tickets/model/archive"
-	"ccnavi/internal/tickets/model/place"
 	"ccnavi/internal/tickets/model/standing"
 	"ccnavi/internal/tickets/model/ticket"
 )
@@ -138,14 +138,7 @@ func parentTreesOffBranch(conf *config.Settings, root string) []rules.Problem {
 // holdsParent はそのツリーに `ticket: <ツリーの名前>` の親の承認済みチケットか提案があるか（sh の ccnavi_parent_tree と
 // 同じ見方）。ready の後は親が手元の退避へ移るので、そこに親が在っても親のワークツリーとして扱う。
 func holdsParent(conf *config.Settings, work tree.Tree, root string) bool {
-	approved := conf.ApprovedDir(work.Root)
-	proposals := ospath.Join(work.Root, filepath.FromSlash(conf.Tickets))
-	for _, path := range []string{
-		approval.CopyPath(approved, work.Name),
-		approval.ClosedPath(approved, work.Name),
-		ospath.Join(proposals, string(place.Todo), work.Name+".md"),
-		ospath.Join(proposals, string(place.Review), work.Name+".md"),
-	} {
+	for _, path := range approval.ParentPaths(conf, work.Root, work.Name) {
 		if !ospath.IsFile(path) {
 			continue
 		}
@@ -217,7 +210,7 @@ func drift(conf *config.Settings, root, project string) ([]rules.Problem, bool) 
 		if !read {
 			continue
 		}
-		local, err := os.ReadFile(ospath.Join(home, filepath.FromSlash(rel)))
+		local, err := fsio.ReadDiskBytes(ospath.Join(home, filepath.FromSlash(rel)))
 		if err != nil {
 			local = nil
 		}

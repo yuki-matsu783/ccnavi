@@ -88,11 +88,9 @@ func parsed(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts
 // イベントが分からず、PreToolUse と同じく止める）。ほかの経路は、打った人が見られるので落ちたまま伝える。
 func loadSettings(stdout, stderr io.Writer, root string, a opts) (conf *config.Settings, problems []string, code int, ok bool) {
 	if hookRoute(a) {
-		defer func() {
-			if r := recover(); r != nil {
-				code, ok = hookCrashed(stdout, stderr, unloaded(root), root, &hookSoFar{mode: config.Enable}, panicked(r)), false
-			}
-		}()
+		defer onPanic(func(_ any, f failure) {
+			code, ok = hookCrashed(stdout, stderr, unloaded(root), root, &hookSoFar{mode: config.Enable}, f), false
+		})
 	}
 	conf, problems = config.Load(root)
 	return conf, problems, 0, true
@@ -402,7 +400,7 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 	case len(cmd) == 6 && a.head("sync", "tidy"):
 		return okOrError(syncTidy(stdout, stderr, root, conf, cwdOf(a), cmd[2], cmd[3], cmd[4], cmd[5])), true
 	case len(cmd) == 3 && a.head("write-and-push", "family"):
-		if !familyForm(cmd[2]) {
+		if !ids.IsValidFamily(cmd[2]) {
 			fmt.Fprintf(stderr, "ccnavi: write-and-push family の %s は有効な識別子の形式ではありません。\n", pyfmt.Repr(cmd[2]))
 			return config.ExitError, true
 		}
@@ -412,7 +410,7 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 		if len(cmd) == 4 {
 			since = cmd[3]
 		}
-		if !familyForm(cmd[2]) {
+		if !ids.IsValidFamily(cmd[2]) {
 			fmt.Fprintf(stderr, "ccnavi: write-and-push sort の %s は有効な識別子の形式ではありません。\n", pyfmt.Repr(cmd[2]))
 			return config.ExitError, true
 		}
@@ -422,7 +420,7 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 		}
 		return okOrError(wap.Sort(stdout, stderr, conf, root, cmd[2], since)), true
 	case len(cmd) >= 3 && a.head("write-and-push", "merge"):
-		if !familyForm(cmd[2]) || len(cmd) != 3 {
+		if !ids.IsValidFamily(cmd[2]) || len(cmd) != 3 {
 			fmt.Fprintf(stderr, "ccnavi: write-and-push merge の %s は有効な識別子の形式ではありません。\n", pyfmt.Repr(cmd[2]))
 			return config.ExitError, true
 		}
@@ -438,6 +436,3 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 	}
 	return 0, false
 }
-
-// familyForm は sh から渡る親の識別子の形（パスとして読まれる文字列を入れない）。
-func familyForm(text string) bool { return ids.IsValidID(text) && !strings.Contains(text, "..") }

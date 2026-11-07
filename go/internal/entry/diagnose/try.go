@@ -2,6 +2,7 @@ package diagnose
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
 	"io"
 	"slices"
@@ -285,14 +286,7 @@ func Test(stdout, stderr io.Writer, conf *config.Settings, root, tool, subject s
 }
 
 // writeJSON は json.dumps(body, ensure_ascii=True, indent=1) と改行。
-func writeJSON(w io.Writer, body any) error {
-	text, err := pyjson.Dumps(body, pyjson.Options{Indent: 1})
-	if err != nil {
-		return err
-	}
-	_, err = io.WriteString(w, text+"\n")
-	return err
-}
+func writeJSON(w io.Writer, body any) error { return pyjson.Write(w, body, pyjson.Options{Indent: 1}) }
 
 func writeTest(w io.Writer, root string, out Result, call Call) {
 	p := func(format string, a ...any) { fmt.Fprintf(w, format, a...) }
@@ -328,7 +322,7 @@ func writeTest(w io.Writer, root string, out Result, call Call) {
 	}
 	// hook はこの 3 つを Claude Code から受け取り、判定がそれで変わる。
 	used := call.payload(root)
-	p("payload: cwd=%s  permission_mode=%s  agent_id=%s\n", used.Cwd, orNone(used.PermissionMode), orNone(used.AgentID))
+	p("payload: cwd=%s  permission_mode=%s  agent_id=%s\n", used.Cwd, cmp.Or(used.PermissionMode, noneShown), cmp.Or(used.AgentID, noneShown))
 	if out.Reason != "" {
 		p("reason: %s\n", out.Reason)
 	}
@@ -379,11 +373,4 @@ func writeTest(w io.Writer, root string, out Result, call Call) {
 	for _, line := range ospath.Splitlines(out.Response) {
 		p("  %s\n", line)
 	}
-}
-
-func orNone(s string) string {
-	if s == "" {
-		return noneShown
-	}
-	return s
 }

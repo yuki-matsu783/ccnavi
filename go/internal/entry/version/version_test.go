@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/env"
 	"ccnavi/internal/tickets/testkit"
 )
 
@@ -67,13 +68,14 @@ func readRepo(t *testing.T, rel ...string) string {
 	return string(data)
 }
 
-// 互換の版は実行ファイル・sh・VS Code 拡張で同じ値。
+// 互換の版は実行ファイル・sh・VS Code 拡張・Python の実行ファイル（移行の間は両方を上げる）で同じ値。
 func TestCompatAgreesWithTheShAndTheExtension(t *testing.T) {
 	for _, c := range []struct {
 		rel     []string
 		pattern string
 	}{
-		{[]string{".ccnavi", "scripts", "ccnavi-common.sh"}, `(?m)^CCNAVI_COMPAT=([0-9]+)$`},
+		{[]string{".ccnavi", "scripts", "ccnavi-common.sh"}, `(?m)^` + env.Compat + `=([0-9]+)$`},
+		{[]string{"src", "ccnavi", "entry", "version.py"}, `(?m)^COMPAT = ([0-9]+)$`},
 		{[]string{"extensions", "vscode", "ccnavi-board", "src", "core", "version.ts"}, `(?m)^export const EXTENSION_COMPAT = ([0-9]+);$`},
 	} {
 		m := regexp.MustCompile(c.pattern).FindStringSubmatch(readRepo(t, c.rel...))

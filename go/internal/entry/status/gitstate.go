@@ -2,16 +2,12 @@ package status
 
 import (
 	"strings"
-	"time"
 
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/model/ticket"
 )
-
-// gitTimeout は置き場のファイルの git での姿を読む 1 回の期限。
-const gitTimeout = 10 * time.Second
 
 // fileKind は置き場のファイルの git での姿。uncommitted はファイルそのものがまだコミットに無い（承認が運ばれていない）。
 // modified はコミット済みのファイルに未コミットの変更がある（着手などで書いた欄）。
@@ -102,7 +98,7 @@ func fileStates(found []*ticket.Ticket) map[string]fileState {
 	return out
 }
 
-func gitOptions() git.Options { return git.Options{Timeout: gitTimeout, RawPaths: true} }
+func gitOptions() git.Options { return git.Options{Timeout: git.ReadTimeout, RawPaths: true} }
 
 // dirtyPaths は (まだコミットに無いパス, 未コミットの変更があるパス)。前者は未追跡と索引に足しただけのもの（`??`・`A`）と、
 // 改名・コピーで入った新しいパス（`R`・`C`）。git を読めなければ偽。
@@ -136,7 +132,7 @@ func dirtyPaths(treeRoot string, rels []string) (added, found map[string]bool, o
 
 // upstreamOf は今のブランチのリモート追跡の ref。設定が無ければ `origin/<ブランチ>` があればそれ。無ければ空。
 func upstreamOf(treeRoot string) string {
-	o := git.Options{Timeout: gitTimeout}
+	o := git.Options{Timeout: git.ReadTimeout}
 	code, out := git.Output(treeRoot, []string{"rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"}, o)
 	if code == 0 && ospath.Strip(out) != "" {
 		return ospath.Strip(out)

@@ -15,11 +15,11 @@ func FromISOFormat(s string) (when time.Time, zoned, ok bool) {
 	switch {
 	case len(s) >= 10 && s[4] == '-' && s[7] == '-':
 		year, month, day = atoi(s[0:4]), atoi(s[5:7]), atoi(s[8:10])
-		if !asciiDigits(s[0:4]) || !asciiDigits(s[5:7]) || !asciiDigits(s[8:10]) {
+		if !IsASCIIDigits(s[0:4]) || !IsASCIIDigits(s[5:7]) || !IsASCIIDigits(s[8:10]) {
 			return time.Time{}, false, false
 		}
 		rest = s[10:]
-	case len(s) >= 8 && asciiDigits(s[0:8]):
+	case len(s) >= 8 && IsASCIIDigits(s[0:8]):
 		year, month, day = atoi(s[0:4]), atoi(s[4:6]), atoi(s[6:8])
 		rest = s[8:]
 	default:
@@ -80,14 +80,14 @@ func parseTime(s string) (time.Duration, bool) {
 			parts = append(parts, whole[i:min(i+2, len(whole))])
 		}
 	}
-	if len(parts) == 0 || len(parts) > 3 || (hasFrac && (len(parts) != 3 || frac == "" || !asciiDigits(frac))) {
+	if len(parts) == 0 || len(parts) > 3 || (hasFrac && (len(parts) != 3 || frac == "" || !IsASCIIDigits(frac))) {
 		return 0, false
 	}
 	limits := []int{23, 59, 59}
 	var d time.Duration
 	units := []time.Duration{time.Hour, time.Minute, time.Second}
 	for i, p := range parts {
-		if len(p) != 2 || !asciiDigits(p) || atoi(p) > limits[i] {
+		if len(p) != 2 || !IsASCIIDigits(p) || atoi(p) > limits[i] {
 			return 0, false
 		}
 		d += time.Duration(atoi(p)) * units[i]
@@ -106,8 +106,9 @@ func validDate(year, month, day int) bool {
 	return time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC).Day() == day
 }
 
-// asciiDigits は ASCII の数字だけの並びか。fromisoformat は ASCII の外の数字（全角など）を読まない。
-func asciiDigits(s string) bool {
+// IsASCIIDigits は ASCII の数字だけの並びか（Python の s.isascii() and s.isdigit()）。空なら偽。fromisoformat は
+// ASCII の外の数字（全角など）を読まない。
+func IsASCIIDigits(s string) bool {
 	if s == "" {
 		return false
 	}
@@ -119,7 +120,7 @@ func asciiDigits(s string) bool {
 	return true
 }
 
-// atoi は asciiDigits で確かめた並びの値。
+// atoi は IsASCIIDigits で確かめた並びの値。
 func atoi(s string) int {
 	n, _ := ParseInt(s)
 	return n

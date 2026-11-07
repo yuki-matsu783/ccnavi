@@ -42,7 +42,7 @@ var parentLine = regexp.MustCompile(`(?m)^parent:[ \t]*(.*?)[ \t]*$`)
 // WorktreeName は place がワークスペースの `.claude/worktrees/<名前>` の中なら、在るディレクトリの綴りの名前
 // （呼び手がパスを組み直して開く）。git に登録されているかは問わない（sh の検査と同じ広さ）。
 func WorktreeName(root, where string) string {
-	rest, ok := tree.PartsUnder(ospath.Join(root, tree.WorktreesDir), where)
+	rest, ok := tree.PartsUnder(tree.WorktreesPath(root), where)
 	if !ok || len(rest) == 0 {
 		return ""
 	}
@@ -136,7 +136,7 @@ func childParent(conf *config.Settings, root, name string) string {
 
 func searchedTrees(conf *config.Settings, root string) []string {
 	tops := []string{root}
-	for _, base := range []string{conf.Projects, ospath.Join(root, tree.WorktreesDir)} {
+	for _, base := range []string{conf.Projects, tree.WorktreesPath(root)} {
 		if base == "" {
 			continue
 		}

@@ -1,10 +1,10 @@
 package suggest
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -393,9 +393,9 @@ func ruleCandidates(conf *config.Settings, root string, records []*pyjson.Object
 		if err != nil {
 			return nil, 0, err
 		}
-		path := filepath.Join(scratch, id+".yml")
-		if err := os.WriteFile(path, []byte(dumped), 0o644); err != nil {
-			return nil, 0, err
+		path := ospath.Join(scratch, id+".yml")
+		if why := fsio.WriteText(path, dumped, fsio.NativeNewline, fsio.Plain); why != "" {
+			return nil, 0, errors.New(why)
 		}
 		trial := *conf
 		trial.Rules = path
@@ -533,12 +533,10 @@ func Report(stdout io.Writer, conf *config.Settings, root string, asJSON bool) (
 		return 0, err
 	}
 	if asJSON {
-		text, err := pyjson.Dumps(body.obj, pyjson.Options{Indent: 1})
-		if err != nil {
+		if err := pyjson.Write(stdout, body.obj, pyjson.Options{Indent: 1}); err != nil {
 			return 0, err
 		}
-		_, err = io.WriteString(stdout, text+"\n")
-		return config.ExitOK, err
+		return config.ExitOK, nil
 	}
 	if len(body.logs) == 0 {
 		where := conf.Log

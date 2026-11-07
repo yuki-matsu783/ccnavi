@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/policy/texts"
 )
@@ -46,5 +47,5 @@ func runText(stdout, stderr io.Writer, root string, words []string) int {
 		return textUnavailable
 	}
 	fmt.Fprintln(stdout, text)
-	return 0
+	return config.ExitOK
 }

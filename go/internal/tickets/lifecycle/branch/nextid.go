@@ -84,7 +84,7 @@ func SerialNames(conf *config.Settings, root string, known *Known) ([]string, []
 			}
 		}
 	}
-	homes := ospath.Join(root, tree.WorktreesDir)
+	homes := tree.WorktreesPath(root)
 	entries, err := ospath.DiskListdir(homes)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		problems = append(problems, tree.WorktreesDir+" を読めなかった（"+fsio.ErrorText(err)+"）")

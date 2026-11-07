@@ -43,6 +43,9 @@ const (
 	ScratchpadWarnMB     = "CCNAVI_SCRATCHPAD_WARN_MB"
 )
 
+// Compat は sh（ccnavi-common.sh）が互換の版を宣言する変数。環境からは読まず、`--lint` が sh の中の代入を読む。
+const Compat = "CCNAVI_COMPAT"
+
 // 時間の上限。
 const (
 	AskContextWaitSeconds     = "CCNAVI_ASK_CONTEXT_WAIT_SECONDS"

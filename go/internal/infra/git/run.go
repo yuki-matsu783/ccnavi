@@ -28,6 +28,8 @@ const (
 	DefaultTimeout = 5 * time.Second
 	// RiskTimeout はリスクの計測が差分と状態を読む期限。
 	RiskTimeout = 10 * time.Second
+	// ReadTimeout は診断と問い合わせ（status・--lint・stop-review の材料）が git から状態と中身を 1 回読む期限。
+	ReadTimeout = 10 * time.Second
 	// ReviewTimeout はレビューの依頼が親のワークツリーを読む期限。
 	ReviewTimeout = 15 * time.Second
 	// MergeTimeout は write-and-push の合流と、ワークツリーの検査（未コミット・差分）の期限。

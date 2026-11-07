@@ -82,11 +82,9 @@ func opsStep(stdout, stderr io.Writer, state string, words []string) (code int, 
 		if r == nil {
 			return config.ExitError, true, err
 		}
-		text, err := pyjson.Dumps(r.Object(), pyjson.Options{RawUnicode: true})
-		if err != nil {
+		if err := pyjson.Write(stdout, r.Object(), pyjson.Options{RawUnicode: true}); err != nil {
 			return 0, true, err
 		}
-		fmt.Fprintln(stdout, text)
 		return config.ExitOK, true, nil
 	case verb == "stage-set" && n >= 4 && n <= 6:
 		return config.ExitOK, true, oplog.StageSet(state, words[1], words[2], oplog.State(words[3]), arg(4), arg(5))

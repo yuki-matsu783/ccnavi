@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	mdExt = ".md"
 	// FollowupKey は続きの子の目印（トップレベルの欄）。見た子の識別子の列。
 	FollowupKey = "followup_of"
 	// nowhereDir は親のワークツリーが決まらないときに読む、誰も作らない置き場（state の下）。
@@ -24,12 +23,24 @@ const (
 
 // CopyPath は作業中の承認済みチケット（doing/）のパス。判定が読むのはここだけ。
 func CopyPath(approvedDir, id string) string {
-	return ospath.Join(approvedDir, string(place.Doing), id+mdExt)
+	return ospath.Join(approvedDir, string(place.Doing), id+place.MdExt)
 }
 
 // ClosedPath は閉じた承認済みチケット（done/）のパス。
 func ClosedPath(approvedDir, id string) string {
-	return ospath.Join(approvedDir, string(place.Done), id+mdExt)
+	return ospath.Join(approvedDir, string(place.Done), id+place.MdExt)
+}
+
+// ParentPaths はツリーで識別子 id の親チケットが在りうるファイル（承認済みの doing/・done/、提案の todo/・review/）。
+// 見る順に並ぶ。
+func ParentPaths(conf *config.Settings, treeRoot, id string) []string {
+	approvedDir := conf.ApprovedDir(treeRoot)
+	return []string{
+		CopyPath(approvedDir, id),
+		ClosedPath(approvedDir, id),
+		place.File(treeRoot, conf.Tickets, place.Todo, id),
+		place.File(treeRoot, conf.Tickets, place.Review, id),
+	}
 }
 
 // reviewDir はそのツリーの提案の置き場の review/。

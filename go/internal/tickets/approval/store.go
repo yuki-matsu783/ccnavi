@@ -61,7 +61,7 @@ func loadDir(directory string, requireRecord bool) ([]*ticket.Ticket, []Unread) 
 	var found []*ticket.Ticket
 	var unread []Unread
 	for _, name := range names {
-		ident, ok := strings.CutSuffix(name, mdExt)
+		ident, ok := strings.CutSuffix(name, place.MdExt)
 		if !ok {
 			continue
 		}

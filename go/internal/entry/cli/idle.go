@@ -5,11 +5,11 @@ import (
 	"io"
 	"os"
 	"slices"
-	"strconv"
 	"time"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/hookio"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/records/handoff"
 )
@@ -91,28 +91,21 @@ func notForIdle(payload hookio.Input) string {
 
 // idleCheck は `idle check <セッション> <印> <待ち秒>`。待機のあと、起こすべきか、起こすときの指示を返す。
 func idleCheck(stdout io.Writer, conf *config.Settings, rest []string, limit int) {
-	if len(rest) != 3 || !asciiDigits(rest[2]) {
+	seconds := -1
+	if len(rest) == 3 && pyfmt.IsASCIIDigits(rest[2]) {
+		if n, err := pyfmt.ParseInt(rest[2]); err == nil {
+			seconds = n
+		}
+	}
+	if seconds < 0 {
+		// int に収まらない待ち秒も読めない引数と同じに扱う（Python は大きな整数のまま進む）。
 		fmt.Fprintln(stdout, "skip usage")
 		return
 	}
-	seconds, _ := strconv.Atoi(rest[2])
 	text, ok := handoff.Check(conf.State, rest[0], rest[1], time.Duration(seconds)*time.Second, limit)
 	if !ok {
 		fmt.Fprintln(stdout, "skip not-waiting")
 		return
 	}
 	io.WriteString(stdout, "fire\n"+text)
-}
-
-// asciiDigits は ASCII の数字だけの語か（Python の isascii() and isdigit()）。
-func asciiDigits(s string) bool {
-	if s == "" {
-		return false
-	}
-	for i := 0; i < len(s); i++ {
-		if s[i] < '0' || s[i] > '9' {
-			return false
-		}
-	}
-	return true
 }

@@ -15,6 +15,9 @@ import (
 // 届くよう、ワークスペースルートの中に置く。
 var WorktreesDir = ospath.Join(".claude", "worktrees")
 
+// WorktreesPath はワークスペースルート root のワークツリーの置き場の絶対パス。
+func WorktreesPath(root string) string { return ospath.Join(root, WorktreesDir) }
+
 // Main はワークスペースルートの名前（空）。
 const Main = ""
 
@@ -157,7 +160,7 @@ const gitdirPrefix = "gitdir:"
 // writtenGitdir は `.git` ファイルの `gitdir:` に書かれた先（書かれたとおり）。ファイルでない・読めない・
 // 形が違えば ok が偽。
 func writtenGitdir(treeRoot string) (string, bool) {
-	gitfile := ospath.Join(treeRoot, ".git")
+	gitfile := ospath.Join(treeRoot, DotGit)
 	if !ospath.IsFile(gitfile) {
 		return "", false
 	}
@@ -205,7 +208,7 @@ func IsWorktreeOf(root, candidate string) bool {
 	if !ospath.IsAbs(gitdir) {
 		gitdir = ospath.Join(candidate, gitdir)
 	}
-	registry := key(ospath.Join(root, ".git", "worktrees"))
+	registry := key(ospath.Join(root, GitWorktrees))
 	if !strings.HasPrefix(key(gitdir), registry+ospath.Sep) {
 		return false
 	}
@@ -213,7 +216,7 @@ func IsWorktreeOf(root, candidate string) bool {
 	if err != nil {
 		return false
 	}
-	return key(ospath.Strip(back)) == key(ospath.Join(candidate, ".git"))
+	return key(ospath.Strip(back)) == key(ospath.Join(candidate, DotGit))
 }
 
 // TreeOf はこのパスが属するツリー。ワークスペースルートの外なら ok が偽（判定を持たない）。

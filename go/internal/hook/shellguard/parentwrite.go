@@ -83,7 +83,7 @@ func CheckParentWrite(conf *config.Settings, root, cwd, subject string, degraded
 
 // parentTrees は親のワークツリーの名前（`.claude/worktrees/` の下で、自身のチケットが親のもの）。名前の順。
 func parentTrees(conf *config.Settings, root string) []string {
-	base := ospath.Join(root, tree.WorktreesDir)
+	base := tree.WorktreesPath(root)
 	names, err := ospath.DiskListdir(base)
 	if err != nil {
 		return nil
@@ -137,7 +137,7 @@ func checkCode(conf *config.Settings, root string, parents []string, c code) Par
 func mentionedParent(root string, parents []string, text string) string {
 	folded := strings.ReplaceAll(text, `\`, "/")
 	runes := []rune(folded)
-	base := ospath.Join(root, tree.WorktreesDir)
+	base := tree.WorktreesPath(root)
 	for _, name := range parents {
 		forms := []string{
 			strings.ReplaceAll(ospath.Join(base, name), `\`, "/"),

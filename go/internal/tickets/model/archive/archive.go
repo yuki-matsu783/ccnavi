@@ -25,8 +25,6 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-const mdExt = ".md"
-
 // flowSuffixes は flows/ の子のフローの拡張子。
 var flowSuffixes = []string{".yml", ".yaml"}
 
@@ -96,7 +94,7 @@ func regularMD(directory string) []string {
 	}
 	var out []string
 	for _, n := range names {
-		if stem, ok := strings.CutSuffix(n, mdExt); ok && regular(ospath.Join(directory, n)) {
+		if stem, ok := strings.CutSuffix(n, place.MdExt); ok && regular(ospath.Join(directory, n)) {
 			out = append(out, stem)
 		}
 	}
@@ -151,7 +149,7 @@ func FindAny(root, ident string) []*ticket.Ticket {
 		if directory == "" {
 			continue
 		}
-		path := ospath.Join(directory, ident+mdExt)
+		path := ospath.Join(directory, ident+place.MdExt)
 		if !regular(path) {
 			continue
 		}
@@ -168,7 +166,7 @@ func ClosedTickets(root string) []*ticket.Ticket {
 	for _, repo := range repoNames(root) {
 		directory := doneDir(root, repo)
 		for _, ident := range regularMD(directory) {
-			if t := load(ospath.Join(directory, ident+mdExt), ident, repo); t != nil {
+			if t := load(ospath.Join(directory, ident+place.MdExt), ident, repo); t != nil {
 				out = append(out, t)
 			}
 		}
@@ -198,7 +196,7 @@ func ArchivedParent(root, project, ident string) *ticket.Ticket {
 	if directory == "" {
 		return nil
 	}
-	path := ospath.Join(directory, ident+mdExt)
+	path := ospath.Join(directory, ident+place.MdExt)
 	if !regular(path) {
 		return nil
 	}
@@ -221,7 +219,7 @@ func ArchivedName(root, project, ident string) (string, bool) {
 	if !ids.IsValidID(ident) {
 		return "", false
 	}
-	if _, ok := ArchivedBytes(root, project, string(place.Done)+"/"+ident+mdExt); ok {
+	if _, ok := ArchivedBytes(root, project, string(place.Done)+"/"+ident+place.MdExt); ok {
 		return ident, true
 	}
 	for _, i := range regularMD(doneDir(root, tree.RepoKey(project))) {
@@ -239,7 +237,7 @@ func ArchivedFields(root, project, ident string) (ticket.DoneCopy, bool) {
 	if !ok {
 		return ticket.DoneCopy{}, false
 	}
-	copy, ok := fieldsOf(ArchivedBytes(root, project, string(place.Done)+"/"+name+mdExt))
+	copy, ok := fieldsOf(ArchivedBytes(root, project, string(place.Done)+"/"+name+place.MdExt))
 	if !ok || !ids.SameID(copy.Ticket, name) {
 		return ticket.DoneCopy{}, false
 	}
@@ -259,7 +257,7 @@ func doneCopies(approvedDir string) map[string]ticket.DoneCopy {
 	directory := ospath.Join(approvedDir, string(place.Done))
 	out := map[string]ticket.DoneCopy{}
 	for _, ident := range regularMD(directory) {
-		if copy, ok := fieldsOf(fsio.ReadBytes(ospath.Join(directory, ident+mdExt))); ok && copy.Ticket == ident {
+		if copy, ok := fieldsOf(fsio.ReadBytes(ospath.Join(directory, ident+place.MdExt))); ok && copy.Ticket == ident {
 			out[ident] = copy
 		}
 	}
@@ -312,7 +310,7 @@ func PlanMove(approvedDir string, parents []string, root, project string) Plan {
 		switch {
 		case ok && here.Parent == "":
 			family[p] = true
-		case !ok && root != "" && !ospath.DiskLexists(ospath.Join(approvedDir, string(place.Doing), p+mdExt)):
+		case !ok && root != "" && !ospath.DiskLexists(ospath.Join(approvedDir, string(place.Doing), p+place.MdExt)):
 			if held, ok := ArchivedFields(root, project, p); ok && held.Parent == "" {
 				family[p] = true
 			}
@@ -367,7 +365,7 @@ func PlanMove(approvedDir string, parents []string, root, project string) Plan {
 	out.Tickets = append(sortedKeys(done, func(i string) bool { return children[i] }),
 		sortedKeys(done, func(i string) bool { return family[i] })...)
 	for _, i := range out.Tickets {
-		out.Files = append(out.Files, string(place.Done)+"/"+i+mdExt)
+		out.Files = append(out.Files, string(place.Done)+"/"+i+place.MdExt)
 	}
 	return out
 }

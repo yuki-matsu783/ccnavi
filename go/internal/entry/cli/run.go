@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"ccnavi/internal/infra/argparse"
@@ -32,20 +33,21 @@ func (in *input) terminal() bool {
 	return ok && ospath.IsTerminal(f.Fd())
 }
 
+// actorMaxLength は `--actor` の長さの上限（字）。
+const actorMaxLength = 100
+
 // actorForm は `--actor` の形。拡張がホストから読むアカウント名の形（`github.ts` の NAME）と同じ。
-var actorForm = regexp.MustCompile(`\A[A-Za-z0-9_.-]{1,100}\z`)
+var actorForm = regexp.MustCompile(`\A[A-Za-z0-9_.-]{1,` + strconv.Itoa(actorMaxLength) + `}\z`)
 
 // Run は 1 回の起動を処理し、終了コードを返す。マーカーに書く経路（via）の既定はエージェントが sh から打つ
 // サブコマンド（cli）で、ユーザの判断の経路と hook は枝の中で差し替える。
 func Run(stdin io.Reader, stdout, stderr io.Writer, argv []string) (code int) {
 	defer via.Session(via.CLI, "")()
 	// hook の経路は自前の受け皿（hook.go）で終わる。ここに来るのは、打った人が見られる経路の想定外の失敗だけ。
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(stderr, "ccnavi: 想定外の失敗で止まった: %v\n", r)
-			code = config.ExitError
-		}
-	}()
+	defer onPanic(func(r any, _ failure) {
+		fmt.Fprintf(stderr, "ccnavi: 想定外の失敗で止まった: %v\n", r)
+		code = config.ExitError
+	})
 	return run(newInput(stdin), stdout, stderr, argv)
 }
 
@@ -145,7 +147,7 @@ func usageRefusal(parser *argparse.Parser, a opts) string {
 	}
 	actor := a.Str("actor")
 	if actor != "" && !actorForm.MatchString(actor) {
-		return "--actor にはホストのアカウント名（英数字と _ . - の 1〜100 字）を渡す"
+		return "--actor にはホストのアカウント名（英数字と _ . - の 1〜" + strconv.Itoa(actorMaxLength) + " 字）を渡す"
 	}
 	if actor != "" && !a.head("review", "confirm") && !decideWrites(a) {
 		return "--actor は review confirm か、反映する形の decide（--reviewed <N> --accept-unresolved）と一緒に指定してください。"

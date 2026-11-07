@@ -10,6 +10,7 @@ import (
 
 	"ccnavi/internal/hook/ccnavimd"
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/policy/rules"
@@ -67,7 +68,7 @@ func collect(conf *config.Settings, root string, notes []string, mode config.Mod
 // shCompatFile は sh が互換の版を宣言する場所。`.ccnavi/scripts/` の sh はどれもこれを `.` で読む。
 var shCompatFile = ospath.Join(config.DefaultProjectHome, config.ScriptsDir, "ccnavi-common.sh")
 
-var shCompatLine = regexp.MustCompile(`(?m)^CCNAVI_COMPAT=([0-9]+)[ \t]*$`)
+var shCompatLine = regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(env.Compat) + `=([0-9]+)[ \t]*$`)
 
 // compatFix は実行ファイルと sh が食い違ったときの直し方。ccnavi のリポジトリなら組み立て直し、配布先なら配り直し
 // （配布先には組み立てる元が無い）。
@@ -95,8 +96,8 @@ func shCompat(root string, compat int) []rules.Problem {
 	}
 	found := shCompatLine.FindStringSubmatch(text)
 	if found == nil {
-		return warn(fmt.Sprintf("%s に互換の版（CCNAVI_COMPAT）が書かれていない。実行ファイル（互換 %d）より古い sh である。%s",
-			path, compat, compatFix(root)))
+		return warn(fmt.Sprintf("%s に互換の版（%s）が書かれていない。実行ファイル（互換 %d）より古い sh である。%s",
+			path, env.Compat, compat, compatFix(root)))
 	}
 	written, _ := strconv.Atoi(found[1])
 	if written == compat {
