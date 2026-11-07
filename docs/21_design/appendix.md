@@ -33,11 +33,10 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `DENY_PHASE_REVIEW` | フェーズのレビューで止まっている（レビュー準備中・レビュー待ち） |
 | `DENY_AGENT_ISOLATION` | `Agent`・`Task` に `isolation` のキーがある（値によらない）。作業場所は ccnavi が決め、isolation のワークツリー（`.claude/worktrees/agent-<id>`）にはチケットの範囲に該当しない。補助で、チケット制御が無効でも dry-run でも止める。`CCNAVI_MODE=disable` だけ通す（9.12） |
 | `DENY_AGENT_NO_CHILD` | 親のワークツリーから、担当の子を指さずに編集する種類のサブエージェントを起動した。作業中の子の識別子を最大 5 件並べる。ゲート。読み取り専用の種類は止めない（9.12） |
-| `DENY_AGENT_MULTI_TARGET` | プロンプトが違うワークツリーを 2 つ以上指している（「触れない」と書いた子も数える）。ゲート。チケット制御が無効のときも、パスが 2 つ以上なら止める（補助。9.12） |
-| `DENY_AGENT_PARENT_TREE` | プロンプトが親のワークツリーだけを指している。ゲート（9.12） |
+| `DENY_AGENT_MULTI_TARGET` | description が違うワークツリーを 2 つ以上指している（「触れない」と書いた子も数える）。ゲート。チケット制御が無効のときも、ワークツリーの名前が 2 つ以上なら止める（補助。9.12） |
+| `DENY_AGENT_PARENT_TREE` | description が親のワークツリーだけを指している。ゲート（9.12） |
 | `DENY_AGENT_CHILD_UNAVAILABLE` | 指した子が担当にできない（閉じた・レビュー待ち・blocked・未着手・ワークツリーが無い・プロジェクトの食い違い）。未着手とワークツリーが無い場合だけ `start` の打ち方を示す。ゲート（9.12） |
-| `DENY_AGENT_TARGET_INVALID` | プロンプトのワークツリーのパスが使えない（このワークスペースの外・`..`・シンボリックリンク・登録が無い・名前が無い）。補助（9.12） |
-| `DENY_AGENT_CWD_CONFLICT` | `tool_input` の cwd が、プロンプトで決まった担当先と違う。補助（9.12） |
+| `DENY_AGENT_CWD_CONFLICT` | `tool_input` の cwd が、description で決まった担当先と違う。補助（9.12） |
 | `NUDGE_TICKET_FEEDBACK` | メインエージェントの `Stop` で、cwd のツリーが承認済みで着手済みの親子に結び付き、親が blocked でなく、親の局面が「フィードバック計画待ち」。同じ状態（親・HEAD・改版を提案済みか）では 1 回だけ止めて、改版を書いて `approval-request` で送りユーザに承認を頼むよう促す。実行中のサブエージェントが居る間は出ない（9.12）。記録の `decision` は `nudge` |
 | `NUDGE_TICKET_FINISH` | メインエージェントの `Stop` で、cwd のワークツリーのチケットが着手済みのまま、未コミットの変更が無く、基準点より先に自分のコミットがある。同じ HEAD では 1 回だけ止めて `finish` か続ける理由を促す（9.6）。記録の `decision` は `nudge`。実行中のサブエージェントが居る間は出ない（9.12） |
 | `NUDGE_TICKET_REQUEST` | メインエージェントの `Stop` で、承認済みの親に作業中の子が残っているか、子が全部閉じたのにレビューを要するフェーズの `requested` が無い。同じ状態では 1 回だけ止めて、次の一手（`finish`・合流・`review-request`）を促す（9.6）。`finish` の促しと重なった回は出ない。実行中のサブエージェントが居る間は出ない（9.12）。記録の `decision` は `nudge` |
@@ -93,7 +92,7 @@ JSON も、同じコードをキー `code` に持つ（通れば `null`。`stopp
 | `builtin:ticket-project` | `DENY_TICKET_PROJECT_MISMATCH` |
 | `builtin:ticket-flow-lock` | `DENY_TICKET_FLOW_LOCKED` |
 | `builtin:phase-review` | `DENY_PHASE_REVIEW` |
-| `builtin:agent-isolation` / `builtin:agent-no-child` / `builtin:agent-multi-target` / `builtin:agent-parent-tree` / `builtin:agent-child-unavailable` / `builtin:agent-target-invalid` / `builtin:agent-cwd-conflict` | `DENY_AGENT_ISOLATION` / `DENY_AGENT_NO_CHILD` / `DENY_AGENT_MULTI_TARGET` / `DENY_AGENT_PARENT_TREE` / `DENY_AGENT_CHILD_UNAVAILABLE` / `DENY_AGENT_TARGET_INVALID` / `DENY_AGENT_CWD_CONFLICT`（`hook.agentlaunch`） |
+| `builtin:agent-isolation` / `builtin:agent-no-child` / `builtin:agent-multi-target` / `builtin:agent-parent-tree` / `builtin:agent-child-unavailable` / `builtin:agent-cwd-conflict` | `DENY_AGENT_ISOLATION` / `DENY_AGENT_NO_CHILD` / `DENY_AGENT_MULTI_TARGET` / `DENY_AGENT_PARENT_TREE` / `DENY_AGENT_CHILD_UNAVAILABLE` / `DENY_AGENT_CWD_CONFLICT`（`hook.agentlaunch`） |
 | `builtin:subagent-ticket-op` | `DENY_SUBAGENT_TICKET_OP` |
 | `builtin:ask-context` | `DENY_ASK_NEEDS_CONTEXT`（`hook.askcontext`） |
 | `builtin:turn-gate:<宣言 id>` | `DENY_NEEDS_USER_TURN`。宣言ごとに名前を分ける（組み込みは `integrate-user-turn`・`review-confirm-user-turn`。6.7） |
@@ -217,7 +216,7 @@ shlex に任せる。走査か shlex のどちらかに手を入れたら `tests
 
 | | 弱点 | 今の扱い |
 |---|---|---|
-| G2 | 孫の `cwd` が親のワークツリーなので、`SubagentStart` が親の子を全部並べ、`SubagentStop` が兄弟の子の変更でも差し戻す | 入れ子の起動では担当の子の識別子を 1 つ書かせ、担当の案内（子・ワークツリー・範囲）を起動前にプロンプトへ書き足す（9.12）。緩和であって、防いではいない |
+| G2 | 孫の `cwd` が親のワークツリーなので、`SubagentStart` が親の子を全部並べ、`SubagentStop` が兄弟の子の変更でも差し戻す | 入れ子の起動では担当の子の識別子を description に 1 つ書かせ、担当の案内（子・ワークツリー・範囲）を起動前にプロンプトへ書き足す（9.12）。緩和であって、防ぐものではない |
 | G3 | 孫は、兄弟の子のワークツリーにもその範囲の中なら書ける | 同上 |
 | G4 | 差し戻しを無視した知らせが、起動した子にしか届かない | 入れ子の起動なら `systemMessage` にも載せる（9.12） |
 | G5 | Bash の実行後チェックは `cwd` のツリーだけを見る | そのまま |
