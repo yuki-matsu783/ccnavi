@@ -69,8 +69,8 @@ type Places struct{ Tickets, Approved string }
 
 func (p Places) holds(rel string) bool { return place.IsTicketPlace(rel, p.Tickets, p.Approved) }
 
-// ScopeGuard は承認された範囲を実行後の側から当てるための持ち物。実行前チェックと同じ範囲・同じ当て方を使う
-// （別に書くと、実行前に通った書き込みが実行後に報告される）。Copies は承認済みチケットを識別子で引く表、
+// ScopeGuard は、承認された範囲を実行後の側から当てるための持ち物。実行前チェックと同じ範囲・同じ当て方を使う
+// （別に書くと、実行前に通った書き込みが実行後に報告されてしまうため）。Copies は承認済みチケットを識別子で引く表、
 // Projects はプロジェクトの置き場。
 type ScopeGuard struct {
 	Root     string
@@ -175,10 +175,10 @@ type scan struct {
 	root    string
 }
 
-// findings は変更のうち報告すべきもの。ccnavi 自身が書く場所は先に除く（除かないと、記録を 1 行足すたびに
-// 自分を違反として報告する）。チケットの置き場の、サブコマンドが書いたと内容から読めるものも除く（scriptWrites）。
-// ルールの deny・ask にヒットした変更は範囲の外でもルールの側で報告する（範囲を広げても済まない場所）。
-// allow にヒットする変更にもチケットの範囲は当てる（実行前チェックがルールとチケットの厳しい側を採るのと同じ）。
+// findings は、変更のうち報告すべきものを返す。ccnavi 自身が書く場所は先に除く（除かないと、記録を 1 行足すたびに
+// 自分を違反として報告してしまう）。チケットの置き場のうち、サブコマンドが書いたと内容から読めるものも除く（scriptWrites）。
+// ルールの deny・ask にヒットした変更は、範囲の外でもルールの側で報告する（範囲を広げても済まない場所のため）。
+// allow にヒットする変更にもチケットの範囲は当てる。実行前チェックがルールとチケットの厳しい側を採るのと同じ。
 func (s scan) findings() []*finding {
 	var own []string
 	for _, p := range s.mine {
@@ -247,13 +247,13 @@ type placed struct {
 }
 
 // scriptWrites はチケットの置き場の変更のうち、ccnavi のサブコマンド（ticket start・finish・cancel、review-request・
-// confirm・ready）が書いたと内容から読めるものの実パス。誰が書いたかは記録せず、何が変わったかで答える（承認が
-// 親のブランチに乗って届いた別の機械でも同じ答えにするため）。
+// confirm・ready）が書いたと内容から読めるものの実パスを返す。誰が書いたかは記録せず、何が変わったかで答える。承認が
+// 親のブランチに乗って届いた別の機械でも、同じ答えにするため。
 //
-// 外すのは、どちらの版も範囲を宣言していないもの（マーカー・記録）、スクリプトだけが書く欄（と review-request の
-// `mr:` の書き足し）以外が 1 文字も変わっていないチケット、finish・cancel の移動（同じ内容が 1 対 1 で消えて現れた組）、
-// ready の退避が消したもの。読めなかったものは外さない（読めないことは「変わっていない」ではなく、git を数秒止める
-// だけで除外が通ってしまう）。
+// 外すのは、次の場合である。どちらの版も範囲を宣言していないもの（マーカー・記録）。スクリプトだけが書く欄（と review-request の
+// `mr:` の書き足し）以外が 1 文字も変わっていないチケット。finish・cancel の移動（同じ内容が 1 対 1 で消えて現れた組）。
+// ready の退避が消したもの。読めなかったものは外さない。読めないことは「変わっていない」ではなく、git を数秒止めるだけで
+// 除外が通ってしまうため。
 func (s scan) scriptWrites() map[string]bool {
 	out := map[string]bool{}
 	if s.top == "" || s.places.Tickets == "" && s.places.Approved == "" {

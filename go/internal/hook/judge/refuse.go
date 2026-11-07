@@ -76,7 +76,7 @@ type refusal struct {
 
 // refuse は拒否か確認を返す。dry-run で一般の保護なら、返していたはずだと言うだけにする。
 // 確認を返す前に直前の発言を調べ（checkAsk）、止める文が返れば拒否に替える（確認の本文と kind は残す）。
-// 実際に止めた回（enable の deny）は同じ拒否の繰り返しを数え、拒否は dry-run でも失敗の連続に数える。
+// 実際に止めた回（enable の deny）は同じ拒否の繰り返しを数える。拒否は dry-run でも失敗の連続に数える。
 // 起動の入力の更新は、確認と dry-run の報告に添える。強制する拒否には添えない。
 func (j *judgement) refuse(verdict rules.Decision, parts []string, o refusal) (int, error) {
 	record := j.record
@@ -151,8 +151,8 @@ func writePass(stdout io.Writer, text string, updated *pyjson.Object) error {
 	return hookio.WritePreToolUse(stdout, hookio.PreToolUseResponse{Context: text, UpdatedInput: updated})
 }
 
-// finalKind はルールとチケットの判定を拒否にした回の分類。ids は土台を落とす前のヒットしたルールの id。
-// `>` の上限で上げた拒否は、ゲートの置き場を守る保護を当てていない代わりなので、ゲートの穴にならないようゲートにする。
+// finalKind はルールとチケットの判定を拒否にした回の分類。ids は、土台を落とす前にヒットしたルールの id。
+// `>` の上限で上げた拒否は、ゲートの置き場を守る保護を当てていない代わりになるので、ゲートの穴をふさぐためゲートとして扱う。
 func finalKind(conf *config.Settings, ids map[string]bool, byTicket, capped bool) config.HoldKind {
 	tickets := conf.TicketsEnabled()
 	if capped || byTicket {
@@ -199,7 +199,7 @@ func rewriteKind(conf *config.Settings, in hookio.Input, subject string, inner [
 }
 
 // FailStreakHint は失敗か拒否を連続に 1 回数え、案内を出す回ならその文を返す。出さない回と数えられない回は空。
-// ツール自体の失敗（PostToolUseFailure）と拒否が同じ連続に数える。
+// ツール自体の失敗（PostToolUseFailure）と拒否は、同じ連続として数える。
 func FailStreakHint(conf *config.Settings, root, session, agent string) string {
 	kind, got := tally.Fail(conf.State, session, agent, tally.StreakThreshold(conf.FailStreakCount))
 	if kind == tally.NoNotice {
@@ -208,8 +208,8 @@ func FailStreakHint(conf *config.Settings, root, session, agent string) string {
 	return docs.FailStreakNote(conf, root, got, kind == tally.First)
 }
 
-// GuardSettingFiles は ccnavi 自身の設定ファイルをバックアップと突き合わせる 1 回（step は selfguard.Before か After）。
-// したことを record.Guarded に残し、知らせる文を返す。実行前と実行後で対象の決め方を 1 か所にするため、step だけを受ける。
+// GuardSettingFiles は ccnavi 自身の設定ファイルを、バックアップと突き合わせる 1 回。step は selfguard.Before か After。
+// 行ったことを record.Guarded に残し、知らせる文を返す。実行前と実行後で対象の決め方を 1 か所にするため、step だけを受ける。
 func GuardSettingFiles(mode config.Mode, conf *config.Settings, root string, in hookio.Input, record *audit.Record, step selfguard.Step) string {
 	setting := config.EffectiveSetting(mode, config.Mode(conf.GuardCoreFiles))
 	targets := selfguard.Targets(root, conf.Rules, conf.Bin, ruleload.LayerFiles(conf, root), conf.Projects)

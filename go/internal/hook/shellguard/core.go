@@ -62,14 +62,13 @@ const (
 	mentionLimit = 80
 )
 
-// CheckCorePaths は、`ccnavi-git.sh` で自己防衛の対象を消す・別のコミットの中身に戻す形なら、サブコマンド・当たった
-// 語・理由の種類。当たらなければ sub が空。
+// CheckCorePaths は、`ccnavi-git.sh` で自己防衛の対象を消す・別のコミットの中身に戻す形なら、サブコマンド・当たった語・
+// 理由の種類を返す。当たらなければ sub が空。
 //
-// 当たるとみなすのは、シェルから書く形の組み込みと同じ場所の式に書いたとおりの語か居場所から解いた絶対パスが当たる、
-// そのパスが守る場所を中に含む、承認済み・レビュー待ちの置き場を指す、当たる先を読みで決められない（`:` で始まる
-// pathspec・固定の部分の無いグロブ・`--pathspec-from-file`）、対象を読み切れない（変数・置換・読めない `cd` の後の
-// 相対パス・読み切れないコマンド行）、`checkout -- <パス>`、のどれか。通すのは、索引の中身に戻す `restore` と、
-// 何も消さない `rm -n`・`--dry-run`。
+// 当たるとみなすのは次のどれかの場合。シェルから書く形の組み込みと同じ場所の式に書いたとおりの語か、居場所から解いた絶対パスが
+// 当たり、そのパスが守る場所を中に含む。承認済み・レビュー待ちの置き場を指す。当たる先を読みで決められない（`:` で始まる
+// pathspec・固定の部分の無いグロブ・`--pathspec-from-file`）。対象を読み切れない（変数・置換・読めない `cd` の後の相対パス・
+// 読み切れないコマンド行）。`checkout -- <パス>`。通すのは、索引の中身に戻す `restore` と、何も消さない `rm -n`・`--dry-run`。
 func CheckCorePaths(conf *config.Settings, root, cwd, subject string, degraded bool) (sub, word string, kind Core) {
 	if !mentionsGitScript(subject) {
 		return "", "", ""
@@ -141,7 +140,7 @@ func CheckCorePaths(conf *config.Settings, root, cwd, subject string, degraded b
 	return "", "", ""
 }
 
-// fedToStdin は、標準入力から読むシェルがあり、呼び出しの語でない語にラッパーの名前があれば、その語
+// fedToStdin は、標準入力から読むシェルに流し込まれた語のうち、呼び出しの語でなくラッパーの名前を含むものを返す
 // （`echo '…ccnavi-git.sh rm …' | sh`）。流し込む文字列の中は、サブコマンドも対象も読めない。
 func fedToStdin(places []shell.Placed) (string, bool) {
 	mention := ""
@@ -173,13 +172,12 @@ func longOption(arg, full string, least int) bool {
 	return len(arg) >= least && strings.HasPrefix(full, arg)
 }
 
-// coreTargets はサブコマンドの引数から、消す・戻す先のパスの語と、読めない指定（あればその語）と、索引の中身に戻す
-// `checkout -- <パス>` か、を返す。
+// coreTargets は、サブコマンドの引数から、消す・戻す先のパスの語と、読めない指定（あればその語）と、索引の中身に戻す
+// `checkout -- <パス>` かどうかを返す。
 //
 // `restore` は `--source` が無ければ何も返さない。`checkout` は `--` より前の最初の語（行き先か起点）を除く。`rm` は
 // `-n`・`--dry-run` があれば（後ろに `--no-dry-run` が無ければ）何も返さない。長いオプションは git が受ける省略形
-// （`--sou=`）も同じに読む。オプションを変数で書く形（`restore $O HEAD~1 <パス>`）は見ない（この検査の限界で、sh が
-// 止める）。
+// （`--sou=`）も同じに読む。オプションを変数で書く形（`restore $O HEAD~1 <パス>`）は見ない。この検査の限界で、sh が止める。
 func coreTargets(sub string, args []string) (paths []string, unknown string, index bool) {
 	longs, shorts := valueLongs[sub], valueShorts[sub]
 	var positional []string
@@ -360,10 +358,10 @@ func inStore(conf *config.Settings, word, full string) bool {
 
 // inReview はレビュー待ちの置き場（とその下）か、置き場の親を指すか。
 //
-// 置き場はツリーごとにあり、どのツリーのものかは問わない。親（`wip/`・`wip/proposals/`）を丸ごと消すと置き場ごと
-// 消えるが、空なら消えるものが無いので通す（親を閉じた後の `ccnavi-git.sh rm -r wip` の案内がこの形で、そのとき
-// レビュー待ちの子は残っていない）。空の親を通すのは `rm` だけ。`restore --source`・`checkout <ref> --` で親を戻すと、
-// いまは空でも過去のコミットにあったレビュー待ちの提案が戻りうるので、中身に依らず当てる。
+// 置き場はツリーごとにあり、どのツリーのものかは問わない。親（`wip/`・`wip/proposals/`）を丸ごと消すと置き場ごと消えるが、
+// 空なら消えるものが無いので通す。親を閉じた後の `ccnavi-git.sh rm -r wip` の案内がこの形で、そのときレビュー待ちの子は残っていない。
+// 空の親を通すのは `rm` だけ。`restore --source`・`checkout <ref> --` で親を戻すと、いまは空でも過去のコミットにあった
+// レビュー待ちの提案が戻りうるので、中身に依らず当てる。
 func inReview(conf *config.Settings, word, full, sub string) bool {
 	tickets := conf.Tickets
 	if tickets == "" {

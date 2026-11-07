@@ -8,8 +8,8 @@ import (
 	"ccnavi/internal/records/audit"
 )
 
-// layer は実行役のコマンド（env・sudo・sh -c など）が中で実行するコマンド 1 つ。cd で移った先から見たパスは
-// runner が shell.Moved。どれも止める側のルールにだけ当てる。
+// layer は、実行役のコマンド（env・sudo・sh -c など）が中で実行するコマンド 1 つ。cd で移った先から見たパスは
+// runner が shell.Moved で持つ。どれも止める側のルールにだけ当てる。
 type layer struct {
 	runner string
 	text   string
@@ -17,10 +17,10 @@ type layer struct {
 	quoted bool
 }
 
-// screen はシェルのコマンドを、実際に実行される部分まで絞る。返すのは、ルールを当てる読み、そこから引用の中で
-// 切り出したコマンドを除いた読み（文の断りを決めるだけに使う）、中で実行されるコマンドの層、書き直しを求める形。
+// screen はシェルのコマンドを、実際に実行される部分まで絞る。返すのは次の 4 つ。ルールを当てる読み、引用の中で切り出した
+// コマンドを除いた読み（文の断りを決めるだけに使う）、中で実行されるコマンドの層、書き直しを求める形。
 // ルールはコマンドについて書かれたものなので、git push を引用した文書は push として扱わない。読み切れないコマンドは
-// 生の文字列のまま当て（実行される部分はすべて含まれる）、record.Degraded にそう残す。Bash 以外は読まない。
+// 生の文字列のまま当てる（実行される部分はすべて含まれる）。その事実は record.Degraded に残す。Bash 以外は読まない。
 func screen(tool, subject string, record *audit.Record) (string, string, []layer, []shell.Rewrite) {
 	if tool != config.ToolBash {
 		return subject, subject, nil, nil

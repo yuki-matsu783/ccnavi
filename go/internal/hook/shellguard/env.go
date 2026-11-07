@@ -10,8 +10,8 @@ import (
 	"ccnavi/internal/policy/texts"
 )
 
-// 同じコマンド行で置いてよい変数。出力の量と待ち時間だけを変え、検査の材料には触れない。通すものを並べる形にして、
-// あとから sh が読むようになった変数は止まる側にする。
+// 同じコマンド行で置いてよい変数。出力の量と待ち時間だけを変え、検査の材料には触れないもの。通すものを並べる形にし、
+// あとから sh が読むようになった変数は、止める側に入れる。
 var passThrough = []string{env.FetchTimeout, env.GitFailLines, env.GitKeepLogs, env.GitMaxLines}
 
 // gitPassThrough は `GIT_` で始まる変数のうち、置いてよいもの。どれも作者の名前と出力の形だけを変え、git が
@@ -56,9 +56,9 @@ func Blocked(name string) bool {
 
 // CheckEnv は、保護済みの sh を呼ぶコマンド行に止める変数の代入があれば、sh のパスと変数名（書いた順・重なり無し）。
 //
-// 数えるのはコマンド行のどこで置いたものでもよい。前置きの代入、`env X=…`、`export X=…`、書き出してある変数への素の
-// 代入（settings.json の env が書き出した変数は代入だけで sh に届く）、`unset X`・`env -u X`。読み切れない形は
-// allow がヒットせずに確認になるので、ここでは見ない。
+// 数えるのは、コマンド行のどこで置いたものでもよい。前置きの代入、`env X=…`、`export X=…`、書き出してある変数への素の
+// 代入（settings.json の env が書き出した変数は、代入だけで sh に届く）、`unset X`・`env -u X`。読み切れない形は、
+// allow がヒットせず確認になるので、ここでは見ない。
 func CheckEnv(subject string, degraded bool) (script string, names []string) {
 	if degraded {
 		return "", nil

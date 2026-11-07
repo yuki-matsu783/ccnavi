@@ -71,9 +71,9 @@ func parentOf(text string) (string, bool) {
 // TicketRole はその名前のワークツリーの役と、子なら親の識別子。
 //
 // 見るのはそのワークツリー自身のツリーの同じ名前のチケットだけ。ほかのツリーに置いたファイルで役を決めると、
-// 子のワークツリーに `parent:` を持つ偽のチケットを 1 つ置くだけで、親のワークツリーの禁止が丸ごと外れる。
-// 見つかったものすべてに同じ `parent:` があれば子。`parent:` の無いもの・読めないもの・親の食い違いがあれば
-// 親（止める側）。
+// 子のワークツリーに `parent:` を持つ偽のチケットを 1 つ置くだけで、親のワークツリーの禁止が丸ごと外れてしまう。
+// 見つかったものすべてに同じ `parent:` があれば子とする。`parent:` が無いもの・読めないもの・親の食い違いがあれば、
+// 親とみなして止める側に倒す。
 func TicketRole(conf *config.Settings, root, name string) (Role, string) {
 	top := ospath.Join(root, tree.WorktreesDir, name)
 	var parents []string

@@ -33,12 +33,12 @@ const (
 	subagentNudgeHead = "[ccnavi] SUBAGENT_OUTCOME"
 )
 
-// atStop は Stop。このターンで変わった保護領域をユーザへ systemMessage で 1 度に報告する（dry-run でも。見えたことを
+// atStop は Stop。このターンで変わった保護領域を、ユーザへ systemMessage で 1 度だけ報告する（dry-run でも。見えたことを
 // 言うだけで、モードの約束を何も破らない）。報告のためには止めない。
 //
-// 止めるのは促しだけで、上から順に最初に当たった 1 つ（finish・依頼までの道・フィードバック計画・サブエージェントの
-// 結果・直接作業の integrate・`match: Stop` のルール）。Stop でモデルに文を届ける経路は止めて reason に書くことしか
-// 無いので、dry-run でも止める。止めた回もターンの続きなので、ターン中の印は残す。
+// 止めるのは促しだけで、上から順に最初に当たった 1 つ。finish・依頼までの道・フィードバック計画・サブエージェントの
+// 結果・直接作業の integrate・`match: Stop` のルールの順に当てる。Stop でモデルに文を届ける経路は、止めて reason に書くことしか
+// ないので、dry-run でも止める。止めた回もターンの続きなので、ターン中の印は残す。
 func atStop(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, root string, in hookio.Input,
 	record *audit.Record, deadline time.Time) (int, error) {
 	// 次の発言での受け入れが読む。
@@ -91,9 +91,9 @@ func atStop(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 	return config.ExitOK, nil
 }
 
-// nudgeable は Stop の促しを考えてよい回か。stop_hook_active（Stop の hook が続けさせた連鎖の 2 回目以降）・
-// サブエージェント・state の置き場が無い（覚えられないまま止めると毎回止まる）回は促さない。実行中のサブエージェントが
-// 居る間（記録を読めないときも）は委任して待つ回なので促さず、「1 回だけ」の記録も進めない。
+// nudgeable は Stop の促しを考えてよい回かを返す。促さないのは、stop_hook_active（Stop の hook が続けさせた連鎖の 2 回目以降）、
+// サブエージェント、state の置き場が無い回（覚えられないまま止めると毎回止まる）。実行中のサブエージェントが居る間（記録を
+// 読めないときも）は、委任して待つ回なので促さず、「1 回だけ」の記録も進めない。
 func nudgeable(conf *config.Settings, in hookio.Input) bool {
 	return !in.StopHookActive && in.AgentID == "" && conf.State != "" && !subagent.Running(conf.State, in.SessionID)
 }
@@ -114,7 +114,7 @@ func nudged(record *audit.Record, code, tree string) {
 	record.Tree = tree
 }
 
-// finishNudge は cwd のツリーのチケットが、作業を終えたように見えるのに finish されていないときの促し。同じセッションで
+// finishNudge は、cwd のツリーのチケットが作業を終えたように見えるのに finish されていないときの促し。同じセッションで
 // 同じチケットを同じ HEAD のまま促したことがあれば促さない。チケット制御が disable なら何もしない。
 func finishNudge(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, record *audit.Record,
 	raw *approval.Raw) string {
@@ -130,8 +130,8 @@ func finishNudge(stderr io.Writer, conf *config.Settings, root string, in hookio
 	return stop.FinishNudge(root, found)
 }
 
-// requestNudge はレビューの依頼までの道の途中で終えようとしたときの、次の一手の促し。最後の発言は読まず、状態だけで
-// 決める。同じ状態（親・フェーズ・残っている子・HEAD）では 1 回だけ。
+// requestNudge は、レビューの依頼までの道の途中で終えようとしたときの、次の一手の促し。最後の発言は読まず、状態だけで
+// 決める。同じ状態（親・フェーズ・残っている子・HEAD）では 1 回だけ出す。
 func requestNudge(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, record *audit.Record,
 	raw *approval.Raw) string {
 	if !conf.TicketsEnabled() || !nudgeable(conf, in) {
@@ -145,8 +145,8 @@ func requestNudge(stderr io.Writer, conf *config.Settings, root string, in hooki
 	return stop.RequestNudge(root, found)
 }
 
-// feedbackNudge はフィードバック計画待ちのまま終えようとしたときの促し。同じ状態（親・HEAD・改版を提案済みか）では
-// 1 回だけ。
+// feedbackNudge は、フィードバック計画待ちのまま終えようとしたときの促し。同じ状態（親・HEAD・改版を提案済みか）では
+// 1 回だけ出す。
 func feedbackNudge(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, record *audit.Record,
 	raw *approval.Raw) string {
 	if !conf.TicketsEnabled() || !nudgeable(conf, in) {
@@ -160,7 +160,7 @@ func feedbackNudge(stderr io.Writer, conf *config.Settings, root string, in hook
 	return stop.FeedbackNudge(root, found)
 }
 
-// subagentNudge は終わったサブエージェントが範囲外の変更を残した・範囲を確かめられなかったときの促し（同じ結果では
+// subagentNudge は、終わったサブエージェントが範囲外の変更を残した、または範囲を確かめられなかったときの促し（同じ結果では
 // 1 回だけ）。結果の 1 行ずつはコードが組み、前後の文は文面ファイルが持つ（状態の行の次の 1 行が何をするか）。
 func subagentNudge(conf *config.Settings, root string, in hookio.Input, record *audit.Record) string {
 	if !conf.TicketsEnabled() || !nudgeable(conf, in) {
@@ -177,8 +177,8 @@ func subagentNudge(conf *config.Settings, root string, in hookio.Input, record *
 	return strings.Join(append(out, said[1:]...), "\n")
 }
 
-// integrateNudge は直接作業が integrate まで進んでいないときの、打ち方の促しと、促せない理由（統合先のツリーが綺麗で
-// ないなど。止めずに報告へ足す）。チケット制御の有無は見ない（直接作業はチケットに結び付かない）。期限を過ぎてから
+// integrateNudge は、直接作業が integrate まで進んでいないときの、打ち方の促しを返す。促せない理由（統合先のツリーが綺麗で
+// ないなど）は、止めずに報告へ足す。チケット制御の有無は見ない（直接作業はチケットに結び付かない）。期限を過ぎてから
 // git を起こさない。
 func integrateNudge(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, record *audit.Record,
 	deadline time.Time) (string, string) {
@@ -197,9 +197,9 @@ func integrateNudge(stderr io.Writer, conf *config.Settings, root string, in hoo
 	return integrate.IntegrateNudge(root, found), ""
 }
 
-// stopRulesNudge は `match: Stop` の allow のルールが、このターンの終わりで止めて渡す文。何を言うか・何回に 1 度かは
+// stopRulesNudge は、`match: Stop` の allow のルールが、このターンの終わりで止めて渡す文を返す。何を言うか・何回に 1 度かは
 // 設定が持ち、ここは当てて数えるだけ。ルールは共通レイヤーとワークスペース自身のレイヤーからだけ引き、本文は
-// ワークスペースルートの版だけを読む（プロジェクトやワークツリーの版はエージェントが書き換えられる）。数えを
+// ワークスペースルートの版だけを読む（プロジェクトやワークツリーの版はエージェントが書き換えられるため）。数えを
 // 覚えられない回は言わない（覚えられないまま止めると毎回止まる）。文の頭には振り返りの前置きを必ず付ける。
 func stopRulesNudge(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, record *audit.Record) string {
 	if in.StopHookActive || in.AgentID != "" || conf.State == "" {
@@ -230,7 +230,7 @@ func stopRulesNudge(stderr io.Writer, conf *config.Settings, root string, in hoo
 
 // overReport は、促しで止める回の記録から同じ Stop の報告を detail へ移す。1 回の Stop の記録は 1 行で、decision と
 // code は促しが勝つ。上書きするだけだと保護領域の変更を報告したことが消え、rules を残したままだとどれで止めたかが
-// 読めなくなるので、報告の code と rules を `report <code> <id,…>` の形で detail に足し、rules を空にする。
+// 読めなくなる。そこで、報告の code と rules を `report <code> <id,…>` の形で detail に足し、rules を空にする。
 func overReport(record *audit.Record) {
 	if record.Decision != audit.Deny || record.Code == "" {
 		return

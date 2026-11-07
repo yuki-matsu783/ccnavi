@@ -21,12 +21,12 @@ import (
 )
 
 // atPrompt は UserPromptSubmit。ターンの基準を取り直し、ユーザの手と言い切れる回は前のターンの終わりからの変更を
-// 受け入れる。返した文はモデルの文脈に入るので、言うことがある回だけ 1 つの additionalContext にまとめて返す
-// （設定ファイルを戻した知らせ・ミラーの知らせ・issue と MR の指定への指示・サブエージェントの知らせ・手で動かした子の
-// 確定の案内）。止めはしない。承認されたことは言わない（拡張とエージェントの status が言う）。
+// 受け入れる。返した文はモデルの文脈に入るので、言うことがある回だけ 1 つの additionalContext にまとめて返す。対象は、
+// 設定ファイルを戻した知らせ・ミラーの知らせ・issue と MR の指定への指示・サブエージェントの知らせ・手で動かした子の
+// 確定の案内。止めはしない。承認されたことは言わない（拡張とエージェントの status が言う）。
 //
-// バックグラウンド作業の完了通知と、前のターンの終わりに動かしている作業が残っていた回は、変更をユーザの手と
-// 区別できないので受け入れず、次のツール呼び出しの前と同じ照合をして消えた設定ファイルを戻す。
+// バックグラウンド作業の完了通知と、前のターンの終わりに動かしている作業が残っていた回は、変更をユーザの手と区別できないので
+// 受け入れない。代わりに、次のツール呼び出しの前と同じ照合をして、消えた設定ファイルを戻す。
 func atPrompt(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, root string, in hookio.Input,
 	record *audit.Record) (int, error) {
 	now := time.Now()
@@ -85,8 +85,7 @@ func atPrompt(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings,
 }
 
 // manualConfirmNote は、ユーザが子を手で done/ に動かして共有していたら、次の発言の前に confirm を案内する文。
-// Stop の促しと同じ記録を使うので、ここで言えば Stop では繰り返さない。発言の内容を読まずに出すので、Stop の促しより
-// 弱く言う。
+// Stop の促しと同じ記録を使う。ここで言えば、Stop では繰り返さない。発言の内容を読まずに出すので、Stop の促しより弱く言う。
 func manualConfirmNote(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, raw *approval.Raw) string {
 	if !conf.TicketsEnabled() || in.AgentID != "" || conf.State == "" {
 		return ""

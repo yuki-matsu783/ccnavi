@@ -40,9 +40,9 @@ import (
 // now は期限と比べる時刻。テストが差し替える。
 var now = time.Now
 
-// Before は実行前チェック。応答を stdout に書き、何が起きたかを record に書き込む（記録と応答を同じ結論から作る）。
-// deadline は判定の期限（入口が呼び出しの頭で config.HookDeadline を足した時刻）。戻り値は hook の終了コード。
-// record.Subject はルールを当てる欄（rules.SubjectOf）を入口が入れておく。
+// Before は実行前チェック。応答を stdout に書き、何が起きたかを record に書く。応答と記録は同じ結論から作る。
+// deadline は判定の期限で、入口が呼び出しの頭で config.HookDeadline を足した時刻。戻り値は hook の終了コード。
+// record.Subject は、ルールを当てる欄（rules.SubjectOf）を入口が入れておく。
 func Before(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, root string, in hookio.Input, record *audit.Record, deadline time.Time) (int, error) {
 	// バックアップは判定より先に取る。この呼び出しが何かを書き換えたときに戻る先になる。
 	guardNote := GuardSettingFiles(mode, conf, root, in, record, selfguard.Before)
@@ -60,8 +60,8 @@ func Before(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 		return skip(stdout, guardNote)
 	}
 
-	// ルールを読み、この呼び出しの行き先のツリーを決める。dest はチケットの範囲を引く行き先で、cwd のツリーで
-	// 置き換える前のもの（ワークスペースの外へ書くときに cwd のワークツリーの範囲を当てない）。
+	// ルールを読み、この呼び出しの行き先のツリーを決める。dest はチケットの範囲を引く行き先で、cwd のツリーで置き換える前のもの。
+	// ワークスペースの外へ書くときに cwd のワークツリーの範囲を当てないよう、置き換える前の値を使う。
 	ruleSet, source, target := ruleload.RulesFor(stderr, conf, root, in, record)
 	dest := target
 	if target == nil && in.Cwd != "" {
@@ -80,12 +80,12 @@ func Before(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 
 	subject, bare, inner, rewrites := screen(in.ToolName, record.Subject, record)
 	if subject == "" {
-		// コメントだけの行など、実行される部分が残らない。何も走らないものに判断を求める意味は無い。
+		// コメントだけの行などは実行される部分が残らない。何も走らないものに判断を求める必要はない。
 		record.Decision, record.Reason = audit.Skip, audit.ReasonNothingToRun
 		return skip(stdout, guardNote)
 	}
 
-	// 組み込みの既定に戻ったときだけ言う。レイヤーが不正で空になったのは退避ではない（記録と lint が言う）。
+	// 組み込みの既定に戻ったときだけ知らせる。レイヤーが不正で空になったのは退避ではないので、記録と lint が伝える。
 	fallback := ""
 	if record.Fallback == builtin.Fallback {
 		path := record.Detail
@@ -100,7 +100,7 @@ func Before(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 		return code, err
 	}
 
-	// 承認済みチケットの置き場。1 回の判定で読むのは 1 度だけにし、レビュー待ちの止めと範囲の索引で持ち回る。
+	// 承認済みチケットの置き場は 1 回の判定で 1 度だけ読み、レビュー待ちの止めと範囲の索引で共有する。
 	var raw *approval.Raw
 
 	// レビューが要るフェーズが終わってマーカーが無い間、サブエージェントの起動と、例外以外のシェルを止める。
@@ -118,8 +118,8 @@ func Before(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 		}
 	}
 
-	// サブエージェントの起動。担当が決まらないときはここで止める。決まったときの入力の更新（担当の案内）は
-	// 持ったまま判定を進め、最後の応答に合わせる。ルールには書き足す前の入力を当てる。
+	// サブエージェントの起動。担当が決まらないときはここで止める。担当が決まったときの入力の更新（担当の案内）は、
+	// 最後の応答に合わせるため持ったまま判定を進める。ルールには、書き足す前の入力を当てる。
 	var updated *pyjson.Object
 	if slices.Contains(config.AgentTools, in.ToolName) {
 		r := launch.Decide(conf, root, in, raw)
@@ -157,8 +157,8 @@ func Before(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 		}
 	}
 
-	// 書き直しを求める形（ブレース展開・実行時に決まるコマンド名・バッククォート・読みが分かれる形）は、
-	// 読み分けずに止めて、形ごとの書き直し方を 1 回で返す。読み違えると止まらずに通るため。
+	// 読みが分かれる形（ブレース展開・実行時に決まるコマンド名・バッククォート）は、読み分けずに止める。
+	// 形ごとの書き直し方を 1 回で返す。読み違えると止まらずに通ってしまうため。
 	if len(rewrites) > 0 {
 		kind := rewriteKind(conf, in, subject, inner, rewrites)
 		var forms []shell.Form
@@ -314,8 +314,8 @@ func (j *judgement) builtinStops(notices []string, subject string, inner []layer
 }
 
 // turnGate はユーザの発言をまたぐゲート。ルールが allow でも、ユーザの返事を待つ手順は外さない。B は止め、通した A は
-// 記録する。付き添いのあるセッションでは ask_if_attended の宣言は B を確認に出す（同じコマンドに A と B を並べたら止める）。
-// サブエージェントは対話でも発言を待つ（確認で先に返すと、後のサブエージェントの禁止に届かない）。
+// 記録する。付き添いのあるセッションでは、ask_if_attended の宣言があると B を確認に出す（同じコマンドに A と B を並べたら止める）。
+// サブエージェントは対話でも発言を待つ。確認で先に返すと、後のサブエージェントの禁止に届かないため。
 func (j *judgement) turnGate(notices []string, subject string, inner []layer) (int, bool, error) {
 	conf, in, record := j.conf, j.in, j.record
 	commands := []string{subject}
@@ -354,7 +354,7 @@ func (j *judgement) turnGate(notices []string, subject string, inner []layer) (i
 }
 
 // parentTreeWrite はサブエージェントの、親のワークツリーへの書き込みを止める文（当たらなければ空）。居場所
-// （実行先のツリー）で見るので、子のワークツリーでのコミットと、子で親のブランチを取り込む merge は通る。
+// （実行先のツリー）で見る。そのため、子のワークツリーでのコミットと、子で親のブランチを取り込む merge は通る。
 func (j *judgement) parentTreeWrite(inner []layer) string {
 	conf, root, in, record := j.conf, j.root, j.in, j.record
 	degraded := record.Degraded != ""
@@ -420,10 +420,9 @@ func (j *judgement) byRules(ruleSet *rules.RuleSet, source, subject, bare string
 	display := redact.Redact(record.Subject)
 	git, _ := config.GitWrapperCommand(root)
 
-	// 生の文字列（読み切れなかった Bash と、読まない PowerShell）に `>` が多すぎると、シェルから書き込む形の保護の照合が
-	// 遅くなり期限を越える。そのときはその保護だけを生の文字列に当てず、ほかの deny と ask を当てたうえで、権限モードに
-	// 依らず拒否にする（照合を飛ばして通すと、上限の後ろの保護対象への書き込みが素通りする）。外す保護がこのツールに
-	// 当たらないなら上限も掛けない。
+	// 生の文字列（読み切れなかった Bash と、読まない PowerShell）に `>` が多すぎると、シェルから書く形の保護の照合が遅くなり、
+	// 期限を越える。そのときは、その保護だけを生の文字列に当てず、ほかの deny と ask を当てたうえで権限モードに依らず拒否にする
+	// （照合を飛ばして通すと、上限の後ろの保護対象への書き込みが素通りするため）。外す保護がこのツールに当たらないなら上限も掛けない。
 	unread := degraded != "" || slices.Contains(config.ShellTools, tool) && tool != config.ToolBash
 	capped := unread && selfguard.TooManyRedirects(subject) && slices.ContainsFunc(ruleSet.Deny, func(r *rules.Rule) bool {
 		return slices.Contains(shellGuardRuleIDs, r.ID) && rules.ToolMatches(r.Match, tool)
@@ -472,7 +471,7 @@ func (j *judgement) byRules(ruleSet *rules.RuleSet, source, subject, bare string
 			break
 		}
 	}
-	// 分類（dry-run でも止めるか）は土台を落とす前の組で決める（層の deny が同時に当たっても、生の git の分類を失わない）。
+	// 分類（dry-run でも止めるか）は、土台を落とす前の組で決める。層の deny が同時に当たっても、生の git の分類を失わない。
 	hitIDs := map[string]bool{}
 	for _, r := range group {
 		hitIDs[r.ID] = true
@@ -542,7 +541,7 @@ func (j *judgement) byRules(ruleSet *rules.RuleSet, source, subject, bare string
 	}
 
 	// ルールの判定とチケットの判定を合わせ、強い側を採る（同じならルール）。チケットが言うのは閉じる向きだけで、
-	// ルールの deny・ask を緩めることは無い。
+	// ルールの deny・ask を緩めることはない。
 	ticketReason, ticketCode := "", ""
 	if verdict != rules.Deny {
 		var hit *ruleHit

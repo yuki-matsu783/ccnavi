@@ -80,8 +80,8 @@ func orWorkspace(project string) string {
 	return project
 }
 
-// flowLock は着手中の子のフローへの書き込みなら、その理由の文。当てるのは解いたパス（full）、解く前のパス、
-// ディレクトリだけを解いたパスの 3 通りで、どれかが置き場に当たれば止める（リンク越しでも止める向きだけ）。
+// flowLock は、着手中の子のフローへの書き込みなら、その理由の文を返す。当てるのは次の 3 通りのパス。解決したパス（full）、
+// 解く前のパス、ディレクトリだけを解決したパス。どれかが置き場に当たれば止める（リンク越しでも止める向きだけ）。
 // ハードリンクはパスに置き場が出ないので、名前が 2 つ以上あるときだけ中身（inode）で見る。
 func flowLock(conf *config.Settings, root string, in hookio.Input, full string, s *scanned) string {
 	value := ""
@@ -130,9 +130,9 @@ type ticketOutcome struct {
 	code     string
 }
 
-// ticketVerdict はチケットが承認された範囲について何を言うか。キーはファイルの行き先 t（cwd で置き換える前のツリー）で、
+// ticketVerdict は、チケットが承認された範囲について何を言うかを返す。キーはファイルの行き先 t（cwd で置き換える前のツリー）で、
 // cwd も agent_id も使わない。範囲の中は allow、ask の項は ask、範囲の外と deny の項は deny。子は親の範囲とフェーズ定義の
-// 上限で切り詰める（scope.Of）。チケットの置き場（提案と承認済み）には何も言わない（範囲から出る方法が無くなる）。
+// 上限で切り詰める（scope.Of）。チケットの置き場（提案と承認済み）には何も言わない。範囲から出る方法が無くなるため。
 func ticketVerdict(conf *config.Settings, root, tool, full string, t *tree.Tree, index map[string]*ticket.Ticket, hit *ruleHit) ticketOutcome {
 	if !conf.TicketsEnabled() || !isWriteTool(tool) || t == nil || t.IsMain() {
 		return ticketOutcome{}
@@ -156,9 +156,9 @@ func ticketVerdict(conf *config.Settings, root, tool, full string, t *tree.Tree,
 		}
 		return lines
 	}
-	// 親のワークツリーは作業の場ではない（成果は子で作り、子の finish が合流する）。親かどうかは、索引と
-	// ワークツリー自身のチケットのどちらかが親と言えば親とする（食い違うときは止める側）。信頼できない（blocked）
-	// チケットは、下の範囲の判定が止める。
+	// 親のワークツリーは作業の場ではない。成果は子で作り、子の finish で合流する。親かどうかは、索引と
+	// ワークツリー自身のチケットのどちらかが親と言えば親とする（食い違うときは止める側に倒す）。信頼できない（blocked）
+	// チケットは、下の範囲の判定で止める。
 	isParent := !tk.IsChild()
 	if !isParent {
 		role, _ := shellguard.TicketRole(conf, root, t.Name)

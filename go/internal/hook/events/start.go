@@ -31,9 +31,9 @@ const (
 	sourceResume  startSource = "resume"
 )
 
-// atStart は SessionStart。大きい対象（実行ファイル）のバックアップと記録の後始末を、セッションに 1 度のここで行う。
-// 判定は返さない。作業の進め方と作業の決まりは起動・再開・compact・clear のどの回にも出す（文脈が新しくなるたびに
-// 届かないと、compact のあとのモデルは進め方を知らないまま続ける）。サブエージェントには出さない。
+// atStart は SessionStart の処理。大きい対象（実行ファイル）のバックアップと記録の後始末を、セッションに 1 度、ここで行う。
+// 判定は返さない。作業の進め方と作業の決まりは、起動・再開・compact・clear のどの回にも出す。文脈が新しくなるたびに
+// 届かないと、compact のあとのモデルは進め方を知らないまま続けてしまう。サブエージェントには出さない。
 func atStart(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, root string, in hookio.Input,
 	record *audit.Record, deadline time.Time) (int, error) {
 	source := startSource(in.Source)
@@ -125,8 +125,8 @@ func within(deadline time.Time, limit time.Duration) time.Time {
 	return until
 }
 
-// reportedBaseline は起動時に在る保護領域の変更を、実行後チェックの基準として記録する。全部のツリーを実行後
-// チェックと同じ式で数えるので、あとで同じ変更が見つかっても新しい変更に数えない。
+// reportedBaseline は、起動時にある保護領域の変更を実行後チェックの基準として記録する。全ツリーを実行後チェックと
+// 同じ式で数えるので、あとで同じ変更が見つかっても新しい変更として数えない。
 func reportedBaseline(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, record *audit.Record) error {
 	if conf.State == "" {
 		return nil
@@ -139,8 +139,8 @@ func reportedBaseline(stderr io.Writer, conf *config.Settings, root string, in h
 	return nil
 }
 
-// pruneAtStart は記録のローテートと、古い記録・終わったセッションの記録の削除。失敗は標準エラーに出し、動かした
-// ものの数を返す（記録の detail に残る）。
+// pruneAtStart は記録のローテートと、古い記録・終わったセッションの記録の削除をする。失敗は標準エラーに出す。
+// 動かしたものの数を返す（記録の detail に残す）。
 func pruneAtStart(stderr io.Writer, conf *config.Settings, root, session string) string {
 	report := prune.Run(root, conf.Log, conf.State, session, prune.Options{})
 	for _, problem := range report.Problems {

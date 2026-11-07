@@ -18,9 +18,9 @@ import (
 	"ccnavi/internal/tickets/model/guard"
 )
 
-// checker は実行後チェックの持ち物。保護領域も範囲も実行前チェックと同じ経路で解く（別に書くと、実行前に通った
-// 書き込みがターンの終わりに報告される）。in が nil なら全部のツリー（ターンの区切り）、あればこの呼び出しが触った
-// ツリーを見る。raw は呼び手が読んだ承認済みの置き場（nil なら読み直す）。
+// checker は実行後チェックの持ち物。保護領域も範囲も、実行前チェックと同じ経路で解く。別に書くと、実行前に通った書き込みが
+// ターンの終わりに報告されてしまうため。in が nil なら全部のツリー（ターンの区切り）、あればこの呼び出しが触ったツリーを見る。
+// raw は呼び手が読んだ承認済みの置き場（nil なら読み直す）。
 func checker(stderr io.Writer, conf *config.Settings, root string, record *audit.Record, in *hookio.Input,
 	raw *approval.Raw) (*post.Checker, error) {
 	watched, err := watchedFor(stderr, conf, root, record, in)
@@ -47,9 +47,9 @@ func checkerOf(stderr io.Writer, conf *config.Settings, root string, watched []p
 // in があればワークスペースルートと、この呼び出しが触ったツリー（パスを持つツールは行き先、ほかは cwd）。横で作業する
 // 指定が有効なユーザのチェックアウトは毎回見る（書き換えはそのチェックアウトに起きる）。
 //
-// ガード自身の保護は実行前と同じ関数から足す。自己防衛が disable でなければ名前で書くツール用の組み込み（共通の
-// ルールファイルが読めない間も）、チケット制御が有効なら承認済みの置き場の 1 本。guard-project-home 全体は足さない
-// （ccnavi ディレクトリの下の正規の書き込みが報告に並ぶ）。
+// ガード自身の保護は、実行前と同じ関数から足す。自己防衛が disable でなければ、名前で書くツール用の組み込み（共通の
+// ルールファイルが読めない間も）と、チケット制御が有効なら承認済みの置き場の 1 本を足す。guard-project-home 全体は足さない。
+// ccnavi ディレクトリの下の正規の書き込みが報告に並んでしまうため。
 func watchedFor(stderr io.Writer, conf *config.Settings, root string, record *audit.Record,
 	in *hookio.Input) ([]post.Watched, error) {
 	ws := tree.MainTree(root)

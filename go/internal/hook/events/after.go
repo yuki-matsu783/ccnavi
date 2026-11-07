@@ -28,16 +28,16 @@ const toolArtifact = "Artifact"
 // dryRunPushback は dry-run で、enable なら差し戻していた報告の頭。
 const dryRunPushback = "[ccnavi dry-run] " + string(config.Enable) + " would have sent this back as a correction:\n"
 
-// after は PostToolUse。実行後チェックを 1 回動かし、言うことがあれば返す。差し戻しても登録しても、最後に直接作業の
-// 候補を登録する（書き込みは起きている。git は呼ばず、失敗しても何も言わない）。
+// after は PostToolUse。実行後チェックを 1 回動かし、言うことがあれば返す。差し戻すかどうかに関わらず、最後に直接作業の
+// 候補を登録する。書き込みは起きているので、git は呼ばず、失敗しても何も言わない。
 func after(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, root string, in hookio.Input,
 	record *audit.Record) (int, error) {
 	defer func() { directcand.Touch(conf, root, in, time.Now()) }()
 	return check(stdout, stderr, mode, conf, root, in, record)
 }
 
-// check は after の本体。期限は渡さない（止められないイベントで、遅れは待ち時間にしかならない。ワークツリーを読む側が
-// 自前の短い時間を持つ）。差し戻すのは、直前の実行が汚したと言える deny があるときだけ。enable なら標準エラーと
+// check は after の本体。期限は渡さない。止められないイベントで、遅れは待ち時間にしかならないため。ワークツリーを読む側が
+// 自前の短い時間を持つ。差し戻すのは、直前の実行が汚したと言える deny があるときだけ。enable なら標準エラーと
 // ExitBlock、dry-run なら差し戻さず、文脈の文に dry-run の頭を添える。
 func check(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, root string, in hookio.Input,
 	record *audit.Record) (int, error) {
@@ -98,8 +98,8 @@ func check(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, ro
 		// dry-run は止めないことが約束なので、差し戻さずに報告の側へ届ける。
 		text = dryRunPushback + text
 	}
-	// 入れ子のサブエージェントの中では、差し戻しを無視した知らせはその子にしか届かない。ユーザにも見えるよう
-	// systemMessage に同じ文を載せる（exit 2 の経路では標準出力の JSON が読まれないので載せられない）。
+	// 入れ子のサブエージェントの中では、差し戻しを無視した知らせは、その子にしか届かない。ユーザにも見えるよう、
+	// systemMessage に同じ文を載せる。exit 2 の経路では標準出力の JSON が読まれないので載せられない。
 	system := ""
 	if in.AgentID != "" {
 		system = bounced
@@ -111,8 +111,8 @@ func check(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, ro
 	return config.ExitOK, nil
 }
 
-// afterFailure は PostToolUseFailure。失敗した呼び出しも失敗する前に設定ファイルや保護領域を変えていることがある
-// （`rm …; false`、途中で落ちたビルド）ので、成功と同じ照合をして戻し、文脈の文で知らせる。失敗の連続に数え、最初の
+// afterFailure は PostToolUseFailure。失敗した呼び出しも、失敗する前に設定ファイルや保護領域を変えていることがある
+// （`rm …; false`、途中で落ちたビルド）。そのため成功と同じ照合をして戻し、文脈の文で知らせる。失敗の連続に数え、最初の
 // 1 回と閾値の倍数の回に資料を引く案内を返す。中断はユーザが止めたもので、ツールの誤りではないので数えない。
 func afterFailure(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, root string, in hookio.Input,
 	record *audit.Record) (int, error) {
