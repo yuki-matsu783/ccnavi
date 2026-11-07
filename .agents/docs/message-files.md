@@ -1,7 +1,7 @@
 ---
 type: guide
 title: 文面ファイルに文を足す・直す
-description: 拒否・促し・次の一手の文を文面ファイルに置く手順。呼ぶ側（Go と sh）の書き方、組み込みルールの文、引けないときの扱い、上書きの口を持たないこと、テスト
+description: 拒否・促し・次の一手の文を文面ファイルに置く手順。呼ぶ側（Go と sh）の書き方、組み込みルールの文、引けないときの扱い、上書きの口がないこと、テスト
 tags: [exe-boundary, sh-scripts]
 keywords: [文面, 文面ファイル, messages, ccnavi text, ccnavi_text, texts.say, 識別子, 差し込み, 欄, 次:, 拒否, 促し, 移行, 読まれない]
 ---

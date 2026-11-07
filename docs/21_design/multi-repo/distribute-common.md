@@ -19,7 +19,7 @@ keywords: [共通レイヤー, 配布, ミラー, プロジェクト, 単体 clo
 
 | 入口 | 書き先 | いつ |
 |---|---|---|
-| ユーザの発言（`UserPromptSubmit`。`tickets/sync/mirror` の `prompt.go`） | `project:` を持つ着手済みの親チケットのワークツリー | 発言のたび。差分が無ければ何も読まず書かない |
+| ユーザの発言（`UserPromptSubmit`。`tickets/sync/mirror` の `prompt.go`） | `project:` がある着手済みの親チケットのワークツリー | 発言のたび。差分が無ければ何も読まず書かない |
 | ユーザが押す `ccnavi-user-mirror.sh`（`tickets/sync/mirror` の `user.go`。拡張のプロジェクト管理画面のボタンも同じ） | プロジェクトのユーザのチェックアウト（`projects/<名前>/`） | ユーザが調べたいとき、押したとき |
 
 `ticket start` とツール呼び出しの中では書かない。書く場所と書く時が決まっているので、書いた分は実行後チェックとバックアップと復元から特別扱いしない。

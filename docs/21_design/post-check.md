@@ -18,7 +18,7 @@ keywords: [実行後チェック, PostToolUse, git status, 保護領域, 違反,
 `PostToolUse` で、`Read` `Grep` `Glob` `WebFetch` `WebSearch` 以外の全ツールの後に走る。
 読み取り専用のツールの直後は `tool-cannot-write` として見に行かない（同じ変更は次の書き込みうるツールの直後に見える）。
 
-見るツリーは、ワークスペースルートと、この呼び出しが触ったツリー（パスを持つツールは行き先、
+見るツリーは、ワークスペースルートと、この呼び出しが触ったツリー（パスを取るツールは行き先、
 Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-files=all --no-renames` を
 期限 2 秒で起動する。読めなければ `worktree-unreadable` として何も言わない。
 

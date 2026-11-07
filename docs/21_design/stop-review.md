@@ -56,7 +56,7 @@ Stop ─┬─ command hook（ccnavi）: 既存の促しを実行 → 共有キ�
 
 ## 記録の置き場と後始末
 
-試行のイベントは `logs/stop-review/events.jsonl`（`decisions.jsonl` には書かない）。計画・試行・操作は state の置き場。`records/prune` が、セッションを名前に持つものはセッションごとに、持たないものはそれ自身の日付で（state の保持日数）、再評価用の材料と events は `CCNAVI_STOP_REVIEW_KEEP_DAYS`（既定 90 日）で消す。
+試行のイベントは `logs/stop-review/events.jsonl`（`decisions.jsonl` には書かない）。計画・試行・操作は state の置き場。`records/prune` が、名前にセッションが入るものはセッションごとに、入らないものはそれ自身の日付で（state の保持日数）、再評価用の材料と events は `CCNAVI_STOP_REVIEW_KEEP_DAYS`（既定 90 日）で消す。
 
 ## 実測で確かめた前提（Claude Code 2.1.303、`claude -p`）
 

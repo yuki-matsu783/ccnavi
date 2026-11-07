@@ -1,7 +1,7 @@
 ---
 type: design
 title: 13. 文面ファイル
-description: 拒否・促し・次の一手の文面を、条件から分けて置く文面ファイルの設計。形式、置き場、識別子、差し込み、読み出し口、上書きの口を持たないこと、壊れたときの扱い、点検
+description: 拒否・促し・次の一手の文面を、条件から分けて置く文面ファイルの設計。形式、置き場、識別子、差し込み、読み出し口、上書きの口がないこと、壊れたときの扱い、点検
 tags: [design-doc, hook, config]
 keywords: [文面, 文面ファイル, messages, 識別子, 差し込み, ccnavi text, 拒否, 促し, 次の一手, 読まれない, lint, 欄, 種類]
 ---
@@ -22,7 +22,7 @@ keywords: [文面, 文面ファイル, messages, 識別子, 差し込み, ccnavi
 | `policy/texts` | 読み込み、検査、差し込み、組み立て、壊れたときの既定の文 | 判定 |
 | `ccnavi text` | sh から `texts` を引く入口 | 文面ファイルの直接の読み書き |
 
-組み込みの拒否・促し（実行ファイル）は `texts.Say` を呼ぶ。通知（`NOTICE_*`）は、見出し（`[ccnavi] <コード> (…)`）と `subject:` などの状態の行をコードに残し、本文だけを `texts.Say` で引く。組み込みルールの文は、ルールが識別子と値を持ち、拒否に当たった回に `texts.Spoken` が引く（13.4）。文面ファイルに移していない文（ルールの `message`、種類を決められない通知など）は呼ばない。ルールの `message` は、ルールファイルにインラインで書いた自由文のまま使う。識別子で引く形はルールファイルからは書けず、持つのは組み込みのルールだけ。sh は文面ファイルを読まず、`ccnavi text` を `ccnavi_text`（`ccnavi-common-state.sh`）で呼ぶ。
+組み込みの拒否・促し（実行ファイル）は `texts.Say` を呼ぶ。通知（`NOTICE_*`）は、見出し（`[ccnavi] <コード> (…)`）と `subject:` などの状態の行をコードに残し、本文だけを `texts.Say` で引く。組み込みルールの文は、識別子と値はルール側にあり、拒否に当たった回に `texts.Spoken` が引く（13.4）。文面ファイルに移していない文（ルールの `message`、種類を決められない通知など）は呼ばない。ルールの `message` は、ルールファイルにインラインで書いた自由文のまま使う。識別子で引く形はルールファイルからは書けず、書けるのは組み込みのルールだけ。sh は文面ファイルを読まず、`ccnavi text` を `ccnavi_text`（`ccnavi-common-state.sh`）で呼ぶ。
 
 ### 13.2 置き場とレイヤー
 
@@ -76,7 +76,7 @@ messages:
 | 種類 | コード | 例 |
 |---|---|---|
 | `deny` | 記録の `code` と同じ（`DENY_*`・`RULE_ASK` など） | `DENY_TICKET_PARENT`、`DENY_PHASE_REVIEW__WAITING` |
-| `deny`（組み込みルール） | `RULE_<ルールの id>`。記録の `code` とは別（記録の `code` は `DENY_COMMAND` など、根拠の種類）。ルールが識別子と値と場合を持ち、拒否に当たった回に `texts.Spoken` が引く | `RULE_GIT_PUSH`、`RULE_GUARD_HOOKS` |
+| `deny`（組み込みルール） | `RULE_<ルールの id>`。記録の `code` とは別（記録の `code` は `DENY_COMMAND` など、根拠の種類）。識別子と値と場合はルール側にあり、拒否に当たった回に `texts.Spoken` が引く | `RULE_GIT_PUSH`、`RULE_GUARD_HOOKS` |
 | `nudge` | 記録の `code` と同じ（`NUDGE_*`） | `NUDGE_INTEGRATE__RUN` |
 | `next`・`choices`・`note` | `NEXT_*`・`CHOICES_*`・`NOTE_*`。出力元の名前を 2 語目に置く | `NEXT_START_DRY_RUN` |
 | `notice` | `NOTICE_*`。記録の `code` とは別（記録の `code` や見出しの理由コードに `NOTICE_` で始まるものがあっても、文面の識別子ではない）。sh からは引かない。出力元の名前を 2 語目に置く。場合を結末や状態で分けるときは `__` | `NOTICE_UNDECLARED__ASK` |
@@ -166,4 +166,4 @@ ccnavi のリポジトリのテストは、次も見る（呼ぶ側が手元の�
 | 実行ファイルが無い、版が合わない（sh） | sh の既定の文（種類ごと。`CHOICES_*` は `次の手:` と番号つきの 1 行、`NOTE_*` は `案内:`、それ以外は `次:` を 1 行）。判定は変えない |
 | 配布先に文面ファイルが無い | 文面ファイルが無いのと同じ。`ccnavi-setup.sh` が文面ファイルを `.ccnavi/messages/` へ配る |
 
-既定の文は 1 つの関数（`texts.Fallback`）が組む。種類ごとに数行で、個々の文を持たない（文が 2 か所に残らない）。
+既定の文は 1 つの関数（`texts.Fallback`）が組む。種類ごとに数行で、個々の文は置かない（文が 2 か所に残らない）。

@@ -112,7 +112,7 @@ error がある間は配点もフェーズ定義も保存できない。
 - 診断ログ（`logs/diag/`）の行の形・置き場・レベルは、sh・実行ファイル・拡張の 3 つの logger で揃える。
   `tests/core/test_diaglog.py` が 3 つの行を突き合わせる
 - Chrome 拡張は、実行ファイルと同じ Go のソースを WASM に組んで同梱する（`go/cmd/ccnavi-chrome`）。拡張が呼ぶのは要求の JSON を 1 つ渡して答えの JSON を受ける 1 つの関数だけで、
-  入口の `entry/chrome` が、判定のコア（`tickets/core`。ブランチの中身 → 判定 → 書くもの）と、手元と同じ `--agree --preview --json` を通す。要求と答えの形は `entry/chrome` と拡張の `src/core/ccnavi.ts` が対で持ち、ここには写さない。
+  入口の `entry/chrome` が、判定のコア（`tickets/core`。ブランチの中身 → 判定 → 書くもの）と、手元と同じ `--agree --preview --json` を通す。要求と答えの形は `entry/chrome` と拡張の `src/core/ccnavi.ts` が対で定義しており、ここには写さない。
   本体のパッケージを動かすときは `entry/chrome` だけを直す。拡張は同じ版の本体と一緒に組むので、別の版の本体と拡張は組み合わさらない。
   互換の版は、拡張が統合先のデータや出力の形を読み違えるような変更のときに上げ、呼び出しの名前だけを変えるときは上げない
 - 互換の版の書き方: 実行ファイル側は `go/internal/entry/version/version.go` の行頭から始まる 1 行 `const Compat = <整数>` で、Chrome 拡張の組み立てが正規表現で読む。

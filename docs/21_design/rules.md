@@ -146,8 +146,8 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 
 | 呼び出し | ルール集合 |
 |---|---|
-| パスを持つツール（`Read` `Grep` `Glob` `Write` `Edit` `MultiEdit` `NotebookEdit`） | 共通レイヤーに、行き先のツリーが属する 1 レイヤーを足したもの。プロジェクトに属すればそのレイヤー、属さなければワークスペース自身のレイヤー。`Grep` と `Glob` の行き先は探し始める場所で、省略されていれば `cwd`（11.4） |
-| パスを持たないツール（`Bash` `PowerShell` `Skill` `Agent` `WebFetch`） | 共通レイヤー・自身のレイヤー・全プロジェクトのレイヤーのルールをタイプごとに連結したもの |
+| パスを取るツール（`Read` `Grep` `Glob` `Write` `Edit` `MultiEdit` `NotebookEdit`） | 共通レイヤーに、行き先のツリーが属する 1 レイヤーを足したもの。プロジェクトに属すればそのレイヤー、属さなければワークスペース自身のレイヤー。`Grep` と `Glob` の行き先は探し始める場所で、省略されていれば `cwd`（11.4） |
+| パスを取らないツール（`Bash` `PowerShell` `Skill` `Agent` `WebFetch`） | 共通レイヤー・自身のレイヤー・全プロジェクトのレイヤーのルールをタイプごとに連結したもの |
 
 共通レイヤーはワークスペースルートの `.ccnavi/config/common/` の 1 本。プロジェクトの `.ccnavi/config/common/`（ミラー。11.12）は、そのプロジェクトだけを clone したときにだけ共通レイヤーとして読まれる。
 共通と config のどちらのファイルも無くてよく、無いのは「設定が無い」正常で空として扱う。両方に無ければ組み込みの既定を使う（11.2、11.4）。

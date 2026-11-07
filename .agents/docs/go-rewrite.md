@@ -53,7 +53,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 
 - パッケージ名は短い小文字の単数（`git`・`shell`・`fsio`）。役割は `doc.go` に 1 段落で書く
 - ファイルは責務ごとに分ける。1 ファイルに型とその操作をまとめる
-- interface は使う側のパッケージで、使うメソッドだけを持つ形で定義する
+- interface は使う側のパッケージで、使うメソッドだけを含む形で定義する
 - 略語は Go の慣習に従う（`ID`・`JSON`・`URL`・`SHA`）
 - OS の違いは `ospath.Windows` で分ける（`runtime.GOOS` を直に比べない）。分ける場所は `infra` の中に閉じ、上の段に OS の分岐を書かない。build タグでファイルを分けるのはよい
 - 外部のプロセスは `exec.CommandContext` で、期限を定数から渡して起動する
@@ -76,7 +76,7 @@ Python の実装と答えを突き合わせていたテストは、Python を外
 - `golden.Load`：Python の答えの写しとして取っていた見本を読み、テストが Go の答えと項目ごとに比べる。Go の振る舞いを意図して変えたときは、落ちたテストが示す Go の答えに合わせて JSON を手で直す。写しを取り直す口（`-update` で Python を起こす処理）と、Python が無いと飛ぶ分岐は消した
 - `golden.Check`：Go の答えをまるごと見本と比べ、`go test -run <テスト> -update` で見本を書き直す。写しを持たずに毎回 Python に聞いていたテスト（文面ファイルの文を含む答え、ルートの場所が毎回変わる答え）は、Python と答えが揃っていた Go の答えからこの見本を取った。列と表は 1 件を 1 行に書くので、書き直した差分は git で件ごとに読める。一時置き場の名前と、ルートで始まって途中で切った引数は `golden.Check` が印に置き換える。ほかの機械ごとに変わる値（ルート・時刻・要約）は、テストが置き換えてから渡す
 - `-update` は `golden.Check` を使うパッケージにだけある。文面ファイルの文を直すと、文を含む見本（`hook/reasons`・`hook/judge` など）が落ちるので、`-update` で書き直してから差分を読む
-- 写しとの比べ方を持たないまま Python とだけ突き合わせていたもの（リポジトリの共通のルール・文面の全件の組み立て・乱数の種を毎回変える回）は、Go だけで確かめる形にするか消した
+- 写しと比べる方法がないまま Python とだけ突き合わせていたもの（リポジトリの共通のルール・文面の全件の組み立て・乱数の種を毎回変える回）は、Go だけで確かめる形にするか消した
 
 ### 移すときに整理する
 
@@ -101,7 +101,7 @@ Python の実装と答えを突き合わせていたテストは、Python を外
 | 正規表現 | Python の re の答えが要る式は `infra/pyre`（Python 3.13 の re の写し）を使う。固定の式で RE2 で書けるものは `regexp`。pyre は RE2 の 5〜10 倍遅い |
 | 正規表現の照合の深さ | pyre は入れ子が `pyre.depthLimit` を越えた照合を打ち切る（Python の sre は打ち切らない。Go はスタックがあふれるとプロセスごと落ちるため）。打ち切りは `SearchChecked` が知らせ、ルールの照合（`rules.Rule.Matches`）は止める側（deny・ask）を当たり、allow を外れにする。数 KB の通常のコマンドでは届かない |
 | YAML（PyYAML の SafeLoader、YAML 1.1） | `gopkg.in/yaml.v3` は libyaml の写しで、1.1 の真偽・8 進・時刻の読みも、読める・読めないの境界も違う。そこで PyYAML の純 Python の読み手を `infra/yaml` に写した。上の段は `*yaml.Map` の取り出し（`Text`・`Map` など）で値を読む。壊れた YAML の苦情の文は純 Python の読み手（SafeLoader）に合わせる。libyaml（CSafeLoader）の文とは違う。書き出し（`yaml.safe_dump`）は純 Python の書き手を写した `yaml.Dump`（80 字の折り返しも同じ） |
-| 辞書の順序 | Python の dict は入れた順。JSON を出すところは順序を持つ型で組む |
+| 辞書の順序 | Python の dict は入れた順。JSON を出すところは順序を保つ型で組む |
 | JSON の出力 | Python の `json.dumps` の既定（`ensure_ascii`・区切りの空白）に合わせる。呼び出しごとに引数を確かめる |
 | 文字列の長さ・切り出し | Python は符号位置で数える。Go の `len` はバイト。`[]rune` か `utf8` で数える |
 
