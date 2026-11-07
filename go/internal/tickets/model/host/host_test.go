@@ -78,6 +78,13 @@ func TestTransportProblem(t *testing.T) {
 	if strings.Contains(got, "SECRET") || !strings.Contains(got, "<伏せた>") {
 		t.Errorf("資格情報を伏せない: %q", got)
 	}
+	// トークンに `@` が入っても、ホストの手前の最後の `@` まで伏せる。
+	if got := TransportProblem("ssh://oauth2:SEC@RET@host.example/a/b"); !strings.Contains(got, "ssh://<伏せた>@host.example/a/b") {
+		t.Errorf("@ を含む資格情報: %q", got)
+	}
+	if got := TransportProblem("oauth2:SEC@RET@host.example:a/b"); !strings.Contains(got, "(<伏せた>@host.example:a/b)") {
+		t.Errorf("scheme の無い形の資格情報: %q", got)
+	}
 }
 
 func TestChangesRequestedNoteByHost(t *testing.T) {

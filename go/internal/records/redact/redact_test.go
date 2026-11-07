@@ -110,6 +110,8 @@ func TestTokenShapes(t *testing.T) {
 		"sk-" + strings.Repeat("A1b2C3d4E5", 4), "sk_live_" + strings.Repeat("A1b2C3d4E5", 2),
 		"rk_live_" + strings.Repeat("A1b2C3d4E5", 2), "AIza" + "SyA1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6",
 		"npm_" + strings.Repeat("A1b2C3d4E5", 3) + "abcdef",
+		"hf_" + strings.Repeat("A1b2C3d4E5", 3) + "abcd", "dop_v1_" + strings.Repeat("0123456789abcdef", 4),
+		"ya29." + "a0AfH6SMB" + strings.Repeat("A1b2C3d4E5", 2), "pypi-" + "AgEIcHlwaS5vcmc" + strings.Repeat("A1b2C3d4E5", 4),
 		"eyJhbGciOiJIUzI1NiJ9" + ".eyJzdWIiOiIxMjM0NTY3ODkwIn0" + ".dozjgNryP4J3jVmNHl0w5N",
 	} {
 		out := Redact("echo " + token + " > /dev/null")
@@ -144,8 +146,33 @@ func TestExactOutputs(t *testing.T) {
 	}
 }
 
-// 長い入力でも手間が長さにほぼ比例すること。記録は実行前チェックの期限の中で書くので、名前の形の頭が
-// 長さを限らずに読み進めると、`-` が続くだけの 1.5 万字で期限を過ぎ、hook の拒否が破棄される（回帰）。
+// 名前の長さに上限を置かない。65 字以上の名前の値も伏せる（回帰）。
+func TestLongNames(t *testing.T) {
+	const secret = "abcdefghijklmnopqrst"
+	for _, size := range []int{64, 65, 200, 10_000} {
+		for _, head := range []string{"x", "-", "_."} {
+			name := strings.Repeat(head, size)[:size] + "token="
+			if got, want := Redact(name+secret), name+Mask(secret); got != want {
+				t.Errorf("size %d head %q: got …%q", size, head, got[len(got)-30:])
+			}
+		}
+	}
+	// 長くても名前がキーワードで終わらなければ読まない。
+	if text := strings.Repeat("x", 100) + "tokenizer=abc123"; Redact(text) != text {
+		t.Errorf("tokenizer: %q", Redact(text))
+	}
+	got := Redact("az storage blob list --connection-string " +
+		"'DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=abc123def456==;EndpointSuffix=core.windows.net'")
+	if strings.Contains(got, "abc123def456") || !strings.Contains(got, "AccountKey=***;EndpointSuffix=core.windows.net") {
+		t.Errorf("AccountKey: %q", got)
+	}
+	if got := Redact("az storage blob list --account-name acct --account-key abc123def456"); got != "az storage blob list --account-name acct --account-key ***" {
+		t.Errorf("--account-key: %q", got)
+	}
+}
+
+// 長い入力でも手間が長さにほぼ比例すること。記録は実行前チェックの期限の中で書き、期限を過ぎると hook の拒否が破棄される。
+// 名前の形を名前の頭から照らすと、`-` が続くだけの 1.5 万字で期限を過ぎた（回帰）。
 func TestSpeed(t *testing.T) {
 	const limit = 500 * time.Millisecond
 	check := func(t *testing.T, text string) {

@@ -390,6 +390,18 @@ def remote_kind(url: str) -> str:
     return classify(url).kind
 
 
+# URL に埋めた資格情報（`//user:token@` と、scheme の無い `user:token@host:path`）。苦情の文には
+# 残さない。トークンに `@` が入ることがあるので、ホストの手前の最後の `@` までとする
+# （sh の ccnavi_mask_url と同じ読み）。
+_CREDENTIALS = re.compile(r"//[^/]*@")
+_SCP_CREDENTIALS = re.compile(r"^[^/:@]*:[^/]*@")
+_HIDDEN = "<伏せた>@"
+
+
+def _mask_credentials(url: str) -> str:
+    return _SCP_CREDENTIALS.sub(_HIDDEN, _CREDENTIALS.sub("//" + _HIDDEN, url))
+
+
 def transport_problem(url: str) -> str:
     """sh がリモートを読み書きできる形になっているか。なっていなければ、その説明。
 
@@ -399,9 +411,7 @@ def transport_problem(url: str) -> str:
     found = classify(url)
     kind = found.kind
     if not kind:
-        # URL に埋めた資格情報（`user:token@`）は出力に残さない
-        shown = re.sub(r"//[^/@]*@", "//<伏せた>@", url)
-        return f"origin ({shown}) が GitHub でも GitLab でもない"
+        return f"origin ({_mask_credentials(url)}) が GitHub でも GitLab でもない"
     if found.problem:
         return found.problem
     if shutil.which("jq") is None:
