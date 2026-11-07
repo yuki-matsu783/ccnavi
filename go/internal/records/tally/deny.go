@@ -49,7 +49,7 @@ func Normalize(subject string) string {
 		}
 		return r
 	}, subject)
-	return strings.Join(strings.FieldsFunc(subject, ospath.IsSpace), " ")
+	return ospath.Squeeze(subject)
 }
 
 // RuleOf は、止めた理由の名前を返す。判定を下したルールの id。無ければ根拠の種別。

@@ -13,6 +13,7 @@ import (
 	"ccnavi/internal/hook/turngate"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/hookio"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/policy/ctxfile"
 	"ccnavi/internal/policy/ruleload"
 	"ccnavi/internal/policy/selfguard"
@@ -23,37 +24,29 @@ import (
 	"ccnavi/internal/tickets/notice"
 )
 
-// SessionStart の source（Claude Code が渡す値）。
-type startSource string
-
-const (
-	sourceStartup startSource = "startup"
-	sourceResume  startSource = "resume"
-)
-
 // atStart は SessionStart の処理。大きい対象（実行ファイル）のバックアップと記録の後始末を、セッションに 1 度、ここで行う。
 // 判定は返さない。作業の進め方と作業の決まりは、起動・再開・compact・clear のどの回にも出す。文脈が新しくなるたびに
 // 届かないと、compact のあとのモデルは進め方を知らないまま続けてしまう。サブエージェントには出さない。
 func atStart(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, root string, in hookio.Input,
 	record *audit.Record, deadline time.Time) (int, error) {
-	source := startSource(in.Source)
+	source := in.Source
 	main := in.AgentID == ""
 	outcomes := selfguard.AtStart(guardSetting(mode, conf), conf.State, in.SessionID, root, guardTargets(conf, root))
 	// 再開と compact の後にも来るので、「1 度だけ渡す文」は改めて届き、every の刻みも数え直しになる。
-	ctxfile.Forget(conf.State, in.SessionID, source == sourceStartup)
+	ctxfile.Forget(conf.State, in.SessionID, source == hookio.StartStartup)
 	// 起動と再開は新しいプロセスで、前のプロセスのサブエージェントは生きていない（compact と clear は同じプロセス）。
-	if source == sourceStartup || source == sourceResume {
+	if source == hookio.StartStartup || source == hookio.StartResume {
 		subagent.ForgetRunning(conf.State, in.SessionID)
 		turn.Clear(conf.State, in.SessionID)
 		turngate.Clear(conf.State, in.SessionID)
 	}
-	if source == sourceStartup {
+	if source == hookio.StartStartup {
 		if err := reportedBaseline(stderr, conf, root, in, record); err != nil {
 			return config.ExitOK, err
 		}
 	}
 	// 基準を取った時の注記（読めなかったツリーなど）を消さないよう、足す。
-	record.Detail = joined("; ", record.Detail, pruneAtStart(stderr, conf, root, in.SessionID))
+	record.Detail = pyfmt.JoinNonEmpty("; ", record.Detail, pruneAtStart(stderr, conf, root, in.SessionID))
 	record.Decision, record.Enforced = audit.Allow, true
 	var blocks []string
 	if len(outcomes) > 0 {
@@ -85,12 +78,12 @@ func atStart(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, 
 		// 読めないレイヤーの deny は黙って効かなくなる。判定のたびには言わないので、開始のたびに言う。
 		if broken := ruleload.Unreadable(conf, root); len(broken) > 0 {
 			said := texts.Say(root, "NOTICE_LAYER_UNREADABLE", texts.Values{"layers": strings.Join(broken, "、")}, nil)
-			rejects = paragraphs(rejects, said)
+			rejects = pyfmt.JoinNonEmpty(paragraphBreak, rejects, said)
 		}
 	}
 	blocks = appendSome(blocks, rejects, pending, direct)
 	// scratchpad/ の容量の問いは起動のときだけ（再開・compact・clear のたびに繰り返さない）。
-	if source == sourceStartup && main {
+	if source == hookio.StartStartup && main {
 		blocks = appendSome(blocks, notice.Scratchpad(root, within(deadline, config.IntegratePending.Value())))
 	}
 	// 学びの提案の候補はユーザにだけ知らせる。
@@ -102,8 +95,8 @@ func atStart(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, 
 	if len(blocks) == 0 && learning == "" {
 		return config.ExitOK, nil
 	}
-	return config.ExitOK, hookio.WriteContext(stdout, hookio.SessionStart, strings.Join(blocks, "\n\n"),
-		paragraphs(rejects, pending, learning))
+	return config.ExitOK, hookio.WriteContext(stdout, hookio.SessionStart, strings.Join(blocks, paragraphBreak),
+		pyfmt.JoinNonEmpty(paragraphBreak, rejects, pending, learning))
 }
 
 // appendSome は空でない文だけを足す。

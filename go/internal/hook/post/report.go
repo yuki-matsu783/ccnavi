@@ -3,6 +3,7 @@ package post
 import (
 	"strings"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/hookio"
@@ -41,7 +42,7 @@ type outcome struct {
 func violation(f *finding, in hookio.Input, o outcome, gitCommand, root string) string {
 	change := f.change
 	lines := []string{
-		"[ccnavi] " + f.code + " (" + sourceOf(f.group) + ")",
+		hookio.Tagged(f.code, sourceOf(f.group)),
 		"path: " + change.Path + " (" + ospath.Strip(change.Status) + " / " + string(change.Kind) + ")",
 	}
 	if f.treeName != "" {
@@ -66,7 +67,7 @@ func violation(f *finding, in hookio.Input, o outcome, gitCommand, root string) 
 			switch {
 			case o.shadowed:
 				why = "shadowed"
-			case f.code == CodeTicketScope:
+			case f.code == CodeOutOfScope:
 				why = "scope"
 			}
 			lines = append(lines, "not-restored: "+texts.Say(root, "NOTICE_POST_NOT_RESTORED", nil, texts.Variants{"what": why}))
@@ -77,7 +78,7 @@ func violation(f *finding, in hookio.Input, o outcome, gitCommand, root string) 
 				what = "moved this file aside."
 			}
 			lines = append(lines, string(selfguard.ActionWould)+": ccnavi did not touch this path. With "+
-				env.RestoreIfDeny+"=enable it would have "+what)
+				env.RestoreIfDeny+"="+string(config.Enable)+" it would have "+what)
 		}
 	case o.moved != "":
 		lines = append(lines, "restored: ccnavi moved this file to "+o.moved+". It was not deleted.")
@@ -103,7 +104,7 @@ func inApprovedArea(path string) bool {
 func preexisting(f *finding, root string) string {
 	change := f.change
 	return strings.Join([]string{
-		"[ccnavi] " + codePreexisting + " (" + sourceOf(f.group) + ")",
+		hookio.Tagged(codePreexisting, sourceOf(f.group)),
 		"path: " + change.Path + " (" + ospath.Strip(change.Status) + " / " + string(change.Kind) + ")",
 		texts.Say(root, "NOTE_POST_PREEXISTING", nil, nil),
 		messagesOf(f.group),
@@ -145,7 +146,7 @@ func callOf(in hookio.Input) string {
 		}
 		return in.ToolName
 	}
-	shown := strings.Join(strings.FieldsFunc(subject, ospath.IsSpace), " ")
+	shown := ospath.Squeeze(subject)
 	if len([]rune(shown)) > texts.ShownSubjectLimit {
 		shown = pyfmt.Head(shown, texts.ShownSubjectLimit) + "…"
 	}

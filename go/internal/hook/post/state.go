@@ -3,9 +3,7 @@ package post
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
-	"os"
 	"slices"
 	"sort"
 
@@ -231,14 +229,8 @@ func (c *Checker) saveTurn(session string, baseline map[string]bool, h heads) {
 // fingerprint は変わったファイルの中身の指紋。受け入れたあとに同じファイルが書き換えられたかを、キー（種類とパス）とは
 // 別に見分ける。消えているか読めないときは missingFingerprint。
 func fingerprint(f *finding) string {
-	file, err := os.Open(f.change.Full)
-	if err != nil {
-		return missingFingerprint
+	if sum, ok := fsio.DiskDigest(f.change.Full, digest.SHA256); ok {
+		return sum
 	}
-	defer file.Close()
-	sum, err := digest.HexOf(digest.SHA256, io.Reader(file))
-	if err != nil {
-		return missingFingerprint
-	}
-	return sum
+	return missingFingerprint
 }

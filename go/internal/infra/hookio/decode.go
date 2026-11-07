@@ -81,8 +81,8 @@ type Input struct {
 	IsInterrupt bool
 	// StopHookActive は Stop・SubagentStop にだけ来る。真なら Stop の hook が続けさせた結果（連鎖の 2 回目以降）。
 	StopHookActive bool
-	// Source は SessionStart にだけ来る（startup・resume・clear・compact）。
-	Source string
+	// Source は SessionStart にだけ来る。
+	Source StartSource
 	// Prompt は UserPromptSubmit にだけ来るユーザの依頼文。記録にも診断ログにも書かない。
 	Prompt string
 	// TranscriptPath は会話の記録（JSONL）の場所。記録にも診断ログにも書かない。
@@ -200,7 +200,7 @@ func Decode(r io.Reader) (Input, error) {
 		Error:          obj.String(keyError),
 		IsInterrupt:    obj.Value(keyIsInterrupt) == true,
 		StopHookActive: obj.Value(keyStopHookActive) == true,
-		Source:         text(obj.Value(keySource)),
+		Source:         StartSource(text(obj.Value(keySource))),
 		Prompt:         obj.String(keyPrompt),
 		TranscriptPath: obj.String(keyTranscriptPath),
 		Busy:           hasItems(obj.Value(keyBackgroundTasks)) || hasItems(obj.Value(keySessionCrons)),

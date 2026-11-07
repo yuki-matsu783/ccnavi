@@ -187,7 +187,7 @@ func runScenario(t *testing.T, s scenario, root string) []result {
 			if w.Path != "" {
 				tr, _ = tree.TreeOf(root, filepath.Join(root, w.Path), conf.Projects)
 			}
-			watched = append(watched, Watched{Tree: tr, Rules: rs, Source: "rules.yml", SideBySide: w.Side})
+			watched = append(watched, Watched{Tree: tr, Rules: rs, SideBySide: w.Side})
 		}
 		var guard *ScopeGuard
 		if s.Scope && conf.TicketsEnabled() {

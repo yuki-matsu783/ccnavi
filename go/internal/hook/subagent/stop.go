@@ -7,11 +7,11 @@ import (
 
 	"ccnavi/internal/hook/outcome"
 	"ccnavi/internal/hook/post"
-	"ccnavi/internal/hook/reasons"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/tree"
+	"ccnavi/internal/policy/builtin"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/records/audit"
 	"ccnavi/internal/tickets/approval"
@@ -22,7 +22,7 @@ import (
 
 // 終わりの文。
 const (
-	scopeHead = "[ccnavi] %s: 子チケットの範囲の外に変更が残っています（" +
+	scopeHead = hookio.Head + "%s: 子チケットの範囲の外に変更が残っています（" +
 		"%d 件）。範囲の中へ戻すか、必要なら親に伝えて次のチケットにしてください。"
 	scopeLine      = "  %s: %s%s  範囲は %s"
 	emptyArea      = "(空)"
@@ -135,8 +135,8 @@ func judgeStop(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings
 		paths[i] = f.label()
 	}
 	record.Decision, record.Paths = audit.Deny, paths
-	record.Rules, record.Code = []string{reasons.TicketRule}, post.CodeTicketScope
-	lines := []string{fmt.Sprintf(scopeHead, post.CodeTicketScope, len(findings))}
+	record.Rules, record.Code = []string{builtin.TicketScopeRuleID}, post.CodeOutOfScope
+	lines := []string{fmt.Sprintf(scopeHead, post.CodeOutOfScope, len(findings))}
 	for _, f := range findings[:min(len(findings), post.ReportLimit)] {
 		area := strings.Join(append(f.child.Paths(rules.Allow), f.child.Paths(rules.Ask)...), ", ")
 		if area == "" {

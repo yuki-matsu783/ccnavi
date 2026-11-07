@@ -23,6 +23,7 @@ const (
 	ToolAskUserQuestion  = "AskUserQuestion"
 	ToolSubagentHandback = "SubagentHandback"
 	ToolStructuredOutput = "StructuredOutput"
+	ToolArtifact         = "Artifact"
 )
 
 // ツール名の組。

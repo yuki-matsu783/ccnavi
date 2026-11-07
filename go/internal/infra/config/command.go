@@ -22,6 +22,8 @@ const (
 	StartWrapper = "ccnavi-start.sh"
 	// WorktreeWrapper は直接作業のワークツリーを切る sh。
 	WorktreeWrapper = "ccnavi-worktree.sh"
+	// StageWrapper は保護対象を下書きで直す sh。
+	StageWrapper = "ccnavi-stage.sh"
 	// LauncherScript は実行ファイルを振り分けて起動する sh（名前の持ち主は platformtag）。
 	LauncherScript = platformtag.LauncherName
 	// ScriptsDir は ccnavi ディレクトリの下の sh の置き場。

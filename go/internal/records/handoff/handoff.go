@@ -84,11 +84,6 @@ func Threshold(raw string) int {
 	return max(config.Int(raw, DefaultTokens, math.MinInt), 0)
 }
 
-// Unattended は見ている人がいない実行（`claude -p`・SDK）か。待機がプロセスを引き止めるので除く。
-func Unattended(getenv func(string) string) bool {
-	return getenv(env.ClaudeSessionAttended) == "0" || strings.HasPrefix(getenv(env.ClaudeCodeEntrypoint), "sdk")
-}
-
 // UsageOf はトランスクリプトの末尾から、直近の応答の会話の大きさとキャッシュの保持時間を読む。
 // サブエージェントの行は別の会話なので除く。大きさが分からなければ nil。
 func UsageOf(transcript string) *Usage {

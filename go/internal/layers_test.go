@@ -133,10 +133,8 @@ var subTiers = map[string]map[string]int{
 		"failsafe": 0, "askcontext": 0, "turngate": 0, "shellguard": 0,
 		// PostToolUse の案内（ラッパーの呼び出しの読みを shellguard から借りる）
 		"hint": 1,
-		// 作業の決まり（CCNAVI.md）と付き添いの有無・Stop の判定役の見分け・実行後チェック
-		"ccnavimd": 0, "stopjudge": 0, "post": 0,
-		// 判定の文と理由コード（付き添いの有無を ccnavimd から読む）
-		"reasons": 1,
+		// 作業の決まり（CCNAVI.md）・Stop の判定役の見分け・実行後チェック・判定の文と理由コード
+		"ccnavimd": 0, "stopjudge": 0, "post": 0, "reasons": 0,
 		// PreToolUse の判定の本体（上の部品を順に当てる）
 		"judge": 2,
 		// サブエージェントの始まりと終わり（子の案内・終わり方の記録・実行後チェックの定数を読む）

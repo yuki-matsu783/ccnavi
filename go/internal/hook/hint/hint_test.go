@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/testkit"
@@ -259,11 +260,11 @@ func TestCommitNotice(t *testing.T) {
 func TestJustCommittedIsRecent(t *testing.T) {
 	w := newCommitWorkspace(t)
 	path := w.worktree("fix-1-a")
-	if justCommitted(path, time.Now().Add(commitBudget)) {
+	if justCommitted(path, time.Now().Add(git.CommitHintTimeout)) {
 		t.Error("コミットの無いワークツリー（reflog の最後は branch）を直前の commit と読んだ")
 	}
 	w.commit(path, "y\n")
-	if !justCommitted(path, time.Now().Add(commitBudget)) {
+	if !justCommitted(path, time.Now().Add(git.CommitHintTimeout)) {
 		t.Error("直前の commit を読めない")
 	}
 }

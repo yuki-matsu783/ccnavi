@@ -71,7 +71,7 @@ const (
 func sprintf(format string, a ...any) string { return fmt.Sprintf(format, a...) }
 
 func line(text string) string {
-	return strings.Join(strings.FieldsFunc(text, ospath.IsSpace), " ")
+	return ospath.Squeeze(text)
 }
 
 func splitKey(key string) []string { return strings.Split(key, "/") }

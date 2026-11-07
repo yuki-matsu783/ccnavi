@@ -99,3 +99,16 @@ func FromUnixSeconds(f float64) time.Time {
 	whole, frac := math.Modf(f)
 	return time.Unix(int64(whole), int64(math.Round(frac*1e9)))
 }
+
+// now は Now が読む時計。差し替えは SetNow だけで行う。
+var now = time.Now
+
+// Now は手元の時刻。hook の期限と記録の時刻はこれを読み、テストは SetNow で 1 か所から時刻を差し込む。
+func Now() time.Time { return now() }
+
+// SetNow は、返した関数を呼ぶまで Now を clock にする（テスト用）。
+func SetNow(clock func() time.Time) (restore func()) {
+	before := now
+	now = clock
+	return func() { now = before }
+}

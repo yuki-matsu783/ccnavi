@@ -2,14 +2,12 @@ package ccnavimd
 
 import (
 	"fmt"
-	"os"
-	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyre"
@@ -27,12 +25,8 @@ const (
 	// 組み込みの guard-scripts が止めるので、セッションの頭に載る文を条件の側から書き換えられない。
 	ScriptFile     = "ccnavimd.sh"
 	functionPrefix = "ccnavi_cond_"
-	// conditionTimeout は sh の条件 1 つに待つ時間。
-	conditionTimeout = 2 * time.Second
 	// indent は囲みの 1 段ぶんのインデント。載せるときに深さの分だけ取る。
 	indent = "  "
-	// unattendedValue は付き添いなしを示す値。
-	unattendedValue = "0"
 	// workspaceRootRule はワークツリーの行を支える deny の id。
 	workspaceRootRule = "workspace-root"
 	// scriptLoadFailed は sh の読み込みに失敗したときの終了コード。構文の誤りで `.` が 1 を返す sh（macOS の bash）でも、
@@ -47,10 +41,8 @@ var (
 	endifLine    = pyre.MustCompile(`^\s*<!--\s*ccnavi:endif\s*-->\s*$`, 0)
 	directive    = pyre.MustCompile(`<!--\s*ccnavi:`, 0)
 	substitution = pyre.MustCompile(`\{\{\s*(?P<name>\w+)\s*\}\}`, 0)
-	// function は sh に書かれた条件の関数。名前は Unicode の単語文字で拾う（形の検査は namePattern がする）。
+	// function は sh に書かれた条件の関数。名前は Unicode の単語文字で拾う（形の検査は shell.IsIdentifier がする）。
 	function = pyre.MustCompile(`^\s*`+functionPrefix+`(?P<name>\w+)\s*\(\s*\)`, pyre.Multiline)
-	// namePattern は条件の名前に使える形（sh の関数名に使える形）。
-	namePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 )
 
 // situation は条件の判定に渡す、そのセッションの状況。
@@ -70,7 +62,7 @@ var conditions = map[string]func(s situation) bool{
 	"tickets":         func(s situation) bool { return s.conf.TicketsEnabled() },
 	"docs":            func(s situation) bool { return s.docs },
 	"dry_run":         func(s situation) bool { return s.mode == config.DryRun },
-	"non_interactive": func(situation) bool { return Unattended() },
+	"non_interactive": func(situation) bool { return hookio.Unattended() },
 }
 
 // substitutions は `{{名前}}` に使える名前。
@@ -88,17 +80,11 @@ var substitutions = []string{
 	"mode_env",     // CCNAVI_MODE
 }
 
-// Unattended は非対話のセッションか。Claude Code が付き添いなしと示したとき（環境変数が "0"）だけ真。
-// 未設定・"1"・読めない値は対話として扱う（非対話と誤ると、聞くべきところで自走するので害が大きい）。
-func Unattended() bool {
-	return os.Getenv(env.ClaudeSessionAttended) == unattendedValue
-}
-
 // NameProblems は条件の名前が sh の関数名に使えない形（`-` を含むなど）の行。lint が error で言う。
 func NameProblems(text string) []string {
 	var found []string
 	for i, line := range ospath.Splitlines(text) {
-		if name, ok := opened(line); ok && !namePattern.MatchString(name) {
+		if name, ok := opened(line); ok && !shell.IsIdentifier(name) {
 			found = append(found, fmt.Sprintf(
 				"%d 行目: 条件の名前 %s は指定できない（英数字と _ だけ。先頭は数字にしない。`-` は _ にする）", i+1, name))
 		}
@@ -115,7 +101,7 @@ func Problems(text string, scripts map[string]bool) []string {
 		number := i + 1
 		if name, ok := opened(line); ok {
 			elses = append(elses, false)
-			if _, builtin := conditions[name]; namePattern.MatchString(name) && !builtin && !scripts[name] {
+			if _, builtin := conditions[name]; shell.IsIdentifier(name) && !builtin && !scripts[name] {
 				found = append(found, fmt.Sprintf("%d 行目: 条件 %s は指定できない（組み込みの条件でも %s の %s でもない）",
 					number, name, ScriptFile, functionPrefix+name))
 			}
@@ -292,7 +278,7 @@ func runScript(conf *config.Settings, root, name string, s situation) bool {
 	}
 	path := strings.ReplaceAll(scriptPath(conf, root), `\`, "/")
 	args := []string{"-c", `. "$1" || exit ` + scriptLoadFailed + `; "$2"`, shell.Program, path, functionPrefix + name}
-	ran, err := shell.Script(args, root, vars, conditionTimeout)
+	ran, err := shell.Script(args, root, vars, shell.ConditionTimeout)
 	if err != nil || ran.TimedOut {
 		return true
 	}
@@ -330,7 +316,7 @@ func valuesFor(conf *config.Settings, root string) map[string]string {
 		"worktrees":    strings.ReplaceAll(tree.WorktreesDir, `\`, "/"),
 		"git_sh":       config.ScriptCommand(root, config.GitWrapper),
 		"ticket_sh":    config.ScriptCommand(root, config.TicketWrapper),
-		"stage_sh":     config.ScriptCommand(root, stageWrapper),
+		"stage_sh":     config.ScriptCommand(root, config.StageWrapper),
 		"worktree_sh":  config.ScriptCommand(root, config.WorktreeWrapper),
 		"handoff":      place.Handoff,
 		"scratch":      place.ScratchDir(root),
@@ -341,9 +327,6 @@ func valuesFor(conf *config.Settings, root string) map[string]string {
 	}
 }
 
-// stageWrapper は保護対象を下書きで直す sh。config に名前が無いのでここに置く。
-const stageWrapper = "ccnavi-stage.sh"
-
 // SessionText はセッションの頭で渡す作業の決まり。md が無い・読めないときは、無いことだけを 1 行で言う
 // （黙ると、決まりが渡っていないことに誰も気づけない）。長すぎるときは切り、切ったことを末尾に言う。
 // docs は索引の案内を出す回か、denyIDs はワークスペースのルールの deny の id。
@@ -351,7 +334,7 @@ func SessionText(conf *config.Settings, root string, docs bool, denyIDs map[stri
 	shown := home(conf) + "/" + File
 	raw, err := ospath.ReadDiskText(Path(conf, root))
 	if err != nil {
-		return "[ccnavi] " + shown + " が無いか読めないので、作業の決まりを渡せない。導入スクリプト（ccnavi-setup.sh）で配る。"
+		return hookio.Head + shown + " が無いか読めないので、作業の決まりを渡せない。導入スクリプト（ccnavi-setup.sh）で配る。"
 	}
 	s := situation{conf: conf, root: root, docs: docs, denyIDs: denyIDs, mode: mode}
 	flags := map[string]bool{}

@@ -125,8 +125,7 @@ func checkCode(conf *config.Settings, root string, parents []string, c code) Par
 		return ParentWrite{short(c.text), name, KindCode}
 	}
 	if c.known {
-		where := WorktreeName(root, c.base)
-		if isParentName(parents, where) && !unscoped(conf, root, where, c.base) {
+		if where := parentAt(conf, root, c.base, listed(parents)); where != "" {
 			return ParentWrite{short(c.text), where, KindCode}
 		}
 	}
@@ -181,11 +180,33 @@ func checkTarget(conf *config.Settings, root string, parents []string, base stri
 		}
 		word = ospath.Join(base, word)
 	}
-	name := WorktreeName(root, word)
-	if !isParentName(parents, name) || unscoped(conf, root, name, word) {
+	name := parentAt(conf, root, word, listed(parents))
+	if name == "" {
 		return ParentWrite{}
 	}
 	return ParentWrite{target, name, KindWrite}
+}
+
+// ParentWriteAt は、Write・Edit の書き込み先 path が親のワークツリー（`.claude/worktrees/<名前>` で、その名前が親の
+// チケット。ワークツリーが git に登録されているか・在るかは問わない）の中なら、その親の名前。下書き・提案・承認済みの
+// 置き場は空（置き場ごとの保護が別に掛かっている）。シェルの書き込み先（CheckParentWrite）も同じ parentAt で見る。
+func ParentWriteAt(conf *config.Settings, root, path string) string {
+	return parentAt(conf, root, path, func(name string) bool { return IsParentTree(conf, root, name) })
+}
+
+// parentAt は path が親のワークツリーの中で、置き場ごとの保護に任せる置き場でなければ、その親の名前。親かどうかは
+// isParent で見る（シェルの検査は在るディレクトリから先に集めた親の名前、Write・Edit はチケットの役割を直に見る）。
+func parentAt(conf *config.Settings, root, path string, isParent func(string) bool) string {
+	name := WorktreeName(root, path)
+	if name == "" || !isParent(name) || unscoped(conf, root, name, path) {
+		return ""
+	}
+	return name
+}
+
+// listed は先に集めた親のワークツリーの名前に入っているか（大文字小文字は畳む）。
+func listed(parents []string) func(string) bool {
+	return func(name string) bool { return isParentName(parents, name) }
 }
 
 // unscoped は下書き・提案・承認済みの置き場か（Write と同じく、置き場ごとの保護に任せる）。

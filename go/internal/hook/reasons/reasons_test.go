@@ -71,7 +71,7 @@ func (c sayCase) run(root string) string {
 	case "fallen_back":
 		return FallenBack(str(a, "path"), root)
 	case "undeclared":
-		return Undeclared(root, str(a, "tool"), str(a, "subject"), str(a, "source"), shell.Reason(str(a, "degraded")),
+		return Undeclared(root, str(a, "tool"), str(a, "subject"), rules.Origin(str(a, "source")), shell.Reason(str(a, "degraded")),
 			rules.Decision(str(a, "verdict")), flag(a, "fell_back"))
 	case "reason_for":
 		return ReasonFor(root, Hit{Rule: c.rule(root), Tool: str(a, "tool"), Subject: str(a, "subject"),

@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"ccnavi/internal/hook/ccnavimd"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/hookio"
@@ -48,22 +47,18 @@ const (
 	CodeTicketParent = "DENY_TICKET_PARENT"
 )
 
-// 組み込みの判定で止めたときの、記録の rules に残す名前。範囲外（TicketRule）を使い回すと、記録の範囲外の件数に
-// 混ざり、繰り返しの文も止めた理由と違う名前を言う。
+// 組み込みの判定で止めたときの、記録の rules に残す名前。範囲外（builtin.TicketScopeRuleID）を使い回すと、記録の
+// 範囲外の件数に混ざり、繰り返しの文も止めた理由と違う名前を言う。
 const (
-	RedirectLimitRule    = "builtin:redirect-limit"
-	TicketRule           = "builtin:ticket-scope"
-	SubagentTicketOpRule = "builtin:subagent-ticket-op" // phase.CodeSubagent
-	PhaseReviewRule      = "builtin:phase-review"       // phase.CodeReview
-	TicketProjectRule    = "builtin:ticket-project"     // CodeTicketProject
-	TicketBlockedRule    = "builtin:ticket-blocked"     // CodeTicketBlocked
-	TicketParentRule     = "builtin:ticket-parent"      // CodeTicketParent
+	RedirectLimitRule    = rules.ReservedIDPrefix + "redirect-limit"
+	SubagentTicketOpRule = rules.ReservedIDPrefix + "subagent-ticket-op" // phase.CodeSubagent
+	PhaseReviewRule      = rules.ReservedIDPrefix + "phase-review"       // phase.CodeReview
+	TicketProjectRule    = rules.ReservedIDPrefix + "ticket-project"     // CodeTicketProject
+	TicketBlockedRule    = rules.ReservedIDPrefix + "ticket-blocked"     // CodeTicketBlocked
+	TicketParentRule     = rules.ReservedIDPrefix + "ticket-parent"      // CodeTicketParent
 )
 
 const (
-	head          = "[ccnavi] "
-	subjectPrefix = "subject: "
-	builtinPrefix = "builtin:"
 	// rewritesShown は止めた文に並べる表記の数。1 つ直せば残りも同じ直し方になる。
 	rewritesShown = 5
 )
@@ -80,7 +75,7 @@ var rewriteCodes = map[shell.Form]string{
 func RewriteCode(form shell.Form) string { return rewriteCodes[form] }
 
 // RewriteRule は書き直しを求める形で止めたときに、記録の rules に残す名前。
-func RewriteRule(form shell.Form) string { return builtinPrefix + string(form) }
+func RewriteRule(form shell.Form) string { return rules.ReservedIDPrefix + string(form) }
 
 // CodeFor はルールの deny の根拠コード。対象がコマンドかパスかで分かれ、読み切れなければ CodeUncertain。
 func CodeFor(tool string, degraded shell.Reason) string {
@@ -110,7 +105,7 @@ var undeclaredTexts = map[bool]map[rules.Decision]string{
 // verdict は judge が決めた結末（ask か deny）。結末と読み切れたかの組で次の一手が違う。表に無い結末（渡した回）は空。
 // source は判定の出所。組み込みの既定に退避した回（fellBack）は、読めなかったルールファイルへ allow を足せとは言わない
 // （直し方は FallenBack の文が言う）。
-func Undeclared(root, tool, subject, source string, degraded shell.Reason, verdict rules.Decision, fellBack bool) string {
+func Undeclared(root, tool, subject string, source rules.Origin, degraded shell.Reason, verdict rules.Decision, fellBack bool) string {
 	id, ok := undeclaredTexts[degraded != ""][verdict]
 	if !ok {
 		return ""
@@ -119,7 +114,7 @@ func Undeclared(root, tool, subject, source string, degraded shell.Reason, verdi
 	if degraded != "" {
 		code = CodeUncertain
 	}
-	lines := []string{head + code + " (source: " + source + ")", subjectPrefix + shorten(subject)}
+	lines := []string{hookio.Cited(code, string(source)), hookio.SubjectPrefix + shorten(subject)}
 	if degraded != "" {
 		lines = append(lines, unreadable(root, degraded, false))
 	}
@@ -129,7 +124,7 @@ func Undeclared(root, tool, subject, source string, degraded shell.Reason, verdi
 		if tool == config.ToolBash {
 			target = "command"
 		}
-		values = texts.Values{"target": target, "where": source}
+		values = texts.Values{"target": target, "where": string(source)}
 	}
 	what := "rules"
 	if fellBack {
@@ -173,7 +168,7 @@ func ReasonFor(root string, h Hit, git string) string {
 		code = useronly.CodeTicketApproval
 		source = "組み込みのルール: " + h.Rule.ID + " (" + env.GuardTicketApproval + ")"
 	}
-	lines := []string{head + code + " (" + source + ")", subjectPrefix + shorten(h.Subject)}
+	lines := []string{hookio.Tagged(code, source), hookio.SubjectPrefix + shorten(h.Subject)}
 	if h.Inner != "" {
 		lines = append(lines, ranBy(root, h.Runner, h.Inner))
 	}
@@ -203,7 +198,7 @@ var askAlternative = map[string]struct {
 // AskHint は確認（ask）の理由に足す説明の行。非対話のときだけ返す（確認に答える人がいないので ask は自動で拒否され、
 // ルール名と対象だけでは確認待ちか止められたかが分からない）。確認として返す回にだけ足す。
 func AskHint(root, bareID, subject string) []string {
-	if !ccnavimd.Unattended() {
+	if !hookio.Unattended() {
 		return nil
 	}
 	id := CodeRuleAsk
@@ -231,7 +226,7 @@ func oneLine(text string) string {
 // shorten は文に載せる対象を 1 行にまとめ、上限で切って切った字数をつける。残りはまとめた後の長さで数える
 // （まとめる前の長さで数えると、改行や空白の続きまで残りに入り、見えていない字数を多く言う）。
 func shorten(text string) string {
-	shown := strings.Join(strings.FieldsFunc(text, ospath.IsSpace), " ")
+	shown := ospath.Squeeze(text)
 	if n := len([]rune(shown)); n > texts.ShownSubjectLimit {
 		shown = pyfmt.Head(shown, texts.ShownSubjectLimit) + fmt.Sprintf("…(+%d)", n-texts.ShownSubjectLimit)
 	}
@@ -285,7 +280,7 @@ func rewriteHint(root string, reason shell.Reason) []string {
 		return nil
 	}
 	lines := ospath.Splitlines(texts.Say(root, id, texts.Values{"runnee": strings.Join(shell.ReadonlyRunnees(), " ")}, nil))
-	if ccnavimd.Unattended() {
+	if hookio.Unattended() {
 		lines = append(lines, ospath.Splitlines(texts.Say(root, "NOTE_REWRITE_HINT__UNATTENDED", nil, nil))...)
 	}
 	return lines
@@ -293,7 +288,7 @@ func rewriteHint(root string, reason shell.Reason) []string {
 
 // SubagentForbidden はサブエージェントに許さない操作を止めた文。runner・inner は Hit と同じ。
 func SubagentForbidden(root, subject, runner, inner string) string {
-	lines := []string{head + phase.CodeSubagent, subjectPrefix + shorten(subject)}
+	lines := []string{hookio.Head + phase.CodeSubagent, hookio.SubjectPrefix + shorten(subject)}
 	if inner != "" {
 		lines = append(lines, ranBy(root, runner, inner))
 	}
@@ -304,7 +299,7 @@ func SubagentForbidden(root, subject, runner, inner string) string {
 // BuiltinRefusal は組み込みの判定で止めた文。ruleID は記録の rules に残す名前と同じにして、受け取った文から記録の行を引ける
 // ようにする。並びは ReasonFor と同じ。
 func BuiltinRefusal(code, ruleID, subject, text string) string {
-	return strings.Join([]string{head + code + " (組み込みのルール: " + ruleID + ")", subjectPrefix + shorten(subject), text}, "\n")
+	return strings.Join([]string{hookio.Tagged(code, "組み込みのルール: "+ruleID), hookio.SubjectPrefix + shorten(subject), text}, "\n")
 }
 
 // InternalError は ccnavi 自身の不具合で判定や検査を終えられなかったときに、モデルへ返す文。呼び出しの中身が原因では
@@ -317,13 +312,13 @@ func InternalError(root, code string, event hookio.Event, kind, logPath string, 
 	case passed:
 		what = "passed"
 	}
-	return head + code + "\n" + texts.Say(root, "DENY_INTERNAL_ERROR", texts.Values{"kind": kind, "log_path": logPath}, texts.Variants{"what": what})
+	return hookio.Head + code + "\n" + texts.Say(root, "DENY_INTERNAL_ERROR", texts.Values{"kind": kind, "log_path": logPath}, texts.Variants{"what": what})
 }
 
 // InternalErrorNotice は ccnavi 自身の不具合で、ツールの呼び出しを持たないイベントの処理を終えられなかったときに、
 // ユーザへ見せる文。止めていないことと診断ログの場所を言う。
 func InternalErrorNotice(code string, event hookio.Event, kind, logPath string) string {
-	return fmt.Sprintf("[ccnavi] %s: %s の処理中に ccnavi の内部の不具合が起き（%s）、そこでの処理を飛ばしました。"+
+	return fmt.Sprintf(hookio.Head+"%s: %s の処理中に ccnavi の内部の不具合が起き（%s）、そこでの処理を飛ばしました。"+
 		"止めたものはありません。詳細は診断ログ %s にあります。", code, event, kind, logPath)
 }
 
@@ -353,7 +348,7 @@ func PayloadUnusable(root, code, problem string, event hookio.Event, mode config
 	if shown == "" {
 		shown = "hook"
 	}
-	return head + code + "\n" + texts.Say(root, "DENY_PAYLOAD_UNUSABLE", texts.Values{"problem": problem, "event": shown}, variants)
+	return hookio.Head + code + "\n" + texts.Say(root, "DENY_PAYLOAD_UNUSABLE", texts.Values{"problem": problem, "event": shown}, variants)
 }
 
 // DeadlineExceeded は判定が期限に届かなかったときの文。照合が長引くのはコマンドが長いか `>` のような形が多いときで、
@@ -364,7 +359,7 @@ func DeadlineExceeded(root, code string, deadline time.Duration, passed bool) st
 	if passed {
 		what = "passed"
 	}
-	return head + code + "\n" + texts.Say(root, "DENY_DEADLINE_EXCEEDED",
+	return hookio.Head + code + "\n" + texts.Say(root, "DENY_DEADLINE_EXCEEDED",
 		texts.Values{"seconds": pyfmt.FormatG(deadline.Seconds())}, texts.Variants{"what": what})
 }
 
@@ -389,5 +384,5 @@ func Rewrite(root, subject string, form shell.Form, found []string, git string) 
 	}
 	code := rewriteCodes[form]
 	text := texts.Say(root, code, values, texts.Variants{"next": next})
-	return strings.Join([]string{head + code, subjectPrefix + shorten(subject), text}, "\n")
+	return strings.Join([]string{hookio.Head + code, hookio.SubjectPrefix + shorten(subject), text}, "\n")
 }

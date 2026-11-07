@@ -105,9 +105,9 @@ func v4Line(root, top, name string, fields map[string]string, deadline time.Time
 	abort := "やめるなら `" + cd + " integrate --abort " + name + "`"
 	redo := "ユーザに確かめてから `" + cd + " integrate --abort " + name + "` で戻し、" +
 		"`" + cd + " integrate " + name + "` を打ち直してください"
-	if k := fields["k"]; k != "" && k != "-" {
+	if k := fields["k"]; k != "" && k != integrate.UnsetK {
 		parent, okP := git.Text(top, []string{"rev-parse", "--verify", k + "^"}, git.Options{Deadline: deadline})
-		treeOf, okT := git.Text(top, []string{"rev-parse", "--verify", k + "^{tree}"}, git.Options{Deadline: deadline})
+		treeOf, okT := git.TreeOf(top, k, git.Options{Deadline: deadline})
 		if !okP || !okT || parent != fields["head"] || treeOf != fields["c_tree"] {
 			return broken("K の親か木が記録と違います。K を採用しません")
 		}
@@ -165,7 +165,7 @@ func leftovers(root, top string, reported map[string]bool, deadline time.Time) [
 	doneDir := ospath.Join(common, integrate.DoneDir)
 	if entries, err := ospath.DiskListdir(doneDir); err == nil {
 		for _, e := range entries {
-			if integrate.ReadRecord(ospath.Join(doneDir, e))["version"] != tree.DirectVersion {
+			if integrate.ReadRecord(ospath.Join(doneDir, e), integrate.LastKept)["version"] != tree.DirectVersion {
 				continue
 			}
 			var remains []string
@@ -225,7 +225,7 @@ func PendingIntegrate(conf *config.Settings, root string, deadline time.Time) st
 				}
 				// marker が無いものや版 4 でないものは、版を知らない記録として知らせる。
 				reported[name] = true
-				fields := integrate.ReadRecord(ospath.Join(marks, name, markerFile))
+				fields := integrate.ReadRecord(ospath.Join(marks, name, markerFile), integrate.LastKept)
 				if fields["version"] == tree.DirectVersion {
 					lines = append(lines, pendingLine{name, v4Line(root, top, name, fields, deadline)})
 				} else {

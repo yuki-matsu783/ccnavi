@@ -356,5 +356,5 @@ func sprintf(format string, a ...any) string { return fmt.Sprintf(format, a...) 
 
 // line は空白をつぶして 1 行にする（Python の " ".join(str(v).split())）。
 func line(text string) string {
-	return strings.Join(strings.FieldsFunc(text, ospath.IsSpace), " ")
+	return ospath.Squeeze(text)
 }

@@ -1,13 +1,13 @@
 package stop
 
 import (
-	"fmt"
 	"slices"
 	"strconv"
 	"strings"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/git"
+	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/approval"
@@ -189,5 +189,5 @@ func RequestNudge(root string, p *Pending) string {
 		"finish_cmds_q":  strings.Join(cmds, "、"),
 		"user_stop_note": UserStopNote,
 	}, texts.Variants{"what": which, "next": which})
-	return fmt.Sprintf("[ccnavi] %s (parent: %s, phase: %s)\n%s", CodeRequestNudge, p.Parent.ID, n, said)
+	return hookio.Tagged(CodeRequestNudge, "parent: "+p.Parent.ID+", phase: "+n) + "\n" + said
 }

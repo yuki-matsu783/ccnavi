@@ -11,6 +11,7 @@ import (
 	"ccnavi/internal/hook/turngate"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/hookio"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/policy/selfguard"
 	"ccnavi/internal/records/audit"
 	"ccnavi/internal/records/turn"
@@ -74,7 +75,7 @@ func atPrompt(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings,
 		outcomes, told = subagent.Notices(conf.State, in)
 	}
 	manual := manualConfirmNote(stderr, conf, root, in, raw)
-	if text := paragraphs(guarded, mirrored, hint, unchecked, outcomes, manual); text != "" {
+	if text := pyfmt.JoinNonEmpty(paragraphBreak, guarded, mirrored, hint, unchecked, outcomes, manual); text != "" {
 		if err := hookio.WriteContext(stdout, hookio.UserPromptSubmit, text, ""); err != nil {
 			return config.ExitOK, err
 		}
@@ -99,7 +100,7 @@ func manualConfirmNote(stderr io.Writer, conf *config.Settings, root string, in 
 		return ""
 	}
 	reviewSh := config.ScriptCommand(root, config.ReviewWrapper)
-	return fmt.Sprintf("[ccnavi] 親 %s のフェーズ %d は、ユーザが子 %s を手で done/ に動かして共有しています"+
+	return fmt.Sprintf(hookio.Head+"親 %s のフェーズ %d は、ユーザが子 %s を手で done/ に動かして共有しています"+
 		"（レビュー完了確認待ち）。この発言が別の用件なら触れずに進めてよい。"+
 		"確定するなら '%s confirm --phase %d' を実行する。"+
 		"移動の前に付いた未解決の指摘だけが版つきで受け入れられ、移動の後に付いたものがあれば止まる。",

@@ -118,8 +118,8 @@ func ChildBase(childTree, parentTree string, timeout time.Duration, childHead st
 	return found, nil
 }
 
-func zPaths(top string, args []string, timeout time.Duration) (map[string]bool, bool) {
-	o := stateOptions(timeout)
+// zPaths は NUL 区切りでパスを答える git の答え（RawPaths で引用を外す）。読めなければ偽。
+func zPaths(top string, args []string, o Options) (map[string]bool, bool) {
 	o.RawPaths = true
 	done := runGit(top, args, o)
 	if !done.OK() {
@@ -132,6 +132,23 @@ func zPaths(top string, args []string, timeout time.Duration) (map[string]bool, 
 		}
 	}
 	return paths, true
+}
+
+// CommitPaths はそのコミットが親から変えたパス（根のコミットは全部。改名と submodule は Committed と同じ理由で開く）。
+// 読めなければ偽。
+func CommitPaths(top, sha string, o Options) (map[string]bool, bool) {
+	return zPaths(top, []string{"diff-tree", "--no-commit-id", "--root", "-r", "--no-renames",
+		"--ignore-submodules=none", "--name-only", "-z", sha}, o)
+}
+
+// TreeDiffPaths は 2 つのツリー（かコミット）の間で違うパス（改名は切る）。読めなければ偽。
+func TreeDiffPaths(top, left, right string, o Options) (map[string]bool, bool) {
+	return zPaths(top, []string{"diff-tree", "-r", "--no-renames", "--name-only", "-z", left, right}, o)
+}
+
+// TreeOf はその版のツリーの sha。読めなければ偽。
+func TreeOf(top, rev string, o Options) (string, bool) {
+	return Text(top, []string{"rev-parse", "--verify", rev + "^{tree}"}, o)
 }
 
 // TakenFromRemote は base..head のうち、統合先（リモート追跡ブランチ）から取り込んだだけのパス。
@@ -162,9 +179,9 @@ func TakenFromRemote(top, base, head string, timeout time.Duration) map[string]b
 				continue
 			}
 			if brought == nil {
-				brought, _ = zPaths(top, append(append([]string(nil), diffPathsArgs...), first, merge), timeout)
+				brought, _ = zPaths(top, append(append([]string(nil), diffPathsArgs...), first, merge), stateOptions(timeout))
 			}
-			differ, ok := zPaths(top, append(append([]string(nil), diffPathsArgs...), other, head), timeout)
+			differ, ok := zPaths(top, append(append([]string(nil), diffPathsArgs...), other, head), stateOptions(timeout))
 			if brought == nil || !ok {
 				continue
 			}

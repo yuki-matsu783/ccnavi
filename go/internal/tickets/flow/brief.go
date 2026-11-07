@@ -7,10 +7,12 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/digest"
 	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/policy/texts"
+	"ccnavi/internal/tickets/model/place"
 	"ccnavi/internal/tickets/model/ticket"
 )
 
@@ -45,7 +47,7 @@ func Fingerprint(file, treeRoot string) string {
 // `phases/<親>/<子>.flow.json`（承認の子の記録と同じ形。承認は flow より上の段なので形だけを揃える）。
 func digestRecordPath(conf *config.Settings, root string, child *ticket.Ticket) string {
 	approved := conf.ApprovedDir(orDefault(child.TreeRoot, root))
-	return ospath.Join(approved, phasesDir, child.Parent, child.ID+"."+digestRecord+fsio.JSONExt)
+	return ospath.Join(approved, place.PhasesDir, child.Parent, child.ID+"."+digestRecord+fsio.JSONExt)
 }
 
 // RecordDigest は着手のときのフローのハッシュを記録する。(書いた記録のパス, 書けなかった理由)。置き場は
@@ -97,7 +99,7 @@ func ChangedNotice(conf *config.Settings, root string, child *ticket.Ticket) str
 	if before == "" || before == now {
 		return ""
 	}
-	return "[ccnavi] " + codeChanged + ": 着手後にフローが書き換わった。子チケット " +
+	return hookio.Head + codeChanged + ": 着手後にフローが書き換わった。子チケット " +
 		Clean(child.ID) + " のフロー " + Clean(file) + " が、" +
 		"着手のとき（" + describe(before) + "）と" +
 		"違う（いま " + describe(now) + "）。担当のサブエージェントが読んだ手順と、ユーザが渡した" +

@@ -87,7 +87,7 @@ func Line(v any) string {
 			text = textOf(v)
 		}
 	}
-	shown := strings.Join(strings.FieldsFunc(Clean(pyfmt.Head(text, textLimit*8)), ospath.IsSpace), " ")
+	shown := ospath.Squeeze(Clean(pyfmt.Head(text, textLimit*8)))
 	shown = neutral(shown)
 	if utf8.RuneCountInString(shown) > textLimit {
 		shown = pyfmt.Head(shown, textLimit) + "…"

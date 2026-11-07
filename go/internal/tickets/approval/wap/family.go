@@ -124,7 +124,7 @@ func Family(stdout io.Writer, conf *config.Settings, root, id string) int {
 
 // oneLine は Python の ' '.join(value.split())（空白の並びを 1 つの空白にし、前後を落とす）。
 func oneLine(value string) string {
-	return strings.Join(strings.FieldsFunc(value, ospath.IsSpace), " ")
+	return ospath.Squeeze(value)
 }
 
 // branchRefusal は HEAD から読んだ親のブランチ名を使えない理由（使えれば空）。

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/policy/builtin"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/policy/selfguard"
@@ -37,15 +38,13 @@ func clock(t *testing.T, checks int, after time.Duration) func() int {
 	t.Helper()
 	calls := 0
 	start := time.Now()
-	saved := now
-	now = func() time.Time {
+	t.Cleanup(fsio.SetNow(func() time.Time {
 		calls++
 		if calls <= checks {
 			return start
 		}
 		return start.Add(after)
-	}
-	t.Cleanup(func() { now = saved })
+	}))
 	return func() int { return calls }
 }
 

@@ -1,5 +1,8 @@
 package env
 
+// Prefix は ccnavi の変数の名前の頭。sh はワークスペースルートと実行ファイルをこの頭の変数から読む。
+const Prefix = "CCNAVI_"
+
 // Claude Code が hook に渡す変数。
 const (
 	ClaudeProjectDir      = "CLAUDE_PROJECT_DIR"

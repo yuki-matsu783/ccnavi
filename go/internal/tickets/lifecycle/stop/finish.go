@@ -6,6 +6,7 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/git"
+	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/texts"
@@ -135,7 +136,7 @@ func FinishNudge(root string, u *Unfinished) string {
 		"base":           prefix(t.BaseSHA, git.ShortSHA),
 		"user_stop_note": UserStopNote,
 	}, texts.Variants{"what": what})
-	return fmt.Sprintf("[ccnavi] %s (ticket: %s)\n%s", CodeFinishNudge, t.ID, said)
+	return hookio.Tagged(CodeFinishNudge, "ticket: "+t.ID) + "\n" + said
 }
 
 func prefix(s string, n int) string {

@@ -7,10 +7,12 @@ import (
 	"unicode/utf8"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathmatch"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/tree"
+	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/model/place"
 	"ccnavi/internal/tickets/model/ticket"
@@ -20,7 +22,7 @@ const (
 	// CodeLocked はロックで止めたときの理由コード（文面ファイルの識別子も同じ）。
 	CodeLocked = "DENY_TICKET_FLOW_LOCKED"
 	// LockRule はロックで止めたときの記録のルール名。
-	LockRule = "builtin:ticket-flow-lock"
+	LockRule = rules.ReservedIDPrefix + "ticket-flow-lock"
 	// codeChanged は着手のあとにフローが書き換わったと知らせる理由コード。止めない（知らせるだけ）。
 	codeChanged = "NOTICE_TICKET_FLOW_CHANGED"
 
@@ -31,7 +33,6 @@ const (
 	AnyProject = "*"
 
 	// 着手のときに残すハッシュの記録（`phases/<親>/<子>.flow.json`）。形は承認の子の記録と同じ。
-	phasesDir    = "phases"
 	digestRecord = "flow"
 )
 
@@ -280,7 +281,7 @@ func InodeHit(conf *config.Settings, root string, copies []*ticket.Ticket, file 
 		if !child.IsChild() || !child.InProgress() {
 			continue
 		}
-		for _, base := range uniqueNonEmpty(child.TreeRoot, root) {
+		for _, base := range pyfmt.NonEmpty([]string{child.TreeRoot, root}, pyfmt.DropRepeats) {
 			other, err := os.Stat(FlowFile(conf, base, child.ID))
 			if err == nil && os.SameFile(info, other) {
 				return child
@@ -290,21 +291,11 @@ func InodeHit(conf *config.Settings, root string, copies []*ticket.Ticket, file 
 	return nil
 }
 
-func uniqueNonEmpty(items ...string) []string {
-	var out []string
-	for _, s := range items {
-		if s != "" && !contains(out, s) {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
 // LockedMessage はロックで止めたときの文面。
 func LockedMessage(root string, conf *config.Settings, child *ticket.Ticket, file string) string {
 	id := Clean(child.ID)
 	return strings.Join([]string{
-		"[ccnavi] " + CodeLocked + " (source: " + Clean(child.Path) + ")",
+		hookio.Cited(CodeLocked, Clean(child.Path)),
 		"ticket: " + id + " (" + Clean(child.Title) + "), started " + Clean(child.StartedAt),
 		"path: " + Clean(file),
 		texts.Say(root, CodeLocked, texts.Values{

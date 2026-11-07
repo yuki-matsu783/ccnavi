@@ -1,10 +1,11 @@
 package shell
 
 import (
-	"ccnavi/internal/infra/ospath"
-
 	"errors"
 	"strings"
+
+	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pyfmt"
 )
 
 // 目印の文字。シェルなら一致がまたげない場所に置き、ルールの `[^\x00]*` が「同じコマンドの中」だけを
@@ -291,21 +292,11 @@ func readAt(src string, depth int) (Reading, []runnable, []runnable, bool) {
 		}
 	}
 	return Reading{
-		Text:     joinNonEmpty(texts),
-		Bare:     joinNonEmpty(bares),
-		Moved:    joinNonEmpty(moveds),
+		Text:     pyfmt.JoinNonEmpty(Sep, texts...),
+		Bare:     pyfmt.JoinNonEmpty(Sep, bares...),
+		Moved:    pyfmt.JoinNonEmpty(Sep, moveds...),
 		Rewrites: rewrites,
 	}, runnables, full, fullOK
-}
-
-func joinNonEmpty(parts []string) string {
-	kept := parts[:0:0]
-	for _, p := range parts {
-		if p != "" {
-			kept = append(kept, p)
-		}
-	}
-	return strings.Join(kept, Sep)
 }
 
 // fullRunnables は外側のコマンドを全文の形で組み直したリスト。語の数が揃わなければ作らない

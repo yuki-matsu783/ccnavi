@@ -16,9 +16,9 @@
 // 壊れた記録は次のユーザの発言（DropBroken）が消すので、詰まらない。
 //
 // Python からの対応: hook/turngate を移した。Cond・Gate・Stop は同名、BUILTIN・INTEGRATE_GATE・REVIEW_CONFIRM_GATE →
-// Builtin・IntegrateGate・ReviewConfirmGate、check（same_command_only は引数）・note・asks・split_by_attendance・
+// Builtin・integrateGate・reviewConfirmGate、check（same_command_only は引数）・note・asks・split_by_attendance・
 // forget_call・clear・drop_broken・validate・rule_id・message・ask_message → Check・Note・Asks・SplitByAttendance・
 // ForgetCall・Clear・DropBroken・Validate・RuleID・Message・AskMessage、止めた理由の定数 → Reason、CODE・RULE_PREFIX・
 // PREFIX・SUFFIX → Code・RulePrefix・Prefix・Suffix。条件が組めないときの ValueError は ErrBadGate を包んだ error。
-// hits は私的にした。
+// hits と、2 つの組み込みのゲート（integrateGate・reviewConfirmGate。上の段は Builtin だけを読む）は私的にした。
 package turngate

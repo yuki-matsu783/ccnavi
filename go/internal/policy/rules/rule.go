@@ -41,6 +41,9 @@ const (
 	DegradedRuleName = "{rule}"
 )
 
+// Origin はルール集合の出所。判定の文の source に出す名前で、ルールファイルの場所か、組み込みの既定（builtin.Source）。
+type Origin string
+
 // 組み合わせ条件（when）と除く（except）のキー。
 const (
 	ExceptKey = "except"

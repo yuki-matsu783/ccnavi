@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"slices"
 	"strings"
-	"time"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
@@ -29,9 +28,6 @@ const (
 	treeHead    = "tree "
 	typeHead    = "type "
 )
-
-// now は時計（テストが差し替える）。
-var now = time.Now
 
 // markPath は印の置き場。セッションを名前に入れるのは state の置き場がワークスペースに 1 つだけだから（入れないと、
 // 別のセッションの差し戻しを読んで、一度も差し戻していない相手を通す）。who は agent_id、無ければワークツリーの名前
@@ -132,7 +128,7 @@ func Running(state, session string) bool {
 	if !ok {
 		return true
 	}
-	when := fsio.UnixSeconds(now())
+	when := fsio.UnixSeconds(fsio.Now())
 	for _, m := range marks {
 		lines, read := markLines(m.file)
 		if read && len(lines) > 0 && lines[0] != sessionLine(session) {

@@ -8,6 +8,7 @@ import (
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/tree"
+	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/model/place"
 )
 
@@ -17,10 +18,10 @@ const (
 	CodeChildPush    = "DENY_CHILD_PUSH"
 	CodeCorePath     = "DENY_WRAPPER_CORE_PATH"
 	CodeParentTree   = "DENY_SUBAGENT_PARENT_TREE"
-	EnvRuleID        = "builtin:script-env"
-	ChildPushRuleID  = "builtin:child-push"
-	CorePathRuleID   = "builtin:guard-wrapper-paths"
-	ParentTreeRuleID = "builtin:subagent-parent-tree"
+	EnvRuleID        = rules.ReservedIDPrefix + "script-env"
+	ChildPushRuleID  = rules.ReservedIDPrefix + "child-push"
+	CorePathRuleID   = rules.ReservedIDPrefix + "guard-wrapper-paths"
+	ParentTreeRuleID = rules.ReservedIDPrefix + "subagent-parent-tree"
 )
 
 // Role はワークツリーの役。チケットが無ければ空（直接作業のワークツリーなど）。

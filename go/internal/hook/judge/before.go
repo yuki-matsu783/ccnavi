@@ -2,21 +2,21 @@ package judge
 
 import (
 	"io"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"ccnavi/internal/catalog/skills"
-	"ccnavi/internal/hook/ccnavimd"
 	"ccnavi/internal/hook/failsafe"
 	"ccnavi/internal/hook/launch"
 	"ccnavi/internal/hook/reasons"
 	"ccnavi/internal/hook/shellguard"
 	"ccnavi/internal/hook/turngate"
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/hookio"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/infra/tree"
@@ -31,14 +31,13 @@ import (
 	"ccnavi/internal/tickets/approval"
 	"ccnavi/internal/tickets/flow"
 	"ccnavi/internal/tickets/model/guard"
-	"ccnavi/internal/tickets/model/place"
 	"ccnavi/internal/tickets/model/ticket"
 	"ccnavi/internal/tickets/model/useronly"
 	"ccnavi/internal/tickets/phase"
 )
 
-// now は期限と比べる時刻。テストが差し替える。
-var now = time.Now
+// paragraphBreak は応答の文と文の区切り（空行）。
+const paragraphBreak = "\n\n"
 
 // Before は実行前チェック。応答を stdout に書き、何が起きたかを record に書く。応答と記録は同じ結論から作る。
 // deadline は判定の期限で、入口が呼び出しの頭で config.HookDeadline を足した時刻。戻り値は hook の終了コード。
@@ -51,7 +50,7 @@ func Before(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 
 	if slices.Contains(config.AskUserTools, in.ToolName) {
 		if text := j.askContext(); text != "" {
-			return j.refuse(rules.Deny, append(nonEmpty(guardNote), askContextRefusal(record, askSubject(in), text)),
+			return j.refuse(rules.Deny, append(pyfmt.NonEmpty([]string{guardNote}, pyfmt.KeepRepeats), askContextRefusal(record, askSubject(in), text)),
 				refusal{kind: config.General})
 		}
 	}
@@ -94,7 +93,7 @@ func Before(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 		}
 		fallback = reasons.FallenBack(path, root)
 	}
-	notices := nonEmpty(guardNote, fallback)
+	notices := pyfmt.NonEmpty([]string{guardNote, fallback}, pyfmt.KeepRepeats)
 
 	if code, done, err := j.builtinStops(notices, subject, inner, coreFilesOn); done || err != nil {
 		return code, err
@@ -324,7 +323,7 @@ func (j *judgement) turnGate(notices []string, subject string, inner []layer) (i
 			commands = append(commands, l.text)
 		}
 	}
-	waited, asked := turngate.SplitByAttendance(turngate.Builtin, !ccnavimd.Unattended() && in.AgentID == "")
+	waited, asked := turngate.SplitByAttendance(turngate.Builtin, !hookio.Unattended() && in.AgentID == "")
 	stop, err := turngate.Check(waited, commands, conf.State, in.SessionID, false)
 	if err == nil && stop == nil {
 		stop, err = turngate.Check(asked, commands, conf.State, in.SessionID, true)
@@ -372,36 +371,11 @@ func (j *judgement) parentTreeWrite(inner []layer) string {
 	if !isWriteTool(in.ToolName) {
 		return ""
 	}
-	// 書き込み先が `.claude/worktrees/<名前>` の中で、その名前が親のチケットか（sh の検査と同じ広さ）。
-	// 提案・下書き・承認済みの置き場は対象にしない（置き場ごとの保護が別に掛かっている）。
-	name := shellguard.WorktreeName(root, record.Subject)
-	if name == "" {
-		return ""
+	// 書き込み先が親のワークツリーの中か（sh の検査と同じ広さ。シェルの書き込み先と同じ関数で見る）。
+	if name := shellguard.ParentWriteAt(conf, root, record.Subject); name != "" {
+		return shellguard.ParentWriteMessage(root, in.ToolName, name, shellguard.KindWrite)
 	}
-	if role, _ := shellguard.TicketRole(conf, root, name); role != shellguard.RoleParent {
-		return ""
-	}
-	rel := worktreeRelative(tree.WorktreePath(root, name), record.Subject)
-	if place.IsUnscoped(rel, conf.Tickets, conf.Approved) {
-		return ""
-	}
-	return shellguard.ParentWriteMessage(root, in.ToolName, name, shellguard.KindWrite)
-}
-
-// worktreeRelative はワークツリーのルートからの相対（"/" 区切り）。
-func worktreeRelative(base, path string) string {
-	if parts, ok := tree.PartsUnder(base, path); ok {
-		return strings.Join(parts, "/")
-	}
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		abs = path
-	}
-	rel, err := filepath.Rel(base, abs)
-	if err != nil {
-		return filepath.ToSlash(abs)
-	}
-	return filepath.ToSlash(rel)
+	return ""
 }
 
 // viaLayer は、ルールが中で実行されるコマンドでヒットしたときのその層（元の形でヒットしたら空）。
@@ -412,7 +386,7 @@ type viaLayer struct {
 
 // byRules はルールを deny・ask・allow の順に当て、ワークスペースルート直下へのシェルの書き込みとチケットの範囲を合わせて
 // 結論を返す。
-func (j *judgement) byRules(ruleSet *rules.RuleSet, source, subject, bare string, inner []layer, notices []string,
+func (j *judgement) byRules(ruleSet *rules.RuleSet, source rules.Origin, subject, bare string, inner []layer, notices []string,
 	target, dest *tree.Tree, index map[string]*ticket.Ticket, updated *pyjson.Object, deadline time.Time) (int, error) {
 	conf, root, in, record := j.conf, j.root, j.in, j.record
 	tool := in.ToolName
@@ -444,7 +418,7 @@ func (j *judgement) byRules(ruleSet *rules.RuleSet, source, subject, bare string
 			slices.SortStableFunc(layers, func(a, b layer) int { return boolOrder(a.quoted) - boolOrder(b.quoted) })
 		}
 		for _, rule := range *ruleSet.Section(name) {
-			if now().After(deadline) {
+			if fsio.Now().After(deadline) {
 				// 期限切れの結論もツールの種類で決める。通すのは設定を読まずに安全と分かる読み取りだけ。
 				code := config.FailClosed(j.mode, tool, failsafe.IsSafe(in, root))
 				_, err := io.WriteString(j.stderr, reasons.DeadlineExceeded(root, string(audit.ReasonDeadlineExceeded),
@@ -553,7 +527,7 @@ func (j *judgement) byRules(ruleSet *rules.RuleSet, source, subject, bare string
 			verdict, ticketReason, ticketCode = t.decision, t.text, t.code
 			if ticketReason != "" {
 				// 判定を下したのはレイヤーを持たないチケット。狭められたルールの id は後ろに残す。
-				decidedBy := reasons.TicketRule
+				decidedBy := builtin.TicketScopeRuleID
 				switch t.code {
 				case reasons.CodeTicketBlocked:
 					decidedBy = reasons.TicketBlockedRule
@@ -573,14 +547,14 @@ func (j *judgement) byRules(ruleSet *rules.RuleSet, source, subject, bare string
 	if conf.TicketsEnabled() {
 		told = guard.ProposeNotice(j.stderr, conf, root, in, record.Subject)
 	}
-	told = joinNonEmpty(told, skills.Notice(j.stderr, conf, root, in, false))
-	context = joinNonEmpty(told, context)
+	told = pyfmt.JoinNonEmpty(paragraphBreak, told, skills.Notice(j.stderr, conf, root, in, false))
+	context = pyfmt.JoinNonEmpty(paragraphBreak, told, context)
 
 	if verdict == rules.Allow {
 		record.Decision, record.Enforced = audit.Allow, true
 		if len(notices) > 0 || context != "" || updated != nil {
 			// 通した回にも言う。ガードが今なにを見ていないのかを言わないと、誰も知らないまま作業が進む。
-			return config.ExitOK, writePass(j.stdout, strings.Join(append(slices.Clip(notices), nonEmpty(context)...), "\n\n"), updated)
+			return config.ExitOK, writePass(j.stdout, pyfmt.JoinNonEmpty(paragraphBreak, append(slices.Clip(notices), context)...), updated)
 		}
 		return config.ExitOK, nil
 	}
@@ -656,7 +630,7 @@ func (j *judgement) byRules(ruleSet *rules.RuleSet, source, subject, bare string
 		// 1 度だけ渡す文（提案の確認・スキルの目録）は渡す回にも言う。
 		record.Decision, record.Enforced = audit.Handover, false
 		if len(notices) > 0 || told != "" || updated != nil {
-			return config.ExitOK, writePass(j.stdout, strings.Join(append(slices.Clip(notices), nonEmpty(told)...), "\n\n"), updated)
+			return config.ExitOK, writePass(j.stdout, pyfmt.JoinNonEmpty(paragraphBreak, append(slices.Clip(notices), told)...), updated)
 		}
 		return config.ExitOK, nil
 	}
@@ -677,31 +651,6 @@ func skip(stdout io.Writer, note string) (int, error) {
 }
 
 func isWriteTool(tool string) bool { return slices.Contains(config.WriteTools, tool) }
-
-// nonEmpty は空でない文だけを並べる。
-func nonEmpty(texts ...string) []string {
-	var out []string
-	for _, t := range texts {
-		if t != "" {
-			out = append(out, t)
-		}
-	}
-	return out
-}
-
-// joinNonEmpty は空でない文を空行でつなぐ。
-func joinNonEmpty(texts ...string) string { return strings.Join(nonEmpty(texts...), "\n\n") }
-
-// distinct は空でない文字列を、最初に出た順で重なりを除いて並べる。
-func distinct(items []string) []string {
-	var out []string
-	for _, s := range items {
-		if s != "" && !slices.Contains(out, s) {
-			out = append(out, s)
-		}
-	}
-	return out
-}
 
 func boolOrder(b bool) int {
 	if b {

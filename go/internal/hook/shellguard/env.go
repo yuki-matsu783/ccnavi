@@ -1,7 +1,6 @@
 package shellguard
 
 import (
-	"regexp"
 	"slices"
 	"strings"
 
@@ -23,35 +22,27 @@ var gitPassThrough = []string{
 	"GIT_PAGER", "GIT_TERMINAL_PROMPT", "GIT_MERGE_AUTOEDIT",
 }
 
-// 止める変数の頭。sh はワークスペースルートと実行ファイルを `CCNAVI_` の変数から読む。
-const (
-	ccnaviPrefix = "CCNAVI_"
-	gitPrefix    = "GIT_"
-)
+// gitPrefix は止める git の変数の頭（ccnavi の変数の頭は env.Prefix）。
+const gitPrefix = "GIT_"
 
 // alsoBlocked は頭のほかに止める変数。sh のワークスペースルートの探し方に影響する。
 var alsoBlocked = []string{env.ClaudeProjectDir}
 
-// EnvCleared は `env -i`（環境を丸ごと空にする）を名前の並びに書く表記。settings.json の env が書き出した置き場も
+// envCleared は `env -i`（環境を丸ごと空にする）を名前の並びに書く表記。settings.json の env が書き出した置き場も
 // 消え、sh は既定の置き場を見る。
-const EnvCleared = "env -i"
+const envCleared = "env -i"
 
 var envClears = []string{"-i", "--ignore-environment", "-"}
 
 // declares は引数に変数名を取り、その変数を置く・外す・書き出すコマンド。
 var declares = []string{"export", "declare", "typeset", "readonly", "local", "unset"}
 
-var (
-	assignment = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)(\[[^\]]*\])?\+?=`)
-	varName    = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
-)
-
 // Blocked は、同じコマンド行で置くと保護済みの sh を呼ぶ形を止める変数か。
 func Blocked(name string) bool {
 	if slices.Contains(passThrough, name) || slices.Contains(gitPassThrough, name) {
 		return false
 	}
-	return strings.HasPrefix(name, ccnaviPrefix) || strings.HasPrefix(name, gitPrefix) || slices.Contains(alsoBlocked, name)
+	return strings.HasPrefix(name, env.Prefix) || strings.HasPrefix(name, gitPrefix) || slices.Contains(alsoBlocked, name)
 }
 
 // CheckEnv は、保護済みの sh を呼ぶコマンド行に止める変数の代入があれば、sh のパスと変数名（書いた順・重なり無し）。
@@ -75,7 +66,7 @@ func CheckEnv(subject string, degraded bool) (script string, names []string) {
 	}
 	for _, p := range places {
 		for _, n := range setNames(p.Words) {
-			if (n == EnvCleared || Blocked(n)) && !slices.Contains(names, n) {
+			if (n == envCleared || Blocked(n)) && !slices.Contains(names, n) {
 				names = append(names, n)
 			}
 		}
@@ -90,7 +81,7 @@ func setNames(words []string) []string {
 	for depth := 0; len(words) > 0 && depth <= shell.UnwrapDepth; depth++ {
 		k := shell.NameIndex(words)
 		for _, w := range words[:k] {
-			if a := assigned(w); a != "" {
+			if a := shell.AssignedName(w); a != "" {
 				names = append(names, a)
 			}
 		}
@@ -107,9 +98,9 @@ func setNames(words []string) []string {
 				if strings.HasPrefix(arg, "-") || strings.HasPrefix(arg, "+") {
 					continue
 				}
-				if a := assigned(arg); a != "" {
+				if a := shell.AssignedName(arg); a != "" {
 					names = append(names, a)
-				} else if varName.MatchString(arg) {
+				} else if shell.IsIdentifier(arg) {
 					names = append(names, arg)
 				}
 			}
@@ -127,7 +118,7 @@ func setNames(words []string) []string {
 	return names
 }
 
-// envNames は `env` が置く・外す変数（`-u X`・`--unset=X`・`X=…`）。環境を空にする形は EnvCleared。
+// envNames は `env` が置く・外す変数（`-u X`・`--unset=X`・`X=…`）。環境を空にする形は envCleared。
 func envNames(args []string) []string {
 	var names []string
 	for i := 0; i < len(args); i++ {
@@ -143,9 +134,9 @@ func envNames(args []string) []string {
 		case strings.HasPrefix(arg, "-u") && len(arg) > 2:
 			names = append(names, arg[2:])
 		case slices.Contains(envClears, arg) || clearsByBundle(arg):
-			names = append(names, EnvCleared)
-		case assigned(arg) != "":
-			names = append(names, assigned(arg))
+			names = append(names, envCleared)
+		case shell.AssignedName(arg) != "":
+			names = append(names, shell.AssignedName(arg))
 		case !strings.HasPrefix(arg, "-"):
 			return names
 		}
@@ -156,13 +147,6 @@ func envNames(args []string) []string {
 // clearsByBundle はまとめた短いオプションに `i` がある（`-vi`）。
 func clearsByBundle(arg string) bool {
 	return strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg[1:], "i")
-}
-
-func assigned(word string) string {
-	if m := assignment.FindStringSubmatch(word); m != nil {
-		return m[1]
-	}
-	return ""
 }
 
 // EnvMessage は環境変数の代入で止めた文。

@@ -7,6 +7,7 @@ import (
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyre"
+	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/policy/texts"
 )
 
@@ -24,9 +25,9 @@ import (
 // Code と組み込みのルールの id。
 const (
 	CodeTicketApproval   = "DENY_TICKET_APPROVAL_CLI"
-	TicketApprovalRuleID = "builtin:guard-ticket-approval"
+	TicketApprovalRuleID = rules.ReservedIDPrefix + "guard-ticket-approval"
 	CodeRecordsPrune     = "DENY_RECORDS_PRUNE"
-	RecordsPruneRuleID   = "builtin:guard-records-prune"
+	RecordsPruneRuleID   = rules.ReservedIDPrefix + "guard-records-prune"
 	textRecordsPrune     = CodeRecordsPrune
 	textTicketApproval   = "RULE_GUARD_TICKET_APPROVAL"
 	pruneVerb            = "prune"

@@ -18,6 +18,7 @@ import (
 	"ccnavi/internal/policy/selfguard"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/records/audit"
+	"ccnavi/internal/tickets/lifecycle/integrate"
 	"ccnavi/internal/tickets/model/useronly"
 )
 
@@ -42,7 +43,6 @@ const (
 type Watched struct {
 	Tree       tree.Tree
 	Rules      *rules.RuleSet
-	Source     string
 	SideBySide bool
 }
 
@@ -96,7 +96,7 @@ func (c *Checker) readAll(record *audit.Record) []readTree {
 }
 
 func (c *Checker) scanOf(r readTree, withPlaces bool) scan {
-	s := scan{changes: r.changes, rules: r.w.Rules, mine: c.Mine, source: r.w.Source, scope: c.Scope, where: r.w.Tree}
+	s := scan{changes: r.changes, rules: r.w.Rules, mine: c.Mine, scope: c.Scope, where: r.w.Tree}
 	if withPlaces {
 		s.top, s.places, s.root = r.top, c.Places, c.Root
 	}
@@ -482,7 +482,7 @@ func (c *Checker) committedFindings(read []readTree, h heads) ([]*finding, []str
 		// integrate-done が積んだ squash だけが変えたパスは外す（片付けの後なので staged の除外は効かない）。
 		var integrated map[string]bool
 		if len(changes) > 0 {
-			integrated = integratedPaths(r.top, base)
+			integrated = integrate.SquashedPaths(r.top, base)
 		}
 		s := c.scanOf(readTree{r.w, r.top, changes}, false)
 		for _, f := range s.findings() {
@@ -539,7 +539,7 @@ func (c *Checker) AtStop(in hookio.Input, record *audit.Record) string {
 		first := found[0].change
 		subject = "保護対象の " + first.Path + "（" + kindLabel(first.Kind) + "）"
 	}
-	lines := []string{"[ccnavi] " + subject + "が、この" + useronly.TurnDefined + "で変わりました。"}
+	lines := []string{hookio.Head + subject + "が、この" + useronly.TurnDefined + "で変わりました。"}
 	for _, f := range found[:min(len(found), ReportLimit)] {
 		where := ""
 		if f.treeName != "" {

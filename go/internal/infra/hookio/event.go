@@ -18,6 +18,16 @@ const (
 	SubagentStop Event = "SubagentStop"
 )
 
+// StartSource は SessionStart の source（なぜセッションが始まったか）。
+type StartSource string
+
+const (
+	StartStartup StartSource = "startup"
+	StartResume  StartSource = "resume"
+	StartClear   StartSource = "clear"
+	StartCompact StartSource = "compact"
+)
+
 // Decision は 1 回の呼び出しに対する判定。緩い順に ask・allow・deny。
 type Decision string
 

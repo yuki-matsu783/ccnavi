@@ -16,9 +16,9 @@ import (
 // 親に言う文。
 const (
 	keyAgentID     = "agentId"
-	ignoredBounce  = "[ccnavi] " + post.CodeTicketScope + ": サブエージェント %s は範囲外の変更を差し戻されたまま終わっています。合流する前に、その子のワークツリーの範囲外の変更を確かめてください。"
-	uncheckedError = "[ccnavi] %s: サブエージェント %s の終わりにccnavi が内部エラーで止まり、子チケットの範囲外の変更を確かめていません。合流する前に、その子のワークツリーを確かめてください。"
-	uncheckedRead  = "[ccnavi] %s: サブエージェント %s の終わりに子チケット %s のワークツリーを読めず、範囲外の変更を確かめていません。合流する前に、そのワークツリーを確かめてください。"
+	ignoredBounce  = hookio.Head + post.CodeOutOfScope + ": サブエージェント %s は範囲外の変更を差し戻されたまま終わっています。合流する前に、その子のワークツリーの範囲外の変更を確かめてください。"
+	uncheckedError = hookio.Head + "%s: サブエージェント %s の終わりにccnavi が内部エラーで止まり、子チケットの範囲外の変更を確かめていません。合流する前に、その子のワークツリーを確かめてください。"
+	uncheckedRead  = hookio.Head + "%s: サブエージェント %s の終わりに子チケット %s のワークツリーを読めず、範囲外の変更を確かめていません。合流する前に、そのワークツリーを確かめてください。"
 )
 
 // launchedAgent は Agent（Task）の PostToolUse なら起動したサブエージェントの agentId。違えば空。

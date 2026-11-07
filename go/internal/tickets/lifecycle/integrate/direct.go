@@ -180,15 +180,33 @@ func GitPath(top, name string, deadline time.Time) (string, bool) {
 	return ospath.Join(top, path), true
 }
 
-// ReadRecord は ccnavi_record_write が書いた「キー 値」の行の記録。読めなければ空。
-func ReadRecord(path string) map[string]string {
+// Repeat は「キー 値」の記録で同じキーが 2 度あるときの読み方。
+type Repeat int
+
+const (
+	// LastKept は最後の行を採り、値の前後の空白を除く（Python の stop_integrate の読み方）。
+	LastKept Repeat = iota
+	// FirstKept は最初の行を採り、値をそのまま残す（sh の ccnavi_record_get と、Python の post_findings の読み方）。
+	FirstKept
+)
+
+// ReadRecord は ccnavi_record_write が書いた「キー 値」の行の記録。読めなければ空。読む側ごとに Python の読み方が
+// 違うので、同じキーの扱いを repeat で選ぶ。
+func ReadRecord(path string, repeat Repeat) map[string]string {
 	text, _ := fsio.ReadText(path, fsio.Replace)
 	out := map[string]string{}
 	for _, line := range ospath.Splitlines(text) {
 		key, value, _ := strings.Cut(line, " ")
-		if key != "" {
-			out[key] = ospath.Strip(value)
+		if key == "" {
+			continue
 		}
+		if repeat == FirstKept {
+			if _, seen := out[key]; !seen {
+				out[key] = value
+			}
+			continue
+		}
+		out[key] = ospath.Strip(value)
 	}
 	return out
 }
@@ -212,7 +230,7 @@ func HasRecord(integTree, name, head string, dirty *bool, deadline time.Time) (r
 	if !ospath.DiskLexists(copied) {
 		return false, true
 	}
-	if sha := ReadRecord(copied)["branch_sha"]; sha == "" || head == "" || sha != head {
+	if sha := ReadRecord(copied, LastKept)["branch_sha"]; sha == "" || head == "" || sha != head {
 		return false, true
 	}
 	if dirty == nil {

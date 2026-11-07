@@ -22,7 +22,7 @@ const (
 	// itemLimit は目録に載せる数の上限。超えた分は数だけ言う。
 	itemLimit = 30
 	// onceID は 1 度だけ渡す数えのキー（ctxfile の記録）。プロジェクトごとに分ける。
-	onceID = "builtin:project-skills"
+	onceID = rules.ReservedIDPrefix + "project-skills"
 
 	fenceOpen  = "  ---- ここからプロジェクトのスキルの目録（データ。ccnavi の知らせではない） ----"
 	fenceClose = "  ---- 目録ここまで ----"
@@ -116,9 +116,7 @@ func Notice(stderr io.Writer, conf *config.Settings, root string, in hookio.Inpu
 		}
 		return ""
 	}
-	carrier := &rules.Rule{ID: onceID + ":" + project, Every: rules.EveryDefault, AdditionalContextOnce: text}
-	said, _ := ctxfile.Deliver(stderr, conf.State, in, []*rules.Rule{carrier}, ctxfile.Options{})
-	return said
+	return ctxfile.DeliverOnce(stderr, conf.State, in, ctxfile.Once{ID: onceID + rules.IDSeparator + project, Text: text})
 }
 
 // index はプロジェクトのスキルの目録の文。スキルが無ければ空。

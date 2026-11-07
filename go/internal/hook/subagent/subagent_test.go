@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/records/audit"
 	"ccnavi/internal/records/prune"
@@ -26,9 +27,7 @@ func TestFlatRemovesEveryLineBreakOfSplitlines(t *testing.T) {
 
 func clock(t *testing.T, at time.Time) {
 	t.Helper()
-	before := now
-	now = func() time.Time { return at }
-	t.Cleanup(func() { now = before })
+	t.Cleanup(fsio.SetNow(func() time.Time { return at }))
 }
 
 func TestRunningCountsOnlyFreshMarksOfThisSession(t *testing.T) {

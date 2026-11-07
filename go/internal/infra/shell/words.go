@@ -160,17 +160,34 @@ func IsRunner(name string) bool {
 	return ok
 }
 
-// assignmentWord はコマンド名の前に置ける代入。配列の要素と足し込みも代入。
-var assignmentWord = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?\+?=`)
+// identifierForm は sh の名前（変数・関数）の形。
+const identifierForm = `[A-Za-z_][A-Za-z0-9_]*`
+
+// assignmentWord はコマンド名の前に置ける代入。配列の要素と足し込みも代入。名前は 1 つ目の組。
+var assignmentWord = regexp.MustCompile(`^(` + identifierForm + `)(\[[^\]]*\])?\+?=`)
+
+// identifier は sh の名前だけの語。
+var identifier = regexp.MustCompile(`^` + identifierForm + `$`)
 
 // runnerAssignment は env と sudo が代入と読む引数。`=` を含めば名前の表記を問わない（シェルより広い）。
 var runnerAssignment = regexp.MustCompile(`^[^=-][^=]*=`)
 
 // namedFD は bash 4.1 以降の名前付き fd（`{fd}>/dev/null`）。
-var namedFD = regexp.MustCompile(`^\{[A-Za-z_][A-Za-z0-9_]*\}$`)
+var namedFD = regexp.MustCompile(`^\{` + identifierForm + `\}$`)
 
 // IsAssignment はコマンドの前に置ける代入の語（`FOO=1`・`a[1]=x`・`x+=1`）か。
 func IsAssignment(word string) bool { return assignmentWord.MatchString(word) }
+
+// AssignedName は代入の語の名前（`a[1]+=x` なら `a`）。代入でなければ空。
+func AssignedName(word string) string {
+	if m := assignmentWord.FindStringSubmatch(word); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+// IsIdentifier は sh の変数・関数の名前に使える形（`[A-Za-z_][A-Za-z0-9_]*`）か。
+func IsIdentifier(word string) bool { return identifier.MatchString(word) }
 
 // classify は、文字列をコードとして実行するコマンドがあれば ReasonTakenAsCode を返す。
 func classify(commands [][]string) Reason {
@@ -349,6 +366,9 @@ func RunnerCommand(name string, args []string) []string {
 func RunnerOptionWidth(name, token string, following []string) int {
 	return optionWidth(token, following, runners[name].valueOptions)
 }
+
+// RunnerTakesValue は実行役のオプション（`-u`・`--unset` の形）が値を取るか。
+func RunnerTakesValue(name, option string) bool { return runners[name].valueOptions[option] }
 
 // optionWidth はオプション 1 つが占める語の数。値を別の語に取るなら 2。`--unset=HOME` と `-o0` は
 // 値が同じ語に入る。まとめ書き（`-Eu me`）は値を取る文字が最後に来たときだけ次の語を値に取る。

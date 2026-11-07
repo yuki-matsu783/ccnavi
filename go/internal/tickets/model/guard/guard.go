@@ -187,26 +187,21 @@ func ProposeNotice(stderr io.Writer, conf *config.Settings, root string, in hook
 	if err != nil || !here.Search(subject) {
 		return ""
 	}
-	said, _ := ctxfile.Deliver(stderr, conf.State, in, []*rules.Rule{proposeRule(conf.Tickets)}, ctxfile.Options{})
-	return said
+	return ctxfile.DeliverOnce(stderr, conf.State, in, ctxfile.Once{ID: ProposeRuleID, Text: proposeText(conf.Tickets)})
 }
 
-// proposeRule は文と数えのキーになる id を持つ入れ物。表には入れない。
-func proposeRule(ticketsRel string) *rules.Rule {
-	return &rules.Rule{
-		ID:    ProposeRuleID,
-		Every: rules.EveryDefault,
-		AdditionalContextOnce: "チケットの提案を書こうとしています（" + ticketsRel + "/todo/ は承認待ちの置き場で、" +
-			"ここに書いただけでは判定の対象になりません）。" +
-			"ユーザに承認を依頼する前に、" +
-			"'sh .ccnavi/scripts/ccnavi-ticket.sh approval-request <親の識別子> --check' で" +
-			"承認できる状態かを確かめてください。承認済みチケットは置きません。" +
-			"終了コードが答えです。0 なら前提は通っています" +
-			"（approval-request（--check なし）で送ります）。" +
-			"1 なら理由が出ます（承認の対象に入らない、親のワークツリーに未コミットの変更がある、" +
-			"ホストや git のリモートが使えない、など。何も送っていません）。" +
-			"直してから打ち直してください。" +
-			"**識別子には、いま書いたものを渡してください。** " +
-			"省くと識別子が無いと言われて止まります。",
-	}
+// proposeText は提案を書いた回の確認の文。
+func proposeText(ticketsRel string) string {
+	return "チケットの提案を書こうとしています（" + ticketsRel + "/todo/ は承認待ちの置き場で、" +
+		"ここに書いただけでは判定の対象になりません）。" +
+		"ユーザに承認を依頼する前に、" +
+		"'sh .ccnavi/scripts/ccnavi-ticket.sh approval-request <親の識別子> --check' で" +
+		"承認できる状態かを確かめてください。承認済みチケットは置きません。" +
+		"終了コードが答えです。0 なら前提は通っています" +
+		"（approval-request（--check なし）で送ります）。" +
+		"1 なら理由が出ます（承認の対象に入らない、親のワークツリーに未コミットの変更がある、" +
+		"ホストや git のリモートが使えない、など。何も送っていません）。" +
+		"直してから打ち直してください。" +
+		"**識別子には、いま書いたものを渡してください。** " +
+		"省くと識別子が無いと言われて止まります。"
 }

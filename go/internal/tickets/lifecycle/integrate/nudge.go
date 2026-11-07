@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/texts"
 )
@@ -32,7 +33,7 @@ func left(d *Direct) string {
 // IntegrateNudge は Stop を止めて渡す文。状態ごとの文は文面ファイルが持ち（NUDGE_INTEGRATE__*）、ここは
 // どの状態かを決めて条件つきの補足（NOTE_INTEGRATE_*）を足す。
 func IntegrateNudge(root string, d *Direct) string {
-	head := "[ccnavi] " + CodeIntegrateNudge + " (worktree: " + d.Name + ")"
+	head := hookio.Tagged(CodeIntegrateNudge, "worktree: "+d.Name)
 	values := texts.Values{"name": d.Name, "integ_tree": d.IntegTree}
 	// 版を知らない記録は、操作させず、ユーザに片付けを頼んで終える。
 	if d.Marker == MarkerUnknown {
@@ -73,7 +74,7 @@ func BlockedNotice(d *Direct) string {
 	case d.Marker != MarkerNone:
 		where = "取り込みの途中ですが"
 	default:
-		return "[ccnavi] 直接作業 " + d.Name + " は、今は取り込めません。" + d.Blocked
+		return hookio.Head + "直接作業 " + d.Name + " は、今は取り込めません。" + d.Blocked
 	}
-	return "[ccnavi] 直接作業 " + d.Name + " は " + where + "、今は取り込みを促せません。" + d.Blocked
+	return hookio.Head + "直接作業 " + d.Name + " は " + where + "、今は取り込みを促せません。" + d.Blocked
 }

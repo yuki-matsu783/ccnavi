@@ -3,7 +3,6 @@ package events
 import (
 	"io"
 	"slices"
-	"strings"
 	"time"
 
 	"ccnavi/internal/hook/judge"
@@ -18,6 +17,9 @@ import (
 	"ccnavi/internal/records/turn"
 	"ccnavi/internal/tickets/lifecycle/branch"
 )
+
+// paragraphBreak は応答の文と文の区切り（空行）。
+const paragraphBreak = "\n\n"
 
 // Decide はイベントごとの処理に振り分け、hook の終了コードを返す。error は、下の部品が想定外に失敗したとき、または
 // 応答を書けなかったときに返る（入口が内部エラーの応答にする）。deadline は判定の期限（起動時刻 + config.HookDeadline）。
@@ -120,17 +122,3 @@ func trackProposals(conf *config.Settings, in hookio.Input) {
 		}
 	}
 }
-
-// joined は空でない文を sep でつなぐ。
-func joined(sep string, parts ...string) string {
-	var kept []string
-	for _, p := range parts {
-		if p != "" {
-			kept = append(kept, p)
-		}
-	}
-	return strings.Join(kept, sep)
-}
-
-// paragraphs は空でない文を空行でつなぐ（応答の文の区切り）。
-func paragraphs(parts ...string) string { return joined("\n\n", parts...) }

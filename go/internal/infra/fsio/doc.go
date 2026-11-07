@@ -20,5 +20,6 @@
 // 無いエラーは空）、exc.errno == errno.EXDEV → CrossDevice、json.dumps(...) を書く形（indent・ensure_ascii・末尾の改行・改行・書き方）→ WriteJSONAs と
 // JSONFormat、read_line(stdin).strip().lower() → ReadAnswer（y・yes なら → ReadYes）、getattr(os, "O_NOFOLLOW", 0)・
 // O_NONBLOCK → NoFollow・NonBlock（その 2 つで開いて fstat → OpenNoFollow）、名前・識別子に入れる時刻の
-// "%Y%m%d%H%M%S"・"%Y%m%d-%H%M%S" → IDStampLayout・NameStampLayout、時差を除いた StampLayout → LocalStampLayout。
+// "%Y%m%d%H%M%S"・"%Y%m%d-%H%M%S" → IDStampLayout・NameStampLayout、時差を除いた StampLayout → LocalStampLayout、
+// ファイルの中身の hashlib の要約（少しずつ読む）→ DiskDigest、hook の時刻の差し込み口 → Now・SetNow。
 package fsio

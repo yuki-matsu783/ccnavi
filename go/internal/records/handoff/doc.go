@@ -9,6 +9,7 @@
 // 置き場は `<state>/idle/<セッション>.json` と `<セッション>.notice`。待つのは sh（ccnavi-idle.sh）の sleep で、
 // ここは判定と状態だけを持つ。ネットワークには出ない。
 //
-// Python からの対応: records.idlehandoff。threshold・unattended・usage_of・start・check・reset・notice・prune →
-// Threshold・Unattended・UsageOf・Start・Check・Reset・Notice・Prune。秒の値は time.Duration にした。
+// Python からの対応: records.idlehandoff。threshold・usage_of・start・check・reset・notice・prune →
+// Threshold・UsageOf・Start・Check・Reset・Notice・Prune。unattended は infra/hookio の Headless（hook の判定の
+// Unattended より広く SDK の入口も含む。Python も 2 つを分けている）。秒の値は time.Duration にした。
 package handoff

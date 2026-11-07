@@ -92,5 +92,5 @@ func strs(v any, out []string) []string {
 
 // line は空白をつぶして 1 行にする（Python の " ".join(str(v).split())）。
 func line(v any) string {
-	return strings.Join(strings.FieldsFunc(pyfmt.Str(v), ospath.IsSpace), " ")
+	return ospath.Squeeze(pyfmt.Str(v))
 }

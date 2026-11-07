@@ -11,6 +11,7 @@ import (
 	"ccnavi/internal/hook/subagent"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/hookio"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/policy/ctxfile"
 	"ccnavi/internal/policy/ruleload"
 	"ccnavi/internal/policy/rules"
@@ -30,7 +31,7 @@ const (
 	// codeSubagentNudge は終わったサブエージェントの結果で止めた回の理由コード（文面ファイルの識別子も同じ）。
 	codeSubagentNudge = "NUDGE_SUBAGENT_OUTCOME"
 	// subagentNudgeHead は終わったサブエージェントの結果の促しの頭の行。
-	subagentNudgeHead = "[ccnavi] SUBAGENT_OUTCOME"
+	subagentNudgeHead = hookio.Head + "SUBAGENT_OUTCOME"
 )
 
 // atStop は Stop。このターンで変わった保護領域を、ユーザへ systemMessage で 1 度だけ報告する（dry-run でも。見えたことを
@@ -50,7 +51,7 @@ func atStop(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 	}
 	report := c.AtStop(in, record)
 	// 拒否の文面はモデルにしか届かないので、言い換えで回っているかもしれないことをユーザにも 1 度言う。
-	report = paragraphs(report, tally.DenyReport(conf.State, in.SessionID, tally.DenyThreshold(conf.DenyRepeat)))
+	report = pyfmt.JoinNonEmpty(paragraphBreak, report, tally.DenyReport(conf.State, in.SessionID, tally.DenyThreshold(conf.DenyRepeat)))
 	// AI 判定の差し戻しの次の Stop は、既存の促しを stop_hook_active が偽のときと同じに 1 回だけ動かす
 	// （差し戻しのせいで既存の促しが黙らないように）。
 	cont := aiContinuation(conf, in)
@@ -72,7 +73,7 @@ func atStop(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 		// 前提を満たせず促せない回は、止めずに理由だけを報告へ足す。
 		var notice string
 		nudge, notice = integrateNudge(stderr, conf, root, asked, record, deadline)
-		report = paragraphs(report, notice)
+		report = pyfmt.JoinNonEmpty(paragraphBreak, report, notice)
 	}
 	if nudge == "" {
 		// 上で止める回はルールの促しを数えない（数えを進めて届かない回を作らない）。
@@ -225,7 +226,7 @@ func stopRulesNudge(stderr io.Writer, conf *config.Settings, root string, in hoo
 	record.Enforced = true
 	record.Rules = delivered
 	preface := texts.Say(root, codeRuleNudge, nil, nil)
-	return codeRuleNudge + ": " + preface + "\n\n" + strings.Join(parts, "\n\n")
+	return codeRuleNudge + ": " + preface + paragraphBreak + strings.Join(parts, paragraphBreak)
 }
 
 // overReport は、促しで止める回の記録から同じ Stop の報告を detail へ移す。1 回の Stop の記録は 1 行で、decision と
@@ -236,7 +237,7 @@ func overReport(record *audit.Record) {
 		return
 	}
 	note := strings.TrimRightFunc("report "+record.Code+" "+strings.Join(record.Rules, ","), unicode.IsSpace)
-	record.Detail = joined("; ", record.Detail, note)
+	record.Detail = pyfmt.JoinNonEmpty("; ", record.Detail, note)
 	record.Rules = nil
 }
 

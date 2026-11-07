@@ -334,6 +334,11 @@ func IsSpace(r rune) bool {
 	return unicode.IsSpace(r) || (r >= 0x1c && r <= 0x1f)
 }
 
+// Squeeze は " ".join(s.split())。空白の並び（改行を含む）を 1 つの空白にし、前後の空白を除く。
+func Squeeze(s string) string {
+	return strings.Join(strings.FieldsFunc(s, IsSpace), " ")
+}
+
 // Strip は引数なしの str.strip()。
 func Strip(s string) string {
 	return strings.TrimFunc(s, IsSpace)

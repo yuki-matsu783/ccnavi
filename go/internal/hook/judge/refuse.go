@@ -7,7 +7,6 @@ import (
 
 	"ccnavi/internal/catalog/docs"
 	"ccnavi/internal/hook/askcontext"
-	"ccnavi/internal/hook/ccnavimd"
 	"ccnavi/internal/hook/reasons"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/hookio"
@@ -26,7 +25,7 @@ import (
 )
 
 // dryRunHoldsNote は dry-run でも効く止め（ゲートと補助）の拒否文に添える 1 行。
-const dryRunHoldsNote = "[ccnavi] CCNAVI_MODE is dry-run, but this stop still applies: ticket gates and the " +
+const dryRunHoldsNote = hookio.Head + "CCNAVI_MODE is dry-run, but this stop still applies: ticket gates and the " +
 	"protections that keep them from being bypassed are enforced in every mode except disable."
 
 // shellGuardRuleIDs はシェルから書き込む形を止める組み込みの保護。生の文字列では `>` の個数に対して 2 乗で遅くなるので、
@@ -87,7 +86,7 @@ func (j *judgement) refuse(verdict rules.Decision, parts []string, o refusal) (i
 		}
 	}
 	// 空行で区切るのは、1 件ずつが閉じた文であることを見た目でも保つため。
-	reason := strings.Join(parts, "\n\n")
+	reason := strings.Join(parts, paragraphBreak)
 	decision := audit.Ask
 	if verdict == rules.Deny {
 		decision = audit.Deny
@@ -98,7 +97,7 @@ func (j *judgement) refuse(verdict rules.Decision, parts []string, o refusal) (i
 	}
 	holds := config.HoldsInDryRun(o.kind)
 	if j.mode == config.DryRun && holds {
-		reason += "\n\n" + dryRunHoldsNote
+		reason += paragraphBreak + dryRunHoldsNote
 	}
 	if j.mode == config.DryRun && !holds {
 		record.Decision, record.Enforced = decision, false
@@ -106,12 +105,12 @@ func (j *judgement) refuse(verdict rules.Decision, parts []string, o refusal) (i
 		if verdict == rules.Deny {
 			would = "stopped"
 		}
-		text := "[ccnavi dry-run] " + string(config.Enable) + " would have " + would + " this call:\n" + reason
+		text := config.DryRunWould(would+" this call:\n") + reason
 		if streak != "" {
-			text += "\n\n" + streak
+			text += paragraphBreak + streak
 		}
 		if o.context != "" {
-			text += "\n\n" + o.context
+			text += paragraphBreak + o.context
 		}
 		return config.ExitOK, writePass(j.stdout, text, o.updated)
 	}
@@ -119,10 +118,10 @@ func (j *judgement) refuse(verdict rules.Decision, parts []string, o refusal) (i
 	record.Decision, record.Enforced = decision, true
 	if verdict == rules.Deny {
 		if n := tally.CountDeny(j.conf.State, record); n >= tally.DenyThreshold(j.conf.DenyRepeat) {
-			reason += "\n\n" + tally.DenyNote(tally.RuleOf(record), n)
+			reason += paragraphBreak + tally.DenyNote(tally.RuleOf(record), n)
 		}
 		if streak != "" {
-			reason += "\n\n" + streak
+			reason += paragraphBreak + streak
 		}
 	}
 	answer := hookio.Ask
@@ -227,7 +226,7 @@ func GuardSettingFiles(mode config.Mode, conf *config.Settings, root string, in 
 // askContextCheck は確認の前の発言を調べる関数。非対話のセッション（答える人がいない）とサブエージェントの呼び出し
 // （会話記録の置き場が別）は調べない。
 func askContextCheck(root string, in hookio.Input) func() string {
-	if ccnavimd.Unattended() || in.AgentID != "" {
+	if hookio.Unattended() || in.AgentID != "" {
 		return func() string { return "" }
 	}
 	return func() string { return askcontext.StopText(root, in.TranscriptPath, in.ToolUseID) }

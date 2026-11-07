@@ -1,7 +1,6 @@
 package shellguard
 
 import (
-	"regexp"
 	"strings"
 
 	"ccnavi/internal/infra/config"
@@ -18,9 +17,6 @@ var scriptName = pyre.MustCompile(`ccnavi-[A-Za-z0-9-]+\.sh`, pyre.IgnoreCase)
 
 // gitScript はラッパーの名前を比べる形（小文字）。
 var gitScript = pyfmt.Lower(config.GitWrapper)
-
-// funcName は関数の定義の頭（`f() { …; }`）の名前。
-var funcName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // chdirShort は実行役のうち、後ろのコマンドを別のディレクトリで走らせる短いオプションの字（長い形はどちらも `--chdir`）。
 var chdirShort = map[string]rune{"env": 'C', "sudo": 'D'}
@@ -111,7 +107,7 @@ func stripHeads(words []string) []string {
 			i++
 			continue
 		}
-		if i+1 < len(words) && words[i+1] == "()" && funcName.MatchString(word) {
+		if i+1 < len(words) && words[i+1] == "()" && shell.IsIdentifier(word) {
 			i += 2
 			continue
 		}
@@ -180,19 +176,13 @@ func runnerChdirs(name string, args []string) []string {
 				}
 				break
 			}
-			if takesValue(name, letter) {
+			if shell.RunnerTakesValue(name, "-"+string(letter)) {
 				break
 			}
 		}
 		i += shell.RunnerOptionWidth(name, arg, args[i+1:])
 	}
 	return found
-}
-
-// takesValue は実行役の短いオプションの字が値を取るか。infra/shell は表を公開しないので、続きの語があるときの
-// 幅（値を取れば 2）で確かめる。
-func takesValue(name string, letter rune) bool {
-	return shell.RunnerOptionWidth(name, "-"+string(letter), []string{""}) == 2
 }
 
 // GitCall は `ccnavi-git.sh <sub>` の呼び出し 1 つ。Args はサブコマンドの後ろの引数、Place は走る場所

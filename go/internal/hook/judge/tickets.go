@@ -9,6 +9,7 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/hookio"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/policy/texts"
@@ -61,8 +62,8 @@ func projectMismatch(root string, t tree.Tree, full string, index map[string]*ti
 		return ""
 	}
 	return strings.Join([]string{
-		"[ccnavi] " + reasons.CodeTicketProject + " (source: " + tk.Path + ")",
-		"subject: " + full,
+		hookio.Cited(reasons.CodeTicketProject, tk.Path),
+		hookio.SubjectPrefix + full,
 		texts.Say(root, reasons.CodeTicketProject, texts.Values{
 			"ticket":   tk.ID,
 			"title":    tk.Title,
@@ -93,7 +94,7 @@ func flowLock(conf *config.Settings, root string, in hookio.Input, full string, 
 	}
 	spelled := fsio.SpelledPath(value, in.Cwd)
 	parent := fsio.ParentResolved(spelled)
-	for _, path := range distinct([]string{full, spelled, parent}) {
+	for _, path := range pyfmt.NonEmpty([]string{full, spelled, parent}, pyfmt.DropRepeats) {
 		at, ok := flow.Locate(conf, root, path)
 		if !ok {
 			continue
@@ -147,8 +148,8 @@ func ticketVerdict(conf *config.Settings, root, tool, full string, t *tree.Tree,
 	}
 	head := func(code, problem string) []string {
 		lines := []string{
-			"[ccnavi] " + code + " (source: " + tk.Path + ")",
-			"subject: " + full,
+			hookio.Cited(code, tk.Path),
+			hookio.SubjectPrefix + full,
 			"ticket: " + tk.ID + " (" + tk.Title + "), worktree " + t.Name,
 		}
 		if problem != "" {
@@ -187,7 +188,7 @@ func ticketVerdict(conf *config.Settings, root, tool, full string, t *tree.Tree,
 	}
 
 	lines := []string{
-		"subject: " + full,
+		hookio.SubjectPrefix + full,
 		"ticket: " + tk.ID + " (" + tk.Title + "), worktree " + t.Name,
 		"scope: " + scopeOf(tk),
 	}
@@ -216,7 +217,7 @@ func ticketVerdict(conf *config.Settings, root, tool, full string, t *tree.Tree,
 		}
 	}
 	if found.Decision == rules.Ask {
-		lines = append([]string{"[ccnavi] " + reasons.CodeTicketAsk + " (source: " + tk.Path + ")"}, lines...)
+		lines = append([]string{hookio.Cited(reasons.CodeTicketAsk, tk.Path)}, lines...)
 		lines = append(lines, "This path is one the ticket marks `ask`: the user looks at each write here. "+
 			"Say what you are changing and why.")
 		return ticketOutcome{decision: rules.Ask, text: strings.Join(lines, "\n")}
@@ -234,7 +235,7 @@ func ticketVerdict(conf *config.Settings, root, tool, full string, t *tree.Tree,
 	body := texts.Say(root, reasons.CodeTicketScope,
 		texts.Values{"ticket": tk.ID, "title": tk.Title, "worktree": t.Name, "path": full, "limit": limit},
 		texts.Variants{"what": which, "why": which, "next": which})
-	lines = append([]string{"[ccnavi] " + reasons.CodeTicketScope + " (source: " + tk.Path + ")"}, lines...)
+	lines = append([]string{hookio.Cited(reasons.CodeTicketScope, tk.Path)}, lines...)
 	return ticketOutcome{decision: rules.Deny, text: strings.Join(append(lines, body), "\n")}
 }
 

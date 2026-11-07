@@ -43,6 +43,9 @@ const (
 	// FrontmatterHintTimeout は frontmatter の無い md の案内が、その md が無視されているかを聞く期限。
 	// 過ぎたら案内しない。
 	FrontmatterHintTimeout = 2 * time.Second
+	// CommitHintTimeout はコミットの後の案内（直接作業のコミットか）が git を読む時間の合計。PostToolUse を長く
+	// 待たせない。
+	CommitHintTimeout = 2 * time.Second
 )
 
 // ShortSHA は文に出す短い sha の桁数。

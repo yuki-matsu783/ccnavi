@@ -352,7 +352,7 @@ func pyBool(b bool) string {
 // RenderMaterial は agent hook に渡す文字列。本文と会話は区切ったデータとして渡し、指示として読ませない。
 // bodies は提案の対象キーごとの本文（取れなければ空）。
 func RenderMaterial(plan Plan, material Material, criteria string, bodies map[string]string) string {
-	targets := strings.Join(strings.FieldsFunc(strings.Join(plan.Targets, ", "), ospath.IsSpace), " ")
+	targets := ospath.Squeeze(strings.Join(plan.Targets, ", "))
 	out := []string{
 		"STOP_REVIEW_MATERIAL",
 		"attempt_id: " + plan.AttemptID,

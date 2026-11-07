@@ -59,7 +59,7 @@ func readCommon(stderr io.Writer, conf *config.Settings, record *audit.Record, r
 // LoadRules は共通レイヤーのルール集合（土台の deny つき）と、その出所を返す。既定に戻ったときは、既定が同じ
 // deny を持つので土台は足さない。出所は既定を使っているなら builtin.Source にする。読めなかったファイルを出所として
 // 出すと、見に行ったユーザが適用されたルールを見つけられないためである。
-func LoadRules(stderr io.Writer, conf *config.Settings, record *audit.Record, root string) (*rules.RuleSet, string) {
+func LoadRules(stderr io.Writer, conf *config.Settings, record *audit.Record, root string) (*rules.RuleSet, rules.Origin) {
 	rs := readCommon(stderr, conf, record, root)
 	if record.Fallback != builtin.Fallback {
 		addBase(rs, stderr, root)
@@ -67,7 +67,7 @@ func LoadRules(stderr io.Writer, conf *config.Settings, record *audit.Record, ro
 	if record.Fallback != "" {
 		return rs, builtin.Source
 	}
-	return rs, conf.Rules
+	return rs, rules.Origin(conf.Rules)
 }
 
 // addBase は土台の deny を、共通レイヤーのルールの後ろ・レイヤーより前に足す。
@@ -158,7 +158,7 @@ func LayerFor(conf *config.Settings, root string, target *tree.Tree) []Layer {
 // ワークスペースルートの外は、行き先を nil にする。パスを持つツールは、共通レイヤーに行き先のレイヤーを足す。
 // 持たないツールは全部のレイヤーの和を使う。どのプロジェクトのものかは特定しない。和なら deny と ask は増える側になる。
 // record.Subject は解決済みの行き先のパス。
-func RulesFor(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, record *audit.Record) (*rules.RuleSet, string, *tree.Tree) {
+func RulesFor(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, record *audit.Record) (*rules.RuleSet, rules.Origin, *tree.Tree) {
 	byPath := isPathTool(in.ToolName)
 	var target *tree.Tree
 	if byPath {

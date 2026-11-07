@@ -9,6 +9,7 @@ import (
 	"slices"
 	"unicode/utf8"
 
+	"ccnavi/internal/infra/digest"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
@@ -244,4 +245,19 @@ func OpenNoFollow(path string) (*os.File, fs.FileInfo, error) {
 		return nil, nil, err
 	}
 	return f, info, nil
+}
+
+// DiskDigest はディスクの中身の要約（16 進）。溜める段は見ず、少しずつ読む（大きなビルドの出力でも中身を全部は
+// 持たない）。消えているか読めなければ偽。
+func DiskDigest(path string, a digest.Algo) (string, bool) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", false
+	}
+	defer f.Close()
+	sum, err := digest.HexOf(a, f)
+	if err != nil {
+		return "", false
+	}
+	return sum, true
 }

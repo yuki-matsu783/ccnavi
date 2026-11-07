@@ -1,11 +1,11 @@
 package stop
 
 import (
-	"fmt"
 	"strings"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/git"
+	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/approval"
@@ -126,5 +126,5 @@ func FeedbackNudge(root string, w *Waiting) string {
 		"todo":           w.Todo,
 		"user_stop_note": UserStopNote,
 	}, texts.Variants{"next": next})
-	return fmt.Sprintf("[ccnavi] %s (parent: %s)\n%s", CodeFeedbackNudge, w.Parent.ID, said)
+	return hookio.Tagged(CodeFeedbackNudge, "parent: "+w.Parent.ID) + "\n" + said
 }

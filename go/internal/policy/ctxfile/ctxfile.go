@@ -107,6 +107,25 @@ type Options struct {
 	CountsPath string
 }
 
+// Once はルールファイルの外の組み込みの案内 1 件。ID は数えのキー（rules.ReservedIDPrefix で始める）。
+type Once struct {
+	ID, Text string
+}
+
+// DeliverOnce は組み込みの案内を、ルールの additionalContextOnce と同じ数え（既定の every で、渡す回の最初の 1 回だけ）で
+// 渡す。案内を持つ側がルールの入れ物を組み直さずに済むよう、ここで組む。
+func DeliverOnce(stderr io.Writer, stateDir string, in hookio.Input, notes ...Once) string {
+	if len(notes) == 0 {
+		return ""
+	}
+	carriers := make([]*rules.Rule, len(notes))
+	for i, n := range notes {
+		carriers[i] = &rules.Rule{ID: n.ID, Every: rules.EveryDefault, AdditionalContextOnce: n.Text}
+	}
+	said, _ := Deliver(stderr, stateDir, in, carriers, Options{})
+	return said
+}
+
 // Deliver は、当たったルールがモデルへ渡す案内（1 件ごとに空行で区切る）と、この呼び出しで once の案内を
 // 渡したかを返す。渡すのは「渡す回」で、every: N は当たった回数が N の倍数になった回を指す。additionalContext は渡す回の
 // たびに、additionalContextOnce は渡す回の最初の 1 回に渡す。数えはルール 1 件につき 1 回（文とファイルで分けない）。

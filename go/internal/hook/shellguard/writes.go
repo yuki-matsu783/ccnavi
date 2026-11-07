@@ -341,7 +341,7 @@ func codeOf(args []string) (string, bool) {
 
 // short は文に出す短い形（空白をつめて 60 字まで）。
 func short(text string) string {
-	text = strings.Join(strings.FieldsFunc(text, ospath.IsSpace), " ")
+	text = ospath.Squeeze(text)
 	if len([]rune(text)) <= shortLimit {
 		return text
 	}

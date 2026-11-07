@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
@@ -313,7 +314,7 @@ func Notices(stateDir, session string) (string, []*Outcome) {
 	for _, o := range all(stateDir, session) {
 		if o.Kind == Unattributed && !o.Notified {
 			todo = append(todo, o)
-			said = append(said, "[ccnavi] "+noticeCode+": "+line(o))
+			said = append(said, hookio.Head+noticeCode+": "+line(o))
 		}
 	}
 	return strings.Join(said, "\n\n"), todo

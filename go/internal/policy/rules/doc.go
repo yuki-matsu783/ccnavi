@@ -17,5 +17,5 @@
 // has_relative_scripts → HasRelativeScripts、readable_every → ReadableEvery、SECTIONS → Sections、
 // DENY・ASK・ALLOW → Deny・Ask・Allow（Decision）、SEVERITY_* → Error・Warn・Info（Severity）、
 // message_id・message_values・message_variants → Rule.Text（TextRef）、subjects.subject_of → SubjectOf、
-// SUBJECT_FIELDS → SubjectFields。
+// SUBJECT_FIELDS → SubjectFields。ルール集合の出所（判定の文の source）→ Origin。
 package rules

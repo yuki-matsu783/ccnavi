@@ -43,7 +43,7 @@ func oneLine(s string) string {
 	if !strings.ContainsAny(s, "\n\r") {
 		return s
 	}
-	return strings.Join(strings.FieldsFunc(s, ospath.IsSpace), " ")
+	return ospath.Squeeze(s)
 }
 
 func countLine(shown, matched, total int) string {

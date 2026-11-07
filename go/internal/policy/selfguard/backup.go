@@ -551,15 +551,7 @@ func statTimes(path string) (time.Time, int64, error) {
 
 // fileDigest は中身の sha256。読めなければ空。
 func fileDigest(path string) string {
-	f, err := os.Open(path)
-	if err != nil {
-		return ""
-	}
-	defer f.Close()
-	sum, err := digest.HexOf(digest.SHA256, f)
-	if err != nil {
-		return ""
-	}
+	sum, _ := fsio.DiskDigest(path, digest.SHA256)
 	return sum
 }
 

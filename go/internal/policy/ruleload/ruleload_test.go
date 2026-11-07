@@ -248,7 +248,7 @@ func goResult(t *testing.T, root string) result {
 		record := &audit.Record{Subject: written}
 		var said bytes.Buffer
 		rs, source, target := RulesFor(&said, conf, root, hookio.Input{ToolName: c[0]}, record)
-		cr := callResult{Rules: idsOf(rs), Source: mark(source), Fallback: record.Fallback, Detail: mark(record.Detail), Said: mark(said.String())}
+		cr := callResult{Rules: idsOf(rs), Source: mark(string(source)), Fallback: record.Fallback, Detail: mark(record.Detail), Said: mark(said.String())}
 		if target != nil {
 			cr.Target = []string{target.Name, target.Project}
 		}

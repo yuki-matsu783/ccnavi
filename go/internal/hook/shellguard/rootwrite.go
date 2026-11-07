@@ -13,7 +13,7 @@ const (
 	// CodeRoot はシェルからワークスペースルート直下へ書き込む形を止めた理由コード。
 	CodeRoot = "DENY_SHELL_WORKSPACE_ROOT"
 	// RootRuleID は文面の見出しに出す名前。記録のルール名は、適用したルール（RootWrite.Rule）の名前。
-	RootRuleID = "builtin:guard-root-shell-write"
+	RootRuleID = rules.ReservedIDPrefix + "guard-root-shell-write"
 	// rootSourceRuleID は適用するルールの id（ルールファイルの Write / Edit の決まり）。
 	rootSourceRuleID = "workspace-root"
 )

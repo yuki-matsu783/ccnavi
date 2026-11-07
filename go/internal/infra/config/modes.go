@@ -85,6 +85,13 @@ const (
 	Aux HoldKind = "aux"
 )
 
+// dryRunHead は dry-run の報告の頭。
+const dryRunHead = "[ccnavi dry-run] "
+
+// DryRunWould は、dry-run で enable なら何をしていたかを言う頭の句（`[ccnavi dry-run] enable would have <what>`）。
+// 実行前（止めた・聞いた）と実行後（差し戻した）の報告が同じ形で言う。
+func DryRunWould(what string) string { return dryRunHead + string(Enable) + " would have " + what }
+
 // HoldsInDryRun は dry-run でも止める分類か。
 func HoldsInDryRun(kind HoldKind) bool { return kind == Gate || kind == Aux }
 

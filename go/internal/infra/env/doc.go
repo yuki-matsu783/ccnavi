@@ -7,5 +7,5 @@
 //
 // Python からの対応: review_host.GITHUB_TOKEN・GITLAB_TOKEN → GitHubToken・GitLabToken、shutil.which が読む PATH →
 // Path、os.path.expanduser が読む HOME・USERPROFILE・HOMEDRIVE・HOMEPATH・USERNAME → Home・UserProfile・HomeDrive・
-// HomePath・UserName。
+// HomePath・UserName。ccnavi の変数の頭 `CCNAVI_` → Prefix。
 package env

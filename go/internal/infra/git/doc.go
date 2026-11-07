@@ -11,5 +11,6 @@
 // gitstate.top_level → TopLevel、head → Head（期限は Options）。各モジュールの git の期限（TIMEOUT_SECONDS など）は
 // 目的ごとの DefaultTimeout・StateTimeout・RiskTimeout・ReviewTimeout・MergeTimeout・CleanupTimeout、文に出す sha の
 // 12 桁は ShortSHA。上の段が書いていた `merge-base --is-ancestor` → IsAncestor（NotAncestorCode）、
-// `status --porcelain` とそのフラグ → Status と Porcelain、`rev-list --count` の数の読み → Count。
+// `status --porcelain` とそのフラグ → Status と Porcelain、`rev-list --count` の数の読み → Count、コミットが変えたパス（diff-tree --root）→ CommitPaths、
+// 2 つのツリーの差のパス → TreeDiffPaths、`rev-parse --verify <版>^{tree}` → TreeOf。
 package git

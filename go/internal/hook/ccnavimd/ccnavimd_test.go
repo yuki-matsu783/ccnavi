@@ -9,6 +9,7 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/tickets/testkit"
 )
 
@@ -111,7 +112,7 @@ func TestProblems(t *testing.T) {
 		t.Errorf("NameProblems: %q", names)
 	}
 	for name := range conditions {
-		if !namePattern.MatchString(name) {
+		if !shell.IsIdentifier(name) {
 			t.Errorf("組み込みの名前 %s が使えない形", name)
 		}
 	}
@@ -125,24 +126,6 @@ func TestRepositoryCCNAVIMDHasNoProblems(t *testing.T) {
 	}
 	if got := Problems(string(data), nil); len(got) != 0 {
 		t.Errorf("%q", got)
-	}
-}
-
-func TestUnattended(t *testing.T) {
-	for _, c := range []struct {
-		value string
-		set   bool
-		want  bool
-	}{{"0", true, true}, {"1", true, false}, {"", true, false}, {"true", true, false}, {"0 ", true, false}, {"", false, false}} {
-		if c.set {
-			t.Setenv(env.ClaudeSessionAttended, c.value)
-		} else {
-			t.Setenv(env.ClaudeSessionAttended, "")
-			os.Unsetenv(env.ClaudeSessionAttended)
-		}
-		if got := Unattended(); got != c.want {
-			t.Errorf("%q (set=%v): %v", c.value, c.set, got)
-		}
 	}
 }
 

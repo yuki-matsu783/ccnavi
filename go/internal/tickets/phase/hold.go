@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/model/useronly"
 )
@@ -57,7 +58,7 @@ func HoldReason(p *Phase, tool, root string) string {
 		}, texts.Variants{"why": why})
 	}
 	lines := []string{
-		"[ccnavi] " + CodeReview + " (parent: " + p.Parent + ", phase: " + number + ", " + p.ReviewLabel() + ")",
+		hookio.Tagged(CodeReview, "parent: "+p.Parent+", phase: "+number+", "+p.ReviewLabel()),
 		said,
 		ParallelRequestNote,
 	}

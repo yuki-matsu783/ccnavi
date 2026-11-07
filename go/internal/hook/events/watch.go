@@ -81,11 +81,7 @@ func watchedFor(stderr io.Writer, conf *config.Settings, root string, record *au
 		}
 	}
 	coreOn := conf.GuardCoreFiles != string(config.Disable)
-	type loadedRules struct {
-		rules  *rules.RuleSet
-		source string
-	}
-	loaded := map[string]loadedRules{}
+	loaded := map[string]*rules.RuleSet{}
 	var out []post.Watched
 	for _, t := range trees {
 		got, ok := loaded[t.Project]
@@ -110,10 +106,10 @@ func watchedFor(stderr io.Writer, conf *config.Settings, root string, record *au
 				}
 				rs.Deny = append(rs.Deny, rule)
 			}
-			got = loadedRules{rs, source}
+			got = rs
 			loaded[t.Project] = got
 		}
-		out = append(out, post.Watched{Tree: t, Rules: got.rules, Source: got.source, SideBySide: sbsKeys[pathcase.Fold(t.Root)]})
+		out = append(out, post.Watched{Tree: t, Rules: got, SideBySide: sbsKeys[pathcase.Fold(t.Root)]})
 	}
 	return out, nil
 }

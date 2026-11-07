@@ -11,5 +11,6 @@
 // fsio.slashed → Slashed、str.strip()・str.rstrip() → Strip・Rstrip、os.path.splitext → Splitext、os.path.islink → IsLink、sorted(os.listdir) → DiskListdir、
 // os.path.getmtime・getsize（os.stat）→ Stat、
 // os.stat(...).st_nlink → HardLinks、os.lstat(...).st_ino・st_ctime_ns → Identity、ドライブの頭（`C:`）の判定 → HasDrive、
-// str.splitlines(keepends=True) → SplitlinesKeep、`try: os.path.relpath(p, start) except ValueError: p` → RelOr。
+// str.splitlines(keepends=True) → SplitlinesKeep、`try: os.path.relpath(p, start) except ValueError: p` → RelOr、
+// " ".join(s.split()) → Squeeze。
 package ospath

@@ -8,7 +8,9 @@ import (
 
 	"ccnavi/internal/hook/childnote"
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/hookio"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/flow"
 	"ccnavi/internal/tickets/model/place"
@@ -24,12 +26,12 @@ const (
 	codeChildUnavailable = "DENY_AGENT_CHILD_UNAVAILABLE"
 	codeCwdConflict      = "DENY_AGENT_CWD_CONFLICT"
 
-	ruleIsolation        = "builtin:agent-isolation"
-	ruleNoChild          = "builtin:agent-no-child"
-	ruleMultiTarget      = "builtin:agent-multi-target"
-	ruleParentTree       = "builtin:agent-parent-tree"
-	ruleChildUnavailable = "builtin:agent-child-unavailable"
-	ruleCwdConflict      = "builtin:agent-cwd-conflict"
+	ruleIsolation        = rules.ReservedIDPrefix + "agent-isolation"
+	ruleNoChild          = rules.ReservedIDPrefix + "agent-no-child"
+	ruleMultiTarget      = rules.ReservedIDPrefix + "agent-multi-target"
+	ruleParentTree       = rules.ReservedIDPrefix + "agent-parent-tree"
+	ruleChildUnavailable = rules.ReservedIDPrefix + "agent-child-unavailable"
+	ruleCwdConflict      = rules.ReservedIDPrefix + "agent-cwd-conflict"
 )
 
 // listedChildren は止める理由に名前を並べる子の数。
@@ -117,8 +119,8 @@ func noChildStop(root string, parent *ticket.Ticket, working []*ticket.Ticket) *
 
 // 担当の案内の囲みと長さの上限（文字）。
 const (
-	guideOpen  = "[ccnavi] 担当の案内（ここから）"
-	guideClose = "[ccnavi] 担当の案内（ここまで）"
+	guideOpen  = hookio.Head + "担当の案内（ここから）"
+	guideClose = hookio.Head + "担当の案内（ここまで）"
 	guideLimit = 4000
 )
 

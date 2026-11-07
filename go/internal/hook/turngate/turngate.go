@@ -24,7 +24,7 @@ import (
 const (
 	// Code は拒否コード。宣言ごとには分けない。どの宣言で止めたかは記録の rules（RuleID）と文面が言う。
 	Code       = "DENY_NEEDS_USER_TURN"
-	RulePrefix = "builtin:turn-gate:"
+	RulePrefix = rules.ReservedIDPrefix + "turn-gate:"
 	// Prefix と Suffix は記録のファイル名の頭と尻。records/prune は Prefix で始まる名前をセッションの記録と読む。
 	Prefix = "turngate-"
 	Suffix = fsio.JSONExt
@@ -113,10 +113,10 @@ func RuleID(g *Gate) string { return RulePrefix + g.ID }
 // defaultKeyName は KeyName を書かない宣言の仮の値。
 const defaultKeyName = "<キー>"
 
-// IntegrateGate は、差分をユーザに見せて返事を待つ手順書の約束を機械にする。キーは `<名前>`。`integrate-done` は
+// integrateGate は、差分をユーザに見せて返事を待つ手順書の約束を機械にする。キーは `<名前>`。`integrate-done` は
 // `-m <メッセージ>` を名前の前後どちらにも置けるので、メッセージの引数を読み飛ばしてから名前を取る。`--abort` は
 // 先頭が `-` なので名前として取れず、A にならない。
-var IntegrateGate = &Gate{
+var integrateGate = &Gate{
 	ID:    "integrate-user-turn",
 	First: Cond{Regex: `ccnavi-git\.sh\s+integrate\s+(?P<key>[^-\s\x00\x01][^\s\x00\x01]*)`},
 	Second: Cond{Regex: `ccnavi-git\.sh\s+integrate-done\s+` +
@@ -133,11 +133,11 @@ var IntegrateGate = &Gate{
 // reviewCheck は `--check`（打つだけで何も変えない確認）。A にも B にもならない。
 const reviewCheck = `(?:^|\s)--check(?:\s|$)`
 
-// ReviewConfirmGate は、レビューを頼んだ（`review-request`）直後に同じターンで確定（`confirm`）して、ユーザのレビューを
+// reviewConfirmGate は、レビューを頼んだ（`review-request`）直後に同じターンで確定（`confirm`）して、ユーザのレビューを
 // 飛ばせないようにする。`confirm` は依頼済みの未解決スレッドの有無しか見ないので、人が何も見ていなくても通る。付き添いの
 // あるセッションでも確認には出さず、「レビューを終えた」というユーザの発言を待つ。キーは付けない（`--phase` の書き方を
 // 読まずに済み、どのフェーズの依頼のあとでも発言を待つ。待つ間は別の依頼を受けない決まりなので困らない）。
-var ReviewConfirmGate = &Gate{
+var reviewConfirmGate = &Gate{
 	ID:         "review-confirm-user-turn",
 	First:      Cond{Regex: `ccnavi-review\.sh\s+review-request(?:\s|$)`, But: []string{reviewCheck}},
 	Second:     Cond{Regex: `ccnavi-review\.sh\s+confirm(?:\s|$)`, But: []string{reviewCheck}},
@@ -148,7 +148,7 @@ var ReviewConfirmGate = &Gate{
 }
 
 // Builtin は組み込みの宣言の表。
-var Builtin = []*Gate{IntegrateGate, ReviewConfirmGate}
+var Builtin = []*Gate{integrateGate, reviewConfirmGate}
 
 type compiledCond struct {
 	pattern *pyre.Regexp

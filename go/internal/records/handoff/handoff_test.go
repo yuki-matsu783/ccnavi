@@ -91,23 +91,6 @@ func TestWaitFor(t *testing.T) {
 	}
 }
 
-func TestUnattended(t *testing.T) {
-	cases := []struct {
-		env  map[string]string
-		want bool
-	}{
-		{map[string]string{env.ClaudeSessionAttended: "0"}, true},
-		{map[string]string{env.ClaudeCodeEntrypoint: "sdk-cli"}, true},
-		{map[string]string{env.ClaudeCodeEntrypoint: "cli"}, false},
-		{map[string]string{}, false},
-	}
-	for _, c := range cases {
-		if got := Unattended(func(k string) string { return c.env[k] }); got != c.want {
-			t.Errorf("Unattended(%v) = %v", c.env, got)
-		}
-	}
-}
-
 var bigUsage = &Usage{Tokens: 500_000, TTL: ttlLong}
 
 func usage(tokens int) *Usage { return &Usage{Tokens: tokens, TTL: ttlLong} }

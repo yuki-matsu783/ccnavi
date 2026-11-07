@@ -18,6 +18,9 @@ const (
 	// 適用する先（パスとコマンド文字列）が違うので id を分ける。読むだけなら止めない。
 	GitDirRuleID      = rules.ReservedIDPrefix + "guard-git-dir"
 	GitDirShellRuleID = rules.ReservedIDPrefix + "guard-git-dir-via-bash"
+	// TicketScopeRuleID は承認されたチケットの範囲の外の書き込みの出所。実行前（Write・Edit を止める）と実行後
+	// （範囲外の変更を報告する）の 2 つの検査が同じ名前を出すので、両方より下のここに置く。
+	TicketScopeRuleID = rules.ReservedIDPrefix + "ticket-scope"
 
 	recursiveDeleteRuleID = rules.ReservedIDPrefix + "recursive-delete"
 	gitPushRuleID         = rules.ReservedIDPrefix + "git-push"
@@ -31,7 +34,7 @@ const (
 	Fallback = rules.ReservedIDPrefix + "rules"
 	// Source は既定を使っているときの出所。読めなかったファイルの名前を出すと、見に行ったユーザが
 	// 適用されたルールを見つけられないため、既定の名前を出す。
-	Source = "(ccnavi built-in defaults)"
+	Source rules.Origin = "(ccnavi built-in defaults)"
 )
 
 // 文面ファイルの識別子と、ラッパーの有無で分かれる欄。

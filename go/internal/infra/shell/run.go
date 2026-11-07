@@ -19,6 +19,8 @@ const (
 	ScriptTimeout = 30 * time.Second
 	// SyntaxTimeout は sh -n で文法を確かめる時間。
 	SyntaxTimeout = 10 * time.Second
+	// ConditionTimeout は作業の決まり（CCNAVI.md）の sh の条件 1 つに待つ時間。過ぎたら判定できないとして真。
+	ConditionTimeout = 2 * time.Second
 )
 
 // killedPipeWait は期限で殺した後、出力の管が閉じるのを待つ長さ。孫のプロセスが管を握っていても戻る。

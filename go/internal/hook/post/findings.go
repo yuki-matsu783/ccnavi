@@ -11,6 +11,7 @@ import (
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/tree"
+	"ccnavi/internal/policy/builtin"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/approval/wap"
 	"ccnavi/internal/tickets/model/archive"
@@ -23,16 +24,14 @@ import (
 const (
 	// codeViolation はルールが守ると宣言した場所の変更。
 	codeViolation = "POST_VIOLATION"
-	// CodeTicketScope は承認されたチケットの範囲の外の変更。実行前チェックは Write・Edit の引数しか見ないので、
-	// シェル・ビルド・スクリプトが書いたものはここでしか見つからない。
-	CodeTicketScope = "POST_TICKET_SCOPE"
-	// ticketScopeRule は範囲外を報告する出所の名前。ルールファイルには無い（組み込みの名前の形）。
-	ticketScopeRule = "builtin:ticket-scope"
-	emptyArea       = "(empty)"
+	// CodeOutOfScope は承認されたチケットの範囲の外の変更（実行前に止める reasons.CodeTicketScope とは別の値）。
+	// 実行前チェックは Write・Edit の引数しか見ないので、シェル・ビルド・スクリプトが書いたものはここでしか見つからない。
+	CodeOutOfScope = "POST_TICKET_SCOPE"
+	emptyArea      = "(empty)"
 )
 
 // codeOrder は記録の code に載せる強さの順。ルールの宣言はチケットの範囲より強い（ルールの deny はチケットが緩めない）。
-var codeOrder = []string{codeViolation, CodeTicketScope}
+var codeOrder = []string{codeViolation, CodeOutOfScope}
 
 // recordCode は見つけた件のうち、記録の code に載せる 1 つ。件が無ければ空。
 func recordCode(found []*finding) string {
@@ -88,18 +87,18 @@ func areaOf(t *ticket.Ticket) string {
 
 // finding は full が範囲の外なら、報告する文の出所（組み込みの名前のルール）とその承認済みチケットの場所を返す。
 // チケットと下書きの置き場は外でも報告しない（次のチケットを提案できなくすると、承認した範囲から出られなくなる）。
-func (g *ScopeGuard) finding(full string) (*rules.Rule, string, bool) {
+func (g *ScopeGuard) finding(full string) (*rules.Rule, bool) {
 	t, ok := tree.TreeOf(g.Root, full, g.Projects)
 	if !ok || t.IsMain() {
-		return nil, "", false
+		return nil, false
 	}
 	tk, ok := tree.Lookup(g.Copies, t.Name)
 	if !ok {
-		return nil, "", false
+		return nil, false
 	}
 	rel := tree.Relative(t, full)
 	if g.Places.holds(rel) || place.IsHandoffPlace(rel) {
-		return nil, "", false
+		return nil, false
 	}
 	var parent *ticket.Ticket
 	if tk.IsChild() {
@@ -108,7 +107,7 @@ func (g *ScopeGuard) finding(full string) (*rules.Rule, string, bool) {
 	// 定義は親に固定したコピーから引く。phases.yml は開かない。
 	found := scope.Of(tk, parent, scope.TypeFor(tk, parent), rel)
 	if !found.Outside() {
-		return nil, "", false
+		return nil, false
 	}
 	// 文は報告のときに文面ファイルから引く。外に出た理由ごとに識別子を分ける。
 	values := map[string]string{"ticket": tk.ID, "worktree": t.Name}
@@ -133,17 +132,14 @@ func (g *ScopeGuard) finding(full string) (*rules.Rule, string, bool) {
 		id = "RULE_TICKET_SCOPE__PLAIN"
 		values["area"] = areaOf(tk)
 	}
-	rule := &rules.Rule{ID: ticketScopeRule, Root: g.Root, Text: rules.TextRef{ID: id, Values: values}}
-	// 出所はその承認済みチケット自身の場所（ツリーごとに在るので 1 か所にまとめられない）。
-	return rule, tk.Path, true
+	rule := &rules.Rule{ID: builtin.TicketScopeRuleID, Root: g.Root, Text: rules.TextRef{ID: id, Values: values}}
+	return rule, true
 }
 
-// finding は報告する 1 件。何が変わったかと、それを報告しているのが誰か（ルールファイルか承認済みチケットか）。
-// 出所を一緒に持たないと、範囲外の報告までルールファイルを指し、そこに無いルールを探させる。
+// finding は報告する 1 件。何が変わったかと、それを報告しているルール（報告の文は記録名で出所を名指しする）。
 type finding struct {
 	change git.Change
 	group  []*rules.Rule
-	source string
 	code   string
 	// どのツリーで見つけたか。記録のキーと報告に使う。
 	treeName string
@@ -167,7 +163,6 @@ type scan struct {
 	changes []git.Change
 	rules   *rules.RuleSet
 	mine    []string
-	source  string
 	scope   *ScopeGuard
 	where   tree.Tree
 	top     string
@@ -203,14 +198,14 @@ func (s scan) findings() []*finding {
 			}
 		}
 		if len(group) > 0 {
-			found = append(found, &finding{change, group, s.source, codeViolation, s.where.Name, s.where.Root})
+			found = append(found, &finding{change, group, codeViolation, s.where.Name, s.where.Root})
 			continue
 		}
 		if s.scope == nil {
 			continue
 		}
-		if rule, at, ok := s.scope.finding(change.Full); ok {
-			found = append(found, &finding{change, []*rules.Rule{rule}, at, CodeTicketScope, s.where.Name, s.where.Root})
+		if rule, ok := s.scope.finding(change.Full); ok {
+			found = append(found, &finding{change, []*rules.Rule{rule}, CodeOutOfScope, s.where.Name, s.where.Root})
 		}
 	}
 	return found

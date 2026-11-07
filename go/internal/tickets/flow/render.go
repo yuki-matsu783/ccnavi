@@ -6,6 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/yaml"
 )
 
@@ -42,7 +43,7 @@ func summary(node *yaml.Map, flows map[string]*yaml.Map) string {
 		if t := Line(data.Get("builtInType")); t != "" {
 			parts = append(parts, "種類: "+t)
 		}
-		return joinNonEmpty(parts, " / ")
+		return pyfmt.JoinNonEmpty(" / ", parts...)
 	case ask:
 		options := strings.Join(labels(data.Get("options"), "label"), " | ")
 		multi := ""
@@ -96,16 +97,6 @@ func summary(node *yaml.Map, flows map[string]*yaml.Map) string {
 		return Line(data.Get("label"))
 	}
 	return ""
-}
-
-func joinNonEmpty(parts []string, sep string) string {
-	var kept []string
-	for _, p := range parts {
-		if p != "" {
-			kept = append(kept, p)
-		}
-	}
-	return strings.Join(kept, sep)
 }
 
 // portLess は出口の並べ順。branch-<番号> は番号の順で前、それ以外は文字列の順で後ろ。

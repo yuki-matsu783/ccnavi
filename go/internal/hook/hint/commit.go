@@ -25,10 +25,8 @@ import (
 
 const (
 	// commitOnceID は数えのキー（ctxfile の記録）の頭。ワークツリーの名前ごとに分ける。
-	commitOnceID = "builtin:direct-commit-review"
+	commitOnceID = rules.ReservedIDPrefix + "direct-commit-review"
 	commitText   = "NOTICE_DIRECT_COMMIT"
-	// commitBudget は判定に使う時間。PostToolUse を長く待たせない。
-	commitBudget = 2 * time.Second
 	// recentCommit は直前の commit と見なす古さ。コミット前の検査が長引く分を見込む。
 	recentCommit = 10 * time.Minute
 	commitSub    = "commit"
@@ -55,7 +53,7 @@ func CommitNotice(stderr io.Writer, conf *config.Settings, root string, in hooki
 	if !isCommit && !slices.Contains(config.AgentTools, in.ToolName) {
 		return ""
 	}
-	deadline := time.Now().Add(commitBudget)
+	deadline := time.Now().Add(git.CommitHintTimeout)
 	var found []string
 	if isCommit {
 		for _, call := range shellguard.GitCalls(in.Cwd, command, shell.Read(command).Degraded, commitSub) {
@@ -78,7 +76,7 @@ func CommitNotice(stderr io.Writer, conf *config.Settings, root string, in hooki
 
 // carry は名前ごとに 1 回だけ文脈として文面を返す。大文字小文字だけが違う名前は 1 つに数える。
 func carry(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, found []string) string {
-	var carriers []*rules.Rule
+	var notes []ctxfile.Once
 	seen := map[string]bool{}
 	for _, name := range found {
 		key := pathcase.Fold(name)
@@ -86,17 +84,12 @@ func carry(stderr io.Writer, conf *config.Settings, root string, in hookio.Input
 			continue
 		}
 		seen[key] = true
-		carriers = append(carriers, &rules.Rule{
-			ID:                    commitOnceID + rules.IDSeparator + key,
-			Every:                 rules.EveryDefault,
-			AdditionalContextOnce: texts.Say(root, commitText, texts.Values{"name": name}, nil),
+		notes = append(notes, ctxfile.Once{
+			ID:   commitOnceID + rules.IDSeparator + key,
+			Text: texts.Say(root, commitText, texts.Values{"name": name}, nil),
 		})
 	}
-	if len(carriers) == 0 {
-		return ""
-	}
-	text, _ := ctxfile.Deliver(stderr, conf.State, in, carriers, ctxfile.Options{})
-	return text
+	return ctxfile.DeliverOnce(stderr, conf.State, in, notes...)
 }
 
 // directName は here が、いま直前にコミットが積まれた直接作業のワークツリーなら、その名前。違えば空。

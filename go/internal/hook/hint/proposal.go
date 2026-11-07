@@ -1,6 +1,7 @@
 package hint
 
 import (
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/tree"
+	"ccnavi/internal/tickets/model/fields"
 	"ccnavi/internal/tickets/model/ids"
 	"ccnavi/internal/tickets/model/ticket"
 )
@@ -21,14 +23,14 @@ const (
 )
 
 // parentFields は親の提案が持つ欄。`project:` は置き場が決めるので数えない。
-var parentFields = []string{"issue", "mr", "plan", "phases"}
+var parentFields = []string{"issue", fields.MRKey, "plan", ticket.PhasesKey}
 
 // createdType は Write の tool_response の type のうち、新しく作ったもの。同じ提案を直すたびには出さない。
 const createdType = "create"
 
 // misplacedWorktree はワークツリーが想定外の位置（`projects/<名前>/.claude/worktrees/<識別子>/`）にあるときの、
 // プロジェクトのツリーの中での頭。その形でも案内を出す。
-var misplacedWorktree = regexp.MustCompile(`^\.claude/worktrees/[^/]+/`)
+var misplacedWorktree = regexp.MustCompile(`^` + regexp.QuoteMeta(filepath.ToSlash(tree.WorktreesDir)) + `/[^/]+/`)
 
 // ProposalHint は、親の提案（ツリーの提案の置き場の `todo/` の直下の md）を Write で新しく作ったときの書式の誤りの
 // 案内。出さないときは空。
@@ -81,7 +83,7 @@ func ProposalHint(conf *config.Settings, root string, in hookio.Input) string {
 			// 子の形。親の欄は求めない。別の親を指す誤りは読み込み（ticket）のエラー文が言う。
 			return ""
 		}
-		return "[ccnavi] " + codeParentKey + " (" + rel + ") 識別子 " + name + " は子の形ではないのに `parent:` が" +
+		return hookio.Tagged(codeParentKey, rel) + " 識別子 " + name + " は子の形ではないのに `parent:` が" +
 			"あります。親の提案なら `parent:` と `phase:` の行を消してください（子だけの欄）。雛形は " +
 			scaffold + " が作ります。"
 	}
@@ -94,7 +96,7 @@ func ProposalHint(conf *config.Settings, root string, in hookio.Input) string {
 	if len(missing) == 0 {
 		return ""
 	}
-	return "[ccnavi] " + codeParentFields + " (" + rel + ") 親の提案に " + strings.Join(missing, "・") +
+	return hookio.Tagged(codeParentFields, rel) + " 親の提案に " + strings.Join(missing, "・") +
 		" がありません。手で足さず、" + scaffold + " で雛形を作るか、`" + launcher +
 		" --plan-order <親> --fill-phases` で `phases:` を差し込んでください。書式は `" + launcher +
 		" --docs --keyword 提案書式` で引く。"

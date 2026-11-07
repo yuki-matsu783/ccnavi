@@ -29,14 +29,14 @@ import (
 const (
 	// candidateNote: サブエージェントには Stop の振り返り（`match: Stop` のルールの文）が届かないので、始まりに 1 行だけ
 	// 渡す。メインはこの節を集めて振り返りに使う（.ccnavi/docs/skill-review.md）。
-	candidateNote = "[ccnavi] 作業中に手順の見落としやすい点やスキルの誤りに気づいたら、最後の報告に" +
+	candidateNote = hookio.Head + "作業中に手順の見落としやすい点やスキルの誤りに気づいたら、最後の報告に" +
 		"「スキル候補」の節を追加して書いてください（対象のスキル・何を直すか・根拠）。" +
 		"スキルのファイルは自分では書かない。"
-	childrenHead = "[ccnavi] 承認済みで開いている子チケット。" +
+	childrenHead = hookio.Head + "承認済みで開いている子チケット。" +
 		"書き込みは行き先のワークツリーのチケットで判定される。"
 	ownFlowOnly = "  フロー: 自分の担当の子チケットのフローだけを読んで従ってください。" +
 		"他の子のフローには従わないでください。担当が分からなければ、読まずにメインに聞いてください"
-	sharedNote = "[ccnavi] 起動時の作業ディレクトリと同じワークツリー（%s）で、別の編集する" +
+	sharedNote = hookio.Head + "起動時の作業ディレクトリと同じワークツリー（%s）で、別の編集する" +
 		"サブエージェントが動いています（%s）。並行して編集するときは、別のワークツリーを切る" +
 		"決まりです（.ccnavi/docs/decisions.md）。同じワークツリーで続けるなら、触るファイルの" +
 		"持ち主を分け、他のサブエージェントの未コミットの変更には触れないでください。" +
@@ -154,7 +154,7 @@ func noteRunning(stderr io.Writer, conf *config.Settings, root string, in hookio
 	if conf.State == "" || in.AgentID == "" {
 		return ""
 	}
-	lines := []string{strconv.FormatInt(now().Unix(), 10)}
+	lines := []string{strconv.FormatInt(fsio.Now().Unix(), 10)}
 	editing := found && agentkind.Of([]string{here.Root, root}, in.AgentType, in.Tools) == agentkind.Edit
 	if editing {
 		lines = append(lines, treeHead+string(here.Kind)+" "+flat(here.Name), typeHead+flat(in.AgentType))
@@ -179,7 +179,7 @@ func sharedTreeNote(stderr io.Writer, conf *config.Settings, in hookio.Input, he
 	}
 	me := fsio.SafeNameOr(in.AgentID, unknownName, fsio.SafeNameLimit)
 	want := string(here.Kind) + " " + pathcase.Fold(here.Name)
-	when := fsio.UnixSeconds(now())
+	when := fsio.UnixSeconds(fsio.Now())
 	peers := map[string]string{}
 	var order []string
 	for _, m := range marks {

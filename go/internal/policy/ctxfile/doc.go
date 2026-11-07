@@ -11,5 +11,6 @@
 // stop_path・forget → BadPath・Locate・OverLimit・Bases・StopPath・Forget、told_refs・remember_refs・
 // told_peers・remember_peers → ToldRefs・RememberRefs・ToldPeers・RememberPeers（set は map[string]bool）、
 // MAX_CHARS → MaxChars、ONCE_KEEP_DAYS → OnceKeep。`once-`・`stop-` の頭は config.OncePrefix・StopPrefix
-// （records/prune が同じ定数で消す）。fsio.safe_name(x) or 既定 → fsio.SafeNameOr。
+// （records/prune が同じ定数で消す）。fsio.safe_name(x) or 既定 → fsio.SafeNameOr。組み込みの
+// 案内を additionalContextOnce の入れ物に包んで渡す形（hint・skills・guard が書いていた）→ DeliverOnce（Once）。
 package ctxfile

@@ -127,7 +127,7 @@ func TestPendingIntegrateMatchesPython(t *testing.T) {
 		entries, _ := os.ReadDir(marks)
 		for _, e := range entries {
 			reported[e.Name()] = true
-			fields := integrate.ReadRecord(filepath.Join(marks, e.Name(), markerFile))
+			fields := integrate.ReadRecord(filepath.Join(marks, e.Name(), markerFile), integrate.LastKept)
 			if fields["version"] == tree.DirectVersion {
 				lines[e.Name()] = testkit.Rel(root, v4Line(root, root, e.Name(), fields, deadline))
 			} else {

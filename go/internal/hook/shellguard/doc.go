@@ -2,7 +2,7 @@
 // 検査は次の 6 つ。保護済みの sh（`.ccnavi/scripts/ccnavi-*.sh`）の検査の材料を変える環境変数の代入（CheckEnv）、子チケットの
 // ワークツリーからの push（CheckChildPush）、git のラッパーで自己防衛の対象を消す・戻す形（CheckCorePaths）、
 // サブエージェントが親のワークツリーを書き換える形（CheckParentTreeGit・CheckParentWrite）、ワークスペースルート直下への
-// 書き込み（CheckRootWrite）。
+// 書き込み（CheckRootWrite）。理由コードとルール名（Code*・*RuleID）は検査と一緒にここが持つ（置き場の決まりは reasons の doc）。
 //
 // どれもルールファイルの外に置く組み込みで、ルールを空にされても消えない。止める広さは sh の検査に合わせ、読み切れない形・
 // 居場所を追えない形は止める側に倒す。sh も同じ検査を 2 重目として持つ。コマンドの語は infra/shell の読み（PlacedCommands）で取り、
@@ -10,7 +10,8 @@
 //
 // Python からの対応: hook の wrapguard・parentwrite・rootwrite をまとめた。check_env・check_child_push・
 // check_core_paths・check_parent_tree_git → CheckEnv・CheckChildPush・CheckCorePaths・CheckParentTreeGit、
-// parentwrite.check → CheckParentWrite（戻りは ParentWrite）、rootwrite.check → CheckRootWrite（戻りは RootWrite）、
+// parentwrite.check → CheckParentWrite（戻りは ParentWrite。Write・Edit の書き込み先も同じ判定を ParentWriteAt で
+// 通す。Python は judge に同じ条件を書いていた）、rootwrite.check → CheckRootWrite（戻りは RootWrite）、
 // git_calls → GitCalls、blocked → Blocked、worktree_name → WorktreeName、ticket_role → TicketRole（ROLE_* は Role）、
 // *_message → EnvMessage・ChildPushMessage・CorePathMessage・ParentTreeMessage・ParentWriteMessage・RootWriteMessage、
 // CORE_* → Core の定数、KIND_* → WriteKind の定数、CODE_*・*_RULE_ID → Code*・*RuleID。

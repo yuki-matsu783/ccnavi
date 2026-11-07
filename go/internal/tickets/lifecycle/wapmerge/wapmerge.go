@@ -75,7 +75,7 @@ func oneLine(text string) string {
 
 // say は値の空白（Python の str.split の空白）を 1 つの空白につめて 1 行にする。
 func say(stdout io.Writer, k key, text string) {
-	fmt.Fprintf(stdout, "%s %s\n", k, strings.Join(strings.FieldsFunc(text, ospath.IsSpace), " "))
+	fmt.Fprintf(stdout, "%s %s\n", k, ospath.Squeeze(text))
 }
 
 func stopWith(stdout io.Writer, why string, hints ...string) {

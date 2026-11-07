@@ -480,7 +480,7 @@ func TestIntegrateForms(t *testing.T) {
 		"commit -m integrate foo":  nil,
 		"log integrate-done foo":   nil,
 	} {
-		if got := keys(t, IntegrateGate.First, git+tail); !slices.Equal(got, want) {
+		if got := keys(t, integrateGate.First, git+tail); !slices.Equal(got, want) {
 			t.Errorf("first %q = %v, want %v", tail, got, want)
 		}
 	}
@@ -501,21 +501,21 @@ func TestIntegrateForms(t *testing.T) {
 		"commit -m integrate foo":   nil,
 		"log integrate-done foo":    nil,
 	} {
-		if got := keys(t, IntegrateGate.Second, git+tail); !slices.Equal(got, want) {
+		if got := keys(t, integrateGate.Second, git+tail); !slices.Equal(got, want) {
 			t.Errorf("second %q = %v, want %v", tail, got, want)
 		}
 	}
-	if got := keys(t, IntegrateGate.Second, "sh other.sh integrate-done foo"); got != nil {
+	if got := keys(t, integrateGate.Second, "sh other.sh integrate-done foo"); got != nil {
 		t.Errorf("別の sh: %v", got)
 	}
 	// 引用の中の文字列（shell が空白を目印に置き換えた echo の引数）は当たらない。
-	if got := keys(t, IntegrateGate.First, "echo ccnavi-git.sh\x01integrate\x01foo"); got != nil {
+	if got := keys(t, integrateGate.First, "echo ccnavi-git.sh\x01integrate\x01foo"); got != nil {
 		t.Errorf("引用: %v", got)
 	}
 	f := newFixture(t)
 	ok(t)(Note(Builtin, []string{git + "integrate Foo"}, f.state, session, "c1", time.Unix(1, 0)))
 	got := ok(t)(Check(Builtin, []string{git + "integrate-done foo -m x"}, f.state, session, false))
-	if got == nil || got.Gate != IntegrateGate || got.Key != "foo" {
+	if got == nil || got.Gate != integrateGate || got.Key != "foo" {
 		t.Errorf("got %+v", got)
 	}
 }
@@ -524,21 +524,21 @@ func TestReviewConfirmForms(t *testing.T) {
 	const review = "sh .ccnavi/scripts/ccnavi-review.sh "
 	const rr = "review-request --body-file req.md"
 	for _, tail := range []string{rr + " --phase 2 --check", rr + " --check --phase 2"} {
-		if got := keys(t, ReviewConfirmGate.First, review+tail); got != nil {
+		if got := keys(t, reviewConfirmGate.First, review+tail); got != nil {
 			t.Errorf("first %q = %v", tail, got)
 		}
 	}
 	for _, tail := range []string{"confirm --phase 2 --check", "confirm --check --phase 2"} {
-		if got := keys(t, ReviewConfirmGate.Second, review+tail); got != nil {
+		if got := keys(t, reviewConfirmGate.Second, review+tail); got != nil {
 			t.Errorf("second %q = %v", tail, got)
 		}
 	}
 	for _, sub := range []string{"decide", "ready", "comment", "fetch", "origin", "merged", "mr-state"} {
-		if keys(t, ReviewConfirmGate.First, review+sub+" --phase 2") != nil || keys(t, ReviewConfirmGate.Second, review+sub+" --phase 2") != nil {
+		if keys(t, reviewConfirmGate.First, review+sub+" --phase 2") != nil || keys(t, reviewConfirmGate.Second, review+sub+" --phase 2") != nil {
 			t.Errorf("%s が当たった", sub)
 		}
 	}
-	if keys(t, ReviewConfirmGate.Second, "sh other.sh confirm --phase 1") != nil {
+	if keys(t, reviewConfirmGate.Second, "sh other.sh confirm --phase 1") != nil {
 		t.Error("別のスクリプトが当たった")
 	}
 	f := newFixture(t)
@@ -567,7 +567,7 @@ func TestReviewConfirmForms(t *testing.T) {
 func TestAskIfAttended(t *testing.T) {
 	const git = "sh .ccnavi/scripts/ccnavi-git.sh "
 	waited, asked := SplitByAttendance(Builtin, true)
-	if !slices.Equal(waited, []*Gate{ReviewConfirmGate}) || !slices.Equal(asked, []*Gate{IntegrateGate}) {
+	if !slices.Equal(waited, []*Gate{reviewConfirmGate}) || !slices.Equal(asked, []*Gate{integrateGate}) {
 		t.Errorf("付き添いあり: %v %v", waited, asked)
 	}
 	if waited, asked := SplitByAttendance(Builtin, false); !slices.Equal(waited, Builtin) || asked != nil {
@@ -577,7 +577,7 @@ func TestAskIfAttended(t *testing.T) {
 		t.Errorf("立てていない宣言: %v %v", waited, asked)
 	}
 	got := ok(t)(Asks(Builtin, []string{git + "integrate-done foo -m x"}))
-	if got == nil || got.Gate != IntegrateGate || got.Key != "foo" || got.Reason != Ask {
+	if got == nil || got.Gate != integrateGate || got.Key != "foo" || got.Reason != Ask {
 		t.Fatalf("Asks got %+v", got)
 	}
 	if s := ok(t)(Asks(asked, []string{"sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1"})); s != nil {
