@@ -1,0 +1,51 @@
+package stop
+
+import (
+	"strings"
+	"testing"
+
+	"ccnavi/internal/tickets/model/ticket"
+)
+
+// 共通の 1 文は全部の段の促しと finish の促しに 1 回ずつ入り、段ごとの次の一手は残る。
+func TestEveryStepKeepsItsGuidanceAndGetsTheCommonNote(t *testing.T) {
+	root := workspace(t)
+	guide := map[Step][]string{
+		StepFinish:  {"finish i0001-01-01", "レビューの依頼（review-request）へ進む"},
+		StepConfirm: {"confirm --phase 1", "decide をユーザに頼む"},
+		StepMerge:   {"status i0001", "合流済みと確かめられたら"},
+		StepLateFix: {"同じフェーズに子を足して", "判断を仰ぐ"},
+		StepRequest: {"未コミットの変更があれば先にコミットして push", "review-request --phase 1"},
+	}
+	parent := &ticket.Ticket{ID: "i0001"}
+	for step, needles := range guide {
+		text := RequestNudge(root, &Pending{parent, 1, step, root, "abc", []string{"i0001-01-01"}, "設計"})
+		for _, n := range append(needles, "ユーザの許可は要りません", UserStopNote, "この案内は同じ状態では 1 回だけ") {
+			if !strings.Contains(text, n) {
+				t.Errorf("%s: %q が無い\n%s", step, n, text)
+			}
+		}
+		if c := strings.Count(text, "止めた理由と、再開するときの次の一手を1行で書きます。"); c != 1 {
+			t.Errorf("%s: 共通の文が %d 回", step, c)
+		}
+	}
+	child := &ticket.Ticket{ID: "i0001-01-01", Parent: "i0001", Phase: 1, BaseSHA: strings.Repeat("0", 40)}
+	text := FinishNudge(root, &Unfinished{child, root, 2, "abc"})
+	for _, n := range []string{CodeFinishNudge, "finish i0001-01-01", "続ける理由（何が残っているか）をユーザに向けて書いてから終える", UserStopNote} {
+		if !strings.Contains(text, n) {
+			t.Errorf("finish の促しに %q が無い\n%s", n, text)
+		}
+	}
+}
+
+func TestCount(t *testing.T) {
+	for _, c := range []struct {
+		in   string
+		n    int
+		read bool
+	}{{"3\n", 3, true}, {" 12 ", 12, true}, {"", 0, false}, {"+1", 0, false}, {"-1", 0, false}, {"1a", 0, false}} {
+		if n, ok := Count(c.in); n != c.n || ok != c.read {
+			t.Errorf("Count(%q) = %d, %v", c.in, n, ok)
+		}
+	}
+}

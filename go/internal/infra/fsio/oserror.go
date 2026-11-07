@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"strings"
 	"syscall"
 
 	"ccnavi/internal/infra/pyfmt"
@@ -113,4 +114,17 @@ func Wrap(err error) error {
 		return nil
 	}
 	return pyError{err}
+}
+
+// StrError は Python の OSError.strerror（`[Errno 13] ` を除いた文）。番号の無いエラーは空文字
+// （Python の None）で、呼び手が `exc.strerror or …` の代わりを選ぶ。
+func StrError(err error) string {
+	if pyErrno(err) == 0 {
+		return ""
+	}
+	text := errnoText(err)
+	if _, rest, ok := strings.Cut(text, "] "); ok {
+		return rest
+	}
+	return text
 }

@@ -17,11 +17,9 @@ type Cleared struct {
 // clearOrder は消す順。reviewed を先に消す。消せなければ止めるので、ほかに手を付ける前に決める。
 var clearOrder = []Kind{Reviewed, Requested, Skipped, Pending}
 
-// Clear はこのフェーズのマーカーを全部消す（同じ番号に子を足した）。reviewed が残るとフェーズは済んだまま
-// 読まれ、足した子を見ずに先へ進むので、消せなければ止める（Failed）。ほかは消せなくても止めない。
+// Clear は、このフェーズのマーカーを全部消す（同じ番号に子を足したときに使う）。reviewed が残ると、フェーズは済んだまま読まれ、足した子を見ずに先へ進んでしまう。そのため、消せなければ止める（Failed）。ほかのマーカーは、消せなくても止めない。
 //
-// 溜める段（承認の plan）では消す書き込みを溜め、見せる行は Writer(FS) が実際に消せた種類で作る（fsio.Call）。
-// announce は消せた種類から見せる行を作る（nil なら行を出さない）。
+// 溜める段（承認の plan）では、消す書き込みを溜め、見せる行は Writer(FS) が実際に消せた種類で作る（fsio.Call）。announce は、消せた種類から見せる行を作る。nil なら行を出さない。
 func Clear(approvedDir, parent string, phase int, announce func([]Kind) []string) Cleared {
 	var present []Kind
 	for _, kind := range clearOrder {

@@ -10,7 +10,7 @@ messages:
     kind: next
     values: [ticket]
     next: |-
-      サブエージェントに、子のワークツリー（.claude/worktrees/{ticket}）での実装を任せる。終わってコミットされたら '{script:ccnavi-ticket.sh} finish {ticket}' を打つ
+      サブエージェントに、子のワークツリー（.claude/worktrees/{ticket}）での実装を任せる（Agent の description に {ticket} を書く）。終わってコミットされたら '{script:ccnavi-ticket.sh} finish {ticket}' を打つ
 
   # 子の着手のあと。フェーズ定義の `skill` が指す工程スキルがこの機械にあるとき。
   NOTE_OPS_START_SKILL:

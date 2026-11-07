@@ -1,14 +1,15 @@
-// Package approval は承認済みチケットの置き場を持つ。判定はここが読んだ承認済みチケットだけを正とする。
-// 提案はエージェントが書けるので、判定が提案を読むと範囲を書き足して通れてしまう。正とするのはチケットの欄では
-// なく置き場（`.ccnavi/approved/` は組み込みの保護がエージェントの書き込みを止める）で、提案を手で doing/ へ
-// 動かすことも承認の経路になる。その経路は承認の画面を通らないので、承認のときにしか当たらなかった構造の検査は
-// BlockingProblems（1 か所）が判定の側で当て、理由を Ticket.Blocked に入れる。承認はチケットの中身を変えず、
-// 提案のバイト列のまま動かす。先行関係はファイルに持たず、読むたびに計画の after から計算する（LoadCopy）。
+// Package approval は承認済みチケットの置き場を持つ。判定が正とするのは、ここが読んだ承認済みチケットだけである。
 //
-// 置き場の読み（Scan・ScanReview・ReadRaw・ScanProposals など）、構造の検査（BlockingProblems・FamilyProblems
-// など）、先行の状態（Pool・UnmetPredecessors・PredecessorProblems）、チケットを動かす・書く操作（Admit・MoveFile・
+// 提案はエージェントが書けるため、判定が提案を読むと範囲を書き足して通れてしまう。正とするのはチケットの欄ではなく
+// 置き場である。`.ccnavi/approved/` は組み込みの保護でエージェントの書き込みが止まる。提案を手で doing/ へ動かすことも
+// 承認の経路になる。この経路は承認の画面を通らないので、承認のときにしか当たらなかった構造の検査は、判定の側で
+// BlockingProblems（1 か所）が当て、理由を Ticket.Blocked に入れる。承認はチケットの中身を変えず、提案のバイト列のまま
+// 動かす。先行関係はファイルに持たず、読むたびに計画の after から計算する（LoadCopy）。
+//
+// 置き場の読み（Scan・ScanReview・ReadRaw・ScanProposals など）、構造の検査（BlockingProblems・FamilyProblems など）、
+// 先行の状態（Pool・UnmetPredecessors・PredecessorProblems）、チケットを動かす・書く操作（Admit・MoveFile・
 // SettleReview・Followup など）、表示だけが読む承認の時刻（ApprovedTimes）を持つ。マーカーと記録は marks、
-// write-and-push の見分けは wap。
+// write-and-push の見分けは wap にある。
 //
 // Python からの対応: tickets/approval の store・checks・ops・times をまとめた（大きさで分けていたため）。
 // store: copy_path・closed_path → CopyPath・ClosedPath、DOING_DIR・DONE_DIR → place.Doing・place.Done、
@@ -30,8 +31,8 @@
 // PredecessorProblems。ops: admit・changed_since_read・update_fields・note_mr・close_copy・to_review・move_file・
 // settle_review・next_child_id・existing_ticket_file・followup_problem・followup・predecessor_pool → 同名の関数
 // （CHANGED_SINCE_READ は ChangedSinceRead の文に閉じた。settle_review と next_child_id の例外は error で返す）。
-// times: approved_times → ApprovedTimes（use_git と Pyodide の分岐は
-// 呼び手が無いので持たない）、ApprovedTime・APPROVED_FROM_COMMIT・APPROVED_UNCOMMITTED → ApprovedTime・FromCommit・
-// Uncommitted。呼び手の無い copies・state_of・review_path・tree_path・stale_proposals・nowhere・outside_reason・
+// times: approved_times → ApprovedTimes（use_git と Pyodide の分岐は呼び手が無いので持たない）、
+// ApprovedTime・APPROVED_FROM_COMMIT・APPROVED_UNCOMMITTED → ApprovedTime・FromCommit・Uncommitted。
+// 呼び手の無い copies・state_of・review_path・tree_path・stale_proposals・nowhere・outside_reason・
 // family_stop_text・content_problems は公開しない。
 package approval

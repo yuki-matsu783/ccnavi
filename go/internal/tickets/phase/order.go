@@ -33,13 +33,9 @@ const (
 	stageClosableFed     = "クローズ可（フィードバック対応済み）"
 )
 
-// OrderProblems は N 番目の子を承認してよいか（先行のフェーズが閉じてレビューが済んでいるか）。苦情は
-// KindNotYet で、承認は通さないが書いた側に直すものは無い（前のフェーズが閉じれば同じ提案が通る）。親の計画が
-// 壊れていれば、壊れた先行で数えずに落とす。
+// OrderProblems は、N 番目の子を承認してよいかを返す。承認してよいのは、先行のフェーズが閉じてレビューが済んでいるときである。苦情は KindNotYet にする。承認は通さないが、書いた側が直すものは無い。前のフェーズが閉じれば、同じ提案が通るからである。親の計画が壊れていれば、壊れた先行で数えずに落とす。
 //
-// adding は同じ承認で先に通った同じ親の子。承認されればそのフェーズは開き、マーカーも消えるので、ディスクの上で
-// 閉じていても開いたフェーズとして読む。読まないと、1 本ずつなら外れる組み合わせがまとめて承認すると通る。
-// raw は Phases と同じ。
+// adding は、同じ承認で先に通った、同じ親の子である。承認されればそのフェーズは開き、マーカーも消える。ディスクの上では閉じていても、開いたフェーズとして読む。読まないと、1 本ずつなら外れる組み合わせが、まとめて承認すると通ってしまう。raw は Phases と同じである。
 func OrderProblems(conf *config.Settings, root string, child, parent *ticket.Ticket, adding []*ticket.Ticket, raw *approval.Raw) []rules.Problem {
 	number, isChild := child.ChildPhase()
 	if !parent.HasPlan() || !isChild || parent.ItemAt(number) == nil {

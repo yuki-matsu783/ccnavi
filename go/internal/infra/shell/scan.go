@@ -428,9 +428,9 @@ func (x *scanner) substitution(collect, quoted bool) error {
 		// 全文の形は外側の 1 語として書き戻す。二重引用の中なら一度閉じて引用し直す
 		// （shlex は二重引用の中の `\$` と `\\` を外さないので、エスケープでは書けない）。
 		if quoted {
-			x.full.WriteString(`"` + quote(source) + `"`)
+			x.full.WriteString(`"` + Quote(source) + `"`)
 		} else {
-			x.full.WriteString(quote(source))
+			x.full.WriteString(Quote(source))
 		}
 	}
 	return nil

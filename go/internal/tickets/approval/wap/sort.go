@@ -128,9 +128,7 @@ type contents struct {
 	readable    bool
 }
 
-// classify は変更のリストを分ける。since が無ければ未コミット（今の中身と HEAD）、あれば HEAD と since を比べる。
-// ユーザの判断が一緒に書く移動は、組の両側を見て (c) にする。at を渡せば、ready がこのツリーから退避した削除を
-// (b) にする（ArchivedRemoval）。approvedRel・reviewRel はツリーからの相対の置き場。上から当てて最初に当たったもの。
+// classify は、変更のリストを分ける。since が無ければ未コミット（今の中身と HEAD）を、あれば HEAD と since を比べる。ユーザの判断が一緒に書く移動は、組の両側を見て (c) にする。at を渡せば、ready がこのツリーから退避した削除を (b) にする（ArchivedRemoval）。approvedRel・reviewRel は、ツリーからの相対の置き場である。上から当てて、最初に当たったものを採る。
 func classify(treeRoot, approvedRel, reviewRel, parent string, changed []string, since string, at *archiveAt) []entry {
 	var ready map[string]bool
 	if at != nil {
@@ -250,9 +248,7 @@ func hookMark(parts []string, parent string, now, before []byte) bool {
 	return true
 }
 
-// ArchivedRemoval は ready の退避が消したものか。rel は承認済みの領域からの相対。ready のマーカー（そのツリーから
-// ready が移したファイルの一覧。記録の保護がエージェントの書き込みを止める）に載っていて、消えた中身が手元の
-// 退避したコピーと同じときだけ。退避の置き場の途中にリンクがあればコピーを読まない（ArchivedBytes）。
+// ArchivedRemoval は、ready の退避が消したものかを返す。rel は承認済みの領域からの相対である。ready のマーカー（そのツリーから ready が移したファイルの一覧）に載っていて、消えた中身が手元の退避したコピーと同じときだけ真になる。マーカーは、記録の保護がエージェントの書き込みを止める。退避の置き場の途中にリンクがあれば、コピーは読まない（ArchivedBytes）。
 func ArchivedRemoval(rel string, now, before []byte, ready map[string]bool, root, project string) bool {
 	if now != nil || before == nil || !ready[rel] || !archive.InReadyPlaces(rel) {
 		return false
@@ -267,9 +263,7 @@ func judgeRecord(parts []string) bool {
 		strings.HasSuffix(parts[2], "."+string(marks.Judge)+fsio.JSONExt)
 }
 
-// human はユーザの判断が書くものの形か（形だけで見る。(c) も (d) も write-and-push は止める）。フローの本文、
-// ユーザの承認で置かれた承認済みチケット、reviewed・(b) でない skipped・close-early・受け入れ台帳、ユーザの判断が
-// 消したマーカー、ユーザの判断が一緒に書く移動（review/ から done/、doing/ から done/）。
+// human は、ユーザの判断が書くものの形かを返す（形だけで見る。(c) も (d) も、write-and-push は止める）。対象は、フローの本文、ユーザの承認で置かれた承認済みチケット、reviewed・(b) でない skipped・close-early・受け入れ台帳、ユーザの判断が消したマーカー、ユーザの判断が一緒に書く移動（review/ から done/、doing/ から done/）である。
 func human(parts []string, approvedRel, reviewRel string, added, removed func(string) bool) bool {
 	rel := approvedRel + "/" + strings.Join(parts, "/")
 	doing, done := string(place.Doing), string(place.Done)

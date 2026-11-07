@@ -2,12 +2,12 @@ package templates
 
 import (
 	"bytes"
+	"cmp"
 	"errors"
 	"io/fs"
 	"os"
 	"slices"
 	"strings"
-	"syscall"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/digest"
@@ -155,15 +155,7 @@ func ReadEntry(layer, root, path string, writable bool) *Entry {
 
 // osReason は読めない理由（Python の exc.strerror か型の名前）。
 func osReason(err error) string {
-	why := "OSError"
-	var errno syscall.Errno
-	if errors.As(err, &errno) {
-		why = fsio.ErrorText(errno)
-		if _, rest, ok := strings.Cut(why, "] "); ok {
-			why = rest
-		}
-	}
-	return "読めない (" + line(why) + ")"
+	return "読めない (" + line(cmp.Or(fsio.StrError(err), "OSError")) + ")"
 }
 
 // ReadLayer はレイヤーの置き場の <名前>.yml を全部読む（名前順）。置き場が無いのは正常（空）。

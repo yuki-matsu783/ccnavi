@@ -13,10 +13,7 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// SamePlan は 2 つのチケットの計画（part が phases.Plan なら全体計画、phases.FeedbackPart ならフィードバック
-// 計画）が同じか。ステップごとの「定義・review・deferred・推移的に辿った先行」で比べる。after の書き方が違っても
-// 先行が同じなら同じ（`after: [2]` と、--explain の「先行 1, 2」を写した `after: [1, 2]`）。フィードバック計画が
-// 無いことと空は分ける。
+// SamePlan は、2 つのチケットの計画が同じかを返す。part が phases.Plan なら全体計画、phases.FeedbackPart ならフィードバック計画を比べる。ステップごとに「定義・review・deferred・推移的に辿った先行」で比べる。after の書き方が違っても、先行が同じなら同じとする。たとえば `after: [2]` と、--explain の「先行 1, 2」を写した `after: [1, 2]` は同じである。フィードバック計画が無いことと、空であることは分ける。
 func SamePlan(a, b *ticket.Ticket, part phases.Part) bool {
 	sa, oka := planSignature(a, part)
 	sb, okb := planSignature(b, part)
@@ -53,9 +50,7 @@ func planSignature(t *ticket.Ticket, part phases.Part) ([]step, bool) {
 	return out, true
 }
 
-// SamePhases は親のコピー（phases:）が同じか。定義を読んだ形で比べ、YAML の書き方・キーの順・既定値を省いた
-// 書き方の違いは同じとする。読めない定義があれば読んだままの値で比べる（形の誤りを直しただけの提案も違いとして
-// 拾う）。コピーが無いもの同士は同じ。
+// SamePhases は、親のコピー（phases:）が同じかを返す。定義を読んだ形で比べ、YAML の書き方・キーの順・既定値を省いた書き方の違いは同じとする。読めない定義があれば、読んだままの値で比べる。形の誤りを直しただけの提案も、違いとして拾うためである。コピーが無いもの同士は同じとする。
 func SamePhases(a, b *ticket.Ticket) bool {
 	ha, hb := phases.HasCopy(a), phases.HasCopy(b)
 	if !ha || !hb {
@@ -119,9 +114,7 @@ func scopeSignature(t *ticket.Ticket) []scopeItem {
 	return out
 }
 
-// PlanDiffers は提案の計画（全体計画かフィードバック計画）・コピー（phases:）・範囲が承認済みチケットと違うか
-// （改版の条件）。先行関係は計画から決まるので、先行関係だけの改版は無い。コピーだけ・範囲だけの違いも改版に
-// する（`--plan-order <親> --fill-phases` で今の phases.yml に揃えた提案を出せるように）。
+// PlanDiffers は、提案の計画（全体計画かフィードバック計画）・コピー（phases:）・範囲が、承認済みチケットと違うかを返す。これが改版の条件になる。先行関係は計画から決まるので、先行関係だけが変わる改版は無い。コピーだけ、または範囲だけの違いも改版にする。`--plan-order <親> --fill-phases` で、今の phases.yml に揃えた提案を出せるようにするためである。
 func PlanDiffers(proposal, current *ticket.Ticket) bool {
 	return !SamePhases(proposal, current) || !SameScope(proposal, current) ||
 		!SamePlan(proposal, current, phases.Plan) || !SamePlan(proposal, current, phases.FeedbackPart)

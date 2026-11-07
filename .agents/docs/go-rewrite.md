@@ -103,7 +103,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 | `infra` | 6,468 | 移した（レビュー前）。Python の re の写し（`infra/pyre`）を含む |
 | `records` | 4,562 | 移した（レビュー前） |
 | `policy` | 6,794 | 移した（レビュー前） |
-| `tickets` | 36,700 | 未着手 |
+| `tickets` | 36,700 | 移した（レビュー前） |
 | `catalog` | 1,683 | 未着手 |
 | `hook` | 10,634 | 未着手 |
 | `entry` | 11,210 | 未着手 |
@@ -120,6 +120,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 | tickets・hook を移すとき | records/prune が持つ上の段のファイル名の残りの写し（nudged-・mirror-・subagent-・turngate-・.turn・.accepted・.reported）を、持ち主の定数と突き合わせるテストを置く（Python は tests/core/test_prune.py が見ていた）。ops と direct- は `config` の定数を両方が読み、sent は oplog のテストが prune の数えで確かめる |
 | hook を移すとき | `infra/pyre` の照合に深さ（歩数）の上限を入れ、超えたら照合を打ち切って拒否側に倒す。いまは繰り返しを含む利用者の式を数 MB のコマンドに当てると、呼び出しが深くなってスタックがあふれ、hook が落ちる（落ちると止めずに通る）。判定の期限（Python も持たない）と一緒に設計する |
 | Python を外すとき | Python の policy・infra のファイルを指す設計書と sh（`docs/21_design/messages.md`・`startup-config.md`・`modules.md`、`.agents/docs/environment.md`・`e2e-exploration.md`、`.ccnavi/scripts/ccnavi-launcher.sh`・`ccnavi-git.sh` のコメント）を Go の置き場に直す |
+| Python を外すとき | Chrome 拡張（`extensions/chrome/ccnavi-approval`）は Pyodide で Python の `entry.ext` → `tickets.core.api` を読む。Go には移せないので、Pyodide 用に Python の判定一式を残して配るか、拡張の判定を TS か WASM に書き直すかを決める（ユーザと合意が要る）。それまでは Go と Python の判定のずれを Chrome の見本（`extensions/chrome/ccnavi-approval/test/fixtures/core-scenarios.json`）で見張る |
 | Python を外すとき | `git.Undo` の案内でパスを `"` で囲むだけの引用を、`config` の引用と同じ規則にする（`$` やバッククォートを含むパスで壊れる。いまは Python と同じ出力を保つため残す） |
 | 余裕のあるとき | `infra/pyre` の照合を速くする（先頭の文字の集合で開始位置を飛ばす、開始位置ごとのクロージャをやめる）。いまは Python の C 実装の約 5 倍遅い。数 KB の通常のコマンドでは問題にならない |
 | 余裕のあるとき | pyre の `(?i)ß` が `ẞ` に当たらない（casefix に 1 組足す）。rules の unsupported が `(?P=name)` の後方参照を通す。`TranslateGlob` が文字クラスの中の `/` を壊す（Python と同じ。Python の globmatch の docstring も誤り）。`\N{名前}` の苦情を名指しの文にする |

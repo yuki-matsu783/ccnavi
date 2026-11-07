@@ -18,10 +18,7 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// 手で動かした子の判定。ユーザがホストの画面などで子を review/ から done/ へ動かしたことを、レビュー完了の
-// 意思として読む。ccnavi が子を動かす経路は settled_by を書くので、finished_to: review の子が done/ にあって
-// settled_by を持たなければ、手で動かしたことになる。判定に使うのは親の正本の置き場とその git の履歴だけで、
-// ネットワークには出ない（origin/<親のブランチ> は最後に取得した状態）。確定そのものは confirm が行う。
+// 手で動かした子の判定は、ユーザがホストの画面などで子を review/ から done/ へ動かしたことを、レビュー完了の意思として読む。ccnavi が子を動かす経路は settled_by を書く。そのため、finished_to: review の子が done/ にあって settled_by を持たなければ、手で動かしたことになる。判定に使うのは、親の正本の置き場とその git の履歴だけである。ネットワークには出ない。origin/<親のブランチ> は、最後に取得した状態を指す。確定そのものは confirm が行う。
 
 // Settle は手動の移動の判定の結果。
 type Settle string
@@ -106,9 +103,7 @@ type ManualOptions struct {
 	MovedAt  *float64
 }
 
-// AssessManual はこのフェーズ（延期を引き受けた分を含む）の手動の移動を判定する。list は Phases の答えで、
-// nil ならここで読む。External で時刻が無ければ NeedTime を立てて返し、読めない時刻（0 以下・NaN・無限大）は
-// 確かめられないものとして SettleBroken。
+// AssessManual は、このフェーズ（延期を引き受けた分を含む）の手動の移動を判定する。list は Phases の答えである。nil なら、ここで読む。External で時刻が無ければ NeedTime を立てて返す。読めない時刻（0 以下・NaN・無限大）は、確かめられないものとして SettleBroken にする。
 func AssessManual(conf *config.Settings, root string, parent *ticket.Ticket, p *Phase, list []*Phase, o ManualOptions) Manual {
 	if p.has(marks.Reviewed) || !p.ReviewRequired() {
 		return Manual{State: SettleNone}

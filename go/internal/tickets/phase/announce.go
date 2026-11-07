@@ -45,9 +45,7 @@ func typeSource(o *pyjson.Object, p *Phase, common *phases.Types) *pyjson.Object
 	return o
 }
 
-// Announce は終わったばかりのフェーズについて 1 度だけ言う文。無ければ空。書くのはマーカーだけで、書けなければ
-// stderr に言う。マーカーを書く置き場が決まらなければ何も書かずに空（読む側に無い置き場へ書くと、そこに置き場が
-// できてしまう）。raw は Phases と同じ。
+// Announce は、終わったばかりのフェーズについて 1 度だけ言う文を返す。無ければ空を返す。書くのはマーカーだけである。書けなければ stderr に言う。マーカーを書く置き場が決まらなければ、何も書かずに空を返す。読む側に無い置き場へ書くと、そこに置き場ができてしまうからである。raw は Phases と同じである。
 func Announce(stderr io.Writer, conf *config.Settings, root string, parent *ticket.Ticket, raw *approval.Raw) string {
 	where, err := approval.HomeDir(conf, root, parent.ID, "", parent.Project)
 	if errors.Is(err, approval.ErrNoParentWorktree) {

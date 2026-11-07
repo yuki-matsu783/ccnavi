@@ -2,9 +2,9 @@ package drafts
 
 import (
 	"slices"
-	"strings"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/tickets/proposal/templates"
 	"ccnavi/internal/tickets/sync/handoff"
 )
@@ -49,21 +49,5 @@ func CloseNotice(conf *config.Settings, root, parent string) string {
 			}
 		}
 	}
-	return sprintf(msgCloseNotice, parent, shellQuote(found.TreeRoot))
-}
-
-// shellQuote は shlex.quote。
-func shellQuote(s string) string {
-	if s == "" {
-		return "''"
-	}
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		safe := c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' ||
-			strings.IndexByte("_@%+=:,./-", c) >= 0
-		if !safe {
-			return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
-		}
-	}
-	return s
+	return sprintf(msgCloseNotice, parent, shell.Quote(found.TreeRoot))
 }

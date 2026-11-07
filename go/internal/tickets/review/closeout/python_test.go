@@ -1,0 +1,286 @@
+package closeout
+
+import (
+	"bufio"
+	"bytes"
+	"io/fs"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+
+	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/tickets/lifecycle/ops"
+	"ccnavi/internal/tickets/model/pyoracle"
+)
+
+// 早めに閉じてから Draft を外すまでを、同じ形のワークスペースを 2 つ作って Python と Go に同じ順で打たせ、終了
+// コード・標準出力・標準エラー・置いたファイル（承認済みの領域・wip/・state・退避）が 1 字も違わないことを見る。
+// 順は ready --check と ready（子が開いている）→ close-early（理由なし・変更要求・n・計画・計画の照合 2 つ・
+// 解決前・解決後）→ 親の finish → ready --check → ready → 退避をコミット → ready（打ち直し）→ ready（Draft が
+// 外れた結果）→ ready --check（打ち直し）。git のワークスペースの道具は review/decide と同じ形をここに書く。
+
+const commitDate = "2026-01-05T00:00:00+0000"
+const fixedClock = "2026-01-06T03:04:05+0900"
+
+var gitEnv = []string{"GIT_CONFIG_GLOBAL=" + os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
+	"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
+	"GIT_AUTHOR_DATE=" + commitDate, "GIT_COMMITTER_DATE=" + commitDate}
+
+func runGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), gitEnv...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return string(out)
+}
+
+func put(t *testing.T, path, text string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+const phasesCopy = "phases:\n  work:\n    kind: work\n    title: 作業\n    review: true\n    when: 作業の案内\n    scope:\n    - src/*\n    - wip/*\n" +
+	"  impl:\n    kind: work\n    title: 実装\n    review: true\n    when: 実装の案内\n    scope:\n    - src/*\n"
+
+func childText(id string, phase int, extra string) string {
+	return "---\nversion: 1\nticket: " + id + "\nparent: i0001\nphase: " + string(rune('0'+phase)) +
+		"\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 " + id + "\nrationale: r\nallow:\n" +
+		"  - match: Write|Edit\n    glob: \"src/*\"\n" + extra + "---\n\n本文\n"
+}
+
+// workspace はワークスペース・origin・親 i0001 のワークツリーを作る。計画は work・impl の 2 フェーズで、フェーズ 1
+// の子はレビュー待ち、フェーズ 2 の子は承認したが未着手。フィードバック計画は無い。親のブランチは push 済み。
+func workspace(t *testing.T) string {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git が無い")
+	}
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, root, "init", "-q", "-b", "main")
+	put(t, filepath.Join(root, ".gitignore"), "/logs\n/remote.git\n/.ccnavi/messages\n")
+	runGit(t, root, "add", ".gitignore")
+	runGit(t, root, "commit", "-q", "-m", "init")
+	from := filepath.Join(pyoracle.RepoRoot(t), ".ccnavi", "messages")
+	entries, err := os.ReadDir(from)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		data, _ := os.ReadFile(filepath.Join(from, e.Name()))
+		put(t, filepath.Join(root, ".ccnavi", "messages", e.Name()), string(data))
+	}
+	runGit(t, root, "init", "-q", "--bare", filepath.Join(root, "remote.git"))
+	runGit(t, root, "remote", "add", "origin", filepath.Join(root, "remote.git"))
+	runGit(t, root, "worktree", "add", "-q", "-b", "i0001", filepath.Join(".claude", "worktrees", "i0001"), "main")
+	tree := filepath.Join(root, ".claude", "worktrees", "i0001")
+	put(t, filepath.Join(tree, "src", "a.go"), "package a\n")
+	put(t, filepath.Join(tree, "wip", "design", "plan.md"), "d\n")
+	runGit(t, tree, "add", "-A")
+	runGit(t, tree, "commit", "-q", "-m", "child work")
+	merged := strings.TrimSpace(runGit(t, tree, "rev-parse", "HEAD"))
+	approved := filepath.Join(tree, ".ccnavi", "approved")
+	put(t, filepath.Join(approved, "doing", "i0001.md"), "---\nversion: 1\nticket: i0001\nmr: 7\nissue: 1\n"+
+		phasesCopy+"plan:\n  - work\n  - impl\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\n"+
+		"allow:\n  - match: Write|Edit\n    glob: \"src/*\"\nstarted_at: \"2026-01-02T00:00:00+0900\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n")
+	put(t, filepath.Join(tree, "wip", "proposals", "review", "i0001-01-01.md"), childText("i0001-01-01", 1,
+		"started_at: \"2026-01-02T00:00:00+0900\"\ncompleted_at: \"2026-01-03T00:00:00+0900\"\nfinished_to: \"review\"\nmerged_sha: \""+merged+"\"\n"))
+	put(t, filepath.Join(approved, "doing", "i0001-02-01.md"), childText("i0001-02-01", 2, "started_at: \"\"\ncompleted_at: \"\"\n"))
+	runGit(t, tree, "add", "-A")
+	runGit(t, tree, "commit", "-q", "-m", "tickets")
+	runGit(t, tree, "push", "-q", "-u", "origin", "i0001")
+	mr := `"mr": {"number": 7, "url": "https://h/pr/7", "draft": true}`
+	threads := `[{"id": "d1", "url": "u1", "path": "src/a.go", "line": 1, "body": "指摘 1", "last_id": "c1"},` +
+		`{"id": "d2", "url": "u2", "path": "", "line": 0, "body": "指摘 2\n2 行目", "last_id": "c2"},` +
+		`{"id": "d3", "url": "u3", "resolved": true, "body": "済み"}]`
+	logs := filepath.Join(root, "logs")
+	put(t, filepath.Join(logs, "threads.json"), `{"host": "github", `+mr+`, "threads": `+threads+`, "reviews": []}`)
+	put(t, filepath.Join(logs, "fewer.json"), `{"host": "github", `+mr+`, "threads": [{"id": "d1", "url": "u1", "body": "指摘 1"}], "reviews": []}`)
+	put(t, filepath.Join(logs, "resolved.json"), `{"host": "github", `+mr+`, "threads": `+
+		strings.ReplaceAll(threads, `"last_id"`, `"resolved": true, "last_id"`)+`, "reviews": []}`)
+	put(t, filepath.Join(logs, "changes.json"), `{"host": "github", `+mr+`, "threads": [], `+
+		`"reviews": [{"state": "CHANGES_REQUESTED", "url": "r/1", "submitted_at": "2026-01-05T02:00:00Z", "author": "rev"}]}`)
+	put(t, filepath.Join(logs, "undrafted.json"), `{"host": "github", "mr": {"number": 7, "url": "https://h/pr/7", "draft": false}, "threads": [], "reviews": []}`)
+	return root
+}
+
+const flowOracle = `
+import io, json, os, subprocess, sys
+from ccnavi.infra import fsio, settings
+from ccnavi.tickets.lifecycle import commands
+from ccnavi.tickets.review import close
+c = json.load(sys.stdin)
+root = c["root"]
+tree = os.path.join(root, ".claude", "worktrees", "i0001")
+logs = os.path.join(root, "logs")
+env = dict(os.environ, **dict(kv.split("=", 1) for kv in c["env"]))
+def git(*args, cwd=tree):
+    subprocess.run(["git", *args], cwd=cwd, env=env, check=True, capture_output=True)
+def rel(s):
+    return s.replace(root, "<root>").replace(root.lower(), "<root>")
+conf, _ = settings.load(root)
+out = []
+def run(name, f, *args, **kw):
+    o, e = io.StringIO(), io.StringIO()
+    code = f(o, e, *args, **kw)
+    out.append([name, code, rel(o.getvalue()), rel(e.getvalue())])
+def early(name, answer, reason, result, **kw):
+    run(name, lambda o, e: close.close_early(io.StringIO(answer), o, e, root, conf, tree, reason,
+        os.path.join(logs, result), **kw))
+def commit(message):
+    git("add", "-A")
+    git("commit", "-q", "-m", message)
+    git("push", "-q", "origin", "i0001")
+plan = os.path.join(conf.state, "accept-plan.json")
+with fsio.clock(c["clock"]):
+    run("check-ready", close.check_ready, root, conf, tree)
+    run("ready-refused", close.ready, root, conf, tree, os.path.join(logs, "threads.json"))
+    early("early-noreason", "y\n", "  ", "threads.json")
+    early("early-changes", "y\n", "r", "changes.json")
+    early("early-declined", "n\n", "r", "threads.json")
+    early("early-plan", " Yes \n", " 今期はここまで ", "threads.json", plan_out=plan)
+    early("early-check", "", "今期はここまで", "threads.json", plan_check=plan)
+    early("early-check-changed", "", "今期はここまで", "fewer.json", plan_check=plan)
+    early("early-done-open", "", "今期はここまで", "threads.json", plan_done=plan)
+    early("early-done", "", "今期はここまで", "resolved.json", plan_done=plan)
+    commit("close early")
+    run("finish", commands.finish, root, conf, "i0001")
+    commit("finish")
+    run("check-ready-ok", close.check_ready, root, conf, tree)
+    run("ready", close.ready, root, conf, tree, os.path.join(logs, "resolved.json"))
+    commit("ready")
+    run("ready-again", close.ready, root, conf, tree, os.path.join(logs, "resolved.json"))
+    run("ready-undrafted", close.ready, root, conf, tree, os.path.join(logs, "undrafted.json"))
+    run("check-ready-again", close.check_ready, root, conf, tree)
+files = {}
+for base in (os.path.join(tree, ".ccnavi", "approved"), os.path.join(tree, "wip"), os.path.join(logs, "state"),
+             os.path.join(logs, "archive")):
+    for here, _, names in os.walk(base):
+        for n in names:
+            p = os.path.join(here, n)
+            with open(p, encoding="utf-8") as f:
+                files[rel(p).replace(os.sep, "/")] = rel(f.read())
+json.dump({"out": out, "files": files}, sys.stdout, ensure_ascii=False)
+`
+
+type flowAnswers struct {
+	Out   [][]any           `json:"out"`
+	Files map[string]string `json:"files"`
+}
+
+func TestFlowMatchesPython(t *testing.T) {
+	py, golang := workspace(t), workspace(t)
+	want := pyoracle.Answers[flowAnswers](t, "flow", flowOracle, map[string]any{"root": py, "env": gitEnv, "clock": fixedClock})
+	root := golang
+	// ready の目印はツリーのパスを畳んで書く。
+	rel := func(s string) string {
+		return strings.ReplaceAll(strings.ReplaceAll(s, root, "<root>"), strings.ToLower(root), "<root>")
+	}
+	tree := filepath.Join(root, ".claude", "worktrees", "i0001")
+	logs := filepath.Join(root, "logs")
+	conf, _ := config.Load(root)
+	restore, err := fsio.FixClock(fixedClock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restore()
+	var out [][]any
+	run := func(name string, f func(stdout, stderr *bytes.Buffer) (int, error)) {
+		var o, e bytes.Buffer
+		code, err := f(&o, &e)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		out = append(out, []any{name, float64(code), rel(o.String()), rel(e.String())})
+	}
+	plain := func(code int) (int, error) { return code, nil }
+	early := func(name, answer, reason, result string, opt EarlyOptions) {
+		run(name, func(o, e *bytes.Buffer) (int, error) {
+			return CloseEarly(bufio.NewReader(strings.NewReader(answer)), o, e, conf, root, tree, reason, filepath.Join(logs, result), opt)
+		})
+	}
+	commit := func(message string) {
+		runGit(t, tree, "add", "-A")
+		runGit(t, tree, "commit", "-q", "-m", message)
+		runGit(t, tree, "push", "-q", "origin", "i0001")
+	}
+	ready := func(name, result string) {
+		run(name, func(o, e *bytes.Buffer) (int, error) {
+			return Ready(o, e, conf, root, tree, filepath.Join(logs, result))
+		})
+	}
+	checkReady := func(name string) {
+		run(name, func(o, e *bytes.Buffer) (int, error) { return plain(CheckReady(o, e, conf, root, tree)) })
+	}
+	plan := filepath.Join(conf.State, "accept-plan.json")
+	checkReady("check-ready")
+	ready("ready-refused", "threads.json")
+	early("early-noreason", "y\n", "  ", "threads.json", EarlyOptions{})
+	early("early-changes", "y\n", "r", "changes.json", EarlyOptions{})
+	early("early-declined", "n\n", "r", "threads.json", EarlyOptions{})
+	early("early-plan", " Yes \n", " 今期はここまで ", "threads.json", EarlyOptions{PlanOut: plan})
+	early("early-check", "", "今期はここまで", "threads.json", EarlyOptions{PlanCheck: plan})
+	early("early-check-changed", "", "今期はここまで", "fewer.json", EarlyOptions{PlanCheck: plan})
+	early("early-done-open", "", "今期はここまで", "threads.json", EarlyOptions{PlanDone: plan})
+	early("early-done", "", "今期はここまで", "resolved.json", EarlyOptions{PlanDone: plan})
+	commit("close early")
+	run("finish", func(o, e *bytes.Buffer) (int, error) { return plain(ops.Finish(o, e, conf, root, "i0001")) })
+	commit("finish")
+	checkReady("check-ready-ok")
+	ready("ready", "resolved.json")
+	commit("ready")
+	ready("ready-again", "resolved.json")
+	ready("ready-undrafted", "undrafted.json")
+	checkReady("check-ready-again")
+	files := map[string]string{}
+	for _, base := range []string{filepath.Join(tree, ".ccnavi", "approved"), filepath.Join(tree, "wip"),
+		filepath.Join(logs, "state"), filepath.Join(logs, "archive")} {
+		_ = filepath.WalkDir(base, func(path string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return nil
+			}
+			data, _ := os.ReadFile(path)
+			files[filepath.ToSlash(rel(path))] = rel(string(data))
+			return nil
+		})
+	}
+	for i := range max(len(out), len(want.Out)) {
+		if i >= len(out) || i >= len(want.Out) || !reflect.DeepEqual(out[i], want.Out[i]) {
+			var g, w any
+			if i < len(out) {
+				g = out[i]
+			}
+			if i < len(want.Out) {
+				w = want.Out[i]
+			}
+			t.Errorf("%d 番目が違う\n go: %q\n py: %q", i, g, w)
+		}
+	}
+	keys := map[string]bool{}
+	for k := range files {
+		keys[k] = true
+	}
+	for k := range want.Files {
+		keys[k] = true
+	}
+	for path := range keys {
+		if files[path] != want.Files[path] {
+			t.Errorf("%s が違う\n go: %q\n py: %q", path, files[path], want.Files[path])
+		}
+	}
+}

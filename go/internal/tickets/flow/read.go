@@ -2,6 +2,7 @@ package flow
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"syscall"
 
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
@@ -92,16 +92,7 @@ func ReadBytes(file, treeRoot string) ([]byte, string) {
 
 // unreadable は OSError の strerror を添えた理由（Python の exc.strerror）。番号の無いエラーは型の名前。
 func unreadable(err error) string {
-	why := "OSError"
-	var errno syscall.Errno
-	if errors.As(err, &errno) {
-		text := fsio.ErrorText(errno)
-		if _, rest, ok := strings.Cut(text, "] "); ok {
-			text = rest
-		}
-		why = text
-	}
-	return "読めない (" + Clean(why) + ")"
+	return "読めない (" + Clean(cmp.Or(fsio.StrError(err), "OSError")) + ")"
 }
 
 // Load はフローを読む。(中身, 読めない理由)。読み方は ReadBytes と Parse。

@@ -150,8 +150,8 @@ func lex(src string) ([]string, error) {
 	}
 }
 
-// quote は shlex.quote と同じ。置換を全文で書き戻すときに 1 語にする。
-func quote(s string) string {
+// Quote は Python の shlex.quote。置換を全文で書き戻すときと、ユーザに見せるコマンドで 1 語にする。
+func Quote(s string) string {
 	if s == "" {
 		return "''"
 	}

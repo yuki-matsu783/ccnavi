@@ -58,10 +58,7 @@ func FamilyStanding(conf *config.Settings, root string, t *ticket.Ticket, fams *
 	return fams.Standing(homeOf(t.ID, t.Parent), t.Project)
 }
 
-// markImported は親子のチケットのうち、信頼できないものに理由を足す。正とするのは親のブランチ（親のワークツリー）
-// の上のチケットだけで、親子のチケットが決まらないものと、親のワークツリーの外にしか無いものは読むが信頼しない。
-// リストからは外さない。外すと「在る」ことで止まっていたもの（承認待ちの重複、開いた子のある親を閉じない）が
-// 通るようになる。
+// markImported は、親子のチケットのうち、信頼できないものに理由を足す。正とするのは、親のブランチ（親のワークツリー）の上のチケットだけである。親子のチケットが決まらないものと、親のワークツリーの外にしか無いものは、読むが信頼しない。リストからは外さない。外すと、「在る」ことで止まっていたもの（承認待ちの重複、開いた子のある親を閉じない）が通るようになってしまうからである。
 func markImported(conf *config.Settings, root string, kept []*ticket.Ticket) {
 	fams := standing.NewFamilies(conf, root)
 	for _, t := range kept {
@@ -237,9 +234,7 @@ func projectLabel(project string) string {
 	return project
 }
 
-// ProjectProblems は project が置き場と合っているか。プロジェクトを決めるのは提案を置いた場所で、frontmatter の
-// project: は照合に使う。予約名（common / self）は指せない（レイヤーとして数えないので、指せると「レイヤーが
-// 決まらないチケット」を承認することになる）。
+// ProjectProblems は、project が置き場と合っているかを返す。プロジェクトを決めるのは、提案を置いた場所である。frontmatter の project: は照合に使う。予約名（common・self）は指せない。レイヤーとして数えないので、指せると「レイヤーが決まらないチケット」を承認することになる。
 func ProjectProblems(t *ticket.Ticket, pool map[string]*ticket.Ticket, conf *config.Settings) []rules.Problem {
 	if t.DeclaredProject != "" && t.DeclaredProject != t.Project {
 		return []rules.Problem{problem(t, "`project: "+t.DeclaredProject+"` が置き場"+
@@ -274,13 +269,10 @@ func ProjectProblems(t *ticket.Ticket, pool map[string]*ticket.Ticket, conf *con
 	return []rules.Problem{problem(t, "`project: "+t.Project+"` は置き場 "+where+" にありません。")}
 }
 
-// ChildProblems は子と親の構造の検査。どれも「子の範囲をどの親で切り詰めるか」が決まらない形なので、承認
-// （validate）でも判定（BlockingProblems）でも通さない。1 か所に置くのは、置き場を動かして承認する進め方で
-// 判定の側だけが古くなり、承認を通ったチケットと通らないチケットで答えが分かれないようにするため。
-// 親の計画か固定したフェーズ定義が壊れていても子を止める（子の番号の先行・レビュー・範囲の上限が決まらない）。
-// 定義は親のコピーから読み、phases.yml は読まない。
+// ChildProblems は、子と親の構造を検査する。どれも「子の範囲をどの親で切り詰めるか」が決まらない形なので、承認（validate）でも判定（BlockingProblems）でも通さない。1 か所に置くのは、置き場を動かして承認する進め方で判定の側だけが古くなり、承認を通ったチケットと通らないチケットで答えが分かれないようにするためである。
+// 親の計画か固定したフェーズ定義が壊れていれば、子も止める。子の番号の先行・レビュー・範囲の上限が決まらないからである。定義は親のコピーから読み、phases.yml は読まない。
 //
-// missing は親が無いときの文（空なら「承認されていない」）。検査は同じで、承認と判定で読む人の次の手が違うだけ。
+// missing は、親が無いときの文である（空なら「承認されていない」）。検査は同じで、承認と判定で読む人の次の手が違うだけである。
 func ChildProblems(t, parent *ticket.Ticket, missing string) []rules.Problem {
 	if mark := t.MaintenanceProblem(); mark != "" {
 		return []rules.Problem{problem(t, mark)}
@@ -305,13 +297,9 @@ func ChildProblems(t, parent *ticket.Ticket, missing string) []rules.Problem {
 	return nil
 }
 
-// BlockingProblems は判定がこの承認済みチケットを信頼できない理由（error だけ）。空なら信頼してよい。
-// 承認のときにしか当たらなかった検査のうち、当たらないと「範囲をどこで切り詰めるか」が決まらないものと、
-// 中身だけで分かる矛盾（started_at の無い base_sha、workflow: 欄、計画と固定した定義の誤り）を置く。
-// 置き場を動かして承認する進め方は --agree を通らないので、判定の側でもここを通す。
+// BlockingProblems は、判定がこの承認済みチケットを信頼できない理由を返す（error だけ）。空なら信頼してよい。承認のときにしか当たらなかった検査のうち、当たらないと「範囲をどこで切り詰めるか」が決まらないものを置く。中身だけで分かる矛盾（started_at の無い base_sha、workflow: 欄、計画と固定した定義の誤り）も置く。置き場を動かして承認する進め方は --agree を通らないので、判定の側でもここを通す。
 //
-// 入れないもの: 親のコピーと今の phases.yml の食い違い（進行中の親には効かない決まり）、フェーズの順序
-// （held_phase が別に止める）、範囲の超過（判定が切り詰める）、再開で残った欄（ResumedFields。--lint が warn）。
+// 入れないものは次のとおり。親のコピーと今の phases.yml の食い違い（進行中の親には効かない決まり）。フェーズの順序（held_phase が別に止める）。範囲の超過（判定が切り詰める）。再開で残った欄（ResumedFields。--lint が warn で言う）。
 func BlockingProblems(conf *config.Settings, t *ticket.Ticket, pool map[string]*ticket.Ticket) []rules.Problem {
 	problems := ProjectProblems(t, pool, conf)
 	problems = append(problems, contentProblems(t)...)
@@ -368,10 +356,7 @@ func ResumedFields(t *ticket.Ticket) []string {
 	return out
 }
 
-// markBlocked は判定が読む承認済みチケットに、信頼できない理由（BlockingProblems の最初）を付ける。理由は実行前・
-// 実行後・サブエージェント終了時の 3 か所が同じ答えで読む（別々に検査すると、実行前は通って実行後に範囲外と
-// 報告される）。親を引く対応表は kept そのもの（判定が parent を引く索引と同じ）。閉じた親まで引ける対応表に
-// すると、判定の側では親が見つからず子の宣言だけで範囲が決まる。
+// markBlocked は、判定が読む承認済みチケットに、信頼できない理由（BlockingProblems の最初）を付ける。理由は、実行前・実行後・サブエージェント終了時の 3 か所が、同じ答えで読む。別々に検査すると、実行前は通って実行後に範囲外と報告される食い違いが起きるからである。親を引く対応表は kept そのものを使う。判定が parent を引く索引と同じにするためである。閉じた親まで引ける対応表にすると、判定の側では親が見つからず、子の宣言だけで範囲が決まってしまう。
 func markBlocked(conf *config.Settings, kept []*ticket.Ticket) {
 	pool := ByID(kept)
 	for _, t := range kept {
